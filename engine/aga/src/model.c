@@ -62,24 +62,34 @@ int AW_AliasBudgetAllows(int vertices,int triangles) {
 /* Only extended models read this disk table, once at load. The CRC binds the
  * allowance to the packaged bytes; the host inspection ledger retains SHA-256.
  * It is an integrity check, not an authentication mechanism. */
-int AW_AliasExceptionAllows(const char *name,int vertices,int triangles,const byte *raw,int bytes) {
-    FILE *f=NULL;char line[160],path[64],extra;int nv,nt,length,i,bit;unsigned long expected;
-    unsigned int crc=0xffffffffU;
+/* The CRC-32 (zlib's) of N bytes, continued from CRC (start 0xffffffff; the result is ~crc). */
+unsigned int AW_AliasCrcAdd(unsigned int crc,const byte *raw,size_t n) {
+    size_t i;int bit;
+    for(i=0;i<n;i++){crc^=raw[i];for(bit=0;bit<8;bit++)crc=(crc>>1)^(0xedb88320U&-(crc&1));}
+    return crc;
+}
+/* An extended model's model-budgets.txt line: NAME with exactly these counts, its byte length and CRC-32 (the
+ * finished value). The alias stream reader computes the CRC while it reads (SKEL-VERTEX-LIMIT-52). */
+int AW_AliasExceptionMatches(const char *name,int vertices,int triangles,int bytes,unsigned long crc) {
+    FILE *f=NULL;char line[160],path[64],extra;int nv,nt,length;unsigned long expected;
     if(!AW_AliasBudgetAllows(vertices,triangles))return 0;
     if(vertices<=2000)return 1;
-    if(!raw || bytes<84 || COM_FOpenFile("model-budgets.txt",&f)<0 || !f)return 0;
+    if(bytes<84 || COM_FOpenFile("model-budgets.txt",&f)<0 || !f)return 0;
     if(!fgets(line,sizeof(line),f) || strcmp(line,"AWPB1\n")){fclose(f);return 0;}
     while(fgets(line,sizeof(line),f)){
         if(Q_sscanf(line,"%63s %d %d %d %lx %c",path,&nv,&nt,&length,&expected,&extra)!=5){fclose(f);return 0;}
         if(strcmp(path,name))continue;
         fclose(f);
-        if(vertices!=nv || triangles!=nt || bytes!=length)return 0;
-        for(i=0;i<bytes;i++){
-            crc^=raw[i];for(bit=0;bit<8;bit++)crc=(crc>>1)^(0xedb88320U&-(crc&1));
-        }
-        return (crc^0xffffffffU)==expected;
+        return vertices==nv && triangles==nt && bytes==length && (crc&0xffffffffUL)==expected;
     }
     fclose(f);return 0;
+}
+int AW_AliasExceptionAllows(const char *name,int vertices,int triangles,const byte *raw,int bytes) {
+    if(!AW_AliasBudgetAllows(vertices,triangles))return 0;
+    if(vertices<=2000)return 1;
+    if(!raw || bytes<84)return 0;
+    return AW_AliasExceptionMatches(name,vertices,triangles,bytes,
+                                    (unsigned long)(AW_AliasCrcAdd(0xffffffffU,raw,(size_t)bytes)^0xffffffffU));
 }
 model_t	*loadmodel;
 char	loadname[COM_FILEBASE_SIZE];	// for hunk tags

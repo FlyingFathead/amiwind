@@ -1,11 +1,13 @@
 # Roadmap and implementation options
 
-_Last updated with AmiWind v0.0.53 (27 October 2026)._
+_Last updated with AmiWind v0.0.54 (28 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
-- [v0.0.54 (next), 26 October 2026](#v0054-next-26-october-2026)
+- [v0.0.55 (next), 28 October 2026](#v0055-next-28-october-2026)
+- [Later: an Extras menu, and two players in the arena, 28 October 2026](#later-an-extras-menu-and-two-players-in-the-arena-28-october-2026)
+- [v0.0.54: Hair, Movement, Magic And More, 28 October 2026](#v0054-hair-movement-magic-and-more-28-october-2026)
 - [v0.0.53: Super Freak Halloween Update, 27 October 2026](#v0053-super-freak-halloween-update-27-october-2026)
 - [v0.0.52: Skeletons Of Society, Vvardenfell Edition, 26 October 2026](#v0052-skeletons-of-society-vvardenfell-edition-26-october-2026)
 - [Near-term: magic effects as sprites and bitmap planes, 25 October 2026](#near-term-magic-effects-as-sprites-and-bitmap-planes-25-october-2026)
@@ -101,24 +103,53 @@ _Last updated with AmiWind v0.0.53 (27 October 2026)._
 
 15 October 2026: exact-source validation completed 4,231 tests: 4,225 passed, three Windows-only skips and three tracked Census expected failures. The 71 focused tests and original-data readback across nine frame positions passed, consistently hiding 33 of 158 original references at stronghold state 6 while preserving unknown scripts. All 243 player resources are reusable after exact producer, input and file verification. Complete combined-world conversion, native comparison, packaging and shipment remain pending; coverage counts are unchanged.
 
-## v0.0.54 (next), 26 October 2026
+## v0.0.55 (next), 28 October 2026
 
-What did not make v0.0.53 moves here, in order:
+What did not make v0.0.54 moves here, in order:
 
 - **Characters that live by their records.** NPCs and creatures wander, idle and attack on sight by what their own
-  record holds (its wander and travel packages, its Fight value), as the original game does ([ACTOR-WANDER-AGGRO-52](BUGS.md)).
+  record holds (its wander and travel packages, its Fight value), as the original game does; since v0.0.54 every
+  character has that record ([ACTOR-WANDER-AGGRO-52](BUGS.md), [ACTOR_STATE.md](ACTOR_STATE.md)).
+- **Creatures on skeletons of their own files**, as the humanoids are since v0.0.52
+  ([modular NPCs](MODULAR_NPCS.md#getting-npc-movement-right)).
 - **Dagoth Ur's fight and voice**, his whole original model kept ([scripted actors](SCRIPTED_ACTORS.md)).
 - **Full-detail heads** on skeletal characters where the rooms have room ([SKEL-VERTEX-LIMIT-52](BUGS.md)).
-- **Creatures on skeletons of their own files**, as the humanoids are since v0.0.52 and the four characters with an
-  animation file of their own are since v0.0.53 ([modular NPCs](MODULAR_NPCS.md#getting-npc-movement-right)).
-- **The 35 entrances whose collision still keeps the use key out of reach**, left from the door check of v0.0.53: 24
-  Daedric shrines whose steps the player slides off, 7 raised trapdoors, 2 Dwemer doors, a Redoran hut door and the
-  Unmarked Shipwreck's upper trapdoor; the fix is in the CHIM world's collision
-  ([DOOR-USE-COLLISION-FILLED-53](BUGS.md)).
+- **One arena mode.** The main game's arena minigame (`dbg arena`) and the combat playground MiniWind are studied side
+  by side first, then merged into one mode in the main game, with fights between two characters of the game to watch
+  (NPC against NPC, by OpenMW's combat rules) ([ARENA-MERGE-54](BUGS.md)).
+- **First-person hands for every weapon type,** with the weapon mesh in the hand: today 4 of the 103 animation groups
+  are built (fists and the torch). The hand driver already runs in C since v0.0.54.
+- **QuakeC's share of the frame, measured,** then only its hot functions moved into C.
+- **Rooms that are still loading in on arrival** ([CHIM-ROOM-POPIN-51](bugs/CHIM-ROOM-POPIN-51.md)).
+- **Streaming ideas:** the player's speed capped by the measured stream rate, reading ahead along the heading, and the
+  type 3 panels (the maintainer's call).
+- **The RTG display path.**
+- **Performance,** after the features: the measured slow spots first.
 
-Then the v0.0.51 playtest findings still open (travel, the crosshair, the night speckle, loose fire sprites), the
-rooms that are still loading in on arrival ([CHIM-ROOM-POPIN-51](BUGS.md)), streaming ideas (the player's speed capped
-by the measured stream rate, reading ahead along the heading), and the RTG display path.
+## Later: an Extras menu, and two players in the arena, 28 October 2026
+
+Ideas of the maintainer for when they fit, not scheduled:
+
+- **An Extras choice on the main menu** that opens what the game already holds: the arena combat mode, the dance
+  scenes (the Halloween one), a player for the in-game videos, and later a library of every book in the game
+  ([EXTRAS-MENU-54](BUGS.md)).
+- **Two players in the arena,** further out: Quake's own network code over a null modem cable or an Amiga TCP/IP
+  stack.
+
+## v0.0.54: Hair, Movement, Magic And More, 28 October 2026
+
+Done in the v0.0.54 release ([release notes](RELEASE-v0.0.54.md)), which the maintainer named "Hair, Movement, Magic
+And More":
+
+- **Characters move by what they are doing**, every animation group chosen by state by OpenMW's rules, and **hair is
+  kept whole**, with heads that keep enough triangles beside it.
+- **One record per character:** all 3,437 NPCs and creatures with their stats, behaviour, items and spells from the
+  game data, kept in saved games; the experimental scripts use them (715 of 1,207 scripts run whole).
+- **Travel services again**, **magic effects** as sprites and particles (experimental), weather, smoke and fog
+  indoors, levelled creatures outdoors, a crosshair and more of the interface, and NPC Gallery v2.0.
+- **34 of the 35 entrances** the converted collision kept out of reach can be used
+  ([DOOR-USE-COLLISION-FILLED-53](bugs/DOOR-USE-COLLISION-FILLED-53.md)).
+- **The Halloween benchmark in the release images**, and an engine change no longer rebuilds the CHIM world.
 
 ## v0.0.53: Super Freak Halloween Update, 27 October 2026
 

@@ -1,6 +1,6 @@
 # Morrowind collision meshes: where they are and how AmiWind uses them
 
-_Last updated with AmiWind v0.0.48-dev2 (23 October 2026)._
+_Last updated with AmiWind v0.0.54 (27 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -248,6 +248,17 @@ The rest of the path:
   - thin plates per authored surface for `hollow_collision`;
   - plates when the convex fill closes more than a step (`surface_collision_beyond`,
     exterior `x/` models of converted towns);
+  - CHIM models (since v0.0.54, DOOR-USE-COLLISION-FILLED-53): a convex piece may not fill the room a player stands
+    in over a walkable face of the same mesh, from a step over it up to the standing height
+    (`mesh_geometry.collision_parts` `standing_room`): such a piece is split, and a piece that cannot be split becomes
+    the authored plates of its triangles. The Redoran guard tower's top room over its trapdoor was solid before.
+    The rule applies to the meshes of the measured table `config/collision-standing-room.json`;
+    `AMIWIND_COLLISION_STANDING_ROOM=all` (every mesh) or `off` (the method before) for development builds only;
+  - CHIM models (since v0.0.54): a model whose pieces asked for exact standing bevels (stair plates, steep toes, deep
+    walkable faces, authored ramps) takes exact bevels for the whole model (`chim.build.model_exact_bevels`); before,
+    only a request for the whole mesh counted and those plates got approximate axial bevels, whose standing hull grew
+    over the treads beside them (the Daedric shrine entry steps). `AMIWIND_COLLISION_PLATE_BEVELS=drop` keeps the method
+    before;
   - CHIM models: authored collision kept under a slab a walkway runs under for a list of mesh names
     (`ex_velothi_temple_01`, `_02`; `--collision-underside names`, the default). General rules for every mesh
     are experimental (`rule`, `split`, `whole`, see [EXPERIMENTAL_FLAGS.md](EXPERIMENTAL_FLAGS.md) and

@@ -69,9 +69,10 @@ class WorldHarvestTests(unittest.TestCase):
         allrefs[1]['container_state']['items'][0]['count'] += 1
         with self.assertRaisesRegex(ValueError, 'metadata mismatch'):
             prepare_graph(context, allrefs, binding)
+        # an owned interior plant is a theft with its owner kept (HARVEST-INTERIOR-PICK-47), never unowned loot
         context = source_context(cells(source(), [('Cave A', 1, True)]))
-        with self.assertRaisesRegex(ValueError, 'ownership'):
-            prepare_graph(context, refs(context), binding)
+        plants = prepare_graph(context, refs(context), binding)[2]
+        self.assertTrue(plants and all(p['owner'] for p in plants))
 
     def test_root_span_sharing_keeps_order_quantities_and_nested_chance(self):
         raw = cells(source(), [(None, 10, False)])

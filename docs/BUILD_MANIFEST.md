@@ -1,6 +1,6 @@
 # World map manifest (design)
 
-_Last updated with AmiWind v0.0.48-dev2 (23 October 2026)._
+_Last updated with AmiWind v0.0.54 (27 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -80,7 +80,7 @@ are coast and seabed). What the legacy map still gives the frame map:
 
 | From the legacy map | Where it really comes from | Without the legacy map |
 | --- | --- | --- |
-| worldspawn (`message`, `aw_hull`, the shared-sky keys, the hand timing and eye height) | the world terrain converter's worldspawn, then the exterior sky and hand metadata passes | one shared function writes the open-world worldspawn with those keys; the passes call it too |
+| worldspawn (`message`, `aw_hull`, the shared-sky keys, the eye height) | the world terrain converter's worldspawn, then the exterior sky and hand metadata passes | one shared function writes the open-world worldspawn with those keys; the passes call it too. Since v0.0.54 the hands' clip timings are not in any map: the image carries them in `gfx/hand-anims.txt` and the engine runs the hands (`engine/aga/src/aw_hands.c`), so a change to the hands rebuilds the image only |
 | player start `0 0 z`, angle 90 | the terrain height at the cell centre + 24 (the world terrain converter) | the same height from the terrain survey, no map compiled |
 | statics, flora, sounds, activated objects | none in the 270 cells | refused as today if a cell has any: such a cell needs its rows from the game data first |
 | the check that every static is a CHIM placement | the legacy map's statics | the CHIM stage's own placement check (the cell's references in the game data) |

@@ -812,7 +812,17 @@ COVERAGE_REPORT = 'harvest-chim-coverage.json'
 CELL_UNITS = 8192.0     # one Morrowind exterior cell, game units
 
 
-def chim_coverage(id1, chim_world, refs, rows, frame_maps=False):
+def unsupported_towns(native):
+    """The CHIM towns of `native` (made from the game data, tools/chim_town.py) that have no harvest catalogue
+    mechanism: plan_rows makes catalogue rows for the fixed towns (Seyda Neen, Balmora) only, and the engine follows
+    catalogues on those towns' sub-cells only (aw_harvest_runtime.c AW_HarvestFollow). A one-town MiniWind of another
+    town (Vivec in the combat playground) ships that town's frames with no way to place its plants."""
+    from town_config import runtime_towns
+    fixed = {town['id'] for town in runtime_towns()[:2]}
+    return sorted(set(native) - fixed)
+
+
+def chim_coverage(id1, chim_world, refs, rows, frame_maps=False, partial_towns=()):
     """Every harvestable plant the CHIM world leaves out is placed by the image (HARVEST-CHIM-REGION-LOSS-41).
 
     The CHIM world leaves every harvest placement out of its frames (chim.build harvest_numbers; its receipt lists
@@ -821,8 +831,10 @@ def chim_coverage(id1, chim_world, refs, rows, frame_maps=False):
     frame maps), or inside a legacy map's coverage (that map keeps it, catalogued or baked; the entity tracker and
     the heap check judge it there). A plant inside a CHIM region frame's own cell must be in that frame map's
     catalogue: that map is what the engine loads there. frame_maps: also require the frame map of each such
-    catalogue to be in id1/maps (the final payload). Returns the report; 'missing' names every plant left out
-    (empty: passed)."""
+    catalogue to be in id1/maps (the final payload). partial_towns (a partial-area test build only, a MiniWind:
+    unsupported_towns): a plant left out only by frames of these towns, which no catalogue can carry, is listed under
+    'partial_area' instead of 'missing' (the build's own limit, written in its report; a plant of a CHIM region frame
+    or of a fixed town stays 'missing'). Returns the report; 'missing' names every plant left out (empty: passed)."""
     from entity_tracker import harvest_refs
     from map_files import frame_map_path
     id1 = Path(id1)
@@ -846,7 +858,7 @@ def chim_coverage(id1, chim_world, refs, rows, frame_maps=False):
     catalogued = set().union(*catalogues.values()) if catalogues else set()
     legacy = [row for row in rows if not row.get('chim')]
     own = {tuple(c): row for row in rows if 'frame' in row for c in row['cells']}
-    missing = []
+    missing, partial = [], []
     counts = dict(region_cell=0, catalogue=0, legacy_map=0)
     for number, frames in sorted(removed.items()):
         ref = by_number.get(number)
@@ -865,6 +877,9 @@ def chim_coverage(id1, chim_world, refs, rows, frame_maps=False):
             counts['catalogue'] += 1
         elif any(select(row, [ref]) for row in legacy):
             counts['legacy_map'] += 1
+        elif partial_towns and set(frames) <= set(partial_towns):
+            partial.append(dict(ref=number, cell=cell, frames=frames,
+                                reason='a town with no harvest catalogue mechanism, in a partial-area test build'))
         else:
             missing.append(dict(ref=number, cell=cell, frames=frames,
                                 reason='in no shipped catalogue and inside no legacy map'))
@@ -875,20 +890,25 @@ def chim_coverage(id1, chim_world, refs, rows, frame_maps=False):
     return dict(format=COVERAGE_FORMAT, chim_receipt_sha256=digest(receipt_path.read_bytes()),
                 frames=len(parity), plants=len(removed), placed=counts,
                 region_frame_catalogues=sum(1 for row in rows if 'frame' in row and row['name'] in catalogues),
-                missing=missing, catalogues_without_frame_map=without,
+                missing=missing, partial_area=partial, partial_towns=sorted(partial_towns),
+                catalogues_without_frame_map=without,
                 rule="every harvest placement the CHIM world leaves out is in a shipped catalogue (for a CHIM region "
                      "cell: its own cell's frame map catalogue) or inside a legacy map")
 
 
 def require_chim_coverage(source, id1, work, *, data_files, chim_world, native=(), frame_maps=False,
-                          report_name=COVERAGE_REPORT):
+                          report_name=COVERAGE_REPORT, partial_area=False):
     """chim_coverage on the image's plan, written to work/<report_name>; a ValueError naming the plants
-    (reference, cell, frame, map) when any is left out. None without a CHIM world."""
+    (reference, cell, frame, map) when any is left out. None without a CHIM world. partial_area (a MiniWind): the
+    plants of a town with no harvest catalogue mechanism (unsupported_towns) are listed and printed as this test
+    build's limit, not refused (HARVEST-CHIM-COVERAGE-ONE-AREA-48: a one-room Vivec MiniWind stopped after 20 minutes);
+    every other build keeps the refusal."""
     if not chim_world or not (Path(chim_world) / 'chim-receipt.json').is_file():
         return None
     _, _, refs = held_placements(source, data_files)
     rows = plan_rows(id1, native, chim_regions(id1, chim_world))
-    report = chim_coverage(id1, chim_world, refs, rows, frame_maps=frame_maps)
+    report = chim_coverage(id1, chim_world, refs, rows, frame_maps=frame_maps,
+                           partial_towns=unsupported_towns(native) if partial_area else ())
     work = Path(work)
     work.mkdir(parents=True, exist_ok=True)
     (work / report_name).write_text(json.dumps(report, indent=1) + '\n', encoding='utf-8', newline='\n')
@@ -898,7 +918,11 @@ def require_chim_coverage(source, id1, work, *, data_files, chim_world, native=(
                                     report['placed']['region_cell'], report['placed']['catalogue'],
                                     report['placed']['legacy_map'], len(report['missing']),
                                     len(report['catalogues_without_frame_map'])), flush=True)
-    problems = ['ref %s (cell %s, frame %s%s): %s' % (m['ref'], ','.join(map(str, m.get('cell') or ['?'])),
+    if report['partial_area']:
+        print('[warning] Harvest CHIM coverage: %d plants of %s are not placed in this partial-area test build: the '
+              'town has no harvest catalogue mechanism (only Seyda Neen and Balmora do); listed in %s.'
+              % (len(report['partial_area']), ', '.join(report['partial_towns']), report_name), flush=True)
+    problems =['ref %s (cell %s, frame %s%s): %s' % (m['ref'], ','.join(map(str, m.get('cell') or ['?'])),
                                                      m.get('frame') or '/'.join(m['frames'][:3]),
                                                      ', map ' + m['map'] if m.get('map') else '', m['reason'])
                 for m in report['missing']]
@@ -955,7 +979,7 @@ def image_step(args, id1, work, *, jobs=None):
     # Fail fast, before the CHIM frame maps: every plant the CHIM world leaves out has a catalogue
     # (HARVEST-CHIM-REGION-LOSS-41); finalize_image runs it again on the final payload (frame_maps=True).
     coverage = require_chim_coverage(args.harvest, id1, work, data_files=args.data_files, chim_world=chim_world,
-                                     native=native_towns(args))
+                                     native=native_towns(args), partial_area=bool(getattr(args, 'miniwind', False)))
     report = Path(work) / 'harvest-staging.json'
     return dict(status='installed', pick_audit={k: (len(pick[k]) if isinstance(pick[k], list) else pick[k]) for k in
                                                 ('plants', 'maps', 'unpickable_before', 'unpickable_fixed', 'unreachable',

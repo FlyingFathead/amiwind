@@ -19,6 +19,10 @@ hinged-doors.txt (AWHD1, AW-20260928-12): every placed DOOR reference of Morrowi
   B <open W or -1> <close W or -1> <name>       DOOR records: Open Sound (SNAM), Close Sound (ANAM), FNAM
   D <reference> <B> <lock level> <flags>        placed doors, references ascending
   L <W>                                         the locked sound (SOUN "LockedDoor", OpenMW Door::activate)
+  K <reference> <lock level> <flags> [<key ID>]  locks, references ascending: every locked load door (with a
+                                                destination) and every hinged door that names a key
+                                                (DEBUG-GOD-LOCKED-DOORS-51)
+  U <text>                                      GMST sKeyUsed (the message after the key's name)
 flags: 1 locked (a lock level above 0 or a key: OpenMW components/esm3/cellref.cpp for content files), 2 key
 (KNAM), 4 trap (TNAM), 8 the DOOR record has a script. The census hall door keeps its story rule in the engine.
 """
@@ -37,6 +41,8 @@ from prepare_intro import voice_convert
 HINGED_FORMAT='AWHD1'
 # The engine's bounds (aw_hinged_door.c HD_ROWS, HD_BASES, HD_SOUNDS, HD_NAME - 1).
 HINGED_ROWS,HINGED_BASES,HINGED_SOUNDS,HINGED_NAME=2048,256,64,31
+# HD_LOCKS, HD_KEY_POOL: the K rows (locked load doors, keyed doors) and their key IDs' bytes.
+HINGED_LOCKS,HINGED_KEY_POOL=512,6144
 LOCKED,KEY,TRAP,SCRIPT=1,2,4,8
 LOCKED_SOUND='lockeddoor'
 
@@ -147,6 +153,52 @@ def hinged_catalogue(raw):
     return used,rows,sounds
 
 
+def door_locks(raw,hinged_rows=()):
+    """(locks, key_used): the lock rows of the K table, references ascending, and the GMST sKeyUsed text.
+
+    locks: every load door (a placed DOOR with a destination) that is locked (a lock level above 0 or a key: OpenMW
+    components/esm3/cellref.cpp), and every hinged door of HINGED_ROWS that names a key, as
+    {'reference','lock','flags','key'}. DEBUG-GOD-LOCKED-DOORS-51: before v0.0.54 no load door was ever locked."""
+    doors=set();key_used='';refs=[]
+    for tag,_,payload in records(raw):
+        if tag=='DOOR':
+            s=dict(subrecords(payload))
+            if 'DELE' not in s:doors.add(string(s['NAME']).casefold())
+        elif tag=='GMST':
+            s=dict(subrecords(payload))
+            if string(s.get('NAME',b''))=='sKeyUsed' and 'STRV' in s:key_used=safe_name(string(s['STRV']))
+    for tag,_,payload in records(raw):
+        if tag!='CELL':continue
+        ref=None
+        for t,data in subrecords(payload):
+            if t=='FRMR':
+                ref={'number':struct.unpack('<I',data)[0],'lock':0,'key':''};refs.append(ref)
+            elif ref is None:continue
+            elif t=='NAME':ref['id']=string(data)
+            elif t=='DODT':ref['destination']=True
+            elif t=='DELE':ref['deleted']=True
+            elif t=='FLTV':ref['lock']=struct.unpack('<i',data[:4])[0]
+            elif t=='KNAM':ref['key']=string(data)
+    locks={}
+    for ref in refs:
+        if ref.get('deleted') or not ref.get('destination') or ref.get('id','').casefold() not in doors:continue
+        lock=max(0,ref['lock'])
+        if lock<=0 and not ref['key']:continue
+        if lock>255:raise ValueError('Lock level above 255: reference %d' % ref['number'])
+        locks[ref['number']]={'reference':ref['number'],'lock':lock,'flags':LOCKED|(KEY if ref['key'] else 0),
+                              'key':key_id(ref['key'])}
+    for row in hinged_rows:
+        if row['key'] and row['reference'] not in locks:
+            locks[row['reference']]={'reference':row['reference'],'lock':row['lock'],'flags':LOCKED|KEY,'key':key_id(row['key'])}
+    return [locks[n] for n in sorted(locks)],key_used
+
+
+def key_id(text):
+    """A key's record ID as the engine compares it (aw_state item IDs, at most 63 characters, printable ASCII)."""
+    if len(text)>63 or any(not 32<=ord(c)<127 for c in text):raise ValueError('Unusable key ID: %r' % text)
+    return text
+
+
 def flags(row,base):
     return (LOCKED if row['lock']>0 or row['key'] else 0)|(KEY if row['key'] else 0)|(TRAP if row['trap'] else 0)|\
         (SCRIPT if base['script'] else 0)
@@ -157,8 +209,9 @@ def safe_name(text):
     return out[:HINGED_NAME]
 
 
-def hinged_text(bases,rows,sounds,sample):
-    """The AWHD1 table. sample(source) -> (path, seconds) converts (or reuses) one SOUN file."""
+def hinged_text(bases,rows,sounds,sample,locks=(),key_used=''):
+    """The AWHD1 table. sample(source) -> (path, seconds) converts (or reuses) one SOUN file; LOCKS and KEY_USED from
+    door_locks() (K and U rows)."""
     samples=[];index={}
     def w(identifier):
         if not identifier:return -1
@@ -180,6 +233,10 @@ def hinged_text(bases,rows,sounds,sample):
     lines+=['D %d %d %d %d' % (r['reference'],number[r['base'].casefold()],r['lock'],flags(r,bases[r['base'].casefold()]))
             for r in rows]
     if locked>=0:lines.append('L %d' % locked)
+    if len(locks)>HINGED_LOCKS or sum(len(k['key'])+1 for k in locks if k['key'])>HINGED_KEY_POOL:
+        raise ValueError('Door lock table exceeds the runtime bounds (%d rows)' % len(locks))
+    lines+=[('K %d %d %d %s' % (k['reference'],k['lock'],k['flags'],k['key'])).rstrip() for k in locks]
+    if key_used:lines.append('U '+key_used)
     return '\n'.join(lines)+'\n'
 
 
@@ -210,7 +267,9 @@ def prepare(data,scene,ffmpeg='ffmpeg'):
     lines=table(rows,converted)
     (scene/'id1/door-sounds.txt').write_text('\n'.join(lines)+'\n',encoding='utf-8',newline='\n')
     bases,hinged,sounds=hinged_catalogue(raw)
-    (scene/'id1/hinged-doors.txt').write_text(hinged_text(bases,hinged,sounds,sample),encoding='ascii',newline='\n')
+    locks,key_used=door_locks(raw,hinged)
+    (scene/'id1/hinged-doors.txt').write_text(hinged_text(bases,hinged,sounds,sample,locks,key_used),encoding='ascii',
+                                               newline='\n')
     pairs=sum(1 for line in lines if line.startswith('p '))
     report={'doors':rows,'files':list(converted.values()),'format':'AWSFX2','pairs':pairs,
             'load_doors':sum(1 for row in rows if row['reference'] not in wanted),'scene_links':sorted(wanted),
@@ -219,7 +278,10 @@ def prepare(data,scene,ffmpeg='ffmpeg'):
                       'locked':sum(1 for r in hinged if flags(r,bases[r['base'].casefold()])&LOCKED),
                       'key':sum(1 for r in hinged if r['key']),'trap':sum(1 for r in hinged if r['trap']),
                       'unlocked_trapped':sum(1 for r in hinged if r['trap'] and not flags(r,bases[r['base'].casefold()])&LOCKED),
-                      'scripted':sum(1 for r in hinged if bases[r['base'].casefold()]['script'])}}
+                      'scripted':sum(1 for r in hinged if bases[r['base'].casefold()]['script'])},
+              'locks':{'rows':len(locks),'load_doors_locked':sum(1 for k in locks if k['reference'] not in
+                                                                   {r['reference'] for r in hinged}),
+                       'with_key':sum(1 for k in locks if k['key'])}}
     (scene/'door-audio.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8',newline='\n');return report
 
 

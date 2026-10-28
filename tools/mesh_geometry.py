@@ -187,6 +187,8 @@ SURFACE_LOSS=.5  # a convex piece's reduced hull may leave its walkable surface 
 UNDERSIDE_DEPTH=1.  # a convex piece reaching more than this below an authored downward surface of its own closes space
 UNDERSIDE_NZ=-.69    # downward-facing: a surface a player can stand under (the walkable normal, mirrored)
 UNDERSIDE_ABOVE=.25  # and solid just above it: the surface is the underside of something (not a top wound downward)
+STANDING_ROOM_DEPTH=1.  # a convex piece filling the standing room over an authored floor more than this closes a room
+                        # the collision mesh leaves open (_closes_over_floor, DOOR-USE-COLLISION-FILLED-53)
 
 def surface_hull(candidate,held,surface_loss):
  """The hull of a convex piece that holds its walkable surface (held: the piece's walkable_samples) within
@@ -209,7 +211,7 @@ def surface_hull(candidate,held,surface_loss):
   q=np.unique(np.vstack((q,bad[far])),axis=0)
 
 def collision_parts(v,f,tolerance=2,plates=None,fill_plates=False,underside=None,underside_split=False,
-                    surface_loss=None,surface_points='walkable'):
+                    surface_loss=None,surface_points='walkable',standing_room=None):
  """Convex proxies of a collision mesh: each connected component, split at its median while the convex hull
  closes source surface deeper than tolerance. plates: a list to collect the positions of authored plates that
  replace a piece (they need exact standing bevels); with it, a flat component whose hull covers more than
@@ -229,9 +231,14 @@ def collision_parts(v,f,tolerance=2,plates=None,fill_plates=False,underside=None
  on (CHIM-VIVEC-DOCK-WALKWAY-43). With surface_loss (units; the CHIM model builder: SURFACE_LOSS) a piece whose
  extreme-point hull leaves a point of its walkable surface more than that outside gets points of that surface added
  until none is (surface_hull; CHIM-HULL-SURFACE-HEAP-46); with surface_points 'all' (the rule as first shipped) a
- piece whose extreme-point hull leaves any of its points more than that outside keeps the hull of all its points."""
+ piece whose extreme-point hull leaves any of its points more than that outside keeps the hull of all its points.
+ With standing_room (a depth, STANDING_ROOM_DEPTH: the CHIM model builder) a piece that fills the standing room over
+ an authored floor of the mesh more than that depth (_closes_over_floor: a room the convex proxy closed, the guard
+ towers' top rooms over their trapdoors, DOOR-USE-COLLISION-FILLED-53) is split further, and a piece that cannot be
+ split becomes the authored plates of its triangles."""
  results=[];tris=v[f[:,:3],:3]*.25
  ceilings=_ceiling_samples(tris) if underside and plates is not None else None
+ floors=_floor_samples(tris) if standing_room is not None and plates is not None else None
  def as_plates(ids):
   for piece in shell_collision_parts(v,f[np.array(ids,int)]):
    plates.append(len(results));results.append(piece)
@@ -271,6 +278,13 @@ def collision_parts(v,f,tolerance=2,plates=None,fill_plates=False,underside=None
    # on every exterior mesh plates at once add 15 % standing clipnodes, split first 3.6 %); the authored plates
    # only for a piece that cannot be split further
    if underside_split and len(ids)>4 and depth<8:
+    axis=np.argmax(np.ptp(samples,axis=0));order=np.argsort(samples[:,axis]);mid=len(order)//2
+    split(np.array(ids)[order[:mid]],depth+1);split(np.array(ids)[order[mid:]],depth+1);return
+   as_plates(ids);return
+  if floors is not None and len(floors) and _closes_over_floor(hull,floors,standing_room):
+   # split first (as the underside rule's split mode: smaller convex pieces cost less than plates), the authored
+   # plates only for a piece that cannot be split further
+   if len(ids)>4 and depth<8:
     axis=np.argmax(np.ptp(samples,axis=0));order=np.argsort(samples[:,axis]);mid=len(order)//2
     split(np.array(ids)[order[:mid]],depth+1);split(np.array(ids)[order[mid:]],depth+1);return
    as_plates(ids);return
@@ -347,6 +361,35 @@ def _closes_under_ceiling(hull,samples,depth=UNDERSIDE_DEPTH):
  def inside(q):
   return ((q@hull.equations[:,:3].T+hull.equations[:,3])<-1e-6).all(axis=1)
  return bool((inside(near-np.array([0.,0.,depth]))&inside(near+np.array([0.,0.,UNDERSIDE_ABOVE]))).any())
+
+def _floor_samples(t):
+ """Sample points of every walkable triangle of a mesh (normal z at least WALKABLE_Z, at least 2 square units): its
+ centre and the points halfway to each corner (as _ceiling_samples)."""
+ from player_hull import WALKABLE_Z
+ n=np.cross(t[:,1]-t[:,0],t[:,2]-t[:,0]);a=np.linalg.norm(n,axis=1);ok=a>1e-9
+ nz=np.zeros(len(t));nz[ok]=n[ok,2]/a[ok]
+ up=t[ok&(nz>=WALKABLE_Z)&(a/2>=2.)]
+ if not len(up):return np.zeros((0,3))
+ c=up.mean(axis=1)
+ return np.concatenate([c]+[(c+up[:,k])/2 for k in range(3)])
+
+def _closes_over_floor(hull,samples,depth=STANDING_ROOM_DEPTH):
+ """True when the convex hull fills the standing room over an authored floor (SAMPLES, _floor_samples of the whole
+ mesh): a sample point lifted by more than a step and by the standing box's height (player_hull) lies more than DEPTH
+ inside the hull. A player standing on that floor would stand inside the piece: the convex proxy closed a room the
+ collision mesh leaves open (a guard tower's top room over its trapdoor, DOOR-USE-COLLISION-FILLED-53). Morrowind
+ collides with the triangles themselves (OpenMW 0.51 components/nifbullet/bulletnifloader.cpp), so it stands there.
+ Stairs are not caught: a flight's hull lies at most a riser over a tread; a solid block's walkable top is its hull's
+ boundary (the lifted points lie outside)."""
+ from player_hull import STEP_HEIGHT,MINS,MAXS
+ lo,hi=hull.min_bound,hull.max_bound
+ near=samples[(samples[:,0]>lo[0])&(samples[:,0]<hi[0])&(samples[:,1]>lo[1])&(samples[:,1]<hi[1])
+              &(samples[:,2]+STEP_HEIGHT<hi[2])&(samples[:,2]>lo[2]-1.)]
+ if not len(near):return False
+ for lift in (STEP_HEIGHT+1.,(STEP_HEIGHT+1.+MAXS[2]-MINS[2])/2,MAXS[2]-MINS[2]):
+  q=near+np.array([0.,0.,lift])
+  if ((q@hull.equations[:,:3].T+hull.equations[:,3])<-depth).all(axis=1).any():return True
+ return False
 
 def _invents_steep_face(hull,t):
  """True when the hull has an upward face too steep to stand on (but not a wall) that no source triangle lies
@@ -511,7 +554,7 @@ def _collision_pieces_stairs(v,f,profile,stairs=None):
  treads=mode!='off' and bool(len(stair_treads(v,f)))
  pieces=collision_parts(v,f,profile.get('collision_tolerance',2),plates=plates,fill_plates=treads,
                         underside=profile.get('underside_plates'),underside_split=bool(profile.get('underside_split')),
-                        **loss)
+                        standing_room=profile.get('standing_room'),**loss)
  own=[pieces[k] for k in plates]
  notes=[f'authored plates where the convex proxy filled open space ({len(own)} plates)'] if own else []
  stair_plates=frozenset()

@@ -31,7 +31,7 @@ from player_hull import lumps, pack_lumps
 from test_seyda_source_carrier import BARREL
 
 LEGACY = {seyda_entities.ENV: 'bsp'}
-FIELDS = {'aw_hand_idle': '0.5', 'aw_hand_draw': '0.375', 'aw_eye_height': '40.5'}
+FIELDS = {'aw_eye_height': '40.5', '_aw_note': 'x'}   # the hand clips are the image's (FIRST-PERSON-HANDS-IN-C-54)
 ROW = '{\n"classname" "aw_npc"\n"aw_ref" "990001"\n"origin" "1 2 3"\n}'
 
 

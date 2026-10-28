@@ -1,5 +1,14 @@
 # SEYDA-WALL-SHAPE-31: dark shape pokes out of a stone wall by the Seyda Neen shore
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 2 times; something has to be done
+
+- Reported with v0.0.51 at 2026-10-25 14:21 +0200: Seen again on the v0.0.51 final (trees as CHIM models): dbg tp -10474 -73437, aw_aim 58 10: the dark triangle at the wall end by the shore, so not the old tree billboard
+- Reported with v0.0.53 at 2026-10-27 16:58 +0200: PERSISTING on the v0.0.53 final with the CHIM trees (27 October 2026, FS-UAE 16 MB, Seyda Neen arrival): the drystone wall x/ex_drystonewall_c_01s1 (CHIM placement 74143, reference 113892, cell -2,-9) shows the wrong shape; stills kept privately.
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -12,7 +21,7 @@
 | Persists in | v0.0.28, v0.0.30, v0.0.31-dev2 (last seen) |
 | Severity | low: A tree card's dark trunk base is drawn over a stone wall from some headings; cosmetic. |
 | Family | Distance drawing (horizon, fog, sky, far edges) (`distance-drawing`) |
-| Deferred by the maintainer | 2026-10-27: deferred by the maintainer to v0.0.54 (the v0.0.53 release triage) |
+| Deferred by the maintainer | 2026-10-28: deferred to v0.0.55 by the coordinator under the maintainer's rule of 2026-10-28 (no answer to the 10:02 question); not new in v0.0.54, does not break play |
 | Playtest version | v0.0.31-dev2 |
 | From commit | source and engine unknown |
 | CHIM engine version | none: legacy engine |

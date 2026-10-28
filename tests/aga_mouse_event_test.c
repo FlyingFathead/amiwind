@@ -36,6 +36,7 @@ int AW_WorldToSource(const char *name,const float *local,float *world){
 static char console_message[256];
 void Con_Printf(char *s,...){strncpy(console_message,s,sizeof(console_message)-1);}
 int AW_UIColor(int r,int g,int b){return (r+g+b)%256;}
+const byte *AW_UIMapArrow(void){return NULL;}	/* aw_ui.c: no arrow, the old marker (UI-MAP-PLAYER-ARROW-51) */
 int AW_ConsoleCharWidth(void){return char_width;}
 void AW_ConsoleCharacter(int x,int y,int c){int n=strlen(drawn);assert(n<16383);drawn[n]=c;drawn[n+1]=0;
     if(y==188 && x>=96){n=strlen(footer);assert(n<79);if(!n)footer_left=x;footer[n]=c;footer[n+1]=0;footer_right=x+char_width;}

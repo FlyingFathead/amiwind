@@ -121,11 +121,81 @@ void AW_FogDepths(byte *table,int distance) {
         if(last>=first){memset(table+first,level,last-first+1);first=last+1;}
     }
 }
+/* Interior fog (INTERIOR-FOG-UNUSED-51): every interior cell's AMBI fog colour
+ * and density (world/interior-fog.awf, tools/prepare_world_ui.interior_fog,
+ * one 20-byte row per foggy room, sorted by map name). Rule from OpenMW file
+ * apps/openmw/mwrender/fogmanager.cpp (read, not copied; its default, distant
+ * fog off): linear fog from the viewing distance x (1 - density) to the viewing
+ * distance, none at density 0; the viewing distance is OpenMW's default 7,168
+ * original units (1,792 local). The row is read once per room from disk (no
+ * table in memory); the colour ramp (r_sky.c) and the depth table are rebuilt
+ * only when the room's fog differs. aw_fog 1 (default): exterior and interior
+ * fog; 2: exterior fog only (interiors as before); 0: none. */
+#define INTERIOR_FOG_PATH "world/interior-fog.awf"
+#define INTERIOR_FOG_ROW 20
+#define INTERIOR_FOG_VIEW 1792
+static char interior_fog_map[16];
+static int interior_fog_loaded,interior_fog_found,interior_fog_rgb[3],interior_fog_density,interior_depth_key=-1;
+static void interior_fog_load(void) {
+    FILE *f=NULL;unsigned char row[INTERIOR_FOG_ROW],head[8];long count,i;int size;
+    if(interior_fog_loaded && !strncmp(interior_fog_map,sv.name,sizeof interior_fog_map))return;
+    Q_strcpy_bounded(interior_fog_map,sv.name,sizeof interior_fog_map);
+    interior_fog_loaded=1;interior_fog_found=0;
+    size=COM_FOpenFile(INTERIOR_FOG_PATH,&f);
+    if(!f)return;
+    if(size<8 || fread(head,1,8,f)!=8 || memcmp(head,"AWF1",4)){fclose(f);return;}
+    count=(long)head[4]|((long)head[5]<<8)|((long)head[6]<<16)|((long)head[7]<<24);
+    if(count<0 || count>8192 || 8+count*INTERIOR_FOG_ROW!=size){fclose(f);return;}
+    for(i=0;i<count;i++){
+        if(fread(row,1,INTERIOR_FOG_ROW,f)!=INTERIOR_FOG_ROW)break;
+        row[15]=0;
+        if(!strcmp((const char *)row,interior_fog_map)){
+            interior_fog_rgb[0]=row[16];interior_fog_rgb[1]=row[17];interior_fog_rgb[2]=row[18];
+            interior_fog_density=row[19];interior_fog_found=interior_fog_density>0;
+            break;
+        }
+    }
+    fclose(f);
+}
+/* Fog levels 1..15 linear from start to end (local units); nearer than start: none. */
+static void AW_FogDepthRange(byte *table,int start,int end) {
+    int level,first=1,last;long depth;
+    if(end<16)end=16;
+    if(start<0)start=0;
+    if(start>end)start=end;
+    memset(table,0,32768);
+    for(level=15;level>=1;level--){
+        depth=start+(long)(end-start)*level/15;if(depth<1)depth=1;
+        last=(int)(32768L/depth);if(last>32767)last=32767;
+        if(last>=first){memset(table+first,level,last-first+1);first=last+1;}
+    }
+}
+static void interior_fog_draw(void) {
+    int i,x,y,w,h,start,key;byte *pixels;short *z;const byte *ramp;
+    if(!aw_fog.value || aw_fog.value>=2 || !sv.active)return;
+    interior_fog_load();
+    if(!interior_fog_found)return;
+    ramp=R_InteriorFogColours(interior_fog_rgb[0],interior_fog_rgb[1],interior_fog_rgb[2]);
+    if(!ramp)return;
+    start=INTERIOR_FOG_VIEW-INTERIOR_FOG_VIEW*interior_fog_density/255;
+    key=start;
+    if(key!=interior_depth_key){interior_depth_key=key;old_distance=-1;AW_FogDepthRange(depths,start,INTERIOR_FOG_VIEW);}
+    w=r_refdef.vrect.width;h=r_refdef.vrect.height;
+    for(y=r_refdef.vrect.y;y<r_refdef.vrect.y+h;y++){
+        pixels=vid.buffer+y*vid.rowbytes+r_refdef.vrect.x;
+        z=d_pzbuffer+y*d_zwidth+r_refdef.vrect.x;
+        for(x=0;x<w;x++){
+            i=z[x];
+            if(i>0 && depths[i])pixels[x]=ramp[(depths[i]<<8)+pixels[x]];
+        }
+    }
+}
 void AW_FogDraw(void) {
     int distance,i,x,y,w,h,level,fog,fill,sea;byte *pixels;short *z;
     const byte *environment,*ramp;
     float extent,u,v,step,ray[3],delta[3];int k;
-    if(AW_Interior())return;
+    if(AW_Interior()){interior_fog_draw();return;}
+    interior_depth_key=-1;
     environment=R_DayNightFogColours();ramp=environment?environment:colours;
     fog=colours && aw_fog.value;
     if(!ramp || (!fog && !environment && !aw_land_fill.value))return;

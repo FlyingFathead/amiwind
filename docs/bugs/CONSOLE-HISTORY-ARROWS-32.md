@@ -9,7 +9,7 @@
 | Where | Console Up/Down history on the maintainer's FS-UAE (Ubuntu) |
 | Reproduction | unknown |
 | Duplicate of | no |
-| Persists in | v0.0.32-dev1 (last seen) |
+| Persists in | fixed in v0.0.53 |
 | Severity | low: Console history recall seems dead for one owner setup; not reproduced. |
 | Family | Console, keyboard and mouse input (`console-input`) |
 | Playtest version | v0.0.32-dev1 |

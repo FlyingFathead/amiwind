@@ -22,6 +22,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "quakedef.h"
 #include "aw_mappath.h"
 #include "aw_anim.h"
+#include "aw_animpick.h"
 #include "amiwind_version.h"
 #include "aw_spike.h"
 
@@ -870,6 +871,8 @@ void SV_SendClientMessages (void)
 {
     int			i;
 
+// every humanoid group by its state (aw_animkit.c): the picked frames go out, the drivers' come back below
+    AW_AnimPickPreSend ();
 // update frags, names, etc
     SV_UpdateToReliableMessages ();
 
@@ -931,6 +934,7 @@ void SV_SendClientMessages (void)
         }
     }
 
+    AW_AnimPickPostSend ();
 
 // clear muzzle flashes
     SV_CleanupEnts ();

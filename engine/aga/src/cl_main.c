@@ -21,6 +21,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "quakedef.h"
 #include "aw_harvest_runtime.h"
+#include "aw_weather.h"
+#include "aw_magic.h"
 
 // we need to declare some mouse variables here, because the menu system
 // references them even when on a unix system.
@@ -681,6 +683,8 @@ int CL_ReadFromServer (void)
         AW_HarvestLink();
         AW_SpeechRelink();
         CL_UpdateTEnts ();
+        AW_MagicUpdate ();   /* magic effects: sprites as temporary entities, after the beams (aw_magic.c) */
+        AW_AtmosUpdate ();   /* falling weather and mesh smoke on the shared effect path (aw_atmos.c) */
     }
 
 //

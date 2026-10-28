@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
- * The NPC voice and greeting table (AWGL1, id1/npc-voices.lut, tools/greeting_lut.py; docs/NPC_VOICE_TABLE.md):
+ * The NPC voice and greeting table (AWGL2, id1/npc-voices.lut, tools/greeting_lut.py; docs/NPC_VOICE_TABLE.md):
  * every NPC record's voice lines (Hello, Idle, Intruder, Thief, Hit, Attack, Flee, ...) and conversation greeting,
  * with the original's static filters decided at build time and the run-time ones as fixed 8-byte condition
  * records. Read once (the part before the texts stays in memory; a text is read when its line is said), looked up
@@ -22,8 +22,50 @@ enum {AW_GLUT_OP_FUNC=1, AW_GLUT_OP_GLOBAL, AW_GLUT_OP_LOCAL, AW_GLUT_OP_NOTLOCA
 #define AW_GLUT_FN_FACTION_RANK_DIFFERENCE 47
 #define AW_GLUT_FN_TALKED_TO_PC 63
 #define AW_GLUT_FN_PC_HEALTH 64
-#define AW_GLUT_HEADER 72
+#define AW_GLUT_VERSION 2          /* 2: the creature sound rows and the named sound slots (27 October 2026) */
+#define AW_GLUT_HEADER 80
 #define AW_GLUT_NPC_ROW 24
+#define AW_GLUT_SOUND_ROW 12       /* the pool file's 8 bytes, u16 length (1/100 s), u16 flags (AW_GLUT_MAPPED) */
+#define AW_GLUT_CREATURE_ROW 20    /* u32 id string offset, 8 x u16 sound (AW_SNDG_* order; 0xFFFF none) */
+#define AW_GLUT_SOUN_ROW 16        /* pool 8 bytes, u16 length, u8 volume, u8 flags, u16 near, u16 far */
+#define AW_GLUT_MAPPED 1           /* the build has the converted file */
+
+/* THE SOUND TABLE CONTRACT (docs/NPC_DEFAULTS.md "How AmiWind stores them"; the writer is tools/greeting_lut.py,
+ * whose SNDG_MOMENTS and SOUND_SLOTS tests/test_greeting_lut.py checks against these two enums, name by name).
+ * Every sound is an index into the file's Sounds table (u16; 0xFFFF none); index i is the pool file
+ * sound/pool/a<16 hex>.wav whose 16 hex digits are the table's 8 bytes (AW_GlutPoolPath).
+ * Creature rows: one per creature record of the three masters, sorted by the folded id like the NPC rows; each
+ * moment holds the creature's own sound generator, else its original's, else one of a creature with the same model,
+ * else the generic one (OpenMW mwclass/creature.cpp getSoundIdFromSndGen; resolved by the builder, the engine only
+ * reads). Named slots: the sounds the engine plays by name (OpenMW mwmechanics/combat.cpp, character.cpp,
+ * the mwclass item classes' getUpSoundId/getDownSoundId), one u16 each in this order. */
+enum {AW_SNDG_LEFT_FOOT, AW_SNDG_RIGHT_FOOT, AW_SNDG_SWIM_LEFT, AW_SNDG_SWIM_RIGHT, AW_SNDG_MOAN, AW_SNDG_ROAR,
+      AW_SNDG_SCREAM, AW_SNDG_LAND, AW_SNDG_MOMENTS};
+enum {
+    AW_SLOT_WEAPON_SWISH, AW_SLOT_MISS, AW_SLOT_LIGHT_ARMOR_HIT, AW_SLOT_MEDIUM_ARMOR_HIT, AW_SLOT_HEAVY_ARMOR_HIT,
+    AW_SLOT_HAND_TO_HAND_HIT, AW_SLOT_HAND_TO_HAND_HIT_2, AW_SLOT_HEALTH_DAMAGE,
+    AW_SLOT_BOW_PULL, AW_SLOT_BOW_SHOOT, AW_SLOT_CROSSBOW_PULL, AW_SLOT_CROSSBOW_SHOOT,
+    AW_SLOT_DEFAULT_LAND, AW_SLOT_DEFAULT_LAND_WATER, AW_SLOT_BODY_FALL_SMALL, AW_SLOT_BODY_FALL_MEDIUM,
+    AW_SLOT_BODY_FALL_LARGE,
+    AW_SLOT_FOOT_BARE_LEFT, AW_SLOT_FOOT_BARE_RIGHT, AW_SLOT_FOOT_LIGHT_LEFT, AW_SLOT_FOOT_LIGHT_RIGHT,
+    AW_SLOT_FOOT_MED_LEFT, AW_SLOT_FOOT_MED_RIGHT, AW_SLOT_FOOT_HEAVY_LEFT, AW_SLOT_FOOT_HEAVY_RIGHT,
+    AW_SLOT_FOOT_WATER_LEFT, AW_SLOT_FOOT_WATER_RIGHT, AW_SLOT_SWIM_LEFT, AW_SLOT_SWIM_RIGHT,
+    /* an item's pick-up (UP) and put-down (DOWN) sound by its kind */
+    AW_SLOT_ITEM_AMMO_UP, AW_SLOT_ITEM_AMMO_DOWN, AW_SLOT_ITEM_APPARATUS_UP, AW_SLOT_ITEM_APPARATUS_DOWN,
+    AW_SLOT_ITEM_ARMOR_LIGHT_UP, AW_SLOT_ITEM_ARMOR_LIGHT_DOWN, AW_SLOT_ITEM_ARMOR_MEDIUM_UP,
+    AW_SLOT_ITEM_ARMOR_MEDIUM_DOWN, AW_SLOT_ITEM_ARMOR_HEAVY_UP, AW_SLOT_ITEM_ARMOR_HEAVY_DOWN,
+    AW_SLOT_ITEM_BODYPART_UP, AW_SLOT_ITEM_BODYPART_DOWN, AW_SLOT_ITEM_BOOK_UP, AW_SLOT_ITEM_BOOK_DOWN,
+    AW_SLOT_ITEM_CLOTHES_UP, AW_SLOT_ITEM_CLOTHES_DOWN, AW_SLOT_ITEM_GOLD_UP, AW_SLOT_ITEM_GOLD_DOWN,
+    AW_SLOT_ITEM_INGREDIENT_UP, AW_SLOT_ITEM_INGREDIENT_DOWN, AW_SLOT_ITEM_LOCKPICK_UP, AW_SLOT_ITEM_LOCKPICK_DOWN,
+    AW_SLOT_ITEM_MISC_UP, AW_SLOT_ITEM_MISC_DOWN, AW_SLOT_ITEM_POTION_UP, AW_SLOT_ITEM_POTION_DOWN,
+    AW_SLOT_ITEM_PROBE_UP, AW_SLOT_ITEM_PROBE_DOWN, AW_SLOT_ITEM_REPAIR_UP, AW_SLOT_ITEM_REPAIR_DOWN,
+    AW_SLOT_ITEM_RING_UP, AW_SLOT_ITEM_RING_DOWN, AW_SLOT_ITEM_WEAPON_BLUNT_UP, AW_SLOT_ITEM_WEAPON_BLUNT_DOWN,
+    AW_SLOT_ITEM_WEAPON_BOW_UP, AW_SLOT_ITEM_WEAPON_BOW_DOWN, AW_SLOT_ITEM_WEAPON_CROSSBOW_UP,
+    AW_SLOT_ITEM_WEAPON_CROSSBOW_DOWN, AW_SLOT_ITEM_WEAPON_LONGBLADE_UP, AW_SLOT_ITEM_WEAPON_LONGBLADE_DOWN,
+    AW_SLOT_ITEM_WEAPON_SHORTBLADE_UP, AW_SLOT_ITEM_WEAPON_SHORTBLADE_DOWN, AW_SLOT_ITEM_WEAPON_SPEAR_UP,
+    AW_SLOT_ITEM_WEAPON_SPEAR_DOWN,
+    AW_SLOTS
+};
 #define AW_GLUT_MAX_LISTS 32       /* lists merged per topic and NPC (the data: at most 21) */
 #define AW_GLUT_MAX_PICKS 64       /* entries kept for the random-pick option */
 
@@ -32,8 +74,9 @@ typedef struct {
     long size, text_base, text_bytes;
     int topics, functions;
     long npcs, sets, listsets, listset_items, lists, list_items, entries, conds, sounds, globals, names, string_bytes;
+    long creatures, slots, souns;  /* version 2: creature sound rows, named sound slots (>= AW_SLOTS), SOUN rows */
     const unsigned char *topic_table, *fixture, *known, *npc, *set, *listset, *listset_item, *list, *list_item,
-        *entry, *cond, *sound, *global, *name, *strings;
+        *entry, *cond, *sound, *global, *name, *creature, *slot, *soun, *strings;
     int topic_of[AW_GLUT_TOPICS];  /* the file's topic index, -1 when the data has none */
 } aw_glut_t;
 
@@ -45,7 +88,7 @@ typedef struct {
 } aw_glut_state_t;
 
 /* Pure parts (host-tested, tests/aga_glut_test.c): */
-/* The resident size an AWGL1 header asks for (everything before the texts), or -1. */
+/* The resident size an AWGL2 header asks for (everything before the texts), or -1. */
 long AW_GlutResidentSize(const unsigned char *header,long file_size);
 /* Index the resident part: 1 = usable. */
 int AW_GlutOpen(aw_glut_t *g,const unsigned char *data,long size,long file_size);
@@ -62,6 +105,28 @@ int AW_GlutPick(const aw_glut_t *g,int npc,int topic,const aw_glut_state_t *s,in
 int AW_GlutHolds(const aw_glut_t *g,int npc,const unsigned char *cond,const aw_glut_state_t *s);
 /* An entry's sound (8-byte pool hash, sound/pool/a<16 hex>.wav): 1 and hash, 0 when it has none. */
 int AW_GlutSound(const aw_glut_t *g,int entry,unsigned char hash[8]);
+/* The sound table (version 2; every index was bounded at open):
+ * a creature record's row by its id (case-insensitive, binary search), -1 when absent; */
+int AW_GlutCreatureFind(const aw_glut_t *g,const char *id);
+/* the Sounds index of a creature row's moment (AW_SNDG_*), -1 when none; */
+int AW_GlutCreatureSound(const aw_glut_t *g,int row,int moment);
+/* the Sounds index of a named slot (AW_SLOT_*), -1 when none; */
+int AW_GlutSlotSound(const aw_glut_t *g,int slot);
+/* a Sounds index as its pool path, "sound/pool/a<16 hex>.wav" (capacity >= AW_GLUT_POOL_PATH, the 32 characters
+ * and the NUL): 1, or 0 for a bad index. */
+#define AW_GLUT_POOL_PATH 33
+int AW_GlutPoolPath(const aw_glut_t *g,int sound,char *out,int capacity);
+/* a Sounds index's length in 1/100 s (0 unknown) and whether the build has the file (AW_GLUT_MAPPED); -1 bad index */
+int AW_GlutSoundLength(const aw_glut_t *g,int sound);
+int AW_GlutSoundMapped(const aw_glut_t *g,int sound);
+/* A SOUN record's row (the compiled scripts' sounds index them: SOUN records of the three masters sorted by folded
+ * id, tools/greeting_lut.py soun_order): 1 and the row, 0 for a bad index. hash is all zero when not mapped. */
+typedef struct {
+    unsigned char hash[8];
+    unsigned short centis, near_units, far_units;   /* hearing distances: min/max x fAudioMin/MaxDistanceMult */
+    unsigned char volume, mapped;
+} aw_glut_soun_t;
+int AW_GlutSoun(const aw_glut_t *g,int index,aw_glut_soun_t *out);
 /* An entry's text offset in the text block, -1 when it has none. */
 long AW_GlutTextOffset(const aw_glut_t *g,int entry);
 /* The speaker's text defines (%Name = name, %Class, %Race, %Faction, %Rank, %Cell from the NPC row) filled in;

@@ -1,6 +1,16 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
- * Disk catalogue, one actor and its footprint per isolated inspection map.
+ * Disk catalogue, one actor per isolated inspection map.
  * Catalogue rows are scanned, not kept resident in the Amiga runtime heap.
+ *
+ * NPC Gallery v2.0 (NPC-GALLERY-V2, the default since v0.0.54; the maintainer: "so that it basically does NOT bake
+ * or render any extra characters that we haven't built already / but uses the existing one's features so that you
+ * can look up npc's etc."): gallery/actors.txt (AWG2, tools/gallery_v2.py) lists the actors the image already
+ * holds, each with its entity row; the chosen actor is spawned from that row with the engine's own spawn path
+ * (ED_ParseEdict and the QuakeC spawn function, as aw_actors.c spawns a joining frame's actors), so the gallery
+ * shows the game's own model, skeleton, animation table, carried items and voice. G plays every animation group
+ * (dbg animkit cycle), T turns the actor round, E talks as in the game. The baked gallery (gallery/catalog.txt, AWG1,
+ * its own model and footprint per record; tools/build_gallery.py) is read when an image has no v2 catalogue
+ * (--npc-gallery-method baked: DON'T DELETE ANY METHOD).
  */
 #include "quakedef.h"
 #include "aw_links.h"
@@ -9,10 +19,20 @@
 #include "aw_region.h"
 #include "aw_mappath.h"
 #include "aw_tryalloc.h"
+#include "aw_hand_models.h"
 typedef struct {
     int number;char kind[8],model[2][24],id[96],name[96];float size[3];
+    char race[32],cls[32],cell[64],mdl[64];   /* v2: the race, class, first cell and the game model of the actor */
 } gallery_entry_t;
 static gallery_entry_t current;
+#define GALLERY_ROW 2048    /* a v2 row: tools/gallery_v2.py ROW_LIMIT + 1 */
+#define GALLERY_TEXT 1400   /* a v2 row's entity text: tools/gallery_v2.py TEXT_LIMIT */
+static char rowbuf[GALLERY_ROW];
+static int v2;              /* the catalogue last opened is the v2 one */
+static char subject_text[GALLERY_TEXT+1],match_text[GALLERY_TEXT+1];
+static edict_t *subject;    /* the v2 actor of the loaded inspection room */
+static int turntable;static double turn_last;
+dfunction_t *ED_FindFunction(char *name);
 #define GALLERY_PAGE 8
 static int count,selected,body,editing,session,returning,help;
 static gallery_entry_t *page;
@@ -27,9 +47,8 @@ static int back_intro,combat,torch_test,torch_actor;
  * pit, the gallery floor or the captured scene itself ("here"). */
 static int arena;static char arena_map[32];
 extern void AW_ArenaInit(void);extern void AW_ArenaEnd(void);extern void AW_ArenaCommand(int argc,char **argv);
-static float back_torch,combat_timing[4],back_fullbright;
+static float back_torch,back_fullbright;
 extern cvar_t r_fullbright;
-static const char *hand_timing[4]={"aw_hand_idle","aw_hand_draw","aw_hand_lower","aw_hand_punch"};
 static void hand_field(edict_t *p,const char *name,float value){
     eval_t *v=GetEdictFieldValue(p,(char *)name);if(v)v->_float=value;
 }
@@ -93,6 +112,47 @@ static int read_entry(char *line,gallery_entry_t *e) {
     }
     return 1;
 }
+/* A v2 row: number, kind, id, name, race, class, cell, model, entity text (tools/gallery_v2.py). *text points into
+ * LINE. The model is a game path (no "..", absolute or device part); the text is fields only (no braces). */
+static int read_entry2(char *line,gallery_entry_t *e,char **text) {
+    static const int limit[8]={0,0,95,95,31,31,63,63};
+    char *fields[9],*s=line,*end;int i;long number;
+    for(i=0;i<9;i++){
+        fields[i]=s;end=strchr(s,i==8?'\n':'\t');
+        if(!end)return 0;
+        *end=0;s=end+1;
+    }
+    number=strtol(fields[0],&end,10);
+    if(*end || number<1 || number>100000)return 0;
+    if(strcmp(fields[1],"NPC_") && strcmp(fields[1],"CREA"))return 0;
+    for(i=2;i<8;i++)if((int)strlen(fields[i])>limit[i])return 0;
+    if(!fields[2][0] || !fields[7][0] || strstr(fields[7],"..") || fields[7][0]=='/' || strchr(fields[7],':') ||
+       strchr(fields[7],'\\') || !fields[8][0] || strlen(fields[8])>GALLERY_TEXT || strchr(fields[8],'{') ||
+       strchr(fields[8],'}'))return 0;
+    memset(e,0,sizeof(*e));e->number=(int)number;strcpy(e->kind,fields[1]);
+    strcpy(e->id,fields[2]);strcpy(e->name,fields[3]);strcpy(e->race,fields[4]);strcpy(e->cls,fields[5]);
+    strcpy(e->cell,fields[6]);strcpy(e->mdl,fields[7]);strcpy(e->model[0],"v2");strcpy(e->model[1],"v2");
+    *text=fields[8];
+    return 1;
+}
+static int read_row(char *line,gallery_entry_t *e,char **text) {
+    *text=NULL;return v2?read_entry2(line,e,text):read_entry(line,e);
+}
+/* The v2 catalogue first, else the baked one; *total its rows. NULL with *bad 0: neither file; *bad 1: invalid. */
+static FILE *open_catalogue(int *total,int *bad) {
+    FILE *f=NULL;char extra;
+    *bad=0;
+    if(COM_FOpenFile("gallery/actors.txt",&f)>=0 && f){
+        if(fgets(rowbuf,sizeof(rowbuf),f) && Q_sscanf(rowbuf,"AWG2 %d %c",total,&extra)==1 && *total>=1 && *total<=100000){v2=1;return f;}
+        fclose(f);f=NULL;
+    }
+    v2=0;
+    if(COM_FOpenFile("gallery/catalog.txt",&f)<0 || !f)return NULL;
+    if(!fgets(rowbuf,sizeof(rowbuf),f) || Q_sscanf(rowbuf,"AWG1 %d %c",total,&extra)!=1 || *total<1 || *total>100000){
+        fclose(f);*bad=1;return NULL;
+    }
+    return f;
+}
 static void read_voice(void) {
     FILE *f=NULL;char line[2304],*path,*duration,*speech,*end;float seconds;
     if(voice){free(voice);voice=NULL;}
@@ -136,32 +196,33 @@ int AW_GalleryOmitted(void) {
 static void print_notice(void){if(omitted)Con_Printf(NO_GALLERY_TEXT);else Con_Printf("%s\n",notice);}
 /* Prefer an exact source ID. Repeated display names select the first stable ID
  * and explicitly report how many variants share that name. */
+static void keep_text(const char *text){if(text)strcpy(match_text,text);else match_text[0]=0;}
 static int select_entry(int index,const char *search) {
-    FILE *f=NULL;char line[512],needle[96],id[96],name[96],extra;int total,i,matches=0,match_index=0,exact=0;
+    FILE *f=NULL;char needle[96],id[96],name[96],*text;int total,i,matches=0,match_index=0,exact=0,bad;
     gallery_entry_t e,match;long number=0;char *end;
     omitted=0;
-    if(COM_FOpenFile("gallery/catalog.txt",&f)<0 || !f){
-        if((omitted=AW_GalleryOmitted()))strcpy(notice,"NPC gallery not included in this build.");
+    if(!(f=open_catalogue(&total,&bad))){
+        if(bad)strcpy(notice,"Invalid gallery catalogue or lookup.");
+        else if((omitted=AW_GalleryOmitted()))strcpy(notice,"NPC gallery not included in this build.");
         else strcpy(notice,"Gallery catalogue missing; rebuild the image.");
         return 0;
     }
-    if(!fgets(line,sizeof(line),f) || Q_sscanf(line,"AWG1 %d %c",&total,&extra)!=1 || total<1 || total>100000)goto bad;
     if(search){normalize(search,needle);if(!needle[0])goto bad;number=strtol(search,&end,10);if(*end)number=0;}
     index=(index%total+total)%total;
     for(i=0;i<total;i++){
-        if(!fgets(line,sizeof(line),f) || !read_entry(line,&e))goto bad;
-        if(!search){if(i==index){match=e;match_index=i;matches=1;}}
+        if(!fgets(rowbuf,sizeof(rowbuf),f) || !read_row(rowbuf,&e,&text))goto bad;
+        if(!search){if(i==index){match=e;match_index=i;matches=1;keep_text(text);}}
         else{
             normalize(e.id,id);normalize(e.name,name);
-            if((number && number==e.number) || (!number && !strcmp(id,needle))){match=e;match_index=i;exact=1;}
+            if((number && number==e.number) || (!number && !strcmp(id,needle))){match=e;match_index=i;exact=1;keep_text(text);}
             else if(!number && !strcmp(name,needle)){
-                matches++;if(!exact && (matches==1 || e.number<match.number)){match=e;match_index=i;}
+                matches++;if(!exact && (matches==1 || e.number<match.number)){match=e;match_index=i;keep_text(text);}
             }
         }
     }
     fclose(f);
     if(search && !exact && !matches){strcpy(notice,"No matching source ID, name or number.");return 0;}
-    current=match;selected=match_index;count=total;notice[0]=0;
+    current=match;selected=match_index;count=total;notice[0]=0;strcpy(subject_text,match_text);
     if(search && !exact && matches>1)sprintf(notice,"%ld matches; first ID shown. Use source ID for variant.",(long)matches);
     return 1;
 bad:
@@ -171,25 +232,26 @@ bad:
  * ordinary play and typing do not scan the catalogue. Enter applies a filter;
  * paging reads one bounded row at a time from disk. All keywords must match. */
 static int keyword_match(const gallery_entry_t *e,const char *search) {
-    char id[96],name[96],term[96],token[96],number[16];int n;
+    char id[96],name[96],term[96],token[96],number[16],race[32],klass[32],cell[64];int n;
     normalize(e->id,id);normalize(e->name,name);sprintf(number,"%ld",(long)e->number);
+    normalize(e->race,race);normalize(e->cls,klass);normalize(e->cell,cell);   /* v2: browse by race, class or cell */
     while(*search){
         while(*search==' ')search++;
         if(!*search)break;
         n=0;while(*search && *search!=' '){if(n<95)token[n++]=*search;search++;}token[n]=0;
         normalize(token,term);
-        if(!term[0] || (!strstr(id,term) && !strstr(name,term) && strcmp(number,term)))return 0;
+        if(!term[0] || (!strstr(id,term) && !strstr(name,term) && strcmp(number,term) && !strstr(race,term) &&
+                        !strstr(klass,term) && !strstr(cell,term)))return 0;
     }
     return 1;
 }
 static void close_browser(void){if(page){free(page);page=NULL;}filtering=scroll_drag=mouse_visible=0;}
 static int read_page(int top) {
-    FILE *f=NULL;char text[512],extra;gallery_entry_t e;int total,i,n=0;
+    FILE *f=NULL;char *text;gallery_entry_t e;int total,i,n=0,invalid;
     page_count=page_total=0;
-    if(!page || COM_FOpenFile("gallery/catalog.txt",&f)<0 || !f)goto bad;
-    if(!fgets(text,sizeof(text),f) || Q_sscanf(text,"AWG1 %d %c",&total,&extra)!=1 || total<1 || total>100000)goto bad;
+    if(!page || !(f=open_catalogue(&total,&invalid)))goto bad;
     for(i=0;i<total;i++){
-        if(!fgets(text,sizeof(text),f) || !read_entry(text,&e))goto bad;
+        if(!fgets(rowbuf,sizeof(rowbuf),f) || !read_row(rowbuf,&e,&text))goto bad;
         if(!keyword_match(&e,filter))continue;
         if(n>=top && page_count<GALLERY_PAGE){page[page_count]=e;page_indices[page_count++]=i;}n++;
     }
@@ -238,6 +300,11 @@ static void reload(void) {
         sprintf(command,"map %s\n",arena_map);Cbuf_InsertText(command);return;
     }
     Cbuf_InsertText(torch_test?"map torchtest\n":"map charplane\n");
+}
+/* A browser row shown: a v2 row's entity text is read again by its index (the page keeps names only). */
+static void choose_row(int n) {
+    if(v2){if(select_entry(page_indices[n],NULL))reload();return;}
+    current=page[n];selected=page_indices[n];notice[0]=0;reload();
 }
 static void leave(void) {
     char command[64];
@@ -297,7 +364,7 @@ static void command(void) {
  * dbgmode arenapit); the empty gallery floor test is dbg combattest gallery
  * (or floor), with its idle/draw/lower/punch/center/help/exit actions. */
 static void combat_command(void){
-    edict_t *p;eval_t *v;FILE *f=NULL;int i,state=-1;char path[AW_MAP_PATH_SIZE];
+    edict_t *p;FILE *f=NULL;int i,state=-1;char path[AW_MAP_PATH_SIZE];
     const char *arg=Cmd_Argv(1);
     if(Cmd_Argc()==2 && !Q_strcasecmp((char *)arg,"exit")){leave();return;}
     if(arena || (!combat && !session && (!*arg || (Q_strcasecmp((char *)arg,"gallery") && Q_strcasecmp((char *)arg,"floor") &&
@@ -330,13 +397,7 @@ static void combat_command(void){
     }
     /* Reuse the authored timing contract from the running game. The gallery
      * BSP has no hand stamp; inventing durations would hide conversion bugs. */
-    for(i=0;i<4;i++){
-        v=GetEdictFieldValue(sv.edicts,(char *)hand_timing[i]);
-        if(!v || !isfinite(v->_float) || v->_float<=0 || v->_float>60){
-            Con_Printf("Combat test needs valid hands in the current game.\n");return;
-        }
-        combat_timing[i]=v->_float;
-    }
+    if(!AW_HandTableReady()){Con_Printf("Combat test needs valid hands in the current game.\n");return;}
     if(COM_FOpenFile(AW_MapPath("charplane",path,sizeof(path)),&f)<124 || !f){
         if(f)fclose(f);
         if(AW_GalleryOmitted()){Con_Printf("Combat test uses the NPC gallery room. " NO_GALLERY_TEXT);return;}
@@ -348,7 +409,7 @@ static void combat_command(void){
 }
 static void torch_center(edict_t *p){combat_center(p);p->v.origin[0]=64;VectorCopy(p->v.origin,p->v.oldorigin);SV_LinkEdict(p,false);}
 static void torch_command(void){
-    edict_t *p;eval_t *v;FILE *f=NULL;int i,n=0,want_actor=0;char search[96],path[AW_MAP_PATH_SIZE];
+    edict_t *p;FILE *f=NULL;int i,n=0,want_actor=0;char search[96],path[AW_MAP_PATH_SIZE];
     gallery_entry_t previous=current;
     const char *arg=Cmd_Argv(1);
     if(Cmd_Argc()==2 && !Q_strcasecmp((char *)arg,"exit")){leave();return;}
@@ -380,13 +441,7 @@ static void torch_command(void){
     if(!sv.active || !sv.edicts || svs.maxclients!=1 || !svs.clients || !(p=svs.clients[0].edict)){
         Con_Printf("Start a local game before entering torch test.\n");return;
     }
-    for(i=0;i<4;i++){
-        v=GetEdictFieldValue(sv.edicts,(char *)hand_timing[i]);
-        if(!v || !isfinite(v->_float) || v->_float<=0 || v->_float>60){
-            Con_Printf("Torch test needs valid hands in the current game.\n");return;
-        }
-        combat_timing[i]=v->_float;
-    }
+    if(!AW_HandTableReady()){Con_Printf("Torch test needs valid hands in the current game.\n");return;}
     if(COM_FOpenFile(AW_MapPath("torchtest",path,sizeof(path)),&f)<124 || !f){
         if(f)fclose(f);
         Con_Printf("Dark torch test room missing; rebuild the image.\n");return;
@@ -400,17 +455,13 @@ usage:
 void AW_GalleryInit(void){Cmd_AddCommand("aw_charplane",command);Cmd_AddCommand("aw_combattest",combat_command);Cmd_AddCommand("aw_torchtest",torch_command);AW_ArenaInit();}
 /* ---- the Vivec Arena's session (aw_arena.c) ---- */
 int AW_GalleryArenaEnter(const char *map) {
-    edict_t *p;eval_t *v;int i;
+    edict_t *p;
     if(session){Con_Printf("Exit the current gallery or test room first.\n");return 0;}
     if(!sv.active || !sv.edicts || svs.maxclients!=1 || !svs.clients || !(p=svs.clients[0].edict)){
         Con_Printf("Start a local game before entering the arena.\n");return 0;
     }
     if(p->v.health<=0){Con_Printf("You are dead.\n");return 0;}
-    for(i=0;i<4;i++){
-        v=GetEdictFieldValue(sv.edicts,(char *)hand_timing[i]);
-        if(!v || !isfinite(v->_float) || v->_float<=0 || v->_float>60){Con_Printf("The arena needs valid hands in the current game.\n");return 0;}
-        combat_timing[i]=v->_float;
-    }
+    if(!AW_HandTableReady()){Con_Printf("The arena needs valid hands in the current game.\n");return 0;}
     if(strlen(map)>=sizeof(arena_map) || strlen(sv.name)>=sizeof(arena_map)){Con_Printf("Scene name too long.\n");return 0;}
     if(!capture_game())return 0;
     arena=1;notice[0]=0;strcpy(arena_map,*map?map:sv.name);reload();return 1;
@@ -426,14 +477,43 @@ void AW_GalleryHandsDrawn(edict_t *p){combat_pose(p,1);}
  * The gallery's own selection is left as it was. */
 int AW_GalleryFind(const char *search,int index,char *id,char *name,char *model,int *total){
     gallery_entry_t keep=current;int keep_selected=selected,keep_count=count,ok;
+    static char kept[GALLERY_TEXT+1];
+    strcpy(kept,subject_text);
     ok=select_entry(index,search);
     if(ok){
         *total=count;
         ok=!strcmp(current.kind,"NPC_") && strcmp(current.model[0],"-");
-        if(ok){strcpy(id,current.id);strcpy(name,current.name);sprintf(model,"gallery/%s.mdl",current.model[0]);}
+        /* v2: the game's own model of the actor (its .anm layout and skeleton table beside it) */
+        if(ok){strcpy(id,current.id);strcpy(name,current.name);
+               if(v2)sprintf(model,"%.63s",current.mdl);else sprintf(model,"gallery/%s.mdl",current.model[0]);}
     }
-    current=keep;selected=keep_selected;count=keep_count;
+    current=keep;selected=keep_selected;count=keep_count;strcpy(subject_text,kept);
     return ok;
+}
+static int gallery_budget(const char *path);
+/* The v2 actor: spawned from its catalogue row by the engine's own path (aw_actors.c SpawnOne: ED_ParseEdict and the
+ * QuakeC spawn function, while the map loads and precaching is legal), standing at X facing +X (a converted character
+ * faces its local +Y; Quake's yaw 0 is +X: world.qc aw_npc_idle). NULL with a notice when it cannot be shown. */
+static edict_t *spawn_subject(float x) {
+    static char text[GALLERY_TEXT+4];edict_t *e;dfunction_t *func;model_t *m;int i;
+    FILE *f=NULL;int bytes;
+    if(!subject_text[0]){strcpy(notice,"Actor row unavailable; rebuild the image.");return NULL;}
+    bytes=COM_FOpenFile(current.mdl,&f);if(f)fclose(f);
+    if(bytes<72){strcpy(notice,"Actor model missing from this image.");return NULL;}
+    if(!gallery_budget(current.mdl)){if(!notice[0])strcpy(notice,"Actor model is invalid.");return NULL;}
+    sprintf(text,"%s }",subject_text);
+    e=ED_Alloc();
+    if(!ED_ParseEdict(text,e) || !e->v.classname || !(func=ED_FindFunction(pr_strings+e->v.classname))){
+        ED_Free(e);strcpy(notice,"Actor row could not be spawned.");return NULL;
+    }
+    e->v.origin[0]=x;e->v.origin[1]=0;e->v.origin[2]=1;
+    e->v.angles[0]=e->v.angles[2]=0;e->v.angles[1]=270;
+    pr_global_struct->self=EDICT_TO_PROG(e);
+    PR_ExecuteProgram(func-pr_functions);
+    i=(int)e->v.modelindex;
+    if(e->free || i<=0 || i>=MAX_MODELS || !(m=sv.models[i])){strcpy(notice,"Actor model unavailable.");return NULL;}
+    for(i=0;i<3;i++)current.size[i]=m->maxs[i]-m->mins[i];
+    return e;
 }
 static int gallery_budget(const char *path) {
     FILE *f=NULL;unsigned char head[72];int vertices,triangles;
@@ -464,14 +544,24 @@ void AW_GalleryEntities(void) {
     /* SV_SpawnServer calls this before setting sv.active. Runtime predicates
      * must stay inactive then, but this captured session's map needs its
      * timings and actors before physics/baselines and client spawn. */
+    subject=NULL;
     if(!session || strcmp(sv.name,arena?arena_map:torch_test?"torchtest":"charplane"))return;
     if(arena){
-        for(i=0;i<4;i++)hand_field(sv.edicts,hand_timing[i],combat_timing[i]);
         AW_ArenaEntities();return;
     }
     if(combat || torch_test){
-        for(i=0;i<4;i++)hand_field(sv.edicts,hand_timing[i],combat_timing[i]);
         if(!torch_test || !torch_actor)return; /* Empty tests need no catalogue. */
+    }
+    if(!strcmp(current.model[0],"v2")){
+        /* v2: the game's own actor; in the dark torch room only when it fits there */
+        if(!(subject=spawn_subject(torch_test?-40:0)) || !torch_test){
+            if(subject)Con_Printf("NPC Gallery v2.0 #%ld %s: %s (%s)\n",(long)current.number,current.id,current.name,current.mdl);
+            return;
+        }
+        if(current.size[0]>96 || current.size[1]>96 || current.size[2]>104){
+            ED_Free(subject);subject=NULL;strcpy(notice,"NPC model does not fit the dark room.");
+        }
+        return;
     }
     if(!strcmp(current.model[body],"-")){strcpy(notice,"Conversion failed; see the private gallery audit.");return;}
     sprintf(model_path[0],"gallery/%s.mdl",current.model[body]);
@@ -500,6 +590,7 @@ void AW_GalleryEntities(void) {
 }
 void AW_GallerySpawn(edict_t *p) {
     float distance;eval_t *goal;
+    if(returning || !AW_GalleryActive()){subject=NULL;turntable=0;}
     if(returning){
         if(strcmp(sv.name,back_map)){returning=0;strcpy(notice,"Return scene did not load; snapshot retained.");return;}
         AW_SaveSnapshotRestore(back_state);free(back_state);back_state=NULL;
@@ -530,6 +621,8 @@ void AW_GallerySpawn(edict_t *p) {
     p->v.origin[0]=distance;p->v.origin[1]=0;p->v.origin[2]=17;
     VectorCopy(vec3_origin,p->v.velocity);p->v.movetype=MOVETYPE_WALK;
     p->v.angles[0]=0;p->v.angles[1]=180;p->v.angles[2]=0;p->v.fixangle=1;
+    /* v2: the crosshair on the actor's middle, so the game's own actor commands (E talk, dbg animkit) find it */
+    if(subject){float eye=17+(p->v.view_ofs[2]>0?p->v.view_ofs[2]:22);p->v.angles[0]=atan2(eye-current.size[2]*.5f,distance)*(180/M_PI);}
     VectorCopy(p->v.angles,cl.viewangles);SV_LinkEdict(p,false);
 }
 int AW_GalleryKey(int key,int down,int shift,int control) {
@@ -550,7 +643,7 @@ int AW_GalleryKey(int key,int down,int shift,int control) {
             n=AW_UIScrollHit(mouse_x,mouse_y,vid.width-18,top,height,page_total,rows,page_top);
             if(n>=0){filtering=0;scroll_drag=mouse_y>=top+10 && mouse_y<top+height-10;if(n!=page_top)read_page(n);return 1;}
             n=mouse_row();
-            if(n>=0){current=page[n];selected=page_indices[n];notice[0]=0;reload();}
+            if(n>=0)choose_row(n);
             else if(mouse_y>=10+h && mouse_y<14+2*h)filtering=1;
             return 1;
         }
@@ -558,7 +651,7 @@ int AW_GalleryKey(int key,int down,int shift,int control) {
         if(shift && key==K_DOWNARROW)key=K_PGDN;
         if(key==K_ENTER){
             if(filtering){read_page(0);filtering=0;}
-            else if(page_count){current=page[page_selected];selected=page_indices[page_selected];notice[0]=0;reload();}
+            else if(page_count)choose_row(page_selected);
             return 1;
         }
         if(key==K_DOWNARROW || key==K_MWHEELDOWN){
@@ -595,6 +688,13 @@ int AW_GalleryKey(int key,int down,int shift,int control) {
     }
     if(key==K_ENTER){if(down){editing=1;query[0]=notice[0]=0;IN_AWClearButtons();}return 1;}
     if(key>='A' && key<='Z')key+='a'-'A';
+    if(subject){
+        /* v2: E is the game's own talk binding (the actor's greeting, or its record's hello from the voice table) */
+        if(key=='e')return 0;
+        if(key=='g'){if(down)Cbuf_InsertText("aw_animkit_cmd cycle\n");return 1;}
+        if(key=='t'){if(down){turntable=!turntable;turn_last=realtime;}return 1;}
+        if(shift && key=='b')return 1;   /* the game's actor is as it is placed: no base-body variant */
+    }
     if(key=='e'){if(down)talk();return 1;}
     /* Amiga's middle button is K_MOUSE2; the right button is K_MOUSE3. */
     if(key==K_TAB || key==K_MOUSE2 || (key=='b' && !shift)){if(down)open_browser();return 1;}
@@ -628,6 +728,12 @@ void AW_GalleryDraw(void) {
         "Shift+B: equipped / base body","Enter (in gallery): exact ID/name/#","WASD + mouse: inspect at true scale",
         "E: converted greeting, when available",
         "Ctrl+X: return to the captured game","F10: console; dbg gallery exit","F1 / Esc: close this help"};
+    static const char *guide2[]={"NPC Gallery v2.0: the game's own actors","Tab / B: browse; keywords match name,",
+        "  ID, race, class or cell; Enter: filter","Arrows / wheel / PgUp/PgDn: browse","Enter / click: show actor",
+        "Shift+N / Shift+P: next / previous","Enter (in gallery): exact ID/name/#","WASD + mouse: inspect at true scale",
+        "E: talk, as in the game","G: play every animation group","T: turntable on/off",
+        "F10: dbg animkit groups / play <group>","Ctrl+X: return to the captured game","F1 / Esc: close this help"};
+    int v2row=!strcmp(current.model[0],"v2");
     if(!AW_GalleryActive() || key_dest!=key_game)return;
     if(arena){AW_ArenaDraw();return;}
     if(torch_test){
@@ -664,19 +770,40 @@ void AW_GalleryDraw(void) {
         }
         scr_copyeverything=1;return;
     }
+    if(v2row){
+        /* NPC Gallery v2.0: the info panel of the game's own actor */
+        if(subject && (subject->free || !sv.active))subject=NULL;
+        if(subject && turntable){
+            /* the turntable: a quarter turn every two seconds (a load or a stall stands still) */
+            float dt=(float)(realtime-turn_last);
+            if(dt>0 && dt<1)subject->v.angles[1]=anglemod(subject->v.angles[1]+45*dt);
+        }
+        turn_last=realtime;
+        sprintf(text,"NPC Gallery v2.0  %ld/%ld #%ld %s",(long)(selected+1),(long)count,(long)current.number,current.name);line(0,text);
+        line(1,current.id);
+        if(!strcmp(current.kind,"NPC_"))sprintf(text,"%s, %s",current.race[0]?current.race:"?",current.cls[0]?current.cls:"?");
+        else strcpy(text,"Creature");
+        line(2,text);
+        line(3,current.cell[0]?current.cell:"(placed by no cell)");
+        sprintf(text,"%ld x %ld x %ld units  %s",(long)current.size[0],(long)current.size[1],(long)current.size[2],current.mdl);line(4,text);
+        line(5,"Shift+N/P next/prev  G groups  T turn  F1 help");
+        if(editing){sprintf(text,"> %s_",query);line(7,text);}if(notice[0])line(8,notice);
+    }else{
     sprintf(text,"%ld/%ld #%ld %s",(long)(selected+1),(long)count,(long)current.number,current.name);line(0,text);
     line(1,current.id);
     sprintf(text,"%s: %ld x %ld x %ld units",body?"Base body":"Equipped",(long)current.size[0],(long)current.size[1],(long)current.size[2]);line(2,text);
     line(3,"Wheel / Shift+N/P: next/prev  F1: help");
     if(editing){sprintf(text,"> %s_",query);line(5,text);}if(notice[0])line(6,notice);
+    }
     /* The reserved strip remains readable independently of target aim and HUD.
      * Paint after normal subtitles: the identity and browse controls persist. */
     y=vid.height-2*h-6;
     AW_UIFill(0,vid.height-28,vid.width,28,AW_UIColor(0,0,0));
-    right_line(y,current.name);right_line(y+h,voice?"(Talk: E / Browse: Tab)  F1: help":"(Browse: Tab / B)  F1: help");
+    right_line(y,current.name);right_line(y+h,voice || v2row?"(Talk: E / Browse: Tab)  F1: help":"(Browse: Tab / B)  F1: help");
     if(help){
         AW_UIBox(2,2,vid.width-4,vid.height-4);
-        for(i=0;i<(int)(sizeof(guide)/sizeof(*guide));i++)text_at(8,8+i*(h+3),guide[i],(vid.width-16)/w);
+        if(v2row)for(i=0;i<(int)(sizeof(guide2)/sizeof(*guide2));i++)text_at(8,8+i*(h+3),guide2[i],(vid.width-16)/w);
+        else for(i=0;i<(int)(sizeof(guide)/sizeof(*guide));i++)text_at(8,8+i*(h+3),guide[i],(vid.width-16)/w);
     }else if(page){
         rows=page_rows();AW_UIBox(2,2,vid.width-4,vid.height-4);
         text_at(8,8,"Gallery browser - Tab/Esc: close",(vid.width-16)/w);
@@ -689,7 +816,9 @@ void AW_GalleryDraw(void) {
              * prefix directly so an int-sized vararg cannot insert a NUL. */
             text[0]=i==page_selected?'>':' ';text[1]=' ';strcpy(text+2,page[i].name);
             text_at(8,y,text,(vid.width-34)/w);
-            sprintf(text,"  #%ld %s",(long)page[i].number,page[i].id);text_at(8,y+h,text,(vid.width-34)/w);
+            if(v2 && page[i].race[0])sprintf(text,"  #%ld %s - %s",(long)page[i].number,page[i].id,page[i].race);
+            else sprintf(text,"  #%ld %s",(long)page[i].number,page[i].id);
+            text_at(8,y+h,text,(vid.width-34)/w);
         }
         AW_UIScrollbar(vid.width-18,22+3*h,rows*(2*h+2),page_total,rows,page_top);
         if(notice[0])text_at(8,vid.height-h-5,notice,(vid.width-16)/w);

@@ -5,7 +5,7 @@ name: Source checks and asset-free Amiga build
 #                       inputs change (tools/ci_tools.py key), else restores that bootstrap from the cache and checks
 #                       it file by file against the manifest written when it was made
 #   source-checks       the source allowlist and the quick checks, beside the tests
-#   tests               the whole suite in TEST_SHARDS parallel jobs: run_tests.py --shard I/N, whole modules
+#   tests               (shown as "Test suite part I of 6") the whole suite in TEST_SHARDS parallel jobs: run_tests.py --shard I/N, whole modules
 #                       balanced by tests/module-timings.json; the shards together run every module exactly once
 #   dry-run             after the tests: the asset-free engine compile, boot-notice image and package
 #   tools-from-nothing  tags, the weekly schedule and manual runs: the from-nothing bootstrap and the dry-run image
@@ -62,8 +62,9 @@ jobs:
 
   tools:
     runs-on: ubuntu-24.04
-    # A cache hit takes about a minute; a key change bootstraps from nothing (the old job's first step)
-    timeout-minutes: 30
+    # A cache hit takes about a minute; a key change bootstraps from nothing (the old job's first step):
+    # 28 min 15 s in run 133 (v0.0.53), so 40 keeps it under 80 % of the limit
+    timeout-minutes: 40
     env:
       PYTHONPATH: ${{ github.workspace }}/src:${{ github.workspace }}/tools
     outputs:
@@ -132,6 +133,9 @@ jobs:
           python tools/build.py --install-dependencies --plan
 
   tests:
+    # The displayed job name (what GitHub shows and the release publisher requires): "Test suite part 1 of 6" to "6 of 6".
+    # The 6 is TEST_SHARDS (the env context is not available in a job name; tests/test_ci_workflow.py keeps both equal)
+    name: Test suite part ${{ matrix.shard }} of 6
     needs: tools
     runs-on: ubuntu-24.04
     # One shard is about a sixth of the suite; the limit leaves room for the whole suite's growth
@@ -219,7 +223,8 @@ jobs:
     # bootstraps from nothing in the tools job of that very run.
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    # the bootstrap alone took 28 min 15 s in run 133 (v0.0.53), then the uncached dry-run image
+    timeout-minutes: 60
     env:
       PYTHONPATH: ${{ github.workspace }}/src:${{ github.workspace }}/tools
     steps:

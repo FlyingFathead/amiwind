@@ -55,8 +55,10 @@
 #define AWM_POP 0x2C
 #define AWM_REF 0x2D           /* u16 object (0xFFFF the player): the next call acts on it */
 #define AWM_QUERY 0x2E         /* u8 query, u16 operand -> whole */
-#define AWM_NOTYET 0x2F        /* u16 name, u8 flags (low 5 bits: numbers popped; 0x80 pushes, 0x40 a fraction,
-                                  0x20 had a reference), u8 strings, u16 per string */
+#define AWM_NOTYET 0x2F        /* u16 function number (tools/mwscript/functions.py FUNCTION_NUMBERS), u16 name,
+                                  u8 flags (low 5 bits: numbers popped; 0x80 pushes, 0x40 a fraction, 0x20 had a
+                                  reference), u8 strings, u16 per string: counted by number, logged once, handed to
+                                  the host's call() (the import route) */
 #define AWM_PLAYSOUND 0x30     /* u16 sound */
 #define AWM_PLAYSOUNDVP 0x31   /* u16 sound; pops pitch, volume */
 #define AWM_PLAYSOUND3D 0x32
@@ -90,6 +92,32 @@
 /* messages (host message() and button()) */
 #define AWM_MESSAGEBOX 0x51    /* u16 text, u8 numbers popped (fractions), u8 buttons, u16 per button (as NOTYET) */
 #define AWM_GETBUTTONPRESSED 0x52 /* -> whole: the button the player chose, once; -1 until then */
+/* the actor record (host actor(), item(), spell(), combat(), dead_count(); aw_actorstate.h AWA_* and AWV_*) */
+#define AWM_ACTOR 0x53         /* u8 verb, u8 stat: GET/RATIO push, SET/MOD/MODCURRENT pop */
+#define AWM_ITEM 0x54          /* u8 verb (0 count -> whole, 1 add, 2 remove: pop the count), u16 item */
+#define AWM_SPELL 0x55         /* u8 verb (0 has -> whole, 1 add, 2 remove, 3 has a common disease -> whole, 4 has a
+                                  blight disease -> whole), u16 spell (0 for 3 and 4) */
+#define AWM_COMBAT 0x56        /* u8 verb (0 StartCombat, 1 StopCombat), u16 the other object (0xFFFF the player) */
+#define AWM_DEADCOUNT 0x57     /* u16 actor row -> whole */
+#define AWM_AIWANDER 0x58      /* u8 extra arguments: pops 3 + extra whole numbers (host wander()) */
+/* the squeeze: a whole number against a small constant, and the branch, in one opcode (pops the number) */
+#define AWM_JNEB 0x59          /* s8 k, s16: jumps when the number is not k */
+#define AWM_JCMPB 0x5A         /* u8 test (0 == 1 != 2 < 3 <= 4 > 5 >=), s8 k, s16: jumps when "number test k" fails */
+/* the world and cell lookups (host player_cell() and position()) */
+#define AWM_GETPCCELL 0x5B     /* u16 PCEL row -> whole: 1 when the player stands in a cell of the row */
+#define AWM_GETPOS 0x5C        /* u8 axis (0 x, 1 y, 2 z) -> fraction: REF's object's or the script's own, game units */
+#define AWM_PLAYERMOVE 0x5D    /* u16 PMOV row: the player's PositionCell worked out at build time (host player_move()) */
+#define AWM_AIPACKAGE 0x5E     /* u8 verb (0 the current package, OpenMW's numbers, -1 none; 1 done) -> whole (host ai_package()) */
+#define AWM_MOVE_OUTDOORS 1
+#define AWM_MOVE_ROOM 2
+#define AWM_SPELL_COMMON_DISEASE 3
+#define AWM_SPELL_BLIGHT_DISEASE 4
+#define AWM_FUNCTIONS 640      /* the most function numbers NOTYET carries (tools/mwscript/opcodes.py FUNCTIONS_MAX) */
+#define AWM_VERB_GET 0
+#define AWM_VERB_SET 1
+#define AWM_VERB_MOD 2
+#define AWM_VERB_MODCURRENT 3
+#define AWM_VERB_RATIO 4
 
 /* QUERY numbers (shared with the greeting conditions). */
 #define AWQ_DISPOSITION 1

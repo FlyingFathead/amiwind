@@ -11,4 +11,5 @@ typedef int (*aw_harvest_region_at_t)(const float *point,int current,char *map,i
 int AW_HarvestFollow(aw_harvest_region_at_t,const float *,int);
 const char *AW_HarvestHint(void);
 int AW_HarvestUse(void);
+void AW_HarvestSweep(int *count,int *bound,int *pickable,int *proxy);
 #endif

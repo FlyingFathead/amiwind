@@ -19,6 +19,9 @@ typedef struct {
     float origin[3],angles[3];int flags,first,count;
     int slot; /* AWH3: one-based global placement index, independent of map. */
     float scale; /* AWH4 external alias only; legacy inline brushes unchanged. */
+    /* The owner's record id of an owned plant (HARVEST-INTERIOR-PICK-47: a tab and the id after the row's label), 0
+     * for none. Taking it is a theft by OpenMW's rule; its saved pick fact is the theft record (AW_HarvestStolen). */
+    unsigned short owner;
 } aw_harvest_plant_t;
 typedef struct {
     int nodes,edges,plants;
@@ -60,4 +63,9 @@ int AW_HarvestPrepare(const aw_harvest_t *,int,aw_state_t *,int,uint32_t);
  * Loot seed/level persists even if inventory capacity rejects the transfer.
  * No item or harvested fact is committed until the complete transfer succeeds. */
 int AW_HarvestTake(const aw_harvest_t *,int,aw_state_t *,int,uint32_t);
+/* The owner's record id of PLANT ("" for an unowned one). */
+const char *AW_HarvestOwner(const aw_harvest_t *,int);
+/* Thefts so far: taken plants of this catalogue that have an owner (the crime system's record: owner from the row,
+ * the items from the persisted roll). */
+int AW_HarvestStolen(const aw_harvest_t *,const aw_state_t *);
 #endif

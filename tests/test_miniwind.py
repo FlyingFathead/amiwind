@@ -137,6 +137,14 @@ class PlanTests(unittest.TestCase):
             self.assertNotIn(flag, image)
         self.assertEqual(value(image, '--miniwind-features'), miniwind.features_line(names(steps)))
 
+    def test_gallery_v2_only_when_named(self):
+        """NPC-GALLERY-V2: a MiniWind takes NPC Gallery v2.0 (no stage, seconds in the image step) only when asked."""
+        steps, _ = plan(['--jobs', '4', '--miniwind', '--npc-gallery-method', 'v2'])
+        image = [str(p) for p in dict(steps)['image']]
+        self.assertIn('--gallery-v2', image)
+        self.assertNotIn('--no-npc-gallery', image)
+        self.assertNotIn('npc-gallery', names(steps))
+
     def test_description_reaches_the_image_and_the_receipt(self):
         text = 'Balmora on CHIM, incremental streaming, photo mode'
         steps, args = plan(['--jobs', '4', '--miniwind', '--miniwind-description', text])
@@ -167,7 +175,9 @@ class PlanTests(unittest.TestCase):
                 image = [str(p) for p in dict(steps)['image']]
                 self.assertFalse(any(part.startswith('--miniwind') for part in image))
                 self.assertIn('--world-scenery', image)
-                self.assertIn('npc-gallery', names(steps))
+                # NPC Gallery v2.0 (NPC-GALLERY-V2): no npc-gallery stage, the image lists the build's own actors
+                self.assertNotIn('npc-gallery', names(steps))
+                self.assertIn('--gallery-v2', image)
                 self.assertFalse(hasattr(args, 'miniwind_record'))
 
     def test_dependencies_follow_the_plan(self):
@@ -639,7 +649,7 @@ class ScopeTests(unittest.TestCase):
         record = args.miniwind_record
         self.assertEqual((record['scope'], record['label']), ('exterior', 'quick playtest, no NPC gallery'))
         self.assertEqual(record['stages'], EXTERIOR_STAGES)
-        for stage in ('balmora-interiors', 'door-audio', 'npc-gallery'):
+        for stage in ('balmora-interiors', 'door-audio'):
             self.assertIn(stage, record['left_out'])
             self.assertTrue(record['left_out'][stage])
         # every stage of the normal CHIM plan it does not run is recorded with a reason

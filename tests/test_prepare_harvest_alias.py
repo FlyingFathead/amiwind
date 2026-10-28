@@ -139,7 +139,8 @@ class ExternalHarvestPreparationTests(unittest.TestCase):
     def test_unsupported_original_state_rejected_in_external_representation(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
-            for number, option in enumerate((dict(script='script'), dict(owner=True), dict(count=-2))):
+            # an owned plant is a theft, not refused (HARVEST-INTERIOR-PICK-47; tests/test_prepare_harvest.py)
+            for number, option in enumerate((dict(script='script'), dict(count=-2))):
                 args, _ = sample(root / str(number), source(**option))
                 with self.assertRaises(ValueError):
                     convert_plan(**args, output=root / 'bad')

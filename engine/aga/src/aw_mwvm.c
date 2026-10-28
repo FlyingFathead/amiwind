@@ -25,8 +25,10 @@ typedef struct {uint32_t reference;uint16_t script,count,at;} parked_t;
  * at load (AW_MwvmLoad), kept for the session; a game that never switches them on spends nothing. */
 typedef struct {
     const unsigned char *base;unsigned long bytes;const aw_mwvm_host_t *host;
-    const unsigned char *glob,*jrnl,*snds,*voic,*musi,*objs,*scrp,*strt,*code;
-    int nglob,njrnl,nsnds,nvoic,nmusi,nobjs,nscrp,nstrt;unsigned long ncode;
+    const unsigned char *glob,*jrnl,*snds,*voic,*musi,*objs,*scrp,*strt,*code,*oact,*pcel,*pmov;
+    int nglob,njrnl,nsnds,nvoic,nmusi,nobjs,nscrp,nstrt,noact,npcel,npmov;unsigned long ncode;
+    uint32_t fcalls[AWM_FUNCTIONS];uint16_t fname[AWM_FUNCTIONS];   /* the import route's counters; name+1 */
+    uint32_t nactb,naitm,naspt;       /* the actor table's rows (on disk: only their counts, for the load check) */
     uint32_t range;int ops_frame,ops_run;
     unsigned char runnable[MAX_SCRIPTS];      /* passed the load check and not hand-written/broken */
     int16_t global_instance[MAX_SCRIPTS];
@@ -82,14 +84,19 @@ static int operand_bytes(const unsigned char *p,unsigned long left){
     case AWM_GTF:case AWM_GEF:case AWM_POP:case AWM_SAYDONE:case AWM_SECONDS:case AWM_RANDOM:case AWM_MENUMODE:
     case AWM_CELLCHANGED:case AWM_SQRT:case AWM_ENABLE:case AWM_DISABLE:case AWM_GETDISABLED:case AWM_LOCK:
     case AWM_UNLOCK:case AWM_GETLOCKED:case AWM_ONACTIVATE:case AWM_ACTIVATE:case AWM_GETBUTTONPRESSED:return 0;
-    case AWM_PUSHB:case AWM_GETL:case AWM_SETL:case AWM_SETLS:return 1;
+    case AWM_PUSHB:case AWM_GETL:case AWM_SETL:case AWM_SETLS:case AWM_AIWANDER:case AWM_GETPOS:
+    case AWM_AIPACKAGE:return 1;
     case AWM_JMP:case AWM_JZ:case AWM_PUSHW:case AWM_GETG:case AWM_SETG:case AWM_SETGS:case AWM_GETJ:case AWM_SETJ:
     case AWM_JOURNAL:case AWM_REF:case AWM_PLAYSOUND:case AWM_PLAYSOUNDVP:case AWM_PLAYSOUND3D:case AWM_PLAYSOUND3DVP:
     case AWM_PLAYLOOP3D:case AWM_PLAYLOOP3DVP:case AWM_STOPSOUND:case AWM_SOUNDPLAYING:case AWM_STREAMMUSIC:
-    case AWM_STARTSCRIPT:case AWM_STOPSCRIPT:case AWM_SCRIPTRUNNING:case AWM_DISTANCE:return 2;
-    case AWM_GETM:case AWM_SETM:case AWM_SETMS:case AWM_QUERY:return 3;
+    case AWM_STARTSCRIPT:case AWM_STOPSCRIPT:case AWM_SCRIPTRUNNING:case AWM_DISTANCE:case AWM_ACTOR:
+    case AWM_DEADCOUNT:case AWM_GETPCCELL:case AWM_PLAYERMOVE:return 2;
+    case AWM_GETM:case AWM_SETM:case AWM_SETMS:case AWM_QUERY:case AWM_ITEM:case AWM_SPELL:case AWM_COMBAT:
+    case AWM_JNEB:return 3;
+    case AWM_JCMPB:return 4;
     case AWM_PUSHL:case AWM_PUSHF:case AWM_SAY:return 4;
-    case AWM_NOTYET:case AWM_MESSAGEBOX:return left>=5?4+2*p[4]:-1;
+    case AWM_MESSAGEBOX:return left>=5?4+2*p[4]:-1;
+    case AWM_NOTYET:return left>=7?6+2*p[6]:-1;
     }
     return -1;
 }
@@ -115,15 +122,32 @@ static int check_code(const unsigned char *code,unsigned long n,int nlocals){
         case AWM_STREAMMUSIC:if((int)U16(o)>=vm.nmusi)return 0;break;
         case AWM_STARTSCRIPT:case AWM_STOPSCRIPT:case AWM_SCRIPTRUNNING:if((int)U16(o)>=vm.nscrp)return 0;break;
         case AWM_QUERY:if(o[0]==0 || o[0]>=AWQ_COUNT)return 0;break;
-        case AWM_NOTYET:if((o[2]&0x1F)>AW_MWVM_STACK)return 0;break;
+        case AWM_NOTYET:
+            if(U16(o)>=AWM_FUNCTIONS || (o[4]&0x1F)>AW_MWVM_STACK)return 0;
+            if(!vm.fname[U16(o)])vm.fname[U16(o)]=(uint16_t)(U16(o+2)+1);
+            break;
+        case AWM_GETPCCELL:if((int)U16(o)>=vm.npcel)return 0;break;
+        case AWM_GETPOS:if(o[0]>2)return 0;break;
+        case AWM_AIPACKAGE:if(o[0]>1)return 0;break;
+        case AWM_PLAYERMOVE:if((int)U16(o)>=vm.npmov)return 0;break;
         case AWM_MESSAGEBOX:if(o[2]>0x1F)return 0;break;
+        case AWM_ACTOR:if(o[0]>AWM_VERB_RATIO || o[1]>=46)return 0;break;   /* 46: aw_actorstate.h AWA_STATS */
+        case AWM_ITEM:if(o[0]>2 || U16(o+1)>=vm.naitm)return 0;break;
+        case AWM_SPELL:if(o[0]>AWM_SPELL_BLIGHT_DISEASE || (o[0]<AWM_SPELL_COMMON_DISEASE && U16(o+1)>=vm.naspt))return 0;
+            break;
+        case AWM_COMBAT:if(o[0]>1 || (U16(o+1)!=AWM_NONE && (int)U16(o+1)>=vm.nobjs))return 0;break;
+        case AWM_DEADCOUNT:if(U16(o)!=AWM_NONE && U16(o)>=vm.nactb)return 0;break;
+        case AWM_AIWANDER:if(o[0]>10)return 0;break;
+        case AWM_JCMPB:if(o[0]>5)return 0;break;
         }
         i+=1+k;
     }
     if(last!=AWM_END && last!=AWM_RET && last!=AWM_JMP)return 0;    /* the code cannot run off its end */
     for(i=0;i<n;i+=1+operand_bytes(code+i,n-i)){
-        if(code[i]==AWM_JMP || code[i]==AWM_JZ){
-            long t=(long)i+3+S16(code+i+1);
+        if(code[i]==AWM_JMP || code[i]==AWM_JZ || code[i]==AWM_JNEB || code[i]==AWM_JCMPB){
+            /* the offset is the operand's last two bytes, counted from the instruction's end */
+            int k=operand_bytes(code+i,n-i);
+            long t=(long)i+1+k+S16(code+i+k-1);
             if(t<0 || t>=(long)n || !marks[t])return 0;
         }
     }
@@ -144,8 +168,24 @@ int AW_MwvmLoad(const unsigned char *data,unsigned long bytes,const aw_mwvm_host
     vm.musi=section("MUSI",&vm.nmusi,&len);vm.objs=section("OBJS",&vm.nobjs,&len);
     vm.scrp=section("SCRP",&vm.nscrp,&len);vm.strt=section("STRT",&vm.nstrt,&len);
     vm.code=section("CODE",&rows,&vm.ncode);
+    /* the actor table (v0.0.54): OACT is resident; ACTB, AITM and ASPT stay on disk, only their row counts here (a
+     * file without them: no actor calls pass the load check) */
+    vm.oact=section("OACT",&vm.noact,&len);
+    {uint32_t off,n,b;
+     vm.nactb=AW_MwvmSection("ACTB",&off,&n,&b)?n:0;vm.naitm=AW_MwvmSection("AITM",&off,&n,&b)?n:0;
+     vm.naspt=AW_MwvmSection("ASPT",&off,&n,&b)?n:0;}
     if(!conf || !vm.glob || !vm.jrnl || !vm.snds || !vm.voic || !vm.musi || !vm.objs || !vm.scrp || !vm.strt ||
        !vm.code || vm.nscrp>MAX_SCRIPTS || vm.nglob>MAX_GLOBALS){AW_MwvmReset();return 0;}
+    /* the GetPCCell rows (v0.0.54; a file without them: no GETPCCELL passes the load check): every row inside */
+    vm.pcel=section("PCEL",&vm.npcel,&len);
+    if(!vm.pcel || vm.npcel<0 || 4ul*(unsigned long)vm.npcel>len)vm.npcel=0;
+    for(i=0;i<vm.npcel;i++){
+        unsigned long off=u32(vm.pcel+4*i);
+        if(off+4>len || off+4+2ul*U16(vm.pcel+off)+2ul*(U16(vm.pcel+off+2)&0x7FFF)>len){vm.npcel=0;break;}
+    }
+    /* the player's moves (v0.0.54; a file without them: no PLAYERMOVE passes the load check) */
+    vm.pmov=section("PMOV",&vm.npmov,&len);
+    if(!vm.pmov || vm.npmov<0 || 20ul*(unsigned long)vm.npmov>len)vm.npmov=0;
     vm.range=u32(conf);vm.ops_frame=(int)U16(conf+4);vm.ops_run=(int)U16(conf+6);
     if(vm.ops_frame<1)vm.ops_frame=1;
     if(vm.ops_run<1)vm.ops_run=1;
@@ -179,6 +219,9 @@ int AW_MwvmMusic(int k){return ON && k>=0 && k<vm.nmusi && (vm.musi[4*k+1]&1)?vm
 uint32_t AW_MwvmObjectReference(int k){return ON && k>=0 && k<vm.nobjs?u32(vm.objs+12*k):0;}
 int AW_MwvmTopicName(int k){return ON && k>=0 && k<vm.njrnl?(int)U16(vm.jrnl+2*k):-1;}
 int AW_MwvmTopicCount(void){return ON?vm.njrnl:0;}
+int AW_MwvmObjectActor(int k){return ON && vm.oact && k>=0 && k<vm.noact?(int)U16(vm.oact+2*k):AWM_NONE;}
+void AW_MwvmStateChanged(void){if(ON)vm.generation++;}
+void AW_MwvmWake(int k){if(ON && k>=0 && k<vm.ninst)vm.inst[k].flags&=~AWI_QUIET;}
 void AW_MwvmConfig(uint32_t *range,int *ops_frame,int *ops_run){
     *range=ON?vm.range:0;*ops_frame=ON?vm.ops_frame:0;*ops_run=ON?vm.ops_run:0;
 }
@@ -186,6 +229,8 @@ int32_t AW_MwvmGlobalInt(int g){return ON && g>=0 && g<vm.nglob?vm.globals[g].i:
 float AW_MwvmGlobalFloat(int g){return ON && g>=0 && g<vm.nglob?vm.globals[g].f:0;}
 int AW_MwvmGlobalCount(void){return ON?vm.nglob:0;}
 const aw_mwvm_stats_t *AW_MwvmStats(void){return ON?&vm.stats:&no_stats;}
+unsigned long AW_MwvmFunctionCalls(int f){return ON && f>=0 && f<AWM_FUNCTIONS?vm.fcalls[f]:0;}
+int AW_MwvmFunctionName(int f){return ON && f>=0 && f<AWM_FUNCTIONS?(int)vm.fname[f]-1:-1;}
 aw_mwvm_instance_t *AW_MwvmInstance(int k){return ON && k>=0 && k<vm.ninst?&vm.inst[k]:NULL;}
 int AW_MwvmInstanceCount(void){return ON?vm.ninst:0;}
 static int nlocals(int script){return vm.scrp[16*script+2];}
@@ -304,16 +349,32 @@ static void log_notyet(int name,int script){
     vm.logged[name>>3]|=(unsigned char)(1<<(name&7));
     if(vm.host && vm.host->notyet)vm.host->notyet(name,AW_MwvmScriptName(script));
 }
+/* GetPCCell: the player's cell against a PCEL row (rooms by stable number, outdoor cells by grid; built at load
+ * time from the names, so nothing compares text here) */
+static int pc_cell(int row){
+    const unsigned char *r;int kind,x=0,y=0,i,rooms,outside;
+    if(!vm.host || !vm.host->player_cell || !(kind=vm.host->player_cell(&x,&y)))return 0;
+    r=vm.pcel+u32(vm.pcel+4*row);rooms=(int)U16(r);outside=(int)(U16(r+2)&0x7FFF);r+=4;
+    if(kind==2){for(i=0;i<rooms;i++)if((int)U16(r+2*i)==x)return 1;return 0;}
+    for(r+=2*rooms,i=0;i<outside;i++)if((signed char)r[2*i]==x && (signed char)r[2*i+1]==y)return 1;
+    return 0;
+}
 static int run(int k){
     aw_mwvm_instance_t *in=&vm.inst[k];
     const unsigned char *s=vm.scrp+16*in->script,*pc=vm.code+u32(s+8);
     const aw_mwvm_host_t *h=vm.host;
     aw_mwcell_t stack[AW_MWVM_STACK+1],*sp=stack,*locals=&vm.cells[in->locals];
     int target=AW_MWVM_SELF,ops=0,changed=0,acted=0,limit=vm.ops_run;
+    /* CellChanged reads 1 on this run and 0 on the next: the next one runs too ("if ( CellChanged == 0 )" starts
+     * the sound markers' loops), so CellChanged needs no VOLATILE */
+    int cell_changed=(in->flags&AWI_CELLCHANGED)!=0;
     float elapsed=vm.now-in->last_run;
     if(elapsed<=0)elapsed=vm.dt;     /* the first run after attaching: this frame's time */
     for(;;){
         unsigned op=*pc++;
+#ifdef AW_MWVM_PROFILE
+        AW_MWVM_PROFILE(op);    /* native measurements only (the bench's opcode pairs); never in the engine build */
+#endif
         if(++ops>limit){
             vm.stats.aborted++;
             if(h && h->warn)h->warn("a run reached the opcode limit",AW_MwvmScriptName(in->script));
@@ -323,6 +384,12 @@ static int run(int k){
         case AWM_END:case AWM_RET:goto done;
         case AWM_JMP:pc+=2+S16(pc);break;
         case AWM_JZ:--sp;pc+=sp->i?2:2+S16(pc);break;
+        case AWM_JNEB:--sp;pc+=sp->i==(int32_t)(int8_t)pc[0]?3:3+S16(pc+1);break;
+        case AWM_JCMPB:{
+            int32_t v=(--sp)->i,c=(int32_t)(int8_t)pc[1];int ok;
+            switch(pc[0]){case 0:ok=v==c;break;case 1:ok=v!=c;break;case 2:ok=v<c;break;case 3:ok=v<=c;break;
+                          case 4:ok=v>c;break;default:ok=v>=c;break;}
+            pc+=ok?4:4+S16(pc+2);break;}
         case AWM_PUSHB:sp->i=(int8_t)*pc++;sp++;break;
         case AWM_PUSHW:sp->i=S16(pc);pc+=2;sp++;break;
         case AWM_PUSHL:sp->i=(int32_t)u32(pc);pc+=4;sp++;break;
@@ -376,11 +443,24 @@ static int run(int k){
         case AWM_REF:target=U16(pc)==AWM_NONE?AW_MWVM_PLAYER:(int)U16(pc);pc+=2;break;
         case AWM_QUERY:sp->i=h && h->query?h->query(k,pc[0],(int)U16(pc+1)):0;sp++;pc+=3;target=AW_MWVM_SELF;break;
         case AWM_NOTYET:{
-            int flags=pc[2];
-            sp-=flags&0x1F;vm.stats.notyet_calls++;log_notyet((int)U16(pc),in->script);
-            if(flags&0x80){if(flags&0x40)sp->f=0;else sp->i=0;sp++;}
-            pc+=4+2*pc[3];target=AW_MWVM_SELF;   /* it did nothing: not an action for the quiet rule */
+            /* the import route: counted by function number; the host may carry it out by that number with the
+             * arguments as the script gave them; else logged once, nothing done, 0 read */
+            int fn=(int)U16(pc),flags=pc[4],n=flags&0x1F;aw_mwcell_t r;
+            sp-=n;vm.stats.notyet_calls++;vm.fcalls[fn]++;r.i=0;
+            if(h && h->call && h->call(k,target,fn,sp,n,pc+6,pc[5],&r)){vm.stats.host_calls++;acted=1;in=&vm.inst[k];}
+            else{log_notyet((int)U16(pc+2),in->script);r.i=0;}   /* did nothing: not an action for the quiet rule */
+            if(flags&0x80)*sp++=r;
+            pc+=6+2*pc[5];target=AW_MWVM_SELF;
             break;}
+        case AWM_GETPCCELL:sp->i=pc_cell((int)U16(pc));sp++;pc+=2;target=AW_MWVM_SELF;break;
+        case AWM_GETPOS:sp->f=h && h->position?h->position(k,target,pc[0]):0.0f;sp++;pc++;target=AW_MWVM_SELF;break;
+        case AWM_AIPACKAGE:
+            sp->i=h && h->ai_package?h->ai_package(k,target,pc[0]):(pc[0]?0:-1);sp++;pc++;target=AW_MWVM_SELF;break;
+        case AWM_PLAYERMOVE:{
+            const unsigned char *m=vm.pmov+20*U16(pc);float at[3];
+            at[0]=f32(m+4);at[1]=f32(m+8);at[2]=f32(m+12);pc+=2;
+            if(h && h->player_move)h->player_move(k,m[0],(int)U16(m+2),at,f32(m+16));
+            acted=1;target=AW_MWVM_SELF;break;}
         case AWM_PLAYSOUND:case AWM_PLAYSOUND3D:case AWM_PLAYLOOP3D:case AWM_STOPSOUND:
             if(h && h->sound)h->sound(k,target,(int)U16(pc),op==AWM_PLAYSOUND?AW_MWSND_2D:op==AWM_PLAYSOUND3D?
                                       AW_MWSND_3D:op==AWM_PLAYLOOP3D?AW_MWSND_LOOP:AW_MWSND_STOP,1.0f,1.0f);
@@ -453,13 +533,49 @@ static int run(int k){
             if(h && h->message)h->message(k,(int)U16(pc),numbers,number,pc+4,pc[3]);
             pc+=4+2*pc[3];acted=1;target=AW_MWVM_SELF;break;}
         case AWM_GETBUTTONPRESSED:sp->i=h && h->button?h->button(k):-1;sp++;target=AW_MWVM_SELF;break;
+        /* the actor record (aw_actorstate.h): a change is state other scripts read, so the generation moves and
+         * quiet scripts that read actors wake, as for globals; the engine moves it too (a hit, a death) */
+        case AWM_ACTOR:{
+            int verb=pc[0],stat=pc[1];aw_mwcell_t v;pc+=2;
+            if(verb==AWM_VERB_SET || verb==AWM_VERB_MOD || verb==AWM_VERB_MODCURRENT){
+                v=*--sp;
+                if(h && h->actor)h->actor(k,target,verb,stat,v);
+                changed=1;acted=1;vm.generation++;
+            }else{
+                v.i=0;
+                *sp++=h && h->actor?h->actor(k,target,verb,stat,v):v;
+            }
+            target=AW_MWVM_SELF;break;}
+        case AWM_ITEM:{
+            int verb=pc[0],item=(int)U16(pc+1);pc+=3;
+            if(verb==0){sp->i=h && h->item?h->item(k,target,0,item,0):0;sp++;}
+            else{--sp;if(h && h->item)h->item(k,target,verb,item,sp->i);changed=1;acted=1;vm.generation++;}
+            target=AW_MWVM_SELF;break;}
+        case AWM_SPELL:{
+            int verb=pc[0],spell=(int)U16(pc+1);pc+=3;
+            if(verb==0 || verb>=AWM_SPELL_COMMON_DISEASE){sp->i=h && h->spell?h->spell(k,target,verb,spell):0;sp++;}
+            else{if(h && h->spell)h->spell(k,target,verb,spell);changed=1;acted=1;vm.generation++;}
+            target=AW_MWVM_SELF;break;}
+        case AWM_COMBAT:{
+            int verb=pc[0],other=U16(pc+1)==AWM_NONE?AW_MWVM_PLAYER:(int)U16(pc+1);pc+=3;
+            if(h && h->combat)h->combat(k,target,verb,other);
+            acted=1;target=AW_MWVM_SELF;break;}
+        case AWM_AIWANDER:{
+            int count=3+pc[0],i;int32_t values[13];pc++;
+            sp-=count;
+            for(i=0;i<count;i++)values[i]=sp[i].i;
+            if(h && h->wander)h->wander(k,target,values,count);
+            acted=1;target=AW_MWVM_SELF;break;}
+        case AWM_DEADCOUNT:
+            sp->i=h && h->dead_count && U16(pc)!=AWM_NONE?h->dead_count((int)U16(pc)):0;sp++;pc+=2;
+            target=AW_MWVM_SELF;break;
         default:goto done;   /* unreachable: every opcode was checked at load */
         }
     }
 done:
     in=&vm.inst[k];
     in->last_run=vm.now;
-    if(changed || acted)in->flags&=~AWI_QUIET;else in->flags|=AWI_QUIET;
+    if(changed || acted || cell_changed)in->flags&=~AWI_QUIET;else in->flags|=AWI_QUIET;
     in->flags&=~AWI_CELLCHANGED;
     in->generation=vm.generation;
     return ops;

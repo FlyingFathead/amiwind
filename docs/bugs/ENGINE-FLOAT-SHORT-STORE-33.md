@@ -65,6 +65,8 @@ for the same pattern follows.
 
 Family: FPU and CPU behaviour (68040/68060) (`fpu-cpu`). Results must not depend on the FPU; unimplemented instructions trap on a real 68040 without a support library. See [families](README.md#families).
 
+- COMBAT-PLAYGROUND-JIT-FREEZE-54 (no report page): The combat playground freezes about 4 s into the fight of a group of four with the JIT on
+- DAGOTH-CHAMBER-JIT-FAULT-53 (no report page): Loading Akulakhan's Chamber freezes with the JIT on and loads fine with the JIT off
 - [ENGINE-060-FSCC-41](ENGINE-060-FSCC-41.md): The engine has 263 fscc instructions (float comparisons as true/false), which the 68060 traps to its support library
 - [ENGINE-060-MUL64-41](ENGINE-060-MUL64-41.md): The 68040 engine has 151 64-bit MULS.L/MULU.L instructions (divisions by constants), which the 68060 traps to its support library
 - [ENGINE-FPSP-MISSING-31](ENGINE-FPSP-MISSING-31.md): Boot disk loads no 68040 FPU support library; emulator hides it

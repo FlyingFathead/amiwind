@@ -965,6 +965,7 @@ to call ED_CallSpawnFunctions () to let the objects initialize themselves.
 */
 /* Set by Chim_Init when the CHIM data exists (chim/chim_statics.c). */
 int (*aw_chim_entity)(char **data);
+void (*aw_levelled_entity)(edict_t *ent);	/* aw_actors.c: a room map's "aw_levelled" entity (CREATURE-ROOM-LEVELLED-54) */
 
 void ED_LoadFromFile (char *data)
 {
@@ -1024,6 +1025,14 @@ void ED_LoadFromFile (char *data)
 		{
 			Con_Printf ("No classname for:\n");
 			ED_Print (ent);
+			ED_Free (ent);
+			continue;
+		}
+
+	/* a room's levelled creature (aw_actors.c LevelledEntity): rolled and spawned there; the placeholder goes */
+		if (aw_levelled_entity && !strcmp (pr_strings + ent->v.classname, "aw_levelled"))
+		{
+			aw_levelled_entity (ent);
 			ED_Free (ent);
 			continue;
 		}

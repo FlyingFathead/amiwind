@@ -195,10 +195,24 @@ def placement_metadata(context, ref):
     # Presence must agree with the independently collected original field list.
     if seen != set(fields) & {'ANAM', 'INTV', 'NAM9'}:
         raise ValueError('Source placement metadata is incomplete')
-    result['admission'] = ('requires_ownership_and_theft' if result['owner'] else
-                           'unsupported_nondefault_charge_or_gold' if result['charge'] not in (-1, 0) or result['gold_value'] != 1 else
+    # An owned plant (HARVEST-INTERIOR-PICK-47, decided for the project 2026-10-27): pickable as a theft, OpenMW's rule
+    # (taking an owned container's contents is a crime only if seen; no crime system yet). The owning character's id travels with the
+    # plant in its catalogue row, so the saved pick fact of an owned placement is the theft record (owner, item from
+    # the persisted roll); the crime system reads it later.
+    result['admission'] = ('unsupported_nondefault_charge_or_gold' if result['charge'] not in (-1, 0) or result['gold_value'] != 1 else
+                           'owned_theft' if result['owner'] else
                            'supported_neutral_container_metadata')
+    if result['owner'] and not re.fullmatch(r'[ -~]{1,63}', result['owner']):
+        result['admission'] = 'unsupported_owner_identifier'
     return result
+
+
+ADMITTED = ('supported_neutral_container_metadata', 'owned_theft')
+
+
+def owner_suffix(plant):
+    """A plant row's owner field: a tab and the owning character's record id after the label, or nothing (aw_harvest.c)."""
+    return '\t' + plant['owner'] if plant.get('owner') else ''
 
 
 def prepare_graph(context, references, binding):
@@ -276,7 +290,7 @@ def prepare_graph(context, references, binding):
         if ref['type'] != 'CONT' or ref.get('script') or not ref['container_state']['flags'] & 1:
             raise ValueError('Only unscripted organic container mushrooms are supported')
         metadata = placement_metadata(context, ref)
-        if metadata['admission'] != 'supported_neutral_container_metadata':
+        if metadata['admission'] not in ADMITTED:
             raise ValueError('Source placement requires ownership/theft or nondefault charge/gold handling: ' + metadata['admission'])
         if not 0 < ref['number'] <= 16777216:
             raise ValueError('Reference cannot be represented exactly by current QC field')
@@ -298,7 +312,8 @@ def prepare_graph(context, references, binding):
         if not re.fullmatch(r'[ -~]{1,63}', label):
             raise ValueError('Unsupported runtime display name encoding/length')
         plants.append(dict(key=key, slot=indices[key], reference=ref['number'], model=entity['model'], flags=ref['container_state']['flags'],
-                           first=first, count=len(contents), origin=origin, angles=angles, label=label))
+                           first=first, count=len(contents), origin=origin, angles=angles, label=label,
+                           owner=metadata['owner']))
         provenance.append(dict(key=key, slot=indices[key], source_key=ref['source_key'], source_id=ref['id'],
                                container_state=ref['container_state'], script=ref['script'], placement_metadata=metadata, entity=entity))
     if len(nodes) > 64 or len(edges) > 256 or len(plants) > context.get('max_plants', 24):
@@ -333,7 +348,7 @@ def prepare(master, region, bsp, *, context=None):
     rows += [' '.join(map(str, e)) for e in edges]
     for p in plants:
         rows.append('{key} {slot} {reference} {model} {flags} {first} {count} '.format(**p) +
-                    ' '.join(format(v, '.9g') for v in p['origin'] + p['angles']) + ' ' + p['label'])
+                    ' '.join(format(v, '.9g') for v in p['origin'] + p['angles']) + ' ' + p['label'] + owner_suffix(p))
     payload = ('\n'.join(rows) + '\n').encode('ascii')
     if len(payload) > 65536:
         raise ValueError('Harvest catalogue exceeds 65536-byte runtime input bound')

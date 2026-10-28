@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-only
-"""The NPC voice and greeting table (tools/greeting_lut.py, AWGL1; NPC-GREETINGS-LIBRARY-MUTE-48).
+"""The NPC voice and greeting table (tools/greeting_lut.py, AWGL2; NPC-GREETINGS-LIBRARY-MUTE-48).
 
 Synthetic records only (no game data): Voice topics by race and sex, an id-specific line, a faction-filtered one, a
 disposition condition and a Random100 one left for run time, conversation greetings gated by a journal entry and by
@@ -247,6 +247,159 @@ class LibraryAndImageStep(unittest.TestCase):
         self.assertIn('vo/d/m/hlo_dm.mp3', report['missing_sources'])
 
 
+def esm(records):
+    """A master's bytes from [(tag, [(sub, str or bytes)])]."""
+    def sub(tag, data):
+        data = data.encode('cp1252') + b'\0' if isinstance(data, str) else data
+        return tag.encode() + struct.pack('<I', len(data)) + data
+    out = b''
+    for tag, fields in records:
+        body = b''.join(sub(t, d) for t, d in fields)
+        out += tag.encode() + struct.pack('<III', len(body), 0, 0) + body
+    return out
+
+
+def sndg(name, creature, moment, sound):
+    return ('SNDG', [('NAME', name), ('DATA', struct.pack('<i', moment)), ('SNAM', sound)] +
+            ([('CNAM', creature)] if creature else []))
+
+
+def soun(name, file):
+    return ('SOUN', [('NAME', name), ('FNAM', file), ('DATA', bytes(3))])
+
+
+def crea(name, model, original=''):
+    return ('CREA', [('NAME', name), ('MODL', model)] + ([('CNAM', original)] if original else []))
+
+
+def sound_data(folder):
+    """Synthetic masters for the sound table: own generators, an original's, a same-model fallback, the generic ones,
+    a creature of an add-on, the engine's named sounds (a few of them)."""
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / 'Morrowind.esm').write_bytes(esm([
+        soun('Rat Moan', 'Cr\\rat\\moan.wav'), soun('Rat Roar', 'Cr\\rat\\roar.wav'),
+        soun('Default Foot', 'Fx\\foot\\default.wav'), soun('Weapon Swish', 'Fx\\swish.wav'),
+        soun('Heavy Armor Hit', 'Fx\\heavyhit.wav'), soun('Item Gold Up', 'Fx\\item\\gold.wav'),
+        crea('rat', 'r\\rat.nif'), crea('rat_diseased', 'r\\rat.nif', original='rat'),
+        crea('rat_twin', 'r\\rat.nif'), crea('Guar', 'r\\guar.nif'),
+        sndg('rat moan', 'rat', 4, 'Rat Moan'), sndg('rat roar', 'rat', 5, 'Rat Roar'),
+        sndg('default left', '', 0, 'Default Foot'), sndg('default right', '', 1, 'Default Foot')]))
+    (folder / 'Tribunal.esm').write_bytes(esm([
+        soun('Goblin Scream', 'Cr\\goblin\\scream.wav'), crea('goblin', 'r\\goblin.nif'),
+        sndg('goblin scream', 'goblin', 6, 'Goblin Scream')]))
+    return folder
+
+
+MEDIA = {'Fx\\swish.wav': 11025, 'Cr\\rat\\moan.wav': 22050}    # converted files and their frames (11,025 Hz)
+
+
+def media_folder(folder):
+    """A media stage folder: media-coverage.json with two converted effects (the catalogue's names: the pool files)."""
+    import json
+    folder.mkdir(parents=True, exist_ok=True)
+    entries = [{'category': 'effects', 'status': 'included', 'frames': frames,
+                'source': 'sound/' + file.replace('\\', '/').casefold(), 'path': 'sound/' + voice_pool_name(file)}
+               for file, frames in MEDIA.items()]
+    (folder / 'media-coverage.json').write_text(json.dumps({'entries': entries}), encoding='utf-8', newline='\n')
+    return folder
+
+
+def sound_fixture(media=True):
+    """(sound_table(), media_lengths()) of the synthetic data, with or without a media catalogue."""
+    with tempfile.TemporaryDirectory() as tmp:
+        folder = media_folder(Path(tmp) / 'media') if media else None
+        return (G.sound_table(sound_data(Path(tmp) / 'Data Files'), voice_pool_name, folder),
+                G.media_lengths(folder) if media else None)
+
+
+class SoundTable(unittest.TestCase):
+    """The creature sound rows, the named slots and the SOUN rows (AWGL2, docs/NPC_DEFAULTS.md "How AmiWind stores
+    them")."""
+
+    @classmethod
+    def setUpClass(cls):
+        sound, cls.lengths = sound_fixture()
+        cls.rows, cls.slots, cls.soun_rows, cls.sound_report = sound
+        cls.raw, cls.report = G.build(kinds(), TOPICS, sound=sound, lengths=cls.lengths)
+        cls.t = G.read(cls.raw)
+
+    def test_soun_rows(self):
+        t = self.t
+        self.assertEqual(len(t['soun']), 7)                                   # every SOUN record of both masters
+        self.assertEqual(struct.calcsize(G.SOUN_ROW), 16)
+        order = G.soun_order({k: None for k in ('rat moan', 'rat roar', 'default foot', 'weapon swish',
+                                                'heavy armor hit', 'item gold up', 'goblin scream')})
+        swish = t['soun'][order.index('weapon swish')]
+        self.assertEqual(swish, (bytes.fromhex(voice_pool_name('Fx\\swish.wav')[6:22]), 100, 0, G.SOUND_MAPPED,
+                                 100, 2000))     # 1 s; volume byte 0; no distances: 5 and 40 x the default multipliers
+        heavy = t['soun'][order.index('heavy armor hit')]
+        self.assertEqual((heavy[0], heavy[1], heavy[3]), (bytes(8), 0, 0))   # not converted: no file, not mapped
+        self.assertEqual(self.sound_report['soun_mapped'], 2)
+
+    def test_sound_rows_carry_length_and_mapped(self):
+        named = dict(zip((s for s, _ in G.SOUND_SLOTS), self.t['slots']))
+        _hash, centis, flags = self.t['sound_rows'][named['WEAPON_SWISH']]
+        self.assertEqual((centis, flags), (100, G.SOUND_MAPPED))
+        _hash, centis, flags = self.t['sound_rows'][named['ITEM_GOLD_UP']]
+        self.assertEqual((centis, flags), (0, 0))
+        self.assertEqual(struct.calcsize(G.SOUND_ROW), 12)
+        no_media, _ = sound_fixture(media=False)
+        self.assertFalse(any(r[11] for r in no_media[2]))                     # no catalogue: nothing marked mapped
+
+    def moments(self, ident):
+        row = dict((i.casefold(), s) for i, s in self.t['creatures'])[ident]
+        return [None if s == G.NONE16 else self.t['sounds'][s] for s in row]
+
+    def test_fallback_rule(self):
+        moan, roar, foot = (voice_pool_name(f)[6:22] for f in ('Cr\\rat\\moan.wav', 'Cr\\rat\\roar.wav',
+                                                               'Fx\\foot\\default.wav'))
+        self.assertEqual(self.moments('rat'), [foot, foot, None, None, moan, roar, None, None])
+        self.assertEqual(self.moments('rat_diseased'), self.moments('rat'))      # its original's
+        self.assertEqual(self.moments('rat_twin')[4:6], [moan, roar])            # a creature with the same model
+        self.assertEqual(self.moments('guar'), [foot, foot] + [None] * 6)        # the generic ones only
+        self.assertEqual(self.moments('goblin')[6], voice_pool_name('Cr\\goblin\\scream.wav')[6:22])   # add-on
+
+    def test_rows_sorted_like_the_engine_compares(self):
+        ids = [i.casefold().encode('cp1252') for i, _ in self.t['creatures']]
+        self.assertEqual(ids, sorted(ids))
+        self.assertEqual(len(ids), 5)
+
+    def test_section_size_and_every_index_in_range(self):
+        t, n = self.t, len(self.t['sounds'])
+        self.assertEqual(self.report['sound_table']['creature_bytes'], 20 * len(t['creatures']))
+        self.assertEqual(struct.calcsize(G.CREATURE_ROW), 20)
+        self.assertEqual(len(t['slots']), len(G.SOUND_SLOTS))
+        self.assertEqual(self.report['sound_table']['slot_bytes'], 2 * len(G.SOUND_SLOTS))
+        for _ident, row in t['creatures']:
+            self.assertEqual(len(row), len(G.SNDG_MOMENTS))
+            for s in row:
+                self.assertTrue(s == G.NONE16 or s < n)
+        for s in t['slots']:
+            self.assertTrue(s == G.NONE16 or s < n)
+        self.assertEqual(len(t['sounds']), len(set(t['sounds'])))              # each pool file once, shared
+        named = dict(zip((s for s, _ in G.SOUND_SLOTS), t['slots']))
+        self.assertEqual(t['sounds'][named['WEAPON_SWISH']], voice_pool_name('Fx\\swish.wav')[6:22])
+        self.assertEqual(t['sounds'][named['ITEM_GOLD_UP']], voice_pool_name('Fx\\item\\gold.wav')[6:22])
+        self.assertEqual(named['MISS'], G.NONE16)
+        self.assertEqual(self.raw[4:6], struct.pack('>H', 2))                 # format version 2
+
+    def test_contract_matches_the_engine_header(self):
+        import re
+        header = (ROOT / 'engine/aga/src/aw_glut.h').read_text(encoding='utf-8')
+        self.assertIn('#define AW_GLUT_VERSION %d' % G.VERSION, header)
+        self.assertIn('#define AW_GLUT_CREATURE_ROW %d' % struct.calcsize(G.CREATURE_ROW), header)
+        self.assertIn('#define AW_GLUT_SOUND_ROW %d' % struct.calcsize(G.SOUND_ROW), header)
+        self.assertIn('#define AW_GLUT_SOUN_ROW %d' % struct.calcsize(G.SOUN_ROW), header)
+        self.assertIn('#define AW_GLUT_MAPPED %d' % G.SOUND_MAPPED, header)
+
+        def enum(prefix, end):
+            block = re.search(r'enum \{([^}]*\b%s\b[^}]*)\}' % end, header).group(1)
+            names = re.findall(r'\b%s(\w+)' % prefix, block)
+            return [n for n in names if n != end[len(prefix):]]
+        self.assertEqual(enum('AW_SNDG_', 'AW_SNDG_MOMENTS'), list(G.SNDG_MOMENTS))
+        self.assertEqual(enum('AW_SLOT_', 'AW_SLOTS'), [s for s, _ in G.SOUND_SLOTS])
+
+
 def ref_holds(t, ident, cond, state):
     """The engine's condition test (aw_glut.c AW_GlutHolds), for the expectations."""
     op, cmp, operand, value = cond
@@ -289,7 +442,8 @@ class NativeVoiceTable(unittest.TestCase):
         import subprocess
         sys.path.insert(0, str(ROOT / 'tests'))
         from test_aga_native_source import tree_project_version
-        cls.raw, _ = G.build(kinds(), TOPICS)
+        sound, lengths = sound_fixture()
+        cls.raw, _ = G.build(kinds(), TOPICS, sound=sound, lengths=lengths)
         cls.t = G.read(cls.raw)
         cls.tmp = tempfile.TemporaryDirectory(prefix='amiwind-glut-c-')
         tmp = Path(cls.tmp.name)
@@ -332,6 +486,19 @@ class NativeVoiceTable(unittest.TestCase):
         lines.append('expand\tmage\tEdwinna\tI am %Name, a %Class of the %Faction (%Rank), %PCName. 10%\t'
                      'I am Edwinna, a Mage of the Mages Guild (Journeyman), %PCName. 10%')
         lines.append('expand\tdunmer_m\tDral\t%name of %CELL in %Faction\tDral of  in ')
+        # the sound table: every creature row by its id (any case) and its eight moments, every named slot and its path
+        for row, (ident, sounds) in enumerate(t['creatures']):
+            lines.append('creature\t%s\t%d\t%s' % (ident.upper(), row,
+                                                   ','.join(str(-1 if s == G.NONE16 else s) for s in sounds)))
+        lines.append('creature\tno_such_creature\t-1')
+        for slot, s in enumerate(t['slots']):
+            lines.append('slot\t%d\t%d\t%s' % (slot, -1 if s == G.NONE16 else s,
+                                                '-' if s == G.NONE16 else 'sound/pool/a%s.wav' % t['sounds'][s]))
+        for s, (_hash, centis, flags) in enumerate(t['sound_rows']):
+            lines.append('slen\t%d\t%d\t%d' % (s, centis, flags & G.SOUND_MAPPED))
+        for i, (h, centis, volume, flags, near, far) in enumerate(t['soun']):
+            lines.append('soun\t%d\t%s\t%d\t%d\t%d\t%d\t%d' % (i, h.hex(), centis, volume, flags & G.SOUND_MAPPED,
+                                                                near, far))
         path = Path(self.tmp.name) / 'expect.txt'
         path.write_text('\n'.join(lines) + '\n', encoding='cp1252')
         self.assertIn('%d checks' % len(lines), self.run_check('pure', str(Path(self.tmp.name) / G.NAME), str(path)))

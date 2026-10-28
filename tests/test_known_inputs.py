@@ -267,6 +267,30 @@ class InputLockTests(unittest.TestCase):
         self.assertEqual(again.trusted, 7)
         self.assertEqual(again.sha256(self.files[2]), sha(b'synthetic 2'))
 
+    def test_saves_side_by_side_never_lose_the_lock(self):
+        # BUILD-INPUTS-LOCK-TMP-RACE-54: two builds starting in one workspace both write the lock; with one fixed
+        # temporary name the second renamed the first's file away (FileNotFoundError)
+        import threading
+        self.run_lock('auto')
+        errors = []
+
+        def save():
+            try:
+                for _ in range(20):
+                    lock = ki.InputLock(self.lock_path, 'auto', self.table)
+                    lock.prepare(self.files[:2])
+                    lock.save()
+            except Exception as error:  # noqa: BLE001
+                errors.append(error)
+        threads = [threading.Thread(target=save) for _ in range(4)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        self.assertEqual(errors, [])
+        self.assertEqual(json.loads(self.lock_path.read_text(encoding='utf-8'))['schema'], ki.LOCK_SCHEMA)
+        self.assertEqual(sorted(p.name for p in self.lock_path.parent.iterdir() if p.name.endswith('.tmp')), [])
+
     def test_core_mode_always_hashes_core_inputs_only(self):
         self.run_lock('core')
         again = self.run_lock('core')

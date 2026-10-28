@@ -184,6 +184,15 @@ class Header(unittest.TestCase):
 
 
 class EngineSources(unittest.TestCase):
+    def test_the_sandbox_setup_runs_after_the_quick_character_screen(self):
+        # v0.0.54-dev1: a MiniWind's boot commands (miniwind.txt "boot") were lost when the quick character screen
+        # opened on arrival; they run when it closes, or on arrival when there is no screen
+        scene = (SRC / 'aw_scene.c').read_text(encoding='utf-8')
+        done = scene.split('static void quick_screen_done(int accepted) {')[1].split('\n}')[0]
+        self.assertIn('miniwind_boot();', done)
+        arrival = scene.split('if(quick_notice && AW_MiniwindActive()){')[1].split('\n    }')[0]
+        self.assertIn('miniwind_boot();', arrival)
+
     @unittest.expectedFailure  # EXPERIMENTAL, unfinished: the quick character screen work in progress
     # (docs/EXPERIMENTAL_FLAGS.md); this check passes once that part is written
     def test_new_game_and_the_debug_command_use_the_same_entry_point(self):

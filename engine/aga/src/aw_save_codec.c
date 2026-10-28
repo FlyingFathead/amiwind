@@ -9,6 +9,11 @@ int (*aw_save_changes_export)(aw_changes_t *changes);
 void (*aw_save_changes_import)(const aw_changes_t *changes);
 int (*aw_save_objects_export)(aw_changes_t *changes);
 void (*aw_save_objects_import)(const aw_changes_t *changes);
+int (*aw_save_actors_export)(unsigned char *out,int capacity);
+void (*aw_save_actors_import)(const unsigned char *data,int bytes);
+/* AWS4 feature bit 16: the actor record's block, u32 length then its bytes (checked by aw_actorstate.c's import);
+ * read straight into the caller's buffer (its contents count only when the decode succeeds) */
+static int actor_scratch_bytes;
 static unsigned char *writing;
 static const unsigned char *reading;
 static int at,end,error;
@@ -283,11 +288,12 @@ int AW_SaveEncode(unsigned char *out,int capacity,const aw_save_t *state)
 int AW_SaveEncodeChanges(unsigned char *out,int capacity,const aw_save_t *state,const aw_changes_t *changes)
 {
     aw_save_t copy=*state;uint32_t size=0,crc;int listed=changes && changes->count>0;
+    int actors=changes && changes->actors && changes->actor_bytes>0;
     if(capacity<12 || capacity>AW_SAVE_BYTES)return 0;
     writing=out;reading=NULL;at=12;end=capacity;error=0;
     memset(out,0,capacity);fields(&copy);if(!error)journal_fields(&copy.state);
     {uint32_t features=(copy.state.harvest.slots?1U:0U)|(inventory_used(&copy.state.inventory)?2U:0U)|
-        (magic_used(&copy.state.magic)?4U:0U)|(listed?8U:0U);word(&features);}
+        (magic_used(&copy.state.magic)?4U:0U)|(listed?8U:0U)|(actors?16U:0U);word(&features);}
     if(!error && copy.state.harvest.slots)harvest_fields(&copy.state.harvest);
     if(!copy.state.harvest.slots){
         int i;for(i=0;i<32;i++)if(copy.state.harvest.catalogue[i])error=1;
@@ -304,6 +310,11 @@ int AW_SaveEncodeChanges(unsigned char *out,int capacity,const aw_save_t *state,
         memcpy(change_scratch.entry,changes->entry,sizeof(aw_change_t)*changes->count);
         qsort(change_scratch.entry,change_scratch.count,sizeof(aw_change_t),change_order);
         changes_fields(&change_scratch);
+    }
+    if(!error && actors){
+        uint32_t n=(uint32_t)changes->actor_bytes;
+        if(n>AW_SAVE_ACTOR_BYTES || changes->actor_bytes>changes->actor_capacity)return 0;
+        word(&n);bytes(changes->actors,(int)n);
     }
     if(error)return 0;
     size=at;memcpy(out,"AWS4",4);at=4;word(&size);
@@ -323,7 +334,7 @@ int AW_SaveDecodeChanges(const unsigned char *data,int size,aw_save_t *out,aw_ch
     /* Older saves have quest indices but no chronological evidence. Do not
      * fabricate earlier entries or dates when decoding them. */
     if(!error && data[3]!='1')journal_fields(&candidate.state);
-    if(!error && data[3]=='4'){word(&features);if(features>15)error=1;}
+    if(!error && data[3]=='4'){word(&features);if(features>31)error=1;}
     if(!error && (data[3]=='3' || (data[3]=='4' && (features&1))))harvest_fields(&candidate.state.harvest);
     if(!error && data[3]=='4'){
         word(&candidate.equipment);
@@ -334,9 +345,20 @@ int AW_SaveDecodeChanges(const unsigned char *data,int size,aw_save_t *out,aw_ch
     if(!error && data[3]=='4' && (features&4))magic_fields(&candidate.state);
     change_scratch.count=0;
     if(!error && data[3]=='4' && (features&8))changes_fields(&change_scratch);
+    actor_scratch_bytes=0;
+    if(!error && data[3]=='4' && (features&16)){
+        uint32_t n=0;word(&n);
+        if(error || n<1 || n>AW_SAVE_ACTOR_BYTES || at>end-(int)n)error=1;
+        else{
+            if(changes && changes->actors && (int)n<=changes->actor_capacity){
+                memcpy(changes->actors,reading+at,n);actor_scratch_bytes=(int)n;}
+            at+=(int)n;
+        }
+    }
     if(error || at!=size)return 0;
     *out=candidate;
     if(changes){changes->count=change_scratch.count;
-        memcpy(changes->entry,change_scratch.entry,sizeof(aw_change_t)*change_scratch.count);}
+        memcpy(changes->entry,change_scratch.entry,sizeof(aw_change_t)*change_scratch.count);
+        changes->actor_bytes=actor_scratch_bytes;}
     return 1;
 }

@@ -14,6 +14,10 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 
+# The map's player arrow in gfx/ui.awu (engine/aga/src/aw_worldui.c MAP_ARROW_*): 16x16 at 0,48.
+ARROW, ARROW_X, ARROW_Y = 16, 0, 48
+
+
 def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -252,6 +256,25 @@ def convert(data, palette_path, out):
     atlas.paste(yellow, (48,32), yellow); sources[path] = hashlib.sha256(raw).hexdigest()
     pal = Image.new('P',(1,1)); pal.putpalette(palette)
     indexed = atlas.convert('RGB').quantize(palette=pal,dither=Image.Dither.NONE)
+    pixels = bytearray(indexed.tobytes())
+    # UI-MAP-PLAYER-ARROW-51 (the maintainer, 25 October 2026: "USE THE ARROW BITMAP AS A SOURCE FROM THE ORIGINAL
+    # MORROWIND FILES"): the map's player arrow, textures/compass.dds (OpenMW's local map draws the player with it,
+    # turned to the player's heading: apps/openmw/mwgui/mapwindow.cpp), 32x32 box-filtered to 16x16 at 0,48 of the
+    # atlas; a pixel under half cover is 255, the transparent index the palette overlay keeps (the engine draws the
+    # arrow when the corner pixel is 255, aw_worldui.c).
+    path = 'textures/compass.dds'; raw = assets.read(path)
+    arrow = Image.open(io.BytesIO(raw)).convert('RGBA').resize((ARROW,ARROW),Image.Resampling.BOX)
+    from prepare_icons import quantise
+    import numpy as np
+    rgba = np.asarray(arrow,dtype=np.float64)/255.0
+    colours = quantise(rgba[...,:3],palette)
+    for y in range(ARROW):
+        for x in range(ARROW):
+            pixels[(ARROW_Y+y)*64+ARROW_X+x] = colours[y*ARROW+x] if rgba[y,x,3]>=.5 else 255
+    if pixels[ARROW_Y*64+ARROW_X]!=255 or all(pixels[(ARROW_Y+y)*64+ARROW_X+x]==255 for y in range(ARROW) for x in range(ARROW)):
+        raise ValueError('compass.dds: no arrow with a clear corner')
+    sources[path] = hashlib.sha256(raw).hexdigest()
+    indexed = Image.frombytes('P',(64,64),bytes(pixels))
     (out/'ui.awu').write_bytes(b'AWU1'+struct.pack('<HH',64,64)+indexed.tobytes())
     path='textures/menu_morrowind.dds';raw=assets.read(path)
     background=Image.open(io.BytesIO(raw)).convert('RGB').resize((320,200),Image.Resampling.BOX)

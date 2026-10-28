@@ -21,12 +21,19 @@
 #include "aw_miniwind.h"
 #include "aw_quickchar.h"
 #include "aw_testbox.h"
+#include "aw_travel.h"
+#include "aw_clock.h"
+#include "aw_tryalloc.h"
 /* Ordinary hinged doors (aw_hinged_door.c sets these; NULL: none). */
 int (*aw_hinged_use)(void);
 int (*aw_hinged_hint)(const char **name,const char **action);
 void (*aw_hinged_spawn)(void);
 void (*aw_hinged_tick)(double seconds);
 int (*aw_hinged_locked_sound)(void);
+/* aw_hinged_door.c AW_HingedDoorLoadLock (DEBUG-GOD-LOCKED-DOORS-51); NULL in fixtures without it: no locks. */
+int (*aw_load_door_lock)(unsigned reference,int use);
+/* aw_talk.c AW_CanTalk (TALK-PROMPT-RULES): the prompt, E (pr_cmds.c #79) and the caravaners; NULL without it. */
+int (*aw_can_talk)(edict_t *e);
 #include "amiwind_version.h"
 
 /* CHIM rooms that need more Fast RAM than this start has (CHIM-ROOM-16MB-REFUSAL-48). The builder marks each
@@ -201,16 +208,27 @@ static double hand_torch_time;
 static int hand_clock_ready;
 static double started;
 static int region_crossing,map_jump;
+static const edict_t *travel_rows_for;   /* the travel services' looked-up provider (travel_service, below) */
 /* A partial-area build (aw_miniwind.c): what an exit to an area it does not
  * hold says, and the quick start's notice still to show on arrival. */
 #define AREA_UNAVAILABLE "Area unavailable"
 static int quick_notice;
 /* A quick start with aw_skip_census: the quick character screen opens on arrival. */
 static int quick_screen;
-/* The partial-area notice waits for the quick character screen to close. */
+/* The sandbox's own setup (miniwind.txt "boot", docs/MINIWIND.md: e.g. "dbg companion test;dbg combat on"), once per
+ * arrival of the quick start. */
+static void miniwind_boot(void) {
+    if(AW_Miniwind()->boot[0]){
+        char line[AW_MINIWIND_BOOT+2];int i;
+        for(i=0;AW_Miniwind()->boot[i] && i<AW_MINIWIND_BOOT;i++)line[i]=AW_Miniwind()->boot[i]==';'?'\n':AW_Miniwind()->boot[i];
+        line[i++]='\n';line[i]=0;Cbuf_AddText(line);
+    }
+}
+/* The partial-area notice and the sandbox's setup wait for the quick character screen to close (they were lost
+ * behind it: the combat playground's duel never started, v0.0.54-dev1). */
 static void quick_screen_done(int accepted) {
     (void)accepted;
-    if(AW_MiniwindActive())AW_UISubtitle(AW_Miniwind()->title,AW_Miniwind()->features,15);
+    if(AW_MiniwindActive()){AW_UISubtitle(AW_Miniwind()->title,AW_Miniwind()->features,15);miniwind_boot();}
 }
 static vec3_t area_last;static int area_last_ok;static double area_said=-10;
 static int area_hold(edict_t *p);
@@ -467,7 +485,7 @@ static void load_scene(aw_scene_link_t *link,int immediate) {
         AW_SetNextLoadingStyle(AW_RegionLoadingFrozen()?AW_LOADING_FROZEN:AW_LOADING_BLANK);
         AW_SetNextLoadingDelay();
     }
-    shroompicker_view=0;
+    shroompicker_view=0;travel_rows_for=NULL;   /* edicts are reused by the next map: look the provider up again */
     next=*link;pending=1;started=Sys_FloatTime();AW_StreamTransitionBegin();
     AW_SaveCapture();
     health=p->v.health;
@@ -600,21 +618,79 @@ static const char *travel_message;
 /* The town table names each town's strider (travel_npc) and where it goes:
  * Seyda's Darvame Hleran to Balmora's arrival, Balmora's Selvil Sareloth
  * back to Seyda through Balmora's return point. */
+/* The travel services of the game data (TRAVEL-SERVICES-CHIM-51; aw_travel.h): id1/travel.txt, read once; the rows of
+ * the provider in front of the player are looked up by its record id (aw_source_id) and kept until another actor is
+ * aimed at. travel_services: 1 while the open menu is such a provider's (else the town table's ride above). */
+static char *travel_text;static int travel_text_read;
+static aw_travel_t travel_rows;static int travel_services;
+static int travel_price[AW_TRAVEL_ROWS],travel_hours[AW_TRAVEL_ROWS];
+static const char *travel_table(void) {
+    FILE *f;int size;
+    if(travel_text_read)return travel_text;
+    travel_text_read=1;
+    if((size=COM_FOpenFile("travel.txt",&f))<0 || !f)return NULL;
+    if(size>0 && size<262144 && (travel_text=AW_TryMalloc(size+1))!=NULL){
+        if((int)fread(travel_text,1,size,f)==size)travel_text[size]=0;else{free(travel_text);travel_text=NULL;}
+    }
+    fclose(f);
+    if(travel_text && AW_TravelParse(travel_text,NULL,&travel_rows)<0){
+        Con_Printf("travel.txt is not a travel table (AWT1); travel services off.\n");free(travel_text);travel_text=NULL;
+    }
+    return travel_text;
+}
+static int travel_service(const edict_t *e) {
+    eval_t *v;const char *text;
+    if(e==travel_rows_for)return travel_rows.count>0;
+    travel_rows_for=e;travel_rows.count=0;
+    v=GetEdictFieldValue((edict_t *)e,"aw_source_id");
+    if(!v || !v->string || !pr_strings[v->string] || !(text=travel_table()))return 0;
+    return AW_TravelParse(text,pr_strings+v->string,&travel_rows)>0;
+}
 static edict_t *travel_target(void) {
     edict_t *e;const aw_town_t *town=AW_Town(AW_TownFind(sv.name));
     if(key_dest!=key_game || AW_StoryRestricted())return NULL;
-    e=npc_target();if(!e)return NULL;
+    e=npc_target();if(!e){travel_rows_for=NULL;return NULL;}
+    /* a caravaner in a fight (or dead) offers no ride: the talk rule (aw_talk.c), for the town table's ride and the
+     * travel services alike */
+    if(aw_can_talk && !aw_can_talk(e))return NULL;
     if(town && town->travel_npc[0] && !strcmp(pr_strings+e->v.netname,town->travel_npc))return e;
+    if(travel_service(e))return e;
     return NULL;
 }
 static int travel_use(void) {
-    edict_t *e=travel_target();
+    edict_t *e=travel_target();int i;float local[3],source[3],*player=NULL;
     if(!e)return 0;
     travel_town=AW_TownFind(sv.name);
-    travel_return=AW_Town(travel_town)->travel_return;
-    travel_count=travel_return?2:5;
+    if(travel_town>=0 && AW_Town(travel_town)->travel_npc[0] &&
+       !strcmp(pr_strings+e->v.netname,AW_Town(travel_town)->travel_npc)){
+        travel_services=0;
+        travel_return=AW_Town(travel_town)->travel_return;
+        travel_count=travel_return?2:5;
+    }else{
+        /* the price from where the player stands (original coordinates), else the provider's own placement */
+        VectorCopy(svs.clients[0].edict->v.origin,local);
+        if(AW_WorldToSource(sv.name,local,source))player=source;
+        for(i=0;i<travel_rows.count;i++)AW_TravelCost(&travel_rows,i,player,&travel_price[i],&travel_hours[i]);
+        travel_services=1;travel_count=travel_rows.count+1;
+    }
     travel_open=1;travel_choice=0;travel_message=NULL;
     key_dest=key_menu;IN_AWClearButtons();return 1;
+}
+/* A ride of the travel services: paid, the clock moved by the ride's hours (none from an interior), then the
+ * destination loaded as a door's link would be. */
+static void travel_ride(int i) {
+    aw_scene_link_t r;const aw_travel_row_t *row=&travel_rows.rows[i];long gold=AW_StateGet(&aw_state,AW_ITEM,"gold_001");
+    char path[40];
+    if(gold<travel_price[i]){travel_message="You do not have enough gold.";return;}
+    if(!map_valid(row->map) || AW_SceneMapSize(row->map,path,sizeof(path))<0){
+        travel_message=AW_MiniwindActive()?AREA_UNAVAILABLE:"Destination not in this build.";return;
+    }
+    memset(&r,0,sizeof(r));copy_name(r.target,sizeof(r.target),row->map);
+    VectorCopy(row->arrival,r.arrival);r.yaw=row->yaw;
+    if(AW_SceneEntryRefuse(r.target,r.arrival,0)){travel_open=0;return;}
+    if(!AW_ItemAdd(&aw_state,"gold_001",-travel_price[i])){travel_message="You do not have enough gold.";return;}
+    if(travel_hours[i]>0)AW_ClockAdvance((travel_hours[i]>720?720:travel_hours[i])*3600000);
+    travel_open=0;key_dest=key_game;region_crossing=0;door_ready=0;door_close=0;load_scene(&r,0);
 }
 int AW_TravelKey(int key) {
     /* The refused room's screen (AW_SceneRoomRefuse): ENTER returns the player to the game at the door; it holds the
@@ -635,6 +711,7 @@ int AW_TravelKey(int key) {
     }
     if(key==K_UPARROW || key=='w'){travel_choice=(travel_choice+travel_count-1)%travel_count;travel_message=NULL;}
     if(key==K_DOWNARROW || key=='s'){travel_choice=(travel_choice+1)%travel_count;travel_message=NULL;}
+    if(key==K_ENTER && travel_services){travel_ride(travel_choice);return 1;}
     if(key==K_ENTER){
         aw_scene_link_t r;const aw_town_t *town=AW_Town(travel_town);memset(&r,0,sizeof(r));
         if(travel_choice==0 && town && AW_TownArrival(travel_return?town->name:town->travel_target,travel_return,r.arrival,&r.yaw)){
@@ -647,15 +724,21 @@ int AW_TravelKey(int key) {
 int AW_TravelDraw(void) {
     int i;char line[96];const aw_town_t *town=AW_Town(travel_town),*home;
     if(room_refused && key_dest==key_menu){AW_UIRoomRefused(refused_text,ROOM_REFUSED_SECOND);return 1;}
-    if(!travel_open || key_dest!=key_menu || !town)return 0;
-    home=AW_Town(AW_TownFind(town->travel_target));
+    if(!travel_open || key_dest!=key_menu || (!town && !travel_services))return 0;
+    home=travel_services?NULL:AW_Town(AW_TownFind(town->travel_target));
     AW_UIBox(18,18,284,170);AW_UISmallBegin();
-    sprintf(line,"Silt Strider: %.60s",town->travel_npc);
+    if(travel_services)sprintf(line,"Travel: %.60s",travel_rows_for?pr_strings+travel_rows_for->v.netname:"");
+    else sprintf(line,"Silt Strider: %.60s",town->travel_npc);
     AW_UITextBox(26,23,268,20,line,-1);
     sprintf(line,"Your gold: %ld",(long)AW_StateGet(&aw_state,AW_ITEM,"gold_001"));
     AW_UITextBox(26,44,268,16,line,-1);
     for(i=0;i<travel_count;i++){
-        sprintf(line,"%s%.60s",i==travel_choice?"> ":"  ",travel_return?(i?"Cancel":home?home->title:"?"):travel_names[i]);
+        if(travel_services){
+            /* the original's line: the destination, then its price in gold (sgp) */
+            if(i<travel_rows.count)sprintf(line,"%s%.44s - %ldgp",i==travel_choice?"> ":"  ",travel_rows.rows[i].label,
+                (long)travel_price[i]);
+            else sprintf(line,"%sCancel",i==travel_choice?"> ":"  ");
+        }else sprintf(line,"%s%.60s",i==travel_choice?"> ":"  ",travel_return?(i?"Cancel":home?home->title:"?"):travel_names[i]);
         if(AW_UIMode()==2){
             int y=61+i*18;
             AW_UIBox(40,y,240,18);
@@ -695,6 +778,8 @@ static int use_link(int i) {
     float duration;char path[40];
     if(!AW_StoryDoor(links[i].reference)){AW_UISubtitle("",links[i].reference==119513?"Finish registration and leave through the courtyard.":links[i].reference==113889?"Check the barrel beside the door first.":"Ask the captain about your duties first.",4);return 1;}
     if(AW_StoryRestricted() && !strcmp(links[i].target,"census") && aw_story.stage<AW_STAGE_OFFICE){AW_UISubtitle("","Speak to the dock guard first.",4);return 1;}
+    /* a locked load door (DEBUG-GOD-LOCKED-DOORS-51): the key or god mode goes through, else the LockedDoor sound */
+    if(aw_load_door_lock && aw_load_door_lock(links[i].reference,1))return 1;
     if(!map_valid(links[i].target) || AW_SceneMapSize(links[i].target,path,sizeof(path))<0){
         /* A quick test build without interiors (aw_excluded.c): a friendly line, not a repair message. */
         if(AW_ContentExcludedSay("interiors",1)){AW_UISubtitle("","Area unavailable in this quick test build.",3);return 1;}
@@ -733,12 +818,16 @@ void AW_SceneDraw(void) {
             name=links[i].label[0]?links[i].label:!strcmp(links[i].target,"seyda")?"Seyda Neen":"Imperial Prison Ship";
             action=!AW_StoryDoor(links[i].reference)?"Locked - finish duties":
                 AW_StoryRestricted() && !strcmp(links[i].target,"census") && aw_story.stage<AW_STAGE_OFFICE?"Speak to dock guard":
+                aw_load_door_lock && aw_load_door_lock(links[i].reference,0)?"Locked":
                 !map_valid(links[i].target)?(AW_ContentExcluded("interiors")?"Area unavailable":"Interior unavailable"):"Enter: E";
         }else if(aw_hinged_hint && aw_hinged_hint(&name,&action)){
         }else{ name=npc_hint();if(name){
             eval_t *voice;edict_t *target=npc_target();npc=1;
             voice=target?GetEdictFieldValue(target,"aw_voice"):NULL;
-            if(voice && voice->string && pr_strings[voice->string])action="E: Talk";
+            /* TALK-PROMPT-RULES: the name stays; the talk option only when the actor can be talked to (aw_talk.c,
+             * the same rule as E) */
+            if(aw_can_talk?target && aw_can_talk(target):voice && voice->string && pr_strings[voice->string])
+                action="E: Talk";
         } }
     }
     if(!name)return;
@@ -1016,13 +1105,7 @@ void AW_SceneSpawn(edict_t *p) {
     }
     if(quick_notice && AW_MiniwindActive()){
         quick_notice=0;AW_UISubtitle(AW_Miniwind()->title,AW_Miniwind()->features,15);
-        /* The sandbox's own setup (miniwind.txt "boot"), once per arrival of the quick start:
-         * e.g. "dbg companion test;dbg combat on" (docs/MINIWIND.md). */
-        if(AW_Miniwind()->boot[0]){
-            char line[AW_MINIWIND_BOOT+2];int i;
-            for(i=0;AW_Miniwind()->boot[i] && i<AW_MINIWIND_BOOT;i++)line[i]=AW_Miniwind()->boot[i]==';'?'\n':AW_Miniwind()->boot[i];
-            line[i++]='\n';line[i]=0;Cbuf_AddText(line);
-        }
+        miniwind_boot();
     }
     AW_HeapAuditReport(sv.worldmodel?sv.worldmodel->name:sv.name);
 }
@@ -1382,6 +1465,20 @@ static int roulette_room(const char *name,aw_scene_link_t *r,char *title,int siz
     if(!entity_value(text,world_end,"\"_aw_cell_int\"",value,sizeof(value)) || Q_sscanf(value,"%ld",cell)!=1)*cell=-1;
     copy_name(r->label,sizeof(r->label),title);
     return 1;
+}
+/* A script's PositionCell of the player into a room (aw_mwhost.c, v0.0.54): room map MAP loaded the way a door loads
+ * it, the player put at ARRIVAL (the map's own units, as a door's arrival) facing YAW. 0 when no game runs, a load is
+ * pending, the story holds the player, or the map is not on this disk; the player is unchanged then. */
+int AW_SceneLoadRoom(const char *map,const float *arrival,float yaw) {
+    aw_scene_link_t r;edict_t *p;char path[MAX_QPATH+24];
+    if(pending || !sv.active || svs.maxclients!=1 || !svs.clients || !(p=svs.clients[0].edict) ||
+       cls.state!=ca_connected || p->v.health<=0 || AW_StoryRestricted())return 0;
+    if(!map || !*map || !map_valid(map) || AW_SceneMapSize(map,path,sizeof(path))<124)return 0;
+    if(!(fabs(arrival[0])<32768 && fabs(arrival[1])<32768 && fabs(arrival[2])<32768))return 0;
+    memset(&r,0,sizeof(r));copy_name(r.target,sizeof(r.target),map);VectorCopy(arrival,r.arrival);
+    r.yaw=yaw;region_crossing=0;door_ready=0;door_close=0;crossing_movetype=p->v.movetype;
+    load_scene(&r,1);
+    return pending!=0;
 }
 /* FIRST: the argument index of the seed (aw_teleport roulette [SEED], routed from dbg door roulette by aw_console.c,
  * so the roulette needs no resident command of its own). */

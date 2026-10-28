@@ -1,0 +1,13 @@
+{
+  "format": "aw-door-check-known-1",
+  "about": "Exterior entrances the door engine check (tools/door_engine_check.py, the wall traced in the CHIM world's own collision) still cannot reach, each with its measured reason and register class. A whole-world image fails on any unreachable entrance not listed here (every entrance of the original is reachable or a known case, never dropped); a listed entrance the check reaches again is named under known_passing and leaves the list. v0.0.54 (DOOR-USE-COLLISION-FILLED-53): the v0.0.54-dev2 world rebuild (decision (b): plate bevels everywhere, the standing-room rule for the Redoran guard tower, door detail tiles) reached 25 of v0.0.53's 35; 10 Daedric shrine entrances (ex_dae_ruin_entry.max) still had no standing spot, because plate bevels alone leave the entry's steps filled. The entry then joined config/collision-standing-room.json, measured offline on the dev2 frames to clear all 10; they were listed here for the dev2 image and left the list with that change. One stays: the shipwreck's upper trapdoor.",
+  "class": "DOOR-USE-COLLISION-FILLED-53",
+  "entrances": {
+    "225480": {
+      "id": "ex_de_ship_trapdoor",
+      "place": "Unmarked Shipwreck, Upper Level (cell -15,14)",
+      "class": "CHIM-STAIR-METHOD1-UNFIXED-48",
+      "reason": "The trapdoor lies on the tilted deck of ex_de_shipwreck (a placement tilted about 20 degrees); the deck's collision there is steeper than the walk (normal z 0.62 under 0.69), so no player stands at the trapdoor. The shipwreck is on config/stair-check-known.json (method 1 cannot fix its flights yet); neither new rule changes it (measured). Whether the original stands a player there (the trapdoor's own collision, OpenMW's 46-degree slope) is still to check."
+    }
+  }
+}

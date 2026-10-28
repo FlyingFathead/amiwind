@@ -12,7 +12,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 MODULES = ['tools/build.py', 'tools/build_aga.py', 'tools/build_parallel.py', 'tools/build_summary.py',
            'tools/build_jobs.py', 'tools/build_profile.py', 'tools/build_cache.py', 'tools/world_volumes.py',
-           'tools/build_windows_xdftool.py']
+           'tools/build_windows_xdftool.py', 'tools/build_parser.py']
 BUILTINS = set(dir(builtins)) | {'__file__', '__name__', '__doc__', '__spec__', '__builtins__'}
 
 

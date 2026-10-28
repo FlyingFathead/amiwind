@@ -1,0 +1,17 @@
+{
+  "schema": "build-recipe-1",
+  "name": "magic",
+  "description": "MiniWind preset --miniwind-magic: Magic effects: dbg cast fire, frost, shock, heal...",
+  "options": {
+    "miniwind": true,
+    "miniwind_scope": "exterior",
+    "miniwind_description": "Magic effects: dbg cast fire, frost, shock, heal...",
+    "direct_to_game_map": "balmora",
+    "exclude_unreferenced": "voice,npcs",
+    "miniwind_boot": "dbg magicfx 1"
+  },
+  "inputs": [],
+  "written_with": null,
+  "checked_with": null,
+  "status": "unverified"
+}

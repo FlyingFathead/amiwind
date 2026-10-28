@@ -273,7 +273,8 @@ class MediaAssetsTests(unittest.TestCase):
         import build
         from build_parallel import stage_dependencies
         from recover_image import recovery_commands
-        args=build.parser().parse_args([])
+        # the baked gallery's plan: recovery reschedules its npc-gallery stage (NPC Gallery v2.0 has none)
+        args=build.parser().parse_args(['--npc-gallery-method','baked'])
         args.data_files=Path('/data');args.sdk=Path('/sdk')
         tools={name:'/tools/'+name for name in ('ffmpeg','qbsp','vis','light','qcc','xdftool','rdbtool')}
         steps=build.commands(args,tools,Path('/new-run'))

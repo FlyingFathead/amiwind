@@ -1,10 +1,11 @@
 # Character Model Gallery
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.54-dev1 (27 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [NPC Gallery v2.0 (the default since v0.0.54)](#npc-gallery-v20-the-default-since-v0054)
 - [Controls](#controls)
 - [Memory and return state](#memory-and-return-state)
 - [Dialogue and coverage boundaries](#dialogue-and-coverage-boundaries)
@@ -13,9 +14,41 @@ _Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 - [Per-model budget exceptions](#per-model-budget-exceptions)
 - [Default NPC gallery: required unless explicitly disabled](#default-npc-gallery-required-unless-explicitly-disabled)
 - [RC3 conversion coverage and authored poses](#rc3-conversion-coverage-and-authored-poses)
+  - [Special large models](#special-large-models)
 - [rc9 preservation check](#rc9-preservation-check)
 
 <!-- contents end -->
+
+## NPC Gallery v2.0 (the default since v0.0.54)
+
+The maintainer, 27 October 2026: the gallery should "no longer use the pre-baked stuff but our latest models", it
+"does NOT bake or render any extra characters that we haven't built already" and it keeps the existing features
+"so that you can look up npc's etc.". NPC Gallery v2.0 is that gallery:
+
+- **Nothing is baked for it.** The builder has no `npc-gallery` stage any more. At the end of the image step
+  `tools/gallery_v2.py` reads the actor rows the finished maps already carry (towns, CHIM frames, interiors) and the
+  CHIM actor table's bases, keeps one row per NPC or creature record and writes one file, `gallery/actors.txt`.
+- **The game's own actors.** The gallery spawns the chosen actor from its row with the engine's own spawn path, so
+  it shows exactly the model, skeleton, animation table, carried items and voice the game uses. A fix to an actor
+  shows in the gallery at once.
+- **Look-up and browsing as before**, plus race, class and cell: type keywords in the browser (Tab) to filter by
+  name, record ID, number, race, class or the first cell that places the actor. The info panel shows the ID, race
+  and class (or "Creature"), the cell, the size and the model.
+- **Animations.** G plays every animation group of the actor's table once (`dbg animkit cycle`); `dbg animkit
+  groups` lists them and `dbg animkit play <group>` plays one. T turns the actor round (turntable). E talks to the
+  actor as in the game.
+- **What it lists** is what the image holds: an NPC or creature that no map of the image places is not in the
+  gallery (the build report `npc-gallery-v2-not-built.json` lists them).
+
+| | Baked gallery (to v0.0.53) | NPC Gallery v2.0 |
+| --- | --- | --- |
+| Build stage | `npc-gallery`: 23 to 57 minutes when its cache missed, 13 to 40 s on a full cache hit | none; the catalogue takes about 5 s in the image step |
+| Image payload | 7,107 files, 234 MB (v0.0.53) | one catalogue file, about 1.4 MB, and the inspection room |
+| Models shown | its own copy of every record (3,551 models) | the game's own actors (2,697 records in the v0.0.53 image) |
+
+The baked gallery stays selectable for comparison: `--npc-gallery-method baked` brings the `npc-gallery` stage back,
+and the engine reads its `gallery/catalog.txt` when an image has no v2 catalogue. A MiniWind leaves the gallery out
+unless `--npc-gallery-method v2` is given. The sections below describe the baked gallery.
 
 rc10 adds [verified persistent NPC model reuse](NPC_MODEL_CACHE.md). Full gallery
 coverage and protected model quality remain mandatory.

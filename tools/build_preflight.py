@@ -14,7 +14,9 @@ tools/build.py runs it for every real image build, right after the previous-rele
   budget_room: a config may only tighten the engine's limits, BUILD-BUDGET-ENGINE-LIMITS-35);
 - every NPC resident of every CHIM area of the build has a grounding classification in
   config/actor_grounding.json (tools/actor_grounding_census.py area_problems; the chim-town stage stopped
-  40 minutes in on unlisted residents, CHIM-ACTOR-GROUNDING-POLICY-36).
+  40 minutes in on unlisted residents, CHIM-ACTOR-GROUNDING-POLICY-36);
+- every CHIM town of a full build other than Seyda Neen and Balmora has a CHIM region frame of the build around its
+  frame, whose catalogues carry its harvestable plants (harvest_town_problems, BUILD-HARVEST-TOWN-PLAN-54).
 
 Every problem is listed at once, each with the command that fixes it. Run it alone with
 `python3 tools/build_preflight.py --workspace DIR [--data-files DIR]`.
@@ -113,6 +115,39 @@ def grounding_problems(data_files, areas):
         return []
     import actor_grounding_census
     return actor_grounding_census.area_problems(data_files, areas)
+
+
+def harvest_town_problems(native, regions, miniwind=False, boxes=None):
+    """[problem] for each CHIM town of a full build (NATIVE: made from the game data, tools/chim_town.py) other than
+    Seyda Neen and Balmora whose frame no built CHIM region frame reaches (BUILD-HARVEST-TOWN-PLAN-54). Only the two
+    fixed towns have a harvest catalogue mechanism of their own (harvest_build.plan_rows, the engine's
+    AW_HarvestFollow); another town's plants are carried by the catalogues of the CHIM region frame maps around its
+    frame (the v0.0.53 final: Vivec's 10, no region cell inside its frame). REGIONS: the build's CHIM region table
+    (resolve_chim_regions: (table, statuses), or None when it builds no region cells). Without a region cell in the ring
+    of cells around the town's frame, the image step's harvest coverage check would stop the build late. A MiniWind
+    (MINIWIND) lists such plants as its limit instead (its plan says so). BOXES: {town: frame box} (default: the towns'
+    own, chim.regions.town_boxes). A necessary condition, checked in seconds; the image step's coverage check stays."""
+    from town_config import runtime_towns
+    fixed = {town['id'] for town in runtime_towns()[:2]}
+    others = [town for town in native or () if town not in fixed]
+    if miniwind or not others:
+        return []
+    from chim import regions as chim_regions
+    cells = set((regions[0] or {}).get('cells') or ()) if regions else set()
+    boxes = boxes if boxes is not None else chim_regions.town_boxes(others)
+    unit = chim_regions.CELL_UNITS
+    problems = []
+    for town in others:
+        box = boxes[town]
+        ring = [(x, y) for x in range(int(box[0] // unit) - 1, int(-(-box[2] // unit)) + 1)
+                for y in range(int(box[1] // unit) - 1, int(-(-box[3] // unit)) + 1)
+                if not chim_regions.box_covered(chim_regions.cell_box((x, y)), [box])]
+        if not any(chim_regions.cell_key(cell) in cells for cell in ring):
+            problems.append(f'CHIM town {town} has no harvest catalogue mechanism of its own (only Seyda Neen and '
+                            f'Balmora do) and no CHIM region frame of this build reaches its frame, so its harvestable '
+                            f'plants would be placed nowhere and the image step would stop; fix: build CHIM region cells '
+                            f'around it (the default --chim-regions list), or leave the town out of the CHIM areas')
+    return problems
 
 
 def run(workspace, data_files=None, uid=None, minimum_gib=None, space=True):

@@ -1,6 +1,6 @@
 # NPC pathfinding: how NPCs find their way
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.54-dev1 (27 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -16,6 +16,7 @@ _Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 - [Grid on CHIM collision (measured)](#grid-on-chim-collision-measured)
 - [Options for AmiWind on the Amiga](#options-for-amiwind-on-the-amiga)
 - [Recommendation and staged plan](#recommendation-and-staged-plan)
+- [Wander packages, compiled (v0.0.54)](#wander-packages-compiled-v0054)
 
 <!-- contents end -->
 
@@ -396,3 +397,45 @@ called done, a regression test, and the full gate.
 
 Stage 1 and 2 need no new data and can start with the first combat work;
 stage 3 needs the CHIM graph format and gate.
+
+## Wander packages, compiled (v0.0.54)
+
+Since v0.0.54-dev1 (console `chim actors ambient on`, **off by default** and not saved until the in-game A/B is
+recorded) residents follow
+their original Wander package ([NPC-WANDER-NOT-EXECUTED-35](bugs/NPC-WANDER-NOT-EXECUTED-35.md)). The rules are the
+original's as OpenMW 0.51 implements them (`apps/openmw/mwmechanics/aiwander.cpp`, `pathgrid.cpp`); our own code.
+
+**At build time** (`tools/ambient_lut.py`, one cached unit, `id1/npc-ambient.lut`, format AWAM1): for every placed
+actor whose first package is Wander, its allowed destinations are the grid points of its cell within the wander
+distance of its start that lie in the same strongly connected part of the grid as the point closest to it (links are
+one-way as stored). With exactly one such point, its start and points part way along that point's links are added;
+with none (no grid, or nothing in reach) it walks now and then to a random spot near its start. Every route between
+two destinations is the grid's cheapest (Manhattan costs, as OpenMW's A\*) and is stored as a next-hop table, so the
+engine never searches. Points are offsets from the actor's own placement, in engine units, so the engine needs no
+world or cell coordinates. A script's `AIWander` that names an actor (159 placements) widens the compile radius to
+its distance; the compiled scripts' `AIWander` (with `aw_mwscript 1`) sets the same package at run time. The idle choice is compiled too: each idle Idle2..Idle9 rolls 0..100 and the highest roll at or under
+its chance wins, all of it only with the chance `fIdleChanceMultiplier` (0.75); the builder stores the exact
+distribution of that roll (at 1 % steps) as one cumulative table per distinct set of chances, so the engine draws
+one number.
+
+Measured on the maintainer's `Morrowind.esm` (27 October 2026): 3,738 placed actors with a Wander package first
+(79 start with Travel or Follow, 89 have none; those stand); 1,802 walk grid routes, 1,167 walk the occasional
+spot near their start, 769 stand (distance 0); 85 distinct idle tables. The whole table is 945,000 bytes: the rows
+(105 KB) and idle tables (1.4 KB) stay in memory; an actor's points and routes (33 bytes at the median, 6.7 KB at
+most) are read from the file when it first comes near the player. Seyda Neen's actors take 9.9 KB of the file,
+Balmora's 40 KB. The stage takes about 5 s on one core.
+
+**In the engine** (`engine/aga/src/aw_ambient.c`): a small state machine per actor within OpenMW's processing range
+(7,168 original units) of the player: choose (an idle, played once from the actor's animation table, or with no
+idle walk to a random other destination), walk the route at the original walk speed, arrive within 64 original
+units, choose again. Decisions every 0.25 s (OpenMW's reaction time), steps every think (0.1 s; `chim actors ambient think S`), one
+step trace set per walking actor per think, nothing for idle or far actors. A greeting pauses the walk; combat
+owns a fighting actor and the package resumes after; ten failed steps in a row end a walk; an idle actor far from
+all its destinations walks back. `chim actors ambient` prints the counters and cost, `chim actors ambient list` the actors, `chim actors ambient steplog on` one line per failed step (where, which way,
+what the standing hull met) (no console command or
+variable of its own: the resident registry budget).
+
+Not done yet (said so, not invented): doors in the way and occupied destinations; swimmers and flyers stand; the
+time of day is kept but unused (OpenMW reads it nowhere either); a package set by a script keeps the spawn position
+as its start; the walk speed is the actor record's Speed attribute (50 only for an actor without a record); baked models
+without an Idle2..Idle9 group only walk; packages other than Wander; the package is not saved.

@@ -117,6 +117,8 @@ static void leave(int restore_player) {
     int i;
     if(!active)return;
     active=0;
+    /* the console turned the crosshair on during photo mode: kept (PHOTO-CROSSHAIR-51) */
+    if(saved_values[SAVED_CROSSHAIR][0] && Cvar_VariableValue("crosshair")!=0)strcpy(saved_values[SAVED_CROSSHAIR],"1");
     for(i=0;i<SAVED;i++)if(saved_values[i][0] && Cvar_FindVar((char *)saved_names[i]))
         Cvar_Set((char *)saved_names[i],saved_values[i]);
     if(shown && AW_UISubtitleIs(shown))AW_UISubtitle("","",0);
@@ -167,17 +169,31 @@ int AW_PhotoKey(int key) {
     return 0;
 }
 /* The crosshair preference (saved in config.cfg; default on from default.cfg).
- * During photo mode a change applies to the value restored on exit. */
+ * Photo mode hides it by default (crosshair 0 on entry). PHOTO-CROSSHAIR-51, the maintainer
+ * (25 October 2026): the console's crosshair on/off overrides that and the Options setting, and
+ * the Options menu shows it: a change during photo mode is shown at once and kept on exit; a
+ * crosshair the console turned on in photo mode (crosshair 1) is kept too. */
 int AW_CrosshairShown(void) {
-    if(active && saved_values[SAVED_CROSSHAIR][0])return Q_atof(saved_values[SAVED_CROSSHAIR])!=0;
+    if(active && saved_values[SAVED_CROSSHAIR][0])
+        return Q_atof(saved_values[SAVED_CROSSHAIR])!=0 || Cvar_VariableValue("crosshair")!=0;
     return Cvar_VariableValue("crosshair")!=0;
 }
 void AW_CrosshairSet(int on) {
-    if(active && saved_values[SAVED_CROSSHAIR][0]){strcpy(saved_values[SAVED_CROSSHAIR],on?"1":"0");return;}
+    if(active && saved_values[SAVED_CROSSHAIR][0])strcpy(saved_values[SAVED_CROSSHAIR],on?"1":"0");
     Cvar_SetValue("crosshair",(float)(on!=0));scr_copyeverything=1;
+}
+/* UI-HUD-TOGGLE-KEY-51 (the maintainer, 25 October 2026: "CTRL+ALT+H or some keycombo in game to
+ * switch HUD on/off ... it would also disable crosshair"): Ctrl+Alt+H (keys.c) or dbg photomode hud.
+ * The full view without the HUD, as the vanity orbit's (screen.c); the crosshair goes with it
+ * (view.c). Not saved; the player keeps walking, nothing else changes. */
+extern int aw_hud_hidden;
+void AW_HudToggle(void) {
+    aw_hud_hidden=!aw_hud_hidden;refresh();
+    Con_Printf(aw_hud_hidden?"HUD hidden (Ctrl+Alt+H shows it again).\n":"HUD shown.\n");
 }
 static void photo_command(void) {
     int on=!active;
+    if(Cmd_Argc()==2 && !Q_strcasecmp(Cmd_Argv(1),"hud")){AW_HudToggle();return;}
     if(Cmd_Argc()>2 || (Cmd_Argc()==2 && !toggle_word(Cmd_Argv(1),&on))){
         Con_Printf("Usage: dbg photomode [on/off, true/false or 1/0]; no argument toggles.\n");return;
     }
@@ -244,6 +260,17 @@ static void crosshair_command(void) {
         AW_CrosshairStyleSet(shape,value);
         Con_Printf("Crosshair %s: %s.\n",shape?"shape":"colour",AW_CrosshairStyleName(shape,value));return;
     }
+    /* dbg crosshair owned [on/off]: the red owned-item cue (view.c; OpenMW "show owned"; not saved, default off as the
+     * original and OpenMW) */
+    if(Cmd_Argc()>=2 && !Q_strcasecmp(Cmd_Argv(1),"owned")){
+        extern int aw_crosshair_owned_cue;
+        if(Cmd_Argc()==3 && !toggle_word(Cmd_Argv(2),&aw_crosshair_owned_cue)){
+            Con_Printf("Usage: dbg crosshair owned [on/off]\n");return;
+        }
+        if(Cmd_Argc()>3){Con_Printf("Usage: dbg crosshair owned [on/off]\n");return;}
+        Con_Printf("Owned-item cue on the crosshair: %s.\n",aw_crosshair_owned_cue?"on (red over an owned thing)":"off");
+        return;
+    }
     if(Cmd_Argc()==2 && !Q_strcasecmp(Cmd_Argv(1),"style")){
         Con_Printf("Crosshair %s, colour %s, shape %s.\n",AW_CrosshairShown()?"on":"off",
             AW_CrosshairStyleName(0,AW_CrosshairStyle(0)),AW_CrosshairStyleName(1,AW_CrosshairStyle(1)));return;
@@ -253,7 +280,7 @@ static void crosshair_command(void) {
                    "dbg crosshair colour [name], dbg crosshair shape [name], dbg crosshair style.\n");return;
     }
     AW_CrosshairSet(on);
-    Con_Printf("Crosshair %s%s.\n",on?"on":"off",active?" (applies when photo mode ends)":"");
+    Con_Printf("Crosshair %s%s.\n",on?"on":"off",active?" (photo mode too, and after it)":"");
 }
 /* Mouse sensitivity: Quake's saved sensitivity cvar (cl_main.c; default 3, the value of
  * every release so far). Options > Controls steps it from 0.5 to 10 by 0.5 (Shift: 0.1);

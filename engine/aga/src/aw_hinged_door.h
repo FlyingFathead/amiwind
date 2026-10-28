@@ -58,6 +58,12 @@ int AW_HingedDoorRow(unsigned reference);
  * lock (aw_mwhost.c sets it: the level the scripts left, ORIGINAL when none). */
 int AW_HingedDoorOriginalLock(unsigned reference);
 extern int (*aw_object_lock_level)(unsigned reference,int original);
+/* DEBUG-GOD-LOCKED-DOORS-51: a load door's lock (the table's K rows; aw_scene.c through aw_load_door_lock).
+ * USE 0: 1 when locked now; USE 1: the player's use, 1 = refused (LockedDoor played), 0 = through (unlocked,
+ * the key, god mode with AW_DOOR_GOD_TEXT in the message box, dbg doorlocks off). */
+int AW_HingedDoorLoadLock(unsigned reference,int use);
+/* The maintainer's words (TG, 25 October 2026). */
+#define AW_DOOR_GOD_TEXT "God mode used to enter a locked door"
 /* Activation: a script that reads OnActivate takes the use (aw_mwhost.c sets it); its Activate opens the door. */
 extern int (*aw_hinged_intercept)(unsigned reference);
 int AW_HingedDoorActivate(unsigned reference);

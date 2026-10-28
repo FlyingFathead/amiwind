@@ -31,6 +31,7 @@
 #include "aw_items.h"
 #include "aw_inventory.h"
 #include "aw_inspect.h"
+#include "aw_hand_models.h"
 
 extern cvar_t chase_active;
 /* The hooks (defined beside their callers, NULL in fixtures without this file). */
@@ -45,6 +46,7 @@ extern int (*aw_view_key)(int key);
 extern void (*aw_view_draw)(void);
 extern void (*aw_combat_scene)(void);
 extern int (*aw_view_fullscreen)(void);
+extern int (*aw_view_orbiting)(void);
 int AW_ArenaActive(void);
 void AW_MusicDeath(void);
 void IN_AWClearButtons(void);
@@ -409,9 +411,8 @@ static int body_hand_layer(edict_t *p,int frame) {
     state=(int)v->_float;
     v=GetEdictFieldValue(p,"aw_torch");if(v && v->_float==1)return -1;
     v=GetEdictFieldValue(p,"aw_hand_started");if(!v)return -1;started=v->_float;
-    v=GetEdictFieldValue(EDICT_NUM(0),state==1?"aw_hand_draw":state==3?"aw_hand_punch":"aw_hand_lower");
-    if(!v || !(v->_float>0 && v->_float<=60))return -1;
-    duration=v->_float;
+    duration=AW_HandDuration(state==1?AW_HAND_DRAW:state==3?AW_HAND_PUNCH:AW_HAND_LOWER,0);
+    if(!(duration>0 && duration<=60))return -1;
     /* The authoritative QuakeC state owns this clock; never restart it when
      * switching camera, gait or landing. The legs retain their own frame. */
     fraction=((float)sv.time-started)/duration;
@@ -663,6 +664,10 @@ int AW_ViewVanityFullscreen(void) {
     return owned && view.mode==AW_VIEW_VANITY && death.stage==AW_DEATH_NONE && fullview_cvar.value!=0;
 }
 int AW_ViewThirdPerson(void) {return owned;}
+/* view.c (PHOTO-CROSSHAIR-51): the camera turns around a centre (vanity, the Toggle POV orbit, dbg cam orbit): no crosshair. */
+static int AW_ViewOrbiting(void) {
+    return owned && (orbit.active || view.mode==AW_VIEW_VANITY || view.mode==AW_VIEW_PREVIEW);
+}
 
 /* ---- the death scene ---- */
 int AW_DeathLocked(void) {return death.stage!=AW_DEATH_NONE || AW_PlayerDead();}
@@ -965,5 +970,6 @@ void AW_ViewInit(void) {
     aw_view_frame=AW_ViewFrame;aw_view_camera=AW_ViewCamera;aw_view_body=AW_ViewBody;aw_view_hide_hands=AW_ViewThirdPerson;
     aw_view_held=view_held;aw_view_torch_emitter=view_torch_emitter;aw_view_torch_light=view_torch_light;
     aw_view_input=AW_ViewInput;aw_view_key=AW_ViewKey;aw_view_draw=AW_ViewDraw;aw_view_fullscreen=AW_ViewVanityFullscreen;
+    aw_view_orbiting=AW_ViewOrbiting;
     combat_scene=aw_combat_scene;aw_combat_scene=scene_spawn;   /* after AW_CombatInit (aw_debug.c) */
 }

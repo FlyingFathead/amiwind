@@ -240,6 +240,7 @@ def combat_summary(report):
     if not report:
         return {'status': 'not_built'}
     return {'status': 'built', 'actors': report['actors'], 'sounds': sorted(report['sounds']),
+            'sound_generators': report.get('sound_generators', {}),
             'fighters': {k: {'model': v['model'], 'bytes': v['bytes'], 'frames': v['frames']}
                          for k, v in report.get('fighters', {}).items()}}
 
@@ -1977,12 +1978,24 @@ def image(args):
     from ui_palette import sync_lookups
     sync_lookups(boot/'id1',check=True)
     if not args.data_files:raise ValueError('Owned data files are required to convert the original carried torch')
-    from prepare_torch import prepare as prepare_torch
+    # The carried torch (about 6 s on one core) reads the game data and the palette and writes only progs/v_torch.mdl
+    # and gfx/torch.*: a spawned worker beside the gallery and the torch test map, which neither read nor write
+    # them (BUILD-IMAGE-FINALIZE-UNDERUSED-48). One job: it runs here, as before.
+    from build_parallel import Background
+    from prepare_torch import prepare_image as prepare_torch_image
     print('Converting original torch and first-person holding animation...',flush=True)
-    torch_report=prepare_torch(args.data_files,boot/'id1')
+    torch_job=Background(prepare_torch_image,args.data_files,boot/'id1',jobs=jobs)
+    # Magic effects (docs/MAGIC_EFFECTS.md): the effect table, sprites and sounds; shown only with aw_magic_fx 1/2
+    from prepare_magic import prepare as prepare_magic
+    print('Converting magic effects (cast, bolt, hit and area sprites and particles)...',flush=True)
+    (out/'magic-effects.json').write_text(json.dumps(prepare_magic(args.data_files,boot/'id1'),indent=2,default=str)+'\n',encoding='utf-8',newline='\n')
     from build_gallery import stage_required, omit_gallery
     if args.no_npc_gallery:
         gallery_report=omit_gallery(boot/'id1')
+    elif getattr(args,'gallery_v2',False):
+        # NPC Gallery v2.0: its room now, its catalogue from the finished maps (finalize_image, gallery_v2.catalogue_step)
+        from gallery_v2 import stage_room
+        gallery_report=stage_room(boot/'id1',out/'npc-gallery-v2-room',args.qbsp,args.vis,args.light)
     else:
         gallery_report=stage_required(args.gallery,boot/'id1')
     (out/'npc-gallery-staging.json').write_text(json.dumps(gallery_report,indent=2)+'\n', newline='\n')
@@ -1990,6 +2003,7 @@ def image(args):
     torchtest_report=build_torchtest(boot/'id1/gfx/palette.lmp',boot/'id1/maps/torchtest.bsp',
                                     out/'torchtest-build',args.qbsp,args.vis,args.light)
     (out/'torchtest-staging.json').write_text(json.dumps(torchtest_report,indent=2)+'\n', newline='\n')
+    torch_report=torch_job.result()
     (out/'torch-conversion.json').write_text(json.dumps(torch_report,indent=2)+'\n', newline='\n')
     # The world UI (map, journal, region names and weather: about 10 s on one core) reads only the game data and the
     # final palette and writes only id1/world: it runs in a spawned worker beside the combat data, the player view
@@ -2000,6 +2014,15 @@ def image(args):
         from build_parallel import Background
         from prepare_world_ui import prepare_image as prepare_world_ui_image
         world_ui=Background(prepare_world_ui_image,args.data_files,boot,jobs=jobs)
+    # The player's view (docs/THIRD_PERSON.md): the camera and death-scene game settings, and the player's body per
+    # playable race and sex for third person (--player-body on|off, tools/prepare_player_view.py). It writes only
+    # view/settings.txt and progs/body/ and reads the game data and the palette: a spawned worker beside the combat
+    # data (combat/, sound/combat/, arena/), with its own worker pool (BUILD-IMAGE-FINALIZE-UNDERUSED-48: 8.4 s on one
+    # core after the combat data in the v0.0.54-dev1 magic MiniWind). One job: here, as before.
+    from prepare_player_view import prepare_image as prepare_player_view_image
+    print('Converting the player view data (camera settings, player bodies)...',flush=True)
+    view_job=Background(prepare_player_view_image,args.data_files,boot/'id1',jobs,
+                        not getattr(args,'no_player_body',False),jobs=jobs)
     # Melee combat for every NPC and the Vivec Arena minigame (docs/COMBAT.md):
     # game settings, one combat sheet per NPC record, the hit/miss sounds and the
     # Arena fighters' combat-frame models, all from the owned master.
@@ -2007,23 +2030,19 @@ def image(args):
     print('Converting combat data (settings, NPC sheets, sounds, Arena fighters)...',flush=True)
     combat_report=prepare_combat(args.data_files,boot/'id1',jobs=jobs)
     (out/'combat-data.json').write_text(json.dumps(combat_report,indent=2)+'\n',encoding='utf-8',newline='\n')
-    # The player's view (docs/THIRD_PERSON.md): the camera and death-scene game settings, and the player's
-    # body per playable race and sex for third person (--player-body on|off, tools/prepare_player_view.py).
-    from prepare_player_view import prepare as prepare_player_view
-    print('Converting the player view data (camera settings, player bodies)...',flush=True)
-    view_report=prepare_player_view(args.data_files,boot/'id1',jobs=jobs,bodies=not getattr(args,'no_player_body',False))
+    view_report=view_job.result()
     (out/'player-view.json').write_text(json.dumps(view_report,indent=2)+'\n',encoding='utf-8',newline='\n')
     from prepare_inventory import prepare as prepare_inventory
     print('Converting original inventory metadata and selected item resources...',flush=True)
     inventory_report=prepare_inventory(args.data_files,boot/'id1',jobs=jobs)
     (out/'inventory-data.json').write_text(json.dumps(inventory_report,indent=2)+'\n',encoding='utf-8',newline='\n')
-    # The Halloween scene (dbg halloween, docs/HALLOWEEN.md): its cast on their shared tables, a MiniWind image only
+    # The Halloween scene (dbg halloween, docs/HALLOWEEN.md): its cast on their shared tables
     import halloween_cast
     if halloween_cast.custom_ost(args) and 'music' in excluded:
         raise ValueError('--custom-ost needs the music (drop --exclude music)')
+    # a --halloween image: every full-world build (tools/build.py adds it unless --halloween-cast off) and the MiniWind
+    # preset --miniwind-halloween; its members are made side by side (halloween_cast.prepare)
     if getattr(args,'halloween',False):
-        if not getattr(args,'miniwind',False):
-            raise ValueError('--halloween is a MiniWind option')
         print('Halloween scene: the cast (skeletons, dancers, Dagoth Ur) on their animation tables...',flush=True)
         halloween_report=halloween_cast.prepare(args.data_files,boot/'id1',jobs=jobs)
         (out/'halloween-cast.json').write_text(json.dumps(halloween_report,indent=2,default=str)+'\n',encoding='utf-8',newline='\n')
@@ -2352,6 +2371,12 @@ def write_world_doors(args, id1, out, chim_frames):
                                               newline='\n')
     print('World doors: %d doors and markers, %d rows added to the door banks, %d filled, %d unresolved '
           '(world-doors.json)' % (len(rows), applied['added'], applied['filled'], len(problems)), flush=True)
+    # the travel services by the same holder rule (TRAVEL-SERVICES-CHIM-51, tools/prepare_travel.py): id1/travel.txt
+    import prepare_travel
+    travel = prepare_travel.write(id1, args.data_files, rooms, towns, regions, room_offsets())
+    (Path(out)/'travel.json').write_text(json.dumps(travel, indent=1, sort_keys=True)+'\n', encoding='utf-8', newline='\n')
+    print('Travel services: %d destinations of %d providers offered, %d left out (travel.json)'
+          % (travel['destinations'], travel['providers_offered'], len(travel['left_out'])), flush=True)
     if problems:
         raise ValueError('World doors: %d door(s) or marker(s) do not resolve (every entrance and every way out must be '
                          'linked, CHIM-REGION-DOORS-NO-ROOMS-48):\n  ' % len(problems) + '\n  '.join(problems[:40]))
@@ -2383,9 +2408,10 @@ def write_door_check(args, id1, out):
     door_audit.write_outputs(audit, out)
     # the literal file name: a path built from a variable reads as the whole config/ folder to the stage keys
     baseline = ROOT/'config'/'door-check-baseline.json'
+    known = ROOT/'config'/'door-check-known.json'
     report, problem = door_engine_check.run(id1=id1, engine_src=engine_src, audit_rows=audit['rows'], out=out,
                                             baseline=baseline if baseline.is_file() else None, jobs=jobs,
-                                            chim_world=args.chim_world)
+                                            chim_world=args.chim_world, known=known if known.is_file() else None)
     a, c = audit['counts'], report['counts']
     print('Door check: %d exterior entrances; the audit: %d usable on arrival, %d locked, %d with a problem; the '
           'engine after walking in: %d usable, %d both ways, %d with the wall traced (door-audit.md, '
@@ -2822,8 +2848,9 @@ def finalize_image(args):
     check_recorded(boot/'id1', out/'bounded-seyda', 'hidden-surface cull', jobs=jobs)
     # Regional map generation can replace a worldspawn after hands conversion.
     # Stamp all final maps from the same authored animation report before gates.
-    from hand_metadata import stamp_staged_hands
+    from hand_metadata import stamp_staged_hands, write_hand_table
     hand_source = json.loads((Path(args.scene)/'scene-ready.json').read_text())['hands']
+    write_hand_table(boot/'id1', hand_source)   # the clips: the image's, not the maps' (FIRST-PERSON-HANDS-IN-C-54)
     hand_metadata = stamp_staged_hands(boot/'id1', hand_source,
         staged_exterior_map_names(boot/'id1', getattr(args, 'chim_world', None), getattr(args, 'exterior_terrain', None)) | staged_interior_map_names(boot/'id1', getattr(args, 'chim_room_batches', None)), jobs=jobs)
     (out/'hand-metadata.json').write_text(json.dumps(hand_metadata,indent=2)+'\n', newline='\n')
@@ -2894,7 +2921,12 @@ def finalize_image(args):
     # conversation greeting for the engine to look up by record (id1/npc-voices.lut); one unit, cached on its inputs.
     # Its sounds are the media stage's converted voices (no voice converted again).
     from greeting_lut import image_step as voice_table_step
-    voice_table_step(args.data_files, boot/'id1', out, jobs=jobs)
+    voice_table_step(args.data_files, boot/'id1', out, jobs=jobs, media=getattr(args, 'media', None))
+    # The ambient table (tools/ambient_lut.py, NPC-WANDER-NOT-EXECUTED-35): every placed actor's Wander package and
+    # its cell's path grid routes (id1/npc-ambient.lut); one unit, cached on its inputs; the engine runs it with
+    # "chim actors ambient on" (default off until the A/B is recorded).
+    from ambient_lut import image_step as ambient_table_step
+    ambient_table_step(args.data_files, boot/'id1', out, jobs=jobs)
     # EXPERIMENTAL actor table (--chim-actor-table on, tools/chim/actors.py, CHIM-EXTERIOR-ACTORS-MISSING-46): every
     # exterior NPC and creature reference in one table beside the frame maps, for the type 1 window; off by default
     actor_library_texts = None
@@ -3013,7 +3045,8 @@ def finalize_image(args):
             from harvest_build import native_towns, require_chim_coverage
             coverage = require_chim_coverage(args.harvest, boot/'id1', out/'harvest', data_files=args.data_files,
                                              chim_world=args.chim_world, native=native_towns(args), frame_maps=True,
-                                             report_name='harvest-chim-coverage-final.json')
+                                             report_name='harvest-chim-coverage-final.json',
+                                             partial_area=bool(getattr(args, 'miniwind', False)))
             if coverage is not None:
                 harvest['chim_coverage_final'] = dict(plants=coverage['plants'], placed=coverage['placed'],
                                                       missing=len(coverage['missing']),
@@ -3065,6 +3098,10 @@ def finalize_image(args):
     from prepare_guard_torches import prepare as prepare_guard_torches
     guard_torches = prepare_guard_torches(args.data_files, boot / 'id1')
     (out/'guard-torch-conversion.json').write_text(json.dumps(guard_torches,indent=2)+'\n', newline='\n')
+    if gallery_report.get('status')=='room staged':
+        # NPC Gallery v2.0: every actor the finished maps and the actor table hold, one catalogue row each (seconds)
+        from gallery_v2 import catalogue_step
+        gallery_report=catalogue_step(boot/'id1',child_ci(args.data_files,'Morrowind.esm'),out,gallery_report,jobs=jobs)
     # Original NPC heads take world, combat and guard models past 2,000 vertices:
     # each gets its byte-matching model-budgets.txt line (NPC-HEAD-DECIMATION-33).
     from audit_gallery_budgets import world_allowances
@@ -3175,8 +3212,8 @@ def finalize_image(args):
             # the custom OST slot (CUSTOM-OST-SLOT-53): the user's own track, one more special track of this image
             # only; with the Halloween cast in the image the dance takes its measured beat
             track,bpm=halloween_cast.soundtrack(halloween_cast.custom_ost(args),target)
-            halloween_cast.set_beat(boot/'id1',bpm)
-            print('Custom OST: %s, %.0f s, %.1f BPM (this image only)'%(track['file'],track['seconds'],bpm),flush=True)
+            halloween_cast.set_beat(boot/'id1',bpm,track['leading_silence_ms'])
+            print('Custom OST: %s, %.0f s, %.1f BPM, leading silence %d ms (the scene pre-roll; this image only)'%(track['file'],track['seconds'],bpm,track['leading_silence_ms']),flush=True)
         from music_catalogue import write_catalogue
         music_catalogue = write_catalogue(target/'soundtrack.json', target/'catalogue.txt')
         (target/'playlist.txt').write_text('\n'.join(' '.join(map(str,[len(groups[g]),*groups[g]])) for g in ['explore','battle'])+'\n'+str(groups['title'])+'\n', newline='\n')
@@ -3431,7 +3468,8 @@ def main():
     i.add_argument('--accept-known-stair-findings', action='append', default=[], metavar='ID', help='PRIVATE -devN TESTS ONLY: the stair gate records the failures of this known finding (tracker ID, config/known-stair-findings.json) as accepted; refused for rc and final')
     i.add_argument('--data-files',type=Path,required=True,help='Owned original game assets')
     gallery_choice=i.add_mutually_exclusive_group(required=True)
-    gallery_choice.add_argument('--gallery',type=Path,help='Verified NPC gallery from build_gallery.py; normal default')
+    gallery_choice.add_argument('--gallery-v2',action='store_true',help='NPC Gallery v2.0 (the default): the actors this image holds, listed from its finished maps (tools/gallery_v2.py); nothing baked')
+    gallery_choice.add_argument('--gallery',type=Path,help='Verified baked NPC gallery from build_gallery.py (--npc-gallery-method baked)')
     gallery_choice.add_argument('--no-npc-gallery',action='store_true',help='DEBUGGING ONLY: omit inspection gallery, never required game NPCs; gallery commands in game (dbg npcgallery etc.) print a built-without-the-NPC-gallery notice')
     i.add_argument('--live-logs',action='store_true',help='BENCHMARK/DIAGNOSTIC IMAGES: write the engine diagnostic logs (walk-profile.csv, frame-stalls.csv, heap-audit.log, ...) as they happen (aw_logs_live 1), as before BOOT-VOLUME-NOT-VALIDATED-33; default keeps them in memory until Exit game or dbg savelogs')
     i.add_argument('--menu-logo',choices=['gold','legacy'],default='gold',help='Menu logo method: gold (default, name only on the palette gold ramp) or legacy (previous wordmark, whole-palette nearest colours; comparison only)')
@@ -3446,7 +3484,7 @@ def main():
     i.add_argument('--miniwind-features',help='With --miniwind: the boot notice feature line tools/build.py generated from its stage plan ("FEATURES ONLY: ...")')
     i.add_argument('--miniwind-description',help='With --miniwind: optional "Scene:" line of the startup screen')
     i.add_argument('--miniwind-boot',metavar='CMD[;CMD]',help='With --miniwind: dbg commands run once on arrival')
-    i.add_argument('--halloween',action='store_true',help='With --miniwind: the Halloween scene\'s cast (tools/halloween_cast.py, dbg halloween)')
+    i.add_argument('--halloween',action='store_true',help='The Halloween scene\'s cast (tools/halloween_cast.py; dbg halloween, aw bench halloween)')
     i.add_argument('--custom-ost','--halloween-soundtrack',dest='custom_ost',type=Path,metavar='FILE',help='The custom OST slot: the user\'s own audio or video file, its audio converted into this image\'s music (also AMIWIND_CUSTOM_OST; docs/HALLOWEEN.md)')
     i.add_argument('--miniwind-town',help='With --miniwind: the town the image holds and boots into (default balmora)')
     i.add_argument('--miniwind-map-inspection',action='store_true',help='With --miniwind: direct inspection with god, noclip and debug HUD')

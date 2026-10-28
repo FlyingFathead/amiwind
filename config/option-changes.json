@@ -1077,7 +1077,7 @@
       "change": "added",
       "to": false,
       "source": "tools/halloween_cast.py (HALLOWEEN-SCENE-53)",
-      "note": "MiniWind only: the Halloween scene's cast in the image (dbg halloween; the preset --miniwind-halloween sets it)"
+      "note": "the Halloween scene's cast in the image (dbg halloween, aw bench halloween; the preset --miniwind-halloween sets it); in every image is a follow-up after v0.0.53"
     },
     {
       "version": "0.0.53-dev2",
@@ -1087,6 +1087,24 @@
       "to": null,
       "source": "tools/halloween_cast.py (CUSTOM-OST-SLOT-53, HALLOWEEN-SCENE-53)",
       "note": "the custom OST slot (alias --halloween-soundtrack; machine setting AMIWIND_CUSTOM_OST): the user's own audio or video file, its audio converted into that user's image only; empty without it"
+    },
+    {
+      "version": "0.0.54-dev1",
+      "option": "halloween_cast",
+      "flag": "--halloween-cast",
+      "change": "added",
+      "to": "on",
+      "source": "tools/halloween_cast.py (HALLOWEEN-SCENE-53, BENCH-NO-STANDARD-DEMO-48)",
+      "note": "the Halloween scene's cast in every full-world image by default (about 1 MB, loaded only when the scene starts; aw bench halloween works in release images); off leaves it out. Only the image step takes it; MiniWind takes it with --halloween only; no song by default"
+    },
+    {
+      "version": "0.0.54-dev1",
+      "option": "npc_gallery_method",
+      "flag": "--npc-gallery-method",
+      "change": "added",
+      "to": null,
+      "source": "tools/gallery_v2.py (NPC-GALLERY-V2)",
+      "note": "NPC Gallery v2.0 by default (null = v2): no npc-gallery stage, the image step lists the actors the build made (gallery/actors.txt) and the gallery spawns them from their own rows; baked = the previous gallery (the npc-gallery stage). A MiniWind leaves the gallery out unless the option is given"
     }
   ],
   "current": {
@@ -1181,6 +1199,7 @@
       "follow_original_stair_rules": true,
       "game_data_policy": "warn",
       "halloween": false,
+      "halloween_cast": "on",
       "hands": "3d",
       "harvest_interiors": "on",
       "heap_mb": null,
@@ -1216,6 +1235,7 @@
       "npc_anim_type": 2,
       "npc_face_lod": null,
       "npc_face_lod_list": null,
+      "npc_gallery_method": null,
       "npc_head_detail": null,
       "npc_head_reducer": null,
       "npc_lod": null,

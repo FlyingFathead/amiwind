@@ -16,6 +16,9 @@ from mwad.paths import resolve_data_files, child_ci
 KINDS={'WEAP':1,'ARMO':2,'CLOT':3,'ALCH':4,'INGR':5,'BOOK':6,'MISC':7,
        'LIGH':7,'APPA':7,'LOCK':7,'PROB':7,'REPA':7}
 CLOTHING_SLOTS={0:9,1:7,2:8,3:15,4:11,5:6,6:5,7:10,8:12,9:14}
+# Armour type (AODT) -> the engine's slot (aw_inventory.h AW_SLOT_*): helmet, cuirass, left and right pauldron,
+# greaves, boots, left and right gauntlet, shield (the left hand), left and right bracer (the gauntlet slots).
+ARMOUR_SLOTS={0:0,1:1,2:3,3:4,4:2,5:7,6:5,7:6,8:17,9:5,10:6}
 ROW=512
 # The debug torch (test only; the maintainer's preview-stage request, 17 October 2026): one
 # catalogue row made from the original torch (LIGH "torch": model, icon, weight, value, light
@@ -179,12 +182,20 @@ def prepare(data_files,id1,selected=(),palette=None,models=True,jobs=None):
             combat=[1+item['subtype'],WEAPON_SKILL[item['subtype']],*raw[22:28],
                     struct.unpack_from('<f',raw,16)[0],struct.unpack_from('<f',raw,12)[0],float(health),0.,0,0]
             slots=1<<16;flags|=1
-        elif item['kind']=='ARMO' and item['subtype']==8:
+        elif item['kind']=='ARMO' and item['subtype'] in ARMOUR_SLOTS:
+            # Every armour piece in its own slot (OpenMW mwclass/armor.cpp getEquipmentSlots; bracers in the
+            # gauntlet slots), its armour class by weight against its type's weight setting (getEquipmentSkill)
+            # and its rating and health for the armour rating (npc.cpp getArmorRating). Bytes 488.. keep their
+            # names from the shield-only catalogue: the class of any piece, the base armour skill.
             raw=item['raw'];health,base=struct.unpack_from('<i',raw,12)[0],struct.unpack_from('<i',raw,20)[0]
-            limit=settings['ishieldweight']
+            from prepare_combat import ARMOR_TYPE_GMST
+            limit=settings[ARMOR_TYPE_GMST[item['subtype']].casefold()]
             cls=0 if item['weight']<=limit*settings['flightmaxmod']+.0005 else 1 if item['weight']<=limit*settings['fmedmaxmod']+.0005 else 2
             combat=[0,26,*([0]*6),0.,0.,float(health),float(base),cls,int(settings['ibasearmorskill'])]
-            slots=1<<17;flags|=1
+            slots=1<<ARMOUR_SLOTS[item['subtype']];flags|=1
+            # Worn pieces count in combat (rating, hit sound) without a body picture yet (PLAYER-BODY-ALL-ANIMS):
+            # equippable when the item does nothing else when worn (no script after registration, no enchantment).
+            if item['subtype']!=8 and inert and not item['enchantment'] and health>0:flags|=4
         if item.get('light'):
             # Equipped like a torch: the left hand (its own slot rules; never a weapon or shield).
             slots=1<<SLOT_LEFT;flags|=1|4|FLAG_LIGHT

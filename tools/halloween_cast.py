@@ -3,7 +3,8 @@
 
 The scene is the animation stage (SKEL-ANIM-STAGE-52) with a beat clock: the engine (aw_halloween.c) puts a cast
 before the camera on Balmora's stage roof and plays a choreography of the game's own animation groups on the beat.
-This module writes what the engine needs into the image (--halloween, a MiniWind build only):
+This module writes what the engine needs into the image (--halloween: every full-world build by default, see
+full_image_args and --halloween-cast; a MiniWind build with --halloween, as its preset --miniwind-halloween):
 
 - the game's skeleton creature (r/skeleton.nif, every skeleton record uses it) as ONE skeletal model on the shared
   humanoid table (progs/humanoid.awsk): its rig is the humanoid biped (the creature is two-legged, so the original
@@ -62,15 +63,25 @@ DAGOTH_BUDGETS = (1000, 800, 640, 480)
 # largest alias face limit
 DAGOTH_BAKE = {'face_limit': 1024, 'minimum_faces': {'Tri neckpart': 30, 'Tri mask': 240, 'Tri maskpart': 47}}
 TEMPO_RANGE = (90.0, 180.0)                      # a measured tempo is folded into this range (halves, doubles)
+# A soundtrack's leading silence (its pre-roll, leading_silence): 10 ms windows, silent while their RMS stays at or
+# under -40 dBFS (ffmpeg silencedetect's usual floor); at most the engine's AW_HALLOWEEN_MAX_PREROLL_MS.
+SILENCE_DB = -40.0
+SILENCE_WINDOW = 0.01
+MAX_PREROLL_MS = 3500
 
 
 # ---------------------------------------------------------------- the builder options (tools/build.py)
 
 def add_options(p):
     p.add_argument('--halloween', action='store_true',
-                   help='With --miniwind: the Halloween scene\'s cast in the image (dbg halloween; the preset '
-                        '--miniwind-halloween; docs/HALLOWEEN.md): the skeleton creature, Desele\'s dancers and Dagoth '
-                        'Ur on their animation tables')
+                   help='The Halloween scene\'s cast (dbg halloween, aw bench halloween; docs/HALLOWEEN.md): the '
+                        'skeleton creature, Desele\'s dancers and Dagoth Ur on their animation tables (the preset '
+                        '--miniwind-halloween sets it); a full-world build carries the cast by default')
+    p.add_argument('--halloween-cast', choices=('on', 'off'), default='on',
+                   help='The Halloween scene\'s cast in a full-world image (default on: about 1 MB, loaded only when '
+                        'the scene starts, so aw bench halloween works in every full image); off leaves it out, and '
+                        'dbg halloween and aw bench halloween then say the image has no cast. A MiniWind build '
+                        'takes the cast with --halloween only (docs/HALLOWEEN.md)')
     p.add_argument('--custom-ost', '--halloween-soundtrack', dest='custom_ost', metavar='FILE',
                    help='The custom OST slot: your own audio or video file; its audio is converted into the game\'s '
                         'music format and put into this image only, played by the custom OST player (aw music custom '
@@ -86,8 +97,6 @@ def custom_ost(args):
 def check(args, p):
     """The options checked before any stage runs (p.exit on a mistake)."""
     track = custom_ost(args)
-    if getattr(args, 'halloween', False) and not getattr(args, 'miniwind', False):
-        p.exit(1, 'Error: --halloween is a MiniWind option (--miniwind or --miniwind-halloween)\n')
     if track and not Path(track).is_file():
         p.exit(1, 'Error: --custom-ost: no such file: %s\n' % track)
 
@@ -98,6 +107,16 @@ def image_args(args):
     if getattr(args, 'custom_ost', None):
         out += ['--custom-ost', str(args.custom_ost)]
     return out
+
+
+def full_image_args(args):
+    """The image step's cast option of a full-world build (not MiniWind: its presets choose with --halloween): the
+    cast is in every full image by default (HALLOWEEN-SCENE-53, BENCH-NO-STANDARD-DEMO-48: aw bench halloween works
+    in release images), --halloween-cast off leaves it out. Only the image step takes it: no other stage's command
+    or key changes (imperative 19). No song: the custom OST slot stays empty unless the user fills it."""
+    if getattr(args, 'miniwind', False) or getattr(args, 'halloween_cast', 'on') == 'off':
+        return []
+    return ['--halloween']
 
 
 # ---------------------------------------------------------------- the skeletal creature models
@@ -337,12 +356,17 @@ def _facts(facts):
 
 # ---------------------------------------------------------------- the cast
 
-def cast_text(rows, bpm, soundtrack):
-    """id1/halloween.txt: 'AWHW1 <bpm x 10> <1 with a soundtrack track, else 0>', then one row a model:
-    '<role> <model path> <name>' (role lead, dancer or skeleton; spaces in the name as '_')."""
+def cast_text(rows, bpm, soundtrack, preroll_ms=0):
+    """id1/halloween.txt: 'AWHW1 <bpm x 10> <1 with a soundtrack track, else 0> [<pre-roll ms>]', then one row a
+    model: '<role> <model path> <name>' (role lead, dancer or skeleton; spaces in the name as '_'). The pre-roll (a
+    soundtrack's leading silence, leading_silence) is written only when there is one, so a cast without it reads as
+    before (the engine's aw_halloween_rules.c reader takes both)."""
     if not 30 <= bpm <= 300:
         raise ValueError('Halloween beat outside 30..300 BPM: %s' % bpm)
-    lines = ['%s %d %d' % (MAGIC, int(round(bpm * 10)), 1 if soundtrack else 0)]
+    if not 0 <= int(preroll_ms) <= MAX_PREROLL_MS:
+        raise ValueError('Halloween pre-roll outside 0..%d ms: %s' % (MAX_PREROLL_MS, preroll_ms))
+    lines = ['%s %d %d' % (MAGIC, int(round(bpm * 10)), 1 if soundtrack else 0) +
+             (' %d' % int(preroll_ms) if soundtrack and int(preroll_ms) else '')]
     for role, model, name in rows:
         if role not in ('lead', 'dancer', 'skeleton'):
             raise ValueError('Unknown Halloween role ' + role)
@@ -353,12 +377,18 @@ def cast_text(rows, bpm, soundtrack):
 
 
 def read_cast(text):
-    """(bpm, soundtrack, rows) of a cast file (the engine's reader, for the tests)."""
+    """(bpm, soundtrack, rows) of a cast file (the engine's reader, for the tests); read_preroll gives the pre-roll."""
     lines = text.splitlines()
     head = lines[0].split()
-    if len(head) != 3 or head[0] != MAGIC:
+    if len(head) not in (3, 4) or head[0] != MAGIC:
         raise ValueError('Not a Halloween cast file')
     return int(head[1]) / 10, head[2] == '1', [tuple(line.split(' ', 2)) for line in lines[1:] if line]
+
+
+def read_preroll(text):
+    """The cast file's pre-roll in milliseconds (0 when it has none)."""
+    head = text.splitlines()[0].split()
+    return int(head[3]) if len(head) == 4 else 0
 
 
 # The game's spell cast sounds (its SOUN records, the short cast "whoosh" of each school, and the bolt of a cast on
@@ -389,19 +419,125 @@ def cast_sounds(kinds, assets, id1):
     return out
 
 
-def set_beat(id1, bpm):
-    """The cast file's beat set to a soundtrack's measured tempo and its soundtrack flag on."""
+def set_beat(id1, bpm, preroll_ms=0):
+    """The cast file's beat set to a soundtrack's measured tempo, its soundtrack flag on and its pre-roll (the
+    track's leading silence in ms: the engine starts the track that much before the dance)."""
     path = Path(id1) / CAST_FILE
     if not path.is_file():
         return                    # an image without the Halloween cast: the custom track alone
     _, _, rows = read_cast(path.read_text(encoding='ascii'))
-    path.write_text(cast_text([(r, m, n) for r, m, n in rows], bpm, True), encoding='utf-8', newline='\n')
+    path.write_text(cast_text([(r, m, n) for r, m, n in rows], bpm, True, preroll_ms), encoding='utf-8',
+                    newline='\n')
+
+
+def leading_silence(pcm, rate, channels=2, threshold_db=SILENCE_DB, window=SILENCE_WINDOW):
+    """Milliseconds of silence at the start of a converted track (signed 8-bit interleaved PCM, as the image plays
+    it): the start of the first WINDOW-second stretch whose RMS over the channels is above THRESHOLD_DB (dBFS). The
+    8-bit dither of silence stays well under -40 dB; the whole track silent gives its length."""
+    x = np.frombuffer(pcm, np.int8).astype(np.float64) / 128.0
+    frames = len(x) // channels
+    x = x[:frames * channels].reshape(frames, channels)
+    n = max(1, int(round(rate * window)))
+    blocks = frames // n
+    if not blocks:
+        return 0
+    rms = np.sqrt((x[:blocks * n] ** 2).reshape(blocks, n * channels).mean(axis=1))
+    loud = np.flatnonzero(rms > 10 ** (threshold_db / 20))
+    first = int(loud[0]) if len(loud) else blocks
+    return int(round(1000 * first * n / rate))
+
+
+def dancer_model(identifier):
+    """A dancer's model path: the cast's own name (hw_...), never a resident's a_... name. A full image holds
+    Desele's dancers as Suran residents under a_<hash>.mdl, from the room stages, and installs them after the cast
+    is made: a cast model under that name would be replaced by (or would replace) the resident's own files."""
+    return 'progs/hw_' + hashlib.sha256(identifier.encode()).hexdigest()[:12] + '.mdl'
+
+
+def _assets(data):
+    from mwad.audit import BSA
+    from mwad.paths import child_ci
+    from npc_geometry import Assets
+    return Assets(Path(data), BSA(child_ci(Path(data), 'Morrowind.bsa')))
+
+
+def _error(error):
+    return '%s: %s' % (type(error).__name__, error)
+
+
+def member(item):
+    """One cast member, made in a worker of its own (prepare runs them side by side): (kind, result, error).
+    The skeletons are required (an error is raised); any other member returns its error and is left out."""
+    kind = item[0]
+    if kind == 'skeleton':
+        from npc_geometry import Skeleton
+        _, data, palette = item
+        assets = _assets(data)
+        skeletons = {}
+
+        def skeleton_of(path):
+            if path not in skeletons:
+                skeletons[path] = Skeleton(assets, path)
+            return skeletons[path]
+        return kind, skeleton_creature(assets, palette, skeleton_of), None
+    try:
+        if kind == 'dagoth':
+            _, data, palette = item
+            return kind, dagoth_ur(_assets(data), palette), None
+        if kind == 'dancer':
+            from prepare_area import build_resident
+            identifier, raw, _voice, record = build_resident(item[1])
+            return kind, (identifier, raw, record), None
+        if kind == 'sounds':
+            from mwad.paths import child_ci
+            from prepare_combat import load as load_sounds
+            _, data, stage = item
+            return kind, cast_sounds(load_sounds(child_ci(Path(data), 'Morrowind.esm')), _assets(data), stage), None
+    except Exception as error:  # noqa: BLE001 (left out with its reason: the skeletons-only version still plays)
+        return kind, (item[1][2]['id'] if kind == 'dancer' else None), _error(error)
+    raise ValueError('Unknown Halloween cast member ' + kind)
+
+
+# the members' relative cost, the larger first (build_parallel: a long member never starts last)
+MEMBER_COST = {'dagoth': 4, 'dancer': 3, 'skeleton': 3, 'sounds': 1}
+
+
+def install(stage, id1):
+    """The staged cast files into id1, each replaced whole (mwad.paths.replace_bytes: a read-only pool link in id1 is
+    replaced, never written through). A shared file the image already holds (the humanoid table, an item model, a
+    sound) is kept as it is: it is the same game file, made for the world by the stages before. Returns
+    (written, kept)."""
+    from mwad.paths import replace_bytes
+    stage, id1 = Path(stage), Path(id1)
+    written, kept = [], []
+    for path in sorted(p for p in stage.rglob('*') if p.is_file()):
+        relative = path.relative_to(stage).as_posix()
+        target = id1 / relative
+        raw = path.read_bytes()
+        if target.is_file():
+            if target.read_bytes() == raw or not owned(relative):
+                kept.append(relative)
+                continue
+        target.parent.mkdir(parents=True, exist_ok=True)
+        replace_bytes(target, raw)
+        written.append(relative)
+    return written, kept
+
+
+def owned(relative):
+    """True for the cast's own files (replaced when they differ); False for the files it shares with the world."""
+    return relative == CAST_FILE or relative == DAGOTH_TABLE or relative.startswith(('progs/hw_', CAST_SOUND_DIR + '/'))
 
 
 def prepare(data_files, id1, jobs=1, soundtrack_bpm=None):
     """Writes the cast models, Dagoth Ur's table and id1/halloween.txt. Returns the report. A cast member that
-    cannot be made is left out with its reason (the scene dances with the rest); the skeletons are required."""
-    from mwad.audit import BSA
+    cannot be made is left out with its reason (the scene dances with the rest); the skeletons are required.
+
+    The members (the skeleton creature, Dagoth Ur, each dancer, the cast sounds) are made side by side in the
+    builder's worker pool (build_parallel.in_order_map; one after the other at one job: about 2 minutes on one core
+    in the v0.0.53 Halloween builds), into a staging folder, and installed into id1 at the end (install)."""
+    from build_parallel import in_order_map
+    from build_scratch import scratch_dir
     from mwad.npc import load_master, outfit, greeting_fixture
     from mwad.paths import child_ci, replace_bytes as replace
 
@@ -409,35 +545,14 @@ def prepare(data_files, id1, jobs=1, soundtrack_bpm=None):
         path.parent.mkdir(parents=True, exist_ok=True)
         replace(path, raw)
     from npc_anim import foot_class, publish as publish_anim, voices_of
-    from npc_geometry import Assets, Skeleton
     import npc_items
-    from prepare_area import build_resident
     import npc_lod
     data = Path(data_files)
     id1 = Path(id1)
     palette = (id1 / 'gfx/palette.lmp').read_bytes()
-    assets = Assets(data, BSA(child_ci(data, 'Morrowind.bsa')))
-    skeletons = {}
-
-    def skeleton_of(path):
-        if path not in skeletons:
-            skeletons[path] = Skeleton(assets, path)
-        return skeletons[path]
     rows, report = [], {'left_out': []}
-    model, facts = skeleton_creature(assets, palette, skeleton_of)
-    replace_bytes(id1 / SKELETON_MODEL, model)
-    report['skeleton'] = {'model': SKELETON_MODEL, **facts}
-    try:
-        table, model, facts = dagoth_ur(assets, palette)
-        replace_bytes(id1 / DAGOTH_TABLE, table)
-        replace_bytes(id1 / DAGOTH_MODEL, model)
-        rows.append(('lead', DAGOTH_MODEL, 'Dagoth Ur'))
-        report['dagoth_ur'] = {'model': DAGOTH_MODEL, **facts}
-    except Exception as error:  # noqa: BLE001 (left out with its reason: the skeletons-only version still plays)
-        report['left_out'].append({'id': 'dagoth_ur', 'reason': '%s: %s' % (type(error).__name__, error)})
-        print('Halloween cast: Dagoth Ur left out:', error, flush=True)
     kinds, _cells, topics = load_master(child_ci(data, 'Morrowind.esm'))
-    tasks = []
+    items = [('skeleton', data, palette), ('dagoth', data, palette)]
     for identifier in DANCERS:
         if identifier not in kinds['NPC_']:
             report['left_out'].append({'id': identifier, 'reason': 'no such NPC record'})
@@ -445,33 +560,53 @@ def prepare(data_files, id1, jobs=1, soundtrack_bpm=None):
         appearance = npc_items.attach_items(kinds, identifier, outfit(kinds, identifier))
         appearance['foot'] = foot_class(kinds, appearance)
         appearance['voices'] = voices_of(topics, appearance)
-        tasks.append((data, palette, appearance, greeting_fixture(topics, appearance), 'ffmpeg',
-                      npc_lod.task_settings()))
-    report['dancers'] = []
-    for task in tasks:
-        try:
-            identifier, raw, _voice, record = build_resident(task)
-        except Exception as error:  # noqa: BLE001
-            report['left_out'].append({'id': task[2]['id'], 'reason': '%s: %s' % (type(error).__name__, error)})
-            continue
-        stem = 'a_' + hashlib.sha256(identifier.encode()).hexdigest()[:12]
-        record.update(model='progs/' + stem + '.mdl')
-        replace_bytes(id1 / record['model'], raw)
-        publish_anim(id1, record)
-        npc_items.publish(id1, record)
-        rows.append(('dancer', record['model'], record['appearance']['name']))
-        report['dancers'].append({'id': identifier, 'model': record['model'], 'bytes': len(raw)})
-    rows.append(('skeleton', SKELETON_MODEL, 'Skeleton'))
-    from prepare_combat import load as load_sounds
-    report['cast_sounds'] = cast_sounds(load_sounds(child_ci(data, 'Morrowind.esm')), assets, id1)
-    import skeletal_actor
-    for path, table in skeletal_actor.table_files().items():
-        if not (id1 / path).is_file():
-            replace_bytes(id1 / path, table)
-    bpm = soundtrack_bpm or DEFAULT_BPM
-    text = cast_text(rows, bpm, soundtrack_bpm is not None)
-    replace_bytes(id1 / CAST_FILE, text.encode('ascii', 'replace'))
-    report.update(cast=rows, bpm=bpm, soundtrack=soundtrack_bpm is not None)
+        items.append(('dancer', (data, palette, appearance, greeting_fixture(topics, appearance), 'ffmpeg',
+                                 npc_lod.task_settings())))
+    # the staging folder beside the image step's output (out/.scratch), never /tmp and never in the boot folder
+    with scratch_dir(prefix='halloween-cast-', near=id1.parent.parent, keep_on_failure=False) as stage:
+        items.append(('sounds', data, stage))
+        report['dancers'] = []
+        lead = []
+        for kind, result, error in in_order_map(member, items, max(1, min(int(jobs or 1), len(items))),
+                                                cost=lambda item: MEMBER_COST[item[0]]):
+            if kind == 'skeleton':
+                model, facts = result
+                replace_bytes(stage / SKELETON_MODEL, model)
+                report['skeleton'] = {'model': SKELETON_MODEL, **facts}
+            elif kind == 'dagoth':
+                if error:
+                    report['left_out'].append({'id': 'dagoth_ur', 'reason': error})
+                    print('Halloween cast: Dagoth Ur left out:', error, flush=True)
+                    continue
+                table, model, facts = result
+                replace_bytes(stage / DAGOTH_TABLE, table)
+                replace_bytes(stage / DAGOTH_MODEL, model)
+                lead.append(('lead', DAGOTH_MODEL, 'Dagoth Ur'))
+                report['dagoth_ur'] = {'model': DAGOTH_MODEL, **facts}
+            elif kind == 'dancer':
+                if error:
+                    report['left_out'].append({'id': result, 'reason': error})
+                    continue
+                identifier, raw, record = result
+                record.update(model=dancer_model(identifier))
+                replace_bytes(stage / record['model'], raw)
+                publish_anim(stage, record)
+                npc_items.publish(stage, record)
+                rows.append(('dancer', record['model'], record['appearance']['name']))
+                report['dancers'].append({'id': identifier, 'model': record['model'], 'bytes': len(raw)})
+            elif kind == 'sounds':
+                report['cast_sounds'] = result if not error else {'error': error}
+        rows = lead + rows + [('skeleton', SKELETON_MODEL, 'Skeleton')]
+        import skeletal_actor
+        for path, table in skeletal_actor.table_files().items():
+            replace_bytes(stage / path, table)
+        bpm = soundtrack_bpm or DEFAULT_BPM
+        text = cast_text(rows, bpm, soundtrack_bpm is not None)
+        replace_bytes(stage / CAST_FILE, text.encode('ascii', 'replace'))
+        written, kept = install(stage, id1)
+    report.update(cast=rows, bpm=bpm, soundtrack=soundtrack_bpm is not None,
+                  files={'written': len(written), 'kept': kept,
+                         'bytes': sum((id1 / p).stat().st_size for p in written)})
     return report
 
 
@@ -553,4 +688,5 @@ def soundtrack(path, music_dir, ffmpeg='ffmpeg'):
     manifest['bytes'] = sum(t['bytes'] for t in manifest['tracks'])
     manifest_path.write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8', newline='\n')
     mono = np.frombuffer(decode(path, 11025, ffmpeg, channels=1, fmt='f32le'), np.float32)
-    return record, tempo(mono, 11025)
+    # the leading silence of the track as the image plays it: the scene's pre-roll (set_beat)
+    return dict(record, leading_silence_ms=min(leading_silence(pcm, RATE), MAX_PREROLL_MS)), tempo(mono, 11025)

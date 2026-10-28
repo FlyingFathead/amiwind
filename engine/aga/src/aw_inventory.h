@@ -65,6 +65,20 @@ void AW_MagicFrame(float seconds);
 float AW_MagicRechargeRate(void);
 /* Pure transactional rules. A failed operation leaves all state unchanged.
  * Placement must already have passed the world's trace/model admission. */
+/* Equipment rules (pure; aw_inventory.c): an armour type's slot (-1 unknown); the slot a new item clears (a two-handed
+ * weapon and a shield exclude each other; -1 none); an equipment slot's armour hit slot (aw_combat.h order; -1 none).
+ * Weapon = 1 + the original type, two-handed: 2 long blade, 4 blunt, 5 staff, 6 spear, 8 axe (OpenMW weapontype.hpp). */
+#define AW_INV_TWO_HANDED(weapon) ((weapon)==3 || (weapon)==5 || (weapon)==6 || (weapon)==7 || (weapon)==9)
+int AW_InventoryArmourSlot(int type);
+int AW_InventoryEquipConflict(const aw_inventory_item_t *item,const aw_inventory_item_t *right,const aw_inventory_item_t *left);
+int AW_InventoryHitSlot(int slot);
+/* The equipped right-hand weapon's original type (WPDT 0..8: short blade, long blade one- and two-handed, blunt one-
+ * and two-handed (close and wide), spear, axe one- and two-handed), -1 when the hand is empty (hand to hand). For the
+ * hand driver and the player body's group picker (v054-animcover). */
+int AW_InventoryEquippedWeaponType(void);
+/* The catalogue row of what a hand (AW_SLOT_RIGHT / AW_SLOT_LEFT) of the player holds, for AW_InventoryEquip's conflict
+ * rule (set by AW_InventoryInit to AW_InventoryEquippedItem; NULL: no conflict rule, the pure fixtures). */
+extern int (*aw_inventory_hand_item)(int slot,aw_inventory_item_t *out);
 int AW_InventoryEquipped(const aw_state_t *,const char *id);
 int AW_InventoryEquipSlot(aw_state_t *,const aw_inventory_item_t *,int slot);
 int AW_InventoryEquip(aw_state_t *,const aw_inventory_item_t *);

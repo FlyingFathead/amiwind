@@ -4,24 +4,24 @@
   "npc_gallery": true,
   "partial_area": null
  },
- "drive_bytes": 4291854336,
+ "drive_bytes": 3058728960,
  "drives": [
   {
-   "bytes": 4291854336,
-   "file": "AmiWind-v0.0.51.hdf"
+   "bytes": 3058728960,
+   "file": "AmiWind-v0.0.53.hdf"
   }
  ],
  "groups": {
   "actors": {
-   "bytes": 1665562982,
-   "files": 11176
+   "bytes": 447974656,
+   "files": 5629
   },
   "chim-world": {
-   "bytes": 1115103922,
+   "bytes": 1139559438,
    "files": 39496
   },
   "classic-maps": {
-   "bytes": 7696732,
+   "bytes": 7697220,
    "files": 1189
   },
   "music": {
@@ -33,12 +33,12 @@
    "files": 7106
   },
   "other": {
-   "bytes": 356039081,
-   "files": 3392
+   "bytes": 371390537,
+   "files": 3393
   },
   "progs": {
-   "bytes": 204055103,
-   "files": 1792
+   "bytes": 169262753,
+   "files": 1752
   },
   "sound": {
    "bytes": 200991172,
@@ -50,10 +50,10 @@
   }
  },
  "labels": [],
- "note": "The v0.0.51 release image (run 2026_10_25_v0.0.51_final_d74cc652), the previous release after the v0.0.51 pin; actors as their own group (stage 0 of the actor disk plan)",
- "payload_bytes": 3976863990,
- "run": "2026_10_25_v0.0.51_final_d74cc652",
+ "note": "The v0.0.53 release image (run 2026_10_27_v0.0.53_final_45f4c426), the previous release after the v0.0.53 pin",
+ "payload_bytes": 2764290774,
+ "run": "2026_10_27_v0.0.53_final_45f4c426",
  "schema": "amiwind-size-ledger-v1",
  "status": "complete",
- "version": "0.0.51"
+ "version": "0.0.53"
 }

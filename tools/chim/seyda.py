@@ -417,18 +417,45 @@ def prepare_area(legacy, data, work, pal_bytes, qbsp, jobs, cache, timer, settin
         index, archive = retain_authored_collision(data, index, archive, selected, work, jobs)
     items = []
     used = list(dict.fromkeys(r['model_index'] for r in selected))
+    # the CHIM model builder's collision rules, as every other CHIM area takes them (chim.build.chim_collision_rules;
+    # 'legacy' keeps the Seyda Neen scenery's own profiles, the method before v0.0.54): the frame converted its
+    # models with the legacy profile, so the tall house's outdoor flight closed a path-grid point of Seyda Neen and
+    # its residents' walks (AMBIENT-WALK-STUCK-COLLISION-54, DOOR-USE-COLLISION-FILLED-53)
+    from chim.build import chim_collision_rules, seyda_collision_mode
+    chim_rules = seyda_collision_mode(settings_override) == 'chim'
+    flight_meshes = set()
+    if chim_rules:
+        from stair_collision_env import stair_collision_method
+        if stair_collision_method() == '1':
+            from chim.build import canonical_model
+            from stair_mesh import flight_unit
+            solid = [mi for mi in used if (index['models'][mi].get('source_collision') or {}).get('mode') != 'nonsolid']
+            with timer.section('stair flights'):
+                counts = run_units('stair-flights', [(fingerprint('stair-flights', canonical_model(
+                    index['models'][mi], index['textures'])), (index['models'][mi], str(archive))) for mi in solid],
+                    flight_unit, jobs, cache)
+            flight_meshes = {mi for mi, n in zip(solid, counts) if n}
     for mi in used:
         model = index['models'][mi]
         # the mesh's CHIM mesh method (config/mesh-methods.json), as every CHIM area applies it
         from chim.build import apply_mesh_method
-        profile = profiles[model['source']] = apply_mesh_method(profiles.get(model['source'], {}), model['source'],
-                                                                settings_override)
-        fp = mesh_fingerprint(model, profile, index['textures'])
+        profile = profiles.get(model['source'], {})
+        if chim_rules:
+            profile = chim_collision_rules(profile, model['source'], mi in flight_meshes)
+        profile = profiles[model['source']] = apply_mesh_method(profile, model['source'], settings_override)
+        fp = mesh_fingerprint(model, profile, index['textures'], 'mesh-stair' if mi in flight_meshes else 'mesh')
         if model['source'] in rebuild_meshes:
             fp = fingerprint('mesh', fp, 'rebuild', time.time_ns())
         items.append((fp, (mi, model, profile, archive, index['textures'])))
     with timer.section('meshes'):
-        prepared = dict(zip(used, run_units('mesh', items, mesh_unit, jobs, cache)))
+        plain = [k for k, mi in enumerate(used) if mi not in flight_meshes]
+        results = dict(zip(plain, run_units('mesh', [items[k] for k in plain], mesh_unit, jobs, cache)))
+        if flight_meshes:
+            from stair_mesh import mesh_unit_stair
+            stairs = [k for k, mi in enumerate(used) if mi in flight_meshes]
+            results.update(zip(stairs, run_units('mesh-stair', [items[k] for k in stairs], mesh_unit_stair, jobs,
+                                                 cache)))
+        prepared = {mi: results[k] for k, mi in enumerate(used)}
     from chim.build import mesh_result_keys
     mesh_fps = mesh_result_keys(items, prepared, used)
     mount_references(index, selected, prepared, CENTRE, SCALE)

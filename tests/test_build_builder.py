@@ -208,7 +208,9 @@ class ChimStageTests(unittest.TestCase):
                                                         'actor-library', 'chim-interiors', 'mwscript',
                                                         # every room batch, by default since v0.0.48
                                                         'chim-room-batches')],
-                         [n for n in legacy if n != 'balmora'])
+                         # NPC Gallery v2.0 (NPC-GALLERY-V2): no npc-gallery stage on the CHIM builder; the legacy
+                         # plan keeps the baked gallery
+                         [n for n in legacy if n not in ('balmora', 'npc-gallery')])
         self.assertLess(names.index('census'), names.index('chim'))
         self.assertLess(names.index('chim'), names.index('image'))
         # CHIM rooms (docs/chim/INTERIOR_STORE.md, the default): right before the image, after every room stage

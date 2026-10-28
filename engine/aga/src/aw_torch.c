@@ -178,6 +178,18 @@ void AW_TorchInit(void){
     Cvar_RegisterVariable(&aw_headlamp);Cmd_AddCommand("aw_headlamp_set",headlamp_command);
     Cmd_AddCommand("aw_torch",toggle);AW_GuardTorchInit();AW_LampInit();
 }
+float AW_LightFlicker(unsigned seed)
+{
+    int n,k;
+    if(torch_flame_style.value<2 || AW_FLICKER_STYLE>=MAX_LIGHTSTYLES)return 1;
+    n=cl_lightstyle[AW_FLICKER_STYLE].length;
+    if(n<=0 || !isfinite(cl.time) || cl.time<0)return 1;
+    k=(int)((unsigned)(cl.time*10)%(unsigned)n);
+    k=cl_lightstyle[AW_FLICKER_STYLE].map[(k+(int)(seed*7u%(unsigned)n))%n]-'a';   /* 'm' (12) = steady */
+    if(k<0)k=0;
+    if(k>12)k=12;
+    return .8f+.2f*(float)k/12.f;
+}
 static int phase(void)
 {
     return (int)floor(fmod(AW_TorchAnimationTime(),1.0)*8);

@@ -26,7 +26,9 @@ static void *table_alloc (long size)
 #define table_alloc(size)	AW_TryMalloc (size)
 #endif
 
-#define AW_SKEL_TABLES	8
+/* 24: the three humanoid tables and their views, and the creatures on their own or appended tables (one each) that a
+ * window or a room shows at once (8 before the creature tables, CREATURE-TABLES-54) */
+#define AW_SKEL_TABLES	24
 
 static struct {
 	char			name[AW_SKEL_TABLE_NAME];
@@ -123,5 +125,22 @@ const aw_skel_table_t *AW_SkelTableFor (const char *name)
 		return NULL;
 	}
 	fclose (f);
+	if (tables[i].table.base_name[0])
+	{
+		/* an appended table (version 3, CREATURE-APPENDED-TABLE-54): its base loaded once, shared (the creature's own
+		 * file holds only its own groups; every other group is the base's) */
+		char base[AW_SKEL_TABLE_NAME];
+		const aw_skel_table_t *of;
+		strcpy (base, tables[i].table.base_name);
+		of = strcmp (base, name) ? AW_SkelTableFor (base) : NULL;
+		if (!of || !AW_SkelAppend (&tables[i].table, of))
+		{
+			free (tables[i].data);
+			tables[i].data = NULL;
+			tables[i].failed = 1;
+			Con_Printf ("Animation table %s: its base %s is missing or does not fit\n", name, base);
+			return NULL;
+		}
+	}
 	return &tables[i].table;
 }

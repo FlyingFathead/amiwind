@@ -2,6 +2,9 @@
   "format": 1,
   "about": "Per-mesh visual triangle targets for dense CHIM areas (chim_build --detail-budget NAME). Collision keeps the source geometry; the open rim stays locked (lod_preserve_border). Not applied unless named. 'vivec-deep' (project decision 2026-10-09: simplify the Temple's dense meshes) fits the Vivec Temple frame at the full 540 view (20,016 B headroom); it becomes the Vivec default after the A/B shots.",
   "budgets": {
+    "rooms": {
+      "meshes/i/in_v_arena_01.nif": 6000
+    },
     "vivec": {
       "meshes/x/ex_vivec_prisonmoon_01.nif": 3000,
       "meshes/x/ex_v_vivecstatue_02.nif": 1200,

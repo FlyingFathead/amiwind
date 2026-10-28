@@ -194,14 +194,17 @@ class Closure(unittest.TestCase):
         self.assertIn("interior:Balmora, Caius Cosades' House", cells)
 
 
-def default_plan():
+def default_plan(*argv):
     import build
-    args = build.parser().parse_args([])
+    args = build.parser().parse_args(list(argv))
     args.data_files = Path('/owned/Data Files')
     args.sdk = Path('/sdk')
     tools = {n: '/tools/' + n for n in ('qbsp', 'vis', 'light', 'qcc', 'ffmpeg', 'xdftool', 'rdbtool')}
     with patch('build_jobs.auto_jobs', return_value=4):
         return build.commands(args, tools, Path('/private/run'))
+
+
+BAKED = ('--npc-gallery-method', 'baked')
 
 
 class Plan(unittest.TestCase):
@@ -212,7 +215,8 @@ class Plan(unittest.TestCase):
             ex.resolve(args, '0.0.33-dev1')
         self.assertIn('needs an area build', str(error.exception))
         self.assertEqual(args.unreferenced_groups, list(cc.GROUPS))
-        steps = ex.apply(default_plan(), ['unreferenced'], run=Path('/r'), area_cells=['interior:Test Cell'],
+        # the baked gallery's stage takes the closure (NPC Gallery v2.0, the default, has no stage: NPC-GALLERY-V2)
+        steps = ex.apply(default_plan(*BAKED), ['unreferenced'], run=Path('/r'), area_cells=['interior:Test Cell'],
                          data_files=Path('/d'), closure_groups=['voice'])
         names = [name for name, _ in steps]
         self.assertEqual(names[0], ex.CLOSURE_STAGE)
@@ -227,7 +231,7 @@ class Plan(unittest.TestCase):
     def test_cache_key_follows_the_closure(self):
         import build_cache
         from build_parallel import stage_dependencies
-        base = default_plan()
+        base = default_plan(*BAKED)
         run = Path('/private/run')
         one = ex.apply(base, ['unreferenced'], run=run, area_cells=['interior:Test Cell'], data_files=Path('/d'),
                        closure_groups=['voice'])

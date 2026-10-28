@@ -101,6 +101,88 @@ int main(void)
         assert(!AW_WeatherIsArrival(1,4096.0,0.0,0) && AW_WeatherIsArrival(1,4097.0,0.0,0));
         assert(AW_WeatherIsArrival(1,0,0,1) && AW_WeatherIsArrival(1,0,0,-1) && AW_WeatherIsArrival(1,0,0,8));
     }
+    {
+        /* AWW2 (WEATHER-AMBIENT-SUN-UNUSED-51): the ambient and sun stops after the fog stops; the land's tone is the
+         * weather's ambient + half its sun against Clear's (rule from OpenMW mwworld/weather.cpp: ambient + sun). */
+        static unsigned char v2[20+AW_WEATHER_LOOK_V2*AW_WEATHERS+10*2];
+        static const unsigned char amb_clear[3]={137,140,160},sun_clear[3]={255,252,238};
+        static const unsigned char amb_blight[3]={79,54,54},sun_blight[3]={224,84,84};
+        static aw_weather_table_t t2;aw_weather_blend_t b2;int tone[3],k,w;unsigned char *r;
+        memset(v2,0,sizeof v2);memcpy(v2,"AWW2",4);
+        put(v2+4,AW_WEATHERS);put(v2+8,2);put(v2+12,20);
+        for(w=0;w<AW_WEATHERS;w++){
+            r=v2+20+AW_WEATHER_LOOK_V2*w;
+            for(k=0;k<12;k++){r[24+k]=amb_clear[k%3];r[36+k]=sun_clear[k%3];}
+            r[48]=15;r[50]=w?0:100;
+        }
+        r=v2+20+AW_WEATHER_LOOK_V2*AW_WEATHER_BLIGHT;
+        for(k=0;k<12;k++){r[24+k]=amb_blight[k%3];r[36+k]=sun_blight[k%3];}
+        r[48]=40;r[0]=90;r[12]=128;
+        v2[20+AW_WEATHER_LOOK_V2*AW_WEATHERS+10+7]=100;   /* region 1: blight */
+        assert(!AW_WeatherParse(v2,(long)sizeof v2-1,&t2));
+        assert(AW_WeatherParse(v2,(long)sizeof v2,&t2) && t2.light==1 && t2.regions==2);
+        assert(t2.look[AW_WEATHER_BLIGHT].delta_milli==40 && t2.look[0].glare==100 && t2.look[AW_WEATHER_BLIGHT].glare==0);
+        assert(t2.look[AW_WEATHER_BLIGHT].sky[0][0]==90 && t2.look[AW_WEATHER_BLIGHT].fog[0][0]==128);
+        assert(t2.look[AW_WEATHER_BLIGHT].ambient[0][0]==79 && t2.look[AW_WEATHER_BLIGHT].sun[3][2]==84);
+        assert(AW_WeatherOfRegion(&t2,1,3,0)==AW_WEATHER_BLIGHT);
+        /* Clear: exactly unchanged. */
+        AW_WeatherBlend(&t2,0,0,AW_WEATHER_STEPS,&b2);
+        AW_WeatherLightTone(&b2,0,0,0,tone);
+        assert(tone[0]==256 && tone[1]==256 && tone[2]==256);
+        /* Blight by day: darker and red (about 72 %, 36 %, 34 % of clear). */
+        AW_WeatherBlend(&t2,AW_WEATHER_BLIGHT,AW_WEATHER_BLIGHT,AW_WEATHER_STEPS,&b2);
+        AW_WeatherLightTone(&b2,0,0,0,tone);
+        assert(tone[0]>=180 && tone[0]<=190 && tone[1]>=88 && tone[1]<=96 && tone[2]>=84 && tone[2]<=92);
+        /* Half way from clear: between the two, mixing stops keeps it in range. */
+        AW_WeatherBlend(&t2,0,AW_WEATHER_BLIGHT,AW_WEATHER_STEPS/2,&b2);
+        AW_WeatherLightTone(&b2,0,3,16,tone);
+        for(k=0;k<3;k++)assert(tone[k]>=AW_WEATHER_TONE_MIN && tone[k]<=AW_WEATHER_TONE_MAX && tone[k]<256);
+        /* An AWW1 table carries no light: the tone stays neutral. */
+        AW_WeatherBlend(&table,AW_WEATHER_BLIGHT,AW_WEATHER_BLIGHT,AW_WEATHER_STEPS,&b2);
+        assert(b2.light==0);
+        AW_WeatherLightTone(&b2,0,0,0,tone);
+        assert(tone[0]==256 && tone[1]==256 && tone[2]==256);
+        AW_WeatherLightTone(NULL,0,0,0,tone);
+        assert(tone[0]==256);
+    }
+    {
+        /* Storms (ACTOR-STORM-POSE-51; rules from OpenMW mwworld/weather.cpp, mwmechanics/character.cpp): ash and
+         * blight only; the weather left counts until half way; the wind blows outward from Red Mountain; an actor
+         * faces into it below -0.5. */
+        float dir[2],ald[3]={-16000.0f,50000.0f,0},rm[3]={25000.0f,70000.0f,0};
+        assert(AW_WeatherIsStorm(AW_WEATHER_ASH,AW_WEATHER_NONE,0.0) && AW_WeatherIsStorm(AW_WEATHER_BLIGHT,AW_WEATHER_NONE,0.0));
+        assert(!AW_WeatherIsStorm(AW_WEATHER_CLEAR,AW_WEATHER_NONE,0.0) && !AW_WeatherIsStorm(4,AW_WEATHER_NONE,0.0));
+        assert(!AW_WeatherIsStorm(9,AW_WEATHER_NONE,0.0));                      /* blizzard: no eye pose */
+        assert(AW_WeatherIsStorm(AW_WEATHER_ASH,0,0.49) && !AW_WeatherIsStorm(AW_WEATHER_ASH,0,0.5));
+        assert(!AW_WeatherIsStorm(0,AW_WEATHER_BLIGHT,0.49) && AW_WeatherIsStorm(0,AW_WEATHER_BLIGHT,0.5));
+        /* Ald'ruhn lies west-south-west of Red Mountain: the wind blows toward -x, a little -y */
+        assert(AW_WeatherStormDirection(ald,dir) && dir[0]<-0.85f && dir[1]<0 && dir[1]>-0.5f);
+        assert(AW_WeatherFacesStorm(0.0f,dir));                                  /* facing east, toward the mountain */
+        assert(!AW_WeatherFacesStorm(180.0f,dir));                               /* back to the wind */
+        assert(!AW_WeatherFacesStorm(90.0f,dir) && !AW_WeatherFacesStorm(270.0f,dir));
+        assert(!AW_WeatherStormDirection(rm,dir) && !AW_WeatherStormDirection(NULL,dir));
+    }
+    {
+        /* Falling weather (WEATHER-RAIN): what falls, and its strength through a transition. */
+        int s;
+        assert(AW_WeatherPrecipOf(0)==AW_PRECIP_NONE && AW_WeatherPrecipOf(4)==AW_PRECIP_RAIN);
+        assert(AW_WeatherPrecipOf(5)==AW_PRECIP_HEAVY_RAIN && AW_WeatherPrecipOf(AW_WEATHER_ASH)==AW_PRECIP_ASH);
+        assert(AW_WeatherPrecipOf(AW_WEATHER_BLIGHT)==AW_PRECIP_ASH && AW_WeatherPrecipOf(8)==AW_PRECIP_SNOW);
+        assert(AW_WeatherPrecipOf(9)==AW_PRECIP_BLIZZARD && AW_WeatherPrecipOf(2)==AW_PRECIP_NONE);
+        assert(AW_WeatherPrecip(4,AW_WEATHER_NONE,0.0,&s)==AW_PRECIP_RAIN && s==AW_WEATHER_STEPS);
+        assert(AW_WeatherPrecip(0,AW_WEATHER_NONE,0.0,&s)==AW_PRECIP_NONE && s==0);
+        /* clear to rain: nothing in the first half, then growing to full */
+        assert(AW_WeatherPrecip(0,4,0.3,&s)==AW_PRECIP_NONE && s==0);
+        assert(AW_WeatherPrecip(0,4,0.75,&s)==AW_PRECIP_RAIN && s==AW_WEATHER_STEPS/2);
+        assert(AW_WeatherPrecip(0,4,1.0,&s)==AW_PRECIP_RAIN && s==AW_WEATHER_STEPS);
+        /* rain to clear: fading over the first half */
+        assert(AW_WeatherPrecip(4,0,0.0,&s)==AW_PRECIP_RAIN && s==AW_WEATHER_STEPS);
+        assert(AW_WeatherPrecip(4,0,0.25,&s)==AW_PRECIP_RAIN && s==AW_WEATHER_STEPS/2);
+        assert(AW_WeatherPrecip(4,0,0.6,&s)==AW_PRECIP_NONE && s==0);
+        /* rain to heavy rain: keeps raining */
+        assert(AW_WeatherPrecip(4,5,0.6,&s)==AW_PRECIP_HEAVY_RAIN && s>0);
+        assert(AW_WeatherPrecip(4,4,0.3,&s)==AW_PRECIP_RAIN && s==AW_WEATHER_STEPS);
+    }
     puts("weather rules ok");
     return 0;
 }

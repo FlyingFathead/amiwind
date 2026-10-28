@@ -78,10 +78,23 @@ static AW_SKEL_APART int keys_ok (const aw_skel_table_t *t)
 int AW_SkelParse (const unsigned char *data, long size, aw_skel_table_t *out)
 {
 	long need;
-	int bones_bytes, kinds_bytes;
-	if (!data || size < AW_SKEL_HEADER || memcmp (data, AW_SKEL_MAGIC, 4) || U16 (data+4) != AW_SKEL_VERSION)
+	int bones_bytes, kinds_bytes, version, head = AW_SKEL_HEADER;
+	if (!data || size < AW_SKEL_HEADER || memcmp (data, AW_SKEL_MAGIC, 4))
+		return 0;
+	version = (int)U16 (data+4);
+	if (version != AW_SKEL_VERSION && version != AW_SKEL_VERSION_APPENDED)
 		return 0;
 	memset (out, 0, sizeof(*out));
+	if (version == AW_SKEL_VERSION_APPENDED)
+	{
+		/* the base table's path after the header (aw_skel.h): NUL padded, not empty, no view of a table */
+		head += AW_SKEL_TABLE_NAME;
+		if (size < head || data[AW_SKEL_HEADER + AW_SKEL_TABLE_NAME - 1] || !data[AW_SKEL_HEADER])
+			return 0;
+		memcpy (out->base_name, data + AW_SKEL_HEADER, AW_SKEL_TABLE_NAME);
+		if (strchr (out->base_name, '|'))
+			return 0;
+	}
 	out->bones = (int)U16 (data+6);
 	out->frames = (int)U32 (data+8);
 	out->rate = F32 (data+12);
@@ -93,19 +106,36 @@ int AW_SkelParse (const unsigned char *data, long size, aw_skel_table_t *out)
 		return 0;
 	bones_bytes = (out->bones * 2 + 3) & ~3;
 	kinds_bytes = (out->bones + 3) & ~3;
-	need = AW_SKEL_HEADER + bones_bytes + kinds_bytes + (long)out->groups * AW_SKEL_GROUP_BYTES +
+	need = head + bones_bytes + kinds_bytes + (long)out->groups * AW_SKEL_GROUP_BYTES +
 		(long)out->keys_count * AW_SKEL_KEY_BYTES;
-	if (size < need || !bones_ok (data, bones_bytes, out))
+	if (size < need || !bones_ok (data + (head - AW_SKEL_HEADER), bones_bytes, out))
 		return 0;
 	need += (long)out->bones * AW_SKEL_BASE_BYTES + (long)out->frames * out->row;
 	if (need != size)
 		return 0;
-	out->group_data = data + AW_SKEL_HEADER + bones_bytes + kinds_bytes;
+	out->group_data = data + head + bones_bytes + kinds_bytes;
 	out->key_data = out->group_data + (long)out->groups * AW_SKEL_GROUP_BYTES;
 	if (!groups_ok (out) || !keys_ok (out))
 		return 0;
 	out->base = out->key_data + (long)out->keys_count * AW_SKEL_KEY_BYTES;
 	out->keys = out->base + (long)out->bones * AW_SKEL_BASE_BYTES;
+	out->own_frames = out->frames;
+	out->own_groups = out->groups;
+	return 1;
+}
+
+int AW_SkelAppend (aw_skel_table_t *t, const aw_skel_table_t *base)
+{
+	int i;
+	if (!t->base_name[0] || !base || base->more || base->bones != t->bones || base->own_frames < 1 ||
+		(long)t->own_frames + base->frames > 1000000L || t->own_groups + base->groups > 0xFFFF)
+		return 0;
+	for (i=0 ; i<t->bones ; i++)
+		if (base->parent[i] != t->parent[i])
+			return 0;
+	t->more = base;
+	t->frames = t->own_frames + base->frames;
+	t->groups = t->own_groups + base->groups;
 	return 1;
 }
 
@@ -189,21 +219,32 @@ int AW_SkelGroup (const aw_skel_table_t *t, const char *name)
 		{
 			memcpy (own, p, n);
 			strcpy (own + n, name);
-			for (i=0 ; i<t->groups ; i++)
+			for (i=0 ; i<t->own_groups ; i++)
 				if (same_name ((const char *)(t->group_data + i*AW_SKEL_GROUP_BYTES), own))
 					return i;
 		}
 		p += n;
 	}
-	for (i=0 ; i<t->groups ; i++)
+	for (i=0 ; i<t->own_groups ; i++)
 		if (same_name ((const char *)(t->group_data + i*AW_SKEL_GROUP_BYTES), name))
 			return i;
+	/* an appended table: the base's group of that name, after the own ones */
+	if (t->more && (i = AW_SkelGroup (t->more, name)) >= 0)
+		return t->own_groups + i;
 	return -1;
 }
 
 void AW_SkelGroupAt (const aw_skel_table_t *t, int index, aw_skel_group_t *out)
 {
-	const unsigned char *g = t->group_data + index*AW_SKEL_GROUP_BYTES;
+	const unsigned char *g;
+	if (t->more && index >= t->own_groups)
+	{
+		AW_SkelGroupAt (t->more, index - t->own_groups, out);
+		out->first += (unsigned)t->own_frames;
+		out->last += (unsigned)t->own_frames;
+		return;
+	}
+	g = t->group_data + index*AW_SKEL_GROUP_BYTES;
 	memcpy (out->name, g, AW_SKEL_NAME);
 	out->first = (unsigned)U32 (g + AW_SKEL_NAME);
 	out->last = (unsigned)U32 (g + AW_SKEL_NAME + 4);
@@ -212,6 +253,11 @@ void AW_SkelGroupAt (const aw_skel_table_t *t, int index, aw_skel_group_t *out)
 int AW_SkelKeyFrame (const aw_skel_table_t *t, int group, const char *text)
 {
 	int i;
+	if (t->more && group >= t->own_groups)
+	{
+		i = AW_SkelKeyFrame (t->more, group - t->own_groups, text);
+		return i < 0 ? -1 : i + t->own_frames;
+	}
 	for (i=0 ; i<t->keys_count ; i++)
 	{
 		const unsigned char *k = t->key_data + i*AW_SKEL_KEY_BYTES;
@@ -414,10 +460,10 @@ static void rows_at (const aw_skel_table_t *t, float frame, const unsigned char 
 	int f0, f1;
 	if (!(frame > 0))
 		frame = 0;
-	if (frame > (float)(t->frames - 1))
-		frame = (float)(t->frames - 1);
+	if (frame > (float)(t->own_frames - 1))
+		frame = (float)(t->own_frames - 1);
 	f0 = (int)frame;
-	f1 = f0 + 1 < t->frames ? f0 + 1 : f0;
+	f1 = f0 + 1 < t->own_frames ? f0 + 1 : f0;
 	*u = frame - (float)f0;
 	*a = t->keys + (long)f0 * t->row;
 	*b = t->keys + (long)f1 * t->row;
@@ -439,6 +485,11 @@ int AW_SkelLeftArmRoot (const aw_skel_table_t *t, int shield, int weapon)
 	return l >= 0 && r >= 0 && l != r && t->parent[l] >= 0 && t->parent[l] == t->parent[r] ? l : -1;
 }
 
+int AW_SkelRightArmRoot (const aw_skel_table_t *t, int shield, int weapon)
+{
+	return AW_SkelLeftArmRoot (t, weapon, shield);
+}
+
 void AW_SkelPose (const aw_skel_table_t *t, float frame, float world[][3][4])
 {
 	AW_SkelPoseLayer (t, frame, 0, -1, world);
@@ -446,15 +497,54 @@ void AW_SkelPose (const aw_skel_table_t *t, float frame, float world[][3][4])
 
 void AW_SkelPoseLayer (const aw_skel_table_t *t, float frame, float layer_frame, int root, float world[][3][4])
 {
-	int i;
-	float u, lu = 0, local[3][4];
-	const unsigned char *a, *b, *la = NULL, *lb = NULL;
-	unsigned char layered[AW_SKEL_MAX_BONES];
+	AW_SkelPoseLayers (t, frame, 1, &layer_frame, &root, world);
+}
+
+void AW_SkelPoseLayers (const aw_skel_table_t *t, float frame, int n, const float *layer_frames, const int *roots,
+	float world[][3][4])
+{
+	int i, j;
+	float u, lu[AW_SKEL_LAYERS], local[3][4], table_frames[AW_SKEL_LAYERS];
+	const unsigned char *a, *b, *la[AW_SKEL_LAYERS], *lb[AW_SKEL_LAYERS];
+	/* per bone: 0 the base frame, j+1 layer j (the layer of the nearest root above it, the bone itself included) */
+	unsigned char layered[AW_SKEL_MAX_BONES], own[AW_SKEL_MAX_BONES];
+	int table_roots[AW_SKEL_LAYERS];
+	if (t->more && roots && layer_frames)
+	{
+		/* an appended table (CREATURE-APPENDED-TABLE-54): a frame past its own is the base's (the same bones); each
+		 * layer is played within the table the frame is in (a creature carries no torch layer across the two) */
+		int base_frame = frame >= (float)t->own_frames;
+		if (n > AW_SKEL_LAYERS)
+			n = AW_SKEL_LAYERS;
+		for (j=0 ; j<n ; j++)
+		{
+			int base_layer = layer_frames[j] >= (float)t->own_frames;
+			table_frames[j] = base_frame ? layer_frames[j] - (float)t->own_frames : layer_frames[j];
+			table_roots[j] = base_layer == base_frame ? roots[j] : -1;
+		}
+		if (base_frame)
+		{
+			AW_SkelPoseLayers (t->more, frame - (float)t->own_frames, n, table_frames, table_roots, world);
+			return;
+		}
+		layer_frames = table_frames;
+		roots = table_roots;
+	}
+	else if (t->more && frame >= (float)t->own_frames)
+	{
+		AW_SkelPoseLayers (t->more, frame - (float)t->own_frames, 0, NULL, NULL, world);
+		return;
+	}
 	rows_at (t, frame, &a, &b, &u);
-	if (root >= 0 && root < t->bones)
-		rows_at (t, layer_frame, &la, &lb, &lu);
-	else
-		root = -1;
+	memset (own, 0, sizeof(own));
+	if (n > AW_SKEL_LAYERS)
+		n = AW_SKEL_LAYERS;
+	for (j=0 ; j<n ; j++)
+		if (roots && layer_frames && roots[j] >= 0 && roots[j] < t->bones)
+		{
+			rows_at (t, layer_frames[j], &la[j], &lb[j], &lu[j]);
+			own[roots[j]] = (unsigned char)(j + 1);
+		}
 	if (!still_same (t))
 	{
 		/* a bone that never moves has one local transform for every frame: made once per table, not per pose
@@ -474,10 +564,11 @@ void AW_SkelPoseLayer (const aw_skel_table_t *t, float frame, float layer_frame,
 	{
 		const unsigned char *base = t->base + i*AW_SKEL_BASE_BYTES, *ra = a, *rb = b;
 		float ru = u;
-		/* the layer's bones (ROOT and every bone under it; parents come first) take the layer frame's keys */
-		layered[i] = root >= 0 && (i == root || (t->parent[i] >= 0 && layered[t->parent[i]]));
+		/* a layer's bones (its ROOT and every bone under it, parents come first; a nested root's own layer wins below
+		 * it) take that layer frame's keys */
+		layered[i] = own[i] ? own[i] : t->parent[i] >= 0 ? layered[t->parent[i]] : 0;
 		if (layered[i])
-			ra = la, rb = lb, ru = lu;
+			ra = la[layered[i]-1], rb = lb[layered[i]-1], ru = lu[layered[i]-1];
 		if (t->kind[i] == AW_SKEL_STILL)
 			memcpy (local, still_local[i], sizeof(local));
 		else if (t->kind[i] == AW_SKEL_TURNS)

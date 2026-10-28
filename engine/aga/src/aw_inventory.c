@@ -52,6 +52,34 @@ int AW_DebugTorchGrant(aw_state_t *s,int enabled){
     if(!AW_ItemAdd(&next,AW_DEBUG_TORCH_ID,1) || !AW_StateSet(&next,AW_GLOBAL,AW_DEBUG_TORCH_GRANTED,1))return 0;
     *s=next;return 1;
 }
+/* An armour type's slot (OpenMW mwclass/armor.cpp getEquipmentSlots), -1 for an unknown type. */
+int AW_InventoryArmourSlot(int type){
+    static const signed char slot[11]={AW_SLOT_HELMET,AW_SLOT_CUIRASS,AW_SLOT_LPAULDRON,AW_SLOT_RPAULDRON,AW_SLOT_GREAVES,
+        AW_SLOT_BOOTS,AW_SLOT_LGAUNTLET,AW_SLOT_RGAUNTLET,AW_SLOT_LEFT,AW_SLOT_LGAUNTLET,AW_SLOT_RGAUNTLET};
+    return type>=0 && type<11?slot[type]:-1;
+}
+/* The slot a new item clears (OpenMW mwclass/weapon.cpp and armor.cpp canBeEquipped with mwworld/actionequip.cpp):
+ * a two-handed weapon takes the shield off the left hand; a shield takes a two-handed weapon out of the right hand.
+ * RIGHT and LEFT: what those hands hold (NULL empty). -1 when nothing has to go. */
+int AW_InventoryEquipConflict(const aw_inventory_item_t *item,const aw_inventory_item_t *right,
+                              const aw_inventory_item_t *left){
+    if(!item)return -1;
+    if(item->category==AW_INV_WEAPON && item->weapon>0 && AW_INV_TWO_HANDED(item->weapon) &&
+       left && left->category==AW_INV_ARMOUR && left->subtype==8)return AW_SLOT_LEFT;
+    if(item->category==AW_INV_ARMOUR && item->subtype==8 && right && right->category==AW_INV_WEAPON &&
+       right->weapon>0 && AW_INV_TWO_HANDED(right->weapon))return AW_SLOT_RIGHT;
+    return -1;
+}
+/* The armour slot a blow can land on (aw_combat.h AW_CombatArmorHitSlot order: cuirass, helmet, greaves, boots, left
+ * and right pauldron, left and right gauntlet, shield) of an equipment slot, -1 for the others. */
+int AW_InventoryHitSlot(int slot){
+    switch(slot){
+    case AW_SLOT_CUIRASS:return 0;case AW_SLOT_HELMET:return 1;case AW_SLOT_GREAVES:return 2;case AW_SLOT_BOOTS:return 3;
+    case AW_SLOT_LPAULDRON:return 4;case AW_SLOT_RPAULDRON:return 5;case AW_SLOT_LGAUNTLET:return 6;
+    case AW_SLOT_RGAUNTLET:return 7;case AW_SLOT_LEFT:return 8;
+    }
+    return -1;
+}
 int AW_InventoryEquipped(const aw_state_t *s,const char *id){
     int i,n=0;if(!s || !inv_id(id,64))return 0;
     for(i=0;i<AW_INVENTORY_SLOTS;i++)if(!strcmp(s->inventory.equipped[i],id))n++;
@@ -67,10 +95,22 @@ int AW_InventoryEquipSlot(aw_state_t *s,const aw_inventory_item_t *item,int slot
     if(used>=AW_StateGet(s,AW_ITEM,item->id))return 0;
     strcpy(s->inventory.equipped[slot],item->id);s->inventory.initialized=1;return 1;
 }
+int (*aw_inventory_hand_item)(int slot,aw_inventory_item_t *out);
+static int equip_into(aw_state_t *s,const aw_inventory_item_t *item);
 int AW_InventoryEquip(aw_state_t *s,const aw_inventory_item_t *item){
-    int i,first=-1;
+    aw_inventory_item_t right,left;int clear=-1;
     if(!s || !item || !inv_id(item->id,64))return 0;
     if(AW_InventoryEquipped(s,item->id))return 1;
+    if(aw_inventory_hand_item)
+        clear=AW_InventoryEquipConflict(item,aw_inventory_hand_item(AW_SLOT_RIGHT,&right)?&right:NULL,
+                                        aw_inventory_hand_item(AW_SLOT_LEFT,&left)?&left:NULL);
+    if(!equip_into(s,item))return 0;
+    /* actionequip.cpp: the new item is worn, then the hand it conflicts with is emptied (back to the pack) */
+    if(clear>=0 && strcmp(s->inventory.equipped[clear],item->id))memset(s->inventory.equipped[clear],0,64);
+    return 1;
+}
+static int equip_into(aw_state_t *s,const aw_inventory_item_t *item){
+    int i,first=-1;
     for(i=0;i<AW_INVENTORY_SLOTS;i++)if(item->slots&(1U<<i)){
         if(first<0)first=i;
         if(!s->inventory.equipped[i][0])return AW_InventoryEquipSlot(s,item,i);
@@ -249,7 +289,7 @@ int AW_InventoryRead(const char *id,aw_inventory_item_t *out){
                    (value.slots!=(1U<<AW_SLOT_RIGHT) || value.weapon<1 ||
                     !(value.health>0 && value.reach>0 && value.speed>0)))goto bad;
                 if(value.category==AW_INV_ARMOUR &&
-                   (value.subtype!=8 || value.slots!=(1U<<AW_SLOT_LEFT) ||
+                   (AW_InventoryArmourSlot(value.subtype)<0 || value.slots!=(1U<<AW_InventoryArmourSlot(value.subtype)) ||
                     !(value.health>0) || value.armor_skill_base<1))goto bad;
             }
             if((value.model[0] && (strncmp(value.model,"progs/inv/",10) || strstr(value.model,".."))) ||
@@ -302,6 +342,11 @@ int AW_InventoryEquippedItem(int slot,aw_inventory_item_t *out){
     if((values[index].flags&(AW_INV_EQUIP|AW_INV_EQUIP_SUPPORTED))!=(AW_INV_EQUIP|AW_INV_EQUIP_SUPPORTED) ||
        !(values[index].slots&(1U<<slot)))return 0;
     *out=values[index];return 1;
+}
+int AW_InventoryEquippedWeaponType(void){
+    aw_inventory_item_t item;
+    if(!AW_InventoryEquippedItem(AW_SLOT_RIGHT,&item) || item.category!=AW_INV_WEAPON || item.weapon<1)return -1;
+    return item.weapon-1;
 }
 int AW_InventoryCanEquip(const aw_inventory_item_t *item){
     if(!item || (item->flags&(AW_INV_EQUIP|AW_INV_EQUIP_SUPPORTED))!=(AW_INV_EQUIP|AW_INV_EQUIP_SUPPORTED))return 0;
@@ -393,12 +438,31 @@ static void inv_combat(aw_fighter_t *sheet){
         sheet->reach=item.reach;sheet->speed=item.speed;sheet->weight=item.weight;
         sheet->weapon_health_max=item.health;sheet->weapon_health=item.health*inv_condition(item.id);
     }
-    if(AW_InventoryEquippedItem(AW_SLOT_LEFT,&item) && item.category==AW_INV_ARMOUR &&
-       item.subtype==8 && item.shield_class>=0 && item.shield_class<=2 && item.armor_skill_base>0){
+    /* Every worn armour piece (OpenMW mwclass/npc.cpp getArmorRating): cuirass 0.3; shield, helmet, greaves, boots and
+     * each pauldron 0.1; each gauntlet or bracer 0.05; an empty slot the unarmoured rating. A piece rates its armour x
+     * its class's skill / iBaseArmorSkill (its own armour when it weighs nothing; armor.cpp getSkillAdjustedArmorRating)
+     * x its condition. Its class is also the hit sound of a blow landing on it (hit_classes, local.lua applyArmor). */
+    {
         static const int skills[3]={AW_SK_LIGHT,AW_SK_MEDIUM,AW_SK_HEAVY};
-        sheet->shield=1;sheet->shield_class=(unsigned char)item.shield_class;
-        sheet->shield_health_max=item.health;sheet->shield_health=item.health*inv_condition(item.id);
-        sheet->armor+=.1f*(item.armor*sheet->skills[skills[item.shield_class]]/item.armor_skill_base-base);
+        static const struct {unsigned char slot;float weight;} worn[10]={{AW_SLOT_CUIRASS,.3f},{AW_SLOT_LEFT,.1f},
+            {AW_SLOT_HELMET,.1f},{AW_SLOT_GREAVES,.1f},{AW_SLOT_BOOTS,.1f},{AW_SLOT_LPAULDRON,.1f},
+            {AW_SLOT_RPAULDRON,.1f},{AW_SLOT_LGAUNTLET,.05f},{AW_SLOT_RGAUNTLET,.05f}};
+        int k,hit;float rating;
+        sheet->hit_classes=0;
+        for(k=0;k<9;k++){
+            if(!AW_InventoryEquippedItem(worn[k].slot,&item) || item.category!=AW_INV_ARMOUR ||
+               AW_InventoryArmourSlot(item.subtype)!=worn[k].slot || item.shield_class<0 || item.shield_class>2 ||
+               item.armor_skill_base<=0)continue;
+            rating=item.weight>0?item.armor*sheet->skills[skills[item.shield_class]]/item.armor_skill_base:item.armor;
+            rating*=inv_condition(item.id);
+            sheet->armor+=worn[k].weight*(rating-base);
+            hit=AW_InventoryHitSlot(worn[k].slot);
+            if(hit>=0)sheet->hit_classes|=(unsigned int)(item.shield_class+1)<<(2*hit);
+            if(worn[k].slot==AW_SLOT_LEFT){
+                sheet->shield=1;sheet->shield_class=(unsigned char)item.shield_class;
+                sheet->shield_health_max=item.health;sheet->shield_health=item.health*inv_condition(item.id);
+            }
+        }
     }
 }
 void AW_InventoryGrantCommand(void){
@@ -412,6 +476,7 @@ void AW_InventoryGrantCommand(void){
 }
 void AW_InventoryInit(void){
     aw_combat_equipment=inv_combat;aw_combat_equipment_store=inv_store;aw_hand_block_item=inv_block_item;
+    aw_inventory_hand_item=AW_InventoryEquippedItem;
     aw_magic_frame=AW_MagicFrame;
 }
 static void inv_level(void){

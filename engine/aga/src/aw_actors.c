@@ -46,6 +46,9 @@
 #include "chim/chim_actor_table.h"
 #include "aw_character.h"
 #include "aw_save.h"
+
+/* "chim actors ambient ..." (aw_ambient.c sets it at init; NULL: not in this engine) */
+void (*aw_ambient_cmd)(void);
 #include "aw_state.h"
 
 #define AI_RANGE		1792.0f		/* local units: OpenMW's actors processing range 7168 x 0.25 */
@@ -79,6 +82,7 @@ extern void (*chim_actors_join)(int cx, int cy, const char *map, const float *of
 extern void (*chim_actors_leave)(int cx, int cy);
 extern void (*chim_actors_tick)(void);
 extern void (*chim_actors_cmd)(void);
+extern void (*aw_levelled_entity)(edict_t *ent);	/* pr_edict.c: an "aw_levelled" entity of a loading map */
 int AW_CompanionEdict (edict_t *e);
 #include "aw_mappath.h"
 #include "aw_tryalloc.h"
@@ -91,6 +95,25 @@ static int IsActor (edict_t *e)
 		return 0;
 	c = pr_strings + e->v.classname;
 	return !strcmp (c, "aw_npc") || !strcmp (c, "aw_creature");
+}
+
+/* dbg creatures on|off ("chim actors creatures 0|1"; no command or cvar of its own: the resident registry budget):
+ * the outdoor creatures of the actor library (models progs/c_*, tools/creature_library.py) and aw_creature actors.
+ * Off: the ones alive are released as a leaving cell releases them (their state kept in the change list) and no new
+ * one spawns; on: they come back with their cells' next joins. Default on, not saved. Room creatures (resident
+ * models, progs/a_*) are not told apart from the room's NPCs yet. */
+static int		creatures_on = 1;
+static unsigned long	creatures_skipped;
+
+static int IsCreature (edict_t *e)
+{
+	const char *m;
+	if (e->free || !e->v.classname)
+		return 0;
+	if (!strcmp (pr_strings + e->v.classname, "aw_creature"))
+		return 1;
+	m = e->v.model ? pr_strings + e->v.model : "";
+	return !strncmp (m, "progs/c_", 8);
 }
 
 static float RefOf (edict_t *e)
@@ -387,6 +410,12 @@ static int SpawnOne (pending_t *q)
 		ED_Free (ent);
 		return 0;
 	}
+	if (!creatures_on && IsCreature (ent))
+	{
+		ED_Free (ent);			/* dbg creatures off: its levelled pick and state stay for when they are on */
+		creatures_skipped++;
+		return 0;
+	}
 	if (q->table)
 	{
 		/* the actor table (EXPERIMENTAL): the base's text, the record's placement in its cell's local units */
@@ -660,6 +689,77 @@ static void TableJoin (int cx, int cy, const float *offset)
 	fclose (f);
 	Con_Printf ("actors: cell %ld %ld joins from the actor table: %ld actors queued (%ld waiting)\n", (long)cx,
 		(long)cy, (long)queued, (long)npending);
+}
+
+/* A room's levelled creature (CREATURE-ROOM-LEVELLED-54): the room map's "aw_levelled" entity (aw_ref = the reference
+ * number, sounds = the list's index in the actor table's lists: chim.actors.table_list_order, the same order the
+ * table is written in), handed over by ED_LoadFromFile (pr_edict.c aw_levelled_entity) while the map loads. Rolled as
+ * an outdoor levelled reference is (ChimActors_LevelledPick at the player's level, the pick kept in the change list
+ * under the reference, so the room gives the same creature again, or nothing), and the creature spawned there and
+ * then (the map is loading: its spawn function may precache). The entity itself is freed by the caller. */
+static void LevelledEntity (edict_t *ent)
+{
+	chim_actor_base_t b;
+	pending_t q;
+	eval_t *v = GetEdictFieldValue (ent, "aw_ref");
+	float ref = v ? v->_float : 0;
+	unsigned list = (unsigned)ent->v.sounds, pick;
+	change_t *c;
+	if (!TableLoad () || !table.lists || list >= table.head.lists)
+		return;
+	table.levelled++;
+	c = Change (ref, 0);
+	if (c && c->pick)
+	{
+		pick = c->pick;
+		table.levelled_kept++;
+	}
+	else
+	{
+		unsigned state = ChimActors_RollSeed ((unsigned)ref, roll_seed);
+		int level = aw_character.valid && aw_character.level > 0 ? aw_character.level : 1;
+		int got = ChimActors_LevelledPick (table.lists, list, level, &state);
+		pick = got < 0 ? 1 : (unsigned)got + 2;
+		if ((c = Change (ref, 1)) != NULL)
+			c->pick = (unsigned short)pick;
+	}
+	if (pick == 1 || !ChimActors_Base (table.bases + (pick-2)*CHIM_ACTOR_BASE_BYTES, &table.head, &b))
+	{
+		table.levelled_none++;
+		return;
+	}
+	if (!b.bytes)
+	{
+		table.levelled_no_model++;
+		return;
+	}
+	{
+		long at;
+		int bytes;
+		FILE *f = TableOpen (&at, &bytes);
+		memset (&q, 0, sizeof(q));
+		if (!f)
+			return;
+		if (!(q.text = AW_TryMalloc (b.bytes + 3)) || fseek (f, at + (long)table.head.text_at + (long)b.at, SEEK_SET) ||
+			fread (q.text, 1, b.bytes, f) != b.bytes)
+		{
+			free (q.text);
+			fclose (f);
+			return;
+		}
+		fclose (f);
+	}
+	q.text[b.bytes] = '}';
+	q.text[b.bytes+1] = 0;
+	q.table = 1;
+	q.scale = 1.0f;
+	q.rec.key = (unsigned)ref;
+	VectorCopy (ent->v.origin, q.rec.origin);
+	q.rec.yaw = ent->v.angles[1];
+	q.rec.flags = 0;
+	if (SpawnOne (&q))
+		table.spawnable++;
+	free (q.text);
 }
 
 static void Join (int cx, int cy, const char *map, const float *offset)
@@ -1039,6 +1139,14 @@ static void Hash (const char *label)
 static void Command (void)
 {
 	char *a = Cmd_Argv (2);
+	if (!strcmp (a, "ambient"))
+	{
+		if (aw_ambient_cmd)
+			aw_ambient_cmd ();		/* the Wander packages (aw_ambient.c sets it) */
+		else
+			Con_Printf ("chim actors ambient: not in this engine\n");
+		return;
+	}
 	if (Cmd_Argc () == 4 && !strcmp (a, "hash"))
 	{
 		Hash (Cmd_Argv (3));
@@ -1047,23 +1155,11 @@ static void Command (void)
 	int i, n = 0, cx, cy, held;
 	edict_t *e;
 	float h;
-	if (!sv.active)
-		return;
-	if (Cmd_Argc () == 3 && (!strcmp (a, "fight") || !strcmp (a, "kill")))
-	{
-		/* the nearest resident that has a combat sheet */
-		ntried = 0;
-		while ((e = Nearest ()) != NULL && !AW_CombatTestEngage (e, a[0] == 'k') && ntried < MAX_EDICTS)
-			tried[ntried++] = e;
-		if (!e)
-		{
-			Con_Printf ("chim actors %s: no resident with a combat sheet near\n", a);
-			return;
-		}
-		Con_Printf ("chim actors %s: %s (ref %.0f, edict %ld)\n", a, e->v.netname ? pr_strings + e->v.netname : "?",
-			RefOf (e), (long)NUM_FOR_EDICT(e));
-		return;
-	}
+	/* The settings first: they hold without a running map. default-game.cfg runs before any map starts, so a
+	 * settings line behind the running-map check below was dropped without a word: "chim actors table 1" never
+	 * took, every joining frame read its frame map, and the 5,082 levelled creature references of the exterior were
+	 * never rolled (CHIM-EXTERIOR-ACTORS-MISSING-46, found 2026-10-27 in the v0.0.53 final: "actors: frame 1 -7
+	 * joins", never "joins from the actor table"). */
 	if (Cmd_Argc () == 4 && !strcmp (a, "budget"))
 	{
 		budget_n = atoi (Cmd_Argv (3));
@@ -1098,6 +1194,55 @@ static void Command (void)
 	if (Cmd_Argc () == 4 && !strcmp (a, "trace"))
 	{
 		aw_actors_trace = atoi (Cmd_Argv (3));
+		return;
+	}
+	if (Cmd_Argc () >= 3 && !strcmp (a, "creatures"))
+	{
+		int released = 0, alive = 0;
+		if (Cmd_Argc () == 4)
+		{
+			char *w = Cmd_Argv (3);
+			int on = !Q_strcasecmp (w, "on") || !Q_strcasecmp (w, "true") || !strcmp (w, "1") ? 1 :
+				!Q_strcasecmp (w, "off") || !Q_strcasecmp (w, "false") || !strcmp (w, "0") ? 0 : -1;
+			if (on < 0)
+			{
+				Con_Printf ("Usage: dbg creatures [on/off, true/false or 1/0]\n");
+				return;
+			}
+			creatures_on = on;
+		}
+		for (i=1 ; sv.active && i<sv.num_edicts ; i++)
+		{
+			e = EDICT_NUM(i);
+			if (!IsCreature (e))
+				continue;
+			if (!creatures_on && !AW_CompanionEdict (e))
+			{
+				Release (e);
+				released++;
+			}
+			else
+				alive++;
+		}
+		Con_Printf ("Creatures %s: %d alive, %d released now, %lu spawns skipped while off (outdoor creatures; not saved)\n",
+			creatures_on ? "on" : "off", alive, released, creatures_skipped);
+		return;
+	}
+	if (!sv.active)
+		return;
+	if (Cmd_Argc () == 3 && (!strcmp (a, "fight") || !strcmp (a, "kill")))
+	{
+		/* the nearest resident that has a combat sheet */
+		ntried = 0;
+		while ((e = Nearest ()) != NULL && !AW_CombatTestEngage (e, a[0] == 'k') && ntried < MAX_EDICTS)
+			tried[ntried++] = e;
+		if (!e)
+		{
+			Con_Printf ("chim actors %s: no resident with a combat sheet near\n", a);
+			return;
+		}
+		Con_Printf ("chim actors %s: %s (ref %.0f, edict %ld)\n", a, e->v.netname ? pr_strings + e->v.netname : "?",
+			RefOf (e), (long)NUM_FOR_EDICT(e));
 		return;
 	}
 	if (Cmd_Argc () == 3 && !strcmp (a, "summon"))
@@ -1322,4 +1467,5 @@ void AW_ActorsInit (void)
 	chim_actors_leave = Leave;
 	chim_actors_tick = Tick;
 	chim_actors_cmd = Command;		/* "chim actors ...": no command or cvar of its own (the resident registry budget) */
+	aw_levelled_entity = LevelledEntity;	/* a room map's levelled creatures (pr_edict.c ED_LoadFromFile) */
 }

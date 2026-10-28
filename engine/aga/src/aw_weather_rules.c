@@ -2,6 +2,7 @@
  * Region weather rules as pure functions (aw_weather.h). No engine state: the
  * host test runs them as they are. */
 #include <string.h>
+#include <math.h>
 #include "aw_weather.h"
 
 const char *const aw_weather_names[AW_WEATHERS]={"clear","cloudy","foggy","overcast","rain",
@@ -50,28 +51,37 @@ static unsigned int word(const unsigned char *p)
 {
     return (unsigned int)p[0]|((unsigned int)p[1]<<8)|((unsigned int)p[2]<<16)|((unsigned int)p[3]<<24);
 }
-/* AWW1 (tools/prepare_world_ui.py region_weather): header, ten 32-byte looks,
+/* AWW1 / AWW2 (tools/prepare_world_ui.py region_weather): header, ten 32-byte
+ * (AWW1) or 56-byte (AWW2: ambient and sun stops after the fog stops) looks,
  * ten chance bytes per region. Any other shape is refused (clear sky stays). */
 int AW_WeatherParse(const unsigned char *raw,long size,aw_weather_table_t *out)
 {
-    unsigned int weathers,regions,hours;int w,s,k;const unsigned char *row;
-    if(!raw || !out || size<20 || memcmp(raw,"AWW1",4))return 0;
+    unsigned int weathers,regions,hours;int w,s,k,look,light;const unsigned char *row;
+    if(!raw || !out || size<20)return 0;
+    if(!memcmp(raw,"AWW1",4)){look=AW_WEATHER_LOOK_V1;light=0;}
+    else if(!memcmp(raw,"AWW2",4)){look=AW_WEATHER_LOOK_V2;light=1;}
+    else return 0;
     weathers=word(raw+4);regions=word(raw+8);hours=word(raw+12);
     if(weathers!=AW_WEATHERS || regions>AW_WEATHER_REGIONS || hours<1 || hours>240)return 0;
-    if(size!=20+32L*(long)weathers+10L*(long)regions)return 0;
+    if(size!=20+(long)look*(long)weathers+10L*(long)regions)return 0;
     memset(out,0,sizeof *out);
-    out->regions=(int)regions;out->hours=(int)hours;
+    out->regions=(int)regions;out->hours=(int)hours;out->light=light;
     for(w=0;w<AW_WEATHERS;w++){
-        row=raw+20+32*w;
+        row=raw+20+look*w;
         for(s=0;s<4;s++)for(k=0;k<3;k++){
             out->look[w].sky[s][k]=row[3*s+k];
             out->look[w].fog[s][k]=row[12+3*s+k];
+            if(light){
+                out->look[w].ambient[s][k]=row[24+3*s+k];
+                out->look[w].sun[s][k]=row[36+3*s+k];
+            }
         }
-        out->look[w].delta_milli=row[24]|(row[25]<<8);
-        out->look[w].glare=row[26]>100?100:row[26];
+        row+=light?48:24;
+        out->look[w].delta_milli=row[0]|(row[1]<<8);
+        out->look[w].glare=row[2]>100?100:row[2];
         if(out->look[w].delta_milli<1)out->look[w].delta_milli=1;
     }
-    memcpy(out->chances,raw+20+32*AW_WEATHERS,10*regions);
+    memcpy(out->chances,raw+20+look*AW_WEATHERS,10*regions);
     return 1;
 }
 int AW_WeatherOfRegion(const aw_weather_table_t *table,int region,int days,int milliseconds)
@@ -128,11 +138,97 @@ void AW_WeatherBlend(const aw_weather_table_t *table,int from,int to,int step,aw
     if(step<0)step=0;
     if(step>AW_WEATHER_STEPS)step=AW_WEATHER_STEPS;
     a=&table->look[from];b=&table->look[to];
+#define MIX(field) (unsigned char)((a->field[s][k]*(AW_WEATHER_STEPS-step)+b->field[s][k]*step+AW_WEATHER_STEPS/2)/AW_WEATHER_STEPS)
     for(s=0;s<4;s++)for(k=0;k<3;k++){
-        out->sky[s][k]=(unsigned char)((a->sky[s][k]*(AW_WEATHER_STEPS-step)+b->sky[s][k]*step+AW_WEATHER_STEPS/2)/AW_WEATHER_STEPS);
-        out->fog[s][k]=(unsigned char)((a->fog[s][k]*(AW_WEATHER_STEPS-step)+b->fog[s][k]*step+AW_WEATHER_STEPS/2)/AW_WEATHER_STEPS);
+        out->sky[s][k]=MIX(sky);
+        out->fog[s][k]=MIX(fog);
+        out->ambient[s][k]=MIX(ambient);
+        out->sun[s][k]=MIX(sun);
+        out->clear_ambient[s][k]=table->look[AW_WEATHER_CLEAR].ambient[s][k];
+        out->clear_sun[s][k]=table->look[AW_WEATHER_CLEAR].sun[s][k];
     }
+#undef MIX
+    out->light=table->light;
     sa=from==AW_WEATHER_CLEAR?0:AW_WEATHER_STEPS;sb=to==AW_WEATHER_CLEAR?0:AW_WEATHER_STEPS;
     out->strength=(sa*(AW_WEATHER_STEPS-step)+sb*step)/AW_WEATHER_STEPS;
     out->glare=(a->glare*(AW_WEATHER_STEPS-step)+b->glare*step)/AW_WEATHER_STEPS;
+}
+int AW_WeatherIsStorm(int current,int next,double progress)
+{
+    int w=next!=AW_WEATHER_NONE && progress>=0.5?next:current;
+    return w==AW_WEATHER_ASH || w==AW_WEATHER_BLIGHT;
+}
+int AW_WeatherPrecipOf(int weather)
+{
+    switch(weather){
+    case 4:return AW_PRECIP_RAIN;
+    case 5:return AW_PRECIP_HEAVY_RAIN;
+    case AW_WEATHER_ASH:case AW_WEATHER_BLIGHT:return AW_PRECIP_ASH;
+    case 8:return AW_PRECIP_SNOW;
+    case 9:return AW_PRECIP_BLIZZARD;
+    default:return AW_PRECIP_NONE;
+    }
+}
+int AW_WeatherPrecip(int current,int next,double progress,int *strength)
+{
+    int a=AW_WeatherPrecipOf(current),b=next==AW_WEATHER_NONE?a:AW_WeatherPrecipOf(next),s;
+    if(next==AW_WEATHER_NONE || a==b){if(strength)*strength=a?AW_WEATHER_STEPS:0;return a;}
+    if(progress<0.5){
+        s=(int)((0.5-progress)*2*AW_WEATHER_STEPS+0.5);
+        if(strength)*strength=a?s:0;
+        return a;
+    }
+    s=(int)((progress-0.5)*2*AW_WEATHER_STEPS+0.5);
+    if(s>AW_WEATHER_STEPS)s=AW_WEATHER_STEPS;
+    if(strength)*strength=b?s:0;
+    return b;
+}
+int AW_WeatherStormDirection(const float *source,float dir[2])
+{
+    float x,y,length;
+    dir[0]=0;dir[1]=1;
+    if(!source)return 0;
+    x=source[0]-AW_WEATHER_RED_MOUNTAIN_X;y=source[1]-AW_WEATHER_RED_MOUNTAIN_Y;
+    length=(float)sqrt((double)(x*x+y*y));
+    if(!(length>1.0f))return 0;
+    dir[0]=x/length;dir[1]=y/length;
+    return 1;
+}
+/* sine of an angle in degrees by Bhaskara's rational form (error under 0.002): no library sin or cos, whose argument
+ * reduction reaches instructions the 68040 does not implement (the gate's engine check) */
+static double sin_degrees(double x)
+{
+    double s=1.0,p;
+    if(!(x>-1e6 && x<1e6))return 0.0;
+    x-=(double)(long)(x/360.0)*360.0;   /* no fmod either */
+    if(x<0)x+=360.0;
+    if(x>180.0){x-=180.0;s=-1.0;}
+    p=x*(180.0-x);
+    return s*4.0*p/(40500.0-p);
+}
+int AW_WeatherFacesStorm(float yaw,const float dir[2])
+{
+    return sin_degrees((double)yaw+90.0)*dir[0]+sin_degrees((double)yaw)*dir[1]<-0.5;
+}
+/* stops a and b (0..3, r_sky.c order) mixed by mix/32; tone in 1/256 per channel (aw_weather.h). */
+void AW_WeatherLightTone(const aw_weather_blend_t *blend,int a,int b,int mix,int *tone)
+{
+    int k;long weather,clear;
+    if(a<0 || a>3)a=0;
+    if(b<0 || b>3)b=0;
+    if(mix<0)mix=0;
+    if(mix>32)mix=32;
+    for(k=0;k<3;k++){
+        tone[k]=256;
+        if(!blend || !blend->light)continue;
+        weather=((long)blend->ambient[a][k]*256+(long)blend->sun[a][k]*AW_WEATHER_SUN_SHARE)*(32-mix)+
+                ((long)blend->ambient[b][k]*256+(long)blend->sun[b][k]*AW_WEATHER_SUN_SHARE)*mix;
+        clear=((long)blend->clear_ambient[a][k]*256+(long)blend->clear_sun[a][k]*AW_WEATHER_SUN_SHARE)*(32-mix)+
+              ((long)blend->clear_ambient[b][k]*256+(long)blend->clear_sun[b][k]*AW_WEATHER_SUN_SHARE)*mix;
+        if(clear<=0)continue;
+        /* weather*256 stays below 2^31: at most (255*256+255*128)*32*256, about 8.0e8 */
+        tone[k]=(int)(weather*256/clear);
+        if(tone[k]<AW_WEATHER_TONE_MIN)tone[k]=AW_WEATHER_TONE_MIN;
+        if(tone[k]>AW_WEATHER_TONE_MAX)tone[k]=AW_WEATHER_TONE_MAX;
+    }
 }

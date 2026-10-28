@@ -327,6 +327,7 @@ void AW_GuardTorchUpdate(void)
         chosen[j]=best;g=&guards[best];light=CL_AllocDlight(GUARD_LIGHT_KEY-j);
         g->light_key=GUARD_LIGHT_KEY-j;
         VectorCopy(g->flame,light->origin);light->radius=AW_TorchLightRadius()*(aw_guard_torch_radius.value>=.1f?(aw_guard_torch_radius.value>2?2:aw_guard_torch_radius.value):.1f);light->minlight=16;
+        light->radius*=AW_LightFlicker((unsigned)best*13u+5u);   /* a torch flame's light flickers (aw_torch.h) */
         light->die=cl.time+.1;light->decay=0;
         last_lights++;
     }

@@ -95,7 +95,9 @@ class HeadRule(unittest.TestCase):
         # The previous split, unchanged (same numbers and bytes as the code before the head rule).
         expected = [int(q) for q in _budget_quotas(shapes, 192, 666, None, None)]
         self.assertEqual([int(q) for q in bake_quotas(shapes, 192, head_detail='budget')], expected)
-        self.assertEqual(expected, [73, 19, 80, 19])
+        self.assertEqual(expected, [69, 28, 75, 18])        # the hair takes the head's weight (hair_share head)
+        with patch.dict(os.environ, {'AMIWIND_NPC_HAIR_SHARE': 'plain'}):   # the split up to v0.0.53
+            self.assertEqual([int(q) for q in _budget_quotas(shapes, 192, 666, None, None)], [73, 19, 80, 19])
         plan = head_plan(shapes, 192, head_detail='budget')
         self.assertEqual((plan['protected'], plan['face_limit']), (frozenset(), 666))
         with patch.dict(os.environ, {'AMIWIND_NPC_HEAD_DETAIL': 'budget'}):

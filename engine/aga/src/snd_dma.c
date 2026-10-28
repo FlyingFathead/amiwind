@@ -415,7 +415,9 @@ channel_t *SND_PickChannel(int entnum, int entchannel)
 		return NULL;
 
 	if (channels[first_to_die].sfx) {
-        AW_SpeechStop(channels[first_to_die].entnum,channels[first_to_die].entchannel);
+        /* a replaced channel ends its own voice; entnum -1 (no entity) has none and would end them all */
+        if (channels[first_to_die].entnum >= 0)
+            AW_SpeechStop(channels[first_to_die].entnum,channels[first_to_die].entchannel);
         channels[first_to_die].sfx = NULL;
     }
 
@@ -567,6 +569,15 @@ void S_StopSound(int entnum, int entchannel)
 			return;
 		}
 	}
+}
+
+/* AmiWind: move a playing sound (a looping magic bolt that flies); S_Update respatializes every channel each frame */
+void S_MoveSound(int entnum, int entchannel, vec3_t origin)
+{
+	int i;
+	for (i=NUM_AMBIENTS ; i<NUM_AMBIENTS + MAX_DYNAMIC_CHANNELS ; i++)
+		if (channels[i].sfx && channels[i].entnum == entnum && channels[i].entchannel == entchannel)
+			VectorCopy(origin, channels[i].origin);
 }
 
 void S_StopAllSounds(qboolean clear)

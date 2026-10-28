@@ -64,6 +64,8 @@ int AW_UIScrollHit(int mx,int my,int x,int y,int height,int total,int visible,in
 void S_LocalSound(char *s){}
 void AW_UIVoiceSubtitle(const char *name,const char *text,double duration){}
 static eval_t timings[4],hands[5];
+static int hand_table_ok;
+int AW_HandTableReady(void){return hand_table_ok;}
 static const char *timing_names[]={"aw_hand_idle","aw_hand_draw","aw_hand_lower","aw_hand_punch"};
 static const char *hand_names[]={"aw_hand_goal","aw_hand_state","aw_torch","aw_hand_started","aw_attack_latched"};
 eval_t *GetEdictFieldValue(edict_t *e,char *name){
@@ -82,13 +84,35 @@ void SV_LinkEdict(edict_t *e,qboolean touch){}
 int AW_ConsoleCharWidth(void){return 8;}
 int AW_ConsoleCharHeight(void){return 8;}
 void AW_ConsoleCharacter(int x,int y,int c){int n=strlen(drawn);assert(n<8191);drawn[n]=(char)c;drawn[n+1]=0;}
+/* NPC Gallery v2.0 (NPC-GALLERY-V2): gallery/actors.txt and the engine's own spawn path. */
+static int v2cat,executed;static char parsed[1600];
+double realtime;
+float anglemod(float a){while(a>=360)a-=360;while(a<0)a+=360;return a;}
+static globalvars_t globals;globalvars_t *pr_global_struct=&globals;
+static dfunction_t spawn_function;dfunction_t *pr_functions=&spawn_function;
+char *ED_ParseEdict(char *data,edict_t *ent){
+    snprintf(parsed,sizeof(parsed),"%s",data);assert(strchr(parsed,'}'));
+    strcpy(stringstore+64,"aw_npc");ent->v.classname=64;return data+strlen(data);
+}
+dfunction_t *ED_FindFunction(char *name){assert(!strcmp(name,"aw_npc"));return &spawn_function;}
+void PR_ExecuteProgram(func_t f){assert(f==0);executed++;actor.v.modelindex=1;sv.models[1]=&actor_model;}
+void ED_Free(edict_t *e){e->free=true;}
 int COM_FOpenFile(char *s,FILE **f){
     const char *catalog="AWG1 3\n7\tCREA\tm0000000000000001\tm0000000000000001\t100\t40\t150\tdagoth_ur_1\tDagoth Ur\n"
         "12\tCREA\tm0000000000000002\tm0000000000000002\t90\t40\t145\tdagoth_ur_2\tDagoth Ur\n"
         "3\tNPC_\tm0000000000000003\tm0000000000000004\t10\t8\t35\tclagius clanler\tClagius Clanler\n";
     opens++;
+    if(!strcmp(s,"gallery/actors.txt")){
+        if(!v2cat){*f=NULL;return -1;}
+        *f=tmpfile();assert(*f);
+        fputs("AWG2 2\n5\tNPC_\tfargoth\tFargoth\tWood Elf\tCommoner\tSeyda Neen\tprogs/a_000000000001.mdl\t"
+              "\"classname\" \"aw_npc\" \"model\" \"progs/a_000000000001.mdl\" \"netname\" \"Fargoth\"\n"
+              "9\tCREA\tmudcrab\tMudcrab\t\t\tBitter Coast Region (-2, -9)\tprogs/c_mudcrab.mdl\t"
+              "\"classname\" \"aw_npc\" \"model\" \"progs/c_mudcrab.mdl\" \"netname\" \"Mudcrab\"\n",*f);
+        rewind(*f);return 1;
+    }
     if(!strcmp(s,"gallery/poses.txt")){*f=tmpfile();assert(*f);fputs("AWGP1\n",*f);rewind(*f);return 6;}
-    if(!strcmp(s,"gallery/m0000000000000003.mdl")){
+    if(!strcmp(s,"gallery/m0000000000000003.mdl") || !strcmp(s,"progs/a_000000000001.mdl") || !strcmp(s,"progs/c_mudcrab.mdl")){
         byte header[72];memset(header,0,sizeof(header));memcpy(header,"IDPO",4);header[60]=3;header[64]=1;
         *f=tmpfile();assert(*f);assert(fwrite(header,1,sizeof(header),*f)==sizeof(header));rewind(*f);return sizeof(header);
     }
@@ -187,7 +211,7 @@ int main(void){
     argc=2;args[1]="help";combat_command();assert(arena_commands==1 && strstr(printed,"dbg combattest gallery"));
     argc=2;args[1]="gallery";queued[0]=0;missing_catalog=1;
     {int before=captures;combat_command();assert(captures==before && !queued[0]);}
-    timings[0]._float=2;timings[1]._float=.4f;timings[2]._float=.3f;timings[3]._float=.8f;
+    hand_table_ok=1;   /* the image's hand clips (aw_hands.c), no longer the maps' fields */
     missing_return=1;
     {int before=captures;combat_command();assert(captures==before && !queued[0] && strstr(printed,"floor missing"));}
     /* The combat floor is the gallery's room: a gallery-less build explains why. */
@@ -206,7 +230,8 @@ int main(void){
     assert(!AW_GalleryActive() && !AW_TorchTestActive());
     assert(!AW_IntroButtons(3) && !AW_IntroImpulse(202));
     {int before=opens;AW_GalleryEntities();assert(opens==before);}
-    assert(timings[0]._float==2 && timings[1]._float==.4f && timings[2]._float==.3f && timings[3]._float==.8f);
+    /* no clip fields are injected any more: the hands read the image's table (FIRST-PERSON-HANDS-IN-C-54) */
+    assert(timings[0]._float==0 && timings[3]._float==0);
     sv.active=true;
     AW_GallerySpawn(&player);assert(player.v.origin[0]==0 && player.v.origin[2]==17);
     assert(hands[0]._float==1 && hands[1]._float==1 && hands[2]._float==0);
@@ -233,9 +258,9 @@ int main(void){
     /* Separate dark room: no catalogue required, real common capture/return,
      * valid source timing, scoped fullbright reset and ordinary V binding. */
     assert(torch_command);argc=1;queued[0]=0;r_fullbright.value=1;
-    timings[0]._float=NAN;
+    hand_table_ok=0;
     {int before=captures;torch_command();assert(captures==before && !queued[0] && r_fullbright.value==1);}
-    timings[0]._float=2;missing_return=1;
+    hand_table_ok=1;missing_return=1;
     {int before=captures;torch_command();assert(captures==before && !queued[0] && r_fullbright.value==1);}
     missing_return=0;torch_command();assert(!strcmp(queued,"map torchtest\n") && r_fullbright.value==0);
     /* A pending test session must not inject fields into another loading map. */
@@ -245,7 +270,7 @@ int main(void){
     strcpy(sv.name,"torchtest");assert(!AW_TorchTestActive() && !AW_GalleryActive());
     memset(timings,0,sizeof(timings));
     {int before=opens;AW_GalleryEntities();assert(opens==before && !allocations && !model_loads);}
-    assert(timings[0]._float==2 && timings[1]._float==.4f && timings[2]._float==.3f && timings[3]._float==.8f);
+    assert(timings[0]._float==0 && timings[3]._float==0);
     sv.active=true;assert(AW_TorchTestActive() && AW_GalleryActive());
     AW_GallerySpawn(&player);assert(player.v.origin[0]==64 && player.v.origin[2]==17 && hands[0]._float==1 && hands[2]._float==0);
     assert(!AW_GalleryKey('v',1,0,0) && !AW_GalleryKey(K_TAB,1,0,0));
@@ -282,5 +307,33 @@ int main(void){
     strcpy(sv.name,"charplane");assert(!AW_IntroButtons(3) && !AW_IntroImpulse(202));
     strcpy(sv.name,"torchtest");assert(!AW_IntroButtons(3) && !AW_IntroImpulse(202));
     assert(player.v.origin[0]==800 && player.v.health==73 && character.level==12 && hands[0]._float==1 && hands[2]._float==1);
+    /* NPC Gallery v2.0: the actor the image holds is spawned from its row by the engine's spawn path (no gallery
+     * model, no footprint, no baked copy); browse by race/class/cell; G plays the groups, E is the game's own talk. */
+    v2cat=1;strcpy(sv.name,"balmora");sv.active=true;argc=1;queued[0]=0;
+    command();assert(!strcmp(queued,"map charplane\n"));
+    actor_model.mins[0]=-20;actor_model.mins[1]=-10;actor_model.mins[2]=-5;
+    actor_model.maxs[0]=20;actor_model.maxs[1]=10;actor_model.maxs[2]=35;
+    strcpy(sv.name,"charplane");sv.active=false;
+    {int before=allocations,loads=model_loads;AW_GalleryEntities();
+     assert(allocations==before+1 && executed==1 && model_loads==loads);}
+    assert(strstr(parsed,"\"netname\" \"Fargoth\"") && actor.v.angles[1]==270 && actor.v.origin[0]==0);
+    sv.active=true;AW_GallerySpawn(&player);assert(player.v.origin[0]==72 && player.v.angles[0]>0);
+    draw();assert(strstr(drawn,"NPC Gallery v2.0") && strstr(drawn,"Wood Elf, Commoner") && strstr(drawn,"Seyda Neen"));
+    assert(!AW_GalleryKey('e',1,0,0));                     /* the game's own talk binding */
+    queued[0]=0;assert(AW_GalleryKey('g',1,0,0) && !strcmp(queued,"aw_animkit_cmd cycle\n"));
+    assert(AW_GalleryKey('t',1,0,0));realtime=1;draw();realtime=1.5;draw();assert(actor.v.angles[1]>270);
+    AW_GalleryKey(K_TAB,1,0,0);AW_GalleryKey('W',1,0,0);AW_GalleryKey('O',1,0,0);AW_GalleryKey('O',1,0,0);
+    AW_GalleryKey(K_ENTER,1,0,0);draw();assert(strstr(drawn,"1 matches") && strstr(drawn,"#5 fargoth - Wood Elf"));
+    AW_GalleryKey(K_ESCAPE,1,0,0);
+    AW_GalleryKey(K_TAB,1,0,0);AW_GalleryKey('C',1,0,0);AW_GalleryKey('O',1,0,0);AW_GalleryKey('A',1,0,0);
+    AW_GalleryKey('S',1,0,0);AW_GalleryKey('T',1,0,0);AW_GalleryKey(K_ENTER,1,0,0);draw();assert(strstr(drawn,"1 matches"));
+    queued[0]=0;AW_GalleryKey(K_ENTER,1,0,0);assert(!strcmp(queued,"map charplane\n"));
+    AW_GalleryEntities();assert(executed==2 && strstr(parsed,"c_mudcrab"));
+    draw();assert(strstr(drawn,"Mudcrab") && strstr(drawn,"Creature"));
+    {char id[96],name[96],model[64];int total=0;
+     assert(AW_GalleryFind("fargoth",0,id,name,model,&total) && total==2 && !strcmp(model,"progs/a_000000000001.mdl"));
+     draw();assert(strstr(drawn,"Mudcrab"));}            /* the arena's lookup leaves the shown actor as it was */
+    queued[0]=0;AW_GalleryKey('x',1,0,1);assert(!strcmp(queued,"map balmora\n"));
+    strcpy(sv.name,"balmora");AW_GallerySpawn(&player);assert(!AW_GalleryActive());
     return 0;
 }

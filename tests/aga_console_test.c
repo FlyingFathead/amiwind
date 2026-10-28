@@ -76,7 +76,8 @@ static void every_entry_translates(void){
   /* dbg fog rule / dbg cut groups print aw_cull with no argument (switch bits) */
   snprintf(expect,sizeof expect,"%s%s\n",handler,
        !strcmp(bar1+1,"characterchange")?" appearance":!strcmp(bar1+1,"inventory grant")?" grant":
-       !strcmp(bar1+1,"door roulette")?" roulette":
+       !strcmp(bar1+1,"door roulette")?" roulette":!strcmp(bar1+1,"doorlocks")?" locks":
+       !strcmp(bar1+1,"creatures")?" actors creatures":
        (!strcmp(bar1+1,"set race") || !strcmp(bar1+1,"set playerrace"))?" playerrace":"");
   if(AW_DebugTranslate(argc,argv,output,sizeof(output))!=1 || strcmp(output,expect)){
    printf("catalogue entry does not reach its handler: dbg %s -> %s (got %s)\n",bar1+1,handler,output);assert(0);

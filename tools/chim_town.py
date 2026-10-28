@@ -620,6 +620,20 @@ def install(town_dir, id1):
     return {'town': record['town'], 'files': len(copied), 'door_bank': door_source}
 
 
+def missing_options(town, argv):
+    """The options this stage needs for TOWN that the command ARGV lacks, in order (the builder checks every
+    chim-town command with it when it composes the plan, before any stage runs: BUILD-MINIWIND-SEYDA-KELP-INDEX-54).
+    Seyda Neen always needs the town scenery's source index (its frame's kelp additions are checked against it, with
+    or without world flora); with --flora also the scene report."""
+    have = {str(part) for part in argv}
+    need = []
+    if town == SEYDA:
+        need.append('--town-source-index')
+        if '--flora' in have:
+            need.append('--town-scene-report')
+    return [name for name in need if name not in have]
+
+
 def main(argv=None):
     from build_jobs import add_jobs
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -632,11 +646,12 @@ def main(argv=None):
     p.add_argument('--town-scene-report', type=Path, help='Seyda Neen: the scene stage\'s scene-report.json')
     add_jobs(p)
     a = p.parse_args(argv)
+    missing = missing_options(a.town, sys.argv[1:] if argv is None else argv)
+    if missing:
+        p.exit(1, 'Error: the %s town step needs %s\n' % (a.town, ', '.join(missing)))
     import build_profile; build_profile.instrument('chim-town')  # sub-stage timers (docs/BUILD_PROFILE.md)
     try:
         if a.town == SEYDA:
-            if a.flora is not None and (a.town_source_index is None or a.town_scene_report is None):
-                raise ValueError('--flora needs --town-source-index and --town-scene-report')
             prepare_seyda(a.data_files, a.scene, a.chim_world, a.out, a.flora, a.town_source_index,
                           a.town_scene_report, a.jobs)
             return

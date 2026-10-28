@@ -174,6 +174,11 @@ void AW_CombatSwing(const aw_combat_settings_t *s,aw_fighter_t *a,aw_fighter_t *
             (s->fDamageStrengthBase+a->attributes[AW_STR]*s->fDamageStrengthMult*.1f);
         wear(s,a,d,out);
         health=1;
+    }else if(a->creature==1){
+        /* Creature::hit without a weapon: its own attack, min + (max - min) x strength, health damage */
+        int lo=a->damage[attack][0],hi=a->damage[attack][1];
+        d=lo+(hi-lo)*strength;
+        health=1;
     }else{
         /* getHandToHandDamage: fatigue damage unless the victim is down
          * (strength does not count: the original rule, OpenMW's default) */
@@ -205,6 +210,53 @@ void AW_CombatSwing(const aw_combat_settings_t *s,aw_fighter_t *a,aw_fighter_t *
     if(v->health<=0){v->health=0;v->dead=1;v->knocked=0;}
     else if(v->fatigue<0)v->knocked=2;
 }
+/* ---- the aggro and flee ratings (aw_combat.h) ---- */
+static const char *const ai_names[AW_COMBAT_AI_COUNT]={
+    "iFightDistanceBase","fFightDistanceMultiplier","fFightDispMult",
+    "fAIFleeHealthMult","fAIFleeFleeMult","fAIMeleeWeaponMult","fAIMeleeArmorMult"
+};
+const char *AW_CombatAiName(int index) {return index>=0 && index<AW_COMBAT_AI_COUNT?ai_names[index]:0;}
+int AW_CombatAiSet(aw_combat_ai_t *a,const char *name,float value) {
+    int i;
+    for(i=0;i<AW_COMBAT_AI_COUNT;i++){
+        const char *x=ai_names[i],*y=name;
+        while(*x && (*x|32)==(*y|32)){x++;y++;}
+        if(!*x && !*y){((float *)a)[i]=value;return 1;}
+    }
+    return 0;
+}
+/* combat.cpp getFightDistanceBias */
+static float distance_bias(const aw_combat_ai_t *a,float distance) {
+    return a->iFightDistanceBase-a->fFightDistanceMultiplier*distance;
+}
+/* mechanicsmanagerimp.cpp isAggressive: Fight + static_cast<int>(distance bias + disposition bias) */
+int AW_CombatFightRating(const aw_combat_ai_t *a,int fight,int disposition,float distance) {
+    return fight+(int)(distance_bias(a,distance)+(50.0f-(float)disposition)*a->fFightDispMult);
+}
+/* aicombataction.cpp vanillaRateFlee */
+float AW_CombatFleeRating(const aw_combat_ai_t *a,const aw_fighter_t *f,float distance) {
+    float ratio,rating;
+    if(f->flee>=100)return (float)f->flee;
+    ratio=f->health_max!=0?f->health/f->health_max:1;
+    rating=(1.0f-ratio)*a->fAIFleeHealthMult+f->flee*a->fAIFleeFleeMult;
+    if(rating!=0)rating+=distance_bias(a,distance);
+    return rating;
+}
+/* weaponpriority.cpp vanillaRateWeaponAndAmmo (melee); hand to hand: the empty weapon rates 0 */
+float AW_CombatAntiFleeRating(const aw_combat_ai_t *a,const aw_fighter_t *f) {
+    float skill,best=0;int i;
+    if(!f->weapon)return 0;
+    skill=f->skills[f->weapon_skill<27?f->weapon_skill:AW_SK_H2H]*.01f;
+    for(i=0;i<3;i++)if(f->damage[i][1]*skill*a->fAIMeleeWeaponMult>best)best=f->damage[i][1]*skill*a->fAIMeleeWeaponMult;
+    return f->armor*a->fAIMeleeArmorMult+best;
+}
+/* aicombataction.cpp makeFleeDecision */
+int AW_CombatFleeDecision(const aw_combat_ai_t *a,const aw_fighter_t *f,float distance) {
+    float rating=AW_CombatFleeRating(a,f,distance);
+    if(rating<100.0f)rating=0;
+    return rating>AW_CombatAntiFleeRating(a,f);
+}
+
 /* Actors::calculateRestoration (fatigue only) */
 int AW_CombatRecover(const aw_combat_settings_t *s,aw_fighter_t *f,float seconds) {
     if(f->dead || seconds<=0)return 0;
@@ -214,4 +266,51 @@ int AW_CombatRecover(const aw_combat_settings_t *s,aw_fighter_t *f,float seconds
     }
     if(f->knocked==2 && f->fatigue>=0){f->knocked=0;return 1;}
     return 0;
+}
+
+/* aw_combat.h AW_CombatCreatureSheet (OpenMW mwclass/creature.cpp hit, getSkill, getArmorRating). */
+int AW_CombatCreatureSheet(const aw_actor_base_t *b,const char *id,aw_fighter_t *o) {
+    int i;
+    memset(o,0,sizeof(*o));
+    if(!b || b->kind!=1 || !b->health || !id || !*id || strlen(id)>=sizeof(o->id))return 0;
+    strcpy(o->id,id);strcpy(o->name,id);
+    o->level=b->level;
+    for(i=0;i<8;i++)o->attributes[i]=(unsigned char)(b->attributes[i]>255?255:b->attributes[i]);
+    for(i=0;i<27;i++)o->skills[i]=b->skills[i];
+    o->health=o->health_max=b->health;o->fatigue=o->fatigue_max=b->fatigue;o->magicka=b->magicka;
+    o->fight=b->fight;o->flee=b->flee;
+    o->weapon=0;o->weapon_skill=AW_SK_H2H;
+    for(i=0;i<6;i++)o->damage[i/2][i%2]=(unsigned char)(b->attack[i]>255?255:b->attack[i]);
+    o->creature=(unsigned char)(b->flags&AWR_BIPEDAL?2:1);
+    o->armor=0;o->aware=1;
+    return 1;
+}
+/* local.lua pickRandomArmor: the band each slot ends at (cuirass, helmet, greaves, boots, left and right pauldron,
+ * left and right gauntlet, shield). */
+int AW_CombatArmorHitSlot(int roll100) {
+    static const unsigned char ends[AW_ARMOR_HIT_SLOTS]={30,40,50,60,70,80,85,90,100};
+    int i;
+    for(i=0;i<AW_ARMOR_HIT_SLOTS-1;i++)if(roll100<ends[i])return i;
+    return AW_ARMOR_HIT_SLOTS-1;
+}
+/* The swing's sounds (aw_combat.h): character.cpp playSwishSound, combat.cpp blockMeleeAttack and
+ * getHandToHandDamage, local.lua applyArmor and onHit, npc.cpp hit. The roll is a cosmetic one (not the fight's
+ * generator), so a seed still replays a fight. */
+int AW_CombatSwingSounds(const aw_swing_t *out,const aw_fighter_t *victim,int by_player,unsigned long roll,int *sounds) {
+    int n=0,c;
+    sounds[n++]=AW_SND_SWISH;
+    if(!out)return n;
+    if(out->outcome==AW_HIT_BLOCKED){
+        c=victim?victim->shield_class:0;sounds[n++]=AW_SND_LIGHT+(c<=2?c:0);
+    }else if(out->outcome==AW_HIT_MISS){
+        if(by_player)sounds[n++]=AW_SND_MISS;
+    }else if(out->outcome==AW_HIT_FATIGUE){
+        sounds[n++]=(roll>>7)&1?AW_SND_PUNCH2:AW_SND_PUNCH;
+    }else{
+        c=victim?AW_HIT_CLASS(victim,AW_CombatArmorHitSlot((int)(roll%100))):0;
+        if(c>=1 && c<=3)sounds[n++]=AW_SND_LIGHT+c-1;
+        sounds[n++]=AW_SND_HEALTH;
+        if(out->critical)sounds[n++]=AW_SND_CRITICAL;
+    }
+    return n;
 }

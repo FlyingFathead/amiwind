@@ -14,6 +14,8 @@ void R_InitDayNight(void);
 int R_SkyExterior(void);
 /* Current exterior fog ramp; NULL preserves the legacy presentation. */
 const unsigned char *R_DayNightFogColours(void);
+/* Interior fog ramp toward R G B (INTERIOR-FOG-UNUSED-51): 16 x 256 bytes, NULL before the palette grid. */
+const unsigned char *R_InteriorFogColours(int r,int g,int b);
 /* Light-space night: lightstyles from AW_LAMP_STYLE up are lamps and are never
  * dimmed by r_daylight (8.8 fixed point, 256 = full daylight; r_light.c). */
 #define AW_LAMP_STYLE 32

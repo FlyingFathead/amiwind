@@ -16,7 +16,10 @@ from mwad.audit import records, subrecords, string
 from mwad.paths import ensure_external, child_ci
 from build_scratch import scratch_dir
 
-WORLD_UI_FILES = ('map.awm', 'journal.awj', 'entries.dat', 'quests.awq', 'region-names.awn', 'region-weather.aww')
+WORLD_UI_FILES = ('map.awm', 'journal.awj', 'entries.dat', 'quests.awq', 'region-names.awn', 'region-weather.aww',
+                  'interior-fog.awf', 'smoke.aws')
+# Written only when the user's data holds what they are made from (the smoke puff: the chimneys' particle texture).
+OPTIONAL_WORLD_UI_FILES = ('smoke.spr',)
 NO_NAME = 0xFFFFFFFF  # region-names.awn row without a region or place
 # Region weather (SKY-REDMOUNTAIN-BLUE-44, docs/DAY_NIGHT_AND_SKY.md "Region weather"): the ten weathers in the order of a REGN
 # record's WEAT chances, named as their Morrowind.ini [Weather NAME] sections.
@@ -50,6 +53,35 @@ WEATHER_FALLBACK = {
     'Blizzard': (((121, 133, 145), (91, 99, 106), (108, 115, 121), (27, 29, 31)),
                  ((121, 133, 145), (91, 99, 106), (108, 115, 121), (21, 24, 28)), .030, 0.0),
 }
+# The land's light per weather (WEATHER-AMBIENT-SUN-UNUSED-51): Morrowind.ini's Ambient and Sun Day, Sunrise, Sunset,
+# Night Color as it ships, used where the data folder holds no Morrowind.ini. Rule from OpenMW file
+# apps/openmw/mwworld/weather.cpp (read, not copied): exteriors are lit by the weather's ambient plus its sun colour.
+WEATHER_LIGHT_FALLBACK = {
+    'Clear': (((137, 140, 160), (47, 66, 96), (68, 75, 96), (32, 35, 42)),
+              ((255, 252, 238), (242, 159, 119), (255, 114, 79), (59, 97, 176))),
+    'Cloudy': (((137, 145, 160), (66, 74, 87), (71, 80, 92), (32, 39, 54)),
+               ((255, 236, 221), (241, 177, 99), (255, 89, 0), (77, 91, 124))),
+    'Foggy': (((92, 109, 120), (48, 43, 37), (29, 53, 76), (28, 33, 39)),
+              ((111, 131, 151), (177, 162, 137), (125, 157, 189), (81, 100, 119))),
+    'Overcast': (((93, 96, 105), (84, 88, 92), (83, 77, 75), (57, 60, 66)),
+                 ((163, 169, 183), (87, 125, 163), (85, 103, 157), (32, 54, 100))),
+    'Rain': (((105, 110, 113), (97, 90, 88), (88, 97, 97), (50, 55, 67)),
+             ((149, 157, 170), (131, 122, 120), (120, 126, 131), (50, 62, 101))),
+    'Thunderstorm': (((90, 90, 90), (54, 54, 54), (54, 54, 54), (49, 51, 54)),
+                     ((138, 144, 155), (91, 99, 122), (96, 101, 117), (55, 76, 110))),
+    'Ashstorm': (((75, 49, 41), (54, 42, 37), (48, 39, 35), (36, 42, 49)),
+                 ((228, 139, 114), (184, 91, 71), (185, 86, 57), (54, 66, 74))),
+    'Blight': (((79, 54, 54), (61, 40, 40), (61, 40, 40), (56, 58, 62)),
+               ((224, 84, 84), (180, 78, 78), (180, 78, 78), (61, 91, 143))),
+    'Snow': (((93, 96, 105), (92, 84, 84), (70, 79, 87), (49, 58, 68)),
+             ((163, 169, 183), (141, 109, 109), (101, 121, 141), (55, 66, 77))),
+    'Blizzard': (((93, 96, 105), (84, 88, 92), (83, 77, 75), (53, 62, 70)),
+                 ((163, 169, 183), (114, 128, 146), (106, 114, 136), (57, 66, 74))),
+}
+# Region weather table versions: AWW1 (sky and fog stops) stays writable and readable; AWW2 (the default) adds the
+# ambient and sun stops the engine lights the land with.
+WEATHER_TABLES = (1, 2)
+DEFAULT_WEATHER_TABLE = 2
 # World map file format (docs/WORLD_MAP_AND_JOURNAL.md "Map file formats"): v1 = AWM1 (terrain pixels and
 # settlements), v2 = AWM2 (AWM1 plus the LAVA section: the molten lava pools of the exterior cells). Builder option
 # --world-map (config key world_map), exported to this stage as AMIWIND_WORLD_MAP; v1 stays selectable.
@@ -182,10 +214,14 @@ def weather_settings(data_files=None, ini_text=None):
     settings = {}
     for weather in WEATHERS:
         sky, fog, delta, glare = WEATHER_FALLBACK[weather]
+        ambient, sun = WEATHER_LIGHT_FALLBACK[weather]
         fields = sections.get('weather ' + weather.casefold(), {})
         settings[weather] = {
             'sky': [colour(fields, 'sky %s color' % stop.casefold(), sky[i]) for i, stop in enumerate(WEATHER_STOPS)],
             'fog': [colour(fields, 'fog %s color' % stop.casefold(), fog[i]) for i, stop in enumerate(WEATHER_STOPS)],
+            'ambient': [colour(fields, 'ambient %s color' % stop.casefold(), ambient[i])
+                        for i, stop in enumerate(WEATHER_STOPS)],
+            'sun': [colour(fields, 'sun %s color' % stop.casefold(), sun[i]) for i, stop in enumerate(WEATHER_STOPS)],
             'delta': number(fields, 'transition delta', delta, 0.001, 1.0),
             'glare': number(fields, 'glare view', glare, 0.0, 1.0)}
     hours = number(sections.get('weather', {}), 'hours between weather changes', WEATHER_HOURS, 1, 240)
@@ -194,13 +230,16 @@ def weather_settings(data_files=None, ini_text=None):
     return settings, int(round(hours)), info
 
 
-def region_weather(raw, settings=None, hours=WEATHER_HOURS):
-    """region-weather.aww (AWW1): the weather chances of every region in region-names.awn's region order (sorted
-    region IDs, the ARN2 index) and the ten weathers' looks. Header 'AWW1' <IIII> weathers, regions, hours between
-    weather changes, 0; per weather 32 bytes: sky stops 4 x RGB, fog stops 4 x RGB (day, sunrise, sunset, night),
-    <H> Transition Delta x 1000, <B> Glare View x 100, 5 zero bytes; per region 10 chance bytes (REGN WEAT:
-    clear, cloudy, foggy, overcast, rain, thunderstorm, ash, blight, snow, blizzard; the base game's 8-byte WEAT
-    leaves snow and blizzard 0)."""
+def region_weather(raw, settings=None, hours=WEATHER_HOURS, table=DEFAULT_WEATHER_TABLE):
+    """region-weather.aww: the weather chances of every region in region-names.awn's region order (sorted
+    region IDs, the ARN2 index) and the ten weathers' looks. Header 'AWW1' or 'AWW2' <IIII> weathers, regions, hours
+    between weather changes, 0; per weather (AWW1, 32 bytes) sky stops 4 x RGB, fog stops 4 x RGB (day, sunrise,
+    sunset, night), <H> Transition Delta x 1000, <B> Glare View x 100, 5 zero bytes; AWW2 (56 bytes, the default,
+    WEATHER-AMBIENT-SUN-UNUSED-51) puts the ambient stops 4 x RGB and the sun stops 4 x RGB after the fog stops;
+    per region 10 chance bytes (REGN WEAT: clear, cloudy, foggy, overcast, rain, thunderstorm, ash, blight, snow,
+    blizzard; the base game's 8-byte WEAT leaves snow and blizzard 0)."""
+    if table not in WEATHER_TABLES:
+        raise ValueError('region weather table must be 1 or 2')
     if settings is None:
         settings = weather_settings(ini_text='')[0]
     chances = {}
@@ -216,10 +255,14 @@ def region_weather(raw, settings=None, hours=WEATHER_HOURS):
     names = sorted(chances)
     if len(names) > WEATHER_REGIONS_MAX:
         raise ValueError('Region weather table exceeds runtime bounds: %d regions' % len(names))
-    out = bytearray(b'AWW1' + struct.pack('<IIII', len(WEATHERS), len(names), hours, 0))
+    out = bytearray(b'AWW%d' % table + struct.pack('<IIII', len(WEATHERS), len(names), hours, 0))
     for weather in WEATHERS:
         look = settings[weather]
         out += bytes(v for stop in look['sky'] for v in stop) + bytes(v for stop in look['fog'] for v in stop)
+        if table == 2:
+            ambient, sun = WEATHER_LIGHT_FALLBACK[weather]
+            out += bytes(v for stop in look.get('ambient', ambient) for v in stop)
+            out += bytes(v for stop in look.get('sun', sun) for v in stop)
         out += struct.pack('<HB5x', int(round(look['delta'] * 1000)), int(round(look['glare'] * 100)))
     for name in names:
         out += chances[name]
@@ -227,21 +270,94 @@ def region_weather(raw, settings=None, hours=WEATHER_HOURS):
 
 
 def read_region_weather(raw):
-    """Parse an AWW1 file: (looks, regions, hours) with looks per weather {'sky','fog','delta','glare'} and regions
-    a list of chance tuples in region index order."""
-    if raw[:4] != b'AWW1':
+    """Parse an AWW1 or AWW2 file: (looks, regions, hours) with looks per weather {'sky','fog','delta','glare'}
+    (AWW2 also 'ambient' and 'sun') and regions a list of chance tuples in region index order."""
+    if raw[:4] not in (b'AWW1', b'AWW2'):
         raise ValueError('Not a region weather file')
+    light = raw[:4] == b'AWW2'
+    size = 56 if light else 32
     weathers, count, hours, _ = struct.unpack_from('<IIII', raw, 4)
-    if weathers != len(WEATHERS) or count > WEATHER_REGIONS_MAX or len(raw) != 20 + 32*weathers + 10*count:
+    if weathers != len(WEATHERS) or count > WEATHER_REGIONS_MAX or len(raw) != 20 + size*weathers + 10*count:
         raise ValueError('Region weather file has the wrong shape')
     looks = []
     for w in range(weathers):
-        row = raw[20+32*w:52+32*w]
-        delta, glare = struct.unpack_from('<HB', row, 24)
-        looks.append({'sky': [tuple(row[3*i:3*i+3]) for i in range(4)],
-                      'fog': [tuple(row[12+3*i:15+3*i]) for i in range(4)], 'delta': delta/1000, 'glare': glare/100})
-    base = 20 + 32*weathers
+        row = raw[20+size*w:20+size*(w+1)]
+        delta, glare = struct.unpack_from('<HB', row, size-8)
+        look = {'sky': [tuple(row[3*i:3*i+3]) for i in range(4)],
+                'fog': [tuple(row[12+3*i:15+3*i]) for i in range(4)], 'delta': delta/1000, 'glare': glare/100}
+        if light:
+            look['ambient'] = [tuple(row[24+3*i:27+3*i]) for i in range(4)]
+            look['sun'] = [tuple(row[36+3*i:39+3*i]) for i in range(4)]
+        looks.append(look)
+    base = 20 + size*weathers
     return looks, [tuple(raw[base+10*i:base+10*i+10]) for i in range(count)], hours
+
+
+INTERIOR_FOG_ROW = 20          # 16-byte map name, fog RGB, density x 255 (interior-fog.awf)
+INTERIOR_FOG_MAX = 8192        # rows the engine scans at most
+
+
+def interior_maps(root=None):
+    """Map name of every interior room the engine can load, by cell ID (casefolded): the fixed Seyda Neen and
+    Balmora scenes (config/seyda_area.json, balmora_interiors.json), the towns' interiors (town_config.town_interiors)
+    and, for every other cell, the batch room name (room_batches.room_map)."""
+    root = Path(root) if root else Path(__file__).resolve().parents[1]
+    maps = {}
+    for name in ('seyda_area.json', 'balmora_interiors.json'):
+        for scene in json.loads((root/'config'/name).read_text(encoding='utf-8')).get('scenes', ()):
+            if scene.get('interior'):
+                maps[scene['cell'].casefold()] = scene['map']
+    from town_config import town_interiors
+    for room in town_interiors(root):
+        maps.setdefault(room['cell'].casefold(), room['map'])
+    return maps
+
+
+def interior_fog(raw, root=None):
+    """interior-fog.awf (AWF1, INTERIOR-FOG-UNUSED-51): the fog of every interior cell with a fog density above 0,
+    by the map name the engine loads it under (interior_maps; a cell no list names: its batch room name). Header
+    'AWF1' <I> rows; per row (sorted by map name) 16 bytes map name (NUL padded), the cell's AMBI fog colour RGB and
+    its fog density x 255 (clamped 0..1). The engine reads the row of the room it loads; rule from OpenMW file
+    apps/openmw/mwrender/fogmanager.cpp (read, not copied): fog from viewing distance x (1 - density) to the viewing
+    distance, none at density 0."""
+    from room_batches import room_map
+    maps = interior_maps(root)
+    rows = {}
+    for tag, flags, payload in records(raw):
+        if tag != 'CELL': continue
+        fields = {}
+        for key, value in subrecords(payload):
+            if key == 'FRMR': break
+            fields[key] = value
+        if 'DELE' in fields or len(fields.get('DATA', b'')) != 12: continue
+        if not struct.unpack_from('<I', fields['DATA'])[0] & 1: continue
+        ambi = bytes(fields.get('AMBI', b''))
+        if len(ambi) != 16: continue
+        density = struct.unpack_from('<f', ambi, 12)[0]
+        if not density > 0: continue
+        cell = string(fields.get('NAME', b''))
+        name = maps.get(cell.casefold()) or room_map(cell)
+        encoded = name.encode('ascii')
+        if not encoded or len(encoded) > 15:
+            raise ValueError('Interior map name does not fit 15 bytes: ' + name)
+        rows[encoded] = ambi[8:11] + bytes([max(0, min(255, int(round(min(density, 1.0) * 255))))])
+    if len(rows) > INTERIOR_FOG_MAX:
+        raise ValueError('Interior fog table exceeds runtime bounds: %d rows' % len(rows))
+    return b'AWF1' + struct.pack('<I', len(rows)) + b''.join(n.ljust(16, b'\0') + rows[n] for n in sorted(rows))
+
+
+def read_interior_fog(raw):
+    """Parse an AWF1 file: {map name: ((r, g, b), density 0..1)}."""
+    if raw[:4] != b'AWF1':
+        raise ValueError('Not an interior fog file')
+    count = struct.unpack_from('<I', raw, 4)[0]
+    if len(raw) != 8 + INTERIOR_FOG_ROW*count:
+        raise ValueError('Interior fog file has the wrong shape')
+    out = {}
+    for i in range(count):
+        row = raw[8+INTERIOR_FOG_ROW*i:8+INTERIOR_FOG_ROW*(i+1)]
+        out[row[:16].rstrip(b'\0').decode('ascii')] = (tuple(row[16:19]), row[19]/255)
+    return out
 
 
 def fixed(value,size):
@@ -479,14 +595,25 @@ def prepare(data_files,survey,scene,world_map=None,lava_pools=None):
         rows=lava_layer(lava_pools,land);lava_report=check_lava_layer(rows,lava_pools,land)
     worldmap=map_asset(report,Image.open(survey/'terrain.png'),palette,version,rows)
     looks,hours,weather_info=weather_settings(data_files)
+    # MESH-PARTICLE-EMITTERS: the exterior smoke and steam emitters of the placed meshes (tools/particle_emitters.py)
+    from particle_emitters import smoke_table
+    smoke,smoke_report=smoke_table(data_files)
+    from particle_emitters import smoke_sprite
+    puff=smoke_sprite(data_files,palette)          # None without the particle texture: the engine then draws no smoke
+    for name in OPTIONAL_WORLD_UI_FILES:
+        if (dest/name).exists():(dest/name).unlink()
+    if puff is not None:(dest/'smoke.spr').write_bytes(puff)
     for name,raw in [('map.awm',worldmap),('journal.awj',index),('entries.dat',blob),('quests.awq',labels),
-                     ('region-names.awn',region_names(master)),('region-weather.aww',region_weather(master,looks,hours))]:
+                     ('region-names.awn',region_names(master)),('region-weather.aww',region_weather(master,looks,hours)),
+                     ('interior-fog.awf',interior_fog(master)),('smoke.aws',smoke)]:
         (dest/name).write_bytes(raw)
     receipt={'format':'AmiWind world UI 1','master_sha256':report['master_sha256'],
              'palette_sha256':hashlib.sha256(palette).hexdigest(),'journal_quests':quests,
              'journal_entries':(len(index)-8)//76,'journal_text_bytes':len(blob),'map_bytes':len(worldmap),
              'region_weather':dict(weather_info,hours=hours),
-             'files':{name:hashlib.sha256((dest/name).read_bytes()).hexdigest() for name in WORLD_UI_FILES}}
+             'smoke':{'rows':smoke_report['rows'],'by_kind':smoke_report['by_kind']},
+             'files':{name:hashlib.sha256((dest/name).read_bytes()).hexdigest() for name in WORLD_UI_FILES+OPTIONAL_WORLD_UI_FILES
+                      if name in WORLD_UI_FILES or (dest/name).exists()}}
     if version=='v2':
         # v1 keeps its receipt byte for byte; v2 records the format and the lava coverage check.
         receipt['map_format']='AWM2';receipt['lava_layer']=dict(lava_report,colour=lava_section_colour(worldmap))
@@ -506,7 +633,7 @@ def prepare_image(data_files, scene):
 def validate(id1):
     dest=Path(id1)/'world';receipt=json.loads((dest/'conversion.json').read_text())
     expected=set(WORLD_UI_FILES)
-    if receipt.get('format')!='AmiWind world UI 1' or set(receipt.get('files',{}))!=expected:
+    if receipt.get('format')!='AmiWind world UI 1' or not expected<=set(receipt.get('files',{}))<=expected|set(OPTIONAL_WORLD_UI_FILES):
         raise ValueError('Incomplete world/journal conversion receipt')
     if receipt['palette_sha256']!=hashlib.sha256((Path(id1)/'gfx/palette.lmp').read_bytes()).hexdigest():
         raise ValueError('World map palette is stale; regenerate world UI assets')

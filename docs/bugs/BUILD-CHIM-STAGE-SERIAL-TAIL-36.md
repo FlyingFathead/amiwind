@@ -2,7 +2,7 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 9 times; something has to be done
+## PERSISTING: reported 12 times; something has to be done
 
 - Reported with v0.0.36-dev3 at 2026-10-11 01:43 +0300: maintainer via the Monitor: chim 19.0-29.1 min on about 1 core in the 270-frame coast build; validation 8 min, heap gate and zone walk 1 min each (file times)
 - Reported with v0.0.36-dev4 at 2026-10-11 10:20 +0300: perf guard seed: CHIM heap gate 295 s on 0.94 of 12 cores in the dev4 whole-city Vivec MiniWind (e7a8e82); the chim-speed repair has not reached the line
@@ -13,6 +13,9 @@
 - Reported with v0.0.51-dev1 at 2026-10-25 (time not recorded): dev1 perf guard FIX-NOW: CHIM validation 121 s on 4.99 of 22 usable cores with independent frames (the only failed section; the stages passed)
 - Reported with v0.0.51-dev3 at 2026-10-25 09:25 +0200: dev3 build summary: chim ran under half its cores with units queued (1 time); the CHIM world was rebuilt for the interior sunlight
 - Reported with v0.0.52-dev3 at 2026-10-26 14:00 +0200: PERSISTING: dev3 perf guard FIX-NOW: CHIM validation 107s on 5.60 of 23 cores (independent frames); the waiver expired 2026-10-14
+- Reported with v0.0.54-dev1 at 2026-10-27 17:10 +0200: PERSISTING (27 October 2026): the CHIM zone walk gate ran 100 s on 0.83 of 7 usable cores in the combat playground MiniWind (run 155a523); its waiver expired on 14 October 2026. Owner the builder worker.
+- Reported with v0.0.53-dev3 at 2026-10-27 17:51 +0200: PERSISTING (27 October 2026, the persisting worker): the v0.0.53-dev3 validation took 2 min 15 s on 4.86 of 13 cores, and the world pack took 2 min 58 s on 0.99 of a core. The fix rides the batched world rebuild.
+- Reported with v0.0.54-dev1 at 2026-10-28 01:48 +0200: PERSISTING (27 October 2026 evening): the CHIM zone walk gate ran 77 s on 0.96 of 7 cores; its waiver had expired on 14 October 2026, so the perf guard failed a MiniWind. Passed to the builder worker.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -28,7 +31,7 @@
 | Persists in | v0.0.36-dev3, v0.0.49-dev1, v0.0.50-dev1 (last seen) |
 | Severity | high: About 10 minutes of one-core work in every chim stage of the coast build, on 24 held workers, redone on every build |
 | Family | Build speed (`build-speed`) |
-| Deferred by the maintainer | 2026-10-27: deferred by the maintainer to v0.0.54 (the v0.0.53 release triage) |
+| Deferred by the maintainer | 2026-10-28: deferred to v0.0.55 by the coordinator under the maintainer's rule of 2026-10-28 (no answer to the 10:02 question); not new in v0.0.54, does not break play |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |
 | Playtest version | v0.0.36-dev3 |
 | From commit | source 3b5e7a9, engine 3b5e7a9, CHIM world 3b5e7a9 |
@@ -41,7 +44,7 @@ _Last updated with AmiWind v0.0.51 (25 October 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 9 times; something has to be done](#persisting-reported-9-times-something-has-to-be-done)
+- [PERSISTING: reported 12 times; something has to be done](#persisting-reported-12-times-something-has-to-be-done)
 - [Status: 25 October 2026 (v0.0.51)](#status-25-october-2026-v0051)
 - [Status: 23 October 2026 (v0.0.48)](#status-23-october-2026-v0048)
 - [Status: 16 October 2026](#status-16-october-2026)
@@ -210,8 +213,11 @@ lists any phase over 30 s on under half its stage's workers as a fix item.
 Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-stage time and CPU in the build profile. See [families](README.md#families).
 
 - [AW-CONCURRENT-BUILDS-OVERSUBSCRIBE-36](AW-CONCURRENT-BUILDS-OVERSUBSCRIBE-36.md): Concurrent master-builder builds oversubscribe the machine: a gate step fails with 'cp: Cannot allocate memory'
+- AW-LEASE-DEAD-CONTAINER-54 (no report page): A core lease whose build was killed keeps its cores and memory for 24 hours
 - [AW-LEASE-MEMORY-DEADLOCK-36](AW-LEASE-MEMORY-DEADLOCK-36.md): Memory leases deadlocked builds: a 44 GiB build never fit while any gate held its 6 GiB, so builds queued for hours
 - [AW-LEASE-NO-GROW-36](AW-LEASE-NO-GROW-36.md): A running build's core lease did not grow back when gates ended, and its worker pools never grow
+- AW-QUEUE-DEAD-TICKET-54 (no report page): A requester killed while queued leaves its queue ticket at the head of the strict FIFO: every build machine-wide waited
+- BUILD-ACTOR-LIBRARY-UNDERUSED-54 (no report page): The actor-library stage ran at 2.69 of 8 allowed cores with 130 units queued and 7 running
 - [BUILD-BODY-BAKE-SLOWER-44](BUILD-BODY-BAKE-SLOWER-44.md): The image step's player body bake ran 42 % slower than its baseline with the same 40 bodies
 - [BUILD-CACHE-ABSOLUTE-PATHS-33](BUILD-CACHE-ABSOLUTE-PATHS-33.md): Stage fingerprints contain absolute paths, so a moved workspace or checkout reuses nothing
 - [BUILD-CACHE-CHIM-UNITS-33](BUILD-CACHE-CHIM-UNITS-33.md): The chim stage's fingerprint changes whenever the CHIM unit cache gains units, so the stage is never reused
@@ -261,6 +267,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-IMAGE-UNDERUSED-32](BUILD-IMAGE-UNDERUSED-32.md): Parts of the image step still run serially or leave most CPUs idle
 - [BUILD-IMAGE-WORLD-READ-FRAMES-47](BUILD-IMAGE-WORLD-READ-FRAMES-47.md): The image step CHIM world read ran its frame-read pool at 2.96 of 24 cores for 102 s (91 units): perf guard FIX-NOW
 - [BUILD-INPUTCHECK-SLOW-32](BUILD-INPUTCHECK-SLOW-32.md): The game data reference check takes over 12 minutes through Docker
+- BUILD-INPUTS-LOCK-TMP-RACE-54 (no report page): Two MiniWinds started together race on the input lock: one fixed temp name, so the first build dies at start
 - [BUILD-JOBS-RESOLVE-PER-STAGE-32](BUILD-JOBS-RESOLVE-PER-STAGE-32.md): With automatic jobs, stages of one build plan can get different worker counts
 - BUILD-M68K-ICE-SKEL-PARSE-52 (no report page): The m68k compiler crashed on the animation table parse (internal compiler error in patch_jump_insn); the host tests compile it with the host compiler only
 - [BUILD-MINIWIND-FINGERPRINT-ENGINE-33](BUILD-MINIWIND-FINGERPRINT-ENGINE-33.md): Every build stage's source fingerprint took in the engine sources through the MiniWind module
@@ -277,7 +284,8 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-PASS-KEY-TOP-BROAD-43](BUILD-PASS-KEY-TOP-BROAD-43.md): A pass key counts a reached module's whole import-time code: a new constant in chim/models.py rekeyed all 1,295 region frame maps
 - [BUILD-PIPELINE-UNDERUTILIZATION-36](BUILD-PIPELINE-UNDERUTILIZATION-36.md): Umbrella: several builder phases run on one core while the rest of the machine idles, and some do work the build no longer needs
 - BUILD-PLAN-BESIDE-STALE-48 (no report page): The resource plan held a reuse build at 1 of 24 room batch workers against memory that stages it no longer runs held in the measured run
-- BUILD-PLAN-PESSIMISTIC-48 (no report page): The start-up resource plan predicts hours for stages that run in minutes: it sums every stage that could run beside one at full speed
+- BUILD-PLAN-HISTORY-ROW-CORRUPT-54 (no report page): The resource plan refuses every 16 GiB build: the mwscript stage is priced at 32,412 MiB from one corrupt history row, while its largest process measured 277 MiB
+- [BUILD-PLAN-PESSIMISTIC-48](BUILD-PLAN-PESSIMISTIC-48.md): The start-up resource plan predicts hours for stages that run in minutes: it sums every stage that could run beside one at full speed
 - [BUILD-PLAYER-VIEW-UNDERUSED-48](BUILD-PLAYER-VIEW-UNDERUSED-48.md): The image step player view remade all 80 player bodies in every build on four fresh worker pools (2m05s at 16.2 of 24 cores)
 - BUILD-POOL-MEMORY-PEAK-48 (no report page): The CHIM and room stages ran side by side at 42 of 44 GiB and were both throttled to one worker for over ten minutes
 - BUILD-POOL-TINY-UNITS-48 (no report page): Stages hand their pools units too small to keep the cores busy (CHIM slices, the town stages)
@@ -291,7 +299,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - BUILD-RESIDENT-BAKE-SLOWER-52 (no report page): The skeletal resident bake of the town stages is 74 to 149 % slower than its baseline with the same residents
 - [BUILD-RESIDENT-MAP-SLOWER-46](BUILD-RESIDENT-MAP-SLOWER-46.md): The resident-map step of the area and balmora-interiors stages ran 55 to 60 percent slower than its baseline with the same units
 - [BUILD-RESOURCE-PLAN-CHIM-ESTIMATE-44](BUILD-RESOURCE-PLAN-CHIM-ESTIMATE-44.md): The resource plan estimated the CHIM stage at 2 workers and 6 h 13 min; it ran on 24 workers in about 75 min
-- BUILD-RESOURCE-PLAN-MINIWIND-FULL-PARENT-52 (no report page): A MiniWind build is refused by the resource plan: its one-area CHIM stage is estimated from the full build's island-wide chim parent (19,868 MiB) and labelled a stair walk although the walk is off
+- [BUILD-RESOURCE-PLAN-MINIWIND-FULL-PARENT-52](BUILD-RESOURCE-PLAN-MINIWIND-FULL-PARENT-52.md): A MiniWind build is refused by the resource plan: its one-area CHIM stage is estimated from the full build's island-wide chim parent (19,868 MiB) and labelled a stair walk although the walk is off
 - [BUILD-REUSE-APPLY-SERIAL-41](BUILD-REUSE-APPLY-SERIAL-41.md): A reused stage staged its files one at a time: world terrain, scenery and flora took 8 to 12 seconds each, one after another, at the start of every reuse build
 - [BUILD-REUSE-KEYS-TOO-BROAD-35](BUILD-REUSE-KEYS-TOO-BROAD-35.md): A whole build reused no stage, and the cost was not visible before the build started
 - [BUILD-REUSE-TMP-UNDECLARED-33](BUILD-REUSE-TMP-UNDECLARED-33.md): A stage that runs while a reused stage is copied becomes non-reusable

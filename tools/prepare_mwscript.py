@@ -43,16 +43,24 @@ def sha(path):
 
 
 def compiler_identity():
-    """SHA-256 over the compiler's source files (tools/mwscript/*.py and this stage)."""
+    """SHA-256 over the compiler's source files (tools/mwscript/*.py, this stage, and tools/prepare_combat.py, whose
+    autocalculation and equipment rules the actor table uses: tools/mwscript/actors.py; tools/room_batches.py and
+    tools/town_interiors.py, whose door arrival rule the player's PositionCell uses: tools/mwscript/rooms.py)."""
     h = hashlib.sha256()
-    for path in sorted((ROOT / 'tools' / 'mwscript').glob('*.py')) + [Path(__file__).resolve()]:
+    for path in sorted((ROOT / 'tools' / 'mwscript').glob('*.py')) + [Path(__file__).resolve(),
+                                                                        ROOT / 'tools' / 'prepare_combat.py',
+                                                                        ROOT / 'tools' / 'room_batches.py',
+                                                                        ROOT / 'tools' / 'town_interiors.py']:
         h.update(path.name.encode() + b'\0' + path.read_bytes())
     return h.hexdigest()
 
 
-def unit_inputs(data_files, media, music, config):
+def unit_inputs(data_files, media, music, config, rooms=None):
     from mwad.paths import child_ci
-    inputs = {'compiler': compiler_identity(), 'config': sha(config)}
+    from mwscript.rooms import room_table, table_digest
+    # the room maps the player's PositionCell loads (the repo's room lists): keyed by what the table holds
+    inputs = {'compiler': compiler_identity(), 'config': sha(config),
+              'rooms': table_digest(room_table() if rooms is None else rooms)}
     for name in MASTERS:
         path = child_ci(Path(data_files), name, required=False)
         inputs[name] = sha(path) if path else None
@@ -69,6 +77,7 @@ def build(data_files, media, music, out, config=CONFIG):
     mapper = MediaMap.from_files(data, Path(media) / 'media-coverage.json',
                                  soundtrack if soundtrack and soundtrack.is_file() else None)
     program, compiled = compile_program(data, mapper, handwritten=config_data['handwritten']['patterns'])
+    moves = {'rows': len(program.moves), 'rooms_known': len(program.rooms or {})}
     binds = bindings(program, compiled)
     conf = {'range_units': int(config_data['activation']['range_units']),
             'ops_per_frame': int(config_data['budget']['ops_per_frame']),
@@ -91,6 +100,10 @@ def build(data_files, media, music, out, config=CONFIG):
               'sections': sizes, 'scripts': len(compiled),
               'not_compiled': [c.name for c in compiled if c.error],
               'bindings': len(binds), 'globals': len(program.globals), 'journal_topics': len(program.journal),
+              'player_moves': moves,
+              'actors': dict(program.actors.report, items=len(program.actors.items),
+                             spells=len(program.actors.spells), inventory_entries=len(program.actors.inventory),
+                             spell_entries=len(program.actors.spell_list)),
               'media': {'sounds': media_rows(program.sounds), 'voices': media_rows(program.voices),
                         'music': media_rows(program.music)},
               'unmapped_uses': [{'script': s, 'kind': k, 'name': n, 'reason': why}

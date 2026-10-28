@@ -15,6 +15,8 @@ typedef struct {
     long left;
     model_t *mod;
     int allocated, total, used;
+    int crc_on;         /* the decoding pass of an extended model (past AW_ALIAS_NORMAL_VERTS): CRC-32 of the member */
+    unsigned int crc;
 } aw_alias_stream_t;
 
 static void AW_AliasStreamError(aw_alias_stream_t *s, const char *why) {
@@ -32,6 +34,7 @@ static void AW_AliasStreamRead(aw_alias_stream_t *s, void *out, size_t n) {
     if(n>(size_t)s->left || AW_LoadRead(out,n,s->file)!=n)
         AW_AliasStreamError(s,"truncated member");
     s->left-=(long)n;
+    if(s->crc_on)s->crc=AW_AliasCrcAdd(s->crc,(const byte *)out,n);
 }
 /* offset < 0 validates/skips data without retaining it. The scratch buffer
  * also prevents a loading callback from invalidating fread's destination. */
@@ -72,13 +75,15 @@ static void AW_AliasStreamTriangles(aw_alias_stream_t *s,int count,int vertices,
 /* A shared skin (model.c AW_SKIN_SHARED): its pixels from progs/skins/<REF>.awk into OFFSET (< 0: only
  * checked). The member's own read position and remaining bytes are kept. */
 static void AW_AliasStreamSharedSkin(aw_alias_stream_t *s,const byte *ref,int offset,size_t n) {
-    char path[48];FILE *skin=NULL;long left=s->left;int size;
+    char path[48];FILE *skin=NULL;long left=s->left;int size,crc_on=s->crc_on;
     if(!AW_SharedSkinPath(ref,path,sizeof(path)))AW_AliasStreamError(s,"shared skin name");
     size=COM_FOpenFile(path,&skin);
     if(!skin)AW_AliasStreamError(s,"shared skin file missing");
     s->held=s->file;s->file=skin;s->left=size;
     if(size<0 || (size_t)size!=n)AW_AliasStreamError(s,"shared skin size");
+    s->crc_on=0;                        /* the member's CRC covers its own bytes, not the shared skin's */
     AW_AliasStreamCopy(s,offset,n);
+    s->crc_on=crc_on;
     fclose(skin);s->file=s->held;s->held=NULL;s->left=left;
 }
 int Mod_TryStreamAlias(model_t *mod) {
@@ -98,8 +103,12 @@ int Mod_TryStreamAlias(model_t *mod) {
     if(LittleLong(disk.ident)!=IDPOLYHEADER){fclose(s.file);return 0;}
     nv=LittleLong(disk.numverts);nt=LittleLong(disk.numtris);nf=LittleLong(disk.numframes);
     width=LittleLong(disk.skinwidth);height=LittleLong(disk.skinheight);
-    /* Extended models must still pass the exact-file exception reader. */
-    if(LittleLong(disk.numskins)!=1 || nv>2000){fclose(s.file);return 0;}
+    /* Extended models (past AW_ALIAS_NORMAL_VERTS, up to MAXALIASVERTS: a skeletal actor with whole hair or a
+     * full-detail head, SKEL-VERTEX-LIMIT-52) are read here too, only within the renderer's allowance; the decoding
+     * pass checks the member's byte-matching model-budgets.txt line (CRC-32 over every byte it reads), as the
+     * generic loader does. */
+    if(LittleLong(disk.numskins)!=1 || nv>MAXALIASVERTS ||
+       (nv>AW_ALIAS_NORMAL_VERTS && !AW_AliasBudgetAllows(nv,LittleLong(disk.numtris)))){fclose(s.file);return 0;}
     if(LittleLong(disk.version)!=ALIAS_VERSION || nv<1 || nt<1 || nf<1 ||
        width<1 || (width&3) || height<1 || height>MAX_LBM_HEIGHT ||
        !AW_AliasSum(&skinbytes,height,(size_t)width))AW_AliasStreamError(&s,"invalid header");
@@ -147,7 +156,8 @@ int Mod_TryStreamAlias(model_t *mod) {
     if(s.left)AW_AliasStreamError(&s,"trailing member data");
     }
     if(fseek(s.file,base,SEEK_SET))AW_AliasStreamError(&s,"member rewind");
-    s.left=bytes;AW_AliasStreamRead(&s,&check,sizeof(check));
+    s.left=bytes;s.crc=0xffffffffU;s.crc_on=nv>AW_ALIAS_NORMAL_VERTS;
+    AW_AliasStreamRead(&s,&check,sizeof(check));
     if(memcmp(&disk,&check,sizeof(disk)))AW_AliasStreamError(&s,"header changed");
     COM_FileBase(mod->name,loadname);
     Cache_Alloc(&mod->cache,s.total,loadname);s.allocated=1;
@@ -216,6 +226,11 @@ int Mod_TryStreamAlias(model_t *mod) {
         }
     }
     if(s.left || s.used!=s.total)AW_AliasStreamError(&s,"decoded size mismatch");
+    if(s.crc_on && !AW_AliasExceptionMatches(mod->name,nv,nt,bytes,(unsigned long)(s.crc^0xffffffffU))){
+        /* no byte-matching allowance: the model is not admitted (the generic loader refuses it the same way) */
+        if(mod->cache.data)Cache_Free(&mod->cache);
+        fclose(s.file);mod->needload=NL_NEEDS_LOADED;return 0;
+    }
     h=(aliashdr_t *)AW_AliasStreamData(&s);m=(mdl_t *)((byte *)h+modeloff);
     /* a skeletal model's frames are its animation table's (the kit's layouts index them); one is stored */
     mod->flags=LittleLong(disk.flags);mod->synctype=LittleLong(disk.synctype);mod->numframes=skelbytes?skelframes:nf;

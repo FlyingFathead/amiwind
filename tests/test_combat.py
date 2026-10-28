@@ -371,6 +371,87 @@ class CombatBuilderTests(unittest.TestCase):
         config = json.loads((ROOT / 'config' / 'arena_player.json').read_text(encoding='utf-8'))
         self.assertEqual((config['race'], config['class']), ('nord', 'monk'))
 
+    def test_combat_playground_casts_and_ai_settings(self):
+        import prepare_combat
+        kinds = {'NPC_': {'ken': [], 'delvam andarys': [], 'agrob gra-bogharz': [], 'depusanis denian': []}}
+        config = json.loads((ROOT / 'config' / 'arena_fighters.json').read_text(encoding='utf-8'))
+        text, report = prepare_combat.casts_file(kinds, config['playground_casts'])
+        self.assertEqual(text, 'AWAC1\naggro\tdelvam andarys, agrob gra-bogharz, depusanis denian, ken\n')
+        self.assertEqual(report['aggro'][-1], 'ken')
+        with self.assertRaisesRegex(ValueError, 'not an NPC record: fargoth'):
+            prepare_combat.casts_file(kinds, {'aggro': [{'id': 'fargoth'}]})
+        with self.assertRaisesRegex(ValueError, '1 to 4'):
+            prepare_combat.casts_file(kinds, {'group': [{'id': 'ken'}] * 5})
+        with self.assertRaisesRegex(ValueError, 'unknown mode'):
+            prepare_combat.casts_file(kinds, {'duel': [{'id': 'ken'}]})
+        self.assertEqual(prepare_combat.casts_file(kinds, {}), ('AWAC1\n', {}))
+        # the engine's ai settings are the builder's, in the same order (aw_combat.h aw_combat_ai_t)
+        names = re.findall(r'"(\w+)"', code('aw_combat_rules.c').split('ai_names[AW_COMBAT_AI_COUNT]={')[1].split('};')[0])
+        self.assertEqual(tuple(names), prepare_combat.AI_SETTINGS)
+        count = int(re.search(r'#define AW_COMBAT_AI_COUNT (\d+)', code('aw_combat.h')).group(1))
+        self.assertEqual(count, len(prepare_combat.AI_SETTINGS))
+        # new behaviour off by default (A/B rule): the Flee and sounds rules are plain switches, zero at start (no
+        # console variables: the resident registry budget)
+        self.assertIn('static int rules[AW_RULE_COUNT];', code('aw_combat.c'))
+        self.assertNotIn('aw_combat_flee', code('aw_combat.c'))
+
+    def test_sound_generators_follow_openmw(self):
+        # mwclass/creature.cpp getSoundIdFromSndGen: own generators, else the first other creature with the same model,
+        # else the generic ones (no creature named); a random one of a type's sounds (the engine picks)
+        import prepare_combat
+
+        def sndg(name, kind, creature, sound):
+            return [rec('NAME', name.encode() + b'\0'), rec('DATA', struct.pack('<i', kind)),
+                    rec('CNAM', creature.encode() + b'\0'), rec('SNAM', sound.encode() + b'\0')]
+        kinds = {'SNDG': {'d4': sndg('d4', 4, 'Daedroth', 'daedroth moan'), 'd5': sndg('d5', 5, 'daedroth', 'daedroth roar'),
+                          'd5b': sndg('d5b', 5, 'daedroth', 'daedroth roar 2'),
+                          'g0': sndg('g0', 0, '', 'FootBareLeft'), 'g5': sndg('g5', 5, '', 'Default Roar'),
+                          'bad': sndg('bad', 9, '', 'nothing')},
+                 'CREA': {'daedroth': [rec('MODL', b'r\\Daedroth.NIF\0')], 'daedroth_summon': [rec('MODL', b'r\\daedroth.nif\0')],
+                          'mudcrab': [rec('MODL', b'r\\crab.nif\0')]}}
+        table = prepare_combat.sound_generators(kinds)
+        self.assertEqual(table['daedroth'][4], ['daedroth moan'])
+        self.assertEqual(table['daedroth'][5], ['daedroth roar', 'daedroth roar 2'])
+        self.assertEqual(table['daedroth'][0], ['footbareleft'])                 # generic left foot
+        self.assertEqual(table['daedroth_summon'][5], ['daedroth roar', 'daedroth roar 2'])   # the same model's
+        self.assertEqual(table['mudcrab'][5], ['default roar'])
+        self.assertEqual(table['mudcrab'][6], [])                                # no scream at all
+        text, names = prepare_combat.generators_file(table)
+        self.assertEqual(text.split('\n')[0], 'AWSG1 3')
+        self.assertIn('daedroth\tfootbareleft\t-\t-\t-\tdaedrothmoan\tdaedrothroar,daedrothroar2\t-\t-', text.split('\n'))
+        self.assertEqual(names['daedrothroar2'], 'daedroth roar 2')
+        self.assertEqual(len(prepare_combat.SNDG_TYPES), 8)
+        # the engine's playground reads the same eight types
+        self.assertIn('#define GENERATORS 8', code('aw_arena.c'))
+
+    def test_hit_armour_classes_and_swing_sound_keys(self):
+        # sheet field 12: the armour class of each slot a blow can land on (local.lua pickRandomArmor order)
+        import prepare_combat
+        kinds = {'ARMO': {'boots': [rec('AODT', struct.pack('<ifiiii', 5, 30.0, 10, 100, 0, 10))],
+                          'cuirass': [rec('AODT', struct.pack('<ifiiii', 1, 10.0, 10, 100, 0, 10))]}}
+        settings = {'fLightMaxMod': .6, 'fMedMaxMod': .9, 'iBootsWeight': 20, 'iCuirassWeight': 30}
+        armor = {'boots': ('boots', 5), 'cuirass': ('cuirass', 1)}
+        self.assertEqual(prepare_combat.hit_field(kinds, armor, settings), 'l--h-----')
+        self.assertEqual(prepare_combat.HIT_SLOTS[0], 'cuirass')
+        self.assertEqual(prepare_combat.HIT_SLOTS[-1], 'shield')
+        # the engine's keys are the builder's, in the same order (aw_combat.h AW_SND_*)
+        keys = re.findall(r'"(\w+)"', code('aw_combat.c').split('sound_key[AW_SND_COUNT]={')[1].split('};')[0])
+        self.assertEqual(tuple(keys), tuple(k for k, _ in prepare_combat.SOUNDS))
+        self.assertEqual(dict(prepare_combat.SOUNDS)['swish'], 'Weapon Swish')
+
+    def test_worn_armour_slots_match_the_engine(self):
+        # every armour type is equippable in its own slot, the builder's table and the engine's the same
+        # (OpenMW mwclass/armor.cpp getEquipmentSlots; aw_inventory.c AW_InventoryArmourSlot)
+        import prepare_inventory
+        names = re.search(r'slot\[11\]=\{([^}]*)\}', code('aw_inventory.c')).group(1)
+        enum = re.search(r'enum \{(AW_SLOT_HELMET[^}]*)\}', code('aw_inventory.h')).group(1)
+        index = {n.strip(): i for i, n in enumerate(enum.split(','))}
+        engine = [index[n.strip()] for n in names.split(',')]
+        self.assertEqual(engine, [prepare_inventory.ARMOUR_SLOTS[t] for t in range(11)])
+        inventory = code('aw_inventory.c')
+        self.assertIn('aw_inventory_hand_item=AW_InventoryEquippedItem;', inventory)
+        self.assertIn('int AW_InventoryEquippedWeaponType(void)', inventory)
+
     def test_sounds_become_11025_hz_8_bit_mono(self):
         import prepare_combat
         source = io.BytesIO()

@@ -1,0 +1,6 @@
+{
+  "format": 1,
+  "about": "CHIM rooms (tools/chim/interior.py room_input): settings every room is built with. cut_models_over: a placed model wider than this (local units) is stored as tiles of the room grain (chim.cut tile mode, the exterior's large-model cut), so the engine culls each tile against the view on its own; a whole-room shell such as the Vivec Arena Pit's bowl (in_v_arena_01, 15,760 faces, one entity, always drawn whole: PERF-ARENA-PIT-SLOW-48) is otherwise sent through the clip path in full every frame. 0 keeps every model whole (the method up to v0.0.54-dev1). detail_budget: a named budget of config/chim-detail-budgets.json for room meshes (fewer visual triangles, the same collision, the open rim locked); null = none.",
+  "cut_models_over": 512,
+  "detail_budget": "rooms"
+}

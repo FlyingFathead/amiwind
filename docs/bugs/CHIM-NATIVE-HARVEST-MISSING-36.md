@@ -9,9 +9,11 @@
 | Where | tools/harvest_build.py plan_rows: CHIM-native harvest planned only for Seyda Neen and Balmora |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | fixed in v0.0.41 |
-| Severity | medium: Every CHIM area beyond the two towns loses harvestable plants that the legacy maps had |
+| Persists in | v0.0.54-dev1 (last seen) |
+| Severity | high: Every CHIM town beyond Seyda Neen and Balmora has no pickable plants (regression, found in v0.0.54-dev1). |
 | Family | Harvestable plants (`harvest`) |
+| Deferred by the maintainer | 2026-10-28: deferred to v0.0.55 by the coordinator under the maintainer's rule of 2026-10-28 (no answer to the 10:02 question); not new in v0.0.54, does not break play |
+| Came back (regression) | in v0.0.54-dev1 (fixed in v0.0.41 before) |
 | CHIM | Engine streaming and memory ([CHIM Engine tracker](CHIM_TRACKER.md)) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |
 | From commit | source be5d6d3, engine be5d6d3, CHIM world be5d6d3 |
@@ -20,6 +22,15 @@
 <!-- END GENERATED FACTS -->
 
 _Last updated with AmiWind v0.0.41-dev5 (16 October 2026)._
+
+## Status: 27 October 2026
+
+Reopened as a regression (fixed in v0.0.41). Found by the combat playground MiniWind of v0.0.54-dev1: harvest
+catalogues exist only for the two fixed towns, Seyda Neen and Balmora (`harvest_build.plan_rows` takes the first two
+runtime towns, and the engine's harvest follow code follows only those). A CHIM town made from the game data, Vivec and
+every other, has no pickable plants. The coverage failure HARVEST-CHIM-COVERAGE-ONE-AREA-48 was its symptom. A MiniWind
+mitigation (a warning instead of a failure at the check) is on branch v0.0.54-combat and not merged; catalogues for
+every CHIM town are still to do.
 
 ## Status: 10 October 2026
 
@@ -85,5 +96,6 @@ Family: Harvestable plants (`harvest`). Harvest catalogues are built by the buil
 Related bugs in other categories:
 
 - [BUILD-IMAGE-CHIM-NATIVE-TOWN-36](BUILD-IMAGE-CHIM-NATIVE-TOWN-36.md): The image step of a CHIM-native town read legacy region maps that are never built: the Bitter Coast test build failed at the end of its image step on maps/bc000.bsp
+- [HARVEST-CHIM-COVERAGE-ONE-AREA-48](HARVEST-CHIM-COVERAGE-ONE-AREA-48.md): The image step harvest coverage check failed on every CHIM world of one area (every MiniWind sandbox of one town)
 
 <!-- END GENERATED CATEGORY -->

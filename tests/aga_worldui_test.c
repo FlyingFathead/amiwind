@@ -40,6 +40,9 @@ int AW_WorldToSource(const char *name,const float *local,float *world){
 static char console_message[256];
 void Con_Printf(char *s,...){strncpy(console_message,s,sizeof(console_message)-1);}
 int AW_UIColor(int r,int g,int b){return (r+g+b)%256;}
+/* aw_ui.c's arrow from gfx/ui.awu (UI-MAP-PLAYER-ARROW-51): a test arrow when arrow_on, else none (the old cross) */
+static byte arrow_pixels[16*64];static int arrow_on;
+const byte *AW_UIMapArrow(void){return arrow_on?arrow_pixels:NULL;}
 int AW_ConsoleCharWidth(void){return char_width;}
 void AW_ConsoleCharacter(int x,int y,int c){int n=strlen(drawn);assert(n<16383);drawn[n]=c;drawn[n+1]=0;
     if(y==188 && x>=96){n=strlen(footer);assert(n<79);if(!n)footer_left=x;footer[n]=c;footer[n+1]=0;footer_right=x+char_width;}
@@ -356,6 +359,14 @@ int main(void){
      assert(marker_x==x && marker_y==y);AW_WorldUIKey('m',1);
      strcpy(sv.name,"vf0000");player.v.origin[0]-=1024;player.v.origin[2]-=512;
      map_command();draw();assert(marker_x==x && marker_y==y && strstr(drawn,"XYZ 512 256 0"));
+     /* UI-MAP-PLAYER-ARROW-51: with the original arrow in the image it replaces the cross and turns with the view:
+      * north (yaw 90) points up the map, east (yaw 0) right; its clear pixels (255) leave the map as it was */
+     {int i;memset(arrow_pixels,255,sizeof(arrow_pixels));for(i=0;i<8;i++)arrow_pixels[i*64+7]=arrow_pixels[i*64+8]=254;
+      arrow_on=1;cl.viewangles[YAW]=90;draw();
+      assert(marker_x<0 && pixels[(y-6)*320+x]==254 && pixels[y*320+x+6]!=254 && pixels[(y+6)*320+x]!=254);
+      cl.viewangles[YAW]=0;draw();
+      assert(marker_x<0 && pixels[y*320+x+6]==254 && pixels[(y-6)*320+x]!=254 && pixels[y*320+x-6]!=254);
+      cl.viewangles[YAW]=0;arrow_on=0;draw();assert(marker_x==x && marker_y==y);}
      AW_WorldUIKey('m',1);strcpy(sv.name,"balmora");player.v.origin[0]=player.v.origin[1]=player.v.origin[2]=0;
     }
     journal_command();draw();assert(strstr(drawn,"No dated journal"));AW_WorldUIKey('j',1);

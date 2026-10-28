@@ -1,6 +1,6 @@
 # NPC voice table (AWGL1)
 
-_Last updated with AmiWind v0.0.48-rc1 (23 October 2026)._
+_Last updated with AmiWind v0.0.54-dev1 (27 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -133,7 +133,7 @@ offset and index once at load, so a pick never reads past the data.
 
 | Part | Bytes | Fields |
 | --- | --- | --- |
-| Header | 72 | `AWGL`, u16 version 1, u16 topics, u32 counts (NPCs, sets, list sets, list set items, lists, list items, entries, conditions, sounds, globals, names, string bytes, text bytes), u16 reset distance, u16 greet seconds, u16 functions, u16 0, 4 zero bytes |
+| Header | 80 | `AWGL`, u16 version 2, u16 topics, u32 counts (NPCs, sets, list sets, list set items, lists, list items, entries, conditions, sounds, globals, names, string bytes, text bytes), u16 reset distance, u16 greet seconds, u16 functions, u16 0, u16 creature rows, u16 named slots, u32 SOUN rows, u32 0 |
 | Topics | 4 each | u32 string offset of the topic's name (`greeting` last) |
 | Fixture | 4 per function, then a bit map | i32 start-of-game value of each SCVR function; bit set = known |
 | NPC rows | 24 each, sorted by id | u32 id, u16 hello distance, u8 disposition, i8 rank (-1 none), u16 set, 5 x u16 define names (class, race, faction, rank, cell; 0xFFFF none), 2 x u16 0 |
@@ -142,9 +142,12 @@ offset and index once at load, so a pick never reads past the data.
 | Lists, items | 8; 2 | u32 first item, u16 count, u16 0; u16 entry (ascending: the original's order) |
 | Entries | 12 | u32 text offset (0xFFFFFFFF none), u32 first condition, u16 sound (0xFFFF none), u8 conditions, u8 flags (1: no run-time condition, its list ends) |
 | Conditions | 8 | u8 opcode, u8 comparison, u16 operand, i32 or f32 value |
-| Sounds | 8 | the pool file's 16 hex digits as 8 bytes |
+| Sounds | 12 | the pool file's 16 hex digits as 8 bytes, u16 length (1/100 s, 0 unknown), u16 flags (1: the build has the file) |
 | Globals | 8 | u32 name, f32 start value |
 | Names | 4 | u32 string offset |
+| Creature rows (version 2) | 20 each, sorted by id | u32 id, 8 x u16 sound (left foot, right foot, swim left, swim right, moan, roar, scream, land; 0xFFFF none) |
+| Named slots (version 2) | 2 each, padded to 4 | u16 sound of each sound the engine plays by name, in `aw_glut.h` AW_SLOT_* order |
+| SOUN rows (version 2) | 16 each | one per SOUN record of the three masters, sorted by folded id: the pool file's 8 bytes (zero when not converted), u16 length, u8 volume, u8 flags (1 mapped), u16 near, u16 far (the record's distances times `fAudioMinDistanceMult` and `fAudioMaxDistanceMult`) |
 | Strings | | ids, names, topic names (NUL-terminated cp1252), padded to 4 |
 | Texts | | the lines' texts, last (not kept in memory) |
 
@@ -168,6 +171,23 @@ in the names table, a function by the original's SCVR function number.
 | 9 | DISP | none | the disposition, compared with the value |
 | 10 | PCFACTION | name index (0xFFFF: the speaker's faction) | the player's rank in the faction (no faction yet: fails) |
 | 11 | RANDOM100 | none | Random100, rolled 0 .. 100 per pick |
+
+### The sound table (version 2, 27 October 2026)
+
+The same file also holds every creature's sound generators and the sounds the engine plays by name (a swing, a
+miss, the armour and hand-to-hand hits, health damage, bow and crossbow, landing, body falls, footsteps, swimming,
+each item kind's pick-up and put-down), as indexes into the Sounds table above. There is one table for these sounds; the combat
+sheets keep no list of their own. The creature rows come from all three masters, and the builder resolves the
+original's fallback (own generator, the original's, one of a creature with the same model, the generic one).
+Every Sounds row also carries the converted file's length and whether the build has it, and one SOUN row per sound
+record carries what the compiled scripts' PlaySound and its kin need (file, length, volume, hearing distances), so
+the scripts read the same table instead of keeping their own copy. Engine calls: `AW_GlutCreatureFind`,
+`AW_GlutCreatureSound`, `AW_GlutSlotSound`, `AW_GlutPoolPath`, `AW_GlutSoundLength`, `AW_GlutSoundMapped`,
+`AW_GlutSoun` (`aw_glut.h`; an index is the pool file `sound/pool/a<16 hex>.wav`). The rules and the counts are in
+[NPC_DEFAULTS.md](NPC_DEFAULTS.md#how-the-game-names-its-sounds). On the game data with the v0.0.53 media stage:
+396 creature rows (1,321 moments from the creature's own or its original's generators, 1,760 from the generic
+ones, none empty), 73 named slots, all found, and 601 SOUN rows, 599 of them converted; the file grows from
+757,205 to 801,393 bytes, the part kept in memory from 450,216 to 494,404.
 
 ## Size and the build
 

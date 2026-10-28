@@ -141,7 +141,8 @@ class ViewEngineContracts(unittest.TestCase):
         for part in ('owned', 'view.mode==AW_VIEW_VANITY', 'death.stage==AW_DEATH_NONE', 'fullview_cvar.value'):
             self.assertIn(part, full)
         screen = code('screen.c')
-        self.assertIn('return AW_PhotoModeActive () || (aw_view_fullscreen && aw_view_fullscreen ());',
+        # (and the hidden HUD, Ctrl+Alt+H: UI-HUD-TOGGLE-KEY-51)
+        self.assertIn('return AW_PhotoModeActive () || (aw_view_fullscreen && aw_view_fullscreen ()) || aw_hud_hidden;',
                       body(screen, 'static int SCR_AWFullView'))
         calc = body(screen, 'static void SCR_CalcRefdef')
         self.assertIn('if (cl.intermission || SCR_AWFullView ())', calc)
@@ -292,7 +293,11 @@ class DeadPlayerShowsAndDoesNothing(unittest.TestCase):
     def test_no_crosshair_no_enemy_bar_no_pick(self):
         view = code('view.c')
         draw = view[view.index('AW_TorchDraw ();'):]
-        self.assertIn('if (!AW_PlayerDead () && !chase_active.value)', draw[:900])
+        # dead (or the HUD hidden, or an orbit: PHOTO-CROSSHAIR-51) = no crosshair and no inspect mark
+        self.assertIn('int clean = AW_PlayerDead () || aw_hud_hidden || (aw_view_orbiting && aw_view_orbiting ());',
+                      draw[:900])
+        self.assertIn('if (inspect && !clean && crosshair.value)', draw[:1200])
+        self.assertIn('if (!clean && !chase_active.value)', draw[:1400])
         self.assertIn('AW_PlayerDead()', body(code('aw_combat.c'), 'int AW_CombatEnemyBar'))
         self.assertIn('AW_PlayerDead()', body(code('aw_combat.c'), 'static void alt_down'))
         self.assertIn('AW_PlayerDead()', body(code('aw_companion.c'), 'static edict_t *pick_target'))
@@ -373,7 +378,8 @@ class PlayerViewBuilderTests(unittest.TestCase):
 
     def test_builder_wiring(self):
         image = (ROOT / 'tools/build_aga.py').read_text(encoding='utf-8')
-        self.assertIn("prepare_player_view(args.data_files,boot/'id1',jobs=jobs,bodies=not getattr(args,'no_player_body',False))", image)
+        self.assertIn("view_job=Background(prepare_player_view_image,args.data_files,boot/'id1',jobs,\n"
+                      "                        not getattr(args,'no_player_body',False),jobs=jobs)", image)
         self.assertIn("i.add_argument('--no-player-body'", image)
         self.assertIn("i.add_argument('--no-death-retry'", image)
         build = (ROOT / 'tools/build.py').read_text(encoding='utf-8')
@@ -544,7 +550,7 @@ class PlayerBodyBudgetTests(unittest.TestCase):
             return result
         with patch('npc_geometry.bake', side_effect=labeled_bake) as bake, \
              patch('npc_anim.fit', side_effect=lambda *args: real_fit(*args, budget=48 * 1024)), \
-             patch.dict('os.environ', {'AMIWIND_NPC_HEAD_REDUCER': 'default'}):
+             patch.dict('os.environ', {'AMIWIND_NPC_HEAD_REDUCER': 'default', 'AMIWIND_NPC_HAIR_SHARE': 'plain'}):
             with self.assertRaisesRegex(ValueError, 'synthetic body: no body fits') as caught:
                 view._fit_body('synthetic body', [], [], [], b'', self.groups())
         self.assertEqual(bake.call_count, 4 * len(view.BUDGETS))
@@ -567,8 +573,9 @@ class PlayerBodyBudgetTests(unittest.TestCase):
             if len(seen) == 1:
                 raise ValueError('synthetic body: no body fits the existing budgets (480/96/plain: over)')
             return 'fitted'
+        # the hair share's own fallback (NPC-HAIR-BACK-MISSING-53) runs first unless the share is the previous one
         with patch.object(view, '_fit_body_search', side_effect=search), \
-             patch.dict('os.environ', {'AMIWIND_NPC_HEAD_REDUCER': 'locked'}):
+             patch.dict('os.environ', {'AMIWIND_NPC_HEAD_REDUCER': 'locked', 'AMIWIND_NPC_HAIR_SHARE': 'plain'}):
             self.assertEqual(view._fit_body('synthetic body', [], [], [], b'', self.groups()), 'fitted')
             self.assertEqual(os.environ['AMIWIND_NPC_HEAD_REDUCER'], 'locked')
         self.assertEqual(seen, ['locked', 'default'])

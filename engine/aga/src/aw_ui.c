@@ -329,6 +329,15 @@ static void ink_command(void) {
     if(!select_font((int)ui_font.value))Cvar_SetValue(ui_readable.name,old);
     scr_copyeverything=1;
 }
+/* UI-MAP-PLAYER-ARROW-51: the original game's map arrow (textures/compass.dds, converted by tools/prepare_ui.py
+ * into gfx/ui.awu: 16x16 at 0,48, rows 64 bytes apart, index 255 clear), NULL when this image has none (its corner
+ * pixel is not clear). aw_worldui.c turns and draws it. */
+const byte *AW_UIMapArrow(void) {
+    const byte *a;
+    initialize();
+    a=skin+8+48*64;
+    return skin_ready && a[0]==255?a:NULL;
+}
 int AW_UIFontSize(void){initialize();return font_bytes?font_height:0;}
 int AW_UISetFontSize(int size){
     initialize();

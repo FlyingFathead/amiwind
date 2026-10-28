@@ -80,10 +80,10 @@
   },
   {
    "id": "npc-gallery",
-   "description": "NPC gallery (every NPC model) and its catalogues",
-   "steps": ["npc-gallery", "image"],
-   "image_options": ["--gallery"],
-   "patterns": ["id1/gallery/*", "id1/model-budgets.txt", "id1/maps/charplane.bsp"]
+   "description": "NPC Gallery v2.0: the catalogue of the actors the image holds and its inspection room (nothing baked)",
+   "steps": ["image"],
+   "image_options": ["--gallery-v2"],
+   "patterns": ["id1/gallery/actors.txt", "id1/gallery/*", "id1/model-budgets.txt", "id1/maps/charplane.bsp"]
   },
   {
    "id": "opening",
@@ -176,10 +176,11 @@
   },
   {
    "id": "world-ui",
-   "description": "World map, journal, quests, region names and entry table",
+   "description": "World map, journal, quests, region names, region weather, interior fog, smoke emitters and entry table",
    "steps": ["world-ui", "image"],
    "patterns": ["id1/world/map.awm", "id1/world/journal.awj", "id1/world/quests.awq", "id1/world/region-names.awn",
-                "id1/world/entries.dat", "id1/world/region-weather.aww"]
+                "id1/world/entries.dat", "id1/world/region-weather.aww", "id1/world/interior-fog.awf",
+                "id1/world/smoke.aws", "id1/world/smoke.spr"]
   },
   {
    "id": "night-lighting",

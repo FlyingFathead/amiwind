@@ -49,6 +49,14 @@ int main(void) {
     assert(!AW_HalloweenReadCast("AWHW1 1324 0\nghost progs/x.mdl X\n",&cast));
     assert(!AW_HalloweenReadCast("AWHW1 1324 0\nskeleton maps/x.bsp X\n",&cast));
     assert(!AW_HalloweenReadCast("AWHW1 1324 0\nskeleton progs/x.mdl X extra\n",&cast));
+    /* the soundtrack's pre-roll: optional on the first line; the older form reads as none */
+    assert(AW_HalloweenReadCast("AWHW1 1320 1 1068\nskeleton progs/hw_skeleton.mdl Skeleton\n",&cast));
+    assert(cast.soundtrack && cast.preroll_ms==1068 && cast.rows==1);
+    assert(AW_HalloweenReadCast("AWHW1 1320 1\nskeleton progs/hw_skeleton.mdl Skeleton\n",&cast) && cast.preroll_ms==0);
+    assert(!AW_HalloweenReadCast("AWHW1 1320 1 9000\n",&cast));
+    assert(!AW_HalloweenReadCast("AWHW1 1320 1 1068 7\n",&cast));
+    assert(AW_HalloweenPreroll(1068,.16f,5)>1.227f && AW_HalloweenPreroll(1068,.16f,5)<1.229f);
+    assert(AW_HalloweenPreroll(0,0,5)==0 && AW_HalloweenPreroll(1000,-1,5)==1.f && AW_HalloweenPreroll(3500,2,5)==5.f);
     /* the lines: the moves the maintainer named, idles only as short beats, the lead mostly casting */
     n=AW_HalloweenLine(AW_HW_SKELETON,&s);
     for(i=0;i<n;i++)if(!strcmp(s[i].group,"idle"))assert(s[i].beats<=2);
@@ -96,8 +104,8 @@ int main(void) {
         if(slot[i].right<0)left++;else right++;
         assert((slot[i].right<0?-slot[i].right:slot[i].right)>widest_dancer);}
      assert(left==right && left>0);}
-    /* the stage's own line: 80 ahead, at most 56 to a side (the roof the stage videos stood on) */
-    for(i=0;i<n;i++)assert(slot[i].ahead==80 && slot[i].right>=-56 && slot[i].right<=56);
+    /* the measured platform: 88..144 ahead, at least 80 to a side; every spot with margin from its edges */
+    for(i=0;i<n;i++)assert(slot[i].ahead>=88+16 && slot[i].ahead<=144-16 && slot[i].right>=-64 && slot[i].right<=64);
     /* without a lead, or asked for: the skeletons alone */
     n=AW_HalloweenLayout(AW_HW_WITH_LEAD,0,3,1,slot);
     for(i=0;i<n;i++)assert(slot[i].role==AW_HW_SKELETON);
@@ -152,6 +160,18 @@ int main(void) {
         assert(yaw>-45 && yaw<45);
         assert(pitch-a[0]>-36.87f && pitch-a[0]<36.87f);
      }}
+    /* the frame's edge rays: looking along +x, the left and right edges at +-45 degrees (left = +y in Quake), the top
+     * edge up by half the vertical field; every ray DIST long; none points below the view's level line */
+    {const float e[3]={0,0,0},l[3]={100,0,0};float ends[AW_HW_EDGE_RAYS][3],n;int k2;
+     AW_HalloweenEdgeRays(e,l,90,73.74f,64,ends);
+     for(k2=0;k2<AW_HW_EDGE_RAYS;k2++){
+        n=(float)sqrt(ends[k2][0]*ends[k2][0]+ends[k2][1]*ends[k2][1]+ends[k2][2]*ends[k2][2]);
+        assert(n>63.9f && n<64.1f);assert(ends[k2][0]>0);assert(ends[k2][2]>-1e-3f);
+     }
+     assert(ends[0][1]>44 && ends[0][1]<46 && ends[0][2]<1e-3f);   /* left middle: (45.25, 45.25, 0) */
+     assert(ends[1][1]<-44 && ends[1][1]>-46);                     /* right middle */
+     assert(ends[3][1]>-1e-3f && ends[3][1]<1e-3f && ends[3][2]>34 && ends[3][2]<40);  /* top middle: up 36.87 deg */
+     assert(ends[2][1]>0 && ends[4][1]<0 && ends[2][2]>0 && ends[4][2]>0);}
     /* the benchmark's figures */
     {float times[200];aw_hw_bench_t b;
      for(i=0;i<200;i++)times[i]=.05f;

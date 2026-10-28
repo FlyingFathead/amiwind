@@ -80,6 +80,8 @@ def remap_miptex(mip):
 def spans(raw,rel):
     """Return validated nonoverlapping indexed-byte spans, or an exclusion reason."""
     n=len(raw);ext=Path(rel).suffix.lower();name=Path(rel).name.lower();out=[]
+    # the atmos tables share the font (.awf) and sprite (.aws) extensions but hold no pixels: matched by path only
+    if rel.lower() in ('world/interior-fog.awf','world/smoke.aws'):return [],'atmos table: map names, positions, RGB'
     def get(fmt,at):
         need(0<=at and at+struct.calcsize(fmt)<=n,'Truncated header '+rel)
         return struct.unpack_from(fmt,raw,at)

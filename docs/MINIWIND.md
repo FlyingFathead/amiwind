@@ -1,6 +1,6 @@
 # MiniWind: the test ground
 
-_Last updated with AmiWind v0.0.53 (27 October 2026)._
+_Last updated with AmiWind v0.0.54-dev1 (27 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -118,12 +118,18 @@ preset, [Build recipes](BUILD_RECIPES.md)); the builder makes one
 | `lava-pools` | `--miniwind-lava-pools` | Molag Mar lava pools: visibility, contact and damage |
 | `redmountain` | `--miniwind-redmountain` | Red Mountain summit: terrain ceiling, standing, high flight |
 | `halloween` | `--miniwind-halloween` | Halloween: skeletons, dancers and Dagoth Ur dance on the beat |
+| `magic` | `--miniwind-magic` | Magic effects: dbg cast fire, frost, shock, heal... |
+| `combat-playground` | `--miniwind-combat-playground` | Combat playground in the Arena Pit: dbg playground MODE |
 <!-- presets end -->
 
 Notes: `balmora-exterior` leaves out the interiors, so every door says
 "Area unavailable". `vivec-arena-chim` and `vivec-city-chim` start at the Arena arrival;
 `vivec-palace` and `vivec-arena-pit` use the interior scope: the Vivec frame and only their start room
 (the Palace of Vivec, `vpi015`, where Vivec meditates; the Arena Pit, `vai000`); every other door says "Area unavailable".
+A MiniWind of a town other than Seyda Neen and Balmora (Vivec in `vivec-palace`, `vivec-arena-pit` and
+`combat-playground`) has no harvestable plants in that town's exterior: only those two towns have harvest
+catalogues. The build's plan says so before any stage runs, and the image step lists the plants in
+`harvest-chim-coverage.json` ("partial_area") instead of stopping; every full build still stops on a lost plant.
 `opening-ship` shows the quick character screen on arrival. `anim-stage` (v0.0.52) is Balmora's exterior with
 skeletal NPCs: on arrival the guard torches are forced on, a cast of NPCs is lined up in front of you and every group
 of the shared animation tables plays one after another ([ANIMKIT.md](ANIMKIT.md), `dbg animkit stage`). `seyda-chim` (since v0.0.36-dev5: Seyda Neen is

@@ -163,6 +163,39 @@ int ChimRoom_Begin (const char *name)
 	return 0;
 }
 
+/* ROOM-LOADS-THRICE-54: a room whose models clearly do not fit grows before its first try. The record's listed models
+ * that are not resident are summed from the store index (their stored bytes plus a block's overheads) and set against
+ * what the zone and the banks can give now (free plus unlocked, evictable blocks); while the need is larger, the room
+ * grows by the next Chim_RoomGrow step. Before, Akulakhan's Chamber at 32 MB loaded every model three times (two tries
+ * refused by the full zone, a grow after each) and on the slow preset outlasted the session's stall check. The tries
+ * stay the fallback: a room the estimate passes but the zone refuses still grows and loads again. */
+#define ROOM_PREGROW_MODEL_EXTRA	512		/* block header, chim_model_t past model_t, model_t, alignment */
+static void RoomPreGrow (const char *name, const byte *file, long directory)
+{
+	unsigned long need = 0, have;
+	chim_zone_stats_t s;
+	int i;
+	for (i=0 ; i<room.models ; i++)
+	{
+		unsigned id = ChimFormat_U32 (file + directory + 4*i);
+		if (id < chim_world.models && !ChimModels_Find (id))
+			need += (unsigned long)chim_world.model[id].bytes + ROOM_PREGROW_MODEL_EXTRA;
+	}
+	for (;;)
+	{
+		ChimZone_Stats (&s);
+		have = s.free_bytes + ((unsigned long)s.used_bytes > (unsigned long)s.locked_bytes
+		                       ? (unsigned long)s.used_bytes - (unsigned long)s.locked_bytes : 0UL);
+		if (need <= have)
+			return;
+		Con_Printf ("CHIM: room %s: its models need about %lu KiB, the zone and banks give %lu KiB: grown before loading\n",
+			name, need/1024, have/1024);
+		if (!Chim_RoomGrow (name))
+			return;
+		room_grown++;
+	}
+}
+
 static int RoomLoad (const char *name)
 {
 	char path[CHIM_PATH_CHARS+1];
@@ -219,6 +252,8 @@ static int RoomLoad (const char *name)
 	room.places = (chim_place_t *)(file + ((pack.bytes + 3) & ~3L));
 	room.rot = (float *)(room.places + room.count);
 	room.model = (chim_model_t **)(room.rot + 9*room.count);
+	if (room_tries == 1)
+		RoomPreGrow (room.name, file, (long)h.directory);
 	/* Every model whole, now: the plaque is up and nothing else loads. Each
 	 * stays locked (its textures with it) until the next map. */
 	for (i=0 ; i<room.models ; i++)

@@ -132,6 +132,8 @@ traps) in the benchmark sweep; the builder check for reachable instructions.
 
 Family: FPU and CPU behaviour (68040/68060) (`fpu-cpu`). Results must not depend on the FPU; unimplemented instructions trap on a real 68040 without a support library. See [families](README.md#families).
 
+- COMBAT-PLAYGROUND-JIT-FREEZE-54 (no report page): The combat playground freezes about 4 s into the fight of a group of four with the JIT on
+- DAGOTH-CHAMBER-JIT-FAULT-53 (no report page): Loading Akulakhan's Chamber freezes with the JIT on and loads fine with the JIT off
 - [ENGINE-060-FSCC-41](ENGINE-060-FSCC-41.md): The engine has 263 fscc instructions (float comparisons as true/false), which the 68060 traps to its support library
 - [ENGINE-060-MUL64-41](ENGINE-060-MUL64-41.md): The 68040 engine has 151 64-bit MULS.L/MULU.L instructions (divisions by constants), which the 68060 traps to its support library
 - [ENGINE-FLOAT-SHORT-STORE-33](ENGINE-FLOAT-SHORT-STORE-33.md): 68040 engine build stored float-to-short conversions of the animation layout parser into the wrong group

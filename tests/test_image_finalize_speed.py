@@ -150,9 +150,40 @@ class WorldUiTests(unittest.TestCase):
         text = ast.get_source_segment(source, image)
         start = text.index('Background(prepare_world_ui_image')
         self.assertLess(start, text.index('prepare_combat(args.data_files'))
-        self.assertLess(start, text.index('prepare_player_view(args.data_files'))
+        self.assertLess(start, text.index('Background(prepare_player_view_image'))
         self.assertLess(text.index('world_ui.result()'), text.index("validate_world_ui(boot/'id1')"))
         self.assertNotIn('prepare_world_ui(args.data_files', text)
+
+    def test_image_runs_the_torch_and_the_player_view_beside_the_steps_that_never_touch_their_files(self):
+        # BUILD-IMAGE-FINALIZE-UNDERUSED-48 (v0.0.54-dev1 magic MiniWind: torch 6.3 s and player view 8.4 s, each on
+        # one core, one after the other): the torch beside the gallery and the torch test map, the player view beside
+        # the combat data; each joined before its report is written and before anything that reads its files
+        source = (ROOT / 'tools/build_aga.py').read_text(encoding='utf-8')
+        image = next(node for node in ast.parse(source).body if isinstance(node, ast.FunctionDef) and node.name == 'image')
+        text = ast.get_source_segment(source, image)
+        torch = text.index('Background(prepare_torch_image')
+        self.assertLess(torch, text.index('stage_required(args.gallery'))
+        self.assertLess(torch, text.index('build_torchtest('))
+        self.assertLess(text.index('build_torchtest('), text.index('torch_report=torch_job.result()'))
+        self.assertLess(text.index('torch_report=torch_job.result()'), text.index("'torch-conversion.json'"))
+        view = text.index('Background(prepare_player_view_image')
+        self.assertLess(view, text.index('prepare_combat(args.data_files'))
+        self.assertLess(text.index('prepare_combat(args.data_files'), text.index('view_report=view_job.result()'))
+        self.assertLess(text.index('view_report=view_job.result()'), text.index("'player-view.json'"))
+        self.assertLess(text.index('view_report=view_job.result()'), text.index('prepare_inventory(args.data_files'))
+        self.assertNotIn('prepare_torch(args.data_files', text)
+
+    def test_the_workers_time_themselves(self):
+        import prepare_player_view
+        import prepare_torch
+        for module, label, call in ((prepare_torch, 'Image: torch', ('/data', '/id1')),
+                                    (prepare_player_view, 'Image: player view', ('/data', '/id1', 4, False))):
+            calls, out = [], io.StringIO()
+            with patch.object(module, 'prepare', lambda *a, **k: calls.append((a, k)) or {'format': 'x'}), \
+                    contextlib.redirect_stdout(out):
+                self.assertEqual(module.prepare_image(*call), {'format': 'x'})
+            self.assertIn(label + ': started', out.getvalue())
+        self.assertEqual(calls[-1], (('/data', '/id1'), {'jobs': 4, 'bodies': False}))
 
 
 if __name__ == '__main__':

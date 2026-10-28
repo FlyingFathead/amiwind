@@ -36,6 +36,7 @@ void Cvar_SetValue(char *name,float value){
 void Cmd_AddCommand(char *name,void (*fn)(void)){if(!strcmp(name,"aw_horizon_migrate"))horizon_migrate=fn;}
 int Cmd_Argc(void){return 1;}char *Cmd_Argv(int n){return "";}
 byte *COM_LoadHunkFile(char *name){return missing_palette?NULL:fog_colours;}
+int COM_FOpenFile(char *name,FILE **file){*file=NULL;return -1;}  /* no interior fog table: the cell's own fog stays off */
 const byte *R_DayNightFogColours(void){return NULL;}
 byte R_DayNightSkyPixel(byte c,float x,float y,float z,int fog){return c;}
 #endif

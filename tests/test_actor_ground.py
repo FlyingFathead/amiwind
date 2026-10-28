@@ -24,6 +24,26 @@ def alias(bottom=0, moving=0):
     return raw
 
 
+def big_alias(vertices):
+    # one frame, one skin, VERTICES vertices: a whole-hair skeletal actor's rest pose can pass 1,999 (r_local.h
+    # MAXALIASVERTS 3072, alias_stream_heap.STREAM_VERTEX_LIMIT)
+    raw=bytearray(struct.pack('<4si3f3ff3f8if',b'IDPO',6,1,1,1,0,0,0,4,0,0,0,1,4,4,vertices,1,1,0,0,1))
+    raw+=struct.pack('<i',0)+bytes(16)+bytes(vertices*12)+struct.pack('<4i',1,0,1,2)
+    raw+=struct.pack('<i4B4B16s',0,0,0,0,0,2,2,0,0,b'idle')+bytes(vertices*4)
+    return bytes(raw)
+
+
+class VertexLimitTests(unittest.TestCase):
+    def test_actor_models_up_to_the_engine_limit(self):
+        # the gate refused every resident of a MiniWind once the whole-hair bake passed 1,999 vertices
+        # ("Unsupported actor model", 2026-10-27, after NPC-HAIR-BACK-MISSING-53 / SKEL-VERTEX-LIMIT-52)
+        from check_actor_ground import model_frames
+        from alias_stream_heap import STREAM_VERTEX_LIMIT
+        self.assertEqual(len(model_frames(big_alias(2400))[0]), 2400)
+        with self.assertRaisesRegex(ValueError, 'Unsupported actor model'):
+            model_frames(big_alias(STREAM_VERTEX_LIMIT + 1))
+
+
 def bsp(actor, floor=0):
     chunks=[b'' for _ in range(15)]
     chunks[0]=('{\n"classname" "worldspawn"\n"aw_hull" "'+PROFILE+'"\n}\n'+actor).encode()

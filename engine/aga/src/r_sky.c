@@ -354,17 +354,43 @@ static byte sky_rgb_stops[4][3]={{95,135,203},{117,141,164},{56,89,129},{9,10,11
 static byte fog_rgb_stops[4][3]={{206,227,255},{255,189,157},{255,189,157},{9,10,11}};
 static int sky_weather_strength,sky_weather_glare=100,sky_weather_key,sky_table_weather=-1,sky_made_weather=-1;
 #define SKY_WEATHER_MIX(value,target) (((value)*(AW_WEATHER_STEPS-sky_weather_strength)+(target)*sky_weather_strength)/AW_WEATHER_STEPS)
+/* Weather light on the land (WEATHER-AMBIENT-SUN-UNUSED-51): the weather's
+ * ambient + sun light against the clear weather's (AW_WeatherLightTone) goes
+ * into the scene ambient the geometry table and the daylight factor already
+ * carry, so an ash or blight storm darkens and reddens the land and its
+ * brightness moves into the light (lamps and torches keep theirs, as at night).
+ * No new setting: aw_weather 1 (default) = sky, fog and land light; aw_weather 2
+ * = sky and fog only, the land's light of before (the earlier method kept);
+ * aw_weather 0 = the clear sky everywhere. Needs an AWW2 table. */
+static aw_weather_blend_t sky_weather_blend;
+static int sky_table_weather_light=-1;
+static int R_SkyWeatherLightPercent(void)
+{
+    return AW_WeatherLightOn()?100:0;
+}
 static void R_SkyWeather(int days,int milliseconds)
 {
-    aw_weather_blend_t blend;
-    sky_weather_key=AW_WeatherFrame(days,milliseconds,&blend);
+    sky_weather_key=AW_WeatherFrame(days,milliseconds,&sky_weather_blend);
     if(sky_weather_key){
-        memcpy(sky_rgb_stops,blend.sky,sizeof sky_rgb_stops);memcpy(fog_rgb_stops,blend.fog,sizeof fog_rgb_stops);
-        sky_weather_strength=blend.strength;sky_weather_glare=blend.glare;
+        memcpy(sky_rgb_stops,sky_weather_blend.sky,sizeof sky_rgb_stops);memcpy(fog_rgb_stops,sky_weather_blend.fog,sizeof fog_rgb_stops);
+        sky_weather_strength=sky_weather_blend.strength;sky_weather_glare=sky_weather_blend.glare;
     }else{
         memcpy(sky_rgb_stops,sky_clear_rgb_stops,sizeof sky_rgb_stops);memcpy(fog_rgb_stops,fog_clear_rgb_stops,sizeof fog_rgb_stops);
         sky_weather_strength=0;sky_weather_glare=100;
     }
+}
+/* The weather's tone on the scene ambient between stops a and b; returns 1 when it changes anything. */
+static int R_SkyWeatherAmbient(int a,int b,int mix,int *ambient)
+{
+    int tone[3],k,percent=R_SkyWeatherLightPercent(),changed=0;
+    if(!sky_weather_key || !percent)return 0;
+    AW_WeatherLightTone(&sky_weather_blend,a,b,mix,tone);
+    for(k=0;k<3;k++){
+        tone[k]=256+(tone[k]-256)*percent/100;
+        if(tone[k]!=256)changed=1;
+        ambient[k]=ambient[k]*tone[k]/256;
+    }
+    return changed;
 }
 /* The weather's own sky colour for palette entry i between stops a and b
  * (0..3): clear-sky texels take the flat sky colour, cloud texels the fog
@@ -397,6 +423,43 @@ static int R_SkySpread(int r,int g,int b)
  * whose grid answer is clearly more saturated is searched exactly instead; on
  * the shipped palette that is 6 of 256 colours at deep night, once per table
  * build, never per pixel. */
+/* NIGHT-RUST-31, reopened in v0.0.51 (rust-red on dark ground at night by a torch, Azura's Coast; a Vivec lamp
+ * post): the +12 spread guard below still let the grid pick the palette's two dark rust entries ((20,11,4),
+ * (18,7,0) on the shipped palette) for dark warm greys such as (12,12,8): 1 to 26 of the 256 colours of a night shade
+ * table (daylight 16..128 of 256), measured on the v0.0.53 final's palette. aw_dark_nearest 1 (default): every
+ * colour darker than 64 in all channels is looked up in a fine dark grid (4-unit steps, 4,096 entries, built once with
+ * the palette) whose answers are chosen by perceived distance (weights 3 4 2 for red green blue) plus a penalty for
+ * the redness a pick adds ((2r-g-b) above the wanted colour's, squared): no rust picks left, mean brightness error
+ * 5.2 -> 4.0 on the same set. Candidates are the palette's entries darker than 128 in every channel. Built with
+ * -DAW_DARK_GRID=0: the grid and exact search of before (kept, DON'T DELETE ANY METHOD; a build switch, not a cvar:
+ * the resident registry budget, tests/resident_registry_budget.json). */
+#ifndef AW_DARK_GRID
+#define AW_DARK_GRID 1
+#endif
+static byte sky_dark[4096];
+static int sky_dark_ready;
+static void R_SkyDarkGrid(void)
+{
+    int i,j,r,g,b,dr,dg,db,more,want,best,distance,best_distance,count=0;byte candidates[256];
+    sky_dark_ready=0;
+    if(!host_basepal)return;
+    for(j=0;j<256;j++)if(host_basepal[3*j]<128 && host_basepal[3*j+1]<128 && host_basepal[3*j+2]<128)candidates[count++]=(byte)j;
+    if(!count)return;
+    for(i=0;i<4096;i++){
+        r=((i>>8)<<2)+2;g=(((i>>4)&15)<<2)+2;b=((i&15)<<2)+2;want=2*r-g-b;
+        best=candidates[0];best_distance=0x7fffffff;
+        for(j=0;j<count;j++){
+            const byte *p=host_basepal+3*candidates[j];
+            dr=r-p[0];dg=g-p[1];db=b-p[2];
+            distance=3*dr*dr+4*dg*dg+2*db*db;
+            more=2*p[0]-p[1]-p[2]-want;
+            if(more>0)distance+=more*more;
+            if(distance<best_distance){best=candidates[j];best_distance=distance;}
+        }
+        sky_dark[i]=(byte)best;
+    }
+    sky_dark_ready=1;
+}
 byte R_SkyNearest(int r,int g,int b);
 byte R_SkyNearest(int r,int g,int b)
 {
@@ -404,6 +467,12 @@ byte R_SkyNearest(int r,int g,int b)
     if(r>255)r=255;
     if(g>255)g=255;
     if(b>255)b=255;
+    if(AW_DARK_GRID && sky_dark_ready && r<64 && g<64 && b<64){
+        if(r<0)r=0;
+        if(g<0)g=0;
+        if(b<0)b=0;
+        return sky_dark[((r>>2)<<8)|((g>>2)<<4)|(b>>2)];
+    }
     grid=sky_rgb[(((r+8)/17)<<8)|(((g+8)/17)<<4)|((b+8)/17)];
     if(!host_basepal || r>=64 || g>=64 || b>=64)return grid;
     p=host_basepal+3*grid;
@@ -618,6 +687,7 @@ void R_InitDayNight(void)
     Cmd_AddCommand("aw_day_clouds_set",R_SkyDayCloudCommand);
     Cmd_AddCommand("aw_nightsky_mode_set",R_SkyNightModeCommand);
     AW_WeatherInit();
+    AW_AtmosInit();
     sky_bank_ready=R_SkyPaletteBank();
     if(!host_basepal)return;
     for(i=0;i<4096;i++){
@@ -630,6 +700,7 @@ void R_InitDayNight(void)
         }
         sky_rgb[i]=(byte)best;
     }
+    R_SkyDarkGrid();
     sky_tints_ready=1;sky_phase_last=sky_table_phase=-2;sky_table_type=sky_made_type=-1;sky_sun_colour=-1;
     sky_table_weather=sky_made_weather=-1;
 }
@@ -923,14 +994,16 @@ static void R_LightHueCommand(void)
 }
 static void R_SkyColourTables(int phase)
 {
-    int a=phase>>10,b=(phase>>6)&15,mix=phase&63,i,k,level,luma,rgb[3],fog[3],ambient[3],source[3],left,right,aa,bb;
+    int a=phase>>10,b=(phase>>6)&15,mix=phase&63,i,k,level,luma,rgb[3],fog[3],ambient[3],source[3],left,right,aa,bb,toned;
     for(k=0;k<3;k++)fog[k]=sky_frame_type>=2?
         (type2_fog[a][k]*(32-mix)+type2_fog[b][k]*mix)/32:
         (fog_rgb_stops[a][k]*(32-mix)+fog_rgb_stops[b][k]*mix)/32;
     for(k=0;k<3;k++)ambient[k]=sky_frame_type>=2?
         (type2_ambient[a][k]*(32-mix)+type2_ambient[b][k]*mix)/32:255;
-    R_SkyNightLight(ambient);
     aa=a==4?3:a;bb=b==4?3:b;
+    /* The weather's own ambient + sun light (WEATHER-AMBIENT-SUN-UNUSED-51), before the split into daylight and hue. */
+    toned=R_SkyWeatherAmbient(aa,bb,mix>32?32:mix,ambient);
+    R_SkyNightLight(ambient);
     /* V2/V3 geometry fog follows the weather's fog; V1 already uses its stops. */
     if(sky_frame_type>=2)R_SkyWeatherFog(aa,bb,mix,fog);
     for(i=0;i<256;i++){
@@ -953,7 +1026,7 @@ static void R_SkyColourTables(int phase)
         for(k=0;k<3;k++)source[k]=host_basepal[3*i+k]*ambient[k]/255;
         /* Scene tone is built into the existing geometry LUT. Daytime and V1
          * retain exact near indices; sky/UI do not consume the ambient tone. */
-        sky_fog[i]=(sky_frame_type==1 || phase==0)?i:R_SkyNearest(source[0],source[1],source[2]);
+        sky_fog[i]=(sky_frame_type==1 || phase==0) && !toned?i:R_SkyNearest(source[0],source[1],source[2]);
         for(level=1;level<16;level++){
             for(k=0;k<3;k++)rgb[k]=(source[k]*(15-level)+fog[k]*level)/15;
             sky_fog[level*256+i]=R_SkyNearest(rgb[0],rgb[1],rgb[2]);
@@ -962,7 +1035,28 @@ static void R_SkyColourTables(int phase)
     if(sky_frame_type>=2)R_SkyType2Tables(phase);
     R_NightTables();
     sky_table_phase=phase;sky_table_type=sky_frame_type;sky_table_weather=sky_weather_key;
-    sky_table_night=R_SkyNightLightOn();sky_table_tint=R_SkyNightTint();
+    sky_table_night=R_SkyNightLightOn();sky_table_tint=R_SkyNightTint();sky_table_weather_light=R_SkyWeatherLightPercent();
+}
+/* Interior fog ramp (INTERIOR-FOG-UNUSED-51, aw_fog.c): 16 levels from each
+ * palette colour to the cell's fog colour, built through the palette grid only
+ * when the colour changes (4,096 lookups at a room load); NULL before the grid. */
+static byte interior_fog_ramp[16*256];
+static int interior_fog_built=-1;
+const unsigned char *R_InteriorFogColours(int r,int g,int b)
+{
+    int key=(r&255)<<16|(g&255)<<8|(b&255),i,level,k,rgb[3],fog[3];
+    if(!sky_tints_ready || !host_basepal)return NULL;
+    if(key==interior_fog_built)return interior_fog_ramp;
+    fog[0]=r&255;fog[1]=g&255;fog[2]=b&255;
+    for(i=0;i<256;i++){
+        interior_fog_ramp[i]=(byte)i;
+        for(level=1;level<16;level++){
+            for(k=0;k<3;k++)rgb[k]=(host_basepal[3*i+k]*(15-level)+fog[k]*level)/15;
+            interior_fog_ramp[level*256+i]=R_SkyNearest(rgb[0],rgb[1],rgb[2]);
+        }
+    }
+    interior_fog_built=key;
+    return interior_fog_ramp;
 }
 const unsigned char *R_DayNightFogColours(void)
 {
@@ -1240,7 +1334,8 @@ void R_SetSkyFrame (void)
     if(sky_phase>=0){
         R_SkyWeather(clock_days,clock_ms);
         if(sky_phase!=sky_table_phase || sky_frame_type!=sky_table_type || sky_weather_key!=sky_table_weather ||
-           R_SkyNightLightOn()!=sky_table_night || R_SkyNightTint()!=sky_table_tint)R_SkyColourTables(sky_phase);
+           R_SkyNightLightOn()!=sky_table_night || R_SkyNightTint()!=sky_table_tint ||
+           R_SkyWeatherLightPercent()!=sky_table_weather_light)R_SkyColourTables(sky_phase);
         R_SkySunFrame(clock_ms);
         R_NightFrame(clock_ms,clock_days);
     }else{

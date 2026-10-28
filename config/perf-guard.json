@@ -35,16 +35,16 @@
   },
   {
    "id": "BUILD-CHIM-STAGE-SERIAL-TAIL-36",
-   "owner": "vivec-b",
+   "owner": "v054-persisting",
    "stage": "chim",
    "sections": [
     "CHIM heap gate",
     "CHIM validation",
     "CHIM zone walk gate"
    ],
-   "since": "2026-10-11",
-   "expires": "2026-10-14",
-   "reason": "PERSISTING: the chim stage's heap gate, validation and zone walk on one core; repaired in source on v0.0.36-chim-speed, not on the line yet"
+   "since": "2026-10-27",
+   "expires": "2026-11-03",
+   "reason": "PERSISTING: the chim stage's heap gate, validation and zone walk on one core (v0.0.54 MiniWinds: the zone walk gate 77 s on 0.96 of 7 cores); fix scheduled for the v0.0.54 batched world rebuild (TODO ONE-WORLD-REBUILD): it re-keys the CHIM world (tools/chim/validate.py), renewed 2026-10-27"
   }
  ]
 }

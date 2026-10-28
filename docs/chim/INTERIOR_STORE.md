@@ -1,6 +1,6 @@
 # Interiors on CHIM: CHIM rooms on a shared store
 
-_Last updated with AmiWind v0.0.52-dev (25 October 2026)._
+_Last updated with AmiWind v0.0.54-dev1 (27 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -85,6 +85,14 @@ MiniWind A/B (below) is next.
   named in the receipt (`failed_rooms`) and left out instead of failing the stage; a batch room's shell map leaves the
   image with it, so its doors stay inert (CHIM-ROOM-FAIL-STAGE-48).
 - Water leaves carry no ambient water sound yet (today's room maps get it from their visibility pass).
+- A room has no visibility data and no far cut: its shell world culls nothing, and the engine leaves out only what
+  lies outside the view, placement by placement. A model that spans the whole room is therefore drawn whole from
+  anywhere in it: the Vivec Arena Pit's bowl (`in_v_arena_01`, 15,760 of the room's 21,898 faces) sent about
+  9,400 front faces through the clip path every frame for about 2,350 in view (PERF-ARENA-PIT-SLOW-48). Since
+  v0.0.54 a room model wider than `cut_models_over` (config/chim-rooms.json, 512 local units) is stored as tiles of
+  the room grain, the exterior's large-model cut ([cut.py](../../tools/chim/cut.py) tile mode), so each tile is
+  culled on its own; 0 keeps every model whole (the earlier method). The same file can name a detail budget for room
+  meshes (config/chim-detail-budgets.json: fewer visual triangles, the same collision).
 - Switching between the exterior store and the interior store drops the kept models. A per-store cache for machines
   with 64 to 128 MB is a follow-up.
 

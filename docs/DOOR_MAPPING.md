@@ -1,6 +1,17 @@
 # Original door mapping
 
-_Last updated with AmiWind v0.0.53 (27 October 2026)._
+_Last updated with AmiWind v0.0.54-dev1 (27 October 2026)._
+
+<!-- contents start -->
+## Contents
+
+- [Ordinary hinged doors (v0.0.48-dev2)](#ordinary-hinged-doors-v0048-dev2)
+  - [Locks (load doors and hinged doors)](#locks-load-doors-and-hinged-doors)
+  - [The worked example: the census hall door](#the-worked-example-the-census-hall-door)
+  - [In-game check (pending)](#in-game-check-pending)
+- [The door check in every build (v0.0.53)](#the-door-check-in-every-build-v0053)
+
+<!-- contents end -->
 
 The converter reads base DOOR records and their placed CELL references from the
 maintainer's Morrowind.esm. A door's model/name/script and open/close sound IDs belong
@@ -102,6 +113,24 @@ Cost on a 68040: a closed or open door does nothing per frame. The prompt looks 
 
 For testing, `dbg door` opens or closes the door under the crosshair even when it is locked; `dbg door status` and
 `dbg door list` show the table and this map's doors.
+
+### Locks (load doors and hinged doors)
+
+Until v0.0.54 every load door opened for everyone. Now the same table carries the locks of the load doors too: one
+`K <reference> <lock level> <flags> [<key ID>]` row (references ascending) for every load door that is locked in the
+game data (a lock level above 0 or a key, as OpenMW's `components/esm3/cellref.cpp` reads content files: 119 in
+Morrowind.esm) and for every hinged door that names a key, and one `U` row with the game setting `sKeyUsed`. A
+locked door, load or hinged, follows the original's rule as OpenMW's `apps/openmw/mwclass/door.cpp` describes it:
+
+- the player carrying the door's key opens it, and the message box says "<the key's name> used to open lock";
+- otherwise it stays shut with the `LockedDoor` sound, and the prompt says Locked;
+- in god mode (`dbg god`) the player goes through, and the message box says "God mode used to enter a locked door"
+  (the maintainer's request, 25 October 2026);
+- a script's Lock and Unlock (the object state) count, and `GetLocked` on a load door reads its level;
+- a story rule (the census hall door) is not a lock: it holds in god mode too.
+
+Lockpicks and the Open spell do not exist yet, so `dbg doorlocks off` switches every lock off until they do
+(default on, not saved; `dbg doorlocks` prints it).
 
 ### The worked example: the census hall door
 
@@ -244,7 +273,36 @@ image step of a whole-world build, door, then entrance, then interior, and the w
 The usable counts only go up: `config/door-check-baseline.json` holds the last counts (from v0.0.53-dev2: 1,102 usable
 after walking in, 1,102 both ways, 1,067 with the wall traced: the other 35, most of them Daedric shrines whose steps
 the player slides off, are DOOR-USE-COLLISION-FILLED-53, for v0.0.54), and a whole-world image that uses fewer stops the
-build. A build that uses more raises the numbers in that file. The same check with the v0.0.52 scene code over the same image finds 272: the
+build. A build that uses more raises the numbers in that file. From v0.0.54 the check also goes over every entrance:
+an entrance the wall check cannot reach must be listed in `config/door-check-known.json` with its measured reason and
+register class, or a whole-world image stops the build; a listed entrance the check reaches again is named so it
+leaves the list. The 35 of v0.0.53 came from three converter causes, each fixed for its whole class (measured on the
+v0.0.53 image's own frames, the models rebuilt with the CHIM model builder's workers):
+
+- the Daedric shrine entry steps (`ex_dae_ruin_entry`, 24 entrances): the stair rules turned some of its collision
+  pieces into thin plates that need exact standing bevels, but a CHIM model took one flag for the whole model and
+  dropped those plates' own request, so they got the approximate axial bevels and their standing hull grew over the
+  steps beside them. A CHIM model now takes exact bevels when any of its pieces asks for them (its standing hull is
+  then compiled and checked as for every exact model). That alone left 10 of the shrine entrances without a standing
+  spot in the v0.0.54-dev2 world (its compiled pieces still filled the room over the steps), so the shrine entry also
+  takes the standing-room rule below (143.6 to 182.6 KB of collision per variant);
+- the Redoran guard towers (`ex_redoran_tower_01`, 8 entrances: the trapdoors on top and a hut door at the foot): a
+  convex piece of the tower's authored collision closed the top room, solid from just over the trapdoor's floor. A
+  convex piece may no longer fill the room a player stands in over a floor of the same mesh (more than a step up to
+  the standing height): it is split, and a piece that cannot be split becomes the authored plates of its triangles
+  (the tower: 54 to 81 pieces, 32.9 to 48.3 KB of collision). The rule applies to the meshes of the measured table
+  `config/collision-standing-room.json` (a mesh joins when a door or walk-route check fails on it and the rule clears
+  it); on every mesh it would change 190 of 1,380 meshes;
+- the Dwemer doors of Nchuleft and Bthungthumz (2): the coarse terrain tiles (every 128 units) bridged the dip the
+  entrance sits in, 170 to 190 units over a threshold the original ground meets. A load door on the ground whose coarse
+  ground stands more than a step over the original keeps the original 32-unit ground samples around it, as the ground
+  under residents does (measured on the v0.0.53 image: 251 entrances in 192 frames, most of them cave and tomb doors
+  the coarse ground buried 10 to 60 units).
+
+The shipwreck's upper trapdoor (Unmarked Shipwreck) stays listed: its tilted deck is steeper than the walk.
+For A/B tests on development builds only: `AMIWIND_COLLISION_STANDING_ROOM=off` (or `all`, every mesh),
+`AMIWIND_COLLISION_PLATE_BEVELS=drop` and the build setting `terrain_door_detail` `off` keep the methods before; an
+rc or final build refuses the environment values before any stage. The same check with the v0.0.52 scene code over the same image finds 272: the
 other 830 region-frame entrances were dead after walking in (DOOR-BANK-STREAMED-FRAME-51).
 
 `dbg door roulette [SEED]` loads the player straight into a random room of the disk, at the room's own start, and

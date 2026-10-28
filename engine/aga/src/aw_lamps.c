@@ -36,9 +36,14 @@
 /* Seconds a lamp takes to grow to full radius when chosen, and to shrink
  * away when dropped (on the spare lamp keys); nothing snaps on or off. */
 #define LAMP_FADE .4f
-typedef struct {float origin[3],radius,lit_since,off_since;int cool,lit,fading,fire;} lamp_t;
-/* The lamp table's class code of a fire (tools/light_sources.py LAMP_CLASSES). */
+typedef struct {float origin[3],radius,lit_since,off_since;int cool,lit,fading,fire,flicker;} lamp_t;
+/* The lamp table's class codes (tools/light_sources.py LAMP_CLASSES): lamp 1, torch 2, fire 3, candle 4. */
+#define LAMP_CLASS_TORCH 2
 #define LAMP_CLASS_FIRE 3
+#define LAMP_CLASS_CANDLE 4
+/* A flame's light flickers (AW_LightFlicker); the table keeps the class, not the original's flags, so torches,
+ * fires and candles flicker and lamps (lanterns) burn steady. */
+#define LAMP_FLICKERS(c) ((c)==LAMP_CLASS_TORCH || (c)==LAMP_CLASS_FIRE || (c)==LAMP_CLASS_CANDLE)
 /* dbg campfires on|off (the maintainer 2026-10-23: "set it on by default but add some dbg command like dbg
  * campfires on|off"; not saved): 0 hides the fires outdoors, live, without a reload: their light on the placed
  * models (r_surf.c), their rows of the night lamps (here) and their flames (aw_guard_torch.c). r_campfires follows
@@ -82,7 +87,7 @@ static void load_cell(FILE *f,long base,unsigned count,int cx,int cy)
         if(lamp_count>=LAMP_CACHE){lamp_dropped++;continue;} /* counted, shown by dbg lamps */
         for(k=0;k<3;k++)l->origin[k]=f32(row+4+k*4);
         l->radius=(float)(row[16]|(row[17]<<8));l->cool=row[19]==2;l->lit=l->fading=0;l->lit_since=l->off_since=0;
-        l->fire=row[18]==LAMP_CLASS_FIRE;
+        l->fire=row[18]==LAMP_CLASS_FIRE;l->flicker=LAMP_FLICKERS(row[18]);
         if(isfinite(l->origin[0]) && isfinite(l->origin[1]) && isfinite(l->origin[2]) && l->radius>0)lamp_count++;
     }
 }
@@ -226,6 +231,8 @@ void AW_LampUpdate(void)
         light->radius=AW_TorchLightRadius()*(aw_lamp_radius.value>=.25f?(aw_lamp_radius.value>3?3:aw_lamp_radius.value):.25f);
         {float fade=((float)cl.time-lamps[best[j]].lit_since)/LAMP_FADE;
          if(fade<1)light->radius*=fade>.05f?fade:.05f;}
+        if(lamps[best[j]].flicker)   /* seeded by its place: the same lamp flickers alike after a reload */
+            light->radius*=AW_LightFlicker((unsigned)(int)(lamps[best[j]].origin[0]+lamps[best[j]].origin[1]));
         light->minlight=16;light->die=cl.time+.1;light->decay=0;
     }
     /* Dropped lamps shrink away on the keys the chosen ones left free. */

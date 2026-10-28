@@ -304,7 +304,36 @@ def scale_key(ident, scale):
     return ident if abs(scale - 1.0) < 1e-4 else '%s@%.4f' % (ident, scale)
 
 
-def build_table(refs, built=None, lists=None, creatures=None, library=None, scales=None):
+def room_levelled_roots(master):
+    """The levelled creature list ids (lower case) placed in the master's interior cells: the rooms' wild creatures
+    (1,270 references of 58 lists in Morrowind.esm). The actor table carries their lists too, so a room's
+    'aw_levelled' entity is rolled by the engine as an exterior one is (aw_actors.c)."""
+    from mwad.audit import cell_data, records, string, subrecords
+    tags, rooms = {}, []
+    for tag, flags, payload in records(master):
+        if flags & 0x20:
+            continue
+        if tag == 'CELL':
+            cell = cell_data(list(subrecords(payload)))
+            if cell['flags'] & 1:
+                rooms.append(cell)
+        elif tag == 'LEVC':
+            fields = dict(subrecords(payload))
+            if 'NAME' in fields and 'DELE' not in fields:
+                tags[string(fields['NAME']).casefold()] = tag
+    return sorted({r['id'].casefold() for c in rooms for r in c['refs']
+                   if not r.get('deleted') and r.get('id', '').casefold() in tags})
+
+
+def table_list_order(lists, refs, room_roots=()):
+    """The table's levelled lists in order: every list the exterior references and the rooms' ROOM_ROOTS reach
+    (used_lists, sorted). One function for the table and the room stage, so an 'aw_levelled' entity's list index is
+    the table's."""
+    roots = {b.casefold() for _, b, t, *_ in refs if t == 'LEVC'} | {r.casefold() for r in room_roots}
+    return used_lists(lists, roots)
+
+
+def build_table(refs, built=None, lists=None, creatures=None, library=None, scales=None, room_roots=()):
     """(table bytes, report) from exterior_actors' rows and built_actors' rows (keyed by reference number).
 
     Without LISTS: version 1, as before. With LISTS (levelled_lists of the master) and CREATURES (creature_ids):
@@ -322,7 +351,7 @@ def build_table(refs, built=None, lists=None, creatures=None, library=None, scal
     v2 = lists is not None
     creatures = set(creatures or ())
     scaled = {n: round(float(sc), 4) for n, sc in (scales or {}).items() if v2 and abs(sc - 1.0) > 1e-5}
-    order = used_lists(lists, {b.casefold() for _, b, t, *_ in refs if t == 'LEVC'}) if v2 else []
+    order = table_list_order(lists, refs, room_roots) if v2 else []
     list_index = {lid: i for i, lid in enumerate(order)}
     # a scale the library has baked models for (keys 'id@S'): those references name the baked models (and say so
     # in their flags); without them the engine draws the model at the record's scale (AWU_SCALE)
@@ -539,7 +568,8 @@ def master_tables(master_path):
     About 5 s on one core; the image step works it out beside its finalize checks and hands it to write_table
     (BUILD-IMAGE-FINALIZE-UNDERUSED-48)."""
     master = Path(master_path).read_bytes()
-    return exterior_actors(master), levelled_lists(master), creature_ids(master), exterior_scales(master)
+    return (exterior_actors(master), levelled_lists(master), creature_ids(master), exterior_scales(master),
+            room_levelled_roots(master))
 
 
 def write_table(path, master_path, maps, chim_root=None, library=None, tables=None):
@@ -548,12 +578,14 @@ def write_table(path, master_path, maps, chim_root=None, library=None, tables=No
     library manifest, tools/creature_library.py, or {record id: base text}: tools/actor_library.py install) gives
     creature and NPC bases their model. TABLES: master_tables(MASTER_PATH), when worked out already. Returns the
     report."""
-    refs, levelled, creatures, scales = master_tables(master_path) if tables is None else tables
+    refs, levelled, creatures, scales, *rest = master_tables(master_path) if tables is None else tables
+    room_roots = rest[0] if rest else ()
     built = built_actors(maps, frame_centres(chim_root) if chim_root else {})
     if library is not None and not isinstance(library, dict):
         from creature_library import base_texts
         library = base_texts(library)
-    data, report = build_table(refs, built, levelled, creatures, library, scales)
+    data, report = build_table(refs, built, levelled, creatures, library, scales, room_roots)
+    report['room_list_roots'] = len(room_roots)
     Path(path).write_bytes(data)
     return report
 

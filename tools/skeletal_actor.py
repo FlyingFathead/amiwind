@@ -1046,7 +1046,13 @@ SKEL_TABLE_PATH = 'progs/humanoid.awsk'   # the humanoid table's game path (unde
 # The quantisation box: every Nth table frame plus every group's first and last frame. 1 (every frame): every 8th
 # missed 11 of 5,046 frames of the base game's table, clamping up to 3.95 units; all of them take seconds to pose.
 BOX_EVERY = 1
-SKEL_VERTEX_LIMIT = 1999        # the alias stream reader (model_alias_stream.inc) reads the block; it takes <= 2000
+# The alias stream reader (model_alias_stream.inc), the only reader of the block, takes up to the renderer's
+# MAXALIASVERTS (engine/aga/src/r_local.h), past 2,000 vertices with the model's byte-matching model-budgets.txt line
+# (the image step writes it: audit_gallery_budgets.world_allowances). It took at most 2,000 up to v0.0.53
+# (SKEL-VERTEX-LIMIT-52); tests/test_skel_vertex_limit.py keeps the two equal.
+SKEL_VERTEX_LIMIT = 3072
+SKEL_FACE_LIMIT = 1024          # the bake's face limit for a resident (3 vertices a face); npc_geometry caps the skin
+                                # at 480 rows, so a budget bake stays at or under npc_geometry.WHOLE_FACE_LIMIT
 RESIDENT_BUDGETS = (480, 384, 320, 256, 192)    # tools/prepare_area.py RESIDENT_LADDER
 SHAPE_TAG = 1000.0              # the extra frame that tells which shape each baked vertex came from (see below)
 MDL_HEAD = 84                   # struct '<4si3f3ff3f8if' (npc_geometry.animated_mdl)
@@ -1173,8 +1179,8 @@ def skeletal_mdl(rest_model, faces, uv, skin_image, lo, step, block, vertex_limi
     """The MDL of a skeletal model: npc_geometry.animated_mdl's layout with one rest frame quantised in the box
     lo + step x 0..255 that holds every pose (its frame box is the whole 0..255, so culling holds every pose; light
     normal index 0, as animated_mdl writes it), then the block. vertex_limit: the engine reads the block only in the
-    alias stream reader, which takes at most 2,000 vertices (25 October 2026); a larger limit (2331, 3072: an
-    original-head bake past 666 faces) writes a model today's engine does not read as skeletal."""
+    alias stream reader, which takes up to SKEL_VERTEX_LIMIT vertices (past 2,000 with the model's model-budgets.txt
+    line); the MDL's own limit is the smallest of animated_mdl's that holds it."""
     import struct
     from npc_geometry import animated_mdl
     nv = len(rest_model)
@@ -1182,7 +1188,7 @@ def skeletal_mdl(rest_model, faces, uv, skin_image, lo, step, block, vertex_limi
         raise ValueError('A skeletal model takes at most %d vertices (the alias stream reader): %d'
                          % (vertex_limit, nv))
     data = bytearray(animated_mdl(np.asarray(rest_model, float)[None], faces, uv, skin_image,
-                                  vertex_limit=None if vertex_limit > SKEL_VERTEX_LIMIT else 1999, names=['rest']))
+                                  vertex_limit=None, names=['rest']))
     lo = np.asarray(lo, float)
     step = np.asarray(step, float)
     corners = np.array([[lo[i] + (255 * step[i] if (c >> i) & 1 else 0) for i in range(3)] for c in range(8)])
@@ -1269,7 +1275,15 @@ def skeletal_from_shapes(shapes, materials, textures, palette, sources, rest_wor
         rest = shape['positions'][0]
         tagged.append({**shape, 'positions': np.concatenate((shape['positions'],
                                                               (rest + [(k + 1) * SHAPE_TAG, 0, 0])[None]))})
-    for budget in budgets:
+    # a whole hair may take a resident past 666 faces: the stream reader takes it (SKEL-VERTEX-LIMIT-52)
+    bake_args.setdefault('whole_limit', SKEL_FACE_LIMIT)
+    # the ladder with the whole hair first; an outfit that fits no budget with it goes down the ladder again with the
+    # hair's whole only within the standard face limit (npc_geometry._budget_quotas)
+    ladder = [(b, bake_args['whole_limit']) for b in budgets]
+    if bake_args['whole_limit']:
+        ladder += [(b, 0) for b in budgets]
+    for step, (budget, whole) in enumerate(ladder):
+        bake_args['whole_limit'] = whole
         try:
             try:
                 frames, faces, uv, skin_image = bake(tagged, materials, textures, palette, budget=budget,
@@ -1285,7 +1299,7 @@ def skeletal_from_shapes(shapes, materials, textures, palette, sources, rest_wor
                                                      reference_frames=8, **bake_args)
             break
         except ValueError as error:
-            if str(error) != 'Alias vertex budget exceeded' or budget == budgets[-1]:
+            if str(error) != 'Alias vertex budget exceeded' or step == len(ladder) - 1:
                 raise
     rest_model = frames[0]
     if len(rest_model) > vertex_limit:

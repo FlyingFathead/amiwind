@@ -23,6 +23,9 @@ void AW_SpeechStop(int entity,int channel) {
 }
 void AW_SpeechStart(int entity,int channel,const char *sound,int start,int length,int speed,int skip) {
     FILE *f;byte data[3013];int n,i,slot=0;char path[128];aw_voice_t *v;
+    /* entity -1 (a sound of no entity: Quake's temporary-entity sounds, cl_tent.c) never speaks; AW_SpeechStop(-1)
+     * means "every voice" (S_StopAllSounds), so it must not be passed on here (SPEECH-STOP-ALL-ON-MINUS1-54) */
+    if(entity<0)return;
     AW_SpeechStop(entity,channel);
     if((strncmp(sound,"npc/",4) && strncmp(sound,"intro/",6)) || strlen(sound)>100 ||
        strstr(sound,"..") || length<=0 || speed<=0)return;

@@ -117,11 +117,11 @@ class IntroContracts(unittest.TestCase):
     def test_hand_stamp_matches_prior_valid_full_prepare_bytes(self):
         raw=bsp('{\n"classname" "worldspawn"\n}\n{"classname" "func_wall" "model" "*1"}\n')
         report=hand_report();parts=lumps(raw);text=parts[0].decode('cp1252');end=text.index('}')
-        values=''.join('"aw_hand_'+name+'" "'+str(info['duration'])+'"\n' for name,info in report['clips'].items())
-        values+='"aw_eye_height" "'+str(report['eye_above_origin'])+'"\n'
+        # the eye height only: the hand clips are the image's gfx/hand-anims.txt (FIRST-PERSON-HANDS-IN-C-54)
+        values='"aw_eye_height" "'+str(report['eye_above_origin'])+'"\n'
         parts[0]=(text[:end]+values+text[end:]).encode('cp1252')
         self.assertEqual(hand_metadata.stamp(raw,hand_metadata.hand_fields(report)),pack_lumps(parts))
-        bad=bsp('{"classname" "worldspawn" "aw_hand_idle" "1" "aw_hand_idle" "2"}')
+        bad=bsp('{"classname" "worldspawn" "aw_eye_height" "1" "aw_eye_height" "2"}')
         with self.assertRaisesRegex(ValueError,'Duplicate'):hand_metadata.stamp(bad,hand_metadata.hand_fields(report))
         report['clips']['idle']['duration']=float('nan')
         with self.assertRaises(ValueError):hand_metadata.hand_fields(report)

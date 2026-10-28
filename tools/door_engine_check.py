@@ -22,7 +22,9 @@ model is drawn is the audit's "placed" check (the CHIM frame places the door) an
     python3 tools/door_engine_check.py --build BUILD --data-files DIR --out DIR ...   (runs the audit first)
 Writes OUT/door-engine-check.json and OUT/door-engine-check.md (private: built from your game data). With --baseline
 (config/door-check-baseline.json) a whole-world image fails when fewer entrances are usable than the last build's
-count: the count only goes up.
+count: the count only goes up. With --known (config/door-check-known.json) a whole-world image also fails when an
+exterior entrance the wall check cannot reach is not listed there with its reason and class
+(DOOR-USE-COLLISION-FILLED-53): every entrance is reachable or a known, registered case.
 """
 import argparse
 import json
@@ -50,7 +52,7 @@ OPENING_MAPS = frozenset({'prison', 'census', 'intro_docks', 'sncourt'})   # doo
 # the scene code and what the scene fixture links with it (tests/test_aga_native_source.py compile_run)
 ENGINE_FILES = ('aw_scene.c', 'aw_region.c', 'aw_story.c', 'aw_state.c', 'mathlib.c', 'cl_main.c', 'view.c',
                 'aw_section.c', 'aw_world.c', 'aw_mappath.c', 'aw_miniwind.c', 'aw_harvest.c', 'aw_harvest_runtime.c',
-                'aw_excluded.c', 'aw_format.c', 'aw_harvest_proxy.c')
+                'aw_excluded.c', 'aw_format.c', 'aw_harvest_proxy.c', 'aw_travel_rules.c')
 
 
 def _inside(core, point, margin=0.0):
@@ -456,6 +458,53 @@ def baseline_problem(report, baseline):
             if worse else None)
 
 
+KNOWN_FORMAT = 'aw-door-check-known-1'
+
+
+def load_known(path):
+    """{reference: reason} of config/door-check-known.json (aw-door-check-known-1): the region-frame entrances the
+    converted collision still blocks for a named, measured reason (DOOR-USE-COLLISION-FILLED-53), each with its
+    register class; refused when the file is not that format or an entry has no reason."""
+    data = json.loads(Path(path).read_text(encoding='utf-8'))
+    if data.get('format') != KNOWN_FORMAT or not isinstance(data.get('entrances'), dict):
+        raise ValueError('%s: format %s with an entrances table expected' % (path, KNOWN_FORMAT))
+    out = {}
+    for ref, row in data['entrances'].items():
+        if not str(ref).isdigit() or not isinstance(row, dict) or not row.get('reason') or not row.get('class'):
+            raise ValueError('%s: entrance %s needs a reference number, a reason and a class' % (path, ref))
+        out[int(ref)] = row
+    return out
+
+
+def known_split(report, known):
+    """The unreachable region-frame entrances of REPORT (the wall traced: checks reach 'no') against KNOWN
+    ({reference: row}, load_known): {'known': [refs listed], 'new': [refs not listed], 'known_passing': [listed refs
+    the check now reaches]}; refs sorted."""
+    known = known or {}
+    blocked = {e['reference'] for e in report['entries'] if e.get('checks', {}).get('reach') == 'no'}
+    reached = {e['reference'] for e in report['entries'] if e.get('checks', {}).get('reach') == 'yes'}
+    return {'known': sorted(blocked & set(known)), 'new': sorted(blocked - set(known)),
+            'known_passing': sorted(reached & set(known))}
+
+
+def known_problem(report, baseline, known):
+    """None, or why a whole-world image (as many entrances held as the baseline's, the wall traced) leaves an
+    exterior entrance unreachable that config/door-check-known.json does not list with its reason: every entrance of
+    the original is either reachable or a known, registered case (DOOR-USE-COLLISION-FILLED-53). A partial-area image
+    is not compared; a listed entrance the check now reaches is reported (known_passing), never a failure."""
+    c = report['counts']
+    if known is None or not baseline or c.get('held', c['doors']) < baseline.get('doors', 0) or \
+            not c.get('reach_traced'):
+        return None
+    new = report.get('known_split', known_split(report, known))['new']
+    if not new:
+        return None
+    by_ref = {e['reference']: e for e in report['entries']}
+    return ('%d exterior entrances cannot be reached and are not on config/door-check-known.json: %s' % (
+        len(new), '; '.join('%d %s -> %s (%s)' % (r, by_ref[r]['id'], by_ref[r]['destination_cell'],
+                                                  by_ref[r]['reach']['why']) for r in new[:12])))
+
+
 def write_outputs(report, out):
     out = Path(out)
     out.mkdir(parents=True, exist_ok=True)
@@ -477,9 +526,16 @@ def write_outputs(report, out):
     lines += ['| %s | %d |' % (k, c['check ' + k]) for k in ('crossing', 'in_frame_at_door', 'prompt', 'enters',
                                                               'activate', 'way_back', 'reach')]
     lines += ['', '## The wall in the way (region frames)', '']
-    lines += ['- %d %s (cell %s) -> %s: %s' % (e['reference'], e['id'], ','.join(map(str, e['cell'] or [])),
-                                               e['destination_cell'], e['reach']['why'])
+    split = report.get('known_split') or {}
+    known = set(split.get('known', ()))
+    lines += ['- %d %s (cell %s) -> %s: %s%s' % (e['reference'], e['id'], ','.join(map(str, e['cell'] or [])),
+                                                 e['destination_cell'], e['reach']['why'],
+                                                 ' (known: config/door-check-known.json)' if e['reference'] in known
+                                                 else '')
               for e in report['entries'] if e.get('checks', {}).get('reach') == 'no'] or ['None.']
+    if split.get('known_passing'):
+        lines += ['', 'Listed in config/door-check-known.json but reached now (take them off the list): %s.'
+                  % ', '.join(map(str, split['known_passing']))]
     lines += ['', '## Per region', '', '| Region | doors | usable | both ways | locked |', '| --- | --- | --- | --- | --- |']
     lines += ['| %s | %d | %d | %d | %d |' % (n, r['doors'], r['usable'], r['both_ways'], r['locked'])
               for n, r in report['regions'].items()]
@@ -491,8 +547,9 @@ def write_outputs(report, out):
 
 
 def run(build=None, id1=None, engine_src=None, audit_rows=None, data_files=None, out=None, baseline=None, jobs=None,
-        scene_source=None, world_doors=None, chim_world=None, world_id1=()):
-    """The check over one image; returns (report, problem or None)."""
+        scene_source=None, world_doors=None, chim_world=None, world_id1=(), known=None):
+    """The check over one image; returns (report, problem or None). known: config/door-check-known.json (load_known):
+    a whole-world image then fails on an unreachable entrance it does not list."""
     import door_audit
     from chim.frame_map import world_directory
     id1 = Path(id1 or Path(build) / 'image/boot/id1')
@@ -510,8 +567,13 @@ def run(build=None, id1=None, engine_src=None, audit_rows=None, data_files=None,
                                         (engine_src / 'aw_town_table.h').read_text(encoding='utf-8', errors='replace'))
     world = chim_world if chim_world and (Path(chim_world) / 'chim' / 'world.cwi').is_file() else None
     report = check(audit_rows, id1, engine_src, world_directory(id1), names, jobs, scene_source, world_id1, world)
-    problem = baseline_problem(report, json.loads(Path(baseline).read_text(encoding='utf-8')) if baseline else None)
+    base = json.loads(Path(baseline).read_text(encoding='utf-8')) if baseline else None
+    problem = baseline_problem(report, base)
     report['baseline_problem'] = problem
+    known_rows = load_known(known) if known else None
+    report['known_split'] = known_split(report, known_rows)
+    report['known_problem'] = known_problem(report, base, known_rows)
+    problem = '; '.join(p for p in (problem, report['known_problem']) if p) or None
     if out:
         write_outputs(report, out)
     return report, problem
@@ -529,6 +591,8 @@ def main(argv=None):
     ap.add_argument('--data-files', type=Path)
     ap.add_argument('--scene-source', type=Path, help='another aw_scene.c (an earlier release) for a before count')
     ap.add_argument('--baseline', type=Path)
+    ap.add_argument('--known', type=Path, help='config/door-check-known.json: the entrances still blocked for a '
+                                               'named reason (a whole-world image fails on any other)')
     ap.add_argument('--out', required=True, type=Path)
     ap.add_argument('--jobs', type=int)
     a = ap.parse_args(argv)
@@ -538,12 +602,16 @@ def main(argv=None):
         ap.error('--audit or --data-files')
     rows = json.loads(a.audit.read_text(encoding='utf-8'))['rows'] if a.audit else None
     report, problem = run(a.build, a.id1, a.engine_src, rows, a.data_files, a.out, a.baseline, a.jobs, a.scene_source,
-                          chim_world=a.chim_world, world_id1=a.world_id1)
+                          chim_world=a.chim_world, world_id1=a.world_id1, known=a.known)
     c = report['counts']
     print('door engine check: %d exterior entrances; usable after walking in %d, both ways %d; with the wall traced '
           '(%d region doors) %d; locked %d; placed %d'
           % (c['doors'], c['usable_after_crossing'], c['both_ways'], c['reach_traced'], c['reachable'], c['locked'],
              c['placed']))
+    split = report.get('known_split') or {}
+    if any(split.values()):
+        print('door engine check: unreachable and known %d, not known %d; known but reached now %d'
+              % (len(split['known']), len(split['new']), len(split['known_passing'])))
     if problem:
         print('door engine check: ' + problem)
         return 1

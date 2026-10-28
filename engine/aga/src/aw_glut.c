@@ -25,7 +25,7 @@ static const char *const known_topics[AW_GLUT_TOPICS]={"hello","idle","intruder"
 
 long AW_GlutResidentSize(const unsigned char *h,long file_size) {
     long size;unsigned long texts;
-    if(memcmp(h,"AWGL",4) || rd16(h+4)!=1)return -1;
+    if(memcmp(h,"AWGL",4) || rd16(h+4)!=AW_GLUT_VERSION)return -1;
     texts=rd32(h+56);
     if(texts>(unsigned long)file_size)return -1;
     size=(long)(file_size-(long)texts);
@@ -41,7 +41,9 @@ int AW_GlutOpen(aw_glut_t *g,const unsigned char *d,long size,long file_size) {
     g->lists=(long)rd32(d+24);g->list_items=(long)rd32(d+28);g->entries=(long)rd32(d+32);g->conds=(long)rd32(d+36);
     g->sounds=(long)rd32(d+40);g->globals=(long)rd32(d+44);g->names=(long)rd32(d+48);g->string_bytes=(long)rd32(d+52);
     g->text_bytes=(long)rd32(d+56);g->functions=(int)rd16(d+64);
-    if(g->topics<1 || g->topics>64 || g->functions>256)return 0;
+    g->creatures=(long)rd16(d+68);g->slots=(long)rd16(d+70);g->souns=(long)rd32(d+72);
+    if(g->souns>0xFFFFL)return 0;
+    if(g->topics<1 || g->topics>64 || g->functions>256 || g->slots<AW_SLOTS)return 0;
     /* each table in file order; every count is checked against the bytes before anything is read */
 #define TAKE(field,bytes) do{long n_=(bytes);if(n_<0 || n_>size-at)return 0;g->field=d+at;at+=n_;}while(0)
     TAKE(topic_table,4L*g->topics);
@@ -55,9 +57,12 @@ int AW_GlutOpen(aw_glut_t *g,const unsigned char *d,long size,long file_size) {
     TAKE(list_item,pad4(2L*g->list_items));
     TAKE(entry,12L*g->entries);
     TAKE(cond,8L*g->conds);
-    TAKE(sound,8L*g->sounds);
+    TAKE(sound,(long)AW_GLUT_SOUND_ROW*g->sounds);
     TAKE(global,8L*g->globals);
     TAKE(name,4L*g->names);
+    TAKE(creature,(long)AW_GLUT_CREATURE_ROW*g->creatures);
+    TAKE(slot,pad4(2L*g->slots));
+    TAKE(soun,(long)AW_GLUT_SOUN_ROW*g->souns);
     TAKE(strings,g->string_bytes);
 #undef TAKE
     /* the string block ends in a NUL (its padding is zero), so every string offset below ends inside it */
@@ -87,6 +92,12 @@ int AW_GlutOpen(aw_glut_t *g,const unsigned char *d,long size,long file_size) {
         if(rd16(e+8)!=NONE16 && (long)rd16(e+8)>=g->sounds)return 0;
     }
     for(i=0;i<g->names;i++)if(rd32(g->name+4*i)>=(unsigned long)g->string_bytes)return 0;
+    for(i=0;i<g->creatures;i++){
+        const unsigned char *r=g->creature+AW_GLUT_CREATURE_ROW*i;
+        if(rd32(r)>=(unsigned long)g->string_bytes)return 0;
+        for(k=0;k<AW_SNDG_MOMENTS;k++)if(rd16(r+4+2*k)!=NONE16 && (long)rd16(r+4+2*k)>=g->sounds)return 0;
+    }
+    for(i=0;i<g->slots;i++)if(rd16(g->slot+2*i)!=NONE16 && (long)rd16(g->slot+2*i)>=g->sounds)return 0;
     for(i=0;i<g->globals;i++)if(rd32(g->global+8*i)>=(unsigned long)g->string_bytes)return 0;
     for(i=0;i<g->topics;i++)if(rd32(g->topic_table+4*i)>=(unsigned long)g->string_bytes)return 0;
     for(t=0;t<AW_GLUT_TOPICS;t++){
@@ -237,7 +248,54 @@ int AW_GlutPick(const aw_glut_t *g,int npc,int topic,const aw_glut_state_t *s,in
 int AW_GlutSound(const aw_glut_t *g,int entry,unsigned char hash[8]) {
     unsigned s;
     if(entry<0 || entry>=g->entries || (s=rd16(g->entry+12*entry+8))==NONE16)return 0;
-    memcpy(hash,g->sound+8*s,8);
+    memcpy(hash,g->sound+AW_GLUT_SOUND_ROW*s,8);
+    return 1;
+}
+int AW_GlutCreatureFind(const aw_glut_t *g,const char *id) {
+    long low=0,high=g->creatures-1;
+    if(!g->data || !id || !*id)return -1;
+    while(low<=high){
+        long mid=(low+high)/2;
+        int c=idcmp(id,(const char *)g->strings+rd32(g->creature+AW_GLUT_CREATURE_ROW*mid));
+        if(!c)return (int)mid;
+        if(c<0)high=mid-1;else low=mid+1;
+    }
+    return -1;
+}
+int AW_GlutCreatureSound(const aw_glut_t *g,int row,int moment) {
+    unsigned s;
+    if(row<0 || row>=g->creatures || moment<0 || moment>=AW_SNDG_MOMENTS)return -1;
+    s=rd16(g->creature+AW_GLUT_CREATURE_ROW*row+4+2*moment);
+    return s==NONE16?-1:(int)s;
+}
+int AW_GlutSlotSound(const aw_glut_t *g,int slot) {
+    unsigned s;
+    if(!g->data || slot<0 || slot>=g->slots)return -1;
+    s=rd16(g->slot+2*slot);
+    return s==NONE16?-1:(int)s;
+}
+int AW_GlutPoolPath(const aw_glut_t *g,int sound,char *out,int capacity) {
+    static const char hex[]="0123456789abcdef";
+    int i;char *p;
+    if(!out || capacity<AW_GLUT_POOL_PATH || sound<0 || sound>=g->sounds)return 0;
+    memcpy(out,"sound/pool/a",12);p=out+12;
+    for(i=0;i<8;i++){unsigned char b=g->sound[AW_GLUT_SOUND_ROW*sound+i];*p++=hex[b>>4];*p++=hex[b&15];}
+    memcpy(p,".wav",5);
+    return 1;
+}
+int AW_GlutSoundLength(const aw_glut_t *g,int sound) {
+    return sound<0 || sound>=g->sounds?-1:(int)rd16(g->sound+AW_GLUT_SOUND_ROW*sound+8);
+}
+int AW_GlutSoundMapped(const aw_glut_t *g,int sound) {
+    return sound<0 || sound>=g->sounds?-1:(int)(rd16(g->sound+AW_GLUT_SOUND_ROW*sound+10)&AW_GLUT_MAPPED);
+}
+int AW_GlutSoun(const aw_glut_t *g,int index,aw_glut_soun_t *out) {
+    const unsigned char *r;
+    if(!out || index<0 || index>=g->souns)return 0;
+    r=g->soun+AW_GLUT_SOUN_ROW*index;
+    memcpy(out->hash,r,8);
+    out->centis=(unsigned short)rd16(r+8);out->volume=r[10];out->mapped=(unsigned char)(r[11]&AW_GLUT_MAPPED);
+    out->near_units=(unsigned short)rd16(r+12);out->far_units=(unsigned short)rd16(r+14);
     return 1;
 }
 long AW_GlutTextOffset(const aw_glut_t *g,int entry) {
@@ -298,7 +356,7 @@ static int load(void) {
     size=COM_FOpenFile((char *)path,&f);
     if(size<AW_GLUT_HEADER || !f){if(f)fclose(f);Con_DPrintf("Voice table: %s not in this build\n",path);return 0;}
     if(fread(header,1,AW_GLUT_HEADER,f)!=AW_GLUT_HEADER || (resident_size=AW_GlutResidentSize(header,size))<0){
-        fclose(f);Con_Printf("Voice table: %s is not AWGL1\n",path);return 0;
+        fclose(f);Con_Printf("Voice table: %s is not AWGL2\n",path);return 0;
     }
     /* once per session, outside the Quake heap (accelerator RAM when there is some) */
     if(!(resident=(unsigned char *)AW_TryMalloc((size_t)resident_size))){fclose(f);Con_Printf("Voice table: no memory for %ld bytes\n",resident_size);return 0;}

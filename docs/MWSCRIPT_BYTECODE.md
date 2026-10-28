@@ -1,6 +1,6 @@
 # MWScript compiled by the builder
 
-_Last updated with AmiWind v0.0.51 (25 October 2026)._
+_Last updated with AmiWind v0.0.54-dev1 (27 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -12,6 +12,7 @@ _Last updated with AmiWind v0.0.51 (25 October 2026)._
 - [The compiler](#the-compiler)
   - [The quirks it keeps](#the-quirks-it-keeps)
   - [What it squeezes](#what-it-squeezes)
+  - [The squeeze, measured (27 October 2026)](#the-squeeze-measured-27-october-2026)
 - [The file: id1/mwscript.awm (AWMS1)](#the-file-id1mwscriptawm-awms1)
 - [The opcode table](#the-opcode-table)
   - [Shared with the greeting conditions](#shared-with-the-greeting-conditions)
@@ -20,6 +21,7 @@ _Last updated with AmiWind v0.0.51 (25 October 2026)._
 - [The interpreter](#the-interpreter)
   - [Which objects run scripts](#which-objects-run-scripts)
   - [What runs today, what is "not yet"](#what-runs-today-what-is-not-yet)
+  - [The import route: every call kept](#the-import-route-every-call-kept)
 - [Sizes and costs](#sizes-and-costs)
 - [Builder stage](#builder-stage)
 - [Next](#next)
@@ -50,18 +52,19 @@ builder container; the per-script table stays private, these are the totals):
 | Scripts | 632 | 263 | 336 | 1,207 |
 | Source text | 514,172 bytes | 214,283 | 252,109 | 942,627 |
 | The original editor's compiled form | 216,421 bytes | 94,553 | 106,774 | 400,397 |
-| AmiWind bytecode | 79,104 bytes | 37,348 | 46,227 | 156,838 (39 % of the original's) |
+| AmiWind bytecode (27 October 2026) | 67,088 bytes | 31,614 | 38,924 | 132,376 (33 % of the original's) |
 | Distinct functions used | 207 | 126 | 120 | 251 |
-| Function calls | 5,827 | 2,470 | 3,439 | 11,288 |
-| Not compiled | 0 | 0 | 4 | 4 |
+| Function calls | 5,827 | 2,470 | 3,516 | 11,365 |
+| Not compiled | 0 | 0 | 0 | 0 |
 
 The 1,207 are 616 Morrowind scripts, 255 Tribunal scripts and all 336 of Bloodmoon (the add-ons replace 24
-earlier ones). The four not compiled are Bloodmoon scripts that read a name declared nowhere in the game data (a
-journal id used as a variable, a truncated local name); the compiler refuses them rather than guess, and lists them
-in its report.
+earlier ones). Every one compiles since v0.0.54. Four Bloodmoon scripts read a name declared nowhere in the game data
+(a journal id used as a variable, "if ( BM_BearHunt1 == 0 )"), and one of them also puts the player before a local
+("Player->fakeiswere"); until v0.0.54 the compiler refused them. Now it reads them as OpenMW does (the two rules
+under [The quirks it keeps](#the-quirks-it-keeps)), with a warning in its report.
 
 Other counts: 143 globals, 318 journal topics, 4 start scripts, 37 locals at most in one script, a stack of 12 cells
-at most, 1,687 bytes of bytecode in the longest script, `while` loops in 4 scripts. Placed objects that carry a
+at most, 1,476 bytes of bytecode in the longest script, `while` loops in 5 scripts. Placed objects that carry a
 script: 8,758 in Morrowind.esm (4,907 of them run something today, see [inert](#which-objects-run-scripts)).
 
 ### What the scripts need
@@ -69,14 +72,14 @@ script: 8,758 in Morrowind.esm (4,907 of them run something today, see [inert](#
 | Share of the 1,207 scripts | Scripts |
 | --- | ---: |
 | Use only the interpreter, audio, the journal and globals | 134 (11 %) |
-| Run whole today (everything they call is carried out) | 142 (12 %) |
+| Run whole today (everything they call is carried out; 27 October 2026) | 735 (61 %) |
 | Touch audio at all | 192 (16 %) |
-| Need AI packages (travel, wander, follow, escort, fight/flee settings) | 181 (15 %) |
-| Need the inventory (add, remove, count items on others, equip, soul gems) | 194 (16 %) |
-| Need combat (start/stop combat, on death, attacked, weapon drawn) | 293 (24 %) |
-| Need spells and effects (add/remove spells, cast, diseases, effects) | 140 (12 %) |
-| Need positioning (position, place, move, rotate, angles, scale) | 151 (13 %) |
-| Need at least one of those five | 668 (55 %) |
+| Use AI packages (travel, wander, follow, escort, fight/flee settings) | 181 (15 %) |
+| Use the inventory (add, remove, count items on others, equip, soul gems) | 194 (16 %) |
+| Use combat (start/stop combat, on death, attacked, weapon drawn) | 293 (24 %) |
+| Use spells and effects (add/remove spells, cast, diseases, effects) | 140 (12 %) |
+| Use positioning (position, place, move, rotate, angles, scale) | 152 (13 %) |
+| Use at least one of those five | 668 (55 %) |
 
 "Run whole today" is larger than "audio, journal and globals" because the player's item counts
 (`player->GetItemCount`) are game state the engine already keeps. Most of the rest also need object state
@@ -144,6 +147,10 @@ all 1,231 SCPT records:
 - `if` and `while` need no brackets; junk after `else` is skipped (8 times: `else set x to 8` does **not** set x,
   as in OpenMW); stray `endif`s are skipped (34 times); a missing `endif` closes at the end;
 - `set` of an undeclared variable skips the line, with a warning (a handful of lines in the data, as OpenMW);
+- a name in an expression that is no variable, function or global reads as a number: its leading digits, else 0
+  (OpenMW's parser does this for old content; four Bloodmoon scripts, v0.0.54);
+- a reference before a name that is no function (`Player->fakeiswere`, a local) is dropped and the name read as it
+  is (OpenMW: "stray explicit reference"; one Bloodmoon script, v0.0.54);
 - `id->( OnDeath == 1 )`: an explicit reference before a bracket applies to the calls inside;
 - `"script".var` / `id.var`: another script's or object's variable; an empty member reads 0;
 - `PositionCell "cell" x y z r` with the cell first (Bloodmoon) is read in the documented order;
@@ -161,8 +168,72 @@ all 1,231 SCPT records:
   sound still playing, `SayDone`, an engine query); only those must run every frame.
 - A script is **INERT** when nothing it can do today is seen outside its own values (only not-yet calls; no sound,
   global, journal, other object, script start or stop) and no other script reads its values: compiled and counted,
-  its placements left out of the file, never run. 470 scripts today; each one comes back by itself when a function
-  it calls is carried out and the file is compiled again.
+  its placements left out of the file, never run. 119 scripts today (230 before the actor calls of v0.0.54); each
+  one comes back by itself when a function it calls is carried out and the file is compiled again.
+- A script that reads the actor record (a stat, an item count, a spell, OnDeath, a dead count) is not VOLATILE: it
+  is marked ACTOR and runs again when the state it can read changes. A script's own change of an actor moves the
+  state generation as a global does, and the engine moves it when a fight changes an actor's health or an actor
+  dies, so OnDeath and GetHealth tests run on those events instead of every frame.
+- **Compare and branch** (v0.0.54): an `if` or `while` that tests a whole number against a constant from -128 to
+  127, the most common test in the game's scripts (`if ( x == 1 )`), is one opcode instead of three: `JNEB` for
+  `==`, `JCMPB` for the other comparisons (4 or 5 bytes instead of 6).
+- **CellChanged is not VOLATILE** (v0.0.54). It reads 1 only on the run after an object was attached or came into
+  range, and the interpreter runs a script then anyway; the run after it also runs (CellChanged reads 0 again, which
+  is what the original's sound markers wait for: "if ( CellChanged == 0 ) if ( GetSoundPlaying ... == 0 )
+  PlayLoopSound3DVP ..."). `GetSoundPlaying` asks only about the script's own sounds: the script acted when it
+  started one, and the engine wakes it when a one-shot sound ends (loops restart by themselves). So a sound marker
+  runs twice and then sleeps until its object leaves and comes back, instead of running every frame.
+
+### The squeeze, measured (27 October 2026)
+
+The whole game compiled twice from the same commit, once without compare and branch (the reference) and once with
+it; both runs without the media catalogue, so only the code differs:
+
+| | Without | With | Change |
+| --- | ---: | ---: | ---: |
+| Bytecode (CODE) | 142,480 bytes | 129,862 bytes | -12,618 (-8.9 %) |
+| Resident while scripts are on | 176,072 bytes | 163,456 bytes | -12,616 |
+| Opcodes in the code | 61,517 | 46,999 | -14,518 |
+| Compare-and-branch opcodes | | 7,259 (5,359 `JNEB`, 1,900 `JCMPB`) | |
+
+Opcodes a frame, natively, the method of the table in [Sizes and costs](#sizes-and-costs) (every scripted object of
+a 3 by 3 cell block attached, 600 frames of 1/20 s, sounds reported as still playing). Like for like: both runs
+attach the same objects and make the same calls; every call to the engine (sounds, voices, journal, object state,
+actor calls) and the final globals and locals were written out and the two lists compared: identical in all five
+blocks (the same SHA-256 prefix).
+
+| Block | Scripts run a frame | Opcodes a frame, without | With | Change |
+| --- | ---: | ---: | ---: | ---: |
+| Vivec (3, -10) | 44 | 426 | 240 | -44 % |
+| Seyda Neen (-2, -9) | 14 | 162 | 96 | -41 % |
+| Cells around (-11, 15) | 15 | 214 | 146 | -32 % |
+| Balmora (-3, -2) | 4 | 58 | 36 | -38 % |
+| Empty sea (0, 0) | 2 | 46 | 28 | -39 % |
+
+CellChanged without VOLATILE, measured the same way (27 October 2026, the v0.0.54 branch): the whole program
+compiled once, a second file made from it with every script that reads CellChanged marked VOLATILE again (142
+scripts: the old rule); the same interpreter runs both. Like for like: every call to the engine and the final globals
+and locals were written out for each block in three sound cases (sounds always playing; never playing; every sound
+ending each 40th frame, the engine then waking the scripts) and compared: identical in all fifteen runs (the same
+SHA-256). Opcodes a frame with sounds playing, as the table above:
+
+| Block | Scripts run a frame, before | After | Opcodes a frame, before | After | Change |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Vivec (3, -10) | 44 | 3.1 | 240 | 37.4 | -84 % |
+| Seyda Neen (-2, -9) | 14 | 7 | 96 | 63.1 | -34 % |
+| Cells around (-11, 15) | 15 | 5 | 146 | 98.4 | -33 % |
+| Balmora (-3, -2) | 4 | 3 | 36 | 33.1 | -8 % |
+| Empty sea (0, 0) | 2 | 1 | 28 | 25.1 | -10 % |
+
+Measured against the integration head before the change (be93bf6c, its own compiler and interpreter, the same
+recipe): the same "before" numbers, so the v0.0.54 world lookups below add no work a frame in these blocks. The
+host's interpreter time a frame, natively on the build machine (relative only, not the Amiga's): Vivec 1.2 to
+0.36 microseconds.
+
+The actor calls themselves (v0.0.54) made the program smaller before the squeeze: CODE 147,531 to 142,480 bytes
+(not-yet calls with their names became small opcodes) and the resident part 177,768 to 176,072 bytes although the
+actor table's OACT section (1,302 bytes) joined it; they also make the scripts do more (their calls are carried out
+instead of logged): Vivec's block 422 to 426 opcodes a frame, the others 4 to 16 more.
 
 ## The file: id1/mwscript.awm (AWMS1)
 
@@ -181,10 +252,16 @@ on disk.
 | OBJS | 12 | reference (if placed once), id, script, placed count, kind | 1,992 |
 | SCRP | 16 | name, locals, stack, flags, code offset and length | 19,312 |
 | STRT | 2 | start scripts | 8 |
-| CODE | | the bytecode | 156,838 |
+| PCEL | | the cells each `GetPCCell` name matches (v0.0.54): per name the rooms by stable number and the outdoor cells by grid, made at build time | 1,692 |
+| PMOV | 20 | the player's PositionCell moves (v0.0.54): kind (outdoors, into a room), the room map's name, x y z, yaw | 420 |
+| CODE | | the bytecode | 132,376 |
 | BIND | 24 | placed scripted objects, by reference: script, flags, cell (grid or the room's stable number), position | 117,768 (4,907 rows) |
 | STRS | | strings (names for the log, messages, ids of not-yet calls) | 145,333 |
+| OACT, ACTB, AINV, AITM, ASPT, ASPL | | the actor table (v0.0.54; OACT resident, the rest on disk): [ACTOR_STATE.md](ACTOR_STATE.md) | 536,338 |
 | | | file / resident | 446,316 / 183,212 |
+
+CODE, PCEL and PMOV measured 27 October 2026 (v0.0.54, without the media catalogue: the whole file 1,062,900 bytes
+with the actor table, 168,348 resident); the other rows are from earlier measurements.
 
 A pool name is the 8 bytes of a converted file's name in the media catalogue, `sound/pool/a<16 hex>.wav`.
 
@@ -210,7 +287,7 @@ A stack machine of 32-bit cells; operands follow their opcode, big-endian. `engi
 | 2C | POP | | drop a value |
 | 2D | REF | u16 object (FFFF the player) | the next call acts on this object |
 | 2E | QUERY | u8 query, u16 operand | an engine fact (table below), pushes a whole number |
-| 2F | NOTYET | u16 name, u8 flags, u8 strings, u16 per string | a function not carried out yet: logged once, its numbers popped, 0 pushed if it has a value (flags: low 5 bits numbers, 80 has a value, 40 a fraction, 20 had a reference) |
+| 2F | NOTYET | u16 function number, u16 name, u8 flags, u8 strings, u16 per string | a function not carried out yet ([the import route](#the-import-route-every-call-kept)): counted by its number, handed to the engine's `call()` with its numbers and strings, logged once when the engine does not carry it out, its numbers popped, 0 (or the engine's answer) pushed if it has a value (flags: low 5 bits numbers, 80 has a value, 40 a fraction, 20 had a reference) |
 | 30-35 | PLAYSOUND, PLAYSOUNDVP, PLAYSOUND3D, PLAYSOUND3DVP, PLAYLOOP3D, PLAYLOOP3DVP | u16 sound | VP forms pop pitch and volume |
 | 36 37 | STOPSOUND, SOUNDPLAYING | u16 sound | |
 | 38 39 | SAY, SAYDONE | u16 voice, u16 text | |
@@ -222,6 +299,18 @@ A stack machine of 32-bit cells; operands follow their opcode, big-endian. `engi
 | 4F 50 | ONACTIVATE, ACTIVATE | - | activation (v0.0.51): ONACTIVATE pushes 1 once after the player used the script's object (the script took the use); ACTIVATE carries out the object's own use |
 | 51 | MESSAGEBOX | u16 text, u8 numbers, u8 buttons, u16 per button | a message box (v0.0.51): its numbers popped (each a number with a fraction) and formatted into the text, its buttons by string index |
 | 52 | GETBUTTONPRESSED | | pushes the button the player chose, once; -1 until then |
+| 53 | ACTOR | u8 verb, u8 stat | the actor record (v0.0.54, [ACTOR_STATE.md](ACTOR_STATE.md)) of REF's object or the script's own: get and ratio push, set, mod and modcurrent pop (a whole number for level, the behaviour ratings, disposition and OnDeath, else a fraction) |
+| 54 | ITEM | u8 verb, u16 item | 0 GetItemCount (pushes), 1 AddItem, 2 RemoveItem (pop the count); the item is a row of the actor table's shared items |
+| 55 | SPELL | u8 verb, u16 spell | 0 GetSpell (pushes), 1 AddSpell, 2 RemoveSpell, 3 GetCommonDisease and 4 GetBlightDisease (push; any spell of that type in the actor's list, the spell operand unused; v0.0.54) |
+| 56 | COMBAT | u8 verb, u16 object | 0 StartCombat against the object (FFFF the player), 1 StopCombat |
+| 57 | DEADCOUNT | u16 actor | GetDeadCount of an actor id (FFFF: an id no actor has, 0) |
+| 58 | AIWANDER | u8 extra | pops range, duration, time and EXTRA more whole numbers (AIWander's arguments) |
+| 59 | JNEB | s8 k, s16 | pops a whole number, jumps when it is not k (the squeeze) |
+| 5A | JCMPB | u8 test, s8 k, s16 | pops a whole number, jumps when "number test k" is false (0 ==, 1 !=, 2 <, 3 <=, 4 >, 5 >=) |
+| 5B | GETPCCELL | u16 PCEL row | pushes 1 when the player stands in one of the row's cells (v0.0.54) |
+| 5C | GETPOS | u8 axis | pushes REF's object's (or the script's own) position on the axis (0 x, 1 y, 2 z), game units (v0.0.54) |
+| 5D | PLAYERMOVE | u16 PMOV row | the player's PositionCell, worked out at build time: into a room (its map, the arrival) or outdoors (v0.0.54) |
+| 5E | AIPACKAGE | u8 verb | pushes REF's actor's (or the script's own) AI package: 0 GetCurrentAIPackage (-1 none, 0 Wander, ...), 1 GetAIPackageDone (v0.0.54) |
 
 QUERY numbers: 1 the speaker's disposition, 2 PC level, 3 PC sex, 4 PC reputation, 5 PC crime level, 6 PC health
 percent, 7 PC rank in a faction (operand: faction string, FFFF the speaker's), 8 PC expelled (same operand), 9 PC
@@ -250,6 +339,15 @@ Every sound a script names resolves at build time to the converted file in the m
   defaults when both are 0; rule from OpenMW's sound code, values from the game data);
 - `Say` names a voice file under Sound; `StreamMusic` a file under Music, which becomes the soundtrack's own
   track number (`music/trackNN.mws`).
+
+What each does follows OpenMW's script sound rules (apps/openmw/mwscript/soundextensions.cpp): the 2D forms play on
+the listener, the 3D forms on the reference, a loop until `StopSound`, `GetSoundPlaying` asks about that reference's
+sound, `Say` plays the voice file on the actor with its text only as a subtitle, `SayDone` reads the actor's say
+finished. The dialogue's own voice lines (greetings, combat taunts, hit and flee lines) go through OpenMW's
+DialogueManager::say instead (apps/openmw/mwdialogue/dialoguemanagerimp.cpp), which also refuses an actor that is
+already speaking, an NPC under water and a knocked-down actor; AmiWind's greeting and combat tables carry that rule
+([NPC_VOICE_TABLE.md](NPC_VOICE_TABLE.md)), not a script's `Say`. The pool file of a sound is the same one the voice
+table names (the media pool, `sound/pool/a<16 hex>.wav`); one shared row table for both is being agreed (v0.0.54).
 
 Measured on the v0.0.48-dev2 media catalogue: **82 sounds, 81 mapped**; **132 voice files, 131 mapped**; **1 music
 file, 0 mapped**. 71 voice names ask for a `.wav` where the data has the `.mp3` (the game plays the `.mp3`): mapped,
@@ -349,11 +447,68 @@ the world until the player chooses (Left/Right or A/D move, Enter, Space, E or t
 button); a new box replaces a shown one, and `GetButtonPressed` reads the choice once, -1 until then
 (`engine/aga/src/aw_msgbox_rules.c`, `aw_msgbox.c`).
 
-Not yet (219 functions; the most used): GetDeadCount 247, OnDeath 245, RemoveItem 239, SetFight
-234, StartCombat 205, AddSpell 173, AddItem 157, GetPCCell 139, ForceGreeting 134, AIWander 130, GetPos 127, Cast
-126, StopCombat 119, AddTopic 105. They wait for menus, AI packages, inventory, combat, spells, positioning and
-dialogue. The scripts' own values are not in saved games yet
-([MWSCRIPT-STATE-NOT-SAVED-48](BUGS.md)).
+The actor record (v0.0.54, [ACTOR_STATE.md](ACTOR_STATE.md)): every attribute's, skill's and dynamic stat's Get,
+Set and Mod, `ModCurrent` and the `GetRatio` forms, `GetLevel`, `SetLevel`, the behaviour ratings' Get, Set and
+Mod (`SetFight`, `SetHello` and the rest), `GetDisposition`, `SetDisposition`, `ModDisposition`, `OnDeath`,
+`GetDeadCount`, `AddItem`, `RemoveItem` and `GetItemCount` on any actor (the player's own items are the game state
+the engine keeps), `AddSpell`, `RemoveSpell`, `GetSpell`, `StartCombat` (with the player), `StopCombat` (through the
+combat layer's per-actor end when it is in the build), and `AIWander` (handed to the ambient tables' wander when
+they are in the build). 87 functions moved from "not yet" to running; the scripts that use them, by function (a
+script counted once per function): OnDeath 221, StartCombat 106, GetDeadCount 105, RemoveItem 81, AddItem 77,
+SetFight 73, AIWander 73, GetHealth 69, AddSpell 52, StopCombat 40, SetHealth 33, SetHello 30. Scripts that run whole
+(everything they call carried out): 390 before, 635 after (of 1,207).
+
+The world and cell lookups (v0.0.54): `GetPCCell` compares the player's cell with the cells its name matches
+(every cell whose name starts with it, without case: a room's name, an outdoor cell's own name, else its region's
+name, else the game setting sDefaultCellname; rule from OpenMW's cellextensions.cpp). The builder turns each name
+into a row of rooms (stable numbers) and outdoor cells (grid) once, so the engine compares numbers and never text,
+and the engine moves the state generation when the player's cell changes, so the scripts that ask are not run every
+frame. `GetPos` reads the position of the script's object or the one named before `->` in game units (OpenMW's
+transformationextensions.cpp). `GetCommonDisease` and `GetBlightDisease` look for a spell of that type in the
+actor's spell list and its changes (OpenMW's hasCommonDisease and hasBlightDisease); the player catches no disease
+from creatures yet, so on the player they read 1 only after a script gave one. `DontSaveObject` compiles to nothing
+and `Xbox` to 0, as OpenMW has them. 6 functions moved from "not yet" to running: scripts that run whole 635 before,
+697 after (of 1,207; GetPCCell alone was the last missing call of 25 of them).
+
+`PositionCell` of the player (v0.0.54; rule from OpenMW's transformationextensions.cpp OpPositionCell): the builder
+works each such move out once (the PMOV section, 20 bytes a move), when its numbers are constants. Into a room: the
+room's map name and the arrival in the map's own units, by the doors' rule (the room lists of the repo: a town or scene
+list's map name, else the batch room's; a recentred room's offset first; a quarter scale and the feet lifted; the
+player's rotation is in degrees), loaded the way a door loads it. Outdoors, and for a cell that is no interior (as
+OpenMW does): the coordinate teleport of `dbg tp X Y Z`, the view keeping its direction. A room whose map is not on
+the disk (a batch room the build did not convert), a pending load or the story's hold: nothing happens, counted in
+`aw_mwscript_status`. Measured 27 October 2026: 22 of the game's PositionCell calls are the player's and carried out
+(21 moves, 19 of them into rooms); 74 stay "not yet": moving an NPC or a creature into another cell waits for the
+object state's table of moved actors (roadmap step 4), and a few of the player's go into rooms no repo list names yet
+(Tribunal and Bloodmoon). Scripts that run whole: 715 of 1,207.
+
+`GetCurrentAIPackage` and `GetAIPackageDone` (v0.0.54; rules from OpenMW's aiextensions.cpp): the actor's package as
+the ambient tables run it (`AW_AmbientAiPackage`, through the engine's `aw_mwscript_ai_package`), with OpenMW's
+numbers (-1 none, 0 Wander; Travel, Escort, Follow and Activate come with those packages), -1 for a dead actor, and
+"done" once a wander that does not repeat has run out. The ambient tables move the state generation when a package
+starts or ends, so these scripts are not run every frame. Without the ambient tables in the build both read -1 and
+0. Scripts that run whole: 735 of 1,207.
+
+Not yet (124 functions; by the number of scripts using them): ForceGreeting 98, PositionCell (other actors) 57, Cast 53,
+PlayGroup 29, GetPCRank 26, AITravel 24, PlaceItem 24, GetPCCrimeLevel 23, Rotate 21, GetEffect 21, AddTopic 20. The
+most called: ForceGreeting 134, Cast 126, AddTopic 105, AITravel 89, HasSoulGem 85, PlayGroup 84, PositionCell 74.
+They wait for the dialogue window, moving actors between cells, spells and effects, the other AI packages, a crime
+level and animation. The scripts' own values are not in saved games
+yet ([MWSCRIPT-STATE-NOT-SAVED-48](BUGS.md)).
+
+### The import route: every call kept
+
+Every script of the game is in the file and every call in it is compiled, also the ones the engine does not carry
+out yet (v0.0.54, the maintainer's "the stuff that is in there would exist in some form, even if it's not plugged
+in yet"). Such a call is a NOTYET instruction that keeps all of it: the function's number (its place in the
+compiler's table, `tools/mwscript/functions.py`, the names in alphabetical order), its name, its numeric arguments
+(computed by the script's own code and handed over in order) and its string arguments (ids, cell names, animation
+groups, by string index; a reference's id first). The interpreter counts every such call by function number and hands
+it to the engine's `call()`: when the engine carries a function out by its number, the scripts use it with no new
+opcode and no change of the file's format (the stage compiles the program again in a few seconds, so a script that
+was left out as [inert](#what-it-squeezes) comes back). Until then the call is logged once and reads 0.
+`aw_mwscript_status` lists the not-yet functions this session called most, with their counts. A function used
+very often gets its own opcode later, as the actor calls did, when that is faster.
 
 ## Sizes and costs
 
@@ -362,7 +517,7 @@ dialogue. The scripts' own values are not in saved games yet
 | `id1/mwscript.awm` | 446,316 bytes (183,212 resident while on) |
 | Interpreter code (68040, -O1) | 9,720 bytes |
 | Engine side code / data | 5,876 / 10,960 bytes |
-| Interpreter tables (taken when switched on) | 65,716 bytes |
+| Interpreter tables (taken when switched on) | 65,716 bytes, plus 3,840 for the import route's counters (v0.0.54) |
 | Journal names (taken when switched on) | 318 topics, 22,896 bytes |
 | Compile time, the whole game | 2.5 s, one unit, reused from the pool when unchanged |
 
@@ -379,11 +534,13 @@ case for work):
 | Empty sea (0, 0) | 0 | 3 | 2 | 42 (141) |
 
 Before inert scripts were left out and NOTYET values stopped counting as VOLATILE, Vivec's block ran 107 scripts and
-2,242 opcodes a frame.
+2,242 opcodes a frame. With the squeeze and CellChanged without VOLATILE (27 October 2026, the tables in
+[The squeeze, measured](#the-squeeze-measured-27-october-2026)): Vivec 3.1 scripts and 37.4 opcodes a frame, Seyda
+Neen 7 and 63.1, the cells around (-11, 15) 5 and 98.4, Balmora 3 and 33.1, the empty sea 1 and 25.1.
 
 **Estimate, not a measurement on the machine:** the 68040 code of the loop is a fetch, a two-range jump table and
 the opcode's body, about 25 to 45 cycles an opcode; at 25 MHz about 1.2 to 1.6 microseconds. Vivec's 514 opcodes
-are then about 0.6 to 0.8 ms a frame; N active scripts cost about N times 15 microseconds (about 9.5 opcodes a run
+were then about 0.6 to 0.8 ms a frame (37 since v0.0.54: about 0.05 ms); N active scripts cost about N times 15 microseconds (about 9.5 opcodes a run
 here, plus the activation test); the budget caps the interpreter at about 5 ms a frame. To be measured in game
 (`dbg mwscript status`, the frame profile) before any default.
 
@@ -398,7 +555,11 @@ receipt's SHA-256, reads it back, and links it into the payload. The legacy buil
 ## Next
 
 1. In-game check in a MiniWind sandbox (Seyda Neen docks and Vivec's water spouts): sounds, loops, ranges, frame
-   time with and without; then the default.
+   time with and without; then the default. The session that decides it: the Seyda Neen and Vivec MiniWinds on
+   the slow preset, the same scripted walk twice (scripts off, then `dbg mwscript on`), the frame profile and
+   `aw_mwscript_status` every 10 s; it passes when the sound markers start and stop with their range, nothing the
+   scripts do shows twice next to a hand-written rule, no run reaches the opcode limit, the not-yet list holds no
+   surprise, and the frame time grows by less than 1 ms.
 2. Object state (roadmap step 4): `Enable`, `Disable`, `GetDisabled`, `Lock`, `Unlock` and `GetLocked` run since
    v0.0.51 and are saved; next: the doors read a script's lock, `OnActivate` and `Activate` (the census door),
    Disable on CHIM scenery and on actors the CHIM world spawns, and the interpreter's own values in saved games.

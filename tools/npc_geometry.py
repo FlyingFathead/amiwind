@@ -446,8 +446,121 @@ class AliasOverflow(ValueError):
     def __init__(self,message,over=0):
         super().__init__(message);self.over=int(over)
 
-def _budget_quotas(shapes,budget,face_limit,minimum_faces,reference_frames):
-    """The previous whole-model split (--npc-head-detail budget), unchanged."""
+HAIR_SHARES=('whole','head','plain')
+HAIR_WHOLE_MARGIN=8         # faces kept free under the alias face limit: the locked reducer may leave a head a few over
+
+def hair_share():
+    """The hair or helmet's share of a budget-head bake (NPC-HAIR-BACK-MISSING-53): 'whole' (the default from
+    v0.0.54: body part slot 1 keeps every original triangle when the model still fits its alias face limit, else
+    'head'), 'head' (slot 1 takes the head's weight and floor) or 'plain' (the v0.0.53 split, byte for byte: slot 1
+    gets 4 faces and a plain share). AMIWIND_NPC_HAIR_SHARE selects it; read here only, so only the stages that
+    reach the NPC bake are keyed on it."""
+    import os
+    value=os.environ.get('AMIWIND_NPC_HAIR_SHARE','').strip() or 'whole'
+    if value not in HAIR_SHARES:raise ValueError('AMIWIND_NPC_HAIR_SHARE must be whole, head or plain')
+    return value
+
+COVER_TILTS=(0.0,40.0,70.0)     # degrees from a head face's normal: the rays that must all meet the cover
+COVER_AROUND=6
+COVER_SAMPLES=((1/3,1/3,1/3),(.7,.15,.15),(.15,.7,.15),(.15,.15,.7))
+
+def _ray_hits(origins,dirs,a,e1,e2,normal,facing_only=True):
+    """Distance along each ray (origins[i] + t dirs[i]) to its nearest triangle (a, e1, e2); inf for none.
+    facing_only: only triangles whose normal points along the ray (their outside seen from inside)."""
+    out=np.full(len(origins),np.inf)
+    for i,(o,d) in enumerate(zip(origins,dirs)):
+        good=(normal@d>0) if facing_only else np.ones(len(a),bool)
+        p=np.cross(d,e2);det=np.einsum('ij,ij->i',e1,p);good&=np.abs(det)>1e-12
+        inv=np.where(good,1/np.where(good,det,1),0);s=o-a
+        u=np.einsum('ij,ij->i',s,p)*inv;q=np.cross(s,e1);v=(q@d)*inv;t=np.einsum('ij,ij->i',e2,q)*inv
+        hit=good&(u>=0)&(v>=0)&(u+v<=1)&(t>0)
+        if hit.any():out[i]=t[hit].min()
+    return out
+
+def _cover(shapes):
+    """The hair or helmet (slot 1) at frame 0 as one triangle soup: (a, e1, e2, normal) or None."""
+    cover=[s for s in shapes if s['part']==1]
+    if not cover:return None
+    tri=np.concatenate([np.asarray(s['positions'][0])[np.asarray(s['faces'])] for s in cover])
+    a=tri[:,0];e1=tri[:,1]-a;e2=tri[:,2]-a
+    return a,e1,e2,np.cross(e1,e2)
+
+def hidden_head_faces(head_points,head_faces,cover):
+    """Per head (slot 0) face: True when the hair or helmet hides it from every side (rays from points on it,
+    along its normal and up to 70 degrees around it, all meet the cover from inside): it is never seen, so the bake
+    leaves it out instead of reducing it (the maintainer, 27 October 2026: a reduced head poked out through the
+    hair as pale specks on the crown and temples)."""
+    a,e1,e2,normal=cover
+    hp=np.asarray(head_points)[np.asarray(head_faces)]
+    hn=np.cross(hp[:,1]-hp[:,0],hp[:,2]-hp[:,0])
+    out=np.zeros(len(hp),bool)
+    for i in range(len(hp)):
+        nn=np.linalg.norm(hn[i])
+        if nn<1e-12:continue
+        n=hn[i]/nn;ref=np.array([1.,0,0]) if abs(n[0])<.9 else np.array([0,1.,0])
+        u=np.cross(n,ref);u/=np.linalg.norm(u);w=np.cross(n,u)
+        dirs=[n]+[np.cos(np.radians(t))*n+np.sin(np.radians(t))*(np.cos(2*np.pi*k/COVER_AROUND)*u+
+                  np.sin(2*np.pi*k/COVER_AROUND)*w) for t in COVER_TILTS[1:] for k in range(COVER_AROUND)]
+        origins=[np.asarray(s)@hp[i]+n*1e-3 for s in COVER_SAMPLES]
+        o=np.repeat(origins,len(dirs),axis=0);d=np.tile(dirs,(len(origins),1))
+        out[i]=bool(np.all(np.isfinite(_ray_hits(o,d,a,e1,e2,normal))))
+    return out
+
+def cull_hidden_head(shapes,minimum_faces=None):
+    """'whole' hair: the head faces the hair or helmet hides are left out before the split (they also free faces
+    for the hair). A head shape every face of which is hidden keeps one face (the shape list stays the same)."""
+    cover=_cover(shapes)
+    if cover is None:return shapes,0
+    out=[];total=0
+    for s in shapes:
+        if s['part']!=0 or (minimum_faces or {}).get(s.get('name','')):out.append(s);continue
+        hide=hidden_head_faces(s['positions'][0],s['faces'],cover)
+        if hide.all():hide[0]=False
+        total+=int(hide.sum());out.append({**s,'faces':np.asarray(s['faces'])[~hide]})
+    return out,total
+
+def keep_head_inside_cover(points,cover,centre,margin=.02):
+    """'whole' hair: no reduced head vertex outside the hair or helmet shell. A vertex whose ray from the head's
+    centre meets the cover nearer than the vertex is moved in, along that ray, to just inside the cover."""
+    a,e1,e2,normal=cover
+    points=np.array(points,float);d=points-centre;dist=np.linalg.norm(d,axis=1)
+    ok=dist>1e-9;dirs=np.where(ok[:,None],d/np.where(ok,dist,1)[:,None],0)
+    t=_ray_hits(np.repeat(centre[None],len(points),axis=0),dirs,a,e1,e2,normal,facing_only=False)
+    move=ok&np.isfinite(t)&(t<dist)
+    points[move]=centre+dirs[move]*(t[move]*(1-margin))[:,None]
+    return points,int(move.sum())
+
+def keep_outside_surface(points,surface,centre,margin=.02):
+    """A reduced hair or helmet vertex inside the head (its ray from the head's centre leaves the head beyond the
+    vertex) moves out along that ray to just outside the head."""
+    a,e1,e2,normal=surface
+    points=np.array(points,float);d=points-centre;dist=np.linalg.norm(d,axis=1)
+    ok=dist>1e-9;dirs=np.where(ok[:,None],d/np.where(ok,dist,1)[:,None],0)
+    t=_ray_hits(np.repeat(centre[None],len(points),axis=0),dirs,a,e1,e2,normal,facing_only=False)
+    move=ok&np.isfinite(t)&(t>dist)
+    points[move]=centre+dirs[move]*(t[move]*(1+margin))[:,None]
+    return points,int(move.sum())
+
+WHOLE_FACE_LIMIT=960        # a caller whose reader takes extended models (whole_limit): 960 faces of 16-texel tiles
+                            # fill the renderer's 480 skin rows (MAX_LBM_HEIGHT); 2,880 vertices
+
+def _whole_hair(shapes,quotas,face_limit):
+    """'whole': the original hair or helmet (slot 1) is a closed, authored shell; any reduction of it pulled the cap
+    into the head (the crown and temples showed scalp) and broke its outline into shards (the maintainer, 27 October
+    2026: the hair must close up and read as one consistent shell). Every slot 1 shape keeps all its faces when the
+    whole model still fits face_limit less HAIR_WHOLE_MARGIN; the head and the rest keep their quotas. Otherwise the
+    quotas are returned unchanged (the 'head' split)."""
+    hair=[i for i,s in enumerate(shapes) if s['part']==1]
+    if not hair:return quotas
+    whole=quotas.copy()
+    for i in hair:whole[i]=len(shapes[i]['faces'])
+    return whole if int(whole.sum())<=face_limit-HAIR_WHOLE_MARGIN else quotas
+
+def _budget_quotas(shapes,budget,face_limit,minimum_faces,reference_frames,whole_limit=None):
+    """The whole-model split of a budget-head bake (--npc-head-detail budget); the hair or helmet takes the head's
+    rule unless hair_share() is 'plain' (the previous split). whole_limit: the face limit a whole hair may take the
+    model to (a caller whose reader takes extended models: skeletal residents, SKEL-VERTEX-LIMIT-52); default
+    face_limit."""
     if face_limit not in ALIAS_FACE_LIMITS:raise ValueError('Unsupported alias face limit')
     ceiling=face_limit if minimum_faces else 480
     if not 64<=budget<=ceiling:raise ValueError('Triangle budget outside allowed profile')
@@ -460,11 +573,35 @@ def _budget_quotas(shapes,budget,face_limit,minimum_faces,reference_frames):
     for s in shapes:
         required=minimum_faces.get(s.get('name',''),0)
         if not isinstance(required,int) or not 0<=required<=len(s['faces']):raise ValueError('Invalid protected shape budget')
-    weights=np.array([len(s['faces'])*(1.7 if s['part']==0 else 1) for s in shapes],dtype=float);weights/=weights.sum()
-    quotas=np.array([max(minimum_faces.get(s.get('name',''),0),min(120,len(s['faces'])) if s['part']==0 and (reference_frames if reference_frames is not None else len(s['positions']))>8 else 4) for s in shapes],int);remaining=budget-int(quotas.sum())
-    if remaining<0:raise ValueError('Too many separate shapes for budget')
-    quotas+=np.floor(weights*remaining).astype(int)
-    return quotas
+    # The head's rule (weight 1.7; a floor of up to 120 faces past 8 frames) covers the hair or helmet too
+    # (hair_share 'head', NPC-HAIR-BACK-MISSING-53): a hair cap reduced far below the head under it sank under the
+    # scalp, and the back of the head showed skin.
+    share=hair_share()
+    def split(group,heads,head_floor=False):
+        weights=np.array([len(s['faces'])*(1.7 if s['part'] in heads else 1) for s in group],dtype=float);weights/=weights.sum()
+        quotas=np.array([max(minimum_faces.get(s.get('name',''),0),min(120,len(s['faces'])) if s['part'] in heads and (head_floor or (reference_frames if reference_frames is not None else len(s['positions']))>8) else 4) for s in group],int);remaining=budget-int(quotas.sum())
+        if remaining<0:raise ValueError('Too many separate shapes for budget')
+        quotas+=np.floor(weights*remaining).astype(int)
+        return quotas
+    # only the full model (the 480 budget, or any budget of a caller's ladder that takes extended models: a skeletal
+    # resident whose outfit overflowed at 480 retries at 384 and lower); the lower levels and parts keep the 'head' split
+    if share=='whole' and (budget>=480 or whole_limit):
+        # the whole hair sits outside the budget: the budget is split among the head and the rest alone, so the head
+        # keeps the share the 'head' split gave the hair (the universal check: Dark Elf women's faces fell to 28-52
+        # triangles beside a whole 261-376 triangle hair)
+        # The head keeps its floor (up to 120 faces) also in the 8-frame retry of an outfit of many shapes, where it
+        # used to fall to 4 faces plus a share (Dark Elf women in robes: a 32-triangle face)
+        rest=[i for i,s in enumerate(shapes) if s['part']!=1]
+        if rest and len(rest)<len(shapes):
+            whole=np.array([len(s['faces']) for s in shapes],int)
+            try:
+                whole[rest]=split([shapes[i] for i in rest],(0,),head_floor=True)
+            except ValueError:
+                whole[rest]=split([shapes[i] for i in rest],(0,))
+            if int(whole.sum())<=max(face_limit,min(int(whole_limit or 0),WHOLE_FACE_LIMIT))-HAIR_WHOLE_MARGIN:
+                return whole
+        return _whole_hair(shapes,split(shapes,(0,1)),max(face_limit,min(int(whole_limit or 0),WHOLE_FACE_LIMIT)))
+    return split(shapes,(0,1) if share in ('head','whole') else (0,))
 
 # Body classes of the original-head bake, in the order they give up triangles
 # when the face limit is tight (maintainer, 9 October 2026): hair/helmet first, then
@@ -499,7 +636,7 @@ def silhouette_floors(shapes,classes):
     return out
 
 def head_plan(shapes,budget=480,face_limit=666,minimum_faces=None,reference_frames=None,head_detail=None,
-              floors=None,classes=None,extra_cut=0):
+              floors=None,classes=None,extra_cut=0,whole_limit=None,raised_limit=False):
     """The whole-model bake plan: quotas, the shapes kept exactly and the alias face limit.
 
     budget mode: the previous split. original mode (default): every shape of body part
@@ -515,9 +652,15 @@ def head_plan(shapes,budget=480,face_limit=666,minimum_faces=None,reference_fram
     for this appearance (the budget bake is used and recorded), never stick limbs.
     """
     from mesh_geometry_env import npc_head_detail
-    quotas=_budget_quotas(shapes,budget,face_limit,minimum_faces,reference_frames)
     mode=npc_head_detail(head_detail)
-    plan={'mode':mode,'quotas':quotas,'protected':frozenset(),'face_limit':face_limit,
+    quotas=_budget_quotas(shapes,budget,face_limit,minimum_faces,reference_frames,
+                          whole_limit if mode=='budget' else None)
+    # a whole hair past face_limit (whole_limit): the largest alias face limit, so the locked reducer's overshoot on
+    # the rest (its rims) still fits (the universal hair check: at 777 the outfits of 245 pairings overflowed and fell
+    # down the resident ladder to a 384 budget)
+    # raised_limit: the bake overflowed at face_limit with a whole hair (bake retries once at the largest limit)
+    limit=face_limit if int(quotas.sum())<=face_limit and not raised_limit else ALIAS_FACE_LIMITS[-1]
+    plan={'mode':mode,'quotas':quotas,'protected':frozenset(),'face_limit':limit,
           'head_faces':0,'hair_reduced':False,'lod_only':False,'cuts':{}}
     if mode=='budget' or not any(s['part'] in HEAD_SLOTS for s in shapes):return plan
     minimum_faces=minimum_faces or {}
@@ -584,8 +727,11 @@ HEAD_REDUCER_FALLBACKS = []
 
 def bake(shapes,materials,textures,palette,budget=480,face_limit=666,minimum_faces=None,reference_frames=None,
          quotas=None,shell_height=None,head_detail=None,lod_only='budget',preserve=None,body_skin_rows=None,
-         body_leg_contour=False,face_parts=None,full_frame_budget=None):
+         body_leg_contour=False,face_parts=None,full_frame_budget=None,whole_limit=None):
     """One topology shared by every frame, per-face tiny UV atlas patches.
+
+    whole_limit: the face limit a whole hair may take a budget bake to (hair_share 'whole'; a caller whose reader
+    takes extended models, e.g. skeletal residents: SKEL-VERTEX-LIMIT-52); such a model uses the raised-limit skin.
 
     Default: quotas from head_plan (the whole-appearance bake). Heads (body part
     slots 0 and 1) keep their original geometry, like Dagoth Ur's mask profile,
@@ -619,6 +765,13 @@ def bake(shapes,materials,textures,palette,budget=480,face_limit=666,minimum_fac
                      face_parts=face_parts,head_reducer=reducer),
                      npc_head_reducer() if npc_head_detail(head_detail)=='budget' else None)
     mode=npc_head_detail(head_detail)
+    if mode=='budget' and (budget>=480 or whole_limit) and hair_share()=='whole':
+        # the head faces the hair or helmet hides are never drawn: out before the split (cull_hidden_head), but only
+        # when the hair then stays whole; a reduced cap keeps the head under it (no hole through a sunk cap)
+        culled,hidden=cull_hidden_head(shapes,minimum_faces)
+        if hidden:
+            q=_budget_quotas(culled,budget,face_limit,minimum_faces,reference_frames,whole_limit)
+            if all(int(q[i])>=len(s['faces']) for i,s in enumerate(culled) if s['part']==1):shapes=culled
     floors=classes=None;shell_set=None
     if mode=='original' and any(s['part'] in HEAD_SLOTS for s in shapes):
         height=float(shell_height) if shell_height else (max(s['positions'][0,:,2].max() for s in shapes)-
@@ -629,8 +782,10 @@ def bake(shapes,materials,textures,palette,budget=480,face_limit=666,minimum_fac
         share=_budget_quotas(shapes,budget,face_limit,minimum_faces,reference_frames)
         floors=[f if c in ('head','hair','detail') else min(f,max(4,int(q))) for f,c,q in zip(silhouette,classes,share)]
     extra=0
+    raised_limit=False
     for _ in range(16):
-        plan=head_plan(shapes,budget,face_limit,minimum_faces,reference_frames,head_detail,floors,classes,extra)
+        plan=head_plan(shapes,budget,face_limit,minimum_faces,reference_frames,head_detail,floors,classes,extra,
+                       whole_limit,raised_limit)
         if classes is not None:
             # Shapes whose quota holds their silhouette keep it in the reduction.
             shell_set=frozenset(i for i,c in enumerate(classes) if c in ('hair','torso','limb')
@@ -653,11 +808,20 @@ def bake(shapes,materials,textures,palette,budget=480,face_limit=666,minimum_fac
                 # successful normal bakes and all animation samples are unchanged.
                 if str(overflow) != 'Alias vertex budget exceeded':raise
                 retry=lambda reducer:_bake(shapes,materials,textures,palette,plan['face_limit'],minimum_faces,
-                             plan['quotas'],shell_height,plan['protected'],False,None,preserve=preserve,
+                             plan['quotas'],shell_height,plan['protected'],plan['face_limit']!=face_limit,None,
+                             preserve=preserve,
                              body_skin_rows=body_skin_rows,body_leg_contour=body_leg_contour,
                              face_parts=face_parts,shell_components=True,full_frame_budget=full_frame_budget,
                              head_reducer=reducer)
-                result=_retry_head_reducer(retry,head_reducer)
+                try:
+                    result=_retry_head_reducer(retry,head_reducer)
+                except AliasOverflow:
+                    # a whole hair that took the model past face_limit: once more at the largest alias face limit
+                    whole=any(int(plan['quotas'][i])>=len(s['faces']) for i,s in enumerate(shapes) if s['part']==1)
+                    if not (whole_limit and whole and hair_share()=='whole' and not raised_limit and
+                            plan['face_limit']<ALIAS_FACE_LIMITS[-1]):
+                        raise
+                    raised_limit=True;continue
             else:
                 extra+=overflow.over+2;continue
         LAST_PLAN.clear()
@@ -736,6 +900,19 @@ def _bake(shapes,materials,textures,palette,face_limit,minimum_faces,quotas,shel
                 points,ff=simplify_head_locked(points,ff,int(quota))
             else:
                 points,ff=simplify_shape(points,ff.astype(np.int32),int(quota),preserve_shell)
+            if shape['part'] in HEAD_SLOTS and hair_share()=='whole':
+                if shape['part']==0:
+                    # the reduced head stays under the hair or helmet (no head vertex through the shell)
+                    cover=_cover(shapes)
+                    if cover is not None:
+                        points,_=keep_head_inside_cover(points,cover,np.asarray(source_points).mean(axis=0))
+                else:
+                    # a reduced hair or helmet stays outside the head (its cap never sinks into the scalp)
+                    head=_cover([{**s,'part':1} for s in shapes if s['part']==0])
+                    if head is not None:
+                        centre=np.concatenate([np.asarray(s['positions'][0]) for s in shapes
+                                               if s['part']==0]).mean(axis=0)
+                        points,_=keep_outside_surface(points,head,centre)
             if shell_components and preserve_shell:
                 candidate=simplify_shell_components(source_points,source_faces,int(quota))
                 if candidate is not None and len(candidate[1]) < len(ff):

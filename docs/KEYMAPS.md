@@ -1,6 +1,6 @@
 # Keyboard and command reference
 
-_Last updated with AmiWind v0.0.48-dev2 (23 October 2026)._
+_Last updated with AmiWind v0.0.54-dev1 (27 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -157,8 +157,10 @@ all remappable through gameplay bindings.
 | Console | Backspace / Del | Delete before / at the cursor |
 | Console | Ctrl+U / Ctrl+K | Cut to the start / end of the line |
 | Console | Up / Down | Previous / next command; Down past the newest returns the typed line |
+| Console | Ctrl+P / Ctrl+N | Previous / next command, as Up / Down (no cursor keys needed) |
 | Console | Tab | Complete a command or variable name |
 | Gameplay | Alt+V | Cycle requested draw distance |
+| Gameplay | Ctrl+Alt+H | Hide / show the HUD and the crosshair (also `dbg photomode hud`; not saved) |
 | Photo mode | Ctrl+F | Fog on/off (the fog setting from before photo mode returns when it ends) |
 | Photo mode | Ctrl+H | Debug HUD on/off, the same as `dbg hud on/off` |
 | Inspect mode (`dbg hud on`) | Left click / right click | Pin the target under the crosshair / leave inspect mode (the same as `dbg hud off`); the hint and the pin are the bottom lines of the screen, under the stat bars |
@@ -220,8 +222,21 @@ is written with the settings from before photo mode.
 
 `dbg crosshair` (also `dbg crosshairs`) toggles the crosshair; `on` / `off` set
 it. Options > Prefs > Show crosshairs does the same. It is the player's preference,
-saved in `config.cfg` (Quake's `crosshair` setting, default on). A change made
-during photo mode applies when photo mode ends.
+saved in `config.cfg` (Quake's `crosshair` setting, default on). Photo mode hides
+the crosshair by default; turning it on or off from the console during photo mode
+(`dbg crosshair on`, or `crosshair 1`) shows the change at once, keeps it after
+photo mode ends, and the Options menu shows it. The crosshair is never drawn in
+the vanity (idle) orbit, the Toggle POV orbit, `dbg cam orbit` or with the HUD
+hidden (Ctrl+Alt+H). In inspect mode (`dbg hud on`) the inspect mark is the
+player's crosshair, in the chosen colour and shape, and it follows the same rules.
+The original game and OpenMW give no cue for owned things by default; `dbg crosshair
+owned on` turns the crosshair red over a thing that has an owner (a plant someone owns:
+taking it is theft), as OpenMW's "show owned" option does, for the session (`off` again).
+
+Ctrl+Alt+H hides the HUD while playing (the bars, compass, gold frame, prompts,
+names and the crosshair; the view uses the whole screen); messages, dialogue and
+menus still show. Ctrl+Alt+H again, or `dbg photomode hud`, brings it back. It
+is not saved and changes nothing else.
 
 Options > Prefs > Crosshair colour and Crosshair shape choose its look, with a
 preview beside each row; `dbg crosshair colour NAME` and `dbg crosshair shape

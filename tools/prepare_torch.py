@@ -182,6 +182,15 @@ def prepare(data_files,id1,upper_arms='hidden',race='nord',female=False,topology
             'scope':'Original mesh/grip and emitter; bounded flame approximation, no smoke or inventory simulation'}
     return report
 
+def prepare_image(data_files,id1):
+    """The image step's carried torch (prepare with its defaults) as its own timed phase: tools/build_aga.py runs it in
+    a spawned worker beside the NPC gallery and the torch test map, which neither read nor write its files
+    (BUILD-IMAGE-FINALIZE-UNDERUSED-48)."""
+    import build_profile
+    with build_profile.phase('Image: torch',detail='beside the NPC gallery and the torch test map'):
+        return prepare(data_files,id1)
+
+
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--data-files',type=Path,required=True);p.add_argument('--id1',type=Path,required=True)
     p.add_argument('--upper-arms',choices=('hidden','legacy'),default='hidden',help='First-person proximal arm visibility, legacy restores the original conversion')

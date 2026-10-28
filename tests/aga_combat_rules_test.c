@@ -249,6 +249,85 @@ int main(void) {
     aw_combat_dice=1;
     m=mevil();y=player();
 
+    /* aggro and flee (the combat playground): the original settings iFightDistanceBase 20, fFightDistanceMultiplier
+     * 0.005, fFightDispMult 0.2, fAIFleeHealthMult 7, fAIFleeFleeMult 0.3, fAIMeleeWeaponMult 2, fAIMeleeArmorMult 1 */
+    {
+        static const float values[AW_COMBAT_AI_COUNT]={20,.005f,.2f,7,.3f,2,1};
+        aw_combat_ai_t a;memset(&a,0,sizeof(a));
+        assert(sizeof(a)==AW_COMBAT_AI_COUNT*sizeof(float));
+        for(i=0;i<AW_COMBAT_AI_COUNT;i++)assert(AW_CombatAiSet(&a,AW_CombatAiName(i),values[i]));
+        assert(!AW_CombatAiSet(&a,"fNoSuchSetting",1) && !AW_CombatAiName(AW_COMBAT_AI_COUNT));
+        assert(AW_CombatAiSet(&a,"IFIGHTDISTANCEBASE",20) && a.fAIMeleeArmorMult==1);
+        /* Fight + (int)(20 - 0.005 x distance + (50 - disposition) x 0.2); hostile at 100 */
+        assert(AW_CombatFightRating(&a,90,50,600)==107);
+        assert(AW_CombatFightRating(&a,90,50,2000)==100);
+        assert(AW_CombatFightRating(&a,90,50,4000)==90);
+        assert(AW_CombatFightRating(&a,90,30,4000)==94);           /* a low disposition raises it */
+        assert(AW_CombatFightRating(&a,90,70,2000)==96);           /* a high one lowers it */
+        assert(AW_CombatFightRating(&a,30,50,0)==50);              /* a townsperson never attacks on sight */
+        /* flee: Mevil (steel mace, Blunt 32, armour 8.814) rates his weapon 14 x 0.32 x 2 + 8.814 = 17.77 */
+        m=mevil();
+        assert(near(AW_CombatAntiFleeRating(&a,&m),17.774f));
+        m.flee=30;m.health=18.8f;                                  /* 20 % health: 0.8 x 7 + 9 + 18 at 400 = 32.6 */
+        assert(near(AW_CombatFleeRating(&a,&m,400),32.6f) && !AW_CombatFleeDecision(&a,&m,400));
+        m.flee=0;m.health=m.health_max;
+        assert(AW_CombatFleeRating(&a,&m,400)==0);                 /* no distance term on a zero rating */
+        m.flee=100;assert(AW_CombatFleeRating(&a,&m,400)==100 && AW_CombatFleeDecision(&a,&m,400));
+        m.weapon=0;m.armor=0;m.flee=30;m.health=1;                 /* hand to hand rates 0, a low rating counts as 0 */
+        assert(AW_CombatAntiFleeRating(&a,&m)==0 && !AW_CombatFleeDecision(&a,&m,400));
+        m=mevil();
+    }
+
+    {   /* the swing's sounds (OpenMW 0.51 character.cpp playSwishSound, combat.cpp blockMeleeAttack and
+         * getHandToHandDamage, local.lua pickRandomArmor, applyArmor and onHit) */
+        aw_swing_t o;aw_fighter_t v=mevil();int list[4],n;
+        static const int bands[][2]={{0,0},{29,0},{30,1},{39,1},{40,2},{50,3},{60,4},{70,5},{80,6},{84,6},{85,7},{89,7},{90,8},{99,8}};
+        for(n=0;n<(int)(sizeof(bands)/sizeof(bands[0]));n++)assert(AW_CombatArmorHitSlot(bands[n][0])==bands[n][1]);
+        v.hit_classes=1u|(3u<<2)|(2u<<16);                         /* light cuirass, heavy helmet, medium shield; rest empty */
+        n=AW_CombatSwingSounds(NULL,NULL,1,0,list);assert(n==1 && list[0]==AW_SND_SWISH);   /* reached nobody */
+        memset(&o,0,sizeof(o));o.outcome=AW_HIT_MISS;
+        n=AW_CombatSwingSounds(&o,&v,1,0,list);assert(n==2 && list[0]==AW_SND_SWISH && list[1]==AW_SND_MISS);
+        n=AW_CombatSwingSounds(&o,&v,0,0,list);assert(n==1);       /* an NPC's miss: the swing only */
+        o.outcome=AW_HIT_BLOCKED;v.shield_class=1;
+        n=AW_CombatSwingSounds(&o,&v,0,0,list);assert(n==2 && list[1]==AW_SND_MEDIUM);
+        o.outcome=AW_HIT_FATIGUE;
+        n=AW_CombatSwingSounds(&o,&v,1,0,list);assert(n==2 && list[1]==AW_SND_PUNCH);
+        n=AW_CombatSwingSounds(&o,&v,1,128,list);assert(n==2 && list[1]==AW_SND_PUNCH2);
+        o.outcome=AW_HIT_HEALTH;
+        n=AW_CombatSwingSounds(&o,&v,1,10,list);                   /* roll 10: the cuirass, light */
+        assert(n==3 && list[1]==AW_SND_LIGHT && list[2]==AW_SND_HEALTH);
+        n=AW_CombatSwingSounds(&o,&v,1,35,list);assert(n==3 && list[1]==AW_SND_HEAVY);   /* the helmet */
+        n=AW_CombatSwingSounds(&o,&v,1,55,list);assert(n==2 && list[1]==AW_SND_HEALTH);  /* bare boots: no armour sound */
+        o.critical=1;n=AW_CombatSwingSounds(&o,&v,1,95,list);
+        assert(n==4 && list[1]==AW_SND_MEDIUM && list[2]==AW_SND_HEALTH && list[3]==AW_SND_CRITICAL);
+    }
+
+    {   /* creatures (COMBAT-DAEDROTH-NO-HIT-51; OpenMW mwclass/creature.cpp hit, getSkill, getArmorRating) */
+        aw_actor_base_t b;aw_fighter_t c,m=mevil();aw_swing_t o;aw_combat_rng_t r;int i;
+        memset(&b,0,sizeof(b));
+        b.kind=0;b.health=10;assert(!AW_CombatCreatureSheet(&b,"npc",&c));           /* an NPC row: not here */
+        b.kind=1;b.level=16;b.health=180;b.fatigue=400;b.fight=90;
+        for(i=0;i<8;i++)b.attributes[i]=300;                                          /* clamped to 255 */
+        for(i=0;i<27;i++)b.skills[i]=70;
+        b.attack[0]=15;b.attack[1]=35;b.attack[2]=10;b.attack[3]=20;b.attack[4]=300;b.attack[5]=400;
+        assert(AW_CombatCreatureSheet(&b,"daedroth",&c) && c.creature==1 && c.attributes[0]==255 && c.armor==0);
+        assert(c.damage[0][0]==15 && c.damage[0][1]==35 && c.damage[2][0]==255 && !c.weapon && c.health==180);
+        /* its own attack: min + (max - min) x strength as health damage, no strength modifier (dice off: a hit) */
+        aw_combat_dice=0;AW_CombatSeed(&r,1);m.armor=0;m.aware=1;
+        AW_CombatSwing(&s,&c,&m,AW_ATTACK_CHOP,.5f,0,1,&r,&o);
+        assert(o.outcome==AW_HIT_HEALTH && near(o.raw,25));
+        m=mevil();
+        b.flags=AWR_BIPEDAL;assert(AW_CombatCreatureSheet(&b,"bip",&c) && c.creature==2);
+        AW_CombatSwing(&s,&c,&m,AW_ATTACK_CHOP,.5f,0,1,&r,&o);
+        assert(o.outcome==AW_HIT_FATIGUE);                                            /* bipedal: hand to hand */
+        m=mevil();
+        /* the creature as the victim: no armour, so the whole blow lands */
+        b.flags=0;AW_CombatCreatureSheet(&b,"daedroth",&c);
+        AW_CombatSwing(&s,&m,&c,AW_ATTACK_CHOP,1,0,1,&r,&o);
+        assert(o.outcome==AW_HIT_HEALTH && near(o.damage,o.raw) && near(c.health,180-o.damage));
+        aw_combat_dice=1;m=mevil();
+    }
+
     /* a fighter sheet stays small (bytes per actor) */
     assert(sizeof(aw_fighter_t)<=180);
     printf("combat rules ok: fighter %lu bytes, settings %lu bytes\n",(unsigned long)sizeof(aw_fighter_t),(unsigned long)sizeof(s));

@@ -1,10 +1,14 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
- * Execute compiled QC and the real carried-torch lifecycle in one fixture. */
+ * The compiled QC's player fields, the engine's hand state machine (aw_hands.c; was world.qc aw_hands_update,
+ * FIRST-PERSON-HANDS-IN-C-54) and the real carried-torch lifecycle in one fixture. The clips come from the image's
+ * table (gfx/hand-anims.txt), set here by set_table. */
 #include "quakedef.h"
 #include "r_local.h"
 #include "aw_hand_state.h"
+#include "aw_hand_models.h"
 #include <assert.h>
 #include <stddef.h>
+#include <stdarg.h>
 server_t sv;
 server_static_t svs;
 client_static_t cls;
@@ -34,7 +38,22 @@ void Cvar_RegisterVariable(cvar_t *c){c->value=atof(c->string);if(!strcmp(c->nam
 void Cvar_SetValue(char *name,float value){if(!strcmp(name,"aw_torch_radius"))radius_setting->value=value;else flame_setting->value=value;}
 int AW_UIColor(int r,int g,int b){assert(r==255 && g==244 && b==214);return 254;}
 
-void Con_Printf(char *fmt,...){}
+void Con_Printf(char *fmt,...){if(!strncmp(fmt,"Hands unavailable:",18))metadata_warnings++;}
+int AW_ModalWorldFrozen(void){return 0;}
+/* the image's hand clip table: none (NULL) or this text */
+static char table_text[256];static int table_present;
+int COM_FOpenFile(char *name,FILE **file){
+    *file=NULL;
+    assert(!strcmp(name,"gfx/hand-anims.txt"));
+    if(!table_present)return -1;
+    *file=fmemopen(table_text,strlen(table_text),"rb");assert(*file);
+    return (int)strlen(table_text);
+}
+static void set_table(float draw,float idle,float lower,float punch){
+    snprintf(table_text,sizeof(table_text),"AWHA1\nclip idle 0 8 %.9f\nclip draw 8 6 %.9f\nclip lower 14 4 %.9f\nclip punch 18 10 %.9f\n",
+             idle,draw,lower,punch);
+    table_present=1;AW_HandTableReset();
+}
 void Host_Error(char *fmt,...){assert(0);abort();}
 void Sys_Error(char *fmt,...){assert(0);abort();}
 void ED_Print(edict_t *e){assert(0);}
@@ -91,16 +110,15 @@ char *ED_NewString(char *text){
 static void animation_boundaries(edict_t *p,edict_t *world,int fn)
 {
     static const int first[]={8,0,18,14},count[]={6,8,10,4};
-    static const char *timing[]={"aw_hand_draw","aw_hand_idle","aw_hand_punch","aw_hand_lower"};
     static const float duration[]={.4f,2.666667938232422f,.5f,.3f};
     int state,sample,tick;
-    for(state=0;state<4;state++)*field(world,timing[state])=duration[state];
+    (void)world;set_table(duration[0],duration[1],duration[3],duration[2]);
     for(state=0;state<4;state++)for(sample=0;sample<count[state]*4;sample++){
         memset(&p->v,0,progs->entityfields*4);p->v.health=100;
         *field(p,"aw_hand_state")=state+1;*field(p,"aw_hand_goal")=state!=3;
         *field(p,"aw_hand_started")=32;
-        pr_global_struct->time=32+duration[state]*(sample+.25f)/(count[state]*4);
-        PR_ExecuteProgram(fn);hands_model(p);
+        sv.time=32+duration[state]*(sample+.25f)/(count[state]*4);
+        AW_HandsTick();hands_model(p);
         if(p->v.weaponframe!=first[state]+sample/4){
             fprintf(stderr,"Hand sequence %d sample %d: frame %.9g expected %d\n",
                 state+1,sample,p->v.weaponframe,first[state]+sample/4);
@@ -110,7 +128,7 @@ static void animation_boundaries(edict_t *p,edict_t *world,int fn)
     memset(&p->v,0,progs->entityfields*4);p->v.health=100;
     *field(p,"aw_hand_state")=2;*field(p,"aw_hand_goal")=1;
     for(tick=0;tick<2000;tick++){
-        pr_global_struct->time=tick*.02f;PR_ExecuteProgram(fn);hands_model(p);
+        sv.time=tick*.02f;AW_HandsTick();hands_model(p);
         assert(p->v.weaponframe>=0 && p->v.weaponframe<8);
         assert(*field(p,"aw_hand_state")==2);
     }
@@ -120,28 +138,27 @@ static void animation_boundaries(edict_t *p,edict_t *world,int fn)
 static void held_attack_during_draw(edict_t *p,edict_t *world,int fn)
 {
     int mode,tick;
-    *field(world,"aw_hand_draw")=.4f;*field(world,"aw_hand_idle")=2;
-    *field(world,"aw_hand_lower")=.3f;*field(world,"aw_hand_punch")=.5f;
+    (void)world;set_table(.4f,2,.3f,.5f);
     for(mode=0;mode<4;mode++){
         memset(&p->v,0,progs->entityfields*4);p->v.health=100;
         *field(p,"aw_hand_goal")=1;*field(p,"aw_hand_state")=1;
         *field(p,"aw_hand_started")=40;
         *field(p,"aw_torch")=mode==2;p->v.button0=1;
-        pr_global_struct->time=40.1f;PR_ExecuteProgram(fn);
+        sv.time=40.1f;AW_HandsTick();
         assert(*field(p,"aw_hand_state")==1);
         if(mode==1)p->v.button0=0; /* released before hands are ready */
         if(mode==3)*field(p,"aw_hand_goal")=0; /* cancelled draw */
-        pr_global_struct->time=40.45f;PR_ExecuteProgram(fn);
-        pr_global_struct->time=40.47f;PR_ExecuteProgram(fn);
+        sv.time=40.45f;AW_HandsTick();
+        sv.time=40.47f;AW_HandsTick();
         if(!mode){
             assert(*field(p,"aw_hand_state")==3);
             assert(*field(p,"aw_attack_latched")==1);
             for(tick=0;tick<100;tick++){
-                pr_global_struct->time=41+tick*.02f;PR_ExecuteProgram(fn);
+                sv.time=41+tick*.02f;AW_HandsTick();
                 assert(*field(p,"aw_hand_state")==2); /* no held autofire */
             }
-            p->v.button0=0;PR_ExecuteProgram(fn);
-            p->v.button0=1;PR_ExecuteProgram(fn);
+            p->v.button0=0;AW_HandsTick();
+            p->v.button0=1;AW_HandsTick();
             assert(*field(p,"aw_hand_state")==3); /* next real press */
         }else assert(*field(p,"aw_hand_state")!=3);
     }
@@ -158,16 +175,16 @@ static void transition_states(edict_t *p,int fn)
         memset(&p->v,0,progs->entityfields*4);p->v.health=100;p->v.button0=1;
         *field(p,"aw_hand_state")=states[i];*field(p,"aw_hand_goal")=goals[i];
         *field(p,"aw_torch")=torches[i];*field(p,"aw_attack_latched")=1;
-        *field(p,"aw_hand_started")=99.89f;pr_global_struct->time=100;
-        PR_ExecuteProgram(fn);frame=p->v.weaponframe;
+        *field(p,"aw_hand_started")=99.89f;sv.time=100;
+        AW_HandsTick();frame=p->v.weaponframe;
         active_torch_model=&torch_model_fixture;AW_TorchResetAnimation();cl.time=123.456;torch_time=AW_TorchAnimationTime();
         torch_frame=AW_TorchFrame();AW_TorchUpdate();AW_TorchViewModel();radius=cl_dlights[0].radius;
         assert(AW_HandSnapshotCapture(&saved,p,100));
-        pr_global_struct->time=100.03125f;PR_ExecuteProgram(fn);expected=p->v.weaponframe;
+        sv.time=100.03125f;AW_HandsTick();expected=p->v.weaponframe;
         /* Host_Spawn_f really zeroes all QC fields, including model and timer. */
         memset(&p->v,0,progs->entityfields*4);p->v.health=100;
         memset(&cl.viewent,0,sizeof(cl.viewent));memset(cl_dlights,0,sizeof(cl_dlights));
-        active_torch_model=&arrival_torch_model;cl.time=2;pr_global_struct->time=2;
+        active_torch_model=&arrival_torch_model;cl.time=2;sv.time=2;
         assert(AW_HandSnapshotRestore(&saved,p,2));AW_TorchRestoreAnimation(torch_time);
         assert(*field(p,"aw_hand_state")==states[i] && *field(p,"aw_hand_goal")==goals[i]);
         assert(*field(p,"aw_torch")==torches[i] && *field(p,"aw_attack_latched")==1);
@@ -180,13 +197,13 @@ static void transition_states(edict_t *p,int fn)
             AW_TorchViewModel();assert(cl.viewent.model==&arrival_torch_model);
             assert(cl.viewent.frame==torch_frame); /* Before the first QC tick. */
         }
-        p->v.button0=1;PR_ExecuteProgram(fn);
+        p->v.button0=1;AW_HandsTick();
         assert(*field(p,"aw_hand_state")==states[i] && p->v.weaponframe==frame);
-        pr_global_struct->time=2.03125f;PR_ExecuteProgram(fn);assert(p->v.weaponframe==expected);
+        sv.time=2.03125f;AW_HandsTick();assert(p->v.weaponframe==expected);
         /* Repeated crossings rebase the same phase without restarting it. */
         assert(AW_HandSnapshotCapture(&saved,p,2.03125));
         assert(AW_HandSnapshotRestore(&saved,p,7));
-        pr_global_struct->time=7;PR_ExecuteProgram(fn);assert(p->v.weaponframe==expected);
+        sv.time=7;AW_HandsTick();assert(p->v.weaponframe==expected);
     }
     /* Long-held ready state must not lose equipment at the handoff, even
      * when its last QC idle timestamp predates a long simulation pause. */
@@ -195,12 +212,12 @@ static void transition_states(edict_t *p,int fn)
     *field(p,"aw_attack_latched")=1;*field(p,"aw_hand_started")=.25f;
     p->v.weaponmodel=ED_NewString("progs/v_nord.mdl")-pr_strings;p->v.weaponframe=3;
     assert(AW_HandSnapshotCapture(&saved,p,121));assert(saved.age==120.75);
-    pr_global_struct->time=121;PR_ExecuteProgram(fn);expected=p->v.weaponframe;
+    sv.time=121;AW_HandsTick();expected=p->v.weaponframe;
     memset(&p->v,0,progs->entityfields*4);p->v.health=100;
     assert(AW_HandSnapshotRestore(&saved,p,2));
     assert(p->v.weaponframe==3 && *field(p,"aw_hand_started")== -118.75f);
     assert(AW_TorchEquipped());AW_TorchUpdate();assert(cl_dlights[0].radius>0);
-    p->v.button0=1;pr_global_struct->time=2;PR_ExecuteProgram(fn);
+    p->v.button0=1;sv.time=2;AW_HandsTick();
     assert(*field(p,"aw_hand_state")==2 && p->v.weaponframe==expected && AW_TorchEquipped());
     /* Equipment intent is independent at the capture boundary. QC decides
      * when lowering/death consumes it; the transfer must not erase the bit. */
@@ -232,59 +249,53 @@ int main(int argc,char **argv)
     pr_edict_size=(offsetof(edict_t,v)+progs->entityfields*4+7)&~7;
     sv.edicts=calloc(2,pr_edict_size);assert(sv.edicts);world=sv.edicts;p=NEXT_EDICT(world);
     pr_global_struct->self=EDICT_TO_PROG(p);builtins[TEST_RINT_BUILTIN_INDEX]=rint_builtin;builtins[TEST_FLOOR_BUILTIN_INDEX]=floor_builtin;builtins[24]=sprint_builtin;
+    /* the hands left the QuakeC: no aw_hands_update, no clip fields in it (FIRST-PERSON-HANDS-IN-C-54) */
     fn=0;for(i=1;i<progs->numfunctions;i++)if(!strcmp(pr_strings+pr_functions[i].s_name,"aw_hands_update"))fn=i;
-    assert(fn);p->v.health=100;
+    assert(!fn);
+    for(i=0;i<progs->numfielddefs;i++)assert(strcmp(pr_strings+pr_fielddefs[i].s_name,"aw_hand_idle") &&
+                                             strcmp(pr_strings+pr_fielddefs[i].s_name,"aw_hand_punch"));
+    p->v.health=100;sv.model_precache[1]="progs/v_nord.mdl";
     memset(&client,0,sizeof(client));client.edict=p;svs.clients=&client;svs.maxclients=1;
     sv.active=true;cls.state=ca_connected;
     memcpy(assets,"AWT1",4);assets[5]=8;assets[7]=16;assets[10]=3;assets[11]=232;
     torch_model_fixture.type=mod_alias;AW_TorchInit();AW_TorchLoadAssets();assert(toggle_torch);
 
-    /* Released region payload: no derived worldspawn timings. */
-    p->v.impulse=202;PR_ExecuteProgram(fn);
-    if(baseline){
-        assert(*field(p,"aw_hand_goal")==1 && *field(p,"aw_hand_state")==1);
-        assert(!pr_strings[p->v.weaponmodel]);toggle_torch();
-        assert(*field(p,"aw_torch")==1 && !AW_TorchEquipped());
-        pr_global_struct->time=10;PR_ExecuteProgram(fn);AW_TorchUpdate();
-        assert(*field(p,"aw_hand_state")==1 && !pr_strings[p->v.weaponmodel]);
-        assert(cl_dlights[0].radius==0);
-        puts("Baseline reproduced: F stays invisible; V accepts on but never equips model/light.");
-        free(sv.edicts);free(raw);return 0;
-    }
+    /* An image without the hand clip table: refused at once, said once. */
+    (void)baseline;table_present=0;AW_HandTableReset();
+    p->v.impulse=202;AW_HandsTick();
     assert(!*field(p,"aw_hand_goal") && !*field(p,"aw_hand_state") && !*field(p,"aw_torch"));
     assert(!pr_strings[p->v.weaponmodel] && metadata_warnings==1);
-    PR_ExecuteProgram(fn);assert(metadata_warnings==1); /* no per-frame warning flood */
+    AW_HandsTick();assert(metadata_warnings==1); /* no per-frame warning flood */
     toggle_torch();assert(!AW_TorchEquipped() && !*field(p,"aw_torch"));
 
-    *field(world,"aw_hand_draw")=.4;*field(world,"aw_hand_idle")=2;
-    *field(world,"aw_hand_lower")=.3;*field(world,"aw_hand_punch")=.5;
-    p->v.impulse=202;PR_ExecuteProgram(fn);
+    set_table(.4f,2,.3f,.5f);
+    p->v.impulse=202;AW_HandsTick();
     assert(*field(p,"aw_hand_goal")==1 && *field(p,"aw_hand_state")==1);hands_model(p);
     toggle_torch();assert(*field(p,"aw_torch")==1 && !AW_TorchEquipped());
-    pr_global_struct->time=.6;PR_ExecuteProgram(fn);assert(*field(p,"aw_hand_state")==2);hands_model(p);
+    sv.time=.6;AW_HandsTick();assert(*field(p,"aw_hand_state")==2);hands_model(p);
     assert(AW_TorchEquipped());AW_TorchUpdate();
     assert(cl_dlights[0].radius>=189 && cl_dlights[0].radius<=196);
     AW_TorchViewModel();assert(cl.viewent.model==&torch_model_fixture);
-    p->v.button0=1;PR_ExecuteProgram(fn);
+    p->v.button0=1;AW_HandsTick();
     assert(*field(p,"aw_hand_state")==2 && *field(p,"aw_torch")==1);
     toggle_torch();AW_TorchUpdate();assert(!AW_TorchEquipped() && cl_dlights[0].radius==0);
     toggle_torch();AW_TorchUpdate();assert(AW_TorchEquipped() && cl_dlights[0].radius>0);
-    p->v.impulse=202;PR_ExecuteProgram(fn);AW_TorchUpdate();
+    p->v.impulse=202;AW_HandsTick();AW_TorchUpdate();
     assert(!*field(p,"aw_hand_goal") && !*field(p,"aw_torch") && *field(p,"aw_hand_state")==4);
     assert(cl_dlights[0].radius==0);
-    pr_global_struct->time=1;PR_ExecuteProgram(fn);
+    sv.time=1;AW_HandsTick();
     assert(!*field(p,"aw_hand_state") && !pr_strings[p->v.weaponmodel]);
-    p->v.button0=0;p->v.impulse=202;PR_ExecuteProgram(fn);pr_global_struct->time=2;PR_ExecuteProgram(fn);
-    p->v.button0=1;PR_ExecuteProgram(fn);assert(*field(p,"aw_hand_state")==3);
-    *field(p,"aw_torch")=1;p->v.health=0;PR_ExecuteProgram(fn);assert(!*field(p,"aw_torch"));
+    p->v.button0=0;p->v.impulse=202;AW_HandsTick();sv.time=2;AW_HandsTick();
+    p->v.button0=1;AW_HandsTick();assert(*field(p,"aw_hand_state")==3);
+    *field(p,"aw_torch")=1;p->v.health=0;AW_HandsTick();assert(!*field(p,"aw_torch"));
     animation_boundaries(p,world,fn);
     transition_states(p,fn);
     held_attack_during_draw(p,world,fn);
     /* A resumed/transitioned state with a missing idle stamp must be rejected
      * before raise completion can divide by an invalid next-state duration. */
     p->v.health=100;*field(p,"aw_hand_goal")=1;*field(p,"aw_hand_state")=1;
-    *field(p,"aw_torch")=1;*field(world,"aw_hand_idle")=0;
-    before=metadata_warnings;PR_ExecuteProgram(fn);AW_TorchUpdate();
+    *field(p,"aw_torch")=1;set_table(.4f,0,.3f,.5f);   /* an idle of 0 s: the table is refused */
+    before=metadata_warnings;AW_HandsTick();AW_TorchUpdate();
     assert(!*field(p,"aw_hand_state") && !*field(p,"aw_torch") && !pr_strings[p->v.weaponmodel]);
     assert(cl_dlights[0].radius==0 && metadata_warnings==before+1);
     puts("QC/torch lifecycle passed: missing metadata, raise, V toggle, viewmodel, light, lower, punch, death and zeroed-VM handoff phases.");

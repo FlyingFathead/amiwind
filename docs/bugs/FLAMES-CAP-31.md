@@ -71,6 +71,7 @@ Family: Engine table limits (`engine-limits`). Fixed engine tables (models, enti
 - ALIAS-BUDGET-32MB-48 (no report page): The alias model budget is still the 16 MB era's 512 KiB: two NPCs fall back to standing-only animations
 - AW-20260928-16 (no report page): Two compiler-reported array bounds violations
 - AW-20260929-02 (no report page): NPCs missing from expanded town render
+- AW-CLIP-NOT-A-FIELD-54 (no report page): Every CHIM room and frame map load prints 'aw_clip' is not a field once per clip wall
 - BALMORA-CAPACITY-005 (no report page): Bounded Balmora maps exceed the 600-entity limit
 - [BUILD-BUDGET-ENGINE-LIMITS-35](BUILD-BUDGET-ENGINE-LIMITS-35.md): Town entity and model budgets were not tied to the engine's per-map tables
 - BUILD-LEGACY-ENGINE-PATHS-48 (no report page): The engine's legacy town region streaming was not marked or fenced as legacy

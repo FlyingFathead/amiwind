@@ -35,7 +35,9 @@ SHIPPED_STAGES = {
     'hand-catalog': 'per-race hands (progs/hands, hand-models.awh, hand-torch.awt)',
     'harvest': 'harvestable mushrooms (harvest-*.txt, progs/harvest/*.mdl)',
     'interior': 'interiors', 'dialogue-lookup': 'voice lookup', 'intro': 'opening, chargen captions',
-    'census': 'census map', 'npc-gallery': 'gallery/*.mdl (7,102 files)',
+    # NPC Gallery v2.0 (NPC-GALLERY-V2, v0.0.54): no npc-gallery stage; the image step lists the actors the build made
+    # (gallery/actors.txt). The baked gallery's stage (gallery/*.mdl, 7,102 files) runs with --npc-gallery-method baked.
+    'census': 'census map',
     'area': 'area interiors', 'balmora-interiors': 'Balmora interiors',
     # CHIM rooms (docs/chim/INTERIOR_STORE.md; maintainer, 22 October 2026): every converted room on one interior store
     'chim-interiors': 'CHIM rooms: the interior store (chimi/) and the room records',
@@ -77,7 +79,6 @@ SHIPPED_IMAGE_OPTIONS = {
     '--world-flora': str(RUN / 'world-flora'),
     '--town-flora-source-index': str(RUN / 'scenery/scenery-index.json'),
     '--town-flora-scene-report': str(RUN / 'alias-scene/scene-report.json'),
-    '--gallery': str(RUN / 'npc-gallery'),
     '--hands': '3d',
     '--hand-catalog': str(RUN / 'hand-catalog'),
     '--mwscript': str(RUN / 'mwscript'),
@@ -94,6 +95,8 @@ SHIPPED_IMAGE_OPTIONS = {
 OPTIONS = {
     # Shipped content: on by default; the only way out is a DEBUGGING ONLY opt-out.
     'no_npc_gallery': 'debug opt-out', 'no_tree_sprites': 'debug opt-out', 'no_harvest': 'debug opt-out',
+    # NPC Gallery v2.0 by default (NPC-GALLERY-V2); baked = the previous gallery
+    'npc_gallery_method': 'shipped default',
     'no_extra_town': 'debug opt-out', 'no_cell_progress': 'debug opt-out', 'only_core_towns': 'debug opt-out',
     # Quick test builds: --exclude GROUP and its --exclude-* aliases (tools/build_exclusions.py, -devN only).
     'exclude': 'debug opt-out', 'exclude_unreferenced': 'debug opt-out', 'with_video': 'mode',
@@ -277,6 +280,8 @@ OPTIONS = {
     'npc_anim_type': 'shipped default',
     # v0.0.53: the Halloween scene's cast and the user's own soundtrack, MiniWind only (docs/HALLOWEEN.md)
     'halloween': 'mode', 'custom_ost': 'mode',
+    # v0.0.54: the cast in every full-world image by default (aw bench halloween in release images); this leaves it out
+    'halloween_cast': 'shipped default',
     # CHIM-native towns (CHIM-LEGACY-CHAIN-33): on by default since v0.0.36 (CHIM-native areas); 'off' and --legacy-area
     # are RETIRED since CHIM v0.1.0 (tools/retired_flags.py, BUILD-LEGACY-CHAIN-DEFAULT-36); --override lets one through.
     'chim_native_towns': 'shipped default', 'chim_regions': 'shipped default', 'chim_regions_status': 'shipped default',
@@ -332,8 +337,16 @@ class DefaultBuildShipsTheRelease(unittest.TestCase):
                                  Path(value) if '/' in value else value)
         # Defaults that v0.0.31 shipped with: no waiver, fast vis, no mesh reduction.
         self.assertEqual(option(image, '--map-budget-policy'), 'strict')
-        for flag in ('--no-npc-gallery', '--vis-mode', '--allow-known-actor-ground-findings', '--intro-captions'):
+        for flag in ('--no-npc-gallery', '--gallery', '--vis-mode', '--allow-known-actor-ground-findings', '--intro-captions'):
             self.assertNotIn(flag, image)
+        self.assertEqual(image.count('--gallery-v2'), 1)
+
+    def test_baked_gallery_stays_selectable(self):
+        """NPC-GALLERY-V2: --npc-gallery-method baked brings the previous npc-gallery stage and its image input back."""
+        plan = dict(steps('--npc-gallery-method', 'baked'))
+        self.assertIn('npc-gallery', plan)
+        self.assertEqual(option(plan['image'], '--gallery'), str(RUN / 'npc-gallery'))
+        self.assertNotIn('--gallery-v2', plan['image'])
 
     def test_media_catalogue_stays_off_the_image_by_default(self):
         # IMAGE-MEDIA-CATALOGUE-ON-DISK-46: nothing in the game reads id1/media/catalogue.json (64 MB in v0.0.46).

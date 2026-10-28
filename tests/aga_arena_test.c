@@ -45,8 +45,14 @@ static const char *fighters="AWAF1 2\n"
 int COM_FOpenFile(char *name,FILE **file){
     *file=NULL;
     if(!strcmp(name,"arena/fighters.txt")){*file=fmemopen((void *)fighters,strlen(fighters),"r");return (int)strlen(fighters);}
+    if(!strcmp(name,"arena/casts.txt")){static const char *casts="AWAC1\ngroupie\tnobody\naggro\tfargoth, mevil molor\n";
+        *file=fmemopen((void *)casts,strlen(casts),"r");return (int)strlen(casts);}
     if(!strcmp(name,"maps/vai000.bsp"))return have_pit?1000:-1;
     if(!strcmp(name,"maps/charplane.bsp"))return have_floor?1000:-1;
+    if(!strcmp(name,"combat/sndg.txt")){static const char *sndg="AWSG1 2\n"
+            "cliff racer\tcrfoot\tcrfoot\t-\t-\tcrmoan\tcrroar\tcrscream\tfall\n"
+            "daedroth\tfootl\tfootr\tswiml\tswimr\tdmoan\tdroar1,droar2\tdscream\tfall\n";
+        *file=fmemopen((void *)sndg,strlen(sndg),"r");return (int)strlen(sndg);}
     if(!strncmp(name,"arena/f",7) || !strncmp(name,"gallery/",8))return 5000;
     return -1;
 }
@@ -54,7 +60,8 @@ int AW_CombatSettingsLoad(void){return 1;}
 int AW_CombatActorLoad(const char *id,aw_fighter_t *out){
     memset(out,0,sizeof(*out));
     if(strcmp(id,"mevil molor") && strcmp(id,"ultis salam") && strcmp(id,"fargoth") && strcmp(id,"caius cosades"))return 0;
-    strcpy(out->id,id);strcpy(out->name,!strcmp(id,"fargoth")?"Fargoth":"Someone");out->level=9;out->health=out->health_max=94;return 1;
+    strcpy(out->id,id);strcpy(out->name,!strcmp(id,"fargoth")?"Fargoth":"Someone");out->level=9;out->health=out->health_max=94;
+    out->fight=(unsigned char)(!strcmp(id,"fargoth")?90:30);return 1;
 }
 void (*aw_combat_result)(int won);
 int AW_CombatEngage(struct edict_s *e,const aw_fighter_t *f,const char *layout){
@@ -91,8 +98,29 @@ void Con_ToggleConsole_f(void){toggles++;}
 void Sys_Error(char *f,...){(void)f;abort();}
 int Q_strcasecmp(char *a,char *b){return strcasecmp(a,b);}
 float Q_atof(char *s){return (float)atof(s);}
+static int flee_cvar=0,sounds_rule_on=0;
 float Cvar_VariableValue(char *name){assert(!strcmp(name,"aw_combat_seed"));return seed_cvar;}
 void Cvar_SetValue(char *name,float v){assert(!strcmp(name,"aw_combat_seed"));seed_cvar=v;}
+int AW_CombatRule(int rule,int on){int *r=rule==AW_RULE_FLEE?&flee_cvar:&sounds_rule_on,was=*r;if(on>=0)*r=on;return was;}
+/* the sounds mode: the combat sounds (all but critical present) and a creature's generators */
+static char played[512];static int plays;
+int AW_CombatSoundPlay(int key){char k[8];if(key==AW_SND_CRITICAL)return 0;snprintf(k,sizeof(k),"k%d ",key);strcat(played,k);plays++;return 1;}
+void S_LocalSound(char *name){if(strlen(played)+strlen(name)<500){strcat(played,name);strcat(played," ");}plays++;}
+/* the combat playground's helpers (aw_animkit.c, aw_anim.c, aw_combat.c): model 4 is a skeletal resident's */
+static int cycles,cycle_on,stops,preps,aggro_calls,aggro_hostile;static edict_t *cycled;
+int AW_AnimKitSkeletal(int modelindex){return modelindex==4;}
+int AW_AnimKitCombatCycle(struct edict_s *e){cycles++;cycled=e;cycle_on=1;return 1;}
+int AW_AnimKitLabel(char *out,int size){if(!cycle_on)return 0;snprintf(out,size,"weapononehand: slash");return 1;}
+void AW_AnimKitStop(void){stops++;cycle_on=0;}
+void AW_AnimPrep(struct edict_s *e){(void)e;preps++;}
+int AW_CombatAggro(struct edict_s *e,const aw_fighter_t *f,const char *layout,int disposition,int *rating,float *distance){
+    (void)layout;assert(disposition==50);aggro_calls++;
+    *distance=(e->v.origin[0]+240)/.25f;*rating=f->fight+(int)(20-.005f*(*distance));
+    if(*rating>=100){aggro_hostile++;return 1;}
+    return 0;
+}
+int AW_CombatActorFleeing(struct edict_s *e){(void)e;return 0;}
+void AW_CombatCost(float *per,float *mean,float *longest,int *fighting){*per=40;*mean=1.25f;*longest=3.5f;*fighting=2;}
 void Cbuf_InsertText(char *s){strcpy(queued,s);}
 int AW_ConsoleCharWidth(void){return 8;}
 int AW_ConsoleCharHeight(void){return 8;}
@@ -221,7 +249,65 @@ int main(void){
     setup_continue();realtime+=.01;draw();assert(strstr(drawn,"VIVEC ARENA"));
     aw_arena_setup=NULL;AW_ArenaEnd();
 
+    /* the combat playground's modes (docs/COMBAT.md "Combat playground") */
+    run("aw_arenapit modes");assert(strstr(printed,"aggro") && strstr(printed,"group [N]"));
+    run("aw_arenapit creatures");assert(strstr(printed,"Creature fights: a creature's sheet comes from the actor record"));
+    {   /* group: the baked fighters at once, side by side on the pit, all engaged; the Flee rule on for the session */
+        int before=engages;
+        run("aw_arenapit group");assert(strstr(printed,"group mode, 2 actors"));
+        spawn_scene("vai000");assert(sv.num_edicts==7 && preps==2);
+        AW_ArenaSpawn(p);
+        assert(edicts[5].v.origin[1]==150 && edicts[6].v.origin[1]==150 && edicts[5].v.origin[0]<edicts[6].v.origin[0]);
+        draw();realtime+=4;draw();assert(engages==before+2 && flee_cvar==1);
+        draw();assert(strstr(drawn,"Combat playground: group") && strstr(drawn,"2 fighting 40/s 1.25 ms max 3.50"));
+        AW_ArenaEnd();assert(flee_cvar==0);
+    }
+    {   /* aggro: nobody is engaged by the mode; each actor's Fight rule decides on its engage timer */
+        int before=engages;
+        run("aw_arenapit aggro");                                           /* the default cast (arena/casts.txt) */
+        assert(strstr(printed,"default aggro cast: fargoth, mevil molor") && strstr(printed,"aggro mode, 2 actors"));
+        spawn_scene("vai000");AW_ArenaSpawn(p);
+        assert(p->v.origin[0]==-240 && edicts[5].v.origin[0]==-90 && edicts[6].v.origin[0]==20);
+        draw();realtime+=4;draw();assert(engages==before && !aggro_calls && flee_cvar==1);
+        realtime+=1.3;draw();assert(aggro_calls==2 && aggro_hostile==1);
+        assert(strstr(drawn,"Fargoth F90 at 600: 107") && strstr(drawn,"Mevil Molor F30 at 1040: 44"));
+        realtime+=1.3;draw();assert(aggro_calls==3);                      /* only the calm one is asked again */
+        AW_ArenaEnd();assert(flee_cvar==0);
+    }
+    {   /* anim: a baked fighter's animations play on a skeletal resident's model, labelled */
+        run("aw_arenapit anim mevil molor");spawn_scene("vai000");
+        assert(edicts[5].v.modelindex==4);
+        AW_ArenaSpawn(p);draw();realtime+=4;draw();assert(cycles==1 && cycled==&edicts[5]);
+        draw();assert(strstr(drawn,"weapononehand: slash"));
+        AW_ArenaEnd();assert(stops==1 && !cycle_on);
+        run("aw_arenapit mevil molor");                                     /* a name: back to the duel */
+        spawn_scene("vai000");assert(sv.num_edicts==6);AW_ArenaEnd();
+    }
+    {   /* sounds: every combat sound in turn (the missing one skipped), then the creature's generators, labelled; the
+         * sounds rule on for the session; the foe only stands by */
+        int before=engages,k;
+        run("aw_arenapit sounds");assert(strstr(printed,"sounds mode, 1 actor"));
+        spawn_scene("vai000");AW_ArenaSpawn(p);
+        draw();realtime+=4;draw();assert(engages==before && sounds_rule_on==1 && flee_cvar==0);
+        draw();assert(strstr(played,"k0 ") && strstr(drawn,"Health Damage: a blow takes health"));
+        for(k=0;k<AW_SND_COUNT+8;k++){realtime+=1.7;draw();}
+        assert(strstr(played,"k6 ") && strstr(played,"k9 ") && !strstr(played,"k7 "));
+        assert(strstr(played,"combat/g/dmoan.wav") && strstr(played,"combat/g/dscream.wav") &&
+               (strstr(played,"combat/g/droar1.wav") || strstr(played,"combat/g/droar2.wav")) && strstr(played,"combat/g/fall.wav"));
+        AW_ArenaEnd();assert(sounds_rule_on==0);
+        played[0]=0;run("aw_arenapit sounds Cliff Racer");spawn_scene("vai000");AW_ArenaSpawn(p);
+        draw();realtime+=4;draw();
+        for(k=0;k<AW_SND_COUNT+8;k++){realtime+=1.7;draw();if(strstr(drawn,"cliff racer: roar"))break;}
+        assert(k<AW_SND_COUNT+8 && strstr(played,"combat/g/crroar.wav") && !strstr(played,"swim"));
+        AW_ArenaEnd();
+        played[0]=0;run("aw_arenapit sounds nobody");spawn_scene("vai000");AW_ArenaSpawn(p);
+        draw();realtime+=4;draw();assert(strstr(printed,"no sound generators for nobody"));
+        AW_ArenaEnd();
+    }
+
     /* dbgmode and testarena */
+    run("dbgmode combat");assert(!strcmp(queued,"aw_arenapit modes\n"));
+    run("dbgmode combat aggro fargoth");assert(!strcmp(queued,"aw_arenapit aggro fargoth\n"));
     run("dbgmode");assert(strstr(printed,"dbgmode arenapit") && strstr(printed,"dbg combattest gallery"));
     run("dbgmode arenapit ultis salam");assert(!strcmp(queued,"aw_arenapit ultis salam\n"));
     run("dbgmode combattest");assert(!strcmp(queued,"aw_combattest gallery\n"));

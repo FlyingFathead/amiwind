@@ -16,6 +16,9 @@
  * The show opens on a black screen with the greeting box alone for AW_HALLOWEEN_BOX_SECONDS, in silence (the music
  * is held); then the scene appears, its clock starts and the user's own soundtrack, when the image has one, starts
  * with the first beat (dbg ost play halloween). Photo mode, its own notices hidden (aw_photomode_ui 0), hides the HUD.
+ * The track starts early, under the greeting, by its own leading silence (the cast file's pre-roll, measured by the
+ * builder) plus AW_HALLOWEEN_AUDIO_LEAD (the player's own start delay, measured in the emulator), so its first beat
+ * is heard on the first frame of the dance.
  *
  * A cast move sounds as it plays: a skeletal actor crossing the release key of its table's spellcast group
  * ("self/touch/target release", the table's own text keys) plays the game's spell cast sound (AW_SkelCastSound; the
@@ -24,7 +27,8 @@
  * The camera director (AW_HalloweenCamera, called by view.c before the world is drawn) changes shot on bar
  * boundaries: wide, dolly-in, tracking, crane, orbit, close-up; each eye is pulled in front of any wall or roof
  * between it and what it looks at (a trace from the subject, as the orbit camera does: aw_view.c). dbg halloween
- * camera wide locks it to the wide shot.
+ * camera wide locks it to the wide shot. The frame's edges are kept clear too: while a wall or roof lies close beside
+ * the eye on a side or the top of the frame, the eye moves in toward its subject (clear_edges).
  *
  * Overlays keep to the corners: the FPS counter, small, at the bottom left (off in the show, on in halloweentest
  * and the benchmark; dbg halloween fps on/off). aw bench halloween (also aw halloweenbench, dbg halloween bench): no
@@ -45,7 +49,8 @@
 
 typedef struct {edict_t *e;int role,mirror,group,frame;const aw_skel_table_t *table;} hw_actor_t;
 static struct {
-    int on,version,count,photo,fps,locked,bench,frames,close_actor,close_shot,intro,music_held,music_checked;
+    int on,version,count,photo,fps,locked,bench,frames,close_actor,close_shot,intro,music_held,music_checked,
+        music_started;
     double started,last;float beat,now,photo_ui,music_was,floor;model_t *world;
     vec3_t eye0,forward,right,angles0,centre;float fit,close_fit;
     aw_hw_cast_t cast;
@@ -57,6 +62,12 @@ static char model_names[AW_HALLOWEEN_MAX_ROWS][AW_HALLOWEEN_PATH],actor_names[AW
 static int model_names_used;
 static model_t *names_world;
 static char hw_class[]="aw_halloween";
+/* The player's own start delay: from the custom play command to the track's first sound at the speaker, measured in
+ * the emulator (27 October 2026, the v0.0.53 platform takes: the onset came 1.22 to 1.23 s after the cut for a track
+ * whose leading silence is 1.07 s, so 0.15 to 0.17 s). The scene starts the track that much earlier too. A constant,
+ * not a setting: it is the player's property, not the user's choice, and a setting would cost a resident cvar slot
+ * (tests/resident_registry_budget.json). */
+#define AW_HALLOWEEN_AUDIO_LEAD 0.16f
 
 static edict_t *player(void) {
     if(!sv.active || svs.maxclients!=1 || !svs.clients || !svs.clients[0].edict)return NULL;
@@ -142,17 +153,39 @@ static int floor_at(const vec3_t at,float up,float down,float *z,edict_t *pass) 
     *z=tr.endpos[2];return 1;
 }
 
-/* An eye with a clear view of LOOK: when a wall or roof lies between them, the eye first rises (up to 80 units, the
- * subject stays in view, seen from higher), and only then comes in front of the obstacle (take 3: pulled straight in,
- * the eye lost the outer dancers and, low, saw only the roof's edge). */
+/* An eye with a clear view of LOOK: when a wall or roof lies between them, the eye first rises a little (up to 32
+ * units: take 3, pulled straight in, lost the outer dancers; take 4, raised up to 80, saw them tiny under a sky of
+ * fog), and only then comes in front of the obstacle. */
 static void clear_eye(vec3_t look,vec3_t eye,edict_t *p) {
     trace_t t;vec3_t d;int k;
-    for(k=0;k<6;k++){
+    for(k=0;k<3;k++){
         t=SV_Move(look,vec3_origin,vec3_origin,eye,MOVE_NOMONSTERS,p);
         if(t.fraction>=1 && !t.startsolid && !t.allsolid)return;
-        if(k<5)eye[2]+=16;
+        if(k<2)eye[2]+=16;
     }
     if(t.fraction<1){VectorSubtract(look,t.endpos,d);VectorNormalize(d);VectorMA(t.endpos,4,d,eye);}
+}
+
+/* The frame's edges clear of walls and roofs: clear_eye keeps the line to LOOK open, but a wall or roof beside the
+ * eye still filled a side of the frame with a dark wedge (the v0.0.53 platform takes: the tracking, orbit and crane
+ * shots by the ruin's walls). While an edge ray (AW_HalloweenEdgeRays, EDGE_NEAR units) hits something, the eye moves
+ * EDGE_STEP units toward LOOK along the open line, never nearer than EDGE_MIN. */
+#define EDGE_NEAR 64.f
+#define EDGE_STEP 12.f
+#define EDGE_MIN 48.f
+static void clear_edges(vec3_t look,vec3_t eye,edict_t *p) {
+    float ends[AW_HW_EDGE_RAYS][3];vec3_t d;trace_t t;int k,i,hit;float dist;
+    for(k=0;k<16;k++){
+        AW_HalloweenEdgeRays(eye,look,r_refdef.fov_x,r_refdef.fov_y,EDGE_NEAR,ends);
+        for(hit=0,i=0;i<AW_HW_EDGE_RAYS && !hit;i++){
+            t=SV_Move(eye,vec3_origin,vec3_origin,ends[i],MOVE_NOMONSTERS,p);
+            hit=t.fraction<1 || t.startsolid || t.allsolid;
+        }
+        if(!hit)return;
+        VectorSubtract(look,eye,d);dist=VectorNormalize(d);
+        if(dist-EDGE_STEP<EDGE_MIN)return;
+        VectorMA(eye,EDGE_STEP,d,eye);
+    }
 }
 
 static void restore_settings(void) {
@@ -206,27 +239,36 @@ static int read_cast(void) {
     return 1;
 }
 
-/* The spot of slot S on the stage floor: the nearest free point (6-unit steps, on the slot's own side) whose floor is
- * the stage's level within 6 units and at least 12 units from every actor already placed. 1 and *out filled. */
+/* The stage platform (take 5: the automatic search found a storey below it and stood the cast off the platform):
+ * the platform is the floor the animation stage's line stood on in the stage videos, at the player's feet level on
+ * the Balmora arrival roof, 80 ahead and up to 56 to each side (aw_animkit.c stage: a short trace from 16 above the
+ * feet to 32 below). Each slot is that fixed spot (aw_halloween_rules.c AW_HalloweenLayout); its floor is found by
+ * the same short trace only, never a lower storey. 1 and *out filled. */
 static int stage_spot(edict_t *p,const aw_hw_slot_t *s,vec3_t forward,vec3_t right,vec3_t out) {
-    static const float ahead[8]={0,-8,8,-16,16,-24,24,32};
-    int a,k,j,side=s->right<0?-1:s->right>0?1:0,best_score=1<<30;vec3_t spot;float z,r;
-    for(a=0;a<8;a++)for(k=0;k<12;k++){
-        int score;
-        r=s->right+(float)((k&1)?-(k+1)/2:(k+1)/2)*6.f*(side?(float)side:1.f);
-        if(side && r*(float)side<4)continue;
-        if(!side && (r<-6 || r>6))continue;
-        VectorMA(p->v.origin,s->ahead+ahead[a],forward,spot);VectorMA(spot,r,right,spot);
-        /* the floor between 24 above and 24 below the stage's level */
-        if(!floor_at(spot,hw.floor+24-p->v.origin[2],p->v.origin[2]-hw.floor+24,&z,(edict_t *)p))continue;
-        if(z-hw.floor>6 || hw.floor-z>6)continue;
-        spot[2]=z;
-        for(j=0;j<hw.count;j++){vec3_t d;VectorSubtract(hw.actor[j].e->v.origin,spot,d);d[2]=0;if(DotProduct(d,d)<144)break;}
-        if(j<hw.count)continue;
-        score=(int)(ahead[a]<0?-ahead[a]:ahead[a])+(int)((r-s->right)<0?s->right-r:r-s->right);
-        if(score<best_score){best_score=score;VectorCopy(spot,out);}
+    vec3_t spot;float z,feet=p->v.origin[2]+p->v.mins[2];
+    VectorMA(p->v.origin,s->ahead,forward,spot);VectorMA(spot,s->right,right,spot);
+    spot[2]=hw.floor;(void)feet;
+    if(!floor_at(spot,16,32,&z,p) || z-hw.floor>4 || hw.floor-z>4)return 0;
+    spot[2]=z;VectorCopy(spot,out);
+    return 1;
+}
+/* The guard over a placed actor: how far its spot is from the platform's edge (the nearest of eight directions where
+ * the floor is no longer the platform's: none within 32 below, or a floor more than 4 units from its height), up to
+ * 64. A probe that starts inside a solid object standing on the platform (a railing, a post: the platform grid's
+ * solid cells) is no edge: it is passed over (take 6: one such line beside a dancer read as the edge). */
+static float edge_distance(edict_t *p,const vec3_t at) {
+    int k,r;float best=64;vec3_t probe,a2,b2;trace_t t;
+    for(k=0;k<8;k++){
+        float a=(float)k*(float)M_PI/4,c=Q_CosRad(a),s=Q_SinRad(a);
+        for(r=4;r<=64;r+=4){
+            VectorCopy(at,probe);probe[0]+=c*r;probe[1]+=s*r;
+            VectorCopy(probe,a2);VectorCopy(probe,b2);a2[2]+=16;b2[2]-=32;
+            t=SV_Move(a2,vec3_origin,vec3_origin,b2,MOVE_NOMONSTERS,p);
+            if(t.startsolid || t.allsolid)continue;
+            if(t.fraction>=1 || t.endpos[2]-hw.floor>4 || hw.floor-t.endpos[2]>4){if(r-4<best)best=(float)(r-4);break;}
+        }
     }
-    return best_score<(1<<30);
+    return best;
 }
 
 static void start(int version,int bench,int fps) {
@@ -253,11 +295,26 @@ static void start(int version,int bench,int fps) {
     VectorCopy(cl.viewangles,view);view[0]=view[2]=0;AngleVectors(view,forward,right,up);
     VectorCopy(p->v.origin,hw.eye0);hw.eye0[2]+=p->v.view_ofs[2];
     VectorCopy(forward,hw.forward);VectorCopy(right,hw.right);VectorCopy(cl.viewangles,hw.angles0);hw.angles0[2]=0;
-    /* the stage floor: the floor under the middle of the line (the lead's spot; the multi-storey guard then keeps
-     * every actor on that one storey) */
-    VectorMA(p->v.origin,slot[0].ahead,forward,spot);
-    if(!floor_at(spot,24,256,&z,p)){Con_Printf("Halloween scene: no floor before you to stand the cast on; face the stage.\n");return;}
+    /* the stage floor: the platform at the player's feet level under the middle of the line (a short trace only:
+     * never the storey below it) */
+    VectorMA(p->v.origin,AW_HALLOWEEN_STAGE_AHEAD,forward,spot);spot[2]=p->v.origin[2]+p->v.mins[2];
+    if(!floor_at(spot,48,256,&z,p)){Con_Printf("Halloween scene: no floor before you; face the stage.\n");return;}
     hw.floor=z;
+    /* the platform's geometry, measured once: the floor height on a grid before the player (ahead 40..200, right
+     * -80..80, 8 units apart; a long trace down from above the feet), relative to the stage floor, for the fixed
+     * spots (HALLOWEEN-SCENE-53) */
+    {int a,r,len;char row[256];
+     Con_Printf("Halloween stage grid: feet %.1f, stage floor %.1f; rows ahead 40..200, columns right -80..80 (floor - stage, '.' none)\n",
+                p->v.origin[2]+p->v.mins[2],hw.floor);
+     for(a=40;a<=200;a+=8){
+        len=sprintf(row,"%3d:",a);
+        for(r=-80;r<=80;r+=8){
+            vec3_t g;float gz;
+            VectorMA(p->v.origin,(float)a,forward,g);VectorMA(g,(float)r,right,g);g[2]=p->v.origin[2]+p->v.mins[2];
+            if(floor_at(g,48,256,&gz,p))len+=sprintf(row+len," %3d",(int)(gz-hw.floor));else len+=sprintf(row+len,"   .");
+        }
+        Con_Printf("%s\n",row);
+     }}
     hw.world=sv.worldmodel;hw.version=version;hw.count=0;
     hw.beat=60.f/((float)hw.cast.bpm10/10.f);
     for(i=0;i<n;i++){
@@ -279,10 +336,15 @@ static void start(int version,int bench,int fps) {
         a->mirror=version==AW_HW_WITH_LEAD && slot[i].right<0;
         hw.count++;
     }
-    /* the ground check over the cast: every actor's feet on the stage floor */
+    /* the ground check over the cast: every actor's feet on the stage platform, inside its edges; per actor its
+     * position, the floor under it and its distance to the platform's edge */
     for(i=0;i<hw.count;i++){
-        float zz;edict_t *x=hw.actor[i].e;
-        if(floor_at(x->v.origin,8,16,&zz,x) && zz-hw.floor<=6 && hw.floor-zz<=6 && x->v.origin[2]-zz<=1)grounded++;
+        float zz=0,edge;edict_t *x=hw.actor[i].e;int on;
+        on=floor_at(x->v.origin,8,16,&zz,x) && zz-hw.floor<=4 && hw.floor-zz<=4 && x->v.origin[2]-zz<=1;
+        edge=edge_distance(p,x->v.origin);
+        if(on && edge>=4)grounded++;
+        Con_Printf("Halloween stage %d: %s at %.0f %.0f %.0f, floor %.1f (stage %.1f), edge %.0f%s\n",i+1,pr_strings+x->v.netname,
+                   x->v.origin[0],x->v.origin[1],x->v.origin[2],zz,hw.floor,edge,on && edge>=4?"":" (OFF THE STAGE: CHECK FAILED)");
     }
     if(!hw.count){Con_Printf("Halloween scene: no room on the stage floor before you.\n");return;}
     /* the camera's start: the whole cast in frame, looking down at its middle (the first frame after the greeting
@@ -293,7 +355,7 @@ static void start(int version,int bench,int fps) {
      VectorScale(c,1.f/hw.count,c);
      for(k=0;k<hw.count;k++){VectorSubtract(hw.actor[k].e->v.origin,c,d);h=DotProduct(d,right);if(h<0)h=-h;if(h>half)half=h;}
      c[2]=hw.floor+22;
-     AW_HalloweenFrameCast(c,half+14,28,forward,r_refdef.fov_x,r_refdef.fov_y,hw.eye0);
+     AW_HalloweenFrameCast(c,half+10,28,forward,r_refdef.fov_x,r_refdef.fov_y,hw.eye0);   /* +10: an actor's half width */
      VectorCopy(c,hw.centre);VectorSubtract(hw.eye0,c,d);hw.fit=Length(d);
      /* the close-up: one dancer alone, head to feet */
      {vec3_t one;AW_HalloweenFrameCast(c,12,22,forward,r_refdef.fov_x,r_refdef.fov_y,one);VectorSubtract(one,c,d);hw.close_fit=Length(d);}
@@ -320,7 +382,8 @@ static void start(int version,int bench,int fps) {
     /* the custom OST player holds the playlist for the whole scene: no OST track at any point; the custom track
      * (when the image has one) starts with the first beat */
     AW_MusicCustomHold();hw.music_held=1;hw.music_checked=0;
-    if(bench)AW_MusicCustomPlay();          /* the benchmark has no greeting: the custom track (if any) at once */
+    hw.music_started=0;
+    if(bench){AW_MusicCustomPlay();hw.music_started=1;}  /* the benchmark has no greeting: the custom track at once */
     /* one line per cast member: who, the table (its view), the group playing at the start */
     for(i=0;i<hw.count;i++){
         hw_actor_t *a=&hw.actor[i];aw_skel_group_t g;const char *own="";
@@ -360,10 +423,19 @@ void AW_HalloweenTick(void) {
         hw.now=(float)hw.frames*AW_HALLOWEEN_BENCH_STEP;hw.frames++;
     }else{
         hw.now=(float)(realtime-hw.started);
+        /* the custom track starts under the greeting by its pre-roll (its own leading silence and the player's start
+         * delay), so the first beat is heard as the scene appears */
+        if(hw.intro && !hw.music_started &&
+           hw.now>=-AW_HalloweenPreroll(hw.cast.soundtrack?hw.cast.preroll_ms:0,AW_HALLOWEEN_AUDIO_LEAD,
+                                        AW_HALLOWEEN_BOX_SECONDS)){
+            AW_MusicCustomPlay();hw.music_started=1;
+            Con_Printf("Halloween music: started %.2f s before the dance (pre-roll %d ms, lead %.2f s)\n",-hw.now,
+                       hw.cast.preroll_ms,(double)AW_HALLOWEEN_AUDIO_LEAD);
+        }
         if(hw.intro && hw.now>=0){
-            /* the greeting is over: the scene appears and the custom track starts with the first beat */
+            /* the greeting is over: the scene appears; the custom track already runs (or starts now) */
             hw.intro=0;hw.started=realtime;hw.now=0;
-            AW_MusicCustomPlay();
+            if(!hw.music_started){AW_MusicCustomPlay();hw.music_started=1;}
         }
         if(hw.now<0)hw.now=0;
         /* the scene's music check, once, a second into the dance: what is playing is the custom track (or silence
@@ -428,6 +500,7 @@ int AW_HalloweenCamera(float origin[3],float angles[3]) {
     /* every shot at its subject's fitting distance: the whole cast (or the one dancer) head to feet in frame */
     AW_HalloweenShotPose(shot,u,hw.forward,hw.centre,hw.fit,close,hw.close_fit,eye,look);
     clear_eye(look,eye,p);                  /* never inside or behind a wall or a roof */
+    clear_edges(look,eye,p);                /* nor beside one that fills a side of the frame */
     VectorCopy(eye,origin);
     AW_HalloweenAim(eye,look,angles);
     return 1;

@@ -23,64 +23,14 @@ float(float value) floor = #37;
 void(entity client, string text) sprint = #24;
 .string aw_hull;
 .float aw_scale;
-.float aw_hand_idle;
 .float aw_eye_height;
-.float aw_hand_draw;
-.float aw_hand_lower;
-.float aw_hand_punch;
+/* The first-person hands' state, run by the engine (aw_hand_models.c AW_HandsTick; the clips in the image's
+ * gfx/hand-anims.txt, FIRST-PERSON-HANDS-IN-C-54): kept as fields for the saves, the torch and the view. */
 .float aw_hand_state;
 .float aw_hand_goal;
 .float aw_torch;
 .float aw_hand_started;
 .float aw_attack_latched;
-void(float state) aw_hand_begin = {
-    self.aw_hand_state = state;
-    self.aw_hand_started = time;
-};
-void() aw_hands_update = {
-    local float elapsed, duration, first, count;
-    if (self.impulse == 202) {
-        self.impulse = 0;
-        self.aw_hand_goal = 1 - self.aw_hand_goal;
-    }
-    // A missing region stamp must not leave an invisible raising state that
-    // accepts V forever but can never equip its model or light.
-    if (self.aw_hand_goal || self.aw_hand_state) {
-        if (!(world.aw_hand_idle > 0 && world.aw_hand_idle <= 60 &&
-              world.aw_hand_draw > 0 && world.aw_hand_draw <= 60 &&
-              world.aw_hand_lower > 0 && world.aw_hand_lower <= 60 &&
-              world.aw_hand_punch > 0 && world.aw_hand_punch <= 60)) {
-            self.aw_hand_goal = 0; self.aw_torch = 0; aw_hand_begin(0);
-            self.weaponmodel = "";
-            sprint(self,"Hands unavailable: invalid animation timings; rebuild converted maps.\n");
-            return;
-        }
-    }
-    if (!self.aw_hand_goal || self.health <= 0) self.aw_torch = 0;
-    if (self.aw_hand_state == 0 && self.aw_hand_goal) aw_hand_begin(1);
-    if (self.aw_hand_state == 2 && !self.aw_hand_goal) aw_hand_begin(4);
-    if (!self.button0) self.aw_attack_latched = 0;
-    if (self.button0 && !self.aw_attack_latched) {
-        // A held press during raising is still pending when the hands become
-        // ready. Releasing it cancels naturally above; never repeat a held
-        // attack once accepted, or turn a torch press into a later punch.
-        if (self.aw_hand_state != 1) self.aw_attack_latched = 1;
-        if (self.aw_hand_state == 2 && !self.aw_torch) aw_hand_begin(3);
-    }
-    if (self.aw_hand_state == 0) { self.weaponmodel = ""; return; }
-    self.weaponmodel = "progs/v_nord.mdl";
-    elapsed = time - self.aw_hand_started;
-    if (self.aw_hand_state == 1) { first = 8; count = 6; duration = world.aw_hand_draw; }
-    if (self.aw_hand_state == 2) { first = 0; count = 8; duration = world.aw_hand_idle; }
-    if (self.aw_hand_state == 3) { first = 18; count = 10; duration = world.aw_hand_punch; }
-    if (self.aw_hand_state == 4) { first = 14; count = 4; duration = world.aw_hand_lower; }
-    if (duration <= 0) { self.weaponmodel = ""; return; }
-    if (elapsed >= duration) {
-        if (self.aw_hand_state == 4) { aw_hand_begin(0); self.weaponmodel = ""; return; }
-        aw_hand_begin(2); first = 0; elapsed = 0; count = 8; duration = world.aw_hand_idle;
-    }
-    self.weaponframe = first + floor(elapsed * count / duration);
-};
 .string aw_voice;
 .string aw_line;
 .float aw_idle_step;
@@ -313,7 +263,6 @@ void() PutClientInServer = {
 };
 void() PlayerPreThink = {
     if (self.impulse == 201) { self.impulse = 0; aw_interact(); }
-    aw_hands_update();
     if (self.button2) {
         /* No swimming up in lava (contents -5, docs/LAVA.md): it is walked on. */
         if (self.waterlevel >= 2 && self.watertype != -5) self.velocity_z = 140;

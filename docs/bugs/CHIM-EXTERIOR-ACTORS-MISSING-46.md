@@ -1,5 +1,15 @@
 # CHIM-EXTERIOR-ACTORS-MISSING-46: most of the outdoor world's NPCs and every outdoor creature are missing
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 3 times; something has to be done
+
+- Reported with v0.0.48-dev2 at 2026-10-22 (time not recorded): the maintainer: outdoors NPCs only in Seyda Neen, Balmora and Vivec
+- Reported with v0.0.54-dev1 at 2026-10-27 15:58 +0200: Still no outdoor creature in the v0.0.54-dev1 MiniWinds. The maintainer, 27 October 2026: how about the in-game creatures? they are nowhere in-game? i.e. wild guars, cliff racers, slaughterfish etc. The image carries all 5,981 exterior creature references and the frames place 317 direct ones; the 4,853 levelled ones are rolled at run time. Taken by the creatures worker, who is diagnosing the run time cause in game.
+- Reported with v0.0.54-dev1 at 2026-10-27 16:30 +0200: Cause found 27 October 2026 by the creatures worker: the actor table setting was dropped silently at game start (CHIM-ACTOR-TABLE-OFF-IN-GAME-47), so only 317 direct creature rows appeared outdoors and the 5,082 levelled references were never rolled. Fix on branch v0.0.54-creatures, in-game check pending.
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -26,6 +36,7 @@ _Last updated with AmiWind v0.0.48-dev2 (22 October 2026)._
 <!-- contents start -->
 ## Contents
 
+- [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
 - [Status: 22 October 2026](#status-22-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -176,6 +187,7 @@ Family: CHIM world streamer (`chim-streamer`). The CHIM streamer keeps Quake's v
 - [BUILD-IMAGE-CHIM-NATIVE-TOWN-36](BUILD-IMAGE-CHIM-NATIVE-TOWN-36.md): The image step of a CHIM-native town read legacy region maps that are never built: the Bitter Coast test build failed at the end of its image step on maps/bc000.bsp
 - [BUILD-LEGACY-CHAIN-DEFAULT-36](BUILD-LEGACY-CHAIN-DEFAULT-36.md): Builds still prepared CHIM towns through the legacy region-map chain by default, and a retired flag (--legacy-area) was accepted with only a warning
 - [CHIM-ACTOR-RING-33](CHIM-ACTOR-RING-33.md): A scripted actor step could move the CHIM chunk ring to the actor
+- CHIM-ACTOR-SPAWN-HITCH-54 (no report page): A joining cell's actor spawns cost 5 to 135 ms a tick: the first model load of one mudcrab took 135 ms, ten spawns took 502 ms
 - [CHIM-ACTOR-TABLE-OFF-IN-GAME-47](CHIM-ACTOR-TABLE-OFF-IN-GAME-47.md): The actor table ships in v0.0.47-dev2, but the engine does not read it by default
 - [CHIM-ACTORS-OUTSIDE-RING-33](CHIM-ACTORS-OUTSIDE-RING-33.md): Actors outside the CHIM ring have no terrain collision
 - [CHIM-ACTORS-TOWN-RETURN-EMPTY-47](CHIM-ACTORS-TOWN-RETURN-EMPTY-47.md): With the type 1 window and the actor table, a town is empty after the player comes back into it from the region frames
@@ -242,6 +254,7 @@ Family: CHIM world streamer (`chim-streamer`). The CHIM streamer keeps Quake's v
 - [CHIM-REGION-POCKET-TOWN-CELLS-42](CHIM-REGION-POCKET-TOWN-CELLS-42.md): The legacy-pocket rule counts cells wholly inside a town frame as legacy: CHIM region cells around a town are left out for nothing
 - [CHIM-REGION-SEABED-NO-HEIGHTS-42](CHIM-REGION-SEABED-NO-HEIGHTS-42.md): The full build refuses the 98 heightless seabed cells as region cells (no original LAND), without naming the cell, although CHIMport converts them
 - CHIM-ROOM-16MB-REFUSAL-48 (no report page): On 16 MB of Fast RAM (or with Extra RAM off) a CHIM room larger than the zone ended the game with a host error at its door
+- [CHIM-ROOM-BLANK-WALLS-54](CHIM-ROOM-BLANK-WALLS-54.md): Our capture camera stood inside a booth wall in Desele's House: the room drew blank from there; not visible to a player
 - [CHIM-ROOM-EFRAG-LIMIT-48](CHIM-ROOM-EFRAG-LIMIT-48.md): The efrag pool limit can leave CHIM room placements undrawn in large rooms
 - [CHIM-ROOM-ESTIMATE-48](CHIM-ROOM-ESTIMATE-48.md): 27 rooms set aside as too large for a CHIM room by a wrong estimate
 - [CHIM-ROOM-HARVEST-DOUBLE-48](CHIM-ROOM-HARVEST-DOUBLE-48.md): CHIM rooms kept harvestable mushrooms in their room records: the image stopped on addamasartus (8 record placements not in the room map), and batch rooms had unpickable mushrooms

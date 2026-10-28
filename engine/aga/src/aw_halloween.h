@@ -18,6 +18,7 @@
  * made to; tools/halloween_cast.py DEFAULT_BPM); a soundtrack's measured tempo comes in the cast file. */
 #define AW_HALLOWEEN_BPM10		1320
 #define AW_HALLOWEEN_BOX_SECONDS	5		/* the greeting alone on black, in silence, before the dance */
+#define AW_HALLOWEEN_MAX_PREROLL_MS	3500	/* a soundtrack's leading silence the scene starts early (under the box) */
 #define AW_HALLOWEEN_TEXT1		"HAPPY HALLOWEEN"
 #define AW_HALLOWEEN_TEXT2		"FROM AMIWIND"
 #define AW_HALLOWEEN_CAST_FILE	"halloween.txt"
@@ -42,10 +43,16 @@ typedef struct {int kind,version,bench,value;} aw_hw_cmd_t;
 int AW_HalloweenParse(int argc,const char **argv,aw_hw_cmd_t *out);
 
 typedef struct {int role;char model[AW_HALLOWEEN_PATH];char name[32];} aw_hw_row_t;
-typedef struct {int bpm10,soundtrack,rows;aw_hw_row_t row[AW_HALLOWEEN_MAX_ROWS];} aw_hw_cast_t;
-/* The cast file's text (NUL-terminated): "AWHW1 <bpm x 10> <0/1>" then "<lead/dancer/skeleton> <model> <name>"
- * lines. 1 and *out filled, or 0 (a bad file: the scene says so and does not start). */
+typedef struct {int bpm10,soundtrack,preroll_ms,rows;aw_hw_row_t row[AW_HALLOWEEN_MAX_ROWS];} aw_hw_cast_t;
+/* The cast file's text (NUL-terminated): "AWHW1 <bpm x 10> <0/1> [<pre-roll ms>]" then "<lead/dancer/skeleton>
+ * <model> <name>" lines. The pre-roll is the soundtrack's leading silence, measured by the builder
+ * (tools/halloween_cast.py leading_silence): the track starts that much before the scene, during the greeting, so its
+ * first beat lands on the first frame of the dance. 1 and *out filled, or 0 (a bad file: the scene says so and does
+ * not start). */
 int AW_HalloweenReadCast(const char *text,aw_hw_cast_t *out);
+/* Seconds before the dance at which the custom track starts: its leading silence (PREROLL_MS) plus the player's start
+ * delay (LEAD seconds, negative taken as 0), at most BOX seconds (the greeting's length); 0 without a soundtrack. */
+float AW_HalloweenPreroll(int preroll_ms,float lead,float box);
 
 /* One move of a choreography: a group of the dancer's table by its Morrowind name, how many beats it takes (0: its
  * own length at about the beat's pace, rounded up to whole pairs of beats), and how it plays: */
@@ -65,6 +72,8 @@ float AW_HalloweenFrame(unsigned first,unsigned last,float rate,float into,float
  * other names unchanged. out holds 32 bytes. */
 void AW_HalloweenMirror(const char *group,char *out);
 
+/* The stage platform's middle, units ahead of the Balmora MiniWind arrival (aw_halloween_rules.c: measured). */
+#define AW_HALLOWEEN_STAGE_AHEAD	116.f
 /* A place on the stage: the role, which of that role's models (wrapping), and where, in map units from the player
  * (right of the view, ahead of it). */
 typedef struct {int role,model;float right,ahead;} aw_hw_slot_t;
@@ -91,10 +100,19 @@ void AW_HalloweenShotPose(int shot,float u,const float forward[3],const float ce
  * FORWARD (level, unit) and down from AW_HALLOWEEN_FRAME_PITCH degrees at CENTRE (the cast's middle, about mid-body),
  * as far back as the cast's half width and half height need to fit the field of view (FOV_X, FOV_Y degrees) with
  * AW_HALLOWEEN_FRAME_MARGIN to spare. */
-#define AW_HALLOWEEN_FRAME_PITCH	22.f
-#define AW_HALLOWEEN_FRAME_MARGIN	1.35f
+#define AW_HALLOWEEN_FRAME_PITCH	5.f		/* only as far down as the feet need: the sky in the top quarter
+								 * (take 5 at 12: no sky, the ruin's fogged wall above the cast) */
+#define AW_HALLOWEEN_FRAME_MARGIN	1.05f	/* the cast 70-85 % of the frame width (take 4 at 1.35: a third;
+								 * take 5 at 1.15: 62 %) */
 void AW_HalloweenFrameCast(const float centre[3],float half_width,float half_height,const float forward[3],
                            float fov_x,float fov_y,float eye[3]);
+/* The frame's edges as rays from EYE looking at LOOK, with a field of view of FOV_X, FOV_Y degrees: the ends, DIST
+ * along each, of the left and right edges' middles and the top edge's two corners and middle (the bottom edge looks
+ * at the stage floor, which belongs in the picture). A wall or roof within DIST on one of them fills that side of the
+ * frame with a dark wedge (the v0.0.53 platform takes): the director moves the eye in until they are clear. */
+#define AW_HW_EDGE_RAYS		5
+void AW_HalloweenEdgeRays(const float eye[3],const float look[3],float fov_x,float fov_y,float dist,
+                          float out[AW_HW_EDGE_RAYS][3]);
 /* Quake view angles (pitch down positive, yaw) looking from EYE at LOOK. */
 void AW_HalloweenAim(const float eye[3],const float look[3],float angles[3]);
 

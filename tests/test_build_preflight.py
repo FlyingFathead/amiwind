@@ -61,5 +61,42 @@ class PreflightTests(unittest.TestCase):
         self.assertLess(check, text.index("        if getattr(args, 'accept_known_stair_findings', None):\n"))
 
 
+class HarvestTownPlanTests(unittest.TestCase):
+    """BUILD-HARVEST-TOWN-PLAN-54: a full build's CHIM town other than Seyda Neen and Balmora needs CHIM region frames
+    around it (their catalogues carry its plants); refused in the plan, not 20 minutes into the image step."""
+    TOWNS = ['balmora', 'seyda', 'vivec_city']
+
+    @classmethod
+    def setUpClass(cls):
+        sys.path.insert(0, str(ROOT / 'src'))
+        import build
+        from chim import regions
+        cls.regions = regions
+        cls.default = regions.plan(['@' + str(build.CHIM_CELLS_DEFAULT)], build.CHIM_CELLS_STATUS_DEFAULT,
+                                   towns=cls.TOWNS)
+
+    def test_the_default_full_build_passes(self):
+        table, problems = self.default
+        self.assertEqual(problems, [])
+        self.assertEqual(build_preflight.harvest_town_problems(self.TOWNS, (table, {})), [])
+
+    def test_a_town_without_region_frames_around_it_is_refused(self):
+        problems = build_preflight.harvest_town_problems(self.TOWNS, None)       # --chim-regions none
+        self.assertEqual(len(problems), 1)
+        self.assertIn('vivec_city', problems[0])
+        far = {'cells': {self.regions.cell_key((-19, 14)): {}}}                   # region cells elsewhere only
+        self.assertEqual(len(build_preflight.harvest_town_problems(['vivec_city'], (far, {}))), 1)
+        near = {'cells': {self.regions.cell_key((0, -12)): {}}}                   # one cell west of Vivec's frame
+        self.assertEqual(build_preflight.harvest_town_problems(['vivec_city'], (near, {})), [])
+
+    def test_the_fixed_towns_and_miniwinds_are_not_refused(self):
+        self.assertEqual(build_preflight.harvest_town_problems(['balmora', 'seyda'], None), [])
+        self.assertEqual(build_preflight.harvest_town_problems(self.TOWNS, None, miniwind=True), [])
+
+    def test_the_check_runs_in_the_build_preflight(self):
+        text = (ROOT / 'tools' / 'build.py').read_text(encoding='utf-8')
+        self.assertIn('build_preflight.harvest_town_problems(chim_native_towns(args, preflight_builder),', text)
+
+
 if __name__ == '__main__':
     unittest.main()

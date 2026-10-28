@@ -1,6 +1,6 @@
 # CHIM world format
 
-_Last updated with AmiWind v0.0.48 (23 October 2026)._
+_Last updated with AmiWind v0.0.54-dev1 (27 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -802,6 +802,25 @@ The type 1 window takes a joining frame's actors from it with `chim actors table
 off and not saved (the actors of the frame maps, as before), so an image built with the table ends
 `id1/default-game.cfg` with that line (`build_aga.py` `stage_chim_actor_table_config`; `chim actors table 0` in the
 console gives the actors of the frame maps back). Written by `tools/chim/actors.py`, read by `chim/chim_actor_table.c` and `aw_actors.c`.
+
+Until v0.0.54 that line did nothing: the game runs `default-game.cfg` before any map starts, and the engine's
+`chim actors` command stopped while no map ran before it reached its settings, so from v0.0.47 to v0.0.53 every
+joining frame took the actors of its frame map and the 5,082 levelled creature references of the exterior were never
+rolled ([CHIM-ACTOR-TABLE-SETTING-DROPPED-47](../bugs/CHIM-EXTERIOR-ACTORS-MISSING-46.md), found 27 October 2026).
+From v0.0.54 the settings (`table`, `budget`, `warm`, `seed`, `trace`) take before a map runs
+(`tests/test_actor_table_setting.py`). What changes with it: a joining frame's actors all come from the table,
+NPCs included, in place of the frame map's actor rows (the region frames' placed rows are in the table as built
+rows, flag 2, so they keep their placed positions); the frame a map starts on still spawns its own map's rows. The
+table path ran only in tests and by hand before; a difference against the frame maps' NPC rows is a finding.
+
+The rooms' levelled creatures (from v0.0.54): the table's levelled lists are every list the exterior or a room
+references (`tools/chim/actors.py` `table_list_order`, one order for the table and the room stage; 58 lists give
+the 1,270 levelled references of Morrowind.esm's rooms), and its bases every creature those lists can give, with the
+actor library's models (a mesh only the rooms' lists reach is baked with the skeletal method). A room map carries
+each levelled reference as an `aw_levelled` entity: `aw_ref` the reference number, `sounds` the list's index in that
+order, origin and angle as the room's creatures. The engine takes such an entity while the map loads
+(`pr_edict.c` hands it to `aw_actors.c`), rolls it as an outdoor levelled reference (the player's level, the pick
+kept under the reference, so the room gives the same creature again, or nothing) and spawns the creature there.
 
 - **Records** (24 bytes, big-endian): u32 key (the reference number & 0xFFFFFF), u16 base, u16 flags, f32 origin
   x, y, z in the local units of the reference's own cell (the cell centre at 0, 0: the frame-local units of that

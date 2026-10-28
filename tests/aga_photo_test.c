@@ -9,6 +9,8 @@
 #include "aw_world.h"
 server_t sv;server_static_t svs;client_state_t cl;client_static_t cls;viddef_t vid;
 keydest_t key_dest;qboolean noclip_anglehack;int scr_copyeverything;vec3_t vec3_origin;
+int aw_hud_hidden;	/* view.c's in the engine */
+int aw_crosshair_owned_cue;	/* view.c's too (default off) */
 static cvar_t *vars[32];static char strings[32][64];static int nvars;
 void Cvar_RegisterVariable(cvar_t *v){assert(nvars<32);vars[nvars]=v;strcpy(strings[nvars],v->string);v->string=strings[nvars];v->value=atof(v->string);nvars++;}
 cvar_t *Cvar_FindVar(char *name){int i;for(i=0;i<nvars;i++)if(!strcmp(vars[i]->name,name))return vars[i];return NULL;}
@@ -139,9 +141,27 @@ int main(void){
  run(crosshair,"sideways");assert(AW_CrosshairShown());
  run(photo,"on");assert(!strcmp(str("crosshair"),"0") && AW_CrosshairShown());
  run(crosshair,"off");assert(!strcmp(str("crosshair"),"0") && !AW_CrosshairShown());
- AW_CrosshairSet(1);assert(AW_CrosshairShown() && !strcmp(str("crosshair"),"0"));AW_CrosshairSet(0);
+ /* PHOTO-CROSSHAIR-51: the console's on/off overrides photo mode's hiding at once and is kept on exit */
+ AW_CrosshairSet(1);assert(AW_CrosshairShown() && !strcmp(str("crosshair"),"1"));AW_CrosshairSet(0);
  run(photo,"off");assert(!strcmp(str("crosshair"),"0") && !AW_CrosshairShown());
  AW_CrosshairSet(1);assert(!strcmp(str("crosshair"),"1"));
+ run(photo,"on");assert(!strcmp(str("crosshair"),"0") && AW_CrosshairShown()); /* hidden by default in photo mode */
+ Cvar_Set("crosshair","1");assert(AW_CrosshairShown()); /* the raw console setting turned it on: kept */
+ run(photo,"off");assert(!strcmp(str("crosshair"),"1"));
+ Cvar_Set("crosshair","0");run(photo,"on");printed[0]=0;run(crosshair,"on");
+ assert(!strcmp(str("crosshair"),"1") && strstr(printed,"photo mode too"));
+ run(photo,"off");assert(!strcmp(str("crosshair"),"1"));
+ /* UI-HUD-TOGGLE-KEY-51: dbg photomode hud (Ctrl+Alt+H) hides and shows the HUD only; photo mode untouched */
+ assert(!aw_hud_hidden);vid.recalc_refdef=false;printed[0]=0;run(photo,"hud");
+ assert(aw_hud_hidden && vid.recalc_refdef && !AW_PhotoModeActive() && strstr(printed,"HUD hidden"));
+ assert(!strcmp(str("crosshair"),"1") && player.v.movetype==MOVETYPE_WALK); /* nothing else changes */
+ run(photo,"HUD");assert(!aw_hud_hidden && strstr(printed,"HUD shown"));
+ /* the owned-item cue switch (dbg crosshair owned): off by default (the original and OpenMW), on/off, a bad word changes nothing */
+ assert(!aw_crosshair_owned_cue);run2(crosshair,"owned","on");assert(aw_crosshair_owned_cue);
+ run2(crosshair,"owned","off");assert(!aw_crosshair_owned_cue && strstr(printed,"cue on the crosshair: off"));
+ run2(crosshair,"owned","maybe");assert(!aw_crosshair_owned_cue && strstr(printed,"Usage: dbg crosshair owned"));
+ run2(crosshair,"owned","on");assert(aw_crosshair_owned_cue);
+ printed[0]=0;run(crosshair,"owned");assert(strstr(printed,"red over an owned thing") && AW_CrosshairShown());
  /* dbg crosshair colour / shape: a name (any case, a unique start) or its number; no name prints. */
  assert(AW_CrosshairStyle(0)==0 && !strcmp(AW_CrosshairStyleName(0,0),"Warm white") && !strcmp(AW_CrosshairStyleName(1,0),"Cross"));
  assert(AW_CrosshairStyleCount(0)==4 && AW_CrosshairStyleCount(1)==4);

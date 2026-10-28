@@ -17,6 +17,9 @@ from chim import heap  # noqa: E402
 from chim.validate import validate  # noqa: E402
 from test_chim_format import fixture  # noqa: E402
 
+# the engine structs the 16 MB zone counts read (heap.nonring_zone_users; CHIM-HEAP-GATE-NONRING-16MB-54)
+NONRING_STRUCTS_SHA256 = 'c4e21b8cecd6745a179469e6caf59b3b257f2962b5b19b519fd1094dc549ded3'
+
 # 68k sizes of the probed types (illustrative; the build probes the real ones)
 SIZES = {'pointer': 4, 'short': 2, 'int': 4, 'hunk': 16, 'dvertex': 12, 'dedge': 4, 'dplane': 20, 'dnode': 24,
          'dclipnode': 8, 'clipnode': 8, 'dleaf': 28, 'texinfo': 40, 'dface': 20, 'dmodel': 64, 'mvertex': 12,
@@ -392,6 +395,137 @@ class ImageGateMarksTests(unittest.TestCase):
         self.assertEqual(report['marked_32mb_late'], ['vf0147'])
         self.assertEqual(marked, [([(1, 2)], ['vf0147.chim'])])
         self.assertEqual((maps['vf0147']['fast_mb'], maps['vf0147']['marked_by_image_gate']), (heap.SAFE_FAST_MB, True))
+
+    def test_a_map_the_stage_marked_is_early_not_late(self):
+        # the v0.0.53 final: vf0147, vf0288 and vf0403 carried the stage's mark (build_aga.py) yet were listed as late
+        from unittest import mock
+        maps = {'vf0147': dict(self.frame('vf0147', False), map_fast_mb=heap.SAFE_FAST_MB),
+                'vf0288': self.frame('vf0288', False)}
+        with mock.patch.object(heap, 'frame_map_heap', return_value=maps), \
+                mock.patch.object(heap, 'frame_fast_ram', return_value=heap.SAFE_FAST_MB), \
+                mock.patch.object(heap, 'mark_frame_maps', return_value=['vf0288']) as mark:
+            report = heap.require_frame_map_heap('world', 'id1', sizes=SIZES, heap_mb=11)
+        self.assertTrue(report['ok'])
+        self.assertEqual((report['marked_32mb_early'], report['marked_32mb_late']), (['vf0147'], ['vf0288']))
+        mark.assert_called_once_with('id1', {(1, 2)}, maps=['vf0288.chim'])
+        self.assertTrue(maps['vf0147']['marked_by_stage'])
+        self.assertNotIn('marked_by_image_gate', maps['vf0147'])
+
+    def test_a_stage_marked_frame_that_fits_neither_still_stops_the_build(self):
+        from unittest import mock
+        maps = {'vf0147': dict(self.frame('vf0147', False), map_fast_mb=heap.SAFE_FAST_MB)}
+        with mock.patch.object(heap, 'frame_map_heap', return_value=maps), \
+                mock.patch.object(heap, 'frame_fast_ram', return_value=0):
+            with self.assertRaisesRegex(ValueError, 'vf0147.chim needs 6251840 bytes'):
+                heap.require_frame_map_heap('world', 'id1', sizes=SIZES, heap_mb=11)
+
+    def test_frame_map_heap_reads_the_maps_own_mark(self):
+        # a frame map with the stage's mark in its worldspawn reports map_fast_mb 32; an unmarked one None
+        import tempfile
+        from pathlib import Path
+        from unittest import mock
+        from chim import format as F
+        from chim.frame_map import FRAME_KEY, entity_text
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / 'maps').mkdir()
+            for stem, cell, mark in (('vf0147', '1 2', True), ('vf0002', '3 4', False)):
+                ws = {'classname': 'worldspawn', FRAME_KEY: cell}
+                if mark:
+                    ws[heap.FRAME_FAST_KEY] = str(heap.SAFE_FAST_MB)
+                lumps = [b''] * 15
+                lumps[0] = entity_text([ws])
+                (Path(tmp) / 'maps' / (stem + '.chim')).write_bytes(F.brush_image(lumps)[0])
+            frames = [('frames/x+01/y+02/frame.ccf', {'cell': [1, 2], 'nx': 2, 'ny': 2, 'owned_total': 9}, []),
+                      ('frames/x+03/y+04/frame.ccf', {'cell': [3, 4], 'nx': 2, 'ny': 2, 'owned_total': 9}, [])]
+            world = {'settings': {}, 'textures': [], 'models': [], 'frames': frames}
+
+            def ring(world, *a, **k):
+                return {'frames': [{'frame': f[0], 'ok': True} for f in world['frames']]}
+            with mock.patch.object(heap, 'ring_peak', side_effect=ring), \
+                    mock.patch.object(heap, 'actor_cache', return_value={}), \
+                    mock.patch.object(heap, 'streamed_chunk_models', return_value={}), \
+                    mock.patch('map_files.frame_maps', return_value=sorted((Path(tmp) / 'maps').iterdir())), \
+                    mock.patch('engine_limits.chim_memory', return_value={'heap_mb': 11, 'zone_kib': 6864,
+                                                                          'pool_kib': 384, 'gap_bytes': 0}), \
+                    mock.patch('engine_limits.whole_map_zone', return_value=7028736):
+                out = heap.frame_map_heap('w', tmp, {'hunk': 16, 'entity': 196}, world=world)
+        self.assertEqual((out['vf0147']['map_fast_mb'], out['vf0002']['map_fast_mb']), (heap.SAFE_FAST_MB, None))
+
+    def test_nonring_users_counted_as_the_v053_seyda_arrival(self):
+        # CHIM-HEAP-GATE-NONRING-16MB-54: the v0.0.53 final's world (35,657 files, 32,714 models, 1,132 textures) and
+        # Seyda Neen's frame (1,638 chunks, 42 x 39 cells, 2,828 owned, 1,012 streamed statics), entity_t 196 bytes
+        users = heap.nonring_zone_users(35657, 32714, 1132, {'nx': 42, 'ny': 39, 'owned_total': 2828}, 1638, 1012,
+                                        {'entity': 196, 'hunk': 16}, buffer_bytes=32768)
+        self.assertEqual(users['store_index'], heap.room_block(35657 * 28 + (32714 + 1132) * 24))
+        self.assertEqual(users['chunk_index'], heap.room_block(1638 * 136 + 42 * 39 * 2 + 2 * 354))
+        self.assertEqual(users['statics_list'], heap.room_block(1012 * (196 + 38 + 88 + 2) + 1640 * 4 + 64))
+        self.assertEqual(users['loading_buffer'], heap.room_block(32768))
+        # with the measured ring of the arrival (3,481 KiB) and the pool (768 KiB) this is the engine's locked zone
+        # (6,591 KiB) within 5 %
+        total = sum(users.values()) + 3481 * 1024 + 768 * 1024
+        self.assertLess(abs(total - 6591 * 1024), 0.05 * 6591 * 1024)
+        self.assertEqual(heap.nonring_zone_users(1, 0, 0, {'nx': 1, 'ny': 1}, 1, 0, {'entity': 196})['statics_list'], 0)
+
+    def test_32mb_judged_with_every_zone_user(self):
+        # the v0.0.53 final's seyda-chim: the bank holds the store index, the prefetch table and the ring's banked parts
+        users = heap.nonring_zone_users(35657, 32714, 1132, {'nx': 42, 'ny': 39, 'owned_total': 2828}, 1638, 1012,
+                                        {'entity': 196, 'hunk': 16}, buffer_bytes=32768)
+        frame = {'budget_bytes': 6012928, 'largest_block_bytes': 567776,
+                 'peak_breakdown': {'models_drawn': 3100888, 'models_collision': 91128, 'textures': 432480,
+                                    'shared': 221648}}
+        memory = {'bank_bytes': 7340032}
+        got = heap.zone_32mb(frame, users, 4564912, memory)
+        self.assertTrue(got['fits_32mb_engine'])
+        self.assertEqual(got['bank_free_32mb_bytes'],
+                         7340032 - users['store_index'] - heap.room_block(heap.ROOM_PREFETCH_TABLE))
+        self.assertEqual(got['need_32mb_bytes'], 4564912 - (3100888 + 91128 + 432480 + 221648) + users['chunk_index']
+                         + users['statics_list'] + users['loading_buffer'])
+        # no bank (a machine below the minimum): the same ring with the zone users does not fit
+        self.assertFalse(heap.zone_32mb(frame, users, 4564912 + 2000000, {'bank_bytes': 0})['fits_32mb_engine'])
+
+    def test_a_map_over_32mb_is_refused(self):
+        from unittest import mock
+        maps = {'vf0002': dict(self.frame('vf0002', True), fits_32mb_engine=False, need_32mb_bytes=7000000)}
+        with mock.patch.object(heap, 'frame_map_heap', return_value=maps):
+            with self.assertRaisesRegex(ValueError, 'vf0002.chim does not fit the 32 MB minimum'):
+                heap.require_frame_map_heap('world', 'id1', sizes=SIZES, heap_mb=11)
+
+    def test_rooms_that_grow_twice_are_named(self):
+        # ROOM-LOADS-THRICE-54: the v0.0.53 final's Akulakhan's Chamber walk grew by the free Fast RAM and the Hunk rest
+        rooms = {'rifa4ef181ed': {'walk_32mb': {'grown': ['free Fast RAM', 'Hunk rest'], 'tries': 3, 'ok': True}},
+                 'ri71c3339d8b': {'walk_32mb': 'one bank: the sum decides'},
+                 'once': {'walk_32mb': {'grown': ['free Fast RAM'], 'tries': 2, 'ok': True}}}
+        self.assertEqual(heap.room_grows_32mb(rooms), {'rifa4ef181ed': 2})
+
+    def test_the_engine_grows_a_room_before_its_first_try(self):
+        # chim_room.c: RoomPreGrow sums the record's models from the store index and grows before the first load
+        src = (ROOT / 'engine' / 'aga' / 'src' / 'chim' / 'chim_room.c').read_text(encoding='utf-8')
+        self.assertIn('static void RoomPreGrow', src)
+        load = src[src.index('static int RoomLoad'):]
+        self.assertLess(load.index('RoomPreGrow (room.name'), load.index('ChimModels_Step (id, &budget)'))
+        self.assertIn('if (room_tries == 1)', load)
+
+    def test_nonring_counts_follow_the_engine_structs(self):
+        # the counts read chim_local.h chim_entry_t / chim_format.h chim_chunk_entry_t and chim_statics.c's two structs:
+        # a change there must be counted again (CHIM_ENTRY_BYTES, CHIM_STATIC_EXTRA, CHIM_SMODEL_BYTES)
+        import hashlib
+        import re
+        from pathlib import Path
+        src = Path(__file__).resolve().parents[1] / 'engine' / 'aga' / 'src' / 'chim'
+
+        def struct(path, name):
+            text = (src / path).read_text(encoding='utf-8')
+            end = text.index('} %s;' % name)
+            body = text[text.rindex('typedef struct', 0, end):end]
+            return re.sub(r'/\*.*?\*/|\s+', '', body, flags=re.S)
+        digest = hashlib.sha256('|'.join([struct('chim_local.h', 'chim_entry_t'),
+                                          struct('chim_format.h', 'chim_chunk_entry_t'),
+                                          struct('chim_statics.c', 'chim_static_t'),
+                                          struct('chim_statics.c', 'chim_smodel_t')]).encode()).hexdigest()
+        self.assertEqual(digest, NONRING_STRUCTS_SHA256, 'the engine structs the 16 MB zone counts read changed: count '
+                         'CHIM_ENTRY_BYTES, CHIM_STATIC_EXTRA and CHIM_SMODEL_BYTES again, then update the digest')
+        self.assertIn('#define CHIM_MAX_STATICS\t\t%d' % heap.CHIM_MAX_STATICS,
+                      (src / 'chim_statics.c').read_text(encoding='utf-8'))
 
     def test_a_frame_that_fits_neither_still_stops_the_build(self):
         from unittest import mock

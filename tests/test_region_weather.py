@@ -43,6 +43,22 @@ class WeatherWiringTests(unittest.TestCase):
         self.assertIn('sky_made_weather==sky_table_weather', sky)
         self.assertIn('AW_WeatherInit();', sky)
 
+    def test_weather_lights_the_land_through_the_scene_ambient(self):
+        # WEATHER-AMBIENT-SUN-UNUSED-51: the weather's ambient + sun light (AWW2) tones the scene ambient before it is
+        # split into daylight and hue, and toned daylight leaves the plain daytime table; aw_weather 2 keeps the
+        # land's light of before (no new setting).
+        sky = code('r_sky.c')
+        tables = sky[sky.index('static void R_SkyColourTables'):sky.index('const unsigned char *R_DayNightFogColours')]
+        self.assertLess(tables.index('toned=R_SkyWeatherAmbient(aa,bb,'), tables.index('R_SkyNightLight(ambient);'))
+        self.assertIn('(sky_frame_type==1 || phase==0) && !toned?i:', tables)
+        self.assertIn('sky_table_weather_light=R_SkyWeatherLightPercent();', tables)
+        self.assertIn('AW_WeatherLightTone(&sky_weather_blend,a,b,mix,tone);', sky)
+        self.assertIn('R_SkyWeatherLightPercent()!=sky_table_weather_light', sky)
+        weather = code('aw_weather.c')
+        self.assertIn('return aw_weather.value<1.5f;', weather)
+        self.assertIn('Cvar_SetValue(aw_weather.name,2)', weather)
+        self.assertIn('20+AW_WEATHER_LOOK_V2*AW_WEATHERS+10*AW_WEATHER_REGIONS', weather)
+
     def test_region_index_comes_from_the_region_name_lookup(self):
         world = code('aw_world.c')
         self.assertIn('int AW_RegionIndexAt(const float *position)', world)
@@ -77,6 +93,33 @@ class WeatherWiringTests(unittest.TestCase):
         from prepare_world_ui import WORLD_UI_FILES
         self.assertIn('region-weather.aww', WORLD_UI_FILES)
         self.assertIn('"world/region-weather.aww"', (SRC / 'aw_weather.h').read_text(encoding='utf-8'))
+
+
+class InteriorFogWiringTests(unittest.TestCase):
+    """INTERIOR-FOG-UNUSED-51: the interior fog pass reads its room's row from world/interior-fog.awf (the builder's
+    table) and fogs linearly from the viewing distance x (1 - density) to the viewing distance (rule from OpenMW
+    mwrender/fogmanager.cpp); aw_fog 2 keeps the interiors of before."""
+
+    def test_interior_fog_pass(self):
+        fog = code('aw_fog.c')
+        draw = fog[fog.index('void AW_FogDraw'):]
+        self.assertIn('if(AW_Interior()){interior_fog_draw();return;}', draw)
+        self.assertIn('#define INTERIOR_FOG_PATH "world/interior-fog.awf"', (SRC / 'aw_fog.c').read_text(encoding='utf-8'))
+        self.assertIn('#define INTERIOR_FOG_VIEW 1792', (SRC / 'aw_fog.c').read_text(encoding='utf-8'))
+        self.assertIn('if(!aw_fog.value || aw_fog.value>=2 || !sv.active)return;', fog)
+        self.assertIn('start=INTERIOR_FOG_VIEW-INTERIOR_FOG_VIEW*interior_fog_density/255;', fog)
+        self.assertIn('AW_FogDepthRange(depths,start,INTERIOR_FOG_VIEW);', fog)
+        # the exterior table is rebuilt after an interior used the shared depth table
+        self.assertIn('old_distance=-1;', fog)
+        sky = code('r_sky.c')
+        self.assertIn('const unsigned char *R_InteriorFogColours(int r,int g,int b)', sky)
+        import sys
+        sys.path.insert(0, str(ROOT / 'tools'))
+        from prepare_world_ui import WORLD_UI_FILES, INTERIOR_FOG_ROW
+        self.assertIn('interior-fog.awf', WORLD_UI_FILES)
+        self.assertIn('#define INTERIOR_FOG_ROW %d' % INTERIOR_FOG_ROW, (SRC / 'aw_fog.c').read_text(encoding='utf-8'))
+        features = (ROOT / 'config' / 'release-features.json').read_text(encoding='utf-8')
+        self.assertIn('id1/world/interior-fog.awf', features)
 
 
 if __name__ == '__main__':

@@ -13,8 +13,11 @@ import struct
 # model's one rest frame goes into the same cache block, counted in its total, inside AW_ALIAS_STREAM_LIMIT; the
 # model's animation table is held outside the cache by aw_skel_load.c, one malloc per table for the session), then for
 # the refused table's message said once per model (26 October 2026, SDK-MALLOC-TRAPS-52: a static list of 64 model
-# pointers, no allocation added).
-STREAM_SHA256='e078ca236c9e14c58df7496d4c46eca4c051d1f02c1a60ba27b5cd25bde8cd3a'
+# pointers, no allocation added), then for extended models (27 October 2026, SKEL-VERTEX-LIMIT-52: a model past
+# 2,000 vertices up to MAXALIASVERTS streams into the same cache block when its model-budgets.txt line matches the
+# CRC-32 computed while reading; a scalar CRC and a flag, no allocation added).
+STREAM_SHA256='811eee9377e8a6560c44d39618ef99763ea36be02ebe09b3d80c999f0eba1d63'
+STREAM_VERTEX_LIMIT=3072       # r_local.h MAXALIASVERTS (past 2,000 only with the model's model-budgets.txt line)
 STREAM_LIMIT=768*1024          # model.c AW_ALIAS_STREAM_LIMIT (tools/npc_anim.py ALIAS_BYTE_BUDGET)
 
 def runtime_policy(source):
@@ -38,7 +41,7 @@ def runtime_policy(source):
 def eligible(raw,decoded):
     if not 84<=len(raw)<=STREAM_LIMIT or decoded>STREAM_LIMIT or raw[:8]!=b'IDPO\x06\x00\x00\x00':return False
     skins,w,h,nv,nt,nf=struct.unpack_from('<6i',raw,48)
-    if skins!=1 or w<=0 or w%4 or not 0<h<=480 or not 0<nv<=2000 or nt<=0 or nf<=0:return False
+    if skins!=1 or w<=0 or w%4 or not 0<h<=480 or not 0<nv<=STREAM_VERTEX_LIMIT or nt<=0 or nf<=0:return False
     at=88+w*h+nv*12+nt*16
     end=at+nf*(28+nv*4)
     # a skeletal actor (tools/skeletal_actor.py) has one rest frame and its "AWSB" block after the frames: the stream

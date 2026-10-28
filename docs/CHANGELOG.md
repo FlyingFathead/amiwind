@@ -1,10 +1,11 @@
 # Changelog
 
-_Last updated with AmiWind v0.0.53 (27 October 2026)._
+_Last updated with AmiWind v0.0.54 (28 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.54: Hair, Movement, Magic And More, 28 October 2026](#v0054-hair-movement-magic-and-more-28-october-2026)
 - [v0.0.53: Super Freak Halloween Update, 27 October 2026](#v0053-super-freak-halloween-update-27-october-2026)
 - [v0.0.52: Skeletons Of Society, Vvardenfell Edition, 26 October 2026](#v0052-skeletons-of-society-vvardenfell-edition-26-october-2026)
 - [v0.0.51: Let There Be More Inner Light, 25 October 2026](#v0051-let-there-be-more-inner-light-25-october-2026)
@@ -161,6 +162,36 @@ _Last updated with AmiWind v0.0.53 (27 October 2026)._
 - [CHIM source candidate - 14 October 2026, v0.0.40-dev1](#chim-source-candidate---14-october-2026-v0040-dev1)
 
 <!-- contents end -->
+
+## v0.0.54: Hair, Movement, Magic And More, 28 October 2026
+
+- Humanoid characters choose every animation group by their state (standing, walking, running, fighting, casting,
+  dying) by OpenMW's rules; the first-person hands play their own clips.
+- Hair is kept whole instead of being cut to a budget, the player's body has hair, and the heads beside whole hair
+  keep 136 to 178 triangles ([NPC-HEAD-STARVED-WHOLE-HAIR-54](bugs/NPC-HEAD-STARVED-WHOLE-HAIR-54.md)).
+- One record per character: all 3,437 NPCs and creatures with their stats, behaviour, items and spells from the game
+  data, autocalculated by the original rules, kept in saved games ([ACTOR_STATE.md](ACTOR_STATE.md)).
+- The experimental scripts (`dbg mwscript on`) read and change those records, start and stop combat and ask a
+  character's current package (wander, travel, follow): 715 of 1,207 scripts run whole (390 in v0.0.53); the commonest test compiles to one
+  instruction, 9 % smaller scripts, 31 to 44 % fewer instructions a frame ([MWSCRIPT_BYTECODE.md](MWSCRIPT_BYTECODE.md)).
+- Travel services again: every caravaner, shipmaster, gondolier and Mages Guild guide, with the original
+  destinations and prices ([TRAVEL-SERVICES-CHIM-51](BUGS.md)).
+- Magic effects as sprites and particles from the game's own textures, experimental and off by default
+  ([MAGIC_EFFECTS.md](MAGIC_EFFECTS.md)).
+- 34 of the 35 entrances the converted collision still kept out of reach can be used: a standing-room rule for the
+  Redoran guard towers and the Daedric shrine entries, exact plate bevels, and the original ground around doors in a
+  dip; the Unmarked Shipwreck's upper trapdoor stays listed
+  ([DOOR-USE-COLLISION-FILLED-53](bugs/DOOR-USE-COLLISION-FILLED-53.md)).
+- Weather and smoke from the game's tables, fog indoors, levelled creatures outdoors, more creature animations.
+- Interface: a crosshair, a hide-HUD key, a locked-door notice, the player's arrow on the map, console history.
+- NPC Gallery v2.0 shows the game's own characters, nothing baked for it ([CHARACTER_MODEL_GALLERY.md](CHARACTER_MODEL_GALLERY.md));
+  `dbg sweep` names what an area's entities miss ([AMIWIND_CONSOLE_COMMANDS.md](AMIWIND_CONSOLE_COMMANDS.md)).
+- No rust-red speckle on dark ground at night ([NIGHT-RUST-31](bugs/NIGHT-RUST-31.md)); owned mushrooms indoors can
+  be picked as theft ([HARVEST-INTERIOR-PICK-47](bugs/HARVEST-INTERIOR-PICK-47.md)).
+- The Vivec Arena Pit draws about 29 % faster (its upper ring 27.5 to 18.0 ms a frame); the first-person hand driver runs in C; the Suran dancers' hair is whole at the back.
+- The Halloween cast is in every full-world build, so `aw bench halloween` works in release images.
+- An engine change, or a builder change the world does not use, no longer rebuilds the CHIM world. The release image
+  is the v0.0.54-dev2 world with the version changed.
 
 ## v0.0.53: Super Freak Halloween Update, 27 October 2026
 

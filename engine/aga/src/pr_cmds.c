@@ -22,6 +22,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "aw_items.h"
 #include "aw_anim.h"
 #include "aw_glut.h"
+#include "aw_talk.h"
 
 #define	RETURN_EDICT(e) (((int *)pr_globals)[OFS_RETURN] = EDICT_TO_PROG(e))
 
@@ -1863,6 +1864,9 @@ static void PF_aw_npctarget(void)
 {
     edict_t *player=G_EDICT(OFS_PARM0);
     edict_t *target=AW_NPCTarget(player,player->v.v_angle);
+    /* QC's aw_interact (E) talks to it: none when it cannot be talked to (TALK-PROMPT-RULES, aw_talk.c, the prompt's
+     * rule): dead, in combat, knocked down or nothing to say */
+    if(target && aw_can_talk && !aw_can_talk(target))target=NULL;
     if(!target)target=EDICT_NUM(0);
     RETURN_EDICT(target);
 }

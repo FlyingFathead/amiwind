@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-only
-"""The NPC voice and greeting table (AWGL1, id1/npc-voices.lut): every NPC record's voice lines and conversation
+"""The NPC voice and greeting table (AWGL2, id1/npc-voices.lut): every NPC record's voice lines and conversation
 greeting, resolved at build time as far as the game's rules are static, for the engine to look up by record
 (NPC-GREETINGS-LIBRARY-MUTE-48; docs/NPC_VOICE_TABLE.md).
 
@@ -40,12 +40,47 @@ for _p in (ROOT / 'tools', ROOT / 'src'):
     sys.path.insert(0, str(_p))
 
 MAGIC = b'AWGL'
-VERSION = 1
+VERSION = 2                      # 2: the creature sound rows and the named sound slots (docs/NPC_DEFAULTS.md)
 NAME = 'npc-voices.lut'
-HEADER = 72
+HEADER = 80
 # after the magic: version, topics, then the counts of npcs, sets, list sets, list set items, lists, list items,
-# entries, conditions, sounds, globals, names, string bytes, text bytes; reset distance, greet seconds, functions
-HEADER_FORMAT = '>HH13IHHHH'
+# entries, conditions, sounds, globals, names, string bytes, text bytes; reset distance, greet seconds, functions,
+# 0; then (version 2) the counts of creature rows and named slots, SOUN rows, 0
+HEADER_FORMAT = '>HH13IHHHHHHII'
+# A Sounds row (version 2): the pool file's 8 bytes, u16 length (1/100 s), u16 flags (SOUND_MAPPED: the build has it)
+SOUND_ROW = '>8sHH'
+SOUND_MAPPED = 1
+# A SOUN row, one per SOUN record of the three masters sorted by the folded id (soun_order()): the pool file's 8 bytes
+# (zero when not mapped), u16 length (1/100 s), u8 volume, u8 flags (SOUND_MAPPED), u16 near, u16 far (hearing
+# distances: the record's min/max times fAudioMinDistanceMult/fAudioMaxDistanceMult, rule from OpenMW
+# apps/openmw/mwsound/soundbuffer.cpp, mwscript.gamedata.GameData.sound_range). The compiled scripts' sounds index it.
+SOUN_ROW = '>8sHBBHH'
+# THE SOUND TABLE CONTRACT: the same order as engine/aga/src/aw_glut.h AW_SNDG_* and AW_SLOT_* (checked name by name
+# by tests/test_greeting_lut.py). A creature row: u32 id string offset, 8 x u16 Sounds index. A slot: u16 Sounds index.
+CREATURE_ROW = '>I8H'
+SNDG_MOMENTS = ('LEFT_FOOT', 'RIGHT_FOOT', 'SWIM_LEFT', 'SWIM_RIGHT', 'MOAN', 'ROAR', 'SCREAM', 'LAND')
+# (slot, the SOUN record the engine plays by name: rule from OpenMW mwmechanics/combat.cpp, character.cpp and the
+# mwclass item classes' getUpSoundId/getDownSoundId)
+SOUND_SLOTS = (
+    ('WEAPON_SWISH', 'Weapon Swish'), ('MISS', 'miss'), ('LIGHT_ARMOR_HIT', 'Light Armor Hit'),
+    ('MEDIUM_ARMOR_HIT', 'Medium Armor Hit'), ('HEAVY_ARMOR_HIT', 'Heavy Armor Hit'),
+    ('HAND_TO_HAND_HIT', 'Hand To Hand Hit'), ('HAND_TO_HAND_HIT_2', 'Hand To Hand Hit 2'),
+    ('HEALTH_DAMAGE', 'Health Damage'), ('BOW_PULL', 'bowPull'), ('BOW_SHOOT', 'bowShoot'),
+    ('CROSSBOW_PULL', 'crossbowPull'), ('CROSSBOW_SHOOT', 'crossbowShoot'), ('DEFAULT_LAND', 'DefaultLand'),
+    ('DEFAULT_LAND_WATER', 'DefaultLandWater'), ('BODY_FALL_SMALL', 'Body Fall Small'),
+    ('BODY_FALL_MEDIUM', 'Body Fall Medium'), ('BODY_FALL_LARGE', 'Body Fall Large'),
+    ('FOOT_BARE_LEFT', 'FootBareLeft'), ('FOOT_BARE_RIGHT', 'FootBareRight'), ('FOOT_LIGHT_LEFT', 'FootLightLeft'),
+    ('FOOT_LIGHT_RIGHT', 'FootLightRight'), ('FOOT_MED_LEFT', 'FootMedLeft'), ('FOOT_MED_RIGHT', 'FootMedRight'),
+    ('FOOT_HEAVY_LEFT', 'FootHeavyLeft'), ('FOOT_HEAVY_RIGHT', 'FootHeavyRight'),
+    ('FOOT_WATER_LEFT', 'FootWaterLeft'), ('FOOT_WATER_RIGHT', 'FootWaterRight'), ('SWIM_LEFT', 'Swim Left'),
+    ('SWIM_RIGHT', 'Swim Right'),
+) + tuple(('ITEM_%s_%s' % (kind.upper().replace(' ', '_'), way.upper()), 'Item %s %s' % (kind, way))
+          for kind in ('Ammo', 'Apparatus', 'Armor Light', 'Armor Medium', 'Armor Heavy', 'Bodypart', 'Book',
+                       'Clothes', 'Gold', 'Ingredient', 'Lockpick', 'Misc', 'Potion', 'Probe', 'Repair', 'Ring',
+                       'Weapon Blunt', 'Weapon Bow', 'Weapon Crossbow', 'Weapon Longblade', 'Weapon Shortblade',
+                       'Weapon Spear')
+          for way in ('Up', 'Down'))
+SOUND_MASTERS = ('Morrowind.esm', 'Tribunal.esm', 'Bloodmoon.esm')
 NONE16 = 0xFFFF
 NONE32 = 0xFFFFFFFF
 # The Voice topics the engine knows by name first (engine/aga/src/aw_glut.h AW_GLUT_*), then any other in ID order;
@@ -153,6 +188,139 @@ def sound_resolver(data):
             missing.add(sound.replace(chr(92), '/').casefold())
         return M.sound_output(found)[len('sound/'):] if found else voice_pool_name(sound)
     return resolve, set(assets), missing
+
+
+def sound_records(data):
+    """({folded SOUN id: {'id', 'file', 'volume', 'min', 'max'}}, [(creature id, folded original, folded model)],
+    {(folded creature, moment): [SOUN id]}, {folded GMST: float}) of the three masters in load order (a later record
+    of an id replaces the earlier; SNDG keep load order)."""
+    from mwad.esm import is_deleted, records as esm_records, subrecords as esm_subrecords, string as esm_string
+    from mwad.paths import child_ci
+    sounds, creatures, gens, gmst = {}, {}, {}, {}
+    for name in SOUND_MASTERS:
+        path = child_ci(Path(data), name, required=False) if data is not None else None
+        if path is None:
+            continue
+        for tag, flags, payload in esm_records(path.read_bytes()):
+            if tag not in ('SOUN', 'SNDG', 'CREA', 'GMST'):
+                continue
+            parts = list(esm_subrecords(payload))
+            f = dict(parts)
+            ident = esm_string(f.get('NAME', b''), errors='replace')
+            if tag == 'GMST':
+                if len(f.get('FLTV', b'')) == 4:
+                    gmst[ident.casefold()] = struct.unpack('<f', f['FLTV'])[0]
+                continue
+            if is_deleted(flags, parts):
+                {'SOUN': sounds, 'SNDG': gens, 'CREA': creatures}[tag].pop(ident.casefold(), None)
+                continue
+            if tag == 'SOUN':
+                d = f.get('DATA', b'\xff\0\0')
+                sounds[ident.casefold()] = {'id': ident, 'file': esm_string(f.get('FNAM', b''), errors='replace'),
+                                            'volume': d[0] if d else 255, 'min': d[1] if len(d) > 1 else 0,
+                                            'max': d[2] if len(d) > 2 else 0}
+            elif tag == 'CREA':
+                creatures[ident.casefold()] = (ident, esm_string(f.get('CNAM', b''), errors='replace').casefold(),
+                                               esm_string(f.get('MODL', b''), errors='replace').casefold())
+            else:
+                data_ = f.get('DATA', b'')
+                moment = struct.unpack('<i', data_[:4])[0] if len(data_) >= 4 else -1
+                if 0 <= moment < len(SNDG_MOMENTS):
+                    gens[ident.casefold()] = (esm_string(f.get('CNAM', b''), errors='replace').casefold(), moment,
+                                              esm_string(f.get('SNAM', b''), errors='replace').casefold())
+    by = {}
+    for creature, moment, sound in gens.values():
+        by.setdefault((creature, moment), []).append(sound)
+    # sorted as the engine's binary search compares (ASCII case-insensitive bytes, aw_glut.c idcmp)
+    return (sounds, sorted(creatures.values(), key=lambda c: c[0].casefold().encode('cp1252', 'replace')), by,
+            gmst)
+
+
+def soun_order(sounds):
+    """The SOUN rows' order: the folded SOUN ids sorted by their bytes (the compiled scripts index the same order)."""
+    return sorted(sounds, key=lambda k: k.encode('cp1252', 'replace'))
+
+
+def media_lengths(media):
+    """{pool hex: centiseconds} of the files the media stage converted (its media-coverage.json), {} without one."""
+    if media is None:
+        return {}
+    path = Path(media) / 'media-coverage.json'
+    if not path.is_file():
+        return {}
+    out = {}
+    for row in json.loads(path.read_text(encoding='utf-8')).get('entries', []):
+        name = (row.get('path') or '').rsplit('/', 1)[-1]
+        if row.get('status') == 'included' and name.startswith('a') and name.endswith('.wav') and len(name) == 21:
+            out[name[1:17]] = max(0, min(NONE16, int(round((row.get('frames') or 0) / 11025 * 100))))
+    return out
+
+
+def sound_table(data, resolve, media=None):
+    """([(creature id, [pool name or None] x 8)], [pool name or None] per SOUND_SLOTS, [SOUN row bytes], report) of
+    DATA's three masters. A moment: the creature's own generator, else its original's, else one of a creature with
+    the same model, else the generic one (rule from OpenMW mwclass/creature.cpp getSoundIdFromSndGen; OpenMW picks at
+    random when several match, the table keeps the first in load order). MEDIA: the media stage's folder, for the
+    SOUN rows' lengths and mapped flags (the compiled scripts' sounds, mwscript.media.MediaMap's resolution)."""
+    sounds, creatures, gens, gmst = sound_records(data)
+    by_model = {}
+    for ident, original, model in creatures:
+        if model:
+            by_model.setdefault(model, []).append(original or ident.casefold())
+
+    def pool(soun):
+        rec = sounds.get((soun or '').casefold())
+        return resolve(rec['file']) if rec and rec['file'] else None
+    rows, own, generic_used, none = [], 0, 0, 0
+    for ident, original, model in creatures:
+        row = []
+        for moment in range(len(SNDG_MOMENTS)):
+            pick = gens.get((ident.casefold(), moment)) or (gens.get((original, moment)) if original else None)
+            if pick:
+                own += 1
+            else:
+                for other in by_model.get(model, ()):
+                    if gens.get((other, moment)):
+                        pick = gens[(other, moment)]
+                        break
+            if not pick and gens.get(('', moment)):
+                pick, generic_used = gens[('', moment)], generic_used + 1
+            row.append(pool(pick[0]) if pick else None)
+            none += row[-1] is None
+        rows.append((ident, row))
+    slots = [pool(soun) for _slot, soun in SOUND_SLOTS]
+    # the SOUN rows: the compiled scripts' sounds (PlaySound, PlayLoopSound, StopSound ...) by the same resolution
+    # as mwscript.media.MediaMap (a .wav the data has only as .mp3, the catalogue's converted file)
+    from types import SimpleNamespace
+    from mwscript.gamedata import GameData
+    hearing = GameData()
+    hearing.gmst = gmst
+    mapper = None
+    catalogue = Path(media) / 'media-coverage.json' if media is not None else None
+    if catalogue is not None and catalogue.is_file():
+        from mwscript.media import MediaMap
+        mapper = MediaMap.from_files(SimpleNamespace(sounds=sounds), catalogue)
+    soun_rows, mapped = [], 0
+    for key in soun_order(sounds):
+        rec = sounds[key]
+        near, far = hearing.sound_range(rec)
+        if mapper is not None:
+            r = mapper.sound(rec['id'])
+            name = (r.get('path_pool') or '').rsplit('/', 1)[-1] if r.get('resolved') else ''
+            hash8 = bytes.fromhex(name[1:17]) if name else bytes(8)
+            centis = max(0, min(NONE16, int(round(r.get('seconds', 0) * 100)))) if name else 0
+        else:
+            name = resolve(rec['file']).rsplit('/', 1)[-1] if rec['file'] else ''
+            hash8, centis = (bytes.fromhex(name[1:17]) if name else bytes(8)), 0
+        flag = SOUND_MAPPED if mapper is not None and name else 0
+        mapped += bool(flag)
+        soun_rows.append(struct.pack(SOUN_ROW, hash8, centis, rec['volume'] & 255, flag, min(near, NONE16),
+                                     min(far, NONE16)))
+    report = {'creatures': len(rows), 'generators': sum(len(v) for v in gens.values()),
+              'moments_own': own, 'moments_generic': generic_used, 'moments_none': none,
+              'slots': len(slots), 'slots_missing': [s for (s, _), p in zip(SOUND_SLOTS, slots) if p is None],
+              'soun_rows': len(soun_rows), 'soun_mapped': mapped, 'catalogue': mapper is not None}
+    return rows, slots, soun_rows, report
 
 
 # ---- per NPC (the worker unit: a chunk of NPC records)
@@ -269,9 +437,11 @@ def _sort_key(key):
     return (t, i, line, sound, repr(runtime))
 
 
-def tables(kinds, names, masks, order, facts, resolve, settings):
+def tables(kinds, names, masks, order, facts, resolve, settings, creature_rows=(), slots=None, soun_rows=(),
+           lengths=None):
     """The deduplicated tables: masks {entry key: audience mask}, order [npc id] (bit i = order[i]),
-    facts {id: npc_facts()}."""
+    facts {id: npc_facts()}; creature_rows, slots, soun_rows: sound_table()'s (pool names, sharing the Sounds table;
+    SOUN rows packed); lengths: media_lengths() (None: no catalogue, every Sounds row length 0 and not marked)."""
     from mwad.dialogue import FUNCTIONS, globals_of
     strings, texts, name_ids, globals_ = Strings(), Strings(), {}, {}
     glob_values = kinds.get('_globals') or globals_of(kinds)
@@ -369,11 +539,27 @@ def tables(kinds, names, masks, order, facts, resolve, settings):
         hello, disposition, rank, defines = facts[ident]
         rows.append(struct.pack(NPC_ROW, strings.add(ident), hello, disposition, rank, sets_of[vector],
                                 *(name_index(defines[k]) if defines[k] else NONE16 for k in DEFINE_FIELDS), 0, 0))
+    # the sound table (version 2): creature moments and named slots, as indexes into the same Sounds table
+    def sound_index(pool):
+        return NONE16 if pool is None else sounds.setdefault(pool, len(sounds))
+    creatures = [struct.pack(CREATURE_ROW, strings.add(ident), *(sound_index(p) for p in row))
+                 for ident, row in creature_rows]
+    slot_values = [sound_index(p) for p in (slots if slots is not None else [None] * len(SOUND_SLOTS))]
+    if len(slot_values) != len(SOUND_SLOTS) or len(creatures) >= NONE16:
+        raise ValueError('Voice table sound slots or creature rows out of range')
     if len(set_rows) >= NONE16 or len(listset_rows) >= NONE16 or len(sounds) >= NONE16:
         raise ValueError('Voice table index past 16 bits')
-    return {'topics': topic_offsets, 'npcs': rows, 'sets': set_rows, 'listsets': listset_rows,
+    if len(soun_rows) >= NONE16:
+        raise ValueError('Voice table SOUN rows past 16 bits')
+
+    def sound_row(pool_name):
+        key = pool_name[6:22]
+        flag = SOUND_MAPPED if lengths is not None and key in lengths else 0
+        return struct.pack(SOUND_ROW, bytes.fromhex(key), (lengths or {}).get(key, 0), flag)
+    return {'topics': topic_offsets, 'npcs': rows, 'creatures': creatures, 'slots': slot_values,
+            'soun': list(soun_rows), 'sets': set_rows, 'listsets': listset_rows,
             'listset_items': listset_items, 'lists': list_rows, 'list_items': list_items, 'entries': entries,
-            'conds': conds, 'sounds': [bytes.fromhex(p[6:22]) for p in sorted(sounds, key=sounds.get)],
+            'conds': conds, 'sounds': [sound_row(p) for p in sorted(sounds, key=sounds.get)],
             'sound_names': sorted(sounds, key=sounds.get),
             'globals': [struct.pack('>If', strings.add(g), float(glob_values.get(g, 0.)))
                         for g in sorted(globals_, key=globals_.get)],
@@ -389,7 +575,7 @@ def _u16s(values):
 
 
 def pack(t):
-    """The AWGL1 file of tables(): big-endian, every table 4-byte aligned (docs/NPC_VOICE_TABLE.md)."""
+    """The AWGL2 file of tables(): big-endian, every table 4-byte aligned (docs/NPC_VOICE_TABLE.md)."""
     _mult, reset, duration = t['settings']
     count = t['functions']
     strings = t['strings'] + bytes(-len(t['strings']) % 4)
@@ -397,7 +583,7 @@ def pack(t):
                                len(t['listsets']), len(t['listset_items']), len(t['lists']), len(t['list_items']),
                                len(t['entries']), len(t['conds']), len(t['sounds']), len(t['globals']),
                                len(t['names']), len(strings), len(t['texts']), min(NONE16, int(round(reset))),
-                               duration, count, 0)
+                               duration, count, 0, len(t['creatures']), len(t['slots']), len(t['soun']), 0)
     head += bytes(HEADER - len(head))
     body = bytearray(head)
     body += b''.join(struct.pack('>I', o) for o in t['topics'])
@@ -411,19 +597,22 @@ def pack(t):
     body += sets + bytes(-len(sets) % 4)
     body += b''.join(t['listsets']) + _u16s(t['listset_items'])
     body += b''.join(t['lists']) + _u16s(t['list_items'])
-    for name in ('entries', 'conds', 'sounds', 'globals', 'names'):
+    for name in ('entries', 'conds', 'sounds', 'globals', 'names', 'creatures'):
         body += b''.join(t[name])
+    body += _u16s(t['slots'])
+    body += b''.join(t['soun'])
     body += strings
     body += t['texts']        # last: the engine keeps everything before it in memory and reads a text when said
     return bytes(body)
 
 
 def read(raw):
-    """The tables of an AWGL1 file as Python values (tests, the measurement)."""
+    """The tables of an AWGL2 file as Python values (tests, the measurement)."""
     if raw[:4] != MAGIC:
         raise ValueError('Not an AWGL file')
     (version, topics, npcs, sets, listsets, listset_items, lists, list_items, entries, conds, sounds, globals_, names,
-     string_bytes, text_bytes, reset, duration, functions, _) = struct.unpack_from(HEADER_FORMAT, raw, 4)
+     string_bytes, text_bytes, reset, duration, functions, _, creatures, slots, souns,
+     _zero) = struct.unpack_from(HEADER_FORMAT, raw, 4)
     if version != VERSION:
         raise ValueError('AWGL version %d' % version)
     at = HEADER
@@ -441,7 +630,11 @@ def read(raw):
     listset_raw, listset_item_raw = take(8 * listsets), take(2 * listset_items, True)
     list_raw, list_item_raw = take(8 * lists), take(2 * list_items, True)
     entry_raw, cond_raw = take(12 * entries), take(8 * conds)
-    sound_raw, global_raw, name_raw = take(8 * sounds), take(8 * globals_), take(4 * names)
+    sound_raw = take(struct.calcsize(SOUND_ROW) * sounds)
+    global_raw, name_raw = take(8 * globals_), take(4 * names)
+    creature_raw = take(struct.calcsize(CREATURE_ROW) * creatures)
+    slot_raw = take(2 * slots, True)
+    soun_raw = take(struct.calcsize(SOUN_ROW) * souns)
     strings = take(string_bytes)
     texts = take(text_bytes)
     if at != len(raw):
@@ -454,7 +647,9 @@ def read(raw):
         return list(struct.unpack('>%dH' % (len(data) // 2), data))
     out = {'topics': [s(o) for o in topic_offsets], 'reset': reset, 'duration': duration,
            'fixture': {i: v for i, v in enumerate(fixture_raw) if bits[i >> 3] >> (i & 7) & 1},
-           'sounds': [sound_raw[i:i + 8].hex() for i in range(0, len(sound_raw), 8)],
+           'sounds': [h.hex() for h, _, _ in struct.iter_unpack(SOUND_ROW, sound_raw)],
+           'sound_rows': list(struct.iter_unpack(SOUND_ROW, sound_raw)),
+           'soun': list(struct.iter_unpack(SOUN_ROW, soun_raw)),
            'globals': [(s(o), v) for o, v in struct.iter_unpack('>If', global_raw)],
            'names': [s(o) for (o,) in struct.iter_unpack('>I', name_raw)], 'bytes': len(raw),
            'listsets': [struct.unpack_from('>IH', listset_raw, i) for i in range(0, len(listset_raw), 8)],
@@ -470,6 +665,10 @@ def read(raw):
         out['npcs'][s(ident)] = {'hello': hello, 'disposition': disposition, 'rank': rank, 'set': vset,
                                  'defines': {k: None if n == NONE16 else out['names'][n]
                                              for k, n in zip(DEFINE_FIELDS, rest)}}
+    row_bytes = struct.calcsize(CREATURE_ROW)
+    out['creatures'] = [(s(v[0]), list(v[1:])) for v in (struct.unpack_from(CREATURE_ROW, creature_raw, i)
+                                                         for i in range(0, len(creature_raw), row_bytes))]
+    out['slots'] = u16(slot_raw)[:slots]
     out['string'] = s
     out['text'] = lambda offset: s(offset, texts)
     out['resident_bytes'] = len(raw) - text_bytes
@@ -521,9 +720,10 @@ def plan_npcs(kinds, homes=None):
     return order, facts, left
 
 
-def build(kinds, topics, homes=None, resolve=None, masks=None, left=None):
-    """(AWGL1 bytes, report) from loaded records (kinds with the dialogue records, topics); masks: the audiences
-    already made (the worker pool's, with left), else made here."""
+def build(kinds, topics, homes=None, resolve=None, masks=None, left=None, sound=None, lengths=None):
+    """(AWGL2 bytes, report) from loaded records (kinds with the dialogue records, topics); masks: the audiences
+    already made (the worker pool's, with left), else made here; sound: sound_table()'s (rows, slots, SOUN rows,
+    report), else no creature or SOUN rows and every slot empty; lengths: media_lengths()."""
     from npc_anim import voice_pool_name
     resolve = resolve or voice_pool_name
     homes = homes or {}
@@ -542,9 +742,13 @@ def build(kinds, topics, homes=None, resolve=None, masks=None, left=None):
         masks = {k: sum(1 << remap[b] for b in range(len(order)) if m >> b & 1 and b in remap)
                  for k, m in masks.items()}
         masks = {k: m for k, m in masks.items() if m}
-    t = tables(kinds, names, masks, keep, facts, resolve, settings)
+    rows, slots, soun_rows, sound_report = sound or ((), None, (), {})
+    t = tables(kinds, names, masks, keep, facts, resolve, settings, rows, slots, soun_rows, lengths)
     raw = pack(t)
-    report = {'format': 'AWGL1', 'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest(),
+    report = {'format': 'AWGL%d' % VERSION, 'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest(),
+              'sound_table': dict(sound_report, creature_bytes=sum(len(r) for r in t['creatures']),
+                                  slot_bytes=2 * len(t['slots']), soun_bytes=sum(len(r) for r in t['soun']),
+                                  sounds_with_length=sum(1 for r in t['sounds'] if r[8:10] != b'\0\0')),
               'npcs': len(t['npcs']), 'sets': len(t['sets']), 'list_sets': len(t['listsets']),
               'lists': len(t['lists']), 'entries': len(t['entries']), 'conditions': len(t['conds']),
               'sounds': len(t['sounds']), 'globals': len(t['globals']), 'names': len(t['names']),
@@ -558,9 +762,9 @@ def build(kinds, topics, homes=None, resolve=None, masks=None, left=None):
     return raw, report
 
 
-def build_master(path, data=None, jobs=1, resolver=None):
-    """(AWGL1 bytes, report) of a master file, the NPC records compiled in chunks on JOBS processes; resolver:
-    sound_resolver(data), when already made."""
+def build_master(path, data=None, jobs=1, resolver=None, media=None):
+    """(AWGL2 bytes, report) of a master file, the NPC records compiled in chunks on JOBS processes; resolver:
+    sound_resolver(data), when already made; media: the media stage's folder (lengths, mapped flags)."""
     from build_parallel import ordered_map
     t0 = time.time()
     kinds, topics = load(path)
@@ -582,7 +786,16 @@ def build_master(path, data=None, jobs=1, resolver=None):
         if done % max(1, len(chunks) // 8) == 0 or done == len(chunks):
             print('Voice table: %d/%d units' % (done, len(chunks)), flush=True)
     resolve, available, missing = resolver or sound_resolver(data)
-    raw, report = build(kinds, topics, homes, resolve, masks, left)
+    # the creature generators and the engine's named sounds, from all three masters (SNDG-TRIBUNAL-BLOODMOON)
+    sound = sound_table(data if data is not None else Path(path).parent, resolve, media)
+    r = sound[3]
+    print('Voice table: sound table: %d creature rows (%d moments own, %d generic, %d none), %d named slots '
+          '(%d missing), %d SOUN rows (%d mapped%s)' % (
+              r['creatures'], r['moments_own'], r['moments_generic'], r['moments_none'], r['slots'],
+              len(r['slots_missing']), r['soun_rows'], r['soun_mapped'],
+              '' if r['catalogue'] else ', no media catalogue'), flush=True)
+    lengths = media_lengths(media) if media is not None else None
+    raw, report = build(kinds, topics, homes, resolve, masks, left, sound, lengths)
     report['home_cells'] = len(homes)
     # sounds named whose source file the data does not have: the engine shows the line and stays quiet
     report['missing_sources'] = sorted(missing) if available is not None else None
@@ -593,10 +806,10 @@ def build_master(path, data=None, jobs=1, resolver=None):
     return raw, report
 
 
-def image_step(data, id1, out=None, jobs=1):
-    """The image step: id1/npc-voices.lut from DATA's Morrowind.esm, through the unit cache (pass_cache.UnitCache,
-    keyed by the master's SHA-256, the sound sources the data offers and this module's sources); the report beside
-    it in OUT (npc-voice-table.json). Returns the report."""
+def image_step(data, id1, out=None, jobs=1, media=None):
+    """The image step: id1/npc-voices.lut from DATA's masters, through the unit cache (pass_cache.UnitCache, keyed by
+    the masters' SHA-256, the sound sources the data offers, the media stage's converted files and lengths (MEDIA)
+    and this module's sources); the report beside it in OUT (npc-voice-table.json). Returns the report."""
     from build_scratch import scratch_dir
     from mwad.esm import sha256_file
     from mwad.paths import child_ci
@@ -605,7 +818,14 @@ def image_step(data, id1, out=None, jobs=1):
     resolver = sound_resolver(data)
     inputs = {'master_sha256': sha256_file(master),
               'sound_sources_sha256': hashlib.sha256('\n'.join(sorted(resolver[1] or ())).encode()).hexdigest()}
-    cache = UnitCache.open('npc-voice-table', {'format': 'AWGL1'}, __file__)
+    for name in SOUND_MASTERS[1:]:    # the sound table reads the add-ons' creatures and generators too
+        addon = child_ci(Path(data), name, required=False)
+        inputs[name.casefold() + '_sha256'] = sha256_file(addon) if addon is not None else None
+    # what the table reads of the media catalogue: the converted files and their lengths (not the whole catalogue)
+    lengths = media_lengths(media) if media is not None else None
+    inputs['media_lengths_sha256'] = None if lengths is None else hashlib.sha256(
+        json.dumps(lengths, sort_keys=True).encode()).hexdigest()
+    cache = UnitCache.open('npc-voice-table', {'format': 'AWGL%d' % VERSION}, __file__)
     target = Path(id1) / NAME
     t0 = time.time()
     print('Voice table: start (1 unit cache lookup, then %d jobs if built)' % jobs, flush=True)
@@ -618,7 +838,7 @@ def image_step(data, id1, out=None, jobs=1):
             raw = (folder / NAME).read_bytes()
             report['reused'] = True
         else:
-            raw, report = build_master(master, data, jobs, resolver)
+            raw, report = build_master(master, data, jobs, resolver, media)
             folder.mkdir(parents=True)
             (folder / NAME).write_bytes(raw)
             (folder / 'report.json').write_text(json.dumps(report, indent=1, sort_keys=True) + '\n', encoding='utf-8',
@@ -643,12 +863,13 @@ def image_step(data, id1, out=None, jobs=1):
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     p.add_argument('--data-files', type=Path, required=True)
-    p.add_argument('--out', type=Path, required=True, help='the AWGL1 file to write')
+    p.add_argument('--out', type=Path, required=True, help='the AWGL2 file to write')
+    p.add_argument('--media', type=Path, help="the media stage's folder (media-coverage.json): lengths, mapped flags")
     p.add_argument('--report', type=Path)
     p.add_argument('--jobs', type=int, default=1)
     a = p.parse_args(argv)
     from mwad.paths import child_ci
-    raw, report = build_master(child_ci(a.data_files, 'Morrowind.esm'), a.data_files, a.jobs)
+    raw, report = build_master(child_ci(a.data_files, 'Morrowind.esm'), a.data_files, a.jobs, media=a.media)
     a.out.write_bytes(raw)
     if a.report:
         a.report.write_text(json.dumps(report, indent=1, sort_keys=True) + '\n', encoding='utf-8', newline='\n')

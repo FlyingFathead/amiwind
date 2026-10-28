@@ -11,8 +11,12 @@ Quirks handled (each seen in the game data or documented by OpenMW's compiler; o
   - an object id may be quoted or bare, an explicit reference is 'id -> function';
   - another object's or script's variable is 'name.variable' (quoted or bare);
   - a comparison chain is one comparison (MWScript has no 'and'/'or');
+  - a name in an expression that is no variable, function or global reads as a number (its leading digits, else 0;
+    OpenMW's rule for legacy content);
   - text after 'end' is ignored.
 """
+import re
+
 from .lexer import tokenize
 from .functions import lookup, KEYWORDS
 
@@ -22,6 +26,17 @@ class ParseError(ValueError):
 
 
 TYPES = {'short': 's', 'long': 'l', 'float': 'f'}
+_NUMBER = re.compile(r'[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?')
+
+
+def _leading_number(text):
+    """The number a stream read takes from the start of TEXT ('12abc' 12.0), 0.0 when it starts with none (as the
+    stream read in OpenMW's parseName leaves it)."""
+    m = _NUMBER.match(text)
+    try:
+        return float(m.group(0)) if m else 0.0
+    except ValueError:
+        return 0.0
 
 
 def declarations(tokens):
@@ -338,7 +353,13 @@ class Parser:
                         return self.primary()
                     finally:
                         self.ref = outer
-                if self.peek().kind != 'name' or not lookup(self.peek().value):
+                if self.peek().kind == 'name' and not lookup(self.peek().value):
+                    # "Player->fakeiswere" (a local): the reference is dropped and the name read as it is (rule
+                    # from OpenMW components/compiler/exprparser.cpp parseName, "Stray explicit reference")
+                    self.warnings.append('line %d: a reference before %r, no function: dropped' %
+                                         (t.line, self.peek().value))
+                    return self.primary()
+                if self.peek().kind != 'name':
                     raise ParseError('line %d: -> needs a function' % t.line)
                 return self.call(ref)
             if nxt.kind == 'op' and nxt.value == '.':
@@ -356,7 +377,13 @@ class Parser:
                 return self.call(getattr(self, 'ref', None))
             if name in self.globals:
                 self.next(); return ('global', name)
-            raise ParseError('line %d: unknown name %r' % (t.line, t.value))
+            # a name that is no variable, function or global: read as a number, its leading digits or 0 (rule from
+            # OpenMW components/compiler/exprparser.cpp parseName, "legacy content"; four Bloodmoon scripts test a
+            # journal id or a truncated local this way, e.g. "if ( BM_BearHunt1 == 0 )", which reads 0 == 0)
+            self.next()
+            self.warnings.append('line %d: %r is no variable: read as a number' % (t.line, t.value))
+            return ('float', _leading_number(t.value))
+        raise ParseError('line %d: expected a value, found %r' % (t.line, t.value))
         raise ParseError('line %d: expected a value, found %r' % (t.line, t.value))
 
     def numeric_argument(self):

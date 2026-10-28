@@ -11,6 +11,7 @@
 #include "aw_log.h"
 #include "aw_spike.h"
 #include "aw_hinged_door.h"
+#include "aw_talk.h"
 #ifdef AMIGA
 #include <proto/dos.h>
 #endif
@@ -23,7 +24,9 @@
 #include "aw_inventory.h"
 #include "aw_statswin.h"
 #include "aw_glut.h"
+#include "aw_ambient.h"
 #include "aw_move.h"
+#include "aw_magic.h"
 void AW_CamInit(void);
 extern trace_t SV_ClipMoveToEntity(edict_t *,vec3_t,vec3_t,vec3_t,vec3_t);
 static edict_t *player(void) {
@@ -265,13 +268,13 @@ static void AW_SessionShift(const float *d) {
 void AW_DebugInit(void) {
     AW_InspectInit();
     Cvar_RegisterVariable(&aw_logs_live);Cmd_AddCommand("aw_logs_live_set",logs_live_command);Cmd_AddCommand("aw_savelogs",savelogs_command);Cmd_AddCommand("aw_godmode",godmode_command);
-    AW_GalleryInit();AW_WorldUIInit();AW_StatsWindowInit();AW_DebugTorchInit();
+    AW_GalleryInit();AW_SweepInit();AW_WorldUIInit();AW_StatsWindowInit();AW_DebugTorchInit();
     AW_StreamInit();AW_PhotoInit();AW_SpikeInit();Chim_Init();
     /* CHIM's window (type 1 crossings) names a cell's region map through the world directory. */
     {extern int (*chim_cell_map)(int,int,char *,int);chim_cell_map=AW_CellMap;}
     {extern void (*aw_session_shift)(const float *);aw_session_shift=AW_SessionShift;}
     AW_MiniwindInit();AW_QuickCharInit();AW_TestBoxInit();
-    AW_CamInit();AW_InputDebugInit();AW_BoundsInit();AW_DoorAudioInit();AW_HingedDoorInit();aw_hinged_story=AW_OpeningHingedStory;AW_MwscriptInit();AW_CompanionInit();AW_CombatInit();AW_MoveInit();AW_ActorsInit();AW_ViewInit();AW_LavaInit();AW_AnimInit();AW_GlutInit();AW_AnimKitInit();AW_HalloweenInit();AW_WaitInit();AW_ConsoleInit();AW_SceneInit();AW_UIInit();AW_IconsInit();AW_IntroInit();AW_SaveInit();
+    AW_CamInit();AW_InputDebugInit();AW_BoundsInit();AW_DoorAudioInit();AW_HingedDoorInit();aw_hinged_story=AW_OpeningHingedStory;AW_TalkInit();AW_MwscriptInit();AW_CompanionInit();AW_CombatInit();AW_AmbientInit();AW_MoveInit();AW_ActorsInit();AW_ViewInit();AW_LavaInit();AW_MagicInit();AW_AnimInit();AW_GlutInit();AW_AnimKitInit();AW_HalloweenInit();AW_WaitInit();AW_ConsoleInit();AW_SceneInit();AW_UIInit();AW_IconsInit();AW_IntroInit();AW_SaveInit();
     aw_save_entry_refuse=AW_SceneSaveEntryRefuse;   /* a save in a 32 MB place on less Fast RAM (CHIM-32MB-SAVE-ENTRY-48) */
     Cmd_AddCommand("amiwind_debug_reset_location",reset_location);
     Cmd_AddCommand("aw_hands",hands);Cmd_AddCommand("aw_eyeheight",eyeheight);

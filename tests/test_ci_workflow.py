@@ -59,6 +59,11 @@ class WorkflowLayoutTests(unittest.TestCase):
                       tests)
         self.assertEqual(self.text.count('tools/run_tests.py'), 1)
 
+    def test_test_jobs_have_a_descriptive_name_that_counts_the_shards(self):
+        # CI-JOBS-UNNAMED-53: the displayed names are what the release publisher requires
+        name = re.search(r'^    name: (.+)$', self.jobs['tests'], re.M).group(1)
+        self.assertEqual(name, 'Test suite part ${{ matrix.shard }} of %d' % self.shards())
+
     def test_order_tools_then_tests_then_dry_run(self):
         self.assertRegex(self.jobs['tests'], r'(?m)^    needs: tools$')
         self.assertRegex(self.jobs['source-checks'], r'(?m)^    needs: tools$')

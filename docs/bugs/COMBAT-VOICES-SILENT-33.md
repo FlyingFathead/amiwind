@@ -73,6 +73,7 @@ Family: Music and sound (`audio`). The mixer must stay fed through loads and sce
 - [AUDIO-HOST-LOAD-33](AUDIO-HOST-LOAD-33.md): Music and sound crackle when the emulator shares a fully loaded host CPU
 - [AUDIO-LOAD-29](AUDIO-LOAD-29.md): OST crackles under heavy loading
 - [AUDIO-LOGO-31](AUDIO-LOGO-31.md): Music crackles while the startup logo plays (WinUAE)
+- AUDIO-MAGIC-STOPS-SPEECH-54 (no report page): A magic sound played as entity -1 stopped every NPC voice mid-line: AW_SpeechStop(-1) matched all speakers
 - [AUDIO-NEWGAME-30](AUDIO-NEWGAME-30.md): Music crackles when confirming New Game (WinUAE)
 - [AUDIO-STOP-CHANNEL-RANGE-39](AUDIO-STOP-CHANNEL-RANGE-39.md): Stopping an entity sound skips half the dynamic mixer slots
 - [AW-20260928-02](AW-20260928-02.md): Dock/menu freeze and looping audio
@@ -82,6 +83,7 @@ Family: Music and sound (`audio`). The mixer must stay fed through loads and sce
 - CHIM-ROOMS-WATER-SOUND-48 (no report page): CHIM water rooms have no ambient water sound in their water: room maps got it from their visibility pass
 - [COMBAT-AMBIENT-SPEECH-GATING-38](COMBAT-AMBIENT-SPEECH-GATING-38.md): Ambient greetings and subtitles interrupt combat
 - [COMBAT-MUSIC-AIR-SWING-35](COMBAT-MUSIC-AIR-SWING-35.md): Swinging at the air starts the combat music; it should start only when the player attacks a valid combat target (an NPC or creature)
+- CREATURE-ANIM-SOUND-54 (no report page): A creature's sound generators from its animations are not played
 - CUSTOM-OST-SLOT-53 (no report page): Requested: a custom OST slot: the user's own track built into the image and a player routine for it, apart from the playlist
 - DOOR-AUDIO-SECOND-COPY-48 (no report page): The door audio stage converts its own copies of the 10 door sounds the media stage already converted (166,338 bytes stored twice)
 - [ENGINE-MUSIC-NO-OFF-SWITCH-36](ENGINE-MUSIC-NO-OFF-SWITCH-36.md): The soundtrack has no off switch: music can only be disabled by deleting music/playlist.txt from the image
@@ -90,6 +92,7 @@ Family: Music and sound (`audio`). The mixer must stay fed through loads and sce
 - [MUSIC-OPENING-CLIP-31](MUSIC-OPENING-CLIP-31.md): A clip of another track plays while the opening scene loads
 - [MUSIC-STARTUP-TRACK-31](MUSIC-STARTUP-TRACK-31.md): A random world track plays under the startup logo
 - [MWSCRIPT-AUDIO-FIRST-48](MWSCRIPT-AUDIO-FIRST-48.md): The game's scripts start no sounds, lines or music cues: MWScript compiled by the builder, audio first
+- MWSCRIPT-ONESHOT-SLOTS-LEAK-54 (no report page): Script one-shot sounds never freed their slot: after 32 distinct one-shots in a map new script sounds were dropped
 - [NPC-GREETING-PICK-33](NPC-GREETING-PICK-33.md): Greetings take the highest disposition threshold at a fixed 50, OpenMW takes the first line that matches
 - [NPC-VOICE-BARKS-33](NPC-VOICE-BARKS-33.md): NPCs never say their combat, hit, flee or idle voice lines
 - PUNCH-AUDIO-COVERAGE-29 (no report page): Original punch swing/hit sound coverage unverified

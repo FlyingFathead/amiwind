@@ -753,7 +753,10 @@ def take_cores(config, request, run_name, runner, notes, sleep=time.sleep):
                 print(f'aw submit: {run_name}: waiting ({priority}): {busy}', flush=True)
                 said = busy
             if waited >= timeout:
+                aw.dequeue(config, run_name, request['requester'])
                 raise aw.AwError(f'{busy} (waited {waited:.0f} s, timeout {timeout:.0f} s)')
+            # keep a ticket queued earlier alive while the machine is busy (AW-QUEUE-DEAD-TICKET-54)
+            aw.touch_ticket(config, run_name, request['requester'])
             sleep(poll)
             waited += poll
             continue

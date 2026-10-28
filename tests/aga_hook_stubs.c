@@ -13,6 +13,10 @@
 #include "aw_weather.h"
 #define WEAK __attribute__((weak))
 WEAK int AW_QuickCharActive(void){return 0;}
+/* The game clock (aw_clock.c): the travel services move it by a ride's hours (aw_scene.c travel_ride). */
+WEAK int AW_ClockAdvance(int milliseconds){(void)milliseconds;return 0;}
+/* The owned-item crosshair cue (view.c defines it; aw_harvest_runtime.c sets it). */
+WEAK int (*aw_crosshair_owned)(void);
 /* The inventory picture: still by default (aw_view.c); fixtures time it with a frozen clock. */
 WEAK int AW_ViewInventoryLive(void){return 0;}
 WEAK double Sys_FloatTime(void){return 0;}
@@ -46,6 +50,21 @@ WEAK void AW_MusicLoadPump(void) {}
  * clear sky every earlier sky contract was written against (SKY-REDMOUNTAIN-BLUE-44). */
 WEAK void AW_WeatherInit(void) {}
 WEAK int AW_WeatherFrame(int days,int milliseconds,aw_weather_blend_t *out){(void)days;(void)milliseconds;(void)out;return 0;}
+/* The interior fog ramp (r_sky.c, INTERIOR-FOG-UNUSED-51): fixtures linking aw_fog.c without r_sky.c draw no interior fog. */
+WEAK const unsigned char *R_InteriorFogColours(int r,int g,int b){(void)r;(void)g;(void)b;return 0;}
+/* The weather's land light (WEATHER-AMBIENT-SUN-UNUSED-51): never reached without a weather (key 0). */
+WEAK int AW_WeatherLightOn(void) {return 1;}
+/* The falling weather and the mesh smoke (aw_atmos.c, WEATHER-RAIN, MESH-PARTICLE-EMITTERS): nothing without it. */
+WEAK void AW_AtmosInit(void) {}
+WEAK void AW_AtmosUpdate(void) {}
+WEAK int AW_WeatherFalling(int *strength) {if(strength)*strength=0;return 0;}
+/* Flame light flicker (aw_torch.c): steady without it. */
+WEAK float AW_LightFlicker(unsigned seed) {(void)seed;return 1;}
+/* The storm at the player (ACTOR-STORM-POSE-51): none without the weather module. */
+WEAK int AW_WeatherStorm(float dir[2]) {(void)dir;return 0;}
+WEAK int AW_WeatherFacesStorm(float yaw,const float dir[2]) {(void)yaw;(void)dir;return 0;}
+WEAK void AW_WeatherLightTone(const aw_weather_blend_t *blend,int a,int b,int mix,int *tone)
+{(void)blend;(void)a;(void)b;(void)mix;tone[0]=tone[1]=tone[2]=256;}
 /* The animation kit console (aw_animkit.c): nothing to drive in fixtures without it. */
 WEAK void AW_AnimKitTick(void) {}
 WEAK void AW_AnimKitInit(void) {}

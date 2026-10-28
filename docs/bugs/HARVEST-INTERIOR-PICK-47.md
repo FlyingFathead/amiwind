@@ -9,7 +9,7 @@
 | Where | Converted interiors with original small mushrooms (Addamasartus, Vivec plazas) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.46 (last seen) |
+| Persists in | fixed in v0.0.54-dev1 |
 | Severity | medium: A whole class of original harvest placements is drawn but cannot be picked; no crash or data loss |
 | Family | Harvestable plants (`harvest`) |
 | Playtest version | v0.0.46 |

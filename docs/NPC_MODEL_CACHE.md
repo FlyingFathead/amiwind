@@ -1,6 +1,6 @@
 # Persistent NPC model conversion cache
 
-_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
+_Last updated with AmiWind v0.0.54-dev1 (27 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -173,6 +173,38 @@ reduced with the boundary-locked reducer of the static meshes (`npc_geometry.sim
 reduction opens no new hole and leaves no gap at the neck; a shape whose rim leaves too few collapses keeps a few
 faces over its share. `default` is the previous reducer, byte for byte. Original heads do not reduce the head and
 are unchanged. The gallery cache key carries the reducer of a budget-head bake (`npc_head_reducer`).
+
+**The hair takes the head's share** (v0.0.54, NPC-HAIR-BACK-MISSING-53): the default from v0.0.54
+(`npc_geometry.hair_share`, setting `AMIWIND_NPC_HAIR_SHARE=head`; `plain` is the split up to v0.0.53, byte for
+byte). The setting is read only inside the NPC bake, so a change to it re-keys only the stages that bake NPCs. The
+budget split weighted only the head (body part slot 0: 1.7 times its triangles,
+and a floor of up to 120 faces in a bake of more than 8 frames, as every skeletal resident is); the hair or helmet
+(slot 1) got 4 faces and a plain share. Reduced to about a sixth of the head's density, a hair cap's flat triangles
+cut under the scalp, and the back of the head showed skin: the Suran dancers' hair kept 24 to 43 of its 174 to 435
+triangles over heads that kept about 185 of 502, and skin showed in 22 to 52 % of the views from behind where the
+original shows hair. Now the hair or helmet takes the head's rule (weight and floor), with the same reducer; the
+dancers' hair keeps 132 to 173 triangles, the head about 150, and skin shows in about 1 % of those views or fewer.
+The body gives up the triangles.
+
+**Whole hair** (v0.0.54, the default `AMIWIND_NPC_HAIR_SHARE=whole`; `head` is the split above): the maintainer's
+rule of 27 October 2026 is that hair reads as one closed, consistent shell, the original hairstyle kept, with no
+specks of head showing through it from any side. Any reduction of a hair cap broke its outline into shards, so in
+the full model (the 480 budget; the lower levels and the parts keep the `head` split):
+
+- the hair or helmet (slot 1) keeps every original triangle when the whole model still fits its face limit, less 8
+  faces for the locked reducer's overshoot. A skeletal resident may go up to 960 faces for it (2,880 vertices, the
+  480 skin rows of the raised-limit skin): the alias stream reader takes models up to the renderer's 3,072 vertices
+  with their byte-matching `model-budgets.txt` line (SKEL-VERTEX-LIMIT-52, below 2,000 up to v0.0.53). The head and
+  the rest keep their shares;
+- head triangles that the hair or helmet hides from every side (rays from points on each face, along its normal and
+  up to 70 degrees around it, all meet the cover) are left out before the split. They are never seen, and they free
+  faces. This happens only when the hair then stays whole, so a reduced cap never has a hole under it;
+- after the head is reduced, no head vertex stays outside the hair or helmet (it moves in along its ray from the
+  head's centre). A reduced cap (hair too large to keep whole) never sinks into the head (its vertices move out).
+
+The Suran dancers keep their hair whole (Marelle 300, Caminda 435, Runa 174 triangles; models of 626, 740 and 501
+faces), and no direction shows head where the original shows hair, except 3 of 1,466 at Caminda's spikes (927, 217
+and 1,088 directions did in v0.0.53).
 
 **Allowances:** a model past 2,000 vertices (666 triangles) loads in the engine
 only with a byte-matching `model-budgets.txt` line. The gallery already writes

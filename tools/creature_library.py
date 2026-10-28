@@ -89,7 +89,10 @@ def ground_mode(ident, flags):
         return int(bool(flags & (SWIMS | FLIES)) and not flags & WALKS)
 
 
-METHODS = ('kf', 'resident')
+# 'skeletal' (CREATURE-TABLES, v0.0.54): the creature's own animation table (tools/creature_tables.py: every group of
+# its own files, OpenMW's source order) and one skeletal model on it; selectable, not the default until the
+# in-game A/B against 'kf' is recorded (a new method is added beside the old, never in place of it).
+METHODS = ('kf', 'resident', 'skeletal')
 DEFAULT_METHOD = 'kf'
 
 
@@ -124,8 +127,8 @@ def bake(data, palette, meshes, out_id1, jobs=1, method=DEFAULT_METHOD, bipedal=
     for mesh, ids in sorted(meshes.items()):
         app = {'id': ids[0], 'kind': 'CREA', 'name': ids[0], 'mesh': mesh}
         for scale in [1.0] + sorted(set((scales or {}).get(mesh, ())) - {1.0}):
-            if method == 'resident' and scale != 1.0:
-                continue
+            if method in ('resident', 'skeletal') and scale != 1.0:
+                continue        # 'skeletal': the engine scales a live actor (AWU_SCALE); one model per mesh
             tasks.append((method, data, palette, app, bool((bipedal or {}).get(mesh)), scale))
     for mesh, ids in sorted((corpses or {}).items()):
         app = {'id': ids[0], 'kind': 'CREA', 'name': ids[0], 'mesh': mesh}
@@ -157,6 +160,8 @@ def _unit(task):
     try:
         if method == 'corpse':
             out = bake_kf(data, palette, app, bipedal, corpse=True)
+        elif method == 'skeletal':
+            out = bake_skeletal(data, palette, app, bipedal)
         elif method == 'resident':
             import creature_residents
             _, raw, record = creature_residents.bake_task((data, palette, app))
@@ -174,6 +179,28 @@ def _unit(task):
 
 
 _assets = {}
+
+
+def bake_skeletal(data, palette, app, bipedal):
+    """{'files': [(role, bytes, path)], 'record': {...}} of one mesh with the 'skeletal' method: its own table, one
+    skeletal model on it and that model's layout (every engine group on the table's frames; tools/creature_tables.py).
+    One model plays every group, so there is no separate mover (the layout names none)."""
+    import creature_tables
+    mesh, out, error = creature_tables.unit((app['mesh'], data, palette, bipedal, False))
+    if out is None:
+        raise ValueError(error)
+    rep = out['report']
+    files = [('table', out['table'], rep['table']), ('standing', out['model'], rep['model']),
+             ('standing_layout', (out['layout'] + '\n').encode('ascii'), rep['model'][:-4] + '.anm')]
+    idle_step = next((float(w.split(':')[3]) for w in out['layout'].split() if w.startswith('idle:')), 0.125)
+    record = {'model': rep['model'], 'roles': ['standing'], 'method': 'skeletal', 'scale': 1.0,
+              'animated_model': rep['animated_model'], 'sources': rep['sources'], 'table': rep['table'],
+              'table_bytes': rep['table_bytes'], 'table_frames': rep['frames'], 'table_groups': len(rep['groups']),
+              'standing_bytes': rep['model_bytes'], 'standing_frames': rep['frames'], 'triangles': rep['faces'],
+              'vertices': rep['vertices'], 'step': idle_step, 'idle': 'idle', 'kit': rep['kit'],
+              'scaled_bones': rep['scaled_bones'], 'repeated_node_names': rep['repeated_node_names'],
+              'sha256': rep['model_sha256'], 'table_sha256': rep['table_sha256']}
+    return {'files': files, 'record': record}
 
 
 def bake_kf(data, palette, app, bipedal, scale=1.0, profile=None, corpse=False):
@@ -351,7 +378,7 @@ def main(argv=None):
     bipedal = {m: any(planned['bases'][i]['flags'] & 1 for i in ids)
                for m, ids in list(meshes.items()) + list(corpses.items())}
     models, failed = bake(a.data_files, a.palette.read_bytes(), meshes, a.out, a.jobs, a.method, bipedal,
-                          corpses=corpses if a.method == 'kf' else None)
+                          corpses=corpses if a.method in ('kf', 'skeletal') else None)
     out = manifest(planned, models)
     out['left_out'] = failed
     (a.out / 'creature-library.json').write_text(json.dumps(out, indent=1, sort_keys=True) + '\n', encoding='utf-8',

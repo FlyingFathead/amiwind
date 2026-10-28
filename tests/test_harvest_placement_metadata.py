@@ -19,12 +19,21 @@ class MetadataTests(unittest.TestCase):
   graph=prepare_graph(c,[r],binding)
   self.assertEqual(graph[1][-1][2],2)
   self.assertEqual(graph[3][0]['placement_metadata'],m)
- def test_owner_is_preserved_and_cannot_become_unowned_loot(self):
+ def test_owner_is_preserved_and_the_plant_is_a_theft_never_unowned_loot(self):
+  # HARVEST-INTERIOR-PICK-47 (decided for the project 2026-10-27): an owned plant is pickable as a theft (OpenMW's
+  # rule); its row keeps the owning character's id, so the pick fact is the theft record
   c=source_context(fixture(sub('ANAM',b'Original Owner\0')+sub('INTV',b'\0'*4)+sub('NAM9',b'\1\0\0\0')))
   r=refs(c)[0];m=placement_metadata(c,r)
   self.assertEqual(m['owner'],'Original Owner')
-  self.assertEqual(m['admission'],'requires_ownership_and_theft')
-  with self.assertRaisesRegex(ValueError,'ownership/theft'):prepare_graph(c,[r],binding)
+  self.assertEqual(m['admission'],'owned_theft')
+  graph=prepare_graph(c,[r],binding)
+  self.assertEqual(graph[2][0]['owner'],'Original Owner')
+  from prepare_harvest import owner_suffix
+  self.assertEqual(owner_suffix(graph[2][0]),'\tOriginal Owner')
+  self.assertEqual(owner_suffix(dict(graph[2][0],owner='')),'')
+ def test_owned_with_a_nondefault_charge_still_refused(self):
+  c=source_context(fixture(sub('ANAM',b'Original Owner\0')+sub('INTV',struct.pack('<i',2))))
+  with self.assertRaisesRegex(ValueError,'nondefault'):prepare_graph(c,refs(c),binding)
  def test_nondefault_duplicate_and_malformed_fields_reject(self):
   for extra in (sub('INTV',struct.pack('<i',2)),sub('NAM9',struct.pack('<i',3)),
                 sub('INTV',b'xx'),sub('ANAM',b'notterminated'),sub('INTV',b'\0'*4)*2):

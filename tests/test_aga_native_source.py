@@ -209,22 +209,14 @@ class NativeSourceTests(unittest.TestCase):
             result=subprocess.run([str(Path(compiler).resolve())],cwd=qc,capture_output=True,text=True)
             self.assertEqual(result.returncode,0,result.stdout+result.stderr)
             validate_quakec(directory/'progs.dat')
-            self.compile_run('aga_torch_qc_test.c',[Path(SOURCE)/'src/pr_exec.c', Path(SOURCE)/'src/aw_torch.c'],
+            # the hands' state machine is the engine's now (aw_hands.c, FIRST-PERSON-HANDS-IN-C-54): the fixture runs it
+            # on the compiled QC's player fields with the carried torch; the clips come from the image's table, so the
+            # old control (a wrong QC floor builtin number) has nothing left to break in the hands
+            self.compile_run('aga_torch_qc_test.c',[Path(SOURCE)/'src/pr_exec.c', Path(SOURCE)/'src/aw_torch.c',
+                                                    Path(SOURCE)/'src/aw_hands.c'],
                 cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'],
                 defines=[f'TEST_RINT_BUILTIN_INDEX={rint_index}',f'TEST_FLOOR_BUILTIN_INDEX={floor_index}'],
                 arguments=[str(directory/'progs.dat')])
-            # A control compiled with the historical wrong number must fail
-            # against this same engine-derived fixture mapping.
-            world=qc/'world.qc'
-            world.write_text(world.read_text().replace('floor = #37;','floor = #36;'))
-            result=subprocess.run([str(Path(compiler).resolve())],cwd=qc,capture_output=True,text=True)
-            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
-            with self.assertRaisesRegex(AssertionError,'Hand sequence 1 sample 2: frame 9 expected 8'):
-                # Keep the expected failure out of the outer test's subTest collector.
-                NativeSourceTests().compile_run('aga_torch_qc_test.c',[Path(SOURCE)/'src/pr_exec.c',Path(SOURCE)/'src/aw_torch.c'],
-                    defines=[f'TEST_RINT_BUILTIN_INDEX={rint_index}',f'TEST_FLOOR_BUILTIN_INDEX={floor_index}'],
-                    cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'],
-                    arguments=[str(directory/'progs.dat')])
 
 
     def test_torch_controls_bounded_light_surface_illumination_and_overlay(self):
@@ -605,8 +597,19 @@ class NativeSourceTests(unittest.TestCase):
         # AW-20260928-12: ordinary hinged doors on the engine's own collision (world.c), 90 degrees in one second.
         self.compile_run("aga_hinged_door_test.c", [ROOT/"engine/aga/src/aw_hinged_door.c", Path(SOURCE)/"src/world.c",
                                                     Path(SOURCE)/"src/mathlib.c"],
-                         argument_sets=[["table"], ["badtable"], ["door"], ["chim"], ["census"]],
+                         argument_sets=[["table"], ["badtable"], ["door"], ["chim"], ["census"], ["locks"]],
                          cflags=["-fsanitize=undefined", "-fno-sanitize-recover=all"])
+
+    def test_talk_rule_combat_dead_knocked_calm_and_one_read_a_frame(self):
+        # TALK-PROMPT-RULES: one predicate for the prompt and E, from flags only (aw_talk.c).
+        self.compile_run("aga_talk_test.c", [ROOT/"engine/aga/src/aw_talk.c"],
+                         cflags=["-fsanitize=undefined", "-fno-sanitize-recover=all"])
+        scene = (ROOT/"engine/aga/src/aw_scene.c").read_text(encoding="utf-8")
+        self.assertIn('if(aw_can_talk?target && aw_can_talk(target):voice && voice->string && pr_strings[voice->string])',
+                      scene)
+        self.assertIn('if(target && aw_can_talk && !aw_can_talk(target))target=NULL;',
+                      (ROOT/"engine/aga/src/pr_cmds.c").read_text(encoding="latin-1"))
+        self.assertIn('AW_TalkInit();', (ROOT/"engine/aga/src/aw_debug.c").read_text(encoding="latin-1"))
 
     def test_mesh_depth_crossings_and_span_coverage(self):
         self.compile_run("aga_mesh_spans_test.c", [ROOT/"engine/aga/src/r_edge.c"])
@@ -715,6 +718,9 @@ class NativeSourceTests(unittest.TestCase):
             sources = [*sources, tree/"src/aw_section.c"]
         if any(p.name == "aw_scene.c" for p in sources):
             sources = [*sources, tree/"src/aw_world.c"]
+            # the travel services' table rules (TRAVEL-SERVICES-CHIM-51)
+            if not any(p.name == "aw_travel_rules.c" for p in sources):
+                sources.append(tree/"src/aw_travel_rules.c")
         # The one map path resolver (aw_mappath.c) every map-path builder asks.
         if any(p.name in MAP_PATH_USERS for p in sources) and not any(p.name == "aw_mappath.c" for p in sources):
             sources = [*sources, tree/"src/aw_mappath.c"]

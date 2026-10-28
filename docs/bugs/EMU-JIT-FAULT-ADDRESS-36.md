@@ -1,5 +1,15 @@
 # EMU-JIT-FAULT-ADDRESS-36: FS-UAE JIT reports fault addresses during the Vivec stage A boot smoke
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 3 times; something has to be done
+
+- Reported with v0.0.36-dev4 at 2026-10-11 07:48 +0300: PERSISTING: whole-city Vivec, JIT only: game clock stops after a noclip move to x 0, y beyond 3600; interpreter runs, no engine unmapped access
+- Reported with v0.0.54-dev1 at 2026-10-27 17:33 +0200: PERSISTING (27 October 2026): the lines JIT: Fault address is 0x80f10000 at two program counters were seen again at 128 MiB Fast in Akulakhan's Chamber (v0.0.53 final) and in the combat playground (155a523, 17:17 +0200, group of four). Both runs freeze with the JIT on (see DAGOTH-CHAMBER-JIT-FAULT-53 and COMBAT-PLAYGROUND-JIT-FREEZE-54); the fault line is not claimed as their cause.
+- Reported with v0.0.54-dev1 at 2026-10-27 23:25 +0200: JIT only (27 October 2026): the game clock stopped once at 128 MB after a mode chain in the combat playground (155a523), JIT on, none with the JIT off. Not reproduced at 32 MB on the JIT (groups of 2, 3 and 4 pass over 137 s); the interpreter run with illegal-memory logging showed 0 unmapped engine accesses. Folded in from COMBAT-PLAYGROUND-JIT-FREEZE-54.
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |

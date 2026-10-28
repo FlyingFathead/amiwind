@@ -57,7 +57,9 @@ def plan(master, residents=(), town_refs=None):
     import creature_library as L
     refs = A.exterior_actors(master)
     lists, creatures = A.levelled_lists(master), A.creature_ids(master)
-    used = A.used_lists(lists, {b.casefold() for _, b, t, *_ in refs if t == 'LEVC'})
+    # the rooms' levelled lists too (chim.actors.table_list_order): the table rolls a room's 'aw_levelled' entity
+    # from the same lists, so every creature they can give needs its model here (CREATURE-ROOM-LEVELLED-54)
+    used = A.table_list_order(lists, refs, A.room_levelled_roots(master))
     want = {b.casefold() for _, b, t, *_ in refs if t == 'CREA'}
     for lid in used:
         want |= {e for e, _ in lists[lid][2] if e in creatures}
@@ -85,6 +87,22 @@ def plan(master, residents=(), town_refs=None):
     return meshes, bipedal, {m: sorted(v) for m, v in scales.items()}, npcs, planned, corpses
 
 
+def room_only_meshes(master, meshes):
+    """The meshes of MESHES (plan's) that only the rooms' levelled lists reach (no exterior reference or exterior
+    list gives them): they are baked with the skeletal method (one rest frame on the creature's own table, about a
+    third of a kf model's bytes), sized for the 32 MB rooms."""
+    from chim import actors as A
+    import creature_library as L
+    refs = A.exterior_actors(master)
+    lists, creatures = A.levelled_lists(master), A.creature_ids(master)
+    ext = {b.casefold() for _, b, t, *_ in refs if t == 'CREA'}
+    for lid in A.used_lists(lists, {b.casefold() for _, b, t, *_ in refs if t == 'LEVC'}):
+        ext |= {e for e, _ in lists[lid][2] if e in creatures}
+    bases = L.plan(master)['bases']
+    ext_meshes = {bases[i]['mesh'] for i in ext if i in bases}
+    return {m: ids for m, ids in meshes.items() if m not in ext_meshes}
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     p.add_argument('--data-files', type=Path, required=True)
@@ -94,6 +112,9 @@ def main(argv=None):
     p.add_argument('--jobs', type=int, default=1)
     p.add_argument('--scaled-variants', action='store_true',
                    help='also bake creature models at the instance scales the exterior uses (the previous method)')
+    p.add_argument('--creature-method', choices=('kf', 'skeletal'), default='kf',
+                   help='kf (default): the baked standing and mover models; skeletal: each creature mesh on its own '
+                        'animation table, every group of its own files (tools/creature_tables.py, CREATURE-TABLES)')
     a = p.parse_args(argv)
     path = list(sys.path)
     import creature_library as L
@@ -111,8 +132,15 @@ def main(argv=None):
     id1.mkdir(parents=True, exist_ok=True)
     palette = a.palette.read_bytes()
     t1 = time.time()
-    models, failed = L.bake(a.data_files, palette, meshes, id1, a.jobs, 'kf', bipedal,
-                            scales if a.scaled_variants else None, corpses=corpses)
+    rooms_only = room_only_meshes(master, meshes)
+    models, failed = L.bake(a.data_files, palette, {m: v for m, v in meshes.items() if m not in rooms_only}, id1,
+                            a.jobs, a.creature_method, bipedal, scales if a.scaled_variants else None, corpses=corpses)
+    if rooms_only:
+        print('Actor library: %d creature meshes only the rooms\' levelled lists give: skeletal (%s)' % (
+            len(rooms_only), ', '.join(sorted(rooms_only))), flush=True)
+        more, more_failed = L.bake(a.data_files, palette, rooms_only, id1, a.jobs, 'skeletal', bipedal)
+        models.update(more)
+        failed.update(more_failed)
     creature_manifest = dict(L.manifest(planned, models), left_out=failed)
     (a.out / 'creature-library.json').write_text(json.dumps(creature_manifest, indent=1, sort_keys=True) + '\n',
                                                  encoding='utf-8', newline='\n')

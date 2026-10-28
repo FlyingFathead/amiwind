@@ -1,6 +1,6 @@
 # Inventory
 
-_Last updated with AmiWind v0.0.48-dev2 (23 October 2026)._
+_Last updated with AmiWind v0.0.54-dev1 (27 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -50,6 +50,19 @@ before saves and equipment changes, and is retained through drop/pickup rather
 than repaired by re-equipping. A durable stack with differing individual
 conditions is not supported; incompatible merges and durable stacked equips
 are refused.
+
+Worn armour (v0.0.54): every armour piece goes into its own slot (helmet, cuirass, each pauldron, greaves, boots,
+each gauntlet or bracer, the shield in the left hand), as OpenMW 0.51 places it (`mwclass/armor.cpp`
+getEquipmentSlots). Pieces with a script that still acts after registration, or with an enchantment, are not
+equippable yet. The armour rating is the original weighting (`mwclass/npc.cpp` getArmorRating): cuirass 0.3;
+shield, helmet, greaves, boots and each pauldron 0.1; each gauntlet 0.05; an empty slot counts the Unarmored skill.
+A piece rates its armour times the skill of its class (light, medium or heavy, by its weight) over iBaseArmorSkill,
+times its condition. Each worn piece also gives the hit sound of a blow landing on it ([COMBAT.md](COMBAT.md)
+"Sounds"). The body does not show worn armour yet (the player body work, PLAYER-BODY-ALL-ANIMS). A two-handed weapon
+and a shield exclude each other: equipping one takes the other off and back to the pack (`actionequip.cpp`,
+`weapon.cpp` and `armor.cpp` canBeEquipped). Not yet: the rule that beast races cannot wear helmets that cover the
+head or boots (armor.cpp). The engine's call `AW_InventoryEquippedWeaponType()` gives the type of the weapon in the
+right hand (-1: hand to hand) for the hands and the player body.
 
 A drop transfers one actual item into a persistent world record with its source
 ID, count, scene, placement, yaw and condition. The converted ground model must

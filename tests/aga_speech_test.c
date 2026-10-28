@@ -26,6 +26,11 @@ int main(void){
     assert(AW_SpeechRemaining()==0);
     available=0;AW_SpeechStart(5,2,"intro/missing.wav",soundtime,11025,11025,0);
     soundtime+=1323;assert(AW_SpeechPose(5,0,21,"progs/np_test.mdl")==8);
+    /* a sound of no entity (a Quake temporary entity, a magic sound) leaves a speaking voice alone
+     * (SPEECH-STOP-ALL-ON-MINUS1-54) */
+    available=1;AW_SpeechStart(5,2,"intro/test.wav",soundtime,11025,11025,0);
+    AW_SpeechStart(-1,0,"intro/test.wav",soundtime,11025,11025,0);
+    assert(AW_SpeechRemaining()>0);
     AW_SpeechStop(-1,-1);assert(AW_SpeechRemaining()==0);
     return 0;
 }

@@ -3,6 +3,7 @@
  */
 #include "quakedef.h"
 #include "aw_links.h"
+#include "aw_ambient.h"	/* AW_ActorStep's failure diagnostics */
 #include "chim/chim.h"
 /* CHIM ring loading and actor freezing (chim/chim_world.c sets them only
  * when its data exists). */
@@ -177,6 +178,7 @@ static qboolean step_height_ok(const vec3_t delta,const trace_t *under)
     if(nz>1)nz=1;
     return fabs(delta[2])<=8.75f+run*sqrt(1-nz*nz)/nz;
 }
+int aw_actor_step_diag,aw_actor_step_fail;float aw_actor_step_reached[3],aw_actor_step_floor[5];   /* aw_ambient.h */
 qboolean AW_ActorStep(edict_t *p,vec3_t move,double dt)
 {
     vec3_t origin,oldorigin,velocity,delta;float flags,groundentity,movetype;trace_t floor;int i;
@@ -197,6 +199,18 @@ qboolean AW_ActorStep(edict_t *p,vec3_t move,double dt)
     if(delta[0]*delta[0]+delta[1]*delta[1]>.00001f && support(p,8.75f,&floor) && step_height_ok(delta,&floor) &&
        !(feet_in_lava(p,p->v.origin) && !feet_in_lava(p,origin))) {
         ground(p,&floor);VectorCopy(vec3_origin,p->v.velocity);SV_LinkEdict(p,true);return true;
+    }
+    /* Why the step failed, only while a diagnostic asks ("chim actors ambient steplog", aw_ambient.c): the test
+     * that refused it at the position the walk move reached, and that position's support trace. */
+    if(aw_actor_step_diag){
+        int moved=delta[0]*delta[0]+delta[1]*delta[1]>.00001f,held=0;trace_t under;
+        memset(&under,0,sizeof(under));
+        if(moved)held=support(p,8.75f,&under);
+        aw_actor_step_fail=!moved?AW_STEP_FAIL_MOVE:!held?AW_STEP_FAIL_SUPPORT:
+            !step_height_ok(delta,&under)?AW_STEP_FAIL_HEIGHT:AW_STEP_FAIL_LAVA;
+        VectorCopy(p->v.origin,aw_actor_step_reached);
+        aw_actor_step_floor[0]=under.fraction;VectorCopy(under.plane.normal,(&aw_actor_step_floor[1]));
+        aw_actor_step_floor[4]=(float)under.startsolid;
     }
     VectorCopy(origin,p->v.origin);VectorCopy(oldorigin,p->v.oldorigin);VectorCopy(velocity,p->v.velocity);
     p->v.flags=flags;p->v.groundentity=groundentity;SV_LinkEdict(p,false);return false;

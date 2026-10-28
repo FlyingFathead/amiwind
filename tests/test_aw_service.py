@@ -342,6 +342,36 @@ class ServiceTests(unittest.TestCase):
         aw.release_cores(self.config, first['id'])
         self.assertEqual(aw.active(aw.load_state(self.config), 'cores'), [])
 
+    def test_a_core_lease_whose_container_is_gone_ends(self):
+        # AW-LEASE-DEAD-CONTAINER-54: two killed builds' core leases held 32 GB and queued the v0.0.54-dev2 build
+        dead, _ = aw.lease_cores(self.config, 'run-dead', 'w1', 'dev', 8, 'aw-build-run-dead', memory_gib=16)
+        live, _ = aw.lease_cores(self.config, 'run-live', 'w2', 'dev', 8, 'aw-build-run-live', memory_gib=16)
+        state = aw.load_state(self.config)
+        later = time.time() + aw.DEAD_CONTAINER_GRACE_S + 1
+        exists = {'aw-build-run-dead': False, 'aw-build-run-live': True}.get
+        self.assertEqual(aw.expire_dead_cores(self.config, state, now=time.time(), probe=exists), [])  # in its grace
+        ended = aw.expire_dead_cores(self.config, state, now=later, probe=exists)
+        self.assertEqual([lease['id'] for lease in ended], [dead['id']])
+        self.assertIn('aw-build-run-dead is gone', ended[0]['expired_because'])
+        self.assertEqual([lease['id'] for lease in aw.active(state, 'cores')], [live['id']])
+        # a container the host cannot ask about is never judged
+        self.assertEqual(aw.expire_dead_cores(self.config, state, now=later, probe=lambda name: None), [])
+        aw.release_cores(self.config, live['id'])
+        aw.release_cores(self.config, dead['id'])
+
+    def test_a_new_lease_drops_dead_ones_first(self):
+        dead, _ = aw.lease_cores(self.config, 'run-dead', 'w1', 'dev', 8, 'aw-build-run-dead', memory_gib=16)
+        state = aw.load_state(self.config)
+        for row in state['leases']:
+            if row['id'] == dead['id']:
+                row['created_epoch'] = time.time() - aw.DEAD_CONTAINER_GRACE_S - 5
+        aw.save_state(self.config, state)
+        with mock.patch.object(aw, 'CONTAINER_PROBE', lambda name: False if name == 'aw-build-run-dead' else True):
+            fresh, _ = aw.lease_cores(self.config, 'run-new', 'w2', 'dev', 8, 'aw-build-run-new', memory_gib=16)
+        held = {lease['id'] for lease in aw.active(aw.load_state(self.config), 'cores')}
+        self.assertEqual(held, {fresh['id']})
+        aw.release_cores(self.config, fresh['id'])
+
     def test_running_builds_grow_back_when_a_gate_ends(self):
         # AW-LEASE-NO-GROW-36: a gate that starts takes its cores from the running builds, and gives them back
         build, _ = aw.lease_cores(self.config, 'run-a', 'w1', 'dev', 24, 'aw-build-run-a')
@@ -379,6 +409,39 @@ class ServiceTests(unittest.TestCase):
         code, result, _ = self.submit(self.request())
         self.assertEqual(result['status'], 'refused')
         self.assertTrue(any('no cores free' in text for text in result['refusals']), result['refusals'])
+
+    def test_a_dead_ticket_leaves_the_queue(self):
+        # AW-QUEUE-DEAD-TICKET-54: a request killed while queued kept its ticket at the head of the queue forever and
+        # every later build waited behind it; a ticket not seen for QUEUE_STALE_S is dropped
+        build = self.config['build']
+        build['host_memory_gib'] = 62
+        first, _ = aw.lease_cores(self.config, 'run-a', 'w1', 'dev', 24, 'aw-build-run-a', memory_gib=44)
+        self.assertEqual(aw.lease_cores(self.config, 'run-dead', 'w2', 'dev', 24, 'c-dead', memory_gib=44,
+                                        ticket='run-dead')[0], None)
+        aw.release_cores(self.config, first['id'])
+        self.assertEqual(aw.lease_cores(self.config, 'run-live', 'w3', 'dev', 4, 'c-live', memory_gib=4,
+                                        ticket='run-live'),
+                         (None, 'a queued request of higher or equal priority goes first'))
+        state = aw.load_state(self.config)
+        for item in state['queue']:
+            if item['ticket'] == 'run-dead':
+                item['seen_epoch'] = item['since_epoch'] = item['since_epoch'] - aw.QUEUE_STALE_S - 1
+        aw.save_state(self.config, state)
+        lease, _ = aw.lease_cores(self.config, 'run-live', 'w3', 'dev', 4, 'c-live', memory_gib=4, ticket='run-live')
+        self.assertIsNotNone(lease)
+        self.assertEqual([item['ticket'] for item in aw.load_state(self.config)['queue']], [])
+        aw.release_cores(self.config, lease['id'])
+
+    def test_a_waiting_ticket_is_kept_alive(self):
+        state = {'queue': []}
+        self.assertTrue(aw._queue_turn(state, 'run-a', 'dev', now=1000.0))
+        self.assertFalse(aw._queue_turn(state, 'run-b', 'dev', now=1000.0))
+        # run-a keeps asking: it stays at the head however long it waits
+        later = 1000.0 + aw.QUEUE_STALE_S * 3
+        for step in range(1, 7):
+            self.assertTrue(aw._queue_turn(state, 'run-a', 'dev', now=1000.0 + step * aw.QUEUE_STALE_S / 2))
+        self.assertFalse(aw._queue_turn(state, 'run-b', 'dev', now=later))
+        self.assertEqual([item['ticket'] for item in state['queue']], ['run-a', 'run-b'])
 
     def test_memory_is_leased_and_a_misfit_waits_in_the_queue(self):
         build = self.config['build']

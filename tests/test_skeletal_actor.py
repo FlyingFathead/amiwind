@@ -485,6 +485,24 @@ class SkeletalModelReadersTests(unittest.TestCase):
             broken[len(self.model) - S.BLOCK_HEAD - self.nv * S.VERT_BYTES] = ord('X')   # not a block
             check_actor_ground.model_frames(bytes(broken))
 
+    def test_a_refused_model_is_named_with_its_counts(self):
+        # ACTOR-MODEL-ERROR-UNNAMED-48 (persisting on 2026-10-27: chim-town-vivec_city stopped with "Unsupported actor
+        # model" and no name): the refusal names the model and the header counts the limits judge
+        import check_actor_ground
+        self.assertEqual(len(check_actor_ground.named_model_frames(self.model, 'progs/ok.mdl')), 1)
+        broken = bytearray(self.model)
+        broken[4:8] = (7).to_bytes(4, 'little')                           # a version the check refuses
+        with self.assertRaises(ValueError) as caught:
+            check_actor_ground.named_model_frames(bytes(broken), 'progs/npc_vilamon.mdl')
+        text = str(caught.exception)
+        self.assertIn('progs/npc_vilamon.mdl', text)
+        self.assertIn('version 7', text)
+        self.assertIn('%d vertices' % self.nv, text)
+        with self.assertRaises(ValueError) as caught:
+            check_actor_ground.named_model_frames(b'IDPO', 'progs/short.mdl')
+        self.assertIn('progs/short.mdl', str(caught.exception))
+        self.assertIn('shorter than the 84-byte header', str(caught.exception))
+
     def test_the_ground_check_grounds_the_rest_frame_whatever_the_layout(self):
         # SKEL-GROUND-LAYOUT-TABLE-52: the layout names table frames (idle:0:21, walk:1102:8 ...), not model frames;
         # the stage-build stop in chim-town-balmora ("Animation kit idle group outside the model frames")

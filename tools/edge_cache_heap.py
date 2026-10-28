@@ -57,8 +57,11 @@ import struct
 # aw_skel_table, model.c includes aw_skel.h for the alias stream; edge-cache code and brush loaders are byte-identical.
 # Re-pinned 2026-10-26 for SDK-MALLOC-TRAPS-52 (model.c): its five malloc/calloc calls go through aw_tryalloc.h
 # (AW_TryMalloc, AW_TryCalloc: NULL instead of the toolchain malloc's TRAP #7); edge-cache code is byte-identical.
+# Re-pinned 2026-10-27 for SKEL-VERTEX-LIMIT-52 (model.c): AW_AliasExceptionAllows split into AW_AliasCrcAdd and
+# AW_AliasExceptionMatches (the alias stream reader checks an extended model's model-budgets.txt line with a CRC-32 it
+# computes while reading); edge-cache code and brush loaders are byte-identical.
 SOURCE_HASHES={
-    'model.c':'5be53d395d5a8e237557552ff49660dd455ffed7ad6faaf8137fc246990efd51',
+    'model.c':'4bf814abb6753f702cce3a3ff7e6ac6baad9e48f080d97be5ed63eb595cf3c7a',
     'model.h':'bc905ee0a36fafb68eb1376b68670f24de270931ca8ba736ca29ab7e1178440a',
     'r_draw.c':'08464e4c3bbb98ed197f7c42c5b013818d2ef4fffd1a5727ed9a6a4c3385cce4',
     'asm_draw.h':'15dafafe33898852972379fc48524346c287a342ba95f17c01becdc75926eba1',

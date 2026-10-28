@@ -2,8 +2,9 @@
  * Region weather at the player (aw_weather.h; SKY-REDMOUNTAIN-BLUE-44). The
  * table (world/region-weather.aww, 430 bytes for nine regions) is read once;
  * the region comes from the same per-cell lookup as the HUD's region name, so
- * nothing is read per frame. aw_weather 1 (saved, default): region weather;
- * 0: the clear sky everywhere (the look before v0.0.46). dbg weather NAME
+ * nothing is read per frame. aw_weather 1 (saved, default): region weather,
+ * sky, fog and the land's light; 2: sky and fog only (the land's light before
+ * WEATHER-AMBIENT-SUN-UNUSED-51); 0: the clear sky everywhere (the look before v0.0.46). dbg weather NAME
  * forces one weather until dbg weather auto (not saved).
  */
 #include "quakedef.h"
@@ -24,7 +25,7 @@ static long last_hour;
 
 static void load(void)
 {
-    static unsigned char raw[20+32*AW_WEATHERS+10*AW_WEATHER_REGIONS];
+    static unsigned char raw[20+AW_WEATHER_LOOK_V2*AW_WEATHERS+10*AW_WEATHER_REGIONS];
     FILE *f=NULL;int size;
     if(attempted)return;
     attempted=1;
@@ -32,7 +33,7 @@ static void load(void)
     if(!f)return; /* No table: every region keeps the clear sky. */
     if(size<20 || size>(int)sizeof raw){fclose(f);Con_Printf("Region weather unavailable: %s has %ld bytes.\n",AW_WEATHER_PATH,(long)size);return;}
     if(fread(raw,1,(size_t)size,f)==(size_t)size && AW_WeatherParse(raw,size,&table))loaded=1;
-    else Con_Printf("Region weather unavailable: %s is not a valid AWW1 table.\n",AW_WEATHER_PATH);
+    else Con_Printf("Region weather unavailable: %s is not a valid AWW1/AWW2 table.\n",AW_WEATHER_PATH);
     fclose(f);
 }
 /* The player's original-world position, or 0 outside an exterior. */
@@ -48,9 +49,25 @@ static int target_weather(int days,int milliseconds,const float *source,int *reg
     if(forced>=0)return forced;
     return AW_WeatherOfRegion(&table,*region,days,milliseconds);
 }
+/* The storm at the player this frame (ACTOR-STORM-POSE-51): set by AW_WeatherFrame. */
+static int storm;
+static float storm_dir[2];
+int AW_WeatherStorm(float dir[2])
+{
+    if(storm && dir){dir[0]=storm_dir[0];dir[1]=storm_dir[1];}
+    return storm;
+}
+/* What falls at the player (WEATHER-RAIN): set by AW_WeatherFrame with the storm. */
+static int falling,falling_strength;
+int AW_WeatherFalling(int *strength)
+{
+    if(strength)*strength=falling?falling_strength:0;
+    return falling;
+}
 int AW_WeatherFrame(int days,int milliseconds,aw_weather_blend_t *out)
 {
     float source[3];int target,region,step;double now=realtime,seconds;long hour;
+    storm=0;falling=AW_PRECIP_NONE;falling_strength=0;
     load();
     if(!loaded || (aw_weather.value<=0 && forced<0)){
         instant=1;have_last=0;last_time=-1;return 0;
@@ -71,7 +88,8 @@ int AW_WeatherFrame(int days,int milliseconds,aw_weather_blend_t *out)
     }
     instant=0;have_last=1;last_time=now;last_target=target;last_hour=hour;
     last_source[0]=source[0];last_source[1]=source[1];last_source[2]=source[2];
-    if(state.next==AW_WEATHER_NONE){
+    storm=AW_WeatherIsStorm(state.current,state.next,state.progress) && AW_WeatherStormDirection(source,storm_dir);
+    falling=AW_WeatherPrecip(state.current,state.next,state.progress,&falling_strength);    if(state.next==AW_WEATHER_NONE){
         AW_WeatherBlend(&table,state.current,state.current,AW_WEATHER_STEPS,out);
         if(state.current==AW_WEATHER_CLEAR)return 0;
         return 1+state.current*AW_WEATHERS*(AW_WEATHER_STEPS+1)+state.current*(AW_WEATHER_STEPS+1)+AW_WEATHER_STEPS;
@@ -81,6 +99,10 @@ int AW_WeatherFrame(int days,int milliseconds,aw_weather_blend_t *out)
     AW_WeatherBlend(&table,state.current,state.next,step,out);
     return 1+state.current*AW_WEATHERS*(AW_WEATHER_STEPS+1)+state.next*(AW_WEATHER_STEPS+1)+step;
 }
+int AW_WeatherLightOn(void)
+{
+    return aw_weather.value<1.5f; /* 2 = sky and fog only (WEATHER-AMBIENT-SUN-UNUSED-51) */
+}
 static void weather_command(void)
 {
     char *s=Cmd_Argv(1);int w;float source[3];const char *now;
@@ -88,13 +110,15 @@ static void weather_command(void)
         if(!strcmp(s,"auto"))forced=-1;
         else if(!strcmp(s,"off") || !strcmp(s,"0")){Cvar_SetValue(aw_weather.name,0);forced=-1;}
         else if(!strcmp(s,"on") || !strcmp(s,"1")){Cvar_SetValue(aw_weather.name,1);forced=-1;}
+        else if(!strcmp(s,"skyonly") || !strcmp(s,"2")){Cvar_SetValue(aw_weather.name,2);forced=-1;}
         else if((w=AW_WeatherIndex(s))>=0)forced=w;
-        else{Con_Printf("Usage: dbg weather [on/off / auto / clear cloudy foggy overcast rain thunder ash blight snow blizzard]\n");return;}
+        else{Con_Printf("Usage: dbg weather [on/off / skyonly / auto / clear cloudy foggy overcast rain thunder ash blight snow blizzard]\n");return;}
         instant=1;
     }else if(Cmd_Argc()!=1){Con_Printf("Usage: dbg weather [on/off / auto / NAME]\n");return;}
     load();
     now=aw_weather_names[state.current<0 || state.current>=AW_WEATHERS?0:state.current];
-    Con_Printf("Region weather %s%s: %s",aw_weather.value>0?"on":"off",forced>=0?", forced":"",now);
+    Con_Printf("Region weather %s%s: %s",aw_weather.value>0?(AW_WeatherLightOn()?"on":"on, sky only"):"off",forced>=0?", forced":"",now);
+    if(loaded && !table.light)Con_Printf(" (AWW1 table: no land light)");
     if(state.next!=AW_WEATHER_NONE)Con_Printf(" changing to %s %ld%%",aw_weather_names[state.next],(long)(state.progress*100));
     if(state.queued!=AW_WEATHER_NONE)Con_Printf(", then %s",aw_weather_names[state.queued]);
     Con_Printf(" (table %s",loaded?"loaded":"missing: clear sky");

@@ -56,12 +56,16 @@ def acti(name, script):
     return record('ACTI', sub('NAME', name), sub('SCRI', script))
 
 
-def cell_exterior(x, y, refs):
-    parts = [sub('NAME', ''), sub('DATA', struct.pack('<Iii', 0, x, y))]
+def cell_exterior(x, y, refs, name='', region=None):
+    parts = [sub('NAME', name), sub('DATA', struct.pack('<Iii', 0, x, y))] + ([sub('RGNN', region)] if region else [])
     for number, ident, pos in refs:
         parts += [sub('FRMR', struct.pack('<I', number)), sub('NAME', ident),
                   sub('DATA', struct.pack('<6f', pos[0], pos[1], pos[2], 0, 0, 0))]
     return record('CELL', *parts)
+
+
+def cell_interior(name):
+    return record('CELL', sub('NAME', name), sub('DATA', struct.pack('<Iii', 1, 0, 0)))
 
 
 SCRIPTS = {
@@ -103,8 +107,32 @@ if ( OnActivate == 1 )
     Activate
     PlaySound "Chime"
 endif
-AiWander 100 5 0
-AiWander 100 5 0
+AiTravel 100 5 0
+AiTravel 100 5 0
+End''',
+    # the actor record (v0.0.54): stats, items, spells, combat, wander and the dead count reach the host
+    'ActorUser': '''Begin ActorUser
+short step
+if ( step == 0 )
+    set step to 1
+    SetFight 90
+    ModHealth -5
+    "chime_obj"->AddItem "Gold_005" 3
+    player->RemoveItem "misc_thing" 2
+    AddSpell "test spell"
+    StartCombat player
+    StopCombat
+    AIWander 512 5 0 0 10 20 30
+endif
+if ( GetHealth < 50 )
+    set step to 2
+endif
+if ( OnDeath == 1 )
+    set step to 3
+endif
+if ( GetDeadCount "nobody" == 0 )
+    set step to step
+endif
 End''',
     'Inert': '''Begin Inert
 float t
@@ -148,21 +176,74 @@ if ( choice == 0 )
     "chime_obj"->Unlock
 endif
 End''',
+    # the original's sound markers start their loop on the run after the cell change (v0.0.54: CellChanged is not
+    # VOLATILE; the interpreter runs the script once more after the run that read 1)
+    'MarkerZero': '''begin MarkerZero
+if ( CellChanged == 0 )
+    if ( GetSoundPlaying "Drip" == 0 )
+        PlayLoopSound3DVP "Drip" 0.4, 1.0
+    endif
+endif
+end''',
+    # the world and cell lookups (v0.0.54): the player's cell by name prefix (a room, an outdoor cell's own name, a
+    # region's name), a position, a disease among the player's spells; DontSaveObject and Xbox as OpenMW has them
+    'CellUser': '''Begin CellUser
+if ( Where == 0 )
+    player->PositionCell 4000 8000 -200 90 "Test Room"
+    player->PositionCell 100 200 300 0 "Seyda Neen"
+    player->PositionCell 1 2 3 0 "Another Room"
+    "cell_obj"->PositionCell 1 2 3 0 "Test Room"
+endif
+if ( GetPCCell "test room" == 1 )
+    set Where to 2
+elseif ( GetPCCell "Seyda" == 1 )
+    set Where to 1
+elseif ( GetPCCell "Bitter Coast" == 1 )
+    set Where to 3
+else
+    set Where to 0
+endif
+set PosX to GetPos x
+if ( player->GetCommonDisease == 1 )
+    set Where to Where + 10
+endif
+DontSaveObject
+set Where to Where + Xbox
+if ( BM_NoSuchVariable == 0 )
+    set Where to Where + 100
+endif
+if ( GetCurrentAIPackage == 0 )
+    if ( GetAIPackageDone == 0 )
+        if ( "actor_obj"->GetAIPackageDone == 1 )
+            set Where to Where + 1000
+        endif
+    endif
+endif
+End''',
 }
 
 
 def master_bytes(scripts=SCRIPTS):
     out = [record('TES3', sub('HEDR', b'\0' * 300))]
-    out += [glob('QuestFlag', 's', 0), glob('Counter', 'l', 0), glob('Fraction', 'f', 1.5)]
-    out += [soun('Cave Wind', 'Fx\\envrn\\cave_wind.wav', 128, 10, 40), soun('Chime', 'Fx\\chime.wav')]
+    out += [glob('QuestFlag', 's', 0), glob('Counter', 'l', 0), glob('Fraction', 'f', 1.5), glob('Where', 'l', 0),
+            glob('PosX', 'f', 0)]
+    out += [record('REGN', sub('NAME', 'Bitter Coast Region'), sub('FNAM', 'Bitter Coast Region'))]
+    out += [soun('Cave Wind', 'Fx\\envrn\\cave_wind.wav', 128, 10, 40), soun('Chime', 'Fx\\chime.wav'),
+            soun('Drip', 'Fx\\drip.wav')]
     out += [scpt(name, text) for name, text in scripts.items()]
     out += [acti('marker_wind', 'AmbientWind'), acti('chime_obj', 'TimerChime'), acti('quiet_obj', 'Quiet'),
             acti('notyet_obj', 'NotYetUser'), acti('loop_obj', 'Looper'), acti('cg_obj', 'chargenTest'),
-            acti('inert_obj', 'Inert'), acti('gate_obj', 'GateScript')]
+            acti('inert_obj', 'Inert'), acti('gate_obj', 'GateScript'), acti('actor_obj', 'ActorUser'),
+            acti('cell_obj', 'CellUser'), acti('drip_obj', 'MarkerZero')]
     out.append(cell_exterior(0, 0, [(101, 'marker_wind', (100, 200, 0)), (102, 'chime_obj', (400, 0, 0)),
                                     (103, 'quiet_obj', (0, 0, 0)), (104, 'notyet_obj', (8, 8, 0)),
                                     (105, 'loop_obj', (16, 16, 0)), (106, 'cg_obj', (0, 0, 0)),
-                                    (107, 'inert_obj', (0, 0, 0)), (108, 'gate_obj', (0, 0, 0))]))
+                                    (107, 'inert_obj', (0, 0, 0)), (108, 'gate_obj', (0, 0, 0)),
+                                    (109, 'actor_obj', (0, 0, 0)), (110, 'cell_obj', (0, 0, 0)),
+                                    (111, 'drip_obj', (0, 0, 0))]))
+    out += [cell_exterior(-2, -9, [], 'Seyda Neen', 'bitter coast region'),
+            cell_exterior(-3, -9, [], '', 'bitter coast region'), cell_interior('Test Room'),
+            cell_interior('Another Room')]
     return b''.join(out)
 
 
@@ -188,10 +269,14 @@ class SyntheticData:
         shutil.rmtree(self.dir, ignore_errors=True)
 
 
+# the room maps the player's PositionCell may load (a test room list: "Another Room" is in none, so stays not yet)
+ROOMS = {'test room': {'map': 'ri0123456789', 'offset': [100, 0, 0]}}
+
+
 def program(handwritten=('chargen*',)):
     with SyntheticData() as s:
         media = MediaMap(s.data, catalogue(), SOUNDTRACK)
-        prog, compiled = compile_program(s.data, media, handwritten=handwritten)
+        prog, compiled = compile_program(s.data, media, handwritten=handwritten, rooms=ROOMS)
         return prog, compiled, bindings(prog), s.data
 
 
@@ -227,9 +312,19 @@ class LexerParserTests(unittest.TestCase):
         self.assertEqual(tree[2][0][2][0][1][0][3], ('member', 'other', 'count'))
         self.assertEqual(tree[2][1][2][3][-1], ('str', 'Raven Rock, Bar'))
 
-    def test_unknown_name_in_an_expression_is_an_error(self):
+    def test_unknown_name_in_an_expression_reads_as_a_number(self):
+        # OpenMW's rule for legacy content (exprparser.cpp parseName): its leading digits, else 0 (four Bloodmoon
+        # scripts test a journal id this way)
+        tree, p = parse('Begin t\nshort a\nif ( BM_BearHunt1 == 0 )\nset a to 12abc\nendif\nEnd\n')
+        cond = tree[2][0][2][0][0]
+        self.assertEqual(cond, ('cmp', '==', ('float', 0.0), ('int', 0)))
+        self.assertEqual(tree[2][0][2][0][1][0][3], ('float', 12.0))
+        self.assertTrue(any('read as a number' in w for w in p.warnings))
+        # a reference before a name that is no function is dropped, the name read as it is (OpenMW)
+        tree, p = parse('Begin t\nshort fakeiswere\nif ( Player->fakeiswere == 0 )\nendif\nEnd\n')
+        self.assertEqual(tree[2][0][2][0][0][2], ('local', 'fakeiswere'))
         with self.assertRaises(ParseError):
-            parse('Begin t\nif ( NoSuchThing == 0 )\nendif\nEnd\n')
+            parse('Begin t\nif ( == 0 )\nendif\nEnd\n')
 
     def test_messagebox_arguments_and_buttons(self):
         tree, p = parse('Begin t\nfloat f\nMessageBox "Value %.0f" f "Ok" "Cancel"\nEnd\n')
@@ -265,13 +360,17 @@ class CompilerTests(unittest.TestCase):
                 again.append(code)
                 if layout == 'N':
                     again += struct.pack('>HBB', *args[:3]) + b''.join(struct.pack('>H', s) for s in args[3:])
+                elif layout == 'F':
+                    again += struct.pack('>HHBB', *args[:4]) + b''.join(struct.pack('>H', s) for s in args[4:])
                 else:
                     for letter, value in zip(layout, args):
                         again += struct.pack({'b': '>b', 'B': '>B', 'h': '>h', 'H': '>H', 'i': '>i', 'f': '>f'}[letter], value)
             self.assertEqual(bytes(again), row['code'])
         strings = awms.strings(f)
         self.assertIn('AmbientWind', strings)
-        self.assertEqual(len(binds), 8)                           # GateScript (object state) is bound too
+        self.assertEqual(len(binds), 11)                          # GateScript, ActorUser, CellUser, MarkerZero too
+        self.assertFalse(names['MarkerZero'].flags & SCRIPT_VOLATILE)   # CellChanged and GetSoundPlaying only
+        self.assertFalse(names['AmbientWind'].flags & SCRIPT_VOLATILE)
         self.assertTrue(names['Inert'].flags & SCRIPT_INERT)
         self.assertNotIn(107, [b['reference'] for b in bindings(prog, compiled)])   # inert: left out of the file
         self.assertFalse(names['NotYetUser'].flags & SCRIPT_INERT)
@@ -305,6 +404,46 @@ class CompilerTests(unittest.TestCase):
         for name, number in QUERIES.items():
             self.assertEqual(queries.get(name), number, name)
         self.assertEqual(queries['COUNT'], max(QUERIES.values()) + 1)
+        # the import route: every function has a number the engine counts (AWM_FUNCTIONS of them)
+        from mwscript.functions import FUNCTIONS, FUNCTION_NUMBERS
+        from mwscript.opcodes import FUNCTIONS_MAX, SPELL_VERBS
+        self.assertIn('#define AWM_FUNCTIONS %d ' % FUNCTIONS_MAX, header)
+        self.assertLessEqual(len(FUNCTIONS), FUNCTIONS_MAX)
+        self.assertEqual(sorted(FUNCTION_NUMBERS.values()), list(range(len(FUNCTIONS))))
+        self.assertIn('#define AWM_SPELL_COMMON_DISEASE %d' % SPELL_VERBS['common_disease'], header)
+        self.assertIn('#define AWM_SPELL_BLIGHT_DISEASE %d' % SPELL_VERBS['blight_disease'], header)
+
+    def test_every_call_is_kept_and_the_cell_table(self):
+        # the import route: a not-yet call keeps its function's number, its name and its arguments (numbers on the
+        # stack, strings by index); GetPCCell names become rows of cells (rooms by number, outdoor cells by grid)
+        from mwscript.functions import FUNCTION_NUMBERS
+        prog, compiled, binds, data = program()
+        names = {c.name: c for c in compiled}
+        calls = [a for _, n, a in awms.decode(names['NotYetUser'].code) if n == 'NOTYET']
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(calls[0][0], FUNCTION_NUMBERS['aitravel'])
+        self.assertEqual(prog.strings.rows[calls[0][1]], 'aitravel')
+        self.assertEqual(calls[0][2] & 0x1F, 3)                    # three numbers: 100 5 0
+        cell = names['CellUser']
+        # PositionCell: the player's moves are worked out here; a room no list names and another object stay not yet
+        self.assertEqual([prog.strings.rows[a[1]] for _, n, a in awms.decode(cell.code) if n == 'NOTYET'],
+                         ['positioncell', 'positioncell'])
+        moves = [a[0] for _, n, a in awms.decode(cell.code) if n == 'PLAYERMOVE']
+        self.assertEqual(len(moves), 2)
+        room, outdoors = (prog.moves.rows[m] for m in moves)
+        self.assertEqual((room['kind'], prog.strings.rows[room['map']]), (2, 'ri0123456789'))
+        self.assertEqual(room['at'], (975.0, 2000.0, -50 + 16.875))      # (x - 100) / 4, y / 4, z / 4 + the feet
+        self.assertEqual(room['yaw'], 0)                                  # 90 degrees: the door rule's yaw 0
+        self.assertEqual((outdoors['kind'], outdoors['at'], outdoors['yaw']), (1, (100.0, 200.0, 300.0), 0.0))
+        self.assertTrue(any('read as a number' in w for w in cell.warnings))
+        rows = {r['name'].casefold(): r for r in prog.pccells.rows}
+        room = data.interior_numbers['test room']
+        self.assertEqual((rows['test room']['rooms'], rows['test room']['outside']), ([room], []))
+        self.assertEqual(rows['seyda']['outside'], [(-2, -9)])
+        self.assertEqual(rows['bitter coast']['outside'], [(-3, -9)])  # (-2, -9) has a name of its own
+        f = awms.read(awms.write(prog, compiled, binds)[0])
+        self.assertEqual(f['PCEL_rows'], 3)
+        self.assertIn('PCEL', awms.RESIDENT)
 
 
 HARNESS = r'''
@@ -343,12 +482,43 @@ static void h_message(int i,int t,const float *v,int n,const unsigned char *b,in
     printf("\n");
 }
 static int h_button(int i){return tick==5?0:-1;}   /* the player chooses the first button at tick 5 */
-static const aw_mwvm_host_t host={h_sound,h_playing,h_say,h_saydone,h_music,h_distance,h_menu,h_query,h_jget,h_jset,h_notyet,h_warn,h_object,h_message,h_button};
+static float health=60;
+static aw_mwcell_t h_actor(int i,int t,int verb,int stat,aw_mwcell_t v){
+    aw_mwcell_t out;out.i=0;
+    printf("%d actor %d %d %d %d %d %.2f\n",tick,i,t,verb,stat,v.i,verb?v.f:0.0f);
+    if(stat==35 && verb==2)health+=v.f;
+    if(stat==35 && verb==0)out.f=health;
+    return out;
+}
+static int32_t h_item(int i,int t,int verb,int item,int32_t n){printf("%d item %d %d %d %d %d\n",tick,i,t,verb,item,(int)n);return 0;}
+static int32_t h_spell(int i,int t,int verb,int s){printf("%d spell %d %d %d %d\n",tick,i,t,verb,s);return verb==3;}
+static void h_combat(int i,int t,int verb,int o){printf("%d combat %d %d %d %d\n",tick,i,t,verb,o);}
+static int32_t h_dead(int a){printf("%d dead %d\n",tick,a);return 0;}
+static void h_wander(int i,int t,const int32_t *v,int n){int k;printf("%d wander %d %d",tick,i,t);for(k=0;k<n;k++)printf(" %d",(int)v[k]);printf("\n");}
+/* the import route: every NOTYET call with its number and arguments; carried out (answer 7) when CALLS asks */
+static int answer=-1;
+static int h_call(int i,int t,int fn,const aw_mwcell_t *v,int n,const unsigned char *s,int ns,aw_mwcell_t *r){
+    int k;printf("%d call %d %d",tick,fn,n);for(k=0;k<n;k++)printf(" %d",(int)v[k].i);printf(" strings %d\n",ns);
+    if(fn!=answer)return 0;
+    r->i=7;return 1;
+}
+/* the player stands outdoors in (-2, -9) for two frames, then in the room ROOM (when set) */
+static int room;
+static int h_cell(int *x,int *y){if(tick<=2 || !room){*x=-2;*y=-9;return 1;}*x=room;*y=0;return 2;}
+static float h_pos(int i,int t,int axis){printf("%d pos %d %d %d\n",tick,i,t,axis);return 123.5f;}
+static int h_move(int i,int kind,int map,const float *at,float yaw){
+    printf("%d move %d %d %.3f %.3f %.3f %.1f\n",tick,kind,map,at[0],at[1],at[2],yaw);return 1;}
+/* the AI package: the script's own actor wanders (0) and its package is not done; another object's is done */
+static int32_t h_ai(int i,int t,int verb){printf("%d ai %d %d %d\n",tick,i,t,verb);return verb?t!=AW_MWVM_SELF:0;}
+static const aw_mwvm_host_t host={h_sound,h_playing,h_say,h_saydone,h_music,h_distance,h_menu,h_query,h_jget,h_jset,h_notyet,h_warn,h_object,h_message,h_button,
+    h_actor,h_item,h_spell,h_combat,h_dead,h_wander,h_call,h_cell,h_pos,h_move,h_ai};
 int main(int argc,char **argv){
     FILE *f=fopen(argv[1],"rb");static unsigned char buf[1<<20];long n=fread(buf,1,sizeof(buf),f);uint32_t off,rows,bytes,r;
     int ticks=atoi(argv[2]),i;float player[3]={0,0,0},dt=(float)atof(argv[3]);
     unsigned used=argc>4?(unsigned)atoi(argv[4]):0;   /* the player uses this reference's object at tick 3 */
     fclose(f);
+    if(getenv("ROOM"))room=atoi(getenv("ROOM"));
+    if(getenv("CALLS"))answer=atoi(getenv("CALLS"));
     if(!AW_MwvmLoad(buf,(unsigned long)n,&host)){printf("load failed\n");return 1;}
     AW_MwvmBeginMap();
     AW_MwvmSection("BIND",&off,&rows,&bytes);
@@ -368,7 +538,8 @@ int main(int argc,char **argv){
         AW_MwvmTick(dt,player);
     }
     {const aw_mwvm_stats_t *s=AW_MwvmStats();
-     printf("stats runs %lu quiet %lu far %lu deferred %lu aborted %lu notyet %lu\n",s->runs,s->skipped_quiet,s->skipped_far,s->deferred,s->aborted,s->notyet_calls);}
+     printf("stats runs %lu quiet %lu far %lu deferred %lu aborted %lu notyet %lu host %lu\n",s->runs,s->skipped_quiet,s->skipped_far,s->deferred,s->aborted,s->notyet_calls,s->host_calls);}
+    for(i=0;i<AWM_FUNCTIONS;i++)if(AW_MwvmFunctionCalls(i))printf("function %d %lu %d\n",i,AW_MwvmFunctionCalls(i),AW_MwvmFunctionName(i));
     for(i=0;i<AW_MwvmGlobalCount();i++)printf("global %d %d %f\n",i,AW_MwvmGlobalInt(i),AW_MwvmGlobalFloat(i));
     return 0;
 }
@@ -396,9 +567,10 @@ class InterpreterTests(unittest.TestCase):
     def tearDownClass(cls):
         shutil.rmtree(cls.tmp, ignore_errors=True)
 
-    def run_vm(self, ticks, dt='0.25', used=None):
+    def run_vm(self, ticks, dt='0.25', used=None, env=None):
         r = subprocess.run([str(self.tmp / 'h'), str(self.tmp / 'test.awm'), str(ticks), dt]
-                           + ([str(used)] if used else []), capture_output=True, text=True)
+                           + ([str(used)] if used else []), capture_output=True, text=True,
+                           env=dict(os.environ, **(env or {})))
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         return r.stdout.splitlines()
 
@@ -431,8 +603,9 @@ class InterpreterTests(unittest.TestCase):
         stats = next(l for l in out if l.startswith('stats')).split()
         self.assertGreater(int(stats[4]), 0)                       # quiet skips happened
         notyet = [l for l in out if l.split()[1:2] == ['notyet']]
-        # AiWander once (OnActivate and Activate run since v0.0.51; never used here, OnActivate reads 0)
-        self.assertEqual(len(notyet), 1, notyet)
+        # AiTravel and PositionCell (of another object, into a room no list names), once each (OnActivate and
+        # Activate run since v0.0.51; never used here, OnActivate reads 0; AIWander runs since v0.0.54)
+        self.assertEqual(len(notyet), 2, notyet)
         self.assertTrue(all(int(l.split()[0]) <= 2 for l in notyet), notyet)   # on its first run (budget order)
         self.assertGreaterEqual(int(stats[10]), 1)                 # the endless loop was stopped
         self.assertTrue(any('opcode limit' in l for l in out))
@@ -477,6 +650,115 @@ class InterpreterTests(unittest.TestCase):
         unlocks = [l.split()[0] for l in out if l.split()[1:2] == ['object'] and l.split()[3] == chime
                    and l.split()[4] == str(OPCODES['UNLOCK'][0])]
         self.assertEqual(unlocks, ['5'], out)
+
+
+@unittest.skipIf(os.name == 'nt', 'native fixtures run in the Linux Docker gate')
+@unittest.skipUnless(shutil.which('cc'), 'a Linux C compiler is required')
+class ActorCallTests(unittest.TestCase):
+    """The actor record's calls (v0.0.54, docs/ACTOR_STATE.md) compile to their opcodes and reach the host."""
+    setUpClass = classmethod(InterpreterTests.setUpClass.__func__)
+    tearDownClass = classmethod(InterpreterTests.tearDownClass.__func__)
+    run_vm = InterpreterTests.run_vm
+    index = InterpreterTests.index
+
+    def test_actor_calls_reach_the_host(self):
+        from mwscript.opcodes import ACTOR_STATS, VERBS
+        out = self.run_vm(4)
+        first = [l.split()[1:] for l in out if l.split()[0] == '1' and l.split()[1] in
+                 ('actor', 'item', 'spell', 'combat', 'wander', 'dead')]
+        kinds = [r[0] for r in first]
+        self.assertEqual(kinds[:7], ['actor', 'actor', 'item', 'item', 'spell', 'combat', 'combat'], first)
+        self.assertEqual(first[0][3:6], [str(VERBS['set']), str(ACTOR_STATS['fight']), '90'])   # whole number
+        self.assertEqual(first[1][3:5], [str(VERBS['mod']), str(ACTOR_STATS['health'])])
+        self.assertEqual(first[1][6], '-5.00')                                                    # a fraction
+        gold = self.prog.actors.item_index['gold_001']
+        self.assertEqual(first[2][2:], [str(self.index('objects', 'chime_obj')), '1', str(gold), '3'])  # gold_005: gold
+        self.assertEqual(first[3][2:4], ['-1', '2'])                                              # the player
+        self.assertEqual(first[5][2:], ['-2', '0', '-1'])                                         # StartCombat player
+        wander = next(r for r in first if r[0] == 'wander')
+        self.assertEqual(wander[3:], ['512', '5', '0', '0', '10', '20', '30'])
+        # GetDeadCount of an id no actor has: DEADCOUNT 0xFFFF reads 0 without asking the host
+        self.assertFalse(any(r[0] == 'dead' for r in first))
+        code = next(c for c in self.compiled if c.name == 'ActorUser').code
+        self.assertIn(('DEADCOUNT', [0xFFFF]), [(n, a) for _, n, a in awms.decode(code)])
+
+    def test_actor_reads_are_not_volatile(self):
+        from mwscript.codegen import SCRIPT_ACTOR
+        c = next(c for c in self.compiled if c.name == 'ActorUser')
+        self.assertFalse(c.flags & SCRIPT_VOLATILE)
+        self.assertTrue(c.flags & SCRIPT_ACTOR)
+        self.assertFalse(c.flags & SCRIPT_NOTYET)
+
+    def test_stats_agree_with_the_engine(self):
+        from mwscript.opcodes import ACTOR_STATS, VERBS
+        header = (ROOT / 'engine/aga/src/aw_actorstate.h').read_text(encoding='utf-8')
+        found = {m.group(1).lower(): int(m.group(2)) for m in re.finditer(r'AWA_([A-Z]+)=(\d+)', header)}
+        for name, number in ACTOR_STATS.items():
+            self.assertEqual(found.get(name), number, name)
+        verbs = {m.group(1).lower(): int(m.group(2)) for m in re.finditer(r'AWV_([A-Z]+)=(\d+)', header)}
+        self.assertEqual(verbs, VERBS)
+        code = (ROOT / 'engine/aga/src/aw_mwcode.h').read_text(encoding='utf-8')
+        for name, number in VERBS.items():
+            self.assertIn('#define AWM_VERB_%s %d' % (name.upper(), number), code)
+
+
+@unittest.skipIf(os.name == 'nt', 'native fixtures run in the Linux Docker gate')
+@unittest.skipUnless(shutil.which('cc'), 'a Linux C compiler is required')
+class ImportRouteTests(unittest.TestCase):
+    """v0.0.54: every not-yet call counted by its function number and handed to the host with its arguments; the
+    world and cell lookups (GetPCCell, GetPos, the diseases) and OpenMW's constants."""
+    setUpClass = classmethod(InterpreterTests.setUpClass.__func__)
+    tearDownClass = classmethod(InterpreterTests.tearDownClass.__func__)
+    run_vm = InterpreterTests.run_vm
+    index = InterpreterTests.index
+
+    def globals_of(self, out):
+        return {l.split()[1]: l.split() for l in out if l.startswith('global')}
+
+    def test_cell_position_disease_and_constants(self):
+        where, posx = str(self.index('globals', 'where')), str(self.index('globals', 'posx'))
+        # outdoors in (-2, -9), named Seyda Neen: 1; the player's common disease: +10; Xbox 0; the unknown name 0: +100;
+        # its own actor wanders, not done, the other actor's package done: +1000
+        out = self.run_vm(4)
+        g = self.globals_of(out)
+        self.assertEqual(g[where][2], '1111')
+        self.assertIn('1 ai', ' '.join(l for l in out if l.split()[1:2] == ['ai']))
+        self.assertEqual(float(g[posx][3]), 123.5)
+        # from the third frame in the room "Test Room": the cell changed, so the script reads 2 (+10 +100)
+        room = self.prog.data.interior_numbers['test room']
+        g = self.globals_of(self.run_vm(4, env={'ROOM': str(room)}))
+        self.assertEqual(g[where][2], '1112')
+
+    def test_the_players_position_cell_reaches_the_host(self):
+        moves = [l.split() for l in self.run_vm(4) if l.split()[1:2] == ['move']]
+        room = str(self.prog.strings.index['ri0123456789'])
+        self.assertEqual(moves, [['1', 'move', '2', room, '975.000', '2000.000', '-33.125', '0.0'],
+                                 ['1', 'move', '1', '65535', '100.000', '200.000', '300.000', '0.0']])
+
+    def test_cell_changed_scripts_run_once_more_after_the_change(self):
+        # "if ( CellChanged == 0 )": the marker's loop starts on the run after the one that read 1 (the harness
+        # reports no sound playing, so it asks again on every run after that: it acted)
+        drip = str(self.index('sounds', 'drip'))
+        starts = [int(l.split()[0]) for l in self.run_vm(4) if l.split()[1:2] == ['sound'] and l.split()[4] == drip]
+        self.assertEqual(starts, [2, 3, 4])
+
+    def test_not_yet_calls_are_counted_and_handed_to_the_host(self):
+        from mwscript.functions import FUNCTION_NUMBERS
+        travel = FUNCTION_NUMBERS['aitravel']
+        out = self.run_vm(4)
+        calls = [l.split()[1:] for l in out if l.split()[1:3] == ['call', str(travel)]]
+        self.assertTrue(calls, out)
+        self.assertEqual(calls[0], ['call', str(travel), '3', '100', '5', '0', 'strings', '0'])
+        counted = {int(l.split()[1]): l.split() for l in out if l.startswith('function')}
+        self.assertEqual(int(counted[travel][2]), len(calls))
+        self.assertEqual(int(counted[travel][3]), self.prog.strings.index['aitravel'])
+        travel_line = str(self.prog.strings.index['aitravel'])
+        self.assertEqual(len([l for l in out if l.split()[1:3] == ['notyet', travel_line]]), 1)    # logged once
+        # carried out by number (the host answers): no log, the host count instead
+        out = self.run_vm(4, env={'CALLS': str(travel)})
+        self.assertFalse([l for l in out if l.split()[1:3] == ['notyet', travel_line]], out)
+        stats = next(l for l in out if l.startswith('stats')).split()
+        self.assertEqual(int(stats[14]), len(calls))
 
 
 class BuilderStageTests(unittest.TestCase):

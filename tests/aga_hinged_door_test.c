@@ -6,6 +6,8 @@
  * into the player, and a CHIM placement door through the CHIM hooks. */
 #include "quakedef.h"
 #include "aw_hinged_door.h"
+#include "aw_state.h"
+#include "aw_inventory.h"
 #include "chim/chim.h"
 #include <assert.h>
 #include <stdarg.h>
@@ -25,6 +27,13 @@ int (*aw_hinged_hint)(const char **name,const char **action);
 void (*aw_hinged_spawn)(void);
 void (*aw_hinged_tick)(double seconds);
 int (*aw_hinged_locked_sound)(void);
+int (*aw_load_door_lock)(unsigned reference,int use);
+/* The player's items: the engine's aw_state.c (linked); the key's catalogue name. */
+static void carry_key(int on){AW_StateSet(&aw_state,AW_ITEM,"key_Private Quarters",on);
+    assert(AW_StateGet(&aw_state,AW_ITEM,"key_Private Quarters")==on);}
+int AW_InventoryRead(const char *id,aw_inventory_item_t *out){
+    if(strcmp(id,"key_Private Quarters"))return 0;strcpy(out->name,"Private Quarters Key");return 1;
+}
 /* a script's lock on one reference (aw_mwhost.c AW_ObjectLockLevel in the engine) */
 static unsigned script_ref;static int script_level;
 static int script_lock(unsigned reference,int original){return reference==script_ref?script_level:original;}
@@ -48,8 +57,9 @@ void S_StartSound(int entnum,int channel,sfx_t *s,vec3_t origin,float volume,flo
 void S_StopSound(int entnum,int channel){(void)entnum;assert(channel==6);stopped++;}
 float Cvar_VariableValue(char *name){assert(!strcmp(name,"aw_door_sounds"));return 1;}
 void Cmd_AddCommand(char *name,xcommand_t f){assert(!strcmp(name,"aw_hinged_door"));door_command=f;}
-int Cmd_Argc(void){return argv1?2:1;}
-char *Cmd_Argv(int i){return i==1 && argv1?argv1:"";}
+static char *argv2;
+int Cmd_Argc(void){return argv2?3:argv1?2:1;}
+char *Cmd_Argv(int i){return i==1 && argv1?argv1:i==2 && argv2?argv2:"";}
 void Con_Printf(char *fmt,...){va_list ap;va_start(ap,fmt);vprintf(fmt,ap);va_end(ap);}
 void Con_DPrintf(char *fmt,...){(void)fmt;}
 void Sys_Error(char *fmt,...){va_list ap;va_start(ap,fmt);vfprintf(stderr,fmt,ap);va_end(ap);exit(2);}
@@ -337,6 +347,10 @@ static void census_mode(void){
     assert(AW_HingedDoorUse() && started==i+1 && !strcmp(last_path,"doors/d00000000000000aa.wav") &&
            story_events[AW_HINGE_STORY_REFUSED]==1 && !story_open);
     tick(.1,10);assert(h->v.angles[1]==0 && solid_at(h,-298,16,24));
+    /* the story's lock holds in god mode too (DEBUG-GOD-LOCKED-DOORS-51: only a door's own lock gives way) */
+    edicts[2].v.flags=FL_GODMODE;i=started;
+    assert(AW_HingedDoorUse() && started==i+1 && story_events[AW_HINGE_STORY_REFUSED]==2);
+    tick(.1,10);assert(h->v.angles[1]==0);edicts[2].v.flags=0;
     /* the papers shown, the guard unlocks it: Open; its record's open sound; 90 degrees in one second */
     story_hall=1;
     assert(AW_HingedDoorHint(&name,&action) && !strcmp(action,"Open: E"));
@@ -364,8 +378,73 @@ static void census_mode(void){
     printf("census ok\n");
 }
 
+/* DEBUG-GOD-LOCKED-DOORS-51: the K rows (locked load doors 5000, 5001; hinged door 200 names a key), the key's
+ * way through with the GMST text, god mode with the maintainer's box, dbg doorlocks. */
+static const char *locked_table=
+    "AWHD1\n"
+    "W doors/d0123456789abcdef.wav 0.5 1.2\n"
+    "W doors/dfedcba9876543210.wav 0.25 0.9\n"
+    "W doors/d00000000000000aa.wav 1 0.4\n"
+    "B 0 1 Door\n"
+    "B -1 -1 Gate of the Tribunal\n"
+    "D 100 0 0 0\n"
+    "D 200 1 50 3\n"
+    "D 172860 0 100 1\n"
+    "L 2\n"
+    "K 200 50 3 key_Private Quarters\n"
+    "K 5000 30 1\n"
+    "K 5001 0 3 key_Private Quarters\n"
+    "K 4999 10 1\n"
+    "K 5002 300 1\n"
+    "U used to open lock\n";
+static void locks_mode(void){
+    const char *name,*action;int i;
+    table=locked_table;setup();AW_HingedDoorInit();assert(aw_load_door_lock==AW_HingedDoorLoadLock);
+    AW_HingedDoorMapBegin();AW_HingedDoorSpawn();
+    /* the game data's levels (GetLocked): a key-only lock reads 1; rows out of order or out of range are left out */
+    assert(AW_HingedDoorOriginalLock(5000)==30 && AW_HingedDoorOriginalLock(5001)==1);
+    assert(AW_HingedDoorOriginalLock(4999)==-1 && AW_HingedDoorOriginalLock(5002)==-1 && AW_HingedDoorOriginalLock(200)==50);
+    assert(AW_HingedDoorLoadLock(5000,0) && !AW_HingedDoorLoadLock(6000,0) && !AW_HingedDoorLoadLock(6000,1));
+    /* locked, no key, no god mode: refused, the LockedDoor sound to the player */
+    i=started;assert(AW_HingedDoorLoadLock(5000,1) && started==i+1 && !strcmp(last_path,"doors/d00000000000000aa.wav"));
+    /* god mode: through, and the message box says so */
+    edicts[2].v.flags=FL_GODMODE;i=subtitles;
+    assert(!AW_HingedDoorLoadLock(5000,1) && subtitles==i+1 && !strcmp(last_subtitle,AW_DOOR_GOD_TEXT));
+    edicts[2].v.flags=0;
+    /* the door's key: through, "<the key's name> used to open lock" (GMST sKeyUsed); another door's lock holds */
+    assert(AW_HingedDoorLoadLock(5001,1));carry_key(1);
+    assert(!AW_HingedDoorLoadLock(5001,1) && !strcmp(last_subtitle,"Private Quarters Key used to open lock"));
+    assert(AW_HingedDoorLoadLock(5000,1));carry_key(0);
+    /* a script's Unlock opens a load door, its Lock locks one the game data leaves open */
+    script_ref=5000;script_level=0;aw_object_lock_level=script_lock;assert(!AW_HingedDoorLoadLock(5000,0));
+    script_ref=6000;script_level=20;assert(AW_HingedDoorLoadLock(6000,0));aw_object_lock_level=NULL;
+    /* the hinged door 200 (lock 50, its key named): refused; god mode opens it with the box */
+    place_player(340,16,180);
+    assert(AW_HingedDoorHint(&name,&action) && !strcmp(action,"Locked"));
+    i=started;assert(AW_HingedDoorUse() && started==i+1);tick(.1,10);assert(edicts[3].v.angles[1]==0);
+    edicts[2].v.flags=FL_GODMODE;
+    assert(AW_HingedDoorUse() && !strcmp(last_subtitle,AW_DOOR_GOD_TEXT));tick(.1,10);assert(edicts[3].v.angles[1]==-90);
+    edicts[2].v.flags=0;
+    /* the same door again from closed: its key opens it */
+    AW_HingedDoorMapBegin();edicts[3].v.angles[1]=0;SV_LinkEdict(&edicts[3],false);AW_HingedDoorSpawn();
+    carry_key(1);
+    assert(AW_HingedDoorUse() && !strcmp(last_subtitle,"Private Quarters Key used to open lock"));
+    tick(.1,10);assert(edicts[3].v.angles[1]==-90);carry_key(0);
+    /* dbg doorlocks off: every lock ignored (load and hinged); on again; a bad word changes nothing */
+    AW_HingedDoorMapBegin();edicts[3].v.angles[1]=0;SV_LinkEdict(&edicts[3],false);AW_HingedDoorSpawn();
+    argv1="locks";argv2="off";door_command();
+    assert(!AW_HingedDoorLoadLock(5000,0) && !AW_HingedDoorLoadLock(5000,1));
+    assert(AW_HingedDoorHint(&name,&action) && !strcmp(action,"Open: E"));
+    argv2="sideways";door_command();assert(!AW_HingedDoorLoadLock(5000,0));
+    argv2="on";door_command();assert(AW_HingedDoorLoadLock(5000,0));
+    assert(AW_HingedDoorHint(&name,&action) && !strcmp(action,"Locked"));
+    argv2=NULL;door_command();argv1=NULL;   /* prints the switch */
+    printf("locks ok\n");
+}
+
 int main(int argc,char **argv){
     assert(argc==2);
+    if(!strcmp(argv[1],"locks")){locks_mode();return 0;}
     if(!strcmp(argv[1],"table"))table_mode();
     else if(!strcmp(argv[1],"badtable"))bad_table_mode();
     else if(!strcmp(argv[1],"door"))door_mode();

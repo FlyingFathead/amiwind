@@ -59,6 +59,14 @@ PARENT_MIB_ENV = 'AMIWIND_STAGE_PARENT_MIB'
 # The stored frame on disk vs its placed bytes (the stair model's input): whole-city Vivec, v0.0.42, 74 MiB of frame
 # files for 150 MiB placed (chunk images plus the model image of every placement). One calibration point.
 PLACED_PER_STORED = 2.03
+# A worker unit is one process and at most one child of it (a converter it runs), neither larger than the stage's largest
+# process: a measured row whose memory a worker exceeds that is not the stage's own (the container's peak taken for the
+# stage's tree, BUILD-PLAN-MWSCRIPT-32GB-54) and is capped to it.
+PLAUSIBLE_WORKER_PER_LARGEST = 2.0
+# Like for like (BUILD-PLAN-SCOPE-54): a MiniWind's stages do a fraction of a full build's work (one area, not the
+# island), so a plan uses only measurements of builds of its own scope; a stage measured only in builds of the other
+# scope gets the no-data estimate, the other scope's numbers named in its model line.
+SCOPES = ('miniwind', 'full')
 MIB = float(1 << 20)
 GIB = float(1 << 30)
 
@@ -214,8 +222,11 @@ def measure(row, timeline=None):
     cgroup = _stage_cgroup_peak(row, timeline)
     if not largest and not tree:
         return None
-    # a process tree's summed RSS counts shared pages once per process: the container's own peak bounds it
-    total = min(v for v in (tree, cgroup) if v) if (tree or cgroup) else largest
+    # a process tree's summed RSS counts shared pages once per process: the container's own peak bounds it. Without a
+    # tree sample (a stage shorter than the sampler's interval) the container's peak is no measure of the stage: it
+    # holds every stage beside it (BUILD-PLAN-MWSCRIPT-32GB-54: v0.0.48-dev2 try14's 0.7 s mwscript stage, largest
+    # process 24.8 MiB, was recorded as 32,412 MiB a worker, the container's peak, and refused MiniWinds as WILL NOT FIT)
+    total = min(v for v in (tree, cgroup) if v) if tree else largest
     largest = largest or total
     total = max(total, largest)
     jobs = max(1, int(row.get('jobs_max') or row.get('jobs') or 1))
@@ -282,6 +293,34 @@ def stair_from_frames(run):
     return best[0], round(WORKER_BASE_MIB + WORKER_MIB_PER_PLACED_MIB * best[1] * PLACED_PER_STORED, 1)
 
 
+def run_scope(run, recorded=None):
+    """'miniwind' or 'full': the scope of the build RUN (a run folder path). RECORDED (a history row's own 'scope')
+    wins; then the run's build-state.json (a MiniWind preset, or --miniwind... in its command line); then its name (the
+    naming rule: YYYY_MM_DD_vX.Y.Z_miniwind-<scene>_<git>). None when nothing tells."""
+    if recorded in SCOPES:
+        return recorded
+    if not run:
+        return None
+    state = _json(Path(run) / 'build-state.json')
+    if isinstance(state, dict) and ('miniwind_preset' in state or state.get('build_argv')):
+        argv = [str(part) for part in state.get('build_argv') or ()]
+        mini = state.get('miniwind_preset') or any(part.startswith('--miniwind') for part in argv)
+        return 'miniwind' if mini else 'full'
+    return 'miniwind' if '_miniwind-' in Path(str(run)).name else 'full'
+
+
+def plausible(row):
+    """ROW (a measurement) with its per-worker memory capped at PLAUSIBLE_WORKER_PER_LARGEST x its largest process,
+    marked 'capped' with the measured value; the row itself when it is plausible."""
+    largest = float(row.get('largest_mib') or 0.0)
+    limit = PLAUSIBLE_WORKER_PER_LARGEST * largest
+    if largest <= 0 or float(row.get('worker_mib') or 0.0) <= limit:
+        return row
+    jobs = max(1, int(row.get('jobs') or 1))
+    return dict(row, worker_mib=round(limit, 1), total_mib=round(largest + jobs * limit, 1),
+                capped={'worker_mib': row.get('worker_mib'), 'total_mib': row.get('total_mib')})
+
+
 def read_history(workspace):
     """{stage: [measurement, ...]} newest last, from WORKSPACE/cache/resource-history.jsonl."""
     out = {}
@@ -299,13 +338,16 @@ def read_history(workspace):
             continue
         if isinstance(item, dict) and isinstance(item.get('measured'), dict) and item.get('stage'):
             out.setdefault(item['stage'], []).append(dict(item['measured'], run=item.get('run'),
-                                                          estimate_total_mib=item.get('estimate_total_mib')))
+                                                          estimate_total_mib=item.get('estimate_total_mib'),
+                                                          **({'scope': item['scope']} if item.get('scope') else {})))
     return out
 
 
-def gather(reuse_from=None, workspace=None, extra_runs=()):
-    """Every measurement this plan can use: {'stages': {stage: [measurement + 'run']}, 'stair': (frame, MiB, source)
-    or None, 'runs': [run, ...]}."""
+def gather(reuse_from=None, workspace=None, extra_runs=(), scope=None, stair_walk=None):
+    """Every measurement this plan can use: {'stages': {stage: [measurement + 'run' + 'scope']}, 'stair': (frame, MiB,
+    source) or None, 'runs': [run, ...], 'scope': SCOPE (the planned build's, 'miniwind' or 'full'; None: every
+    measurement counts, the earlier method), 'stair_walk': STAIR_WALK (the build's stair walk scope; 'off': no stair
+    figure is looked for)}. History rows: the newest HISTORY_ROWS per stage and scope."""
     stages, runs = {}, []
     order = []
     for start in [reuse_from, *extra_runs]:
@@ -314,26 +356,37 @@ def gather(reuse_from=None, workspace=None, extra_runs=()):
                 runs.append(str(run))
                 order.append(run)
     stair = None
+    walks = stair_walk != 'off'
+    scopes = {}
     for run in order:
+        scopes[str(run)] = run_scope(run)
         profile = _json(run / 'build-profile.json') or {}
         timeline = profile.get('timeline')
         for row in profile.get('stages') or []:
             found = measure(row, timeline)
             if found:
-                stages.setdefault(row['name'], []).append(dict(found, run=str(run)))
-        if stair is None:
+                stages.setdefault(row['name'], []).append(dict(found, run=str(run), scope=scopes[str(run)]))
+        if stair is None and walks:
             logged = stair_from_logs(run)
             if logged:
                 stair = (logged[0], logged[1], 'measured: the stair gate of %s' % run.name)
-    if stair is None:
+    if stair is None and walks:
         for run in order:
             stored = stair_from_frames(run)
             if stored:
                 stair = (stored[0], stored[1], 'estimated from the stored frame size of %s' % run.name)
                 break
     for name, rows in read_history(workspace).items():
-        stages.setdefault(name, []).extend(rows[-HISTORY_ROWS:])
-    return {'stages': stages, 'stair': stair, 'runs': runs}
+        newest = {}
+        for row in rows:
+            run = row.get('run')
+            if run not in scopes:
+                scopes[run] = run_scope(run)
+            row = dict(row, scope=run_scope(run, row.get('scope')) if row.get('scope') else scopes[run])
+            newest.setdefault(row['scope'], []).append(row)
+        for kept in newest.values():
+            stages.setdefault(name, []).extend(kept[-HISTORY_ROWS:])
+    return {'stages': stages, 'stair': stair, 'runs': runs, 'scope': scope, 'stair_walk': stair_walk}
 
 
 # --------------------------------------------------------------------------
@@ -343,11 +396,17 @@ def builds_chim_world(command):
     return any('chim_build.py' in str(part) for part in command or ())
 
 
-def stage_model(name, command, measurements, stair=None):
+def stage_model(name, command, measurements, stair=None, scope=None, stair_walk=None):
     """{'source', 'parent_mib', 'worker_mib', 'unit_mib', 'largest_unit', 'ref_jobs', 'ref_wall', 'ref_cores', 'runs'}
-    of one stage, from its measurements (conservative: the largest of them) and, for a CHIM world stage, the stair
-    walk model."""
-    rows = measurements or []
+    of one stage, from its measurements (conservative: the largest of them; each capped by plausible()) and, for a CHIM
+    world stage that walks stairs, the stair walk model. SCOPE ('miniwind' or 'full', the planned build's): only
+    measurements of that scope count (a row without one counts everywhere); STAIR_WALK 'off' (the build's
+    --stair-walk): no stair model, nothing is walked (BUILD-PLAN-STAIR-WALK-OFF-54)."""
+    rows = [plausible(r) for r in measurements or []]
+    other = []
+    if scope in SCOPES:
+        other = [r for r in rows if r.get('scope') not in (None, scope)]
+        rows = [r for r in rows if r.get('scope') in (None, scope)]
     if rows:
         parent = max(r['largest_mib'] for r in rows)
         worker = max(r['worker_mib'] for r in rows)
@@ -368,6 +427,12 @@ def stage_model(name, command, measurements, stair=None):
                  'worker_mib': DEFAULT_WORKER_MIB, 'unit_mib': DEFAULT_WORKER_MIB,
                  'largest_unit': 'unknown (no measurement)', 'ref_jobs': None, 'ref_wall': None, 'ref_cores': None,
                  'runs': [], 'beside_mib': 0.0}
+        if other:
+            model['source'] = ('estimated, no data yet for a %s build (measured only in %s builds, largest process '
+                               '%.0f MiB: not like for like)' % (scope, other[0].get('scope'),
+                                                                max(r['largest_mib'] for r in other)))
+    if stair_walk == 'off':
+        stair = None
     if stair and builds_chim_world(command):
         frame, mib, how = stair
         if mib >= model['worker_mib']:
@@ -419,9 +484,12 @@ def _waits_for(steps):
     return found
 
 
-def plan(steps, running, jobs, got, gathered, reuse_from=None):
+def plan(steps, running, jobs, got, gathered, reuse_from=None, stair_walk=None):
     """The resource plan document (schema resource-plan-1) of STEPS [(name, command)] of which RUNNING (names) will
-    actually run, at --jobs JOBS, against GOT (limits())."""
+    actually run, at --jobs JOBS, against GOT (limits()); the build's scope is GATHERED's (gather(scope=)), STAIR_WALK
+    its stair walk scope ('off', 'flights', 'all'; None: GATHERED's, else not known and the stair model counts)."""
+    scope = gathered.get('scope')
+    stair_walk = stair_walk or gathered.get('stair_walk')
     memory_mib = got['memory_bytes'] / MIB if got.get('memory_bytes') else None
     room = memory_mib * HEADROOM if memory_mib else None
     threads = max(1, int(got.get('threads') or jobs or 1))
@@ -431,7 +499,8 @@ def plan(steps, running, jobs, got, gathered, reuse_from=None):
     plans = {name: jobs if '--jobs' in [str(part) for part in command or ()] else 1 for name, command in steps}
     for name, command in steps:
         if name in running:
-            models[name] = stage_model(name, command, gathered['stages'].get(name), gathered.get('stair'))
+            models[name] = stage_model(name, command, gathered['stages'].get(name), gathered.get('stair'), scope,
+                                       stair_walk)
     # BUILD-PLAN-BESIDE-STALE-48: the memory measured beside a stage in an earlier run counts only up to what the
     # other stages running in THIS build can hold at full speed; a reuse build that reruns four stages planned the
     # room batches at 1 of 24 workers against 43 GB that stages it no longer runs held in the measured run
@@ -499,6 +568,10 @@ def plan(steps, running, jobs, got, gathered, reuse_from=None):
            'wall_s': round(sum(walls), 1) if walls else None,
            'full_speed_wall_s': round(sum(fulls), 1) if fulls else None,
            'refusals': refusals, 'advisory': advisory(rows, got, threads, jobs, models)}
+    if scope in SCOPES:
+        doc['scope'] = scope
+    if stair_walk:
+        doc['stair_walk'] = str(stair_walk)
     doc['verdict'] = 'refused' if refusals else 'throttled' if any(r['status'] != 'OK' for r in rows) else 'ok'
     return doc
 
@@ -589,11 +662,17 @@ def checklist(doc):
                         (': ' + '; '.join(r['reasons'])) if r['reasons'] else '', r['model']))
     if doc['advisory']:
         lines.append('ADVISORY: ' + doc['advisory']['text'])
-    lines.append('Resource plan: %s (%d OK, %d WILL THROTTLE, %d WILL NOT FIT)%s' % (
+    # stages with no measured time are not in the sum: named, so a short total is never read as the build's time
+    # (BUILD-PLAN-WALL-UNMEASURED-54: v0.0.54 seyda-ui 3d6b612 planned about 8 min and took about 45, mostly the
+    # chim-town-seyda stage, which had no MiniWind measurement)
+    unknown = [r['stage'] for r in doc['stages'] if r['wall_s'] is None]
+    lines.append('Resource plan: %s (%d OK, %d WILL THROTTLE, %d WILL NOT FIT)%s%s' % (
         doc['verdict'].upper(), sum(1 for r in doc['stages'] if r['status'] == 'OK'),
         sum(1 for r in doc['stages'] if r['status'] == 'WILL THROTTLE'),
         sum(1 for r in doc['stages'] if r['status'] == 'WILL NOT FIT'),
-        '; expected wall about %s (stages added up)' % _seconds(doc['wall_s']) if doc['wall_s'] else ''))
+        '; expected wall about %s (stages added up)' % _seconds(doc['wall_s']) if doc['wall_s'] else '',
+        '; time not known for %d stage%s (no measurement of this build\'s scope): %s' % (
+            len(unknown), '' if len(unknown) == 1 else 's', ', '.join(unknown)) if unknown else ''))
     return lines
 
 
@@ -934,6 +1013,16 @@ SCHEMA_DOCUMENT = json.loads(r"""
   "machine": {
    "type": "object"
   },
+  "scope": {
+   "enum": [
+    "miniwind",
+    "full"
+   ]
+  },
+  "stair_walk": {
+   "type": "string",
+   "minLength": 1
+  },
   "flagged_over_estimate": {
    "type": "array",
    "items": {
@@ -1001,7 +1090,8 @@ def after_build(run, workspace=None, log=print):
             flagged.append(stage['stage'])
         history.append({'format': HISTORY_FORMAT, 'run': str(run), 'stage': stage['stage'], 'measured': found,
                         'estimate_total_mib': estimate, 'estimate_model': stage['model'],
-                        'written': time.strftime('%Y-%m-%dT%H:%M:%S%z')})
+                        'written': time.strftime('%Y-%m-%dT%H:%M:%S%z'),
+                        **({'scope': doc['scope']} if doc.get('scope') in SCOPES else {})})
     doc['flagged_over_estimate'] = flagged
     try:
         write(run, doc)

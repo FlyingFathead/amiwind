@@ -20,6 +20,8 @@ static aw_save_t world,pending;
 /* The world-state change list of a save (feature 8): written from aw_actors.c's export, read back at a load and
  * handed to its import before the window spawns (static: off the Amiga task stack). */
 static aw_changes_t save_changes,pending_changes;
+/* the actor record's block (feature 16), one buffer for a save and one for a loaded save */
+static unsigned char save_actor_block[AW_SAVE_ACTOR_BYTES],pending_actor_block[AW_SAVE_ACTOR_BYTES];
 static int loading,scheduled,content_ready;
 static double last_auto,settle;
 static byte content_id[32];
@@ -138,6 +140,7 @@ void AW_SaveSpawn(void)
         if(!pending_changes.count)AW_SaveFoldActors(&world,&pending_changes);
         if(aw_save_changes_import)aw_save_changes_import(&pending_changes);
         if(aw_save_objects_import)aw_save_objects_import(&pending_changes);
+        if(aw_save_actors_import)aw_save_actors_import(pending_changes.actors,pending_changes.actor_bytes);
         AW_BarrierLoad();AW_OpeningSpawn();
     }
     for(i=1;i<sv.num_edicts;i++){
@@ -241,6 +244,10 @@ int AW_SaveWrite(int slot)
        (aw_save_objects_export && aw_save_objects_export(&save_changes)<0)){
         free(raw);Con_Printf("Save change list incomplete; previous saves retained.\n");return 0;
     }
+    save_changes.actors=save_actor_block;save_changes.actor_capacity=AW_SAVE_ACTOR_BYTES;save_changes.actor_bytes=0;
+    if(aw_save_actors_export && (save_changes.actor_bytes=aw_save_actors_export(save_actor_block,AW_SAVE_ACTOR_BYTES))<0){
+        free(raw);Con_Printf("Save actor records too large; previous saves retained.\n");return 0;
+    }
     n=AW_SaveEncodeChanges(raw,AW_SAVE_BYTES,&world,&save_changes);if(!n){free(raw);Con_Printf("Save state validation failed; previous saves retained.\n");return 0;}
     side=newest(world.profile,slot,&check);side=side==0?1:0;
     if(!path(filename,sizeof(filename),world.profile,slot,side)){free(raw);return 0;}
@@ -263,6 +270,8 @@ int AW_SaveWrite(int slot)
 int AW_SaveRead(uint32_t profile,int slot)
 {
     aw_save_t candidate,other;char map[40];int n,i,generation;
+    pending_changes.actors=pending_actor_block;pending_changes.actor_capacity=AW_SAVE_ACTOR_BYTES;
+    pending_changes.actor_bytes=0;
     if(!AW_CharacterLoad() || !content() || (generation=newest(profile,slot,&candidate))<0 ||
        !read_file_changes(profile,slot,generation,&candidate,&pending_changes)){
         Con_Printf("No valid compatible save generation; current game retained.\n");return 0;

@@ -1,6 +1,6 @@
 # Running AmiWind on real Amiga hardware
 
-_Last updated with AmiWind v0.0.53 (27 October 2026)._
+_Last updated with AmiWind v0.0.54 (27 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -141,8 +141,9 @@ number another machine can be compared with, record a short walk once and play i
 
 Send that file with the settings you had on and where you recorded.
 
-**The standard test (v0.0.53): `aw bench halloween`.** In an image built with the Halloween scene
-(`--miniwind-halloween`, [HALLOWEEN.md](HALLOWEEN.md)), stand where the image starts you and type
+**The standard test (v0.0.53): `aw bench halloween`.** In an image with the Halloween scene's cast (every full-world
+build from v0.0.54 on, and `--miniwind-halloween`; [HALLOWEEN.md](HALLOWEEN.md)), stand where the Halloween build
+starts you (in a full image: open, level ground, the same place on every machine you compare) and type
 `aw bench halloween` (or `aw bench halloween skeletons` for the lighter cast; `aw halloweenbench` and
 `dbg halloween bench` are the same command). The scene plays 600 frames with its
 clock stepping a tenth of a second each frame, the same camera path and the same dance every time, so every machine

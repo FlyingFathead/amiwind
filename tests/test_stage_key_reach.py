@@ -29,7 +29,9 @@ class StageKeyReachTests(unittest.TestCase):
         return set(python) | set(data)
 
     def test_stage_keys_are_form_3(self):
-        self.assertEqual(build_cache.STAGE_TOP_FORMAT, 3)
+        # form 3's reach; form 4 (BUILD-KEY-TOP-DEFAULTS-NAME-54) differs only in the import-time text
+        self.assertGreaterEqual(build_cache.STAGE_TOP_FORMAT, 3)
+        self.assertTrue(build_cache.SourceIndex(ROOT, top_format=build_cache.STAGE_TOP_FORMAT).stage_form)
 
     def test_mwscript_key_covers_the_compiler_files_it_hashes(self):
         # BUILD-MWSCRIPT-KEY-UNDERDECLARED-48: compiler_identity reads every tools/mwscript/*.py

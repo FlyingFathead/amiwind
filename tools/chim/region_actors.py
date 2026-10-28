@@ -225,12 +225,12 @@ def support(scene, point, bottom, water):
 def soles(library_id1, e, angles, models):
     """The actor's sole samples at its yaw and instance scale, as the frame map's contact check reads them
     (check_actor_ground: the lowest rendered vertices of the initial idle poses); () without the model file."""
-    from check_actor_ground import contact_samples, layout_of, model_frames
+    from check_actor_ground import contact_samples, layout_of, named_model_frames
     path = Path(library_id1) / e.get('model', '')
     if not e.get('model') or not path.is_file():
         return ()
     if e['model'] not in models:
-        models[e['model']] = (model_frames(path.read_bytes()), layout_of(path))
+        models[e['model']] = (named_model_frames(path.read_bytes(), e['model']), layout_of(path))
     frames, layout = models[e['model']]
     scale = float(e.get('aw_scale', 1.0))
     return tuple(tuple(v * scale for v in s) for s in contact_samples(frames, angles, False, layout))

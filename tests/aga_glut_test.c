@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
  * The voice table (engine/aga/src/aw_glut.c, NPC-GREETINGS-LIBRARY-MUTE-48), compiled natively.
- * With AW_GLUT_HOST_TEST: the pure part on a real AWGL1 file the builder made (tests/test_greeting_lut.py):
+ * With AW_GLUT_HOST_TEST: the pure part on a real AWGL2 file the builder made (tests/test_greeting_lut.py):
  *   aga_glut_test pure TABLE EXPECTATIONS   (tab-separated lines: find / pick / sound / expand / damaged)
  * Without it: the engine glue with the real aw_anim.c and small Quake stubs: the greet trigger's spawn step
  * (hello distance for an NPC without its own greeting, a town resident's own fields kept), the hello said with
@@ -59,6 +59,33 @@ int main(int argc,char **argv) {
             assert(n==3);
             if(!strcmp(f[2],"-"))assert(!AW_GlutSound(&g,atoi(f[1]),h));
             else{assert(AW_GlutSound(&g,atoi(f[1]),h));for(k=0;k<8;k++)sprintf(hex+2*k,"%02x",h[k]);assert(!strcmp(hex,f[2]));}
+        }else if(!strcmp(f[0],"creature")){     /* creature ID ROW [S0,..,S7] (Sounds index, -1 none) */
+            int row=AW_GlutCreatureFind(&g,f[1]),k;
+            assert(n==3 || n==4);
+            if(row!=atoi(f[2])){fprintf(stderr,"creature %s: %d, want %s\n",f[1],row,f[2]);return 1;}
+            if(n==4){char *s=f[3];for(k=0;k<AW_SNDG_MOMENTS;k++){int want=(int)strtol(s,&s,10);
+                if(AW_GlutCreatureSound(&g,row,k)!=want){fprintf(stderr,"creature %s moment %d: %d, want %d\n",f[1],k,AW_GlutCreatureSound(&g,row,k),want);return 1;}
+                if(*s==',')s++;}}
+            assert(AW_GlutCreatureSound(&g,row,AW_SNDG_MOMENTS)==-1 && AW_GlutCreatureSound(&g,-1,0)==-1);
+        }else if(!strcmp(f[0],"slot")){         /* slot N INDEX PATH|- */
+            char path[AW_GLUT_POOL_PATH];int got=AW_GlutSlotSound(&g,atoi(f[1]));
+            assert(n==4);
+            if(got!=atoi(f[2])){fprintf(stderr,"slot %s: %d, want %s\n",f[1],got,f[2]);return 1;}
+            if(got>=0){assert(AW_GlutPoolPath(&g,got,path,sizeof(path)));assert(!strcmp(path,f[3]));}
+            assert(!AW_GlutPoolPath(&g,got>=0?got:0,path,AW_GLUT_POOL_PATH-1));
+        }else if(!strcmp(f[0],"slen")){         /* slen SOUND CENTIS MAPPED */
+            assert(n==4);
+            if(AW_GlutSoundLength(&g,atoi(f[1]))!=atoi(f[2]) || AW_GlutSoundMapped(&g,atoi(f[1]))!=atoi(f[3])){
+                fprintf(stderr,"slen %s: %d %d\n",f[1],AW_GlutSoundLength(&g,atoi(f[1])),AW_GlutSoundMapped(&g,atoi(f[1])));return 1;}
+        }else if(!strcmp(f[0],"soun")){         /* soun INDEX HEX CENTIS VOLUME MAPPED NEAR FAR */
+            aw_glut_soun_t s;char hex[17];int k;
+            assert(n==8 && AW_GlutSoun(&g,atoi(f[1]),&s));
+            for(k=0;k<8;k++)sprintf(hex+2*k,"%02x",s.hash[k]);
+            {char got[96];
+             sprintf(got,"%s %u %u %u",hex,(unsigned)s.centis,(unsigned)s.volume,(unsigned)s.mapped);
+             if(strcmp(hex,f[2]) || s.centis!=atoi(f[3]) || s.volume!=atoi(f[4]) || s.mapped!=atoi(f[5]) ||
+                s.near_units!=atoi(f[6]) || s.far_units!=atoi(f[7])){fprintf(stderr,"soun %s: %s %u %u\n",f[1],got,s.near_units,s.far_units);return 1;}}
+            assert(!AW_GlutSoun(&g,(int)g.souns,&s) && !AW_GlutSoun(&g,-1,&s));
         }else if(!strcmp(f[0],"expand")){
             char out[512];
             assert(n==5);

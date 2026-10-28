@@ -60,5 +60,12 @@ int AW_ItemsLightEmitter(const struct model_s *item,float out[3]);
 int AW_ItemsTorchLayer(const struct model_s *m,const void *skel_table,int frame,float *layer_frame,int *root);
 /* r_alias.c's hook to it (set with the level's item tables; NULL: no torch pose, as in the renderer's native tests) */
 extern int (*R_AliasTorchLayer)(const struct model_s *m,const void *skel_table,int frame,float *layer_frame,int *root);
+/* An actor (of an item table: its arm bones are known) facing into an ash or blight storm while idle, walking,
+ * running, turning or sneaking shields its eyes: 1 with its right arm's root and the table frame of the "idlestorm"
+ * group (ACTOR-STORM-POSE-51; aw_weather.h). yaw: the drawn entity's. The torso part of the original pose is left
+ * out (one arm layer). */
+int AW_ItemsStormLayer(const struct model_s *m,const void *skel_table,int frame,float yaw,float *layer_frame,int *root);
+extern int (*R_AliasStormLayer)(const struct model_s *m,const void *skel_table,int frame,float yaw,float *layer_frame,
+    int *root);
 #endif
 #endif

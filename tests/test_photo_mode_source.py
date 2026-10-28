@@ -44,7 +44,9 @@ class PhotoModeSourceTests(unittest.TestCase):
         # PHOTO-GALLERY-TEXT-33: test-room and gallery instruction text is hidden.
         self.assertRegex(update, r'if \(!AW_PhotoModeActive\(\) && !vanity\)\s*AW_GalleryDraw\(\);')
         # The message box is drawn in photo mode only for photo mode's own notice.
-        self.assertRegex(update, r'if \(\(!AW_PhotoModeActive\(\) && !vanity\) \|\| AW_PhotoNoticeShowing\(\)\)\s*AW_UIDraw\(\);')
+        # With the HUD hidden (Ctrl+Alt+H, UI-HUD-TOGGLE-KEY-51) messages and dialogue stay.
+        self.assertRegex(update, r'if \(\(!AW_PhotoModeActive\(\) && \(!vanity \|\| aw_hud_hidden\)\) \|\| '
+                                 r'AW_PhotoNoticeShowing\(\)\)\s*AW_UIDraw\(\);')
         self.assertLess(update.index('AW_PhotoDraw ()'), update.index('if (!vanity)\n            Sbar_Draw ();'))
         # Notices use AmiWind's message box (the Wait refusal's), not a centre print.
         photo = source('aw_photo.c')
@@ -92,7 +94,9 @@ class PhotoModeSourceTests(unittest.TestCase):
         view = source('view.c')
         draw = body(view, 'void AW_CrosshairDraw')
         # Classic + Cross is the old draw call itself, byte for byte the same pixels.
-        self.assertRegex(draw, r"if \(!shape && !colour\)\s*\{\s*Draw_Character \(x, y, '\+'\);\s*return;")
+        # (the owned-item cue, off by default, draws the cross in its own red instead)
+        self.assertRegex(draw, r"if \(!shape && !colour && !owned\)\s*\{\s*Draw_Character \(x, y, '\+'\);\s*return;")
+        self.assertIn('int aw_crosshair_owned_cue = 0;', view)
         self.assertIn('AW_CrosshairDraw (x, y);', view)
         # The pick crosshair (dbg companion pick) keeps its own red cross and its white "picking" one.
         self.assertRegex(view, r"if \(pick == 1\)\s*Draw_Character \(x, y, '\+'\);")

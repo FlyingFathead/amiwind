@@ -1,6 +1,6 @@
 # The Halloween scene
 
-_Last updated with AmiWind v0.0.53 (27 October 2026)._
+_Last updated with AmiWind v0.0.54-dev1 (27 October 2026)._
 
 For Halloween 2026 the animation stage gets a beat: the game's own skeletons, the dancers of Desele's House of
 Earthly Delights in Suran and Dagoth Ur himself dance on a roof in Balmora, filmed by a small camera director. It is
@@ -10,13 +10,20 @@ table of its own, and `dbg halloween bench` turns it into the standard frame-rat
 
 ## Building it
 
+Every full-world build carries the cast, so `dbg halloween` and `aw bench halloween` work in the release images (since
+v0.0.54). The cast is about 1 MB on the drive, and the game loads it only when the scene starts: it takes no memory
+until then. `--halloween-cast off` leaves it out of a full-world image; that image then says it has no cast. The
+cast is packed by the image step alone, so turning it on or off rebuilds the image and nothing else. A full build
+carries no song: the custom OST slot (below) stays empty unless you fill it.
+
 ```
 tools/build.py --miniwind-halloween [--custom-ost FILE] ...
 ```
 
 `--miniwind-halloween` is the MiniWind preset ([MINIWIND.md](MINIWIND.md)): Balmora's exterior, as the animation
 stage ([ANIMKIT.md](ANIMKIT.md)), with the scene's cast in the image (`--halloween`). On arrival it runs
-`dbg halloween`. The cast is made from your own game data, as everything else in the image:
+`dbg halloween`. Other MiniWind builds take the cast only with `--halloween`. The cast is made from your own game
+data, as everything else in the image:
 
 | Cast member | Model | Animation table |
 | --- | --- | --- |
@@ -61,7 +68,11 @@ scene's default beat (132 beats a minute). (`--halloween-soundtrack` is the same
 
 The show opens on a black screen: for 5 seconds, in silence, a box in the exact centre says, on two centred lines,
 HAPPY HALLOWEEN and FROM AMIWIND (the game's own message box, only as large as its two lines). Then the rooftop
-appears, the dance begins and your soundtrack, when the image has one, starts with the first beat. The greeting never
+appears, the dance begins and your soundtrack, when the image has one, starts with the first beat. Most tracks begin
+with a moment of silence: the builder measures it on the converted track (10 ms windows under -40 dB) and writes it
+into the cast file, and the scene starts your track that much earlier, under the greeting, together with the player's
+own start delay (0.16 seconds, measured in the emulator), so the first beat is heard as the
+rooftop appears. The greeting never
 draws over the scene. Every readout keeps to a corner: the FPS counter, when it is on, sits small in the bottom-left
 corner. Photo mode hides the HUD while the scene runs, with its own notice box and hints switched off
 (`dbg photomode ui off` does that for photo mode at any time; the scene puts the setting back when it ends). The
@@ -130,6 +141,9 @@ a little between runs.
   shared table holds the moving groups in place).
 - No spell effects on the casts yet; the cast animations alone.
 - The scene starts the beat when it starts; it does not look for the first downbeat of a soundtrack.
-- The scene and the benchmark need an image with the cast (`--miniwind-halloween`); the v0.0.53 release images do not
-  carry it, so in them `dbg halloween` and `aw bench halloween` say the image has no cast. The cast joins the
-  default build in a follow-up.
+- The scene and the benchmark need an image with the cast: every full-world build from v0.0.54 on (unless built with
+  `--halloween-cast off`) and `--miniwind-halloween`. The v0.0.53 release images do not carry it, so in them
+  `dbg halloween` and `aw bench halloween` say the image has no cast.
+- The scene plays in front of you, where you stand. The Halloween MiniWind build starts you on the stage roof in
+  Balmora; in a full image, stand on open, level ground and face the open side. For numbers to compare with other
+  machines, run the benchmark at the same place.

@@ -7,6 +7,7 @@ import struct
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 from hand_metadata import hand_fields, stamp, stamp_staged_hands
 from player_hull import lumps, pack_lumps
 
@@ -43,10 +44,42 @@ class HandMetadata(unittest.TestCase):
         self.assertEqual(stamp(fixed, hand_fields(self.report())), fixed)
 
     def test_existing_metadata_is_updated_without_duplicate_fields(self):
-        raw = self.map_bytes(b'"aw_hand_draw" "0.1"\n')
+        raw = self.map_bytes(b'"aw_eye_height" "3"\n')
         fixed = stamp(raw, hand_fields(self.report()))
-        self.assertEqual(bytes(lumps(fixed)[0]).count(b'"aw_hand_draw"'), 1)
-        self.assertIn(b'"aw_hand_draw" "0.47"', lumps(fixed)[0])
+        self.assertEqual(bytes(lumps(fixed)[0]).count(b'"aw_eye_height"'), 1)
+        self.assertIn(b'"aw_eye_height" "16.25"', lumps(fixed)[0])
+
+    def test_hand_clips_are_the_images_never_a_maps(self):
+        # FIRST-PERSON-HANDS-IN-C-54: the clips go to gfx/hand-anims.txt (the engine's AW_HandTableParse); a map's
+        # worldspawn keeps the eye height only, and an older map's clip keys are removed when it is stamped
+        from hand_metadata import hand_table, write_hand_table, RETIRED_FIELDS
+        self.assertEqual(hand_fields(self.report()), {'aw_eye_height': '16.25'})
+        self.assertEqual(hand_table(self.report()), 'AWHA1\nclip idle 0 8 2.700000\nclip draw 8 6 0.470000\n'
+                         'clip lower 14 4 0.270000\nclip punch 18 10 1.070000\n')
+        raw = self.map_bytes(b'"aw_hand_draw" "0.1"\n"aw_hand_idle" "2"\n')
+        fixed = bytes(lumps(stamp(raw, hand_fields(self.report())))[0])
+        for key in RETIRED_FIELDS:
+            self.assertNotIn(key.encode(), fixed)
+        with tempfile.TemporaryDirectory() as tmp:
+            digest = write_hand_table(tmp, self.report())
+            data = (Path(tmp) / 'gfx/hand-anims.txt').read_bytes()
+            self.assertEqual(digest, hashlib.sha256(data).hexdigest())
+            self.assertNotIn(b'e-', data)
+        root = Path(__file__).resolve().parents[1]
+        qc = (root / 'engine/aga/qc/world.qc').read_text(encoding='utf-8')
+        for key in RETIRED_FIELDS:
+            self.assertNotIn(key, qc)
+        self.assertNotIn('aw_hands_update', qc)
+        # the engine reads the same text (the C parser, host-built)
+        import test_aga_native_source as native
+        native.NativeSourceTests().compile_run('aga_hand_table_test.c',
+            [root / 'engine/aga/src/aw_hands.c'], defines=['AW_HANDS_HOST_TEST'],
+            cflags=['-fsanitize=undefined', '-fno-sanitize-recover=all'])
+        engine = (root / 'engine/aga/src/aw_hands.c').read_text(encoding='utf-8')
+        self.assertIn('aw_hands.c', (root / 'engine/aga/Makefile').read_text(encoding='utf-8'))
+        self.assertIn('void AW_HandsTick(void) {', engine)
+        self.assertIn('AW_HandsTick();', (root / 'engine/aga/src/aw_animkit.c').read_text(encoding='utf-8'))
+        self.assertIn('write_hand_table(boot/\'id1\', hand_source)', (root / 'tools/build_aga.py').read_text(encoding='utf-8'))
 
     def test_scene_timings_are_the_stamped_carrier_lines(self):
         # BUILD-SEYDA-BSP-CARRIER-48: the readers take the timings from the hands report; the lines are the ones the
@@ -91,7 +124,7 @@ class HandMetadata(unittest.TestCase):
         with self.assertRaises(ValueError): hand_fields(report)
 
     def test_malformed_and_duplicate_map_metadata_are_rejected(self):
-        raw = self.map_bytes(b'"aw_hand_draw" "1"\n"aw_hand_draw" "2"\n')
+        raw = self.map_bytes(b'"aw_eye_height" "1"\n"aw_eye_height" "2"\n')
         with self.assertRaises(ValueError): stamp(raw, hand_fields(self.report()))
         raw = self.map_bytes().replace(b'worldspawn', b'info_start')
         with self.assertRaises(ValueError): stamp(raw, hand_fields(self.report()))

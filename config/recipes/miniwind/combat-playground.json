@@ -1,0 +1,20 @@
+{
+  "schema": "build-recipe-1",
+  "name": "combat-playground",
+  "description": "MiniWind preset --miniwind-combat-playground: Combat playground in the Arena Pit: dbg playground MODE",
+  "options": {
+    "miniwind": true,
+    "miniwind_scope": "interior",
+    "miniwind_description": "Combat playground in the Arena Pit: dbg playground MODE",
+    "direct_to_game_map": "interior:Vivec, Arena Pit",
+    "exclude": [
+      "npc-gallery"
+    ],
+    "exclude_unreferenced": "voice,npcs",
+    "miniwind_boot": "dbg playground modes;dbg playground duel"
+  },
+  "inputs": [],
+  "written_with": null,
+  "checked_with": null,
+  "status": "unverified"
+}

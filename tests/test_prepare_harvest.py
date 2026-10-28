@@ -94,10 +94,14 @@ class HarvestPreparationTests(unittest.TestCase):
         self.assertEqual(len({identity_key(v) for v in values}), 4)
 
     def test_rejects_script_ownership_restock_and_changed_contents(self):
-        for kwargs in ({'script':'script'}, {'owner':True}, {'count':-2}):
+        for kwargs in ({'script':'script'}, {'count':-2}):
             with self.subTest(kwargs=kwargs):
                 raw=source(**kwargs);region,bsp=inputs(raw)
                 with self.assertRaises(ValueError):prepare(raw,region,bsp)
+        # an owned plant is a theft, not refused (HARVEST-INTERIOR-PICK-47): its row ends in a tab and the owning character's id
+        raw=source(owner=True);region,bsp=inputs(raw);payload,receipt=prepare(raw,region,bsp)
+        self.assertIn('\t',payload.decode('ascii').splitlines()[-1])
+        self.assertEqual(receipt['placements'][0]['placement_metadata']['admission'],'owned_theft')
         raw=source();region,bsp=inputs(raw);region['source_references'][0]['container_state']['items'][0]['count']=9
         with self.assertRaisesRegex(ValueError,'metadata mismatch'):prepare(raw,region,bsp)
 

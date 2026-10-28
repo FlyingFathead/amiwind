@@ -105,10 +105,20 @@ static int route_format(route_t *r,int argc,char **argv,int j,char *out,int capa
         if(used+7>capacity)return 0;
         strcpy(out+used," grant");used+=6;
     }
+    /* dbg creatures [on/off]: "chim actors creatures", no resident command or cvar of its own (aw_actors.c) */
+    if(!strcmp(r->command,"chim") && !strcmp(r->words,"creatures")){
+        if(argc-j>1 || used+20>capacity)return 0;
+        strcpy(out+used," actors creatures");used+=17;
+    }
     /* dbg door roulette [SEED]: the teleport command's roulette, no resident command of its own */
     if(!strcmp(r->command,"aw_teleport") && !strcmp(r->words,"door roulette")){
         if(used+10>capacity)return 0;
         strcpy(out+used," roulette");used+=9;
+    }
+    /* dbg doorlocks [on/off]: the hinged door command's lock switch, no resident command of its own */
+    if(!strcmp(r->command,"aw_hinged_door") && !strcmp(r->words,"doorlocks")){
+        if(used+7>capacity)return 0;
+        strcpy(out+used," locks");used+=6;
     }
     if(!strcmp(r->command,"aw_quickchar_set") &&
        (!strcmp(r->words,"set race") || !strcmp(r->words,"set playerrace"))){

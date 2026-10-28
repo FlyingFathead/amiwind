@@ -798,6 +798,15 @@ static int night_rust_checks(void){
     assert(R_SkyNearest(17,0,0)==5);
     assert(R_SkyNearest(9,8,8)==6);
     assert(R_SkyNearest(255,255,255)==255 && R_SkyNearest(300,-0,0)==R_SkyNearest(255,0,0));
+    /* NIGHT-RUST-31 reopened (v0.0.51): the shipped palette's dark rust entry (20,11,4) beside a dark grey-brown
+     * (17,13,12); a dark warm grey (12,12,8) must take the grey-brown (the grid of before took the rust: its spread
+     * 16 passed the +12 guard), negative channels count as 0 */
+    palette[3*7]=20;palette[3*7+1]=11;palette[3*7+2]=4;
+    palette[3*8]=17;palette[3*8+1]=13;palette[3*8+2]=12;
+    AW_FogInit();R_InitDayNight();
+    assert(R_SkyNearest(12,12,8)==8);
+    assert(R_SkyNearest(17,0,0)==5 && R_SkyNearest(9,8,8)==6);
+    assert(R_SkyNearest(-5,-5,-5)==R_SkyNearest(0,0,0));
     puts("night tint: dark near-greys keep their hue; grid answers elsewhere unchanged");
     return 0;
 }

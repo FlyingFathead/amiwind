@@ -6,5 +6,14 @@
     {"id": "ultis salam", "note": "Arena scout, level 9, steel longsword, boiled netch cuirass and helm"},
     {"id": "farmin", "note": "Arena Waistworks warrior, level 8 (autocalculated), steel longsword"},
     {"id": "seanwen", "note": "Arena master-at-arms, level 25, ebony longsword and shield (strong)"}
-  ]
+  ],
+  "playground_about": "The combat playground's default casts (dbgmode combat aggro / group without names; docs/COMBAT.md \"Combat playground\"), written to arena/casts.txt. At most four NPC records each; stats from combat/actors.txt, stand-in models. The aggro cast spans the Fight ratings: one attacks on sight from across the Pit, one from mid-Pit, one only up close, and a Flee-100 pacifist who never attacks and runs once hit.",
+  "playground_casts": {
+    "aggro": [
+      {"id": "delvam andarys", "note": "Fight 100, level 14, short blade"},
+      {"id": "agrob gra-bogharz", "note": "Fight 90, level 9"},
+      {"id": "depusanis denian", "note": "Fight 85, level 17, short blade"},
+      {"id": "ken", "note": "Fight 50, Flee 100, level 5"}
+    ]
+  }
 }

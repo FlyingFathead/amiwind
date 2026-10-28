@@ -110,19 +110,35 @@ qboolean AW_AliasSphereVisible(vec3_t origin, float radius)
 static int AW_PoseBox (const model_t *model, const aliashdr_t *hdr, int frame, byte box[6]);
 /* A skeletal entity's pose: its table frame, and while it holds a torch its left arm on the table's torch group
  * (aw_items.c AW_ItemsTorchLayer; SKEL-ITEM-TAGS-52). Returns the pose's key in the pose cache: the frame, or -1 less
- * the frame for the torch pose (a frame poses one way or the other). LAYER and ROOT may be NULL. */
+ * the frame for the torch pose (a frame poses one way or the other); facing into an ash or blight storm its right
+ * arm on the table's idlestorm group (aw_items.c AW_ItemsStormLayer; ACTOR-STORM-POSE-51), AW_STORM_KEY more.
+ * LAYERS and ROOTS (AW_SKEL_LAYERS each: the torch's, the storm's; root -1 none) may be NULL. */
+#define AW_STORM_KEY 0x100000
 int (*R_AliasTorchLayer)(const struct model_s *m, const void *skel_table, int frame, float *layer_frame, int *root);
-static int AW_SkelEntityKey (const model_t *model, const aliashdr_t *hdr, int frame, float *layer, int *root)
+int (*R_AliasStormLayer)(const struct model_s *m, const void *skel_table, int frame, float yaw, float *layer_frame,
+                         int *root);
+static int AW_SkelEntityKey (const model_t *model, const aliashdr_t *hdr, int frame, float yaw, float *layers,
+                             int *roots)
 {
     float l;
-    int r;
+    int r, key = frame;
+    if (roots)
+        roots[0] = roots[1] = -1;
+    if (R_AliasStormLayer && R_AliasStormLayer (model, hdr->aw_skel_table, frame, yaw, &l, &r))
+    {
+        key += AW_STORM_KEY;
+        if (layers)
+            layers[1] = l;
+        if (roots)
+            roots[1] = r;
+    }
     if (!R_AliasTorchLayer || !R_AliasTorchLayer (model, hdr->aw_skel_table, frame, &l, &r))
-        return frame;
-    if (layer)
-        *layer = l;
-    if (root)
-        *root = r;
-    return -1 - frame;
+        return key;
+    if (layers)
+        layers[0] = l;
+    if (roots)
+        roots[0] = r;
+    return -1 - key;
 }
 
 qboolean R_AliasCheckBBox (void)
@@ -165,8 +181,8 @@ qboolean R_AliasCheckBBox (void)
     {
         byte box[6];
         const byte *bmin = pframedesc->bboxmin.v, *bmax = pframedesc->bboxmax.v;
-        if (pahdr->aw_skel && AW_PoseBox (pmodel, pahdr, AW_SkelEntityKey (pmodel, pahdr, currententity->frame, NULL,
-                                                                             NULL), box))
+        if (pahdr->aw_skel && AW_PoseBox (pmodel, pahdr, AW_SkelEntityKey (pmodel, pahdr, currententity->frame,
+                                                                             currententity->angles[YAW], NULL, NULL), box))
             bmin = box, bmax = box + 3;
 
 // x worldspace coordinates
@@ -755,11 +771,11 @@ static int R_AliasSkelFrame (void)
     const aw_skel_table_t	*table = (const aw_skel_table_t *)paliashdr->aw_skel_table;
     trivertx_t			*rest;
     aw_posed_t			*slot;
-    int					i, frame = currententity->frame, key, root = -1;
-    float				layer = 0;
+    int					i, frame = currententity->frame, key, roots[AW_SKEL_LAYERS] = {-1, -1};
+    float				layers[AW_SKEL_LAYERS] = {0, 0};
     if (!table || pmdl->numverts > MAXALIASVERTS || paliashdr->frames[0].type != ALIAS_SINGLE)
         return 0;
-    key = AW_SkelEntityKey (currententity->model, paliashdr, frame, &layer, &root);
+    key = AW_SkelEntityKey (currententity->model, paliashdr, frame, currententity->angles[YAW], layers, roots);
     if (!aw_pose_grown)
     {
         aw_posed_t *more = (aw_posed_t *)AW_TryMalloc (AW_POSE_CACHE_LARGE * sizeof(aw_posed_t));
@@ -792,7 +808,7 @@ static int R_AliasSkelFrame (void)
     {
         double t0;				/* the posing's two halves timed for dbg rcount (its "kp" field) */
         AW_RT_BEGIN(t0);
-        AW_SkelPoseLayer (table, (float)frame, layer, key < 0 ? root : -1, world);
+        AW_SkelPoseLayers (table, (float)frame, AW_SKEL_LAYERS, layers, roots, world);
         AW_RT_END(RT_SKELPOSE, t0);
         AW_RT_BEGIN(t0);
         AW_SkelPoseVerts (block.data, &rest[0].lightnormalindex, sizeof(trivertx_t), pmdl->numverts, block.rest_scale,

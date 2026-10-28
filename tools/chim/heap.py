@@ -700,6 +700,62 @@ def actor_fast_ram(id1, rows, source=None):
             'keep_bytes': keep, 'fits_keep': need <= keep}
 
 
+# The zone's users besides the ring and the frame-world pool, on the 16 MB baseline (CHIM-HEAP-GATE-NONRING-16MB-54): the
+# v0.0.53 final's 16 MB Seyda Neen arrival locked 6,591 of 6,596 KiB ("chim": models, textures, catalogues and terrain
+# 3,481 KiB), and the gate saw a ring of 4.56 MB in a 6.01 MB budget. On the target (m68k, 4-byte pointers and ints):
+# - chim_world.c ReadIndex, the store index, in the map's zone when the prefetch is off (no extra Fast RAM, as on 16 MB):
+#   a chim_file_row_t per file and a chim_asset_t with its slot pointer per model and texture (ROOM_INDEX_ROW,
+#   ROOM_INDEX_ASSET, as the room gate counts it);
+# - chim_chunks.c ChimChunks_Begin, the frame's chunk index: a chim_entry_t per chunk (chim_local.h: the 44-byte
+#   chim_chunk_entry_t and 92 bytes of state, 136), a short per cell and two bits per owned placement;
+# - chim_statics.c ListBegin, the streamed statics' list: per stated static a chim_static_t (entity_t and 38 bytes), a
+#   chim_smodel_t (MAX_QPATH and 24 bytes, 88) and a short, an int per chunk and 2 more, and 64 (CHIM_MAX_STATICS 2048);
+# - chim_world.c MapBeginWork, the loading buffer (chim_buffer_kib, at least AW_BRUSH_SLICE_BYTES).
+# Each is one zone block (room_block: the block header and the data rounded to 16). tests/test_chim_heap.py keeps the
+# struct definitions these counts read against the engine source.
+CHIM_ENTRY_BYTES = 136
+CHIM_STATIC_EXTRA = 38
+CHIM_SMODEL_BYTES = 88
+CHIM_MAX_STATICS = 2048
+
+
+def nonring_zone_users(files, models, textures, frame, chunks, stated, sizes, buffer_bytes=None):
+    """{user: zone bytes (block header included)} a CHIM frame map's zone holds besides the ring and the frame-world
+    pool on the 16 MB baseline: 'store_index' (files, models, textures: the world index's row counts), 'chunk_index'
+    (FRAME: nx, ny, owned_total; CHUNKS: its chunk count), 'statics_list' (STATED: the map's streamed statics) and
+    'loading_buffer'."""
+    if buffer_bytes is None:
+        from engine_limits import cvar_default
+        buffer_bytes = cvar_default('chim/chim_world.c', 'chim_buffer_kib') * 1024
+    buffer_bytes = max(int(buffer_bytes), int(sizes.get('bsp_slice_bytes', 0)))
+    stated = min(int(stated), CHIM_MAX_STATICS)
+    out = {'store_index': room_block(int(files) * ROOM_INDEX_ROW + (int(models) + int(textures)) * ROOM_INDEX_ASSET),
+           'chunk_index': room_block(int(chunks) * CHIM_ENTRY_BYTES + int(frame['nx']) * int(frame['ny']) * 2
+                                     + 2 * ((int(frame.get('owned_total', 0)) + 7) // 8)),
+           'statics_list': room_block(stated * (sizes['entity'] + CHIM_STATIC_EXTRA + CHIM_SMODEL_BYTES + 2)
+                                      + (int(chunks) + 2) * 4 + 64) if stated else 0,
+           'loading_buffer': room_block(buffer_bytes)}
+    return out
+
+
+def zone_32mb(frame, users, gated, memory=None):
+    """A frame map on the 32 MB minimum of Fast RAM (the maintainer's requirement; engine_limits.fast_ram_memory): the
+    automatic cache bank holds the store index and the prefetch table (chim_world.c ReadIndex and chim_prefetch.c, kept
+    there with the prefetch on) and, in what is left, the ring's models and textures (chim_zone.c AllocIn); the map's
+    zone holds the rest of the ring, the chunk index, the statics list and the loading buffer within the budget (the
+    built heap's whole-map zone less the frame-world pool: the 32 MB heap is larger, so this is on the safe side), and
+    the largest block fits the larger of the two. Returns need_32mb_bytes, headroom_32mb_bytes, fits_32mb_engine,
+    bank_free_32mb_bytes."""
+    from engine_limits import MIN_FAST_RAM_MIB, fast_ram_memory
+    memory = memory or fast_ram_memory(MIN_FAST_RAM_MIB)
+    bank = max(0, memory['bank_bytes'] - users['store_index'] - room_block(ROOM_PREFETCH_TABLE))
+    banked = sum(int((frame.get('peak_breakdown') or {}).get(k, 0)) for k in BANKED)
+    need = gated - min(bank, banked) + users['chunk_index'] + users['statics_list'] + users['loading_buffer']
+    budget = frame['budget_bytes']
+    return {'need_32mb_bytes': need, 'headroom_32mb_bytes': budget - need, 'bank_free_32mb_bytes': bank,
+            'fits_32mb_engine': need <= budget and frame.get('largest_block_bytes', 0) <= max(budget, bank)}
+
+
 def frame_map_heap(world_dir, id1, sizes, heap_mb=None, zone_kib=None, pool_kib=None, streamed=None, extra_maps=(),
                    jobs=1, cache_dir=None, world=None):
     """The whole-map CHIM heap of each frame map in id1/maps (found by its "_chim_frame" key, .chim or .bsp:
@@ -714,11 +770,12 @@ def frame_map_heap(world_dir, id1, sizes, heap_mb=None, zone_kib=None, pool_kib=
     (chim.frame_map.load, read only here); without it the world is read again (BUILD-IMAGE-REGION-MAPS-SERIAL-43)."""
     from pathlib import Path
     from engine_limits import MEASURED_HUNK, chim_memory, whole_map_zone
-    from chim.frame_map import FRAME_KEY, HUNK_KEY, entities
+    from chim.frame_map import CHUNK_KEY, FRAME_KEY, HUNK_KEY, entities
     from chim.validate import Failures, load_world
     memory = chim_memory(heap_mb=heap_mb)
     if world is not None:
         settings, textures, models, frames = world['settings'], world['textures'], world['models'], world['frames']
+        files = world.get('files') or []
     else:
         fails = Failures()
         settings, files, disk, textures, models, frames = load_world(world_dir, fails)
@@ -738,11 +795,16 @@ def frame_map_heap(world_dir, id1, sizes, heap_mb=None, zone_kib=None, pool_kib=
         cell = tuple(int(v) for v in rows[0][FRAME_KEY].split())
         before = MEASURED_HUNK['before_map_bytes'] + _a16(len(data) + sizes['hunk'])
         after = int(rows[0].get(HUNK_KEY, MEASURED_HUNK['client_per_map_bytes']))
+        # the Fast RAM mark the map already carries: the image step writes it from the CHIM stage's own heap gate
+        # (build_aga.py, receipt 'fast_ram_32mb') before this check runs
+        mark = rows[0].get(FRAME_FAST_KEY)
         entry = {'path': path, 'cell': cell, 'before': before, 'after': after,
+                 'map_fast_mb': int(mark) if str(mark or '').isdigit() else None,
                  'zone': whole_map_zone(before, after, memory),
                  'streamed': (streamed_chunk_bytes(rows, id1, sizes) if policy == 'chunk'
                               else streamed_chunk_models(rows, id1, sizes)),
-                 'actor_cache': actor_cache(id1, rows, sizes, memory['gap_bytes'])}
+                 'actor_cache': actor_cache(id1, rows, sizes, memory['gap_bytes']),
+                 'stated_statics': sum(1 for e in rows if CHUNK_KEY in e)}
         batch = next((b for b in batches if cell not in b), None)
         if batch is None:
             batch = {}
@@ -760,11 +822,26 @@ def frame_map_heap(world_dir, id1, sizes, heap_mb=None, zone_kib=None, pool_kib=
                            zone_bytes={cell: e['zone'] for cell, e in batch.items()}, jobs=jobs, cache_dir=cache_dir,
                            **per)
         by_path = {f['frame']: f for f in report['frames']}
+        spec = {tuple(f[1]['cell']): f for f in world['frames']}
         for cell, e in batch.items():
             frame = dict(by_path[by_cell[cell]])
             frame.update(map=e['path'].name, heap_mb=memory['heap_mb'], before_zone_bytes=e['before'],
                          after_zone_bytes=e['after'], whole_map_zone_bytes=e['zone'], streamed_models=policy,
-                         actor_cache=e['actor_cache'])
+                         actor_cache=e['actor_cache'], map_fast_mb=e['map_fast_mb'])
+            # every other zone user on the 16 MB baseline (CHIM-HEAP-GATE-NONRING-16MB-54): reported beside the ring's
+            # budget, the ring's headroom once they are counted, and whether the 16 MB engine holds the gated ring
+            _, fr, chunks = spec[cell]
+            users = nonring_zone_users(len(files), len(models), len(textures), fr, len(chunks), e['stated_statics'],
+                                       sizes)
+            fixed = sum(users.values())
+            frame.update(nonring_zone_users=users, nonring_zone_bytes=fixed)
+            if 'budget_bytes' in frame and 'peak_bytes' in frame:
+                gated = frame['peak_bytes'] if frame.get('gated_ring', 'active') == 'active' else \
+                    frame['load_ring']['peak_bytes']
+                frame.update(budget_16mb_engine_bytes=frame['budget_bytes'] - fixed,
+                             headroom_16mb_engine_bytes=frame['budget_bytes'] - fixed - gated,
+                             fits_16mb_engine=gated <= frame['budget_bytes'] - fixed)
+                frame.update(zone_32mb(frame, users, gated))
             out[e['path'].stem] = frame
     return dict(sorted(out.items()))
 
@@ -788,13 +865,45 @@ def require_frame_map_heap(world_dir, id1, sdk=None, sizes=None, heap_mb=None, r
         # (CHIM-FRAME-16MB-REFUSAL-48: 32 MB is the default, the player is kept out on less), not refused: the CHIM
         # stage's estimate can pass a frame that this exact check finds over (BUILD-CHIM-HEAP-GATE-LATE-36: vf0147,
         # 9,536 bytes over in the v0.0.52-dev1 build). Only a frame that fits neither stops the build.
-        late = []
+        # A map that already carries the mark got it from the CHIM stage's own gate (the early check agreed): it is
+        # listed as 'marked_32mb_early', never as late. Only a map this exact check had to mark itself is late, the
+        # class of BUILD-CHIM-HEAP-GATE-LATE-36 (the v0.0.53 final listed its three early-marked maps as late).
+        late, early = [], []
         for name, m in maps.items():
             if not m['ok'] and m.get('efrags', {'ok': True})['ok'] and frame_fast_ram(m) == SAFE_FAST_MB:
-                if mark_frame_maps(id1, frame_cells([m['frame']]), maps=[m['map']]):
+                if m.get('map_fast_mb') == SAFE_FAST_MB:
+                    m.update(ok=True, fast_mb=SAFE_FAST_MB, marked_by_stage=True)
+                    early.append(name)
+                elif mark_frame_maps(id1, frame_cells([m['frame']]), maps=[m['map']]):
                     m.update(ok=True, fast_mb=SAFE_FAST_MB, marked_by_image_gate=True)
                     late.append(name)
+        if late:
+            print('[warning] CHIM frame-map heap gate: %d frame map(s) over the 16 MB budget that the CHIM stage\'s heap '
+                  'gate did not mark (its estimate disagrees with this exact check: BUILD-CHIM-HEAP-GATE-LATE-36), '
+                  'marked %s %d here: %s' % (len(late), FRAME_FAST_KEY, SAFE_FAST_MB, ', '.join(late)), flush=True)
+        # CHIM-HEAP-GATE-NONRING-16MB-54: every zone user counted. 32 MB of Fast RAM is the game's minimum (the
+        # maintainer, 2026-10-27; README): a frame map whose ring, with the chunk index, the statics list and the
+        # loading buffer in the zone and the store index and prefetch table in the cache bank, does not fit 32 MB is
+        # refused. 16 MB is said only (the store index alone is about 1.8 MB of the 16 MB zone: low priority).
+        for name, m in maps.items():
+            if m.get('fits_32mb_engine') is False:
+                m.update(ok=False, refused_32mb=True)
+        over16 = sorted(n for n, m in maps.items() if m.get('fits_16mb_engine') is False and m.get('fast_mb') != SAFE_FAST_MB)
+        if over16:
+            worst = min(over16, key=lambda n: maps[n]['headroom_16mb_engine_bytes'])
+            print('[note] CHIM frame-map heap gate: on 16 MB of Fast RAM (below the 32 MB minimum) %d of %d frame maps do '
+                  'not fit the zone once its other users are counted (store index, chunk index, statics list, loading '
+                  'buffer: %d bytes in %s); worst %s, over by %d bytes (CHIM-HEAP-GATE-NONRING-16MB-54)'
+                  % (len(over16), len(maps), maps[worst]['nonring_zone_bytes'], worst, worst,
+                     -maps[worst]['headroom_16mb_engine_bytes']), flush=True)
+        fits32 = [m['headroom_32mb_bytes'] for m in maps.values() if 'headroom_32mb_bytes' in m]
+        if fits32:
+            print('[chim] frame-map heap on the 32 MB minimum, every zone user counted: %d of %d frame maps fit, least '
+                  'headroom %d bytes' % (sum(1 for m in maps.values() if m.get('fits_32mb_engine')), len(fits32),
+                                         min(fits32)), flush=True)
         report = {'maps': maps, 'ok': all(m['ok'] for m in maps.values()), 'marked_32mb_late': late,
+                  'marked_32mb_early': early, 'over_16mb_engine': over16,
+                  'refused_32mb': sorted(n for n, m in maps.items() if m.get('refused_32mb')),
                   'method': 'frame map: zone = engine_limits.whole_map_zone(start-up Hunk + frame-map BSP, '
                             '_chim_hunk_rest); rings as the CHIM heap gate with each chunk\'s streamed statics'}
         report['status'] = 'passed' if report['ok'] else 'failed'
@@ -805,6 +914,10 @@ def require_frame_map_heap(world_dir, id1, sdk=None, sizes=None, heap_mb=None, r
     if bad:
         m = bad[0]
         ring = m['peak_bytes'] if m['gated_ring'] == 'active' else m['load_ring']['peak_bytes']
+        if m.get('refused_32mb'):
+            raise ValueError('CHIM frame-map heap gate failed: %s does not fit the 32 MB minimum: its zone needs %d bytes '
+                             '(the ring past the cache bank, the chunk index, the statics list, the loading buffer) of %d'
+                             % (m['map'], m['need_32mb_bytes'], m['budget_bytes']))
         raise ValueError('CHIM frame-map heap gate failed: %s needs %d bytes (%s ring), its whole-map zone leaves '
                          '%d for chunks (zone %d bytes on a %d MiB heap)'
                          % (m['map'], ring, m['gated_ring'], m['budget_bytes'], m['zone_bytes'], m['heap_mb']))
@@ -1090,6 +1203,17 @@ SAFE_FAST_MB = 32
 ROOM_FAST_KEY = '_chim_room_fast_mb'    # the room map's worldspawn mark the engine reads at the door (aw_scene.c)
 
 
+def room_grows_32mb(rooms):
+    """{room: growth steps} of the rooms whose 32 MB allocator walk (room_heap 'walk_32mb') grew more than once."""
+    out = {}
+    for name, r in rooms.items():
+        w = r.get('walk_32mb')
+        steps = len(w.get('grown') or []) if isinstance(w, dict) else 0
+        if steps > 1:
+            out[name] = steps
+    return out
+
+
 def require_room_map_heap(id1, sdk=None, sizes=None, heap_mb=None, report_path=None):
     """The image step's zone gate per CHIM room map (room_map_heap): report_path (JSON). A room that fits the 16 MB
     baseline ('fits_zone': the zone and the Hunk rest less the loading buffer, room_zone_limits) is 'fast_mb' 16; one
@@ -1132,6 +1256,14 @@ def require_room_map_heap(id1, sdk=None, sizes=None, heap_mb=None, report_path=N
                             'allocator (chim/room_zone.py); a room over the 16 MB zone that is ok carries "%s" "%d"'
                             % (ROOM_FAST_KEY, SAFE_FAST_MB)}
         report['status'] = 'passed' if report['ok'] else 'failed'
+        # ROOM-LOADS-THRICE-54: rooms that grow more than once on the 32 MB minimum (the allocator walk's steps). The
+        # engine grows them before the first try (chim_room.c RoomPreGrow); without that each step cost a whole load
+        report['grows_32mb'] = room_grows_32mb(report['rooms'])
+        if report['grows_32mb']:
+            print('[warning] CHIM room heap gate: %d room(s) need more than one growth step on the 32 MB minimum (each '
+                  'step a whole reload unless the engine grows the room first, ROOM-LOADS-THRICE-54): %s'
+                  % (len(report['grows_32mb']), ', '.join('%s %d' % kv for kv in sorted(report['grows_32mb'].items()))),
+                  flush=True)
     if report_path:
         Path(report_path).write_text(json.dumps(report, indent=1, sort_keys=True) + '\n', encoding='utf-8',
                                      newline='\n')

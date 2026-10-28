@@ -20,6 +20,25 @@ import engine_smoke  # noqa: E402
 
 
 
+class DefaultFastRamTests(unittest.TestCase):
+    """The maintainer, 27 October 2026: the game runs at 32 MB of Fast RAM by default from now on."""
+    def test_smoke_runs_at_32_mb_by_default(self):
+        self.assertEqual(engine_smoke.DEFAULT_FAST_MB, 32)
+        self.assertIn('FASTMB=${FASTMB:-32}', engine_smoke.PROBE)
+        self.assertIn("'--fast-mb', type=int, default=DEFAULT_FAST_MB", (ROOT / 'tools/engine_smoke.py').read_text())
+        with unittest.mock.patch.object(engine_smoke, 'docker') as docker, \
+                contextlib.redirect_stdout(io.StringIO()):
+            code = engine_smoke.main(['--engine', '/nonexistent', '--volume', 'v', '--image-dir', 'i',
+                                      '--scratch', 's', '--roms', '/nonexistent', '--out', '/nonexistent'])
+        self.assertEqual(code, 2)
+        docker.assert_not_called()
+
+    def test_sweep_step_is_logged_and_can_fail_the_smoke(self):
+        """ENTITY-SWEEP-AB: dbg sweep's SWEEP RESULT line in the smoke; --sweep fail makes a FAIL result fatal."""
+        self.assertIn('rc "aw_sweep"', engine_smoke.PROBE)
+        self.assertIn('FAIL dbg sweep', engine_smoke.PROBE)
+
+
 class EngineSmokeTests(unittest.TestCase):
     def run_main(self, *argv):
         out = io.StringIO()

@@ -45,6 +45,34 @@ typedef struct {
      * u16 each, as in the code); button() returns the button the player chose once, then -1 until the next choice */
     void (*message)(int instance,int text,const float *numbers,int number,const unsigned char *buttons,int count);
     int (*button)(int instance);
+    /* the actor record (aw_actorstate.h; v0.0.54): VERB AWM_VERB_* on STAT AWA_* (GET and RATIO return the value,
+     * a whole number for the whole stats, else a fraction; SET, MOD, MODCURRENT take VALUE); ITEM: verb 0 count,
+     * 1 add, 2 remove COUNT of AITM row ITEM; SPELL: verb 0 has, 1 add, 2 remove ASPT row SPELL; COMBAT: verb 0
+     * StartCombat against OTHER (an object, or AW_MWVM_PLAYER), 1 StopCombat; DEAD_COUNT: deaths of ACTB row ACTOR */
+    aw_mwcell_t (*actor)(int instance,int target,int verb,int stat,aw_mwcell_t value);
+    int32_t (*item)(int instance,int target,int verb,int item,int32_t count);
+    int32_t (*spell)(int instance,int target,int verb,int spell);
+    void (*combat)(int instance,int target,int verb,int other);
+    int32_t (*dead_count)(int actor);
+    /* AIWander: COUNT (3..13) whole numbers in the script's order: range, duration, time, then the rest */
+    void (*wander)(int instance,int target,const int32_t *values,int count);
+    /* The import route (v0.0.54): a function the compiler marks "not yet" (NOTYET), by its number
+     * (tools/mwscript/functions.py FUNCTION_NUMBERS), with its numbers in the script's order and its strings (COUNT
+     * big-endian u16 string indexes; a reference's id first when it had one). Return 1 with RESULT set when the
+     * engine carries it out; 0 leaves it "not yet" (logged once, 0 read). May be NULL. */
+    int (*call)(int instance,int target,int function,const aw_mwcell_t *numbers,int count,
+                const unsigned char *strings,int nstrings,aw_mwcell_t *result);
+    /* GetPCCell: the player's cell: 1 outdoors (X, Y the grid cell), 2 in a room (X its stable number), 0 none */
+    int (*player_cell)(int *x,int *y);
+    /* GetPos: axis AXIS (0 x, 1 y, 2 z) of the target's position, game units */
+    float (*position)(int instance,int target,int axis);
+    /* PositionCell of the player (a PMOV row): KIND AWM_MOVE_OUTDOORS (AT the original's coordinates) or
+     * AWM_MOVE_ROOM (MAP the room map's name, a string index; AT its own units, as a door's arrival), YAW degrees.
+     * Returns 1 when the move starts. */
+    int (*player_move)(int instance,int kind,int map,const float *at,float yaw);
+    /* GetCurrentAIPackage (VERB 0: OpenMW's package numbers, -1 none) and GetAIPackageDone (VERB 1: 1 or 0) of the
+     * target actor */
+    int32_t (*ai_package)(int instance,int target,int verb);
 } aw_mwvm_host_t;
 
 typedef struct {
@@ -68,8 +96,12 @@ typedef struct {
 #define AWI_ACTIVATED 128  /* the player used its object and the script took the use: OnActivate reads 1 once */
 
 typedef struct {
-    unsigned long frames,runs,skipped_quiet,skipped_far,deferred,ops,max_ops_frame,aborted,notyet_calls;
+    unsigned long frames,runs,skipped_quiet,skipped_far,deferred,ops,max_ops_frame,aborted,notyet_calls,host_calls;
 } aw_mwvm_stats_t;
+/* The import route's counters: NOTYET calls run per function number (AWM_FUNCTIONS of them), and the string index
+ * of each function's name (-1: no script calls it). */
+unsigned long AW_MwvmFunctionCalls(int function);
+int AW_MwvmFunctionName(int function);
 
 /* Load the resident part of an AWMS1 file (DATA, BYTES: at least its resident bytes; the whole file works too).
  * Returns 1, or 0 with nothing loaded (bad magic, version, sizes). The buffer must outlive the interpreter. */
@@ -87,6 +119,12 @@ int AW_MwvmMusic(int music);                             /* track number, -1 non
 uint32_t AW_MwvmObjectReference(int object);             /* 0: not placed once */
 int AW_MwvmTopicName(int topic);                         /* string index */
 int AW_MwvmTopicCount(void);
+/* The actor table row (ACTB) an object names (the resident OACT section), 0xFFFF none. */
+int AW_MwvmObjectActor(int object);
+/* The engine changed state the scripts read (an actor was hit or died): quiet scripts run again. */
+void AW_MwvmStateChanged(void);
+/* One instance's own state changed (a sound it started ended): it runs again on the next frame. */
+void AW_MwvmWake(int instance);
 void AW_MwvmConfig(uint32_t *range_units,int *ops_frame,int *ops_run);
 /* Section offsets in the file (BIND and STRS stay on disk): offset, rows; 0 if absent. */
 int AW_MwvmSection(const char tag[4],uint32_t *offset,uint32_t *rows,uint32_t *bytes);

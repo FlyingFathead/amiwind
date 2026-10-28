@@ -104,6 +104,27 @@ class Cast(unittest.TestCase):
             (Path(d) / hc.CAST_FILE).write_text(text, encoding='ascii')
             hc.set_beat(d, 120.0)
             self.assertEqual(hc.read_cast((Path(d) / hc.CAST_FILE).read_text())[:2], (120.0, True))
+            self.assertEqual(hc.read_preroll((Path(d) / hc.CAST_FILE).read_text()), 0)
+            # the soundtrack's pre-roll (its leading silence) on the first line
+            hc.set_beat(d, 120.0, 1068)
+            written = (Path(d) / hc.CAST_FILE).read_text()
+            self.assertTrue(written.startswith('AWHW1 1200 1 1068\n'))
+            self.assertEqual(hc.read_cast(written)[:2], (120.0, True))
+            self.assertEqual(hc.read_preroll(written), 1068)
+        self.assertNotIn(' 500', hc.cast_text(rows, 132.4, False, 500).splitlines()[0])   # none without a track
+        with self.assertRaises(ValueError):
+            hc.cast_text(rows, 132.4, True, hc.MAX_PREROLL_MS + 1)
+
+    def test_leading_silence_of_a_converted_track(self):
+        from prepare_music import RATE
+        rng = np.random.default_rng(3)
+        silent = int(1.068 * RATE)
+        # 8-bit stereo as the image plays it: dithered silence (+-1 step), then a tone
+        quiet = rng.integers(-1, 2, size=silent * 2)
+        tone = (60 * np.sin(np.arange(RATE) * 2 * np.pi * 440 / RATE)).repeat(2)
+        pcm = np.concatenate((quiet, tone)).astype(np.int8).tobytes()
+        self.assertAlmostEqual(hc.leading_silence(pcm, RATE), 1068, delta=11)
+        self.assertEqual(hc.leading_silence(tone.astype(np.int8).tobytes(), RATE), 0)
 
     def test_tempo_of_a_click_track(self):
         for bpm in (132.4, 100.0, 150.0):
@@ -138,6 +159,7 @@ class Soundtrack(unittest.TestCase):
             self.assertEqual(record['source'], hc.SOUNDTRACK_SOURCE)
             self.assertTrue(unpack_stream((music / 'track01.mws').read_bytes()))
             self.assertAlmostEqual(bpm, 120.0, delta=0.6)
+            self.assertLessEqual(record['leading_silence_ms'], 20)     # the click track starts at once
             written = json.loads((music / 'soundtrack.json').read_text())
             self.assertEqual(len(written['tracks']), 2)
             from music_catalogue import build_catalogue
@@ -203,11 +225,71 @@ class Wiring(unittest.TestCase):
         class P:
             def exit(self, code, text):
                 raise Exit(text)
-        for argv, said in ((['--halloween'], 'a MiniWind option'),
-                           (['--custom-ost', '/no/such/file'], 'no such file')):
+        for argv, said in ((['--custom-ost', '/no/such/file'], 'no such file'),):
             with self.assertRaisesRegex(Exit, said):
                 hc.check(build.parser().parse_args(argv), P())
         hc.check(build.parser().parse_args(['--miniwind', '--halloween']), P())
+        # the image step builds the cast in a --halloween image: every full-world build and the MiniWind preset
+        aga = (ROOT / 'tools/build_aga.py').read_text(encoding='utf-8')
+        self.assertIn("if getattr(args,'halloween',False):", aga)
+        self.assertIn('halloween_report=halloween_cast.prepare(args.data_files,boot/\'id1\',jobs=jobs)', aga)
+
+    def test_a_full_build_plans_the_cast_and_the_flag_leaves_it_out(self):
+        # HALLOWEEN-SCENE-53 / BENCH-NO-STANDARD-DEMO-48 (v0.0.54): the cast is in every full-world image, so
+        # aw bench halloween works in release images; --halloween-cast off leaves it out. Imperative 19: the option
+        # reaches the image step alone, so no other stage's command (and key) changes.
+        from test_actor_library import steps
+        default = dict(steps())
+        self.assertEqual(default, dict(steps('--halloween-cast', 'on')))
+        left_out = dict(steps('--halloween-cast', 'off'))
+        self.assertEqual(default['image'].count('--halloween'), 1)
+        self.assertNotIn('--halloween', left_out['image'])
+        self.assertEqual(sorted(default), sorted(left_out))
+        changed = sorted(n for n in default if [str(x) for x in default[n]] != [str(x) for x in left_out[n]])
+        self.assertEqual(changed, ['image'])
+        # no song by default: the custom OST slot stays empty
+        self.assertNotIn('--custom-ost', default['image'])
+        import build
+        self.assertEqual(hc.full_image_args(build.parser().parse_args([])), ['--halloween'])
+        self.assertEqual(hc.full_image_args(build.parser().parse_args(['--halloween-cast', 'off'])), [])
+
+    def test_miniwind_keeps_its_own_choice(self):
+        # a MiniWind build takes the cast only with --halloween (its preset): never twice, never by default
+        from test_actor_library import steps
+        plain = dict(steps('--miniwind', '--miniwind-scope', 'exterior'))
+        cast = dict(steps('--miniwind', '--miniwind-scope', 'exterior', '--halloween'))
+        self.assertNotIn('--halloween', plain['image'])
+        self.assertEqual(cast['image'].count('--halloween'), 1)
+
+    def test_dancers_have_the_casts_own_names_and_shared_files_are_kept(self):
+        # a full image holds Desele's dancers as Suran residents (progs/a_<hash>.mdl, installed after the cast):
+        # the cast's dancers take names of their own; a shared file the image holds is kept, the cast's own replaced
+        import hashlib
+        name = hc.dancer_model('breton dancer girl')
+        self.assertEqual(name, 'progs/hw_' + hashlib.sha256(b'breton dancer girl').hexdigest()[:12] + '.mdl')
+        self.assertLess(len(name), 64)
+        with tempfile.TemporaryDirectory() as tmp:
+            stage, id1 = Path(tmp) / 'stage', Path(tmp) / 'id1'
+            for root, files in ((stage, {'progs/humanoid.awsk': b'new', name: b'cast', hc.CAST_FILE: b'AWHW1',
+                                         'sound/aw/cast/bolt.wav': b'w', 'progs/items/x.mdl': b'item2'}),
+                                (id1, {'progs/humanoid.awsk': b'old', name: b'stale', 'progs/items/x.mdl': b'item'})):
+                for path, raw in files.items():
+                    (root / path).parent.mkdir(parents=True, exist_ok=True)
+                    (root / path).write_bytes(raw)
+            written, kept = hc.install(stage, id1)
+            self.assertEqual(sorted(kept), ['progs/humanoid.awsk', 'progs/items/x.mdl'])
+            self.assertEqual(sorted(written), sorted([name, hc.CAST_FILE, 'sound/aw/cast/bolt.wav']))
+            self.assertEqual((id1 / 'progs/humanoid.awsk').read_bytes(), b'old')
+            self.assertEqual((id1 / name).read_bytes(), b'cast')
+
+    def test_members_are_made_side_by_side(self):
+        # basic 6: the v0.0.53 Halloween builds made the cast on one core for about 2 minutes; the members now go to
+        # the builder's worker pool, and a member other than the skeletons is left out with its reason
+        text = (ROOT / 'tools/halloween_cast.py').read_text(encoding='utf-8')
+        self.assertIn('in_order_map(member, items,', text)
+        kind, identifier, error = hc.member(('dancer', (None, None, {'id': 'x'}, None, 'ffmpeg', {})))
+        self.assertEqual((kind, identifier), ('dancer', 'x'))
+        self.assertTrue(error)
 
     def test_custom_ost_slot_empty_without_setting_and_only_the_image_step_takes_it(self):
         # CUSTOM-OST-SLOT-53: without the option or the machine setting the slot stays empty; the setting reaches the

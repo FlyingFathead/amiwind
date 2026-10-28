@@ -202,9 +202,9 @@ class SkelSourceTests(unittest.TestCase):
         self.assertIn('aw_posed_t *more = (aw_posed_t *)AW_TryMalloc (AW_POSE_CACHE_LARGE * sizeof(aw_posed_t));', alias)
         self.assertIn('for (i=0 ; i<aw_pose_slots ; i++)', alias)
         # culled by the box of the pose it stands in once posed, not by the every-pose rest box (an extra model drawn)
-        # (its key: the frame, or the torch pose's, SKEL-ITEM-TAGS-52)
+        # (its key: the frame, or the torch pose's, SKEL-ITEM-TAGS-52; the storm pose's, ACTOR-STORM-POSE-51)
         self.assertIn('if (pahdr->aw_skel && AW_PoseBox (pmodel, pahdr, AW_SkelEntityKey (pmodel, pahdr, '
-                      'currententity->frame, NULL,', alias)
+                      'currententity->frame,', alias)
         self.assertIn('memcpy (box, aw_posed[i].box, 6);', alias)
 
     def test_a_room_short_of_memory_gets_the_tables_and_posed_frames_back_first(self):
@@ -265,7 +265,8 @@ class SkelTorchLayerNativeTests(unittest.TestCase):
                                        str(SOURCE / 'aw_skel.c'), '-lm', '-o', str(exe)],
                                       capture_output=True, text=True)
             self.assertEqual(compiled.returncode, 0, compiled.stdout + compiled.stderr)
-            result = subprocess.run([str(exe), 'layer', str(scratch / 'table.bin'), *map(str, args)],
+            result = subprocess.run([str(exe), 'layers' if len(args) == 7 else 'layer', str(scratch / 'table.bin'),
+                                     *map(str, args)],
                                     capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         lines = result.stdout.splitlines()
@@ -302,12 +303,41 @@ class SkelTorchLayerNativeTests(unittest.TestCase):
         self.assertEqual(self.run_layer(table, 0, 0, -1, 5, 11)[0], -1)
         self.assertEqual(self.run_layer(table, 0, 0, -1, 6, 6)[0], -1)
         self.assertEqual(self.run_layer(table, 0, 0, -1, 6, 12)[0], -1)
+        # ACTOR-STORM-POSE-51: two layers at once, the torch on the left arm and the storm on the right; the right arm's
+        # root is the weapon bone's fourth ancestor (7), the rest of the body keeps the base frame
+        root, got = self.run_layer(table, 2, 8, 2, 4, 7, 6, 11)
+        self.assertEqual(root, 7)
+
+        def layered(frame, roots):
+            """world origins with each root's subtree on its frame (the nearest root above a bone wins)"""
+            under = {}
+            for b, parent in enumerate(self.PARENTS):
+                if b in roots:
+                    under[b] = roots[b]
+                elif parent in under:
+                    under[b] = under[parent]
+            locals_ = [S.local_matrix(rq[under.get(b, frame), b], pq[under.get(b, frame), b]) for b in range(bones)]
+            return np.array([m[3, :3] for m in S.pose_matrices(self.PARENTS, locals_)])
+
+        np.testing.assert_allclose(got, layered(2, {2: 8, 7: 4}), atol=2e-3)
+        np.testing.assert_allclose(got[[0, 1, 12]], world(2)[[0, 1, 12]], atol=2e-3)
+        self.assertGreater(np.abs(got[11] - world(2, 8, 2)[11]).max(), 0.5)     # the weapon hand moved with the arm
+        # the single-layer wrapper poses as before
+        np.testing.assert_allclose(self.run_layer(table, 2, 8, 2, 6, 11)[1], world(2, 8, 2), atol=2e-3)
+        # nested roots: the nearer root wins below it (a layer on the spine, the left arm back on the base frame)
+        root, got = self.run_layer(table, 2, 4, 1, 2, 2, 6, 11)
+        np.testing.assert_allclose(got, layered(2, {1: 4, 2: 2}), atol=2e-3)
 
     def test_the_renderer_the_cull_box_and_the_items_pose_alike(self):
         alias = (SOURCE / 'r_alias.c').read_text()
-        self.assertIn('AW_SkelPoseLayer (table, (float)frame, layer, key < 0 ? root : -1, world);', alias)
+        self.assertIn('AW_SkelPoseLayers (table, (float)frame, AW_SKEL_LAYERS, layers, roots, world);', alias)
         self.assertIn('p->frame == key)', alias)
-        self.assertIn('AW_PoseBox (pmodel, pahdr, AW_SkelEntityKey (pmodel, pahdr, currententity->frame, NULL,', alias)
+        self.assertIn('AW_PoseBox (pmodel, pahdr, AW_SkelEntityKey (pmodel, pahdr, currententity->frame,', alias)
+        # ACTOR-STORM-POSE-51: the storm layer is part of the pose key and of the cull box's pose
+        self.assertIn('key += AW_STORM_KEY;', alias)
+        self.assertIn('currententity->angles[YAW], NULL, NULL), box))', alias)
+        self.assertIn('R_AliasStormLayer=AW_ItemsStormLayer;', (SOURCE / 'aw_items.c').read_text())
+        self.assertIn('AW_SkelGroup(tab,"idlestorm")', (SOURCE / 'aw_items.c').read_text())
         items = (SOURCE / 'aw_items.c').read_text()
         self.assertIn('AW_SkelPoseLayer(tab,(float)f,layer,layered?root:-1,world);', items)
         self.assertIn('R_AliasTorchLayer=AW_ItemsTorchLayer;', items)

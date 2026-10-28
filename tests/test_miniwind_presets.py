@@ -98,12 +98,17 @@ class Table(unittest.TestCase):
     def test_every_preset_parses(self):
         rows = mp.presets()
         self.assertEqual(sorted(row['name'] for row in rows),
-                         ['anim-stage', 'animkit', 'balmora', 'balmora-exterior', 'halloween', 'lava-pools', 'opening-ship',
+                         ['anim-stage', 'animkit', 'balmora', 'balmora-exterior', 'combat-playground', 'halloween',
+                          'lava-pools', 'magic', 'opening-ship',
                           'redmountain',
                           'seyda-chim', 'vivec-arena-chim', 'vivec-arena-pit', 'vivec-city-chim', 'vivec-city-exterior',
                           'vivec-palace'])
         # v0.0.43: Red Mountain's summit, the raised terrain ceiling (CHIM-RED-MOUNTAIN-SOLID-SKY-43)
         self.assertEqual(mp.find('redmountain')['start'], 'redmtn_x3y8')
+        # v0.0.54: the combat playground in the Arena Pit, its room only, the modes listed on arrival
+        playground = mp.find('combat-playground')
+        self.assertEqual((playground['start'], playground['scope']), ('interior:Vivec, Arena Pit', 'interior'))
+        self.assertEqual(playground['boot_commands'], ['dbg playground modes', 'dbg playground duel'])
         palace = mp.find('vivec-palace')         # v0.0.42: Vivec in his palace (INTERIOR-CREATURES-MISSING-41)
         self.assertEqual(palace['start'], 'interior:Vivec, Palace of Vivec')
         seyda = mp.find('seyda-chim')            # v0.0.36-dev5: Seyda Neen CHIM-native, starts at its arrival

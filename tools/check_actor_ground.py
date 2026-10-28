@@ -20,6 +20,7 @@ from actor_grounding import initial_state
 from audit_walkability import Scene, axes
 from player_hull import lumps
 from actor_frames import MAX_FRAMES
+ACTOR_VERTEX_LIMIT=3072     # engine/aga/src/r_local.h MAXALIASVERTS (tests/test_skel_vertex_limit.py)
 
 
 def entities(raw):
@@ -27,12 +28,34 @@ def entities(raw):
             for block in re.findall(r'\{[^{}]*\}', lumps(raw)[0].decode('cp1252'))]
 
 
+def model_header_facts(raw):
+    """The alias header's counts as text (ident, version, vertices, triangles, frames, skins, skin size), for errors."""
+    if len(raw) < 84:
+        return '%d bytes, shorter than the 84-byte header' % len(raw)
+    h = struct.unpack_from('<4si3f3ff3f8if', raw)
+    ident, version = h[0].decode('latin-1', 'replace'), h[1]
+    ns, w, height, nv, nt, nf = h[12:18]
+    return ('ident %s version %d, %d vertices, %d triangles, %d frames (limit %d), %d skins (limit 32), skin %dx%d'
+            % (ident, version, nv, nt, nf, MAX_FRAMES, ns, w, height))
+
+
+def named_model_frames(raw, name):
+    """model_frames, whose refusals name the model and its header counts (ACTOR-MODEL-ERROR-UNNAMED-48: the build
+    stopped with "Unsupported actor model" and no hint which of a town's residents it was)."""
+    try:
+        return model_frames(raw)
+    except (ValueError, struct.error) as error:
+        raise ValueError('%s: %s (%s)' % (name, error, model_header_facts(raw))) from error
+
+
 def model_frames(raw):
     """Decode final quantized alias positions; reject unsupported grouped poses."""
     if len(raw)<84:raise ValueError('Truncated actor model')
     h=struct.unpack_from('<4si3f3ff3f8if',raw)
     ns,w,height,nv,nt,nf=h[12:18]
-    if h[:2]!=(b'IDPO',6) or not 0<nv<=1999 or not 0<nf<=MAX_FRAMES or not 0<ns<=32:
+    # up to the renderer's MAXALIASVERTS (3,072): a skeletal resident with a whole hair goes past 2,000 vertices with
+    # its model-budgets.txt line (SKEL-VERTEX-LIMIT-52; skeletal_actor.SKEL_VERTEX_LIMIT)
+    if h[:2]!=(b'IDPO',6) or not 0<nv<=ACTOR_VERTEX_LIMIT or not 0<nf<=MAX_FRAMES or not 0<ns<=32:
         raise ValueError('Unsupported actor model')
     if not 0<w<=4096 or not 0<height<=480 or not 0<nt<=4096:
         raise ValueError('Invalid actor model counts')
@@ -232,7 +255,7 @@ def audit(maps, jobs=1, chim_frames=None, defer_shells=False):
         if name not in model_cache:
             raw = (maps.parent/p).read_bytes()
             hashes[name] = hashlib.sha256(raw).hexdigest()
-            model_cache[name] = (model_frames(raw), layout_of(maps.parent/p))
+            model_cache[name] = (named_model_frames(raw, name), layout_of(maps.parent/p))
         return model_cache[name]
     shells = set()
     scanned = ordered_map(_scan_map_shell if defer_shells else _scan_map, paths, max(1, min(jobs, len(paths))))

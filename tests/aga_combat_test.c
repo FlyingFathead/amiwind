@@ -24,6 +24,8 @@ int (*aw_combat_buttons)(int);int (*aw_combat_guard_marker)(void);   /* cl_input
 #include "aw_items.h"
 static int items_shown,items_hidden;
 int AW_CompanionPickAim(void){return 0;}      /* aw_companion.c: the right button in pick mode */
+/* aw_hand_models.c: the image's hand clip table (FIRST-PERSON-HANDS-IN-C-54): a 0.9 s punch, as the old stamp gave */
+float AW_HandDuration(int clip,float fallback){(void)fallback;return clip==3?.9f:fallback;}
 int AW_ItemsShow(edict_t *a,edict_t *o[AW_ITEMS_KINDS]){(void)a;o[0]=o[1]=NULL;items_shown++;return 0;}
 void AW_ItemsUpdate(edict_t *a,edict_t *i[AW_ITEMS_KINDS]){(void)a;(void)i;}
 void AW_ItemsHide(edict_t *i[AW_ITEMS_KINDS]){i[0]=i[1]=NULL;items_hidden++;}
@@ -74,6 +76,18 @@ int COM_FOpenFile(char *name,FILE **file){
     char path[160];long n;sprintf(path,"%s/%s",dir,name);
     *file=fopen(path,"rb");if(!*file)return -1;
     fseek(*file,0,SEEK_END);n=ftell(*file);fseek(*file,0,SEEK_SET);return (int)n;
+}
+/* The actor record (aw_actorstate.c, aw_mwhost.c): one creature, "daedroth" (COMBAT-DAEDROTH-NO-HIT-51). */
+static int actor_tables=1;
+int AW_MwscriptActors(void){return actor_tables;}
+int AW_ActorFind(const char *id){return !strcmp(id,"daedroth")?7:AW_ACTOR_NONE;}
+int AW_ActorBase(int row,aw_actor_base_t *out){
+    int i;if(row!=7)return 0;
+    memset(out,0,sizeof(*out));out->kind=1;out->level=16;out->health=180;out->fatigue=400;out->magicka=50;
+    for(i=0;i<8;i++)out->attributes[i]=60;
+    for(i=0;i<27;i++)out->skills[i]=70;              /* the combat value in every combat skill (getSkill) */
+    out->fight=90;out->attack[0]=15;out->attack[1]=35;out->attack[2]=15;out->attack[3]=35;out->attack[4]=15;out->attack[5]=35;
+    return 1;
 }
 static struct {char *name;xcommand_t f;} commands[8];static int command_count;
 static cvar_t *cvars[16];static int cvar_count;
@@ -167,6 +181,11 @@ int main(void){
     assert(f.weapon==4 && f.weapon_skill==AW_SK_BLUNT && f.damage[0][1]==14 && f.shield && f.attributes[AW_AGI]==63);
     assert(f.skills[AW_SK_H2H]==38 && f.fatigue_max==208 && f.armor>8.8f && f.armor<8.82f);
     assert(AW_CombatActorLoad("weakling",&f) && f.health==3);
+    /* a creature: no row in combat/actors.txt, its sheet from the actor record (COMBAT-DAEDROTH-NO-HIT-51) */
+    assert(AW_CombatActorLoad("Daedroth",&f) && f.creature==1 && f.health_max==180 && f.fight==90 && f.armor==0);
+    assert(f.damage[0][0]==15 && f.damage[2][1]==35 && !f.weapon && f.skills[AW_SK_H2H]==70);
+    actor_tables=0;assert(!AW_CombatActorLoad("daedroth",&f));actor_tables=1;
+    assert(!AW_CombatActorLoad("nobody at all",&f));
     assert(AW_CombatActorLoad("a guard",&f) && f.level==5);
     assert(!AW_CombatActorLoad("mevil",&f) && !AW_CombatActorLoad("nobody",&f) && !AW_CombatActorLoad("",&f));
     /* the arena's set fighter replaces the character's sheet while set */

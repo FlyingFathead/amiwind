@@ -13,30 +13,68 @@
  * Opponent: a baked Arena fighter (arena/fighters.txt: combat frames), any
  * humanoid NPC of the gallery (one pose) or any NPC record with a stand-in
  * model; stats always from combat/actors.txt (the record's own sheet).
+ *
+ * The combat playground (docs/COMBAT.md "Combat playground", the MiniWind preset combat-playground) is this
+ * minigame's modes: duel (the minigame as it was), anim (one actor plays every combat group of its animation
+ * table in turn, labelled), aggro (up to four actors who start a fight on their own by the Fight rule and flee by
+ * the Flee rule), group (up to four fighters at once, with the measured cost of their thinks) and sounds (every
+ * combat sound in turn and a creature's sound generators, labelled).
  */
 #include "quakedef.h"
 #include "aw_links.h"
 #include "aw_combat.h"
 #include "aw_character.h"
 #include "aw_mappath.h"
+#include "aw_animkit.h"
+#include "aw_anim.h"
 
 #define MAP_PIT "vai000"
 #define MAP_FLOOR "charplane"
 enum {PHASE_NONE,PHASE_SETUP,PHASE_TITLE,PHASE_FIGHT,PHASE_RESULT};
 enum {SOURCE_FIGHTER,SOURCE_GALLERY,SOURCE_STANDIN};
 #define TITLE_SECONDS 3.0
+/* The playground's modes and their cast: at most the combat layer's four slots (aw_combat.c SLOTS). */
+enum {MODE_DUEL,MODE_ANIM,MODE_AGGRO,MODE_GROUP,MODE_SOUNDS,MODE_COUNT};
+static const char *const mode_names[MODE_COUNT]={"duel","anim","aggro","group","sounds"};
+/* sounds: the combat sound table, one entry every SOUND_SECONDS: the swing's sounds (combat/settings.txt, the keys of
+ * aw_combat.h AW_SND_*), then a creature's sound generators (combat/sndg.txt, tools/prepare_combat.py
+ * sound_generators). The labels name the event and the sound record (OpenMW 0.51, aw_combat.h AW_CombatSwingSounds). */
+#define SOUND_SECONDS 1.6
+static const char *const sound_labels[AW_SND_COUNT]={
+    "Health Damage: a blow takes health","miss: your swing misses","Hand To Hand Hit: a punch tires",
+    "Light Armor Hit: light armour struck","Medium Armor Hit: medium armour struck","Heavy Armor Hit: heavy armour struck",
+    "Weapon Swish: every melee swing","critical damage: a critical strike","Body Fall Medium: knocked down, dies",
+    "Hand To Hand Hit 2: a punch tires"};
+#define GENERATORS 8
+static const char *const generator_names[GENERATORS]={"left foot","right foot","swim left","swim right","moan","roar",
+                                                      "scream","land"};
+static char sound_creature[32]="daedroth";
+static char generator_path[GENERATORS][32];
+static int sound_entry,generator_count;
+static double sound_next;
+static float saved_sounds=-1;
+#define FOES 4
 
-/* The chosen opponent: about 260 bytes. */
-static struct {
+/* A chosen opponent: about 260 bytes. foes[0] is the duel's opponent and every mode's lead. */
+static struct foe_s {
     char id[32],name[32],model[64],layout[128];
     int source,pick;            /* pick: position in fighters + gallery order */
     aw_fighter_t sheet;
-} foe;
+} foes[FOES];
+#define foe foes[0]
+static int choosing;            /* the foe take() fills */
+static int mode,cast_count=1;
 static int phase,map_choice=-1,standin_index,help,replay,setup_called,drawn_once;
 static double phase_started;
 static unsigned long replay_seed;
-static float saved_seed;
-static edict_t *opponent;
+static float saved_seed,saved_flee=-1;
+static edict_t *opponents[FOES];
+#define opponent opponents[0]
+/* aggro: each actor's engage timer (OpenMW actor.hpp mEngageCombat: 1 s, deviating by 0.25 s) and last numbers */
+static struct {double next;int rating,state;float distance;} aggro[FOES];
+static unsigned long jitter_state=0x2545f491UL;
+static int anim_model;          /* the first skeletal resident model of the scene (the anim mode's actor) */
+static char anim_name[32];
 /* The arena player's set sheet (config/arena_player.json -> arena/player.txt);
  * aw_arena_player 0 fights with the game's own character instead. */
 static aw_fighter_t player_preset;
@@ -89,13 +127,13 @@ static void normalize(const char *in,char *out,int size) {
 }
 /* The sheet decides: a choice without combat data is refused. */
 static int take(const char *id,const char *name,const char *model,const char *layout,int source,int pick) {
-    aw_fighter_t sheet;
+    aw_fighter_t sheet;struct foe_s *o=&foes[choosing];
     if(!AW_CombatSettingsLoad()){Con_Printf("Combat data missing (combat/settings.txt); rebuild the image.\n");return 0;}
     if(!AW_CombatActorLoad(id,&sheet)){Con_Printf("No combat sheet for %s (combat/actors.txt); rebuild the image or choose another NPC.\n",id);return 0;}
-    memset(&foe,0,sizeof(foe));
-    Q_strcpy_bounded(foe.id,id,sizeof(foe.id));Q_strcpy_bounded(foe.name,name && *name?name:sheet.name,sizeof(foe.name));
-    Q_strcpy_bounded(foe.model,model?model:"",sizeof(foe.model));Q_strcpy_bounded(foe.layout,layout?layout:"",sizeof(foe.layout));
-    foe.source=source;foe.pick=pick;foe.sheet=sheet;
+    memset(o,0,sizeof(*o));
+    Q_strcpy_bounded(o->id,id,sizeof(o->id));Q_strcpy_bounded(o->name,name && *name?name:sheet.name,sizeof(o->name));
+    Q_strcpy_bounded(o->model,model?model:"",sizeof(o->model));Q_strcpy_bounded(o->layout,layout?layout:"",sizeof(o->layout));
+    o->source=source;o->pick=pick;o->sheet=sheet;
     return 1;
 }
 static int choose_fighter(int k) {
@@ -141,6 +179,8 @@ static int choose(const char *spec) {
     Con_Printf("No fighter, gallery NPC or NPC record matches \"%s\" (dbgmode arenapit list).\n",spec);
     return 0;
 }
+static int choose_into(int k,const char *spec) {int was=choosing,ok;choosing=k;ok=choose(spec);choosing=was;return ok;}
+static int fighter_into(int k,int row) {int was=choosing,ok;choosing=k;ok=choose_fighter(row);choosing=was;return ok;}
 static void list(void) {
     char id[32],model[64],name[32],layout[128];int k,f=fighter_count(),g=gallery_count();
     Con_Printf("Vivec Arena opponents (dbgmode arenapit <name, record ID or gallery #>):\n");
@@ -150,6 +190,78 @@ static void list(void) {
     else Con_Printf(" (no NPC gallery in this build)\n");
     Con_Printf(" + any NPC record ID (stand-in model). next / prev step through fighters, then the gallery.\n");
     if(foe.id[0])Con_Printf("Current: %s (%s)\n",foe.name,foe.id);
+}
+static void modes(void) {
+    Con_Printf("Combat playground modes (dbgmode combat <mode> ..., the same as dbgmode arenapit <mode> ...):\n");
+    Con_Printf(" duel [opponent]          one opponent fights you (the Vivec Arena minigame)\n");
+    Con_Printf(" anim [actor]             one actor plays every combat group of its animation table, labelled\n");
+    Con_Printf(" aggro [id, id, ...]      up to 4 actors attack on sight by their Fight rating, flee by Flee\n");
+    Con_Printf(" group [N] [id, id, ...]  N (1-4) fighters at once, with the cost of their thinks\n");
+    Con_Printf(" sounds [creature]        every combat sound in turn, then a creature's sound generators, labelled\n");
+    Con_Printf(" loadout NAME             your weapon and shield for the next fight (fists, sword_shield, ...)\n");
+    Con_Printf(" creatures                what creature fights do and do not have yet\n");
+}
+static void creatures(void) {
+    Con_Printf("Creature fights: a creature's sheet comes from the actor record (docs/ACTOR_STATE.md): its level,\n"
+               "attributes, combat skill, health and its own attacks. Fight one here by its record ID (dbgmode arenapit\n"
+               "daedroth: a stand-in model) or by hitting it in the world. Not yet: creatures' carried weapons, their\n"
+               "own animation groups in a fight, their sound generators from their animations.\n");
+}
+
+/* A creature's sound generators (combat/sndg.txt "AWSG1 N", then sorted rows "id<tab>g0<tab>...<tab>g7", each
+ * generator a comma list of sound names under sound/combat/g/ or "-"): one of each type's sounds, picked as OpenMW
+ * picks among them (mwclass/creature.cpp getSoundIdFromSndGen: a random one). Returns how many types have a sound,
+ * -1 when the creature has no row. */
+static int creature_generators(const char *id,char path[GENERATORS][32]) {
+    FILE *f=NULL;char line[768],want[32],*field[GENERATORS+1],*s;int i,k,n,found=-1,count=0;
+    static unsigned long pick=0x6a09e667UL;
+    for(i=0;i<31 && id[i];i++)want[i]=(id[i]>='A' && id[i]<='Z')?id[i]+32:id[i];
+    want[i]=0;
+    memset(path,0,GENERATORS*32);
+    if(COM_FOpenFile("combat/sndg.txt",&f)<0 || !f)return -1;
+    if(!fgets(line,sizeof(line),f) || strncmp(line,"AWSG1 ",6)){fclose(f);return -1;}
+    while(found<0 && fgets(line,sizeof(line),f)){
+        line[strcspn(line,"\r\n")]=0;
+        for(s=line,i=0;i<=GENERATORS;i++){field[i]=s;s=strchr(s,'\t');if(i<GENERATORS){if(!s)break;*s++=0;}}
+        if(i<=GENERATORS || strcmp(field[0],want))continue;
+        found=0;
+        for(k=0;k<GENERATORS;k++){
+            char *names=field[k+1],*pickname;int choices=1;
+            if(!strcmp(names,"-") || !*names)continue;
+            for(s=names;*s;s++)if(*s==',')choices++;
+            pick^=(pick<<13)&0xffffffffUL;pick^=pick>>17;pick^=(pick<<5)&0xffffffffUL;
+            for(n=(int)((pick>>8)%(unsigned long)choices),pickname=names;n>0;n--)pickname=strchr(pickname,',')+1;
+            s=strchr(pickname,',');if(s)*s=0;
+            if(strlen(pickname)>16 || strstr(pickname,".."))continue;
+            sprintf(path[k],"combat/g/%s.wav",pickname);count++;
+        }
+    }
+    fclose(f);
+    return found<0?-1:count;
+}
+/* The sounds mode: entries 0..AW_SND_COUNT-1 the swing's sounds, then the creature's generator types that have one. */
+static void sounds_start(void) {
+    generator_count=creature_generators(sound_creature,generator_path);
+    if(generator_count<0)Con_Printf("Combat playground: no sound generators for %s (combat/sndg.txt; a creature record ID).\n",sound_creature);
+    sound_entry=-1;sound_next=realtime;
+}
+static void sounds_tick(char *label,int size) {
+    int total=AW_SND_COUNT+GENERATORS,tries;
+    if(realtime>=sound_next){
+        for(tries=0;tries<total;tries++){
+            sound_entry=(sound_entry+1)%total;
+            if(sound_entry<AW_SND_COUNT?AW_CombatSoundPlay(sound_entry):
+               generator_path[sound_entry-AW_SND_COUNT][0] && (S_LocalSound(generator_path[sound_entry-AW_SND_COUNT]),1))break;
+        }
+        if(tries==total)sound_entry=-1;
+        sound_next=realtime+SOUND_SECONDS;
+    }
+    if(sound_entry<0)Q_strcpy_bounded(label,"No combat sounds in this build",size);
+    else if(sound_entry<AW_SND_COUNT)Q_strcpy_bounded(label,sound_labels[sound_entry],size);
+    else{   /* "creature: type" (the creature's ID is at most 31 characters, the type 10: fits 64) */
+        Q_strcpy_bounded(label,sound_creature,size);
+        strncat(label,": ",size-strlen(label)-1);strncat(label,generator_names[sound_entry-AW_SND_COUNT],size-strlen(label)-1);
+    }
 }
 
 /* ---- the map ---- */
@@ -165,46 +277,71 @@ static const char *map_name(void) {
 
 int AW_ArenaActive(void) {return phase!=PHASE_NONE;}
 
+/* One opponent's model: its own, else (the anim mode) a skeletal resident's, else a stand-in. Returns the model
+ * index, 0 when there is none. */
+static int foe_model(struct foe_s *o,int standin) {
+    int i;model_t *m=NULL;char *model=o->model;
+    if(model[0] && file_size(model)>=72)m=Mod_ForName(model,false);
+    if(!m && o->source!=SOURCE_STANDIN && model[0])Con_Printf("Opponent model %s missing; using a stand-in.\n",model);
+    if(m){
+        for(i=1;i<MAX_MODELS && sv.model_precache[i];i++)if(!strcmp(sv.model_precache[i],model))break;
+        if(i==MAX_MODELS){Con_Printf("Arena: model table full.\n");return 0;}
+        if(!sv.model_precache[i]){sv.model_precache[i]=ED_NewString(model);sv.models[i]=m;}
+        return i;
+    }
+    {   /* A stand-in: a resident's model of this scene, else a fighter's. */
+        char id[32],path[64],name[32],layout[128];
+        if(!standin && fighter_row(0,id,path,name,layout) && file_size(path)>=72 && (m=Mod_ForName(path,false))){
+            for(i=1;i<MAX_MODELS && sv.model_precache[i];i++);
+            if(i<MAX_MODELS){sv.model_precache[i]=ED_NewString(path);sv.models[i]=m;standin=i;}
+        }
+        o->layout[0]=0;
+        if(!standin)Con_Printf("Arena: no model for a stand-in opponent.\n");
+        return standin;
+    }
+}
 /* Called while the arena map spawns (before baselines; precaching is legal):
- * spectators leave, the opponent arrives. */
+ * spectators leave, the opponents arrive. */
 void AW_ArenaEntities(void) {
-    int i,standin=0;edict_t *e;model_t *m=NULL;char *model=foe.model;
-    opponent=NULL;
+    int i,k,standin=0,index;edict_t *e;
+    for(k=0;k<FOES;k++)opponents[k]=NULL;
+    anim_model=0;anim_name[0]=0;
     for(i=1;i<sv.num_edicts;i++){
         e=EDICT_NUM(i);
         if(e->free)continue;
         if(!strcmp(pr_strings+e->v.classname,"aw_npc") || !strcmp(pr_strings+e->v.classname,"aw_corpse")){
             if(!standin && e->v.modelindex>0)standin=(int)e->v.modelindex;
+            if(mode==MODE_ANIM && !anim_model && e->v.modelindex>0 && !strcmp(pr_strings+e->v.classname,"aw_npc") &&
+               AW_AnimKitSkeletal((int)e->v.modelindex)){
+                anim_model=(int)e->v.modelindex;
+                Q_strcpy_bounded(anim_name,e->v.netname?pr_strings+e->v.netname:"resident",sizeof(anim_name));
+            }
             ED_Free(e);
         }
     }
-    if(model[0] && file_size(model)>=72)m=Mod_ForName(model,false);
-    if(!m && foe.source!=SOURCE_STANDIN && model[0])Con_Printf("Opponent model %s missing; using a stand-in.\n",model);
-    if(m){
-        for(i=1;i<MAX_MODELS && sv.model_precache[i];i++)if(!strcmp(sv.model_precache[i],model))break;
-        if(i==MAX_MODELS){Con_Printf("Arena: model table full.\n");return;}
-        if(!sv.model_precache[i]){sv.model_precache[i]=ED_NewString(model);sv.models[i]=m;}
-        standin_index=i;
-    }else{
-        /* A stand-in: a resident's model of this scene, else a fighter's. */
-        char id[32],path[64],name[32],layout[128];
-        if(!standin && fighter_row(0,id,path,name,layout) && file_size(path)>=72 && (m=Mod_ForName(path,false))){
-            for(i=1;i<MAX_MODELS && sv.model_precache[i];i++);
-            if(i<MAX_MODELS){sv.model_precache[i]=ED_NewString(path);sv.models[i]=m;standin=i;foe.layout[0]=0;}
+    for(k=0;k<cast_count && k<FOES;k++){
+        struct foe_s *o=&foes[k];
+        if(!o->id[0])continue;
+        index=foe_model(o,standin);
+        /* the anim mode wants an animation table: a resident's skeletal model when the opponent's is baked */
+        if(mode==MODE_ANIM && k==0 && anim_model && (!index || !AW_AnimKitSkeletal(index))){
+            index=anim_model;o->layout[0]=0;
+            Con_Printf("Combat playground: the animations play on %s's model (a skeletal resident of this scene).\n",anim_name);
         }
-        if(!standin){Con_Printf("Arena: no model for a stand-in opponent.\n");return;}
-        standin_index=standin;foe.layout[0]=0;
+        if(!index)return;
+        if(k==0)standin_index=index;
+        e=ED_Alloc();
+        e->v.classname=ED_NewString("aw_npc")-pr_strings;e->v.netname=ED_NewString(o->name)-pr_strings;
+        e->v.model=sv.model_precache[index]-pr_strings;e->v.modelindex=index;
+        e->v.movetype=MOVETYPE_NONE;e->v.solid=SOLID_BBOX;e->v.health=o->sheet.health;
+        {   /* the residents' standing box (world.qc aw_npc_floor), through setsize's own code */
+            static vec3_t low={-7.32f,-7.12f,0},high={7.32f,7.12f,33.25f};
+            SetMinMaxSize(e,low,high,false);
+        }
+        {eval_t *v=GetEdictFieldValue(e,"aw_source_id");if(v)v->string=ED_NewString(o->id)-pr_strings;}
+        if(mode!=MODE_DUEL)AW_AnimPrep(e);     /* its <model>.anm: the anim mode's groups of a baked model */
+        opponents[k]=e;
     }
-    e=ED_Alloc();
-    e->v.classname=ED_NewString("aw_npc")-pr_strings;e->v.netname=ED_NewString(foe.name)-pr_strings;
-    e->v.model=sv.model_precache[standin_index]-pr_strings;e->v.modelindex=standin_index;
-    e->v.movetype=MOVETYPE_NONE;e->v.solid=SOLID_BBOX;e->v.health=foe.sheet.health;
-    {   /* the residents' standing box (world.qc aw_npc_floor), through setsize's own code */
-        static vec3_t low={-7.32f,-7.12f,0},high={7.32f,7.12f,33.25f};
-        SetMinMaxSize(e,low,high,false);
-    }
-    {eval_t *v=GetEdictFieldValue(e,"aw_source_id");if(v)v->string=ED_NewString(foe.id)-pr_strings;}
-    opponent=e;
 }
 /* Floor under (x, y) from z down: the hull's resting origin, 0 if none. */
 static int floor_at(edict_t *e,float x,float y,float z,vec3_t out) {
@@ -219,34 +356,63 @@ static void face(edict_t *e,vec3_t at,float offset) {
     e->v.angles[1]=(float)(Q_atan2(at[1]-e->v.origin[1],at[0]-e->v.origin[0])*180/M_PI)+offset;
 }
 static void set_phase(int p) {phase=p;phase_started=realtime;drawn_once=0;if(p==PHASE_SETUP)setup_called=0;}
+/* Where foe k stands on the pit or the floor (map units), the player at *you: the duel's two spots 300 apart on
+ * the long axis; a group side by side; the aggro cast in a row along the pit's length at growing distances
+ * (150 to 480 map units, 600 to 1920 original units), so the distance term decides who attacks first. */
+static void spot(int k,float *x,float *y,float *you_x,float *you_y) {
+    if(mode==MODE_AGGRO){*you_x=-240;*you_y=0;*x=-240+150+110*(float)k;*y=k&1?30:-30;return;}
+    *you_x=0;*you_y=-150;*y=150;
+    *x=mode==MODE_GROUP?((float)k-(float)(cast_count-1)*.5f)*48:0;
+}
 void AW_ArenaSpawn(edict_t *p) {
-    vec3_t you_at,foe_at,back,back_angles,forward,right,up;int placed=0;
+    vec3_t you_at,foe_at[FOES],back,back_angles,forward,right,up;int placed=0,k,n=0;float x,y,yx,yy,z=0;
     if(!opponent || opponent->free){Con_Printf("Arena: no opponent spawned.\n");return;}
-    /* The pit floor (original z -464, x -1142..1170, y -918..920): the two
+    for(k=0;k<FOES;k++)if(opponents[k] && !opponents[k]->free)n=k+1;
+    /* The pit floor (original z -464, x -1142..1170, y -918..920): the duel's two
      * fighters 300 units apart on the long axis, facing each other. */
-    if(!strcmp(sv.name,MAP_PIT))
-        placed=floor_at(p,0,-150,-60,you_at) && floor_at(opponent,0,150,-60,foe_at);
-    else if(!strcmp(sv.name,MAP_FLOOR))
-        placed=floor_at(p,0,-150,48,you_at) && floor_at(opponent,0,150,48,foe_at);
+    if(!strcmp(sv.name,MAP_PIT))z=-60;
+    else if(!strcmp(sv.name,MAP_FLOOR))z=48;
+    if(z!=0){
+        spot(0,&x,&y,&yx,&yy);
+        placed=floor_at(p,yx,yy,z,you_at);
+        for(k=0;k<n && placed;k++){
+            if(!opponents[k])continue;
+            spot(k,&x,&y,&yx,&yy);
+            if(!floor_at(opponents[k],x,y,z,foe_at[k]))placed=0;
+        }
+    }
     if(!placed){
-        /* Here: where the game was captured, the opponent ahead (on the pit
+        /* Here: where the game was captured, the opponents ahead (on the pit
          * or the floor without a clear spot: the map's own spawn point). */
         if(!strcmp(sv.name,MAP_PIT) || !strcmp(sv.name,MAP_FLOOR) || !AW_GalleryArenaBack(back,back_angles)){
             VectorCopy(p->v.origin,back);VectorCopy(p->v.angles,back_angles);
         }
         back_angles[0]=back_angles[2]=0;AngleVectors(back_angles,forward,right,up);
         VectorCopy(back,you_at);
-        placed=floor_at(opponent,back[0]+forward[0]*160,back[1]+forward[1]*160,back[2]+24,foe_at) ||
-               floor_at(opponent,back[0]+forward[0]*64,back[1]+forward[1]*64,back[2]+24,foe_at);
-        if(!placed){VectorCopy(back,foe_at);foe_at[0]+=forward[0]*64;foe_at[1]+=forward[1]*64;foe_at[2]+=p->v.mins[2];}
+        for(k=0;k<n;k++){
+            float ahead=mode==MODE_AGGRO?150+110*(float)k:160,side=mode==MODE_GROUP?((float)k-(float)(n-1)*.5f)*40:0,near=64;
+            edict_t *o=opponents[k];
+            if(!o)continue;
+            if(floor_at(o,back[0]+forward[0]*ahead+right[0]*side,back[1]+forward[1]*ahead+right[1]*side,back[2]+24,foe_at[k]) ||
+               floor_at(o,back[0]+forward[0]*near+right[0]*side,back[1]+forward[1]*near+right[1]*side,back[2]+24,foe_at[k]))continue;
+            VectorCopy(back,foe_at[k]);foe_at[k][0]+=forward[0]*near+right[0]*side;foe_at[k][1]+=forward[1]*near+right[1]*side;
+            foe_at[k][2]+=p->v.mins[2];
+        }
     }
     VectorCopy(you_at,p->v.origin);VectorCopy(you_at,p->v.oldorigin);VectorCopy(vec3_origin,p->v.velocity);
-    VectorCopy(foe_at,opponent->v.origin);VectorCopy(foe_at,opponent->v.oldorigin);
-    face(p,foe_at,0);face(opponent,you_at,-90);
+    for(k=0;k<n;k++){
+        edict_t *o=opponents[k];
+        if(!o)continue;
+        VectorCopy(foe_at[k],o->v.origin);VectorCopy(foe_at[k],o->v.oldorigin);
+        face(o,you_at,-90);
+        o->v.flags=(int)o->v.flags|FL_ONGROUND;
+        SV_LinkEdict(o,false);
+        memset(&aggro[k],0,sizeof(aggro[k]));
+    }
+    face(p,foe_at[0],0);
     VectorCopy(p->v.angles,p->v.v_angle);VectorCopy(p->v.angles,cl.viewangles);
     p->v.movetype=MOVETYPE_WALK;p->v.fixangle=1;
-    opponent->v.flags=(int)opponent->v.flags|FL_ONGROUND;
-    SV_LinkEdict(p,false);SV_LinkEdict(opponent,false);
+    SV_LinkEdict(p,false);
     /* The set fighter (the captured character comes back on exit). */
     aw_combat_player_preset=NULL;
     if(arena_player.value && AW_CombatLoadout(loadout,&player_preset,loadout_used)){
@@ -265,13 +431,55 @@ void AW_ArenaSpawn(edict_t *p) {
     set_phase(aw_arena_setup?PHASE_SETUP:PHASE_TITLE);
 }
 static void setup_done(void) {if(phase==PHASE_SETUP)set_phase(PHASE_TITLE);}
+/* The aggro and group modes switch the Flee rule on for their session (AW_CombatRule AW_RULE_FLEE); the rest of the
+ * game keeps its setting, which comes back when the mode ends. */
+static void flee_rule(int on) {
+    if(on && saved_flee<0)saved_flee=(float)AW_CombatRule(AW_RULE_FLEE,1);
+    else if(!on && saved_flee>=0){AW_CombatRule(AW_RULE_FLEE,(int)saved_flee);saved_flee=-1;}
+}
+/* The same for the swing's sounds as OpenMW plays them (AW_RULE_SOUNDS): on in the aggro, group and sounds modes. */
+static void sounds_rule(int on) {
+    if(on && saved_sounds<0)saved_sounds=(float)AW_CombatRule(AW_RULE_SOUNDS,1);
+    else if(!on && saved_sounds>=0){AW_CombatRule(AW_RULE_SOUNDS,(int)saved_sounds);saved_sounds=-1;}
+}
+/* xorshift32 for the engage timers' deviation (not the fight's generator: a seed still replays a fight) */
+static float jitter(void) {
+    unsigned long x=jitter_state;
+    x^=(x<<13)&0xffffffffUL;x^=x>>17;x^=(x<<5)&0xffffffffUL;jitter_state=x;
+    return (float)((x>>8)&0xffff)/65535.0f*.5f-.25f;
+}
 static void fight(void) {
+    int k;
     if(!opponent || opponent->free){set_phase(PHASE_RESULT);return;}
+    if(mode==MODE_ANIM){
+        if(!AW_AnimKitCombatCycle(opponent))Con_Printf("Combat playground: %s has no animation groups to play.\n",foe.name);
+        set_phase(PHASE_FIGHT);return;
+    }
+    flee_rule(mode==MODE_AGGRO || mode==MODE_GROUP);
+    sounds_rule(mode==MODE_AGGRO || mode==MODE_GROUP || mode==MODE_SOUNDS);
+    if(mode==MODE_SOUNDS){sounds_start();set_phase(PHASE_FIGHT);return;}
+    if(mode==MODE_AGGRO){
+        for(k=0;k<FOES;k++){aggro[k].next=realtime+1.0f+jitter();aggro[k].state=0;}
+        replay=0;set_phase(PHASE_FIGHT);return;
+    }
     saved_seed=Cvar_VariableValue("aw_combat_seed");
     if(replay && replay_seed)Cvar_SetValue("aw_combat_seed",(float)replay_seed);
-    AW_CombatEngage(opponent,&foe.sheet,foe.layout[0]?foe.layout:NULL);
+    for(k=0;k<FOES;k++){
+        struct foe_s *o=&foes[k];
+        if(opponents[k] && !opponents[k]->free)AW_CombatEngage(opponents[k],&o->sheet,o->layout[0]?o->layout:NULL);
+    }
     if(replay)Cvar_SetValue("aw_combat_seed",saved_seed);
     replay=0;set_phase(PHASE_FIGHT);
+}
+/* aggro: each calm actor's check on its engage timer */
+static void aggro_tick(void) {
+    int k;
+    for(k=0;k<FOES;k++){
+        edict_t *e=opponents[k];struct foe_s *o=&foes[k];
+        if(!e || e->free || aggro[k].state==1 || realtime<aggro[k].next)continue;
+        aggro[k].next=realtime+1.0f+jitter();
+        aggro[k].state=AW_CombatAggro(e,&o->sheet,o->layout[0]?o->layout:NULL,50,&aggro[k].rating,&aggro[k].distance);
+    }
 }
 static void result(int won) {
     const aw_combat_stats_t *s=AW_CombatStats();double t=s->ended-s->started;edict_t *p;
@@ -293,12 +501,65 @@ static void rematch(int same_seed) {replay=same_seed;AW_GalleryArenaReload();}
 static void step(int dir) {if(choose_pick(foe.pick+dir))AW_GalleryArenaReload();}
 
 /* ---- the command (dbgmode arenapit and its aliases) ---- */
+static int mode_of(const char *word) {
+    int m;
+    if(!Q_strcasecmp((char *)word,"animations") || !Q_strcasecmp((char *)word,"animation"))return MODE_ANIM;
+    for(m=0;m<MODE_COUNT;m++)if(!Q_strcasecmp((char *)word,(char *)mode_names[m]))return m;
+    return -1;
+}
+/* A mode's default cast (arena/casts.txt, tools/prepare_combat.py casts_file): "MODE<tab>id, id, ..." into out. */
+static int default_cast(int m,char *out,int size) {
+    FILE *f=NULL;char line[256],*tab;int n=strlen(mode_names[m]);
+    out[0]=0;
+    if(COM_FOpenFile("arena/casts.txt",&f)<0 || !f)return 0;
+    if(!fgets(line,sizeof(line),f) || strncmp(line,"AWAC1",5)){fclose(f);return 0;}
+    while(fgets(line,sizeof(line),f)){
+        line[strcspn(line,"\r\n")]=0;tab=strchr(line,'\t');
+        if(!tab || tab-line!=n || strncmp(line,mode_names[m],n))continue;
+        Q_strcpy_bounded(out,tab+1,size);break;
+    }
+    fclose(f);return out[0]!=0;
+}
+/* "<mode> [N] [spec, spec, ...]": the cast of a mode; 0 when nobody could be chosen. */
+static int choose_cast(int m,int argc,char **argv) {
+    char text[200],*s,*next;int i,n=0,want=FOES,k=0;
+    if(argc>2 && m==MODE_GROUP && argv[2][0]>='1' && argv[2][0]<='9' && !argv[2][1]){want=argv[2][0]-'0';if(want>FOES)want=FOES;i=3;}
+    else i=2;
+    for(text[0]=0;i<argc;i++){
+        if(n+(int)strlen(argv[i])+2>(int)sizeof(text)){Con_Printf("Cast too long.\n");return 0;}
+        if(n)text[n++]=' ';
+        strcpy(text+n,argv[i]);n+=strlen(argv[i]);text[n]=0;
+    }
+    if(m==MODE_SOUNDS){             /* the argument names the creature whose generators play; the duel's foe stands by */
+        if(text[0]){char *c;Q_strcpy_bounded(sound_creature,text,sizeof(sound_creature));
+            for(c=sound_creature;*c;c++)if(*c>='A' && *c<='Z')*c+=32;}     /* record IDs are matched lower case */
+        return foe.id[0] || choose_pick(0);
+    }
+    if(m==MODE_DUEL || m==MODE_ANIM){
+        if(text[0])return choose_into(0,text);
+        return foe.id[0] || choose_pick(0);
+    }
+    /* a comma list of opponents, else the mode's default cast, else the baked fighters */
+    if(!text[0] && default_cast(m,text,sizeof(text)))Con_Printf("Combat playground: the default %s cast: %s\n",mode_names[m],text);
+    for(s=text;*s && k<want;s=next){
+        next=strchr(s,',');if(next)*next++=0;else next=s+strlen(s);
+        while(*s==' ')s++;
+        if(*s && choose_into(k,s))k++;
+    }
+    if(!text[0])for(i=0;i<fighter_count() && k<want;i++)if(fighter_into(k,i))k++;
+    if(!k)Con_Printf("No opponent for %s mode (give record IDs separated by commas).\n",mode_names[m]);
+    cast_count=k?k:1;
+    return k>0;
+}
 void AW_ArenaCommand(int argc,char **argv) {
-    char spec[96];int i,n=0;const char *a=argc>1?argv[1]:"";
+    char spec[96];int i,n=0,m;const char *a=argc>1?argv[1]:"";
     if(argc==2 && !Q_strcasecmp((char *)a,"exit")){AW_GalleryArenaLeave();return;}
     if(argc==2 && !Q_strcasecmp((char *)a,"list")){list();return;}
+    if(argc==2 && !Q_strcasecmp((char *)a,"modes")){modes();return;}
+    if(argc>=2 && (!Q_strcasecmp((char *)a,"creature") || !Q_strcasecmp((char *)a,"creatures"))){creatures();return;}
     if(argc==2 && !Q_strcasecmp((char *)a,"help")){help=phase!=PHASE_NONE;
-        Con_Printf("dbgmode arenapit [opponent | list | next | prev | here | pit | floor | seed N | loadout NAME | rematch | setup | exit]\n");return;}
+        Con_Printf("dbgmode arenapit [opponent | list | next | prev | here | pit | floor | seed N | loadout NAME | rematch | setup | exit]\n");
+        modes();return;}
     if(argc==2 && !Q_strcasecmp((char *)a,"setup")){
         if(aw_arena_setup)Con_Printf("Fighter setup runs before the next title card.\n");
         else Con_Printf("Fighter setup arrives with the quick character screen; fighters use their own sheets.\n");
@@ -317,6 +578,18 @@ void AW_ArenaCommand(int argc,char **argv) {
         map_choice=!Q_strcasecmp((char *)a,"pit")?0:!Q_strcasecmp((char *)a,"floor")?1:2;
         if(phase==PHASE_NONE){a="";argc=1;}else{Con_Printf("Arena map: %s from the next entry.\n",a);return;}
     }
+    if(argc>=2 && (m=mode_of(a))>=0){
+        int was=mode,count=cast_count;
+        if(phase!=PHASE_NONE && mode==MODE_ANIM)AW_AnimKitStop();
+        mode=m;cast_count=1;
+        if(!choose_cast(m,argc,argv)){mode=was;cast_count=count;return;}
+        if(m!=MODE_AGGRO && m!=MODE_GROUP)cast_count=1;
+        if(m!=MODE_AGGRO && m!=MODE_GROUP)flee_rule(0);
+        if(m!=MODE_AGGRO && m!=MODE_GROUP && m!=MODE_SOUNDS)sounds_rule(0);
+        Con_Printf("Combat playground: %s mode, %ld actor%s (dbgmode combat modes).\n",mode_names[m],(long)cast_count,cast_count==1?"":"s");
+        if(phase!=PHASE_NONE){AW_GalleryArenaReload();return;}
+        AW_GalleryArenaEnter(map_name());return;
+    }
     if(phase!=PHASE_NONE){
         if(argc==2 && !Q_strcasecmp((char *)a,"rematch")){rematch(0);return;}
         if(argc==2 && !Q_strcasecmp((char *)a,"next")){step(1);return;}
@@ -328,7 +601,11 @@ void AW_ArenaCommand(int argc,char **argv) {
         strcpy(spec+n,argv[i]);n+=strlen(argv[i]);
     }
     spec[n]=0;
-    if(n && Q_strcasecmp(spec,"next") && Q_strcasecmp(spec,"prev") && Q_strcasecmp(spec,"previous")){if(!choose(spec))return;}
+    if(n && Q_strcasecmp(spec,"next") && Q_strcasecmp(spec,"prev") && Q_strcasecmp(spec,"previous")){
+        if(!choose(spec))return;
+        if(mode!=MODE_DUEL){if(mode==MODE_ANIM && phase!=PHASE_NONE)AW_AnimKitStop();flee_rule(0);sounds_rule(0);}
+        mode=MODE_DUEL;cast_count=1;      /* an opponent by name: the duel */
+    }
     else if(!foe.id[0] || n){
         int dir=!n?0:!Q_strcasecmp(spec,"next")?1:-1;
         if(!choose_pick(foe.id[0]?foe.pick+dir:dir>0?0:dir)){Con_Printf("No opponent available (no fighters, gallery or combat data in this build).\n");return;}
@@ -347,16 +624,19 @@ static void dbgmode(void) {
     char line[256];int i,n;
     if(Cmd_Argc()<2){
         Con_Printf("dbgmode arenapit [opponent]   Vivec Arena combat minigame (also dbg arenapit/battlearena/arenatest/arena/combattest, testarena)\n");
+        Con_Printf("dbgmode combat <mode> [...]   combat playground: duel, anim, aggro, group, sounds (dbgmode combat modes)\n");
         Con_Printf("dbgmode combattest            empty gallery floor, current hands (dbg combattest gallery)\n");
         Con_Printf("dbgmode torchtest             dark room, torch\n");
         Con_Printf("dbgmode gallery               NPC model gallery\n");
         return;
     }
-    if(!Q_strcasecmp(Cmd_Argv(1),"arenapit") || !Q_strcasecmp(Cmd_Argv(1),"arena"))strcpy(line,"aw_arenapit");
+    if(!Q_strcasecmp(Cmd_Argv(1),"arenapit") || !Q_strcasecmp(Cmd_Argv(1),"arena") || !Q_strcasecmp(Cmd_Argv(1),"combat") ||
+       !Q_strcasecmp(Cmd_Argv(1),"playground"))strcpy(line,"aw_arenapit");
     else if(!Q_strcasecmp(Cmd_Argv(1),"combattest"))strcpy(line,"aw_combattest gallery");
     else if(!Q_strcasecmp(Cmd_Argv(1),"torchtest"))strcpy(line,"aw_torchtest");
     else if(!Q_strcasecmp(Cmd_Argv(1),"gallery"))strcpy(line,"aw_charplane");
     else {Con_Printf("Unknown debug mode %s (dbgmode lists them).\n",Cmd_Argv(1));return;}
+    if(Cmd_Argc()==2 && (!Q_strcasecmp(Cmd_Argv(1),"combat") || !Q_strcasecmp(Cmd_Argv(1),"playground")))strcat(line," modes");
     for(i=2;i<Cmd_Argc();i++){
         n=strlen(line);
         if(n+strlen(Cmd_Argv(i))+3>=sizeof(line))break;
@@ -374,8 +654,12 @@ void AW_ArenaInit(void) {
 }
 /* aw_gallery.c: the session ended or the map is not ours any more. */
 void AW_ArenaEnd(void) {
+    int k;
     if(phase==PHASE_NONE)return;
-    AW_CombatClear();phase=PHASE_NONE;opponent=NULL;help=0;aw_combat_player_preset=NULL;
+    if(mode==MODE_ANIM)AW_AnimKitStop();
+    flee_rule(0);sounds_rule(0);
+    AW_CombatClear();phase=PHASE_NONE;help=0;aw_combat_player_preset=NULL;
+    for(k=0;k<FOES;k++)opponents[k]=NULL;
 }
 
 /* ---- keys and drawing ---- */
@@ -400,6 +684,31 @@ static void text_at(int x,int y,const char *s) {
     for(;*s && x+w<=(int)vid.width;s++,x+=w)if(x>=0)AW_ConsoleCharacter(x,y,(unsigned char)*s);
 }
 static void centred(int y,const char *s) {text_at((vid.width-(int)strlen(s)*AW_ConsoleCharWidth())/2,y,s);}
+/* One line per actor of the aggro and group modes: its state and, in aggro, the Fight rule's numbers. */
+static void cast_lines(int y) {
+    int k,h=AW_ConsoleCharHeight();char text[96];
+    for(k=0;k<FOES;k++){
+        edict_t *e=opponents[k];const aw_fighter_t *f;const char *state;
+        if(!e || e->free)continue;
+        f=AW_CombatFighter(e);
+        state=!f?"calm":f->dead?"dead":AW_CombatActorFleeing(e)?"FLEEING":f->knocked?"down":"HOSTILE";
+        if(mode==MODE_AGGRO){
+            if(aggro[k].state<0)sprintf(text,"%.14s F%ld: no rule (rebuild)",foes[k].name,(long)foes[k].sheet.fight);
+            else sprintf(text,"%.14s F%ld at %ld: %ld %s",foes[k].name,(long)foes[k].sheet.fight,(long)aggro[k].distance,
+                         (long)aggro[k].rating,state);
+        }else sprintf(text,"%.14s %ld/%ld %s",foes[k].name,(long)(f?f->health:foes[k].sheet.health),
+                      (long)foes[k].sheet.health_max,state);
+        text_at(4,y,text);y+=h;
+    }
+    if(mode==MODE_GROUP){
+        float per,mean,longest;int fighting;
+        AW_CombatCost(&per,&mean,&longest,&fighting);
+        /* 40 characters fit a 320 pixel screen: thinks a second, the mean and the longest think */
+        sprintf(text,"%ld fighting %ld/s %ld.%02ld ms max %ld.%02ld",(long)fighting,(long)per,
+                (long)mean,(long)(mean*100)%100,(long)longest,(long)(longest*100)%100);
+        text_at(4,y,text);
+    }
+}
 void AW_ArenaDraw(void) {
     char text[96];int h=AW_ConsoleCharHeight(),y;double t=realtime-phase_started;
     extern int scr_copyeverything;
@@ -415,15 +724,42 @@ void AW_ArenaDraw(void) {
     }else if(phase==PHASE_TITLE){
         y=vid.height/3;
         centred(y,"VIVEC ARENA");
-        sprintf(text,"%s, level %ld",foe.name,(long)foe.sheet.level);centred(y+2*h,text);
-        sprintf(text,"%s%s",foe.sheet.weapon?"armed":"hand to hand",foe.sheet.shield?", shield":"");centred(y+3*h,text);
-        if(t>=TITLE_SECONDS-1)centred(y+5*h,"FIGHT!");
+        if(mode==MODE_DUEL){
+            sprintf(text,"%s, level %ld",foe.name,(long)foe.sheet.level);centred(y+2*h,text);
+            sprintf(text,"%s%s",foe.sheet.weapon?"armed":"hand to hand",foe.sheet.shield?", shield":"");centred(y+3*h,text);
+            if(t>=TITLE_SECONDS-1)centred(y+5*h,"FIGHT!");
+        }else{
+            sprintf(text,"Combat playground: %s",mode_names[mode]);centred(y+2*h,text);
+            if(cast_count>1)sprintf(text,"%s and %ld more",foe.name,(long)(cast_count-1));
+            else sprintf(text,"%s",foe.name);
+            centred(y+3*h,text);
+            if(t>=TITLE_SECONDS-1)centred(y+5*h,mode==MODE_ANIM?"WATCH":mode==MODE_SOUNDS?"LISTEN":mode==MODE_AGGRO?"COME CLOSER":"FIGHT!");
+        }
         if(t>=TITLE_SECONDS)fight();
     }else if(phase==PHASE_FIGHT){
         const aw_fighter_t *f=opponent?AW_CombatFighter(opponent):NULL;
-        sprintf(text,"Vivec Arena: %s",foe.name);text_at(4,4,text);
-        if(f && f->knocked)text_at(4,4+h,f->knocked==2?"Knocked out":"Knocked down");
-        text_at(4,4+2*h,"F1: help  Ctrl+X: leave");
+        if(mode==MODE_AGGRO)aggro_tick();
+        if(mode==MODE_DUEL){
+            sprintf(text,"Vivec Arena: %s",foe.name);text_at(4,4,text);
+            if(f && f->knocked)text_at(4,4+h,f->knocked==2?"Knocked out":"Knocked down");
+            text_at(4,4+2*h,"F1: help  Ctrl+X: leave");
+        }else if(mode==MODE_ANIM){
+            char label[64];
+            sprintf(text,"Animations: %s",anim_model && standin_index==anim_model?anim_name:foe.name);text_at(4,4,text);
+            if(AW_AnimKitLabel(label,sizeof(label))){
+                int w=AW_ConsoleCharWidth()*((int)strlen(label)+2);
+                y=vid.height-4*h;AW_UIBox((vid.width-w)/2,y-4,w,h+8);centred(y,label);
+            }
+        }else if(mode==MODE_SOUNDS){
+            char label[64];int w;
+            text_at(4,4,"Combat playground: sounds");
+            sounds_tick(label,sizeof(label));
+            w=AW_ConsoleCharWidth()*((int)strlen(label)+2);
+            y=vid.height-4*h;AW_UIBox((vid.width-w)/2,y-4,w,h+8);centred(y,label);
+        }else{
+            sprintf(text,"Combat playground: %s",mode_names[mode]);text_at(4,4,text);
+            cast_lines(4+2*h);
+        }
     }else{
         int w=AW_ConsoleCharWidth()*34,x=(vid.width-w)/2;
         y=vid.height/4;
@@ -443,6 +779,7 @@ void AW_ArenaDraw(void) {
         text_at(8,8+6*h,"dbgmode arenapit <name, ID or #>");
         text_at(8,8+7*h,"dbgmode arenapit seed N (replay)");
         text_at(8,8+8*h,"dbg combat readout on/off: per swing");
+        text_at(8,8+9*h,"dbgmode combat duel/anim/aggro/group");
         text_at(8,8+10*h,"Ctrl+X or dbgmode arenapit exit");
         text_at(8,8+11*h,"F1 / Esc: close help");
     }

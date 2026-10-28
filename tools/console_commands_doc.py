@@ -57,7 +57,7 @@ def registered_names(source_dir):
     """Command and setting names the engine registers (Cmd_AddCommand, cvars)."""
     import re
     names = set()
-    for f in sorted(Path(source_dir).glob('*.c')):
+    for f in sorted(Path(source_dir).rglob('*.c')):     # chim/ too: "chim" is registered in chim/chim_world.c
         t = f.read_text(encoding='latin-1')
         names.update(re.findall(r'Cmd_AddCommand\s*\(\s*"([^"]+)"', t))
         names.update(re.findall(r'cvar_t\s+\w+\s*=\s*\{\s*"([^"]+)"', t))

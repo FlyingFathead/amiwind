@@ -1,6 +1,6 @@
 # Build profile and stage reuse
 
-_Last updated with AmiWind v0.0.49-dev (24 October 2026)._
+_Last updated with AmiWind v0.0.54-dev1 (27 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -306,12 +306,25 @@ Where the numbers come from, said on every line in brackets:
   stage's peak less its largest process, per worker; the process tree's summed
   memory is bounded by the container's own peak while the stage ran, since
   shared pages count once per process). The largest of the measurements is used.
+  Like for like: a MiniWind plan uses only MiniWind measurements and a full
+  build only full ones (the scope of a run comes from its `build-state.json`,
+  else its name; history rows carry `scope`, and the newest five of each scope
+  are kept); a stage measured only in builds of the other scope gets the no-data
+  estimate, its model line naming the other scope's figure. Without a sampled
+  process tree (a stage shorter than the sampler's interval) the stage's total is
+  its largest process, never the container's peak, and a measured worker larger
+  than twice the stage's largest process is capped to that (a worker unit is one
+  process and at most one child of it). Origin: v0.0.54-dev1 MiniWinds were
+  refused against the v0.0.53 full final: the whole island's chim figures, and a
+  0.7 s mwscript stage recorded at 32,412 MiB a worker (the container's peak).
 - **stair model**: every stage that builds a CHIM world walks its stairs with
   one frame per worker: 128 MiB + 18 x the frame's placed MiB
   (`tools/chim/stair_pool.py`, calibrated on the v0.0.41 world and the
   whole-city Vivec frame of v0.0.42). The largest frame comes from the stair
   gate's own worker line of an earlier run, else from the stored frame's size
   on disk (about 2.03 placed bytes per stored byte, one calibration point).
+  With `--stair-walk off` (the default) nothing is walked and no stair figure is
+  looked for or priced.
 - **estimated, no data yet**: a stage never measured (512 MiB a worker beside a
   256 MiB parent).
 - **beside it**: the memory the other stages held at the stage's measured peak
@@ -403,6 +416,13 @@ occurrence; the build carries on, and the build summary lists it as a warning:
 ```text
 [underused] WARNING: chim ran on 1.0 of 20 cores (allowance 1, share 20) for 65 s with 400 units queued and 1 running; slowest running unit: rcp16_p11 (42 s); phase now: CHIM stats: resident rings (running 12 s); held by: memory guard; the build carries on (RUN/underused.jsonl)
 ```
+
+In the image step, the steps that share no file run side by side in spawned
+workers, each as its own timed phase: the world UI and the player view beside the
+combat data, and the carried torch beside the NPC gallery and the torch test map
+(BUILD-IMAGE-FINALIZE-UNDERUSED-48). Before this, the v0.0.54-dev1 magic MiniWind
+ran the torch, the combat data, the player view and the world UI one after the
+other, on about one core each.
 
 The build summary's digest (`tools/build_digest.py`) is written into
 `RUN/build-summary.json` (schema `amiwind-build-summary-v2`, key `digest`) and

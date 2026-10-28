@@ -72,6 +72,11 @@ cvar_t	v_idlescale = {"v_idlescale", "0", false};
 cvar_t	crosshair = {"crosshair", "0", true};
 int (*aw_companion_crosshair)(int x, int y);	/* aw_companion.c */
 int (*aw_inspect_crosshair)(void);
+/* aw_view.c: the vanity orbit, the Toggle POV orbit or dbg cam orbit turns the camera (no crosshair). */
+int (*aw_view_orbiting)(void);
+/* UI-HUD-TOGGLE-KEY-51: Ctrl+Alt+H (dbg photomode hud) hides the HUD and the crosshair (aw_photo.c
+ * toggles it, screen.c draws the full view without the HUD); not saved. */
+int aw_hud_hidden;
 cvar_t	cl_crossx = {"cl_crossx", "0", false};
 cvar_t	cl_crossy = {"cl_crossy", "0", false};
 
@@ -118,18 +123,45 @@ static int V_CrosshairColour (int value)
     return cached_index;
 }
 
+/* The owned-item cue on the crosshair (OpenMW apps/openmw/mwgui/windowmanagerimp.cpp setFocusObject +
+ * hud.cpp setCrosshairOwned, settings "show owned" 2/3, "color crosshair owned" 1.0 0.15 0.15; the original game
+ * gives no cue): the harvest side sets aw_crosshair_owned (1 while the thing under the crosshair is owned: a flag
+ * already on its row, no search); aw_crosshair_owned_cue is dbg crosshair owned on/off (aw_photo.c). */
+int (*aw_crosshair_owned)(void);
+int aw_crosshair_owned_cue = 0;	/* off: the original's and OpenMW's default ("show owned" 0) */
+static int V_CrosshairOwnedColour (void)
+{
+    static byte *cached_palette;
+    static int cached_index = 254;
+    int i, d, best = 2147483647, r, g, b;
+
+    if (!host_basepal)
+        return 254;
+    if (host_basepal == cached_palette)
+        return cached_index;
+    for (i = 0; i < 255; i++)
+    {
+        r = host_basepal[i*3] - 255; g = host_basepal[i*3+1] - 38; b = host_basepal[i*3+2] - 38;
+        d = r*r + g*g + b*b;
+        if (d < best) { best = d; cached_index = i; }
+    }
+    cached_palette = host_basepal;
+    return cached_index;
+}
+
 void AW_CrosshairDraw (int x, int y)
 {
     int shape = AW_CrosshairStyle (1), colour = AW_CrosshairStyle (0), c, cx = x + 3, cy = y + 3;
+    int owned = aw_crosshair_owned_cue && aw_crosshair_owned && aw_crosshair_owned ();
 
-    if (!shape && !colour)
+    if (!shape && !colour && !owned)
     {
         Draw_Character (x, y, '+');
         return;
     }
     if (cx < 4 || cy < 4 || cx + 5 > (int)vid.width || cy + 5 > (int)vid.height)
         return;
-    c = V_CrosshairColour (colour);
+    c = owned ? V_CrosshairOwnedColour () : V_CrosshairColour (colour);
     switch (shape)
     {
     case 1:	/* open cross: four arms around a gap (the original's target.dds form) */
@@ -1263,14 +1295,18 @@ void V_RenderView (void)
         int y = scr_vrect.y + scr_vrect.height/2 + cl_crossy.value;
         int inspect = aw_inspect_crosshair && aw_inspect_crosshair ();
         int pick = inspect ? 2 : aw_companion_crosshair ? aw_companion_crosshair (x, y) : 0;
-        /* Inspection uses the rendered camera centre, in either perspective.
-         * Cosmetic crosshair offsets must not move its selection indicator. */
-        if (inspect)
-            Draw_Character (scr_vrect.x + scr_vrect.width/2 - 4,
-                            scr_vrect.y + scr_vrect.height/2 - 4, '+');
+        /* PHOTO-CROSSHAIR-51: nothing over a clean frame: photo mode (its crosshair 0), the
+         * hidden HUD (Ctrl+Alt+H, UI-HUD-TOGGLE-KEY-51), the vanity and dbg cam orbits and death. */
+        int clean = AW_PlayerDead () || aw_hud_hidden || (aw_view_orbiting && aw_view_orbiting ());
+        /* Inspection uses the rendered camera centre, in either perspective; cosmetic
+         * crosshair offsets must not move it. It is the player's crosshair (Options style,
+         * crosshair on/off), so it follows the same rules (OPTIONS-CROSSHAIR-STYLE-48). */
+        if (inspect && !clean && crosshair.value)
+            AW_CrosshairDraw (scr_vrect.x + scr_vrect.width/2 - 3,
+                              scr_vrect.y + scr_vrect.height/2 - 3);
         /* No crosshair while dead (PLAYER-DEATH-LIMBO-35) or behind the player (chase camera:
          * OpenMW camera.lua updateCrosshair shows it in first person only). */
-        if (!AW_PlayerDead () && !chase_active.value)
+        if (!clean && !chase_active.value)
         {
             if (pick == 1)
                 Draw_Character (x, y, '+');

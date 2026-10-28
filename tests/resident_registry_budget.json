@@ -3,13 +3,13 @@
  "note": "Ratchet: tests/test_resident_registry.py fails above these numbers and asks for them to be lowered when the engine needs less. Raise only with a dated, maintainer-approved reason.",
  "totals": {
   "commands": {
-   "count": 283,
-   "hunk_bytes": 9056
+   "count": 285,
+   "hunk_bytes": 9120
   },
   "cvars": {
-   "count": 342,
-   "static_bytes": 8208,
-   "zone_bytes": 11168
+   "count": 344,
+   "static_bytes": 8256,
+   "zone_bytes": 11232
   },
   "tables": {
    "count": 0,
@@ -46,7 +46,11 @@
   "2026-10-26: the maintainer's evening requests (via the coordinator): aw bench halloween, the standard benchmark command for testers, with the alias aw halloweenbench (one command record aw_bench, and the aw prefix as one more dbg dispatcher record: 64 hunk bytes), and a config flag that hides photo mode's own notice box and hints (the cvar aw_photomode_ui: 24 structure bytes, 32 zone bytes) (HALLOWEEN-SCENE-53)",
   "2026-10-26: dbg halloween and its alias dbg halloweentest, the Halloween scene the maintainer asked for (TG 2026-10-26 10:21-10:22 +0200: the command and the alias by name; later the same day: the FPS counter off in the show, on in the test alias): two command records, aw_halloween and aw_halloweentest (64 hunk bytes); no cvars, the cast is read from disk on the command only (HALLOWEEN-SCENE-53)",
   "2026-10-23: dbg door, for testing the hinged doors the maintainer asked for (approved in the desktop chat, 23 October 2026); AW-20260928-12",
-  "2026-10-23: merge of v0.0.48-merge-dev-doors (sensitivity, step rules, hinged doors) into the interiors line (voice table, MWScript, player speed, Stats and Magic windows, campfires): both sides' approved raises recorded separately above; the totals are their union (no new setting)"
+  "2026-10-23: merge of v0.0.48-merge-dev-doors (sensitivity, step rules, hinged doors) into the interiors line (voice table, MWScript, player speed, Stats and Magic windows, campfires): both sides' approved raises recorded separately above; the totals are their union (no new setting)",
+  "2026-10-27: WEATHER-RAIN and MESH-PARTICLE-EMITTERS, the maintainer's v0.0.54 items (desktop chat 2026-10-27 14:44 +0200: rain \"maybe we can do it with sprites\", chimney smoke \"a shit simple sprite thing\"; the TODO item asks for a default-off setting first): aw_atmos, one saved cvar (24 structure bytes, 32 zone bytes; bit 1 the falling weather, default off until measured; bit 2 the mesh smoke, default on); dbg atmos reuses the on-disk catalogue, no command. The weather's land light (aw_weather 2) and the interior fog (aw_fog 2) reuse existing cvars.",
+  "2026-10-27: maintainer-requested magic effects prototype (desktop chat 2026-10-27, TODO MAGICKA GRAPHICS, worker v054-magic): aw_magic_fx, one saved setting (default 0 = off, nothing loaded), and aw_magicfx, one command record for dbg cast (the effect table, sprites and sounds are read from disk on the first cast only); 32 hunk bytes, 24 structure bytes, 32 zone bytes.",
+  "2026-10-27: merge of v0.0.54-magic (aw_magic_fx, aw_magicfx) into v0.0.54-atmos (aw_atmos): both raises recorded separately above; the cvar totals are their union (344).",
+  "2026-10-27: aw_sweep (dbg sweep, ENTITY-SWEEP-AB), the console command the maintainer asked for on 2026-10-27 15:33 +0200 / 2026-10-27 13:33 UTC: 'some subroutine dbg command ... that checks the existence of all such entities across the map'; one command, 32 hunk bytes"
  ],
  "entries": {
   "commands": [
@@ -168,6 +172,7 @@
    "aw_logs_live_set",
    "aw_luma_status",
    "aw_magic",
+   "aw_magicfx",
    "aw_magicmenu",
    "aw_main_menu",
    "aw_music_custom",
@@ -210,6 +215,7 @@
    "aw_startup",
    "aw_startup_continue",
    "aw_stats",
+   "aw_sweep",
    "aw_target_names_set",
    "aw_target_place",
    "aw_teleport",
@@ -361,6 +367,7 @@
    "aw_animate_item_pickups",
    "aw_animkit",
    "aw_arena_player",
+   "aw_atmos",
    "aw_auto_center",
    "aw_autoram",
    "aw_autosaves",
@@ -437,6 +444,7 @@
    "aw_light_hue",
    "aw_loading_style",
    "aw_logs_live",
+   "aw_magic_fx",
    "aw_map_debug_available",
    "aw_map_format",
    "aw_map_lava",

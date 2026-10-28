@@ -73,10 +73,14 @@ DEFAULT_SCOPE = 'units'
 # import-time code but units of its own, its body and each method, so an edit to a method a stage never reaches keeps
 # its key; the reach also follows the code a stage hands to a cache key (keyed_scripts) and the Python files it
 # reads as data (FOLDER.glob('*.py')). Per-unit caches (code_key, pass_cache) keep their forms.
-TOP_FORMATS = (1, 2, 3)
-STAGE_TOP_FORMAT = 3
-TOP_TEXT = {1: '<top>', 2: '<top>#2', 3: '<top>#3'}
-UNIT_PREFIX = {1: 'units:', 2: 'units2:', 3: 'units3:'}
+# Form 4 (stage keys, BUILD-KEY-TOP-DEFAULTS-NAME-54): form 3, and of a function's defaults the import-time code lists
+# only those that run code, each by its parameter's name (a literal one is the function's own text): adding
+# partial_area=False to a function whose defaults also name COVERAGE_REPORT re-keyed every stage reaching the module.
+# The same reach as form 3, so a form 3 record is compared in form 3 (previous_selections).
+TOP_FORMATS = (1, 2, 3, 4)
+STAGE_TOP_FORMAT = 4
+TOP_TEXT = {1: '<top>', 2: '<top>#2', 3: '<top>#3', 4: '<top>#4'}
+UNIT_PREFIX = {1: 'units:', 2: 'units2:', 3: 'units3:', 4: 'units4:'}
 ENV_PREFIX = 'AMIWIND_'
 ENV_NAME = re.compile(r'AMIWIND_[A-Z0-9_]*[A-Z0-9]')
 ENV_ANY = '*'
@@ -178,7 +182,9 @@ INSTRUMENTATION_MODULES = frozenset({'tools/build_profile.py', 'tools/build_prog
                                      # the CHIM label's key line (BUILD-CHIM-LABEL-IN-KEYS-48): loaded only by this
                                      # module's key code; read in a stage, it refused 5 rc1 stages
                                      # (BUILD-REUSE-RC1-RECORDS-REFUSED-48)
-                                     'tools/chim_compat.py'})
+                                     'tools/chim_compat.py',
+                                     # engine C files counted by their use (BUILD-STAGE-KEY-ENGINE-HEADERS-54)
+                                     'tools/engine_facts.py'})
 OUTPUT_NEUTRAL = INSTRUMENTATION_MODULES
 # Single functions that can never change a stage's outputs although they read files: the closure does not follow them
 # (explicit list with the reason, tested in tests/test_build_cache.py; add one only if no output can depend on it).
@@ -533,7 +539,8 @@ class SourceIndex:
     every imported module. All are kept.
     """
 
-    def __init__(self, root=ROOT, scope=DEFAULT_SCOPE, top_format=1, chim_label_keys=False, narrow_headers=None):
+    def __init__(self, root=ROOT, scope=DEFAULT_SCOPE, top_format=1, chim_label_keys=False, narrow_headers=None,
+                 engine_facts=None):
         if scope not in SCOPES:
             raise ValueError(f'fingerprint scope must be one of {", ".join(SCOPES)}')
         if top_format not in TOP_FORMATS:
@@ -565,6 +572,8 @@ class SourceIndex:
         self._chim_line = None
         # C_HEADER_READERS name only the engine files they read (stage keys: form 3; its companion follows it)
         self.narrow_headers = self.stage_form if narrow_headers is None else narrow_headers
+        # ... and each engine C file by its use: C facts, or left out (tools/engine_facts.py); False: whole files
+        self.engine_facts = self.narrow_headers if engine_facts is None else engine_facts
         self._includes = {}
 
     def chim_line_digest(self):
@@ -1335,6 +1344,9 @@ class SourceIndex:
                                                    lambda: self.names_version(script))
                 if counts:
                     selected[path] = value
+        if self.engine_facts and self.narrow_headers:
+            import engine_facts
+            selected = engine_facts.narrow(self, script, selected, C_HEADER_FOLDERS, C_HEADER_READERS)
         return selected, False
 
     def previous_selections(self, script):
@@ -1344,7 +1356,9 @@ class SourceIndex:
         if self.top_format < 3:
             return {form: self.selection(script, form)[0] for form in TOP_FORMATS if form < self.top_format}
         companion = self.companion()
-        return {form: companion.selection(script, form)[0] for form in TOP_FORMATS if form < self.top_format}
+        # form 3 and later share the stage reach: from this index (form 4 differs from 3 in the import-time text only)
+        return {form: (companion if form < 3 else self).selection(script, form)[0]
+                for form in TOP_FORMATS if form < self.top_format}
 
     def companion(self):
         """The form 2 index of the same checkout (previous_selections; None-free: self when this index is older)."""
@@ -1352,7 +1366,8 @@ class SourceIndex:
             return self
         if self._companion is None:
             self._companion = SourceIndex(self.root, scope=self.scope, top_format=2,
-                                          chim_label_keys=self.chim_label_keys, narrow_headers=self.narrow_headers)
+                                          chim_label_keys=self.chim_label_keys, narrow_headers=self.narrow_headers,
+                                          engine_facts=self.engine_facts)
             self._companion._files = self.files       # the same checkout: its file hashes once
         return self._companion
 
@@ -2133,7 +2148,7 @@ def unit_texts(tree, text, lazy, classes=None):
     # run code on import (anything but literals). A literal default is part of its function's own text, which
     # only that function's callers reach (BUILD-KEY-FUNCTION-DEFAULTS-TOP-36).
     # Form 3: form 2 without the classes that are units of their own (CLASSES).
-    top, top2, top3 = [], [], []
+    top, top2, top3, top4 = [], [], [], []
     tables = lazy_tables(tree)
     for statement in tree.body:
         if id(statement) in tables:
@@ -2146,6 +2161,14 @@ def unit_texts(tree, text, lazy, classes=None):
             if not all(_literal(d) for d in defaults):
                 top2.append(line)
                 top3.append(line)
+            # form 4: only the defaults that run code, by parameter name
+            args = statement.args
+            named = list(zip([a.arg for a in [*args.posonlyargs, *args.args]][-len(args.defaults):] if args.defaults
+                             else [], args.defaults)) + [(a.arg, d) for a, d in zip(args.kwonlyargs, args.kw_defaults)
+                                                         if d is not None]
+            running = ['%s=%s' % (name, ast.dump(d)) for name, d in named if not _literal(d)]
+            if running:
+                top4.append(f'\0defaults {statement.name}: ' + ' | '.join(running) + '\n')
             continue
         first = min([statement.lineno] + [d.lineno for d in getattr(statement, 'decorator_list', ())])
         source = ''.join(lines[first - 1:statement.end_lineno]).rstrip() + '\n'
@@ -2153,9 +2176,11 @@ def unit_texts(tree, text, lazy, classes=None):
         top2.append(source)
         if id(statement) not in classes:
             top3.append(source)
+            top4.append(source)
     texts['<top>'] = ''.join(top)
     texts[TOP_TEXT[2]] = ''.join(top2)
     texts[TOP_TEXT[3]] = ''.join(top3)
+    texts[TOP_TEXT[4]] = ''.join(top4)
     return texts
 
 
@@ -2468,14 +2493,18 @@ def comparable(old_components, new_components, run, name):
         return new_components
     sources = dict(new_components['sources'], by_file=previous, digest=digest_json(previous), files=len(previous))
     environment = (PREVIOUS_SOURCES.get((str(run), name)) or {}).get('environment')
-    if environment is not None and 'environment' in new_components:
+    # the companion's environment is the older reach's (forms 1 and 2); form 3 has this index's reach
+    if environment is not None and 'environment' in new_components and old_form < 3:
         return dict(new_components, sources=sources, environment=environment)
     return dict(new_components, sources=sources)
 
 
-def comparable_all(components, old_details, run):
-    """{stage: comparable components} for every stage (see comparable)."""
-    return {name: comparable(old_details.get(name), parts, run, name) for name, parts in components.items()}
+def comparable_all(components, old_details, run, old_run=None):
+    """{stage: comparable components} for every stage (see comparable). OLD_RUN (the reuse source): its records of
+    whole engine files are read as C facts when its own source tree proves them (engine_facts.translate)."""
+    import engine_facts
+    return {name: engine_facts.translate(old_details.get(name), comparable(old_details.get(name), parts, run, name),
+                                         old_run, name, parts) for name, parts in components.items()}
 
 
 def _keyed_environment(environment):
@@ -4019,7 +4048,7 @@ def prepare(steps, run, metadata, reuse_from=None, mode='copy', index=None, scop
             old_details = json.loads((reuse_from / 'profile' / 'fingerprints.json').read_text())
         except (OSError, ValueError):
             old_details = {}
-        compared = comparable_all(components, old_details, run)
+        compared = comparable_all(components, old_details, run, reuse_from)
         narrowed = {}
         plans, reasons = plan_reuse(steps, fingerprints, dependencies, compared, problems, reuse_from,
                                     forced=set(forced), index=index, narrowed=narrowed)
@@ -4474,7 +4503,7 @@ def predict(old_run, scope=DEFAULT_SCOPE, root=ROOT, dependencies=None, index=No
         old_details = {}
     index = index or SourceIndex(root, scope=scope, top_format=STAGE_TOP_FORMAT)
     fingerprints, components, problems, _ = fingerprint_steps(steps, old_run, state, index, dependencies)
-    components = comparable_all(components, old_details, old_run)
+    components = comparable_all(components, old_details, old_run, old_run)
     result = {}
     for name, _ in steps:
         if name in NON_REUSABLE:

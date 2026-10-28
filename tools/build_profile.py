@@ -536,6 +536,7 @@ PHASES = {
     ('build_aga image', 'check_image'): 'Image: check',
     ('build_aga image', 'payload_preflight'): 'Image: payload preflight',
     ('build_aga image', 'prepare_torch:prepare'): 'Image: torch',
+    ('build_aga image', 'prepare_magic:prepare'): 'Image: magic effects',
     ('build_aga image', 'prepare_combat:prepare'): 'Image: combat data',
     ('build_aga image', 'prepare_player_view:prepare'): 'Image: player view',
     ('build_aga image', 'prepare_seyda_regions:convert_builder_scene'): 'Image: Seyda Neen legacy region maps',
@@ -638,7 +639,7 @@ INSTRUMENT = {
         'check_world_map_heap:audit_world_maps', 'entity_tracker:build_gate', 'night_lighting:stage',
         'world_volumes:pack', 'world_volumes:verify_combined',
         # every image sub-phase between the passes is a timed phase (BUILD-SILENT-PHASES-36)
-        'payload_preflight', 'prepare_torch:prepare', 'prepare_combat:prepare', 'prepare_player_view:prepare',
+        'payload_preflight', 'prepare_torch:prepare', 'prepare_magic:prepare', 'prepare_combat:prepare', 'prepare_player_view:prepare',
         'prepare_shared_sky_assets:prepare_staged_sky', 'prepare_guard_torches:prepare',
         'hand_metadata:stamp_staged_hands', 'cell_numbers:stamp_staged_cells', 'harvest_build:image_step',
         'world_progress:build_step', 'stage_direct_start', 'chim.heap:require_frame_map_heap',

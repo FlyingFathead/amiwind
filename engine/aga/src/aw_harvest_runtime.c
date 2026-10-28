@@ -32,7 +32,11 @@ static void shroomtracker(void)
     if(Cmd_Argc()!=1){Con_Printf("Usage: aw_shroomtracker\n");return;}
     Con_Printf("Mushrooms picked: %ld\n",(long)AW_HarvestPickedCount(&aw_state));
 }
-void AW_HarvestInit(void){AW_HarvestInitData(&harvest);Cvar_RegisterVariable(&harvest_mode);Cmd_AddCommand("aw_shroomtracker",shroomtracker);}
+/* The owned-item crosshair cue (view.c, dbg crosshair owned; HARVEST-INTERIOR-PICK-47): 1 while the plant under the
+ * crosshair has an owner, the flag already on its catalogue row. Declared here, not in quakedef.h (stage keys). */
+extern int (*aw_crosshair_owned)(void);
+static int crosshair_owned(void);
+void AW_HarvestInit(void){AW_HarvestInitData(&harvest);Cvar_RegisterVariable(&harvest_mode);Cmd_AddCommand("aw_shroomtracker",shroomtracker);aw_crosshair_owned=crosshair_owned;}
 void AW_HarvestClear(void)
 {
     AW_HarvestProxyClear();free(plants);plants=NULL;available=NULL;
@@ -93,6 +97,15 @@ static int binding(edict_t *e)
     return result;
 }
 int AW_HarvestProtect(edict_t *e){return binding(e)>=0;}
+/* dbg sweep (aw_sweep.c, ENTITY-SWEEP-AB): the loaded catalogue's plants, those bound to a live placement, those
+ * pickable now (not picked); *proxy 1 for the AWH4 proxy representation (no edicts to bind). */
+void AW_HarvestSweep(int *count,int *bound,int *pickable,int *proxy)
+{
+    int i;
+    *count=harvest.plants;*bound=*pickable=0;*proxy=harvest.representation==4;
+    if(*proxy){*bound=harvest.plants;return;}
+    for(i=0;plants && i<harvest.plants;i++)if(plants[i]){(*bound)++;if(available[i])(*pickable)++;}
+}
 void AW_HarvestSpawn(void)
 {
     int i,b,result,level=aw_character.valid?aw_character.level:1;unsigned char duplicate[AW_HARVEST_PLANTS];edict_t *e;
@@ -166,6 +179,7 @@ static int target(void)
     return best;
 }
 const char *AW_HarvestHint(void){int i=target();return i<0?NULL:AW_HarvestText(&harvest,harvest.plant[i].label);}
+static int crosshair_owned(void){int i=sv.active?target():-1;return i>=0 && harvest.plant[i].owner;}
 int AW_HarvestUse(void)
 {
     int i=target(),result,level,j,k;int32_t before[AW_HARVEST_NODES],amount;

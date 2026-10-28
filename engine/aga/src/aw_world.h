@@ -10,6 +10,7 @@ const char *AW_SceneName(void);
 const char *AW_SceneWalkModel(void);
 int AW_MapTeleport(const float *);
 int AW_MapTeleportAt(const float *,int);
+int AW_SceneLoadRoom(const char *,const float *,float);
 int AW_SceneShot(int,const char *,const float *,int,float,float);
 qboolean AW_MapPlaceBelow(edict_t *,const float *);
 qboolean AW_MapPlace(edict_t *,const float *);

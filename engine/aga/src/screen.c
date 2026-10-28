@@ -227,7 +227,7 @@ static int scr_aw_full_view;
 /* Photo mode or the vanity orbit: the intermission's full-screen view (view size 120, no status lines). */
 static int SCR_AWFullView (void)
 {
-    return AW_PhotoModeActive () || (aw_view_fullscreen && aw_view_fullscreen ());
+    return AW_PhotoModeActive () || (aw_view_fullscreen && aw_view_fullscreen ()) || aw_hud_hidden;
 }
 
 static void SCR_CalcRefdef (void)
@@ -1032,8 +1032,9 @@ void SCR_UpdateScreen (void)
             Sbar_Draw ();
         if (!AW_PhotoModeActive() && !vanity)
             AW_SceneDraw();
-        /* In photo mode the message box shows only photo mode's own notice. */
-        if ((!AW_PhotoModeActive() && !vanity) || AW_PhotoNoticeShowing())
+        /* In photo mode the message box shows only photo mode's own notice. With the HUD hidden
+         * (Ctrl+Alt+H) messages, dialogue and menus stay: only the HUD goes. */
+        if ((!AW_PhotoModeActive() && (!vanity || aw_hud_hidden)) || AW_PhotoNoticeShowing())
             AW_UIDraw();
         AW_IntroDraw();
         AW_HalloweenDraw();		/* dbg halloween: its FPS counter and greeting box, photo mode or not */

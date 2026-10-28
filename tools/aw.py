@@ -388,8 +388,8 @@ def new_lease(config, state, kind, key, requester, purpose='', reason='', versio
     now = time.time()
     lease = {'id': f'{kind}-{state["next_seq"]}', 'kind': kind, 'key': key, 'requester': requester,
              'purpose': purpose, 'reason': reason or '', 'version': version or '', 'commit': commit or '',
-             'created': stamp(), 'renewed': None, 'expires_epoch': now + ttl, 'expires': stamp_epoch(now + ttl),
-             'status': 'active'}
+             'created': stamp(), 'created_epoch': now, 'renewed': None, 'expires_epoch': now + ttl,
+             'expires': stamp_epoch(now + ttl), 'status': 'active'}
     state['next_seq'] += 1
     state['leases'].append(lease)
     return lease
@@ -579,12 +579,36 @@ def core_holders(state):
             for lease in active(state, 'cores')]
 
 
-def _queue_turn(state, ticket, priority):
-    """True when no request queued before this one has a higher or equal priority (release-critical first, then
-    first come first served); the ticket is queued (once) either way."""
+# A queued request asks again every build.queue_poll_s (30 s) and marks its ticket seen each time; a ticket not seen
+# for this long belongs to a request that is gone (killed while queued) and is dropped, or it would head the strict
+# first-come queue forever and hold every later build back (AW-QUEUE-DEAD-TICKET-54). A ticket of an older aw without
+# the mark counts from when it was queued, and a live one of those simply queues again at its next poll.
+QUEUE_STALE_S = 1800
+
+
+def prune_queue(state, now=None, keep=None):
+    """Drop queued tickets not seen for QUEUE_STALE_S (KEEP: a ticket never dropped); returns the dropped ones."""
+    now = time.time() if now is None else now
     queue = state.setdefault('queue', [])
+    gone = [item for item in queue if item['ticket'] != keep
+            and now - float(item.get('seen_epoch', item.get('since_epoch', now))) > QUEUE_STALE_S]
+    if gone:
+        state['queue'] = [item for item in queue if item not in gone]
+    return gone
+
+
+def _queue_turn(state, ticket, priority, now=None):
+    """True when no request queued before this one has a higher or equal priority (release-critical first, then
+    first come first served); the ticket is queued (once) either way and marked seen; tickets of requests that stopped
+    asking are dropped first (prune_queue)."""
+    now = time.time() if now is None else now
+    prune_queue(state, now, keep=ticket)
+    queue = state['queue']
     if not any(item['ticket'] == ticket for item in queue):
-        queue.append({'ticket': ticket, 'priority': priority, 'since': stamp(), 'since_epoch': time.time()})
+        queue.append({'ticket': ticket, 'priority': priority, 'since': stamp(), 'since_epoch': now})
+    for item in queue:
+        if item['ticket'] == ticket:
+            item['seen_epoch'] = now
     weight = CORE_PRIORITIES.get(priority, 2)
     for item in queue:
         if item['ticket'] == ticket:
@@ -601,6 +625,19 @@ def dequeue(config, ticket, requester='aw'):
         save_state(config, state)
 
 
+def touch_ticket(config, ticket, requester='aw'):
+    """Mark a queued ticket seen while its request waits for a busy machine (it does not ask for a lease then)."""
+    with Lock(config, requester):
+        state = load_state(config)
+        hit = False
+        for item in state.get('queue', []):
+            if item['ticket'] == ticket:
+                item['seen_epoch'] = time.time()
+                hit = True
+        if hit:
+            save_state(config, state)
+
+
 def _rebalance(state, holders, plan):
     changes = []
     for holder in holders:
@@ -610,6 +647,47 @@ def _rebalance(state, holders, plan):
                 if row['id'] == holder['id']:
                     row['cores'] = plan[holder['id']]
     return changes
+
+
+# A core lease whose build container is gone (the build was killed, its aw request with it) holds its cores and
+# memory until its TTL: two killed builds of 2026-10-27 held 32 GB and queued the v0.0.54-dev2 build
+# (AW-LEASE-DEAD-CONTAINER-54). Such a lease ends like a worktree lease whose worktree is gone, once it is older
+# than the grace a build needs to start its container; a container this host cannot ask about is never judged.
+DEAD_CONTAINER_GRACE_S = 600
+# (name) -> True (the container exists), False (no such container) or None (cannot tell); None: docker on this host.
+# A launcher that runs aw in a container without docker sets one that asks the host.
+CONTAINER_PROBE = None
+
+
+def docker_container_exists(name):
+    """True / False / None (docker not reachable) for a container NAME, by `docker container inspect`."""
+    try:
+        done = subprocess.run(['docker', 'container', 'inspect', '--format', '{{.State.Status}}', name],
+                              capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if done.returncode == 0:
+        return True
+    return False if 'no such container' in (done.stderr or '').lower() else None
+
+
+def expire_dead_cores(config, state, now=None, probe=None):
+    """Ends the core leases whose build container is gone (each expiry logged); returns the ended leases."""
+    now = time.time() if now is None else now
+    probe = probe or CONTAINER_PROBE or docker_container_exists
+    ttl = int(config.get('lease_ttl_s', {}).get('cores', DEFAULT_TTL['cores']))
+    ended = []
+    for lease in active(state, 'cores'):
+        name = lease.get('container')
+        start = float(lease.get('created_epoch') or (lease['expires_epoch'] - ttl))
+        if not name or now - start < DEAD_CONTAINER_GRACE_S:
+            continue
+        if probe(name) is False:
+            lease.update(status='expired', expired=stamp(), expired_because=f'the build container {name} is gone')
+            ended.append(lease)
+    for lease in ended:
+        log_trial(config, 'expire', lease=lease, why=lease['expired_because'])
+    return ended
 
 
 def lease_cores(config, run_name, requester, priority, want, container, purpose='', reason='', memory_gib=0.0,
@@ -624,6 +702,7 @@ def lease_cores(config, run_name, requester, priority, want, container, purpose=
     with Lock(config, requester):
         state = load_state(config)
         refresh(state)
+        expire_dead_cores(config, state)
         holders = core_holders(state)
         gates = len(active(state, 'gate'))
         new = {'id': '(new)', 'priority': priority, 'want': want}
@@ -772,7 +851,7 @@ def job_done(config, requester):
 def list_leases(config, everything=False):
     with Lock(config, 'aw-list'):
         state = load_state(config)
-        if bool(refresh(state)) | bool(expire_finished(config, state)):
+        if bool(refresh(state)) | bool(expire_finished(config, state)) | bool(expire_dead_cores(config, state)):
             save_state(config, state)
     return state['leases'] if everything else active(state)
 

@@ -340,6 +340,12 @@
   },
   {
    "file": "engine/aga/src/r_sky.c",
+   "contains": "static byte sky_dark[4096];",
+   "class": "unrelated",
+   "note": "the dark colour grid's entries (16 x 16 x 16, NIGHT-RUST-31), not a position"
+  },
+  {
+   "file": "engine/aga/src/r_sky.c",
    "contains": "for(i=0;i<4096;i++){",
    "class": "unrelated",
    "note": "a size, count, buffer or flag value, not a position"

@@ -64,6 +64,8 @@ const char *AW_HarvestText(const aw_harvest_t *h,unsigned short at)
 unsigned AW_HarvestStorageBytes(const aw_harvest_t *h){return h->storage_bytes+h->text_bytes;}
 static int span(int first,int count,int total){return first>=0 && count>=0 && first<=total-count;}
 static int identifier(const char *s){int n=0;for(;*s;s++,n++)if((unsigned char)*s<=32 || n>=63)return 0;return n>0;}
+/* An owner's record id (ANAM): printable, spaces allowed (NPC ids such as "darvame hleran"), 1..63 bytes. */
+static int owner_text(const char *s){int n=0;for(;*s;s++,n++)if((unsigned char)*s<32 || (unsigned char)*s>126 || n>=63)return 0;return n>0;}
 static int digest_read(const char *text,unsigned char *out)
 {
     int i,c;if(strlen(text)!=64)return 0;memset(out,0,32);
@@ -126,6 +128,7 @@ int AW_HarvestValidate(const aw_harvest_t *h)
     for(i=0;i<h->plants;i++){
         const aw_harvest_plant_t *p=&h->plant[i];const char *key=AW_HarvestText(h,p->key);
         if(h->slots && (p->slot<1 || p->slot>h->slots))return 0;
+        if(!text_valid(h,p->owner) || (p->owner && !owner_text(AW_HarvestText(h,p->owner))))return 0;
         if(!text_valid(h,p->key) || !text_valid(h,p->label) || !text_valid(h,p->model) ||
            strlen(key)!=57 || strncmp(key,"aw:h:",5) || !span(p->first,p->count,h->edges) ||
            !AW_HarvestText(h,p->label)[0] || !p->reference || p->reference>16777216U || !(p->flags&1))return 0;
@@ -142,7 +145,7 @@ int AW_HarvestValidate(const aw_harvest_t *h)
 int AW_HarvestLoad(FILE *f,int bytes,aw_harvest_t *h)
 {
     int i,k,c,nodes,edges,plants,models=0,slots=0,representation=0;
-    long start=ftell(f);char magic[8],digest[65],token[64],label[64];unsigned char catalogue[32];
+    long start=ftell(f);char magic[8],digest[65],token[64],label[64],row[128];unsigned char catalogue[32];
     AW_HarvestRelease(h);memset(catalogue,0,sizeof(catalogue));
     if(start<0 || bytes<0 || bytes>65536)goto bad;
     if(Q_fscanf(f,"%7s %d %d %d",magic,&nodes,&edges,&plants)!=4 || (strcmp(magic,"AWH1") && strcmp(magic,"AWH2") && strcmp(magic,"AWH3") && strcmp(magic,"AWH4")))goto bad;
@@ -186,8 +189,14 @@ int AW_HarvestLoad(FILE *f,int bytes,aw_harvest_t *h)
         for(k=0;k<3;k++)if(Q_fscanf(f," %f",&p->origin[k])!=1)goto bad;
         for(k=0;k<3;k++)if(Q_fscanf(f," %f",&p->angles[k])!=1)goto bad;
         if(h->representation==4 && Q_fscanf(f," %f",&p->scale)!=1)goto bad;
-        if(Q_fscanf(f," %63[^\r\n]",label)!=1)goto bad;
-        p->label=AW_HarvestIntern(h,label);if(p->label==AW_HARVEST_BAD_TEXT)goto bad;
+        if(Q_fscanf(f," %127[^\r\n]",row)!=1)goto bad;
+        {   /* the label, then an owned plant's tab and owner id (HARVEST-INTERIOR-PICK-47) */
+            char *tab=strchr(row,'\t');
+            if(tab){*tab=0;if(!owner_text(tab+1))goto bad;}
+            if(strlen(row)>63)goto bad;
+            p->label=AW_HarvestIntern(h,row);if(p->label==AW_HARVEST_BAD_TEXT)goto bad;
+            p->owner=tab?AW_HarvestIntern(h,tab+1):0;if(p->owner==AW_HARVEST_BAD_TEXT)goto bad;
+        }
     }
     if(ftell(f)-start>bytes)goto bad;
     while(ftell(f)-start<bytes){c=fgetc(f);if(c!=' ' && c!='\n' && c!='\r' && c!='\t')goto bad;}
@@ -339,4 +348,14 @@ int AW_HarvestTake(const aw_harvest_t *h,int plant,aw_state_t *state,int level,u
     }
     if(!fact_set(h,plant,state,fact|DONE))return -1;
     memcpy(state->values[AW_ITEM],next,sizeof(next));state->count[AW_ITEM]=count;return 1;
+}
+const char *AW_HarvestOwner(const aw_harvest_t *h,int plant)
+{
+    return plant>=0 && plant<h->plants?AW_HarvestText(h,h->plant[plant].owner):"";
+}
+int AW_HarvestStolen(const aw_harvest_t *h,const aw_state_t *state)
+{
+    int i,count=0;
+    for(i=0;i<h->plants;i++)if(h->plant[i].owner && compatible(h,state) && (fact_get(h,i,state)&(DONE|EMPTY))==DONE)count++;
+    return count;
 }

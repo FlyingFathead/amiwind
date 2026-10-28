@@ -18,6 +18,9 @@ MASTERS = ('Morrowind.esm', 'Tribunal.esm', 'Bloodmoon.esm')
 # Record types that may name a script (SCRI) and be placed in a cell.
 SCRIPTED = ('ACTI', 'ALCH', 'APPA', 'ARMO', 'BOOK', 'CLOT', 'CONT', 'CREA', 'DOOR', 'INGR', 'LIGH', 'LOCK', 'MISC',
             'NPC_', 'PROB', 'REPA', 'WEAP', 'STAT')
+# Records kept whole for the actor table (actors.py): the actors, what their stats come from, what they carry.
+RECORD_TAGS = ('NPC_', 'CREA', 'RACE', 'CLAS', 'SKIL', 'WEAP', 'ARMO', 'CLOT', 'LEVI', 'SPEL', 'FACT', 'GMST',
+               'ALCH', 'APPA', 'BOOK', 'INGR', 'LIGH', 'LOCK', 'MISC', 'PROB', 'REPA')
 
 
 def _text(data):
@@ -54,6 +57,12 @@ class GameData:
         self.gmst = {}             # folded float game settings
         self.interior_ids = []     # [(master, [interior cell ids])] (tools/cell_numbers.py)
         self.interior_numbers = {} # folded interior cell id -> its stable number (_aw_cell_int)
+        self.exteriors = {}        # (x, y) -> (cell name, folded region id) of every exterior CELL record
+        self.regions = {}          # folded REGN id -> its name
+        self.default_cell_name = 'Wilderness'   # GMST sDefaultCellname: an exterior with no name and no region
+        # the records the actor table reads (tools/mwscript/actors.py): {tag: {folded id: [(sub, data)]}}, the last
+        # master wins; SKIL by its INDX number; a deleted record removes the earlier one
+        self.records = {tag: {} for tag in RECORD_TAGS}
 
     def sound_range(self, soun):
         """(min, max) hearing distance of a SOUN record in game units: its bytes times the game settings
@@ -86,6 +95,18 @@ class GameData:
     def _master(self, master, raw):
         pending_refs = []
         for tag, flags, payload in records(raw):
+            if tag in RECORD_TAGS:
+                parts = list(subrecords(payload))
+                if tag == 'SKIL':
+                    index = dict(parts).get('INDX', b'')
+                    if len(index) == 4:
+                        self.records[tag][struct.unpack('<i', index)[0]] = parts
+                else:
+                    ident = _text(dict(parts).get('NAME', b'')).casefold()
+                    if _deleted(flags, parts):
+                        self.records[tag].pop(ident, None)
+                    elif ident:
+                        self.records[tag][ident] = parts
             if tag == 'SCPT':
                 parts = list(subrecords(payload))
                 fields = dict(parts)
@@ -123,6 +144,13 @@ class GameData:
                 name = _text(fields.get('NAME', b''))
                 if len(fields.get('FLTV', b'')) == 4:
                     self.gmst[name.casefold()] = struct.unpack('<f', fields['FLTV'])[0]
+                elif name.casefold() == 'sdefaultcellname' and fields.get('STRV'):
+                    self.default_cell_name = _text(fields['STRV'])
+            elif tag == 'REGN':
+                fields = dict(subrecords(payload))
+                ident = _text(fields.get('NAME', b'')).casefold()
+                if ident:
+                    self.regions[ident] = _text(fields.get('FNAM', b'')) or ident
             elif tag == 'SSCR':
                 fields = dict(subrecords(payload))
                 ident = _text(fields.get('NAME', b'')).casefold()
@@ -162,6 +190,10 @@ class GameData:
         cell_flags, gx, gy = struct.unpack('<Iii', head['DATA']) if len(head.get('DATA', b'')) == 12 else (0, 0, 0)
         interior = bool(cell_flags & 1)
         cell_name = _text(head.get('NAME', b''))
+        if not interior:
+            # the name GetPCCell compares (the last master's record of the grid cell wins)
+            old = self.exteriors.get((gx, gy), ('', ''))
+            self.exteriors[(gx, gy)] = (cell_name or old[0], _text(head.get('RGNN', b'')).casefold() or old[1])
         for r in refs:
             if r.get('deleted') or 'id' not in r:
                 continue

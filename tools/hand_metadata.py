@@ -11,11 +11,17 @@ from player_hull import lumps, pack_lumps
 CLIPS = (('idle', 0, 8), ('draw', 8, 6), ('lower', 14, 4), ('punch', 18, 10))
 
 
-def hand_fields(report):
-    """Use source-derived timings, never guessed replacement animation times."""
+# The hand clips live in the image (hand_table: gfx/hand-anims.txt), never in a map's worldspawn
+# (FIRST-PERSON-HANDS-IN-C-54): these keys of older maps are removed when a map is stamped.
+RETIRED_FIELDS = tuple('aw_hand_' + name for name, _first, _count in CLIPS)
+HAND_TABLE = 'gfx/hand-anims.txt'
+
+
+def hand_clips(report):
+    """[(name, first, count, duration)] of a hands report: source-derived timings, never guessed ones."""
     if report.get('model') != 'progs/v_nord.mdl' or report.get('frames') != 28:
         raise ValueError('First-person hand report has an incompatible frame contract')
-    result = {}
+    result = []
     for name, first, count in CLIPS:
         clip = report.get('clips', {}).get(name, {})
         duration = clip.get('duration', 0)
@@ -23,7 +29,31 @@ def hand_fields(report):
             raise ValueError('First-person hand frame range differs: ' + name)
         if isinstance(duration, bool) or not isinstance(duration, (int, float)) or not math.isfinite(duration) or not 0 < duration <= 60:
             raise ValueError('Invalid first-person hand duration: ' + name)
-        result['aw_hand_' + name] = str(duration)
+        result.append((name, first, count, float(duration)))
+    return result
+
+
+def hand_table(report):
+    """The image's hand clip table (engine aw_hand_models.h AW_HandTableParse): "AWHA1", then one
+    "clip NAME FIRST COUNT DURATION" line per clip, the duration in plain decimals (no exponent)."""
+    lines = ['AWHA1'] + ['clip %s %d %d %.6f' % clip for clip in hand_clips(report)]
+    return '\n'.join(lines) + '\n'
+
+
+def write_hand_table(id1, report):
+    """Write gfx/hand-anims.txt into an image's id1; returns its SHA-256."""
+    data = hand_table(report).encode('ascii')
+    path = Path(id1) / HAND_TABLE
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(data)
+    return hashlib.sha256(data).hexdigest()
+
+
+def hand_fields(report):
+    """The worldspawn fields the hands give every converted map: the eye height only (the clips are the image's,
+    hand_table). The report's clips are still checked here, so a bad hands stage fails before any map."""
+    hand_clips(report)
+    result = {}
     eye = report.get('eye_above_origin', 0)
     if isinstance(eye, bool) or not isinstance(eye, (int, float)) or not math.isfinite(eye) or not 0 < eye <= 128:
         raise ValueError('Invalid first-person eye height')
@@ -75,6 +105,8 @@ def stamp_lump(raw, entity_lump, fields):
     if not block or not re.search(rb'"classname"\s+"worldspawn"', block[1]):
         raise ValueError('Map must begin with worldspawn')
     body = block[1]
+    for key in RETIRED_FIELDS:
+        body = re.sub(rb'"' + key.encode('ascii') + rb'"\s+"[^"\r\n]*"\s*', b'', body)
     for key, value in fields.items():
         pattern = rb'"' + key.encode('ascii') + rb'"\s+"[^"\r\n]*"'
         old = re.findall(pattern, body)

@@ -354,7 +354,44 @@ RUN = {'playsound', 'playsoundvp', 'playsound3d', 'playsound3dvp', 'playloopsoun
        # activation (v0.0.51): a script that reads OnActivate takes over its object's use; Activate does it
        'onactivate', 'activate',
        # messages (v0.0.51): a message box with its buttons, the button the player chose
-       'messagebox', 'getbuttonpressed'}
+       'messagebox', 'getbuttonpressed',
+       # the actor record (v0.0.54, docs/ACTOR_STATE.md): items, spells, combat, the dead count; the stats below
+       'additem', 'removeitem', 'getitemcount', 'addspell', 'removespell', 'getspell', 'startcombat', 'stopcombat',
+       'getdeadcount',
+       # the ambient tables' wander (v0.0.54, engine/aga/src/aw_ambient.h)
+       'aiwander',
+       # the world and cell lookups (v0.0.54): the player's cell against a build-time table of the cells a name
+       # matches (GETPCCELL), an object's position (GETPOS), the diseases among an actor's spells (SPELL verbs 3, 4)
+       'getpccell', 'getpos', 'getcommondisease', 'getblightdisease',
+       # what OpenMW does nothing for (miscextensions.cpp OpDontSaveObject) or answers with a constant (OpXBox: 0)
+       'dontsaveobject', 'xbox',
+       # the ambient tables' AI package (v0.0.54, aw_ambient.h AW_AmbientAiPackage): the current one and its end
+       'getcurrentaipackage', 'getaipackagedone'}
+
+
+def _actor_calls():
+    """{function: (verb, stat)} of the calls that read or change the actor record's stats (the ACTOR opcode)."""
+    from .opcodes import ACTOR_STATS as S, VERBS as V
+    calls = {}
+    for i, a in enumerate(ATTRIBUTES):
+        calls.update({'get' + a: (V['get'], S['attribute'] + i), 'set' + a: (V['set'], S['attribute'] + i),
+                      'mod' + a: (V['mod'], S['attribute'] + i)})
+    for i, s in enumerate(SKILLS):
+        calls.update({'get' + s: (V['get'], S['skill'] + i), 'set' + s: (V['set'], S['skill'] + i),
+                      'mod' + s: (V['mod'], S['skill'] + i)})
+    for d in DYNAMICS:
+        calls.update({'get' + d: (V['get'], S[d]), 'set' + d: (V['set'], S[d]), 'mod' + d: (V['mod'], S[d]),
+                      'modcurrent' + d: (V['modcurrent'], S[d]), 'get' + d + 'getratio': (V['ratio'], S[d])})
+    for r in ('hello', 'fight', 'flee', 'alarm'):
+        calls.update({'get' + r: (V['get'], S[r]), 'set' + r: (V['set'], S[r]), 'mod' + r: (V['mod'], S[r])})
+    calls.update({'getlevel': (V['get'], S['level']), 'setlevel': (V['set'], S['level']),
+                  'getdisposition': (V['get'], S['disposition']), 'setdisposition': (V['set'], S['disposition']),
+                  'moddisposition': (V['mod'], S['disposition']), 'ondeath': (V['get'], S['ondeath'])})
+    return calls
+
+
+ACTOR_CALLS = _actor_calls()
+RUN |= set(ACTOR_CALLS)
 
 # Groups the measurement reports as "the engine does not have it yet" (the brief's list), and the rest.
 MISSING_GROUPS = ('ai', 'inventory', 'combat', 'spells', 'position')
@@ -363,11 +400,12 @@ ALL_GROUPS = ('core', 'audio', 'journal', 'dialogue', 'ai', 'inventory', 'combat
 
 
 class Function:
-    __slots__ = ('name', 'ret', 'args', 'group', 'run')
+    __slots__ = ('name', 'ret', 'args', 'group', 'run', 'number')
 
     def __init__(self, name, ret, args, group):
         self.name, self.ret, self.args, self.group = name, ret, args, group
         self.run = name in RUN
+        self.number = None
 
     def required(self):
         return self.args.split('/')[0]
@@ -409,6 +447,13 @@ def _build():
 
 
 FUNCTIONS = _build()
+# Every function's number, the operand of a NOTYET call (the import route, docs/MWSCRIPT_BYTECODE.md): the names in
+# alphabetical order, so the engine can count each not-yet function and carry one out by its number (host call())
+# with the arguments the call already passes, without a new opcode or a change of the file's format. The engine's
+# AWF_* numbers (aw_mwcode.h) are checked against these by tests/test_mwscript.py.
+FUNCTION_NUMBERS = {name: i for i, name in enumerate(sorted(FUNCTIONS))}
+for _name, _fn in FUNCTIONS.items():
+    _fn.number = FUNCTION_NUMBERS[_name]
 KEYWORDS = ('begin', 'end', 'short', 'long', 'float', 'if', 'endif', 'else', 'elseif', 'while', 'endwhile',
             'return', 'messagebox', 'set', 'to')
 

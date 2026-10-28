@@ -1,6 +1,6 @@
 # Build cache: resuming and reusing work safely
 
-_Last updated with AmiWind v0.0.49-dev (24 October 2026)._
+_Last updated with AmiWind v0.0.54-dev1 (27 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -145,6 +145,15 @@ that run code on import (anything but a literal). Adding or changing a function 
 stage reaches changes no stage key. A reuse source recorded in form 1 is compared in
 form 1, so the change of form costs no rebuild (BUILD-KEY-FUNCTION-DEFAULTS-TOP-36).
 
+Form 4 (since 27 October 2026, BUILD-KEY-TOP-DEFAULTS-NAME-54): of a function's default values the import-time code
+lists only those that run code, each by its parameter's name. In form 3 a function whose defaults named a module
+constant (`report=COVERAGE_REPORT`) put all of its defaults there, so adding `partial_area=False` to
+`tools/harvest_build.py` re-keyed every stage that reaches the module, the CHIM world among them. A reuse source
+recorded in an earlier form or by an earlier engine file reading is read through its own source tree (the checkout
+its stage ran from, `tools/engine_facts.py translate`): when that tree gives exactly the recorded sources, its
+sources in today's form are compared with this checkout's, so a change of form rebuilds nothing and a real edit still
+shows.
+
 The data files a stage's key counts are those its reached code names. A function default that only builds a path
 (`config_dir=ROOT / 'config'`) names its files for that function alone: a stage that imports the module but never
 calls the function is not keyed on them. A loop over a written-out list names only the listed files, also when the
@@ -152,6 +161,23 @@ list is held in a local name and the loop name is bound by another loop too. Unt
 whole `config/` folder, so every new entry in `config/option-changes.json` rebuilt the CHIM, town, flora, engine and
 image stages (BUILD-OPTION-RECORD-KEYS-STAGES-47). A default that runs code, or a list that is changed or passed on,
 still counts as before.
+
+Engine C files count by their use in a stage key (`tools/engine_facts.py`, BUILD-STAGE-KEY-ENGINE-HEADERS-54). A file
+the stage's code reads as text (parsed, hashed, compiled by name) counts whole. A header named only in `define()`
+calls or the `DEFINES` table, or reached only through the `#include` closure of a named file or of the target ABI
+probe, counts as its C facts: the macros and declarations whose names the stage can reach (the names in its Python
+string constants, in the engine files it counts whole, and in what those facts use, `#if` conditions included). The
+files `check_world_map_heap.compile_target_sizes` hashes only for its receipt count only where the receipt is written
+(the map heap audit). So a new prototype in `quakedef.h` or `sound.h`, a field of a structure no check sizes, or a new
+header of engine-only declarations re-keys no CHIM world stage, while a limit, a probed structure or a macro the world
+reads still does. A `.c` file read only for single definitions (its `#define` lines through `define()`, its cvar
+defaults through `cvar_default`: `chim/chim_world.c`, `chim/chim_statics.c`) counts by those definitions alone, never
+by its function bodies, so a status print added to `chim_world.c` re-keys no CHIM world either
+(BUILD-STAGE-KEY-ENGINE-C-WHOLE-54; the reading's version 2, key values `cfacts2:`). Anything the reading cannot explain (an engine folder named whole, a token-pasting macro in the
+facts) keeps the stage's engine files whole. A reuse source keyed with whole engine files is compared by its C facts
+when its own source tree (the checkout its stage ran from) gives exactly its recorded sources; otherwise as before.
+Until 27 October 2026 the actor record's and the magic effects' header edits planned a full CHIM world rebuild for
+v0.0.54 builds.
 
 The image-pass and unit caches (`tools/pass_cache.py`) use form 2 as well. Their keys
 also leave out `tools/pass_cache.py` itself: that is the cache's own key and storage

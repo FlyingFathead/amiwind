@@ -1,6 +1,6 @@
 # aw: the master builder command line
 
-_Last updated with AmiWind v0.0.41-dev5 (16 October 2026)._
+_Last updated with AmiWind v0.0.54-dev2 (28 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -106,7 +106,11 @@ the job holds (its core lease gives the cores back to the running builds), and e
 broadcast and status ends the worktree lease of a job whose worktree is gone, or whose HEAD is
 merged into the integration ref with a clean worktree and no lease renewal or commit for
 `lease_idle_s.worktree` seconds (default 2 h). Each such end is logged in the trial log with its
-reason, and the lease keeps it (`expired_because`).
+reason, and the lease keeps it (`expired_because`). In the same way a core lease ends when its
+build container is gone (the build was killed and its request with it), once the lease is older
+than the 10 minutes a build needs to start its container; a container the host cannot be asked
+about is never judged (AW-LEASE-DEAD-CONTAINER-54: two killed builds held 32 GB and kept the
+v0.0.54-dev2 build queued). Every new core lease and every listing checks first.
 
 ### Core leases
 
@@ -134,7 +138,9 @@ the containers' memory less a host reserve).
 - **Queue**: a build that does not fit (cores or memory) waits in the queue instead of starting,
   checked every `build.queue_poll_s` (default 30 s) for up to `build.queue_timeout_s` (default
   6 h; then it is refused). The queue goes by priority, then by arrival: a request never starts
-  while an earlier one of the same or a higher priority still waits.
+  while an earlier one of the same or a higher priority still waits. A waiting request marks its
+  place as seen at every check; a place not seen for 30 minutes belongs to a request that is gone
+  (stopped while it waited) and is dropped, so it cannot hold every later build back.
 - **Plan**: every build gets its minimum, then one core at a time goes to the build with the
   fewest cores per priority weight, never more than it asked for (`options.cpus` or
   `options.jobs`, else `build.cpus`). The build runs with `--jobs`, `docker --cpus` and

@@ -55,6 +55,19 @@ def _log(msg):
     print('[chim rooms] ' + msg, flush=True)
 
 
+def room_settings():
+    """The settings every CHIM room is built with (config/chim-rooms.json): {'cut_models_over': local units, 0 = every
+    model whole; 'detail_budget': {lower-case mesh source: visual triangle target} of the named budget, {} for none}.
+    A whole-room shell model (the Vivec Arena Pit's bowl) is otherwise one entity drawn whole from anywhere in the
+    room (PERF-ARENA-PIT-SLOW-48)."""
+    from chim.build import detail_budget
+    data = json.loads((Path(__file__).resolve().parents[2] / 'config/chim-rooms.json').read_text(encoding='utf-8'))
+    cut = float(data.get('cut_models_over') or 0)
+    if cut < 0:
+        raise ValueError('config/chim-rooms.json: cut_models_over must be 0 (off) or a width in local units')
+    return {'cut_models_over': cut, 'detail_budget': detail_budget(data.get('detail_budget'))}
+
+
 def light_level(value):
     """A light value (interior_lighting.point_light: 0..255 before clamping) as a stored level: 1 to 255 (0 means
     'no level' in the record, so a dark placement keeps level 1, the darkest)."""
@@ -227,11 +240,18 @@ def room_input(work, pal_bytes, qbsp, jobs, cache, timer, collision_cache, harve
                 for name, profile in group.get('visual_profiles', {}).items()}
     flatten = load_profiles(scene_kind='interior')
     used = sorted({r['model_index'] for r in selected})
+    rooms = room_settings()
     for mi in used:
         model = index['models'][mi]
         profiles.setdefault(model['source'], rock_profile(model['source'], model['triangles']))
         if model['source'] in flatten:
             profiles[model['source']] = {**profiles[model['source']], 'flatten': flatten[model['source']]}
+        target = rooms['detail_budget'].get(model['source'].replace(chr(92), '/').lower())
+        if target and model['triangles'] > target:
+            # a named detail budget for room meshes (config/chim-rooms.json): fewer visual triangles, the same
+            # collision, the open rim locked, as chim.build applies an area's budget
+            profiles[model['source']] = dict(profiles[model['source']], ratio=target / model['triangles'],
+                                             visual_triangle_target=target, lod_preserve_border=True)
     models = list(index['models'])
     items = []
     for mi in used:
@@ -257,7 +277,9 @@ def room_input(work, pal_bytes, qbsp, jobs, cache, timer, collision_cache, harve
                        profiles=profiles, mesh_fps=mesh_fps, texture_records=index['textures'], archive=archive,
                        palette=pal_bytes, heights=None, materials=None, step=grain, floor=0.0, ceiling=0.0,
                        ground_textures={}, qbsp=qbsp, collision_cache=collision_cache, jobs=jobs,
-                       cache=cache, timer=timer, settings={'placement_format': '0.8'}, mesh_occluders=False,
+                       cache=cache, timer=timer,
+                       settings={'placement_format': '0.8', 'grain': grain, 'cut_models_over': rooms['cut_models_over']},
+                       mesh_occluders=False,
                        terrain_on=False)
     lighting = index.get('lighting') or {}
     by_number = {r['number']: r for r in selected}

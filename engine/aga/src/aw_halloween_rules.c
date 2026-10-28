@@ -77,6 +77,11 @@ static int number(const char *s,int *out) {
     for(;*s;s++){if(*s<'0' || *s>'9' || n>100000)return 0;n=n*10+(*s-'0');}
     *out=n;return 1;
 }
+float AW_HalloweenPreroll(int preroll_ms,float lead,float box) {
+    float s=(preroll_ms>0?preroll_ms/1000.f:0.f)+(lead>0?lead:0.f);
+    if(s>box)s=box;
+    return s<0?0:s;
+}
 int AW_HalloweenReadCast(const char *text,aw_hw_cast_t *out) {
     char w[AW_HALLOWEEN_PATH];const char *p=text;
     memset(out,0,sizeof(*out));
@@ -84,6 +89,13 @@ int AW_HalloweenReadCast(const char *text,aw_hw_cast_t *out) {
     if(!word(&p,w,sizeof(w)) || !number(w,&out->bpm10) || out->bpm10<300 || out->bpm10>3000)return 0;
     if(!word(&p,w,sizeof(w)) || (strcmp(w,"0") && strcmp(w,"1")))return 0;
     out->soundtrack=w[0]=='1';
+    /* optional on the first line: the soundtrack's leading silence in milliseconds (its pre-roll) */
+    while(*p==' ')p++;
+    if(*p>='0' && *p<='9'){
+        if(!word(&p,w,sizeof(w)) || !number(w,&out->preroll_ms) || out->preroll_ms>AW_HALLOWEEN_MAX_PREROLL_MS)return 0;
+        while(*p==' ')p++;
+        if(*p && *p!='\n' && *p!='\r')return 0;
+    }
     for(;;){
         aw_hw_row_t *r;
         while(*p=='\r' || *p=='\n' || *p==' ')p++;
@@ -185,18 +197,20 @@ static int put(aw_hw_slot_t *out,int n,int role,int model,float right,float ahea
 int AW_HalloweenLayout(int version,int leads,int dancers,int skeletons,aw_hw_slot_t *out) {
     int n=0,i;
     if(skeletons<1)return 0;
-    /* One row 80 units ahead, at most 56 to each side: the animation stage's own line on the Balmora roof (the stage
-     * videos, aw_animkit.c stage: 80 ahead, 16 apart; a wider or deeper cast stood on other roof levels). */
+    /* The Balmora stage platform, measured from its own floor (the scene's stage grid, 27 October 2026, from the
+     * MiniWind arrival facing yaw 90): one level from 88 to 144 units ahead and at least 80 to each side, a stairway
+     * up toward the player in front of it (the take 5 cast stood on its top step, 80 ahead). One row through its
+     * middle, 116 ahead: 28 units from its front and back edges, at most 60 to a side (20 from the measured width). */
     if(version==AW_HW_WITH_LEAD && leads>0){
         /* him in the centre, the dancers right beside him (two each side), the skeletons further out (two each side) */
-        static const float dx[4]={-16,16,-30,30},sx[4]={-44,44,-56,56};
-        n=put(out,n,AW_HW_LEAD,0,0,80);
-        for(i=0;dancers>0 && i<4;i++)n=put(out,n,AW_HW_DANCER,i%dancers,dx[i],80);
-        for(i=0;i<4;i++)n=put(out,n,AW_HW_SKELETON,i%skeletons,sx[i],80);
+        static const float dx[4]={-16,16,-30,30},sx[4]={-46,46,-60,60};
+        n=put(out,n,AW_HW_LEAD,0,0,AW_HALLOWEEN_STAGE_AHEAD);
+        for(i=0;dancers>0 && i<4;i++)n=put(out,n,AW_HW_DANCER,i%dancers,dx[i],AW_HALLOWEEN_STAGE_AHEAD);
+        for(i=0;i<4;i++)n=put(out,n,AW_HW_SKELETON,i%skeletons,sx[i],AW_HALLOWEEN_STAGE_AHEAD);
         return n;
     }
-    /* the skeletons alone: the stage's line of eight */
-    for(i=0;i<8;i++)n=put(out,n,AW_HW_SKELETON,i%skeletons,-56.f+16.f*(float)i,80);
+    /* the skeletons alone: a line of eight, 16 apart */
+    for(i=0;i<8;i++)n=put(out,n,AW_HW_SKELETON,i%skeletons,-56.f+16.f*(float)i,AW_HALLOWEEN_STAGE_AHEAD);
     return n;
 }
 
@@ -254,6 +268,27 @@ void AW_HalloweenFrameCast(const float centre[3],float half_width,float half_hei
     d=dw>dh?dw:dh;
     for(i=0;i<3;i++)eye[i]=centre[i]-forward[i]*d*c;
     eye[2]=centre[2]+d*s;
+}
+void AW_HalloweenEdgeRays(const float eye[3],const float look[3],float fov_x,float fov_y,float dist,
+                          float out[AW_HW_EDGE_RAYS][3]) {
+    static const float sx[AW_HW_EDGE_RAYS]={-1,1,-1,0,1},sy[AW_HW_EDGE_RAYS]={0,0,1,1,1};
+    float f[3],r[3],u[3],n,tx,ty,d[3];int i,k;
+    if(!(fov_x>1 && fov_x<179))fov_x=90;
+    if(!(fov_y>1 && fov_y<179))fov_y=73.74f;
+    tx=Q_TanRad((float)(fov_x*M_PI/360));ty=Q_TanRad((float)(fov_y*M_PI/360));
+    for(i=0;i<3;i++)f[i]=look[i]-eye[i];
+    n=(float)sqrt(f[0]*f[0]+f[1]*f[1]+f[2]*f[2]);
+    if(n<.01f){f[0]=1;f[1]=f[2]=0;}else for(i=0;i<3;i++)f[i]/=n;
+    /* right = forward x up (level), up = right x forward */
+    r[0]=f[1];r[1]=-f[0];r[2]=0;
+    n=(float)sqrt(r[0]*r[0]+r[1]*r[1]);
+    if(n<.01f){r[0]=1;r[1]=0;}else{r[0]/=n;r[1]/=n;}
+    u[0]=r[1]*f[2]-r[2]*f[1];u[1]=r[2]*f[0]-r[0]*f[2];u[2]=r[0]*f[1]-r[1]*f[0];
+    for(k=0;k<AW_HW_EDGE_RAYS;k++){
+        for(i=0;i<3;i++)d[i]=f[i]+sx[k]*tx*r[i]+sy[k]*ty*u[i];
+        n=(float)sqrt(d[0]*d[0]+d[1]*d[1]+d[2]*d[2]);
+        for(i=0;i<3;i++)out[k][i]=eye[i]+d[i]/n*dist;
+    }
 }
 void AW_HalloweenAim(const float eye[3],const float look[3],float angles[3]) {
     float d[3],flat;int i;

@@ -183,3 +183,94 @@ def hull_points_mode():
     if mode not in HULL_POINTS_MODES:
         raise ValueError(HULL_POINTS_VARIABLE + ' must be table, all, extremes or table-whole, not %r' % mode)
     return mode
+
+
+# Which meshes the CHIM model builder keeps the standing room over an authored floor open for
+# (mesh_geometry.collision_parts standing_room, DOOR-USE-COLLISION-FILLED-53): a convex piece that fills the room a
+# player stands in over a floor of the mesh more than mesh_geometry.STANDING_ROOM_DEPTH is split, and a piece that
+# cannot be split becomes the authored plates of its triangles (Morrowind collides with the triangles themselves).
+# table (default from v0.0.54): the meshes of config/collision-standing-room.json (measured: a door or a walk route
+# the rule clears; the Redoran guard tower first, 8 entrances), every other mesh keeps its unit key and bytes; all:
+# every mesh, for measurement only (190 of 1,380 meshes change, +1.7 MB of collision island-wide); off: the method
+# before. Resolved into each mesh's profile (standing_room), so it is in every model's unit key. A release VERSION
+# refuses all and off (refuse_in_release).
+STANDING_ROOM_MODES = ('table', 'all', 'off')
+STANDING_ROOM_VARIABLE = 'AMIWIND_COLLISION_STANDING_ROOM'
+
+
+def refuse_in_release(what, mode, default, version=None):
+    """A debug-only method (a mode other than DEFAULT) is refused for a release version string (rc or final): a
+    shipped build takes the repository's default, never a machine's environment (the public builder builds what we
+    ship; DOOR-USE-COLLISION-FILLED-53). No version given: not checked here (the converters never read the version: a
+    version change may not re-key the CHIM world); the build entry checks it before any stage (debug_collision_waivers,
+    called by the exclusion refusals)."""
+    if mode == default or not version:
+        return mode
+    import re
+    # the private-test version rule, inline: importing the module that reads the version file would key every CHIM
+    # stage by it
+    if not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+-dev[0-9]+', version.strip()):
+        raise ValueError('%s %s is a debug-only method: a release build (version %s) takes the default %s'
+                         % (what, mode, version, default))
+    return mode
+
+
+def debug_collision_waivers():
+    """The debug-only collision methods this environment selects, as waiver names: the build entry refuses them for
+    rc and final builds and lists them for release readiness."""
+    out = []
+    if standing_room_mode() != 'table':
+        out.append('%s=%s' % (STANDING_ROOM_VARIABLE, standing_room_mode()))
+    if plate_bevels_mode() != 'mesh':
+        out.append('%s=%s' % (PLATE_BEVELS_VARIABLE, plate_bevels_mode()))
+    return out
+
+
+def standing_room_mode(version=None):
+    mode = os.environ.get(STANDING_ROOM_VARIABLE, '').strip() or 'table'
+    if mode not in STANDING_ROOM_MODES:
+        raise ValueError(STANDING_ROOM_VARIABLE + ' must be table, all or off, not %r' % mode)
+    return refuse_in_release(STANDING_ROOM_VARIABLE, mode, 'table', version)
+
+
+from pathlib import Path  # noqa: E402
+STANDING_ROOM_TABLE = Path(__file__).resolve().parents[1] / 'config/collision-standing-room.json'
+
+
+def standing_room_meshes(path=STANDING_ROOM_TABLE):
+    """{source path in lower case} of config/collision-standing-room.json (aw-collision-standing-room-1)."""
+    import json
+    path = Path(path)
+    data = json.loads(path.read_text(encoding='utf-8'))
+    if data.get('format') != 'aw-collision-standing-room-1' or not isinstance(data.get('meshes'), dict):
+        raise ValueError('%s: format aw-collision-standing-room-1 with a meshes table expected' % path)
+    return {k.replace(chr(92), '/').casefold() for k in data['meshes']}
+
+
+def standing_room_applies(source, mode=None, meshes=None):
+    """Whether the standing-room rule is in the profile of the mesh SOURCE under MODE (standing_room_mode)."""
+    mode = standing_room_mode() if mode is None else mode
+    if mode == 'all':
+        return True
+    if mode == 'off':
+        return False
+    return source.replace(chr(92), '/').casefold() in (standing_room_meshes() if meshes is None else meshes)
+
+
+# Which standing bevels a CHIM model gets when its converter asked for exact bevels on some of its pieces only (the
+# plates of the stair rules, steep toes, walkable faces left deep, authored ramps: prepare_mesh_bsp lod
+# collision_bevels_pieces; DOOR-USE-COLLISION-FILLED-53). mesh (default from v0.0.54): the whole model takes exact
+# bevels (chim.models.variant_unit then compiles its standing hull, checked and patched), as the visible-tread rule
+# already asks for; a thin plate with the approximate axial bevels grows its standing hull over the treads beside it
+# (COLLISION-STAIR-SLOPE-32): the 24 Daedric shrine entrances' steps (ex_dae_ruin_entry) slid the player off. drop: the
+# method before (the positions dropped, approximate bevels unless the whole mesh asked for exact), for A/B tests.
+# Part of every model variant's unit key (its exact flag).
+PLATE_BEVELS_MODES = ('mesh', 'drop')
+PLATE_BEVELS_VARIABLE = 'AMIWIND_COLLISION_PLATE_BEVELS'
+
+
+def plate_bevels_mode(version=None):
+    mode = os.environ.get(PLATE_BEVELS_VARIABLE, '').strip() or 'mesh'
+    if mode not in PLATE_BEVELS_MODES:
+        raise ValueError(PLATE_BEVELS_VARIABLE + ' must be mesh or drop, not %r' % mode)
+    return refuse_in_release(PLATE_BEVELS_VARIABLE, mode, 'mesh', version)

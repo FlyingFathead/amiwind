@@ -1,6 +1,6 @@
 # Door graph: every load door and every interior
 
-_Last updated with AmiWind v0.0.52 (26 October 2026)._
+_Last updated with AmiWind v0.0.54-dev1 (27 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -329,6 +329,15 @@ of the master, and the teleport markers too, each resolved by one holder rule:
   never written into a bank (there is no door to touch). The jail system and the game's scripts look it up later.
 - **The build check.** A door or marker that does not resolve stops the image with the list. So do the named places of
   `dbg tp` (`config/teleport-names.txt`, for example `dbg tp heartchamber`) whose room is not in the image.
+- **Travel services** (v0.0.54, `tools/prepare_travel.py`, [TRAVEL-SERVICES-CHIM-51](../BUGS.md)). The same step
+  resolves the destinations of every caravaner, shipmaster, gondolier and guild guide of the masters (their travel
+  records) by the same holder rule and writes them to `id1/travel.txt`, with the receipt in the image's `travel.json`.
+  The engine opens the list when the player talks to such an actor (by its record id). The rules follow OpenMW's travel
+  window: outdoors the price is the distance from the player to the destination divided by the game setting
+  `fTravelMult` (at least 1), and the ride takes the flat distance divided by `fTravelTimeMult` in hours; a provider
+  indoors (a guild guide) charges `fMagesGuildTravel` and no time passes. A destination the image does not hold is not
+  offered and is listed in the receipt (Solstheim, for one). Not yet applied: the price change by disposition and
+  Mercantile, and the fare of followers.
 
 **Measured on the v0.0.49 image** (24 October 2026): of the base game's 3,133 load doors and markers, 3,027 led where
 they should. The table gives the same target and arrival for all 3,021 doors the image already linked, and links the

@@ -103,9 +103,11 @@ Family: First-person hands and torch (`torch-hands`). First-person hands, punche
 
 - AW-20260928-18 (no report page): Punch blocked after Census office exit
 - [DEBUG-GALLERY-TIMING-29](DEBUG-GALLERY-TIMING-29.md): Hands unavailable in the combat and torch test rooms
+- FIRST-PERSON-WEAPON-SETS-MISSING-54 (no report page): First-person hands have only 4 of the 103 original animation groups: no weapon stance or attack, spellcast, hit, swim or storm
 - HAND-IDLE-BLINK-29 (no report page): Fists disappear once per idle breathing cycle
 - HAND-PUNCH-COVERAGE-29 (no report page): Near-plane opening at maximum punch extension
 - HAND-PUNCH-TRANSITION-29 (no report page): Hands briefly disappear when changing into the punch animation
+- PLAYER-EQUIPMENT-NOT-WORN-54 (no report page): The player body shows no chosen head or hair, no worn clothing or armour and no weapon: it is baked per race and sex with fixed new-game looks
 - [PLAYER-MOVEMENT-FRAME-SKIP-39](PLAYER-MOVEMENT-FRAME-SKIP-39.md): Third-person Nord and Khajiit fast movement loses smooth foot animation
 - [PLAYER-PUNCH-THIRDPERSON-39](PLAYER-PUNCH-THIRDPERSON-39.md): Third-person punches have no visible player-body attack animation
 - [PLAYER-READY-THIRDPERSON-38](PLAYER-READY-THIRDPERSON-38.md): Third-person player lacks fists-up and weapon-draw animation

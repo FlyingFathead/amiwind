@@ -1,6 +1,6 @@
 # Trees and Grass, Day and Night
 
-_Last updated with AmiWind v0.0.46 (20 October 2026)._
+_Last updated with AmiWind v0.0.54 (27 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -82,8 +82,56 @@ Now each region draws its own weather:
 - `dbg weather` shows the weather and the region's chances; `dbg weather blight` (or any weather name) forces one
   until `dbg weather auto`; `dbg weather off` (saved as `aw_weather 0`) brings back the clear sky everywhere.
 
-Not yet: the weathers' own cloud textures, rain, snow and ash particles, the storm sounds, the darker ambient light
-of a storm and the shorter fog of Foggy weather.
+The land's light under a weather (v0.0.54, [WEATHER-AMBIENT-SUN-UNUSED-51](bugs/README.md)): until v0.0.53 only the
+sky and the fog followed the weather, so the land under an ash or blight storm, Red Mountain above all, was lit as on
+a clear day.
+
+- The table is now `AWW2`: after each weather's sky and fog colours it carries its ambient and sun colours (day,
+  sunrise, sunset, night) from `Morrowind.ini`, or the values it ships with. `AWW1` tables are still read (the land
+  then keeps its light) and the builder can still write them.
+- Rule from OpenMW file `apps/openmw/mwworld/weather.cpp`: the land is lit by the weather's ambient colour plus its
+  sun colour. AmiWind's light is baked for the clear weather, so the land takes the ratio of the weather's light to
+  the clear weather's, per colour channel (the sun counted at half, its average share on lit ground), blended between
+  the times of day as the sky is. The ratio goes into the scene light the day and night tables already carry: its
+  brightness into the light (lamps and torches keep theirs, as at night), its hue into the colour table. A blight
+  storm by day comes to about 72 % red, 36 % green and 34 % blue of the clear light; rain to about 70 % grey.
+- `dbg weather skyonly` (saved as `aw_weather 2`) keeps the sky and fog weather with the land's light of before.
+
+Storms and characters (v0.0.54, [ACTOR-STORM-POSE-51](bugs/README.md)): in an ash or blight storm (during a change,
+the weather being left counts until half way), the wind blows outward from Red Mountain at the player's position.
+A character facing into it (its facing against the wind below -0.5) while idle, walking, running, turning or
+sneaking raises its right arm to shield its eyes with the `idlestorm` group, as in the original; rules from OpenMW
+files `apps/openmw/mwworld/weather.cpp` and `apps/openmw/mwmechanics/character.cpp`. AmiWind poses the right arm
+only (the original also leans the torso), and only characters whose carried-item table names their arm bones.
+
+Interior fog (v0.0.54, [INTERIOR-FOG-UNUSED-51](bugs/README.md)): every interior cell's fog colour and density
+(`id1/world/interior-fog.awf`, world UI stage, one row per room with a density above 0, by the room's map name) now
+fogs the room. Rule from OpenMW file `apps/openmw/mwrender/fogmanager.cpp` with its default settings: linear fog from
+the viewing distance times (1 - density) to the viewing distance, 7,168 original units; no fog at density 0. The
+same palette fog pass as outdoors; `aw_fog 2` keeps the fog outdoors only (interiors as before).
+
+Flickering flames (v0.0.54): the night lamps of class torch, fire and candle and the guards' torches now flicker as
+the baked flame lights already did: their reach follows lightstyle 33, the string `tools/light_sources.py` makes from
+the original's flicker rule (as OpenMW's light controller has it), each light at its own offset, between 80 % and
+100 % of its steady reach. Lanterns burn steady. `dbg torch flame classic` keeps every dynamic light steady.
+
+Rain, snow and storm ash (v0.0.54, WEATHER-RAIN, `dbg atmos 3`; off by default until its frame cost is measured):
+in rain, thunderstorm, snow, blizzard, ash and blight weather, drops, flakes or ash fall in a box around the view
+(the sizes of `Morrowind.ini`: rain diameter 600, heights 200 to 700, precipitation gravity 575 original units, snow at
+a tenth of the speed; the ash blows outward from Red Mountain), drawn with the engine's Quake particles. They fade in
+over the second half of a change into such weather and out over the first half of a change away from it. AmiWind
+keeps at most 48 (64 in heavy rain and blizzards) alive, far fewer than the original's 450 to 650, for the 68040.
+
+Smoke (v0.0.54, MESH-PARTICLE-EMITTERS, on by default, `dbg atmos 2`): the smoke and steam emitters of the placed
+meshes outdoors (chimneys, campfires, torches, braziers, steam vents and lava vents; 531 in the three masters) are in
+`id1/world/smoke.aws` (world UI stage, `tools/particle_emitters.py`), and the chimneys' own smoke texture is a small
+sprite, `id1/world/smoke.spr`, whose four frames keep fewer of the puff as it rises. The nearest four emitters in
+front of the view each send up three puffs that rise their emitter's height in its particle lifetime and grow; no
+particle simulation. `tools/particle_emitters.py sweep` lists every emitter of every placed mesh by kind (fire, fire
+ash, sparks, smoke, steam, spray, mist, bubbles, lava).
+
+Not yet: the weathers' own cloud textures, the rain and storm sounds, the rain's own drop texture, and the shorter fog
+of Foggy weather.
 
 ## Clouds missing in v0.0.40 and v0.0.41 (17 October 2026)
 

@@ -636,6 +636,59 @@ static void home_frame (void)
 	puts ("home frame actors passed");
 }
 
+/* A room's levelled creatures (CREATURE-ROOM-LEVELLED-54): an "aw_levelled" entity of the room map (aw_ref, sounds =
+ * the list's index) handed over as ED_LoadFromFile does: rolled on every list of the table at levels 1 and 30, the
+ * picked creature spawned at the entity's place with its reference; the room loaded again gives the same creature.
+ * Prints "room LIST LEVEL REF MODEL|none X Y". */
+void (*aw_levelled_entity)(edict_t *ent);
+static void room_levelled (void)
+{
+	int list, level, pass, i;
+	reset_level ();
+	assert (aw_levelled_entity);
+	for (level=1 ; level<=30 ; level+=29)
+	{
+		aw_character.valid = 1;
+		aw_character.level = level;
+		command ("clear", NULL);
+		for (list=0 ; list<4 ; list++)
+		{
+			char first[64] = "";
+			for (pass=0 ; pass<2 ; pass++)
+			{
+				edict_t *e = ED_Alloc ();
+				eval_t *v = GetEdictFieldValue (e, "aw_ref");
+				int before = sv.num_edicts, found = 0;
+				char got[64] = "none";
+				e->v.classname = NewString ("aw_levelled");
+				e->v.origin[0] = 10.0f * list;
+				e->v.origin[1] = 7.0f;
+				e->v.sounds = list;
+				v->_float = 900 + list;
+				aw_levelled_entity (e);
+				ED_Free (e);
+				for (i=2 ; i<sv.num_edicts ; i++)
+					if (!ents[i].free && ents[i].v.classname && strcmp (pr_strings + ents[i].v.classname, "aw_levelled") &&
+						(v = GetEdictFieldValue (&ents[i], "aw_ref")) != NULL && v->_float == 900 + list)
+					{
+						snprintf (got, sizeof(got), "%s", pr_strings + ents[i].v.model);
+						assert (fabs (ents[i].v.origin[0] - 10.0f * list) < 0.01f && fabs (ents[i].v.origin[1] - 7.0f) < 0.01f);
+						ents[i].free = true;		/* the room is left: its creature goes */
+						found++;
+					}
+				assert (found <= 1);
+				(void)before;
+				if (!pass)
+					snprintf (first, sizeof(first), "%s", got);
+				else
+					assert (!strcmp (first, got));		/* loaded again: the kept pick */
+			}
+			printf ("room %d %d %d %s\n", list, level, 900 + list, first);
+		}
+	}
+	puts ("room levelled passed");
+}
+
 int main (int argc, char **argv)
 {
 	static client_t client;
@@ -673,6 +726,8 @@ int main (int argc, char **argv)
 		disabled_actor ();
 	else if (!strcmp (argv[1], "roll"))
 		roll ((unsigned)atoi (argv[4]));
+	else if (!strcmp (argv[1], "room"))
+		room_levelled ();
 	else
 		return 2;
 	return 0;

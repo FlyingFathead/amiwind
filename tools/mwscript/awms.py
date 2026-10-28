@@ -22,6 +22,9 @@
                             i16 cell y i32 x y z (game units)
   STRT  2 bytes a start script: u16 script
   STRS  u32 offset per string, then the NUL-ended strings (cp1252)
+  OACT, ACTB, AINV, AITM, ASPT, ASPL: the actor table (actors.py; docs/ACTOR_STATE.md)
+  PCEL  the cells each GetPCCell name matches (resident; pccell_section below)
+  PMOV  20 bytes a move of the player (PositionCell; resident; written in write() below)
 
 A pool name is the 8 bytes of a converted file's name in the media catalogue: sound/pool/a<16 hex>.wav.
 """
@@ -32,7 +35,11 @@ from .opcodes import NAME, LAYOUT
 MAGIC = b'AWMS'
 VERSION = 1
 TYPES = {'s': 0, 'l': 1, 'f': 2}
-ORDER = ('CONF', 'GLOB', 'JRNL', 'SNDS', 'VOIC', 'MUSI', 'OBJS', 'SCRP', 'STRT', 'CODE', 'BIND', 'STRS')
+ORDER = ('CONF', 'GLOB', 'JRNL', 'SNDS', 'VOIC', 'MUSI', 'OBJS', 'SCRP', 'STRT', 'OACT', 'PCEL', 'PMOV', 'CODE', 'BIND', 'STRS',
+         'ACTB', 'AINV', 'AITM', 'ASPT', 'ASPL')
+# The actor sections (actors.py, docs/ACTOR_STATE.md): OACT is resident (a script's target -> its actor row); the
+# others stay on disk and are read a row at a time by the engine's actor state (aw_actorstate.c).
+ACTOR_SECTIONS = ('OACT', 'ACTB', 'AINV', 'AITM', 'ASPT', 'ASPL')
 DEFAULT_CONF = {'range_units': 12288, 'ops_per_frame': 4000, 'ops_per_run': 2000}
 RESIDENT = ORDER[:ORDER.index('BIND')]
 
@@ -49,6 +56,23 @@ def _hash8(row):
 
 def _centis(row):
     return max(0, min(0xFFFF, int(round(row.get('seconds', 0) * 100))))
+
+
+def pccell_section(table):
+    """(bytes, rows) of PCEL: u32 offset (from the section's start) per row, then each row: u16 rooms, u16 outdoor
+    cells (bit 15: the name also matches sDefaultCellname, an outdoor cell with no record; not used yet), u16 per
+    room (its stable number), then s8 x, s8 y per outdoor cell; rows padded to 2 bytes."""
+    rows = table.rows if table is not None else []
+    head = bytearray()
+    body = bytearray()
+    for r in rows:
+        head += struct.pack('>I', 4 * len(rows) + len(body))
+        body += struct.pack('>HH', len(r['rooms']), len(r['outside']) | (0x8000 if r['wilderness'] else 0))
+        body += b''.join(struct.pack('>H', n) for n in r['rooms'])
+        body += b''.join(struct.pack('>bb', x, y) for x, y in r['outside'])
+        if len(r['outside']) > 0x7FFF or len(r['rooms']) > 0xFFFF:
+            raise ValueError('GetPCCell row too long: ' + r['name'])
+    return bytes(head + body), len(rows)
 
 
 def write(program, compiled, binds, conf=None):
@@ -98,6 +122,13 @@ def write(program, compiled, binds, conf=None):
             cell = struct.pack('>Hh', b['cell'], 0)
         bind += struct.pack('>IHH', b['reference'], b['script'], b['flags']) + cell + struct.pack('>iii', *b['position'])
     strt = b''.join(struct.pack('>H', p.scripts.index[s]) for s in p.data.start_scripts if s in p.scripts.index)
+    pcel = pccell_section(getattr(p, 'pccells', None))
+    # PMOV, 20 bytes a move of the player (PositionCell, v0.0.54): u8 kind (1 outdoors, 2 into a room) u8 0 u16 the
+    # room map's name (string index, 0xFFFF outdoors) f32 x y z (outdoors the original's units; a room its map's own
+    # units, as a door's arrival) f32 yaw (degrees)
+    moves = getattr(p, 'moves', None)
+    pmov = (b''.join(struct.pack('>BBHffff', r['kind'], 0, r['map'], *r['at'], r['yaw']) for r in moves.rows)
+            if moves is not None else b'', len(moves) if moves is not None else 0)
     blob = bytearray()
     offsets = []
     for s in p.strings.rows:
@@ -108,7 +139,18 @@ def write(program, compiled, binds, conf=None):
                 'SNDS': (snds, len(p.sounds)), 'VOIC': (voic, len(p.voices)), 'MUSI': (musi, len(p.music)),
                 'OBJS': (objs, len(p.objects)), 'SCRP': (bytes(scrp), len(compiled)),
                 'CODE': (bytes(code), len(compiled)), 'BIND': (bytes(bind), len(binds)),
-                'STRT': (strt, len(strt) // 2)}
+                'STRT': (strt, len(strt) // 2), 'PCEL': pcel, 'PMOV': pmov}
+    actors = getattr(p, 'actors', None)
+    if actors is not None:
+        sections.update(actors.sections(p.objects.rows))
+        # the actor rows interned strings: STRS is written again with them
+        blob, offsets = bytearray(), []
+        for s in p.strings.rows:
+            offsets.append(len(blob))
+            blob += s.encode('cp1252', 'replace') + b'\0'
+        sections['STRS'] = (b''.join(struct.pack('>I', o) for o in offsets) + bytes(blob), len(p.strings))
+    else:
+        sections.update({tag: (b'', 0) for tag in ACTOR_SECTIONS})
     head = 16 + 16 * len(ORDER)
     out = bytearray()
     directory = bytearray()
@@ -177,12 +219,15 @@ def decode(code):
         i += 1
         args = []
         layout = LAYOUT[op]
-        if layout == 'N':
+        if layout in ('N', 'F'):
+            # F (NOTYET): u16 the function's number first, then as N (MESSAGEBOX)
+            number = struct.unpack_from('>H', code, i)[0] if layout == 'F' else None
+            i += 2 if layout == 'F' else 0
             name, flags, nstr = struct.unpack_from('>HBB', code, i)
             i += 4
             strs = list(struct.unpack_from('>%dH' % nstr, code, i))
             i += 2 * nstr
-            args = [name, flags, nstr] + strs
+            args = ([number] if layout == 'F' else []) + [name, flags, nstr] + strs
         else:
             for letter in layout:
                 fmt = {'b': '>b', 'B': '>B', 'h': '>h', 'H': '>H', 'i': '>i', 'f': '>f'}[letter]
@@ -199,8 +244,9 @@ def disassemble(code, names=None):
     for at, name, args in decode(code):
         text = ' '.join(str(a) for a in args)
         if name == 'NOTYET' and names:
-            text = '%s flags=%#x strings=%s' % (names[args[0]], args[1], [names[s] for s in args[3:]])
-        if name in ('JMP', 'JZ'):
-            text += ' -> %d' % (at + 3 + args[0])
+            text = '#%d %s flags=%#x strings=%s' % (args[0], names[args[1]], args[2], [names[s] for s in args[4:]])
+        if name in ('JMP', 'JZ', 'JNEB', 'JCMPB'):
+            size = {'JMP': 3, 'JZ': 3, 'JNEB': 4, 'JCMPB': 5}[name]
+            text += ' -> %d' % (at + size + args[-1])
         lines.append('%5d %-13s %s' % (at, name, text))
     return '\n'.join(lines)

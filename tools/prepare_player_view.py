@@ -237,9 +237,26 @@ def _fit_body(identifier, shapes, materials, textures, palette, groups):
     stopped on the Argonian female player body, NPC-HEAD-DECIMATION-33)."""
     import os
     from mesh_geometry_env import NPC_HEAD_REDUCER_VARIABLE, npc_head_reducer
+    from npc_geometry import hair_share
     try:
         return _fit_body_search(identifier, shapes, materials, textures, palette, groups)
     except ValueError as error:
+        # the player body's byte budget holds every gait frame: with the whole hair or the head's share for the hair
+        # (NPC-HAIR-BACK-MISSING-53) no body fitted (the breton female: 1,359 vertices at 480, over the byte budget):
+        # the search again with the hair's previous share (v0.0.53, 'plain'), which fits
+        if hair_share() != 'plain' and 'no body fits the existing budgets' in str(error):
+            print('player body %s: no fit with the %s hair share; this body uses the previous share for its hair'
+                  % (identifier, hair_share()), flush=True)
+            saved_share = os.environ.get('AMIWIND_NPC_HAIR_SHARE')
+            os.environ['AMIWIND_NPC_HAIR_SHARE'] = 'plain'
+            try:
+                return _fit_body(identifier, shapes, materials, textures, palette, groups)
+            finally:
+                if saved_share is None:
+                    os.environ.pop('AMIWIND_NPC_HAIR_SHARE', None)
+                else:
+                    os.environ['AMIWIND_NPC_HAIR_SHARE'] = saved_share
+
         if npc_head_reducer() != 'locked' or 'no body fits the existing budgets' not in str(error):
             raise
         print('player body %s: no fit with the locked head reducer; this body uses the previous head reducer'
@@ -747,6 +764,14 @@ def prepare(data_files, id1, jobs=None, bodies=True):
     print('Player view: %d units (%d from the unit cache, %d made) in %.1f s' %
           (units, reused, units - reused, time.monotonic() - started), flush=True)
     return report
+
+
+def prepare_image(data_files, id1, jobs=None, bodies=True):
+    """The image step's player view (prepare) as its own timed phase: tools/build_aga.py runs it in a spawned worker
+    beside the combat data, which neither reads nor writes view/ or progs/body/ (BUILD-IMAGE-FINALIZE-UNDERUSED-48)."""
+    import build_profile
+    with build_profile.phase('Image: player view', detail='beside the combat data'):
+        return prepare(data_files, id1, jobs=jobs, bodies=bodies)
 
 
 def main():

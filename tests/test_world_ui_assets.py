@@ -62,8 +62,48 @@ class WorldUIAssetsTests(unittest.TestCase):
         self.assertEqual(chances[rows[2,5]][WEATHERS.index('Blight')],100)     # Red Mountain: blight, never clear
         self.assertEqual(looks[WEATHERS.index('Blight')]['fog'][0],(128,19,19))
         self.assertEqual(looks[0]['sky'][0],(95,135,203));self.assertEqual(looks[0]['glare'],1.0)
+        # WEATHER-AMBIENT-SUN-UNUSED-51: AWW2 (the default) carries the ambient and sun stops the land is lit with;
+        # AWW1 stays writable and readable, the same chances and sky/fog looks without them.
+        self.assertEqual(region_weather(raw)[:4],b'AWW2')
+        self.assertEqual(looks[WEATHERS.index('Blight')]['ambient'][0],(79,54,54))
+        self.assertEqual(looks[WEATHERS.index('Blight')]['sun'][0],(224,84,84))
+        self.assertEqual(looks[0]['sun'][3],(59,97,176))
+        old=region_weather(raw,table=1)
+        self.assertEqual(old[:4],b'AWW1');self.assertEqual(len(old),20+32*len(WEATHERS)+10*3)
+        old_looks,old_chances,_=read_region_weather(old)
+        self.assertEqual(old_chances,chances);self.assertNotIn('ambient',old_looks[0])
+        self.assertEqual([l['sky'] for l in old_looks],[l['sky'] for l in looks])
+        self.assertEqual(len(region_weather(raw)),20+56*len(WEATHERS)+10*3)
+        with self.assertRaisesRegex(ValueError,'1 or 2'):
+            region_weather(raw,table=3)
         with self.assertRaisesRegex(ValueError,'WEAT of 3 bytes'):
             region_weather(region(b'odd\0',b'Odd\0',[1,2,3]))
+
+    def test_interior_fog_rows_by_the_map_the_engine_loads(self):
+        # INTERIOR-FOG-UNUSED-51: every interior cell's AMBI fog colour and density, by its map name: a fixed scene's
+        # own name (Seyda Neen's census office), else the batch room name; no row at density 0 or for exteriors.
+        from prepare_world_ui import interior_fog, read_interior_fog
+        from room_batches import room_map
+        def cell(name, flags, fog, density, x=0, y=0):
+            ambi = bytes([10, 20, 30, 0, 40, 50, 60, 0]) + bytes(fog) + b'\0' + struct.pack('<f', density)
+            return record('CELL', sub('NAME', name.encode()+b'\0')+sub('DATA', struct.pack('<Iii', flags, x, y))
+                          + sub('AMBI', ambi))
+        raw = (cell('Seyda Neen, Census and Excise Office', 1, (1, 2, 3), 0.5)
+               + cell('Arkngthand, Hall of Centrifuge', 1, (200, 120, 40), 0.9)
+               + cell('Some Empty Room', 1, (9, 9, 9), 0.0)
+               + cell('Seyda Neen', 0, (5, 5, 5), 1.0, -2, -9)
+               + cell('Very Dense', 1, (7, 8, 9), 3.0))
+        data = interior_fog(raw)
+        self.assertEqual(data[:4], b'AWF1')
+        fog = read_interior_fog(data)
+        self.assertEqual(set(fog), {'census', room_map('Arkngthand, Hall of Centrifuge'), room_map('Very Dense')})
+        self.assertEqual(fog['census'][0], (1, 2, 3)); self.assertAlmostEqual(fog['census'][1], 128/255)
+        self.assertEqual(fog[room_map('Arkngthand, Hall of Centrifuge')][0], (200, 120, 40))
+        self.assertEqual(fog[room_map('Very Dense')][1], 1.0)           # density clamped to 1
+        names = [data[8+20*i:24+20*i] for i in range(3)]
+        self.assertEqual(names, sorted(names))                        # sorted by map name
+        with self.assertRaisesRegex(ValueError, 'wrong shape'):
+            read_interior_fog(data[:-1])
 
     def test_weather_settings_read_the_ini_and_fall_back_per_value(self):
         from prepare_world_ui import weather_settings, WEATHER_FALLBACK
@@ -72,6 +112,12 @@ class WorldUIAssetsTests(unittest.TestCase):
         self.assertEqual(hours,12)
         self.assertEqual(looks['Blight']['sky'][0],(1,2,3));self.assertEqual(looks['Blight']['delta'],.05)
         self.assertEqual(looks['Blight']['fog'][3],WEATHER_FALLBACK['Blight'][1][3])   # out of range: shipped value
+        # WEATHER-AMBIENT-SUN-UNUSED-51: the ambient and sun stops are read the same way, value by value.
+        from prepare_world_ui import WEATHER_LIGHT_FALLBACK
+        lit,_,_=weather_settings(ini_text='[Weather Ashstorm]\r\nAmbient Day Color=010,020,030\r\nSun Night Color=bad\r\n')
+        self.assertEqual(lit['Ashstorm']['ambient'][0],(10,20,30))
+        self.assertEqual(lit['Ashstorm']['sun'][3],WEATHER_LIGHT_FALLBACK['Ashstorm'][1][3])
+        self.assertEqual(lit['Clear']['ambient'],list(WEATHER_LIGHT_FALLBACK['Clear'][0]))
         self.assertEqual(looks['Clear']['fog'][0],(206,227,255))
         self.assertGreater(info['fallback_values'],0)
 
@@ -101,7 +147,8 @@ class WorldUIAssetsTests(unittest.TestCase):
             (world/'regions.awr').write_bytes(region)
             (world/'other-tool-output').mkdir()
             receipt=prepare(data,survey,scene)
-            self.assertEqual(set(receipt['files']),{'map.awm','journal.awj','entries.dat','quests.awq','region-names.awn','region-weather.aww'})
+            self.assertEqual(set(receipt['files']),{'map.awm','journal.awj','entries.dat','quests.awq','region-names.awn','region-weather.aww',
+                                                    'interior-fog.awf','smoke.aws'})
             self.assertEqual(validate(scene/'id1'),receipt)
             self.assertEqual((world/'regions.awr').read_bytes(),region)
             # Re-running on the same private staging tree remains valid.

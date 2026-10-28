@@ -301,6 +301,10 @@ static void console_terminal_key(int key)
         else if(key=='e')key=K_END;
         else if(key=='u'){memmove(line+1,line+key_linepos,len-key_linepos+1);key_linepos=1;return;}
         else if(key=='k'){line[key_linepos]=0;return;}
+        /* Ctrl+P / Ctrl+N: the previous / next command, as bash (CONSOLE-HISTORY-ARROWS-32: they work when a
+         * host or emulator setting takes the cursor keys, e.g. FS-UAE's keyboard joystick) */
+        else if(key=='p')key=K_UPARROW;
+        else if(key=='n')key=K_DOWNARROW;
         else if(key>=32 && key<127)return;	// no other Ctrl letters type
     }
     if(shift_down && (key==K_HOME || key==K_END)){	// Shift+Home/End: scrollback ends
@@ -923,6 +927,11 @@ void Key_Event (int key, qboolean down)
      * mode, like dbg hud off (aw_inspect.c; INSPECT-NO-RIGHT-CLICK-EXIT-42). */
     if (down && key_dest == key_game && aw_inspect_key && aw_inspect_key(key)) return;
 
+    /* Ctrl+Alt+H: the HUD and the crosshair off and on, in and out of photo mode
+     * (UI-HUD-TOGGLE-KEY-51; aw_photo.c AW_HudToggle through dbg photomode hud). */
+    if (down && key_dest == key_game && keydown[K_CTRL] && keydown[K_ALT] && (key == 'h' || key == 'H')) {
+        Cbuf_AddText("aw_photomode hud\n");return;
+    }
     /* Photo mode only: Ctrl+F fog, Ctrl+H debug HUD. Outside photo mode
      * Ctrl and F keep their bindings (fast flight, hands). */
     if (down && key_dest == key_game && keydown[K_CTRL] && AW_PhotoKey(key)) return;

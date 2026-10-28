@@ -20,6 +20,10 @@
 #include "aw_actors.h"
 #include "aw_msgbox.h"
 #include "aw_tryalloc.h"
+#include "aw_actorstate.h"
+#include "aw_character.h"
+#include "aw_combat.h"
+#include "aw_animpick.h"
 
 #define FILE_NAME "mwscript.awm"
 #define MAX_RESIDENT (1024*1024)
@@ -104,6 +108,9 @@ static sfx_t *pool_sound(const unsigned char hash[8]){
     strcpy(name+22,".wav");
     return S_PrecacheSound(name);
 }
+/* PlaySound, PlaySoundVP, PlaySound3D(VP), PlayLoopSound3D(VP), StopSound and GetSoundPlaying (rules from OpenMW
+ * apps/openmw/mwscript/soundextensions.cpp: the 2D forms on the listener, the 3D forms on the reference, a loop
+ * until StopSound; GetSoundPlaying asks about that reference's sound) */
 static void host_sound(int instance,int target,int sound,int how,float gain,float pitch){
     unsigned char hash[8];int centis,vol,near_units,far_units,entity,i,slot=-1;vec3_t at;sfx_t *s;float attenuation;
     (void)pitch;   /* Quake's mixer has no pitch; the VP forms keep their volume */
@@ -142,6 +149,12 @@ static int host_sound_playing(int instance,int target,int sound){
                            realtime<loops[i].until)return 1;
     return 0;
 }
+/* Say (rule from OpenMW apps/openmw/mwscript/soundextensions.cpp OpSay: the voice file on the actor through the
+ * sound manager's say, its text shown only as a subtitle; SayDone: OpSayDone, the actor's say finished). The
+ * dialogue's own voice lines (greetings, combat taunts, hit and flee lines) go through
+ * apps/openmw/mwdialogue/dialoguemanagerimp.cpp DialogueManager::say instead, which also refuses an actor that is
+ * already speaking, an NPC under water and a knocked-down actor: the greeting and combat tables carry that rule
+ * (docs/NPC_VOICE_TABLE.md), not a script's Say. */
 static void host_say(int instance,int target,int voice,int text){
     unsigned char hash[8];int centis,entity,i,slot=0;vec3_t at;sfx_t *s;
     (void)text;
@@ -333,6 +346,254 @@ static void objects_import(const aw_changes_t *in){
     map_model=NULL;   /* the loaded map attaches again: its disabled edicts are hidden there */
 }
 
+/* --- the actor record (v0.0.54; aw_actorstate.c, docs/ACTOR_STATE.md): the actor table's rows are read through one
+ * handle on the file kept open for the session; the live records are the actor state's. The scripts' actor calls
+ * act on it with OpenMW's rules; the player's stats are the character sheet's (aw_character), read into the
+ * player's record before a call and written back after; an NPC in a fight keeps its health, magicka and fatigue
+ * in its fighter sheet (aw_combat.c) until combat reads the record itself, so both are kept the same here. --- */
+int (*aw_mwscript_combat_end)(struct edict_s *e);
+int (*aw_mwscript_wander)(struct edict_s *e,int distance,int duration,int hour,const unsigned char idle[8],int repeat);
+/* The ambient tables' current AI package of an actor (aw_ambient.h AW_AmbientAiPackage, assigned in AW_AmbientInit):
+ * OpenMW's package number (-1 none, 0 Wander, ...) and *DONE once it has run out; NULL: -1 and 0. The ambient tables
+ * move the scripts' state generation when a package starts or ends (AW_MwvmStateChanged). */
+int (*aw_mwscript_ai_package)(struct edict_s *e,int *done);
+static FILE *actor_file;static long actor_base;static int actors_failed,dagoth_ur_1=-2;
+static unsigned long actor_calls,actor_misses,combat_starts,combat_stops,wanders;
+static int actor_read(void *context,uint32_t offset,void *out,uint32_t bytes){
+    (void)context;
+    if(!actor_file || fseek(actor_file,actor_base+(long)offset,SEEK_SET))return 1;
+    return fread(out,1,bytes,actor_file)!=bytes;
+}
+int AW_MwscriptActors(void){
+    static const aw_actorstate_io_t io={actor_read,NULL};
+    unsigned char head[16+16*32];int length,n;
+    if(AW_ActorStateReady())return 1;
+    if(actors_failed)return 0;
+    actors_failed=1;
+    if(actor_file){fclose(actor_file);actor_file=NULL;}
+    length=COM_FOpenFile(FILE_NAME,&actor_file);
+    if(!actor_file || length<16)return 0;
+    actor_base=ftell(actor_file);
+    if(fread(head,1,16,actor_file)!=16 || memcmp(head,"AWMS",4))return 0;
+    n=(head[6]<<8)|head[7];if(n>32)n=32;
+    if(fread(head+16,1,16*n,actor_file)!=(size_t)(16*n) || !AW_ActorStateOpen(head,16+16*n,&io))return 0;
+    actors_failed=0;
+    Con_DPrintf("Actor record: %d actors, %lu bytes kept.\n",AW_ActorCount(),AW_ActorStateResident());
+    return 1;
+}
+static int row_of_edict(edict_t *e){
+    eval_t *v=e?GetEdictFieldValue(e,"aw_source_id"):NULL;
+    if(!v || !v->string || !*(pr_strings+v->string))return AW_ACTOR_NONE;
+    return AW_ActorFind(pr_strings+v->string);
+}
+/* each instance's own actor row, found once by its edict's record id */
+static int instance_row[AW_MWVM_INSTANCES];static uint32_t instance_row_ref[AW_MWVM_INSTANCES];
+static aw_actor_t *player_record(void){
+    aw_actor_t *a=AW_ActorPlayer();int i;
+    if(!a || !aw_character.valid)return a;
+    for(i=0;i<8;i++){a->attr_base[i]=aw_character.attributes[i];a->attr_mod[i]=(short)(aw_character.modifiers[i]-aw_character.damage[i]);}
+    for(i=0;i<27;i++){a->skill_base[i]=aw_character.skills[i];a->skill_mod[i]=0;}
+    for(i=0;i<3;i++){a->dyn_base[i]=aw_character.maximum[i];a->dyn_cur[i]=aw_character.current[i];}
+    if(sv_player)a->dyn_cur[0]=sv_player->v.health;      /* the player's live health is the edict's */
+    a->level=(short)aw_character.level;a->kind=0;
+    return a;
+}
+static void player_store(const aw_actor_t *a){
+    int i;
+    if(!a || !aw_character.valid)return;
+    for(i=0;i<8;i++){
+        int mod=a->attr_mod[i];
+        aw_character.attributes[i]=a->attr_base[i];
+        /* the sheet keeps its fortify (race, birthsign) and its damage apart */
+        if(mod>=aw_character.modifiers[i])aw_character.damage[i]=0;
+        if(mod>aw_character.modifiers[i])aw_character.modifiers[i]=(short)mod;
+        else aw_character.damage[i]=(short)(aw_character.modifiers[i]-mod);
+    }
+    for(i=0;i<27;i++)aw_character.skills[i]=(short)(a->skill_base[i]+a->skill_mod[i]);
+    for(i=0;i<3;i++){aw_character.maximum[i]=a->dyn_base[i];aw_character.current[i]=a->dyn_cur[i];}
+    aw_character.level=a->level;
+    if(sv_player)sv_player->v.health=a->dyn_cur[0];
+}
+/* The record a script's target names: the player's, its own object's, or another object's (its one placed
+ * reference and the OACT table). EDICT: the actor's edict when its map has it loaded. */
+static aw_actor_t *actor_of(int instance,int target,edict_t **edict){
+    aw_mwvm_instance_t *in=AW_MwvmInstance(instance);int row;uint32_t ref;edict_t *e=NULL;
+    *edict=NULL;
+    if(!AW_MwscriptActors())return NULL;
+    if(target==AW_MWVM_PLAYER){*edict=sv_player;return player_record();}
+    if(target==AW_MWVM_SELF){
+        if(!in || !in->reference || instance<0 || instance>=AW_MWVM_INSTANCES)return NULL;
+        ref=in->reference;e=in->entity>0?edict_of(in->entity):NULL;
+        if(instance_row_ref[instance]!=ref){instance_row_ref[instance]=ref;instance_row[instance]=row_of_edict(e);}
+        row=instance_row[instance];
+    }else{
+        /* an id placed more than once (no one reference): not yet (OpenMW changes the record of every copy) */
+        ref=AW_MwvmObjectReference(target);row=AW_MwvmObjectActor(target);
+        if(!ref)return NULL;
+        e=edict_of(entity_of_reference(ref));
+    }
+    if(row==AW_ACTOR_NONE)return NULL;
+    *edict=e && !e->free?e:NULL;
+    return AW_ActorGet(ref,row,1);
+}
+/* an engaged NPC: its fighter sheet holds the live dynamic stats (aw_combat.c) */
+static aw_fighter_t *fighter_of(edict_t *e){return e && e!=sv_player?(aw_fighter_t *)AW_CombatFighter(e):NULL;}
+static void from_fighter(aw_actor_t *a,const aw_fighter_t *f){
+    if(!a || !f)return;
+    a->dyn_cur[0]=f->health;if(f->health_max>0)a->dyn_base[0]=f->health_max;
+    a->dyn_cur[2]=f->fatigue;if(f->fatigue_max>0)a->dyn_base[2]=f->fatigue_max;
+    a->dyn_cur[1]=f->magicka;
+    if(f->dead && !(a->flags&AWL_DEAD))AW_ActorKill(a);
+}
+static void to_fighter(const aw_actor_t *a,aw_fighter_t *f){
+    if(!a || !f)return;
+    f->health=a->dyn_cur[0];f->health_max=a->dyn_base[0];f->fatigue=a->dyn_cur[2];f->fatigue_max=a->dyn_base[2];
+    f->magicka=a->dyn_cur[1];
+}
+static aw_mwcell_t host_actor(int instance,int target,int verb,int stat,aw_mwcell_t value){
+    aw_mwcell_t out;edict_t *e;aw_actor_t *a=actor_of(instance,target,&e);aw_fighter_t *f;
+    int whole=stat>=AWA_LEVEL && verb!=AWV_RATIO;float v;
+    out.i=0;actor_calls++;
+    if(!a){actor_misses++;return out;}
+    f=fighter_of(e);from_fighter(a,f);
+    if(verb==AWV_GET || verb==AWV_RATIO){
+        if(verb==AWV_RATIO)out.f=AW_ActorRatio(a,stat);
+        else if(stat==AWA_ONDEATH)out.i=AW_ActorOnDeath(a);
+        else if(whole)out.i=(int32_t)AW_ActorStat(a,stat);
+        else out.f=AW_ActorStat(a,stat);
+        return out;
+    }
+    /* the original's endgame scripts change dagoth_ur_1 from afar after he is gone: ignored, as OpenMW does
+     * (statsextensions.cpp OpModDynamic) */
+    if(dagoth_ur_1==-2)dagoth_ur_1=AW_ActorFind("dagoth_ur_1");
+    if(target>=0 && !e && a->base==(uint16_t)dagoth_ur_1)return out;
+    v=whole?(float)value.i:value.f;
+    if(verb==AWV_SET)AW_ActorSetStat(a,stat,v);
+    else if(verb==AWV_MOD)AW_ActorModStat(a,stat,v);
+    else AW_ActorModCurrent(a,stat,v);
+    if(a->dyn_cur[0]<=0 && a->dyn_base[0]>0 && !(a->flags&AWL_DEAD) && a->reference!=AW_ACTOR_PLAYER_REF)AW_ActorKill(a);
+    if(a->reference==AW_ACTOR_PLAYER_REF)player_store(a);
+    to_fighter(a,f);
+    return out;
+}
+static void folded_item_id(int item,char *out,int capacity){
+    aw_item_t it;int i;
+    out[0]=0;
+    if(!AW_ActorItem(item,&it) || !read_string(it.id,out,capacity))return;
+    for(i=0;out[i];i++)if(out[i]>='A' && out[i]<='Z')out[i]=(char)(out[i]+32);
+}
+static int32_t host_item(int instance,int target,int verb,int item,int32_t count){
+    edict_t *e;aw_actor_t *a=actor_of(instance,target,&e);aw_item_t it;
+    actor_calls++;
+    if(!a){actor_misses++;return 0;}
+    if(verb && (!AW_ActorItem(item,&it) || it.kind==AWK_UNKNOWN))return 0;   /* an id no record has (OpenMW: refused) */
+    if(a->reference==AW_ACTOR_PLAYER_REF){
+        /* the player's inventory is the game state the engine keeps (aw_state.c AW_ITEM) */
+        char id[64];int32_t have;
+        folded_item_id(item,id,sizeof(id));
+        if(!id[0])return 0;
+        have=AW_StateGet(&aw_state,AW_ITEM,id);
+        if(count<0)count=(int32_t)(uint16_t)count;
+        if(verb==1 && count)AW_StateSet(&aw_state,AW_ITEM,id,have+count);
+        else if(verb==2 && count)AW_StateSet(&aw_state,AW_ITEM,id,have>count?have-count:0);
+        return AW_StateGet(&aw_state,AW_ITEM,id);
+    }
+    if(verb==1)return AW_ActorAddItem(a,item,count);
+    if(verb==2)return AW_ActorRemoveItem(a,item,count);
+    return AW_ActorItemCount(a,item);
+}
+static int32_t host_spell(int instance,int target,int verb,int spell){
+    edict_t *e;aw_actor_t *a=actor_of(instance,target,&e);
+    actor_calls++;
+    if(!a){actor_misses++;return 0;}
+    if(verb==1)return AW_ActorAddSpell(a,spell);
+    if(verb==2)return AW_ActorRemoveSpell(a,spell);
+    if(verb==AWM_SPELL_COMMON_DISEASE)return AW_ActorHasSpellType(a,3);   /* ASPT type 3: a common disease */
+    if(verb==AWM_SPELL_BLIGHT_DISEASE)return AW_ActorHasSpellType(a,2);   /* ASPT type 2: a blight disease */
+    return AW_ActorHasSpell(a,spell);
+}
+static void host_combat(int instance,int target,int verb,int other){
+    edict_t *e;aw_actor_t *a=actor_of(instance,target,&e);
+    actor_calls++;
+    if(!a || !e || e==sv_player){actor_misses++;return;}
+    if(verb==0){
+        /* StartCombat with the player (the one fight the combat layer has): not when either is dead (OpenMW) */
+        aw_fighter_t sheet;eval_t *v=GetEdictFieldValue(e,"aw_source_id");
+        if(other!=AW_MWVM_PLAYER || (a->flags&AWL_DEAD) || !sv_player || sv_player->v.health<=0)return;
+        if(!v || !v->string || !AW_CombatActorLoad(pr_strings+v->string,&sheet))return;
+        to_fighter(a,&sheet);
+        if(AW_CombatEngage(e,&sheet,NULL)){a->flags|=AWL_COMBAT;combat_starts++;}
+        return;
+    }
+    a->flags&=~AWL_COMBAT;
+    if(aw_mwscript_combat_end){aw_mwscript_combat_end(e);combat_stops++;}
+    else Con_DPrintf("MWScript: StopCombat waits for the combat layer's per-actor end.\n");
+}
+static int32_t host_dead_count(int actor){return AW_MwscriptActors()?AW_ActorDeadCount(actor):0;}
+/* AIWander's arguments as OpenMW's OpAiWander reads them: range, duration, time; then, if there are more, the
+ * first is an idle chance the game never used (dropped), up to eight idle chances (Idle2..Idle9; any given makes the
+ * package repeat), and a last explicit repeat flag */
+static void host_wander(int instance,int target,const int32_t *values,int count){
+    edict_t *e;aw_actor_t *a=actor_of(instance,target,&e);unsigned char idle[8];int i,repeat=0,n;
+    actor_calls++;
+    if(!e || e==sv_player){actor_misses++;return;}
+    (void)a;
+    memset(idle,0,sizeof(idle));
+    n=count-4;           /* after range, duration, time and the unused chance */
+    for(i=0;i<8 && i<n;i++){int32_t c=values[4+i];idle[i]=(unsigned char)(c<0?0:c>100?100:c);repeat=1;}
+    if(n>8)repeat=values[12]!=0;
+    if(aw_mwscript_wander){aw_mwscript_wander(e,values[0],values[1],values[2],idle,repeat);wanders++;}
+    else Con_DPrintf("MWScript: AIWander waits for the ambient tables.\n");
+}
+/* GetCurrentAIPackage and GetAIPackageDone (rules from OpenMW apps/openmw/mwscript/aiextensions.cpp
+ * OpGetCurrentAIPackage, OpGetAiPackageDone): the actor's package by the ambient tables; a dead actor has none
+ * (-1); no actor, the player or no ambient tables: -1 and not done */
+static unsigned long ai_queries;
+static int32_t host_ai_package(int instance,int target,int verb){
+    edict_t *e;aw_actor_t *a=actor_of(instance,target,&e);int done=0,current;
+    ai_queries++;
+    if(!e || e==sv_player || !aw_mwscript_ai_package)return verb?0:-1;
+    current=aw_mwscript_ai_package(e,&done);
+    if(verb)return done?1:0;
+    if((a && (a->flags&AWL_DEAD)) || e->v.health<=0)return -1;
+    return current;
+}
+int AW_MwscriptSpeedAttribute(struct edict_s *e){
+    int row;aw_actor_t *a;uint32_t ref;eval_t *v;
+    if(!e || !AW_MwscriptActors())return -1;
+    if(e==sv_player)return (int)AW_ActorStat(player_record(),AWA_ATTRIBUTE+4);
+    v=GetEdictFieldValue(e,"aw_ref");ref=v && v->_float>0?(uint32_t)v->_float:0;
+    if((row=row_of_edict(e))==AW_ACTOR_NONE)return -1;
+    a=ref?AW_ActorGet(ref,row,0):NULL;
+    if(a)return (int)AW_ActorStat(a,AWA_ATTRIBUTE+4);
+    {aw_actor_base_t b;return AW_ActorBase(row,&b)?b.attributes[4]:-1;}
+}
+/* The drawn weapon's type for the animation's stance (aw_animpick.h): the record's weapon entry; found once per
+ * engagement (the record is a binary search on disk). */
+int AW_MwscriptWeaponType(struct edict_s *e){
+    int row;
+    if(!e || e==sv_player || !AW_MwscriptActors() || (row=row_of_edict(e))==AW_ACTOR_NONE)return -1;
+    return AW_ActorWeaponType(row);
+}
+/* Once a frame while anyone fights: the fighters' health and deaths reach their records (the dead count, OnDeath),
+ * and the scripts that read actors wake (AW_MwvmStateChanged). */
+static void actors_from_fights(void){
+    int i;edict_t *e;const aw_fighter_t *f;
+    if(!AW_CombatHostiles() || !AW_ActorStateReady())return;
+    for(i=1;i<sv.num_edicts;i++){
+        eval_t *v;uint32_t ref;int row;aw_actor_t *a;float before;int dead;
+        e=EDICT_NUM(i);if(e->free || !(f=AW_CombatFighter(e)))continue;
+        v=GetEdictFieldValue(e,"aw_ref");ref=v && v->_float>0?(uint32_t)v->_float:0;
+        if(!ref || (row=row_of_edict(e))==AW_ACTOR_NONE || !(a=AW_ActorGet(ref,row,1)))continue;
+        before=a->dyn_cur[0];dead=(a->flags&AWL_DEAD)!=0;
+        from_fighter(a,f);
+        if(a->dyn_cur[0]!=before || dead!=((a->flags&AWL_DEAD)!=0)){
+            if(a->dyn_cur[0]!=a->dyn_base[0])a->flags|=AWL_CHANGED;
+            AW_MwvmStateChanged();
+        }
+    }
+}
+
 /* --- MessageBox (aw_msgbox.c shows it): the text and the buttons read from the file's strings --- */
 static void host_message(int instance,int text,const float *numbers,int number,const unsigned char *buttons,int count){
     static char format[AW_MSGBOX_TEXT],shown[AW_MSGBOX_TEXT],labels[AW_MSGBOX_BUTTONS][AW_MSGBOX_LABEL];
@@ -348,9 +609,63 @@ static void host_message(int instance,int text,const float *numbers,int number,c
 }
 static int host_button(int instance){(void)instance;return AW_MsgBoxPressed();}
 
+/* --- the world and cell lookups (v0.0.54) --- */
+/* The player's cell, worked out once a frame in AW_MwscriptTick: outdoors the grid cell of the player's position in
+ * the game's coordinates (8192 game units a cell), in a room its stable number (worldspawn _aw_cell_int). A change
+ * moves the state generation, so the quiet scripts that ask GetPCCell run again. */
+static int pc_kind,pc_x,pc_y;
+static long map_room;                /* the loaded room's stable number, 0 outdoors (attach_map) */
+static float room_shift[3];          /* a room map's local position = game position / 4 + this (attach_map) */
+static int host_player_cell(int *x,int *y){*x=pc_x;*y=pc_y;return pc_kind;}
+static void to_game_units(const vec3_t local,float out[3]){
+    int i;
+    if(AW_WorldToSource(sv.name,local,out))return;            /* an outdoor map: its own origin */
+    for(i=0;i<3;i++)out[i]=(local[i]-room_shift[i])*4.0f;     /* a room map: a quarter scale plus its shift */
+}
+static void player_cell_update(void){
+    int kind=0,x=0,y=0;float at[3];
+    if(sv_player){
+        if(map_room){kind=2;x=(int)map_room;}
+        else if(AW_WorldToSource(sv.name,sv_player->v.origin,at)){
+            kind=1;x=(int)floor(at[0]/8192.0f);y=(int)floor(at[1]/8192.0f);
+        }
+    }
+    if(kind!=pc_kind || x!=pc_x || y!=pc_y){pc_kind=kind;pc_x=x;pc_y=y;AW_MwvmStateChanged();}
+}
+/* GetPos (rule from OpenMW apps/openmw/mwscript/transformationextensions.cpp OpGetPos: the reference's position on
+ * the axis, in game units) */
+static float host_position(int instance,int target,int axis){
+    vec3_t local;float game[3];
+    if(axis<0 || axis>2 || locate(instance,target,local)<0)return 0.0f;
+    to_game_units(local,game);
+    return game[axis];
+}
+/* PositionCell of the player (rule from OpenMW apps/openmw/mwscript/transformationextensions.cpp OpPositionCell):
+ * into a room, its map loaded the way a door loads it with the arrival the builder worked out (aw_scene.c
+ * AW_SceneLoadRoom); outdoors (also a cell no interior has, as OpenMW), the coordinate teleport of dbg tp X Y Z
+ * (AW_MapTeleportAt: the map that holds the point, the first surface at or below Z; the view keeps its yaw). A room
+ * not on this disk, a pending load or the story's hold: nothing happens, counted. */
+static unsigned long player_moves,player_moves_refused;
+static int host_player_move(int instance,int kind,int map,const float *at,float yaw){
+    char name[64];float source[3];int ok=0;(void)instance;
+    if(kind==AWM_MOVE_OUTDOORS){source[0]=at[0];source[1]=at[1];source[2]=at[2];ok=AW_MapTeleportAt(source,1);}
+    else if(kind==AWM_MOVE_ROOM && read_string(map,name,sizeof(name)))ok=AW_SceneLoadRoom(name,at,yaw);
+    if(ok)player_moves++;
+    else{player_moves_refused++;Con_DPrintf("MWScript: PositionCell of the player not possible here (kind %d).\n",kind);}
+    return ok;
+}
+/* The import route: no function is carried out by number yet; each NOTYET call is counted (aw_mwscript_status)
+ * and logged once. A function plugged in here needs no new opcode and no change of the file's format. */
+static int host_call(int instance,int target,int function,const aw_mwcell_t *numbers,int count,
+                     const unsigned char *strings,int nstrings,aw_mwcell_t *result){
+    (void)instance;(void)target;(void)function;(void)numbers;(void)count;(void)strings;(void)nstrings;(void)result;
+    return 0;
+}
+
 static const aw_mwvm_host_t host={host_sound,host_sound_playing,host_say,host_say_done,host_music,host_distance,
     host_menu_mode,host_query,host_journal_get,host_journal_set,host_notyet,host_warn,host_object,host_message,
-    host_button};
+    host_button,host_actor,host_item,host_spell,host_combat,host_dead_count,host_wander,host_call,host_player_cell,
+    host_position,host_player_move,host_ai_package};
 
 /* --- loading and the map's objects --- */
 static int load(void){
@@ -404,6 +719,8 @@ static void attach_map(void){
     FILE *f=NULL;int length,i,k,nroom=0,anchored=0;long base,room;uint32_t offset,rows,bytes,r;unsigned char row[24];
     vec3_t local,shift;float source[3];edict_t *e;eval_t *v;int outdoors;
     AW_MwvmBeginMap();
+    {float zero[3]={0,0,0};vec3_t at;    /* the player's cell: a room's number (its shift comes with the bindings) */
+     map_room=AW_SourceToWorld(sv.name,zero,at)?0:map_cell_number();room_shift[0]=room_shift[1]=room_shift[2]=0;}
     for(i=0;i<LOOPS;i++)if(loops[i].used){S_StopSound(loops[i].entity,loops[i].channel);loops[i].used=0;}
     memset(says,0,sizeof(says));
     edict_ref_count=0;
@@ -457,6 +774,7 @@ static void attach_map(void){
         if(k>=0)attach_places++;else attach_refused++;
     }
     fclose(f);
+    VectorCopy(shift,room_shift);
     /* room maps are the source positions at a quarter scale (tools/prepare_quake.py SCALE), plus a room's shift */
     for(r=0;r<(uint32_t)nroom;r++){
         const unsigned char *p=room_rows[r];uint32_t ref=((uint32_t)p[0]<<24)|((uint32_t)p[1]<<16)|((uint32_t)p[2]<<8)|p[3];
@@ -487,6 +805,11 @@ void AW_MwscriptTick(float dt){
      * sample ends */
     for(i=0;i<LOOPS;i++){
         aw_mwvm_instance_t *in;
+        if(loops[i].used && !loops[i].looping && realtime>=loops[i].until){
+            /* a one-shot sound ended: GetSoundPlaying of its script reads 0 now, so the script runs again (a script
+             * that only asks CellChanged and GetSoundPlaying is not run every frame: codegen.py) */
+            loops[i].used=0;AW_MwvmWake(loops[i].instance);continue;
+        }
         if(!loops[i].used || !loops[i].looping)continue;
         in=AW_MwvmInstance(loops[i].instance);
         if(!in || !(in->flags&AWI_USED) || !(in->flags&AWI_ACTIVE)){
@@ -498,6 +821,8 @@ void AW_MwscriptTick(float dt){
         }
     }
     VectorCopy(sv_player->v.origin,player);
+    player_cell_update();
+    actors_from_fights();
     AW_MwvmTick(dt,player);
 }
 static void status(void){
@@ -512,14 +837,44 @@ static void status(void){
                attach_places,attach_rooms,attach_refused,global,active,looping);
     Con_Printf("frames %lu runs %lu quiet-skips %lu far %lu deferred %lu ops %lu (max %lu a frame) aborted %lu not-yet calls %lu\n",
                s->frames,s->runs,s->skipped_quiet,s->skipped_far,s->deferred,s->ops,s->max_ops_frame,s->aborted,s->notyet_calls);
+    {/* the import route: the not-yet functions this session called most (by function number) */
+     int top[8],ntop=0,f,i,j;char name[32];
+     for(f=0;f<AWM_FUNCTIONS;f++){
+         unsigned long c=AW_MwvmFunctionCalls(f);
+         if(!c)continue;
+         for(i=0;i<ntop && AW_MwvmFunctionCalls(top[i])>=c;i++);
+         if(i==8)continue;
+         if(ntop<8)ntop++;
+         for(j=ntop-1;j>i;j--)top[j]=top[j-1];
+         top[i]=f;
+     }
+     Con_Printf("not yet, most called:");
+     for(i=0;i<ntop;i++){
+         if(!read_string(AW_MwvmFunctionName(top[i]),name,sizeof(name)))strcpy(name,"?");
+         Con_Printf(" %s %lu",name,AW_MwvmFunctionCalls(top[i]));
+     }
+     Con_Printf("%s; player cell %d %d %d; player moves %lu (%lu not possible); AI package queries %lu%s\n",
+                ntop?"":" none",pc_kind,pc_x,pc_y,player_moves,player_moves_refused,ai_queries,
+                aw_mwscript_ai_package?"":" (no ambient tables)");}
     {int i,disabled=0,locks=0;
      for(i=0;i<object_count;i++){disabled+=objects[i].disabled;locks+=objects[i].lock_set;}
      Con_Printf("object state: %d disabled, %d locks set (%d of %d kept; %lu hidden, %lu over the table); uses taken by "
                 "OnActivate %lu, Activate %lu\n",disabled,locks,object_count,OBJECTS,objects_hidden,objects_full,
                 intercepted,activated);}
+    {const aw_actorstate_stats_t *a=AW_ActorStateStats();
+     Con_Printf("actor record: %d actors, %lu bytes kept; calls %lu (%lu with no actor), records made %lu, changed %lu, "
+                "dropped %lu, full %lu, disk reads %lu; combat started %lu stopped %lu; wanders %lu\n",AW_ActorCount(),
+                AW_ActorStateResident(),actor_calls,actor_misses,a->created,a->changed,a->evicted,a->full,a->reads,
+                combat_starts,combat_stops,wanders);}
+}
+static int actors_export(unsigned char *out,int capacity){return AW_ActorStateReady()?AW_ActorStateExport(out,capacity):0;}
+static void actors_import(const unsigned char *data,int bytes){
+    if(!AW_MwscriptActors())return;
+    if(!AW_ActorStateImport(data,bytes))Con_Printf("Saved actor records unreadable: actors start from the game data.\n");
 }
 void AW_MwscriptInit(void){
     Cvar_RegisterVariable(&mwscript);
+    aw_save_actors_export=actors_export;aw_save_actors_import=actors_import;   /* the actor record (feature 16) */
     aw_save_objects_export=objects_export;aw_save_objects_import=objects_import;
     aw_object_lock_level=AW_ObjectLockLevel;   /* the doors read a script's Lock and Unlock */
     aw_scene_intercept=aw_hinged_intercept=object_intercept;   /* OnActivate takes a door's use */

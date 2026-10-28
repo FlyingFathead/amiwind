@@ -225,6 +225,10 @@ static void terminal_section(void){
  raw(RAW_UP,0x8000);line_is("]echo one",9);
  raw(RAW_DOWN,0x8000);raw(RAW_DOWN,0x8000);line_is("]echo three",11);
  raw(RAW_DOWN,0x8000);line_is("]",1);
+ /* Ctrl+P / Ctrl+N walk the history as Up / Down (CONSOLE-HISTORY-ARROWS-32: no cursor keys needed) */
+ raw(raw_for('p'),8);line_is("]echo three",11);raw(raw_for('p'),8|0x8000);line_is("]echo two",9);
+ raw(raw_for('n'),8);line_is("]echo three",11);raw(raw_for('n'),8);line_is("]",1);
+ Key_AmigaQualifiers(0);
  /* Down past the newest entry returns the line being typed. */
  type_text("ech");raw(0x4f,0);line_is("]ech",3);
  raw(RAW_UP,0);line_is("]echo three",11);raw(RAW_UP,0);line_is("]echo two",9);

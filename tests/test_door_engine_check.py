@@ -149,5 +149,60 @@ class DoorEngineCheck(unittest.TestCase):
         self.assertLessEqual(saved['usable_after_crossing'], saved['doors'])
 
 
+class KnownEntrances(unittest.TestCase):
+    """config/door-check-known.json (DOOR-USE-COLLISION-FILLED-53): over all entrances of a whole-world image, every
+    entrance the wall check cannot reach must be listed with its reason and class; no compiler needed."""
+
+    @staticmethod
+    def report(reach, held=1102):
+        entries = [{'reference': ref, 'id': 'ex_test_door', 'destination_cell': 'Test Tomb %d' % ref,
+                    'checks': {'reach': r}, 'reach': {'reach': r, 'why': 'test'}} for ref, r in reach.items()]
+        return {'counts': {'doors': 1102, 'held': held, 'reach_traced': len(reach), 'usable_after_crossing': 1102,
+                           'both_ways': 1102, 'reachable': 1102}, 'entries': entries}
+
+    BASELINE = {'format': door_engine_check.BASELINE_FORMAT, 'doors': 1102}
+
+    def test_an_unlisted_unreachable_entrance_fails_a_whole_world_image(self):
+        known = {7: {'reason': 'measured', 'class': 'TEST-1'}}
+        report = self.report({5: 'no', 6: 'yes', 7: 'no', 8: 'yes'})
+        self.assertEqual(door_engine_check.known_split(report, known),
+                         {'known': [7], 'new': [5], 'known_passing': []})
+        problem = door_engine_check.known_problem(report, self.BASELINE, known)
+        self.assertIn('1 exterior entrances cannot be reached', problem)
+        self.assertIn('5 ex_test_door -> Test Tomb 5', problem)
+        # listed: no problem; a listed entrance reached again is named, never a failure
+        known[5] = {'reason': 'measured', 'class': 'TEST-1'}
+        known[8] = {'reason': 'measured', 'class': 'TEST-1'}
+        self.assertIsNone(door_engine_check.known_problem(report, self.BASELINE, known))
+        self.assertEqual(door_engine_check.known_split(report, known)['known_passing'], [8])
+
+    def test_partial_images_and_untraced_walls_are_not_compared(self):
+        report = self.report({5: 'no'}, held=40)
+        self.assertIsNone(door_engine_check.known_problem(report, self.BASELINE, {}))
+        report = self.report({5: 'no'})
+        report['counts']['reach_traced'] = 0
+        self.assertIsNone(door_engine_check.known_problem(report, self.BASELINE, {}))
+        # no known list given: the baseline alone decides (the check before v0.0.54)
+        self.assertIsNone(door_engine_check.known_problem(self.report({5: 'no'}), self.BASELINE, None))
+
+    def test_the_repository_list_is_the_format_the_check_reads(self):
+        path = ROOT / 'config/door-check-known.json'
+        known = door_engine_check.load_known(path)
+        for ref, row in known.items():
+            self.assertIsInstance(ref, int)
+            self.assertTrue(row['reason'] and row['class'] and row.get('place'), ref)
+        baseline = json.loads((ROOT / 'config/door-check-baseline.json').read_text(encoding='utf-8'))
+        self.assertLessEqual(baseline['reachable'] + len(known), baseline['doors'])
+        # the image step passes the list to the check (tools/build_aga.py write_door_check)
+        text = (ROOT / 'tools/build_aga.py').read_text(encoding='utf-8')
+        self.assertIn("known = ROOT/'config'/'door-check-known.json'", text)
+        with tempfile.TemporaryDirectory() as tmp:
+            bad = Path(tmp) / 'known.json'
+            bad.write_text(json.dumps({'format': door_engine_check.KNOWN_FORMAT,
+                                       'entrances': {'12': {'class': 'TEST-1'}}}), encoding='utf-8')
+            with self.assertRaises(ValueError):
+                door_engine_check.load_known(bad)
+
+
 if __name__ == '__main__':
     unittest.main()

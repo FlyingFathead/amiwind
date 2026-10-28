@@ -44,7 +44,7 @@ class EngineWiringTests(unittest.TestCase):
     def test_host_reads_the_strings_and_clears_the_box_without_a_game(self):
         host = code('aw_mwhost.c')
         self.assertIn('AW_MsgBoxFormat(shown,sizeof(shown),format,numbers,number);', host)
-        self.assertIn('host_object,host_message,\n    host_button};', host)
+        self.assertIn('host_object,host_message,\n    host_button,', host)
         self.assertIn('!sv_player){AW_MsgBoxClear();return;}', host)
         # no C library floating-point formatting in the engine (aw_format.c)
         self.assertNotIn('snprintf(', code('aw_msgbox_rules.c').replace('Q_snprintf(', ''))

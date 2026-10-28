@@ -34,9 +34,15 @@ typedef struct {
     float position[3],yaw,health;/* island position (Quake units), or scene-local for AW_CHANGE_SCENE */
     float hours;                 /* game time when captured (hours since the game's start) */
 } aw_change_t;
+/* AWS4 feature bit 16: the actor record's block (aw_actorstate.c AW_ActorStateExport, AWAS1), at most this many
+ * bytes; an older reader refuses a save that has it. */
+#define AW_SAVE_ACTOR_BYTES 32768
 typedef struct {
     int count;
     aw_change_t entry[AW_SAVE_CHANGES];
+    /* the actor block: a caller's buffer of ACTOR_CAPACITY bytes, ACTOR_BYTES used (0: none); NULL: not wanted */
+    unsigned char *actors;
+    int actor_bytes,actor_capacity;
 } aw_changes_t;
 
 #define AW_EQUIPMENT_DRAWN 1U
@@ -103,6 +109,10 @@ extern void (*aw_save_changes_import)(const aw_changes_t *changes);
  * actors exported (after it), and read from a loaded save's list (after the actors' import). */
 extern int (*aw_save_objects_export)(aw_changes_t *changes);
 extern void (*aw_save_objects_import)(const aw_changes_t *changes);
+/* aw_mwhost.c sets these: the actor record's block (feature 16): export the bytes (0 none, -1 too small), import a
+ * loaded save's block (BYTES 0: none, the records start from their rows). */
+extern int (*aw_save_actors_export)(unsigned char *out,int capacity);
+extern void (*aw_save_actors_import)(const unsigned char *data,int bytes);
 /* aw_scene.c AW_SceneSaveEntryRefuse (bound in aw_debug.c; NULL: no check): 1 when the saved scene and position lie
  * in a place marked for more Fast RAM than this start has; the refusal screen is up (CHIM-32MB-SAVE-ENTRY-48). */
 extern int (*aw_save_entry_refuse)(const char *scene,const float *position);

@@ -87,13 +87,15 @@ GROUPS = {
         'label': 'NPC gallery',
         'notice': 'the NPC gallery',
         'alias': '--exclude-npc-gallery',
-        'skip': ('npc-gallery',),
+        # NPC Gallery v2.0 (NPC-GALLERY-V2, the default) has no stage: the image step leaves its catalogue out. The
+        # baked gallery's npc-gallery stage (--npc-gallery-method baked) is dropped by the legacy switch it sets.
+        'skip': (),
         'options': {},
         'legacy': 'no_npc_gallery',
         'placements': False,
         'in_game': 'dbg npcgallery and the other gallery commands say the build has no gallery; '
                    'every NPC of the game is still built',
-        'saves': 'the npc-gallery stage (the longest stage of a full build)',
+        'saves': 'the gallery catalogue and room (seconds; with --npc-gallery-method baked the npc-gallery stage)',
     },
     'interiors': {
         'label': 'interiors',
@@ -270,6 +272,13 @@ def resolve(args, version, area_build=False):
     if groups:
         from project_version import require_private_test_version
         require_private_test_version(version, [f'{OPTION} {", ".join(groups)}'])
+    # the debug-only collision methods of the environment (mesh_geometry_env: the methods before the v0.0.54 door
+    # rules, DOOR-USE-COLLISION-FILLED-53): an rc or final build refuses them before any stage
+    from mesh_geometry_env import debug_collision_waivers
+    waivers = debug_collision_waivers()
+    if waivers:
+        from project_version import require_private_test_version
+        require_private_test_version(version, waivers)
     for name in groups:
         if GROUPS[name].get('area_builds') and not area_build:
             raise ValueError(f'{OPTION} {name} needs an area build (a single area, MiniWind or a direct start): '

@@ -587,7 +587,7 @@ def validate(bugs, families=None):
                 errors.append('%s: reports must be a non-empty list' % where)
             else:
                 for r in reports:
-                    if not isinstance(r, dict) or set(r) - {'version', 'at', 'note'} or not {'version', 'at'} <= set(r)                             or not REPORT_VERSION_RE.match(str(r.get('version')))                             or not REPORT_AT_RE.match(str(r.get('at')))                             or ('note' in r and not _line_ok(r['note'], 200)):
+                    if not isinstance(r, dict) or set(r) - {'version', 'at', 'note'} or not {'version', 'at'} <= set(r)                             or not REPORT_VERSION_RE.match(str(r.get('version')))                             or not REPORT_AT_RE.match(str(r.get('at')))                             or ('note' in r and not _line_ok(r['note'], 500)):
                         errors.append('%s: each report needs version (vX.Y.Z[-devN]) and at (YYYY-MM-DD HH:MM +ZZZZ, '
                                       'or a date alone), optional one-line note' % where)
                         break
@@ -755,7 +755,7 @@ def validate_regressions(b, where):
                 or not REPORT_VERSION_RE.match(str(r.get('version'))) or not REPORT_AT_RE.match(str(r.get('at'))) \
                 or r.get('was') not in ('fixed', 'closed') \
                 or not (r.get('fixed_in') is None or VERSION_RE.match(str(r.get('fixed_in')))) \
-                or any(k in r and not _line_ok(r[k], 200) for k in ('by', 'note')):
+                or any(k in r and not _line_ok(r[k], 500) for k in ('by', 'note')):
             return ['%s: each regression needs version, at, was (fixed or closed) and fixed_in (or null), optional '
                     'one-line by and note' % where]
     ats = [str(r['at']) for r in regs]

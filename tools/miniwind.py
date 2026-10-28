@@ -206,7 +206,24 @@ def plan(steps, scope=DEFAULT_SCOPE, town=TOWN):
             left_out[name] = reason
         else:
             kept.append((name, command))
+    if any(name == 'harvest' for name, _ in kept):
+        note = harvest_note(town)
+        if note:
+            print(note, flush=True)
     return kept, left_out
+
+
+def harvest_note(town=TOWN):
+    """The plan's early word on harvest (HARVEST-CHIM-COVERAGE-ONE-AREA-48: a Vivec MiniWind stopped at the image
+    step's coverage check after 20 minutes): a town with no harvest catalogue mechanism (harvest_build
+    unsupported_towns: only Seyda Neen and Balmora have one) ships its frames without its plants; the image step lists
+    them as this build's limit. None for a town that has it."""
+    from harvest_build import unsupported_towns
+    if not unsupported_towns([town]):
+        return None
+    return ('MiniWind plan: %s has no harvest catalogue mechanism (only Seyda Neen and Balmora do): its harvestable '
+            'plants are left out of this partial-area build and listed by the image step '
+            '(harvest-chim-coverage.json "partial_area").' % town)
 
 
 # Stages that build the same feature another way: the legacy Balmora chain (--legacy-area balmora)

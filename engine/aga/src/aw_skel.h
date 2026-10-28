@@ -47,7 +47,15 @@ typedef struct {
 	unsigned	first, last;
 } aw_skel_group_t;
 
-typedef struct {
+/* An APPENDED table (version 3, CREATURE-APPENDED-TABLE-54): the version 2 layout with, after the 24-byte header, a
+ * char base[32] (NUL padded): the game path of the shared table it extends ("progs/humanoid.awsk"). It holds only its
+ * own groups, on exactly the base's bones (same count, same parents); the loader links the base (AW_SkelTableFor), and
+ * the pair is one table to everything that uses it: its own groups first (indices 0..own_groups-1, frames
+ * 0..own_frames-1), then the base's, whose frames follow its own (frame own_frames + the base's frame). A humanoid-type
+ * creature plays every humanoid group from the one shared table and only its own from its small file. */
+#define AW_SKEL_VERSION_APPENDED	3
+#define AW_SKEL_TABLE_NAME	32		/* a table's game path, NUL padded (the model's block and an appended table) */
+typedef struct aw_skel_table_s {
 	int			bones, frames, groups, keys_count;
 	float		rate, scale;
 	short		parent[AW_SKEL_MAX_BONES];
@@ -59,11 +67,17 @@ typedef struct {
 	const unsigned char	*base;			/* bones x AW_SKEL_BASE_BYTES */
 	const unsigned char	*keys;			/* frames x row */
 	char		prefix[AW_SKEL_PREFIX];	/* a view's own groups ("f:", "d:f:" in order), looked up first by name; "" for a table */
+	int			own_frames, own_groups;	/* this file's own (frames and groups count both, the base's included) */
+	char		base_name[AW_SKEL_TABLE_NAME];	/* version 3: the base table's path; "" otherwise */
+	const struct aw_skel_table_s	*more;	/* version 3, linked by the loader: the base; NULL otherwise */
 } aw_skel_table_t;
 
 /* 1 and *out filled when data[0..size) is a valid table (sizes, parents before children, groups inside the
  * frames); 0 otherwise. The table keeps pointers into data: data must live as long as the table. */
 int AW_SkelParse (const unsigned char *data, long size, aw_skel_table_t *out);
+/* An appended table (version 3, parsed) linked to its BASE (a version 2 table of the same bones and parents): 1 and
+ * the pair is one table (its groups and frames counts the sum); 0 when they do not fit together. */
+int AW_SkelAppend (aw_skel_table_t *t, const aw_skel_table_t *base);
 /* The index of a group by name (case-insensitive), or -1; a view (prefix set) gives its own group of that name
  * (prefix + name) when the table has one. */
 int AW_SkelGroup (const aw_skel_table_t *t, const char *name);
@@ -78,6 +92,15 @@ void AW_SkelPose (const aw_skel_table_t *t, float frame, float world[][3][4]);
  * his torch has his left arm on the table's "torch" group, as the baked guards (tools/prepare_guard_torches.py
  * TorchLayer, below Bip01 L Clavicle) and the original (SKEL-ITEM-TAGS-52). */
 void AW_SkelPoseLayer (const aw_skel_table_t *t, float frame, float layer_frame, int root, float world[][3][4]);
+/* Up to AW_SKEL_LAYERS such layers at once (roots[j] -1: none): a guard in an ash storm shields his eyes with his
+ * right arm ("idlestorm", ACTOR-STORM-POSE-51) while his left arm holds the torch. A bone takes the layer of the
+ * nearest root at or above it. */
+#define AW_SKEL_LAYERS 2
+void AW_SkelPoseLayers (const aw_skel_table_t *t, float frame, int n, const float *layer_frames, const int *roots,
+	float world[][3][4]);
+/* The right arm's root (Bip01 R Clavicle): the weapon bone's fourth ancestor, as AW_SkelLeftArmRoot; -1 when the
+ * table is not shaped so. */
+int AW_SkelRightArmRoot (const aw_skel_table_t *t, int shield, int weapon);
 /* The left arm's root (Bip01 L Clavicle) from the item bones: the shield bone's fourth ancestor (shield bone, hand,
  * forearm, upper arm, clavicle; tools/skeletal_actor.py STICK_BONES), checked against the weapon bone's (the other
  * clavicle, the same parent). -1 when the table is not shaped so. */
@@ -101,7 +124,6 @@ void AW_SkelPoseVerts (const unsigned char *verts, const unsigned char *normals,
  * bones' rotations, so it is applied here, after posing. */
 #define AW_SKEL_BLOCK_MAGIC	"AWSB"
 #define AW_SKEL_BLOCK_HEAD	76
-#define AW_SKEL_TABLE_NAME	32
 typedef struct {
 	char		table[AW_SKEL_TABLE_NAME];
 	float		rest_scale;

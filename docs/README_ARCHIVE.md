@@ -1,10 +1,11 @@
 # Earlier README sections
 
-_Last updated with AmiWind v0.0.53 (27 October 2026)._
+_Last updated with AmiWind v0.0.54 (28 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.51: Let There Be More Inner Light](#v0051-let-there-be-more-inner-light)
 - [v0.0.50: The Doors: Riders On The CHIM](#v0050-the-doors-riders-on-the-chim)
 - [v0.0.49: Build Turnaround](#v0049-build-turnaround)
 - [v0.0.48: Inner CHIM & Actors On Stage](#v0048-inner-chim--actors-on-stage)
@@ -46,6 +47,16 @@ _Last updated with AmiWind v0.0.53 (27 October 2026)._
 - [Development (as the front page stated it before 20 October 2026)](#development-as-the-front-page-stated-it-before-20-october-2026)
 
 <!-- contents end -->
+
+## v0.0.51: Let There Be More Inner Light
+
+Akulakhan's Chamber, the game's final room, loads on 32 MB: the engine's first CHIM cache bank needed more memory
+than 32 MB leaves, so the room's models did not fit. Every interior is baked again with its cell's "sunlight", the
+light the original gives a room from one fixed direction above, which our rooms never had: 322 of the 1,335 interior
+cells get at least twice as much of it as their ambient light, so rooms that live on it are no longer dim, and the
+interior brightness default goes back to 1.0. The CHIM world's reads feed the music between small slices, and every
+load prints how long the music waited. The game's scripts (experimental, off by default) can enable, disable, lock
+and unlock objects and show message boxes.
 
 The front page ([README](../README.md)) used to carry these sections. They are dated records of earlier releases and of the work around them, kept as written; where one disagrees with the front page, the front page is newer. The release notes of each version are in `docs/RELEASE-v*.md`.
 
@@ -1071,7 +1082,7 @@ complete package inclusion remain pending; dev2 has not shipped.
 
 Update (v0.0.44, 19 October 2026): the notes above are from 14 and 15 October 2026 and describe states that have
 since passed. The current state is in
-[Where AmiWind stands](../README.md#where-amiwind-stands-27-october-2026) near the top.
+[Where AmiWind stands](../README.md#where-amiwind-stands-28-october-2026) near the top.
 
 ## Development (as the front page stated it before 20 October 2026)
 

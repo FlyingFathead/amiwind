@@ -1,6 +1,6 @@
 # Build audit and the local pipeline
 
-_Last updated with AmiWind v0.0.53 (27 October 2026)._
+_Last updated with AmiWind v0.0.54 (27 October 2026)._
 
 The public GitHub Actions workflow (`.github/workflows/source-check.yml`) checks
 the source on every push, in parallel jobs: the cached public tools, the test
@@ -9,6 +9,27 @@ suite in shards, then the asset-free dry-run image (its jobs are described in
 Morrowind data, so they cannot run there. A local pipeline runs the checks that
 need a real build. Its generic part, the post-build audit, is in this repository
 so anyone can run it on their own builds.
+
+## The hosted jobs and their names
+
+GitHub shows every job under its displayed name. The release publisher waits
+for exactly these names at the commit on `main`, so a change to this list is
+told to the maintainer, with the old and new names, before the release is
+pushed. The job ids in the workflow file stay the same; only a matrix job's
+displayed name is built from its matrix value.
+
+| Displayed name | Job id | What it does |
+|---|---|---|
+| `tools` | `tools` | Restores the bootstrapped public tools from the Actions cache and checks them file by file (a changed installer key bootstraps from nothing). |
+| `source-checks` | `source-checks` | The source allowlist and the quick checks. |
+| `Test suite part 1 of 6` to `Test suite part 6 of 6` | `tests` | The whole test suite in six parallel shards (`tools/run_tests.py --shard I/6`): whole modules balanced by `tests/module-timings.json`, every module in exactly one shard. Together the six parts run each module once. |
+| `dry-run` | `dry-run` | After the tests: the engine compile, the boot-notice image and its package. |
+| `docker-builder` | `docker-builder` | Builds the tools-only Docker image and validates the Linux container builder. |
+| `host-launcher-parity (ubuntu-24.04)`, `host-launcher-parity (windows-2022)` | `host-launcher-parity` | The shared host contract and the real Windows launcher checks. |
+| `tools-from-nothing` | `tools-from-nothing` | Tags, the weekly schedule and manual runs only: the from-nothing bootstrap and the dry-run image without any cache. Not required at a `main` commit. |
+
+Before v0.0.54 the six test parts had no name of their own and GitHub showed
+them as `tests (1)` to `tests (6)`.
 
 ## Post-build audit: `tools/build_audit.py`
 

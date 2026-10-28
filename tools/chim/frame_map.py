@@ -595,7 +595,7 @@ def actor_contact(id1, rows, world, index):
     hull (chunk terrain and placed models, chim.collision.FrameScene). Actors stay actor records:
     only their model's poses are read."""
     from actor_grounding import initial_state
-    from check_actor_ground import contact_samples, layout_of, model_frames
+    from check_actor_ground import contact_samples, layout_of, named_model_frames
     from chim.collision import FrameScene
     scene = FrameScene(world, index, hull=0)
     models, record, refused = {}, [], []
@@ -615,7 +615,7 @@ def actor_contact(id1, rows, world, index):
         name = e.get('model', '')
         if name not in models:
             # the model's frame layout (tools/actor_frames.py): kit models are checked on their idle group
-            models[name] = (model_frames((Path(id1) / name).read_bytes()), layout_of(Path(id1) / name))
+            models[name] = (named_model_frames((Path(id1) / name).read_bytes(), name), layout_of(Path(id1) / name))
         samples = contact_samples(models[name][0], angles, bool(float(e.get('aw_intro_role', 0) or 0)), models[name][1])
         gaps, failures = contact(scene, point, samples)
         if failures:

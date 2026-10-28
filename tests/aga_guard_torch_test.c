@@ -25,6 +25,7 @@ static const char *argument="";static cvar_t *cycle;static void(*cmd)(void);
 static float universal_radius=192;
 float AW_TorchLightRadius(void){return universal_radius;}
 int AW_TorchFlameCoreColor(void){return -1;}
+float AW_LightFlicker(unsigned seed){(void)seed;return 1;}   /* steady here: the radii under test are the torch's */
 /* no skeletal guard carries a torch item here (aw_items.c; the baked registry's guards are under test) */
 int AW_ItemsLightEmitter(const struct model_s *item,float out[3]){(void)item;(void)out;return 0;}
 byte AW_TorchFlameColor(byte original,int texel,float age,int core){return original;}

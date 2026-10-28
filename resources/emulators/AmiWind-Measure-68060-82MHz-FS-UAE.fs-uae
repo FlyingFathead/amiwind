@@ -26,7 +26,8 @@ uae_cpu_24bit_addressing = false
 chip_memory = 2048
 slow_memory = 0
 fast_memory = 0
-zorro_iii_memory = 16384
+# 32 MB of Fast RAM, the game's minimum (decided for the project 27 October 2026: every session runs at 32 MB).
+zorro_iii_memory = 32768
 kickstart_file = /path/to/your/kickstart-3.1-a1200.rom
 hard_drive_0 = /path/to/your/AmiWind.hdf
 hard_drive_0_type = hdf

@@ -313,5 +313,136 @@ class BuildPreflightTests(unittest.TestCase):
         self.assertEqual(doc['verdict'], 'ok')
 
 
+def history_row(stage, largest, total, jobs, container, run, worker=None):
+    return {'jobs': jobs, 'largest_mib': largest, 'total_mib': total, 'container_mib': container,
+            'worker_mib': round(max(0.0, total - largest) / jobs, 1) if worker is None else worker,
+            'wall': 60.0, 'cores': 4.0, 'run': run, 'stage': stage}
+
+
+FULL = '/vol/ws8/build/2026_10_27_v0.0.53_final_45f4c426'
+MINI = '/vol/ws8/build/2026_10_26_v0.0.53-dev2_miniwind-halloween_5989e142'
+# BUILD-PLAN-MWSCRIPT-32GB-54: the history row as v0.0.48-dev2 try14 wrote it (the container's peak taken for a 0.7 s
+# stage whose largest process was 24.8 MiB), and the two rows after it (277 MiB, no workers)
+MWSCRIPT_ROWS = [history_row('mwscript', 24.8, 32436.9, 1, 32436.9,
+                             '/vol/ws8/build/2026_10_23_v0.0.48-dev2_dev2-try14_396a2dc2', worker=32412.2),
+                 history_row('mwscript', 277.3, 277.3, 1, 7422.2, '/vol/ws8/build/2026_10_25_v0.0.51-dev1_dev1_ec96c86d'),
+                 history_row('mwscript', 277.0, 277.0, 1, 26885.7, '/vol/ws8/build/2026_10_25_v0.0.51-dev2_dev2_804c2d01')]
+
+
+class MiniWindPlanTests(unittest.TestCase):
+    """The v0.0.54 MiniWind refusals (2026-10-27): magic and Seyda MiniWinds planned against the v0.0.53 full final."""
+    STEPS = [('intro', ['python3', 'tools/prepare_intro.py', '--jobs', '8']),
+             ('census', ['python3', 'tools/prepare_census.py', '--jobs', '8']),
+             ('mwscript', ['python3', 'tools/prepare_mwscript.py']),
+             ('chim', ['python3', 'tools/chim_build.py', '--area', 'seyda_neen', '--jobs', '8']),
+             ('chim-town-seyda', ['python3', 'tools/chim_town.py', '--town', 'seyda_neen', '--jobs', '8'])]
+    STAIR = ('x+04/y-12', 2200.0, 'estimated from the stored frame size of 2026_10_27_v0.0.53_final_45f4c426')
+
+    def stages(self):
+        full = {'intro': [history_row('intro', 382.0, 382.0 + 8 * 570, 8, 30000.0, FULL)],
+                'census': [history_row('census', 356.0, 356.0 + 8 * 173, 8, 26000.0, FULL)],
+                'chim': [history_row('chim', 19546.1, 23614.2, 24, 42958.4, FULL)],
+                'chim-town-seyda': [history_row('chim-town-seyda', 6059.0, 7206.0, 11, 34801.9, FULL)],
+                'mwscript': [dict(r) for r in MWSCRIPT_ROWS]}
+        for rows in full.values():
+            for row in rows:
+                row['scope'] = rp.run_scope(row['run'])
+        full['chim'].append(dict(history_row('chim', 698.1, 1191.3, 8, 7946.4, MINI), scope='miniwind'))
+        full['intro'].append(dict(history_row('intro', 368.0, 3340.0, 8, 6481.9, MINI), scope='miniwind'))
+        return full
+
+    def test_run_scope_from_the_state_then_the_name(self):
+        self.assertEqual(rp.run_scope(MINI), 'miniwind')
+        self.assertEqual(rp.run_scope(FULL), 'full')
+        self.assertEqual(rp.run_scope(FULL, 'miniwind'), 'miniwind')
+        with tempfile.TemporaryDirectory() as tmp:
+            run = Path(tmp) / '2026_10_27_v0.0.54-dev1_full_x'
+            run.mkdir()
+            (run / 'build-state.json').write_text(json.dumps({'miniwind_preset': {'name': 'magic'}}), encoding='utf-8')
+            self.assertEqual(rp.run_scope(run), 'miniwind')
+            (run / 'build-state.json').write_text(json.dumps({'miniwind_preset': None, 'build_argv': ['n']}),
+                                                  encoding='utf-8')
+            self.assertEqual(rp.run_scope(run), 'full')
+
+    def test_the_container_peak_is_never_a_stage_without_its_tree(self):
+        row = {'name': 'mwscript', 'status': 'passed', 'jobs': 1, 'wall': 0.716, 'cores_avg': 0.34,
+               'peak_process_rss_bytes': int(24.8 * MIB), 'peak_tree_rss_bytes': None, 'start': 0, 'end': 1}
+        timeline = {'t': [0.5], 'memory_bytes': [int(32436.9 * MIB)], 'stages': {'mwscript': [[0, 0.3]]}}
+        found = rp.measure(row, timeline)
+        self.assertEqual((found['total_mib'], found['worker_mib']), (24.8, 0.0))
+        self.assertEqual(found['container_mib'], 32436.9)
+
+    def test_the_try14_mwscript_row_is_capped(self):
+        capped = rp.plausible(MWSCRIPT_ROWS[0])
+        self.assertEqual(capped['worker_mib'], 49.6)
+        self.assertEqual(capped['capped']['worker_mib'], 32412.2)
+        self.assertIs(rp.plausible(MWSCRIPT_ROWS[1]), MWSCRIPT_ROWS[1])
+        doc = rp.plan(self.STEPS, {'mwscript'}, 8, got(16, 8),
+                      {'stages': {'mwscript': list(MWSCRIPT_ROWS)}, 'stair': None, 'runs': []})
+        row = doc['stages'][0]
+        self.assertEqual(row['status'], 'OK')
+        self.assertLess(row['unit_mib'], 300.0)                  # the 277 MiB process, not 32,412 MiB
+        self.assertEqual(doc['verdict'], 'ok')
+
+    def test_no_stair_walk_is_priced_with_stair_walk_off(self):
+        rows = {'chim': [history_row('chim', 698.1, 1191.3, 8, 7946.4, MINI)]}
+        on = rp.plan(self.STEPS, {'chim'}, 8, got(16, 8), {'stages': rows, 'stair': self.STAIR, 'runs': []})
+        self.assertIn('stair', on['stages'][0])                   # walks on: the stair model counts
+        off = rp.plan(self.STEPS, {'chim'}, 8, got(16, 8),
+                      {'stages': rows, 'stair': self.STAIR, 'runs': []}, stair_walk='off')
+        row = off['stages'][0]
+        self.assertNotIn('stair', row)
+        self.assertNotIn('stair walk', row['largest_unit'])
+        self.assertEqual((row['status'], row['workers']), ('OK', 8))
+        self.assertEqual(off['stair_walk'], 'off')
+        self.assertEqual(rp.validate(off), [])
+        with tempfile.TemporaryDirectory() as tmp:     # and gather does not look for a stair figure at all
+            with mock.patch.object(rp, 'stair_from_frames', side_effect=AssertionError('looked')), \
+                    mock.patch.object(rp, 'stair_from_logs', side_effect=AssertionError('looked')):
+                found = rp.gather(None, tmp, (), 'miniwind', 'off')
+        self.assertIsNone(found['stair'])
+        self.assertEqual(found['stair_walk'], 'off')
+
+    def test_a_miniwind_against_full_build_history_is_not_throttled_below_its_lease(self):
+        gathered = {'stages': self.stages(), 'stair': self.STAIR, 'runs': [FULL], 'scope': 'miniwind',
+                    'stair_walk': 'off'}
+        doc = rp.plan(self.STEPS, {name for name, _ in self.STEPS}, 8, got(16, 8), gathered)
+        rows = {r['stage']: r for r in doc['stages']}
+        self.assertEqual(doc['verdict'], 'ok', rp.checklist(doc))
+        for name, row in rows.items():
+            self.assertEqual(row['workers'], row['planned_workers'], name)
+        self.assertLess(rows['chim']['parent_mib'], 1000.0)          # the MiniWind's own chim, not the island's
+        self.assertIn('not like for like', rows['chim-town-seyda']['model'])
+        self.assertEqual(doc['scope'], 'miniwind')
+        self.assertEqual(rp.validate(doc), [])
+        # BUILD-PLAN-WALL-UNMEASURED-54: the stages with no measured time are named beside the total
+        self.assertIsNone(rows['chim-town-seyda']['wall_s'])
+        self.assertIn('time not known for', rp.checklist(doc)[-1])
+        self.assertIn('chim-town-seyda', rp.checklist(doc)[-1])
+        # the same history without the scope (the earlier method) refused it: the island's chim parent
+        before = rp.plan(self.STEPS, {name for name, _ in self.STEPS}, 8, got(16, 8),
+                         {'stages': self.stages(), 'stair': self.STAIR, 'runs': [FULL]})
+        self.assertEqual(before['verdict'], 'refused')
+
+    def test_a_full_build_keeps_its_full_measurements(self):
+        gathered = {'stages': self.stages(), 'stair': None, 'runs': [FULL], 'scope': 'full', 'stair_walk': 'off'}
+        doc = rp.plan(self.STEPS, {'chim'}, 24, got(44, 24), gathered)
+        self.assertGreater(doc['stages'][0]['parent_mib'], 19000.0)
+
+    def test_the_history_keeps_the_newest_rows_of_each_scope(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = Path(tmp) / 'cache'
+            cache.mkdir()
+            lines = [{'format': rp.HISTORY_FORMAT, 'stage': 'chim', 'run': FULL.replace('45f4c426', str(i)),
+                      'measured': history_row('chim', 19000.0 + i, 23000.0, 24, 42000.0, '')} for i in range(7)]
+            lines.append({'format': rp.HISTORY_FORMAT, 'stage': 'chim', 'run': MINI, 'scope': 'miniwind',
+                          'measured': history_row('chim', 700.0, 1200.0, 8, 8000.0, '')})
+            (cache / rp.HISTORY).write_text(''.join(json.dumps(l) + '\n' for l in lines), encoding='utf-8')
+            found = rp.gather(None, tmp, (), 'miniwind', 'off')
+        rows = found['stages']['chim']
+        self.assertEqual(sum(r['scope'] == 'full' for r in rows), rp.HISTORY_ROWS)
+        self.assertEqual([r['largest_mib'] for r in rows if r['scope'] == 'miniwind'], [700.0])
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -1,6 +1,6 @@
 # Character animation
 
-_Last updated with AmiWind v0.0.48-dev2 (23 October 2026)._
+_Last updated with AmiWind v0.0.54-dev1 (27 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -236,7 +236,9 @@ OpenMW 0.51 and the game settings:
   (about 2 s each, 22 KB as 11 kHz 8-bit); the layout adds about 1 KB of text per
   model; the engine keeps 672 bytes of line table per model in use.
 - Creatures: their moan, roar and scream play only from their own animations'
-  sound keys and sound generator records (not done yet).
+  sound keys and sound generator records. The generator table is built
+  (combat/sndg.txt, [COMBAT.md](COMBAT.md) "Sounds") and the combat playground plays
+  it; the creatures' animation keys do not play it yet.
 
 ## Memory
 

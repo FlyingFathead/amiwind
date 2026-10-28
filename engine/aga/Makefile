@@ -123,11 +123,11 @@ OBJDIR = obj
 SRCS = \
 	amiga_stubs.c \
 	aw_debug.c aw_cam_rules.c aw_cam.c aw_clock.c aw_wait.c \
-	aw_ui.c aw_icons.c aw_excluded.c aw_movie.c aw_speech.c aw_intro.c aw_story.c aw_state.c aw_harvest.c aw_harvest_runtime.c aw_harvest_proxy.c aw_opening.c aw_barrier.c aw_character.c aw_head.c aw_reader.c aw_worldui.c aw_statswin.c aw_inventory.c aw_debug_torch.c aw_save_codec.c aw_save.c aw_savemenu.c aw_nav.c aw_npcpath.c aw_companion.c aw_combat_rules.c aw_combat.c aw_items.c aw_arena.c aw_actors.c aw_view_rules.c aw_view.c aw_console.c aw_console_glyphs.c aw_door_audio.c aw_hinged_door.c aw_mwvm.c aw_mwhost.c aw_msgbox_rules.c aw_msgbox.c aw_scene.c aw_hand_sprites.c aw_anim.c aw_animkit_rules.c aw_animkit.c aw_halloween_rules.c aw_halloween.c aw_skel.c aw_skel_load.c aw_skel_release.c aw_fastrelease.c aw_tryalloc.c aw_glut.c aw_lava_rules.c aw_lava.c \
-	aw_spawn.c aw_scenery.c aw_region.c aw_section.c aw_mappath.c aw_gallery.c aw_stream.c aw_spike.c aw_heapsize.c \
-	aw_walk.c aw_move_rules.c aw_move.c aw_world.c aw_bounds_rules.c aw_bounds.c aw_torch.c aw_guard_torch.c aw_lamps.c aw_remote.c aw_fog_location.c aw_weather_rules.c aw_weather.c aw_hand_models.c aw_npc_lod.c \
+	aw_ui.c aw_icons.c aw_excluded.c aw_movie.c aw_speech.c aw_intro.c aw_story.c aw_state.c aw_harvest.c aw_harvest_runtime.c aw_harvest_proxy.c aw_opening.c aw_barrier.c aw_character.c aw_head.c aw_reader.c aw_worldui.c aw_statswin.c aw_inventory.c aw_debug_torch.c aw_save_codec.c aw_save.c aw_savemenu.c aw_nav.c aw_npcpath.c aw_companion.c aw_combat_rules.c aw_combat.c aw_items.c aw_arena.c aw_actors.c aw_ambient.c aw_view_rules.c aw_view.c aw_console.c aw_console_glyphs.c aw_door_audio.c aw_hinged_door.c aw_actorstate.c aw_mwvm.c aw_mwhost.c aw_msgbox_rules.c aw_msgbox.c aw_travel_rules.c aw_scene.c aw_hand_sprites.c aw_anim.c aw_animkit_rules.c aw_animkit.c aw_halloween_rules.c aw_halloween.c aw_skel.c aw_skel_load.c aw_skel_release.c aw_fastrelease.c aw_tryalloc.c aw_glut.c aw_lava_rules.c aw_lava.c aw_magic_rules.c aw_magic.c \
+	aw_spawn.c aw_scenery.c aw_region.c aw_section.c aw_mappath.c aw_gallery.c aw_sweep.c aw_stream.c aw_spike.c aw_heapsize.c \
+	aw_walk.c aw_move_rules.c aw_move.c aw_world.c aw_bounds_rules.c aw_bounds.c aw_torch.c aw_guard_torch.c aw_lamps.c aw_remote.c aw_fog_location.c aw_weather_rules.c aw_weather.c aw_atmos.c aw_hand_models.c aw_hands.c aw_npc_lod.c \
 	aw_music.c aw_aread.c aw_log.c \
-	aw_profile.c aw_render_ranges.c aw_fpu_status.c aw_photo.c aw_miniwind.c aw_quickchar.c aw_testbox.c \
+	aw_profile.c aw_render_ranges.c aw_fpu_status.c aw_photo.c aw_talk.c aw_miniwind.c aw_quickchar.c aw_testbox.c \
 	aw_platform.c \
 	aw_fog.c aw_horizon.c \
 	chase.c \

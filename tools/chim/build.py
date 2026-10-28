@@ -393,7 +393,7 @@ def frame_input(*, frame, centre, models, references, prepared, profiles, mesh_f
             model = models[mi]
             profile = model['_profile'] if '_profile' in model else profiles[model['source']]
             size = profile.get('texture_size', 64)
-            exact = bool(prepared[mi][4].get('collision_bevels'))
+            exact = model_exact_bevels(prepared[mi][4])
             if (settings or {}).get('model_bevels', 'profile') != 'profile':
                 # EXPERIMENTAL edge bevels on every model (chim.bevels; CHIM-COMPILED-HULL-OVERFILL-46)
                 from chim.bevels import model_bevels_mode
@@ -774,6 +774,22 @@ def apply_mesh_method(profile, source, settings):
         return profile
     return apply(profile, source, settings)
 MODEL_HULL_PATCH = ('off', 'on')
+
+
+def model_exact_bevels(lod, mode=None):
+    """The exact flag of a CHIM model variant from its prepared mesh's lod (prepare_mesh_bsp._prepare_model): True when
+    the converter asked for exact standing bevels on the whole mesh ('collision_bevels'), and with the plate bevels
+    mode 'mesh' (the default, mesh_geometry_env.plate_bevels_mode) also when it asked for them on some pieces only
+    ('collision_bevels_pieces': stair plates, steep toes, deep walkable faces, authored ramps). A variant takes one
+    flag for the whole model; dropping the positions left those plates with approximate axial bevels, whose standing
+    hull grew over the treads beside them: the 24 Daedric shrine entrances' steps slid the player off
+    (DOOR-USE-COLLISION-FILLED-53, COLLISION-STAIR-SLOPE-32). 'drop': the method before."""
+    if lod.get('collision_bevels'):
+        return True
+    if mode is None:
+        from mesh_geometry_env import plate_bevels_mode
+        mode = plate_bevels_mode()
+    return mode == 'mesh' and bool(lod.get('collision_bevels_pieces'))
 
 
 def model_hull_patch_on(settings):
@@ -1366,6 +1382,102 @@ def resident_detail_on(settings_override):
     return mode == 'on'
 
 
+SEYDA_COLLISION_MODES = ('chim', 'legacy')
+
+
+def seyda_collision_mode(settings_override):
+    """How the Seyda Neen frame (chim.seyda) converts its models' collision (settings_override 'seyda_collision'):
+    'chim' (default from v0.0.54), the CHIM model builder's rules as every other CHIM area (chim_collision_rules);
+    'legacy', the Seyda Neen scenery's own profiles, the method before."""
+    mode = (settings_override or {}).get('seyda_collision', 'chim')
+    if mode not in SEYDA_COLLISION_MODES:
+        raise ValueError('Unknown Seyda Neen collision mode: %s' % mode)
+    return mode
+
+
+def chim_collision_rules(profile, source, flight=False):
+    """PROFILE with the CHIM model builder's collision rules for the mesh SOURCE, as prepare_area's mesh loop sets
+    them (keep the two the same): the stair-plate rules, the visible-tread rule, stair collision method 1 for a mesh
+    with a flight (FLIGHT), the measured hull-surface table, the standing-room table and the underside mode. For the
+    frames that take their profiles from elsewhere (the Seyda Neen frame's legacy scenery, chim.seyda)."""
+    from mesh_geometry import SURFACE_LOSS, UNDERSIDE_DEPTH, STANDING_ROOM_DEPTH
+    from mesh_geometry_env import underside_mode, hull_points_mode, standing_room_applies
+    from stair_collision_env import stair_collision_method
+    profile = dict(profile, stair_plates=True, visible_treads=True)
+    if flight and stair_collision_method() == '1':
+        profile['stair_collision'] = 'mesh'
+    hull_points = hull_points_mode()
+    key = source.replace(chr(92), '/').casefold()
+    if hull_points == 'all' or (hull_points in ('table', 'table-whole') and key in hull_surface_table()):
+        profile['hull_surface_loss'] = SURFACE_LOSS
+        if hull_points == 'table-whole':
+            profile['hull_surface_points'] = 'all'
+    if standing_room_applies(source):
+        profile['standing_room'] = STANDING_ROOM_DEPTH
+    underside = underside_mode()
+    if underside == 'whole':
+        profile['underside_whole'] = UNDERSIDE_DEPTH
+    elif underside in ('rule', 'split'):
+        profile['underside_plates'] = UNDERSIDE_DEPTH
+        if underside == 'split':
+            profile['underside_split'] = True
+    return profile
+
+
+DOOR_DETAIL_MODES = ('on', 'off')
+DOOR_DETAIL_REACH = 64          # the use reach (56) and the standing box in front of the door
+DOOR_GROUND_BAND = 64           # a load door within this height of the original ground stands on the terrain
+
+
+def door_detail_on(settings_override):
+    """Original LAND samples at load doors whose coarse ground misses the original (settings_override
+    'terrain_door_detail': on, the default from v0.0.54; off, the method before)."""
+    mode = (settings_override or {}).get('terrain_door_detail', 'on')
+    if mode not in DOOR_DETAIL_MODES:
+        raise ValueError('Unknown terrain door detail mode: %s' % mode)
+    return mode == 'on'
+
+
+def door_detail_tiles(references, settings, height, heights, low, high, step):
+    """{(x, y)}: low corners of the frame's terrain tiles that keep the original LAND samples because a load door
+    (a DOOR with a destination) stands on the ground there and the coarse tiles (the corner HEIGHTS every STEP units
+    from LOW) stand more than a step over the original ground under it (height(x, y), frame-local): the entrance sits in
+    a dip narrower than a tile, so the coarse ground buries its threshold (the Dwemer doors of Nchuleft and Bthungthumz:
+    the chunk ground 170 to 190 units over a threshold the original ground meets, DOOR-USE-COLLISION-FILLED-53). Every
+    tile within DOOR_DETAIL_REACH of the door is listed, inside the ground box: the form of resident_detail_tiles for
+    entrances. A door up on a building or a tower (more than DOOR_GROUND_BAND over the original ground) is not."""
+    from player_hull import STEP_HEIGHT
+    centre, scale = settings['centre'], settings['scale']
+    tiles = set()
+    for ref in references:
+        if ref.get('type') != 'DOOR' or not ref.get('destination'):
+            continue
+        x, y = [(ref['position'][k] - centre[k]) * scale for k in range(2)]
+        z = ref['position'][2] * scale
+        i, j = math.floor((x - low[0]) / step), math.floor((y - low[1]) / step)
+        if not (0 <= j < len(heights) - 1 and 0 <= i < len(heights[0]) - 1):
+            continue
+        try:
+            ground = height(x, y)
+        except KeyError:
+            continue
+        if abs(z - ground) > DOOR_GROUND_BAND:
+            continue
+        fx, fy = (x - low[0]) / step - i, (y - low[1]) / step - j
+        coarse = (heights[j][i] * (1 - fx) * (1 - fy) + heights[j][i + 1] * fx * (1 - fy)
+                  + heights[j + 1][i] * (1 - fx) * fy + heights[j + 1][i + 1] * fx * fy)
+        if coarse - ground <= STEP_HEIGHT:
+            continue            # the coarse ground holds the door (or lies under it: the player steps down to it)
+        for tx in range(math.floor((x - DOOR_DETAIL_REACH - low[0]) / step),
+                        math.floor((x + DOOR_DETAIL_REACH - low[0]) / step) + 1):
+            for ty in range(math.floor((y - DOOR_DETAIL_REACH - low[1]) / step),
+                            math.floor((y + DOOR_DETAIL_REACH - low[1]) / step) + 1):
+                tile = (low[0] + tx * step, low[1] + ty * step)
+                if low[0] <= tile[0] < high[0] and low[1] <= tile[1] < high[1]:
+                    tiles.add(tile)
+    return tiles
+
+
 def resident_detail_tiles(work, settings, height, low, high, step, references=None):
     """{(x, y)}: low corners of the frame's terrain tiles that keep the original LAND samples because a
     resident of this town stands on the ground there (CHIM-VIVEC-FRAME-WIDE-41).
@@ -1604,9 +1716,11 @@ def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings
     everywhere = everywhere_recipe(recipes)
     archive = work / 'scenery/scenery.mwpak'
     budget = detail_budget(area_cut_settings(settings, settings_override).get('detail_budget'))
-    from mesh_geometry import UNDERSIDE_DEPTH
-    from mesh_geometry_env import underside_mode
+    from mesh_geometry import UNDERSIDE_DEPTH, STANDING_ROOM_DEPTH
+    from mesh_geometry_env import underside_mode, standing_room_mode, standing_room_applies, standing_room_meshes
     underside = underside_mode()
+    standing_room = standing_room_mode()
+    standing_meshes = standing_room_meshes() if standing_room == 'table' else set()
     from mesh_geometry import SURFACE_LOSS
     from mesh_geometry_env import hull_points_mode
     hull_points = hull_points_mode()
@@ -1653,6 +1767,11 @@ def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings
             if hull_points == 'table-whole':
                 # the rule as first shipped, for A/B tests: the hull of all a piece's points (CHIM-HULL-SURFACE-HEAP-46)
                 profile['hull_surface_points'] = 'all'
+        if standing_room_applies(model['source'], standing_room, standing_meshes):
+            # a convex piece may not fill the standing room over an authored floor (mesh_geometry.collision_parts
+            # standing_room: the guard towers' top rooms over their trapdoors, DOOR-USE-COLLISION-FILLED-53); the
+            # measured table config/collision-standing-room.json by default
+            profile['standing_room'] = STANDING_ROOM_DEPTH
         if underside == 'whole':
             profile['underside_whole'] = UNDERSIDE_DEPTH
         elif underside in ('rule', 'split'):
@@ -1783,6 +1902,15 @@ def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings
         if detail:
             print('[chim] %s: %d terrain tiles keep the original LAND samples under ground residents'
                   % (town, len(detail)), flush=True)
+        # Original LAND samples at the load doors the coarse tiles bury (DOOR-USE-COLLISION-FILLED-53); 'off' keeps
+        # the plain tiles there (the method before v0.0.54)
+        door_tiles = (door_detail_tiles(selected, settings, lambda x, y: terrain_at(grids, settings, x, y)[0],
+                                        heights, low, high, step)
+                      if door_detail_on(settings_override) else set())
+        if door_tiles - detail:
+            print('[chim] %s: %d terrain tiles keep the original LAND samples at entrances the coarse ground buries'
+                  % (town, len(door_tiles - detail)), flush=True)
+            detail = detail | door_tiles
         tri_ground = (shoreline_ground(lambda x, y: terrain_at(grids, settings, x, y), materials, low, high, step,
                                        frame_liquids(pools, centre), shoreline=mode == 'on',
                                        grid_origin=tuple(v*SCALE for v in centre), detail=detail)

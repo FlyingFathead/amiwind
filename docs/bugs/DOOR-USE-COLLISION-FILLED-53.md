@@ -9,7 +9,7 @@
 | Where | CHIM collision at load doors: tower and fort hulls, terrain chunks (region frames) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.53-dev2 (last seen) |
+| Persists in | fixed in v0.0.54-dev2 |
 | Severity | medium: 10 of 1,102 exterior entrances cannot be entered; the other 1,092 can |
 | Family | Scene changes, arrivals and handoffs (`transitions-arrivals`) |
 | CHIM | Engine streaming and memory ([CHIM Engine tracker](CHIM_TRACKER.md)) |

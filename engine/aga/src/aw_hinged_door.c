@@ -25,6 +25,8 @@
 #include "quakedef.h"
 #include "aw_hinged_door.h"
 #include "aw_activated.h"
+#include "aw_state.h"
+#include "aw_inventory.h"
 #include "chim/chim.h"
 
 #define HD_ROWS 2048		/* placed doors in the table (the original game has 1,026) */
@@ -48,6 +50,15 @@ typedef struct {
 static hd_row_t rows[HD_ROWS];static hd_base_t bases[HD_BASES];static hd_sound_t sounds[HD_SOUNDS];
 static int row_count,base_count,sound_count,locked_sound=-1,loaded;
 static hd_door_t placed[HD_PLACED];static int placed_count,moving,overflow;
+/* DEBUG-GOD-LOCKED-DOORS-51: the K rows (every locked load door, every hinged door naming a key) and their key IDs. */
+#define HD_LOCKS 512
+#define HD_KEY_POOL 6144
+typedef struct {unsigned ref;unsigned char lock,flags;unsigned short key;} hd_lock_t;   /* key: pool offset + 1, 0 none */
+static hd_lock_t locks[HD_LOCKS];static int lock_count,key_pool_used;static char key_pool[HD_KEY_POOL];
+static char key_used[48];   /* GMST sKeyUsed */
+/* dbg doorlocks on|off (the coordinator, 2026-10-27: on by default, a debug switch until lockpicks and the Open
+ * spell exist; no cvar: the resident registry is full). Not saved. */
+static int door_locks=1;
 int (*aw_hinged_story)(unsigned ref,int event);
 static int story(unsigned ref,int event){return aw_hinged_story?aw_hinged_story(ref,event):-1;}
 
@@ -92,9 +103,27 @@ static void load(void){
             rows[row_count].lock=(unsigned char)b;rows[row_count++].flags=(unsigned char)c;
         }else if(line[0]=='L' && line[1]==' '){
             if(Q_sscanf(line+2,"%d %c",&a,&extra)==1 && a>=0 && a<sound_count)locked_sound=a;
+        }else if(line[0]=='K' && line[1]==' '){
+            /* a lock row: left out when it breaks a rule (out of order, no room); never renumbers anything */
+            char *key;int len;
+            n=0;
+            if(lock_count>=HD_LOCKS || Q_sscanf(line+2,"%u %d %d%n",&ref,&b,&c,&n)!=3 || b<0 || b>255 || c<0 || c>15 ||
+               (lock_count && ref<=locks[lock_count-1].ref))continue;
+            key=line+2+n;while(*key==' ')key++;
+            len=(int)strcspn(key,"\r\n");
+            locks[lock_count].key=0;
+            if(len>0){
+                if(len>63 || key_pool_used+len+1>HD_KEY_POOL)continue;
+                memcpy(key_pool+key_pool_used,key,len);key_pool[key_pool_used+len]=0;
+                locks[lock_count].key=(unsigned short)(key_pool_used+1);key_pool_used+=len+1;
+            }
+            locks[lock_count].ref=ref;locks[lock_count].lock=(unsigned char)b;locks[lock_count++].flags=(unsigned char)c;
+        }else if(line[0]=='U' && line[1]==' '){
+            n=(int)strcspn(line+2,"\r\n");if(n>(int)sizeof(key_used)-1)n=sizeof(key_used)-1;
+            memcpy(key_used,line+2,n);key_used[n]=0;
         }else{bad=1;break;}
     }
-    if(bad){row_count=base_count=sound_count=0;locked_sound=-1;}
+    if(bad){row_count=base_count=sound_count=lock_count=key_pool_used=0;locked_sound=-1;key_used[0]=0;}
     fclose(f);
 }
 int AW_HingedDoorRow(unsigned reference){
@@ -122,12 +151,56 @@ int (*aw_object_lock_level)(unsigned reference,int original);
 static int locked(const hd_door_t *d){
     int s=story(d->ref,AW_HINGE_STORY_LOCK),original=original_lock(d->row);
     if(s>=0)return s!=0;
-    return (aw_object_lock_level?aw_object_lock_level(d->ref,original):original)>0;
+    return door_locks && (aw_object_lock_level?aw_object_lock_level(d->ref,original):original)>0;
 }
-/* The game data's lock level of a placed door (GetLocked on a door no script has locked), -1 not a door here. */
+/* The K row of REFERENCE, NULL for none (binary search; rows ascending). */
+static const hd_lock_t *lock_row(unsigned reference){
+    int low=0,high,mid;
+    load();high=lock_count-1;
+    while(low<=high){
+        mid=(low+high)/2;
+        if(locks[mid].ref==reference)return &locks[mid];
+        if(locks[mid].ref<reference)low=mid+1;else high=mid-1;
+    }
+    return NULL;
+}
+/* The game data's lock level of a placed door (GetLocked on a door no script has locked), -1 not a door here:
+ * a hinged door's D row, else a load door's K row (0 when it is not locked: a load door without a K row). */
 int AW_HingedDoorOriginalLock(unsigned reference){
-    int row=AW_HingedDoorRow(reference);
-    return row<0?-1:original_lock(row);
+    int row=AW_HingedDoorRow(reference);const hd_lock_t *k;
+    if(row>=0)return original_lock(row);
+    k=lock_row(reference);
+    return k && (k->flags&AW_HINGE_LOCKED)?(k->lock?k->lock:1):-1;
+}
+/* The locked door's way through (OpenMW apps/openmw/mwclass/door.cpp Door::activate, rule read, not copied): the
+ * player who carries the door's key opens it ("<key> used to open lock", GMST sKeyUsed); else, in god mode (dbg god),
+ * the player goes through and the message box says so (the maintainer, 25 October 2026: "it should throw a
+ * rectangle box text: 'God mode used to enter a locked door'"). 1 = through, 0 = refused. */
+static int lock_pass(unsigned reference){
+    const hd_lock_t *k=lock_row(reference);const char *key=k && k->key?key_pool+k->key-1:NULL;edict_t *p;
+    char text[160];aw_inventory_item_t item;
+    if(key && AW_StateGet(&aw_state,AW_ITEM,key)>0){
+        memset(&item,0,sizeof(item));
+        snprintf(text,sizeof(text),"%s %s",AW_InventoryRead(key,&item) && item.name[0]?item.name:key,
+                 key_used[0]?key_used:"used to open lock");
+        AW_UISubtitle("",text,3);return 1;
+    }
+    p=sv.active && svs.clients?svs.clients[0].edict:NULL;
+    if(p && ((int)p->v.flags&FL_GODMODE)){AW_UISubtitle("",AW_DOOR_GOD_TEXT,4);return 1;}
+    return 0;
+}
+/* aw_scene.c (through aw_load_door_lock): a load door's lock. USE 0: 1 when it is locked now (the prompt says
+ * Locked). USE 1, the player's use: 1 = refused (the LockedDoor sound to the player), 0 = through (unlocked, the
+ * key, god mode, dbg doorlocks off). A script's Lock / Unlock counts (aw_object_lock_level). */
+int AW_HingedDoorLoadLock(unsigned reference,int use){
+    int level=AW_HingedDoorOriginalLock(reference);
+    if(level<0)level=0;
+    if(aw_object_lock_level)level=aw_object_lock_level(reference,level);
+    if(level<=0 || !door_locks)return 0;
+    if(!use)return 1;
+    if(lock_pass(reference))return 0;
+    AW_HingedDoorLockedSound();
+    return 1;
 }
 static int sound_entity(const hd_door_t *d){return d->edict?d->edict:MAX_EDICTS+(int)(d-placed);}
 static void play(hd_door_t *d,int sample){
@@ -247,7 +320,10 @@ int AW_HingedDoorActivate(unsigned reference){
 }
 static int use_door(hd_door_t *d,int force){
     const hd_row_t *r=&rows[d->row];const hd_base_t *b=&bases[r->base];
-    if(!force && locked(d)){play(d,locked_sound);story(d->ref,AW_HINGE_STORY_REFUSED);return 1;}
+    /* the story's lock (the census hall door) holds for everyone; any other lock lets the key or god mode through */
+    if(!force && locked(d) && (story(d->ref,AW_HINGE_STORY_LOCK)>=0 || !lock_pass(d->ref))){
+        play(d,locked_sound);story(d->ref,AW_HINGE_STORY_REFUSED);return 1;
+    }
     if(!d->dir){d->dir=d->amount>0?-1:1;moving++;}
     else d->dir=(signed char)-d->dir;
     d->held=0;
@@ -341,6 +417,18 @@ void AW_HingedDoorRecentre(const float *d){
 static void command(void){
     char *a=Cmd_Argc()>1?Cmd_Argv(1):"";int i,list=!Q_strcasecmp(a,"list");hd_door_t *d;
     load();
+    /* dbg doorlocks [on/off]: every door's lock (load and hinged) on or off; no argument prints it */
+    if(!Q_strcasecmp(a,"locks")){
+        char *w=Cmd_Argc()>2?Cmd_Argv(2):"";
+        if(Cmd_Argc()>3 || (*w && Q_strcasecmp(w,"on") && Q_strcasecmp(w,"off") && strcmp(w,"1") && strcmp(w,"0") &&
+           Q_strcasecmp(w,"true") && Q_strcasecmp(w,"false"))){
+            Con_Printf("Usage: dbg doorlocks [on/off, true/false or 1/0]\n");return;
+        }
+        if(*w)door_locks=!Q_strcasecmp(w,"on") || !strcmp(w,"1") || !Q_strcasecmp(w,"true");
+        Con_Printf("Door locks %s (%ld locked load doors and keyed doors in the table; god mode or the key opens them).\n",
+                   door_locks?"on":"off: every lock ignored",(long)lock_count);
+        return;
+    }
     if(list || !Q_strcasecmp(a,"status")){
         int edicts=0;
         for(i=0;i<placed_count;i++)edicts+=placed[i].edict!=0;
@@ -366,6 +454,7 @@ extern void (*aw_hinged_tick)(double seconds);
 extern void (*aw_hinged_map_begin)(void);
 extern int (*aw_hinged_protect)(edict_t *e);
 extern int (*aw_hinged_locked_sound)(void);
+extern int (*aw_load_door_lock)(unsigned reference,int use);
 /* The original LockedDoor sound to the player, not at a door (aw_scene.c: a
  * room door this start cannot open, CHIM-ROOM-16MB-REFUSAL-48). 1 when played. */
 int AW_HingedDoorLockedSound(void){
@@ -381,4 +470,5 @@ void AW_HingedDoorInit(void){
     aw_hinged_use=AW_HingedDoorUse;aw_hinged_hint=AW_HingedDoorHint;aw_hinged_spawn=AW_HingedDoorSpawn;
     aw_hinged_tick=AW_HingedDoorTick;aw_hinged_map_begin=AW_HingedDoorMapBegin;aw_hinged_protect=AW_HingedDoorProtect;
     aw_hinged_locked_sound=AW_HingedDoorLockedSound;
+    aw_load_door_lock=AW_HingedDoorLoadLock;
 }

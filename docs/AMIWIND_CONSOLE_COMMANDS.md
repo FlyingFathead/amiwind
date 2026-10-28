@@ -1,6 +1,6 @@
 # AmiWind console commands
 
-_Generated from `config/debug-commands.txt` with AmiWind v0.0.53._
+_Generated from `config/debug-commands.txt` with AmiWind v0.0.54._
 
 Open the console with F10 or the backquote key and type
 a command, for example `dbg headlamp on`. This page is generated from
@@ -32,6 +32,7 @@ Type: "dbg help" for help.
 
 | Command | Also | Arguments and notes |
 | --- | --- | --- |
+| `dbg atmos` | - | 0..3 (saved, default 2): 1 rain, snow and storm ash outdoors (off until measured), 2 chimney, fire and steam smoke; 3 both |
 | `dbg cam` | - | [mark NAME / recall NAME / list / orbit [photo] [speed DEG] [ref N / mark NAME] / orbit off] (docs/CAMERA_MARKS.md) mark saves place, view, time, headlamp, fog; recall: a public mark (bm1..bm5, sn1..sn5, vivec-palace) or yours, as dbg tp; orbit circles the crosshair target, player detached: +/- speed, 0 holds, wheel distance, right click or Esc ends |
 | `dbg camera` | `dbg pov`, `dbg thirdperson` | [first / third / toggle / distance 7.5..200 / vanity on/off/now / death on/off / retry on/off / body on/off / die] player view: no argument = status; Tab first/third person (held: orbit), wheel zooms; vanity = idle orbit; death = death camera; retry = Retry fight; die = test death (docs/THIRD_PERSON.md) |
 | `dbg campfires` | - | [on/off, true/false or 1/0] fires outdoors (default on; not saved): on = campfires, braziers, fire pits, torches and flame lamps burn and light the objects around them (and, at night, the ground near the nearest); off = no flame and no fire light outdoors, at once (interiors keep their fires) |
@@ -39,13 +40,14 @@ Type: "dbg help" for help.
 | `dbg cull` | - | far detail (saved; also Options > Video > Far detail): 1 Full (everything to the fog), 3 Light, 4 Strong (default; saves from before v0.0.42 keep Full), 6 Strong + small faces (distant models drop out sooner: faster); also 0 none, 2 fog-exact (same picture as 1), 5 small faces only, 7 debug view; on = 1, off = 0; +8 fog rule, +16 cut groups (see those) |
 | `dbg cut groups` | - | [on/off, 1/0; no argument shows aw_cull] whole-structure cuts (saved as aw_cull + 16; default off until the in-game A/B): the pieces of one long structure (walkways, town walls, bridges, the Ghostfence, hillside rocks; the frame map's .cut file) are drawn, fogged and left out together, tested on the structure's box; 0 each piece on its own |
 | `dbg draw distance` | `dbg drawdistance`, `dbg fog distance` | [100..4096 local units; default 540] |
-| `dbg fog` | - | on/off or 1/0 (default on) |
+| `dbg fog` | - | on/off or 1/0 (default on: exterior and interior fog; the console value 2 = exterior fog only, interiors without their cell fog as before) |
 | `dbg fog location` | `dbg foglocation` | 1/0 places in id1/world/fog-locations.txt set their own day/night fog distance (Balmora 300 day, 250 night; default 0 off) |
 | `dbg fog rule` | - | [on/off, 1/0; no argument shows aw_cull] no distance cut before the fog is opaque (saved as aw_cull + 8; default off until the in-game A/B): the Light/Strong far detail cut-offs and the small-faces step start at the fog distance, so nothing pops out of clear air; 0 the cut-offs as before (faster) |
 | `dbg ghostfence` | - | [on/off, true/false or 1/0] animated scrolling textures (default on; not saved): on = the Ghostfence curtain, waterfalls and other turbulent textures ripple over time; off = drawn straight and still (unlit, as they are built; also stills water in interiors) |
-| `dbg killhud` | `dbg photomode` | [on/off, true/false or 1/0; no argument toggles] clean screenshots: hides bars, crosshair, hands, prompts, names, subtitles and overlays; full-screen view; fog off and free camera (aw_photomode_nofog, aw_photomode_noclip, aw_photomode_hands); Ctrl+F fog, Ctrl+H dbg hud; off returns to the start point (not saved; also Options > Video > Photo mode) |
+| `dbg killhud` | `dbg photomode` | [on/off, true/false or 1/0; no argument toggles; hud: Ctrl+Alt+H] clean shots: hides bars, crosshair, hands, prompts, names, subtitles and overlays; full view; fog off and free camera (aw_photomode_nofog, aw_photomode_noclip, aw_photomode_hands); Ctrl+F fog, Ctrl+H dbg hud; off returns to the start point (not saved; Options > Video > Photo mode) |
 | `dbg land fill` | `dbg landfill` | 1/0 (default 1): Land Fill Independence v1, enabled LAND passes with fog on or off; 0 disables for A/B |
 | `dbg land method` | - | 1/0 legacy resident LAND rasterizer (default 0, experimental); separate from the CHIM far layer |
+| `dbg magicfx` | - | [0 / 1 / 2; no argument shows the value] magic effects (docs/MAGIC_EFFECTS.md, experimental): 0 off (default, saved), 1 sprites and particles, 2 also their light |
 | `dbg noclipbob` | `dbg noclipwobble` | same as noclipwobble |
 | `dbg photomode ui` | - | [on/off or 1/0] photo mode's own notice box and hints (saved; default on; off hides them; the Halloween scene turns them off while it runs) |
 | `dbg playvid` | `dbg playvideo`, `dbg videoplay`, `dbg vidplay` | <1..17 / 01..17 / catalogue name> (drains queued game audio first) |
@@ -56,19 +58,21 @@ Type: "dbg help" for help.
 
 | Command | Also | Arguments and notes |
 | --- | --- | --- |
-| `dbg animkit` | - | [on/off / list / groups / play <group> / cycle [all] / stage [1..8] / stop / speed <0.1..4>] animation kit (docs/ANIMKIT.md): on/off gaits by speed; list/groups: the target's groups; play: a group on it (skeletal: any by name); cycle: all groups in turn; stage: skeletal NPCs before you |
-| `dbg arena` | `dbg arenapit`, `dbg arenatest`, `dbg battlearena` | [opponent / list / next / prev / here/pit/floor / seed N / rematch / setup / exit] Vivec Arena combat minigame (also dbgmode arenapit, testarena): title, fight, result, then Enter rematch / S same seed / N, B next, previous / P pick / Esc leave; opponent = Arena fighter, gallery # or NPC record ID; Ctrl+X returns (not saved) |
+| `dbg animkit` | - | [on/off / list / groups / play <group> / cycle [all] / stage [1..8] / stop / speed <0.1..4> / pick [on/off / cast / sneak / idle]] animation kit (docs/ANIMKIT.md): on/off gaits by speed; list/groups, play, cycle, stage: the target's groups; pick: every group by state |
+| `dbg arena` | `dbg arenapit`, `dbg arenatest`, `dbg battlearena`, `dbg playground` | [opponent / list / next / prev / here/pit/floor / seed N / rematch / setup / exit] Vivec Arena combat minigame (also dbgmode arenapit, testarena): title, fight, result, then Enter rematch / S same seed / N, B next, previous / P pick / Esc leave; opponent = Arena fighter, gallery # or NPC record ID; Ctrl+X returns (not saved) |
 | `dbg aw charplane` | `dbg gallery`, `dbg modelgallery`, `dbg npcgallery` | [number/name/ID; next/previous/body/exit] |
 | `dbg aw hors` | - | 0 (new Hors, Nord / Barbarian / Steed, after Census) |
 | `dbg bench` | `dbg halloweenbench` | [halloween [skeletons]] the standard benchmark (docs/REAL_HARDWARE.md; also aw halloweenbench, dbg halloween bench): 600 fixed frames of the Halloween scene, FPS small at the bottom left, then one result line on the console to copy |
+| `dbg cast` | - | [NAME [target / touch / self / fail] [npc] [area FEET] [dur SECONDS] [repeat] / list / stop / orb 0-3; no argument: status and costs] a spell's look and sound (docs/MAGIC_EFFECTS.md; needs dbg magicfx 1 or 2): cast animation, orb, hand glow, cast, bolt, hit, area burst; npc: the actor in front casts at you; no magicka or effects on actors |
 | `dbg characterchange` | `dbg quickchar` | [race class birthsign review / all] reopen the pier race, gender, head and hair menu over the current scene; confirm to apply (after registration) |
 | `dbg choosecompanion` | `dbg pickcompanion` | same as companion pick |
-| `dbg combat` | - | [on/off / seed N / readout on/off / music on/off / dice on/off / style amiwind/original / block hold/auto / bestattack on/off / loadout NAME/off / calm] melee combat: no argument = status and costs; readout = a console line per swing; seed 0 = a new seed per fight; block hold = right button blocks (defaults: on, readout on, music on, block hold) |
+| `dbg combat` | - | [on/off / seed N / readout on/off / music on/off / dice on/off / style amiwind/original / block hold/auto / flee on/off / bestattack on/off / loadout NAME/off / calm] melee combat: no argument = status, costs; readout = a line per swing; seed 0 = new per fight; flee on = also by Flee rating (defaults on, readout on, music on, block hold, flee off) |
 | `dbg combattest` | - | [opponent] same as arenapit; combattest gallery (or floor): the empty floor test, current hands, then idle/draw/lower/punch/center/help/exit |
 | `dbg companion` | - | [pick/choose/test/off/distance N/mimic speed on/off] NPC follower test (not saved): no argument = status and counters; pick = attack the NPC under the red crosshair; test = spawn one beside you; off = it goes home / is removed; distance 48..512 (default 96); mimic speed (default on) |
 | `dbg companiontest` | - | [on/off] same as companion test / companion off; no argument: status |
+| `dbg creatures` | - | [on/off, true/false or 1/0; no argument: status] the outdoor creatures (default on; not saved): off removes the wild creatures alive (their state kept) and spawns none, to compare frame rate, memory and behaviour; on brings them back as their cells join again |
 | `dbg daycycle gallery` | - | [here/off] (eight-stage camera tour; here keeps this view; Esc returns) |
-| `dbg halloween` | - | [dagoth / skeletons / bench [skeletons] / fps on/off / camera wide/director / stop / status] Halloween scene (docs/HALLOWEEN.md, --miniwind-halloween image): skeletons, Desele's dancers, Dagoth Ur dance on the beat; dagoth (default) or skeletons alone; bench: the standard benchmark, one result line |
+| `dbg halloween` | - | [dagoth / skeletons / bench [skeletons] / fps on/off / camera wide/director / stop / status] Halloween scene (docs/HALLOWEEN.md, an image with the cast): skeletons, Desele's dancers, Dagoth Ur dance on the beat; dagoth (default) or skeletons alone; bench: the standard benchmark, one result line |
 | `dbg halloweentest` | - | [same words as halloween] the Halloween scene with the FPS counter on (bottom left) |
 | `dbg inventory grant` | - | <quoted source item ID> <1..999> explicit diagnostic grant of actual catalogue items (not saved defaults) |
 | `dbg lightgallery` | - | [off] lighting switches at this spot in a strip below the view: night mode, tint, lamps, glow, headlamp, horizon veil, time preview; arrows change, Esc done |
@@ -83,7 +87,7 @@ Type: "dbg help" for help.
 
 | Command | Also | Arguments and notes |
 | --- | --- | --- |
-| `dbg door` | - | [status / list; no argument: open or close the hinged door under the crosshair, locks ignored] ordinary hinged doors (docs/DOOR_MAPPING.md): status counts the table and this map's doors, list prints each (reference, edict or CHIM, how far open, lock) |
+| `dbg door` | `dbg doorlocks` | [status / list; no argument: open or close the hinged door under the crosshair, locks ignored] ordinary hinged doors (docs/DOOR_MAPPING.md): status counts the table and this map's doors, list prints each (reference, edict or CHIM, how far open, lock) |
 | `dbg door roulette` | - | [SEED] one random interior: loads you straight into a room of this disk at the room's own start and prints which (name, map id, cell number) and the seed; the same SEED loads the same room again (random tests of interior loading) |
 | `dbg god` | `dbg godmode` | [on/off, true/false or 1/0; no argument toggles] Quake god mode (no damage; the HUD shows GOD) (not saved) |
 | `dbg map format` | - | 2 draws the v2 world map layers (default) / 1 draws a v2 map as the v1 map (terrain and settlements only) |
@@ -141,7 +145,7 @@ Type: "dbg help" for help.
 | `dbg torch radius` | - | [32..288] (player + admitted guard lights; default 192, classic 144) |
 | `dbg torch strength` | - | [0..1] (player + admitted guards; default 0.7; local light only) |
 | `dbg warm light` | - | 1/0 torch, lamp and window light takes the light hue (default 1) |
-| `dbg weather` | - | [on/off / auto / clear cloudy foggy overcast rain thunder ash blight snow blizzard] region weather: sky and fog colours from the region's weather chances (default on, saved; off = clear sky everywhere); a weather name forces it until auto; no argument: the weather and the region's chances |
+| `dbg weather` | - | [on/off / skyonly / auto / clear cloudy foggy overcast rain thunder ash blight snow blizzard] region weather: sky, fog and land light from the region's chances (default on, saved; skyonly: sky and fog only; off: clear sky); a name forces it until auto; no argument: the weather and chances |
 
 ## Ui / Console
 
@@ -196,3 +200,4 @@ Type: "dbg help" for help.
 | `dbg sealevel` | - | on/off |
 | `dbg show fps` | - | [on/off] |
 | `dbg showram` | - | on/off |
+| `dbg sweep` | - | [actors/plants/doors/lights/statics] each entity class of the loaded area: what the image ships (map entities, door bank, harvest catalogue) against what is live; names each failure (actor without model or animation, harvestable but not pickable, door without a link); last line SWEEP RESULT ok/FAIL (read only) |

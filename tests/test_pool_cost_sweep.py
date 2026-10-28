@@ -34,6 +34,7 @@ REASONS = {
     'tools/room_actor_bake.py:_bake': LATER,   # the CHIM room actor bake, the same pools as bake_ground
     'tools/actor_grounding_census.py:measure': LATER,
     'tools/asset_census.py:scan_meshes': UNIFORM,
+    'tools/creature_tables.py:build': LATER,   # one unit per creature mesh (89, 2-25 s each), not a default stage yet
     'tools/audit_gallery_budgets.py:main': GATE,
     'tools/interior_store.py:main': GATE,
     'tools/build_gallery.py:prefetch_dependencies': UNIFORM,
@@ -46,6 +47,7 @@ REASONS = {
     'tools/build_parallel.py:governed_map': 'the fallback of governed_map itself: it passes its caller\'s cost on',
     'tools/build_costs.py:costed_map': 'the cost history wrapper itself (passes cost=)',
     'tools/cell_numbers.py:stamp_staged_cells': UNIFORM,
+    'tools/particle_emitters.py:sweep': GATE,   # a read-only survey tool, one NIF per unit, never a build stage
     'tools/check_actor_ground.py:audit': GATE,
     'tools/check_world_map_heap.py:inspect_maps': LATER,
     'tools/chim/collision.py:stair_gate': SORTED,

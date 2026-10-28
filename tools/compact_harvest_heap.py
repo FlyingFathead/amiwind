@@ -108,7 +108,9 @@ def catalogue_usage(raw,sizes):
         last=14 if version=='AWH4' else 13 if version=='AWH3' else 12
         fields=line.split(maxsplit=last)
         if len(fields)!=last+1:raise ValueError('Invalid harvest plant record')
-        intern(fields[0]);intern(fields[3 if version in ('AWH3','AWH4') else 2]);intern(fields[-1])
+        # the label, then (an owned plant, HARVEST-INTERIOR-PICK-47) a tab and the owning character's id: two interned strings
+        label,_,owner=fields[-1].partition('\t')
+        intern(fields[0]);intern(fields[3 if version in ('AWH3','AWH4') else 2]);intern(label);intern(owner)
     text=1+sum(len(s)+1 for s in strings) if strings else 0
     if text>sizes['harvest_text_capacity']:raise ValueError('Harvest dictionary exceeds measured runtime')
     arrays=sum(n*sizes[key] for n,key in zip((models,nodes,edges,plants),

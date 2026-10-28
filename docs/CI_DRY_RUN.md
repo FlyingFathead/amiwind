@@ -1,6 +1,6 @@
 # Asset-free compilation and boot image
 
-_Last updated with AmiWind v0.0.53 (27 October 2026)._
+_Last updated with AmiWind v0.0.54 (27 October 2026)._
 
 The GitHub Actions workflow `.github/workflows/source-check.yml` runs on pushes,
 pull requests, tags, a weekly schedule and manual dispatch. It uses Ubuntu 24.04
@@ -16,7 +16,7 @@ did all of it in a row and outgrew its time limit):
 | --- | --- |
 | `tools` | Bootstraps every public tool into an empty directory (`tools/build.py --autoinstall --install-dependencies`) when anything the installer reads has changed, and keeps that directory in the Actions cache. Otherwise it restores the kept copy and checks it file by file. |
 | `source-checks` | The source allowlist, the NIF reader check and the setup plan. |
-| `tests` | The whole test suite, in parallel jobs (`tools/run_tests.py --shard I/N`). |
+| `tests` | The whole test suite, in parallel jobs (`tools/run_tests.py --shard I/N`), shown as `Test suite part 1 of 6` to `Test suite part 6 of 6` ([CI.md](CI.md)). |
 | `dry-run` | After the tests pass: the engine compile, the boot-notice image and its package. |
 | `tools-from-nothing` | On tags, every Monday and on request: the bootstrap into an empty directory with no cache, then the dry-run image built with those fresh tools. |
 | `host-launcher-parity`, `docker-builder` | The host launcher checks on Linux and Windows, and the Linux container builder. |
@@ -42,6 +42,12 @@ spread over the N shards by the recorded module times in
 depends only on the commit, so all shards of one run agree on it, and the runner
 checks that every module is in exactly one shard before it starts.
 `--list --shard I/N` prints the tests of one shard.
+
+**The time limits.** Each job has its own `timeout-minutes`, kept so that the
+slowest recorded run stays under 80 % of it. The first run of the split layout
+(v0.0.53) bootstrapped the tools from nothing in 28 minutes 15 seconds, so from
+v0.0.54 `tools` has 40 minutes and `tools-from-nothing` (that bootstrap plus an
+uncached dry-run) has 60. The slowest test shard took 19 minutes of its 30.
 
 No Morrowind installation, game assets, Kickstart ROM, Workbench files or private
 recovery archives are inputs to this workflow. It does not run an emulator or

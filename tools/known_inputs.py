@@ -820,9 +820,16 @@ class InputLock:
                   'note': 'Private: hashes of your own input files. Never share or ship this file.',
                   'files': dict(sorted(files.items()))}
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = self.path.with_name(self.path.name + '.tmp')
-        temporary.write_text(json.dumps(record, indent=2) + '\n', encoding='utf-8', newline='\n')
-        temporary.replace(self.path)
+        # a temporary name of this writer's own: builds started side by side in one workspace each write the lock,
+        # and one fixed name let the second rename the first's file away (FileNotFoundError at the build's start,
+        # BUILD-INPUTS-LOCK-TMP-RACE-54); the last complete write wins, as before
+        temporary = self.path.with_name('%s.%s.tmp' % (self.path.name, os.urandom(6).hex()))
+        try:
+            temporary.write_text(json.dumps(record, indent=2) + '\n', encoding='utf-8', newline='\n')
+            temporary.replace(self.path)
+        finally:
+            if temporary.exists():
+                temporary.unlink()
         return self.path
 
 

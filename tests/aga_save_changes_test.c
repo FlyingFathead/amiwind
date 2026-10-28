@@ -160,6 +160,18 @@ int main(int argc,char **argv)
     other[n-AW_CHANGE_ENTRY_BYTES+5]|=0x80;                  /* the second entry's flags: an unknown bit (15) */
     put(other+8,crc32(other+12,n-12));assert(!AW_SaveDecodeChanges(other,n,&decoded,&back));
     other[n-1]^=1;assert(!AW_SaveDecodeChanges(other,n,&decoded,&back));
+    /* the actor record's block (v0.0.54, feature 16): read back into the caller's buffer, with no change list too;
+     * a reader without a buffer skips it; a block over the cap is refused */
+    {static unsigned char block[64],got[64];int k2;
+     list.count=0;list.actors=block;list.actor_bytes=10;list.actor_capacity=64;memcpy(block,"AWAS\1\0\0\0\0\0",10);
+     k2=AW_SaveEncodeChanges(other,sizeof(other),&save,&list);assert(k2>0);
+     back.actors=got;back.actor_capacity=64;back.actor_bytes=0;
+     assert(AW_SaveDecodeChanges(other,k2,&decoded,&back) && back.actor_bytes==10 && !memcmp(got,block,10) && back.count==0);
+     back.actors=NULL;back.actor_capacity=0;
+     assert(AW_SaveDecodeChanges(other,k2,&decoded,&back) && back.actor_bytes==0);
+     list.actor_bytes=AW_SAVE_ACTOR_BYTES+1;list.actor_capacity=AW_SAVE_ACTOR_BYTES+1;
+     assert(!AW_SaveEncodeChanges(other,sizeof(other),&save,&list));
+     list.actors=NULL;list.actor_bytes=list.actor_capacity=0;}
     fprintf(o,"refusals ok\n");
 #endif
     if(o!=stdout)fclose(o);

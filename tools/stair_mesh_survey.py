@@ -76,6 +76,10 @@ def chim_profile(source, triangles, group_profile, surface_table):
     profile = town_model_profile(group_profile or {}, source, triangles, underpass_names=True)
     profile['stair_plates'] = True
     profile['visible_treads'] = True
+    from mesh_geometry import STANDING_ROOM_DEPTH
+    from mesh_geometry_env import standing_room_applies
+    if standing_room_applies(source):
+        profile['standing_room'] = STANDING_ROOM_DEPTH
     if source.replace(chr(92), '/').casefold() in surface_table:
         profile['hull_surface_loss'] = SURFACE_LOSS
     return profile

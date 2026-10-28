@@ -10,7 +10,7 @@ byte *draw_chars;
 static cvar_t *freeze,*black,*mode;
 static int character,reader,gallery,movie,clears,extra_audio;
 static int physics,network,commands,presentation,audio,music,intro,waits,saves,scenes;
-static int scenery,harvest,speech,tempents,packets,parsed;
+static int scenery,harvest,speech,tempents,magic,packets,parsed;
 static int death_prompt;
 static int prompt_active(void){return death_prompt;}
 
@@ -38,6 +38,7 @@ void AW_SceneryLink(void){scenery++;}
 void AW_HarvestLink(void){harvest++;}
 void AW_SpeechRelink(void){speech++;}
 void CL_UpdateTEnts(void){tempents++;}
+void AW_MagicUpdate(void){magic++;}   /* magic effects: frozen with the temporary entities (aw_magic.c) */
 void R_RemoveEfrags(entity_t *e){assert(0);}
 int aw_visedicts_dropped,aw_visedicts_dropped_frame;
 void AW_VisedictDropped(void){assert(0);}
@@ -127,11 +128,11 @@ int main(void){
     cl.mtime[0]=7;cl.mtime[1]=6.98;
     for(i=0;i<200;i++){black->value=i&1;realtime+=host_frametime;packets=1;CL_ReadFromServer();}
     assert(cl.time==7 && cl.oldtime==7 && parsed==200);
-    assert(!scenery && !harvest && !speech && !tempents);
+    assert(!scenery && !harvest && !speech && !tempents && !magic);
     /* Resume uses one frame, never the four elapsed seconds spent in UI. */
     death_prompt=0;sv.time=7.02;packets=1;CL_ReadFromServer();
     assert(fabs(cl.time-7.02)<.00001 && cl.oldtime==7 && parsed==201);
-    assert(scenery==1 && harvest==1 && speech==1 && tempents==1);
+    assert(scenery==1 && harvest==1 && speech==1 && tempents==1 && magic==1);
     character=1;freeze->value=0;sv.time=7.04;packets=1;CL_ReadFromServer();
     assert(fabs(cl.time-7.04)<.00001 && scenery==2 && harvest==2);
 #else

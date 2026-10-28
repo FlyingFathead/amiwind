@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "aw_bounds.h"
 #include "aw_state.h"
 #include "aw_items.h"
+#include "aw_ambient.h"
 #include "chim/chim.h"
 
 /*
@@ -1698,6 +1699,8 @@ void SV_Physics (void)
 	AW_CompanionPhysics ();
 	/* Hostile NPCs and the player's punch (aw_combat.c), after the companion. */
 	AW_CombatPhysics ();
+	/* The residents' Wander packages (aw_ambient.c), after combat: an actor combat holds is left alone. */
+	AW_AmbientPhysics ();
 	/* Carried lights of skeletal actors: a guard's torch follows its hand (aw_items.c). */
 	AW_ItemsCarriedUpdate ();
 	/* Enchanted items recharge with unpaused time (OpenMW Engine::frame rechargeItems). */

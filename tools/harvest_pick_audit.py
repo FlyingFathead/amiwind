@@ -64,7 +64,7 @@ def read_catalogue(text):
         boxes.append((tuple(map(float, p[2:5])), tuple(map(float, p[5:8]))))
     plants = []
     for line in lines[1 + count:]:
-        p = line.split()
+        p = line.partition('\t')[0].split()      # an owned plant's row ends in a tab and its owner (not the label)
         if len(p) < 14 or not p[0].startswith('aw:h:') or not p[3].startswith('@'):
             continue
         plants.append({'ref': int(p[2]), 'model': int(p[3][1:]), 'origin': tuple(map(float, p[7:10])),

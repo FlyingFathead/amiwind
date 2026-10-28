@@ -915,6 +915,29 @@ static void lava_draw(float left,float top){
         lava_painted+=painted;
     }
 }
+/* UI-MAP-PLAYER-ARROW-51 (the maintainer, 25 October 2026: the map's player marker as the original's arrow that
+ * turns with the player, "USE THE ARROW BITMAP AS A SOURCE FROM THE ORIGINAL MORROWIND FILES"): the arrow of
+ * textures/compass.dds (aw_ui.c AW_UIMapArrow, 16x16, 255 clear) centred at CX,CY, pointing along YAW (Quake degrees:
+ * 0 east, 90 north = up on the map), turned by the nearest source pixel (no new colours), clipped to the map view
+ * (x 4..315, y 19..172). 0 when the image has no arrow: the old marker is drawn. */
+static int map_arrow(int cx,int cy,float yaw){
+    const byte *a=AW_UIMapArrow();int x,y,sx,sy;float c,s,u,v,turn;byte p;
+    if(!a)return 0;
+    turn=(90.0f-yaw)*(3.14159265f/180.0f);   /* clockwise from up */
+    c=Q_CosRad(turn);s=Q_SinRad(turn);
+    for(y=-12;y<=12;y++){
+        if(cy+y<19 || cy+y>=173)continue;
+        for(x=-12;x<=12;x++){
+            if(cx+x<4 || cx+x>=316)continue;
+            /* the screen pixel turned back onto the arrow (y down: a clockwise turn) */
+            u=x*c+y*s;v=y*c-x*s;
+            sx=(int)floor(u+8.0f);sy=(int)floor(v+8.0f);
+            if(sx<0 || sy<0 || sx>=16 || sy>=16 || (p=a[sy*64+sx])==255)continue;
+            vid.buffer[(cy+y)*vid.rowbytes+cx+x]=p;
+        }
+    }
+    return 1;
+}
 static void map_draw(void){
     int x,y,sx,sy,cols[312],ocean=map_ocean,gold=AW_UIColor(248,225,136),i,mx,my,in_game=map_in_game();
     float left=map_x-156*map_step,top=map_y-77*map_step,px,py,angle,dx,dy;byte *dst;char line[96];
@@ -952,7 +975,9 @@ static void map_draw(void){
         px=(player_x-map_bounds[0])*map_w/(map_bounds[2]-map_bounds[0]);py=(map_bounds[3]-player_y)*map_h/(map_bounds[3]-map_bounds[1]);
         mx=4+(int)((px-left)/map_step);my=19+(int)((py-top)/map_step);
         if(mx>=9 && mx<311 && my>=24 && my<168){
-            if(in_game){edict_t *e=svs.clients[0].edict;angle=e->v.angles[1]*(3.14159265f/180.0f);dx=Q_CosRad(angle);dy=-Q_SinRad(angle);
+            /* UI-MAP-PLAYER-ARROW-51: the original game's arrow, turned with the view, in both maps */
+            if(map_arrow(mx,my,cl.viewangles[YAW])){}
+            else if(in_game){edict_t *e=svs.clients[0].edict;angle=e->v.angles[1]*(3.14159265f/180.0f);dx=Q_CosRad(angle);dy=-Q_SinRad(angle);
                 map_line(mx,my,mx+(int)(dx*7),my+(int)(dy*7),AW_UIColor(255,255,255));
                 map_line(mx+(int)(dx*7),my+(int)(dy*7),mx+(int)(dx*4-dy*2),my+(int)(dy*4+dx*2),AW_UIColor(255,255,255));
                 map_line(mx+(int)(dx*7),my+(int)(dy*7),mx+(int)(dx*4+dy*2),my+(int)(dy*4-dx*2),AW_UIColor(255,255,255));

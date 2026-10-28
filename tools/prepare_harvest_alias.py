@@ -23,7 +23,7 @@ from harvest_alias_mesh import convert, alias_cost
 from mwad.scene import read_asset, unpack_geometry
 from player_hull import lumps
 from prepare_harvest import (identity_key, source_context, prepare_graph, prepare,
-                             stage_pickup_sound, placement_source_key)
+                             stage_pickup_sound, placement_source_key, owner_suffix)
 from prepare_scenery import reference_rotation, world_bounds
 from world_flora_policy import source_key
 
@@ -180,7 +180,7 @@ def catalogue(context, refs, origin, model_indices, registry):
     for plant, ref in zip(plants, refs):
         lines.append('{key} {slot} {reference} {model} {flags} {first} {count} '.format(**plant) +
                      ' '.join(format(v, '.9g') for v in plant['origin'] + plant['angles'] + [ref['scale']]) +
-                     ' ' + plant['label'])
+                     ' ' + plant['label'] + owner_suffix(plant))
     raw = ('\n'.join(lines) + '\n').encode('ascii')
     if len(raw) > 65536:
         raise ValueError('Harvest catalogue exceeds 65536-byte runtime input bound')

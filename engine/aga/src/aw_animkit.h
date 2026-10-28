@@ -53,6 +53,20 @@ int AW_AnimKitSpanFrame(unsigned first,unsigned last,float rate,float *t,float d
 extern int aw_anim_kit_enabled;
 extern float aw_anim_kit_speed;
 
+/* The combat playground's animation mode (aw_arena.c, docs/COMBAT.md "Combat playground"): E plays every combat
+ * group of its shared table in turn, over and over (a baked actor: its layout's groups); 1 table, 2 baked layout,
+ * 0 nothing to play. Label: the lead's group and attack phase ("weapononehand: slash"), 0 when no cycle runs.
+ * Skeletal: a model with a shared table. Stop: every forced actor given back. */
+struct edict_s;
+int AW_AnimKitCombatCycle(struct edict_s *e);
+int AW_AnimKitLabel(char *out,int size);
+int AW_AnimKitSkeletal(int modelindex);
+void AW_AnimKitStop(void);
 void AW_AnimKitInit(void);
 void AW_AnimKitTick(void);
+/* aw_magic.c: the actor plays its table's spellcast group for "self" / "touch" / "target" once, from the variant's
+ * start key to its stop key; the seconds from start to the "<variant> release" key (when the spell leaves), or -1
+ * (no table, no group or keys, or the kit off or compiled out). */
+struct edict_s;
+float AW_AnimKitCast(struct edict_s *e,const char *variant);
 #endif

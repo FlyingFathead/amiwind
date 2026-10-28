@@ -8,6 +8,7 @@ float Q_CosRad(float radians);
 #include "aw_anim.h"
 #include "aw_skel.h"
 #include "aw_torch.h"
+#include "aw_weather.h"
 #endif
 #include "aw_items.h"
 #include "aw_tryalloc.h"
@@ -121,6 +122,7 @@ static int named;
 
 static void level_check(void) {
     R_AliasTorchLayer=AW_ItemsTorchLayer;   /* the renderer poses a torch-holding guard's arm (r_alias.c) */
+    R_AliasStormLayer=AW_ItemsStormLayer;   /* and an actor's eye-shielding arm in an ash or blight storm */
     if(level_world!=sv.worldmodel){level_world=sv.worldmodel;used=0;named=0;memset(table,0,sizeof(table));}
 }
 static model_t *model_of(edict_t *e) {
@@ -270,6 +272,43 @@ int AW_ItemsTorchLayer(const model_t *m,const void *skel_table,int frame,float *
     span=(int)(g.last-g.first)+1;
     if(span<1)return 0;
     /* the group's frames in turn with the actor's own (the baked guards: its eight phases), so a frame poses alike */
+    *layer_frame=(float)(g.first+(unsigned)(frame<0?0:frame)%(unsigned)span);
+    return 1;
+}
+
+/* ACTOR-STORM-POSE-51: the frames an actor may shield its eyes in. Rule from OpenMW file
+ * apps/openmw/mwmechanics/character.cpp (updateIdleStormState, read, not copied): only with no upper-body action
+ * (no attack, cast, weapon or hit) and out of the water; here: a frame of the idle groups (idle, idle2..idle9) or of
+ * walking, running, turning or sneaking; a view's own prefix ("f:", "d:f:") is skipped. One answer kept. */
+static int storm_frame(const aw_skel_table_t *tab,int frame) {
+    static const aw_skel_table_t *last_tab;static int last_frame=-1,last_ok;
+    aw_skel_group_t g;int i;const char *name,*c;
+    if(tab==last_tab && frame==last_frame)return last_ok;
+    last_tab=tab;last_frame=frame;last_ok=0;
+    for(i=0;i<tab->groups;i++){
+        AW_SkelGroupAt(tab,i,&g);
+        if(frame<(int)g.first || frame>(int)g.last)continue;
+        for(name=c=g.name;*c && c<g.name+AW_SKEL_NAME;c++)if(*c==':')name=c+1;
+        if(!Q_strncasecmp((char *)name,"idle",4))
+            last_ok=!name[4] || (name[4]>='2' && name[4]<='9' && !name[5]);
+        else last_ok=!Q_strncasecmp((char *)name,"walk",4) || !Q_strncasecmp((char *)name,"run",3) ||
+                     !Q_strncasecmp((char *)name,"turn",4) || !Q_strncasecmp((char *)name,"sneak",5);
+        break;
+    }
+    return last_ok;
+}
+int AW_ItemsStormLayer(const model_t *m,const void *skel_table,int frame,float yaw,float *layer_frame,int *root) {
+    const aw_skel_table_t *tab=(const aw_skel_table_t *)skel_table;
+    aw_skel_group_t g;int t,i,span;float dir[2];
+    if(!m || !tab || !AW_WeatherStorm(dir) || !AW_WeatherFacesStorm(yaw,dir))return 0;
+    for(t=0;t<used && table[t].model!=m;t++);
+    if(t==used || !table[t].skel)return 0;
+    if((*root=AW_SkelRightArmRoot(tab,table[t].bone[1],table[t].bone[0]))<0 || (i=AW_SkelGroup(tab,"idlestorm"))<0)return 0;
+    if(!storm_frame(tab,frame))return 0;
+    AW_SkelGroupAt(tab,i,&g);
+    span=(int)(g.last-g.first)+1;
+    if(span<1)return 0;
+    /* the group in turn with the actor's own frames, as the torch layer */
     *layer_frame=(float)(g.first+(unsigned)(frame<0?0:frame)%(unsigned)span);
     return 1;
 }

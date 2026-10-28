@@ -50,13 +50,28 @@ MOVE_SETTINGS = ('fMinWalkSpeed', 'fMaxWalkSpeed', 'fEncumberedMoveEffect', 'fBa
                  'fFatigueRunBase', 'fFatigueRunMult', 'fFatigueSwimWalkBase', 'fFatigueSwimWalkMult',
                  'fFatigueSwimRunBase', 'fFatigueSwimRunMult', 'fFatigueSneakBase', 'fFatigueSneakMult',
                  'fFatigueJumpBase', 'fFatigueJumpMult', 'fFatigueBase', 'fFatigueMult')
+# The aggro and flee ratings (engine/aga/src/aw_combat.h aw_combat_ai_t, the same order; docs/COMBAT.md "Combat
+# playground"): written as "ai NAME VALUE" lines, which the melee settings' loader skips.
+AI_SETTINGS = ('iFightDistanceBase', 'fFightDistanceMultiplier', 'fFightDispMult',
+               'fAIFleeHealthMult', 'fAIFleeFleeMult', 'fAIMeleeWeaponMult', 'fAIMeleeArmorMult')
 # Settings only the builder needs (armour classes, magicka).
 BUILD_SETTINGS = ('iBaseArmorSkill', 'fLightMaxMod', 'fMedMaxMod', 'iHelmWeight', 'iCuirassWeight',
                   'iPauldronWeight', 'iGreavesWeight', 'iBootsWeight', 'iGauntletWeight', 'iShieldWeight',
                   'fNPCbaseMagickaMult')
+# The swing's sounds (engine/aga/src/aw_combat.h AW_SND_*, AW_CombatSwingSounds; docs/COMBAT.md "Sounds"), by the sound
+# record OpenMW 0.51 plays: 'Weapon Swish' for every melee swing (mwmechanics/character.cpp playSwishSound), the armour
+# hit sounds and 'Health Damage' / 'miss' (files/data-mw/scripts/omw/combat/local.lua applyArmor, onHit), the two punch
+# sounds (combat.cpp getHandToHandDamage), 'critical damage' (mwclass/npc.cpp hit). 'Body Fall Medium' is the earlier
+# knockdown and death sound.
 SOUNDS = (('health', 'Health Damage'), ('miss', 'miss'), ('punch', 'Hand To Hand Hit'),
           ('light', 'Light Armor Hit'), ('medium', 'Medium Armor Hit'), ('heavy', 'Heavy Armor Hit'),
-          ('swish', 'SwishM'), ('critical', 'critical damage'), ('fall', 'Body Fall Medium'))
+          ('swish', 'Weapon Swish'), ('critical', 'critical damage'), ('fall', 'Body Fall Medium'),
+          ('punch2', 'Hand To Hand Hit 2'))
+# The slots a blow can land on, in the order of OpenMW's pickRandomArmor bands (local.lua; aw_combat_rules.c
+# AW_CombatArmorHitSlot): sheet field 12 gives each one's armour class (- none, l light, m medium, h heavy).
+HIT_SLOTS = ('cuirass', 'helmet', 'greaves', 'boots', 'lpauldron', 'rpauldron', 'lgauntlet', 'rgauntlet', 'shield')
+# A creature's sound generator types (OpenMW components/esm3/loadsndg.hpp, the SNDG record's DATA value 0..7).
+SNDG_TYPES = ('left', 'right', 'swimleft', 'swimright', 'moan', 'roar', 'scream', 'land')
 # Original weapon types 0..8 are melee; skill each uses; two-handed (no shield).
 WEAPON_SKILL = {0: 22, 1: 5, 2: 5, 3: 4, 4: 4, 5: 4, 6: 7, 7: 6, 8: 6}
 TWO_HANDED = {2, 4, 5, 6, 8}
@@ -82,11 +97,18 @@ def first(fields, tag, default=b''):
 
 
 def load(master):
-    kinds = {k: {} for k in ('NPC_', 'RACE', 'CLAS', 'SKIL', 'WEAP', 'ARMO', 'LEVI', 'GMST', 'SOUN')}
+    kinds = {k: {} for k in ('NPC_', 'RACE', 'CLAS', 'SKIL', 'WEAP', 'ARMO', 'LEVI', 'GMST', 'SOUN', 'SNDG', 'CREA')}
     for tag, flags, raw in records(master.read_bytes()):
         if tag not in kinds:
             continue
         fields = list(subrecords(raw))
+        if tag in ('SNDG', 'CREA'):
+            # kept with only what the sound generators need (the ID, the type, the creature, the sound; the model)
+            if flags & 0x20 or first(fields, 'DELE'):
+                continue
+            kinds[tag][string(first(fields, 'NAME')).casefold()] = [(k, v) for k, v in fields
+                                                                     if k in ('NAME', 'DATA', 'CNAM', 'SNAM', 'MODL')]
+            continue
         if tag == 'SKIL':
             kinds[tag][struct.unpack('<i', first(fields, 'INDX'))[0]] = fields
             continue
@@ -270,7 +292,7 @@ def sheet(kinds, identifier, settings):
     row = [identifier, name, level, ' '.join(map(str, attributes)), ' '.join(map(str, skills)),
            f'{health} {magicka} {fatigue}', f'{fight} {flee}', ' '.join(map(str, wfield)),
            f'{rating:.3f} {1 if "shield" in armor else 0}', source,
-           condition_field(kinds, weapon[3] if weapon else None, armor, settings)]
+           condition_field(kinds, weapon[3] if weapon else None, armor, settings), hit_field(kinds, armor, settings)]
     return '\t'.join(map(str, row)), {'weapon': item, 'weapon_type': typ, 'armor': sorted(a for a, _ in armor.values()),
                                        'level': level, 'source': source, 'name': name}
 
@@ -280,6 +302,20 @@ SKILL_NAMES = ('block', 'armorer', 'medium armor', 'heavy armor', 'blunt weapon'
                'athletics', 'enchant', 'destruction', 'alteration', 'illusion', 'conjuration', 'mysticism',
                'restoration', 'alchemy', 'unarmored', 'security', 'sneak', 'acrobatics', 'light armor',
                'short blade', 'marksman', 'mercantile', 'speechcraft', 'hand to hand')
+
+
+def armor_class(kinds, item, typ, settings):
+    """'l', 'm' or 'h': the armour skill of a piece by its weight against its type's weight setting (OpenMW
+    mwclass/armor.cpp getEquipmentSkill: up to fLightMaxMod x the setting light, up to fMedMaxMod medium)."""
+    weight = struct.unpack_from('<f', first(kinds['ARMO'][item], 'AODT'), 4)[0]
+    limit = settings[ARMOR_TYPE_GMST[typ]]
+    return 'l' if weight <= limit * settings['fLightMaxMod'] + .0005 else \
+        'm' if weight <= limit * settings['fMedMaxMod'] + .0005 else 'h'
+
+
+def hit_field(kinds, armor, settings):
+    # Field 12 of a sheet row: the armour class of every slot a blow can land on (HIT_SLOTS), - for an empty slot.
+    return ''.join(armor_class(kinds, *armor[slot], settings) if slot in armor else '-' for slot in HIT_SLOTS)
 
 
 def condition_field(kinds, wpdt, armor, settings):
@@ -352,7 +388,7 @@ def player_sheet(kinds, settings, preset, loadout=None):
     row = ['loadout:' + loadout, text(preset.get('name', 'Arena Challenger'))[:31], level,
            ' '.join(map(str, attributes)), ' '.join(map(str, skills)), f'{health} {magicka} {fatigue}', '0 0',
            ' '.join(map(str, wfield)), f'{rating:.3f} {1 if "shield" in armor else 0}', 'p',
-           condition_field(kinds, wpdt, armor, settings)]
+           condition_field(kinds, wpdt, armor, settings), hit_field(kinds, armor, settings)]
     return '\t'.join(map(str, row)), {'loadout': loadout, 'level': level, 'race': race, 'class': cls,
                                       'health': health, 'fatigue': fatigue, 'armor_rating': round(rating, 3),
                                       'hand_to_hand': skills[26], 'agility': attributes[3],
@@ -512,11 +548,104 @@ def _master(data):
     return _masters[key]
 
 
+def generator_records(kinds):
+    """[(type, creature or '', sound)] of the master's SNDG records, in record ID order."""
+    out = []
+    for key in sorted(kinds['SNDG']):
+        fields = kinds['SNDG'][key]
+        data = first(fields, 'DATA')
+        if len(data) != 4:
+            continue
+        kind = struct.unpack('<i', data)[0]
+        if 0 <= kind < len(SNDG_TYPES):
+            out.append((kind, string(first(fields, 'CNAM')).casefold(), string(first(fields, 'SNAM')).casefold()))
+    return out
+
+
+def sound_generators(kinds):
+    """{creature ID: [[sound record IDs] per SNDG_TYPES type]} for every creature record, by OpenMW 0.51's rule
+    (mwclass/creature.cpp getSoundIdFromSndGen): the generators naming the creature; when it has none of a type, those
+    of the first other creature with the same model (records in ID order, as OpenMW's store holds them); else the
+    generic ones (no creature named). The engine picks one of a type's sounds at random, as OpenMW does."""
+    records_ = generator_records(kinds)
+    own, generic = {}, [[] for _ in SNDG_TYPES]
+    for kind, creature, sound in records_:
+        if creature:
+            own.setdefault(creature, [[] for _ in SNDG_TYPES])[kind].append(sound)
+        else:
+            generic[kind].append(sound)
+    model = {key: string(first(fields, 'MODL')).casefold() for key, fields in kinds['CREA'].items()}
+    order = sorted(kinds['CREA'])
+    by_model = {}
+    for creature in order:
+        by_model.setdefault(model[creature], []).append(creature)
+    table, empty = {}, [[] for _ in SNDG_TYPES]
+    for creature in order:
+        mine = own.get(creature, empty)
+        # OpenMW looks at the same-model creature only when the creature has no sound of the type itself
+        other = next((c for c in by_model[model[creature]] if c != creature), None) if model[creature] else None
+        row = []
+        for kind in range(len(SNDG_TYPES)):
+            sounds = list(mine[kind]) or (list(own.get(other, empty)[kind]) if other else [])
+            row.append(sounds or list(generic[kind]))
+        table[creature] = row
+    return table
+
+
+def generator_name(sound):
+    """The file name (without .wav, under sound/combat/g/) of a sound record: its letters and digits, at most 16."""
+    return ''.join(c for c in sound.casefold() if c.isalnum())[:16]
+
+
+def generators_file(table):
+    """combat/sndg.txt: "AWSG1 N", then one sorted row per creature: the ID and the eight types' sound names (comma
+    lists, '-' for none). Returns the text and the sound records it names {name: record}."""
+    names, rows = {}, []
+    for creature in sorted(table):
+        if not creature.isascii() or any(c in creature for c in '\t\n') or len(creature) > 31:
+            continue
+        cells = []
+        for sounds in table[creature]:
+            words = []
+            for sound in sounds:
+                name = generator_name(sound)
+                if names.setdefault(name, sound) != sound:
+                    raise ValueError('Two sound records share the file name %s: %s, %s' % (name, names[name], sound))
+                if name not in words:
+                    words.append(name)
+            cells.append(','.join(words) or '-')
+        rows.append('\t'.join([creature] + cells))
+    return 'AWSG1 %d\n' % len(rows) + ''.join(r + '\n' for r in rows), names
+
+
+PLAYGROUND_MODES = ('aggro', 'group')
+
+
+def casts_file(kinds, casts):
+    """arena/casts.txt: "AWAC1", then one "MODE<tab>id, id, ..." line per combat playground mode with a default cast
+    (config/arena_fighters.json playground_casts; the engine's aw_arena.c reads it when no names are given). Every
+    id must be an NPC record of the master (the sheet comes from combat/actors.txt); at most four per mode, the
+    combat layer's slots."""
+    lines, report = ['AWAC1'], {}
+    for mode in sorted(casts):
+        if mode not in PLAYGROUND_MODES:
+            raise ValueError('Combat playground cast for an unknown mode: %s (modes: %s)' % (mode, ', '.join(PLAYGROUND_MODES)))
+        ids = [str(row['id']).casefold() for row in casts[mode]]
+        if not 1 <= len(ids) <= 4:
+            raise ValueError('Combat playground cast %s: 1 to 4 NPC records, not %d' % (mode, len(ids)))
+        for identifier in ids:
+            if identifier not in kinds['NPC_'] or ',' in identifier or '\t' in identifier or not identifier.isascii():
+                raise ValueError('Combat playground cast %s: not an NPC record: %s' % (mode, identifier))
+        lines.append(mode + '\t' + ', '.join(ids))
+        report[mode] = ids
+    return '\n'.join(lines) + '\n', report
+
+
 def prepare(data_files, id1, jobs=None, fighters=None):
     data = resolve_data_files(Path(data_files))
     id1 = Path(id1)
     kinds = load(child_ci(data, 'Morrowind.esm'))
-    settings = {name: gmst(kinds, name) for name in SETTINGS + BUILD_SETTINGS + MOVE_SETTINGS}
+    settings = {name: gmst(kinds, name) for name in SETTINGS + BUILD_SETTINGS + MOVE_SETTINGS + AI_SETTINGS}
     (id1 / 'combat').mkdir(parents=True, exist_ok=True)
     (id1 / 'sound/combat').mkdir(parents=True, exist_ok=True)
     from npc_geometry import Assets
@@ -524,6 +653,7 @@ def prepare(data_files, id1, jobs=None, fighters=None):
     lines = ['AWCS1']
     lines += [f'{name} {settings[name]:.6g}' for name in SETTINGS]
     lines += movement_lines(kinds, settings)
+    lines += [f'ai {name} {settings[name]:.6g}' for name in AI_SETTINGS]
     sounds = {}
     for key, record in SOUNDS:
         fields = kinds['SOUN'].get(record.casefold())
@@ -534,6 +664,25 @@ def prepare(data_files, id1, jobs=None, fighters=None):
         seconds = convert_wav(raw, id1 / 'sound/combat' / f'{key}.wav')
         lines.append(f'sound {key} combat/{key}.wav')
         sounds[key] = {'record': record, 'source': source, 'seconds': round(seconds, 3)}
+    # Every creature's sound generators (combat/sndg.txt, the sounds under sound/combat/g/): the combat playground's
+    # sounds mode plays them; creature fights and the creatures' own animation keys will use the same table.
+    generator_text, generator_sounds = generators_file(sound_generators(kinds))
+    (id1 / 'combat/sndg.txt').write_text(generator_text, encoding='ascii', newline='\n')
+    (id1 / 'sound/combat/g').mkdir(parents=True, exist_ok=True)
+    converted, missing, generator_bytes = 0, [], 0
+    for name, record in sorted(generator_sounds.items()):
+        fields = kinds['SOUN'].get(record)
+        source = 'sound/' + string(first(fields, 'FNAM')).replace('\\', '/').casefold() if fields else None
+        try:
+            raw = assets.read(source) if source else None
+        except (KeyError, FileNotFoundError, ValueError):
+            raw = None
+        if raw is None:
+            missing.append(record)
+            continue
+        convert_wav(raw, id1 / 'sound/combat/g' / f'{name}.wav')
+        generator_bytes += (id1 / 'sound/combat/g' / f'{name}.wav').stat().st_size
+        converted += 1
     # Clip lengths the engine times states by (the player's knockdown, a block without frames):
     # the original base_anim text keys.
     from npc_geometry import Skeleton
@@ -548,13 +697,17 @@ def prepare(data_files, id1, jobs=None, fighters=None):
             clips[key] = round(length, 4)
     (id1 / 'combat/settings.txt').write_text('\n'.join(lines) + '\n', encoding='ascii', newline='\n')
     count, size, skipped = write_actors(kinds, settings, id1 / 'combat/actors.txt')
-    report = {'settings': {k: settings[k] for k in SETTINGS}, 'sounds': sounds, 'clips': clips,
+    report = {'settings': {k: settings[k] for k in SETTINGS + AI_SETTINGS}, 'sounds': sounds, 'clips': clips,
+              'sound_generators': {'creatures': generator_text.count('\n') - 1, 'sounds': converted,
+                                   'bytes': generator_bytes, 'missing': missing},
               'actors': {'count': count, 'bytes': size, 'skipped_non_ascii_or_long_ids': skipped}}
     preset = json.loads((ROOT / 'config/arena_player.json').read_text(encoding='utf-8'))
     player_text, report['arena_player'] = player_file(kinds, settings, preset)
     (id1 / 'arena').mkdir(parents=True, exist_ok=True)
     (id1 / 'arena/player.txt').write_text(player_text, encoding='ascii', newline='\n')
     config = json.loads((ROOT / 'config/arena_fighters.json').read_text(encoding='utf-8'))
+    text_casts, report['playground_casts'] = casts_file(kinds, config.get('playground_casts') or {})
+    (id1 / 'arena/casts.txt').write_text(text_casts, encoding='ascii', newline='\n')
     chosen = fighters if fighters is not None else [row['id'] for row in config['fighters']]
     if chosen:
         from build_jobs import resolve_jobs

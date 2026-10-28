@@ -121,6 +121,16 @@ class ActorsNativeTests(unittest.TestCase):
             if key != 14:
                 self.assertAlmostEqual(float(l[12]), 1.0, places=3)     # unscaled references stay at 1
 
+    def test_room_levelled_entity_rolls_spawns_there_and_keeps_its_pick(self):
+        """CREATURE-ROOM-LEVELLED-54: a room map's aw_levelled entity is rolled from the table's list (its index in
+        'sounds'), the creature spawned at the entity's place under its reference, the same one again when the room
+        loads again (the C side asserts place and pick); at level 30 a list gives at least as much as at level 1."""
+        out = self.run_check('room')
+        self.assertIn('room levelled passed', out)
+        rows = [l.split() for l in out.splitlines() if l.startswith('room ') and len(l.split()) == 5]
+        self.assertTrue(rows)
+        self.assertTrue(any(r[4] != 'none' for r in rows))
+
     def test_levelled_roll_is_deterministic_and_kept(self):
         def picks(seed):
             out = [l.split() for l in self.run_check('roll', seed).splitlines() if l.startswith('pick pass ')]

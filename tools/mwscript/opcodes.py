@@ -12,7 +12,7 @@ whole-number scripts on integer instructions only.
 """
 
 # name: (code, operand layout). Layout letters: b s8, B u8, h s16 (relative jump: from the end of the operand), H u16,
-# i s32, f f32, and "N" = a NOTYET argument list (see below).
+# i s32, f f32, "N" = a MESSAGEBOX argument list and "F" = a NOTYET call (see below).
 OPCODES = {
     # control
     'END': (0x00, ''), 'RET': (0x01, ''), 'JMP': (0x02, 'h'), 'JZ': (0x03, 'h'),
@@ -35,8 +35,10 @@ OPCODES = {
     'REF': (0x2D, 'H'),
     # an engine query (QUERIES below) with one operand -> pushes a whole number
     'QUERY': (0x2E, 'BH'),
-    # a function the engine cannot carry out yet: logged once, its numeric arguments popped, 0 pushed if it has a value
-    'NOTYET': (0x2F, 'N'),
+    # a function the engine does not carry out yet (the import route): counted by its number and logged once, its
+    # numeric arguments handed to the host's call() with its strings and then popped, 0 pushed if it has a value
+    # (or what call() answers once the engine carries it out by number)
+    'NOTYET': (0x2F, 'F'),
     # audio (sound table index, voice table index, music table index)
     'PLAYSOUND': (0x30, 'H'), 'PLAYSOUNDVP': (0x31, 'H'), 'PLAYSOUND3D': (0x32, 'H'), 'PLAYSOUND3DVP': (0x33, 'H'),
     'PLAYLOOP3D': (0x34, 'H'), 'PLAYLOOP3DVP': (0x35, 'H'), 'STOPSOUND': (0x36, 'H'), 'SOUNDPLAYING': (0x37, 'H'),
@@ -55,10 +57,50 @@ OPCODES = {
     # messages: MESSAGEBOX shows a text (its numbers formatted in) with its buttons; GETBUTTONPRESSED pushes the
     # button the player chose, once (-1 until then)
     'MESSAGEBOX': (0x51, 'N'), 'GETBUTTONPRESSED': (0x52, ''),
+    # the actor record (engine/aga/src/aw_actorstate.h; docs/ACTOR_STATE.md), on the object REF names, else the
+    # script's own: ACTOR u8 verb u8 stat (GET and RATIO push, SET MOD MODCURRENT pop; the value is a whole number
+    # for WHOLE_STATS, else a number with a fraction); ITEM u8 verb (0 count: pushes, 1 add, 2 remove: pop the count)
+    # u16 item (the actor table's AITM row); SPELL u8 verb (0 has: pushes, 1 add, 2 remove) u16 spell (ASPT row);
+    # COMBAT u8 verb (0 StartCombat, 1 StopCombat) u16 the other object (0xFFFF the player); DEADCOUNT u16 the
+    # actor (ACTB row, 0xFFFF none: 0) pushes a whole number
+    'ACTOR': (0x53, 'BB'), 'ITEM': (0x54, 'BH'), 'SPELL': (0x55, 'BH'), 'COMBAT': (0x56, 'BH'),
+    'DEADCOUNT': (0x57, 'H'),
+    # AIWander (the ambient tables' wander, engine/aga/src/aw_ambient.h): u8 the arguments after the first three;
+    # pops 3 + that many whole numbers (range, duration, time, then OpenMW's argument list), in order
+    'AIWANDER': (0x58, 'B'),
+    # the squeeze (v0.0.54): an "if" or "while" testing a whole number against a small constant, in one opcode
+    # instead of PUSHB, the comparison and JZ: JNEB s8 k, s16 pops a whole number and jumps when it is not k;
+    # JCMPB u8 test (CMP_CODES), s8 k, s16 jumps when "value test k" is false. Offsets from the end of the operand.
+    'JNEB': (0x59, 'bh'), 'JCMPB': (0x5A, 'Bbh'),
+    # the world and cell lookups (v0.0.54): GETPCCELL u16 a row of the PCEL section (the cells a GetPCCell name
+    # matches, made at build time) pushes 1 when the player stands in one; GETPOS u8 axis (0 x, 1 y, 2 z) pushes the
+    # position of REF's object or the script's own, in game units (a fraction)
+    'GETPCCELL': (0x5B, 'H'), 'GETPOS': (0x5C, 'B'),
+    # PositionCell of the player with constant numbers (v0.0.54): u16 a row of the PMOV section, the move worked out at
+    # build time (into a room: its map and the arrival in the map's units; outdoors: the original's coordinates)
+    'PLAYERMOVE': (0x5D, 'H'),
+    # the AI package of REF's actor or the script's own (v0.0.54): u8 verb, 0 GetCurrentAIPackage (OpenMW's numbers:
+    # -1 none, 0 Wander, 1 Travel, 2 Escort, 3 Follow, 4 Activate), 1 GetAIPackageDone; pushes a whole number
+    'AIPACKAGE': (0x5E, 'B'),
 }
-# NOTYET operands: u16 the function's name (string index), u8 numeric arguments popped (bit 7: pushes a value,
-# bit 6: the value is a number with a fraction), u8 string arguments, then one u16 string index per string argument.
-# MESSAGEBOX has the same layout: u16 the text (string index), u8 numbers popped (each a number with a fraction),
+PLAYERMOVE_KINDS = {'outdoors': 1, 'room': 2}
+# SPELL verbs beyond has/add/remove: 3 has a common disease, 4 has a blight disease (any spell of that type; the
+# operand is not used)
+SPELL_VERBS = {'has': 0, 'add': 1, 'remove': 2, 'common_disease': 3, 'blight_disease': 4}
+# The most functions the engine counts (aw_mwcode.h AWM_FUNCTIONS); functions.py has fewer (a test checks).
+FUNCTIONS_MAX = 640
+CMP_CODES = {'==': 0, '!=': 1, '<': 2, '<=': 3, '>': 4, '>=': 5}
+# The actor record's stats and the ACTOR verbs: the same numbers as aw_actorstate.h (AWA_*, AWV_*), checked by
+# tests/test_mwscript.py.
+ACTOR_STATS = {'attribute': 0, 'skill': 8, 'health': 35, 'magicka': 36, 'fatigue': 37, 'level': 38, 'hello': 39,
+               'fight': 40, 'flee': 41, 'alarm': 42, 'disposition': 43, 'ondeath': 44, 'dead': 45}
+WHOLE_STATS = {38, 39, 40, 41, 42, 43, 44, 45}
+VERBS = {'get': 0, 'set': 1, 'mod': 2, 'modcurrent': 3, 'ratio': 4}
+# NOTYET operands (layout "F"): u16 the function's number (functions.py FUNCTION_NUMBERS), u16 its name (string
+# index, for the log), u8 numeric arguments popped (bit 7: pushes a value, bit 6: the value is a number with a
+# fraction, bit 5: had a reference), u8 string arguments, then one u16 string index per string argument (the
+# reference's id first when it had one).
+# MESSAGEBOX (layout "N"): u16 the text (string index), u8 numbers popped (each a number with a fraction),
 # u8 buttons, then one u16 string index per button.
 
 # QUERY numbers: the engine facts a condition or a script asks for, with their u16 operand. Shared with the NPC

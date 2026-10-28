@@ -138,6 +138,10 @@ def chim_profile(model, group_profile, rule, flight, variant=('recipe', None)):
         profile['hull_surface_loss'] = SURFACE_LOSS
         if hull_points_mode() == 'table-whole':
             profile['hull_surface_points'] = 'all'
+    from mesh_geometry import STANDING_ROOM_DEPTH
+    from mesh_geometry_env import standing_room_applies
+    if standing_room_applies(model['source']):
+        profile['standing_room'] = STANDING_ROOM_DEPTH
     if underside == 'whole':
         profile['underside_whole'] = UNDERSIDE_DEPTH
     elif underside in ('rule', 'split'):

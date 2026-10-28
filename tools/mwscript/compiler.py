@@ -3,7 +3,7 @@
 from collections import Counter
 
 from .codegen import (Program, ScriptCompiler, CompileError, SCRIPT_BROKEN, SCRIPT_START, SCRIPT_GLOBAL,
-                      SCRIPT_HANDWRITTEN, SCRIPT_INERT, EFFECT_OPS)
+                      SCRIPT_HANDWRITTEN, SCRIPT_INERT, EFFECT_OPS, effect_op)  # noqa: F401 (EFFECT_OPS: callers)
 from .functions import lookup
 from .lexer import LexError
 from .parser import Parser, ParseError
@@ -28,13 +28,16 @@ def handwritten_patterns(config=None):
     return tuple(p.casefold() for p in json.loads(path.read_text(encoding='utf-8'))['handwritten']['patterns'])
 
 
-def compile_program(data, media=None, scripts=None, handwritten=None):
+def compile_program(data, media=None, scripts=None, handwritten=None, rooms=None):
     """(Program, [Compiled]) for every script of DATA (the winning record of each id), in table order.
     SCRIPTS: compile these records instead (one master's own records, for the per-master measurement).
-    HANDWRITTEN: name patterns marked SCRIPT_HANDWRITTEN (None: config/mwscript.json)."""
+    HANDWRITTEN: name patterns marked SCRIPT_HANDWRITTEN (None: config/mwscript.json).
+    ROOMS: the room maps the player's PositionCell can load (rooms.room_table; None: the repo's own lists)."""
     from fnmatch import fnmatchcase
+    from .rooms import room_table
     patterns = handwritten_patterns() if handwritten is None else tuple(p.casefold() for p in handwritten)
     program = Program(data, media, scripts)
+    program.rooms = room_table() if rooms is None else rooms
     parsed = {}
     globals_ = {k: v[0] for k, v in data.globals.items()}
     if scripts is not None:
@@ -97,7 +100,8 @@ def compile_program(data, media=None, scripts=None, handwritten=None):
                 if obj['script'] is not None:
                     read_by_others.add(obj['script'])
     for index, c in enumerate(out):
-        if c.error is None and index not in read_by_others and not any(name in EFFECT_OPS for _, name in c.ops):
+        if c.error is None and index not in read_by_others and \
+                not any(effect_op(name, args) for _, name, args in decode(c.code)):
             c.flags |= SCRIPT_INERT
     return program, out
 

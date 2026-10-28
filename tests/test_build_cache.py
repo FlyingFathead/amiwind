@@ -300,7 +300,9 @@ class FingerprintTests(unittest.TestCase):
                           'tools/resource_plan.py', 'tools/pool_status.py', 'tools/stage_watch.py',
                           'tools/build_digest.py', 'tools/code_key.py',
                           # loaded only by the cache key code (BUILD-REUSE-RC1-RECORDS-REFUSED-48)
-                          'tools/chim_compat.py'})
+                          'tools/chim_compat.py',
+                          # what a stage key counts of an engine C file (BUILD-STAGE-KEY-ENGINE-HEADERS-54)
+                          'tools/engine_facts.py'})
         tools = self.repository / 'tools'
         (tools / 'build_progress.py').write_text('def show(text):\n    print(text)\n')
         (tools / 'build_profile.py').write_text('from build_progress import show\ndef instrument(stage):\n    show(stage)\n')
@@ -1540,6 +1542,9 @@ class DiagnosticOutputTests(unittest.TestCase):
 PINNED_KEY_RULES = {
     3: {'alpha': ['b84d2fd763575b0a', []], 'beta': ['b52506690b85fe52', []], 'delta': ['93d99519ee6e67fe', []],
         'gamma': ['4e83df8d84b34f8d', []]},
+    # form 4 (BUILD-KEY-TOP-DEFAULTS-NAME-54): the import-time code lists only the defaults that run code, by name
+    4: {'alpha': ['1cd1a3cd865af94c', []], 'beta': ['7fe8d18c1067045d', []], 'delta': ['e33a05cf3fae3a75', []],
+        'gamma': ['a29f0b846cc94518', []]},
 }
 
 
@@ -1607,7 +1612,11 @@ class ReuseCascadeTests(unittest.TestCase):
 
     @unittest.skipUnless(MANIFESTS, 'stage wrapper and manifests are exercised on POSIX')
     def test_a_reuse_source_in_the_old_key_form_is_reused_whole(self):
-        # form 2 -> 3 (BUILD-STAGE-KEY-WHOLE-CLASS-48), as 1 -> 2 before it
+        # form 3 -> 4 (BUILD-KEY-TOP-DEFAULTS-NAME-54), 2 -> 3 (BUILD-STAGE-KEY-WHOLE-CLASS-48), as 1 -> 2 before it
+        first, _ = self.build('first-3', top_format=3)
+        _, state = self.build('second-3', reuse_from=first)
+        self.assertEqual(self.reused(state), ['alpha', 'beta', 'delta', 'gamma'])
+        self.assertEqual(state['stage_cache']['preflight']['unexpected_stages'], [])
         first, _ = self.build('first-2', top_format=2)
         _, state = self.build('second-2', reuse_from=first)
         self.assertEqual(self.reused(state), ['alpha', 'beta', 'delta', 'gamma'])

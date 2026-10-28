@@ -118,3 +118,8 @@ int AW_AnimKitSpanFrame(unsigned first,unsigned last,float rate,float *t,float d
     if(f>=frames)f=frames-1;
     return (int)first+f;
 }
+
+/* Every humanoid animation group hooked up (aw_animpick.h, ANIM-GROUPS-NOT-HOOKED-54): the group choice by OpenMW's
+ * rules, kept in this unit (no new engine source file: the Makefile is an input of the world's heap check key,
+ * STAGE-CONTENT-KEYS). */
+#include "aw_animpick_rules.inc"

@@ -93,6 +93,23 @@ int main(int argc,char **argv)
     assert(AW_HarvestLoad(f,i,&h) && !strcmp(HSTR(h.node[0].label),"Original item name"));fclose(f);
     f=tmpfile();assert(f);fputs("AWH2 1 0 0\n0 0 0 0 0 item_id\t-\n",f);i=(int)ftell(f);rewind(f);
     assert(!AW_HarvestLoad(f,i,&h));fclose(f);
+    /* HARVEST-INTERIOR-PICK-47: an owned plant's row ends in a tab and its owner's id; it loads, keeps its label,
+     * and taking it counts as a theft (its pick fact is the record); an unowned one is no theft. */
+    f=tmpfile();assert(f);
+    fputs("AWH2 1 0 2\n0 0 0 0 0 item_id\tOriginal item name\n"
+          "aw:h:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 42 *1 1 0 0 0 0 0 0 0 0 Owned mushroom\tdarvame hleran\n"
+          "aw:h:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb 43 *2 1 0 0 0 0 0 0 0 0 Free mushroom\n",f);
+    i=(int)ftell(f);rewind(f);
+    assert(AW_HarvestLoad(f,i,&h));fclose(f);
+    assert(!strcmp(HSTR(h.plant[0].label),"Owned mushroom") && !strcmp(AW_HarvestOwner(&h,0),"darvame hleran"));
+    assert(!strcmp(HSTR(h.plant[1].label),"Free mushroom") && !AW_HarvestOwner(&h,1)[0] && !AW_HarvestOwner(&h,7)[0]);
+    f=tmpfile();assert(f);
+    fputs("AWH2 1 0 1\n0 0 0 0 0 item_id\tOriginal item name\n"
+          "aw:h:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 42 *1 1 0 0 0 0 0 0 0 0 Owned mushroom\tbad\towner\n",f);
+    i=(int)ftell(f);rewind(f);assert(!AW_HarvestLoad(f,i,&h));fclose(f);
+    fixture();assert(!AW_HarvestStolen(&h,&state));
+    h.plant[0].owner=h.node[1].id;assert(AW_HarvestValidate(&h));
+    assert(AW_HarvestTake(&h,0,&state,1,5)==1 && AW_HarvestStolen(&h,&state)==1);
     if(argc==2){
         f=fopen(argv[1],"rb");assert(f);fseek(f,0,SEEK_END);i=(int)ftell(f);rewind(f);assert(AW_HarvestLoad(f,i,&h));fclose(f);assert(h.plants==6);
         memset(&state,0,sizeof(state));for(i=0;i<h.plants;i++){result=AW_HarvestTake(&h,i,&state,1,123+i);assert(result>0);}

@@ -11,6 +11,7 @@
  */
 #ifndef AW_COMBAT_H
 #define AW_COMBAT_H
+#include "aw_actorstate.h"
 
 /* Attribute and skill indices of the original data (NPDT order). */
 enum {AW_STR,AW_INT,AW_WIL,AW_AGI,AW_SPD,AW_END,AW_PER,AW_LUC};
@@ -43,6 +44,17 @@ typedef struct {
 } aw_combat_settings_t;
 #define AW_COMBAT_SETTING_COUNT 36
 
+/* The aggro and flee ratings' game settings (combat/settings.txt "ai NAME VALUE" lines, tools/prepare_combat.py AI_SETTINGS;
+ * the master file's GMST names). Kept apart from the melee settings: an image without them still fights, only the
+ * aggro and flee rules are unavailable. */
+typedef struct {
+    float iFightDistanceBase,fFightDistanceMultiplier,fFightDispMult;
+    float fAIFleeHealthMult,fAIFleeFleeMult,fAIMeleeWeaponMult,fAIMeleeArmorMult;
+} aw_combat_ai_t;
+#define AW_COMBAT_AI_COUNT 7
+int AW_CombatAiSet(aw_combat_ai_t *a,const char *name,float value);
+const char *AW_CombatAiName(int index);
+
 /* One fighter's sheet: about 150 bytes. Values as the original data holds
  * them (attributes and skills 0..255, dynamic stats as floats). */
 typedef struct {
@@ -61,8 +73,14 @@ typedef struct {
     unsigned char shield_class;         /* 0 light, 1 medium, 2 heavy (its block sound) */
     unsigned char block_off;            /* not ready to block (OpenMW isReadyToBlock): the player not
                                            holding the block button with aw_combat_block 1 (AmiWind extension) */
+    unsigned char creature;             /* 0 an NPC or the player; 1 a creature striking with its own attacks
+                                           (damage = its record's chop/slash/thrust); 2 a bipedal creature (hand to
+                                           hand, its combat skill); AW_CombatCreatureSheet */
+    unsigned int hit_classes;           /* the armour a blow can land on, 2 bits per AW_CombatArmorHitSlot slot: 0 none,
+                                           1 light, 2 medium, 3 heavy (its hit sound; sheet field 12); AW_HIT_CLASS */
     float weapon_health,weapon_health_max,shield_health,shield_health_max;  /* condition; max 0 = unknown (full) */
 } aw_fighter_t;
+#define AW_HIT_CLASS(f,slot) ((int)(((f)->hit_classes>>(2*(slot)))&3u))
 /* Two-handed weapon types (and hand to hand, which OpenMW's weapon table also marks
  * two-handed): no shield block. weapon = 1 + original type. */
 #define AW_TWO_HANDED(w) ((w)==0 || (w)==3 || (w)==5 || (w)==6 || (w)==7 || (w)==9)
@@ -103,9 +121,46 @@ float AW_CombatUnarmoredRating(const aw_combat_settings_t *s,const aw_fighter_t 
  * still: the victim is not walking (block bonus). */
 void AW_CombatSwing(const aw_combat_settings_t *s,aw_fighter_t *attacker,aw_fighter_t *victim,
                     int attack,float strength,float angle,int still,aw_combat_rng_t *r,aw_swing_t *out);
+/* The sounds of one melee swing (docs/COMBAT.md "Sounds"): combat/settings.txt "sound KEY PATH" keys in this order. */
+enum {AW_SND_HEALTH,AW_SND_MISS,AW_SND_PUNCH,AW_SND_LIGHT,AW_SND_MEDIUM,AW_SND_HEAVY,AW_SND_SWISH,AW_SND_CRITICAL,
+      AW_SND_FALL,AW_SND_PUNCH2,AW_SND_COUNT};
+#define AW_ARMOR_HIT_SLOTS 9
+/* The armour slot a blow lands on for a roll 0..99 (OpenMW 0.51 files/data-mw/scripts/omw/combat/local.lua
+ * pickRandomArmor): cuirass under 30, then helmet, greaves, boots, left and right pauldron (10 each), left and right
+ * gauntlet (5 each), the shield from 90. */
+int AW_CombatArmorHitSlot(int roll100);
+/* The sounds of a resolved swing into SOUNDS (at most 4), returns how many (OpenMW 0.51): every melee swing its swing
+ * sound (mwmechanics/character.cpp prepareHit, playSwishSound "Weapon Swish"); a block the shield's armour hit sound
+ * (combat.cpp blockMeleeAttack); a miss "miss" only for the player's swing (combat/local.lua onHit); hand to hand
+ * without health damage "Hand To Hand Hit" or "Hand To Hand Hit 2" (combat.cpp getHandToHandDamage); health damage
+ * the armour hit sound of the piece the blow lands on (none for an empty slot; local.lua applyArmor), "Health
+ * Damage" (local.lua onHit) and "critical damage" on a critical strike (mwclass/npc.cpp hit). ROLL picks the slot
+ * and the punch sound; out NULL = a swing that reached nobody. */
+int AW_CombatSwingSounds(const aw_swing_t *out,const aw_fighter_t *victim,int by_player,unsigned long roll,int *sounds);
+/* A creature's fighter sheet from its actor record row (kind 1; docs/ACTOR_STATE.md), OpenMW 0.51 mwclass/creature.cpp:
+ * the record's level, attributes, health, fatigue and magicka, Fight and Flee; every combat skill its combat value
+ * (getSkill by specialization, as the actor record stores it); no armour (getArmorRating: equipment ignored, only the
+ * Shield effect); its attacks as the chop, slash and thrust damage (hit: min + (max - min) x strength, health damage,
+ * no strength modifier and no condition), a bipedal one punching by hand to hand instead. Carried weapons are not
+ * read yet: a creature with one fights with its own attacks. 0 when ROW is not a creature. ID names the sheet. */
+int AW_CombatCreatureSheet(const aw_actor_base_t *row,const char *id,aw_fighter_t *out);
 /* Fatigue return per second of game time; knocked-out fighters stand when
  * fatigue is back above zero. Returns 1 when the fighter got up. */
 int AW_CombatRecover(const aw_combat_settings_t *s,aw_fighter_t *f,float seconds);
+
+/* Aggro: the effective Fight of an actor toward the player (OpenMW 0.51 mechanicsmanagerimp.cpp isAggressive with
+ * combat.cpp getFightDistanceBias and getFightDispositionBias): Fight + (int)(iFightDistanceBase -
+ * fFightDistanceMultiplier x distance + (50 - disposition) x fFightDispMult); hostile at 100 or more. distance in
+ * original units; disposition 50 for a creature (and, until the actor record carries it, for an NPC). */
+int AW_CombatFightRating(const aw_combat_ai_t *a,int fight,int disposition,float distance);
+/* Flee (OpenMW aicombataction.cpp vanillaRateFlee and makeFleeDecision): Flee >= 100 rates Flee itself; else
+ * (1 - health / maximum) x fAIFleeHealthMult + Flee x fAIFleeFleeMult, plus the distance bias when not zero; a
+ * rating under 100 counts as 0. The fighter flees when it beats the rating of its best action: hand to hand 0, a
+ * melee weapon armour rating x fAIMeleeArmorMult + its best maximum damage x skill / 100 x fAIMeleeWeaponMult
+ * (weaponpriority.cpp vanillaRateWeaponAndAmmo). */
+float AW_CombatFleeRating(const aw_combat_ai_t *a,const aw_fighter_t *f,float distance);
+float AW_CombatAntiFleeRating(const aw_combat_ai_t *a,const aw_fighter_t *f);
+int AW_CombatFleeDecision(const aw_combat_ai_t *a,const aw_fighter_t *f,float distance);
 
 /* One encounter's totals (the arena's result screen). */
 typedef struct {
@@ -119,7 +174,31 @@ typedef struct {
 
 /* aw_combat.c: the engine side. */
 extern aw_combat_settings_t aw_combat_settings;
+extern aw_combat_ai_t aw_combat_ai;
 int AW_CombatSettingsLoad(void);
+int AW_CombatAiLoaded(void);            /* every "ai" line was in combat/settings.txt */
+/* The combat layer's rule switches (dbg combat flee|sounds on/off; plain switches, not console variables: the
+ * resident registry budget). AW_RULE_FLEE: flee by the Flee rating (OpenMW aicombataction.cpp makeFleeDecision);
+ * AW_RULE_SOUNDS: the swing's sounds by AW_CombatSwingSounds. Both off by default (A/B); the combat playground switches
+ * them on for its session. ON < 0 only reads; returns the value before the call. */
+enum {AW_RULE_FLEE,AW_RULE_SOUNDS,AW_RULE_COUNT};
+int AW_CombatRule(int rule,int on);
+/* Combat sound KEY (AW_SND_*): its file (sound/ relative, "" when the image has none) and playing it locally. */
+const char *AW_CombatSoundPath(int key);
+int AW_CombatSoundPlay(int key);
+struct edict_s;
+/* Aggro on sight (the combat playground; the world's residents follow when the actor record carries Fight): the
+ * effective Fight of E toward the player at their distance, and when it reaches 100 and E sees the player
+ * (OpenMW Actors::engageCombat: getLOS, awarenessCheck; a player who is not sneaking is always noticed) E starts
+ * fighting with SHEET and LAYOUT (AW_CombatEngage). Returns 1 when E fights (now or already), 0 when it stays
+ * calm, -1 when the rule cannot run (no player, no ai settings). *rating and *distance (original units) get the
+ * numbers; either may be NULL. */
+int AW_CombatAggro(struct edict_s *e,const aw_fighter_t *sheet,const char *layout,int disposition,int *rating,float *distance);
+/* A fighting actor that runs from the player (its Flee rating or no route to the player). */
+int AW_CombatActorFleeing(struct edict_s *e);
+/* The measured cost of the fighters' thinks: thinks per second since the encounter began, the mean and the
+ * longest think in milliseconds, the fighters now in slots. */
+void AW_CombatCost(float *per_second,float *ms_mean,float *ms_max,int *fighters);
 int AW_CombatActorLoad(const char *id,aw_fighter_t *out);
 void AW_CombatPlayerSheet(aw_fighter_t *out);
 extern void (*aw_combat_equipment)(aw_fighter_t *sheet);
@@ -149,7 +228,19 @@ int AW_CombatHostiles(void);
 int AW_PlayerInCombat(void);
 struct edict_s;
 int AW_CombatEngage(struct edict_s *e,const aw_fighter_t *fighter,const char *layout);
+/* THE hand-off between combat and the other actor layers (ambient wander/idles, MWScript): one check, one end, one
+ * notice. AW_CombatActorState: 0 = not in combat (the other layers own the actor), 1 = fighting (combat owns its
+ * movement, frame and think; others yield), 2 = died in combat (nobody resumes it). AW_CombatActorEnd: ends this
+ * actor's fight (StopCombat): its own think comes back, its carried items go; 1 when it was in combat.
+ * aw_combat_actor_released (NULL = none): called once whenever an actor leaves combat alive (calm, end, the slot
+ * given back), so a yielding layer resumes it there and nowhere else. */
+int AW_CombatActorState(struct edict_s *e);
+int AW_CombatActorEnd(struct edict_s *e);
+extern void (*aw_combat_actor_released)(struct edict_s *e);
 const aw_fighter_t *AW_CombatFighter(struct edict_s *e);
+/* An engaged NPC's current swing: 0 chop, 1 slash, 2 thrust; -1 when it is not fighting (aw_animkit.c picks the
+ * attack's keys by it, ANIM-GROUPS-NOT-HOOKED-54). */
+int AW_CombatAttackType(struct edict_s *e);
 void AW_CombatClear(void);
 const aw_combat_stats_t *AW_CombatStats(void);
 const aw_fighter_t *AW_CombatPlayer(void);

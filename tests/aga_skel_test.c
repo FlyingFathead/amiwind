@@ -107,10 +107,87 @@ static int layer_mode (char **argv)
 	return 0;
 }
 
+/* aga_skel_test layers TABLE FRAME LAYER0 ROOT0 LAYER1 ROOT1 SHIELD WEAPON: AW_SkelRightArmRoot (SHIELD, WEAPON), then
+ * every bone's world origin posed by AW_SkelPoseLayers with both layers (a guard's torch arm and his storm arm,
+ * ACTOR-STORM-POSE-51), one line each. */
+static int layers_mode (char **argv)
+{
+	long size;
+	unsigned char *data = read_file (argv[2], &size);
+	aw_skel_table_t t;
+	static float world[AW_SKEL_MAX_BONES][3][4];
+	float frames[2];
+	int b, roots[2];
+	assert (AW_SkelParse (data, size, &t));
+	frames[0] = (float)atof (argv[4]); roots[0] = atoi (argv[5]);
+	frames[1] = (float)atof (argv[6]); roots[1] = atoi (argv[7]);
+	printf ("root %d\n", AW_SkelRightArmRoot (&t, atoi (argv[8]), atoi (argv[9])));
+	AW_SkelPoseLayers (&t, (float)atof (argv[3]), 2, frames, roots, world);
+	for (b=0 ; b<t.bones ; b++)
+		printf ("%.6f %.6f %.6f\n", world[b][0][3], world[b][1][3], world[b][2][3]);
+	return 0;
+}
+
+/* aga_skel_test append BASE OWN: an appended table (version 3, CREATURE-APPENDED-TABLE-54) linked to its base: the own
+ * groups first, then the base's (frames after the own ones); a pose past the own frames is the base's pose, one
+ * within them the own table's; the base's name in the file; refusals (other parents, a base that is itself
+ * appended, a version 2 table). Prints "append GROUPS FRAMES OWN_GROUPS OWN_FRAMES BASE_NAME". */
+static int append_mode (char **argv)
+{
+	long bs, os;
+	unsigned char *bd = read_file (argv[2], &bs), *od = read_file (argv[3], &os);
+	aw_skel_table_t base, own, alone, bad;
+	aw_skel_group_t g, h;
+	static float w1[AW_SKEL_MAX_BONES][3][4], w2[AW_SKEL_MAX_BONES][3][4];
+	int i, b, k;
+	assert (AW_SkelParse (bd, bs, &base) && !base.base_name[0]);
+	assert (AW_SkelParse (od, os, &own) && own.base_name[0] && !own.more);
+	alone = own;
+	assert (!AW_SkelAppend (&base, &own));				/* a version 2 table appends nothing */
+	bad = own;
+	bad.parent[bad.bones - 1] = (short)(bad.parent[bad.bones - 1] == 0 ? -1 : 0);
+	assert (!AW_SkelAppend (&bad, &base));				/* other parents */
+	assert (AW_SkelAppend (&own, &base));
+	bad = alone;
+	assert (!AW_SkelAppend (&bad, &own));				/* a base that is itself appended */
+	assert (own.groups == alone.groups + base.groups && own.frames == alone.frames + base.frames);
+	printf ("append %d %d %d %d %s\n", own.groups, own.frames, own.own_groups, own.own_frames, own.base_name);
+	for (i=0 ; i<base.groups ; i++)
+	{
+		AW_SkelGroupAt (&base, i, &g);
+		k = AW_SkelGroup (&own, g.name);
+		AW_SkelGroupAt (&own, k, &h);
+		if (k >= own.own_groups)
+		{
+			/* a base group the creature does not have: the base's frames, after the own ones */
+			assert (h.first == g.first + (unsigned)own.own_frames && h.last == g.last + (unsigned)own.own_frames);
+			assert (AW_SkelKeyFrame (&own, k, "stop") == (AW_SkelKeyFrame (&base, i, "stop") < 0 ? -1 :
+				AW_SkelKeyFrame (&base, i, "stop") + own.own_frames));
+			AW_SkelPose (&own, (float)h.first + 0.5f, w1);
+			AW_SkelPose (&base, (float)g.first + 0.5f, w2);
+		}
+		else
+		{
+			/* the creature's own group of that name wins */
+			assert (k < alone.groups);
+			AW_SkelPose (&own, (float)h.first, w1);
+			AW_SkelPose (&alone, (float)h.first, w2);
+		}
+		for (b=0 ; b<own.bones ; b++)
+			for (k=0 ; k<12 ; k++)
+				assert (w1[b][k/4][k%4] == w2[b][k/4][k%4]);
+	}
+	return 0;
+}
+
 int main (int argc, char **argv)
 {
+	if (argc == 4 && !strcmp (argv[1], "append"))
+		return append_mode (argv);
 	if (argc == 8 && !strcmp (argv[1], "layer"))
 		return layer_mode (argv);
+	if (argc == 10 && !strcmp (argv[1], "layers"))
+		return layers_mode (argv);
 	if (argc == 17 && !strcmp (argv[1], "tag"))
 		return tag_mode (argv);
 	if (argc == 13 && !strcmp (argv[1], "verts"))

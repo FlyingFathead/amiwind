@@ -422,6 +422,9 @@ void AW_PhotoConsoleReminder(void);
 int AW_PhotoKey(int key);
 int AW_CrosshairShown(void);
 void AW_CrosshairSet(int on);
+/* UI-HUD-TOGGLE-KEY-51: Ctrl+Alt+H / dbg photomode hud; aw_hud_hidden lives in view.c (not saved). */
+void AW_HudToggle(void);
+extern int aw_hud_hidden;
 /* Crosshair colour (shape 0) and shape (shape 1): aw_crosshair_colour / aw_crosshair_shape. */
 int AW_CrosshairStyleCount(int shape);
 int AW_CrosshairStyle(int shape);
@@ -471,6 +474,16 @@ float AW_DoorSound(unsigned reference,int closing);
 /* Compiled game scripts (aw_mwhost.c, aw_mwvm.c; docs/MWSCRIPT_BYTECODE.md), experimental: aw_mwscript 0 by default. */
 void AW_MwscriptInit(void);
 void AW_MwscriptTick(float dt);
+/* The actor record behind the scripts (aw_mwhost.c, aw_actorstate.h; docs/ACTOR_STATE.md): opens the actor table of
+ * id1/mwscript.awm (1 ready). The hooks the other tables fill: StopCombat (aw_combat.h AW_CombatActorEnd) and
+ * AIWander (aw_ambient.h AW_AmbientWander); NULL: the call is logged once and does nothing. The Speed attribute of
+ * an actor's record for the ambient walk (aw_ambient_speed_attribute), -1 when it has none. */
+int AW_MwscriptActors(void);
+struct edict_s;
+extern int (*aw_mwscript_combat_end)(struct edict_s *e);
+extern int (*aw_mwscript_wander)(struct edict_s *e,int distance,int duration,int hour,const unsigned char idle[8],int repeat);
+extern int (*aw_mwscript_ai_package)(struct edict_s *e,int *done);   /* the ambient tables' AI package (aw_mwhost.c) */
+int AW_MwscriptSpeedAttribute(struct edict_s *e);
 /* Object state the scripts set (aw_mwhost.c): 1 when Disable hid the placement REFERENCE; its lock level, or
  * ORIGINAL when no script set one (0 unlocked .. 100). */
 int AW_ObjectDisabled(unsigned int reference);
@@ -541,6 +554,8 @@ int AW_UIBackground(void);
 int AW_MenuFrontEnd(void);
 byte *AW_UIMenuPalette(void);
 int AW_UIColor(int,int,int);
+/* aw_ui.c: the original map arrow (16x16 in gfx/ui.awu, rows 64 bytes apart, 255 clear), NULL when absent. */
+const byte *AW_UIMapArrow(void);
 void AW_UIFill(int,int,int,int,int);
 void AW_UIScrollbar(int,int,int,int,int,int);
 int AW_UIScrollHit(int,int,int,int,int,int,int,int);
@@ -613,6 +628,11 @@ int AW_NPCFloor(edict_t *actor);
 int AW_NPCFloorRetry(void);
 int AW_AliasBudgetAllows(int vertices,int triangles);
 int AW_AliasExceptionAllows(const char *name,int vertices,int triangles,const byte *raw,int bytes);
+unsigned int AW_AliasCrcAdd(unsigned int crc,const byte *raw,size_t n);
+int AW_AliasExceptionMatches(const char *name,int vertices,int triangles,int bytes,unsigned long crc);
+/* The alias stream reader's ordinary vertex bound (the original 2,000); an extended model up to MAXALIASVERTS
+ * (r_local.h: 3,072) needs its byte-matching model-budgets.txt line, as in the generic loader. */
+#define AW_ALIAS_NORMAL_VERTS	2000
 int AW_GalleryActive(void);
 int AW_GalleryOmitted(void);
 /* Quick test builds (tools/build.py --exclude): id1/excluded-content.txt, aw_excluded.c. */
@@ -630,6 +650,7 @@ void AW_GalleryEntities(void);
 void AW_GallerySpawn(edict_t *player);
 int AW_GalleryKey(int key,int down,int shift,int control);
 void AW_GalleryDraw(void);
+void AW_SweepInit(void);   /* dbg sweep (aw_sweep.c, ENTITY-SWEEP-AB) */
 void AW_StreamInit(void);
 int AW_StreamOption(int,int);
 float AW_StreamLookahead(void);

@@ -1,6 +1,6 @@
 # Animation kit
 
-_Last updated with AmiWind v0.0.53 (27 October 2026)._
+_Last updated with AmiWind v0.0.54 (27 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -9,6 +9,7 @@ _Last updated with AmiWind v0.0.53 (27 October 2026)._
 - [Skeletal actors: the layout from the table](#skeletal-actors-the-layout-from-the-table)
 - [Console: dbg animkit](#console-dbg-animkit)
 - [Morrowind's groups: wired and not wired yet](#morrowinds-groups-wired-and-not-wired-yet)
+- [Every group hooked up](#every-group-hooked-up)
 - [Walk or run: the rules and their sources](#walk-or-run-the-rules-and-their-sources)
 - [MiniWind sandbox](#miniwind-sandbox)
 - [Known limits](#known-limits)
@@ -129,13 +130,52 @@ Wired (Morrowind group -> engine group): `idle` -> idle, `walkforward` -> walk, 
 `shield` -> block. The sidesteps `dodgel` / `dodger` are an AmiWind extension sampled from `walkleft` /
 `walkright` (Morrowind has no dodge group).
 
-Present in the data, not wired yet: the idle variants (`idle2` to `idle9`, `idle1h`, `idle2c`,
-`idle2w`, `idlespell`, `idlecrossbow`, `idlesneak`, `idlestorm`, `torch`), `hit2` to `hit5`,
-the swimming hits, `death2` to `death5` and the knockdown, knockout and swimming deaths, `knockout`,
-walking and running backwards and sideways, turning, sneaking, swimming in other directions,
-the weapon attack sets (`weapononehand`, `weapontwohand`, `weapontwowide`, `bowandarrow`, `crossbow`,
-`throwweapon`), `spellcast` and the inventory poses. `dbg animkit list` prints the full table; the
-engine table is `engine/aga/src/aw_animkit_rules.c`.
+The table above is the kit's own (the engine groups the game logic drives). On a skeletal actor (the default) every
+other group of the table is played as well, by the actor's state: see the next section. `dbg animkit list` prints
+the kit's table; the engine table is `engine/aga/src/aw_animkit_rules.c`.
+
+## Every group hooked up
+
+From v0.0.54 every group of the humanoid tables is played by the game, not only by name from the console. The
+drivers (combat, the companion, the residents' idle, the walk) still move an actor through the kit's groups; just
+before the server sends the frames, a skeletal actor's frame is moved into the group the original game (as OpenMW
+plays it) shows in the same state, and given back after the send, so no driver sees a changed frame. A one-shot or a
+gait keeps the driver's progress through its group (its timing, the attack's hit, the feet's speed); a standing
+group plays on its own clock. `dbg animkit pick off` is the previous method: the kit's groups only (not saved).
+
+| State | Groups | Rule (OpenMW 0.51, read, not copied) |
+| --- | --- | --- |
+| Moving | `walk`/`run`/`sneak`/`swimwalk`/`swimrun` + `forward`/`back`/`left`/`right` by the motion against the facing; with a weapon drawn the stance's own set (`walkforward1h`, `runleft2c`, `sneakbackhh`, ...) | `mwmechanics/character.cpp` `refreshMovementAnims`; a missing stance group falls back to the long blade's (`1s`, `1b`, `bow`, `1t` to `1h`, `2b` to `2c`), a missing swim group to its land group, a missing run to walk |
+| Turning on the spot | `turnleft`/`turnright` (+ stance), `swimturnleft`/`-right`, `spellturnleft`/`-right` | `refreshMovementAnims` (not while sneaking) |
+| Standing | `idle`, `idlehh`, `idle1h`, `idle2c`, `idle2w`, `idlespell`, `idlecrossbow`; `idlesneak`, `idleswim`; the wander idles `idle2` to `idle9` by the package's chances; `idlestorm` on the arm facing an ash or blight storm (a layer over the rest) | `refreshIdleAnims`, `aiwander.cpp` `getRandomIdle`, `updateIdleStormState` |
+| Hit | `hit1` to `hit5` at random, `knockdown`, `knockout` (held down while out), `swimknockdown`, `swimknockout`, `shield` (block) | `refreshHitRecoilAnims` |
+| Death | `death1` to `death5` at random, `deathknockdown`, `deathknockout`, `swimdeath`, `swimdeathknockdown`, `swimdeathknockout` | `playRandomDeath` |
+| Attack | the weapon's group (`handtohand`, `weapononehand`, `weapontwohand`, `weapontwowide`, `bowandarrow`, `crossbow`, `throwweapon`) from `chop`/`slash`/`thrust` (or `shoot`) `start` to its follow | `updateWeaponState`, `getWeaponAnimation` |
+| Drawing, putting away | the same group's `equip start` to `equip stop` when a fight starts, `unequip` when it ends | `updateWeaponState` |
+| Casting | `spellcast` from `self`/`touch`/`target start` to its `stop` (the beast file keeps these keys in its second `spellcast` place) | `updateWeaponState` |
+| Others | `jump` + stance, `pickprobe`, the `inventory` poses, `torch` (the left arm while a light is carried) | `refreshJumpAnims`, `characterpreview.cpp` |
+
+The stance is the actor's own weapon (its record's weapon type), drawn while it fights; the swing (chop, slash,
+thrust) is the one combat chose. A woman's own groups and an NPC's own animation file (the Suran dancers) answer the
+plain names first, as before.
+
+Some groups wait for a caller from other work: the wander idles need the package chances from the ambient tables, a
+cast needs an NPC that casts (the spell effects work), sneaking needs MWScript's `ForceSneak`, NPCs do not jump yet,
+and `pickprobe` and the inventory poses are the player's. Their entry points are in the engine
+(`engine/aga/src/aw_animpick.h`) and the console reaches them now:
+
+| Command | What it does |
+| --- | --- |
+| `dbg animkit pick` | On or off, frames placed, and the group and rule of the NPC under the crosshair. |
+| `dbg animkit pick on` / `off` | Every group by state, or the kit's groups only (not saved). |
+| `dbg animkit pick cast self` / `touch` / `target` | The NPC under the crosshair casts. |
+| `dbg animkit pick sneak on` / `off` | It sneaks (the sneak gaits and `idlesneak`). |
+| `dbg animkit pick idle C2 C3 C4 C5 C6 C7 C8 C9` | Its wander idle chances (0 to 100 each). |
+
+The coverage: `python3 tools/anim_coverage.py <build>/.../progs/humanoid.awsk <build>/.../progs/humanoid_kna.awsk
+--markdown coverage.md` lists every group of a build's tables: in which table, hooked by what, and the caller still
+to come; a group nothing plays is reported as never played (`--check` fails on it). The gate test
+(`tests/test_anim_coverage.py`) proves every group reachable through the rules.
 
 ## Walk or run: the rules and their sources
 
@@ -175,8 +215,11 @@ The kit can also be compiled out: build the engine with `-DAW_ANIMKIT=0` (movers
 
 ## Known limits
 
-- Only the groups listed as wired are picked by the game logic; the rest of the table plays only when asked for
-  by name (`dbg animkit play`, `cycle`) on a skeletal NPC.
+- On a baked actor (`--npc-anim-type 1`) only the kit's groups play; every group by state needs the skeletal
+  tables (the default).
+- A group the state picks plays over the driver's timing: a variant longer or shorter than the kit's group plays
+  faster or slower to fit it. OpenMW blends groups per body part (a weapon stance over the legs, the storm pose on the
+  upper body); here one group plays on the whole body, the carried torch's left arm excepted.
 - The near and far NPC models (`--npc-lod on`) are for idle-only residents; with the baked kit
   (`--npc-anim-type 1`) an actor has one model plus its mover, and a skeletal actor has none.
 - A skeletal actor's head is reduced to the budget detail for now: the skeletal block is read only by the

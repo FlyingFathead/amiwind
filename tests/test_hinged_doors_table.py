@@ -10,8 +10,8 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / 'tools'), str(ROOT / 'src')]
 
-from prepare_door_audio import (HINGED_BASES, HINGED_NAME, HINGED_ROWS, HINGED_SOUNDS, hinged_catalogue,  # noqa: E402
-                                hinged_text, sample_name)
+from prepare_door_audio import (HINGED_BASES, HINGED_KEY_POOL, HINGED_LOCKS, HINGED_NAME, HINGED_ROWS,  # noqa: E402
+                                HINGED_SOUNDS, door_locks, hinged_catalogue, hinged_text, sample_name)
 
 
 def sub(tag, data):
@@ -107,6 +107,27 @@ class HingedDoorTable(unittest.TestCase):
         for line in records:
             for value in map(int, line.split()[1:3]):
                 self.assertTrue(-1 <= value < len(samples))
+
+    def test_lock_rows_for_load_doors_and_keyed_doors(self):
+        # DEBUG-GOD-LOCKED-DOORS-51: K rows for every locked load door and every hinged door naming a key; U = sKeyUsed
+        raw = master() + record('GMST', sub('NAME', z('sKeyUsed')) + sub('STRV', b'used to open lock'))
+        raw += cell('Town',
+                    ref(80, 'load_door', ('DODT', struct.pack('<6f', 0, 0, 0, 0, 0, 0)), ('FLTV', struct.pack('<i', 30))),
+                    ref(90, 'load_door', ('DODT', struct.pack('<6f', 0, 0, 0, 0, 0, 0)), ('KNAM', z('key_Private Quarters'))),
+                    ref(95, 'load_door', ('DODT', struct.pack('<6f', 0, 0, 0, 0, 0, 0)), ('FLTV', struct.pack('<i', 40)),
+                        ('DELE', struct.pack('<i', 0))))
+        bases, rows, sounds = hinged_catalogue(raw)
+        locks, key_used = door_locks(raw, rows)
+        self.assertEqual(key_used, 'used to open lock')
+        # 50: an unlocked load door, 95: deleted, 10: a hinged door without a key (its D row has the lock): no K row
+        self.assertEqual([(k['reference'], k['lock'], k['flags'], k['key']) for k in locks],
+                         [(20, 0, 3, 'key_room'), (80, 30, 1, ''), (90, 0, 3, 'key_Private Quarters')])
+        lines = hinged_text(bases, rows, sounds, lambda s: (sample_name(s), 1), locks, key_used).splitlines()
+        self.assertEqual([l for l in lines if l[:2] in ('K ', 'U ')],
+                         ['K 20 0 3 key_room', 'K 80 30 1', 'K 90 0 3 key_Private Quarters', 'U used to open lock'])
+        source = (ROOT / 'engine/aga/src/aw_hinged_door.c').read_text(encoding='utf-8')
+        defines = dict(re.findall(r'#define (HD_\w+) (\d+)', source))
+        self.assertEqual((int(defines['HD_LOCKS']), int(defines['HD_KEY_POOL'])), (HINGED_LOCKS, HINGED_KEY_POOL))
 
     def test_bounds_and_name_length_are_the_engines(self):
         source = (ROOT / 'engine/aga/src/aw_hinged_door.c').read_text(encoding='utf-8')

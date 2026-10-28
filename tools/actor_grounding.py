@@ -218,11 +218,11 @@ class _Fitter:
             raise ValueError(name + '.bsp: ' + str(error)) from error
 
     def _soles(self, model, angles, intro):
-        from check_actor_ground import model_frames, layout_of, contact_samples
+        from check_actor_ground import named_model_frames, layout_of, contact_samples
         name = Path(model)
         if name.is_absolute() or '..' in name.parts: raise ValueError('Unsafe actor model path')
         path = self.maps.parent/name
-        return tuple(contact_samples(model_frames(path.read_bytes()), angles, intro, layout_of(path)))
+        return tuple(contact_samples(named_model_frames(path.read_bytes(), model), angles, intro, layout_of(path)))
 
     @staticmethod
     def contact(s, point, samples):

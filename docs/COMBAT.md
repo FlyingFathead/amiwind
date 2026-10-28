@@ -1,11 +1,12 @@
 # Combat and the Vivec Arena minigame
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.54-dev1 (27 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [Playing the Vivec Arena (testing guide)](#playing-the-vivec-arena-testing-guide)
+- [Combat playground](#combat-playground)
 - [How combat works](#how-combat-works)
 - [Blocking](#blocking)
 - [Cost on a 68040](#cost-on-a-68040)
@@ -95,6 +96,47 @@ test (current hands, punch on an empty gallery floor) is
 `dbg combattest gallery` (or `dbg combattest floor`, `dbgmode combattest`),
 with its actions `idle`, `draw`, `lower`, `punch`, `center`, `help` and
 `exit` as before.
+
+## Combat playground
+
+The combat playground is the Vivec Arena's set of test modes. The MiniWind preset `--miniwind-combat-playground`
+builds a small image that starts in the Arena Pit and lists the modes. Pick a mode in the console with
+`dbg playground MODE` (or `dbgmode combat MODE`, `dbgmode arenapit MODE`). `dbg playground modes` lists them.
+Development builds only; nothing is saved.
+
+| Mode | What it shows |
+| --- | --- |
+| `duel [opponent]` | The Vivec Arena minigame above: one opponent fights you. |
+| `anim [actor]` | One actor plays every combat group of its animation table in turn, over and over: idle, walk, run, the attack groups of each weapon class (hand to hand, one-handed, two-handed, two-handed wide, bow, crossbow, thrown), the shield block, hits, knockdown, knockout and deaths. The bottom of the screen names the group and, in an attack group, its phase (equip, chop, slash, thrust, shoot, unequip). A baked Arena fighter has no animation table, so its animations play on the model of a skeletal resident of the scene. A model without a table plays its own groups. |
+| `aggro [id, id, ...]` | Up to four actors who are not fighting yet. Each one decides on its own whether to attack, by the Fight rule below, and runs away by the Flee rule. The screen shows each actor's Fight, distance, rating and state (calm, HOSTILE, FLEEING, down, dead). Without names it uses the default cast: four NPC records with Fight 100, 90, 85 and a Flee-100 pacifist (config/arena_fighters.json `playground_casts`). They stand in a row along the Pit at 600 to 1,920 original units from you. |
+| `group [N] [id, id, ...]` | N fighters (1 to 4; without names, the Arena fighters) all attack you at once. The screen shows each fighter's health and the measured cost of their thinks: thinks a second, mean and longest think in milliseconds. |
+| `sounds [creature]` | Every combat sound in turn, one every 1.6 seconds, named on screen with its event (see Sounds below), then the sound generators of a creature record (default `daedroth`): left and right foot, swimming, moan, roar, scream and land. |
+| `loadout NAME` | Your weapon and shield for the next fight (config/arena_player.json). |
+| `creatures` | Says what creature fights do and do not have yet (see Known limits). |
+
+The rules the aggro mode runs, with the game settings read from your master file:
+
+- Attack on sight (OpenMW 0.51 `mechanicsmanagerimp.cpp` isAggressive, `combat.cpp` getFightDistanceBias,
+  `actors.cpp` engageCombat). The effective Fight is Fight + iFightDistanceBase - fFightDistanceMultiplier x
+  distance + (50 - disposition) x fFightDispMult. The distance is in original units. The actor attacks when the
+  effective Fight reaches 100 and it can see you. Each actor checks about once a second (1 s, give or take 0.25 s).
+  A player who is not sneaking is always noticed. With the original settings (20, 0.005, 0.2), a Fight-90 actor
+  attacks within 2,000 units and a Fight-85 actor within 1,000. A townsperson with Fight 30 never attacks on sight.
+- Disposition: creatures use 50. NPCs also use 50 until the actor record carries their disposition, so the
+  disposition term is 0 for now.
+- Flee (OpenMW `aicombataction.cpp` vanillaRateFlee and makeFleeDecision, `weaponpriority.cpp`
+  vanillaRateWeaponAndAmmo). An actor with Flee 100 or more rates its Flee value. Any other actor rates
+  (1 - health / maximum) x fAIFleeHealthMult + Flee x fAIFleeFleeMult, plus the distance term when that is not 0.
+  A rating under 100 counts as 0. The actor runs when its rating beats the rating of its best action. Hand to hand
+  rates 0. A melee weapon rates armour rating x fAIMeleeArmorMult + the weapon's best maximum damage x skill / 100
+  x fAIMeleeWeaponMult. The original settings (7, 0.3) mean that only actors with a very high Flee ever run.
+  A fleeing actor runs for one second, then stands and watches. It runs again whenever you come within its reach.
+  It decides again after three seconds (ActionFlee).
+- The Flee rule is the switch `dbg combat flee on/off`. It is off by default, so fights in the
+  world keep the earlier rule: a fighter flees only when it cannot reach you. The aggro and group modes switch it
+  on for their session and restore it afterwards. The same goes for the sounds rule (`dbg combat sounds on/off`,
+  see Sounds), which the aggro, group and sounds modes switch on. Attack on sight runs only inside the playground for now. The
+  world's residents get it once the actor record carries Fight for every placed actor.
 
 ## How combat works
 
@@ -242,10 +284,34 @@ fNPCHealthBarFade seconds (0.5) (OpenMW `hud.cpp` setEnemy /
 updateEnemyHealthBar, `openmw_hud.layout` EnemyHealth). On the 8-bit screen
 the fade is a stipple.
 
-Sounds: the original hit, miss, punch, armour, swish, critical and body-fall
-sounds play (converted to 11 kHz). Voices: the layer calls one voice hook per
-event (the fight starts, the NPC swings, takes a hit, flees, dies); the
-character animation kit plays the original combat lines through it.
+Sounds: the original sound records, read from your master file and converted to 11 kHz. Which sound plays for what
+follows OpenMW 0.51; the rule is the switch `dbg combat sounds on/off` (off by default: then each outcome plays one
+sound, as before). With it on:
+
+| Event | Sound record | Rule from |
+| --- | --- | --- |
+| Every melee swing, hit or miss | Weapon Swish | `character.cpp` prepareHit, playSwishSound |
+| Your swing misses | miss (only for the player's swings) | `combat/local.lua` onHit |
+| A blow is blocked | the shield's Light, Medium or Heavy Armor Hit | `combat.cpp` blockMeleeAttack |
+| A punch tires (no health damage) | Hand To Hand Hit or Hand To Hand Hit 2 | `combat.cpp` getHandToHandDamage |
+| A blow takes health | the armour piece struck: Light, Medium or Heavy Armor Hit (none for an empty slot), then Health Damage | `combat/local.lua` pickRandomArmor, applyArmor, onHit |
+| A critical strike | critical damage | `npc.cpp` hit |
+| Knocked down or killed | Body Fall Medium (the earlier sound; the original plays it from the animation) | |
+| NPC footsteps | FootBare, FootLight, FootMed or FootHeavy Left and Right by the boots worn; FootWater and Swim in water | `npc.cpp` getSoundIdFromSndGen ([ANIMATION.md](ANIMATION.md)) |
+
+The piece struck is picked as OpenMW picks it: cuirass 30 %, helmet, greaves, boots and each pauldron 10 %, each
+gauntlet 5 %, the shield 10 %. Each combat sheet carries the armour class of each of those slots.
+
+Creatures: the builder writes every creature record's sound generators (combat/sndg.txt; the SNDG records) by
+OpenMW's rule (`mwclass/creature.cpp` getSoundIdFromSndGen): the creature's own generators of each type, else
+those of the first other creature with the same model, else the generic ones; one of a type's sounds is picked at
+random. Types: left and right foot, swim left and right, moan, roar, scream and land. In Morrowind.esm: 260
+creatures, 147 sounds. The combat playground's `sounds` mode plays them; creature fights (see Known limits) will
+use the same table.
+
+Voices: the layer calls one voice hook per event (the fight starts, the NPC swings, takes a hit, flees, dies);
+the character animation kit plays the original combat lines through it (the "hit" voice when an NPC loses
+health, OpenMW `npc.cpp` onHit).
 
 The enemy's bar is yellow: the reserved UI palette bank (indices 225..253)
 holds the yellow bar's colours since format 2 of the bank; the sky palette's
@@ -260,9 +326,10 @@ runs while nobody is hostile except the player's fatigue return; the punch is
 followed only from the moment the attack button is pressed. `dbg combat`
 prints the measured thinks, traces, time per think and bytes.
 
-Disk: combat/actors.txt (about 480 KB, every NPC record, read one letter's
-rows per lookup), combat/settings.txt, nine sounds (about 40 KB) and the four
-fighters (about 0.3 MB each).
+Disk: combat/actors.txt (about 490 KB, every NPC record, read one letter's
+rows per lookup), combat/settings.txt, ten sounds (about 40 KB), the creatures'
+sound generators (combat/sndg.txt, about 30 KB, and 147 sounds, about 1.7 MB) and
+the four fighters (about 0.3 MB each).
 
 ## Known limits
 
@@ -281,6 +348,15 @@ fighters (about 0.3 MB each).
   weapon mesh on the first-person weapon bone and the original first-person
   weapon groups (idle, equip and the three attacks per one-handed,
   two-handed and two-handed-wide class).
-- NPCs do not yet start fights on their own (Fight rating, alarms), and do not flee when hurt (only
-  the Flee rating's rule for an unreachable player is in).
-- Creatures (Dagoth Ur, the Arena's beasts) are not converted for maps yet.
+- The world's NPCs do not yet start fights on their own. The Fight rule runs in the combat playground only,
+  and alarms are not in. Fleeing by the Flee rating is in, behind `dbg combat flee on` (off by default).
+- Sounds play at the listener, not from the fighter's position. Creatures do not yet play their own sound
+  generators from their animations' sound keys; the table is built and the `sounds` mode plays it.
+- Creatures: combat/actors.txt holds NPC records only, so until v0.0.54 a creature had no sheet and a blow passed
+  through it. A creature's sheet now comes from the actor record ([ACTOR_STATE.md](ACTOR_STATE.md)), by OpenMW's
+  rules (`mwclass/creature.cpp` hit, getSkill, getArmorRating): its level, attributes, health, fatigue, Fight and
+  Flee; its combat value in every combat skill; no armour; its own chop, slash and thrust attacks as health damage
+  (minimum + (maximum - minimum) x swing, no Strength modifier, no condition); a bipedal creature punches hand to
+  hand. Hit one in the world, or name its record ID in the arena (`dbgmode arenapit daedroth`, a stand-in model).
+  Not yet: weapons a creature carries (it fights with its own attacks), its own animation groups in a fight and its
+  sound generators from its animations.
