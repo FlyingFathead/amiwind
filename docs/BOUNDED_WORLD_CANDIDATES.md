@@ -79,7 +79,7 @@ acceptance. The helper does not infer or silently shrink it.
 The prototype measurements below are historical. The later normal-converter
 bounded layouts carried into v0.0.27 passed the complete static map gates and
 private image assembly/readbacks. Target lifecycle checks remain open; see
-[the current release record](RELEASE-v0.0.27.md).
+[the current release record](releases/notes/RELEASE-v0.0.27.md).
 
 The central 512-unit core with its 896-unit apron still required 6,929,680 bytes,
 638,224 above the BSP ceiling, despite a genuine smaller world and removal of

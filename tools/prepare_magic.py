@@ -29,6 +29,10 @@ TABLE = 'gfx/magic.awm'
 SOUND_DIR = 'sound/aw/magic'
 SCALE = 0.25                     # Morrowind units to map units (prepare_quake.SCALE)
 SPRITE = 32                      # sprite side in pixels (aw_magic.h AW_MAGIC_SPRITE_PIXELS)
+# the bubble's finer copy (progs/awmf_NN.spr beside progs/awmx_NN.spr): for shells seen close, the player's own seen
+# from behind and the first-person veil, where 32 pixels made a coarse dither (the maintainer: "the shield veil looks
+# kinda wild", TG 2026-10-28 08:07 +0200); aw_magic.c finds it by that name and scales it by its own width
+FINE_SIDE = 64
 FADES = (1.0, 0.7, 0.45, 0.25)   # the four fade frames' strength
 RAMP = 8
 EMITTERS = 3
@@ -49,6 +53,12 @@ FAIL_LENGTH = 1.0
 # it (the game's cast and hit shells; OpenMW mwrender/animation.cpp addEffect attaches them to the actor, looping for
 # continuous effects): one sprite per effect, the shell texture rendered onto a sphere seen from outside
 BUBBLE = 'bubble'
+# The effects whose hit visual stays on the target for the spell's whole duration (the flag 0x20, ContinuousVfx). The
+# game data does not store it: the original engine has it built in per effect, and OpenMW records those built-in
+# flags (components/esm3/loadmgef.cpp; this list of effect numbers is read from it, nothing else copied): the four
+# shields, levitate, fire / shock / frost damage, drain health, damage health, poison, and effect 58.
+CONTINUOUS_VFX = frozenset({3, 4, 5, 6, 10, 14, 15, 16, 18, 23, 27, 58})
+CONTINUOUS_FLAG = 0x20
 BUBBLE_LENGTH = 1.5
 PHASE_ORDER = tuple(p[0] for p in PHASES) + (FAIL, BUBBLE)
 SOUND_FIELDS = (('cast', 'CSND'), ('bolt', 'BSND'), ('hit', 'HSND'), ('area', 'ASND'))
@@ -292,17 +302,22 @@ def sprite_bytes(rgba, palette, glow):
     return bytes(out)
 
 
-def bubble_bytes(rgba, rgb, palette, shell=None):
+def bubble_bytes(rgba, rgb, palette, shell=None, side=SPRITE, ellipse=(1.0, 1.0)):
     """A Quake sprite of a translucent sphere (four fade frames like sprite_bytes): the shell texture wrapped around
     it (longitude by angle, latitude by radius) in the effect's colour, strongest at the rim where a see-through
     shell is seen edge-on (its path through the shell grows as 1 / cos), see-through in the middle. SHELL: the
-    effect's hit model baked by shell_image, laid over it."""
+    effect's hit model baked by shell_image, laid over it. SIDE: the sprite's pixels (FINE_SIDE: the finer copy for
+    shells seen close, the player's own and the first-person veil). ELLIPSE: the outline's half width and half
+    height as shares of the sprite's half side (shell_ellipse: the hit model's own proportions, e.g. the shield's
+    upright egg, taller than wide)."""
+    S = side
     import numpy as np
     from PIL import Image
     tex = np.asarray(Image.fromarray(np.asarray(rgba, dtype=np.uint8), 'RGBA').resize((64, 64), Image.Resampling.LANCZOS),
                      dtype=float)
-    y, x = np.mgrid[0:SPRITE, 0:SPRITE]
-    dx, dy = (x + 0.5 - SPRITE / 2) / (SPRITE / 2), (y + 0.5 - SPRITE / 2) / (SPRITE / 2)
+    y, x = np.mgrid[0:S, 0:S]
+    ax, az = (min(1.0, max(0.05, float(e))) for e in ellipse)
+    dx, dy = (x + 0.5 - S / 2) / (S / 2) / ax, (y + 0.5 - S / 2) / (S / 2) / az
     r = np.sqrt(dx * dx + dy * dy)
     inside = r < 1.0
     depth = np.sqrt(np.clip(1 - r * r, 0.0, 1.0))
@@ -322,20 +337,32 @@ def bubble_bytes(rgba, rgb, palette, shell=None):
         rgba = np.zeros(bw.shape + (4,))
         rgba[..., :3] = np.clip(0.6 * boosted(bc) + 0.4 * tint, 0, 255)
         rgba[..., 3] = bw * 255
-        small = np.asarray(_I.fromarray(rgba.astype(np.uint8), 'RGBA').resize((SPRITE, SPRITE), _I.Resampling.BOX),
+        small = np.asarray(_I.fromarray(rgba.astype(np.uint8), 'RGBA').resize((S, S), _I.Resampling.BOX),
                            dtype=float)
         sw = np.clip(small[..., 3] / 255.0 * 1.6, 0, 1)
         w = w * 0.7
         take = sw > w
         colour = np.where(take[..., None], small[..., :3], colour)
         w = np.where(take, sw, w)
-    index = nearest(colour, palette).reshape(SPRITE, SPRITE)
-    threshold = np.array([[(BAYER[j % 4][i % 4] + 0.5) / 16 for i in range(SPRITE)] for j in range(SPRITE)])
-    out = bytearray(struct.pack('<4siifiiifi', b'IDSP', 1, 2, SPRITE * 0.7072, SPRITE, SPRITE, len(FADES), 0.0, 0))
+    index = nearest(colour, palette).reshape(S, S)
+    threshold = np.array([[(BAYER[j % 4][i % 4] + 0.5) / 16 for i in range(S)] for j in range(S)])
+    out = bytearray(struct.pack('<4siifiiifi', b'IDSP', 1, 2, S * 0.7072, S, S, len(FADES), 0.0, 0))
     for strength in FADES:
         frame = np.where(w * strength > threshold, index, 255).astype(np.uint8)
-        out += struct.pack('<5i', 0, -SPRITE // 2, SPRITE // 2, SPRITE, SPRITE) + frame.tobytes()
+        out += struct.pack('<5i', 0, -S // 2, S // 2, S, S) + frame.tobytes()
     return bytes(out)
+
+
+def shell_ellipse(geometry, side):
+    """The hit model's outline seen from the front as (half width, half height) shares of shell_image's square of
+    SIDE (both 1 for a sphere as wide as tall). The shield's model (e/magic_hit_s.nif) is 101 NIF units wide and 147
+    tall, from the feet to above the head: an upright egg, about 1.45 times as tall as wide."""
+    import numpy as np
+    pts = [g['verts'] for g in geometry if len(g['verts'])]
+    if not pts or not side > 0:
+        return (1.0, 1.0)
+    v = np.concatenate(pts)
+    return (round(float(v[:, 0].max() - v[:, 0].min()) / side, 4), round(float(v[:, 2].max() - v[:, 2].min()) / side, 4))
 
 
 def shell_image(geometry, textures, grid=64):
@@ -395,10 +422,16 @@ def shell_image(geometry, textures, grid=64):
     return colour, strength, float(side), float(zc)
 
 
-def read_sprite(raw):
-    """(frames, width, height) of a sprite sprite_bytes wrote; refuses anything else."""
+def fine_path(path, letter='f'):
+    """A copy of a bubble sprite beside progs/awmx_NN.spr (the egg, the hit model's own outline): 'f' its finer copy
+    (progs/awmf_NN.spr), 'y' the sphere (awmy), 'g' the sphere's finer copy (awmg); aw_magic.c shell_model."""
+    return path.replace('/awmx_', '/awm%s_' % letter)
+
+
+def read_sprite(raw, side=SPRITE):
+    """(frames, width, height) of a sprite sprite_bytes / bubble_bytes wrote (SIDE pixels); refuses anything else."""
     magic, version, kind, radius, width, height, frames, beam, sync = struct.unpack_from('<4siifiiifi', raw)
-    if magic != b'IDSP' or version != 1 or kind != 2 or width != SPRITE or height != SPRITE or frames < 1:
+    if magic != b'IDSP' or version != 1 or kind != 2 or width != side or height != side or frames < 1:
         raise ValueError('Not a magic effect sprite')
     at = 36
     for _ in range(frames):
@@ -725,7 +758,7 @@ def prepare(data_files, id1):
         # the bubble: the effect's own hit model baked from the front into a see-through sprite (the shell that wraps
         # a character the spell holds on), its SIZE the model's width in map units for a standard character (the
         # engine scales it to the actor); without a textured hit model the sphere of its hit texture (SIZE 0)
-        fx['flags'] = int(row.get('flags', 0))
+        fx['flags'] = int(row.get('flags', 0)) | (CONTINUOUS_FLAG if index in CONTINUOUS_VFX else 0)
         source = (pictures.get('hit') or pictures.get('cast') or ((particle_texture, 13) if particle_texture else None))
         if source or phase_models.get('hit'):
             try:
@@ -738,20 +771,31 @@ def prepare(data_files, id1):
                     textures = {g['texture']: texture_rgba(effective_texture(g['texture'], g['root_first'],
                                                                              particle_texture)) for g in geometry}
                     image = shell_image(geometry, textures)
+                outline = (1.0, 1.0)
                 if image is not None:
-                    size, how = round(min(512, image[2] * SCALE), 2), 'hit model on sphere'
+                    size, how = round(min(512, image[2] * SCALE), 2), 'hit model on its own outline'
+                    outline = shell_ellipse(geometry, image[2])
                 import numpy as np
                 body = texture_rgba(source[0]) if source else np.zeros((8, 8, 4), np.uint8)
-                raw = bubble_bytes(body, fx['rgb'], palette, shell=image)
-                read_sprite(raw)
+                # the shell shapes to choose (dbg cast shell egg|sphere): the egg, the hit model's own outline (the
+                # default; the maintainer: the shield was egg-shaped in the original), and the sphere kept as it was
+                # (the maintainer, 2026-10-28: "that looks hella cool, you could still save it as some version")
                 (id1 / 'progs').mkdir(parents=True, exist_ok=True)
-                (id1 / path).write_bytes(raw)
+                copies = {}
+                for letter, side_px, shape in (('x', SPRITE, outline), ('f', FINE_SIDE, outline),
+                                               ('y', SPRITE, (1.0, 1.0)), ('g', FINE_SIDE, (1.0, 1.0))):
+                    data_ = bubble_bytes(body, fx['rgb'], palette, shell=image, side=side_px, ellipse=shape)
+                    read_sprite(data_, side_px)
+                    target = path if letter == 'x' else fine_path(path, letter)
+                    (id1 / target).write_bytes(data_)
+                    copies[target] = len(data_)
                 sprites[key] = path
                 report['sprites'][path] = {'texture': source[0] if source else None, 'bubble': word, 'from': how,
-                                           'bytes': len(raw)}
+                                           'outline': outline, 'copies': copies, 'bytes': sum(copies.values())}
                 fx['phases'][BUBBLE] = {'length': BUBBLE_LENGTH, 'sprite': path, 'size': size, 'radius': 0,
                                         'sound': None, 'emitters': []}
-                notes[BUBBLE] = {'sprite': path, 'from': how, 'size': size, 'hit_model': phase_models.get('hit')}
+                notes[BUBBLE] = {'sprite': path, 'from': how, 'size': size, 'hit_model': phase_models.get('hit'),
+                                 'outline': outline}
             except Exception as error:  # noqa: BLE001
                 report['refused'].append({'effect': word, 'phase': BUBBLE, 'error': str(error)})
         fail = sound_for(phase_sound(row, FAIL, school)[0])

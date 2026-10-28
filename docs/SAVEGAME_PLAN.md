@@ -10,7 +10,7 @@ manual slots, 0–16 autosaves (default 3) and dual validated generations are
 implemented. Native filesystem and failure acceptance are recorded with the
 playtest evidence. The design below remains the broader target; named manual
 saves, general object deltas and controlled original ESS comparisons are pending.
-See [checkpoint limits](RELEASE-v0.0.21-dev1.md). Requested 28 September 2026. Deliver with the next dock/Census milestone once its character
+See [checkpoint limits](releases/notes/RELEASE-v0.0.21-dev1.md). Requested 28 September 2026. Deliver with the next dock/Census milestone once its character
 record is authoritative: attributes set and the game saveable/loadable. See [character creation](CHARACTER_CREATION.md) and
 [world persistence](PERSISTENCE_AND_STREAMING.md).
 

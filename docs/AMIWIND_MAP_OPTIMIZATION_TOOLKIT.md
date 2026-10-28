@@ -95,7 +95,7 @@ including terrain clipping in other cells; do not start a broad reconversion
 on the strength of this one diagnostic.
 
 Current evidence and outstanding work are recorded in
-[the findings snapshot](MAP_OPTIMIZATION_FINDINGS_2026-10-04.md).
+[the findings snapshot](history/investigations/MAP_OPTIMIZATION_FINDINGS_2026-10-04.md).
 
 ## Placement-aware terrain clipping and residency
 

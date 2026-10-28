@@ -19,7 +19,7 @@ _Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 <!-- contents end -->
 
 **Status:** bounded implementation present in v0.0.21-dev1; acceptance remains
-in progress. See [checkpoint scope](RELEASE-v0.0.21-dev1.md). The audit below
+in progress. See [checkpoint scope](releases/notes/RELEASE-v0.0.21-dev1.md). The audit below
 remains the behavioral target. Numeric journal indices, globals and inventory
 counts are distinct from the intro UI stage; no universal linear quest enum.
 NPCs retain individual local state and timers. A general script/condition

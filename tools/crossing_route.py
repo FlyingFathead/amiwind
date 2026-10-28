@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """The fixed crossing route: CHIM cell crossings timed in a headless FS-UAE session.
 
-CHIM-CROSSING-SLUGGISH-43, docs/PLAN-v0.0.45.md step 1.1 (the A of every crossing comparison; method and results in
+CHIM-CROSSING-SLUGGISH-43, docs/history/plans/PLAN-v0.0.45.md step 1.1 (the A of every crossing comparison; method and results in
 docs/performance/CROSSING_BASELINE.md). The route is data (ROUTE below): legs in original Morrowind global
 coordinates, each a level noclip flight across one cell edge, diagonally through one cell corner where four frames
 meet, or around a corner in a small square, in a light region (Ascadian Isles, Bitter Coast) and at a heavy town frame

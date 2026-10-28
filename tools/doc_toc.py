@@ -25,9 +25,10 @@ list on the next write.
 Not edited: the root README.md (kept as is), licence texts, generated pages
 (docs/BUGS.md: tools/bug_register.py renders it and its only section is the
 register table; docs/AMIWIND_CONSOLE_COMMANDS.md: rendered whole by
-tools/console_commands_doc.py) and frozen history (docs/journals/, released
-docs/RELEASE-v*.md notes, docs/PATCH-*, docs/BUGS-v0.0.29-RC1.md,
-docs/RC2_ISSUE_CHECKPOINT.md).
+tools/console_commands_doc.py; the docs index pages: tools/docs_index.py) and frozen
+history (docs/journals/ except the maintainer's HORSTATORS_* journals, docs/releases/:
+released notes and whitespace baselines, docs/history/checkpoints/BUGS-v0.0.29-RC1.md,
+docs/history/checkpoints/RC2_ISSUE_CHECKPOINT.md).
 
 Links use GitHub's heading anchors: lower case, punctuation removed, each space a
 hyphen, repeated anchors suffixed -1, -2 in document order.
@@ -62,6 +63,9 @@ GENERATED = {
     'docs/bugs/CHIM_TRACKER.md': 'generated whole by tools/bug_register.py with the register',
     'docs/chim/FEATURES.md': 'generated whole by tools/chim_features.py from docs/chim/features.json',
     'docs/chim/CELL_TRACKER.md': 'generated whole by tools/cell_progress.py render-md from the tracker data',
+    'docs/README.md': 'generated whole by tools/docs_index.py from docs/README.topics.json',
+    'docs/releases/README.md': 'generated whole by tools/docs_index.py from docs/releases/',
+    'docs/history/README.md': 'generated whole by tools/docs_index.py from docs/history/MOVES.json',
 }
 # The line every GENERATED page carries under its title, written by its generator (documentation policy of record,
 # 19 October 2026): what it was generated from and the AmiWind version of the source that generated it, no date; a
@@ -76,8 +80,12 @@ def generated_line(source, version=None):
     return '_Generated from `%s` with AmiWind v%s._' % (source, str(version).lstrip('v'))
 
 
-FROZEN = {'docs/BUGS-v0.0.29-RC1.md', 'docs/RC2_ISSUE_CHECKPOINT.md'}
-FROZEN_PREFIXES = ('docs/journals/', 'docs/RELEASE-v', 'docs/PATCH-')
+FROZEN = {'docs/history/checkpoints/BUGS-v0.0.29-RC1.md', 'docs/history/checkpoints/RC2_ISSUE_CHECKPOINT.md'}
+# Released notes and baselines (docs/releases/README.md is generated, GENERATED above) and the frozen bug journals.
+# The other records of docs/history/ and the maintainer's journals keep the contents lists they had at the docs/
+# root before the v0.0.55 move, so they stay checked like any document.
+FROZEN_PREFIXES = ('docs/journals/', 'docs/releases/')
+NOT_FROZEN_PREFIXES = ('docs/journals/HORSTATORS_',)
 LICENCE = re.compile(r'^(LICEN[CS]E|COPYING|NOTICE)', re.I)
 
 HEADING = re.compile(r'^ {0,3}(#{1,6})(?:[ \t]+(.*?))?[ \t]*$')
@@ -97,7 +105,7 @@ def excluded(rel):
         return EXCLUDED[rel]
     if rel in GENERATED:
         return GENERATED[rel]
-    if rel in FROZEN or rel.startswith(FROZEN_PREFIXES):
+    if rel in FROZEN or (rel.startswith(FROZEN_PREFIXES) and not rel.startswith(NOT_FROZEN_PREFIXES)):
         return 'frozen history'
     if LICENCE.match(rel.rsplit('/', 1)[-1]):
         return 'licence text'

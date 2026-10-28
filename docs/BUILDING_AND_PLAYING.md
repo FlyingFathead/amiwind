@@ -10,7 +10,7 @@ Start with `.\setup-windows.cmd -Plan`, then `.\setup-windows.cmd -Yes`, and fol
 build pipeline. Earlier native Windows full conversion and WinUAE game-entry
 checks passed; experimental reliability limits remain. The published v0.0.27
 passed Linux/Windows launcher CI, Docker builder CI and the source/asset-free
-build job. See the [release notes](RELEASE-v0.0.27.md) for the scope of each
+build job. See the [release notes](releases/notes/RELEASE-v0.0.27.md) for the scope of each
 check; these results do not certify a full v0.0.27 gameplay run on either host.
 
 **Quickest way to compile on Ubuntu/Debian Linux (or Ubuntu under WSL):**
@@ -145,7 +145,7 @@ safe minimum for the whole game (since 23 October 2026; 128 MiB from 21 October,
 before; more is used automatically; 16 MiB still starts with a warning and loads more
 often, see [Fast RAM](FS-UAE-LAUNCHER.md#fast-ram)), with JIT and maximum CPU speed. The v0.0.16 playable image was tested with
 FS-UAE 3.1.66 on Linux. The Windows checkpoint reached the game in WinUAE 6.0.3
-using this hardware profile; see the [test scope](VALIDATION-WINDOWS-2026-10-02.md).
+using this hardware profile; see the [test scope](history/validation/VALIDATION-WINDOWS-2026-10-02.md).
 The public [dry-run build](CI_DRY_RUN.md) contains no game assets or ROMs
 and boots to a test notice; it is not the playable demo.
 

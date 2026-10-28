@@ -58,7 +58,7 @@ interior brightness default goes back to 1.0. The CHIM world's reads feed the mu
 load prints how long the music waited. The game's scripts (experimental, off by default) can enable, disable, lock
 and unlock objects and show message boxes.
 
-The front page ([README](../README.md)) used to carry these sections. They are dated records of earlier releases and of the work around them, kept as written; where one disagrees with the front page, the front page is newer. The release notes of each version are in `docs/RELEASE-v*.md`.
+The front page ([README](../README.md)) used to carry these sections. They are dated records of earlier releases and of the work around them, kept as written; where one disagrees with the front page, the front page is newer. The release notes of each version are in `docs/releases/notes/` (listed in [releases](releases/README.md); they sat at the docs/ root as `docs/RELEASE-v*.md` until v0.0.54).
 
 ## v0.0.50: The Doors: Riders On The CHIM
 
@@ -115,7 +115,7 @@ its scheduling changes.
 More improvements to cell-to-cell streaming are on the way: most of what is left of a crossing is the engine
 restarting the game for every new frame, and the next step replaces that with a switch in place.
 
-Running on CHIM Engine v0.2.1. See the [release notes](RELEASE-v0.0.45.md) for what changed and what is
+Running on CHIM Engine v0.2.1. See the [release notes](releases/notes/RELEASE-v0.0.45.md) for what changed and what is
 known in this build.
 
 ## v0.0.44: By Azura's Trees!
@@ -142,7 +142,7 @@ What went wrong while building v0.0.44, and how it was fixed:
   of map now and runs after the frames: the guards in the streets carry their torches at night again, 19 guard types
   instead of 13 ([GUARD-TORCH-CHIM-FRAMES-44](bugs/GUARD-TORCH-CHIM-FRAMES-44.md)).
 
-Running on CHIM Engine v0.2.1. See the [release notes](RELEASE-v0.0.44.md) for what changed and what is
+Running on CHIM Engine v0.2.1. See the [release notes](releases/notes/RELEASE-v0.0.44.md) for what changed and what is
 known in this build.
 
 ## v0.0.43: Let There Be CHIM: Vvardenfell's Outdoors, All of It
@@ -158,7 +158,7 @@ Counted in full, that is 1,409 cells on CHIM: the 1,348 one-cell region frames a
 empty sea cells) and 61 cells in the town frames of Balmora, Seyda Neen and Vivec, of which 46 were in the
 region list. [What these numbers count](chim/CELL_TRACKER.md#what-we-count).
 
-Running on CHIM Engine v0.2.1. See the [release notes](RELEASE-v0.0.43.md) for what changed and what is
+Running on CHIM Engine v0.2.1. See the [release notes](releases/notes/RELEASE-v0.0.43.md) for what changed and what is
 known in this build, and the [CHIM Progress Tracker](chim/PROGRESS_TRACKER.md) for every cell.
 
 <p align="center">
@@ -179,7 +179,7 @@ still picture in the original pose.
 The 1,395 were the exterior cells planned for CHIM at the time; how today's counts are made up is in
 [what these numbers count](chim/CELL_TRACKER.md#what-we-count).
 
-Running on CHIM Engine v0.2.1. See the [release notes](RELEASE-v0.0.42.md) for what changed and what is
+Running on CHIM Engine v0.2.1. See the [release notes](releases/notes/RELEASE-v0.0.42.md) for what changed and what is
 known in this build, and the [CHIM Progress Tracker](chim/PROGRESS_TRACKER.md) for every cell.
 
 | | |
@@ -201,7 +201,7 @@ Sadrith Mora and Vos: 723 cells, each converted from your own copy of Morrowind.
 irregular meshes (Telvanni roots and towers, Daedric and Dwemer ruins) now compiles into compact hulls instead
 of chains of thousands of planes, which is what lets the Telvanni towns fit the memory budget.
 
-Running on CHIM Engine v0.2.1. See the [release notes](RELEASE-v0.0.41.md) for what changed and what is
+Running on CHIM Engine v0.2.1. See the [release notes](releases/notes/RELEASE-v0.0.41.md) for what changed and what is
 known in this build, and the [CHIM Progress Tracker](chim/PROGRESS_TRACKER.md) for every cell.
 
 <!-- v0.0.41 gallery: photo-mode captures from the release build go here -->
@@ -219,7 +219,7 @@ limb deformation during animation conversion. Rebuilt models pass serialized che
 Original-spacing terrain diagonals and two local detail repairs are integrated
 with source edge checks and a passing complete automated suite (explicit skips
 and expected failures). Compiled/native seams and actor contact remain open. Combat, swimming, gait and appearance reports remain open.
-See the [release preparation notes](RELEASE-v0.0.40.md) and
+See the [release preparation notes](releases/notes/RELEASE-v0.0.40.md) and
 [bug register](BUGS.md#fix-index) for the exact scope and remaining gates.
 
 ### Along the coast: ring 2
@@ -254,7 +254,7 @@ CHIM content is unchanged from the inspected RC2: 360 whole regional cells,
 with six partial town overlaps excluded from that count. Conversion and audit
 progress are separate from packaged or fully playable coverage.
 
-See the [release notes](RELEASE-v0.0.39.md),
+See the [release notes](releases/notes/RELEASE-v0.0.39.md),
 [changelog](CHANGELOG.md) and [bug register](BUGS.md#fix-index).
 Unfinished work and new features continue in
 [v0.0.40](ROADMAP.md#v0040---unfinished-work-and-new-features).
@@ -262,7 +262,7 @@ Unfinished work and new features continue in
 <!-- v0.0.38 preview -->
 ## Previous public source release: v0.0.38 - Lava Is All You Need (And A Hint Of Tel Uvirith)
 
-See the [v0.0.38 release notes](RELEASE-v0.0.38.md) for changes and remaining verification limits.
+See the [v0.0.38 release notes](releases/notes/RELEASE-v0.0.38.md) for changes and remaining verification limits.
 
 Published v0.0.38 brings lava conversion repairs, new CHIM exterior areas,
 reduced Tel Uvirith geometry, collision fixes and updated Toolkit inspection
@@ -293,9 +293,9 @@ A separate normal-movement test verified lava damage with god mode and noclip of
 These views do not establish sound or complete world-traversal acceptance.
 <!-- /v0.0.38 preview -->
 
-**v0.0.37 - Proofreading the Cantons:** a small fix release: the v0.0.36 release notes and this page now match the released code, and the logo images are fixed. Release notes: [docs/RELEASE-v0.0.37.md](RELEASE-v0.0.37.md).
+**v0.0.37 - Proofreading the Cantons:** a small fix release: the v0.0.36 release notes and this page now match the released code, and the logo images are fixed. Release notes: [docs/releases/notes/RELEASE-v0.0.37.md](releases/notes/RELEASE-v0.0.37.md).
 
-**v0.0.36, running on CHIM Engine v0.2.0:** introduced CHIM coverage along the coastline and the next ring inland, all of Vivec is one CHIM map with 130 of its rooms, Seyda Neen and Balmora are CHIM-native, terrain is stored once, and the engine gets wider coordinates, third person, blocking and a death scene. Release notes: [docs/RELEASE-v0.0.36.md](RELEASE-v0.0.36.md).
+**v0.0.36, running on CHIM Engine v0.2.0:** introduced CHIM coverage along the coastline and the next ring inland, all of Vivec is one CHIM map with 130 of its rooms, Seyda Neen and Balmora are CHIM-native, terrain is stored once, and the engine gets wider coordinates, third person, blocking and a death scene. Release notes: [docs/releases/notes/RELEASE-v0.0.36.md](releases/notes/RELEASE-v0.0.36.md).
 
 ### CHIM progress map
 
@@ -359,7 +359,7 @@ RC2. See the [cell tracker](chim/CELL_TRACKER.md) and
 The [11 October v0.0.36 map](images/amiwind-v0.0.36-progress-map.png)
 is retained as a historical snapshot.
 
-**Earlier release, v0.0.35:** walk and run for NPCs, combat with weapons and shields, lava, Seyda Neen from your own data, about 30 engine crash fixes and a faster, resumable builder. Details: [docs/RELEASE-v0.0.35.md](RELEASE-v0.0.35.md).
+**Earlier release, v0.0.35:** walk and run for NPCs, combat with weapons and shields, lava, Seyda Neen from your own data, about 30 engine crash fixes and a faster, resumable builder. Details: [docs/releases/notes/RELEASE-v0.0.35.md](releases/notes/RELEASE-v0.0.35.md).
 
 ## v0.0.35 - CHIMporting It All: Gathering Up The Loose Branches From The Seashore
 
@@ -370,7 +370,7 @@ use weapons and shields, lava glows and burns, Seyda Neen is built from your own
 engine crash paths are closed and the builder resumes a failed build from where it stopped. Unfinished
 work ships behind switches that are off by default.
 
-- [Release notes](RELEASE-v0.0.35.md)
+- [Release notes](releases/notes/RELEASE-v0.0.35.md)
 
 ## v0.0.34 - CHIM: Tightening the Bolts
 
@@ -381,7 +381,7 @@ the mesh is reduced, and it still fits Balmora's chunk memory), and every placed
 Coast mushroom can be picked (invisible tree collision no longer blocks the pick). Both
 fixes come with an island-wide check that runs in every build.
 
-- [Release notes](RELEASE-v0.0.34.md)
+- [Release notes](releases/notes/RELEASE-v0.0.34.md)
 
 ## v0.0.33 - Towards CHIM: Replacing the Engine Block
 
@@ -436,7 +436,7 @@ v0.0.32 is left out of this release; it comes back on CHIM.
 
 Read more:
 
-- [Release notes](RELEASE-v0.0.33.md), with what is known in this build
+- [Release notes](releases/notes/RELEASE-v0.0.33.md), with what is known in this build
 - [CHIM engine](chim/README.md)
 - [CHIM file format](CHIM_FILE_FORMAT.md): what CHIM stores and why, its files (`.chim` maps and the CHIM world), versions and roadmap
 - [CHIM features](chim/FEATURES.md): what is done, measured or still to do
@@ -480,7 +480,7 @@ What's new:
 - **New logo** and start-up lines.
 
 Release notes, with what is known in this build:
-[v0.0.32](RELEASE-v0.0.32.md).
+[v0.0.32](releases/notes/RELEASE-v0.0.32.md).
 
 ## v0.0.31 - Lamps, Lanterns and Loading
 
@@ -559,7 +559,7 @@ What we gained (measured):
 | ![A Balmora plaza at 21:38 with a Hlaalu guard carrying a torch](images/amiwind-v0.0.31-balmora-night-plaza-guard.png) | **21:38, a plaza guard.** Guard torches light half as far as before, so they no longer outshine the lamps. |
 | ![A Balmora house corner lit by its lamp at 22:36](images/amiwind-v0.0.31-balmora-night-house-corner.png) | **22:36, a house corner.** Lamps stay lit while you turn and walk; a lamp that hands its light to a nearer one fades out instead of snapping off. |
 
-Release notes: [v0.0.31](RELEASE-v0.0.31.md) (with the dev1-dev6 notes linked
+Release notes: [v0.0.31](releases/notes/RELEASE-v0.0.31.md) (with the dev1-dev6 notes linked
 there) and the [bug register](BUGS.md).
 
 ### Whoops! Actually...
@@ -628,10 +628,10 @@ compiler warnings. Every lighting and loading change has a console switch.
 
 Still open: Seyda Neen crossing pauses (a lighter rebuild of its maps is under
 way), a rare load freeze seen in automated runs, and the issues carried over
-from v0.0.29. See the [release notes](RELEASE-v0.0.30.md) and the
+from v0.0.29. See the [release notes](releases/notes/RELEASE-v0.0.30.md) and the
 [tracker](BUGS.md). Development builds:
-[dev3](RELEASE-v0.0.30-dev3.md), [dev4](RELEASE-v0.0.30-dev4.md),
-[dev5](RELEASE-v0.0.30-dev5.md), [rc1](RELEASE-v0.0.30-rc1.md).
+[dev3](releases/notes/RELEASE-v0.0.30-dev3.md), [dev4](releases/notes/RELEASE-v0.0.30-dev4.md),
+[dev5](releases/notes/RELEASE-v0.0.30-dev5.md), [rc1](releases/notes/RELEASE-v0.0.30-rc1.md).
 
 ## v0.0.29 - Let There Be (Just a Bit More) Light
 
@@ -643,7 +643,7 @@ jump have positive RC2 playtest results. Confirmation dialogs use framed buttons
 This remains an experimental project with incomplete world and gameplay coverage.
 Balmora Temple geometry holes and WinUAE music crackle/pauses remain known issues,
 alongside the hand-animation transition and memory/performance limits. See the
-[release notes](RELEASE-v0.0.29.md) and [current tracker](BUGS.md).
+[release notes](releases/notes/RELEASE-v0.0.29.md) and [current tracker](BUGS.md).
 
 ## Earlier v0.0.29-rc1 playtest - More Mushrooms! (...and fixes)
 
@@ -651,7 +651,7 @@ The **rc1 candidate is assembled** and has completed a bounded native FS-UAE
 playtest: Audio controls, independent dialogue/effects levels and mushroom
 pickup with save/reload were verified. Public source publication remains pending.
 Final **More Mushrooms** still depends on the world-coverage and regression gates
-in [the release plan](PLAN-v0.0.29.md). The dev4 hotlist remains below.
+in [the release plan](history/plans/PLAN-v0.0.29.md). The dev4 hotlist remains below.
 
 - **Broader mushroom coverage:** the current memory model admits 347 of 390
   exterior maps. Forty-three maps and additional interior routes still need
@@ -791,8 +791,8 @@ This is a development preview; **v0.0.28 remains the latest stable release**.
   and a combat-testing arena remain on the roadmap.
 
 Dev4 is a **development prerelease**, with a small mushroom pilot rather than
-worldwide coverage. See the [dev4 notes](RELEASE-v0.0.29-dev4.md) for tests,
-known issues and exact scope, plus the [active plan](PLAN-v0.0.29.md).
+worldwide coverage. See the [dev4 notes](releases/notes/RELEASE-v0.0.29-dev4.md) for tests,
+known issues and exact scope, plus the [active plan](history/plans/PLAN-v0.0.29.md).
 There are no new dev4 pictures yet; the gallery below is from v0.0.28.
 
 ## v0.0.28 — Trees and Grass, Day and Night
@@ -807,7 +807,7 @@ through a shared indexed sky designed for the Amiga renderer.
 Fresh Windows and Linux builds produce the same Amiga executable. The release
 adds foliage, a shared sky, tiny background stars, both moons and timed guard
 torches. Explore the new skies below and see the
-[release notes](RELEASE-v0.0.28.md) for verified scope and known limitations.
+[release notes](releases/notes/RELEASE-v0.0.28.md) for verified scope and known limitations.
 Source publication is completed through the separately gated release workflow.
 
 | Sunrise 06:30 | Red sunset 18:00 | Blue hour 20:15 |
@@ -890,10 +890,10 @@ inspect converted BSP geometry and plan optimization work. It is one component
 in the aspirational **AmiWind Map Optimization Toolkit** direction, not a claim
 that a complete automatic optimizer or runtime profiler is finished. The
 bounded hidden-surface pass remains experimental, and verified house examples
-currently produce no cuts. Read its [development roadmap](BUILD_TOOLKIT_ROADMAP.md)
+currently produce no cuts. Read its [development roadmap](history/superseded/BUILD_TOOLKIT_ROADMAP.md)
 and [exterior hidden-surface status](EXTERIOR_HIDDEN_SURFACES.md).
 The [Map Optimization Toolkit overview](AMIWIND_MAP_OPTIMIZATION_TOOLKIT.md)
-and [measured findings](MAP_OPTIMIZATION_FINDINGS_2026-10-04.md) distinguish
+and [measured findings](history/investigations/MAP_OPTIMIZATION_FINDINGS_2026-10-04.md) distinguish
 completed representation savings from open geometry and target gates.
 See the [memory notes](MEMORY_ALLOCATION.md),
 [cell-changing checklist](CELL_CHANGING.md),
@@ -1024,11 +1024,11 @@ installation as private runtime input. Images contain source and tools; game
 data, converted assets and ROMs stay outside image layers and public releases.
 While it runs, the Toolkit's [Monitor](DOCKER_BUILD.md#watch-a-build-in-the-monitor) follows it
 in a browser: `python tools/toolkit_serve.py --monitor-docker amiwind-docker-builds --open`.
-The [v0.0.27 release notes](RELEASE-v0.0.27.md) record the first Docker-built
+The [v0.0.27 release notes](releases/notes/RELEASE-v0.0.27.md) record the first Docker-built
 baseline's build and CI evidence. Earlier full-conversion and game-entry results remain in the dated
-[Windows](VALIDATION-WINDOWS-2026-10-02.md) and
-[Docker](VALIDATION-DOCKER-2026-10-02.md) records and
-[v0.0.26 release notes](RELEASE-v0.0.26.md).
+[Windows](history/validation/VALIDATION-WINDOWS-2026-10-02.md) and
+[Docker](history/validation/VALIDATION-DOCKER-2026-10-02.md) records and
+[v0.0.26 release notes](releases/notes/RELEASE-v0.0.26.md).
 
 See [world survey](WORLD_SURVEY.md), [project state](PROJECT_STATE.md),
 [font options](PAPER_FONT_OPTIONS.md) and
@@ -1088,19 +1088,19 @@ since passed. The current state is in
 
 The next work is the rest of the island on CHIM: the open world converted cell by
 cell, Vivec back on CHIM and joined to the world, NPC animations and Arena combat.
-Build-time profiling and [avoiding unnecessary recompilation](BUILD_TOOLKIT_ROADMAP.md)
+Build-time profiling and [avoiding unnecessary recompilation](history/superseded/BUILD_TOOLKIT_ROADMAP.md)
 remain priorities alongside [the gameplay roadmap](ROADMAP.md) and the
 [CHIM features](chim/FEATURES.md) page.
 
 Update (v0.0.44, 19 October 2026): the open world is on CHIM and so is the whole city of Vivec. The next work is
-in the [v0.0.45 plan](PLAN-v0.0.45.md): cell crossings, the open playtest bugs and every interior of the
+in the [v0.0.45 plan](history/plans/PLAN-v0.0.45.md): cell crossings, the open playtest bugs and every interior of the
 base game.
 
 [FAQ](FAQ.md) · [Gallery](GALLERY.md) · [Project state](PROJECT_STATE.md) · [Asset coverage](ASSET_COVERAGE.md) ·
 [Open bug reports](BUGS.md) · [Roadmap](ROADMAP.md) ·
 [Repository layout](REPOSITORY_LAYOUT.md) · [Release workflow](RELEASE_WORKFLOW.md) ·
 [Changelog](CHANGELOG.md) · [Build dependencies](BUILD_DEPENDENCIES.md) ·
-[Build/compiler toolkit roadmap](BUILD_TOOLKIT_ROADMAP.md) ·
+[Build/compiler toolkit roadmap](history/superseded/BUILD_TOOLKIT_ROADMAP.md) ·
 [Licensing and credits](LICENSING_AND_CREDITS.md)
 
 Thanks to the Morrowind creators, the Amiga community, and the contributors whose

@@ -10,7 +10,7 @@ source regression checks this rule. See [CONFIG-COMMENT-29](journals/BUG_JOURNAL
 for the dev2 punctuation correction and acceptance limits.
 
 This is the maintained runtime source in the AmiWind repository. See
-[the published v0.0.27 scope](RELEASE-v0.0.27.md) for current release evidence;
+[the published v0.0.27 scope](releases/notes/RELEASE-v0.0.27.md) for current release evidence;
 versioned implementation notes below retain their historical origins.
 
 Created by FlyingFathead a.k.a. Horstator. Thanks to ChaosWhisperer.

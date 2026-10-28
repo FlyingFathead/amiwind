@@ -5,3 +5,9 @@ AWTN1
 # The arrival is where the game's own door into the place puts the player (tools/world_doors.py, room_target).
 # The Heart Chamber: Akulakhan's Chamber, from the door of Dagoth Ur, Facility Cavern (reference 258101).
 heartchamber|rifa4ef181ed|-24 320 472.875|90|Akulakhan's Chamber (the Heart Chamber)
+# Desele's House of Earthly Delights, Suran: from the street door (reference 199296, Suran), where it puts the player.
+suranclub|ric5e9a38a4d|-68.6065 -1.5125 38.79825|266.7|Desele's House of Earthly Delights, Suran
+# Outdoor places: the map "global", x y z in original Morrowind global coordinates (the route of dbg tp X Y Z: z is the
+# height to land at or below, the yaw is unused). The middle of the town's exterior cells, a street height of its doors.
+suran|global|54080 -53044 1100|0|Suran
+aldruhn|global|-12606 54169 2500|0|Ald'ruhn

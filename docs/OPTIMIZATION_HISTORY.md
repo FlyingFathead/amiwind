@@ -58,7 +58,7 @@ world 104,416 ms, entities 2,304 ms,
 C2P 291 ms; zero renderer overflow/read errors,
 2 late audio updates. World work remains dominant.
 Different routes prevent a controlled FPS comparison. See
-[checkpoint-013 validation](CHECKPOINT_013_VALIDATION.md) for all evidence/limits.
+[checkpoint-013 validation](history/checkpoints/CHECKPOINT_013_VALIDATION.md) for all evidence/limits.
 
 ## 2026-09-27: checkpoint-012 humanoid hull and first actors
 
@@ -75,7 +75,7 @@ world 124,641 ms, entities 2,253 ms, C2P 431 ms. Different camera routes prevent
 an FPS comparison to dev4. Hunk use rose 39,600 bytes to 6,344,288; model caches
 are separate. Zero render overflow and music read errors, two late audio updates
 including warm-up. Preserve these limitations instead of hiding them behind JIT.
-See [checkpoint-012 validation](CHECKPOINT_012_VALIDATION.md).
+See [checkpoint-012 validation](history/checkpoints/CHECKPOINT_012_VALIDATION.md).
 
 ## 2026-09-27: dev4 fresh-boot movement regression
 
@@ -88,7 +88,7 @@ before either command. Keep this ordering in every future scene acceptance gate.
 The world and renderer are unchanged; hunk use remains 6,304,688 bytes. The new
 run changes views and therefore is not a frame-rate comparison. It records zero
 surface/edge overflow and zero music read errors, but two late audio updates
-including warm-up. See [checkpoint-011](CHECKPOINT_011_VALIDATION.md). Do not fix
+including warm-up. See [checkpoint-011](history/checkpoints/CHECKPOINT_011_VALIDATION.md). Do not fix
 an invalid spawn by weakening the blocked-trace safeguard that prevents sinking.
 
 ## 2026-09-27: dev3 correctness before expansion
@@ -113,11 +113,11 @@ Three audio late updates remained in the diagnostic session; only the warm-up
 miss occurred in its shorter restart. Keep that evidence and investigate scheduling
 separately. The OST player itself was not changed. Native paired revalidation,
 console recovery and shell restart now join the release acceptance gates.
-Details and exact limits: [checkpoint-010](CHECKPOINT_010_VALIDATION.md).
+Details and exact limits: [checkpoint-010](history/checkpoints/CHECKPOINT_010_VALIDATION.md).
 
 ## 2026-09-27: dev2 geometry, music and restart repair
 
-See [checkpoint-009](CHECKPOINT_009_VALIDATION.md) for exact hashes and test
+See [checkpoint-009](history/checkpoints/CHECKPOINT_009_VALIDATION.md) for exact hashes and test
 scope. Correctness came before expanding to another town.
 
 | Candidate or fault | Observation | Result |
@@ -220,7 +220,7 @@ totals are not a complete CPU utilization breakdown.
 
 ## Existing A500 baseline
 
-The earlier streaming experiments remain in [PROFILING.md](PROFILING.md).
+The earlier streaming experiments remain in [PROFILING.md](history/superseded/PROFILING.md).
 Blocking 16 KiB reads produced a 360 ms worst observed frame in the original
 fixed-camera comparison; cooperative 4 KiB slices reduced that to 160 ms with
 a small average-fps tradeoff. A longer movement test then exposed starvation,
@@ -267,7 +267,7 @@ tables trade arithmetic for memory traffic, so both sides need measurement.
 ## Packaged HDF baseline
 
 The final checkpoint-006 sustained run and known stalls are recorded in
-[CHECKPOINT_006_VALIDATION.md](CHECKPOINT_006_VALIDATION.md). Its exact
+[CHECKPOINT_006_VALIDATION.md](history/checkpoints/CHECKPOINT_006_VALIDATION.md). Its exact
 `context.json` and `profile.json` accompany the private image. Do not compare
 its four-minute control/music route directly to the shorter dev10/dev12 runs.
 
@@ -302,7 +302,7 @@ See CHECKPOINT_007_VALIDATION.md for hashes, counters and test scope.
 The maintainer confirms that the central town-square obstruction is fixed. This
 corroborates the bounded collision-hull work recorded in checkpoint-013; it
 does not close the separate pier, scene-boundary or terrain rendering reports.
-See [PLAYTEST_STATUS.md](PLAYTEST_STATUS.md) for per-version acceptance status.
+See [PLAYTEST_STATUS.md](history/superseded/PLAYTEST_STATUS.md) for per-version acceptance status.
 
 ## v0.0.13-dev1 / checkpoint-014 — correct geometry and bounded render buffers
 
@@ -351,7 +351,7 @@ Final route: 2184 frames / 97,615 ms, world 83,531 ms, entities 1434 ms, C2P
 different views from checkpoint-014, so do not derive a paired FPS improvement.
 Audio: 2 late updates / 7114 missed frames plus startup warmup; no file read
 errors. No claim of glitch-free audio or stock-A1200 speed. Full evidence and
-rejected trial: [CHECKPOINT_015_VALIDATION.md](CHECKPOINT_015_VALIDATION.md).
+rejected trial: [CHECKPOINT_015_VALIDATION.md](history/checkpoints/CHECKPOINT_015_VALIDATION.md).
 
 Console background is an opaque row fill, with no alpha pass or extra buffer.
 The readable/retro font switch keeps one 16 KiB active atlas and temporarily

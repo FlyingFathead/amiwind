@@ -824,15 +824,18 @@ def persisting_block(b):
     return chr(10).join(out + ['', PERS_END])
 
 
-def persisting_section(bugs, with_state=True):
-    """The "Persisting, not resolved" list for the register and the CHIM tracker."""
+def persisting_section(bugs, with_state=True, in_bugs=False):
+    """The "Persisting, not resolved" list for the register and the CHIM tracker. IN_BUGS: the page sits in docs/bugs/
+    beside the report pages (the CHIM tracker), so a report page is linked as ID.md, not as the register's bugs/ID.md
+    (TRACKER-CHIM-PAGE-REPORT-LINKS-55: 45 tracker links named docs/bugs/bugs/ID.md)."""
     items = persisting(bugs)
     if not items:
         return []
     out = ['### Persisting, not resolved', '',
            'Bugs reported two or more times. Most reports first. Each has its report lines on its page.', '']
     for b in items:
-        out.append('- %s: %s (reported %d times, %s)' % (link(b), b['title'], len(b['reports']), b['state']))
+        here = ('[%s](%s)' % (b['id'], b['report'][len('bugs/'):]) if b['report'] else b['id']) if in_bugs else link(b)
+        out.append('- %s: %s (reported %d times, %s)' % (here, b['title'], len(b['reports']), b['state']))
     return out + ['']
 
 
@@ -1026,7 +1029,7 @@ def chim_tracker(bugs, journal_text, version, pages=None):
         part = [b for b in chim if b['chim'] == key]
         out.append('| [%s](#%s) | %d | %d | %d |' % (title, doc_toc.slug(title),
                                                    *(sum(1 for b in part if b['state'] == s) for s in STATES)))
-    pers = persisting_section(chim)
+    pers = persisting_section(chim, in_bugs=True)
     if pers:
         out += [''] + pers[:-1]
     out += ['', '## Latest changes', '',

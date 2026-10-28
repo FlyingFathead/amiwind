@@ -45,6 +45,12 @@ static cvar_t	chim_reserve_kib = {"chim_reserve_kib", "2048"};
  * default: a frame map from before the statement keeps its full zone and the
  * gap is said after loading, until its builder states the figure), 0 never. */
 static cvar_t	chim_rest_measured = {"chim_rest_measured", "1"};
+/* The Vivec Arena Pit's room type (the maintainer, 2026-10-28: one saved setting picks the method; PERF-ARENA-PIT-
+ * SLOW-48): -1 (default) = the type its room map names as the default ("_chim_room_type_default", the builder's
+ * config/chim-rooms.json), 0 = the bowl whole (the method up to v0.0.54-dev1), 1 = tiles, 2 = tiles + the room detail
+ * budget (the default since the maintainer's decision of 2026-10-28). A room map with "_chim_room_types" "0 1 2" holds its default type as rooms/<room>.crm and each other type as
+ * rooms/<room>t<N>.crm on the same store; only the chosen record's models load. Read when the room map loads. */
+static cvar_t	aw_vivec_arena_pit_type = {"aw_vivec_arena_pit_type", "-1", true};
 static cvar_t	chim_read_kib = {"chim_read_kib", "32"};
 static cvar_t	chim_buffer_kib = {"chim_buffer_kib", "32"};
 /* 0: towns use their region maps: LEGACY TOWN REGIONS, the A/B of a historical regression only (an image that ships
@@ -880,6 +886,38 @@ static int WorldspawnKey (const char *entities, const char *key, char *value, in
 	return 1;
 }
 
+/* A room map with types ("_chim_room_types" "0 1 2", "_chim_room_type_default"
+ * "1"; today only the Vivec Arena Pit): the record of the type
+ * aw_vivec_arena_pit_type asks for, "<room>t<N>"; the default type and any
+ * type the map does not list keep "<room>" (said once on the console). */
+static void RoomType (const char *entities, char *room_name, int size)
+{
+	char types[32], text[8], *at;
+	int want, fallback, n;
+	if (!WorldspawnKey (entities, "_chim_room_types", types, sizeof(types)))
+		return;
+	fallback = WorldspawnKey (entities, "_chim_room_type_default", text, sizeof(text)) ? atoi (text) : 0;
+	want = (int)aw_vivec_arena_pit_type.value;
+	if (want < 0 || want == fallback)
+		return;
+	for (at = types ; *at ; )
+	{
+		while (*at == ' ')
+			at++;
+		if (!*at)
+			break;
+		n = atoi (at);
+		if (n == want && n >= 0 && n <= 9 && (int)strlen (room_name) + 2 <= CHIM_ROOM_NAME_CHARS && (int)strlen (room_name) + 3 <= size)
+		{
+			sprintf (room_name + strlen (room_name), "t%d", want);
+			return;
+		}
+		while (*at && *at != ' ')
+			at++;
+	}
+	Con_Printf ("CHIM: room %s has no type %d (types %s); its default type %d loads\n", room_name, want, types, fallback);
+}
+
 /* "_chim_frame" "X Y" in the map's worldspawn names its CHIM frame (the
  * underscore keeps QuakeC's entity parser from warning about the key). */
 static int WorldspawnFrame (const char *entities, int *cx, int *cy)
@@ -996,6 +1034,8 @@ static void MapBeginWork (const char *entities, double spike_t0)
 	/* "_chim_room" "<room>": a room map, its placements from the room record
 	 * (chim_room.c); else "_chim_frame": a frame map of the exterior world. */
 	is_room = WorldspawnKey (entities, "_chim_room", room_name, sizeof(room_name));
+	if (is_room)
+		RoomType (entities, room_name, sizeof(room_name));
 	/* An exterior frame map's fire lights, before any chunk reads its records
 	 * (chim_chunks.c); a room has none (its placements carry their levels). */
 	ChimChunks_FireLights (is_room ? NULL : entities);
@@ -1961,6 +2001,7 @@ void Chim_Init (void)
 	Cvar_RegisterVariable (&chim_zone_kib);
 	Cvar_RegisterVariable (&chim_reserve_kib);
 	Cvar_RegisterVariable (&chim_rest_measured);
+	Cvar_RegisterVariable (&aw_vivec_arena_pit_type);
 	Cvar_RegisterVariable (&chim_read_kib);
 	Cvar_RegisterVariable (&chim_buffer_kib);
 	Cvar_RegisterVariable (&chim_debug);

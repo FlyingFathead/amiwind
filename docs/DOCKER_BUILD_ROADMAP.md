@@ -20,7 +20,7 @@ _Last updated with AmiWind v0.0.53 (27 October 2026)._
 Published v0.0.27 passed the complete Linux Docker suite (558 tests, 3 skips)
 and asset-free Amiga compile before publication. Its hosted Docker, Linux/Windows
 launcher-parity and source/asset-free jobs all passed; publication and downloaded
-source-asset verification are complete. See [v0.0.27 release notes](RELEASE-v0.0.27.md).
+source-asset verification are complete. See [v0.0.27 release notes](releases/notes/RELEASE-v0.0.27.md).
 These results do not establish a new full-game conversion or target gameplay run.
 
 ## Historical full-conversion evidence — v0.0.26, 2 October 2026
@@ -38,7 +38,7 @@ save archive 535,999,488 bytes, with no BSA, ESM, HDF, ROM or private input/buil
 paths in image layers. Hosted Docker CI is required before publication.
 
 The earlier cold 35-minute-3-second run used rc1 identity; see its historical
-[validation record](VALIDATION-DOCKER-2026-10-02.md).
+[validation record](history/validation/VALIDATION-DOCKER-2026-10-02.md).
 
 The planning and native storage snapshots below are historical estimates; they
 do not override the current evidence or establish a measured Docker peak.
@@ -49,7 +49,7 @@ with experimental Windows reliability limits still documented. The Docker
 builder, read-only input helper and dedicated CI job are implemented. The local
 wrapper suite passed 433 tests with 3 skips; full final-identity conversion,
 strict actor-ground validation, verified HDF export and WinUAE game entry passed.
-See [Docker builder](DOCKER_BUILD.md) and [v0.0.26 release notes](RELEASE-v0.0.26.md).
+See [Docker builder](DOCKER_BUILD.md) and [v0.0.26 release notes](releases/notes/RELEASE-v0.0.26.md).
 The implementation wraps the established Linux pipeline with its
 full-content defaults and existing validation gates. Native Linux remains the
 foundation; native Windows 11 remains experimental. A Linux container build on
@@ -136,7 +136,7 @@ Container implementation and validation follow rc1. Preserve local conversion
 outputs and validated caches during provisioning; do not move active workspaces. The 40 GiB figure is a free-space
 budget, not the published image size or an automatically imposed VM disk cap.
 See the [main roadmap](ROADMAP_HISTORY.md#docker-builder-and-v0026-validation),
-[capacity requirements](BUILD_TOOLKIT_ROADMAP.md#capacity-before-conversion) and
+[capacity requirements](history/superseded/BUILD_TOOLKIT_ROADMAP.md#capacity-before-conversion) and
 Docker's [Windows WSL 2 backend](https://docs.docker.com/desktop/features/wsl/).
 
 ### Later staging observation

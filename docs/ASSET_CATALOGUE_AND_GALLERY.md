@@ -268,4 +268,4 @@ verify them; unchanged terrain bytes alone are not proof of equivalent gameplay.
 Avoid rebuilding unrelated terrain for catalogue-only work. Scenery changes do
 require their affected scene/chunk products to be regenerated; engine/image-only
 recovery cannot insert placements into old BSPs. Dependency-based reuse remains
-part of the [build toolkit roadmap](BUILD_TOOLKIT_ROADMAP.md).
+part of the [build toolkit roadmap](history/superseded/BUILD_TOOLKIT_ROADMAP.md).

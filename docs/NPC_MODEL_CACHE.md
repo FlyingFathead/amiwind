@@ -327,7 +327,7 @@ cold run six. First conversion remains expensive. All 3,551 models and all
 light compiler changed lightmap packing; all 464 faces, their lighting samples
 and other BSP lumps matched. No terrain or target-runtime speedup is claimed.
 
-Keep [recoverable checkpoints](BUILD_RECOVERY_STORAGE.md) outside transient
+Keep [recoverable checkpoints](history/superseded/BUILD_RECOVERY_STORAGE.md) outside transient
 working storage; the cache does not make an ephemeral workspace persistent.
 
 ## v0.0.25 validation

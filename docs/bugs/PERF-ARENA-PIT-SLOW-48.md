@@ -29,7 +29,24 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.54 (27 October 2026)._
+_Last updated with AmiWind v0.0.54-dev1 (28 October 2026)._
+
+<!-- contents start -->
+## Contents
+
+- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [Status: 27 October 2026](#status-27-october-2026)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
 
 ## Status: 27 October 2026
 
@@ -59,7 +76,57 @@ Enter the Arena Pit and look across the floor at the tiers, on the slow preset a
 
 ## Repair
 
-In progress on the streaming worker's branch; the A/B decides the form.
+In progress on the streaming worker's branch; the A/B decides the form. The possibilities, in order:
+
+1. Room models over 512 stored as tiles, so each tile culls on its own. Done (269bfc14 and a0e11473).
+2. A room detail budget that takes the bowl (`in_v_arena_01`) from 14,872 to 6,000 visual triangles, collision
+   unchanged. Done (e741a7e2).
+3. Idea, not built: the upper tiers as backdrop panels, pictures of the stands on a ring of large quads, because the
+   player is held on the pit floor and sees them from about the same place. See
+   [the idea](../chim/IDEAS.md#the-arena-pits-upper-tiers-as-backdrop-panels).
+
+### The setting
+
+The setting `aw_vivec_arena_pit_type` chooses the form (done, e7baa27b and 5422b1fc, gate 4279):
+
+| Value | Form |
+| --- | --- |
+| 0 | the bowl whole |
+| 1 | tiles (the default, measured) |
+| 2 | tiles and the room detail budget |
+| 3 | the backdrop panels (idea, not built) |
+
+The image stores the room once per type. The door loads the chosen one, and only its models are in memory.
+
+### First A/B
+
+One base, the same poses, 32 MB Fast, JIT, FPU and maximum CPU. Frame time, control (type 0) to type 1:
+
+| Pose | Control | Type 1 |
+| --- | --- | --- |
+| Pit floor, east | 31.2 ms | 22.3 ms |
+| Pit floor, north | 24.1 ms | 13.9 ms |
+| Pit floor, looking up | 25.8 ms | 13.9 ms |
+| Upper level by the east door | 40.8 ms | 34.0 ms |
+| End of the 360 degree turn | 21.7 ms | 14.7 ms |
+
+The same surfaces are drawn; the room models grow by 135 KiB. The upper level gains least, because almost the whole
+bowl is in view there. The maintainer: the frame rate drops both on the floor and on the upper ring. The numbers for
+type 2 are still being measured.
+
+### A finding: the original's fog cannot bound a far cut here
+
+The Pit's cell fog density is 0.25, so by the OpenMW rule the fog starts at 1,344 units, beyond the room's diagonal of
+about 1,240 units. The original's fog hides nothing inside the room, so a far cut bounded by it cannot help.
+
+### More ideas
+
+- A lossless mesh optimizer pass on the bowl. 4,289 of its faces are under 4 square units; merging neighbouring
+  coplanar faces into fewer, larger polygons keeps the picture identical and cuts the per-face cost of the software
+  renderer. Unlike type 2, it does not lower the detail.
+- Symmetry. If the bowl is rotationally symmetric, one sector stored and placed several times saves model memory and
+  load time (not frame time). Being checked by geometry.
+- Orbit-camera clips of every type, for a visual comparison.
 
 ## Verification
 
@@ -78,6 +145,7 @@ Family: Rendering cost and visibility (`render-performance`). Read the visibilit
 - AW-20260928-07 (no report page): Slow opening exterior / excessive residency
 - [CHIM-SLOWCPU-FRAMETIME-33](CHIM-SLOWCPU-FRAMETIME-33.md): Balmora on CHIM runs at about 1 frame per second on a slow 68040 (cycle-exact emulation)
 - [CHIM-TRACE-TAIL-33](CHIM-TRACE-TAIL-33.md): A few CHIM collision traces visit thousands of clipnodes
+- DEMOWIND-54 (no report page): Requested: DemoWind, a small fullscreen AGA build with only cheap animated effects, browsed one by one
 - [ENGINE-C2P-ROWSTRIDE-35](ENGINE-C2P-ROWSTRIDE-35.md): The display conversion ignored the bitmap row stride: a screen whose rows are padded for the fetch mode rendered skewed
 - [ENGINE-CEILF-PER-EDGE-36](ENGINE-CEILF-PER-EDGE-36.md): R_EmitEdge calls the C library ceil twice per edge
 - [ENGINE-DEAD-FIXEDPOINT-GRADIENTS-36](ENGINE-DEAD-FIXEDPOINT-GRADIENTS-36.md): The 68040 build converts every drawn surface's gradients to fixed point that nothing reads

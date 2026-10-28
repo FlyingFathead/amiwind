@@ -20,7 +20,7 @@ The 2,526-region terrain foundation now carries 37,960 exterior rocks and 816
 giant mushrooms. Detailed Seyda Neen and Balmora use the later bounded town
 layouts; other settlements, vegetation and actors remain incomplete. Current
 private builds span two simultaneously mounted HDFs. Use their generated
-configuration and full drive list. See [v0.0.27 scope](RELEASE-v0.0.27.md),
+configuration and full drive list. See [v0.0.27 scope](releases/notes/RELEASE-v0.0.27.md),
 [current cell handoffs](CELL_CHANGING.md) and [storage](STORAGE.md).
 
 The following preserves the v0.0.25-rc1 terrain baseline, including its original

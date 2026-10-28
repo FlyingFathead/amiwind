@@ -51,6 +51,12 @@ typedef struct {
     aw_magic_emitter_t em[AW_MAGIC_EMITTERS];
 } aw_magic_phase_t;
 
+/* The shell shapes of the magic effect set (each effect's bubble is built in both, tools/prepare_magic.py: the
+ * shape's sprites beside progs/awmx_NN.spr): 0 the egg, the effect's own hit model outline (the shield's upright
+ * "cosmic egg", taller than wide, from the feet to above the head; the default); 1 the dotted sphere, a round see-
+ * through bubble of the effect's colour strongest at its rim (kept from v0.0.54's first shell at the maintainer's
+ * word, for spells and effects that want it). */
+enum {AW_MAGIC_SHAPE_EGG,AW_MAGIC_SHAPE_SPHERE,AW_MAGIC_SHAPES};
 /* The magic effect record's flag for a hit visual that stays on the target for the spell's whole duration (rule from
  * OpenMW components/esm3/loadmgef.hpp ContinuousVfx, mwmechanics/spellcasting.cpp and character.cpp
  * updateContinuousVfx: the hit model loops while the effect is active). */

@@ -144,6 +144,22 @@ def host_memory():
     return total, free
 
 
+def build_memory(root='/sys/fs/cgroup'):
+    """(limit bytes, in use bytes, reclaimable file cache bytes) the running build's guards read: the container's
+    (cgroup_memory) when it has a limit, else the machine's (MemTotal, MemTotal - MemAvailable, 0: MemAvailable already
+    leaves the reclaimable cache out). Without a container limit cgroup_memory has no limit, and the scheduler's guard,
+    its ALARM and every pool's memory governor saw nothing: a tester's build on a plain Linux machine (no container) ran
+    its chim stage 38 h at 0.4 cores and died when the kernel killed a worker for memory (BUILD-GUARD-BLIND-NO-CGROUP-55).
+    The limits() of the start-up plan already fell back to the machine."""
+    limit, used, cache = cgroup_memory(root)
+    if limit is not None:
+        return limit, used, cache
+    total, free = host_memory()
+    if total is None or free is None:
+        return limit, used, cache
+    return total, max(0, total - free), 0
+
+
 def limits(memory_gb=None, threads=None, root='/sys/fs/cgroup'):
     """What the build gets: {'memory_bytes', 'memory_source', 'used_bytes', 'threads', 'threads_source'}. Given values
     (--resource-memory-gb / --resource-threads: the container the build will run in, e.g. a lease) win over this
@@ -1168,7 +1184,7 @@ class MemoryGovernor:
         self.root, self.clock = root, clock
         self.interval = float(os.environ.get(GOVERNOR_ENV, GOVERNOR_SECONDS) if interval is None else interval)
         self.log = log or (lambda line: print(line, flush=True))
-        self.reader = reader or (lambda: (cgroup_memory(self.root), cgroup_threads(self.root)))
+        self.reader = reader or (lambda: (build_memory(self.root), cgroup_threads(self.root)))
         self.at, self.value, self.changes, self.base, self.start_quota = None, None, [], None, None
         self.room_at, self.room = None, None       # admits(): the memory room of per-unit admission
 
@@ -1402,7 +1418,7 @@ class SchedulerGuard:
         self.alarm_seconds = float(os.environ.get(ALARM_ENV, ALARM_SECONDS) if alarm_seconds is None else alarm_seconds)
         self.starved = {}         # stage -> (since, last alarm) while held below half its share
         self.alarms = []
-        self.reader = reader or (lambda: (cgroup_memory(), cgroup_threads()))
+        self.reader = reader or (lambda: (build_memory(), cgroup_threads()))
         self.clock, self.at = clock, None
         self.interval = float(os.environ.get(GOVERNOR_ENV, GOVERNOR_SECONDS) if interval is None else interval)
         self.log = log or (lambda line: print(line, flush=True))

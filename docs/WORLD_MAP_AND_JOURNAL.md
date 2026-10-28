@@ -249,7 +249,7 @@ a debug-world-map lava overlay. Do not confuse the unwanted palette dots with
 POIs or lava. Expose missing/unresolved survey coverage. Ash/blight regions and
 transition boundaries also require original CELL/REGN/script evidence, not a
 guessed distance from Red Mountain. These are planned studies; see
-[v0.0.29 work list](PLAN-v0.0.29.md#weather-storms-and-lava-study).
+[v0.0.29 work list](history/plans/PLAN-v0.0.29.md#weather-storms-and-lava-study).
 
 v0.0.36: the lava part is done as the v2 map's lava layer
 ([Map file formats](#map-file-formats-v1-and-v2-lava-pools)): it is built from the source-authored pool

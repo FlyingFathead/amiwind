@@ -45,7 +45,7 @@ _Last updated with AmiWind v0.0.48-dev2 (22 October 2026)._
 
 [CHIM-FRAME-STATIC-SEAM-40](../bugs/CHIM-FRAME-STATIC-SEAM-40.md) — 15 October 2026, v0.0.41-dev1: exact source validation completed 4,242 tests (4,236 passed, three Windows-only skips and three Census expected failures), with zero failures/errors; the matching engine compiled. The completed 369-frame world passed structural/source, modeled heap, host zone-walk and scoped stair gates. Of 547 boundary comparisons, 544 measured agreement and three remain held (237, 241, 242). Of 36 sampled models, 22 have matching face counts and unique face correspondence; 14 differ in collision-only versus visual representation and require payload/sprite/native review. These measurements do not establish visual severity or universal equivalence. Native captures, independent interior conversion, image assembly/readback and package acceptance remain pending; coverage states are unchanged. Stair evidence retains 15,348 advisory findings despite zero blocking failures.
 
-15 October 2026: active preparation now targets v0.0.41-dev1. The planned final release title is **v0.0.41: Collisions And Boundaries**. Earlier source snapshots, checks and findings retain their recorded version identities; they do not establish acceptance of this development candidate. Matching source validation, completed image assembly/readback, native checks, packaging and delivery remain separate gates. See the [current development candidate](../RELEASE-v0.0.41-dev1.md).
+15 October 2026: active preparation now targets v0.0.41-dev1. The planned final release title is **v0.0.41: Collisions And Boundaries**. Earlier source snapshots, checks and findings retain their recorded version identities; they do not establish acceptance of this development candidate. Matching source validation, completed image assembly/readback, native checks, packaging and delivery remain separate gates. See the [current development candidate](../releases/notes/RELEASE-v0.0.41-dev1.md).
 
 [BUILD-INVENTORY-PALETTE-41](../bugs/BUILD-INVENTORY-PALETTE-41.md) — 15 October 2026, v0.0.41 source candidate: image assembly prepares inventory before the sky palette pass, which rejected current AWIC icons and AWI2/AWST metadata as unknown images. The source repair validates each inventory format at its exact path, remaps only icon pixels and preserves metadata bytes. Scoped evidence contains 15 passing palette checks and 2 passing inventory-asset checks on matching unchanged source. Actual image assembly, native verification, packaging and shipment remain pending.
 
@@ -218,13 +218,13 @@ island. The documented problems for an open world are:
   info ([the .chim map format](CHIM_MAP_FORMAT.md)). A whole area cannot be one map.
 - **Coordinates are small.** The engine's positions were designed for a range of about +-4,096 units, so a large
   area has to be re-centred as the player moves ([engine notes](ENGINE.md)). Version 0.0.36 widens the range so
-  that a whole city fits one map ([release notes](../RELEASE-v0.0.36.md)).
+  that a whole city fits one map ([release notes](../releases/notes/RELEASE-v0.0.36.md)).
 - **Every map is a separate file, and objects are copied.** The old exterior regions each carry a core of 768 units
   plus an overlap on every side, so each placed object is stored about ten times, and every
   map holds its own copy of every texture it uses ([world streamer](../WORLD_STREAMER.md)).
 - **Quake's visibility does not help outdoors.** Quake hides what cannot be seen through walls; in the open air
   almost everything can be seen, so the visibility data culls little ([town visibility](../performance/TOWN-VISIBILITY.md)).
-- **Every region crossing reads a whole map** from a slow disk ([Seyda Neen performance](../SEYDA_NEEN_PERFORMANCE.md)).
+- **Every region crossing reads a whole map** from a slow disk ([Seyda Neen performance](../history/superseded/SEYDA_NEEN_PERFORMANCE.md)).
 - **The Amiga is small.** Memory is tight; disk partitions must stay below 2 GiB and drive images below
   4 GiB ([image size](../IMAGE_SIZE.md)). Storing the island ten times over does not fit, and loading it
   whole into memory is out of the question.

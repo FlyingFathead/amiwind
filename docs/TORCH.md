@@ -105,7 +105,7 @@ INTERIOR-LIGHT-29 work. A lit floor or wall does not verify an actor's light
 sample. Compare static interior lighting, carried torch on/off, NPC body and
 room surface response separately; inspect alias/sprite selection, light data,
 sample position and final shading. A shared cause with TORCH-NPC-LIGHT-29 is
-not established. Keep this case in [the release issue matrix](BUGS-v0.0.29-RC1.md#rc1-owner-playtest-follow-up-6-october-2026).
+not established. Keep this case in [the release issue matrix](history/checkpoints/BUGS-v0.0.29-RC1.md#rc1-owner-playtest-follow-up-6-october-2026).
 
 ## NPC illumination: dev4 report
 
@@ -450,7 +450,7 @@ otherwise the ambient RGB sum must be at most 201. That interior policy requires
 authored data; a dark screenshot is not sufficient evidence. The new exterior
 guard feature must not claim full inventory, combat, weather or interior parity.
 
-The dedicated [Study lanterns and torch lighting more](LANTERNS_AND_TORCH_LIGHTING.md)
+The dedicated [Study lanterns and torch lighting more](history/superseded/LANTERNS_AND_TORCH_LIGHTING.md)
 covers wall-mounted torches, lantern fixtures and carried lights; authored
 placements/attachments; indoor static/dynamic lighting; the guard day/night
 cycle; and measured local illumination rather than flame sprites alone.

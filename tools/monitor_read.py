@@ -149,9 +149,19 @@ class Reader:
         times, cores = t.get('t') or [], t.get('cgroup_cores') or t.get('cores') or []
         step = max(1, len(times) // TIMELINE_POINTS)
         series = [[times[i], cores[i]] for i in range(0, min(len(times), len(cores)), step)]
+        # the memory curve beside the cores (TOOLKIT-MONITOR-NO-MEMORY-55): GiB in use per sample, its ceiling and peak
+        used = t.get('memory_bytes') or []
+        gib = float(1 << 30)
+        memory = [[times[i], round(used[i] / gib, 2)] for i in range(0, min(len(times), len(used)), step)
+                  if isinstance(used[i], (int, float))]
+        known = [(v, times[i]) for i, v in enumerate(used[:len(times)]) if isinstance(v, (int, float))]
+        peak = max(known) if known else None
+        limit = t.get('memory_limit_bytes')
         return {'run': run, 'timeline': {'status': p.get('status'), 'wall_seconds': p.get('wall_seconds'),
                                          'budget': p.get('budget'), 'host_cpus': p.get('host_cpus'),
-                                         'stages': stages, 'cores': series}}
+                                         'stages': stages, 'cores': series, 'memory': memory,
+                                         'memory_limit_gib': round(limit / gib, 2) if limit else None,
+                                         'memory_peak': [peak[1], round(peak[0] / gib, 2)] if peak else None}}
 
     def log(self, run, name, offset=-1, max_bytes=MAX_READ, trace=False):
         """Bytes [offset, offset + max) of logs/NAME (or, with TRACE, of the stage's read/write trace

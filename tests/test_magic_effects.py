@@ -103,6 +103,13 @@ class MeshRuleTests(unittest.TestCase):
         self.assertEqual(M.sprite_size('cast', [dict(e, size=1, jitter=[0, 0, 0], speed=0)], []), 8)   # the minimum
         self.assertEqual(M.sprite_size('hit', [dict(e, speed=2000)], []), 48)                           # the maximum
 
+    def test_continuous_vfx_effects(self):
+        # built into the original engine, not in the records (MEDT flags read 0x600 for shields): shields, levitate,
+        # damage over time keep their hit visual for the duration
+        self.assertTrue({3, 4, 5, 6, 10, 14, 15, 16}.issubset(M.CONTINUOUS_VFX))
+        self.assertNotIn(75, M.CONTINUOUS_VFX)        # restore health: the hit plays once
+        self.assertEqual(M.CONTINUOUS_FLAG, 0x20)
+
     def test_sounds_have_short_names(self):
         self.assertEqual(M.sound_file('destruction cast'), 'sound/aw/magic/destruction_cast.wav')
         self.assertLessEqual(len(Path(M.sound_file('a' * 80)).name), 30)
@@ -185,6 +192,21 @@ class TextureTests(unittest.TestCase):
         self.assertGreater(strength[32, 32], 0.9)
         self.assertEqual(strength[0, 0], 0)
         self.assertIsNone(M.shell_image([], {}))
+        # the finer copy for shells seen close (the player's own, the first-person veil)
+        fine = M.bubble_bytes(self.glow(), [128, 0, 128], self.palette(), side=M.FINE_SIDE)
+        self.assertEqual(M.read_sprite(fine, M.FINE_SIDE), (4, 64, 64))
+        self.assertEqual(M.fine_path('progs/awmx_07.spr'), 'progs/awmf_07.spr')
+        self.assertEqual(M.fine_path('progs/awmx_07.spr', 'g'), 'progs/awmg_07.spr')   # the sphere's finer copy
+        # the egg: the hit model's own outline, taller than wide (the shield: 101 x 147 NIF units)
+        self.assertEqual(M.shell_ellipse(geo, side), (round(64 / side, 4), round(64 / side, 4)))
+        tall = [dict(geo[0], verts=np.array([[-35, 0, 0], [35, 0, 0], [35, 0, 101], [-35, 0, 101]], dtype=float))]
+        ax, az = M.shell_ellipse(tall, 110.0)
+        self.assertGreater(az / ax, 1.4)
+        egg = M.bubble_bytes(self.glow(), [128, 0, 128], self.palette(), side=M.FINE_SIDE, ellipse=(ax, az))
+        frame = egg[56:56 + 64 * 64]
+        shown = [(i % 64, i // 64) for i, b in enumerate(frame) if b != 255]
+        xs, ys = [p[0] for p in shown], [p[1] for p in shown]
+        self.assertGreater(max(ys) - min(ys), 1.3 * (max(xs) - min(xs)))   # taller than wide, baked in the sprite
         raw = M.bubble_bytes(self.glow(), [128, 0, 128], self.palette(), shell=(colour, strength, side, zc))
         self.assertEqual(M.read_sprite(raw), (4, 32, 32))
 
@@ -242,10 +264,16 @@ class EngineWiringTests(unittest.TestCase):
         self.assertIn('sprintf(key,"%s release",variant);rel=AW_SkelKeyFrame(t,g,key);', kit)
         self.assertEqual(kit.count('float AW_AnimKitCast(edict_t *e,const char *variant)'), 2)  # and its compiled-out stub
         # the orb types to compare (0 the first prototype kept), around the caster and the target; the shared fx API
-        self.assertIn('static int orb_type=2;', magic)
-        self.assertIn('orb_at(c,at,c->height,t1,orb,0);', magic)
-        # the hit shell follows its target for the spell's duration (ContinuousVfx, dbg cast ... dur S)
-        self.assertIn('orb_at(c,at3,c->hit_height,la1,len,c->duration>0);', magic)
+        self.assertIn('#define orb_type orb_kind()', magic)
+        self.assertIn('orb_at(c,at,c->height,t1,orb,0,c->caster==0);', magic)
+        # the hit shell follows its target for the spell's duration (ContinuousVfx, dbg cast ... dur S); the
+        # player's own shell and the first-person veil take the finer copy, the veil its faintest frame
+        self.assertIn('orb_at(c,at3,c->hit_height,la1,len,c->duration>0,t && t==sv_player);', magic)
+        self.assertIn('AW_FxSprite(fine,eye,VIEW_VEIL*2.2f,AW_MAGIC_FADE_FRAMES-1)', magic)
+        # the shell shapes of the effect set: egg (default) and sphere, saved with the orb type in aw_magic_orb
+        self.assertIn('static cvar_t aw_magic_orb={"aw_magic_orb","2",true};', magic)
+        self.assertIn('static model_t *shell_model(int fx,int shape,int fine)', magic)
+        self.assertIn('enum {AW_MAGIC_SHAPE_EGG,AW_MAGIC_SHAPE_SPHERE,AW_MAGIC_SHAPES};', self.code('aw_magic.h'))
         self.assertIn('(table->fx[fx].flags&AW_MAGIC_CONTINUOUS_VFX)?HOLD_DEFAULT:0', magic)
         self.assertIn('int AW_FxParticles(const float at[3],int count', magic)
         self.assertIn('int AW_FxSprite(struct model_s *model,const float at[3],float world_size,int frame) {', magic)

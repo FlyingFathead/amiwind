@@ -213,7 +213,7 @@ status: source-tested repair candidate, target acceptance pending.**
   including source-supported storms outside Ghostfence. Exact affected
   settlements and NPC triggers remain a study, not an implemented claim.
 
-See the complete [v0.0.29 fix and feature list](PLAN-v0.0.29.md), including lava
+See the complete [v0.0.29 fix and feature list](history/plans/PLAN-v0.0.29.md), including lava
 fields and their debug-map representation. Existing sky behavior below is kept
 for comparison; weather/lava source data and derived artwork are not included
 in the public repository.
@@ -1032,7 +1032,7 @@ modest modeled safety-margin overrun as a warning needing adjustment; actual
 allocation failures and functional omissions remain errors. Live memory and
 release acceptance still require separate evidence. Current
 original-to-candidate disk totals and the full area scope are recorded in the
-[map findings ledger](MAP_OPTIMIZATION_FINDINGS_2026-10-04.md); do not infer RAM
+[map findings ledger](history/investigations/MAP_OPTIMIZATION_FINDINGS_2026-10-04.md); do not infer RAM
 from BSP bytes.
 
 Source checks: [`aw_wait.c`](../engine/aga/src/aw_wait.c) and

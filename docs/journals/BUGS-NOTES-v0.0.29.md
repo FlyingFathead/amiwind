@@ -63,7 +63,7 @@ their dated history. No audio repair or full-release readiness is claimed.
 
 ## Current RC2 issue status: 2026-10-06T19:08:08+00:00
 
-[Implemented repairs, demonstrated cases and still-open issues](../RC2_ISSUE_CHECKPOINT.md).
+[Implemented repairs, demonstrated cases and still-open issues](../history/checkpoints/RC2_ISSUE_CHECKPOINT.md).
 This dated checkpoint supersedes older candidate status below. Delivery and
 final extracted-package launch are still pending; Temple holes remain open.
 
@@ -140,7 +140,7 @@ No subsequent package or first shipped fixed version is established below.
 | [CENSUS-ENTITIES-30](../bugs/CENSUS-ENTITIES-30.md) | v0.0.30-dev5 Census office: upright rug (black hole seen in the ceiling below), tapestry inside a bookshelf. The dev5 lighting rebuild paired an older object list with the dev3 geometry; 67 of 140 objects used the neighbouring model. Fixed in v0.0.30-rc1 (dev4 object list plus dev5 flames). Not owner-accepted. | Owner playtest of the Census office in rc1. |
 | [INTRO-ROLES-30](../bugs/INTRO-ROLES-30.md) | `NUM_FOR_EDICT: bad pointer` crash on a Seyda Neen region change: intro role pointers outlived a map reload. Repaired in v0.0.30-dev4 (stale roles dropped before use); scripted route crashed 2/2 on dev3, 0/3 repaired. Not owner-accepted. | Full opening played through with region changes; owner playtest. |
 | [CONVERTER-ROOT-ROTATION-30](../bugs/CONVERTER-ROOT-ROTATION-30.md) | Converter applied NIF root-node rotations that Morrowind ignores. Rebuilt: Balmora Temple, Tharys Ancestral Tomb, five Seyda Neen fireplace interiors. Pending: one Balmora exterior placement. Not yet shipped. | Walk-through of rebuilt interiors; Balmora exterior rebuild; owner playtest. |
-| LIGHT-EXTERIOR-JUMP-29 | Brightness discontinuity at the reported Seyda Neen shack | Y | v0.0.29-rc2 | Empty-versus-unused lightdata correction passes six focused checks. RC2 playtester confirms the reported shack brightness jump is gone. This is scoped to that reproduction; wider town/world traversal coverage remains. [Original boundary evidence](../BUGS-v0.0.29-RC1.md#repeated-boundary-evidence-6-october-2026). |
+| LIGHT-EXTERIOR-JUMP-29 | Brightness discontinuity at the reported Seyda Neen shack | Y | v0.0.29-rc2 | Empty-versus-unused lightdata correction passes six focused checks. RC2 playtester confirms the reported shack brightness jump is gone. This is scoped to that reproduction; wider town/world traversal coverage remains. [Original boundary evidence](../history/checkpoints/BUGS-v0.0.29-RC1.md#repeated-boundary-evidence-6-october-2026). |
 | HAND-PUNCH-COVERAGE-29 | Near-plane opening at maximum punch extension | Y | v0.0.29-rc2 | Sampled default and Argonian Female native views show no prior aperture; RC2 High Elf playtester also reports no exposed gaps, sex unspecified. Brief idle-to-punch disappearance and full race/pose coverage remain separate. |
 | [DEBUG-GALLERY-TIMING-29](../bugs/DEBUG-GALLERY-TIMING-29.md) | New candidate defect reproduced natively in combat/torch rooms: hands unavailable due to invalid animation timing. Pre-activation callback incorrectly requires active server. Regression fails before repair; six focused checks pass after the narrow fix, with no skips. | Full candidate gates, then native hands/punch/torch/state-return checks. |
 | TORCHTEST-DARKNESS-29 | Separate open candidate defect. Zero light samples still show dim gray floor because palette generation enforces a 15% minimum. | Room-scoped darkness policy and actual-palette native off/on comparison; preserve ordinary scenes. |
@@ -152,9 +152,9 @@ No subsequent package or first shipped fixed version is established below.
 Owner-confirmed RC1 positives remain scoped: appearance-screen entry music,
 Go back/Choose borders, substantially improved fists, and tested torch-to-NPC
 response. They do not close the separate reports above. Full coordinates,
-reproduction notes and follow-up requests: [RC1 playtest ledger](../RC1_PLAYTEST_LEDGER.md).
+reproduction notes and follow-up requests: [RC1 playtest ledger](../history/feedback/RC1_PLAYTEST_LEDGER.md).
 
-Consolidated RC1 reports, coordinates and scoped positive observations: [RC1 playtest ledger](../RC1_PLAYTEST_LEDGER.md).
+Consolidated RC1 reports, coordinates and scoped positive observations: [RC1 playtest ledger](../history/feedback/RC1_PLAYTEST_LEDGER.md).
 
 ## RC1 Seyda Neen brightness discontinuity: cause isolated
 
@@ -262,7 +262,7 @@ daylit environment. Compare fixed pose/time with torch off/on, radius and streng
 preserve the player's previous equipment, game state and scene on exit.
 This is requested next-candidate work, not a command shipped in RC1.
 
-Current work is the [v0.0.29 immediate fixlist](../PLAN-v0.0.29.md), following
+Current work is the [v0.0.29 immediate fixlist](../history/plans/PLAN-v0.0.29.md), following
 published v0.0.29-rc1. New owner reports and source candidates below remain open
 until their own native acceptance; historical passes do not close later reports.
 The published release and its immutable artifacts are not modified by this work.
@@ -607,7 +607,7 @@ audibility without drowning dialogue or global music. Owner acceptance pending.
 Deck/pier sideways escape during creation and missing interior door open/close
 squeaks remain open in dev3. The owner confirms improved pier guard orientation
 and working ship-to-Census progression; preserve those behaviours. Full report,
-UI dispositions and reproduction gates: [FEEDBACK-v0.0.23-dev2.md](../FEEDBACK-v0.0.23-dev2.md).
+UI dispositions and reproduction gates: [FEEDBACK-v0.0.23-dev2.md](../history/feedback/FEEDBACK-v0.0.23-dev2.md).
 
 ## dev3 feedback follow-up — 29 September 2026
 
@@ -615,7 +615,7 @@ The reported Vodunius-house visibility holes and the misrotated port rock are
 addressed; see [terrain findings and workflow](../WHAT_ARE_ROCKS.md). Voice style 2
 now defaults to aim-only identity, overriding voiced speaker headers.
 NPC conversation-facing, deck/pier sideways containment and door squeaks remain
-open in [the consolidated dev2 feedback](../FEEDBACK-v0.0.23-dev2.md).
+open in [the consolidated dev2 feedback](../history/feedback/FEEDBACK-v0.0.23-dev2.md).
 
 ## dev3 regression retest / dev4
 
@@ -623,13 +623,13 @@ Owner confirms the port rock is fixed. Newly reproduced and corrected: tree
 sprite background-depth rejection; Darvame dropping under the platform before
 static scenery spawns; uneven dialogue padding; ornamental caret/rotation glyphs;
 startup theme/timing; missing optional opening quote overlay. See
-[the full feedback table and trials](../FEEDBACK-v0.0.23-dev3.md).
+[the full feedback table and trials](../history/feedback/FEEDBACK-v0.0.23-dev3.md).
 These focused checks do not close unrelated open items above.
 
 ## RC1 remaining acceptance items — 30 September 2026
 
 The coordinate-by-coordinate record is in
-[INVESTIGATION-v0.0.24-rc1.md](../INVESTIGATION-v0.0.24-rc1.md). Keep these open:
+[INVESTIGATION-v0.0.24-rc1.md](../history/investigations/INVESTIGATION-v0.0.24-rc1.md). Keep these open:
 
 - stairs10 at -685,+619,141: reported origin is inside terrain; do not silently
   substitute the older negative-Y report or call it a passed staircase.

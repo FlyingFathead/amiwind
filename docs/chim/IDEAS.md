@@ -1,6 +1,6 @@
 # CHIM ideas and held-back work
 
-_Last updated with AmiWind v0.0.46 (21 October 2026)._
+_Last updated with AmiWind v0.0.54-dev1 (28 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -23,6 +23,7 @@ _Last updated with AmiWind v0.0.46 (21 October 2026)._
 - [Island-wide audits (mechanism classes)](#island-wide-audits-mechanism-classes)
 - [Collision from what the game already knows](#collision-from-what-the-game-already-knows)
   - [Terrain collision from heights (measured prototype, 21 October 2026)](#terrain-collision-from-heights-measured-prototype-21-october-2026)
+- [The Arena Pit's upper tiers as backdrop panels](#the-arena-pits-upper-tiers-as-backdrop-panels)
 - [Also held back](#also-held-back)
 - [Measured and dropped](#measured-and-dropped)
 
@@ -491,7 +492,7 @@ Guide: [CHIM build guide](build_guide/README.md).
 | MiniWind presets | planned | `--miniwind-preset NAME` for repeatable small builds of a chosen spot (the Vivec Arena pit as the worked example). |
 | Start straight in the game | designed | `--direct-to-game-map` with an area, `interior:<cell id>`, `cell:X,Y` or `pos:X,Y,Z@HEADING`, plus `--quick-character`, skipping the intro. |
 | Incremental image | planned | Rewrite only the image files a change reaches, instead of assembling the whole image again. |
-| Longest work first | in source on a branch | Worker pools hand out the largest items first from measured cost history, so no stage ends on one core while the rest wait ([parallel build](../PARALLEL_BUILD.md)). |
+| Longest work first | in source on a branch | Worker pools hand out the largest items first from measured cost history, so no stage ends on one core while the rest wait ([parallel build](../history/superseded/PARALLEL_BUILD.md)). |
 
 ## Texture effects: a bug turned into an effect
 
@@ -663,6 +664,49 @@ Bytes it would remove from a 0.11 world: the clipnode payload (55.7 MB) and the 
 78 MB of the 98.0 MB plane payload) of the 83,236 generated records, and up to 42.7 MB more in the others before
 packing, about 176 MB of the 298.5 MB of terrain records. It would ship as an option with an A/B against the stored
 hull, never as a silent replacement.
+
+## The Arena Pit's upper tiers as backdrop panels
+
+Status: planned (an idea of the maintainer, 28 October 2026; nothing built). Detail and the measured context:
+[PERF-ARENA-PIT-SLOW-48](../bugs/PERF-ARENA-PIT-SLOW-48.md).
+
+The cost in the Vivec Arena Pit is not only the pit but everything above it. Racing games of the first 3D console
+generation drew the roadside landscape as a picture on a few flat planes, and the stands and balcony of the Pit can be
+treated the same way: the player is held on the pit floor and always sees them from about the same place, from below
+and at a distance, so the parallax is small.
+
+Measured context (v0.0.54-dev1, JIT, FPU, maximum CPU, 32 MB Fast): the bowl is one placement of 15,760 faces that is
+always in view (rooms get no fog, far cut or detail step). Its brush faces take 14.7 to 24.4 ms of a 23.0 to 43.9 ms
+view, and the frame takes 25 to 38 ms.
+
+The plan:
+
+- Render the upper tiers (the band from height 64 to 160, 9,349 of the bowl's small faces) from the centre of the pit
+  floor at 8 to 16 headings. The shots are taken from the real room in the emulator, so the original lighting is baked
+  in.
+- Cut the shots into textures on a ring of 8 to 16 large quads at the stands' radius.
+- The pit wall, the floor and all collision stay real geometry.
+- It is room-only: the Pit is its own room (vai000) behind a load door, so the outdoor world is not re-keyed.
+- Cost: about 128 KB at 8 bits for 16 panels of 128 by 64.
+- The stands are empty in the original, so the panels are still pictures with nothing to animate, which suits the method.
+
+Open: how the panel seams look at the turn of the head, and whether the pit wall's top edge hides the join.
+
+This is type 3 of the setting `aw_vivec_arena_pit_type`: 0 the bowl whole, 1 tiles (the default), 2 tiles and the room
+detail budget, 3 the backdrop panels. Types 0 to 2 are done; the image stores the room once per type and the door loads
+the chosen one. The first A/B of type 1 against the whole bowl cut the frame time by 7 to 11 ms on the pit floor and by
+7 ms on the upper level, with the same surfaces drawn.
+
+Two more ideas for the same room, each with what it would buy:
+
+- **A lossless mesh optimizer pass on the bowl.** 4,289 of its faces are under 4 square units. Merging neighbouring
+  coplanar faces into fewer, larger polygons keeps the picture identical and cuts the per-face cost of the software
+  renderer, which the detail budget (type 2) does by lowering detail instead.
+- **Symmetry.** If the bowl is rotationally symmetric, one stored sector placed several times saves model memory and
+  load time, not frame time. Being checked by geometry.
+
+A far cut bounded by the original's fog would not help: the Pit's fog starts beyond the room (see the
+[bug page](../bugs/PERF-ARENA-PIT-SLOW-48.md#a-finding-the-originals-fog-cannot-bound-a-far-cut-here)).
 
 ## Also held back
 

@@ -68,6 +68,11 @@ WEAK void AW_WeatherLightTone(const aw_weather_blend_t *blend,int a,int b,int mi
 /* The animation kit console (aw_animkit.c): nothing to drive in fixtures without it. */
 WEAK void AW_AnimKitTick(void) {}
 WEAK void AW_AnimKitInit(void) {}
+/* DemoWind (aw_demowind.c): never on in fixtures. */
+WEAK void AW_DemoWindInit(void) {}
+WEAK void AW_DemoWindDraw(void) {}
+WEAK int AW_DemoWindActive(void) {return 0;}
+WEAK int AW_DemoWindKey(int key,int down) {(void)key;(void)down;return 0;}
 /* The Halloween scene (aw_halloween.c): nothing runs in fixtures without it. */
 WEAK void AW_HalloweenInit(void) {}
 WEAK void AW_HalloweenTick(void) {}

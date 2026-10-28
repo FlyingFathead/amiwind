@@ -177,4 +177,4 @@ Seyda Neen. Reparse saved outputs; exercise repeat clipping rather than bypass i
 with an `already_clipped` flag. A no-op clipper can be stable, so the first-cut
 test must also prove buried portions disappear and exposed portions survive.
 See [hidden-surface findings](EXTERIOR_HIDDEN_SURFACES.md) and
-[the dated findings snapshot](MAP_OPTIMIZATION_FINDINGS_2026-10-04.md).
+[the dated findings snapshot](history/investigations/MAP_OPTIMIZATION_FINDINGS_2026-10-04.md).

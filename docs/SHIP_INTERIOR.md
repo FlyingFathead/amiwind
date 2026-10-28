@@ -47,6 +47,6 @@ The loaded scene restores a bounded subset of player state (health and hand
 draw goal). Inventory, quests, actor state, doors and persistent cell state are
 future work. General scene IDs and save-safe transitions need a dedicated design.
 See [conversion recipes](CONVERSION_RECIPES.md) and
-[checkpoint validation](CHECKPOINT_017_VALIDATION.md).
+[checkpoint validation](history/checkpoints/CHECKPOINT_017_VALIDATION.md).
 
 `dbg scene change` opens the two-scene debug popup; Escape cancels to the console.

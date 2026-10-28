@@ -38,10 +38,10 @@ helps analyze geometry and plan work; it does not edit BSPs, perform complete
 automatic optimization, or profile live runtime performance. Since v0.0.31 it
 lives at `amiwind-toolkit/map-inspector.html` as part of the
 [AmiWind Toolkit](AMIWIND_TOOLKIT.md); the old `tools/polycount_inspector.html`
-link redirects there. See the [toolkit roadmap](BUILD_TOOLKIT_ROADMAP.md) and
+link redirects there. See the [toolkit roadmap](history/superseded/BUILD_TOOLKIT_ROADMAP.md) and
 [exterior hidden-surface status](EXTERIOR_HIDDEN_SURFACES.md).
 See the [Map Optimization Toolkit overview](AMIWIND_MAP_OPTIMIZATION_TOOLKIT.md)
-and [measured findings](MAP_OPTIMIZATION_FINDINGS_2026-10-04.md).
+and [measured findings](history/investigations/MAP_OPTIMIZATION_FINDINGS_2026-10-04.md).
 Created during AmiWind v0.0.28. Inspector prototype 0.1.3 includes optional local
 base-texture inspection, compass, overhead inspection and polygon planning.
 The startup-frame repair remains: an empty viewport

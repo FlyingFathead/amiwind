@@ -914,6 +914,7 @@ void Key_Event (int key, qboolean down)
         shift_down = down;
 
     if (AW_MovieKey(key,down)) return;
+    if (AW_DemoWindKey(key,down)) return;	/* dbg demowind: effect and distance keys, Esc */
     if (AW_WorldUIKey(key,down)) return;
 
     /* Physical Amiga raw key 0 maps to grave (Finnish host: section key).

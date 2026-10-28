@@ -171,23 +171,27 @@ HULL_SURFACE_TABLE = Path(__file__).resolve().parents[2] / 'config/collision-hul
 def hull_surface_table(path=HULL_SURFACE_TABLE):
     """The meshes whose convex pieces keep their source surface (hull_surface_loss; CHIM-VIVEC-DOCK-WALKWAY-43): the
     measured table, source paths in lower case."""
+    from mesh_tables import tracked      # each cached result keys the rows it reads (BUILD-KEY-MESH-TABLE-WHOLE-54)
     data = json.loads(Path(path).read_text(encoding='utf-8'))
-    return {m.replace(chr(92), '/').casefold() for m in data['meshes']}
+    return tracked({m.replace(chr(92), '/').casefold() for m in data['meshes']}, path)
 
 
 def hull_surface_recipe_table(path=HULL_SURFACE_TABLE):
     """{visual recipe: meshes} that keep their source surface only where a cell's visual recipe reduces them (config
     recipe_meshes; CHIM-HULL-SURFACE-RESURVEY-48: ex_de_ship under the Telvanni coast recipe), source paths in lower
     case."""
+    from mesh_tables import tracked
     data = json.loads(Path(path).read_text(encoding='utf-8'))
-    return {r: {m.replace(chr(92), '/').casefold() for m in ms} for r, ms in data.get('recipe_meshes', {}).items()}
+    return {r: tracked({m.replace(chr(92), '/').casefold() for m in ms}, path)
+            for r, ms in data.get('recipe_meshes', {}).items()}
 
 
 def hull_surface_known(path=HULL_SURFACE_TABLE):
     """The measured meshes the collision surface gate does not fail: still over a step with the rule (another converter
     path), each with its depth and reason (config known_over_step)."""
+    from mesh_tables import tracked
     data = json.loads(Path(path).read_text(encoding='utf-8'))
-    return {m.replace(chr(92), '/').casefold() for m in data.get('known_over_step', {})}
+    return tracked({m.replace(chr(92), '/').casefold() for m in data.get('known_over_step', {})}, path)
 
 
 def hull_surface_unit(task):

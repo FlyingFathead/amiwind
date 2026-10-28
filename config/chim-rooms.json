@@ -1,6 +1,18 @@
 {
   "format": 1,
-  "about": "CHIM rooms (tools/chim/interior.py room_input): settings every room is built with. cut_models_over: a placed model wider than this (local units) is stored as tiles of the room grain (chim.cut tile mode, the exterior's large-model cut), so the engine culls each tile against the view on its own; a whole-room shell such as the Vivec Arena Pit's bowl (in_v_arena_01, 15,760 faces, one entity, always drawn whole: PERF-ARENA-PIT-SLOW-48) is otherwise sent through the clip path in full every frame. 0 keeps every model whole (the method up to v0.0.54-dev1). detail_budget: a named budget of config/chim-detail-budgets.json for room meshes (fewer visual triangles, the same collision, the open rim locked); null = none.",
+  "about": "CHIM rooms (tools/chim/interior.py room_input): settings every room is built with. cut_models_over: a placed model wider than this (local units) is stored as tiles of the room grain (chim.cut tile mode, the exterior's large-model cut), so the engine culls each tile against the view on its own; a whole-room shell such as the Vivec Arena Pit's bowl (in_v_arena_01, 15,760 faces, one entity, always drawn whole: PERF-ARENA-PIT-SLOW-48) is otherwise sent through the clip path in full every frame. 0 keeps every model whole (the method up to v0.0.54-dev1). detail_budget: a named budget of config/chim-detail-budgets.json for room meshes (fewer visual triangles, the same collision, the open rim locked); null = none. room_types (the maintainer, 2026-10-28: the Arena Pit's methods behind one saved setting, aw_vivec_arena_pit_type): a room built in several types, each with its own cut_models_over and detail_budget; the default type's record is rooms/<room>.crm, every other type's rooms/<room>t<N>.crm on the same store, and the engine loads the type the setting names (-1, the default setting: this default). rooms: the only rooms that get these (the rooms they were measured for); every other room is built as before, every model whole and no budget (the maintainer, 2026-10-28, on blank walls in a dev2 room: we can't have walls like that except in the vivec arena pit).",
+  "rooms": ["vai000"],
   "cut_models_over": 512,
-  "detail_budget": "rooms"
+  "detail_budget": "rooms",
+  "room_types": {
+    "vai000": {
+      "about": "Vivec, Arena Pit: 0 = the bowl whole (the original, the method up to v0.0.54-dev1), 1 = tiles, 2 = tiles + the room detail budget (the bowl at 6,000 visual triangles). Default 2, decided by the maintainer on 2026-10-28 (about 07:2x +0200) after the one-image A/B of that night (frame ms floor/ring: type 0 17.4/27.5, type 1 14.5/23.2, type 2 13.9/18.0): 'Type 2 is more than good enough ... keep in our builder the original as type 0, type 1, type 2, and 2 would be our default from now on'. Type 4 (tiles + the lossless planar merge, the room setting merge_faces) was measured equal to type 1 (-43 faces) and is not built (image space); the setting stays available.",
+      "default": 2,
+      "types": {
+        "0": {"cut_models_over": 0, "detail_budget": null},
+        "1": {"cut_models_over": 512, "detail_budget": null},
+        "2": {"cut_models_over": 512, "detail_budget": "rooms"}
+      }
+    }
+  }
 }

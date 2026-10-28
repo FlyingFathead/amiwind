@@ -530,8 +530,13 @@ def completed_map(function, items, jobs=None, cost=None):
     `cost` (item -> number): submitted largest first (BUILD-CHIM-REGION-FRAMES-TAIL-43).
     Many small units go out in guided chunks, one pool task each (BUILD-POOL-TINY-UNITS-48, _chunk_size); each unit
     still runs `function(item)` and yields its own result.
+    A worker lost while the map runs (a broken pool, mostly the kernel's out-of-memory killer) no longer ends the map
+    (BUILD-OOM-DEGRADE-NOT-DIE-54): the units not handed back yet go out again in a fresh pool with half the units in
+    flight, at most _pool_loss_retries() times, each with one [pool] WARNING line (_pool_lost); one more loss ends the map
+    with its error, as before. A unit is handed back once: only units whose results never came back run again.
     """
     import pool_status
+    from concurrent.futures.process import BrokenProcessPool
     count = resolve_jobs(jobs)
     size, limit = _throttle(count)
     if size == 1:
@@ -551,48 +556,117 @@ def completed_map(function, items, jobs=None, cost=None):
     stage = active_stage_pool()
     # BUILD-POOL-TINY-UNITS-48: many small units go out in chunks (_chunk_size), one task per chunk
     chunks = _chunk_plan(total)
-    with worker_environment(), _map_pool(size) as pool:
-        pending = set()
-        window = count if stage is not None and stage.capacity > size else 2 * count
+    again, losses, cut = [], 0, None     # units sent out again after a lost worker; the in-flight cap since then
+    try:
+        while True:
+            lost = None
+            with worker_environment(), _map_pool(size) as pool:
+                pending = set()
+                window = count if stage is not None and stage.capacity > size else 2 * count
 
-        def refill():
-            while len(pending) < (window if limit is None else limit()):
-                cap = window if limit is None else limit()
-                batch = []
-                for _ in range(_chunk_size(chunks, cap)):
-                    try:
-                        batch.append(next(items))
-                    except StopIteration:
-                        break
-                if not batch:
-                    if status:
-                        status.end_of_input()
-                    return
-                pending.add(_submit_chunk(pool, function, batch, status, chunks))
+                def room():
+                    allowed = window if limit is None else limit()
+                    return allowed if cut is None else max(1, min(allowed, cut))
 
-        try:
-            refill()
-            while pending:
-                # under the scheduler a short wait, so a raised allowance starts more units at once, not only when a
-                # unit finishes (maintainer 2026-10-19: pools follow the live allowance continuously)
-                done, pending = wait(pending, timeout=None if limit is None else _grow_seconds(),
-                                     return_when=FIRST_COMPLETED)
-                results, error = [], None
-                for future in done:
-                    values, failed = _chunk_results(future)
-                    results += values
-                    error = error or failed
-                if error is None:
+                def refill():
+                    while len(pending) < room():
+                        cap = room()
+                        batch = []
+                        for _ in range(_chunk_size(chunks, cap)):
+                            try:
+                                batch.append(again.pop(0) if again else next(items))
+                            except StopIteration:
+                                break
+                        if not batch:
+                            if status:
+                                status.end_of_input()
+                            return
+                        pending.add(_submit_chunk(pool, function, batch, status, chunks))
+
+                try:
                     refill()
-                yield from results
-                if error is not None:
-                    raise error
-        finally:
-            for future in pending:
-                future.cancel()
-            if status:
-                status.close()
-            _chunk_report(chunks, getattr(function, '__name__', 'map'))
+                    while pending:
+                        # under the scheduler a short wait, so a raised allowance starts more units at once, not only
+                        # when a unit finishes (maintainer 2026-10-19: pools follow the live allowance continuously)
+                        done, pending = wait(pending, timeout=None if limit is None else _grow_seconds(),
+                                             return_when=FIRST_COMPLETED)
+                        results, error = [], None
+                        for future in done:
+                            values, failed = _chunk_results(future)
+                            results += values
+                            if isinstance(failed, BrokenProcessPool):
+                                lost = lost or failed
+                                again.extend(future._aw_batch[len(values):])
+                            else:
+                                error = error or failed
+                        if lost is not None and error is None:
+                            # every task still out died with the pool, or finished just before it: keep what came back
+                            for future in pending:
+                                values, failed = _chunk_results(future) if future.done() else ([], lost)
+                                results += values
+                                if failed is not None:
+                                    again.extend(future._aw_batch[len(values):])
+                            pending = set()
+                            if chunks['left'] is not None:
+                                chunks['left'] += len(again)
+                            flight = room()
+                        if error is None and lost is None:
+                            refill()
+                        yield from results
+                        if error is not None:
+                            raise error
+                finally:
+                    for future in pending:
+                        future.cancel()
+            if lost is None:
+                return
+            if losses >= _pool_loss_retries():
+                raise lost
+            losses += 1
+            cut = max(1, flight // 2)
+            _pool_lost(getattr(function, '__name__', 'map'), lost, len(again), flight, cut, losses)
+    finally:
+        if status:
+            status.close()
+        _chunk_report(chunks, getattr(function, '__name__', 'map'))
+
+
+def _pool_loss_retries():
+    """How often completed_map sends a lost worker's units out again (at half the units in flight each time) before the
+    map ends with the broken pool's error (BUILD-OOM-DEGRADE-NOT-DIE-54: 24 -> 12 -> 6, then a clean failure)."""
+    return 2
+
+
+def _oom_kills():
+    """The container's out-of-memory kills so far (cgroup v2 memory.events oom_kill), or None: a machine without a
+    container counts them only in the kernel log."""
+    try:
+        for line in Path('/sys/fs/cgroup/memory.events').read_text().splitlines():
+            if line.startswith('oom_kill '):
+                return int(line.split()[1])
+    except (OSError, ValueError):
+        pass
+    return None
+
+
+def _pool_lost(label, error, units, flight, cut, loss):
+    """The one loud line of a lost worker in completed_map (no silent retry): what was lost, what goes out again at
+    how many units in flight, the memory now and the out-of-memory kills. Returns the line."""
+    try:
+        from resource_plan import build_memory
+        limit, used, cache = build_memory()
+        memory = ('%.1f of %.1f GiB in use' % ((used - cache) / 2.0 ** 30, limit / 2.0 ** 30)
+                  if limit and used is not None else 'memory unknown')
+    except Exception:              # the warning itself must never end the map
+        memory = 'memory unknown'
+    kills = _oom_kills()
+    line = ('[pool] WARNING: RAM exhausted? %s lost a worker (%s: %s); %d unit(s) go out again with %d in flight '
+            '(was %d), retry %d of %d; %s; out-of-memory kills: %s (BUILD-OOM-DEGRADE-NOT-DIE-54)' % (
+                label, type(error).__name__, str(error).split('\n')[0][:120], units, cut, flight, loss,
+                _pool_loss_retries(), memory, 'not counted outside a container (see the kernel log: dmesg)'
+                if kills is None else kills))
+    print(line, flush=True)
+    return line
 
 
 def _indexed_call(function, pair):
@@ -891,6 +965,7 @@ def _submit_chunk(pool, function, batch, status, state):
             first, count = batch[0][0], len(batch)
             status.submit_many(first, batch[0][1], count)
             future.add_done_callback(lambda _f: status.finish_many(first, count))
+    future._aw_batch = batch                       # sent out again if its worker is lost (completed_map)
 
     def timed(_future, units=len(batch)):
         state['units'] += units

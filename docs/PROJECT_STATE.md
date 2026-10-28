@@ -32,7 +32,7 @@ _Last updated with AmiWind v0.0.51 (25 October 2026)._
 
 ## 25 October 2026: v0.0.51 - Let There Be More Inner Light
 
-The newest release is [v0.0.51: Let There Be More Inner Light](RELEASE-v0.0.51.md), running on CHIM Engine v0.2.2.
+The newest release is [v0.0.51: Let There Be More Inner Light](releases/notes/RELEASE-v0.0.51.md), running on CHIM Engine v0.2.2.
 Akulakhan's Chamber, the game's final room, loads on 32 MB. Every interior is baked with its cell's sunlight, the
 light the original gives a room from one fixed direction, which the bake had always left out; the interior
 brightness default is back to 1.0 ([interior lighting](INTERIOR_LIGHTING.md)). The music keeps playing through the
@@ -49,7 +49,7 @@ models and more of the game's scripts. Open problems are in the [bug register](B
 
 ## 21 October 2026: v0.0.47-dev1 - development snapshot
 
-The newest development snapshot is [v0.0.47-dev1](RELEASE-v0.0.47-dev1.md) (not a release; the newest release is
+The newest development snapshot is [v0.0.47-dev1](releases/notes/RELEASE-v0.0.47-dev1.md) (not a release; the newest release is
 still v0.0.46). It adds the shimmering Ghostfence, a lighter image, a Workbench icon, pursuit on slopes and a builder
 that walks no stairs by default. The emulator presets start with 128 MiB of Fast RAM. The type 1 crossing, the
 outdoor actor table and the smaller world formats are in the source behind switches that are off
@@ -57,7 +57,7 @@ outdoor actor table and the smaller world formats are in the source behind switc
 
 ## 19 October 2026: v0.0.45 - CHIM Streaming Improved, Guard Torches Are Back
 
-The newest release is [v0.0.45: CHIM Streaming Improved, Guard Torches Are Back](RELEASE-v0.0.45.md), running on
+The newest release is [v0.0.45: CHIM Streaming Improved, Guard Torches Are Back](releases/notes/RELEASE-v0.0.45.md), running on
 CHIM Engine v0.2.1. Crossing from one CHIM cell to the next reads the frames around the player ahead into spare
 Fast RAM, and the engine's heap grows with the RAM the machine has; the 16 MiB baseline keeps its sizes. The
 guards in the streets carry their torches at night again. Most of what is left of a crossing is the engine
@@ -66,8 +66,8 @@ restarting the game for every new frame; the next step switches the frame in pla
 
 ## 19 October 2026: v0.0.44 - By Azura's Trees!
 
-The newest release is [v0.0.44: By Azura's Trees!](RELEASE-v0.0.44.md), a patch release for
-[v0.0.43: Let There Be CHIM: Vvardenfell's Outdoors, All of It](RELEASE-v0.0.43.md). Both run on CHIM Engine v0.2.1.
+The newest release is [v0.0.44: By Azura's Trees!](releases/notes/RELEASE-v0.0.44.md), a patch release for
+[v0.0.43: Let There Be CHIM: Vvardenfell's Outdoors, All of It](releases/notes/RELEASE-v0.0.43.md). Both run on CHIM Engine v0.2.1.
 
 - **The outdoors.** Every exterior cell of Vvardenfell is on CHIM since v0.0.43: 1,409 cells, of which 1,348 are
   in one-cell region frames and 61 in the town frames of Balmora, Seyda Neen and Vivec (1,292 land cells, 98
@@ -78,11 +78,11 @@ The newest release is [v0.0.44: By Azura's Trees!](RELEASE-v0.0.44.md), a patch 
   sprites.
 - **Interiors.** They are still ordinary Quake maps. Measured on 19 October 2026, 176 of Vvardenfell's 1,134
   interior cells are converted and reachable, and 919 are not converted yet
-  ([checklist](PLAN-v0.0.45.md#3-every-interior-of-the-base-game)).
-- **Known problems** are listed in the [v0.0.44 notes](RELEASE-v0.0.44.md#known-in-this-build) and the
+  ([checklist](history/plans/PLAN-v0.0.45.md#3-every-interior-of-the-base-game)).
+- **Known problems** are listed in the [v0.0.44 notes](releases/notes/RELEASE-v0.0.44.md#known-in-this-build) and the
   [bug register](BUGS.md), among them the pauses when crossing from one CHIM cell to the next
   ([CHIM-CROSSING-SLUGGISH-43](bugs/CHIM-CROSSING-SLUGGISH-43.md)).
-- **Next.** The [v0.0.45 plan](PLAN-v0.0.45.md): cell crossings first, then the bugs from the v0.0.43 playtests,
+- **Next.** The [v0.0.45 plan](history/plans/PLAN-v0.0.45.md): cell crossings first, then the bugs from the v0.0.43 playtests,
   then every interior of the base game. Object and container state, NPC placement and compiled MWScript follow, in
   the [roadmap](ROADMAP.md#the-road-after-v0044-19-october-2026).
 - **Where to look.** The [CHIM Progress Tracker](chim/PROGRESS_TRACKER.md) and the [CHIM cell tracker](chim/CELL_TRACKER.md)
@@ -100,7 +100,7 @@ movement, lights NPCs by the floor they stand on, adds glow and flames in
 rebuilt maps, reads converted NPC models once instead of twice, and builds the
 engine without compiler warnings. Release candidate 1 also fixed misplaced
 objects in dev5's Census and Excise Office. Details:
-[release notes](RELEASE-v0.0.30.md), [changelog](CHANGELOG.md).
+[release notes](releases/notes/RELEASE-v0.0.30.md), [changelog](CHANGELOG.md).
 
 Gates for the release candidate: 1,361-file source preflight, 1,072 Linux
 tests (0 failures, 4 skipped) and a warning-free asset-free Amiga build, all in
@@ -115,7 +115,7 @@ Open, in priority order:
    reproducible from the public tools ([BUILD-SEYDA-REGEN-30](BUG_JOURNAL.md)),
    then rebuild the maps lighter (ground simplification, merged flat faces,
    simpler collision for clutter) with placements and mechanics unchanged.
-   See [Seyda Neen performance](SEYDA_NEEN_PERFORMANCE.md).
+   See [Seyda Neen performance](history/superseded/SEYDA_NEEN_PERFORMANCE.md).
 2. **Load freeze (SEYDA-LOAD-HANG-30):** rare stop during automated Seyda Neen
    loads; a disk read never completes. Cause open.
 3. **Lighting:** flame tuning, the prison ship's cabin lantern, Balmora street
@@ -193,9 +193,9 @@ show restored brown ground. Initial New Game/movie skip/Jiub/name entry,
 default V3/cloud settings and clock freeze/invalid-time/resume checks passed.
 Image015 passed the tested day/night gallery, guard appearance, renderer-state restoration and session-stability checks within scope. Full ground/NPC routes and travel/save flows remain open. Historical V1 captures do not demonstrate the new effects. No whole-world canonical-culling or physical-hardware performance claim follows.
 
-See [stable preparation](RELEASE-v0.0.28.md), [sky controls](DAY_NIGHT_AND_SKY.md),
+See [stable preparation](releases/notes/RELEASE-v0.0.28.md), [sky controls](DAY_NIGHT_AND_SKY.md),
 [canonical terrain evidence](CANONICAL_TERRAIN_CULLING.md) and the
-[historical rc1 record](RELEASE-v0.0.28-rc1.md).
+[historical rc1 record](releases/notes/RELEASE-v0.0.28-rc1.md).
 
 ## Published: v0.0.27 — Rocks, Mushrooms, and Then Some
 
@@ -205,7 +205,7 @@ peeled release tag were verified at that commit. The Linux publisher completed
 release creation and downloaded-asset verification; all four jobs in
 [CI run 37113138642](https://github.com/FlyingFathead/amiwind/actions/runs/37113138642)
 passed: Docker builder, Linux and Windows launcher parity, and source/asset-free
-build. See the [release record](RELEASE-v0.0.27.md#publication-and-source-validation--3-october-2026).
+build. See the [release record](releases/notes/RELEASE-v0.0.27.md#publication-and-source-validation--3-october-2026).
 
 The release adds 37,960 exterior rock placements and 816 giant mushrooms across
 2,526 world regions. All five giant-mushroom models retain joined cap geometry
@@ -255,7 +255,7 @@ inactive, and the static asset gallery remains planned.
 
 See [memory policy](MEMORY_ALLOCATION.md), [cell changes](CELL_CHANGING.md),
 [bug journal](BUG_JOURNAL.md), [roadmap](ROADMAP.md), and
-[release notes](RELEASE-v0.0.27.md). Original and converted proprietary assets,
+[release notes](releases/notes/RELEASE-v0.0.27.md). Original and converted proprietary assets,
 ROMs and playable/playtest packages remain private; the public release is source
 and documentation only.
 
@@ -278,7 +278,7 @@ The two generated emulator configurations mount both HDFs simultaneously.
 
 Corrected-image maintainer playtest, texture/boundary acceptance, fresh Linux/Docker
 pipeline validation and hosted CI remain pending. The published baseline is
-v0.0.26. See [rc2 notes](RELEASE-v0.0.27-rc2.md),
+v0.0.26. See [rc2 notes](releases/notes/RELEASE-v0.0.27-rc2.md),
 [What are rocks?](WHAT_ARE_ROCKS.md) and [known issues](BUG_JOURNAL.md).
 
 ### Published v0.0.26 baseline — historical
@@ -291,20 +291,20 @@ with zero unresolved findings. Its verified HDF is 3,489,693,696 bytes, SHA-256
 `da3f80b3d7ebefe30c53031fdd29c34a094d0b486328daa46739a4a5ad6364a3`; Conversion elapsed was 1,566.061 seconds (26 minutes 6 seconds), excluding export, provisioning and emulator testing; the cached run
 reported 78 warnings. WinUAE 6.0.3 played the opening
 movie, entered Jiub's prison scene and responded to Enter/Escape. Local wrapper
-validation passed 433 tests with 3 skips. See [v0.0.26 release notes](RELEASE-v0.0.26.md).
+validation passed 433 tests with 3 skips. See [v0.0.26 release notes](releases/notes/RELEASE-v0.0.26.md).
 
 The cold offline rc1-identity Docker run remains historical evidence: 35 minutes
 3 seconds, same HDF size, full conversion, strict actor-ground pass and WinUAE
 game-entry check. Linux remains the established foundation; native Windows stays
 experimental with known worker/cancellation failures. Hosted Docker CI and public
-publication completed for v0.0.26; they remain pending for v0.0.27-rc2. See [rc1 scope](RELEASE-v0.0.26-rc1.md),
-[Windows evidence](VALIDATION-WINDOWS-2026-10-02.md) and
-[Docker evidence](VALIDATION-DOCKER-2026-10-02.md).
+publication completed for v0.0.26; they remain pending for v0.0.27-rc2. See [rc1 scope](releases/notes/RELEASE-v0.0.26-rc1.md),
+[Windows evidence](history/validation/VALIDATION-WINDOWS-2026-10-02.md) and
+[Docker evidence](history/validation/VALIDATION-DOCKER-2026-10-02.md).
 
 ### Earlier gameplay and performance checkpoints
 
 **Top engineering priority:** reduce world-terrain build time and avoid
-unnecessary recompilation between runs. The [toolkit roadmap](BUILD_TOOLKIT_ROADMAP.md)
+unnecessary recompilation between runs. The [toolkit roadmap](history/superseded/BUILD_TOOLKIT_ROADMAP.md)
 puts `vfXXXX` phase profiling, persistent reuse and duplicate BSP/collision work
 as an ongoing priority alongside host support; speculative QCC acceleration
 remains future work. The workstation
@@ -314,11 +314,11 @@ world/journal receipt check. rc6 repairs that receipt and provides checked
 rc3 private-test assembly with 23 explicitly accepted contact findings. That rc3 result remains historical evidence. Current rc7 actor-fit validation
 is recorded separately below.
 
-**Source reconciliation:** see [RECONCILE-v0.0.25-rc1.md](RECONCILE-v0.0.25-rc1.md). Earlier native results describe the original candidate, not the merged runtime.
+**Source reconciliation:** see [RECONCILE-v0.0.25-rc1.md](history/merges/RECONCILE-v0.0.25-rc1.md). Earlier native results describe the original candidate, not the merged runtime.
 
 **Previous source release: v0.0.25**, completion-driven character-model scheduling and verified reuse,
 original-model torch and source-region HUD,
-including the rc8 crash correction. See [v0.0.25 scope](RELEASE-v0.0.25.md) and
+including the rc8 crash correction. See [v0.0.25 scope](releases/notes/RELEASE-v0.0.25.md) and
 [validation](validation/v0.0.25-source.json). Target playtesting remains pending.
 The regular, very brief fist blink every 1–2 seconds is still open. The
 static asset gallery and broad scenery coverage remain future work.
@@ -332,7 +332,7 @@ build/publication results, not a claim of successful runtime playtesting.
 
 Subsequent rc7 playtesting found an F-then-V crash. The host regression reproduces
 an invalid access through a negative collision-tree root in brush lighting.
-rc8 uses each model's visible face range instead. See [release notes](RELEASE-v0.0.25-rc8.md)
+rc8 uses each model's visible face range instead. See [release notes](releases/notes/RELEASE-v0.0.25-rc8.md)
 and [validation](validation/rc8-source.json). Target torch retesting is pending;
 final release remains blocked until this regression is checked in the emulator.
 
@@ -363,7 +363,7 @@ TODO and is explicitly outside rc1.
 The rc7 fitter addresses the previously reported 23 contact cases using the
 actual quantized idle mesh. The strict production audit remains unchanged;
 its measured result is recorded in the current validation receipt. Inventory, general quest execution and complete playthrough
-acceptance remain future work. See [candidate verification](RELEASE-v0.0.25-rc7.md)
+acceptance remain future work. See [candidate verification](releases/notes/RELEASE-v0.0.25-rc7.md)
 and [terrain conversion](WORLD_TERRAIN.md). Published dev1 and v0.0.24 archives
 remain immutable.
 
@@ -395,7 +395,7 @@ but 23 broader contact findings remain unresolved. The three new RC2 walking
 stalls have a collision-trace correction; old positive-Y stairs10 and exact wedge
 reports remain open. The candidate carries the failed contact audit; the normal
 production image gate still requires a complete pass. Method 1 remains the
-loading default. See [RC3 scope](RELEASE-v0.0.24-rc3.md).
+loading default. See [RC3 scope](releases/notes/RELEASE-v0.0.24-rc3.md).
 
 ### RC1 baseline (historical)
 
@@ -423,8 +423,8 @@ whole-map polygon-density analysis, full NPC services, schedules, combat and
 quest simulation remain future work. Greetings use a bounded authored fixture.
 
 Stable v0.0.23 and the published dev5 prerelease remain unchanged. Final
-v0.0.24 needs the maintainer's green light. See [RC scope](RELEASE-v0.0.24-rc1.md),
-[complete checklist](INVESTIGATION-v0.0.24-rc1.md),
+v0.0.24 needs the maintainer's green light. See [RC scope](releases/notes/RELEASE-v0.0.24-rc1.md),
+[complete checklist](history/investigations/INVESTIGATION-v0.0.24-rc1.md),
 [conversion lessons](BALMORA_CONVERSION_LESSONS.md) and
 [Amiga naming constraints](RELEASE_WORKFLOW.md#amiga-limitations).
 
@@ -442,8 +442,8 @@ effective distance at 540 to stay within their certified overlap.
 `seydaneen`, `prisonship` and the other converted scene names. Seyda Neen interior
 lookup works from Balmora. Choose defaults highlighted, review has page numbers,
 Shift+V replaces bare numeric distance presets, and the Census front exit stays
-locked during registration. See [dev4 scope](RELEASE-v0.0.24-dev4.md) and
-[investigation findings](INVESTIGATION-v0.0.24-dev4.md).
+locked during registration. See [dev4 scope](releases/notes/RELEASE-v0.0.24-dev4.md) and
+[investigation findings](history/investigations/INVESTIGATION-v0.0.24-dev4.md).
 
 Seyda Neen, thirteen town interiors, Addamasartus, the prison ship and Balmora's
 exterior are converted. Balmora uses 64 overlapping resident regions and return
@@ -457,7 +457,7 @@ its conversion unchanged. Balmora often feels faster than Seyda Neen; this
 observation remains distinct from matched measurements. The loader replaces
 one BSP synchronously and does not yet stream in the background.
 
-See [earlier findings and evidence](INVESTIGATION-v0.0.24-dev2.md),
+See [earlier findings and evidence](history/investigations/INVESTIGATION-v0.0.24-dev2.md),
 [mesh mapping notes](MESH_TIPS_AND_TRICKS.md), [race heights](PLAYER_MOVEMENT.md#original-race-based-heights)
 and [roadmap](ROADMAP.md). Boat performance still needs optimization; the matched
 v0.0.23/dev1 test did not reproduce a new slowdown. Boundary loading remains
@@ -475,7 +475,7 @@ launcher, dry-run builder and version generator remain preserved. TTF paper outp
 stays preferred; bitmap-derived paper ink defaults to the approved filled candidate,
 with JSON/CLI opt-out. The small character UI, other menus and dialogue retain their
 existing fonts. CPU-job detection tolerates a failed process CPU-count query.
-See [v0.0.22 scope](RELEASE-v0.0.22.md) and [paper settings](PAPER_FONT_OPTIONS.md).
+See [v0.0.22 scope](releases/notes/RELEASE-v0.0.22.md) and [paper settings](PAPER_FONT_OPTIONS.md).
 
 Whole-pipeline parallel scheduling remains pending. This source merge does not
 claim a new Amiga/HDF build or emulator playtest. The maintainer completed all 17
@@ -486,7 +486,7 @@ successful check it counts down for five seconds, with Space or Enter as an imme
 skip. The asset-free dry-run image now runs `AmiWindCheck` before `AmiWindDryRun`,
 then shows the existing dry-run notice. This avoids relying on Amiga console
 scrollback and makes the dry-run HDF a useful preflight test image. See
-[dev7 scope](RELEASE-v0.0.21-dev7.md).
+[dev7 scope](releases/notes/RELEASE-v0.0.21-dev7.md).
 
 Dev6 added a two-layer startup diagnostics path. The native `AmiWindCheck` prints
 its exact AmiWind version at entry and exit and reports guest-observable CPU/FPU,
@@ -494,13 +494,13 @@ AGA, PAL timing, Exec API and memory state. JIT, fastest-possible CPU mode,
 cycle-exact policy and exact ROM-file identity remain host-side facts; the portable
 FS-UAE launcher now enforces the accelerated reference profile, prints a checklist,
 and maps the known ROM SHA-256 to Kickstart 3.1 A1200 40.68. See
-[dev6 scope](RELEASE-v0.0.21-dev6.md).
+[dev6 scope](releases/notes/RELEASE-v0.0.21-dev6.md).
 
 Dev5 preserves the dev4 gameplay/world-mapping checkpoint and fixes host-side
 font-source portability. GOG GOTY remains the preferred source installation: its
 loose BookArt TTFs are preferred for rasterization. Steam GOTY normally lacks
 those TTFs, so the build reports the difference and falls back to Bethesda FNT+TEX
-font data rather than failing at the reading stage. See [dev5 scope](RELEASE-v0.0.21-dev5.md).
+font data rather than failing at the reading stage. See [dev5 scope](releases/notes/RELEASE-v0.0.21-dev5.md).
 
 Dev4 packages Horstator's 28 September evening notes and the optional polygonal
 POI-region design in WORLD_MAPPING_PLAN.md and ROADMAP.md. Region swapping and
@@ -515,7 +515,7 @@ compound rotations. Focused native plank passage/containment passed; maintainer
 confirmation and full opening acceptance remain pending.
 
 The opening/character/save prototype and UI changes are described in
-[the checkpoint notes](RELEASE-v0.0.21-dev3.md). Native validation is recorded
+[the checkpoint notes](releases/notes/RELEASE-v0.0.21-dev3.md). Native validation is recorded
 separately from implemented source; incomplete acceptance items remain open.
 Numeric journal indices, globals, item counts and NPC script locals are separate
 state. The intro stage only coordinates this opening UI sequence.
@@ -532,7 +532,7 @@ and working [save/load with adjustable autosave history](SAVEGAME_PLAN.md). Thes
 
 Ship wave/hull ambience is reduced by 5 dB relative to v0.0.19. This release
 documents the intermittent freezes; it does not claim to fix them. See
-[release notes](RELEASE-v0.0.20.md).
+[release notes](releases/notes/RELEASE-v0.0.20.md).
 
 **Open stability reports (28 September):** intermittent prison-ship exit freeze
 and a separate dock/menu freeze with looping music on FS-UAE 3.1.66. The hatch
@@ -540,7 +540,7 @@ worked on retry. Both remain unresolved; see [bug register](BUGS.md).
 
 New Game enters the first ship introduction with original voices, name entry,
 speech-driven facial poses and bounded guard navigation. UI bars have distinct
-colors and the optional outer frame defaults off. See [scope and verification](RELEASE-v0.0.19.md).
+colors and the optional outer frame defaults off. See [scope and verification](releases/notes/RELEASE-v0.0.19.md).
 Version 0.0.19 also silences routine track-change notices when the debug overlay is off.
 Dev5 refines menus, increases movie/logo resolution, hides transition console/debug
 overlays by default, restores deck-guard speech and exposes town entrance names.
@@ -555,7 +555,7 @@ confirmed test-006 works on 28 September 2026. That v0.0.17 release included FS-
 autorun and the default `early_game_demo_start_1` town-center opening with
 track 04. Final ROM-directory prompting and documentation updates follow that
 confirmation; the engine is unchanged from test-006. Hosted CI is checked by
-the maintainer when pushing the release commit. See [validation](VALIDATION-v0.0.17.md)
+the maintainer when pushing the release commit. See [validation](history/validation/VALIDATION-v0.0.17.md)
 and [demo opening](EARLY_GAME_DEMO_START.md).
 
 The published v0.0.16 release includes boot credits, a blue ordinary-water tint and

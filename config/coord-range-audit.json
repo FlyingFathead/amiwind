@@ -273,6 +273,12 @@
    "note": "a size, count, buffer or flag value, not a position"
   },
   {
+   "file": "engine/aga/src/aw_demowind.c",
+   "contains": "e[0]=4096*f[0]",
+   "class": "unrelated",
+   "note": "sky direction scale (DemoWind, as d_sky.c)"
+  },
+  {
    "file": "engine/aga/src/d_sky.c",
    "contains": "4096*vpn[0]",
    "class": "unrelated",

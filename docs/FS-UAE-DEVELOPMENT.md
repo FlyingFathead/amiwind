@@ -18,7 +18,7 @@ _Last updated with AmiWind v0.0.36 (11 October 2026)._
 
 <!-- contents end -->
 
-For the persistent headless Linux setup, see [FS-UAE in Docker](FS-UAE-DOCKER.md). For proposed headless automation and throughput measurement, see [FS-UAE headless development throughput](FS-UAE-HEADLESS-THROUGHPUT.md).
+For the persistent headless Linux setup, see [FS-UAE in Docker](history/superseded/FS-UAE-DOCKER.md). For proposed headless automation and throughput measurement, see [FS-UAE headless development throughput](FS-UAE-HEADLESS-THROUGHPUT.md).
 A ROM-only Ubuntu 24.04 / FS-UAE 3.1.66 session produced fresh full/cropped
 frames, a visibly booted Kickstart screen, prompt-synchronized PTY replies for
 registers, memory map and disassembly, and one bounded guest-memory read. A

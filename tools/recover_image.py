@@ -82,7 +82,7 @@ def inspect_run(args, root):
         raise ValueError('Recovery cannot add a different opening-caption input')
     # Bound this migration to the published rc3 source. Do not silently reuse
     # conversions from an unknown local generator patch or another release.
-    base = json.loads((root / 'docs/PATCH-v0.0.25-rc6.json').read_text())['base_files']
+    base = json.loads((root / 'docs/releases/patches/PATCH-v0.0.25-rc6.json').read_text())['base_files']
     recorded = state.get('source_sha256', {})
     suffixes = {'.py', '.c', '.h', '.patch', '.qc', '.asm', '.sh', '.cfg'}
     required = {name for name in base if Path(name).suffix in suffixes or

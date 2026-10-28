@@ -178,7 +178,7 @@ class Release(unittest.TestCase):
                 self.assertFalse(candidate.exists())
 
     # RELEASE-WS-BASELINE-VERSION-33: inherited files are recognised from the last PUBLISHED release
-    # (docs/WHITESPACE-BASELINE.json), not from a docs/PATCH-v<VERSION>.json made by hand per VERSION.
+    # (docs/WHITESPACE-BASELINE.json), not from a docs/releases/patches/PATCH-v<VERSION>.json made per VERSION.
     def inherited_fixture(self, root, version='0.1.0'):
         fixture(root)
         (root / 'VERSION').write_text(version + '\n')
@@ -197,6 +197,7 @@ class Release(unittest.TestCase):
                 root = Path(tmp) / 'repo'
                 self.inherited_fixture(root, version)
                 self.assertEqual(list((root / 'docs').glob('PATCH-*')), [])
+                self.assertEqual(list((root / 'docs' / 'releases' / 'patches').glob('PATCH-*')), [])
                 inspect_source(root)
                 candidate = Path(tmp) / 'candidate.zip'
                 create_candidate(root, candidate)
@@ -239,7 +240,8 @@ class Release(unittest.TestCase):
             root = Path(tmp) / 'repo'
             self.inherited_fixture(root)
             (root / WHITESPACE_BASELINE).unlink()
-            patch_name = 'docs/PATCH-v0.1.0.json'
+            patch_name = 'docs/releases/patches/PATCH-v0.1.0.json'
+            (root / patch_name).parent.mkdir(parents=True)
             (root / patch_name).write_text(json.dumps({'base_files': {
                 INHERITED: {'sha256': hashlib.sha256(LEGACY).hexdigest()}}}) + '\n')
             allowlist = root / 'tools/release-files.json'

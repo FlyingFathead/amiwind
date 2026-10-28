@@ -44,6 +44,30 @@ static void position(void) {
             (long)global[1],(long)global[2],sv.name,(long)floor(global[0]/8192),(long)floor(global[1]/8192));
     else Con_Printf("scene %s / no exterior coordinate transform\n",sv.name);
 }
+/* SESSION-AW-VIEW-IN-SOLID-54: a capture camera inside a booth wall drew blank frames that were first read as a room
+ * fault. aw_view warns (it still places the camera: a capture may want it) when the eye point is in solid, or, in an
+ * interior, open to nothing within 8192 units in one of the six axis directions (outside the room). */
+static void view_check(edict_t *p) {
+    static float dir[6][3]={{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
+    static const char *toward[6]={"+x","-x","+y","-y","up","down"};
+    vec3_t eye,end;trace_t tr;int i;
+    VectorAdd(p->v.origin,p->v.view_ofs,eye);
+    VectorCopy(eye,end);end[2]-=0.125f;
+    tr=SV_Move(eye,vec3_origin,vec3_origin,end,MOVE_NOMONSTERS,p);
+    if(tr.startsolid || tr.allsolid) {
+        Con_Printf("aw_view WARNING: the camera at %ld %ld %ld is inside solid (a wall or outside the map): its frames show no room\n",
+            (long)eye[0],(long)eye[1],(long)eye[2]);return;
+    }
+    if(!AW_Interior())return;
+    for(i=0;i<6;i++) {
+        VectorMA(eye,8192,dir[i],end);
+        tr=SV_Move(eye,vec3_origin,vec3_origin,end,MOVE_NOMONSTERS,p);
+        if(tr.fraction>=1) {
+            Con_Printf("aw_view WARNING: the camera at %ld %ld %ld is outside the room: nothing toward %s within 8192 units\n",
+                (long)eye[0],(long)eye[1],(long)eye[2],toward[i]);return;
+        }
+    }
+}
 /* Reproducible local camera placement for visual regression captures. */
 static void view(void) {
     edict_t *p=player();int i;float v[5];if(!p)return;
@@ -54,7 +78,7 @@ static void view(void) {
     if(v[4]<-80 || v[4]>80)return;
     for(i=0;i<3;i++)p->v.origin[i]=v[i];
     VectorCopy(vec3_origin,p->v.velocity);p->v.angles[0]=v[4];p->v.angles[1]=v[3];p->v.angles[2]=0;
-    p->v.fixangle=1;SV_LinkEdict(p,false);
+    p->v.fixangle=1;SV_LinkEdict(p,false);view_check(p);
 }
 static void tcl(void) { if(player())Cbuf_AddText("noclip\n"); }
 static void unstuck(void) { AW_Unstuck(player()); }
@@ -274,7 +298,7 @@ void AW_DebugInit(void) {
     {extern int (*chim_cell_map)(int,int,char *,int);chim_cell_map=AW_CellMap;}
     {extern void (*aw_session_shift)(const float *);aw_session_shift=AW_SessionShift;}
     AW_MiniwindInit();AW_QuickCharInit();AW_TestBoxInit();
-    AW_CamInit();AW_InputDebugInit();AW_BoundsInit();AW_DoorAudioInit();AW_HingedDoorInit();aw_hinged_story=AW_OpeningHingedStory;AW_TalkInit();AW_MwscriptInit();AW_CompanionInit();AW_CombatInit();AW_AmbientInit();AW_MoveInit();AW_ActorsInit();AW_ViewInit();AW_LavaInit();AW_MagicInit();AW_AnimInit();AW_GlutInit();AW_AnimKitInit();AW_HalloweenInit();AW_WaitInit();AW_ConsoleInit();AW_SceneInit();AW_UIInit();AW_IconsInit();AW_IntroInit();AW_SaveInit();
+    AW_CamInit();AW_InputDebugInit();AW_BoundsInit();AW_DoorAudioInit();AW_HingedDoorInit();aw_hinged_story=AW_OpeningHingedStory;AW_TalkInit();AW_MwscriptInit();AW_CompanionInit();AW_CombatInit();AW_AmbientInit();AW_MoveInit();AW_ActorsInit();AW_ViewInit();AW_LavaInit();AW_MagicInit();AW_AnimInit();AW_GlutInit();AW_AnimKitInit();AW_HalloweenInit();AW_DemoWindInit();AW_WaitInit();AW_ConsoleInit();AW_SceneInit();AW_UIInit();AW_IconsInit();AW_IntroInit();AW_SaveInit();
     aw_save_entry_refuse=AW_SceneSaveEntryRefuse;   /* a save in a 32 MB place on less Fast RAM (CHIM-32MB-SAVE-ENTRY-48) */
     Cmd_AddCommand("amiwind_debug_reset_location",reset_location);
     Cmd_AddCommand("aw_hands",hands);Cmd_AddCommand("aw_eyeheight",eyeheight);

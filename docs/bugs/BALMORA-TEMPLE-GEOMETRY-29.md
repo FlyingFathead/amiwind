@@ -360,7 +360,7 @@ fixed radius/strength/time without assuming this causes missing architecture.
 Track the surface-strength work in [torch notes](../TORCH.md) separately from
 this geometry/collision defect.
 
-See [issue index](../BUGS.md), [RC1 tracker](../BUGS-v0.0.29-RC1.md),
+See [issue index](../BUGS.md), [RC1 tracker](../history/checkpoints/BUGS-v0.0.29-RC1.md),
 [coverage](../ASSET_COVERAGE.md) and [roadmap](../ROADMAP.md).
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->

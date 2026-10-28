@@ -21,7 +21,7 @@ JOURNAL = DOCS / 'BUG_JOURNAL.md'
 FROZEN = [DOCS / 'journals' / 'BUG_JOURNAL-v0.0.29.md', DOCS / 'journals' / 'BUG_JOURNAL-v0.0.31.md',
           DOCS / 'journals' / 'BUG_JOURNAL-v0.0.34.md', DOCS / 'journals' / 'BUG_JOURNAL-v0.0.35-v0.0.36.md',
           DOCS / 'journals' / 'BUG_JOURNAL-v0.0.37-v0.0.41.md', DOCS / 'journals' / 'BUGS-NOTES-v0.0.29.md',
-          DOCS / 'BUGS-v0.0.29-RC1.md', DOCS / 'RC2_ISSUE_CHECKPOINT.md']
+          DOCS / 'history' / 'checkpoints' / 'BUGS-v0.0.29-RC1.md', DOCS / 'history' / 'checkpoints' / 'RC2_ISSUE_CHECKPOINT.md']
 FROZEN_BANNER = 'Frozen history:'
 LINK = re.compile(r'\]\(([^)\s]+)\)')
 
@@ -363,7 +363,7 @@ class BugTrackerTest(unittest.TestCase):
         self.assertEqual(release.TEXT_LIMIT, 262144)
         files = [REGISTER, JOURNAL, *sorted(p for p in (DOCS / 'bugs').iterdir() if p.is_file()),
                  *sorted((DOCS / 'bugs' / 'archive').glob('*.json'))]
-        files += sorted(DOCS.glob('PATCH-v*.json'))  # whitespace baselines (RELEASE-PATCH-SIZE-33)
+        files += sorted((DOCS / 'releases' / 'patches').glob('PATCH-v*.json'))  # whitespace baselines (RELEASE-PATCH-SIZE-33)
         # 2026-10-11 coordinator: bugs.json warned at 85 % until the second archive rotation
         # (TRACKER-REGISTER-SIZE-36); 2026-10-16 the one archive warned at 85 % too (TRACKER-REGISTER-SIZE-33).
         # 2026-10-20: the 2026-10-20 register audit took the one archive to 89 % of its 256 KiB limit; the
@@ -486,12 +486,14 @@ class BugTrackerTest(unittest.TestCase):
         self.assertEqual([b['id'] for b in old], ['BUILD-ROT-33'])
 
     def test_whitespace_baselines_get_the_named_limit(self):
-        # RELEASE-PATCH-SIZE-33: docs/PATCH-v<version>.json lists every file of the published base
-        # release; the v0.0.33-dev1 baseline (1,811 files) passed 256 KiB.
+        # RELEASE-PATCH-SIZE-33: docs/releases/patches/PATCH-v<version>.json lists every file of the published
+        # base release; the v0.0.33-dev1 baseline (1,811 files) passed 256 KiB.
         sys.path.insert(0, str(ROOT / 'tools'))
         import release
-        self.assertEqual(release.text_limit('docs/PATCH-v0.0.33-dev1.json'), 1048576)
-        self.assertEqual(release.text_limit('docs/PATCH-v0.0.32.json'), 1048576)
+        self.assertEqual(release.text_limit('docs/releases/patches/PATCH-v0.0.33-dev1.json'), 1048576)
+        self.assertEqual(release.text_limit('docs/releases/patches/PATCH-v0.0.32.json'), 1048576)
+        # since v0.0.55 a baseline at the docs/ root is not a baseline (the layout test refuses it there)
+        self.assertEqual(release.text_limit('docs/PATCH-v0.0.33-dev1.json'), release.TEXT_LIMIT)
         self.assertEqual(release.text_limit('docs/bugs/bugs.json'), 1048576)
         # the CHIM inclusion ledger grows with every packaged build (287 KB on 16 October 2026)
         self.assertEqual(release.text_limit('amiwind-toolkit/chim-inclusion.js'), 1048576)

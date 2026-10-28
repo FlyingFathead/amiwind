@@ -1,6 +1,6 @@
 # One AmiWind repository
 
-_Last updated with AmiWind v0.0.28 (4 October 2026)._
+_Last updated with AmiWind v0.0.54 (28 October 2026)._
 
 Official project home: https://github.com/FlyingFathead/amiwind
 
@@ -23,7 +23,7 @@ inside does not. No second source directory needs to be copied or published.
 | engine/aga/qc/ | Native gameplay/scene QuakeC source |
 | runtime/ | Preserved older A500 runtime and terrain reader |
 | tests/ | Host and native-source regression fixtures |
-| docs/ | Development, provenance, validation and roadmap |
+| docs/ | Documentation by topic, release notes, history and the bug register (index: docs/README.md) |
 | resources/emulators/ | Public emulator presets |
 | out/ | Ignored local build outputs; never included in source ZIP |
 | .github/workflows/ | Source tests and asset-free Amiga compilation |
@@ -34,6 +34,27 @@ with `--workspace` available for an external location. Only the five selected
 README screenshots are approved documentation images. Component licence notices
 remain distinct: host/A500 code uses the root licence; the AGA engine retains its
 own COPYING and upstream notices. Consolidation does not relicense code.
+
+## The docs/ folder
+
+Since v0.0.55 the docs/ root holds only topic documents; [docs/README.md](README.md) is the generated index of
+them by topic (`python3 tools/docs_index.py write`, data in docs/README.topics.json), and a gate test fails when a
+document is missing from it.
+
+| Path relative to docs/ | Purpose |
+| --- | --- |
+| *.md at the root | Topic documents, each listed in README.md |
+| releases/notes/ | Release notes, RELEASE-v&lt;version&gt;.md, dev and rc notes beside the final |
+| releases/patches/ | Whitespace baselines, PATCH-v&lt;version&gt;.json (the published base tree of a release) |
+| releases/README.md | Every release with its notes and baseline, and the old-to-new path map |
+| history/&lt;kind&gt;/ | One-off records kept as history: checkpoints, local-rc, feedback, investigations, validation, plans, merges, other, superseded |
+| history/MOVES.json | Where every file of the old docs/ root went (nothing was deleted) |
+| journals/ | Frozen bug journals and the maintainer's journals |
+| bugs/, chim/, trackers/, performance/, images/ | The bug register, CHIM, trackers, measurements, images |
+
+A release writes only its notes, its baseline and the documents it changes; a per-version file at the docs/
+root is refused by the gate (tests/test_docs_layout.py). Old release tags keep their own trees, so links into a
+tag (`/blob/v0.0.37/docs/RELEASE-v0.0.37.md`) still work.
 
 ## Why the old ZIP had two roots
 
@@ -73,7 +94,7 @@ remain protected against placing private game data beneath them.
 ## Historical repository-consolidation validation
 
 The results below describe the original consolidation checkpoint. Current
-source/build/publication evidence is in [v0.0.27 release notes](RELEASE-v0.0.27.md).
+source/build/publication evidence is in [v0.0.27 release notes](releases/notes/RELEASE-v0.0.27.md).
 
 At that checkpoint, 113 host tests passed, including dependency-consent, reference-checksum, WSL-path,
 corruption and output-boundary cases. Native engine/preflight compilation passed
@@ -83,6 +104,6 @@ FS-UAE with a privately supplied ROM. All 7,197 reference data hashes matched.
 
 At that checkpoint, GitHub-hosted execution, a clean-machine package setup,
 a fresh full scene conversion and Windows/WSL execution had not been performed.
-The consolidation itself did not change gameplay. See [v0.0.16](RELEASE-v0.0.16.md)
+The consolidation itself did not change gameplay. See [v0.0.16](releases/notes/RELEASE-v0.0.16.md)
 for the subsequent tint/default changes. Later Windows, Docker and hosted CI
 results are recorded separately; those early unperformed checks are historical.

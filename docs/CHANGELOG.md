@@ -327,7 +327,7 @@ _Last updated with AmiWind v0.0.54 (28 October 2026)._
   original's sound markers.
 - Next: the next version starts with build turnaround, a final rebuilt from its candidate's caches in minutes
   ([roadmap: build turnaround first](ROADMAP.md#build-turnaround-first-24-october-2026)).
-- Details: [the v0.0.48 release notes](RELEASE-v0.0.48.md).
+- Details: [the v0.0.48 release notes](releases/notes/RELEASE-v0.0.48.md).
 
 ## v0.0.47: CHIM: The More, The Merrier, 21 October 2026
 
@@ -345,7 +345,7 @@ _Last updated with AmiWind v0.0.54 (28 October 2026)._
 - New builder options `--clean` (a clean start) and `--public-defaults` (only the repository's own defaults, old
   methods refused).
 - Terrain generated from the game's heights, shared files and skins stored once, no stair walk by default.
-- Details: [the v0.0.47 release notes](RELEASE-v0.0.47.md).
+- Details: [the v0.0.47 release notes](releases/notes/RELEASE-v0.0.47.md).
 
 ## v0.0.46: Red Mountain Getting Red: A Whole Heap Of Fixes, 20 October 2026
 
@@ -357,7 +357,7 @@ _Last updated with AmiWind v0.0.54 (28 October 2026)._
   ([CHIM-HULL-SURFACE-HEAP-46](bugs/CHIM-HULL-SURFACE-HEAP-46.md)).
 - Rebuilds reuse more: stair walks are keyed by the data they walk, and the build's finish time is printed in UTC and
   local time.
-- Details: [the v0.0.46 release notes](RELEASE-v0.0.46.md).
+- Details: [the v0.0.46 release notes](releases/notes/RELEASE-v0.0.46.md).
 
 ## v0.0.45: CHIM Streaming Improved, Guard Torches Are Back, 20 October 2026
 
@@ -369,7 +369,7 @@ _Last updated with AmiWind v0.0.54 (28 October 2026)._
   ([GUARD-TORCH-CHIM-FRAMES-44](bugs/GUARD-TORCH-CHIM-FRAMES-44.md)).
 - The CHIM stage runs its serial sections on the worker pool, and a change to the scheduler no longer rebuilds
   every stage.
-- Details: [the v0.0.45 release notes](RELEASE-v0.0.45.md).
+- Details: [the v0.0.45 release notes](releases/notes/RELEASE-v0.0.45.md).
 
 ## v0.0.44: By Azura's Trees!, 19 October 2026
 
@@ -380,7 +380,7 @@ _Last updated with AmiWind v0.0.54 (28 October 2026)._
 - Interior plant sprites reach every room type ([INTERIOR-MORAG-TONG-FPS-43](bugs/INTERIOR-MORAG-TONG-FPS-43.md)).
 - The CHIM tracker counts what each build puts on CHIM: 1,292 land cells and 117 sea cells
   ([TRACKER-CHIM-COUNT-STALE-44](bugs/TRACKER-CHIM-COUNT-STALE-44.md)).
-- Details: [the v0.0.44 release notes](RELEASE-v0.0.44.md).
+- Details: [the v0.0.44 release notes](releases/notes/RELEASE-v0.0.44.md).
 
 ## v0.0.43: Let There Be CHIM: Vvardenfell's Outdoors, All of It, 19 October 2026
 
@@ -393,7 +393,7 @@ _Last updated with AmiWind v0.0.54 (28 October 2026)._
   interior plants and trees are sprites by default.
 - The build checks a pooled stage against the memory it needs before it starts, the image step's frame maps run on
   all cores, and the playtest is smaller.
-- Details: [the v0.0.43 release notes](RELEASE-v0.0.43.md).
+- Details: [the v0.0.43 release notes](releases/notes/RELEASE-v0.0.43.md).
 
 ## v0.0.42: Things Are Starting To Look Pretty Khuul, 17 October 2026
 
@@ -407,7 +407,7 @@ _Last updated with AmiWind v0.0.54 (28 October 2026)._
   converted.
 - The inventory starts to take its original shape: title bar, item icons from the game's own art, the character as a
   still picture.
-- Details: [the v0.0.42 release notes](RELEASE-v0.0.42.md).
+- Details: [the v0.0.42 release notes](releases/notes/RELEASE-v0.0.42.md).
 
 [CHIM-CELL-FEATURE-LIST-INCOMPLETE-38](bugs/CHIM-CELL-FEATURE-LIST-INCOMPLETE-38.md) — 15 October 2026, v0.0.41-dev1: full-build preparation rejected five explicitly selected ocean routing cells absent from the original CELL/LAND inventory, before legacy compilation. The source checklist now records additional ocean routing cells separately and allows their absence only before routing rows are appended. Final classification/stage verification still requires every row and CHIM routing flags; undeclared or unselected missing cells are rejected. All 98 targeted checks across five modules pass, including three new ocean checklist regressions. Exact production conversion, native ocean behavior, image/package and delivery checks remain pending; coverage states are unchanged.
 
@@ -421,7 +421,7 @@ _Last updated with AmiWind v0.0.54 (28 October 2026)._
 
 15 October 2026 — The preceding v0.0.41 source snapshot completed 4,242 tests: 4,236 passed, zero failures/errors, three Windows-only skips and three exact Census expected failures; source was unchanged. This does not validate the subsequent v0.0.41-dev1 version alignment or establish image/native/package acceptance.
 
-15 October 2026: active preparation now targets v0.0.41-dev1. The planned final release title is **v0.0.41: Collisions And Boundaries**. Earlier source snapshots, checks and findings retain their recorded version identities; they do not establish acceptance of this development candidate. Matching source validation, completed image assembly/readback, native checks, packaging and delivery remain separate gates. See the [current development candidate](RELEASE-v0.0.41-dev1.md).
+15 October 2026: active preparation now targets v0.0.41-dev1. The planned final release title is **v0.0.41: Collisions And Boundaries**. Earlier source snapshots, checks and findings retain their recorded version identities; they do not establish acceptance of this development candidate. Matching source validation, completed image assembly/readback, native checks, packaging and delivery remain separate gates. See the [current development candidate](releases/notes/RELEASE-v0.0.41-dev1.md).
 
 [BUILD-INVENTORY-PALETTE-41](bugs/BUILD-INVENTORY-PALETTE-41.md) — 15 October 2026, v0.0.41 source candidate: image assembly prepares inventory before the sky palette pass, which rejected current AWIC icons and AWI2/AWST metadata as unknown images. The source repair validates each inventory format at its exact path, remaps only icon pixels and preserves metadata bytes. Scoped evidence contains 15 passing palette checks and 2 passing inventory-asset checks on matching unchanged source. Actual image assembly, native verification, packaging and shipment remain pending.
 
@@ -606,7 +606,7 @@ included; original-game reference screenshots remain excluded
 ([public image selection](bugs/PUBLIC-REFERENCE-SCREENSHOT-40.md)).
 
 The README links the final-version preparation notes.
-The [release notes](RELEASE-v0.0.40.md) retain unresolved actor contact,
+The [release notes](releases/notes/RELEASE-v0.0.40.md) retain unresolved actor contact,
 combined-world/native seams and gameplay checks. New exact-source validation
 is required; this preparation does not promote coverage or shipment.
 
@@ -925,7 +925,7 @@ leveled-creature references remain deferred; packaged coverage is unchanged.
 
 v0.0.40-dev2 candidate preparation, 15 October 2026: the animation correction
 passes 115 shared converter checks. Regenerated assets, full release gates and
-shipment remain pending. [Candidate notes](RELEASE-v0.0.40-dev2.md).
+shipment remain pending. [Candidate notes](releases/notes/RELEASE-v0.0.40-dev2.md).
 
 
 ## v0.0.40-dev2 - unreleased animation correction, 15 October 2026
@@ -1484,7 +1484,7 @@ Changes since published v0.0.38 (`d40fa70b4787da09b8a6d5006f46ef6fb7e56c6f`),
 including the dev1 development work. Running on CHIM Engine v0.2.0.
 These are implemented source changes. Complete image assembly, exact-package
 readback and target gameplay acceptance remain pending at this checkpoint.
-See [RC1 release notes](RELEASE-v0.0.39-rc1.md) for the detailed scope and
+See [RC1 release notes](releases/notes/RELEASE-v0.0.39-rc1.md) for the detailed scope and
 [the bug register](BUGS.md#fix-index) for current issue status.
 
 ### Saves and death UI
@@ -1673,7 +1673,7 @@ Public source published 13 October 2026 at
 - Unsafe lava autosaves, teleport checkpoint behavior, tinted death menus,
   third-person animation, water, combat speech and loading remain issues
   recorded for follow-up. The RC1 repairs above are not retroactive v0.0.38 fixes.
-- Full details and issue links: [v0.0.38 notes](RELEASE-v0.0.38.md).
+- Full details and issue links: [v0.0.38 notes](releases/notes/RELEASE-v0.0.38.md).
 
 ## v0.0.37: Proofreading the Cantons
 
@@ -1682,7 +1682,7 @@ Public source published 13 October 2026 at
   with the existing implementation. No new gameplay change is claimed.
 - Correct main-page release wording and media assets; add the real Amiga
   hardware guide and regenerate the dated CHIM coverage reference.
-- Full details: [v0.0.37 notes](RELEASE-v0.0.37.md).
+- Full details: [v0.0.37 notes](releases/notes/RELEASE-v0.0.37.md).
 
 ## v0.0.36: 36 Lessons of Vivec's Cantons (And Vvardenfell Shorelines)
 
@@ -1693,7 +1693,7 @@ Public source published 13 October 2026 at
 - Add wider coordinates, third-person/vanity camera behavior, a player death
   scene and retry-fight option, and optional hold-to-block behavior.
 - Add build performance guards, shared resource leases and cache provenance.
-- Full changes, linked fixes and limitations: [v0.0.36 notes](RELEASE-v0.0.36.md).
+- Full changes, linked fixes and limitations: [v0.0.36 notes](releases/notes/RELEASE-v0.0.36.md).
 
 ## v0.0.35: CHIMporting It All: Gathering Up The Loose Branches From The Seashore
 
@@ -1751,7 +1751,7 @@ Public source published 13 October 2026 at
   unpickable in v0.0.33).
 - New build gates: the seam audit (every reduced mesh, with the profile each converter
   uses) and the harvest pick audit (every placed plant on the final maps).
-- Details: [release notes](RELEASE-v0.0.34.md).
+- Details: [release notes](releases/notes/RELEASE-v0.0.34.md).
 
 ## v0.0.33: Towards CHIM: Replacing the Engine Block
 
@@ -1865,7 +1865,7 @@ Public source published 13 October 2026 at
   object about 9.8 times, the measured CHIM savings (Balmora exterior 7.6 times
   smaller, Seyda Neen area 24.3 times) and an estimated size budget for the
   whole game.
-- Details: [release notes](RELEASE-v0.0.33.md).
+- Details: [release notes](releases/notes/RELEASE-v0.0.33.md).
 
 ## v0.0.32: Last Stop on the Old Line: Window-Shopping in Vivec
 
@@ -1884,7 +1884,7 @@ Public source published 13 October 2026 at
   and a known-inputs check; Seyda Neen ships as recorded in v0.0.31 with a
   temporary pre-CHIM heap bypass for three maps.
 - New logo and start-up lines.
-- Details: [release notes](RELEASE-v0.0.32.md).
+- Details: [release notes](releases/notes/RELEASE-v0.0.32.md).
 
 Details of the v0.0.32 development line:
 
@@ -1918,7 +1918,7 @@ Details of the v0.0.32 development line:
   (BUILD-JOBS-RESOLVE-PER-STAGE-32); palette readers wait for Census
   (BUILD-PALETTE-RACE-32); xdftool commands stay below ARG_MAX
   (BUILD-XDFTOOL-ARGMAX-32).
-- Details: [parallel host builds](PARALLEL_BUILD.md).
+- Details: [parallel host builds](history/superseded/PARALLEL_BUILD.md).
 - Builder: the Vivec Arena preview is built by default. Towns a release ships
   are marked `shipped_since` in `config/towns.json`; `--extra-town` adds towns
   not shipped yet, and `--no-extra-town` / `--only-core-towns` leave towns out
@@ -1933,7 +1933,7 @@ Details of the v0.0.32 development line:
 - Fog distance slider, skyline fill, optional location fog.
 - Music start-up and opening fixes; place names; AmiWind Toolkit; console.
 - Measured: buildings, rooms and rocks never blocked Quake visibility.
-- Details: [release notes](RELEASE-v0.0.31.md).
+- Details: [release notes](releases/notes/RELEASE-v0.0.31.md).
 
 ## v0.0.31-dev6: Lamps, Lanterns and Loading
 
@@ -1941,7 +1941,7 @@ Details of the v0.0.32 development line:
 - Fog distance slider (100..1500), skyline fill, optional location fog.
 - Measured: buildings, rooms and rocks do not block visibility
   (TOWN-VIS-OCCLUSION-31).
-- Details: [release notes](RELEASE-v0.0.31-dev6.md).
+- Details: [release notes](releases/notes/RELEASE-v0.0.31-dev6.md).
 
 ## v0.0.31-dev5: Lamps, Lanterns and Loading
 
@@ -1949,7 +1949,7 @@ Details of the v0.0.32 development line:
   win the light slots and fade in (LAMPS-RANGE-31).
 - Lantern and window glass glow at night; light hue setting.
 - Guard torches light half as far (GUARD-TORCH-BRIGHT-31).
-- Details: [release notes](RELEASE-v0.0.31-dev5.md).
+- Details: [release notes](releases/notes/RELEASE-v0.0.31-dev5.md).
 
 ## v0.0.31-dev4: Revisiting Seyda Neen
 
@@ -1958,7 +1958,7 @@ Details of the v0.0.32 development line:
 - Shorter wait after the intro video; the ship fades in from black.
 - AmiWind Toolkit: World / Local / 3D Inspector tabs, grid buttons, marker
   highlight, keyboard panning.
-- Details: [release notes](RELEASE-v0.0.31-dev4.md).
+- Details: [release notes](releases/notes/RELEASE-v0.0.31-dev4.md).
 
 ## v0.0.31-dev3: Revisiting Seyda Neen
 
@@ -1969,7 +1969,7 @@ Details of the v0.0.32 development line:
 - `dbg time` / `dbg settime`, `dbg 24hrcycle` / `dbg daytimecycle`,
   `dbg luma` status; generated console command page.
 - Light source census and Quake mapping ([light sources](LIGHT_SOURCES.md)).
-- Details: [release notes](RELEASE-v0.0.31-dev3.md).
+- Details: [release notes](releases/notes/RELEASE-v0.0.31-dev3.md).
 
 ## v0.0.31-dev2: Revisiting Seyda Neen
 
@@ -1977,7 +1977,7 @@ Details of the v0.0.32 development line:
   crossings 0.39-0.48 s on the test route (dev1 0.70-0.91 s).
 - `dbg headlamp` / `dbg hlamp`: torch light without a torch.
 - Entity tracker in the image build; bug register tags.
-- Details: [release notes](RELEASE-v0.0.31-dev2.md).
+- Details: [release notes](releases/notes/RELEASE-v0.0.31-dev2.md).
 
 ## v0.0.31-dev1: Revisiting Seyda Neen
 
@@ -1986,7 +1986,7 @@ Details of the v0.0.32 development line:
   the test route, 6 instead of 43 maps over the modeled memory reserve.
 - Hearth fires shaped from the original emitters, hot colour ramp and embers;
   torch embers; `dbg torchgallery` alias.
-- Details: [release notes](RELEASE-v0.0.31-dev1.md).
+- Details: [release notes](releases/notes/RELEASE-v0.0.31-dev1.md).
 
 ## v0.0.30: The Temple
 
@@ -1996,7 +1996,7 @@ Details of the v0.0.32 development line:
   at some transitions remain open (AUDIO-LOAD-29 and related).
 - Bug tracking unified: [`docs/bugs/bugs.json`](bugs/bugs.json) generates
   the [register](BUGS.md); rules in [docs/bugs](bugs/README.md).
-- Details: [release notes](RELEASE-v0.0.30.md).
+- Details: [release notes](releases/notes/RELEASE-v0.0.30.md).
 
 ## v0.0.30-rc1: The Temple
 
@@ -2013,7 +2013,7 @@ Details of the v0.0.32 development line:
   crackle.
 - Bug journal entries before 7 October 2026 moved to
   [journals/BUG_JOURNAL-v0.0.29.md](journals/BUG_JOURNAL-v0.0.29.md).
-- Details: [release notes](RELEASE-v0.0.30-rc1.md).
+- Details: [release notes](releases/notes/RELEASE-v0.0.30-rc1.md).
 
 ## v0.0.30-dev5: The Temple
 
@@ -2025,7 +2025,7 @@ Details of the v0.0.32 development line:
   of ambient only (`aw_actor_brush_light`).
 - Seyda Neen: converted actor models are read once instead of twice when
   loading (`aw_alias_single_pass`); heavier crossings read about 15 % less.
-  See [Seyda Neen performance](SEYDA_NEEN_PERFORMANCE.md).
+  See [Seyda Neen performance](history/superseded/SEYDA_NEEN_PERFORMANCE.md).
 - Engine builds without compiler warnings and the build now fails on any new
   warning. Removed the unreachable, broken 16-bit surface drawer; bounded all
   path formatting; moved a 15 KB sprite buffer off the stack.
@@ -2035,7 +2035,7 @@ Details of the v0.0.32 development line:
 - Converter: the recovered root scale is rounded, restoring exact vertex
   sharing; the rebuilt Temple matches v0.0.30-dev4 byte for byte.
 - Rebuilt maps: Balmora Temple (lantern glow), Census and Excise Office
-  (flames). Details: [release notes](RELEASE-v0.0.30-dev5.md).
+  (flames). Details: [release notes](releases/notes/RELEASE-v0.0.30-dev5.md).
 
 ## v0.0.30-dev4: The Temple
 
@@ -2045,7 +2045,7 @@ Details of the v0.0.32 development line:
 - Added Options > Controls for rebinding gameplay actions, with greyed
   planned actions.
 - Arrow keys mirror W/A/S/D by default (Up/Down walk, Left/Right strafe).
-- Maps unchanged from dev3. Details: [release notes](RELEASE-v0.0.30-dev4.md).
+- Maps unchanged from dev3. Details: [release notes](releases/notes/RELEASE-v0.0.30-dev4.md).
 
 ## v0.0.30-dev3: The Temple
 
@@ -2057,7 +2057,7 @@ Details of the v0.0.32 development line:
   admitted again.
 - Added `tools/analyze_subcell_redundancy.py` and its documentation.
 - Engine source unchanged; version 0.0.30-dev3.
-- Details: [release notes](RELEASE-v0.0.30-dev3.md).
+- Details: [release notes](releases/notes/RELEASE-v0.0.30-dev3.md).
 
 ## v0.0.29-rc2: Let There Be (Just a Bit More) Light
 
@@ -2118,7 +2118,7 @@ This is a release candidate for continued playtesting. Final source, package che
   renderer-state restoration. Broader routes and unrestricted play remain outside
   this native test scope.
   Historical rc1/V1 captures retain attribution; v0.0.27 is still published.
-  See [stable preparation](RELEASE-v0.0.28.md).
+  See [stable preparation](releases/notes/RELEASE-v0.0.28.md).
 
 ## 0.0.28-rc1 â€” Trees and Grass, Day and Night â€” candidate, 4 October 2026
 
@@ -2134,7 +2134,7 @@ This is a release candidate for continued playtesting. Final source, package che
   separators; retained measured failed terrain trials and the current inspector.
 - Both host suites and Amiga compiles passed; normalized executables match byte
   for byte. New HDF assembly/readback passed. Independent gameplay acceptance
-  and publication remain pending. See [candidate scope](RELEASE-v0.0.28-rc1.md).
+  and publication remain pending. See [candidate scope](releases/notes/RELEASE-v0.0.28-rc1.md).
 
 ## 0.0.27 â€” Rocks, Mushrooms, and Then Some â€” 3 October 2026
 
@@ -2152,7 +2152,7 @@ This is a release candidate for continued playtesting. Final source, package che
   a terrain-overview prototype; full condition-aware voices and the 17-video
   catalogue remain future work. Playable packages stay private.
 
-See [the release evidence and limits](RELEASE-v0.0.27.md). Later editorial
+See [the release evidence and limits](releases/notes/RELEASE-v0.0.27.md). Later editorial
 corrections clarify this release state without changing its tag or source asset.
 
 ## 0.0.26
@@ -2165,7 +2165,7 @@ with diagnostic retention, alongside native Linux and Windows parity checks.
 Full final-version conversion, export and WinUAE game entry passed locally,
 alongside 433 synthetic tests (3 skips). The cached conversion took 26m06s;
 the earlier cold rc1 conversion took 35m03s. Hosted CI gates publication.
-See [Docker validation](VALIDATION-DOCKER-2026-10-02.md).
+See [Docker validation](history/validation/VALIDATION-DOCKER-2026-10-02.md).
 
 ## 0.0.26-rc1
 
@@ -2175,7 +2175,7 @@ Full conversion plus recovered image assembly passed, followed by WinUAE game
 entry; historical full-image evidence retains its v0.0.25 identity. Native
 Windows remains experimental, with intermittent worker and cancellation defects
 open. Linux is the established foundation. Docker and input helpers are planned
-for final v0.0.26. See [rc1 release notes](RELEASE-v0.0.26-rc1.md).
+for final v0.0.26. See [rc1 release notes](releases/notes/RELEASE-v0.0.26-rc1.md).
 
 ## 0.0.25
 
@@ -2227,7 +2227,7 @@ gallery coverage, protected geometry and runtime rendering remain unchanged.
 - Document original actor progression states separately from contact geometry.
 - Retain checked engine/image-only recovery from completed rc3 conversions.
 - Record source/native/placement evidence and untested runtime limits in the
-  [rc7 release notes](RELEASE-v0.0.25-rc7.md).
+  [rc7 release notes](releases/notes/RELEASE-v0.0.25-rc7.md).
 
 
 ## v0.0.25-rc6 â€” 1 October 2026
@@ -2333,7 +2333,7 @@ gallery coverage, protected geometry and runtime rendering remain unchanged.
   exact-model polygon allowance needed for Dagoth Ur. Repair the reported Balmora
   terrain material in every affected town-region copy.
 - Retain the 23 known ground-contact findings. This is a development playable;
-  [scope and verification](RELEASE-v0.0.25-dev1.md) remain explicit.
+  [scope and verification](releases/notes/RELEASE-v0.0.25-dev1.md) remain explicit.
 
 ## v0.0.24 - Welcome to Balmora (and Vvardenfell!) - 1 October 2026
 
@@ -2347,7 +2347,7 @@ gallery coverage, protected geometry and runtime rendering remain unchanged.
 - Carry all 3,551 model assets and the RC palette, collision, targeting and
   journal improvements. Retain 23 unresolved placement findings explicitly;
   release approval does not change the automated audit result.
-- [Release notes](RELEASE-v0.0.24.md).
+- [Release notes](releases/notes/RELEASE-v0.0.24.md).
 
 ## v0.0.24-rc4 â€” 1 October 2026
 
@@ -2356,7 +2356,7 @@ inspection mesh; native M map and J two-page journal with earned dated history,
 quest links and AWS2 saves. Assets load on demand and are freed on close.
 Includes screenshot-tracking validation. Whole-island 3D traversal, inventory
 and complete quest scripting remain future work; the 23 placement findings
-remain open. See [scope and evidence](RELEASE-v0.0.24-rc4.md).
+remain open. See [scope and evidence](releases/notes/RELEASE-v0.0.24-rc4.md).
 
 ## v0.0.24-rc3 â€” 1 October 2026
 
@@ -2365,7 +2365,7 @@ allowances up to 1,024 triangles, preserved Dagoth mask detail, two authored air
 inspection poses, repaired skin-tone lookup tables, gallery cursor/paging and a
 collision-trace correction for the three RC2 walking stalls. Adds the island
 terrain/polygon-density plan and M/I/J interface roadmap. The 23 strict ground
-contact findings remain open. See [scope and evidence](RELEASE-v0.0.24-rc3.md).
+contact findings remain open. See [scope and evidence](releases/notes/RELEASE-v0.0.24-rc3.md).
 
 ## v0.0.24-rc2 â€” 1 October 2026
 
@@ -2373,7 +2373,7 @@ Interim maintainer-testing checkpoint: gallery browser/help/return, bounded per-
 geometry allowances, canonical ground placement and independent contact audit,
 close NPC targeting, birthsign ordering, guarded hill-material repair, Options
 scrolling and measured experimental read-ahead. The strict contact and walking
-findings remain open. See [full scope and limits](RELEASE-v0.0.24-rc2.md).
+findings remain open. See [full scope and limits](releases/notes/RELEASE-v0.0.24-rc2.md).
 
 ## v0.0.24-rc1 â€” 30 September 2026
 
@@ -2401,8 +2401,8 @@ whole-map polygon-density analysis, full NPC services, schedules, combat and
 quest simulation remain future work. Greetings use a bounded authored fixture.
 
 Stable v0.0.23 and the published dev5 prerelease remain unchanged. Final
-v0.0.24 needs the maintainer's green light. See [RC scope](RELEASE-v0.0.24-rc1.md),
-[complete checklist](INVESTIGATION-v0.0.24-rc1.md),
+v0.0.24 needs the maintainer's green light. See [RC scope](releases/notes/RELEASE-v0.0.24-rc1.md),
+[complete checklist](history/investigations/INVESTIGATION-v0.0.24-rc1.md),
 [conversion lessons](BALMORA_CONVERSION_LESSONS.md) and
 [Amiga naming constraints](RELEASE_WORKFLOW.md#amiga-limitations).
 
@@ -2423,7 +2423,7 @@ v0.0.24 needs the maintainer's green light. See [RC scope](RELEASE-v0.0.24-rc1.m
   keep player dimensions, FOV and the accepted dev3 Strider unchanged.
 - Record new stair/door appearance reports as open Balmora fixes and defer the
   whole-map polygon-density study to the next version.
-- See [scope and validation](RELEASE-v0.0.24-dev4.md).
+- See [scope and validation](releases/notes/RELEASE-v0.0.24-dev4.md).
 
 ## v0.0.24-dev3 â€” 30 September 2026
 
@@ -2435,7 +2435,7 @@ v0.0.24 needs the maintainer's green light. See [RC scope](RELEASE-v0.0.24-rc1.m
 - Record positive dev2 exterior feedback, missing Balmora interiors, the reported
   faster city performance and Seyda Neen subdivision/prefetch investigation.
 - Pass 279 host tests; native warning review remains 82, with no new diagnostics.
-  See [validation and limitations](RELEASE-v0.0.24-dev3.md).
+  See [validation and limitations](releases/notes/RELEASE-v0.0.24-dev3.md).
 
 ## v0.0.24-dev2 â€” 30 September 2026
 
@@ -2449,20 +2449,20 @@ v0.0.24 needs the maintainer's green light. See [RC scope](RELEASE-v0.0.24-rc1.m
 - Follow the dock guard's clear final approach to the actual goal; align ordinary
   NPC and Strider driver Talk hints with their respective interaction conditions.
 - Record matched boat performance, native captures and remaining limits in
-  [the investigation](INVESTIGATION-v0.0.24-dev2.md) and the existing mesh notes.
+  [the investigation](history/investigations/INVESTIGATION-v0.0.24-dev2.md) and the existing mesh notes.
 - Pass 278 host tests. Review native warnings: 85 to 82, no added diagnostic.
 
 ## v0.0.24-dev1 â€” 30 September 2026
 
 Initial Balmora exterior, 64 overlapping regions, 1,488 scenery placements,
-18 residents and return Strider travel. See [original scope](BALMORA-v0.0.24-dev1.md).
+18 residents and return Strider travel. See [original scope](history/other/BALMORA-v0.0.24-dev1.md).
 Its generic architectural reduction was defective; dev2 corrects that conversion.
 
 ## v0.0.23-dev4 â€” 29 September 2026
 
 Padded content-sized dialogue and caret/rotation regressions; 2/5/1-second logo
 with continuous title music; optional opening quote overlay; sprite background
-depth and deferred NPC floor placement. See [release notes](RELEASE-v0.0.23-dev4.md).
+depth and deferred NPC floor placement. See [release notes](releases/notes/RELEASE-v0.0.23-dev4.md).
 
 ## 0.0.23-dev2 â€” 29 September 2026
 
@@ -2497,7 +2497,7 @@ See `RELEASE-v0.0.23-dev2.md` for measured checks and incomplete gameplay.
 - Preserve gameplay code; sea audio, continuous music verification and the
   remaining Seyda Neen interiors are subsequent checkpoints.
 
-See [release scope and validation](RELEASE-v0.0.23-dev1.md).
+See [release scope and validation](releases/notes/RELEASE-v0.0.23-dev1.md).
 
 ## v0.0.22 - normal public source release, 29 September 2026
 
@@ -2508,7 +2508,7 @@ See [release scope and validation](RELEASE-v0.0.23-dev1.md).
 - No new gameplay feature, HDF build, emulator acceptance or parallel-build speedup
   is claimed by this version-only promotion.
 
-See [release scope and validation](RELEASE-v0.0.22.md).
+See [release scope and validation](releases/notes/RELEASE-v0.0.22.md).
 
 ## v0.0.21-dev8 - reconciled boot/launcher and paper-font sources, 29 September 2026
 
@@ -2523,7 +2523,7 @@ See [release scope and validation](RELEASE-v0.0.22.md).
 - Handle `OSError` from Python's process CPU-count query and test that fallback.
 - No parallelization overhaul, new HDF or emulator acceptance is claimed here.
 
-See [release scope and validation](RELEASE-v0.0.21-dev8.md).
+See [release scope and validation](releases/notes/RELEASE-v0.0.21-dev8.md).
 
 ## v0.0.21-dev7 - visible five-second preflight and dry-run boot order, 29 September 2026
 
@@ -2682,7 +2682,7 @@ bounded game-directory discovery, actionable download failures, corrected tool
 probes, QuakeC preflight, and one authoritative VERSION file. CI exercises the
 same installer with public tools and an asset-free image. Test-004 completed the
 maintainer's full game-data build; the maintainer subsequently confirmed test-006 works.
-See [validation scope](VALIDATION-v0.0.17.md) and [release notes](RELEASE-v0.0.17.md).
+See [validation scope](history/validation/VALIDATION-v0.0.17.md) and [release notes](releases/notes/RELEASE-v0.0.17.md).
 
 - Optional FS-UAE autorun checks the emulator and owned ROM before building,
   accepts a ROM file or directory and prompts if none is selected, and fills both paths in the documented preset.
@@ -2831,7 +2831,7 @@ See CHECKPOINT_010_VALIDATION.md for verified scope and remaining limitations.
 - Guided Linux build, restored credits/notices and versioned presets under
   resources/emulators. 51 host tests, guided build and HDF readback passed.
 - Startup audio deadlines, terrain/mesh joins and later gameplay remain open.
-  See [checkpoint-009](CHECKPOINT_009_VALIDATION.md) for exact scope and counters.
+  See [checkpoint-009](history/checkpoints/CHECKPOINT_009_VALIDATION.md) for exact scope and counters.
 
 # Development source 0.8.3.dev1 / runtime v0.0.11-dev1
 
@@ -2839,7 +2839,7 @@ See CHECKPOINT_010_VALIDATION.md for verified scope and remaining limitations.
 - Music title filtering, history controls, bounded prefetch and transition diagnostics.
 - Renderer overflow counters; geometry repair still experimental.
 - 47 host tests passed; full guided HDF build/readback passed. Native acceptance pending.
-- See [development record](DEVELOPMENT_011.md); v0.0.10 remains the latest released playable checkpoint.
+- See [development record](history/superseded/DEVELOPMENT_011.md); v0.0.10 remains the latest released playable checkpoint.
 
 # Runtime v0.0.10 / source 0.8.2 â€” 27 September 2026
 

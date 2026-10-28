@@ -15,7 +15,7 @@ plus 32 MiB Fast RAM, the safe minimum for the whole game since 23 October 2026 
 must keep starting on, warns and loads more often; [why 32 MB](REAL_HARDWARE.md#why-32-mb-of-fast-ram),
 [AGA runtime](AGA_RUNTIME.md)). The engine
 is AmiQuake, which is Quake's renderer, lighting, collision, sound and QuakeC; AmiWind reuses Quake's machinery
-before building anything new ([engine study](ENGINE_STUDY.md)).
+before building anything new ([engine study](history/superseded/ENGINE_STUDY.md)).
 
 | Part | Where | Page |
 | --- | --- | --- |
@@ -78,7 +78,7 @@ Every exterior cell of Vvardenfell has been on CHIM since v0.0.43: 1,409 cells, 
 sea floor and 19 are open sea; 1,348 are one-cell region frames and 61 sit in the town frames (Balmora, Seyda Neen
 and the whole city of Vivec). No classic region maps remain outdoors. The counts and what they mean are in
 [what we count](chim/CELL_TRACKER.md#what-we-count) and the [progress tracker](chim/PROGRESS_TRACKER.md); the
-current release is described in the [v0.0.53 notes](RELEASE-v0.0.53.md).
+current release is described in the [v0.0.53 notes](releases/notes/RELEASE-v0.0.53.md).
 
 Interiors: since v0.0.48, 1,132 of the 1,134 base-game interiors are CHIM rooms, on CHIM's store-once layout. Only
 the prison ship and the census office, where the opening sequence runs, stay classic Quake room maps on purpose
@@ -105,7 +105,7 @@ legacy one stays selectable. Principles, each documented where it lives:
 - **Reuse by hash.** Every unit is keyed by the hash of its inputs; unchanged units are reused after a failure or a
   small change ([build cache](BUILD_CACHE.md)).
 - **Profiled and parallel.** Stages report time and cores, and a perf guard compares them with the previous build
-  ([build profile](BUILD_PROFILE.md#perf-guard), [parallel build](PARALLEL_BUILD.md)).
+  ([build profile](BUILD_PROFILE.md#perf-guard), [parallel build](history/superseded/PARALLEL_BUILD.md)).
 - **Checks before the expensive step.** A payload preflight and the disk-layout checks (partitions under 2 GiB,
   files well under 2 GiB, images under 4 GiB) run first ([payload preflight](BUILD_PROFILE.md#payload-preflight),
   [image size](IMAGE_SIZE.md)).
@@ -132,4 +132,4 @@ in October 2026, is about 0.2 frames per second on an A4000 with a 68060 at 100 
 
 The converter uses format facts from OpenMW's sources; it neither runs nor links OpenMW, and OpenMW serves as a
 reference for formats and behaviour ([licensing and credits](LICENSING_AND_CREDITS.md)). Earlier design notes:
-[world mapping plan](WORLD_MAPPING_PLAN.md), [pipeline](PIPELINE.md), [data streaming](DATA_STREAMING.md).
+[world mapping plan](history/superseded/WORLD_MAPPING_PLAN.md), [pipeline](history/superseded/PIPELINE.md), [data streaming](DATA_STREAMING.md).

@@ -47,6 +47,20 @@ chosen effects use and writes the whole table, every effect's sound per phase, i
 Not yet: magicka, skills, cast chances and the effects on actors (they come with the game logic), the shields and
 auras on characters, the lightning rods of shock, the spell icons in a magic menu.
 
+### Shell shapes
+
+Every effect's shell is built in two numbered shapes, both baked into sprites when the image is built (the engine
+draws one sprite either way, at the same cost per pixel):
+
+| Shape | Name | What it looks like |
+|---|---|---|
+| 0 | egg (the default) | the effect's own hit model seen from the front: for the shield an upright "cosmic egg" about one and a half times as tall as wide, reaching from the feet to above the head, as in the original |
+| 1 | sphere | a round, dotted see-through bubble in the effect's colour, strongest at its rim, with the hit model's pattern laid in (the first shell of v0.0.54, kept as its own shape for spells and effects that want it) |
+
+The shape is chosen with `dbg cast shell egg|sphere` (saved with the orb type) or for one cast with
+`dbg cast NAME ... shape sphere`. Shells seen close (the player's own seen from behind, the first-person veil) use
+a finer 64-pixel copy of the same shape.
+
 ## How it is made
 
 Nothing is drawn by hand. The image step (`tools/prepare_magic.py`) reads the user's own game data: each chosen
@@ -77,7 +91,9 @@ With the setting off (the default) nothing is loaded, spawned or drawn.
 | `dbg cast NAME touch` / `self` | the hit within reach / on yourself instead of a bolt |
 | `dbg cast NAME fail` | a failed cast: the school's failure sound only |
 | `dbg cast NAME npc` | the actor most in front of you (within 600 units) casts NAME at you |
-| `dbg cast orb 0` ... `3` | the orb type (see above; not saved) |
+| `dbg cast orb 0` ... `3` | the orb type (see above; saved) |
+| `dbg cast shell egg` / `sphere` | the shell shape of the effect set (see below; saved) |
+| `dbg cast NAME ... shape egg` / `sphere` | the shell shape for this one cast |
 | `dbg cast NAME ... dur SECONDS` | how long the hit shell stays on the character the spell lands on |
 | `dbg cast NAME area FEET` | a larger area burst |
 | `dbg cast NAME repeat` | cast again as each cast ends (for measurements), until `dbg cast stop` |

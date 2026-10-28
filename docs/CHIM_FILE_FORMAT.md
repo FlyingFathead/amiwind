@@ -68,7 +68,7 @@ The engine reads 0.4 to 0.7 and refuses anything else with a message naming both
 
 Counts are the main currency; frame times are emulator numbers, relative until a hardware
 number exists. From the v0.0.33 release, legacy against CHIM on the same Balmora cameras
-([release notes](RELEASE-v0.0.33.md#measured-gains),
+([release notes](releases/notes/RELEASE-v0.0.33.md#measured-gains),
 [measurements](performance/CHIM-v0.0.33-MEASUREMENTS.json)):
 
 - Balmora's exterior: 162.1 MB of legacy region maps to 21.3 MB of CHIM world; Seyda Neen with

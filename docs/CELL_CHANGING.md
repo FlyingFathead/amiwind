@@ -106,7 +106,7 @@ not cover these transition defects. See [bug journal](BUG_JOURNAL.md).
 Measure how much neighbouring sub-cells duplicate with
 [sub-cell redundancy](SUBCELL_REDUNDANCY.md) before and after changing cores or
 overlap. Crossing load times, what a crossing reads and the cache and loader
-changes are measured in [Seyda Neen performance](SEYDA_NEEN_PERFORMANCE.md).
+changes are measured in [Seyda Neen performance](history/superseded/SEYDA_NEEN_PERFORMANCE.md).
 
 A core chooses which BSP owns the player. Coverage is the larger area that BSP
 can render and collide with. Hysteresis keeps ownership from bouncing back and

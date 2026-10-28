@@ -2,7 +2,7 @@
 
 _Last updated with AmiWind v0.0.45 (20 October 2026)._
 
-The A side of every crossing comparison in the [v0.0.45 plan](../PLAN-v0.0.45.md#1-cell-crossings) (step 1.1),
+The A side of every crossing comparison in the [v0.0.45 plan](../history/plans/PLAN-v0.0.45.md#1-cell-crossings) (step 1.1),
 for [CHIM-CROSSING-SLUGGISH-43](../bugs/CHIM-CROSSING-SLUGGISH-43.md): walking from one CHIM cell into the next
 pauses the game, worst at corners. This page says how a crossing is measured, on which route, and what the
 v0.0.44 and v0.0.45 release images measure at 16 MB and at 128 MB of Fast RAM. Nothing here changes the game: the

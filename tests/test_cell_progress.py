@@ -1198,8 +1198,11 @@ class ReleaseUiTests(unittest.TestCase):
         # nothing else changed (same reason the CSS fingerprint moves with it).
         # 2026-10-11 (maintainer): the "Everything here runs in your browser ..." sentence moved behind a small grey circled "?"
         # (the same text as its mouseover title); nothing else changed.
+        # 2026-10-28 (maintainer: "reload throws you back into the World"): mark() keeps the open tab in the address
+        # (TOOLKIT-RELOAD-WORLD-55); the header markup and its CSS are unchanged, the CSS fingerprint moves because it
+        # spans the script up to the first closing brace, inside mark().
         self.assertEqual(sha(header), '8671d753f463c2fccbdace4b0a568d2f3ea99c39f1b2dce0cff6d4b58b305e31')
-        self.assertEqual(sha(css), 'fe54d571c143bc412f9d7c7ca224031a8d0a193d390e8b8a6f7347b34637a602')
+        self.assertEqual(sha(css), '06a6803390c79aa63a37794983461b10f5972d07ca0eb2c46ef9a459f4548626')
         head = (self.KIT / 'chim-head.js').read_bytes()
         # K-OCEAN (v0.0.36) added the open-sea row on purpose; TRACKER-OCEAN-COUNTED-DONE-36 (maintainer, 2026-10-11) made it silver and renamed it.
         # 2026-10-17: the approved row's label reads "maintainer-approved" (public wording); nothing else changed.
@@ -1525,7 +1528,7 @@ class PlanTests(ReleaseUiTests):
                         'Gold: planned for a release', 'Who decides what', 'Awaiting lighting', 'Passed, something still deferred'):
             self.assertIn(heading, page, heading)
         self.assertIn('**TOTALS**', page)
-        for name in ('README.md', 'docs/RELEASE-v0.0.36.md', 'docs/chim/PROGRESS_TRACKER.md', 'docs/chim/README.md'):
+        for name in ('README.md', 'docs/releases/notes/RELEASE-v0.0.36.md', 'docs/chim/PROGRESS_TRACKER.md', 'docs/chim/README.md'):
             self.assertIn('CHIM_PROGRESS_MAP.md', (ROOT / name).read_text(encoding='utf-8'), name)
         self.assertIn('href="../docs/chim/CHIM_PROGRESS_MAP.md"', (self.KIT / 'world-map.html').read_text(encoding='utf-8'))   # the legend's "what do these colours mean?"; no external URL
         self.assertIn("['docs', 'chim', 'CHIM_PROGRESS_MAP.md']", (ROOT / 'tools' / 'toolkit_serve.py').read_text(encoding='utf-8'))      # and the server shows it

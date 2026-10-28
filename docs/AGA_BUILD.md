@@ -1,6 +1,6 @@
 # AGA checkpoint build and controls
 
-_Last updated with AmiWind v0.0.48-dev2 (23 October 2026)._
+_Last updated with AmiWind v0.0.54 (28 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -18,7 +18,7 @@ _Last updated with AmiWind v0.0.48-dev2 (23 October 2026)._
 Published v0.0.27 includes detailed Seyda Neen and Balmora, the island's
 2,526 terrain regions, 37,960 exterior rocks and 816 giant mushrooms. Other
 settlements and wider gameplay remain incomplete. See [current scope and
-validation limits](RELEASE-v0.0.27.md). The A500 runtime remains a separate
+validation limits](releases/notes/RELEASE-v0.0.27.md). The A500 runtime remains a separate
 experiment; this accelerated AGA profile is not stock-A1200 performance proof.
 
 ## Reference configuration
@@ -50,8 +50,8 @@ remove those dependencies. This AGA executable does not support Kickstart 1.3.
 Private playable builds can span multiple RDB HDFs. Use the generated
 configuration and mount every disk listed in the build summary simultaneously,
 with the boot disk first. WinUAE uses RDB hardfiles on the UAE controller with
-their stored geometry. The dated [Windows tests](VALIDATION-WINDOWS-2026-10-02.md)
-and [v0.0.27 record](RELEASE-v0.0.27.md) distinguish game-entry checks from later
+their stored geometry. The dated [Windows tests](history/validation/VALIDATION-WINDOWS-2026-10-02.md)
+and [v0.0.27 record](releases/notes/RELEASE-v0.0.27.md) distinguish game-entry checks from later
 build/readback results and still-pending target acceptance. Use working image
 copies: exiting the game writes profiling files to their filesystems.
 
@@ -111,7 +111,9 @@ spot remains sticky, record `aw_pos` and `aw_blockers` there. This diagnostic
 does not run per frame and does not alter collision.
 
 `aw_view x y z yaw pitch` places a reproducible diagnostic camera while noclip
-is enabled. `aw_probe` runs 441 floor sweeps and writes `collision-probe.csv`.
+is enabled; it prints a warning when that camera point is inside solid, or, in an
+interior, outside the room, because frames from there show no room.
+`aw_probe` runs 441 floor sweeps and writes `collision-probe.csv`.
 The latter stalls the game and is not a normal performance workload. Use
 `aw_cull 0..6` ([far test](performance/FAR-TEST.md)) and `aw_fog 0/1` to isolate distance rejection from shading.
 These are development tools, not save/load or final Morrowind controls.
@@ -196,7 +198,7 @@ The player uses two 16 KiB PCM buffers and cooperative 4 KiB read slices; each
 individual disk read is still synchronous. Playback feeds a bounded stereo DMA
 ring. Special-event tracks are stored but not triggered by gameplay yet.
 See [music behaviour](OPENMW_REF_MUSIC_AND_AUDIO.md) and
-[checkpoint-010 validation](CHECKPOINT_010_VALIDATION.md) for full-song evidence,
+[checkpoint-010 validation](history/checkpoints/CHECKPOINT_010_VALIDATION.md) for full-song evidence,
 remaining startup/deadline limitations and exact binary/image hashes.
 
 BSP input is loaded one section at a time to reduce temporary memory, but the

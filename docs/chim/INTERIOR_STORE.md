@@ -91,8 +91,18 @@ MiniWind A/B (below) is next.
   9,400 front faces through the clip path every frame for about 2,350 in view (PERF-ARENA-PIT-SLOW-48). Since
   v0.0.54 a room model wider than `cut_models_over` (config/chim-rooms.json, 512 local units) is stored as tiles of
   the room grain, the exterior's large-model cut ([cut.py](../../tools/chim/cut.py) tile mode), so each tile is
-  culled on its own; 0 keeps every model whole (the earlier method). The same file can name a detail budget for room
-  meshes (config/chim-detail-budgets.json: fewer visual triangles, the same collision).
+  culled on its own; 0 keeps every model whole (the earlier method). Only the rooms the file's `rooms` list names
+  get the cut and the detail budget, the rooms they were measured for (today the Arena Pit); every other room is
+  built as before (decided for the project on 28 October 2026). The same file can name a detail budget for room
+  meshes (config/chim-detail-budgets.json: fewer visual triangles, the same collision). A room can also be built in
+  several types (`room_types` in the same file; decided for the project on 28 October 2026 for the Vivec Arena Pit):
+  the default type's record is `rooms/<room>.crm`, every other type's `rooms/<room>t<N>.crm` on the same store, the
+  room map names the types (`"_chim_room_types"`, `"_chim_room_type_default"`), and the saved setting
+  `aw_vivec_arena_pit_type` (-1 = the room's default; 0 the bowl whole, the original; 1 tiles; 2 tiles and the detail budget, the default,
+  decided by the maintainer on 28 October 2026 after the in-game A/B: frame time on the Pit's floor and upper ring
+  17.4 / 27.5 ms for type 0, 14.5 / 23.2 for type 1, 13.9 / 18.0 for type 2; a lossless planar merge of the bowl
+  measured equal to type 1 and is not built)
+  picks the record the door loads, so only that type's models take memory.
 - Switching between the exterior store and the interior store drops the kept models. A per-store cache for machines
   with 64 to 128 MB is a follow-up.
 

@@ -265,7 +265,7 @@ hide gameplay menus or the crosshair.
 
 `dbg scene ship` and `dbg scene town` retain their aliases. The scene picker and
 `dbg scene <map>` also cover the 13 town interiors and Addamasartus; see
-[the scene list](SEYDA_NEEN_INTERIORS.md). `dbg recover`
+[the scene list](history/superseded/SEYDA_NEEN_INTERIORS.md). `dbg recover`
 finds a checked spawn in the current scene; `dbg reset location 0` returns to town.
 `dbg eyeheight` reports eye offset and height above the feet. An optional numeric
 offset (4..24 runtime units above the hull origin) supports comparison, e.g.
@@ -300,7 +300,7 @@ Use these during play:
 | `dbg tp lighthouse` | Lighthouse interior |
 | `dbg tp addamasartus` | Addamasartus |
 
-Other converted map names from [the scene list](SEYDA_NEEN_INTERIORS.md) work too.
+Other converted map names from [the scene list](history/superseded/SEYDA_NEEN_INTERIORS.md) work too.
 Names are case-insensitive. `seyda` / `town` and `ship` retain their short aliases.
 `debug tp ...` and `amiwind debug tp ...` use the same handler. Teleport uses the
 existing scene state capture and checked arrival path, not a New Game reset.
@@ -426,7 +426,7 @@ dithering with cached remaps; its approximately 8 KiB table growth and 63-method
 passes full 822-test gates and matching Amiga compiles, including tiny-star,
 arrival and cloud-speed corrections. Native replay remains pending; earlier
 startup/default/clock results do not validate those changed bytes. See [day/night implementation and
-limits](DAY_NIGHT_AND_SKY.md), [current release evidence](RELEASE-v0.0.28.md) and
+limits](DAY_NIGHT_AND_SKY.md), [current release evidence](releases/notes/RELEASE-v0.0.28.md) and
 [dialogue and waiting](DIALOGUE_AND_WAIT.md).
 
 `aw_show_speaker_name_during_voiceovers 0/1` controls voiced speaker identity

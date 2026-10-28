@@ -1,6 +1,6 @@
 # Roadmap and implementation options
 
-_Last updated with AmiWind v0.0.54 (28 October 2026)._
+_Last updated with AmiWind v0.0.55-dev1 (28 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -91,7 +91,7 @@ _Last updated with AmiWind v0.0.54 (28 October 2026)._
 
 [CHIM-FRAME-STATIC-SEAM-40](bugs/CHIM-FRAME-STATIC-SEAM-40.md) — 15 October 2026, v0.0.41-dev1: exact source validation completed 4,242 tests (4,236 passed, three Windows-only skips and three Census expected failures), with zero failures/errors; the matching engine compiled. The completed 369-frame world passed structural/source, modeled heap, host zone-walk and scoped stair gates. Of 547 boundary comparisons, 544 measured agreement and three remain held (237, 241, 242). Of 36 sampled models, 22 have matching face counts and unique face correspondence; 14 differ in collision-only versus visual representation and require payload/sprite/native review. These measurements do not establish visual severity or universal equivalence. Native captures, independent interior conversion, image assembly/readback and package acceptance remain pending; coverage states are unchanged. Stair evidence retains 15,348 advisory findings despite zero blocking failures.
 
-15 October 2026: active preparation now targets v0.0.41-dev1. The planned final release title is **v0.0.41: Collisions And Boundaries**. Earlier source snapshots, checks and findings retain their recorded version identities; they do not establish acceptance of this development candidate. Matching source validation, completed image assembly/readback, native checks, packaging and delivery remain separate gates. See the [current development candidate](RELEASE-v0.0.41-dev1.md).
+15 October 2026: active preparation now targets v0.0.41-dev1. The planned final release title is **v0.0.41: Collisions And Boundaries**. Earlier source snapshots, checks and findings retain their recorded version identities; they do not establish acceptance of this development candidate. Matching source validation, completed image assembly/readback, native checks, packaging and delivery remain separate gates. See the [current development candidate](releases/notes/RELEASE-v0.0.41-dev1.md).
 
 [BUILD-INVENTORY-PALETTE-41](bugs/BUILD-INVENTORY-PALETTE-41.md) — 15 October 2026, v0.0.41 source candidate: image assembly prepares inventory before the sky palette pass, which rejected current AWIC icons and AWI2/AWST metadata as unknown images. The source repair validates each inventory format at its exact path, remaps only icon pixels and preserves metadata bytes. Scoped evidence contains 15 passing palette checks and 2 passing inventory-asset checks on matching unchanged source. Actual image assembly, native verification, packaging and shipment remain pending.
 
@@ -104,6 +104,10 @@ _Last updated with AmiWind v0.0.54 (28 October 2026)._
 15 October 2026: exact-source validation completed 4,231 tests: 4,225 passed, three Windows-only skips and three tracked Census expected failures. The 71 focused tests and original-data readback across nine frame positions passed, consistently hiding 33 of 158 original references at stronghold state 6 while preserving unknown scripts. All 243 player resources are reusable after exact producer, input and file verification. Complete combined-world conversion, native comparison, packaging and shipment remain pending; coverage counts are unchanged.
 
 ## v0.0.55 (next), 28 October 2026
+
+First out, as v0.0.55-dev1 (28 October 2026): builds that survive memory pressure on any machine, memory in the
+Toolkit's build monitor, the docs organised into folders with a generated index, and DemoWind's first effect
+([dev1 notes](releases/notes/RELEASE-v0.0.55-dev1.md)).
 
 What did not make v0.0.54 moves here, in order:
 
@@ -120,6 +124,9 @@ What did not make v0.0.54 moves here, in order:
 - **First-person hands for every weapon type,** with the weapon mesh in the hand: today 4 of the 103 animation groups
   are built (fists and the torch). The hand driver already runs in C since v0.0.54.
 - **QuakeC's share of the frame, measured,** then only its hot functions moved into C.
+- **DemoWind:** cheap animated effects tried one by one with their cost on screen; the first, the blood-red sky over
+  Red Mountain, is in v0.0.55-dev1 (`dbg demowind`, [DEMOWIND.md](DEMOWIND.md)); rain on water, the Ghostfence
+  shimmer, lava and ash storms follow, and the good ones go into the game.
 - **Rooms that are still loading in on arrival** ([CHIM-ROOM-POPIN-51](bugs/CHIM-ROOM-POPIN-51.md)).
 - **Streaming ideas:** the player's speed capped by the measured stream rate, reading ahead along the heading, and the
   type 3 panels (the maintainer's call).
@@ -138,7 +145,7 @@ Ideas of the maintainer for when they fit, not scheduled:
 
 ## v0.0.54: Hair, Movement, Magic And More, 28 October 2026
 
-Done in the v0.0.54 release ([release notes](RELEASE-v0.0.54.md)), which the maintainer named "Hair, Movement, Magic
+Done in the v0.0.54 release ([release notes](releases/notes/RELEASE-v0.0.54.md)), which the maintainer named "Hair, Movement, Magic
 And More":
 
 - **Characters move by what they are doing**, every animation group chosen by state by OpenMW's rules, and **hair is
@@ -153,7 +160,7 @@ And More":
 
 ## v0.0.53: Super Freak Halloween Update, 27 October 2026
 
-Done in the v0.0.53 release ([release notes](RELEASE-v0.0.53.md)), which the maintainer named "Super Freak Halloween
+Done in the v0.0.53 release ([release notes](releases/notes/RELEASE-v0.0.53.md)), which the maintainer named "Super Freak Halloween
 Update":
 
 - **Doors after a streamed crossing.** Walking across a frame border into another region frame left that frame's
@@ -196,7 +203,7 @@ at Red Mountain keeps a neutral light ([WEATHER-AMBIENT-SUN-UNUSED-51](BUGS.md))
 shielding their eyes in ash and blight storms, as in Ald'ruhn ([ACTOR-STORM-POSE-51](BUGS.md)). Outdoor lights
 without a mesh come later ([CHIM-MESHLESS-LIGHTS-33](bugs/CHIM-MESHLESS-LIGHTS-33.md)).
 
-Done in the v0.0.52 release ([release notes](RELEASE-v0.0.52.md)), which the maintainer named "Skeletons Of Society,
+Done in the v0.0.52 release ([release notes](releases/notes/RELEASE-v0.0.52.md)), which the maintainer named "Skeletons Of Society,
 Vvardenfell Edition":
 
 - **One skeleton for everyone.** Every humanoid moves by one shared skeleton and one shared table of every action a
@@ -246,7 +253,7 @@ a model costs every vertex. So:
 
 v0.0.51 takes up what moved from v0.0.50. First the fixes that could not wait, then the game work.
 
-Done in the v0.0.51 release ([release notes](RELEASE-v0.0.51.md)); the interiors also get the light the original
+Done in the v0.0.51 release ([release notes](releases/notes/RELEASE-v0.0.51.md)); the interiors also get the light the original
 gives them from above ([INTERIOR-SUNLIGHT-UNBAKED-51](bugs/INTERIOR-SUNLIGHT-UNBAKED-51.md)), and the interior
 brightness default goes back to 1.0:
 
@@ -295,7 +302,7 @@ The plan:
 2. Every door looked up in that table.
 3. A build check that fails the image when a door the game can reach is not linked.
 
-Done in the v0.0.50 release ([release notes](RELEASE-v0.0.50.md), [door graph](chim/DOOR_GRAPH.md)): all three steps,
+Done in the v0.0.50 release ([release notes](releases/notes/RELEASE-v0.0.50.md), [door graph](chim/DOOR_GRAPH.md)): all three steps,
 the jail markers kept as rows of the table for the jail system and the game's scripts, and the opening's maps (the
 prison ship, the pier, the census office) left with the doors the opening scene gives them. Next on this line: the old
 town frames' geometry as ordinary CHIM region frames (later; the doors already use one table).
@@ -570,7 +577,7 @@ Arena duel idea is for the indoor Arena, an ordinary level. The order of work, e
 split by its parts to find what is thrown away and rebuilt although it is the same in neighbouring frames; a design
 note reviewed for its weak points (the origin shift, the model-list limit, saved games); a prototype in a small
 sandbox of 2×2 frames; an A/B against type 0 on the same crossing route; then the whole island
-([plan section 1](PLAN-v0.0.45.md#1-cell-crossings); the full design: [Cell crossings](chim/CELL_CROSSINGS.md)).
+([plan section 1](history/plans/PLAN-v0.0.45.md#1-cell-crossings); the full design: [Cell crossings](chim/CELL_CROSSINGS.md)).
 
 ### Decisions of 20 October 2026
 
@@ -605,7 +612,7 @@ Decided for the project on 19 October 2026, in this order. Each step ends in a b
 as with the outdoors: the world first, then what is in it, then what happens in it.
 
 1. **v0.0.44: By Azura's Trees!** Published 19 October 2026: the patch release with the Bitter Coast tree fix
-   ([CHIM-BITTERCOAST-HEAP-SHAPEGUARD-43](bugs/CHIM-BITTERCOAST-HEAP-SHAPEGUARD-43.md); [release notes](RELEASE-v0.0.44.md)).
+   ([CHIM-BITTERCOAST-HEAP-SHAPEGUARD-43](bugs/CHIM-BITTERCOAST-HEAP-SHAPEGUARD-43.md); [release notes](releases/notes/RELEASE-v0.0.44.md)).
 2. **Bug fixes, cell crossings first.** Walking from one CHIM cell into the next still pauses the game, worst at
    cell corners ([CHIM-CROSSING-SLUGGISH-43](bugs/CHIM-CROSSING-SLUGGISH-43.md)). AmiWind uses the RAM an
    accelerator card has: 16 MB stays the baseline that must work, and memory past it holds the neighbouring frames
@@ -637,7 +644,7 @@ as with the outdoors: the world first, then what is in it, then what happens in 
    engine step, with the old storage kept selectable.
 3. **Every interior of the base game, with an interior progress tracker, and interiors on CHIM too.** Measured on
    19 October 2026: the base game has 1,328 interiors; 176 are in the game today and 919 on Vvardenfell are not
-   converted yet ([checklist](PLAN-v0.0.45.md#3-every-interior-of-the-base-game)). Today every interior is its own
+   converted yet ([checklist](history/plans/PLAN-v0.0.45.md#3-every-interior-of-the-base-game)). Today every interior is its own
    Quake map that carries its own copy of every mesh and texture it uses, about 2 MB a room. About 950 more rooms
    that way would add about 2 GB to an image of 3.62 GB, past the 4 GiB a drive image may hold. So the interiors go
    the way the outdoors went: each mesh and texture stored once in the shared CHIM store and placed by reference in
@@ -783,11 +790,11 @@ Every step is an A/B against the original game at the same place and time, with 
 ## Next: the outdoors complete, then every entrance and every interior, 18 October 2026
 
 **v0.0.43, published 19 October 2026: every exterior cell of Vvardenfell on CHIM** (1,409 cells: 1,348 in
-one-cell region frames and 61 in town frames, [what these numbers count](chim/CELL_TRACKER.md#what-we-count); [release notes](RELEASE-v0.0.43.md)). **v0.0.44: By Azura's Trees!**, the patch
+one-cell region frames and 61 in town frames, [what these numbers count](chim/CELL_TRACKER.md#what-we-count); [release notes](releases/notes/RELEASE-v0.0.43.md)). **v0.0.44: By Azura's Trees!**, the patch
 release that followed, was published on 19 October 2026: the trunk shape guard had made the Bitter Coast trees too
 large for memory, and v0.0.44 fixes it ([CHIM-BITTERCOAST-HEAP-SHAPEGUARD-43](bugs/CHIM-BITTERCOAST-HEAP-SHAPEGUARD-43.md);
-[release notes](RELEASE-v0.0.44.md)). After it come bug fixes, the pauses when crossing from cell to cell first, and
-every interior missing from the base game (below; step by step in the [v0.0.45 plan](PLAN-v0.0.45.md)).
+[release notes](releases/notes/RELEASE-v0.0.44.md)). After it come bug fixes, the pauses when crossing from cell to cell first, and
+every interior missing from the base game (below; step by step in the [v0.0.45 plan](history/plans/PLAN-v0.0.45.md)).
 
 History, as written during v0.0.43 (all of it is done; v0.0.43 shipped the whole outdoors): after v0.0.43-dev2 the cells still classic
 are the ones held by the stair walk (Ald-ruhn, Maar Gan, Suran and one rope bridge cell, with the town cells
@@ -874,7 +881,7 @@ game: no edges between CHIM and classic cells, no border copies of classic objec
 stored many times over, one world format outdoors. The classic region builder stays in the code, selectable for
 A/B regression tests, but no build ships it. The path: v0.0.41 (rings 0 to 4 with the Bitter Coast and Azura's
 Coast whole), the batch import of the easy cells in v0.0.42, the remaining cells by weight, the seabed cells and
-the open sea, then Solstheim ([v0.0.42 working plan](PLAN-v0.0.42.md)).
+the open sea, then Solstheim ([v0.0.42 working plan](history/plans/PLAN-v0.0.42.md)).
 
 ## v0.0.42: Complete Vivec (the city), 16 October 2026
 
@@ -882,7 +889,7 @@ Project decision, 16 October 2026: v0.0.41 ships the first regional build (More 
 (A Telvanni Root Story)); v0.0.42 completes the city of Vivec.
 
 The step-by-step checklist, with what counts as done for each step, is the
-[v0.0.42 working plan](PLAN-v0.0.42.md).
+[v0.0.42 working plan](history/plans/PLAN-v0.0.42.md).
 
 - [ ] `dbg orbit` (planned): an inspection camera that orbits the object under the crosshair, a world position or an
   original reference number, with the debug HUD, noclip and god mode on; mouse wheel for distance; orbit speed
@@ -891,7 +898,7 @@ The step-by-step checklist, with what counts as done for each step, is the
   full-screen promo clips. Built on Quake's chase camera; the test harness records one orbit as a short clip.
 - [ ] The stair gate only where something changed: each flight walked once, a pass kept by the SHA-256 of what it
   read, and known-good stair records (place, behaviour, hash; no game data) shipped in the repository so a build
-  from unchanged data skips the walk ([plan 1.0b](PLAN-v0.0.42.md#10b-the-stair-gate-walk-each-flight-once-keep-every-pass-ship-the-known-results)).
+  from unchanged data skips the walk ([plan 1.0b](history/plans/PLAN-v0.0.42.md#10b-the-stair-gate-walk-each-flight-once-keep-every-pass-ship-the-known-results)).
 - [ ] `dbg flyingcam` (planned): a fly-over camera that spirals across the whole island at a set speed and
   height above the ground, from the coast inwards like the CHIMport's own ring order, and slows to a stop over
   the highest terrain point, on Red Mountain (found from the land records). Flown in noclip and god mode by default;
@@ -1084,7 +1091,7 @@ conversion and structural, heap, zone-walk and stair validation. A later
 combined ownership failure keeps the candidate held; corrected compiled-world,
 native and package acceptance remain pending. Complete rings 0, 1 and 2, original
 references, actors, horizons and visual/collision seams remain release gates.
-See [release preparation](RELEASE-v0.0.40.md) and
+See [release preparation](releases/notes/RELEASE-v0.0.40.md) and
 [the static seam report](bugs/CHIM-FRAME-STATIC-SEAM-40.md).
 
 ## Owner apron follow-up, 15 October 2026
@@ -1233,7 +1240,7 @@ package counts remain separate and unchanged.
 
 v0.0.40-dev2 candidate preparation, 15 October 2026: the animation correction
 passes 115 shared converter checks. Regenerated assets, full release gates and
-shipment remain pending. [Candidate notes](RELEASE-v0.0.40-dev2.md).
+shipment remain pending. [Candidate notes](releases/notes/RELEASE-v0.0.40-dev2.md).
 
 
 Animation follow-up, 15 October 2026: the
@@ -1576,7 +1583,7 @@ v0.0.38 is published. Its full-world conversion includes both lava paths, all
 stronghold in cell (10,1). The compact replacement passed exact RC1 HDF/package
 readback, scoped native inspection and delivery. Final v0.0.39 retains that
 implemented scope and requires its own final-source and image checks. See the
-[release checklist](RELEASE-v0.0.38.md) for acceptance requirements and the
+[release checklist](releases/notes/RELEASE-v0.0.38.md) for acceptance requirements and the
 [bug register](BUGS.md) for current issue status.
 
 The Toolkit's Included counts must come from verified package contents.
@@ -1605,7 +1612,7 @@ stop a miss from stalling a frame. The 2 MiB Chip + 16 MiB Fast machine stays a 
 
 v0.0.36 starts moving the open world onto CHIM inside the game itself. Converted areas sit inside
 the legacy island, the border between the two is measured and made seamless, and CHIM takes over
-cell by cell, from the sea and the coast inward. Draft notes: [release notes](RELEASE-v0.0.36.md).
+cell by cell, from the sea and the coast inward. Draft notes: [release notes](releases/notes/RELEASE-v0.0.36.md).
 
 Historical target: v0.0.36 = the whole coastline on CHIM (every cell of the outer ring and every passing cell of the second ring),
 the open ocean placed in the game (one shared ocean chunk), the whole city of Vivec by default, and Seyda Neen and
@@ -1658,7 +1665,7 @@ v0.0.35 gathers in the work that was finished over the last releases but left on
 branches: builder improvements (resumable image step, unit caches and output hashes, a
 shared storage pool, a build preflight, tighter reuse keys), lava, the CHIMport tracker
 and more. Unfinished or experimental work ships behind a switch that is off by default.
-Release notes: [RELEASE-v0.0.35.md](RELEASE-v0.0.35.md).
+Release notes: [RELEASE-v0.0.35.md](releases/notes/RELEASE-v0.0.35.md).
 
 After v0.0.35, with no dates promised:
 
@@ -1835,15 +1842,15 @@ Tracker: IMAGE-ONE-HDF-TARGET-36 and BUILD-PARTITION-GROWTH-UNGATED-36 (nothing 
 
 A fix release on top of v0.0.33: the silt strider's hull is closed and every Bitter Coast
 mushroom can be picked, each with an island-wide check that runs in every build
-([release notes](RELEASE-v0.0.34.md)).
+([release notes](releases/notes/RELEASE-v0.0.34.md)).
 
 ## v0.0.33 - Towards CHIM: Replacing the Engine Block (released)
 
 v0.0.33 is out: the first release on the CHIM engine, the world streamer, with
 Balmora and Seyda Neen on CHIM and the CHIM builder as the default
-([release notes](RELEASE-v0.0.33.md); plan below and [world streamer](WORLD_STREAMER.md)).
+([release notes](releases/notes/RELEASE-v0.0.33.md); plan below and [world streamer](WORLD_STREAMER.md)).
 The release before it, v0.0.32, was the last on the legacy engine
-([release notes](RELEASE-v0.0.32.md)).
+([release notes](releases/notes/RELEASE-v0.0.32.md)).
 What CHIM is, its versions and milestones: [CHIM](chim/README.md); every
 idea that is designed, measured or held back, with its status:
 [CHIM ideas](chim/IDEAS.md).
@@ -2032,7 +2039,7 @@ below.
 The game heap is a fixed 11 MiB. On the reference configuration a fully loaded
 Seyda Neen sub-cell leaves only about 2.6 MB of it for cached models, so each
 crossing evicts and re-reads actor models
-([Seyda Neen performance](SEYDA_NEEN_PERFORMANCE.md)). Accelerated Amigas such
+([Seyda Neen performance](history/superseded/SEYDA_NEEN_PERFORMANCE.md)). Accelerated Amigas such
 as an A1200 with a PiStorm32 Lite or a full 68060 board have far more Fast RAM
 ([hardware FAQ](FAQ.md#can-todays-heavily-upgraded-amigas-realistically-run-amiwind)).
 

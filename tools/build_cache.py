@@ -283,6 +283,11 @@ SCHEDULING_UNITS = frozenset({
     # item once; only the order in which units start and finish changes, never a result or its place
     ('tools/build_parallel.py', '_indexed_call'),
     ('tools/build_parallel.py', 'in_order_map'),
+    # a lost worker's units sent out again at half the units in flight (completed_map, BUILD-OOM-DEGRADE-NOT-DIE-54): each
+    # unit still runs its function on its item and is handed back once; only which pool and how many at once change
+    ('tools/build_parallel.py', '_oom_kills'),
+    ('tools/build_parallel.py', '_pool_lost'),
+    ('tools/build_parallel.py', '_pool_loss_retries'),
 })
 # Pool sizing constants: module-level literals (one line each) that only size and order a pool's units. Their
 # assignment lines are left out of their module's import-time text, so a new or changed sizing constant keys no

@@ -1,6 +1,6 @@
 # CHIM feature tracker
 
-_Generated from `docs/chim/features.json` with AmiWind v0.0.54._
+_Generated from `docs/chim/features.json` with AmiWind v0.0.55-dev1._
 
 <!-- Generated whole by tools/chim_features.py render from docs/chim/features.json; do not edit by hand. -->
 
@@ -135,7 +135,7 @@ Every mesh, collision hull and texture of an exterior is stored once and placed 
 - The island-wide CHIM size is not measured yet; the measured figures are for Balmora and Seyda Neen, although every exterior cell of Vvardenfell is built as a CHIM world since v0.0.43.
 - Format 0.9 stores a placement once per frame, not once for the island: an object in the overlapping margins of neighbouring region frames is still stored in each (about 3.5 frames per object, CHIM-PLACEMENT-MARGIN-COPIES-46). When the owner chunk is not in the zone, reading a chunk's catalogue takes more reads than with copies (estimated 985,500 against 517,059 for every chunk once); not built yet.
 
-**Read more:** [World streamer design](../WORLD_STREAMER.md); [CHIM world format](WORLD_FORMAT.md); [Draft v0.0.33 release notes, disk](../RELEASE-v0.0.33.md#disk-each-asset-once); [Measurements behind the release charts](../performance/CHIM-v0.0.33-MEASUREMENTS.json); [World format: reach index (0.9, experimental)](WORLD_FORMAT.md#reach-index-09-experimental).
+**Read more:** [World streamer design](../WORLD_STREAMER.md); [CHIM world format](WORLD_FORMAT.md); [Draft v0.0.33 release notes, disk](../releases/notes/RELEASE-v0.0.33.md#disk-each-asset-once); [Measurements behind the release charts](../performance/CHIM-v0.0.33-MEASUREMENTS.json); [World format: reach index (0.9, experimental)](WORLD_FORMAT.md#reach-index-09-experimental).
 
 **Bugs:** [WORLD-REGION-DUPLICATION-31](../bugs/WORLD-REGION-DUPLICATION-31.md), [CHIM-PLACEMENT-MARGIN-COPIES-46](../bugs/CHIM-PLACEMENT-MARGIN-COPIES-46.md).
 
@@ -154,7 +154,7 @@ Balmora and Seyda Neen (with the intro docks and the courtyard) are drawn only b
 - CHIM builds still run part of the legacy exterior chain (the open world, the Vivec Arena and Balmora's region maps) and record which stages and who reads them; moving the frame maps and town flora off that chain is still to do (CHIM-LEGACY-CHAIN-33).
 - The countryside between the towns shipped as legacy region maps, marked "not yet CHIM", until v0.0.43; since then every exterior cell of Vvardenfell is a CHIM frame.
 
-**Read more:** [CHIM engine: towns](ENGINE.md#towns); [Builder types](build_guide/BUILDER_TYPES.md); [Draft v0.0.33 release notes](../RELEASE-v0.0.33.md).
+**Read more:** [CHIM engine: towns](ENGINE.md#towns); [Builder types](build_guide/BUILDER_TYPES.md); [Draft v0.0.33 release notes](../releases/notes/RELEASE-v0.0.33.md).
 
 **Bugs:** [CHIM-LEGACY-CHAIN-33](../bugs/CHIM-LEGACY-CHAIN-33.md), [BUILD-SEYDA-REGEN-30](../bugs/BUILD-SEYDA-REGEN-30.md), [HEAP-SEYDA-OVERLAP-32](../bugs/HEAP-SEYDA-OVERLAP-32.md).
 
@@ -298,7 +298,7 @@ The land is cut into chunks of 256 units. A ring of chunks around the player is 
 - The total read time over the walk is the same, 1.64 s legacy against 1.65 s CHIM: CHIM spreads it thinner, it does not remove it.
 - To be repeated with the release world (format 0.5) on a quiet host.
 
-**Read more:** [CHIM engine: loading](ENGINE.md#loading); [Draft v0.0.33 release notes, loading](../RELEASE-v0.0.33.md#loading-smaller-steps-no-region-stop); [Measurements behind the release charts](../performance/CHIM-v0.0.33-MEASUREMENTS.json).
+**Read more:** [CHIM engine: loading](ENGINE.md#loading); [Draft v0.0.33 release notes, loading](../releases/notes/RELEASE-v0.0.33.md#loading-smaller-steps-no-region-stop); [Measurements behind the release charts](../performance/CHIM-v0.0.33-MEASUREMENTS.json).
 
 **Bugs:** [CHIM-READ-RUNS-33](../bugs/CHIM-READ-RUNS-33.md), [CHIM-READ-BUDGET-33](../bugs/CHIM-READ-BUDGET-33.md), [BENCH-JIT-PROFILE-32](../bugs/BENCH-JIT-PROFILE-32.md).
 
@@ -366,7 +366,7 @@ Chunks are pinned only while they load, farther chunks give way first, small blo
 - Some loads still fail for lack of room (far buildings); a larger zone budget would halve the remaining gaps and waits for the memory measurements (CHIM-ZONE-BUDGET-33).
 - The repaired engine awaits the maintainer's playtest.
 
-**Read more:** [Draft v0.0.33 release notes, Balmora's holes](../RELEASE-v0.0.33.md#lets-fix-those-bugs); [CHIM engine: memory](ENGINE.md#memory).
+**Read more:** [Draft v0.0.33 release notes, Balmora's holes](../releases/notes/RELEASE-v0.0.33.md#lets-fix-those-bugs); [CHIM engine: memory](ENGINE.md#memory).
 
 **Bugs:** [CHIM-CHUNK-LOAD-FAIL-33](../bugs/CHIM-CHUNK-LOAD-FAIL-33.md), [CHIM-ZONE-BUDGET-33](../bugs/CHIM-ZONE-BUDGET-33.md), [CHIM-ZONE-RING-THRASH-33](../bugs/CHIM-ZONE-RING-THRASH-33.md).
 
@@ -387,7 +387,7 @@ CHIM reserves one chunk zone of fixed size in the Hunk when a town loads. The bu
 - The zone is taken from the Hunk, so less Hunk is left at the load peak: Balmora 2.32 MB (legacy 3.53 MB), Seyda Neen 1.10 MB (legacy 4.42 MB), which is under the 2 MiB rule (CHIM-SEYDA-HUNK-GAP-33, open).
 - The zone is the engine's chim_zone_kib (6,864 KiB) less the frame-world pool (2 x 384 KiB): 6,242,304 bytes of chunk room, read by the builder from the engine source; a zone the world states itself is still proposed (CHIM-ZONE-BUDGET-33).
 
-**Read more:** [CHIM engine: memory](ENGINE.md#memory); [Draft v0.0.33 release notes, memory](../RELEASE-v0.0.33.md#memory); [CHIM ideas: memory](IDEAS.md#memory).
+**Read more:** [CHIM engine: memory](ENGINE.md#memory); [Draft v0.0.33 release notes, memory](../releases/notes/RELEASE-v0.0.33.md#memory); [CHIM ideas: memory](IDEAS.md#memory).
 
 **Bugs:** [CHIM-SEYDA-HUNK-GAP-33](../bugs/CHIM-SEYDA-HUNK-GAP-33.md), [CHIM-ZONE-BUDGET-33](../bugs/CHIM-ZONE-BUDGET-33.md), [CHIM-HEAP-CHECK-33](../bugs/CHIM-HEAP-CHECK-33.md), [HEAP-SEYDA-OVERLAP-32](../bugs/HEAP-SEYDA-OVERLAP-32.md).
 
@@ -513,7 +513,7 @@ The shallow per-chunk trees and the far smaller number of models sent to the ren
 - CHIM spends 17-28 % more time outside the 3D view (streaming and the frame world), measured at two of the cameras.
 - The JIT figures have no drift-control rerun and vary about 2 times between busy-host sessions; a quiet-host session is still to be measured.
 
-**Read more:** [Draft v0.0.33 release notes, frame time](../RELEASE-v0.0.33.md#frame-time-and-renderer-counters); [Measurements behind the release charts](../performance/CHIM-v0.0.33-MEASUREMENTS.json); [CHIM ideas: the slow-accelerator reality](IDEAS.md#the-slow-accelerator-reality).
+**Read more:** [Draft v0.0.33 release notes, frame time](../releases/notes/RELEASE-v0.0.33.md#frame-time-and-renderer-counters); [Measurements behind the release charts](../performance/CHIM-v0.0.33-MEASUREMENTS.json); [CHIM ideas: the slow-accelerator reality](IDEAS.md#the-slow-accelerator-reality).
 
 **Bugs:** [BENCH-JIT-PROFILE-32](../bugs/BENCH-JIT-PROFILE-32.md), [CHIM-VIEW-FACES-33](../bugs/CHIM-VIEW-FACES-33.md).
 
@@ -691,7 +691,7 @@ Diagnostic logs stay in memory during play and are written on request or when th
 
 - Autosaves are not covered by these runs.
 
-**Read more:** [Draft v0.0.33 release notes](../RELEASE-v0.0.33.md).
+**Read more:** [Draft v0.0.33 release notes](../releases/notes/RELEASE-v0.0.33.md).
 
 **Bugs:** [BOOT-VOLUME-NOT-VALIDATED-33](../bugs/BOOT-VOLUME-NOT-VALIDATED-33.md).
 
@@ -807,7 +807,7 @@ tools/build.py --builder chim builds the CHIM world from your own Morrowind data
 
 - Different builds and host loads, so wall times are not a matched pair; a matched from-scratch pair on a quiet host is still to be run.
 
-**Read more:** [Builder types](build_guide/BUILDER_TYPES.md); [CHIM build statistics](STATS.md); [Draft v0.0.33 release notes, build time](../RELEASE-v0.0.33.md#build-time).
+**Read more:** [Builder types](build_guide/BUILDER_TYPES.md); [CHIM build statistics](STATS.md); [Draft v0.0.33 release notes, build time](../releases/notes/RELEASE-v0.0.33.md#build-time).
 
 **Bugs:** [CHIM-LEGACY-CHAIN-33](../bugs/CHIM-LEGACY-CHAIN-33.md), [CHIM-RECEIPT-COMMIT-33](../bugs/CHIM-RECEIPT-COMMIT-33.md).
 

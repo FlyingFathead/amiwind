@@ -48,10 +48,10 @@ TEXT_LIMIT = 262144
 # The CHIM inclusion ledger (tools/chim_inclusion.py) grows with every packaged build, like the register.
 LARGE_TEXT = {"docs/bugs/bugs.json": 1048576, "docs/BUGS.md": 1048576, "docs/chim/cell-progress-reference.json": 1048576,
               "amiwind-toolkit/chim-inclusion.json": 1048576, "amiwind-toolkit/chim-inclusion.js": 1048576}
-# Whitespace baselines (docs/PATCH-v<version>.json) list every file of the published base release and
-# grow with the repository (RELEASE-PATCH-SIZE-33).
+# Whitespace baselines (docs/releases/patches/PATCH-v<version>.json; at the docs/ root until v0.0.54) list every
+# file of the published base release and grow with the repository (RELEASE-PATCH-SIZE-33).
 # The known-good stair records (tools/stair_records.py, one entry per CHIM frame) grow with the CHIM world.
-LARGE_TEXT_PATTERNS = ((re.compile(r"docs/PATCH-v[0-9][0-9A-Za-z.-]*[.]json"), 1048576),
+LARGE_TEXT_PATTERNS = ((re.compile(r"docs/releases/patches/PATCH-v[0-9][0-9A-Za-z.-]*[.]json"), 1048576),
                        (re.compile(r"config/stair-records/[0-9A-Za-z._-]+[.]json"), 1048576))
 
 

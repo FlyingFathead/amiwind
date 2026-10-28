@@ -419,5 +419,5 @@ others), with a "fits a 68040?" note for each and what it means for these steps:
 [streaming research](STREAMING_RESEARCH.md).
 
 See also: [the roadmap](../ROADMAP.md#cell-crossings-one-continuous-world-19-october-2026),
-[the v0.0.45 plan](../PLAN-v0.0.45.md), [CHIM engine](ENGINE.md),
+[the v0.0.45 plan](../history/plans/PLAN-v0.0.45.md), [CHIM engine](ENGINE.md),
 [CHIM-CROSSING-SLUGGISH-43](../bugs/CHIM-CROSSING-SLUGGISH-43.md).

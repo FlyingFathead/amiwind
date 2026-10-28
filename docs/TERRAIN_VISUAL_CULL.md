@@ -34,7 +34,7 @@ native route. Wider-world coverage and native appearance/ground/NPC traversal
 remain open. This is bounded experimental source work, not global certification.
 
 See [canonical culling evidence](CANONICAL_TERRAIN_CULLING.md) and
-[stable preparation](RELEASE-v0.0.28.md) for current scope.
+[stable preparation](releases/notes/RELEASE-v0.0.28.md) for current scope.
 
 ## Historical candidate010 rejection and 011 diagnosis
 

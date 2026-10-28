@@ -680,6 +680,11 @@ qboolean AW_ActorStep(edict_t *,vec3_t,double);
 void AW_AnimInit(void);
 void AW_AnimKitInit(void);
 void AW_AnimKitTick(void);
+/* DemoWind, the effects test kit (aw_demowind.c, docs/DEMOWIND.md). */
+void AW_DemoWindInit(void);
+void AW_DemoWindDraw(void);
+int AW_DemoWindActive(void);
+int AW_DemoWindKey(int key,int down);
 /* The Halloween scene (aw_halloween.c, aw_halloween.h). */
 void AW_HalloweenInit(void);
 void AW_HalloweenTick(void);

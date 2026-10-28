@@ -431,11 +431,12 @@ class Receipts(Base):
 class Presets(Base):
     def test_every_preset_is_its_recipe(self):
         # every old table row is a recipe; seyda-chim, lava-pools, vivec-palace, vivec-city-exterior and redmountain
-        # came later, and anim-stage (v0.0.52, SKEL-ANIM-STAGE-52), halloween (v0.0.53) and combat-playground (v0.0.54)
+        # came later, and anim-stage (v0.0.52, SKEL-ANIM-STAGE-52), halloween (v0.0.53), combat-playground (v0.0.54)
+        # and demowind (v0.0.55, docs/DEMOWIND.md)
         self.assertEqual(sorted(row['name'] for row in mp.presets()
                                 if row['name'] not in ('seyda-chim', 'lava-pools', 'vivec-palace', 'vivec-city-exterior',
                                                        'redmountain', 'anim-stage', 'halloween', 'magic',
-                                                       'combat-playground')),
+                                                       'combat-playground', 'demowind')),
                          sorted(row['name'] for row in OLD_PRESETS))
         # vivec-arena-pit moved to the interior scope (MINIWIND-NO-INTERIOR-SCOPE-42): its room only
         self.assertEqual(mp.find('vivec-arena-pit')['scope'], 'interior')

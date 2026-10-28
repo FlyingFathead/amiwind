@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Performance charts for the public docs, as plain SVG (renders on GitHub, diffs
 as text). The numbers are measurements recorded in the docs they illustrate:
-docs/performance/TOWN-VISIBILITY.md and docs/SEYDA_NEEN_PERFORMANCE.md.
+docs/performance/TOWN-VISIBILITY.md and docs/history/superseded/SEYDA_NEEN_PERFORMANCE.md.
 
 Usage: perf_charts.py write [--out docs/images]   (rewrite the SVGs)
        perf_charts.py check [--out docs/images]   (fail if they are stale)

@@ -135,7 +135,7 @@ maps, removes its legacy region maps and fails the build if any is still in the
 image (`build.json` `chim_world.legacy_check`). Extra towns that are not CHIM
 areas (the Vivec Arena preview) are left out of a CHIM image. The open world between the towns was made of the
 legacy builder's maps until the regional CHIM builds; since v0.0.43 every exterior cell of Vvardenfell is a CHIM
-frame and no legacy exterior map is left in the image ([release notes](RELEASE-v0.0.43.md)). A CHIM build with Seyda Neen
+frame and no legacy exterior map is left in the image ([release notes](releases/notes/RELEASE-v0.0.43.md)). A CHIM build with Seyda Neen
 converts it from your data and checks its frame maps against the converted
 region maps; from v0.0.35 the recorded v0.0.31 Seyda Neen maps
 (`--seyda-recorded DIR`) are optional and NOT RECOMMENDED since v0.0.31 (legacy; the default converts
@@ -181,7 +181,7 @@ are assembled in deterministic input order. Census VIS uses the same limit; map
 lighting runs one thread per map so its output is reproducible.
 FFmpeg and numerical-library threads are bounded to avoid nested oversubscription.
 The pinned QBSP and final BSP/HDF assembly remain serial. See
-[parallel build details and verification](PARALLEL_BUILD.md).
+[parallel build details and verification](history/superseded/PARALLEL_BUILD.md).
 
 Choose your Morrowind installation. The tool validates its files, discovers
 existing dependencies, proposes missing packages/downloads with their source
@@ -265,7 +265,7 @@ to switch to its newly prepared environment. No game files or ROMs are downloade
 Windows 11 users: use `setup-windows.cmd` / `setup-windows.ps1` and
 `build.cmd` / `build.ps1` with the [Windows guide](WINDOWS_BUILD.md). The shared
 pipeline has completed native Windows conversion, corrected image assembly and
-WinUAE game entry at the [dated checkpoint](VALIDATION-WINDOWS-2026-10-02.md).
+WinUAE game entry at the [dated checkpoint](history/validation/VALIDATION-WINDOWS-2026-10-02.md).
 Native Windows remains experimental. Docker Desktop on WSL2 has separate build
 evidence; ordinary Ubuntu-under-WSL2 is still a separately documented trial.
 

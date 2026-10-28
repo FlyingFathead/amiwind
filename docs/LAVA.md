@@ -51,8 +51,8 @@ never from texture colour or names alone.
   AmiWind's game code, and the C version (`PF_WaterMove`) is compiled only under `QUAKE2`. The lava splash effect
   (`R_LavaSplash`, `r_part.c`) exists but is too heavy to run continuously (it spawns over a thousand particles).
 - **Plans that never became work:** the v0.0.29 plan's "weather, storms and lava study"
-  ([PLAN-v0.0.29.md](PLAN-v0.0.29.md#weather-storms-and-lava-study)), the lighting source study
-  ([LANTERNS_AND_TORCH_LIGHTING.md](LANTERNS_AND_TORCH_LIGHTING.md#source-study-light-attachments-and-lava-are-separate-contracts)),
+  ([PLAN-v0.0.29.md](history/plans/PLAN-v0.0.29.md#weather-storms-and-lava-study)), the lighting source study
+  ([LANTERNS_AND_TORCH_LIGHTING.md](history/superseded/LANTERNS_AND_TORCH_LIGHTING.md#source-study-light-attachments-and-lava-are-separate-contracts)),
   the world map study ([WORLD_MAP_AND_JOURNAL.md](WORLD_MAP_AND_JOURNAL.md#v0029-lava-and-weather-map-study)) and
   the roadmap's "fires and lava" entry ([ROADMAP.md](ROADMAP.md#near-future-fires-and-lava-across-the-world)).
   Self-lit materials (v0.0.30, `dbg emissive`) made lava textures glow but left them solid models. No bug or tracker

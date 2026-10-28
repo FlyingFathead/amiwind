@@ -1,10 +1,11 @@
 # AmiWind release workflow
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.54 (28 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [Where release files go](#where-release-files-go)
 - [Mandatory change records](#mandatory-change-records)
 - [Historical rc1 handoff (published)](#historical-rc1-handoff-published)
 - [Historical v0.0.25 complete update package](#historical-v0025-complete-update-package)
@@ -30,11 +31,22 @@ _Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 Official project: https://github.com/FlyingFathead/amiwind/
 
 Published public-source base for the current v0.0.39 final preparation:
-**[v0.0.38 - Lava Is All You Need (And A Hint Of Tel Uvirith)](RELEASE-v0.0.38.md)**,
+**[v0.0.38 - Lava Is All You Need (And A Hint Of Tel Uvirith)](releases/notes/RELEASE-v0.0.38.md)**,
 13 October 2026, commit `d40fa70b4787da09b8a6d5006f46ef6fb7e56c6f`.
 The maintainer performs Git/GitHub publishing from Linux. Release archives and tags
 remain immutable; source/documentation corrections use follow-up commits.
 Public source publication and private image validation/delivery are separate.
+
+## Where release files go
+
+Since v0.0.55 a release writes its notes to `docs/releases/notes/RELEASE-v<version>.md` (dev and rc notes beside
+them), its whitespace baseline to `docs/releases/patches/PATCH-v<version>.json`, adds its row to
+[releases](releases/README.md) and regenerates the [documentation index](README.md)
+(`python3 tools/docs_index.py write`). One-off records (checkpoint validations, local release candidates, feedback,
+investigations, per-version validations, plans, merges) go to `docs/history/<kind>/`, journals to `docs/journals/`.
+Nothing is written at the docs/ root except topic documents, and nothing in docs/ is deleted: a document that is
+replaced moves to `docs/history/superseded/` with a line naming its replacement. The gate refuses a per-version file
+at the docs/ root and any relative link that names no file (tests/test_docs_layout.py).
 
 ## Mandatory change records
 

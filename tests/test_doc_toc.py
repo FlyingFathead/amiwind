@@ -224,8 +224,8 @@ class AnchorLinkTests(unittest.TestCase):
 
 class ScopeTests(unittest.TestCase):
     def test_readme_frozen_generated_and_licences_are_excluded(self):
-        for rel in ('README.md', 'docs/journals/BUG_JOURNAL-v0.0.29.md', 'docs/RELEASE-v0.0.31.md',
-                    'docs/BUGS-v0.0.29-RC1.md', 'docs/RC2_ISSUE_CHECKPOINT.md', 'docs/PATCH-v0.0.20.md',
+        for rel in ('README.md', 'docs/journals/BUG_JOURNAL-v0.0.29.md', 'docs/releases/notes/RELEASE-v0.0.31.md',
+                    'docs/history/checkpoints/BUGS-v0.0.29-RC1.md', 'docs/history/checkpoints/RC2_ISSUE_CHECKPOINT.md', 'docs/releases/patches/PATCH-v0.0.20.md',
                     'docs/BUGS.md', 'docs/AMIWIND_CONSOLE_COMMANDS.md', 'LICENSE.md', 'engine/COPYING.md'):
             self.assertTrue(doc_toc.excluded(rel), rel)
         for rel in ('docs/ROADMAP.md', 'docs/bugs/README.md', 'docs/LICENSING_AND_CREDITS.md'):
@@ -281,7 +281,9 @@ class GeneratedLineTests(unittest.TestCase):
     SOURCES = {'docs/BUGS.md': 'docs/bugs/bugs.json', 'docs/bugs/CHIM_TRACKER.md': 'docs/bugs/bugs.json',
                'docs/chim/FEATURES.md': 'docs/chim/features.json',
                'docs/AMIWIND_CONSOLE_COMMANDS.md': 'config/debug-commands.txt',
-               'docs/chim/CELL_TRACKER.md': 'cell-progress.json'}
+               'docs/chim/CELL_TRACKER.md': 'cell-progress.json',
+               'docs/README.md': 'docs/README.topics.json', 'docs/releases/README.md': 'docs/releases/',
+               'docs/history/README.md': 'docs/history/MOVES.json'}
 
     def test_the_line(self):
         self.assertEqual(doc_toc.generated_line('docs/bugs/bugs.json', 'v0.0.46-dev1'),

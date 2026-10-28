@@ -465,7 +465,7 @@ scenery reference IDs remain covered; the maximum resident count is 654.
 The restored original bm019 region repaired the first two reported native views,
 with no surface/edge overflow (5,975 peak surface fragments, 11,320 edges).
 Final dev2 full-scene captures and memory results are recorded in
-[the investigation record](INVESTIGATION-v0.0.24-dev2.md). This does not certify
+[the investigation record](history/investigations/INVESTIGATION-v0.0.24-dev2.md). This does not certify
 every facade in the city. The dev1 visual inspection was insufficient: reference
 counts and successful collision checks did not establish intact visible meshes.
 

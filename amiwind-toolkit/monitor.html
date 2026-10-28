@@ -36,7 +36,7 @@ h2{font-size:15px;margin:0 0 8px;color:#ffe28a}
 table{border-collapse:collapse;width:100%;font-size:12px}
 td,th{padding:3px 6px;border-bottom:1px solid #243649;text-align:left;vertical-align:top}
 td.passed{color:#7dffa6}td.failed{color:#ff7070}td.running{color:#8bd5ff}
-.right{min-width:0}#timeline{max-width:100%}#acttail{margin:6px 0 4px;max-height:12em;overflow:auto;background:#0b121a;border:1px solid #2c4256;border-radius:6px;padding:6px;font:11px/1.3 ui-monospace,Consolas,monospace;white-space:pre-wrap;word-break:break-all}.silent{color:#ffb070;font-weight:600}.red{color:#ff5050;font-weight:700}#timelinechart{overflow:hidden;touch-action:none;cursor:crosshair}#timelinechart svg{display:block}#tlbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:6px}#tlbar input{background:#203346;color:#edf3fa;border:1px solid #456;border-radius:4px}#timelinedetail{margin:6px 0 0;white-space:pre-wrap;font:11px/1.35 ui-monospace,Consolas,monospace;color:#ffe9b0}#timelinedetail:empty{display:none}#timeline.maximized{position:fixed;inset:0;z-index:1000;margin:0;border-radius:0;overflow:auto;background:#162433}#timeline:fullscreen{overflow:auto;background:#162433}#timelinechart rect{cursor:pointer}#timelinetip{min-height:1.4em;margin-top:4px}
+.lens{background:none;border:0;cursor:pointer;padding:0 2px;font-size:12px}.runlink{cursor:pointer;text-decoration:underline dotted}tr.picked td{background:#22384d}.right{min-width:0}#timeline{max-width:100%}#acttail{margin:6px 0 4px;max-height:12em;overflow:auto;background:#0b121a;border:1px solid #2c4256;border-radius:6px;padding:6px;font:11px/1.3 ui-monospace,Consolas,monospace;white-space:pre-wrap;word-break:break-all}.silent{color:#ffb070;font-weight:600}.red{color:#ff5050;font-weight:700}#timelinechart{overflow:hidden;touch-action:none;cursor:crosshair}#timelinechart svg{display:block}#tlbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:6px}#tlbar input{background:#203346;color:#edf3fa;border:1px solid #456;border-radius:4px}#timelinedetail{margin:6px 0 0;white-space:pre-wrap;font:11px/1.35 ui-monospace,Consolas,monospace;color:#ffe9b0}#timelinedetail:empty{display:none}#timeline.maximized{position:fixed;inset:0;z-index:1000;margin:0;border-radius:0;overflow:auto;background:#162433}#timeline:fullscreen{overflow:auto;background:#162433}#timelinechart rect{cursor:pointer}#timelinetip{min-height:1.4em;margin-top:4px}
 .error{color:#ffaaaa}
 </style>
 <script src="header.js"></script>
@@ -160,6 +160,7 @@ function lowNow() {
   const c = S.liveCores || [], rs = redStretches(c, redSettings().threshold, redSettings().min), last = rs[rs.length - 1];
   return last && c.length && last.end === c[c.length - 1][0] ? ' · UNDER ' + redSettings().threshold + ' CORES FOR ' + fmtS(last.end - last.start) : '';
 }
+const RAM_ORANGE = 0.20, RAM_RED = 0.10;   // the RAM line's colours: under this share of the limit available
 function renderProgress(p) {
   const status = p ? p.status || '-' : 'no build-progress.json';
   $('status').textContent = status; $('status').className = 'big ' + (p ? p.status : '');
@@ -181,7 +182,24 @@ function renderProgress(p) {
   let grid = $('coregrid');
   if (!grid) { grid = el('div'); grid.id = 'coregrid'; $('facts').after(grid); }
   grid.replaceChildren();
+  // RAM above the cores (TOOLKIT-MONITOR-NO-MEMORY-55): used and available, orange under RAM_ORANGE of the limit
+  // available, red under RAM_RED; then the cores in numbers above their squares
+  let ram = $('ramline'), coreText = $('coreline');
+  if (!ram) { ram = el('div'); ram.id = 'ramline'; grid.before(ram); }
+  if (!coreText) { coreText = el('div'); coreText.id = 'coreline'; grid.before(coreText); }
+  const m = p.memory;
+  if (m && Number.isFinite(m.used_gib) && Number.isFinite(m.limit_gib) && m.limit_gib > 0) {
+    const avail = Math.max(0, m.limit_gib - m.used_gib), share = avail / m.limit_gib;
+    ram.textContent = 'RAM: ' + m.used_gib.toFixed(1) + ' GiB used, ' + avail.toFixed(1) + ' GiB available (of ' + m.limit_gib.toFixed(1) +
+      ', ' + (m.source || '?') + ') · peak ' + m.peak_gib.toFixed(1) + ' GiB at ' + fmtS(m.peak_seconds) +
+      (m.peak_stages && m.peak_stages.length ? ' (' + m.peak_stages.join(', ') + ')' : '') +
+      (m.low_warnings ? ' · ' + m.low_warnings + ' low-RAM warning' + (m.low_warnings === 1 ? '' : 's') : '');
+    ram.className = share < RAM_RED ? 'red' : share < RAM_ORANGE ? 'silent' : '';
+    ram.title = (100 * share).toFixed(0) + ' % available; orange under ' + (100 * RAM_ORANGE) + ' %, red under ' + (100 * RAM_RED) + ' %';
+  } else ram.textContent = 'RAM: not recorded by this build';
   const total = Math.max(0, Math.round(p.budget || 0)), used = Math.min(total, Math.round(p.cores_now || 0));
+  coreText.textContent = total ? 'Cores: ' + (p.cores_now != null ? p.cores_now : '-') + ' busy of ' + total + ' threads' + lowNow() : '';
+  coreText.className = lowNow() ? 'red' : '';
   if (p.status === 'running' && total) {
     const low = lowNow(), under = (p.cores_now || 0) < total / 2;
     const fill = low ? '#e04848' : under ? '#e0a23a' : '#3fbf7a';
@@ -326,11 +344,12 @@ function renderTimeline(bars, opts) {
   const cores = opts.cores && opts.cores.length > 1 ? opts.cores : (opts.live && S.liveCores && S.liveCores.length > 1 ? S.liveCores : null);
   const red = cores ? redStretches(cores, redSettings().threshold, redSettings().min) : [];
   S.red = red;
+  const mem = opts.memory && opts.memory.length > 1 ? opts.memory : (opts.live && S.liveMemory && S.liveMemory.length > 1 ? S.liveMemory : null);
   const anySections = bars.some(b => secs[b.name] && ((secs[b.name].sections || []).length || (secs[b.name].trace || []).length));
   const rows = lanes(bars), full = !!S.full;
   const W = Math.max(600, (chart.clientWidth || 900) - 2);
   // the cores label has its own 16 px band above the plot (TOOLKIT-TIMELINE-CORES-TOP-48: the line's top ran into it)
-  const coreH = cores ? (full ? 140 : 70) : 0, top = 24 + coreH, plotTop = 18, plotBottom = 12 + coreH;
+  const coreH = cores || mem ? (full ? 140 : 70) : 0, top = 24 + coreH, plotTop = 18, plotBottom = 12 + coreH;
   const avail = full && typeof window !== 'undefined' && window.innerHeight ? window.innerHeight - 140 : 0;
   const rowH = Math.max(anySections ? 50 : 14, avail ? Math.floor((avail - top - 18) / Math.max(1, rows)) : 0);
   const H = top + rows * rowH + 18;
@@ -358,6 +377,16 @@ function renderTimeline(bars, opts) {
       if (inside.length > 1) svg += '<polyline fill="none" stroke="#ff4040" stroke-width="2" points="' + inside.map(c => cx(c[0]).toFixed(1) + ',' + y(c[1]).toFixed(1)).join(' ') + '"/>';
     }
     svg += '<text x="4" y="11" fill="#9fb3c8" font-size="9">cores (max ' + cap + '); red: under ' + redSettings().threshold + ' cores for ' + redSettings().min + ' s or more · ' + red.length + ' stretch' + (red.length === 1 ? '' : 'es') + '</text>';
+  }
+  if (mem) {
+    // memory in use (orange), scaled to the container's limit or the machine's RAM; the peak marked with a dot
+    const mcap = Math.max(0.1, opts.memLimit || 0, ...mem.map(m => m[1])), my = v => plotTop + (plotBottom - plotTop) * (1 - v / mcap);
+    const mp = mem.filter(m => m[0] >= view.t0 - 60 && m[0] <= view.t1 + 60);
+    svg += '<polyline fill="none" stroke="#ffb454" stroke-width="1.2" points="' + mp.map(m => cx(m[0]).toFixed(1) + ',' + my(m[1]).toFixed(1)).join(' ') + '"/>';
+    const peak = opts.memPeak || mem.reduce((a, m) => (m[1] > a[1] ? m : a), mem[0]);
+    if (peak && vis(peak[0], peak[0])) svg += '<circle cx="' + cx(peak[0]).toFixed(1) + '" cy="' + my(peak[1]).toFixed(1) + '" r="3" fill="#ffb454"><title>memory peak ' + peak[1] + ' GiB at ' + fmtS(peak[0]) + '</title></circle>';
+    const now = mem[mem.length - 1][1];
+    svg += '<text x="' + (W - 4) + '" y="11" fill="#ffb454" font-size="9" text-anchor="end">memory ' + now + ' of ' + (opts.memLimit || '?') + ' GiB · peak ' + (peak ? peak[1] + ' GiB at ' + fmtS(peak[0]) : '-') + '</text>';
   }
   if (S.sel && vis(S.sel.start, S.sel.end)) svg += '<rect x="' + cx(S.sel.start).toFixed(1) + '" y="0" width="' + Math.max(2, cx(S.sel.end) - cx(S.sel.start)).toFixed(1) + '" height="' + (H - 14) +
     '" fill="#ffe28a" fill-opacity="0.16" stroke="#ffe28a" stroke-width="1"/>';
@@ -485,16 +514,35 @@ function profileBars(t) {
 }
 function renderResults(rows) {
   if (!rows || !rows.length) { $('results').textContent = 'No results.'; return; }
+  S.resultRows = rows;
   const table = el('table'), head = el('tr');
-  for (const h of ['finished', 'kind', 'status', 'time', 'run']) head.append(el('th', '', h));
+  for (const h of ['', 'finished', 'kind', 'status', 'time', 'run']) head.append(el('th', '', h));
   table.append(head);
+  // a magnifier on the rows whose build run folder the monitor can read: opens that run (stages, timeline, RAM, logs)
+  // and highlights its row (TOOLKIT-RESULTS-NO-OPEN-55); gates have no run folder
+  const known = new Set((S.runList || []).map(x => x.run));
   for (const r of rows.slice(0, 15)) {
-    const tr = el('tr');
-    tr.append(el('td', '', String(r.finished || '').slice(5, 16)), el('td', '', (r.kind || '') + (r.gate ? ' ' + r.gate : '') + (r.dry_run ? ' (dry run)' : '')),
-      el('td', r.status || '', r.status || ''), el('td', '', fmtS(r.seconds)), el('td', '', String(r.run_name || '').replace(/^\d{4}_\d\d_\d\d_/, '')));
+    const tr = el('tr'), name = String(r.run_name || ''), lens = el('td');
+    if (known.has(name)) {
+      const b = el('button', 'lens', '\u{1F50D}');
+      b.title = 'Open ' + name + ' in the monitor'; b.setAttribute('aria-label', b.title);
+      b.onclick = () => openRun(name);
+      lens.append(b);
+    }
+    const label = el('td', known.has(name) ? 'runlink' : '', name.replace(/^\d{4}_\d\d_\d\d_/, ''));
+    if (known.has(name)) { label.onclick = () => openRun(name); label.title = 'Open in the monitor'; }
+    if (name && name === S.run) tr.className = 'picked';
+    tr.append(lens, el('td', '', String(r.finished || '').slice(5, 16)), el('td', '', (r.kind || '') + (r.gate ? ' ' + r.gate : '') + (r.dry_run ? ' (dry run)' : '')),
+      el('td', r.status || '', r.status || ''), el('td', '', fmtS(r.seconds)), label);
     table.append(tr);
   }
   $('results').replaceChildren(table);
+}
+function openRun(name) {
+  // a picked run stops "follow latest" (as choosing it in the run list does) and is shown at once
+  $('followlatest').checked = false; saveFollowPrefs();
+  $('run').value = name; chooseRun(name);
+  renderResults(S.resultRows);
 }
 function appendLog(text, reset) {
   const pre = $('log'), atEnd = pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 20;
@@ -571,8 +619,7 @@ async function activity(running) {
   row('Trace', S.trace ? S.trace + ' · ' + fmtB(S.tsize) + ' · grew ' + ago(S.tgrew) : 'no trace for this stage', S.tgrew && nowMs - S.tgrew > 60000 ? 'silent' : '');
   row('Last 10 s', count('w') + ' files written · ' + count('r') + ' read · ' + count('c') + ' code entries');
   row('Code now', S.tool || '-');
-  row('Cores now', p.cores_now != null ? p.cores_now + (p.budget ? ' of ' + p.budget : '') : '-');
-  const tail = $('acttail'), atEnd = tail.scrollTop + tail.clientHeight >= tail.scrollHeight - 10;
+  row('Cores now', p.cores_now != null ? p.cores_now + (p.budget ? ' of ' + p.budget : '') : '-');  const tail = $('acttail'), atEnd = tail.scrollTop + tail.clientHeight >= tail.scrollHeight - 10;
   tail.textContent = S.tlines.slice(-ACT_KEEP).map(l => l.text).join('\n');
   if (atEnd) tail.scrollTop = tail.scrollHeight;
 }
@@ -607,6 +654,13 @@ async function tick() {
         const lastT = S.liveCores.length ? S.liveCores[S.liveCores.length - 1][0] : -1;
         if (S.progress.elapsed_seconds > lastT) S.liveCores.push([S.progress.elapsed_seconds, S.progress.cores_now]);
       }
+      // the memory curve beside the cores (TOOLKIT-MONITOR-NO-MEMORY-55): GiB in use per poll, from build-progress.json
+      const m = S.progress && S.progress.memory;
+      if (m && Number.isFinite(m.used_gib) && Number.isFinite(S.progress.elapsed_seconds)) {
+        S.liveMemory = S.liveMemory || [];
+        const lastM = S.liveMemory.length ? S.liveMemory[S.liveMemory.length - 1][0] : -1;
+        if (S.progress.elapsed_seconds > lastM) S.liveMemory.push([S.progress.elapsed_seconds, m.used_gib]);
+      }
       await refreshLists(false);
       renderProgress(S.progress);
       if (S.progress && S.progress.status === 'running') await activity((S.progress.stages || []).filter(s => s.status === 'running').map(s => s.name));
@@ -622,15 +676,18 @@ async function tick() {
           const st = await get('/monitor/run/' + encodeURIComponent(S.run) + '/state.json');
           S.state = st.ok ? st.state : null;
         }
+        const mem = S.progress.memory || {};
         const bars = liveBars(S.state, S.progress), o = {live: true, now: S.progress.elapsed_seconds, label: 'Live, from build-state.json',
-          budget: S.progress.budget, empty: 'No stage start times in build-state.json yet.'};
+          budget: S.progress.budget, empty: 'No stage start times in build-state.json yet.',
+          memLimit: mem.limit_gib, memPeak: Number.isFinite(mem.peak_seconds) ? [mem.peak_seconds, mem.peak_gib] : null};
         renderTimeline(bars, o);
         if (await loadSections(bars)) renderTimeline(liveBars(S.state, S.progress), o);
       } else if (S.timelineFor !== S.run) {
         S.timelineFor = S.run;
         const t = await get('/monitor/run/' + encodeURIComponent(S.run) + '/timeline.json');
         if (t.ok && t.timeline) {
-          const o = {now: t.timeline.wall_seconds, cores: t.timeline.cores, budget: t.timeline.budget, label: 'Finished run, from build-profile.json'};
+          const o = {now: t.timeline.wall_seconds, cores: t.timeline.cores, budget: t.timeline.budget, label: 'Finished run, from build-profile.json',
+            memory: t.timeline.memory, memLimit: t.timeline.memory_limit_gib, memPeak: t.timeline.memory_peak};
           renderTimeline(profileBars(t.timeline), o);
           if (await loadSections(profileBars(t.timeline))) renderTimeline(profileBars(t.timeline), o);
         }
@@ -665,6 +722,7 @@ async function refreshRuns() {
   }
   if (keep && runs.some(x => x.run === keep)) sel.value = keep;
   S.runList = runs;
+  if (S.resultRows) renderResults(S.resultRows);               // the magnifiers need the run list
   if ($('followlatest').checked && runs.length) {
     for (const x of runs.slice(0, 5)) {
       if (!x.progress) continue;

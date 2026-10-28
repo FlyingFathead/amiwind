@@ -39,7 +39,7 @@ _Last updated with AmiWind v0.0.51 (25 October 2026)._
 
 **Latest release:** v0.0.51 - Let There Be More Inner Light (25 October 2026, CHIM Engine v0.2.2). Akulakhan's
 Chamber loads on 32 MB, every interior is lit with the light the original gives it from above, and the music plays on
-through the loads ([release notes](RELEASE-v0.0.51.md)). Since v0.0.48, 1,132 of the 1,134 base-game interiors are
+through the loads ([release notes](releases/notes/RELEASE-v0.0.51.md)). Since v0.0.48, 1,132 of the 1,134 base-game interiors are
 CHIM rooms with the actors standing in them; since v0.0.50 every door leads in and back out.
 Since v0.0.43 every exterior cell of Vvardenfell is on the CHIM engine: 1,409 cells, 1,348 in one-cell region
 frames and 61 in the town frames of Balmora, Seyda Neen and Vivec
@@ -290,7 +290,7 @@ RAM does not enlarge AmiWind's **11 MiB game heap**, defined in the
 engine's cache instead ([next answer](#can-amiwind-use-more-ram-if-my-amiga-has-it)).
 Earlier measurements on the classic world showed where more would help: a fully loaded Seyda Neen sub-cell leaves only about 2.6 MB
 of the heap for cached models, so each crossing evicts and re-reads actor
-models (see [Seyda Neen performance](SEYDA_NEEN_PERFORMANCE.md)). A larger heap
+models (see [Seyda Neen performance](history/superseded/SEYDA_NEEN_PERFORMANCE.md)). A larger heap
 on a high-memory machine could keep them across crossings; this is untested.
 CPU rendering, AGA
 presentation, loading and audio still need to be measured together on the
@@ -534,7 +534,7 @@ still evolving. Individual optimization passes have their own implementation
 and validation status. For example, the bounded hidden-surface detector has
 produced zero house-interior cuts in documented trials; broader automatic
 removal remains unfinished. See the
-[measured findings](MAP_OPTIMIZATION_FINDINGS_2026-10-04.md) and
+[measured findings](history/investigations/MAP_OPTIMIZATION_FINDINGS_2026-10-04.md) and
 [hidden-surface status](EXTERIOR_HIDDEN_SURFACES.md).
 
 The shared-sky work gives a concrete example of a completed reduction:
@@ -562,12 +562,12 @@ result are substantial parts of that work. The current scope is described below.
 ## How much of Morrowind is currently working?
 
 As of **25 October 2026**, the latest release is **v0.0.51: Let There Be More Inner Light** (CHIM Engine v0.2.2;
-[release notes](RELEASE-v0.0.51.md)). Since
+[release notes](releases/notes/RELEASE-v0.0.51.md)). Since
 v0.0.43 (**Let There Be CHIM: Vvardenfell's Outdoors, All of It**) every exterior cell of Vvardenfell runs on the CHIM
 engine (1,409 cells: 1,292 land cells, 98 sea-floor cells and 19 open-sea cells; [what these numbers count](chim/CELL_TRACKER.md#what-we-count)), from Seyda Neen, Balmora and the whole city of Vivec to Ald-ruhn, Maar Gan, Suran and Red
 Mountain; no classic region maps are left outdoors. Since v0.0.48, 1,132 of the 1,134 base-game interiors are CHIM
 rooms; the prison ship and the census office, where the opening sequence runs, stay classic room maps on purpose
-until rooms have object state ([v0.0.48 notes](RELEASE-v0.0.48.md)). The [CHIM Progress Tracker](chim/PROGRESS_TRACKER.md) shows
+until rooms have object state ([v0.0.48 notes](releases/notes/RELEASE-v0.0.48.md)). The [CHIM Progress Tracker](chim/PROGRESS_TRACKER.md) shows
 which cell is which. "Release" here identifies the project's release track; AmiWind as a whole is still an early
 work in progress.
 
@@ -620,7 +620,7 @@ without them, started automatically on a 68060:
 [trapped instructions per frame](68060.md#trapped-instructions-per-frame).
 
 See the [current overview](../README.md),
-[v0.0.44 release notes](RELEASE-v0.0.44.md),
+[v0.0.44 release notes](releases/notes/RELEASE-v0.0.44.md),
 [project state](PROJECT_STATE.md) and [roadmap](ROADMAP.md) for maintained scope
 and outstanding work.
 

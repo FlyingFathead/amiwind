@@ -97,6 +97,19 @@ class WorkflowLayoutTests(unittest.TestCase):
         self.assertIn("github.event_name == 'schedule'", block)
         self.assertRegex(self.text, r"(?m)^  schedule:\n    - cron: '[^']+'$")
 
+    def test_the_suite_never_runs_on_a_tag_push(self):
+        # CI-TAG-RUN-DUPLICATE-54 (a regression class, beside FAILURE_LOOKUP 122): the v0.0.54 tag push ran the whole
+        # suite again on a commit main had already passed. The tests are skipped on tag refs (the dry-run needs them);
+        # a tag run keeps the from-nothing bootstrap only.
+        self.assertRegex(self.jobs['tests'], r"(?m)^    if: \$\{\{ !startsWith\(github\.ref, 'refs/tags/'\) \}\}$")
+        self.assertEqual(self.text.count('tools/run_tests.py'), 1)   # nowhere else runs the suite
+        self.assertNotIn('run_tests.py', self.jobs['tools-from-nothing'])
+
+    def test_actions_cache_runs_on_node_24(self):
+        # actions/cache v4 ran on Node 20, which GitHub retires: v5.1.0 (Node 24), its commit read from the tag
+        for line in re.findall(r'uses: (actions/cache/\S+)', self.text):
+            self.assertTrue(line.endswith('@caa296126883cff596d87d8935842f9db880ef25'), line)
+
     def test_actions_are_pinned_by_commit(self):
         for line in re.findall(r'uses: (\S+)', self.text):
             self.assertRegex(line, r'^[\w.-]+/[\w./-]+@[0-9a-f]{40}$', line)

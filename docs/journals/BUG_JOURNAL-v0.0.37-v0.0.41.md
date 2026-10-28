@@ -633,7 +633,7 @@ dev2. No packaged or accepted coverage is added by this source integration.
 
 v0.0.40-dev2 candidate preparation, 15 October 2026: the animation correction
 passes 115 shared converter checks. Regenerated assets, full release gates and
-shipment remain pending. [Candidate notes](../RELEASE-v0.0.40-dev2.md).
+shipment remain pending. [Candidate notes](../releases/notes/RELEASE-v0.0.40-dev2.md).
 
 
 ## NPC-ANIMATION-OFFSET-40: rotating simplification offsets, 15 October 2026

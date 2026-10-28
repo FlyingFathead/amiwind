@@ -34,7 +34,7 @@ separate directories outside the source tree (ignored `out/` is also permitted).
 No existing context, evidence or volume is deleted. Pick new directories on a
 retry. The default named volume `amiwind-docker-builds` retains Linux build files;
 `--volume` selects another volume. `--jobs` defaults to the host CPU count and
-reaches the build unchanged; see [Parallel host builds](PARALLEL_BUILD.md).
+reaches the build unchanged; see [Parallel host builds](history/superseded/PARALLEL_BUILD.md).
 
 On Windows PowerShell, `python` can be the full path to your installed Python.
 Quoted context/results paths may contain spaces. Docker must be available on
@@ -79,7 +79,7 @@ The `docker-builder` job builds the same allowlisted context, bootstraps tools,
 runs synthetic regressions and performs an asset-free Amiga compile. Diagnostic
 logs/receipts upload on success or failure. Existing native Linux and Windows
 checks remain separate. The hosted Docker job runs for every published release (most recently
-[v0.0.35](RELEASE-v0.0.35.md)). Each source release requires its own exact-commit CI; local prototype
+[v0.0.35](releases/notes/RELEASE-v0.0.35.md)). Each source release requires its own exact-commit CI; local prototype
 success does not establish hosted CI success.
 
 The maintainer-input/export helper completed the full v0.0.26 conversion and exported
@@ -89,7 +89,7 @@ passed. Those are dated full-game results. Published v0.0.27 subsequently
 passed all four hosted jobs, its full Linux Docker suite and asset-free compile,
 with release/download verification complete; these do not establish another
 full-game Docker conversion or target playthrough. See the
-[v0.0.26 record](RELEASE-v0.0.26.md), [v0.0.27 release](RELEASE-v0.0.27.md) and
+[v0.0.26 record](releases/notes/RELEASE-v0.0.26.md), [v0.0.27 release](releases/notes/RELEASE-v0.0.27.md) and
 [Docker roadmap](DOCKER_BUILD_ROADMAP.md).
 
 ## Full private build (game-entry checkpoint passed)
@@ -176,7 +176,7 @@ The cold private full conversion on Windows 11 / WSL 2 completed on 2 October
 regions passed; packaged actor-ground validation found zero unresolved issues.
 It took 35 minutes 3 seconds, excluding provisioning and emulator testing, and
 produced a 3,489,693,696-byte rc1-identity HDF. WinUAE game entry and keyboard/menu
-controls passed. See [cold-build evidence](VALIDATION-DOCKER-2026-10-02.md).
+controls passed. See [cold-build evidence](history/validation/VALIDATION-DOCKER-2026-10-02.md).
 
 ### Final v0.0.26 helper/export build
 

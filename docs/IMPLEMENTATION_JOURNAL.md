@@ -83,7 +83,7 @@ Area chapter: [Seyda Neen, arrival ship and opening tradeoffs](journals/SEYDA_NE
 | CONT records and placements | Planned audit/conversion | No native container/inventory state; see CONTAINERS.md. |
 | Interior CELL and DOOR destinations | Planned separate scene and safe handoff | After exterior acceptance; state must survive geometry unloading. |
 
-See [pipeline](PIPELINE.md), [world mapping](WORLD_MAPPING_PLAN.md),
+See [pipeline](history/superseded/PIPELINE.md), [world mapping](history/superseded/WORLD_MAPPING_PLAN.md),
 [NPC research](OPENMW_REF_NPCS_AND_DIALOGUE.md) and
 [dialogue lookups](DIALOGUE_LOOKUPS.md). Model drawing does not itself supply
 Morrowind's actor assembly or game rules.
@@ -97,7 +97,7 @@ Morrowind's actor assembly or game rules.
 - **Fix/version:** unsigned decode plus plane-lump bounds validation,
   v0.0.13-dev1 / checkpoint-014. No wider field or bank switching needed.
 - **Evidence/regression:** actual-loader boundary fixture and same-camera native
-  pier comparison in [checkpoint-014](CHECKPOINT_014_VALIDATION.md). Retain 32767,
+  pier comparison in [checkpoint-014](history/checkpoints/CHECKPOINT_014_VALIDATION.md). Retain 32767,
   32768 and maximum/bad-index cases. Locally verified; maintainer pending. The separate
   shack-wall report remains open.
 
@@ -123,7 +123,7 @@ Morrowind's actor assembly or game rules.
   and assembly dependencies for hull, hatch, cabin, gangplank and opening actors.
 - **Status:** identified after checkpoint-014; **not fixed**.
 - **Evidence/regression:** owned-master audit summarized in
-  [area scope](SEYDA_NEEN_SCOPE.md). Test arrival and post-registration states
+  [area scope](history/superseded/SEYDA_NEEN_SCOPE.md). Test arrival and post-registration states
   separately. Missing geometry does not prove departure logic was implemented.
 
 ## J004 — movement stuck far from visible architecture
@@ -135,7 +135,7 @@ Morrowind's actor assembly or game rules.
   v0.0.12-dev2 / checkpoint-013. Keeping point hulls unchanged avoided the extra
   memory of an early candidate. Maintainer confirmed the central square repaired.
 - **Regression/limit:** retain the exact route and hull fixtures in
-  [checkpoint-013](CHECKPOINT_013_VALIDATION.md). Bad host samples are not a count
+  [checkpoint-013](history/checkpoints/CHECKPOINT_013_VALIDATION.md). Bad host samples are not a count
   of proven gameplay traps; other approximate collision still needs testing.
 
 ## J005 — tight movement was partly a scale mismatch
@@ -147,7 +147,7 @@ Morrowind's actor assembly or game rules.
   support/step repairs, v0.0.12-dev1 / checkpoint-012. Walking bob retained.
 - **Regression/limit:** untouched startup walking before recovery, narrow
   approaches, stairs both ways and idle slopes. See [movement](PLAYER_MOVEMENT.md)
-  and [checkpoint-012](CHECKPOINT_012_VALIDATION.md). Entity size alone is
+  and [checkpoint-012](history/checkpoints/CHECKPOINT_012_VALIDATION.md). Entity size alone is
   insufficient; later architecture correction is tracked separately in J004.
 
 ## J006 — playlist advanced but the same file played
@@ -158,7 +158,7 @@ Morrowind's actor assembly or game rules.
 - **Fix/version:** construct digits directly and log actual filenames/progress,
   v0.0.11-dev2 / checkpoint-009. Distinct complete songs were verified.
 - **Regression/limit:** actual opens, natural completion and history controls,
-  not just playlist counters. See [checkpoint-009](CHECKPOINT_009_VALIDATION.md).
+  not just playlist counters. See [checkpoint-009](history/checkpoints/CHECKPOINT_009_VALIDATION.md).
   Deadline misses remain a separate issue; zero read errors is not clean audio.
 
 ## J007 — door panels disappeared behind walls
@@ -168,7 +168,7 @@ Morrowind's actor assembly or game rules.
 - **Fix/version:** narrow 1% to 0.001%, v0.0.11-dev3 / checkpoint-010. No draw-last
   override that would display doors through nearer walls.
 - **Regression/limit:** matched cameras with panel/frame/foreground geometry;
-  [checkpoint-010](CHECKPOINT_010_VALIDATION.md). Do not reuse this diagnosis for
+  [checkpoint-010](history/checkpoints/CHECKPOINT_010_VALIDATION.md). Do not reuse this diagnosis for
   the open shack-wall report without reproducing it.
 
 ## J008 — coordinates were drawn but the display stayed stale
@@ -184,7 +184,7 @@ Morrowind's actor assembly or game rules.
 
 Include runtime/pipeline version, source/build hashes, camera/route, hardware
 profile and evidence location when relevant. Keep public fixtures synthetic.
-Link [playtest status](PLAYTEST_STATUS.md) for maintainer acceptance and
+Link [playtest status](history/superseded/PLAYTEST_STATUS.md) for maintainer acceptance and
 [optimization history](OPTIMIZATION_HISTORY.md) for measured comparisons.
 Do not replace a prior failure with a later pass: explain what changed.
 
@@ -208,7 +208,7 @@ Do not replace a prior failure with a later pass: explain what changed.
   cache allocation failed during the acceptance route. Retain the failed run.
   Set the reservation to 9 MiB inside the unchanged 16 MiB Fast configuration,
   with matching contiguous-memory preflight/reporting. No silent hardware upgrade.
-- **Evidence/limits:** [checkpoint-015](CHECKPOINT_015_VALIDATION.md) records final
+- **Evidence/limits:** [checkpoint-015](history/checkpoints/CHECKPOINT_015_VALIDATION.md) records final
   native deck movement, cache openings, surfaces, audio and memory. Scene residency
   still needs bounded chunks; a larger heap is not an offloading strategy.
 
@@ -235,7 +235,7 @@ Do not replace a prior failure with a later pass: explain what changed.
 - **Cause:** unknown. Needs same-camera original LAND/placed-rock comparison and
   converted topology/coverage/visibility audit. Do not apply the pier fix by analogy.
 - **Next evidence:** `dbg coords on`, `dbg pos`, camera direction and source mapping.
-  No fix version assigned. See [playtest status](PLAYTEST_STATUS.md).
+  No fix version assigned. See [playtest status](history/superseded/PLAYTEST_STATUS.md).
 
 ## J012 — hollow ship rooms and collision stack (checkpoint-016)
 
@@ -1118,7 +1118,7 @@ alongside code changes. Reserved panel shortcuts remain explicit in the list.
 Ctrl debug noclip first computes the normal Shift velocity, then doubles it;
 this preserves the requested ratio after clamping and avoids diagonal bonuses.
 
-Full final candidate checks are recorded in [the release notes](RELEASE-v0.0.25-rc1.md).
+Full final candidate checks are recorded in [the release notes](releases/notes/RELEASE-v0.0.25-rc1.md).
 The 23 pre-existing contact findings remain failed; no gate or threshold was
 weakened. Retain the established partition-placement preference and loading-cost
 discussion in J030 and STORAGE.md; this candidate adds no expansion content.

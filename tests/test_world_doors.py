@@ -144,6 +144,18 @@ class TeleportNames(unittest.TestCase):
         names = world_doors.teleport_names((ROOT / 'config' / world_doors.TELEPORT_NAMES).read_bytes())
         self.assertEqual(names['heartchamber'][0], 'rifa4ef181ed')      # Akulakhan's Chamber (config/room-batches.json)
 
+    def test_suran_and_ald_ruhn_names(self):
+        names = world_doors.teleport_names((ROOT / 'config' / world_doors.TELEPORT_NAMES).read_bytes())
+        # Desele's House of Earthly Delights: a room map of config/room-batches.json, the street door's arrival
+        self.assertEqual(names['suranclub'][0], 'ric5e9a38a4d')
+        self.assertIn('ric5e9a38a4d', (ROOT / 'config' / 'room-batches.json').read_text(encoding='utf-8'))
+        # the towns: outdoor places in original global coordinates (Suran cell 6,-7; Ald-ruhn cells -2,6)
+        for name, (cx, cy) in (('suran', (6, -7)), ('aldruhn', (-2, 6))):
+            self.assertEqual(names[name][0], world_doors.GLOBAL_PLACE)
+            x, y, z = names[name][1]
+            self.assertEqual((int(x // 8192), int(y // 8192)), (cx, cy))
+        self.assertEqual(world_doors.teleport_name_problems(names, {'x': 'ric5e9a38a4d', 'y': 'rifa4ef181ed'}), [])
+
     def test_bad_lines_are_refused(self):
         for raw in (b'AWTN0\n', b'AWTN1\nname|map|1 2|90|label\n', b'AWTN1\nn|m|1 2 3|0|x\nN|m|1 2 3|0|y\n',
                     b'AWTN1\n%s|m|1 2 3|0|x\n' % (b'n' * 24)):

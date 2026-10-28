@@ -55,7 +55,7 @@ build receipt supplies the complete drive list to both FS-UAE and WinUAE
 configuration generation. Missing world disks stop configuration; this is not
 disk swapping. Both final HDF filesystem readbacks passed. The complete static
 heap gate covered 2,717 maps, but storage capacity does not add runtime heap or
-certify target gameplay. See [release evidence](RELEASE-v0.0.27.md) and
+certify target gameplay. See [release evidence](releases/notes/RELEASE-v0.0.27.md) and
 [build output](BUILD_OUTPUT.md).
 
 Keep each HDF below 4 GiB and each partition below 2 GiB. Measure the current

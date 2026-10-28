@@ -21,10 +21,8 @@ def png_header(path):
 
 
 def frozen(name):
-    return (name.startswith('docs/PATCH-') or name.startswith('docs/journals/')
-            or name.startswith('docs/RELEASE-v') or name.startswith('docs/validation/')
-            or name in ('docs/BUGS-v0.0.29-RC1.md', 'docs/RC2_ISSUE_CHECKPOINT.md',
-                        'tests/test_project_logo.py'))
+    return (name.startswith(('docs/releases/', 'docs/history/', 'docs/journals/', 'docs/validation/'))
+            or name == 'tests/test_project_logo.py')
 
 
 class ProjectLogoTests(unittest.TestCase):

@@ -146,7 +146,7 @@ fixed on WinUAE in RC1**. The small Enter jump at the prison-ship follow-guard
 prompt remains, and the ship-to-deck load produces OST crackling. These are
 separate acceptance cases: AUDIO-APPEARANCE-29 is accepted, AUDIO-ENTER-29 and
 AUDIO-LOAD-29 remain open. Earlier native profiles did not reproduce the latter
-reports. See [the current matrix](BUGS-v0.0.29-RC1.md#rc1-owner-playtest-follow-up-6-october-2026).
+reports. See [the current matrix](history/checkpoints/BUGS-v0.0.29-RC1.md#rc1-owner-playtest-follow-up-6-october-2026).
 
 The **next source candidate defaults Effects to 75%** for the requested mix.
 Master, Music and Dialogue defaults remain as before. Saved configuration loads

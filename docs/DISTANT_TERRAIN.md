@@ -79,7 +79,7 @@ Measure actual target frame cost and counters, verify that genuine gaps remain
 open, and retain the old-mode switch.
 
 See [the bug journal](journals/BUG_JOURNAL-v0.0.29.md#land-horizon-gaps-29-sky-visible-through-distant-resident-ground-open)
-and [the separate horizon study](PLAN-v0.0.29.md#distant-terrain-topology-and-occlusion-study).
+and [the separate horizon study](history/plans/PLAN-v0.0.29.md#distant-terrain-topology-and-occlusion-study).
 
 ## Horizon draw methods (v0.0.32)
 

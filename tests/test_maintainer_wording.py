@@ -7,8 +7,8 @@ the owner chunk / frame / core / record of a placement, cell and town ownership,
 the schema field owner_accepted, status values such as owner-accepted-known-findings, the reporter
 value "owner" in bugs.json and bug IDs.
 
-Not checked: frozen history (docs/journals/, the bug archive, released docs/RELEASE-v*.md notes,
-docs/PATCH-*, docs/BUGS-v0.0.29-RC1.md, docs/RC2_ISSUE_CHECKPOINT.md), the generated register pages
+Not checked: frozen history (docs/journals/, the bug archive, released notes and whitespace baselines in
+docs/releases/, the records and superseded documents in docs/history/), the generated register pages
 (their live rows come from bugs.json, checked below; archived rows from the frozen archive), recorded
 receipts (docs/validation/, the build receipts copied into the Toolkit's CHIM inclusion ledger), the
 generated blocks of bug pages (rendered from bugs.json or the frozen archive), engine source comments,
@@ -20,9 +20,8 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-CURRENT_DEV_NOTES = re.compile(r'^docs/RELEASE-v0\.0\.42')
-SKIP = re.compile(r'^(docs/journals/|docs/bugs/archive/|engine/|src/|docs/PATCH-|docs/RELEASE-v|docs/validation/|'
-                  r'docs/BUGS-v0\.0\.29-RC1\.md$|docs/RC2_ISSUE_CHECKPOINT\.md$|'
+CURRENT_DEV_NOTES = re.compile(r'^docs/releases/notes/RELEASE-v0\.0\.42')
+SKIP = re.compile(r'^(docs/journals/|docs/bugs/archive/|engine/|src/|docs/releases/|docs/history/|docs/validation/|'
                   r'docs/BUGS\.md$|docs/bugs/CHIM_TRACKER\.md$|amiwind-toolkit/chim-inclusion\.js(on)?$|'
                   r'tests/test_maintainer_wording\.py$)')
 TEXT = {'.md', '.json', '.py', '.sh', '.js', '.html', '.txt', '.c', '.h', '.yml', '.ps1', '.cmd'}

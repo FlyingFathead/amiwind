@@ -39,7 +39,7 @@ and projects UVs from the source approximately. It is not a new high-to-low
 detail texture bake. Native dock/deck/gangplank and console/hands acceptance passed with a 9 MiB
 heap on the unchanged 16 MiB Fast emulator profile; the 8 MiB trial failed cache
 allocation. This does not certify the entire ship route. See
-[checkpoint-015](../CHECKPOINT_015_VALIDATION.md) for counts, hashes and limits.
+[checkpoint-015](../history/checkpoints/CHECKPOINT_015_VALIDATION.md) for counts, hashes and limits.
 
 The ship assembly currently represents a **static arrival preview**. The full
 opening scripts and the post-registration removal transition are not implemented.
@@ -81,7 +81,7 @@ normal authored route when judging what must be visible.
   deadlines; do not invent a saving from source polygon count alone.
 
 The next broader milestone remains the connected starting area in
-[SEYDA_NEEN_SCOPE.md](../SEYDA_NEEN_SCOPE.md). Opening interiors begin with the
+[SEYDA_NEEN_SCOPE.md](../history/superseded/SEYDA_NEEN_SCOPE.md). Opening interiors begin with the
 prison ship, followed by the Census office as the first town interior.
 
 ## Low light as an early rendering test

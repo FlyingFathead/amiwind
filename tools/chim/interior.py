@@ -55,17 +55,52 @@ def _log(msg):
     print('[chim rooms] ' + msg, flush=True)
 
 
-def room_settings():
-    """The settings every CHIM room is built with (config/chim-rooms.json): {'cut_models_over': local units, 0 = every
+def room_settings(room=None):
+    """The settings a CHIM room is built with (config/chim-rooms.json): {'cut_models_over': local units, 0 = every
     model whole; 'detail_budget': {lower-case mesh source: visual triangle target} of the named budget, {} for none}.
     A whole-room shell model (the Vivec Arena Pit's bowl) is otherwise one entity drawn whole from anywhere in the
-    room (PERF-ARENA-PIT-SLOW-48)."""
+    room (PERF-ARENA-PIT-SLOW-48). Only the rooms the file's "rooms" list names get them (the rooms they were measured
+    for: the maintainer, 2026-10-28, "we can't have walls like that except in the vivec arena pit"); every other room
+    (ROOM None or not listed) is built as before: every model whole, no budget. A room with types (room_types) is built
+    per type with that type's own settings (room_types)."""
+    data = _rooms_config()
+    if room is None or room not in (data.get('rooms') or ()):
+        return {'cut_models_over': 0.0, 'detail_budget': {}, 'merge_faces': frozenset()}
+    return _resolved(data)
+
+
+def _rooms_config():
+    return json.loads((Path(__file__).resolve().parents[2] / 'config/chim-rooms.json').read_text(encoding='utf-8'))
+
+
+def _resolved(data, where='config/chim-rooms.json'):
     from chim.build import detail_budget
-    data = json.loads((Path(__file__).resolve().parents[2] / 'config/chim-rooms.json').read_text(encoding='utf-8'))
     cut = float(data.get('cut_models_over') or 0)
     if cut < 0:
-        raise ValueError('config/chim-rooms.json: cut_models_over must be 0 (off) or a width in local units')
-    return {'cut_models_over': cut, 'detail_budget': detail_budget(data.get('detail_budget'))}
+        raise ValueError(where + ': cut_models_over must be 0 (off) or a width in local units')
+    # merge_faces: room meshes whose faces go through the lossless planar merge (tools/planar_merge.py, the CHIM mesh
+    # method 'merge': coplanar triangles with one texture mapping as one convex face, never more faces, the same picture)
+    merge = frozenset(str(m).replace(chr(92), '/').lower() for m in (data.get('merge_faces') or ()))
+    return {'cut_models_over': cut, 'detail_budget': detail_budget(data.get('detail_budget')), 'merge_faces': merge}
+
+
+TYPE_SUFFIX = 't'      # rooms/<room>t<N>.crm: the record of type N of a room with types (engine chim_world.c RoomType)
+
+
+def room_types():
+    """{room: {'default': N, 'types': {N: settings}}} of the rooms built in several types (config/chim-rooms.json
+    room_types; the maintainer, 2026-10-28: the Vivec Arena Pit's methods behind one saved setting,
+    aw_vivec_arena_pit_type). The default type's record is rooms/<room>.crm, each other's rooms/<room>t<N>.crm, all on
+    the one store; the engine loads the one the setting names (only its models). Types 0-9."""
+    out = {}
+    for room, spec in (_rooms_config().get('room_types') or {}).items():
+        types = {int(n): _resolved(s, 'config/chim-rooms.json room_types %s type %s' % (room, n))
+                 for n, s in spec['types'].items()}
+        default = int(spec['default'])
+        if default not in types or not all(0 <= n <= 9 for n in types):
+            raise ValueError('config/chim-rooms.json room_types %s: types 0-9 and a default among them' % room)
+        out[room] = {'default': default, 'types': types}
+    return out
 
 
 def light_level(value):
@@ -216,7 +251,7 @@ def room_selection(room, references, wanted, harvest=None):
     return every, selected, left_out
 
 
-def room_input(work, pal_bytes, qbsp, jobs, cache, timer, collision_cache, harvest=None):
+def room_input(work, pal_bytes, qbsp, jobs, cache, timer, collision_cache, harvest=None, settings=None):
     """One room's models, textures and placements (chim.build.frame_input with no ground), its light levels and
     bounds, from the room's own scenery export and compiled map (prepare_area.build_room's work folder).
 
@@ -240,12 +275,15 @@ def room_input(work, pal_bytes, qbsp, jobs, cache, timer, collision_cache, harve
                 for name, profile in group.get('visual_profiles', {}).items()}
     flatten = load_profiles(scene_kind='interior')
     used = sorted({r['model_index'] for r in selected})
-    rooms = room_settings()
+    # SETTINGS: one type of a room with types (room_types); else the room's own settings (only listed rooms get any)
+    rooms = settings or room_settings(work.name)
     for mi in used:
         model = index['models'][mi]
         profiles.setdefault(model['source'], rock_profile(model['source'], model['triangles']))
         if model['source'] in flatten:
             profiles[model['source']] = {**profiles[model['source']], 'flatten': flatten[model['source']]}
+        if model['source'].replace(chr(92), '/').lower() in rooms.get('merge_faces', ()):
+            profiles[model['source']] = dict(profiles[model['source']], faces='merge')
         target = rooms['detail_budget'].get(model['source'].replace(chr(92), '/').lower())
         if target and model['triangles'] > target:
             # a named detail budget for room meshes (config/chim-rooms.json): fewer visual triangles, the same
@@ -549,7 +587,7 @@ def liquid_extent(liquids):
     return lo, hi
 
 
-def room_map(room_bsp, name, record, bounds, liquids=None, store=None):
+def room_map(room_bsp, name, record, bounds, liquids=None, store=None, types=None):
     """maps/<room>.chim: the room map's entities with its placed meshes taken out (they are the room record's
     placements, checked at the same origins), the activated objects as collision-only edicts, and a shell world:
     empty space closed by clip walls on six sides. A room with liquids (room_liquids) gets them in that world
@@ -628,6 +666,10 @@ def room_map(room_bsp, name, record, bounds, liquids=None, store=None):
     world.pop(FRAME_KEY, None)
     world['_chim_world'] = STORE
     world[ROOM_KEY] = name
+    if types:
+        # a room with types (room_types): the engine loads rooms/<room>t<N>.crm for aw_vivec_arena_pit_type N
+        world['_chim_room_types'] = ' '.join(str(n) for n in types[0])
+        world['_chim_room_type_default'] = str(types[1])
     lo = [v - EDGE_MARGIN for v in bounds[0]]
     hi = [v + EDGE_MARGIN for v in bounds[1]]
     liquid_report = None
@@ -783,14 +825,22 @@ def _room_task(task):
     from chim.units import Timer, UnitCache
     work, palette, qbsp, unit_cache, collision_cache = task[:5]
     harvest = task[5] if len(task) > 5 else None
+    # a room with types (room_types): (type, its settings, is the default type)
+    kind = task[6] if len(task) > 6 else None
     cache, timer = UnitCache(Path(unit_cache)), Timer()
     try:
-        room = room_input(work, Path(palette).read_bytes(), qbsp, 1, cache, timer, Path(collision_cache), harvest)
+        room = room_input(work, Path(palette).read_bytes(), qbsp, 1, cache, timer, Path(collision_cache), harvest,
+                          settings=kind[1] if kind else None)
+        if kind is not None:
+            room['type'], room['type_default'] = kind[0], kind[2]
     except Exception as error:  # noqa: BLE001 (one room's failure costs that room only, named: CHIM-ROOM-FAIL-STAGE-48)
         import traceback
         where = traceback.extract_tb(error.__traceback__)[-1]
-        return {'room': Path(work).name, 'failed': '%s: %s (%s:%d %s)' % (
+        out = {'room': Path(work).name, 'failed': '%s: %s (%s:%d %s)' % (
             type(error).__name__, error, Path(where.filename).name, where.lineno, where.name)}
+        if kind is not None:
+            out['type'], out['type_default'] = kind[0], kind[2]
+        return out
     room['units'], room['timing'] = cache.stats, timer.report()
     return room
 
@@ -829,6 +879,7 @@ def build(room_works, palette, out, qbsp=None, jobs=1, unit_cache=None, harvest=
                                    'each as its harvest entity (CHIM-ROOM-HARVEST-DOUBLE-48)'}
         _log('harvest: %d harvestable interior plants are left out of the room records' % len(numbers))
     store = Store()
+    types_of = room_types()
     rows, kept_bsp, tasks, liquids = [], [], [], {}
     (out / STORE / 'rooms').mkdir(parents=True, exist_ok=True)
     for work in room_works:
@@ -841,10 +892,32 @@ def build(room_works, palette, out, qbsp=None, jobs=1, unit_cache=None, harvest=
             kept_bsp.append({'room': work.name, 'reason': why})
             _log('%s: kept as a room map: %s' % (work.name, why))
             continue
-        tasks.append((str(work), str(palette), qbsp and str(qbsp), str(unit_cache), str(out / 'work' / 'collision-cache'),
-                      numbers))
-    units, timing, failed = {}, {}, []
+        base = (str(work), str(palette), qbsp and str(qbsp), str(unit_cache), str(out / 'work' / 'collision-cache'),
+                numbers)
+        if work.name in types_of:
+            spec = types_of[work.name]
+            for n, settings in sorted(spec['types'].items()):
+                tasks.append(base + ((n, settings, n == spec['default']),))
+        else:
+            tasks.append(base)
+    units, timing, failed, typed = {}, {}, [], []
     for room in ordered_map(_room_task, tasks, max(1, int(jobs or 1)), cost=room_cost):
+        if room.get('type') is not None and not room['type_default'] and room.get('failed'):
+            failed.append({'room': '%s%s%d' % (room['room'], TYPE_SUFFIX, room['type']), 'reason': room['failed']})
+            _log('%s type %d: FAILED, not made: %s' % (room['room'], room['type'], room['failed']))
+            continue
+        if room.get('type') is not None and not room['type_default'] and not room.get('failed'):
+            # another type of a room with types: its record beside the default's, on the same store; no room map of
+            # its own (the default type's room map names the types, the engine picks the record)
+            name = '%s%s%d' % (room['room'], TYPE_SUFFIX, room['type'])
+            room.pop('units', None)
+            room.pop('timing', None)
+            data, row = store.add_room(dict(room, room=name))
+            (out / STORE / 'rooms' / (name + '.crm')).write_bytes(data)
+            typed.append(dict(row, type_of=room['room'], type=room['type'], record_sha256=hashlib.sha256(data).hexdigest()))
+            _log('%s: type %d record %s: %d placements, %d models' % (room['room'], room['type'], name,
+                                                                     row['placements'], row['models']))
+            continue
         if room.get('failed'):
             # the room is not made; the image leaves it out (a batch room's shell map too) and its doors stay inert
             failed.append({'room': room['room'], 'reason': room['failed']})
@@ -859,6 +932,10 @@ def build(room_works, palette, out, qbsp=None, jobs=1, unit_cache=None, harvest=
         (out / STORE / 'rooms' / (room['room'] + '.crm')).write_bytes(data)
         row['bounds'] = [list(room['bounds'][0]), list(room['bounds'][1])]
         row['record_sha256'] = hashlib.sha256(data).hexdigest()
+        if room.get('type') is not None:
+            # the default type of a room with types: its room map names every type (engine RoomType)
+            row['types'] = sorted(types_of[room['room']]['types'])
+            row['type_default'] = room['type']
         if room['room'] in liquids:
             # the image step's room map writes them into its world (room_map)
             row['liquids'] = liquids[room['room']]
@@ -872,6 +949,8 @@ def build(room_works, palette, out, qbsp=None, jobs=1, unit_cache=None, harvest=
                                                  if row.get('harvest_left_out') else ''))
     receipt = {'format': 'aw-chim-rooms-1', 'store': store.write(out), 'rooms': rows, 'kept_room_maps': kept_bsp,
                'failed_rooms': failed, 'units': units, 'timing': timing, 'jobs': int(jobs or 1)}
+    if typed:
+        receipt['room_types'] = typed
     if harvest_receipt is not None:
         harvest_receipt['left_out'] = sum(len(r.get('harvest_left_out', ())) for r in rows)
         receipt['harvest'] = harvest_receipt
@@ -895,10 +974,11 @@ def is_shell_map(data):
 
 def _room_map_task(task):
     """One room's CHIM room map on a pool worker: (room, bytes, report); the caller alone writes the files."""
-    bsp, name, record_path, bounds, liquids = task
+    bsp, name, record_path, bounds, liquids = task[:5]
+    types = task[5] if len(task) > 5 else None
     # the store is the folder above rooms/<room>.crm
     data, report = room_map(bsp, name, Path(record_path).read_bytes(), bounds, liquids,
-                            store=Path(record_path).parent.parent)
+                            store=Path(record_path).parent.parent, types=types)
     return name, data, report
 
 
@@ -923,7 +1003,7 @@ def install(rooms_out, id1, jobs=1):
             absent.append(row['room'])
             continue
         tasks.append((str(bsp), row['room'], str(target / 'rooms' / (row['room'] + '.crm')), row['bounds'],
-                      row.get('liquids')))
+                      row.get('liquids'), (row['types'], row['type_default']) if 'types' in row else None))
     for name, data, report in ordered_map(_room_map_task, tasks, max(1, int(jobs or 1)),
                                           cost=lambda t: Path(t[0]).stat().st_size):
         bsp = id1 / 'maps' / (name + '.bsp')
@@ -934,6 +1014,10 @@ def install(rooms_out, id1, jobs=1):
     # records of rooms the image does not hold are not shipped
     for room in absent:
         (target / 'rooms' / (room + '.crm')).unlink()
+    # and the other types' records of such a room
+    for row in receipt.get('room_types', []):
+        if row['type_of'] in absent:
+            (target / 'rooms' / (row['room'] + '.crm')).unlink()
     # a batch room's shell map (no world of its own: tools/chim_room_batches.py) whose CHIM room was not made (failed,
     # or kept as a room map) is no room: it leaves the image, so its doors stay inert ("Interior unavailable")
     removed = []

@@ -942,24 +942,16 @@ def early_frame_failures(spec, section, name, jobs=1):
         hit = cache.load(key)
         if hit is not None:
             return ['%s: %s' % (label, f) for f in hit[0]]
-    from build_parallel import live_jobs        # the stage's workers now, not its start share
+    from build_parallel import completed_map, live_jobs      # the stage's workers now, not its start share
     jobs = max(1, min(int(live_jobs(jobs or 1)), len(items)))
     groups = [(items[k::jobs], section) for k in range(jobs)]
     found = []
-    if jobs > 1:
-        import multiprocessing
-        from concurrent.futures import ProcessPoolExecutor
-        try:
-            context = multiprocessing.get_context('fork')
-        except ValueError:
-            context = None
-    if jobs > 1 and context is not None:
-        with ProcessPoolExecutor(jobs, mp_context=context) as pool:
-            for lines in pool.map(_early_chunks, groups):
-                found += lines
-    else:
-        for group in groups:
-            found += _early_chunks(group)
+    # on the stage's own worker pool, under its allowance and memory guard, with a lost worker's groups sent out again
+    # (BUILD-OOM-DEGRADE-NOT-DIE-54); it used to fork a pool of its own from the CHIM main process, outside both, and a
+    # tester's build died there after 38 h when the kernel killed one of those workers for memory
+    # (BUILD-CHIM-EARLY-CHECK-POOL-55)
+    for lines in completed_map(_early_chunks, groups, jobs, cost=lambda group: len(group[0])):   # chunks per group
+        found += lines
     if key is not None:
         import cache_provenance
         cache_provenance.name_unit(cache, key, lambda: label, lambda: [('section', section)] + [('chunk %d,%d' % (c['cx'], c['cy']), c['image']) for c, _ in items])

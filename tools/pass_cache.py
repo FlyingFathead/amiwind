@@ -70,7 +70,11 @@ _DIGESTS = {}
 # before: a miss is looked up under it once and the hit recorded under the new key (PassCache.load), so the
 # change costs no pass a rerun.
 PASS_KEY_FORM = 2
-PASS_KEY_NEUTRAL = frozenset({'tools/pass_cache.py'})
+# The per-mesh measured tables leave the keys too (BUILD-KEY-MESH-TABLE-WHOLE-54: one new standing-room row re-keyed
+# all 935 room units): each entry records the decisions of the meshes it read (mesh_tables.rows, field mesh_rows) and
+# is taken only while they are unchanged; mesh_tables.py is that record's own code.
+PASS_KEY_NEUTRAL = frozenset({'tools/pass_cache.py', 'tools/mesh_tables.py',
+                              'config/collision-standing-room.json', 'config/collision-hull-surface.json'})
 
 
 def source_digest(*scripts, form=PASS_KEY_FORM):
@@ -183,6 +187,13 @@ def note_covered(lines):
         pass
 
 
+# Measured-table recorders of this process's misses, by (cache folder, name, key), until their store; and the rows of
+# the entry a lookup just found (a re-store under another key keeps them). Module state, not the cache's: the cache
+# object is pickled into pool workers.
+_RECORDING = {}
+_LOADED_ROWS = {}
+
+
 class PassCache:
     """One pass's view of the cache; picklable, so pool workers get it in their task."""
 
@@ -253,13 +264,14 @@ class PassCache:
         """(row, output bytes or None) recorded for this input, or None. A miss is looked up in the
         --reuse-from workspace's cache (file_cache.fallback_root, read-only) and pooled here on a hit
         (BUILD-CACHE-PER-WORKSPACE-33)."""
+        import mesh_tables
         found = self._load(input_sha256)
         for sources in self.previous if found is None else ():
             # the same result recorded under an older key form (BUILD-PASS-KEY-OVERBROAD-36): verified like any
-            # entry, then recorded under the current key
+            # entry, then recorded under the current key (an older form counted the measured tables whole)
             found = self._load(input_sha256, sources=sources)
             if found is not None:
-                self.store(input_sha256, found[0], found[1])
+                self.store(input_sha256, found[0], found[1], mesh_rows=mesh_tables.whole_rows())
                 break
         if found is None:
             from file_cache import fallback_root
@@ -267,7 +279,13 @@ class PassCache:
             if other is not None:
                 found = self._load(input_sha256, other)
                 if found is not None:
-                    self.store(input_sha256, found[0], found[1])
+                    self.store(input_sha256, found[0], found[1], mesh_rows=_LOADED_ROWS.get(self._slot(input_sha256)))
+        if found is None:
+            # a miss: the measured-table rows the result now built reads go into its entry (store)
+            slot = self._slot(input_sha256)
+            if slot not in _RECORDING:
+                _RECORDING[slot] = mesh_tables.begin()
+        _LOADED_ROWS.pop(self._slot(input_sha256), None)
         self._count(found is not None)
         if found is not None and getattr(self, 'covered', ()):
             note_covered(self.covered)          # BUILD-KEY-UNIT-RESTORED-CODE-52
@@ -288,12 +306,32 @@ class PassCache:
                     return None
             import cache_provenance
             cache_provenance.verify_pass(meta, output)
+            import mesh_tables
+            if not mesh_tables.matches(meta.get('mesh_rows')):
+                return None                 # a measured-table decision it read changed (BUILD-KEY-MESH-TABLE-WHOLE-54)
+            mesh_tables.note_record(meta.get('mesh_rows'))
+            _LOADED_ROWS[self._slot(input_sha256)] = meta.get('mesh_rows')
             return meta['row'], output
         except (OSError, ValueError, KeyError, TypeError):
             return None
 
-    def store(self, input_sha256, row, output=None):
-        """Record a result (output None: the pass left the map unchanged). Never fails a build."""
+    def _slot(self, input_sha256):
+        return (str(self.root), self.name, self.key(input_sha256))
+
+    def store(self, input_sha256, row, output=None, mesh_rows=None):
+        """Record a result (output None: the pass left the map unchanged). Never fails a build. MESH_ROWS: the
+        measured-table decisions it read (mesh_tables.rows); by default those its miss recorded, or, stored without
+        a lookup first, the tables whole."""
+        import mesh_tables
+        used = _RECORDING.pop(self._slot(input_sha256), None)
+        if mesh_rows is None:
+            if used is not None:
+                mesh_tables.end(used)
+                mesh_rows = mesh_tables.rows(used)
+            else:
+                mesh_rows = mesh_tables.whole_rows()
+        elif used is not None:
+            mesh_tables.end(used)
         meta_path, blob_path = self._paths(input_sha256)
         try:
             meta_path.parent.mkdir(parents=True, exist_ok=True)
@@ -305,6 +343,8 @@ class PassCache:
             meta = {'format': FORMAT, 'pass': self.name, 'input_sha256': input_sha256,
                     'output_sha256': None if output is None else hashlib.sha256(output).hexdigest(),
                     'row': row}
+            if mesh_rows:
+                meta['mesh_rows'] = mesh_rows
             import cache_provenance
             cache_provenance.attach_pass(meta, output, 'image-passes/' + self.name, self.key(input_sha256), self.options, self.sources, self)
             partial = meta_path.with_name(meta_path.name + suffix)

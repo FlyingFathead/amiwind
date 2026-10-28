@@ -66,6 +66,10 @@ OVERRUN_MIN = 5.0          # ... and at least this many seconds
 IDLE_SHARE = 0.5           # same rule as the profiler: under half of the jobs ...
 IDLE_SECONDS = 60.0        # ... for longer than this
 CORES_WINDOW = 10.0        # "cores now" = mean over the last this many seconds
+PEAK_LOG_SHARE = 0.75      # a new memory peak above this share of the limit prints a [memory] line ...
+PEAK_LOG_STEP_GIB = 0.5    # ... when it is at least this much above the last one printed (no line per sample)
+LOW_RAM_SHARE = 0.10       # under this share of the limit available: a [memory] WARNING line ...
+LOW_RAM_REPEAT_SECONDS = 300.0   # ... again at most this often while it lasts
 DONE = ('passed',)
 STOPPED = ('failed', 'cancelled')
 COMPARABLE_RATIO = 2.0     # history of a run within this size ratio counts as the same size
@@ -753,6 +757,7 @@ class Tracker:
         epoch = time.time()
         eta = result['eta_seconds']
         recent_build = [cores for t, cores in build_cores if t >= now - CORES_WINDOW]
+        memory = self.memory_reading(now, [row['name'] for row in rows if row['status'] == 'running'])
         return {'schema': SCHEMA, 'run': self.run.name, 'status': status,
                 'started_at': _now_iso(self.started_epoch), 'updated_at': _now_iso(epoch),
                 'updated_epoch': round(epoch, 3), 'interval': self.interval,
@@ -762,10 +767,50 @@ class Tracker:
                 'critical_path': result['critical_path'], 'critical_path_seconds': result['critical_path_seconds'],
                 'work_seconds': result['work_seconds'], 'counts': counts,
                 'cores_now': round(sum(recent_build) / len(recent_build), 2) if recent_build else None,
+                'memory': memory,
                 'stages': rows, 'idle_warnings': warnings, 'build_idle': build_idle, 'host': host,
                 'no_history': result['no_history'], 'fallback_seconds': result['fallback_seconds'],
                 'history': {'runs': self.history_runs, 'defaults': self.defaults_used},
                 'writes': self.writes + 1}
+
+    def memory_reading(self, now, running):
+        """The build's memory now and its peak so far (the Toolkit monitor's memory curve, TOOLKIT-MONITOR-NO-MEMORY-55):
+        {'used_gib', 'limit_gib', 'source', 'peak_gib', 'peak_seconds', 'peak_stages'}, from the container's limit or,
+        without one, the machine (resource_plan.build_memory); None when neither can be read. A new peak above
+        PEAK_LOG_SHARE of the limit prints one [memory] line naming the stages that ran then."""
+        try:
+            from resource_plan import build_memory, cgroup_memory
+            limit, used, cache = build_memory()
+            source = 'container' if cgroup_memory()[0] is not None else 'machine'
+        except Exception:  # noqa: BLE001 - progress must never fail a build
+            return None
+        if not limit or used is None:
+            return None
+        gib = float(1 << 30)
+        live = max(0, used - cache) / gib
+        peak = getattr(self, 'memory_peak', None)
+        if peak is None or live > peak[0]:
+            peak = (live, round(now, 1), list(running))
+            self.memory_peak = peak
+            logged = getattr(self, 'memory_peak_logged', 0.0)
+            if live >= PEAK_LOG_SHARE * limit / gib and live >= logged + PEAK_LOG_STEP_GIB:
+                self.memory_peak_logged = live
+                print('[memory] new peak %.1f of %.1f GiB (%s) at +%s, running: %s' % (
+                    live, limit / gib, source, duration(now), ', '.join(running) or 'nothing'), flush=True)
+        # nearly out of memory: one WARNING line every LOW_RAM_REPEAT_SECONDS while under LOW_RAM_SHARE available (the
+        # scheduler's guard cuts workers above its critical line; this says so in the log and in the monitor)
+        available = max(0.0, limit / gib - live)
+        low = available < LOW_RAM_SHARE * limit / gib
+        warned = getattr(self, 'low_ram_warned', None)
+        if low and (warned is None or now - warned >= LOW_RAM_REPEAT_SECONDS):
+            self.low_ram_warned = now
+            self.low_ram_count = getattr(self, 'low_ram_count', 0) + 1
+            print('[memory] WARNING: RAM nearly exhausted: %.1f GiB available of %.1f (%s) at +%s, running: %s; the '
+                  'memory guard holds new units back and cuts workers above its critical line' % (
+                      available, limit / gib, source, duration(now), ', '.join(running) or 'nothing'), flush=True)
+        return {'used_gib': round(live, 2), 'limit_gib': round(limit / gib, 2), 'source': source,
+                'available_gib': round(available, 2), 'low': low, 'low_warnings': getattr(self, 'low_ram_count', 0),
+                'peak_gib': round(peak[0], 2), 'peak_seconds': peak[1], 'peak_stages': peak[2]}
 
     def write(self):
         try:

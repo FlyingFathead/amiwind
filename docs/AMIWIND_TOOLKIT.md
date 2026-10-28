@@ -1,6 +1,6 @@
 # AmiWind Toolkit
 
-_Last updated with AmiWind v0.0.48-dev2 (22 October 2026)._
+_Last updated with AmiWind v0.0.55-dev1 (28 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -592,7 +592,10 @@ The **Monitor** tab (`amiwind-toolkit/monitor.html`) follows a build as it runs,
   finish time in rows of their own (the finish time in local time with its offset and in UTC, both dated), the ETA's
   basis (critical path or history) and the cores in use now, from the run's `build-progress.json`. Under "Cores now" a
   square of one box per core of the budget shows the busy cores filled: green at half the budget or more, amber under
-  it, red once the build has stayed under the low-cores line (see the stage timeline) for its set time;
+  it, red once the build has stayed under the low-cores line (see the stage timeline) for its set time. Above the squares
+  two lines in numbers: **RAM** (used and available, of the container's limit or, without a container, the machine's
+  RAM, with the peak, when it came and the stages that ran then; orange under 20 % available, red under 10 %, with the
+  count of low-RAM warnings of the build) and **Cores** (busy of the build's threads);
 - **Activity:** what the running stage is doing even when its log is silent, from its read/write trace
   (`profile/reads/NN-stage.txt`: files written, files read, code entered): the files written and read and the code
   entries of the last 10 seconds, the code it is in now, the last entries, how long ago the trace and the log last
@@ -613,11 +616,14 @@ The **Monitor** tab (`amiwind-toolkit/monitor.html`) follows a build as it runs,
   (marked "derived from trace (approximate)"; module loads and pool start-up are never used as names). Sections under 4
   cores for over a minute are hatched red with their names shown. The **cores line** turns red, with a faint red fill,
   wherever the build stays under 2.5 cores for 30 s or more (both values can be changed above the chart); the live
-  "Cores now" readout turns red the same way. Hover shows a cursor across every row with the time, the cores, the stage
+  "Cores now" readout turns red the same way. The **memory line** (orange) runs beside the cores, scaled to the limit,
+  with a dot at the peak, live from `build-progress.json` and for a finished run from its `build-profile.json`. Hover shows a cursor across every row with the time, the cores, the stage
   and sections running then; click or tap a red stretch to select it (highlighted, with a list of what ran in it),
   arrows step to the next or previous stretch, Esc clears. Wheel zooms the time axis, drag pans, **Reset zoom** shows
   the whole run, and **Fullscreen** fills the screen (a maximised panel where the browser has no fullscreen);
-- **Recent builds and gates:** the newest master builder results, when the server is given them.
+- **Recent builds and gates:** the newest master builder results, when the server is given them. A 🔍 on a row whose run
+  the monitor can read (and a click on its name) opens that run and highlights the row; gates have no run of their own.
+- **Reload:** the open tab is kept in the address (`#monitor`), so a reload of the Toolkit opens it again.
 - **Build run:** the run list is read again every 15 seconds and with **Refresh**, keeping your choice; runs that
   appeared after the page opened are marked "new", and **follow latest** switches to the newest running build.
 

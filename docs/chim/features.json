@@ -55,7 +55,7 @@
         },
         {
           "title": "Draft v0.0.33 release notes, disk",
-          "path": "docs/RELEASE-v0.0.33.md#disk-each-asset-once"
+          "path": "docs/releases/notes/RELEASE-v0.0.33.md#disk-each-asset-once"
         },
         {
           "title": "Measurements behind the release charts",
@@ -97,7 +97,7 @@
         },
         {
           "title": "Draft v0.0.33 release notes",
-          "path": "docs/RELEASE-v0.0.33.md"
+          "path": "docs/releases/notes/RELEASE-v0.0.33.md"
         }
       ],
       "bugs": [
@@ -143,7 +143,7 @@
         },
         {
           "title": "Draft v0.0.33 release notes, loading",
-          "path": "docs/RELEASE-v0.0.33.md#loading-smaller-steps-no-region-stop"
+          "path": "docs/releases/notes/RELEASE-v0.0.33.md#loading-smaller-steps-no-region-stop"
         },
         {
           "title": "Measurements behind the release charts",
@@ -271,7 +271,7 @@
       "links": [
         {
           "title": "Draft v0.0.33 release notes, Balmora's holes",
-          "path": "docs/RELEASE-v0.0.33.md#lets-fix-those-bugs"
+          "path": "docs/releases/notes/RELEASE-v0.0.33.md#lets-fix-those-bugs"
         },
         {
           "title": "CHIM engine: memory",
@@ -340,7 +340,7 @@
         },
         {
           "title": "Draft v0.0.33 release notes, memory",
-          "path": "docs/RELEASE-v0.0.33.md#memory"
+          "path": "docs/releases/notes/RELEASE-v0.0.33.md#memory"
         },
         {
           "title": "CHIM ideas: memory",
@@ -380,7 +380,7 @@
       "links": [
         {
           "title": "Draft v0.0.33 release notes",
-          "path": "docs/RELEASE-v0.0.33.md"
+          "path": "docs/releases/notes/RELEASE-v0.0.33.md"
         }
       ],
       "bugs": [
@@ -504,7 +504,7 @@
       "links": [
         {
           "title": "Draft v0.0.33 release notes, frame time",
-          "path": "docs/RELEASE-v0.0.33.md#frame-time-and-renderer-counters"
+          "path": "docs/releases/notes/RELEASE-v0.0.33.md#frame-time-and-renderer-counters"
         },
         {
           "title": "Measurements behind the release charts",
@@ -841,7 +841,7 @@
         },
         {
           "title": "Draft v0.0.33 release notes, build time",
-          "path": "docs/RELEASE-v0.0.33.md#build-time"
+          "path": "docs/releases/notes/RELEASE-v0.0.33.md#build-time"
         }
       ],
       "bugs": [

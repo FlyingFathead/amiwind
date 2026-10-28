@@ -329,7 +329,7 @@ contains local paths: keep it with private build evidence outside the source
 checkout. Public release documentation uses sanitized results only.
 
 This does not alter the existing production image acceptance gates. Native
-Windows build/image output passed at the [dated checkpoint](VALIDATION-WINDOWS-2026-10-02.md);
+Windows build/image output passed at the [dated checkpoint](history/validation/VALIDATION-WINDOWS-2026-10-02.md);
 v0.0.27 also passed hosted Windows launcher parity. Those results do not certify
 every build mode or full-game reliability; see the remaining limits in
 [the Windows roadmap](WINDOWS_BUILD_ROADMAP.md).

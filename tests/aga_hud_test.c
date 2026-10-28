@@ -106,7 +106,7 @@ int main(void) {
  Sbar_Draw();assert(fill_y==182 && !strcmp(bearing,"E 090 / REGION: unavailable"));
  assert(small_draws==1);arg="1";hud_type();Sbar_Draw();assert(small_draws==1);arg="2";hud_type();Sbar_Draw();assert(small_draws==2);
  assert(!strcmp(local_line,"LOCAL XYZ: -12 42 66 E 090 P:0") && scr_copyeverything);
- assert(strstr(global_line,"unavailable"));
+ assert(strstr(global_line,"GLOBAL XYZ: N/A (interior)"));
  memset(&local,0,sizeof(local));memset(&player,0,sizeof(player));
  sv.active=true;strcpy(sv.name,"seyda");svs.maxclients=1;svs.clients=&local;local.edict=&player;
  player.v.movetype=MOVETYPE_NONE;player.v.flags=0;
@@ -147,7 +147,7 @@ int main(void) {
   * gives the GLOBAL row and the cell; no frame, no transform. */
  {
   strcpy(sv.name,"balmora");player.v.origin[0]=1023.75f;player.v.origin[1]=-200;
-  Sbar_Draw();assert(strstr(global_line,"unavailable") && !strstr(local_line,"CELL"));
+  Sbar_Draw();assert(strstr(global_line,"N/A (interior)") && !strstr(local_line,"CELL"));
   aw_chim_source=chim_source;Sbar_Draw();
   assert(!strncmp(global_line,"GLOBAL XYZ: -16385 -13088 260",29) && !strcmp(local_line+strlen(local_line)-11," CELL -3,-2"));
   player.v.origin[0]=1024;Sbar_Draw();assert(!strcmp(local_line+strlen(local_line)-11," CELL -2,-2"));
@@ -191,7 +191,8 @@ int main(void) {
    static char plain[]="{\n\"classname\" \"worldspawn\"\n}\n";
    strcpy(sv.name,"census");strcpy(room.name,"maps/census.bsp");room.entities=entities;cl.worldmodel=&room;
    Sbar_Draw();assert(!strcmp(local_line+strlen(local_line)-8," INT 763"));
-   assert(strstr(global_line,"unavailable") && !strstr(global_line,"INT"));
+   /* HUD-INTERIOR-CLOCK-CUT-54: the short interior text, so the clock fits */
+   assert(strstr(global_line,"GLOBAL XYZ: N/A (interior)") && !strstr(global_line,"unavailable") && !strstr(global_line,"INT"));
    argc=1;cell_command();assert(!strcmp(printed,"Cell: INT 763 = \"Seyda Neen, Census and Excise Office\" / map census\n"));argc=2;
    vid.width=304;Sbar_Draw();assert(!strcmp(local_line+strlen(local_line)-6," I 763"));vid.width=376;
    /* The same model slot reused for another map re-reads its keys. */

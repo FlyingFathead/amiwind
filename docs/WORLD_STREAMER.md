@@ -56,7 +56,7 @@ side. Each placed object is stored about ten times
 ([WORLD-REGION-DUPLICATION-31](bugs/WORLD-REGION-DUPLICATION-31.md)), every map
 carries its own copy of every texture it uses, vis gives no useful culling
 outdoors ([town visibility](performance/TOWN-VISIBILITY.md)), and every region
-crossing reads a whole map ([Seyda Neen performance](SEYDA_NEEN_PERFORMANCE.md)).
+crossing reads a whole map ([Seyda Neen performance](history/superseded/SEYDA_NEEN_PERFORMANCE.md)).
 Interiors bake light per object, so every placement of a piece is a separate
 copy of its geometry.
 

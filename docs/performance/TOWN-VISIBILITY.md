@@ -162,4 +162,4 @@ leaf with visibility data, the number of leaves in its decompressed visibility
 row divided by all leaves, averaged over the leaves. Faces per model come from
 the model lump; `func_wall` counts from the entity lump.
 
-The story behind it: [Horstator's musings, 7 October 2026](../HORSTATORS_MUSINGS_2026-10-07.md).
+The story behind it: [Horstator's musings, 7 October 2026](../journals/HORSTATORS_MUSINGS_2026-10-07.md).

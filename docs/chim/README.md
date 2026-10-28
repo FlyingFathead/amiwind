@@ -54,7 +54,7 @@ collision, sound and QuakeC are Quake's. What changes is the outdoor world:
 - **Interiors are CHIM rooms.** Since v0.0.48, 1,132 of the 1,134 base-game
   interiors are CHIM rooms on the store-once layout. The prison ship and the
   census office, where the opening sequence runs, stay ordinary Quake room maps
-  on purpose until rooms have object state ([v0.0.48 notes](../RELEASE-v0.0.48.md)).
+  on purpose until rooms have object state ([v0.0.48 notes](../releases/notes/RELEASE-v0.0.48.md)).
 - **One frame map per area.** A small Quake map (`maps/<town>-chim.chim`) holds
   what is not chunk data: actors, flora sprites, the start point and the
   frame's position. Loading it switches the engine to CHIM for that area.
@@ -175,7 +175,7 @@ their chosen format and Solstheim, see the [progress tracker](PROGRESS_TRACKER.m
 | M1 | Balmora exterior | Shipped (v0.0.33). Built and walked: five benchmark cameras, the street loop, gate exits and doors in and out of interiors pass in FS-UAE. Played in the first private test builds. Open: chunk loading when the memory zone is full ([CHIM-CHUNK-LOAD-FAIL-33](../bugs/CHIM-CHUNK-LOAD-FAIL-33.md), repair on a branch), the distant view ([CHIM-FAR-TERRAIN-33](../bugs/CHIM-FAR-TERRAIN-33.md)). |
 | M2 | Seyda Neen, the intro docks and the courtyard | Built; passes the validator, the stair gate, the strict heap gate (no exceptions) and the frame-map checks against the shipped maps. The temporary Seyda Neen heap bypass of the legacy builder ends here. Open: the Hunk safety margin at the default zone ([CHIM-SEYDA-HUNK-GAP-33](../bugs/CHIM-SEYDA-HUNK-GAP-33.md)). |
 | M3 | Vivec | The whole city of Vivec is one CHIM frame since v0.0.36. The status text of the original plan (stage A in progress, stage B designed) is superseded. |
-| M4 | The open world between the towns | Every exterior cell of Vvardenfell is on CHIM since v0.0.43, in one-cell region frames (a crossing is a map load, [CHIM regions](CHIM_REGIONS.md)) and three town frames. The fixed 3 x 3 frame grid of the original design is not built; the pauses at cell crossings are [CHIM-CROSSING-SLUGGISH-43](../bugs/CHIM-CROSSING-SLUGGISH-43.md), the first work of the [v0.0.45 plan](../PLAN-v0.0.45.md). |
+| M4 | The open world between the towns | Every exterior cell of Vvardenfell is on CHIM since v0.0.43, in one-cell region frames (a crossing is a map load, [CHIM regions](CHIM_REGIONS.md)) and three town frames. The fixed 3 x 3 frame grid of the original design is not built; the pauses at cell crossings are [CHIM-CROSSING-SLUGGISH-43](../bugs/CHIM-CROSSING-SLUGGISH-43.md), the first work of the [v0.0.45 plan](../history/plans/PLAN-v0.0.45.md). |
 | M5 | The whole island | After M4; this is CHIM 1.0. The project is aiming for 1 May 2027, Morrowind's 25th anniversary: an aim, not a promise. |
 
 v0.0.33 ships when the areas v0.0.32 ships run on CHIM and the distant view

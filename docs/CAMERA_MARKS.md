@@ -35,7 +35,7 @@ In this order, as the benchmark method does it by hand:
      `dbg tp`.
 
 A recall is a debug teleport, nothing more: it does not detach the player from the world. The planned camera modes
-(docs/PLAN-v0.0.42.md 1.2c) add that (no enemy notices, no triggers) and will take marks by name.
+(docs/history/plans/PLAN-v0.0.42.md 1.2c) add that (no enemy notices, no triggers) and will take marks by name.
 
 ## The marks files
 

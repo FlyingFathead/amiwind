@@ -65,7 +65,7 @@ their dated history. No audio repair or full-release readiness is claimed.
 
 ## Current RC2 issue status: 2026-10-06T19:08:08+00:00
 
-[Implemented repairs, demonstrated cases and still-open issues](../RC2_ISSUE_CHECKPOINT.md).
+[Implemented repairs, demonstrated cases and still-open issues](../history/checkpoints/RC2_ISSUE_CHECKPOINT.md).
 This dated checkpoint supersedes older candidate status below. Delivery and
 final extracted-package launch are still pending; Temple holes remain open.
 
@@ -252,7 +252,7 @@ No subsequent package or first shipped fixed version is established below.
 Owner-confirmed RC1 positives remain scoped: appearance-screen entry music,
 Go back/Choose borders, substantially improved fists, and tested torch-to-NPC
 response. They do not close the separate reports above. Full coordinates,
-reproduction notes and follow-up requests: [RC1 playtest ledger](../RC1_PLAYTEST_LEDGER.md).
+reproduction notes and follow-up requests: [RC1 playtest ledger](../history/feedback/RC1_PLAYTEST_LEDGER.md).
 
 ## Structural packet/BSP comparison: 2026-10-06T14:46:55+00:00
 
@@ -491,7 +491,7 @@ separate owner RC1 acceptance.
 
 New open reports: **CENSUS-DOOR-STUCK-29**, trapped after opening the Census
 Office interior door; **LIGHT-EXTERIOR-JUMP-29**, abrupt outdoor brightening near
-shacks without a carried torch. [Reproduction and next checks](../BUGS-v0.0.29-RC1.md#rc1-door-snag-and-outdoor-brightness-reports-6-october-2026)
+shacks without a carried torch. [Reproduction and next checks](../history/checkpoints/BUGS-v0.0.29-RC1.md#rc1-door-snag-and-outdoor-brightness-reports-6-october-2026)
 retain uncertainty about both causes. Earlier accepted appearance-entry audio
 and character-button borders remain accepted within their stated scope.
 
@@ -521,7 +521,7 @@ investigations; UI maintenance owns boundary navigation and regression checks.
 
 Dev4 playtesting reports lit walls/floors but dark NPC bodies. Five screenshots,
 the night/day poses, source leads and required acceptance matrix are retained in
-[the rc1 issue report](../BUGS-v0.0.29-RC1.md#torch-npc-light-29-nearby-npcs-do-not-respond-to-torchlight-open).
+[the rc1 issue report](../history/checkpoints/BUGS-v0.0.29-RC1.md#torch-npc-light-29-nearby-npcs-do-not-respond-to-torchlight-open).
 **Fixed: N; final-release blocker.**
 
 ## CONFIG-COMMENT-29: semicolon splits a default comment (repair candidate)
@@ -1497,10 +1497,10 @@ because one contributing allocation was removed. Every report must identify
 (1) version, bug, location and circumstances; (2) how to replicate; (3) how to
 fix, with evidence and verified fixed version. Unknown/pending facts stay explicit.
 
-Current release: [published stable v0.0.27](../RELEASE-v0.0.27.md), 3 October 2026.
+Current release: [published stable v0.0.27](../releases/notes/RELEASE-v0.0.27.md), 3 October 2026.
 Its hosted CI, source publication and downloaded-asset checks are complete.
 The repaired private image passed assembly/readback and the complete static map
-gate. [CRASH-01](../HEAP_CRASH_v0.0.27-rc3.md) remains an open target-validation
+gate. [CRASH-01](../history/investigations/HEAP_CRASH_v0.0.27-rc3.md) remains an open target-validation
 incident; publication does not certify its exact route or a heap lifecycle.
 Earlier rc build records below retain their historical status and evidence.
 
@@ -1533,7 +1533,7 @@ held-input preservation are assembled. The rc3 engine, strict actor contact,
 full gallery, filesystem readbacks, HDF checksums and emulator mount lists
 passed. Actual outer subdivision core/coverage records were checked against
 the runtime contract. Owner terrain/Shift/Ctrl/focus and character-state
-playtesting remains pending. See [rc3 notes](../RELEASE-v0.0.27-rc3.md) and the
+playtesting remains pending. See [rc3 notes](../releases/notes/RELEASE-v0.0.27-rc3.md) and the
 [growing cell-change checklist](../CELL_CHANGING.md).
 
 
@@ -1879,7 +1879,7 @@ Do not label either as the cause. No reliable trigger or state capture exists
 yet. Track separately from the repeated visible-fist disappearance; the latter
 is the persistent and more immediately distracting visual defect.
 
-Historical checkpoint record. Current combined source status: [RECONCILE-v0.0.25-rc1.md](../RECONCILE-v0.0.25-rc1.md).
+Historical checkpoint record. Current combined source status: [RECONCILE-v0.0.25-rc1.md](../history/merges/RECONCILE-v0.0.25-rc1.md).
 
 Record every reported regression here or in its linked version record. Include
 affected version, symptom, reproduction, established cause (or explicitly unknown),
@@ -1996,7 +1996,7 @@ recorded separately; this result alone is not complete build acceptance.
 ## 1 October 2026: dev1 to rc1 recovery
 
 Detailed records and chronological validation:
-[v0.0.25-rc1 recovery journal](../RECOVERY-v0.0.25-rc1.md).
+[v0.0.25-rc1 recovery journal](../history/local-rc/RECOVERY-v0.0.25-rc1.md).
 
 | ID | Issue / reproduction | Cause and implementation | Current validation / limits |
 | --- | --- | --- | --- |
@@ -3731,14 +3731,14 @@ latency change to hide the symptom.
 
 The Nord screenshot/close-ups show a detached-looking fragment at the left torch
 grip. Dev4 still ships the reduced legacy model, not the topology candidate.
-[Exact package findings, pose and acceptance](../BUGS-v0.0.29-RC1.md#torch-hand-nord-29-detached-looking-grip-fragment-in-dev4-open).
+[Exact package findings, pose and acceptance](../history/checkpoints/BUGS-v0.0.29-RC1.md#torch-hand-nord-29-detached-looking-grip-fragment-in-dev4-open).
 **Fixed: N; final-release blocker.**
 
 ## HUNK-RESERVE-SN012-29: dev4 warning below 2 MiB (OPEN)
 
 The `sn012.bsp` first-presented diagnostic has1,940,480 B clearance, below the
 2MiB target. Current supplied reproduction vicinity is-11510,-73406,123.
-[Full measured fields, limitations and memory work](../BUGS-v0.0.29-RC1.md#hunk-reserve-sn012-29-dev4-warning-below-2-mib-open).
+[Full measured fields, limitations and memory work](../history/checkpoints/BUGS-v0.0.29-RC1.md#hunk-reserve-sn012-29-dev4-warning-below-2-mib-open).
 
 ## Debug flame feedback and renderer-metadata warning: dev4 follow-up
 
@@ -3747,7 +3747,7 @@ source candidate. The reported flame disappearance occurs with sampled
 `hands state 2 goal 1 frame 5 torch 1`; the shaft is visible beneath the console.
 Full-viewport flame acceptance remains open. The independent native render-range
 reader recognizes `aw_render_ranges`, while generic field parsing warns.
-[Details and required checks](../BUGS-v0.0.29-RC1.md#debug-flame-feedback-and-renderer-metadata-warning-dev4-follow-up).
+[Details and required checks](../history/checkpoints/BUGS-v0.0.29-RC1.md#debug-flame-feedback-and-renderer-metadata-warning-dev4-follow-up).
 
 
 ## 6 October 2026: bounded native lighting and exact-storage progress

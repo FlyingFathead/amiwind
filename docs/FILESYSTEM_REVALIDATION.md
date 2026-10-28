@@ -55,4 +55,4 @@ maps. Prefer rebuilding/re-extracting the corrected checkpoint where possible.
 Regression gates include synthetic legacy roots, valid-checksum normalization,
 unknown-corruption rejection, full HDF payload readback, and native forced
 revalidation followed by scene use, clean quit and relaunch. ROM/emulator hashes
-and the final gate results are in [checkpoint-010](CHECKPOINT_010_VALIDATION.md).
+and the final gate results are in [checkpoint-010](history/checkpoints/CHECKPOINT_010_VALIDATION.md).

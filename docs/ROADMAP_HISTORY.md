@@ -200,7 +200,7 @@ their dated history. No audio repair or full-release readiness is claimed.
 
 ## Current RC2 issue status: 2026-10-06T19:08:08+00:00
 
-[Implemented repairs, demonstrated cases and still-open issues](RC2_ISSUE_CHECKPOINT.md).
+[Implemented repairs, demonstrated cases and still-open issues](history/checkpoints/RC2_ISSUE_CHECKPOINT.md).
 This dated checkpoint supersedes older candidate status below. Delivery and
 final extracted-package launch are still pending; Temple holes remain open.
 
@@ -359,7 +359,7 @@ tracks topology, animation and clipping checks separately from torch grip.
 - Investigate abrupt outdoor brightening near shacks with no carried torch;
   separate map/light-state handoff from clock/weather changes.
 
-Both are open playtester reports with unconfirmed causes. See [the follow-up](BUGS-v0.0.29-RC1.md#rc1-door-snag-and-outdoor-brightness-reports-6-october-2026).
+Both are open playtester reports with unconfirmed causes. See [the follow-up](history/checkpoints/BUGS-v0.0.29-RC1.md#rc1-door-snag-and-outdoor-brightness-reports-6-october-2026).
 
 ## Post-delivery RC1 priorities: 6 October 2026
 
@@ -377,7 +377,7 @@ current release goal; the combat milestone follows it.
 - Continue the existing hand/grip, memory reserve, world/interior mushroom
   coverage and outdoor traversal gates; these new observations do not close them.
 
-The [current issue matrix](BUGS-v0.0.29-RC1.md#rc1-owner-playtest-follow-up-6-october-2026)
+The [current issue matrix](history/checkpoints/BUGS-v0.0.29-RC1.md#rc1-owner-playtest-follow-up-6-october-2026)
 records owners, next checks and bounded acceptance. Earlier dated plans remain
 historical context.
 
@@ -386,7 +386,7 @@ historical context.
 The published development checkpoint is
 [v0.0.29-dev4](https://github.com/FlyingFathead/amiwind/releases/tag/v0.0.29-dev4).
 Next comes the rc1 playtest, then final More Mushrooms once worldwide picking
-and the final-release gates pass. The [current release plan](PLAN-v0.0.29.md)
+and the final-release gates pass. The [current release plan](history/plans/PLAN-v0.0.29.md)
 tracks scope and next evidence steps; [BUGS.md](BUGS.md) is the issue-status index.
 Current blockers include NPC torch illumination, connected torch-bearing hands,
 the Enter-music regression and world-map admission. Flame visibility and the
@@ -432,7 +432,7 @@ work; it is not included merely because a previous playtest archive exists.
 
 ## Historical baseline — published v0.0.27, 3 October 2026
 
-[AmiWind v0.0.27 — Rocks, Mushrooms, and Then Some is published](RELEASE-v0.0.27.md).
+[AmiWind v0.0.27 — Rocks, Mushrooms, and Then Some is published](releases/notes/RELEASE-v0.0.27.md).
 Its exact-commit hosted CI, public source release and downloaded-asset checks
 passed. Rock/giant-mushroom coverage, bounded town conversion, held-input
 preservation, map-marker repair and dual-emulator configuration generation are
@@ -523,10 +523,10 @@ validation, verified HDF assembly and WinUAE game entry. All 3,551 NPC models an
 2,526 terrain regions passed; the HDF is 3,489,693,696 bytes with SHA-256
 `da3f80b3d7ebefe30c53031fdd29c34a094d0b486328daa46739a4a5ad6364a3`. The cached
 run had conversion elapsed of 1,566.061 seconds (26 minutes 6 seconds), excluding export, provisioning and emulator testing, and reported 78 warnings. The local wrapper suite
-passed 433 tests with 3 skips. Hosted source, Linux/Windows parity and Docker CI passed; v0.0.26 is published. See [release notes](RELEASE-v0.0.26.md).
+passed 433 tests with 3 skips. Hosted source, Linux/Windows parity and Docker CI passed; v0.0.26 is published. See [release notes](releases/notes/RELEASE-v0.0.26.md).
 
 The earlier cold Docker run used rc1 identity and took 35 minutes 3 seconds; its
-separate evidence remains in [Docker validation](VALIDATION-DOCKER-2026-10-02.md).
+separate evidence remains in [Docker validation](history/validation/VALIDATION-DOCKER-2026-10-02.md).
 Keep Linux builds supported through the same portable converter; host-specific
 setup and launchers must not create a separate conversion implementation.
 
@@ -536,7 +536,7 @@ setup and launchers must not create a separate conversion implementation.
   preserve Linux's existing slash-separated identifiers and LF output.
 - [x] Finish full conversion and payload validation on Windows; corrected image
   assembly and WinUAE prison-scene entry passed. See the
-  [recovered-build validation record](VALIDATION-WINDOWS-2026-10-02.md).
+  [recovered-build validation record](history/validation/VALIDATION-WINDOWS-2026-10-02.md).
 - [x] Record timings, versions, warnings, output hashes and recovery limits.
 - [x] Prepare the v0.0.26-rc1 Windows source checkpoint.
 - [x] Complete the final v0.0.26 full conversion, strict actor-ground validation,
@@ -571,7 +571,7 @@ Terrain handoffs, held-input preservation, bounded town maps and heap estimates
 are implemented, with separate runtime checks still open. The final private
 image passed its static gates and filesystem readbacks. The original rc3 load
 incident still requires exact-route target acceptance; publication and static
-estimates do not close it. See the [release evidence and limits](RELEASE-v0.0.27.md).
+estimates do not close it. See the [release evidence and limits](releases/notes/RELEASE-v0.0.27.md).
 
 ### v0.0.28 — Trees and Grass, Day and Night
 
@@ -586,7 +586,7 @@ publication proceeds with the known issue and further audio investigation
 is deferred until after publication.
 The corrected image passes 10,766-file readback and three partition
 checks. Independent replay remains pending, including Balmora at night and
-both moon silhouettes. See the [current release record](RELEASE-v0.0.28.md).
+both moon silhouettes. See the [current release record](releases/notes/RELEASE-v0.0.28.md).
 
 - [x] Default-on automatic cycle using the persistent clock and explicit T waits.
 - [x] Default V3 and selectable V1/V2; independent default-on sun/cloud toggles.
@@ -633,7 +633,7 @@ its optional inspection facility is disabled.
 The reported full-world conversion takes an impractical part of an evening on
 the workstation. Prioritize making `vfXXXX` compilation and repeated builds
 practical alongside the current native Windows validation, before speculative compiler acceleration.
-The [build/compiler toolkit roadmap](BUILD_TOOLKIT_ROADMAP.md) defines the work:
+The [build/compiler toolkit roadmap](history/superseded/BUILD_TOOLKIT_ROADMAP.md) defines the work:
 
 1. Preserve the current run and measure individual phases, including both BSP
    compilations per region. Record success or failure rather than assuming it.
@@ -676,14 +676,14 @@ a WinUAE prison-scene smoke test passed on 2 October 2026. Intermittent
 Windows worker failures remain open. The
 [Windows build roadmap](WINDOWS_BUILD_ROADMAP.md) records the current evidence,
 recovery limits and acceptance milestones. WSL2 is a separate Linux-host route
-and now has a [full Docker conversion record](VALIDATION-DOCKER-2026-10-02.md).
+and now has a [full Docker conversion record](history/validation/VALIDATION-DOCKER-2026-10-02.md).
 
 ## Docker builder and v0.0.26 validation
 
 The builder, private input/export helper and local final-version validation are
 complete. The cached v0.0.26 helper/export run passed all conversions, the strict
 actor-ground gate, verified HDF assembly and WinUAE game entry. Hosted Docker CI
-and publication completed for v0.0.26; the later v0.0.27 hosted gates also passed. See the [release notes](RELEASE-v0.0.26.md) and
+and publication completed for v0.0.26; the later v0.0.27 hosted gates also passed. See the [release notes](releases/notes/RELEASE-v0.0.26.md) and
 [Docker builder details](DOCKER_BUILD_ROADMAP.md). Full-build peak storage remains
 unmeasured; the 40 GiB figure is an initial planning allowance.
 The implemented optional Linux build environment wraps the established pipeline
@@ -718,14 +718,14 @@ not the total space needed to build AmiWind. See Docker's
 
 ## Build and compiler toolkit
 
-The separate [toolkit roadmap](BUILD_TOOLKIT_ROADMAP.md) proposes phase profiling
+The separate [toolkit roadmap](history/superseded/BUILD_TOOLKIT_ROADMAP.md) proposes phase profiling
 for `vfXXXX` conversion, measured CPU/storage improvements, optional GPU asset
 work and deferred GPU-assisted QCC research. These are future investigations,
 not implemented backends or measured speedups.
 
 ## v0.0.25-rc1 regression work
 
-See [the consolidated dev1 feedback](FEEDBACK-v0.0.25-dev1.md). Priorities are
+See [the consolidated dev1 feedback](history/feedback/FEEDBACK-v0.0.25-dev1.md). Priorities are
 Seyda Neen's grounded island handoff, trustworthy global coordinates/map marker,
 water/terrain verification, console M/N protection, normal compass and Ctrl flight.
 
@@ -736,12 +736,12 @@ water/terrain verification, console M/N protection, normal compass and Ctrl flig
   seeds consistently and reduce near-coplanar portal clipping. Preserve native
   collision and visibility checks when changing that pipeline.
 
-Historical rc1 planning context: release [v0.0.24 - Welcome to Balmora (and Vvardenfell!)](RELEASE-v0.0.24.md).
-Candidate at that time: [v0.0.25-rc1](RELEASE-v0.0.25-rc1.md), correcting the first
+Historical rc1 planning context: release [v0.0.24 - Welcome to Balmora (and Vvardenfell!)](releases/notes/RELEASE-v0.0.24.md).
+Candidate at that time: [v0.0.25-rc1](releases/notes/RELEASE-v0.0.25-rc1.md), correcting the first
 playable terrain pass. Next work includes retained placement findings, broader
 route playtesting and scenery beyond the detailed towns. Solstheim/Bloodmoon and
 Tribunal are outside this island pass.
-The [29 September plan](PLAN-2026-09-29.md) retains historical priorities.
+The [29 September plan](history/plans/PLAN-2026-09-29.md) retains historical priorities.
 
 ## Balmora interiors and loading
 
@@ -885,7 +885,7 @@ does not establish arbitrary equipment composition.
 
 Maintenance v0.0.20 is retained. v0.0.21-dev1 implements the bounded opening,
 character/save and UI prototype; the checkboxes below track full acceptance,
-not merely source presence. See [checkpoint limits](RELEASE-v0.0.21-dev1.md).
+not merely source presence. See [checkpoint limits](releases/notes/RELEASE-v0.0.21-dev1.md).
 
 - [ ] Dock guard route, original CharGenDock dialogue and race-menu speech gates.
 - [ ] Race/sex/face/hair selector with rotating head preview and bounded resource use.
@@ -908,7 +908,7 @@ not merely source presence. See [checkpoint limits](RELEASE-v0.0.21-dev1.md).
 Source audit, order and acceptance: [CHARACTER_CREATION.md](CHARACTER_CREATION.md).
 Save design and pending comparison gates: [SAVEGAME_PLAN.md](SAVEGAME_PLAN.md).
 
-Core world/cell/chunk design: [WORLD_MAPPING_PLAN.md](WORLD_MAPPING_PLAN.md).
+Core world/cell/chunk design: [WORLD_MAPPING_PLAN.md](history/superseded/WORLD_MAPPING_PLAN.md).
 
 ## Next world-mapping milestone: entire-world terrain inspection
 
@@ -963,7 +963,7 @@ gameplay system is complete.
   must not require complete full-detail native residency. Use findings to choose
   streaming, optional polygonal BSP regions and elevated-view handling.
 
-See [terrain inspection plan](WORLD_MAPPING_PLAN.md#next-milestone-entire-world-terrain-topomesh).
+See [terrain inspection plan](history/superseded/WORLD_MAPPING_PLAN.md#next-milestone-entire-world-terrain-topomesh).
 
 
 ## Recovered follow-up: FREQUENT FLYER BONUS / whole-world scaling harness
@@ -992,7 +992,7 @@ package; documentation/planning only.
   load separately as in Morrowind, but exterior traversal should not degrade into
   gratuitous loading screens merely to satisfy the partitioning strategy.
 
-See [world-scale flight and precomputed geometry experiments](WORLD_MAPPING_PLAN.md#recovered-follow-up-world-scale-flight-and-precomputed-geometry-experiments).
+See [world-scale flight and precomputed geometry experiments](history/superseded/WORLD_MAPPING_PLAN.md#recovered-follow-up-world-scale-flight-and-precomputed-geometry-experiments).
 
 ## Fundamental mechanics before attribute effects
 
@@ -1057,7 +1057,7 @@ Maintainer principle: **"the fog is our friend"** for both bounded rendering/loa
 work and Morrowind's mystique. Preserve atmosphere when measuring view-distance
 tradeoffs; merely fogging still-processed/resident geometry is not the goal.
 
-Horstator's evening proposal, 28 September 2026: [full note](HORSTATORS_JOURNAL_2026-09-28.md#evening--polygonal-poi-regions-if-streaming-is-insufficient).
+Horstator's evening proposal, 28 September 2026: [full note](journals/HORSTATORS_JOURNAL_2026-09-28.md#evening--polygonal-poi-regions-if-streaming-is-insufficient).
 First use fog-limited visibility to support measured cell/chunk streaming and
 offloading, allowing brief pauses at selected crossings. Only if no sane version
 of that approach meets the target budgets are explicit region swaps a required
@@ -1114,7 +1114,7 @@ for scenery decoding, alias/sprite previews, BSP model geometry/lightmaps, intro
 conversion. It preserves single-writer scene assembly, live prefixed output,
 per-stage logs, failure propagation and explicit serial mode. Native make and
 VIS/LIGHT use the shared budget; Census no longer hard-codes two threads.
-See [PARALLEL_BUILD.md](PARALLEL_BUILD.md) for boundaries and measured validation.
+See [PARALLEL_BUILD.md](history/superseded/PARALLEL_BUILD.md) for boundaries and measured validation.
 
 Remaining opportunities: individual actor/hand conversion internals, terrain
 conversion, final assembly and safe incremental caches.
@@ -1132,7 +1132,7 @@ then a working local gameplay slice before expansion to other towns.** Complete
 the port, lighthouse/islets, bridges, opposing shore, residential connections
 and mainland/Silt Strider approach. The strider itself is a desired later visual
 landmark; its travel service is a separate task. See the coverage and acceptance
-routes in [SEYDA_NEEN_SCOPE.md](SEYDA_NEEN_SCOPE.md).
+routes in [SEYDA_NEEN_SCOPE.md](history/superseded/SEYDA_NEEN_SCOPE.md).
 
 Inventory town containers alongside scenery now. First preserve their placement,
 appearance and collision; then add activation, player/container item transfer and
@@ -1271,7 +1271,7 @@ options must remain distinguishable with the selected palette.
 
 Maintainer confirmation (27 September 2026): the central town-square obstruction is
 fixed in v0.0.12-dev2. Track per-iteration confirmations and open reports in
-[PLAYTEST_STATUS.md](PLAYTEST_STATUS.md); keep this location as regression coverage.
+[PLAYTEST_STATUS.md](history/superseded/PLAYTEST_STATUS.md); keep this location as regression coverage.
 
 Bound each architectural convex piece before player-hull expansion. Facet-only
 expansion can create remote solid spikes around acute or thin pieces. Keep the
@@ -1336,7 +1336,7 @@ Full dialogue filtering, quest state and combat remain open; checkpoint-013
 adds bounded proximity polling. The player box now matches the scaled base humanoid collision dimensions;
 native startup, idle and one stair route passed after ground-support and stair
 repairs. Other reported tight spots still need route-specific checking. Keep the preferred Quake bob. See [movement](PLAYER_MOVEMENT.md)
-and [checkpoint validation](CHECKPOINT_012_VALIDATION.md).
+and [checkpoint validation](history/checkpoints/CHECKPOINT_012_VALIDATION.md).
 
 ## Checkpoint-011 startup repair and NPC handoff
 
@@ -1418,7 +1418,7 @@ rendering, movement and collision are stable.
 v0.0.11-dev2 replaces convex facade scenery with shared mesh surfaces, corrects
 the native music filename fault, restores history controls and verifies shell
 relaunch. Linux `build.sh`, public notices and versioned `resources/emulators/`
-presets are present. See [validation](CHECKPOINT_009_VALIDATION.md).
+presets are present. See [validation](history/checkpoints/CHECKPOINT_009_VALIDATION.md).
 
 The queue below is retained in full: terrain joins and remaining visual gaps,
 audio deadlines, Balmora/recall travel, NPCs, dialogue, combat and interiors
@@ -1575,7 +1575,7 @@ proper surrounding map coverage becomes available.
 
 ## First complete vicinity
 
-Use [SEYDA_NEEN_SCOPE.md](SEYDA_NEEN_SCOPE.md) and the maintainer's UESP map as the
+Use [SEYDA_NEEN_SCOPE.md](history/superseded/SEYDA_NEEN_SCOPE.md) and the maintainer's UESP map as the
 coverage target: town/tradehouse, shacks, lighthouse peninsula, docks, Census
 buildings, prison-ship arrival and Silt Strider approach. Audit neighboring source
 cells before choosing smaller runtime streaming chunks. Fix origin-only object
@@ -1591,7 +1591,7 @@ beside the road. The maintainer clarified this is missing/malformed formation ge
 Compare original LAND/placed rocks with conversion at the same XYZ/yaw. Diagnose
 source topology, selected coverage and render visibility separately. Use the
 new `dbg coords on` / `dbg pos` aliases to collect coordinates. This remains
-open; see [playtest status](PLAYTEST_STATUS.md).
+open; see [playtest status](history/superseded/PLAYTEST_STATUS.md).
 
 ## Checkpoint-016 playtest steering (27 September 2026)
 
@@ -1642,7 +1642,7 @@ conversion reports so later areas inherit lessons rather than manual patches.
 
 ## Recovered maintainer list, 27 September 2026, 22:17 Helsinki
 
-The complete active register is [SEYDA_NEEN_NEXT_STEPS.md](SEYDA_NEEN_NEXT_STEPS.md):
+The complete active register is [SEYDA_NEEN_NEXT_STEPS.md](history/superseded/SEYDA_NEEN_NEXT_STEPS.md):
 interior structural regression first; town-edge/Silt Strider audit; exterior and
 interior actor rosters; authored activities and conditioned speech pools; container
 placement/state/refresh; separate interiors and door lookup tables; opening and
@@ -1866,13 +1866,13 @@ The reported Vodunius-house visibility holes and the misrotated port rock are
 addressed; see [terrain findings and workflow](WHAT_ARE_ROCKS.md). Voice style 2
 now defaults to aim-only identity, overriding voiced speaker headers.
 NPC conversation-facing, deck/pier sideways containment and door squeaks remain
-open in [the consolidated dev2 feedback](FEEDBACK-v0.0.23-dev2.md).
+open in [the consolidated dev2 feedback](history/feedback/FEEDBACK-v0.0.23-dev2.md).
 
 ## 29 September 2026 / v0.0.23-dev4
 
 Published base: dev3 / `7e36e9051da477147f78cf22236a0a4c0c7201ae`.
-See the updated [dated plan](PLAN-2026-09-29.md) and
-[dev3 feedback disposition](FEEDBACK-v0.0.23-dev3.md). This checkpoint corrects
+See the updated [dated plan](history/plans/PLAN-2026-09-29.md) and
+[dev3 feedback disposition](history/feedback/FEEDBACK-v0.0.23-dev3.md). This checkpoint corrects
 content-sized dialogue, input/rotation glyphs, startup audio/timing, opening quote,
 tree sprite depth and Darvame's floor placement. The maintainer accepts the dev3 rock
 fix. Door sounds, containment, complete voice behaviour and sky remain pending.
@@ -2110,7 +2110,7 @@ continuity and collision. These transitions have not passed target playtesting.
 Historical memory evidence remains in [memory allocation](MEMORY_ALLOCATION.md),
 [heap watcher and `build.json` receipt fields](HEAP_WATCHER.md#build-receipts-used-free-and-growth-margin),
 [bounded-world candidate notes](BOUNDED_WORLD_CANDIDATES.md), and the
-[world-detail/topology ladder](WORLD_DETAIL_LADDER.md). The 28-map baseline
+[world-detail/topology ladder](history/superseded/WORLD_DETAIL_LADDER.md). The 28-map baseline
 included town overlays, special town maps and interiors; the separate
 21-candidate trial had 6 passes and 15 failures (9 Seyda Neen and 6 Balmora
 overlay/exterior subcells). Those counts describe different scopes and must not
@@ -2242,7 +2242,7 @@ sampled views, with a worst top-silhouette error of 13 pixels at 128x60. Keep
 other blank/white-horizon reports separate. Next compare source-preserving rock
 geometry/proxies at fixed pose, yaw/pitch, time, draw distance and fog, retaining
 near depth protection, seams and resource budgets. No complete fix is accepted;
-see the [active horizon study](PLAN-v0.0.29.md#distant-terrain-topology-and-occlusion-study).
+see the [active horizon study](history/plans/PLAN-v0.0.29.md#distant-terrain-topology-and-occlusion-study).
 
 The observation that a requested 1000-unit
 Balmora distance felt faster is not a measured effective distance or diagnosis;
@@ -2327,7 +2327,7 @@ The existing surface_flatten.py route currently selects exterior decorative wind
 Keep generated geometry/media private; record actual representation savings and
 preserve unchanged reserves. See WORLD-FLORA-HEAP-010 in the bug journal.
 
-The dedicated [Study lanterns and torch lighting more](LANTERNS_AND_TORCH_LIGHTING.md)
+The dedicated [Study lanterns and torch lighting more](history/superseded/LANTERNS_AND_TORCH_LIGHTING.md)
 covers wall-mounted torches, lantern fixtures and carried lights; authored
 placements/attachments; indoor static/dynamic lighting; the guard day/night
 cycle; and measured local illumination rather than flame sprites alone.
@@ -2479,11 +2479,11 @@ coverage, and do not block a smaller verified development playtest.
 
 ### Conditional v0.0.29 release checkpoint -- More Mushrooms
 
-The planned release title is **AmiWind v0.0.29 -- More Mushrooms**. Ship only after worldwide original mushroom placement and picking are complete and the relevant release gates pass; this is a future milestone, not a completion claim. See the [v0.0.29 plan](PLAN-v0.0.29.md#conditional-release-milestone-more-mushrooms) for scope and evidence requirements. Dev4's six-placement pilot may supply clearly labeled progress screenshots only; final release screenshots must show the completed worldwide candidate. The later Caius quest milestone is separate from this release title.
+The planned release title is **AmiWind v0.0.29 -- More Mushrooms**. Ship only after worldwide original mushroom placement and picking are complete and the relevant release gates pass; this is a future milestone, not a completion claim. See the [v0.0.29 plan](history/plans/PLAN-v0.0.29.md#conditional-release-milestone-more-mushrooms) for scope and evidence requirements. Dev4's six-placement pilot may supply clearly labeled progress screenshots only; final release screenshots must show the completed worldwide candidate. The later Caius quest milestone is separate from this release title.
 
 ## Mandatory roadmap and bug tracking
 
-Maintain this roadmap with [BUGS.md](BUGS.md) and the [current release plan](PLAN-v0.0.29.md). Each active or deferred milestone needs its current scope, next action and acceptance gate; each defect needs an ID, evidence and status. Reconcile both against the exact package before release. Current priority remains final More Mushrooms before the combat-arena milestone.
+Maintain this roadmap with [BUGS.md](BUGS.md) and the [current release plan](history/plans/PLAN-v0.0.29.md). Each active or deferred milestone needs its current scope, next action and acceptance gate; each defect needs an ID, evidence and status. Reconcile both against the exact package before release. Current priority remains final More Mushrooms before the combat-arena milestone.
 
 ### Player and NPC animation coverage follow-up
 

@@ -1,6 +1,6 @@
 # AmiWind console commands
 
-_Generated from `config/debug-commands.txt` with AmiWind v0.0.54._
+_Generated from `config/debug-commands.txt` with AmiWind v0.0.55-dev1._
 
 Open the console with F10 or the backquote key and type
 a command, for example `dbg headlamp on`. This page is generated from
@@ -63,7 +63,7 @@ Type: "dbg help" for help.
 | `dbg aw charplane` | `dbg gallery`, `dbg modelgallery`, `dbg npcgallery` | [number/name/ID; next/previous/body/exit] |
 | `dbg aw hors` | - | 0 (new Hors, Nord / Barbarian / Steed, after Census) |
 | `dbg bench` | `dbg halloweenbench` | [halloween [skeletons]] the standard benchmark (docs/REAL_HARDWARE.md; also aw halloweenbench, dbg halloween bench): 600 fixed frames of the Halloween scene, FPS small at the bottom left, then one result line on the console to copy |
-| `dbg cast` | - | [NAME [target / touch / self / fail] [npc] [area FEET] [dur SECONDS] [repeat] / list / stop / orb 0-3; no argument: status and costs] a spell's look and sound (docs/MAGIC_EFFECTS.md; needs dbg magicfx 1 or 2): cast animation, orb, hand glow, cast, bolt, hit, area burst; npc: the actor in front casts at you; no magicka or effects on actors |
+| `dbg cast` | - | [NAME [target / touch / self / fail] [npc] [area FEET] [dur S] [shape egg/sphere] [repeat] / list / stop / orb 0-3 / shell egg/sphere; no argument: status and costs] a spell's look and sound (docs/MAGIC_EFFECTS.md; needs dbg magicfx 1/2): cast animation, orb, cast, bolt, hit, area; npc: the actor in front casts at you; no magicka |
 | `dbg characterchange` | `dbg quickchar` | [race class birthsign review / all] reopen the pier race, gender, head and hair menu over the current scene; confirm to apply (after registration) |
 | `dbg choosecompanion` | `dbg pickcompanion` | same as companion pick |
 | `dbg combat` | - | [on/off / seed N / readout on/off / music on/off / dice on/off / style amiwind/original / block hold/auto / flee on/off / bestattack on/off / loadout NAME/off / calm] melee combat: no argument = status, costs; readout = a line per swing; seed 0 = new per fight; flee on = also by Flee rating (defaults on, readout on, music on, block hold, flee off) |
@@ -72,6 +72,7 @@ Type: "dbg help" for help.
 | `dbg companiontest` | - | [on/off] same as companion test / companion off; no argument: status |
 | `dbg creatures` | - | [on/off, true/false or 1/0; no argument: status] the outdoor creatures (default on; not saved): off removes the wild creatures alive (their state kept) and spawns none, to compare frame rate, memory and behaviour; on brings them back as their cells join again |
 | `dbg daycycle gallery` | - | [here/off] (eight-stage camera tour; here keeps this view; Esc returns) |
+| `dbg demowind` | - | [on / off / next / prev / effect 1-2 / dist 0-7 / status] DemoWind (docs/DEMOWIND.md): the effects test kit, fullscreen, no world; each effect with its ms a frame and bytes on screen; Left/Right effect, Up/Down distance to Red Mountain, Esc off |
 | `dbg halloween` | - | [dagoth / skeletons / bench [skeletons] / fps on/off / camera wide/director / stop / status] Halloween scene (docs/HALLOWEEN.md, an image with the cast): skeletons, Desele's dancers, Dagoth Ur dance on the beat; dagoth (default) or skeletons alone; bench: the standard benchmark, one result line |
 | `dbg halloweentest` | - | [same words as halloween] the Halloween scene with the FPS counter on (bottom left) |
 | `dbg inventory grant` | - | <quoted source item ID> <1..999> explicit diagnostic grant of actual catalogue items (not saved defaults) |
@@ -99,7 +100,7 @@ Type: "dbg help" for help.
 | `dbg scene` | - | ship/town/balmora/<map name> |
 | `dbg scene change` | `dbg tp menu` | (scene picker) |
 | `dbg superspeed` | - | [on/off, true/false or 1/0; no argument = status and current speeds] the old fixed fast walk/run (cl_forwardspeed, Shift x cl_movespeedkey) instead of the original's speed from Speed, Athletics and load; no running fatigue (default off; not saved; also plain superspeed on/off) |
-| `dbg tp` | - | [X Y [Z] original Morrowind global coordinates (Z: land on the first floor at or below it) / mark or marker (the map marker you set on the map screen) / seydaneen / prisonship / balmora / vivec (the whole city vivec_city, else the Vivec Arena) / tel_uvirith (also teluvirith) / heartchamber (teleport-names.txt) / <map name>; no argument opens menu] |
+| `dbg tp` | - | [X Y [Z] original global coordinates (Z: land on the first floor at or below it) / mark or marker (the map marker you set on the map screen) / seydaneen / prisonship / balmora / vivec (the whole city vivec_city, else the Vivec Arena) / tel_uvirith (also teluvirith) / heartchamber / suran / suranclub / aldruhn / <map name>; no argument opens menu] |
 | `dbg unstuck` | - | (nearest clear standing spot below or beside you; never into a wall or water; leaves noclip) |
 | `dbg view` | - | x y z yaw pitch |
 | `dbg worldbounds` | - | [on/off, true/false or 1/0; no argument shows the state] the sea current along the edge of the open world that turns you back (an AmiWind extension; on in a default build) (not saved) |

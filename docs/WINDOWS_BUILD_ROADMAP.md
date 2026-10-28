@@ -4,7 +4,7 @@ _Last updated with AmiWind v0.0.28 (4 October 2026)._
 
 ## Current baseline — published v0.0.27
 
-The published [v0.0.27 release](RELEASE-v0.0.27.md) passed all four hosted jobs:
+The published [v0.0.27 release](releases/notes/RELEASE-v0.0.27.md) passed all four hosted jobs:
 Windows and Linux launcher parity, Docker builder, and source/asset-free build.
 The complete Linux Docker suite and asset-free Amiga compile also passed before
 publication. These checks do not establish a full native Windows suite or an
@@ -15,8 +15,8 @@ exhaustive v0.0.27 gameplay run. Native Windows remains experimental.
 **Linux is the established foundation; native Windows 11 remains experimental.**
 The complete recipe at that checkpoint converted on native Windows, produced a verified
 HDF after correcting/retrying image assembly, and entered Jiub's prison scene
-in WinUAE 6.0.3. See the [dated validation record](VALIDATION-WINDOWS-2026-10-02.md)
-and [rc1 release notes](RELEASE-v0.0.26-rc1.md) for exact provenance and limits.
+in WinUAE 6.0.3. See the [dated validation record](history/validation/VALIDATION-WINDOWS-2026-10-02.md)
+and [rc1 release notes](releases/notes/RELEASE-v0.0.26-rc1.md) for exact provenance and limits.
 The tested full image used the v0.0.25 runtime identity; rc1 packages the port.
 
 Windows setup/build entry points delegate to the same Python conversion pipeline
@@ -69,5 +69,5 @@ cache hits, effective worker counts, CPU/RAM and peak storage. The successful
 terrain stage processed 2,526 regions in 572.34 seconds with a 24-worker budget;
 that is not a cold whole-build timing. Preserve useful local intermediates.
 Improve throughput without omitting content or relaxing quality/validation.
-See the [toolkit roadmap](BUILD_TOOLKIT_ROADMAP.md) and
+See the [toolkit roadmap](history/superseded/BUILD_TOOLKIT_ROADMAP.md) and
 [compiler roadmap](THIRD_PARTY_COMPILERS.md) for further work.

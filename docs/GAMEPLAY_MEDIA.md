@@ -139,7 +139,7 @@ streets are dark; the moon-rooftop view includes only a small roof silhouette.
 The original palette and exposure are preserved.
 
 The capture build passed the bounded independent native checks described in
-[the release notes](RELEASE-v0.0.28.md). This establishes the shown scenes and
+[the release notes](releases/notes/RELEASE-v0.0.28.md). This establishes the shown scenes and
 controls, not physical-hardware performance or an unrestricted world playthrough.
 
 ## v0.0.23-dev2 captures — 29 September 2026

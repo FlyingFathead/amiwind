@@ -4,7 +4,7 @@
 
 # AmiWind
 
-_Last updated with AmiWind v0.0.54 (28 October 2026)._
+_Last updated with AmiWind v0.0.55-dev1 (28 October 2026)._
 
 An unofficial, experimental RPG engine and enthusiast project bringing Morrowind
 to the Commodore Amiga, featuring CHIM: an AmiQuake-based engine and an asset
@@ -30,7 +30,7 @@ More in the [gallery](docs/GALLERY.md).
 The newest release is **v0.0.54: Hair, Movement, Magic And More**: characters move by what they are doing and keep
 their hair whole, every NPC and creature has its own record of stats, items and spells from the game data, travel
 services are back, spells can show the game's own effects (experimental, off by default), and 34 more entrances can be used, running
-on CHIM Engine v0.2.2 ([release notes](docs/RELEASE-v0.0.54.md)). The project's own builds have had every exterior cell of Vvardenfell on CHIM since v0.0.43 (a build from the
+on CHIM Engine v0.2.2 ([release notes](docs/releases/notes/RELEASE-v0.0.54.md)). The project's own builds have had every exterior cell of Vvardenfell on CHIM since v0.0.43 (a build from the
 repository does so only from v0.0.47, when the cell list became part of the repository and the default): 1,409
 cells, counting the 61 in the town frames (1,348 are one-cell region frames; 1,292 land cells, 98 sea-floor cells
 and 19 open-sea cells), with no classic region maps left outdoors. What these numbers count:
@@ -38,6 +38,11 @@ and 19 open-sea cells), with no classic region maps left outdoors. What these nu
 [CHIM Progress Tracker](docs/chim/PROGRESS_TRACKER.md). Since v0.0.48 every interior of the base game but two (the
 prison and the census office) is built as a CHIM room, with the people the game places in them. Solstheim is not
 converted.
+
+The development line is at **v0.0.55-dev1** (28 October 2026), a builder fix first: a build on a machine that runs
+short of memory, with or without a container, now slows down and says so instead of crawling for hours and then
+failing, and the Toolkit's build monitor shows the memory beside the cores
+([dev1 notes](docs/releases/notes/RELEASE-v0.0.55-dev1.md)).
 
 What comes next is in the [roadmap](docs/ROADMAP.md): in v0.0.55, characters that wander, idle and attack on sight by
 their own records, creatures on skeletons of their own, Dagoth Ur's fight and voice, full-detail heads where rooms
@@ -106,7 +111,7 @@ weapon, cast, block, dodge, fall and die, with weapons, shields and the guards' 
 Lorkhan are in Akulakhan's Chamber for the first time, and the chamber loads on 32 MB, also coming from a town. A full
 memory no longer stops the machine with a Software Failure, and a WARNING box says so when there is less than 32 MB.
 
-Earlier releases: the [release notes](docs/RELEASE-v0.0.54.md) link back through every version, and the sections the
+Earlier releases: the [release notes](docs/releases/notes/RELEASE-v0.0.54.md) link back through every version, and the sections the
 front page used to carry are kept in [earlier README sections](docs/README_ARCHIVE.md).
 
 ### What works, and the honest limits
@@ -129,7 +134,7 @@ front page used to carry are kept in [earlier README sections](docs/README_ARCHI
   unfinished, and items and containers in rooms are not live objects yet; the jail markers are in the door table for
   the jail system to come. Characters do not wander by their records yet, nobody attacks on sight yet, and Dagoth Ur
   does not fight or speak yet; the Unmarked Shipwreck's upper trapdoor still keeps the use key out of reach
-  ([v0.0.54 release notes](docs/RELEASE-v0.0.54.md#known-in-this-build)).
+  ([v0.0.54 release notes](docs/releases/notes/RELEASE-v0.0.54.md#known-in-this-build)).
 - The reference target is an A1200 with AGA, a 68040 with FPU, 2 MiB Chip and 32 MiB Fast RAM (the safe minimum;
   16 MiB starts with a warning); development and
   every performance figure so far come from emulators and are relative. The first real-hardware figures, from testers
@@ -176,12 +181,14 @@ WinUAE: [Building and playing](docs/BUILDING_AND_PLAYING.md), the [Linux build g
 
 ## Where to read more
 
+- Every document, by topic: [the documentation index](docs/README.md) · every release with its notes:
+  [releases](docs/releases/README.md)
 - Project: [FAQ](docs/FAQ.md) · [Gallery](docs/GALLERY.md) · [Project state](docs/PROJECT_STATE.md) ·
   [Roadmap](docs/ROADMAP.md) · [Changelog](docs/CHANGELOG.md) · [Open bug reports](docs/BUGS.md)
 - How it works: [Architecture](docs/ARCHITECTURE.md) · [Actor placement](docs/ACTOR_PLACEMENT.md) · [CHIM](docs/chim/README.md) ·
   [CHIM progress tracker](docs/chim/PROGRESS_TRACKER.md) · [CHIM progress map (colours)](docs/chim/CHIM_PROGRESS_MAP.md) · [Asset coverage](docs/ASSET_COVERAGE.md)
 - Building: [Building and playing](docs/BUILDING_AND_PLAYING.md) · [Build dependencies](docs/BUILD_DEPENDENCIES.md) ·
-  [Build/compiler toolkit roadmap](docs/BUILD_TOOLKIT_ROADMAP.md) · [Release workflow](docs/RELEASE_WORKFLOW.md) · [Hosted CI jobs](docs/CI.md)
+  [Release workflow](docs/RELEASE_WORKFLOW.md) · [Hosted CI jobs](docs/CI.md)
 - Development: [Repository layout](docs/REPOSITORY_LAYOUT.md) · [Project rules](docs/PROJECT_RULES.md) (including the
   required Linux and Windows compatibility) · [Polycount Inspector](docs/POLYCOUNT_INSPECTOR.md) ·
   [Earlier README sections](docs/README_ARCHIVE.md)

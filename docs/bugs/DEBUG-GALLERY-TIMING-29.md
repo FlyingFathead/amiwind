@@ -35,7 +35,7 @@ pre-Census punch/torch/exit acceptance are pending. No shipped fixed version.
 
 **Update, 7 October 2026:** first delivered in v0.0.29-rc2; a later native run
 showed punch, torch off/on/off after appearance choice and return to the
-ordinary state ([RC2 checkpoint](../RC2_ISSUE_CHECKPOINT.md)). The darkness
+ordinary state ([RC2 checkpoint](../history/checkpoints/RC2_ISSUE_CHECKPOINT.md)). The darkness
 issue below (TORCHTEST-DARKNESS-29) remains open.
 
 ## Native follow-up: 2026-10-06T18:49:45+03:00

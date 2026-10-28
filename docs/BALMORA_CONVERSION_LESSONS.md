@@ -47,7 +47,7 @@ dev1–dev5 findings and current RC1 investigation. Historical results apply to
 the tested build and route; they do not close a later report automatically.
 
 The complete owner Parts 1–7 coordinate checklist and current acceptance gates
-are in [the RC1 investigation](INVESTIGATION-v0.0.24-rc1.md). Keep suspected
+are in [the RC1 investigation](history/investigations/INVESTIGATION-v0.0.24-rc1.md). Keep suspected
 causes separate from measured ones, and record native verification separately
 from conversion or host-test success.
 
@@ -67,7 +67,7 @@ overflow was investigated separately and did not explain the isolated failure.
 cost through bounded sub-cells. Match source/candidate views and inspect facade,
 roof and boundary coverage. Keep organic-object reduction separately bounded.
 The maintainer subsequently accepted the exteriors in dev2/dev3. See the measured
-single-building comparison in [dev2 findings](INVESTIGATION-v0.0.24-dev2.md).
+single-building comparison in [dev2 findings](history/investigations/INVESTIGATION-v0.0.24-dev2.md).
 
 ## 2. Hollow passages became solid collision
 
@@ -88,7 +88,7 @@ converted collision within region budgets. Validate actual normal walking in
 both directions, including adjacent walls and landings. Earlier bridge/temple
 and b17 routes passed targeted checks; new RC1 maintainer coordinates retain their
 own gates. See [mesh guidance](MESH_TIPS_AND_TRICKS.md),
-[dev4 findings](INVESTIGATION-v0.0.24-dev4.md), and the RC1 checklist.
+[dev4 findings](history/investigations/INVESTIGATION-v0.0.24-dev4.md), and the RC1 checklist.
 
 ## 3. A stair ramp fell just below the walkable-floor threshold
 
@@ -290,7 +290,7 @@ only bottleneck. The ship investigation measured substantial collision work;
 rendering, UI queries, actor caches and resident geometry also matter. Preserve
 the accepted frozen-frame Loading... box while measuring sub-cell changes.
 The whole-map high/low polygon-density study remains a later-version roadmap
-item. See [profiling](PROFILING.md), [dev5 investigation](INVESTIGATION-v0.0.24-dev5.md),
+item. See [profiling](history/superseded/PROFILING.md), [dev5 investigation](history/investigations/INVESTIGATION-v0.0.24-dev5.md),
 [conversion recipes](CONVERSION_RECIPES.md) and [roadmap](ROADMAP.md).
 
 ## 13. A directory-mounted build hid an invalid Amiga filename

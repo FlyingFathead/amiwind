@@ -343,7 +343,8 @@ class PageTests(unittest.TestCase):
         self.assertIn("const FOLLOW_KEY = 'amiwind-monitor-follow-1';", html)
         self.assertIn('return {latest: true, stage: true};', html)          # nothing saved: both on
         self.assertIn("$('followlatest').checked = saved.latest; $('follow').checked = saved.stage;", html)
-        self.assertEqual(html.count('saveFollowPrefs();'), 4)                # every way a choice changes is saved
+        # every way a choice changes is saved (the fifth: a run opened from Recent builds, TOOLKIT-RESULTS-NO-OPEN-55)
+        self.assertEqual(html.count('saveFollowPrefs();'), 5)
         self.assertIn('if (S.run) return;', html)
 
     @unittest.skipUnless(shutil.which('node'), 'Node.js unavailable')

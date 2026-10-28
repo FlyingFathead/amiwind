@@ -44,7 +44,7 @@ button, which arrives as `MOUSE3`, not as the PC's `MOUSE2`.
 ## Why it was not caught
 
 No test covered the default binds of the mouse buttons; the console line went unnoticed in an
-earlier capture (docs/PLAYTEST_STATUS.md mentions the unbound `MOUSE3`).
+earlier capture (docs/history/superseded/PLAYTEST_STATUS.md mentions the unbound `MOUSE3`).
 
 ## Reproduction
 

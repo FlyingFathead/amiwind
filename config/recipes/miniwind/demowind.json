@@ -1,0 +1,17 @@
+{
+  "schema": "build-recipe-1",
+  "name": "demowind",
+  "description": "MiniWind preset --miniwind-demowind: DemoWind: effects only, no world (dbg demowind)",
+  "options": {
+    "miniwind": true,
+    "miniwind_scope": "exterior",
+    "miniwind_description": "DemoWind: effects only, no world (dbg demowind)",
+    "direct_to_game_map": "balmora",
+    "exclude_unreferenced": "voice,npcs",
+    "miniwind_boot": "dbg demowind on"
+  },
+  "inputs": [],
+  "written_with": null,
+  "checked_with": null,
+  "status": "unverified"
+}

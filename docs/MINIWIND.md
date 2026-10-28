@@ -1,6 +1,6 @@
 # MiniWind: the test ground
 
-_Last updated with AmiWind v0.0.54-dev1 (27 October 2026)._
+_Last updated with AmiWind v0.0.54 (28 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -120,6 +120,7 @@ preset, [Build recipes](BUILD_RECIPES.md)); the builder makes one
 | `halloween` | `--miniwind-halloween` | Halloween: skeletons, dancers and Dagoth Ur dance on the beat |
 | `magic` | `--miniwind-magic` | Magic effects: dbg cast fire, frost, shock, heal... |
 | `combat-playground` | `--miniwind-combat-playground` | Combat playground in the Arena Pit: dbg playground MODE |
+| `demowind` | `--miniwind-demowind` | DemoWind: effects only, no world (dbg demowind) |
 <!-- presets end -->
 
 Notes: `balmora-exterior` leaves out the interiors, so every door says

@@ -16,7 +16,7 @@ def apply(source, target, backup):
     if not (target/'VERSION').is_file():
         raise ValueError('Target is not an AmiWind checkout')
     manifest = json.loads((source/'docs/PACKAGE_MANIFEST.json').read_text())
-    bases = json.loads((source/'docs/RECONCILE-BASES.json').read_text())
+    bases = json.loads((source/'docs/history/merges/RECONCILE-BASES.json').read_text())
     operations, conflicts = [], []
     for name in sorted(set(manifest['files']) | set(bases['removed'])):
         rel = PurePosixPath(name)

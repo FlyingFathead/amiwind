@@ -321,7 +321,7 @@ void Sbar_Draw(void) {
         else Draw_Fill(HUD_RIGHT_X,vid.height-lift-(rows3?HUD_ROW_EXTRA+2:18),vid.width-HUD_RIGHT_X,rows3?HUD_ROW_EXTRA+2:18,255);
         if(view_source(p,global))
             snprintf(line,sizeof(line),"GLOBAL XYZ: %ld %ld %ld",(long)global[0],(long)global[1],(long)global[2]);
-        else strcpy(line,"GLOBAL XYZ: unavailable (interior)");
+        else strcpy(line,"GLOBAL XYZ: N/A (interior)");  /* short, so the clock fits (HUD-INTERIOR-CLOCK-CUT-54) */
         if(hud_type.value!=1){
             strcpy(clock," TIME --:--");
             if(AW_ClockEnsure()){

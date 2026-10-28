@@ -27,7 +27,7 @@ _Last updated with AmiWind v0.0.53 (27 October 2026)._
 **Linux is the established build baseline. Native Windows 11 building is
 experimental.** A complete conversion of the then-current recipe and verified HDF, followed by WinUAE game
 entry, passed on 2 October 2026 after correcting/retrying image assembly.
-See [the validation record](VALIDATION-WINDOWS-2026-10-02.md) for scope and timing.
+See [the validation record](history/validation/VALIDATION-WINDOWS-2026-10-02.md) for scope and timing.
 Intermittent Python worker failures remain open; this success does not establish
 that the Windows path is consistently reliable.
 See [known issues and recovery limits](#windows-build-and-known-issues).
@@ -70,7 +70,7 @@ geometry test, and five repetitions of the two affected Balmora regions at
 The root cause and a reliable workaround remain under investigation. A reduced
 job count or a successful retry must not be described as a confirmed repair.
 The later conversion and image-retry checkpoint reached the game in WinUAE,
-as recorded in [validation](VALIDATION-WINDOWS-2026-10-02.md);
+as recorded in [validation](history/validation/VALIDATION-WINDOWS-2026-10-02.md);
 that is not comprehensive gameplay validation.
 
 Preserve the failed run's `build-state.json`, `build-summary.json` and stage
@@ -303,8 +303,8 @@ the existing Linux dependencies and build recipes.
 The notes below describe the separate Ubuntu-under-WSL2 route; a complete
 full-game run through this specific route is not recorded here. Docker Desktop
 with its WSL2 backend has completed a full conversion, as recorded in
-[Docker validation](VALIDATION-DOCKER-2026-10-02.md). See the
-[current release notes](RELEASE-v0.0.27.md) for later source/CI evidence and limits.
+[Docker validation](history/validation/VALIDATION-DOCKER-2026-10-02.md). See the
+[current release notes](releases/notes/RELEASE-v0.0.27.md) for later source/CI evidence and limits.
 
 1. Install Ubuntu using [Microsoft's WSL guide](https://learn.microsoft.com/windows/wsl/install).
    Choose a named distribution with `wsl --list --online`. For an Ubuntu 24.04
@@ -452,7 +452,7 @@ the complete gallery and all 2,526 terrain regions. It then failed at image
 packing with WinError 206: the xdftool command exceeded the Windows process
 argument limit. The Windows-only batching correction passed focused file-readback
 and regression checks, then passed full HDF validation and WinUAE game entry.
-See [the exact successful checkpoint](VALIDATION-WINDOWS-2026-10-02.md).
+See [the exact successful checkpoint](history/validation/VALIDATION-WINDOWS-2026-10-02.md).
 See [WIN-03](journals/BUG_JOURNAL-v0.0.29.md#win-03-windows-image-packing-command-exceeds-process-limit--fixed-in-working-tree-2-october-2026).
 The original failed receipt remains failed; an image-only retry records its own
 result. WIN-01 was not observed in this run and remains unresolved.

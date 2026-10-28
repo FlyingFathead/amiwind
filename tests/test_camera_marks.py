@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-only
-"""Named camera marks: dbg cam mark / recall / list (docs/CAMERA_MARKS.md, docs/PLAN-v0.0.42.md 1.2c).
+"""Named camera marks: dbg cam mark / recall / list (docs/CAMERA_MARKS.md, docs/history/plans/PLAN-v0.0.42.md 1.2c).
 
 The public marks file (config/camera-marks.txt) holds the ten emulator benchmark cameras exactly as
 docs/HARDWARE-BENCHMARK.md gives them and the Palace of Vivec comparison pose; the builder copies it onto the boot
@@ -143,6 +143,23 @@ class Command(unittest.TestCase):
         # a private mark never shadows a public one
         mark = cam[cam.index('static void mark_command'):cam.index('static void cam_command')]
         self.assertIn('is a public camera mark', mark)
+
+
+class ViewInSolid(unittest.TestCase):
+    """aw_view warns when its camera point is in solid or outside the room (SESSION-AW-VIEW-IN-SOLID-54)."""
+
+    def test_aw_view_checks_the_eye_point_after_placing_it(self):
+        debug = re.sub(r'/\*.*?\*/', '', (SRC / 'aw_debug.c').read_text(encoding='utf-8'), flags=re.S)
+        view = debug[debug.index('static void view(void)'):debug.index('static void tcl(void)')]
+        self.assertLess(view.index('SV_LinkEdict(p,false)'), view.index('view_check(p);'))
+        check = debug[debug.index('static void view_check(edict_t *p)'):debug.index('static void view(void)')]
+        self.assertIn('VectorAdd(p->v.origin,p->v.view_ofs,eye)', check)      # the eye, not the hull origin
+        self.assertIn('tr.startsolid || tr.allsolid', check)                 # in solid
+        self.assertIn('if(!AW_Interior())return;', check)                    # outside: interiors only
+        self.assertEqual(check.count('SV_Move(eye,vec3_origin,vec3_origin,end,MOVE_NOMONSTERS,p)'), 2)
+        self.assertIn('tr.fraction>=1', check)
+        # one fixed prefix the session tooling looks for in its console log
+        self.assertEqual(check.count('"aw_view WARNING: '), 2)
 
 
 class Orbit(unittest.TestCase):

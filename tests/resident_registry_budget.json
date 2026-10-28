@@ -3,13 +3,13 @@
  "note": "Ratchet: tests/test_resident_registry.py fails above these numbers and asks for them to be lowered when the engine needs less. Raise only with a dated, maintainer-approved reason.",
  "totals": {
   "commands": {
-   "count": 285,
-   "hunk_bytes": 9120
+   "count": 286,
+   "hunk_bytes": 9152
   },
   "cvars": {
-   "count": 344,
-   "static_bytes": 8256,
-   "zone_bytes": 11232
+   "count": 346,
+   "static_bytes": 8304,
+   "zone_bytes": 11296
   },
   "tables": {
    "count": 0,
@@ -49,8 +49,12 @@
   "2026-10-23: merge of v0.0.48-merge-dev-doors (sensitivity, step rules, hinged doors) into the interiors line (voice table, MWScript, player speed, Stats and Magic windows, campfires): both sides' approved raises recorded separately above; the totals are their union (no new setting)",
   "2026-10-27: WEATHER-RAIN and MESH-PARTICLE-EMITTERS, the maintainer's v0.0.54 items (desktop chat 2026-10-27 14:44 +0200: rain \"maybe we can do it with sprites\", chimney smoke \"a shit simple sprite thing\"; the TODO item asks for a default-off setting first): aw_atmos, one saved cvar (24 structure bytes, 32 zone bytes; bit 1 the falling weather, default off until measured; bit 2 the mesh smoke, default on); dbg atmos reuses the on-disk catalogue, no command. The weather's land light (aw_weather 2) and the interior fog (aw_fog 2) reuse existing cvars.",
   "2026-10-27: maintainer-requested magic effects prototype (desktop chat 2026-10-27, TODO MAGICKA GRAPHICS, worker v054-magic): aw_magic_fx, one saved setting (default 0 = off, nothing loaded), and aw_magicfx, one command record for dbg cast (the effect table, sprites and sounds are read from disk on the first cast only); 32 hunk bytes, 24 structure bytes, 32 zone bytes.",
+  "2026-10-28: the magic shell shapes, the maintainer (TG via the coordinator, 2026-10-28, on the dotted sphere shell: \"that looks hella cool, you could still save it as some version so that you don't delete it\", and the shield as the original's egg by default): aw_magic_orb, one saved setting carrying both the orb type (ones, 0-3) and the shell shape of the effect set (tens: 0 egg, 1 sphere); no command (dbg cast orb / shell route through aw_magicfx); 24 structure bytes, 32 zone bytes.",
   "2026-10-27: merge of v0.0.54-magic (aw_magic_fx, aw_magicfx) into v0.0.54-atmos (aw_atmos): both raises recorded separately above; the cvar totals are their union (344).",
-  "2026-10-27: aw_sweep (dbg sweep, ENTITY-SWEEP-AB), the console command the maintainer asked for on 2026-10-27 15:33 +0200 / 2026-10-27 13:33 UTC: 'some subroutine dbg command ... that checks the existence of all such entities across the map'; one command, 32 hunk bytes"
+  "2026-10-27: aw_sweep (dbg sweep, ENTITY-SWEEP-AB), the console command the maintainer asked for on 2026-10-27 15:33 +0200 / 2026-10-27 13:33 UTC: 'some subroutine dbg command ... that checks the existence of all such entities across the map'; one command, 32 hunk bytes",
+  "2026-10-28: aw_vivec_arena_pit_type, the maintainer's call of 2026-10-28 ~01:2x +0200 (relayed by the coordinator: the Arena Pit methods go behind one saved setting; 0 the bowl whole, 1 tiles, 2 tiles + the room detail budget, 3 the backdrop panels later; the image stores the room once per type and the setting picks which one the door loads, PERF-ARENA-PIT-SLOW-48): one saved cvar (24 structure bytes, 32 zone bytes; default -1 = the type the room map names as its default); no command",
+  "2026-10-28: v0.0.55 merge round 1 of v0.0.54-streaming (aw_vivec_arena_pit_type) and v0.0.54-magic (aw_magic_orb): both approved raises recorded separately above; the cvar totals are their union (346), no new setting",
+  "2026-10-28: DemoWind, the effects test kit the maintainer asked for (desktop chat 2026-10-28 12:36 +0200: a fullscreen AGA set of cheap effects, no world, browsed one after another; v0.0.55 seed \"DemoWind\"): aw_demowind, one command record (32 hunk bytes; dbg demowind routes to it through the on-disk catalogue); no cvars; its 81,920 bytes of tiles are allocated on dbg demowind on and freed on off"
  ],
  "entries": {
   "commands": [
@@ -138,6 +142,7 @@
    "aw_debug_hud",
    "aw_debug_hud_type",
    "aw_demo_start",
+   "aw_demowind",
    "aw_desktop",
    "aw_dialogue_layout",
    "aw_dialogue_method",
@@ -445,6 +450,7 @@
    "aw_loading_style",
    "aw_logs_live",
    "aw_magic_fx",
+   "aw_magic_orb",
    "aw_map_debug_available",
    "aw_map_format",
    "aw_map_lava",
@@ -522,6 +528,7 @@
    "aw_view_distance",
    "aw_view_third",
    "aw_view_vanity",
+   "aw_vivec_arena_pit_type",
    "aw_voice_dialogue_display_style",
    "aw_warm_light",
    "aw_weather",

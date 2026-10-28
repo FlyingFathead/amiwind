@@ -4,24 +4,24 @@
   "npc_gallery": true,
   "partial_area": null
  },
- "drive_bytes": 3058728960,
+ "drive_bytes": 3052437504,
  "drives": [
   {
-   "bytes": 3058728960,
-   "file": "AmiWind-v0.0.53.hdf"
+   "bytes": 3052437504,
+   "file": "AmiWind-v0.0.54.hdf"
   }
  ],
  "groups": {
   "actors": {
-   "bytes": 447974656,
+   "bytes": 613056272,
    "files": 5629
   },
   "chim-world": {
-   "bytes": 1139559438,
+   "bytes": 1165853938,
    "files": 39496
   },
   "classic-maps": {
-   "bytes": 7697220,
+   "bytes": 7701976,
    "files": 1189
   },
   "music": {
@@ -29,20 +29,20 @@
    "files": 21
   },
   "npc-gallery": {
-   "bytes": 234005720,
-   "files": 7106
+   "bytes": 1445601,
+   "files": 1
   },
   "other": {
-   "bytes": 371390537,
-   "files": 3393
+   "bytes": 376826641,
+   "files": 3412
   },
   "progs": {
-   "bytes": 169262753,
-   "files": 1752
+   "bytes": 201315624,
+   "files": 1829
   },
   "sound": {
-   "bytes": 200991172,
-   "files": 7193
+   "bytes": 203128110,
+   "files": 7370
   },
   "video": {
    "bytes": 137136474,
@@ -50,10 +50,10 @@
   }
  },
  "labels": [],
- "note": "The v0.0.53 release image (run 2026_10_27_v0.0.53_final_45f4c426), the previous release after the v0.0.53 pin",
- "payload_bytes": 2764290774,
- "run": "2026_10_27_v0.0.53_final_45f4c426",
+ "note": "",
+ "payload_bytes": 2762737440,
+ "run": "2026_10_28_v0.0.54_full-final-try2_00023b2",
  "schema": "amiwind-size-ledger-v1",
  "status": "complete",
- "version": "0.0.53"
+ "version": "0.0.54"
 }

@@ -168,7 +168,7 @@ leaves no more holes than method 1).
   24 KiB guess, and a walk that releases a chunk and activates it again while the player stands still should
   count as a failure, not a note. Both change which frames pass, so they wait for a decision for the project.
 - Related: the vivec_city frame is 54 x 54 chunks (6.75 cells a side) and reaches Ebonheart; its chunk index
-  alone is 361 KiB (CHIM-VIVEC-FRAME-WIDE-41 in docs/PLAN-v0.0.42.md 2.3). Khuul is a 15 x 15 region frame
+  alone is 361 KiB (CHIM-VIVEC-FRAME-WIDE-41 in docs/history/plans/PLAN-v0.0.42.md 2.3). Khuul is a 15 x 15 region frame
   and runs full too, so the frame size is a contributor, not the whole cause.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->

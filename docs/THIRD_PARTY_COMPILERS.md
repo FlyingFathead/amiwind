@@ -122,4 +122,4 @@ GPU-assisted host compilation if actual profiling establishes a useful parallel
 workload. Vendoring source alone does not provide CUDA support. The compiler
 must still emit compatible Quake VM bytecode for the Amiga; CUDA-targeted output
 would serve a different runtime. Measure QCC's share before prioritizing it over
-asset conversion. See the separate [build and compiler toolkit roadmap](BUILD_TOOLKIT_ROADMAP.md#deferred-possibility-gpu-assisted-qcc).
+asset conversion. See the separate [build and compiler toolkit roadmap](history/superseded/BUILD_TOOLKIT_ROADMAP.md#deferred-possibility-gpu-assisted-qcc).

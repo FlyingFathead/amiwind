@@ -107,7 +107,7 @@ does not matter. A stage that leaves most cores idle is a bug: the image step on
 24 threads for about 23 minutes per pass
 ([BUILD-IMAGE-SERIAL-32](bugs/BUILD-IMAGE-SERIAL-32.md)). Serial work says why it must be serial,
 and parallel results stay byte-identical to serial ones (a regression test checks it).
-`--jobs N` is exact and reaches every stage and pool; see [Parallel host builds](PARALLEL_BUILD.md).
+`--jobs N` is exact and reaches every stage and pool; see [Parallel host builds](history/superseded/PARALLEL_BUILD.md).
 
 ## Mandatory map rule: EVERY MAP MUST LET QUAKE'S VIS DO ITS JOB
 
@@ -382,7 +382,7 @@ imports the towns a release ships (`shipped_since` in `config/towns.json`: the
 Vivec Arena since v0.0.32); the builder adds a town not shipped yet with
 `--extra-town <id>` and selects the vis pass with
 `--vis {fast,full}` (vis threads follow `--jobs`). See
-[TOWN_IMPORT.md](TOWN_IMPORT.md), [PARALLEL_BUILD.md](PARALLEL_BUILD.md#vis-threads-and-vis-mode)
+[TOWN_IMPORT.md](TOWN_IMPORT.md), [PARALLEL_BUILD.md](history/superseded/PARALLEL_BUILD.md#vis-threads-and-vis-mode)
 and [performance/TOWN-VISIBILITY.md](performance/TOWN-VISIBILITY.md).
 
 ## World estimate
@@ -425,7 +425,7 @@ as measured high-cost regions, especially settlements, require it. Mark failing
 heap/headroom regions and profile the actual payload before splitting; preserve
 visibility/collision overlaps and gameplay continuity.
 
-Future content follows a deliberate [world-detail/topology ladder](WORLD_DETAIL_LADDER.md):
+Future content follows a deliberate [world-detail/topology ladder](history/superseded/WORLD_DETAIL_LADDER.md):
 rocks/mushrooms, trees/roots/stumps, marsh vegetation, early Seyda Neen shorelines,
 terrain formations, paths/roads, natural entrances and regional sets. Keep
 interactive micro-clutter separate. This is a future TODO, not current expansion
@@ -447,5 +447,5 @@ patched backends are distinguished; unattended runtime validation is pending.
 
 ## Headless development container
 
-See [FS-UAE in Docker](FS-UAE-DOCKER.md) for a persistent container,
+See [FS-UAE in Docker](history/superseded/FS-UAE-DOCKER.md) for a persistent container,
 private virtual display, screenshots, console debugger and backup steps.

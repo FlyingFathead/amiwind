@@ -1,6 +1,6 @@
 # Build profile and stage reuse
 
-_Last updated with AmiWind v0.0.54-dev1 (27 October 2026)._
+_Last updated with AmiWind v0.0.55-dev1 (28 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -81,7 +81,7 @@ the time goes. None of these changes what a build produces.
 
 | Option or command | What it does |
 | --- | --- |
-| `--jobs N` (`-j N`) | Exactly N workers for the whole build, shared by the stages that run at the same time; a warning when N exceeds the usable CPU threads, never a cap. Default: automatic (CPU count, quota, memory). See [PARALLEL_BUILD.md](PARALLEL_BUILD.md) |
+| `--jobs N` (`-j N`) | Exactly N workers for the whole build, shared by the stages that run at the same time; a warning when N exceeds the usable CPU threads, never a cap. Default: automatic (CPU count, quota, memory). See [PARALLEL_BUILD.md](history/superseded/PARALLEL_BUILD.md) |
 | `--serial-stages`, `--single-thread` | Diagnosis: stages one after another (keeping their jobs), or one worker in total |
 | `--reuse-from RUN` | Development builds: copy the outputs of stages whose input fingerprint did not change instead of running them; refused for release candidates and finals. See [Stage reuse](#stage-reuse-for-development-builds) |
 | `python tools/build.py status RUN` | Live progress of a running build: stages, cores in use, percent, ETA, idle-core warnings. See [Live progress and ETA](#live-progress-and-eta) |
@@ -99,7 +99,7 @@ the time goes. None of these changes what a build produces.
 
 `./build.sh status ...` and `./build.sh profile ...` are the same commands.
 `--vis full` is not a speed option: it runs the slower full vis pass (see
-[PARALLEL_BUILD.md](PARALLEL_BUILD.md#vis-threads-and-vis-mode)). There is no
+[PARALLEL_BUILD.md](history/superseded/PARALLEL_BUILD.md#vis-threads-and-vis-mode)). There is no
 general partial-area build yet (one region or cell instead of the whole game);
 the town options above are the only way to build less, and only for debugging.
 
@@ -490,6 +490,35 @@ a large input (the heap gate's position slices of one frame) send it once. Each
 unit still runs its function on its item and yields its own result; a failing
 unit ends the map as before. `AMIWIND_POOL_CHUNKS=off` keeps one task per unit
 (the method before v0.0.48); it is not part of any key.
+
+**A machine without a container is guarded too** (BUILD-GUARD-BLIND-NO-CGROUP-55,
+v0.0.55). The guard, its ALARM, the start check and every pool's governor read
+the container's limit (cgroup `memory.max`) and, when there is none, the
+machine: MemTotal as the limit and MemTotal - MemAvailable in use
+(`resource_plan.build_memory`). Before v0.0.55 a build on a plain Linux machine
+saw no memory at all: a tester's full build ran its chim stage 38 hours at 0.4
+cores and then died when the kernel killed a worker for memory.
+
+**A lost worker costs a retry, not the build** (BUILD-OOM-DEGRADE-NOT-DIE-54,
+v0.0.55). When a worker of `completed_map` dies (a broken pool, mostly the
+kernel's out-of-memory killer), the units that did not come back go out again
+in a fresh pool with half the units in flight, at most twice; each time one line
+says so (`[pool] WARNING: RAM exhausted? chim lost a worker (...); 12 unit(s) go
+out again with 4 in flight (was 8), retry 1 of 2; 27.9 of 30.0 GiB in use;
+out-of-memory kills: 1`). A third loss ends the map with its error. A unit is
+handed back once, so the results are the same; it is scheduling only and keys
+no stage. The CHIM stage's early frame checks run on the stage's own pool with
+the same retry (BUILD-CHIM-EARLY-CHECK-POOL-55); they used to fork a pool of
+their own from the CHIM main process, outside the memory guard.
+
+**Memory in the log and the monitor** (TOOLKIT-MONITOR-NO-MEMORY-55, v0.0.55).
+`build-progress.json` carries the build's memory (used, available, the limit and
+whether it is the container's or the machine's, the peak with its time and the
+stages that ran then); the build log gets a `[memory] new peak ...` line at each
+new peak above 75 % of the limit and a `[memory] WARNING: RAM nearly exhausted`
+line every 5 minutes while less than 10 % is available. The profile's timeline
+keeps the memory per sample and the limit, so the Toolkit monitor draws the
+memory curve beside the cores ([AmiWind Toolkit](AMIWIND_TOOLKIT.md#monitor)).
 
 ## Perf database
 

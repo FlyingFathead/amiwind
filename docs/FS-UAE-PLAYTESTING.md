@@ -73,9 +73,9 @@ To build the playable HDF from your Morrowind installation, use the
 [Linux](LINUX_BUILD.md) or [Windows / WSL build guide](WINDOWS_BUILD.md).
 The public source ZIP includes the preset, not game data, a playable HDF or
 a Kickstart ROM. A public dry-run HDF, when produced for the current version, boots only to a
-test notice. See [v0.0.48 release notes](RELEASE-v0.0.48.md) for current source
+test notice. See [v0.0.48 release notes](releases/notes/RELEASE-v0.0.48.md) for current source
 and build evidence. Actual FS-UAE multi-drive gameplay remains pending;
-[v0.0.17 validation](VALIDATION-v0.0.17.md) records the earlier local baseline.
+[v0.0.17 validation](history/validation/VALIDATION-v0.0.17.md) records the earlier local baseline.
 
 ## Build and launch automatically
 
@@ -487,5 +487,5 @@ patched backends are distinguished; unattended runtime validation is pending.
 
 ## Headless development container
 
-See [FS-UAE in Docker](FS-UAE-DOCKER.md) for a persistent container,
+See [FS-UAE in Docker](history/superseded/FS-UAE-DOCKER.md) for a persistent container,
 private virtual display, screenshots, console debugger and backup steps.

@@ -123,7 +123,7 @@ The maintainer confirms the port rock fix in dev3. The later missing rider was a
 entity spawn-order problem: actor floor traces ran before the platform brushes
 were linked. The cut-off town tree was a signed sprite-depth comparison against
 the background. Neither required changing the accepted rock mesh or terrain.
-See [dev3 feedback trials](FEEDBACK-v0.0.23-dev3.md) for the discarded culling
+See [dev3 feedback trials](history/feedback/FEEDBACK-v0.0.23-dev3.md) for the discarded culling
 experiment and the final fixes. Preserve structural rocks when optimizing LAND.
 
 ## v0.0.27-rc2: Rocks and Mushrooms
@@ -131,7 +131,7 @@ experiment and the final fixes. Preserve structural rocks when optimizing LAND.
 The world overlay uses the existing topomap and authored exterior placements:
 37,960 rocks and 816 giant mushrooms, covered across 2,526 retained regions.
 Town sub-cell maps remain deliberate frame-cost controls. Small collectible
-mushrooms are excluded. See [candidate scope](RELEASE-v0.0.27-rc2.md).
+mushrooms are excluded. See [candidate scope](releases/notes/RELEASE-v0.0.27-rc2.md).
 
 The giant-mushroom playtest exposed another structural reduction problem.
 Original cap sections use different materials but share joining positions.

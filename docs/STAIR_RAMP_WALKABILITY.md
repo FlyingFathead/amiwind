@@ -102,5 +102,5 @@ case. `tools/audit_walkability.py` uses the matching `player_hull.WALKABLE_Z`;
 native constant. The offline result does not substitute for native movement.
 
 See [player movement](PLAYER_MOVEMENT.md),
-[RC1 investigation](INVESTIGATION-v0.0.24-rc1.md) and
+[RC1 investigation](history/investigations/INVESTIGATION-v0.0.24-rc1.md) and
 [conversion recipes](CONVERSION_RECIPES.md).

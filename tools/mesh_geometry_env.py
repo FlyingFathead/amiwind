@@ -244,7 +244,8 @@ def standing_room_meshes(path=STANDING_ROOM_TABLE):
     data = json.loads(path.read_text(encoding='utf-8'))
     if data.get('format') != 'aw-collision-standing-room-1' or not isinstance(data.get('meshes'), dict):
         raise ValueError('%s: format aw-collision-standing-room-1 with a meshes table expected' % path)
-    return {k.replace(chr(92), '/').casefold() for k in data['meshes']}
+    from mesh_tables import tracked      # each cached result keys the rows it reads (BUILD-KEY-MESH-TABLE-WHOLE-54)
+    return tracked({k.replace(chr(92), '/').casefold() for k in data['meshes']}, path)
 
 
 def standing_room_applies(source, mode=None, meshes=None):

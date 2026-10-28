@@ -138,7 +138,7 @@ Bounds are explicit: 24 catalogued placements per loaded map, 64 content nodes,
 256 edges, 16 nested list levels and at most 64 items in an authored stack.
 AWH3 now stores up to 4,096 catalogue-bound placement facts in a dedicated
 saved table, independently of the 32-entry quest/global tables. Inventory still
-holds 32 item types. See [harvest state](HARVEST-STATE.md) for identity, sparse
+holds 32 item types. See [harvest state](history/superseded/HARVEST-STATE.md) for identity, sparse
 AWS3 saves and legacy-codec compatibility limits. Whole-world map admission is
 still pending: the origin-only census reaches 75 plants in one coverage region,
 above the current 24-per-map bound. Indexing those placements does not convert

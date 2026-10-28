@@ -63,7 +63,7 @@ Chip RAM, 32 MiB Z3 Fast RAM, 68040 with internal FPU and JIT**, fastest possibl
 CPU speed, AGA/PAL and 24-bit addressing disabled. The subsequent full Windows-built HDF also reached the main menu, played the
 opening and entered the prison scene with Jiub; name entry and menu input worked,
 and a clean exit returned to AmigaDOS. See the
-[Windows validation record](VALIDATION-WINDOWS-2026-10-02.md) for the limited smoke-test scope.
+[Windows validation record](history/validation/VALIDATION-WINDOWS-2026-10-02.md) for the limited smoke-test scope.
 
 The first Windows-generated test image failed on its AmigaDOS startup script
 because it contained CRLF line endings. Writing LF fixed the test-image boot;
@@ -111,7 +111,7 @@ The preset contains no personal Windows paths, device identifiers, ROMs or
 game data. Its description and filename identify the development version.
 The preset describes the WinUAE 6.0.3 reference configuration. The current
 Windows smoke-test scope is recorded above; earlier Linux execution tests used
-FS-UAE 3.1.66. Neither establishes stock A1200 speed. See [v0.0.16 validation](VALIDATION-v0.0.16.md)
+FS-UAE 3.1.66. Neither establishes stock A1200 speed. See [v0.0.16 validation](history/validation/VALIDATION-v0.0.16.md)
 for the tested machine and scope. Historical startup thresholds and maintainer
 reports remain below for comparison.
 
@@ -141,7 +141,7 @@ with noclip; a fresh native test reproduced the same lock. Dev4 finds grounded
 standing space with room to step in every direction. Use the new image, keeping
 your working ROM. For the old image: F10, `noclip`, close the console, move clear
 of the obstruction, then toggle `noclip` again. This is a workaround, not a key
-binding fix. See [checkpoint-011](CHECKPOINT_011_VALIDATION.md).
+binding fix. See [checkpoint-011](history/checkpoints/CHECKPOINT_011_VALIDATION.md).
 
 The maintainer resolved the reported ROM/flicker startup issue with their correct
 licensed ROM. Its effective checksum is not yet recorded. The packaged test ROM

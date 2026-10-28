@@ -35,7 +35,7 @@ python3 tools/asset_census.py disk --census ~/amiwind-census/census.json --bakes
 ```
 
 `--jobs N` runs exactly N mesh readers (absent or 0: automatic, from the CPU
-count and memory); see [Parallel host builds](PARALLEL_BUILD.md).
+count and memory); see [Parallel host builds](history/superseded/PARALLEL_BUILD.md).
 
 Everything runs on your machine and reads only your files; the output is
 yours and stays private. `--route-cell` names an exterior cell; the walk goes

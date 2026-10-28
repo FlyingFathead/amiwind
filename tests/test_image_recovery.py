@@ -37,7 +37,8 @@ class ImageRecoveryTests(unittest.TestCase):
                'steps':[{'name':name,'status':'failed' if name=='image' else 'passed','command':command}
                         for name,command in steps if name not in ('world-ui', 'actor-contact', 'npc-gallery', 'world-scenery-assets', 'world-scenery', 'media', 'seam-audit')]}
         (old/'build-state.json').write_text(json.dumps(state))
-        (source/'docs/PATCH-v0.0.25-rc6.json').write_text(json.dumps({'base_files':{'tools/example.py':{'sha256':'a'*64}}}))
+        (source/'docs/releases/patches').mkdir(parents=True, exist_ok=True)
+        (source/'docs/releases/patches/PATCH-v0.0.25-rc6.json').write_text(json.dumps({'base_files':{'tools/example.py':{'sha256':'a'*64}}}))
         areas=[]
         for name,filename in [('Seyda Neen','seyda_area.json'),('Balmora','balmora.json')]:
             config=json.loads((build.ROOT/'config'/filename).read_text())

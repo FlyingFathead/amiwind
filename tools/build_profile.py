@@ -147,9 +147,26 @@ def host_cpus():
 
 
 def read_cgroup_memory():
+    """The build's memory in use (bytes): the container's memory.current, else the machine's MemTotal - MemAvailable
+    (a build on a plain machine recorded no memory at all: TOOLKIT-MONITOR-NO-MEMORY-55), else None."""
     try:
         return int(Path('/sys/fs/cgroup/memory.current').read_text())
     except (OSError, ValueError):
+        pass
+    try:
+        from resource_plan import host_memory
+        total, free = host_memory()
+        return total - free if total is not None and free is not None else None
+    except Exception:  # noqa: BLE001 - the profile must never fail a build
+        return None
+
+
+def memory_limit_bytes():
+    """The ceiling of the memory curve: the container's limit, else the machine's MemTotal, else None."""
+    try:
+        from resource_plan import build_memory
+        return build_memory()[0]
+    except Exception:  # noqa: BLE001
         return None
 
 
@@ -1000,6 +1017,7 @@ class Sampler(threading.Thread):
         return {'interval': self.interval, 't': self.times, 'cores': self.total,
                 'cgroup_cores': self.cgroup if any(v is not None for v in self.cgroup) else None,
                 'memory_bytes': self.memory if any(v is not None for v in self.memory) else None,
+                'memory_limit_bytes': memory_limit_bytes(),
                 'host_cpus': self.cpus,
                 'host_busy': self.host if any(v is not None for v in self.host) else None,
                 'stages': {name: [[row[0], row[1]] for row in rows] for name, rows in self.stages.items()}}

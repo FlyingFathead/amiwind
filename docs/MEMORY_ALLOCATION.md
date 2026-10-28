@@ -64,7 +64,7 @@ Existing `-condebug` writes per message and is not a suitable streaming design.
 Fix CONSOLE-WHEEL-29 independently rather than adding disk I/O to its input path.
 Status: investigation requested, no disk-backed implementation yet.
 
-Current release status, 3 October 2026: [v0.0.27 is published](RELEASE-v0.0.27.md).
+Current release status, 3 October 2026: [v0.0.27 is published](releases/notes/RELEASE-v0.0.27.md).
 Its final private package passed the complete 2,717-map static heap gate and
 both HDF filesystem readbacks. The worst modeled margin is 135,952 bytes after
 the unchanged 3 MiB non-map allowance and 2 MiB safety reserve. No target heap
@@ -91,7 +91,7 @@ Treat this as a private playtest candidate with explicit reserve warnings.
 Native cold/warm loads, guard-cache pressure, transitions and high-pressure
 routes remain acceptance work; no reserve policy, hard heap ceiling or reference
 emulator memory setting was lowered to obtain these results. See the
-[current release record](RELEASE-v0.0.28.md).
+[current release record](releases/notes/RELEASE-v0.0.28.md).
 
 ## Mandatory: LEAVE HEADROOM
 
@@ -323,12 +323,12 @@ max(3 MiB, measured non-BSP peak plus an explicit upcoming-content allowance);
 retain the 2 MiB safety floor and increase it for measured/model discrepancies or
 unmodeled transients. Record assumptions with each matched build.
 
-See [the fog observation and profiling plan](HORSTATORS_MUSINGS_2026-10-03.md).
+See [the fog observation and profiling plan](journals/HORSTATORS_MUSINGS_2026-10-03.md).
 
 ## Incident reporting: correction versus mitigation
 
 Use the version/circumstances, reproduction and fix structure in
-[the rc3 crash report](HEAP_CRASH_v0.0.27-rc3.md). Producer's rule:
+[the rc3 crash report](history/investigations/HEAP_CRASH_v0.0.27-rc3.md). Producer's rule:
 **mitigation is NOT a fix; it is a bandage**. Record workarounds and partial
 corrections separately, and keep the verified fixed version pending until the
 underlying issue is corrected and the required target acceptance succeeds.

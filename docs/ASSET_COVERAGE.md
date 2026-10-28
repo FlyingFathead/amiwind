@@ -89,7 +89,7 @@ need target checks. The compact/global follow-on is outside this dev4 snapshot.
 
 The frozen dev4 suite ran 953 tests (949 passed, four skipped), and the 68040
 engine/boot checker compiled. Four bounded native groups passed. See
-[dev4 release notes](RELEASE-v0.0.29-dev4.md) for limitations, including the
+[dev4 release notes](releases/notes/RELEASE-v0.0.29-dev4.md) for limitations, including the
 quickload equipment reset, transition pauses and allocation reserve warnings.
 
 ## Earlier dated coverage snapshots
@@ -159,7 +159,7 @@ outside the sealed dev4 package; memory admission and native acceptance are open
 Global rollout requires merged per-map catalogues, additional model preparation,
 measured capacity expansion and interior support; proximity hiding alone does
 not remove those limits. See [small mushrooms](SMALL_MUSHROOMS.md) and
-[persistent harvest state](HARVEST-STATE.md).
+[persistent harvest state](history/superseded/HARVEST-STATE.md).
 
 ## Dev4 sealed package readback — 6 October 2026, 04:27 UTC
 
@@ -226,7 +226,7 @@ Current screenshots show the six-placement dev4 pilot only.
 
 | Version / snapshot | Packaged output | Conversion prepared for this version | Runtime acceptance |
 |---|---|---|---|
-| v0.0.28 public release | Historical category denominators not reconstructed here | See its [release notes](RELEASE-v0.0.28.md) | Use that release's recorded scope; do not infer current counts |
+| v0.0.28 public release | Historical category denominators not reconstructed here | See its [release notes](releases/notes/RELEASE-v0.0.28.md) | Use that release's recorded scope; do not infer current counts |
 | v0.0.29-dev3 / 5 October | 10,766 files; 156 WAV, 23 lip, 3 AWV and 18 MWS artifacts; 3,551 gallery model keys and 275 head/hair parts | Complete historical source-conversion counts unknown | Bounded scene checks; whole-asset coverage unknown |
 | v0.0.29-dev4 preparation / 5 October | No completed dev4 package claimed | 6,447 voices, 717 effects, 18 music tracks and 17 videos; 9 missing original audio references, 0 failed media outputs | Full-batch event/playback acceptance pending |
 | v0.0.29-dev4 mushroom diagnostic / 5 October, 18:45 UTC | No new packaged count claimed | 6 original placements from 3 source models converted into a bounded diagnostic sample | Native appearance untested; harvest interaction not implemented |
@@ -389,7 +389,7 @@ category summaries and verified image readback. State unavailable evidence as
 unknown; do not infer zero or carry acceptance from a different build. Retain
 dated evidence for previous snapshots rather than changing sealed artifacts.
 
-The [asset progress helper](ASSET_PROGRESS.md) generates the path inventory and
+The [asset progress helper](history/superseded/ASSET_PROGRESS.md) generates the path inventory and
 media/readback comparison. Converter-specific provenance supplies the other
 tables. Original assets, full private inventories and machine-specific paths
 are not part of this public report.
@@ -417,7 +417,7 @@ increase the six diagnostic placements already converted or establish native
 acceptance. Eight additional placed activators on two other mushroom-like
 models remain outside the supported taxonomy and interaction scope.
 
-The [dedicated harvest store](HARVEST-STATE.md) is integrated in unsealed dev4
+The [dedicated harvest store](history/superseded/HARVEST-STATE.md) is integrated in unsealed dev4
 source: 4,096 catalogue-bound placement facts, independent of quest/global slots,
 with persistent encounter rolls, picked/empty state and atomic inventory grants.
 The deduplicated Docker source checks passed 94 tests; six Amiga target objects

@@ -1184,7 +1184,8 @@ static void scene_help(void) {
 }
 /* dbg tp NAME for a place no town name reaches: teleport-names.txt in the game data (config/teleport-names.txt,
  * checked by the builder), one "name|map|x y z|yaw|label" per line; the arrival is where the game's own door into the
- * place puts the player. 1 with R filled when NAME is listed and its map is valid. */
+ * place puts the player. A map of "global" is an outdoor place: x y z are original Morrowind global coordinates, z the
+ * height to land at or below (the route of dbg tp X Y Z). 1 with R filled when NAME is listed and its map is valid. */
 static int named_place(const char *name,aw_scene_link_t *r) {
     FILE *f;char line[192],key[24],map[16],label[96];float x,y,z,yaw;int found=0;
     COM_FOpenFile("teleport-names.txt",&f);
@@ -1193,7 +1194,7 @@ static int named_place(const char *name,aw_scene_link_t *r) {
     while(!found && fgets(line,sizeof(line),f)) {
         if(line[0]=='#')continue;
         if(Q_sscanf(line,"%23[^|]|%15[^|]|%f %f %f|%f|%95[^\r\n]",key,map,&x,&y,&z,&yaw,label)!=7)continue;
-        if(Q_strcasecmp(key,(char *)name) || !map_valid(map))continue;
+        if(Q_strcasecmp(key,(char *)name) || (strcmp(map,"global") && !map_valid(map)))continue;
         memset(r,0,sizeof(*r));copy_name(r->target,sizeof(r->target),map);copy_name(r->label,sizeof(r->label),label);
         r->arrival[0]=x;r->arrival[1]=y;r->arrival[2]=z;r->yaw=yaw;found=1;
     }
@@ -1223,6 +1224,11 @@ static void scene_command(void) {
     }
     /* a named place (teleport-names.txt: dbg tp heartchamber) */
     if(sv.active && Cmd_Argc()==2 && strcmp(s,"ship") && strcmp(s,"town") && !map_valid(s) && named_place(s,&r)){
+        if(!strcmp(r.target,"global")){
+            if(!AW_MapTeleportAt(r.arrival,1))Con_Printf("%s: no map on this disk holds that point; player state unchanged.\n",r.label);
+            else Con_Printf("%s\n",r.label);
+            return;
+        }
         if(AW_SceneMapSize(r.target,path,sizeof(path))<124){Con_Printf("Destination not on this disk: %s.\n",r.label);return;}
         door_ready=0;door_close=0;Con_Printf("%s\n",r.label);load_scene(&r,1);return;
     }

@@ -261,6 +261,7 @@ def apply(id1, rows, door_bounds):
 
 
 TELEPORT_NAMES = 'teleport-names.txt'      # config/ and the game data: dbg tp NAME (engine aw_scene.c named_place)
+GLOBAL_PLACE = 'global'                    # the map of an outdoor place: x y z are original global coordinates
 
 
 def teleport_names(raw):
@@ -289,7 +290,7 @@ def teleport_name_problems(names, rooms):
     """One line per named place whose map is not a room the image holds (rooms: {cell: map})."""
     held = set(rooms.values())
     return ['named place %s: map %s is not in this image' % (name, place[0])
-            for name, place in sorted(names.items()) if place[0] not in held]
+            for name, place in sorted(names.items()) if place[0] != GLOBAL_PLACE and place[0] not in held]
 
 
 def unresolved_problems(rows):

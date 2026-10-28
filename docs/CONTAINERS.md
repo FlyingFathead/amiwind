@@ -9,7 +9,7 @@ DOOR placements; including a CONT mesh alone would not implement its contents.
 ## Host mapping
 
 Audit CONT base records and their placed CELL references within the agreed
-[starting area](SEYDA_NEEN_SCOPE.md), including later interior destinations.
+[starting area](history/superseded/SEYDA_NEEN_SCOPE.md), including later interior destinations.
 Keep a shared base definition separate from each placed container's identity.
 Retain model, name, inventory entries/counts, capacity/flags and script links;
 preserve placement metadata relevant to ownership, locks, traps and initial

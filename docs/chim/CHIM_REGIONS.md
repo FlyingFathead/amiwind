@@ -11,7 +11,7 @@ option, off by default, and the releases named a cell list kept outside the sour
 
 Update, 19 October 2026: this page describes how a cell joins a build, as designed in v0.0.36. Since v0.0.43 every
 exterior cell of Vvardenfell is a CHIM frame (one cell per region frame, 1,348 of them, besides the three town
-frames; [release notes](../RELEASE-v0.0.43.md)), so "the legacy open world stays the default" below describes
+frames; [release notes](../releases/notes/RELEASE-v0.0.43.md)), so "the legacy open world stays the default" below describes
 v0.0.36, not the releases.
 
 CHIMport ([CHIMPORT.md](CHIMPORT.md)) converts the island cell by cell and grades every cell
