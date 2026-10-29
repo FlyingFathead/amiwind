@@ -1,6 +1,6 @@
 # CHIM Engine tracker
 
-_Generated from `docs/bugs/bugs.json` with AmiWind v0.0.55-dev1._
+_Generated from `docs/bugs/bugs.json` with AmiWind v0.0.55-dev2._
 
 <!-- Generated whole by tools/bug_register.py render from docs/bugs/bugs.json and docs/BUG_JOURNAL.md; do not edit by hand. -->
 

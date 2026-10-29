@@ -1,6 +1,6 @@
 # Roadmap and implementation options
 
-_Last updated with AmiWind v0.0.55-dev1 (28 October 2026)._
+_Last updated with AmiWind v0.0.55-dev2 (28 October 2026)._
 
 <!-- contents start -->
 ## Contents

@@ -3896,5 +3896,8 @@
   "tests/test_ci_workflow.py",
   "docs/releases/notes/RELEASE-v0.0.55-dev1.md",
   "resources/emulators/AmiWind-v0.0.55-dev1-FS-UAE.fs-uae",
-  "resources/emulators/AmiWind-v0.0.55-dev1-WinUAE.uae"
+  "resources/emulators/AmiWind-v0.0.55-dev1-WinUAE.uae",
+  "docs/releases/notes/RELEASE-v0.0.55-dev2.md",
+  "resources/emulators/AmiWind-v0.0.55-dev2-FS-UAE.fs-uae",
+  "resources/emulators/AmiWind-v0.0.55-dev2-WinUAE.uae"
 ]

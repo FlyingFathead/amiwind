@@ -1,6 +1,6 @@
 # Bug register
 
-_Generated from `docs/bugs/bugs.json` with AmiWind v0.0.55-dev1._
+_Generated from `docs/bugs/bugs.json` with AmiWind v0.0.55-dev2._
 
 The single list of every AmiWind bug and its current status. How tracking
 works, the report template and the rules: [bug tracking](bugs/README.md).
@@ -20,7 +20,7 @@ a duplicate or superseded (the status says which).
 
 <!-- BEGIN GENERATED BUG REGISTER: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
-1278 bugs: 628 open, 559 fixed, 91 closed.
+1279 bugs: 628 open, 560 fixed, 91 closed.
 
 ### Persisting, not resolved
 
@@ -1211,6 +1211,7 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 | MINIWIND-EXTERIOR-CHIM-INTERIORS-52 | An exterior MiniWind stops in its image step: the image is told to install the CHIM interior store that the exterior scope does not build | high | v0.0.52-dev1 (v0.0.52-dev-source-fbd3c9af) | fixed | v0.0.52 | - | - | Fixed in the working tree (2026-10-26 04:01 +0200 / 2026-10-26 02:01 UTC, found by the animation stage build try4, SKEL-ANIM-STAGE-52): --miniwind-anim-stage (exterior scope) stopped in the image's finalize: No such file or directory .../chim-interiors/chim-rooms-receipt.json. chim_interior_commands adds the chim-interiors stage and --chim-interiors to the image; the MiniWind filter (miniwind_commands, exterior scope) then drops the stage but left the option. Every exterior MiniWind since the CHIM rooms became the default was affected (animkit, balmora-exterior, anim-stage). Fix: tools/build.py drops --chim-interiors from the image when no chim-interiors stage is left, after the MiniWind and exclusion filters. Test: tests/test_animkit.py test_an_exterior_miniwind_image_installs_no_interior_store. |
 | [MINIWIND-PAYLOAD-NOT-SLIM-33](bugs/MINIWIND-PAYLOAD-NOT-SLIM-33.md) | MiniWind #2 was built with the full movie and voice payload | low | v0.0.33-dev (MiniWind v0.0.33-dev1 #2) | fixed | v0.0.35 | - | - | Fixed: MiniWind builds default to --exclude-video and --exclude-unreferenced (build_exclusions.miniwind_defaults); in the release line by v0.0.35. |
 | [MODEL-MARKSURF-SIGNED-31](bugs/MODEL-MARKSURF-SIGNED-31.md) | Face indices above 32,767 in leaf face lists become bad pointers | medium | v0.0.32-dev | fixed | v0.0.32 | - | - | Fixed in v0.0.32: marksurface entries and leaf ranges read unsigned with bounds checks; native fixture aga_marksurface_index_test.c (test_aga_native_source). |
+| MONITOR-WARNINGS-ROW-54 | Requested: the Toolkit build monitor gathers every warning of a build in one yellow row, Warnings: N with a view of the lines | medium | v0.0.54 | fixed | v0.0.55 | - | - | Fixed in v0.0.55-dev2 (28 October 2026): the progress writer reads the new lines of every stage log at each snapshot and keeps the warning lines (WARNING anywhere, the underuse lines, the scheduler's alarms and memory cuts) with their time and stage, up to 200, in build-progress.json; the monitor shows a yellow Warnings: N row under the RAM line, [view] opens the list, hidden at 0. tests/test_pool_lost_worker.py. |
 | [MWAD-DELETED-RECORD-35](bugs/MWAD-DELETED-RECORD-35.md) | Readers disagree on what a deleted record is | low | v0.0.35-dev1 (none) | fixed | v0.0.35 | - | - | Fixed in v0.0.35 (v0.0.35-mwad-fixes merged): one shared mwad.esm reader path; tests/test_mwad_shared.py DeletedTests. |
 | [MWAD-READER-CHECKS-35](bugs/MWAD-READER-CHECKS-35.md) | Data readers: missing length checks, duplicate FRMR, diverging master lists, lock key | low | v0.0.35-dev1 (none) | fixed | v0.0.35 | - | - | Fixed in v0.0.35 (v0.0.35-mwad-fixes merged): one shared mwad.esm reader path; tests/test_mwad_shared.py reader checks. |
 | [MWAD-STRING-DECODE-35](bugs/MWAD-STRING-DECODE-35.md) | Data readers decode record strings four different ways | low | v0.0.35-dev1 (none) | fixed | v0.0.35 | - | - | Fixed in v0.0.35 (v0.0.35-mwad-fixes merged): one shared mwad.esm reader path; tests/test_mwad_shared.py StringTests. |
@@ -2905,6 +2906,7 @@ Every bug from v0.0.30 on belongs to one family (bugs with a shared cause or are
 - EVIDENCE-STAMPS-TYPED-53: Evidence script headers carried hand-typed times instead of copies of the stamp tool (fixed, low)
 - GATE-NUMBER-RACE-53: Two workers started gate 4074 at the same moment: the gate scripts number-is-free check is not atomic (fixed, low)
 - HANDOFF-WRAPPER-01: Source handoff wrapper reused an existing extraction directory (fixed, low)
+- MONITOR-WARNINGS-ROW-54: Requested: the Toolkit build monitor gathers every warning of a build in one yellow row, Warnings: N with a view of the lines (fixed, medium)
 - PREFLIGHT-DISK-FIGURE-53: The release preflight does not check the shipped disk figure, so the final commit failed its gate on it (gate 4078) (fixed, medium)
 - PREFLIGHT-PERSISTING-PARSE-53: The release preflight counted only persisting bugs whose line ended in NOT SCHEDULED, so lapsed deferrals printed 0 bugs and half a list (fixed, medium)
 - [PUBLIC-REFERENCE-SCREENSHOT-40](bugs/PUBLIC-REFERENCE-SCREENSHOT-40.md): Original-game reference screenshot included in the public source list (fixed, high)

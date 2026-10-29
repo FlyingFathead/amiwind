@@ -4,7 +4,7 @@
 
 # AmiWind
 
-_Last updated with AmiWind v0.0.55-dev1 (28 October 2026)._
+_Last updated with AmiWind v0.0.55-dev2 (28 October 2026)._
 
 An unofficial, experimental RPG engine and enthusiast project bringing Morrowind
 to the Commodore Amiga, featuring CHIM: an AmiQuake-based engine and an asset
@@ -39,10 +39,10 @@ and 19 open-sea cells), with no classic region maps left outdoors. What these nu
 prison and the census office) is built as a CHIM room, with the people the game places in them. Solstheim is not
 converted.
 
-The development line is at **v0.0.55-dev1** (28 October 2026), a builder fix first: a build on a machine that runs
+The development line is at **v0.0.55-dev2** (28 October 2026). Its dev1 was a builder fix first: a build on a machine that runs
 short of memory, with or without a container, now slows down and says so instead of crawling for hours and then
 failing, and the Toolkit's build monitor shows the memory beside the cores
-([dev1 notes](docs/releases/notes/RELEASE-v0.0.55-dev1.md)).
+([dev1 notes](docs/releases/notes/RELEASE-v0.0.55-dev1.md)); v0.0.55-dev2 adds a warnings row to the monitor ([dev2 notes](docs/releases/notes/RELEASE-v0.0.55-dev2.md)).
 
 What comes next is in the [roadmap](docs/ROADMAP.md): in v0.0.55, characters that wander, idle and attack on sight by
 their own records, creatures on skeletons of their own, Dagoth Ur's fight and voice, full-detail heads where rooms

@@ -1,6 +1,6 @@
 # AmiWind history
 
-_Generated from `docs/history/MOVES.json` with AmiWind v0.0.55-dev1._
+_Generated from `docs/history/MOVES.json` with AmiWind v0.0.55-dev2._
 
 Records of earlier work, kept as history and never deleted: each file sits in the folder of its kind. Nothing here describes the current state; the [documentation index](../README.md) does. [MOVES.json](MOVES.json) maps every file that left the docs/ root in v0.0.55 to its new place (release notes and baselines: [releases](../releases/README.md); journals: [journals](../journals/)).
 

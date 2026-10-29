@@ -197,6 +197,22 @@ function renderProgress(p) {
     ram.className = share < RAM_RED ? 'red' : share < RAM_ORANGE ? 'silent' : '';
     ram.title = (100 * share).toFixed(0) + ' % available; orange under ' + (100 * RAM_ORANGE) + ' %, red under ' + (100 * RAM_RED) + ' %';
   } else ram.textContent = 'RAM: not recorded by this build';
+  // the warnings row (MONITOR-WARNINGS-ROW, the maintainer: "highlight warnings in yellow ... a clickable
+  // 'warning(s) N [view]'"): every WARNING line of the stage logs, from build-progress.json; hidden at 0
+  let warnRow = $('warnrow'), warnList = $('warnlist');
+  if (!warnRow) { warnRow = el('div'); warnRow.id = 'warnrow'; ram.after(warnRow); }
+  if (!warnList) { warnList = el('pre'); warnList.id = 'warnlist'; warnList.hidden = true; warnRow.after(warnList); }
+  const w = p.warnings;
+  if (w && w.count > 0) {
+    warnRow.hidden = false; warnRow.className = 'silent';
+    warnRow.replaceChildren(el('span', '', 'Warnings: ' + w.count + ' '));
+    const view = el('a', 'runlink', warnList.hidden ? '[view]' : '[hide]'); view.href = '#';
+    view.onclick = e => { e.preventDefault(); warnList.hidden = !warnList.hidden; S.warnOpen = !warnList.hidden; renderProgress(S.progress); };
+    warnRow.append(view);
+    warnList.hidden = !S.warnOpen;
+    warnList.textContent = (w.lines || []).map(x => fmtS(x.seconds) + '  ' + x.stage + '  ' + x.line).join('\n') +
+      (w.count > (w.lines || []).length ? '\n... ' + (w.count - w.lines.length) + ' more in the stage logs' : '');
+  } else { warnRow.hidden = true; warnList.hidden = true; }
   const total = Math.max(0, Math.round(p.budget || 0)), used = Math.min(total, Math.round(p.cores_now || 0));
   coreText.textContent = total ? 'Cores: ' + (p.cores_now != null ? p.cores_now : '-') + ' busy of ' + total + ' threads' + lowNow() : '';
   coreText.className = lowNow() ? 'red' : '';

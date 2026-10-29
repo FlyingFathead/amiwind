@@ -1,6 +1,6 @@
 # AmiWind Toolkit
 
-_Last updated with AmiWind v0.0.55-dev1 (28 October 2026)._
+_Last updated with AmiWind v0.0.55-dev2 (28 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -595,7 +595,10 @@ The **Monitor** tab (`amiwind-toolkit/monitor.html`) follows a build as it runs,
   it, red once the build has stayed under the low-cores line (see the stage timeline) for its set time. Above the squares
   two lines in numbers: **RAM** (used and available, of the container's limit or, without a container, the machine's
   RAM, with the peak, when it came and the stages that ran then; orange under 20 % available, red under 10 %, with the
-  count of low-RAM warnings of the build) and **Cores** (busy of the build's threads);
+  count of low-RAM warnings of the build) and **Cores** (busy of the build's threads). Under the RAM line a yellow
+  **Warnings: N [view]** row gathers every warning the build has printed in its stage logs (WARNING lines, underuse
+  lines, the scheduler's alarms and memory cuts) with the time and the stage; `[view]` opens the list, and the row is
+  hidden while there are none;
 - **Activity:** what the running stage is doing even when its log is silent, from its read/write trace
   (`profile/reads/NN-stage.txt`: files written, files read, code entered): the files written and read and the code
   entries of the last 10 seconds, the code it is in now, the last entries, how long ago the trace and the log last

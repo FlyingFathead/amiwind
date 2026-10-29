@@ -1,6 +1,6 @@
 # AmiWind documentation
 
-_Generated from `docs/README.topics.json` with AmiWind v0.0.55-dev1._
+_Generated from `docs/README.topics.json` with AmiWind v0.0.55-dev2._
 
 Every document of the project, by topic, with the version and date of its last update. A document marked "needs a refresh" predates the current state of its subject and is due for a review; its facts may be out of date. Release notes and whitespace baselines are listed in [releases](releases/README.md); one-off records and replaced documents in [history](history/README.md).
 
@@ -71,7 +71,7 @@ Every document of the project, by topic, with the version and date of its last u
 | [EXPERIMENTAL_FLAGS.md](EXPERIMENTAL_FLAGS.md) | Experimental flags | v0.0.48-dev2 (23 October 2026) |
 | [CRASH_REPORTING.md](CRASH_REPORTING.md) | Fatal error reports | v0.0.28 (4 October 2026), needs a refresh |
 | [DEBUG_OVERLAYS.md](DEBUG_OVERLAYS.md) | Development overlays | v0.0.48-dev2 (22 October 2026) |
-| [AMIWIND_CONSOLE_COMMANDS.md](AMIWIND_CONSOLE_COMMANDS.md) | AmiWind console commands | generated (v0.0.55-dev1) |
+| [AMIWIND_CONSOLE_COMMANDS.md](AMIWIND_CONSOLE_COMMANDS.md) | AmiWind console commands | generated (v0.0.55-dev2) |
 | [MEMORY_ALLOCATION.md](MEMORY_ALLOCATION.md) | Memory allocation and heap clearance | v0.0.42-dev1 (17 October 2026), needs a refresh |
 | [HEAP_WATCHER.md](HEAP_WATCHER.md) | Heap watcher: build estimates and complete scene lifecycles | v0.0.42-dev1 (17 October 2026), needs a refresh |
 | [COLLISION_MESHES.md](COLLISION_MESHES.md) | Morrowind collision meshes: where they are and how AmiWind uses them | v0.0.54 (27 October 2026) |
@@ -200,7 +200,7 @@ Every document of the project, by topic, with the version and date of its last u
 
 | Document | Title | Last updated |
 | --- | --- | --- |
-| [AMIWIND_TOOLKIT.md](AMIWIND_TOOLKIT.md) | AmiWind Toolkit | v0.0.55-dev1 (28 October 2026) |
+| [AMIWIND_TOOLKIT.md](AMIWIND_TOOLKIT.md) | AmiWind Toolkit | v0.0.55-dev2 (28 October 2026) |
 | [AMIWIND_MAP_OPTIMIZATION_TOOLKIT.md](AMIWIND_MAP_OPTIMIZATION_TOOLKIT.md) | AmiWind Map Optimization Toolkit | v0.0.41-dev4 (16 October 2026), needs a refresh |
 | [POLYCOUNT_INSPECTOR.md](POLYCOUNT_INSPECTOR.md) | AmiWind 3D Map Inspector | v0.0.42-dev1 (17 October 2026), needs a refresh |
 | [POLYGON_HEATMAP.md](POLYGON_HEATMAP.md) | Polygon density, cells and town subcells | v0.0.32-dev1 (8 October 2026), needs a refresh |
@@ -227,7 +227,7 @@ Every document of the project, by topic, with the version and date of its last u
 
 | Document | Title | Last updated |
 | --- | --- | --- |
-| [BUGS.md](BUGS.md) | Bug register | generated (v0.0.55-dev1) |
+| [BUGS.md](BUGS.md) | Bug register | generated (v0.0.55-dev2) |
 | [BUG_JOURNAL.md](BUG_JOURNAL.md) | Bug journal | v0.0.48-dev2 (23 October 2026) |
 
 ## Releases
@@ -235,7 +235,7 @@ Every document of the project, by topic, with the version and date of its last u
 | Document | Title | Last updated |
 | --- | --- | --- |
 | [CHANGELOG.md](CHANGELOG.md) | Changelog | v0.0.54 (28 October 2026) |
-| [ROADMAP.md](ROADMAP.md) | Roadmap and implementation options | v0.0.55-dev1 (28 October 2026) |
+| [ROADMAP.md](ROADMAP.md) | Roadmap and implementation options | v0.0.55-dev2 (28 October 2026) |
 | [RELEASE_WORKFLOW.md](RELEASE_WORKFLOW.md) | AmiWind release workflow | v0.0.54 (28 October 2026) |
 | [CI.md](CI.md) | Build audit and the local pipeline | v0.0.54 (27 October 2026) |
 | [CI_DRY_RUN.md](CI_DRY_RUN.md) | Asset-free compilation and boot image | v0.0.54 (27 October 2026) |

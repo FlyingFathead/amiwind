@@ -70,6 +70,12 @@ PEAK_LOG_SHARE = 0.75      # a new memory peak above this share of the limit pri
 PEAK_LOG_STEP_GIB = 0.5    # ... when it is at least this much above the last one printed (no line per sample)
 LOW_RAM_SHARE = 0.10       # under this share of the limit available: a [memory] WARNING line ...
 LOW_RAM_REPEAT_SECONDS = 300.0   # ... again at most this often while it lasts
+# The monitor's warnings row (MONITOR-WARNINGS-ROW): the lines of the stage logs that are warnings. The builder's own
+# forms: "WARNING" anywhere ([pool] WARNING, [memory] WARNING, size and perf warnings), the underuse lines and the
+# scheduler's alarms and memory cuts
+WARNING_LINE = re.compile(r'\bWARNING\b|\[underused\]|\[scheduler\] (ALARM|memory tight)')
+WARNINGS_KEPT = 200              # warning lines kept in build-progress.json (the count goes on past it)
+WARNINGS_READ_BYTES = 8 << 20    # at most this much new log text read per log and snapshot
 DONE = ('passed',)
 STOPPED = ('failed', 'cancelled')
 COMPARABLE_RATIO = 2.0     # history of a run within this size ratio counts as the same size
@@ -758,6 +764,10 @@ class Tracker:
         eta = result['eta_seconds']
         recent_build = [cores for t, cores in build_cores if t >= now - CORES_WINDOW]
         memory = self.memory_reading(now, [row['name'] for row in rows if row['status'] == 'running'])
+        try:
+            build_warnings = self.warnings_reading(now)
+        except Exception:  # noqa: BLE001 - progress must never fail a build
+            build_warnings = None
         return {'schema': SCHEMA, 'run': self.run.name, 'status': status,
                 'started_at': _now_iso(self.started_epoch), 'updated_at': _now_iso(epoch),
                 'updated_epoch': round(epoch, 3), 'interval': self.interval,
@@ -768,6 +778,7 @@ class Tracker:
                 'work_seconds': result['work_seconds'], 'counts': counts,
                 'cores_now': round(sum(recent_build) / len(recent_build), 2) if recent_build else None,
                 'memory': memory,
+                'warnings': build_warnings,
                 'stages': rows, 'idle_warnings': warnings, 'build_idle': build_idle, 'host': host,
                 'no_history': result['no_history'], 'fallback_seconds': result['fallback_seconds'],
                 'history': {'runs': self.history_runs, 'defaults': self.defaults_used},
@@ -811,6 +822,42 @@ class Tracker:
         return {'used_gib': round(live, 2), 'limit_gib': round(limit / gib, 2), 'source': source,
                 'available_gib': round(available, 2), 'low': low, 'low_warnings': getattr(self, 'low_ram_count', 0),
                 'peak_gib': round(peak[0], 2), 'peak_seconds': peak[1], 'peak_stages': peak[2]}
+
+    def warnings_reading(self, now):
+        """Every warning the build has printed so far, gathered from the stage logs (MONITOR-WARNINGS-ROW): the new
+        bytes of each logs/*.log since the last snapshot are read, and each line matching WARNING_LINE is kept with the
+        build time it was seen at and its stage; at most WARNINGS_KEPT lines are kept (the count goes on). Returns
+        {'count', 'lines': [{'seconds', 'stage', 'line'}]}; a log that cannot be read is skipped (progress never fails)."""
+        seen = getattr(self, 'warning_offsets', None)
+        if seen is None:
+            seen = self.warning_offsets = {}
+            self.warning_lines, self.warning_count = [], 0
+        try:
+            logs = sorted((self.run / 'logs').glob('*.log'))
+        except OSError:
+            logs = []
+        for log in logs:
+            try:
+                size = log.stat().st_size
+                start = seen.get(log.name, 0)
+                if size <= start:
+                    continue
+                with open(log, 'rb') as fh:
+                    fh.seek(start)
+                    data = fh.read(min(size - start, WARNINGS_READ_BYTES))
+            except OSError:
+                continue
+            cut = data.rfind(b'\n') + 1          # a line still being written is read next time, whole
+            if not cut:
+                continue
+            seen[log.name] = start + cut
+            stage = re.sub(r'^\d+-', '', log.stem)
+            for raw in data[:cut].decode('utf-8', 'replace').splitlines():
+                if WARNING_LINE.search(raw):
+                    self.warning_count += 1
+                    if len(self.warning_lines) < WARNINGS_KEPT:
+                        self.warning_lines.append({'seconds': round(now, 1), 'stage': stage, 'line': raw.strip()[:400]})
+        return {'count': self.warning_count, 'lines': list(self.warning_lines)}
 
     def write(self):
         try:

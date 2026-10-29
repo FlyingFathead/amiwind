@@ -103,6 +103,28 @@ class MonitorMemory(unittest.TestCase):
         self.assertIn('[memory] WARNING: RAM nearly exhausted', out.getvalue())
         self.assertIn('[memory] new peak', out.getvalue())
 
+    def test_progress_gathers_the_warning_lines_of_the_stage_logs(self):
+        # MONITOR-WARNINGS-ROW: the monitor's yellow row counts every warning line of the stage logs, read in steps
+        import build_progress
+        with tempfile.TemporaryDirectory() as temp:
+            run = Path(temp)
+            (run / 'logs').mkdir()
+            chim = run / 'logs' / '32-chim.log'
+            chim.write_text('model 1 / 2\n[pool] WARNING: RAM exhausted? chim lost a worker\nhalf a lin', encoding='utf-8')
+            (run / 'logs' / '40-image.log').write_text('[underused] WARNING: image ran on 1.0 of 24 cores\nok\n',
+                                                       encoding='utf-8')
+            progress = build_progress.Tracker.__new__(build_progress.Tracker)
+            progress.run = run
+            first = progress.warnings_reading(10.0)
+            self.assertEqual(first['count'], 2)
+            self.assertEqual([x['stage'] for x in first['lines']], ['chim', 'image'])
+            with open(chim, 'a', encoding='utf-8') as fh:     # the half line ends, one more warning comes
+                fh.write('e\n[scheduler] ALARM: chim held at 1 of 8 workers\n')
+            again = progress.warnings_reading(20.0)
+        self.assertEqual(again['count'], 3)
+        self.assertEqual((again['lines'][-1]['stage'], again['lines'][-1]['seconds']), ('chim', 20.0))
+        self.assertIn('ALARM', again['lines'][-1]['line'])
+
     def test_the_monitor_timeline_carries_the_memory_curve(self):
         import monitor_read
         with tempfile.TemporaryDirectory() as temp:
