@@ -1,6 +1,21 @@
 # World tree sprites and the Balmora comparison zone
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.56-dev1 (29 October 2026)._
+
+<!-- contents start -->
+## Contents
+
+- [Open sprite-root regression - 4 October 2026](#open-sprite-root-regression---4-october-2026)
+- [Study: cheap trees with some depth (29 October 2026)](#study-cheap-trees-with-some-depth-29-october-2026)
+- [Balmora mesh exclusion](#balmora-mesh-exclusion)
+- [Reproducible shared sprite conversion](#reproducible-shared-sprite-conversion)
+- [Scale and visibility investigation](#scale-and-visibility-investigation)
+- [Acceptance](#acceptance)
+- [Converter evidence after v0.0.27](#converter-evidence-after-v0027)
+- [Current development checkpoint: Trees and Grass](#current-development-checkpoint-trees-and-grass)
+- [Reserves fail fast (11 October 2026)](#reserves-fail-fast-11-october-2026)
+
+<!-- contents end -->
 
 ## Open sprite-root regression - 4 October 2026
 
@@ -23,6 +38,80 @@ Billboard trees deliberately approximate the original three-dimensional view;
 tilted trunks, collision and interactive stumps need explicit preservation checks.
 Never silently omit non-unit scales or replace container state with decoration.
 Generated sprites, original inputs and preview images remain private.
+
+## Study: cheap trees with some depth (29 October 2026)
+
+The maintainer asked how trees could stay cheap and still have some dimensionality. Two classic bitmap
+techniques, both drawing one baked tree image (branches and foliage in the picture, transparent around the outline)
+instead of modelled geometry:
+
+| Technique | Seen from above | Pieces | What it gives | What it costs |
+| --- | --- | --- | --- | --- |
+| Camera-facing billboard (what the sprite trees are today; Daggerfall-style) | One line turning around the trunk | 1 panel | The same full tree from every side; the cheapest fill | Flat: no parallax, the tree turns with the player; a slope shows its root edge |
+| Crossed planes, 2 panels at 90 degrees | A cross | 4 half-panels | Fixed in the world: real parallax while walking past, no turning | Twice the panels; the edge-on panel shows as a thin line at 45 degree steps; more overdraw |
+| Crossed planes, 4 panels at 45 degrees | An eight-spoked star | 8 half-panels | A rounder crown from every side, steadier silhouette | Four times the panels and the overdraw of one billboard |
+
+Each full panel crosses the trunk, so N panels make 2N half-panels around it. The engine already has the pieces
+for the star (the maintainer's pick, 29 October 2026: "that split from above into two planes that then creates 8
+sort of planes"): Quake's SPR_ORIENTED sprite keeps its own angle in the world (engine/aga/src/r_sprite.c), so a
+tree becomes four oriented sprites at 0, 45, 90 and 135 degrees on the trunk, the same sprite pixels the billboard
+uses, no new sprite format. The cost is four sprites drawn instead of one, which is why it belongs near the player
+only. Still to check in our engine: that intersecting sprites sort per pixel (the depth test and write of the
+sprite spans), so the planes cut each other cleanly. Crossed panels stay fixed in the world
+(a placed model, like any static mesh), while a billboard turns to face the camera every frame.
+
+A fourth kind, from the maintainer (29 October 2026): **directional sprites**, eight views of the tree baked at 45
+degree steps, one camera-facing panel that shows the view for the angle the player looks from (the classic
+eight-rotation sprite). It reads as solid from every side at a billboard's fill cost; the price is eight images per
+tree model in memory instead of one; five with mirroring (the three mirrored views drawn from their opposites, as
+the classic games did; a mirrored tree reads as natural). Daggerfall's own trees are single-image billboards; its
+eight-direction sprites are its creatures and people. Two things to know: the draw cost per frame is the same as a
+billboard (one panel, only the picture changes), and it is still a camera-facing panel, so on its own it does not
+fix the pick (HARVEST-SEYDA-TREE-SPRITE-BLOCKS-PICK-47): the pick trace must skip sprite panels either way. Quake's
+sprite format has no view-angle frame choice; the engine needs that added.
+
+**Distance levels (the maintainer, 29 October 2026: "could we have in world streaming like an LOD where if the
+trees are nearer, they turn from billboard to ... 90deg ... 8-sided sprites or bitmap planes").** The tree's form
+picked by distance in the streamer: crossed panels (or directional sprites) near the player and wherever a harvest
+plant grows at the tree's foot, plain billboards far away. The switch distance is a measured number, with a margin
+so trees do not flicker between forms at the boundary. And the nearest level can be the tree itself (the maintainer, 29 October 2026: "if we have a streaming world ...
+have the kind of LOD where you could just then load in the tree as you get closer"): the original mesh streamed in
+within a short radius, like any other cell content, and dropped again as the player moves on, so only the few trees
+around the player cost mesh memory and drawing. Type 2's levels, nearest first: the mesh, crossed panels or
+eight-direction sprites, the billboard. The Balmora mesh zone (below) gives the measured cost of a mesh tree to set
+the radii from. Both stay selectable (the maintainer, 29 October 2026:
+"tree type 1 (billboard) and type 2 (this new method)"), as a saved setting like the Arena Pit types: tree type 1
+is the billboard of today, type 2 the new form with depth and the distance switch. This is the fix direction of
+[HARVEST-SEYDA-TREE-SPRITE-BLOCKS-PICK-47](bugs/HARVEST-SEYDA-TREE-SPRITE-BLOCKS-PICK-47.md).
+
+For AmiWind's budget, the cost that matters is fill (overdraw of the transparent pixels) and the panel count per
+leaf, not the image: all three can share the one baked image per tree model this page already requires (crossed
+panels can use side views baked at their angles). Candidates to measure, like for like at 32 MB Fast:
+- billboards everywhere (today);
+- two crossed panels near the player, billboards past a distance (the depth where it shows, the cheap path where
+  it does not);
+- four panels only for the few large landmark trees.
+
+The checks under "Acceptance" apply unchanged: collision, roots on slopes (TREE-PILLAR-28), leaf membership of the
+wider footprint, measured frame times and heap. Not started; a study item, nothing enabled.
+
+### Bloodmoon: Solstheim's forests (29 October 2026)
+
+The maintainer, on why this matters most for Bloodmoon: Solstheim has "an insane amount of spruce trees" drawn "in a
+really ineffective way", which makes it "a real performance sink". Bloodmoon is not in the build yet: the builder
+converts the base game only ([BUILD-EXPANSIONS-31](bugs/BUILD-EXPANSIONS-31.md); both expansions, exteriors and
+interiors, are step 7 of the [roadmap](ROADMAP.md)), so this plan is ready before Solstheim's cells are. His direction: do them "in a traditional 'rally'
+style", the way the rally games of the 1990s lined their tracks with whole forests of crossed-plane trees.
+
+A spruce is close to the best case for that: tall, narrow and much the same from every side, so the eight-plane
+star (four oriented sprites at 45 degrees) reads as a solid tree, and a cone of plain billboards reads well at a
+distance. The plan for Solstheim, when its exteriors come in:
+- tree type 2 from the start, with the distance levels above: the mesh only close up and only where needed (a
+  harvest plant at its foot, a tree the player can bump into), the star in the middle, billboards far;
+- one shared sprite set per spruce model, baked once (as this page requires for every tree);
+- first step, before any design: a census of Solstheim's tree and shrub references (models, counts per cell,
+  scales) from the builder's own inventory, and the frame time of a dense forest cell with meshes against
+  billboards, like for like at 32 MB Fast. No Solstheim figure is measured yet.
 
 ## Balmora mesh exclusion
 

@@ -118,6 +118,16 @@ class BugTrackerTest(unittest.TestCase):
         self.assertEqual(bug_register.rendered(text, bug_register.load()), text,
                          'docs/BUGS.md is stale: run tools/bug_register.py render')
 
+    def test_every_report_page_is_in_the_release_list(self):
+        # the gate stages only tools/release-files.json: a page left out is missing in the gate (gates 4499/4500)
+        self.assertEqual(bug_register.unshipped_pages(bug_register.load()), [])
+        with tempfile.TemporaryDirectory() as temp:
+            (Path(temp) / 'tools').mkdir()
+            (Path(temp) / 'tools' / 'release-files.json').write_text('["docs/bugs/A-1.md"]', encoding='utf-8')
+            bugs = [{'id': 'A-1', 'report': 'bugs/A-1.md'}, {'id': 'B-2', 'report': 'bugs/B-2.md'},
+                    {'id': 'C-3', 'report': None}]
+            self.assertEqual(bug_register.unshipped_pages(bugs, root=Path(temp)), ['docs/bugs/B-2.md'])
+
     def test_report_pages_are_linked_from_json(self):
         for b in bug_register.load():
             page = DOCS / 'bugs' / (b['id'] + '.md')

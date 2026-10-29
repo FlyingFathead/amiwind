@@ -9,10 +9,10 @@
 | Where | Image step after the player view (tools/build_aga.py finalize); tools/stage_watch.py record |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.54-dev1 (last seen) |
+| Persists in | v0.0.56-dev1 (last seen) |
 | Severity | high: The image finalize runs on one core again (54 s on 8 allowed cores in v0.0.54-dev1). |
 | Family | Build speed (`build-speed`) |
-| Deferred by the maintainer | 2026-10-29: to v0.0.56, the maintainer (TG 2026-10-29 10:47 +0200 / 08:47 UTC, on the six expired v0.0.55 deferrals): 'Yeah defer them to the next' |
+| Deferred by the maintainer | 2026-10-29: to v0.0.57, the maintainer (desktop chat 2026-10-29, on the six expired v0.0.56 deferrals): 'Yes, defer those six bugs to v0.0.57.' |
 | Came back (regression) | in v0.0.54-dev1 (fixed in v0.0.48 before) |
 | Playtest version | 2026_10_22_v0.0.48-dev2_miniwind-balmora-rooms-bsp_1336ba94 |
 | From commit | source 1336ba9, engine 1336ba9, CHIM world 1336ba9 |

@@ -1,6 +1,6 @@
 # AmiWind console commands
 
-_Generated from `config/debug-commands.txt` with AmiWind v0.0.55._
+_Generated from `config/debug-commands.txt` with AmiWind v0.0.56._
 
 Open the console with F10 or the backquote key and type
 a command, for example `dbg headlamp on`. This page is generated from
@@ -100,7 +100,7 @@ Type: "dbg help" for help.
 | `dbg scene` | - | ship/town/balmora/<map name> |
 | `dbg scene change` | `dbg tp menu` | (scene picker) |
 | `dbg superspeed` | - | [on/off, true/false or 1/0; no argument = status and current speeds] the old fixed fast walk/run (cl_forwardspeed, Shift x cl_movespeedkey) instead of the original's speed from Speed, Athletics and load; no running fatigue (default off; not saved; also plain superspeed on/off) |
-| `dbg tp` | - | [X Y [Z] original global coordinates (Z: land on the first floor at or below it) / mark or marker (the map marker you set on the map screen) / seydaneen / prisonship / balmora / vivec (the whole city vivec_city, else the Vivec Arena) / tel_uvirith (also teluvirith) / heartchamber / suran / suranclub / aldruhn / <map name>; no argument opens menu] |
+| `dbg tp` | - | [X Y [Z] original global coordinates (Z: the floor at or below it) / mark or marker (the map marker you set on the map screen) / seydaneen / prisonship / balmora / vivec (the whole city vivec_city, else the Vivec Arena) / tel_uvirith (teluvirith) / heartchamber / suran / suranclub / aldruhn / khuul / arenapit / <map name>; no argument opens menu] |
 | `dbg unstuck` | - | (nearest clear standing spot below or beside you; never into a wall or water; leaves noclip) |
 | `dbg view` | - | x y z yaw pitch |
 | `dbg worldbounds` | - | [on/off, true/false or 1/0; no argument shows the state] the sea current along the edge of the open world that turns you back (an AmiWind extension; on in a default build) (not saved) |

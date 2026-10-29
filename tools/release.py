@@ -111,6 +111,8 @@ DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.42-dev1-{name}.png" for n
     "castle-ebonheart-fog", "dawn-hillside", "dawn-valley", "dusk-sunset-wanderer", "early-dawn", "ebonheart-dawn", "ebonheart-dusk", "ebonheart-dusk-2", "khuul", "khuul-2", "khuul-3", "late-sunset", "later-dawn", "masser-night", "sun-setting-near-khuul", "sunset", "sunset-blue", "sunset-fog", "sunset-tower"))
 # v0.0.43 gallery (README and docs/GALLERY.md): the maintainer's Ghostgate shot from the v0.0.43-dev2 playtest
 DOCUMENTATION_IMAGES.add("docs/images/amiwind-v0.0.43-dev2-ghostgate.png")
+# The v0.0.56-dev1 gallery: Ald'ruhn, sixteen frames from Amiberry on the Raspberry Pi 4B boot stick (docs/GALLERY.md).
+DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.56-dev1-aldruhn-{n}.png" for n in range(1, 17))
 # Toolkit screenshots (amiwind-toolkit/README.md): World with the CHIM progress tracker, the 3D Inspector on a .chim map
 # and on a CHIM world with the memory overlay.
 DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.36-toolkit-{name}.png" for name in ("world-chim-tracker", "inspector-chim-map", "inspector-chim-world-memory", "monitor"))
@@ -135,6 +137,8 @@ NATIVE_SOURCE_INCLUDES = {"engine/aga/src/model_alias_stream.inc", "engine/aga/s
 # Vendored third-party C++ sources, unchanged, with their licence beside them (third_party/<name>/README.md lists
 # version and SHA-256 per file): meshoptimizer's simplifier (MIT), compiled on the build host by tools/meshopt.py.
 VENDORED_SOURCES = {"third_party/meshoptimizer/simplifier.cpp", "third_party/meshoptimizer/allocator.cpp"}
+# The Pi boot image tool (docs/PI_BOOT_IMAGE.md): the Linux assembly script and its Amiberry preset; exact names.
+PI_IMAGE_TOOL = {"tools/pi_image/make_pi_image.sh", "tools/pi_image/amiwind.uae"}
 
 
 def allowed_files(root):
@@ -149,7 +153,7 @@ def allowed_files(root):
             raise ValueError("Unsafe source file list entry")
         preset = (p.suffix in (".uae", ".fs-uae") and p.parent == PurePosixPath("resources/emulators")) or name in ("config/keymaps.cfg", "config/game.cfg") or name in DOCUMENTATION_IMAGES or name in DOCUMENTATION_CLIPS or name in PROJECT_MEDIA or name in DOCUMENTATION_SOURCE_GRAPHICS or name in DEBUG_CATALOGUES or name in WORLD_TABLES or (p.suffix == ".chimfx" and p.parent == CHIM_EFFECTS_DIR)
         native_aux = name in ("tools/polycount_inspector.html", "amiwind-toolkit/map-inspector.html", "amiwind-toolkit/world-map.html", "amiwind-toolkit/index.html", "amiwind-toolkit/chim-head.js", "amiwind-toolkit/zebra.js", "amiwind-toolkit/chim-legend.js", "amiwind-toolkit/chim-inclusion.js", "amiwind-toolkit/panel-fold.js", "amiwind-toolkit/interior-tracker.js", "amiwind-toolkit/header.js", "amiwind-toolkit/chim-reader.js", "amiwind-toolkit/monitor.html", "amiwind-toolkit/mesh-compare.html", "amiwind-toolkit/view-camera.js", "tests/test_mesh_compare.js", "tests/test_cell_progress_legend.js", "tests/test_cell_progress_page_run.js", "tests/test_interior_tracker.js", "tests/test_toolkit_chim.js", "tests/test_toolkit_monitor.js", "tests/test_toolkit_fold.js", "tests/test_legend_groups.js", "tests/test_polycount_markup.js", "tests/test_world_metrics_layer.js", "engine/aga/Makefile", "engine/aga/qc/progs.src", "engine/aga/src/progdefs.q1", "engine/aga/src/progdefs.q2", "docs/aga/COPYING.NEWLIB", ".github/workflows/source-check.yml")
-        if not preset and not native_aux and name not in NATIVE_SOURCE_INCLUDES and name not in VENDORED_SOURCES and p.suffix not in (".py", ".md", ".json", ".toml", ".c", ".h", ".asm", ".qc", ".patch") and name not in (".gitignore", ".gitattributes", "LICENSE", "VERSION", "CHIM_VERSION", "engine/aga/COPYING", "build.sh", "build.cmd", "build.ps1", "setup-windows.cmd", "setup-windows.ps1"):
+        if not preset and not native_aux and name not in NATIVE_SOURCE_INCLUDES and name not in VENDORED_SOURCES and name not in PI_IMAGE_TOOL and p.suffix not in (".py", ".md", ".json", ".toml", ".c", ".h", ".asm", ".qc", ".patch") and name not in (".gitignore", ".gitattributes", "LICENSE", "VERSION", "CHIM_VERSION", "engine/aga/COPYING", "build.sh", "build.cmd", "build.ps1", "setup-windows.cmd", "setup-windows.ps1"):
             raise ValueError(f"Unexpected distributable file type: {name}")
     return sorted(paths)
 

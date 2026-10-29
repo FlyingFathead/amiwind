@@ -589,6 +589,29 @@
       "commits": []
     },
     {
+      "id": "tree-forms-by-distance",
+      "name": "Trees with depth by distance (tree type 2)",
+      "area": "rendering",
+      "summary": "A tree's form chosen by its distance from the player, on top of the flora sprites already streamed with their chunks: the tree mesh close up, the maintainer's eight-plane star in the middle (four fixed-in-world sprites at 45 degrees through the trunk) or eight-direction sprites, the billboard far. Tree type 1, today's billboard, stays selectable. Asked by the maintainer, 2026-10-29.",
+      "status": "planned",
+      "version": null,
+      "gains": [],
+      "gain_note": "Decided, not designed or built: no in-game figure yet. The radii come from the measured cost of the Balmora mesh trees at 32 MB Fast.",
+      "caveats": [
+        "The star needs no new format: Quake's SPR_ORIENTED sprites keep their angle in the world and the engine already draws them (r_sprite.c). Eight-direction sprites (five baked views, three mirrored) need an engine change: Quake's sprite format has no frame choice by view angle.",
+        "A camera-facing sprite, directional or not, still stands between the eye and a plant at its foot: the harvest pick trace must skip sprite panels whichever form is drawn."
+      ],
+      "vis": "The forms are ordinary static entities and sprites linked to the same leaves; a form change near the player swaps which one is linked, with a margin so trees do not flicker at the boundary.",
+      "links": [
+        {
+          "title": "Tree study: cheap trees with some depth",
+          "path": "docs/WORLD_TREE_SPRITES.md#study-cheap-trees-with-some-depth-29-october-2026"
+        }
+      ],
+      "bugs": ["HARVEST-SEYDA-TREE-SPRITE-BLOCKS-PICK-47"],
+      "commits": []
+    },
+    {
       "id": "modular-npcs",
       "name": "Modular NPCs",
       "area": "characters",

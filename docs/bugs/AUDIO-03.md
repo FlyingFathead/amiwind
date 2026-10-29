@@ -12,7 +12,7 @@
 | Persists in | v0.0.29, v0.0.30-rc1, v0.0.31-dev2 (last seen) |
 | Severity | medium: Audible crackle at one scene change; the game continues. |
 | Family | Music and sound (`audio`) |
-| Deferred by the maintainer | 2026-10-29: to v0.0.56, the maintainer (TG 2026-10-29 10:47 +0200 / 08:47 UTC, on the six expired v0.0.55 deferrals): 'Yeah defer them to the next' |
+| Deferred by the maintainer | 2026-10-29: to v0.0.57, the maintainer (desktop chat 2026-10-29, on the six expired v0.0.56 deferrals): 'Yes, defer those six bugs to v0.0.57.' |
 
 <!-- END GENERATED FACTS -->
 

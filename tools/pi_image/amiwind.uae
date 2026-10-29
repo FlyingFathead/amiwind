@@ -1,0 +1,33 @@
+config_description=AmiWind on a Raspberry Pi (68040+FPU, JIT, 32 MB Fast minimum): made by tools/pi_image/make_pi_image.sh
+use_gui=no
+kickstart_rom_file=/opt/amiwind/data/kick.rom
+chipset=aga
+chipset_compatible=A1200
+cpu_type=68040
+cpu_model=68040
+fpu_model=68040
+cpu_compatible=false
+cpu_24bit_addressing=false
+# Amiberry's A1200 default is cycle-exact, which forces compatible mode and switches the JIT off (cachesize=0): every
+# cycle-exact switch off, as in the WinUAE preset
+cycle_exact=false
+cpu_cycle_exact=false
+cpu_memory_cycle_exact=false
+blitter_cycle_exact=false
+cpu_speed=max
+# the JIT translation cache: 16384 KB is the maximum; a larger number is read as 0, which switches the JIT off
+cachesize=16384
+compfpu=true
+comp_trustbyte=direct
+comp_trustword=direct
+comp_trustlong=direct
+comp_trustnaddr=direct
+# the 68k CPU on its own thread is faster in play but ended a load in an engine error (SPRITE-BAD-TYPE-THREADED-56)
+cpu_threaded=false
+chipmem_size=4
+z3mem_size=32
+fastmem_size=0
+bogomem_size=0
+gfx_fullscreen_amiga=true
+sound_output=exact
+hardfile2=rw,DH0:/opt/amiwind/current.hdf,0,0,0,512,0,,uae0

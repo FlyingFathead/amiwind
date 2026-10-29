@@ -24,7 +24,9 @@ several runs) is counted only when every one of its links is in the deletion set
 Dry run by default: the collector prints the list (path, kind, owner, reason, bytes freed) and
 writes it as JSON with --json. Only --delete removes anything, and only items whose decision is
 "expire" (never pinned, active or unregistered items). --item PATH limits deletion to the listed
-items (the maintainer approves a list; the collector deletes exactly that list).
+items (the maintainer approves a list; the collector deletes exactly that list); --items-file FILE adds one PATH per
+line (for long lists, such as the pool objects of a clean-out archived first: an --item each would pass the argument
+limit).
 
 Registry (--registry FILE, JSON): {"items": [{"path": "...", "owner": "job", "purpose": "...",
 "state": "active"|"done", "expires": "with-job"|"never"}]}; paths absolute or relative to the root
@@ -34,7 +36,7 @@ they are under. Pins (WORKSPACE/cache/pins.json, or --pins FILE): {"pins": [{"pa
 Commands:
   build_gc.py plan ROOT... [--workspace W ...] [--registry FILE] [--pins FILE] [--work-pool ROOT] [--pool DIR]
                            [--json FILE]
-  build_gc.py plan ... --delete [--item PATH ...]
+  build_gc.py plan ... --delete [--item PATH ...] [--items-file FILE]
   build_gc.py pin WORKSPACE RUN --kind owner --reason TEXT
   build_gc.py unpin WORKSPACE RUN
 """
@@ -486,6 +488,7 @@ def main(argv=None):
                         'built and the last two releases); runs of older series expire unless pinned; 0 = off')
     p.add_argument('--delete', action='store_true', help='really delete the expired items (default: report only)')
     p.add_argument('--item', action='append', type=Path, help='with --delete: delete only these expired items')
+    p.add_argument('--items-file', type=Path, help='with --delete: more --item paths, one per line')
     for name in ('pin', 'unpin'):
         p = sub.add_parser(name)
         p.add_argument('workspace', type=Path)
@@ -508,14 +511,19 @@ def main(argv=None):
             roots.append(Path(root) / 'work')
     if not roots and not args.pool:
         parser.error('plan needs a folder, --work-pool or --pool')
+    items = list(args.item or [])
+    if args.items_file:
+        items += [Path(line.strip()) for line in args.items_file.read_text(encoding='utf-8').splitlines() if line.strip()]
+        if not items:
+            parser.error('--items-file %s lists no item' % args.items_file)
+    if items and not args.delete:
+        parser.error('--item and --items-file need --delete')
     result = plan(roots, args.workspace, registry, args.pins, extra_pools=args.pool, keep_series=args.keep_series)
     report(result)
     if args.json:
         write_json(args.json, result)
     if args.delete:
-        delete(result, args.item)
-    elif args.item:
-        parser.error('--item needs --delete')
+        delete(result, items or None)
     return 0
 
 

@@ -6,11 +6,11 @@
 | --- | --- |
 | Reported by | maintainer |
 | First noticed | 21 October 2026, in v0.0.47-dev1 |
-| Where | Seyda Neen region, mushrooms beside sprite trees: the harvest pick trace |
+| Where | Every sprite (billboard) tree with harvest plants beside it; first seen near Seyda Neen |
 | Reproduction | sometimes |
 | Duplicate of | no |
-| Persists in | v0.0.47-dev1 (last seen) |
-| Severity | medium: harvestable plants cannot be collected near sprite trees; a gameplay loss with a workaround of picking from another side |
+| Persists in | v0.0.55 (last seen) |
+| Severity | high: maintainer, 29 Oct: billboard trees are unacceptable here; mushrooms grow right next to trees and picking beside a flat tree is really bad |
 | Family | Harvestable plants (`harvest`) |
 | CHIM | Rendering and visibility ([CHIM Engine tracker](CHIM_TRACKER.md)) |
 | Playtest version | 2026_10_21_v0.0.47-dev1_dev1-try2_4a2d42b9 |
@@ -20,7 +20,21 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.47-dev1 (21 October 2026)._
+_Last updated with AmiWind v0.0.56-dev1 (29 October 2026)._
+
+## Status: 29 October 2026
+
+Open, persisting in v0.0.55, severity raised to high. The maintainer, on the camera-facing billboard trees: "yeah
+this is ass", "kind of unacceptable since many mushrooms etc grow directly next to the trees and it's really fucky
+to go pick them up if they're just a billboard". So this is not only a Seyda Neen spot: every sprite tree with a
+harvest plant at its foot has it, because the flat panel turns with the player and stands between the eye and the
+plant from most sides.
+
+Fix direction: no flat camera-facing tree where plants grow beside it. The candidates are in
+[the tree study](../WORLD_TREE_SPRITES.md#study-cheap-trees-with-some-depth-29-october-2026): crossed fixed
+panels (they stay in place, so the plant stays reachable between them) or the tree's mesh within pick distance of a
+harvest plant, measured like for like at 32 MB Fast; and in any case the pick trace must not stop on a sprite
+tree's panel. Scheduled in the v0.0.56 TODO (TREES-DEPTH-56).
 
 ## Status: 21 October 2026
 

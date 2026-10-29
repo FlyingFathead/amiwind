@@ -5,6 +5,7 @@ _Last updated with AmiWind v0.0.55 (29 October 2026)._
 <!-- contents start -->
 ## Contents
 
+- [v0.0.56: released 29 October 2026; v0.0.57 next](#v0056-released-29-october-2026-v0057-next)
 - [v0.0.55: released 29 October 2026; v0.0.56 next](#v0055-released-29-october-2026-v0056-next)
 - [Later: an Extras menu, and two players in the arena, 28 October 2026](#later-an-extras-menu-and-two-players-in-the-arena-28-october-2026)
 - [v0.0.54: Hair, Movement, Magic And More, 28 October 2026](#v0054-hair-movement-magic-and-more-28-october-2026)
@@ -102,6 +103,15 @@ _Last updated with AmiWind v0.0.55 (29 October 2026)._
 [CHIM-RECIPE-APRON-SCOPE-41](bugs/CHIM-RECIPE-APRON-SCOPE-41.md) — 15 October 2026, v0.0.41 candidate: recipe repair converted all four affected frames with structural PASS. Three still failed the unchanged memory gate (peaks 6,957,632; 6,939,952; 6,644,768 bytes for (10,0), (10,1), (9,2)); (11,0) passed at 5,875,568 bytes. The separate placed-model reserve repair passes all four on identical world bytes. A complete successor world and recipe/model/sprite equivalence and native checks remain pending.
 
 15 October 2026: exact-source validation completed 4,231 tests: 4,225 passed, three Windows-only skips and three tracked Census expected failures. The 71 focused tests and original-data readback across nine frame positions passed, consistently hiding 33 of 158 original references at stronghold state 6 while preserving unknown scripts. All 243 player resources are reusable after exact producer, input and file verification. Complete combined-world conversion, native comparison, packaging and shipment remain pending; coverage counts are unchanged.
+
+## v0.0.56: released 29 October 2026; v0.0.57 next
+
+v0.0.56, "Some Velvet Morning", shipped early and short: AmiWind on a Raspberry Pi 4 from a USB stick, the tool to
+make your own ([your own AmiWind boot stick](PI_BOOT_IMAGE.md)), a gallery of Ald'ruhn taken on it, and `dbg fps on`
+working by itself ([release notes](releases/notes/RELEASE-v0.0.56.md)). Everything else planned for v0.0.56, the list
+below included, moves to v0.0.57 as it stands, with the build from scratch of the release line first (skipped again
+for v0.0.56, the maintainer's call) and, new, cheaper models for the places full of detailed objects: the prison
+ship's hold, Seyda Neen, the Dwemer ruins ([PRISON-SHIP-RENDER-COST-56](bugs/PRISON-SHIP-RENDER-COST-56.md)).
 
 ## v0.0.55: released 29 October 2026; v0.0.56 next
 

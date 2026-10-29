@@ -1,12 +1,12 @@
 # CHIM feature tracker
 
-_Generated from `docs/chim/features.json` with AmiWind v0.0.55._
+_Generated from `docs/chim/features.json` with AmiWind v0.0.56._
 
 <!-- Generated whole by tools/chim_features.py render from docs/chim/features.json; do not edit by hand. -->
 
 What the [CHIM engine](README.md) has done for AmiWind, feature by feature: what each feature does, where it stands, the gain that was measured (what was compared, how and when) and how Quake's visibility culling still works with it. Generated from [`features.json`](features.json); a test fails when this page is stale. Bugs are on the [CHIM bug tracker](../bugs/CHIM_TRACKER.md); ideas and held-back work are collected in [CHIM ideas](IDEAS.md). How far the open world has been converted, cell by cell, is on the [CHIM cell tracker](CELL_TRACKER.md).
 
-CHIM version: 0.2.2. 45 features: 21 shipped, 1 in this release, 19 in progress, 3 planned, 1 ideas. Updated 23 October 2026.
+CHIM version: 0.2.2. 46 features: 21 shipped, 1 in this release, 19 in progress, 4 planned, 1 ideas. Updated 23 October 2026.
 
 ## What CHIM has done so far
 
@@ -38,7 +38,7 @@ Several features also have a cost, listed under their caveats: CHIM leaves less 
 | Shipped | in a published release | 21 |
 | In this release (CHIM 0.2.2) | in the line that becomes the next release; not yet published | 1 |
 | In progress | being built or measured; not finished | 19 |
-| Planned | decided; no finished design or code | 3 |
+| Planned | decided; no finished design or code | 4 |
 | Idea | written down, not decided | 1 |
 
 ### Shipped
@@ -102,6 +102,7 @@ Several features also have a cost, listed under their caveats: CHIM leaves less 
 | Feature | Area | What it does | Measured gain |
 | --- | --- | --- | --- |
 | [Mold shells for distant landmarks](#mold-shells-for-distant-landmarks) | Rendering and visibility | Closed low-poly shells for landmarks such as Vivec's cantons, so they stand on the horizon without paying for their full detail. | not measured |
+| [Trees with depth by distance (tree type 2)](#trees-with-depth-by-distance-tree-type-2) | Rendering and visibility | A tree's form chosen by its distance from the player, on top of the flora sprites already streamed with their chunks: the tree mesh close up, the maintainer's eight-plane star in the middle (four fixed-in-world sprites at 45 degrees through the trunk) or eight-direction sprites, the billboard far. Tree type 1, today's billboard, stays selectable. Asked by the maintainer, 2026-10-29. | not measured |
 | [The open world on CHIM (milestone M4)](#the-open-world-on-chim-milestone-m4) | Roadmap | A fixed grid of frames of 3 x 3 cells covers the whole island; the engine keeps up to four frames resident and shifts the origin when you cross a frame edge, with no map load. | not measured |
 | [The whole game on one legacy-safe hard file](#the-whole-game-on-one-legacy-safe-hard-file) | Roadmap | With every asset stored once, the world itself should come to about 1 GB, so the whole game fits one hard file that a classic Amiga can use, where today's pipeline would need about 24 GB. | about 1 GB against about 24 GB |
 
@@ -549,6 +550,25 @@ Closed low-poly shells for landmarks such as Vivec's cantons, so they stand on t
 **Visibility:** Shells are closed low-poly bodies drawn in place of the full distant model; the renderer counters decide whether they are kept.
 
 **Read more:** [Distant shells](../DISTANT_SHELLS.md); [CHIM ideas: the distant view](IDEAS.md#the-distant-view-far-terrain-and-mold-shells).
+
+#### Trees with depth by distance (tree type 2)
+
+**Status:** Planned. **ID:** `tree-forms-by-distance`.
+
+A tree's form chosen by its distance from the player, on top of the flora sprites already streamed with their chunks: the tree mesh close up, the maintainer's eight-plane star in the middle (four fixed-in-world sprites at 45 degrees through the trunk) or eight-direction sprites, the billboard far. Tree type 1, today's billboard, stays selectable. Asked by the maintainer, 2026-10-29.
+
+**Measured gain:** Not measured. Decided, not designed or built: no in-game figure yet. The radii come from the measured cost of the Balmora mesh trees at 32 MB Fast.
+
+**Visibility:** The forms are ordinary static entities and sprites linked to the same leaves; a form change near the player swaps which one is linked, with a margin so trees do not flicker at the boundary.
+
+**Caveats:**
+
+- The star needs no new format: Quake's SPR_ORIENTED sprites keep their angle in the world and the engine already draws them (r_sprite.c). Eight-direction sprites (five baked views, three mirrored) need an engine change: Quake's sprite format has no frame choice by view angle.
+- A camera-facing sprite, directional or not, still stands between the eye and a plant at its foot: the harvest pick trace must skip sprite panels whichever form is drawn.
+
+**Read more:** [Tree study: cheap trees with some depth](../WORLD_TREE_SPRITES.md#study-cheap-trees-with-some-depth-29-october-2026).
+
+**Bugs:** [HARVEST-SEYDA-TREE-SPRITE-BLOCKS-PICK-47](../bugs/HARVEST-SEYDA-TREE-SPRITE-BLOCKS-PICK-47.md).
 
 #### Fires burn on CHIM frames
 

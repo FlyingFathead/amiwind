@@ -50,7 +50,9 @@ class Rules(unittest.TestCase):
         self.assertIn('#define AW_HALLOWEEN_TEXT2\t\t"FROM AMIWIND"', header)
         engine = (SRC / 'aw_halloween.c').read_text(encoding='utf-8')
         self.assertIn('x=((int)vid.width-w)/2;y=((int)vid.height-h)/2;', engine)    # the box in the exact centre
-        self.assertIn('AW_SmallString(2,vid.height-7,line);', engine)               # FPS small, bottom left
+        self.assertIn('if(hw.fps)AW_FpsCorner();', engine)                          # the dbg fps counter
+        self.assertIn('AW_SmallString(2,vid.height-7,line);',                       # FPS small, bottom left
+                      (SRC / 'aw_hud.c').read_text(encoding='utf-8'))
         self.assertIn('static void command(void) {command_with(0);}', engine)       # the show: FPS off
         self.assertIn('static void command_test(void) {command_with(1);}', engine)  # halloweentest: FPS on
         self.assertIn('AW_HalloweenCamera(r_refdef.vieworg,r_refdef.viewangles);',

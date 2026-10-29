@@ -1,6 +1,6 @@
 # Development overlays
 
-_Last updated with AmiWind v0.0.48-dev2 (22 October 2026)._
+_Last updated with AmiWind v0.0.56-dev1 (29 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -353,12 +353,15 @@ geometry missing from the converted scene.
 ## FPS display
 
 `dbg fps on/off` (also true/false/1/0 and the other debug prefixes) controls a
-default-off FPS readout on the second top-right line. It averages rendered game
+FPS readout, small, in the bottom-left corner of the screen. By default it comes on
+with `dbg hud`; `dbg fps on` shows it always, without the debug HUD too, and
+`dbg fps off` hides it, the debug HUD's as well (before v0.0.56 it needed the debug
+HUD on and was off by default). It shows in every view, the vanity camera shots too. Photo mode hides it, unless Ctrl+H
+brings the HUD back. The Halloween benchmark shows the same counter in the same place. It averages rendered game
 frames over approximately one second using the profiler's existing time sample.
 No extra clock call, file access or unbounded history is added. The number is
-AmiWind's frame rate, not WinUAE's video refresh rate or host compositor FPS.
-`dbg overlay off` hides it while preserving its individual setting. Use the
-same overlay/viewport settings when comparing views.
+AmiWind's frame rate, not the emulator's video refresh rate or host compositor FPS.
+Use the same overlay/viewport settings when comparing views.
 
 ## Loading presentation
 

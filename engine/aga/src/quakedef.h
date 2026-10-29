@@ -409,6 +409,8 @@ void AW_NoclipVelocity(vec3_t view, usercmd_t *cmd, float maximum, vec3_t out);
 void AW_NoclipDebugVelocity(vec3_t view,usercmd_t *cmd,float maximum,
                            int fast,int shifted,float shift_scale,vec3_t out);
 int AW_DebugOverlaysEnabled(void);
+void AW_FpsCorner(void);	/* aw_hud.c: the FPS counter, bottom-left corner of the screen */
+void AW_FpsDraw(void);		/* aw_hud.c: dbg fps, every view (HUD-FPS-NEEDS-DBG-HUD-56) */
 /* Photo mode (aw_photo.c): dbg photomode / dbg killhud, dbg crosshair. */
 void AW_PhotoInit(void);
 int AW_PhotoModeActive(void);

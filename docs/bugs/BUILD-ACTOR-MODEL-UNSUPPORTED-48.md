@@ -12,7 +12,7 @@
 | Persists in | v0.0.54-dev1 (last seen) |
 | Severity | high: Regressed in v0.0.54-dev1 (was medium): a builder stop; not reproducible on the release line |
 | Family | Builder breaks and reproducibility (`builder-from-scratch`) |
-| Deferred by the maintainer | 2026-10-29: to v0.0.56, the maintainer (TG 2026-10-29 10:47 +0200 / 08:47 UTC, on the six expired v0.0.55 deferrals): 'Yeah defer them to the next' |
+| Deferred by the maintainer | 2026-10-29: to v0.0.57, the maintainer (desktop chat 2026-10-29, on the six expired v0.0.56 deferrals): 'Yes, defer those six bugs to v0.0.57.' |
 | Came back (regression) | in v0.0.54-dev1 (closed before) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |
 | From commit | source and engine 408ed09 |

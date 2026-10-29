@@ -1,6 +1,6 @@
 # Running AmiWind on real Amiga hardware
 
-_Last updated with AmiWind v0.0.54 (27 October 2026)._
+_Last updated with AmiWind v0.0.56-dev1 (29 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -18,6 +18,7 @@ _Last updated with AmiWind v0.0.54 (27 October 2026)._
 - [A cache test plan](#a-cache-test-plan)
 - [Compatibility roadmap](#compatibility-roadmap)
 - [Not yet: non-blocking disk reads](#not-yet-non-blocking-disk-reads)
+- [Raspberry Pi with Amiberry](#raspberry-pi-with-amiberry)
 - [PiStorm](#pistorm)
 - [What to send back](#what-to-send-back)
 
@@ -50,6 +51,7 @@ which settings use more memory. Measurements from real machines are very welcome
 - [A cache test plan](#a-cache-test-plan)
 - [Compatibility roadmap](#compatibility-roadmap)
 - [Not yet: non-blocking disk reads](#not-yet-non-blocking-disk-reads)
+- [Raspberry Pi with Amiberry](#raspberry-pi-with-amiberry)
 - [PiStorm](#pistorm)
 - [What to send back](#what-to-send-back)
 
@@ -305,6 +307,97 @@ Planned ([roadmap](ROADMAP.md), the cache plan above):
 - Disk reads that never stop a frame. Some reads during play still wait for the disk
   ([ENGINE-SYNC-IO-MAIN-LOOP-36](bugs/ENGINE-SYNC-IO-MAIN-LOOP-36.md)); a real hard disk or card is slower than an
   emulator's host disk, so this matters more on real hardware.
+
+## Raspberry Pi with Amiberry
+
+A Raspberry Pi running Amiberry, the emulator the THEA1200 is built on, is the cheapest way to an Amiga-like box for
+AmiWind. Linux runs underneath, but the box can start straight into the emulator with no desktop.
+
+**What we have measured** (a Raspberry Pi 4B Rev 1.1, Amiberry 8.5.0, v0.0.56-dev1, 29 October 2026): the game is
+playable, in the maintainer's words "completely playable", but the frame rate dips here and there depending on the
+scene: from about 10 to 50 frames a second. Open places and plain walls are fast; places with many detailed objects
+in view are the slowest: the prison ship's hold at the start, Seyda Neen (faster in Vivec than in that small town)
+and the Dwemer ruins. The cause is the polygon count of the original models, made for a graphics card, which a
+software renderer draws face by face; making them cheaper is our own work, not the emulator's
+([PRISON-SHIP-RENDER-COST-56](bugs/PRISON-SHIP-RENDER-COST-56.md)). Amiberry's ARM64 JIT is also younger than the x86
+one. The game's own counter: `dbg fps on` (before v0.0.56-dev2 it needed `dbg hud on` as well).
+
+**Why Amiberry and not FS-UAE on a Pi.** On x86-64 (amd64) PCs FS-UAE runs AmiWind fine, even on an old single-core
+Celeron, with its JIT. FS-UAE's ARM64 build has no JIT: it would emulate the 68040 instruction by instruction, far
+too slow for AmiWind. Amiberry has its own ARM64 JIT, so on a Pi it is the way. We have not run FS-UAE on the Pi
+itself; it is ruled out by the missing JIT.
+
+**What we tried, and what each step gave** (in this order, on the Pi 4B):
+
+| Step | Result |
+| --- | --- |
+| Screen mode 720x576 at 50 Hz (`video=HDMI-A-1:720x576@50` in `cmdline.txt`) instead of the monitor's own 1920x1200 at 59 Hz | clearly smoother: no 5x scaling, and the refresh matches the Amiga's 50 Hz PAL |
+| Overclock to 2.0 GHz (`arm_freq=2000`, `over_voltage=6`, `gpu_freq=750` in `config.txt`, never `force_turbo`; with a heatsink and a fan) | better; held at 43 to 46 C with no throttling |
+| JIT translation cache 16384 KB (`cachesize=16384`), the maximum | a little faster; above 16384 Amiberry reads 0, which switches the JIT off |
+| The 68k CPU on its own core (`cpu_threaded=true`), an experimental Amiberry mode | the biggest step in play, "way faster": the CPU and the chipset each get a core where they shared one; but loading is slower, and one load ended in an engine error ([SPRITE-BAD-TYPE-THREADED-56](bugs/SPRITE-BAD-TYPE-THREADED-56.md)): **leave it off** until that is settled |
+| Zorro III Fast RAM 128 MB | runs; 32 MB is the requirement |
+
+Checked and already right: JIT memory access `direct` (all four `comp_trust` settings; `indirect` made FPU code about
+26 times slower in [Amiberry issue 2299](https://github.com/BlitterStudio/amiberry/issues/2299), fixed in 8.4.0),
+every cycle-exact switch off (Amiberry's A1200 default is cycle-exact, which turns the JIT off), the FPU JIT on, no
+line doubling. Amiberry's log should say `JIT=CPU/FPU=16384. fast`.
+
+**The settings** (the project's preset, the same as the emulator presets in `resources/emulators/`):
+
+| Setting | Value |
+| --- | --- |
+| CPU | 68040, FPU the CPU's own |
+| JIT | on, with the FPU JIT |
+| CPU speed | fastest possible |
+| JIT cache | 16384 KB |
+| CPU thread | shared (`cpu_threaded=false`; see below) |
+| 24-bit addressing, MMU, cycle-exact | off |
+| Chip RAM | 2 MB |
+| Fast RAM | 32 MB, Zorro III |
+| Boot drive | the AmiWind hard disk image |
+
+**Starting straight into the emulator.** Pi distributions install Amiberry for you (for one,
+[DietPi](https://dietpi.com/docs/software/gaming/#amiberry), which starts Amiberry at boot; Amibian is built around
+it). Their own guides describe the classic floppy setup (an A500 with Kickstart 1.3 and `.adf` disk images), but the
+start straight into a hard disk setup is Amiberry's own and has been shown working (a 2020 video tutorial, DietPi on
+a Pi 400, an AGA Amiga with a hard drive, into Workbench in about 13 seconds):
+
+1. Set the machine up in Amiberry (here: the settings above, the AmiWind image as the boot drive).
+2. Save the configuration under the name `default`: Amiberry loads it when it starts.
+3. In the Miscellaneous settings, untick "Show GUI on startup", and save `default` again.
+
+From then on the Pi starts straight into the Amiga; F12 brings the settings back. The AmiWind image boots by itself,
+so the Workbench install that tutorial does first is not needed. For a Pi 3 class board, Amiberry's own
+[quick start guide](https://github.com/BlitterStudio/amiberry/wiki/Quick-start-guide) is the place to read which
+build fits. A Pi 3B+ has not been measured: of the two boards, the 4B is the one to choose. The Kickstart ROM and the AmiWind image are yours to supply (the image is built from
+your own copy of the game).
+
+**What you need, legally yours.** Two things the project can never give you, and with them everything above is
+yours to put together, an Amiberry boot image included:
+
+- **The original game**, which the builder needs to make AmiWind: The Elder Scrolls III: Morrowind, Game of the Year
+  Edition, from [GOG](https://www.gog.com/en/game/the_elder_scrolls_iii_morrowind_goty_edition) or
+  [Steam](https://store.steampowered.com/app/22320/The_Elder_Scrolls_III_Morrowind_Game_of_the_Year_Edition/).
+- **The Amiga Kickstart 3.1 ROM**, which the emulator needs to start an Amiga: legally from Cloanto's
+  [Amiga Forever](https://www.amigaforever.com/), which licenses the original ROMs, or read from an Amiga you own.
+
+With both, you build AmiWind on your own machine, then put the AmiWind image and your Kickstart into an Amiberry
+setup, on a Pi, a THEA1200 or any computer. What you make from them stays yours: share the tools and the steps,
+never the ROM, the game's files or the built image.
+
+**Planned, the maintainer's idea (29 October 2026):** after a successful build, the builder makes a boot image for
+a USB stick or SD card that starts a Pi straight into Amiberry with this preset and AmiWind, from what the player
+supplies: their own Kickstart ROM and the AmiWind image they just built from their own copy of the game. DietPi is a stripped-down Debian with its own setup scripts, so the same
+can be scripted by the builder: a minimal Debian for the Pi, Amiberry, the AmiWind preset on top of it as
+Amiberry's `default` configuration (an Amiberry preset beside the FS-UAE and WinUAE ones the builder already makes
+in `resources/emulators/`: the settings above, the GUI off at start), a service that starts Amiberry at boot, and
+a quiet boot. Built complete, it needs no internet at its first start (DietPi's
+first start updates itself online), and a small FAT partition on the stick or card, which any PC opens, takes the
+Kickstart ROM and the AmiWind image, with no Linux tools needed to copy them in. Like the
+game itself, the boot image is made on the player's machine and never published: the project ships only the tool
+that makes it, never the Kickstart, AmigaOS or anything from Morrowind. The first such stick works (29 October
+2026): a Pi 4B starts from it straight into AmiWind, and the numbers above are from it. Make your own with
+`tools/pi_image/make_pi_image.sh`: [your own AmiWind boot stick](PI_BOOT_IMAGE.md).
 
 ## PiStorm
 

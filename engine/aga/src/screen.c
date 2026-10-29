@@ -1051,6 +1051,7 @@ void SCR_UpdateScreen (void)
             AW_GalleryDraw();
         if (!vanity)
             AW_UIOuterFrame();
+        AW_FpsDraw();			/* dbg fps: the bottom-left corner of the screen, the vanity orbit too */
         SCR_DrawConsole ();
         M_Draw ();
     }

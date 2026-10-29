@@ -518,6 +518,18 @@ def release_media(root=ROOT):
     return set(release.DOCUMENTATION_IMAGES), set(release.DOCUMENTATION_CLIPS), shipped, exceptions
 
 
+def unshipped_pages(bugs, root=ROOT):
+    """Report pages (docs/bugs/<ID>.md) missing from tools/release-files.json. The gate stages only the files of
+    that list, so a page left out is missing there although it is in the checkout (gates 4499 and 4500, 29 October
+    2026: DOOR-MOVERS-NOT-IN-55 and DOOR-TRAPS-NOT-SPRUNG-55)."""
+    listing = root / 'tools' / 'release-files.json'
+    if not listing.is_file():
+        return []
+    shipped = set(json.loads(listing.read_text(encoding='utf-8')))
+    return sorted('docs/' + b['report'] for b in bugs if isinstance(b, dict) and b.get('report')
+                  and 'docs/' + b['report'] not in shipped)
+
+
 def image_problems(bugs, pages=None, images=None, media=None):
     """Every frame a report page shows is a public documentation image: docs/images/amiwind-v<version>-
     <name>.png (or a .gif clip), present, a real PNG/GIF under the release size limit, listed in
@@ -1714,6 +1726,11 @@ def main(argv=None):
         if stale:
             print('stale generated files (run tools/bug_register.py render): ' + ', '.join(stale), file=sys.stderr)
             return 1
+        unshipped = unshipped_pages(bugs)
+        if unshipped:
+            print('report pages not in tools/release-files.json (the gate stages only that list, so the register '
+                  'would link a missing page there): ' + ', '.join(unshipped), file=sys.stderr)
+            return 1
         print('bug register ok: %d bugs (%d live, %d archived), %d with report pages' % (
             len(bugs), len(live), len(old), sum(1 for b in bugs if b['report'])))
         return 0
@@ -1725,6 +1742,8 @@ def main(argv=None):
             path.write_text(text, encoding='utf-8', newline='\n')
             changed += 1
     print('rendered %d bugs (%d files changed)' % (len(bugs), changed))
+    for page in unshipped_pages(bugs):
+        print('warning: %s is not in tools/release-files.json: add it, or check and the gate fail' % page)
     return 0
 
 

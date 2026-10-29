@@ -7,9 +7,9 @@
    "hunk_bytes": 9152
   },
   "cvars": {
-   "count": 347,
-   "static_bytes": 8328,
-   "zone_bytes": 11328
+   "count": 348,
+   "static_bytes": 8352,
+   "zone_bytes": 11360
   },
   "tables": {
    "count": 0,
@@ -55,7 +55,8 @@
   "2026-10-28: aw_vivec_arena_pit_type, the maintainer's call of 2026-10-28 ~01:2x +0200 (relayed by the coordinator: the Arena Pit methods go behind one saved setting; 0 the bowl whole, 1 tiles, 2 tiles + the room detail budget, 3 the backdrop panels later; the image stores the room once per type and the setting picks which one the door loads, PERF-ARENA-PIT-SLOW-48): one saved cvar (24 structure bytes, 32 zone bytes; default -1 = the type the room map names as its default); no command",
   "2026-10-28: v0.0.55 merge round 1 of v0.0.54-streaming (aw_vivec_arena_pit_type) and v0.0.54-magic (aw_magic_orb): both approved raises recorded separately above; the cvar totals are their union (346), no new setting",
   "2026-10-28: DemoWind, the effects test kit the maintainer asked for (desktop chat 2026-10-28 12:36 +0200: a fullscreen AGA set of cheap effects, no world, browsed one after another; v0.0.55 seed \"DemoWind\"): aw_demowind, one command record (32 hunk bytes; dbg demowind routes to it through the on-disk catalogue); no cvars; its 81,920 bytes of tiles are allocated on dbg demowind on and freed on off",
-  "2026-10-29: the Red Mountain sky, DemoWind's effect 2 in the game, asked for by the maintainer (TG 2026-10-29 07:48 +0200 / 2026-10-29 05:48 UTC: 'this red mountain sky step is especially cool' / 'yeah if you can put those into the next release?'; REDMOUNTAIN-SKY-55, RED-MOUNTAIN-MENACE-54): aw_redmountain, one saved console variable (24 structure bytes, 32 zone bytes; default 1, 0 keeps the region weather alone); no command (dbg weather shows the pull), no table"
+  "2026-10-29: the Red Mountain sky, DemoWind's effect 2 in the game, asked for by the maintainer (TG 2026-10-29 07:48 +0200 / 2026-10-29 05:48 UTC: 'this red mountain sky step is especially cool' / 'yeah if you can put those into the next release?'; REDMOUNTAIN-SKY-55, RED-MOUNTAIN-MENACE-54): aw_redmountain, one saved console variable (24 structure bytes, 32 zone bytes; default 1, 0 keeps the region weather alone); no command (dbg weather shows the pull), no table",
+  "2026-10-29: _aw_debug_fps_hud, the maintainer asked for it: 'we need that FPS COUNTER ON BY DEFAULT IN THE dbg hud on view but so that it can also be disabled separately' (one cvar, 24 static bytes)"
  ],
  "entries": {
   "commands": [
@@ -351,6 +352,7 @@
    "_aw_debug_all",
    "_aw_debug_coords",
    "_aw_debug_fps",
+   "_aw_debug_fps_hud",
    "_aw_debug_hud_type",
    "_aw_debug_sealevel",
    "_cl_color",
@@ -487,6 +489,7 @@
    "aw_poly_budget_over_cap",
    "aw_quickchar_voice",
    "aw_rcount",
+   "aw_redmountain",
    "aw_region_loading",
    "aw_region_loading_delay",
    "aw_remote",

@@ -32,6 +32,9 @@ static int view_source(const float *local,float *world) {
 static cvar_t coords = {"_aw_debug_coords", "0", true};
 static cvar_t overlays = {"_aw_debug_all", "0", true};
 static cvar_t fps = {"_aw_debug_fps", "0", true};
+/* The maintainer, 2026-10-29: "we need that FPS COUNTER ON BY DEFAULT IN THE dbg hud on view but so that it can also
+ * be disabled separately": the counter comes with the debug HUD (1, the default) unless dbg fps off turned it off. */
+static cvar_t fps_hud = {"_aw_debug_fps_hud", "1", true};
 static cvar_t show_compass = {"aw_compass", "0", true};
 static cvar_t hud_type = {"_aw_debug_hud_type", "2", true};
 extern int AW_FpsTenths(void);
@@ -70,7 +73,8 @@ static void debug_all(void) {
 static void debug_compass(void) {
     if(debug_toggle(&show_compass,"dbg compass"))scr_copyeverything=1;
 }
-static void debug_fps(void) {debug_toggle(&fps,"amiwind_debug_fps");}
+/* dbg fps on: always shown; dbg fps off: never, not even with the debug HUD. */
+static void debug_fps(void) {if(debug_toggle(&fps,"amiwind_debug_fps"))Cvar_SetValue(fps_hud.name,fps.value!=0);}
 static void debug_showfps(void) {if(Cmd_Argc()==1)Cvar_SetValue(fps.name,1);else debug_fps();}
 static void debug_ram(void) {debug_toggle(&scr_showram,"amiwind_debug_showram");}
 static void debug_sea(void) {debug_toggle(&sealevel,"amiwind_debug_sealevel");}
@@ -202,6 +206,7 @@ void Sbar_Init(void) {
     Cvar_RegisterVariable(&fps);
     Cvar_RegisterVariable(&hud_type);
     Cvar_RegisterVariable(&show_compass);
+    Cvar_RegisterVariable(&fps_hud);
     Cmd_AddCommand("amiwind_debug_compass",debug_compass);
     Cmd_AddCommand("aw_debug_hud_type",debug_hud_type);
     Cmd_AddCommand("amiwind_debug_coords",debug_coords);Cmd_AddCommand("amiwind_debug_all",debug_all);
@@ -275,6 +280,27 @@ static void inspect_lines(int lift) {
 static void strip_text(int x,int y,char *s,int font) {
     if(font==8)Draw_String(x,y,s);else AW_SmallString(x,y,s);
 }
+/* HUD-FPS-NEEDS-DBG-HUD-56 (the maintainer: "it's only showing the dbg fps on whenever you have already
+ * dbg hud on" / "also be on during the vanity camera shoots" / "only appear on the top left or bottom left
+ * corner of the entire available screen"): small, in the bottom-left corner of the whole screen, on the
+ * HUD's black (255: palette 0 drew the Halloween bench's box white on Amiberry, no number readable).
+ * The Halloween bench draws the same corner. */
+void AW_FpsCorner(void) {
+    char line[32];int n=AW_FpsTenths();
+    if(!vid.buffer)return;
+    sprintf(line,"FPS:%ld.%ld",(long)(n/10),(long)(n%10));
+    Draw_Fill(0,vid.height-8,(int)strlen(line)*4+4,8,255);
+    AW_SmallString(2,vid.height-7,line);
+    scr_copyeverything=1;
+}
+/* screen.c, after everything else but the console: dbg fps is its own switch, in every view (the vanity
+ * orbit too, without dbg hud); photo mode hides it unless Ctrl+H brings the HUD back. */
+void AW_FpsDraw(void) {
+    if(key_dest==key_console)return;
+    if(!fps.value && !(fps_hud.value && AW_DebugOverlaysEnabled()))return;
+    if(AW_PhotoModeActive() && !AW_DebugOverlaysEnabled())return;
+    AW_FpsCorner();
+}
 void Sbar_Draw(void) {
     char title[128];const char *region;int limit,width=hud_type.value==1?8:4,slots,lift;
     if(key_dest==key_console)return;
@@ -299,11 +325,6 @@ void Sbar_Draw(void) {
     if(slots){strip_text(8,vid.height-HUD_LINE_BOTTOM-lift,title,width);scr_copyeverything=1;}
     else strip_text(8,8,title,width);
     inspect_lines(lift);
-    if(fps.value){
-        char line[32];int n=AW_FpsTenths(),x=8;
-        sprintf(line,"FPS:%ld.%ld",(long)(n/10),(long)(n%10));
-        Draw_Fill(x,19,80,10,255);Draw_String(x+4,20,line);
-    }
     if(AW_DebugCoordsEnabled() && cls.state==ca_connected && cl.viewentity>0 && cl.viewentity<MAX_EDICTS) {
         char line[80],second[80],extra[80],clock[16];vec_t *p=cl_entities[cl.viewentity].origin;vec3_t global;
         int year,month,day,hour,minute,heading,rows3;

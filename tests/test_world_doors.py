@@ -148,13 +148,16 @@ class TeleportNames(unittest.TestCase):
         names = world_doors.teleport_names((ROOT / 'config' / world_doors.TELEPORT_NAMES).read_bytes())
         # Desele's House of Earthly Delights: a room map of config/room-batches.json, the street door's arrival
         self.assertEqual(names['suranclub'][0], 'ric5e9a38a4d')
+        # the Arena Pit: the arena's own room map, where the canton door from the Arena puts the player
+        self.assertEqual(names['arenapit'][0], 'vai000')
         self.assertIn('ric5e9a38a4d', (ROOT / 'config' / 'room-batches.json').read_text(encoding='utf-8'))
-        # the towns: outdoor places in original global coordinates (Suran cell 6,-7; Ald-ruhn cells -2,6)
-        for name, (cx, cy) in (('suran', (6, -7)), ('aldruhn', (-2, 6))):
+        # the towns: outdoor places in original global coordinates (Suran cell 6,-7; Ald-ruhn cells -2,6; Khuul -9,17)
+        for name, (cx, cy) in (('suran', (6, -7)), ('aldruhn', (-2, 6)), ('khuul', (-9, 17))):
             self.assertEqual(names[name][0], world_doors.GLOBAL_PLACE)
             x, y, z = names[name][1]
             self.assertEqual((int(x // 8192), int(y // 8192)), (cx, cy))
-        self.assertEqual(world_doors.teleport_name_problems(names, {'x': 'ric5e9a38a4d', 'y': 'rifa4ef181ed'}), [])
+        self.assertEqual(world_doors.teleport_name_problems(names, {'x': 'ric5e9a38a4d', 'y': 'rifa4ef181ed',
+                                                                    'vivec, arena pit': 'vai000'}), [])
 
     def test_bad_lines_are_refused(self):
         for raw in (b'AWTN0\n', b'AWTN1\nname|map|1 2|90|label\n', b'AWTN1\nn|m|1 2 3|0|x\nN|m|1 2 3|0|y\n',

@@ -36,7 +36,7 @@ server_t sv;
 server_static_t svs;
 entity_t cl_entities[MAX_EDICTS];
 cvar_t scr_showram={"showram","0"};
-cvar_t *settings[6];int settings_count;
+cvar_t *settings[8];int settings_count;
 void (*cell_command)(void),(*command)(void),(*master)(void),(*ram)(void),(*sea)(void),(*fps)(void),(*hud_type)(void),(*compass_command)(void);
 int argc=2,fill_y=-1,text_y=-1,text_x=-1;
 char *arg="on",last[128],title[128];
@@ -50,8 +50,10 @@ int Q_strcasecmp(char *a,char *b) {return strcasecmp(a,b);}
 void Cvar_RegisterVariable(cvar_t *p) {settings[settings_count++]=p;p->value=atof(p->string);}
 void Cvar_SetValue(char *name,float v) {int i;if(!strcmp(name,"showram")){scr_showram.value=v;return;}for(i=0;i<settings_count;i++)if(!strcmp(name,settings[i]->name)){settings[i]->value=v;return;}assert(0);}
 void Cmd_AddCommand(char *name,void (*fn)(void)) {if(!strcmp(name,"aw_cell"))cell_command=fn;else if(!strcmp(name,"amiwind_debug_compass"))compass_command=fn;else if(!strcmp(name,"amiwind_debug_coords"))command=fn;else if(!strcmp(name,"amiwind_show_debug"))master=fn;else if(!strcmp(name,"amiwind_debug_showram"))ram=fn;else if(!strcmp(name,"amiwind_debug_sealevel"))sea=fn;else if(!strcmp(name,"amiwind_debug_fps"))fps=fn;else if(!strcmp(name,"aw_debug_hud_type"))hud_type=fn;}
-void Draw_Fill(int x,int y,int w,int h,int c) {int lift=AW_InspectHudLift();fill_y=y;fill_x=x;fill_w=w;if(y+h==vid.height-lift)assert(photo_mode?x==0 && w==vid.width:x==144 && w==vid.width-144);assert(y+h==vid.height-lift || (y==19 && h==10 && x==8 && w==80));}
-void Draw_String(int x,int y,char *s) {text_x=x;text_y=y;strcpy(last,s);if(!strncmp(s,"FPS:",4)){assert(!strcmp(s,"FPS:12.3"));fps_draws++;}}
+/* HUD-FPS-NEEDS-DBG-HUD-56: the FPS box sits in the bottom-left corner of the whole screen, on black (255). */
+static int fps_box(int x,int y,int w,int h,int c) {return x==0 && y==(int)vid.height-8 && w==(int)strlen("FPS:12.3")*4+4 && h==8 && c==255;}
+void Draw_Fill(int x,int y,int w,int h,int c) {int lift=AW_InspectHudLift();if(fps_box(x,y,w,h,c))return;fill_y=y;fill_x=x;fill_w=w;if(y+h==vid.height-lift)assert(photo_mode?x==0 && w==vid.width:x==144 && w==vid.width-144);assert(y+h==vid.height-lift);}
+void Draw_String(int x,int y,char *s) {text_x=x;text_y=y;strcpy(last,s);assert(strncmp(s,"FPS",3));}
 static int small_draws,compass_draws,strip_draws,top_draws;static char global_line[80],local_line[80],bearing[96],extra_line[80],strip_line[4][AW_INSPECT_LINE],inspect_line[AW_INSPECT_LINE];
 /* HUD-DEBUG-STRIP-OVER-BOXES-42 / HUD-NOTIFY-OVERLAP-31: with a strip (sb_lines) nothing is drawn
  * inside the view, and right-column text never reaches the weapon/magic boxes (x < 144).
@@ -59,6 +61,7 @@ static int small_draws,compass_draws,strip_draws,top_draws;static char global_li
  * up by the lift; the inspect lines are the only text in the bottom lift pixels, under the bars. */
 void AW_SmallString(int x,int y,const char *s){
  int lift=AW_InspectHudLift();
+ if(!strncmp(s,"FPS:",4)){assert(!strcmp(s,"FPS:12.3") && x==2 && y==(int)vid.height-7);fps_draws++;return;}
  if(sb_lines)assert(y>=vid.height-sb_lines);
  if(y==8){assert(x==8 && !sb_lines);strcpy(title,s);small_draws++;top_draws++;return;}
  if(lift && y>=vid.height-lift){ /* underneath the bars: the hint, then the pin lines */
@@ -92,7 +95,8 @@ int main(void) {
  client_t local;edict_t player;
  Sbar_Init();assert(!AW_DebugCoordsEnabled() && !AW_DebugOverlaysEnabled());
  assert(aw_ui_hud_lift==AW_InspectHudLift && !AW_InspectHudLift());
- assert(compass_command && settings_count==6 && !strcmp(settings[5]->name,"aw_compass"));
+ assert(compass_command && settings_count==7 && !strcmp(settings[5]->name,"aw_compass"));
+ assert(!strcmp(settings[6]->name,"_aw_debug_fps_hud") && settings[6]->value==1); /* the FPS comes with dbg hud */
  assert(settings[5]->archive && settings[5]->value==0);
  vid.width=376;vid.height=200;cls.state=ca_connected;key_dest=key_game;
  Sbar_Draw();assert(compass_draws==0); /* Default is hidden, even in gameplay. */
@@ -204,12 +208,24 @@ int main(void) {
   }
   player.v.origin[0]=497;player.v.origin[1]=-200;
  }
- assert(!fps_draws);arg="on";fps();Sbar_Draw();assert(fps_draws==1);
+ {static byte screen[4];vid.buffer=screen;}
+ /* HUD-FPS-NEEDS-DBG-HUD-56 (the maintainer: "it's only showing the dbg fps on whenever you have
+  * already dbg hud on"): dbg fps draws from screen.c (AW_FpsDraw), never from the HUD, so it shows with
+  * the debug HUD off and in the vanity orbit (which skips Sbar_Draw); not over the console. */
+ /* the maintainer: "FPS COUNTER ON BY DEFAULT IN THE dbg hud on view but so that it can also be disabled
+  * separately": master is on here, so the counter shows by default; dbg fps off hides it even with the HUD */
+ assert(AW_DebugOverlaysEnabled());AW_FpsDraw();assert(fps_draws==1);fps_draws=0;
+ arg="off";fps();AW_FpsDraw();assert(!fps_draws);  /* off, even with dbg hud */
+ arg="on";fps();Sbar_Draw();assert(!fps_draws);AW_FpsDraw();assert(fps_draws==1);
  arg="off";ram();assert(!scr_showram.value);
  arg="0";master();assert(!AW_DebugOverlaysEnabled() && !AW_DebugCoordsEnabled());
  assert(settings[0]->value==0);
  assert(AW_SeaLevelEnabled());
- fill_y=-1;Sbar_Draw();assert(fill_y==-1 && fps_draws==1);
+ fill_y=-1;Sbar_Draw();assert(fill_y==-1);AW_FpsDraw();assert(fps_draws==2); /* the debug HUD off */
+ key_dest=key_console;AW_FpsDraw();assert(fps_draws==2);key_dest=key_game;
+ photo_mode=1;AW_FpsDraw();assert(fps_draws==2);                             /* photo mode hides it */
+ arg="on";master();AW_FpsDraw();assert(fps_draws==3);arg="0";master();photo_mode=0; /* unless Ctrl+H */
+ arg="off";fps();AW_FpsDraw();assert(fps_draws==3);
  {int i,n=compass_draws;const char *expected[]={"N 000","W 270","S 180","E 090","NE 045"};
   float yaw[]={90,180,270,360,45};
   for(i=0;i<5;i++){cl.viewangles[YAW]=yaw[i];Sbar_Draw();assert(!strncmp(bearing,expected[i],strlen(expected[i])));assert(strstr(bearing," / REGION: Bitter Coast Region"));}

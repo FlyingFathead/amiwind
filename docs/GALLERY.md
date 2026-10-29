@@ -7,6 +7,7 @@ What changed in each version: [changelog](CHANGELOG.md).
 <!-- contents start -->
 ## Contents
 
+- [v0.0.56-dev1: Ald'ruhn on a Raspberry Pi](#v0056-dev1-aldruhn-on-a-raspberry-pi)
 - [v0.0.44: By Azura's Trees!](#v0044-by-azuras-trees)
 - [v0.0.43: Let There Be CHIM: Vvardenfell's Outdoors, All of It](#v0043-let-there-be-chim-vvardenfells-outdoors-all-of-it)
 - [v0.0.42: Things Are Starting To Look Pretty Khuul](#v0042-things-are-starting-to-look-pretty-khuul)
@@ -23,7 +24,33 @@ What changed in each version: [changelog](CHANGELOG.md).
 
 <!-- contents end -->
 
-_Last updated with AmiWind v0.0.44 (19 October 2026)._
+_Last updated with AmiWind v0.0.56-dev1 (29 October 2026)._
+
+## v0.0.56-dev1: Ald'ruhn on a Raspberry Pi
+
+All sixteen taken from Amiberry on the Raspberry Pi 4B, in the maintainer's playtest on a Pi that starts straight
+into AmiWind from a USB stick ([how it was set up](REAL_HARDWARE.md#raspberry-pi-with-amiberry)): Ald'ruhn, the
+Redoran town in the Ashlands, under an ash storm sky, from the afternoon through sundown into the night. The maintainer, playing it: "that is beautiful... that is
+fucking beautiful. that is .... magnifique!"
+
+| | |
+| --- | --- |
+| ![The red gate of a Redoran shell house in Ald'ruhn, Amiberry on the Raspberry Pi 4B, v0.0.56-dev1](images/amiwind-v0.0.56-dev1-aldruhn-1.png) | ![The player on an Ald'ruhn walkway under the ash sky, Amiberry on the Raspberry Pi 4B, v0.0.56-dev1](images/amiwind-v0.0.56-dev1-aldruhn-2.png) |
+| **The red gate** of a Redoran shell house. | **Under the ash sky**, the hills of the Ashlands behind. |
+| ![Redoran shell houses with red-lit doorways in Ald'ruhn, Amiberry on the Raspberry Pi 4B, v0.0.56-dev1](images/amiwind-v0.0.56-dev1-aldruhn-3.png) | ![The shell houses of Ald'ruhn and the storm sky, Amiberry on the Raspberry Pi 4B, v0.0.56-dev1](images/amiwind-v0.0.56-dev1-aldruhn-4.png) |
+| **Shell houses** with their lamps lit. | **The storm** pulling over the rooftops. |
+| ![A Redoran shell house and the town beyond, Amiberry on the Raspberry Pi 4B, v0.0.56-dev1](images/amiwind-v0.0.56-dev1-aldruhn-5.png) | ![The player walking toward a red-lit Redoran house, Amiberry on the Raspberry Pi 4B, v0.0.56-dev1](images/amiwind-v0.0.56-dev1-aldruhn-6.png) |
+| **Into town**, past the shells. | **Toward the red light.** |
+| ![The red gate and the great shell beyond, Amiberry on the Raspberry Pi 4B, v0.0.56-dev1](images/amiwind-v0.0.56-dev1-aldruhn-7.png) | ![A walkway along the Ald'ruhn shells under the ash sky, Amiberry on the Raspberry Pi 4B, v0.0.56-dev1](images/amiwind-v0.0.56-dev1-aldruhn-8.png) |
+| **The red gate** and the great shell beyond. | **Along the shells** at the edge of town. |
+| ![A street of Redoran shell houses, one glowing red, Amiberry on the Raspberry Pi 4B, v0.0.56-dev1](images/amiwind-v0.0.56-dev1-aldruhn-9.png) | ![A great shell and the ash plants in front of it at dusk, Amiberry on the Raspberry Pi 4B, v0.0.56-dev1](images/amiwind-v0.0.56-dev1-aldruhn-10.png) |
+| **A street of shells**, one lit red from within. | **A great shell at dusk**, the ash plants in front. |
+| ![A red-lit Redoran shell house beside a standing shell under the ash clouds, Amiberry on the Raspberry Pi 4B, v0.0.56-dev1](images/amiwind-v0.0.56-dev1-aldruhn-11.png) | ![The sky over Ald'ruhn turned red, a shell house ahead, Amiberry on the Raspberry Pi 4B, v0.0.56-dev1](images/amiwind-v0.0.56-dev1-aldruhn-12.png) |
+| **A red-lit house** beside a standing shell. | **The sky turned red** over Ald'ruhn. |
+| ![A Redoran in bonemold armour watching the red gate as the sun goes down, Amiberry on the Raspberry Pi 4B, v0.0.56-dev1](images/amiwind-v0.0.56-dev1-aldruhn-13.png) | ![The last light between the shells of Ald'ruhn, Amiberry on the Raspberry Pi 4B, v0.0.56-dev1](images/amiwind-v0.0.56-dev1-aldruhn-14.png) |
+| **Sundown at the red gate.** | **The last light** between the shells. |
+| ![A Redoran shell house at nightfall under the dark ash clouds, Amiberry on the Raspberry Pi 4B, v0.0.56-dev1](images/amiwind-v0.0.56-dev1-aldruhn-15.png) | ![Torches lit along an Ald'ruhn street at night, Amiberry on the Raspberry Pi 4B, v0.0.56-dev1](images/amiwind-v0.0.56-dev1-aldruhn-16.png) |
+| **Nightfall** over the shells. | **Later in the night**, the torches lit. |
 
 ## v0.0.44: By Azura's Trees!
 

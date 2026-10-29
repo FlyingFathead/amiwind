@@ -7,7 +7,15 @@ AWTN1
 heartchamber|rifa4ef181ed|-24 320 472.875|90|Akulakhan's Chamber (the Heart Chamber)
 # Desele's House of Earthly Delights, Suran: from the street door (reference 199296, Suran), where it puts the player.
 suranclub|ric5e9a38a4d|-68.6065 -1.5125 38.79825|266.7|Desele's House of Earthly Delights, Suran
+# The Arena Pit, Vivec: the pit floor where the canton door from the Arena (reference 466158) puts the player; the
+# room map is the arena's own (vai000). dbg tp vivec lands in the city, so the release smoke hops here (SMOKE-HOPS-56).
+arenapit|vai000|437.63431 0.58477 13.40949|180|Vivec, Arena Pit
 # Outdoor places: the map "global", x y z in original Morrowind global coordinates (the route of dbg tp X Y Z: z is the
 # height to land at or below, the yaw is unused). The middle of the town's exterior cells, a street height of its doors.
-suran|global|54080 -53044 1100|0|Suran
+# Suran is a hillside town (its door exits run from 350 to 1,700 units high): the cell middle landed among the rocks
+# between terraces (TPNAMES-HEIGHTS-56, 29 October 2026), so it is the street outside the Suran Tradehouse's lower
+# door, where that door puts the player.
+suran|global|57088 -54208 1400|0|Suran
 aldruhn|global|-12606 54169 2500|0|Ald'ruhn
+# Khuul (cell -9,17): the street outside Thongar's Tradehouse, where its door (reference 102149) puts the player.
+khuul|global|-66897 139876 400|0|Khuul

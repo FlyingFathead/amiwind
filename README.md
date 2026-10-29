@@ -4,7 +4,7 @@
 
 # AmiWind
 
-_Last updated with AmiWind v0.0.55 (29 October 2026)._
+_Last updated with AmiWind v0.0.56 (29 October 2026)._
 
 An unofficial, experimental RPG engine and enthusiast project bringing Morrowind
 to the Commodore Amiga, featuring CHIM: an AmiQuake-based engine and an asset
@@ -27,11 +27,10 @@ More in the [gallery](docs/GALLERY.md).
 
 ## Where AmiWind stands (29 October 2026)
 
-The newest release is **v0.0.55: Sky Is Turning Red (Among Other Things)**: nearer Red Mountain the sky turns red
-before you reach the mountain's own region, the clouds race and the crater sky is darker still; builds survive memory
-pressure on any machine, the build monitor shows the memory, the build disk and every warning, the garbage collector
-ages out old release series and every build warns when its disk fills, and the docs are organised, running on CHIM
-Engine v0.2.2 ([release notes](docs/releases/notes/RELEASE-v0.0.55.md)). The project's own builds have had every exterior cell of Vvardenfell on CHIM since v0.0.43 (a build from the
+The newest release is **v0.0.56: Some Velvet Morning**: AmiWind on a Raspberry Pi, a Pi 4 that starts straight
+into the game from a USB stick, the tool to [make your own](docs/PI_BOOT_IMAGE.md), and a
+[gallery](docs/GALLERY.md) of Ald'ruhn taken on it; `dbg fps on` works by itself, running on CHIM Engine v0.2.2
+([release notes](docs/releases/notes/RELEASE-v0.0.56.md)). The project's own builds have had every exterior cell of Vvardenfell on CHIM since v0.0.43 (a build from the
 repository does so only from v0.0.47, when the cell list became part of the repository and the default): 1,409
 cells, counting the 61 in the town frames (1,348 are one-cell region frames; 1,292 land cells, 98 sea-floor cells
 and 19 open-sea cells), with no classic region maps left outdoors. What these numbers count:
@@ -40,10 +39,17 @@ and 19 open-sea cells), with no classic region maps left outdoors. What these nu
 prison and the census office) is built as a CHIM room, with the people the game places in them. Solstheim is not
 converted.
 
-What comes next is in the [roadmap](docs/ROADMAP.md): in v0.0.56, characters that wander, idle and attack on sight by
+What comes next is in the [roadmap](docs/ROADMAP.md): in v0.0.57, characters that wander, idle and attack on sight by
 their own records, creatures on skeletons of their own, Dagoth Ur's fight and voice, full-detail heads where rooms
 have room, one arena mode merged from the arena minigame and the combat playground, and the rooms that still load in
 on arrival.
+
+### What v0.0.56 changed
+
+A Raspberry Pi 4 starts straight into AmiWind from a USB stick, and `tools/pi_image/make_pi_image.sh` makes such a
+stick from your own Kickstart and your own AmiWind image; on a Pi 4 the game is playable, about 10 to 50 frames a
+second by scene. `dbg fps on` shows the frame rate without the debug HUD, and new teleports reach Khuul and the Vivec
+Arena Pit. Full list: [v0.0.56 release notes](docs/releases/notes/RELEASE-v0.0.56.md).
 
 ### What v0.0.55 changed
 

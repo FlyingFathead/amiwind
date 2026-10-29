@@ -1,6 +1,6 @@
 # AmiWind documentation
 
-_Generated from `docs/README.topics.json` with AmiWind v0.0.55._
+_Generated from `docs/README.topics.json` with AmiWind v0.0.56._
 
 Every document of the project, by topic, with the version and date of its last update. A document marked "needs a refresh" predates the current state of its subject and is due for a review; its facts may be out of date. Release notes and whitespace baselines are listed in [releases](releases/README.md); one-off records and replaced documents in [history](history/README.md).
 
@@ -11,11 +11,12 @@ Every document of the project, by topic, with the version and date of its last u
 | [ABOUT.md](ABOUT.md) | About AmiWind, licences and credits | v0.0.46 (20 October 2026), needs a refresh |
 | [FAQ.md](FAQ.md) | AmiWind FAQ | v0.0.51 (25 October 2026) |
 | [BUILDING_AND_PLAYING.md](BUILDING_AND_PLAYING.md) | Building and playing | v0.0.55 (29 October 2026) |
-| [REAL_HARDWARE.md](REAL_HARDWARE.md) | Running AmiWind on real Amiga hardware | v0.0.54 (27 October 2026) |
+| [REAL_HARDWARE.md](REAL_HARDWARE.md) | Running AmiWind on real Amiga hardware | v0.0.56-dev1 (29 October 2026) |
+| [PI_BOOT_IMAGE.md](PI_BOOT_IMAGE.md) | Your own AmiWind boot stick for the Raspberry Pi | v0.0.56-dev1 (29 October 2026) |
 | [68060.md](68060.md) | AmiWind on the 68060 | v0.0.54-dev1 (27 October 2026) |
 | [MORROWIND_EDITIONS.md](MORROWIND_EDITIONS.md) | Morrowind editions: what the builder reads | v0.0.42-dev1 (17 October 2026), needs a refresh |
 | [GAME_INPUT_LAYOUT.md](GAME_INPUT_LAYOUT.md) | Installed Morrowind game inputs | v0.0.25-rc3 (1 October 2026), needs a refresh |
-| [GALLERY.md](GALLERY.md) | AmiWind gallery | v0.0.44 (19 October 2026), needs a refresh |
+| [GALLERY.md](GALLERY.md) | AmiWind gallery | v0.0.56-dev1 (29 October 2026), needs a refresh |
 | [GAMEPLAY_MEDIA.md](GAMEPLAY_MEDIA.md) | Gameplay media | v0.0.42-dev1 (17 October 2026), needs a refresh |
 | [LICENSING_AND_CREDITS.md](LICENSING_AND_CREDITS.md) | Licensing, provenance and credits | v0.0.48-dev2 (23 October 2026) |
 | [CONTENT_POLICY.md](CONTENT_POLICY.md) | Original game content stays outside this repository | v0.0.42-dev1 (17 October 2026), needs a refresh |
@@ -30,7 +31,7 @@ Every document of the project, by topic, with the version and date of its last u
 | --- | --- | --- |
 | [AW.md](AW.md) | aw: the master builder command line | v0.0.54-dev2 (28 October 2026) |
 | [AGA_BUILD.md](AGA_BUILD.md) | AGA checkpoint build and controls | v0.0.54 (28 October 2026) |
-| [BUILD_CACHE.md](BUILD_CACHE.md) | Build cache: resuming and reusing work safely | v0.0.55 (29 October 2026) |
+| [BUILD_CACHE.md](BUILD_CACHE.md) | Build cache: resuming and reusing work safely | v0.0.56-dev1 (29 October 2026) |
 | [BUILD_DEPENDENCIES.md](BUILD_DEPENDENCIES.md) | Dependency checks and reference versions | v0.0.46-dev1 (20 October 2026) |
 | [BUILD_MANIFEST.md](BUILD_MANIFEST.md) | World map manifest (design) | v0.0.54 (27 October 2026) |
 | [BUILD_OUTPUT.md](BUILD_OUTPUT.md) | Build completion output | v0.0.48 (24 October 2026) |
@@ -70,8 +71,8 @@ Every document of the project, by topic, with the version and date of its last u
 | [ENGINE_PROFILES.md](ENGINE_PROFILES.md) | Engine profiles | v0.0.46 (20 October 2026) |
 | [EXPERIMENTAL_FLAGS.md](EXPERIMENTAL_FLAGS.md) | Experimental flags | v0.0.48-dev2 (23 October 2026) |
 | [CRASH_REPORTING.md](CRASH_REPORTING.md) | Fatal error reports | v0.0.28 (4 October 2026), needs a refresh |
-| [DEBUG_OVERLAYS.md](DEBUG_OVERLAYS.md) | Development overlays | v0.0.48-dev2 (22 October 2026) |
-| [AMIWIND_CONSOLE_COMMANDS.md](AMIWIND_CONSOLE_COMMANDS.md) | AmiWind console commands | generated (v0.0.55) |
+| [DEBUG_OVERLAYS.md](DEBUG_OVERLAYS.md) | Development overlays | v0.0.56-dev1 (29 October 2026) |
+| [AMIWIND_CONSOLE_COMMANDS.md](AMIWIND_CONSOLE_COMMANDS.md) | AmiWind console commands | generated (v0.0.56) |
 | [MEMORY_ALLOCATION.md](MEMORY_ALLOCATION.md) | Memory allocation and heap clearance | v0.0.42-dev1 (17 October 2026), needs a refresh |
 | [HEAP_WATCHER.md](HEAP_WATCHER.md) | Heap watcher: build estimates and complete scene lifecycles | v0.0.42-dev1 (17 October 2026), needs a refresh |
 | [COLLISION_MESHES.md](COLLISION_MESHES.md) | Morrowind collision meshes: where they are and how AmiWind uses them | v0.0.54 (27 October 2026) |
@@ -122,7 +123,7 @@ Every document of the project, by topic, with the version and date of its last u
 | [WORLD_SURVEY.md](WORLD_SURVEY.md) | Vvardenfell terrain and cell-density survey | v0.0.25-dev1 (1 October 2026), needs a refresh |
 | [WORLD_TERRAIN.md](WORLD_TERRAIN.md) | Playable Vvardenfell terrain | v0.0.42-dev1 (17 October 2026), needs a refresh |
 | [WORLD_MAP_AND_JOURNAL.md](WORLD_MAP_AND_JOURNAL.md) | World map and progression journal | v0.0.42-dev1 (17 October 2026), needs a refresh |
-| [WORLD_TREE_SPRITES.md](WORLD_TREE_SPRITES.md) | World tree sprites and the Balmora comparison zone | v0.0.42-dev1 (17 October 2026), needs a refresh |
+| [WORLD_TREE_SPRITES.md](WORLD_TREE_SPRITES.md) | World tree sprites and the Balmora comparison zone | v0.0.56-dev1 (29 October 2026), needs a refresh |
 | [BOUNDED_WORLD_CANDIDATES.md](BOUNDED_WORLD_CANDIDATES.md) | Bounded world candidates | v0.0.28 (4 October 2026), needs a refresh |
 | [POI_CHECKLIST.md](POI_CHECKLIST.md) | Points-of-interest checklist | v0.0.30 (7 October 2026), needs a refresh |
 | [DOOR_MAPPING.md](DOOR_MAPPING.md) | Original door mapping | v0.0.54-dev1 (27 October 2026) |
@@ -227,14 +228,14 @@ Every document of the project, by topic, with the version and date of its last u
 
 | Document | Title | Last updated |
 | --- | --- | --- |
-| [BUGS.md](BUGS.md) | Bug register | generated (v0.0.55) |
+| [BUGS.md](BUGS.md) | Bug register | generated (v0.0.56) |
 | [BUG_JOURNAL.md](BUG_JOURNAL.md) | Bug journal | v0.0.48-dev2 (23 October 2026) |
 
 ## Releases
 
 | Document | Title | Last updated |
 | --- | --- | --- |
-| [CHANGELOG.md](CHANGELOG.md) | Changelog | v0.0.55 (29 October 2026) |
+| [CHANGELOG.md](CHANGELOG.md) | Changelog | v0.0.56 (29 October 2026) |
 | [ROADMAP.md](ROADMAP.md) | Roadmap and implementation options | v0.0.55 (29 October 2026) |
 | [RELEASE_WORKFLOW.md](RELEASE_WORKFLOW.md) | AmiWind release workflow | v0.0.54 (28 October 2026) |
 | [CI.md](CI.md) | Build audit and the local pipeline | v0.0.54 (27 October 2026) |

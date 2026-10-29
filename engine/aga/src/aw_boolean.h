@@ -7,7 +7,7 @@ static int __attribute__((unused)) AW_BooleanCvar(const char *name) {
     static const char *const names[]={"aw_daynightcycle","aw_daynight","aw_sun","aw_clouds","aw_starsky","aw_star_twinkle","aw_nightsky","guards_torch_cycle","aw_fog","aw_compass","aw_ui_hud","aw_ui_frame",
         "aw_intro_text_overlay","aw_show_speaker_name_during_voiceovers",
         "aw_allow_poly_budget_over","aw_input_trace","aw_door_sounds","aw_mwscript","aw_ghostfence","aw_campfires","aw_target_names","early_game_demo_start_1","_aw_debug_all",
-        "_aw_debug_coords","_aw_debug_fps","_aw_debug_sealevel","showram",
+        "_aw_debug_coords","_aw_debug_fps","_aw_debug_fps_hud","_aw_debug_sealevel","showram",
         "r_drawentities","r_drawworld","r_fullbright","r_drawviewmodel",
         "cl_nolerp","lookspring","lookstrafe",NULL};
     int i;for(i=0;names[i];i++)if(!strcmp(name,names[i]))return 1;

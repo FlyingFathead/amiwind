@@ -1,10 +1,11 @@
 # Changelog
 
-_Last updated with AmiWind v0.0.55 (29 October 2026)._
+_Last updated with AmiWind v0.0.56 (29 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.56: Some Velvet Morning, 29 October 2026](#v0056-some-velvet-morning-29-october-2026)
 - [v0.0.55: Sky Is Turning Red (Among Other Things), 29 October 2026](#v0055-sky-is-turning-red-among-other-things-29-october-2026)
 - [v0.0.54: Hair, Movement, Magic And More, 28 October 2026](#v0054-hair-movement-magic-and-more-28-october-2026)
 - [v0.0.53: Super Freak Halloween Update, 27 October 2026](#v0053-super-freak-halloween-update-27-october-2026)
@@ -163,6 +164,18 @@ _Last updated with AmiWind v0.0.55 (29 October 2026)._
 - [CHIM source candidate - 14 October 2026, v0.0.40-dev1](#chim-source-candidate---14-october-2026-v0040-dev1)
 
 <!-- contents end -->
+
+## v0.0.56: Some Velvet Morning, 29 October 2026
+
+- Your own AmiWind boot stick for the Raspberry Pi: `tools/pi_image/make_pi_image.sh` makes an image that starts a
+  Pi straight into Amiberry and AmiWind from your own Kickstart and AmiWind image; a Pi 4 at 2.0 GHz by default
+  ([your own AmiWind boot stick](PI_BOOT_IMAGE.md)).
+- AmiWind on a Raspberry Pi 4 is playable, about 10 to 50 frames a second by scene
+  ([Raspberry Pi with Amiberry](REAL_HARDWARE.md#raspberry-pi-with-amiberry)); a gallery of Ald'ruhn taken on it.
+- `dbg fps on` works by itself, in the bottom-left corner, in the vanity shots too ([HUD-FPS-NEEDS-DBG-HUD-56](BUGS.md)).
+- `dbg tp khuul`, `dbg tp arenapit`, `dbg tp suran` on a street; the release smoke test hops by teleport.
+- Released early, without the build from scratch of the line; the rest moved to v0.0.57
+  ([release notes](releases/notes/RELEASE-v0.0.56.md)).
 
 ## v0.0.55: Sky Is Turning Red (Among Other Things), 29 October 2026
 

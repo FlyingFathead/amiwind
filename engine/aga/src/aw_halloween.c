@@ -507,7 +507,7 @@ int AW_HalloweenCamera(float origin[3],float angles[3]) {
 }
 
 void AW_HalloweenDraw(void) {
-    char line[32];int n,lh,w,h,x,y,w1,w2,i;
+    int lh,w,h,x,y,w1,w2,i;
     if(!hw.on || key_dest==key_console || !vid.buffer)return;
     if(hw.intro){
         /* the greeting: alone on black, the box only as large as its two lines, in the exact centre */
@@ -524,14 +524,8 @@ void AW_HalloweenDraw(void) {
         scr_copyeverything=1;
         return;
     }
-    if(hw.fps){
-        /* small, in the bottom-left corner */
-        n=AW_FpsTenths();
-        sprintf(line,"FPS %ld.%ld",(long)(n/10),(long)(n%10));
-        Draw_Fill(0,vid.height-8,(int)strlen(line)*4+4,8,0);
-        AW_SmallString(2,vid.height-7,line);
-        scr_copyeverything=1;
-    }
+    /* small, in the bottom-left corner: the same counter as dbg fps (HUD-FPS-NEEDS-DBG-HUD-56) */
+    if(hw.fps)AW_FpsCorner();
 }
 
 static void command_with(int fps) {

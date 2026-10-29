@@ -1,6 +1,6 @@
 # Build cache: resuming and reusing work safely
 
-_Last updated with AmiWind v0.0.55 (29 October 2026)._
+_Last updated with AmiWind v0.0.56-dev1 (29 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -678,8 +678,10 @@ who builds every release fills the disk over a few weeks (BUILD-CACHE-NO-RETENTI
   last two releases with their dev builds), so their pool objects are freed with
   them; pin a run you want to keep (`build_gc.py pin`).
 * **Deleting.** Only `--delete` removes anything, and only items the plan lists
-  as expired; `--item PATH` limits it to a list you approved. Pinned, running and
-  unregistered items are never deleted.
+  as expired; `--item PATH` limits it to a list you approved (`--items-file FILE`
+  for a long one, one path per line). Pinned, running and unregistered items are
+  never deleted. A run's files are mostly links into the shared pool: deleting old
+  runs frees little until the next plan expires the pool objects only they used.
 
 ```
 python tools/build_gc.py plan out                         # what would go, nothing deleted

@@ -138,6 +138,25 @@ class CollectorTest(unittest.TestCase):
         self.assertFalse(other.exists())
         self.assertTrue((self.workspace / 'build' / 'new').exists())
 
+    def test_items_file_deletes_exactly_its_listed_expired_items(self):
+        # a long approved list (2026-10-29: 262 301 pool objects archived first) in a file, one path per line
+        old = self.run_folder('old', started='2026-10-09T08:00:00Z')
+        other = self.run_folder('other', started='2026-10-09T08:30:00Z')
+        self.run_folder('new', started='2026-10-09T09:00:00Z')
+        self.own(old, 'job-a', 'done')
+        self.own(other, 'job-a', 'done')
+        listing = self.volume.parent / 'items.txt'
+        listing.write_text('%s\r\n\n' % old, encoding='utf-8')
+        registry = self.volume.parent / 'registry.json'
+        registry.write_text(json.dumps({'items': self.registry}), encoding='utf-8')
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(build_gc.main(['plan', str(self.volume), '--registry', str(registry), '--delete',
+                                            '--items-file', str(listing)]), 0)
+        self.assertFalse(old.exists())
+        self.assertTrue(other.exists())
+        with self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()):
+            build_gc.main(['plan', str(self.volume), '--items-file', str(listing)])     # never without --delete
+
     def test_running_state_is_rechecked_before_deleting(self):
         old = self.run_folder('old', started='2026-10-09T08:00:00Z')
         self.run_folder('new', started='2026-10-09T09:00:00Z')
