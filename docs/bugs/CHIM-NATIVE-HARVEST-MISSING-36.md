@@ -12,7 +12,7 @@
 | Persists in | v0.0.54-dev1 (last seen) |
 | Severity | high: Every CHIM town beyond Seyda Neen and Balmora has no pickable plants (regression, found in v0.0.54-dev1). |
 | Family | Harvestable plants (`harvest`) |
-| Deferred by the maintainer | 2026-10-28: deferred to v0.0.55 by the coordinator under the maintainer's rule of 2026-10-28 (no answer to the 10:02 question); not new in v0.0.54, does not break play |
+| Deferred by the maintainer | 2026-10-29: to v0.0.56, the maintainer (TG 2026-10-29 10:47 +0200 / 08:47 UTC, on the six expired v0.0.55 deferrals): 'Yeah defer them to the next' |
 | Came back (regression) | in v0.0.54-dev1 (fixed in v0.0.41 before) |
 | CHIM | Engine streaming and memory ([CHIM Engine tracker](CHIM_TRACKER.md)) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |

@@ -161,6 +161,7 @@ function lowNow() {
   return last && c.length && last.end === c[c.length - 1][0] ? ' · UNDER ' + redSettings().threshold + ' CORES FOR ' + fmtS(last.end - last.start) : '';
 }
 const RAM_ORANGE = 0.20, RAM_RED = 0.10;   // the RAM line's colours: under this share of the limit available
+const DISK_ORANGE = 0.20;                  // the Disk line turns orange under this share free (red: the build's own low flag)
 function renderProgress(p) {
   const status = p ? p.status || '-' : 'no build-progress.json';
   $('status').textContent = status; $('status').className = 'big ' + (p ? p.status : '');
@@ -197,6 +198,20 @@ function renderProgress(p) {
     ram.className = share < RAM_RED ? 'red' : share < RAM_ORANGE ? 'silent' : '';
     ram.title = (100 * share).toFixed(0) + ' % available; orange under ' + (100 * RAM_ORANGE) + ' %, red under ' + (100 * RAM_RED) + ' %';
   } else ram.textContent = 'RAM: not recorded by this build';
+  // the build disk under RAM (BUILD-CACHE-NO-RETENTION-55): free of total, orange under DISK_ORANGE free, red when the
+  // build says low (under 10 % or the preflight's 35 GiB); the [disk] WARNING lines land in the warnings row below
+  let disk = $('diskline');
+  if (!disk) { disk = el('div'); disk.id = 'diskline'; coreText.before(disk); }
+  const d = p.disk;
+  if (d && Number.isFinite(d.free_gib) && Number.isFinite(d.total_gib) && d.total_gib > 0) {
+    const free = d.free_gib / d.total_gib;
+    disk.textContent = 'Disk: ' + d.free_gib.toFixed(0) + ' GiB free of ' + d.total_gib.toFixed(0) + ' (' + (100 * (1 - free)).toFixed(0) +
+      ' % full) · lowest ' + d.lowest_free_gib.toFixed(0) + ' GiB free' +
+      (d.low_warnings ? ' · ' + d.low_warnings + ' low-disk warning' + (d.low_warnings === 1 ? '' : 's') : '');
+    disk.className = d.low ? 'red' : free < DISK_ORANGE ? 'silent' : '';
+    disk.title = (100 * free).toFixed(0) + ' % free; orange under ' + (100 * DISK_ORANGE) + ' % free, red when the build reports it low; ' +
+      'free space: python tools/build_gc.py plan WORKSPACE (docs/BUILD_CACHE.md "Free disk space")';
+  } else disk.textContent = 'Disk: not recorded by this build';
   // the warnings row (MONITOR-WARNINGS-ROW, the maintainer: "highlight warnings in yellow ... a clickable
   // 'warning(s) N [view]'"): every WARNING line of the stage logs, from build-progress.json; hidden at 0
   let warnRow = $('warnrow'), warnList = $('warnlist');

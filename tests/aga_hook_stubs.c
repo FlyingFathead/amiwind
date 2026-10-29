@@ -54,6 +54,7 @@ WEAK int AW_WeatherFrame(int days,int milliseconds,aw_weather_blend_t *out){(voi
 WEAK const unsigned char *R_InteriorFogColours(int r,int g,int b){(void)r;(void)g;(void)b;return 0;}
 /* The weather's land light (WEATHER-AMBIENT-SUN-UNUSED-51): never reached without a weather (key 0). */
 WEAK int AW_WeatherLightOn(void) {return 1;}
+WEAK int AW_WeatherMountainLevel(void) {return 0;}
 /* The falling weather and the mesh smoke (aw_atmos.c, WEATHER-RAIN, MESH-PARTICLE-EMITTERS): nothing without it. */
 WEAK void AW_AtmosInit(void) {}
 WEAK void AW_AtmosUpdate(void) {}

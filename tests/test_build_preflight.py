@@ -38,6 +38,15 @@ class PreflightTests(unittest.TestCase):
         self.assertIn('GiB needed', problems[0])
         self.assertEqual(build_preflight.free_space_problems(self.workspace / 'not-yet', minimum_gib=0), [])
 
+    def test_a_filling_disk_warns_and_names_the_collector(self):
+        # BUILD-CACHE-NO-RETENTION-55: old runs and cache entries piled up for weeks and nothing said so.
+        warning = build_preflight.fill_warning(self.workspace, share=0.0)  # any disk is at least 0 % full
+        self.assertIn('[disk] WARNING: the build disk is', warning)
+        self.assertIn('python tools/build_gc.py plan ' + str(self.workspace), warning)
+        self.assertIn('--delete', warning)
+        self.assertIsNone(build_preflight.fill_warning(self.workspace, share=1.01))  # never over 100 % full
+        self.assertIsNotNone(build_preflight.fill_warning(self.workspace / 'not-yet' / 'deeper', share=0.0))
+
     def test_too_little_room_stops_every_build(self):
         # BUILD-DISK-NEED-UNKNOWN-52: a tester's public build filled its disk halfway; every build, development
         # ones too, stops before its first stage, against at least 35 GiB by default

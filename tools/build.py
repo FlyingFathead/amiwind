@@ -2818,6 +2818,9 @@ def main(argv=None):
                                                                   args.chim_regions_table, args.miniwind)
             if problems:
                 raise ValueError('Build preflight failed before any stage:\n  ' + '\n  '.join(problems))
+            fill = build_preflight.fill_warning(args.workspace)
+            if fill:
+                print(fill, flush=True)
         if getattr(args, 'accept_known_stair_findings', None):
             from project_version import require_private_test_version
             require_private_test_version(VERSION, ['--accept-known-stair-findings'])

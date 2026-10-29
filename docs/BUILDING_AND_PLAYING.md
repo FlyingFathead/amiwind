@@ -1,6 +1,6 @@
 # Building and playing
 
-_Last updated with AmiWind v0.0.49-dev1 (24 October 2026)._
+_Last updated with AmiWind v0.0.55 (29 October 2026)._
 
 How to build AmiWind from your own Morrowind copy and run it in an emulator. The short version is in the [README](../README.md#build-it-from-your-own-morrowind).
 
@@ -81,6 +81,14 @@ refuses options a public user would not have: see
 [clean builds](BUILD_CACHE.md#clean-builds-and-public-defaults). The numbers of
 every build and gate can be kept in one database for comparisons across runs:
 [perf database](PERF_DATABASE.md).
+
+**Disk space:** every build keeps its run folder and adds to the build cache, so
+the workspace grows with each release you build. When the build disk is 80 % full
+or more, the build prints a `[disk] WARNING` line naming the garbage collector:
+`python tools/build_gc.py plan out` lists what it would remove (old release
+series, finished scratch, cache objects nothing uses any more) and deletes nothing;
+add `--delete` to remove exactly what it lists as expired. See
+[free disk space](BUILD_CACHE.md#free-disk-space).
 
 A normal build includes everything the release ships; no extra option is
 needed. From v0.0.33 the default builder is CHIM, with Balmora and Seyda Neen on

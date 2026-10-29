@@ -1,11 +1,11 @@
 # Roadmap and implementation options
 
-_Last updated with AmiWind v0.0.55-dev2 (28 October 2026)._
+_Last updated with AmiWind v0.0.55 (29 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
-- [v0.0.55 (next), 28 October 2026](#v0055-next-28-october-2026)
+- [v0.0.55: released 29 October 2026; v0.0.56 next](#v0055-released-29-october-2026-v0056-next)
 - [Later: an Extras menu, and two players in the arena, 28 October 2026](#later-an-extras-menu-and-two-players-in-the-arena-28-october-2026)
 - [v0.0.54: Hair, Movement, Magic And More, 28 October 2026](#v0054-hair-movement-magic-and-more-28-october-2026)
 - [v0.0.53: Super Freak Halloween Update, 27 October 2026](#v0053-super-freak-halloween-update-27-october-2026)
@@ -103,13 +103,15 @@ _Last updated with AmiWind v0.0.55-dev2 (28 October 2026)._
 
 15 October 2026: exact-source validation completed 4,231 tests: 4,225 passed, three Windows-only skips and three tracked Census expected failures. The 71 focused tests and original-data readback across nine frame positions passed, consistently hiding 33 of 158 original references at stronghold state 6 while preserving unknown scripts. All 243 player resources are reusable after exact producer, input and file verification. Complete combined-world conversion, native comparison, packaging and shipment remain pending; coverage counts are unchanged.
 
-## v0.0.55 (next), 28 October 2026
+## v0.0.55: released 29 October 2026; v0.0.56 next
 
-First out, as v0.0.55-dev1 (28 October 2026): builds that survive memory pressure on any machine, memory in the
-Toolkit's build monitor, the docs organised into folders with a generated index, and DemoWind's first effect
-([dev1 notes](releases/notes/RELEASE-v0.0.55-dev1.md)).
+v0.0.55, "Sky Is Turning Red (Among Other Things)", shipped the Red Mountain sky in the game, builds that survive
+memory pressure on any machine, memory, disk and warnings in the Toolkit's build monitor, the garbage collector's
+age rule with the disk warnings, the organised docs and DemoWind
+([release notes](releases/notes/RELEASE-v0.0.55.md)).
 
-What did not make v0.0.54 moves here, in order:
+What did not make v0.0.55 moves to v0.0.56, in order: first the build from scratch of the release line (skipped for
+v0.0.55 to ship it the same day) and the stale-docs pass, then:
 
 - **Characters that live by their records.** NPCs and creatures wander, idle and attack on sight by what their own
   record holds (its wander and travel packages, its Fight value), as the original game does; since v0.0.54 every

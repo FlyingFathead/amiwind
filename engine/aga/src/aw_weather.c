@@ -12,6 +12,11 @@
 #include "aw_world.h"
 
 static cvar_t aw_weather={"aw_weather","1",true};
+/* The Red Mountain sky (REDMOUNTAIN-SKY-55, aw_weather.h AW_WeatherMountainPull): 1 (saved, default) pulls the sky,
+ * fog and land light toward the Blight weather nearer the mountain; 0 = the region weather alone, as before. */
+static cvar_t aw_redmountain={"aw_redmountain","1",true};
+static int mountain_pull;
+int AW_WeatherMountainLevel(void) {return mountain_pull;}
 static aw_weather_table_t table;
 static int loaded,attempted,forced=-1;
 /* The weather in effect (aw_weather_state_t: current, a running transition, a queued one) and where
@@ -66,8 +71,8 @@ int AW_WeatherFalling(int *strength)
 }
 int AW_WeatherFrame(int days,int milliseconds,aw_weather_blend_t *out)
 {
-    float source[3];int target,region,step;double now=realtime,seconds;long hour;
-    storm=0;falling=AW_PRECIP_NONE;falling_strength=0;
+    float source[3];int target,region,step,key;double now=realtime,seconds;long hour;
+    storm=0;falling=AW_PRECIP_NONE;falling_strength=0;mountain_pull=0;
     load();
     if(!loaded || (aw_weather.value<=0 && forced<0)){
         instant=1;have_last=0;last_time=-1;return 0;
@@ -89,15 +94,22 @@ int AW_WeatherFrame(int days,int milliseconds,aw_weather_blend_t *out)
     instant=0;have_last=1;last_time=now;last_target=target;last_hour=hour;
     last_source[0]=source[0];last_source[1]=source[1];last_source[2]=source[2];
     storm=AW_WeatherIsStorm(state.current,state.next,state.progress) && AW_WeatherStormDirection(source,storm_dir);
-    falling=AW_WeatherPrecip(state.current,state.next,state.progress,&falling_strength);    if(state.next==AW_WEATHER_NONE){
+    falling=AW_WeatherPrecip(state.current,state.next,state.progress,&falling_strength);
+    if(state.next==AW_WEATHER_NONE){
         AW_WeatherBlend(&table,state.current,state.current,AW_WEATHER_STEPS,out);
-        if(state.current==AW_WEATHER_CLEAR)return 0;
-        return 1+state.current*AW_WEATHERS*(AW_WEATHER_STEPS+1)+state.current*(AW_WEATHER_STEPS+1)+AW_WEATHER_STEPS;
+        key=state.current==AW_WEATHER_CLEAR?0:
+            1+state.current*AW_WEATHERS*(AW_WEATHER_STEPS+1)+state.current*(AW_WEATHER_STEPS+1)+AW_WEATHER_STEPS;
+    }else{
+        step=(int)(state.progress*AW_WEATHER_STEPS);
+        if(step>AW_WEATHER_STEPS)step=AW_WEATHER_STEPS;
+        AW_WeatherBlend(&table,state.current,state.next,step,out);
+        key=1+state.current*AW_WEATHERS*(AW_WEATHER_STEPS+1)+state.next*(AW_WEATHER_STEPS+1)+step;
     }
-    step=(int)(state.progress*AW_WEATHER_STEPS);
-    if(step>AW_WEATHER_STEPS)step=AW_WEATHER_STEPS;
-    AW_WeatherBlend(&table,state.current,state.next,step,out);
-    return 1+state.current*AW_WEATHERS*(AW_WEATHER_STEPS+1)+state.next*(AW_WEATHER_STEPS+1)+step;
+    /* the Red Mountain pull on top (REDMOUNTAIN-SKY-55): one distance a frame; the key changes with the pull, so
+     * the sky tables are rebuilt at most AW_WEATHER_STEPS times on the way to the crater */
+    if(aw_redmountain.value>0 && forced<0)mountain_pull=AW_WeatherMountainPull(source);
+    if(mountain_pull>0)AW_WeatherMountainBlend(&table,mountain_pull,out);
+    return key*(AW_WEATHER_STEPS+1)+mountain_pull;
 }
 int AW_WeatherLightOn(void)
 {
@@ -121,6 +133,7 @@ static void weather_command(void)
     if(loaded && !table.light)Con_Printf(" (AWW1 table: no land light)");
     if(state.next!=AW_WEATHER_NONE)Con_Printf(" changing to %s %ld%%",aw_weather_names[state.next],(long)(state.progress*100));
     if(state.queued!=AW_WEATHER_NONE)Con_Printf(", then %s",aw_weather_names[state.queued]);
+    Con_Printf("; Red Mountain pull %d/%d%s",mountain_pull,AW_WEATHER_STEPS,aw_redmountain.value>0?"":" (aw_redmountain 0)");
     Con_Printf(" (table %s",loaded?"loaded":"missing: clear sky");
     if(loaded && player_source(source)){
         int region=AW_RegionIndexAt(source);
@@ -136,5 +149,6 @@ static void weather_command(void)
 void AW_WeatherInit(void)
 {
     Cvar_RegisterVariable(&aw_weather);
+    Cvar_RegisterVariable(&aw_redmountain);
     Cmd_AddCommand("aw_weather_set",weather_command);
 }

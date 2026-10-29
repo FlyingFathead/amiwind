@@ -1,6 +1,6 @@
 # Trees and Grass, Day and Night
 
-_Last updated with AmiWind v0.0.54 (27 October 2026)._
+_Last updated with AmiWind v0.0.55 (29 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -96,6 +96,27 @@ a clear day.
   brightness into the light (lamps and torches keep theirs, as at night), its hue into the colour table. A blight
   storm by day comes to about 72 % red, 36 % green and 34 % blue of the clear light; rain to about 70 % grey.
 - `dbg weather skyonly` (saved as `aw_weather 2`) keeps the sky and fog weather with the land's light of before.
+
+The Red Mountain sky (v0.0.55, REDMOUNTAIN-SKY-55; the maintainer liked DemoWind's effect 2 and asked for it in
+the game): nearer the mountain the sky turns red before the Red Mountain region's border is reached, as DemoWind's
+distance steps do ([DemoWind](DEMOWIND.md)).
+
+- The pull toward the Blight weather, 0 to 16, comes from the player's distance to Red Mountain (original units
+  25,000, 70,000, the point the storms blow from): none from 38,000 units away, so Ald'ruhn (about 40,800) keeps its
+  region weather (the maintainer on the first shots: "ald'ruhn is good with the region weather"), rising linearly
+  inward (about 2 just outside the Ghostfence, 9 inside it), full within 12,000 units, the crater. One distance a
+  frame, no table read.
+- The pull mixes the region weather's sky and land light toward the Blight weather's own colours from the table,
+  the same `Morrowind.ini` values, and its fog at half the pull: fully fogged far land takes the fog colour flat, and
+  Blight's own fog (128, 19, 19) at the full pull turned distant rock outside the Ghostfence into flat orange-red
+  shapes in the first in-game shots. At full pull the crater sky is a quarter darker still. Inside the Red Mountain
+  region the region weather is already Blight, so there the pull only darkens the crater. The sky tables change with
+  the pull, so they are rebuilt at most 16 times on the way up.
+- The clouds speed up with it toward Blight's `Cloud Speed` (9 against Clear's 1.25, up to 7.2 times at the crater);
+  the extra speed is an offset that only accumulates, so a step never moves the clouds.
+- This is AmiWind's own choice, not the original's, which switches the sky at the region border. `aw_redmountain 0`
+  (saved) keeps the region weather alone; `dbg weather` shows the pull. A forced weather (`dbg weather NAME`) draws
+  without the pull.
 
 Storms and characters (v0.0.54, [ACTOR-STORM-POSE-51](bugs/README.md)): in an ash or blight storm (during a change,
 the weather being left counts until half way), the wind blows outward from Red Mountain at the player's position.

@@ -12,7 +12,7 @@
 | Persists in | v0.0.54-dev1 (last seen) |
 | Severity | high: Regressed in v0.0.54-dev1 (was medium): a builder stop; not reproducible on the release line |
 | Family | Builder breaks and reproducibility (`builder-from-scratch`) |
-| Deferred by the maintainer | 2026-10-28: deferred to v0.0.55 by the coordinator under the maintainer's rule of 2026-10-28 (no answer to the 10:02 question); not new in v0.0.54, does not break play |
+| Deferred by the maintainer | 2026-10-29: to v0.0.56, the maintainer (TG 2026-10-29 10:47 +0200 / 08:47 UTC, on the six expired v0.0.55 deferrals): 'Yeah defer them to the next' |
 | Came back (regression) | in v0.0.54-dev1 (closed before) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |
 | From commit | source and engine 408ed09 |
@@ -106,6 +106,7 @@ Family: Builder breaks and reproducibility (`builder-from-scratch`). The reposit
 - AW25-09 (no report page): Image stage rejected the world/journal receipt after terrain
 - [BUILD-ACTOR-CONTACT-CALL-32](BUILD-ACTOR-CONTACT-CALL-32.md): Builder actor-contact stage calls convert() with the wrong arguments since v0.0.27
 - [BUILD-ACTOR-CONTACT-REGRESSION-38](BUILD-ACTOR-CONTACT-REGRESSION-38.md): Full dev3 rebuild rejects116 previously grounded actors
+- BUILD-CACHE-NO-RETENTION-55 (no report page): The build cache keeps every entry forever: about 603 GB nothing recent uses
 - [BUILD-CHIM-CELLS-PRIVATE-LIST-47](BUILD-CHIM-CELLS-PRIVATE-LIST-47.md): The releases' CHIM cell list was not in the source tree; public builds had no CHIM exterior cells
 - BUILD-CHIM-EARLY-CHECK-POOL-55 (no report page): The chim stage's early frame checks forked a worker pool of their own outside the stage's memory allowance
 - [BUILD-CHIM-VIS-VARIANT-SORT-42](BUILD-CHIM-VIS-VARIANT-SORT-42.md): CHIM world visibility step stops on mixed variant keys (model numbers beside terrain tile variants)

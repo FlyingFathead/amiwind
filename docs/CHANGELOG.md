@@ -1,10 +1,11 @@
 # Changelog
 
-_Last updated with AmiWind v0.0.54 (28 October 2026)._
+_Last updated with AmiWind v0.0.55 (29 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.55: Sky Is Turning Red (Among Other Things), 29 October 2026](#v0055-sky-is-turning-red-among-other-things-29-october-2026)
 - [v0.0.54: Hair, Movement, Magic And More, 28 October 2026](#v0054-hair-movement-magic-and-more-28-october-2026)
 - [v0.0.53: Super Freak Halloween Update, 27 October 2026](#v0053-super-freak-halloween-update-27-october-2026)
 - [v0.0.52: Skeletons Of Society, Vvardenfell Edition, 26 October 2026](#v0052-skeletons-of-society-vvardenfell-edition-26-october-2026)
@@ -162,6 +163,22 @@ _Last updated with AmiWind v0.0.54 (28 October 2026)._
 - [CHIM source candidate - 14 October 2026, v0.0.40-dev1](#chim-source-candidate---14-october-2026-v0040-dev1)
 
 <!-- contents end -->
+
+## v0.0.55: Sky Is Turning Red (Among Other Things), 29 October 2026
+
+- Nearer Red Mountain the sky, the land's light and, at half strength, the fog pull toward the game's Blight weather
+  before the mountain's region begins; the clouds speed up toward Blight's and the crater sky is darker
+  (`aw_redmountain`, on by default; Ald'ruhn keeps its own weather) ([RED-MOUNTAIN-MENACE-54](BUGS.md)).
+- Builds survive memory pressure on any machine: the guards read the machine's memory without a container, a worker
+  lost to memory is retried with fewer units at once, the CHIM stage's early checks run under the same limits
+  ([BUILD-GUARD-BLIND-NO-CGROUP-55](BUGS.md), [BUILD-OOM-DEGRADE-NOT-DIE-54](BUGS.md)).
+- The Toolkit's build monitor shows RAM, the build disk, a memory curve and a warnings row; a reload keeps the tab,
+  and a magnifier opens a build from Recent builds and gates.
+- The garbage collector ages out the runs of release series older than the newest three, and every build warns at
+  80 % disk fill and while the disk runs low ([BUILD-CACHE-NO-RETENTION-55](BUGS.md)).
+- The docs have folders and a generated index; DemoWind (`dbg demowind`) shows cheap effects with their cost.
+- Released without the build from scratch of the line, which moves to v0.0.56
+  ([release notes](releases/notes/RELEASE-v0.0.55.md)).
 
 ## v0.0.54: Hair, Movement, Magic And More, 28 October 2026
 

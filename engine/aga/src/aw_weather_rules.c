@@ -153,6 +153,37 @@ void AW_WeatherBlend(const aw_weather_table_t *table,int from,int to,int step,aw
     out->strength=(sa*(AW_WEATHER_STEPS-step)+sb*step)/AW_WEATHER_STEPS;
     out->glare=(a->glare*(AW_WEATHER_STEPS-step)+b->glare*step)/AW_WEATHER_STEPS;
 }
+int AW_WeatherMountainPull(const float *source)
+{
+    double dx,dy,d,t;int pull;
+    if(!source)return 0;
+    dx=source[0]-AW_WEATHER_RED_MOUNTAIN_X;dy=source[1]-AW_WEATHER_RED_MOUNTAIN_Y;d=sqrt(dx*dx+dy*dy);
+    if(!(d<AW_WEATHER_MOUNTAIN_REACH))return 0;   /* also a NaN position */
+    if(d<=AW_WEATHER_MOUNTAIN_CRATER)return AW_WEATHER_STEPS;
+    t=(AW_WEATHER_MOUNTAIN_REACH-d)/(AW_WEATHER_MOUNTAIN_REACH-AW_WEATHER_MOUNTAIN_CRATER);
+    pull=(int)(t*AW_WEATHER_STEPS+0.5);
+    return pull<0?0:pull>AW_WEATHER_STEPS?AW_WEATHER_STEPS:pull;
+}
+void AW_WeatherMountainBlend(const aw_weather_table_t *table,int pull,aw_weather_blend_t *out)
+{
+    const aw_weather_look_t *b;int s,k,strength;
+    if(!table || !out || pull<=0)return;
+    if(pull>AW_WEATHER_STEPS)pull=AW_WEATHER_STEPS;
+    b=&table->look[AW_WEATHER_BLIGHT];
+#define PULL(field,w) out->field[s][k]=(unsigned char)((out->field[s][k]*(AW_WEATHER_STEPS-(w))+b->field[s][k]*(w)+AW_WEATHER_STEPS/2)/AW_WEATHER_STEPS)
+    for(s=0;s<4;s++)for(k=0;k<3;k++){
+        /* the fog at AW_WEATHER_MOUNTAIN_FOG/256 of the pull: the far land, fully fogged, takes the fog colour flat,
+         * and Blight's own fog (128 19 19) at full turned distant rock into flat orange-red shapes (shots of
+         * 2026-10-29 outside the Ghostfence); the red belongs in the sky, as in DemoWind */
+        PULL(sky,pull);PULL(fog,pull*AW_WEATHER_MOUNTAIN_FOG/256);
+        if(table->light){PULL(ambient,pull);PULL(sun,pull);}
+        if(pull==AW_WEATHER_STEPS)out->sky[s][k]=(unsigned char)(out->sky[s][k]*AW_WEATHER_MOUNTAIN_DARK/256);
+    }
+#undef PULL
+    strength=out->strength>pull?out->strength:pull;
+    out->strength=strength;
+    out->glare=(out->glare*(AW_WEATHER_STEPS-pull)+b->glare*pull)/AW_WEATHER_STEPS;
+}
 int AW_WeatherIsStorm(int current,int next,double progress)
 {
     int w=next!=AW_WEATHER_NONE && progress>=0.5?next:current;

@@ -6,6 +6,9 @@ One retention policy, applied the same way everywhere (docs/BUILD_CACHE.md):
 
   kept (pinned)    release and release-candidate references, the newest passed run of every build
                    line (the latest verified reuse source), and every owner pin (pins.json);
+  expires (age)    a run of a release series older than the newest --keep-series (default 3: the line
+                   being built and the last two releases with their dev builds), unless pinned or
+                   still building, whatever its line (BUILD-CACHE-NO-RETENTION-55);
   kept (active)    items whose owning job is still running (registry state "active"), and runs that
                    are still building;
   expires          run folders, played or smoke disk copies, package and extraction scratch and test
@@ -40,6 +43,7 @@ from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import stat as stat_module
 import sys
@@ -54,6 +58,10 @@ KEEP, EXPIRE, UNREGISTERED = 'keep', 'expire', 'unregistered'
 STALE_RUNNING_SECONDS = 6 * 3600
 TEMPORARY_AGE_SECONDS = 86400
 TEMPORARY_SUFFIXES = ('.pool-tmp', '.amiwind-reuse-tmp', '.tmp')
+# Release retention (BUILD-CACHE-NO-RETENTION-55): runs of the newest KEEP_SERIES release series are kept by the
+# usual rules (the line being built, and the last two releases with their dev builds); a run of an older series
+# expires unless it is pinned or still building, whatever its line. 0 turns the rule off.
+KEEP_SERIES = 3
 
 
 def now():
@@ -124,6 +132,16 @@ def run_line(state):
         return str(state['line'])
     builder = state.get('builder') or (state.get('builder_options') or {}).get('builder') or 'legacy'
     return f"{state.get('runtime_version') or 'unknown'}:{builder}:{state.get('recipe') or 'build'}"
+
+
+def series(version):
+    """The release series of a version text: (0, 0, 55) for '0.0.55', '0.0.55-dev1' or 'v0.0.55-rc2'; None if unknown."""
+    numbers = re.findall(r'\d+', str(version or '').split('-')[0])
+    return tuple(int(n) for n in numbers[:3]) if len(numbers) >= 3 else None
+
+
+def series_text(value):
+    return 'v' + '.'.join(str(n) for n in value)
 
 
 def newest_mtime(folder, limit=2000):
@@ -234,7 +252,8 @@ def pool_items(pool, add, now_seconds):
         add(path, 'pool-temporary', EXPIRE, 'pool temporary older than a day')
 
 
-def plan(roots, workspaces=(), registry_items=None, pin_files=None, now_seconds=None, extra_pools=()):
+def plan(roots, workspaces=(), registry_items=None, pin_files=None, now_seconds=None, extra_pools=(),
+         keep_series=KEEP_SERIES):
     """The collector's decisions: [{path, kind, decision, reason, owner, files}] plus totals."""
     now_seconds = now_seconds or time.time()
     roots = [Path(root) for root in roots]
@@ -281,6 +300,9 @@ def plan(roots, workspaces=(), registry_items=None, pin_files=None, now_seconds=
                 if line not in newest or stamp > newest[line][0]:
                     newest[line] = (stamp, run)
         latest = {run: line for line, (_, run) in newest.items()}
+        known = sorted({s for s in (series(st.get('runtime_version')) for st in states.values()) if s}, reverse=True)
+        kept_series = set(known[:keep_series]) if keep_series else set(known)
+        kept_names = ', '.join(series_text(s) for s in sorted(kept_series))
         for run, state in states.items():
             status = state.get('status') or 'unknown'
             version = str(state.get('runtime_version') or '')
@@ -292,9 +314,13 @@ def plan(roots, workspaces=(), registry_items=None, pin_files=None, now_seconds=
             if scratch.is_dir() and status in ('passed', 'failed', 'cancelled'):
                 add(scratch, 'run-scratch', EXPIRE, f'scratch left in a {status} run', extra)
             pin = pinned(run, pins)
+            run_series = series(version)
             if pin:
                 add(run, 'run', KEEP, f"pinned ({pin.get('kind', 'owner')}): {pin.get('reason', '')}".rstrip(': '),
                     extra)
+            elif run_series and run_series not in kept_series:
+                add(run, 'run', EXPIRE, f'release series {series_text(run_series)} is older than the kept series '
+                    f'({kept_names}): retention rule', extra)
             elif run in latest:
                 add(run, 'run', KEEP, f'latest passed run of line {latest[run]} (reuse source)', extra)
             else:
@@ -455,6 +481,9 @@ def main(argv=None):
     p.add_argument('--pool', action='append', type=Path, default=[],
                    help='a storage pool outside the workspaces (--storage-pool-dir / AMIWIND_STORAGE_POOL)')
     p.add_argument('--json', type=Path, help='write the plan here')
+    p.add_argument('--keep-series', type=int, default=KEEP_SERIES,
+                   help='release series whose runs are kept by the usual rules (default %(default)s: the line being '
+                        'built and the last two releases); runs of older series expire unless pinned; 0 = off')
     p.add_argument('--delete', action='store_true', help='really delete the expired items (default: report only)')
     p.add_argument('--item', action='append', type=Path, help='with --delete: delete only these expired items')
     for name in ('pin', 'unpin'):
@@ -479,7 +508,7 @@ def main(argv=None):
             roots.append(Path(root) / 'work')
     if not roots and not args.pool:
         parser.error('plan needs a folder, --work-pool or --pool')
-    result = plan(roots, args.workspace, registry, args.pins, extra_pools=args.pool)
+    result = plan(roots, args.workspace, registry, args.pins, extra_pools=args.pool, keep_series=args.keep_series)
     report(result)
     if args.json:
         write_json(args.json, result)

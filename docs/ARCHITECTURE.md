@@ -83,7 +83,7 @@ current release is described in the [v0.0.53 notes](releases/notes/RELEASE-v0.0.
 Interiors: since v0.0.48, 1,132 of the 1,134 base-game interiors are CHIM rooms, on CHIM's store-once layout. Only
 the prison ship and the census office, where the opening sequence runs, stay classic Quake room maps on purpose
 until rooms have object state. Solstheim is not converted
-([README](../README.md#where-amiwind-stands-28-october-2026)).
+([README](../README.md#where-amiwind-stands-29-october-2026)).
 
 ## Crossing from one cell to the next
 

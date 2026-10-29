@@ -103,6 +103,25 @@ class MonitorMemory(unittest.TestCase):
         self.assertIn('[memory] WARNING: RAM nearly exhausted', out.getvalue())
         self.assertIn('[memory] new peak', out.getvalue())
 
+    def test_progress_reports_the_build_disk_and_warns_when_nearly_full(self):
+        # BUILD-CACHE-NO-RETENTION-55: the preflight looks once; the build disk is watched like RAM while it runs
+        import build_progress
+        import shutil
+        progress = build_progress.Tracker.__new__(build_progress.Tracker)
+        progress.run = Path('/vol/ws8/build/RUN')
+        full = shutil._ntuple_diskusage(1000 * GIB, 980 * GIB, 20 * GIB)
+        out = io.StringIO()
+        with mock.patch.object(shutil, 'disk_usage', lambda path: full), contextlib.redirect_stdout(out):
+            got = progress.disk_reading(100.0, ['chim'])
+            again = progress.disk_reading(150.0, ['chim'])     # within LOW_DISK_REPEAT_SECONDS: no second line
+        self.assertEqual((got['free_gib'], got['total_gib'], got['low'], got['lowest_free_gib']), (20.0, 1000.0, True, 20.0))
+        self.assertEqual(again['low_warnings'], 1)
+        self.assertEqual(out.getvalue().count('[disk] WARNING: build disk nearly full'), 1)
+        self.assertIn('python tools/build_gc.py plan ' + str(Path('/vol/ws8')), out.getvalue())
+        roomy = shutil._ntuple_diskusage(1000 * GIB, 500 * GIB, 500 * GIB)
+        with mock.patch.object(shutil, 'disk_usage', lambda path: roomy):
+            self.assertFalse(progress.disk_reading(400.0, [])['low'])
+
     def test_progress_gathers_the_warning_lines_of_the_stage_logs(self):
         # MONITOR-WARNINGS-ROW: the monitor's yellow row counts every warning line of the stage logs, read in steps
         import build_progress

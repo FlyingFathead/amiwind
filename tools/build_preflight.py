@@ -31,6 +31,8 @@ from pathlib import Path
 
 MIN_FREE_ENV = 'AMIWIND_MIN_FREE_GIB'
 DEFAULT_MIN_FREE_GIB = 35
+FILL_WARN_ENV = 'AMIWIND_FILL_WARN_PERCENT'
+DEFAULT_FILL_WARN_PERCENT = 80
 SHOWN = 5
 
 
@@ -83,6 +85,30 @@ def free_space_problems(workspace, minimum_gib=None):
         return [f'{free:.1f} GiB free where the workspace is ({existing}), {minimum_gib:g} GiB needed; fix: free space '
                 f'there or build in another --workspace ({MIN_FREE_ENV} sets the minimum)']
     return []
+
+
+def fill_warning(workspace, share=None):
+    """A warning line when the disk the workspace is on is SHARE full or more, naming the garbage collector, or None.
+    Never a refusal: free_space_problems refuses; this says early where the space went (BUILD-CACHE-NO-RETENTION-55:
+    old runs and cache entries piled up for weeks and nothing said so)."""
+    if share is None:
+        try:
+            share = float(os.environ.get(FILL_WARN_ENV, DEFAULT_FILL_WARN_PERCENT)) / 100
+        except ValueError:
+            share = DEFAULT_FILL_WARN_PERCENT / 100
+    existing = Path(workspace).absolute()
+    while not existing.exists() and existing.parent != existing:
+        existing = existing.parent
+    try:
+        usage = shutil.disk_usage(existing)
+    except OSError:
+        return None
+    if not usage.total or usage.used / usage.total < share:
+        return None
+    return (f'[disk] WARNING: the build disk is {usage.used / usage.total:.0%} full ({usage.free / 2 ** 30:.0f} GiB free '
+            f'of {usage.total / 2 ** 30:.0f} GiB at {existing}); old runs and cache entries: python tools/build_gc.py '
+            f'plan {Path(workspace)} (a dry run; add --delete to remove what it lists as expired; docs/BUILD_CACHE.md '
+            f'"Free disk space"; {FILL_WARN_ENV} sets the percent)')
 
 
 def data_problems(data_files):

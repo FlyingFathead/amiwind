@@ -1,6 +1,6 @@
 # Build cache: resuming and reusing work safely
 
-_Last updated with AmiWind v0.0.54-dev1 (27 October 2026)._
+_Last updated with AmiWind v0.0.55 (29 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -28,6 +28,7 @@ _Last updated with AmiWind v0.0.54-dev1 (27 October 2026)._
 - [Shared storage pool: store once](#shared-storage-pool-store-once)
 - [One pool for several workspaces and the CHIMporter](#one-pool-for-several-workspaces-and-the-chimporter)
 - [Garbage collector: one retention policy](#garbage-collector-one-retention-policy)
+- [Free disk space](#free-disk-space)
 - [Work pool: leased workspaces](#work-pool-leased-workspaces)
 
 <!-- contents end -->
@@ -636,6 +637,7 @@ job scratch. It applies the same rules everywhere:
 | --- | --- |
 | kept: pinned | release and release-candidate references, maintainer pins (`WORKSPACE/cache/pins.json`, edited with `build_gc.py pin` / `unpin`) |
 | kept: reuse source | the newest passed run of every build line (version, builder type and recipe) |
+| expires: age | a run of a release series older than the newest three (`--keep-series`, default 3: the line being built and the last two releases with their dev builds), whatever its line, unless it is pinned or still building; `--keep-series 0` turns the rule off |
 | kept: active | runs still building; items whose owning job is still active; build caches |
 | expires | run folders, played or smoke copies, package and extraction scratch and test workspaces whose owning job is done; scratch left in a finished run; pooled objects that no run links and no reuse key (or CHIMport cell manifest key) names; pool temporaries older than a day |
 | unregistered | anything without an owner: reported with its size, never deleted |
@@ -657,6 +659,33 @@ since the plan was made is left alone.
 python tools/build_gc.py plan VOLUME_OR_WORKSPACE... [--registry FILE] [--json plan.json]
 python tools/build_gc.py plan ... --delete --item PATH [--item PATH ...]
 python tools/build_gc.py pin WORKSPACE build/RUN --kind rc --reason "release candidate reference"
+```
+
+## Free disk space
+
+A workspace grows with every build: each run keeps its folder, and the caches
+keep every entry they ever stored. Nothing is removed on its own, so a builder
+who builds every release fills the disk over a few weeks (BUILD-CACHE-NO-RETENTION-55).
+
+* **The warning.** When the disk the workspace is on is 80 % full or more, the
+  build prints a `[disk] WARNING` line before the first stage, with the
+  collector command for that workspace (`AMIWIND_FILL_WARN_PERCENT` sets the
+  percent). It never stops a build; too little room for the build itself is the
+  separate free-space refusal of the preflight.
+* **What to run.** `python tools/build_gc.py plan WORKSPACE` lists every item
+  with its decision and the bytes deleting it would really free. Runs of the
+  release series older than the newest three expire (the line you build and the
+  last two releases with their dev builds), so their pool objects are freed with
+  them; pin a run you want to keep (`build_gc.py pin`).
+* **Deleting.** Only `--delete` removes anything, and only items the plan lists
+  as expired; `--item PATH` limits it to a list you approved. Pinned, running and
+  unregistered items are never deleted.
+
+```
+python tools/build_gc.py plan out                         # what would go, nothing deleted
+python tools/build_gc.py plan out --json gc-plan.json     # the same list as JSON
+python tools/build_gc.py plan out --delete                # delete what the plan lists as expired
+python tools/build_gc.py pin out build/RUN --kind owner --reason "keep this one"
 ```
 
 ## Work pool: leased workspaces

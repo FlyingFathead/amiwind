@@ -1,6 +1,6 @@
 # Build profile and stage reuse
 
-_Last updated with AmiWind v0.0.55-dev1 (28 October 2026)._
+_Last updated with AmiWind v0.0.55 (29 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -519,6 +519,15 @@ new peak above 75 % of the limit and a `[memory] WARNING: RAM nearly exhausted`
 line every 5 minutes while less than 10 % is available. The profile's timeline
 keeps the memory per sample and the limit, so the Toolkit monitor draws the
 memory curve beside the cores ([AmiWind Toolkit](AMIWIND_TOOLKIT.md#monitor)).
+
+**The build disk in the log and the monitor** (BUILD-CACHE-NO-RETENTION-55,
+v0.0.55). `build-progress.json` also carries the disk the run is on (free,
+total, how full, the lowest free seen); the build log gets a `[disk] WARNING:
+build disk nearly full` line every 5 minutes while less than 10 % or less than
+35 GiB is free, naming the garbage collector, and the monitor shows a **Disk:**
+line under the RAM line (orange under 20 % free, red when the build says low).
+Before the first stage the preflight warns at 80 % full
+([free disk space](BUILD_CACHE.md#free-disk-space)).
 
 ## Perf database
 

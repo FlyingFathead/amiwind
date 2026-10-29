@@ -99,6 +99,22 @@ int AW_WeatherIndex(const char *name);
 #define AW_WEATHER_RED_MOUNTAIN_X 25000.0f
 #define AW_WEATHER_RED_MOUNTAIN_Y 70000.0f
 int AW_WeatherIsStorm(int current,int next,double progress);
+/* The Red Mountain sky (REDMOUNTAIN-SKY-55, the DemoWind effect in the game; SKY-REDMOUNTAIN-BLUE-44): nearer the
+ * mountain (the storm origin above) the sky, fog and land light are pulled toward the Blight weather's own colours,
+ * before the Red Mountain region's border is reached, and the clouds speed up toward Blight's. The pull 0..
+ * AW_WEATHER_STEPS: 0 from AW_WEATHER_MOUNTAIN_REACH units away (Ald'ruhn, about 40,800, keeps its region weather:
+ * the maintainer, TG 2026-10-29 09:01 +0200 / 07:01 UTC, on the shots: "ald'ruhn is good with the region weather"),
+ * rising linearly with the closeness (about 2 outside the Ghostfence at 35,000, 9 inside it at 23,000), full within
+ * AW_WEATHER_MOUNTAIN_CRATER (the crater), where the sky also darkens by AW_WEATHER_MOUNTAIN_DARK/256. Our own choice, not the original's (the
+ * original switches the sky at the region border); aw_redmountain 0 keeps the region weather alone. Cloud Speed as
+ * Morrowind.ini ships it: Clear 1.25, Blight 9 (the ratio x100 below). */
+#define AW_WEATHER_MOUNTAIN_REACH 38000.0f
+#define AW_WEATHER_MOUNTAIN_CRATER 12000.0f
+#define AW_WEATHER_MOUNTAIN_DARK 192
+#define AW_WEATHER_MOUNTAIN_CLOUDS 720
+#define AW_WEATHER_MOUNTAIN_FOG 128    /* the fog follows at half the pull (the far land takes the fog colour flat) */
+int AW_WeatherMountainPull(const float *source);
+void AW_WeatherMountainBlend(const aw_weather_table_t *table,int pull,aw_weather_blend_t *out);
 /* Falling weather (WEATHER-RAIN): what falls in a weather (AW_PRECIP_*) and how strongly 0..AW_WEATHER_STEPS
  * during a transition: the leaving weather's fades out over the first half, the arriving weather's comes in over
  * the second (OpenMW mwworld/weather.cpp starts the rain once a transition passes its Rain Threshold, 0.6 as
@@ -124,6 +140,8 @@ void AW_WeatherInit(void);
 int AW_WeatherFrame(int days,int milliseconds,aw_weather_blend_t *out);
 /* 1 when the weather lights the land too (aw_weather 1, the default); 0 for aw_weather 2 (sky and fog only). */
 int AW_WeatherLightOn(void);
+/* The Red Mountain pull of this frame (0..AW_WEATHER_STEPS; REDMOUNTAIN-SKY-55): the clouds speed up with it. */
+int AW_WeatherMountainLevel(void);
 /* 1 with the storm's direction while an ash or blight storm blows at the player this frame (exteriors, region
  * weather on; set by AW_WeatherFrame, so it follows the sky). */
 int AW_WeatherStorm(float dir[2]);

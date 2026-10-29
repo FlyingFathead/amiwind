@@ -70,6 +70,9 @@ PEAK_LOG_SHARE = 0.75      # a new memory peak above this share of the limit pri
 PEAK_LOG_STEP_GIB = 0.5    # ... when it is at least this much above the last one printed (no line per sample)
 LOW_RAM_SHARE = 0.10       # under this share of the limit available: a [memory] WARNING line ...
 LOW_RAM_REPEAT_SECONDS = 300.0   # ... again at most this often while it lasts
+LOW_DISK_SHARE = 0.10      # under this share of the build disk free, or under LOW_DISK_GIB: a [disk] WARNING line ...
+LOW_DISK_GIB = 35.0        # ... (the preflight's refusal minimum, build_preflight.DEFAULT_MIN_FREE_GIB) ...
+LOW_DISK_REPEAT_SECONDS = 300.0  # ... again at most this often while it lasts
 # The monitor's warnings row (MONITOR-WARNINGS-ROW): the lines of the stage logs that are warnings. The builder's own
 # forms: "WARNING" anywhere ([pool] WARNING, [memory] WARNING, size and perf warnings), the underuse lines and the
 # scheduler's alarms and memory cuts
@@ -764,6 +767,7 @@ class Tracker:
         eta = result['eta_seconds']
         recent_build = [cores for t, cores in build_cores if t >= now - CORES_WINDOW]
         memory = self.memory_reading(now, [row['name'] for row in rows if row['status'] == 'running'])
+        disk = self.disk_reading(now, [row['name'] for row in rows if row['status'] == 'running'])
         try:
             build_warnings = self.warnings_reading(now)
         except Exception:  # noqa: BLE001 - progress must never fail a build
@@ -778,6 +782,7 @@ class Tracker:
                 'work_seconds': result['work_seconds'], 'counts': counts,
                 'cores_now': round(sum(recent_build) / len(recent_build), 2) if recent_build else None,
                 'memory': memory,
+                'disk': disk,
                 'warnings': build_warnings,
                 'stages': rows, 'idle_warnings': warnings, 'build_idle': build_idle, 'host': host,
                 'no_history': result['no_history'], 'fallback_seconds': result['fallback_seconds'],
@@ -822,6 +827,33 @@ class Tracker:
         return {'used_gib': round(live, 2), 'limit_gib': round(limit / gib, 2), 'source': source,
                 'available_gib': round(available, 2), 'low': low, 'low_warnings': getattr(self, 'low_ram_count', 0),
                 'peak_gib': round(peak[0], 2), 'peak_seconds': peak[1], 'peak_stages': peak[2]}
+
+    def disk_reading(self, now, running):
+        """The build disk now (the Toolkit monitor's Disk line, BUILD-CACHE-NO-RETENTION-55): {'free_gib', 'total_gib',
+        'used_share', 'low', 'low_warnings', 'lowest_free_gib'} of the disk the run folder is on; None when it cannot be
+        read. Under LOW_DISK_SHARE free or LOW_DISK_GIB: one [disk] WARNING line every LOW_DISK_REPEAT_SECONDS, naming
+        the garbage collector (the RAM warning's twin: the preflight only looks once, before the first stage)."""
+        try:
+            import shutil as _shutil
+            usage = _shutil.disk_usage(self.run)
+        except Exception:  # noqa: BLE001 - progress must never fail a build
+            return None
+        if not usage.total:
+            return None
+        gib = float(1 << 30)
+        free, total = usage.free / gib, usage.total / gib
+        lowest = min(free, getattr(self, 'disk_lowest', free))
+        self.disk_lowest = lowest
+        low = free < max(LOW_DISK_GIB, LOW_DISK_SHARE * total)
+        warned = getattr(self, 'low_disk_warned', None)
+        if low and (warned is None or now - warned >= LOW_DISK_REPEAT_SECONDS):
+            self.low_disk_warned = now
+            self.low_disk_count = getattr(self, 'low_disk_count', 0) + 1
+            print('[disk] WARNING: build disk nearly full: %.1f GiB free of %.0f at +%s, running: %s; free space with '
+                  'python tools/build_gc.py plan %s (a dry run; --delete removes what it lists as expired)' % (
+                      free, total, duration(now), ', '.join(running) or 'nothing', self.run.parent.parent), flush=True)
+        return {'free_gib': round(free, 2), 'total_gib': round(total, 2), 'used_share': round(usage.used / usage.total, 4),
+                'low': low, 'low_warnings': getattr(self, 'low_disk_count', 0), 'lowest_free_gib': round(lowest, 2)}
 
     def warnings_reading(self, now):
         """Every warning the build has printed so far, gathered from the stage logs (MONITOR-WARNINGS-ROW): the new

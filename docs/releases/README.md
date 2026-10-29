@@ -1,11 +1,12 @@
 # AmiWind releases
 
-_Generated from `docs/releases/` with AmiWind v0.0.55-dev2._
+_Generated from `docs/releases/` with AmiWind v0.0.55._
 
 Every release line, newest first: its release notes (docs/releases/notes/) and the whitespace baseline of the published release it was built on (docs/releases/patches/). Until v0.0.54 these files sat at the docs/ root; the table at the end maps every old path to the new one. Links into an old release tag (https://github.com/FlyingFathead/amiwind/blob/v0.0.37/docs/releases/notes/RELEASE-v0.0.37.md) keep working, because every tag keeps its own tree.
 
 | Version | Kind | Title | Notes | Whitespace baseline | GitHub |
 | --- | --- | --- | --- | --- | --- |
+| v0.0.55 | final | AmiWind v0.0.55: Sky Is Turning Red (Among Other Things) | [RELEASE-v0.0.55.md](notes/RELEASE-v0.0.55.md) | [PATCH-v0.0.55.json](patches/PATCH-v0.0.55.json) | [tag v0.0.55](https://github.com/FlyingFathead/amiwind/releases/tag/v0.0.55) |
 | v0.0.55-dev2 | dev | AmiWind v0.0.55-dev2 (in development) | [RELEASE-v0.0.55-dev2.md](notes/RELEASE-v0.0.55-dev2.md) | none | - |
 | v0.0.55-dev1 | dev | AmiWind v0.0.55-dev1 (in development) | [RELEASE-v0.0.55-dev1.md](notes/RELEASE-v0.0.55-dev1.md) | none | - |
 | v0.0.54 | final | AmiWind v0.0.54: Hair, Movement, Magic And More | [RELEASE-v0.0.54.md](notes/RELEASE-v0.0.54.md) | [PATCH-v0.0.54.json](patches/PATCH-v0.0.54.json) | [tag v0.0.54](https://github.com/FlyingFathead/amiwind/releases/tag/v0.0.54) |

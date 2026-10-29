@@ -279,10 +279,15 @@ static void R_SkyTypeCommand(void)
     Con_Printf("Sky V%ld: %s\n",(long)R_SkyType(),R_SkyType()==1?"Clear reference":R_SkyType()==3?"extra stronk twilight":"red/gold twilight and blue hour");
 }
 /* Invalid direct cvar writes cannot feed NaN/overflow into the sky sampler. */
-static double R_SkyCloudSpeed(void)
+static double R_SkyCloudBaseSpeed(void)
 {
     return sky_cloud_speed.value>=0 && sky_cloud_speed.value<=100?
         (double)sky_cloud_speed.value:0.00333333333;
+}
+/* nearer Red Mountain the clouds race toward Blight's Cloud Speed (REDMOUNTAIN-SKY-55): x1 .. x7.2 at the crater */
+static double R_SkyCloudSpeed(void)
+{
+    return R_SkyCloudBaseSpeed()*(1.0+(AW_WEATHER_MOUNTAIN_CLOUDS-100)/100.0*AW_WeatherMountainLevel()/AW_WEATHER_STEPS);
 }
 static int R_SkyCloudType(void){return sky_cloud_type.value==2?2:1;}
 static int R_SkyVeilKeep(int x,int y,int density)
@@ -1358,7 +1363,16 @@ void R_SetSkyFrame (void)
      * The cloud-only multiplier defaults to 1/300 (0.8 texels/sec). It never
      * affects sun/colour timing, and gallery previews leave cloud time alone.
      * Scale before wrapping so midnight, save restore and map changes agree. */
-    skytime=(float)fmod(environment_time*R_SkyCloudSpeed(),temp);
+    /* The Red Mountain clouds (REDMOUNTAIN-SKY-55): the extra speed near the mountain is an accumulated offset on
+     * top, so a step of the pull changes the speed, never the clouds' position (no jump); a stall or a clock jump
+     * of over two seconds adds nothing. */
+    {
+        static double mountain_extra,mountain_last=-1;double dt=environment_time-mountain_last,base=R_SkyCloudBaseSpeed();
+        if(mountain_last>=0 && dt>0 && dt<2.0)
+            mountain_extra=fmod(mountain_extra+dt*(R_SkyCloudSpeed()-base),temp);
+        mountain_last=environment_time;
+        skytime=(float)fmod(environment_time*base+mountain_extra,temp);
+    }
 
 
 	r_skymade = 0;

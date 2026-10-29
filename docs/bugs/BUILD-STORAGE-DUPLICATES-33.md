@@ -242,4 +242,8 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [ROOM-BATCH-CORES-49](ROOM-BATCH-CORES-49.md): The room batches stage ran on about two of its eight cores for minutes before its first room, and kept few of its finished rooms when stopped
 - ROOM-RESIDENTS-KEY-SERIAL-49 (no report page): The room residents step opens its unit cache once per resident: 233 s on one core before any cached resident is restored
 
+Related bugs in other categories:
+
+- BUILD-CACHE-NO-RETENTION-55 (no report page): The build cache keeps every entry forever: about 603 GB nothing recent uses
+
 <!-- END GENERATED CATEGORY -->

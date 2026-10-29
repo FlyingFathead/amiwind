@@ -1118,6 +1118,24 @@ def parse_fact_table(text):
     return rows
 
 
+def with_contents_lists(pages):
+    """PAGES {path: text} with each public page's contents list as tools/doc_toc.py write leaves it: a new bug in a
+    family changes that family's pages, and their lists were left stale until doc_toc ran (REGISTER-ADD-NO-RELEASE-ROW-48,
+    gates 4462 and 4477 of v0.0.55)."""
+    import doc_toc
+    public = set(doc_toc.public_docs())
+    out = {}
+    for path, text in pages.items():
+        rel = path.relative_to(ROOT).as_posix()
+        if rel in public and not doc_toc.excluded(rel):
+            try:
+                text = doc_toc.render(text)
+            except ValueError:
+                pass  # doc_toc check reports it with its reason
+        out[path] = text
+    return out
+
+
 def rendered_page(text, b, bugs, by_id, families):
     lines = text.rstrip('\n').split('\n')
     lines, _ = _strip_block(lines, FACTS_BEGIN, FACTS_END)
@@ -1685,7 +1703,7 @@ def main(argv=None):
     if errors:
         print('\n'.join(errors), file=sys.stderr)
         return 1
-    new = outputs(bugs, families)
+    new = with_contents_lists(outputs(bugs, families))
     live, old = split(bugs)
     rotated = rotation(bugs)
     if args.cmd == 'check':

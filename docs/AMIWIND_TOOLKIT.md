@@ -1,6 +1,6 @@
 # AmiWind Toolkit
 
-_Last updated with AmiWind v0.0.55-dev2 (28 October 2026)._
+_Last updated with AmiWind v0.0.55 (29 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -593,9 +593,11 @@ The **Monitor** tab (`amiwind-toolkit/monitor.html`) follows a build as it runs,
   basis (critical path or history) and the cores in use now, from the run's `build-progress.json`. Under "Cores now" a
   square of one box per core of the budget shows the busy cores filled: green at half the budget or more, amber under
   it, red once the build has stayed under the low-cores line (see the stage timeline) for its set time. Above the squares
-  two lines in numbers: **RAM** (used and available, of the container's limit or, without a container, the machine's
+  three lines in numbers: **RAM** (used and available, of the container's limit or, without a container, the machine's
   RAM, with the peak, when it came and the stages that ran then; orange under 20 % available, red under 10 %, with the
-  count of low-RAM warnings of the build) and **Cores** (busy of the build's threads). Under the RAM line a yellow
+  count of low-RAM warnings of the build), **Disk** (free of the build disk's total, how full, the lowest free seen;
+  orange under 20 % free, red when the build reports it nearly full, with the count of low-disk warnings; v0.0.55)
+  and **Cores** (busy of the build's threads). Under the RAM line a yellow
   **Warnings: N [view]** row gathers every warning the build has printed in its stage logs (WARNING lines, underuse
   lines, the scheduler's alarms and memory cuts) with the time and the stage; `[view]` opens the list, and the row is
   hidden while there are none;

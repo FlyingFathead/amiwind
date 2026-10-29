@@ -4,7 +4,7 @@
 
 # AmiWind
 
-_Last updated with AmiWind v0.0.55-dev2 (28 October 2026)._
+_Last updated with AmiWind v0.0.55 (29 October 2026)._
 
 An unofficial, experimental RPG engine and enthusiast project bringing Morrowind
 to the Commodore Amiga, featuring CHIM: an AmiQuake-based engine and an asset
@@ -25,12 +25,13 @@ Like community projects such as
 
 More in the [gallery](docs/GALLERY.md).
 
-## Where AmiWind stands (28 October 2026)
+## Where AmiWind stands (29 October 2026)
 
-The newest release is **v0.0.54: Hair, Movement, Magic And More**: characters move by what they are doing and keep
-their hair whole, every NPC and creature has its own record of stats, items and spells from the game data, travel
-services are back, spells can show the game's own effects (experimental, off by default), and 34 more entrances can be used, running
-on CHIM Engine v0.2.2 ([release notes](docs/releases/notes/RELEASE-v0.0.54.md)). The project's own builds have had every exterior cell of Vvardenfell on CHIM since v0.0.43 (a build from the
+The newest release is **v0.0.55: Sky Is Turning Red (Among Other Things)**: nearer Red Mountain the sky turns red
+before you reach the mountain's own region, the clouds race and the crater sky is darker still; builds survive memory
+pressure on any machine, the build monitor shows the memory, the build disk and every warning, the garbage collector
+ages out old release series and every build warns when its disk fills, and the docs are organised, running on CHIM
+Engine v0.2.2 ([release notes](docs/releases/notes/RELEASE-v0.0.55.md)). The project's own builds have had every exterior cell of Vvardenfell on CHIM since v0.0.43 (a build from the
 repository does so only from v0.0.47, when the cell list became part of the repository and the default): 1,409
 cells, counting the 61 in the town frames (1,348 are one-cell region frames; 1,292 land cells, 98 sea-floor cells
 and 19 open-sea cells), with no classic region maps left outdoors. What these numbers count:
@@ -39,15 +40,21 @@ and 19 open-sea cells), with no classic region maps left outdoors. What these nu
 prison and the census office) is built as a CHIM room, with the people the game places in them. Solstheim is not
 converted.
 
-The development line is at **v0.0.55-dev2** (28 October 2026). Its dev1 was a builder fix first: a build on a machine that runs
-short of memory, with or without a container, now slows down and says so instead of crawling for hours and then
-failing, and the Toolkit's build monitor shows the memory beside the cores
-([dev1 notes](docs/releases/notes/RELEASE-v0.0.55-dev1.md)); v0.0.55-dev2 adds a warnings row to the monitor ([dev2 notes](docs/releases/notes/RELEASE-v0.0.55-dev2.md)).
-
-What comes next is in the [roadmap](docs/ROADMAP.md): in v0.0.55, characters that wander, idle and attack on sight by
+What comes next is in the [roadmap](docs/ROADMAP.md): in v0.0.56, characters that wander, idle and attack on sight by
 their own records, creatures on skeletons of their own, Dagoth Ur's fight and voice, full-detail heads where rooms
 have room, one arena mode merged from the arena minigame and the combat playground, and the rooms that still load in
 on arrival.
+
+### What v0.0.55 changed
+
+Nearer Red Mountain the sky, the light on the land and, at half strength, the fog turn toward the game's own Blight
+weather before the mountain's region begins (Ald'ruhn keeps its own weather), the clouds speed up toward Blight's and
+the crater sky is darker still (`aw_redmountain`, on by default). The builder reads the machine's memory when there is
+no container, retries a worker lost to memory with fewer units at once instead of failing, and watches the build disk
+like the memory; the Toolkit's build monitor shows RAM, the disk, a memory curve and every warning of a build. The
+garbage collector (`tools/build_gc.py`) now ages out the runs of old release series, and every build warns before its
+disk is full and names it. The docs have folders and a generated index. Full list:
+[v0.0.55 release notes](docs/releases/notes/RELEASE-v0.0.55.md).
 
 ### What v0.0.54 changed
 
@@ -134,7 +141,7 @@ front page used to carry are kept in [earlier README sections](docs/README_ARCHI
   unfinished, and items and containers in rooms are not live objects yet; the jail markers are in the door table for
   the jail system to come. Characters do not wander by their records yet, nobody attacks on sight yet, and Dagoth Ur
   does not fight or speak yet; the Unmarked Shipwreck's upper trapdoor still keeps the use key out of reach
-  ([v0.0.54 release notes](docs/releases/notes/RELEASE-v0.0.54.md#known-in-this-build)).
+  ([v0.0.55 release notes](docs/releases/notes/RELEASE-v0.0.55.md#known-in-this-build)).
 - The reference target is an A1200 with AGA, a 68040 with FPU, 2 MiB Chip and 32 MiB Fast RAM (the safe minimum;
   16 MiB starts with a warning); development and
   every performance figure so far come from emulators and are relative. The first real-hardware figures, from testers

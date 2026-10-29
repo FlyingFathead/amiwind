@@ -80,6 +80,27 @@ class CollectorTest(unittest.TestCase):
         self.assertEqual(got['nobody'][0], 'unregistered')
         self.assertEqual(got['world-terrain-v1'][0], 'keep')
 
+    def test_runs_of_older_release_series_expire(self):
+        # BUILD-CACHE-NO-RETENTION-55: the newest passed run of an old line was kept forever as a "reuse source".
+        for name, version, started in (('v51', '0.0.51', '2026-10-01T08:00:00Z'),
+                                       ('v52', '0.0.52-rc1', '2026-10-02T08:00:00Z'),
+                                       ('v53', '0.0.53', '2026-10-03T08:00:00Z'),
+                                       ('v54', '0.0.54-dev2', '2026-10-04T08:00:00Z'),
+                                       ('v55', '0.0.55-dev1', '2026-10-05T08:00:00Z'),
+                                       ('v52live', '0.0.52-dev1', '2026-10-02T09:00:00Z')):
+            self.run_folder(name, version=version, started=started, status='running' if name == 'v52live' else 'passed')
+        build_gc.edit_pin(self.workspace, 'build/v51', 'release', 'v0.0.51 release reference')
+        got = self.decisions(self.plan())
+        self.assertEqual(got['v52'][0], 'expire')
+        self.assertIn('release series v0.0.52 is older than the kept series (v0.0.53, v0.0.54, v0.0.55)', got['v52'][1])
+        for kept in ('v53', 'v54', 'v55'):
+            self.assertEqual(got[kept][0], 'keep')                  # the newest three series: the usual rules
+        self.assertIn('pinned (release)', got['v51'][1])            # a pin wins over age
+        self.assertEqual(got['v52live'], ('keep', 'still building'))
+        self.assertEqual(self.decisions(self.plan(keep_series=0))['v52'][0], 'keep')  # 0 = the rule off
+        self.assertEqual(build_gc.series('v0.0.55-rc2'), (0, 0, 55))
+        self.assertIsNone(build_gc.series('unknown'))
+
     def test_pins_win_over_everything(self):
         old = self.run_folder('rc1', version='0.0.33-rc1', started='2026-10-09T08:00:00Z')
         self.run_folder('rc1b', version='0.0.33-rc1', started='2026-10-09T09:00:00Z')

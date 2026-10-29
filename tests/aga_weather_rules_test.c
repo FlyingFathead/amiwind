@@ -183,6 +183,44 @@ int main(void)
         assert(AW_WeatherPrecip(4,5,0.6,&s)==AW_PRECIP_HEAVY_RAIN && s>0);
         assert(AW_WeatherPrecip(4,4,0.3,&s)==AW_PRECIP_RAIN && s==AW_WEATHER_STEPS);
     }
+    {
+        /* The Red Mountain pull (REDMOUNTAIN-SKY-55): none at Seyda Neen or Ald'ruhn (the maintainer: "ald'ruhn is
+         * good with the region weather"), rising from outside the Ghostfence, full in the crater; never above
+         * AW_WEATHER_STEPS and 0 for a position that is not a number. */
+        float seyda[3]={-12000,-70000,0},aldruhn[3]={-12606,54169,0},outside[3]={4000,42000,0},fence[3]={20605,47338,0};
+        float crater[3]={25500,69500,0},nan_at[3];aw_weather_blend_t b;int p_al,p_out,p_fence,s,k;
+        nan_at[0]=nan_at[1]=nan_at[2]=0.0f/0.0f;
+        assert(AW_WeatherParse(file,build(),&table));   /* a fresh AWW1 table: Clear day 95 135 203, Blight 90 35 35 */
+        assert(AW_WeatherMountainPull(seyda)==0);
+        p_al=AW_WeatherMountainPull(aldruhn);p_out=AW_WeatherMountainPull(outside);p_fence=AW_WeatherMountainPull(fence);
+        assert(p_al==0);
+        assert(p_out>=1 && p_out<=3);
+        assert(p_fence>p_out && p_fence<AW_WEATHER_STEPS);
+        assert(AW_WeatherMountainPull(crater)==AW_WEATHER_STEPS);
+        assert(AW_WeatherMountainPull(nan_at)==0 && AW_WeatherMountainPull(NULL)==0);
+        /* the blend: a clear sky pulled half way toward the Blight weather's own colours, strength raised */
+        AW_WeatherBlend(&table,AW_WEATHER_CLEAR,AW_WEATHER_CLEAR,AW_WEATHER_STEPS,&b);
+        assert(b.strength==0 && b.sky[0][0]==95);
+        AW_WeatherMountainBlend(&table,AW_WEATHER_STEPS/2,&b);
+        assert(b.strength==AW_WEATHER_STEPS/2);
+        assert(b.sky[0][0]==(95+90+1)/2 && b.sky[0][1]==(135+35+1)/2);
+        {   /* the fog at AW_WEATHER_MOUNTAIN_FOG/256 of the pull */
+            int f0=table.look[0].fog[0][0],w=(AW_WEATHER_STEPS/2)*AW_WEATHER_MOUNTAIN_FOG/256;
+            assert(b.fog[0][0]==(f0*(AW_WEATHER_STEPS-w)+128*w+AW_WEATHER_STEPS/2)/AW_WEATHER_STEPS);
+        }
+        /* full pull: the Blight sky darkened by AW_WEATHER_MOUNTAIN_DARK/256; the fog half way to Blight's */
+        AW_WeatherBlend(&table,AW_WEATHER_CLEAR,AW_WEATHER_CLEAR,AW_WEATHER_STEPS,&b);
+        AW_WeatherMountainBlend(&table,AW_WEATHER_STEPS,&b);
+        assert(b.strength==AW_WEATHER_STEPS && b.sky[0][0]==90*AW_WEATHER_MOUNTAIN_DARK/256);
+        {
+            int f0=table.look[0].fog[0][0],w=AW_WEATHER_STEPS*AW_WEATHER_MOUNTAIN_FOG/256;
+            assert(b.fog[0][0]==(f0*(AW_WEATHER_STEPS-w)+128*w+AW_WEATHER_STEPS/2)/AW_WEATHER_STEPS);
+        }
+        /* pull 0 changes nothing */
+        AW_WeatherBlend(&table,AW_WEATHER_CLEAR,AW_WEATHER_CLEAR,AW_WEATHER_STEPS,&b);
+        AW_WeatherMountainBlend(&table,0,&b);
+        for(s=0;s<4;s++)for(k=0;k<3;k++)assert(b.sky[s][k]==table.look[0].sky[s][k]);
+    }
     puts("weather rules ok");
     return 0;
 }

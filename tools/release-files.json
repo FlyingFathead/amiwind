@@ -2457,6 +2457,7 @@
   "resources/emulators/AmiWind-v0.0.54-WinUAE.uae",
   "docs/releases/notes/RELEASE-v0.0.54.md",
   "docs/releases/patches/PATCH-v0.0.54.json",
+  "docs/releases/patches/PATCH-v0.0.55.json",
   "resources/emulators/AmiWind-v0.0.53-WinUAE.uae",
   "resources/emulators/AmiWind-v0.0.52-WinUAE.uae",
   "resources/emulators/AmiWind-v0.0.50-WinUAE.uae",
@@ -3187,6 +3188,7 @@
   "docs/bugs/CHIM-AUTO-BANK-CLIFF-51.md",
   "tests/test_stage_engine_key.py",
   "tests/test_stage_key_top_defaults.py",
+  "tests/test_bug_register_contents.py",
   "tests/test_bug_register_persisting.py",
   "tests/test_bug_register_regression.py",
   "tests/test_stage_jobs_ceiling.py",
@@ -3899,5 +3901,8 @@
   "resources/emulators/AmiWind-v0.0.55-dev1-WinUAE.uae",
   "docs/releases/notes/RELEASE-v0.0.55-dev2.md",
   "resources/emulators/AmiWind-v0.0.55-dev2-FS-UAE.fs-uae",
-  "resources/emulators/AmiWind-v0.0.55-dev2-WinUAE.uae"
+  "resources/emulators/AmiWind-v0.0.55-dev2-WinUAE.uae",
+  "docs/releases/notes/RELEASE-v0.0.55.md",
+  "resources/emulators/AmiWind-v0.0.55-FS-UAE.fs-uae",
+  "resources/emulators/AmiWind-v0.0.55-WinUAE.uae"
 ]
