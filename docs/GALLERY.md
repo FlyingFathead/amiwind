@@ -30,8 +30,7 @@ _Last updated with AmiWind v0.0.56-dev1 (29 October 2026)._
 
 All sixteen taken from Amiberry on the Raspberry Pi 4B, in the maintainer's playtest on a Pi that starts straight
 into AmiWind from a USB stick ([how it was set up](REAL_HARDWARE.md#raspberry-pi-with-amiberry)): Ald'ruhn, the
-Redoran town in the Ashlands, under an ash storm sky, from the afternoon through sundown into the night. The maintainer, playing it: "that is beautiful... that is
-fucking beautiful. that is .... magnifique!"
+Redoran town in the Ashlands, under an ash storm sky, from the afternoon through sundown into the night.
 
 | | |
 | --- | --- |
