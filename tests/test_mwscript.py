@@ -107,8 +107,8 @@ if ( OnActivate == 1 )
     Activate
     PlaySound "Chime"
 endif
-AiTravel 100 5 0
-AiTravel 100 5 0
+FadeTo 100 5
+FadeTo 100 5
 End''',
     # the actor record (v0.0.54): stats, items, spells, combat, wander and the dead count reach the host
     'ActorUser': '''Begin ActorUser
@@ -137,7 +137,7 @@ End''',
     'Inert': '''Begin Inert
 float t
 set t to t + GetSecondsPassed
-Rotate Z 30
+RotateWorld Z 30
 End''',
     'Looper': '''Begin Looper
 short n
@@ -220,6 +220,36 @@ if ( GetCurrentAIPackage == 0 )
     endif
 endif
 End''',
+    # v0.0.57: the player's standing through the host's call() (functions.HOST); never placed, compiled only
+    'StandingUser': '''Begin StandingUser
+short r
+if ( GetPCCrimeLevel > 1000 )
+    ModPCCrimeLevel -50
+endif
+set r to GetPCRank "Mages Guild"
+if ( r < 2 )
+    PCRaiseRank "Mages Guild"
+endif
+if ( player->GetRace "Dark Elf" == 1 )
+    ModPCFacRep 5 "Mages Guild"
+endif
+AddTopic "little secret"
+AddTopic "no such topic"
+End''',
+    # v0.0.57: Cast of a cure on the player is carried out; any other Cast stays not yet
+    'CastUser': '''Begin CastUser
+short r
+Cast "Cure Blight Disease" player
+Cast "Fireball" player
+Cast "shrine test sp" player
+if ( player->GetEffect sEffectFortifyAttribute == 1 )
+    set r to 1
+endif
+End''',
+    'StandingReader': '''Begin StandingReader
+short r
+set r to GetPCRank "Mages Guild"
+End''',
 }
 
 
@@ -230,6 +260,16 @@ def master_bytes(scripts=SCRIPTS):
     out += [record('REGN', sub('NAME', 'Bitter Coast Region'), sub('FNAM', 'Bitter Coast Region'))]
     out += [soun('Cave Wind', 'Fx\\envrn\\cave_wind.wav', 128, 10, 40), soun('Chime', 'Fx\\chime.wav'),
             soun('Drip', 'Fx\\drip.wav')]
+    # a shrine blessing: Fortify Strength 10 for 60 s, Restore Health 5-15 at once (ENAM: effect, skill, attribute,
+    # range, area, duration, low, high)
+    out += [record('SPEL', sub('NAME', 'shrine test sp'), sub('SPDT', struct.pack('<3i', 0, 0, 0)),
+                   sub('ENAM', struct.pack('<hbbiiiii', 79, -1, 0, 0, 0, 60, 10, 10)),
+                   sub('ENAM', struct.pack('<hbbiiiii', 75, -1, -1, 0, 0, 0, 5, 15)),
+                   sub('ENAM', struct.pack('<hbbiiiii', 69, -1, -1, 0, 0, 0, 0, 0)),
+                   sub('ENAM', struct.pack('<hbbiiiii', 27, -1, -1, 0, 0, 3, 2, 2)))]
+    out += [record('DIAL', sub('NAME', 'Little Secret'), sub('DATA', b'\0')),
+            record('DIAL', sub('NAME', 'background'), sub('DATA', b'\0')),
+            record('DIAL', sub('NAME', 'A Journal'), sub('DATA', b'\x04'))]
     out += [scpt(name, text) for name, text in scripts.items()]
     out += [acti('marker_wind', 'AmbientWind'), acti('chime_obj', 'TimerChime'), acti('quiet_obj', 'Quiet'),
             acti('notyet_obj', 'NotYetUser'), acti('loop_obj', 'Looper'), acti('cg_obj', 'chargenTest'),
@@ -421,9 +461,9 @@ class CompilerTests(unittest.TestCase):
         names = {c.name: c for c in compiled}
         calls = [a for _, n, a in awms.decode(names['NotYetUser'].code) if n == 'NOTYET']
         self.assertEqual(len(calls), 2)
-        self.assertEqual(calls[0][0], FUNCTION_NUMBERS['aitravel'])
-        self.assertEqual(prog.strings.rows[calls[0][1]], 'aitravel')
-        self.assertEqual(calls[0][2] & 0x1F, 3)                    # three numbers: 100 5 0
+        self.assertEqual(calls[0][0], FUNCTION_NUMBERS['fadeto'])
+        self.assertEqual(prog.strings.rows[calls[0][1]], 'fadeto')
+        self.assertEqual(calls[0][2] & 0x1F, 2)                    # two numbers: 100 5
         cell = names['CellUser']
         # PositionCell: the player's moves are worked out here; a room no list names and another object stay not yet
         self.assertEqual([prog.strings.rows[a[1]] for _, n, a in awms.decode(cell.code) if n == 'NOTYET'],
@@ -444,6 +484,56 @@ class CompilerTests(unittest.TestCase):
         f = awms.read(awms.write(prog, compiled, binds)[0])
         self.assertEqual(f['PCEL_rows'], 3)
         self.assertIn('PCEL', awms.RESIDENT)
+
+    def test_the_players_standing_goes_through_the_host_call(self):
+        # v0.0.57 (functions.HOST): crime level, faction rank, faction reputation and GetRace keep the import route's
+        # form (no new opcode) but the script is not "not yet"; a reference becomes a REF before the call, the
+        # numbers arrive as the function declares them (ModPCCrimeLevel a fraction, ModPCFacRep a whole number)
+        from mwscript.functions import FUNCTION_NUMBERS, HOST
+        prog, compiled, _, _ = program()
+        names = {c.name: c for c in compiled}
+        user = names['StandingUser']
+        self.assertFalse(user.flags & SCRIPT_NOTYET)
+        self.assertFalse(user.flags & SCRIPT_VOLATILE)
+        self.assertFalse(user.flags & SCRIPT_INERT)              # it changes the standing
+        self.assertEqual(user.notyet, [])
+        self.assertTrue(names['StandingReader'].flags & SCRIPT_INERT)   # a read alone is seen nowhere
+        ops = [(n, a) for _, n, a in awms.decode(user.code)]
+        calls = [a for n, a in ops if n == 'NOTYET']
+        self.assertEqual([a[0] for a in calls], [FUNCTION_NUMBERS[n] for n in (
+            'getpccrimelevel', 'modpccrimelevel', 'getpcrank', 'pcraiserank', 'getrace', 'modpcfacrep', 'addtopic')])
+        # AddTopic: the topic's TOPC row (sorted: background 0, little secret 1) as its number; an unknown topic
+        # compiles to nothing, with a warning; the journal DIAL is no topic
+        i = next(k for k, (n, a) in enumerate(ops) if n == 'NOTYET' and a[0] == FUNCTION_NUMBERS['addtopic'])
+        self.assertEqual(ops[i - 1], ('PUSHB', [1]))
+        self.assertTrue(any('unknown topic' in w for w in user.warnings))
+        f = awms.read(awms.write(prog, compiled, bindings(prog))[0])
+        self.assertEqual(f['TOPC_rows'], 2)
+        self.assertEqual([prog.strings.rows[struct.unpack_from('>H', f['TOPC'], 2 * k)[0]] for k in range(2)],
+                         ['background', 'Little Secret'])
+        i = next(k for k, (n, a) in enumerate(ops) if n == 'NOTYET' and a[0] == FUNCTION_NUMBERS['getrace'])
+        self.assertEqual(ops[i - 1], ('REF', [0xFFFF]))          # player->GetRace: the player as the target
+        self.assertEqual(prog.strings.rows[calls[4][4]], 'Dark Elf')
+        self.assertEqual(calls[4][3], 1)                          # one string, no reference id among them
+        before = ops[[k for k, (n, a) in enumerate(ops) if n == 'NOTYET'][1] - 1]
+        self.assertIn(before[0], ('PUSHF', 'I2F'))                # -50 as a fraction
+        cast = names['CastUser']
+        self.assertEqual(cast.notyet, ['cast'])                   # Fireball waits; the cure and the blessing run
+        self.assertEqual(len([a for _, n, a in awms.decode(cast.code) if n == 'NOTYET']), 4)
+        ge = [(n, a) for _, n, a in awms.decode(cast.code)]
+        k = next(i for i, (n, a) in enumerate(ge) if n == 'NOTYET' and a[0] == FUNCTION_NUMBERS['geteffect'])
+        self.assertEqual(ge[k - 1], ('PUSHB', [79]))               # sEffectFortifyAttribute: effect 79
+        self.assertEqual(ge[k - 2], ('REF', [0xFFFF]))
+        # with a cure (kind 4, common disease) and Poison landing as Damage Health
+        self.assertEqual(prog.spfx.rows[0]['effects'], [(3, 0, 60, 10, 10), (2, 35, 0, 5, 15), (4, 3, 0, 0, 0),
+                                                        (1, 35, 3, 2, 2)])
+        f = awms.read(awms.write(prog, compiled, bindings(prog))[0])
+        self.assertEqual(f['SPFX_rows'], 1)
+        self.assertEqual(len(f['SPFX']), 4 + 32)
+        self.assertIn('SPFX', awms.RESIDENT)
+        header = (ROOT / 'engine/aga/src/aw_mwcode.h').read_text(encoding='utf-8')
+        found = {m.group(1).lower(): int(m.group(2)) for m in re.finditer(r'#define AWF_(\w+) (\d+)', header)}
+        self.assertEqual(found, {n: FUNCTION_NUMBERS[n] for n in HOST})
 
 
 HARNESS = r'''
@@ -603,7 +693,7 @@ class InterpreterTests(unittest.TestCase):
         stats = next(l for l in out if l.startswith('stats')).split()
         self.assertGreater(int(stats[4]), 0)                       # quiet skips happened
         notyet = [l for l in out if l.split()[1:2] == ['notyet']]
-        # AiTravel and PositionCell (of another object, into a room no list names), once each (OnActivate and
+        # FadeTo and PositionCell (of another object, into a room no list names), once each (OnActivate and
         # Activate run since v0.0.51; never used here, OnActivate reads 0; AIWander runs since v0.0.54)
         self.assertEqual(len(notyet), 2, notyet)
         self.assertTrue(all(int(l.split()[0]) <= 2 for l in notyet), notyet)   # on its first run (budget order)
@@ -744,21 +834,135 @@ class ImportRouteTests(unittest.TestCase):
 
     def test_not_yet_calls_are_counted_and_handed_to_the_host(self):
         from mwscript.functions import FUNCTION_NUMBERS
-        travel = FUNCTION_NUMBERS['aitravel']
+        travel = FUNCTION_NUMBERS['fadeto']
         out = self.run_vm(4)
         calls = [l.split()[1:] for l in out if l.split()[1:3] == ['call', str(travel)]]
         self.assertTrue(calls, out)
-        self.assertEqual(calls[0], ['call', str(travel), '3', '100', '5', '0', 'strings', '0'])
+        self.assertEqual(calls[0], ['call', str(travel), '2', '100', '5', 'strings', '0'])
         counted = {int(l.split()[1]): l.split() for l in out if l.startswith('function')}
         self.assertEqual(int(counted[travel][2]), len(calls))
-        self.assertEqual(int(counted[travel][3]), self.prog.strings.index['aitravel'])
-        travel_line = str(self.prog.strings.index['aitravel'])
+        self.assertEqual(int(counted[travel][3]), self.prog.strings.index['fadeto'])
+        travel_line = str(self.prog.strings.index['fadeto'])
         self.assertEqual(len([l for l in out if l.split()[1:3] == ['notyet', travel_line]]), 1)    # logged once
         # carried out by number (the host answers): no log, the host count instead
         out = self.run_vm(4, env={'CALLS': str(travel)})
         self.assertFalse([l for l in out if l.split()[1:3] == ['notyet', travel_line]], out)
         stats = next(l for l in out if l.startswith('stats')).split()
         self.assertEqual(int(stats[14]), len(calls))
+
+
+STANDING_HARNESS = r'''
+#include <stdio.h>
+#include "aw_pcstanding.h"
+int main(void){
+    int i;char name[16];
+    AW_StandingReset();
+    printf("%d %d\n",AW_StandingRank("Mages Guild"),AW_StandingCrime());
+    AW_StandingModCrime(-5);printf("crime %d\n",AW_StandingCrime());           /* never below 0 */
+    AW_StandingSetCrime(1500);AW_StandingModCrime(-50);printf("crime %d\n",AW_StandingCrime());
+    AW_StandingSetReputation(300);printf("rep %d\n",AW_StandingReputation());   /* capped at 255 */
+    AW_StandingLower("Mages Guild");printf("rank %d\n",AW_StandingRank("mages guild"));   /* not a member: -1 */
+    AW_StandingRaise("Mages Guild");printf("rank %d\n",AW_StandingRank("MAGES GUILD"));   /* joins: 0 */
+    for(i=0;i<12;i++){AW_StandingRaise("mages guild");}
+    printf("rank %d\n",AW_StandingRank("Mages Guild"));    /* 9 */
+    AW_StandingJoin("Mages Guild");printf("rank %d\n",AW_StandingRank("Mages Guild"));    /* join keeps the rank */
+    AW_StandingSetExpelled("Fighters Guild",1);printf("expelled %d %d\n",AW_StandingExpelled("fighters guild"),
+        AW_StandingRank("Fighters Guild"));
+    AW_StandingJoin("Fighters Guild");AW_StandingLower("Fighters Guild");
+    printf("left %d %d\n",AW_StandingRank("Fighters Guild"),AW_StandingExpelled("Fighters Guild"));
+    AW_StandingSetFactionReputation("Temple",3);AW_StandingSetFactionReputation("temple",AW_StandingFactionReputation("TEMPLE")+4);
+    printf("facrep %d %d\n",AW_StandingFactionReputation("Temple"),AW_StandingFactionReputation("Imperial Cult"));
+    for(i=0;i<40;i++){sprintf(name,"f%d",i);AW_StandingJoin(name);}
+
+    printf("full %d %d\n",AW_StandingFull(),AW_StandingRank("f39"));
+    {static unsigned char block[2048];int n;
+     AW_StandingReset();AW_StandingSetCrime(70000);AW_StandingSetReputation(12);AW_StandingRaise("Temple");
+     AW_StandingRaise("temple");AW_StandingSetExpelled("Thieves Guild",1);AW_StandingSetFactionReputation("Temple",-3);
+     n=AW_StandingExport(block,sizeof(block));AW_StandingReset();
+     i=AW_StandingImport(block,n);
+     printf("saved %d %d %d %d %d %d %d\n",n,i,AW_StandingCrime(),AW_StandingReputation(),
+            AW_StandingRank("TEMPLE"),AW_StandingExpelled("thieves guild"),AW_StandingFactionReputation("Temple"));
+     i=AW_StandingImport(block,n-1);
+     printf("bad %d %d\n",i,AW_StandingRank("Temple"));}
+    return 0;
+}
+'''
+
+
+@unittest.skipIf(os.name == 'nt', 'native fixtures run in the Linux Docker gate')
+@unittest.skipUnless(shutil.which('cc'), 'a Linux C compiler is required')
+class StandingTests(unittest.TestCase):
+    """v0.0.57: the player's standing (aw_pcstanding.c) natively, with OpenMW's rules (npcstats.cpp)."""
+
+    def test_crime_reputation_ranks_expelled(self):
+        tmp = Path(tempfile.mkdtemp(prefix='aw-standing-'))
+        try:
+            (tmp / 'h.c').write_text(STANDING_HARNESS, encoding='utf-8')
+            src = ROOT / 'engine/aga/src'
+            built = subprocess.run(['cc', '-std=gnu89', '-Wall', '-Werror', '-Wshadow', '-fsanitize=undefined,address',
+                                    '-fno-sanitize-recover=all', '-I' + str(src), str(tmp / 'h.c'),
+                                    str(src / 'aw_pcstanding.c'), '-o', str(tmp / 'h')], capture_output=True, text=True)
+            self.assertEqual(built.returncode, 0, built.stdout + built.stderr)
+            out = subprocess.run([str(tmp / 'h')], capture_output=True, text=True, check=True).stdout.splitlines()
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+        self.assertEqual(out, ['-1 0', 'crime 0', 'crime 1450', 'rep 255', 'rank -1', 'rank 0', 'rank 9', 'rank 9',
+                               'expelled 1 -1', 'left -1 0', 'facrep 7 0', 'full 1 -1',
+                               'saved 88 1 70000 12 1 1 -3', 'bad 0 -1'])
+
+
+EFFECT_HARNESS = r'''
+#include <stdio.h>
+#include <string.h>
+#include "aw_effects.h"
+int main(void){
+    static aw_actor_t a;static unsigned char block[512];int i,n,ok;
+    memset(&a,0,sizeof(a));a.dyn_base[0]=a.dyn_cur[0]=50;a.dyn_base[1]=a.dyn_cur[1]=40;a.attr_base[0]=40;
+    AW_EffectsReset();
+    AW_EffectsAdd(&a,AW_FX_FORTIFY,AWA_ATTRIBUTE+0,10,5);
+    AW_EffectsAdd(&a,AW_FX_DAMAGE,AWA_HEALTH,2,3);
+    AW_EffectsAdd(&a,AW_FX_DRAIN,AWA_MAGICKA,15,4);
+    AW_EffectsAdd(&a,AW_FX_FORTIFY,AWA_HEALTH,20,10);
+    printf("start %d %.1f %.1f %.1f %.1f\n",a.attr_mod[0],a.dyn_cur[0],a.dyn_base[0],a.dyn_cur[1],a.dyn_base[1]);
+    printf("has %d %d %d %d\n",AW_EffectsHas(79),AW_EffectsHas(80),AW_EffectsHas(19),AW_EffectsHas(14));
+    for(i=0;i<6;i++)AW_EffectsTick(&a,1.0f);
+    printf("after6 %d %.1f %.1f %.1f %d\n",a.attr_mod[0],a.dyn_cur[0],a.dyn_base[0],a.dyn_cur[1],AW_EffectsCount());
+    n=AW_EffectsExport(block,sizeof(block));ok=AW_EffectsImport(block,n);
+    printf("saved %d %d %d\n",n,ok,AW_EffectsCount());
+    AW_EffectsAdd(&a,AW_FX_RESTORE,AWA_HEALTH,100,0);
+    printf("restore %.1f\n",a.dyn_cur[0]);
+    for(i=0;i<5;i++)AW_EffectsTick(&a,1.0f);
+    printf("end %.1f %.1f %d\n",a.dyn_cur[0],a.dyn_base[0],AW_EffectsCount());
+    for(i=0;i<20;i++)AW_EffectsAdd(&a,AW_FX_FORTIFY,AWA_SKILL+3,1,60);
+    printf("full %d %lu\n",AW_EffectsCount(),AW_EffectsRefused());
+    ok=AW_EffectsImport(block,n-1);
+    printf("bad %d %d\n",ok,AW_EffectsCount());
+    return 0;
+}
+'''
+
+
+@unittest.skipIf(os.name == 'nt', 'native fixtures run in the Linux Docker gate')
+@unittest.skipUnless(shutil.which('cc'), 'a Linux C compiler is required')
+class EffectTests(unittest.TestCase):
+    """v0.0.57 (SPELL-EFFECTS-57): Fortify, Drain, Damage and Restore on the player's record, natively."""
+
+    def test_fortify_drain_damage_restore_and_the_save(self):
+        tmp = Path(tempfile.mkdtemp(prefix='aw-effects-'))
+        try:
+            (tmp / 'h.c').write_text(EFFECT_HARNESS, encoding='utf-8')
+            src = ROOT / 'engine/aga/src'
+            built = subprocess.run(['cc', '-std=gnu89', '-Wall', '-Werror', '-Wshadow', '-fsanitize=undefined,address',
+                                    '-fno-sanitize-recover=all', '-I' + str(src), str(tmp / 'h.c'),
+                                    str(src / 'aw_effects.c'), '-o', str(tmp / 'h')], capture_output=True, text=True)
+            self.assertEqual(built.returncode, 0, built.stdout + built.stderr)
+            out = subprocess.run([str(tmp / 'h')], capture_output=True, text=True, check=True).stdout.splitlines()
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+        # Fortify Strength +10 and Fortify Health +20 at once, Drain Magicka -15; Damage Health 2 a second for 3 s;
+        # after 6 s the Fortify Strength and the Drain have ended and are undone, the Fortify Health still holds
+        self.assertEqual(out, ['start 10 70.0 70.0 25.0 40.0', 'has 1 1 1 0', 'after6 0 64.0 70.0 40.0 1', 'saved 16 1 1',
+                               'restore 70.0', 'end 50.0 50.0 0', 'full 16 4', 'bad 0 0'])
 
 
 class BuilderStageTests(unittest.TestCase):

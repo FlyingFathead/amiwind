@@ -1701,6 +1701,8 @@ void SV_Physics (void)
 	AW_CombatPhysics ();
 	/* The residents' Wander packages (aw_ambient.c), after combat: an actor combat holds is left alone. */
 	AW_AmbientPhysics ();
+	/* A room has no CHIM window tick: the change list's room entries are applied here (aw_actors.c, v0.0.57) */
+	AW_ActorsRoomTick ();
 	/* Carried lights of skeletal actors: a guard's torch follows its hand (aw_items.c). */
 	AW_ItemsCarriedUpdate ();
 	/* Enchanted items recharge with unpaused time (OpenMW Engine::frame rechargeItems). */

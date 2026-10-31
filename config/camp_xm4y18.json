@@ -1,0 +1,68 @@
+{
+  "format": 1,
+  "comment": "MiniWind test area (v0.0.57, POLYCOUNT-CAMPS-ALDRUHN-57): Urshilaku Camp, the single cell (-4, 18), the hottest cell of the CHIM polycount heatmap (63,288 faces placed in v0.0.56; its yurts carry about half). Checks the simplified yurts in game against the original: the same pose, faces drawn and frame time at 32 MB Fast. Centre = the middle of the cell; bounds +-1024 = the one cell. Not shipped (no shipped_since): built only by its MiniWind preset. No interiors: their doors show as unavailable.",
+  "source_cell": [
+    -4,
+    18
+  ],
+  "source_radius": 0,
+  "centre": [
+    -28672,
+    151552
+  ],
+  "scale": 0.25,
+  "bounds": [
+    [
+      -1024,
+      -1024
+    ],
+    [
+      1024,
+      1024
+    ]
+  ],
+  "reference_margin": 0,
+  "terrain_margin": 896,
+  "handoff_core": [
+    [
+      -1024,
+      -1024
+    ],
+    [
+      1024,
+      1024
+    ]
+  ],
+  "core_size": 1024,
+  "overlap": 896,
+  "hysteresis": 96,
+  "draw_distance": 540,
+  "terrain_step": 128,
+  "terrain_material_repairs": [],
+  "entity_budget": 1000,
+  "model_budget": 220,
+  "collision_margin": 224,
+  "region_core_overrides": {},
+  "town": {
+    "id": "camp_xm4y18",
+    "title": "Urshilaku Camp (test)",
+    "map": "camp_xm4y18",
+    "map_prefix": "uc",
+    "region_cap": 64,
+    "message": "Urshilaku Camp (test)",
+    "region_file": "camp_xm4y18-regions.txt",
+    "door_file": "scene-doors-camp_xm4y18.txt",
+    "visual_group": "camp_xm4y18",
+    "arrival": {
+      "source_position": [
+        -28672,
+        151552,
+        1040
+      ],
+      "source_rotation_z": 0.0,
+      "reason": "The cell centre, among the yurts: the player stood at 976 game units there in the v0.0.56 image (dbg tp -28672 151552), plus 64."
+    },
+    "return": null
+  },
+  "interiors": []
+}

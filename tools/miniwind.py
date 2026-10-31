@@ -215,9 +215,10 @@ def plan(steps, scope=DEFAULT_SCOPE, town=TOWN):
 
 def harvest_note(town=TOWN):
     """The plan's early word on harvest (HARVEST-CHIM-COVERAGE-ONE-AREA-48: a Vivec MiniWind stopped at the image
-    step's coverage check after 20 minutes): a town with no harvest catalogue mechanism (harvest_build
-    unsupported_towns: only Seyda Neen and Balmora have one) ships its frames without its plants; the image step lists
-    them as this build's limit. None for a town that has it."""
+    step's coverage check after 20 minutes): a town with no harvest catalogue mechanism ships its frames without its
+    plants; the image step lists them as this build's limit. Since v0.0.57 every town with a region table has one
+    (CHIM-NATIVE-HARVEST-MISSING-36; harvest_build.unsupported_towns judges the image itself), so the plan has no
+    word: None."""
     from harvest_build import unsupported_towns
     if not unsupported_towns([town]):
         return None

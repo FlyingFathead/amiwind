@@ -22,7 +22,10 @@ void Q_memset(void *p,int n,int sz){memset(p,n,sz);}
 void Q_memcpy(void *p,void *q,int sz){memcpy(p,q,sz);}
 void Sys_Error(char *fmt,...){assert(expect_error);longjmp(failure,1);}
 void Host_Error(char *fmt,...){assert(expect_error);longjmp(failure,1);}
-void Con_Printf(char *fmt,...){assert(0 && "unexpected efrag exhaustion");}
+static int bad_sprite_lines;
+void Con_Printf(char *fmt,...){assert(strstr(fmt,"SPRITE-BAD-TYPE") && "unexpected efrag exhaustion");bad_sprite_lines++;}
+extern unsigned long aw_bad_sprite_skips;
+extern int R_SpriteDrawable(const entity_t *ent);
 int MSG_ReadByte(void){if(msg_readcount>=net_message.cursize){msg_badread=true;return -1;}return net_message.data[msg_readcount++];}
 float MSG_ReadCoord(void){int a=MSG_ReadByte(),b=MSG_ReadByte();return (short)(a|(b<<8))/8.0f;}
 float MSG_ReadAngle(void){return MSG_ReadByte()*360.0f/256;}
@@ -63,5 +66,19 @@ int main(void){
     if(!setjmp(failure)){parse_scale(&sprite,1,true,3);assert(0);}
     sprite.type=mod_alias;
     if(!setjmp(failure)){parse_scale(&sprite,1,true,32);assert(0);}
+    /* SPRITE-BAD-TYPE-THREADED-56: a sprite model whose data is no sprite (freed or reused memory) is left out of
+     * the frame, never Sys_Error; the console names it once per model. */
+    {
+        static msprite_t garbage;static model_t stale;
+        garbage.type=1073750932;garbage.numframes=1;stale.type=mod_sprite;stale.cache.data=&garbage;
+        strcpy(stale.name,"progs/flora_x.spr");
+        memset(&ent,0,sizeof(ent));ent.model=&stale;expect_error=0;
+        assert(!R_SpriteDrawable(&ent) && !R_SpriteDrawable(&ent));
+        assert(aw_bad_sprite_skips==2 && bad_sprite_lines==1);
+        garbage.type=SPR_VP_PARALLEL;garbage.numframes=0;   /* a valid type with no frames is left out too */
+        assert(!R_SpriteDrawable(&ent) && aw_bad_sprite_skips==3 && bad_sprite_lines==1);
+        stale.cache.data=NULL;assert(!R_SpriteDrawable(&ent) && aw_bad_sprite_skips==4);
+        ent.model=&sprite;assert(R_SpriteDrawable(&ent) && aw_bad_sprite_skips==4);   /* the loaded sprite draws */
+    }
     return 0;
 }

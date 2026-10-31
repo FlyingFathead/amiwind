@@ -3,7 +3,7 @@
  "retired": "23 October 2026 (v0.0.48, BUILD-STALE-BSP-CONFIG-48): a v0.0.32 legacy-builder record, kept as the classic baseline of tests/test_release_coverage.py only. No packaging step checks a payload against it (PLAYTEST-PAYLOAD-COVERAGE-32), and a CHIM payload (v0.0.47-dev2: 5,726 files no feature explained) is not comparable with it. Record a new baseline from a published CHIM release payload (payload_coverage.py classes) when that gate is added.",
  "release": "v0.0.32",
  "recorded_from": "v0.0.32-dev2 playtest payload (Vivec Arena preview); record again from the published v0.0.32 payload",
- "files": 18410,
+ "files": 18411,
  "classes": {
   "AmiWind": 1,
   "AmiWindCheck": 1,
@@ -316,6 +316,7 @@
   "id1/world/entries.dat": 1,
   "id1/world/fog-locations.txt": 1,
   "id1/world/journal.awj": 1,
+  "id1/world/large-rooms.txt": 1,
   "id1/world/lamps.awl": 1,
   "id1/world/map.awm": 1,
   "id1/world/night-windows.txt": 1,

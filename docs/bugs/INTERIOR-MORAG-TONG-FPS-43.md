@@ -5,7 +5,7 @@
 ## PERSISTING: reported 4 times; something has to be done
 
 - Reported with v0.0.43-dev2 at 2026-10-18 17:56 +0300: maintainer pinned the suspect: the big planter tree in the middle, entity 93, func_wall, source ref 378691, model *90 (local 130 -5 18)
-- Reported with v0.0.43-dev2 at 2026-10-18 17:57 +0300: maintainer pinned a second suspect: a wooden table, entity 6, func_wall, source ref 65016, model *4 (local 7 125 20): 'feels like polycount 1 million'
+- Reported with v0.0.43-dev2 at 2026-10-18 17:57 +0300: maintainer pinned a second suspect: a wooden table, entity 6, func_wall, source ref 65016, model *4 (local 7 125 20): feels extremely heavy in polygons
 - Reported with v0.0.43-dev2 at 2026-10-18 20:12 +0300: maintainer: Vivec Redoran Plaza is a frame-rate killer too; the planter plants (func_wall model *79, ref 466735) should probably be sprites
 - Reported with v0.0.44-dev1 at 2026-10-19 13:28 +0300: image step stopped: the Balmora Mages Guild plant sprite was placed but not installed (only Vivec's room installer copied sprites); fixed for every installer
 
@@ -30,7 +30,7 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
+_Last updated with AmiWind v0.0.56 (30 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -95,7 +95,7 @@ Measured read-only on the dev2 map `bmmoragtong.bsp` (BSP29, 122 models):
 
 ## Second room: Vivec, Redoran Plaza, 18 October 2026
 
-The maintainer called Vivec, Redoran Plaza (map `vri003`) "a framerate killer" and pinned model *79 (source
+The maintainer found Vivec, Redoran Plaza (map `vri003`) to be very hard on the frame rate and pinned model *79 (source
 reference 466735). Measured read-only on the dev2 map:
 
 - 21,002 stored faces, 28,734 planes, 5,663 nodes, 13,686 clipnodes, 117 models; one vis leaf. Placements that
@@ -226,10 +226,12 @@ Family: Rendering cost and visibility (`render-performance`). Read the visibilit
 - [ENGINE-UPSTREAM-ASM-UNUSED-36](ENGINE-UPSTREAM-ASM-UNUSED-36.md): The engine is built without AmiQuake's 68k assembly: spans, fixed point and maths run as C at -O1
 - [ENGINE-UPSTREAM-SPANS8-SPRITE-LOOP-36](ENGINE-UPSTREAM-SPANS8-SPRITE-LOOP-36.md): Upstream AmiQuake's assembly D_DrawSpans8 has the shape of the sprite span loop; it never runs at the default d_subdiv16 1
 - [ENGINE-VID-UPDATE-FIRST-RECT-35](ENGINE-VID-UPDATE-FIRST-RECT-35.md): VID_Update converted only the first rectangle of the update list
+- [FOG-SKY-UNFOGGED-57](FOG-SKY-UNFOGGED-57.md): With the 300 fog distance, buildings 20 m away turn solid fog colour while the sky stays clouds: a ragged patch of sky hangs between rooftops
 - [INTERIOR-FAR-BLANK-MANOR-56](INTERIOR-FAR-BLANK-MANOR-56.md): In Ald'ruhn's Manor District the far parts appear as blank spots instead of fading into dark grey, and the room is slow
 - MODAL-WORLD-29 (no report page): Head/race and journal backgrounds consume world work
 - [NPC-TARGET-REDUNDANT-31](NPC-TARGET-REDUNDANT-31.md): NPC targeting runs 2-4 times per frame and checks every NPC
 - [PERF-ARENA-PIT-SLOW-48](PERF-ARENA-PIT-SLOW-48.md): The Vivec Arena Pit runs slowly: a large interior with heavy drawn and collision geometry
+- [POLYCOUNT-CAMPS-ALDRUHN-57](POLYCOUNT-CAMPS-ALDRUHN-57.md): The Ashlander camps and central Ald'ruhn are the hottest cells of the polycount heatmap: the yurts alone carry about half of a camp's faces
 - [PRISON-SHIP-RENDER-COST-56](PRISON-SHIP-RENDER-COST-56.md): The prison ship's hold draws slower than the Vivec Arena Pit: frame rate dips in the opening room
 - [RENDER-BMODEL-FRAGMENTS-32](RENDER-BMODEL-FRAGMENTS-32.md): Brush models spanning many terrain leaves are clipped face by face down the terrain BSP
 - [RENDER-EDGECACHE-SEYDA-32](RENDER-EDGECACHE-SEYDA-32.md): No edges are reused between frames in Seyda Neen views

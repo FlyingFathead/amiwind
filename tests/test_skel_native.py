@@ -234,6 +234,35 @@ class SkelSourceTests(unittest.TestCase):
         self.assertIn('tables[i].data = table_alloc (size);', load)
         self.assertNotIn('= malloc (size);\n\tif (!tables[i].data', load)
 
+    def test_a_table_holds_its_index_and_reads_only_the_frames_posed(self):
+        # WALK-CYCLES-57: the common table is 602 KB, of which 39 KB is its index; a town's people play idles, turns,
+        # walk and run (about 118 KB of frames). Paged by default, read in chunks when first posed and kept with the
+        # table; the previous method (the whole file in one block) stays selectable (dbg animkit tables whole).
+        load = (SOURCE / 'aw_skel_load.c').read_text()
+        self.assertIn('int aw_skel_paged = 1;', load)
+        self.assertIn('if (aw_skel_paged)', load)
+        self.assertIn('tables[i].table.row_of = paged_row;', load)
+        self.assertIn('pages_free ((aw_skel_pages_t *)tables[i].table.pages);', load)
+        skel = (SOURCE / 'aw_skel.c').read_text()
+        self.assertIn('*a = t->row_of (t, f0);', skel)
+        kit = (SOURCE / 'aw_animkit.c').read_text()
+        self.assertIn('aw_skel_paged=strcmp(argv[2],"whole")!=0;', kit)
+
+    def test_a_layout_of_a_model_not_loaded_yet_is_checked_when_it_loads(self):
+        # ANIMKIT-COVERAGE-35 / WALK-CYCLES-57: six actor models of the v0.0.57-dev2 sweep were known by name only at
+        # spawn (numframes 0), so every group failed the frame check and the actor kept its idle; the layout is now
+        # parsed against the table's frame limit and checked against the frames when the model loads (AW_AnimOf)
+        anim = (SOURCE / 'aw_anim.c').read_text()
+        self.assertIn('prep_layout(m,m->name,m->numframes>0?m->numframes:AW_ANIM_UNLOADED_FRAMES);', anim)
+        self.assertIn('if(table[g].model==m && m->numframes>0 && table[g].needed>m->numframes)', anim)
+        # the generic alias loader keeps a skeletal model's block and links its table as the stream does (Seyda's
+        # dreamers were read by it, stood in their rest frame and had their layouts refused against 1 frame)
+        model = (SOURCE / 'model.c').read_text()
+        self.assertIn('if(frames==1 && left==(size_t)AW_SKEL_BLOCK_HEAD+(size_t)verts*AW_SKEL_VERT_BYTES', model)
+        self.assertIn('if (aw_alias_skel_link (pheader, b, rest, pmodel->numverts, &frames))', model)
+        self.assertIn('h->aw_skel_table = table;', (SOURCE / 'aw_skel_load.c').read_text())
+        self.assertIn('aw_alias_skel_link = AW_SkelLinkAlias;', (SOURCE / 'aw_skel_release.c').read_text())
+
     def test_the_save_buffers_ask_only_for_memory_there_is(self):
         # SDK-MALLOC-TRAPS-52: with the table refused, the 16 MB stage stopped again in AW_SaveWrite's 256 KB buffer
         # (the arrival autosave): the save buffers go through AW_TryMalloc, which asks exec's largest block first

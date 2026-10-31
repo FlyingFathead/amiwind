@@ -1,6 +1,6 @@
 # Asset coverage
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.56 (30 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -396,7 +396,7 @@ are not part of this public report.
 
 ### Dev4 mushroom cue and preview update
 
-The maintainer approved the **static converted-mesh preview** (“mushrooms look great!”).
+The maintainer approved the **static converted-mesh preview** (he was pleased with the mushrooms).
 That feedback applies to the preview image only; native in-game appearance remains
 untested. The selected pickup cue has one present source file, one converted
 output and zero conversion failures. Its source/runtime fixture passed, but no

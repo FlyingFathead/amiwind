@@ -71,6 +71,17 @@ int main(int argc,char **argv) {
             assert(AW_AmbientHash(f[1])==strtoul(f[2],NULL,10));
         }else if(!strcmp(f[0],"missing")){
             assert(AW_AmbientFind(&t,strtoul(f[1],NULL,10),strtoul(f[2],NULL,10))==-1);
+        }else if(!strcmp(f[0],"levelled")){
+            /* a levelled reference's routes joined with the picked creature's package (aw_ambient.c find_actor) */
+            aw_ambient_row_t routes,pkg;unsigned long ref=strtoul(f[1],NULL,10);
+            long a=AW_AmbientFind(&t,ref,AW_AMBIENT_LEVELLED_HASH),b=AW_AmbientFind(&t,AW_AMBIENT_LEVELLED_REF,strtoul(f[2],NULL,10));
+            assert(a>=0 && b>=0);
+            AW_AmbientRow(&t,a,&routes);AW_AmbientRow(&t,b,&pkg);
+            assert(routes.flags&AW_AMBIENT_LEVELLED);
+            AW_AmbientLevelled(&routes,&pkg);
+            assert(routes.ref==ref && routes.distance==(unsigned)atoi(f[3]) && routes.duration==(unsigned)atoi(f[4]) &&
+                   routes.flags==(unsigned)atoi(f[5]) && routes.profile==(unsigned)atoi(f[6]) && routes.destinations>1);
+            {aw_ambient_table_t h;assert(AW_AmbientHeader(&h,data,size) && h.rows==t.rows && h.profiles_at==t.profiles_at);}
         }else assert(0);
         checks++;
     }
@@ -90,6 +101,21 @@ int main(int argc,char **argv) {
         AW_AmbientAllow(&pk,100);assert(pk.count==2 && !pk.manual);   /* the one point and the start */
         AW_AmbientAllow(&pk,0);assert(pk.count==0 && !pk.manual);
         assert(AW_AmbientNearest(&pk,150,0,0)>=0);
+        {   /* AITravel (v0.0.57): the route starts at the point nearest the actor and ends at the destination nearest
+             * the target; a package without points plans nothing (the walk goes straight) */
+            int from,xyz[3],best=-1,j;long bd=0,d;aw_ambient_pkg_t none;
+            AW_AmbientPoint(&pk,pk.destinations-1,xyz,NULL);
+            from=AW_AmbientTravelPlan(&pk,150,0,0,xyz[0]+1,xyz[1],xyz[2],&goal);
+            assert(from==AW_AmbientNearest(&pk,150,0,0) && goal>=0 && goal<pk.destinations);
+            for(j=0;j<pk.destinations;j++){int q[3];AW_AmbientPoint(&pk,j,q,NULL);
+                d=(long)(q[0]-xyz[0]-1)*(q[0]-xyz[0]-1)+(long)(q[1]-xyz[1])*(q[1]-xyz[1])+(long)(q[2]-xyz[2])*(q[2]-xyz[2]);
+                if(best<0 || d<bd){best=j;bd=d;}}
+            assert(goal==best);
+            memset(&none,0,sizeof(none));
+            assert(AW_AmbientTravelPlan(&none,0,0,0,10,10,0,&goal)==-1 && goal==-1);
+            /* the maximum range: 7168 original units = 1792 engine units */
+            assert(AW_AmbientTravelInRange(1792,0,0) && !AW_AmbientTravelInRange(1793,0,0));
+        }
         free((void *)pk.blob);
     }
     assert(AW_AmbientWithin(0,0,0,0) && AW_AmbientWithin(25,0,0,100) && !AW_AmbientWithin(26,0,0,100));

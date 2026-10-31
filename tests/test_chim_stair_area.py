@@ -172,8 +172,9 @@ class StairWalkArea(unittest.TestCase):
 
 
 class GateOrder(unittest.TestCase):
-    """B15: tools/chim_build.py runs the stair gate first (right after the validation), before the statistics, the
-    heap gate and the zone walk; --gate-order stairs-last keeps the order before v0.0.42."""
+    """B15: tools/chim_build.py runs the stair gate first (right after the validation), before the heap gate, the
+    statistics and the zone walk; --gate-order stairs-last keeps the order before v0.0.42 (the statistics now after
+    the heap gate, beside the zone walk)."""
 
     def order(self, extra):
         import chim_build
@@ -203,10 +204,11 @@ class GateOrder(unittest.TestCase):
         return calls
 
     def test_stairs_first_by_default(self):
-        self.assertEqual(self.order([]), ['validation', 'stairs', 'stats', 'heap', 'zone walk'])
+        # the stats after the heap gate, beside the zone walk (one job: right before it; BUILD-CHIM-STAGE-SERIAL-TAIL-36)
+        self.assertEqual(self.order([]), ['validation', 'stairs', 'heap', 'stats', 'zone walk'])
 
     def test_stairs_last_is_the_earlier_order(self):
-        self.assertEqual(self.order(['--gate-order', 'stairs-last']), ['validation', 'stats', 'heap', 'zone walk',
+        self.assertEqual(self.order(['--gate-order', 'stairs-last']), ['validation', 'heap', 'stats', 'zone walk',
                                                                         'stairs'])
 
 

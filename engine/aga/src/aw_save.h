@@ -25,7 +25,10 @@
 #define AW_CHANGE_LOCK 128U      /* a script set its lock: the level (0 unlocked .. 100) in AW_CHANGE_LOCK_LEVEL */
 #define AW_CHANGE_LOCK_SHIFT 8
 #define AW_CHANGE_LOCK_LEVEL 0x7F00U
-#define AW_CHANGE_FLAGS (63U|AW_CHANGE_DISABLED|AW_CHANGE_LOCK|AW_CHANGE_LOCK_LEVEL)
+/* v0.0.57 (SAVEGAME-COMPLETE-57): WHERE is a room's stable number (worldspawn _aw_cell_int) and POSITION is
+ * room-local; never with AW_CHANGE_SCENE */
+#define AW_CHANGE_ROOM 0x8000U
+#define AW_CHANGE_FLAGS (63U|AW_CHANGE_DISABLED|AW_CHANGE_LOCK|AW_CHANGE_LOCK_LEVEL|AW_CHANGE_ROOM)
 #define AW_CHANGE_ENTRY_BYTES 36
 typedef struct {
     uint32_t key;

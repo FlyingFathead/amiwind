@@ -30,7 +30,7 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.48-dev2 (23 October 2026)._
+_Last updated with AmiWind v0.0.56 (30 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -96,12 +96,11 @@ The renewed maintainer report describes turbo traversal. [Movement speed study](
 
 ## Reported again and repaired in source, 23 October 2026
 
-The maintainer, 23 October 2026 (~02:35 +0300, desktop chat): "we should probably make our character traverse at the
-beginner speeds with the variables set by the game, right now you can just go around the island with something akin
-to the boots of blinding speed or having taken enough potions etc"; "we could add like `dbg superspeed on` (also
-`superspeed on`) into the console, otherwise you'd traverse in Morrowind's parameter's set speed(s) and our current
-speed thing would be the "superspeed" setting"; "I need for debugging reasons that the athletics+whatever the else,
-that they are as they are now in that debug superspeed mode". He added that the speed must follow the character as it
+The maintainer, 23 October 2026 (~02:35 +0300, desktop chat): the character should traverse at the beginner speeds
+with the variables set by the game; at present one can go around the island at a speed akin to the boots of blinding
+speed or after enough potions. He proposed a console setting `dbg superspeed on` (also `superspeed on`); without it
+the character traverses at the speeds Morrowind's parameters set, and the current speed becomes the "superspeed"
+setting. For debugging he needs athletics and the other skills to stay as they are now in that superspeed mode. He added that the speed must follow the character as it
 changes (levelling, skill gains, later effects), that encumbrance, paralysis and other effects belong to the same
 rule, and that running and jumping cost fatigue that returns over time.
 
@@ -166,6 +165,8 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - MWSCRIPT-CELLCHANGED-VOLATILE-54 (no report page): CellChanged made the sound-marker scripts volatile: 85 percent of Vivec's per-frame script work
 - MWSCRIPT-DATA-UNKNOWN-NAMES-48 (no report page): Four Bloodmoon scripts read names declared nowhere in the game data and do not compile
 - MWSCRIPT-INTERIOR-PLACEMENTS-48 (no report page): Scripted placements in rooms that have no edict are not attached: the engine has no room identity to match them (3,612 of 4,907 bindings are in rooms)
+- MWSCRIPT-OLD-CONFIG-OFF-57 (no report page): An install whose saved config holds aw_mwscript 0 keeps compiled scripts off after the default turned on
+- MWSCRIPT-STANDING-NOT-SAVED-57 (no report page): The players standing the scripts change (crime level, reputation, faction ranks, expelled marks, faction reputation) is not in saved games
 - MWSCRIPT-STATE-NOT-SAVED-48 (no report page): The compiled scripts' values (globals, object and script locals, journal indexes) are not in saved games
 - [PHYSICS-GRAVITY-SCALE-36](PHYSICS-GRAVITY-SCALE-36.md): Gravity is Quake's 800 although the world is scaled 0.25: jumps and falls are several times faster than the original
 - [PLAYER-DEATH-LIMBO-35](PLAYER-DEATH-LIMBO-35.md): After the player dies there is no way out: the game stays in a limbo with no reload or retry

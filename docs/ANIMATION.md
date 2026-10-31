@@ -1,6 +1,6 @@
 # Character animation
 
-_Last updated with AmiWind v0.0.54-dev1 (27 October 2026)._
+_Last updated with AmiWind v0.0.57-dev1 (30 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -172,10 +172,17 @@ sounds (spawn time only). A model without a layout keeps the previous frames
 
 In water: swim (swimidle when still); otherwise idle below 1 unit per second,
 else walk or run by the nearer own speed (the actors have no run flag), played
-at the actor's speed over the group's own speed (clamped 0.25 to 4), so the feet
-match the ground. Footsteps play when the frame carrying the event is entered;
-the medium (dry, wading, swimming) is read at the actor's feet and chest. The
-NPC companion test uses it.
+at the actor's speed over the group's own speed (clamped 0.25 to 10; the original
+caps the played speed at 10 times the group's own, as OpenMW 0.51's character
+controller does), so the feet match the ground. Footsteps play when the frame
+carrying the event is entered; the medium (dry, wading, swimming) is read at the
+actor's feet and chest. The NPC companion test uses it.
+
+The speed is the distance the actor really covered (from v0.0.57): a wandering
+resident's walk plays by the length of each step it took, so a step cut short by
+a wall or a waypoint plays that much of the cycle, and a fighter's chase and
+flight play their run by the distance run over the run group's own speed, not by
+the clock. The feet stay planted at any chase speed (`aw_combat_speed`).
 
 ### Mover models
 

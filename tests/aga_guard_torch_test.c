@@ -57,6 +57,8 @@ int Cmd_Argc(void){return argc_;}char *Cmd_Argv(int n){assert(n==1);return (char
 void Con_Printf(char*f,...){}
 int Q_strcasecmp(char*a,char*b){while(*a && *b){int x=*a++,y=*b++;if(x>='A'&&x<='Z')x+=32;if(y>='A'&&y<='Z')y+=32;if(x!=y)return x-y;}return *a-*b;}
 int AW_ClockEnsure(void){return 1;}
+/* GUARD-TORCHES-57: what falls at the player (aw_weather.c); torches go away in rain, snow and storms */
+static int falling;int AW_WeatherFalling(int *s){if(s)*s=falling?4:0;return falling;}
 int32_t AW_StateGet(const aw_state_t*s,int kind,const char*id){assert(kind==AW_GLOBAL && !strcmp(id,"amiwind:clock:ms"));return clock_ms;}
 int R_SkyExterior(void){return exterior;}int AW_GalleryActive(void){return gallery;}
 edict_t *EDICT_NUM(int n){assert(n>=0 && n<40);return &actors[n];}
@@ -108,7 +110,15 @@ int main(void)
     oldloads=model_loads;AW_GuardTorchUpdate();assert(model_loads==oldloads);
     blocked_x=80;AW_GuardTorchUpdate();assert(lights()==2 && !light_x(80)&&light_x(100)&&light_x(120));blocked_x=-1;
     clock_ms=21600000;AW_GuardTorchUpdate();assert(!lights() && cl_numvisedicts==4);
-    clock_ms--;AW_GuardTorchUpdate();assert(lights()==2);cycle->value=0;AW_GuardTorchUpdate();assert(!lights());
+    clock_ms--;AW_GuardTorchUpdate();assert(lights()==2);
+    /* GUARD-TORCHES-57 (OpenMW useTorches): dark but raining or an ash storm: put away; forced on stays on */
+    assert(AW_GuardTorchNight() && AW_GuardTorchWanted());
+    falling=1;AW_GuardTorchUpdate();assert(!lights() && cl_numvisedicts==4 && AW_GuardTorchNight() && !AW_GuardTorchWanted());
+    falling=3;AW_GuardTorchUpdate();assert(!lights());
+    cycle->value=2;AW_GuardTorchUpdate();assert(lights()==2);cycle->value=1;   /* the earlier rule, dark hours only */
+    set_command("on");AW_GuardTorchUpdate();assert(lights()==2 && AW_GuardTorchWanted());set_command("auto");
+    falling=0;AW_GuardTorchUpdate();assert(lights()==2);
+    cycle->value=0;AW_GuardTorchUpdate();assert(!lights());
     set_command("on");AW_GuardTorchUpdate();assert(cl_numvisedicts==8 && lights()==2);
     set_command("garbage");AW_GuardTorchUpdate();assert(cl_numvisedicts==8);
     set_command("off");AW_GuardTorchUpdate();assert(!lights() && cl_numvisedicts==4);

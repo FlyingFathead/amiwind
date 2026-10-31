@@ -1,6 +1,6 @@
 # Character Model Gallery
 
-_Last updated with AmiWind v0.0.54-dev1 (27 October 2026)._
+_Last updated with AmiWind v0.0.56 (30 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -21,9 +21,9 @@ _Last updated with AmiWind v0.0.54-dev1 (27 October 2026)._
 
 ## NPC Gallery v2.0 (the default since v0.0.54)
 
-The maintainer, 27 October 2026: the gallery should "no longer use the pre-baked stuff but our latest models", it
-"does NOT bake or render any extra characters that we haven't built already" and it keeps the existing features
-"so that you can look up npc's etc.". NPC Gallery v2.0 is that gallery:
+The maintainer, 27 October 2026: the gallery should no longer use the pre-baked models but the project's latest
+models, it should not bake or render any extra characters that have not been built already, and it keeps the
+existing features so that NPCs can still be looked up. NPC Gallery v2.0 is that gallery:
 
 - **Nothing is baked for it.** The builder has no `npc-gallery` stage any more. At the end of the image step
   `tools/gallery_v2.py` reads the actor rows the finished maps already carry (towns, CHIM frames, interiors) and the

@@ -1,6 +1,6 @@
 # NPC pathfinding: how NPCs find their way
 
-_Last updated with AmiWind v0.0.54-dev1 (27 October 2026)._
+_Last updated with AmiWind v0.0.57-dev1 (30 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -17,6 +17,7 @@ _Last updated with AmiWind v0.0.54-dev1 (27 October 2026)._
 - [Options for AmiWind on the Amiga](#options-for-amiwind-on-the-amiga)
 - [Recommendation and staged plan](#recommendation-and-staged-plan)
 - [Wander packages, compiled (v0.0.54)](#wander-packages-compiled-v0054)
+- [Travel packages, from the scripts (v0.0.57)](#travel-packages-from-the-scripts-v0057)
 
 <!-- contents end -->
 
@@ -400,8 +401,9 @@ stage 3 needs the CHIM graph format and gate.
 
 ## Wander packages, compiled (v0.0.54)
 
-Since v0.0.54-dev1 (console `chim actors ambient on`, **off by default** and not saved until the in-game A/B is
-recorded) residents follow
+Since v0.0.54-dev1 (console `chim actors ambient on`; **on by default since v0.0.57**, not saved;
+`chim actors ambient off` keeps every actor standing; `on` and `off` answer what they do and whether
+`id1/npc-ambient.lut` was loaded, with its actors and resident bytes) residents follow
 their original Wander package ([NPC-WANDER-NOT-EXECUTED-35](bugs/NPC-WANDER-NOT-EXECUTED-35.md)). The rules are the
 original's as OpenMW 0.51 implements them (`apps/openmw/mwmechanics/aiwander.cpp`, `pathgrid.cpp`); our own code.
 
@@ -435,7 +437,67 @@ all its destinations walks back. `chim actors ambient` prints the counters and c
 what the standing hull met) (no console command or
 variable of its own: the resident registry budget).
 
-Not done yet (said so, not invented): doors in the way and occupied destinations; swimmers and flyers stand; the
+Not done yet (said so, not invented): doors in the way and occupied destinations (flyers and swimmers move since v0.0.57, below); the
 time of day is kept but unused (OpenMW reads it nowhere either); a package set by a script keeps the spawn position
 as its start; the walk speed is the actor record's Speed attribute (50 only for an actor without a record); baked models
 without an Idle2..Idle9 group only walk; packages other than Wander; the package is not saved.
+
+**Levelled creatures (v0.0.57).** Most wild creatures are not placed by name: the cell holds a levelled list (6,352
+references, 5,082 outdoors) and the engine rolls the creature when the cell joins. In OpenMW 0.51 the picked creature
+is an ordinary reference of that creature and runs its own record's packages (`apps/openmw/mwclass/creaturelevlist.cpp`,
+`apps/openmw/mwclass/creature.cpp`); every creature the island's lists can give starts with Wander (86 creatures).
+Until v0.0.56 the table held placed actors only, so these creatures stood still. Now every levelled reference has a
+routes row compiled at the largest Wander distance its list can give, and every creature such a list can give has its
+package (distance, duration, idles, flags); when the picked creature comes near, the engine joins the two. The table
+grew to 10,176 rows and 1.75 MB on disk; the engine no longer keeps the rows in memory: only the first key of every
+32 rows (about 2.5 KB) and the idle tables stay resident, and a lookup reads one block of 896 bytes. An actor found
+absent is remembered, so it costs no second read.
+
+**Aggro on sight (v0.0.57).** A creature this module moves also runs OpenMW's engage check
+(`apps/openmw/mwmechanics/actors.cpp` engageCombat, every second give or take a quarter): when its Fight plus the
+distance bias (`iFightDistanceBase - fFightDistanceMultiplier x distance`, `mwmechanics/combat.cpp`) reaches 100 and it
+sees the player, it attacks and chases with the combat layer (`AW_CombatAggro`, the same rule as the combat
+playground's aggro mode, see [Combat](COMBAT.md)). A creature whose Fight cannot reach 100 even at distance 0 is never
+checked again; the rating is worked out from the kept Fight before any file is read. At most four fight at once (the
+combat layer's slots); a fifth waits for its next check. Creatures only: an NPC's disposition toward the player is not
+modelled yet. `chim actors ambient aggro off` turns it off (not saved); `chim actors ambient` prints the checks.
+
+**Flying creatures (v0.0.57).** Cliff racers and other creatures whose record says they fly (and not walk) wander
+too. As in OpenMW 0.51 (`apps/openmw/mwmechanics/aiwander.cpp`: a pure flying creature takes a straight path, its
+random spot near the start lies at the start's height, and one failed step ends the walk), they fly straight to
+each destination with no floor test and no gravity: the standing hull is swept toward the target in three
+dimensions. They are never put on the ground: the creature library gives a flyer `aw_ground_mode` 1 from its record's
+flags, so the spawn keeps the placed height. On the routes of a cell's path grid a flyer heads for the grid points
+themselves, as OpenMW's does. A flyer that fights chases the same way: OpenMW lets an actor that can move up and
+down shortcut straight to its target (`apps/openmw/mwmechanics/aipackage.cpp` pathTo), so the combat layer sweeps a
+flying fighter straight toward the player's height instead of taking the walkers' ground route, and it no longer
+flees as "cannot reach you" (COMBAT-FLYER-FLEES-57).
+
+**Swimming creatures (v0.0.57).** Slaughterfish and dreugh swim the same straight way, and as in OpenMW
+(`aiwander.cpp`: path grids do not cover water, so swimmers ignore them; a water creature's random spot must lie in
+water) they pick a random spot near their start at the start's depth, take it only when it is in water, and never
+step out of the water. A fighting swimmer chases the same straight way and waits at the shore when the player is
+on land (it never leaves the water).
+
+## Travel packages, from the scripts (v0.0.57)
+
+Since v0.0.57 a script's `AITravel X Y Z` moves the actor on the same compiled routes as its Wander package
+(`AW_AmbientTravel` in `engine/aga/src/aw_ambient.c`, a public entry the wander code can use too). The rules are
+OpenMW 0.51's (`apps/openmw/mwmechanics/aitravel.cpp`), our own code: a target more than 7168 original units away
+does not start the package (`isWithinMaxRange`); the actor walks its routes from the point nearest it to the
+destination nearest the target, then straight to the target; it never crosses a door (the routes are one cell's or
+one room's); it has arrived within the walk's arrival distance (64 original units), and a walk stuck for the usual
+number of steps also ends the package. The scripts' `GetCurrentAIPackage` then reads 1 (Travel) and
+`GetAIPackageDone` reads 1 once it arrived; a fight pauses it and the actor goes on straight to the target after.
+An actor without compiled routes walks straight there. Not yet: OpenMW's two seconds of waiting near the end before
+it calls the travel done, and travel into another cell. Kept by `tests/aga_ambient_test.c` (the route ends and the
+range).
+
+**AIFollow** (v0.0.57, the same module, `AW_AmbientFollow`; rules from OpenMW 0.51 `aifollow.cpp`, our own code): the
+follow distance is 64 original units plus the target's half width plus twice the actor's; the package becomes active
+only once the target is within that distance plus 384 units and in sight (checked every half second); then the actor
+walks toward the target while it is farther than the distance (30 units of hysteresis between moving and
+stopping) and stands facing it when near. A duration in game hours ends it, and so does reaching the final point
+when one is given; `GetCurrentAIPackage` reads 3. Not yet: crossing doors with the target (OpenMW moves a follower
+only at a teleport door within 800 units, out of view), running when far behind, and the order of several followers.
+The console's `aw_mwscript_status call aifollow` makes the actor under the crosshair follow the player.

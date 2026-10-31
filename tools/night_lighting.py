@@ -12,6 +12,9 @@ The engine reads three tables from id1/world/ (aw_lamps.c, aw_fog_location.c):
                      the scenery sources the town maps were converted from.
   fog-locations.txt  per place day and night fog distance, a validated copy
                      of config/fog-locations.txt.
+  large-rooms.txt    interiors that fade into fog at the draw distance and
+                     draw nothing past it, a validated copy of
+                     config/large-rooms.txt (FOG-300-DEFAULT-57).
 
 The image builder writes them after the final map optimisation, so the
 window table names the textures of the maps that ship. Scenery sources the
@@ -27,8 +30,13 @@ import re
 import struct
 from pathlib import Path
 
-TABLES = ('world/lamps.awl', 'world/night-windows.txt', 'world/fog-locations.txt')
+TABLES = ('world/lamps.awl', 'world/night-windows.txt', 'world/fog-locations.txt', 'world/large-rooms.txt')
 FOG_SOURCE = Path(__file__).resolve().parents[1] / 'config/fog-locations.txt'
+# Large rooms (FOG-300-DEFAULT-57, aw_fog.c large_room_load): "map [cap]" per line, # comments; the room fades
+# into its fog at the draw distance (at most cap) and draws nothing past it.
+LARGE_ROOMS_SOURCE = Path(__file__).resolve().parents[1] / 'config/large-rooms.txt'
+LARGE_ROOM_LINE = re.compile(r'([a-z0-9_]{1,15})(?: ([0-9]{3,4}))?')
+LARGE_ROOM_MAX_LINE = 94  # the engine reads lines into a 96-byte buffer
 FOG_LINE = re.compile(r'([A-Za-z0-9_]{1,63}) ([0-9]{3,4}) ([0-9]{3,4})')
 FOG_RANGE = (100, 1500)  # aw_fog_location.c accepts local units in this range
 FOG_MAX_BYTES = 16384
@@ -71,6 +79,33 @@ def fog_table(raw):
             raise ValueError('Duplicate fog location: ' + name)
         places.add(name)
     return raw, len(places)
+
+
+def large_rooms_table(raw):
+    """Validated large-rooms bytes and their room count (map names as the engine compares them: 15 characters)."""
+    if not raw or len(raw) > FOG_MAX_BYTES:
+        raise ValueError('Invalid large rooms table size')
+    if b'\r' in raw or not raw.endswith(b'\n'):
+        raise ValueError('Large rooms table must use LF line ends and end with one')
+    try:
+        text = raw.decode('ascii')
+    except UnicodeDecodeError:
+        raise ValueError('Large rooms table is not ASCII') from None
+    rooms = set()
+    for number, line in enumerate(text.split('\n')[:-1], 1):
+        if len(line) > LARGE_ROOM_MAX_LINE or any(ord(c) < 32 or ord(c) == 127 for c in line):
+            raise ValueError(f'Invalid large rooms line {number}')
+        if not line or line.startswith('#'):
+            continue
+        match = LARGE_ROOM_LINE.fullmatch(line)
+        if not match:
+            raise ValueError(f'Large rooms line {number} is not "map [cap]"')
+        if match[2] is not None and not 100 <= int(match[2]) <= 4096:
+            raise ValueError(f'Large room cap out of range on line {number}')
+        if match[1] in rooms:
+            raise ValueError('Duplicate large room: ' + match[1])
+        rooms.add(match[1])
+    return raw, len(rooms)
 
 
 def check_lamp_table(raw):
@@ -197,7 +232,7 @@ def night_windows(maps_dir, map_names, sources, palette=None, data_files=None):
 
 
 def stage(id1, *, master, maps, sources, palette=None, data_files=None, work_dir=None,
-          fog_source=FOG_SOURCE, lighting_type=None):
+          fog_source=FOG_SOURCE, lighting_type=None, large_rooms_source=LARGE_ROOMS_SOURCE):
     """Write the three tables into id1/world and return their receipt. lighting_type: the CHIM lighting type
     (tools/chim/light_types.py) choosing the lamp table's classes; None = the warm lamp classes (legacy builds)."""
     from light_sources import lamp_table
@@ -217,7 +252,9 @@ def stage(id1, *, master, maps, sources, palette=None, data_files=None, work_dir
     windows, report, summary = night_windows(Path(id1) / 'maps', maps, sources, palette, data_files)
     window_maps = check_window_table(windows)
     fog, places = fog_table(Path(fog_source).read_bytes())
-    payloads = {'world/lamps.awl': lamps, 'world/night-windows.txt': windows, 'world/fog-locations.txt': fog}
+    large, rooms = large_rooms_table(Path(large_rooms_source).read_bytes())
+    payloads = {'world/lamps.awl': lamps, 'world/night-windows.txt': windows, 'world/fog-locations.txt': fog,
+                'world/large-rooms.txt': large}
     for name, raw in payloads.items():
         (Path(id1) / name).write_bytes(raw)
     tables = {name: {'bytes': len(raw), 'sha256': sha(raw)} for name, raw in payloads.items()}
@@ -227,6 +264,8 @@ def stage(id1, *, master, maps, sources, palette=None, data_files=None, work_dir
     tables['world/night-windows.txt']['maps'] = window_maps
     tables['world/fog-locations.txt']['places'] = places
     tables['world/fog-locations.txt']['source'] = 'config/fog-locations.txt'
+    tables['world/large-rooms.txt']['rooms'] = rooms
+    tables['world/large-rooms.txt']['source'] = 'config/large-rooms.txt'
     receipt = {'format': 'AmiWind night lighting tables 1',
                'status': 'partial' if summary['sources_skipped'] else 'complete',
                'tables': tables, 'night_windows': summary}

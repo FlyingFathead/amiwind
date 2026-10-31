@@ -20,7 +20,7 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.47 (21 October 2026)._
+_Last updated with AmiWind v0.0.56 (30 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -46,7 +46,7 @@ No repair yet: a placed item with state needs a live pickup object, not baked sc
 
 ## Symptom
 
-The maintainer, 21 October 2026, about the Luminous Russula in caves "that go to your inventory": in the original game
+The maintainer, 21 October 2026, about the Luminous Russula in caves, which goes straight into the inventory: in the original game
 some ingredients lie in rooms as items (an `ingred_russula_01` on a shelf or a table) and are taken straight into the
 inventory. In AmiWind's converted interiors those items are not there at all: nothing is drawn and nothing can be
 taken.
@@ -86,7 +86,7 @@ original): the shelves are empty in AmiWind. The image's `entity-tracker.json` l
 ## Design of record: the shell is baked, everything that can be taken is an object
 
 Decided for the project, 21 October 2026. The maintainer: interiors cannot be fully pre-baked, because rooms are where
-the things on tables and shelves are, "shit you can take and so forth". An interior is therefore two kinds of content:
+the things on tables and shelves are, the items a player can take. An interior is therefore two kinds of content:
 
 1. **The shell:** walls, floors, stairs, fixed furniture and fixtures. Baked into the room's map as today (lightmaps,
    visibility and collision compiled once).

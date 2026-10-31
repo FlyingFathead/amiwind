@@ -70,7 +70,18 @@ typedef struct aw_skel_table_s {
 	int			own_frames, own_groups;	/* this file's own (frames and groups count both, the base's included) */
 	char		base_name[AW_SKEL_TABLE_NAME];	/* version 3: the base table's path; "" otherwise */
 	const struct aw_skel_table_s	*more;	/* version 3, linked by the loader: the base; NULL otherwise */
+	/* frames paged from the file (aw_skel_load.c, WALK-CYCLES-57): keys NULL and row_of gives frame f's row (never
+	 * NULL: a row that cannot be read gives frame 0's, kept from the load); NULL for a table held whole */
+	const unsigned char	*(*row_of) (const struct aw_skel_table_s *t, int frame);
+	void		*pages;
 } aw_skel_table_t;
+
+/* The bytes of a table file before its frames (header, bones, groups, keys, base keys) from its first
+ * AW_SKEL_HEADER + AW_SKEL_TABLE_NAME bytes (HAVE of them read), or -1 when they are no table's. */
+long AW_SkelIndexBytes (const unsigned char *head, long have);
+/* AW_SkelParse on a table's index only (data[0..size), AW_SkelIndexBytes long) of a file of FILE_SIZE bytes: keys
+ * NULL; the loader sets row_of (frames read when posed, WALK-CYCLES-57). */
+int AW_SkelParseIndex (const unsigned char *data, long size, long file_size, aw_skel_table_t *out);
 
 /* 1 and *out filled when data[0..size) is a valid table (sizes, parents before children, groups inside the
  * frames); 0 otherwise. The table keeps pointers into data: data must live as long as the table. */
@@ -143,6 +154,11 @@ const aw_skel_table_t *AW_SkelTableFor (const char *name);
 /* Every loaded table given back; the next lookup loads it again (the caller first flushes the models that point into
  * them). The bytes given back. */
 unsigned long AW_SkelTablesRelease (void);
+/* 1 (the default): a table loaded from now on keeps its index and reads its frames when posed (WALK-CYCLES-57); 0:
+ * the previous method, the whole file in one block. */
+extern int aw_skel_paged;
+/* The paged tables' frame bytes held and on disk, and every loaded table's block bytes (index, or the whole file). */
+void AW_SkelTablesBytes (unsigned long *held, unsigned long *disk, unsigned long *index);
 /* r_alias.c: the posed frames given back (the large pose cache freed, the kept slots emptied). The bytes freed. */
 unsigned long R_AliasPoseCacheRelease (void);
 /* aw_skel_release.c: registers the release of both with aw_fastrelease.c (run before a large block is sized from the

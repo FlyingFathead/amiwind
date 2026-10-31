@@ -29,7 +29,7 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.46 (20 October 2026)._
+_Last updated with AmiWind v0.0.56 (30 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -57,7 +57,7 @@ the blight sky turns blue while he is still inside the fence. See
 checked in game in a fresh play copy of the v0.0.46 image with the fixed engine, but it is not gated or in a
 build yet.
 
-Earlier the same day: fixed in v0.0.46. The maintainer checked the v0.0.46-dev1 playtest on the evening of 20 October 2026: "at least the red mountain is now red". The weather itself (clouds, rain, ash) is still missing and is not part of this bug.
+Earlier the same day: fixed in v0.0.46. The maintainer checked the v0.0.46-dev1 playtest on the evening of 20 October 2026 and saw Red Mountain red at last. The weather itself (clouds, rain, ash) is still missing and is not part of this bug.
 The text below is the state before that build.
 
 Cause found; repaired in the source on branch v0.0.46-sky-pedestal (region weather, every region), not yet in a

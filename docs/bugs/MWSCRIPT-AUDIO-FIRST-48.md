@@ -19,7 +19,7 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.48-dev2 (23 October 2026)._
+_Last updated with AmiWind v0.0.56 (30 October 2026)._
 
 ## Status: 23 October 2026
 
@@ -29,8 +29,8 @@ measurements: [MWSCRIPT_BYTECODE.md](../MWSCRIPT_BYTECODE.md).
 
 ## What is missing
 
-The maintainer, 23 October 2026: "all of the audio is already in the game so we should start utilizing it as per
-MWscript". The converted sounds and voices are in the image, but nothing plays the ones the game's own scripts start:
+The maintainer, 23 October 2026: all of the audio is already in the game, so it should now be put to use as the
+game's own scripts (MWScript) direct. The converted sounds and voices are in the image, but nothing plays the ones the game's own scripts start:
 ambient loops at sound markers (cave wind, water spouts, creaking boats, dripping), activator sounds, NPC lines spoken
 by scripts, and music cues.
 

@@ -123,6 +123,16 @@ class Scope(unittest.TestCase):
         self.assertIn('outside the area this build holds', str(error.exception))
         self.assertEqual(ds.check(ds.parse('cell:2,-9'), FULL).cell_xy, [2, -9])  # the open world
 
+    def test_a_start_outside_the_map_the_town_makes_is_refused_before_any_stage(self):
+        # MINIWIND-EXTERIOR-DIRECT-START-CELL-57: cell:0,-7 is in Seyda Neen's source grid (cells -5..1, -12..-6) but
+        # not in the map it makes (global y up to -57344); the image step stopped 11-14 minutes in on it
+        scope = ds.build_scope(['seyda'], False, False, 'exterior')
+        with self.assertRaises(ValueError) as error:
+            ds.check(ds.parse('cell:0,-7'), scope)
+        self.assertIn('outside the map seyda makes', str(error.exception))
+        self.assertIn('cell:0,-8', str(error.exception))
+        self.assertEqual(ds.check(ds.parse('cell:0,-8'), scope).cell_xy, [0, -8])
+
 
 class Character(unittest.TestCase):
     def masters(self, root):

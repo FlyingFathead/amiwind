@@ -312,6 +312,15 @@ def _main(ap, a):
                         (a.stair_walk_places, 'AMIWIND_STAIR_WALK_PLACES'), (a.stair_watch, 'AMIWIND_STAIR_WATCH')):
         if value:
             os.environ[name] = value
+    # The validation's unit cache key (pass_cache.source_digest of chim/validate.py and everything it reaches, in two
+    # key forms): about 20 s on one core at the start of the validation in the v0.0.57-dev5 full build
+    # (BUILD-CHIM-STAGE-SERIAL-TAIL-36). Worked out in a thread beside the world build instead; the same digests
+    # (memoized per process), the validation picks them up.
+    digest_warm = None
+    if a.validate and (a.jobs or 0) != 1:
+        from concurrent.futures import ThreadPoolExecutor
+        digest_warm = ThreadPoolExecutor(max_workers=1)
+        digest_warm_job = digest_warm.submit(warm_validation_key)
     from chim.build import build_areas
     from chim.texfx import effect_path
     def build_world():
@@ -362,6 +371,12 @@ def _main(ap, a):
         # measurements; the report and stdout are what `chim/validate.py OUT --json ... --palette ...` writes.
         from build_jobs import resolve_jobs
         from chim.validate import report_text, report_world
+        if digest_warm is not None:
+            try:
+                digest_warm_job.result()        # a failure here only means the validation works it out itself
+            except Exception as exc:            # noqa: BLE001
+                print('CHIM validation: unit cache key not worked out ahead (%s); worked out now' % exc, flush=True)
+            digest_warm.shutdown(wait=True)
         with build_profile.phase('CHIM validation', '%d frames' % len(areas)) as timer:
             src_path = a.out / 'chim-source.json'
             source_doc = json.loads(src_path.read_text(encoding='utf-8')) if src_path.is_file() else None
@@ -447,10 +462,11 @@ def _main(ap, a):
         if fallback:
             print('CHIM hull fallback: chains kept for %s (a ring did not fit with their routed hulls)'
                   % ', '.join(fallback['kept_as_chain']), flush=True)
-        if a.stats:
-            # While the validation's world is in memory (the gates never change the world).
-            write_stats(a, build_profile, validated, stats_source)
-            validated = stats_source = None
+        # The stats run beside the zone walk below (BUILD-CHIM-STAGE-SERIAL-TAIL-36: 23.5 s on 2 of 24 cores in the
+        # v0.0.57-dev5 full build, before the heap gate and the zone walk): while the validation's world is in memory
+        # (the gates never change the world). They start after the heap gate, the last gate that writes the receipt
+        # they read (the zone walk writes nothing they read): the same chim-stats.json.
+        stats_job = None
         # Order with --gate-order stairs-last (BUILD-CHIM-HEAP-GATE-LATE-36, the method before v0.0.42): the checks that
         # take seconds per frame first (heap, zone walk), the stair walk last, so a ring over the zone stops the stage at
         # once.
@@ -487,12 +503,25 @@ def _main(ap, a):
         # The engine's own zone allocator over a walk through every frame: never a step without ground
         # (CHIM-CHUNK-LOAD-FAIL-33, chim.zone_sim).
         from chim.zone_sim import require_zone_walk
+        if a.stats and resolve_jobs(a.jobs) > 1:
+            from concurrent.futures import ThreadPoolExecutor
+            stats_pool = ThreadPoolExecutor(max_workers=1)
+            stats_job = stats_pool.submit(write_stats, a, build_profile, validated, stats_source)
+            validated = stats_source = None
+        elif a.stats:
+            write_stats(a, build_profile, validated, stats_source)   # one job: here, before the zone walk
+            validated = stats_source = None
         walk_timer = build_profile.phase('CHIM zone walk gate').__enter__()
         try:
             walk = require_zone_walk(a.out, a.sdk, jobs=resolve_jobs(a.jobs), world=shared)
         except ValueError as exc:
             walk_timer.__exit__(ValueError, exc, None)
+            if stats_job is not None:
+                stats_job.result()
             ap.exit(1, 'Error: %s\n' % exc)
+        if stats_job is not None:
+            stats_job.result()
+            stats_pool.shutdown(wait=True)
         walk_timer.done('CHIM zone walk gate: %s %s' % (walk['status'], ', '.join(
             '%s: %d steps, %d loads without room, %d partial activations, %d+%d chunks released, %d model loads'
             % (w['name'], w['steps'], w['zone_fail'], w['partial'], w['released_band'], w['released_ring'],
@@ -518,6 +547,19 @@ def receipt_text(receipt, jobs):
     from build_jobs import resolve_jobs
     from chim.build import RECEIPT_LISTS
     return parallel_json.dumps(receipt, RECEIPT_LISTS, jobs=resolve_jobs(jobs))
+
+
+def warm_validation_key():
+    """The digests chim.validate.check_cache asks pass_cache for (PassCache.open: source_digest, previous_digests,
+    covered_lines of chim/validate.py), worked out once ahead; pass_cache memoizes them per process. Nothing when
+    the pass cache is off."""
+    import pass_cache
+    if pass_cache.folder() is None:
+        return
+    import chim.validate as V
+    pass_cache.source_digest(V.__file__)
+    pass_cache.previous_digests(V.__file__)
+    pass_cache.covered_lines(V.__file__)
 
 
 def write_stats(a, build_profile, validated, source=None):

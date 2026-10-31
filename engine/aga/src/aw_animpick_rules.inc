@@ -143,6 +143,14 @@ int AW_AnimPick(const aw_pick_state_t *s,aw_pick_has_t h,void *c,aw_pick_t *o) {
         if(w==AW_PW_PICKPROBE){aw_pick_state_t t=*s;t.event=AW_PE_USE;return AW_AnimPick(&t,h,c,o);}
         if(w==AW_PW_NONE)w=AW_PW_HANDTOHAND;      /* drawn with nothing in the hand: hand-to-hand */
         weapon_group(w,h,c,o->group);
+        if(!has(h,c,o->group) && (random_group("attack",s->roll,h,c,o->group) ||
+                                  (s->swim && random_group("swimattack",s->roll,h,c,o->group)))){
+            /* a creature's own attacks (CREATURE-COMBAT-ANIM-GROUPS-54): a random attack1..N, swimattackN in water,
+             * start to stop (rule from OpenMW 0.51 mwmechanics/character.cpp chooseRandomAttackAnimation) */
+            if(s->swim){char t[AW_PICK_NAME];if(random_group("swimattack",s->roll,h,c,t))put(o->group,AW_PICK_NAME,t,NULL);}
+            keys(o,"start","stop");o->rule="creature attack, a random one: chooseRandomAttackAnimation";
+            return 1;
+        }
         if(ranged(w)){keys(o,"shoot start","shoot follow stop");o->rule="attack, shoot: updateWeaponState";}
         else{
             put(a,sizeof(a),attacks[s->attack%3]," start");

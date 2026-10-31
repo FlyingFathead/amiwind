@@ -61,7 +61,9 @@ typedef struct
 	unsigned char	dead, moved, fight, follow;
 	unsigned short	pick;		/* a levelled reference's roll: 0 not rolled, 1 nothing, 2 + the base it gave */
 	float	health, hours;		/* health when left (moved); game hours when captured */
+	long	room;			/* v0.0.57: the room's stable number when captured in a room (origin room-local), else 0 */
 } change_t;
+static long RoomNumber (void);
 
 static change_t	changes[MAX_CHANGES];
 static int		nchanges;
@@ -214,6 +216,24 @@ static float GameHours (void)
 		AW_StateGet (&aw_state, AW_GLOBAL, "amiwind:clock:ms") / 3600000.0f;
 }
 
+/* The loaded room's stable number (worldspawn "_aw_cell_int", tools/cell_numbers.py; the same reading as aw_mwhost.c),
+ * 0 outdoors or when the map has none (v0.0.57, SAVEGAME-COMPLETE-57: a change entry is keyed by its room). */
+static long RoomNumber (void)
+{
+	const char *p = sv.worldmodel ? sv.worldmodel->entities : NULL, *key, *end;
+	long n = 0;
+	if (!p || !(key = strstr (p, "\"_aw_cell_int\"")) || !(end = strchr (p, '}')) || key > end)
+		return 0;
+	key += 14;
+	while (*key == ' ' || *key == '\t')
+		key++;
+	if (*key != '"')
+		return 0;
+	for (key++ ; *key >= '0' && *key <= '9' && n < 0xFFFFFF ; key++)
+		n = n * 10 + (*key - '0');
+	return *key == '"' ? n : 0;
+}
+
 /* An actor's state into its change entry (when it leaves, and for a save): dead, where, health, fight, follow. */
 static void Capture (edict_t *e, change_t *c)
 {
@@ -226,6 +246,9 @@ static void Capture (edict_t *e, change_t *c)
 	c->follow = AW_CompanionEdict (e) ? 1 : 0;
 	c->moved = 1;
 	c->health = h;
+	c->room = RoomNumber ();
+	if (c->room)
+		d[0] = d[1] = d[2] = 0;		/* a room keeps its own coordinates */
 	VectorAdd (e->v.origin, d, c->origin);
 	VectorCopy (e->v.angles, c->angles);
 	c->hours = GameHours ();
@@ -954,6 +977,39 @@ static void Leave (int cx, int cy)
 		(long)dropped, (Sys_FloatTime () - t0)*1000);
 }
 
+/* A room (no CHIM window, so no window tick): on a new map or after a load, the room's actors take their change
+ * entries (SAVEGAME-COMPLETE-57: an actor moved in a room is where it was left after a save and a reload, and after
+ * leaving and coming back); when the room is left, its actors' state goes into the change list (Capture). */
+void AW_ActorsRoomTick (void)
+{
+	static char map[64];
+	static long room;
+	int i;
+	if (!sv.active)
+		return;
+	if (strncmp (map, sv.name, sizeof(map) - 1))
+	{
+		Q_strncpy (map, sv.name, sizeof(map) - 1);
+		room = RoomNumber ();
+		if (room && nchanges)
+			apply_pending = 1;
+	}
+	if (!room)
+		return;
+	if (apply_pending)
+		ApplyLoaded ();
+	/* keep the room's actors captured as they stand: the room's map goes away without a leave of its own */
+	for (i=1 ; i<sv.num_edicts ; i++)
+	{
+		edict_t *e = EDICT_NUM(i);
+		change_t *c;
+		if (!IsActor (e) || !RefOf (e) || ((int)sv.time * 2 + i) % 64)
+			continue;			/* a few actors a frame, each about every half minute of frames */
+		if ((c = Change (RefOf (e), 1)) != NULL)
+			Capture (e, c);
+	}
+}
+
 /* Every window tick: the queued spawns; every tenth, kept actors whose cell
  * left the window are released once no rule keeps them. */
 static void Tick (void)
@@ -1353,6 +1409,12 @@ static int ToEntry (const change_t *c, aw_changes_t *out)
 	e->yaw = anglemod (c->angles[1]);
 	e->health = c->health;
 	e->hours = c->hours;
+	if (c->room > 0 && c->room <= 0xFFFFFF)
+	{
+		e->flags |= AW_CHANGE_ROOM;
+		e->where = (int32_t)c->room;
+		return 1;
+	}
 	cx = (int)floor (c->origin[0] / 2048.0f);
 	cy = (int)floor (c->origin[1] / 2048.0f);
 	e->where = (int32_t)(((uint32_t)(cx & 0xFFFF) << 16) | (uint32_t)(cy & 0xFFFF));
@@ -1423,6 +1485,7 @@ static void SaveImport (const aw_changes_t *in)
 		c->angles[1] = e->yaw;
 		c->health = e->health;
 		c->hours = e->hours;
+		c->room = (e->flags & AW_CHANGE_ROOM) ? (long)e->where : 0;
 	}
 	apply_pending = 1;
 	Con_Printf ("actors: %d changes from the save (%d carried for other modules)\n", nchanges, carried.count);
@@ -1444,7 +1507,15 @@ static void ApplyLoaded (void)
 		change_t *c;
 		if (!IsActor (e) || !(c = Change (RefOf (e), 0)))
 			continue;
-		if (c->moved)
+		if (c->moved && c->room != RoomNumber ())
+			;			/* captured in another room (or outdoors): its position belongs there */
+		else if (c->moved && c->room)
+		{
+			VectorCopy (c->origin, e->v.origin);	/* room-local */
+			VectorCopy (c->angles, e->v.angles);
+			SV_LinkEdict (e, false);
+		}
+		else if (c->moved)
 		{
 			VectorSubtract (c->origin, d, e->v.origin);
 			VectorCopy (c->angles, e->v.angles);
@@ -1459,8 +1530,19 @@ static void ApplyLoaded (void)
 	Con_Printf ("actors: the save's changes applied to %d of the scene's actors\n", applied);
 }
 
+/* A fallen fighter whose combat slot goes to a new fighter (aw_combat.c, COMBAT-PACK-SLOTS-57): its death into the
+ * change list now, as Capture would record it when it leaves, so it does not come back alive. */
+extern void (*aw_combat_actor_died)(struct edict_s *e);
+static void Died (edict_t *e)
+{
+	change_t *c = Change (RefOf (e), 1);
+	if (c)
+		c->dead = 1;
+}
+
 void AW_ActorsInit (void)
 {
+	aw_combat_actor_died = Died;
 	aw_save_changes_export = SaveExport;
 	aw_save_changes_import = SaveImport;
 	chim_actors_join = Join;

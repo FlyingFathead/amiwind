@@ -21,7 +21,7 @@
 | Persists in | v0.0.28, v0.0.30, v0.0.31-dev2 (last seen) |
 | Severity | low: A tree card's dark trunk base is drawn over a stone wall from some headings; cosmetic. |
 | Family | Distance drawing (horizon, fog, sky, far edges) (`distance-drawing`) |
-| Deferred by the maintainer | 2026-10-29: to v0.0.57, the maintainer (desktop chat 2026-10-29, on the six expired v0.0.56 deferrals): 'Yes, defer those six bugs to v0.0.57.' |
+| Deferred by the maintainer | 2026-10-31: the maintainer, desktop chat: 'yeah we'll put that fix in v0.0.58' (the tree-card depth fix, after its look across the island) |
 | Playtest version | v0.0.31-dev2 |
 | From commit | source and engine unknown |
 | CHIM engine version | none: legacy engine |

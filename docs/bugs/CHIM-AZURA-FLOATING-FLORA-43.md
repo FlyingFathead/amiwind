@@ -7,7 +7,7 @@
 - Reported with v0.0.43-dev2 at 2026-10-18 18:10 +0300: maintainer: second spot, cell 16,9 (global 136878 75700 373, frame map vf2303): leaf cards and twig lines in a tree-crown pattern, no trunk drawn
 - Reported with v0.0.43-dev2 at 2026-10-18 18:12 +0300: maintainer pinned it: CHIM placement 379487, mesh f/flora_tree_ac_01@s1.85 (model 12410), source ref 137320, cell 16,9; a repeating pattern
 - Reported with v0.0.43-dev2 at 2026-10-18 18:14 +0300: maintainer: third spot, cell 18,5, leaf cards under a giant mushroom (pick: f/flora_emp_parasol_02@s1.84, ref 133286); the leaves themselves are not pickable
-- Reported with v0.0.43-dev2 at 2026-10-18 18:15 +0300: maintainer: fourth spot, cell 19,4 under a parasol (f/flora_emp_parasol_02@s1.58); 'it's the same plant, repeating', not the mushroom
+- Reported with v0.0.43-dev2 at 2026-10-18 18:15 +0300: maintainer: fourth spot, cell 19,4 under a parasol (f/flora_emp_parasol_02@s1.58); it is the same plant repeating, not the mushroom
 - Reported with v0.0.43-dev2 at 2026-10-18 18:22 +0300: maintainer found a WORKING copy of the same tree: cell 18,5, f/flora_tree_ac_01@s1.54 (model 12430), ref 133288; compare with the broken @s1.85 (model 12410)
 - Reported with v0.0.43-dev2 at 2026-10-18 19:46 +0300: maintainer: a broken rock on CHIM, Bitter Coast cell -4,-6: f/terrain_rocks_ai_02@s1 (model 1750, ref 476548), a rock that takes the flora reducer profile
 - Reported with v0.0.43-dev2 at 2026-10-18 20:25 +0300: correction: terrain_rocks_ai_02 (Bitter Coast -4,-6) is not on the flora path and not reduced (393 of 396 faces); its open edges match the one-sided NIF: OpenMW A/B needed

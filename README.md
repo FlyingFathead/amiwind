@@ -4,7 +4,7 @@
 
 # AmiWind
 
-_Last updated with AmiWind v0.0.56 (29 October 2026)._
+_Last updated with AmiWind v0.0.57 (31 October 2026)._
 
 An unofficial, experimental RPG engine and enthusiast project bringing Morrowind
 to the Commodore Amiga, featuring CHIM: an AmiQuake-based engine and an asset
@@ -25,12 +25,14 @@ Like community projects such as
 
 More in the [gallery](docs/GALLERY.md).
 
-## Where AmiWind stands (29 October 2026)
+## Where AmiWind stands (31 October 2026)
 
-The newest release is **v0.0.56: Some Velvet Morning**: AmiWind on a Raspberry Pi, a Pi 4 that starts straight
-into the game from a USB stick, the tool to [make your own](docs/PI_BOOT_IMAGE.md), and a
-[gallery](docs/GALLERY.md) of Ald'ruhn taken on it; `dbg fps on` works by itself, running on CHIM Engine v0.2.2
-([release notes](docs/releases/notes/RELEASE-v0.0.56.md)). The project's own builds have had every exterior cell of Vvardenfell on CHIM since v0.0.43 (a build from the
+The newest release is **v0.0.57: Remembering The Emperor**, dedicated to the memory of Sir Patrick Stewart, the voice
+of Emperor Uriel Septim VII: you can talk to Vvardenfell's people, who answer with the game's own words, and they and
+its creatures wander, walk and run with their feet on the ground,
+every resident animates, creatures attack with their own moves, guards light their torches at night, 957 of the game's
+1,207 scripts run whole, and the busiest places are lighter to draw with the fog at 300 by default, running on CHIM
+Engine v0.2.2 ([release notes](docs/releases/notes/RELEASE-v0.0.57.md)). The project's own builds have had every exterior cell of Vvardenfell on CHIM since v0.0.43 (a build from the
 repository does so only from v0.0.47, when the cell list became part of the repository and the default): 1,409
 cells, counting the 61 in the town frames (1,348 are one-cell region frames; 1,292 land cells, 98 sea-floor cells
 and 19 open-sea cells), with no classic region maps left outdoors. What these numbers count:
@@ -39,10 +41,23 @@ and 19 open-sea cells), with no classic region maps left outdoors. What these nu
 prison and the census office) is built as a CHIM room, with the people the game places in them. Solstheim is not
 converted.
 
-What comes next is in the [roadmap](docs/ROADMAP.md): in v0.0.57, characters that wander, idle and attack on sight by
-their own records, creatures on skeletons of their own, Dagoth Ur's fight and voice, full-detail heads where rooms
-have room, one arena mode merged from the arena minigame and the combat playground, and the rooms that still load in
-on arrival.
+What comes next is in the [roadmap](docs/ROADMAP.md): in v0.0.58, the rest of the conversation (links in the
+text, persuasion, services, disposition starting fights, choices, every quest's journal), levelling as in the original
+with its level-up box and sound, the game's area sounds from its sound markers, characters and creatures
+placed by scripts, more weapons, lighter large interiors such as Ald'ruhn's Manor District,
+the rooms that still load in on arrival, and saves from the original game and OpenMW loaded into AmiWind.
+
+### What v0.0.57 changed
+
+Talk (E) opens the dialogue window: the greeting, the topics, and the game's own answers chosen by the original's
+rule, with the blue disposition bar and answers that follow the game as it goes. People and creatures wander and idle
+by their own records, walk and run by the distance they cover, and turn on the
+player within their fight distance; cliff racers fly and attack, fish swim, every resident animates, and creatures
+attack with their own moves. Guards light their torches at night. 957 of the game's 1,207 scripts run whole, using
+scripted objects works, and saves keep the player's standing and the characters' orders. The fog starts at 300, the sky
+fades into it, large interiors fade into fog, and the heaviest models are lighter. `dbg tp` opens a list of the 82
+named places, and the race page shows each race's stats. Full list:
+[v0.0.57 release notes](docs/releases/notes/RELEASE-v0.0.57.md).
 
 ### What v0.0.56 changed
 

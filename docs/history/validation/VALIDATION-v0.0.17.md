@@ -7,7 +7,7 @@ _Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 - Maintainer test-004: all 12 conversion, engine and HDF stages completed using the
   maintainer's Morrowind installation. The SDK/map-tool downloads matched their pins;
   the pinned reference QuakeC compiler compiled the supplied game logic.
-- Maintainer test-006: the maintainer reported "it works now" after the requested rebuild
+- Maintainer test-006: the maintainer reported that it works after the requested rebuild
   with FS-UAE autorun and default town-center/track-04 startup, and requested
   publication. This is maintainer-reported acceptance, not an independent exhaustive
   gameplay or performance test.

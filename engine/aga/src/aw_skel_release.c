@@ -32,8 +32,12 @@ static unsigned long AW_SkelReleaseAll (void)
 	return given;
 }
 
+extern int (*aw_alias_skel_link)(aliashdr_t *h, byte *block, long size, int verts, int *frames);
+int AW_SkelLinkAlias (aliashdr_t *h, byte *block, long size, int verts, int *frames);
+
 void AW_SkelReleaseInit (void)
 {
+	aw_alias_skel_link = AW_SkelLinkAlias;	/* model.c's generic alias loader links skeletal blocks too */
 	/* the first releaser of aw_fastrelease.c: called before a large block is sized from the free Fast RAM */
 	AW_FastReleaseRegister ("animation tables and posed frames", AW_SkelReleaseAll);
 }

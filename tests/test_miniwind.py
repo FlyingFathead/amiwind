@@ -960,7 +960,7 @@ class TownSandboxTests(unittest.TestCase):
         self.assertIn('DEBUG ONLY', err.getvalue())
         # the image step and the game config
         self.assertIn('aw_drawdistance 448\n', build_aga.startup_config('map seyda\n', 448))
-        self.assertIn('aw_drawdistance 540\n', build_aga.startup_config('map seyda\n'))
+        self.assertIn('aw_drawdistance 300\n', build_aga.startup_config('map seyda\n'))
 
     def test_town_image_keeps_the_town_and_its_rooms(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -1005,7 +1005,7 @@
       "change": "added",
       "to": "on",
       "source": "tools/build.py, tools/chim/flames.py (CHIM-EXTERIOR-FLAMES-MISSING-48)",
-      "note": "the maintainer, 2026-10-23: \"set it on by default but add some dbg command like dbg campfires on|off\": each fire outdoors carries its light record in its frame map flame row and the engine lights the placed models around it; off = flames without light; in game dbg campfires off hides the fires' flames and light"
+      "note": "decided with the maintainer, 2026-10-23: on by default, with a dbg command (dbg campfires on|off): each fire outdoors carries its light record in its frame map flame row and the engine lights the placed models around it; off = flames without light; in game dbg campfires off hides the fires' flames and light"
     },
     {
       "version": "0.0.48-dev2",

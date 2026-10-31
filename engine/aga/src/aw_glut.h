@@ -103,6 +103,43 @@ int AW_GlutDuration(const aw_glut_t *g);
 int AW_GlutPick(const aw_glut_t *g,int npc,int topic,const aw_glut_state_t *s,int pick_random,int roll);
 /* One condition record (8 bytes) for an NPC: 1 holds, 0 not (or not known to the engine). */
 int AW_GlutHolds(const aw_glut_t *g,int npc,const unsigned char *cond,const aw_glut_state_t *s);
+/* THE SHARED CONDITION EVALUATOR (greetings, voice lines and the dialogue table's topics, aw_dial.c): what a
+ * condition record reads beside the run-time state, from whichever table holds it. */
+#define AW_GLUT_FN_CHOICE 50
+typedef struct {
+    const unsigned char *global;   /* rows of 8 bytes: u32 name string offset, f32 value */
+    long globals;
+    const unsigned char *name;     /* rows of 4 bytes: u32 string offset */
+    long names;
+    const unsigned char *strings;
+    const unsigned char *fixture,*known;   /* the start-of-game function values and which are known */
+    int functions;
+    int rank;                      /* the speaker's faction rank, -1 none */
+    int disposition;               /* the speaker's disposition the Disposition test reads */
+    const char *cell;              /* the speaker's home cell name, NULL when not one cell */
+    int choice;                    /* the player's pick of the open Choice, -1 none */
+    const char *faction;           /* the speaker's faction id (folded), NULL none: PcFaction tests without a faction */
+    int speaker;                   /* the speaker's edict number for the live hooks, -1 none */
+    int local_slots;               /* 1: a Local / NotLocal operand is the slot in the speaker's script (the dialogue
+                                    * table; AW_GLUT_LOCAL_FLOAT marks a float), 0: a name (the voice table) */
+} aw_glut_cond_t;
+#define AW_GLUT_LOCAL_FLOAT 0x4000
+/* The game's live state for the conditions (aw_mwhost.c sets it when the scripts are on; NULL: the start-of-game
+ * values, as before). Each returns 1 with *OUT set, or 0 when it does not know (then the start value). Names are the
+ * condition's own (folded ids). */
+typedef struct {
+    int (*journal)(const char *quest,long *out);                  /* the quest's journal index */
+    int (*dead)(const char *actor,long *out);                     /* GetDeadCount of an actor id */
+    int (*item)(const char *item,long *out);                      /* the player's count of an item id */
+    int (*pc_rank)(const char *faction,long *out);                /* the player's rank, -1 not a member */
+    int (*global)(const char *name,float *out);                   /* a global's value */
+    int (*function)(const aw_glut_cond_t *c,unsigned fn,long *out);   /* an SCVR function the fixture would read */
+    int (*local)(const aw_glut_cond_t *c,int slot,int is_float,float *out);  /* the speaker's script local */
+} aw_glut_live_t;
+extern const aw_glut_live_t *aw_glut_live;
+int AW_GlutCond(const aw_glut_cond_t *c,const unsigned char *cond,const aw_glut_state_t *s);
+/* The context of an NPC row of the voice table (its rank, base disposition and home cell; no choice open). */
+void AW_GlutCondOf(const aw_glut_t *g,int npc,aw_glut_cond_t *c);
 /* An entry's sound (8-byte pool hash, sound/pool/a<16 hex>.wav): 1 and hash, 0 when it has none. */
 int AW_GlutSound(const aw_glut_t *g,int entry,unsigned char hash[8]);
 /* The sound table (version 2; every index was bounded at open):
@@ -148,6 +185,10 @@ int AW_GlutSay(struct edict_s *e,int topic,int talked);
 const char *AW_GlutText(void);
 /* The pick only (barks: aw_anim.c AW_VoiceSay): the entry's sound hash; -1 none, 0 picked without a sound, 1. */
 int AW_GlutBark(struct edict_s *e,int npc,int topic,int pick_random,unsigned char hash[8]);
+/* For the dialogue window (aw_dialwin.c): the edict's row (-1 none) with its condition context and run-time state;
+ * a text with the speaker's and the player's defines filled. */
+int AW_GlutSpeaker(struct edict_s *e,int talked,aw_glut_cond_t *c,aw_glut_state_t *s);
+void AW_GlutFill(struct edict_s *e,int row,const char *raw,char *out,int capacity);
 /* The conversation greeting text of a manual talk for an NPC without its own (aw_converse): 1 and the text. */
 int AW_GlutConverse(struct edict_s *e,int again,char *out,int capacity);
 #endif

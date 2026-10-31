@@ -1,10 +1,11 @@
 # Changelog
 
-_Last updated with AmiWind v0.0.56 (29 October 2026)._
+_Last updated with AmiWind v0.0.57 (31 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.57: Remembering The Emperor, 31 October 2026](#v0057-remembering-the-emperor-31-october-2026)
 - [v0.0.56: Some Velvet Morning, 29 October 2026](#v0056-some-velvet-morning-29-october-2026)
 - [v0.0.55: Sky Is Turning Red (Among Other Things), 29 October 2026](#v0055-sky-is-turning-red-among-other-things-29-october-2026)
 - [v0.0.54: Hair, Movement, Magic And More, 28 October 2026](#v0054-hair-movement-magic-and-more-28-october-2026)
@@ -164,6 +165,28 @@ _Last updated with AmiWind v0.0.56 (29 October 2026)._
 - [CHIM source candidate - 14 October 2026, v0.0.40-dev1](#chim-source-candidate---14-october-2026-v0040-dev1)
 
 <!-- contents end -->
+
+## v0.0.57: Remembering The Emperor, 31 October 2026
+
+- Dedicated to the memory of Sir Patrick Stewart (1940-2026), the voice of Emperor Uriel Septim VII.
+- People and creatures wander and idle by their own records, walk and run by the distance they cover, and turn on the
+  player within their fight distance; cliff racers fly and attack, fish swim, every resident animates, and creatures
+  attack with their own moves.
+- Guards light their torches at night and in ash and blight storms.
+- Harvestable plants in every CHIM town (before, only Seyda Neen and Balmora had them).
+- A faster builder: the actor library and the image step on more of their cores, a shorter world-stage tail; a whole
+  build from scratch came out with every game file identical to the release image.
+- 957 of the game's 1,207 scripts run whole: crime, reputation and faction standing, scripted animations, GetEffect,
+  ForceGreeting, AITravel, AIFollow, Position, Rotate; using scripted objects runs their scripts; temple cures work;
+  saves keep the standing and the characters' orders.
+- Fog at 300 by default, the sky fades into the fog, large interiors fade into fog, lighter heavy models (Ashlander
+  camps, central Ald'ruhn, ruins), and a texture surface cache that holds busy views.
+- The first conversations: Talk (E) opens the dialogue window with the greeting, the topics and the game's own answers
+  by the original's rule, the blue disposition bar, answers that follow the live journal, globals and faction standing,
+  and %PCName and the other placeholders filled; the whole dialogue is a table on disk, 26.6 KB in memory.
+- `dbg tp` opens a searchable list of the 82 named places; the race page shows each race's stats.
+- The fifth development snapshot with its version number; the rest moved to v0.0.58, and the build from scratch of the
+  line runs after the release ([release notes](releases/notes/RELEASE-v0.0.57.md)).
 
 ## v0.0.56: Some Velvet Morning, 29 October 2026
 

@@ -19,7 +19,7 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.45 (20 October 2026)._
+_Last updated with AmiWind v0.0.56 (30 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -103,7 +103,7 @@ exterior sky is flat.
   map is converted again. The bank method stays for the palette it was made for. Without the bank the twilight
   tones come from the nearest palette colours. Checked on the real v0.0.41 palette (SHA-256 e7ce2a84...): the
   converted sky (18debc84...) alone, put into the v0.0.41 release image, shows clouds at noon and red and gold
-  clouds at dusk in FS-UAE; the maintainer judged the noon and dusk frames ("it looks good now").
+  clouds at dusk in FS-UAE; the maintainer judged the noon and dusk frames good.
 - `build_aga` image step: a `fallback_warning` from the shared sky preparation with owned data files stops the
   build, naming the reason and the staged palette's SHA-256, instead of shipping a flat sky.
 - Tests: `tests/test_prepare_shared_sky_assets.py` (another palette gets palette-matched clouds and nothing else

@@ -77,7 +77,7 @@ static void every_entry_translates(void){
   snprintf(expect,sizeof expect,"%s%s\n",handler,
        !strcmp(bar1+1,"characterchange")?" appearance":!strcmp(bar1+1,"inventory grant")?" grant":
        !strcmp(bar1+1,"door roulette")?" roulette":!strcmp(bar1+1,"doorlocks")?" locks":
-       !strcmp(bar1+1,"creatures")?" actors creatures":
+       !strcmp(bar1+1,"creatures")?" actors creatures":!strcmp(bar1+1,"mwscript")?" about":
        (!strcmp(bar1+1,"set race") || !strcmp(bar1+1,"set playerrace"))?" playerrace":"");
   if(AW_DebugTranslate(argc,argv,output,sizeof(output))!=1 || strcmp(output,expect)){
    printf("catalogue entry does not reach its handler: dbg %s -> %s (got %s)\n",bar1+1,handler,output);assert(0);
@@ -127,6 +127,13 @@ int main(int count,char **values){
     assert(AW_DebugTranslate(3,god,output,sizeof(output))==1 && !strcmp(output,"aw_godmode true\n"));
     assert(AW_DebugTranslate(3,mode,output,sizeof(output))==1 && !strcmp(output,"aw_godmode off\n"));
     assert(AW_DebugTranslate(2,mode,output,sizeof(output))==1 && !strcmp(output,"aw_godmode\n"));
+  }
+  { /* dbg mwscript [on|off] (DBG-MWSCRIPT-SILENT-56): the status handler takes the switch and answers; alone: about */
+    char *mw[3]={"dbg","mwscript","on"};
+    assert(AW_DebugTranslate(3,mw,output,sizeof(output))==1 && !strcmp(output,"aw_mwscript_status on\n"));
+    mw[2]="off";assert(AW_DebugTranslate(3,mw,output,sizeof(output))==1 && !strcmp(output,"aw_mwscript_status off\n"));
+    assert(AW_DebugTranslate(2,mw,output,sizeof(output))==1 && !strcmp(output,"aw_mwscript_status about\n"));
+    mw[2]="status";assert(AW_DebugTranslate(3,mw,output,sizeof(output))==1 && !strcmp(output,"aw_mwscript_status\n"));
   }
   { /* dbg music on|off (ENGINE-MUSIC-NO-OFF-SWITCH-36): the stream status handler takes the switch words. */
     char *music[3]={"dbg","music","off"};

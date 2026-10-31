@@ -1,0 +1,20 @@
+{
+  "schema": "build-recipe-1",
+  "name": "urshilaku-camp",
+  "description": "MiniWind preset --miniwind-urshilaku-camp: Urshilaku Camp, one cell: the simplified yurts, faces drawn and frame time",
+  "options": {
+    "miniwind": true,
+    "miniwind_scope": "exterior",
+    "miniwind_description": "Urshilaku Camp: simplified yurts, faces drawn and frame time",
+    "direct_to_game_map": "camp_xm4y18",
+    "exclude": [
+      "npc-gallery"
+    ],
+    "exclude_unreferenced": "voice,npcs",
+    "miniwind_boot": "dbg headlamp off"
+  },
+  "inputs": [],
+  "written_with": null,
+  "checked_with": null,
+  "status": "unverified"
+}

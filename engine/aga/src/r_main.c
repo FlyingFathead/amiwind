@@ -120,7 +120,7 @@ float	se_time1, se_time2, de_time1, de_time2, dv_time1, dv_time2;
 
 void R_MarkLeaves (void);
 
-cvar_t aw_drawdistance = {"aw_drawdistance","540",true};
+cvar_t aw_drawdistance = {"aw_drawdistance","300",true};	/* FOG-300-DEFAULT-57: the universal default */
 cvar_t	r_draworder = {"r_draworder","0"};
 /* dbg ghostfence on/off: turbulent textures ripple (1, default) or are drawn straight and still (0); not saved. */
 cvar_t	aw_ghostfence = {"aw_ghostfence","1"};

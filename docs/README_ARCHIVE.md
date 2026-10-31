@@ -1,6 +1,6 @@
 # Earlier README sections
 
-_Last updated with AmiWind v0.0.54 (28 October 2026)._
+_Last updated with AmiWind v0.0.57 (31 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -1082,7 +1082,7 @@ complete package inclusion remain pending; dev2 has not shipped.
 
 Update (v0.0.44, 19 October 2026): the notes above are from 14 and 15 October 2026 and describe states that have
 since passed. The current state is in
-[Where AmiWind stands](../README.md#where-amiwind-stands-29-october-2026) near the top.
+[Where AmiWind stands](../README.md#where-amiwind-stands-31-october-2026) near the top.
 
 ## Development (as the front page stated it before 20 October 2026)
 

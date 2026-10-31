@@ -1,6 +1,6 @@
 # Trees and Grass, Day and Night
 
-_Last updated with AmiWind v0.0.55 (29 October 2026)._
+_Last updated with AmiWind v0.0.56 (30 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -103,7 +103,7 @@ distance steps do ([DemoWind](DEMOWIND.md)).
 
 - The pull toward the Blight weather, 0 to 16, comes from the player's distance to Red Mountain (original units
   25,000, 70,000, the point the storms blow from): none from 38,000 units away, so Ald'ruhn (about 40,800) keeps its
-  region weather (the maintainer on the first shots: "ald'ruhn is good with the region weather"), rising linearly
+  region weather (the maintainer, on the first shots, found Ald'ruhn good with its region weather), rising linearly
   inward (about 2 just outside the Ghostfence, 9 inside it), full within 12,000 units, the crater. One distance a
   frame, no table read.
 - The pull mixes the region weather's sky and land light toward the Blight weather's own colours from the table,

@@ -110,6 +110,12 @@ static int route_format(route_t *r,int argc,char **argv,int j,char *out,int capa
         if(argc-j>1 || used+20>capacity)return 0;
         strcpy(out+used," actors creatures");used+=17;
     }
+    /* dbg mwscript alone: what the compiled scripts do and what was loaded (DBG-MWSCRIPT-SILENT-56); dbg mwscript
+     * status keeps the counts only */
+    if(!strcmp(r->command,"aw_mwscript_status") && !strcmp(r->words,"mwscript") && argc==j){
+        if(used+8>capacity)return 0;
+        strcpy(out+used," about\n");return 1;
+    }
     /* dbg door roulette [SEED]: the teleport command's roulette, no resident command of its own */
     if(!strcmp(r->command,"aw_teleport") && !strcmp(r->words,"door roulette")){
         if(used+10>capacity)return 0;

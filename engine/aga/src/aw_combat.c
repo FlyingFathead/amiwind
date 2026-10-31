@@ -26,6 +26,7 @@
 #include "aw_anim.h"
 #include "aw_move.h"
 #include "aw_hand_models.h"
+#include "aw_ambient.h"
 
 #define SLOTS 4                /* hostile NPCs at a time */
 #define SCALE .25f              /* original units -> game units (tools/prepare_quake.py SCALE) */
@@ -52,6 +53,8 @@ typedef struct {
     float dodged;               /* units stepped of this dodge */
     func_t think;float nextthink;
     edict_t *item[AW_ITEMS_KINDS];  /* carried weapon/shield while fighting (aw_items.c) */
+    float run_x;                /* the run group's own speed (layout X, units a second; 0: by time) */
+    float gait;vec3_t gait_at;  /* WALK-CYCLES-57: seconds into the run group by distance, and where it was counted */
 } slot_t;
 
 aw_combat_settings_t aw_combat_settings;
@@ -389,6 +392,7 @@ static void layout_default(slot_t *s) {
             if(!k->present && (kit[g]==AW_ANIM_DODGEL || kit[g]==AW_ANIM_DODGER))k=&a->g[a->g[AW_ANIM_WALK].present?AW_ANIM_WALK:AW_ANIM_RUN];
             if(!k->present)k=&a->g[AW_ANIM_IDLE];
             s->base[g]=k->base;s->count[g]=k->count;s->step[g]=k->step;
+            if(g==G_RUN)s->run_x=k->x;
         }
         s->hit_fraction=a->g[AW_ANIM_ATTACK].present && a->g[AW_ANIM_ATTACK].x>.05f && a->g[AW_ANIM_ATTACK].x<.95f?a->g[AW_ANIM_ATTACK].x:.5f;
         s->rolled=!a->g[AW_ANIM_DEATH].present;
@@ -438,6 +442,17 @@ static void animate(slot_t *s) {
         else{s->base[G_DEATH]=0;s->count[G_DEATH]=1;}
     }
     if(s->state==S_DEAD && s->rolled){s->e->v.frame=s->base[G_IDLE];return;}
+    if(g==G_RUN && s->run_x>0){
+        /* WALK-CYCLES-57: the run's phase by the distance covered over the group's own speed (OpenMW
+         * CharacterController: the movement animation's speed scaled to the actor's speed), so the feet do not slide
+         * at aw_combat_speed or when a step is cut short; a jump of more than two seconds' run (a teleport) is not counted */
+        float dx=s->e->v.origin[0]-s->gait_at[0],dy=s->e->v.origin[1]-s->gait_at[1],d=(float)sqrt(dx*dx+dy*dy);
+        float clip=s->count[G_RUN]*s->step[G_RUN];
+        if(d<s->run_x*2)s->gait+=d/s->run_x;
+        if(clip>0 && s->gait>=clip)s->gait-=clip*(float)(int)(s->gait/clip);
+        VectorCopy(s->e->v.origin,s->gait_at);
+        t=s->gait;
+    }else VectorCopy(s->e->v.origin,s->gait_at);
     i=(int)(t/s->step[g]);
     if(g==G_IDLE || g==G_RUN || g==G_DODGEL || g==G_DODGER)i%=s->count[g];
     else if(i>=s->count[g])i=s->count[g]-1;      /* one-shot groups hold the last frame */
@@ -476,6 +491,7 @@ static void face_player(edict_t *e,edict_t *p) {
 
 /* ---- engagement ---- */
 void (*aw_combat_actor_released)(edict_t *e);
+void (*aw_combat_actor_died)(edict_t *e);
 static void release(slot_t *s) {
     edict_t *alive=s->e && !s->e->free && s->state!=S_DEAD?s->e:NULL;
     AW_ItemsHide(s->item);
@@ -528,7 +544,16 @@ static void begin_encounter(void) {
 int AW_CombatEngage(edict_t *e,const aw_fighter_t *fighter,const char *layout) {
     slot_t *s=slot_of(e);int i;
     if(!combat_on.value || !e || e->free || !fighter || !AW_CombatSettingsLoad())return 0;
-    if(!s){for(i=0;i<SLOTS && slots[i].e;i++);if(i==SLOTS){Con_Printf("Combat: %ld hostile NPCs already.\n",(long)SLOTS);return 0;}s=&slots[i];}
+    if(!s){
+        for(i=0;i<SLOTS && slots[i].e;i++){}
+        /* every slot taken: a fallen fighter's slot is reused (a pack of more than SLOTS keeps coming as the first
+         * ones die, COMBAT-PACK-SLOTS-57); its death is handed to the actors' change list first, so the corpse stays
+         * dead when its cell joins again (aw_actors.c) */
+        if(i==SLOTS)for(i=0;i<SLOTS;i++)if(slots[i].e && (slots[i].f.dead || slots[i].state==S_DEAD || slots[i].e->free)){
+            if(!slots[i].e->free && aw_combat_actor_died)aw_combat_actor_died(slots[i].e);
+            release(&slots[i]);break;
+        }
+        if(i==SLOTS){Con_Printf("Combat: %ld hostile NPCs already.\n",(long)SLOTS);return 0;}s=&slots[i];}
     if(!AW_CombatHostiles())begin_encounter();
     AW_ItemsHide(s->item);      /* a re-engaged NPC: its items again from the start */
     memset(s,0,sizeof(*s));s->e=e;s->f=*fighter;s->f.aware=1;
@@ -646,8 +671,9 @@ static void ended(int won) {
 /* The NPC struck at its hit key: resolve against the player. */
 static void npc_strike(slot_t *s,edict_t *p) {
     aw_swing_t out;float dz,gap=gap_to(s->e,p,&dz),reach=AW_CombatReach(&aw_combat_settings,&s->f)*SCALE;int mapped;
+    float dzr=reach+((AW_AmbientFlags(s->e)&AW_AMBIENT_FLYER)?64:0);   /* a flyer strikes from above the eyes (the engage check's allowance) */
     you.health=p->v.health;
-    if(gap>reach || dz>reach || dz<-reach || you.dead){
+    if(gap>reach || dz>dzr || dz<-dzr || you.dead){
         s->f.fatigue-=aw_combat_settings.fFatigueAttackBase+(s->f.weapon?s->f.weight*s->strength*aw_combat_settings.fWeaponFatigueMult:0);
         totals.npc_swings++;totals.npc_misses++;swing_sounds(NULL,NULL,0);
         if(readout.value)Con_Printf("Combat: %s swings, out of reach\n",s->f.name);
@@ -881,7 +907,29 @@ static void think(slot_t *s,edict_t *p,float dt) {
         set_state(s,S_CHASE,G_IDLE);
     }
     face_player(s->e,p);
-    if(s->state==S_SWING)return;                         /* strike and end: per frame */
+    /* A flyer near the player holds its striking place in the air (COMBAT-FLYER-FLEES-57 reopened: it fought from
+     * inside the player, drawn at the player's feet): in front of the player, at 70 % of its striking gap from the
+     * player's hull, a little above the player's eyes (Quake's 22 when view_ofs is unset), moving there at the chase speed
+     * against the world only (touching the player's hull must not pin it), every think, swings included. */
+    if((AW_AmbientFlags(s->e)&AW_AMBIENT_FLYER) && gap_to(s->e,p,&dz)<=AW_CombatReach(&aw_combat_settings,&s->f)*SCALE*1.5f){
+        edict_t *fe=s->e;vec3_t hold,dv,end;trace_t tr;
+        float r=AW_CombatReach(&aw_combat_settings,&s->f)*SCALE,hx=fe->v.origin[0]-p->v.origin[0],hy=fe->v.origin[1]-p->v.origin[1];
+        float hl=(float)sqrt(hx*hx+hy*hy),stand=r*.7f+(fe->v.maxs[0]>8?fe->v.maxs[0]:7.32f)+(p->v.maxs[0]>8?p->v.maxs[0]:7.32f),len,mv;
+        if(hl<1){hx=1;hy=0;hl=1;}
+        hold[0]=p->v.origin[0]+hx/hl*stand;hold[1]=p->v.origin[1]+hy/hl*stand;
+        /* above the eyes: a player standing in water has the eyes at the surface, and a flyer at that height is
+         * hidden under the drawn water (seen in game, 30 October 2026) */
+        hold[2]=p->v.origin[2]+(p->v.view_ofs[2]>1?p->v.view_ofs[2]:22)+16;
+        VectorSubtract(hold,fe->v.origin,dv);len=(float)Length(dv);mv=chase_speed.value*dt;
+        if(len>2){
+            if(mv>len)mv=len;
+            VectorMA(fe->v.origin,mv/len,dv,end);
+            tr=SV_Move(fe->v.origin,fe->v.mins,fe->v.maxs,end,MOVE_NOMONSTERS,fe);
+            if(readout.value>=2)Con_Printf("flyer %s: at %.0f %.0f %.0f hold %.0f %.0f %.0f frac %.2f solid %d\n",s->f.name,fe->v.origin[0],
+                                           fe->v.origin[1],fe->v.origin[2],hold[0],hold[1],hold[2],tr.fraction,(int)tr.startsolid);
+            if(!tr.startsolid && !tr.allsolid && tr.fraction>0){VectorCopy(tr.endpos,fe->v.origin);SV_LinkEdict(fe,false);}
+        }
+    }    if(s->state==S_SWING)return;                         /* strike and end: per frame */
     reach=AW_CombatReach(&aw_combat_settings,&s->f)*SCALE;
     gap=gap_to(s->e,p,&dz);
     /* the flee rule on: the flee decision of every next action (aicombat.cpp: prepareNextAction whenever the actor is
@@ -898,7 +946,9 @@ static void think(slot_t *s,edict_t *p,float dt) {
         }
     }
     if(s->cooldown>0)s->cooldown-=dt;
-    if(gap<=reach*.8f && dz<reach && dz>-reach){
+    /* a flyer strikes from its place above the player's eyes, so its height gap may be larger by that much */
+    if(gap<=reach*.8f && dz<reach+((AW_AmbientFlags(s->e)&AW_AMBIENT_FLYER)?64:0) &&
+       dz>-reach-((AW_AmbientFlags(s->e)&AW_AMBIENT_FLYER)?64:0)){
         if(s->group!=G_IDLE)set_state(s,S_CHASE,G_IDLE);
         AW_PathIdle(&s->path,(int)s->e->v.origin[0],(int)s->e->v.origin[1]);
         if(s->cooldown<=0){
@@ -908,6 +958,47 @@ static void think(slot_t *s,edict_t *p,float dt) {
             voice(s->e,AW_VOICE_SWING);
             set_state(s,S_SWING,G_ATTACK);s->f.attacking=1;
         }
+        return;
+    }
+    /* A flying fighter (COMBAT-FLYER-FLEES-57): OpenMW 0.51 aipackage.cpp pathTo lets an actor that can move by the
+     * Z axis shortcut straight to its target while it is in line of sight (shortcutPath, UpdateFlag_CanMoveByZ),
+     * never the walkers' ground route. Here: the standing hull swept straight toward the player's height in three
+     * dimensions (no floor test, no gravity); a blocked sweep keeps it where it is (no flee: the target is reachable
+     * through the air). Walkers keep the ground chase below. Our own code. */
+    if(AW_AmbientFlags(s->e)&(AW_AMBIENT_FLYER|AW_AMBIENT_SWIMMER)){
+        vec3_t d,end;trace_t tr;float len;edict_t *fe=s->e;
+        step=(int)(chase_speed.value*dt);if(step>(int)(gap-reach*.6f))step=(int)(gap-reach*.6f);if(step<1)step=1;
+        /* the goal is not the player's centre (it flew into the player and fought from inside, drawn out of sight:
+         * COMBAT-FLYER-FLEES-57 reopened) but a point in front of the player at striking distance, a flyer at the
+         * player's eye height (a swimmer at the player's own height); the player stays solid to the sweep */
+        {
+            float hx=s->e->v.origin[0]-p->v.origin[0],hy=s->e->v.origin[1]-p->v.origin[1],hl=(float)sqrt(hx*hx+hy*hy),stand=reach*.7f+(fe->v.maxs[0]>8?fe->v.maxs[0]:7.32f)+(p->v.maxs[0]>8?p->v.maxs[0]:7.32f);   /* centre distance at 70 % of the striking gap (gap_to), so it is seen in front, not inside the view */
+            vec3_t goal3;
+            if(hl<1){hx=1;hy=0;hl=1;}
+            goal3[0]=p->v.origin[0]+hx/hl*stand;goal3[1]=p->v.origin[1]+hy/hl*stand;
+            goal3[2]=p->v.origin[2]+((AW_AmbientFlags(fe)&AW_AMBIENT_FLYER)?(p->v.view_ofs[2]>1?p->v.view_ofs[2]:22):0);   /* 22: Quake's eye height when view_ofs is not set */
+            VectorSubtract(goal3,s->e->v.origin,d);
+        }
+        len=(float)Length(d);
+        if(len>1){
+            if((float)step>len)step=(int)len;
+            VectorMA(s->e->v.origin,(float)step/len,d,end);
+            tr=SV_Move(fe->v.origin,fe->v.mins,fe->v.maxs,end,MOVE_NORMAL,fe);
+            /* a swimmer chases the same straight way but never leaves the water (OpenMW: a pure water creature's path
+             * stays in water); at the shore it waits there */
+            /* blocked on the way (a rock, a roof): a flyer climbs over it first (OpenMW's flyers leave the straight
+             * shortcut when it is not clear; here the cheapest way round is up) */
+            if((tr.startsolid || tr.allsolid || tr.fraction<1) && (AW_AmbientFlags(fe)&AW_AMBIENT_FLYER)){
+                VectorCopy(fe->v.origin,end);end[2]+=step;
+                tr=SV_Move(fe->v.origin,fe->v.mins,fe->v.maxs,end,MOVE_NORMAL,fe);
+            }
+            if(!tr.startsolid && !tr.allsolid && tr.fraction>0 &&
+               (!(AW_AmbientFlags(fe)&AW_AMBIENT_SWIMMER) || AW_AmbientInWater(tr.endpos))){VectorCopy(tr.endpos,s->e->v.origin);SV_LinkEdict(s->e,false);moved=1;}
+        }
+        s->f.moving=(unsigned char)moved;
+        if(moved && s->group!=G_RUN)set_state(s,S_CHASE,G_RUN);
+        else if(!moved && s->group!=G_IDLE)set_state(s,S_CHASE,G_IDLE);
+        face_player(s->e,p);
         return;
     }
     self[0]=(int)floor(s->e->v.origin[0]);self[1]=(int)floor(s->e->v.origin[1]);self[2]=(int)floor(s->e->v.origin[2]+s->e->v.mins[2]);

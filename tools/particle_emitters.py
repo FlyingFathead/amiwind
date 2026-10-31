@@ -5,8 +5,8 @@
 Morrowind draws chimney and campfire smoke, steam vents, torch and brazier flames, waterfall spray, blight clouds
 and the like with NiParticleSystemController emitters inside the placed meshes. AmiWind draws the flames (aw_flame
 rows: tools/prepare_scenery.model_flames, tools/chim/flames.py) and leaves every other emitter out
-(prepare_scenery.FLAME_SKIP, chim.flames.NOT_FIRE_MESH). Before any of them is drawn (the maintainer, 27 October
-2026: "it could be a shit simple sprite thing"), this sweep says what there is: every placed mesh with an emitter,
+(prepare_scenery.FLAME_SKIP, chim.flames.NOT_FIRE_MESH). Before any of them is drawn (decided for the project,
+27 October 2026: a plain, simple sprite is enough), this sweep says what there is: every placed mesh with an emitter,
 each emitter's kind (from its node, mesh and particle texture names), its particle texture, size, rise and birth
 rate, and how often the mesh is placed outdoors and indoors.
 
@@ -358,7 +358,7 @@ def smoke_table(data_files, kinds=('smoke', 'steam')):
                  'textures': {k: list(v) for k, v in sorted(colours.items())}}
 
 
-# The smoke puff the engine draws (world/smoke.spr, MESH-PARTICLE-EMITTERS: "a shit simple sprite thing"): the
+# The smoke puff the engine draws (world/smoke.spr, MESH-PARTICLE-EMITTERS: a plain, simple sprite): the
 # chimneys' own particle texture as a Quake sprite (IDSP version 1, facing the view), SMOKE_SPRITE_FRAMES frames of
 # SMOKE_SPRITE_SIZE square, each frame keeping fewer of the puff's texels (alpha above a rising threshold), so a
 # puff thins out as it rises; transparent texels are palette index 255 as in every AmiWind sprite.

@@ -2,7 +2,8 @@
  * The game side of the compiled scripts (aw_mwvm.c): the file id1/mwscript.awm, the objects of the loaded map,
  * sounds, voices, music, the journal and the player (docs/MWSCRIPT_BYTECODE.md).
  *
- * EXPERIMENTAL, off by default (aw_mwscript 0; dbg mwscript on): the file's resident part (scripts, code and the
+ * On by default since v0.0.57 (aw_mwscript 1; dbg mwscript off switches it off, dbg mwscript tells what it does and
+ * what was loaded): the file's resident part (scripts, code and the
  * tables they index) is read once when it is switched on, into one block that stays for the session; nothing is
  * allocated while scripts run. At each map change the objects that carry a script are attached: every edict whose
  * original reference (aw_ref) has a script in the file's bindings, and on an outdoor map every scripted placement
@@ -24,6 +25,12 @@
 #include "aw_character.h"
 #include "aw_combat.h"
 #include "aw_animpick.h"
+#include "aw_pcstanding.h"
+#include "aw_effects.h"
+#include "aw_talk.h"
+#include "aw_glut.h"
+#include "aw_dial.h"
+#include <ctype.h>
 
 #define FILE_NAME "mwscript.awm"
 #define MAX_RESIDENT (1024*1024)
@@ -34,8 +41,9 @@
 #define CHAN_SCRIPT 5
 #define CHAN_SCRIPT_VOICE 2
 
-static cvar_t mwscript={"aw_mwscript","0",true};
-static unsigned char *resident;static unsigned long resident_bytes;
+static cvar_t mwscript={"aw_mwscript","1",true};
+static unsigned char *resident;static unsigned long resident_bytes,file_bytes;
+static const char *load_why="not read yet";   /* the console answer (dbg mwscript): why the file is not loaded */
 static int load_failed,attached_map;
 static char map_name[64];static void *map_model;
 static char *topic_names;static int *topic_offsets;static int32_t *topic_values;
@@ -302,6 +310,35 @@ static int object_intercept(unsigned reference){
     }
     return 0;
 }
+/* E on an object with no NPC under the crosshair (v0.0.57): the scripted placement that reads OnActivate nearest the
+ * view's line, within the activation distance (iMaxActivateDist 192 game units, the original's GMST; OpenMW
+ * mwworld/worldimp.cpp getMaxActivationDistance) and inside a narrow cone (cos 0.95 against the view). Activators and
+ * other placements the CHIM world keeps without an edict are scripts' instances with their positions; the script's
+ * OnActivate reads 1 on its next run. 1 when one took the use. */
+static void to_game_units(const vec3_t local,float out[3]);
+int AW_MwscriptUseInView(const float *eye,const float *forward);
+int AW_MwscriptUseInView(const float *eye,const float *forward){
+    int k,n,best=-1;float best_cos=0.95f,e[3];
+    if(!mwscript.value || !resident)return 0;
+    to_game_units(eye,e);
+    n=AW_MwvmInstanceCount();
+    for(k=0;k<n;k++){
+        aw_mwvm_instance_t *in=AW_MwvmInstance(k);float d[3],g[3],len,c;vec3_t l;
+        if(!in || !(in->flags&AWI_USED) || (in->flags&AWI_GLOBAL) || !in->reference)continue;
+        if(!(AW_MwvmScriptFlags(in->script)&AWS_ONACTIVATE))continue;
+        VectorCopy(in->origin,l);to_game_units(l,g);
+        d[0]=g[0]-e[0];d[1]=g[1]-e[1];d[2]=g[2]-e[2];
+        len=(float)sqrt(d[0]*d[0]+d[1]*d[1]+d[2]*d[2]);
+        if(len>192.0f || len<1.0f)continue;
+        d[0]=in->origin[0]-eye[0];d[1]=in->origin[1]-eye[1];d[2]=in->origin[2]-eye[2];
+        len=(float)sqrt(d[0]*d[0]+d[1]*d[1]+d[2]*d[2]);
+        c=(d[0]*forward[0]+d[1]*forward[1]+d[2]*forward[2])/len;
+        if(c>best_cos){best_cos=c;best=k;}
+    }
+    if(best<0)return 0;
+    {aw_mwvm_instance_t *in=AW_MwvmInstance(best);in->flags|=AWI_ACTIVATED;in->flags&=~AWI_QUIET;intercepted++;}
+    return 1;
+}
 static void object_activate(uint32_t reference){
     activated++;
     if(AW_HingedDoorActivate(reference))return;
@@ -357,6 +394,11 @@ int (*aw_mwscript_wander)(struct edict_s *e,int distance,int duration,int hour,c
  * OpenMW's package number (-1 none, 0 Wander, ...) and *DONE once it has run out; NULL: -1 and 0. The ambient tables
  * move the scripts' state generation when a package starts or ends (AW_MwvmStateChanged). */
 int (*aw_mwscript_ai_package)(struct edict_s *e,int *done);
+int (*aw_mwscript_travel)(struct edict_s *e,const float to[3]);
+int (*aw_mwscript_follow)(struct edict_s *e,struct edict_s *target,float hours,const float *final);
+int (*aw_mwscript_packages_export)(unsigned char *out,int capacity);
+int (*aw_mwscript_packages_import)(const unsigned char *data,int bytes);
+static unsigned long travels,travels_refused,follows,follows_refused,positions,positions_refused;
 static FILE *actor_file;static long actor_base;static int actors_failed,dagoth_ur_1=-2;
 static unsigned long actor_calls,actor_misses,combat_starts,combat_stops,wanders;
 static int actor_read(void *context,uint32_t offset,void *out,uint32_t bytes){
@@ -654,11 +696,246 @@ static int host_player_move(int instance,int kind,int map,const float *at,float 
     else{player_moves_refused++;Con_DPrintf("MWScript: PositionCell of the player not possible here (kind %d).\n",kind);}
     return ok;
 }
-/* The import route: no function is carried out by number yet; each NOTYET call is counted (aw_mwscript_status)
- * and logged once. A function plugged in here needs no new opcode and no change of the file's format. */
+/* The import route: each NOTYET call is counted (aw_mwscript_status); a function carried out here by its number
+ * needs no new opcode and no change of the file's format; the others are logged once and read 0.
+ * v0.0.57: the player's standing (aw_pcstanding.c; rules from OpenMW apps/openmw/mwscript/statsextensions.cpp
+ * OpGetPCCrimeLevel, OpSetPCCrimeLevel, OpModPCCrimeLevel, OpPCJoinFaction, OpPCRaiseRank, OpPCLowerRank,
+ * OpGetPCRank, OpGetPCFacRep, OpSetPCFacRep, OpModPCFacRep, OpPcExpelled, OpPcExpell, OpPcClearExpelled, OpGetRace;
+ * dialogueextensions.cpp OpGetReputation, OpSetReputation, OpModReputation). A faction not named is the target
+ * actor's own (the player has none: rank -1). */
+static unsigned long standing_calls,standing_misses,anim_plays,anim_misses,topics_added,cures,effects_cast;
+static unsigned long greetings,greetings_missed,rotations,rotations_missed;
+dfunction_t *ED_FindFunction(char *name);
+/* The topics the player knows (AddTopic, v0.0.57): one bit per row of the file's TOPC section (the game's dialogue
+ * topics, sorted; the names stay on disk), taken when the file loads; saved with the game. */
+static unsigned char *known_topics;static int topic_rows,topic_bytes;
+int AW_MwscriptTopicKnown(int row);   /* the dialogue window's question (DIALOGUE-57): 1 when row ROW is known */
+int AW_MwscriptTopicKnown(int row){return row>=0 && row<topic_rows && known_topics && (known_topics[row>>3]>>(row&7)&1);}
+/* ForceGreeting's act on actor E (see AWF_FORCEGREETING below); 1 when the greeting was played */
+static int force_greeting(edict_t *e){
+    dfunction_t *greet;int self,other;
+    if(!e || e->free || e==sv_player || !sv_player || strcmp(pr_strings+e->v.classname,"aw_npc") ||
+       (aw_can_talk && !aw_can_talk(e)) || !(greet=ED_FindFunction("aw_greet"))){greetings_missed++;return 0;}
+    self=pr_global_struct->self;other=pr_global_struct->other;
+    pr_global_struct->self=EDICT_TO_PROG(sv_player);
+    G_INT(OFS_PARM0)=EDICT_TO_PROG(e);G_INT(OFS_PARM1)=EDICT_TO_PROG(sv_player);G_FLOAT(OFS_PARM2)=0;
+    PR_ExecuteProgram(greet-pr_functions);
+    pr_global_struct->self=self;pr_global_struct->other=other;
+    greetings++;return 1;
+}
+static const char *call_string(const unsigned char *strings,int nstrings,int i){
+    return i<nstrings?cached_id((strings[2*i]<<8)|strings[2*i+1]):NULL;
+}
+static const char *actor_faction(int instance,int target,char *out,int capacity){
+    edict_t *e;aw_actor_t *a;aw_actor_base_t b;
+    if(target==AW_MWVM_PLAYER || !(a=actor_of(instance,target,&e)) || a->reference==AW_ACTOR_PLAYER_REF)return NULL;
+    if(!AW_ActorBase(a->base,&b) || b.faction==AW_ACTOR_NONE || !read_string(b.faction,out,capacity) || !out[0])return NULL;
+    return out;
+}
+static int same_id(const char *a,const char *b){
+    for(;*a && *b;a++,b++)if(tolower((unsigned char)*a)!=tolower((unsigned char)*b))return 0;
+    return *a==*b;
+}
 static int host_call(int instance,int target,int function,const aw_mwcell_t *numbers,int count,
                      const unsigned char *strings,int nstrings,aw_mwcell_t *result){
-    (void)instance;(void)target;(void)function;(void)numbers;(void)count;(void)strings;(void)nstrings;(void)result;
+    char own[64];const char *faction;int value=count>0?numbers[0].i:0;
+    switch(function){
+    case AWF_GETPCCRIMELEVEL:result->f=(float)AW_StandingCrime();standing_calls++;return AW_MWVM_CALL_READ;
+    case AWF_SETPCCRIMELEVEL:case AWF_MODPCCRIMELEVEL:
+        if(count<1)return 0;
+        if(function==AWF_SETPCCRIMELEVEL)AW_StandingSetCrime((int)numbers[0].f);else AW_StandingModCrime((int)numbers[0].f);
+        standing_calls++;AW_MwvmStateChanged();return 1;
+    case AWF_GETREPUTATION:case AWF_SETREPUTATION:case AWF_MODREPUTATION:
+        if(target!=AW_MWVM_PLAYER){
+            edict_t *e;aw_actor_t *a;aw_actor_base_t b;
+            /* an NPC's reputation: its record's (changing it is not kept per actor yet: "not yet") */
+            if(function!=AWF_GETREPUTATION || !(a=actor_of(instance,target,&e)) || !AW_ActorBase(a->base,&b)){
+                standing_misses++;return 0;}
+            result->i=b.reputation;standing_calls++;return AW_MWVM_CALL_READ;
+        }
+        standing_calls++;
+        if(function==AWF_GETREPUTATION){result->i=AW_StandingReputation();return AW_MWVM_CALL_READ;}
+        AW_StandingSetReputation(function==AWF_SETREPUTATION?value:AW_StandingReputation()+value);
+        AW_MwvmStateChanged();return 1;
+    case AWF_GETPCRANK:case AWF_PCRAISERANK:case AWF_PCLOWERRANK:case AWF_PCJOINFACTION:
+    case AWF_PCEXPELLED:case AWF_PCEXPELL:case AWF_PCCLEAREXPELLED:
+        faction=call_string(strings,nstrings,0);
+        if(!faction)faction=actor_faction(instance,target,own,sizeof(own));
+        standing_calls++;
+        if(function==AWF_GETPCRANK){result->i=faction?AW_StandingRank(faction):-1;return AW_MWVM_CALL_READ;}
+        if(function==AWF_PCEXPELLED){result->i=faction?AW_StandingExpelled(faction):0;return AW_MWVM_CALL_READ;}
+        if(!faction)return 1;              /* a factionless speaker: nothing to change (OpenMW) */
+        if(function==AWF_PCRAISERANK)AW_StandingRaise(faction);
+        else if(function==AWF_PCLOWERRANK)AW_StandingLower(faction);
+        else if(function==AWF_PCJOINFACTION)AW_StandingJoin(faction);
+        else AW_StandingSetExpelled(faction,function==AWF_PCEXPELL);
+        AW_MwvmStateChanged();return 1;
+    case AWF_GETPCFACREP:case AWF_SETPCFACREP:case AWF_MODPCFACREP:
+        faction=call_string(strings,nstrings,0);
+        if(!faction)faction=actor_faction(instance,target,own,sizeof(own));
+        standing_calls++;
+        if(function==AWF_GETPCFACREP){result->i=faction?AW_StandingFactionReputation(faction):0;return AW_MWVM_CALL_READ;}
+        if(!faction || count<1)return 1;
+        AW_StandingSetFactionReputation(faction,function==AWF_SETPCFACREP?value:AW_StandingFactionReputation(faction)+value);
+        AW_MwvmStateChanged();return 1;
+    case AWF_ADDTOPIC:
+        /* AddTopic (OpenMW dialogueextensions.cpp OpAddTopic: the topic joins the player's known list; the dialogue
+         * window shows it, DIALOGUE-57): the compiler hands the topic's TOPC row as the number */
+        if(count<1 || numbers[0].i<0 || numbers[0].i>=topic_rows || !known_topics)return 0;
+        known_topics[numbers[0].i>>3]|=(unsigned char)(1<<(numbers[0].i&7));topics_added++;
+        return 1;
+    case AWF_FORCEGREETING:{
+        /* ForceGreeting (OpenMW dialogueextensions.cpp OpForceGreeting: the actor opens the dialogue with its
+         * greeting): the greeting the engine plays when the player talks to the actor (QC aw_greet, the voice table
+         * and its hello line), by the same talk rule (aw_talk.c: alive, not hostile, something to say); the dialogue
+         * window itself comes with DIALOGUE-57. Nothing happens with no actor, no player or a line still playing. */
+        vec3_t at;int n=locate(instance,target,at);
+        force_greeting(n>0?edict_of(n):NULL);
+        return 1;}
+    case AWF_AITRAVEL:{
+        /* AITravel X Y Z [repeat] (OpenMW aiextensions.cpp OpAiTravel, aitravel.cpp): the actor walks to the point
+         * (the original's coordinates) by the ambient tables' routes (aw_ambient.c AW_AmbientTravel); GetAIPackageDone
+         * reads 1 when it arrived. Without the ambient tables in the build, or an actor not loaded: nothing, counted. */
+        vec3_t at,local;edict_t *e;int n=locate(instance,target,at);float game[3];
+        e=n>0?edict_of(n):NULL;
+        if(count<3 || !e || e==sv_player || !aw_mwscript_travel){travels_refused++;return 1;}
+        game[0]=numbers[0].f;game[1]=numbers[1].f;game[2]=numbers[2].f;
+        if(!AW_SourceToWorld(sv.name,game,local)){   /* a room: a quarter scale plus its shift (as to_game_units) */
+            int i;for(i=0;i<3;i++)local[i]=game[i]/4.0f+room_shift[i];
+        }
+        if(aw_mwscript_travel(e,local))travels++;else travels_refused++;
+        return 1;}
+    case AWF_AIFOLLOW:{
+        /* AIFollow TARGET DURATION X Y Z [reset] (OpenMW aiextensions.cpp OpAiFollow, aifollow.cpp): the actor follows
+         * the target (the player, or an actor of this map by its id) by the ambient tables (AW_AmbientFollow) */
+        const char *who=call_string(strings,nstrings,0);vec3_t at,local;edict_t *e,*t=NULL;int n=locate(instance,target,at),i;
+        float game[3];
+        e=n>0?edict_of(n):NULL;
+        if(!who || count<4 || !e || e==sv_player || !aw_mwscript_follow){follows_refused++;return 1;}
+        if(!Q_strcasecmp((char *)who,"player"))t=sv_player;
+        else for(i=1;i<sv.num_edicts && !t;i++){
+            edict_t *x=EDICT_NUM(i);eval_t *v;
+            if(x->free || !(v=GetEdictFieldValue(x,"aw_source_id")) || !v->string)continue;
+            if(!Q_strcasecmp(pr_strings+v->string,(char *)who))t=x;
+        }
+        game[0]=numbers[1].f;game[1]=numbers[2].f;game[2]=numbers[3].f;
+        if(game[0]!=0 || game[1]!=0 || game[2]!=0){
+            if(!AW_SourceToWorld(sv.name,game,local))for(i=0;i<3;i++)local[i]=game[i]/4.0f+room_shift[i];
+        }else local[0]=local[1]=local[2]=0;
+        if(t && aw_mwscript_follow(e,t,numbers[0].f,local))follows++;else follows_refused++;
+        return 1;}
+    case AWF_POSITION:{
+        /* Position X Y Z ZROT (OpenMW transformationextensions.cpp OpPosition): the player goes to the outdoor point
+         * (the coordinate teleport, as PositionCell outdoors); any other object with an entity moves within the map it
+         * is in. The rotation is not applied yet (the player keeps its view; an object its facing). */
+        vec3_t at,local;int n=locate(instance,target,at),i;edict_t *e;float game[3];
+        if(count<3){positions_refused++;return 1;}
+        game[0]=numbers[0].f;game[1]=numbers[1].f;game[2]=numbers[2].f;
+        if(target==AW_MWVM_PLAYER){
+            if(AW_MapTeleportAt(game,1))positions++;else positions_refused++;
+            return 1;
+        }
+        e=n>0?edict_of(n):NULL;
+        if(!e || e->free || e==sv_player){positions_refused++;return 1;}
+        if(!AW_SourceToWorld(sv.name,game,local))for(i=0;i<3;i++)local[i]=game[i]/4.0f+room_shift[i];
+        VectorCopy(local,e->v.origin);SV_LinkEdict(e,false);positions++;
+        return 1;}
+    case AWF_GETSTANDINGPC:{
+        /* GetStandingPC (OpenMW miscextensions.cpp OpGetStandingPc, World::getPlayerStandingOn): 1 while the player
+         * stands on the object. Here an object with an entity (Quake's ground entity); CHIM scenery without one is
+         * part of the world's collision and reads 0 (not yet) */
+        vec3_t at;int n=locate(instance,target,at);edict_t *e=n>0?edict_of(n):NULL;
+        result->i=e && sv_player && ((int)sv_player->v.flags&FL_ONGROUND) && PROG_TO_EDICT(sv_player->v.groundentity)==e;
+        return AW_MWVM_CALL_READ;}
+    case AWF_GETTARGET:{
+        /* GetTarget ID (OpenMW aiextensions.cpp OpGetTarget: 1 when the actor's combat package targets ID): the
+         * combat layer here fights the player only (aw_combat.c), so the answer is 1 for the player while the actor
+         * is in a fight and alive, 0 for anyone else */
+        const char *id=call_string(strings,nstrings,0);vec3_t at;edict_t *e;int n=locate(instance,target,at);
+        const aw_fighter_t *f;
+        e=n>0?edict_of(n):NULL;
+        result->i=id && !Q_strcasecmp((char *)id,"player") && e && e!=sv_player && (f=AW_CombatFighter(e))!=NULL &&
+                  !f->dead;
+        return AW_MWVM_CALL_READ;}
+    case AWF_ROTATE:{
+        /* Rotate AXIS DEGREES-A-SECOND (OpenMW transformationextensions.cpp OpRotate: by that many degrees times the
+         * frame's duration; the player only around z): on an object with an entity; the CHIM scenery without one
+         * cannot turn yet. Quake's yaw turns the other way round from the original's z. */
+        const char *axis=call_string(strings,nstrings,0);vec3_t at;edict_t *e;int n=locate(instance,target,at);
+        float step=count>=1?numbers[0].f*(float)host_frametime:0;
+        e=n>0?edict_of(n):NULL;
+        if(!axis || !e || e->free){rotations_missed++;return 1;}
+        if(e==sv_player || tolower((unsigned char)axis[0])=='z')e->v.angles[1]-=step;
+        else if(tolower((unsigned char)axis[0])=='x')e->v.angles[0]+=step;
+        else if(tolower((unsigned char)axis[0])=='y')e->v.angles[2]+=step;
+        rotations++;return 1;}
+    case AWF_GETEFFECT:
+        /* GetEffect (OpenMW miscextensions.cpp OpGetEffect: an active effect of that kind on the actor): only the
+         * player has active effects here (aw_effects.c); an actor's own reads 0, true while no effect lands on it */
+        result->i=count>=1 && target==AW_MWVM_PLAYER?AW_EffectsHas(numbers[0].i):0;
+        return AW_MWVM_CALL_READ;
+    case AWF_CAST:{
+        /* Cast SPELL TARGET (OpenMW apps/openmw/mwscript/miscextensions.cpp OpCast; the cures' effects from
+         * mwmechanics/spelleffects.cpp CureCommonDisease / CureBlightDisease / CurePoison): v0.0.57 carries out the
+         * cures on the player, the caster plays its cast (aw_animkit.c); every other spell waits for the spell
+         * effects (SPELL-EFFECTS-57) and stays "not yet". Cure Poison: no poison state exists yet, so it changes
+         * nothing (said so in docs/MWSCRIPT_BYTECODE.md). */
+        const char *spell=call_string(strings,nstrings,0),*who=call_string(strings,nstrings,1);char s[64];int k,type;
+        vec3_t at;edict_t *caster;int n;
+        if(count>=1){
+            /* SPELL-EFFECTS-57, the first slice: the compiler handed the spell's SPFX row (every effect a Fortify,
+             * Drain, Damage or Restore of a stat); each lands on the player with its magnitude rolled once */
+            uint32_t off,rows,bytes;int row=numbers[0].i,e;aw_actor_t *p=player_record();
+            if(!p || !AW_MwvmSection("SPFX",&off,&rows,&bytes) || row<0 || (uint32_t)row>=rows ||
+               off+bytes>resident_bytes)return 0;
+            {const unsigned char *h=resident+off+4*row;int first=(h[0]<<8)|h[1],nfx=h[2];
+             for(e=0;e<nfx;e++){
+                 const unsigned char *x=resident+off+4*rows+8*(first+e);int lo=(x[4]<<8)|x[5],hi=(x[6]<<8)|x[7];
+                 float m=(float)(hi>lo?lo+rand()%(hi-lo+1):lo);
+                 if(x[0]==4){   /* a cure: the spells of that type go (0: Cure Poison, no poison state yet) */
+                     if(x[1])AW_ActorRemoveSpellType(p,x[1]);
+                     cures++;continue;
+                 }
+                 if(AW_EffectsAdd(p,x[0],x[1],m,(float)((x[2]<<8)|x[3])))effects_cast++;
+             }}
+            player_store(p);AW_MwvmStateChanged();
+            n=locate(instance,target,at);caster=n>0?edict_of(n):NULL;
+            if(caster && caster!=sv_player)AW_AnimPickCast(caster,AW_PR_TOUCH);
+            return 1;
+        }
+        if(!spell || !who || Q_strcasecmp((char *)who,"player"))return 0;
+        for(k=0;spell[k] && k<63;k++)s[k]=(char)tolower((unsigned char)spell[k]);
+        s[k]=0;
+        if(strstr(s,"cure common disease"))type=3;
+        else if(strstr(s,"cure blight disease"))type=2;
+        else if(strstr(s,"cure poison"))type=0;
+        else return 0;
+        if(type){aw_actor_t *p=player_record();if(p && AW_ActorRemoveSpellType(p,type)>0)AW_MwvmStateChanged();}
+        n=locate(instance,target,at);caster=n>0?edict_of(n):NULL;
+        if(caster && caster!=sv_player)AW_AnimPickCast(caster,AW_PR_TOUCH);
+        cures++;return 1;}
+    case AWF_PLAYGROUP:case AWF_LOOPGROUP:{
+        /* PlayGroup group [flags] / LoopGroup group count [flags] (aw_animkit.c AW_AnimPickScripted, OpenMW's
+         * animationextensions.cpp): on a skeletal actor whose map is loaded; else nothing happens, counted */
+        const char *group=call_string(strings,nstrings,0);vec3_t at;edict_t *e;int n=locate(instance,target,at);
+        e=n>0?edict_of(n):NULL;
+        if(group && e && !e->free && e!=sv_player &&
+           AW_AnimPickScripted(e,group,function==AWF_LOOPGROUP && count>0?numbers[0].i:0))anim_plays++;
+        else anim_misses++;
+        return 1;}
+    case AWF_GETRACE:{
+        const char *race=call_string(strings,nstrings,0);edict_t *e;aw_actor_t *a;aw_actor_base_t b;
+        standing_calls++;result->i=0;
+        if(!race)return AW_MWVM_CALL_READ;
+        if(target==AW_MWVM_PLAYER){
+            if(aw_character.valid && aw_character.race>=0 && aw_character.race<aw_race_count)
+                result->i=same_id(aw_races[aw_character.race].id,race);
+            return AW_MWVM_CALL_READ;
+        }
+        if((a=actor_of(instance,target,&e)) && AW_ActorBase(a->base,&b) && b.kind==0 && b.race!=AW_ACTOR_NONE &&
+           read_string(b.race,own,sizeof(own)))result->i=same_id(own,race);
+        return AW_MWVM_CALL_READ;}
+    }
     return 0;
 }
 
@@ -667,25 +944,112 @@ static const aw_mwvm_host_t host={host_sound,host_sound_playing,host_say,host_sa
     host_button,host_actor,host_item,host_spell,host_combat,host_dead_count,host_wander,host_call,host_player_cell,
     host_position,host_player_move,host_ai_package};
 
+/* The dialogue conditions' live state (aw_glut.h aw_glut_live, DIALOGUE-57): what the scripts keep, read by name.
+ * Not yet: script locals, SameRace, SameSex, RankRequirement, globals by name (they keep the start value). */
+static int live_journal(const char *quest,long *out){
+    int i,n=AW_MwvmTopicCount();long best=AW_StateGet(&aw_state,AW_JOURNAL,(char *)quest);
+    for(i=0;topic_values && topic_names && i<n;i++)
+        if(topic_values[i]>best && same_id(topic_names+topic_offsets[i],quest))best=topic_values[i];
+    *out=best;return 1;
+}
+static int live_dead(const char *actor,long *out){
+    int row;
+    if(!AW_MwscriptActors() || (row=AW_ActorFind(actor))<0){*out=0;return 1;}   /* an id no actor has: 0 dead */
+    *out=AW_ActorDeadCount(row);return 1;
+}
+static int live_item(const char *item,long *out){*out=AW_StateGet(&aw_state,AW_ITEM,(char *)item);return 1;}
+static int live_rank(const char *faction,long *out){*out=AW_StandingRank(faction);return 1;}
+/* SCVR function numbers (mwad.dialogue FUNCTIONS): the player's standing and the character's stats */
+static int live_function(const aw_glut_cond_t *c,unsigned fn,long *out){
+    if(fn==5){*out=AW_StandingReputation();return 1;}                      /* PcReputation */
+    if(fn==43){*out=AW_StandingCrime();return 1;}                          /* PcCrimeLevel */
+    if(fn==39){*out=c->faction?AW_StandingExpelled(c->faction):0;return 1;} /* PcExpelled (the speaker's faction) */
+    if(fn==46){*out=c->faction && AW_StandingRank(c->faction)>=0;return 1;} /* SameFaction */
+    if(!aw_character.valid)return 0;
+    if(fn==6){*out=aw_character.level;return 1;}                           /* PcLevel */
+    if(fn==38){*out=aw_character.female?1:0;return 1;}                      /* PcGender: 1 female (OpenMW) */
+    if(fn==10){*out=aw_character.attributes[0];return 1;}                  /* PcStrength */
+    if(fn>=51 && fn<=57){*out=aw_character.attributes[fn-50];return 1;}    /* PcIntelligence .. PcLuck */
+    if(fn>=11 && fn<=37){*out=aw_character.skills[fn-11];return 1;}        /* PcBlock .. PcHandToHand */
+    return 0;
+}
+/* the speaker's script local: its attached instance's slot (no instance: 0, OpenMW's empty locals) */
+static int live_local(const aw_glut_cond_t *c,int slot,int is_float,float *out){
+    int k,n=AW_MwvmInstanceCount();aw_mwvm_instance_t *in;aw_mwcell_t v;
+    *out=0;
+    for(k=0;c->speaker>0 && k<n;k++)
+        if((in=AW_MwvmInstance(k))!=NULL && (in->flags&AWI_USED) && in->entity==c->speaker){
+            v=AW_MwvmLocal(k,slot);*out=is_float?v.f:(float)v.i;break;}
+    return 1;
+}
+/* a global by name: the GLOB rows' names read once from the file (32 bytes each, kept for the session) */
+static char *global_names;static int global_names_tried;
+static int live_global(const char *name,float *out){
+    uint32_t off,rows,bytes;int i;
+    if(!AW_MwvmLoaded() || !AW_MwvmSection("GLOB",&off,&rows,&bytes) || off+8ul*rows>resident_bytes)return 0;
+    if(!global_names && !global_names_tried){
+        FILE *f=NULL;long base;
+        global_names_tried=1;
+        if(COM_FOpenFile(FILE_NAME,&f)>0 && f && (global_names=(char *)AW_TryCalloc(rows?rows:1,32))!=NULL){
+            base=ftell(f);
+            for(i=0;i<(int)rows;i++)
+                if(!read_string_from(f,base,(int)((resident[off+8*i+2]<<8)|resident[off+8*i+3]),global_names+32*i,32))
+                    global_names[32*i]=0;
+        }
+        if(f)fclose(f);
+    }
+    for(i=0;global_names && i<(int)rows;i++)if(same_id(global_names+32*i,name)){
+        *out=resident[off+8*i]==2?AW_MwvmGlobalFloat(i):(float)AW_MwvmGlobalInt(i);return 1;}
+    return 0;
+}
+/* The disposition's facts of a speaker (aw_dial.h aw_dial_facts_t; DIALOGUE-57): its own disposition from the actor
+ * record (the scripts' SetDisposition and ModDisposition included) when the actor table has it, else BASE; same race,
+ * the player's Personality, crime level, faction ranks. Not yet: disease, a drawn weapon, Charm (0). */
+static int standing_rank(const char *faction,int *expelled){*expelled=AW_StandingExpelled(faction);return AW_StandingRank(faction);}
+void AW_MwscriptDispositionFacts(const char *record,unsigned long reference,int base,const char *faction,aw_dial_facts_t *f){
+    int row=-1;aw_actor_base_t b;aw_actor_t *a;char race[64];
+    memset(f,0,sizeof(*f));
+    f->base=base;f->faction=faction;f->rank=standing_rank;f->bounty=AW_StandingCrime();
+    f->personality=aw_character.valid?(float)aw_character.attributes[6]:50.0f;
+    if(!AW_MwscriptActors() || !record || (row=AW_ActorFind(record))<0 || !AW_ActorBase(row,&b))return;
+    if(reference && (a=AW_ActorGet((uint32_t)reference,row,0))!=NULL)f->base=(int)AW_ActorStat(a,AWA_DISPOSITION);
+    if(aw_character.valid && b.race!=AW_ACTOR_NONE && read_string(b.race,race,sizeof(race)))
+        f->same_race=same_id(race,aw_races[aw_character.race].id);
+}
+/* An NPC record's faction id (the actor table), "" when it has none or the table is not loaded. */
+int AW_MwscriptActorFaction(const char *record,char *out,int capacity);
+int AW_MwscriptActorFaction(const char *record,char *out,int capacity){
+    int row;aw_actor_base_t b;
+    out[0]=0;
+    if(!AW_MwscriptActors() || !record || (row=AW_ActorFind(record))<0 || !AW_ActorBase(row,&b) ||
+       b.faction==AW_ACTOR_NONE || !read_string(b.faction,out,capacity))return 0;
+    return out[0]!=0;
+}
+static const aw_glut_live_t live={live_journal,live_dead,live_item,live_rank,live_global,live_function,live_local};
+
 /* --- loading and the map's objects --- */
 static int load(void){
     FILE *f=NULL;int length,i,n;unsigned char head[16];uint32_t wanted;char name[64];long base;
     if(resident || load_failed)return resident!=NULL;
     load_failed=1;
     length=COM_FOpenFile(FILE_NAME,&f);
-    if(!f){Con_Printf("MWScript: no %s in this image.\n",FILE_NAME);return 0;}
-    if(length<16 || fread(head,1,16,f)!=16 || memcmp(head,"AWMS",4)){fclose(f);Con_Printf("MWScript: bad file.\n");return 0;}
+    if(!f){load_why="no id1/mwscript.awm in this image";Con_Printf("MWScript: no %s in this image.\n",FILE_NAME);return 0;}
+    file_bytes=length>0?(unsigned long)length:0;
+    if(length<16 || fread(head,1,16,f)!=16 || memcmp(head,"AWMS",4)){
+        fclose(f);load_why="the file is not AWMS";Con_Printf("MWScript: bad file.\n");return 0;}
     wanted=((uint32_t)head[12]<<24)|((uint32_t)head[13]<<16)|((uint32_t)head[14]<<8)|head[15];
     if(wanted<16 || wanted>MAX_RESIDENT || wanted>(uint32_t)length || !(resident=(unsigned char *)AW_TryMalloc(wanted))){
-        fclose(f);Con_Printf("MWScript: cannot keep %lu bytes.\n",(unsigned long)wanted);return 0;}
+        fclose(f);load_why="no memory for its resident part";Con_Printf("MWScript: cannot keep %lu bytes.\n",(unsigned long)wanted);return 0;}
     memcpy(resident,head,16);
-    if(fread(resident+16,1,wanted-16,f)!=wanted-16){fclose(f);free(resident);resident=NULL;return 0;}
+    if(fread(resident+16,1,wanted-16,f)!=wanted-16){fclose(f);free(resident);resident=NULL;load_why="read error";return 0;}
     fclose(f);resident_bytes=wanted;
-    if(!AW_MwvmLoad(resident,resident_bytes,&host)){free(resident);resident=NULL;Con_Printf("MWScript: refused.\n");return 0;}
+    if(!AW_MwvmLoad(resident,resident_bytes,&host)){
+        free(resident);resident=NULL;load_why="the interpreter refused it (format or version)";Con_Printf("MWScript: refused.\n");return 0;}
     n=AW_MwvmTopicCount();
     topic_offsets=(int *)AW_TryMalloc(sizeof(int)*(n+1));topic_values=(int32_t *)AW_TryMalloc(sizeof(int32_t)*(n+1));
     topic_names=(char *)AW_TryMalloc(64*(n+1));
-    if(!topic_offsets || !topic_values || !topic_names){Con_Printf("MWScript: no memory for the journal names.\n");return 0;}
+    if(!topic_offsets || !topic_values || !topic_names){
+        load_why="no memory for the journal names";Con_Printf("MWScript: no memory for the journal names.\n");return 0;}
     f=NULL;length=COM_FOpenFile(FILE_NAME,&f);
     base=f?ftell(f):0;     /* the file's start (inside a PAK it is not 0) */
     for(i=0;i<n;i++){
@@ -694,7 +1058,12 @@ static int load(void){
         strcpy(topic_names+64*i,name);
     }
     if(f)fclose(f);
-    load_failed=0;
+    {uint32_t off,rows,b;      /* the known topics: one bit per TOPC row */
+     if(AW_MwvmSection("TOPC",&off,&rows,&b) && rows>0 && rows<0x10000 &&
+        (known_topics=(unsigned char *)AW_TryMalloc((rows+7)/8))!=NULL){
+         topic_rows=(int)rows;topic_bytes=(int)((rows+7)/8);memset(known_topics,0,topic_bytes);}}
+    load_failed=0;load_why="loaded";
+    aw_glut_live=&live;     /* the dialogue conditions read the scripts' state from now on */
     Con_Printf("MWScript: %d scripts, %lu bytes kept.\n",AW_MwvmScriptCount(),resident_bytes);
     return 1;
 }
@@ -823,11 +1192,15 @@ void AW_MwscriptTick(float dt){
     VectorCopy(sv_player->v.origin,player);
     player_cell_update();
     actors_from_fights();
+    if(AW_EffectsCount()){   /* the player's active spell effects on the game clock (SPELL-EFFECTS-57) */
+        aw_actor_t *p=player_record();
+        if(p && AW_EffectsTick(p,dt)){player_store(p);AW_MwvmStateChanged();}
+    }
     AW_MwvmTick(dt,player);
 }
-static void status(void){
+static void status_counts(void){
     const aw_mwvm_stats_t *s=AW_MwvmStats();int k,n=AW_MwvmInstanceCount(),attached=0,global=0,active=0,looping=0;
-    if(!resident){Con_Printf("MWScript %s; file not loaded (dbg mwscript on).\n",mwscript.value?"on":"off");return;}
+    if(!resident){Con_Printf("MWScript %s; file not loaded (%s).\n",mwscript.value?"on":"off",load_why);return;}
     for(k=0;k<n;k++){aw_mwvm_instance_t *in=AW_MwvmInstance(k);if(!in || !(in->flags&AWI_USED))continue;
         if(in->flags&AWI_GLOBAL)global++;else attached++;if(in->flags&AWI_ACTIVE)active++;}
     for(k=0;k<LOOPS;k++)looping+=loops[k].used;
@@ -866,14 +1239,160 @@ static void status(void){
                 "dropped %lu, full %lu, disk reads %lu; combat started %lu stopped %lu; wanders %lu\n",AW_ActorCount(),
                 AW_ActorStateResident(),actor_calls,actor_misses,a->created,a->changed,a->evicted,a->full,a->reads,
                 combat_starts,combat_stops,wanders);}
+    Con_Printf("player standing: crime level %d, reputation %d; calls %lu (%lu not carried out)%s; PlayGroup %lu "
+               "(%lu with no skeletal actor or group); topics added %lu (of %d, %d bytes kept); cures cast %lu; spell effects "
+               "landed %lu, active %d, refused %lu; ForceGreeting %lu (%lu not possible); Rotate %lu (%lu with no entity); AITravel %lu (%lu not possible); AIFollow %lu (%lu not possible); Position %lu (%lu not possible)\n",
+               AW_StandingCrime(),AW_StandingReputation(),standing_calls,standing_misses,
+               AW_StandingFull()?"; faction table full":"",anim_plays,anim_misses,topics_added,topic_rows,topic_bytes,cures,
+               effects_cast,AW_EffectsCount(),AW_EffectsRefused(),greetings,greetings_missed,rotations,rotations_missed,travels,travels_refused,follows,follows_refused,positions,positions_refused);
 }
-static int actors_export(unsigned char *out,int capacity){return AW_ActorStateReady()?AW_ActorStateExport(out,capacity):0;}
+/* "aw_mwscript_status [on|off|about]" (dbg mwscript [on|off], dbg mwscript status; DBG-MWSCRIPT-SILENT-56): the
+ * switch answers in the console what it does, whether id1/mwscript.awm was loaded (scripts, bytes, its format) and
+ * the counts. Switching on reads the file at once (no map needed), so the answer is never "nothing happened". */
+/* the debug call's helpers: a string's index in the file (a scan of STRS on disk, without case), the known topics */
+static int find_string(char *text){
+    FILE *f=NULL;uint32_t off,rows,bytes,i;long base;char s[64];int found=-1;
+    if(!AW_MwvmSection("STRS",&off,&rows,&bytes) || COM_FOpenFile(FILE_NAME,&f)<=0 || !f){if(f)fclose(f);return -1;}
+    base=ftell(f);
+    for(i=0;i<rows && found<0;i++)if(read_string_from(f,base,(int)i,s,sizeof(s)) && !Q_strcasecmp(s,text))found=(int)i;
+    fclose(f);return found;
+}
+static int topics_known(void){int i,n=0;for(i=0;i<topic_rows;i++)n+=AW_MwscriptTopicKnown(i);return n;}
+static void status(void){
+    char *a=Cmd_Argc()>1?Cmd_Argv(1):"";int k,on=-1;
+    if(!Q_strcasecmp(a,"on") || !Q_strcasecmp(a,"true") || !Q_strcasecmp(a,"yes") || !strcmp(a,"1"))on=1;
+    else if(!Q_strcasecmp(a,"off") || !Q_strcasecmp(a,"false") || !Q_strcasecmp(a,"no") || !strcmp(a,"0"))on=0;
+    if(!Q_strcasecmp(a,"call")){
+        /* "aw_mwscript_status call FUNCTION [number] [faction]" (dbg mwscript call): one of the player's standing or
+         * AddTopic calls through the same host route a script takes, on the player (a test and evidence route) */
+        static struct {char *name;int fn;} calls[]={{"getpccrimelevel",AWF_GETPCCRIMELEVEL},
+            {"setpccrimelevel",AWF_SETPCCRIMELEVEL},{"modpccrimelevel",AWF_MODPCCRIMELEVEL},
+            {"modreputation",AWF_MODREPUTATION},{"getpcrank",AWF_GETPCRANK},{"pcraiserank",AWF_PCRAISERANK},
+            {"pcjoinfaction",AWF_PCJOINFACTION},{"pcexpell",AWF_PCEXPELL},{"addtopic",AWF_ADDTOPIC}};
+        aw_mwcell_t num[1],r;unsigned char str[2];int i,n=0,ns=0,fn=-1,done;char *f=Cmd_Argc()>2?Cmd_Argv(2):"";
+        if(!Q_strcasecmp(f,"aifollow")){   /* the actor under the crosshair follows the player, as a script's AIFollow */
+            edict_t *e=sv_player?AW_NPCTarget(sv_player,sv_player->v.v_angle):NULL;
+            if(Cmd_Argc()>3){   /* or the actor of that record id ("aw_mwscript_status call aifollow indrele rathryon") */
+                char id[64];int argi;id[0]=0;
+                for(argi=3;argi<Cmd_Argc();argi++){if(argi>3)strncat(id," ",sizeof(id)-strlen(id)-1);strncat(id,Cmd_Argv(argi),sizeof(id)-strlen(id)-1);}
+                e=NULL;
+                for(argi=1;argi<sv.num_edicts && !e;argi++){
+                    edict_t *x=EDICT_NUM(argi);eval_t *v;
+                    if(!x->free && (v=GetEdictFieldValue(x,"aw_source_id"))!=NULL && v->string && !Q_strcasecmp(pr_strings+v->string,id))e=x;
+                }
+            }
+            Con_Printf("dbg mwscript call aifollow: %s (%s)\n",
+                       e && aw_mwscript_follow && aw_mwscript_follow(e,sv_player,0,NULL)?"following the player":"not possible",
+                       e?pr_strings+e->v.netname:"no actor under the crosshair");
+            return;
+        }
+        if(!Q_strcasecmp(f,"journal")){   /* "call journal QUEST INDEX": the quest's index set, as a script's Journal */
+            int t,quests=load()?AW_MwvmTopicCount():0,found=-1;
+            for(t=0;Cmd_Argc()>4 && t<quests && found<0;t++)if(topic_names && same_id(topic_names+topic_offsets[t],Cmd_Argv(3)))found=t;
+            if(found<0){Con_Printf("dbg mwscript call journal QUEST INDEX: no such quest (the file must be loaded)\n");return;}
+            host_journal_set(found,atoi(Cmd_Argv(4)),0);AW_MwvmStateChanged();
+            Con_Printf("dbg mwscript call journal: %s %ld\n",topic_names+topic_offsets[found],(long)host_journal_get(found));
+            return;
+        }
+        if(!Q_strcasecmp(f,"forcegreeting")){   /* the actor under the crosshair greets, as a script's ForceGreeting */
+            edict_t *e=sv_player?AW_NPCTarget(sv_player,sv_player->v.v_angle):NULL;
+            Con_Printf("dbg mwscript call forcegreeting: %s (%s)\n",force_greeting(e)?"greeting played":"not possible",
+                       e?pr_strings+e->v.netname:"no actor under the crosshair");
+            return;
+        }
+        for(i=0;i<(int)(sizeof(calls)/sizeof(calls[0]));i++)if(!Q_strcasecmp(f,calls[i].name))fn=calls[i].fn;
+        if(fn<0 || !load()){Con_Printf("dbg mwscript call: getpccrimelevel, setpccrimelevel N, modpccrimelevel N, "
+                                       "modreputation N, getpcrank FACTION, pcraiserank FACTION, pcjoinfaction FACTION, "
+                                       "pcexpell FACTION, addtopic ROW, journal QUEST INDEX (the file must be loaded)\n");return;}
+        for(i=3;i<Cmd_Argc();i++){
+            char *s=Cmd_Argv(i);
+            if((s[0]>='0' && s[0]<='9') || s[0]=='-'){
+                num[0].i=atoi(s);if(fn==AWF_SETPCCRIMELEVEL || fn==AWF_MODPCCRIMELEVEL)num[0].f=(float)Q_atof(s);n=1;}
+            else{   /* a faction: its string index is not known here, so the call goes by name below */
+                int at=find_string(s);
+                if(at>=0){str[0]=(unsigned char)(at>>8);str[1]=(unsigned char)at;ns=1;}
+                else{Con_Printf("dbg mwscript call: no string %s in the file\n",s);return;}
+            }
+        }
+        r.i=0;done=host_call(-1,AW_MWVM_PLAYER,fn,num,n,str,ns,&r);
+        Con_Printf("dbg mwscript call %s: %s, answer %d (%.1f); crime level %d, reputation %d, topics known %d\n",f,
+                   done?"carried out":"not carried out",(int)r.i,r.f,AW_StandingCrime(),AW_StandingReputation(),topics_known());
+        return;
+    }
+    if(on<0 && Q_strcasecmp(a,"about")){status_counts();return;}
+    if(on>=0)Cvar_SetValue(mwscript.name,(float)on);
+    if(!mwscript.value)   /* off: the scripts' sounds stop with it (the tick no longer runs them) */
+        for(k=0;k<LOOPS;k++)if(loops[k].used){S_StopSound(loops[k].entity,loops[k].channel);loops[k].used=0;}
+    Con_Printf("MWScript %s (aw_mwscript %d, default 1, saved): %s\n",mwscript.value?"ON":"OFF",(int)mwscript.value,
+               mwscript.value?"the game's compiled scripts run: ambient and activator sounds, NPC voice lines, music "
+               "cues, journal and globals, object state (Disable, Lock), actor records and AIWander (with the Wander "
+               "packages, chim actors ambient). Functions not carried out yet are counted and logged once.":
+               "no compiled script runs; the scripts' sounds stopped. dbg mwscript on runs them again.");
+    if(mwscript.value)load();
+    if(resident)Con_Printf("file id1/%s: format AWMS %d, %lu bytes on disk, %d scripts, %lu bytes kept (one block, "
+                           "outside the Quake heap); bindings read per map\n",FILE_NAME,(resident[4]<<8)|resident[5],
+                           file_bytes,AW_MwvmScriptCount(),resident_bytes);
+    else Con_Printf("file id1/%s: not loaded (%s)\n",FILE_NAME,load_why);
+    status_counts();
+}
+/* The actor block of a saved game (feature 16), with the player's standing and known topics after it (v0.0.57,
+ * MWSCRIPT-STANDING-NOT-SAVED-57): [actor records][AWPS standing]["AWKT" u16 rows u16 bytes, the known-topic bits]
+ * [u32 bytes of the two]["AWTR"]. A save of an earlier version has no trailer: its block is the actor records. */
+static void put_u32(unsigned char *p,unsigned long v){p[0]=(unsigned char)(v>>24);p[1]=(unsigned char)(v>>16);p[2]=(unsigned char)(v>>8);p[3]=(unsigned char)v;}
+static int actors_export(unsigned char *out,int capacity){
+    int n=AW_ActorStateReady()?AW_ActorStateExport(out,capacity):0,s,t;
+    if(n<0)return n;
+    if((s=AW_StandingExport(out+n,capacity-n))<0)return -1;
+    t=6+topic_bytes;
+    if(n+s+t+8>capacity)return -1;
+    memcpy(out+n+s,"AWKT",4);out[n+s+4]=(unsigned char)(topic_rows>>8);out[n+s+5]=(unsigned char)topic_rows;
+    if(topic_bytes)memcpy(out+n+s+6,known_topics,topic_bytes);
+    {int f=AW_EffectsExport(out+n+s+t,capacity-n-s-t-8);   /* the active spell effects (SPELL-EFFECTS-57) */
+     if(f<0)return -1;
+     t+=f;}
+    if(aw_mwscript_packages_export){   /* the actors' travel and follow packages (aw_ambient.c, SAVEGAME-COMPLETE-57) */
+        int k=aw_mwscript_packages_export(out+n+s+t,capacity-n-s-t-8);
+        if(k<0)return -1;
+        t+=k;}
+    put_u32(out+n+s+t,(unsigned long)(s+t));memcpy(out+n+s+t+4,"AWTR",4);
+    return n+s+t+8;
+}
 static void actors_import(const unsigned char *data,int bytes){
+    int actors=bytes;
+    AW_StandingReset();AW_EffectsReset();
+    if(aw_mwscript_packages_import)aw_mwscript_packages_import(NULL,0);   /* none until the save's block says */
+    if(topic_bytes)memset(known_topics,0,topic_bytes);
+    if(data && bytes>=8 && !memcmp(data+bytes-4,"AWTR",4)){
+        unsigned long tail=((unsigned long)data[bytes-8]<<24)|((unsigned long)data[bytes-7]<<16)|
+                           ((unsigned long)data[bytes-6]<<8)|data[bytes-5];
+        if(tail<=(unsigned long)(bytes-8)){
+            const unsigned char *p=data+bytes-8-tail;int s;
+            actors=(int)(bytes-8-tail);
+            s=p[0]=='A' && tail>=12?12+38*p[5]:0;
+            if(s<=0 || (unsigned long)s>tail || !AW_StandingImport(p,s))Con_Printf("Saved standing unreadable: it starts empty.\n");
+            else if(tail-s>=6 && !memcmp(p+s,"AWKT",4)){
+                int rows=(p[s+4]<<8)|p[s+5],nb=(rows+7)/8;unsigned long rest;
+                if(rows==topic_rows && (unsigned long)(s+6+nb)<=tail && nb==topic_bytes){if(nb)memcpy(known_topics,p+s+6,nb);}
+                else Con_Printf("Saved topics belong to other game data: none known.\n");
+                rest=(unsigned long)(s+6+nb);
+                /* the active spell effects after it (v0.0.57; a save without them: none active), then the actors'
+                 * travel and follow packages (AWPK; a save without them: none) */
+                if(rest+6<=tail && !memcmp(p+rest,"AWEF",4)){
+                    unsigned long fx=6+10UL*p[rest+5];
+                    if(rest+fx>tail || !AW_EffectsImport(p+rest,(int)fx))Con_Printf("Saved spell effects unreadable: none active.\n");
+                    else rest+=fx;
+                }
+                if(rest+6<=tail && !memcmp(p+rest,"AWPK",4) && aw_mwscript_packages_import &&
+                   !aw_mwscript_packages_import(p+rest,(int)(tail-rest)))Con_Printf("Saved actor packages unreadable: none kept.\n");
+            }
+        }
+    }
     if(!AW_MwscriptActors())return;
-    if(!AW_ActorStateImport(data,bytes))Con_Printf("Saved actor records unreadable: actors start from the game data.\n");
+    if(!AW_ActorStateImport(data,actors))Con_Printf("Saved actor records unreadable: actors start from the game data.\n");
 }
 void AW_MwscriptInit(void){
     Cvar_RegisterVariable(&mwscript);
+    AW_StandingReset();AW_EffectsReset();
     aw_save_actors_export=actors_export;aw_save_actors_import=actors_import;   /* the actor record (feature 16) */
     aw_save_objects_export=objects_export;aw_save_objects_import=objects_import;
     aw_object_lock_level=AW_ObjectLockLevel;   /* the doors read a script's Lock and Unlock */

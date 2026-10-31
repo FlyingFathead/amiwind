@@ -133,8 +133,22 @@ def main(argv=None):
     palette = a.palette.read_bytes()
     t1 = time.time()
     rooms_only = room_only_meshes(master, meshes)
-    models, failed = L.bake(a.data_files, palette, {m: v for m, v in meshes.items() if m not in rooms_only}, id1,
-                            a.jobs, a.creature_method, bipedal, scales if a.scaled_variants else None, corpses=corpses)
+    # The creatures (about 50 models) and the NPCs (about 400 appearances) are baked side by side: one after the
+    # other, the NPCs' 400 units waited for the creatures' last few (BUILD-ACTOR-LIBRARY-UNDERUSED-54: 45 s at about
+    # 2 cores in the v0.0.57-dev5 full build). The creatures take a quarter of the jobs, the NPCs the rest; they
+    # write different files (progs/c_* and progs/n_*, the NPCs' sounds), each into id1 as before.
+    from concurrent.futures import ThreadPoolExecutor
+    creature_jobs = max(1, a.jobs // 4) if a.jobs > 1 else 1
+    npc_jobs = max(1, a.jobs - creature_jobs) if a.jobs > 1 else 1
+    side = ThreadPoolExecutor(max_workers=1)
+    creature_future = side.submit(L.bake, a.data_files, palette,
+                                  {m: v for m, v in meshes.items() if m not in rooms_only}, id1, creature_jobs,
+                                  a.creature_method, bipedal, scales if a.scaled_variants else None, corpses=corpses)
+    t2 = time.time()
+    npc_manifest = NL.build(a.data_files, palette, npcs, id1, npc_jobs)
+    npc_seconds = time.time() - t2
+    models, failed = creature_future.result()
+    side.shutdown(wait=True)
     if rooms_only:
         print('Actor library: %d creature meshes only the rooms\' levelled lists give: skeletal (%s)' % (
             len(rooms_only), ', '.join(sorted(rooms_only))), flush=True)
@@ -146,12 +160,10 @@ def main(argv=None):
                                                  encoding='utf-8', newline='\n')
     print('Actor library: creatures done - took %.1fs, %d models, %d left out' % (time.time() - t1, len(models),
                                                                                   len(failed)), flush=True)
-    t2 = time.time()
-    npc_manifest = NL.build(a.data_files, palette, npcs, id1, a.jobs)
     (a.out / 'npc-library.json').write_text(json.dumps(npc_manifest, indent=1, sort_keys=True) + '\n',
                                             encoding='utf-8', newline='\n')
     print('Actor library: NPCs done - took %.1fs, %d appearances, %d left out' % (
-        time.time() - t2, len(npc_manifest['models']), len(npc_manifest['left_out'])), flush=True)
+        npc_seconds, len(npc_manifest['models']), len(npc_manifest['left_out'])), flush=True)
     summary = {'creature_meshes': len(meshes), 'corpse_meshes': len(corpses),
                'corpse_models': sum(1 for k in models if k.endswith(L.CORPSE_KEY)),
                'creature_models': len(models), 'creature_left_out': failed,

@@ -124,7 +124,7 @@ DOCUMENTATION_SOURCE_GRAPHICS.update(f"docs/images/amiwind-perf-{name}.svg" for 
 DEBUG_CATALOGUES = {"config/debug-commands.txt", "config/shroompicker.txt", "config/camera-marks.txt",
                     "config/teleport-names.txt"}
 # Plain-text world tables shipped to id1/world/ (maintainer-editable, no game data).
-WORLD_TABLES = {"config/fog-locations.txt"}
+WORLD_TABLES = {"config/fog-locations.txt", "config/large-rooms.txt"}
 # Project-authored CHIM texture effect definitions: plain-text .chimfx files of the public effects library
 # (docs/chim/TEXTURE_EFFECTS.md); no game data.
 CHIM_EFFECTS_DIR = PurePosixPath("tools/chim/effects")

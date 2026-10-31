@@ -155,65 +155,104 @@ static int compare_float(float x,int c,float v) {
 static const char *name_of(const aw_glut_t *g,unsigned index) {
     return index==NONE16 || (long)index>=g->names?NULL:(const char *)g->strings+rd32(g->name+4*index);
 }
+static const char *cond_name(const aw_glut_cond_t *c,unsigned index) {
+    return index==NONE16 || (long)index>=c->names?NULL:(const char *)c->strings+rd32(c->name+4*index);
+}
 /* A function's value: the live ones from the engine, the rest the start-of-game fixture; 0 when not known. */
-static int value(const aw_glut_t *g,int npc,unsigned fn,const aw_glut_state_t *s,long *out) {
-    int rank=(signed char)g->npc[AW_GLUT_NPC_ROW*npc+7];
+static int value(const aw_glut_cond_t *c,unsigned fn,const aw_glut_state_t *s,long *out) {
     switch(fn){
     case AW_GLUT_FN_HEALTH_PERCENT:*out=s->speaker_health_percent;return 1;
     case AW_GLUT_FN_PC_HEALTH_PERCENT:*out=s->player_health_percent;return 1;
     case AW_GLUT_FN_PC_HEALTH:*out=s->player_health;return 1;
     case AW_GLUT_FN_TALKED_TO_PC:*out=s->talked!=0;return 1;
     /* the player holds no rank in any faction yet (no faction system): -1 - the speaker's rank */
-    case AW_GLUT_FN_FACTION_RANK_DIFFERENCE:*out=rank<0?0:-1-rank;return 1;
+    case AW_GLUT_FN_FACTION_RANK_DIFFERENCE:*out=c->rank<0?0:-1-c->rank;return 1;
+    /* the pick of the open Choice (OpenMW filter.cpp: the dialogue's choice, -1 when none is open) */
+    case AW_GLUT_FN_CHOICE:*out=c->choice;return 1;
     }
-    if((int)fn>=g->functions || !(g->known[fn>>3]>>(fn&7)&1))return 0;
-    *out=sx32(rd32(g->fixture+4*fn));
+    if(aw_glut_live && aw_glut_live->function && aw_glut_live->function(c,fn,out))return 1;
+    if((int)fn>=c->functions || !(c->known[fn>>3]>>(fn&7)&1))return 0;
+    *out=sx32(rd32(c->fixture+4*fn));
     return 1;
 }
+const aw_glut_live_t *aw_glut_live;
 static int starts_with(const char *text,const char *prefix) {
     for(;*prefix;text++,prefix++)if(lower((unsigned char)*text)!=lower((unsigned char)*prefix))return 0;
     return 1;
 }
+void AW_GlutCondOf(const aw_glut_t *g,int npc,aw_glut_cond_t *c) {
+    memset(c,0,sizeof(*c));
+    c->global=g->global;c->globals=g->globals;c->name=g->name;c->names=g->names;c->strings=g->strings;
+    c->fixture=g->fixture;c->known=g->known;c->functions=g->functions;c->choice=-1;c->rank=-1;c->speaker=-1;
+    if(npc<0 || npc>=g->npcs)return;
+    c->rank=(signed char)g->npc[AW_GLUT_NPC_ROW*npc+7];
+    c->disposition=g->npc[AW_GLUT_NPC_ROW*npc+6];
+    c->cell=name_of(g,rd16(g->npc+AW_GLUT_NPC_ROW*npc+18));
+}
 int AW_GlutHolds(const aw_glut_t *g,int npc,const unsigned char *c,const aw_glut_state_t *s) {
+    aw_glut_cond_t ctx;
+    AW_GlutCondOf(g,npc,&ctx);
+    return AW_GlutCond(&ctx,c,s);
+}
+int AW_GlutCond(const aw_glut_cond_t *g,const unsigned char *c,const aw_glut_state_t *s) {
     unsigned op=c[0],cmp=c[1],operand=rd16(c+2);unsigned long raw=rd32(c+4);long x;
     switch(op){
     case AW_GLUT_OP_FUNC:
-        if(!value(g,npc,operand,s,&x))return 0;
+        if(!value(g,operand,s,&x))return 0;
         return cmp&0x80?compare_float((float)x,cmp,rdf(c+4)):compare_int(x,cmp,sx32(raw));
-    case AW_GLUT_OP_GLOBAL:
+    case AW_GLUT_OP_GLOBAL:{
+        float v;
         if((long)operand>=g->globals)return 0;
-        return compare_float(rdf(g->global+8*operand+4),cmp,cmp&0x80?rdf(c+4):(float)sx32(raw));
+        v=rdf(g->global+8*operand+4);
+        if(aw_glut_live && aw_glut_live->global)aw_glut_live->global((const char *)g->strings+rd32(g->global+8*operand),&v);
+        return compare_float(v,cmp,cmp&0x80?rdf(c+4):(float)sx32(raw));}
     case AW_GLUT_OP_RANDOM100:
         return cmp&0x80?compare_float((float)s->random100,cmp,rdf(c+4)):compare_int(s->random100,cmp,sx32(raw));
-    case AW_GLUT_OP_LOCAL:          /* the speaker's script locals: 0 until scripts run (OpenMW: empty locals read 0) */
-    case AW_GLUT_OP_JOURNAL:        /* journal indexes: 0 until the journal exists */
-    case AW_GLUT_OP_DEAD:           /* dead counts: 0 */
-        return cmp&0x80?compare_float(0,cmp,rdf(c+4)):compare_int(0,cmp,sx32(raw));
-    case AW_GLUT_OP_NOTLOCAL:
-        return !(cmp&0x80?compare_float(0,cmp,rdf(c+4)):compare_int(0,cmp,sx32(raw)));
+    case AW_GLUT_OP_JOURNAL:        /* the quest's journal index (the scripts' journal; 0 without it) */
+    case AW_GLUT_OP_DEAD:{          /* an actor id's dead count (the actor record; 0 without it) */
+        const char *name=cond_name(g,operand);long v=0;
+        if(name && aw_glut_live){
+            if(op==AW_GLUT_OP_JOURNAL && aw_glut_live->journal)aw_glut_live->journal(name,&v);
+            if(op==AW_GLUT_OP_DEAD && aw_glut_live->dead)aw_glut_live->dead(name,&v);
+        }
+        return cmp&0x80?compare_float((float)v,cmp,rdf(c+4)):compare_int(v,cmp,sx32(raw));}
+    case AW_GLUT_OP_LOCAL:          /* the speaker's script local (OpenMW: empty locals read 0) */
+    case AW_GLUT_OP_NOTLOCAL:{
+        float v=0;int holds;
+        if(g->local_slots && aw_glut_live && aw_glut_live->local)
+            aw_glut_live->local(g,(int)(operand&~AW_GLUT_LOCAL_FLOAT&0x3FFF),(operand&AW_GLUT_LOCAL_FLOAT)!=0,&v);
+        holds=cmp&0x80?compare_float(v,cmp,rdf(c+4)):compare_int((long)v,cmp,sx32(raw));
+        return op==AW_GLUT_OP_LOCAL?holds:!holds;}
     case AW_GLUT_OP_ITEM:{          /* the player's items: none counted yet; gold is not known (the builder's rule) */
-        const char *item=name_of(g,operand);
+        const char *item=cond_name(g,operand);long v=0;
+        if(item && aw_glut_live && aw_glut_live->item && aw_glut_live->item(item,&v))
+            return cmp&0x80?compare_float((float)v,cmp,rdf(c+4)):compare_int(v,cmp,sx32(raw));
         if(!item || !strcmp(item,"gold_001"))return 0;
         return compare_int(0,cmp,sx32(raw));
     }
-    case AW_GLUT_OP_CELL:{          /* the NPC row's home cell, a case-insensitive prefix (OpenMW ciStartsWith) */
-        const char *cell=name_of(g,rd16(g->npc+AW_GLUT_NPC_ROW*npc+18)),*want=name_of(g,operand);
+    case AW_GLUT_OP_CELL:{          /* the NPC's home cell, a case-insensitive prefix (OpenMW ciStartsWith) */
+        const char *cell=g->cell,*want=cond_name(g,operand);
         int match=cell && want && starts_with(cell,want);
         if(!cell)return 0;
         return raw?match:!match;
     }
-    case AW_GLUT_OP_DISP:           /* the NPC's base disposition (no modifiers yet) */
-        return compare_int(g->npc[AW_GLUT_NPC_ROW*npc+6],cmp,sx32(raw));
-    case AW_GLUT_OP_PCFACTION:      /* the player belongs to no faction yet */
-        return 0;
+    case AW_GLUT_OP_DISP:           /* the NPC's disposition (the voice table: its base, no modifiers yet) */
+        return compare_int(g->disposition,cmp,sx32(raw));
+    case AW_GLUT_OP_PCFACTION:{     /* the player's rank in the faction (none named: the speaker's), at least VALUE;
+                                     * a member only (OpenMW filter.cpp testPlayer) */
+        const char *faction=operand==NONE16?g->faction:cond_name(g,operand);long rank=-1;
+        if(!faction || !*faction)faction=g->faction;
+        if(!faction || !aw_glut_live || !aw_glut_live->pc_rank || !aw_glut_live->pc_rank(faction,&rank))return 0;
+        return rank>=0 && rank>=sx32(raw);}
     }
     return 0;
 }
 
 int AW_GlutPick(const aw_glut_t *g,int npc,int topic,const aw_glut_state_t *s,int pick_random,int roll) {
     unsigned at[AW_GLUT_MAX_LISTS],end[AW_GLUT_MAX_LISTS];int picks[AW_GLUT_MAX_PICKS];
-    unsigned set,ls,n,k;int file_topic,count=0;unsigned long first;
+    unsigned set,ls,n,k;int file_topic,count=0;unsigned long first;aw_glut_cond_t ctx;
     if(!g->data || npc<0 || npc>=g->npcs || topic<0 || topic>=AW_GLUT_TOPICS || (file_topic=g->topic_of[topic])<0)return -1;
+    AW_GlutCondOf(g,npc,&ctx);
     set=rd16(g->npc+AW_GLUT_NPC_ROW*npc+8);
     ls=rd16(g->set+2*((long)set*g->topics+file_topic));
     if(ls==NONE16)return -1;
@@ -233,7 +272,7 @@ int AW_GlutPick(const aw_glut_t *g,int npc,int topic,const aw_glut_state_t *s,in
         at[from]++;                  /* an entry is in one list only (one audience per entry) */
         row=g->entry+12*best;
         nc=row[10];
-        for(c=0;c<nc && ok;c++)ok=AW_GlutHolds(g,npc,g->cond+8*(rd32(row+4)+c),s);
+        for(c=0;c<nc && ok;c++)ok=AW_GlutCond(&ctx,g->cond+8*(rd32(row+4)+c),s);
         if(ok){
             if(!pick_random)return (int)best;
             if(count<AW_GLUT_MAX_PICKS)picks[count++]=(int)best;
@@ -446,6 +485,21 @@ int AW_GlutBark(edict_t *e,int row,int topic,int pick_random,unsigned char hash[
     state_of(e,0,&s);
     if((entry=AW_GlutPick(&table,row,topic,&s,pick_random,rand()))<0)return -1;
     return AW_GlutSound(&table,entry,hash);
+}
+int AW_MwscriptActorFaction(const char *record,char *out,int capacity);   /* aw_mwhost.c */
+int AW_GlutSpeaker(edict_t *e,int talked,aw_glut_cond_t *c,aw_glut_state_t *s) {
+    static char faction[64];int row=AW_GlutNpcOf(e);
+    if(row<0)return -1;
+    AW_GlutCondOf(&table,row,c);
+    state_of(e,talked,s);
+    c->speaker=NUM_FOR_EDICT(e);
+    c->faction=AW_MwscriptActorFaction(source_id(e),faction,sizeof(faction))?faction:NULL;
+    return row;
+}
+void AW_GlutFill(edict_t *e,int row,const char *raw,char *out,int capacity) {
+    char speaker[1024];
+    AW_GlutExpand(&table,row,pr_strings+e->v.netname,raw,speaker,sizeof(speaker));
+    AW_ExpandDialogue(out,capacity,speaker);
 }
 int AW_GlutConverse(edict_t *e,int again,char *out,int capacity) {
     int row=AW_GlutNpcOf(e),entry;aw_glut_state_t s;

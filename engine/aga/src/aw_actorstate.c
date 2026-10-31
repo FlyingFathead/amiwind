@@ -408,6 +408,22 @@ int AW_ActorHasSpellType(const aw_actor_t *a,int type){
     }
     return 0;
 }
+/* A cure (v0.0.57, MWScript Cast of Cure Common Disease / Cure Blight Disease): every spell of TYPE goes from the
+ * actor's list (rule from OpenMW apps/openmw/mwmechanics/spells.cpp purgeCommonDisease / purgeBlightDisease).
+ * Returns how many were removed. */
+int AW_ActorRemoveSpellType(aw_actor_t *a,int type){
+    aw_actor_base_t b;int i,s,removed=0;unsigned char e[2];
+    if(!st || !a)return 0;
+    for(i=a->nspells-1;i>=0;i--)
+        if(a->spells[i].change>0 && spell_type(a->spells[i].spell)==type && spell_change(a,a->spells[i].spell,0))removed++;
+    if(a->base!=AW_ACTOR_NONE && AW_ActorBase(a->base,&b))
+        for(i=0;i<b.spell_count;i++){
+            if(!fetch(st->aspl.offset+2u*(uint32_t)(b.spell_first+i),e,2))break;
+            s=(int)U16(e);
+            if(spell_type(s)==type && AW_ActorHasSpell(a,s) && spell_change(a,s,0))removed++;
+        }
+    return removed;
+}
 int AW_ActorAddSpell(aw_actor_t *a,int spell){return spell_change(a,spell,1);}
 int AW_ActorRemoveSpell(aw_actor_t *a,int spell){return spell_change(a,spell,0);}
 

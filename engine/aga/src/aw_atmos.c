@@ -11,7 +11,7 @@
  * ash blows outward from Red Mountain. AmiWind's own budget: at most AW_PRECIP_LIVE drops alive (the original's
  * Max Raindrops 450 / 650 are far past a 68040's particle budget), so the box is filled thinly.
  *
- * MESH-PARTICLE-EMITTERS (the maintainer: "it could be a shit simple sprite thing btw"): every exterior smoke and
+ * MESH-PARTICLE-EMITTERS (decided for the project: a plain, simple sprite is enough): every exterior smoke and
  * steam emitter of the placed meshes (world/smoke.aws, tools/particle_emitters.smoke_table: chimneys, campfires,
  * torches, braziers, steam vents) near the view puffs SMOKE_PUFFS sprites of the chimneys' own particle texture
  * (world/smoke.spr) that rise its emitter's rise in its particle lifetime, grow and thin out (the sprite's frames);

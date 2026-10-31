@@ -2287,8 +2287,11 @@ static int AW_AliasStageBytes(const void *buffer,int bytes) {
             if(!memchr(((const daliasframe_t *)p)->name,0,16) || !AW_AliasBlock(&total,(size_t)verts*sizeof(trivertx_t)))return 0;
         }
     }
+    /* a skeletal model's block after its one rest frame (aw_skel.h "AWSB"), kept as the stream keeps it */
+    if(frames==1 && left==(size_t)AW_SKEL_BLOCK_HEAD+(size_t)verts*AW_SKEL_VERT_BYTES && !AW_AliasBlock(&total,left))return 0;
     return (int)total;
 }
+int (*aw_alias_skel_link)(aliashdr_t *h,byte *block,long size,int verts,int *frames);
 static void *AW_AliasAlloc(int bytes,char *name) {
     byte *p;size_t block;
     if(!aw_alias_stage)return Hunk_AllocName(bytes,name);
@@ -2715,6 +2718,22 @@ void Mod_LoadAliasModel (model_t *mod, void *buffer, int bytes)
                                         &pheader->frames[i].bboxmin,
                                         &pheader->frames[i].bboxmax,
                                         pheader, pheader->frames[i].name);
+        }
+    }
+
+    {
+        /* ANIMKIT-COVERAGE-35 (v0.0.57): a skeletal model this loader reads (the stream declined it: Seyda's dreamers
+         * Dreamer_Talker04/05) kept only its rest frame and stood in it, its layout refused ("invalid against 1 model
+         * frames"); its skeletal block is now kept and its table linked here as the stream does (model_alias_stream.inc) */
+        long rest = (long)bytes - (long)((byte *)pframetype - (byte *)buffer);
+        if (numframes == 1 && rest == AW_SKEL_BLOCK_HEAD + (long)pmodel->numverts * AW_SKEL_VERT_BYTES && aw_alias_skel_link)
+        {
+            int frames = 0;
+            byte *b = AW_AliasAlloc ((int)rest, loadname);
+            memcpy (b, pframetype, (size_t)rest);
+            /* aw_skel_load.c AW_SkelLinkAlias (set at start-up; host test builds of this file leave it NULL) */
+            if (aw_alias_skel_link (pheader, b, rest, pmodel->numverts, &frames))
+                mod->numframes = frames;		/* a refusal is said by the link (rest pose) */
         }
     }
 

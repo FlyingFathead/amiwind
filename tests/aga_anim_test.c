@@ -143,7 +143,8 @@ int main(void) {
     g=AW_AnimMoveGroup(&a,38.52f,0,&rate);assert(g==AW_ANIM_WALK && rate>.99f && rate<1.01f);
     g=AW_AnimMoveGroup(&a,46,0,&rate);assert(g==AW_ANIM_WALK);          /* below the midpoint 47.1 */
     g=AW_AnimMoveGroup(&a,60,0,&rate);assert(g==AW_ANIM_RUN && rate>1.07f && rate<1.08f);
-    g=AW_AnimMoveGroup(&a,1000,0,&rate);assert(g==AW_ANIM_RUN && rate==4);
+    g=AW_AnimMoveGroup(&a,1000,0,&rate);assert(g==AW_ANIM_RUN && rate==10);   /* the original's cap (WALK-CYCLES-57) */
+    g=AW_AnimMoveGroup(&a,300,0,&rate);assert(g==AW_ANIM_RUN && rate>5.38f && rate<5.39f);   /* past the old cap of 4 */
     g=AW_AnimMoveGroup(&a,2,0,&rate);assert(g==AW_ANIM_WALK && rate==.25f);
     assert(AW_AnimMoveGroup(&a,0,1,&rate)==AW_ANIM_SWIMIDLE);
     assert(AW_AnimMoveGroup(&a,26.25f,1,&rate)==AW_ANIM_SWIM && rate>.99f);

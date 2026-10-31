@@ -9,10 +9,9 @@
 | Where | tools/check_actor_ground.py model_frames and the actor stages that call it |
 | Reproduction | once |
 | Duplicate of | no |
-| Persists in | v0.0.54-dev1 (last seen) |
+| Persists in | fixed in v0.0.57 |
 | Severity | high: Regressed in v0.0.54-dev1 (was medium): a builder stop; not reproducible on the release line |
 | Family | Builder breaks and reproducibility (`builder-from-scratch`) |
-| Deferred by the maintainer | 2026-10-29: to v0.0.57, the maintainer (desktop chat 2026-10-29, on the six expired v0.0.56 deferrals): 'Yes, defer those six bugs to v0.0.57.' |
 | Came back (regression) | in v0.0.54-dev1 (closed before) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |
 | From commit | source and engine 408ed09 |
@@ -150,6 +149,7 @@ Family: Builder breaks and reproducibility (`builder-from-scratch`). The reposit
 - [CHIM-WINDOW-TOWER-SUPPORT-41](CHIM-WINDOW-TOWER-SUPPORT-41.md): Thatched tower omitted from decorative window facade support
 - [ENGINE-BUILD-REPRO-31](ENGINE-BUILD-REPRO-31.md): Engine builds from identical source give different binaries
 - [ENGINE-FRAME-REFUSE-PROTOTYPE-48](ENGINE-FRAME-REFUSE-PROTOTYPE-48.md): The engine build stops on a missing prototype: AW_SceneFrameRefuse has no declaration
+- MINIWIND-EXTERIOR-DIRECT-START-CELL-57 (no report page): An exterior MiniWind direct start at cell 0,-7 (the Ascadian Isles creatures recipe) fails in the image step: no map of the build holds the point
 - PREFLIGHT-GUARD-UNSTAMPED-NPCS-48 (no report page): The payload preflight guard count refused census.bsp: its three NPCs get their source identity later in the image step
 - [RELEASE-FINAL-LINE-STALE-RC-48](RELEASE-FINAL-LINE-STALE-RC-48.md): The v0.0.48 final line was cut from an older rc1 head than the image: it lacked the two layout fixes the shipped image was built with
 - RELEASE-GUARD-NO-FROMSCRATCH-RULE-54 (no report page): No release guard rule requires a from-scratch build: v0.0.52 and v0.0.53 shipped without one

@@ -12,7 +12,8 @@
 | Persists in | v0.0.29, v0.0.30-rc1, v0.0.31-dev2 (last seen) |
 | Severity | medium: Audible crackle at one scene change; the game continues. |
 | Family | Music and sound (`audio`) |
-| Deferred by the maintainer | 2026-10-29: to v0.0.57, the maintainer (desktop chat 2026-10-29, on the six expired v0.0.56 deferrals): 'Yes, defer those six bugs to v0.0.57.' |
+| Waiting on | Lacks dependency: the maintainer's WinUAE listening check (the fix c93ffae is in since v0.0.31) |
+| Deferred by the maintainer | 2026-10-29: to v0.0.57, the maintainer (desktop chat 2026-10-29, on the six expired v0.0.56 deferrals): approved, the six bugs are deferred to v0.0.57. |
 
 <!-- END GENERATED FACTS -->
 

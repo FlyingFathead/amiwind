@@ -63,6 +63,15 @@ class StageTests(unittest.TestCase):
                 self.assertEqual([str(x) for x in command], [str(x) for x in default[name]], name)
 
 
+class SideBySideTests(unittest.TestCase):
+    def test_creatures_and_npcs_are_baked_side_by_side(self):
+        # BUILD-ACTOR-LIBRARY-UNDERUSED-54: the NPCs' units waited for the creatures' last few; the creatures now run
+        # in a thread beside the NPC build, on a quarter of the jobs
+        text = (ROOT / 'tools/actor_library.py').read_text(encoding='utf-8')
+        self.assertLess(text.index('creature_future = side.submit(L.bake'), text.index('NL.build('))
+        self.assertLess(text.index('NL.build('), text.index('creature_future.result()'))
+
+
 class NpcLibraryTests(unittest.TestCase):
     APP = {'id': 'a', 'parts': [{'slot': 0, 'mesh': 'b/head.nif'}], 'skeleton': 'meshes/base_anim.nif',
            'height': 1.0, 'weight': 1.0, 'female': False, 'initially_dead': False, 'foot': 'bare'}

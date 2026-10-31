@@ -29,6 +29,15 @@ class DebugTeleportNameTests(unittest.TestCase):
         arena = [t for t in rows if t['id'] == 'vivec_arena']
         self.assertTrue(arena and 'teleport_arrival' in arena[0]['flags'])
 
+    def test_balmora_takes_its_street_arrival_and_keeps_the_map_route(self):
+        # TPNAMES-HEIGHTS-56: a listed town map name takes its street arrival (the map start was a roof edge); on a
+        # disk where no map holds the point (a MiniWind) the town's own map still loads.
+        text = SCENE.read_text(encoding='utf-8')
+        self.assertIn('strcmp(s,"town") && named_place(s,&r)){', text)
+        self.assertIn('if(!map_valid(s)){Con_Printf("%s: no map on this disk holds that point', text)
+        names = (ROOT / 'config' / 'teleport-names.txt').read_text(encoding='utf-8')
+        self.assertIn('\nbalmora|global|-20536 -13960 346|0|Balmora\n', names)
+
     def test_console_page_lists_vivec(self):
         page = (ROOT / 'docs' / 'AMIWIND_CONSOLE_COMMANDS.md').read_text(encoding='utf-8')
         self.assertIn('vivec (the whole city vivec_city, else the Vivec Arena)', page)

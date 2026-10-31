@@ -7,7 +7,6 @@
     ["docs/FS-UAE-DEVELOPMENT.md", "docs/FS-UAE-HEADLESS-THROUGHPUT.md"],
     ["docs/history/other/README_PRE_V016.md", "docs/LICENSE"],
     ["docs/history/superseded/FS-UAE-DOCKER.md", "docs/FS-UAE-HEADLESS-THROUGHPUT.md"],
-    ["docs/NPC_DEFAULTS.md", "docs/bugs/ACTOR-WANDER-AGGRO-52.md"],
     ["docs/NPC_DEFAULTS.md", "docs/bugs/MWSCRIPT-STATE-NOT-SAVED-48.md"]
   ]
 }

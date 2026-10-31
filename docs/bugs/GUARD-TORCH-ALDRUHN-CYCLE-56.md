@@ -19,7 +19,7 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.56 (29 October 2026)._
+_Last updated with AmiWind v0.0.57 (30 October 2026)._
 
 ## Status: 29 October 2026
 
@@ -37,9 +37,18 @@ Ald'ruhn, the guards near the temple; other spots in Ald'ruhn not checked yet.
 
 ## How it happened
 
-Not known yet. The guard torch cycle (`guards_torch_cycle`) was built for the town guards first met in Seyda Neen and
-Balmora; Ald'ruhn's guards are Redoran guards, a different record, and may not be in the list of guards the cycle
-handles, or they stand on a CHIM frame the cycle does not reach.
+Partly known (30 October 2026). Not the guard list: the game data gives Ald'ruhn's outdoor guards (`redoran guard
+male`, `redoran guard female`, class Guard) the same carried light as Balmora's Hlaalu guards, `torch_infinite_time`
+(radius 256, carryable), so the build gives them the torch. Of the 62 class Guard records of Morrowind.esm placed
+outdoors, all but 17 single guards (captains, sharpshooters, the census boat and dock guards) carry it; those 17 carry
+no light in the original either.
+
+One difference from the original's rule was found and repaired: the original puts the torches away while anything
+falls, not only by day (rule from OpenMW files apps/openmw/mwworld/weather.cpp, `useTorches`: dark AND no
+precipitation, where an ash or blight storm counts; apps/openmw/mwmechanics/actors.cpp, `updateEquippedLight`). The
+engine followed the clock alone. Ald'ruhn lies in the Ashlands, where ash storms are frequent, so its guards are the
+ones that differ most. What the maintainer saw by day (a torch kept in daylight) is not explained by this and is not
+reproduced yet.
 
 ## Why it was not caught
 
@@ -51,8 +60,10 @@ By the maintainer's account: in Ald'ruhn beside the temple, watch a guard across
 
 ## Repair
 
-None yet. First which guards the cycle covers (by record and by town), then the Redoran guards in, checked at
-dusk and dawn in Ald'ruhn.
+v0.0.57 (GUARD-TORCHES-57): the guards' torch rule is the original's, dark hours (before 06:00, after 20:00) with
+nothing falling; `guards_torch_cycle 2` keeps the earlier rule (dark hours only), `0` turns the cycle off. The
+guard torch light reaches as far as the original torch's (64 map units, `aw_guard_torch_radius` 0.33 of the
+player torch's). The torch kept by day still needs a look in Ald'ruhn itself.
 
 ## Verification
 

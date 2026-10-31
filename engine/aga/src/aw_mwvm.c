@@ -445,9 +445,10 @@ static int run(int k){
         case AWM_NOTYET:{
             /* the import route: counted by function number; the host may carry it out by that number with the
              * arguments as the script gave them; else logged once, nothing done, 0 read */
-            int fn=(int)U16(pc),flags=pc[4],n=flags&0x1F;aw_mwcell_t r;
+            int fn=(int)U16(pc),flags=pc[4],n=flags&0x1F,done;aw_mwcell_t r;
             sp-=n;vm.stats.notyet_calls++;vm.fcalls[fn]++;r.i=0;
-            if(h && h->call && h->call(k,target,fn,sp,n,pc+6,pc[5],&r)){vm.stats.host_calls++;acted=1;in=&vm.inst[k];}
+            done=h && h->call?h->call(k,target,fn,sp,n,pc+6,pc[5],&r):0;
+            if(done){vm.stats.host_calls++;if(done!=AW_MWVM_CALL_READ)acted=1;in=&vm.inst[k];}
             else{log_notyet((int)U16(pc+2),in->script);r.i=0;}   /* did nothing: not an action for the quiet rule */
             if(flags&0x80)*sp++=r;
             pc+=6+2*pc[5];target=AW_MWVM_SELF;

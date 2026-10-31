@@ -186,7 +186,7 @@
    "id": "night-lighting",
    "description": "Lamps, lit night windows and fog locations",
    "steps": ["image"],
-   "patterns": ["id1/world/lamps.awl", "id1/world/night-windows.txt", "id1/world/fog-locations.txt"]
+   "patterns": ["id1/world/lamps.awl", "id1/world/night-windows.txt", "id1/world/fog-locations.txt", "id1/world/large-rooms.txt"]
   },
   {
    "id": "harvest",

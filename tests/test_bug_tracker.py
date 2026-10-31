@@ -479,20 +479,21 @@ class BugTrackerTest(unittest.TestCase):
         self.assertTrue(bug_register.archivable(base))
         self.assertTrue(bug_register.archivable(dict(base, state='closed')))
         self.assertFalse(bug_register.archivable(dict(base, state='open')))
-        # the rotation reaches v0.0.51 since the v0.0.53 door check, 26 October 2026 (bugs-v0.0.48-v0.0.51.json);
+        # the rotation reaches v0.0.54 since the v0.0.57-dev1 merge, 30 October 2026 (bugs-v0.0.52-v0.0.54.json);
         # later series stay live
         self.assertTrue(bug_register.archivable(dict(base, found_in='v0.0.36')))
         self.assertTrue(bug_register.archivable(dict(base, found_in='v0.0.40')))
         self.assertTrue(bug_register.archivable(dict(base, found_in='v0.0.42')))
         self.assertTrue(bug_register.archivable(dict(base, found_in='v0.0.47')))
         self.assertTrue(bug_register.archivable(dict(base, found_in='v0.0.51')))
-        self.assertFalse(bug_register.archivable(dict(base, found_in='v0.0.52')))
+        self.assertTrue(bug_register.archivable(dict(base, found_in='v0.0.54')))
+        self.assertFalse(bug_register.archivable(dict(base, found_in='v0.0.55')))
         self.assertFalse(bug_register.archivable(dict(base, found_in='v0.0.36'), up_to=35))
         self.assertFalse(bug_register.archivable(dict(base, found_in='unknown', id='AW-20261010-01')))
         two = [{'version': 'v0.0.33', 'at': '2026-10-09'}, {'version': 'v0.0.36-dev3', 'at': '2026-10-11'}]
         self.assertFalse(bug_register.archivable(dict(base, reports=two)), 'a persisting bug stays in bugs.json')
-        live, old = bug_register.split([base, dict(base, id='BUILD-ROT-52', found_in='v0.0.52')])
-        self.assertEqual([b['id'] for b in live], ['BUILD-ROT-52'])
+        live, old = bug_register.split([base, dict(base, id='BUILD-ROT-55', found_in='v0.0.55')])
+        self.assertEqual([b['id'] for b in live], ['BUILD-ROT-55'])
         self.assertEqual([b['id'] for b in old], ['BUILD-ROT-33'])
 
     def test_whitespace_baselines_get_the_named_limit(self):

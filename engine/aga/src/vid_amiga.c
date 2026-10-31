@@ -100,6 +100,35 @@ extern qboolean mouse_has_moved;
  static byte *surfcache = NULL;
 #endif
 
+/* Surface cache size (RENDER-SURFCACHE-THRASH-32). The method before: (width*height/(320*200))*256*1024*2 bytes,
+ * an integer division, so every screen under 128,000 pixels got 512 KB, while the prison ship's hold draws
+ * 1.62 MB of surface texels in one frame (v0.0.57-dev1, aw_rcount 1) and Seyda Neen 0.76 MB: those views pushed
+ * their own surfaces out of the cache and drew them again every frame. The default is the largest measured view
+ * plus a margin, 2 MiB at 320 x 200 (scaled up for a larger screen, never below the method before); Quake's
+ * -surfcachesize KB start-up argument overrides it. It lives outside the game heap, in the rest of Fast RAM
+ * (docs/chim/build_guide/MEMORY.md "The picture"). */
+#define AW_SURFCACHE_DEFAULT (2048*1024)
+static int surfcache_bytes;
+/* bytes past the method before: chim_world.c Chim_MemoryStart takes them from the system margin, not the CHIM cache */
+int aw_surfcache_extra;
+
+static int AW_SurfaceCacheBefore (int width, int height)
+{
+  return (width*height/(320*200))*256*1024*2;
+}
+
+static int AW_SurfaceCacheBytes (int width, int height)
+{
+  int size, before;
+  if (COM_CheckParm ("-surfcachesize") && COM_CheckParm ("-surfcachesize") + 1 < com_argc)
+    return Q_atoi (com_argv[COM_CheckParm ("-surfcachesize") + 1]) * 1024;
+  size = (int)((double)AW_SURFCACHE_DEFAULT * (width * height) / (320 * 200));
+  if (size < AW_SURFCACHE_DEFAULT)
+    size = AW_SURFCACHE_DEFAULT;
+  before = AW_SurfaceCacheBefore (width, height);
+  return size > before ? size : before;
+}
+
 unsigned short	d_8to16table[256];
 /* unsigned	d_8to24table[256]; */
 
@@ -422,10 +451,17 @@ void	VID_Init (unsigned char *palette)
     if ((vid_buffer = (pixel_t *)AW_TryMalloc(sizeof(pixel_t) *
                                         width * height)) == NULL)
       Sys_Error ("Out of memory");
-  if ((zbuffer = (short *)AW_TryMalloc(sizeof(short) * width * height)) == NULL ||
-      (surfcache = (byte *)AW_TryMalloc(sizeof(byte) *
-                                  (width*height/(320*200))*256*1024*2)) == NULL)
+  if ((zbuffer = (short *)AW_TryMalloc(sizeof(short) * width * height)) == NULL)
     Sys_Error ("Out of memory");
+  surfcache_bytes = AW_SurfaceCacheBytes (width, height);
+  if ((surfcache = (byte *)AW_TryMalloc(surfcache_bytes)) == NULL) {
+    /* below the 32 MB Fast requirement: the cache of the method before, so the game still starts */
+    Con_Printf ("Surface cache: %d KB not free, using %d KB (frames may redraw lit surfaces)\n",
+                surfcache_bytes / 1024, AW_SurfaceCacheBefore (width, height) / 1024);
+    surfcache_bytes = AW_SurfaceCacheBefore (width, height);
+    if ((surfcache = (byte *)AW_TryMalloc(surfcache_bytes)) == NULL)
+      Sys_Error ("Out of memory");
+  }
 
   vid.width = vid.conwidth = width;
   vid.height = vid.conheight = height;
@@ -454,8 +490,10 @@ void	VID_Init (unsigned char *palette)
 
   d_pzbuffer = zbuffer;
 
-  D_InitCaches (surfcache, sizeof(byte) *
-                           (width*height/(320*200))*256*1024*2);
+  aw_surfcache_extra = surfcache_bytes - AW_SurfaceCacheBefore (width, height);
+  if (aw_surfcache_extra < 0)
+    aw_surfcache_extra = 0;
+  D_InitCaches (surfcache, surfcache_bytes);
 
   VID_SetPalette (palette);
 

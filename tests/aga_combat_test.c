@@ -50,6 +50,8 @@ trace_t SV_Move(vec3_t a,vec3_t mi,vec3_t ma,vec3_t b,int type,edict_t *e){
     if(b[2]<0 && a[2]>=0){t.fraction=a[2]/(a[2]-b[2]);t.endpos[2]=0;t.plane.normal[2]=1;}
     return t;
 }
+int AW_AmbientFlags(struct edict_s *e){(void)e;return 0;}
+int AW_AmbientInWater(const float p[3]){(void)p;return 0;}   /* the swimmer chase's water test (never reached here) */   /* every fighter here walks (the flyer chase: test_ambient_lut.py) */
 qboolean AW_ActorStep(edict_t *e,vec3_t move,double dt){(void)dt;if(walled)return false;e->v.origin[0]+=move[0];e->v.origin[1]+=move[1];aw_sv_move_calls+=3;steps++;return true;}
 edict_t *AW_NPCTargetReach(edict_t *p,vec3_t angles,float reach){(void)p;(void)angles;assert(reach>32 && reach<64);return target;}
 void S_LocalSound(char *s){sounds++;strcpy(last_sound,s);}

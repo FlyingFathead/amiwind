@@ -20,7 +20,7 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.47 (21 October 2026)._
+_Last updated with AmiWind v0.0.56 (30 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -46,8 +46,8 @@ Part of HARVEST-WORLD-29 (picking and persistent state worldwide), which listed 
 
 ## Symptom
 
-The maintainer, 21 October 2026: "we should do the same as with the pickable mushrooms, so that they disappear once
-picked", for the plants inside interiors, and: "we've never done any indoor picking".
+The maintainer, 21 October 2026: the plants inside interiors should work like the pickable mushrooms outdoors, so
+that they disappear once picked; indoor picking had never been done.
 
 In the v0.0.46 release image (headless FS-UAE, 128 MB, fresh play copy), standing on the floor of the Addamasartus
 cave 34 units from a Violet Coprinus (original reference 365589) and looking at it: no "E: Pick" prompt, the use key

@@ -393,6 +393,38 @@ def _actor_calls():
 ACTOR_CALLS = _actor_calls()
 RUN |= set(ACTOR_CALLS)
 
+# Carried out by the engine through the import route (v0.0.57): the call keeps its NOTYET form (function number,
+# numbers, strings; no new opcode, no change of the file's format) and the host's call() answers it by number
+# (engine/aga/src/aw_mwhost.c, aw_pcstanding.c). The player's standing: crime level, reputation, faction rank, the
+# expelled mark and the faction reputation (rules from OpenMW apps/openmw/mwscript/statsextensions.cpp and
+# dialogueextensions.cpp), and GetRace. EFFECTS: those that change something (the INERT rule).
+HOST = {'getpccrimelevel', 'setpccrimelevel', 'modpccrimelevel',
+        'getreputation', 'setreputation', 'modreputation',
+        'getpcrank', 'pcraiserank', 'pclowerrank', 'pcjoinfaction',
+        'pcexpelled', 'pcexpell', 'pcclearexpelled',
+        'getpcfacrep', 'setpcfacrep', 'modpcfacrep', 'getrace',
+        # v0.0.57: an animation group on a skeletal actor (aw_animkit.c AW_AnimPickScripted; OpenMW
+        # animationextensions.cpp OpPlayAnim, OpLoopAnim)
+        'playgroup', 'loopgroup',
+        # v0.0.57: a topic the player knows (one bit per TOPC row, saved; OpenMW dialogueextensions.cpp OpAddTopic)
+        'addtopic',
+        # v0.0.57: Cast of the cures on the player (the compiler keeps every other Cast "not yet", codegen.CURES)
+        'cast',
+        # v0.0.57: GetEffect reads the active spell effects (aw_effects.c; OpenMW miscextensions.cpp OpGetEffect)
+        'geteffect',
+        # v0.0.57: ForceGreeting plays the actor's greeting as talking to it does (the dialogue window: DIALOGUE-57)
+        'forcegreeting',
+        # v0.0.57: Rotate on an object with an entity; GetTarget against the combat layer (it fights the player only)
+        'rotate', 'gettarget',
+        # v0.0.57: AITravel on the ambient tables' routes (aw_ambient.c AW_AmbientTravel; OpenMW aitravel.cpp)
+        'aitravel',
+        # v0.0.57: AIFollow on the same entry (aifollow.cpp); GetStandingPC on objects with an entity
+        'aifollow', 'getstandingpc',
+        # v0.0.57: Position of the player (the coordinate teleport) and of objects with an entity (transformationextensions.cpp)
+        'position'}
+HOST_EFFECTS = {'forcegreeting', 'rotate', 'aitravel', 'aifollow', 'position','playgroup', 'loopgroup', 'addtopic', 'cast','setpccrimelevel', 'modpccrimelevel', 'setreputation', 'modreputation', 'pcraiserank',
+                'pclowerrank', 'pcjoinfaction', 'pcexpell', 'pcclearexpelled', 'setpcfacrep', 'modpcfacrep'}
+
 # Groups the measurement reports as "the engine does not have it yet" (the brief's list), and the rest.
 MISSING_GROUPS = ('ai', 'inventory', 'combat', 'spells', 'position')
 ALL_GROUPS = ('core', 'audio', 'journal', 'dialogue', 'ai', 'inventory', 'combat', 'spells', 'position', 'stats',
@@ -404,7 +436,7 @@ class Function:
 
     def __init__(self, name, ret, args, group):
         self.name, self.ret, self.args, self.group = name, ret, args, group
-        self.run = name in RUN
+        self.run = name in RUN or name in HOST
         self.number = None
 
     def required(self):
@@ -440,7 +472,7 @@ def _build():
     for c in CONTROLS:
         add('enable' + c, '-', '-', 'control'); add('disable' + c, '-', '-', 'control')
         add('get' + c + 'disabled', 'l', '-', 'control')
-    for name in RUN:
+    for name in RUN | HOST:
         if name not in table:
             raise ValueError('Run function missing from the table: ' + name)
     return table
@@ -454,6 +486,7 @@ FUNCTIONS = _build()
 FUNCTION_NUMBERS = {name: i for i, name in enumerate(sorted(FUNCTIONS))}
 for _name, _fn in FUNCTIONS.items():
     _fn.number = FUNCTION_NUMBERS[_name]
+HOST_EFFECT_NUMBERS = frozenset(FUNCTION_NUMBERS[n] for n in HOST_EFFECTS)
 KEYWORDS = ('begin', 'end', 'short', 'long', 'float', 'if', 'endif', 'else', 'elseif', 'while', 'endwhile',
             'return', 'messagebox', 'set', 'to')
 

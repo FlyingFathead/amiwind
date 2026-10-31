@@ -6,6 +6,7 @@
 #define AW_ACTORS_H
 
 void AW_ActorsInit (void);
+void AW_ActorsRoomTick (void);
 /* Object state: a script's Disable keeps an actor of the CHIM window from spawning (aw_mwhost.c sets it). */
 extern int (*aw_actor_disabled)(unsigned reference);
 

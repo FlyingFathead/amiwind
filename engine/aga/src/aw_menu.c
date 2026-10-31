@@ -345,7 +345,7 @@ static void prefs_video_change(int id,int direction,int enter){
         if(enter){fog_slider=1;fog_drag=fog_typing=0;fog_typed[0]=0;fog_before=fog_value();}
         else AW_SetDrawDistance(AW_DrawDistance()+direction*(keydown[K_SHIFT]?1:10));
         break;
-    case ROW_RESET:if(enter)AW_SetDrawDistance(540);break;
+    case ROW_RESET:if(enter)AW_SetDrawDistance(300);break;
     case ROW_FAR:far_step(direction);break;
     /* Photo mode needs the running game; the menu closes first so the
      * notice and then the clean frames follow at once. */
@@ -622,7 +622,7 @@ static void prefs_video_line(int id,char *line){
     case ROW_OBJECTS:sprintf(line,"Objects: %s",places[AW_SceneUIOption(2,0)-1]);break;
     case ROW_AUTOSAVE:sprintf(line,"Autosave history: %ld",(long)AW_AutosaveCount());break;
     case ROW_FOG:sprintf(line,"Fog distance: %ld",(long)AW_DrawDistance());break;
-    case ROW_RESET:strcpy(line,"Reset distance: 540");break;
+    case ROW_RESET:strcpy(line,"Reset distance: 300");break;
     case ROW_FAR:if(far_index()<0)strcpy(line,"Far detail: Custom");else sprintf(line,"Far detail: %s",far_names[far_index()]);break;
     case ROW_PHOTO:strcpy(line,AW_PhotoModeActive()?"Leave photo mode":"Photo mode");break;
     case ROW_AREA:strcpy(line,AW_RegionLoadingFrozen()?"Area loading: Freeze frame":"Area loading: Black screen");break;

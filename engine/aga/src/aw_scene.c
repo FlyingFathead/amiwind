@@ -24,6 +24,7 @@
 #include "aw_travel.h"
 #include "aw_clock.h"
 #include "aw_tryalloc.h"
+#include "aw_listbox.h"
 /* Ordinary hinged doors (aw_hinged_door.c sets these; NULL: none). */
 int (*aw_hinged_use)(void);
 int (*aw_hinged_hint)(const char **name,const char **action);
@@ -1223,14 +1224,18 @@ static void scene_command(void) {
         Con_Printf("dbg tp needs a game running: New Game first%s.\n",AW_MiniwindActive()?", or aw_quick_start":"");return;
     }
     /* a named place (teleport-names.txt: dbg tp heartchamber) */
-    if(sv.active && Cmd_Argc()==2 && strcmp(s,"ship") && strcmp(s,"town") && !map_valid(s) && named_place(s,&r)){
+    /* listed there, a town's map name too takes its street arrival (balmora: the map start was a roof edge,
+     * TPNAMES-HEIGHTS-56); a map name not listed loads its map as before */
+    if(sv.active && Cmd_Argc()==2 && strcmp(s,"ship") && strcmp(s,"town") && named_place(s,&r)){
         if(!strcmp(r.target,"global")){
-            if(!AW_MapTeleportAt(r.arrival,1))Con_Printf("%s: no map on this disk holds that point; player state unchanged.\n",r.label);
-            else Con_Printf("%s\n",r.label);
-            return;
+            if(AW_MapTeleportAt(r.arrival,1)){Con_Printf("%s\n",r.label);return;}
+            /* no map holds the point (a MiniWind, DEBUG-TP-MINIWIND-36): a town's own map still loads, as before */
+            if(!map_valid(s)){Con_Printf("%s: no map on this disk holds that point; player state unchanged.\n",r.label);return;}
         }
-        if(AW_SceneMapSize(r.target,path,sizeof(path))<124){Con_Printf("Destination not on this disk: %s.\n",r.label);return;}
-        door_ready=0;door_close=0;Con_Printf("%s\n",r.label);load_scene(&r,1);return;
+        else{
+            if(AW_SceneMapSize(r.target,path,sizeof(path))<124){Con_Printf("Destination not on this disk: %s.\n",r.label);return;}
+            door_ready=0;door_close=0;Con_Printf("%s\n",r.label);load_scene(&r,1);return;
+        }
     }
     if(!sv.active || Cmd_Argc()!=2 || (strcmp(s,"ship") && strcmp(s,"town") && !map_valid(s))) {
         if(sv.active && Cmd_Argc()==2)Con_Printf("Unknown destination: %s.\n",Cmd_Argv(1));
@@ -1413,7 +1418,8 @@ static void teleport_command(void) {
         Con_Printf("Usage: dbg tp X Y [Z], dbg tp <name>, or dbg tp map\n");return;
     }
 
-    if(Cmd_Argc()==1 && sv.active){Cbuf_InsertText("aw_scene_menu\n");return;}
+    /* no argument: the settlements box (aw_tpplaces.c, TP-PICKER-57); a disk without its table: the scene picker */
+    if(Cmd_Argc()==1 && sv.active){if(!AW_TpPlacesOpen())Cbuf_InsertText("aw_scene_menu\n");return;}
     scene_command();
 }
 /* dbg door roulette [SEED] (the maintainer, v0.0.53: random tests of interior loading): one random room of this

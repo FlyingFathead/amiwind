@@ -144,6 +144,8 @@ int AW_ActorHasSpell(const aw_actor_t *a,int spell);
  * GetCommonDisease). */
 int AW_ActorHasSpellType(const aw_actor_t *a,int type);
 int AW_ActorAddSpell(aw_actor_t *a,int spell);
+/* A cure: every spell of an ASPT TYPE (2 blight, 3 disease) leaves the actor's list; how many were removed. */
+int AW_ActorRemoveSpellType(aw_actor_t *a,int type);
 int AW_ActorRemoveSpell(aw_actor_t *a,int spell);
 
 /* Saved games: the changed records and the dead counts (a byte block, AWAS1). Export returns the bytes written

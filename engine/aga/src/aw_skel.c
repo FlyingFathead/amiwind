@@ -75,7 +75,39 @@ static AW_SKEL_APART int keys_ok (const aw_skel_table_t *t)
 	return 1;
 }
 
+long AW_SkelIndexBytes (const unsigned char *data, long have)
+{
+	long bones, groups, keys, head = AW_SKEL_HEADER;
+	if (!data || have < AW_SKEL_HEADER || memcmp (data, AW_SKEL_MAGIC, 4))
+		return -1;
+	if (U16 (data+4) == AW_SKEL_VERSION_APPENDED)
+		head += AW_SKEL_TABLE_NAME;
+	else if (U16 (data+4) != AW_SKEL_VERSION)
+		return -1;
+	bones = (long)U16 (data+6);
+	groups = (long)U16 (data+20);
+	keys = (long)U16 (data+22);
+	if (bones < 1 || bones > AW_SKEL_MAX_BONES)
+		return -1;
+	return head + ((bones * 2 + 3) & ~3L) + ((bones + 3) & ~3L) + groups * AW_SKEL_GROUP_BYTES +
+		keys * AW_SKEL_KEY_BYTES + bones * AW_SKEL_BASE_BYTES;
+}
+
+static int parse (const unsigned char *data, long size, long file_size, aw_skel_table_t *out);
 int AW_SkelParse (const unsigned char *data, long size, aw_skel_table_t *out)
+{
+	return parse (data, size, size, out);
+}
+int AW_SkelParseIndex (const unsigned char *data, long size, long file_size, aw_skel_table_t *out)
+{
+	if (!parse (data, size, file_size, out) || AW_SkelIndexBytes (data, size) != size)
+		return 0;
+	out->keys = NULL;		/* the frames are the loader's (row_of) */
+	return 1;
+}
+
+/* SIZE bytes of DATA held, of a file of FILE_SIZE bytes (the same when the table is held whole) */
+static int parse (const unsigned char *data, long size, long file_size, aw_skel_table_t *out)
 {
 	long need;
 	int bones_bytes, kinds_bytes, version, head = AW_SKEL_HEADER;
@@ -110,8 +142,8 @@ int AW_SkelParse (const unsigned char *data, long size, aw_skel_table_t *out)
 		(long)out->keys_count * AW_SKEL_KEY_BYTES;
 	if (size < need || !bones_ok (data + (head - AW_SKEL_HEADER), bones_bytes, out))
 		return 0;
-	need += (long)out->bones * AW_SKEL_BASE_BYTES + (long)out->frames * out->row;
-	if (need != size)
+	need += (long)out->bones * AW_SKEL_BASE_BYTES;
+	if (need > size || need + (long)out->frames * out->row != file_size || (size != need && size != file_size))
 		return 0;
 	out->group_data = data + head + bones_bytes + kinds_bytes;
 	out->key_data = out->group_data + (long)out->groups * AW_SKEL_GROUP_BYTES;
@@ -465,6 +497,13 @@ static void rows_at (const aw_skel_table_t *t, float frame, const unsigned char 
 	f0 = (int)frame;
 	f1 = f0 + 1 < t->own_frames ? f0 + 1 : f0;
 	*u = frame - (float)f0;
+	if (!t->keys && t->row_of)
+	{
+		/* a paged table (WALK-CYCLES-57): only the frames posed are read and kept */
+		*a = t->row_of (t, f0);
+		*b = f1 == f0 ? *a : t->row_of (t, f1);
+		return;
+	}
 	*a = t->keys + (long)f0 * t->row;
 	*b = t->keys + (long)f1 * t->row;
 }

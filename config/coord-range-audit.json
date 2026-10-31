@@ -51,6 +51,12 @@
    "note": "interior view distance"
   },
   {
+   "file": "engine/aga/src/aw_fog.c",
+   "contains": "#define LARGE_ROOM_MAX 4096",
+   "class": "kept",
+   "note": "large-room fog distance cap, the view distance cap (FOG-300-DEFAULT-57): a distance, not a position"
+  },
+  {
    "file": "engine/aga/src/aw_cam.c",
    "contains": "if(m->fog>4096)m->fog=4096;",
    "class": "kept",

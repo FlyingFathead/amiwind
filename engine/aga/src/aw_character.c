@@ -34,6 +34,20 @@ static int over_ok(void) {
     return mouse_x>=OK_X && mouse_x<OK_X+OK_W &&
         mouse_y>=OK_Y && mouse_y<OK_Y+OK_H;
 }
+/* RACE-STATS-57: the race page's "View Stats" button (row STATS_ROW, between Hair and OK) opens a box with the
+ * race's base attributes for the chosen sex, its skill bonuses and its specials, from the catalogue the builder
+ * made from the game's RACE records (character/catalog.awc, already loaded for this screen: nothing more held).
+ * The original's race menu lists skill bonuses and specials (OpenMW 0.51 apps/openmw/mwgui/race.cpp
+ * updateSkills, updateSpellPowers); the base attributes are the record's own (ESM RADT), shown here too. */
+#define STATS_ROW 5
+#define STATS_X 10
+#define STATS_Y 133
+#define STATS_W 92
+#define STATS_H 23
+static int stats_open;
+static int over_stats(void) {
+    return mouse_x>=STATS_X && mouse_x<STATS_X+STATS_W && mouse_y>=STATS_Y && mouse_y<STATS_Y+STATS_H;
+}
 static const char *attributes[]={"Strength","Intelligence","Willpower","Agility","Speed","Endurance","Personality","Luck"};
 static const char *skills[]={"Block","Armorer","Medium armor","Heavy armor","Blunt weapon","Long blade","Axe","Spear","Athletics","Enchant","Destruction","Alteration","Illusion","Conjuration","Mysticism","Restoration","Alchemy","Unarmored","Security","Sneak","Acrobatics","Light armor","Short blade","Marksman","Mercantile","Speechcraft","Hand to hand"};
 
@@ -288,14 +302,14 @@ int AW_CharacterOpenQuick(int kind,int confirm)
     skip_confirm=0;
     if(kind<1 || kind>4 || !AW_CharacterLoad() || !aw_character.valid)return 0;
     skip_confirm=!confirm;
-    choice=aw_character;menu=kind;row=page=accepted=review_return=mouse_visible=confirming=0;rotation=0;
+    choice=aw_character;menu=kind;row=page=accepted=review_return=mouse_visible=confirming=stats_open=0;rotation=0;
     mouse_x=100;mouse_y=kind==1?48:176;
     IN_AWClearButtons();
     if(kind==1 && !AW_HeadLoad(choice.head,choice.hair)){menu=0;return 0;}
     return 1;
 }
 int AW_CharacterActive(void){return menu!=0;}
-void AW_CharacterClose(void){menu=confirming=accepted=review_return=skip_confirm=0;AW_HeadClear();IN_AWClearButtons();}
+void AW_CharacterClose(void){menu=confirming=accepted=review_return=skip_confirm=stats_open=0;AW_HeadClear();IN_AWClearButtons();}
 int AW_CharacterDone(void){int result=accepted;accepted=0;return result;}
 
 static void change(int direction)
@@ -321,7 +335,9 @@ void AW_CharacterMouse(int dx,int dy)
     if(mouse_y<0)mouse_y=0;
     if(mouse_y>199)mouse_y=199;
     if(confirming){if(mouse_y>=143 && mouse_y<166)confirm_yes=mouse_x>=160;return;}
+    if(stats_open)return;
     if(menu==1 && mouse_x<198 && mouse_y>=38 && mouse_y<126)row=(mouse_y-38)/22;
+    if(menu==1 && over_stats())row=STATS_ROW;
     if(AW_UIMode()==2?over_ok():mouse_y>=166)row=4;
 }
 int AW_CharacterKey(int key)
@@ -337,6 +353,14 @@ int AW_CharacterKey(int key)
             if(confirm_yes){aw_character=choice;accepted=menu;menu=0;AW_HeadClear();IN_AWClearButtons();apply_eye();}
         }
         return 1;
+    }
+    if(stats_open){
+        /* the race's stats box: Enter, Escape, V or a click closes it (back on the button) */
+        if(key==K_ENTER || key==K_ESCAPE || key==K_MOUSE1 || key=='v' || key=='V'){stats_open=0;row=STATS_ROW;}
+        return 1;
+    }
+    if(menu==1 && (key=='v' || key=='V' || (key==K_MOUSE1 && over_stats()) || (key==K_ENTER && row==STATS_ROW))){
+        stats_open=1;row=STATS_ROW;return 1;
     }
     if(key==K_ESCAPE)return 0; /* Pause menu, retaining the unfinished choice. */
     if(key=='a' || key=='A')key=K_LEFTARROW;
@@ -367,7 +391,13 @@ int AW_CharacterKey(int key)
     if(key=='[')rotation-=.2f;
     if(key==']')rotation+=.2f;
     if(key==K_UPARROW || key==K_DOWNARROW || key==K_TAB){
-        if(menu==1)row=(row+(key==K_UPARROW?4:1))%5;
+        if(menu==1){
+            /* Race, Sex, Face, Hair, View Stats, OK, then round again */
+            static const unsigned char order[6]={0,1,2,3,STATS_ROW,4};
+            int at=0;
+            while(at<5 && order[at]!=row)at++;
+            row=order[(at+(key==K_UPARROW?5:1))%6];
+        }
         else if(AW_UIMode()==2 && key==K_TAB)row=row==4?0:4;
         else {row=0;change(key==K_UPARROW?-1:1);}
     }
@@ -413,7 +443,13 @@ void AW_CharacterDraw(void)
             }
             AW_UITextBox(34,y,136,21,line,gold);
         }
-        AW_UITextBox(10,133,185,23,"Arrows/WASD: Choose",muted);
+        AW_UIBox(STATS_X,STATS_Y,STATS_W,STATS_H);
+        if(row==STATS_ROW || (mouse_visible && over_stats()))
+            AW_UIFill(STATS_X+3,STATS_Y+3,STATS_W-6,STATS_H-6,AW_UIColor(54,47,32));
+        AW_UISmallBegin();
+        AW_UITextBox(STATS_X,STATS_Y,STATS_W,STATS_H,"View Stats",gold);
+        AW_UITextBox(STATS_X+STATS_W+4,STATS_Y,195-STATS_X-STATS_W-4,STATS_H,"Arrows: choose",muted);
+        AW_UISmallEnd();
         rotation+=host_frametime*.35f;AW_HeadDraw(201,34,108,122,rotation);
     }else if(menu==2){
         AW_UITextBox(12,36,296,22,aw_classes[choice.clas].name,gold);
@@ -446,6 +482,36 @@ void AW_CharacterDraw(void)
         AW_UITextBox(OK_X,OK_Y,OK_W,OK_H,"OK",gold);
     }else {
     AW_UITextBox(10,166,300,22,menu==4?"Enter: accept  Arrows/WASD: pages":menu==1?"Enter: next / accept   LMB: rotate":"Arrows/WASD: Choose  Enter: accept",gold);
+    }
+    if(stats_open && menu==1){
+        /* RACE-STATS-57: base attributes (the chosen sex), skill bonuses and specials of the race */
+        const aw_race_t *r=&aw_races[choice.race];int n=0;
+        AW_UIBox(8,26,304,170);
+        sprintf(line,"%s - %s",r->name,choice.female?"Female":"Male");
+        AW_UITextBox(14,30,292,18,line,gold);
+        AW_UISmallBegin();
+        AW_UITextBox(16,49,136,11,"Attributes",muted);
+        for(i=0;i<8;i++){
+            sprintf(line,"%s %ld",attributes[i],(long)r->attributes[i*2+choice.female]);
+            AW_UITextBox(16,61+i*11,136,11,line,gold);
+        }
+        AW_UITextBox(160,49,144,11,"Skill bonus",muted);
+        for(i=0;i<27 && n<7;i++)if(r->skills[i]){
+            sprintf(line,"%s +%ld",skills[i],(long)r->skills[i]);
+            AW_UITextBox(160,61+n*11,144,11,line,gold);n++;
+        }
+        if(!n)AW_UITextBox(160,61,144,11,"none",gold);
+        AW_UITextBox(160,61+7*11,144,11,"Specials",muted);
+        for(i=0;i<r->power_count && i<3;i++){
+            /* the catalogue holds the spells' IDs ("resist magicka_25", "orc_beserk"): shown with spaces, as the small
+             * font has no underscore or percent sign (the spells' own names are not in the catalogue yet) */
+            const char *s=r->powers[i];int k=0;
+            while(*s && k<(int)sizeof(line)-1){if(*s!='%')line[k++]=*s=='_'?' ':*s;s++;}
+            line[k]=0;
+            AW_UITextBox(160,72+7*11+i*11,144,11,line,gold);
+        }
+        if(!r->power_count)AW_UITextBox(160,72+7*11,144,11,"none",gold);
+        AW_UISmallEnd();
     }
     if(confirming){
         AW_UIBox(16,48,288,126);AW_UISmallBegin();

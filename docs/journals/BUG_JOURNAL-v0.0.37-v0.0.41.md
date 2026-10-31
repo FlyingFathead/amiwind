@@ -1691,7 +1691,7 @@ BUILD-REUSE-KEYS-TOO-BROAD-35: 17 October 2026, v0.0.42-dev1: PERSISTING; narrow
 
 INSPECT-OVER-VIEWPORT-42: 17 October 2026, v0.0.42-dev1: the maintainer's frames at Vivec's entrance show the inspect hint and the ten-line pin panel on black boxes over the top of the view. Repaired in source: the hint is a coordinate row above GLOBAL/LOCAL XYZ, the pin is packed into the strip under the view (72 lines high while inspect is on); in-game frame pending.
 
-INSPECT-OVER-VIEWPORT-42: 17 October 2026, v0.0.42-rc1: the maintainer specified the place, "underneath the player stats HUD". Repaired in source: the hint and up to three pin lines are the bottom four lines of the screen, below the health, magic and fatigue bars; while inspect is on, the bars, the boxes and the coordinate rows move up by those lines and the strip under the view grows to 84 lines. Native HUD test updated; in-game frame pending on the rc1 image.
+INSPECT-OVER-VIEWPORT-42: 17 October 2026, v0.0.42-rc1: the maintainer specified the place, underneath the player stats HUD. Repaired in source: the hint and up to three pin lines are the bottom four lines of the screen, below the health, magic and fatigue bars; while inspect is on, the bars, the boxes and the coordinate rows move up by those lines and the strip under the view grows to 84 lines. Native HUD test updated; in-game frame pending on the rc1 image.
 
 HUD-DEBUG-STRIP-OVER-BOXES-42: 17 October 2026, v0.0.42-dev1: the debug XYZ strip's black fill (from x 88) covers half the weapon box and the magic box. Repaired in source: rows and fill start right of the boxes (x 144); a cell that fits neither row goes on the row above.
 

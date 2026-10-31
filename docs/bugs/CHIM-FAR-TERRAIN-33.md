@@ -20,7 +20,7 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
+_Last updated with AmiWind v0.0.56 (30 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -49,7 +49,7 @@ CHIM build before the repair. Design and measurements: [FAR_TERRAIN.md](../chim/
 On CHIM the ground ends where the active ring ends. Beyond the view distance there is only fog and
 sky colour, so valleys look empty (the maintainer's frame beyond the Balmora bridge at -17541 -15916) and
 Vivec is not visible from the world. The legacy region maps draw these places much better: the
-maintainer rated them "5/5 (or 4/5) in many places with the old one".
+maintainer rated the old method at 5/5 (or 4/5) in many places.
 
 ## Where
 

@@ -2283,8 +2283,8 @@ matched original-versus-candidate A/B geometry captures and measurements at the
 same camera, region and load state so reduced faces or collision cost are not
 confused with culling, fog or changed residency.
 This is mandatory follow-up, not a prerequisite that delays this playtest.
-Building-audit example: Harry recalls particularly high polygon counts on some Seyda Neen buildings, including arches. Measure curved tessellation, decorative surfaces and collision cost; preserve arch openings, silhouette and original UVs. This is an observation to profile, not established redundant geometry.
-Building-audit hypothesis, Harry's “it just works!” observation: original meshes
+Building-audit example: the maintainer recalls particularly high polygon counts on some Seyda Neen buildings, including arches. Measure curved tessellation, decorative surfaces and collision cost; preserve arch openings, silhouette and original UVs. This is an observation to profile, not established redundant geometry.
+Building-audit hypothesis, from the maintainer's observation that the original meshes work as they are: original meshes
 may include substantial geometry hidden or unused in normal views. Determine
 which surfaces genuinely lack required consumers before removing anything;
 occluded geometry can still matter for levitation/other angles, interiors,

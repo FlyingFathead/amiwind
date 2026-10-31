@@ -1,0 +1,7 @@
+# Large rooms (FOG-300-DEFAULT-57, INTERIOR-FAR-BLANK-MANOR-56): interiors that
+# fade into their cell's fog colour (dark grey when the record has none) at the
+# player's draw distance and draw nothing past it. One room per line:
+# map name [cap in local units, 100..4096]. Chosen from the converted size:
+# tools/large_rooms.py over a build's chim-room-batches/scene/area-work.
+# Ald-ruhn, Manor District: 1236 x 1253 local units, the open canopy court.
+rie242a8d69e

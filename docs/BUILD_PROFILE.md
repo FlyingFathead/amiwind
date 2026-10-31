@@ -1,6 +1,6 @@
 # Build profile and stage reuse
 
-_Last updated with AmiWind v0.0.55 (29 October 2026)._
+_Last updated with AmiWind v0.0.57-dev4 (30 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -28,6 +28,7 @@ _Last updated with AmiWind v0.0.55 (29 October 2026)._
 - [Build speed in CHIM](#build-speed-in-chim)
   - [CHIM world conversion (v0.0.42)](#chim-world-conversion-v0042)
 - [Payload preflight](#payload-preflight)
+- [Recipe collision preflight](#recipe-collision-preflight)
 - [Measured release builds (v0.0.33 -> v0.0.34)](#measured-release-builds-v0033---v0034)
 
 <!-- contents end -->
@@ -1546,6 +1547,24 @@ Payload preflight: 7 checks, 0 errors, 4.1 s
 `tools/build.py --check-payload RUN` runs it alone on a run folder's staged
 payload, with the image command recorded in its `build-state.json`. The later
 checks still run on what the image step writes.
+
+## Recipe collision preflight
+
+Before the stages run, a CHIM build checks every reduction row of the everywhere
+visual recipe against the collision surface gate (`tools/recipe_collision_preflight.py`,
+RECIPE-ROW-MOVES-COLLISION-57): each row's mesh, taken from the reuse source's
+staged CHIM meshes, is measured with the row and without it through the CHIM model
+builder's own profile. A row that makes the gate fail where the mesh without it
+passes refuses the build at once and names the mesh, instead of the CHIM stage
+stopping minutes later. Results are cached by the row's key (the row, its mesh,
+the meshoptimizer source and the rule's version) in `cache/recipe-collision-v1`
+beside the storage pool, so only a new or changed row is measured, on all the
+build's workers. A mesh the reuse source does not hold is listed as not checked;
+the CHIM stage's own gate still checks it. It prints:
+
+```text
+Recipe collision preflight: 74 rows, 74 cached, 0 to measure on 20 workers, 0 without a staged mesh
+```
 
 ## Measured release builds (v0.0.33 -> v0.0.34)
 

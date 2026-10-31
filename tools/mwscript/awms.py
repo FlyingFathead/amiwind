@@ -25,6 +25,7 @@
   OACT, ACTB, AINV, AITM, ASPT, ASPL: the actor table (actors.py; docs/ACTOR_STATE.md)
   PCEL  the cells each GetPCCell name matches (resident; pccell_section below)
   PMOV  20 bytes a move of the player (PositionCell; resident; written in write() below)
+  TOPC  2 bytes a dialogue topic (DIAL type 0), sorted by folded id: u16 name (on disk; AddTopic hands the row)
 
 A pool name is the 8 bytes of a converted file's name in the media catalogue: sound/pool/a<16 hex>.wav.
 """
@@ -35,8 +36,8 @@ from .opcodes import NAME, LAYOUT
 MAGIC = b'AWMS'
 VERSION = 1
 TYPES = {'s': 0, 'l': 1, 'f': 2}
-ORDER = ('CONF', 'GLOB', 'JRNL', 'SNDS', 'VOIC', 'MUSI', 'OBJS', 'SCRP', 'STRT', 'OACT', 'PCEL', 'PMOV', 'CODE', 'BIND', 'STRS',
-         'ACTB', 'AINV', 'AITM', 'ASPT', 'ASPL')
+ORDER = ('CONF', 'GLOB', 'JRNL', 'SNDS', 'VOIC', 'MUSI', 'OBJS', 'SCRP', 'STRT', 'OACT', 'PCEL', 'PMOV', 'SPFX', 'CODE', 'BIND', 'STRS',
+         'ACTB', 'AINV', 'AITM', 'ASPT', 'ASPL', 'TOPC')
 # The actor sections (actors.py, docs/ACTOR_STATE.md): OACT is resident (a script's target -> its actor row); the
 # others stay on disk and are read a row at a time by the engine's actor state (aw_actorstate.c).
 ACTOR_SECTIONS = ('OACT', 'ACTB', 'AINV', 'AITM', 'ASPT', 'ASPL')
@@ -129,6 +130,21 @@ def write(program, compiled, binds, conf=None):
     moves = getattr(p, 'moves', None)
     pmov = (b''.join(struct.pack('>BBHffff', r['kind'], 0, r['map'], *r['at'], r['yaw']) for r in moves.rows)
             if moves is not None else b'', len(moves) if moves is not None else 0)
+    # SPFX (v0.0.57, SPELL-EFFECTS-57): 4 bytes a spell a Cast names (u16 first effect, u8 effects, u8 0), then 8
+    # bytes an effect (u8 kind 0 drain 1 damage 2 restore 3 fortify, u8 stat, u16 seconds, u16 low, u16 high); resident
+    spfx_rows = getattr(p, 'spfx', None)
+    head, body, first = bytearray(), bytearray(), 0
+    for r in (spfx_rows.rows if spfx_rows is not None else []):
+        head += struct.pack('>HBB', first, len(r['effects']), 0)
+        for e in r['effects']:
+            body += struct.pack('>BBHHH', *e)
+        first += len(r['effects'])
+    spfx = (bytes(head + body), len(spfx_rows) if spfx_rows is not None else 0)
+    # TOPC, 2 bytes a dialogue topic (v0.0.57): u16 name, sorted by folded id (AddTopic hands the row number); on disk
+    rows = getattr(p, 'topic_rows', None)
+    topics = sorted(rows(), key=rows().get) if rows else []
+    names = getattr(p.data, 'topics', {})
+    topc = (b''.join(struct.pack('>H', p.string(names[k])) for k in topics), len(topics))
     blob = bytearray()
     offsets = []
     for s in p.strings.rows:
@@ -139,7 +155,7 @@ def write(program, compiled, binds, conf=None):
                 'SNDS': (snds, len(p.sounds)), 'VOIC': (voic, len(p.voices)), 'MUSI': (musi, len(p.music)),
                 'OBJS': (objs, len(p.objects)), 'SCRP': (bytes(scrp), len(compiled)),
                 'CODE': (bytes(code), len(compiled)), 'BIND': (bytes(bind), len(binds)),
-                'STRT': (strt, len(strt) // 2), 'PCEL': pcel, 'PMOV': pmov}
+                'STRT': (strt, len(strt) // 2), 'PCEL': pcel, 'PMOV': pmov, 'TOPC': topc, 'SPFX': spfx}
     actors = getattr(p, 'actors', None)
     if actors is not None:
         sections.update(actors.sections(p.objects.rows))

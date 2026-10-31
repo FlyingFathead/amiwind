@@ -131,6 +131,7 @@ void Con_Printf(char *f,...){(void)f;}
 void Con_DPrintf(char *f,...){(void)f;}
 void Sys_Error(char *f,...){(void)f;abort();}
 int AW_CombatHealthPercent(edict_t *e){(void)e;return -1;}
+int AW_MwscriptActorFaction(const char *record,char *out,int capacity){(void)record;(void)capacity;out[0]=0;return 0;}
 void AW_ExpandDialogue(char *out,int capacity,const char *source){
     /* the player's defines: only %PCName here */
     const char *p=strstr(source,"%PCName");

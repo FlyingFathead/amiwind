@@ -34,6 +34,32 @@ def classify(c):
             'runs_whole': c.error is None and not c.flags & SCRIPT_NOTYET}
 
 
+def blockers(compiled, top=40):
+    """The not-yet functions ranked by how many scripts each one stops (v0.0.57, MWSCRIPT-MORE-57): 'scripts' uses
+    it at all, 'last' it is the only not-yet function the script calls (carrying it out makes the script run whole),
+    and a greedy order: each step the function that makes the most further scripts run whole."""
+    sets = [set(c.notyet) for c in compiled if c.error is None and c.notyet]
+    uses = Counter(n for s in sets for n in s)
+    last = Counter(next(iter(s)) for s in sets if len(s) == 1)
+    rows = [{'function': n, 'scripts': k, 'last': last.get(n, 0)} for n, k in uses.most_common()]
+    rows.sort(key=lambda r: (-r['last'], -r['scripts'], r['function']))
+    greedy, left, done = [], [set(s) for s in sets], set()
+    for _ in range(top):
+        gain = Counter()
+        for s in left:
+            rest = s - done
+            if rest:
+                for n in rest:
+                    gain[n] += 1.0 / len(rest)    # a script shared by k missing functions gives each 1/k
+        if not gain:
+            break
+        pick = max(gain, key=lambda n: (gain[n], uses[n], n))
+        done.add(pick)
+        greedy.append({'function': pick, 'scripts': uses[pick],
+                       'runs_whole_after': sum(1 for s in left if not (s - done))})
+    return {'blocked_scripts': len(sets), 'by_last': rows[:top], 'greedy': greedy}
+
+
 def master_summary(master, compiled):
     uses = usage(compiled)
     rows = [classify(c) for c in compiled]
@@ -56,6 +82,7 @@ def master_summary(master, compiled):
         'inert_today': sum(1 for c in compiled if c.flags & 64),
         'handwritten': sum(1 for c in compiled if c.flags & 32),
         'with_while': sum(1 for c in compiled if c.loops),
+        'blockers': blockers(compiled),
     }
 
 

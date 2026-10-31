@@ -17,5 +17,9 @@ arenapit|vai000|437.63431 0.58477 13.40949|180|Vivec, Arena Pit
 # door, where that door puts the player.
 suran|global|57088 -54208 1400|0|Suran
 aldruhn|global|-12606 54169 2500|0|Ald'ruhn
+# Balmora: its map start was a roof edge (the Pi fog run and the settlement sweeps, 30 October 2026); the street
+# outside the door the settlement list picks (the door standing lowest over the ground, tools/tp_places_lut.py), where
+# that door puts the player (checked in game on the v0.0.57-dev2 image: on the street beside the door).
+balmora|global|-20536 -13960 346|0|Balmora
 # Khuul (cell -9,17): the street outside Thongar's Tradehouse, where its door (reference 102149) puts the player.
 khuul|global|-66897 139876 400|0|Khuul

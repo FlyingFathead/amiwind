@@ -860,6 +860,8 @@ needs almost the entire 256k of stack space!
 /* aw_view.c: the death prompt (docs/THIRD_PERSON.md); NULL in fixtures without it. */
 void (*aw_view_draw)(void);
 void (*aw_msgbox_draw)(void);
+/* aw_listbox.c: puts back the view kept behind an open list box (1) instead of the modal's black. */
+int (*aw_listbox_restore)(void);
 
 void SCR_UpdateScreen (void)
 {
@@ -987,7 +989,8 @@ void SCR_UpdateScreen (void)
     D_EnableBackBufferAccess ();	// of all overlay stuff if drawing directly
     AW_DemoWindDraw ();
     if(AW_ModalWorldHidden()) {
-        AW_UIFill(0,0,vid.width,vid.height,AW_UIColor(0,0,0));
+        if(!(aw_listbox_restore && aw_listbox_restore ()))
+            AW_UIFill(0,0,vid.width,vid.height,AW_UIColor(0,0,0));
         scr_copyeverything=true;
     }
 

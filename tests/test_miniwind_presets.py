@@ -101,8 +101,10 @@ class Table(unittest.TestCase):
                          ['anim-stage', 'animkit', 'balmora', 'balmora-exterior', 'combat-playground', 'demowind',
                           'halloween', 'lava-pools', 'magic', 'opening-ship',
                           'redmountain',
-                          'seyda-chim', 'vivec-arena-chim', 'vivec-arena-pit', 'vivec-city-chim', 'vivec-city-exterior',
-                          'vivec-palace'])
+                          'seyda-chim', 'urshilaku-camp', 'vivec-arena-chim', 'vivec-arena-pit', 'vivec-city-chim',
+                          'vivec-city-exterior', 'vivec-palace'])
+        # v0.0.57: Urshilaku Camp, one cell, the simplified yurts (POLYCOUNT-CAMPS-ALDRUHN-57)
+        self.assertEqual(mp.find('urshilaku-camp')['start'], 'camp_xm4y18')
         # v0.0.43: Red Mountain's summit, the raised terrain ceiling (CHIM-RED-MOUNTAIN-SOLID-SKY-43)
         self.assertEqual(mp.find('redmountain')['start'], 'redmtn_x3y8')
         # v0.0.54: the combat playground in the Arena Pit, its room only, the modes listed on arrival

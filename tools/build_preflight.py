@@ -154,7 +154,9 @@ def harvest_town_problems(native, regions, miniwind=False, boxes=None):
     (MINIWIND) lists such plants as its limit instead (its plan says so). BOXES: {town: frame box} (default: the towns'
     own, chim.regions.town_boxes). A necessary condition, checked in seconds; the image step's coverage check stays."""
     from town_config import runtime_towns
-    fixed = {town['id'] for town in runtime_towns()[:2]}
+    # since v0.0.57 every town with a region table has catalogues of its own (harvest_build.plan_rows,
+    # CHIM-NATIVE-HARVEST-MISSING-36); the check stays for a town without one
+    fixed = {town['id'] for town in runtime_towns() if town.get('regions')}
     others = [town for town in native or () if town not in fixed]
     if miniwind or not others:
         return []

@@ -1,6 +1,6 @@
 # Next milestone: dock and Census Office character creation
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.57-dev2 (30 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -168,6 +168,19 @@ Save name, stable race/head/hair/class/birthsign IDs, sex, level, all eight
 attributes and skills; do not save only the displayed numbers or selector indices.
 The current Nord hands are not proof that selected-race first-person appearance
 has been implemented. Audit those assets as a separate acceptance item.
+
+### View Stats on the race page (v0.0.57)
+
+The race page has a **View Stats** button under the four choices, between Hair
+and OK: arrows up and down reach it (Race, Sex, Face, Hair, View Stats, OK),
+Enter or V opens it, and the mouse clicks it. A box shows the race's base
+attributes for the chosen sex, its skill bonuses and its specials, from the
+same catalogue the page already reads (`character/catalog.awc`, built from the
+game's RACE records: attributes, skill bonuses, powers), so nothing more is
+loaded. The original's race menu lists the skill bonuses and specials (the
+rule as OpenMW 0.51 shows it: `apps/openmw/mwgui/race.cpp`, updateSkills and
+updateSpellPowers); the base attributes are the record's own, shown beside
+them. Enter, Escape, V or a click closes the box.
 
 Race-based height is also original data. The complete male/female multiplier
 table and its source are recorded in

@@ -76,7 +76,10 @@ ARCHIVES = ((ARCHIVE_DIR / 'bugs-to-v0.0.31.json', 31),
             # 2026-10-26 22:30 +0200 / 2026-10-26 20:30 UTC: v0.0.53-dev alone stood at 95.0 % of the 1 MiB limit
             # (996,295 bytes) and the door check's register lines took bugs.json over the 95 % line (gate 4061); the
             # rotation moves on to v0.0.51, a release before the last (TRACKER-REGISTER-SIZE-36)
-            (ARCHIVE_DIR / 'bugs-v0.0.48-v0.0.51.json', 51))
+            (ARCHIVE_DIR / 'bugs-v0.0.48-v0.0.51.json', 51),
+            # 2026-10-30: the merge of v0.0.57-dev1 into the alive branch took bugs.json to 95.0 % (996,377 bytes,
+            # gate 4681); the rotation moves on to v0.0.54, a release before the last two (TRACKER-REGISTER-SIZE-36)
+            (ARCHIVE_DIR / 'bugs-v0.0.52-v0.0.54.json', 54))
 ARCHIVE_UP_TO = ARCHIVES[-1][1]   # fixed or closed bugs first found in v0.0.40 or earlier rotate into an archive
 # Archive files of earlier layouts: still read when present, emptied into ARCHIVES and removed by render.
 RETIRED_ARCHIVES = (ARCHIVE_DIR / 'bugs-v0.0.29-v0.0.33.json',)
@@ -292,13 +295,19 @@ def _line_ok(text, limit):
     return isinstance(text, str) and text.strip() and '|' not in text and '\n' not in text and len(text) <= limit
 
 
+# Names the public text never holds, any case (the maintainer, 24 and 29 October 2026): kept in pieces so no file of the
+# tree spells them. tests/test_public_tree_private_words.py takes this tuple for its whole-tree check, and the gate's
+# first step (the maintainer's private list, a longer one) checks every commit.
+PRIVATE_WORDS = ('cla' + 'ude', 'open' + 'ai', 'chatg' + 'pt', 'anthrop' + 'ic', 'cop' + 'ilot', 'gem' + 'ini',
+                 'deep' + 'seek', 'mid' + 'journey')
+
+
 def validate_facts(b, ids, families, where):
     errors = []
     # the register is public: no field of any bug names the private working folder or a tool (the maintainer,
-    # 24 October 2026; tests/test_public_tree_private_words.py checks the whole public tree in the gate); the words
-    # are kept in pieces so this file does not hold them
+    # 24 October 2026; tests/test_public_tree_private_words.py checks the whole public tree in the gate)
     text = json.dumps(b, ensure_ascii=False).lower()
-    for word in ('cla' + 'ude', 'open' + 'ai', 'chatg' + 'pt'):
+    for word in PRIVATE_WORDS:
         if word in text:
             errors.append('%s: a field holds a private word (%s...): the register is public' % (where, word[:3]))
     missing = [k for k in FACTS if k not in b]

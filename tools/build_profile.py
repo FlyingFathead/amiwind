@@ -512,6 +512,10 @@ class phase:
         _write_section(record)
         if _phases and _phases[-1] is self:
             _phases.pop()
+        elif self in _phases:
+            # a phase run in a thread beside another (the CHIM stats beside the zone walk) can end first: it leaves
+            # the stack wherever it is, so the current phase stays the one still running
+            _phases.remove(self)
         if _phases:
             _write_now(_phases[-1]._state())
         else:

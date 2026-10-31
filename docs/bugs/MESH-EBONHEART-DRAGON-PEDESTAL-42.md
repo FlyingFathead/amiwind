@@ -29,7 +29,7 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.46 (20 October 2026)._
+_Last updated with AmiWind v0.0.56 (30 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -51,7 +51,7 @@ _Last updated with AmiWind v0.0.46 (20 October 2026)._
 
 ## Status: 20 October 2026
 
-Fixed in v0.0.46. The maintainer checked the v0.0.46-dev1 playtest on the evening of 20 October 2026: "ebonheart's statue pedestal is at least confirmed fixed, just checked it out".
+Fixed in v0.0.46. The maintainer checked the v0.0.46-dev1 playtest on the evening of 20 October 2026 and confirmed Ebonheart's statue pedestal fixed.
 The text below is the state before that build.
 
 Cause found: the converter applied the translation of the model's root node, which the game drops. Repaired in
@@ -175,7 +175,7 @@ Family: Mesh converter geometry (`converter-geometry`). Converted faces must be 
 
 - AW-20260928-21 (no report page): Exterior Census door/wall overlap
 - AW25-02 (no report page): Dry valleys and rises rendered as flooded after coarse terrain conversion
-- BALMORA-GROUND-DENTS-51 (no report page): Sharp V-shaped dents in Balmora s ground beside the canal wall (cell -3,-2); the maintainer: they are back
+- BALMORA-GROUND-DENTS-51 (no report page): Sharp V-shaped dents in Balmora s ground beside the canal wall (cell -3,-2), reported by the maintainer as back
 - [BALMORA-TEMPLE-GEOMETRY-29](BALMORA-TEMPLE-GEOMETRY-29.md): Balmora Temple lower rooms: missing walls and floors, collision holes
 - BSP-LIGHT-01 (no report page): Vodunius face lightmap range exceeded its lighting lump
 - [BUILD-INTERIOR-INDEX-ROUTED-33](BUILD-INTERIOR-INDEX-ROUTED-33.md): Full build stops in the interior stage: the prison ship collision index expects a convex-piece chain, but the converter now routes large standing hulls

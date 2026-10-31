@@ -1,6 +1,19 @@
 # Save/load milestone: compact state and a manageable save list
 
-_Last updated with AmiWind v0.0.24-rc4 (1 October 2026)._
+_Last updated with AmiWind v0.0.57-dev1 (30 October 2026)._
+
+<!-- contents start -->
+## Contents
+
+- [First usable save](#first-usable-save)
+- [Avoid clutter in files and in the UI](#avoid-clutter-in-files-and-in-the-ui)
+- [Format and failure recovery](#format-and-failure-recovery)
+- [Sanity check against original saves and OpenMW](#sanity-check-against-original-saves-and-openmw)
+- [Planned: importing original and OpenMW saves](#planned-importing-original-and-openmw-saves)
+- [Actors in rooms and their packages (v0.0.57)](#actors-in-rooms-and-their-packages-v0057)
+- [References inspected](#references-inspected)
+
+<!-- contents end -->
 
 **Status:** the post-RC3 checkpoint adds AWS2 dated journal history, retaining
 AWS1 decoding without invented history. See [journal schema and limits](WORLD_MAP_AND_JOURNAL.md).
@@ -106,6 +119,51 @@ Before enabling Save/Load:
    chargen; coalesce simultaneous triggers and test transition/audio interactions.
 7. Run on the reference FS-UAE configuration and then WinUAE/physical hardware;
    measure save latency, audio behavior, memory peaks and long-session growth.
+
+## Planned: importing original and OpenMW saves
+
+Planned for v0.0.57 (decided 30 October 2026). A save from the original game (`.ess`) or from OpenMW can be loaded into
+AmiWind once and becomes an AmiWind save. Why: the same save opened in OpenMW and in AmiWind puts both in the same
+game state (place, quest stage, inventory, time of day), so every comparison between the two (scripts, wandering,
+dialogue, weapons, fog) is like for like, with no walking both games to the same spot by hand.
+
+How:
+
+- **Reading is cheap.** Both save formats use the game's own record layout (a record tag, a size, then sub-records).
+  The game reads the file once, one record at a time from disk, with a small buffer; the embedded screenshot and map
+  image are skipped. Nothing of the foreign format stays in memory, and nothing foreign is read during play.
+- **Matching is the work.** A save names the original game's references (the content file and the reference number,
+  and record ids). The builder writes a lookup table on disk from those to AmiWind's own placements; the import looks
+  each changed reference up in it and writes the change into an AmiWind save.
+- **What cannot land is said.** Anything the game cannot place yet (a character AmiWind does not spawn, an item kind it
+  does not support) is listed by the import, never silently dropped.
+- **In the menu: a save browser.** Load Game shows three tabs, **AmiWind**, **Morrowind** and **OpenMW**. The
+  Morrowind and OpenMW tabs list the saves of that kind found in the game's import folder, each with its character
+  name, place and level read from its header, before anything is converted. Choosing one imports it (an **Import
+  Save** step with a short report of what came over and what could not) and the new save appears under AmiWind,
+  ready to load. Keyboard and mouse both work.
+- **One way, into AmiWind's own format.** The import only reads the original and OpenMW formats and only writes
+  AmiWind's own save; AmiWind never writes a `.ess` or an OpenMW save. It also checks and cleans while it reads:
+  every record is validated before anything is written, duplicate and orphaned references are dropped, whole copies
+  of cells and containers become only the real changes, and a save too damaged to trust is refused with a readable
+  reason (original saves are known to grow and break down over a long game). Only files that start with the
+  original game's own save header are taken: Oblivion and Skyrim saves use the same `.ess` name in another format.
+- A tool on the PC that does the same conversion stays the fallback.
+
+Order: first the study of what each format keeps and loses, then AmiWind's own complete save (every change to the
+world as a compact list against the game's data), then the import. OpenMW's own importer of original saves
+(below) is studied for the rules; AmiWind's import is its own code.
+
+## Actors in rooms and their packages (v0.0.57)
+
+The change list keys an actor captured in a room by the room's stable number (worldspawn `_aw_cell_int`) and keeps
+its position in the room's own coordinates (flag AW_CHANGE_ROOM); an entry of another room or of the outdoors is not
+applied in this one. In a room the actors' state is captured as they stand and applied after a load and when the
+room is entered again (rooms have no CHIM window tick, so `AW_ActorsRoomTick` does it). The actors' travel and
+follow packages started by the scripts (AITravel, AIFollow) are saved as their own block (AWPK, 26 bytes a package:
+the actor, the state, the target point, the followed actor, the hours left) and started again when the actor is in
+the map; OpenMW keeps the whole package sequence in the actor's state (components/esm3/aisequence.cpp), here only those
+two. Kept by `tests/aga_save_changes_test.c` (a room entry round trip and its refusals).
 
 ## References inspected
 

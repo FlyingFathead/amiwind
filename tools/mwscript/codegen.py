@@ -17,9 +17,29 @@ from .opcodes import CODE, CMP_I, CMP_F, ARITH_I, ARITH_F, NONE, QUERIES, WHOLE_
 # The squeeze switch: False builds the program without the compare-and-branch opcodes (the A/B reference run; the
 # builder always squeezes).
 SQUEEZE = True
-from .functions import lookup, ACTOR_CALLS
+from .functions import lookup, ACTOR_CALLS, HOST, HOST_EFFECT_NUMBERS
 
-SCRIPT_VOLATILE = 1      # reads time, distance, chance, sound state or an engine query
+# The magic effects in the game's numbering (the MGEF index; OpenMW components/esm3/loadmgef.cpp lists them in this
+# order): GetEffect names one as "sEffect<Name>" (v0.0.57)
+EFFECT_NAMES = (
+    'WaterBreathing SwiftSwim WaterWalking Shield FireShield LightningShield FrostShield Burden Feather Jump Levitate '
+    'SlowFall Lock Open FireDamage ShockDamage FrostDamage DrainAttribute DrainHealth DrainMagicka DrainFatigue '
+    'DrainSkill DamageAttribute DamageHealth DamageMagicka DamageFatigue DamageSkill Poison WeaknessToFire '
+    'WeaknessToFrost WeaknessToShock WeaknessToMagicka WeaknessToCommonDisease WeaknessToBlightDisease '
+    'WeaknessToCorprusDisease WeaknessToPoison WeaknessToNormalWeapons DisintegrateWeapon DisintegrateArmor '
+    'Invisibility Chameleon Light Sanctuary NightEye Charm Paralyze Silence Blind Sound CalmHumanoid CalmCreature '
+    'FrenzyHumanoid FrenzyCreature DemoralizeHumanoid DemoralizeCreature RallyHumanoid RallyCreature Dispel Soultrap '
+    'Telekinesis Mark Recall DivineIntervention AlmsiviIntervention DetectAnimal DetectEnchantment DetectKey '
+    'SpellAbsorption Reflect CureCommonDisease CureBlightDisease CureCorprusDisease CurePoison CureParalyzation '
+    'RestoreAttribute RestoreHealth RestoreMagicka RestoreFatigue RestoreSkill FortifyAttribute FortifyHealth '
+    'FortifyMagicka FortifyFatigue FortifySkill').split()
+# Spell effects of the first slice beyond Fortify/Drain/Damage/Restore (v0.0.57): the cures (effect number: the ASPT
+# spell type they remove) and the effects that hurt health like Damage Health
+CURE_EFFECTS = {69: 3, 70: 2, 72: 0}
+HEALTH_DAMAGE_EFFECTS = (14, 15, 16, 27)
+# Cast carried out (v0.0.57): the cures on the player (aw_mwhost.c AWF_CAST)
+CURES = ('cure common disease', 'cure blight disease', 'cure poison')
+SCRIPT_VOLATILE = 1     # reads time, distance, chance, sound state or an engine query
 SCRIPT_NOTYET = 2        # holds at least one NOTYET call
 SCRIPT_START = 4         # a start script (runs from the beginning of the game)
 SCRIPT_BROKEN = 8        # did not compile (an error in the original data); its code is END
@@ -46,6 +66,9 @@ def effect_op(name, args):
         return args[0] != 0
     if name == 'SPELL':
         return args[0] in (SPELL_VERBS['add'], SPELL_VERBS['remove'])
+    if name == 'NOTYET':
+        # the import route's calls the engine carries out (functions.HOST) and that change something
+        return args[0] in HOST_EFFECT_NUMBERS
     return False
 
 # The opcodes whose answer changes without the state generation moving (a script that holds one runs every frame).
@@ -188,6 +211,58 @@ class Program:
             raise CompileError('GetPCCell %r: a cell outside the table\'s ranges' % name)
         wild = d.default_cell_name.casefold().startswith(key)
         return self.pccells.get(key, {'name': name, 'rooms': rooms, 'outside': outside, 'wilderness': wild})
+
+    def spell_effects(self, spell):
+        """The SPFX row of a spell whose every effect is in the first slice of the spell effects (v0.0.57,
+        SPELL-EFFECTS-57), else None. Each effect: (kind 0 drain 1 damage 2 restore 3 fortify, the actor record's stat
+        number, duration seconds, magnitude low, high), from the SPEL record's ENAM (OpenMW's effect numbers: drain
+        17-21, damage 22-26, restore 74-78, fortify 79-83; each block attribute, health, magicka, fatigue, skill)."""
+        if not hasattr(self, 'spfx'):
+            self.spfx = Table()
+        key = spell.casefold()
+        if key in self.spfx.index:
+            return self.spfx.index[key]
+        parts = getattr(self.data, 'records', {}).get('SPEL', {}).get(key)
+        if not parts:
+            return None
+        effects = []
+        for tag, data in parts:
+            if tag != 'ENAM' or len(data) < 24:
+                continue
+            number, skill, attribute, _rng, _area, duration, low, high = struct.unpack_from('<hbbiiiii', data)
+            if number in CURE_EFFECTS:
+                # a cure (kind 4): the spell type it removes (3 common disease, 2 blight; 0 poison: no state yet)
+                effects.append((4, CURE_EFFECTS[number], 0, 0, 0))
+                continue
+            if number in HEALTH_DAMAGE_EFFECTS:
+                # Fire, Frost and Shock Damage and Poison hurt health like Damage Health (OpenMW spelleffects.cpp);
+                # resistances do not exist here yet, so the full magnitude lands
+                number = 23
+            kind = next((k for k, b in enumerate((17, 22, 74, 79)) if b <= number <= b + 4), None)
+            if kind is None:
+                return None
+            which = number - (17, 22, 74, 79)[kind]
+            if which == 0:
+                if not 0 <= attribute < 8:
+                    return None
+                stat = attribute
+            elif which == 4:
+                if not 0 <= skill < 27:
+                    return None
+                stat = 8 + skill
+            else:
+                stat = 34 + which            # 35 health, 36 magicka, 37 fatigue (docs/ACTOR_STATE.md)
+            effects.append((kind, stat, max(0, min(duration, 0xFFFF)), max(0, min(low, 0xFFFF)),
+                            max(0, min(max(low, high), 0xFFFF))))
+        if not effects or len(effects) > 8:
+            return None
+        return self.spfx.get(key, {'name': spell, 'effects': effects})
+
+    def topic_rows(self):
+        """The game's dialogue topics, sorted by folded id: {folded id: TOPC row} (v0.0.57)."""
+        if getattr(self, '_topic_rows', None) is None:
+            self._topic_rows = {k: i for i, k in enumerate(sorted(getattr(self.data, 'topics', {})))}
+        return self._topic_rows
 
     def player_move(self, args):
         """PMOV row of a PositionCell of the player, or None when it stays "not yet" (a number not constant, a room no
@@ -426,6 +501,8 @@ class ScriptCompiler:
             if move is not None:
                 self.e.op('PLAYERMOVE', move)
                 return None
+        if fn.name in HOST:
+            return self.hostcall(fn, ref, args)
         if not fn.run:
             return self.notyet(fn, ref, args, value)
         n = fn.name
@@ -615,19 +692,72 @@ class ScriptCompiler:
             return 'i'
         raise CompileError('run function without code: ' + n)
 
-    def notyet(self, fn, ref, args, value):
+    def hostcall(self, fn, ref, args):
+        """A function the engine carries out through the import route (functions.HOST, v0.0.57): the NOTYET form,
+        but the reference becomes a REF before it (the host gets the target as for every other call, not an id
+        string) and the script is not marked NOTYET. A read wakes with the state generation (the host moves it when
+        a script changes the standing), so it is not VOLATILE."""
+        if fn.name == 'cast':
+            # v0.0.57: on the player, the cures and the spells whose every effect is a Fortify, Drain, Damage or
+            # Restore of an attribute, a skill, health, magicka or fatigue (SPELL-EFFECTS-57, the first slice: the
+            # spell's SPFX row as the number); any other Cast stays "not yet"
+            strs = [a[1].casefold() for a in args if a[0] == 'str']
+            spell, who = (strs + ['', ''])[:2]
+            if who != 'player':
+                return self.notyet(fn, ref, args, None)
+            if not any(c in spell for c in CURES):
+                row = self.p.spell_effects(spell)
+                if row is None:
+                    return self.notyet(fn, ref, args, None)
+                if ref is not None:
+                    self.e.op('REF', self.p.object(ref))
+                return self.notyet(fn, None, [('str', spell), ('str', who), ('int', row)], None, carried=True)
+        if fn.name in ('gettarget', 'getstandingpc'):
+            # a fight starts without the state generation moving: the script asks every frame
+            self.flags |= SCRIPT_VOLATILE
+        if fn.name == 'geteffect':
+            # v0.0.57: the effect's number (0 none known) as the call's number; the engine reads the active effects
+            name = args[0][1].casefold() if args and args[0][0] == 'str' else ''
+            name = name[7:] if name.startswith('seffect') else name
+            folded = [n.casefold() for n in EFFECT_NAMES]
+            number = folded.index(name) if name in folded else -1
+            if number < 0:
+                self.warnings.append('GetEffect of an unknown effect %r: reads 0' % name)
+                return self.push_const(('int', 0))
+            if ref is not None:
+                self.e.op('REF', self.p.object(ref))
+            return self.notyet(fn, None, [('int', number)], None, carried=True)
+        if fn.name == 'addtopic':
+            # the topic's TOPC row as the number (the engine keeps one bit per row); a name no DIAL topic has does
+            # nothing, as OpenMW logs and skips it
+            name = args[0][1] if args and args[0][0] == 'str' else ''
+            row = self.p.topic_rows().get(name.casefold())
+            if row is None:
+                self.warnings.append('AddTopic of an unknown topic %r: nothing' % name)
+                return None
+            return self.notyet(fn, None, [('int', row)], None, carried=True)
+        if ref is not None:
+            self.e.op('REF', self.p.object(ref))
+        return self.notyet(fn, None, args, None, carried=True)
+
+    def notyet(self, fn, ref, args, value, carried=False):
         """NOTYET: the numeric arguments pushed, the strings as indexes; logged once by the engine."""
-        self.flags |= SCRIPT_NOTYET
-        self.notyet_names.append(fn.name)
+        if not carried:
+            self.flags |= SCRIPT_NOTYET
+            self.notyet_names.append(fn.name)
         numeric = 0
         strings = []
         if ref is not None:
             strings.append(self.p.string(ref))
-        for a in args:
+        letters = fn.args.replace('/', '')
+        for i, a in enumerate(args):
             if a[0] == 'str':
                 strings.append(self.p.string(a[1]))
             else:
-                self.expr(a)
+                kind = self.expr(a)
+                if carried:
+                    # the host reads each number as the function declares it (a fraction or a whole number)
+                    self.convert(kind, 'f' if i < len(letters) and letters[i] == 'f' else 'i')
                 numeric += 1
         returns = fn.ret != '-'
         if numeric > 0x1F or len(strings) > 0xFF:

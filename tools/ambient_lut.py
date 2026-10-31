@@ -27,6 +27,13 @@ Compiled form (one row per placed actor with a Wander package, sorted by referen
   applied, by the exact distribution of the roll above at 1 % steps (the engine computes a script's profile the
   same way, engine/aga/src/aw_ambient.c AW_AmbientIdleProfile).
 
+Levelled creatures (v0.0.57, ACTORS-ALIVE-56): the creature a levelled list picks runs its own record's packages
+(OpenMW 0.51 mwclass/creaturelevlist.cpp + mwclass/creature.cpp). Every placed levelled reference gets a routes row
+(reference number, id hash 0, flag 16) compiled at the largest Wander distance its list can give, and every creature
+such a list can give a package row (reference number 0, its id hash) with one home point; the engine joins the two
+when the picked creature registers (aw_ambient.c find_actor). Same AWAM1 layout; the engine keeps only every 32nd
+row's key resident and reads a block of rows per lookup.
+
 File (big-endian): header 32 bytes: "AWAM", u16 version 1, u16 row bytes 28, u32 rows, u32 points, u32 hop bytes,
 u32 profiles, u16 idle multiplier (x 65535), u16 0, u32 0. Rows x 28: u32 reference number, u32 id hash (FNV-1a of
 the lower-case id), u16 distance (original units), u16 duration (hours), u8 time of day, u8 flags, u8 local points,
@@ -69,7 +76,11 @@ MAX_WIDTH = 128                 # destinations the engine takes (aw_ambient.h AW
 MIN_WANDER = 128               # OpenMW aiwander.cpp minimumWanderDistance (destination tolerance 64 x 2)
 IDLE_STEPS = 100                # the idle roll's exact distribution at 1 % steps (the engine's rule too)
 # row flags
-F_REPEAT, F_CREATURE, F_FLYER, F_SWIMMER = 1, 2, 4, 8
+F_REPEAT, F_CREATURE, F_FLYER, F_SWIMMER, F_LEVELLED = 1, 2, 4, 8, 16
+# levelled creatures (same AWAM1 layout, two reserved keys): a levelled reference's routes are the row
+# (reference number, LEVELLED_HASH); a creature its list can give has its package in the row (LEVELLED_REF, id hash)
+LEVELLED_HASH = 0
+LEVELLED_REF = 0
 # point kinds
 K_GRID, K_HOME, K_PARTWAY = 0, 1, 2
 AREAS = {  # bytes per town, measured like tools/path_grid_stats.py AREAS: exterior centre, radius in cells, room prefix
@@ -421,11 +432,36 @@ def placed_wanderers(actors, cells):
     return out
 
 
+def list_creatures(lists, lid, seen=None):
+    """The creature ids (lower case) a levelled creature list can give at any player level, nested lists followed."""
+    seen = set() if seen is None else seen
+    if lid in seen or lid not in lists:
+        return set()
+    seen.add(lid)
+    out = set()
+    for entry, _level in lists[lid][2]:
+        out |= list_creatures(lists, entry, seen) if entry in lists else {entry}
+    return out
+
+
+def row_flags(w, a):
+    flags = F_REPEAT if w['repeat'] else 0
+    if a['kind'] == 'CREA':
+        flags |= F_CREATURE
+        if a['flags'] & 0x20:
+            flags |= F_FLYER
+        if a['flags'] & 0x10 and not a['flags'] & 0x40:
+            flags |= F_SWIMMER
+    return flags
+
+
 def build_master(master, report_areas=True):
     """(bytes, report) of the table for one master file's bytes or path."""
     raw = master if isinstance(master, (bytes, bytearray)) else Path(master).read_bytes()
     t0 = time.time()
     gmst, actors, cells, grids, scripts = parse_master(raw)
+    from chim.actors import levelled_lists
+    lists = levelled_lists(raw)
     multiplier = int(round(max(0.0, min(1.0, gmst.get('fIdleChanceMultiplier', 0.75))) * 65535))
     scripted = scripted_distances(scripts, actors)
     rows = []; points = []; hops = bytearray(); profiles = {}; cache = {}
@@ -452,13 +488,7 @@ def build_master(master, report_areas=True):
         radius = max(w['distance'], scripted.get(ident, 0))
         if radius > w['distance']:
             counts['scripted_radius'] += 1
-        flags = (F_REPEAT if w['repeat'] else 0)
-        if a['kind'] == 'CREA':
-            flags |= F_CREATURE
-            if a['flags'] & 0x20:
-                flags |= F_FLYER
-            if a['flags'] & 0x10 and not a['flags'] & 0x40:
-                flags |= F_SWIMMER
+        flags = row_flags(w, a)
         if flags & (F_FLYER | F_SWIMMER):
             counts['flyers_swimmers'] += 1
         pts, width, hop, notes = compile_actor(tuple(ref['position']), grid, origin, w['distance'], radius, cache)
@@ -480,7 +510,62 @@ def build_master(master, report_areas=True):
         while len(hops) % 4:
             hops.append(0)
         per_row_cell.append((cell, len(pts) * POINT + len(hop) + (-len(hop)) % 4 + ROW))
+    # Levelled creature references (LEVELLED_HASH rows) and the packages of the creatures they can give (LEVELLED_REF
+    # rows). OpenMW 0.51 spawns the creature a list picks as an ordinary reference of that creature
+    # (mwclass/creaturelevlist.cpp: ManualRef of the picked id), whose package sequence is filled from its own record's
+    # packages (mwclass/creature.cpp: getAiSequence().fill(mBase->mAiPackage)); so the picked creature wanders by its
+    # record. The engine knows the pick only when the cell joins: the routes are compiled once per reference at the
+    # largest Wander distance among the creatures its list can give, and the package (distance, duration, idles,
+    # flags) is looked up by the picked creature's id (aw_ambient.c find_levelled).
+    placed_rows = len(rows)
+    used = {}
+    lev = {'references': 0, 'with_wander': 0, 'creatures': 0}
+    for cell in cells:
+        for ref in cell['refs']:
+            lid = ref.get('id', '').casefold()
+            if lid not in lists or ref.get('deleted') or 'position' not in ref:
+                continue
+            lev['references'] += 1
+            creas = []
+            for cid in sorted(list_creatures(lists, lid)):
+                a = actors.get(cid)
+                if a and a['packages'] and a['packages'][0][0] == 'wander':
+                    creas.append((cid, a))
+                    used[cid] = a
+            if not creas:
+                continue
+            lev['with_wander'] += 1
+            distance = max(a['packages'][0][1]['distance'] for _, a in creas)
+            interior = bool(cell['flags'] & 1)
+            key = ('i', cell['name'].casefold()) if interior else ('e', cell['x'], cell['y'])
+            origin = (0, 0, 0) if interior else (cell['x'] * CELL_UNITS, cell['y'] * CELL_UNITS, 0)
+            pts, width, hop, notes = compile_actor(tuple(ref['position']), grids.get(key), origin, distance, distance,
+                                                   cache)
+            for k in ('destinations_cut', 'local_points_cut'):
+                counts[k] += 1 if k in notes else 0
+            rows.append((ref['number'], LEVELLED_HASH, min(65535, distance), 0, 0, F_LEVELLED, len(pts), width,
+                         len(points), len(hops), 0))
+            points.extend(pts)
+            hops += hop
+            while len(hops) % 4:
+                hops.append(0)
+            per_row_cell.append((cell, len(pts) * POINT + len(hop) + (-len(hop)) % 4 + ROW))
+    for cid, a in sorted(used.items()):
+        w = a['packages'][0][1]
+        prof = tuple(idle_profile(w['idle'], multiplier))
+        if prof not in profiles:
+            profiles[prof] = len(profiles)
+        rows.append((LEVELLED_REF, fnv(cid), min(65535, w['distance']), min(65535, w['duration']), w['hour'] & 255,
+                     row_flags(w, a), 1, 1, len(points), len(hops), profiles[prof]))
+        points.append(((0, 0, 0), K_HOME))
+        hops += bytes([0, 0, 0, 0])
+    lev['creatures'] = len(used)
     order = sorted(range(len(rows)), key=lambda i: (rows[i][0], rows[i][1]))
+    for r in rows[:placed_rows]:
+        if r[0] == LEVELLED_REF:
+            raise ValueError('Ambient table: a placement has reference number 0 (reserved for levelled packages)')
+        if r[1] == LEVELLED_HASH:
+            raise ValueError('Ambient table: an actor id hashes to 0 (reserved for levelled references)')
     for a, b in zip(order, order[1:]):
         if rows[a][:2] == rows[b][:2]:
             raise ValueError('Ambient table: two placements share reference %d and id hash' % rows[a][0])
@@ -500,7 +585,8 @@ def build_master(master, report_areas=True):
     report = {'format': 'AWAM%d' % VERSION, 'bytes': len(out), 'sha256': hashlib.sha256(out).hexdigest(),
               'rows': len(rows), 'points': len(points), 'hop_bytes': len(hops), 'profiles': len(profiles),
               'idle_multiplier': multiplier / 65535.0, 'first_package': first_kinds, 'counts': counts,
-              'scripted_actors': len(scripted), 'grids': len(grids), 'seconds': round(time.time() - t0, 2)}
+              'scripted_actors': len(scripted), 'grids': len(grids), 'levelled': lev,
+              'seconds': round(time.time() - t0, 2)}
     if report_areas:
         report['areas'] = area_bytes(per_row_cell)
     return bytes(out), report

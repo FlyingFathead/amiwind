@@ -401,7 +401,9 @@ int AW_SaveLatest(uint32_t profile,char *label,int capacity)
     if(best>=0 && capacity>0)AW_SaveDescription(profile,best,label,capacity);
     return best;
 }
-static void quicksave(void){AW_SaveWrite(0);}
+static void quicksave(void){   /* without a profile no save is written: say so, as quickload does (QUICKSAVE-NO-PROFILE-SILENT-57) */
+    if(!world.profile){Con_Printf("Choose a character in Load game first: no save without one.\n");return;}
+    AW_SaveWrite(0);}
 static void quickload(void){if(world.profile)AW_SaveRead(world.profile,0);else Con_Printf("Choose a character in Load game first.\n");}
 void AW_SaveInit(void)
 {

@@ -2,12 +2,14 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 4 times; something has to be done
+## PERSISTING: reported 6 times; something has to be done
 
 - Reported with v0.0.44 at 2026-10-19 17:00 +0300: v0.0.44 release build (before this fix merged): CHIM validation 131 s on 2.8 of 23 cores, stair gate 1,066 s on 4.9 of 23; perf guard FIX-NOW
 - Reported with v0.0.46-dev1 at 2026-10-20 14:48 +0300: dev1 try 2: CHIM queues stalled with 1351 or 978 units queued, 0 running, 1.1-1.7 cores for 90-376 s; source and receipt 35 s at 2.3 cores; pack 3m51s on 1 core (serial)
 - Reported with v0.0.47-dev1 at 2026-10-21 14:44 +0300: dev1 try 2: 6 underused:chim windows (longest 3m21s); pack 1m28s on 1 core, source and receipt 40 s at 2.05, stats 41 s at 1.34; first window 6.6 cores, 1,270 queued
 - Reported with v0.0.47-dev2 at 2026-10-21 17:30 +0300: same pattern in the image step world read (23 units running on 2 cores); see BUILD-IMAGE-WORLD-READ-FRAMES-47
+- Reported with v0.0.57-dev1 at 2026-10-30 04:05 +0200: The v0.0.57-dev1 resource plan (lease 24 threads, 44 GB) holds the chim stage at 1 of 24 workers for about 4h22m: the memory the stages beside it held in earlier runs leaves room for one; 3 GB more would run it about 84 percent faster
+- Reported with v0.0.57-dev1 at 2026-10-30 05:33 +0200: v0.0.57-dev1 full build: the chim stage ran under half its 24 cores in far terrain (3.7 cores, 266 s), source and receipt (1.6 cores, 311 s), visibility rows (9.8 cores, 90 s) and stats writing (5.0 cores, 75 s)
 
 <!-- END GENERATED PERSISTING -->
 
@@ -36,7 +38,7 @@ _Last updated with AmiWind v0.0.47-dev2 (21 October 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 4 times; something has to be done](#persisting-reported-4-times-something-has-to-be-done)
+- [PERSISTING: reported 6 times; something has to be done](#persisting-reported-6-times-something-has-to-be-done)
 - [Status: 19 October 2026](#status-19-october-2026)
 - [Symptom](#symptom)
 - [v0.0.47-dev1 (21 October 2026): what is still under half the cores](#v0047-dev1-21-october-2026-what-is-still-under-half-the-cores)
@@ -214,7 +216,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [AW-LEASE-MEMORY-DEADLOCK-36](AW-LEASE-MEMORY-DEADLOCK-36.md): Memory leases deadlocked builds: a 44 GiB build never fit while any gate held its 6 GiB, so builds queued for hours
 - [AW-LEASE-NO-GROW-36](AW-LEASE-NO-GROW-36.md): A running build's core lease did not grow back when gates ended, and its worker pools never grow
 - AW-QUEUE-DEAD-TICKET-54 (no report page): A requester killed while queued leaves its queue ticket at the head of the strict FIFO: every build machine-wide waited
-- BUILD-ACTOR-LIBRARY-UNDERUSED-54 (no report page): The actor-library stage ran at 2.69 of 8 allowed cores with 130 units queued and 7 running
+- [BUILD-ACTOR-LIBRARY-UNDERUSED-54](BUILD-ACTOR-LIBRARY-UNDERUSED-54.md): The actor-library stage ran at 2.69 of 8 allowed cores with 130 units queued and 7 running
 - [BUILD-BODY-BAKE-SLOWER-44](BUILD-BODY-BAKE-SLOWER-44.md): The image step's player body bake ran 42 % slower than its baseline with the same 40 bodies
 - [BUILD-CACHE-ABSOLUTE-PATHS-33](BUILD-CACHE-ABSOLUTE-PATHS-33.md): Stage fingerprints contain absolute paths, so a moved workspace or checkout reuses nothing
 - [BUILD-CACHE-CHIM-UNITS-33](BUILD-CACHE-CHIM-UNITS-33.md): The chim stage's fingerprint changes whenever the CHIM unit cache gains units, so the stage is never reused
@@ -237,6 +239,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-CHIM-VIS-ROWS-KEY-BROAD-46](BUILD-CHIM-VIS-ROWS-KEY-BROAD-46.md): The CHIM visibility rows are keyed on the frames' whole collision, so every collision change redoes 75,904 units, and each frame took 4 times longer
 - [BUILD-CHIM-VIS-ROWS-SERIAL-42](BUILD-CHIM-VIS-ROWS-SERIAL-42.md): The CHIM visibility rows of a build with many new frames run on one worker at a time and print nothing for half an hour or more
 - [BUILD-CHIM-WORLD-SERIAL-TAIL-41](BUILD-CHIM-WORLD-SERIAL-TAIL-41.md): After the region frames the CHIM world conversion prepared the towns one after another and worked out 723 frames' visibility rows in turn: about 7 minutes on 1 to 5 of 24 cores
+- BUILD-DIRECT-START-CELL-LATE-57 (no report page): A MiniWind with --direct-to-game-map cell:X,Y outside its maps fails only in the image step, 12 minutes in
 - BUILD-DOOR-CHECK-LATE-54 (no report page): The door engine check reads only the CHIM world's collision but runs in image finalize, hours into a full build
 - [BUILD-DOOR-REFERENCE-SERIAL-33](BUILD-DOOR-REFERENCE-SERIAL-33.md): The door step reads the whole master once per destination cell
 - [BUILD-ENGINE-SOURCE-KEY-BROAD-36](BUILD-ENGINE-SOURCE-KEY-BROAD-36.md): Any engine source edit changes the keys of the chim and world-flora stages
@@ -295,7 +298,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-PROGRESS-ETA-BASIS-36](BUILD-PROGRESS-ETA-BASIS-36.md): The live build progress took a stage's expected time from earlier runs of any size: dev3's chim stage was expected at 154 s and ran 1 h 48 min
 - BUILD-PY-TEXT-LIMIT-52 (no report page): tools/build.py is a few bytes under the release text size limit: the next change to it fails the gate unless it is split
 - BUILD-RESIDENT-BAKE-SLOWER-52 (no report page): The skeletal resident bake of the town stages is 74 to 149 % slower than its baseline with the same residents
-- BUILD-RESIDENT-HAIR-SLOWER-54 (no report page): build_resident ran 87 to 159 percent slower with the same units in the v0.0.54-dev2 town stages
+- [BUILD-RESIDENT-HAIR-SLOWER-54](BUILD-RESIDENT-HAIR-SLOWER-54.md): build_resident ran 87 to 159 percent slower with the same units in the v0.0.54-dev2 town stages
 - [BUILD-RESIDENT-MAP-SLOWER-46](BUILD-RESIDENT-MAP-SLOWER-46.md): The resident-map step of the area and balmora-interiors stages ran 55 to 60 percent slower than its baseline with the same units
 - [BUILD-RESOURCE-PLAN-CHIM-ESTIMATE-44](BUILD-RESOURCE-PLAN-CHIM-ESTIMATE-44.md): The resource plan estimated the CHIM stage at 2 workers and 6 h 13 min; it ran on 24 workers in about 75 min
 - [BUILD-RESOURCE-PLAN-MINIWIND-FULL-PARENT-52](BUILD-RESOURCE-PLAN-MINIWIND-FULL-PARENT-52.md): A MiniWind build is refused by the resource plan: its one-area CHIM stage is estimated from the full build's island-wide chim parent (19,868 MiB) and labelled a stair walk although the walk is off
@@ -341,6 +344,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [MINIWIND-NOT-MINUTES-33](MINIWIND-NOT-MINUTES-33.md): A reused MiniWind build took about two hours instead of minutes
 - [MINIWIND-SCENE-CHAIN-WEIGHT-42](MINIWIND-SCENE-CHAIN-WEIGHT-42.md): Every MiniWind bakes all playable races and the opening rooms, and walks its whole frame stairs
 - [NPC-BAKED-WHOLE-DUPLICATION-33](NPC-BAKED-WHOLE-DUPLICATION-33.md): Every NPC appearance is baked whole: shared body parts are converted again for each actor, and equipment cannot change
+- PERF-GUARD-RESIDENT-BUSY-HOST-57 (no report page): The dev5 full build's perf guard failed chim-town-balmora and chim-town-vivec_city build_resident as slower (129 s, was 52 s; 147 s, was 62 s) while two other builds ran beside it: contention, not code
 - RELEASE-GUARD-SLOW-CLONE-51 (no report page): The release guard, the fail-fast first step of a release, took 6 minutes on about 0.14 of a core: its release check clones the whole repository through the Windows-mounted drive
 - RELEASE-SUITE-RECORD-SERIAL-51 (no report page): The release's suite record runs the whole test suite again on one core for about 22 minutes, right after the gate ran the same tests in about 2 minutes
 - [ROOM-BAKE-FOOTPRINT-SLOW-48](ROOM-BAKE-FOOTPRINT-SLOW-48.md): The room actor bake's footprint rule with the collision-box test is more than 100 times slower

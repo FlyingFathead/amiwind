@@ -28,6 +28,31 @@ static cvar_t aw_terrain_horizon={"aw_terrain_horizon","0",true};
  * results; kept for future improvement. The game config (config/game.cfg)
  * selects 0, the land-outline horizon (HORIZON-FLORA-SPRITES-32). */
 static cvar_t aw_skyline_fill={"aw_skyline_fill","1",true};
+/* Sky haze (FOG-SKY-UNFOGGED-57): with a short draw distance the scenery reaches the full fog colour a few dozen
+ * metres away while the sky stayed raw clouds, so fogged buildings stood as flat shapes with clouds between them.
+ * OpenMW blends the sky into the fog colour (apps/openmw/mwrender/sky.cpp and the fog shaders: the sky takes the
+ * fog towards the horizon, more as the fog comes nearer); here the whole sky takes one fog level of the same colour
+ * colour the scenery fogs to, by the draw distance: none at SKY_HAZE_CLEAR and beyond (the HORSTATOR APPROVED
+ * horizon as before), rising linearly to SKY_HAZE_FULL at SKY_HAZE_THICK and nearer. NO per-pixel work (the fog
+ * pass costs 150-210 ms a frame on a slow 68040, RENDER-FOG-PASS-COST-33): r_sky.c folds the level into the sky's
+ * own colour tables once, when the level or the sky phase changes (R_SkyHaze), and the pass reads them as before.
+ * Exteriors only; aw_sky_haze 0 = the sky as before (DON'T DELETE ANY METHOD). */
+static cvar_t aw_sky_haze={"aw_sky_haze","1",true};
+#define SKY_HAZE_CLEAR 540
+#define SKY_HAZE_THICK 260   /* 2026-10-30: 200 -> 260, level 9 -> 11 at the default 300: the cloud patch still showed */
+#define SKY_HAZE_FULL 13
+static int AW_SkyHazeLevel(int distance) {
+    if(distance>=SKY_HAZE_CLEAR)return 0;
+    if(distance<=SKY_HAZE_THICK)return SKY_HAZE_FULL;
+    return (SKY_HAZE_CLEAR-distance)*SKY_HAZE_FULL/(SKY_HAZE_CLEAR-SKY_HAZE_THICK);
+}
+int AW_DrawDistance(void);
+int AW_SkyHazeNow(void);
+/* The level for the sky tables now (r_sky.c): 0 indoors, with colour fog or aw_sky_haze off. */
+int AW_SkyHazeNow(void) {
+    if(!aw_fog.value || aw_sky_haze.value<=0 || !sv.active || AW_Interior())return 0;
+    return AW_SkyHazeLevel(AW_DrawDistance());
+}
 /* Once per saved configuration, after config.cfg (quake.rc), as aw_gallery_migrate:
  * a save from before the land-outline default (v0.0.31, dev builds) still holds
  * aw_skyline_fill 1. Later explicit choices stay effective. */
@@ -90,7 +115,7 @@ static void distance_report(void) {
 }
 static void distance_command(void) {
     char *s;int value=0;
-    if(Cmd_Argc()==1){Con_Printf("Fog/draw distance: %ld local units (default 540).\n",(long)aw_drawdistance.value);distance_report();return;}
+    if(Cmd_Argc()==1){Con_Printf("Fog/draw distance: %ld local units (default 300).\n",(long)aw_drawdistance.value);distance_report();return;}
     if(Cmd_Argc()!=2)goto invalid;
     s=Cmd_Argv(1);if(!*s)goto invalid;
     while(*s){if(*s<'0'||*s>'9')goto invalid;value=value*10+*s++-'0';if(value>4096)goto invalid;}
@@ -101,14 +126,14 @@ static void distance_command(void) {
     if(AW_Interior())Con_Printf("Exterior setting; indoor visibility is unchanged.\n");
     return;
 invalid:
-    Con_Printf("Usage: dbg fog distance 100..4096 (default 540)\n");
+    Con_Printf("Usage: dbg fog distance 100..4096 (default 300)\n");
 }
 static void cycle_distance(void) {
-    int value=aw_drawdistance.value<540?540:aw_drawdistance.value<1000?1000:450;
+    int value=aw_drawdistance.value<300?300:aw_drawdistance.value<540?540:aw_drawdistance.value<1000?1000:300;
     AW_SetDrawDistance(value);
     Con_Printf("View distance: %ld (effective %ld).\n",(long)value,(long)AW_DrawDistance());
 }
-void AW_FogInit(void) { Cvar_RegisterVariable(&aw_land_fill);Cvar_RegisterVariable(&aw_terrain_horizon);Cvar_RegisterVariable(&aw_skyline_fill);Cvar_RegisterVariable(&aw_horizon_defaults);Cmd_AddCommand("aw_horizon_migrate",horizon_migrate);Cmd_AddCommand("aw_horizon_stats",AW_HorizonReport);Cvar_RegisterVariable(&aw_fog);Cvar_RegisterVariable(&aw_cull);Cmd_AddCommand("aw_fog_distance",distance_command);Cmd_AddCommand("aw_viewdistance_cycle",cycle_distance);colours=COM_LoadHunkFile("gfx/fog.lmp"); }
+void AW_FogInit(void) { Cvar_RegisterVariable(&aw_land_fill);Cvar_RegisterVariable(&aw_terrain_horizon);Cvar_RegisterVariable(&aw_skyline_fill);Cvar_RegisterVariable(&aw_sky_haze);Cvar_RegisterVariable(&aw_horizon_defaults);Cmd_AddCommand("aw_horizon_migrate",horizon_migrate);Cmd_AddCommand("aw_horizon_stats",AW_HorizonReport);Cvar_RegisterVariable(&aw_fog);Cvar_RegisterVariable(&aw_cull);Cmd_AddCommand("aw_fog_distance",distance_command);Cmd_AddCommand("aw_viewdistance_cycle",cycle_distance);colours=COM_LoadHunkFile("gfx/fog.lmp"); }
 /* Fill inverse-depth bands with 15 integer divisions, not 32767 floating-point
  * divisions on each live adjustment. Same 40%-to-100% linear fog profile. */
 void AW_FogDepths(byte *table,int distance) {
@@ -157,6 +182,45 @@ static void interior_fog_load(void) {
     }
     fclose(f);
 }
+/* Large rooms (FOG-300-DEFAULT-57, INTERIOR-FAR-BLANK-MANOR-56): rooms listed
+ * in world/large-rooms.txt ("map [cap]", # comments; config/large-rooms.txt,
+ * chosen from their converted size by tools/large_rooms.py) fade into their
+ * cell's fog colour, dark grey when the record has none, at the player's draw
+ * distance (at most the cap, local units) like an exterior, and draw nothing
+ * past it (AW_CullBegin). Read once per room, as the fog row. */
+#define LARGE_ROOMS_PATH "world/large-rooms.txt"
+#define LARGE_ROOM_GREY 40
+#define LARGE_ROOM_MAX 4096            /* the view distance cap, as the fog distance's */
+static char large_room_map[16];
+static int large_room_loaded,large_room_cap;
+static void large_room_load(void) {
+    FILE *f=NULL;char line[96],*p;int cap,n;
+    if(large_room_loaded && !strncmp(large_room_map,sv.name,sizeof large_room_map))return;
+    Q_strcpy_bounded(large_room_map,sv.name,sizeof large_room_map);
+    large_room_loaded=1;large_room_cap=0;
+    if(COM_FOpenFile(LARGE_ROOMS_PATH,&f)<0 || !f)return;
+    n=(int)strlen(large_room_map);
+    while(n && fgets(line,sizeof line,f)){
+        if(line[0]=='#' || strncmp(line,large_room_map,n))continue;
+        p=line+n;
+        if(*p!=' ' && *p!='\t' && *p!='\n' && *p!='\r' && *p)continue;
+        while(*p==' ' || *p=='\t')p++;
+        cap=0;while(*p>='0' && *p<='9' && cap<100000)cap=cap*10+*p++-'0';
+        if(!cap || cap>LARGE_ROOM_MAX)cap=LARGE_ROOM_MAX;
+        large_room_cap=cap<100?100:cap;
+        break;
+    }
+    fclose(f);
+}
+/* The large room's fog and draw distance here, 0 when this is not one (or fog is off). */
+int AW_LargeRoomDistance(void) {
+    int d;
+    if(!sv.active || !AW_Interior() || !aw_fog.value || aw_fog.value>=2)return 0;
+    large_room_load();
+    if(!large_room_cap)return 0;
+    d=aw_drawdistance.value>=100?(int)aw_drawdistance.value:100;
+    return d<large_room_cap?d:large_room_cap;
+}
 /* Fog levels 1..15 linear from start to end (local units); nearer than start: none. */
 static void AW_FogDepthRange(byte *table,int start,int end) {
     int level,first=1,last;long depth;
@@ -171,9 +235,30 @@ static void AW_FogDepthRange(byte *table,int start,int end) {
     }
 }
 static void interior_fog_draw(void) {
-    int i,x,y,w,h,start,key;byte *pixels;short *z;const byte *ramp;
+    int i,x,y,w,h,start,key,large;byte *pixels;short *z;const byte *ramp;
     if(!aw_fog.value || aw_fog.value>=2 || !sv.active)return;
     interior_fog_load();
+    large=AW_LargeRoomDistance();
+    if(large){
+        /* The exterior profile (AW_FogDepths: 44 % to 100 % of the distance); the
+         * background past the geometry (z below 1) takes the full fog colour. */
+        ramp=interior_fog_found?R_InteriorFogColours(interior_fog_rgb[0],interior_fog_rgb[1],interior_fog_rgb[2]):
+            R_InteriorFogColours(LARGE_ROOM_GREY,LARGE_ROOM_GREY,LARGE_ROOM_GREY);
+        if(!ramp)return;
+        key=-2-large;
+        if(key!=interior_depth_key){interior_depth_key=key;old_distance=-1;AW_FogDepths(depths,large);}
+        w=r_refdef.vrect.width;h=r_refdef.vrect.height;
+        for(y=r_refdef.vrect.y;y<r_refdef.vrect.y+h;y++){
+            pixels=vid.buffer+y*vid.rowbytes+r_refdef.vrect.x;
+            z=d_pzbuffer+y*d_zwidth+r_refdef.vrect.x;
+            for(x=0;x<w;x++){
+                i=z[x];
+                if(i<=0)pixels[x]=ramp[(15<<8)+pixels[x]];
+                else if(depths[i])pixels[x]=ramp[(depths[i]<<8)+pixels[x]];
+            }
+        }
+        return;
+    }
     if(!interior_fog_found)return;
     ramp=R_InteriorFogColours(interior_fog_rgb[0],interior_fog_rgb[1],interior_fog_rgb[2]);
     if(!ramp)return;
@@ -363,12 +448,17 @@ geometry:
     return 1;
 }
 void AW_CullBegin(void) {
+    int large=AW_LargeRoomDistance();
     float distance=AW_Interior()?4096:AW_DrawDistance();int mode=CULL_MODE;
+    if(large)distance=large;           /* a large room draws nothing past its fog (FOG-300-DEFAULT-57) */
     if(!++far_frame){memset(far_cache,0,sizeof(far_cache));far_frame=1;}
     VectorCopy(vpn,far_normal);
     far_distance=DotProduct(r_origin,far_normal)+distance+16;
     fog_exact=mode>=2 && !AW_Interior() && fog_exact_begin((int)distance);
-    size_cut=AW_Interior()?0:mode==3?1:mode==4 || mode==6?2:0;
+    /* Indoors too (30 October 2026, docs/chim/MESH_METHODS.md): a large hall's props
+     * past the share of its distance (the indoor distance above, or a large room's fog) are
+     * left out the same way; a small room is nearer than every share. */
+    size_cut=mode==3?1:mode==4 || mode==6?2:0;
     detail_step=!AW_Interior() && (mode==5 || mode==6);
     cut_distance=distance;
     fog_rule=!AW_Interior() && ((int)aw_cull.value&AW_CULL_FOG_RULE);

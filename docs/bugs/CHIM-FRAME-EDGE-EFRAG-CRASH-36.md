@@ -32,7 +32,7 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
+_Last updated with AmiWind v0.0.56 (30 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -118,7 +118,7 @@ Later the renderer met them:
 - a looping chain froze the frame while the audio buffer kept playing.
 
 It needed the third-person, idle (vanity) or death camera, but the damage stayed after switching back to first person.
-That explains the maintainer's Seyda Neen crash after "juggling between first and third person".
+That explains the maintainer's Seyda Neen crash after switching back and forth between first and third person.
 
 ## Why it was not caught
 

@@ -1,6 +1,6 @@
 # Running AmiWind on real Amiga hardware
 
-_Last updated with AmiWind v0.0.56-dev1 (29 October 2026)._
+_Last updated with AmiWind v0.0.57-dev1 (30 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -20,6 +20,11 @@ _Last updated with AmiWind v0.0.56-dev1 (29 October 2026)._
 - [Not yet: non-blocking disk reads](#not-yet-non-blocking-disk-reads)
 - [Raspberry Pi with Amiberry](#raspberry-pi-with-amiberry)
 - [PiStorm](#pistorm)
+  - [What the Pi 4 result suggests](#what-the-pi-4-result-suggests)
+  - [What it does not say](#what-it-does-not-say)
+  - [On paper](#on-paper)
+  - [The PiStorm project's own DoomAttack figures](#the-pistorm-projects-own-doomattack-figures)
+  - [Our number to compare with](#our-number-to-compare-with)
 - [What to send back](#what-to-send-back)
 
 <!-- contents end -->
@@ -314,7 +319,7 @@ A Raspberry Pi running Amiberry, the emulator the THEA1200 is built on, is the c
 AmiWind. Linux runs underneath, but the box can start straight into the emulator with no desktop.
 
 **What we have measured** (a Raspberry Pi 4B Rev 1.1, Amiberry 8.5.0, v0.0.56-dev1, 29 October 2026): the game is
-playable, in the maintainer's words "completely playable", but the frame rate dips here and there depending on the
+playable, but the frame rate dips here and there depending on the
 scene: from about 10 to 50 frames a second. Open places and plain walls are fast; places with many detailed objects
 in view are the slowest: the prison ship's hold at the start, Seyda Neen (faster in Vivec than in that small town)
 and the Dwemer ruins. The cause is the polygon count of the original models, made for a graphics card, which a
@@ -334,7 +339,7 @@ itself; it is ruled out by the missing JIT.
 | Screen mode 720x576 at 50 Hz (`video=HDMI-A-1:720x576@50` in `cmdline.txt`) instead of the monitor's own 1920x1200 at 59 Hz | clearly smoother: no 5x scaling, and the refresh matches the Amiga's 50 Hz PAL |
 | Overclock to 2.0 GHz (`arm_freq=2000`, `over_voltage=6`, `gpu_freq=750` in `config.txt`, never `force_turbo`; with a heatsink and a fan) | better; held at 43 to 46 C with no throttling |
 | JIT translation cache 16384 KB (`cachesize=16384`), the maximum | a little faster; above 16384 Amiberry reads 0, which switches the JIT off |
-| The 68k CPU on its own core (`cpu_threaded=true`), an experimental Amiberry mode | the biggest step in play, "way faster": the CPU and the chipset each get a core where they shared one; but loading is slower, and one load ended in an engine error ([SPRITE-BAD-TYPE-THREADED-56](bugs/SPRITE-BAD-TYPE-THREADED-56.md)): **leave it off** until that is settled |
+| The 68k CPU on its own core (`cpu_threaded=true`), an experimental Amiberry mode | the biggest step in play, much faster: the CPU and the chipset each get a core where they shared one; but loading is slower, and one load ended in an engine error ([SPRITE-BAD-TYPE-THREADED-56](bugs/SPRITE-BAD-TYPE-THREADED-56.md)): **leave it off** until that is settled |
 | Zorro III Fast RAM 128 MB | runs; 32 MB is the requirement |
 
 Checked and already right: JIT memory access `direct` (all four `comp_trust` settings; `indirect` made FPU code about
@@ -406,9 +411,36 @@ that makes it, never the Kickstart, AmigaOS or anything from Morrowind. The firs
 (AArch64) code as it runs. The Amiga's own chipset stays in place, so the picture still comes from AGA, as
 AmiWind expects. The hardware and software are published under open-source licences (BSD-like to MPLv2), and the
 JIT's speed can be adjusted while the machine runs, from timing-friendly settings up to full speed. Project page
-and documentation: [pistorm.github.io](https://pistorm.github.io/) (read 17 October 2026).
+and documentation: [pistorm.github.io](https://pistorm.github.io/) (read 17 October 2026); Emu68's releases:
+[github.com/michalsc/Emu68/releases](https://github.com/michalsc/Emu68/releases).
 
-What it means for AmiWind, on paper (no AmiWind run on a PiStorm has been reported yet):
+**Everything in this section is a projection. No AmiWind run on a PiStorm has been reported yet; it needs a run on
+the hardware** ([what to send back](#what-to-send-back)).
+
+### What the Pi 4 result suggests
+
+The [Raspberry Pi with Amiberry](#raspberry-pi-with-amiberry) run is the nearest measurement we have: a 68040 with an
+FPU, translated by a JIT on one host core of a Pi 4B at 2.0 GHz, plays AmiWind, with the frame rate dipping from
+about 10 to 50 frames a second depending on the scene. That suggests the standard 68040 and FPU build is viable on a
+PiStorm. Emu68 runs the same kind of machine: it translates the 68k floating-point instructions too, so the FPU-heavy
+3D code does not fall back to slow software emulation.
+
+### What it does not say
+
+It is not a frame-rate prediction for a PiStorm:
+
+- **Two different JITs.** Amiberry's and Emu68's translators are separate programs and translate differently, so
+  the same Pi can be faster or slower under one than under the other.
+- **Bare metal against Linux.** Emu68 runs on the Pi without an operating system underneath; Amiberry runs as a
+  program on Linux, with the emulated chipset sharing the host.
+- **The real Amiga is still in the picture path.** On a PiStorm the Amiga's own Chip RAM and chipset stay in the
+  display path unless the screen is Pi-backed RTG. AmiWind's AGA screen is drawn into Chip RAM, so what the chipset
+  and the link between the Pi and the Amiga allow limits the picture, however fast the Pi is. In the Amiberry run
+  the chipset is emulated and costs nothing like that.
+
+### On paper
+
+What it means for AmiWind, on paper:
 
 - **The CPU and FPU.** Emu68 presents itself as a 68040 with an FPU, the CPU the standard engine build targets
   ([FAQ](FAQ.md#can-todays-heavily-upgraded-amigas-realistically-run-amiwind)).
@@ -430,9 +462,38 @@ What it means for AmiWind, on paper (no AmiWind run on a PiStorm has been report
   among them the DoomAttack timedemo (AGA and RTG modes, frames per second from the reported ticks). A report with
   both AmiWind's own `awbench` / timedemo and that DoomAttack figure places AmiWind beside other PiStorm results.
 
+### The PiStorm project's own DoomAttack figures
+
+The PiStorm [benchmark page](https://pistorm.github.io/docs/benchmarks/) (read 30 October 2026) lists synthetic
+tests (AIBB, SysInfo, CoreMark) and real programs: the DoomAttack timedemo and a LightWave render. Its DoomAttack
+timedemo graphs, in frames per second:
+
+| DoomAttack timedemo | PiStorm, Pi 4B at 2.2 GHz | PiStorm, Pi 3A+ at 1.4 GHz | 68060 at 100 MHz | 68060 at 50 MHz |
+| --- | --- | --- | --- | --- |
+| AGA, low resolution | 57.4 | 55.2 | 34.3 | 23.3 |
+| RTG, 320x200, 8 bit | about 400 | 193 | 46.8 | not listed |
+
+How we read it:
+
+- **The AGA screen is capped by the chip bus.** The Pi 4B, with a much faster CPU than the Pi 3A+, is barely above
+  it (57.4 against 55.2): the screen update, not the CPU, sets the figure.
+- **The CPU is not the limit.** On the RTG screen, which does not go through the chipset, the Pi 4B reaches about
+  400 against 46.8 for a 68060 at 100 MHz: about 8.5 times the CPU speed of that 68060.
+- **For AmiWind**, the AGA ceiling on a Pi 4 PiStorm is likely in the same range, the 50s, as an upper bound on
+  what the screen can show, however cheap the 3D work becomes. The way past it is the RTG screen: the engine's RTG
+  path is still slow (ENGINE-RTG-SLOW-PATH-52 in the [bug register](BUGS.md)), and fixing that is the lever.
+  This is a projection from another program's figures until a real run.
+
+### Our number to compare with
+
+DoomAttack and AmiWind are different programs, so their frame rates are not converted into each other. The
+like-for-like number for PiStorm owners is AmiWind's own standard test, `aw bench halloween` ([above](#first-measure-then-play)):
+the same 600 frames, camera path and dance on every machine. Run it, and `awbench` for the CPU, FPU and memory
+throughput, on the PiStorm, and put the result beside the same machine's DoomAttack figure from the page above.
+
 A first report from a PiStorm (which board, which Pi, the Emu68 version and its JIT settings, Fast RAM, the
-`awbench` results and, if you have it, the DoomAttack figure) would turn this section into measurements. See
-[what to send back](#what-to-send-back).
+`aw bench halloween` line, the `awbench` results and, if you have it, the DoomAttack figure, and whether the screen
+was AGA or RTG) would turn this section into measurements. See [what to send back](#what-to-send-back).
 
 ## What to send back
 

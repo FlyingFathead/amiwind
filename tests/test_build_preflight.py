@@ -89,14 +89,12 @@ class HarvestTownPlanTests(unittest.TestCase):
         self.assertEqual(problems, [])
         self.assertEqual(build_preflight.harvest_town_problems(self.TOWNS, (table, {})), [])
 
-    def test_a_town_without_region_frames_around_it_is_refused(self):
-        problems = build_preflight.harvest_town_problems(self.TOWNS, None)       # --chim-regions none
-        self.assertEqual(len(problems), 1)
-        self.assertIn('vivec_city', problems[0])
+    def test_every_town_with_a_region_table_has_its_own_catalogues(self):
+        # CHIM-NATIVE-HARVEST-MISSING-36 (v0.0.57): every town with a region table carries its plants in catalogues of
+        # its own (harvest_build.plan_rows), so a town with no region frames around it is no longer refused
+        self.assertEqual(build_preflight.harvest_town_problems(self.TOWNS, None), [])       # --chim-regions none
         far = {'cells': {self.regions.cell_key((-19, 14)): {}}}                   # region cells elsewhere only
-        self.assertEqual(len(build_preflight.harvest_town_problems(['vivec_city'], (far, {}))), 1)
-        near = {'cells': {self.regions.cell_key((0, -12)): {}}}                   # one cell west of Vivec's frame
-        self.assertEqual(build_preflight.harvest_town_problems(['vivec_city'], (near, {})), [])
+        self.assertEqual(build_preflight.harvest_town_problems(['vivec_city'], (far, {})), [])
 
     def test_the_fixed_towns_and_miniwinds_are_not_refused(self):
         self.assertEqual(build_preflight.harvest_town_problems(['balmora', 'seyda'], None), [])

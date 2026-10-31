@@ -20,7 +20,7 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.47-dev1 (21 October 2026)._
+_Last updated with AmiWind v0.0.56 (30 October 2026)._
 
 ## Status: 21 October 2026
 
@@ -31,10 +31,10 @@ look and the original game at the same poses before it becomes a default.
 ## Symptom
 
 The Bitter Coast trees of the `flora_bc_tree` family are drawn as broken flat slabs. The maintainer, playing
-v0.0.47-dev1, described the family as "these tree types that look like a pyramid with a floating rectangular box
-on top", called the trees "a bit wonky" (an earlier remark of his too), said one tree's figure is "more or less
-broken", and said that "all of these look like shit tbh ... the polycount is so absurdly low". He also thinks
-they "would probably work better as a sprite". Screenshots from the maintainer's playtest (private) show all
+v0.0.47-dev1, described the family as tree types that look like a pyramid with a floating rectangular box on
+top, called the trees a bit wonky (an earlier remark of his too), said one tree's figure is more or less broken, and
+found all of them poor-looking because their polygon count is very low. He also thinks they would probably work
+better as a sprite. Screenshots from the maintainer's playtest (private) show all
 three spots below.
 
 ## Where

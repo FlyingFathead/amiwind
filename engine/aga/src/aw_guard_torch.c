@@ -11,6 +11,7 @@
 #include "aw_torch.h"
 #include "aw_items.h"
 #include "aw_tryalloc.h"
+#include "aw_weather.h"
 #include <stdint.h>
 #ifdef AMIGA
 #include <proto/exec.h>
@@ -48,6 +49,8 @@ static const byte *flame_pixels;
 static int last_aliases,last_eligible,last_frames,last_models,last_evicted;
 static int last_lights,last_light_range,last_light_contents,last_light_trace,last_light_untested;
 static const char *last_gate="not rendered";
+/* 1: dark hours with nothing falling (automatic_torch, GUARD-TORCHES-57); 2: dark hours only (the rule before
+ * v0.0.57, kept selectable); 0: never automatically */
 static cvar_t guards_torch_cycle={"guards_torch_cycle","1",true};
 static unsigned read16(const byte *p){return ((unsigned)p[0]<<8)|p[1];}
 static int32_t readfixed(const byte *p){return (int32_t)(((uint32_t)p[0]<<24)|((uint32_t)p[1]<<16)|((uint32_t)p[2]<<8)|p[3]);}
@@ -125,7 +128,7 @@ static void command(void)
     if(Cmd_Argc()==2 && strchr(Cmd_Argv(1),'.')){
         /* A decimal is the guard torch light radius: dbg guardtorch 0.5 (0.1..2). */
         float s=(float)Q_strtod(Cmd_Argv(1),NULL);
-        if(!(s>=.1f && s<=2)){Con_Printf("Usage: dbg guardtorch 0.1..2.0 (light radius, player torch 1; default 0.5)\n");return;}
+        if(!(s>=.1f && s<=2)){Con_Printf("Usage: dbg guardtorch 0.1..2.0 (light radius, player torch 1; default 0.33, the original's reach)\n");return;}
         Cvar_SetValue(aw_guard_torch_radius.name,s);
         Con_Printf("Guard torch light radius %g of the player torch's.\n",aw_guard_torch_radius.value);return;
     }
@@ -137,7 +140,8 @@ static void command(void)
         override=value;
     }else if(Cmd_Argc()!=1){Con_Printf("Usage: dbg guardtorch [on/off/auto]\n");return;}
     Con_Printf("Guard torches: %s; cycle %s; %d source records.\n",
-        override<0?"auto":override?"on":"off",guards_torch_cycle.value>0?"on":"off",guard_count);
+        override<0?"auto":override?"on":"off",guards_torch_cycle.value>=2?"dark hours":
+        guards_torch_cycle.value>0?"dark hours, put away in rain, snow and storms":"off",guard_count);
     for(i=0;i<visible_count;i++)if(guards[i].active)active++;
     Con_Printf("Last guard frame: %s; aliases %d, eligible %d, admitted %d, frame skips %d, model skips %d, evicted %d.\n",
         last_gate,last_aliases,last_eligible,active,last_frames,last_models,last_evicted);
@@ -163,7 +167,17 @@ static int automatic_night(void)
 }
 /* Night as the guard torches see it; the night lamps share it. */
 int AW_GuardTorchNight(void){return automatic_night();}
-int AW_GuardTorchWanted(void){return override>0 || (override<0 && automatic_night());}
+/* GUARD-TORCHES-57: the actors' own rule for carrying a torch. Rule from OpenMW files
+ * apps/openmw/mwworld/weather.cpp (WeatherManager::useTorches) and apps/openmw/mwmechanics/actors.cpp
+ * (updateEquippedLight), read, not copied: an actor with a carryable light equips it while it is dark (before
+ * Weather_Sunrise_Time 6, after sunset 18 + Sunset_Duration 2, the hours automatic_night keeps) AND nothing falls
+ * (rain, snow, an ash or blight storm all count) and puts it away otherwise. The night lamps keep the night alone.
+ * guards_torch_cycle 2 brings back the earlier rule (darkness only). */
+static int automatic_torch(void)
+{
+    return automatic_night() && (guards_torch_cycle.value>=2 || AW_WeatherFalling(NULL)==AW_PRECIP_NONE);
+}
+int AW_GuardTorchWanted(void){return override>0 || (override<0 && automatic_torch());}
 static guard_asset_t *asset(entity_t *ent,edict_t **actor,int automatic)
 {
     uintptr_t ptr=(uintptr_t)ent,base=(uintptr_t)cl_entities,offset;int index,i;
@@ -276,8 +290,8 @@ void AW_GuardTorchUpdate(void)
     last_gate="inactive";
     if(!flame_pixels || override==0 || !r_drawentities.value || !sv.active ||
         cls.state!=ca_connected || svs.maxclients!=1 || cl.intermission || AW_GalleryActive())return;
-    night=automatic_night();
-    last_gate="automatic daytime/disabled";if(override<0 && !night)return;
+    night=automatic_torch();
+    last_gate="automatic daytime/weather/disabled";if(override<0 && !night)return;
     last_gate=override>0?"forced on":"automatic night";
     initial=cl_numvisedicts;
     for(i=0;i<initial && visible_count<GUARD_VISIBLE && cl_numvisedicts<MAX_VISEDICTS;i++){

@@ -156,7 +156,10 @@ loaded(){ s=0; while [ $s -lt $((150*K)) ]; do alive || finish "FAIL emulator ex
 t0=$(date +%s)
 sleep $((9*K))
 n=0; while [ ! -s $R/awctl/state.txt ] && [ $n -lt $((200*K)) ]; do
-  alive || finish "FAIL emulator exited during boot"; con "aw_remote 1"; sleep 2; key Escape; sleep $((8*K)); n=$((n+2+8*K)); done
+  # Escape first: the start-up logo takes every key, and its memory notice reads M as "not now" (the CHIM cache off
+  # for this start): the m of "aw_remote" typed onto the logo failed gate smokes with the zone full
+  # (SMOKE-M-KEY-SKIPS-CHIM-CACHE-57). Escape ends the logo before anything is typed.
+  alive || finish "FAIL emulator exited during boot"; key Escape; sleep 1; con "aw_remote 1"; sleep 2; key Escape; sleep $((8*K)); n=$((n+3+8*K)); done
 [ -s $R/awctl/state.txt ] || finish "FAIL no remote control after boot"
 log "boot: remote up after $(( $(date +%s) - t0 )) s"; shot menu
 if [ "${START:-map}" = enter ] || [ "${START:-map}" = auto ]; then  # a MiniWind image starts its own scene; Enter through its quick character pages

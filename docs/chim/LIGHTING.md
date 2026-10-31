@@ -1,6 +1,6 @@
 # CHIM lighting
 
-_Last updated with AmiWind v0.0.48-dev2 (23 October 2026)._
+_Last updated with AmiWind v0.0.56 (30 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -98,7 +98,7 @@ at most 12, as in the rooms. 850 emitters of non-fire meshes are left out (the a
 
 ### The fires' light (on by default)
 
-The maintainer, 23 October 2026: "set it on by default but add some dbg command like dbg campfires on|off". Each
+Decided with the maintainer, 23 October 2026: on by default, with a dbg command `dbg campfires on|off`. Each
 fire placement's light record (the LIGH placement at the fire, same mesh, found in the game data by place) gives its
 first flame row `"aw_flame_light" "R L"`: the radius in map units and the brightness (the colour's luma, 0 to 255).
 When a chunk's records are read the engine gives every placed model without a stored level a level from the frame

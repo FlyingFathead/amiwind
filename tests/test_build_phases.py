@@ -43,6 +43,42 @@ def silent_stage(out, seconds):
     return [sys.executable, '-c', SILENT_STAGE % (str(ROOT / 'tools'), seconds), str(out)]
 
 
+class SideBySidePhaseTests(unittest.TestCase):
+    def test_a_phase_that_ends_first_beside_another_leaves_the_stack(self):
+        # BUILD-CHIM-STAGE-SERIAL-TAIL-36: the CHIM stats run in a thread beside the zone walk and can end first
+        stream = io.StringIO()
+        outer = build_profile.phase('CHIM stats', stream=stream).__enter__()
+        inner = build_profile.phase('CHIM zone walk gate', stream=stream).__enter__()
+        outer.__exit__(None, None, None)
+        self.assertNotIn(outer, build_profile._phases)
+        self.assertIs(build_profile._phases[-1], inner)
+        inner.__exit__(None, None, None)
+        self.assertNotIn(inner, build_profile._phases)
+
+    def test_the_validation_key_is_worked_out_ahead_with_the_same_calls(self):
+        # BUILD-CHIM-STAGE-SERIAL-TAIL-36: the validation's pass-cache key (about 20 s on one core) in a thread
+        # beside the world build: the very calls PassCache.open makes for chim/validate.py, memoized per process
+        import chim_build
+        import pass_cache
+        import chim.validate as V
+        calls = []
+        with patch.object(pass_cache, 'folder', return_value='/somewhere'), \
+                patch.object(pass_cache, 'source_digest', side_effect=lambda *s, **k: calls.append(('d', s, k))), \
+                patch.object(pass_cache, 'previous_digests', side_effect=lambda *s: calls.append(('p', s))), \
+                patch.object(pass_cache, 'covered_lines', side_effect=lambda *s: calls.append(('c', s))):
+            chim_build.warm_validation_key()
+        self.assertEqual(calls, [('d', (V.__file__,), {}), ('p', (V.__file__,)), ('c', (V.__file__,))])
+        source = (ROOT / 'tools/pass_cache.py').read_text(encoding='utf-8')
+        self.assertIn('return cls(name, options, source_digest(*scripts), root, tally, previous_digests(*scripts),\n'
+                      '                   covered=covered_lines(*scripts))', source)
+
+    def test_the_chim_stats_run_beside_the_zone_walk_after_the_heap_gate(self):
+        text = (ROOT / 'tools/chim_build.py').read_text(encoding='utf-8')
+        submit = text.index('stats_job = stats_pool.submit(write_stats')
+        self.assertLess(text.index("build_profile.phase('CHIM heap gate'"), submit)
+        self.assertLess(submit, text.index('walk = require_zone_walk('))
+
+
 class PhaseTests(unittest.TestCase):
     def run_phase(self, sections, env=None, fail=False):
         stream = io.StringIO()

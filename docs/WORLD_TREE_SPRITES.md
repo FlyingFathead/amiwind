@@ -1,6 +1,6 @@
 # World tree sprites and the Balmora comparison zone
 
-_Last updated with AmiWind v0.0.56-dev1 (29 October 2026)._
+_Last updated with AmiWind v0.0.56 (30 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -52,8 +52,8 @@ instead of modelled geometry:
 | Crossed planes, 4 panels at 45 degrees | An eight-spoked star | 8 half-panels | A rounder crown from every side, steadier silhouette | Four times the panels and the overdraw of one billboard |
 
 Each full panel crosses the trunk, so N panels make 2N half-panels around it. The engine already has the pieces
-for the star (the maintainer's pick, 29 October 2026: "that split from above into two planes that then creates 8
-sort of planes"): Quake's SPR_ORIENTED sprite keeps its own angle in the world (engine/aga/src/r_sprite.c), so a
+for the star (the maintainer's pick, 29 October 2026: seen from above, two crossed planes that together make eight
+half-planes): Quake's SPR_ORIENTED sprite keeps its own angle in the world (engine/aga/src/r_sprite.c), so a
 tree becomes four oriented sprites at 0, 45, 90 and 135 degrees on the trunk, the same sprite pixels the billboard
 uses, no new sprite format. The cost is four sprites drawn instead of one, which is why it belongs near the player
 only. Still to check in our engine: that intersecting sprites sort per pixel (the depth test and write of the
@@ -70,17 +70,17 @@ billboard (one panel, only the picture changes), and it is still a camera-facing
 fix the pick (HARVEST-SEYDA-TREE-SPRITE-BLOCKS-PICK-47): the pick trace must skip sprite panels either way. Quake's
 sprite format has no view-angle frame choice; the engine needs that added.
 
-**Distance levels (the maintainer, 29 October 2026: "could we have in world streaming like an LOD where if the
-trees are nearer, they turn from billboard to ... 90deg ... 8-sided sprites or bitmap planes").** The tree's form
+**Distance levels (the maintainer, 29 October 2026: world streaming could have a level of detail where trees turn from
+billboards into crossed planes or eight-sided sprites as they come nearer).** The tree's form
 picked by distance in the streamer: crossed panels (or directional sprites) near the player and wherever a harvest
 plant grows at the tree's foot, plain billboards far away. The switch distance is a measured number, with a margin
-so trees do not flicker between forms at the boundary. And the nearest level can be the tree itself (the maintainer, 29 October 2026: "if we have a streaming world ...
-have the kind of LOD where you could just then load in the tree as you get closer"): the original mesh streamed in
+so trees do not flicker between forms at the boundary. And the nearest level can be the tree itself (the maintainer, 29 October 2026: with a streaming world, the tree can
+simply be loaded in as the player gets closer): the original mesh streamed in
 within a short radius, like any other cell content, and dropped again as the player moves on, so only the few trees
 around the player cost mesh memory and drawing. Type 2's levels, nearest first: the mesh, crossed panels or
 eight-direction sprites, the billboard. The Balmora mesh zone (below) gives the measured cost of a mesh tree to set
 the radii from. Both stay selectable (the maintainer, 29 October 2026:
-"tree type 1 (billboard) and type 2 (this new method)"), as a saved setting like the Arena Pit types: tree type 1
+tree type 1 is the billboard and tree type 2 the new method), as a saved setting like the Arena Pit types: tree type 1
 is the billboard of today, type 2 the new form with depth and the distance switch. This is the fix direction of
 [HARVEST-SEYDA-TREE-SPRITE-BLOCKS-PICK-47](bugs/HARVEST-SEYDA-TREE-SPRITE-BLOCKS-PICK-47.md).
 
@@ -97,11 +97,11 @@ wider footprint, measured frame times and heap. Not started; a study item, nothi
 
 ### Bloodmoon: Solstheim's forests (29 October 2026)
 
-The maintainer, on why this matters most for Bloodmoon: Solstheim has "an insane amount of spruce trees" drawn "in a
-really ineffective way", which makes it "a real performance sink". Bloodmoon is not in the build yet: the builder
+The maintainer, on why this matters most for Bloodmoon: Solstheim has a very large number of spruce trees drawn in an
+inefficient way, which makes it a real performance sink. Bloodmoon is not in the build yet: the builder
 converts the base game only ([BUILD-EXPANSIONS-31](bugs/BUILD-EXPANSIONS-31.md); both expansions, exteriors and
-interiors, are step 7 of the [roadmap](ROADMAP.md)), so this plan is ready before Solstheim's cells are. His direction: do them "in a traditional 'rally'
-style", the way the rally games of the 1990s lined their tracks with whole forests of crossed-plane trees.
+interiors, are step 7 of the [roadmap](ROADMAP.md)), so this plan is ready before Solstheim's cells are. His direction: do them in the traditional rally
+style, the way the rally games of the 1990s lined their tracks with whole forests of crossed-plane trees.
 
 A spruce is close to the best case for that: tall, narrow and much the same from every side, so the eight-plane
 star (four oriented sprites at 45 degrees) reads as a solid tree, and a cone of plain billboards reads well at a

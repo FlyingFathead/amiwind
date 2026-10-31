@@ -12,10 +12,13 @@
 static cvar_t torch_radius={"aw_torch_radius","192",true};
 static cvar_t torch_flame_style={"aw_torch_flame_style","2",true};
 cvar_t aw_torch_strength={"aw_torch_strength","0.7",true,false,.7f};
-/* Guard torch light radius relative to the player's torch (dbg guardtorch 0.5):
- * the same brightness at the flame, half the reach; a full torch's reach on every
- * guard read as over-bright in the light-space night. */
-cvar_t aw_guard_torch_radius={"aw_guard_torch_radius","0.5",true,false,.5f};
+/* Guard torch light radius relative to the player's torch (dbg guardtorch 0.33):
+ * the same brightness at the flame, the original's reach: the guards carry
+ * torch_infinite_time, LHDT radius 256 original units = 64 map units at the
+ * world scale 0.25, a third of the player torch's 192 (GUARD-TORCHES-57). It was
+ * 0.5 (96 units, GUARD-TORCH-BRIGHT-31), 1.0 before that: a full torch's reach on
+ * every guard read as over-bright in the light-space night. */
+cvar_t aw_guard_torch_radius={"aw_guard_torch_radius",".33",true,false,.33f};   /* 63 units: never past the original */
 float AW_TorchLightRadius(void) {
     float radius=torch_radius.value;
     if(!isfinite(radius))return 192;

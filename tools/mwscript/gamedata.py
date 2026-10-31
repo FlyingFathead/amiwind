@@ -59,6 +59,7 @@ class GameData:
         self.interior_numbers = {} # folded interior cell id -> its stable number (_aw_cell_int)
         self.exteriors = {}        # (x, y) -> (cell name, folded region id) of every exterior CELL record
         self.regions = {}          # folded REGN id -> its name
+        self.topics = {}           # folded DIAL topic id (type 0) -> its name
         self.default_cell_name = 'Wilderness'   # GMST sDefaultCellname: an exterior with no name and no region
         # the records the actor table reads (tools/mwscript/actors.py): {tag: {folded id: [(sub, data)]}}, the last
         # master wins; SKIL by its INDX number; a deleted record removes the earlier one
@@ -151,6 +152,16 @@ class GameData:
                 ident = _text(fields.get('NAME', b'')).casefold()
                 if ident:
                     self.regions[ident] = _text(fields.get('FNAM', b'')) or ident
+            elif tag == 'DIAL':
+                # the dialogue topics (DATA type 0) AddTopic names and the dialogue window lists (v0.0.57)
+                parts = list(subrecords(payload)); fields = dict(parts)
+                ident = _text(fields.get('NAME', b''))
+                kind = fields.get('DATA', b'\0')[:1]
+                if ident and kind == b'\0':
+                    if _deleted(flags, parts):
+                        self.topics.pop(ident.casefold(), None)
+                    else:
+                        self.topics[ident.casefold()] = ident
             elif tag == 'SSCR':
                 fields = dict(subrecords(payload))
                 ident = _text(fields.get('NAME', b'')).casefold()

@@ -1,10 +1,11 @@
 # Roadmap and implementation options
 
-_Last updated with AmiWind v0.0.55 (29 October 2026)._
+_Last updated with AmiWind v0.0.57 (31 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.57: released 31 October 2026; v0.0.58 next](#v0057-released-31-october-2026-v0058-next)
 - [v0.0.56: released 29 October 2026; v0.0.57 next](#v0056-released-29-october-2026-v0057-next)
 - [v0.0.55: released 29 October 2026; v0.0.56 next](#v0055-released-29-october-2026-v0056-next)
 - [Later: an Extras menu, and two players in the arena, 28 October 2026](#later-an-extras-menu-and-two-players-in-the-arena-28-october-2026)
@@ -104,6 +105,37 @@ _Last updated with AmiWind v0.0.55 (29 October 2026)._
 
 15 October 2026: exact-source validation completed 4,231 tests: 4,225 passed, three Windows-only skips and three tracked Census expected failures. The 71 focused tests and original-data readback across nine frame positions passed, consistently hiding 33 of 158 original references at stronghold state 6 while preserving unknown scripts. All 243 player resources are reusable after exact producer, input and file verification. Complete combined-world conversion, native comparison, packaging and shipment remain pending; coverage counts are unchanged.
 
+## v0.0.57: released 31 October 2026; v0.0.58 next
+
+v0.0.57, "Remembering The Emperor", dedicated to the memory of Sir Patrick Stewart, shipped as its fifth development
+snapshot with the first conversations added: the dialogue window with the game's own answers and the disposition bar,
+people and creatures that wander, walk, run and attack by their own records, every resident animated, guards' torches
+at night, 957 of the game's 1,207 scripts running whole, the fog at 300 by default with the sky fading into it, and
+lighter heavy models ([release notes](releases/notes/RELEASE-v0.0.57.md)). Everything else planned for v0.0.57 moves
+to v0.0.58 as it stands, the save import below included: first the rest of the conversation (links in the text,
+persuasion, services, disposition starting fights, result scripts and choices, every quest's journal), characters and
+creatures placed by scripts through one shared spawn, more weapons, lighter large interiors (Ald'ruhn's Manor District
+by the Vivec Arena Pit's method: its room models as tiles), and the rooms that still load in on arrival. The build from
+scratch of the line, skipped for the release again, runs right after it.
+
+New for v0.0.58 (31 October 2026):
+
+- **Levelling, as in the original.** Skills rise with use, by the class's major, minor and miscellaneous skills and its
+  specialization, with the game's own settings; after ten raises of major and minor skills the game asks you to rest,
+  and resting brings the original's level-up box with its sound: the level-up picture, "You have ascended to Level N"
+  and the level's own text from the game data, the eight attributes in two columns with each one's multiplier (x2,
+  x3) from the skills raised, three picks marked with the round coins, and OK; then health, magicka and fatigue are
+  worked out again. Every check that reads skills and
+  attributes (hitting, persuading, prices, casting) then uses the new values. The rules are the original's, with
+  OpenMW 0.51 as the readable reference and the test to compare against; a design note comes first, as for the
+  dialogue.
+- **The game's area sounds.** Morrowind's invisible sound markers (boats creaking at a pier, a hull under the planks,
+  water) are already placed in the world but silent (SOUND-MARKERS-SILENT-48); they
+  become looping sounds with the range of the original records, only the ones near the player loaded, measured for
+  the mixer's cost at 32 MB Fast; then the sounds the game's scripts start.
+- **Morrowind's own mouse cursor** in the windows, taken from your game data, with today's drawn cursor as the
+  fallback when it is not found (a planned `dbg cursortype 1` today's, `2` the original's, the default).
+
 ## v0.0.56: released 29 October 2026; v0.0.57 next
 
 v0.0.56, "Some Velvet Morning", shipped early and short: AmiWind on a Raspberry Pi 4 from a USB stick, the tool to
@@ -112,6 +144,15 @@ working by itself ([release notes](releases/notes/RELEASE-v0.0.56.md)). Everythi
 below included, moves to v0.0.57 as it stands, with the build from scratch of the release line first (skipped again
 for v0.0.56, the maintainer's call) and, new, cheaper models for the places full of detailed objects: the prison
 ship's hold, Seyda Neen, the Dwemer ruins ([PRISON-SHIP-RENDER-COST-56](bugs/PRISON-SHIP-RENDER-COST-56.md)).
+
+New for v0.0.57 (30 October 2026): **saves that keep the whole game, and saves from the original game and from OpenMW
+loaded into AmiWind.** First a study of what the original game's saves and OpenMW's saves keep and lose, next to what
+AmiWind keeps today; then a save that holds every change to the world (objects moved, taken or dropped, containers,
+doors and locks, characters, scripts, the journal, the in-game calendar) as a compact list of changes against your own
+game data. Then an import: a C routine in the game reads an original save (`.ess`) or an OpenMW save once, record by
+record from disk, matches its references to AmiWind's own through a table the builder makes, and writes an AmiWind
+save. The same save then opens in OpenMW and in AmiWind in the same state, so every comparison between the two
+starts from the same place, quest stage, inventory and time ([save plan](SAVEGAME_PLAN.md#planned-importing-original-and-openmw-saves)).
 
 ## v0.0.55: released 29 October 2026; v0.0.56 next
 
@@ -697,7 +738,7 @@ as with the outdoors: the world first, then what is in it, then what happens in 
    found; if `Tribunal.esm` or `Bloodmoon.esm` is missing, it warns at once, names the missing expansion, and builds
    without it, and the summary at the end of the build repeats the warning: "Bloodmoon (and/or Tribunal) was not
    found and is not included in this build". Nothing that belongs to a missing expansion is referenced by the image.
-   Bloodmoon comes first (the maintainer, 23 October 2026: "an essential part of Morrowind"): right after the
+   Bloodmoon comes first (the maintainer, 23 October 2026: it is an essential part of Morrowind): right after the
    base game's interiors and actors are in, Solstheim's 144 exterior cells go to CHIM the way Vvardenfell's did, then
    its 96 rooms by batch from the same door graph and room store, with its actors. Both expansions' audio and video
    are already converted into AmiWind by default, so what remains is the territory, not the media.

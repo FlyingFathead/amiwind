@@ -1,6 +1,6 @@
 # MiniWind: the test ground
 
-_Last updated with AmiWind v0.0.54 (28 October 2026)._
+_Last updated with AmiWind v0.0.57-dev1 (30 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -121,6 +121,7 @@ preset, [Build recipes](BUILD_RECIPES.md)); the builder makes one
 | `magic` | `--miniwind-magic` | Magic effects: dbg cast fire, frost, shock, heal... |
 | `combat-playground` | `--miniwind-combat-playground` | Combat playground in the Arena Pit: dbg playground MODE |
 | `demowind` | `--miniwind-demowind` | DemoWind: effects only, no world (dbg demowind) |
+| `urshilaku-camp` | `--miniwind-urshilaku-camp` | Urshilaku Camp: simplified yurts, faces drawn and frame time |
 <!-- presets end -->
 
 Notes: `balmora-exterior` leaves out the interiors, so every door says
@@ -137,7 +138,9 @@ of the shared animation tables plays one after another ([ANIMKIT.md](ANIMKIT.md)
 CHIM-native, so it is a MiniWind town) starts at Seyda Neen's arrival with its houses; the Census office and the
 prison ship are left out. `redmountain` (v0.0.43) is the 3 x 3 cells around Red Mountain's summit, the island's
 highest ground, arriving on the summit: for the terrain ceiling over high ground (standing, the terrain drawn from the
-eye, a high flight). `halloween` (v0.0.53) is the animation stage's Balmora with the Halloween scene's cast in the
+eye, a high flight). `urshilaku-camp` (v0.0.57) is the single cell of Urshilaku Camp, the hottest cell of the
+polycount heatmap, arriving among the yurts: for the simplified yurts' look, faces drawn and frame time
+(POLYCOUNT-CAMPS-ALDRUHN-57). `halloween` (v0.0.53) is the animation stage's Balmora with the Halloween scene's cast in the
 image: on arrival `dbg halloween` starts the dance; `--custom-ost FILE` adds your own music to your image
 ([HALLOWEEN.md](HALLOWEEN.md)). A test
 (`tests/test_miniwind_docs.py`) fails when a preset is missing from this table.

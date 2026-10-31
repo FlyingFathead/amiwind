@@ -863,7 +863,7 @@ window.addEventListener('mouseup', () => {
 function showMulti() {
   const n = multi.size;
   $('multi').textContent = n ? n + ' cell' + (n === 1 ? '' : 's') + ' selected (' + (paintMode ? 'click / drag paints, ' : '') + 'shift-drag selects a rectangle, Esc clears)' : '';
-  $('copycells').disabled = !n;
+  $('copycells').disabled = !n && !picked;
   $('undocells').disabled = !paintUndo.length;
 }
 // Undo for painting: each stroke, rectangle or Esc clear saves the selection it started from (newest last, at most 50).
@@ -883,7 +883,10 @@ $('painton').onclick = () => paintApply(true);
 $('paintoff').onclick = () => paintApply(false);
 // The painted cells as a CHIM cell list (aw-chim-cells-1, the builder's --chim-regions @FILE format), with place names.
 function paintedCellsJson() {
-  const cells = [...multi].map(k => k.split(',').map(Number)).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  // the painted cells; with none painted, the one clicked cell (a single click clears the painted set and only picks:
+  // TOOLKIT-COPY-ONE-CELL-57)
+  const keys = multi.size ? [...multi] : (picked ? [picked.x + ',' + picked.y] : []);
+  const cells = keys.map(k => k.split(',').map(Number)).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
   const names = {};
   for (const [x, y] of cells) { const n = placeName(x, y); if (n) names[x + ',' + y] = n; }
   return {format: 'aw-chim-cells-1', cells, names, source: 'AmiWind Toolkit World Map, painted cells'};
@@ -892,7 +895,7 @@ $('copycells').onclick = async () => {
   const doc = paintedCellsJson(), text = JSON.stringify(doc);
   try { await navigator.clipboard.writeText(text); }
   catch (_) { const t = document.createElement('textarea'); t.value = text; document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove(); }
-  $('copycellsdone').textContent = 'Copied ' + doc.cells.length + ' cells'; setTimeout(() => { $('copycellsdone').textContent = ''; }, 3000);
+  $('copycellsdone').textContent = 'Copied ' + doc.cells.length + ' cell' + (doc.cells.length === 1 ? '' : 's'); setTimeout(() => { $('copycellsdone').textContent = ''; }, 3000);
 };
 // 3D inspectable: the cell has a map present in the chosen maps folder.
 function inspectable(c) { return !!(c && c.maps && c.maps.some(hasMap)); }
@@ -1170,7 +1173,7 @@ $('metricsfile').onchange = e => {
   load(f, text => { if (setMetrics(JSON.parse(text))) metricsFileName = f.name; });
 };
 // Copy state: toolkit version, loaded data, layers and selection, as JSON to paste.
-const TOOLKIT = {name: 'AmiWind Toolkit · World Map', version: '0.1.17'};
+const TOOLKIT = {name: 'AmiWind Toolkit · World Map', version: '0.1.18'};
 let statusFileName = null;
 function stateJson() {
   const sel = picked && data ? data.cells.find(c => c.x === picked.x && c.y === picked.y) : null;
@@ -1423,7 +1426,7 @@ canvas.onclick = e => {
   if ((!data && !metrics && !chim) || dragMoved || e.shiftKey) return;
   const {x, y, c} = cellAt(e);
   if (multi.size) { multi.clear(); showMulti(); }
-  picked = {x, y}; $('picked').textContent = describe(x, y, c, ' · '); draw();
+  picked = {x, y}; $('picked').textContent = describe(x, y, c, ' · '); showMulti(); draw();
   showSelected(x, y, c);
   if (metricsOn()) showMetricsCell(x, y);
   if (chimOn()) showChimCell(x, y);
@@ -1542,7 +1545,12 @@ function legendCtl() {
 }
 function legendSet(state) { legendOff = new Set([...legendOff].filter(k => !k.startsWith('chim:')).concat(state.off)); relFilter = state.rel; cset.colour = state.colour; }
 let chim = null, chimCells = new Map(), chimCellList = [], chimClicked = null, chimBucket = null, chimSource = null,
-  chimImported = false, chimNext = {spiral: new Map(), risk: new Map()}, chimNextDoc = null, chimMaxRing = 1, chimMaxElapsed = 1;
+  chimImported = false, chimNext = {spiral: new Map(), risk: new Map()}, chimNextDoc = null, chimMaxRing = 1, chimMaxElapsed = 1,
+  chimMaxFaces = 1;
+// Polycount heatmap (2026-10-30, POLYCOUNT-HEATMAP-CHIM-57): the faces the newest ingested CHIM build places in the cell
+// (tools/cell_progress.py stats.faces.chim_placed; every build's tracker step refreshes it), linear to the heaviest cell
+// (a log scale washed every cell to orange: plain terrain alone has a few thousand faces).
+function chimFaces(c) { const f = c.stats && c.stats.faces; return f ? (f.chim_placed || f.after || 0) : 0; }
 const cset = {colour: 'status', order: 'spiral', filter: '', nums: true, next: true};
 function chimOn() { return !!chim && on('chim'); }
 function chimCell(x, y) { return chimOn() ? chimCells.get(x + ',' + y) || null : null; }
@@ -1552,7 +1560,13 @@ function chimOpenBugs(c) {
 function chimMech(id) { const m = chim.mechanisms.find(m => m.id === id); return m ? m.label : id; }
 function chimColour2(c, m) { const keep = cset.colour; cset.colour = m; try { return chimColour(c); } finally { cset.colour = keep; } }
 function chimColour(c) {
-  if (inclusionBuild()) { const r = inclusionCell(c); return r ? (r.state === 'included' && inclusionVerified(inclusionBuild()) ? '#35cf80' : '#f4b942') : '#536170'; }
+  if (cset.colour === 'faces') { const n = chimFaces(c); return n ? heat(Math.min(1, n / chimMaxFaces)) : null; }
+  // A cell with no LAND record that the build includes (open sea the game defines, e.g. -15,-8) is drawn in the sea
+  // colour, not land green (TRACKER-SEA-CELL-LAND-GREEN-57: it looked like a leftover land tile out at sea).
+  // And an EMPTY one (no LAND, nothing placed) is not drawn at all: it blends into the sea background like the cells the
+  // game never defined (the maintainer, 2026-10-30, on -15,-8 still standing out in its own blue: "yeah would be nice").
+  if (inclusionBuild()) { const r = inclusionCell(c); if (r && !c.land && !(c.contents && c.contents.refs_total)) return null;
+    return r ? (r.state === 'included' && inclusionVerified(inclusionBuild()) ? (c.land ? '#35cf80' : CHIM_BUCKETS.sea_in_game[0]) : '#f4b942') : '#536170'; }
   const m = cset.colour;
   if (m === 'compare') return chimRef && chimDrawn(c) ? CHIM_COMPARE[chimCompareClass(c)][0] : null;
   if (m === 'status') return chimDrawn(c) || c.chim.converted ? (CHIM_BUCKETS[chimCls(c)] || CHIM_BUCKETS.not_started)[0] : (c.contents && c.contents.refs_total ? '#2a3a4c' : null);
@@ -1600,6 +1614,7 @@ function chimLegend() {
   if (m === 'legacy') return Object.entries(CHIM_GRADES).map(([g, c]) => [c, 'legacy ' + g + ': ' + ({A: 'full map, 80 %+ placed', B: 'full town/area map', C: 'terrain, some placed', D: 'terrain only', E: 'no terrain'}[g]), 'chim:grade:' + g]);
   if (m === 'bugs') return [['#1f3b73', 'open bugs linked to the cell (few)'], ['#ef4545', 'many']];
   if (m === 'lastbuild') return [['#1f3b73', 'quick last build'], ['#ef4545', 'slow'], ['#555f6b', 'no ledger entry']];
+  if (m === 'faces') return [['#1f3b73', 'few faces placed'], ['#ef4545', 'most: ' + chimMaxFaces.toLocaleString() + ' faces in one cell']];
   return Object.entries({passed: 'passed', failed: 'failed', accepted: 'failed, maintainer-accepted', not_measured: 'not measured'}).map(([k, t]) => [CHIM_AUDIT[k], chimMech(m.slice(6)) + ': ' + t, 'chim:audit:' + k]);
 }
 // Grouped legend rows: a header row per group ([null, title, null, 'head']), then its states with cells; states at 0 are
@@ -1900,7 +1915,7 @@ function chimTotalsBlock() {
       .map(([g, label]) => '<details><summary>' + label + '</summary>' + chimCatTable(g.by_category) + '</details>').join('') + '</details>';
 }
 
-// ---- The store-once chart (maintainer, 2026-10-09: "what is this chart trying to tell?"). The title is the takeaway; two panels
+// ---- The store-once chart (maintainer, 2026-10-09: the chart did not say what it shows). The title is the takeaway; two panels
 // with 14 px+ text, every legend OUTSIDE the plot, a log axis so the no-reuse line fits, ring labels staggered above panel (a).
 const MESH_COL = {store: '#4fc3f7', risk: '#ffcf55', own: '#ff7b72'};
 const MESH_SENTENCE = 'Spiral order grows one contiguous playable area from the coast inwards. Risk order meets the most distinct meshes first, so a bug in a mesh shows up early.';
@@ -2109,13 +2124,14 @@ function setChim(doc, source, keepView) {
   chim.bounds = xs.length ? [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)] : null;
   chimMaxRing = Math.max(1, ...chimCellList.map(c => c.ring || 0));
   chimMaxElapsed = Math.max(1, ...chimCellList.map(c => c.last_build ? c.last_build.elapsed_s : 0));
+  chimMaxFaces = Math.max(1, ...chimCellList.map(chimFaces));
   for (const o of ['spiral', 'risk']) {
     const key = o === 'spiral' ? 'spiral_rank' : 'risk_rank';
     const list = chimCellList.filter(c => !c.chim.converted && c[key]).sort((a, b) => a[key] - b[key]).slice(0, CHIM_NEXT);
     chimNext[o] = new Map(list.map((c, i) => [c.x + ',' + c.y, i + 1]));
   }
   const cur = cset.colour, flt = cset.filter;
-  $('chimcolour').innerHTML = [['status', 'CHIM status']].concat(doc.plan_next ? [['plan', 'Release plan (gold = planned for ' + doc.plan_next + ')']] : []).concat([['lighting', 'Lighting (lit / partial / unlit)'], ['lava', 'Lava (mapped / converted)'], ['ring', 'Spiral ring'], ['scout', 'Scout risk (estimator)'], ['legacy', 'Legacy mapping quality'],
+  $('chimcolour').innerHTML = [['status', 'CHIM status'], ['faces', 'Polycount: faces placed per cell (newest CHIM build)']].concat(doc.plan_next ? [['plan', 'Release plan (gold = planned for ' + doc.plan_next + ')']] : []).concat([['lighting', 'Lighting (lit / partial / unlit)'], ['lava', 'Lava (mapped / converted)'], ['ring', 'Spiral ring'], ['scout', 'Scout risk (estimator)'], ['legacy', 'Legacy mapping quality'],
     ['bugs', 'Open bugs linked'], ['lastbuild', 'Last build time']]).concat(doc.mechanisms.map(m => ['audit:' + m.id, 'Audit: ' + m.label]))
     .map(([v, t]) => '<option value="' + escapeHtml(v) + '">' + escapeHtml(t) + '</option>').join('');
   if (chimRef) $('chimcolour').insertAdjacentHTML('beforeend', '<option value="compare">Compare with the project reference</option>');

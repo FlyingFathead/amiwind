@@ -370,6 +370,7 @@ void AW_FogDraw(void);
 void AW_PlatformInit(void);
 void AW_PlatformClose(void);
 void AW_CullBegin(void);
+int AW_LargeRoomDistance(void);
 int AW_NodeVisible(short *bounds);
 
 void AW_DebugInit(void);
@@ -484,6 +485,10 @@ int AW_MwscriptActors(void);
 struct edict_s;
 extern int (*aw_mwscript_combat_end)(struct edict_s *e);
 extern int (*aw_mwscript_wander)(struct edict_s *e,int distance,int duration,int hour,const unsigned char idle[8],int repeat);
+extern int (*aw_mwscript_travel)(struct edict_s *e,const float to[3]);
+extern int (*aw_mwscript_follow)(struct edict_s *e,struct edict_s *target,float hours,const float *final);
+extern int (*aw_mwscript_packages_export)(unsigned char *out,int capacity);   /* aw_ambient.c: saved travel/follow */
+extern int (*aw_mwscript_packages_import)(const unsigned char *data,int bytes);   /* the ambient tables' AITravel (aw_mwhost.c) */
 extern int (*aw_mwscript_ai_package)(struct edict_s *e,int *done);   /* the ambient tables' AI package (aw_mwhost.c) */
 int AW_MwscriptSpeedAttribute(struct edict_s *e);
 /* Object state the scripts set (aw_mwhost.c): 1 when Disable hid the placement REFERENCE; its lock level, or

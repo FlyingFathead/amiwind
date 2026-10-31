@@ -1,6 +1,6 @@
 # AGA checkpoint build and controls
 
-_Last updated with AmiWind v0.0.54 (28 October 2026)._
+_Last updated with AmiWind v0.0.57 (30 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -65,7 +65,7 @@ copies: exiting the game writes profiling files to their filesystems.
 | Left / right arrow | Turn |
 | Shift | Run |
 | Space | Jump; upward swim input when submerged |
-| Alt+V | Cycle requested draw distance: 450 / 540 / 1000; region exteriors cap at 540 |
+| Alt+V | Cycle requested draw distance: 300 / 540 / 1000; region exteriors cap at 540 |
 | Shift+F5 / Shift+F6 | Previous / next song in playback history, then shuffled selection |
 | F6 | Next song (legacy alias) |
 | F8 | Audition battle/exploration music mode; not combat detection |
@@ -232,4 +232,4 @@ model remain intact. See [first-person hands](FIRST_PERSON_HANDS.md).
 Checkpoint-017 debugging: `dbg scene change` opens the scene picker. Escape →
 Options → Graphics provides live exterior fog/draw distance; arrows step10,
 Shift+arrows step1. `dbg fog distance 675` sets an exact value, `dbg fps on`
-shows the once-per-second frame-rate estimate. Default is540; counter off.
+shows the once-per-second frame-rate estimate. Default is 300 (the universal default since v0.0.57); counter off.

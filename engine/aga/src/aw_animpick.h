@@ -90,6 +90,8 @@ void AW_AnimPickPostSend(void);
 void AW_AnimPickCast(struct edict_s *e,int range);
 /* Sneaking on or off (MWScript ForceSneak / ClearForceSneak): the sneak gaits and idlesneak. */
 void AW_AnimPickSneak(struct edict_s *e,int on);
+/* MWScript PlayGroup GROUP (COUNT 0) / LoopGroup GROUP COUNT: the group over what plays, once plus COUNT more; 1 played. */
+int AW_AnimPickScripted(struct edict_s *e,const char *group,int count);
 /* The actor's wander package idle chances Idle2..Idle9 (AI_W, AIWander): the wander idles while it stands. */
 void AW_AnimPickIdleChances(struct edict_s *e,const unsigned char chances[8]);
 /* The group the actor shows now (1), for dbg and tests. */

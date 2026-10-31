@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """A closed bug that comes back is a regression, never a new bug (REGISTER-REGRESSION-HANDLER-52).
 
-The maintainer, 25 October 2026: searches go through BOTH open and closed bugs, "so as to NOT open up old bugs as new
-ones if it's something that has been closed but has been regressed", and "a regression handler so to speak": "oh
-shit, this bug was marked as closed then, but now it's open again". tools/bug_register.py: `find` searches the whole
+The maintainer, 25 October 2026: searches go through both open and closed bugs, so that an old bug is never opened
+again as a new one when it was closed but has regressed; a regression handler that says the bug was marked closed
+then and is open again now. tools/bug_register.py: `find` searches the whole
 register (archives included), `add` refuses a title that nearly matches a fixed or closed bug, and `reopen` puts the
 bug back to open with an entry in its regressions list, one severity step up."""
 import sys

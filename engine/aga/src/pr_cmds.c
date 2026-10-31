@@ -22,6 +22,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "aw_items.h"
 #include "aw_anim.h"
 #include "aw_glut.h"
+#include "aw_dial.h"
 #include "aw_talk.h"
 
 #define	RETURN_EDICT(e) (((int *)pr_globals)[OFS_RETURN] = EDICT_TO_PROG(e))
@@ -1859,11 +1860,25 @@ void PF_Fixme (void)
 
 
 
+int AW_MwscriptUseInView(const float *eye,const float *forward);   /* aw_mwhost.c (MWSCRIPT-MORE-57) */
 /* The UI and QC manual greeting resolve the same visible actor. */
 static void PF_aw_npctarget(void)
 {
     edict_t *player=G_EDICT(OFS_PARM0);
     edict_t *target=AW_NPCTarget(player,player->v.v_angle);
+    /* a script that reads OnActivate takes the actor's use (the original's rule, as for doors: aw_mwhost.c
+     * object_intercept): E talks to nobody and the script's OnActivate reads 1 on its next run (MWSCRIPT-MORE-57) */
+    if(target && aw_scene_intercept){
+        eval_t *ref=GetEdictFieldValue(target,"aw_ref");
+        if(ref && ref->_float>0 && aw_scene_intercept((unsigned)ref->_float))target=NULL;
+    }
+    /* no actor under the crosshair: a scripted object in view that reads OnActivate takes the use (activators and the
+     * other placements the CHIM world keeps without an edict; aw_mwhost.c) */
+    if(!AW_NPCTarget(player,player->v.v_angle)){
+        vec3_t eye,forward,right,up;
+        VectorAdd(player->v.origin,player->v.view_ofs,eye);AngleVectors(player->v.v_angle,forward,right,up);
+        AW_MwscriptUseInView(eye,forward);
+    }
     /* QC's aw_interact (E) talks to it: none when it cannot be talked to (TALK-PROMPT-RULES, aw_talk.c, the prompt's
      * rule): dead, in combat, knocked down or nothing to say */
     if(target && aw_can_talk && !aw_can_talk(target))target=NULL;
@@ -1910,7 +1925,10 @@ static void PF_aw_converse(void)
      * table's conversation greeting, the same rule picked when the talk opens (aw_glut.c) */
     else if(!AW_GlutConverse(e,G_FLOAT(OFS_PARM1)!=0,text,sizeof(text)))return;
     seconds=strlen(text)/12.0;if(seconds<8)seconds=8;if(seconds>40)seconds=40;
-    AW_UISubtitle(pr_strings+e->v.netname,text,seconds);
+    /* the dialogue window (aw_dialwin.c, DIALOGUE-57) when the NPC has topics: the greeting opens the conversation
+     * there; otherwise (or aw_dialogue_window 0) the greeting as a subtitle, as before */
+    if(!AW_DialWindowOpen(e,text,G_FLOAT(OFS_PARM1)!=0))
+        AW_UISubtitle(pr_strings+e->v.netname,text,seconds);
     G_FLOAT(OFS_RETURN)=(float)seconds;
 }
 

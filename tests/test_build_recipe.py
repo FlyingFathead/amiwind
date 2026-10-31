@@ -436,7 +436,7 @@ class Presets(Base):
         self.assertEqual(sorted(row['name'] for row in mp.presets()
                                 if row['name'] not in ('seyda-chim', 'lava-pools', 'vivec-palace', 'vivec-city-exterior',
                                                        'redmountain', 'anim-stage', 'halloween', 'magic',
-                                                       'combat-playground', 'demowind')),
+                                                       'combat-playground', 'demowind', 'urshilaku-camp')),
                          sorted(row['name'] for row in OLD_PRESETS))
         # vivec-arena-pit moved to the interior scope (MINIWIND-NO-INTERIOR-SCOPE-42): its room only
         self.assertEqual(mp.find('vivec-arena-pit')['scope'], 'interior')

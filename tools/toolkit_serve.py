@@ -56,7 +56,7 @@ Usage:
   toolkit_serve.py [--build DIR] --data DIR [--maps DIR] [--metrics FILE] [--progress DIR|FILE] [--port 8031] [--open]
 Then open http://127.0.0.1:8031/ (printed).
 """
-import argparse, json, mimetypes, queue, re, shlex, subprocess, sys, threading, time, webbrowser
+import argparse, errno, json, mimetypes, queue, re, shlex, subprocess, sys, threading, time, webbrowser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
@@ -554,6 +554,17 @@ def progress_folder(path):
     return path.parent if path.is_file() else path
 
 
+TRANSIENT_SOCKET_ERRNOS = {errno.ENOBUFS, errno.ENFILE, errno.EMFILE}
+TRANSIENT_SOCKET_WINERRORS = {10055, 10024}         # WSAENOBUFS, WSAEMFILE
+
+
+def transient_socket_error(exc):
+    """True when an OSError from the server's select loop is a passing shortage of socket buffers or file handles
+    (the host busy with builds), after which serving can simply go on (TOOLKIT-SERVE-SOCKET-BUFFER-57)."""
+    return (getattr(exc, 'winerror', None) in TRANSIENT_SOCKET_WINERRORS
+            or getattr(exc, 'errno', None) in TRANSIENT_SOCKET_ERRNOS)
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument('--data', type=Path)
@@ -657,7 +668,17 @@ def main(argv=None):
     if a.open:
         webbrowser.open(url)
     try:
-        server.serve_forever()
+        while True:
+            try:
+                server.serve_forever()
+                break
+            except OSError as exc:
+                # TOOLKIT-SERVE-SOCKET-BUFFER-57: a host short of socket buffers or file handles for a moment (busy
+                # builds) must not end the Toolkit; anything else still stops it
+                if not transient_socket_error(exc):
+                    raise
+                print('Toolkit server: transient socket error (%s); serving again in 2 s' % exc, flush=True)
+                time.sleep(2)
     except KeyboardInterrupt:
         pass
     finally:

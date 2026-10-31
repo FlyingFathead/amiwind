@@ -6,7 +6,7 @@
 
 - Reported with v0.0.33 at 2026-10-09 (time not recorded): found by the island-wide seam audit: 49 reduced meshes tear their seams
 - Reported with v0.0.36-dev3 at 2026-10-11 03:36 +0300: measured as visible holes: 39 of 150 open-world rocks at 64 triangles show the sky through on more than 5 of 100 pixels, worst 48 (terrain_ashland_rock_01)
-- Reported with v0.0.43-dev2 at 2026-10-18 19:03 +0300: maintainer: Ashlands rocks still open underneath (cell -4,12, func_wall model *52, source ref 283924); 'the same rocks I've mentioned', should not be open
+- Reported with v0.0.43-dev2 at 2026-10-18 19:03 +0300: maintainer: Ashlands rocks still open underneath (cell -4,12, func_wall model *52, source ref 283924); the same rocks he mentioned earlier, which should not be open
 - Reported with v0.0.43-dev2 at 2026-10-18 19:04 +0300: maintainer: another open rock, cell -4,13 (func_wall model *44, ref 245627); fixed in some map spots but not in others
 - Reported with v0.0.43-dev2 at 2026-10-18 19:06 +0300: open rocks at -4,12/-4,13 are on classic region maps in dev2 (not CHIM); one step into CHIM cell -5,13 the same rocks are closed; dev3 has all three on CHIM
 - Reported with v0.0.43-dev2 at 2026-10-18 19:20 +0300: maintainer: two long spikes hang from a rock/terrain face in Balmora (cell -3,-3, global -20051 -19320 80, local 107 -1758 20); Balmora is a CHIM town frame
@@ -148,7 +148,7 @@ Family: Mesh converter geometry (`converter-geometry`). Converted faces must be 
 
 - AW-20260928-21 (no report page): Exterior Census door/wall overlap
 - AW25-02 (no report page): Dry valleys and rises rendered as flooded after coarse terrain conversion
-- BALMORA-GROUND-DENTS-51 (no report page): Sharp V-shaped dents in Balmora s ground beside the canal wall (cell -3,-2); the maintainer: they are back
+- BALMORA-GROUND-DENTS-51 (no report page): Sharp V-shaped dents in Balmora s ground beside the canal wall (cell -3,-2), reported by the maintainer as back
 - [BALMORA-TEMPLE-GEOMETRY-29](BALMORA-TEMPLE-GEOMETRY-29.md): Balmora Temple lower rooms: missing walls and floors, collision holes
 - BSP-LIGHT-01 (no report page): Vodunius face lightmap range exceeded its lighting lump
 - [BUILD-INTERIOR-INDEX-ROUTED-33](BUILD-INTERIOR-INDEX-ROUTED-33.md): Full build stops in the interior stage: the prison ship collision index expects a convex-piece chain, but the converter now routes large standing hulls

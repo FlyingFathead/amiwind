@@ -180,6 +180,14 @@ static int append_mode (char **argv)
 	return 0;
 }
 
+/* a paged table's frames (WALK-CYCLES-57): the rows after the index of the whole file, frame clamped as the loader */
+static const unsigned char *paged_rows;
+static const unsigned char *test_row (const aw_skel_table_t *t, int frame)
+{
+	assert (frame >= 0 && frame < t->own_frames);
+	return paged_rows + (long)frame * t->row;
+}
+
 int main (int argc, char **argv)
 {
 	if (argc == 4 && !strcmp (argv[1], "append"))
@@ -196,7 +204,7 @@ int main (int argc, char **argv)
 		return block_mode (argv);
 	long size;
 	unsigned char *data, *bad;
-	aw_skel_table_t t;
+	aw_skel_table_t t, paged;
 	aw_skel_group_t g;
 	static float world[AW_SKEL_MAX_BONES][3][4];
 	float frame, in[3], out[3];
@@ -239,12 +247,26 @@ int main (int argc, char **argv)
 		AW_SkelKeyFrame (&t, AW_SkelGroup (&t, "walkforward"), "STOP"),
 		AW_SkelKeyFrame (&t, AW_SkelGroup (&t, "idle"), "stop"),
 		AW_SkelKeyFrame (&t, AW_SkelGroup (&t, "walkforward"), "chop hit"), t.keys_count);
+	{
+		/* WALK-CYCLES-57: the index alone, its frames given by row_of, poses exactly as the table held whole */
+		long index = AW_SkelIndexBytes (data, size);
+		assert (index > 0 && index < size);
+		assert (AW_SkelParseIndex (data, index, size, &paged) && !paged.keys && paged.frames == t.frames);
+		assert (!AW_SkelParseIndex (data, index, size - 1, &paged));
+		assert (!AW_SkelParseIndex (data, index - 1, size, &paged));
+		assert (AW_SkelParseIndex (data, index, size, &paged));
+		paged_rows = data + index;
+		paged.row_of = test_row;
+	}
 	points = fopen (argv[2], "r");
 	assert (points);
 	while (fscanf (points, "%f %d %f %f %f", &frame, &bone, &in[0], &in[1], &in[2]) == 5)
 	{
+		static float paged_world[AW_SKEL_MAX_BONES][3][4];
 		assert (bone >= 0 && bone < t.bones);
+		AW_SkelPose (&paged, frame, paged_world);
 		AW_SkelPose (&t, frame, world);
+		assert (!memcmp (paged_world, world, sizeof(world[0]) * t.bones));
 		AW_SkelTransform (world[bone], in, out);
 		printf ("%.6f %.6f %.6f\n", out[0], out[1], out[2]);
 	}

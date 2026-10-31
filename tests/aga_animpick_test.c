@@ -33,6 +33,14 @@ static aw_pick_state_t st(int weapon,int event,int move) {
     return s;
 }
 static const char *pick(aw_pick_state_t s,aw_pick_t *o) {assert(AW_AnimPick(&s,has,NULL,o));return o->group;}
+/* a creature's own table (k_*.awsk of the v0.0.57 build: no weapon groups; attack1..3, hit1, death1) */
+static int creature_has(void *context,const char *n) {
+    static const char *const g[]={"idle","idle2","walkforward","runforward","attack1","attack2","attack3","hit1","death1",
+        "knockdown","turnleft","turnright",0};
+    int i;(void)context;
+    for(i=0;g[i];i++)if(!strcmp(g[i],n))return 1;
+    return 0;
+}
 
 int main(void) {
     aw_pick_t o;aw_pick_state_t s;int w,e,m,r,k,sw,i,idle,storm,missing=0;
@@ -77,6 +85,14 @@ int main(void) {
     s=st(11,AW_PE_JUMP,0);assert(!strcmp(pick(s,&o),"jump1h"));
     s=st(AW_PW_NONE,AW_PE_BLOCK,0);assert(!strcmp(pick(s,&o),"shield") && !strcmp(o.start,"block start"));
     s=st(AW_PW_PICKPROBE,AW_PE_ATTACK,0);assert(!strcmp(pick(s,&o),"pickprobe"));
+    /* CREATURE-COMBAT-ANIM-GROUPS-54: a creature attacks with a random one of its own attack1..3, start to stop */
+    for(r=0;r<3;r++){
+        char want[16];
+        s=st(AW_PW_NONE,AW_PE_ATTACK,0);s.roll=(unsigned char)r;sprintf(want,"attack%d",r+1);
+        assert(AW_AnimPick(&s,creature_has,NULL,&o) && !strcmp(o.group,want) && !strcmp(o.start,"start") && !strcmp(o.stop,"stop"));
+    }
+    s=st(AW_PW_NONE,AW_PE_HIT,0);assert(AW_AnimPick(&s,creature_has,NULL,&o) && !strcmp(o.group,"hit1"));
+    s=st(AW_PW_NONE,AW_PE_DEATH,0);s.roll=3;assert(AW_AnimPick(&s,creature_has,NULL,&o) && !strcmp(o.group,"death1"));
     {   /* aiwander.cpp getRandomIdle: the dancers' chances; one roll per idle, the highest under its chance wins */
         static const unsigned char dancer[8]={20,20,20,10,0,0,0,80},r1[8]={50,50,50,50,50,50,50,60},r2[8]={15,90,90,90,90,90,90,90};
         assert(AW_PickWanderIdle(dancer,100,40,r1)==9);

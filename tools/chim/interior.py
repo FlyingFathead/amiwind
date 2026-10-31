@@ -69,6 +69,17 @@ def room_settings(room=None):
     return _resolved(data)
 
 
+def room_recipe(room):
+    """The visual recipe (config/visual-recipes.json) a room's named meshes are simplified with (config/chim-rooms.json
+    recipe_rooms {room map: recipe}), or None: every room not listed is built as before."""
+    name = (_rooms_config().get('recipe_rooms') or {}).get(room)
+    if name is not None:
+        from visual_recipes import load_recipes
+        if name not in load_recipes()['recipes']:
+            raise ValueError('config/chim-rooms.json recipe_rooms: unknown visual recipe ' + name)
+    return name
+
+
 def _rooms_config():
     return json.loads((Path(__file__).resolve().parents[2] / 'config/chim-rooms.json').read_text(encoding='utf-8'))
 
@@ -290,6 +301,18 @@ def room_input(work, pal_bytes, qbsp, jobs, cache, timer, collision_cache, harve
             # collision, the open rim locked, as chim.build applies an area's budget
             profiles[model['source']] = dict(profiles[model['source']], ratio=target / model['triangles'],
                                              visual_triangle_target=target, lod_preserve_border=True)
+    # the hot room meshes through meshoptimizer with locked borders and the seam gate (config/chim-rooms.json
+    # recipe_rooms, MESHOPT-HOT-MODELS-57): only the rooms listed there and only the meshes their visual recipe names
+    # (source + packet SHA-256), so every other room and mesh keeps its unit key
+    recipe = room_recipe(work.name)
+    if recipe:
+        from visual_recipes import load_recipes, apply_recipe
+        recipes = load_recipes()
+        for mi in used:
+            model = index['models'][mi]
+            entry = recipes['recipes'][recipe]['models'].get(model['source'].replace(chr(92), '/').lower())
+            if entry is not None and 'ratio' in entry:
+                profiles[model['source']] = apply_recipe(profiles[model['source']], model, recipe, recipes)
     models = list(index['models'])
     items = []
     for mi in used:

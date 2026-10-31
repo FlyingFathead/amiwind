@@ -19,22 +19,22 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.56 (29 October 2026)._
+_Last updated with AmiWind v0.0.56 (30 October 2026)._
 
 ## Status: 29 October 2026
 
-Open. Found by the maintainer on the Raspberry Pi 4 boot stick (v0.0.56-dev1): "manor district: shit's loading in as
-blank spots instead of fading into darker grey". Shots of the room were taken on the Pi, interior 90.
+Open. Found by the maintainer on the Raspberry Pi 4 boot stick (v0.0.56-dev1): in the Manor District, far parts load
+in as blank spots instead of fading into a darker grey. Shots of the room were taken on the Pi, interior 90.
 
 ## Symptom
 
 In the Manor District (the large room inside Skar where the Redoran manors stand) the parts of the room beyond the
 draw distance show as blank spots of the clear colour, then pop in as you come nearer, where they should fade into a
-dark grey with distance. The room is also slow (the maintainer: "those blank spots are not supposed to be there and
-also that shit takes a ton of processing"): with no fog, nothing limits how far it draws.
+dark grey with distance. The room is also slow (the maintainer: the blank spots are not meant to be there, and the
+room takes a lot of processing): with no fog, nothing limits how far it draws.
 
-Seen again in the vanity camera's orbit the same evening (the maintainer: "just a few more frames in there and it's
-fucking ripping itself wide open"; two shots taken on the Pi at that moment): large flat cream-white areas where the
+Seen again in the vanity camera's orbit the same evening (a few more frames in the room and the picture falls apart;
+two shots taken on the Pi at that moment): large flat cream-white areas where the
 floor and the walls should be, around the walkway and under the shells, not only far away: whole surfaces are not
 drawn and the clear colour shows through.
 
@@ -57,7 +57,7 @@ By the maintainer's account: walk through the Manor District and look along it.
 
 ## Repair
 
-None yet. DECIDED by the maintainer: "we should have interior fog enabled in places that are of that size". Large
+None yet. DECIDED by the maintainer: interior fog is enabled in places of that size. Large
 interiors get fog (the colour of their cell record, else a dark grey) at the draw distance, so far parts fade into it
 as outdoors and nothing past it is drawn; small rooms stay as they are. Which rooms count as large comes from their
 size in the converted data, listed, not guessed; with FOG-300-DEFAULT-57 the distance follows the same default.
@@ -93,10 +93,12 @@ Family: Rendering cost and visibility (`render-performance`). Read the visibilit
 - [ENGINE-UPSTREAM-ASM-UNUSED-36](ENGINE-UPSTREAM-ASM-UNUSED-36.md): The engine is built without AmiQuake's 68k assembly: spans, fixed point and maths run as C at -O1
 - [ENGINE-UPSTREAM-SPANS8-SPRITE-LOOP-36](ENGINE-UPSTREAM-SPANS8-SPRITE-LOOP-36.md): Upstream AmiQuake's assembly D_DrawSpans8 has the shape of the sprite span loop; it never runs at the default d_subdiv16 1
 - [ENGINE-VID-UPDATE-FIRST-RECT-35](ENGINE-VID-UPDATE-FIRST-RECT-35.md): VID_Update converted only the first rectangle of the update list
+- [FOG-SKY-UNFOGGED-57](FOG-SKY-UNFOGGED-57.md): With the 300 fog distance, buildings 20 m away turn solid fog colour while the sky stays clouds: a ragged patch of sky hangs between rooftops
 - [INTERIOR-MORAG-TONG-FPS-43](INTERIOR-MORAG-TONG-FPS-43.md): The Morag Tong Guild interior runs at a very low frame rate
 - MODAL-WORLD-29 (no report page): Head/race and journal backgrounds consume world work
 - [NPC-TARGET-REDUNDANT-31](NPC-TARGET-REDUNDANT-31.md): NPC targeting runs 2-4 times per frame and checks every NPC
 - [PERF-ARENA-PIT-SLOW-48](PERF-ARENA-PIT-SLOW-48.md): The Vivec Arena Pit runs slowly: a large interior with heavy drawn and collision geometry
+- [POLYCOUNT-CAMPS-ALDRUHN-57](POLYCOUNT-CAMPS-ALDRUHN-57.md): The Ashlander camps and central Ald'ruhn are the hottest cells of the polycount heatmap: the yurts alone carry about half of a camp's faces
 - [PRISON-SHIP-RENDER-COST-56](PRISON-SHIP-RENDER-COST-56.md): The prison ship's hold draws slower than the Vivec Arena Pit: frame rate dips in the opening room
 - [RENDER-BMODEL-FRAGMENTS-32](RENDER-BMODEL-FRAGMENTS-32.md): Brush models spanning many terrain leaves are clipped face by face down the terrain BSP
 - [RENDER-EDGECACHE-SEYDA-32](RENDER-EDGECACHE-SEYDA-32.md): No edges are reused between frames in Seyda Neen views

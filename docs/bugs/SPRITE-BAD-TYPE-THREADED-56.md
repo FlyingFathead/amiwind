@@ -10,7 +10,7 @@
 | Reproduction | once |
 | Duplicate of | no |
 | Persists in | v0.0.56-dev1 (last seen) |
-| Severity | critical: the game stops for good during a load (the maintainer: 'yeah that's a critical bug for sure'); the cause, emulator mode or engine, is not known yet |
+| Severity | critical: the game stops for good during a load (the maintainer rated it critical); the cause, emulator mode or engine, is not known yet |
 | Family | Rendering cost and visibility (`render-performance`) |
 | Playtest version | 2026_10_29_v0.0.56-dev1_full-dev1-arenapit_5406920 |
 | From commit | source 5406920, engine 5406920, CHIM world 5406920 |
@@ -19,15 +19,14 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.56-dev1 (29 October 2026)._
+_Last updated with AmiWind v0.0.57-dev3 (30 October 2026)._
 
 ## Status: 29 October 2026
 
 Open. Seen once, by the maintainer on the Raspberry Pi 4 boot stick: `dbg aw hors 0` (his test character in the
-middle of Seyda Neen) stayed on "Loading..." ("yeah I think we're stuck in the fucking Loading screen now"), and
-when Amiberry was restarted the screen showed the error: "it said something about a badsprite type" / "in your exit
-stuff". The maintainer: "yeah that's a critical bug for sure". With the threaded CPU switched off again, the same
-`dbg aw hors 0` loaded at the first try ("ok now it loaded back into dbg aw hors 0"): one run, not yet the proof.
+middle of Seyda Neen) stayed on "Loading...", and when Amiberry was restarted the screen showed an error about a bad
+sprite type in the engine's exit message. The maintainer judged it a critical bug. With the threaded CPU switched off
+again, the same `dbg aw hors 0` loaded at the first try: one run, not yet the proof.
 
 ## Symptom
 
@@ -60,9 +59,23 @@ The emulator presets the gates and smoke tests use have no threaded CPU, and no 
 
 Once so far: on the stick with `cpu_threaded=true`, `dbg aw hors 0`.
 
+## Seen again: 30 October 2026, v0.0.57-dev2 on FS-UAE
+
+FS-UAE with JIT at 32 MB Fast, no threaded CPU: at the end of a settlement sweep (28 teleports), a few seconds
+after the Gnisis region load, the engine stopped with "R_DrawSprite: Bad sprite type 1073750932". That number is
+0x40002094, an address: the sprite model's memory had been freed or reused while an entity still pointed at it.
+So the engine has the bug; the threaded CPU is not the only cause. Ten more teleports into Gnisis (five from
+Ghostgate, five from Gnaar Mok) did not repeat it.
+
 ## Repair
 
-None yet. The threaded CPU is off again on the stick and in the stick's preset. Next: the same load without it, a
+A guard, not the cause yet: `R_DrawSprite` checks a sprite's data (its type and frame count) before drawing it and
+leaves a bad one out of the frame instead of ending the game. The console names it once per model: the CHIM
+streamed static and its chunk when it is one, else the entity's address, with the model's name and the bad fields
+(`SPRITE-BAD-TYPE: ...`). A native test covers the check. The next sighting names the entity, which shows the list
+that keeps it past its model.
+
+Before that: none. The threaded CPU is off again on the stick and in the stick's preset. Next: the same load without it, a
 few times (if it never fails, the emulator mode is the cause), and the same load on FS-UAE at 32 MB Fast (if it
 fails there, the engine is). If the engine: find which sprite model the entity points at after the load, as for
 the efrag crash.
@@ -98,11 +111,13 @@ Family: Rendering cost and visibility (`render-performance`). Read the visibilit
 - [ENGINE-UPSTREAM-ASM-UNUSED-36](ENGINE-UPSTREAM-ASM-UNUSED-36.md): The engine is built without AmiQuake's 68k assembly: spans, fixed point and maths run as C at -O1
 - [ENGINE-UPSTREAM-SPANS8-SPRITE-LOOP-36](ENGINE-UPSTREAM-SPANS8-SPRITE-LOOP-36.md): Upstream AmiQuake's assembly D_DrawSpans8 has the shape of the sprite span loop; it never runs at the default d_subdiv16 1
 - [ENGINE-VID-UPDATE-FIRST-RECT-35](ENGINE-VID-UPDATE-FIRST-RECT-35.md): VID_Update converted only the first rectangle of the update list
+- [FOG-SKY-UNFOGGED-57](FOG-SKY-UNFOGGED-57.md): With the 300 fog distance, buildings 20 m away turn solid fog colour while the sky stays clouds: a ragged patch of sky hangs between rooftops
 - [INTERIOR-FAR-BLANK-MANOR-56](INTERIOR-FAR-BLANK-MANOR-56.md): In Ald'ruhn's Manor District the far parts appear as blank spots instead of fading into dark grey, and the room is slow
 - [INTERIOR-MORAG-TONG-FPS-43](INTERIOR-MORAG-TONG-FPS-43.md): The Morag Tong Guild interior runs at a very low frame rate
 - MODAL-WORLD-29 (no report page): Head/race and journal backgrounds consume world work
 - [NPC-TARGET-REDUNDANT-31](NPC-TARGET-REDUNDANT-31.md): NPC targeting runs 2-4 times per frame and checks every NPC
 - [PERF-ARENA-PIT-SLOW-48](PERF-ARENA-PIT-SLOW-48.md): The Vivec Arena Pit runs slowly: a large interior with heavy drawn and collision geometry
+- [POLYCOUNT-CAMPS-ALDRUHN-57](POLYCOUNT-CAMPS-ALDRUHN-57.md): The Ashlander camps and central Ald'ruhn are the hottest cells of the polycount heatmap: the yurts alone carry about half of a camp's faces
 - [PRISON-SHIP-RENDER-COST-56](PRISON-SHIP-RENDER-COST-56.md): The prison ship's hold draws slower than the Vivec Arena Pit: frame rate dips in the opening room
 - [RENDER-BMODEL-FRAGMENTS-32](RENDER-BMODEL-FRAGMENTS-32.md): Brush models spanning many terrain leaves are clipped face by face down the terrain BSP
 - [RENDER-EDGECACHE-SEYDA-32](RENDER-EDGECACHE-SEYDA-32.md): No edges are reused between frames in Seyda Neen views

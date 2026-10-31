@@ -108,9 +108,16 @@ def held_cores(stage):
     return float(stage.get('jobs_mean') or stage.get('jobs_max') or stage.get('jobs') or 1)
 
 
+SATURATED_PERCENT = 90.0   # the whole host this busy: a stage's time is not this stage's alone
+
+
 def host_busy(stage):
+    """Other work above the profiler's share (host_busy), or the whole host saturated while the stage ran
+    (busy_percent at least SATURATED_PERCENT, whoever's the work: other builds or this build's own stages beside it).
+    PERF-GUARD-RESIDENT-BUSY-HOST-57: the v0.0.57-dev5 chim-town stages ran on a host 92.9 % busy with
+    other_percent 22.4 % and were judged on time as if quiet (build_resident 129 s, was 52 s, the same code)."""
     host = stage.get('host') or {}
-    return bool(host.get('host_busy'))
+    return bool(host.get('host_busy')) or float(host.get('busy_percent') or 0) >= SATURATED_PERCENT
 
 
 def free_cores(stage):

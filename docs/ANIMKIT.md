@@ -1,6 +1,6 @@
 # Animation kit
 
-_Last updated with AmiWind v0.0.54 (27 October 2026)._
+_Last updated with AmiWind v0.0.57-dev4 (30 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -171,6 +171,9 @@ and `pickprobe` and the inventory poses are the player's. Their entry points are
 | `dbg animkit pick cast self` / `touch` / `target` | The NPC under the crosshair casts. |
 | `dbg animkit pick sneak on` / `off` | It sneaks (the sneak gaits and `idlesneak`). |
 | `dbg animkit pick idle C2 C3 C4 C5 C6 C7 C8 C9` | Its wander idle chances (0 to 100 each). |
+| (creatures) | A creature on its own table attacks with a random one of its own `attack1`..`attackN` (`swimattackN` in water), start to stop, as the original picks a creature's attack; hits and deaths take a random `hitN` / `deathN` of its table (v0.0.57). |
+| `dbg animkit tables` | The animation tables' bytes: index blocks, frames held against frames on disk (v0.0.57). |
+| `dbg animkit tables paged` / `whole` | Frames read when posed (the default) or the whole file in one block, for the next table loaded. |
 
 The coverage: `python3 tools/anim_coverage.py <build>/.../progs/humanoid.awsk <build>/.../progs/humanoid_kna.awsk
 --markdown coverage.md` lists every group of a build's tables: in which table, hooked by what, and the caller still

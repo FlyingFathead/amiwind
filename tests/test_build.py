@@ -23,6 +23,9 @@ class GuidedBuildTests(unittest.TestCase):
         self.assertNotIn('map seyda', text)
         self.assertNotIn('map prison', text)
         self.assertIn('exec keymaps-default.cfg', text)
+        # FOG-300-DEFAULT-57: the image starts at the universal fog distance 300; the engine cvar agrees.
+        self.assertIn('aw_drawdistance 300\n', text)
+        self.assertIn('{"aw_drawdistance","300",true}', (ROOT/'engine/aga/src/r_main.c').read_text(encoding='latin-1'))
         self.assertNotIn('bind ', text)
         self.assertIn('bind "ESCAPE" togglemenu', (ROOT/'config/keymaps.cfg').read_text())
         self.assertIn('r_drawviewmodel 1', text)

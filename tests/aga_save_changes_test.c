@@ -134,6 +134,17 @@ int main(int argc,char **argv)
      assert(read.entry[0].flags==AW_CHANGE_DISABLED);
      assert(read.entry[1].flags==(AW_CHANGE_LOCK|(50U<<AW_CHANGE_LOCK_SHIFT)));
      assert(read.entry[2].flags==(AW_CHANGE_LOCK|AW_CHANGE_DISABLED));}
+    /* a room's actor (v0.0.57, SAVEGAME-COMPLETE-57): WHERE is the room's stable number, the position room-local;
+     * a room entry with no room number, or with a scene too, is refused */
+    {aw_changes_t rooms;aw_changes_t read;int k;
+     rooms.count=0;
+     rooms.entry[rooms.count]=entry(7001,AW_CHANGE_MOVED|AW_CHANGE_ROOM,0,0,0,112.5f,30);rooms.entry[rooms.count++].where=203;
+     k=AW_SaveEncodeChanges(other,sizeof(other),&save,&rooms);assert(k>0);
+     assert(AW_SaveDecodeChanges(other,k,&decoded,&read) && read.count==1);
+     assert(read.entry[0].flags==(AW_CHANGE_MOVED|AW_CHANGE_ROOM) && read.entry[0].where==203 &&
+            read.entry[0].position[0]==112.5f && read.entry[0].health==30);
+     rooms.entry[0].where=0;assert(!AW_SaveEncodeChanges(other,sizeof(other),&save,&rooms));
+     rooms.entry[0].where=203;rooms.entry[0].flags|=AW_CHANGE_SCENE;assert(!AW_SaveEncodeChanges(other,sizeof(other),&save,&rooms));}
     /* a full list fits the cap; one more entry does not */
     list.count=0;
     for(i=0;i<AW_SAVE_CHANGES;i++)list.entry[list.count++]=entry(1000+i,AW_CHANGE_DEAD,0,0,0,0,0);
@@ -146,7 +157,8 @@ int main(int argc,char **argv)
     list.count=2;list.entry[0]=entry(9,AW_CHANGE_DEAD,0,0,0,0,0);list.entry[1]=entry(9,AW_CHANGE_DEAD,0,0,0,0,0);
     assert(!AW_SaveEncodeChanges(other,sizeof(other),&save,&list));
     list.entry[1]=entry(0x01000009,AW_CHANGE_DEAD,0,0,0,0,0);assert(!AW_SaveEncodeChanges(other,sizeof(other),&save,&list));
-    list.entry[1]=entry(10,0x8000,0,0,0,0,0);assert(!AW_SaveEncodeChanges(other,sizeof(other),&save,&list));
+    list.entry[1]=entry(10,0x10000,0,0,0,0,0);assert(!AW_SaveEncodeChanges(other,sizeof(other),&save,&list));
+    list.entry[1]=entry(10,AW_CHANGE_ROOM,0,0,0,0,0);assert(!AW_SaveEncodeChanges(other,sizeof(other),&save,&list));   /* room 0 */
     /* object state (v0.0.51): a lock level needs its flag and stays within 100 */
     list.entry[1]=entry(10,AW_CHANGE_DISABLED|(5U<<AW_CHANGE_LOCK_SHIFT),0,0,0,0,0);
     assert(!AW_SaveEncodeChanges(other,sizeof(other),&save,&list));
@@ -157,7 +169,7 @@ int main(int argc,char **argv)
     /* a corrupt entry with a good CRC is refused field by field; a bad CRC too */
     list.entry[1]=entry(10,AW_CHANGE_DEAD,0,0,0,0,0);
     n=AW_SaveEncodeChanges(other,sizeof(other),&save,&list);assert(n>0);
-    other[n-AW_CHANGE_ENTRY_BYTES+5]|=0x80;                  /* the second entry's flags: an unknown bit (15) */
+    other[n-AW_CHANGE_ENTRY_BYTES+5]|=0x80;                  /* the second entry's packed word: a stray bit */
     put(other+8,crc32(other+12,n-12));assert(!AW_SaveDecodeChanges(other,n,&decoded,&back));
     other[n-1]^=1;assert(!AW_SaveDecodeChanges(other,n,&decoded,&back));
     /* the actor record's block (v0.0.54, feature 16): read back into the caller's buffer, with no change list too;

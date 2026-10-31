@@ -536,8 +536,27 @@ def prepare(data_files, id1, jobs=1, soundtrack_bpm=None):
     The members (the skeleton creature, Dagoth Ur, each dancer, the cast sounds) are made side by side in the
     builder's worker pool (build_parallel.in_order_map; one after the other at one job: about 2 minutes on one core
     in the v0.0.53 Halloween builds), into a staging folder, and installed into id1 at the end (install)."""
-    from build_parallel import in_order_map
     from build_scratch import scratch_dir
+    with scratch_dir(prefix='halloween-cast-', near=Path(id1).parent.parent, keep_on_failure=False) as stage:
+        report = stage_cast(data_files, id1, stage, jobs, soundtrack_bpm)
+        return install_cast(report, stage, id1)
+
+
+def install_cast(report, stage, id1):
+    """The second half of prepare: the staged cast installed into id1 (install) and the report's file counts."""
+    id1 = Path(id1)
+    written, kept = install(stage, id1)
+    report['files'] = {'written': len(written), 'kept': kept,
+                       'bytes': sum((id1 / p).stat().st_size for p in written)}
+    return report
+
+
+def stage_cast(data_files, id1, stage, jobs=1, soundtrack_bpm=None):
+    """The first half of prepare: every cast file made into STAGE (an empty folder), nothing written to id1, which is
+    only read (its palette). The image step runs it in a worker beside the combat data, the player view and the
+    inventory, and installs the stage where the cast was made before (BUILD-IMAGE-FINALIZE-UNDERUSED-48: about 50 s on
+    a few cores after the inventory in the v0.0.57-dev5 full build). Returns the report without its file counts."""
+    from build_parallel import in_order_map
     from mwad.npc import load_master, outfit, greeting_fixture
     from mwad.paths import child_ci, replace_bytes as replace
 
@@ -550,6 +569,7 @@ def prepare(data_files, id1, jobs=1, soundtrack_bpm=None):
     data = Path(data_files)
     id1 = Path(id1)
     palette = (id1 / 'gfx/palette.lmp').read_bytes()
+    stage = Path(stage)
     rows, report = [], {'left_out': []}
     kinds, _cells, topics = load_master(child_ci(data, 'Morrowind.esm'))
     items = [('skeleton', data, palette), ('dagoth', data, palette)]
@@ -562,8 +582,9 @@ def prepare(data_files, id1, jobs=1, soundtrack_bpm=None):
         appearance['voices'] = voices_of(topics, appearance)
         items.append(('dancer', (data, palette, appearance, greeting_fixture(topics, appearance), 'ffmpeg',
                                  npc_lod.task_settings())))
-    # the staging folder beside the image step's output (out/.scratch), never /tmp and never in the boot folder
-    with scratch_dir(prefix='halloween-cast-', near=id1.parent.parent, keep_on_failure=False) as stage:
+    # the staging folder is the caller's (prepare: beside the image step's output, out/.scratch; never /tmp and never
+    # in the boot folder)
+    if True:
         items.append(('sounds', data, stage))
         report['dancers'] = []
         lead = []
@@ -603,10 +624,7 @@ def prepare(data_files, id1, jobs=1, soundtrack_bpm=None):
         bpm = soundtrack_bpm or DEFAULT_BPM
         text = cast_text(rows, bpm, soundtrack_bpm is not None)
         replace_bytes(stage / CAST_FILE, text.encode('ascii', 'replace'))
-        written, kept = install(stage, id1)
-    report.update(cast=rows, bpm=bpm, soundtrack=soundtrack_bpm is not None,
-                  files={'written': len(written), 'kept': kept,
-                         'bytes': sum((id1 / p).stat().st_size for p in written)})
+    report.update(cast=rows, bpm=bpm, soundtrack=soundtrack_bpm is not None)
     return report
 
 

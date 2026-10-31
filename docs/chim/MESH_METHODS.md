@@ -1,6 +1,6 @@
 # CHIM mesh methods
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.57-dev1 (30 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -10,6 +10,8 @@ _Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 - [The method table and its rule](#the-method-table-and-its-rule)
 - [Measured](#measured)
   - [Tel Uvirith cell (10,1) diagnostic, 12 October 2026](#tel-uvirith-cell-101-diagnostic-12-october-2026)
+- [Hot models](#hot-models)
+  - [Stronger rows for the camps and Ald'ruhn](#stronger-rows-for-the-camps-and-aldruhn)
 - [Selecting a method](#selecting-a-method)
 - [Determinism, keys and checks](#determinism-keys-and-checks)
 - [Licence](#licence)
@@ -209,6 +211,173 @@ converter's reducer reached its ratio by collapsing the hull's ribs and rails in
 end up as faces cut by the 240-texel split), while meshoptimizer keeps every part's outline. Unbounded,
 meshoptimizer reached 2,611 faces but removed the four mast poles and the rope entirely (closed thin parts
 have no border to lock); the error bound and the part guard below keep them.
+
+## Hot models
+
+MESHOPT-HOT-MODELS-57 (30 October 2026): the places found slow on the Raspberry Pi 4 ranked by triangles x
+placements (the polycount heatmap's data: the v0.0.56 build's world survey and the master file's room
+references), the worst through meshoptimizer with locked borders at the default error bound (0.25 % of the
+model's diagonal; ratio 0.25 is only the ceiling, the bound stops each model earlier).
+
+| Place | Model | Triangles | Placed | After | Shape error |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Prison ship hold (drawn faces 26,628) | in_prison_ship (shell, already reduced by its own profile) | 7,997 faces | 1 | unchanged | |
+| | active_de_bed_30 | 576 | 14 | 576 (meshopt keeps it) | |
+| | contain_barrel_01 | 336 | 15 | 332 (not applied) | |
+| Central Ald'ruhn | ex_redoran_hut_02 | 917 | 7 | 727 | 0.27 % |
+| | ex_redoran_hut_01_a | 253 | 21 | 215 | 0.26 % |
+| | ex_redoran_hut_01 | 917 | 5 | 705 | 0.28 % |
+| | ex_ar_01 | 4,226 | 1 | 2,142 | 0.31 % |
+| | ex_redoran_tower_01 | 1,593 | 2 | 1,009 | 0.36 % |
+| Ald'ruhn, Manor District (room) | in_ar_shelltop_01 | 5,529 | 1 | 2,431 | 0.33 % |
+| | in_ar_shellbottom_01 | 4,781 | 1 | 2,857 | 0.29 % |
+| Ashlander camps (yurts) | ex_ashl_tent_02 | 2,480 | 49 | 1,756 | 0.33 % |
+| | ex_ashl_tent_01 | 2,874 | 5 | 2,434 | 0.24 % |
+| | ex_ashl_tent_04 | 1,400 | 11 | 1,222 | 0.34 % |
+| | ex_ashl_tent_03 (left out: 2.3 % error) | 6,904 | 4 | | |
+| Dwemer pieces | ex_dwrv_statue00 | 2,365 | 10 | 1,280 | 0.31 % |
+
+Every simplified model passes the seam gate (below) and the seam audit (no torn seam or rim). The rows live
+in the everywhere recipe of `config/visual-recipes.json` (source + packet SHA-256, so a changed mesh keeps its
+original), and the Manor District's shells in that room only (`config/chim-rooms.json` `recipe_rooms`). The
+prison ship's hold is not helped by this method: its props are small parts with open rims that the locked
+borders keep (meshopt leaves 97-100 % of them even at 1-2 % error), and its shell is already reduced harder by
+its own profile; its cost is the count of props in view (14 beds, 15 barrels).
+
+### Stronger rows for the camps and Ald'ruhn
+
+POLYCOUNT-CAMPS-ALDRUHN-57 (30 October 2026). The CHIM polycount heatmap of the v0.0.56 build puts six camps and
+villages and central Ald'ruhn at the top (faces placed per cell). Which models carry those faces, from that build's
+placements (every model's faces x its placements in the cell): in the three Ashlander camps the yurts alone are about
+half (Urshilaku Camp 45 %, Zainab Camp 51 %, Ahemmusa Camp 57 %: ex_ashl_tent_02 about 2,140 faces a copy, 7-9
+copies a camp, and ex_ashl_tent_03 about 6,460 faces a copy); in Ald'ruhn the Redoran huts, the tavern, the
+buildings and their steps, windows and wall corners.
+
+At the default error bound the yurts barely move: the simplifier keeps every open border locked (the rims where
+parts and materials meet), so the count stops falling at a floor long before the ratio. These models get their own
+rows: ratio 0.1, and an error bound chosen per model from a sweep of 0.25, 0.5, 1, 2, 3 and 5 % of the diagonal,
+at the point where the face count stops falling. The borders stay locked at every bound, so no rim moves: every row
+passes the seam gate on the whole model (no new and no lost open edge) and the seam audit (torn share 0).
+
+| Model | Faces before | Bound | Faces after | Shape error (share of diagonal) |
+| --- | ---: | ---: | ---: | ---: |
+| ex_ashl_tent_02 | 1,770 (0.25 %) | 1 % | 1,264 | 3.1 % |
+| ex_ashl_tent_03 (row taken out again: it changed the yurt's collision, RECIPE-ROW-MOVES-COLLISION-57) | 5,058 (0.25 %) | 0.5 % | 4,960 | 2.6 % |
+| ex_ashl_tent_01 | 2,676 (0.25 %) | 1 % | 2,553 | 2.0 % |
+| ex_ashl_tent_04 | 1,095 (0.25 %) | 0.5 % | 1,067 | 0.6 % |
+| contain_tramaroot_02 | 360 | 1 % | 274 | 1.3 % |
+| ex_siltstrider_01 | 912 | 1 % | 551 | 1.2 % |
+| ex_redoran_hut_01 | 672 (0.25 %) | 1 % | 441 | 1.2 % |
+| ex_redoran_hut_02 | 707 (0.25 %) | 1 % | 490 | 1.3 % |
+| ex_redoran_hut_01_a | 178 (0.25 %) | 2 % | 130 | 1.5 % |
+| ex_redoran_tavern_01 | 1,324 | 1 % | 1,142 | 1.0 % |
+| ex_redoran_building_01 | 1,400 | 1 % | 1,000 | 1.6 % |
+| ex_redoran_building_02 | 1,183 | 1 % | 840 | 1.4 % |
+| ex_redoran_steps_01 | 678 | 1 % | 445 | 1.2 % |
+| ex_redoran_window_02 | 116 | 1 % | 92 | 1.0 % |
+| ex_redwall_corner_02 | 195 | 1 % | 146 | 1.0 % |
+| contain_urn_02 | 200 | 1 % | 182 | 0.9 % |
+
+"Faces before" is the merged face count at the default bound (0.25 %) for the models that already had a row, and
+unreduced for the rest. The shape error is the largest sampled distance between the two surfaces both ways; the
+yurts' larger figure is at their hide edges, not at a rim. Collision stays on the original mesh. Left out after the
+sweep: ex_ashl_banner and furn_ex_ashl_guarskin (no gain, or more faces), contain_com_basket_01 (no gain).
+Found on the way: ex_ashl_tent_01 at the default bound (its first row) shows 20 new open edges when the whole model
+is checked, though each part passes on its own: the gate checks parts one by one, so an edge where two parts meet
+can open unseen. Its new row (1 %) has none, and the gate now also checks the whole model: a simplified part that
+carries a new or lost open edge of the whole result is put back whole (`meshopt._whole_model_gate`); a model that
+passes keeps its output unchanged.
+
+Faces placed per cell, the v0.0.56 build's heatmap figure and the estimate with these rows (each model's placed
+faces scaled by its measured cut); the next build's tracker replaces the estimate with the measured figure:
+
+| Cell | v0.0.56 | Estimate |
+| --- | ---: | ---: |
+| Urshilaku Camp (-4,18) | 63,288 | 48,928 (-22.7 %) |
+| Zainab Camp (9,10) | 57,065 | 43,252 (-24.2 %) |
+| Ahemmusa Camp (11,16) | 56,144 | 42,754 (-23.8 %) |
+| Ald'ruhn (-2,6) | 55,281 | 44,123 (-20.2 %) |
+| Bal Isra (-5,9) | 60,840 | 57,928 (-4.8 %) |
+| Ald Velothi (-11,15) | 62,234 | 61,614 (-1.0 %) |
+| Tel Aruhn (15,5) | 59,446 | 59,446 (not touched: Telvanni roots and menhirs) |
+
+Measured on the full images (v0.0.57-dev1 before, v0.0.57-dev2 after, Urshilaku Camp, the same pose, 32 MB
+Fast, JIT, quiet host): faces drawn at the two heavy headings 10,843 to 7,832 (-28 %) and 11,447 to 7,933
+(-31 %); frame time there 30.8 to 15.6 ms and 20.3 to 16.2 ms (dev2 also has the larger surface cache,
+RENDER-SURFCACHE-THRASH-32, so the faces are the clean number for this change).
+
+The second set (30 October 2026): the next three cells of the heatmap, by faces x placements in each: Ald
+Velothi (the shacks, the longboat; the Imperial ship's row was taken out again: it changed the ship's collision,
+RECIPE-ROW-MOVES-COLLISION-57), Bal Isra (the scaffolds, a wall corner, the tramaroot planters) and
+Tel Aruhn (the Telvanni menhirs, roots, doorway, manor and tunnel, the paper lanterns, the longboat). Same rule:
+ratio 0.1, bound 1 % of the diagonal (2 % for ex_redwall_corner_01), borders locked, every row through the
+whole-model seam gate. The menhir ex_t_menhir_l_01 is also the most placed model of the open sea floor (296 to
+94 faces). Left out: the dock pieces and misc_com_bucket_01 (no gain), ex_t_stair_spiral (a staircase: kept as
+it is). Where a Telvanni town has its own cell recipe (Sadrith Mora, Vos: telvanni-v1), that recipe still wins for
+the meshes it names. Estimate (each model's placed faces scaled by its measured cut against the unreduced mesh;
+the ship's figure is an upper bound, its converter profile already reduces it): Ald Velothi 62,234 to about
+53,400, Bal Isra 60,840 to about 54,700 (with the first set's Redoran rows), Tel Aruhn 59,446 to about 43,500.
+
+The third set (30 October 2026): the six places the v0.0.57-dev2 settlement sweep measured over 50 ms per frame
+(Ashurnibibi, Holamayan, Mzuleft Ruin, Nchuleft Ruin, Odrosal, Tureynulal), their heaviest meshes by faces x
+placements in the dev2 build: the Daedric ruin pieces, the Holamayan shrine and its cover, the Telvanni coastal
+rock and small menhir, the lava vents, the Dwemer ruin pieces (towers, walls, headers, steam stacks, entrances) and
+the rope bridge. Same rule (ratio 0.1, bound 1 %, borders locked, whole-model seam gate). Left out:
+ex_dwrv_walker00 (shape error 4.7 % of its diagonal) and ex_dwrv_pipe00 (no gain); the short Daedric stair
+(a staircase). The Dwemer pieces gain little (most of their faces sit on locked rims: ruin60 886 to 747,
+enter00 1,098 to 940), the Daedric pieces and the vents about half (ex_dae_ruin_02_skew 1,530 to 669, the vents
+970 to 466). Share of each place's placed faces cut, estimated from the dev2 placements (an upper bound): Holamayan
+about 41 %, Mzuleft Ruin 27 %, Ashurnibibi 13 %, Tureynulal 8 %, Nchuleft Ruin 7 %, Odrosal 7 %. The Dwemer
+places need another lever (their ruins' faces are mostly rims and flat panels: the planar merge and hidden faces).
+
+The fourth set (30 October 2026): the heatmap ranked again with the first three sets counted (the v0.0.57-dev2
+build's placements, each named model scaled by its measured cut), then the heaviest models no row names yet in the
+next hot cells: the common thatch tower and tall house and the Nord house (cell -2,2), the Telvanni straight tower,
+turret, doorway, manor, slave market and large root (Tel Branora, Tel Mora), the skiff and longboat, the shacks, a
+shack door and awning (Gnaar Mok, Hla Oad, Khuul, Dagon Fel) and a Hlaalu curved wall. Same rule (ratio 0.1, bound
+1 %, borders locked, whole-model seam gate); cuts of 19-70 % per model (ex_t_root_xl_02 872 to 265, ex_t_manor_02
+768 to 320, ex_skiff 1,200 to 582). Left out: what the bound does not reduce (the lanterns, the drystone wall, the
+Nord door, the load door, the lamp post, the docks and Imperial bridge and wall pieces under 15 %), and the walked
+surfaces (the curved Telvanni bridge, the main dock, ramps and stairs), whose drawn surface should stay where the
+player's feet are. With all four sets, the next cells' placed faces drop a further 3-10 % (Tel Mora 10 %, Dagon Fel
+6 %, Hla Oad 6 %, Tel Branora 5 %). What remains at the top of the heatmap after this is mostly flora (kelp,
+wickwheat, grass, hackle-lo) and the Ashlands rocks: those take the flora and rock rules (sprites, distance drop,
+CHIM-TERRAIN-ROCK-EXEMPT-38), not this one.
+
+Tried for the sea flora (30 October 2026): leaving out a placement wholly under the sea when the eye is above it,
+in the engine's per-placement far test. On the v0.0.57-dev2 image at Ald Velothi's harbour (eye 122 units above the
+sea) it left out nothing: the brush-model counts and faces were identical at every heading, so the kelp there does
+not reach that test as placements of its own (most likely drawn through the CHIM chunk's shared render ranges).
+Taken out again; the sea flora needs its rule where those ranges are drawn.
+
+A fifth, small set (30 October 2026) for central Ald'ruhn's west view, the slowest heading of the town on the
+Raspberry Pi 4B: the urns 01, 03 and 05 at a 2 % bound (198 to 141 faces each; at 1 % they keep almost every face),
+the Redoran barracks (833 to 667) and window 01 (120 to 92) at 1 %; no seam or rim torn, no row refused by the
+collision preflight. The basket, the overhangs and the guar cart keep over 95 % at any bound and have no row. The
+view's cost is mostly how many props it draws, not their faces (22 brush models against 8-10 at the other
+headings): the next experiment for it is in [ideas](IDEAS.md#the-slow-accelerator-reality).
+
+**The size-scaled cut-off indoors (30 October 2026).** The engine's size-scaled cut-off (aw_cull 3 and 4) now
+applies in interiors too, against the room's distance (4096 units, or a large room's fog distance). In Ald'ruhn's
+Manor District (FS-UAE, JIT, 32 MB Fast, the same image with the engine before and after) it leaves out 2 of 16 brush
+models at the heaviest heading (faces tested 17,052 to 16,566) and nothing at the other three: the room is mostly
+nearer than every share, and that heading's cost is the district's own shell seen from inside (55 brush models in
+the room, 17,000 faces tested). Shells like it need tiles, so that the parts behind the view are not tested.
+
+The prison ship's hold is not helped by stronger rows either: its props keep 97-100 % of their faces at any bound
+(see above), so its levers stay fewer props drawn and hidden faces (PRISON-SHIP-RENDER-COST-56).
+
+**Collision check of every row.** A row changes the drawn mesh, but the converter's visible-tread rule checks the
+collision over a mesh's stairs and walkways against the mesh as drawn, so a row can change the collision too
+(RECIPE-ROW-MOVES-COLLISION-57: the Imperial ship and the large yurt). Every build checks each row before its stages
+run: the collision surface gate's verdict on the row's mesh with and without the row; a row that makes the gate fail
+refuses the build and names the mesh ([recipe collision preflight](../BUILD_PROFILE.md#recipe-collision-preflight)).
+
+**Seam gate.** `meshopt.seam_check` compares the open edges (welded by exact position) of a part before and
+after: an open edge the source does not have is a crack, a source open edge that is gone or moved is a gap to
+the part or model it meets. `simplify_locked` keeps a part whole when either count is not zero; with locked
+borders it does not trigger on any model measured, so outputs and unit keys are those of the method before the
+gate. `tests/test_meshopt_seams.py` keeps it.
 
 ## Selecting a method
 

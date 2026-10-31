@@ -1,6 +1,6 @@
 # Modular NPCs: every body part stored once, assembled per actor
 
-_Last updated with AmiWind v0.0.53 (27 October 2026)._
+_Last updated with AmiWind v0.0.57-dev1 (30 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -21,6 +21,7 @@ _Last updated with AmiWind v0.0.53 (27 October 2026)._
 - [Stage 1 in the builder: the gallery from parts](#stage-1-in-the-builder-the-gallery-from-parts)
 - [Joint seams](#joint-seams)
 - [Runtime method C: one shared animation table, posed in the alias renderer](#runtime-method-c-one-shared-animation-table-posed-in-the-alias-renderer)
+  - [Paged animation frames (v0.0.57)](#paged-animation-frames-v0057)
 - [Getting NPC movement right](#getting-npc-movement-right)
 - [Runtime method A: load-time composition](#runtime-method-a-load-time-composition)
 - [Runtime method B: attached parts as follower entities](#runtime-method-b-attached-parts-as-follower-entities)
@@ -502,10 +503,30 @@ Every NPC then has every action: the region NPCs that today have only a standing
 run and fight like the town NPCs. First step: a prototype on one town, measuring the frame time with and without the
 bone transform on the slow-CPU preset and the RAM of the town's actors, against today's baked models.
 
+### Paged animation frames (v0.0.57)
+
+A table is read in two parts (WALK-CYCLES-57, `aw_skel_load.c`). Its index (header, bones, group names and frame
+ranges, text keys, the bones' base keys) is loaded with the table and kept; its frames stay in the file, which stays
+open with the table, and are read 16 at a time the first time a pose needs one of them, then kept with the table. A
+town whose people stand, play their idles, turn, walk and run holds those groups' frames, not the deaths, attacks,
+spellcasts and swims nobody plays there. Measured on the tables of v0.0.57-dev1:
+
+| Table | File | Index | Frame rows | Idles, turns, walk, run |
+| --- | --- | --- | --- | --- |
+| Common humanoid (29 bones, 2,932 frames) | 602,008 bytes | 39,064 | 562,944 (192 a frame) | 117,696 |
+| Beast humanoid (33 bones, 2,570 frames) | 654,324 bytes | 37,524 | 616,800 (240 a frame) | 107,760 |
+
+A walk cycle is 11 table frames at 8 a second (2,112 bytes of the common table); a chunk read is about 3 KB, made the
+first time an actor poses a frame of it (the pose cache in `r_alias.c` keeps the posed vertices as before). Frame 0's
+row is read with the index and stands in for a chunk that cannot be read. The tables are given back with the posed
+frames before a room sizes its block (`aw_skel_release.c`), as before. `dbg animkit tables` prints the bytes held
+against the bytes on disk; `dbg animkit tables whole` is the previous method (the whole file in one block) for the
+next table loaded, `dbg animkit tables paged` the default.
+
 ## Getting NPC movement right
 
-The rules the skeletons follow (the maintainer, 25 October 2026: "if a humanoid can do it, it needs to be in our
-look-up table"; "we do not prebake that"):
+The rules the skeletons follow (decided with the maintainer, 25 October 2026: whatever a humanoid can do must be in
+the look-up table, and it is not pre-baked):
 
 **Every action, from one table.** The table holds every animation group of the humanoid skeleton (139 of 139 in the
 base game: idles, walking, running, sneaking, swimming and turning in every direction and weapon stance, jumping,

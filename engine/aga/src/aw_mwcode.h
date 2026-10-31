@@ -113,6 +113,37 @@
 #define AWM_SPELL_COMMON_DISEASE 3
 #define AWM_SPELL_BLIGHT_DISEASE 4
 #define AWM_FUNCTIONS 640      /* the most function numbers NOTYET carries (tools/mwscript/opcodes.py FUNCTIONS_MAX) */
+/* Function numbers the host's call() carries out (v0.0.57; tools/mwscript/functions.py HOST and FUNCTION_NUMBERS,
+ * checked by tests/test_mwscript.py) */
+#define AWF_ADDTOPIC 6
+#define AWF_AIFOLLOW 10
+#define AWF_AITRAVEL 12
+#define AWF_GETSTANDINGPC 201
+#define AWF_POSITION 345
+#define AWF_CAST 17
+#define AWF_FORCEGREETING 74
+#define AWF_GETEFFECT 114
+#define AWF_GETTARGET 208
+#define AWF_ROTATE 359
+#define AWF_GETPCCRIMELEVEL 154
+#define AWF_GETPCFACREP 155
+#define AWF_GETPCRANK 158
+#define AWF_GETRACE 172
+#define AWF_GETREPUTATION 173
+#define AWF_LOOPGROUP 231
+#define AWF_PLAYGROUP 338
+#define AWF_MODPCCRIMELEVEL 281
+#define AWF_MODPCFACREP 282
+#define AWF_MODREPUTATION 286
+#define AWF_PCCLEAREXPELLED 324
+#define AWF_PCEXPELL 325
+#define AWF_PCEXPELLED 326
+#define AWF_PCJOINFACTION 330
+#define AWF_PCLOWERRANK 331
+#define AWF_PCRAISERANK 332
+#define AWF_SETPCCRIMELEVEL 413
+#define AWF_SETPCFACREP 414
+#define AWF_SETREPUTATION 418
 #define AWM_VERB_GET 0
 #define AWM_VERB_SET 1
 #define AWM_VERB_MOD 2

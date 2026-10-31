@@ -19,20 +19,19 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.56-dev1 (29 October 2026)._
+_Last updated with AmiWind v0.0.56 (30 October 2026)._
 
 ## Status: 29 October 2026
 
-Open. Cause not pinned. Registered from the maintainer's report: "the game has a ton of different gates and
-trapdoors and shit like that, hell, even tavern/inn/club whatever bar counter opening hinges ... that are still not
-really in". On the counters: "those bar counters that have hinges on the side so that it's for staff only", "a
-lid-kind of hinge", the kind German beer halls have, and "many bars for that matter". He added that he saw the
-counter flaps in someone's playthrough and is not sure of them: such a playthrough may run mods, so whether the base
-game (Morrowind.esm, Tribunal, Bloodmoon) has counter flaps at all is for the census to show. Gates and trapdoors
-are in the base game, and "the game has some lids" (the maintainer, same day; one is the swinging lid of the
-prison ship's hatch, `docs/DOOR_MAPPING.md`). His caution for the census, on how uniformly the data does these:
-"in true Bethesda/Morrowind fashion, idk how much consistency is there in that", so each kind is read from the
-records, never assumed from the model's look. Traps on doors are their own bug,
+Open. Cause not pinned. Registered from the maintainer's report: the game has many different gates and trapdoors, and
+also the opening hinges of tavern, inn and club bar counters, that are still not in. On the counters: the bar
+counters with a hinge at the side so that the way through is for staff only, a lid-kind of hinge, the kind German
+beer halls have, and many bars besides. He added that he saw the counter flaps in someone's playthrough and is not
+sure of them: such a playthrough may run mods, so whether the base game (Morrowind.esm, Tribunal, Bloodmoon) has
+counter flaps at all is for the census to show. Gates and trapdoors are in the base game, and so are some lids (the
+maintainer, same day; one is the swinging lid of the prison ship's hatch, `docs/DOOR_MAPPING.md`). His caution for
+the census, on how uniformly the data does these: the original's data may not be consistent about it, so each kind
+is read from the records, never assumed from the model's look. Traps on doors are their own bug,
 [DOOR-TRAPS-NOT-SPRUNG-55](DOOR-TRAPS-NOT-SPRUNG-55.md).
 
 ## Census: 29 October 2026

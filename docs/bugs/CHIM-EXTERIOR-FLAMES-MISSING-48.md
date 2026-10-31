@@ -21,7 +21,7 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.48-dev2 (23 October 2026)._
+_Last updated with AmiWind v0.0.56 (30 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -93,8 +93,8 @@ own map's flames unchanged.
   the large ones), drawn from the row's size and shape. Nothing per fire is stored but its row: 106,859 bytes of
   entity text over the whole island with the fires' light keys, at most 7,350 bytes in one map (Vivec), counted in the
   map's `_chim_hunk_rest`.
-- The fires' light, on by default (the maintainer, 23 October 2026: "set it on by default but add some dbg command
-  like dbg campfires on|off"): each fire's first flame row carries its light record's radius and brightness
+- The fires' light, on by default (decided with the maintainer, 23 October 2026: on by default, with a dbg command
+  `dbg campfires on|off`): each fire's first flame row carries its light record's radius and brightness
   (`aw_flame_light`; all 719 fire placements found theirs), and the engine lights the placed models round it when
   their chunk is read (`chim_chunks.c`, the rooms' rule), added to the dimmed ambient outdoors: 6,320 placements in
   299 frames, 144 in the busiest fire frame (Vivec). `dbg campfires off` hides the fires outdoors at once (flames,

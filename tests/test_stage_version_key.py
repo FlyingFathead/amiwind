@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """A version change rekeys only what shows the version (BUILD-CHIM-KEY-VERSION-48).
 
-The maintainer, 2026-10-24 02:51 +0300 / 2026-10-23 23:51 UTC: "A VERSION NUMBER CHANGE SHOULD NOT FUCKING CAUSE THIS
-KIND OF A FUCKING HULABALLOO". v0.0.48 had to ship its rc1 image as the final because the label alone re-keyed the
+The maintainer, 2026-10-24 02:51 +0300 / 2026-10-23 23:51 UTC: a version number change must not cause this kind of
+upheaval. v0.0.48 had to ship its rc1 image as the final because the label alone re-keyed the
 whole CHIM world: tools/project_version.py read the version file at import, so every stage that imported it keyed
 the file. This gate test fails when a stage script of tools/build.py keys the version file without showing the
 version in its output (read only, no build). The engine and the image show it and are rebuilt by policy."""

@@ -287,6 +287,55 @@ mspriteframe_t *R_GetSpriteframe (msprite_t *psprite)
 }
 
 
+/* SPRITE-BAD-TYPE-THREADED-56: an entity reached the renderer with a sprite model whose data is not a sprite (the
+ * type read 1073750932 = 0x40002094, an address: the model's memory was freed or reused while the entity still
+ * pointed at it). Seen twice (Amiberry on a Pi 4; FS-UAE after 28 teleports of a settlement sweep), never at will.
+ * Until its cause is found the entity is left out of this frame instead of ending the game, and the console names
+ * it once per model pointer: the entity (a CHIM streamed static says which through aw_sprite_describe, bound to
+ * ChimStatics_Describe in aw_debug.c; else its address), its model's name and the bad fields. */
+const char *(*aw_sprite_describe)(const entity_t *ent, char *out, int size);
+static void *bad_sprite_models[8];
+static int bad_sprite_reports;
+unsigned long aw_bad_sprite_skips;
+
+static int R_SpriteValid (const msprite_t *psprite)
+{
+	return psprite && psprite->type >= SPR_VP_PARALLEL_UPRIGHT && psprite->type <= SPR_VP_PARALLEL_ORIENTED &&
+		psprite->numframes >= 1 && psprite->numframes <= 1000;	/* the game's sprites have a few frames */
+}
+
+static void R_BadSprite (const entity_t *ent, const msprite_t *psprite)
+{
+	char where[96], name[40];
+	int i, n;
+	aw_bad_sprite_skips++;
+	for (i=0 ; i<bad_sprite_reports ; i++)
+		if (bad_sprite_models[i] == (void *)ent->model)
+			return;
+	if (bad_sprite_reports >= (int)(sizeof(bad_sprite_models)/sizeof(bad_sprite_models[0])))
+		return;
+	bad_sprite_models[bad_sprite_reports++] = (void *)ent->model;
+	/* a CHIM streamed static names itself; any other entity by its address (the dbg entity tools map it) */
+	if (!aw_sprite_describe || !aw_sprite_describe (ent, where, sizeof(where)))
+		sprintf (where, "entity %p", (const void *)ent);
+	for (n=0 ; n<(int)sizeof(name)-1 && ent->model->name[n] ; n++)	/* printable only: the name may be garbage too */
+		name[n] = ent->model->name[n] >= 32 && ent->model->name[n] < 127 ? ent->model->name[n] : '?';
+	name[n] = 0;
+	Con_Printf ("SPRITE-BAD-TYPE: %s, model %p \"%s\", sprite %p type %d frames %d: left out (not drawn)\n",
+		where, (void *)ent->model, name, (const void *)psprite, psprite ? psprite->type : -1,
+		psprite ? psprite->numframes : -1);
+}
+
+/* 1 when ENT's sprite data can be drawn; else the report above and 0 (the caller leaves it out). */
+int R_SpriteDrawable (const entity_t *ent)
+{
+	const msprite_t *psprite = ent->model->cache.data;
+	if (R_SpriteValid (psprite))
+		return 1;
+	R_BadSprite (ent, psprite);
+	return 0;
+}
+
 /*
 ================
 R_DrawSprite
@@ -299,6 +348,8 @@ void R_DrawSprite (void)
 	vec3_t			tvec;
 	float			dot, angle, sr, cr;
 
+	if (!R_SpriteDrawable (currententity))
+		return;
 	psprite = currententity->model->cache.data;
 
 	r_spritedesc.pspriteframe = R_GetSpriteframe (psprite);

@@ -234,7 +234,11 @@ class Wiring(unittest.TestCase):
         # the image step builds the cast in a --halloween image: every full-world build and the MiniWind preset
         aga = (ROOT / 'tools/build_aga.py').read_text(encoding='utf-8')
         self.assertIn("if getattr(args,'halloween',False):", aga)
-        self.assertIn('halloween_report=halloween_cast.prepare(args.data_files,boot/\'id1\',jobs=jobs)', aga)
+        # made in a worker beside the combat data, installed where it was made before (BUILD-IMAGE-FINALIZE-UNDERUSED-48)
+        self.assertIn("halloween_job=Background(halloween_cast.stage_cast,args.data_files,boot/'id1',halloween_stage,jobs,jobs=jobs)", aga)
+        self.assertIn("halloween_report=halloween_cast.install_cast(halloween_job.result(),halloween_stage,boot/'id1')", aga)
+        self.assertLess(aga.index('halloween_job=Background('), aga.index('combat_report=prepare_combat('))
+        self.assertLess(aga.index('inventory_report=prepare_inventory('), aga.index('halloween_cast.install_cast('))
 
     def test_a_full_build_plans_the_cast_and_the_flag_leaves_it_out(self):
         # HALLOWEEN-SCENE-53 / BENCH-NO-STANDARD-DEMO-48 (v0.0.54): the cast is in every full-world image, so

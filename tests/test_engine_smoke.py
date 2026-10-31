@@ -33,6 +33,12 @@ class DefaultFastRamTests(unittest.TestCase):
         self.assertEqual(code, 2)
         docker.assert_not_called()
 
+    def test_boot_ends_the_logo_before_typing(self):
+        # SMOKE-M-KEY-SKIPS-CHIM-CACHE-57: the m of a command typed onto the start-up logo answered its memory notice
+        # (CHIM cache off for that start); Escape ends the logo before the first console line
+        line = next(l for l in engine_smoke.PROBE.splitlines() if 'con "aw_remote 1"' in l)
+        self.assertLess(line.index('key Escape'), line.index('con "aw_remote 1"'))
+
     def test_sweep_step_is_logged_and_can_fail_the_smoke(self):
         """ENTITY-SWEEP-AB: dbg sweep's SWEEP RESULT line in the smoke; --sweep fail makes a FAIL result fatal."""
         self.assertIn('rc "aw_sweep"', engine_smoke.PROBE)

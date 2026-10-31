@@ -1,6 +1,6 @@
 # NPC voice table (AWGL1)
 
-_Last updated with AmiWind v0.0.54-dev1 (27 October 2026)._
+_Last updated with AmiWind v0.0.56 (30 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -16,9 +16,9 @@ _Last updated with AmiWind v0.0.54-dev1 (27 October 2026)._
 <!-- contents end -->
 
 Every NPC record's voice lines and conversation greeting in one file the engine looks up by record:
-`id1/npc-voices.lut`. The maintainer asked for it on 23 October 2026: "the npc greetings should be as they are per
-npc, we need a really fast LUT for that", then for the whole voice vocabulary, "since we already have the audio
-files", and for the run-time conditions as "bytecode stuff or something .... so that it's not slow as shit"
+`id1/npc-voices.lut`. The maintainer asked for it on 23 October 2026: the NPC greetings should be as they are per
+NPC, which needs a really fast lookup table; then for the whole voice vocabulary, since the audio files are already
+in the game; and for the run-time conditions as bytecode, so that they are not slow
 ([NPC-GREETINGS-LIBRARY-MUTE-48](bugs/NPC-GREETINGS-LIBRARY-MUTE-48.md)).
 
 ## Status: how far the voices are (23 October 2026)

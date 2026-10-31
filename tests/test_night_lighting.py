@@ -60,6 +60,15 @@ class FormatTests(unittest.TestCase):
             with self.subTest(raw=raw[:30]), self.assertRaises(ValueError):
                 NL.fog_table(raw)
 
+    def test_large_rooms_table_follows_the_engine(self):
+        raw, rooms = NL.large_rooms_table((ROOT / 'config/large-rooms.txt').read_bytes())
+        self.assertIn(b'rie242a8d69e\n', raw)
+        self.assertEqual(NL.large_rooms_table(b'# c\nrie242a8d69e\nvhi017 450\n')[1], 2)
+        for bad in (b'', b'rie242a8d69e', b'rie242a8d69e\r\n', b'a\na\n', b'rie242a8d69e 99\n', b'r 4097\n',
+                    b'Rie242a8d69e\n', b'a234567890123456\n', b'r  300\n'):
+            with self.subTest(raw=bad), self.assertRaises(ValueError):
+                NL.large_rooms_table(bad)
+
     def test_lamp_table_check_follows_the_engine(self):
         from light_sources import lamp_table
         raw = lamp_table(master())
@@ -99,7 +108,10 @@ class StageTests(unittest.TestCase):
             receipt = s.stage(balmora_scenery=s.root / 'balmora-scenery', town_scenery=s.root / 'town-scenery',
                               scene=s.root / 'scene')
             world = s.id1 / 'world'
-            self.assertEqual(sorted(p.name for p in world.iterdir()), ['fog-locations.txt', 'lamps.awl', 'night-windows.txt'])
+            self.assertEqual(sorted(p.name for p in world.iterdir()),
+                             ['fog-locations.txt', 'lamps.awl', 'large-rooms.txt', 'night-windows.txt'])
+            self.assertEqual((world / 'large-rooms.txt').read_bytes(), (ROOT / 'config/large-rooms.txt').read_bytes())
+            self.assertEqual(receipt['tables']['world/large-rooms.txt']['rooms'], 1)
             lamps = (world / 'lamps.awl').read_bytes()
             self.assertEqual(lamps[:8], b'AWL1' + struct.pack('<I', 3))
             self.assertEqual(len(lamps), 8 + 3 * 20)

@@ -230,8 +230,8 @@ CHIM_LABEL_SHOWN_UNITS = frozenset({('tools/project_version.py', 'chim_version')
                                     ('tools/miniwind.py', 'logo_lines'),
                                     ('tools/build_aga.py', 'stage_runtime')})
 CHIM_LABEL_HIDDEN_UNITS = frozenset({('tools/chim/zone_sim.py', 'build_library')})
-# The AmiWind version in the keys (BUILD-CHIM-KEY-VERSION-48; the maintainer, 2026-10-24: "A VERSION NUMBER CHANGE
-# SHOULD NOT FUCKING CAUSE THIS KIND OF A FUCKING HULABALLOO"): the VERSION file counts in a key only when the reach
+# The AmiWind version in the keys (BUILD-CHIM-KEY-VERSION-48; decided for the project, 24 October 2026: a version
+# number change must not rebuild anything but what shows the version): the VERSION file counts in a key only when the reach
 # names it other than through VERSION_HIDDEN_UNITS, the units that read it only for a record's provenance, a refusal
 # or a host-side check whose result never holds the version (names_version). v0.0.48 rebuilt the whole CHIM world
 # for its rc1 label: project_version read VERSION at import, so every stage importing it keyed the file. A version

@@ -19,7 +19,7 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.56-dev1 (29 October 2026)._
+_Last updated with AmiWind v0.0.56 (30 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -42,9 +42,9 @@ _Last updated with AmiWind v0.0.56-dev1 (29 October 2026)._
 ## Status: 29 October 2026
 
 Open. Known since the hinged doors came in (v0.0.48-dev2, [DOOR_MAPPING.md](../DOOR_MAPPING.md): "an unlocked
-trapped door opens without its trap for now"), never registered until the maintainer named it: "some doors are
-trapped so that you might take a hit when you open them up", adding, on how consistently the game data does such
-things, "in true Bethesda/Morrowind fashion, idk how much consistency is there in that".
+trapped door opens without its trap for now"), never registered until the maintainer named it: some doors are
+trapped so that opening them can cost a hit. He added, on how consistently the game data does such things, that the
+original's data may not be consistent about it.
 
 ## Census: 29 October 2026
 
@@ -139,6 +139,8 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - MWSCRIPT-CELLCHANGED-VOLATILE-54 (no report page): CellChanged made the sound-marker scripts volatile: 85 percent of Vivec's per-frame script work
 - MWSCRIPT-DATA-UNKNOWN-NAMES-48 (no report page): Four Bloodmoon scripts read names declared nowhere in the game data and do not compile
 - MWSCRIPT-INTERIOR-PLACEMENTS-48 (no report page): Scripted placements in rooms that have no edict are not attached: the engine has no room identity to match them (3,612 of 4,907 bindings are in rooms)
+- MWSCRIPT-OLD-CONFIG-OFF-57 (no report page): An install whose saved config holds aw_mwscript 0 keeps compiled scripts off after the default turned on
+- MWSCRIPT-STANDING-NOT-SAVED-57 (no report page): The players standing the scripts change (crime level, reputation, faction ranks, expelled marks, faction reputation) is not in saved games
 - MWSCRIPT-STATE-NOT-SAVED-48 (no report page): The compiled scripts' values (globals, object and script locals, journal indexes) are not in saved games
 - [PHYSICS-GRAVITY-SCALE-36](PHYSICS-GRAVITY-SCALE-36.md): Gravity is Quake's 800 although the world is scaled 0.25: jumps and falls are several times faster than the original
 - [PLAYER-DEATH-LIMBO-35](PLAYER-DEATH-LIMBO-35.md): After the player dies there is no way out: the game stays in a limbo with no reload or retry

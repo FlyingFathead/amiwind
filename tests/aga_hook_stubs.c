@@ -52,6 +52,10 @@ WEAK void AW_WeatherInit(void) {}
 WEAK int AW_WeatherFrame(int days,int milliseconds,aw_weather_blend_t *out){(void)days;(void)milliseconds;(void)out;return 0;}
 /* The interior fog ramp (r_sky.c, INTERIOR-FOG-UNUSED-51): fixtures linking aw_fog.c without r_sky.c draw no interior fog. */
 WEAK const unsigned char *R_InteriorFogColours(int r,int g,int b){(void)r;(void)g;(void)b;return 0;}
+/* The combat layer's death hook (aw_combat.c, COMBAT-PACK-SLOTS-57): fixtures linking aw_actors.c without it. */
+WEAK void (*aw_combat_actor_died)(struct edict_s *e);
+/* The sky haze level (aw_fog.c, FOG-SKY-UNFOGGED-57): fixtures linking r_sky.c without aw_fog.c see no haze. */
+WEAK int AW_SkyHazeNow(void) {return 0;}
 /* The weather's land light (WEATHER-AMBIENT-SUN-UNUSED-51): never reached without a weather (key 0). */
 WEAK int AW_WeatherLightOn(void) {return 1;}
 WEAK int AW_WeatherMountainLevel(void) {return 0;}
@@ -117,3 +121,6 @@ WEAK int AW_HandBlockItemApply(void){return 0;}
 WEAK const char *AW_InventoryDropReason(void){return "Cannot place item here; kept.";}
 
 WEAK void AW_InventoryGrantCommand(void){}
+
+/* dbg tp's settlements box (aw_tpplaces.c, TP-PICKER-57): no table in fixtures, so the scene picker opens as before. */
+WEAK int AW_TpPlacesOpen(void){return 0;}

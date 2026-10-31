@@ -9,11 +9,15 @@ binary, any case) for the names of the private working folder and of tools the p
 file name for assistant instruction files. The words and names are kept in pieces here so this file holds none whole."""
 import json
 import subprocess
+import sys
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-WORDS = tuple(w.encode() for w in ('cla' + 'ude', 'open' + 'ai', 'chatg' + 'pt'))
+sys.path.insert(0, str(ROOT / 'tools'))
+import bug_register  # noqa: E402
+
+WORDS = tuple(w.encode() for w in bug_register.PRIVATE_WORDS)     # one list, kept in pieces in the register tool
 INSTRUCTION_FILES = frozenset(n.lower() for n in ('AGE' + 'NTS.md', 'GEM' + 'INI.md', '.cursor' + 'rules',
                                                   '.windsurf' + 'rules', '.cline' + 'rules',
                                                   'co' + 'pilot-instructions.md', 'cla' + 'ude.md'))
@@ -55,9 +59,6 @@ class PublicTreeWords(unittest.TestCase):
         self.assertEqual(bad, [], 'assistant instruction files in the public tree: ' + ', '.join(bad))
 
     def test_the_register_refuses_the_words(self):
-        import sys
-        sys.path.insert(0, str(ROOT / 'tools'))
-        import bug_register
         for word in WORDS:
             bug = {'id': 'X-1', 'title': 'a note naming ' + word.decode() + '/notes'}
             self.assertTrue([e for e in bug_register.validate_facts(bug, set(), set(), 'X-1') if 'private word' in e])

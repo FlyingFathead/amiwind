@@ -336,9 +336,15 @@ def stage_game_config(id1, debug_luma=False, live_logs=False):
     return {'diagnostic_logs': 'live' if live_logs else 'memory'}
 
 
-def startup_config(config, draw_distance=540):
+# The image's starting fog/draw distance (FOG-300-DEFAULT-57: 300 is the universal default, it buys
+# the frame rate back in the high-polygon towns). The builder's CHIM draw distance (the world's
+# visibility reach, 540) is a world setting and stays; this is only the image's startup line.
+DEFAULT_FOG_DISTANCE = 300
+
+
+def startup_config(config, draw_distance=DEFAULT_FOG_DISTANCE):
     """Configure controls first; quake.rc selects the named start after autoexec.
-    draw_distance: the starting fog/draw distance (540; a DEBUG ONLY MiniWind image states a closer one)."""
+    draw_distance: the starting fog/draw distance (300; a DEBUG ONLY MiniWind image may state another)."""
     config=re.sub(r'(?m)^r_max(?:surfs|edges) [^\n]*\n?', '', config)
     config=re.sub(r'(?m)^aw_drawdistance [^\n]*\n?', '', config)
     config=re.sub(r'(?m)^bind "?[123]"? "aw_drawdistance (?:450|540|700|1000)"\n?', "", config)
@@ -1602,7 +1608,7 @@ def miniwind_options(args):
     draw = getattr(args, 'default_draw_distance', None)
     if draw is not None and (not debug or not 128 <= draw <= 540):
         raise ValueError('--default-draw-distance is DEBUG ONLY (--miniwind-debug) and 128..540')
-    return {'features': features, 'scope': scope, 'town': town, 'debug': debug, 'draw_distance': draw or 540, 'boot': boot,
+    return {'features': features, 'scope': scope, 'town': town, 'debug': debug, 'draw_distance': draw or DEFAULT_FOG_DISTANCE, 'boot': boot,
             'map_inspection': inspection,
             'description': miniwind.check_description(getattr(args, 'miniwind_description', None))}
 
@@ -1735,6 +1741,25 @@ CHIM_ACTOR_TABLE_LINES = (b'// Actor table (builder option --chim-actor-table on
                           b'// actors from maps/chim-actors.cca. Not saved; "chim actors table 0" in the console gives\n'
                           b'// the actors of the frame maps back.\n'
                           b'chim actors table 1\n')
+
+
+def stage_actor_logic_config(id1):
+    """The compiled game logic on by default (v0.0.57, DBG-MWSCRIPT-SILENT-56, NPC-WANDER-NOT-EXECUTED-35): the
+    compiled scripts (id1/mwscript.awm, aw_mwscript) and the compiled Wander packages (id1/npc-ambient.lut, "chim
+    actors ambient") are the engine's defaults too; the lines state them in the game's default settings so the
+    image says what it starts with. The off switches stay: dbg mwscript off, chim actors ambient off."""
+    path = Path(id1) / 'default-game.cfg'
+    raw = path.read_bytes()
+    if not raw.endswith(b'\n'):
+        raw += b'\n'
+    path.write_bytes(raw + ACTOR_LOGIC_LINES)
+    return {'on': True, 'config': 'id1/default-game.cfg', 'lines': ['aw_mwscript 1', 'chim actors ambient on']}
+
+
+ACTOR_LOGIC_LINES = (b'// Compiled game logic (default on since v0.0.57): the game\'s compiled scripts and the actors\'\n'
+                     b'// Wander packages. "dbg mwscript off" and "chim actors ambient off" in the console switch them off.\n'
+                     b'aw_mwscript 1\n'
+                     b'chim actors ambient on\n')
 
 
 CHIM_CROSSING_LINES = (b'// Cell crossings (builder option --chim-crossing 0|1, default 1 since v0.0.47): type 1, the\n'
@@ -1944,7 +1969,7 @@ def image(args):
     # checked as planned here and as written there (BUILD-SEYDA-CONVERTED-NOT-STAGED-35).
     payload_preflight(args, out, excluded, jobs, pending=None if mini else seyda_pending(args, scene))
     cfg=boot/'id1/default.cfg'
-    cfg.write_text(startup_config(cfg.read_text(), mini['draw_distance'] if mini else 540), newline='\n')
+    cfg.write_text(startup_config(cfg.read_text(), mini['draw_distance'] if mini else DEFAULT_FOG_DISTANCE), newline='\n')
     shutil.copyfile(ROOT/'config/keymaps.cfg',boot/'id1/keymaps-default.cfg')
     logs_record=stage_game_config(boot/'id1', debug_luma=engine_record.get('debug_luma',False),
                                   live_logs=getattr(args,'live_logs',False))
@@ -1953,6 +1978,7 @@ def image(args):
     args.image_world_bounds_record=stage_world_bounds(args, boot/'id1')  # build.json, only when on
     args.image_chim_crossing_record=stage_chim_crossing(args, boot/'id1')  # build.json, only for type 1
     args.image_chim_actor_table_config=stage_chim_actor_table_config(args, boot/'id1')  # build.json, only when on
+    args.image_actor_logic_config=stage_actor_logic_config(boot/'id1')  # compiled scripts + Wander packages on
     # --death-retry off (tools/prepare_player_view.py): aw_death_retry 0 in the game defaults.
     from prepare_player_view import stage_death_retry
     args.image_death_retry_record=stage_death_retry(getattr(args,'no_death_retry',False), boot/'id1')
@@ -2014,6 +2040,20 @@ def image(args):
         from build_parallel import Background
         from prepare_world_ui import prepare_image as prepare_world_ui_image
         world_ui=Background(prepare_world_ui_image,args.data_files,boot,jobs=jobs)
+    # The Halloween cast (dbg halloween, docs/HALLOWEEN.md) is made into a staging folder in a worker beside the
+    # combat data, the player view and the inventory (it only reads the game data and the palette) and installed into
+    # id1 where it was made before, so the image holds the same files (BUILD-IMAGE-FINALIZE-UNDERUSED-48: about 50 s on
+    # a few cores after the inventory in the v0.0.57-dev5 full build).
+    import halloween_cast
+    if halloween_cast.custom_ost(args) and 'music' in excluded:
+        raise ValueError('--custom-ost needs the music (drop --exclude music)')
+    halloween_job=halloween_stage=None
+    if getattr(args,'halloween',False):
+        from build_parallel import Background
+        halloween_stage=out/'.scratch'/'halloween-cast-stage'
+        shutil.rmtree(halloween_stage,ignore_errors=True);halloween_stage.mkdir(parents=True)
+        print('Halloween scene: the cast (skeletons, dancers, Dagoth Ur) on their animation tables...',flush=True)
+        halloween_job=Background(halloween_cast.stage_cast,args.data_files,boot/'id1',halloween_stage,jobs,jobs=jobs)
     # The player's view (docs/THIRD_PERSON.md): the camera and death-scene game settings, and the player's body per
     # playable race and sex for third person (--player-body on|off, tools/prepare_player_view.py). It writes only
     # view/settings.txt and progs/body/ and reads the game data and the palette: a spawned worker beside the combat
@@ -2036,15 +2076,12 @@ def image(args):
     print('Converting original inventory metadata and selected item resources...',flush=True)
     inventory_report=prepare_inventory(args.data_files,boot/'id1',jobs=jobs)
     (out/'inventory-data.json').write_text(json.dumps(inventory_report,indent=2)+'\n',encoding='utf-8',newline='\n')
-    # The Halloween scene (dbg halloween, docs/HALLOWEEN.md): its cast on their shared tables
-    import halloween_cast
-    if halloween_cast.custom_ost(args) and 'music' in excluded:
-        raise ValueError('--custom-ost needs the music (drop --exclude music)')
-    # a --halloween image: every full-world build (tools/build.py adds it unless --halloween-cast off) and the MiniWind
-    # preset --miniwind-halloween; its members are made side by side (halloween_cast.prepare)
-    if getattr(args,'halloween',False):
-        print('Halloween scene: the cast (skeletons, dancers, Dagoth Ur) on their animation tables...',flush=True)
-        halloween_report=halloween_cast.prepare(args.data_files,boot/'id1',jobs=jobs)
+    # The Halloween scene (dbg halloween, docs/HALLOWEEN.md): its cast on their shared tables, installed here (made
+    # in the worker started above). A --halloween image: every full-world build (tools/build.py adds it unless
+    # --halloween-cast off) and the MiniWind preset --miniwind-halloween.
+    if halloween_job is not None:
+        halloween_report=halloween_cast.install_cast(halloween_job.result(),halloween_stage,boot/'id1')
+        shutil.rmtree(halloween_stage,ignore_errors=True)
         (out/'halloween-cast.json').write_text(json.dumps(halloween_report,indent=2,default=str)+'\n',encoding='utf-8',newline='\n')
     from prepare_world_ui import validate as validate_world_ui
     if world_ui is not None:world_ui.result()
@@ -2270,7 +2307,7 @@ def miniwind_receipt(args, out, boot):
     debug = bool(getattr(args, 'miniwind_debug', False))
     return {'name': miniwind.NAME, 'scope': scope, 'label': miniwind.label(scope),
             'partial_area': miniwind.partial_area(scope, town), 'town': town,
-            'debug_only': debug, 'draw_distance': getattr(args, 'default_draw_distance', None) or 540,
+            'debug_only': debug, 'draw_distance': getattr(args, 'default_draw_distance', None) or DEFAULT_FOG_DISTANCE,
             'notice': [miniwind.notice_title(debug), args.miniwind_features],
             'notice_file': 'id1/' + miniwind.DATA_FILE, 'notice_sha256': digest(notice),
             'marker_file': miniwind.MARKER_FILE, 'description': getattr(args, 'miniwind_description', None),
@@ -2922,11 +2959,20 @@ def finalize_image(args):
     # Its sounds are the media stage's converted voices (no voice converted again).
     from greeting_lut import image_step as voice_table_step
     voice_table_step(args.data_files, boot/'id1', out, jobs=jobs, media=getattr(args, 'media', None))
+    # The dialogue table (tools/dialogue_lut.py, DIALOGUE-57): every NPC record's topics, answers, result scripts and
+    # links, and every quest's journal entries (id1/dialogue.lut); one unit, cached on its inputs; its NPC rows are
+    # the voice table's just written (checked by the step).
+    from dialogue_lut import image_step as dialogue_table_step
+    dialogue_table_step(args.data_files, boot/'id1', out, jobs=jobs)
     # The ambient table (tools/ambient_lut.py, NPC-WANDER-NOT-EXECUTED-35): every placed actor's Wander package and
     # its cell's path grid routes (id1/npc-ambient.lut); one unit, cached on its inputs; the engine runs it with
     # "chim actors ambient on" (default off until the A/B is recorded).
     from ambient_lut import image_step as ambient_table_step
     ambient_table_step(args.data_files, boot/'id1', out, jobs=jobs)
+    # The settlements table (tools/tp_places_lut.py, TP-PICKER-57): every named place of the island and its arrival
+    # on the street (id1/tp-places.lut), read by `dbg tp` with no argument only while its list box is open.
+    from tp_places_lut import image_step as tp_places_step
+    tp_places_step(args.data_files, boot/'id1', out, jobs=jobs)
     # EXPERIMENTAL actor table (--chim-actor-table on, tools/chim/actors.py, CHIM-EXTERIOR-ACTORS-MISSING-46): every
     # exterior NPC and creature reference in one table beside the frame maps, for the type 1 window; off by default
     actor_library_texts = None
@@ -3490,7 +3536,7 @@ def main():
     i.add_argument('--miniwind-map-inspection',action='store_true',help='With --miniwind: direct inspection with god, noclip and debug HUD')
     i.add_argument('--miniwind-debug',action='store_true',help='With --miniwind: a DEBUG ONLY image, not a playtest')
     i.add_argument('--default-draw-distance',type=int,help='DEBUG ONLY (--miniwind-debug): the starting draw distance, '
-                   '128..540 (default 540)')
+                   '128..540 (default 300)')
     i.add_argument('--miniwind-scope',choices=('full','exterior','interior'),help='With --miniwind: full (default; Balmora exterior and interiors), exterior (the Balmora exterior only; implies --no-npc-gallery) or interior (the start room of an interior:<cell> start only)')
     i.add_argument('--world-flora',type=Path,help='Complete validated private world vegetation overlay; preserves rock/mushroom inputs')
     i.add_argument('--harvest',type=Path,help='Harvest source from harvest_build.py prepare (builder step harvest); the builder default')

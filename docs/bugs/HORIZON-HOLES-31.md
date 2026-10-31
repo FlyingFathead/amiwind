@@ -2,10 +2,11 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 2 times; something has to be done
+## PERSISTING: reported 3 times; something has to be done
 
 - Reported with v0.0.44 at 2026-10-19 18:28 +0300: maintainer: distant topology still breaks up (counted as a bug); idea: a very low-poly depth/silhouette model of the world for the distance, with the far-terrain and mold-shell layers; later to-do
 - Reported with v0.0.46 at 2026-10-20 20:09 +0300: Listed under Known in this build in the v0.0.46 release notes (still open at the release).
+- Reported with v0.0.57-dev3 at 2026-10-30 (time not recorded): Seen again in a new form: at the 300 fog distance whole buildings at the end of the Seyda Neen start street turn solid fog colour and the sky shows between them (FOG-SKY-UNFOGGED-57).
 
 <!-- END GENERATED PERSISTING -->
 
@@ -28,12 +29,12 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.45 (20 October 2026)._
+_Last updated with AmiWind v0.0.56 (30 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
 - [Status: 7 October 2026](#status-7-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -128,7 +129,7 @@ openings in the Ashlands, cell 0,17. The visible failure pose is global
 5312,141714,1125, heading 6, pitch 6, time 06:06. After moving forward, the
 maintainer's next image shows continuous ground at 4637,143445,769, heading 352,
 pitch -3, time 06:11. These are different poses, not a matched fix comparison.
-The maintainer describes this as "GAPING HOLES IN DISTANT TERRAIN" and reports it
+The maintainer describes this as large holes in distant terrain and reports it
 across terrain, not only at one location. Keep it under this existing issue.
 
 Another fog-off image shows extensive sky exposure between terrain fragments
@@ -230,6 +231,7 @@ Family: Distance drawing (horizon, fog, sky, far edges) (`distance-drawing`). Fa
 Related bugs in other categories:
 
 - [CHIM-FAR-OBJECTS-33](CHIM-FAR-OBJECTS-33.md): Houses between the CHIM ring and the legacy overlap depth are missing from the fogged horizon
+- [FOG-SKY-UNFOGGED-57](FOG-SKY-UNFOGGED-57.md): With the 300 fog distance, buildings 20 m away turn solid fog colour while the sky stays clouds: a ragged patch of sky hangs between rooftops
 - [VIVEC-DISTANT-BRIDGES-32](VIVEC-DISTANT-BRIDGES-32.md): Distant bridges between the Vivec cantons are not drawn
 
 <!-- END GENERATED CATEGORY -->

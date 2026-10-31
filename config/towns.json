@@ -189,6 +189,18 @@
         "ground_place"
       ],
       "travel": null
+    },
+    {
+      "id": "camp_xm4y18",
+      "config": "camp_xm4y18.json",
+      "world_slot": -1,
+      "flags": [
+        "own_doors",
+        "scenery_catalogue",
+        "teleport_arrival",
+        "ground_place"
+      ],
+      "travel": null
     }
   ]
 }

@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """The AmiWind Toolkit Monitor: read-only build monitoring (tools/monitor_read.py, tools/toolkit_serve.py /monitor/,
 amiwind-toolkit/monitor.html). Sample run folders only; DOM stubbed in the page check (no browser claim)."""
+import errno
 import json
 import os
 import shutil
@@ -46,6 +47,18 @@ def sample_run(builds, run=RUN, status='running'):
     (d / 'logs' / '32-chim.log').write_bytes(''.join('CHIM stair gate: frames/x+%02d/y+00/frame.ccf: %d steps\n' % (i, i)
                                                      for i in range(2000)).encode())
     return d
+
+
+class ServeLoopTests(unittest.TestCase):
+    def test_transient_socket_errors_do_not_end_the_server(self):
+        # TOOLKIT-SERVE-SOCKET-BUFFER-57: WinError 10055 from select() during a heavy build stopped the Toolkit
+        windows = OSError(10055, 'no buffer space')
+        windows.winerror = 10055
+        self.assertTrue(toolkit_serve.transient_socket_error(windows))
+        self.assertTrue(toolkit_serve.transient_socket_error(OSError(errno.ENOBUFS, 'no buffer space')))
+        self.assertTrue(toolkit_serve.transient_socket_error(OSError(errno.EMFILE, 'too many open files')))
+        self.assertFalse(toolkit_serve.transient_socket_error(OSError(errno.EADDRINUSE, 'address in use')))
+        self.assertFalse(toolkit_serve.transient_socket_error(OSError(errno.EACCES, 'permission denied')))
 
 
 class ReaderTests(unittest.TestCase):

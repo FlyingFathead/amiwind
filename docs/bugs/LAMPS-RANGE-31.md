@@ -19,7 +19,7 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.45 (19 October 2026)._
+_Last updated with AmiWind v0.0.56 (30 October 2026)._
 
 ## Status: 7 October 2026
 
@@ -28,8 +28,8 @@ Open (limit of the v0.0.31-dev4 night lamps). Maintainer report; cause known.
 ## Symptom
 
 Walking through Balmora at night, distant lamps, including those in the next
-sub-cell, stay dark and light up only as the player comes close ("can't see
-shit", then "oh, there's light after all").
+sub-cell, stay dark and light up only as the player comes close (the lamps cannot be
+seen from afar, then there is light after all).
 
 ## Where
 

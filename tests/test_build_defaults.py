@@ -65,7 +65,7 @@ SHIPPED_STAGES = {
     'world-flora-assets': 'progs/aw_flora/*.spr (76 files)', 'world-flora': 'trees and grass overlay',
     'media': 'sound/*, intro videos (the catalogue stays beside the image)', 'music': 'music/*.mws', 'engine': 'AmiWind, AmiWindCheck',
     # v0.0.48 (MWSCRIPT-AUDIO-FIRST-48): every script compiled (docs/MWSCRIPT_BYTECODE.md); the engine runs it with
-    # aw_mwscript on (experimental, off by default)
+    # aw_mwscript on (on by default since v0.0.57)
     'mwscript': 'mwscript.awm (the compiled game scripts)',
     'image': 'the HDF images',
     # v0.0.33, the first CHIM release: Balmora and Seyda Neen as a CHIM world (config/build-defaults.json).

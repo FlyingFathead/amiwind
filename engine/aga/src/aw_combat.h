@@ -237,6 +237,9 @@ int AW_CombatEngage(struct edict_s *e,const aw_fighter_t *fighter,const char *la
 int AW_CombatActorState(struct edict_s *e);
 int AW_CombatActorEnd(struct edict_s *e);
 extern void (*aw_combat_actor_released)(struct edict_s *e);
+/* aw_combat_actor_died (NULL = none): called when a fallen fighter's slot is taken for a new fighter (more hostiles
+ * than slots), so the owner records the death before the slot forgets it (aw_actors.c: the change list). */
+extern void (*aw_combat_actor_died)(struct edict_s *e);
 const aw_fighter_t *AW_CombatFighter(struct edict_s *e);
 /* An engaged NPC's current swing: 0 chop, 1 slash, 2 thrust; -1 when it is not fighting (aw_animkit.c picks the
  * attack's keys by it, ANIM-GROUPS-NOT-HOOKED-54). */

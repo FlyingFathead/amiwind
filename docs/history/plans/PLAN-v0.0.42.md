@@ -70,7 +70,7 @@ Maintainer, 16 October 2026: release v0.0.41 first, then build things better, st
 ### 1.0b The stair gate: walk each flight once, keep every pass, ship the known results
 
 The stair walk is one of the slowest gates (8 min 52 s, 2.67 million steps and ramps in v0.0.41-dev5) and the one
-that stopped dev5 after 1 h 35 min. Maintainer, 16 October 2026: "so that we don't have this stairway march for aeons".
+that stopped dev5 after 1 h 35 min. Maintainer, 16 October 2026: the stair walk should not run for ages on every build.
 
 - [x] Each flight walked once, in the frame that owns it, plus the margin the engine lets a player stand in before
   it switches map; border copies reuse that result ([BUILD-STAIR-WALK-BORDER-COPIES-41](../../bugs/BUILD-STAIR-WALK-BORDER-COPIES-41.md)).
@@ -93,7 +93,7 @@ that stopped dev5 after 1 h 35 min. Maintainer, 16 October 2026: "so that we don
   collision, so its hashes match and the walk is skipped; only a flight whose hash differs (a changed converter or
   other game data) is walked. Hashes and coordinates only, no game data. The stair gate stays the development
   check; a release build checks the records, and a full walk runs in the nightly reference build. A full walk
-  stays one builder option away for anyone who wants it (maintainer: "if you WANT to run the staircase tests, you CAN"),
+  stays one builder option away for anyone who wants it (maintainer: whoever wants to run the staircase tests can),
   e.g. `--stair-walk full` ignoring every stored and shipped record. For anyone building the game from their own
   data the walk is a developer and debugging tool, off by default (maintainer, 16 October 2026): a build whose
   collision hashes match the shipped records skips it; a flight whose hash differs is reported (it means a

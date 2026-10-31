@@ -221,7 +221,30 @@ def build_scope(towns, world, interiors_excluded=False, miniwind_scope=None, roo
     for town in towns:
         for cell in town_grid(town, root):
             cells.setdefault(cell, town)
-    return {'towns': list(towns), 'interiors': interiors, 'world': bool(world), 'cells': cells}
+    return {'towns': list(towns), 'interiors': interiors, 'world': bool(world), 'cells': cells,
+            'areas': {town: area for town in towns for area in [town_area(town, root)] if area}}
+
+
+def town_area(town, root=ROOT):
+    """(centre, bounds) of the map a town area makes: its config's "centre" (original units) and "bounds" (map-local,
+    (x0, y0), (x1, y1), x 0.25 of the original), or None when the config gives none. The source grid (town_grid) is
+    the cells the stage reads, wider than the map it makes: Seyda Neen reads cells -5..1, -12..-6 and its map covers
+    global x -24576..8192, y -90112..-57344 (MINIWIND-EXTERIOR-DIRECT-START-CELL-57)."""
+    row = next((t for t in towns_table(root) if t['id'] == town), None)
+    if row is None:
+        return None
+    config = json.loads((Path(root) / 'config' / row['config']).read_text(encoding='utf-8'))
+    if 'centre' not in config or 'bounds' not in config:
+        return None
+    (x0, y0), (x1, y1) = config['bounds']
+    return (tuple(config['centre']), ((x0, y0), (x1, y1)))
+
+
+def area_holds(area, gx, gy):
+    """The global point (gx, gy) inside the map of AREA (town_area)."""
+    (cx, cy), ((x0, y0), (x1, y1)) = area
+    lx, ly = (gx - cx) * LOCAL_SCALE, (gy - cy) * LOCAL_SCALE
+    return x0 <= lx < x1 and y0 <= ly < y1
 
 
 def valid_starts(scope):
@@ -259,6 +282,20 @@ def check(start, scope):
     if not scope['world'] and cell not in scope['cells']:
         raise ValueError('%s %s: cell %d,%d is outside the area this build holds%s'
                          % (OPTION, start.text, cell[0], cell[1], holds))
+    if not scope['world']:
+        # the map the town makes, not only the cells its stage reads (MINIWIND-EXTERIOR-DIRECT-START-CELL-57: an
+        # Ascadian Isles start at cell:0,-7 passed the source grid check and failed 11-14 minutes into the image step)
+        area = scope.get('areas', {}).get(scope['cells'][cell])
+        if area and not area_holds(area, start.gx, start.gy):
+            (cx, cy), ((x0, y0), (x1, y1)) = area
+            inside = sorted(c for c in scope['cells'] if area_holds(area, (c[0] + 0.5) * CELL_UNITS,
+                                                                    (c[1] + 0.5) * CELL_UNITS))
+            raise ValueError('%s %s: global %s %s is outside the map %s makes (global x %s..%s, y %s..%s); its cells '
+                             'whose middle is inside: %s' % (
+                                 OPTION, start.text, _number(start.gx), _number(start.gy), scope['cells'][cell],
+                                 _number(cx + x0 / LOCAL_SCALE), _number(cx + x1 / LOCAL_SCALE),
+                                 _number(cy + y0 / LOCAL_SCALE), _number(cy + y1 / LOCAL_SCALE),
+                                 ' '.join('cell:%d,%d' % c for c in inside) or 'none'))
     start.cell_xy = list(cell)
     return start
 

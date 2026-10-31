@@ -200,7 +200,7 @@ static void check_controls(void){
 static void check_video(void){
  open_options();page(3);
  down(1);M_Keydown('a');assert(distance==530);keydown[K_SHIFT]=true;M_Keydown('D');assert(distance==531);keydown[K_SHIFT]=false;
- M_Keydown('s');M_Keydown(K_ENTER);assert(distance==540);
+ M_Keydown('s');M_Keydown(K_ENTER);assert(distance==300);   /* reset = the universal default 300 */
  /* Far detail: plain names, Enter and the arrows step Full, Light, Strong,
   * Strong + small faces (aw_cull 1, 3, 4, 6); a console-only value reads Custom. */
  down(1);assert(!strcmp(far_label,"Far detail: Strong") && highlight_y==36+2*19);

@@ -344,6 +344,9 @@ static byte warm_table[64*256];
 static char warm_built[32];
 static void R_LightHueCommand(void);
 static int sky_table_daylight=256,sky_table_night=-1,sky_table_tint=-1;
+/* Sky haze (aw_fog.c AW_SkyHazeNow, FOG-SKY-UNFOGGED-57): the level folded into sky_gradient (-1 not built). */
+static int sky_table_haze=-1;
+int AW_SkyHazeNow(void);
 static byte sky_shade[256];
 /* Clear-weather RGB stops from the reference configuration. Timing below is a
  * compact approximation; clouds retain their existing texture luminance and
@@ -1038,6 +1041,14 @@ static void R_SkyColourTables(int phase)
         }
     }
     if(sky_frame_type>=2)R_SkyType2Tables(phase);
+    /* Sky haze: every band's colour pulled toward the geometry fog colour by level/15, once per rebuild (no per-pixel
+     * work: the pass reads sky_gradient as before). The day/night types 2 and 3 only; type 1 keeps its sky. */
+    sky_table_haze=AW_SkyHazeNow();
+    if(sky_frame_type>=2 && sky_table_haze>0)for(i=0;i<16*256;i++){
+        int g=sky_gradient[i],h=sky_table_haze>15?15:sky_table_haze;
+        for(k=0;k<3;k++)rgb[k]=(host_basepal[3*g+k]*(15-h)+fog[k]*h)/15;
+        sky_gradient[i]=R_SkyNearest(rgb[0],rgb[1],rgb[2]);
+    }
     R_NightTables();
     sky_table_phase=phase;sky_table_type=sky_frame_type;sky_table_weather=sky_weather_key;
     sky_table_night=R_SkyNightLightOn();sky_table_tint=R_SkyNightTint();sky_table_weather_light=R_SkyWeatherLightPercent();
@@ -1340,7 +1351,7 @@ void R_SetSkyFrame (void)
         R_SkyWeather(clock_days,clock_ms);
         if(sky_phase!=sky_table_phase || sky_frame_type!=sky_table_type || sky_weather_key!=sky_table_weather ||
            R_SkyNightLightOn()!=sky_table_night || R_SkyNightTint()!=sky_table_tint ||
-           R_SkyWeatherLightPercent()!=sky_table_weather_light)R_SkyColourTables(sky_phase);
+           R_SkyWeatherLightPercent()!=sky_table_weather_light || AW_SkyHazeNow()!=sky_table_haze)R_SkyColourTables(sky_phase);
         R_SkySunFrame(clock_ms);
         R_NightFrame(clock_ms,clock_days);
     }else{

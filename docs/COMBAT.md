@@ -1,6 +1,6 @@
 # Combat and the Vivec Arena minigame
 
-_Last updated with AmiWind v0.0.54-dev1 (27 October 2026)._
+_Last updated with AmiWind v0.0.57-dev1 (30 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -135,8 +135,9 @@ The rules the aggro mode runs, with the game settings read from your master file
 - The Flee rule is the switch `dbg combat flee on/off`. It is off by default, so fights in the
   world keep the earlier rule: a fighter flees only when it cannot reach you. The aggro and group modes switch it
   on for their session and restore it afterwards. The same goes for the sounds rule (`dbg combat sounds on/off`,
-  see Sounds), which the aggro, group and sounds modes switch on. Attack on sight runs only inside the playground for now. The
-  world's residents get it once the actor record carries Fight for every placed actor.
+  see Sounds), which the aggro, group and sounds modes switch on. Since v0.0.57 attack on sight also runs in the
+  world for the creatures that wander (placed and levelled ones): the same rule, on the same one-second check, see
+  [NPC pathfinding](NPC_PATHFINDING.md) "Aggro on sight"; `chim actors ambient aggro off` turns it off.
 
 ## How combat works
 
@@ -348,8 +349,9 @@ the four fighters (about 0.3 MB each).
   weapon mesh on the first-person weapon bone and the original first-person
   weapon groups (idle, equip and the three attacks per one-handed,
   two-handed and two-handed-wide class).
-- The world's NPCs do not yet start fights on their own. The Fight rule runs in the combat playground only,
-  and alarms are not in. Fleeing by the Flee rating is in, behind `dbg combat flee on` (off by default).
+- The world's NPCs do not yet start fights on their own (their disposition toward the player is not modelled);
+  creatures that wander do since v0.0.57, at most four at once; in a larger pack the next one joins as soon as one
+  falls (a fallen fighter's slot is reused and its death kept, COMBAT-PACK-SLOTS-57). Alarms are not in. Fleeing by the Flee rating is in, behind `dbg combat flee on` (off by default).
 - Sounds play at the listener, not from the fighter's position. Creatures do not yet play their own sound
   generators from their animations' sound keys; the table is built and the `sounds` mode plays it.
 - Creatures: combat/actors.txt holds NPC records only, so until v0.0.54 a creature had no sheet and a blow passed

@@ -2,11 +2,12 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 3 times; something has to be done
+## PERSISTING: reported 4 times; something has to be done
 
 - Reported with v0.0.46 at 2026-10-20 20:09 +0300: Listed under Known in this build in the v0.0.46 release notes (still open at the release).
 - Reported with v0.0.53-dev2 at 2026-10-26 (time not recorded): 19:14 UTC door sample: the Yassu Mine room load (ri9f4c8ccd45) stopped after its BSP while a gate ran its emulator; the next try loaded in 7.6 s
 - Reported with v0.0.52 at 2026-10-26 15:58 +0200: PERSISTING: v0.0.52 final delivery, 16 MB smoke: dbg tp to Balmora did not load; game waits on SIGF_DOS, the request held by DH0 (emulator disk stall); passed in the run before
+- Reported with v0.0.57-dev1 at 2026-10-30 12:19 +0200: Gate 4784 boot smoke (commit a1c00e4a, the shared gate-smoke v0.0.54 image, 32 MB Fast): the second load (balmora, load 1 of 3) was not in play, signon 1; the same image and a one-line later commit passed gate 4785.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -35,7 +36,7 @@ _Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
+- [PERSISTING: reported 4 times; something has to be done](#persisting-reported-4-times-something-has-to-be-done)
 - [Symptom](#symptom)
 - [Where](#where)
 - [How it happened](#how-it-happened)

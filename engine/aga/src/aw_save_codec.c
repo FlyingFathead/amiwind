@@ -256,7 +256,9 @@ static void changes_fields(aw_changes_t *c)
            ((e->flags&AW_CHANGE_LOCK_LEVEL) && !(e->flags&AW_CHANGE_LOCK)) ||
            ((e->flags&AW_CHANGE_LOCK_LEVEL)>>AW_CHANGE_LOCK_SHIFT)>100U ||
            ((e->flags&AW_CHANGE_PICK)?(e->pick<1 || e->pick>0x8001U):e->pick!=0)){error=1;return;}
-        if(e->flags&AW_CHANGE_SCENE){if(e->where<0 || e->where>=AW_SCENE_COUNT || !AW_MapName(e->where)[0]){error=1;return;}}
+        if(e->flags&AW_CHANGE_ROOM){
+            if((e->flags&AW_CHANGE_SCENE) || e->where<1 || e->where>0xffffff){error=1;return;}}
+        else if(e->flags&AW_CHANGE_SCENE){if(e->where<0 || e->where>=AW_SCENE_COUNT || !AW_MapName(e->where)[0]){error=1;return;}}
         else{
             int cx=(int16_t)((uint32_t)e->where>>16),cy=(int16_t)((uint32_t)e->where&0xffffU);
             if(cx<-1024 || cx>1024 || cy<-1024 || cy>1024){error=1;return;}

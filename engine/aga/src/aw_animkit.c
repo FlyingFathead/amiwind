@@ -271,6 +271,15 @@ static void command(void) {
     if(argc>4)argc=4;
     for(i=0;i<argc;i++)argv[i]=Cmd_Argv(i);
     if(argc>=2 && !strcmp(argv[1],"pick")){pick_command();return;}   /* every group by state (below) */
+    if(argc>=2 && !strcmp(argv[1],"tables")){
+        /* WALK-CYCLES-57: the tables' frames paged (only the groups played held) or whole; the next table loaded */
+        unsigned long held,disk,index;
+        if(argc>=3)aw_skel_paged=strcmp(argv[2],"whole")!=0;
+        AW_SkelTablesBytes(&held,&disk,&index);
+        Con_Printf("Animation tables %s: %lu KB in blocks, frames %lu KB held of %lu KB paged on disk.\n",
+                   aw_skel_paged?"paged":"whole",index/1024,held/1024,disk/1024);
+        return;
+    }
     if(!AW_AnimKitParse(argc,argv,&c)){
         Con_Printf("dbg animkit: %s\n",c.name);
         Con_Printf("dbg animkit [on/off / list / groups / play <group> / cycle [all] / stage [1..8] / stop / speed <0.1..4> / pick ...]\n");
@@ -332,6 +341,7 @@ typedef struct {
     int fighting,weapon,knocked,turn;
     unsigned char sneak,has_chances,idle,roll,chances[8];
     int over_from,over_to;float over_t;     /* equip, unequip, cast: a one-shot over the source (-1 none) */
+    int over_loops;                         /* a script's PlayGroup/LoopGroup: further plays of the same span */
     aw_pick_state_t last;int picked,gi,from,to,lfrom,lto,loop,inner;float t;
     char group[AW_PICK_NAME];const char *rule;
     float saved;int applied;
@@ -391,7 +401,7 @@ static int weapon_of(edict_t *e) {
 static void over(picker_t *p,const aw_skel_table_t *t,aw_pick_state_t s) {
     aw_pick_t o;int g;
     if(!AW_AnimPick(&s,table_has,(void *)t,&o) || (g=AW_SkelGroup(t,o.group))<0)return;
-    p->over_from=key_frame(t,g,o.start);p->over_to=key_frame(t,g,o.stop);p->over_t=0;
+    p->over_from=key_frame(t,g,o.start);p->over_to=key_frame(t,g,o.stop);p->over_t=0;p->over_loops=0;
     if(p->over_from<0 || p->over_to<p->over_from)p->over_from=-1;
     else{memcpy(p->group,o.group,sizeof(p->group));p->rule=o.rule;}   /* both AW_PICK_NAME, NUL-terminated */
 }
@@ -454,7 +464,7 @@ static void drive(picker_t *p,edict_t *e,const aw_skel_table_t *t,const aw_anim_
     if(p->over_from>=0){
         int done=0;
         out=AW_AnimKitSpanFrame((unsigned)p->over_from,(unsigned)p->over_to,t->rate,&p->over_t,dt*aw_anim_kit_speed,0,&done);
-        if(done)p->over_from=-1;
+        if(done){if(p->over_loops>0){p->over_loops--;p->over_t=0;}else p->over_from=-1;}
         p->saved=e->v.frame;e->v.frame=(float)out;p->applied=1;pick_driven++;
         return;
     }
@@ -523,6 +533,18 @@ void AW_AnimPickCast(edict_t *e,int range) {
     if(!t || !(p=picker_of(e,1)))return;
     memset(&s,0,sizeof(s));s.weapon=AW_PW_SPELL;s.event=AW_PE_CAST;s.range=(unsigned char)(range>=0 && range<3?range:0);
     over(p,t,s);
+}
+/* MWScript PlayGroup / LoopGroup (rule from OpenMW apps/openmw/mwscript/animationextensions.cpp OpPlayAnim and
+ * OpLoopAnim, mwmechanics/character.cpp playGroup: the group once, or COUNT more times, then back to what the state
+ * plays): the group's whole span over the source, as a cast plays; a hit, a fall or a death ends it. 0: the actor
+ * has no skeletal table or no such group. */
+int AW_AnimPickScripted(edict_t *e,const char *group,int count) {
+    picker_t *p;const aw_skel_table_t *t=e?table_of(e):NULL;int g;aw_skel_group_t gg;
+    if(!t || !group || (g=AW_SkelGroup(t,group))<0 || !(p=picker_of(e,1)))return 0;
+    AW_SkelGroupAt(t,g,&gg);
+    p->over_from=(int)gg.first;p->over_to=(int)gg.last;p->over_t=0;p->over_loops=count>0?count:0;
+    strncpy(p->group,gg.name,sizeof(p->group)-1);p->group[sizeof(p->group)-1]=0;p->rule="script PlayGroup";
+    return 1;
 }
 void AW_AnimPickSneak(edict_t *e,int on) {picker_t *p=picker_of(e,1);if(p)p->sneak=(unsigned char)(on!=0);}
 void AW_AnimPickIdleChances(edict_t *e,const unsigned char chances[8]) {

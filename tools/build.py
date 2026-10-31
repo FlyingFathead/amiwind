@@ -565,8 +565,8 @@ def mwscript_status(args):
     """The compiled game scripts (id1/mwscript.awm) in this build: (built, status).
 
     Every real AGA image build compiles them (docs/MWSCRIPT_BYTECODE.md): one unit of a few seconds,
-    reused from the pool when its inputs are unchanged. The engine runs them only with aw_mwscript on
-    (EXPERIMENTAL, off by default). Asset-free dry runs, terrain-only builds and the rc3 image recovery
+    reused from the pool when its inputs are unchanged. The engine runs them with aw_mwscript on
+    (default on since v0.0.57; dbg mwscript off). Asset-free dry runs, terrain-only builds and the rc3 image recovery
     make none."""
     if getattr(args, 'dry_run', False):
         return False, 'asset-free'
@@ -576,7 +576,7 @@ def mwscript_status(args):
         return False, 'not part of the rc3 image recovery'
     if getattr(args, 'builder', 'chim') == 'legacy':
         return False, 'not part of the legacy builder (kept unchanged for A/B regression tests)'
-    return True, 'enabled (engine switch aw_mwscript, experimental, off by default)'
+    return True, 'enabled (engine switch aw_mwscript, on by default; dbg mwscript off)'
 
 
 def mwscript_steps(args, tool, run):
@@ -3184,6 +3184,13 @@ def main(argv=None):
         if args.reuse_from and args.allow_release_reuse:
             metadata['stage_cache']['release_reuse'] = 'allowed: the from-scratch gate runs separately'
         resource_preflight(args, steps, metadata)
+        if args.builder_options['builder'] == 'chim' and not args.dry_run and any(name == 'chim' for name, _ in steps):
+            # every reduction row checked against the collision surface gate before the CHIM stage meets it
+            # (RECIPE-ROW-MOVES-COLLISION-57; tools/recipe_collision_preflight.py): seconds when cached
+            import recipe_collision_preflight
+            metadata['recipe_collision_preflight'] = recipe_collision_preflight.run(
+                args.reuse_from, Path(storage_pool_dir(args)).parent / 'recipe-collision-v1',
+                int(args.jobs or os.cpu_count() or 1), log=lambda line: print(line, flush=True))
         print(f"Build run: {run}\nLive tool output follows; per-stage logs are saved in {run / 'logs'}.", flush=True)
         live = None
         if args.builder_options['builder'] == 'chim' and args.stage == 'aga' and not args.dry_run and not args.no_cell_progress:

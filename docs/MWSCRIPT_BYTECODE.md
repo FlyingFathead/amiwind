@@ -1,6 +1,6 @@
 # MWScript compiled by the builder
 
-_Last updated with AmiWind v0.0.54-dev1 (27 October 2026)._
+_Last updated with AmiWind v0.0.57 (31 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -22,6 +22,7 @@ _Last updated with AmiWind v0.0.54-dev1 (27 October 2026)._
   - [Which objects run scripts](#which-objects-run-scripts)
   - [What runs today, what is "not yet"](#what-runs-today-what-is-not-yet)
   - [The import route: every call kept](#the-import-route-every-call-kept)
+- [Spell effects: the design (SPELL-EFFECTS-57)](#spell-effects-the-design-spell-effects-57)
 - [Sizes and costs](#sizes-and-costs)
 - [Builder stage](#builder-stage)
 - [Next](#next)
@@ -36,10 +37,14 @@ script once and writes compact bytecode for a small interpreter in the engine, a
 compiler squeezes out of it, the file, the opcode table (shared with the NPC greeting conditions), what runs today,
 what does not yet, and what it costs.
 
-The first target, at the maintainer's request (23 October 2026: "all of the audio is already in the game so we
-should start utilizing it as per MWscript"), is audio: the sounds, voice lines and music cues the scripts start.
-Status: **EXPERIMENTAL**, compiled in every build, run by the engine only with `dbg mwscript on` (setting
-`aw_mwscript`, off by default) until the in-game check. Register entry:
+The first target, at the maintainer's request (23 October 2026: the audio is already in the game, so it should now be
+used as the scripts direct), is audio: the sounds, voice lines and music cues the scripts start.
+Status: compiled in every build and **on by default since v0.0.57** (setting `aw_mwscript`, default 1, saved;
+the builder also states `aw_mwscript 1` in the game's default settings). `dbg mwscript off` switches the scripts
+off and stops their sounds; `dbg mwscript` alone, `on` and `off` answer in the console what the scripts do,
+whether `id1/mwscript.awm` was loaded (format, bytes on disk, scripts, bytes kept) and the
+`aw_mwscript_status` counts ([DBG-MWSCRIPT-SILENT-56](BUGS.md)). The in-game check is still the open item (Next 1).
+Register entry:
 [MWSCRIPT-AUDIO-FIRST-48](bugs/MWSCRIPT-AUDIO-FIRST-48.md).
 
 ## How much MWScript there is (measured 23 October 2026)
@@ -72,7 +77,7 @@ script: 8,758 in Morrowind.esm (4,907 of them run something today, see [inert](#
 | Share of the 1,207 scripts | Scripts |
 | --- | ---: |
 | Use only the interpreter, audio, the journal and globals | 134 (11 %) |
-| Run whole today (everything they call is carried out; 27 October 2026) | 735 (61 %) |
+| Run whole today (everything they call is carried out; 30 October 2026) | 957 (79 %) |
 | Touch audio at all | 192 (16 %) |
 | Use AI packages (travel, wander, follow, escort, fight/flee settings) | 181 (15 %) |
 | Use the inventory (add, remove, count items on others, equip, soul gems) | 194 (16 %) |
@@ -257,6 +262,7 @@ on disk.
 | CODE | | the bytecode | 132,376 |
 | BIND | 24 | placed scripted objects, by reference: script, flags, cell (grid or the room's stable number), position | 117,768 (4,907 rows) |
 | STRS | | strings (names for the log, messages, ids of not-yet calls) | 145,333 |
+| TOPC | 2 | the game's dialogue topics, sorted (v0.0.57): name; on disk, AddTopic hands the row | 4,196 |
 | OACT, ACTB, AINV, AITM, ASPT, ASPL | | the actor table (v0.0.54; OACT resident, the rest on disk): [ACTOR_STATE.md](ACTOR_STATE.md) | 536,338 |
 | | | file / resident | 446,316 / 183,212 |
 
@@ -436,7 +442,15 @@ Activation (v0.0.51): `OnActivate` and `Activate` run, with the original's rule.
 takes over its object's use: when the player uses the object, it does nothing by itself, and `OnActivate` reads 1
 once on the script's next run; the script's `Activate` then carries out the object's own use (a door opens, locks
 kept). Today the use is taken over for doors (hinged doors and load doors); other objects' own use (items,
-containers, actors) is not yet. A script the engine carries by hand (the census office's) is never attached, so its
+containers) is not yet. Since v0.0.57 actors too: E on an actor whose script reads `OnActivate` talks to nobody and
+the script's `OnActivate` reads 1 (`pr_cmds.c`, the same intercept as the doors'); the script's `Activate` on an
+actor does nothing yet (OpenMW would open the talk or the corpse's inventory). Measured 30 October 2026: 258 scripts
+read OnActivate; placed on activators 71 scripts (1,525 placements), books 11, doors 6, NPCs 8 (8 placements),
+items and containers the rest. Activators too (v0.0.57): E with no actor under the crosshair goes to the scripted
+placement that reads OnActivate nearest the line of view, within the original's activation distance (iMaxActivateDist,
+192 game units) and a narrow cone, also when the CHIM world keeps it without an entity (the script's instance has its
+position); that covers the 71 activator scripts (1,525 placements) and the books, items and containers whose scripts
+read OnActivate. Their own use without a script (picking an item up, opening a container) is not yet. A script the engine carries by hand (the census office's) is never attached, so its
 door keeps the engine's own rules. The `aw_mwscript_status` command counts the uses the scripts took and their
 `Activate` calls.
 
@@ -489,11 +503,99 @@ numbers (-1 none, 0 Wander; Travel, Escort, Follow and Activate come with those 
 starts or ends, so these scripts are not run every frame. Without the ambient tables in the build both read -1 and
 0. Scripts that run whole: 735 of 1,207.
 
-Not yet (124 functions; by the number of scripts using them): ForceGreeting 98, PositionCell (other actors) 57, Cast 53,
-PlayGroup 29, GetPCRank 26, AITravel 24, PlaceItem 24, GetPCCrimeLevel 23, Rotate 21, GetEffect 21, AddTopic 20. The
+The stats themselves (attributes, skills, health, magicka and fatigue with Get, Set, Mod, ModCurrent and the ratio,
+level, the behaviour ratings, disposition) run since v0.0.54 on every actor and on the player (above). The player's
+standing runs since v0.0.57 (rules from OpenMW's statsextensions.cpp and dialogueextensions.cpp; the engine's
+`aw_pcstanding.c`): `GetPCCrimeLevel`, `SetPCCrimeLevel`, `ModPCCrimeLevel` (the bounty, never below 0 by Mod);
+`GetReputation`, `SetReputation`, `ModReputation` of the player (0 to 255, as the original caps it; an NPC's reads
+its record, changing an NPC's is not yet); per faction `GetPCRank` (-1 when not a member), `PCJoinFaction`,
+`PCRaiseRank` (joins when not a member, then one rank up to the record's last rank slot), `PCLowerRank` (below rank 0
+leaves the faction and clears the expelled mark), `PCExpelled`, `PCExpell`, `PCClearExpelled`, `GetPCFacRep`,
+`SetPCFacRep`, `ModPCFacRep`; without a faction named, the speaker's own (a factionless one reads -1 and changes
+nothing); and `GetRace` of the player or an NPC. These use the import route below: the call keeps its form and the
+engine answers it by its number (no new opcode, no change of the file's format); a read does not keep its script
+awake, a change wakes the scripts that read the standing. Kept in saved games since the AddTopic change below
+([MWSCRIPT-STANDING-NOT-SAVED-57](BUGS.md)). Measured 30 October 2026 over the game's data: scripts that run whole
+735 before, 765 after (of 1,207); Morrowind.esm alone 376 before, 403 after (of 632). Cost: 71 bytes more
+bytecode, 72 bytes more resident file, 1,300 bytes of engine table (32 factions), nothing read from disk but the
+faction names (the 16-entry id cache).
+
+`PlayGroup` and `LoopGroup` (v0.0.57; rule from OpenMW's animationextensions.cpp and character.cpp playGroup): the
+named group of the actor's skeletal table plays once (LoopGroup: once plus the count) over what its state plays, the
+way a cast plays (`aw_animkit.c`), then the state's own group again; a hit, a fall or a death ends it. On an actor
+without a skeletal table, or a group its table lacks, nothing happens (counted in `aw_mwscript_status`). Scripts that
+run whole: 765 before, 783 after (of 1,207).
+
+`AddTopic` (v0.0.57; rule from OpenMW's dialogueextensions.cpp OpAddTopic): the topic joins the player's known
+topics, which the dialogue window will list (DIALOGUE-57). The builder writes the game's 2,098 dialogue topics (DIAL
+records of the topic type, sorted) as the TOPC section, on disk (4,196 bytes, a name index each); a script's AddTopic
+becomes the topic's row number, so the engine keeps one bit per topic (263 bytes) and compares no text. An AddTopic
+of a name no topic has compiles to nothing, with a warning. The known topics and the player's standing are kept in
+saved games, after the actor records (a save of an earlier version loads as before, with none known). Scripts that run
+whole: 783 before, 799 after (of 1,207); Morrowind.esm 418 of 632.
+
+`Cast` of the cures (v0.0.57; OpenMW miscextensions.cpp OpCast, the effects from spelleffects.cpp): a Cast on the
+player of Cure Common Disease removes every common disease from the player's spells, Cure Blight Disease every
+blight; Cure Poison changes nothing, because no poison state exists yet. The caster plays its cast. These are the
+shrines' cure blessings (16 shrine scripts, 48 casts); the same scripts also cast their own shrine blessing, which
+waits for the spell effects (SPELL-EFFECTS-57: an effect table on disk, active effects per actor, saved), so they
+do not run whole yet and the count of scripts that run whole stays 799. Every other Cast compiles as "not yet".
+
+`ForceGreeting` (v0.0.57; OpenMW dialogueextensions.cpp OpForceGreeting: the actor opens the dialogue with its
+greeting): the actor plays the greeting the engine plays when the player talks to it (the voice table and its hello
+line, QC `aw_greet`), by the same talk rule (alive, not hostile, not knocked down, something to say). The dialogue
+window itself is DIALOGUE-57; until it exists the greeting is what talking does. An actor that is not loaded, or
+cannot talk, does nothing (counted in `aw_mwscript_status`). Cost: one QC call when a script asks, nothing resident.
+Scripts that run whole: 834 before, 899 after (of 1,207).
+
+`Rotate` (v0.0.57; OpenMW transformationextensions.cpp OpRotate: the given degrees a second times the frame's
+duration, the player only around z) turns an object that has an entity; CHIM scenery without one cannot turn yet
+(counted). `GetTarget` (OpenMW aiextensions.cpp OpGetTarget): the combat layer here fights the player only, so it
+reads 1 for the player while the actor fights and lives, else 0; a fight starts without the state generation moving,
+so a script that asks runs every frame. Scripts that run whole: 899 before, 919 after (of 1,207).
+
+`AITravel` (v0.0.57; OpenMW aiextensions.cpp OpAiTravel, aitravel.cpp): the actor walks to the point on the
+ambient tables' routes (docs/NPC_PATHFINDING.md "Travel packages, from the scripts"); `GetCurrentAIPackage` reads 1
+and `GetAIPackageDone` 1 once it arrived. Scripts that run whole: 919 before, 930 after. `AIFollow` (OpenMW
+aifollow.cpp) on the same module (docs/NPC_PATHFINDING.md); `GetStandingPC` (OpenMW World::getPlayerStandingOn)
+reads 1 while the player stands on an object that has an entity (CHIM scenery without one reads 0 yet). Scripts that
+run whole: 930 before, 950 after. `GetDetected` waits for the sneak and detection rules. `Position` (OpenMW
+transformationextensions.cpp OpPosition): the player goes to the outdoor point by the coordinate teleport (as the
+original, the player always lands outdoors); any other object with an entity moves within the map it is in; the
+rotation is not applied yet. Scripts that run whole: 950 before, 957 after. `PlaceAtPC` waits: it makes a new
+object, which the engine cannot spawn from a script yet.
+
+**The object spawner (proposed, measured 30 October 2026).** `PlaceAtPC`, `PlaceAtMe`, `PlaceItem` and
+`PlaceItemCell` would let 15 more scripts run whole; the scripts name 38 different objects (in their calls: NPCs 23
+times, activators 27, creatures 8, clothing 7, the rest unscripted creatures and items). The engine has no table from
+an object's id to a converted model today: every model on the disk belongs to a placed reference. The plan, by
+OpenMW 0.51's rules (transformationextensions.cpp OpPlaceAt / OpPlaceItem: COUNT copies, at DISTANCE in the
+DIRECTION 0 front, 1 back, 2 left, 3 right of the player or the object, on the ground; PlaceItem at X Y Z with a
+rotation): (1) the builder collects the ids the scripts' Place calls name and converts each once into a spawn pack
+(static models for activators and items, the actor pipeline's skeletal model and record for NPCs and creatures), with
+a table id to model on disk and only its index resident; (2) the engine spawns an entity from that table with the
+existing entity code (the static and actor spawn paths the CHIM window uses), at OpenMW's position; (3) every spawned
+reference goes into the saved game as a new kind of change (id, cell, position, rotation, its actor record when it is
+an actor): that is a part SAVEGAME-COMPLETE-57 must add (the change list today only holds placed references). First
+slice: activators and items (static models), then creatures, then NPCs.
+
+A test route in the console: `aw_mwscript_status call FUNCTION [number] [faction]` carries out one of the
+standing calls or `addtopic ROW` on the player through the same host route a script takes, and answers with the
+crime level, the reputation and the number of known topics; `aw_mwscript_status` shows the same counts. A named
+faction is found by a scan of the file's strings on disk, which takes several seconds on the Amiga: a test route,
+never a script's path (scripts carry the faction's string number). Checked in game on 30 October 2026 (Seyda Neen
+MiniWind, 32 MB Fast): crime level 1450, reputation 12, a Mages Guild rank and one known topic set, a quicksave, all
+changed, a quickload: the crime level, the reputation and the topic came back.
+
+Not yet (111 functions the game's scripts call, 124 before v0.0.57). The ones that stop the most scripts, measured 30 October 2026 (`python3 -m mwscript.measure`,
+"blockers": the scripts for which the function is the only call not carried out, of the scripts using it):
+ForceGreeting 64 of 98, Cast 29 of 53, PositionCell (other actors) 25 of 37,
+AITravel 10 of 24, BecomeWerewolf 10 of 18, GetTarget 8 of 15, GetStandingPC 8 of 13, PlaceAtPC 7 of 15, Position 7
+of 14, Rotate 6 of 21, GetDetected 6 of 10. Carried out in that order (each step the function that frees the most
+further scripts), ForceGreeting alone brings 63 more scripts to run whole, with Cast 91, with PositionCell 117. The
 most called: ForceGreeting 134, Cast 126, AddTopic 105, AITravel 89, HasSoulGem 85, PlayGroup 84, PositionCell 74.
-They wait for the dialogue window, moving actors between cells, spells and effects, the other AI packages, a crime
-level and animation. The scripts' own values are not in saved games
+They wait for the dialogue window, moving actors between cells, spells and effects, the other AI packages and
+animation. The scripts' own values are not in saved games
 yet ([MWSCRIPT-STATE-NOT-SAVED-48](BUGS.md)).
 
 ### The import route: every call kept
@@ -509,6 +611,51 @@ opcode and no change of the file's format (the stage compiles the program again 
 was left out as [inert](#what-it-squeezes) comes back). Until then the call is logged once and reads 0.
 `aw_mwscript_status` lists the not-yet functions this session called most, with their counts. A function used
 very often gets its own opcode later, as the actor calls did, when that is faster.
+
+## Spell effects: the design (SPELL-EFFECTS-57)
+
+**The first slice runs since v0.0.57** (`engine/aga/src/aw_effects.c`): a `Cast` on the player of a spell whose
+every effect is a Fortify, Drain, Damage or Restore of an attribute, a skill, health, magicka or fatigue lands those
+effects (the magnitude rolled once between the record's low and high), ticks them on the game clock, undoes Fortify
+and Drain when they end and keeps the active ones in saved games. The builder writes only the spells a Cast names
+(SPFX, resident: 1,096 bytes for the game); the player's pool holds 16 effects (a full pool refuses one, counted in
+`aw_mwscript_status`). Measured 30 October 2026: scripts that run whole 799 before, 816 after (of 1,207); the shrines'
+blessings of these kinds now run. `GetEffect` (v0.0.57; OpenMW miscextensions.cpp OpGetEffect) reads the active
+list: the builder turns the effect's name ("sEffectPoison") into the game's effect number, and the engine answers 1
+when an effect of that number is active on the player. Effects of other kinds cannot be active yet, and no other
+actor carries effects yet, so 0 is the true answer there; the scripts ask mostly about Poison, Fire Damage,
+Invisibility and Chameleon. Scripts that run whole: 816 before, 830 after. Then the effects the remaining Casts named most: the cures
+inside a blessing (Cure Common Disease and Cure Blight Disease remove those spells, Cure Poison changes nothing yet)
+and Fire, Frost and Shock Damage and Poison, which hurt health like Damage Health (no resistances exist here yet, so
+the full magnitude lands): 830 before, 834 after. Still waiting: the effects of other kinds (Shield, Water
+Breathing, Swift Swim, Levitate and the like; 13 scripts wait only for a Cast of them), Casts on other actors, effects on other actors, the effect table of every spell and
+enchantment.
+
+The design, as it was written first (the rest of it is still to build). What the shrines' blessings, the traps, `Cast`, `GetEffect` and the effect Get/Set/Mod calls
+wait for. The rules are OpenMW 0.51's (apps/openmw/mwmechanics/activespells.cpp for the active list and its ticking,
+spelleffects.cpp for what each effect does, spellcasting.cpp for casting), written independently.
+
+- **The effect table, on disk.** The builder writes the game's SPEL and ENCH records' effect lists (ENAM: effect
+  number, skill or attribute, range, area, duration, magnitude low and high) and the MGEF flags the engine needs (the
+  effect's school, whether it has a duration or a magnitude) as one section of `id1/mwscript.awm`: a row per spell
+  pointing at its effects, 12 bytes an effect. Only an index (the spell's row by its STRS number, 4 bytes a spell)
+  stays resident when the scripts are on; the effects are read when a spell is cast. The size goes into the
+  resident registry against the 32 MB Fast machine; the builder report states it.
+- **The active list, per actor.** A fixed pool of active effects (effect, stat, magnitude, seconds left, the caster's
+  spell), 16 bytes each, about 64 for the whole loaded world plus 16 for the player, so at most about 1.3 KB; a full
+  pool refuses a new effect (counted, logged once), it never allocates.
+- **Ticking.** Durations count down on the game's own time, the same clock the scripts' `GetSecondsPassed` reads,
+  not the frame; a magnitude is rolled once when the spell lands (between low and high, as OpenMW). When an effect
+  ends, what it did is undone by OpenMW's rule for its kind: a Fortify takes its bonus back, a Drain gives its loss
+  back, a Damage and a Restore are instant (no duration of their own: a Damage with a duration hurts each second).
+- **The stats.** The actor record already holds attributes and skills as base plus a modifier and the dynamic stats
+  as current and base (docs/ACTOR_STATE.md); Fortify and Drain move the modifier (dynamic: the base and the current),
+  Damage moves the current down, Restore moves it up to the base. These are the existing calls with OpenMW's caps.
+- **Saved games.** The active list goes into the save beside the actor records and the player's standing (the same
+  trailer, a new tagged block); an older save loads with nothing active.
+- **The first slice.** Fortify, Drain, Damage and Restore of the attributes and of health, magicka and fatigue, with
+  durations, applied by `Cast` on the player and by the shrine blessings (their spells are of those kinds); then
+  measure how many scripts run whole. `GetEffect` reads the active list.
 
 ## Sizes and costs
 
@@ -566,6 +713,14 @@ receipt's SHA-256, reads it back, and links it into the payload. The legacy buil
 3. Room placements checked in game: the stable room number and the quarter-scale positions, a recentred room's
    shift.
 4. The greeting conditions on the same interpreter (`MessageBox` runs since v0.0.51).
+5. The next blockers by the scripts they stop (measured 30 October 2026, "Not yet" above): ForceGreeting (64
+   scripts wait only for it: it needs the dialogue window of DIALOGUE-57, which opens on the actor and lists the
+   known topics this page's AddTopic keeps), Cast (spells on actors), then PositionCell of other actors (25
+   scripts). That one waits for the object state's moved-actors table (SAVEGAME-COMPLETE-57): a row per actor a
+   script moved (its reference, the new cell by grid or stable room number, position and rotation), kept in saved
+   games; the CHIM window and the room loader spawn a moved actor where its row says and not at its placement, and
+   an actor moved out of the loaded map is removed from it; the builder can work the destination out as it does for
+   the player (PMOV), so the engine reads numbers only. Then the scripts' own values in saved games.
 
 ## Credits
 

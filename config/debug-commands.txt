@@ -3,7 +3,7 @@ AWDC1
 AUDIO|door sounds|aw_door_sounds|on/off (default on)
 AUDIO|music|aw_music_status|[on/off, true/false or 1/0; no argument = status of the switch and the stream] background music (default on; not saved): off closes the stream at once and opens none until on again
 AUDIO|music custom|aw_music_custom|[play / stop; no argument: status] the custom OST player (an image built with --custom-ost FILE): play your own track alone, the playlist and its auto-advance waiting; stop gives the playlist back; without a custom track: silence, never the OST
-AUDIO|mwscript|aw_mwscript|on/off (EXPERIMENTAL, default off, saved) run the game's compiled scripts (docs/MWSCRIPT_BYTECODE.md): ambient and activator sounds, NPC lines, music cues, journal and globals; functions not carried out yet are logged once
+AUDIO|mwscript|aw_mwscript_status|[on/off, true/false or 1/0; no argument: what it does] (default on, saved) the game's compiled scripts (docs/MWSCRIPT_BYTECODE.md): sounds, NPC lines, music cues, journal, globals, object state, AIWander; not-yet functions logged once. Answers with the file (id1/mwscript.awm: format, scripts, bytes kept) and the counts
 AUDIO|mwscript status|aw_mwscript_status|the compiled scripts: objects attached on this map, global scripts, sounds, runs, skipped runs, opcodes per frame
 AUDIO|ost play|aw_music_play|00..98 / original music filename stem (spaces as underscores)
 VIDEO|atmos|aw_atmos|0..3 (saved, default 2): 1 rain, snow and storm ash outdoors (off until measured), 2 chimney, fire and steam smoke; 3 both
@@ -14,13 +14,13 @@ VIDEO|crosshair|aw_crosshair|[on/off or 1/0; no argument toggles / colour NAME /
 VIDEO|crosshairs|aw_crosshair|same as crosshair
 VIDEO|cull|aw_cull|far detail (saved; also Options > Video > Far detail): 1 Full (everything to the fog), 3 Light, 4 Strong (default; saves from before v0.0.42 keep Full), 6 Strong + small faces (distant models drop out sooner: faster); also 0 none, 2 fog-exact (same picture as 1), 5 small faces only, 7 debug view; on = 1, off = 0; +8 fog rule, +16 cut groups (see those)
 VIDEO|cut groups|aw_cull|[on/off, 1/0; no argument shows aw_cull] whole-structure cuts (saved as aw_cull + 16; default off until the in-game A/B): the pieces of one long structure (walkways, town walls, bridges, the Ghostfence, hillside rocks; the frame map's .cut file) are drawn, fogged and left out together, tested on the structure's box; 0 each piece on its own
-VIDEO|draw distance|aw_fog_distance|[100..4096 local units; default 540]
-VIDEO|drawdistance|aw_fog_distance|[100..4096 local units; default 540]
+VIDEO|draw distance|aw_fog_distance|[100..4096 local units; default 300]
+VIDEO|drawdistance|aw_fog_distance|[100..4096 local units; default 300]
 VIDEO|fog|aw_fog|on/off or 1/0 (default on: exterior and interior fog; the console value 2 = exterior fog only, interiors without their cell fog as before)
-VIDEO|fog distance|aw_fog_distance|[100..4096 local units; default 540]
-VIDEO|fog location|aw_fog_location|1/0 places in id1/world/fog-locations.txt set their own day/night fog distance (Balmora 300 day, 250 night; default 0 off)
+VIDEO|fog distance|aw_fog_distance|[100..4096 local units; default 300]
+VIDEO|fog location|aw_fog_location|1/0 places in id1/world/fog-locations.txt (the HUD title's place or region, or the map) set their own day/night fog distance (Ald'ruhn 300, Balmora 300 day, 250 night; default 1 on)
 VIDEO|fog rule|aw_cull|[on/off, 1/0; no argument shows aw_cull] no distance cut before the fog is opaque (saved as aw_cull + 8; default off until the in-game A/B): the Light/Strong far detail cut-offs and the small-faces step start at the fog distance, so nothing pops out of clear air; 0 the cut-offs as before (faster)
-VIDEO|foglocation|aw_fog_location|1/0 places in id1/world/fog-locations.txt set their own day/night fog distance (Balmora 300 day, 250 night; default 0 off)
+VIDEO|foglocation|aw_fog_location|1/0 places in id1/world/fog-locations.txt (the HUD title's place or region, or the map) set their own day/night fog distance (Ald'ruhn 300, Balmora 300 day, 250 night; default 1 on)
 VIDEO|ghostfence|aw_ghostfence|[on/off, true/false or 1/0] animated scrolling textures (default on; not saved): on = the Ghostfence curtain, waterfalls and other turbulent textures ripple over time; off = drawn straight and still (unlit, as they are built; also stills water in interiors)
 VIDEO|killhud|aw_photomode|[on/off, true/false or 1/0; no argument toggles; hud: Ctrl+Alt+H] clean shots: hides bars, crosshair, hands, prompts, names, subtitles and overlays; full view; fog off and free camera (aw_photomode_nofog, aw_photomode_noclip, aw_photomode_hands); Ctrl+F fog, Ctrl+H dbg hud; off returns to the start point (not saved; Options > Video > Photo mode)
 VIDEO|land fill|aw_land_fill|1/0 (default 1): Land Fill Independence v1, enabled LAND passes with fog on or off; 0 disables for A/B
@@ -91,7 +91,7 @@ WORLD / TRAVEL|reset location|amiwind_debug_reset_location|0
 WORLD / TRAVEL|scene|aw_scene|ship/town/balmora/<map name>
 WORLD / TRAVEL|scene change|aw_scene_menu|(scene picker)
 WORLD / TRAVEL|superspeed|superspeed|[on/off, true/false or 1/0; no argument = status and current speeds] the old fixed fast walk/run (cl_forwardspeed, Shift x cl_movespeedkey) instead of the original's speed from Speed, Athletics and load; no running fatigue (default off; not saved; also plain superspeed on/off)
-WORLD / TRAVEL|tp|aw_teleport|[X Y [Z] original global coordinates (Z: the floor at or below it) / mark or marker (the map marker you set on the map screen) / seydaneen / prisonship / balmora / vivec (the whole city vivec_city, else the Vivec Arena) / tel_uvirith (teluvirith) / heartchamber / suran / suranclub / aldruhn / khuul / arenapit / <map name>; no argument opens menu]
+WORLD / TRAVEL|tp|aw_teleport|[X Y [Z] original global coordinates (Z: the floor at or below it) / mark or marker (the map marker you set on the map screen) / seydaneen / prisonship / balmora / vivec (the whole city vivec_city, else the Vivec Arena) / tel_uvirith (teluvirith) / heartchamber / suran / suranclub / aldruhn / khuul / arenapit / <map name>; no argument: town list]
 WORLD / TRAVEL|tp map|aw_teleport_map|select a destination on the world map
 WORLD / TRAVEL|tp menu|aw_scene_menu|(teleport picker)
 WORLD / TRAVEL|unstuck|aw_unstuck|(nearest clear standing spot below or beside you; never into a wall or water; leaves noclip)
@@ -107,7 +107,7 @@ SKY / LIGHTING|daynightcycle|aw_daynightcycle|on/off true/false 1/0 (automatic t
 SKY / LIGHTING|daytimecycle|aw_24hrcycle|same as 24hrcycle
 SKY / LIGHTING|emissive|aw_emissive|[0 or 1] glowing lanterns, flames, lava and mushrooms (default 1); no argument: query
 SKY / LIGHTING|exterior luma|aw_exteriorluma_set|[0..4] no argument: query
-SKY / LIGHTING|guardtorch|aw_guardtorch|[on/off/auto] (all guard torches; auto follows guards_torch_cycle) or light radius 0.1..2.0 of the player torch (default 0.5)
+SKY / LIGHTING|guardtorch|aw_guardtorch|[on/off/auto] (all guard torches; auto follows guards_torch_cycle: dark hours with nothing falling) or light radius 0.1..2.0 of the player torch (default 0.33, the original torch's reach)
 SKY / LIGHTING|headlamp|aw_headlamp_set|[on/off, true/false or 1/0] torch light without holding a torch (not saved)
 SKY / LIGHTING|hlamp|aw_headlamp_set|[on/off, true/false or 1/0] same as headlamp
 SKY / LIGHTING|horizon veil|aw_horizon_veil|0..15 (default 0 off) haze the lowest sky bands into the far fog colour so distant gaps read as haze
@@ -132,6 +132,7 @@ SKY / LIGHTING|outdoorlantern|aw_lamp_radius|[0.25..3.0] light radius of exterio
 SKY / LIGHTING|set time|aw_set_time|HHMM (0000..2359) or morning/night/midday/day/evening/sunset/sunrise/dusk/dawn
 SKY / LIGHTING|settime|aw_set_time|same as time
 SKY / LIGHTING|sky|aw_daynight|on/off true/false 1/0 (sky/fog presentation; time control is separate)
+SKY / LIGHTING|skyhaze|aw_sky_haze|1/0 (default 1): the sky fades toward the fog colour as the draw distance gets shorter (none at 540 and beyond), so fogged buildings and sky meet in one haze; 0 = the sky as before
 SKY / LIGHTING|skyline fill|aw_skyline_fill|1/0 object silhouetting horizon: sky below fogged far scenery takes the fog colour; experimental and buggy (sprites need their shapes from the alpha channel); tested but subpar results, kept for future improvement (default 0: land-outline horizon)
 SKY / LIGHTING|skylinefill|aw_skyline_fill|1/0 object silhouetting horizon: sky below fogged far scenery takes the fog colour; experimental and buggy (sprites need their shapes from the alpha channel); tested but subpar results, kept for future improvement (default 0: land-outline horizon)
 SKY / LIGHTING|skyspeed|aw_skyspeed_set|[0..100] (cloud multiplier; default 0.00333333333 = 1/300 of old speed)
@@ -178,7 +179,7 @@ DIAGNOSTICS|hud type|aw_debug_hud_type|1 original / 2 compact (default)
 DIAGNOSTICS|logs live|aw_logs_live_set|[on/off, true/false or 1/0] write the diagnostic logs (DEBUG.TXT, walk-profile.csv, frame-stalls.csv, heap-audit.log, cell-load-profile.tsv, music-events.csv, ...) as they happen, for benchmarks; default off: kept in memory (oldest lines drop) and written at Exit game or with dbg savelogs (saved once set)
 DIAGNOSTICS|npcfloors|aw_npc_floors|(read-only ground-contact report)
 DIAGNOSTICS|npclod|aw_npclod|[auto/0/1/2/3 / target <0..3/auto> / show on/off / bands <d0> <d1> <d2> / stats] NPC model levels (--npc-lod on builds): 0..3 forces a level on every NPC, auto = distance bands; target = the NPC under the crosshair; show labels level, triangles, KiB, distance; bands sets the edges live; stats (not saved)
-DIAGNOSTICS|npcs|aw_npcs|
+DIAGNOSTICS|npcs|aw_npcs|[talk [ID]] the NPCs of the area with their positions; talk: open the dialogue window with the nearest NPC that has topics (or record ID), turned to face it, as Talk (E) does
 DIAGNOSTICS|overlay|amiwind_show_debug|on/off true/false 1/0
 DIAGNOSTICS|pos|aw_pos|
 DIAGNOSTICS|probe|aw_probe|(slow floor audit)

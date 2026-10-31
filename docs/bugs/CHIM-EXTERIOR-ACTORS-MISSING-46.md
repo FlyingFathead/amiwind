@@ -5,7 +5,7 @@
 ## PERSISTING: reported 3 times; something has to be done
 
 - Reported with v0.0.48-dev2 at 2026-10-22 (time not recorded): the maintainer: outdoors NPCs only in Seyda Neen, Balmora and Vivec
-- Reported with v0.0.54-dev1 at 2026-10-27 15:58 +0200: Still no outdoor creature in the v0.0.54-dev1 MiniWinds. The maintainer, 27 October 2026: how about the in-game creatures? they are nowhere in-game? i.e. wild guars, cliff racers, slaughterfish etc. The image carries all 5,981 exterior creature references and the frames place 317 direct ones; the 4,853 levelled ones are rolled at run time. Taken by the creatures worker, who is diagnosing the run time cause in game.
+- Reported with v0.0.54-dev1 at 2026-10-27 15:58 +0200: Still no outdoor creature in the v0.0.54-dev1 MiniWinds. The maintainer asked, 27 October 2026, about the in-game creatures: none is seen anywhere in game (wild guars, cliff racers, slaughterfish and the rest). The image carries all 5,981 exterior creature references and the frames place 317 direct ones; the 4,853 levelled ones are rolled at run time. Taken by the creatures worker, who is diagnosing the run time cause in game.
 - Reported with v0.0.54-dev1 at 2026-10-27 16:30 +0200: Cause found 27 October 2026 by the creatures worker: the actor table setting was dropped silently at game start (CHIM-ACTOR-TABLE-OFF-IN-GAME-47), so only 317 direct creature rows appeared outdoors and the 5,082 levelled references were never rolled. Fix on branch v0.0.54-creatures, in-game check pending.
 
 <!-- END GENERATED PERSISTING -->

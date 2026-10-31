@@ -1,6 +1,6 @@
 # Memory on the Amiga: the game heap, the CHIM zone and what the builder checks
 
-_Last updated with AmiWind v0.0.48-dev2 (23 October 2026)._
+_Last updated with AmiWind v0.0.57-dev1 (30 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -37,7 +37,11 @@ An A1200 with 16 MiB of Fast RAM holds, from the bottom up:
 - **The game heap (11 MiB of Fast RAM by default)**: Quake's Hunk, one block taken at start-up.
   Every map, model, texture, sound and the CHIM zone live in it. The boot check asks for the heap
   plus 3 MiB of free Fast RAM (14 MiB) and the heap plus 16 bytes in one block.
-- **The rest of Fast RAM**: the program itself, the screen and z buffers, the surface cache,
+- **The rest of Fast RAM**: the program itself, the screen and z buffers, the surface cache (2 MiB
+  since v0.0.57: the heaviest measured view, the prison ship's hold, draws 1.62 MB of surface texels in one
+  frame; before, 512 KB; `-surfcachesize KB` overrides it, and when 2 MiB is not free the game falls back to
+  512 KB and says so; RENDER-SURFCACHE-THRASH-32; its 1.5 MiB past the old size come out of the margin left to the
+  system, not out of the automatic CHIM cache below),
   short-lived copies (alias model staging up to 512 KiB, the world map screen's 250 KB map, movie
   buffers), and the guard torch's 1 MiB probe. With the 11 MiB heap about 1.4 MB stays free in one
   block after the heaviest map.

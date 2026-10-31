@@ -20,13 +20,13 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.56-dev1 (29 October 2026)._
+_Last updated with AmiWind v0.0.56 (30 October 2026)._
 
 ## Status: 29 October 2026
 
-Open, persisting in v0.0.55, severity raised to high. The maintainer, on the camera-facing billboard trees: "yeah
-this is ass", "kind of unacceptable since many mushrooms etc grow directly next to the trees and it's really fucky
-to go pick them up if they're just a billboard". So this is not only a Seyda Neen spot: every sprite tree with a
+Open, persisting in v0.0.55, severity raised to high. The maintainer, on the camera-facing billboard trees: they are
+unacceptable, since many mushrooms and other plants grow directly next to the trees and picking them up is awkward
+when the tree is just a billboard. So this is not only a Seyda Neen spot: every sprite tree with a
 harvest plant at its foot has it, because the flat panel turns with the player and stands between the eye and the
 plant from most sides.
 

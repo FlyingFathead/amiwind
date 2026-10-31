@@ -42,6 +42,10 @@ byte *COM_LoadHunkFile(char *p){return fog_colours;}
 /* config.cfg for AW_ConfigWithout: NULL = no saved configuration. */
 static const char *saved_config;
 int COM_FOpenFile(char *name,FILE **f){
+ if(!strcmp(name,"world/large-rooms.txt")){           /* FOG-300-DEFAULT-57: one large room, capped at 450 */
+  static const char rooms[]="# large rooms\nrie242a8d69e 450\nrimanor\n";
+  *f=tmpfile();fputs(rooms,*f);rewind(*f);return (int)strlen(rooms);
+ }
  assert(!strcmp(name,"config.cfg"));
  if(!saved_config){*f=NULL;return -1;}
  *f=tmpfile();fputs(saved_config,*f);rewind(*f);return (int)strlen(saved_config);
@@ -107,6 +111,23 @@ static void fog_exact_tests(void){
  sky_fogged=0;AW_CullBegin();assert(point_far(700,0,-50)==AW_FAR_DRAW);sky_fogged=1;
  Cvar_SetValue("aw_skyline_fill",1);AW_CullBegin();assert(point_far(700,0,-50)==AW_FAR_DRAW);Cvar_SetValue("aw_skyline_fill",0);
  inside=1;AW_CullBegin();assert(point_far(700,0,-50)==AW_FAR_DRAW);inside=0;
+ /* Large rooms (FOG-300-DEFAULT-57): a listed room draws nothing past the draw distance,
+  * at most its cap; an unlisted room, fog off or an exterior keep the 4096 indoor reach. */
+ {qboolean was_active=sv.active;char was_name[sizeof sv.name];float was_distance=aw_drawdistance.value;
+  memcpy(was_name,sv.name,sizeof was_name);sv.active=1;inside=1;Cvar_SetValue("aw_cull",1);
+  strcpy(sv.name,"rie242a8d69e");aw_drawdistance.value=300;AW_CullBegin();
+  {vec3_t at={400,0,0},near_at={250,0,0},far_at={3000,0,0};
+  assert(AW_LargeRoomDistance()==300 && !AW_ModelVisible(at,10) && AW_ModelVisible(near_at,10));
+  aw_drawdistance.value=700;AW_CullBegin();
+  at[0]=500;near_at[0]=400;
+  assert(AW_LargeRoomDistance()==450 && !AW_ModelVisible(at,10) && AW_ModelVisible(near_at,10));
+  strcpy(sv.name,"rimanor");AW_CullBegin();assert(AW_LargeRoomDistance()==700);
+  strcpy(sv.name,"rimano");AW_CullBegin();assert(!AW_LargeRoomDistance() && AW_ModelVisible(far_at,10));
+  strcpy(sv.name,"rie242a8d69e");Cvar_SetValue("aw_fog",0);AW_CullBegin();
+  assert(!AW_LargeRoomDistance() && AW_ModelVisible(far_at,10));Cvar_SetValue("aw_fog",1);}
+  inside=0;assert(!AW_LargeRoomDistance());
+  sv.active=was_active;memcpy(sv.name,was_name,sizeof was_name);aw_drawdistance.value=was_distance;
+  Cvar_SetValue("aw_cull",2);AW_CullBegin();}
  /* A flame farther than full fog moves the test behind it. */
  aw_flame_depth_limit=flame_limit;flame_limit_value=40;AW_CullBegin();
  assert(point_far(700,0,-50)==AW_FAR_DRAW && point_far(900,0,-50)==AW_FAR_SKIP);

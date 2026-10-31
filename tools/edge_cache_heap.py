@@ -60,8 +60,11 @@ import struct
 # Re-pinned 2026-10-27 for SKEL-VERTEX-LIMIT-52 (model.c): AW_AliasExceptionAllows split into AW_AliasCrcAdd and
 # AW_AliasExceptionMatches (the alias stream reader checks an extended model's model-budgets.txt line with a CRC-32 it
 # computes while reading); edge-cache code and brush loaders are byte-identical.
+# Re-pinned 2026-10-30 for ANIMKIT-COVERAGE-35 (model.c): the generic alias loader sizes and keeps a skeletal model's
+# block after its rest frame and links it through the aw_alias_skel_link hook; edge-cache code and brush loaders are
+# byte-identical.
 SOURCE_HASHES={
-    'model.c':'4bf814abb6753f702cce3a3ff7e6ac6baad9e48f080d97be5ed63eb595cf3c7a',
+    'model.c':'426da51737baabdcfd340358faff96741998bb980a3b896026c3be094d973ae1',
     'model.h':'bc905ee0a36fafb68eb1376b68670f24de270931ca8ba736ca29ab7e1178440a',
     'r_draw.c':'08464e4c3bbb98ed197f7c42c5b013818d2ef4fffd1a5727ed9a6a4c3385cce4',
     'asm_draw.h':'15dafafe33898852972379fc48524346c287a342ba95f17c01becdc75926eba1',

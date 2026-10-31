@@ -343,17 +343,23 @@ class LargestFirst(unittest.TestCase):
                 self.assertLess(recorded['light'], 1.0)                                # this run's times recorded
 
     def test_completed_map_submits_by_cost(self):
-        # The order of the calls, not their clock readings: with two workers 'c' cannot be called before
-        # 'b' or 'd' has returned, while a worker delayed on a loaded host can read its clock late
-        # (TESTS-SUPERVISOR-START-CLOCK-46). The workers are processes, so each call appends to a file.
+        # The submission order, not what the workers did with it (TESTS-SUPERVISOR-START-CLOCK-46): the map keeps
+        # four tasks in flight for two workers, so a worker process the host delays can take 'd' and write its
+        # call after the other worker has finished 'b' and taken 'c' (gate 4757, v0.0.57-dev3: calls b, c, d).
+        # Neither clock readings nor call logs of worker processes give the order the map submitted in; the
+        # submission order itself (_by_cost, the order completed_map hands its units to the pool) is checked, and
+        # the map's results with it.
         weight = {'a': 1, 'b': 4, 'c': 2, 'd': 3}
         with tempfile.TemporaryDirectory() as tmp:
             log = str(Path(tmp, 'calls'))
             items = [(name, .2, log) for name in 'abcd']
-            rows = list(build_parallel.completed_map(called_in_order, items, 2, cost=lambda item: weight[item[0]]))
+            cost = lambda item: weight[item[0]]   # noqa: E731
+            submitted = [item[0] for _, item in build_parallel._by_cost(items, cost)]
+            rows = list(build_parallel.completed_map(called_in_order, items, 2, cost=cost))
             calls = Path(log).read_text().split()
+        self.assertEqual(submitted, ['b', 'd', 'c', 'a'])
         self.assertEqual(sorted(rows), ['a', 'b', 'c', 'd'])
-        self.assertEqual(set(calls[:2]), {'b', 'd'})
+        self.assertEqual(sorted(calls), ['a', 'b', 'c', 'd'])      # each unit called once
 
     def test_region_frames_weigh_their_source_cells(self):
         from chim import build as chim_build

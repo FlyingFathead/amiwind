@@ -144,7 +144,9 @@ static int move_group(const aw_anim_t *a,float speed,int swimming,int idle,int w
     if(g!=AW_ANIM_IDLE && a->g[g].x>0){
         *rate=speed/a->g[g].x;
         if(*rate<.25f)*rate=.25f;
-        if(*rate>4)*rate=4;
+        /* the original caps the played speed at 10 times the group's own (OpenMW 0.51 mwmechanics/character.cpp
+         * maxSpeedMult; was 4 here, a slide past it: WALK-CYCLES-57) */
+        if(*rate>10)*rate=10;
     }
     *rate*=aw_anim_kit_speed;
     return g;
@@ -334,6 +336,7 @@ static int lazy_index(const char *name) {
     sv.models[i]=Mod_FindName(sv.model_precache[i]);   /* the name only: nothing is loaded */
     return i;
 }
+#define AW_ANIM_UNLOADED_FRAMES 1000000   /* a skeletal table's frames at most (aw_skel.c parse) */
 static void prep_layout(model_t *m,const char *path,int numframes) {
     char anm[MAX_QPATH+4];byte *text;int mark,k,i;size_t n=strlen(path);aw_anim_t *a;
     if(used>=TABLE)return;
@@ -343,7 +346,8 @@ static void prep_layout(model_t *m,const char *path,int numframes) {
     mark=Hunk_LowMark();
     text=COM_LoadHunkFile(anm);
     if(!text){AW_AnimDefault(a,numframes);Hunk_FreeToLowMark(mark);return;}
-    if(!AW_AnimParse(a,(const char *)text,numframes))Con_Printf("Animation layout %s: invalid, idle only\n",anm);
+    if(!AW_AnimParse(a,(const char *)text,numframes))
+        Con_Printf("Animation layout %s: invalid against %d model frames, idle only\n",anm,numframes);
     Hunk_FreeToLowMark(mark);
     {int g,need,last=used-1;table[last].needed=0;
      for(g=0;g<AW_ANIM_GROUPS;g++)if(a->g[g].present){need=(int)a->g[g].base+(int)a->g[g].count;if(need>table[last].needed)table[last].needed=need;}}
@@ -371,7 +375,10 @@ void AW_AnimPrep(edict_t *e) {
     model_t *m,*mover;aw_anim_t *a;int i;
     level_check();
     if(!(m=model_of(e)) || slot(m) || used>=TABLE)return;
-    prep_layout(m,m->name,m->numframes);
+    /* a model known by name only (not loaded yet: numframes 0) has its layout checked against its frames when it
+     * loads (AW_AnimOf, as a mover's); parsed against 0 frames every group failed and the actor kept only its idle,
+     * dragged through a walk or a fight (ANIMKIT-COVERAGE-35, WALK-CYCLES-57 sweep of v0.0.57-dev2) */
+    prep_layout(m,m->name,m->numframes>0?m->numframes:AW_ANIM_UNLOADED_FRAMES);
     if(!(a=slot(m)) || !a->mover[0])return;
     /* the mover's layout now (spawn time: its sounds are precached); its frames are checked when it loads */
     if(!(i=lazy_index(a->mover))){a->mover[0]=0;return;}

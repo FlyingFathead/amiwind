@@ -1893,6 +1893,17 @@ static void Chim_MemoryStart (void)
 	if (available && !cache_manual && aw_autoram.value)
 		AW_FastReleaseAll ("the CHIM cache banks");	/* before the free Fast RAM is measured */
 	memory_free = chim_fast_avail ? chim_fast_avail (0) : 0;
+#ifdef AMIGA
+	/* The surface cache's bytes past its size before v0.0.57 (RENDER-SURFCACHE-THRASH-32, vid_amiga.c) come out of
+	 * the margin left to the system, not out of the CHIM cache: measured at 32 MB Fast, counting them here made the
+	 * cache 7 MiB -> 5 MiB and the gate's boot smoke saw the zone full. The margin keeps its 2 MiB floor. */
+	{
+		extern int aw_surfcache_extra;
+		if (memory_free && aw_surfcache_extra > 0
+		    && ChimZone_AutoMargin (chim_fast_avail (2)) >= CHIM_AUTO_FLOOR + (unsigned long)aw_surfcache_extra)
+			memory_free += (unsigned long)aw_surfcache_extra;
+	}
+#endif
 	memory_total = chim_fast_avail ? chim_fast_avail (2) : 0;
 	if (memory_total < memory_free)
 		memory_total = memory_free;

@@ -18,6 +18,7 @@
 #define AW_MWVM_STRINGS 8192       /* NOTYET names logged once each */
 #define AW_MWVM_SELF (-2)
 #define AW_MWVM_PLAYER (-1)
+#define AW_MWVM_CALL_READ 2      /* the host's call() answered a read: nothing changed */
 
 typedef union {int32_t i;float f;} aw_mwcell_t;
 
@@ -59,7 +60,9 @@ typedef struct {
     /* The import route (v0.0.54): a function the compiler marks "not yet" (NOTYET), by its number
      * (tools/mwscript/functions.py FUNCTION_NUMBERS), with its numbers in the script's order and its strings (COUNT
      * big-endian u16 string indexes; a reference's id first when it had one). Return 1 with RESULT set when the
-     * engine carries it out; 0 leaves it "not yet" (logged once, 0 read). May be NULL. */
+     * engine carries it out; AW_MWVM_CALL_READ when it only read state (an answer, nothing changed: the quiet rule
+     * may let the script sleep); 0 leaves it "not yet" (logged once, 0 read). May be NULL. A function the compiler
+     * marks carried by the host (tools/mwscript/functions.py HOST) comes with its reference as TARGET instead. */
     int (*call)(int instance,int target,int function,const aw_mwcell_t *numbers,int count,
                 const unsigned char *strings,int nstrings,aw_mwcell_t *result);
     /* GetPCCell: the player's cell: 1 outdoors (X, Y the grid cell), 2 in a room (X its stable number), 0 none */

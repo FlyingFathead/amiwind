@@ -1,6 +1,6 @@
 # AmiWind console commands
 
-_Generated from `config/debug-commands.txt` with AmiWind v0.0.56._
+_Generated from `config/debug-commands.txt` with AmiWind v0.0.57._
 
 Open the console with F10 or the backquote key and type
 a command, for example `dbg headlamp on`. This page is generated from
@@ -24,8 +24,7 @@ Type: "dbg help" for help.
 | `dbg door sounds` | - | on/off (default on) |
 | `dbg music` | - | [on/off, true/false or 1/0; no argument = status of the switch and the stream] background music (default on; not saved): off closes the stream at once and opens none until on again |
 | `dbg music custom` | - | [play / stop; no argument: status] the custom OST player (an image built with --custom-ost FILE): play your own track alone, the playlist and its auto-advance waiting; stop gives the playlist back; without a custom track: silence, never the OST |
-| `dbg mwscript` | - | on/off (EXPERIMENTAL, default off, saved) run the game's compiled scripts (docs/MWSCRIPT_BYTECODE.md): ambient and activator sounds, NPC lines, music cues, journal and globals; functions not carried out yet are logged once |
-| `dbg mwscript status` | - | the compiled scripts: objects attached on this map, global scripts, sounds, runs, skipped runs, opcodes per frame |
+| `dbg mwscript` | `dbg mwscript status` | [on/off, true/false or 1/0; no argument: what it does] (default on, saved) the game's compiled scripts (docs/MWSCRIPT_BYTECODE.md): sounds, NPC lines, music cues, journal, globals, object state, AIWander; not-yet functions logged once. Answers with the file (id1/mwscript.awm: format, scripts, bytes kept) and the counts |
 | `dbg ost play` | - | 00..98 / original music filename stem (spaces as underscores) |
 
 ## Video
@@ -39,9 +38,9 @@ Type: "dbg help" for help.
 | `dbg crosshair` | `dbg crosshairs` | [on/off or 1/0; no argument toggles / colour NAME / shape NAME / style] show the crosshair (saved; default on; also Options > Prefs); colours Warm white (default), Yellow, Green, Blue; shapes Cross (default), Open cross, Small cross, Dot (saved); a number or a name's start is enough, no name lists them; style prints all three |
 | `dbg cull` | - | far detail (saved; also Options > Video > Far detail): 1 Full (everything to the fog), 3 Light, 4 Strong (default; saves from before v0.0.42 keep Full), 6 Strong + small faces (distant models drop out sooner: faster); also 0 none, 2 fog-exact (same picture as 1), 5 small faces only, 7 debug view; on = 1, off = 0; +8 fog rule, +16 cut groups (see those) |
 | `dbg cut groups` | - | [on/off, 1/0; no argument shows aw_cull] whole-structure cuts (saved as aw_cull + 16; default off until the in-game A/B): the pieces of one long structure (walkways, town walls, bridges, the Ghostfence, hillside rocks; the frame map's .cut file) are drawn, fogged and left out together, tested on the structure's box; 0 each piece on its own |
-| `dbg draw distance` | `dbg drawdistance`, `dbg fog distance` | [100..4096 local units; default 540] |
+| `dbg draw distance` | `dbg drawdistance`, `dbg fog distance` | [100..4096 local units; default 300] |
 | `dbg fog` | - | on/off or 1/0 (default on: exterior and interior fog; the console value 2 = exterior fog only, interiors without their cell fog as before) |
-| `dbg fog location` | `dbg foglocation` | 1/0 places in id1/world/fog-locations.txt set their own day/night fog distance (Balmora 300 day, 250 night; default 0 off) |
+| `dbg fog location` | `dbg foglocation` | 1/0 places in id1/world/fog-locations.txt (the HUD title's place or region, or the map) set their own day/night fog distance (Ald'ruhn 300, Balmora 300 day, 250 night; default 1 on) |
 | `dbg fog rule` | - | [on/off, 1/0; no argument shows aw_cull] no distance cut before the fog is opaque (saved as aw_cull + 8; default off until the in-game A/B): the Light/Strong far detail cut-offs and the small-faces step start at the fog distance, so nothing pops out of clear air; 0 the cut-offs as before (faster) |
 | `dbg ghostfence` | - | [on/off, true/false or 1/0] animated scrolling textures (default on; not saved): on = the Ghostfence curtain, waterfalls and other turbulent textures ripple over time; off = drawn straight and still (unlit, as they are built; also stills water in interiors) |
 | `dbg killhud` | `dbg photomode` | [on/off, true/false or 1/0; no argument toggles; hud: Ctrl+Alt+H] clean shots: hides bars, crosshair, hands, prompts, names, subtitles and overlays; full view; fog off and free camera (aw_photomode_nofog, aw_photomode_noclip, aw_photomode_hands); Ctrl+F fog, Ctrl+H dbg hud; off returns to the start point (not saved; Options > Video > Photo mode) |
@@ -100,7 +99,7 @@ Type: "dbg help" for help.
 | `dbg scene` | - | ship/town/balmora/<map name> |
 | `dbg scene change` | `dbg tp menu` | (scene picker) |
 | `dbg superspeed` | - | [on/off, true/false or 1/0; no argument = status and current speeds] the old fixed fast walk/run (cl_forwardspeed, Shift x cl_movespeedkey) instead of the original's speed from Speed, Athletics and load; no running fatigue (default off; not saved; also plain superspeed on/off) |
-| `dbg tp` | - | [X Y [Z] original global coordinates (Z: the floor at or below it) / mark or marker (the map marker you set on the map screen) / seydaneen / prisonship / balmora / vivec (the whole city vivec_city, else the Vivec Arena) / tel_uvirith (teluvirith) / heartchamber / suran / suranclub / aldruhn / khuul / arenapit / <map name>; no argument opens menu] |
+| `dbg tp` | - | [X Y [Z] original global coordinates (Z: the floor at or below it) / mark or marker (the map marker you set on the map screen) / seydaneen / prisonship / balmora / vivec (the whole city vivec_city, else the Vivec Arena) / tel_uvirith (teluvirith) / heartchamber / suran / suranclub / aldruhn / khuul / arenapit / <map name>; no argument: town list] |
 | `dbg unstuck` | - | (nearest clear standing spot below or beside you; never into a wall or water; leaves noclip) |
 | `dbg view` | - | x y z yaw pitch |
 | `dbg worldbounds` | - | [on/off, true/false or 1/0; no argument shows the state] the sea current along the edge of the open world that turns you back (an AmiWind extension; on in a default build) (not saved) |
@@ -118,7 +117,7 @@ Type: "dbg help" for help.
 | `dbg daynightcycle` | - | on/off true/false 1/0 (automatic time; explicit set/wait still work) |
 | `dbg emissive` | - | [0 or 1] glowing lanterns, flames, lava and mushrooms (default 1); no argument: query |
 | `dbg exterior luma` | `dbg luma exterior`, `dbg luma outdoor` | [0..4] no argument: query |
-| `dbg guardtorch` | - | [on/off/auto] (all guard torches; auto follows guards_torch_cycle) or light radius 0.1..2.0 of the player torch (default 0.5) |
+| `dbg guardtorch` | - | [on/off/auto] (all guard torches; auto follows guards_torch_cycle: dark hours with nothing falling) or light radius 0.1..2.0 of the player torch (default 0.33, the original torch's reach) |
 | `dbg headlamp` | `dbg hlamp` | [on/off, true/false or 1/0] torch light without holding a torch (not saved) |
 | `dbg horizon veil` | - | 0..15 (default 0 off) haze the lowest sky bands into the far fog colour so distant gaps read as haze |
 | `dbg indoor luma` | `dbg interior luma`, `dbg interiorluma`, `dbg luma indoor`, `dbg luma interior` | [0..4] (brightness-enabled builds; static interior multiplier; default 1.0; no argument queries) |
@@ -135,6 +134,7 @@ Type: "dbg help" for help.
 | `dbg outdoorlantern` | - | [0.25..3.0] light radius of exterior lamps and lanterns at night, relative to the torch (default 1.0) |
 | `dbg set time` | `dbg settime`, `dbg time` | HHMM (0000..2359) or morning/night/midday/day/evening/sunset/sunrise/dusk/dawn |
 | `dbg sky` | - | on/off true/false 1/0 (sky/fog presentation; time control is separate) |
+| `dbg skyhaze` | - | 1/0 (default 1): the sky fades toward the fog colour as the draw distance gets shorter (none at 540 and beyond), so fogged buildings and sky meet in one haze; 0 = the sky as before |
 | `dbg skyline fill` | `dbg skylinefill` | 1/0 object silhouetting horizon: sky below fogged far scenery takes the fog colour; experimental and buggy (sprites need their shapes from the alpha channel); tested but subpar results, kept for future improvement (default 0: land-outline horizon) |
 | `dbg skyspeed` | - | [0..100] (cloud multiplier; default 0.00333333333 = 1/300 of old speed) |
 | `dbg skytype` | - | 1/2/3 or V1/V2/V3 (V3 extra stronk default) |
@@ -193,7 +193,7 @@ Type: "dbg help" for help.
 | `dbg logs live` | - | [on/off, true/false or 1/0] write the diagnostic logs (DEBUG.TXT, walk-profile.csv, frame-stalls.csv, heap-audit.log, cell-load-profile.tsv, music-events.csv, ...) as they happen, for benchmarks; default off: kept in memory (oldest lines drop) and written at Exit game or with dbg savelogs (saved once set) |
 | `dbg npcfloors` | - | (read-only ground-contact report) |
 | `dbg npclod` | - | [auto/0/1/2/3 / target <0..3/auto> / show on/off / bands <d0> <d1> <d2> / stats] NPC model levels (--npc-lod on builds): 0..3 forces a level on every NPC, auto = distance bands; target = the NPC under the crosshair; show labels level, triangles, KiB, distance; bands sets the edges live; stats (not saved) |
-| `dbg npcs` | - | - |
+| `dbg npcs` | - | [talk [ID]] the NPCs of the area with their positions; talk: open the dialogue window with the nearest NPC that has topics (or record ID), turned to face it, as Talk (E) does |
 | `dbg pos` | - | - |
 | `dbg probe` | - | (slow floor audit) |
 | `dbg rcount` | - | [0/1/2/3/4] once a second: renderer counts per frame (brush models, faces, clip fragments, edges, spans, surface cache, alias models) and timing split; 2 = remote state file only; 3 = 2 + brush-slot profile (walk/emit split, distance x size table, leaves per placement); 4 = 3 printed |

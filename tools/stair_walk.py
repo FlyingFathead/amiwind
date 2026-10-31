@@ -723,8 +723,8 @@ SCOPE_ENV = 'AMIWIND_STAIR_WALK'
 SCOPES = ('all', 'flights')
 
 
-# 2026-10-20 [v0.0.46] the maintainer: "YOU FUCKING FIGURE OUT A WAY TO DO OUR BUILDS WITHOUT THOSE. YOU FUCKING
-# DISABLE IT BY DEFAULT." AMIWIND_STAIR_WALK=off (the builder's default) skips every stair walk; the walks stay
+# 2026-10-20 [v0.0.46] decided for the project: builds run without stair walks, off by default.
+# AMIWIND_STAIR_WALK=off (the builder's default) skips every stair walk; the walks stay
 # selectable (--stair-walk flights|all) and are never deleted (BUILD-STAIR-WALK-OFF-46).
 DEFAULT_OFF = False   # the command-line tools set it while they run (chim_build, chimport); the builder sets AMIWIND_STAIR_WALK=off
 

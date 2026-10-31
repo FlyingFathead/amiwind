@@ -26,8 +26,8 @@ def section(name, wall, cores, items=None, phase=False):
     return row
 
 
-def profile(run, sections, stage='image', jobs=24, busy=False, other=0.0, fingerprint='f1'):
-    host = {'cpus': 24, 'busy_percent': 50.0, 'other_percent': other, 'host_busy': busy, 'samples': 9}
+def profile(run, sections, stage='image', jobs=24, busy=False, other=0.0, fingerprint='f1', busy_percent=50.0):
+    host = {'cpus': 24, 'busy_percent': busy_percent, 'other_percent': other, 'host_busy': busy, 'samples': 9}
     return {'schema': 'amiwind-build-profile-v1', 'run': 'out/build/' + run, 'version': '0.0.36-dev5',
             'budget': jobs, 'started_at': '2026-10-11T10:00:00',
             'stages': [{'name': stage, 'status': 'passed', 'jobs': jobs, 'jobs_mean': jobs, 'fingerprint': fingerprint,
@@ -57,6 +57,19 @@ class PerfGuardTests(unittest.TestCase):
         self.assertEqual(row['verdict'], perf_guard.FAIL)
         self.assertEqual(row['baseline']['tier'], 'saturating')
         self.assertTrue(any(text.startswith('parallel -> serial') for text in row['reasons']), row['reasons'])
+
+    def test_a_saturated_host_is_busy_for_the_time(self):
+        # PERF-GUARD-RESIDENT-BUSY-HOST-57: the v0.0.57-dev5 chim-town stages, host 92.9 % busy (this build's own
+        # stages beside them), other work 22.4 %: the same 15 units 129 s, was 52 s, the same code; not a failure
+        before = profile('old', [section('parallel map: build_resident', 52, 5.0, items=15)], stage='chim-town-balmora')
+        now = profile('new', [section('parallel map: build_resident', 129, 4.67, items=15)], stage='chim-town-balmora',
+                      other=22.4, busy_percent=92.9)
+        row = judge(now, [before])['rows'][0]
+        self.assertNotEqual(row['verdict'], perf_guard.FAIL, row['reasons'])
+        self.assertTrue(any('time not compared' in r for r in row['reasons']), row['reasons'])
+        # the same run on a quiet host is still judged on its time
+        quiet = profile('new2', [section('parallel map: build_resident', 129, 4.67, items=15)], stage='chim-town-balmora')
+        self.assertEqual(judge(quiet, [before])['rows'][0]['verdict'], perf_guard.FAIL)
 
     def test_the_same_work_staying_parallel_passes(self):
         before = profile('old', [section('parallel map: walk', 300, 11.6, items=270)])

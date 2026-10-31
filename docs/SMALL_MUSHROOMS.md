@@ -1,6 +1,6 @@
 # Optional small mushrooms
 
-_Last updated with AmiWind v0.0.33 (9 October 2026)._
+_Last updated with AmiWind v0.0.57 (31 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -8,6 +8,7 @@ _Last updated with AmiWind v0.0.33 (9 October 2026)._
 - [Direct pickup in the dev4 source candidate](#direct-pickup-in-the-dev4-source-candidate)
 - [Crosshair prompt and pickup notification](#crosshair-prompt-and-pickup-notification)
 - [Dev4 pickup confirmation and repeatable release checkpoint](#dev4-pickup-confirmation-and-repeatable-release-checkpoint)
+- [Every CHIM town has its catalogues (v0.0.57)](#every-chim-town-has-its-catalogues-v0057)
 
 <!-- contents end -->
 
@@ -220,3 +221,14 @@ location can be checked quickly without resetting collected state. See the
 [pickup checkpoint instructions](DEBUG_OVERLAYS.md#mushroom-pickup-checkpoint-next-v0029-build).
 The command and post-load view setup need source/target checks and native
 acceptance before the final release is marked ready.
+
+## Every CHIM town has its catalogues (v0.0.57)
+
+Until v0.0.57 the image made harvest catalogues for the sub-cells of two towns only, Seyda Neen and Balmora; a
+CHIM town made from the game data (Vivec and every other) had none of its own, so the plants inside its frame
+could not be picked there. The image step now makes a catalogue for every region of every town whose region table
+the image ships (`tools/harvest_build.py` plan_rows); the engine already followed any town's regions on its frame
+map (`aw_region.c` AW_RegionAt, `aw_harvest_runtime.c` AW_HarvestFollow). The CHIM world is unchanged (it left
+those plants out before, for the image to place). New catalogues change the save-content fingerprint, as any
+catalogue change does. A partial-area test build whose image has no region table of a town (an interior-scope
+MiniWind of one of its rooms) lists that town's plants as its limit.

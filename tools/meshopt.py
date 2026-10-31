@@ -110,6 +110,36 @@ def _keeps_extent(vertices, part, tri, share=0.9):
     return bool(np.all((b >= a * share) | (a - b <= 0.5)))
 
 
+def open_edges(vertices, faces):
+    """The open edges of a triangle list as {(position key, position key)}: vertices welded by exact position (the
+    seam rule ignores texture splits), an edge used by exactly one triangle is open. An edge where two parts or two
+    materials meet is used once by each side, so it is not open; a gap between them would be."""
+    faces = np.asarray(faces, dtype=np.int64)
+    if not len(faces):
+        return set()
+    keys, inverse = np.unique(np.asarray(vertices, dtype=float)[:, :3], axis=0, return_inverse=True)
+    t = inverse.reshape(-1)[faces[:, :3]]
+    e = np.sort(np.concatenate((t[:, [0, 1]], t[:, [1, 2]], t[:, [2, 0]])), axis=1)
+    e = e[e[:, 0] != e[:, 1]]                   # a degenerate triangle's collapsed edge is no edge
+    pairs, counts = np.unique(e, axis=0, return_counts=True)
+    return {(tuple(keys[a]), tuple(keys[b])) for a, b in pairs[counts == 1]}
+
+
+def seam_check(vertices, before, after):
+    """MESHOPT seam gate (the maintainer's imperative, MESHOPT-HOT-MODELS-57: a simpler model never opens a seam, a
+    crack or a gap where parts or neighbouring models meet): {'source_open', 'result_open', 'new_open'} edge counts.
+    new_open = open edges of the result that the source does not have; 0 passes. The source's own open edges (the
+    rims where a neighbouring model meets this one) must all remain, edge for edge (lost_open = 0), since a rim that
+    moves or is re-cut opens a gap to the neighbour."""
+    a, b = open_edges(vertices, before), open_edges(vertices, after)
+    return {'source_open': len(a), 'result_open': len(b), 'new_open': len(b - a), 'lost_open': len(a - b)}
+
+
+def seam_ok(vertices, before, after):
+    s = seam_check(vertices, before, after)
+    return s['new_open'] == 0 and s['lost_open'] == 0
+
+
 def simplify_locked(vertices, faces, ratio, preserve_materials=(), error_share=ERROR_SHARE):
     """(vertices, faces): faces (n, 4: a b c material) reduced per connected part of each material to about
     ratio, borders locked. vertices are returned unchanged (the output references them); materials in
@@ -124,6 +154,7 @@ def simplify_locked(vertices, faces, ratio, preserve_materials=(), error_share=E
     max_error = float(np.linalg.norm(used_all.max(axis=0) - used_all.min(axis=0))) * error_share if len(used_all) else 0.0
     out = []
     groups = []
+    simplified = []     # (slot in out, source part) of every part the simplifier changed
     for material in sorted(set(faces[:, 3].tolist())):
         mf = faces[faces[:, 3] == material]
         if ratio == 1 or material in set(preserve_materials):
@@ -157,5 +188,41 @@ def simplify_locked(vertices, faces, ratio, preserve_materials=(), error_share=E
         if not _keeps_extent(vertices, mf, tri):
             out.append(mf)                  # a part the simplifier would remove or flatten stays whole
             continue
+        if not seam_ok(vertices, mf, tri):
+            # the seam gate: a part whose simplified surface has an open edge the source part does not have (a crack)
+            # or lost one of its rims (a gap to the part or model it meets) stays whole; with LOCK_BORDER this
+            # should never trigger, so outputs (and unit keys) are those of the method before the gate
+            out.append(mf)
+            continue
         out.append(np.column_stack((tri, np.full(len(tri), material))))
-    return vertices, (np.vstack(out) if out else faces[:0])
+        simplified.append((len(out) - 1, mf))
+    return vertices, _whole_model_gate(vertices, faces, out, simplified)
+
+
+def _whole_model_gate(vertices, faces, out, simplified):
+    """The seam gate on the whole model (POLYCOUNT-CAMPS-ALDRUHN-57): the per-part gate cannot see an edge where two
+    parts meet (closed in the source, used once by each part) that opens when one side is re-cut; measured on
+    ex_ashl_tent_01 at the default bound (20 such edges). A simplified part that carries a new open edge of the whole
+    result is put back whole, until the whole model passes; a model that passes keeps its output unchanged."""
+    if not out:
+        return faces[:0]
+    before = open_edges(vertices, faces)
+    for _ in range(len(simplified) + 1):
+        result = np.vstack(out)
+        now = open_edges(vertices, result)
+        changed = (now - before) | (before - now)
+        if not changed:
+            return result
+        bad = {p for e in changed for p in e}
+        reverted = False
+        for slot, (i, source) in enumerate(simplified):
+            if i is None:
+                continue
+            pts = {tuple(p) for p in vertices[out[i][:, :3].reshape(-1), :3]}
+            if pts & bad:
+                out[i] = source
+                simplified[slot] = (None, source)
+                reverted = True
+        if not reverted:
+            break
+    return np.vstack(out)

@@ -19,14 +19,14 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.56-dev1 (29 October 2026)._
+_Last updated with AmiWind v0.0.56 (30 October 2026)._
 
 ## Status: 29 October 2026
 
-Fixed in the source for the next build. Found by the maintainer on the Raspberry Pi 4 boot stick (Amiberry): "it's
-only showing the `dbg fps on` whenever you have already `dbg hud on`", and where it belongs: "under the fucking
-viewport or at least on the bottom left corner of it" / "or top left corner, as long as it's not like that in the
-middle of the screen".
+Fixed in the source for the next build. Found by the maintainer on the Raspberry Pi 4 boot stick (Amiberry): the
+`dbg fps on` readout showed only when `dbg hud on` was already set. Where it belongs, by his account: under the
+viewport, or at least in its bottom left corner, or in the top left corner, as long as it is not in the middle of the
+screen.
 
 ## Symptom
 
@@ -54,8 +54,8 @@ Always: `dbg hud off`, then `dbg fps on`.
 
 ## Repair
 
-The maintainer, on where and when: "also be on during the vanity camera shoots" / "only appear on the top left or
-bottom left corner of the entire available screen". The FPS counter is its own switch, drawn by the screen code
+The maintainer, on where and when: it is also on during the vanity camera shoots, and it appears only in the top
+left or bottom left corner of the entire available screen. The FPS counter is its own switch, drawn by the screen code
 after everything else but the console (`AW_FpsDraw` in `aw_hud.c`, called from `screen.c`), so it shows without
 `dbg hud` and in the vanity orbit, which skips the HUD; small, in the bottom-left corner of the whole screen, on
 the HUD's black. Photo mode hides it unless Ctrl+H brings the HUD back. The Halloween benchmark draws the same
@@ -88,7 +88,7 @@ Family: Menus, HUD, map screen and text (`ui-text`). Menus, HUD, map screen, fon
 - AW25-03 (no report page): Map marker reported stale; HUD lacked global/local positions
 - CHAR-CONFIRM-BORDER-29 (no report page): Character Go back / Choose actions lack OK-style frames
 - [CHIM-REGION-DOORS-NO-PROMPT-42](CHIM-REGION-DOORS-NO-PROMPT-42.md): Doors in CHIM region cells show no entrance at all (no prompt, not even Interior unavailable), e.g. every door in Khuul
-- DBG-MWSCRIPT-SILENT-56 (no report page): dbg mwscript on prints nothing: the switch gives no answer, so it looks as if it did nothing
+- [DBG-MWSCRIPT-SILENT-56](DBG-MWSCRIPT-SILENT-56.md): dbg mwscript on prints nothing: the switch gives no answer, so it looks as if it did nothing
 - EXTRAS-MENU-54 (no report page): Requested: an Extras choice on the main menu that opens what the game holds: the arena, the dance scenes, the in-game videos, later a library of every book
 - [FONT-BITMAP-INDEX-32](FONT-BITMAP-INDEX-32.md): Bitmap font path keeps the .fnt glyph order; the engine indexes by game byte (wrong characters)
 - [FONT-TTF-COVERAGE-32](FONT-TTF-COVERAGE-32.md): Magic Cards TrueType font silently lacks many characters and replaces ASCII brackets with ornaments
@@ -97,6 +97,7 @@ Family: Menus, HUD, map screen and text (`ui-text`). Menus, HUD, map screen, fon
 - HUD-INTERIOR-CLOCK-CUT-54 (no report page): The dbg hud line GLOBAL XYZ: unavailable (interior) is so long that the clock is cut off
 - [HUD-NOTIFY-OVERLAP-31](HUD-NOTIFY-OVERLAP-31.md): Console messages print over the location title
 - [HUD-STATS-29](HUD-STATS-29.md): Health uses fixed 100; other bars hardcoded full
+- LEVEL-UP-MISSING-57 (no report page): Requested: levelling as in the original: skills rise with use, the level-up box with its text and sound, attributes raised, the new values used by every check
 - MAP-FOCUS-DRAG-29 (no report page): Map or journal keeps dragging after window focus returns
 - MAP-MARKER-29 (no report page): Requested: click to place a user map marker
 - MAP-REG-01 (no report page): In-Game map mode hid settlement markers (regression)
@@ -110,6 +111,7 @@ Family: Menus, HUD, map screen and text (`ui-text`). Menus, HUD, map screen, fon
 - [PHOTO-DEBUG-STRIP-33](PHOTO-DEBUG-STRIP-33.md): Photo mode with Ctrl+H: the coordinate strip blacks out only from x=88, leaving the bottom-left corner of the view
 - [PHOTO-GALLERY-TEXT-33](PHOTO-GALLERY-TEXT-33.md): Photo mode leaves test-room and gallery instruction text over the view
 - [PLACE-NAMES-INTERIOR-31](PLACE-NAMES-INTERIOR-31.md): Location label has no place name inside interiors
+- QUICKSAVE-NO-PROFILE-SILENT-57 (no report page): Quicksave says nothing when no character profile is chosen (a game started from the console with map), while quickload says why
 - RAM-WARNING-BOX-52 (no report page): Requested: under 32 MB of Fast RAM a WARNING message box for a few seconds before the AmiWind logo
 - [TOOLKIT-CELL-HIGHLIGHT-SCALE-38](TOOLKIT-CELL-HIGHLIGHT-SCALE-38.md): Selected-cell outline offset on scaled displays
 - [TOOLKIT-INCLUSION-PACKAGE-38](TOOLKIT-INCLUSION-PACKAGE-38.md): CHIM inclusion metadata omitted from Toolkit packaging rules

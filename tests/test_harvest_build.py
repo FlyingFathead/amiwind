@@ -301,6 +301,22 @@ class HarvestBuild(HarvestCase):
         self.assertNotEqual(found(harvest_build.chim_coverage(id1, empty, refs, harvest_build.plan_rows(id1))),
                             found(reports[0]))
 
+    def test_a_chim_town_made_from_the_game_data_gets_its_own_catalogue_rows(self):
+        # CHIM-NATIVE-HARVEST-MISSING-36 (v0.0.57): every town whose region table the image ships gets catalogue rows
+        # (before: Seyda Neen and Balmora only, so Vivec's plants were in no catalogue of its frame)
+        from town_config import runtime_towns
+        id1 = Path(self.root / 'v/id1')
+        (id1 / 'maps').mkdir(parents=True)
+        vivec = next(t for t in runtime_towns() if t['id'] == 'vivec_city')
+        p = vivec['prefix']
+        (id1 / vivec['regions']).write_text('AWBR1 2 96 540 0 0 64 90 0 0 64 90\n'
+                                            '%s000 -2079 -2079 -1536 -1536 -2079 -2560 -836 -836\n'
+                                            '%s001 -1536 -2079 -768 -1536 -2048 -2560 -68 -836\n' % (p, p))
+        names = {r['name']: r for r in harvest_build.plan_rows(id1, ['vivec_city'])}
+        self.assertEqual(sorted(names), [p + '000', p + '001'])     # no region maps: a CHIM-native town's rows
+        self.assertTrue(all(r.get('chim') for r in names.values()))
+        self.assertEqual(harvest_build.unsupported_towns(['vivec_city'], id1), [])
+
     def test_partial_area_build_of_a_town_without_harvest_catalogues(self):
         # HARVEST-CHIM-COVERAGE-ONE-AREA-48, persisting (v0.0.54-dev1 combat playground: an interior-scope MiniWind of
         # one Vivec room stopped at the image step after 20 minutes): a one-area CHIM world of a town that has no
@@ -310,7 +326,10 @@ class HarvestBuild(HarvestCase):
         self.prepare()
         _, _, refs = harvest_build.source_placements(self.root / 'harvest', self.data)
         id1 = stage(self.root / 's')
-        self.assertEqual(harvest_build.unsupported_towns(['vivec_city', 'seyda', 'balmora']), ['vivec_city'])
+        # CHIM-NATIVE-HARVEST-MISSING-36 (v0.0.57): a town is unsupported only when the image ships no region table of
+        # it (here: no town's region table is staged)
+        self.assertEqual(harvest_build.unsupported_towns(['vivec_city', 'seyda'], id1), ['seyda', 'vivec_city'])
+        self.assertEqual(harvest_build.unsupported_towns(['vivec_city']), [])
         world = self.root / 'world-vivec'
         world.mkdir()
         (world / 'chim-receipt.json').write_text(json.dumps(
@@ -321,7 +340,7 @@ class HarvestBuild(HarvestCase):
         refused = harvest_build.chim_coverage(id1, world, refs, rows)
         self.assertEqual(([m['ref'] for m in refused['missing']], refused['partial_area']), ([102, 103], []))
         listed = harvest_build.chim_coverage(id1, world, refs, rows,
-                                             partial_towns=harvest_build.unsupported_towns(['vivec_city']))
+                                             partial_towns=harvest_build.unsupported_towns(['vivec_city'], id1))
         self.assertEqual(([m['ref'] for m in listed['partial_area']], listed['missing']), ([102, 103], []))
         with self.assertRaisesRegex(ValueError, 'HARVEST-CHIM-REGION-LOSS-41.*102'):
             harvest_build.require_chim_coverage(self.root / 'harvest', id1, id1.parent / 'work', data_files=self.data,
@@ -331,17 +350,18 @@ class HarvestBuild(HarvestCase):
                                                      partial_area=True)
         self.assertEqual((len(report['partial_area']), report['missing'], report['partial_towns']),
                          (2, [], ['vivec_city']))
-        # a fixed town's plants stay a refusal in a partial-area build
+        # v0.0.57 (CHIM-NATIVE-HARVEST-MISSING-36): every town with a region table has catalogues, so any town whose
+        # table this partial-area image lacks (Balmora here too) is listed as its limit, and the plan has no early word
         fixed = self.root / 'world-balmora'
         fixed.mkdir()
         (fixed / 'chim-receipt.json').write_text(json.dumps(
             {'areas': ['balmora'], 'town': 'balmora', 'parity': {'harvest_removed': [102, 103]}}))
-        with self.assertRaisesRegex(ValueError, 'HARVEST-CHIM-REGION-LOSS-41'):
-            harvest_build.require_chim_coverage(self.root / 'harvest', id1, id1.parent / 'work', data_files=self.data,
-                                                chim_world=fixed, native=['balmora'], partial_area=True)
-        # the early word: the MiniWind plan names the town before any stage runs
+        report = harvest_build.require_chim_coverage(self.root / 'harvest', id1, id1.parent / 'work',
+                                                     data_files=self.data, chim_world=fixed, native=['balmora'],
+                                                     partial_area=True)
+        self.assertEqual(report['partial_towns'], ['balmora'])
         import miniwind
-        self.assertIn('vivec_city has no harvest catalogue mechanism', miniwind.harvest_note('vivec_city'))
+        self.assertIsNone(miniwind.harvest_note('vivec_city'))
         self.assertIsNone(miniwind.harvest_note('balmora'))
         # both of the image step's calls pass the build's partial-area state
         self.assertIn("partial_area=bool(getattr(args, 'miniwind', False))",

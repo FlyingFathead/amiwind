@@ -212,8 +212,8 @@ function renderProgress(p) {
     disk.title = (100 * free).toFixed(0) + ' % free; orange under ' + (100 * DISK_ORANGE) + ' % free, red when the build reports it low; ' +
       'free space: python tools/build_gc.py plan WORKSPACE (docs/BUILD_CACHE.md "Free disk space")';
   } else disk.textContent = 'Disk: not recorded by this build';
-  // the warnings row (MONITOR-WARNINGS-ROW, the maintainer: "highlight warnings in yellow ... a clickable
-  // 'warning(s) N [view]'"): every WARNING line of the stage logs, from build-progress.json; hidden at 0
+  // the warnings row (MONITOR-WARNINGS-ROW, requested by the maintainer: warnings highlighted in yellow, as a
+  // clickable 'warning(s) N [view]' link): every WARNING line of the stage logs, from build-progress.json; hidden at 0
   let warnRow = $('warnrow'), warnList = $('warnlist');
   if (!warnRow) { warnRow = el('div'); warnRow.id = 'warnrow'; ram.after(warnRow); }
   if (!warnList) { warnList = el('pre'); warnList.id = 'warnlist'; warnList.hidden = true; warnRow.after(warnList); }

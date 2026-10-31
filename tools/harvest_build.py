@@ -268,7 +268,10 @@ def plan_rows(id1, native=(), regions=None):
                                  frame=region['frame'], cells=[list(c) for c in region['cells']]))
                 chim.add(r['name'])
     from town_config import runtime_towns
-    for town in runtime_towns()[:2]:  # the fixed towns: Seyda Neen and Balmora
+    # every town whose region table the image ships (CHIM-NATIVE-HARVEST-MISSING-36: only Seyda Neen and Balmora had
+    # catalogues, so a CHIM town made from the game data, Vivec and the others, had no pickable plants in its frame;
+    # the engine follows any town's regions on its frame map, aw_region.c AW_RegionAt / AW_HarvestFollow)
+    for town in runtime_towns():
         table = id1 / town['regions']
         if table.is_file():
             found = town_rows(table, town['prefix'], town_origin(town['id']))
@@ -812,14 +815,16 @@ COVERAGE_REPORT = 'harvest-chim-coverage.json'
 CELL_UNITS = 8192.0     # one Morrowind exterior cell, game units
 
 
-def unsupported_towns(native):
-    """The CHIM towns of `native` (made from the game data, tools/chim_town.py) that have no harvest catalogue
-    mechanism: plan_rows makes catalogue rows for the fixed towns (Seyda Neen, Balmora) only, and the engine follows
-    catalogues on those towns' sub-cells only (aw_harvest_runtime.c AW_HarvestFollow). A one-town MiniWind of another
-    town (Vivec in the combat playground) ships that town's frames with no way to place its plants."""
+def unsupported_towns(native, id1=None):
+    """The CHIM towns of `native` (made from the game data, tools/chim_town.py) whose plants no catalogue can carry
+    in this image: plan_rows makes catalogue rows for every town whose region table the image ships (the engine
+    follows any town's regions on its frame map, aw_harvest_runtime.c AW_HarvestFollow), so a town without its table
+    in ID1 (an interior-scope MiniWind of a room of that town ships no exterior town map). Without ID1: none."""
+    if id1 is None:
+        return []
     from town_config import runtime_towns
-    fixed = {town['id'] for town in runtime_towns()[:2]}
-    return sorted(set(native) - fixed)
+    shipped = {town['id'] for town in runtime_towns() if (Path(id1) / town['regions']).is_file()}
+    return sorted(set(native) - shipped)
 
 
 def chim_coverage(id1, chim_world, refs, rows, frame_maps=False, partial_towns=()):
@@ -908,7 +913,7 @@ def require_chim_coverage(source, id1, work, *, data_files, chim_world, native=(
     _, _, refs = held_placements(source, data_files)
     rows = plan_rows(id1, native, chim_regions(id1, chim_world))
     report = chim_coverage(id1, chim_world, refs, rows, frame_maps=frame_maps,
-                           partial_towns=unsupported_towns(native) if partial_area else ())
+                           partial_towns=unsupported_towns(native, id1) if partial_area else ())
     work = Path(work)
     work.mkdir(parents=True, exist_ok=True)
     (work / report_name).write_text(json.dumps(report, indent=1) + '\n', encoding='utf-8', newline='\n')
@@ -920,7 +925,7 @@ def require_chim_coverage(source, id1, work, *, data_files, chim_world, native=(
                                     len(report['catalogues_without_frame_map'])), flush=True)
     if report['partial_area']:
         print('[warning] Harvest CHIM coverage: %d plants of %s are not placed in this partial-area test build: the '
-              'town has no harvest catalogue mechanism (only Seyda Neen and Balmora do); listed in %s.'
+              'image ships no region table of the town, so no catalogue can carry them; listed in %s.'
               % (len(report['partial_area']), ', '.join(report['partial_towns']), report_name), flush=True)
     problems =['ref %s (cell %s, frame %s%s): %s' % (m['ref'], ','.join(map(str, m.get('cell') or ['?'])),
                                                      m.get('frame') or '/'.join(m['frames'][:3]),

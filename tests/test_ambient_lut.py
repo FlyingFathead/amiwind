@@ -47,6 +47,14 @@ def npc(ident, distance, idles=(0,) * 8, script='', tag='NPC_', first=None, cfla
     return rec(tag, subs)
 
 
+def levc(ident, entries, flags=1, chance=0):
+    subs = [sub('NAME', z(ident)), sub('DATA', struct.pack('<I', flags)), sub('NNAM', bytes([chance])),
+            sub('INDX', struct.pack('<I', len(entries)))]
+    for name, level in entries:
+        subs += [sub('CNAM', z(name)), sub('INTV', struct.pack('<H', level))]
+    return rec('LEVC', subs)
+
+
 def ref(number, ident, pos):
     return [sub('FRMR', struct.pack('<I', number)), sub('NAME', z(ident)),
             sub('DATA', struct.pack('<6f', *pos, 0, 0, 0))]
@@ -82,9 +90,13 @@ def master():
     out += npc('Single', 100)
     out += npc('Traveller', 300, first='AI_T')
     out += npc('Bird', 500, tag='CREA', cflags=0x20)
+    out += npc('Crab', 200, (30, 0, 0, 0, 0, 0, 0, 0), tag='CREA')
+    out += npc('Rat', 0, tag='CREA', first='AI_T')       # first package Travel: no package row
+    out += levc('lev_inner', [('Crab', 1)])
+    out += levc('lev_wild', [('Bird', 1), ('lev_inner', 3), ('Rat', 5)])
     out += cell('Test Room', 0, 0, True, [ref(7, 'Walker', (10, 0, 0)), ref(3, 'Stander', (400, 0, 0)),
                                          ref(9, 'Single', (590, 20, 0)), ref(11, 'Traveller', (0, 0, 0)),
-                                         ref(12, 'Bird', (0, 0, 0))])
+                                         ref(12, 'Bird', (0, 0, 0)), ref(30, 'lev_wild', (200, 0, 0))])
     out += pgrd('Test Room', 0, 0, pts, links)
     out += cell('', 2, -3, False, [ref(20, 'Walker', (2 * 8192 + 100, -3 * 8192 + 100, 50))])
     return out
@@ -155,6 +167,21 @@ class AmbientTableTests(unittest.TestCase):
         self.assertEqual(self.points[r['first_point']][3], A.K_HOME)
         self.assertEqual(self.row(3)['distance'], 0)
 
+    def test_levelled_reference_gets_routes_and_its_creatures_packages(self):
+        # OpenMW 0.51: the picked creature runs its own record's packages (creaturelevlist.cpp, creature.cpp)
+        routes = next(r for r in self.rows if r['ref'] == 30)
+        self.assertEqual(routes['hash'], A.LEVELLED_HASH)
+        self.assertTrue(routes['flags'] & A.F_LEVELLED)
+        self.assertEqual(routes['distance'], 500)            # the largest Wander distance the list can give
+        self.assertGreater(routes['destinations'], 1)        # grid points of the room within 500
+        packages = {r['hash']: r for r in self.rows if r['ref'] == A.LEVELLED_REF}
+        self.assertEqual(set(packages), {A.fnv('bird'), A.fnv('crab')})   # the nested list's Crab too; not Rat
+        crab = packages[A.fnv('crab')]
+        self.assertEqual((crab['distance'], crab['points'], crab['destinations']), (200, 1, 1))
+        self.assertTrue(crab['flags'] & A.F_CREATURE)
+        self.assertTrue(packages[A.fnv('bird')]['flags'] & A.F_FLYER)
+        self.assertEqual(self.report['levelled'], {'references': 1, 'with_wander': 1, 'creatures': 2})
+
     def test_idle_profile(self):
         m = 49151                                           # 0.75
         self.assertEqual(A.idle_profile([0] * 8, m), [0] * 8)
@@ -212,6 +239,9 @@ class AmbientNativeTests(unittest.TestCase):
                                                '\t'.join(map(str, A.idle_profile(c, head['multiplier'])))))
             lines.append('hash\tWalker\t%d' % A.fnv('walker'))
             lines.append('missing\t7\t%d' % A.fnv('nobody'))
+            crab = next(r for r in rows if r['ref'] == A.LEVELLED_REF and r['hash'] == A.fnv('crab'))
+            lines.append('levelled\t30\t%d\t%d\t%d\t%d\t%d' % (A.fnv('crab'), crab['distance'], crab['duration'],
+                                                            crab['flags'] | A.F_LEVELLED, crab['profile']))
             (Path(tmp) / 'expect.tsv').write_text('\n'.join(lines) + '\n', encoding='utf-8')
             native.NativeSourceTests().compile_run(
                 'aga_ambient_test.c', [SRC / 'aw_ambient.c'], defines=['AW_AMBIENT_HOST_TEST'],
@@ -223,9 +253,10 @@ class AmbientSourceContractTests(unittest.TestCase):
     def code(self, name):
         return re.sub(r'/\*.*?\*/', '', (SRC / name).read_text(encoding='utf-8'), flags=re.S)
 
-    def test_default_off_wired_and_listed(self):
+    def test_default_on_wired_and_listed(self):
         c = self.code('aw_ambient.c')
-        self.assertIn('static int ambient_on;', c)          # off by default, no cvar or command of its own
+        self.assertIn('static int ambient_on=1;', c)        # on by default since v0.0.57, no cvar or command of its own
+        self.assertIn('chim actors ambient on', (ROOT / 'tools/build_aga.py').read_text(encoding='utf-8'))
         self.assertNotRegex(c, r'Cvar_RegisterVariable|Cmd_AddCommand')
         self.assertIn('aw_ambient_cmd ();', self.code('aw_actors.c'))
         self.assertIn('aw_ambient_cmd=AW_AmbientCommand;', c)
@@ -235,6 +266,63 @@ class AmbientSourceContractTests(unittest.TestCase):
         self.assertIn('AW_AmbientPhysics', self.code('sv_phys.c'))
         self.assertIn('AW_AmbientInit', self.code('aw_debug.c'))
         self.assertIn('ambient_table_step', (ROOT / 'tools/build_aga.py').read_text(encoding='utf-8'))
+
+    def test_levelled_index_and_aggro_wired(self):
+        c = self.code('aw_ambient.c')
+        # levelled creatures: own id first, then the reference's routes with the creature's package
+        self.assertIn('find(ref,AW_AMBIENT_LEVELLED_HASH,r)', c)
+        self.assertIn('find(AW_AMBIENT_LEVELLED_REF,hash,&pkg)', c)
+        # the rows stay on disk: one key per block resident, a block read per lookup, absent actors remembered
+        self.assertIn('resident_size=blocks*8+', c)
+        self.assertNotIn('AW_AmbientOpen(&table', c)
+        self.assertIn('none_ref[i]==ref', c)
+        # aggro on sight in the world: the combat layer's rule, on the engage timer, creatures only, 4 fighters
+        self.assertIn('AW_CombatAggro(s->e,&sheet,NULL,50,NULL,NULL)', c)
+        self.assertIn('AW_CombatFightRating(&aw_combat_ai,s->fight,50,', c)
+        self.assertIn('static int aggro_on=1;', c)
+        self.assertIn('AW_AMBIENT_CREATURE', c)
+        # flyers wander off the ground: a straight 3D sweep, no floor test, one failed step ends the walk;
+        # swimmers swim too (v0.0.57): no path grid, random spots near the start that are in water, never out of it
+        self.assertIn('AW_AmbientAllow(&s->pkg,r.distance);', c)
+        self.assertIn('if(!AW_AmbientInWater(at))', c)
+        self.assertIn('(!AW_Interior() && p[2]<0)', c)   # outdoors below the sea level is water (CHIM seas)
+        self.assertIn('(s->flags&AW_AMBIENT_SWIMMER) && !AW_AmbientInWater(tr.endpos)', c)
+        self.assertIn('tr=SV_Move(e->v.origin,e->v.mins,e->v.maxs,end,MOVE_NORMAL,e);', c)
+        self.assertRegex(c, r'if\(fly\(s,t3,speed\*dt\)\)')
+
+    def test_no_stale_edict_after_a_map_change(self):
+        # ACTOR-AMBIENT-STALE-EDICT-57: a teleport to another map crashed with "NUM_FOR_EDICT: bad pointer" when a
+        # script asked for an actor's package while the slots still held the old map's edicts
+        c = self.code('aw_ambient.c')
+        self.assertIn('if(slots_world!=sv.worldmodel)reset_all();', c.split('static slot_t *slot_for')[1][:300])
+        release = c.split('static void release')[1].split('static void reset_all')[0]
+        self.assertNotIn('NUM_FOR_EDICT', release)
+        self.assertIn('slots_world==sv.worldmodel', release)
+
+    def test_flying_fighter_chases_through_the_air(self):
+        # COMBAT-FLYER-FLEES-57: a hostile cliff racer fled ("cannot reach you") because the chase used the ground
+        # route; a flyer now sweeps straight toward the player in 3D (OpenMW aipackage.cpp pathTo shortcut) and
+        # never takes the unreachable-target flee; walkers keep the ground chase
+        c = self.code('aw_combat.c')
+        flyer = c.split('if(AW_AmbientFlags(s->e)&(AW_AMBIENT_FLYER|AW_AMBIENT_SWIMMER)){')[1].split('self[0]=')[0]
+        self.assertIn('SV_Move(fe->v.origin,fe->v.mins,fe->v.maxs,end,MOVE_NORMAL,fe)', flyer)
+        self.assertIn('return;', flyer)
+        self.assertNotIn('S_FLEE', flyer)
+        self.assertIn('AW_AmbientInWater(tr.endpos)', flyer)   # a fighting swimmer stays in water
+        self.assertLess(c.index('AW_AmbientFlags(s->e)&(AW_AMBIENT_FLYER|AW_AMBIENT_SWIMMER)'), c.index('AW_PathThink(&s->path,&io,self,goal'))
+        a = self.code('aw_ambient.c')
+        self.assertIn('int AW_AmbientFlags(edict_t *e)', a)
+
+    def test_fallen_fighters_free_their_slots(self):
+        # COMBAT-PACK-SLOTS-57: four corpses kept every combat slot, so a fifth hostile of a pack never attacked; a
+        # fallen fighter's slot is reused, its death handed to the actors' change list first (no respawn alive)
+        c = self.code('aw_combat.c')
+        engage = c.split('int AW_CombatEngage(edict_t *e,const aw_fighter_t *fighter,const char *layout) {')[1][:900]
+        self.assertIn('slots[i].f.dead || slots[i].state==S_DEAD', engage)
+        self.assertLess(engage.index('aw_combat_actor_died(slots[i].e)'), engage.index('release(&slots[i])'))
+        a = self.code('aw_actors.c')
+        self.assertIn('aw_combat_actor_died = Died;', a)
+        self.assertIn('c->dead = 1;', a.split('static void Died (edict_t *e)')[1][:200])
 
     def test_no_search_at_run_time(self):
         c = self.code('aw_ambient.c')

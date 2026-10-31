@@ -98,6 +98,8 @@ int AW_UIMode(void) {return ui_mode.value==1?1:2;}
 int AW_ModalBlackBackground(void) {return modal_black.value!=0;}
 /* aw_menu.c: the Options screen covers the whole screen (OPTIONS-CROSSHAIR-STYLE-48). */
 int (*aw_menu_fullscreen)(void);
+/* aw_listbox.c sets it at its first box: 0 no box, 1 a box over the view to render, 2 over its kept copy. */
+int (*aw_listbox_over_world)(void);
 int AW_ModalWorldHidden(void) {
     /* Blackout is independent of simulation pause. An opaque background can
      * skip world drawing without a saved framebuffer; with black disabled,
@@ -105,6 +107,13 @@ int AW_ModalWorldHidden(void) {
      * The full-screen Options panel hides the world whatever the policy: it is
      * not drawn behind it at all. */
     if(aw_menu_fullscreen && aw_menu_fullscreen() && !cl.intermission && !death_prompt())return 1;
+    /* The console-font list box (aw_listbox.c: dbg tp, later dbg weapon / dbg gear) sits ON TOP of the game, as
+     * the console does: the view keeps drawing behind it whatever aw_modal_black says (TP-PICKER-57). */
+    if(aw_listbox_over_world && !AW_InventoryActive()){
+        int box=aw_listbox_over_world();
+        if(box==1)return 0;                    /* render the view once */
+        if(box==2)return 1;                    /* its kept copy is put back (screen.c aw_listbox_restore) */
+    }
     return (AW_InventoryActive() || AW_ModalBlackBackground()) && modal_world_ready() && !cl.intermission && !death_prompt();
 }
 void AW_ModalFrame(void) {

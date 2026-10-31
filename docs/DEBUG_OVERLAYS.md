@@ -1,6 +1,6 @@
 # Development overlays
 
-_Last updated with AmiWind v0.0.56-dev1 (29 October 2026)._
+_Last updated with AmiWind v0.0.57-dev3 (30 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -16,6 +16,7 @@ _Last updated with AmiWind v0.0.56-dev1 (29 October 2026)._
 - [Compact console in checkpoint-016](#compact-console-in-checkpoint-016)
 - [Reproducing a reported view](#reproducing-a-reported-view)
 - [Teleport shortcuts and destination menu (v0.0.24-dev4)](#teleport-shortcuts-and-destination-menu-v0024-dev4)
+  - [The settlement list (v0.0.57)](#the-settlement-list-v0057)
 - [Live exterior fog/draw distance (checkpoint-017)](#live-exterior-fogdraw-distance-checkpoint-017)
 - [FPS display](#fps-display)
 - [Loading presentation](#loading-presentation)
@@ -290,7 +291,8 @@ Use these during play:
 
 | Command | Destination / action |
 | --- | --- |
-| `dbg tp` or `dbg tp menu` | Open the destination picker |
+| `dbg tp` | Open the settlement list (below); on a disk without it, the scene picker |
+| `dbg tp menu` | Open the scene picker |
 | `dbg tp X Y` | Original Morrowind global XY; checked terrain/water arrival |
 | `dbg tp balmora` | Balmora exterior at the converted arrival point |
 | `dbg tp seydaneen` | Seyda Neen exterior at the checked town recall point |
@@ -302,6 +304,26 @@ Use these during play:
 
 Other converted map names from [the scene list](history/superseded/SEYDA_NEEN_INTERIORS.md) work too.
 Names are case-insensitive. `seyda` / `town` and `ship` retain their short aliases.
+
+### The settlement list (v0.0.57)
+
+`dbg tp` with no argument opens a box on top of the game (the view stays behind it, as with the console; the
+world waits while it is open, so the view is drawn once and kept, and an open box costs almost nothing), in the
+console font, with every named place of the
+island: towns, villages, camps, forts, strongholds and ruins, taken from the game's own place names (the names
+its world map shows). Type to search: letters and digits only, case ignored, so `aldruhn` finds Ald-ruhn and
+`vivecar` finds Vivec, Arena; Backspace takes a letter back. Up/Down, PgUp/PgDn, Home/End and the mouse wheel
+move, Enter or a click on a name takes you there, Escape closes the box.
+
+You arrive where the game itself would put you on the street: the place's own teleport marker when it has one,
+else the outside end of a door into the place, the one nearest the place's middle among the doors on its street
+(on land the doors that stand lowest over the ground, so not a tower or ruin top; over the water, as in Vivec, the
+lowest walkway near the middle), else where a placed object stands on land near the middle, on the ground there. The choice runs the same coordinate teleport as `dbg tp X Y Z`, so a place
+that is not on this disk says so and leaves you where you are.
+
+The list is a small table the builder makes from the game data (`tp-places.lut`, about 4 KB for 82 places,
+`tools/tp_places_lut.py`). The game reads it from the disk when the box opens and frees it when the box closes;
+nothing of it stays in memory while you play. The same box is meant for the weapon and gear pickers next.
 `debug tp ...` and `amiwind debug tp ...` use the same handler. Teleport uses the
 existing scene state capture and checked arrival path, not a New Game reset.
 Missing map files and unknown destinations are rejected before leaving the scene.

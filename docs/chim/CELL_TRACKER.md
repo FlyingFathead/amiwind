@@ -2,7 +2,7 @@
 
 # CHIM Cell Tracker
 
-_Generated from `cell-progress.json` with AmiWind v0.0.48-dev2._
+_Generated from `cell-progress.json` with AmiWind v0.0.57-dev4._
 
 Live status of the open world on CHIM, Vvardenfell (island 1). Generated page: do not edit by hand. Per-cell detail is in the Toolkit and its CSV export. What each number counts: [what we count](#what-we-count).
 
@@ -10,7 +10,7 @@ Live status of the open world on CHIM, Vvardenfell (island 1). Generated page: d
 
 These audit totals count the cells with a LAND record (land and seabed), not cells included in a playable build; see Included in builds below.
 
-**Every cell of the tracker, in three groups** (the Toolkit legend shows the same; newest ingested build: v047_release):
+**Every cell of the tracker, in three groups** (the Toolkit legend shows the same; newest ingested build: v0_0_57_dev4_full_v0_0_57_dev4_snapshot_):
 
 - **In the game: 1,409** (Cell complete, awaiting lighting 13, Terrain complete, awaiting lighting 804, Passed (something still deferred) 376, Sea, in the game 216)
 - **Not in the game yet: 153** (Solstheim (Bloodmoon) 153)
@@ -18,7 +18,7 @@ These audit totals count the cells with a LAND record (land and seabed), not cel
 
 Accounted for: 2,164 of 2,317 cells (in the game + settled). Settled squares count toward "accounted for", never toward the cells in the game. Settled: No cell exists here in the original game data. AmiWind's edge current turns the player back before this point, so there is nothing to build.
 
-**On CHIM in the newest ingested build (v0.0.47 release, clean public build (791771f7)): 1,292 of 1,292 Vvardenfell land cells (100.0 %), plus 117 sea cells.**
+**On CHIM in the newest ingested build (v0.0.57-dev4 (c53994d6)): 1,292 of 1,292 Vvardenfell land cells (100.0 %), plus 117 sea cells.**
 
 A cell is on CHIM in a build when a frame of the CHIM world of that build owns it. The tracker records per cell the newest build that carries it. Land cells have terrain heights; the sea cells are seabed and open ocean ([what we count](#what-we-count)).
 
@@ -38,7 +38,7 @@ Lighting: lit 0, partial 137, unlit 1,056, not measured 99 (cells; lit is requir
 
 Original light sources placed in these cells (numbers of lights, not of cells): lamp / lantern 545 (0 without a mesh), candle 6 (0 without a mesh), torch 69 (0 without a mesh), fire 74 (4 without a mesh), glowing plant 332 (332 without a mesh), darkener (negative light) 12 (12 without a mesh), plain light 1,936 (1,936 without a mesh). In converted cells: 0 lights baked, 694 night lamps only, 2,280 not represented.
 
-Generated 2026-10-22 22:38 +0000. Tracker data generated 2026-10-22T19:48:55+00:00.
+Generated 2026-10-30 20:00 +0200. Tracker data generated 2026-10-30T17:59:32+00:00.
 
 ## What we count
 
@@ -57,11 +57,10 @@ In short: Vvardenfell has 1,390 cells with a LAND record (1,292 land cells with 
 | 197 | Empty sea (status): empty land cells and seabed cells. The builder calls these "seabed". | tracker status |
 | 767 | Open-ocean cells: no LAND record; water over the default sea floor (one shared ocean chunk). | ocean conversion |
 | 1,436 | Land cells of every island: Vvardenfell 1,292 and Solstheim 144. Not a Vvardenfell figure; Solstheim (Bloodmoon) is not converted yet. | LAND records with heights, all masters |
-| 1,409 | Cells on CHIM in the newest ingested build (v0.0.47 release, clean public build (791771f7)): every cell a frame of that build's world owns: 1,292 land, 98 seabed and 19 open ocean. | the build's CHIM world |
+| 1,409 | Cells on CHIM in the newest ingested build (v0.0.57-dev4 (c53994d6)): every cell a frame of that build's world owns: 1,292 land, 98 seabed and 19 open ocean. | the build's CHIM world |
 | 1,351 | Frames in that build's CHIM world: 1,348 region frames (one cell each) and 3 town frames. | the build's CHIM world |
 | 61 | Cells owned by the town frames: balmora 9, seyda 16, vivec_city 36. | the build's CHIM world |
 | 1,132 | The builder's "land" in its log line "N cells on CHIM (S seabed, L land, O ocean)": land cells with something placed, in region frames only (town frames not included). That line's seabed is 197 and its ocean 19. | builder log |
-| 1,409 | Cells in the cell list given to the builder: the region frames and 61 listed cells that lie inside a town frame (the builder drops them: the town frame owns them). The other 0 town-frame cells were never listed. Not the number of exterior cells. | builder log, inclusion ledger |
 
 How they add up:
 
@@ -74,7 +73,6 @@ How they add up:
 - region frames + town frames = frames: 1,348 + 3 = 1,351
 - cells in region frames + cells in town frames = cells on CHIM: 1,348 + 61 = 1,409
 - builder land + builder seabed + builder ocean = cells in region frames (one cell per region frame): 1,132 + 197 + 19 = 1,348
-- region frames + listed cells dropped inside a town frame = cells in the builder's list: 1,348 + 61 = 1,409
 
 Older notes use other totals. 1,436 (the tracker headline before v0.0.44) is the land cells of both islands. "46 more inside the town frames" (v0.0.43 notes) is the listed cells the builder dropped; the town frames own more cells than that (see above). 1,395 (v0.0.42 notes) is the cells with a LAND record plus the 5 open-sea cells then selected; 14 more open-sea cells joined in v0.0.43. 1,404 (world survey) is the exterior CELL records of Morrowind.esm: the 1,390 cells with a LAND record and those 14 open-sea cells. The figures in this table are the ones to use.
 
@@ -102,6 +100,15 @@ Included means verified in a packaged image. Packaged does not mean published or
 
 | Version | Evidence state | Included |
 | :-- | --: | --: |
+| v0.0.56 | released | 1,390 (100.0 %) |
+| v0.0.55 | released | 1,390 (100.0 %) |
+| v0.0.54 | released | 1,390 (100.0 %) |
+| v0.0.53 | released | 1,390 (100.0 %) |
+| v0.0.52 | released | 1,390 (100.0 %) |
+| v0.0.51 | released | 1,390 (100.0 %) |
+| v0.0.50 | released | 1,390 (100.0 %) |
+| v0.0.49 | released | 1,390 (100.0 %) |
+| v0.0.48 | released | 1,390 (100.0 %) |
 | v0.0.47 | released | 1,390 (100.0 %) |
 | v0.0.44-dev1 | packaged | 1,390 (100.0 %) |
 | v0.0.43-dev2 | packaged | 1,351 (97.2 %) |
@@ -177,21 +184,21 @@ Counts are every placed reference in converted cells, from the conversion job. D
 
 Every interior cell of the game has a room on the tracker, keyed by its cell ID: none is left out. A room is in the game, not in the game yet, or set aside with its reason (a set-aside room keeps its state and is converted in a later batch). Rooms are counted by the island their entrance is on; rooms with no entrance area are counted on their own.
 
-**1,328 rooms: in the game 61; not in the game yet 946; set aside, with a reason 321.**
+**1,328 rooms: in the game 61; not in the game yet 1,251; set aside, with a reason 16.**
 
 | Group | State | Vvardenfell | Solstheim | Mournhold | No entrance area | All |
 | :-- | :-- | --: | --: | --: | --: | --: |
-| In the game | In the game on CHIM rooms | 0 | 0 | 0 | 0 | 0 |
-| In the game | In the game as a room map | 61 | 0 | 0 | 0 | 61 |
-| Not in the game yet | Converted, not in the game yet | 0 | 0 | 0 | 0 | 0 |
-| Not in the game yet | Not started | 812 | 78 | 56 | 0 | 946 |
-| Set aside, with a reason | Set aside: hard case | 250 | 17 | 35 | 0 | 302 |
-| Set aside, with a reason | Set aside: test cell | 0 | 0 | 0 | 9 | 9 |
-| Set aside, with a reason | Set aside: teleport only | 0 | 1 | 2 | 1 | 4 |
+| In the game | In the game on CHIM rooms | 59 | 0 | 0 | 0 | 59 |
+| In the game | In the game as a room map | 2 | 0 | 0 | 0 | 2 |
+| Not in the game yet | Converted, not in the game yet | 1,062 | 3 | 0 | 8 | 1,073 |
+| Not in the game yet | Not started | 0 | 92 | 86 | 0 | 178 |
+| Set aside, with a reason | Set aside: hard case | 0 | 0 | 5 | 0 | 5 |
+| Set aside, with a reason | Set aside: test cell | 0 | 0 | 0 | 2 | 2 |
+| Set aside, with a reason | Set aside: teleport only | 0 | 1 | 2 | 0 | 3 |
 | Set aside, with a reason | Set aside: no entrance, no script | 0 | 0 | 0 | 6 | 6 |
 | Total |  | 1,123 | 96 | 93 | 16 | 1,328 |
 
-Reasons of the set-aside rooms (a room can have two): behaves exterior 5, lava 61, levitate only 5, over limit 41, teleport only 4, unreachable 15, water 230.
+Reasons of the set-aside rooms (a room can have two): behaves exterior 5, teleport only 3, unreachable 8.
 
 - later: Mournhold (Tribunal.esm): Mournhold is reached only by script (Tribunal's teleport): its rooms wait for the scripts step (roadmap step 6).
 - later: Solstheim (Bloodmoon.esm): Solstheim's exterior (Bloodmoon) is not on CHIM yet: its rooms come in with the island (roadmap step 7).

@@ -587,6 +587,27 @@ where Quake was designed around 800 surfaces. So the plan is:
 8. Scenery baked into the world last outdoors; interiors (sealed rooms whose
    every mesh is a separate model today) are the clean case for it.
 
+**Next measured experiment: town clutter as items (30 October 2026, not built).**
+Central Ald'ruhn, facing west (aw_aim 180) from the town spawn (local -79 230 603),
+is the slowest of its four headings on the Raspberry Pi 4B (7 fps against 9-13), and
+the size-scaled cut-off gains nothing there (aw_cull 1: 7.1, 4: 7.2, 4 plus the fog
+rule: 6.5 fps). The view is not one heavy model: a market stall a few hundred units
+away (urns, baskets, an overhang) plus a long street of Redoran houses. The renderer
+counters (dbg rcount 3, FS-UAE with JIT, 32 MB Fast, v0.0.57-dev4) show the brush
+models doing the extra work:
+
+| Heading | Brush models drawn | Brush-model faces tested | Spans | Brush models (us) | Scan (us) | Frame, renderer (us) |
+|---|---|---|---|---|---|---|
+| 0 (east) | 9 | 2,914 | 3,151 | 4,879 | 2,145 | 9,866 |
+| 90 | 10 | 2,692 | 1,919 | 3,908 | 1,477 | 8,580 |
+| 180 (west) | 22 | 5,671 | 7,587 | 8,409 | 4,928 | 15,044 |
+| 270 | 8 | 3,205 | 3,636 | 5,413 | 2,632 | 11,355 |
+
+Mesh reduction of the stall's models gains little (most of their faces sit on
+locked rims). The experiment: draw small town props (urns, baskets, crates, sacks)
+as items, with no world clipping, and compare this view like for like (fps on the
+Pi, the counters above, memory).
+
 The first measurements of that plan (16 October 2026) are written up in
 [where a slow frame goes](../performance/SLOW-FRAME-BREAKDOWN.md).
 
