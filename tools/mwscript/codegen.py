@@ -101,6 +101,29 @@ class Table:
         return len(self.rows)
 
 
+SCRIPT_DIALOGUE = 512   # a dialogue result script (_dlg_N): run when its answer is shown, never attached or started
+
+
+def fnv1a(raw):
+    """32-bit FNV-1a of bytes (the DRSC key; aw_mwvm.c computes the same)."""
+    h = 0x811C9DC5
+    for b in raw:
+        h = ((h ^ b) * 0x01000193) & 0xFFFFFFFF
+    return h
+
+
+def check_result_keys(results):
+    """Stop the build when two different result texts share (hash, length): the engine tells result scripts apart by
+    those two alone, so such a pair could run the wrong script. Names both texts."""
+    seen = {}
+    for r in results:
+        key = (r['hash'], r['length'])
+        other = seen.setdefault(key, r['text'])
+        if other != r['text']:
+            raise CompileError('two dialogue result texts share the hash %08x and the length %d: %r and %r'
+                               % (key[0], key[1], other[:60], r['text'][:60]))
+
+
 class Program:
     """The tables every script shares, filled while scripts compile.
 
@@ -127,9 +150,48 @@ class Program:
         self.script_locals = {}   # folded script id -> {local: (type, slot)}
         for s in (data.scripts.values() if scripts is None else scripts):
             self.scripts.get(s.id.casefold(), {'name': s.id, 'script': s})
+        self.results = []           # the dialogue's result scripts (the DRSC section): see dialogue_results()
+        if scripts is None:
+            self.dialogue_results()
         # the actor table (actors.py): every NPC and creature record, the items and spells they and the scripts name
         from .actors import ActorTables
         self.actors = ActorTables(data, self.string)
+
+    def dialogue_results(self):
+        """Every distinct (speaker, result text) of the dialogue becomes a script of its own (_dlg_N, flag
+        SCRIPT_DIALOGUE), its body the text, declared with the speaker's own script's locals in slot order, so it
+        runs on the speaker's instance and reads and sets the speaker's locals (as the original runs a result in the
+        speaker's script context). A speaker with no script, or a line any speaker may say: no locals. The engine
+        finds one by the text's FNV-1a hash, its length and the speaker's script (DRSC rows), so a collision never
+        runs another text's script."""
+        from .gamedata import Script
+        from .parser import Parser
+        globals_ = {k: v[0] for k, v in self.data.globals.items()}
+        declared = {}
+        for n, ((speaker, text), _) in enumerate(self.data.results.items()):
+            script = self.data.bases.get(speaker, (None, ''))[1] if speaker else ''
+            if script not in self.data.scripts:
+                script = ''
+            if script not in declared:
+                lines = []
+                if script:
+                    p = Parser(self.data.scripts[script].text, globals_)
+                    try:
+                        p.script()
+                    except Exception:   # noqa: BLE001 (a broken speaker script: its locals as far as read)
+                        pass
+                    word = {'s': 'short', 'l': 'long', 'f': 'float'}
+                    lines = ['%s %s' % (word.get(letter, 'short'), name)
+                             for name, (letter, slot) in sorted(p.locals.items(), key=lambda kv: kv[1][1])]
+                declared[script] = '\n'.join(lines)
+            ident = '_dlg_%d' % n
+            body = 'Begin %s\n%s\n%s\nEnd %s\n' % (ident, declared[script], text, ident)
+            s = Script(ident, 'dialogue', body, len(text), 0, (0, 0, 0, 0, 0), [])
+            self.scripts.get(ident, {'name': ident, 'script': s, 'dialogue': True})
+            raw = text.encode('cp1252', 'replace')
+            self.results.append({'hash': fnv1a(raw), 'length': len(raw), 'speaker_script': script, 'script': ident,
+                                 'text': raw})
+        check_result_keys(self.results)
 
     def string(self, text):
         return self.strings.get(text)

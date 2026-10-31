@@ -51,6 +51,9 @@ void CL_InitTEnts (void)
 	cl_sfx_ric2 = S_PrecacheSound ("weapons/ric2.wav");
 	cl_sfx_ric3 = S_PrecacheSound ("weapons/ric3.wav");
 	cl_sfx_r_exp3 = S_PrecacheSound ("weapons/r_exp3.wav");
+	/* held for the whole session: their name slots are never reused (AUDIO-SFX-NAME-TABLE-FULL-58) */
+	S_KeepSound (cl_sfx_wizhit); S_KeepSound (cl_sfx_knighthit); S_KeepSound (cl_sfx_tink1);
+	S_KeepSound (cl_sfx_ric1); S_KeepSound (cl_sfx_ric2); S_KeepSound (cl_sfx_ric3); S_KeepSound (cl_sfx_r_exp3);
 #ifdef QUAKE2
 	cl_sfx_imp = S_PrecacheSound ("shambler/sattck1.wav");
 	cl_sfx_rail = S_PrecacheSound ("weapons/lstart.wav");

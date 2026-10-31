@@ -1,5 +1,14 @@
 # AUDIO-MISSING-SOURCES-32: The image step reports missing sources for 7 voices and 2 effects
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 2 times; something has to be done
+
+- Reported with v0.0.45 at 2026-10-20 02:30 +0300: v0.0.45 image: 6447 voices with 7 missing sources, 717 effects with 2 missing sources
+- Reported with v0.0.57 at 2026-10-31 12:42 +0000: vo/d/f/Hit_DF007.mp3, still the one voice the table names without a source in v0.0.57, is missing from the game data itself: the Dark Elf female hit voices run Hit_DF006 then Hit_DF008 in the loose files of both the GOG and the Steam edition, and none of Morrowind.bsa, Tribunal.bsa or Bloodmoon.bsa has it. Not a path we read wrongly: silent by design, written as a reason in tools/greeting_lut.py MISSING_IN_GAME_DATA.
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |

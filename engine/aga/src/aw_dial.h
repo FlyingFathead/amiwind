@@ -10,9 +10,11 @@
  */
 #ifndef AW_DIAL_H
 #define AW_DIAL_H
+#include "aw_mwvm.h"
+#include "aw_actorstate.h"
 #include "aw_glut.h"
 
-#define AW_DIAL_VERSION 1
+#define AW_DIAL_VERSION 2   /* 2: the NPCs' service words (the last section); a version 1 table is refused */
 #define AW_DIAL_HEADER 96
 #define AW_DIAL_TOPIC_ROW 8        /* u32 name offset (topic strings), u8 name length, u8 kind, u16 0 */
 #define AW_DIAL_ENTRY_ROW 20       /* u32 text, u32 first condition, u32 script, u32 first link, u16 links, u8 conditions, u8 flags */
@@ -36,7 +38,8 @@ typedef struct {
     int info_refusal;              /* the topic "Info Refusal", -1 none */
     /* file offsets of the sections after the resident part */
     long at_conversation, conversation_bytes, at_rows, at_listsets, at_listset_items, at_lists, at_list_items,
-        at_entries, at_conds, at_links, at_quests, at_journal, at_ranks, at_tstrings, at_scripts, at_texts;
+        at_entries, at_conds, at_links, at_quests, at_journal, at_ranks, at_tstrings, at_scripts, at_texts,
+         at_services, at_skill_attributes, at_ui_texts;
     const unsigned char *topic, *npc_offset, *fixture, *known, *start;
     int starts;                    /* the topics a new character knows (the census captain's AddTopic) */
     const unsigned char *settings, *faction, *reaction;   /* the game settings, faction ids, faction reactions */
@@ -46,7 +49,25 @@ typedef struct {
 /* The game settings of the disposition (tools/dialogue_lut.py SETTINGS, same order). */
 enum {AW_DIAL_SET_RACE, AW_DIAL_SET_PERSONALITY_MULT, AW_DIAL_SET_PERSONALITY_BASE, AW_DIAL_SET_FACTION_RANK_MULT,
       AW_DIAL_SET_FACTION_RANK_BASE, AW_DIAL_SET_FACTION_MOD, AW_DIAL_SET_CRIME, AW_DIAL_SET_DISEASE,
-      AW_DIAL_SET_WEAPON_DRAWN, AW_DIAL_SETTINGS};
+      AW_DIAL_SET_WEAPON_DRAWN,
+      AW_DIAL_SET_PERSONALITY_MOD, AW_DIAL_SET_LUCK_MOD, AW_DIAL_SET_REPUTATION_MOD, AW_DIAL_SET_LEVEL_MOD,
+      AW_DIAL_SET_BRIBE10, AW_DIAL_SET_BRIBE100, AW_DIAL_SET_BRIBE1000, AW_DIAL_SET_PER_MIN_CHANCE,
+      AW_DIAL_SET_PER_MIN_CHANGE, AW_DIAL_SET_PER_DIE_ROLL_MULT, AW_DIAL_SET_PER_TEMP_MULT, AW_DIAL_SET_FATIGUE_BASE,
+      AW_DIAL_SET_FATIGUE_MULT, AW_DIAL_SET_TRAINING_MOD, AW_DIAL_SET_SPELL_VALUE_MULT, AW_DIAL_SET_REPAIR_MULT, AW_DIAL_SET_EFFECT_COST_MULT,
+      AW_DIAL_SET_SPELLMAKING_VALUE_MULT, AW_DIAL_SET_ENCHANT_VALUE_MULT, AW_DIAL_SET_ENCHANT_CHANCE_MULT,
+      AW_DIAL_SET_ENCHANT_CONSTANT_CHANCE_MULT, AW_DIAL_SET_ENCHANT_CONSTANT_DURATION_MULT, AW_DIAL_SET_ENCHANT_MULT,
+      AW_DIAL_SET_SOUL_FOR_CONSTANT, AW_DIAL_SETTINGS};
+/* Persuasion (the rule of OpenMW's MechanicsManager::getPersuasionDispositionChange, our own code). */
+enum {AW_PERSUADE_ADMIRE, AW_PERSUADE_INTIMIDATE, AW_PERSUADE_TAUNT, AW_PERSUADE_BRIBE10, AW_PERSUADE_BRIBE100,
+      AW_PERSUADE_BRIBE1000, AW_PERSUADE_KINDS};
+typedef struct {
+    float personality,luck,reputation,speechcraft,mercantile,level;
+    float fatigue;                 /* current over maximum (1 when rested) */
+} aw_dial_person_t;
+typedef struct {
+    int success,temp,perm;         /* the conversation's temporary change, the permanent one */
+    int fight,flee;                /* the NPC's settings after it (Intimidate and Taunt change them) */
+} aw_dial_persuasion_t;
 #define AW_DIAL_FACTION_ID 32
 #define AW_DIAL_RANKS 10           /* a faction's rank names on disk, AW_DIAL_FACTION_ID bytes each */
 /* The file offset of faction FACTION's rank RANK name (0..9), -1 when the table has no such faction. */
@@ -70,6 +91,15 @@ typedef struct {
 } aw_dial_facts_t;
 /* The NPC's disposition toward the player, clamped to 0..100 when CLAMP. */
 int AW_DialDisposition(const aw_dial_t *d,const aw_dial_facts_t *f,int clamp);
+/* The scripts' faction reaction changes (ModFactionReaction: VALUE added; SetFactionReaction: SET), A toward B, kept
+ * for the game (32 at most) and saved (AWFR); the disposition reads them. */
+void AW_DialReactionsReset(void);
+int AW_DialReactionChange(const char *a,const char *b,int value,int set);
+int AW_DialReactionsExport(unsigned char *out,int capacity);
+int AW_DialReactionsImport(const unsigned char *p,int bytes);
+/* One persuasion of KIND (AW_PERSUADE_*) with the NPC's derived DISPOSITION, ROLL 0..99 and its FIGHT and FLEE. */
+void AW_DialPersuade(const aw_dial_t *d,int kind,const aw_dial_person_t *player,const aw_dial_person_t *npc,
+                     int disposition,int roll,int fight,int flee,aw_dial_persuasion_t *out);
 float AW_DialSetting(const aw_dial_t *d,int setting);
 
 /* Reads BYTES at a file OFFSET into OUT: 1 done, 0 failed (the engine: the open file; the host test: memory). */
@@ -93,6 +123,9 @@ typedef struct {
 } aw_dial_conv_t;
 
 /* Pure parts (host-tested, tests/aga_dial_test.c): */
+/* Why a header is refused, for the console line ("" when it is not): not an AWDL file, or another format version
+ * (VERSION_OUT the file's). */
+const char *AW_DialRefusal(const unsigned char *h,long file_size,int *version_out);
 /* The resident size an AWDL1 header asks for, or -1. */
 long AW_DialResidentSize(const unsigned char *header,long file_size);
 /* Index the resident part: 1 = usable (every section's size checked against the file's). */
@@ -127,8 +160,88 @@ int AW_DialAnswer(const aw_dial_conv_t *c,int topic,const aw_glut_state_t *s);
 /* File offsets of an answer's text and result script, -1 when it has none. */
 long AW_DialTextAt(const aw_dial_conv_t *c,int answer);
 long AW_DialScriptAt(const aw_dial_conv_t *c,int answer);
-/* An answer's links (topics its text names), read with READ; the count, at most MAX. */
+/* An answer's links (topics its text names, each once in text order), read with READ; the count, at most MAX. */
 int AW_DialLinks(const aw_dial_conv_t *c,int answer,aw_dial_read_t read,void *user,unsigned short *out,int max);
+/* An answer's link spans in its shown text (the explicit @name# markers already stripped by the builder): offset and
+ * length in characters, the topic; in text order; the count, at most MAX. */
+#define AW_DIAL_LINK_ROW 6
+typedef struct {unsigned short offset,length,topic;} aw_dial_span_t;
+int AW_DialSpans(const aw_dial_conv_t *c,int answer,aw_dial_read_t read,void *user,aw_dial_span_t *out,int max);
+/* The services NPC ROW offers (OpenMW's ESM::NPC bits; tools/dialogue_lut.py services_of): one read, when a
+ * conversation opens. 0 none. */
+#define AW_DIAL_SERVICE_BARTER 0x037FFUL      /* AllItems: any of these, the Barter entry */
+#define AW_DIAL_SERVICE_SPELLS 0x00800UL
+#define AW_DIAL_SERVICE_TRAINING 0x04000UL
+#define AW_DIAL_SERVICE_SPELLMAKING 0x08000UL
+#define AW_DIAL_SERVICE_ENCHANTING 0x10000UL
+#define AW_DIAL_SERVICE_REPAIR 0x20000UL
+unsigned long AW_DialServices(const aw_dial_t *d,int row,aw_dial_read_t read,void *user);
+#define AW_DIAL_SKILLS 27
+/* The window's words, the game's own (GMST; tools/dialogue_lut.py UI_TEXTS, same order): AW_DIAL_TEXTS of
+ * AW_DIAL_UI_TEXT bytes each, read into OUT (AW_DIAL_TEXTS x AW_DIAL_UI_TEXT) when a conversation opens. */
+enum {AW_DIAL_TEXT_PERSUASION,AW_DIAL_TEXT_ADMIRE,AW_DIAL_TEXT_INTIMIDATE,AW_DIAL_TEXT_TAUNT,AW_DIAL_TEXT_BRIBE10,
+      AW_DIAL_TEXT_BRIBE100,AW_DIAL_TEXT_BRIBE1000,AW_DIAL_TEXT_BACK,AW_DIAL_TEXT_BARTER,AW_DIAL_TEXT_SPELLS,
+      AW_DIAL_TEXT_TRAVEL,AW_DIAL_TEXT_SPELLMAKING,AW_DIAL_TEXT_ENCHANTING,AW_DIAL_TEXT_TRAINING,AW_DIAL_TEXT_REPAIR,
+      AW_DIAL_TEXT_GOODBYE,AW_DIAL_TEXT_GP,AW_DIAL_TEXT_TRAINING_WORDS,AW_DIAL_TEXT_TRAINING_ATTRIBUTE,
+      AW_DIAL_TEXT_BUY,AW_DIAL_TEXT_SELL,AW_DIAL_TEXT_MAGNITUDE,AW_DIAL_TEXT_DURATION,AW_DIAL_TEXT_AREA,
+      AW_DIAL_TEXT_RANGE,AW_DIAL_TEXT_RANGE_SELF,AW_DIAL_TEXT_RANGE_TOUCH,AW_DIAL_TEXT_RANGE_TARGET,
+      AW_DIAL_TEXT_NEED_EFFECT,AW_DIAL_TEXT_NEED_NAME,AW_DIAL_TEXT_ZERO_COST,AW_DIAL_TEXT_NO_GOLD_SPELL,AW_DIAL_TEXT_NAME,
+      AW_DIAL_TEXT_EFFECTS,AW_DIAL_TEXT_CREATE,AW_DIAL_TEXT_FEET,AW_DIAL_TEXT_SECONDS,AW_DIAL_TEXT_POINTS,
+      AW_DIAL_TEXT_POINT_COST,AW_DIAL_TEXT_NEED_ENCH_EFFECT,AW_DIAL_TEXT_NEED_SOUL,AW_DIAL_TEXT_NEED_ITEM,
+      AW_DIAL_TEXT_TOO_MUCH,AW_DIAL_TEXT_CAST_ONCE,AW_DIAL_TEXT_CAST_STRIKES,AW_DIAL_TEXT_CAST_USED,
+      AW_DIAL_TEXT_CAST_CONSTANT,AW_DIAL_TEXT_CAST_COST,AW_DIAL_TEXT_ENCHANT_DONE,AW_DIAL_TEXT_ITEM,AW_DIAL_TEXT_SOUL,
+      AW_DIAL_TEXT_CHANCE,AW_DIAL_TEXT_SKILL0,AW_DIAL_TEXTS=AW_DIAL_TEXT_SKILL0+27};
+#define AW_DIAL_UI_TEXT 48
+int AW_DialUiTexts(const aw_dial_t *d,aw_dial_read_t read,void *user,char *out);
+/* the attribute skill SKILL is governed by (0..7, the SKIL record), -1 unknown */
+int AW_DialSkillAttribute(const aw_dial_t *d,int skill,aw_dial_read_t read,void *user);
+/* OpenMW getBarterOffer: the price asked (BUYING) or given for BASE; DISPOSITION the derived one */
+int AW_DialBarterOffer(const aw_dial_t *d,int base,int buying,const aw_dial_person_t *player,const aw_dial_person_t *npc,
+                       int disposition);
+/* the NPC's three best skills of SKILLS[COUNT] into OUT (ties: the earlier skill); the count */
+int AW_DialTrainingPicks(const float *skills,int count,int *out);
+/* OpenMW SpellBuyingWindow: max(1, cost x fSpellValueMult), then the offer */
+int AW_DialSpellPrice(const aw_dial_t *d,int cost,const aw_dial_person_t *player,const aw_dial_person_t *npc,int disposition);
+/* OpenMW MerchantRepair: the price of mending a thing of VALUE from DURABILITY to MAX (both whole points) */
+int AW_DialRepairPrice(const aw_dial_t *d,int value,int max,int durability,const aw_dial_person_t *player,
+                       const aw_dial_person_t *npc,int disposition);
+/* Spellmaking (OpenMW SpellCreationDialog::notifyEffectsChanged, spellutil calcEffectCost with the player-spell
+ * method): one effect of a made spell, its magic effect's base cost and flags (MGEF), and the made spell's magicka
+ * cost and price */
+typedef struct {float base_cost;int flags,magnitude_min,magnitude_max,duration,area,range;} aw_dial_effect_t;
+#define AW_DIAL_MGEF_NO_DURATION 0x4
+#define AW_DIAL_MGEF_NO_MAGNITUDE 0x8
+#define AW_DIAL_MGEF_APPLIED_ONCE 0x1000
+#define AW_DIAL_RANGE_TARGET 2
+float AW_DialEffectCostPlayer(const aw_dial_t *d,const aw_dial_effect_t *e);
+int AW_DialSpellmakingCost(const aw_dial_t *d,const aw_dial_effect_t *e,int count);
+int AW_DialSpellmakingPrice(const aw_dial_t *d,const aw_dial_effect_t *e,int count,const aw_dial_person_t *player,
+                            const aw_dial_person_t *npc,int disposition);
+/* Enchanting (OpenMW mwmechanics/enchanting.cpp): the effects' accumulated costs (CONSTANT: a constant effect,
+ * its duration fEnchantmentConstantDurationMult), the points, the cast cost by the caster's Enchant skill, the price at
+ * an enchanter, the enchanter's chance and an item's capacity */
+int AW_DialEnchantCosts(const aw_dial_t *d,const aw_dial_effect_t *e,int count,int constant,float *out);
+float AW_DialEnchantPoints(const aw_dial_t *d,const aw_dial_effect_t *e,int count,int constant,int precise);
+int AW_DialEnchantCastCost(const aw_dial_t *d,const aw_dial_effect_t *e,int count,int constant,float enchant_skill);
+int AW_DialEnchantPrice(const aw_dial_t *d,const aw_dial_effect_t *e,int count,int constant,
+                        const aw_dial_person_t *player,const aw_dial_person_t *npc,int disposition);
+int AW_DialEnchantChance(const aw_dial_t *d,const aw_dial_effect_t *e,int count,int constant,float enchant_skill,
+                         float intelligence,float luck,float fatigue);
+int AW_DialEnchantCapacity(const aw_dial_t *d,float item_points);
+/* OpenMW Enchanting::nextCastStyle (ENDT types 0 cast once, 1 when strikes, 2 when used, 3 constant): the style after
+ * STYLE for an ITEM kind, a constant effect only with a soul of at least iSoulAmountForConstantEffect */
+enum {AW_DIAL_ENCHANT_WORN,AW_DIAL_ENCHANT_WEAPON,AW_DIAL_ENCHANT_BOOK};
+int AW_DialNextCastStyle(int item,int style,int soul,const aw_dial_t *d);
+int AW_DialTrainingPrice(const aw_dial_t *d,int skill,const aw_dial_person_t *player,const aw_dial_person_t *npc,
+                         int disposition);
+/* Spans through the define filling (which changes lengths): AW_DialMarkSpans puts AW_DIAL_LINK_OPEN/CLOSE around each
+ * span of TEXT (spans in text order, not overlapping); after the filling AW_DialTakeSpans takes the marks out again
+ * and gives each span its new offset and length, the topics in the same order. Both return the output's length. */
+#define AW_DIAL_LINK_OPEN '\002'
+#define AW_DIAL_LINK_CLOSE '\003'
+int AW_DialMarkSpans(const char *text,const aw_dial_span_t *spans,int n,char *out,int capacity);
+int AW_DialTakeSpans(const char *marked,const aw_dial_span_t *topics,int n,char *out,int capacity,aw_dial_span_t *spans,
+                     int *found);
 /* The next line of *TEXT wrapped at COLS characters (at the last space that fits, else cut; a line end ends a line):
  * 1 and the line in OUT (CAPACITY > COLS), *TEXT moved past it; 0 at the end. */
 int AW_DialWrapNext(const char **text,int cols,char *out,int capacity);
@@ -143,5 +256,53 @@ void AW_DialWindowTalk(const char *id);
 /* aw_mwhost.c: a speaker's disposition facts from the actor record, the character and the player's standing */
 void AW_MwscriptDispositionFacts(const char *record,unsigned long reference,int base,const char *faction,
                                  aw_dial_facts_t *f);
+int AW_MwscriptPersons(const char *record,unsigned long reference,aw_dial_person_t *player,aw_dial_person_t *npc,
+                       int *fight,int *flee);
+void AW_MwscriptSetSpeaker(const char *record,unsigned long reference,int disposition,int fight,int flee);
+int AW_MwscriptPlayerGold(int delta);
+/* training: the speaker's 27 skills, the player's skill (raised by one when RAISE) and attribute (aw_mwhost.c) */
+int AW_MwscriptNpcSkills(const char *record,unsigned long reference,float *out);
+int AW_MwscriptPlayerSkill(int skill,int raise);
+int AW_MwscriptPlayerAttribute(int attribute);
+/* the speaker's spells for sale (plain spells the player lacks, by name) with names and costs; buying adds one */
+int AW_MwscriptSpellsForSale(const char *record,unsigned long reference,int *out,int max,char (*names)[48],int *costs);
+int AW_MwscriptBuySpell(int spell);
+/* Barter (the plain pages; OpenMW's full window is its own tracker row): a ware of the merchant's stock or the
+ * player's inventory, its name, value, inventory category, whether enchanted and how many */
+typedef struct {char id[40],name[48];int value,category,enchanted,count,row;} aw_dial_ware_t;
+int AW_MwscriptStock(const char *record,unsigned long reference,aw_dial_ware_t *out,int max);
+int AW_MwscriptPlayerWares(aw_dial_ware_t *out,int max);
+/* one item changes hands at PRICE gold: BUY from the merchant, else sold to it; 1 done */
+int AW_MwscriptTrade(const char *record,unsigned long reference,const aw_dial_ware_t *w,int buy,int price);
+/* the player's weapons and armour below full health (their health and current points); mending one to full */
+int AW_MwscriptRepairables(aw_dial_ware_t *out,int *maximum,int *durability,int max);
+int AW_MwscriptMend(const char *id);
+/* the effects the player may make spells with (aw_actorstate.h aw_spell_effect_t) */
+int AW_MwscriptKnownEffects(aw_spell_effect_t *out,int max);
+/* Dialogue result scripts (aw_mwhost.c): the answer's result TEXT (LENGTH bytes) run on the speaker; the window's
+ * Choice and Goodbye arrive through aw_dial_result_choice while it runs. 1 ran, 0 none compiled for it, -1 it did not
+ * compile (said in the log) */
+int AW_MwscriptRunResult(const char *record,unsigned long reference,const char *text,int length);
+extern void (*aw_dial_result_choice)(const char **texts,int ntexts,const aw_mwcell_t *numbers,int count);
+/* Enchanting: the player's enchantable things (points, kind AW_DIAL_ENCHANT_*); making MADE with filled gem GEM */
+int AW_MwscriptEnchantables(aw_dial_ware_t *out,int *points,int *kind,int max);
+int AW_MwscriptEnchant(const aw_made_item_t *made,int gem);
+float AW_MwscriptSpeakerStat(const char *record,unsigned long reference,int stat);
+/* the speaker attacks when its Fight rating with this disposition reaches 100 (OpenMW isAggressive; aw_combat.c
+ * AW_CombatAggro); 1 a fight started, 0 not, -1 no combat layer */
+struct edict_s;
+int AW_MwscriptSpeakerAggro(struct edict_s *e,int disposition);
+/* The derived disposition of an NPC toward the player for the world's aggro on sight (DIALOGUE-FIGHT-DISPOSITION-57),
+ * without reading the NPC's conversation each engage tick: what is the NPC's own (its record's disposition, same race,
+ * its faction) is looked up once into CACHE when the NPC's slot is made; each call then only takes the NPC's current disposition (the record's,
+ * with the changes persuasion and scripts made, kept on its actor record) and the player's side. 50 without the
+ * dialogue table. */
+typedef struct {signed char ready;signed char same_race;short base;int actor_row;char faction[32];} aw_dial_npc_cache_t;
+void AW_DialNpcPrepare(struct edict_s *e,aw_dial_npc_cache_t *cache);   /* when the NPC's slot is made; reads */
+int AW_DialNpcDisposition(struct edict_s *e,const aw_dial_npc_cache_t *cache);  /* the engage tick; reads nothing */
+/* the player's side and the NPC's current disposition into F (aw_mwhost.c); the race and faction are the caller's */
+void AW_MwscriptDispositionNow(int actor_row,unsigned long reference,int base,aw_dial_facts_t *f);
+/* the NPC's row in the actor file (a binary search on disk: once, with the cache), -1 none */
+int AW_MwscriptActorRow(const char *record);
 int AW_DialWindowActive(void);
 #endif

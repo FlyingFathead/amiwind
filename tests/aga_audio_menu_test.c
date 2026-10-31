@@ -14,6 +14,10 @@ int main(void){
  M_Keydown(K_DOWNARROW);M_Keydown(K_HOME);assert(bgmvolume.value==0 && volume.value>.9f);
  M_Keydown(K_DOWNARROW);M_Keydown(K_HOME);assert(effectsvolume.value==0 && dialoguevolume.value==1);
  M_Keydown(K_DOWNARROW);M_Keydown(K_HOME);assert(dialoguevolume.value==0);
+ /* Your footsteps (PLAYER-FOOTSTEPS-NONE-58): off by default, Enter or Left/Right toggles, Home does nothing */
+ sets=audio_sets;M_Keydown(K_DOWNARROW);M_Draw();assert(highlight_y==156 && player_steps==0);
+ M_Keydown(K_HOME);assert(player_steps==0 && audio_sets==sets);
+ M_Keydown(K_ENTER);assert(player_steps==1);M_Keydown(K_RIGHTARROW);assert(player_steps==0);
  down(1);assert(highlight_y==179 && highlight_w==74); /* Back */
  M_Keydown(K_ENTER);M_Draw();assert(!aw_menu_fullscreen());
  M_Keydown(K_ENTER);M_Draw();assert(aw_menu_fullscreen() && highlight_y==9 && highlight_w==66); /* Options and its Audio page stay selected */
@@ -32,6 +36,7 @@ int main(void){
  sets=audio_sets;
  for(i=0;i<24;i++){M_Keydown(K_MWHEELDOWN);M_Draw();}
  assert(highlight_y==179 && highlight_w==74); /* Back stays selected. */
+ M_Keydown(K_UPARROW);M_Draw();assert(highlight_y==156 && highlight_w==280);   /* Your footsteps */
  M_Keydown(K_UPARROW);M_Draw();assert(highlight_y==126 && highlight_w==280);
  for(i=0;i<24;i++)M_Keydown(K_UPARROW);
  M_Draw();assert(highlight_y==9 && highlight_w==66); /* the tab row stays selected */

@@ -100,6 +100,7 @@ typedef struct {
 
 typedef struct {
     unsigned long frames,runs,skipped_quiet,skipped_far,deferred,ops,max_ops_frame,aborted,notyet_calls,host_calls;
+    unsigned long dialogue_runs;    /* dialogue result scripts run (AW_MwvmRunDialogue) */
 } aw_mwvm_stats_t;
 /* The import route's counters: NOTYET calls run per function number (AWM_FUNCTIONS of them), and the string index
  * of each function's name (-1: no script calls it). */
@@ -140,6 +141,12 @@ aw_mwvm_instance_t *AW_MwvmInstance(int instance);
 int AW_MwvmInstanceCount(void);
 /* Start scripts and StartScript. */
 void AW_MwvmStartScript(int script);
+/* a dialogue result script (_dlg_N) once on the speaker (its reference and script; -1 none); 1 ran */
+int AW_MwvmRunDialogue(int script,uint32_t reference,int speaker);
+/* the DRSC key of a result text (32-bit FNV-1a) and its row (on disk, read through READ): see aw_mwvm.c */
+uint32_t AW_MwvmTextHash(const char *text,int length);
+int AW_MwvmFindDialogue(int (*read)(void *user,uint32_t offset,void *out,uint32_t bytes),void *user,uint32_t hash,
+                        int length,int speaker,int *row_speaker,int *broken);
 /* One frame: DT seconds of game time, PLAYER the player's position (engine units). */
 void AW_MwvmTick(float dt,const float player[3]);
 const aw_mwvm_stats_t *AW_MwvmStats(void);

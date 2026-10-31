@@ -39,6 +39,8 @@ typedef struct {
     float charge_max;
     /* AW_INV_LIGHT rows: burn time in seconds (AW_LIGHT_INFINITE = never runs out), radius, colour. */
     int light_time,light_radius;
+    /* the record's enchantment points (bytes 504..505 of a row that is not a light): what Enchanting can put on it */
+    int enchant_capacity;
     unsigned char light_colour[3];
 } aw_inventory_item_t;
 enum {AW_ENCH_NONE,AW_ENCH_ONCE,AW_ENCH_STRIKES,AW_ENCH_USED,AW_ENCH_CONSTANT};
@@ -53,6 +55,7 @@ float AW_MagicCharge(const aw_state_t *,const aw_inventory_item_t *);
 int AW_MagicSetCharge(aw_state_t *,const aw_inventory_item_t *,float);
 int AW_MagicRecharge(aw_state_t *,const aw_inventory_item_t *,float seconds,float rate);
 float AW_InventoryCondition(const char *id);
+int AW_InventorySetCondition(const char *id,float condition);
 /* Pure rules (debug torch): the remaining burn time of a carried light after seconds of use
  * (AW_LIGHT_INFINITE stays infinite; else it counts down to 0, as OpenMW's held light); and the
  * one-time grant: 1 = given now, 0 = switched off, given before, or no room (state unchanged). */

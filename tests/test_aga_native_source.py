@@ -524,6 +524,10 @@ class NativeSourceTests(unittest.TestCase):
     def test_ship_ambience_gain_is_local_to_static_prison_channels(self):
         self.compile_run("aga_ship_ambience_test.c", [Path(SOURCE)/"src/snd_dma.c", Path(SOURCE)/"src/mathlib.c"])
 
+    def test_sound_name_table_never_fills(self):
+        # AUDIO-SFX-NAME-TABLE-FULL-58: more than MAX_SFX different sounds in a session, the newest still found
+        self.compile_run("aga_sfx_names_test.c", [Path(SOURCE)/"src/snd_dma.c", Path(SOURCE)/"src/mathlib.c"])
+
     def test_movie_stream_clock_skip_and_bounds(self):
         self.compile_run("aga_movie_test.c", [ROOT/"engine/aga/src/aw_movie.c"])
 

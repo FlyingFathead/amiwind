@@ -71,6 +71,69 @@ class SideBySideTests(unittest.TestCase):
         self.assertLess(text.index('creature_future = side.submit(L.bake'), text.index('NL.build('))
         self.assertLess(text.index('NL.build('), text.index('creature_future.result()'))
 
+    def test_the_npc_pool_follows_the_live_share_up_to_every_allowed_core(self):
+        # BUILD-ACTOR-LIBRARY-UNDERUSED-54 (reopened 31 October 2026): launched with --jobs 12 beside other stages,
+        # the NPC pool must not stay below the cores the stage is allowed once it runs alone
+        import os
+        import actor_library
+        import build_parallel
+        with tempfile.TemporaryDirectory() as tmp:
+            allowance = Path(tmp) / 'allowance'
+            allowance.write_text('12')
+            env = {build_parallel.ALLOWANCE_ENV: str(allowance), build_parallel.BUDGET_ENV: '24',
+                   'AMIWIND_BUILD_JOBS': '12'}
+            with patch.dict(os.environ, env):
+                creatures, npcs = actor_library.pool_sizes(12)
+                self.assertEqual(creatures, 3)
+                self.assertEqual(npcs, 24)                      # sized for the budget: grows when the stage is alone
+                # the pool's in-flight limit follows the allowance: 24 once the other stages finish
+                size, limit = build_parallel._throttle(npcs)
+                self.assertEqual(size, 24)
+                allowance.write_text('24')
+                import time
+                time.sleep(.6)
+                self.assertEqual(limit(), 24)
+    def test_the_two_pools_never_hold_more_than_the_allowance(self):
+        # while the creatures bake, the NPC pool's limit is the allowance minus the creature workers; after, all of it
+        import os
+        import time
+        import actor_library
+        import build_parallel
+        with tempfile.TemporaryDirectory() as tmp:
+            allowance = Path(tmp) / 'allowance'
+            allowance.write_text('12')
+            env = {build_parallel.ALLOWANCE_ENV: str(allowance), build_parallel.BUDGET_ENV: '24',
+                   'AMIWIND_BUILD_JOBS': '12'}
+            with patch.dict(os.environ, env):
+                creatures, npcs = actor_library.pool_sizes(12)
+                with actor_library.NpcAllowance(creatures) as share:
+                    self.assertNotEqual(os.environ[build_parallel.ALLOWANCE_ENV], str(allowance))
+                    _, npc_limit = build_parallel._throttle(npcs)
+                    _, creature_limit = build_parallel._throttle(creatures)
+                    self.assertLessEqual(npc_limit() + creature_limit(), 12)
+                    self.assertEqual(npc_limit(), 9)
+                    allowance.write_text('24')                     # the other stages finished
+                    time.sleep(1.2)
+                    self.assertEqual(npc_limit(), 21)
+                    self.assertLessEqual(npc_limit() + creature_limit(), 24)
+                    share.creatures_done()
+                    time.sleep(.6)
+                    self.assertEqual(npc_limit(), 24)              # every allowed core once the creatures are done
+                self.assertEqual(os.environ[build_parallel.ALLOWANCE_ENV], str(allowance))   # put back
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop(build_parallel.ALLOWANCE_ENV, None)
+            with actor_library.NpcAllowance(3):
+                self.assertNotIn(build_parallel.ALLOWANCE_ENV, os.environ)    # outside the scheduler: nothing
+
+    def test_outside_the_scheduler_the_split_is_as_before(self):
+        import os
+        import actor_library
+        import build_parallel
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop(build_parallel.ALLOWANCE_ENV, None)
+            self.assertEqual(actor_library.pool_sizes(12), (3, 9))      # outside the scheduler: as before
+            self.assertEqual(actor_library.pool_sizes(1), (1, 1))
+
 
 class NpcLibraryTests(unittest.TestCase):
     APP = {'id': 'a', 'parts': [{'slot': 0, 'mesh': 'b/head.nif'}], 'skeleton': 'meshes/base_anim.nif',

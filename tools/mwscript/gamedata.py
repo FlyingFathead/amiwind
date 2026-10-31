@@ -20,7 +20,7 @@ SCRIPTED = ('ACTI', 'ALCH', 'APPA', 'ARMO', 'BOOK', 'CLOT', 'CONT', 'CREA', 'DOO
             'NPC_', 'PROB', 'REPA', 'WEAP', 'STAT')
 # Records kept whole for the actor table (actors.py): the actors, what their stats come from, what they carry.
 RECORD_TAGS = ('NPC_', 'CREA', 'RACE', 'CLAS', 'SKIL', 'WEAP', 'ARMO', 'CLOT', 'LEVI', 'SPEL', 'FACT', 'GMST',
-               'ALCH', 'APPA', 'BOOK', 'INGR', 'LIGH', 'LOCK', 'MISC', 'PROB', 'REPA')
+               'ALCH', 'APPA', 'BOOK', 'INGR', 'LIGH', 'LOCK', 'MISC', 'PROB', 'REPA', 'MGEF')
 
 
 def _text(data):
@@ -60,6 +60,9 @@ class GameData:
         self.exteriors = {}        # (x, y) -> (cell name, folded region id) of every exterior CELL record
         self.regions = {}          # folded REGN id -> its name
         self.topics = {}           # folded DIAL topic id (type 0) -> its name
+        # the dialogue's result scripts (INFO BNAM) with the speaker each names (ONAM, folded; '' any speaker), in
+        # first-seen order: compiled as scripts of their own (compiler.py, DIALOGUE-COMPLETE-58)
+        self.results = {}
         self.default_cell_name = 'Wilderness'   # GMST sDefaultCellname: an exterior with no name and no region
         # the records the actor table reads (tools/mwscript/actors.py): {tag: {folded id: [(sub, data)]}}, the last
         # master wins; SKIL by its INDX number; a deleted record removes the earlier one
@@ -98,7 +101,7 @@ class GameData:
         for tag, flags, payload in records(raw):
             if tag in RECORD_TAGS:
                 parts = list(subrecords(payload))
-                if tag == 'SKIL':
+                if tag in ('SKIL', 'MGEF'):              # keyed by INDX: these have no NAME
                     index = dict(parts).get('INDX', b'')
                     if len(index) == 4:
                         self.records[tag][struct.unpack('<i', index)[0]] = parts
@@ -162,6 +165,11 @@ class GameData:
                         self.topics.pop(ident.casefold(), None)
                     else:
                         self.topics[ident.casefold()] = ident
+            elif tag == 'INFO':
+                parts = list(subrecords(payload)); fields = dict(parts)
+                text = _text(fields.get('BNAM') or b'')    # as the dialogue table keeps it (mwad text)
+                if text.strip() and not _deleted(flags, parts):
+                    self.results.setdefault((_text(fields.get('ONAM', b'')).casefold(), text), None)
             elif tag == 'SSCR':
                 fields = dict(subrecords(payload))
                 ident = _text(fields.get('NAME', b'')).casefold()

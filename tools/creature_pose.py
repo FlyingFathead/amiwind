@@ -336,14 +336,40 @@ class CreatureRig:
                 ev = self.sources[si]['events']
                 hit = next((ev[h] for h in ATTACK_HITS if h in ev and a <= ev[h] <= b), None)
                 entry['hit'] = (hit - a) / (b - a) if hit is not None else .5
+            entry['events'] = sound_events(self.sources[si]['keys'], a, b, step, count, kind)
             samples.extend((si, float(t), fixed) for t in times)
             groups.append(entry)
         return samples, groups
 
 
+# The creature's sound generator moments its animations key ('soundgen: X', CREATURE-ANIM-SOUND-54): the engine
+# plays each from the creature's row of the voice table (aw_glut.c AW_GlutCreatureFind; swimming turns left and
+# right into swim left and right), as OpenMW plays a creature's SoundGen keys through getSoundIdFromSndGen.
+SOUND_EVENTS = ('left', 'right', 'moan', 'roar', 'scream', 'land')
+
+
+def sound_events(keys, a, b, step, count, kind):
+    """[(frame offset, event)] of the 'soundgen: X' keys from time A up to B (B too for a 'hold' group), each on the
+    sampled frame nearest its time; a loop's offsets wrap, the others stop at the last frame. Unknown moments are
+    left out."""
+    out = []
+    for t, line in keys:
+        if not line.startswith('soundgen:') or not a <= t <= b or (t == b and kind != 'hold'):
+            continue
+        words = line.split(':', 1)[1].split()
+        if not words or words[0] not in SOUND_EVENTS:
+            continue
+        offset = int(np.floor((t - a) / step + .5)) if step > 0 else 0
+        offset = offset % count if kind == 'loop' else min(offset, count - 1)
+        if (offset, words[0]) not in out:
+            out.append((offset, words[0]))
+    return out
+
+
 def layout(groups):
-    """The animation layout string of the NPC kit's format (npc_anim.layout: NAME:BASE:COUNT:STEP[:X]); creature
-    sound events are not converted yet."""
+    """The animation layout string of the NPC kit's format (npc_anim.layout: NAME:BASE:COUNT:STEP[:X]), then the
+    sound generator events (@NAME:OFFSET:EVENT, SOUND_EVENTS) without sound files: the engine takes them from the
+    creature's row of the voice table."""
     words = []
     for g in groups:
         word = '%s:%d:%d:%.4f' % (g['name'], g['base'], g['count'], g['step'])
@@ -352,4 +378,7 @@ def layout(groups):
         elif 'hit' in g:
             word += ':%.3f' % g['hit']
         words.append(word)
+    for g in groups:
+        for offset, event in g.get('events') or ():
+            words.append('@%s:%d:%s' % (g['name'], offset, event))
     return ' '.join(words)

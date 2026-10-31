@@ -133,12 +133,22 @@ def source_items(data):
         result[identifier]=dict(id=identifier,name=name,category=KINDS[kind],kind=kind,
             subtype=subtype,weight=weight,value=value,source_model=text(fields,'MODL'),
             source_icon=text(fields,'TEXT' if kind=='ALCH' else 'ITEX'),script=text(fields,'SCRI').casefold(),
-            raw=raw,enchantment=text(fields,'ENAM').casefold() if kind in ('CLOT','ARMO','WEAP','BOOK') else '',parts=any(k=='INDX' for k,_ in fields))
+            raw=raw,enchantment=text(fields,'ENAM').casefold() if kind in ('CLOT','ARMO','WEAP','BOOK') else '',parts=any(k=='INDX' for k,_ in fields),
+            capacity=enchant_capacity(kind,raw))
     for identifier,enchant in enchantments.items():
         if not 0<=enchant[0]<=3:continue
         try:charges[identifier]=max_charge(enchant,effects[identifier],mgef,settings)
         except (KeyError,ValueError):pass
     return result,enchantments,scripts,settings,initial,charges
+
+def enchant_capacity(kind,raw):
+    # The record's enchantment points (what an Enchanting service can put on it; OpenMW getEnchantmentPoints): WPDT
+    # bytes 20..21, AODT 16..19, CTDT 10..11, BKDT 16..19; 0 for the rest (they cannot be enchanted).
+    if kind=='WEAP' and len(raw)>=22:return struct.unpack_from('<H',raw,20)[0]
+    if kind=='ARMO' and len(raw)>=20:return max(0,min(0xFFFF,struct.unpack_from('<i',raw,16)[0]))
+    if kind=='CLOT' and len(raw)>=12:return struct.unpack_from('<H',raw,10)[0]
+    if kind=='BOOK' and len(raw)>=20:return max(0,min(0xFFFF,struct.unpack_from('<i',raw,16)[0]))
+    return 0
 
 def prepare(data_files,id1,selected=(),palette=None,models=True,jobs=None):
     data=resolve_data_files(Path(data_files));id1=Path(id1)
@@ -243,7 +253,8 @@ def prepare(data_files,id1,selected=(),palette=None,models=True,jobs=None):
         charge=charges[item['enchantment']] if kind else 0.
         if not (math.isfinite(charge) and 0<=charge<=1000000):raise ValueError('Invalid enchantment charge '+identifier)
         light=item.get('light')
-        tail=struct.pack('<i3Bx',light['time'],*light['colour']) if light else bytes(8)
+        # bytes 504..511: a carried light's burn time and colour; else the enchantment points (u16 at 504, v0.0.58)
+        tail=struct.pack('<i3Bx',light['time'],*light['colour']) if light else struct.pack('<H6x',item.get('capacity',0))
         row+=struct.pack('<ii6iffffii',*combat)+struct.pack('<B3xf',kind,charge)+tail
         assert len(row)==ROW;rows.append(row)
     out=id1/'inventory/items.awi';out.parent.mkdir(parents=True,exist_ok=True)

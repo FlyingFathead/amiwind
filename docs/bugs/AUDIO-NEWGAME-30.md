@@ -77,8 +77,10 @@ Family: Music and sound (`audio`). The mixer must stay fed through loads and sce
 - AUDIO-ENTER-29 (no report page): Sub-second soundtrack cut on Enter to follow the guard
 - [AUDIO-HOST-LOAD-33](AUDIO-HOST-LOAD-33.md): Music and sound crackle when the emulator shares a fully loaded host CPU
 - [AUDIO-LOAD-29](AUDIO-LOAD-29.md): OST crackles under heavy loading
+- AUDIO-LOCAL-SOUND-CUTS-58 (no report page): One blow's combat sounds cut each other: every local sound replaces the player's other sounds, so only the last of swish, armour struck and Health Damage is heard
 - [AUDIO-LOGO-31](AUDIO-LOGO-31.md): Music crackles while the startup logo plays (WinUAE)
 - AUDIO-MAGIC-STOPS-SPEECH-54 (no report page): A magic sound played as entity -1 stopped every NPC voice mid-line: AW_SpeechStop(-1) matched all speakers
+- AUDIO-SFX-NAME-TABLE-FULL-58 (no report page): The mixer's sound name table (512 entries) is never emptied during a session: once 512 different sounds have played, every new voice line or effect stays silent
 - [AUDIO-STOP-CHANNEL-RANGE-39](AUDIO-STOP-CHANNEL-RANGE-39.md): Stopping an entity sound skips half the dynamic mixer slots
 - [AW-20260928-02](AW-20260928-02.md): Dock/menu freeze and looping audio
 - AW-20260928-15 (no report page): Prison wave ambience masks dialogue
@@ -87,6 +89,7 @@ Family: Music and sound (`audio`). The mixer must stay fed through loads and sce
 - CHIM-ROOMS-WATER-SOUND-48 (no report page): CHIM water rooms have no ambient water sound in their water: room maps got it from their visibility pass
 - [COMBAT-AMBIENT-SPEECH-GATING-38](COMBAT-AMBIENT-SPEECH-GATING-38.md): Ambient greetings and subtitles interrupt combat
 - [COMBAT-MUSIC-AIR-SWING-35](COMBAT-MUSIC-AIR-SWING-35.md): Swinging at the air starts the combat music; it should start only when the player attacks a valid combat target (an NPC or creature)
+- COMBAT-SOUNDS-RULE-OFF-58 (no report page): The original's combat sounds are switched off by default: normal play hears one sound per outcome, not OpenMW's set (swing swish, the armour piece struck, blocks, punches, criticals)
 - [COMBAT-VOICES-SILENT-33](COMBAT-VOICES-SILENT-33.md): Player pain grunts and hostile NPC taunts are not heard in fights
 - CREATURE-ANIM-SOUND-54 (no report page): A creature's sound generators from its animations are not played
 - CUSTOM-OST-SLOT-53 (no report page): Requested: a custom OST slot: the user's own track built into the image and a player routine for it, apart from the playlist
@@ -100,6 +103,8 @@ Family: Music and sound (`audio`). The mixer must stay fed through loads and sce
 - MWSCRIPT-ONESHOT-SLOTS-LEAK-54 (no report page): Script one-shot sounds never freed their slot: after 32 distinct one-shots in a map new script sounds were dropped
 - [NPC-GREETING-PICK-33](NPC-GREETING-PICK-33.md): Greetings take the highest disposition threshold at a fixed 50, OpenMW takes the first line that matches
 - [NPC-VOICE-BARKS-33](NPC-VOICE-BARKS-33.md): NPCs never say their combat, hit, flee or idle voice lines
+- NPC-VOICE-INTRUDER-THIEF-NO-EVENT-58 (no report page): NPCs never say their Intruder or Thief lines: the voice table holds them for 2,654 NPCs, but no engine event says them
+- PLAYER-FOOTSTEPS-NONE-58 (no report page): The player has no footstep sounds: only NPCs play them, and there is no setting for the player's own
 - PUNCH-AUDIO-COVERAGE-29 (no report page): Original punch swing/hit sound coverage unverified
 - SOUND-MARKERS-SILENT-48 (no report page): The original's sound markers are placed but silent: 2,163 in Morrowind (187 outdoors in 78 cells, 1,976 in 434 rooms), water under the Khuul pier, creaking under bridges and boats
 - WIN-05 (no report page): Intermittent WinUAE background-music snapping

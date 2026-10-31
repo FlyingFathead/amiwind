@@ -147,6 +147,65 @@ int AW_ActorAddSpell(aw_actor_t *a,int spell);
 /* A cure: every spell of an ASPT TYPE (2 blight, 3 disease) leaves the actor's list; how many were removed. */
 int AW_ActorRemoveSpellType(aw_actor_t *a,int type);
 int AW_ActorRemoveSpell(aw_actor_t *a,int spell);
+/* A spell's type (ASPT), name and price cost (ASPC, the game's rule: tools/mwscript/actors.py spell_cost); 0 when
+ * the table has no ASPC (before v0.0.58) or SPELL is out of range. */
+int AW_ActorSpellInfo(int spell,int *type,char *name,int capacity,int *cost);
+/* The spells A holds now (its base list with the changes), up to MAX; the count. */
+int AW_ActorSpells(const aw_actor_t *a,int *out,int max);
+/* The items A holds now (gold aside) with counts and whether equipped, up to MAX; and an item's id (folded). */
+int AW_ActorItems(const aw_actor_t *a,int *items,int *counts,int *equipped,int max);
+int AW_ActorItemId(int item,char *out,int capacity);
+/* Things sold to merchants that did not stock them (BARTER-SOLD-ITEM-LOST-58): per merchant REFERENCE and id, a
+ * count; added (DELTA > 0) or bought back (< 0); carried in the saved game as an AWSL block. */
+/* Magic effects (AMGE, the MGEF records: flags, base cost, school) and a spell's effects (ASPE/AEFF, its ENAM);
+ * read from disk when a window or a cast asks. 0 / none when the table predates them (v0.0.58). */
+typedef struct {uint32_t flags;float base_cost;int school;char name[32];} aw_mgef_t;   /* name: the game's word */
+typedef struct {int16_t effect;signed char skill,attribute;unsigned char range;unsigned short area,duration,magnitude_min,magnitude_max;} aw_spell_effect_t;
+int AW_ActorMagicEffect(int index,aw_mgef_t *out);
+int AW_ActorSpellEffects(int spell,aw_spell_effect_t *out,int max);
+/* Things the player made (bounded, saved: AWMD, AWEN): spells and enchanted items, up to 8 effects each. */
+#define AW_MADE_EFFECTS 8
+#define AW_MADE_ITEM_PREFIX "aw_made_"   /* the inventory id of made item N: aw_made_N */
+#define AW_MADE_SPELL_BYTES 152
+#define AW_MADE_ITEM_BYTES 200
+typedef struct {char name[32];int effects;aw_spell_effect_t effect[AW_MADE_EFFECTS];} aw_made_spell_t;
+typedef struct {char base[40],name[32];float charge,charge_max;unsigned char cast_type;int effects;
+                aw_spell_effect_t effect[AW_MADE_EFFECTS];} aw_made_item_t;
+void AW_MadeReset(void);
+int AW_MadeSpellCount(void);
+int AW_MadeItemCount(void);
+const aw_made_spell_t *AW_MadeSpellAt(int i);
+const aw_made_item_t *AW_MadeItemAt(int i);
+int AW_MadeSpellAdd(const aw_made_spell_t *s);     /* its index, -1 full, not valid or no memory */
+int AW_MadeItemAdd(const aw_made_item_t *m);
+/* the inventory's way to the made items (aw_inventory.c; set to AW_MadeItemAt by the script host) */
+extern const aw_made_item_t *(*aw_inventory_made_item)(int index);
+int AW_MadeExport(unsigned char *out,int capacity);
+int AW_MadeImport(const unsigned char *p,int bytes);
+/* Filled soul gems (bounded, saved: AWSG): the gem id and the soul's creature (ACTB row); its soul value. */
+void AW_GemsReset(void);
+int AW_GemCount(void);
+int AW_GemAdd(const char *gem,int creature);
+int AW_GemAt(int i,char *gem,int capacity,int *creature);
+int AW_GemRemove(int i);
+int AW_GemSoul(int i);
+int AW_GemsExport(unsigned char *out,int capacity);
+int AW_GemsImport(const unsigned char *p,int bytes);
+/* Places a script revealed on the map (ShowMap TEXT: the exterior cells whose name holds it; bounded, saved: AWMP),
+ * kept for the map's place markers. */
+void AW_RevealedReset(void);
+int AW_RevealedCount(void);
+const char *AW_RevealedAt(int i);
+int AW_RevealedAdd(const char *text);
+int AW_RevealedExport(unsigned char *out,int capacity);
+int AW_RevealedImport(const unsigned char *p,int bytes);
+void AW_SoldReset(void);
+int AW_SoldCount(void);
+int AW_SoldMax(void);
+int AW_SoldAt(int i,uint32_t *reference,char *id,int capacity,int *count);
+int AW_SoldAdd(uint32_t reference,const char *id,int delta);
+int AW_SoldExport(unsigned char *out,int capacity);
+int AW_SoldImport(const unsigned char *p,int bytes);
 
 /* Saved games: the changed records and the dead counts (a byte block, AWAS1). Export returns the bytes written
  * (0 nothing to save, -1 too small); Import returns 1, or 0 for a bad block (the pool is left empty). */

@@ -116,6 +116,11 @@
 /* Function numbers the host's call() carries out (v0.0.57; tools/mwscript/functions.py HOST and FUNCTION_NUMBERS,
  * checked by tests/test_mwscript.py) */
 #define AWF_ADDTOPIC 6
+#define AWF_CHOICE 22
+#define AWF_SHOWMAP 448
+#define AWF_MODFACTIONREACTION 260
+#define AWF_SETFACTIONREACTION 390
+#define AWF_GOODBYE 219
 #define AWF_AIFOLLOW 10
 #define AWF_AITRAVEL 12
 #define AWF_GETSTANDINGPC 201

@@ -56,6 +56,8 @@ NPCS = {'dunmer_m': npc('dunmer_m', 'Dral', 'Dark Elf'),
         'fargoth': npc('fargoth', 'Fargoth', 'Wood Elf'),
         'mage': npc('mage', 'Edwinna', 'Breton', cls='Mage', faction='Mages Guild', female=True, rank=2,
                     disposition=70)}
+ACCENTED = ('atúlg gro-largúm', 'yatúr gro-shak')    # the two Orcs of NPC-VOICE-NONASCII-IDS-48
+NPCS.update({ident: npc(ident, ident.title(), 'Orc') for ident in ACCENTED})
 RANDOM = ('02fX3Random100', 50)               # global Random100 >= 50
 JOURNAL = ('04JX3A1_Fargoth', 10)             # journal A1_Fargoth >= 10
 TALKED = ('01630', 0)                         # TalkedToPc == 0
@@ -86,7 +88,7 @@ TOPICS = {
 
 def kinds():
     out = {'NPC_': dict(NPCS), 'CLOT': {}, 'ARMO': {}, 'REGN': {}, 'GLOB': {}, 'SCPT': {},
-           'RACE': {r.casefold(): [f('NAME', r), f('FNAM', r)] for r in ('Dark Elf', 'Breton', 'Imperial', 'Wood Elf')},
+           'RACE': {r.casefold(): [f('NAME', r), f('FNAM', r)] for r in ('Dark Elf', 'Breton', 'Imperial', 'Wood Elf', 'Orc')},
            'CLAS': {'mage': [f('NAME', 'Mage'), f('FNAM', 'Mage')], 'commoner': [f('NAME', 'Commoner'),
                                                                                  f('FNAM', 'Commoner')]},
            'FACT': {'mages guild': [f('NAME', 'Mages Guild'), f('FNAM', 'Mages Guild'), f('RNAM', 'Associate'),
@@ -196,11 +198,41 @@ class VoiceTable(unittest.TestCase):
                 elif not runtime:
                     self.assertIs(verdict, True)
 
-    def test_non_ascii_ids_are_left_out_with_a_reason(self):
+    def test_accented_ids_are_in_the_table_as_windows_1252(self):
+        # NPC-VOICE-NONASCII-IDS-48: the two Orcs are kept, their ids stored as the game data's own bytes
+        for ident in ACCENTED:
+            self.assertIn(ident, self.t['npcs'])
+            self.assertNotIn(ident, self.report['left_out'])
+            self.assertEqual(self.hellos(ident), ['Hm?'])
+        self.assertIn('atúlg gro-largúm'.encode('cp1252') + b'\0', self.raw)
+        ids = [G.id_bytes(i) for i in self.t['npcs']]
+        self.assertEqual(ids, sorted(ids))                             # the order the engine's search needs
+
+    def test_missing_sources_need_a_written_reason(self):
+        self.assertEqual(G.unexplained_missing(['vo/d/f/Hit_DF007.mp3', 'vo\\d\\f\\hit_df007.mp3']), [])
+        self.assertEqual(G.unexplained_missing(['vo/x/none.mp3']), ['vo/x/none.mp3'])
+        self.assertEqual(G.unexplained_missing(None), [])
+
+    def test_coverage_line_names_every_character_without_a_sound(self):
+        # VOICE-COVERAGE-58: every NPC of the fixture has a voiced line
+        c = self.report['coverage']
+        self.assertEqual((c['npcs_voiced'], c['npcs_total'], c['npcs_unmapped']), (len(NPCS), len(NPCS), {}))
+        self.assertEqual(G.unexplained(c), [])
+        self.assertIn('NPCs %d/%d voiced' % (len(NPCS), len(NPCS)), G.coverage_line(c))
+        # a voiceless NPC (only unvoiced lines of its own topics) is named and has no reason: a build stops on it
         k = kinds()
-        k['NPC_']['atúlg'] = npc('atúlg', 'Atulg', 'Breton')
-        _, report = G.build(k, TOPICS)
-        self.assertIn('atúlg', report['left_out'])
+        topics = {t: [i for i in infos if not dict(i).get('SNAM')] for t, infos in TOPICS.items()}
+        _, report = G.build(k, topics)
+        self.assertEqual(G.unexplained(report['coverage']), sorted(NPCS))
+        self.assertIn('NO REASON', G.coverage_line(report['coverage']))
+        old = dict(G.SILENT_BY_DESIGN)
+        try:
+            G.SILENT_BY_DESIGN.update({i: 'silent in the original' for i in NPCS})
+            _, report = G.build(k, topics)
+            self.assertEqual(G.unexplained(report['coverage']), [])
+        finally:
+            G.SILENT_BY_DESIGN.clear()
+            G.SILENT_BY_DESIGN.update(old)
 
 
 class LibraryAndImageStep(unittest.TestCase):
@@ -470,7 +502,9 @@ class NativeVoiceTable(unittest.TestCase):
 
     def test_lookup_and_pick_match_the_reference(self):
         t, lines = self.t, []
-        order = sorted(t['npcs'])
+        order = sorted(t['npcs'], key=G.id_bytes)
+        # an accented id with its ASCII letters in upper case: found by the same bytes (the engine lowers ASCII only)
+        lines.append('find\tATúLG GRO-LARGúM\t%d' % order.index('atúlg gro-largúm'))
         for ident in order:
             lines.append('find\t%s\t%d' % (ident.upper() if ident == 'fargoth' else ident, order.index(ident)))
             lines.append('hello\t%s\t%d' % (ident, t['npcs'][ident]['hello']))
@@ -506,7 +540,24 @@ class NativeVoiceTable(unittest.TestCase):
     def test_engine_glue_greet_trigger(self):
         present = [voice_pool_name(s)[6:22] for s in ('vo\\d\\m\\hlo_dm.mp3', 'vo\\b\\m\\hlo_bm.mp3',
                                                       'vo\\d\\m\\atk_dm.mp3')]
-        self.assertIn('glue ok', self.run_check('glue', str(Path(self.tmp.name) / G.NAME), ','.join(present)))
+        t = self.t
+        row = dict((i.casefold(), r) for i, r in t['creatures'])['rat']
+        moan = row[G.SNDG_MOMENTS.index('MOAN')]
+        mapped = moan != G.NONE16 and t['sound_rows'][moan][2] & G.SOUND_MAPPED
+        want = 'pool/a%s.wav' % t['sounds'][moan] if mapped else '-'
+        players = Path(self.tmp.name) / G.PLAYER_VOICES
+        players.write_bytes(G.player_voices_text({'breton/m': 'breton_m'}))
+        self.assertIn('glue ok', self.run_check('glue', str(Path(self.tmp.name) / G.NAME), ','.join(present), want,
+                                                str(players)))
+
+    def test_player_voices_pick_the_commonest_hit_lines(self):
+        # COMBAT-VOICES-SILENT-33: the player's pain lines by his race and sex, from an NPC without a faction
+        raw, report = G.build(kinds(), TOPICS)
+        self.assertEqual(report['player_voices']['breton/m'], 'breton_m')
+        self.assertNotIn('breton/f', report['player_voices'])          # the only Breton woman is in a faction
+        self.assertEqual(report['player_voices']['dark elf/f'], 'dunmer_f')
+        text = G.player_voices_text(report['player_voices']).decode('cp1252')
+        self.assertTrue(text.startswith('AWPV1\n') and 'breton\tm\tbreton_m\n' in text)
 
 
 class EngineSource(unittest.TestCase):
@@ -517,6 +568,12 @@ class EngineSource(unittest.TestCase):
         qc = (ROOT / 'engine/aga/qc/world.qc').read_text(encoding='utf-8')
         for line in ('aw_glut_prep = #84', 'aw_glut_say = #85', 'aw_glut_text = #86', 'aw_glut_prep(self);'):
             self.assertIn(line, qc)
+        # NPC-GREETING-PICK-33: the table's first match before a resident's build-time line; no gap across all actors
+        greet = qc.split('void(entity npc, entity listener, float automatic) aw_greet = {', 1)[1].split('\n};', 1)[0]
+        self.assertLess(greet.index('if (aw_glut_say(npc,0))'), greet.index('npc.aw_voice != ""'))
+        self.assertNotIn('aw_voice_deadline = time + 8', greet)
+        idle = qc.split('void() aw_npc_idle = {', 1)[1].split('\n};', 1)[0]
+        self.assertNotIn('aw_voice_deadline', idle)
         builtins = (src / 'pr_cmds.c').read_text(encoding='latin-1').split('builtin_t pr_builtin[] =', 1)[1]
         for name in ('PF_aw_glut_prep, /* #84', 'PF_aw_glut_say,  /* #85', 'PF_aw_glut_text  /* #86'):
             self.assertIn(name, builtins)

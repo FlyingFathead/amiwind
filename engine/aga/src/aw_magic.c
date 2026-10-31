@@ -150,7 +150,7 @@ static model_t *sprite_of(int fx,int phase) {
 static void sound_on(int fx,int phase,vec3_t at,int channel) {
     const aw_magic_phase_t *ph=&table->fx[fx].phase[phase];
     if(!ph->present || !ph->sound[0])return;
-    if(!sounds[fx][phase])sounds[fx][phase]=S_PrecacheSound((char *)ph->sound);
+    if(!sounds[fx][phase]){sounds[fx][phase]=S_PrecacheSound((char *)ph->sound);S_KeepSound(sounds[fx][phase]);}
     if(sounds[fx][phase])S_StartSound(SOUND_ENT,channel,sounds[fx][phase],at,1,1);
 }
 static void sound_at(int fx,int phase,vec3_t at) {sound_on(fx,phase,at,0);}

@@ -479,7 +479,7 @@ class BugTrackerTest(unittest.TestCase):
         self.assertTrue(bug_register.archivable(base))
         self.assertTrue(bug_register.archivable(dict(base, state='closed')))
         self.assertFalse(bug_register.archivable(dict(base, state='open')))
-        # the rotation reaches v0.0.54 since the v0.0.57-dev1 merge, 30 October 2026 (bugs-v0.0.52-v0.0.54.json);
+        # the rotation reaches v0.0.57 since the v0.0.58 dev line, 31 October 2026 (bugs-v0.0.55-v0.0.57.json);
         # later series stay live
         self.assertTrue(bug_register.archivable(dict(base, found_in='v0.0.36')))
         self.assertTrue(bug_register.archivable(dict(base, found_in='v0.0.40')))
@@ -487,14 +487,29 @@ class BugTrackerTest(unittest.TestCase):
         self.assertTrue(bug_register.archivable(dict(base, found_in='v0.0.47')))
         self.assertTrue(bug_register.archivable(dict(base, found_in='v0.0.51')))
         self.assertTrue(bug_register.archivable(dict(base, found_in='v0.0.54')))
-        self.assertFalse(bug_register.archivable(dict(base, found_in='v0.0.55')))
+        self.assertTrue(bug_register.archivable(dict(base, found_in='v0.0.57-dev5')))
+        self.assertFalse(bug_register.archivable(dict(base, found_in='v0.0.58')))
         self.assertFalse(bug_register.archivable(dict(base, found_in='v0.0.36'), up_to=35))
         self.assertFalse(bug_register.archivable(dict(base, found_in='unknown', id='AW-20261010-01')))
         two = [{'version': 'v0.0.33', 'at': '2026-10-09'}, {'version': 'v0.0.36-dev3', 'at': '2026-10-11'}]
         self.assertFalse(bug_register.archivable(dict(base, reports=two)), 'a persisting bug stays in bugs.json')
-        live, old = bug_register.split([base, dict(base, id='BUILD-ROT-55', found_in='v0.0.55')])
-        self.assertEqual([b['id'] for b in live], ['BUILD-ROT-55'])
+        live, old = bug_register.split([base, dict(base, id='BUILD-ROT-58', found_in='v0.0.58')])
+        self.assertEqual([b['id'] for b in live], ['BUILD-ROT-58'])
         self.assertEqual([b['id'] for b in old], ['BUILD-ROT-33'])
+
+    def test_status_cell_keeps_open_bugs_whole(self):
+        # 2026-10-31: docs/BUGS.md lists every bug, archived ones too, and reached 95.06 % of its 1 MiB limit; a fixed
+        # or closed bug's Status is cut in the table, never an open one's, and the whole text stays in the data
+        long_text = ' '.join(['word%d' % i for i in range(80)])
+        n = bug_register.STATUS_CELL_DONE
+        self.assertEqual(bug_register.status_cell({'state': 'open', 'status': long_text}), long_text)
+        done = bug_register.status_cell({'state': 'fixed', 'status': long_text, 'report': 'bugs/X.md'})
+        self.assertTrue(done.endswith('(more on its page)'), done)
+        self.assertLessEqual(len(done.split(' ... ')[0]), n)
+        self.assertTrue(long_text.startswith(done.split(' ... ')[0]))
+        self.assertTrue(bug_register.status_cell({'state': 'closed', 'status': long_text}).endswith(
+            '(more in the register data)'))
+        self.assertEqual(bug_register.status_cell({'state': 'fixed', 'status': 'short'}), 'short')
 
     def test_whitespace_baselines_get_the_named_limit(self):
         # RELEASE-PATCH-SIZE-33: docs/releases/patches/PATCH-v<version>.json lists every file of the published

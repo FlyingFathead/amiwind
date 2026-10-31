@@ -253,6 +253,10 @@ End''',
 }
 
 
+# a dialogue result script on the Quiet object (its local done): run through the DRSC row (DIALOGUE-COMPLETE-58)
+RESULT_TEXT = 'set done to 7' + chr(13) + chr(10) + 'Choice ' + chr(34) + 'A' + chr(34) + ' 3'
+
+
 def master_bytes(scripts=SCRIPTS):
     out = [record('TES3', sub('HEDR', b'\0' * 300))]
     out += [glob('QuestFlag', 's', 0), glob('Counter', 'l', 0), glob('Fraction', 'f', 1.5), glob('Where', 'l', 0),
@@ -268,6 +272,8 @@ def master_bytes(scripts=SCRIPTS):
                    sub('ENAM', struct.pack('<hbbiiiii', 69, -1, -1, 0, 0, 0, 0, 0)),
                    sub('ENAM', struct.pack('<hbbiiiii', 27, -1, -1, 0, 0, 3, 2, 2)))]
     out += [record('DIAL', sub('NAME', 'Little Secret'), sub('DATA', b'\0')),
+            record('INFO', sub('INAM', '1'), sub('ONAM', 'quiet_obj'), sub('NAME', 'A secret.'),
+                   sub('BNAM', RESULT_TEXT)),
             record('DIAL', sub('NAME', 'background'), sub('DATA', b'\0')),
             record('DIAL', sub('NAME', 'A Journal'), sub('DATA', b'\x04'))]
     out += [scpt(name, text) for name, text in scripts.items()]
@@ -318,6 +324,18 @@ def program(handwritten=('chargen*',)):
         media = MediaMap(s.data, catalogue(), SOUNDTRACK)
         prog, compiled = compile_program(s.data, media, handwritten=handwritten, rooms=ROOMS)
         return prog, compiled, bindings(prog), s.data
+
+
+class ResultKeyTests(unittest.TestCase):
+    def test_two_texts_with_one_key_stop_the_build(self):
+        # the engine tells result scripts apart by (hash, length): two different texts with one key are refused
+        from mwscript.codegen import check_result_keys, CompileError
+        same = [{'hash': 1, 'length': 3, 'text': b'abc'}, {'hash': 1, 'length': 3, 'text': b'abc'}]
+        check_result_keys(same)                                    # one text twice (two speakers): fine
+        with self.assertRaises(CompileError) as caught:
+            check_result_keys([{'hash': 1, 'length': 3, 'text': b'abc'}, {'hash': 1, 'length': 3, 'text': b'xyz'}])
+        self.assertIn("b'abc'", str(caught.exception))
+        self.assertIn("b'xyz'", str(caught.exception))
 
 
 class LexerParserTests(unittest.TestCase):
@@ -602,11 +620,13 @@ static int h_move(int i,int kind,int map,const float *at,float yaw){
 static int32_t h_ai(int i,int t,int verb){printf("%d ai %d %d %d\n",tick,i,t,verb);return verb?t!=AW_MWVM_SELF:0;}
 static const aw_mwvm_host_t host={h_sound,h_playing,h_say,h_saydone,h_music,h_distance,h_menu,h_query,h_jget,h_jset,h_notyet,h_warn,h_object,h_message,h_button,
     h_actor,h_item,h_spell,h_combat,h_dead,h_wander,h_call,h_cell,h_pos,h_move,h_ai};
+static unsigned char buf[1<<20];static long nbuf;
+static int read_mem(void *u,uint32_t off,void *out,uint32_t n){(void)u;if((long)off+(long)n>nbuf)return 0;memcpy(out,buf+off,n);return 1;}
 int main(int argc,char **argv){
-    FILE *f=fopen(argv[1],"rb");static unsigned char buf[1<<20];long n=fread(buf,1,sizeof(buf),f);uint32_t off,rows,bytes,r;
+    FILE *f=fopen(argv[1],"rb");long n=fread(buf,1,sizeof(buf),f);uint32_t off,rows,bytes,r;
     int ticks=atoi(argv[2]),i;float player[3]={0,0,0},dt=(float)atof(argv[3]);
     unsigned used=argc>4?(unsigned)atoi(argv[4]):0;   /* the player uses this reference's object at tick 3 */
-    fclose(f);
+    fclose(f);nbuf=n;
     if(getenv("ROOM"))room=atoi(getenv("ROOM"));
     if(getenv("CALLS"))answer=atoi(getenv("CALLS"));
     if(!AW_MwvmLoad(buf,(unsigned long)n,&host)){printf("load failed\n");return 1;}
@@ -617,6 +637,18 @@ int main(int argc,char **argv){
         for(i=0;i<3;i++)o[i]=(float)(int32_t)(((uint32_t)p[12+4*i]<<24)|((uint32_t)p[13+4*i]<<16)|((uint32_t)p[14+4*i]<<8)|p[15+4*i])*0.25f;
         printf("attach %u %d\n",(unsigned)((p[0]<<24)|(p[1]<<16)|(p[2]<<8)|p[3]),
                AW_MwvmAttach(((uint32_t)p[0]<<24)|(p[1]<<16)|(p[2]<<8)|p[3],(p[4]<<8)|p[5],(p[6]<<8)|p[7],-1,o));
+    }
+    if(getenv("DIALOGUE")){   /* a result text run on reference 103 (the Quiet object) through its DRSC row */
+        const char *text=getenv("DIALOGUE");int speaker=-1,row_speaker,broken,script,k;
+        for(k=0;k<AW_MwvmInstanceCount();k++){aw_mwvm_instance_t *in=AW_MwvmInstance(k);
+            if(in && (in->flags&AWI_USED) && in->reference==103)speaker=in->script;}
+        script=AW_MwvmFindDialogue(read_mem,NULL,AW_MwvmTextHash(text,(int)strlen(text)),(int)strlen(text),speaker,&row_speaker,&broken);
+        printf("dialogue %d speaker %d row %d broken %d ran %d\n",script,speaker,row_speaker,broken,
+               script>=0?AW_MwvmRunDialogue(script,103,row_speaker):0);
+        for(k=0;k<AW_MwvmInstanceCount();k++){aw_mwvm_instance_t *in=AW_MwvmInstance(k);
+            if(in && (in->flags&AWI_USED) && in->reference==103)printf("done %d\n",(int)AW_MwvmLocal(k,0).i);}
+        printf("missing %d\n",AW_MwvmFindDialogue(read_mem,NULL,AW_MwvmTextHash("nothing",7),7,speaker,&row_speaker,&broken));
+        return 0;
     }
     for(tick=1;tick<=ticks;tick++){
         if(used && tick==3)
@@ -682,6 +714,21 @@ class InterpreterTests(unittest.TestCase):
         self.assertEqual(g[str(self.index('globals', 'questflag'))][2], '2')
         self.assertEqual(g[str(self.index('globals', 'counter'))][2], '1')
         self.assertFalse([l for l in out if ' sound ' in l and l.split()[4] == str(chime) and l.split()[0] == '0'])
+
+    def test_dialogue_result_runs_on_the_speaker_through_its_row(self):
+        # DIALOGUE-COMPLETE-58: the result text's row is found by hash and length, compiled with the Quiet script's
+        # locals; run on reference 103 it sets that instance's local done to 7 and calls Choice (host call 22)
+        from mwscript.codegen import SCRIPT_DIALOGUE
+        out = self.run_vm(0, env={'DIALOGUE': RESULT_TEXT, 'CALLS': '-1'})
+        line = next(l for l in out if l.startswith('dialogue')).split()
+        quiet = str(self.index('scripts', 'quiet'))
+        self.assertEqual(line[3], quiet)                          # the speaker's attached script
+        self.assertEqual(line[5], quiet)                          # the row compiled with its locals
+        self.assertEqual((line[7], line[9]), ('0', '1'))          # compiled, ran
+        self.assertTrue(self.compiled[int(line[1])].flags & SCRIPT_DIALOGUE)
+        self.assertIn('done 7', out)
+        self.assertTrue(any(l.split()[1:3] == ['call', '22'] for l in out), out)
+        self.assertIn('missing -1', out)
 
     def test_handwritten_scripts_do_not_attach(self):
         out = self.run_vm(1)
@@ -983,7 +1030,7 @@ class BuilderStageTests(unittest.TestCase):
                 self.assertEqual(receipt['cache'], attempt)
                 raw = (out / 'id1/mwscript.awm').read_bytes()
                 f = awms.read(raw)
-                self.assertEqual(f['SCRP_rows'], len(SCRIPTS))
+                self.assertEqual(f['SCRP_rows'], len(SCRIPTS) + 1)      # and the one dialogue result script (_dlg_0)
                 report = json.loads((out / 'mwscript-report.json').read_text())
                 self.assertEqual(report['media']['sounds']['mapped'], 2)
                 self.assertEqual(report['media']['music']['mapped'], 1)

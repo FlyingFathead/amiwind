@@ -15,6 +15,7 @@ extern int AW_SceneryCount(void);
 #include <limits.h>
 #include "aw_inventory.h"
 #include "aw_tryalloc.h"
+#include "aw_actorstate.h"
 #if AW_STATE_VALUES > 32
 #error Inventory condition bitset requires AW_STATE_VALUES <= 32
 #endif
@@ -229,10 +230,22 @@ static int inv_field(char *out,const byte *raw,int n){
     for(i=0;raw[i];i++)if(raw[i]<32)return 0;
     memcpy(out,raw,n);return 1;
 }
+/* the made items' store (aw_actorstate.c AW_MadeItemAt), set by the script host when it starts; none in the tools' tests */
+const aw_made_item_t *(*aw_inventory_made_item)(int index);
 int AW_InventoryRead(const char *id,aw_inventory_item_t *out){
     FILE *f=NULL;byte head[8],row[INV_ROW];int size,lo=0,hi,mid,cmp;long base;uint32_t bits;
     aw_inventory_item_t value;
     if(!out || !inv_id(id,64))return 0;
+    if(!strncmp(id,AW_MADE_ITEM_PREFIX,sizeof(AW_MADE_ITEM_PREFIX)-1)){
+        /* an item the player had enchanted (Enchanting; aw_actorstate.c): its base item with the made name, cast
+         * type and charge; its effects are the made item's own */
+        const aw_made_item_t *m=aw_inventory_made_item?aw_inventory_made_item(atoi(id+sizeof(AW_MADE_ITEM_PREFIX)-1)):NULL;
+        if(!m || !strncmp(m->base,AW_MADE_ITEM_PREFIX,sizeof(AW_MADE_ITEM_PREFIX)-1) || !AW_InventoryRead(m->base,out))return 0;
+        Q_snprintf(out->id,sizeof(out->id),"%s",id);Q_snprintf(out->name,sizeof(out->name),"%s",m->name);
+        Q_snprintf(out->enchantment,sizeof(out->enchantment),"%s",id);
+        out->enchant_kind=m->cast_type+1;out->charge_max=m->charge_max;out->enchant_capacity=0;
+        return 1;
+    }
     size=COM_FOpenFile("inventory/items.awi",&f);if(!f)return 0;base=ftell(f);
     if(size<8 || fread(head,1,8,f)!=8 || memcmp(head,"AWI2",4))goto bad;
     hi=(int)inv_u32(head+4);if(hi<1 || hi>65536 || size!=8+hi*INV_ROW)goto bad;
@@ -267,7 +280,8 @@ int AW_InventoryRead(const char *id,aw_inventory_item_t *out){
                 memcpy(value.light_colour,row+508,3);
                 if(row[511] || value.category!=AW_INV_MISC || value.light_radius<1 || value.light_radius>65535 ||
                    (value.light_time!=AW_LIGHT_INFINITE && (value.light_time<1 || value.light_time>1000000)))goto bad;
-            }else{int n;for(n=504;n<512;n++)if(row[n])goto bad;}
+            }else{int n;value.enchant_capacity=row[504]|(row[505]<<8);   /* the record's enchantment points */
+                  for(n=506;n<512;n++)if(row[n])goto bad;}
             if(value.category<1 || value.category>7 || value.value<0 ||
                !(value.weight>=0 && value.weight<=1000000) ||
                (value.slots&~((1U<<AW_INVENTORY_SLOTS)-1)) ||
@@ -369,6 +383,14 @@ static float inv_condition(const char *id){
     return index>=0 && (aw_state.inventory.condition_known&(1U<<index))?aw_state.inventory.condition[index]:1;
 }
 float AW_InventoryCondition(const char *id){return inv_condition(id);}
+/* A carried thing's condition (0..1 of its record's health) set, the dialogue's Repair service; 0 when not carried */
+int AW_InventorySetCondition(const char *id,float condition){
+    int index=inv_item_index(&aw_state,id);
+    if(index<0)return 0;
+    aw_state.inventory.condition[index]=condition<0?0:condition>1?1:condition;
+    aw_state.inventory.condition_known|=1U<<index;
+    return 1;
+}
 /* The selected magic item, read once per selection change (no per-frame I/O). */
 int AW_MagicSelectedItem(aw_inventory_item_t *out){
     static char id[64];static aw_inventory_item_t value;static int ok;

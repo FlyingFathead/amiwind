@@ -24,6 +24,8 @@ static float far_detail=4;static int far_sets;
 static float autoram=1;
 /* Controls > Invert Y axis: the sign of Quake's m_pitch (default 0.022). */
 static float pitch_value=.022f;
+/* Audio > Your footsteps (aw_player_footsteps, default off). */
+static float player_steps;
 float Cvar_VariableValue(char *name){
     if(!strcmp(name,"aw_cull"))return far_detail;
     if(!strcmp(name,"aw_autoram"))return autoram;
@@ -31,11 +33,13 @@ float Cvar_VariableValue(char *name){
     if(!strcmp(name,"aw_combat_dice"))return combat_dice;
     if(!strcmp(name,"aw_combat_block"))return combat_block;
     if(!strcmp(name,"m_pitch"))return pitch_value;
+    if(!strcmp(name,"aw_player_footsteps"))return player_steps;
     assert(0);return 0;
 }
 void Cvar_SetValue(char *name,float value){cvar_t *rows[]={&volume,&bgmvolume,&effectsvolume,&dialoguevolume};int i;
     if(!strcmp(name,"aw_cull")){assert(value==1 || value==3 || value==4 || value==6);far_detail=value;far_sets++;return;}
     if(!strcmp(name,"m_pitch")){pitch_value=value;return;}
+    if(!strcmp(name,"aw_player_footsteps")){assert(value==0 || value==1);player_steps=value;return;}
     assert(value>=0 && value<=1);
     if(!strcmp(name,"aw_combat_miss")){combat_miss=value;return;}
     if(!strcmp(name,"aw_autoram")){autoram=value;return;}

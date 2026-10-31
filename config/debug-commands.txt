@@ -1,6 +1,7 @@
 AWDC1
 # Group|debug words|registered handler|help arguments
 AUDIO|door sounds|aw_door_sounds|on/off (default on)
+AUDIO|footsteps|aw_player_footsteps_cmd|[on/off, true/false or 1/0; no argument = status] your own footsteps (default off, saved; also Options > Audio): by your boots (bare, light, medium, heavy), in water and swimming; NPC and creature footsteps stay on (aw_npc_footsteps)
 AUDIO|music|aw_music_status|[on/off, true/false or 1/0; no argument = status of the switch and the stream] background music (default on; not saved): off closes the stream at once and opens none until on again
 AUDIO|music custom|aw_music_custom|[play / stop; no argument: status] the custom OST player (an image built with --custom-ost FILE): play your own track alone, the playlist and its auto-advance waiting; stop gives the playlist back; without a custom track: silence, never the OST
 AUDIO|mwscript|aw_mwscript_status|[on/off, true/false or 1/0; no argument: what it does] (default on, saved) the game's compiled scripts (docs/MWSCRIPT_BYTECODE.md): sounds, NPC lines, music cues, journal, globals, object state, AIWander; not-yet functions logged once. Answers with the file (id1/mwscript.awm: format, scripts, bytes kept) and the counts

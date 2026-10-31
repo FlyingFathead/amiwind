@@ -137,6 +137,14 @@ static void audio_set(int row,int percent){
     if(audio_levels[row]->value!=percent*.01f)Cvar_SetValue(audio_levels[row]->name,percent*.01f);
 }
 static void audio_pointer(int row){audio_set(row,((mouse_x-AUDIO_X)*100+AUDIO_W/2)/AUDIO_W);}
+/* Below the sliders: your own footsteps, on/off (aw_player_footsteps, saved, default off; dbg footsteps;
+ * PLAYER-FOOTSTEPS-NONE-58). NPC and creature footsteps are not this setting. */
+#define AUDIO_STEPS 4
+#define AUDIO_ROWS 5
+#define AUDIO_STEPS_H 16
+static int audio_row_y(int row){return AUDIO_Y+row*AUDIO_H;}
+static int audio_row_h(int row){return row==AUDIO_STEPS?AUDIO_STEPS_H:AUDIO_H;}
+static void steps_toggle(void){Cvar_SetValue("aw_player_footsteps",Cvar_VariableValue("aw_player_footsteps")?0:1);}
 /* Options > Controls > Mouse sensitivity: Quake's saved sensitivity (default 3.0, unchanged),
  * 0.5 to 10 in steps of 0.5 (Shift: 0.1); arrows, Home/End, or drag the rail. Invert Y axis:
  * Quake's own invert, the sign of the saved m_pitch (the original's "Invert Y Axis", sMouseFlip). */
@@ -293,7 +301,7 @@ static int photo_ready(void){return !frontend && AW_PhotoModeAvailable();}
 
 /* ---- Options pages ---- */
 static void close_menu(void);
-static int tab_rows(int t){return t==TAB_PREFS?PREFS_ROWS:t==TAB_AUDIO?4:t==TAB_CONTROLS?CONTROL_ROWS:VIDEO_ROWS;}
+static int tab_rows(int t){return t==TAB_PREFS?PREFS_ROWS:t==TAB_AUDIO?AUDIO_ROWS:t==TAB_CONTROLS?CONTROL_ROWS:VIDEO_ROWS;}
 static int row_id(int row){return tab==TAB_PREFS?prefs_rows[row]:video_rows[row];}
 static int row_active(int row){
     if(tab==TAB_CONTROLS)return control_ready(row);
@@ -362,6 +370,7 @@ static void prefs_video_change(int id,int direction,int enter){
 static void row_key(int key){
     int direction=key==K_LEFTARROW?-1:key==K_RIGHTARROW?1:0,enter=key==K_ENTER || key==K_MOUSE1;
     if(tab==TAB_AUDIO){
+        if(selection==AUDIO_STEPS){if(direction || enter)steps_toggle();return;}
         if(direction)audio_set(selection,audio_percent(selection)+direction*(keydown[K_SHIFT]?1:5));
         if(key==K_HOME || key==K_END)audio_set(selection,key==K_HOME?0:100);
         if(key==K_MOUSE1 && mouse_x>=AUDIO_X-4 && mouse_x<=AUDIO_X+AUDIO_W+4){audio_drag=selection+1;audio_pointer(selection);}
@@ -387,7 +396,7 @@ static int options_hit(int *index){
     int i,n=tab_rows(tab);
     for(i=0;i<TABS;i++)if(inside(TAB_X+i*TAB_STEP,TAB_Y,TAB_W,TAB_H)){*index=i;return 1;}
     if(inside(BACK_X,BACK_Y,BACK_W,BACK_H))return 3;
-    if(tab==TAB_AUDIO){for(i=0;i<4;i++)if(inside(LIST_X,AUDIO_Y+i*AUDIO_H,LIST_W,AUDIO_H)){*index=i;return 2;}return 0;}
+    if(tab==TAB_AUDIO){for(i=0;i<AUDIO_ROWS;i++)if(inside(LIST_X,audio_row_y(i),LIST_W,audio_row_h(i))){*index=i;return 2;}return 0;}
     for(i=0;i<VISIBLE && graphics_top+i<n;i++)if(inside(LIST_X,LIST_Y+i*ROW_H,LIST_W,ROW_H)){*index=graphics_top+i;return 2;}
     return 0;
 }
@@ -646,6 +655,9 @@ static void options_draw(void){
             rail(AUDIO_X,yy+13,AUDIO_W,value*AUDIO_W/100);
             sprintf(line,"%ld%%",(long)value);AW_UITextBox(256,yy,38,AUDIO_H,line,colours[1]);
         }
+        label(LIST_X,audio_row_y(AUDIO_STEPS),LIST_W,AUDIO_STEPS_H,
+              Cvar_VariableValue("aw_player_footsteps")?"Your footsteps: On":"Your footsteps: Off",1,
+              focus==FOCUS_ROWS && selection==AUDIO_STEPS);
     }else{
         for(i=graphics_top;i<graphics_top+VISIBLE && i<n;i++){
             yy=LIST_Y+(i-graphics_top)*ROW_H;selected=focus==FOCUS_ROWS && selection==i;
@@ -672,7 +684,7 @@ static void options_draw(void){
     }
     if(focus==FOCUS_TABS)help="Left/Right: page   Down: settings";
     else if(focus==FOCUS_BACK)help="Enter: back to the menu";
-    else if(tab==TAB_AUDIO)help="Arrows / drag: volume";
+    else if(tab==TAB_AUDIO)help=selection==AUDIO_STEPS?"Left/Right: change   Esc: back":"Arrows / drag: volume";
     else if(tab==TAB_CONTROLS && controls_capture)help="Press a key   Esc: cancel";
     else if(tab==TAB_CONTROLS && CONTROL_ACTION(selection))help="Enter: set   Del: clear";
     else if(tab==TAB_CONTROLS && selection==CONTROL_SENS)help="Arrows / drag   Shift: fine";

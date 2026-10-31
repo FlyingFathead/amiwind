@@ -1,6 +1,6 @@
 # The actor record
 
-_Last updated with AmiWind v0.0.54-dev1 (27 October 2026)._
+_Last updated with AmiWind v0.0.58-dev1 (31 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -71,6 +71,9 @@ after the script sections. Big-endian; the layout is in `tools/mwscript/actors.p
 | AITM | 28 | a shared item: id, kind, type, condition, armour rating, damage, flags, weight, speed, reach | on disk |
 | ASPT | 4 | a shared spell: id, type | on disk |
 | ASPL | 2 | a spell entry | on disk |
+| ASPC | 4 | a spell's name and price cost (per ASPT row; the dialogue's Spells service) | on disk |
+| ASPE / AEFF | 4 / 14 | a spell's effects (per ASPT row: the first entry and count; each effect as the record has it) | on disk |
+| AMGE | 12 | a magic effect's flags, base cost and school (per effect index; Spellmaking and Enchanting) | on disk |
 
 Measured on the game data (27 October 2026): 3,437 actors (3,041 NPCs, 396 creatures), 20,596 inventory entries,
 1,691 items, 629 spells, 14,276 spell entries; with the items, spells and objects the scripts name (v0.0.54's

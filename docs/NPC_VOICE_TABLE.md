@@ -1,6 +1,6 @@
 # NPC voice table (AWGL1)
 
-_Last updated with AmiWind v0.0.56 (30 October 2026)._
+_Last updated with AmiWind v0.0.58 (31 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -42,8 +42,8 @@ in the game; and for the run-time conditions as bytecode, so that they are not s
 
 **Not done yet:**
 - **No in-game check.** Nobody has listened in a build yet; the first build with the table is v0.0.48-dev2.
-- **Two NPCs left out.** Two Orc NPCs have accented letters in their record ids and stay silent
-  ([NPC-VOICE-NONASCII-IDS-48](bugs/NPC-VOICE-NONASCII-IDS-48.md)).
+- **The two Orcs with accented ids: in the table since v0.0.58, not yet heard in a build.** Atúlg gro-Largúm and
+  Yatúr gro-Shak were left out until v0.0.57 ([NPC-VOICE-NONASCII-IDS-48](bugs/NPC-VOICE-NONASCII-IDS-48.md)).
 - **Lines with no recording.** Conversation greetings are text in the original (only a few have a recording, like the
   captain's), so most greetings show as text.
 - **Sounds tied to a place.** The original's sound markers (water under the Khuul pier, creaking under bridges, the
@@ -51,7 +51,26 @@ in the game; and for the run-time conditions as bytecode, so that they are not s
 
 ## What it holds
 
-- Every NPC record of `Morrowind.esm` (2,673 of 2,675; two ids with non-ASCII letters are left out with the reason).
+- Every NPC record of `Morrowind.esm` (2,675 of 2,675 since v0.0.58). Record ids are stored as the game data's own
+  Windows-1252 bytes and sorted by those bytes with ASCII letters lowered, the order the engine's search compares;
+  the world's entity text carries `aw_source_id` in the same bytes, so the two Orcs with accented ids
+  (`atúlg gro-largúm`, `yatúr gro-shak`) are found like every other NPC (NPC-VOICE-NONASCII-IDS-48; the dialogue
+  table takes the same NPC plan, so they are in it too).
+- **Coverage, in every build** (VOICE-COVERAGE-58): the report `npc-voice-table.json` has `coverage` (NPCs with at
+  least one voiced line out of the NPC records, creatures with at least one sound out of the creature rows, every
+  character without a sound named with its reason) and the build log prints it as one line, `Voice coverage: NPCs
+  N/M voiced, creatures N/M with sounds, unmapped: ...`. A character without any sound and without a written reason
+  (left out by the table, or `SILENT_BY_DESIGN` in `tools/greeting_lut.py`) stops the image step and is named.
+  The v0.0.57 release table, read back: every one of its 2,673 NPCs has a voiced line (hit and attack all 2,673,
+  hello 2,648, idle, intruder, thief and flee 2,654) and every one of its 396 creatures has a sound. What is mapped
+  and what has been heard, moment by moment: [Voices and sounds](VOICE_FEATURES.md).
+- **The player's own lines (v0.0.58, COMBAT-VOICES-SILENT-33).** The player has no record of his own in the table,
+  so the image step also writes `id1/npc-voice-player.txt`: per race and sex, the NPC without a faction whose Hit
+  lines are the commonest of that race and sex. The player says those when hurt (30 %, `iVoiceHitOdds`) and when
+  killed, as OpenMW's player does (`npc.cpp` onHit).
+- **Hello for every NPC from the table (v0.0.58, NPC-GREETING-PICK-33).** A town resident's build-time hello is
+  used only when the table has no Hello line for it; there is no gap any more across all actors: each NPC greets
+  once until the player leaves its reset distance, one voice at a time per NPC.
 - Every Voice topic of the data: Hello, Idle, Intruder, Thief, Hit, Attack, Flee and Alarm (no NPC can say the
   data's one Alarm line), and the conversation greeting (the Greeting 0 to 9 topics in turn, OpenMW's order).
 - Per NPC: its hello distance (the NPC's Hello setting times `iGreetDistanceMultiplier`, in Quake units), its base

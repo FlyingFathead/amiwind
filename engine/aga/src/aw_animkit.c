@@ -674,6 +674,7 @@ void AW_AnimKitTick(void) {
     /* a load or a stall stands still; a slow machine's long frames still play (SKEL-RUNTIME-COST-52: on the
      * slow-CPU preset, about 1.6 s a frame, the old 0.5 s cut left every forced group on its first frame) */
     if(dt<0 || dt>3.0f)dt=0;
+    if(aw_player_steps)aw_player_steps();   /* the player's own footsteps (aw_glut.c; off by default) */
     if(!forced_count)return;
     if(!sv.active || forced_world!=sv.worldmodel){
         if(forced_world!=sv.worldmodel){memset(forced,0,sizeof(forced));forced_count=0;cycle.on=0;}  /* a new map: its edicts are gone */
@@ -684,7 +685,10 @@ void AW_AnimKitTick(void) {
         forced_t *f=&forced[i];edict_t *e=f->e;
         if(!e || e->free){if(i==0)cycle.on=0;continue;}
         if(f->kit>=0){
-            e->v.frame=(float)AW_AnimAdvance(AW_AnimOf(e),&f->play,f->kit,dt,aw_anim_kit_speed,NULL);
+            unsigned long crossed=0;
+            e->v.frame=(float)AW_AnimAdvance(AW_AnimOf(e),&f->play,f->kit,dt,aw_anim_kit_speed,&crossed);
+            /* the forced group's own sound keys: a creature's roar in its attack, scream in its hit (CREATURE-ANIM-SOUND-54) */
+            AW_AnimSounds(e,AW_AnimOf(e),f->kit,crossed,AW_AnimMedium(e));
             if(cycle.on && cycle.combat && i==0){
                 const aw_anim_group_t *k=&AW_AnimOf(e)->g[f->kit];float clip=k->count*k->step;
                 f->t+=dt*aw_anim_kit_speed;

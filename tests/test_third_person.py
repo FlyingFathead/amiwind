@@ -303,7 +303,8 @@ class DeadPlayerShowsAndDoesNothing(unittest.TestCase):
         self.assertIn('AW_PlayerDead()', body(code('aw_companion.c'), 'static edict_t *pick_target'))
 
     def test_no_greeting_no_voice_line(self):
-        self.assertIn('if(AW_PlayerDead())return 0;', body(code('aw_anim.c'), 'int AW_VoiceSay'))
+        # nobody talks to a dead player; only the player's own death line still plays (COMBAT-VOICES-SILENT-33)
+        self.assertIn('if(AW_PlayerDead() && e!=p)return 0;', body(code('aw_anim.c'), 'int AW_VoiceSay'))
         qc = (ROOT / 'engine/aga/qc/world.qc').read_text(encoding='utf-8')
         # the automatic greeting (QuakeC) skips a dead player, as OpenMW Actors::updateGreetingState
         self.assertIn('aw_player.health <= 0', qc[qc.index('void() aw_npc_idle'):qc.index('float(entity actor) aw_npcfloor')])

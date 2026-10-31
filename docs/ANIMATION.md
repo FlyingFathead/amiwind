@@ -1,6 +1,6 @@
 # Character animation
 
-_Last updated with AmiWind v0.0.57-dev1 (30 October 2026)._
+_Last updated with AmiWind v0.0.58 (31 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -8,7 +8,15 @@ _Last updated with AmiWind v0.0.57-dev1 (30 October 2026)._
 - [Quake mechanism](#quake-mechanism)
 - [The original animation data](#the-original-animation-data)
 - [Builder: the animation kit](#builder-the-animation-kit)
+  - [Profiles](#profiles)
+  - [Sampling](#sampling)
+  - [Block and dodge](#block-and-dodge)
+  - [Footstep sounds](#footstep-sounds)
+  - [The layout file](#the-layout-file)
 - [Engine](#engine)
+  - [Choosing a group](#choosing-a-group)
+  - [Mover models](#mover-models)
+  - [Combat](#combat)
 - [Voices](#voices)
 - [Memory](#memory)
 - [Visibility](#visibility)
@@ -243,9 +251,20 @@ OpenMW 0.51 and the game settings:
   (about 2 s each, 22 KB as 11 kHz 8-bit); the layout adds about 1 KB of text per
   model; the engine keeps 672 bytes of line table per model in use.
 - Creatures: their moan, roar and scream play only from their own animations'
-  sound keys and sound generator records. The generator table is built
-  (combat/sndg.txt, [COMBAT.md](COMBAT.md) "Sounds") and the combat playground plays
-  it; the creatures' animation keys do not play it yet.
+  sound keys and sound generator records. Since v0.0.58 (CREATURE-ANIM-SOUND-54,
+  in source, not yet heard in a build) the creature builders write each group's
+  `soundgen` keys into the layout (`@attack:2:roar`, `@idle:5:moan`, `@run:1:left`;
+  creature_pose.py and creature_tables.py) and the engine plays them from the
+  creature's row of the [voice table](NPC_VOICE_TABLE.md): steps on the body
+  channel at the footstep volume (swim left and right in deep water), moan, roar
+  and scream on the voice channel, land on the body. They play while a creature
+  walks or wanders, in its fights (the combat layer's groups) and in forced groups
+  (`dbg animkit`). `aw_npc_footsteps 0` silences the steps only.
+- The player's own footsteps (v0.0.58, PLAYER-FOOTSTEPS-NONE-58): off by default,
+  `dbg footsteps on` or Options > Audio > Your footsteps, saved. The same rule as
+  the NPCs' (the boots' armour class, water, swimming), one step every
+  `aw_player_footstep_stride` units walked (26 by default: an AmiWind
+  approximation, the original plays them from the player's walk and run keys).
 
 ## Memory
 

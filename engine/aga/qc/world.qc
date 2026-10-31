@@ -94,19 +94,22 @@ void(entity npc, entity listener, float automatic) aw_greet = {
             return;
         }
     }
-    if (npc.aw_voice != "") {
+    /* NPC-GREETING-PICK-33: the Hello from the voice table first, for every NPC, town residents too: the first line
+     * whose conditions hold now (OpenMW's first match: disposition, Random100, the other run-time conditions); the
+     * build-time line of a resident (aw_voice, the previous method) only when the table has none for it */
+    if (aw_glut_say(npc,0)) {
+        if (aw_glut_text() != "") centerprint(listener,npc.netname,"\n",aw_glut_text());
+    } else if (npc.aw_voice != "") {
         sound(npc,2,npc.aw_voice,0.9,1);
         centerprint(listener,npc.netname,"\n",npc.aw_line);
-    } else if (aw_glut_say(npc,0)) {
-        /* no greeting of its own: the NPC's Hello from the voice table (its voice plays when the build has it) */
-        if (aw_glut_text() != "") centerprint(listener,npc.netname,"\n",aw_glut_text());
     }
     npc.aw_hello_done = 1;
     npc.aw_hello_polls = 0;
     npc.aw_face_until = time + npc.aw_greet_duration;
     if (automatic) {
+        /* no gap across all actors (OpenMW has none): each NPC greets once until the player leaves its reset
+         * distance, and one voice at a time per NPC (aw_anim.c speaker_slot) */
         npc.aw_hello_count = npc.aw_hello_count + 1;
-        aw_voice_deadline = time + 8;
     } else {
         npc.aw_manual_count = npc.aw_manual_count + 1;
         aw_voice_deadline = time + 4;
@@ -150,7 +153,7 @@ void() aw_npc_idle = {
     traceline(self.origin + '0 0 27',aw_player.origin + aw_player.view_ofs,1,self);
     if (trace_fraction < 1) { self.aw_hello_polls = 0; return; }
     self.aw_hello_polls = self.aw_hello_polls + 1;
-    if (self.aw_hello_polls >= 2 && time >= aw_voice_deadline)
+    if (self.aw_hello_polls >= 2)
         aw_greet(self,aw_player,1);
 };
 /* All static brushes must be linked before the actor's floor trace. Exported

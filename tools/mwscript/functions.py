@@ -421,8 +421,17 @@ HOST = {'getpccrimelevel', 'setpccrimelevel', 'modpccrimelevel',
         # v0.0.57: AIFollow on the same entry (aifollow.cpp); GetStandingPC on objects with an entity
         'aifollow', 'getstandingpc',
         # v0.0.57: Position of the player (the coordinate teleport) and of objects with an entity (transformationextensions.cpp)
-        'position'}
-HOST_EFFECTS = {'forcegreeting', 'rotate', 'aitravel', 'aifollow', 'position','playgroup', 'loopgroup', 'addtopic', 'cast','setpccrimelevel', 'modpccrimelevel', 'setreputation', 'modreputation', 'pcraiserank',
+        'position',
+        # v0.0.58: Choice and Goodbye in a dialogue result script (the dialogue window: DIALOGUE-COMPLETE-58; OpenMW
+        # dialogueextensions.cpp OpChoice, OpGoodbye)
+        'choice', 'goodbye',
+        # v0.0.58: a faction's reaction toward another (aw_dial.c AW_DialReactionChange; OpenMW dialogueextensions.cpp
+        # OpModFactionReaction, OpSetFactionReaction): the disposition reads it, saved
+        'modfactionreaction', 'setfactionreaction',
+        # v0.0.58: ShowMap records the revealed place (aw_actorstate.c AW_RevealedAdd, saved) for the map's place
+        # markers (INGAME-MAP-ORIGINAL-57: shown when the map has them)
+        'showmap'}
+HOST_EFFECTS = {'showmap', 'choice', 'goodbye', 'modfactionreaction', 'setfactionreaction', 'forcegreeting', 'rotate', 'aitravel', 'aifollow', 'position','playgroup', 'loopgroup', 'addtopic', 'cast','setpccrimelevel', 'modpccrimelevel', 'setreputation', 'modreputation', 'pcraiserank',
                 'pclowerrank', 'pcjoinfaction', 'pcexpell', 'pcclearexpelled', 'setpcfacrep', 'modpcfacrep'}
 
 # Groups the measurement reports as "the engine does not have it yet" (the brief's list), and the rest.

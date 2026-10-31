@@ -1,10 +1,11 @@
 # Streamed music and speech
 
-_Last updated with AmiWind v0.0.48-dev2 (23 October 2026)._
+_Last updated with AmiWind v0.0.58 (31 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [The mixer's limits: 31 October 2026](#the-mixers-limits-31-october-2026)
 - [Every NPC's voice lines: 23 October 2026](#every-npcs-voice-lines-23-october-2026)
 - [Sounds the game's scripts start: 23 October 2026](#sounds-the-games-scripts-start-23-october-2026)
 - [Music on and off, and the packet fix: 11 October 2026](#music-on-and-off-and-the-packet-fix-11-october-2026)
@@ -25,6 +26,41 @@ _Last updated with AmiWind v0.0.48-dev2 (23 October 2026)._
 - [RC1 Audio options candidate](#rc1-audio-options-candidate)
 
 <!-- contents end -->
+
+## The mixer's limits: 31 October 2026
+
+Measured in the v0.0.57 release image while planning complete voice and sound coverage for v0.0.58.
+
+- **What the image holds.** 2,673 NPCs in the voice table (every base-game NPC but two, whose record ids carry
+  accented letters: NPC-VOICE-NONASCII-IDS-48), 7,247 voice entries over 4,490 sounds, for the moments hello,
+  greeting, idle, intruder, thief, hit, attack, flee and alarm. All 396 creatures have sounds: 1,321 moments their
+  own, 1,760 borrowed under the shared fallback, none silent. 599 of the 601 sound records are mapped.
+- **The format is already the cheapest.** All 7,347 sound files on the boot disk, voices included, are mono,
+  11,025 Hz, 8-bit; only the music is stereo.
+- **The hardware.** Paula's four channels: the music keeps two, speech and effects share the other two through the
+  engine's software mixer (Quake's).
+- **At one moment** the mixer plays up to 8 sounds from characters and things (MAX_DYNAMIC_CHANNELS) beside 4
+  ambient loops and the placed sounds, 128 channels in all. One blow in a fight can be three sounds (the swing, the
+  armour struck, health damage); when all 8 are busy the oldest or farthest is replaced, so a sound is cut short and
+  nothing else happens. Counted on the code (v0.0.58): a blow plays at most four (Weapon Swish, the armour piece
+  struck, Health Damage, critical damage), all on the player's side; until v0.0.58 each of them was started as a
+  "local" sound, which in Quake replaces every other sound of the player, so only the last one of a blow was heard
+  (AUDIO-LOCAL-SOUND-CUTS-58). Now they play side by side (`S_LocalSoundBeside`): each takes a free channel of the
+  8, and when none is free the one nearest its end is dropped first; the player's sounds are never dropped for
+  another character's.
+- **Slot reuse (v0.0.58, in source).** When the 512 names are all taken, the oldest name whose cached data has been
+  freed, that no channel is playing, that no level precache names and that no long-lived holder keeps (the
+  temporary-entity sounds, the spell effects) is given to the new sound. Nothing more stays in memory; the console
+  says "Sound table full" only when no slot is free at all.
+- **The name table is the real limit.** The mixer keeps one entry per different sound played, 512 at most, each a
+  64-byte copy of its path plus a 4-byte pointer to its cached data (34,816 bytes), and never empties it during a
+  session. Once 512 different sounds have played, every new one is refused and stays silent
+  (AUDIO-SFX-NAME-TABLE-FULL-58). The more sounds are mapped, the sooner a long session reaches it.
+- **The planned fix (v0.0.58, AUDIO-SFX-TABLE-58).** The builder already knows every sound in the image (its sound
+  catalogue). The mixer keys sounds by catalogue number instead of by name: the names stay on disk, each sound
+  needs only its 4-byte data pointer, so one slot for every sound in the game takes about 29 KB, less than today's
+  table, and it cannot fill. A sound named at run time that is not in the catalogue goes to a small overflow table
+  whose slots are reused when their data has been freed.
 
 ## Every NPC's voice lines: 23 October 2026
 

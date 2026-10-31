@@ -79,7 +79,12 @@ ARCHIVES = ((ARCHIVE_DIR / 'bugs-to-v0.0.31.json', 31),
             (ARCHIVE_DIR / 'bugs-v0.0.48-v0.0.51.json', 51),
             # 2026-10-30: the merge of v0.0.57-dev1 into the alive branch took bugs.json to 95.0 % (996,377 bytes,
             # gate 4681); the rotation moves on to v0.0.54, a release before the last two (TRACKER-REGISTER-SIZE-36)
-            (ARCHIVE_DIR / 'bugs-v0.0.52-v0.0.54.json', 54))
+            (ARCHIVE_DIR / 'bugs-v0.0.52-v0.0.54.json', 54),
+            # 2026-10-31: the v0.0.58 dev line's merge of the dialogue work took docs/BUGS.md to 95.06 % of its 1 MiB
+            # limit (996,775 bytes, gate 5010); up to v0.0.56 moved only 3 bugs (BUGS.md unchanged), so the rotation
+            # moves on to v0.0.57, the last release, shipped the same day: 20 of its bugs are fixed or closed
+            # (TRACKER-REGISTER-SIZE-36)
+            (ARCHIVE_DIR / 'bugs-v0.0.55-v0.0.57.json', 57))
 ARCHIVE_UP_TO = ARCHIVES[-1][1]   # fixed or closed bugs first found in v0.0.40 or earlier rotate into an archive
 # Archive files of earlier layouts: still read when present, emptied into ARCHIVES and removed by render.
 RETIRED_ARCHIVES = (ARCHIVE_DIR / 'bugs-v0.0.29-v0.0.33.json',)
@@ -1181,6 +1186,21 @@ def rendered_page(text, b, bugs, by_id, families):
     return '\n'.join(out) + '\n'
 
 
+STATUS_CELL_DONE = 200   # characters of a fixed or closed bug's status in docs/BUGS.md's table
+
+
+def status_cell(b):
+    """The table's Status cell. 2026-10-31 (gate 5010: docs/BUGS.md at 95.06 % of its 1 MiB limit; archiving cannot
+    shrink it, since the page lists every bug, archived ones too): an open bug keeps its whole status; a fixed or
+    closed one shows its first STATUS_CELL_DONE characters, cut at a word, and points to its report page when it has
+    one. The whole text stays in docs/bugs/bugs.json or its archive file and on the report page."""
+    text = b['status']
+    if b['state'] == 'open' or len(text) <= STATUS_CELL_DONE:
+        return text
+    cut = text[:STATUS_CELL_DONE].rsplit(' ', 1)[0].rstrip(' ,;:(')
+    return cut + (' ... (more on its page)' if b.get('report') else ' ... (more in the register data)')
+
+
 def table(bugs):
     out = persisting_section(bugs)
     if out:
@@ -1191,7 +1211,7 @@ def table(bugs):
         waiting = b.get('waiting_on', '')[len(WAITING_PREFIX):] or ('deferred' if b.get('deferred') else '-')
         out.append('| %s | %s | %s | %s | %s | %s | %s | %s | %s |' % (
             link(b), b['title'], b.get('severity', '-'), found_in_cell(b), b['state'], b['fixed_in'] or '-',
-            b['owner_accepted'] or '-', waiting, b['status']))
+            b['owner_accepted'] or '-', waiting, status_cell(b)))
     for tag in TAGS:
         tagged = [b for b in sorted(bugs, key=lambda b: (ORDER[b['state']], b['id'])) if tag in b.get('tags', [])]
         if tagged:

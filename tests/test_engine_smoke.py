@@ -81,6 +81,20 @@ class EngineSmokeTests(unittest.TestCase):
                        'FAIL the run ended outside play'):
             self.assertIn(needle, text)
 
+    def test_music_checks_wait_for_a_fresh_answer_and_a_silent_game_is_a_stall(self):
+        # SMOKE-MUSIC-REREAD-FLAKY-57: the game stopped taking commands a few seconds after a load (state.txt no longer
+        # written) and the music check failed on the previous status line; now a command not taken in RC_WAIT is a
+        # stall (examined, an emulator disk stall retried once), and each music value is a NEW status answer
+        text = engine_smoke.PROBE
+        rc = next(l for l in text.splitlines() if l.startswith('rc(){'))
+        self.assertIn('RC_WAIT:-60', rc)
+        self.assertIn('stall "the game stopped taking commands', text)
+        self.assertIn("grep -c 'reads='", text)                        # status waits for a new line
+        self.assertIn('MUSIC_WAIT:-45', text)                            # a window, not one fixed sleep
+        self.assertNotIn('rc "aw_music_status"; sleep $((3*K)); c=$(reads)', text)
+        self.assertIn('[ -e $R/finished ] && exit 0', text)              # the first result stands
+        self.assertIn('FAIL music did not read again after dbg music on', text)   # still strict on a real stall
+
     def test_map_change_repeats(self):
         """CHIM-SEYDA-BALMORA-LOAD-HANG-43: one map change passed 3 of 5 runs; the smoke repeats it (default 3)."""
         text = engine_smoke.PROBE

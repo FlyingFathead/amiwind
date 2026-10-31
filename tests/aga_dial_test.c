@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include "aw_dial.h"
 
 static unsigned char *slurp(const char *path,long *size) {
@@ -65,6 +66,16 @@ static int disp_rank(const char *faction,int *expelled){
 int main(int argc,char **argv) {
     long size,vsize,resident;unsigned char *data,*voices;aw_dial_t d;aw_glut_t g;file_t file;char line[4096];
     FILE *x;int checks=0,opened=-1;static unsigned char buffer[131072];aw_dial_conv_t conv;
+    if(argc==3 && !strcmp(argv[1],"--refusal")){
+        /* a table of another format: the reason, and the reader opens nothing (it never reads past the end) */
+        int version;const char *why;aw_dial_t bad;long r;
+        data=slurp(argv[2],&size);
+        why=AW_DialRefusal(data,size,&version);r=AW_DialResidentSize(data,size);
+        printf("refusal version %d wanted %d: %s\n",version,AW_DIAL_VERSION,*why?why:"none");
+        if(r>0 && r<=size && AW_DialOpen(&bad,data,r,size)){printf("opened\n");free(data);return 1;}
+        free(data);
+        printf("refused\n");return 0;
+    }
     assert(argc==4);
     data=slurp(argv[1],&size);voices=slurp(argv[2],&vsize);
     file.data=data;file.size=size;file.reads=0;
@@ -96,8 +107,8 @@ int main(int argc,char **argv) {
              if(conv.answers>0)assert(!AW_DialConverse(&c2,&d,npc,&speaker,read_mem,&file,small,sizeof(small)));}
         }else if(!strcmp(f[0],"answer")){
             aw_glut_state_t s;int got,npc=AW_GlutFind(&g,f[1]),entry;char text[2048],script[2048],links[512];
-            unsigned short l[64];int nl,k;
-            assert(n==10 && npc==opened);
+            unsigned short l[64];int nl,k;aw_dial_span_t sp[64];char spans[1024];
+            assert(n==11 && npc==opened);
             memset(&s,0,sizeof(s));
             s.random100=atoi(f[5]);s.speaker_health_percent=s.player_health_percent=s.player_health=100;
             conv.cond.disposition=atoi(f[3]);conv.cond.choice=atoi(f[4]);
@@ -111,6 +122,10 @@ int main(int argc,char **argv) {
             for(k=0;k<nl;k++)sprintf(links+strlen(links),"%s%u",k?",":"",l[k]);
             if(!nl)strcpy(links,"-");
             if(strcmp(links,f[9])){fprintf(stderr,"answer %s topic %s links %s, want %s\n",f[1],f[2],links,f[9]);return 1;}
+            nl=AW_DialSpans(&conv,got,read_mem,&file,sp,64);spans[0]=0;
+            for(k=0;k<nl;k++)sprintf(spans+strlen(spans),"%s%u:%u:%u",k?",":"",sp[k].offset,sp[k].length,sp[k].topic);
+            if(!nl)strcpy(spans,"-");
+            if(strcmp(spans,f[10])){fprintf(stderr,"answer %s topic %s spans %s, want %s\n",f[1],f[2],spans,f[10]);return 1;}
         }else if(!strcmp(f[0],"list")){          /* list ID DISP KNOWN(all|start) TOPIC,..|- */
             aw_glut_state_t s;int npc=AW_GlutFind(&g,f[1]),out[AW_DIAL_MAX_TOPICS],m,k;char got[4096];
             static unsigned char known[8192];
@@ -130,12 +145,127 @@ int main(int argc,char **argv) {
             facts.diseased=atoi(f[7]);facts.weapon_drawn=atoi(f[8]);facts.rank=disp_rank;
             got=AW_DialDisposition(&d,&facts,atoi(f[9]));
             if(got!=atoi(f[10])){fprintf(stderr,"disp %s %s %s %s %s %s: %d, want %s\n",f[1],f[2],f[3],f[4],f[5],f[6],got,f[10]);return 1;}
+        }else if(!strcmp(f[0],"dispbench")){     /* dispbench CALLS FACTION RANKS: the per-tick cost of the world's NPC aggro
+                                                  * disposition (the rule on cached facts), printed in ns per call */
+            aw_dial_facts_t facts;long calls=atol(f[1]),k;volatile int sink=0;clock_t t0;double ns;
+            assert(n==4);
+            memset(&facts,0,sizeof(facts));facts.base=40;facts.same_race=1;facts.personality=40;
+            facts.faction=strcmp(f[2],"-")?f[2]:NULL;strcpy(disp_ranks,strcmp(f[3],"-")?f[3]:"");facts.rank=disp_rank;
+            t0=clock();
+            for(k=0;k<calls;k++){facts.bounty=(int)(k&63);sink+=AW_DialDisposition(&d,&facts,1);}
+            ns=(double)(clock()-t0)*1e9/CLOCKS_PER_SEC/(double)(calls>0?calls:1);
+            printf("dispbench %ld calls %.1f ns per call (%d)\n",calls,ns,sink&1);
+        }else if(!strcmp(f[0],"services")){      /* services ROW WANT: the NPC row's service flags */
+            unsigned long got;
+            assert(n==3);
+            got=AW_DialServices(&d,atoi(f[1]),read_mem,&file);
+            if(got!=strtoul(f[2],NULL,10)){fprintf(stderr,"services %s: %lu, want %s\n",f[1],got,f[2]);return 1;}
+        }else if(!strcmp(f[0],"reactmod")){      /* reactmod A B VALUE SET: a script's faction reaction change */
+            assert(n==5 && AW_DialReactionChange(f[1],f[2],atoi(f[3]),atoi(f[4])));
+        }else if(!strcmp(f[0],"reactreset")){
+            unsigned char blob[256];int k=AW_DialReactionsExport(blob,sizeof(blob)),m;
+            m=AW_DialReactionsImport(blob,k);   /* through a save and back: the same changes */
+            assert(k>0 && m==k);
+            AW_DialReactionsReset();
         }else if(!strcmp(f[0],"rank")){          /* rank FACTION RANK NAME|- (any case) */
             char got[64];long at=AW_DialRankAt(&d,f[1],atoi(f[2]));
             assert(n==4);
             string_at(&file,at,got,sizeof(got));
             if(at>=0 && !got[0])strcpy(got,"-");
             if(strcmp(got,f[3])){fprintf(stderr,"rank %s %s: %s, want %s\n",f[1],f[2],got,f[3]);return 1;}
+        }else if(!strcmp(f[0],"persuade")){      /* persuade KIND PLAYER(7) NPC(7) DISP ROLL FIGHT FLEE "success temp perm fight flee" */
+            aw_dial_person_t who[2];aw_dial_persuasion_t r;char got[64];int w;
+            assert(n==9);
+            for(w=0;w<2;w++){float v[7];
+                assert(sscanf(f[2+w],"%f,%f,%f,%f,%f,%f,%f",&v[0],&v[1],&v[2],&v[3],&v[4],&v[5],&v[6])==7);
+                who[w].personality=v[0];who[w].luck=v[1];who[w].reputation=v[2];who[w].speechcraft=v[3];
+                who[w].mercantile=v[4];who[w].level=v[5];who[w].fatigue=v[6];}
+            AW_DialPersuade(&d,atoi(f[1]),&who[0],&who[1],atoi(f[4]),atoi(f[5]),atoi(f[6]),atoi(f[7]),&r);
+            sprintf(got,"%d %d %d %d %d",r.success,r.temp,r.perm,r.fight,r.flee);
+            if(strcmp(got,f[8])){fprintf(stderr,"persuade %s %s %s disp %s roll %s: %s, want %s\n",f[1],f[2],f[3],f[4],f[5],got,f[8]);return 1;}
+        }else if(!strcmp(f[0],"barter") || !strcmp(f[0],"trainprice") || !strcmp(f[0],"spellprice")){
+            /* barter BASE BUYING PLAYER(7) NPC(7) DISP WANT; trainprice SKILL PLAYER(7) NPC(7) DISP WANT */
+            aw_dial_person_t who[2];int w,got,o=!strcmp(f[0],"barter")?1:0;
+            assert(n==(o?7:6));
+            for(w=0;w<2;w++){float v[7];
+                assert(sscanf(f[2+o+w],"%f,%f,%f,%f,%f,%f,%f",&v[0],&v[1],&v[2],&v[3],&v[4],&v[5],&v[6])==7);
+                who[w].personality=v[0];who[w].luck=v[1];who[w].reputation=v[2];who[w].speechcraft=v[3];
+                who[w].mercantile=v[4];who[w].level=v[5];who[w].fatigue=v[6];}
+            got=o?AW_DialBarterOffer(&d,atoi(f[1]),atoi(f[2]),&who[0],&who[1],atoi(f[5])):
+                  f[0][0]=='s'?AW_DialSpellPrice(&d,atoi(f[1]),&who[0],&who[1],atoi(f[4])):
+                  AW_DialTrainingPrice(&d,atoi(f[1]),&who[0],&who[1],atoi(f[4]));
+            if(got!=atoi(f[n-1])){fprintf(stderr,"%s %s %s %s: %d, want %s\n",f[0],f[1],f[2+o],f[3+o],got,f[n-1]);return 1;}
+        }else if(!strcmp(f[0],"repairprice")){   /* repairprice VALUE MAX DURABILITY PLAYER(7) NPC(7) DISP WANT */
+            aw_dial_person_t who[2];int w,got;
+            assert(n==8);
+            for(w=0;w<2;w++){float v[7];
+                assert(sscanf(f[4+w],"%f,%f,%f,%f,%f,%f,%f",&v[0],&v[1],&v[2],&v[3],&v[4],&v[5],&v[6])==7);
+                who[w].personality=v[0];who[w].luck=v[1];who[w].reputation=v[2];who[w].speechcraft=v[3];
+                who[w].mercantile=v[4];who[w].level=v[5];who[w].fatigue=v[6];}
+            got=AW_DialRepairPrice(&d,atoi(f[1]),atoi(f[2]),atoi(f[3]),&who[0],&who[1],atoi(f[6]));
+            if(got!=atoi(f[7])){fprintf(stderr,"repairprice %s %s %s: %d, want %s\n",f[1],f[2],f[3],got,f[7]);return 1;}
+        }else if(!strcmp(f[0],"caststyle")){     /* caststyle ITEM STYLE SOUL WANT */
+            assert(n==5);
+            if(AW_DialNextCastStyle(atoi(f[1]),atoi(f[2]),atoi(f[3]),&d)!=atoi(f[4])){fprintf(stderr,"caststyle %s %s %s\n",f[1],f[2],f[3]);return 1;}
+        }else if(!strcmp(f[0],"enchant")){       /* enchant EFFECTS CONSTANT PLAYER NPC DISP "cast price chance points*100" */
+            aw_dial_effect_t e[8];aw_dial_person_t who[2];int m=0,w,c=atoi(f[2]);char got[64];const char *s=f[1];
+            assert(n==7);
+            while(strcmp(s,"-") && *s && m<8){
+                int used=0;
+                assert(sscanf(s,"%f,%d,%d,%d,%d,%d,%d%n",&e[m].base_cost,&e[m].flags,&e[m].magnitude_min,&e[m].magnitude_max,
+                              &e[m].duration,&e[m].area,&e[m].range,&used)==7);
+                m++;s+=used;if(*s==0x3B)s++;
+            }
+            for(w=0;w<2;w++){float v[7];
+                assert(sscanf(f[3+w],"%f,%f,%f,%f,%f,%f,%f",&v[0],&v[1],&v[2],&v[3],&v[4],&v[5],&v[6])==7);
+                who[w].personality=v[0];who[w].luck=v[1];who[w].reputation=v[2];who[w].speechcraft=v[3];
+                who[w].mercantile=v[4];who[w].level=v[5];who[w].fatigue=v[6];}
+            sprintf(got,"%d %d %d %d",AW_DialEnchantCastCost(&d,e,m,c,45),AW_DialEnchantPrice(&d,e,m,c,&who[0],&who[1],atoi(f[5])),
+                    AW_DialEnchantChance(&d,e,m,c,80,60,50,0.8f),(int)(AW_DialEnchantPoints(&d,e,m,c,1)*100));
+            if(strcmp(got,f[6])){fprintf(stderr,"enchant %s const %s disp %s: %s, want %s\n",f[1],f[2],f[5],got,f[6]);return 1;}
+        }else if(!strcmp(f[0],"spellmaking")){   /* spellmaking EFFECTS(b,f,lo,hi,dur,area,range;..|-) PLAYER NPC DISP "cost price" */
+            aw_dial_effect_t e[8];aw_dial_person_t who[2];int m=0,w;char got[32];const char *s=f[1];
+            assert(n==6);
+            while(strcmp(s,"-") && *s && m<8){
+                int used=0;
+                assert(sscanf(s,"%f,%d,%d,%d,%d,%d,%d%n",&e[m].base_cost,&e[m].flags,&e[m].magnitude_min,&e[m].magnitude_max,
+                              &e[m].duration,&e[m].area,&e[m].range,&used)==7);
+                m++;s+=used;if(*s==0x3B)s++;
+            }
+            for(w=0;w<2;w++){float v[7];
+                assert(sscanf(f[2+w],"%f,%f,%f,%f,%f,%f,%f",&v[0],&v[1],&v[2],&v[3],&v[4],&v[5],&v[6])==7);
+                who[w].personality=v[0];who[w].luck=v[1];who[w].reputation=v[2];who[w].speechcraft=v[3];
+                who[w].mercantile=v[4];who[w].level=v[5];who[w].fatigue=v[6];}
+            sprintf(got,"%d %d",AW_DialSpellmakingCost(&d,e,m),AW_DialSpellmakingPrice(&d,e,m,&who[0],&who[1],atoi(f[4])));
+            if(strcmp(got,f[5])){fprintf(stderr,"spellmaking %s disp %s: %s, want %s\n",f[1],f[4],got,f[5]);return 1;}
+        }else if(!strcmp(f[0],"trainpicks")){    /* trainpicks SKILLS(27) WANT(a,b,c) */
+            float v[27];int out[3],k,m;char got[32];const char *s=f[1];
+            assert(n==3);
+            for(k=0;k<27;k++){v[k]=(float)strtod(s,(char **)&s);if(*s==',')s++;}
+            m=AW_DialTrainingPicks(v,27,out);got[0]=0;
+            for(k=0;k<m;k++)sprintf(got+strlen(got),"%s%d",k?",":"",out[k]);
+            if(strcmp(got,f[2])){fprintf(stderr,"trainpicks %s: %s, want %s\n",f[1],got,f[2]);return 1;}
+        }else if(!strcmp(f[0],"uitext")){        /* uitext INDEX WANT: the window's word from the table */
+            static char texts[AW_DIAL_TEXTS*AW_DIAL_UI_TEXT];
+            assert(n==3 && atoi(f[1])>=0 && atoi(f[1])<AW_DIAL_TEXTS);
+            assert(AW_DialUiTexts(&d,read_mem,&file,texts));
+            if(strcmp(texts+AW_DIAL_UI_TEXT*atoi(f[1]),f[2])){fprintf(stderr,"uitext %s: %s, want %s\n",f[1],texts+AW_DIAL_UI_TEXT*atoi(f[1]),f[2]);return 1;}
+        }else if(!strcmp(f[0],"skillattr")){     /* skillattr SKILL WANT (-1 unknown) */
+            assert(n==3);
+            if(AW_DialSkillAttribute(&d,atoi(f[1]),read_mem,&file)!=atoi(f[2])){fprintf(stderr,"skillattr %s\n",f[1]);return 1;}
+        }else if(!strcmp(f[0],"spanfill")){      /* spanfill TEXT SPANS(o:l:t,..) PCRANK NEXT CELL WANT_TEXT WANT_SPANS */
+            aw_dial_span_t in[16],out[16];int m=0,got,k;char marked[512],filled[512],shown[512],spans[256];const char *s=f[2];
+            assert(n==8);
+            while(strcmp(s,"-") && *s && m<16){
+                in[m].offset=(unsigned short)strtol(s,(char **)&s,10);s++;in[m].length=(unsigned short)strtol(s,(char **)&s,10);s++;
+                in[m].topic=(unsigned short)strtol(s,(char **)&s,10);m++;if(*s==',')s++;
+            }
+            AW_DialMarkSpans(f[1],in,m,marked,sizeof(marked));
+            AW_DialFillDefines(marked,filled,sizeof(filled),f[3],f[4],f[5]);
+            AW_DialTakeSpans(filled,in,m,shown,sizeof(shown),out,&got);
+            spans[0]=0;for(k=0;k<got;k++)sprintf(spans+strlen(spans),"%s%u:%u:%u",k?",":"",out[k].offset,out[k].length,out[k].topic);
+            if(!got)strcpy(spans,"-");
+            if(strcmp(shown,f[6]) || strcmp(spans,f[7])){fprintf(stderr,"spanfill '%s': '%s' %s, want '%s' %s\n",f[1],shown,spans,f[6],f[7]);return 1;}
         }else if(!strcmp(f[0],"defines")){       /* defines TEXT PCRANK NEXT CELL WANT */
             char got[512];
             assert(n==6);

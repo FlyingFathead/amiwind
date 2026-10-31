@@ -208,6 +208,7 @@ int AW_AmbientTravelPlan(const aw_ambient_pkg_t *p,int fx,int fy,int fz,int tx,i
 #include "aw_tryalloc.h"
 #include "aw_mwvm.h"
 #include "aw_combat.h"
+#include "aw_dial.h"
 
 #define SLOTS 128
 #define ACTOR_RANGE 1792.0f       /* OpenMW's actors processing range 7168 x 0.25 */
@@ -237,7 +238,9 @@ typedef struct {
     float travel_to[3];
     short follow_num;           /* AIFollow: the followed edict's number */
     float follow_hours,follow_check;int follow_minutes;unsigned char follow_moving,follow_final;
+    aw_dial_npc_cache_t disp;   /* an NPC's disposition facts for the aggro (DIALOGUE-FIGHT-DISPOSITION-57) */
 } slot_t;
+static int aggro_on;static void aggro_facts(slot_t *s);   /* below (aggro on sight) */
 static void travel_end(slot_t *s);
 static void follow_think(slot_t *s,float dt);
 /* Saved AI packages (v0.0.57, SAVEGAME-COMPLETE-57): a loaded game's travel and follow packages, waiting until their
@@ -408,6 +411,7 @@ static slot_t *start(edict_t *e,const aw_ambient_row_t *row) {
         if(r.flags&AW_AMBIENT_SWIMMER){memset(s->pkg.allowed,0,sizeof(s->pkg.allowed));s->pkg.count=0;s->pkg.manual=(unsigned char)(r.distance>0);}
     }
     s->e=e;s->ref=field(e,"aw_ref",0);VectorCopy(e->v.origin,s->home);
+    if(aggro_on)aggro_facts(s);
     s->state=S_CHOOSE;s->at=-1;s->can_walk=(unsigned char)can_walk(e);
     if(!s->can_walk && s->pkg.distance){st.no_walk++;}
     s->next_think=s->last_think=s->react_at=(float)sv.time;s->check_at=(float)sv.time+IDLE_CHECK;
@@ -489,32 +493,39 @@ static void begin_walk(slot_t *s) {
  * MechanicsManager::isAggressive holds (mechanicsmanagerimp.cpp: Fight + combat.cpp getFightDistanceBias
  * (iFightDistanceBase - fFightDistanceMultiplier x distance) + getFightDispositionBias >= 100) and it sees the player
  * (World::getLOS). The rule and the start of the fight are aw_combat.c's (AW_CombatAggro, the combat playground's
- * aggro mode); this module runs it for the creatures it moves. Our own code. Creatures only for now: an NPC's
- * disposition toward the player is not modelled yet (AW_CombatFightRating takes 50), said in docs/COMBAT.md. */
+ * aggro mode); this module runs it for the actors it moves. Our own code. A creature's disposition bias takes 50; an
+ * NPC's is its derived disposition toward the player (DIALOGUE-FIGHT-DISPOSITION-57; aw_dialwin.c AW_DialNpcDisposition:
+ * the NPC's own facts looked up once into the slot, then only its current disposition and the player's side). */
 #define FIGHT_SLOTS 4           /* aw_combat.c SLOTS: hostiles at a time; a check with no slot free waits */
 static int aggro_on=1;          /* "chim actors ambient aggro on|off" (default on, not saved) */
+/* The aggro's facts, read once when the slot is made (the cell's load, with the actor's other data) and never on an
+ * engage tick (a disk read in a fight stutters): the record's Fight, and an NPC's own disposition facts. A Fight that
+ * cannot reach 100 even at distance 0 and disposition 0 never checks. */
+static void aggro_facts(slot_t *s) {
+    aw_fighter_t sheet;int npc=!(s->flags&AW_AMBIENT_CREATURE);
+    if(!AW_CombatAiLoaded() || !AW_CombatActorLoad(source_id(s->e),&sheet) ||
+       sheet.fight+aw_combat_ai.iFightDistanceBase+(npc?50.0f*aw_combat_ai.fFightDispMult:0)<100){s->fight=-1;return;}
+    s->fight=(short)(sheet.fight>0?sheet.fight:1);
+    if(npc)AW_DialNpcPrepare(s->e,&s->disp);
+}
 static void aggro(slot_t *s) {
-    aw_fighter_t sheet;int got;
-    if(!aggro_on || !(s->flags&AW_AMBIENT_CREATURE) || s->fight<0 || sv.time<s->engage_at)return;
+    aw_fighter_t sheet;int got,disposition=50,npc=!(s->flags&AW_AMBIENT_CREATURE);
+    if(!aggro_on || s->fight<0 || sv.time<s->engage_at)return;
     s->engage_at=(float)sv.time+0.75f+0.5f*(float)(roll16()&1023)/1023.0f;
     if(!AW_CombatAiLoaded())return;
-    if(!s->fight){
-        /* read once per package: a Fight that cannot reach 100 even at distance 0 never checks again */
-        if(!AW_CombatActorLoad(source_id(s->e),&sheet) ||
-           sheet.fight+aw_combat_ai.iFightDistanceBase<100){s->fight=-1;return;}
-        s->fight=(short)(sheet.fight>0?sheet.fight:1);
-    }
+    if(!s->fight)return;        /* read with the slot (aggro_facts); never on the engage tick */
     st.aggro_checks++;
     {
         /* the rating from the kept Fight first (no file read while it stays under 100); distance in original units */
         edict_t *p=player();vec3_t d;
         if(!p)return;
+        if(npc)disposition=AW_DialNpcDisposition(s->e,&s->disp);
         VectorSubtract(s->e->v.origin,p->v.origin,d);
-        if(AW_CombatFightRating(&aw_combat_ai,s->fight,50,(float)Length(d)/AW_MOVE_UNIT_SCALE)<100)return;
+        if(AW_CombatFightRating(&aw_combat_ai,s->fight,disposition,(float)Length(d)/AW_MOVE_UNIT_SCALE)<100)return;
     }
     if(AW_CombatHostiles()>=FIGHT_SLOTS){st.aggro_full++;return;}
     if(!AW_CombatActorLoad(source_id(s->e),&sheet)){s->fight=-1;return;}
-    got=AW_CombatAggro(s->e,&sheet,NULL,50,NULL,NULL);
+    got=AW_CombatAggro(s->e,&sheet,NULL,disposition,NULL,NULL);
     if(got>0){st.aggro_engaged++;if(s->state==S_WALK)stop_walk(s);}
     else if(got<0 && !AW_CombatAiLoaded())s->fight=-1;
 }

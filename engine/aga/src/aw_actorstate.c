@@ -16,7 +16,7 @@
 typedef struct {uint32_t offset,rows,bytes;} section_t;
 typedef struct {
     aw_actorstate_io_t io;
-    section_t actb,ainv,aitm,aspt,aspl,strs;
+    section_t actb,ainv,aitm,aspt,aspl,aspc,aspe,aeff,amge,strs;
     aw_actor_t pool[AW_ACTOR_POOL];
     aw_actor_t player;
     uint16_t *dead;            /* per ACTB row */
@@ -44,8 +44,8 @@ static int find_section(const unsigned char *head,uint32_t head_bytes,const char
     return 0;
 }
 static char fold(char c){return c>='A' && c<='Z'?(char)(c+32):c;}
-/* String INDEX of STRS, folded, into OUT (CAPACITY bytes). */
-static int string_of(int index,char *out,int capacity){
+/* String INDEX of STRS into OUT (CAPACITY bytes), folded when FOLDED (the ids; a name to show keeps its case). */
+static int string_at(int index,char *out,int capacity,int folded){
     unsigned char b[4];int n;
     out[0]=0;
     if(index<0 || (uint32_t)index>=st->strs.rows || !fetch(st->strs.offset+4u*(uint32_t)index,b,4))return 0;
@@ -55,8 +55,10 @@ static int string_of(int index,char *out,int capacity){
         out[n]=0;
     }
     out[capacity-1]=0;
-    for(n=0;out[n];n++)out[n]=fold(out[n]);
+    if(folded)for(n=0;out[n];n++)out[n]=fold(out[n]);
     return 1;
+}
+static int string_of(int index,char *out,int capacity){return string_at(index,out,capacity,1);
 }
 
 void AW_ActorStateClose(void){
@@ -76,6 +78,9 @@ int AW_ActorStateOpen(const unsigned char *head,uint32_t head_bytes,const aw_act
     st->io=*io;st->actb=actb;
     find_section(head,head_bytes,"AINV",&st->ainv);find_section(head,head_bytes,"AITM",&st->aitm);
     find_section(head,head_bytes,"ASPT",&st->aspt);find_section(head,head_bytes,"ASPL",&st->aspl);
+    find_section(head,head_bytes,"ASPC",&st->aspc);
+    find_section(head,head_bytes,"ASPE",&st->aspe);find_section(head,head_bytes,"AEFF",&st->aeff);
+    find_section(head,head_bytes,"AMGE",&st->amge);    /* absent before v0.0.58: no effects to make or enchant with */     /* absent in a table before v0.0.58: no spells for sale */
     find_section(head,head_bytes,"STRS",&st->strs);
     st->nactors=(int)actb.rows;
     if(!(st->dead=(uint16_t *)AW_TryMalloc(sizeof(uint16_t)*(unsigned long)st->nactors))){AW_ActorStateClose();return 0;}
@@ -426,6 +431,27 @@ int AW_ActorRemoveSpellType(aw_actor_t *a,int type){
 }
 int AW_ActorAddSpell(aw_actor_t *a,int spell){return spell_change(a,spell,1);}
 int AW_ActorRemoveSpell(aw_actor_t *a,int spell){return spell_change(a,spell,0);}
+int AW_ActorSpellInfo(int spell,int *type,char *name,int capacity,int *cost){
+    unsigned char e[4];
+    if(name && capacity>0)name[0]=0;
+    if(cost)*cost=0;
+    if(type)*type=st?spell_type(spell):-1;
+    if(!st || spell<0 || (uint32_t)spell>=st->aspc.rows || !fetch(st->aspc.offset+4u*(uint32_t)spell,e,4))return 0;
+    if(cost)*cost=(int)U16(e+2);
+    if(name && U16(e)!=0xFFFF)string_at((int)U16(e),name,capacity,0);
+    return 1;
+}
+int AW_ActorSpells(const aw_actor_t *a,int *out,int max){
+    aw_actor_base_t b;int i,n=0;unsigned char e[2];
+    if(!st || !a)return 0;
+    if(a->base!=AW_ACTOR_NONE && AW_ActorBase(a->base,&b))
+        for(i=0;i<b.spell_count && n<max;i++){
+            if(!fetch(st->aspl.offset+2u*(uint32_t)(b.spell_first+i),e,2))break;
+            if(AW_ActorHasSpell(a,(int)U16(e)))out[n++]=(int)U16(e);
+        }
+    for(i=0;i<a->nspells && n<max;i++)if(a->spells[i].change>0 && !base_spell(a,a->spells[i].spell))out[n++]=a->spells[i].spell;
+    return n;
+}
 
 /* --- saved games: "AWAS" u8 version (1) u8 0 u16 records, u16 dead counts; then each record and each count,
  * big-endian; a record: u32 reference u16 base u16 flags i16 level i16 attr base/mod [16] i16 skill base/mod [54]
@@ -500,4 +526,325 @@ int AW_ActorStateImport(const unsigned char *data,int bytes){
 bad:
     memset(st->pool,0,sizeof(st->pool));memset(st->dead,0,sizeof(uint16_t)*(unsigned long)st->nactors);
     return 0;
+}
+/* The items A holds now (its base list and the changes, gold not counted: it is the record's gold), with counts and
+ * whether equipped; up to MAX; the count of distinct items. For a merchant's stock (the dialogue's Barter). */
+int AW_ActorItems(const aw_actor_t *a,int *items,int *counts,int *equipped,int max){
+    aw_actor_base_t b;int i,j,n=0,seen;unsigned char e[AINV_BYTES];
+    if(!st || !a)return 0;
+    if(a->base!=AW_ACTOR_NONE && AW_ActorBase(a->base,&b))
+        for(i=0;i<b.inv_count && n<max;i++){
+            int item;
+            if(!fetch(st->ainv.offset+(uint32_t)(b.inv_first+i)*AINV_BYTES,e,AINV_BYTES))break;
+            item=(int)U16(e);seen=0;
+            if(item==GOLD_ITEM)continue;
+            for(j=0;j<n;j++)if(items[j]==item)seen=1;
+            if(seen || AW_ActorItemCount(a,item)<=0)continue;
+            items[n]=item;counts[n]=AW_ActorItemCount(a,item);base_count(a,item,&equipped[n]);n++;
+        }
+    for(i=0;i<a->nitems && n<max;i++){
+        int item=a->items[i].item;seen=0;
+        if(item==GOLD_ITEM)continue;
+        for(j=0;j<n;j++)if(items[j]==item)seen=1;
+        if(seen || AW_ActorItemCount(a,item)<=0)continue;
+        items[n]=item;counts[n]=AW_ActorItemCount(a,item);equipped[n]=0;n++;
+    }
+    return n;
+}
+/* The id of item ITEM (AITM), folded; 0 when there is none */
+int AW_ActorItemId(int item,char *out,int capacity){
+    aw_item_t it;
+    if(capacity>0)out[0]=0;
+    return AW_ActorItem(item,&it) && string_of((int)it.id,out,capacity);
+}
+/* --- things sold to merchants that did not stock them (BARTER-SOLD-ITEM-LOST-58) ---
+ * They go into that merchant's stock and can be bought back, as in the original (OpenMW moves them into its
+ * container). Allocated only once such a thing is sold (nothing kept before), carried in the saved game (AWSL). */
+typedef struct {uint32_t reference;char id[40];int16_t count;} sold_t;
+/* bounded: a playthrough never sells this many kinds to merchants that do not stock them; past it the oldest entry
+ * goes (that merchant forgets it, as a restock would) */
+#define AW_SOLD_MAX 1024
+#define AW_SOLD_ENTRY 48            /* sizeof(sold_t), at most (46 on the 68k, 48 where uint32_t aligns to 4) */
+AW_RESIDENT_GROWS("barter sold things (BARTER-SOLD-ITEM-LOST-58)",AW_SOLD_MAX,AW_SOLD_ENTRY);
+typedef char aw_sold_entry_fits[sizeof(sold_t)<=AW_SOLD_ENTRY?1:-1];
+static sold_t *sold;static int sold_count,sold_capacity;
+static void sold_remove(int i){
+    if(i<0 || i>=sold_count)return;
+    memmove(sold+i,sold+i+1,sizeof(sold_t)*(size_t)(sold_count-i-1));sold_count--;   /* the order stays by age */
+}
+static int ci_equal(const char *a,const char *b){while(*a && fold(*a)==fold(*b)){a++;b++;}return !*a && !*b;}
+void AW_SoldReset(void){free(sold);sold=NULL;sold_count=sold_capacity=0;}
+int AW_SoldCount(void){return sold_count;}
+int AW_SoldMax(void){return AW_SOLD_MAX;}
+int AW_SoldAt(int i,uint32_t *reference,char *id,int capacity,int *count){
+    if(i<0 || i>=sold_count || capacity<1)return 0;
+    *reference=sold[i].reference;*count=sold[i].count;
+    strncpy(id,sold[i].id,(size_t)capacity-1);id[capacity-1]=0;
+    return 1;
+}
+int AW_SoldAdd(uint32_t reference,const char *id,int delta){
+    int i;
+    if(!id || !*id || strlen(id)>=sizeof(sold[0].id))return 0;
+    for(i=0;i<sold_count;i++)if(sold[i].reference==reference && ci_equal(sold[i].id,id))break;
+    if(i==sold_count){
+        if(delta<=0)return 0;
+        if(sold_count==AW_SOLD_MAX){sold_remove(0);i=sold_count;}   /* the oldest is forgotten */
+        if(sold_count==sold_capacity){
+            int grow=sold_capacity?sold_capacity*2:16;sold_t *n;
+            if(grow>AW_SOLD_MAX)grow=AW_SOLD_MAX;
+            n=(sold_t *)AW_TryMalloc(sizeof(sold_t)*(unsigned long)grow);
+            if(!n)return 0;
+            if(sold)memcpy(n,sold,sizeof(sold_t)*(size_t)sold_count);
+            free(sold);sold=n;sold_capacity=grow;
+        }
+        sold[i].reference=reference;strcpy(sold[i].id,id);sold[i].count=0;sold_count++;
+    }
+    if(sold[i].count+delta<0 || sold[i].count+delta>32767)return 0;
+    sold[i].count=(int16_t)(sold[i].count+delta);
+    if(!sold[i].count)sold_remove(i);
+    return 1;
+}
+/* "AWSL" u16 rows, then per row: u32 reference, u8 id length, the id, i16 count. The bytes written, -1 no room. */
+int AW_SoldExport(unsigned char *out,int capacity){
+    int k,need=6;unsigned char *q=out;
+    for(k=0;k<sold_count;k++)need+=7+(int)strlen(sold[k].id);
+    if(need>capacity)return -1;
+    memcpy(q,"AWSL",4);q[4]=(unsigned char)(sold_count>>8);q[5]=(unsigned char)sold_count;q+=6;
+    for(k=0;k<sold_count;k++){
+        int len=(int)strlen(sold[k].id);uint16_t c=(uint16_t)sold[k].count;
+        q[0]=(unsigned char)(sold[k].reference>>24);q[1]=(unsigned char)(sold[k].reference>>16);
+        q[2]=(unsigned char)(sold[k].reference>>8);q[3]=(unsigned char)sold[k].reference;
+        q[4]=(unsigned char)len;memcpy(q+5,sold[k].id,(size_t)len);q[5+len]=(unsigned char)(c>>8);q[6+len]=(unsigned char)c;
+        q+=7+len;
+    }
+    return need;
+}
+/* The block written above, replacing what is kept; the bytes read, -1 unreadable (then none kept). */
+int AW_SoldImport(const unsigned char *p,int bytes){
+    int rows,k,at=6;char id[40];
+    AW_SoldReset();
+    if(!p || bytes<6 || memcmp(p,"AWSL",4))return -1;
+    rows=(p[4]<<8)|p[5];
+    for(k=0;k<rows;k++){
+        int len;uint32_t ref;int16_t count;
+        if(at+5>bytes || (len=p[at+4])>=(int)sizeof(id) || at+7+len>bytes){AW_SoldReset();return -1;}
+        ref=((uint32_t)p[at]<<24)|((uint32_t)p[at+1]<<16)|((uint32_t)p[at+2]<<8)|p[at+3];
+        memcpy(id,p+at+5,(size_t)len);id[len]=0;count=(int16_t)((p[at+5+len]<<8)|p[at+6+len]);
+        if(count>0 && !AW_SoldAdd(ref,id,count)){AW_SoldReset();return -1;}
+        at+=7+len;
+    }
+    return at;
+}
+/* --- magic effects and spell effects (Spellmaking, Enchanting): read only while a window or a cast needs them --- */
+int AW_ActorMagicEffect(int index,aw_mgef_t *out){
+    unsigned char e[12];uint32_t flags,bits;
+    if(!st || index<0 || (uint32_t)index>=st->amge.rows || !fetch(st->amge.offset+12u*(uint32_t)index,e,12) || !e[9])return 0;
+    flags=u32(e);bits=u32(e+4);
+    memcpy(&out->base_cost,&bits,4);out->flags=flags;out->school=e[8];out->name[0]=0;
+    if(U16(e+10)!=0xFFFF)string_at((int)U16(e+10),out->name,sizeof(out->name),0);
+    return 1;
+}
+int AW_ActorSpellEffects(int spell,aw_spell_effect_t *out,int max){
+    unsigned char e[14],r[4];int i,n;uint32_t first;
+    if(!st || spell<0 || (uint32_t)spell>=st->aspe.rows || !fetch(st->aspe.offset+4u*(uint32_t)spell,r,4))return 0;
+    first=U16(r);n=r[2]<max?r[2]:max;
+    for(i=0;i<n;i++){
+        if(first+(uint32_t)i>=st->aeff.rows || !fetch(st->aeff.offset+14u*(first+(uint32_t)i),e,14))return i;
+        out[i].effect=(int16_t)U16(e);out[i].skill=(signed char)e[2];out[i].attribute=(signed char)e[3];out[i].range=e[4];
+        out[i].area=U16(e+6);out[i].duration=U16(e+8);out[i].magnitude_min=U16(e+10);out[i].magnitude_max=U16(e+12);
+    }
+    return n;
+}
+/* --- things the player made: spells (Spellmaking) and enchanted items (Enchanting) ---
+ * Bounded lists carried in the saved game (AWMD, AWEN); nothing allocated until the first is made. Older saves:
+ * none. A made spell is the player's own (not an ASPT row); the casting code reads its effects from here. */
+#define AW_MADE_MAX 64
+AW_RESIDENT_GROWS("made spells (Spellmaking)",AW_MADE_MAX,AW_MADE_SPELL_BYTES);
+AW_RESIDENT_GROWS("enchanted items (Enchanting)",AW_MADE_MAX,AW_MADE_ITEM_BYTES);
+typedef char aw_made_spell_fits[sizeof(aw_made_spell_t)<=AW_MADE_SPELL_BYTES?1:-1];
+typedef char aw_made_item_fits[sizeof(aw_made_item_t)<=AW_MADE_ITEM_BYTES?1:-1];
+static aw_made_spell_t *made_spells;static int made_spell_count;
+static aw_made_item_t *made_items;static int made_item_count;
+void AW_MadeReset(void){free(made_spells);made_spells=NULL;made_spell_count=0;free(made_items);made_items=NULL;made_item_count=0;}
+int AW_MadeSpellCount(void){return made_spell_count;}
+int AW_MadeItemCount(void){return made_item_count;}
+const aw_made_spell_t *AW_MadeSpellAt(int i){return i>=0 && i<made_spell_count?&made_spells[i]:NULL;}
+const aw_made_item_t *AW_MadeItemAt(int i){return i>=0 && i<made_item_count?&made_items[i]:NULL;}
+int AW_MadeSpellAdd(const aw_made_spell_t *s){
+    if(!s || s->effects<1 || s->effects>AW_MADE_EFFECTS || made_spell_count>=AW_MADE_MAX)return -1;
+    if(!made_spells && !(made_spells=(aw_made_spell_t *)AW_TryMalloc(sizeof(aw_made_spell_t)*AW_MADE_MAX)))return -1;
+    made_spells[made_spell_count]=*s;made_spells[made_spell_count].name[sizeof(s->name)-1]=0;
+    return made_spell_count++;
+}
+int AW_MadeItemAdd(const aw_made_item_t *m){
+    if(!m || m->effects<1 || m->effects>AW_MADE_EFFECTS || made_item_count>=AW_MADE_MAX)return -1;
+    if(!made_items && !(made_items=(aw_made_item_t *)AW_TryMalloc(sizeof(aw_made_item_t)*AW_MADE_MAX)))return -1;
+    made_items[made_item_count]=*m;made_items[made_item_count].name[sizeof(m->name)-1]=0;
+    made_items[made_item_count].base[sizeof(m->base)-1]=0;
+    return made_item_count++;
+}
+/* one effect as 14 bytes, the AEFF layout */
+static void put_effect(unsigned char *q,const aw_spell_effect_t *e){
+    q[0]=(unsigned char)((uint16_t)e->effect>>8);q[1]=(unsigned char)e->effect;q[2]=(unsigned char)e->skill;
+    q[3]=(unsigned char)e->attribute;q[4]=e->range;q[5]=0;
+    q[6]=(unsigned char)(e->area>>8);q[7]=(unsigned char)e->area;q[8]=(unsigned char)(e->duration>>8);q[9]=(unsigned char)e->duration;
+    q[10]=(unsigned char)(e->magnitude_min>>8);q[11]=(unsigned char)e->magnitude_min;
+    q[12]=(unsigned char)(e->magnitude_max>>8);q[13]=(unsigned char)e->magnitude_max;
+}
+static void get_effect(const unsigned char *p,aw_spell_effect_t *e){
+    e->effect=(int16_t)U16(p);e->skill=(signed char)p[2];e->attribute=(signed char)p[3];e->range=p[4];
+    e->area=(unsigned short)U16(p+6);e->duration=(unsigned short)U16(p+8);
+    e->magnitude_min=(unsigned short)U16(p+10);e->magnitude_max=(unsigned short)U16(p+12);
+}
+/* "AWMD" u8 spells, each: name[32] u8 effects, 14 bytes an effect; then "AWEN" u8 items, each: base[40] name[32]
+ * f32 charge (bits) f32 charge max u8 cast type u8 effects, 14 bytes an effect. The bytes written, -1 no room. */
+int AW_MadeExport(unsigned char *out,int capacity){
+    int i,j,at=0,need=10;
+    for(i=0;i<made_spell_count;i++)need+=33+14*made_spells[i].effects;
+    for(i=0;i<made_item_count;i++)need+=82+14*made_items[i].effects;
+    if(need>capacity)return -1;
+    memcpy(out,"AWMD",4);out[4]=(unsigned char)made_spell_count;at=5;
+    for(i=0;i<made_spell_count;i++){
+        memcpy(out+at,made_spells[i].name,32);out[at+32]=(unsigned char)made_spells[i].effects;at+=33;
+        for(j=0;j<made_spells[i].effects;j++,at+=14)put_effect(out+at,&made_spells[i].effect[j]);
+    }
+    memcpy(out+at,"AWEN",4);out[at+4]=(unsigned char)made_item_count;at+=5;
+    for(i=0;i<made_item_count;i++){
+        uint32_t u;const aw_made_item_t *m=&made_items[i];
+        memcpy(out+at,m->base,40);memcpy(out+at+40,m->name,32);
+        memcpy(&u,&m->charge,4);out[at+72]=(unsigned char)(u>>24);out[at+73]=(unsigned char)(u>>16);out[at+74]=(unsigned char)(u>>8);out[at+75]=(unsigned char)u;
+        memcpy(&u,&m->charge_max,4);out[at+76]=(unsigned char)(u>>24);out[at+77]=(unsigned char)(u>>16);out[at+78]=(unsigned char)(u>>8);out[at+79]=(unsigned char)u;
+        out[at+80]=m->cast_type;out[at+81]=(unsigned char)m->effects;at+=82;
+        for(j=0;j<m->effects;j++,at+=14)put_effect(out+at,&m->effect[j]);
+    }
+    return at;
+}
+int AW_MadeImport(const unsigned char *p,int bytes){
+    int i,j,n,at=5;
+    AW_MadeReset();
+    if(!p || bytes<10 || memcmp(p,"AWMD",4))return -1;
+    n=p[4];
+    for(i=0;i<n;i++){
+        aw_made_spell_t s;
+        if(at+33>bytes)goto bad;
+        memset(&s,0,sizeof(s));memcpy(s.name,p+at,32);s.name[31]=0;s.effects=p[at+32];at+=33;
+        if(s.effects<1 || s.effects>AW_MADE_EFFECTS || at+14*s.effects>bytes)goto bad;
+        for(j=0;j<s.effects;j++,at+=14)get_effect(p+at,&s.effect[j]);
+        if(AW_MadeSpellAdd(&s)<0)goto bad;
+    }
+    if(at+5>bytes || memcmp(p+at,"AWEN",4))goto bad;
+    n=p[at+4];at+=5;
+    for(i=0;i<n;i++){
+        aw_made_item_t m;uint32_t u;
+        if(at+82>bytes)goto bad;
+        memset(&m,0,sizeof(m));memcpy(m.base,p+at,40);m.base[39]=0;memcpy(m.name,p+at+40,32);m.name[31]=0;
+        u=u32(p+at+72);memcpy(&m.charge,&u,4);u=u32(p+at+76);memcpy(&m.charge_max,&u,4);
+        m.cast_type=p[at+80];m.effects=p[at+81];at+=82;
+        if(m.effects<1 || m.effects>AW_MADE_EFFECTS || at+14*m.effects>bytes)goto bad;
+        for(j=0;j<m.effects;j++,at+=14)get_effect(p+at,&m.effect[j]);
+        if(AW_MadeItemAdd(&m)<0)goto bad;
+    }
+    return at;
+bad:
+    AW_MadeReset();return -1;
+}
+/* --- filled soul gems (Enchanting; Soultrap fills them): the gem's id and the soul's creature (its ACTB row, the
+ * soul's value read from it); bounded, saved (AWSG), nothing until the first is filled --- */
+#define AW_GEMS_MAX 64
+#define AW_GEM_BYTES 44
+AW_RESIDENT_GROWS("filled soul gems (Enchanting)",AW_GEMS_MAX,AW_GEM_BYTES);
+typedef struct {char gem[40];uint16_t creature;uint16_t pad;} gem_t;
+typedef char aw_gem_fits[sizeof(gem_t)<=AW_GEM_BYTES?1:-1];
+static gem_t *gems;static int gem_count;
+void AW_GemsReset(void){free(gems);gems=NULL;gem_count=0;}
+int AW_GemCount(void){return gem_count;}
+int AW_GemAdd(const char *gem,int creature){
+    if(!gem || !*gem || strlen(gem)>=sizeof(gems[0].gem) || creature<0 || creature>0xFFFE || gem_count>=AW_GEMS_MAX)return -1;
+    if(!gems && !(gems=(gem_t *)AW_TryMalloc(sizeof(gem_t)*AW_GEMS_MAX)))return -1;
+    strcpy(gems[gem_count].gem,gem);gems[gem_count].creature=(uint16_t)creature;gems[gem_count].pad=0;
+    return gem_count++;
+}
+int AW_GemAt(int i,char *gem,int capacity,int *creature){
+    if(i<0 || i>=gem_count || capacity<1)return 0;
+    strncpy(gem,gems[i].gem,(size_t)capacity-1);gem[capacity-1]=0;*creature=gems[i].creature;
+    return 1;
+}
+int AW_GemRemove(int i){
+    if(i<0 || i>=gem_count)return 0;
+    memmove(gems+i,gems+i+1,sizeof(gem_t)*(size_t)(gem_count-i-1));gem_count--;
+    return 1;
+}
+/* the soul's value (the creature record's soul, ACTB): the charge an enchantment can hold */
+int AW_GemSoul(int i){
+    aw_actor_base_t b;
+    if(i<0 || i>=gem_count || !AW_ActorBase(gems[i].creature,&b))return 0;
+    return (int)b.soul;
+}
+/* "AWSG" u8 gems, each: u8 id length, the id, u16 creature row. The bytes written, -1 no room. */
+int AW_GemsExport(unsigned char *out,int capacity){
+    int i,at=5,need=5;
+    for(i=0;i<gem_count;i++)need+=3+(int)strlen(gems[i].gem);
+    if(need>capacity)return -1;
+    memcpy(out,"AWSG",4);out[4]=(unsigned char)gem_count;
+    for(i=0;i<gem_count;i++){
+        int len=(int)strlen(gems[i].gem);
+        out[at]=(unsigned char)len;memcpy(out+at+1,gems[i].gem,(size_t)len);
+        out[at+1+len]=(unsigned char)(gems[i].creature>>8);out[at+2+len]=(unsigned char)gems[i].creature;at+=3+len;
+    }
+    return at;
+}
+int AW_GemsImport(const unsigned char *p,int bytes){
+    int i,n,at=5;char gem[40];
+    AW_GemsReset();
+    if(!p || bytes<5 || memcmp(p,"AWSG",4))return -1;
+    n=p[4];
+    for(i=0;i<n;i++){
+        int len;
+        if(at+1>bytes || (len=p[at])>=(int)sizeof(gem) || at+3+len>bytes){AW_GemsReset();return -1;}
+        memcpy(gem,p+at+1,(size_t)len);gem[len]=0;
+        if(AW_GemAdd(gem,(int)U16(p+at+1+len))<0){AW_GemsReset();return -1;}
+        at+=3+len;
+    }
+    return at;
+}
+/* --- places a script revealed on the map (ShowMap; OpenMW guiextensions.cpp OpShowMap: every exterior cell whose
+ * name holds the text becomes known) --- the texts, kept for the map's place markers (INGAME-MAP-ORIGINAL-57) and
+ * saved (AWMP); nothing until the first ShowMap, a bounded list */
+#define AW_REVEALED_MAX 128
+#define AW_REVEALED_BYTES 32
+AW_RESIDENT_GROWS("places revealed by ShowMap",AW_REVEALED_MAX,AW_REVEALED_BYTES);
+static char (*revealed)[AW_REVEALED_BYTES];static int revealed_count;
+void AW_RevealedReset(void){free(revealed);revealed=NULL;revealed_count=0;}
+int AW_RevealedCount(void){return revealed_count;}
+const char *AW_RevealedAt(int i){return i>=0 && i<revealed_count?revealed[i]:NULL;}
+int AW_RevealedAdd(const char *text){
+    int i;
+    if(!text || !*text || strlen(text)>=AW_REVEALED_BYTES)return 0;
+    for(i=0;i<revealed_count;i++)if(ci_equal(revealed[i],text))return 1;   /* known already */
+    if(revealed_count>=AW_REVEALED_MAX)return 0;
+    if(!revealed && !(revealed=(char (*)[AW_REVEALED_BYTES])AW_TryMalloc((unsigned long)AW_REVEALED_BYTES*AW_REVEALED_MAX)))return 0;
+    strcpy(revealed[revealed_count++],text);
+    return 1;
+}
+/* "AWMP" u8 count, each u8 length and the text. Bytes written, -1 no room. */
+int AW_RevealedExport(unsigned char *out,int capacity){
+    int i,at=5,need=5;
+    for(i=0;i<revealed_count;i++)need+=1+(int)strlen(revealed[i]);
+    if(need>capacity)return -1;
+    memcpy(out,"AWMP",4);out[4]=(unsigned char)revealed_count;
+    for(i=0;i<revealed_count;i++){int n=(int)strlen(revealed[i]);out[at]=(unsigned char)n;memcpy(out+at+1,revealed[i],(size_t)n);at+=1+n;}
+    return at;
+}
+int AW_RevealedImport(const unsigned char *p,int bytes){
+    int i,n,at=5;char text[AW_REVEALED_BYTES];
+    AW_RevealedReset();
+    if(!p || bytes<5 || memcmp(p,"AWMP",4))return -1;
+    n=p[4];
+    for(i=0;i<n;i++){
+        int len;
+        if(at+1>bytes || (len=p[at])>=AW_REVEALED_BYTES || at+1+len>bytes){AW_RevealedReset();return -1;}
+        memcpy(text,p+at+1,(size_t)len);text[len]=0;at+=1+len;
+        if(!AW_RevealedAdd(text)){AW_RevealedReset();return -1;}
+    }
+    return at;
 }

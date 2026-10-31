@@ -116,10 +116,21 @@ static struct {eval_t source,voice,hello,reset,duration,manual,netname;} fields[
 static const char *table_path,*present;
 static int played,precached_ok;static char last_sound[64];
 static sfx_t sample;static sfxcache_t cache={11025,0,11025,1,0,{0}};
-static cvar_t *lut_cvar;
+static cvar_t *lut_cvar,*steps_cvar;
+void Cmd_AddCommand(char *name,xcommand_t f){(void)name;(void)f;}
+float Cvar_VariableValue(char *name){(void)name;return 0;}
+void Cvar_SetValue(char *name,float v){(void)name;(void)v;}
+int Cmd_Argc(void){return 1;}
+char *Cmd_Argv(int i){(void)i;return "";}
+int Q_strcasecmp(char *a,char *b){return strcasecmp(a,b);}
+const aw_fighter_t *AW_CombatPlayer(void){return NULL;}
+/* the player's race and sex (aw_character.c) and the player voice file the builder writes */
+#include "aw_character.h"
+aw_character_t aw_character;aw_race_t aw_races[16];int aw_race_count;
+static const char *player_file;
 
 static int add_string(const char *s){int at=string_at;strcpy(strings+at,s);string_at+=(int)strlen(s)+1;return at;}
-void Cvar_RegisterVariable(cvar_t *c){c->value=(float)atof(c->string);if(!strcmp(c->name,"aw_npc_voice_lut"))lut_cvar=c;}
+void Cvar_RegisterVariable(cvar_t *c){c->value=(float)atof(c->string);if(!strcmp(c->name,"aw_npc_voice_lut"))lut_cvar=c;if(!strcmp(c->name,"aw_player_footsteps"))steps_cvar=c;}
 int Hunk_LowMark(void){return 0;}
 void Hunk_FreeToLowMark(int m){(void)m;}
 byte *COM_LoadHunkFile(char *p){(void)p;return NULL;}
@@ -141,6 +152,7 @@ void AW_ExpandDialogue(char *out,int capacity,const char *source){
 int COM_FOpenFile(char *p,FILE **f){
     char hex[17];
     *f=NULL;
+    if(!strcmp(p,"npc-voice-player.txt") && player_file){long n;*f=fopen(player_file,"rb");if(!*f)return -1;fseek(*f,0,SEEK_END);n=ftell(*f);fseek(*f,0,SEEK_SET);return (int)n;}
     if(!strcmp(p,"npc-voices.lut")){long n;*f=fopen(table_path,"rb");if(!*f)return -1;fseek(*f,0,SEEK_END);n=ftell(*f);fseek(*f,0,SEEK_SET);return (int)n;}
     if(!strncmp(p,"sound/pool/a",12) && strlen(p)==32){
         memcpy(hex,p+12,16);hex[16]=0;
@@ -176,7 +188,8 @@ static void actor(int n,const char *id,const char *name,const char *voice,float 
 }
 int main(int argc,char **argv){
     char text[512];int before;
-    assert(argc==4 && !strcmp(argv[1],"glue"));
+    assert(argc==6 && !strcmp(argv[1],"glue"));
+    player_file=argv[5];
     table_path=argv[2];present=argv[3];
     pr_strings=strings;cls.state=ca_connected;svs.maxclients=1;
     edicts[1].v.health=100;edicts[1].v.max_health=100;
@@ -213,6 +226,35 @@ int main(int argc,char **argv){
     /* a new level reuses the edict number for another record: the cache follows the record id */
     actor(2,"breton_m","Jean",NULL,0);
     assert(AW_GlutPrep(&edicts[2]) && AW_GlutSay(&edicts[2],AW_GLUT_HELLO,0) && !strcmp(AW_GlutText(),"Hello."));
+    /* an Orc whose record id has accented letters (NPC-VOICE-NONASCII-IDS-48): the entity text carries the id in
+       Windows-1252 bytes, the table holds the same bytes, so the spawn step finds its row */
+    actor(3,"at\xfalg gro-larg\xfam","Atulg gro-Largum",NULL,0);
+    assert(AW_GlutNpcOf(&edicts[3])>=0 && AW_GlutPrep(&edicts[3]));
+    actor(3,"yat\xfar gro-shak","Yatur gro-Shak",NULL,0);
+    assert(AW_GlutNpcOf(&edicts[3])>=0 && AW_GlutPrep(&edicts[3]));
+    /* a creature's sound generator moment through the animation hook (CREATURE-ANIM-SOUND-54): the rat's moan as
+       the pool name the mixer takes (argv[4], "-" when the build lacks the file); a record not in the table has none */
+    {char path[40];
+     actor(3,"RAT","Rat",NULL,0);
+     assert(aw_creature_sound);
+     if(!strcmp(argv[4],"-"))assert(!aw_creature_sound(&edicts[3],AW_SNDG_MOAN,path,sizeof(path)));
+     else{assert(aw_creature_sound(&edicts[3],AW_SNDG_MOAN,path,sizeof(path)));
+          if(strcmp(path,argv[4])){fprintf(stderr,"creature moan %s, want %s\n",path,argv[4]);return 1;}}
+     actor(3,"no_such_creature","Ghost",NULL,0);
+     assert(!aw_creature_sound(&edicts[3],AW_SNDG_MOAN,path,sizeof(path)));}
+    /* the player's step sound by boots class and water (PLAYER-FOOTSTEPS-NONE-58), off by default and saved */
+    assert(AW_GlutPlayerStepSlot(0,AW_ANIM_DRY,0)==AW_SLOT_FOOT_BARE_LEFT && AW_GlutPlayerStepSlot(3,AW_ANIM_DRY,1)==AW_SLOT_FOOT_HEAVY_RIGHT);
+    assert(AW_GlutPlayerStepSlot(1,AW_ANIM_DRY,0)==AW_SLOT_FOOT_LIGHT_LEFT && AW_GlutPlayerStepSlot(2,AW_ANIM_DRY,1)==AW_SLOT_FOOT_MED_RIGHT);
+    assert(AW_GlutPlayerStepSlot(2,AW_ANIM_WADE,0)==AW_SLOT_FOOT_WATER_LEFT && AW_GlutPlayerStepSlot(1,AW_ANIM_SWIMMING,1)==AW_SLOT_SWIM_RIGHT);
+    assert(AW_GlutPlayerStepSlot(9,AW_ANIM_DRY,0)==AW_SLOT_FOOT_BARE_LEFT);
+    assert(steps_cvar && steps_cvar->value==0 && steps_cvar->archive);
+    /* the player's pain line (COMBAT-VOICES-SILENT-33): a Breton man says a Breton man's Hit line, a race without a
+       line in the file has none */
+    strcpy(aw_races[0].id,"Breton");strcpy(aw_races[1].id,"Khajiit");aw_race_count=2;
+    aw_character.race=0;aw_character.female=0;
+    actor(2,"breton_m","Jean",NULL,0);
+    assert(AW_GlutNpcOf(&edicts[1])>=0 && AW_GlutNpcOf(&edicts[1])==AW_GlutNpcOf(&edicts[2]));
+    aw_character.race=1;assert(AW_GlutNpcOf(&edicts[1])<0);
     printf("glue ok\n");
     return 0;
 }

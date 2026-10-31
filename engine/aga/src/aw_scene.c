@@ -22,6 +22,7 @@
 #include "aw_quickchar.h"
 #include "aw_testbox.h"
 #include "aw_travel.h"
+#include "aw_glut.h"
 #include "aw_clock.h"
 #include "aw_tryalloc.h"
 #include "aw_listbox.h"
@@ -647,10 +648,25 @@ static int travel_service(const edict_t *e) {
     if(!v || !v->string || !pr_strings[v->string] || !(text=travel_table()))return 0;
     return AW_TravelParse(text,pr_strings+v->string,&travel_rows)>0;
 }
+/* the dialogue window's Travel (aw_dialwin.c): the menu of the speaker, opened once the window has closed */
+static edict_t *travel_from,*travel_pending;
+/* OpenMW: using a travel provider opens the conversation and Travel is chosen there (aw_dialwin.c); the menu opens
+ * straight away only for a provider with no dialogue row (an image without the dialogue table) */
+static int travel_by_talk(void) {
+    edict_t *e=travel_target();
+    return e && AW_GlutNpcOf(e)>=0;
+}
+int AW_SceneTravelOffers(edict_t *e) {
+    const aw_town_t *town=AW_Town(AW_TownFind(sv.name));
+    if(!e)return 0;
+    if(town && town->travel_npc[0] && !strcmp(pr_strings+e->v.netname,town->travel_npc))return 1;
+    return travel_service(e);
+}
+void AW_SceneTravelWith(edict_t *e) {travel_pending=e;}
 static edict_t *travel_target(void) {
     edict_t *e;const aw_town_t *town=AW_Town(AW_TownFind(sv.name));
     if(key_dest!=key_game || AW_StoryRestricted())return NULL;
-    e=npc_target();if(!e){travel_rows_for=NULL;return NULL;}
+    e=travel_from?travel_from:npc_target();if(!e){travel_rows_for=NULL;return NULL;}
     /* a caravaner in a fight (or dead) offers no ride: the talk rule (aw_talk.c), for the town table's ride and the
      * travel services alike */
     if(aw_can_talk && !aw_can_talk(e))return NULL;
@@ -760,7 +776,7 @@ static int use_link(int i);
 int AW_SceneUse(void) {
     int i;
     if(AW_PlayerDead())return 1;   /* dead: nothing is used (the key is spent) */
-    i=0;if(pending || door_ready)return 1;if(travel_use())return 1;if(!npc_hint() && (AW_InventoryUse() || AW_HarvestUse()))return 1;i=aimed_door();
+    i=0;if(pending || door_ready)return 1;if(!travel_by_talk() && travel_use())return 1;if(!npc_hint() && (AW_InventoryUse() || AW_HarvestUse()))return 1;i=aimed_door();
     if(i<0)return aw_hinged_use?aw_hinged_use():0;   /* an ordinary hinged door (aw_hinged_door.c), else nothing here */
     if(aw_scene_intercept && aw_scene_intercept(links[i].reference))return 1;
     return use_link(i);
@@ -1111,6 +1127,10 @@ void AW_SceneSpawn(edict_t *p) {
     AW_HeapAuditReport(sv.worldmodel?sv.worldmodel->name:sv.name);
 }
 void AW_SceneTick(void) {
+    if(travel_pending && key_dest==key_game){
+        edict_t *e=travel_pending;travel_pending=NULL;
+        if(!e->free){travel_from=e;travel_use();travel_from=NULL;}
+    }
     aw_scene_link_t r;edict_t *p;
     AW_NPCFloorRetry();
     if(!pending && aw_hinged_tick)aw_hinged_tick(host_frametime);   /* nothing unless a door turns */

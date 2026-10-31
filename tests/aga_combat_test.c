@@ -55,6 +55,11 @@ int AW_AmbientInWater(const float p[3]){(void)p;return 0;}   /* the swimmer chas
 qboolean AW_ActorStep(edict_t *e,vec3_t move,double dt){(void)dt;if(walled)return false;e->v.origin[0]+=move[0];e->v.origin[1]+=move[1];aw_sv_move_calls+=3;steps++;return true;}
 edict_t *AW_NPCTargetReach(edict_t *p,vec3_t angles,float reach){(void)p;(void)angles;assert(reach>32 && reach<64);return target;}
 void S_LocalSound(char *s){sounds++;strcpy(last_sound,s);}
+void S_LocalSoundBeside(char *s){S_LocalSound(s);}   /* one blow's sounds side by side (snd_dma.c) */
+/* the fighters' group sound keys (aw_anim.c, not in the host part): counted */
+static int group_sound_calls;
+int AW_AnimMedium(edict_t *e){(void)e;return 0;}
+void AW_AnimSounds(edict_t *e,const aw_anim_t *a,int group,unsigned long crossed,int medium){(void)e;(void)a;(void)group;(void)crossed;(void)medium;group_sound_calls++;}
 void AW_MusicCombat(int on){if(on)music_on++;else music_off++;}
 void AW_MusicDeath(void){music_death++;}
 double Sys_FloatTime(void){return clock_now+=.0001;}

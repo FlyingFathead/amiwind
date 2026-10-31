@@ -2,10 +2,11 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 2 times; something has to be done
+## PERSISTING: reported 3 times; something has to be done
 
 - Reported with v0.0.57-dev1 at 2026-10-30 11:17 +0200: v0.0.57-dev2 full build (2026_10_30_v0.0.57-dev1_full-dev2_2a4027c): actor-library again at 1.6 of 12 cores with 415 units queued and none running, the same start-up stall as the dev1 build
 - Reported with v0.0.57-dev4 at 2026-10-30 19:19 +0200: PERSISTING: dev4 full run 2026_10_30_v0.0.57-dev4_full-...-after-the-collision-fix_c53994d, actor-library at 11.78 of 24 cores with 37 units queued and 23 running (fail_watch UNDERUSED); the resource plan had already throttled it to 19 workers for memory (672 MiB each beside a 741 MiB parent), so part of this is the memory limit, part the slowest unit's tail
+- Reported with v0.0.58-dev1 at 2026-10-31 16:20 +0200: v0.0.58-dev1 build: 8.99 of 24 cores, 192 queued, 8 running, again. Cause found: build.py gives the stage --jobs 12 (log: 'Actor library ... 12 jobs'), actor_library.py splits 12 into 3 creature + 9 NPC jobs (npc_library 'NPC library ... 9 jobs'). The share is fixed at stage start (half of 24, other stages beside it) and never grows when they finish. Fix: take the pool's live share, or the full allowed count when it runs alone.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -18,10 +19,10 @@
 | Where | tools/build.py actor-library stage pool; its unit scheduling |
 | Reproduction | unknown |
 | Duplicate of | no |
-| Persists in | fixed in v0.0.57 |
-| Severity | medium: Regressed in v0.0.57-dev1 (was low): A few minutes on a third of the cores in a MiniWind; the output is right. |
+| Persists in | v0.0.57 (last seen) |
+| Severity | high: Regressed in v0.0.57 (was medium): Regressed in v0.0.57-dev1 (was low): A few minutes on a third of the cores in a MiniWind; the output is right. |
 | Family | Build speed (`build-speed`) |
-| Came back (regression) | in v0.0.57-dev1 (fixed in v0.0.54-dev1 before) |
+| Came back (regression) | in v0.0.57-dev1 (fixed in v0.0.54-dev1 before); in v0.0.57 (fixed in v0.0.57 before) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |
 | Playtest version | 2026_10_27_v0.0.54-dev1_miniwind-seyda-ambient_55625e2f |
 | From commit | source 55625e2, engine 55625e2, CHIM world 55625e2 |
@@ -35,7 +36,7 @@ _Last updated with AmiWind v0.0.57-dev5 (30 October 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
 - [Status: 30 October 2026](#status-30-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -225,7 +226,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [MINIWIND-NOT-MINUTES-33](MINIWIND-NOT-MINUTES-33.md): A reused MiniWind build took about two hours instead of minutes
 - [MINIWIND-SCENE-CHAIN-WEIGHT-42](MINIWIND-SCENE-CHAIN-WEIGHT-42.md): Every MiniWind bakes all playable races and the opening rooms, and walks its whole frame stairs
 - [NPC-BAKED-WHOLE-DUPLICATION-33](NPC-BAKED-WHOLE-DUPLICATION-33.md): Every NPC appearance is baked whole: shared body parts are converted again for each actor, and equipment cannot change
-- PERF-GUARD-RESIDENT-BUSY-HOST-57 (no report page): The dev5 full build's perf guard failed chim-town-balmora and chim-town-vivec_city build_resident as slower (129 s, was 52 s; 147 s, was 62 s) while two other builds ran beside it: contention, not code
+- [PERF-GUARD-RESIDENT-BUSY-HOST-57](PERF-GUARD-RESIDENT-BUSY-HOST-57.md): The dev5 full build's perf guard failed chim-town-balmora and chim-town-vivec_city build_resident as slower (129 s, was 52 s; 147 s, was 62 s) while two other builds ran beside it: contention, not code
 - RELEASE-GUARD-SLOW-CLONE-51 (no report page): The release guard, the fail-fast first step of a release, took 6 minutes on about 0.14 of a core: its release check clones the whole repository through the Windows-mounted drive
 - RELEASE-SUITE-RECORD-SERIAL-51 (no report page): The release's suite record runs the whole test suite again on one core for about 22 minutes, right after the gate ran the same tests in about 2 minutes
 - [ROOM-BAKE-FOOTPRINT-SLOW-48](ROOM-BAKE-FOOTPRINT-SLOW-48.md): The room actor bake's footprint rule with the collision-box test is more than 100 times slower

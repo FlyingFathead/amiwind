@@ -231,5 +231,26 @@ class LibraryTests(unittest.TestCase):
         self.assertIn("'--creature-method', choices=('kf', 'skeletal'), default='kf'", text)
 
 
+class SoundEventTests(unittest.TestCase):
+    """CREATURE-ANIM-SOUND-54: a creature's 'soundgen: X' keys become layout events the engine plays from the
+    creature's row of the voice table."""
+
+    def test_keys_inside_the_group_on_their_nearest_frame(self):
+        import creature_pose
+        keys = [(0.0, 'idle: start'), (0.1, 'soundgen: moan'), (0.45, 'soundgen: left'), (0.55, 'soundgen: right'),
+                (0.9, 'soundgen: swish'), (1.0, 'soundgen: roar'), (2.0, 'soundgen: scream')]
+        events = creature_pose.sound_events(keys, 0.0, 1.0, 0.1, 10, 'loop')
+        self.assertEqual(events, [(1, 'moan'), (5, 'left'), (6, 'right')])     # not past B, not unknown moments
+        held = creature_pose.sound_events(keys, 0.0, 1.0, 0.25, 4, 'hold')
+        self.assertIn((3, 'roar'), held)                                        # a hold group keeps B, last frame
+
+    def test_layout_writes_the_events(self):
+        import creature_pose
+        groups = [{'name': 'idle', 'base': 0, 'count': 8, 'step': .1, 'events': [(2, 'moan')]},
+                  {'name': 'attack', 'base': 8, 'count': 6, 'step': .1, 'hit': .5, 'events': [(1, 'roar')]}]
+        self.assertEqual(creature_pose.layout(groups),
+                         'idle:0:8:0.1000 attack:8:6:0.1000:0.500 @idle:2:moan @attack:1:roar')
+
+
 if __name__ == '__main__':
     unittest.main()

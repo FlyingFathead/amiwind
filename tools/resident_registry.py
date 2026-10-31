@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-only
 """Resident registries of the engine: what every console command, console variable and large static name table
-costs in memory for the whole session (ENGINE-RESIDENT-REGISTRY-GROWTH-36).
+costs in memory for the whole session (ENGINE-RESIDENT-REGISTRY-GROWTH-36), and the worst case of every growing
+allocation the engine declares with AW_RESIDENT_GROWS (aw_tryalloc.h: a name, the most entries, one entry's bytes).
 
 Quake keeps these for the whole game. Each console command (Cmd_AddCommand, cmd.c) is a cmd_function_t on the
 low hunk: 12 bytes rounded up to 16, plus the 16-byte hunk header (zone.c Hunk_AllocName) = 32 bytes. Each
@@ -105,11 +106,14 @@ def scan(engine=ENGINE):
     """{'commands': [...], 'cvars': [...], 'tables': [...], 'problems': [...]}: every registration in the
     compiled engine sources, with its file and resident bytes."""
     src = engine / 'src'
-    commands, cvars, tables, problems = {}, {}, [], []
+    commands, cvars, tables, problems, growing = {}, {}, [], [], []
     texts, local, shared = {}, {}, {}
     # String macros used as cvar defaults (aw_lava.h: #define AW_LAVA_DEFAULT_TINT "128 4 4").
-    macros = {}
+    macros, numbers = {}, {}
     for header in sorted(src.rglob('*.[ch]')):
+        for macro, value in re.findall(r'^[ \t]*#\s*define\s+(\w+)\s+(\d+)\b', header.read_text(encoding='latin-1'),
+                                       re.M):
+            numbers.setdefault(macro, int(value))
         for macro, value in re.findall(r'^[ \t]*#\s*define\s+(\w+)\s+("(?:[^"\\]|\\.)*")',
                                        header.read_text(encoding='latin-1'), re.M):
             macros.setdefault(macro, value)
@@ -137,6 +141,14 @@ def scan(engine=ENGINE):
                 if not statement.group(1):
                     shared[var] = value  # declared extern where it is registered
     for name, text in texts.items():
+        # growing allocations (AW_RESIDENT_GROWS, aw_tryalloc.h): a name, the most entries and the bytes of one
+        for call in re.finditer(r'\bAW_RESIDENT_GROWS\s*\(\s*"((?:[^"\\]|\\.)*)"\s*,\s*(\w+)\s*,\s*(\w+)\s*\)', text):
+            count, size = (int(v) if v.isdigit() else numbers.get(v) for v in call.group(2, 3))
+            if count is None or size is None:
+                problems.append(f'{name}: AW_RESIDENT_GROWS {call.group(1)}: a bound that is not a number or macro')
+                continue
+            growing.append({'name': literal(call.group(1)), 'file': name, 'entries': count, 'entry_bytes': size,
+                            'bytes': count * size})
         defaults = dict(shared, **local.get(name, {}))
         for call in re.finditer(r'\bCmd_AddCommand\s*\(\s*([^,]*),', text):
             argument = call.group(1).strip()
@@ -179,7 +191,8 @@ def scan(engine=ENGINE):
                 tables.append({'name': table.group(1), 'file': name, 'strings': len(strings), 'bytes': size})
     rows = [{'name': key, 'file': value, 'bytes': command_bytes()} for key, value in sorted(commands.items())]
     return {'commands': rows, 'cvars': [cvars[key] for key in sorted(cvars)],
-            'tables': sorted(tables, key=lambda t: (t['file'], t['name'])), 'problems': problems}
+            'tables': sorted(tables, key=lambda t: (t['file'], t['name'])),
+            'growing': sorted(growing, key=lambda g: g['name']), 'problems': problems}
 
 
 def totals(found):
@@ -187,7 +200,9 @@ def totals(found):
     return {'commands': {'count': len(found['commands']), 'hunk_bytes': sum(r['bytes'] for r in found['commands'])},
             'cvars': {'count': len(found['cvars']), 'static_bytes': sum(r['static_bytes'] for r in found['cvars']),
                       'zone_bytes': sum(r['zone_bytes'] for r in found['cvars'])},
-            'tables': {'count': len(found['tables']), 'bytes': sum(r['bytes'] for r in found['tables'])}}
+            'tables': {'count': len(found['tables']), 'bytes': sum(r['bytes'] for r in found['tables'])},
+            'growing': {'count': len(found.get('growing', [])),
+                        'worst_bytes': sum(r['bytes'] for r in found.get('growing', []))}}
 
 
 def over_budget(found, budget):
@@ -218,7 +233,8 @@ def budget_document(found, reasons):
             'note': 'Ratchet: tests/test_resident_registry.py fails above these numbers and asks for them to be '
                     'lowered when the engine needs less. Raise only with a dated, maintainer-approved reason.',
             'totals': totals(found), 'reasons': reasons,
-            'entries': {group: [row['name'] for row in found[group]] for group in ('commands', 'cvars', 'tables')}}
+            'entries': {group: [row['name'] for row in found.get(group, [])]
+                        for group in ('commands', 'cvars', 'tables', 'growing')}}
 
 
 def write_budget(document, path=BUDGET):
@@ -265,6 +281,8 @@ def main(argv=None):
             print('problem: ' + problem)
         for table in found['tables']:
             print(f"table {table['file']}:{table['name']}: {table['strings']} strings, {table['bytes']} bytes")
+        for g in found['growing']:
+            print(f"growing {g['file']}: {g['name']}: up to {g['entries']} x {g['entry_bytes']} = {g['bytes']} bytes")
     return 1 if found['problems'] else 0
 
 

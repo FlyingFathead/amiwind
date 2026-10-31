@@ -16,10 +16,13 @@
 /* dbg animkit (aw_animkit.c): 0 = movers play their idle frames (the previous method); a playback
  * rate multiplier. Defaults: the kit on, rate x1. */
 int aw_anim_kit_enabled=1;
+/* hooks the voice table sets (aw_glut.c AW_GlutInit): creature sound generator moments, the player's footsteps */
+int (*aw_creature_sound)(struct edict_s *e,int moment,char *out,int size);
+void (*aw_player_steps)(void);
 float aw_anim_kit_speed=1;
 const char *const aw_anim_group_names[AW_ANIM_GROUPS]={"idle","walk","run","swim","swimidle","hit","knock","death","attack","block","dodgel","dodger","jump","land",
     "ready","readywalk","readyrun","readyjump","readyland"};
-static const char *const event_names[AW_ANIM_EVENT_KINDS]={"left","right"};
+static const char *const event_names[AW_ANIM_EVENT_ALL]={"left","right","moan","roar","scream","land"};
 static const char *const voice_topics[AW_VOICE_TOPICS]={"attack","hit","flee","idle"};
 static int hexval(int c) {return c>='0' && c<='9'?c-'0':c>='a' && c<='f'?c-'a'+10:-1;}
 
@@ -60,8 +63,8 @@ int AW_AnimParse(aw_anim_t *a,const char *p,int numframes) {
         if(*p=='@'){
             p++;
             if((g=name_of(&p,aw_anim_group_names,AW_ANIM_GROUPS))<0 || !number(&p,v) || *p++!=':')goto skip;
-            for(k=0;k<AW_ANIM_EVENT_KINDS;k++){size_t n2=strlen(event_names[k]);if(!strncmp(p,event_names[k],n2) && word_end(p+n2)){p+=n2;break;}}
-            if(k==AW_ANIM_EVENT_KINDS)goto skip;
+            for(k=0;k<AW_ANIM_EVENT_ALL;k++){size_t n2=strlen(event_names[k]);if(!strncmp(p,event_names[k],n2) && word_end(p+n2)){p+=n2;break;}}
+            if(k==AW_ANIM_EVENT_ALL)goto skip;
             if(t.events<AW_ANIM_EVENTS && v[0]>=0 && v[0]<256){
                 t.ev_group[t.events]=(unsigned char)g;t.ev_offset[t.events]=(unsigned char)v[0];t.ev_kind[t.events]=(unsigned char)k;t.events++;
             }
@@ -412,9 +415,23 @@ static cvar_t footsteps={"aw_npc_footsteps","1",true};
 static cvar_t footstep_volume={"aw_npc_footstep_volume","0.6",true};
 static struct {edict_t *e;const aw_anim_t *a;int medium;} emitting;
 static void emit(void *context,int kind) {
-    const char *name=emitting.a->sound[kind][emitting.medium];(void)context;
+    const char *name=kind<AW_ANIM_EVENT_KINDS?emitting.a->sound[kind][emitting.medium]:"";char gen[40];(void)context;
+    if(kind<AW_ANIM_EVENT_KINDS && !footsteps.value)return;
     /* channel 4: the body; the voice keeps channel 2 (aw_greet) */
-    if(name[0])SV_StartSound(emitting.e,4,(char *)name,(int)(footstep_volume.value*255),2);
+    if(name[0]){SV_StartSound(emitting.e,4,(char *)name,(int)(footstep_volume.value*255),2);return;}
+    /* a creature: its sound generator moment from the voice table (CREATURE-ANIM-SOUND-54; OpenMW getSoundIdFromSndGen).
+     * Steps on the body channel at the footstep volume, swimming as swim left and right; moan, roar and scream on the
+     * voice channel, land on the body. */
+    if(aw_creature_sound){
+        static const int moment[AW_ANIM_EVENT_ALL]={AW_SNDG_LEFT_FOOT,AW_SNDG_RIGHT_FOOT,AW_SNDG_MOAN,AW_SNDG_ROAR,AW_SNDG_SCREAM,AW_SNDG_LAND};
+        int m=moment[kind],voice=kind==AW_ANIM_EV_MOAN || kind==AW_ANIM_EV_ROAR || kind==AW_ANIM_EV_SCREAM;
+        if(emitting.medium==AW_ANIM_SWIMMING && kind<AW_ANIM_EVENT_KINDS)m=kind==AW_ANIM_LEFT?AW_SNDG_SWIM_LEFT:AW_SNDG_SWIM_RIGHT;
+        /* straight to the client mixer, as the voices are (AW_VoicePlay): no server precache for these */
+        if(cls.state==ca_connected && aw_creature_sound(emitting.e,m,gen,sizeof(gen))){
+            sfx_t *sfx=S_PrecacheSound(gen);
+            if(sfx)S_StartSound(NUM_FOR_EDICT(emitting.e),voice?2:4,sfx,emitting.e->v.origin,voice?1:footstep_volume.value,voice?1:2);
+        }
+    }
 }
 /* ---- voice barks ---- */
 static cvar_t voices_on={"aw_npc_voices","1",true};
@@ -467,7 +484,7 @@ int AW_VoiceSay(edict_t *e,int topic,int odds) {
     if(!e || e->free || !voices_on.value || cls.state!=ca_connected)return 0;
     /* Dead: nobody talks to the player any more (OpenMW Actors greets only a living player; no idle or fight
      * lines either: an AmiWind rule, PLAYER-DEATH-LIMBO-35). */
-    if(AW_PlayerDead())return 0;
+    if(AW_PlayerDead() && e!=p)return 0;      /* the player's own death line still plays (COMBAT-VOICES-SILENT-33) */
     if(odds<10000 && (rand()%10000)>=odds)return 0;
     if(topic==AW_VOICE_IDLE_LINE){                             /* OpenMW Actors::playIdleDialogue */
         vec3_t from,to,d;trace_t tr;
@@ -555,7 +572,7 @@ void AW_AnimSaveSwap(int begin) {
     (void)begin;
 }
 void AW_AnimSounds(edict_t *e,const aw_anim_t *a,int group,unsigned long crossed,int medium) {
-    if(!crossed || !footsteps.value || !a->events)return;
+    if(!crossed || !a->events)return;          /* aw_npc_footsteps 0 silences the steps only (emit) */
     emitting.e=e;emitting.a=a;emitting.medium=medium;
     AW_AnimEvents(a,group,crossed,emit,NULL);
 }

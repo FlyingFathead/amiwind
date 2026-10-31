@@ -26,7 +26,16 @@ enum {AW_ANIM_IDLE, AW_ANIM_WALK, AW_ANIM_RUN, AW_ANIM_SWIM, AW_ANIM_SWIMIDLE,
       AW_ANIM_JUMP, AW_ANIM_LAND,
       AW_ANIM_READY, AW_ANIM_READYWALK, AW_ANIM_READYRUN,
       AW_ANIM_READYJUMP, AW_ANIM_READYLAND, AW_ANIM_GROUPS};
-enum {AW_ANIM_LEFT, AW_ANIM_RIGHT, AW_ANIM_EVENT_KINDS};
+enum {AW_ANIM_LEFT, AW_ANIM_RIGHT, AW_ANIM_EVENT_KINDS};     /* the events with sound files (~EVENT:...) */
+/* The creature sound generator events (@NAME:OFFSET:moan ...; CREATURE-ANIM-SOUND-54): no files in the layout, the
+ * creature's row of the voice table names them (aw_creature_sound). ev_kind values after the footstep kinds. */
+enum {AW_ANIM_EV_MOAN=AW_ANIM_EVENT_KINDS, AW_ANIM_EV_ROAR, AW_ANIM_EV_SCREAM, AW_ANIM_EV_LAND, AW_ANIM_EVENT_ALL};
+/* The voice table's creature sounds (aw_glut.c sets it; NULL: none): the pool path of E's sound generator moment
+ * (aw_glut.h AW_SNDG_*) in OUT, 1 when the creature has one. */
+struct edict_s;
+/* The player's own footsteps, once a frame (aw_glut.c sets it, PLAYER-FOOTSTEPS-NONE-58; NULL: none). */
+extern void (*aw_player_steps)(void);
+extern int (*aw_creature_sound)(struct edict_s *e,int moment,char *out,int size);
 enum {AW_ANIM_DRY, AW_ANIM_WADE, AW_ANIM_SWIMMING, AW_ANIM_MEDIA};
 #define AW_ANIM_EVENTS 24
 #define AW_ANIM_SOUND_NAME 40

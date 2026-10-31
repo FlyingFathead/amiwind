@@ -36,7 +36,12 @@ typedef struct sfx_s
 {
 	char 	name[MAX_QPATH];
 	cache_user_t	cache;
+	int		keep;	/* a long-lived holder keeps this pointer (S_KeepSound): its name slot is never reused */
 } sfx_t;
+
+void S_KeepSound (sfx_t *sfx);
+qboolean S_SfxFree (sfx_t *sfx);
+void S_LocalSoundBeside (char *sound);
 
 // !!! if this is changed, it much be changed in asm_i386.h too !!!
 typedef struct

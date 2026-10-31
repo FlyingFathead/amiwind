@@ -9,6 +9,7 @@ condition; the condition records use the voice table's opcodes; the links, scrip
 image step; and the engine's reader and first-match search (engine/aga/src/aw_dial.c with the shared evaluator
 aw_glut.c AW_GlutCond) against this module's own answers for every NPC, topic and a spread of run-time states.
 """
+import re
 import shutil
 import struct
 import subprocess
@@ -51,7 +52,7 @@ def journal_info(identifier, index, line, name=False, finished=False):
 
 TOPICS = {
     'background': [info('b0', 'Welcome, guild member.', kind=0, DNAM='Mages Guild'),
-                   info('b1', 'I am Fargoth, of Seyda Neen. Ask about my ring.', kind=0, ONAM='fargoth'),
+                   info('b1', 'I am Fargoth, of Seyda Neen. Ask about @my ring#.', kind=0, ONAM='fargoth'),
                    info('b2', 'A guild mage. See the Mages Guild.', kind=0, FNAM='Mages Guild', disp=60),
                    info('b3', 'Just a Dunmer, outlander.', kind=0, RNAM='Dark Elf'),
                    info('b4', 'Nothing much.', kind=0)],
@@ -86,7 +87,8 @@ def kinds():
     k['DIAL'] = {t: kind for t, (_n, kind) in DIALS.items()}
     k['NPC_'] = dict(k['NPC_'], fargoth=k['NPC_']['fargoth'] + [f('SCRI', 'FargothScript')])
     k['SCPT'] = {'fargothscript': [('SCHD', b'FargothScript'.ljust(52, b'\0')), f('SCTX', SCRIPT)]}
-    k['GMST'] = dict(k['GMST'], **{n.casefold(): [f('NAME', n), ('FLTV', struct.pack('<f', v))]
+    k['GMST'] = dict(k['GMST'], **{n.casefold(): [f('NAME', n), ('INTV', struct.pack('<i', int(v))) if n[0] == 'i'
+                                                  else ('FLTV', struct.pack('<f', v))]
                                    for n, v in DISPOSITION_SETTINGS.items()})
     k['FACT'] = dict(k['FACT'])
     k['FACT']['mages guild'] = k['FACT']['mages guild'] + [f('ANAM', 'Mages Guild'), ('INTV', struct.pack('<i', 3)),
@@ -99,7 +101,20 @@ def kinds():
 # the disposition's game settings (test values in the game's range; the table copies whatever the data has)
 DISPOSITION_SETTINGS = {'fDispRaceMod': 5.0, 'fDispPersonalityMult': 0.5, 'fDispPersonalityBase': 50.0,
                         'fDispFactionRankMult': 0.5, 'fDispFactionRankBase': 1.0, 'fDispFactionMod': 3.0,
-                        'fDispCrimeMod': 0.001, 'fDispDiseaseMod': -10.0, 'fDispWeaponDrawn': -5.0}
+                        'fDispCrimeMod': 0.001, 'fDispDiseaseMod': -10.0, 'fDispWeaponDrawn': -5.0,
+                        # persuasion: the original's values (Morrowind.esm)
+                        'fPersonalityMod': 5.0, 'fLuckMod': 10.0, 'fReputationMod': 1.0, 'fLevelMod': 5.0,
+                        'fBribe10Mod': 35.0, 'fBribe100Mod': 75.0, 'fBribe1000Mod': 150.0, 'iPerMinChance': 5,
+                        'iPerMinChange': 1, 'fPerDieRollMult': 0.15, 'fPerTempMult': 1.0, 'fFatigueBase': 1.25,
+                        'fFatigueMult': 0.5, 'iTrainingMod': 10,
+                        'fSpellValueMult': 10.0, 'fRepairMult': 1.0, 'fEffectCostMult': 0.5,
+                        'fSpellMakingValueMult': 7.0, 'fEnchantmentValueMult': 1000.0,
+                        'fEnchantmentChanceMult': 3.0, 'fEnchantmentConstantChanceMult': 0.5,
+                        'fEnchantmentConstantDurationMult': 100.0, 'fEnchantmentMult': 0.1,
+                        'iSoulAmountForConstantEffect': 400}
+MGEF_FLAGS = 0x4 | 0x8                        # no duration, no magnitude
+PEOPLE = [   # personality, luck, reputation, speechcraft, mercantile, level, fatigue (current / maximum)
+    (40, 40, 0, 5, 5, 1, 1.0), (75, 55, 20, 60, 45, 12, 0.8), (30, 50, 5, 15, 30, 3, 0.0), (100, 100, 80, 100, 100, 40, 1.0)]
 
 
 def brute_force(k, ident, topic):
@@ -111,7 +126,7 @@ def brute_force(k, ident, topic):
         runtime = context.compile(fields)
         if runtime is None:
             continue
-        out.append((dialogue.text(fields, 'NAME'), len(runtime)))
+        out.append((D.EXPLICIT_LINK.sub(r'\1', dialogue.text(fields, 'NAME')), len(runtime)))   # markers stripped
         if not runtime:
             break
     return out
@@ -188,6 +203,19 @@ DISPOSITION_CASES = [   # base, same race, personality, bounty, faction, player 
     (90, 1, 100, 0, None, {}, 0, 0), (3, 0, 10, 99999, None, {}, 1, 1), (61, 0, 47, 7, 'mages guild', {}, 0, 1)]
 
 
+def link_fields(t, entry):
+    """(each linked topic once in text order, the spans 'offset:length:topic,...') of an entry, '-' for none."""
+    if entry < 0 or t['entries'][entry][3] == D.NONE32:
+        return '-', '-'
+    _text, _first, _script, link, n, _c, _f = t['entries'][entry]
+    spans = t['links'][link:link + n]
+    topics = []
+    for _o, _l, topic in spans:
+        if topic not in topics:
+            topics.append(topic)
+    return ','.join(map(str, topics)) or '-', ','.join('%d:%d:%d' % s for s in spans) or '-'
+
+
 def ref_list(t, npc, known, state):
     """The window's topic list (OpenMW getAvailableTopics): Topic kind, known, and an answer or a refusal."""
     out = []
@@ -227,7 +255,7 @@ class DialogueTable(unittest.TestCase):
     def test_static_filters(self):
         member = 'Welcome, guild member.'          # the player's faction test is left for run time, for everyone
         self.assertEqual(self.answers('fargoth', 'Background'),
-                         [member, 'I am Fargoth, of Seyda Neen. Ask about my ring.'])
+                         [member, 'I am Fargoth, of Seyda Neen. Ask about my ring.'])   # the marker stripped
         self.assertEqual(self.answers('mage', 'Background'),
                          [member, 'A guild mage. See the Mages Guild.', 'Nothing much.'])
         self.assertEqual(self.answers('dunmer_f', 'Background'), [member, 'Just a Dunmer, outlander.'])
@@ -258,11 +286,13 @@ class DialogueTable(unittest.TestCase):
         self.assertEqual(choice[1][3], [(G.OP_FUNC, 0, dialogue.FUNCTIONS.index('Choice'), 1)])
         self.assertEqual(choice[3][3], [(G.OP_DISP, 3, 0, 30)])
         background = D.answers(self.t, npc, self.names.index('Background'))[1]
-        self.assertEqual(background[2], [self.names.index('my ring')])         # the topic its text names
+        # the explicit marker '@my ring#' stripped from the shown text, its span on the topic
+        self.assertEqual(background[0], 'I am Fargoth, of Seyda Neen. Ask about my ring.')
+        self.assertEqual(background[2], [(39, 7, self.names.index('my ring'))])
         mage = D.answers(self.t, self.order.index('mage'), self.names.index('Background'))[1]
         self.assertEqual(mage[2], [])                                           # "Mages Guild" is no topic
         rumor = D.answers(self.t, npc, self.names.index('latest rumors'))[0]
-        self.assertEqual(rumor[2], [self.names.index('Background')])
+        self.assertEqual(rumor[2], [(13, 10, self.names.index('Background'))])
 
     def test_local_slots_follow_the_script_compiler(self):
         from mwscript.lexer import tokenize
@@ -275,6 +305,18 @@ class DialogueTable(unittest.TestCase):
         find = D.link_finder(['Background', None, 'my ring', 'ring'])
         self.assertEqual(find('My Ring, the ring, a ringing background.'), [2, 3, 0])
         self.assertEqual(find('backgrounds'), [])
+        spans = D.span_finder(['Background', None, 'my ring', 'ring'])
+        # OpenMW's rule: a name starts at a word separator (nothing checked at its end: "ringing" links "ring"), the
+        # longest of overlapping names wins; an explicit marker is stripped and linked when it names a topic, kept as
+        # plain text when it does not; the text after a marker is a new segment (a name may start right after it)
+        self.assertEqual(spans('My Ring, the ring, a ringing background.'),
+                         ('My Ring, the ring, a ringing background.', [(0, 7, 2), (13, 4, 3), (21, 4, 3), (29, 10, 0)]))
+        self.assertEqual(spans('Ask about @my ring# or @nothing#, then ring.'),
+                         ('Ask about my ring or nothing, then ring.', [(10, 7, 2), (35, 4, 3)]))
+        self.assertEqual(spans('@ring#s and backgrounds'), ('rings and backgrounds', [(0, 4, 3), (10, 10, 0)]))
+        self.assertEqual(spans('(ring) "ring" [ring] xring'), ('(ring) "ring" [ring] xring',
+                                                                  [(1, 4, 3), (8, 4, 3), (15, 4, 3)]))
+        self.assertEqual(spans('@ring\x7f\x7f# and an @ unclosed'), ('ring and an @ unclosed', [(0, 4, 3)]))
 
     def test_persuasion_topic_kept_for_every_npc(self):
         for ident in NPCS:
@@ -282,6 +324,7 @@ class DialogueTable(unittest.TestCase):
 
     def test_disposition_settings_and_factions(self):
         self.assertEqual(self.t['settings'], {k: pytest_f32(v) for k, v in DISPOSITION_SETTINGS.items()})
+        self.assertEqual(tuple(self.t['settings']), D.SETTINGS)
         self.assertEqual(self.t['factions'], ['fighters guild', 'mages guild'])
         self.assertEqual(sorted(self.t['reactions']), [(0, 1, 1), (1, 0, -2), (1, 1, 3)])
         self.assertEqual(self.report['settings_missing'], [])
@@ -302,6 +345,29 @@ class DialogueTable(unittest.TestCase):
         mages = self.t['rank_names'][self.t['factions'].index('mages guild')]
         self.assertEqual(mages[:4], ['Associate', 'Apprentice', 'Journeyman', ''])
         self.assertEqual(len(mages), D.RANKS)
+
+    def test_persuasion_rule(self):
+        t = self.t
+        keys = ('personality', 'luck', 'reputation', 'speechcraft', 'mercantile', 'level', 'fatigue')
+        weak, strong = (dict(zip(keys, PEOPLE[i])) for i in (0, 3))
+        # a strong speaker admiring a weak one at 50: a sure success, the change by the roll
+        r = D.persuade(t, 0, strong, weak, 50, 10)
+        self.assertTrue(r['success'])
+        self.assertGreater(r['temp'], 0)
+        self.assertEqual(r['perm'], r['temp'])                      # fPerTempMult 1
+        # the weak one: only the minimum chance (iPerMinChance 5) above a roll of 5
+        self.assertFalse(D.persuade(t, 0, weak, strong, 50, 50)['success'])
+        self.assertTrue(D.persuade(t, 0, weak, strong, 50, 0)['success'])
+        # a successful taunt raises Fight and lowers Flee; intimidation the other way
+        taunt = D.persuade(t, 2, strong, weak, 50, 10, fight=30, flee=30)
+        self.assertTrue(taunt['success'])
+        self.assertGreater(taunt['fight'], 30)
+        self.assertLess(taunt['flee'], 30)
+        scare = D.persuade(t, 1, strong, weak, 50, 10, fight=30, flee=30)
+        self.assertLess(scare['fight'], 30)
+        self.assertGreater(scare['flee'], 30)
+        # never past 0..100
+        self.assertEqual(D.persuade(t, 5, strong, weak, 98, 0)['temp'], 2)
 
     def test_start_topics_from_the_census_captain(self):
         self.assertEqual([self.names[t] for t in self.t['start']], ['Background', 'my ring'])
@@ -428,11 +494,9 @@ class NativeDialogue(unittest.TestCase):
                                 t['text'](t['entries'][got][0])
                             script = '-' if got < 0 or t['entries'][got][2] == D.NONE32 else \
                                 t['script'](t['entries'][got][2]).replace('\n', '|')
-                            links = ','.join(str(x) for x in (D.answers(t, npc, topic)[
-                                D.candidates(t, npc, topic).index(got)][2] if got >= 0 and got in
-                                D.candidates(t, npc, topic) else [])) or '-'
-                            lines.append('answer\t%s\t%d\t%d\t%d\t%d\t%d\t%s\t%s\t%s' % (
-                                ident, topic, disposition, choice, random, got, text, script, links))
+                            links, spans = link_fields(t, got)
+                            lines.append('answer\t%s\t%d\t%d\t%d\t%d\t%d\t%s\t%s\t%s\t%s' % (
+                                ident, topic, disposition, choice, random, got, text, script, links, spans))
             for disposition in (0, 50, 100):
                 for which, known in (('all', set(range(len(names)))), ('start', set(t['start']))):
                     state = {'choice': -1, 'random': 50, 'disposition': disposition}
@@ -460,11 +524,9 @@ class NativeDialogue(unittest.TestCase):
                         text = '-' if got < 0 or t['entries'][got][0] == D.NONE32 else t['text'](t['entries'][got][0])
                         script = '-' if got < 0 or t['entries'][got][2] == D.NONE32 else \
                             t['script'](t['entries'][got][2]).replace('\n', '|')
-                        e = t['entries'][got] if got >= 0 else None
-                        links = ','.join(str(x) for x in t['links'][e[3]:e[3] + e[4]]) if e and e[3] != D.NONE32 \
-                            else '-'
-                        lines.append('answer\t%s\t%d\t%d\t%d\t50\t%d\t%s\t%s\t%s' % (
-                            ident, topic, disposition, choice, got, text, script, links or '-'))
+                        links, spans = link_fields(t, got)
+                        lines.append('answer\t%s\t%d\t%d\t%d\t50\t%d\t%s\t%s\t%s\t%s' % (
+                            ident, topic, disposition, choice, got, text, script, links, spans))
         self.live_answers = sum(1 for line in lines if line.startswith('answer') and 'You found it!' in line)
         self.assertGreater(self.live_answers, 0)                  # the local made an answer reachable
         for base, race, personality, bounty, faction, ranks, diseased, weapon in DISPOSITION_CASES:
@@ -475,6 +537,23 @@ class NativeDialogue(unittest.TestCase):
                     base, race, personality, bounty, faction or '-',
                     ','.join('%s:%d:%d' % (k, r, e) for k, (r, e) in sorted(ranks.items())) or '-', diseased,
                     weapon, clamp, want))
+        # a script's ModFactionReaction (mages guild toward itself +5) and SetFactionReaction (mages guild toward
+        # fighters guild = 4): the disposition reads the changed reactions; then the game's own again
+        mages, fighters = t['factions'].index('mages guild'), t['factions'].index('fighters guild')
+        react = {(a, b): r for a, b, r in t['reactions']}
+        react[(mages, mages)] = react.get((mages, mages), 0) + 5
+        react[(mages, fighters)] = 4
+        changed = dict(t, reactions=[(a, b, r) for (a, b), r in react.items()])
+        lines.append('reactmod\tMages Guild\tmages guild\t5\t0')
+        lines.append('reactmod\tmages guild\tFighters Guild\t4\t1')
+        for base, race, personality, bounty, faction, ranks, diseased, weapon in DISPOSITION_CASES:
+            want = D.derived_disposition(changed, base, race, personality, bounty, faction, ranks, diseased, weapon,
+                                         clamp=False)
+            lines.append('disp\t%d\t%d\t%d\t%d\t%s\t%s\t%d\t%d\t0\t%d' % (
+                base, race, personality, bounty, faction or '-',
+                ','.join('%s:%d:%d' % (k, r, e) for k, (r, e) in sorted(ranks.items())) or '-', diseased,
+                weapon, want))
+        lines.append('reactreset')
         for faction, names in zip(t['factions'], t['rank_names']):
             for rank, name in enumerate(names):
                 lines.append('rank\t%s\t%d\t%s' % (faction.upper() if rank == 1 else faction, rank, name or '-'))
@@ -485,6 +564,81 @@ class NativeDialogue(unittest.TestCase):
                 ('%pcrank %NEXTPCRANK %cell %PCRace %Name', '%', '%', 'Balmora', '% % Balmora %PCRace %Name'),
                 ('100% sure', 'x', 'y', 'z', '100% sure')):
             lines.append('defines\t%s\t%s\t%s\t%s\t%s' % (text, pc, nxt, cell, want))
+        # persuasion: every kind over people, dispositions and rolls, the engine against the reference
+        keys = ('personality', 'luck', 'reputation', 'speechcraft', 'mercantile', 'level', 'fatigue')
+        for kind in range(6):
+            for a in PEOPLE:
+                for b in PEOPLE:
+                    for disposition in (0, 30, 50, 77, 100):
+                        for roll in range(0, 100, 7):
+                            r = D.persuade(t, kind, dict(zip(keys, a)), dict(zip(keys, b)), disposition, roll, 40, 60)
+                            lines.append('persuade\t%d\t%s\t%s\t%d\t%d\t40\t60\t%d %d %d %d %d' % (
+                                kind, ','.join(map(str, a)), ','.join(map(str, b)), disposition, roll,
+                                r['success'], r['temp'], r['perm'], r['fight'], r['flee']))
+        # barter offers and training (OpenMW getBarterOffer, TrainingWindow): the engine against the reference
+        for a in PEOPLE:
+            for b in PEOPLE:
+                for disposition in (0, 30, 50, 77, 100):
+                    for base in (0, 1, 7, 100, 2500):
+                        for buying in (0, 1):
+                            got = D.barter_offer(t, base, buying, dict(zip(keys, a)), dict(zip(keys, b)), disposition)
+                            lines.append('barter\t%d\t%d\t%s\t%s\t%d\t%d' % (
+                                base, buying, ','.join(map(str, a)), ','.join(map(str, b)), disposition, got))
+                    for cost in (0, 1, 7, 45):
+                        got = D.spell_price(t, cost, dict(zip(keys, a)), dict(zip(keys, b)), disposition)
+                        lines.append('spellprice\t%d\t%s\t%s\t%d\t%d' % (
+                            cost, ','.join(map(str, a)), ','.join(map(str, b)), disposition, got))
+                    for value, maximum, durability in ((0, 100, 0), (5, 300, 299), (120, 1000, 40), (7, 7, 3)):
+                        got = D.repair_price(t, value, maximum, durability, dict(zip(keys, a)), dict(zip(keys, b)),
+                                             disposition)
+                        lines.append('repairprice\t%d\t%d\t%d\t%s\t%s\t%d\t%d' % (
+                            value, maximum, durability, ','.join(map(str, a)), ','.join(map(str, b)), disposition, got))
+                    for skill in (5, 33, 99):
+                        got = D.training_price(t, skill, dict(zip(keys, a)), dict(zip(keys, b)), disposition)
+                        lines.append('trainprice\t%d\t%s\t%s\t%d\t%d' % (
+                            skill, ','.join(map(str, a)), ','.join(map(str, b)), disposition, got))
+        # spellmaking (OpenMW SpellCreationDialog): magicka cost and price of effect lists
+        made = ([], [dict(base_cost=5.0, flags=0, min=10, max=20, duration=5, area=0, range=2)],
+                [dict(base_cost=1.0, flags=MGEF_FLAGS, min=0, max=0, duration=0, area=3, range=0),
+                 dict(base_cost=12.5, flags=0, min=1, max=100, duration=30, area=10, range=2),
+                 dict(base_cost=0.6, flags=0x1000, min=5, max=5, duration=0, area=0, range=1)])
+        for effects in made:
+            field = ';'.join('%r,%d,%d,%d,%d,%d,%d' % (e['base_cost'], e['flags'], e['min'], e['max'], e['duration'],
+                                                       e['area'], e['range']) for e in effects) or '-'
+            for a in PEOPLE[:2]:
+                for disposition in (0, 50, 100):
+                    lines.append('spellmaking\t%s\t%s\t%s\t%d\t%d %d' % (
+                        field, ','.join(map(str, a)), ','.join(map(str, PEOPLE[2])), disposition,
+                        D.spellmaking_cost(t, effects),
+                        D.spellmaking_price(t, effects, dict(zip(keys, a)), dict(zip(keys, PEOPLE[2])), disposition)))
+        for effects in made:
+            field = ';'.join('%r,%d,%d,%d,%d,%d,%d' % (e['base_cost'], e['flags'], e['min'], e['max'], e['duration'],
+                                                       e['area'], e['range']) for e in effects) or '-'
+            for constant in (0, 1):
+                for disposition in (0, 50, 100):
+                    lines.append('enchant\t%s\t%d\t%s\t%s\t%d\t%d %d %d %d' % (
+                        field, constant, ','.join(map(str, PEOPLE[1])), ','.join(map(str, PEOPLE[3])), disposition,
+                        D.enchant_cast_cost(t, effects, constant, 45),
+                        D.enchant_price(t, effects, constant, dict(zip(keys, PEOPLE[1])), dict(zip(keys, PEOPLE[3])),
+                                        disposition),
+                        D.enchant_chance(t, effects, constant, 80, 60, 50, 0.8),
+                        int(D.enchant_points(t, effects, constant) * 100)))
+        for item in (0, 1, 2):
+            for style in (0, 1, 2, 3):
+                for soul in (0, 399, 400, 1000):
+                    lines.append('caststyle\t%d\t%d\t%d\t%d' % (item, style, soul, D.next_cast_style(t, item, style, soul)))
+        for skills in ([5] * 27, list(range(27)), [10, 50, 50, 20, 50, 70] + [0] * 21, [90, 90] + [5] * 25):
+            lines.append('trainpicks\t%s\t%s' % (','.join(map(str, skills)),
+                                                 ','.join(map(str, D.training_picks(skills)))))
+        for skill, attribute in enumerate(t['skill_attributes']):
+            lines.append('skillattr\t%d\t%d' % (skill, attribute if attribute < 8 else -1))
+        # link spans through the define filling: a define before a link moves it, inside it lengthens it
+        for text, spans, want_text, want_spans in (
+                ('As a %PCRank you know my ring.', '22:7:5', 'As a Associate you know my ring.', '24:7:5'),
+                ('%Cell and the ring of %Cell.', '14:4:3', 'Balmora and the ring of Balmora.', '16:4:3'),
+                ('Nothing linked.', '-', 'Nothing linked.', '-'),
+                ('Ask about %NextPCRank now', '10:11:1', 'Ask about Apprentice now', '10:10:1')):
+            lines.append('spanfill\t%s\t%s\tAssociate\tApprentice\tBalmora\t%s\t%s' % (text, spans, want_text, want_spans))
         lines.append('start\t%s' % (','.join(map(str, t['start'])) or '-'))
         for cols, text, want in ((10, 'Hello there outlander', 'Hello|there|outlander'),
                                  (5, 'abcdefgh ij', 'abcde|fgh|ij'), (11, 'one two\nthree', 'one two|three'),
@@ -496,6 +650,80 @@ class NativeDialogue(unittest.TestCase):
                                  str(Path(self.tmp.name) / G.NAME), str(path)], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn('%d checks' % len(lines), result.stdout)
+
+    def test_services_from_the_npc_or_its_class(self):
+        # OpenMW MWClass::Npc::getServices: an autocalculated NPC (FLAG 0x10) offers its class's services (CLDT
+        # 56..59), any other its own (AIDT 8..11); the engine reads the row's word (aw_dial.c AW_DialServices)
+        k = kinds()
+        k['NPC_']['fargoth'] = [(t, struct.pack('<HBBB3xI', 30, 10, 20, 0, D.SERVICE_TRAINING | 0x1) if t == 'AIDT'
+                                 else v) for t, v in k['NPC_']['fargoth']]
+        k['NPC_']['mage'] = [(t, struct.pack('<I', D.NPC_AUTOCALC) if t == 'FLAG' else v) for t, v in k['NPC_']['mage']]
+        k.setdefault('CLAS', {})['mage'] = [('NAME', b'Mage\0'), ('CLDT', bytes(56) + struct.pack(
+            '<I', D.SERVICE_SPELLS | D.SERVICE_SPELLMAKING))]
+        self.assertEqual(D.services_of(k, 'fargoth'), D.SERVICE_TRAINING | 0x1)
+        self.assertEqual(D.services_of(k, 'mage'), D.SERVICE_SPELLS | D.SERVICE_SPELLMAKING)
+        self.assertEqual(D.services_of(k, 'dunmer_m'), 0)
+        # a skill's governing attribute (SKIL SKDT), 255 for a skill the master lacks
+        k['SKIL'] = {10: [('INDX', struct.pack('<i', 10)), ('SKDT', struct.pack('<ii4f', 2, 1, 1, 1, 1, 1))]}
+        self.assertEqual(D.skill_attributes(k)[10], 2)
+        self.assertEqual(D.skill_attributes(k)[0], 255)
+        # the window's words: the master's GMST when it has one, else the fallback
+        k['GMST'] = dict(k.get('GMST', {}))
+        k['GMST']['sservicetrainingwords'] = [('NAME', b'sServiceTrainingWords\0'), ('STRV', b'Thou knowest it all.')]
+        raw, report = D.build(k, TOPICS, DIALS)
+        texts = D.read(raw)['ui_texts']
+        words = [n for n, _ in D.UI_TEXTS].index('sServiceTrainingWords')
+        self.assertEqual(texts[words], 'Thou knowest it all.')
+        self.assertEqual(texts[0], 'Persuasion')
+        self.assertNotIn('sServiceTrainingWords', report['ui_texts_missing'])
+        self.assertIn('sPersuasion', report['ui_texts_missing'])
+        services = D.read(raw)['services']
+        self.assertIn(D.SERVICE_TRAINING | 0x1, services)
+        self.assertIn(D.SERVICE_SPELLS | D.SERVICE_SPELLMAKING, services)
+        tmp = Path(self.tmp.name)
+        (tmp / 'services.lut').write_bytes(raw)
+        path = tmp / 'services.txt'
+        path.write_text(''.join('services\t%d\t%d\n' % (row, s) for row, s in enumerate(services)) +
+                        'services\t%d\t0\n' % len(services) +
+                        ''.join('uitext\t%d\t%s\n' % (i, s) for i, s in enumerate(texts)), encoding='cp1252')
+        result = subprocess.run([str(tmp / 'dial'), str(tmp / 'services.lut'), str(tmp / G.NAME), str(path)],
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_pre_change_table_is_refused_loudly(self):
+        # a version 1 table (before the service words) in this engine: refused with its version, nothing opened; and
+        # this module refuses it too (it never writes a table its own reader rejects: build() reads its output back)
+        raw = bytearray(self.raw)
+        npcs = len(D.read(bytes(raw))['services'])
+        old = raw[:len(raw) - 4 * npcs]
+        struct.pack_into('>H', old, 4, 1)
+        tmp = Path(self.tmp.name)
+        cases = (('v1.lut', bytes(old), 'version 1 wanted %d: another format version' % D.VERSION),
+                 ('v2-short.lut', bytes(raw[:-4 * npcs]), 'none'),          # the sections do not add up: AW_DialOpen
+                 ('cut.lut', bytes(raw[:D.HEADER - 1]), 'not a dialogue table'))
+        for name, data, want in cases:
+            (tmp / name).write_bytes(data)
+            result = subprocess.run([str(tmp / 'dial'), '--refusal', str(tmp / name)], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, name + result.stdout + result.stderr)
+            self.assertIn(want, result.stdout, name)
+            self.assertIn('refused', result.stdout, name)
+        with self.assertRaises(ValueError):
+            D.read(bytes(old))
+        engine = (ROOT / 'engine/aga/src/aw_dial.h').read_text(encoding='utf-8')
+        self.assertIn('#define AW_DIAL_VERSION %d ' % D.VERSION, engine)
+
+    def test_world_aggro_disposition_is_cheap(self):
+        # DIALOGUE-FIGHT-DISPOSITION-57: the world's aggro takes an NPC's derived disposition on every engage tick
+        # (about 1 s per actor) from facts cached once (aw_dialwin.c AW_DialNpcDisposition), never its conversation.
+        # The rule alone, natively and with the sanitizers on; the Pi measurement comes with an image.
+        path = Path(self.tmp.name) / 'bench.txt'
+        path.write_text('dispbench\t200000\tmages guild\tmages guild=2\n', encoding='cp1252')
+        result = subprocess.run([str(Path(self.tmp.name) / 'dial'), str(Path(self.tmp.name) / D.NAME),
+                                 str(Path(self.tmp.name) / G.NAME), str(path)], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        ns = float(re.search(r'dispbench \d+ calls ([\d.]+) ns', result.stdout).group(1))
+        print('\n' + result.stdout.strip().splitlines()[0])
+        self.assertLess(ns, 20000.0)     # 20 us: far above what is measured; catches a rule that starts reading files
 
 
 if __name__ == '__main__':

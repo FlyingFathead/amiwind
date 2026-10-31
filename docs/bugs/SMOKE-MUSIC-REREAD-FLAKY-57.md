@@ -2,10 +2,14 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 2 times; something has to be done
+## PERSISTING: reported 6 times; something has to be done
 
 - Reported with v0.0.57-dev4 at 2026-10-30 (time not recorded): Seen twice more on the alive branch: gate 4692 (dbg music off not confirmed) and gate 4698 (music not reading in seyda); the same engine passed the smoke in gates 4693 and 4697 on reruns, with three other gates running.
 - Reported with v0.0.57-dev4 at 2026-10-30 21:33 +0200: Gates 4838, 4842 and 4845 (worker v057-walk, engine-only and register changes): the smoke failed on the music reads (after dbg music on, or not reading in seyda: reads empty) and passed on the rerun of the same commit (4839, 4843, 4846).
+- Reported with v0.0.58-dev1 at 2026-10-31 (time not recorded): Gate 5037 (7a41518b, actor-table and save code only): music did not read again after dbg music on (reads 40 -> 40); rerun as gate 5038.
+- Reported with v0.0.58-dev1 at 2026-10-31 (time not recorded): Gate 5044 (543f900f, a merge of the dev line): music did not read again after dbg music on (reads 40 -> 40); rerun as gate 5045.
+- Reported with v0.0.58 at 2026-10-31 15:02 +0000: Gate 5092 (head 70baa6b5, branch v0.0.58-voices, docs, a builder pool size and a register status over integration/latest 3d9da4c1): every part passed except the smoke, 'music did not read again after dbg music on (reads 40 -> 40)'; nothing in the change touches the engine's music. Re-gated.
+- Reported with v0.0.58 at 2026-10-31 15:10 +0000: Gate 5093 (head 96f19656, branch v0.0.58-voices; no engine file differs from integration/latest 3d9da4c1, which passed gate 5015): every part passed except the smoke, this time 'music not reading in seyda (reads -> )', empty reads; the second smoke-only failure in a row on the same engine as 5092.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -33,7 +37,7 @@ _Last updated with AmiWind v0.0.57-dev5 (30 October 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [PERSISTING: reported 6 times; something has to be done](#persisting-reported-6-times-something-has-to-be-done)
 - [Status: 30 October 2026](#status-30-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -138,6 +142,7 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - [MWAD-TEXT-WRITER-LF-35](MWAD-TEXT-WRITER-LF-35.md): Some JSON and text writers do not pin LF and UTF-8
 - [OPS-GATE-UNLISTED-TESTS-36](OPS-GATE-UNLISTED-TESTS-36.md): The gate runs only the tests listed in the public file list, and nothing checked that every test file is listed
 - [PLAYTEST-SHIPPED-WITHOUT-SMOKE-36](PLAYTEST-SHIPPED-WITHOUT-SMOKE-36.md): The v0.0.36-dev3 private playtest package was published with an engine that dies on every map load: no ship step or gate booted it
+- PREGATE-GLOBAL-SHADOW-58 (no report page): Pregate C check misses global shadowing; the engine build fails on it
 - PREGATE-SYNTAX-SKIP-SILENT-57 (no report page): The pre-gate C syntax check skipped itself without failing on worktrees in the per-version folder layout
 - RELEASE-CONNECT-STEP-SKIPPED-53 (no report page): After v0.0.52 and v0.0.53 were published the release's connect-it-fully step was skipped: the pinned previous release and the size baseline stayed at v0.0.51
 - [RELEASE-INCLUSION-CHECK-LATE-48](RELEASE-INCLUSION-CHECK-LATE-48.md): The release guard does not check the CHIM inclusion ledger: the v0.0.48 kit stopped in its source step after the guard and the full suite had passed
@@ -183,5 +188,6 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - [TESTS-SUPERVISOR-START-CLOCK-46](TESTS-SUPERVISOR-START-CLOCK-46.md): A scheduler test sorted units by the clock each worker read, and failed when the host delayed a thread
 - [TOOLKIT-TEST-POINTERLOCK-31](TOOLKIT-TEST-POINTERLOCK-31.md): Inspector test left pointer lock set, breaking later drag checks
 - TOOLS-UNPINNED-WRITER-ATMOS-54 (no report page): tools/particle_emitters.py wrote JSON without pinned line endings
+- TRACKER-BUGS-PAGE-SIZE-58 (no report page): docs/BUGS.md lists every bug with its whole status, archived ones too, so the archive rotation cannot keep it under its size limit: it reached 95.06 % of 1 MiB
 
 <!-- END GENERATED CATEGORY -->

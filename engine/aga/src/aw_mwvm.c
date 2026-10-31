@@ -614,3 +614,64 @@ void AW_MwvmTick(float dt,const float player[3]){
     vm.stats.ops+=used;
     if((unsigned long)used>vm.stats.max_ops_frame)vm.stats.max_ops_frame=used;
 }
+/* A dialogue result script (DIALOGUE-COMPLETE-58): SCRIPT (a _dlg_N row of DRSC) runs once on the speaker's instance
+ * (REFERENCE, its SPEAKER script: the result reads and sets the speaker's locals, as the original runs it in the
+ * speaker's script context); a speaker not attached now runs on its parked locals (made if needed) through a
+ * scratch instance; no speaker script: no locals. 1 ran. */
+int AW_MwvmRunDialogue(int script,uint32_t reference,int speaker){
+    int k,n,ok;parked_t *p=NULL;aw_mwvm_instance_t *in;
+    if(!ON || script<0 || script>=vm.nscrp)return 0;
+    for(k=0;k<vm.ninst;k++){
+        in=&vm.inst[k];
+        if((in->flags&(AWI_USED|AWI_GLOBAL))==AWI_USED && reference && in->reference==reference &&
+           (int)in->script==speaker){
+            in->script=(uint16_t)script;ok=1;run(k);in->script=(uint16_t)speaker;vm.stats.dialogue_runs++;
+            return ok;
+        }
+    }
+    n=nlocals(script);
+    if(speaker>=0 && speaker<vm.nscrp && reference)p=park_slot(reference,speaker);
+    if(vm.high-n<vm.low || (k=new_instance())<0)return 0;
+    vm.high-=n;in=&vm.inst[k];
+    in->script=(uint16_t)script;in->flags=AWI_USED|AWI_GLOBAL;in->reference=reference;in->locals=vm.high;in->last_run=vm.now;
+    if(p && p->count>=n)memcpy(&vm.cells[vm.high],&vm.park[p->at],n*sizeof(aw_mwcell_t));
+    else memset(&vm.cells[vm.high],0,n*sizeof(aw_mwcell_t));
+    run(k);
+    if(p && p->count>=n)memcpy(&vm.park[p->at],&vm.cells[vm.high],n*sizeof(aw_mwcell_t));
+    vm.high+=n;in->flags=0;
+    while(vm.ninst>0 && !(vm.inst[vm.ninst-1].flags&AWI_USED))vm.ninst--;
+    vm.stats.dialogue_runs++;
+    return 1;
+}
+uint32_t AW_MwvmTextHash(const char *text,int length){
+    uint32_t h=0x811C9DC5u;int i;
+    for(i=0;i<length;i++){h^=(unsigned char)text[i];h*=0x01000193u;}
+    return h;
+}
+/* The DRSC row of a result text (its HASH and LENGTH; the section on disk read through READ at file offsets): of the
+ * rows for the text, the one compiled with SPEAKER (the speaker's attached script, -1 none) or, failing that, the
+ * first; its script, ROW_SPEAKER (the script whose locals it was compiled with, -1 none) and BROKEN. -1 none. */
+int AW_MwvmFindDialogue(int (*read)(void *user,uint32_t offset,void *out,uint32_t bytes),void *user,uint32_t hash,
+                        int length,int speaker,int *row_speaker,int *broken){
+    uint32_t off,rows,bytes,lo=0,hi,mid;unsigned char r[12];int i,chosen=-1,want=length>0xFFFF?0xFFFF:length;
+    *row_speaker=-1;*broken=0;
+    if(!read || !AW_MwvmSection("DRSC",&off,&rows,&bytes) || !rows)return -1;
+    hi=rows;
+    while(lo<hi){   /* the first row at or after (hash, length) */
+        uint32_t h;int n;
+        mid=(lo+hi)/2;
+        if(!read(user,off+12u*mid,r,12))return -1;
+        h=u32(r);n=(int)U16(r+4);
+        if(h<hash || (h==hash && n<want))lo=mid+1;else hi=mid;
+    }
+    for(i=(int)lo;(uint32_t)i<rows;i++){
+        int sp,script;
+        if(!read(user,off+12u*(uint32_t)i,r,12) || u32(r)!=hash || (int)U16(r+4)!=want)break;
+        sp=(int)U16(r+6);script=(int)U16(r+8);
+        if(chosen<0 || sp==speaker || (sp==0xFFFF && speaker<0)){
+            chosen=script;*row_speaker=sp==0xFFFF?-1:sp;*broken=U16(r+10)&1;
+            if(sp==speaker)break;
+        }
+    }
+    return chosen;
+}

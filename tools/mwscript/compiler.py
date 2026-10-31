@@ -3,7 +3,7 @@
 from collections import Counter
 
 from .codegen import (Program, ScriptCompiler, CompileError, SCRIPT_BROKEN, SCRIPT_START, SCRIPT_GLOBAL,
-                      SCRIPT_HANDWRITTEN, SCRIPT_INERT, EFFECT_OPS, effect_op)  # noqa: F401 (EFFECT_OPS: callers)
+                      SCRIPT_HANDWRITTEN, SCRIPT_INERT, SCRIPT_DIALOGUE, EFFECT_OPS, effect_op)  # noqa: F401 (EFFECT_OPS: callers)
 from .functions import lookup
 from .lexer import LexError
 from .parser import Parser, ParseError
@@ -79,6 +79,8 @@ def compile_program(data, media=None, scripts=None, handwritten=None, rooms=None
         if c.error is not None:
             c.code, c.flags, c.calls, c.max_depth, c.ops = b'\x00', SCRIPT_BROKEN, list(p.used), 0, [(0, 'END')]
             c.notyet = [n for n in p.used if not lookup(n).run]
+        if row.get('dialogue'):
+            c.flags |= SCRIPT_DIALOGUE
         if ident in starts:
             c.flags |= SCRIPT_START
         if any(fnmatchcase(ident, p) for p in patterns):

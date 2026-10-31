@@ -111,12 +111,33 @@ v0.0.57, "Remembering The Emperor", dedicated to the memory of Sir Patrick Stewa
 snapshot with the first conversations added: the dialogue window with the game's own answers and the disposition bar,
 people and creatures that wander, walk, run and attack by their own records, every resident animated, guards' torches
 at night, 957 of the game's 1,207 scripts running whole, the fog at 300 by default with the sky fading into it, and
-lighter heavy models ([release notes](releases/notes/RELEASE-v0.0.57.md)). Everything else planned for v0.0.57 moves
-to v0.0.58 as it stands, the save import below included: first the rest of the conversation (links in the text,
-persuasion, services, disposition starting fights, result scripts and choices, every quest's journal), characters and
-creatures placed by scripts through one shared spawn, more weapons, lighter large interiors (Ald'ruhn's Manor District
-by the Vivec Arena Pit's method: its room models as tiles), and the rooms that still load in on arrival. The build from
-scratch of the line, skipped for the release again, runs right after it.
+lighter heavy models ([release notes](releases/notes/RELEASE-v0.0.57.md)). The whole game was also built from scratch,
+nothing reused, and every game file came out identical to the release image.
+
+**v0.0.58, "Time To Talk": the conversation and the character.** Everything else planned moves to v0.0.59 as it
+stands, so this version stays small enough to finish:
+
+- **The conversation, complete,** against the original and OpenMW 0.51, with a tracker page that shows every part
+  and its proof: links in the text, persuasion (admire, intimidate, taunt, bribe), disposition that can start a fight,
+  the services (travel, training, spells, barter, repair, spellmaking, enchanting), result scripts and choices, every
+  quest's journal, and the conditions reading the game's live state.
+- **Levelling with the original's level-up box** (below).
+- **Character creation at the Census Office as in the original:** the class, the birthsign, the review sheet, and the
+  race's own numbers on the race screen.
+- **The box you see when you aim at something** within the game's own reach (name, and for items weight and value),
+  tried first on the Census Office's own items and its dagger.
+- **A performance history:** every build records its boot time, load times and the standard Halloween benchmark, on
+  the build machine and on a Raspberry Pi 4 running Amiberry, in one table per version.
+- **Every voice and sound in place, and heard:** each character's voice lines (greetings, hellos, idle remarks, the
+  lines for thieves and intruders, and in fights the attack, hit, flee and alarm lines, pain and taunts), every
+  creature's own sounds, and the combat sounds as the original plays them (the swing, the armour piece struck, blocks,
+  punches, critical strikes, bows and spells), on by default. A tracker page shows each kind of sound and its proof;
+  two Orcs whose names carry accented letters get their voices and their conversations back.
+- Riding along: the area sounds and Morrowind's own mouse cursor (below).
+
+Moved to v0.0.59: characters and creatures placed by scripts through one shared spawn, more weapons, lighter large
+interiors (Ald'ruhn's Manor District as tiles), the rooms that still load in on arrival, saves that keep everything,
+the save import, the original-style map, weather by region, moving gates and trapdoors, and the rest of the list.
 
 New for v0.0.58 (31 October 2026):
 

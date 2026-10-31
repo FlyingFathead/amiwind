@@ -315,10 +315,25 @@ sfx_t *S_FindName (char *name)
 
 	if (num_sfx == MAX_SFX)
 	{
-		static qboolean warned;
-		if (!warned)
-			Con_Printf ("Sound table full (%d names): new sounds are not played\n", MAX_SFX);
-		warned = true;
+		/* AUDIO-SFX-NAME-TABLE-FULL-58: the table is never emptied in a session, so
+		 * once MAX_SFX different sounds have played a new one would be refused. Reuse
+		 * the name slot of a sound nothing holds any more: its cached data freed, no
+		 * channel playing it, not a level precache, not kept (S_KeepSound). Slots are
+		 * tried oldest name first (a cursor that goes round the table). */
+		static int cursor;
+		int n;
+		for (n = 0 ; n < MAX_SFX ; n++)
+		{
+			sfx = &known_sfx[(cursor + n) % MAX_SFX];
+			if (S_SfxFree (sfx))
+			{
+				cursor = (int)(sfx - known_sfx + 1) % MAX_SFX;
+				memset (sfx, 0, sizeof(*sfx));
+				strcpy (sfx->name, name);
+				return sfx;
+			}
+		}
+		Con_Printf ("Sound table full (%d names, none free): %s is not played\n", MAX_SFX, name);
 		return NULL;
 	}
 
@@ -328,6 +343,30 @@ sfx_t *S_FindName (char *name)
 	num_sfx++;
 
 	return sfx;
+}
+
+/* S_KeepSound: a holder that keeps the pointer past the current sound (the
+ * temp-entity sounds, the spell effects, the ambients) marks it, so its name
+ * slot is never handed to another sound. */
+void S_KeepSound (sfx_t *sfx)
+{
+	if (sfx)
+		sfx->keep = 1;
+}
+
+/* A name slot another sound may take: nothing points at it any more. */
+qboolean S_SfxFree (sfx_t *sfx)
+{
+	int i;
+	if (sfx->keep || Cache_Check (&sfx->cache))
+		return false;
+	for (i = 0 ; i < total_channels ; i++)
+		if (channels[i].sfx == sfx)
+			return false;
+	for (i = 0 ; i < MAX_SOUNDS ; i++)
+		if (cl.sound_precache[i] == sfx)
+			return false;
+	return true;
 }
 
 
@@ -557,7 +596,10 @@ void S_StartSound(int entnum, int entchannel, sfx_t *sfx, vec3_t origin, float f
 void S_StopSound(int entnum, int entchannel)
 {
 	int i;
-    AW_SpeechStop(entnum,entchannel);
+	/* -1 means "every voice" to AW_SpeechStop: a sound of no entity has none (AUDIO-MAGIC-STOPS-SPEECH-54) */
+	if (entnum >= 0) {
+		AW_SpeechStop(entnum,entchannel);
+	}
 
 	for (i=NUM_AMBIENTS ; i<NUM_AMBIENTS + MAX_DYNAMIC_CHANNELS ; i++)
 	{
@@ -1210,6 +1252,21 @@ void S_LocalSound (char *sound)
 		return;
 	}
 	S_StartSound (cl.viewentity, -1, sfx, vec3_origin, 1, 1);
+}
+
+/* S_LocalSoundBeside: a local sound that plays BESIDE the others (AUDIO-LOCAL-SOUND-CUTS-58). S_LocalSound's
+ * entity channel -1 replaces every sound of the view entity, so the swish, the armour struck and Health Damage of
+ * one blow cut each other and only the last was heard. Channel 0 never replaces: it takes a free dynamic channel,
+ * else the one nearest its end (of the 8, MAX_DYNAMIC_CHANNELS). */
+void S_LocalSoundBeside (char *sound)
+{
+	sfx_t	*sfx;
+
+	if (nosound.value || !sound_started)
+		return;
+	sfx = S_PrecacheSound (sound);
+	if (sfx)
+		S_StartSound (cl.viewentity, 0, sfx, vec3_origin, 1, 1);
 }
 
 

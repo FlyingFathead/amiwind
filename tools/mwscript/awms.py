@@ -22,10 +22,12 @@
                             i16 cell y i32 x y z (game units)
   STRT  2 bytes a start script: u16 script
   STRS  u32 offset per string, then the NUL-ended strings (cp1252)
-  OACT, ACTB, AINV, AITM, ASPT, ASPL: the actor table (actors.py; docs/ACTOR_STATE.md)
+  OACT, ACTB, AINV, AITM, ASPT, ASPL, ASPC, ASPE, AEFF, AMGE: the actor table (actors.py; docs/ACTOR_STATE.md)
   PCEL  the cells each GetPCCell name matches (resident; pccell_section below)
   PMOV  20 bytes a move of the player (PositionCell; resident; written in write() below)
   TOPC  2 bytes a dialogue topic (DIAL type 0), sorted by folded id: u16 name (on disk; AddTopic hands the row)
+  DRSC  12 bytes a dialogue result script, sorted: u32 FNV-1a of its text, u16 length, u16 speaker script, u16 its
+        compiled script (_dlg_N), u16 flags (1 did not compile); on disk
 
 A pool name is the 8 bytes of a converted file's name in the media catalogue: sound/pool/a<16 hex>.wav.
 """
@@ -37,10 +39,10 @@ MAGIC = b'AWMS'
 VERSION = 1
 TYPES = {'s': 0, 'l': 1, 'f': 2}
 ORDER = ('CONF', 'GLOB', 'JRNL', 'SNDS', 'VOIC', 'MUSI', 'OBJS', 'SCRP', 'STRT', 'OACT', 'PCEL', 'PMOV', 'SPFX', 'CODE', 'BIND', 'STRS',
-         'ACTB', 'AINV', 'AITM', 'ASPT', 'ASPL', 'TOPC')
+         'ACTB', 'AINV', 'AITM', 'ASPT', 'ASPL', 'TOPC', 'ASPC', 'ASPE', 'AEFF', 'AMGE', 'DRSC')
 # The actor sections (actors.py, docs/ACTOR_STATE.md): OACT is resident (a script's target -> its actor row); the
 # others stay on disk and are read a row at a time by the engine's actor state (aw_actorstate.c).
-ACTOR_SECTIONS = ('OACT', 'ACTB', 'AINV', 'AITM', 'ASPT', 'ASPL')
+ACTOR_SECTIONS = ('OACT', 'ACTB', 'AINV', 'AITM', 'ASPT', 'ASPL', 'ASPC', 'ASPE', 'AEFF', 'AMGE')
 DEFAULT_CONF = {'range_units': 12288, 'ops_per_frame': 4000, 'ops_per_run': 2000}
 RESIDENT = ORDER[:ORDER.index('BIND')]
 
@@ -145,6 +147,17 @@ def write(program, compiled, binds, conf=None):
     topics = sorted(rows(), key=rows().get) if rows else []
     names = getattr(p.data, 'topics', {})
     topc = (b''.join(struct.pack('>H', p.string(names[k])) for k in topics), len(topics))
+    # DRSC (v0.0.58, DIALOGUE-COMPLETE-58): the dialogue's result scripts, 12 bytes a row sorted by (hash, length,
+    # speaker script): u32 FNV-1a of the result text, u16 its length, u16 the speaker's script (0xFFFF none), u16 the
+    # compiled _dlg_N script, u16 flags (1: did not compile); on disk, read when an answer is shown
+    drsc_rows = []
+    for r in getattr(p, 'results', []):
+        sp = p.scripts.index.get(r['speaker_script'], 0xFFFF) if r['speaker_script'] else 0xFFFF
+        index = p.scripts.index[r['script']]
+        broken = 1 if compiled[index].error is not None else 0
+        drsc_rows.append((r['hash'], min(0xFFFF, r['length']), sp, index, broken))
+    drsc_rows.sort()
+    drsc = (b''.join(struct.pack('>IHHHH', *r) for r in drsc_rows), len(drsc_rows))
     blob = bytearray()
     offsets = []
     for s in p.strings.rows:
@@ -155,7 +168,8 @@ def write(program, compiled, binds, conf=None):
                 'SNDS': (snds, len(p.sounds)), 'VOIC': (voic, len(p.voices)), 'MUSI': (musi, len(p.music)),
                 'OBJS': (objs, len(p.objects)), 'SCRP': (bytes(scrp), len(compiled)),
                 'CODE': (bytes(code), len(compiled)), 'BIND': (bytes(bind), len(binds)),
-                'STRT': (strt, len(strt) // 2), 'PCEL': pcel, 'PMOV': pmov, 'TOPC': topc, 'SPFX': spfx}
+                'STRT': (strt, len(strt) // 2), 'PCEL': pcel, 'PMOV': pmov, 'TOPC': topc, 'SPFX': spfx,
+                'DRSC': drsc}
     actors = getattr(p, 'actors', None)
     if actors is not None:
         sections.update(actors.sections(p.objects.rows))

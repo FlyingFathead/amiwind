@@ -38,7 +38,7 @@ for _p in (ROOT / 'tools', ROOT / 'src'):
 import greeting_lut as G  # noqa: E402  (the voice table: NPC order, condition opcodes, strings)
 
 MAGIC = b'AWDL'
-VERSION = 1
+VERSION = 2                      # 2: the NPCs' service words, the last section (aw_dial.h AW_DIAL_VERSION)
 NAME = 'dialogue.lut'
 HEADER = 96
 # after the magic: version, functions; then the counts of topics, npcs, row bytes, list sets, list set items, lists,
@@ -52,7 +52,13 @@ LOCAL_FLOAT = 0x4000             # a Local / NotLocal operand: the slot in the s
 # of OpenMW's MechanicsManager::getDerivedDisposition, our own code), from the master's GMST records (0 when absent,
 # listed in the report)
 SETTINGS = ('fDispRaceMod', 'fDispPersonalityMult', 'fDispPersonalityBase', 'fDispFactionRankMult',
-            'fDispFactionRankBase', 'fDispFactionMod', 'fDispCrimeMod', 'fDispDiseaseMod', 'fDispWeaponDrawn')
+            'fDispFactionRankBase', 'fDispFactionMod', 'fDispCrimeMod', 'fDispDiseaseMod', 'fDispWeaponDrawn',
+            # persuasion (OpenMW MechanicsManager::getPersuasionDispositionChange and getPersuasionRatings)
+            'fPersonalityMod', 'fLuckMod', 'fReputationMod', 'fLevelMod', 'fBribe10Mod', 'fBribe100Mod',
+            'fBribe1000Mod', 'iPerMinChance', 'iPerMinChange', 'fPerDieRollMult', 'fPerTempMult', 'fFatigueBase',
+            'fFatigueMult', 'iTrainingMod', 'fSpellValueMult', 'fRepairMult', 'fEffectCostMult', 'fSpellMakingValueMult',
+            'fEnchantmentValueMult', 'fEnchantmentChanceMult', 'fEnchantmentConstantChanceMult',
+            'fEnchantmentConstantDurationMult', 'fEnchantmentMult', 'iSoulAmountForConstantEffect')
 FACTION_ID = 32                  # a faction row: its folded id, NUL padded
 
 
@@ -61,9 +67,12 @@ def settings_of(kinds):
     from mwad.esm import first
     values, missing = [], []
     for name in SETTINGS:
-        raw = first(kinds.get('GMST', {}).get(name.casefold(), []), 'FLTV')
+        record = kinds.get('GMST', {}).get(name.casefold(), [])
+        raw, whole = first(record, 'FLTV'), first(record, 'INTV')
         if len(raw) == 4:
             values.append(struct.unpack('<f', raw)[0])
+        elif len(whole) == 4:                                   # an i-setting: its whole number, kept as a float
+            values.append(float(struct.unpack('<i', whole)[0]))
         else:
             values.append(0.0)
             missing.append(name)
@@ -120,6 +129,8 @@ def start_topics(topics, names):
     return sorted(names.index(n) for n in found if n in names)
 TOPIC_ROW = '>IBBH'              # topic name offset (topic strings), name length, kind, 0
 ENTRY_ROW = '>IIIIHBB'           # text, first condition, script, first link (NONE32 none), links, conditions, flags
+LINK_ROW = '>HHH'                # a link span in the shown text: offset, length, topic (span_finder)
+LINK_BYTES = 6
 LIST_ROW = '>IHH'                # first item, items, 0 (list sets and lists)
 QUEST_ROW = '>IIHH'              # quest id (topic strings), first journal entry, entries, 0
 JOURNAL_ROW = '>HBBI'            # index, flags, 0, text offset
@@ -271,6 +282,74 @@ def link_finder(display):
     return find
 
 
+EXPLICIT_LINK = re.compile(r'@([^@#]*)#')     # brute-force tests: the markers stripped
+WORD_SEPARATORS = '\n\r \t\'"(['                # a link starts at a segment's start or after one of these
+PSEUDO_ASTERISK = '\x7f'
+
+
+def _lower(text):
+    """ASCII lower case, one character for one (the offsets stay the text's)."""
+    return ''.join(chr(ord(c) + 32) if 'A' <= c <= 'Z' else c for c in text)
+
+
+def span_finder(display):
+    """A function text -> (shown text, [(offset, length, topic index)]): the rule of OpenMW's hypertext parsing and
+    keyword search (apps/openmw/mwdialogue/keywordsearch.cpp; the reference and the test oracle, our own code):
+    - an explicit link '@name#' (the next '#' after an '@') is shown as its name, trailing pseudo-asterisks dropped, and
+      links that topic when the name is one;
+    - the text between explicit links is searched for every topic name (case-insensitive) that starts at the
+      segment's start or after a word separator (newline, space, tab, quotes, '(' or '['); nothing is checked at the
+      name's end;
+    - overlapping names: repeatedly the longest of the first run of overlapping matches is kept and those overlapping
+      it are dropped.
+    Offsets and lengths count the shown text's characters."""
+    names = {}
+    for t, n in enumerate(display):
+        if n:
+            names.setdefault(_lower(n), t)
+    lengths = sorted({len(n) for n in names})
+
+    def highlight(segment, base, out):
+        low = _lower(segment)
+        matches = []
+        for i in range(len(segment)):
+            if i and segment[i - 1] not in WORD_SEPARATORS:
+                continue
+            for n in lengths:
+                if i + n <= len(segment) and low[i:i + n] in names:
+                    matches.append((i, i + n, names[low[i:i + n]]))
+        found = []
+        while matches:
+            longest = 0
+            for k in range(len(matches)):
+                if matches[k][1] - matches[k][0] > matches[longest][1] - matches[longest][0]:
+                    longest = k
+                if k + 1 == len(matches) or matches[k][1] <= matches[k + 1][0]:
+                    break
+            keep = matches.pop(longest)
+            found.append(keep)
+            matches = [m for m in matches if not (m[0] < keep[1] and m[1] > keep[0])]
+        out += [(base + b, e - b, t) for b, e, t in sorted(found)]
+
+    def find(line):
+        shown, spans, at = '', [], 0
+        while True:
+            begin = line.find('@', at)
+            end = line.find('#', begin) if begin >= 0 else -1
+            if begin < 0 or end < 0:
+                highlight(line[at:], len(shown), spans)
+                shown += line[at:]
+                return shown, spans
+            highlight(line[at:begin], len(shown), spans)
+            shown += line[at:begin]
+            word = line[begin + 1:end].rstrip(PSEUDO_ASTERISK)
+            if _lower(word) in names:
+                spans.append((len(shown), len(word), names[_lower(word)]))
+            shown += word
+            at = end + 1
+    return find
+
+
 def journal(topics, dials):
     """[(quest id, [(index, flags, text)])] of the Journal DIALs, quests sorted by the folded id's bytes, entries
     sorted by index (flags: QUEST_NAME, QUEST_FINISHED, QUEST_RESTART)."""
@@ -292,6 +371,107 @@ def journal(topics, dials):
 
 # ---- the table
 
+# The services an NPC offers (OpenMW ESM::NPC service bits and MWClass::Npc::getServices): an autocalculated NPC (FLAG
+# 0x10) offers its class's (CLDT bytes 56..59), any other its own (AIDT bytes 8..11). Read by the window once, when a
+# conversation opens (the last section, one word per NPC).
+SERVICE_BARTER = 0x00001 | 0x00002 | 0x00004 | 0x00008 | 0x00010 | 0x00020 | 0x00040 | 0x00080 | 0x00100 | \
+    0x00200 | 0x00400 | 0x01000 | 0x02000          # AllItems
+SERVICE_SPELLS, SERVICE_TRAINING, SERVICE_SPELLMAKING, SERVICE_ENCHANTING, SERVICE_REPAIR = \
+    0x00800, 0x04000, 0x08000, 0x10000, 0x20000
+NPC_AUTOCALC = 0x10
+
+
+SKILLS = 27
+
+# The words the dialogue window shows that are the game's own (GMST STRV), copied into the table (the last section, a
+# fixed UI_TEXT bytes each, read when a conversation opens); the fallback only when the master has none. Order: the
+# engine's AW_DIAL_TEXT_* (aw_dial.h).
+UI_TEXT = 48
+UI_TEXTS = (('sPersuasion', 'Persuasion'), ('sAdmire', 'Admire'), ('sIntimidate', 'Intimidate'), ('sTaunt', 'Taunt'),
+            ('sBribe 10 Gold', 'Bribe 10 Gold'), ('sBribe 100 Gold', 'Bribe 100 Gold'),
+            ('sBribe 1000 Gold', 'Bribe 1000 Gold'), ('sBack', 'Back'), ('sBarter', 'Barter'), ('sSpells', 'Spells'),
+            ('sTravel', 'Travel'), ('sSpellmakingMenuTitle', 'Spellmaking'), ('sEnchanting', 'Enchanting'),
+            ('sServiceTrainingTitle', 'Training'), ('sRepair', 'Repair'), ('sGoodbye', 'Goodbye'), ('sgp', 'gp'),
+            ('sServiceTrainingWords', 'I cannot teach you any more of that.'),
+            ('sNotifyMessage17', 'You cannot train a skill above its governing attribute.'), ('sBuy', 'Buy'),
+            ('sSell', 'Sell'), ('sMagnitude', 'Magnitude'), ('sDuration', 'Duration'), ('sArea', 'Area'),
+            ('sRange', 'Range'), ('sRangeSelf', 'Self'), ('sRangeTouch', 'Touch'), ('sRangeTarget', 'Target'),
+            ('sNotifyMessage30', 'You have to add at least one effect to a spell.'),
+            ('sNotifyMessage10', 'You have to name the spell before buying it.'),
+            ('sEnchantmentMenu8', 'You cannot buy a spell that has a zero point cost.'),
+            ('sNotifyMessage18', 'You do not have enough gold to buy this spell.'), ('sName', 'Name'),
+            ('sEffects', 'Effects'), ('sCreate', 'Create'), ('sfeet', 'ft'), ('sseconds', 'secs'), ('spoints', 'pts'),
+            ('sEnchantmentMenu4', 'Point Cost'),
+            ('sEnchantmentMenu11', 'You must add at least one effect to an enchantment'),
+            ('sNotifyMessage52', 'You must have a soul gem with a soul to make an Enchanted Item'),
+            ('sNotifyMessage11', 'You have to have an item to enchant.'),
+            ('sNotifyMessage29', 'You cannot add more enchantment to an object than it can hold.'),
+            ('sItemCastOnce', 'Cast Once'), ('sItemCastWhenStrikes', 'Cast When Strikes'),
+            ('sItemCastWhenUsed', 'Cast When Used'), ('sItemCastConstant', 'Constant Effect'), ('sCastCost', 'Cast Cost'),
+            ('sEnchantmentMenu12', 'You have successfully created an enchanted item'), ('sItem', 'Item'),
+            ('sSoulGem', 'Soul'), ('sEnchantmentMenu6', 'Chance')) + tuple(
+    ('sSkill' + n, s) for n, s in (
+        ('Block', 'Block'), ('Armorer', 'Armorer'), ('Mediumarmor', 'Medium Armor'), ('Heavyarmor', 'Heavy Armor'),
+        ('Bluntweapon', 'Blunt Weapon'), ('Longblade', 'Long Blade'), ('Axe', 'Axe'), ('Spear', 'Spear'),
+        ('Athletics', 'Athletics'), ('Enchant', 'Enchant'), ('Destruction', 'Destruction'),
+        ('Alteration', 'Alteration'), ('Illusion', 'Illusion'), ('Conjuration', 'Conjuration'),
+        ('Mysticism', 'Mysticism'), ('Restoration', 'Restoration'), ('Alchemy', 'Alchemy'),
+        ('Unarmored', 'Unarmored'), ('Security', 'Security'), ('Sneak', 'Sneak'), ('Acrobatics', 'Acrobatics'),
+        ('Lightarmor', 'Light Armor'), ('Shortblade', 'Short Blade'), ('Marksman', 'Marksman'),
+        ('Mercantile', 'Mercantile'), ('Speechcraft', 'Speechcraft'), ('Handtohand', 'Hand-to-hand')))
+
+
+def ui_texts_of(kinds):
+    """([text per UI_TEXTS], [GMST names the master lacks]): each the master's STRV, else the fallback; cp1252, cut to
+    fit UI_TEXT bytes with its NUL."""
+    from mwad.esm import first
+    out, missing = [], []
+    for name, fallback in UI_TEXTS:
+        raw = first(kinds.get('GMST', {}).get(name.casefold(), []), 'STRV').rstrip(b'\0')
+        if not raw:
+            missing.append(name)
+            raw = fallback.encode('cp1252')
+        out.append(raw[:UI_TEXT - 1].decode('cp1252', 'replace'))
+    return out, missing
+
+
+def skill_records(path):
+    """{skill index: fields} of the master's SKIL records (keyed by INDX: they have no NAME)."""
+    from mwad.esm import first, records, subrecords
+    out = {}
+    for tag, _flags, raw in records(Path(path).read_bytes()):
+        if tag == 'SKIL':
+            fields = list(subrecords(raw))
+            index = first(fields, 'INDX')
+            if len(index) == 4:
+                out[struct.unpack('<i', index)[0]] = fields
+    return out
+
+
+def skill_attributes(kinds):
+    """[governing attribute index per skill 0..26] (SKIL SKDT bytes 0..3; 255 when the master has none): the
+    attribute a skill cannot be trained past (OpenMW TrainingWindow::onTrainingSelected)."""
+    from mwad.esm import first
+    out = []
+    for i in range(SKILLS):
+        data = first(kinds.get('SKIL', {}).get(i, []), 'SKDT')
+        value = struct.unpack_from('<i', data, 0)[0] if len(data) >= 4 else -1
+        out.append(value if 0 <= value < 8 else 255)
+    return out
+
+
+def services_of(kinds, ident):
+    from mwad.esm import first
+    npc = kinds.get('NPC_', {}).get(ident, [])
+    flag = first(npc, 'FLAG')
+    if len(flag) == 4 and struct.unpack('<I', flag)[0] & NPC_AUTOCALC:
+        cls = kinds.get('CLAS', {}).get(first(npc, 'CNAM').rstrip(b'\0').decode('cp1252', 'replace').casefold(), [])
+        data = first(cls, 'CLDT')
+        return struct.unpack_from('<I', data, 56)[0] if len(data) >= 60 else 0
+    aidt = first(npc, 'AIDT')
+    return struct.unpack_from('<I', aidt, 8)[0] if len(aidt) >= 12 else 0
+
+
 def tables(kinds, topics, dials, names, masks, order):
     """The deduplicated tables of masks {(topic, info, runtime): audience mask over ORDER}."""
     from mwad.dialogue import FUNCTIONS, globals_of
@@ -300,7 +480,7 @@ def tables(kinds, topics, dials, names, masks, order):
     name_ids, globals_, conds = {}, {}, []
     glob_values = kinds.get('_globals') or globals_of(kinds)
     display = [dials[n][0] if dials[n][1] == KIND_TOPIC else None for n in names]
-    links_of = link_finder(display)
+    spans_of = span_finder(display)
 
     def name_index(value):
         if value not in name_ids:
@@ -363,7 +543,9 @@ def tables(kinds, topics, dials, names, masks, order):
             raise ValueError('More than 255 run-time conditions in one INFO')
         first = len(conds)
         conds += [condition(*c) for c in runtime]
-        found = links_of(line) if line else []
+        line, found = spans_of(line) if line else ('', [])
+        if any(s + n > 0xFFFF for s, n, _ in found):
+            raise ValueError('A link past 64 KB of text')
         entries.append(struct.pack(ENTRY_ROW, texts.add(line) if line else NONE32, first,
                                    scripts.add(script) if script.strip() else NONE32,
                                    len(links) if found else NONE32, len(found), len(runtime),
@@ -411,6 +593,8 @@ def tables(kinds, topics, dials, names, masks, order):
         journal_rows += [struct.pack(JOURNAL_ROW, index, flags, 0, texts.add(line) if line else NONE32)
                          for index, flags, line in items]
     return {'topics': topic_rows, 'offsets': offsets, 'rows': bytes(rows), 'listsets': listset_rows,
+            'services': [services_of(kinds, i) for i in order], 'skill_attributes': skill_attributes(kinds),
+            'ui_texts': ui_texts_of(kinds)[0],
             'listset_items': listset_items, 'lists': list_rows, 'list_items': list_items, 'entries': entries,
             'conds': conds, 'links': links, 'quests': quests, 'journal': journal_rows,
             'globals': [struct.pack('>If', strings.add(g), float(glob_values.get(g, 0.)))
@@ -465,14 +649,18 @@ def sections(t):
         ('lists', b''.join(t['lists']) + b''.join(struct.pack('>I', x) for x in t['list_items']), ON_DISK),
         ('entries', b''.join(t['entries']), ON_DISK),
         ('conds', b''.join(t['conds']), ON_DISK),
-        ('links', _pad(b''.join(struct.pack('>H', x) for x in t['links'])), ON_DISK),
+        ('links', _pad(b''.join(struct.pack(LINK_ROW, *x) for x in t['links'])), ON_DISK),
         ('quests', b''.join(t['quests']), ON_DISK),
         ('journal', b''.join(t['journal']), ON_DISK),
         ('rank_names', b''.join(n.encode('cp1252', 'replace')[:FACTION_ID - 1].ljust(FACTION_ID, b'\0')
                                 for names in t['rank_names'] for n in names), ON_DISK),
         ('topic_strings', _pad(t['tstrings']), ON_DISK),
         ('scripts', _pad(t['scripts']), ON_DISK),
-        ('texts', t['texts'], ON_DISK)]
+        ('texts', t['texts'], ON_DISK),
+        ('services', b''.join(struct.pack('>I', s) for s in t['services']), ON_DISK),
+        ('skill_attributes', _pad(bytes(t['skill_attributes'])), ON_DISK),
+        ('ui_texts', b''.join(s.encode('cp1252', 'replace')[:UI_TEXT - 1].ljust(UI_TEXT, b'\0')
+                              for s in t['ui_texts']), ON_DISK)]
 
 
 def pack(t):
@@ -517,16 +705,20 @@ def read(raw):
     listset_raw, listset_item_raw = take(8 * listsets), take(4 * listset_items)
     list_raw, list_item_raw = take(8 * lists), take(4 * list_items)
     entry_raw, cond_raw = take(20 * entries), take(8 * conds)
-    link_raw = take(len(_pad(bytes(2 * links))))
+    link_raw = take(len(_pad(bytes(LINK_BYTES * links))))
     quest_raw, journal_raw = take(12 * quests), take(8 * journal_n)
     rank_raw = take(FACTION_ID * RANKS * nfactions)
     tstrings, scripts, texts = take(tstring_bytes), take(script_bytes), take(text_bytes)
+    services = list(struct.unpack('>%dI' % npcs, take(4 * npcs)))
+    skill_attributes = list(take(len(_pad(bytes(SKILLS))))[:SKILLS])
+    ui_texts = [take(UI_TEXT).rstrip(b'\0').decode('cp1252') for _ in UI_TEXTS]
     if at != len(raw):
         raise ValueError('AWDL size mismatch')
 
     def s(offset, block):
         return None if offset == NONE32 else block[offset:block.index(b'\0', offset)].decode('cp1252')
     out = {'resident_bytes': resident, 'conversation_bytes': conversation, 'bytes': len(raw), 'order_sha': order_sha,
+           'services': services, 'skill_attributes': skill_attributes, 'ui_texts': ui_texts,
            'info_refusal': None if info_refusal == NONE16 else info_refusal, 'start': start,
            'settings': settings, 'factions': faction_ids, 'reactions': reactions,
            'rank_names': [[rank_raw[(f * RANKS + r) * FACTION_ID:(f * RANKS + r + 1) * FACTION_ID].rstrip(b'\0')
@@ -541,7 +733,7 @@ def read(raw):
            'list_items': list(struct.unpack('>%dI' % list_items, list_item_raw)),
            'entries': list(struct.iter_unpack(ENTRY_ROW, entry_raw)),
            'conds': [struct.unpack_from('>BBHi', cond_raw, i) for i in range(0, len(cond_raw), 8)],
-           'links': list(struct.unpack('>%dH' % links, link_raw[:2 * links])),
+           'links': [struct.unpack_from(LINK_ROW, link_raw, LINK_BYTES * i) for i in range(links)],
            'text': lambda o: s(o, texts), 'script': lambda o: s(o, scripts)}
     out['topics'] = [(s(o, tstrings), kind) for o, _n, kind, _z in struct.iter_unpack(TOPIC_ROW, topic_raw)]
     out['quests'] = []
@@ -594,6 +786,270 @@ def derived_disposition(table, base, same_race, personality, bounty, faction, ra
         x = f32(x + s['fDispWeaponDrawn'])
     x = int(x)                       # toward zero, as a C cast
     return max(0, min(100, x)) if clamp else x
+
+
+PERSUASION = ('Admire', 'Intimidate', 'Taunt', 'Bribe10', 'Bribe100', 'Bribe1000')   # aw_dial.h AW_PERSUADE_*
+
+
+def _f32(v):
+    return struct.unpack('<f', struct.pack('<f', v))[0]
+
+
+def _fatigue_term(s, who):
+    return _f32(s['fFatigueBase'] - _f32(s['fFatigueMult'] * _f32(1 - max(0.0, who['fatigue']))))
+
+
+def barter_offer(table, base, buying, player, npc, disposition):
+    """The price an NPC asks (BUYING: the player buys) or gives for BASE (aw_dial.c AW_DialBarterOffer; the rule of
+    OpenMW's MechanicsManager::getBarterOffer, our own code), single precision; DISPOSITION the derived one."""
+    if base == 0:
+        return 0
+    s = table['settings']
+    a = min(player['mercantile'], 100.0)
+    b = min(_f32(_f32(0.1) * player['luck']), 10.0)
+    c = min(_f32(_f32(0.2) * player['personality']), 10.0)
+    e = min(npc['mercantile'], 100.0)
+    f = min(_f32(_f32(0.1) * npc['luck']), 10.0)
+    g = min(_f32(_f32(0.2) * npc['personality']), 10.0)
+    pc = _f32(_f32(_f32(_f32(float(disposition - 50) + a) + b) + c) * _fatigue_term(s, player))
+    np_ = _f32(_f32(_f32(e + f) + g) * _fatigue_term(s, npc))
+    if buying:
+        term = _f32(_f32(0.01) * _f32(100 - _f32(0.5 * _f32(pc - np_))))
+    else:
+        term = _f32(_f32(0.01) * _f32(50 - _f32(0.5 * _f32(np_ - pc))))
+    return max(1, int(_f32(float(base) * term)))
+
+
+def spell_price(table, cost, player, npc, disposition):
+    """A spell's price at a merchant (OpenMW SpellBuyingWindow::addSpell): max(1, cost x fSpellValueMult), then the
+    offer."""
+    price = int(_f32(float(cost) * table['settings']['fSpellValueMult']))
+    return barter_offer(table, max(1, price), True, player, npc, disposition)
+
+
+def repair_price(table, value, maximum, durability, player, npc, disposition):
+    """The price of mending a thing (OpenMW MerchantRepair::setPtr): r = max(1, int(max / max(1, value))), x = int(
+    (max - durability) / r) x fRepairMult (truncated, at least 1), then the offer."""
+    p = float(max(1, value))
+    r = float(max(1, int(_f32(maximum / p))))
+    x = int(_f32((maximum - durability) / r))
+    x = int(_f32(table['settings']['fRepairMult'] * x))
+    return barter_offer(table, max(1, x), True, player, npc, disposition)
+
+
+MGEF_NO_DURATION, MGEF_NO_MAGNITUDE, MGEF_APPLIED_ONCE, RANGE_TARGET = 0x4, 0x8, 0x1000, 2
+
+
+def effect_cost_player(table, e):
+    """One effect's cost in a spell the player makes (OpenMW spellutil calcEffectCost, the player-spell method: a
+    duration offset of 1 and an area of at least 1). E: {base_cost, flags, min, max, duration, area, range}."""
+    s = table['settings']
+    lo = 1 if e['flags'] & MGEF_NO_MAGNITUDE else e['min']
+    hi = 1 if e['flags'] & MGEF_NO_MAGNITUDE else e['max']
+    lo, hi = max(1, lo), max(1, hi)
+    duration = 1 if e['flags'] & MGEF_NO_DURATION else e['duration']
+    if not e['flags'] & MGEF_APPLIED_ONCE:
+        duration = max(1, duration)
+    x = _f32(_f32(0.5) * float(lo + hi))
+    x = _f32(x * _f32(_f32(0.1) * e['base_cost']))
+    x = _f32(x * float(1 + duration))
+    x = _f32(x + _f32(_f32(_f32(0.05) * float(max(1, e['area']))) * e['base_cost']))
+    return _f32(x * s['fEffectCostMult'])
+
+
+def _spellmaking_total(table, effects):
+    y = 0.0
+    for e in effects:
+        y = _f32(y + max(1.0, effect_cost_player(table, e)))
+        if e['range'] == RANGE_TARGET:
+            y = _f32(y * _f32(1.5))                 # the running total, as OpenMW and the original do
+    return y
+
+
+def spellmaking_cost(table, effects):
+    """The magicka cost of a made spell (OpenMW SpellCreationDialog::notifyEffectsChanged)."""
+    return int(_spellmaking_total(table, effects))
+
+
+def spellmaking_price(table, effects, player, npc, disposition):
+    """Its price: max(1, total x fSpellMakingValueMult), then the offer; 0 with no effect."""
+    if not effects:
+        return 0
+    price = int(_f32(_spellmaking_total(table, effects) * table['settings']['fSpellMakingValueMult']))
+    return barter_offer(table, max(1, price), True, player, npc, disposition)
+
+
+def enchant_costs(table, effects, constant):
+    """The accumulated cost after each effect of an enchantment (OpenMW Enchanting::getEffectCosts): + ((min + max) x
+    duration + area) x base cost x fEffectCostMult x 0.05, at least 1, x 1.5 on target; CONSTANT: the duration is
+    fEnchantmentConstantDurationMult."""
+    s, cost, out = table['settings'], 0.0, []
+    for e in effects:
+        lo, hi, area = max(1, e['min']), max(1, e['max']), max(1, e['area'])
+        duration = s['fEnchantmentConstantDurationMult'] if constant else float(e['duration'])
+        term = _f32(_f32(_f32(_f32(float(lo + hi) * duration) + float(area)) * e['base_cost']) * s['fEffectCostMult'])
+        cost = max(1.0, _f32(cost + _f32(term * _f32(0.05))))
+        if e['range'] == RANGE_TARGET:
+            cost = _f32(cost * _f32(1.5))
+        out.append(cost)
+    return out
+
+
+def enchant_points(table, effects, constant, precise=True):
+    import math
+    total = 0.0
+    for c in enchant_costs(table, effects, constant):
+        total = _f32(total + (c if precise else float(math.floor(c))))
+    return total
+
+
+def enchant_cast_cost(table, effects, constant, enchant_skill):
+    """The charge a use takes (getEffectiveCastCost: the floored points, then each Enchant point over 10 a percent
+    less, at least 1); 0 for a constant effect."""
+    if constant:
+        return 0
+    c = float(int(enchant_points(table, effects, constant, False)))
+    r = _f32(c - _f32(_f32(c / 100) * _f32(enchant_skill - 10)))
+    return int(1 if r < 1 else r)
+
+
+def enchant_price(table, effects, constant, player, npc, disposition):
+    """At an enchanter (getEnchantPrice, one item): the offer for int(last accumulated cost x fEnchantmentValueMult),
+    at least 1."""
+    if not effects:
+        return 1
+    last = enchant_costs(table, effects, constant)[-1]
+    price = barter_offer(table, int(_f32(last * table['settings']['fEnchantmentValueMult'])), True, player, npc,
+                         disposition)
+    return max(1, price)
+
+
+def enchant_chance(table, effects, constant, enchant_skill, intelligence, luck, fatigue):
+    """The enchanter's chance (getEnchantChance): (Enchant - points x fEnchantmentChanceMult + 0.2 Intelligence + 0.1
+    Luck) x the fatigue term, x fEnchantmentConstantChanceMult for a constant effect; truncated."""
+    s = table['settings']
+    x = _f32(_f32(_f32(enchant_skill - _f32(enchant_points(table, effects, constant) * s['fEnchantmentChanceMult']))
+                  + _f32(_f32(0.2) * intelligence)) + _f32(_f32(0.1) * luck))
+    x = _f32(x * _fatigue_term(s, {'fatigue': fatigue}))
+    if constant:
+        x = _f32(x * s['fEnchantmentConstantChanceMult'])
+    return int(x)
+
+
+ENCHANT_WORN, ENCHANT_WEAPON, ENCHANT_BOOK = 0, 1, 2
+
+
+def next_cast_style(table, item, style, soul):
+    """OpenMW Enchanting::nextCastStyle for the items the engine carries (melee weapons only): armour and clothing
+    when used then constant, a weapon when strikes, when used, constant, a book cast once; constant only with a soul
+    of at least iSoulAmountForConstantEffect."""
+    powerful = soul >= table['settings']['iSoulAmountForConstantEffect']
+    if item == ENCHANT_WORN:
+        return 3 if style == 2 and powerful else 2
+    if item == ENCHANT_WEAPON:
+        return 2 if style == 1 else (3 if powerful else 1) if style == 2 else 1
+    return 0
+
+
+def training_picks(skills):
+    """The indices of the NPC's three best skills (OpenMW TrainingWindow: by value, ties to the earlier skill)."""
+    return sorted(range(len(skills)), key=lambda i: -skills[i])[:3]
+
+
+def training_price(table, skill, player, npc, disposition):
+    """The price of training a skill of base value SKILL: iTrainingMod x the base (at least 1), then the offer."""
+    price = int(_f32(float(skill) * table['settings']['iTrainingMod']))
+    return barter_offer(table, max(1, price), True, player, npc, disposition)
+
+
+def persuasion_ratings(s, who, player):
+    """(rating1, rating2, rating3) of a person {'personality', 'luck', 'reputation', 'speechcraft', 'mercantile',
+    'level', 'fatigue' (current over maximum)}: the rule of OpenMW's getPersuasionRatings, in single precision."""
+    pers = _f32(who['personality'] / s['fPersonalityMod']) if s['fPersonalityMod'] else 0.0
+    luck = _f32(who['luck'] / s['fLuckMod']) if s['fLuckMod'] else 0.0
+    rep = _f32(who['reputation'] * s['fReputationMod'])
+    fatigue = _f32(s['fFatigueBase'] - _f32(s['fFatigueMult'] * _f32(1 - max(0.0, who['fatigue']))))
+    level = _f32(who['level'] * s['fLevelMod'])
+    r1 = _f32(_f32(_f32(_f32(rep + luck) + pers) + who['speechcraft']) * fatigue)
+    if player:
+        r2 = _f32(r1 + level)
+        r3 = _f32(_f32(_f32(who['mercantile'] + luck) + pers) * fatigue)
+    else:
+        r2 = _f32(_f32(_f32(_f32(_f32(level + rep) + luck) + pers) + who['speechcraft']) * fatigue)
+        r3 = _f32(_f32(_f32(_f32(who['mercantile'] + rep) + luck) + pers) * fatigue)
+    return r1, r2, r3
+
+
+def persuade(table, kind, player, npc, disposition, roll, fight=50, flee=50):
+    """{'success', 'temp', 'perm', 'fight', 'flee'} of a persuasion (KIND an index of PERSUASION) as the engine works it
+    out (aw_dial.c AW_DialPersuade; the rule of OpenMW's MechanicsManager::getPersuasionDispositionChange, our own code):
+    DISPOSITION the derived one, ROLL 0..99, FIGHT and FLEE the NPC's settings before (after: the new values)."""
+    import math
+    s = table['settings']
+    p1, p2, p3 = persuasion_ratings(s, player, True)
+    n1, n2, n3 = persuasion_ratings(s, npc, False)
+    d = _f32(1 - _f32(_f32(0.02) * abs(disposition - 50)))
+    t1 = _f32(d * _f32(_f32(p1 - n1) + 50))
+    t2 = _f32(d * _f32(_f32(p2 - n2) + 50))
+    bribe = {3: s['fBribe10Mod'], 4: s['fBribe100Mod']}.get(kind, s['fBribe1000Mod'])
+    t3 = _f32(_f32(d * _f32(_f32(p3 - n3) + 50)) + bribe)
+    min_chance, min_change = s['iPerMinChance'], s['iPerMinChange']
+    roll_mult, temp_mult = s['fPerDieRollMult'], s['fPerTempMult']
+    x = y = 0.0
+    if kind == 0:                                   # admire
+        t1 = max(min_chance, t1)
+        success = roll <= t1
+        c = float(math.floor(_f32(roll_mult * _f32(t1 - roll))))
+        x = max(min_change, c) if success else c
+    elif kind == 1:                                 # intimidate
+        t2 = max(min_chance, t2)
+        success = roll <= t2
+        r = float(math.floor(_f32(t2 - roll))) if roll != t2 else 1.0
+        if success:
+            sv = float(math.floor(_f32(_f32(r * roll_mult) * temp_mult)))
+            flee = max(0, min(100, flee + int(max(min_change, sv))))
+            fight = max(0, min(100, fight + int(min(-min_change, -sv))))
+        c = -abs(float(math.floor(_f32(r * roll_mult))))
+        if success:
+            if abs(c) < min_change:
+                x = y = min_change
+            else:
+                x = -float(math.floor(_f32(c * temp_mult)))
+                y = c
+        else:
+            x = float(math.floor(_f32(c * temp_mult)))
+            y = c
+    elif kind == 2:                                 # taunt
+        t1 = max(min_chance, t1)
+        success = roll <= t1
+        c = abs(float(math.floor(_f32(t1 - roll))))
+        if success:
+            sv = _f32(_f32(c * roll_mult) * temp_mult)
+            flee = max(0, min(100, flee + min(-int(min_change), int(-sv))))
+            fight = max(0, min(100, fight + max(int(min_change), int(sv))))
+        x = float(math.floor(_f32(-c * roll_mult)))
+        if success and abs(x) < min_change:
+            x = -min_change
+    else:                                           # bribe
+        t3 = max(min_chance, t3)
+        success = roll <= t3
+        c = float(math.floor(_f32(_f32(t3 - roll) * roll_mult)))
+        x = max(min_change, c) if success else c
+    if kind == 1:
+        temp = int(x)
+    else:
+        temp = int(_f32(x * temp_mult))
+    if disposition + temp > 100:
+        temp = 100 - disposition
+    elif disposition + temp < 0:
+        temp = -disposition
+    if not temp_mult:
+        perm = 0
+    elif kind == 1:
+        perm = -int(_f32(temp / temp_mult)) if success else int(y)
+    else:
+        perm = int(_f32(temp / temp_mult))
+    return {'success': bool(success), 'temp': temp, 'perm': perm, 'fight': fight, 'flee': flee}
 
 
 def candidates(table, npc, topic):
@@ -666,11 +1122,59 @@ def build(kinds, topics, dials, homes=None, masks=None, left=None):
     t = tables(kinds, topics, dials, names, masks, keep)
     raw = pack(t)
     report = report_of(t, raw, keep, left, names, dials)
-    report.update(conversation_buffer(read(raw), keep))
+    table = read(raw)
+    report.update(conversation_buffer(table, keep))
+    report['coverage'] = coverage(table)
+    report['ui_texts_missing'] = ui_texts_of(kinds)[1]     # the window's words the master lacks: the fallback shown
     return raw, report
 
 
 AMIGA_ANSWER = 24                # sizeof(aw_dial_answer_t) on the 68k (engine/aga/src/aw_dial.h), 8-byte pieces
+
+# What the engine reads live (engine/aga/src/aw_glut.c AW_GlutCond with aw_mwhost.c's live hooks): the SCVR functions
+# by name (mwad.dialogue FUNCTIONS); every other function reads its start-of-game value when the fixture knows one,
+# else it never passes. Kept in step with the engine by tests/test_dialogue_features.py.
+LIVE_FUNCTIONS = ('Health_Percent', 'PcHealthPercent', 'PcHealth', 'TalkedToPc', 'FactionRankDifference', 'Choice',
+                  'PcReputation', 'PcCrimeLevel', 'PcExpelled', 'SameFaction', 'PcLevel', 'PcGender', 'PcStrength',
+                  'PcIntelligence', 'PcWillpower', 'PcAgility', 'PcSpeed', 'PcEndurance', 'PcPersonality', 'PcLuck',
+                  'PcBlock', 'PcArmorer', 'PcMediumArmor', 'PcHeavyArmor', 'PcBluntWeapon', 'PcLongBlade', 'PcAxe',
+                  'PcSpear', 'PcAthletics', 'PcEnchant', 'PcDestruction', 'PcAlteration', 'PcIllusion',
+                  'PcConjuration', 'PcMysticism', 'PcRestoration', 'PcAlchemy', 'PcUnarmored', 'PcSecurity', 'PcSneak',
+                  'PcAcrobatics', 'PcLightArmor', 'PcShortBlade', 'PcMarksman', 'PcMercantile', 'PcSpeechcraft',
+                  'PcHandToHand')
+
+
+def coverage(table):
+    """The table's run-time conditions as the engine reads them: {'conditions': {'live', 'start_value', 'never'},
+    'by_kind': {kind: {state: n}}, 'functions_start_value', 'functions_never': {name: n}, 'answers': {'total',
+    'unconditional', 'reachable', 'unreachable'}}. An answer is unreachable when one of its conditions never passes."""
+    from mwad.dialogue import FUNCTIONS
+    live = {FUNCTIONS.index(n) for n in LIVE_FUNCTIONS}
+    kinds = {G.OP_FUNC: 'function', G.OP_GLOBAL: 'global', G.OP_LOCAL: 'local', G.OP_NOTLOCAL: 'not-local',
+             G.OP_JOURNAL: 'journal', G.OP_ITEM: 'item', G.OP_DEAD: 'dead', G.OP_CELL: 'cell',
+             G.OP_DISP: 'disposition', G.OP_PCFACTION: 'pc-faction', G.OP_RANDOM100: 'random100'}
+    states, by_kind, start_fn, never_fn = {'live': 0, 'start_value': 0, 'never': 0}, {}, {}, {}
+    answers = {'total': len(table['entries']), 'unconditional': 0, 'reachable': 0, 'unreachable': 0}
+    for _text, first, _s, _l, _n, n, _f in table['entries']:
+        unreachable = False
+        for op, _cmp, operand, _v in table['conds'][first:first + n]:
+            if op != G.OP_FUNC or operand in live:
+                state = 'live'
+            elif operand in table['fixture']:
+                state = 'start_value'
+                start_fn[FUNCTIONS[operand]] = start_fn.get(FUNCTIONS[operand], 0) + 1
+            else:
+                state = 'never'
+                never_fn[FUNCTIONS[operand]] = never_fn.get(FUNCTIONS[operand], 0) + 1
+                unreachable = True
+            states[state] += 1
+            kind = by_kind.setdefault(kinds.get(op, str(op)), {})
+            kind[state] = kind.get(state, 0) + 1
+        answers['unconditional'] += not n
+        answers['unreachable' if unreachable else 'reachable'] += 1
+    return {'conditions': states, 'by_kind': by_kind, 'answers': answers,
+            'functions_start_value': dict(sorted(start_fn.items(), key=lambda x: -x[1])),
+            'functions_never': dict(sorted(never_fn.items(), key=lambda x: -x[1]))}
 
 
 def conversation_buffer(table, order):
@@ -712,6 +1216,7 @@ def build_master(path, jobs=1):
     t0 = time.time()
     print('=== PHASE 1/3: Dialogue table: reading the master ===', flush=True)
     kinds, topics = G.load(path)
+    kinds = dict(kinds, SKIL=skill_records(path))
     dials = dial_names(path)
     homes = G.home_cells(path, kinds)
     names = table_topics(dials)

@@ -1,6 +1,6 @@
 # AmiWind console commands
 
-_Generated from `config/debug-commands.txt` with AmiWind v0.0.57._
+_Generated from `config/debug-commands.txt` with AmiWind v0.0.58-dev2._
 
 Open the console with F10 or the backquote key and type
 a command, for example `dbg headlamp on`. This page is generated from
@@ -22,6 +22,7 @@ Type: "dbg help" for help.
 | Command | Also | Arguments and notes |
 | --- | --- | --- |
 | `dbg door sounds` | - | on/off (default on) |
+| `dbg footsteps` | - | [on/off, true/false or 1/0; no argument = status] your own footsteps (default off, saved; also Options > Audio): by your boots (bare, light, medium, heavy), in water and swimming; NPC and creature footsteps stay on (aw_npc_footsteps) |
 | `dbg music` | - | [on/off, true/false or 1/0; no argument = status of the switch and the stream] background music (default on; not saved): off closes the stream at once and opens none until on again |
 | `dbg music custom` | - | [play / stop; no argument: status] the custom OST player (an image built with --custom-ost FILE): play your own track alone, the playlist and its auto-advance waiting; stop gives the playlist back; without a custom track: silence, never the OST |
 | `dbg mwscript` | `dbg mwscript status` | [on/off, true/false or 1/0; no argument: what it does] (default on, saved) the game's compiled scripts (docs/MWSCRIPT_BYTECODE.md): sounds, NPC lines, music cues, journal, globals, object state, AIWander; not-yet functions logged once. Answers with the file (id1/mwscript.awm: format, scripts, bytes kept) and the counts |

@@ -45,6 +45,8 @@ int host_framecount; /* npc_target caches its result per frame: each call below 
 #define AW_SceneDraw() (host_framecount++,AW_SceneDraw())
 #define AW_SceneUse() (host_framecount++,AW_SceneUse())
 int AW_UISpeakerAtRight(void){return 0;}
+/* the dialogue table (aw_glut.c): no NPC has a dialogue row here, so a travel provider's use key opens its menu */
+int AW_GlutNpcOf(struct edict_s *e){(void)e;return -1;}
 void AW_UIObjectName(const char *name,int style){if(name)strcpy(object_name,name);}
 void S_LocalSound(char *name){}
 int AW_IntroUse(void){return 0;}

@@ -375,6 +375,7 @@ void AW_GlutExpand(const aw_glut_t *g,int npc,const char *name,const char *p,cha
 #include "aw_anim.h"
 #include "aw_combat.h"
 #include "aw_tryalloc.h"
+#include "aw_character.h"
 
 static cvar_t lut_on={"aw_npc_voice_lut","1",true};   /* 0: the previous method (per-model bark lines only) */
 static aw_glut_t table;
@@ -384,9 +385,16 @@ static short npc_of[MAX_EDICTS];  /* row + 1 per edict, 0 unknown, -1 none; chec
 static char said[1024];
 static const char path[]="npc-voices.lut";
 
+static int creature_sound(edict_t *e,int moment,char *out,int size);
+static cvar_t player_steps,player_stride,player_step_volume;
+static void player_footsteps(void);
+static void player_footsteps_cmd(void);
 void AW_GlutInit(void) {
     Cvar_RegisterVariable(&lut_on);
+    Cvar_RegisterVariable(&player_steps);Cvar_RegisterVariable(&player_stride);Cvar_RegisterVariable(&player_step_volume);
+    Cmd_AddCommand("aw_player_footsteps_cmd",player_footsteps_cmd);
     aw_voice_table_row=AW_GlutNpcOf;aw_voice_table_bark=AW_GlutBark;
+    aw_creature_sound=creature_sound;aw_player_steps=player_footsteps;
 }
 static int load(void) {
     FILE *f=NULL;long size,resident_size;unsigned char header[AW_GLUT_HEADER];
@@ -413,10 +421,32 @@ static const char *source_id(edict_t *e) {
     eval_t *v=GetEdictFieldValue(e,"aw_source_id");
     return v && v->string?pr_strings+v->string:"";
 }
+/* The player's voice row (COMBAT-VOICES-SILENT-33): id1/npc-voice-player.txt names, per race and sex, the NPC whose
+ * Hit lines are that race and sex's own (tools/greeting_lut.py player_voices); read when the player's race or sex
+ * changes, nothing kept but the row. -1 when the build has no file or no line for the player. */
+static int player_row(void) {
+    static int cached=-2,cached_race=-1,cached_female=-1;
+    FILE *f=NULL;char line[160],want[72];int n;
+    if(aw_character.race<0 || aw_character.race>=aw_race_count)return -1;
+    if(cached!=-2 && cached_race==aw_character.race && cached_female==aw_character.female)return cached;
+    cached=-1;cached_race=aw_character.race;cached_female=aw_character.female;
+    want[0]=0;strncat(want,aw_races[aw_character.race].id,63);strcat(want,aw_character.female?"\tf\t":"\tm\t");
+    for(n=0;want[n];n++)if(want[n]>='A' && want[n]<='Z')want[n]+=32;
+    if(COM_FOpenFile("npc-voice-player.txt",&f)<0 || !f)return -1;
+    if(!fgets(line,sizeof(line),f) || strncmp(line,"AWPV1",5)){fclose(f);return -1;}
+    while(fgets(line,sizeof(line),f)){
+        line[strcspn(line,"\r\n")]=0;
+        for(n=0;line[n] && line[n]!='\t';n++)if(line[n]>='A' && line[n]<='Z')line[n]+=32;
+        if(!strncmp(line,want,strlen(want))){cached=AW_GlutFind(&table,line+strlen(want));break;}
+    }
+    fclose(f);
+    return cached;
+}
 int AW_GlutNpcOf(edict_t *e) {
     int n,row;const char *id;
     if(!e || e->free || !lut_on.value || !load())return -1;
     n=NUM_FOR_EDICT(e);
+    if(n==1)return player_row();        /* the player has no record id of his own: his race and sex's lines */
     if(n<0 || n>=MAX_EDICTS)return -1;
     id=source_id(e);
     row=npc_of[n]-1;
@@ -426,6 +456,57 @@ int AW_GlutNpcOf(edict_t *e) {
     row=AW_GlutFind(&table,id);
     npc_of[n]=(short)(row<0?-1:row+1);
     return row;
+}
+/* A creature's sound generator moment (CREATURE-ANIM-SOUND-54): its row by the record id (aw_source_id), the
+ * moment's sound as the pool name the mixer takes ("pool/a<hash>.wav"); 0 when the creature has no row, the moment
+ * no sound, or this build lacks the file (a MiniWind keeps only what its actors need). */
+static int creature_sound(edict_t *e,int moment,char *out,int size) {
+    int row,sound;char pool[AW_GLUT_POOL_PATH];
+    if(!e || e->free || !lut_on.value || !load() || size<AW_GLUT_POOL_PATH-6)return 0;
+    if((row=AW_GlutCreatureFind(&table,source_id(e)))<0 || (sound=AW_GlutCreatureSound(&table,row,moment))<0)return 0;
+    if(!AW_GlutSoundMapped(&table,sound) || !AW_GlutPoolPath(&table,sound,pool,sizeof(pool)))return 0;
+    strcpy(out,pool+6);       /* without "sound/" */
+    return 1;
+}
+/* The player's own footsteps (PLAYER-FOOTSTEPS-NONE-58; the maintainer, 31 October 2026: a setting, OFF by default,
+ * Options > Audio and dbg footsteps, saved). The original's rule for every actor (docs/ANIMATION.md "Footstep
+ * sounds"): the boots' armour class (bare, light, medium, heavy), water, swimming; the sounds are the voice table's
+ * named slots. The step itself: one every aw_player_footstep_stride units walked on the ground, left and right in
+ * turn (an AmiWind approximation of the original's walk and run sound keys: the player has no third-person
+ * animation clock here). */
+static cvar_t player_steps={"aw_player_footsteps","0",true};
+static cvar_t player_stride={"aw_player_footstep_stride","26",true};
+static cvar_t player_step_volume={"aw_player_footstep_volume","0.6",true};
+static float walked;static vec3_t walked_at;static int walked_foot,walked_ready;
+int AW_GlutPlayerStepSlot(int boots_class,int medium,int right) {
+    static const int dry[4]={AW_SLOT_FOOT_BARE_LEFT,AW_SLOT_FOOT_LIGHT_LEFT,AW_SLOT_FOOT_MED_LEFT,AW_SLOT_FOOT_HEAVY_LEFT};
+    int base=medium==AW_ANIM_SWIMMING?AW_SLOT_SWIM_LEFT:medium==AW_ANIM_WADE?AW_SLOT_FOOT_WATER_LEFT:
+        dry[boots_class>=0 && boots_class<=3?boots_class:0];
+    return base+(right?1:0);
+}
+static void player_footsteps(void) {
+    edict_t *p;float dx,dy;int boots=0,medium,sound;char pool[AW_GLUT_POOL_PATH];sfx_t *sfx;const aw_fighter_t *me;
+    if(!player_steps.value || !sv.active || cls.state!=ca_connected || svs.maxclients<1){walked_ready=0;return;}
+    p=EDICT_NUM(1);
+    if(p->free || p->v.health<=0){walked_ready=0;return;}
+    if(!walked_ready){VectorCopy(p->v.origin,walked_at);walked=0;walked_ready=1;return;}
+    dx=p->v.origin[0]-walked_at[0];dy=p->v.origin[1]-walked_at[1];VectorCopy(p->v.origin,walked_at);
+    medium=AW_AnimMedium(p);
+    if(!((int)p->v.flags&FL_ONGROUND) && medium!=AW_ANIM_SWIMMING)return;   /* in the air: no step */
+    {float d=(float)sqrt(dx*dx+dy*dy);if(d>64)return;walked+=d;}            /* a teleport is not a walk */
+    if(walked<(player_stride.value>4?player_stride.value:4))return;
+    walked=0;walked_foot=!walked_foot;
+    if((me=AW_CombatPlayer())!=NULL)boots=AW_HIT_CLASS(me,3);               /* the boots' slot (cuirass, helmet, greaves, boots ...) */
+    if(!load() || (sound=AW_GlutSlotSound(&table,AW_GlutPlayerStepSlot(boots,medium,walked_foot)))<0)return;
+    if(!AW_GlutSoundMapped(&table,sound) || !AW_GlutPoolPath(&table,sound,pool,sizeof(pool)))return;
+    if((sfx=S_PrecacheSound(pool+6))!=NULL)S_StartSound(1,4,sfx,p->v.origin,player_step_volume.value,1);
+}
+static void player_footsteps_cmd(void) {
+    const char *a=Cmd_Argc()>1?Cmd_Argv(1):"";
+    if(!Q_strcasecmp((char *)a,"on") || !strcmp(a,"1") || !Q_strcasecmp((char *)a,"true"))Cvar_SetValue("aw_player_footsteps",1);
+    else if(!Q_strcasecmp((char *)a,"off") || !strcmp(a,"0") || !Q_strcasecmp((char *)a,"false"))Cvar_SetValue("aw_player_footsteps",0);
+    else if(*a){Con_Printf("dbg footsteps: on/off (your own footsteps; default off, saved; also Options > Audio)\n");return;}
+    Con_Printf("Your footsteps: %s (NPC and creature footsteps: aw_npc_footsteps)\n",player_steps.value?"on":"off");
 }
 static void set_float(edict_t *e,char *field,float value) {
     eval_t *v=GetEdictFieldValue(e,field);

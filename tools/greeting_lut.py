@@ -704,15 +704,21 @@ def lines(table, ident, topic):
     return out
 
 
+def id_bytes(ident):
+    """A record id as the engine compares it: its Windows-1252 bytes (the game data's own encoding, as the world's
+    entity text carries aw_source_id), ASCII letters lowered and every other byte as it is (aw_glut.c idcmp)."""
+    return ident.encode('cp1252', errors='replace').lower()
+
+
 def plan_npcs(kinds, homes=None):
-    """([NPC id] in table order (by the id's bytes), {id: npc_facts()}, {id: reason left out})."""
+    """([NPC id] in table order (by id_bytes), {id: npc_facts()}, {id: reason left out}). Ids with accented
+    letters (atúlg gro-largúm, yatúr gro-shak) are kept: the strings are Windows-1252 bytes and the engine looks
+    them up with the same bytes (NPC-VOICE-NONASCII-IDS-48)."""
     multiplier = greet_settings(kinds)[0]
     homes = homes or {}
     order, facts, left = [], {}, {}
-    for ident in sorted(kinds['NPC_'], key=lambda i: i.encode('cp1252', errors='replace')):
+    for ident in sorted(kinds['NPC_'], key=id_bytes):
         try:
-            if not ident.isascii():
-                raise ValueError('non-ASCII record id')
             facts[ident] = npc_facts(kinds, ident, multiplier, homes.get(ident))
             order.append(ident)
         except (ValueError, KeyError, struct.error, IndexError) as error:
@@ -759,7 +765,101 @@ def build(kinds, topics, homes=None, resolve=None, masks=None, left=None, sound=
                                                                       'conds', 'sounds', 'globals', 'names')}}
     report['table_bytes'].update(listset_items=2 * len(t['listset_items']), list_items=2 * len(t['list_items']),
                                  strings=len(t['strings']), texts=len(t['texts']))
+    report['coverage'] = coverage(kinds, keep, masks, left, rows)
+    report['player_voices'] = player_voices(kinds, keep, hit_sets_of(raw))
     return raw, report
+
+
+def hit_sets_of(raw):
+    """{npc id: the list set of its Hit topic} of a packed table."""
+    t = read(raw)
+    hit = t['topics'].index('hit') if 'hit' in t['topics'] else None
+    return {} if hit is None else {i: t['sets'][n['set']][hit] for i, n in t['npcs'].items()}
+
+
+def player_voices(kinds, keep, hit_sets):
+    """{'race/sex': npc id} (sex 'f' or 'm'): for the player's pain and death lines (COMBAT-VOICES-SILENT-33; OpenMW
+    plays the player's Hit voice by his race and sex, npc.cpp onHit): of the NPCs of that race and sex without a
+    faction, the one whose Hit lines are the commonest set (the race and sex's own lines, no unique character's),
+    the first by id on a tie."""
+    from mwad.dialogue import speaker
+    groups = {}
+    for ident in keep:
+        try:
+            s = speaker(kinds, ident)
+        except (ValueError, KeyError, struct.error):
+            continue
+        if s['faction'] or hit_sets.get(ident, NONE16) == NONE16:
+            continue
+        groups.setdefault('%s/%s' % (s['race'], 'f' if s['female'] else 'm'), []).append(ident)
+    out = {}
+    for key, idents in sorted(groups.items()):
+        counts = {}
+        for i in idents:
+            counts[hit_sets[i]] = counts.get(hit_sets[i], 0) + 1
+        best = max(counts.values())
+        out[key] = sorted((i for i in idents if counts[hit_sets[i]] == best), key=id_bytes)[0]
+    return out
+
+
+PLAYER_VOICES = 'npc-voice-player.txt'
+
+
+def player_voices_text(mapping):
+    """The engine's file (id1/npc-voice-player.txt): 'AWPV1', then 'race<TAB>f|m<TAB>npc id' lines, Windows-1252."""
+    lines = ['AWPV1'] + ['%s\t%s\t%s' % (k.rsplit('/', 1)[0], k.rsplit('/', 1)[1], v) for k, v in sorted(mapping.items())]
+    return ('\n'.join(lines) + '\n').encode('cp1252', errors='replace')
+
+
+# Characters the original itself gives no sound, with the written reason (id casefolded: reason). Empty: in the
+# Morrowind master every NPC record has a voiced line and every creature a sound (v0.0.57 release table).
+SILENT_BY_DESIGN = {}
+# Sound files the table names that the game data itself does not have (path casefolded, '/' separated: reason).
+# The line is shown and stays quiet, as in the original. Checked against the GOG and Steam editions on 31 October 2026.
+MISSING_IN_GAME_DATA = {
+    'vo/d/f/hit_df007.mp3': 'missing in the game data itself: the Dark Elf female hit voices run Hit_DF006 then '
+                            'Hit_DF008 (GOG and Steam loose files; none of the three archives has it)'}
+
+
+def unexplained_missing(missing):
+    """Missing sound sources without a written reason (MISSING_IN_GAME_DATA)."""
+    return sorted(m for m in missing or () if m.replace('\\', '/').casefold() not in MISSING_IN_GAME_DATA)
+
+
+def coverage(kinds, keep, masks, left, creature_rows):
+    """The coverage of a voice table: NPCs with at least one voiced line / NPC records, creatures with at least one
+    sound / creature rows, and every character without a sound named, with its reason (left out by the table, or
+    SILENT_BY_DESIGN) or None when nothing explains it (unexplained(): a build stops on those)."""
+    voiced = 0
+    for key, mask in masks.items():
+        if key[3]:
+            voiced |= mask
+    unmapped = {}
+    for bit, ident in enumerate(keep):
+        if not voiced >> bit & 1:
+            unmapped[ident] = SILENT_BY_DESIGN.get(ident.casefold())
+    for ident, reason in left.items():
+        unmapped[ident] = 'left out of the table: ' + str(reason)
+    silent_creatures = {ident: SILENT_BY_DESIGN.get(ident.casefold()) for ident, row in creature_rows
+                        if all(p is None for p in row)}
+    npcs_total = len(kinds['NPC_'])
+    return {'npcs_total': npcs_total, 'npcs_voiced': npcs_total - len(unmapped),
+            'creatures_total': len(creature_rows), 'creatures_sounded': len(creature_rows) - len(silent_creatures),
+            'npcs_unmapped': unmapped, 'creatures_unmapped': silent_creatures}
+
+
+def coverage_line(c):
+    """One line for the build log and the report: 'Voice coverage: NPCs 2675/2675 voiced, creatures ...'."""
+    named = sorted(list(c['npcs_unmapped']) + list(c['creatures_unmapped']))
+    return 'Voice coverage: NPCs %d/%d voiced, creatures %d/%d with sounds, unmapped: %s' % (
+        c['npcs_voiced'], c['npcs_total'], c['creatures_sounded'], c['creatures_total'],
+        ', '.join('%s (%s)' % (i, c['npcs_unmapped'].get(i) or c['creatures_unmapped'].get(i) or 'NO REASON')
+                  for i in named) or 'none')
+
+
+def unexplained(c):
+    """Characters without a sound and without a written reason (sorted ids)."""
+    return sorted(i for part in ('npcs_unmapped', 'creatures_unmapped') for i, r in c[part].items() if not r)
 
 
 def build_master(path, data=None, jobs=1, resolver=None, media=None):
@@ -799,10 +899,15 @@ def build_master(path, data=None, jobs=1, resolver=None, media=None):
     report['home_cells'] = len(homes)
     # sounds named whose source file the data does not have: the engine shows the line and stays quiet
     report['missing_sources'] = sorted(missing) if available is not None else None
+    if report['missing_sources']:
+        report['coverage']['missing_sources'] = {
+            m: MISSING_IN_GAME_DATA.get(m.replace('\\', '/').casefold()) for m in report['missing_sources']}
     report['seconds'] = round(time.time() - t0, 1)
     print('Voice table: %d NPCs, %d sets, %d list sets, %d lists, %d entries, %d conditions, %d sounds, %d bytes '
           '(%.1f s)' % (report['npcs'], report['sets'], report['list_sets'], report['lists'], report['entries'],
                         report['conditions'], report['sounds'], report['bytes'], report['seconds']), flush=True)
+    report['coverage_line'] = coverage_line(report['coverage'])
+    print(report['coverage_line'], flush=True)
     return raw, report
 
 
@@ -848,8 +953,16 @@ def image_step(data, id1, out=None, jobs=1, media=None):
             report['reused'] = False
     if hashlib.sha256(raw).hexdigest() != report['sha256']:
         raise ValueError('Voice table: SHA-256 differs from its report')
+    # VOICE-COVERAGE-58: a character without any sound needs a written reason (left out, or SILENT_BY_DESIGN);
+    # a table without a single sound (data with no voiced line at all, a text-only fixture) is not judged
+    missing = unexplained(report['coverage']) if report.get('sounds') else []
+    if missing:
+        raise ValueError('Voice table: %d characters have no sound and no written reason: %s' % (
+            len(missing), ', '.join(missing)))
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_bytes(raw)
+    # the player's own voice lines by race and sex (COMBAT-VOICES-SILENT-33)
+    (Path(id1) / PLAYER_VOICES).write_bytes(player_voices_text(report.get('player_voices') or {}))
     if out is not None:
         Path(out).mkdir(parents=True, exist_ok=True)
         (Path(out) / 'npc-voice-table.json').write_text(json.dumps(report, indent=1, sort_keys=True) + '\n',

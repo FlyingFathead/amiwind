@@ -16,6 +16,12 @@ Built once from the game data by the mwscript stage, written as sections of id1/
           u8 damage[6] (chop, slash, thrust: min, max)  u16 flags (1 two-handed)  f32 weight  f32 speed  f32 reach
   ASPT  4 bytes a spell: u16 id  u8 type (0 spell, 1 ability, 2 blight, 3 disease, 4 curse, 5 power)  u8 0
   ASPL  2 bytes a spell entry: u16 spell (ASPT row)
+  ASPE  4 bytes per ASPT row: u16 first AEFF entry, u8 entries, u8 0; AEFF 14 bytes an effect: i16 effect, i8 skill,
+        i8 attribute, u8 range, u8 0, u16 area, u16 duration, u16 magnitude min, u16 max (ENAM)
+  AMGE  12 bytes per magic effect index 0..142: u32 flags, f32 base cost, u8 school, u8 present (MGEF MEDT),
+        u16 name (string: the effect's game setting, effect_names; 0xFFFF none)
+  ASPC  4 bytes per ASPT row: u16 name (string, 0xFFFF none)  u16 cost (the game's price rule, spell_cost); the
+        spells the dialogue's Spells service sells (on disk)
   OACT  2 bytes per OBJS row: the actor its id names (ACTB row, 0xFFFF none); resident, for the scripts' targets
 
 The stats are the record's own (NPDT); NPCs with autocalculated stats (12-byte NPDT) get them by the original
@@ -27,6 +33,7 @@ and the equipped weapon and armour are the combat sheets' (prepare_combat.equipm
 NPC's spells (OpenMW mwclass/npc.cpp). Nothing of the game is in the repo: everything is read at build time.
 """
 import struct
+
 
 ACTOR_FEMALE, ACTOR_ESSENTIAL, ACTOR_RESPAWN, ACTOR_AUTOCALC = 1, 2, 4, 8
 ACTOR_WALKS, ACTOR_SWIMS, ACTOR_FLIES, ACTOR_BIPEDAL = 16, 32, 64, 128
@@ -59,6 +66,82 @@ def _clamp(v, lo, hi, what, report):
         report['clamped'][what] += 1
         return max(lo, min(hi, v))
     return v
+
+
+SPELL_AUTOCALC = 1
+MGEF_NO_DURATION, MGEF_NO_MAGNITUDE, MGEF_APPLIED_ONCE = 0x4, 0x8, 0x1000
+RANGE_TARGET = 2
+
+
+def _f32(v):
+    return struct.unpack('<f', struct.pack('<f', v))[0]
+
+
+AEFF_BYTES, AMGE_BYTES, MAGIC_EFFECTS = 14, 12, 143
+
+
+def effect_names(records):
+    """The game's name of every magic effect index. The masters keep one sEffect<Name> setting per effect, in the
+    effects' own order after sEffects (Morrowind.esm 0..136, then the expansions' new ones), so the n-th such setting
+    in load order names effect n. Nothing is listed by hand; the build refuses an effect of the data without a name."""
+    keys = [k for k in records.get('GMST', {}) if k.startswith('seffect') and k != 'seffects']
+    out = [''] * MAGIC_EFFECTS
+    for i, k in enumerate(keys[:MAGIC_EFFECTS]):
+        out[i] = _text(_first(records['GMST'][k], 'STRV'))
+    return out
+
+
+def spell_effects(fields):
+    """[(effect, skill, attribute, range, 0, area, duration, magnitude min, magnitude max)] of a spell's ENAM
+    entries, clamped to the row's 16-bit fields."""
+    def c(v):
+        return max(0, min(0xFFFF, v))
+    out = []
+    for tag, d in fields:
+        if tag != 'ENAM' or len(d) < 24:
+            continue
+        effect, skill, attr, rng, area, duration, lo, hi = struct.unpack_from('<hbbiiiii', d)
+        out.append((effect, skill, attr, rng & 255, 0, c(area), c(duration), c(lo), c(hi)))
+    return out
+
+
+def spell_cost(records, fields):
+    """A spell's cost as the game prices it (rule from OpenMW mwmechanics/spellutil.cpp calcSpellCost and
+    calcEffectCost, the game-spell method; our own code): the record's SPDT cost unless it is autocalculated, else the
+    sum over its effects (ENAM) of 0.5 (min + max magnitude, each at least 1) x 0.1 base cost x duration (at least 1
+    unless applied once) + 0.05 area x base cost, times fEffectCostMult, x 1.5 on target; rounded."""
+    spdt = _first(fields, 'SPDT')
+    if len(spdt) < 12:
+        return 0
+    _type, cost, flags = struct.unpack_from('<iii', spdt)
+    if not flags & SPELL_AUTOCALC:
+        return cost
+    g = records.get('GMST', {}).get('feffectcostmult')
+    raw = _first(g, 'FLTV') if g else b''
+    mult = struct.unpack('<f', raw)[0] if len(raw) == 4 else 0.5
+    total = 0.0
+    for tag, d in fields:
+        if tag != 'ENAM' or len(d) < 24:
+            continue
+        effect, _skill, _attr, rng, area, duration, lo, hi = struct.unpack_from('<hbbiiiii', d)
+        medt = _first(records.get('MGEF', {}).get(effect, []), 'MEDT')
+        if len(medt) < 12:
+            continue
+        _school, base, eflags = struct.unpack_from('<ifi', medt)
+        lo, hi = (lo, hi) if not eflags & MGEF_NO_MAGNITUDE else (1, 1)
+        lo, hi = max(1, lo), max(1, hi)
+        duration = duration if not eflags & MGEF_NO_DURATION else 1
+        if not eflags & MGEF_APPLIED_ONCE:
+            duration = max(1, duration)
+        x = _f32(0.5 * (lo + hi))
+        x = _f32(x * _f32(_f32(0.1) * base))
+        x = _f32(x * duration)
+        x = _f32(x + _f32(_f32(_f32(0.05) * max(0, area)) * base))
+        x = max(0.0, _f32(x * mult))
+        if rng == RANGE_TARGET:
+            x = _f32(x * 1.5)
+        total = _f32(total + x)
+    return int(total + 0.5)              # std::round of a non-negative cost
 
 
 class ActorTables:
@@ -135,8 +218,11 @@ class ActorTables:
         f = self.records['SPEL'].get(key)
         spdt = _first(f, 'SPDT') if f else b''
         self.spell_index[key] = len(self.spells)
+        name = _text(_first(f, 'FNAM')) if f else ''
         self.spells.append({'id': self.string(ident), 'type': struct.unpack_from('<i', spdt)[0] & 255
-                            if len(spdt) >= 4 else 255})
+                            if len(spdt) >= 4 else 255, 'name': self.string(name) if name else NONE,
+                            'cost': min(0xFFFF, max(0, spell_cost(self.records, f))) if f else 0,
+                            'effects': spell_effects(f) if f else []})
         return self.spell_index[key]
 
     # --- one actor ---
@@ -298,6 +384,24 @@ class ActorTables:
                                     r['damage'], r['flags'], r['weight'], r['speed'], r['reach']) for r in self.items)
         aspt = b''.join(struct.pack('>HBB', r['id'], r['type'], 0) for r in self.spells)
         aspl = b''.join(struct.pack('>H', i) for i in self.spell_list)
+        aspc = b''.join(struct.pack('>HH', r['name'], r['cost']) for r in self.spells)
+        # ASPE / AEFF: each spell's effects; AMGE: the magic effects (Spellmaking, Enchanting, casting)
+        aspe, aeff = bytearray(), bytearray()
+        for r in self.spells:
+            aspe += struct.pack('>HBB', len(aeff) // AEFF_BYTES, min(255, len(r['effects'])), 0)
+            for e in r['effects'][:255]:
+                aeff += struct.pack('>hbbBBHHHH', *e)
+        mgef = self.records.get('MGEF', {})
+        names = effect_names(self.records)
+        missing = [i for i in range(MAGIC_EFFECTS) if i in mgef and not names[i]]
+        if missing:
+            raise ValueError('magic effects without a name in the game settings: %s' % missing[:10])
+        amge = bytearray()
+        for i in range(MAGIC_EFFECTS):
+            medt = _first(mgef.get(i, []), 'MEDT')
+            school, base, flags = struct.unpack_from('<ifi', medt) if len(medt) >= 12 else (255, 0.0, 0)
+            name = s(names[i]) if names[i] else NONE
+            amge += struct.pack('>IfBBH', flags & 0xFFFFFFFF, base, school & 255, 1 if len(medt) >= 12 else 0, name)
         oact = b''.join(struct.pack('>H', NONE if self.actor(o['id']) is None else self.actor(o['id']))
                         for o in objects)
         if len(self.rows) > 0xFFFE or len(self.items) > 0xFFFE or len(self.inventory) > 0xFFFF \
@@ -306,6 +410,8 @@ class ActorTables:
         assert len(actb) == ACTB_BYTES * len(self.rows)
         return {'ACTB': (bytes(actb), len(self.rows)), 'AINV': (ainv, len(self.inventory)),
                 'AITM': (aitm, len(self.items)), 'ASPT': (aspt, len(self.spells)), 'ASPL': (aspl, len(self.spell_list)),
+                'ASPC': (aspc, len(self.spells)), 'ASPE': (bytes(aspe), len(self.spells)),
+                'AEFF': (bytes(aeff), len(aeff) // AEFF_BYTES), 'AMGE': (bytes(amge), MAGIC_EFFECTS),
                 'OACT': (oact, len(objects))}
 
 

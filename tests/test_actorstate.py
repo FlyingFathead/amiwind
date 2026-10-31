@@ -43,6 +43,8 @@ def aidt(hello, fight, flee, alarm):
     return sub('AIDT', struct.pack('<HBBB3sI', hello, fight, flee, alarm, b'\0' * 3, 0))
 
 
+RESULT_CHOICE = 'Choice "Yes" 1 "No" 2'
+
 def master_bytes():
     out = [record('GMST', sub('NAME', 'fNPCbaseMagickaMult'), sub('FLTV', struct.pack('<f', 2.0)))]
     for i in range(27):   # skill i: governed by attribute i % 8, specialization i % 3
@@ -52,7 +54,16 @@ def master_bytes():
     out.append(record('RACE', sub('NAME', 'Test Race'), sub('RADT', radt), npcs('race power')))
     cldt = struct.pack('<3i', 0, 5, 0) + b''.join(struct.pack('<2i', m, M) for m, M in ((8, 5), (9, 6), (10, 7), (11, 4), (12, 0)))
     out.append(record('CLAS', sub('NAME', 'Test Class'), sub('CLDT', cldt + struct.pack('<2i', 0, 0))))
-    out.append(record('SPEL', sub('NAME', 'test spell'), sub('SPDT', struct.pack('<3i', 0, 5, 0))))
+    out.append(record('SPEL', sub('NAME', 'test spell'), sub('FNAM', 'Spell of Testing'), sub('SPDT', struct.pack('<3i', 0, 5, 0))))
+    # an autocalculated spell (SPDT flags 1): its cost from its effect and the magic effect's base cost (MGEF 14)
+    # the effects' names: one sEffect<Name> setting per effect index, in order after sEffects (effect 14 Fire Damage)
+    out.append(record('GMST', sub('NAME', 'sEffects'), sub('STRV', 'Effects')))
+    for i in range(14):
+        out.append(record('GMST', sub('NAME', 'sEffectTest%d' % i), sub('STRV', 'Test Effect %d' % i)))
+    out.append(record('GMST', sub('NAME', 'sEffectFireDamage'), sub('STRV', 'Fire Damage')))
+    out.append(record('MGEF', sub('INDX', struct.pack('<i', 14)), sub('MEDT', struct.pack('<ifi', 2, 5.0, 0) + bytes(24))))
+    out.append(record('SPEL', sub('NAME', 'auto spell'), sub('FNAM', 'Auto Spell'), sub('SPDT', struct.pack('<3i', 0, 99, 1)),
+                      sub('ENAM', struct.pack('<hbbiiiii', 14, -1, -1, 2, 0, 5, 10, 20))))
     out.append(record('SPEL', sub('NAME', 'race power'), sub('SPDT', struct.pack('<3i', 5, 0, 0))))
     out.append(record('SPEL', sub('NAME', 'other spell'), sub('SPDT', struct.pack('<3i', 1, 0, 0))))
     wpdt = struct.pack('<fihhffh6Bi', 20.0, 100, 1, 500, 1.25, 1.5, 0, 2, 10, 3, 12, 4, 14, 0)
@@ -66,11 +77,16 @@ def master_bytes():
     out.append(record('NPC_', sub('NAME', 'Fixed_NPC'), sub('RNAM', 'Test Race'), sub('CNAM', 'Test Class'),
                       sub('NPDT', npdt), sub('FLAG', struct.pack('<I', 1)), aidt(30, 90, 10, 5),
                       npco(2, 'test_sword'), npco(1, 'test_cuirass'), npco(5, 'gold_005'), npco(1, 'test_list'),
-                      npcs('test spell')))
+                      npcs('test spell'), npcs('auto spell')))
     out.append(record('NPC_', sub('NAME', 'auto_npc'), sub('RNAM', 'Test Race'), sub('CNAM', 'Test Class'),
                       sub('NPDT', struct.pack('<hBBb3si', 3, 60, 0, -1, b'\0' * 3, 7)), sub('FLAG', struct.pack('<I', 0x18))))
     out.append(record('NPC_', sub('NAME', 'player'), sub('RNAM', 'Test Race'), sub('CNAM', 'Test Class'),
                       sub('NPDT', npdt), sub('FLAG', struct.pack('<I', 0))))
+    # a dialogue topic with result scripts (DIALOGUE-COMPLETE-58): each compiled as a _dlg_ script, found by DRSC
+    out.append(record('DIAL', sub('NAME', 'test topic'), sub('DATA', b'\0')))
+    out.append(record('INFO', sub('INAM', '1'), sub('ONAM', 'Fixed_NPC'), sub('NAME', 'Well?'),
+                      sub('BNAM', RESULT_CHOICE)))
+    out.append(record('INFO', sub('INAM', '2'), sub('NAME', 'Bye.'), sub('BNAM', 'Goodbye')))
     crea = struct.pack('<24i', 0, 4, *([20] * 8), 30, 0, 60, 10, 40, 5, 15, 1, 3, 2, 4, 0, 0, 0)
     out.append(record('CREA', sub('NAME', 'test_rat'), sub('NPDT', crea), sub('FLAG', struct.pack('<I', 0x48)),
                       aidt(0, 100, 0, 0), npcs('other spell')))
@@ -130,7 +146,13 @@ class ActorTableTests(unittest.TestCase):
         sword = self.t.items[self.t.item_index['test_sword']]
         self.assertEqual((sword['type'], sword['health'], sword['damage']), (1, 500, bytes([2, 10, 3, 12, 4, 14])))
         spells = [self.names[self.t.spells[s]['id']] for s in self.t.spell_list[r['spell_first']:r['spell_first'] + r['spell_count']]]
-        self.assertEqual(spells, ['test spell', 'race power'])         # the race's powers join (OpenMW)
+        self.assertEqual(spells, ['test spell', 'auto spell', 'race power'])   # the race's powers join (OpenMW)
+        # ASPC: the names and the game's price cost (fixed SPDT 5; autocalculated 0.5 x 30 x 0.5 x 5 x 0.5 x 1.5 = 28.1)
+        info = {self.names[s['id']]: (self.names[s['name']] if s['name'] != 0xFFFF else None, s['cost'])
+                for s in self.t.spells}
+        self.assertEqual(info['test spell'], ('Spell of Testing', 5))
+        self.assertEqual(info['auto spell'], ('Auto Spell', 28))
+        self.assertEqual(len(self.f['ASPC']), 4 * len(self.t.spells))
 
     def test_autocalculated_npc_by_the_original_rule(self):
         import prepare_combat
@@ -150,9 +172,34 @@ class ActorTableTests(unittest.TestCase):
         self.assertEqual((r['health'], r['fatigue'], r['fight']), (30, 60, 100))
         self.assertTrue(r['flags'] & ACTOR_WALKS)
 
+    def test_every_magic_effect_has_the_games_name(self):
+        # the n-th sEffect setting names effect n (no hand list); an effect of the data without one stops the build
+        from mwscript import actors as AC
+        names = AC.effect_names(self.prog.actors.records)
+        self.assertEqual((names[0], names[13], names[14], names[15]), ('Test Effect 0', 'Test Effect 13', 'Fire Damage', ''))
+        mgef = dict(self.prog.actors.records['MGEF'])
+        mgef[15] = []
+        records = dict(self.prog.actors.records, MGEF=mgef)
+        self.assertEqual([i for i in range(AC.MAGIC_EFFECTS) if i in records['MGEF'] and not AC.effect_names(records)[i]], [15])
+
+    def test_dialogue_results_compiled_and_keyed(self):
+        # each result text a _dlg_ script (Choice and Goodbye carried by the host), DRSC sorted by (hash, length)
+        from mwscript.codegen import fnv1a, SCRIPT_DIALOGUE
+        rows = [struct.unpack_from('>IHHHH', self.f['DRSC'], 12 * i) for i in range(self.f['DRSC_rows'])]
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows, sorted(rows))
+        for text in (RESULT_CHOICE, 'Goodbye'):
+            raw = text.encode('cp1252')
+            match = [r for r in rows if r[0] == fnv1a(raw) and r[1] == len(raw)]
+            self.assertEqual(len(match), 1, text)
+            self.assertEqual(match[0][2], 0xFFFF)       # the speakers have no script: no locals
+            self.assertEqual(match[0][4], 0)            # compiled
+        flags = [s['flags'] for s in awms.scripts(self.f)]
+        self.assertEqual(sum(1 for x in flags if x & SCRIPT_DIALOGUE), 2)
+
     def test_file_reads_back(self):
         f = awms.read(self.raw)
-        for tag in ('OACT', 'ACTB', 'AINV', 'AITM', 'ASPT', 'ASPL'):
+        for tag in ('OACT', 'ACTB', 'AINV', 'AITM', 'ASPT', 'ASPL', 'ASPC'):
             self.assertIn(tag, f)
         self.assertLess(f['resident'], [16 + 16 * i for i in range(1)][0] + len(self.raw))
 
@@ -167,7 +214,7 @@ static int rd(void *c,uint32_t off,void *out,uint32_t n){(void)c;if(off+n>(uint3
 #define P(...) printf(__VA_ARGS__)
 int main(int argc,char **argv){
     FILE *f=fopen(argv[1],"rb");aw_actorstate_io_t io={rd,NULL};aw_actor_t *a,*r;int row,i;unsigned char save[8192];int n;
-    int sword=atoi(argv[2]),ring=atoi(argv[3]),spell=atoi(argv[4]),other=atoi(argv[5]);
+    int sword=atoi(argv[2]),ring=atoi(argv[3]),spell=atoi(argv[4]),other=atoi(argv[5]),auto_spell=atoi(argv[6]);
     fseek(f,0,SEEK_END);size=ftell(f);fseek(f,0,SEEK_SET);file=malloc(size);if(fread(file,1,size,f)!=(size_t)size)return 2;fclose(f);
     n=AW_ActorStateOpen(file,(uint32_t)size,&io);P("open %d count %d\n",n,AW_ActorCount());
     P("find %d %d %d %d\n",AW_ActorFind("FIXED_npc"),AW_ActorFind("test_rat"),AW_ActorFind("nobody"),AW_ActorFind("auto_npc"));
@@ -212,6 +259,11 @@ int main(int argc,char **argv){
       AW_ActorItemCount(a,ring),AW_ActorHasSpell(a,spell),AW_ActorHasSpell(a,other),AW_ActorDeadCount(AW_ActorFind("test_rat")));
     P("small %d\n",AW_ActorStateExport(save+4096,20));
     save[4]=9;P("bad %d\n",AW_ActorStateImport(save,n));
+    {char name[48];int type,cost,held[8],k,m;aw_actor_t *x=AW_ActorGet(4321,row,1);
+     k=AW_ActorSpellInfo(spell,&type,name,sizeof(name),&cost);P("aspc %d %d %s %d\n",k,type,name,cost);
+     m=AW_ActorSpells(x,held,8);P("held %d",m);for(k=0;k<m;k++)P(" %d",held[k]);P("\n");
+     {int it[8],ct[8],eq[8];char id[40];m=AW_ActorItems(x,it,ct,eq,8);P("stock %d",m);
+      for(k=0;k<m;k++){AW_ActorItemId(it[k],id,sizeof(id));P(" %s:%d",id,ct[k]);}P("\n");}}
     /* the pool: unchanged records give way, changed ones stay */
     AW_ActorStateImport(NULL,0);
     for(i=0;i<AW_ACTOR_POOL+10;i++)if(!AW_ActorGet(5000+i,row,1))break;
@@ -219,6 +271,49 @@ int main(int argc,char **argv){
     for(i=0;i<AW_ACTOR_POOL;i++){aw_actor_t *x=AW_ActorGet(9000+i,row,1);if(!x)break;AW_ActorSetStat(x,AWA_LEVEL,9);}
     P("changed %d full %d\n",i,AW_ActorGet(99999,row,1)==NULL);
     P("player %d resident %lu\n",AW_ActorPlayer()!=NULL && AW_ActorPlayer()->base==(uint16_t)AW_ActorFind("player"),AW_ActorStateResident());
+    /* sold to a merchant that does not stock it: kept, carried through a save, bought back (BARTER-SOLD-ITEM-LOST-58) */
+    {unsigned char blob[256];int k,m,count;uint32_t ref;char id[40];
+     k=AW_SoldAdd(1234,"misc_vase",1);k+=AW_SoldAdd(1234,"MISC_Vase",1);k+=AW_SoldAdd(77,"misc_vase",1);
+     m=AW_SoldExport(blob,sizeof(blob));AW_SoldReset();P("sold %d export %d after-reset %d",k,m,AW_SoldCount());
+     k=AW_SoldImport(blob,m);P(" import %d count %d",k,AW_SoldCount());
+     for(k=0;k<AW_SoldCount();k++){AW_SoldAt(k,&ref,id,sizeof(id),&count);P(" %u:%s:%d",(unsigned)ref,id,count);}
+     {int b1=AW_SoldAdd(1234,"misc_vase",-1),b2=AW_SoldAdd(1234,"misc_vase",-1),b3=AW_SoldAdd(1234,"misc_vase",-1);
+      P(" back %d %d %d left %d",b1,b2,b3,AW_SoldCount());}
+     blob[5]=9;k=AW_SoldImport(blob,m);P(" bad %d %d\n",k,AW_SoldCount());AW_SoldReset();}
+    /* the magic effects and a spell's effects (Spellmaking, Enchanting) */
+    {aw_mgef_t me;aw_spell_effect_t se[4];int k=AW_ActorMagicEffect(14,&me),m=AW_ActorSpellEffects(auto_spell,se,4);
+     P("mgef %d %u %.1f %d %s none %d effects %d",k,(unsigned)me.flags,me.base_cost,me.school,me.name,AW_ActorMagicEffect(3,&me),m);
+     if(m>0)P(" %d %d %d %u %u %u %u",se[0].effect,se[0].skill,se[0].range,se[0].area,se[0].duration,se[0].magnitude_min,se[0].magnitude_max);
+     P("\n");}
+    /* the bound: past AW_SoldMax kinds the oldest is forgotten, never refused */
+    {char id[40];int k,ok=1,count;uint32_t ref;
+     for(k=0;k<=AW_SoldMax();k++){sprintf(id,"thing_%d",k);ok&=AW_SoldAdd(5,id,1);}
+     AW_SoldAt(0,&ref,id,sizeof(id),&count);
+     P("cap %d ok %d count %d first %s\n",AW_SoldMax(),ok,AW_SoldCount(),id);AW_SoldReset();}
+    /* made spells and enchanted items: added, carried through a save, bounded at 64 each */
+    {aw_made_spell_t s;aw_made_item_t m;unsigned char blob[32768];int k,len,full=0;
+     memset(&s,0,sizeof(s));strcpy(s.name,"My Fire");s.effects=2;s.effect[0].effect=14;s.effect[0].range=2;
+     s.effect[0].magnitude_min=5;s.effect[0].magnitude_max=10;s.effect[1].effect=1;s.effect[1].duration=30;
+     memset(&m,0,sizeof(m));strcpy(m.base,"steel_longsword");strcpy(m.name,"Biter");m.charge=40;m.charge_max=40;
+     m.cast_type=2;m.effects=1;m.effect[0].effect=14;m.effect[0].magnitude_max=7;
+     k=AW_MadeSpellAdd(&s);k+=AW_MadeItemAdd(&m);len=AW_MadeExport(blob,sizeof(blob));AW_MadeReset();
+     P("made %d export %d",k,len);k=AW_MadeImport(blob,len);
+     P(" import %d spells %d items %d %s %d %u %s %s %.0f",k,AW_MadeSpellCount(),AW_MadeItemCount(),AW_MadeSpellAt(0)->name,
+       AW_MadeSpellAt(0)->effects,(unsigned)AW_MadeSpellAt(0)->effect[1].duration,AW_MadeItemAt(0)->base,AW_MadeItemAt(0)->name,
+       AW_MadeItemAt(0)->charge);
+     for(k=0;k<70;k++)if(AW_MadeSpellAdd(&s)<0)full++;
+     blob[4]=200;k=AW_MadeImport(blob,len);P(" full %d bad %d %d\n",full,k,AW_MadeSpellCount());AW_MadeReset();}
+    /* filled soul gems: the soul from the creature record, through a save */
+    {unsigned char blob[512];int k,len,creature;char gem[40];
+     k=AW_GemAdd("misc_soulgem_petty",AW_ActorFind("test_rat"));len=AW_GemsExport(blob,sizeof(blob));AW_GemsReset();
+     P("gem %d export %d",k,len);k=AW_GemsImport(blob,len);AW_GemAt(0,gem,sizeof(gem),&creature);
+     P(" import %d %s soul %d",k,gem,AW_GemSoul(0));k=AW_GemRemove(0);P(" removed %d left %d\n",k,AW_GemCount());AW_GemsReset();}
+    /* places revealed by ShowMap: once each (any case), through a save */
+    {unsigned char blob[512];int k,len;
+     k=AW_RevealedAdd("Tel Fyr");k+=AW_RevealedAdd("TEL FYR");k+=AW_RevealedAdd("Gnaar Mok");
+     len=AW_RevealedExport(blob,sizeof(blob));AW_RevealedReset();
+     P("revealed %d count",k);k=AW_RevealedImport(blob,len);P(" %d export %d import %d %s %s\n",AW_RevealedCount(),len,k,
+       AW_RevealedAt(0),AW_RevealedAt(1));AW_RevealedReset();}
     AW_ActorStateClose();free(file);return 0;
 }
 '''
@@ -241,7 +336,7 @@ class EngineTests(unittest.TestCase):
         assert built.returncode == 0, built.stdout + built.stderr
         t = cls.prog.actors
         args = [str(t.item_index['test_sword']), str(t.item_index['test_ring']), str(t.spell_index['test spell']),
-                str(t.spell_index['other spell'])]
+                str(t.spell_index['other spell']), str(t.spell_index['auto spell'])]
         r = subprocess.run([str(cls.tmp / 'h'), str(cls.tmp / 'a.awm'), *args], capture_output=True, text=True)
         assert r.returncode == 0, r.stdout + r.stderr
         cls.out = r.stdout.splitlines()
@@ -281,11 +376,49 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(self.out[27], 'after 150 60 ring 5 spells 1 1 count 1')
         self.assertEqual(self.out[28:30], ['small -1', 'bad 0'])
 
+    def test_spell_info_and_held_spells(self):
+        # ASPC read back natively: the name and cost; a fresh record of the NPC holds its base list (its two spells
+        # and the race power)
+        t = self.prog.actors
+        self.assertEqual(self.out[30], 'aspc 1 0 Spell of Testing 5')
+        want = [t.spell_index[k] for k in ('test spell', 'auto spell', 'race power')]
+        self.assertEqual(self.out[31], 'held 3 ' + ' '.join(map(str, want)))
+
+    def test_stock(self):
+        # a merchant's stock for Barter: its things with counts, gold aside (a fresh record: the base list)
+        self.assertEqual(self.out[32], 'stock 3 test_sword:2 test_cuirass:1 test_ring:1')
+
+    def test_sold_things_survive_a_save_and_are_bought_back(self):
+        # BARTER-SOLD-ITEM-LOST-58: sell twice (any case) to merchant 1234 and once to 77, save, reopen, buy back
+        self.assertEqual(self.out[36], 'sold 3 export 38 after-reset 0 import 38 count 2 1234:misc_vase:2 77:misc_vase:1 '
+                                       'back 1 1 0 left 1 bad -1 0')
+
+    def test_magic_and_spell_effects(self):
+        # AMGE 14 (school 2, base 5.0), an effect index the master lacks, and the autocalculated spell's one effect
+        self.assertEqual(self.out[37], 'mgef 1 0 5.0 2 Fire Damage none 0 effects 1 14 -1 2 0 5 10 20')
+
+    def test_sold_things_are_bounded(self):
+        # 1025 kinds: all taken, the list stays at 1024, the oldest (thing_0) forgotten
+        self.assertEqual(self.out[38], 'cap 1024 ok 1 count 1024 first thing_1')
+
+    def test_made_things_survive_a_save_and_are_bounded(self):
+        # 5 + 33 + 2 x 14 + 5 + 82 + 14 = 167 bytes; 64 spells at most (63 more fit, 7 of 70 refused); a bad count refused
+        self.assertEqual(self.out[39], 'made 0 export 167 import 167 spells 1 items 1 My Fire 2 30 steel_longsword Biter 40 '
+                                       'full 7 bad -1 0')
+
+    def test_soul_gems(self):
+        # the rat's soul (its record's soul, 10) read through the creature row; 5 + 1 + 18 + 2 = 26 bytes
+        self.assertEqual(self.out[40], 'gem 0 export 26 import 26 misc_soulgem_petty soul 10 removed 1 left 0')
+
+    def test_revealed_places(self):
+        # ShowMap's places: kept once (any case), 5 + 8 + 10 = 23 bytes saved
+        self.assertEqual(self.out[41], 'revealed 3 count 2 export 23 import 23 Tel Fyr Gnaar Mok')
+
     def test_pool(self):
-        self.assertEqual(self.out[30], 'pool %d evicted 10' % (128 + 10))
-        self.assertEqual(self.out[31], 'changed 128 full 1')
-        self.assertTrue(self.out[32].startswith('player 1 resident '))
-        self.assertLess(int(self.out[32].split()[3]), 40000)
+        self.assertEqual(self.out[33], 'pool %d evicted 10' % (128 + 10))
+        self.assertEqual(self.out[34], 'changed 128 full 1')
+        self.assertTrue(self.out[35].startswith('player 1 resident '))
+        self.assertLess(int(self.out[35].split()[3]), 40000)
 
 
 if __name__ == '__main__':

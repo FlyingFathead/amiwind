@@ -30,6 +30,7 @@
 #include "aw_talk.h"
 #include "aw_glut.h"
 #include "aw_dial.h"
+#include "aw_inventory.h"
 #include <ctype.h>
 
 #define FILE_NAME "mwscript.awm"
@@ -736,6 +737,8 @@ static int same_id(const char *a,const char *b){
     for(;*a && *b;a++,b++)if(tolower((unsigned char)*a)!=tolower((unsigned char)*b))return 0;
     return *a==*b;
 }
+/* the dialogue window's Choice and Goodbye (aw_dialwin.c sets it while a result script runs): TEXTS NULL = Goodbye */
+void (*aw_dial_result_choice)(const char **texts,int ntexts,const aw_mwcell_t *numbers,int count);
 static int host_call(int instance,int target,int function,const aw_mwcell_t *numbers,int count,
                      const unsigned char *strings,int nstrings,aw_mwcell_t *result){
     char own[64];const char *faction;int value=count>0?numbers[0].i:0;
@@ -778,6 +781,30 @@ static int host_call(int instance,int target,int function,const aw_mwcell_t *num
         if(!faction || count<1)return 1;
         AW_StandingSetFactionReputation(faction,function==AWF_SETPCFACREP?value:AW_StandingFactionReputation(faction)+value);
         AW_MwvmStateChanged();return 1;
+    case AWF_MODFACTIONREACTION:case AWF_SETFACTIONREACTION:{
+        /* ModFactionReaction / SetFactionReaction FACTION1 FACTION2 VALUE: faction 1's reaction toward faction 2 */
+        const char *a=call_string(strings,nstrings,0),*b=call_string(strings,nstrings,1);
+        if(!a || !b || count<1)return 0;
+        if(!AW_DialReactionChange(a,b,numbers[count-1].i,function==AWF_SETFACTIONREACTION)){
+            Con_DPrintf("MWScript: faction reaction changes are full (32); %s toward %s not kept\n",a,b);return 0;}
+        AW_MwvmStateChanged();return 1;}
+    case AWF_SHOWMAP:{
+        /* ShowMap TEXT: the exterior cells whose name holds TEXT become known on the map (OpenMW OpShowMap); kept
+         * for the map's place markers (INGAME-MAP-ORIGINAL-57), which do not exist yet */
+        const char *text=call_string(strings,nstrings,0);
+        if(!text || !*text)return 0;
+        if(!AW_RevealedAdd(text)){Con_DPrintf("MWScript: ShowMap %s not kept (128 places at most)\n",text);return 0;}
+        AW_MwvmStateChanged();return 1;}
+    case AWF_CHOICE:case AWF_GOODBYE:
+        /* Choice and Goodbye in a dialogue result script (OpenMW dialogueextensions.cpp OpChoice, OpGoodbye): the
+         * dialogue window shows the choices (each text with its number) or ends the conversation with Goodbye alone;
+         * outside a conversation they do nothing */
+        if(!aw_dial_result_choice)return 0;
+        if(function==AWF_GOODBYE){aw_dial_result_choice(NULL,0,NULL,0);return 1;}
+        {const char *texts[24];int k,n=0;
+         for(k=0;k<nstrings && k<24;k++)texts[n++]=call_string(strings,nstrings,k);
+         aw_dial_result_choice(texts,n,numbers,count);}
+        return 1;
     case AWF_ADDTOPIC:
         /* AddTopic (OpenMW dialogueextensions.cpp OpAddTopic: the topic joins the player's known list; the dialogue
          * window shows it, DIALOGUE-57): the compiler hands the topic's TOPC row as the number */
@@ -1015,6 +1042,45 @@ void AW_MwscriptDispositionFacts(const char *record,unsigned long reference,int 
     if(reference && (a=AW_ActorGet((uint32_t)reference,row,0))!=NULL)f->base=(int)AW_ActorStat(a,AWA_DISPOSITION);
     if(aw_character.valid && b.race!=AW_ACTOR_NONE && read_string(b.race,race,sizeof(race)))
         f->same_race=same_id(race,aw_races[aw_character.race].id);
+}
+/* Persuasion (DIALOGUE-COMPLETE-58): the player's and the speaker's persuasion stats, the speaker's Fight and Flee;
+ * the speaker's actor record (made when it has none yet: a persuasion changes it). 1 when the speaker's record is there. */
+static aw_actor_t *speaker_actor(const char *record,unsigned long reference){
+    int row;
+    if(!AW_MwscriptActors() || !record || (row=AW_ActorFind(record))<0)return NULL;
+    return AW_ActorGet((uint32_t)reference,row,1);
+}
+int AW_MwscriptPersons(const char *record,unsigned long reference,aw_dial_person_t *player,aw_dial_person_t *npc,
+                       int *fight,int *flee){
+    aw_actor_t *a=speaker_actor(record,reference);aw_actor_base_t b;
+    memset(player,0,sizeof(*player));memset(npc,0,sizeof(*npc));player->fatigue=npc->fatigue=1;*fight=*flee=0;
+    if(aw_character.valid){
+        player->personality=aw_character.attributes[6];player->luck=aw_character.attributes[7];
+        player->speechcraft=aw_character.skills[25];player->mercantile=aw_character.skills[24];
+        player->level=(float)aw_character.level;player->reputation=(float)AW_StandingReputation();
+        player->fatigue=aw_character.maximum[2]>0?aw_character.current[2]/aw_character.maximum[2]:1;
+    }
+    if(!a || !AW_ActorBase(a->base,&b))return 0;
+    npc->personality=AW_ActorStat(a,AWA_ATTRIBUTE+6);npc->luck=AW_ActorStat(a,AWA_ATTRIBUTE+7);
+    npc->speechcraft=AW_ActorStat(a,AWA_SKILL+25);npc->mercantile=AW_ActorStat(a,AWA_SKILL+24);
+    npc->level=AW_ActorStat(a,AWA_LEVEL);npc->reputation=(float)b.reputation;npc->fatigue=AW_ActorRatio(a,AWA_FATIGUE);
+    *fight=(int)AW_ActorStat(a,AWA_FIGHT);*flee=(int)AW_ActorStat(a,AWA_FLEE);
+    return 1;
+}
+/* The speaker's own disposition, Fight and Flee set (the actor record, saved with the game). */
+void AW_MwscriptSetSpeaker(const char *record,unsigned long reference,int disposition,int fight,int flee){
+    aw_actor_t *a=speaker_actor(record,reference);
+    if(!a)return;
+    if(disposition>=0)AW_ActorSetStat(a,AWA_DISPOSITION,(float)disposition);
+    if(fight>=0)AW_ActorSetStat(a,AWA_FIGHT,(float)fight);
+    if(flee>=0)AW_ActorSetStat(a,AWA_FLEE,(float)flee);
+    AW_MwvmStateChanged();
+}
+/* The player's gold (the scripts' item count of gold_001), changed by DELTA first. */
+int AW_MwscriptPlayerGold(int delta){
+    long gold=AW_StateGet(&aw_state,AW_ITEM,"gold_001");
+    if(delta){gold+=delta;if(gold<0)gold=0;AW_StateSet(&aw_state,AW_ITEM,"gold_001",(int32_t)gold);AW_MwvmStateChanged();}
+    return (int)gold;
 }
 /* An NPC record's faction id (the actor table), "" when it has none or the table is not loaded. */
 int AW_MwscriptActorFaction(const char *record,char *out,int capacity);
@@ -1350,6 +1416,21 @@ static int actors_export(unsigned char *out,int capacity){
     {int f=AW_EffectsExport(out+n+s+t,capacity-n-s-t-8);   /* the active spell effects (SPELL-EFFECTS-57) */
      if(f<0)return -1;
      t+=f;}
+    {int k=AW_SoldExport(out+n+s+t,capacity-n-s-t-8);   /* things sold to merchants (AWSL, BARTER-SOLD-ITEM-LOST-58) */
+     if(k<0)return -1;
+     t+=k;
+     k=AW_MadeExport(out+n+s+t,capacity-n-s-t-8);           /* made spells and enchanted items (AWMD, AWEN) */
+     if(k<0)return -1;
+     t+=k;
+     k=AW_GemsExport(out+n+s+t,capacity-n-s-t-8);           /* filled soul gems (AWSG) */
+     if(k<0)return -1;
+     t+=k;
+     k=AW_DialReactionsExport(out+n+s+t,capacity-n-s-t-8);  /* the scripts' faction reaction changes (AWFR) */
+     if(k<0)return -1;
+     t+=k;
+     k=AW_RevealedExport(out+n+s+t,capacity-n-s-t-8);       /* places revealed by ShowMap (AWMP) */
+     if(k<0)return -1;
+     t+=k;}
     if(aw_mwscript_packages_export){   /* the actors' travel and follow packages (aw_ambient.c, SAVEGAME-COMPLETE-57) */
         int k=aw_mwscript_packages_export(out+n+s+t,capacity-n-s-t-8);
         if(k<0)return -1;
@@ -1359,7 +1440,7 @@ static int actors_export(unsigned char *out,int capacity){
 }
 static void actors_import(const unsigned char *data,int bytes){
     int actors=bytes;
-    AW_StandingReset();AW_EffectsReset();
+    AW_StandingReset();AW_EffectsReset();AW_SoldReset();AW_MadeReset();AW_GemsReset();AW_DialReactionsReset();AW_RevealedReset();
     if(aw_mwscript_packages_import)aw_mwscript_packages_import(NULL,0);   /* none until the save's block says */
     if(topic_bytes)memset(known_topics,0,topic_bytes);
     if(data && bytes>=8 && !memcmp(data+bytes-4,"AWTR",4)){
@@ -1382,6 +1463,26 @@ static void actors_import(const unsigned char *data,int bytes){
                     if(rest+fx>tail || !AW_EffectsImport(p+rest,(int)fx))Con_Printf("Saved spell effects unreadable: none active.\n");
                     else rest+=fx;
                 }
+                if(rest+6<=tail && !memcmp(p+rest,"AWSL",4)){   /* things sold to merchants (v0.0.58) */
+                    int k=AW_SoldImport(p+rest,(int)(tail-rest));
+                    if(k<0)Con_Printf("Saved merchants' bought things unreadable: none kept.\n");else rest+=(unsigned long)k;
+                }
+                if(rest+10<=tail && !memcmp(p+rest,"AWMD",4)){   /* made spells and enchanted items (v0.0.58) */
+                    int k=AW_MadeImport(p+rest,(int)(tail-rest));
+                    if(k<0)Con_Printf("Saved made spells and enchanted items unreadable: none kept.\n");else rest+=(unsigned long)k;
+                }
+                if(rest+5<=tail && !memcmp(p+rest,"AWSG",4)){   /* filled soul gems (v0.0.58) */
+                    int k=AW_GemsImport(p+rest,(int)(tail-rest));
+                    if(k<0)Con_Printf("Saved soul gems unreadable: none filled.\n");else rest+=(unsigned long)k;
+                }
+                if(rest+5<=tail && !memcmp(p+rest,"AWFR",4)){   /* faction reaction changes (v0.0.58) */
+                    int k=AW_DialReactionsImport(p+rest,(int)(tail-rest));
+                    if(k<0)Con_Printf("Saved faction reactions unreadable: the game's own.\n");else rest+=(unsigned long)k;
+                }
+                if(rest+5<=tail && !memcmp(p+rest,"AWMP",4)){   /* places revealed by ShowMap (v0.0.58) */
+                    int k=AW_RevealedImport(p+rest,(int)(tail-rest));
+                    if(k<0)Con_Printf("Saved revealed places unreadable: none kept.\n");else rest+=(unsigned long)k;
+                }
                 if(rest+6<=tail && !memcmp(p+rest,"AWPK",4) && aw_mwscript_packages_import &&
                    !aw_mwscript_packages_import(p+rest,(int)(tail-rest)))Con_Printf("Saved actor packages unreadable: none kept.\n");
             }
@@ -1398,5 +1499,220 @@ void AW_MwscriptInit(void){
     aw_object_lock_level=AW_ObjectLockLevel;   /* the doors read a script's Lock and Unlock */
     aw_scene_intercept=aw_hinged_intercept=object_intercept;   /* OnActivate takes a door's use */
     aw_actor_disabled=AW_ObjectDisabled;   /* the CHIM window spawns no disabled actor */
+    aw_inventory_made_item=AW_MadeItemAt;   /* enchanted items (aw_made_N) read through the inventory */
     Cmd_AddCommand("aw_mwscript_status",status);
+}
+/* the speaker of a conversation attacks when its Fight rating with the conversation's disposition reaches 100 */
+int AW_MwscriptSpeakerAggro(edict_t *e,int disposition){
+    eval_t *v,*r;aw_actor_t *a;aw_fighter_t sheet;int got;
+    if(!e || e==sv_player || !(v=GetEdictFieldValue(e,"aw_source_id")) || !v->string)return -1;
+    r=GetEdictFieldValue(e,"aw_ref");
+    if(!(a=speaker_actor(pr_strings+v->string,r?(unsigned long)r->_float:0)) || (a->flags&AWL_DEAD))return -1;
+    if(!AW_CombatActorLoad(pr_strings+v->string,&sheet))return -1;
+    to_fighter(a,&sheet);
+    if((got=AW_CombatAggro(e,&sheet,NULL,disposition,NULL,NULL))>0){a->flags|=AWL_COMBAT;combat_starts++;}
+    return got;
+}
+int AW_MwscriptActorRow(const char *record){
+    int row;
+    return AW_MwscriptActors() && record && (row=AW_ActorFind(record))>=0?row:-1;
+}
+/* the engage tick's part: memory only (the actor pool, the player's standing) */
+void AW_MwscriptDispositionNow(int actor_row,unsigned long reference,int base,aw_dial_facts_t *f){
+    aw_actor_t *a;
+    f->base=base;f->rank=standing_rank;f->bounty=AW_StandingCrime();
+    f->personality=aw_character.valid?(float)aw_character.attributes[6]:50.0f;
+    if(reference && actor_row>=0 && AW_MwscriptActors() && (a=AW_ActorGet((uint32_t)reference,actor_row,0))!=NULL)
+        f->base=(int)AW_ActorStat(a,AWA_DISPOSITION);
+}
+/* Training (DIALOGUE-COMPLETE-58): the speaker's skills (its actor record), the player's skill (raised by one when
+ * RAISE, at most 100) and attribute */
+int AW_MwscriptNpcSkills(const char *record,unsigned long reference,float *out){
+    aw_actor_t *a=speaker_actor(record,reference);int i;
+    for(i=0;i<27;i++)out[i]=a?AW_ActorStat(a,AWA_SKILL+i):0;
+    return a!=NULL;
+}
+int AW_MwscriptPlayerSkill(int which,int raise){
+    if(!aw_character.valid || which<0 || which>=27)return 0;
+    if(raise && aw_character.skills[which]<100){aw_character.skills[which]++;AW_MwvmStateChanged();}
+    return aw_character.skills[which];
+}
+int AW_MwscriptPlayerAttribute(int attribute){
+    return aw_character.valid && attribute>=0 && attribute<8?aw_character.attributes[attribute]:0;
+}
+/* Spells for sale (DIALOGUE-COMPLETE-58; OpenMW SpellBuyingWindow): the speaker's spells of the plain spell type the
+ * player does not know yet, sorted by name (any case); their names and costs; buying one adds it to the player */
+int AW_MwscriptSpellsForSale(const char *record,unsigned long reference,int *out,int max,char (*names)[48],int *costs){
+    aw_actor_t *a=speaker_actor(record,reference),*p=AW_ActorPlayer();int held[64],n,i,j,k=0,type;
+    if(!a || !p)return 0;
+    n=AW_ActorSpells(a,held,64);
+    for(i=0;i<n && k<max;i++){
+        char name[48];int cost;
+        if(!AW_ActorSpellInfo(held[i],&type,name,sizeof(name),&cost) || type!=0 || AW_ActorHasSpell(p,held[i]))continue;
+        for(j=k;j>0 && Q_strcasecmp(names[j-1],name)>0;j--){out[j]=out[j-1];costs[j]=costs[j-1];memcpy(names[j],names[j-1],48);}
+        out[j]=held[i];costs[j]=cost;memcpy(names[j],name,48);k++;
+    }
+    return k;
+}
+int AW_MwscriptBuySpell(int spell){
+    aw_actor_t *p=AW_ActorPlayer();
+    return p && AW_ActorAddSpell(p,spell);
+}
+static int ware_of(const char *id,aw_dial_ware_t *w){
+    aw_inventory_item_t it;
+    if(!AW_InventoryRead(id,&it))return 0;
+    Q_snprintf(w->id,sizeof(w->id),"%s",id);Q_snprintf(w->name,sizeof(w->name),"%s",it.name[0]?it.name:id);
+    w->value=it.value;w->category=it.category;w->enchanted=it.enchantment[0]!=0;
+    return 1;
+}
+/* the merchant's stock: what its record holds now, equipped things and gold aside (OpenMW trades neither) */
+int AW_MwscriptStock(const char *record,unsigned long reference,aw_dial_ware_t *out,int max){
+    aw_actor_t *a=speaker_actor(record,reference);int items[64],counts[64],equipped[64],n,i,k=0;char id[40];
+    if(!a)return 0;
+    n=AW_ActorItems(a,items,counts,equipped,64);
+    for(i=0;i<n && k<max;i++){
+        if(equipped[i] || !AW_ActorItemId(items[i],id,sizeof(id)) || !ware_of(id,&out[k]))continue;
+        out[k].count=counts[i];out[k].row=items[i];k++;
+    }
+    for(i=0;i<AW_SoldCount() && k<max;i++){   /* what the player sold it (BARTER-SOLD-ITEM-LOST-58) */
+        uint32_t ref;int count;
+        if(AW_SoldAt(i,&ref,id,sizeof(id),&count) && ref==(uint32_t)reference && ware_of(id,&out[k])){out[k].count=count;out[k].row=-2;k++;}
+    }
+    return k;
+}
+/* the player's inventory (aw_state's items), gold and equipped things aside */
+int AW_MwscriptPlayerWares(aw_dial_ware_t *out,int max){
+    int i,k=0;
+    for(i=0;i<aw_state.count[AW_ITEM] && k<max;i++){
+        const aw_value_t *v=&aw_state.values[AW_ITEM][i];
+        if(v->value<=0 || !Q_strcasecmp((char *)v->id,"gold_001") || AW_InventoryEquipped(&aw_state,v->id) ||
+           !ware_of(v->id,&out[k]))continue;
+        out[k].count=v->value;out[k].row=-1;k++;
+    }
+    return k;
+}
+int AW_MwscriptTrade(const char *record,unsigned long reference,const aw_dial_ware_t *w,int buy,int price){
+    aw_actor_t *a=speaker_actor(record,reference);int gold=AW_MwscriptPlayerGold(0);
+    if(!a)return 0;
+    if(buy){
+        if(gold<price)return 0;
+        if(w->row==-2){if(!AW_SoldAdd((uint32_t)reference,w->id,-1))return 0;}
+        else if(w->row<0 || AW_ActorRemoveItem(a,w->row,1)!=1)return 0;
+        AW_ItemAdd(&aw_state,w->id,1);AW_MwscriptPlayerGold(-price);
+    }else{
+        int row=w->row,items[64],counts[64],equipped[64],n,i;char id[40];
+        if(AW_StateGet(&aw_state,AW_ITEM,w->id)<1)return 0;
+        if(row<0){   /* the merchant's own row for the thing when it stocks it (no file-wide search on a sale) */
+            n=AW_ActorItems(a,items,counts,equipped,64);
+            for(i=0;i<n;i++)if(AW_ActorItemId(items[i],id,sizeof(id)) && !Q_strcasecmp(id,(char *)w->id)){row=items[i];break;}
+        }
+        if(row>=0 && !AW_ActorAddItem(a,row,1))return 0;   /* the record's change list is full (MERCHANT-ITEM-CAP-58) */
+        if(row<0 && !AW_SoldAdd((uint32_t)reference,w->id,1)){   /* not stocked: kept as sold to this merchant */
+            Con_Printf("Barter: no memory to keep %s at the merchant; it stays with you.\n",w->id);return 0;}
+        AW_ItemAdd(&aw_state,w->id,-1);AW_MwscriptPlayerGold(price);
+    }
+    AW_MwvmStateChanged();
+    return 1;
+}
+/* Repair (OpenMW MerchantRepair): the player's weapons and armour below their full health, equipped ones too, with
+ * the record's health and the current points; mending one sets it to full */
+int AW_MwscriptRepairables(aw_dial_ware_t *out,int *maximum,int *durability,int max){
+    int i,k=0;aw_inventory_item_t it;
+    for(i=0;i<aw_state.count[AW_ITEM] && k<max;i++){
+        const aw_value_t *v=&aw_state.values[AW_ITEM][i];int full,now;
+        if(v->value<=0 || !AW_InventoryRead(v->id,&it) || (it.category!=AW_INV_WEAPON && it.category!=AW_INV_ARMOUR))continue;
+        full=(int)it.health;now=(int)(AW_InventoryCondition(v->id)*it.health);
+        if(full<=0 || now>=full || !ware_of(v->id,&out[k]))continue;
+        out[k].count=v->value;out[k].row=-1;maximum[k]=full;durability[k]=now;k++;
+    }
+    return k;
+}
+int AW_MwscriptMend(const char *id){return AW_InventorySetCondition(id,1);}
+/* Spellmaking (OpenMW SpellCreationDialog / EffectEditorBase::startEditing): the effects the player may use, those of
+ * the plain spells he knows and of the spells he made, each effect with its skill or attribute once */
+int AW_MwscriptKnownEffects(aw_spell_effect_t *out,int max){
+    aw_actor_t *p=AW_ActorPlayer();int held[64],n=p?AW_ActorSpells(p,held,64):0,i,j,k=0,m,type;aw_spell_effect_t e[8];
+    char name[8];int cost;
+    for(i=0;i<n+AW_MadeSpellCount();i++){
+        if(i<n){
+            if(!AW_ActorSpellInfo(held[i],&type,name,sizeof(name),&cost) || type!=0)continue;
+            m=AW_ActorSpellEffects(held[i],e,8);
+        }else{
+            const aw_made_spell_t *s=AW_MadeSpellAt(i-n);
+            m=s?s->effects:0;
+            for(j=0;j<m;j++)e[j]=s->effect[j];
+        }
+        for(j=0;j<m && k<max;j++){
+            int q,seen=0;
+            for(q=0;q<k;q++)if(out[q].effect==e[j].effect && out[q].skill==e[j].skill && out[q].attribute==e[j].attribute)seen=1;
+            if(!seen)out[k++]=e[j];
+        }
+    }
+    return k;
+}
+/* Enchanting (OpenMW EnchantingDialog): the player's things that can take an enchantment (not enchanted, enchantment
+ * points above 0: weapons, armour, clothing, books), with their points and kind */
+int AW_MwscriptEnchantables(aw_dial_ware_t *out,int *points,int *kind,int max){
+    int i,k=0;aw_inventory_item_t it;
+    for(i=0;i<aw_state.count[AW_ITEM] && k<max;i++){
+        const aw_value_t *v=&aw_state.values[AW_ITEM][i];
+        if(v->value<=0 || !AW_InventoryRead(v->id,&it) || it.enchantment[0] || it.enchant_capacity<=0)continue;
+        if(it.category!=AW_INV_WEAPON && it.category!=AW_INV_ARMOUR && it.category!=AW_INV_CLOTHING && it.category!=AW_INV_BOOK)continue;
+        if(!ware_of(v->id,&out[k]))continue;
+        out[k].count=v->value;out[k].row=-1;points[k]=it.enchant_capacity;
+        kind[k]=it.category==AW_INV_WEAPON?AW_DIAL_ENCHANT_WEAPON:it.category==AW_INV_BOOK?AW_DIAL_ENCHANT_BOOK:AW_DIAL_ENCHANT_WORN;
+        k++;
+    }
+    return k;
+}
+/* the enchanting: the item and the filled gem leave the inventory (Azura's Star stays, emptied), the made item comes;
+ * its id aw_made_N. 1 done. */
+int AW_MwscriptEnchant(const aw_made_item_t *made,int gem){
+    char id[48],gem_id[40];int creature,n;
+    if(!made || !AW_GemAt(gem,gem_id,sizeof(gem_id),&creature) || AW_StateGet(&aw_state,AW_ITEM,made->base)<1)return 0;
+    if((n=AW_MadeItemAdd(made))<0)return 0;
+    Q_snprintf(id,sizeof(id),"%s%d",AW_MADE_ITEM_PREFIX,n);
+    AW_ItemAdd(&aw_state,made->base,-1);AW_ItemAdd(&aw_state,id,1);
+    AW_GemRemove(gem);
+    if(Q_strcasecmp(gem_id,"misc_soulgem_azura"))AW_ItemAdd(&aw_state,gem_id,-1);
+    AW_MwvmStateChanged();
+    return 1;
+}
+/* one stat of the speaker's actor record (AWA_*): the enchanter's Enchant and Intelligence for its chance */
+float AW_MwscriptSpeakerStat(const char *record,unsigned long reference,int stat){
+    aw_actor_t *a=speaker_actor(record,reference);
+    return a?AW_ActorStat(a,stat):0;
+}
+/* --- dialogue result scripts (DIALOGUE-COMPLETE-58) ---
+ * The answer's result text is found in the DRSC rows (on disk, sorted by the text's FNV-1a hash, its length, the
+ * speaker's script) by its hash and length, so a hash collision with another length never runs another text's
+ * script; of the rows for the text, the one compiled with the speaker's own script runs on its instance. */
+static unsigned long results_run,results_missing,results_broken;
+/* the file's bytes at OFFSET (from its start), for the DRSC rows on disk */
+typedef struct {FILE *f;long base;} file_reader_t;
+static int read_file_at(void *user,uint32_t offset,void *out,uint32_t bytes){
+    file_reader_t *r=(file_reader_t *)user;
+    return !fseek(r->f,r->base+(long)offset,SEEK_SET) && fread(out,1,bytes,r->f)==bytes;
+}
+int AW_MwscriptRunResult(const char *record,unsigned long reference,const char *text,int length){
+    int speaker=-1,k,chosen,row_speaker,broken;file_reader_t r;
+    if(!text || length<=0)return 0;
+    for(k=0;k<AW_MwvmInstanceCount();k++){   /* the speaker's attached script, when it has one */
+        aw_mwvm_instance_t *in=AW_MwvmInstance(k);
+        if(in && (in->flags&(AWI_USED|AWI_GLOBAL))==AWI_USED && in->reference==(uint32_t)reference){speaker=in->script;break;}
+    }
+    r.f=NULL;
+    if(COM_FOpenFile(FILE_NAME,&r.f)<=0 || !r.f){if(r.f)fclose(r.f);return 0;}
+    r.base=ftell(r.f);
+    chosen=AW_MwvmFindDialogue(read_file_at,&r,AW_MwvmTextHash(text,length),length,speaker,&row_speaker,&broken);
+    fclose(r.f);
+    (void)record;
+    if(chosen<0){results_missing++;Con_DPrintf("Dialogue: no compiled result script for this answer\n");return 0;}
+    if(broken){
+        char name[64];read_string(AW_MwvmScriptName(chosen),name,sizeof(name));results_broken++;
+        Con_DPrintf("Dialogue: result script %s did not compile; its answer runs without it\n",name);return -1;
+    }
+    results_run++;
+    /* the locals are those the row was compiled with (its speaker script): never another script's layout */
+    return AW_MwvmRunDialogue(chosen,(uint32_t)reference,row_speaker);
 }

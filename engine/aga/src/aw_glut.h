@@ -147,6 +147,9 @@ int AW_GlutSound(const aw_glut_t *g,int entry,unsigned char hash[8]);
 int AW_GlutCreatureFind(const aw_glut_t *g,const char *id);
 /* the Sounds index of a creature row's moment (AW_SNDG_*), -1 when none; */
 int AW_GlutCreatureSound(const aw_glut_t *g,int row,int moment);
+/* the named slot (AW_SLOT_FOOT_* / AW_SLOT_SWIM_*) of a step: boots class 0 bare, 1 light, 2 medium, 3 heavy;
+ * medium aw_anim.h AW_ANIM_DRY / WADE / SWIMMING; right 0 left foot, 1 right (PLAYER-FOOTSTEPS-NONE-58) */
+int AW_GlutPlayerStepSlot(int boots_class,int medium,int right);
 /* the Sounds index of a named slot (AW_SLOT_*), -1 when none; */
 int AW_GlutSlotSound(const aw_glut_t *g,int slot);
 /* a Sounds index as its pool path, "sound/pool/a<16 hex>.wav" (capacity >= AW_GLUT_POOL_PATH, the 32 characters

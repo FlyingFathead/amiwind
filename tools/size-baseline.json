@@ -4,11 +4,11 @@
   "npc_gallery": true,
   "partial_area": null
  },
- "drive_bytes": 3054534656,
+ "drive_bytes": 3041951744,
  "drives": [
   {
-   "bytes": 3054534656,
-   "file": "AmiWind-v0.0.56.hdf"
+   "bytes": 3041951744,
+   "file": "AmiWind-v0.0.57.hdf"
   }
  ],
  "groups": {
@@ -17,7 +17,7 @@
    "files": 5629
   },
   "chim-world": {
-   "bytes": 1165853966,
+   "bytes": 1149273866,
    "files": 39496
   },
   "classic-maps": {
@@ -33,8 +33,8 @@
    "files": 1
   },
   "other": {
-   "bytes": 379209910,
-   "files": 3414
+   "bytes": 383503179,
+   "files": 3419
   },
   "progs": {
    "bytes": 201687396,
@@ -50,10 +50,10 @@
   }
  },
  "labels": [],
- "note": "v0.0.56",
- "payload_bytes": 2765492509,
- "run": "2026_10_29_v0.0.56_full-final_b213657",
+ "note": "v0.0.57",
+ "payload_bytes": 2753205678,
+ "run": "2026_10_31_v0.0.57_full-v0.0.57-release_7ff625e",
  "schema": "amiwind-size-ledger-v1",
  "status": "complete",
- "version": "0.0.56"
+ "version": "0.0.57"
 }

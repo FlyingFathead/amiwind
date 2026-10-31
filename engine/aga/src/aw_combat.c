@@ -55,6 +55,7 @@ typedef struct {
     edict_t *item[AW_ITEMS_KINDS];  /* carried weapon/shield while fighting (aw_items.c) */
     float run_x;                /* the run group's own speed (layout X, units a second; 0: by time) */
     float gait;vec3_t gait_at;  /* WALK-CYCLES-57: seconds into the run group by distance, and where it was counted */
+    signed char sound_group,sound_frame;   /* the group frame whose sound keys last played (CREATURE-ANIM-SOUND-54) */
 } slot_t;
 
 aw_combat_settings_t aw_combat_settings;
@@ -318,7 +319,9 @@ static edict_t *player(void) {
     if(!sv.active || svs.maxclients!=1 || !svs.clients || !svs.clients[0].edict)return NULL;
     return svs.clients[0].edict;
 }
-static void sound(int which) {if(which>=0 && which<AW_SND_COUNT && sound_path[which][0])S_LocalSound(sound_path[which]);}
+/* beside each other: one blow's sounds (swish, the armour struck, Health Damage, critical: at most 4 of the 8
+ * dynamic channels) all play (AUDIO-LOCAL-SOUND-CUTS-58) */
+static void sound(int which) {if(which>=0 && which<AW_SND_COUNT && sound_path[which][0])S_LocalSoundBeside(sound_path[which]);}
 const char *AW_CombatSoundPath(int key) {
     if(!settings_ok)AW_CombatSettingsLoad();
     return key>=0 && key<AW_SND_COUNT?sound_path[key]:"";
@@ -433,6 +436,22 @@ static int layout_parse(slot_t *s,const char *text) {
     s->rolled=0;return 1;
 }
 static float duration(slot_t *s,int g);
+/* The sound keys of the frames the fighter's group has passed since the last call (the animation's own keys: a
+ * creature's roar in its attack, scream in its hit, steps in its run; aw_anim.c AW_AnimSounds plays them, a
+ * creature's from its voice-table row, CREATURE-ANIM-SOUND-54). Only for a fighter that plays its layout's groups. */
+static void group_sounds(slot_t *s,int g,int i) {
+    static const int kit[G_COUNT]={AW_ANIM_IDLE,AW_ANIM_RUN,AW_ANIM_ATTACK,AW_ANIM_HIT,AW_ANIM_KNOCK,AW_ANIM_DEATH,
+                                   AW_ANIM_BLOCK,AW_ANIM_DODGEL,AW_ANIM_DODGER};
+    const aw_anim_t *a=AW_AnimOf(s->e);unsigned long crossed=0;int k,last=s->sound_frame;
+    if(i<0 || i>=32)return;
+    if(s->sound_group!=g){last=-1;s->sound_group=(signed char)g;}
+    else if(i==last)return;
+    if(i>last)for(k=last+1;k<=i;k++)crossed|=1UL<<k;
+    else{for(k=last+1;k<s->count[g] && k<32;k++)crossed|=1UL<<k;for(k=0;k<=i;k++)crossed|=1UL<<k;}   /* a loop wrapped */
+    s->sound_frame=(signed char)i;
+    if(a && a->from_layout && a->g[kit[g]].present && a->g[kit[g]].base==s->base[g])
+        AW_AnimSounds(s->e,a,kit[g],crossed,AW_AnimMedium(s->e));
+}
 static void animate(slot_t *s) {
     int g=s->group,i;float t=s->state_time;
     /* A dead resident lies in its standing model: the mover's memory goes back (aw_anim.c). */
@@ -459,6 +478,7 @@ static void animate(slot_t *s) {
     /* Knocked out: the knockdown clip falls and gets up; hold its lowest (middle) frame until fatigue returns. */
     if(g==G_KNOCK && s->f.knocked==2 && i>s->count[g]/2)i=s->count[g]/2;
     s->e->v.frame=s->base[g]+i;
+    group_sounds(s,g,i);
 }
 static void set_state(slot_t *s,int state,int group) {s->state=(unsigned char)state;s->group=(unsigned char)group;s->state_time=0;}
 static float duration(slot_t *s,int g) {return s->count[g]*s->step[g];}
@@ -694,7 +714,10 @@ static void npc_strike(slot_t *s,edict_t *p) {
     else if(out.outcome==AW_HIT_MISS){totals.npc_misses++;if(!mapped)sound(SND_SWISH);player_react_miss(p,&out);}
     else{
         totals.npc_hits++;
-        if(out.outcome==AW_HIT_HEALTH){totals.taken_health+=out.damage;flash(out.damage);if(!mapped)sound(SND_HEALTH);}
+        if(out.outcome==AW_HIT_HEALTH){totals.taken_health+=out.damage;flash(out.damage);if(!mapped)sound(SND_HEALTH);
+            /* the player says a Hit line too (OpenMW npc.cpp onHit: the player is an NPC there; iVoiceHitOdds; his race and
+             * sex's lines from the voice table, aw_glut.c player row; COMBAT-VOICES-SILENT-33) */
+            if(!you.dead)voice(p,AW_VOICE_HIT);}
         else{totals.taken_fatigue+=out.damage;if(!mapped)sound(SND_PUNCH);}
     }
     print_swing(s->f.name,"you",s->attack,&out);
@@ -705,6 +728,7 @@ static void npc_strike(slot_t *s,edict_t *p) {
     you_store(p);
     if(you.dead){
         if(readout.value)Con_Printf("Combat: you have been killed by %s\n",s->f.name);
+        voice(p,AW_VOICE_DEATH);    /* Hit, always, when death comes (OpenMW Actors::killDeadActors) */
         sound(SND_FALL);ended(0);
     }
 }

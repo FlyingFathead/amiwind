@@ -28,4 +28,8 @@ int AW_TravelParse(const char *text,const char *provider,aw_travel_t *out);
 /* The price and hours of ROW: from PLAYER (the player's original coordinates; NULL when unknown) as OpenMW reckons
  * them, else the table's own. */
 void AW_TravelCost(const aw_travel_t *t,int row,const float *player,int *price,int *hours);
+/* the dialogue window's Travel (aw_scene.c): this speaker offers travel; the menu opened once the window has closed */
+struct edict_s;
+int AW_SceneTravelOffers(struct edict_s *e);
+void AW_SceneTravelWith(struct edict_s *e);
 #endif

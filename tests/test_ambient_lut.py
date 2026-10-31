@@ -276,9 +276,11 @@ class AmbientSourceContractTests(unittest.TestCase):
         self.assertIn('resident_size=blocks*8+', c)
         self.assertNotIn('AW_AmbientOpen(&table', c)
         self.assertIn('none_ref[i]==ref', c)
-        # aggro on sight in the world: the combat layer's rule, on the engage timer, creatures only, 4 fighters
-        self.assertIn('AW_CombatAggro(s->e,&sheet,NULL,50,NULL,NULL)', c)
-        self.assertIn('AW_CombatFightRating(&aw_combat_ai,s->fight,50,', c)
+        # aggro on sight in the world: the combat layer's rule, on the engage timer, 4 fighters; a creature's disposition
+        # bias at 50, an NPC's from its derived disposition (DIALOGUE-FIGHT-DISPOSITION-57)
+        self.assertIn('AW_CombatAggro(s->e,&sheet,NULL,disposition,NULL,NULL)', c)
+        self.assertIn('AW_CombatFightRating(&aw_combat_ai,s->fight,disposition,', c)
+        self.assertIn('if(npc)disposition=AW_DialNpcDisposition(s->e,&s->disp);', c)
         self.assertIn('static int aggro_on=1;', c)
         self.assertIn('AW_AMBIENT_CREATURE', c)
         # flyers wander off the ground: a straight 3D sweep, no floor test, one failed step ends the walk;

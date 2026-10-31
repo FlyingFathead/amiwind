@@ -63,6 +63,22 @@ Not measured yet. The v0.0.45 build showed the same pattern: about 17 GB in the 
 stayed idle. The likely holders are the world-wide tables the main process keeps for every frame while workers write
 them, but this has to be measured before anything is changed.
 
+The tester's v0.0.51 build (the second report above) ran on a Linux machine with 15 GiB of RAM and 14 GiB of swap.
+Their `free -g` during the stall, relayed by the maintainer on 31 October 2026:
+
+```
+               total        used        free      shared  buff/cache   available
+Mem:              15          14           0           0           1           1
+Swap:             14          10           4
+```
+
+Memory was full (1 GiB available) and 10 GiB was already in swap. That explains both halves of the report: a stage
+whose main process holds this much leaves almost nothing for its workers, so the scheduler ran 1 or 2 of 8, and those
+crawled at 0.4 cores while the machine swapped. When swap ran short, the kernel killed a worker. v0.0.51 had no
+whole-build resource plan yet; the later one (`--resource-plan`) prices each stage's memory before the build starts.
+Whether it now refuses, or clearly warns about, this machine (15 GiB, no container limit) is still to be checked with
+the chim stage's measured peak: a 16 GB machine must hear that before the chim stage starts, not 38 hours in.
+
 ## Why it was not caught
 
 The memory guard did its job: the build slowed down instead of failing. The build summary listed the stage as
@@ -226,7 +242,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [MINIWIND-NOT-MINUTES-33](MINIWIND-NOT-MINUTES-33.md): A reused MiniWind build took about two hours instead of minutes
 - [MINIWIND-SCENE-CHAIN-WEIGHT-42](MINIWIND-SCENE-CHAIN-WEIGHT-42.md): Every MiniWind bakes all playable races and the opening rooms, and walks its whole frame stairs
 - [NPC-BAKED-WHOLE-DUPLICATION-33](NPC-BAKED-WHOLE-DUPLICATION-33.md): Every NPC appearance is baked whole: shared body parts are converted again for each actor, and equipment cannot change
-- PERF-GUARD-RESIDENT-BUSY-HOST-57 (no report page): The dev5 full build's perf guard failed chim-town-balmora and chim-town-vivec_city build_resident as slower (129 s, was 52 s; 147 s, was 62 s) while two other builds ran beside it: contention, not code
+- [PERF-GUARD-RESIDENT-BUSY-HOST-57](PERF-GUARD-RESIDENT-BUSY-HOST-57.md): The dev5 full build's perf guard failed chim-town-balmora and chim-town-vivec_city build_resident as slower (129 s, was 52 s; 147 s, was 62 s) while two other builds ran beside it: contention, not code
 - RELEASE-GUARD-SLOW-CLONE-51 (no report page): The release guard, the fail-fast first step of a release, took 6 minutes on about 0.14 of a core: its release check clones the whole repository through the Windows-mounted drive
 - RELEASE-SUITE-RECORD-SERIAL-51 (no report page): The release's suite record runs the whole test suite again on one core for about 22 minutes, right after the gate ran the same tests in about 2 minutes
 - [ROOM-BAKE-FOOTPRINT-SLOW-48](ROOM-BAKE-FOOTPRINT-SLOW-48.md): The room actor bake's footprint rule with the collision-box test is more than 100 times slower

@@ -4,7 +4,7 @@
 
 # AmiWind
 
-_Last updated with AmiWind v0.0.57 (31 October 2026)._
+_Last updated with AmiWind v0.0.58-dev2 (31 October 2026)._
 
 An unofficial, experimental RPG engine and enthusiast project bringing Morrowind
 to the Commodore Amiga, featuring CHIM: an AmiQuake-based engine and an asset
@@ -41,11 +41,17 @@ and 19 open-sea cells), with no classic region maps left outdoors. What these nu
 prison and the census office) is built as a CHIM room, with the people the game places in them. Solstheim is not
 converted.
 
-What comes next is in the [roadmap](docs/ROADMAP.md): in v0.0.58, the rest of the conversation (links in the
-text, persuasion, services, disposition starting fights, choices, every quest's journal), levelling as in the original
-with its level-up box and sound, the game's area sounds from its sound markers, characters and creatures
-placed by scripts, more weapons, lighter large interiors such as Ald'ruhn's Manor District,
-the rooms that still load in on arrival, and saves from the original game and OpenMW loaded into AmiWind.
+The development line is at **v0.0.58-dev2** (31 October 2026): on top of dev1's links, persuasion, services and
+creature sounds, the scripts of answers run (choices, Goodbye), Enchanting, your own pain and death lines, and steadier
+builds, for testing in game ([dev2 notes](docs/releases/notes/RELEASE-v0.0.58-dev2.md),
+[dev1 notes](docs/releases/notes/RELEASE-v0.0.58-dev1.md)).
+
+What comes next is in the [roadmap](docs/ROADMAP.md): v0.0.58, "Time To Talk", is the conversation and the character:
+the rest of the conversation (choices, every quest's journal, the services still missing), levelling as in the original
+with its level-up box and sound, character creation at the Census Office as in the original, the box you see when you
+aim at something, every voice and sound in place and heard, the game's area sounds and Morrowind's own mouse cursor,
+and a performance history per version. Characters placed by scripts, more weapons, lighter large interiors, the rooms
+that still load in on arrival and the save import move to v0.0.59.
 
 ### What v0.0.57 changed
 

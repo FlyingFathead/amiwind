@@ -32,4 +32,8 @@ void *AW_TryRealloc (void *old, unsigned long size);
 #define AW_TryRealloc(old, size)	realloc (old, size)
 #endif
 
+/* A growing allocation's worst case for the resident registry (tools/resident_registry.py, the growing group):
+ * NAME, at most MAX entries of BYTES each. Generates nothing but a declaration. */
+#define AW_RESIDENT_GROWS(name,max,bytes) extern int aw_resident_grows_declared
+
 #endif

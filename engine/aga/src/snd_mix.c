@@ -525,7 +525,7 @@ void S_BeginSceneVoice(void)
         v->channel.leftvol=ch->leftvol;v->channel.rightvol=ch->rightvol;
         v->next=paintedtime;v->end=ch->end;v->speed=sc->speed;v->bytes=bytes;
         scene_voice_bytes+=bytes;if(scene_voice_bytes>scene_voice_peak)scene_voice_peak=scene_voice_bytes;
-        AW_SpeechStop(ch->entnum,ch->entchannel);
+        if(ch->entnum>=0)AW_SpeechStop(ch->entnum,ch->entchannel);   /* -1 would end every voice (AUDIO-MAGIC-STOPS-SPEECH-54) */
         ch->sfx=NULL; /* Ownership moves exactly once, including repeated crossings. */
         continue;
 refused:

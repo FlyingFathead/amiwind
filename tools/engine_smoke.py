@@ -104,8 +104,23 @@ key(){ W=$(win); xdotool windowfocus --sync $W 2>/dev/null; xdotool key --clearm
 # xdo ARGS: raw xdotool steps in the emulator window (mouse buttons, held qualifiers), e.g.
 # "keydown Super_L mousedown 1 mousemove_relative 0 120 mouseup 1 keyup Super_L"
 xdo(){ W=$(win); xdotool windowfocus --sync $W 2>/dev/null; xdotool $1; }
-rc(){ i=0; while [ -e $R/awctl/cmd.txt ] && [ $i -lt 40 ]; do sleep 0.5; i=$((i+1)); done
+# rc TEXT: one remote-control command. The game takes the previous one first; one it has not taken in RC_WAIT
+# seconds (60, a loaded host's margin) means the game stopped answering: examined as a stall (SMOKE-MUSIC-REREAD-
+# FLAKY-57: gates 5037, 5044, 5092 and 5093 had the game stop writing its state and taking commands a few seconds after
+# a load, and the next check, the music's, failed with a misleading message).
+rc(){ i=0; while [ -e $R/awctl/cmd.txt ] && [ $i -lt $((${RC_WAIT:-60}*2*K)) ]; do sleep 0.5; i=$((i+1)); done
+  [ -e $R/awctl/cmd.txt ] && stall "the game stopped taking commands: '$(cat $R/awctl/cmd.txt)' not taken in ${RC_WAIT:-60} s, before '$1' (state last written $(date -u -r $R/awctl/state.txt +%T 2>/dev/null), map $(st map))"
   printf '%s\n' "$1" > $R/awctl/cmd.txt.tmp && mv $R/awctl/cmd.txt.tmp $R/awctl/cmd.txt; log "cmd $1"; }
+# status: a fresh aw_music_status answer's reads= value: waits (up to 30 s) for a NEW status line, never takes the
+# previous one (a loaded host answers late); empty when no new line came
+status(){ n0=$(grep -c 'reads=' $R/awctl/console.log 2>/dev/null); rc "aw_music_status" >/dev/null; s=0   # log() tees: keep its line out of the value
+  while [ $s -lt $((30*K)) ]; do [ "$(grep -c 'reads=' $R/awctl/console.log 2>/dev/null)" -gt "${n0:-0}" ] && { reads; return 0; }
+    sleep 1; s=$((s+1)); done; }
+# advance FROM: fresh status answers until reads pass FROM, over a window of MUSIC_WAIT seconds (45: a loaded host);
+# the last value (or empty) when they never did. Strict: the stream must read on; only the waiting is longer.
+advance(){ until_t=$(( $(date +%s) + ${MUSIC_WAIT:-45}*K )); v=
+  while [ $(date +%s) -lt $until_t ]; do v=$(status); [ -n "$v" ] && [ "$v" -gt "${1:-0}" ] && break; sleep $((2*K)); done
+  echo "$v"; }
 shot(){ ffmpeg -loglevel error -y -f x11grab -draw_mouse 0 -video_size 1024x768 -i :$N -frames:v 1 $R/shots/$1.png 2>/dev/null; }
 # rec NAME / recstop: an H.264 clip of the screen (shots/NAME.mp4, RECFPS frames a second, RECCRF quality; no
 # audio: the emulator's sound goes to the dummy driver) while the script goes on; finish stops it.
@@ -126,7 +141,9 @@ reads(){ grep -o 'reads=[0-9]*' $R/awctl/console.log 2>/dev/null | tail -1 | cut
 # From 32 MB of Fast RAM no CHIM chunk may wait for room in the zone (CHIM-ZONE-BUDGET-33: 0 in Seyda Neen, Balmora and
 # Vivec at 32 MB since v0.0.51; at 16 MB the retries are the known cost). ZONEFULL=allow (--allow-zone-full) only counts.
 zonefull(){ grep -c "CHIM: .*zone full" $R/awctl/console.log 2>/dev/null; }
-finish(){ case "$1" in PASS*) b=$(st efrags_bad); [ -n "$b" ] && [ "$b" != 0 ] && set -- "FAIL efrag safety net used $b times (console: Efrag safety net)"
+# finish RESULT: the first result stands; a finish reached inside $( ) (rc in status/advance) ends only that subshell,
+# so the outer script's own finish afterwards must not write a second result over it
+finish(){ [ -e $R/finished ] && exit 0; : > $R/finished; case "$1" in PASS*) b=$(st efrags_bad); [ -n "$b" ] && [ "$b" != 0 ] && set -- "FAIL efrag safety net used $b times (console: Efrag safety net)"
     z=$(zonefull); [ "${z:-0}" -gt 0 ] && [ "$FASTMB" -ge 32 ] && [ "${ZONEFULL:-fail}" != allow ] && case "$1" in PASS*)
       set -- "FAIL CHIM zone full $z times at $FASTMB MB of Fast RAM (none allowed from 32 MB: CHIM-ZONE-BUDGET-33)";; esac
     [ "$(st screen)" = game ] || set -- "FAIL the run ended outside play: screen $(st screen) (map $(st map))";; esac
@@ -200,11 +217,12 @@ if [ -s $R/script.txt ]; then
     finish "FAIL scripted run ended outside play: map $(st map), signon $(st signon), world leaves $(st world_leafs)"
   finish "PASS script, $(st map) running, $(( $(date +%s) - t0 )) s"
 fi
-rc "aw_music_status"; sleep $((3*K)); a=$(reads); sleep $((5*K)); rc "aw_music_status"; sleep $((3*K)); b=$(reads)
-[ -n "$a" ] && [ -n "$b" ] && [ "$b" -gt "$a" ] || finish "FAIL music not reading in $MAP1 (reads $a -> $b)"
+a=$(status); [ -n "$a" ] || stall "no answer to aw_music_status in $MAP1"
+sleep $((5*K)); b=$(advance "$a")
+[ -n "$a" ] && [ -n "$b" ] && [ "$b" -gt "$a" ] || finish "FAIL music not reading in $MAP1 (reads $a -> $b over ${MUSIC_WAIT:-45} s)"
 log "music on: reads $a -> $b"
 rc "aw_music_status off"; sleep $((3*K)); grep -q "Background music off" $R/awctl/console.log || finish "FAIL dbg music off not confirmed"
-play 5 "music off"; rc "aw_music_status"; sleep $((3*K)); e=$(reads)
+play 5 "music off"; e=$(status); [ -n "$e" ] || stall "no answer to aw_music_status with the music off"
 case "$TP" in
 same\ *)  # a one-area image (MiniWind of one CHIM frame): teleport inside MAP1 (e.g. past the narrow +/-4,096 range)
   rc "dbg tp ${TP#same }"; sleep $((10*K)); alive || finish "FAIL emulator exited after dbg tp ${TP#same }"
@@ -235,10 +253,10 @@ done; log "map change ran $r times";;
 esac
 inplay "the second load ($(st server))"
 play $PLAY "$(st server) (music off)"; shot map2
-rc "aw_music_status"; sleep $((3*K)); c=$(reads)
+c=$(status); [ -n "$c" ] || stall "no answer to aw_music_status after the second load"
 [ "$c" = "$e" ] || finish "FAIL music read while off (reads $e -> $c)"
-rc "aw_music_status on"; sleep $((8*K)); rc "aw_music_status"; sleep $((3*K)); d=$(reads)
-[ -n "$d" ] && [ "$d" -gt "${c:-0}" ] || finish "FAIL music did not read again after dbg music on (reads $c -> $d)"
+rc "aw_music_status on"; sleep $((3*K)); d=$(advance "$c")
+[ -n "$d" ] && [ "$d" -gt "${c:-0}" ] || finish "FAIL music did not read again after dbg music on (reads $c -> $d over ${MUSIC_WAIT:-45} s)"
 play 5 "music on again"
 finish "PASS boot, $MAP1 and $(st server) loaded, music reads $a -> $b, off (reads stayed $c), on again ($c -> $d), $(( $(date +%s) - t0 )) s"
 '''

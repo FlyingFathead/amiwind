@@ -467,13 +467,21 @@ def kit(rig, data, times, base=None):
             entry['speed'] = g['speed']
         if 'hit' in g:
             entry['hit'] = g['hit']
+        # the sound generator keys inside the group's frames (CREATURE-ANIM-SOUND-54): the table keeps them whole
+        events = []
+        for text, _gi, frame in ([] if based else t['keys']):
+            words = text.split(':', 1)[1].split() if text.startswith('soundgen:') else []
+            if words and words[0] in creature_pose.SOUND_EVENTS and a <= frame < a + count \
+                    and (frame - a, words[0]) not in events:
+                events.append((int(frame - a), words[0]))
+        entry['events'] = events
         out.append(entry)
     return out
 
 
 def layout(groups):
-    """The layout string of the kit groups (npc_anim.layout's NAME:BASE:COUNT:STEP[:X]); no sound events yet
-    (SNDG-TRIBUNAL-BLOODMOON, v054-combat: the creature sound generators)."""
+    """The layout string of the kit groups (npc_anim.layout's NAME:BASE:COUNT:STEP[:X]) and their sound generator
+    events (creature_pose.layout: @NAME:OFFSET:EVENT, played from the creature's row of the voice table)."""
     import creature_pose
     return creature_pose.layout(groups)
 
