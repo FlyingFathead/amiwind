@@ -753,6 +753,7 @@ void CL_ParseStatic (qboolean scaled)
     if (scaled && msg_readcount > net_message.cursize - 4)
         Host_Error("Truncated aw_flora static scale");
     ent->aw_sprite_scale = scaled ? MSG_ReadFloat() : 1;
+    ent->aw_flora = scaled ? 1 : 0;
     if (!isfinite(ent->aw_sprite_scale) || ent->aw_sprite_scale <= 0 ||
         (scaled && ent->model->type != mod_sprite) ||
         !isfinite(ent->aw_sprite_scale * ent->model->radius))

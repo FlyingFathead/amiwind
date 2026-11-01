@@ -101,6 +101,12 @@ int AW_GlutDuration(const aw_glut_t *g);
 /* The entry an NPC says for a topic: the first, in the original's order, whose conditions hold (pick_random: a
  * random one of those that hold up to the list's end, an AmiWind option; roll picks it); -1 when none. */
 int AW_GlutPick(const aw_glut_t *g,int npc,int topic,const aw_glut_state_t *s,int pick_random,int roll);
+/* Every entry of an NPC's topic in the original's order (the merge AW_GlutPick walks, no condition tested), up to
+ * MAX into OUT; the count. */
+int AW_GlutCandidates(const aw_glut_t *g,int npc,int topic,int *out,int max);
+/* 1 when two raw INFO texts are the same line: their letters and digits (ASCII folded) equal, the link marks,
+ * asterisks, spaces and punctuation not counted; an empty line matches nothing. */
+int AW_GlutSameLine(const char *voice,const char *shown);
 /* One condition record (8 bytes) for an NPC: 1 holds, 0 not (or not known to the engine). */
 int AW_GlutHolds(const aw_glut_t *g,int npc,const unsigned char *cond,const aw_glut_state_t *s);
 /* THE SHARED CONDITION EVALUATOR (greetings, voice lines and the dialogue table's topics, aw_dial.c): what a
@@ -186,6 +192,9 @@ int AW_GlutNpcOf(struct edict_s *e);
  * pool) and keep its text (speaker and player defines filled) for AW_GlutText; 1 when an entry was picked. */
 int AW_GlutSay(struct edict_s *e,int topic,int talked);
 const char *AW_GlutText(void);
+/* The conversation greeting's voice (aw_dialwin.c): the voice of the voice table's Greeting entry with the shown
+ * raw line SHOWN (silent when that INFO has none), else the table's own greeting pick; 1 when a voice started. */
+int AW_GlutGreetVoice(struct edict_s *e,const char *shown);
 /* The pick only (barks: aw_anim.c AW_VoiceSay): the entry's sound hash; -1 none, 0 picked without a sound, 1. */
 int AW_GlutBark(struct edict_s *e,int npc,int topic,int pick_random,unsigned char hash[8]);
 /* For the dialogue window (aw_dialwin.c): the edict's row (-1 none) with its condition context and run-time state;

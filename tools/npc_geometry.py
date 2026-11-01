@@ -556,6 +556,47 @@ def _whole_hair(shapes,quotas,face_limit):
     for i in hair:whole[i]=len(shapes[i]['faces'])
     return whole if int(whole.sum())<=face_limit-HAIR_WHOLE_MARGIN else quotas
 
+# CREATURE-RACER-MESH-SPIKE-58: the reduction can keep a thin chain's vertices but collapse its faces to lines (the
+# cliff racer's tail lost its lower curve, so the tail tip floated free below the body). The check samples every
+# source face (centre, edge points) and looks for a baked face sample near it; a sample farther than LOSS_RATIO of the
+# model's largest extent is surface the bake lost.
+LOSS_RATIO=0.05
+LOSS_SAMPLES=4
+
+
+def face_samples(v,f):
+    """Points on every face (n, 3) x faces (m, 3): the centre and three points along each edge."""
+    t=np.asarray(v,float)[np.asarray(f,int)]
+    pts=[t.mean(1)]
+    for a in (.25,.5,.75):
+        pts+=[t[:,i]*a+t[:,(i+1)%3]*(1-a) for i in range(3)]
+    return np.concatenate(pts)
+
+
+def lost_surface(source,source_faces,baked,baked_faces,size,ratio=LOSS_RATIO):
+    """(count, worst): the samples of one source shape's faces with no baked face sample within RATIO * SIZE."""
+    s=face_samples(source,source_faces)
+    b=face_samples(baked,baked_faces)
+    if not len(s):
+        return 0,0.0
+    near=np.empty(len(s))
+    for i in range(0,len(s),256):
+        near[i:i+256]=np.sqrt(((s[i:i+256,None,:]-b[None,:,:])**2).sum(-1)).min(1)
+    return int((near>ratio*size).sum()),float(near.max())
+
+
+def lost_shapes(shapes,frame,faces,ratio=LOSS_RATIO,least=LOSS_SAMPLES):
+    """{shape name: (count, worst)} of the shapes (bake input, first frame) whose surface the baked FRAME/FACES lost."""
+    src=np.concatenate([s['positions'][0] for s in shapes])
+    size=float((src.max(0)-src.min(0)).max()) or 1.0
+    out={}
+    for s in shapes:
+        count,worst=lost_surface(s['positions'][0],s['faces'],frame,np.asarray(faces)[:,:3],size,ratio)
+        if count>=least:
+            out[s.get('name','')]=(count,round(worst,2))
+    return out
+
+
 def _budget_quotas(shapes,budget,face_limit,minimum_faces,reference_frames,whole_limit=None):
     """The whole-model split of a budget-head bake (--npc-head-detail budget); the hair or helmet takes the head's
     rule unless hair_share() is 'plain' (the previous split). whole_limit: the face limit a whole hair may take the

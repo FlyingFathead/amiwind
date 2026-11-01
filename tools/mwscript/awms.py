@@ -45,6 +45,18 @@ ORDER = ('CONF', 'GLOB', 'JRNL', 'SNDS', 'VOIC', 'MUSI', 'OBJS', 'SCRP', 'STRT',
 ACTOR_SECTIONS = ('OACT', 'ACTB', 'AINV', 'AITM', 'ASPT', 'ASPL', 'ASPC', 'ASPE', 'AEFF', 'AMGE')
 DEFAULT_CONF = {'range_units': 12288, 'ops_per_frame': 4000, 'ops_per_run': 2000}
 RESIDENT = ORDER[:ORDER.index('BIND')]
+# The engine's limits (the interpreter's MAX_SCRIPTS and MAX_GLOBALS; tests/test_mwscript.py keeps them equal): a file over them is refused there and every
+# script stays off (MWSCRIPT-REFUSED-SCRIPT-COUNT-58), so the builder refuses it here first.
+ENGINE_MAX_SCRIPTS = 16384
+ENGINE_MAX_GLOBALS = 512
+
+
+def check_limits(scripts, globals_):
+    """Raise ValueError when the engine would refuse a file with this many scripts or globals."""
+    if scripts > ENGINE_MAX_SCRIPTS:
+        raise ValueError('%d scripts: the engine takes at most %d (the interpreter refuses more)' % (scripts, ENGINE_MAX_SCRIPTS))
+    if globals_ > ENGINE_MAX_GLOBALS:
+        raise ValueError('%d globals: the engine takes at most %d (the interpreter refuses more)' % (globals_, ENGINE_MAX_GLOBALS))
 
 
 def _hash8(row):
@@ -81,6 +93,7 @@ def pccell_section(table):
 def write(program, compiled, binds, conf=None):
     """The file's bytes, and a size table {section: bytes}. CONF: config/mwscript.json's activation and budget."""
     p = program
+    check_limits(len(compiled), len(p.globals))
     conf = dict(DEFAULT_CONF, **(conf or {}))
     confb = struct.pack('>IHH', conf['range_units'], conf['ops_per_frame'], conf['ops_per_run'])
     for c in compiled:

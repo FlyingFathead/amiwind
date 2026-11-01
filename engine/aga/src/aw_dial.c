@@ -11,6 +11,7 @@
 #include <math.h>
 #include <string.h>
 #include "aw_dial.h"
+#include "aw_tryalloc.h"
 
 static unsigned rd16(const unsigned char *p) {return (unsigned)p[0]<<8|p[1];}
 static unsigned long rd32(const unsigned char *p) {return (unsigned long)p[0]<<24|(unsigned long)p[1]<<16|(unsigned long)p[2]<<8|p[3];}
@@ -86,7 +87,8 @@ int AW_DialOpen(aw_dial_t *d,const unsigned char *h,long size,long file_size) {
     d->at_texts=at;at+=d->text_bytes;
     d->at_services=at;at+=4L*d->npcs;           /* the NPCs' service flags (one 32-bit word each) */
     d->at_skill_attributes=at;at+=pad4(AW_DIAL_SKILLS);   /* the skills' governing attributes */
-    d->at_ui_texts=at;at+=(long)AW_DIAL_UI_TEXT*AW_DIAL_TEXTS;   /* the window's words (GMST), last */
+    d->at_ui_texts=at;at+=(long)AW_DIAL_UI_TEXT*AW_DIAL_TEXTS;   /* the window's words (GMST) */
+    d->at_rank_reqs=at;at+=(long)AW_DIAL_RANK_REQ*rd16(h+H_FACTIONS);   /* the factions' rank requirements, last */
     if(at!=file_size || (d->string_bytes&3) || d->string_bytes<1){memset(d,0,sizeof(*d));d->info_refusal=-1;return 0;}
     for(i=0;i<d->topics;i++){
         const unsigned char *r=d->topic+AW_DIAL_TOPIC_ROW*i;
@@ -205,15 +207,58 @@ int AW_DialDisposition(const aw_dial_t *d,const aw_dial_facts_t *f,int clamp) {
     x-=AW_DialSetting(d,AW_DIAL_SET_CRIME)*f->bounty;
     if(f->diseased)x+=AW_DialSetting(d,AW_DIAL_SET_DISEASE);
     if(f->weapon_drawn)x+=AW_DialSetting(d,AW_DIAL_SET_WEAPON_DRAWN);
+    x+=f->charm;                   /* Charm's magnitude on the NPC (getDerivedDisposition adds it last) */
     v=(int)x;
     if(clamp)v=v<0?0:v>100?100:v;
     return v;
+}
+static int same_id_ci(const char *a,const char *b) {
+    for(;*a && *b;a++,b++){
+        int x=*a>='A' && *a<='Z'?*a+32:*a,y=*b>='A' && *b<='Z'?*b+32:*b;
+        if(x!=y)return 0;
+    }
+    return !*a && !*b;
+}
+int AW_DialPairFunction(const aw_dial_pair_t *p,unsigned fn,long *out) {
+    if(!p || !p->known || !out)return 0;
+    switch(fn){
+    case AW_DIAL_FN_SAME_SEX:*out=(p->player_female!=0)==(p->speaker_female!=0);return 1;
+    case AW_DIAL_FN_SAME_RACE:*out=p->player_race && p->speaker_race && *p->player_race &&
+                                   same_id_ci(p->player_race,p->speaker_race);return 1;
+    case AW_DIAL_FN_SHOULD_ATTACK:
+        if(p->fight_rating<0)return 0;
+        *out=p->fight_rating>=100;return 1;
+    }
+    return 0;
 }
 
 long AW_DialRankAt(const aw_dial_t *d,const char *faction,int rank) {
     int i=faction_index(d,faction);
     if(i<0 || rank<0 || rank>=AW_DIAL_RANKS)return -1;
     return d->at_ranks+(long)AW_DIAL_FACTION_ID*((long)i*AW_DIAL_RANKS+rank);
+}
+/* the section's row: u8 attribute x2, u8 skill x7 (255 none), 3 zeros, then per rank s16 attribute 1, attribute 2,
+ * first skill, second skill, faction reputation */
+int AW_DialRankRequirement(const aw_dial_t *d,const char *faction,int rank,const short *attributes,const short *skills,
+                           int reputation,aw_dial_read_t read,void *user) {
+    unsigned char r[AW_DIAL_RANK_REQ];int i=faction_index(d,faction),next=rank<0?0:rank+1,best=-1,second=-1,ok=1,k,s,result=0;
+    const unsigned char *q;
+    if(i<0 || next>=AW_DIAL_RANKS || !read || !attributes || !skills ||
+       !read(user,d->at_rank_reqs+(long)AW_DIAL_RANK_REQ*i,r,AW_DIAL_RANK_REQ))return 0;
+    q=r+12+10*next;
+    for(k=0;k<2;k++)if(r[k]<8 && attributes[r[k]]<(short)rd16(q+2*k))ok=0;
+    for(k=0;k<7;k++){
+        if(r[2+k]>=AW_DIAL_SKILLS)continue;
+        s=skills[r[2+k]];
+        if(s>best){second=best;best=s;}else if(s>second)second=s;
+    }
+    if(ok && best>=0){                 /* no favoured skill: met */
+        if(best<(short)rd16(q+4))ok=0;
+        else if(second>=0 && second<(short)rd16(q+6))ok=0;
+    }
+    if(ok)result|=1;
+    if(reputation>=(short)rd16(q+8))result|=2;
+    return result;
 }
 static int starts_ci(const char *p,const char *word) {
     for(;*word;p++,word++)if(lower_c((unsigned char)*p)!=*word)return 0;
@@ -605,6 +650,51 @@ int AW_DialAnswer(const aw_dial_conv_t *c,int topic,const aw_glut_state_t *s) {
     return AW_DialPick(c,c->d->info_refusal,s,NULL);
 }
 
+int AW_DialGreeting(const aw_dial_conv_t *c,const aw_glut_state_t *s,int *topic) {
+    int k;
+    if(topic)*topic=-1;
+    for(k=0;k<c->topics;k++){        /* the row's topics are in the table's order: Greeting 0 before Greeting 1 */
+        int t=c->topic[k].topic,got;
+        if(AW_DialTopicKind(c->d,t)!=AW_DIAL_KIND_GREETING)continue;
+        if((got=AW_DialPick(c,t,s,NULL))>=0){if(topic)*topic=t;return got;}
+    }
+    return -1;
+}
+
+unsigned long AW_DialNameHash(const char *name,int length) {
+    unsigned long h=2166136261ul;int i;
+    for(i=0;i<length && name[i];i++){
+        unsigned char ch=(unsigned char)name[i];
+        if(ch>='A' && ch<='Z')ch=(unsigned char)(ch+32);
+        h=((h^ch)*16777619ul)&0xFFFFFFFFul;
+    }
+    return h;
+}
+int AW_DialTopicMap(const aw_dial_t *d,aw_dial_read_t read,void *user,const unsigned long *hashes,int rows,
+                    unsigned short *map) {
+    long t;int r,mapped=0;char name[256];
+    if(!d->data || !map)return 0;
+    for(t=0;t<d->topics;t++){
+        int length;long at;unsigned long h;
+        map[t]=AW_DIAL_NO_ROW;
+        if(AW_DialTopicKind(d,(int)t)!=AW_DIAL_KIND_TOPIC || (at=AW_DialTopicName(d,(int)t,&length))<0 || length<1)continue;
+        if(!read(user,at,name,length))return -1;
+        h=AW_DialNameHash(name,length);
+        for(r=0;r<rows && r<(int)AW_DIAL_NO_ROW;r++)if(hashes[r]==h){map[t]=(unsigned short)r;mapped++;break;}
+    }
+    return mapped;
+}
+void AW_DialKnownSync(const aw_dial_t *d,unsigned char *known,const unsigned short *map,int (*knows)(int row)) {
+    long t;
+    if(!d->data || !map || !knows)return;
+    for(t=0;t<d->topics;t++){
+        if(map[t]==(unsigned short)AW_DIAL_NO_ROW)continue;       /* a topic the scripts do not know of: its bit stays */
+        if(knows(map[t]))known[t>>3]|=(unsigned char)(1<<(t&7));
+        else known[t>>3]&=(unsigned char)~(1<<(t&7));
+    }
+    for(t=0;t<d->starts;t++)AW_DialKnow(d,known,AW_DialStartTopic(d,(int)t));
+}
+
 long AW_DialTextAt(const aw_dial_conv_t *c,int answer) {
     if(answer<0 || answer>=c->answers || c->answer[answer].text==AW_DIAL_NONE32)return -1;
     return c->d->at_texts+(long)c->answer[answer].text;
@@ -654,6 +744,21 @@ int AW_DialSpans(const aw_dial_conv_t *c,int answer,aw_dial_read_t read,void *us
     }
     return n;
 }
+/* The links of a journal entry, from its entry row (AW_DIAL_ENTRY_ROW: u32 first link at 12, u16 links at 16), the same
+ * builder-made spans and rows as a conversation's answer (OpenMW's journal uses the dialogue's keyword search). */
+int AW_DialEntrySpans(const aw_dial_t *d,const unsigned char *entry_row,aw_dial_read_t read,void *user,aw_dial_span_t *out,int max) {
+    unsigned char raw[AW_DIAL_LINK_ROW];unsigned long link;int n,k;
+    if(!d || !entry_row || !read || max<=0)return 0;
+    link=((unsigned long)entry_row[12]<<24)|((unsigned long)entry_row[13]<<16)|((unsigned long)entry_row[14]<<8)|entry_row[15];
+    if(link==(unsigned long)AW_DIAL_NONE32)return 0;
+    n=rd16(entry_row+16);if(n>max)n=max;
+    for(k=0;k<n;k++){
+        if(!read(user,d->at_links+(long)AW_DIAL_LINK_ROW*(long)(link+(unsigned long)k),raw,AW_DIAL_LINK_ROW))return k;
+        out[k].offset=(unsigned short)rd16(raw);out[k].length=(unsigned short)rd16(raw+2);
+        out[k].topic=(unsigned short)rd16(raw+4);
+    }
+    return n;
+}
 int AW_DialMarkSpans(const char *text,const aw_dial_span_t *spans,int n,char *out,int capacity) {
     int at=0,k=0,o=0;
     if(capacity<=0)return 0;
@@ -694,4 +799,110 @@ int AW_DialLinks(const aw_dial_conv_t *c,int answer,aw_dial_read_t read,void *us
         if(!seen)out[m++]=spans[k].topic;
     }
     return m;
+}
+/* --- the journal's topic pages (OpenMW Journal::addTopic, Topic::addEntry: one entry per answer heard, the same answer
+ * once; removeLastAddedTopicResponse for ClearInfoActor) ---
+ * An entry is the answer's table entry, its topic and the speaker's name (a small pool, each name once). Bounded by
+ * the data: the three masters hold 16,796 Topic answers, a game hears far fewer; at the bound the oldest entry whose topic
+ * has a newer one gives way (every topic keeps its newest) and the caller logs it. Nothing is
+ * allocated until the first entry; saved (AWTP). */
+#define HEARD_MAX 12000
+#define HEARD_NAMES 1024
+AW_RESIDENT_GROWS("journal topic entries",HEARD_MAX,6);
+AW_RESIDENT_GROWS("journal topic speakers",HEARD_NAMES,AW_DIAL_SPEAKER_NAME);
+typedef struct {uint16_t entry,topic,name;} heard_t;
+static heard_t *heard;static int nheard,heard_cap;
+static char (*heard_names)[AW_DIAL_SPEAKER_NAME];static int nnames;
+void AW_DialHeardReset(void){free(heard);heard=NULL;nheard=heard_cap=0;free(heard_names);heard_names=NULL;nnames=0;}
+int AW_DialHeardCount(void){return nheard;}
+int AW_DialHeardAt(int i,int *entry,int *topic,const char **speaker){
+    if(i<0 || i>=nheard)return 0;
+    *entry=heard[i].entry;*topic=heard[i].topic;*speaker=heard[i].name<nnames?heard_names[heard[i].name]:"";
+    return 1;
+}
+static int name_index(const char *name){
+    int i;
+    for(i=0;i<nnames;i++)if(same_id(heard_names[i],name))return i;
+    if(nnames>=HEARD_NAMES)return -1;
+    if(!heard_names && !(heard_names=(char (*)[AW_DIAL_SPEAKER_NAME])AW_TryMalloc((unsigned long)AW_DIAL_SPEAKER_NAME*HEARD_NAMES)))return -1;
+    strncpy(heard_names[nnames],name,AW_DIAL_SPEAKER_NAME-1);heard_names[nnames][AW_DIAL_SPEAKER_NAME-1]=0;
+    return nnames++;
+}
+static void heard_remove(int i){
+    memmove(heard+i,heard+i+1,sizeof(heard_t)*(size_t)(nheard-i-1));nheard--;
+}
+int AW_DialHeardAdd(int entry,int topic,const char *speaker){
+    int i,name,dropped=0;
+    if(entry<0 || entry>0xFFFF || topic<0 || topic>0xFFFF || !speaker)return 0;
+    for(i=0;i<nheard;i++)if(heard[i].entry==entry)return 1;          /* heard already */
+    if((name=name_index(speaker))<0)name=0xFFFF;
+    if(nheard==HEARD_MAX){   /* the oldest entry whose topic has a newer one gives way: every topic keeps its newest */
+        int j,k,best=0;
+        for(j=0;j<nheard;j++){
+            for(k=j+1;k<nheard && heard[k].topic!=heard[j].topic;k++);
+            if(k<nheard){best=j;break;}
+        }
+        heard_remove(best);dropped=1;
+    }
+    if(nheard==heard_cap){
+        int grow=heard_cap?heard_cap*2:256;heard_t *n;
+        if(grow>HEARD_MAX)grow=HEARD_MAX;
+        if(!(n=(heard_t *)AW_TryMalloc(sizeof(heard_t)*(unsigned long)grow)))return 0;
+        if(heard)memcpy(n,heard,sizeof(heard_t)*(size_t)nheard);
+        free(heard);heard=n;heard_cap=grow;
+    }
+    heard[nheard].entry=(uint16_t)entry;heard[nheard].topic=(uint16_t)topic;heard[nheard].name=(uint16_t)name;nheard++;
+    return dropped?2:1;
+}
+/* the answer ENTRY is on its topic's journal page already (OpenMW: the journal's topic has that info id) */
+int AW_DialHeardHas(int entry){
+    int i;
+    for(i=0;i<nheard;i++)if(heard[i].entry==entry)return 1;
+    return 0;
+}
+int AW_DialHeardRemoveLast(int topic,const char *speaker){
+    int i;
+    for(i=nheard-1;i>=0;i--)
+        if(heard[i].topic==topic && heard[i].name<nnames && same_id(heard_names[heard[i].name],speaker)){heard_remove(i);return 1;}
+    return 0;
+}
+/* "AWTP" u16 names, each u8 length and the name; u16 entries, each u16 entry, topic, name. Bytes, -1 no room. */
+int AW_DialHeardExport(unsigned char *out,int capacity){
+    int i,at=6,need=8+6*nheard;
+    for(i=0;i<nnames;i++)need+=1+(int)strlen(heard_names[i]);
+    if(need>capacity)return -1;
+    memcpy(out,"AWTP",4);out[4]=(unsigned char)(nnames>>8);out[5]=(unsigned char)nnames;
+    for(i=0;i<nnames;i++){int n=(int)strlen(heard_names[i]);out[at]=(unsigned char)n;memcpy(out+at+1,heard_names[i],(size_t)n);at+=1+n;}
+    out[at]=(unsigned char)(nheard>>8);out[at+1]=(unsigned char)nheard;at+=2;
+    for(i=0;i<nheard;i++){
+        out[at]=(unsigned char)(heard[i].entry>>8);out[at+1]=(unsigned char)heard[i].entry;
+        out[at+2]=(unsigned char)(heard[i].topic>>8);out[at+3]=(unsigned char)heard[i].topic;
+        out[at+4]=(unsigned char)(heard[i].name>>8);out[at+5]=(unsigned char)heard[i].name;at+=6;
+    }
+    return at;
+}
+int AW_DialHeardImport(const unsigned char *p,int bytes){
+    int i,names,entries,at=6;char name[AW_DIAL_SPEAKER_NAME];
+    AW_DialHeardReset();
+    if(!p || bytes<8 || memcmp(p,"AWTP",4))return -1;
+    names=(p[4]<<8)|p[5];
+    if(names>HEARD_NAMES)goto bad;
+    for(i=0;i<names;i++){
+        int n;
+        if(at+1>bytes || (n=p[at])>=AW_DIAL_SPEAKER_NAME || at+1+n>bytes)goto bad;
+        memcpy(name,p+at+1,(size_t)n);name[n]=0;at+=1+n;
+        if(nnames>=HEARD_NAMES)goto bad;
+        if(!heard_names && !(heard_names=(char (*)[AW_DIAL_SPEAKER_NAME])AW_TryMalloc((unsigned long)AW_DIAL_SPEAKER_NAME*HEARD_NAMES)))goto bad;
+        strcpy(heard_names[nnames++],name);   /* by position: the entries name them by index */
+    }
+    if(at+2>bytes)goto bad;
+    entries=(p[at]<<8)|p[at+1];at+=2;
+    if(entries>HEARD_MAX || at+6*entries>bytes)goto bad;
+    for(i=0;i<entries;i++,at+=6){
+        int e=(p[at]<<8)|p[at+1],tp=(p[at+2]<<8)|p[at+3],nm=(p[at+4]<<8)|p[at+5];
+        if(AW_DialHeardAdd(e,tp,nm<nnames?heard_names[nm]:"")!=1)goto bad;
+    }
+    return at;
+bad:
+    AW_DialHeardReset();return -1;
 }

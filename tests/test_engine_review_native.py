@@ -117,6 +117,17 @@ class EngineReviewSource(unittest.TestCase):
         self.assertIn('vid.width, rows', body)
         self.assertIn('BytesPerRow < width / 8', text('vid_amiga.c'))
 
+    def test_screen_mode_falls_back_to_the_default_monitor(self):
+        # VIDEO-NTSC-NO-PAL-MODE-58: an NTSC machine (no PAL monitor) stopped at start with "Can't FindDisplayInfo()
+        # for mode ffffffff"; an INVALID_ID from the PAL request now asks again without naming a monitor
+        video = text('vid_amiga.c')
+        body = video[video.index('BIDTAG_MonitorID,        PAL_MONITOR_ID,'):]
+        body = body[:body.index('Con_Printf ("No PAL screen mode')]
+        self.assertIn('if (mode == INVALID_ID) {', body)
+        retry = body[body.index('if (mode == INVALID_ID) {'):]
+        self.assertIn('BestModeID (', retry)
+        self.assertNotIn('BIDTAG_MonitorID', retry)
+
     def test_gamma_table_does_not_call_pow(self):
         self.assertNotRegex(text('view.c'), r'\bpow\s*\(')
 

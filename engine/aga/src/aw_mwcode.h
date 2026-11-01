@@ -117,6 +117,7 @@
  * checked by tests/test_mwscript.py) */
 #define AWF_ADDTOPIC 6
 #define AWF_CHOICE 22
+#define AWF_CLEARINFOACTOR 27
 #define AWF_SHOWMAP 448
 #define AWF_MODFACTIONREACTION 260
 #define AWF_SETFACTIONREACTION 390

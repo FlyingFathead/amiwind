@@ -4,19 +4,24 @@
 #include <string.h>
 int main(void)
 {
-    int i;aw_state_t before;
+    int i;aw_state_t before;unsigned notices;
     AW_StateReset();
+    notices=AW_JournalNotices();
     assert(AW_JournalAdd(&aw_state,"Test_Quest",1));
+    assert(AW_JournalNotices()==notices+1);           /* a new entry: one journal-updated notice */
     assert(aw_state.journal_count==1 && aw_state.journal[0].quest==0);
     assert(aw_state.journal[0].days==0 && aw_state.journal[0].milliseconds==32400000);
     assert(AW_JournalAdd(&aw_state,"TEST_QUEST",1) && aw_state.journal_count==1);
+    assert(AW_JournalNotices()==notices+1);           /* the same index again: none */
     assert(AW_StateSet(&aw_state,AW_GLOBAL,"amiwind:clock:ready",1));
     assert(AW_StateSet(&aw_state,AW_GLOBAL,"amiwind:clock:days",9));
     assert(AW_StateSet(&aw_state,AW_GLOBAL,"amiwind:clock:ms",12345));
     assert(AW_JournalAdd(&aw_state,"test_quest",5));
     assert(aw_state.journal[1].days==9 && aw_state.journal[1].milliseconds==12345);
     assert(AW_StateSet(&aw_state,AW_JOURNAL,"test_quest",0));
+    notices=AW_JournalNotices();
     assert(AW_JournalAdd(&aw_state,"test_quest",1) && aw_state.journal_count==2);
+    assert(AW_JournalNotices()==notices+1);           /* an entry heard before, its index rising again: one */
     assert(AW_StateGet(&aw_state,AW_JOURNAL,"test_quest")==1);
     for(i=6;aw_state.journal_count<AW_JOURNAL_ENTRIES;i++)assert(AW_JournalAdd(&aw_state,"test_quest",i));
     before=aw_state;assert(!AW_JournalAdd(&aw_state,"other",1));

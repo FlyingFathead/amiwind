@@ -2,10 +2,11 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 2 times; something has to be done
+## PERSISTING: reported 3 times; something has to be done
 
 - Reported with v0.0.57 at 2026-10-31 03:46 +0200: v0.0.57 release image run 2026_10_31_v0.0.57_full-v0.0.57-release_7ff625e: every stage passed, the perf guard failed the same two: chim-town-balmora build_resident 86 s, was 52 s (+65 %); chim-town-vivec_city 98 s, was 62 s (+57 %), same units. Worker gates shared the host. Perf only, delivered; the monitor lists the run as failed for this.
 - Reported with v0.0.58-dev1 at 2026-10-31 16:50 +0200: v0.0.58-dev1 build 2026_10_31_v0.0.58-dev1_full-v0.0.58-dev1_3d610fa: every stage passed, the perf guard failed the same two: chim-town-balmora build_resident 101 s, was 52 s (+93 %); chim-town-vivec_city 118 s, was 62 s (+89 %), same units; worker gates (5046, 5088 and more) shared the host. Third sighting: delivered (perf only).
+- Reported with v0.0.58-dev3 at 2026-11-01 04:34 +0200: Seen again in the v0.0.58 test image build of 6679573 (2026-11-01): the perf guard failed chim-town-vivec_city parallel map build_resident at 32.9 s CPU per unit against a 7.1 s baseline with the same 39 units, while a gate ran beside the build (busy host). The stages passed and the image is valid; perf only, not blocking.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -32,7 +33,7 @@
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
 - [Symptom](#symptom)
 - [Where](#where)
 - [How it happened](#how-it-happened)

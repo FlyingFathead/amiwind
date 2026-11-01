@@ -826,6 +826,12 @@ class ChimWorldTests(unittest.TestCase):
         out = self.run_world(['roomdoor'], placed=True, room=True)[0]
         self.assertIn('roomdoor ok', out)
 
+    def test_a_taken_room_placement_leaves_drawing_and_collision(self):
+        # PICKUP-PLACED-58: a placed item the player takes from a CHIM room (chim_room.c ChimRoom_Hide): its efrags
+        # go, it is no longer solid, and an Enable brings it back.
+        out = self.run_world(['roomtake'], placed=True, room=True)[0]
+        self.assertIn('roomtake ok', out)
+
     def test_a_chim_room_short_of_zone_grows_into_free_fast_ram_then_the_hunk(self):
         # ROOM-AKULAKHAN-HEAP-52: a room map holds nothing but its room; one whose models do not fit the zone and the
         # cache banks takes a bank of the free Fast RAM (largest block less 2 MiB), then the Hunk's rest

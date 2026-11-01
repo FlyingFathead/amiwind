@@ -213,6 +213,22 @@
    "image_options": ["--chim-world"],
    "patterns": ["id1/maps/*-chim.bsp", "id1/maps/*-chim.chim", "id1/maps/*-chim.far", "id1/maps/*-chim.cut",
                 "id1/maps/vf[0-9]*.chim", "id1/maps/vf[0-9]*.far", "id1/maps/vf[0-9]*.cut", "id1/maps/chim-actors.cca"]
+  },
+  {
+   "id": "focus",
+   "builder": "chim",
+   "description": "Focus table (AWF2, v0.0.58): name, weight, value, owner and record id of every item, actor and door placed in a room, for the framed box and for taking placed items",
+   "steps": ["focus", "image"],
+   "image_options": ["--focus"],
+   "patterns": ["id1/focus.awf"]
+  },
+  {
+   "id": "books",
+   "builder": "chim",
+   "description": "Book texts (AWB1, v0.0.58): the readable books, scrolls and letters of the game data as plain text, read on demand by the book reader",
+   "steps": ["books", "image"],
+   "image_options": ["--books"],
+   "patterns": ["id1/books.awb"]
   }
  ]
 }

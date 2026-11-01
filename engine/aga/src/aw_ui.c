@@ -377,7 +377,8 @@ static void layout_command(void) {
         Cvar_SetValue(dialogue_layout.name,s[0]-'0');
     else Con_Printf("dbg ui layout 1 legacy / 2 full width centered / 3 padded content (default)\n");
 }
-static int advance(int c){return font_bytes?font[8+c*8+6]:8;}
+/* chars 2 and 3 are the dialogue's link marks (AW_DIAL_LINK_OPEN/CLOSE): no width, never drawn */
+static int advance(int c){return c==2 || c==3?0:(font_bytes?font[8+c*8+6]:8);}
 int AW_UIWidth(const char *text) {
     int width=0,best=0;initialize();
     while(*text){if(*text=='\n'){if(width>best)best=width;width=0;text++;}else width+=advance((unsigned char)*text++);}
@@ -389,6 +390,7 @@ void AW_UIText(int x,int y,const char *text,int color) {
     while(*text) {
         c=(unsigned char)*text++;
         if(c=='\n'){x=start;y+=line_height;continue;}
+        if(c==2 || c==3)continue;
         if(font_bytes){m=font+8+c*8;w=m[2];h=m[3];ox=x+(signed char)m[4];oy=y+(signed char)m[5];pixels=font+2056+u16(m);}
         else {w=h=8;ox=x;oy=y;pixels=draw_chars+(c>>4)*1024+(c&15)*8;}
         for(yy=0;yy<h;yy++)if(oy+yy>=0 && oy+yy<(int)vid.height) {
@@ -653,6 +655,26 @@ void AW_UIObjectName(const char *name,int style) {
     if(vid.height-y<24)return;
     AW_UISmallBegin();
     name_label(name,style==3?8:vid.width-6,y+3,style!=3);
+    AW_UISmallEnd();scr_copyeverything=1;
+}
+/* The focus box (FOCUS-BOX-58): the original's framed box under the crosshair, the name on the first line and an
+ * item's weight and value below it; the name in red when taking the item would be theft (owned 1). */
+void AW_UIFocusBox(const char *name,const char *line2,const char *line3,int owned) {
+    static int red=-1;const char *lines[3];int n=0,i,w=0,lw,h,x,y,bottom,pad=5;
+    if(!name || !*name)return;
+    initialize();
+    if(red<0)red=AW_UIColor(220,40,40);
+    lines[n++]=name;if(line2 && *line2)lines[n++]=line2;if(line3 && *line3)lines[n++]=line3;
+    AW_UISmallBegin();
+    for(i=0;i<n;i++){lw=AW_UIWidth(lines[i]);if(lw>w)w=lw;}
+    w+=2*pad;if(w>(int)vid.width-8)w=vid.width-8;
+    h=n*line_height+2*pad;
+    bottom=r_refdef.vrect.y+r_refdef.vrect.height;
+    x=((int)vid.width-w)/2;y=r_refdef.vrect.y+r_refdef.vrect.height/2+10;
+    if(y+h>bottom)y=bottom-h;
+    if(y<0)y=0;
+    AW_UIBox(x,y,w,h);
+    for(i=0;i<n;i++)AW_UITextBox(x,y+pad+i*line_height,w,line_height,lines[i],!i && owned?red:-1);
     AW_UISmallEnd();scr_copyeverything=1;
 }
 /* Cache painted extents for each font selection, including sparse bitmap masks.

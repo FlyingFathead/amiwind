@@ -125,6 +125,8 @@ struct edict_s;
 void AW_AmbientInit (void);
 /* SV_Physics, after combat: every registered actor near the player thinks every think interval (0.1 s). */
 void AW_AmbientPhysics (void);
+/* SV_SpawnServer: a new server (a same-map reload too): every slot reset at the next tick, no old edict touched. */
+void AW_AmbientServerReset (void);
 /* aw_actors.c (v0.0.57, SAVEGAME-COMPLETE-57): in a room, the change list's room entries applied after a load or on
  * entry, and the room's actors captured as they stand; called by SV_Physics after AW_AmbientPhysics. */
 void AW_ActorsRoomTick (void);

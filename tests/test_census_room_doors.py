@@ -65,6 +65,24 @@ class CensusOfficeDoors(unittest.TestCase):
         self.assertIn({'id': 2, 'map': 'census', 'cell': 'Seyda Neen, Census and Excise Office', 'interior': True},
                       scenes['scenes'])
 
+    def test_its_small_items_are_placed_statics(self):
+        # INTERIOR-PLACED-ITEMS-47: the office's takeable items (the Iron Dagger 119577 on the back-room table, the
+        # quill, the meal, the registration paper) go into its map as placed statics with their references, so the
+        # focus box and the activate key find them; actors, deleted references and markers stay out.
+        from prepare_census import is_census_item
+        self.assertTrue(is_census_item({'number': 119577, 'id': 'chargen dagger', 'type': 'WEAP',
+                                        'model': 'w\\W_dagger_iron.nif'}))
+        self.assertTrue(is_census_item({'number': 406347, 'id': 'misc_quill', 'type': 'MISC', 'model': 'm\\misc_quill.nif'}))
+        self.assertTrue(is_census_item({'number': 1, 'id': 'chargen statssheet', 'type': 'MISC', 'model': 'm\\paper.nif'}))
+        for ref in ({'number': 2, 'id': 'chargen class', 'type': 'NPC_', 'model': 'b\\x.nif'},
+                    {'number': 3, 'id': 'misc_quill', 'type': 'MISC', 'model': 'm\\misc_quill.nif', 'deleted': True},
+                    {'number': 4, 'id': 'misc_quill', 'type': 'MISC', 'model': ''},
+                    {'number': 5, 'id': 'furn_com_rm_table_04', 'type': 'STAT', 'model': 'f\\furn_com_rm_table_04.nif'}):
+            with self.subTest(ref=ref['number']):
+                self.assertFalse(is_census_item(ref))
+        census = (ROOT / 'tools/prepare_census.py').read_text(encoding='utf-8')
+        self.assertIn("refs+=items;omitted=[o for o in omitted if o['reference'] not in taken]", census)
+
     def test_its_doors_are_kept_as_geometry(self):
         # tools/prepare_census.py selects the office's geometry with mwad.interior.select_geometry: every DOOR placed
         # with a model is kept, so each door is a func_wall edict at its placement's origin and yaw.

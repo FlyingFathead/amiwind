@@ -200,6 +200,24 @@ class Wiring(unittest.TestCase):
         self.assertIs(row['halloween'], True)
         self.assertNotIn('halloween', miniwind_presets.find('anim-stage'))     # only its own preset has the field
 
+    def test_a_new_server_drops_the_scenes_old_edicts(self):
+        # HORS-AFTER-HALLOWEEN-CRASH-58: 'dbg aw hors 0' after the scene in Seyda Neen reloads the same map; the world
+        # model stays cached, so the tick's world check saw no change and cast a sound on an old server's edict
+        # (NUM_FOR_EDICT: bad pointer). SV_SpawnServer now resets the scene and the ambient slots before the map's
+        # entities load, like AW_AnimSceneReset.
+        server = (SRC / 'sv_main.c').read_text(encoding='utf-8')
+        start = server.index('memset (&sv, 0, sizeof(sv));')
+        load = server.index('ED_LoadFromFile (sv.worldmodel->entities);', start)
+        for call in ('AW_HalloweenServerReset();', 'AW_AmbientServerReset();'):
+            self.assertLess(server.index(call, start), load, call)
+        engine = (SRC / 'aw_halloween.c').read_text(encoding='utf-8')
+        body = engine[engine.index('void AW_HalloweenServerReset(void) {'):]
+        body = body[:body.index('\n}\n')]
+        self.assertIn('hw.world=NULL;', body)
+        self.assertNotIn('ED_Free', body)                     # the old edicts are never touched
+        self.assertIn('void AW_AmbientServerReset(void) {slots_world=NULL;}',
+                      (SRC / 'aw_ambient.c').read_text(encoding='utf-8'))
+
     def test_catalogue_lines_fit_the_engine_reader(self):
         # gate 4049: a 524-byte catalogue line broke every dbg command (aw_console.c DEBUG_LINE); the page tool
         # (pregate) now refuses it first

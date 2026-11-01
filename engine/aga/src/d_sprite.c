@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 static int		sprite_height;
 static int		minindex, maxindex;
 static sspan_t	*sprite_spans;
+/* The depth test's 1/z factor for the sprite being drawn (R_SpriteDepthScale). */
+static float	sprite_depthscale = 1;
 
 #if	!id386
 #if !id68k
@@ -50,6 +52,11 @@ void D_SpriteDrawSpans (sspan_t *pspan)
 	fixed16_t	s, t, snext, tnext, sstep, tstep;
 	float		sdivz, tdivz, zi, z, du, dv, spancountminus1;
 	float		sdivz8stepu, tdivz8stepu, zi8stepu;
+	/* Flora: texel rows from basecut down (the trunk base) test depth scaled by
+	 * basescale (16.16); the rest of the card keeps its plane's depth. */
+	int			basescale = (int)(sprite_depthscale * 65536.0f);
+	fixed16_t	basecut = basescale < 65536 ?
+		(fixed16_t)(sprite_height * (1.0f - AW_FLORA_BASE_SHARE)) << 16 : 0x7fffffff;
 	byte		btemp;
 	short		*pz;
 
@@ -183,6 +190,8 @@ void D_SpriteDrawSpans (sspan_t *pspan)
 					/* Background depth is negative. Preserve the signed comparison
                      * while retaining unsigned fixed-point accumulator wrap. */
                     depthvalue=slowdepth?(!(pixelzi>0)?0:pixelzi>=32767.0/32768?32767:(int)(pixelzi*32768)):(int)(izi>>16);
+                    if (t >= basecut)
+                        depthvalue = (int)(((unsigned int)depthvalue * (unsigned int)basescale) >> 16);
                     if (*pz <= depthvalue)
 					{
 						*pz = depthvalue;
@@ -378,6 +387,10 @@ void D_SpriteCalculateGradients (void)
     VectorScale(p_taxis, sprite_scale_inv, p_taxis);
 
 	distinv = 1.0 / (-DotProduct (modelorg, r_spritedesc.vpn));
+	sprite_depthscale = R_SpriteDepthScale (currententity,
+		-DotProduct (modelorg, r_spritedesc.vpn),
+		(r_spritedesc.pspriteframe->right - r_spritedesc.pspriteframe->left) /
+		sprite_scale_inv);
 
 	d_sdivzstepu = p_saxis[0] * xscaleinv;
 	d_tdivzstepu = p_taxis[0] * xscaleinv;

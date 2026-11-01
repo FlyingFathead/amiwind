@@ -41,6 +41,8 @@ The Monitor (amiwind-toolkit/monitor.html), read-only: follow a build as it runs
                command from what a page asks
   --results DIR      master builder results (aw-result-1 JSON files) shown as recent builds and gates
   --console-logs DIR master builder console logs (<run>.console.log), followed like a stage log
+  --machine-jobs     also list every job using the machine (gates, test sessions, pregates: containers named
+               amiwind-gate-*, aw-*, aw-pregate-*) with their cores, so the monitor's core count matches the machine's load
   --bind ADDRESS     the address to listen on (default 127.0.0.1: this machine only). Another address, such as this
                machine's LAN address, lets a phone on your network open the Toolkit; anyone on that network can then
                read what the server serves (the Toolkit, your data, your build logs), so only do it on a network you trust
@@ -212,6 +214,66 @@ def docker_monitor_command(spec, image=DOCKER_DEFAULT_IMAGE, docker='docker', re
 RESULT_FIELDS = ('run_name', 'kind', 'status', 'gate', 'commit', 'version', 'started', 'finished', 'seconds',
                  'reason', 'requester', 'failed_steps', 'dry_run')
 RESULT_NAME = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._+-]*\.json$')
+PERF_ONLY = 'passed-perf-guard-failed'   # a build whose stages all passed and whose only failed step is the perf guard
+
+
+def result_outcome(d):
+    """The outcome of a result record: its own `outcome` when it has one, else derived: a failed record whose only
+    failed step is the perf guard, with the build step itself ok, is PERF_ONLY; otherwise the status."""
+    status = d.get('status')
+    if isinstance(d.get('outcome'), str):
+        return d['outcome']
+    steps = d.get('steps') if isinstance(d.get('steps'), dict) else {}
+    build = steps.get('build') if isinstance(steps.get('build'), dict) else {}
+    if status == 'failed' and d.get('failed_steps') == ['perf-guard'] and build.get('ok') is True:
+        return PERF_ONLY
+    return status
+
+
+def perf_failing(d):
+    """The sections the perf guard failed (a few short strings), for the hover text of a PERF_ONLY row."""
+    guard = d.get('perf_guard') if isinstance(d.get('perf_guard'), dict) else {}
+    failing = guard.get('failing') if isinstance(guard.get('failing'), list) else []
+    return [str(x)[:160] for x in failing[:8]]
+
+
+# The jobs that use the machine besides builds: gate containers (amiwind-gate-*), master builder jobs (aw-*) and
+# pregates (aw-pregate-*). Read with one `docker stats --no-stream` call; nothing is started, stopped or changed.
+MACHINE_PREFIXES = (('aw-pregate-', 'pregate'), ('amiwind-gate-', 'gate'), ('aw-', 'job'))
+MACHINE_TTL = 4.0
+
+
+def machine_jobs(docker='docker', run=subprocess.run):
+    """{'ok', 'jobs': [{name, kind, cpu_pct, cores, mem}], 'cores_used', 'machine_cores'} for the containers named
+    like MACHINE_PREFIXES. `cores` is the container's CPU percentage / 100 (docker stats: 100 % = one core)."""
+    try:
+        out = run([docker, 'stats', '--no-stream', '--format', '{{.Name}}|{{.CPUPerc}}|{{.MemUsage}}'],
+                  capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=20)
+    except (OSError, subprocess.SubprocessError) as e:
+        return {'ok': False, 'error': 'docker stats failed: %s' % type(e).__name__}
+    if out.returncode != 0:
+        return {'ok': False, 'error': 'docker stats failed (exit %s)' % out.returncode}
+    jobs = []
+    for line in out.stdout.splitlines():
+        name, _, rest = line.partition('|')
+        kind = next((k for prefix, k in MACHINE_PREFIXES if name.startswith(prefix)), None)
+        if not kind:
+            continue
+        cpu, _, mem = rest.partition('|')
+        try:
+            pct = float(cpu.strip().rstrip('%'))
+        except ValueError:
+            pct = 0.0
+        jobs.append({'name': name, 'kind': kind, 'cpu_pct': round(pct, 1), 'cores': round(pct / 100, 2),
+                     'mem': mem.split('/')[0].strip()})
+    jobs.sort(key=lambda j: -j['cores'])
+    cores = None
+    try:
+        info = run([docker, 'info', '--format', '{{.NCPU}}'], capture_output=True, text=True, timeout=20)
+        cores = int(info.stdout.strip()) if info.returncode == 0 else None
+    except (OSError, subprocess.SubprocessError, ValueError):
+        cores = None
+    return {'ok': True, 'jobs': jobs, 'cores_used': round(sum(j['cores'] for j in jobs), 2), 'machine_cores': cores}
 
 
 def recent_results(folder, limit=30):
@@ -230,6 +292,9 @@ def recent_results(folder, limit=30):
             continue
         if isinstance(d, dict) and d.get('schema') == 'aw-result-1':
             row = {k: d.get(k) for k in RESULT_FIELDS}
+            row['outcome'] = result_outcome(d)
+            if row['outcome'] == PERF_ONLY:
+                row['perf_failing'] = perf_failing(d)
             numbers = d.get('numbers') if isinstance(d.get('numbers'), dict) else {}
             row['numbers'] = {k: v for k, v in numbers.items() if isinstance(v, (int, float, str)) and len(str(v)) < 80}
             out.append(row)
@@ -355,6 +420,8 @@ class Handler(SimpleHTTPRequestHandler):
     builds = None   # the Monitor's build source (LocalBuilds or CommandBuilds, cached), or None
     results_dir = None   # master builder results for the Monitor, or None
     console_dir = None   # master builder console logs for the Monitor, or None
+    machine_docker = None   # the docker executable for the Monitor's machine view (--machine-jobs), or None
+    machine_cache = (0.0, None)
     mesh_cache = None   # Mesh Compare: the folder of mesh exports, or None
     mesh_exporter = None   # Mesh Compare: a MeshExporter when --mesh-data-files is given, or None
     chim_worlds = {}   # --chim-world NAME=DIR: CHIM world folders served read-only at /chim-world/NAME/
@@ -411,7 +478,15 @@ class Handler(SimpleHTTPRequestHandler):
             return self.send_json({'ok': False, 'error': 'bad query'}, 400)
         if parts == ['config.json']:
             return self.send_json({'ok': True, 'builds': self.builds is not None, 'results': self.results_dir is not None,
-                                   'console': self.console_dir is not None})
+                                   'console': self.console_dir is not None, 'machine': self.machine_docker is not None})
+        if parts == ['machine.json']:
+            if self.machine_docker is None:
+                return self.send_json({'ok': False, 'error': 'no machine view (start the server with --machine-jobs)'}, 404)
+            at, doc = type(self).machine_cache
+            if doc is None or time.time() - at > MACHINE_TTL:
+                doc = machine_jobs(self.machine_docker)
+                type(self).machine_cache = (time.time(), doc)
+            return self.send_json(doc)
         if parts == ['results.json']:
             return self.send_json({'ok': True, 'results': recent_results(self.results_dir) if self.results_dir else []})
         if len(parts) == 2 and parts[0] == 'console':
@@ -582,6 +657,9 @@ def main(argv=None):
     p.add_argument('--bind', default='127.0.0.1', help='listen address (default 127.0.0.1, this machine only)')
     p.add_argument('--results', type=Path, help='Monitor: master builder results (aw-result-1 JSON)')
     p.add_argument('--console-logs', type=Path, help='Monitor: master builder console logs (<run>.console.log)')
+    p.add_argument('--machine-jobs', action='store_true',
+                   help='Monitor: also list the gates, test sessions and other jobs using the machine (containers named '
+                        'amiwind-gate-*, aw-*, aw-pregate-*) with their cores, read with one `docker stats --no-stream`')
     p.add_argument('--mesh-cache', type=Path, help='Mesh Compare: a folder of mesh exports (tools/mesh_export.py --out)')
     p.add_argument('--mesh-data-files', type=Path, help='Mesh Compare: your own Data Files, to export meshes into --mesh-cache')
     p.add_argument('--mesh-docker', metavar='IMAGE', help='Mesh Compare: export in a throwaway container of this image')
@@ -598,7 +676,8 @@ def main(argv=None):
         if not build_progress:
             p.error('no toolkit/cell-progress.json found under %s (build with the CHIM builder, or run cell_progress.py ingest)' % a.build)
     data = a.data or build_data
-    monitor = a.builds or a.builds_command or a.monitor_docker or a.results or a.console_logs
+    monitor = a.builds or a.builds_command or a.monitor_docker or a.results or a.console_logs or a.machine_jobs
+    Handler.machine_docker = a.docker if a.machine_jobs else None
     worlds = {}
     for item in a.chim_world:
         name, sep, folder = item.partition('=')

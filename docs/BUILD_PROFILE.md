@@ -1,6 +1,6 @@
 # Build profile and stage reuse
 
-_Last updated with AmiWind v0.0.57-dev4 (30 October 2026)._
+_Last updated with AmiWind v0.0.58 (31 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -214,7 +214,7 @@ median of the exact, else same-units, runs.
 
 | Verdict | When | Fails the build |
 | --- | --- | --- |
-| `FAIL` | parallel -> serial (the baseline used 2+ cores, now under 1.5); or under half of the baseline's share of usable cores (and fewer cores); or more than 25 % and 30 s slower with the same units | yes |
+| `FAIL` | parallel -> serial (the baseline used 2+ cores, now under 1.5); or under half of the baseline's share of usable cores (and fewer cores); or more than 25 % and 30 s slower with the same units: on wall time when the section ran on about the cores of its timed baseline (within 15 %), else on CPU seconds per unit (a section given another share of the machine, PERF-GUARD-RESIDENT-BUSY-HOST-57); every row names its basis (`basis: wall time` or `basis: CPU per unit`) | yes |
 | `FIX-NOW` | no baseline needed: over 1 min with independent units (items, a phase total, or a section `config/perf-guard.json` declares per-unit) on under a quarter of the cores it could use (min(cores held, units)) | yes |
 | `WAIVED` | a FAIL or FIX-NOW covered by a waiver in `config/perf-guard.json` (bug ID, owning job, expiry date) | no; shown in the table, the result and `aw status` |
 | `BUSY HOST` | other work loaded the machine (the profiler's `host_busy`) in this run or the only baseline: time is never compared; cores only when the section still had at least the baseline's cores free, or left most of its free cores idle (the reasons say which) | no |

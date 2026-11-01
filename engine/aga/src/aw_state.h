@@ -54,6 +54,7 @@ int32_t AW_StateGet(const aw_state_t *state,int kind,const char *id);
 int AW_StateSet(aw_state_t *state,int kind,const char *id,int32_t value);
 int AW_StateTest(const aw_state_t *state,int kind,const char *id,int comparison,int32_t value);
 int AW_JournalAdd(aw_state_t *state,const char *id,int32_t index);
+unsigned AW_JournalNotices(void);   /* sJournalEntry notices owed so far (a rising quest index each) */
 int AW_ItemAdd(aw_state_t *state,const char *id,int32_t count);
 /* Enchantment recharge for unpaused or waited seconds (aw_inventory.c sets it). */
 extern void (*aw_magic_frame)(float seconds);

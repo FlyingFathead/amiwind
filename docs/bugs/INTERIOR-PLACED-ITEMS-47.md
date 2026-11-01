@@ -1,5 +1,15 @@
 # INTERIOR-PLACED-ITEMS-47: takeable and movable items and containers in converted interiors are not live objects (placed items are left out)
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 3 times; something has to be done
+
+- Reported with v0.0.54-dev1 at 2026-10-27 17:17 +0200: PERSISTING (27 October 2026, the NPC docs audit): 6 of 2,031 placed items in interiors are takeable.
+- Reported with v0.0.58-dev4 at 2026-11-01 05:16 +0000: The office's 124 takeable items now share one inline model per equal item (57 models instead of 124), the shared bake taken from the first equal item, so the office stays under the engine's model table. Each item keeps its own func_wall edict and reference, so the aim box, taking with the activate key and the saved taken state work as before.
+- Reported with v0.0.58-dev3 at 2026-11-01 05:33 +0200: PERSISTING (v0.0.58-dev3 test image): the opening's Census and Excise Office is a compiled room map (tools/prepare_census.py) that leaves all 124 small items out (Iron Dagger 119577, Quill Pen 406347, the meal on the back-room table and others): they are not drawn and cannot be taken. Only the registration paper is kept, as the opening's own object.
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -25,6 +35,7 @@ _Last updated with AmiWind v0.0.56 (30 October 2026)._
 <!-- contents start -->
 ## Contents
 
+- [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
 - [Status: 21 October 2026](#status-21-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -165,6 +176,7 @@ Family: Content silently missing from a build (`build-content-missing`). Every o
 - [CHIM-ROOM-LAVA-UNDER-WATER-48](CHIM-ROOM-LAVA-UNDER-WATER-48.md): CHIM rooms could not hold a lava pool whose bed reaches under the water level: 3 base-game rooms set aside
 - [CHIM-ROOM-SHELL-NO-HULL-48](CHIM-ROOM-SHELL-NO-HULL-48.md): Batch CHIM rooms declared no standing hull, so the actor ground check refused all 1,910 of their residents
 - [CHIM-TRACKER-APRON-40](CHIM-TRACKER-APRON-40.md): Tracker counts town apron dependencies as complete original cells
+- FOCUS-ROOM-BACK-TABLE-58 (no report page): In the Census and Excise Office the back-room table with the Iron Dagger is not drawn and aiming at the dagger shows no item box
 - [GUARD-TORCH-REBAKE-MISMATCH-48](GUARD-TORCH-REBAKE-MISMATCH-48.md): Eight guards first staged in v0.0.48 get no torch: their base models do not rebake exactly
 - [GUARD-TORCH-TYPES-LIMIT-48](GUARD-TORCH-TYPES-LIMIT-48.md): The image step stops on Too many distinct staged guard models: the batch rooms bring more than 32 guard types
 - IMAGE-WORLD-BATCH-PAIRS-52 (no report page): The image stopped writing a world partition: the boot units moved off DH0 (source, volume path pairs) were turned into paths before the pairs were read
@@ -186,6 +198,8 @@ Family: Content silently missing from a build (`build-content-missing`). Every o
 
 Related bugs in other categories:
 
+- CENSUS-BACK-TABLE-NOT-DRAWN-58 (no report page): The back-room table of the Census and Excise Office is not drawn
+- FOCUS-BOX-UNDRAWN-ITEMS-58 (no report page): The focus box showed for room items that the room does not draw, and the activate key then took nothing
 - [HARVEST-INTERIOR-PICK-47](HARVEST-INTERIOR-PICK-47.md): Mushrooms inside interiors cannot be picked
 - [HARVEST-ORGANIC-PLANTS-47](HARVEST-ORGANIC-PLANTS-47.md): Only the small mushrooms can be picked; every other harvestable plant is scenery
 - [UI-INVENTORY-INTEGRATION-40](UI-INVENTORY-INTEGRATION-40.md): Inventory integration and safe world placement remain incomplete

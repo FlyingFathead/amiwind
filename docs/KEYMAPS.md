@@ -1,6 +1,6 @@
 # Keyboard and command reference
 
-_Last updated with AmiWind v0.0.54-dev1 (27 October 2026)._
+_Last updated with AmiWind v0.0.58-dev4 (1 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -74,7 +74,8 @@ default stays 3.0. The page steps it from 0.5 to 10 by 0.5 (Shift with an arrow:
 vertical mouse look upside down (Quake's own invert: the sign of the saved
 `m_pitch`), as the original game's Invert Y Axis.
 
-The gameplay actions follow with their current keys. Select an
+The gameplay actions follow with their current keys (Sneak among them, default
+Left Ctrl). Select an
 action and press Enter or click, then press the new key; Escape cancels.
 Delete or Backspace clears the action's keys. Each action holds up to two keys;
 a third key replaces both. A key already used by another action moves to the
@@ -107,8 +108,8 @@ is tracked in [UI-KEY-HELP-STALE-38](bugs/UI-KEY-HELP-STALE-38.md).
 | (unbound) | `+left` / `+right` | Keyboard turn; mouse turns by default. Earlier saved key files keep Left / Right as turn. |
 | Space | `+jump` | Jump |
 | Shift | `+speed` | Run; faster noclip flight |
-| Ctrl | `+aw_fastflight` | Debug noclip only: twice Shift flight speed |
-| E | `+aw_use` | Use / interact; up in noclip |
+| Ctrl | `+aw_sneak` | Sneak while held (the original's default key, Left Ctrl): slower walking by the game's sneak speed setting, no running, a lower view, sneaking fatigue and the original's sneak indicator beside the HUD boxes; not while swimming. In debug noclip it is the fast-flight key (twice Shift flight speed). Older saved key files that bound `+aw_fastflight` get `+aw_sneak` on that key. |
+| E | `+aw_use` | Use / interact; up in noclip. On a book, scroll or letter ("E: Read", red when it belongs to someone) E opens the reader: Left / Right, Up / Down or Page Up / Page Down turn the pages, E takes it ("E: Take", or "E: Steal" in red), Esc closes it; the mouse clicks both buttons. Reading is free. Magic scrolls are taken without reading. The texts come from the game data (build stage `books`, `tools/prepare_books.py`: id1/books.awb, read one book at a time). |
 | Q | `+movedown` | Down in noclip |
 | Mouse 1 | `+attack` | Attack |
 | Right mouse (Amiga sends it as `MOUSE3`) | `+aw_alt` | Block: hold to raise your shield (`aw_combat_block 1`, an AmiWind extension and the default; the original blocks automatically, docs/COMBAT.md "Blocking"). In pick mode (`dbg companion pick`) it picks a companion, like the left button. Older saved key files get it if `MOUSE3` is unbound. |
@@ -213,7 +214,7 @@ While photo mode is on, Ctrl+F switches the fog and Ctrl+H the debug HUD
 (`dbg hud`; its coordinate strip then spans the whole bottom edge, and an open
 light gallery strip comes back with it), each with a
 brief notice in the same box. Outside photo mode these keys keep their bindings (F raises the
-hands, Ctrl is the noclip fast-flight key). F10 still opens the console, which
+hands, Ctrl is the sneak key and the noclip fast-flight key). F10 still opens the console, which
 reminds you how to leave. Leaving photo mode restores every setting it changed
 exactly as before (fog, debug HUD and the rest, whatever Ctrl+F/Ctrl+H did) and
 puts the player back where photo mode started, standing, with no momentum.

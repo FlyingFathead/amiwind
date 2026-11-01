@@ -47,7 +47,7 @@ typedef struct {
     float scale;
     /* state */
     int running;        /* now: Shift (+speed) held */
-    int sneaking;       /* later: no sneak input yet */
+    int sneaking;       /* now: the sneak key held on foot (AW_MoveSneaking, SNEAK-58) */
     int swimming;       /* now: the water movement path */
     int knocked;        /* now: knocked down / knocked out (combat input lock) */
     int paralyzed;      /* later: Paralyze effect */
@@ -98,6 +98,8 @@ float AW_MoveFatigueAfter(float fatigue,float loss);
  * on; after each move, the fatigue cost of running/swimming and of a jump. */
 void AW_MoveInit(void);
 int AW_MoveSuperspeed(void);
+/* SNEAK-58: 1 while the player sneaks (the sneak key held, on foot, not swimming, not in noclip). */
+int AW_MoveSneaking(void);
 /* The player's inputs as the rules see them this frame (live character sheet). */
 void AW_MovePlayerInputs(aw_move_inputs_t *in);
 #endif

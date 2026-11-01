@@ -179,8 +179,9 @@ int AW_CombatSettingsLoad(void);
 int AW_CombatAiLoaded(void);            /* every "ai" line was in combat/settings.txt */
 /* The combat layer's rule switches (dbg combat flee|sounds on/off; plain switches, not console variables: the
  * resident registry budget). AW_RULE_FLEE: flee by the Flee rating (OpenMW aicombataction.cpp makeFleeDecision);
- * AW_RULE_SOUNDS: the swing's sounds by AW_CombatSwingSounds. Both off by default (A/B); the combat playground switches
- * them on for its session. ON < 0 only reads; returns the value before the call. */
+ * AW_RULE_SOUNDS: the swing's sounds by AW_CombatSwingSounds. Flee off by default (A/B); sounds ON by default since
+ * v0.0.58 (COMBAT-SOUNDS-RULE-OFF-58; the player's own footsteps are their own setting, off). The combat playground
+ * switches both on for its session. ON < 0 only reads; returns the value before the call. */
 enum {AW_RULE_FLEE,AW_RULE_SOUNDS,AW_RULE_COUNT};
 int AW_CombatRule(int rule,int on);
 /* Combat sound KEY (AW_SND_*): its file (sound/ relative, "" when the image has none) and playing it locally. */

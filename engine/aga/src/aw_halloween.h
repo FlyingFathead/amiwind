@@ -124,6 +124,8 @@ void AW_HalloweenBenchFigures(const float *times,int n,aw_hw_bench_t *out);
 void AW_HalloweenInit(void);
 void AW_HalloweenTick(void);
 void AW_HalloweenDraw(void);
+/* SV_SpawnServer: a new server (a same-map reload too) ends the scene without touching its old edicts. */
+void AW_HalloweenServerReset(void);
 /* The director's view (view.c, before the world is drawn): 1 when it set r_refdef's eye and angles. */
 int AW_HalloweenCamera(float origin[3],float angles[3]);
 #endif

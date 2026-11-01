@@ -16,9 +16,11 @@ int (*aw_inventory_row_icon)(int slot,const char *id,int equipped,int x,int y);
 static byte screen[200][320];
 static int opens,placeholders,armed,selected;
 static float condition=.5f,charge=5;
-static const char *keys[]={"hud:bar","hud:box","hud:track:magic","hud:track:weapon","inv:steel longsword","inv:steel longsword:equip","item:steel longsword","item:test_ring","skill:26","ui:head:block","ui:head:left","ui:head:right"};
-static const int sizes[][3]={{20,4,11},{20,20,12},{18,2,13},{18,2,14},{16,16,21},{16,16,22},{18,18,15},{18,18,16},{18,18,17},{154,12,18},{1,12,19},{1,12,20}};
-#define ROWS 12
+static const char *keys[]={"hud:bar","hud:box","hud:sneak","hud:track:magic","hud:track:weapon","inv:steel longsword","inv:steel longsword:equip","item:steel longsword","item:test_ring","skill:26","ui:head:block","ui:head:left","ui:head:right"};
+static const int sizes[][3]={{20,4,11},{20,20,12},{18,18,23},{18,2,13},{18,2,14},{16,16,21},{16,16,22},{18,18,15},{18,18,16},{18,18,17},{154,12,18},{1,12,19},{1,12,20}};
+#define ROWS 13
+static int sneaking;
+int AW_MoveSneaking(void){return sneaking;}
 static FILE *memory(const byte *p,int n,FILE **out){FILE *f=tmpfile();assert(f);assert(fwrite(p,1,n,f)==(size_t)n);fseek(f,0,SEEK_SET);*out=f;return f;}
 /* pack_mode 1: the AWL2 table into one pack (gfx/icons.awp), as the builder writes it. */
 static int pack_mode;
@@ -110,6 +112,9 @@ int main(void){
     /* Full charge fills the track; zero leaves it empty. */
     memset(screen,0,sizeof(screen));charge=20;assert(aw_hud_item_boxes(y,AW_HUD_ALL));assert(count(108,y+21,18,2,13)==36);
     memset(screen,0,sizeof(screen));charge=0;assert(aw_hud_item_boxes(y,AW_HUD_ALL));assert(count(108,y+21,18,2,13)==0);
+    /* SNEAK-58: the sneak indicator beside the boxes only while sneaking */
+    memset(screen,0,sizeof(screen));assert(aw_hud_item_boxes(y,AW_HUD_ALL));assert(count(130,y+1,18,18,23)==0);
+    sneaking=1;assert(aw_hud_item_boxes(y,AW_HUD_ALL));assert(count(130,y+1,18,18,23)==18*18);sneaking=0;
     /* An unknown key fails once and is not looked up again every frame. */
     {aw_icon_t slot;memset(&slot,0,sizeof(slot));assert(!AW_IconLoad(&slot,"item:none"));reads=opens;
      assert(!AW_IconLoad(&slot,"item:none"));assert(opens==reads);}

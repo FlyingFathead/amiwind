@@ -254,7 +254,50 @@ class ServerTests(unittest.TestCase):
         self.assertEqual([r['run_name'] for r in rows], ['g1'])                 # aw-result-1 only
         self.assertNotIn('blob', rows[0]['numbers'])                           # long values left out
         self.assertEqual(json.loads(self.get('/monitor/config.json')[1]),
-                         {'ok': True, 'builds': True, 'results': True, 'console': True})
+                         {'ok': True, 'builds': True, 'results': True, 'console': True, 'machine': False})
+        self.assertEqual(self.get('/monitor/machine.json')[0], 404)             # off unless --machine-jobs
+
+    def test_a_perf_guard_only_failure_is_its_own_outcome(self):
+        def doc(**kw):
+            base = {'schema': 'aw-result-1', 'kind': 'build', 'status': 'failed', 'run_name': 'b', 'failed_steps': ['perf-guard'],
+                    'steps': {'build': {'exit': 3, 'ok': True}, 'perf-guard': {'exit': 0, 'ok': False}},
+                    'perf_guard': {'verdict': 'failed', 'failing': ['fog 12 %', 'draw 9 %']}}
+            base.update(kw)
+            return base
+        with tempfile.TemporaryDirectory() as tmp:
+            for name, d in (('perf', doc()), ('other', doc(failed_steps=['perf-guard', 'check'])),
+                            ('stage', doc(steps={'build': {'exit': 1, 'ok': False}}, failed_steps=['perf-guard'])),
+                            ('named', doc(outcome='passed-perf-guard-failed', failed_steps=[])),
+                            ('ok', doc(status='passed', failed_steps=[]))):
+                d['run_name'] = name
+                (Path(tmp) / (name + '.json')).write_text(json.dumps(d), encoding='utf-8')
+            rows = {r['run_name']: r for r in toolkit_serve.recent_results(tmp)}
+        self.assertEqual(rows['perf']['outcome'], 'passed-perf-guard-failed')
+        self.assertEqual(rows['perf']['status'], 'failed')                      # the record's status is unchanged
+        self.assertEqual(rows['perf']['perf_failing'], ['fog 12 %', 'draw 9 %'])
+        self.assertEqual(rows['other']['outcome'], 'failed')                    # another step failed too
+        self.assertEqual(rows['stage']['outcome'], 'failed')                    # a stage failed
+        self.assertEqual(rows['named']['outcome'], 'passed-perf-guard-failed')  # the record's own field wins
+        self.assertEqual(rows['ok']['outcome'], 'passed')
+        self.assertNotIn('perf_failing', rows['ok'])
+
+    def test_machine_jobs_lists_gates_tests_and_pregates_with_cores(self):
+        stats = '\n'.join(['amiwind-gate-5320|350.00%|1.2GiB / 31GiB', 'aw-pregate-x|100%|2GiB / 31GiB',
+                           'aw-job-1|12%|10MiB / 31GiB', 'amiwind-toolkit-monitor-8031|1%|5MiB / 256MiB', 'postgres|90%|1GiB / 2GiB'])
+
+        def run(argv, **kw):
+            self.assertEqual(argv[0], 'docker')
+            self.assertEqual(argv[1] in ('stats', 'info'), True)                 # read-only calls only
+            return subprocess.CompletedProcess(argv, 0, stdout=stats if argv[1] == 'stats' else '24\n', stderr='')
+        m = toolkit_serve.machine_jobs('docker', run)
+        self.assertTrue(m['ok'])
+        self.assertEqual([(j['name'], j['kind'], j['cores']) for j in m['jobs']],
+                         [('amiwind-gate-5320', 'gate', 3.5), ('aw-pregate-x', 'pregate', 1.0), ('aw-job-1', 'job', 0.12)])
+        self.assertEqual((m['cores_used'], m['machine_cores']), (4.62, 24))
+        bad = toolkit_serve.machine_jobs('docker', lambda argv, **kw: subprocess.CompletedProcess(argv, 1, stdout='', stderr='x'))
+        self.assertFalse(bad['ok'])
+        gone = toolkit_serve.machine_jobs('docker-never-run')
+        self.assertFalse(gone['ok'])
 
     def test_traversal_and_bad_input_are_refused(self):
         for path in ('/monitor/run/..%2f..%2fsecret.json/progress.json', '/monitor/run/%2e%2e/progress.json',
@@ -360,6 +403,16 @@ class PageTests(unittest.TestCase):
         self.assertEqual(html.count('saveFollowPrefs();'), 5)
         self.assertIn('if (S.run) return;', html)
 
+    def test_timeline_boxes_are_on_by_default_in_the_timeline_controls(self):
+        html = (ROOT / 'amiwind-toolkit' / 'monitor.html').read_text(encoding='utf-8')
+        self.assertIn('<input type="checkbox" id="showcores" checked autocomplete="off">', html)
+        self.assertIn('<input type="checkbox" id="showram" checked autocomplete="off">', html)
+        self.assertIn('Cores used</label>', html)
+        self.assertIn('RAM usage</label>', html)
+        bar = html.split('<div id="tlbar">')[1].split('</div>')[0]           # both boxes sit in the Timeline controls
+        self.assertIn('id="showcores"', bar)
+        self.assertIn('id="showram"', bar)
+
     @unittest.skipUnless(shutil.which('node'), 'Node.js unavailable')
     def test_page_renders_a_sample_run(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -405,6 +458,27 @@ class PageTests(unittest.TestCase):
         self.assertNotIn('maximized', page['fullClassAfter'])
         self.assertIn('RED STRETCH', page['hover'])
         self.assertIn('red: under 2.5', page['hover'])
+        # the overall bar: the build's percentage, the expected finish and the time left; the passed share without a percentage
+        self.assertEqual((page['overall']['hidden'], page['overall']['width'], page['overall']['now']), (False, '19%', '19'))
+        self.assertIn('19 % done · expected finish ', page['overall']['text'])
+        self.assertIn(' left', page['overall']['text'])
+        self.assertEqual((page['overallDone']['width'], page['overallDone']['cls']), ('75%', 'passed'))
+        self.assertEqual(page['overallDone']['text'], '75 % done · passed')
+        self.assertTrue(page['overallNone'])
+        # a build whose stages passed and whose perf guard failed is its own amber state, sections on hover
+        self.assertEqual((page['perfCell']['text'], page['perfCell']['cls']), ('passed, perf guard failed', 'perfonly'))
+        self.assertIn('fog 12 % | draw 9 %', page['perfCell']['title'])
+        self.assertEqual((page['failedCell']['text'], page['failedCell']['cls']), ('failed', 'failed'))
+        # the machine view lists every job with its cores and hides when the server has none
+        self.assertFalse(page['machine']['hidden'])
+        self.assertEqual(page['machine']['rows'], 3)                            # header + two jobs
+        self.assertIn('2 jobs using 4.5 cores of 24 on the machine', page['machine']['note'])
+        self.assertTrue(page['machineOff'])
+        # the timeline's Cores used and RAM usage boxes show or hide their lines
+        self.assertEqual(page['linesBoth'], {'cores': True, 'ram': True})
+        self.assertEqual(page['linesNoCores'], {'cores': False, 'ram': True})
+        self.assertEqual(page['linesNoRam'], {'cores': True, 'ram': False})
+        self.assertEqual(page['linesNone'], {'cores': False, 'ram': False})
         self.assertEqual(page['runValue'], RUN)                                # the selection is kept
         self.assertTrue(any(t.startswith('\u25cf new') and 'vivec-stage-a' in t for t in page['runOptions']))
         self.assertFalse(any(t.startswith('\u25cf new') and RUN in t for t in page['runOptions']))

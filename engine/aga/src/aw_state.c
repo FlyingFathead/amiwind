@@ -44,6 +44,10 @@ int AW_StateTest(const aw_state_t *state,int kind,const char *id,int comparison,
     }
     return 0;
 }
+/* The journal-updated notices owed (OpenMW Journal::addEntry: sJournalEntry whenever a quest's index rises, a new
+ * entry or one heard before; nothing for a repeat or a lower index). The caller compares the count around a call. */
+static unsigned journal_notices;
+unsigned AW_JournalNotices(void){return journal_notices;}
 int AW_JournalAdd(aw_state_t *state,const char *id,int32_t index)
 {
     char name[64];int i,quest,known=0;int32_t days,ms;aw_journal_entry_t *entry;
@@ -60,6 +64,7 @@ int AW_JournalAdd(aw_state_t *state,const char *id,int32_t index)
     if(!AW_StateGet(state,AW_GLOBAL,"amiwind:clock:ready"))ms=32400000;
     if(days<0 || days>365000 || ms<0 || ms>=86400000)return 0;
     if(!AW_StateSet(state,AW_JOURNAL,id,index))return 0;
+    journal_notices++;
     if(!known){
         entry=&state->journal[state->journal_count++];
         entry->quest=quest;entry->stage=index;entry->days=days;entry->milliseconds=ms;

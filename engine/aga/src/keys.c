@@ -781,6 +781,9 @@ void AW_ControlsMigrate(void)
     if(!keybindings[K_TAB] || !*keybindings[K_TAB])Key_SetBinding(K_TAB,"+aw_pov");
     if(!keybindings[K_MWHEELUP] || !*keybindings[K_MWHEELUP])Key_SetBinding(K_MWHEELUP,"aw_view_zoom 1");
     if(!keybindings[K_MWHEELDOWN] || !*keybindings[K_MWHEELDOWN])Key_SetBinding(K_MWHEELDOWN,"aw_view_zoom -1");
+    /* SNEAK-58: +aw_sneak replaced +aw_fastflight (v0.0.58); a key that held it gets sneak, Ctrl gets it if free */
+    for(key=0;key<256;key++)if(keybindings[key] && !strcmp(keybindings[key],"+aw_fastflight"))Key_SetBinding(key,"+aw_sneak");
+    if(!keybindings[K_CTRL] || !*keybindings[K_CTRL])Key_SetBinding(K_CTRL,"+aw_sneak");
 }
 
 void Key_Init (void)

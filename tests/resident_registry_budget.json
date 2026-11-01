@@ -16,8 +16,8 @@
    "bytes": 0
   },
   "growing": {
-   "count": 5,
-   "worst_bytes": 78592
+   "count": 7,
+   "worst_bytes": 183360
   }
  },
  "reasons": [
@@ -66,14 +66,15 @@
   "2026-10-31: made spells (64 x 152 bytes) and enchanted items (64 x 200 bytes), nothing until the first is made, worst 22,528 bytes; decided by the coordinator for a feature-complete dialogue (the maintainer asked for it), sized to the data",
   "2026-10-31: filled soul gems (64 x 44 bytes = 2,816), nothing until the first is filled; part of the coordinator-approved made-things design (Enchanting)",
   "2026-10-31: the maintainer (TG): 'by default the player's own footstep sounds could be turned on (or off) from sound options menu or dbg console' (PLAYER-FOOTSTEPS-NONE-58: dbg footsteps, aw_player_footsteps, its stride and volume)",
-  "2026-10-31: places revealed by ShowMap (128 x 32 bytes = 4,096), nothing until the first ShowMap; the coordinator asked for the data to be kept for the map place markers (INGAME-MAP-ORIGINAL-57)"
+  "2026-10-31: places revealed by ShowMap (128 x 32 bytes = 4,096), nothing until the first ShowMap; the coordinator asked for the data to be kept for the map place markers (INGAME-MAP-ORIGINAL-57)",
+  "2026-10-31: the journal topic pages, sized from the data (16,796 Topic answers in the three masters, each heard once): at most 12,000 entries x 6 bytes and 1,024 speaker names x 32 bytes, worst 104,768 bytes, a few KB in a long game, growing from 256; the coordinator approved the plan"
  ],
  "entries": {
   "commands": [
    "+attack",
    "+aw_alt",
-   "+aw_fastflight",
    "+aw_pov",
+   "+aw_sneak",
    "+aw_use",
    "+back",
    "+forward",
@@ -93,8 +94,8 @@
    "+use",
    "-attack",
    "-aw_alt",
-   "-aw_fastflight",
    "-aw_pov",
+   "-aw_sneak",
    "-aw_use",
    "-back",
    "-forward",
@@ -717,6 +718,8 @@
    "barter sold things (BARTER-SOLD-ITEM-LOST-58)",
    "enchanted items (Enchanting)",
    "filled soul gems (Enchanting)",
+   "journal topic entries",
+   "journal topic speakers",
    "made spells (Spellmaking)",
    "places revealed by ShowMap"
   ]

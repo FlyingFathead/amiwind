@@ -52,6 +52,10 @@ int main(int argc,char **argv) {
             s.player_health_percent=atoi(f[6]);s.player_health=s.player_health_percent;
             got=AW_GlutPick(&g,AW_GlutFind(&g,f[1]),topic_of(f[2]),&s,0,0);
             if(got!=atoi(f[7])){fprintf(stderr,"pick %s %s talked %s r %s hp %s: %d, want %s\n",f[1],f[2],f[3],f[4],f[5],got,f[7]);return 1;}
+            /* the picked entry is one of the topic's candidates, which come in the original's (entry) order */
+            if(got>=0){int all[256],m=AW_GlutCandidates(&g,AW_GlutFind(&g,f[1]),topic_of(f[2]),all,256),k,in=0;
+                for(k=0;k<m;k++){if(all[k]==got)in=1;assert(!k || all[k]>all[k-1]);}
+                assert(in);}
             /* the random-pick option returns one of the entries that hold, never one that does not */
             if(got>=0){int k;for(k=0;k<8;k++){int r=AW_GlutPick(&g,AW_GlutFind(&g,f[1]),topic_of(f[2]),&s,1,k);assert(r>=0);}}
         }else if(!strcmp(f[0],"sound")){
@@ -97,6 +101,15 @@ int main(int argc,char **argv) {
     }
     fclose(x);
     assert(AW_GlutFind(&g,"nobody")==-1 && AW_GlutFind(&g,"")==-1 && AW_GlutFind(&g,NULL)==-1);
+    /* the shown greeting and the voice table's line of the same INFO (VOICE-COVERAGE-58): the link marks,
+       pseudo-asterisks, spacing and letter case do not count; another line or an empty one never matches */
+    assert(AW_GlutSameLine("I am %Name, a %Class of the @Mages Guild#.","I am %Name, a %Class of the Mages Guild."));
+    assert(AW_GlutSameLine("What do you want, %PCRace?","what do  you want %pcrace"));
+    assert(AW_GlutSameLine("Ask about @Vivec*#.","Ask about Vivec."));
+    assert(!AW_GlutSameLine("What do you want?","What do you want, %PCRace?"));
+    assert(!AW_GlutSameLine("","") && !AW_GlutSameLine("...","!") && !AW_GlutSameLine(NULL,"x"));
+    assert(AW_GlutSameLine("Ser\xe9na.","ser\xe9na") && !AW_GlutSameLine("Ser\xe9na.","Ser\xc9na."));
+    {int none[4];assert(AW_GlutCandidates(&g,-1,AW_GLUT_GREETING,none,4)==0 && AW_GlutCandidates(&g,0,AW_GLUT_TOPICS,none,4)==0);}
     printf("%d checks\n",checks);
     free(data);
     return 0;
@@ -218,6 +231,16 @@ int main(int argc,char **argv){
     assert(AW_VoiceSay(&edicts[4],AW_VOICE_ATTACK_LINE,10000) && played==before+1);
     assert(!strncmp(last_sound,"pool/a",6));
     realtime=20;
+    /* the conversation greeting's voice follows the shown greeting (VOICE-COVERAGE-58): the mage's shown line (with
+       the dialogue table's link marks) is its voiced Greeting 1 INFO; the Dunmer's shown line is an INFO with no
+       voice: silent, as in the original; a line the voice table lacks: the table's own pick (the previous method) */
+    before=played;
+    assert(AW_GlutGreetVoice(&edicts[4],"I am %Name, a %Class of the @%Faction#.") && played==before+1);
+    realtime=30;before=played;
+    assert(!AW_GlutGreetVoice(&edicts[2],"What do you want, %PCRace?") && played==before);
+    assert(AW_GlutGreetVoice(&edicts[4],"A line of another table.") && played==before+1);
+    realtime=40;before=played;
+    assert(!AW_GlutGreetVoice(&edicts[5],"Hello.") && !AW_GlutGreetVoice(&edicts[4],NULL) && played==before);
     /* aw_npc_voice_lut 0: the previous method (the model's own lines; these models have none) */
     lut_cvar->value=0;before=played;
     assert(AW_GlutNpcOf(&edicts[2])<0 && !AW_VoiceSay(&edicts[2],AW_VOICE_ATTACK_LINE,10000) && played==before);

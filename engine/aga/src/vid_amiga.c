@@ -266,13 +266,24 @@ void	VID_Init (unsigned char *palette)
                             CYBRBIDTG_NominalHeight, BASEHEIGHT,
                             CYBRBIDTG_Depth,         8,
                             TAG_DONE);
-  else if (GfxBase->LibNode.lib_Version >= 39)
+  else if (GfxBase->LibNode.lib_Version >= 39) {
     mode = BestModeID (BIDTAG_NominalWidth,     BASEWIDTH,
                        BIDTAG_NominalHeight,    BASEHEIGHT,
                        BIDTAG_Depth,            8,
                        BIDTAG_DIPFMustNotHave,  propertymask,
                        BIDTAG_MonitorID,        PAL_MONITOR_ID,
                        TAG_DONE);
+    /* An NTSC machine has no PAL monitor: ask again without naming one, so the default monitor's mode is
+     * taken (VIDEO-NTSC-NO-PAL-MODE-58: the start stopped with "Can't FindDisplayInfo() for mode ffffffff"). */
+    if (mode == INVALID_ID) {
+      mode = BestModeID (BIDTAG_NominalWidth,     BASEWIDTH,
+                         BIDTAG_NominalHeight,    BASEHEIGHT,
+                         BIDTAG_Depth,            8,
+                         BIDTAG_DIPFMustNotHave,  propertymask,
+                         TAG_DONE);
+      Con_Printf ("No PAL screen mode: using the default monitor's mode %08lx\n", (unsigned long)mode);
+    }
+  }
   else
     mode = PAL_MONITOR_ID;  // Default to PAL for older systems
 

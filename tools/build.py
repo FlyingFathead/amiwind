@@ -587,6 +587,48 @@ def mwscript_steps(args, tool, run):
     return step, ['--mwscript', str(run / 'mwscript')]
 
 
+def focus_status(args):
+    """The focus table (id1/focus.awf, FOCUS-BOX-58) in this build: (built, status). A stage of its own beside the
+    others (no stage's input or key changes): every real AGA image build makes it, as the compiled scripts."""
+    built, status = mwscript_status(args)
+    return built, ('enabled (the framed box of placed items, actors and doors in rooms)' if built else status)
+
+
+def focus_steps(args, tool, run):
+    """The focus stage and its image option: every interior placement's name, weight, value and owner."""
+    step = ('focus', tool('prepare_focus.py', '--data-files', args.data_files, '--out', run / 'focus'))
+    return step, ['--focus', str(run / 'focus')]
+
+
+def books_steps(args, tool, run):
+    """The book texts stage and its image option (BOOK-READER-58): the readable books' texts, read on demand by the
+    reader; a stage of its own, depending on nothing, so no other stage's key changes."""
+    step = ('books', tool('prepare_books.py', '--data-files', args.data_files, '--out', run / 'books'))
+    return step, ['--books', str(run / 'books')]
+
+
+def install_ini(data_files):
+    """The install's Morrowind.ini (the class questions, CHARGEN-CENSUS-57), beside Data Files or in it; None when
+    the install has none (a game data folder copied alone)."""
+    try:
+        data = resolve_data_files(Path(data_files))
+    except (OSError, ValueError):
+        return None
+    for folder in (data, data.parent):
+        found = child_ci(folder, 'Morrowind.ini', required=False)
+        if found is not None and found.is_file():
+            return found
+    return None
+
+
+def chargen_steps(args, tool, run):
+    """The class questions stage and its image option (CHARGEN-CENSUS-57): a stage of its own beside the others,
+    depending on nothing, so no other stage's key changes; the ini is named on its command line and hashed."""
+    ini = install_ini(args.data_files)
+    step = ('chargen', tool('prepare_chargen.py', *(['--ini', ini] if ini else []), '--out', run / 'chargen'))
+    return step, ['--chargen', str(run / 'chargen')]
+
+
 def harvest_status(args):
     """Harvestable mushrooms in this build: (built, status).
 
@@ -1230,6 +1272,22 @@ def commands(args, tools, run):
         steps = [(name, command + options if name == 'image' else command) for name, command in steps]
     if mwscript_status(args)[0] and any(name == 'image' for name, _ in steps) and any(name == 'media' for name, _ in steps):
         step, options = mwscript_steps(args, tool, run)
+        image_index = next(i for i, (name, _) in enumerate(steps) if name == 'image')
+        steps.insert(image_index, step)
+        steps = [(name, command + options if name == 'image' else command) for name, command in steps]
+    if focus_status(args)[0] and any(name == 'image' for name, _ in steps):
+        step, options = focus_steps(args, tool, run)
+        image_index = next(i for i, (name, _) in enumerate(steps) if name == 'image')
+        steps.insert(image_index, step)
+        steps = [(name, command + options if name == 'image' else command) for name, command in steps]
+        # BOOK-READER-58: the book texts go with the focus table (its rows say which placed books are read)
+        step, options = books_steps(args, tool, run)
+        image_index = next(i for i, (name, _) in enumerate(steps) if name == 'image')
+        steps.insert(image_index, step)
+        steps = [(name, command + options if name == 'image' else command) for name, command in steps]
+    # (not in a retained-run image recovery: that run's stage set is fixed, tools/recover_image.py)
+    if args.stage == 'aga' and any(name == 'image' for name, _ in steps) and not getattr(args, 'recover_image_from', None):
+        step, options = chargen_steps(args, tool, run)
         image_index = next(i for i, (name, _) in enumerate(steps) if name == 'image')
         steps.insert(image_index, step)
         steps = [(name, command + options if name == 'image' else command) for name, command in steps]

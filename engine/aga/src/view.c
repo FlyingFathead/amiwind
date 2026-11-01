@@ -1067,8 +1067,23 @@ V_CalcRefdef
 
 ==================
 */
+/* SNEAK-58: the eye's drop while sneaking (aw_move.c sets it; NULL in fixtures without it): 1 sneaking, 0 standing.
+ * The view eases down and up over SNEAK_EASE seconds. The drop is a quarter of the eye's height above the feet, an
+ * approximation of the original's lower view until a measured comparison gives the number. */
+float (*aw_view_sneak)(void);
+#define SNEAK_DROP .25f
+#define SNEAK_EASE .2f
+static float sneak_drop(void) {
+    static float amount;static double last;float want=aw_view_sneak && aw_view_sneak()>0?1:0,step;
+    edict_t *p=sv.active && svs.maxclients==1 && svs.clients?svs.clients[0].edict:NULL;
+    step=last>0 && cl.time>last?(float)(cl.time-last)/SNEAK_EASE:1;last=cl.time;
+    if(step>1)step=1;
+    amount+=want>amount?(want-amount<step?want-amount:step):-(amount-want<step?amount-want:step);
+    return p?amount*SNEAK_DROP*(p->v.view_ofs[2]-p->v.mins[2]):0;
+}
 void V_CalcRefdef (void)
 {
+    float sneak_offset;
     entity_t	*ent, *view;
     int			i;
     vec3_t		forward, right, up;
@@ -1100,7 +1115,8 @@ void V_CalcRefdef (void)
 
 // refresh position
     VectorCopy (ent->origin, r_refdef.vieworg);
-    r_refdef.vieworg[2] += cl.viewheight + bob;
+    sneak_offset=sneak_drop();
+    r_refdef.vieworg[2] += cl.viewheight + bob - sneak_offset;
 
 // never let it sit exactly on a node line, because a water plane can
 // dissapear when viewed with the eye exactly on it.
@@ -1135,7 +1151,7 @@ void V_CalcRefdef (void)
     CalcGunAngle ();
 
     VectorCopy (ent->origin, view->origin);
-    view->origin[2] += cl.viewheight;
+    view->origin[2] += cl.viewheight - sneak_offset;   /* the hands follow the lowered eye (SNEAK-58) */
 
     /* The authored torch includes proximal arm geometry behind the alias near
      * plane. Forward stride bob reveals those cut ends, especially running.

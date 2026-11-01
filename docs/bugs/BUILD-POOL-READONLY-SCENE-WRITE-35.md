@@ -175,4 +175,8 @@ Family: Build reuse keys and output attribution (`build-cache-reuse`). A unit is
 - DOOR-CHECK-KNOWN-UNKEYED-54 (no report page): config/door-check-known.json is in no stage key: an edit to the known list never re-runs a passed image's door check
 - [MWAD-WALK-ORDER-35](MWAD-WALK-ORDER-35.md): Input check results depend on directory listing order
 
+Related bugs in other categories:
+
+- TEST-POOL-RESUME-SHELL-CONTAINER-58 (no report page): A stage-key test fails when run on its own in the shell container: a pool-mode resume reuses the scene-chain stage it should rerun
+
 <!-- END GENERATED CATEGORY -->

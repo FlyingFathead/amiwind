@@ -1,6 +1,6 @@
 # Combat and the Vivec Arena minigame
 
-_Last updated with AmiWind v0.0.57-dev1 (30 October 2026)._
+_Last updated with AmiWind v0.0.58-dev2 (31 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -134,8 +134,8 @@ The rules the aggro mode runs, with the game settings read from your master file
   It decides again after three seconds (ActionFlee).
 - The Flee rule is the switch `dbg combat flee on/off`. It is off by default, so fights in the
   world keep the earlier rule: a fighter flees only when it cannot reach you. The aggro and group modes switch it
-  on for their session and restore it afterwards. The same goes for the sounds rule (`dbg combat sounds on/off`,
-  see Sounds), which the aggro, group and sounds modes switch on. Since v0.0.57 attack on sight also runs in the
+  on for their session and restore it afterwards. The sounds rule (`dbg combat sounds on/off`, see Sounds) is on
+  by default since v0.0.58; the aggro, group and sounds modes switch it on for their session too. Since v0.0.57 attack on sight also runs in the
   world for the creatures that wander (placed and levelled ones): the same rule, on the same one-second check, see
   [NPC pathfinding](NPC_PATHFINDING.md) "Aggro on sight"; `chim actors ambient aggro off` turns it off.
 
@@ -286,8 +286,9 @@ updateEnemyHealthBar, `openmw_hud.layout` EnemyHealth). On the 8-bit screen
 the fade is a stipple.
 
 Sounds: the original sound records, read from your master file and converted to 11 kHz. Which sound plays for what
-follows OpenMW 0.51; the rule is the switch `dbg combat sounds on/off` (off by default: then each outcome plays one
-sound, as before). With it on:
+follows OpenMW 0.51; the rule is the switch `dbg combat sounds on/off` (on by default since v0.0.58; off plays one
+sound per outcome, as before). Your own footsteps are a separate setting, off by default (`dbg footsteps on/off`
+and Options > Audio); NPC and creature footsteps play with the rule. With it on:
 
 | Event | Sound record | Rule from |
 | --- | --- | --- |

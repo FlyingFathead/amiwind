@@ -370,6 +370,9 @@ static void reset_all(void) {
     for(i=0;i<SLOTS;i++)if(slots[i].e)release(&slots[i],0);
     memset(slot_of,0,sizeof(slot_of));memset(none_ref,0,sizeof(none_ref));slots_world=sv.worldmodel;rng=1;scan_at=0;
 }
+/* SV_SpawnServer: every slot's edict is stale, also on a reload of the same map, which the world check cannot see
+ * (HORS-AFTER-HALLOWEEN-CRASH-58): the next tick resets every slot without touching its old edict. */
+void AW_AmbientServerReset(void) {slots_world=NULL;}
 static slot_t *free_slot(void) {int i;for(i=0;i<SLOTS;i++)if(!slots[i].e)return &slots[i];return NULL;}
 static int is_actor(edict_t *e) {
     const char *c;

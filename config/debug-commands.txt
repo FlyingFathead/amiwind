@@ -46,7 +46,7 @@ PLAYTESTING|arena|aw_arenapit|[opponent / list / next / prev / here/pit/floor / 
 PLAYTESTING|arenapit|aw_arenapit|[opponent / list / next / prev / here/pit/floor / seed N / rematch / setup / exit] Vivec Arena combat minigame (also dbgmode arenapit, testarena): title, fight, result, then Enter rematch / S same seed / N, B next, previous / P pick / Esc leave; opponent = Arena fighter, gallery # or NPC record ID; Ctrl+X returns (not saved)
 PLAYTESTING|arenatest|aw_arenapit|same as arenapit
 PLAYTESTING|aw charplane|aw_charplane|[number/name/ID; next/previous/body/exit]
-PLAYTESTING|aw hors|aw_debug_hors|0 (new Hors, Nord / Barbarian / Steed, after Census)
+PLAYTESTING|aw hors|aw_debug_hors|0 (new Hors, Nord / Barbarian / Steed, after Census; in play or from the main menu)
 PLAYTESTING|battlearena|aw_arenapit|same as arenapit
 PLAYTESTING|bench|aw_bench|[halloween [skeletons]] the standard benchmark (docs/REAL_HARDWARE.md; also aw halloweenbench, dbg halloween bench): 600 fixed frames of the Halloween scene, FPS small at the bottom left, then one result line on the console to copy
 PLAYTESTING|cast|aw_magicfx|[NAME [target / touch / self / fail] [npc] [area FEET] [dur S] [shape egg/sphere] [repeat] / list / stop / orb 0-3 / shell egg/sphere; no argument: status and costs] a spell's look and sound (docs/MAGIC_EFFECTS.md; needs dbg magicfx 1/2): cast animation, orb, cast, bolt, hit, area; npc: the actor in front casts at you; no magicka

@@ -49,7 +49,7 @@ state bit 2 is edge triggered on the down to up transition
 kbutton_t	in_mlook, in_klook;
 kbutton_t	in_left, in_right, in_forward, in_back;
 kbutton_t	in_lookup, in_lookdown, in_moveleft, in_moveright;
-kbutton_t	in_strafe, in_speed, in_fastflight, in_use, in_jump, in_attack;
+kbutton_t	in_strafe, in_speed, in_fastflight, in_sneak, in_use, in_jump, in_attack;
 kbutton_t	in_up, in_down;
 int (*aw_companion_buttons)(int bits);	/* aw_companion.c */
 int (*aw_combat_buttons)(int bits);	/* aw_combat.c: no swing while guarding */
@@ -142,7 +142,7 @@ void IN_AWUseUp(void) {KeyUp(&in_up);}
 void IN_AWClearButtons(void) {
     kbutton_t *buttons[]={&in_left,&in_right,&in_forward,&in_back,&in_lookup,
       &in_lookdown,&in_moveleft,&in_moveright,&in_strafe,&in_speed,&in_use,
-      &in_jump,&in_attack,&in_up,&in_down,&in_klook,&in_fastflight};
+      &in_jump,&in_attack,&in_up,&in_down,&in_klook,&in_fastflight,&in_sneak};
     int i;for(i=0;i<sizeof(buttons)/sizeof(buttons[0]);i++)memset(buttons[i],0,sizeof(kbutton_t));
     in_impulse=0;IN_AWMouseReset();
 }
@@ -168,8 +168,10 @@ void IN_MoverightUp(void) {KeyUp(&in_moveright);}
 
 void IN_SpeedDown(void) {KeyDown(&in_speed);}
 void IN_SpeedUp(void) {KeyUp(&in_speed);}
-void IN_FastFlightDown(void) {KeyDown(&in_fastflight);}
-void IN_FastFlightUp(void) {KeyUp(&in_fastflight);}
+/* SNEAK-58: +aw_sneak, held = sneak (the original's default Left Ctrl); in debug noclip it is the fast-flight key,
+ * so both buttons follow it */
+void IN_SneakDown(void) {KeyDown(&in_sneak);KeyDown(&in_fastflight);}
+void IN_SneakUp(void) {KeyUp(&in_sneak);KeyUp(&in_fastflight);}
 void IN_StrafeDown(void) {KeyDown(&in_strafe);}
 void IN_StrafeUp(void) {KeyUp(&in_strafe);}
 
@@ -474,8 +476,10 @@ void CL_InitInput (void)
 	Cmd_AddCommand ("-moveright", IN_MoverightUp);
 	Cmd_AddCommand ("+speed", IN_SpeedDown);
 	Cmd_AddCommand ("-speed", IN_SpeedUp);
-    Cmd_AddCommand("+aw_fastflight",IN_FastFlightDown);
-    Cmd_AddCommand("-aw_fastflight",IN_FastFlightUp);
+    /* SNEAK-58: +aw_sneak replaces +aw_fastflight (the same key, Ctrl; fast flight reads it in debug noclip),
+     * so the command count stays; AW_ControlsMigrate rebinds saved +aw_fastflight keys */
+    Cmd_AddCommand("+aw_sneak",IN_SneakDown);
+    Cmd_AddCommand("-aw_sneak",IN_SneakUp);
 	Cmd_AddCommand ("+attack", IN_AttackDown);
 	Cmd_AddCommand ("-attack", IN_AttackUp);
 	Cmd_AddCommand ("+use", IN_UseDown);

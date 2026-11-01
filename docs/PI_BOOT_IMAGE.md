@@ -1,6 +1,6 @@
 # Your own AmiWind boot stick for the Raspberry Pi
 
-_Last updated with AmiWind v0.0.56-dev1 (29 October 2026)._
+_Last updated with AmiWind v0.0.58-dev2 (31 October 2026)._
 
 A USB stick or SD card that starts a Raspberry Pi straight into AmiWind: power on, a short line saying
 "Starting AmiWind v... on Amiberry ... on the Raspberry Pi ...", and you are on the prison ship. It is a plain
@@ -80,11 +80,50 @@ What the first stick taught us, all built in:
 - `cpu_threaded=false`: the 68k CPU on its own thread was much faster in play but ended a load in an engine error
   ([SPRITE-BAD-TYPE-THREADED-56](bugs/SPRITE-BAD-TYPE-THREADED-56.md)); it stays off until that is settled.
 - The screen at 576p 50 Hz instead of the monitor's own mode: no large scaling, and the refresh matches the Amiga's.
+- Auto-crop (`amiberry.gfx_auto_crop=true`): only the 320x200 picture the game draws is scaled to the monitor, not
+  the PAL screen's empty border, so it fills a widescreen monitor much better at no cost to the game. On an older
+  stick, add that line to `/home/amiwind/.config/amiberry/conf/default.uae`.
 - A start line on the screen before Amiberry takes it, so a failed start never looks like a hang; a clear message
   if `kick.rom` or the AmiWind image is missing.
 - The hardware watchdog (a hung Pi reboots by itself), a kept system journal, a console on tty2, a quiet boot.
 - Sound to the 3.5 mm jack (Pi OS Lite's default). For HDMI sound, set the HDMI card as the default in
   `/etc/asound.conf`.
+
+## Running other Amiga benchmarks on the stick
+
+The same Pi can run other Amiga programs on the same Amiberry settings, so their results compare with published ones
+(this is how the DoomAttack figures on [real hardware](REAL_HARDWARE.md#the-pi-4b-boot-stick-as-a-reference-measured)
+were taken). Nothing below is part of AmiWind or of the stick image: bring your own copies.
+
+1. **A boot folder on the Pi**, e.g. `/home/amiwind/bench/sys`, with the `C`, `L`, `Libs` and `Devs` drawers of your own
+   Workbench 3.1 disk (for example from Amiga Forever) and the program, here the `DoomAttack` folder from the archive
+   the [PiStorm benchmark page](https://pistorm.github.io/docs/benchmarks/) links.
+2. **A start script**, `S/Startup-Sequence` in that folder. Without `ENV:` and a larger stack DoomAttack stops at
+   "Please insert volume ENV" or "The minimum stack size is 20000":
+
+   ```text
+   FailAt 21
+   C:SetPatch QUIET
+   C:MakeDir RAM:ENV RAM:T
+   C:Assign ENV: RAM:ENV
+   C:Assign T: RAM:T
+   C:Assign LIBS: SYS:DoomAttack/libs ADD
+   Stack 65536
+   CD SYS:DoomAttack
+   DoomAttack -forcedemo -timedemo demo3
+   ```
+
+3. **The screen mode in DoomAttack's `.doomrc`**, or it asks for one: `displayid 69632` (0x11000, NTSC low
+   resolution, the PiStorm page's AGA mode) or `displayid 135168` (0x21000, PAL low resolution, the screen family
+   AmiWind uses).
+4. **A copy of the stick's Amiberry settings**: copy `/home/amiwind/.config/amiberry/conf/default.uae` to
+   `bench.uae`, delete its `hardfile2=` line, and add `filesystem2=rw,DH0:SYS:/home/amiwind/bench/sys,0` (plus
+   `ntsc=true` for the NTSC run). Never point it at your AmiWind image.
+5. **Run it alone**: `sudo systemctl stop amiwind`, check that nothing else is busy (`uptime`), note
+   `vcgencmd measure_clock arm`, `vcgencmd measure_temp` and `vcgencmd get_throttled`, then
+   `amiberry -G -f bench.uae`. At the end DoomAttack prints `timed 2134 gametics in N realtics` (it says "Error:",
+   which is how Doom reports a finished timedemo): frames per second = 35 x 2134 / N.
+6. **Back to AmiWind**: quit Amiberry (F12, Quit) and `sudo systemctl start amiwind`.
 
 ## When something goes wrong
 

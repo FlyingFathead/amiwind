@@ -1,6 +1,6 @@
 # AmiWind console commands
 
-_Generated from `config/debug-commands.txt` with AmiWind v0.0.58-dev2._
+_Generated from `config/debug-commands.txt` with AmiWind v0.0.58._
 
 Open the console with F10 or the backquote key and type
 a command, for example `dbg headlamp on`. This page is generated from
@@ -61,7 +61,7 @@ Type: "dbg help" for help.
 | `dbg animkit` | - | [on/off / list / groups / play <group> / cycle [all] / stage [1..8] / stop / speed <0.1..4> / pick [on/off / cast / sneak / idle]] animation kit (docs/ANIMKIT.md): on/off gaits by speed; list/groups, play, cycle, stage: the target's groups; pick: every group by state |
 | `dbg arena` | `dbg arenapit`, `dbg arenatest`, `dbg battlearena`, `dbg playground` | [opponent / list / next / prev / here/pit/floor / seed N / rematch / setup / exit] Vivec Arena combat minigame (also dbgmode arenapit, testarena): title, fight, result, then Enter rematch / S same seed / N, B next, previous / P pick / Esc leave; opponent = Arena fighter, gallery # or NPC record ID; Ctrl+X returns (not saved) |
 | `dbg aw charplane` | `dbg gallery`, `dbg modelgallery`, `dbg npcgallery` | [number/name/ID; next/previous/body/exit] |
-| `dbg aw hors` | - | 0 (new Hors, Nord / Barbarian / Steed, after Census) |
+| `dbg aw hors` | - | 0 (new Hors, Nord / Barbarian / Steed, after Census; in play or from the main menu) |
 | `dbg bench` | `dbg halloweenbench` | [halloween [skeletons]] the standard benchmark (docs/REAL_HARDWARE.md; also aw halloweenbench, dbg halloween bench): 600 fixed frames of the Halloween scene, FPS small at the bottom left, then one result line on the console to copy |
 | `dbg cast` | - | [NAME [target / touch / self / fail] [npc] [area FEET] [dur S] [shape egg/sphere] [repeat] / list / stop / orb 0-3 / shell egg/sphere; no argument: status and costs] a spell's look and sound (docs/MAGIC_EFFECTS.md; needs dbg magicfx 1/2): cast animation, orb, cast, bolt, hit, area; npc: the actor in front casts at you; no magicka |
 | `dbg characterchange` | `dbg quickchar` | [race class birthsign review / all] reopen the pier race, gender, head and hair menu over the current scene; confirm to apply (after registration) |

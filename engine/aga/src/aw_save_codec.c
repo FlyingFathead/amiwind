@@ -60,6 +60,9 @@ static void string(char *s,int size)
 static void id(int *index,int type)
 {
     char value[64];int i,count=type==0?aw_race_count:type==1?aw_class_count:type==2?aw_birth_count:aw_part_count;
+    /* the player's own class (CHARGEN-CENSUS-57): the slot after the catalogue's, its "~" ID holding its definition
+     * (aw_character.c checks it and fills the fields from it) */
+    if(type==1 && count>0 && count<32 && aw_classes[count].id[0]=='~')count++;
     memset(value,0,sizeof(value));
     if(writing){
         if(*index<0 || *index>=count){error=1;return;}
@@ -70,7 +73,10 @@ static void id(int *index,int type)
     if(error)return;
     if(!writing){
         for(i=0;i<count;i++)if(!strcmp(value,type==0?aw_races[i].id:type==1?aw_classes[i].id:type==2?aw_births[i].id:aw_parts[i].id))break;
-        if(i==count)error=1;else *index=i;
+        if(i==count && type==1 && value[0]=='~' && aw_class_count>0 && aw_class_count<32){
+            /* a saved own class: into the slot; aw_character.c rejects an invalid definition when it is used */
+            memcpy(aw_classes[aw_class_count].id,value,64);*index=aw_class_count;
+        }else if(i==count)error=1;else *index=i;
     }
 }
 static void fields(aw_save_t *s)

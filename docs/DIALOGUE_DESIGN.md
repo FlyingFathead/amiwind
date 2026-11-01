@@ -1,6 +1,6 @@
 # Dialogue: design (topics, conditions, choices, disposition, journal)
 
-_Last updated with AmiWind v0.0.57 (31 October 2026)._
+_Last updated with AmiWind v0.0.58-dev3 (1 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -202,6 +202,13 @@ the speaker's script, read by the script compiler's own declaration rule), the p
 marks, and the character's level, sex, attributes and skills. Measured on Morrowind.esm before this: 9,775 of the
 22,482 run-time conditions read a fixed start value and 1,814 could never pass. Still the start value: SameRace,
 SameSex, RankRequirement and the rest of the player's state the engine does not keep yet.
+
+**Rank requirements (v0.0.58).** RankRequirement reads the speaker's faction's requirements for the player's next
+rank from the table's last section (format version 3: per faction its two favoured attributes, seven favoured skills
+and, per rank, the two attribute values, the two skill values and the faction reputation; 112 bytes a faction, on
+disk). The answer is 1 when the attributes and the best two favoured skills meet them, 2 when the faction reputation
+does, 3 for both, 0 at the last rank. The engine keeps one faction's row (112 bytes) between reads.
+FactionRankDifference is the player's rank in the speaker's faction (-1 when not a member) minus the speaker's.
 
 **The disposition bar (v0.0.57 rc1).** Across the top of the window, blue, with its number: the NPC's disposition
 toward the player as OpenMW works it out (MechanicsManager::getDerivedDisposition, our own code): the NPC's own

@@ -30,6 +30,7 @@ static struct
 	chim_user_t		block;			/* the record, the placements, their matrices, the model list */
 	chim_place_t	*places;
 	float			*rot;			/* 9 floats per placement */
+	const byte		*records;		/* the placed records in the block (each one's reference at +4), for hiding one */
 	chim_model_t	**model;		/* by the record's model list */
 	int				count, models;
 	vec3_t			mins, maxs;		/* the drawn boxes of every placement */
@@ -252,6 +253,7 @@ static int RoomLoad (const char *name)
 	room.places = (chim_place_t *)(file + ((pack.bytes + 3) & ~3L));
 	room.rot = (float *)(room.places + room.count);
 	room.model = (chim_model_t **)(room.rot + 9*room.count);
+	room.records = file + h.data;
 	if (room_tries == 1)
 		RoomPreGrow (room.name, file, (long)h.directory);
 	/* Every model whole, now: the plaque is up and nothing else loads. Each
@@ -344,6 +346,28 @@ static int RoomLoad (const char *name)
 /* Client side, once per frame: once per client map, every placement linked
  * into the room map's world with its drawn box (R_AddEfrags would use the
  * model's unrotated bounds). */
+static void LinkOne (chim_place_t *p)
+{
+	int before = aw_efrags_used;
+	p->ent.efrag = NULL;
+	p->leaves = 0;
+	if (aw_efrags_used + CHIM_EFRAG_RESERVE/4 > chim_efrag_limit)
+	{
+		room.waiting++;
+		return;
+	}
+	VectorCopy (p->mins, r_emins);
+	VectorCopy (p->maxs, r_emaxs);
+	r_addent = &p->ent;
+	lastlink = &p->ent.efrag;
+	r_pefragtopnode = NULL;
+	R_SplitEntityOnNode (cl.worldmodel->nodes);
+	p->ent.topnode = r_pefragtopnode;
+	p->leaves = aw_efrags_used - before;
+	room.efrags += p->leaves;
+	room.linked++;
+}
+
 void ChimRoom_Link (void)
 {
 	int i;
@@ -353,25 +377,9 @@ void ChimRoom_Link (void)
 	room.linked = room.efrags = room.waiting = 0;
 	for (i=0 ; i<room.count ; i++)
 	{
-		chim_place_t *p = &room.places[i];
-		int before = aw_efrags_used;
-		p->ent.efrag = NULL;
-		p->leaves = 0;
-		if (aw_efrags_used + CHIM_EFRAG_RESERVE/4 > chim_efrag_limit)
-		{
-			room.waiting++;
-			continue;
-		}
-		VectorCopy (p->mins, r_emins);
-		VectorCopy (p->maxs, r_emaxs);
-		r_addent = &p->ent;
-		lastlink = &p->ent.efrag;
-		r_pefragtopnode = NULL;
-		R_SplitEntityOnNode (cl.worldmodel->nodes);
-		p->ent.topnode = r_pefragtopnode;
-		p->leaves = aw_efrags_used - before;
-		room.efrags += p->leaves;
-		room.linked++;
+		room.places[i].ent.efrag = NULL;
+		if (room.places[i].linked)		/* a taken or disabled placement stays out (ChimRoom_Hide) */
+			LinkOne (&room.places[i]);
 	}
 	if (room.waiting)
 		Con_Printf ("CHIM: room %s: %ld placements not drawn, the efrag pool is full\n", room.name, (long)room.waiting);
@@ -395,6 +403,8 @@ void ChimRoom_Clip (vec3_t start, vec3_t mins, vec3_t maxs, vec3_t end, trace_t 
 	for (i=0 ; i<room.count ; i++)
 	{
 		chim_place_t *p = &room.places[i];
+		if (!p->linked)
+			continue;
 		for (k=0 ; k<3 ; k++)
 			if (low[k] > p->maxs[k] || high[k] < p->mins[k])
 				break;
@@ -404,6 +414,54 @@ void ChimRoom_Clip (vec3_t start, vec3_t mins, vec3_t maxs, vec3_t end, trace_t 
 		if (best->allsolid)
 			return;
 	}
+}
+
+/* PICKUP-PLACED-58: the placements of one original reference (every cut piece
+ * of it: the record's reference less the piece bits, tools/chim/cut.py) leave
+ * the room (HIDE 1: not drawn, not solid; their efrags go now) or come back
+ * (HIDE 0: an Enable). The record stays; the next map loads it whole again and
+ * the object state hides it again (aw_mwhost.c). Returns the placements changed. */
+#define ROOM_SOURCE_MASK	0xFFFFFFu
+/* The loaded room's drawn placements of REFERENCE (0: the room does not draw
+ * it). Read once per map by the focus table (aw_inventory.c focus_load). */
+int ChimRoom_Has (unsigned reference)
+{
+	int i, found = 0;
+	if (!room.on || !reference)
+		return 0;
+	for (i=0 ; i<room.count ; i++)
+		if (room.places[i].linked &&
+			(ChimFormat_U32 (room.records + (long)i*CHIM_RECORD_BYTES_PLACED + 4) & ROOM_SOURCE_MASK) == reference)
+			found++;
+	return found;
+}
+int ChimRoom_Hide (unsigned reference, int hide)
+{
+	int i, changed = 0;
+	if (!room.on || !reference)
+		return 0;
+	for (i=0 ; i<room.count ; i++)
+	{
+		chim_place_t *p = &room.places[i];
+		if ((ChimFormat_U32 (room.records + (long)i*CHIM_RECORD_BYTES_PLACED + 4) & ROOM_SOURCE_MASK) != reference ||
+			p->linked == !hide)
+			continue;
+		if (hide)
+		{
+			if (p->ent.efrag)
+				R_RemoveEfrags (&p->ent);
+			p->ent.efrag = NULL;
+			p->linked = 0;
+		}
+		else
+		{
+			p->linked = 1;
+			if (room.link_world && room.link_world == cl.worldmodel)
+				LinkOne (p);
+		}
+		changed++;
+	}
+	return changed;
 }
 
 void ChimRoom_Report (void)

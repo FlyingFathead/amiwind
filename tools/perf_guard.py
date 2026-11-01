@@ -239,6 +239,10 @@ def pick_baseline(row, records, own_run=None):
     return {'tier': tier, 'run': best['run'], 'cores': best['cores'],
             'usable': best.get('usable') or best.get('budget') or 1, 'share': round(_share(best), 3),
             'wall': round(_median([r['wall'] for r in timed_quiet]), 1) if timed else None,
+            # the cores the timed records ran on, and their CPU seconds per unit (PERF-GUARD-RESIDENT-BUSY-HOST-57)
+            'time_cores': round(_median([r['cores'] for r in timed_quiet]), 2) if timed else None,
+            'cpu_per_unit': (round(_median([r['cores'] * r['wall'] / r['units'] for r in timed_quiet]), 3)
+                             if timed and all(r.get('units') for r in timed_quiet) else None),
             'time_tier': ('exact' if exact else 'units') if timed else None,
             'time_busy': bool(timed) and all(r.get('busy') for r in timed),
             'samples': len(pool), 'busy': not quiet}
@@ -257,6 +261,18 @@ def waiver_for(row, policy, today, fixed):
             return dict(waiver, void=f'expired {expires}')
         return waiver
     return None
+
+
+CORES_MATCH = 0.15       # a section's cores within this share of its timed baseline's: compared on wall time
+
+
+def cpu_basis(row, base):
+    """True when a row's time is judged on CPU seconds per unit: the cores it ran on differ from its timed baseline's
+    by more than CORES_MATCH, and both have the figures (PERF-GUARD-RESIDENT-BUSY-HOST-57: the chim-town
+    build_resident rows of three builds ran on half their baseline's cores with less CPU, and failed on wall time)."""
+    if not row.get('units') or base.get('cpu_per_unit') is None or not base.get('time_cores'):
+        return False
+    return abs(row['cores'] - base['time_cores']) > CORES_MATCH * base['time_cores']
 
 
 def judge(profile, records, policy=None, today=None, fixed=None):
@@ -296,8 +312,21 @@ def judge(profile, records, policy=None, today=None, fixed=None):
             if base['wall'] is not None:
                 if row['busy'] or base['time_busy']:
                     reasons.append('time not compared: busy host in %s' % ('this run' if row['busy'] else 'the baseline'))
+                elif cpu_basis(row, base):
+                    # the section ran on other cores than its baseline (a share of the machine beside other stages):
+                    # its wall time says how many cores it got, not how fast the code is; CPU seconds per unit do
+                    per_unit = row['cores'] * row['wall'] / row['units']
+                    delta = per_unit - base['cpu_per_unit']
+                    reasons.append('basis: CPU per unit (%.2f cores, the baseline %.2f): %.1fs, was %.1fs'
+                                   % (row['cores'], base['time_cores'], per_unit, base['cpu_per_unit']))
+                    if delta * row['units'] > TIME_SECONDS and delta > TIME_TOLERANCE * base['cpu_per_unit']:
+                        reasons.append('slower in CPU per unit with the same %s units: %.1fs, was %.1fs (+%.0f %%)'
+                                       % (row['units'], per_unit, base['cpu_per_unit'],
+                                          100 * delta / base['cpu_per_unit']))
                 else:
                     delta = row['wall'] - base['wall']
+                    reasons.append('basis: wall time (%.2f cores, the baseline %.2f)'
+                                   % (row['cores'], base['time_cores']))
                     if delta > TIME_SECONDS and delta > TIME_TOLERANCE * base['wall']:
                         reasons.append('slower with the same %s units: %.0fs, was %.0fs (+%.0f %%)'
                                        % (row['units'], row['wall'], base['wall'], 100 * delta / base['wall']))

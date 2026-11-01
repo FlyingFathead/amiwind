@@ -135,6 +135,20 @@ int main(void){
     { const char *v[]={"aw_quickchar","class"};run(2,v); }
     assert(AW_QuickCharActive() && opened[0][0]==2);
     AW_QuickCharCancel();assert(!AW_QuickCharActive() && !menu);
+    /* CHARGEN-BIRTHSIGN-REVIEW-58: the dev5 pass's order, one command per step. The class page (its box open) gives
+     * way to the birthsign page asked for next, never stays on screen; the review with no name asks for it first. */
+    opens=0;{ const char *v[]={"aw_quickchar","class"};run(2,v); }
+    assert(AW_QuickCharActive() && opens==1 && opened[0][0]==2 && menu==2);
+    { const char *v[]={"aw_quickchar","birthsign"};run(2,v); }
+    assert(AW_QuickCharActive() && opens==2 && opened[1][0]==3 && menu==3 && strstr(printed,"cancelled"));
+    accept_menu();AW_QuickCharTick();assert(!AW_QuickCharActive());
+    aw_story.name[0]=0;opens=0;{ const char *v[]={"aw_quickchar","review"};run(2,v); }
+    assert(AW_QuickCharActive() && !opens);                 /* the name page first */
+    assert(AW_QuickCharKey(K_ENTER) && !strcmp(aw_story.name,"Player") && opens==1 && opened[0][0]==4 && opened[0][1]==1);
+    accept_menu();AW_QuickCharTick();assert(!AW_QuickCharActive());
+    strcpy(aw_story.name,"Hors");opens=0;{ const char *v[]={"aw_quickchar","review"};run(2,v); }
+    assert(AW_QuickCharActive() && opens==1 && opened[0][0]==4);   /* a name already given: straight to review */
+    AW_QuickCharCancel();
     /* Scripted character: aw_quickchar_set marks it (a quick start keeps it); clear forgets. */
     assert(!AW_QuickCharScripted());
     { const char *v[]={"aw_quickchar_set","race","nord"};run(3,v); }

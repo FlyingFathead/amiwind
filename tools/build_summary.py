@@ -108,6 +108,23 @@ def read_media_coverage(run, status, output_identity, mode):
         return {'path': str(path), 'error': str(error), 'categories': None}, scope
 
 
+def read_voice_coverage(run):
+    """VOICE-COVERAGE-58: the voice table's coverage line (tools/greeting_lut.py coverage_line, written by the image
+    step into image/npc-voice-table.json): NPCs voiced / total, creatures with sounds / total, the unmapped named."""
+    path = Path(run) / 'image' / 'npc-voice-table.json'
+    if not path.is_file():
+        return None
+    try:
+        report = json.loads(path.read_text(encoding='utf-8'))
+        line = report.get('coverage_line') if isinstance(report, dict) else None
+        if not line and isinstance(report, dict) and isinstance(report.get('coverage'), dict):
+            from greeting_lut import coverage_line
+            line = coverage_line(report['coverage'])
+        return {'path': str(path), 'line': line or 'Voice coverage not recorded in the voice table report'}
+    except (OSError, UnicodeError, ValueError, KeyError, TypeError) as error:
+        return {'path': str(path), 'line': 'Voice coverage could not be read: %s' % error}
+
+
 def media_coverage_lines(coverage, scope):
     if coverage is None:
         if scope == 'not-recorded':
@@ -409,6 +426,7 @@ class BuildSummary:
             with Progress('Checking final output size and SHA-256'):
                 identity = output_identity(output)
         media_coverage, coverage_scope = read_media_coverage(self.run, status, identity, self.mode)
+        voice_coverage = read_voice_coverage(self.run)
         artifacts = None
         if identity and Path(identity['path']).suffix == '.hdf':
             image = Path(identity['path'])
@@ -445,6 +463,7 @@ class BuildSummary:
                   'timing_scope': 'provenance, build stages and final output hashing; excludes prerequisites/setup and emulator launch',
                   'output': identity, 'artifacts': artifacts, 'compiler_warnings': warnings,
                   'media_coverage': media_coverage, 'coverage_scope': coverage_scope,
+                  'voice_coverage': voice_coverage,
                   'build_environment': self.environment,
                   'actor_ground_audit': actor_acceptance,
                   'fpu_support': fpu_receipt,
@@ -535,6 +554,7 @@ class BuildSummary:
         else:
             lines.append('Output: no completed output verified')
         lines.extend(media_coverage_lines(media_coverage, coverage_scope))
+        lines.append(voice_coverage['line'] if voice_coverage else 'Voice coverage not recorded (no voice table report)')
         if sizes and sizes.get('groups'):
             lines.extend(size_ledger.table_lines(sizes))
         elif sizes:

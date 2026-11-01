@@ -22,6 +22,7 @@
 | Persists in | v0.0.57 (last seen) |
 | Severity | high: Regressed in v0.0.57 (was medium): Regressed in v0.0.57-dev1 (was low): A few minutes on a third of the cores in a MiniWind; the output is right. |
 | Family | Build speed (`build-speed`) |
+| Deferred by the maintainer | 2026-11-01: deferred by the maintainer to v0.0.59 with the build-speed work (a build speed issue, no effect on the game; the fix in source confirms on the next build that rebuilds the actor library) |
 | Came back (regression) | in v0.0.57-dev1 (fixed in v0.0.54-dev1 before); in v0.0.57 (fixed in v0.0.57 before) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |
 | Playtest version | 2026_10_27_v0.0.54-dev1_miniwind-seyda-ambient_55625e2f |

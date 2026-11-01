@@ -1,11 +1,13 @@
 # Roadmap and implementation options
 
-_Last updated with AmiWind v0.0.57 (31 October 2026)._
+_Last updated with AmiWind v0.0.58 (1 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.58: released 1 November 2026; v0.0.59 next](#v0058-released-1-november-2026-v0059-next)
 - [v0.0.57: released 31 October 2026; v0.0.58 next](#v0057-released-31-october-2026-v0058-next)
+  - [The v0.0.58 list, item by item](#the-v0058-list-item-by-item)
 - [v0.0.56: released 29 October 2026; v0.0.57 next](#v0056-released-29-october-2026-v0057-next)
 - [v0.0.55: released 29 October 2026; v0.0.56 next](#v0055-released-29-october-2026-v0056-next)
 - [Later: an Extras menu, and two players in the arena, 28 October 2026](#later-an-extras-menu-and-two-players-in-the-arena-28-october-2026)
@@ -105,6 +107,35 @@ _Last updated with AmiWind v0.0.57 (31 October 2026)._
 
 15 October 2026: exact-source validation completed 4,231 tests: 4,225 passed, three Windows-only skips and three tracked Census expected failures. The 71 focused tests and original-data readback across nine frame positions passed, consistently hiding 33 of 158 original references at stronghold state 6 while preserving unknown scripts. All 243 player resources are reusable after exact producer, input and file verification. Complete combined-world conversion, native comparison, packaging and shipment remain pending; coverage counts are unchanged.
 
+## v0.0.58: released 1 November 2026; v0.0.59 next
+
+v0.0.58, "Time To Talk", shipped as its sixth development snapshot: links, persuasion, the services, enchanting,
+choices and journal topic pages in the dialogue window; character creation with the class list, questions or a class
+of your own, the birthsign page and the review sheet; the aim box, placed items that can be taken ("E: Take", "E:
+Steal"), books and letters read in place, the Census and Excise Office's small items and sneaking; creature sounds and
+combat sounds on by default; and the fixes to the cliff racer, the character restart command, the NTSC start, the
+presets and the Seyda Neen shore wall ([release notes](releases/notes/RELEASE-v0.0.58.md)). The game's scripts, which
+the engine had refused for their number until dev6, run again. Checked in game: character creation in order, the stolen
+item kept through a save and load, no aim box on creatures, residents that walk by their Wander packages and the debug
+restart from the main menu. Not yet checked in game: the filled text macros in books and the journal, taking a free
+item, the aim box on doors, the Fargoth greeting, your own footsteps, the creature sound test, and character creation's
+class questions with the install's data, a class of your own and the class list.
+
+**v0.0.59 next.** What v0.0.58 planned and did not finish moves, openly, to v0.0.59, with the same list below: world
+models and object placement (every item with its own model when dropped or placed, every placed item in its place from
+one shared model table, and more models per map than the present limit of 256), what the player wears and wields on
+the body in first and third person, the crime system, player casting and the spell-effect system, weapons of every
+type, levelling with the original's level-up box, the full trade window, links in the journal's quest entries,
+characters and creatures placed by scripts, saves that keep the whole game and the save import, lighter large
+interiors, the area sounds and Morrowind's own mouse cursor, and a performance history per version.
+
+v0.0.59 starts with the world models: the 512-entry model table, every item with its own model when dropped or placed,
+and every item the original places in its place from one shared model table, with what the player wears and wields
+following from it. The dialogue macros filled at run time and the bound-key names are done in the same version. The
+rest of the list below follows in the tracker's order.
+
+The list below is the v0.0.58 plan with its states at the release; its open items are the v0.0.59 list.
+
 ## v0.0.57: released 31 October 2026; v0.0.58 next
 
 v0.0.57, "Remembering The Emperor", dedicated to the memory of Sir Patrick Stewart, shipped as its fifth development
@@ -114,8 +145,8 @@ at night, 957 of the game's 1,207 scripts running whole, the fog at 300 by defau
 lighter heavy models ([release notes](releases/notes/RELEASE-v0.0.57.md)). The whole game was also built from scratch,
 nothing reused, and every game file came out identical to the release image.
 
-**v0.0.58, "Time To Talk": the conversation and the character.** Everything else planned moves to v0.0.59 as it
-stands, so this version stays small enough to finish:
+**v0.0.58, "Time To Talk": the conversation and the character** (planned). The plan first made for v0.0.59 was folded
+into this version because its parts depend on each other. The main parts:
 
 - **The conversation, complete,** against the original and OpenMW 0.51, with a tracker page that shows every part
   and its proof: links in the text, persuasion (admire, intimidate, taunt, bribe), disposition that can start a fight,
@@ -135,11 +166,11 @@ stands, so this version stays small enough to finish:
   two Orcs whose names carry accented letters get their voices and their conversations back.
 - Riding along: the area sounds and Morrowind's own mouse cursor (below).
 
-Moved to v0.0.59: characters and creatures placed by scripts through one shared spawn, more weapons, lighter large
-interiors (Ald'ruhn's Manor District as tiles), the rooms that still load in on arrival, saves that keep everything,
-the save import, the original-style map, weather by region, moving gates and trapdoors, and the rest of the list.
+The former v0.0.59 items (characters and creatures placed by scripts through one shared spawn, more weapons, lighter
+large interiors, saves that keep everything, the save import, the original-style map, weather by region, moving gates
+and trapdoors, and the rest) are in the list below.
 
-New for v0.0.58 (31 October 2026):
+Planned for v0.0.58 on 31 October 2026 and moved to v0.0.59:
 
 - **Levelling, as in the original.** Skills rise with use, by the class's major, minor and miscellaneous skills and its
   specialization, with the game's own settings; after ten raises of major and minor skills the game asks you to rest,
@@ -156,6 +187,251 @@ New for v0.0.58 (31 October 2026):
   the mixer's cost at 32 MB Fast; then the sounds the game's scripts start.
 - **Morrowind's own mouse cursor** in the windows, taken from your game data, with today's drawn cursor as the
   fallback when it is not found (a planned `dbg cursortype 1` today's, `2` the original's, the default).
+
+Done in v0.0.58, in the development snapshots ([dev3](releases/notes/RELEASE-v0.0.58-dev3.md),
+[dev4](releases/notes/RELEASE-v0.0.58-dev4.md), [dev5](releases/notes/RELEASE-v0.0.58-dev5.md) and
+[dev6](releases/notes/RELEASE-v0.0.58-dev6.md)) and the release ([notes](releases/notes/RELEASE-v0.0.58.md)); what
+the in-game check did not reach is named in each line:
+
+- Dialogue links, persuasion, the services (travel, training, spells, barter, repair, spellmaking), enchanting,
+  answers that run their scripts, and the voices and creature sounds of the first snapshots.
+- Placed items taken with "E: Take" or a red "E: Steal", books and letters read in place, the Census and Excise
+  Office's small items within the engine's model limit, and sneaking on Left Ctrl.
+
+- The cliff racer is drawn whole; the character restart debug command no longer crashes after the Halloween scene and
+  works from the main menu; an NTSC machine starts; the emulator presets show only the drawn 320x200 picture.
+- Dialogue: the journal's topic pages and their links, exhausted topics drawn dimmer, a "journal updated" notice,
+  the greeting picked at talk time, faction rank checks and more live conditions (same sex, same race, should attack,
+  disease, a drawn weapon, the Charm effect).
+- Character creation: a scrolled class list, the birthsign page, the review sheet, the install's class questions and
+  a class of the player's own.
+- The aim box for items and doors, in rooms and outdoors (not yet checked in game on doors), and placed items that
+  can be picked up (an owned item checked in game; a free item not yet).
+- The game's scripts run (8,618 kept, none refused), and the game's text macros are filled in books, the journal and
+  messages (not yet checked in game).
+- Combat sounds on by default, and the creature sound test that keeps playing; the Seyda Neen shore wall gap closed.
+- The build monitor: the amber "passed, perf guard failed" state, one overall progress bar, a machine view of gates and
+  tests with their cores, and timeline boxes for cores and memory; the build report gives the voice coverage.
+
+What is left is in the list below and moves to v0.0.59.
+
+### The v0.0.58 list, item by item
+
+The same list as the project's internal tracker at the v0.0.58 release, grouped. The plan first made for v0.0.59 was
+folded into v0.0.58 because its parts depend on each other; the items that are not done carry over to v0.0.59. Items
+marked done are finished (some shipped in v0.0.57 and carry over for the record); items marked "In progress" have work
+in the v0.0.58 snapshots and are not finished. At the release: 27 done, 6 in progress (the complete conversation
+tracker, faction ranks, the world models and the larger model table, the voice coverage, and the release check on
+notes claims) and 63 open, 96 in all.
+
+
+**The conversation and the character**
+
+- [ ] In progress: the conversation system complete against the original and OpenMW 0.51, with a tracker page listing
+  each part, its state and its proof, and a release check that refuses unfinished rows.
+- [ ] The dialogue conditions read the live state of the game: journal, globals, locals, dead counts, and the
+  player's faction and rank (same sex, same race and should attack are live since v0.0.58; journal, globals, locals
+  and dead counts follow).
+- [x] The rest of the original dialogue window: clickable links in text, persuasion, services, choices, result
+  scripts, exhausted topics and journal topic pages; shipped in v0.0.58 (the Fargoth greeting is not yet checked in
+  game).
+- [ ] In progress: joining and rising in factions: ranks are kept, saved and checked by dialogue.
+- [ ] The full trade window: buying and selling with prices from disposition and skill.
+- [ ] Topic names in the journal quest entries become links too.
+- [ ] Companions and escorted characters follow the player through doors.
+- [x] The first dialogue system, shipped in v0.0.57: the window, greetings, the disposition bar and the game's own
+  answers from the live state; the rest is tracked as the complete conversation.
+- [ ] Levelling as in the original: skills rise with use, resting brings the level-up box with the attribute picks,
+  and health, magicka, fatigue and all checks use the new values.
+- [x] The rest of character creation at the Census Office as in the original: class by list, questions or
+  own, birthsign, the review sheet, and the office's characters and doors in order; shipped in v0.0.58; checked in
+  game: the order of the pages, the name on the review sheet, the greyed questions button and the birthsign page; the
+  class questions with install data and a class of your own are not yet checked in game.
+- [x] A View Stats button on the race selection screen shows the race's base attributes and skill bonuses from the
+  game data; shipped in v0.0.57.
+- [ ] Morrowind's own mouse cursor from your game data in every window, with the current cursor as the fallback and a
+  choice in the Options menu.
+- [x] The box shown when you aim at an item within the game's own reach (name, weight, value), tried
+  first on the Census Office items and its test dagger. It shows for items and doors; the reach is still
+  measured to an item's origin ([FOCUS-REACH-ITEM-ORIGIN-58](BUGS.md)), the office's back-room table is not yet
+  drawn ([CENSUS-BACK-TABLE-NOT-DRAWN-58](BUGS.md)), and the box on doors is not yet checked in game.
+- [x] Items placed in the world can be picked up when a room draws them as objects, and the taking is kept in the
+  saved object state; an owned item taken is kept taken through a save and load (checked in game). Taking a free item
+  is not yet checked in game; items without a model of their own wait for the world models (v0.0.59).
+- [x] Owned items show a red "E: Steal" prompt, unowned ones "E: Take", in the same place as "E: Talk"; checked in
+  game for the owned item.
+- [x] Sneaking on Left Ctrl as in the original: slower, lower view and the sneak indicator; shipped in v0.0.58. The
+  sneak animation and detection are in v0.0.59.
+- [ ] In progress: every item has its own model when dropped or placed, and every kind of item can be carried and
+  dropped.
+- [ ] In progress: each map can use more models than before (the old limit was 256), so rooms with many items fit.
+- [ ] A test that every kind of item can be dropped from the inventory indoors and outdoors, lands in front of the
+  player, can be picked up again and stays where it was dropped across a save.
+- [ ] A scripted check of the game's own scripts: taking the silver tray in the Census and Excise Office behaves as in
+  the original.
+
+**Sound**
+
+- [ ] In progress: every character voice line and every creature sound is mapped into the world and heard in game,
+  with combat sounds on by default and a tracker page showing each kind and its proof
+  ([NPC-VOICE-NONASCII-IDS-48](BUGS.md)). Dev4 turns the combat sounds on by default and adds the voice coverage to the
+  build report.
+- [x] The sound table no longer fills up: a name slot nothing uses is reused, so voice lines and effects
+  stay audible in long sessions, and the mixer limits are written down ([AUDIO-SFX-NAME-TABLE-FULL-58](BUGS.md)).
+- [ ] The area sounds of the invisible sound markers play as looping sounds with the original range, only those near
+  the player loaded, measured for cost at 32 MB Fast ([SOUND-MARKERS-SILENT-48](BUGS.md)).
+
+**Characters, creatures and combat**
+
+- [ ] The original crime system: theft, pickpocketing, attacks, killing and trespass seen by witnesses raise a bounty,
+  and guards arrest, fine or jail.
+- [ ] Player casting: ready a spell, pay its magicka, roll to succeed and deliver Self, Touch or Target effects, with
+  the casting animation and HUD.
+- [ ] A spell-effect system: effects applied over their duration to actors and kept in saves, with the script calls
+  that wait for it.
+- [ ] Weapons and shields of every type in first and third person, a debug weapon menu and gear menu, and a tester
+  mode giving every weapon, all kept in the save.
+- [ ] First-person hands with the weapon in them for every weapon type; 4 of 103 animation groups exist today.
+- [ ] Cliff racers that attack the player land their strikes and are drawn at the right size; then fish in the water
+  and the kill-and-return behaviour.
+- [ ] Characters and creatures placed by scripts through one shared spawn, proven in game across save and reload.
+- [ ] An object spawner for scripts that place characters, creatures, activators and items, with spawned references
+  kept in saves.
+- [ ] Characters that live by their records: creatures on their own skeletons, the Dagoth Ur fight and voice, and
+  full-detail heads.
+- [ ] Walk and run cycles for every moving character at low CPU cost, with the animation table on disk and feet that
+  do not slide.
+- [ ] Every character plays its full animation sequences, those with their own animation keep it, and the shared
+  table stays small.
+- [ ] Every guard that carries a torch in the original has it lit at night, in the hold pose, with the light not too
+  bright.
+- [ ] The arena minigame and the MiniWind playground merge into one arena mode, with fights between two characters
+  of the game to watch.
+- [ ] Compiled scripts and compiled wander packages, built but off by default, are tested in game, fixed where needed
+  and then switched on by default.
+- [ ] More of the game's scripts run as compact bytecode, with the engine's tables read from disk on demand; 957 of
+  1,207 scripts run whole today.
+
+**Saves, the map and the interface**
+
+- [ ] Saves that keep the whole game: moved or taken objects, containers, doors and locks, characters, script
+  variables, the journal and the calendar, as a compact change list.
+- [ ] Saves are titled by default with the player's name and the in-game date and time, and a custom title can still
+  be typed.
+- [ ] Import saves from the original game and OpenMW into the AmiWind save format from a save browser in the Load
+  menu, validated and cleaned, one way only.
+- [ ] The in-game map in the original style: explored areas shown as visited, the local map, and markers for Vivec and
+  every landmark.
+- [ ] An index of every item you can pick up, from the game's records: cell, position, item and owner.
+- [ ] New defaults reach existing installs: the settings file records its version and a default changed since then
+  applies once unless the player set it by hand.
+- [ ] A Performance, Balanced or Quality preset in the options that sets the related options together, default
+  Performance, each still changeable on its own.
+- [ ] A screen-mode choice in Options > Video, PAL letterbox or NTSC full screen, with the emulator crop settings
+  documented beside it.
+- [ ] Later: an Extras entry on the main menu, and a two-player arena over a null modem cable or TCP/IP.
+- [ ] Every tested build visits all 82 named places by teleport and records arrival, load and frame time in one
+  table.
+- [x] The teleport debug command with no place name opens a searchable list of the 82 named places; shipped in
+  v0.0.57.
+
+**The world, weather and drawing**
+
+- [ ] Lighter large interiors: Ald'ruhn Manor District built from tiles by the Arena Pit method, then the prison hold
+  and the Vivec cantons.
+- [ ] The most expensive models go through the mesh optimizer with a check that no seam opens; the Ashlander yurts and
+  camp props are first.
+- [ ] Fog distance 300 is the default since v0.0.57; still to do: a fog distance by place for the measured slow
+  places, and the Raspberry Pi frame-time measurement.
+- [ ] Render cost on the Raspberry Pi 4: the town alone against the scene cast measured, then the larger share is cut.
+- [ ] A study of why DoomAttack runs so fast on the same machines, and which of its methods can make AmiWind faster
+  (screen copy, span drawing, memory layout).
+- [ ] Trees with depth by distance: the real mesh near the player, crossed panels between, billboards far away, as
+  tree type 1 or 2, so plants at a trunk foot can be picked.
+- [ ] Gates, trapdoors, hatches, bar counter flaps and lids that move, and trapped doors, from a census of the game's
+  records.
+- [ ] Weather by region from the region records: ash storms in the Ashlands, blight at Red Mountain, full weather
+  colours and the storm pose.
+- [ ] The Ghostfence shimmers from the original's own animation.
+- [ ] DemoWind, a fullscreen browser of cheap effects with their cost on screen; the Red Mountain sky is in, more
+  effects follow.
+- [ ] Teleports to Suran, the Suran club and Ald'ruhn land on the street, checked in game at 32 MB Fast.
+- [ ] The in-game warning shown in solid view mode is checked in game.
+- [ ] QuakeC's share of the frame is measured, then only its hot functions move into C.
+- [x] The Toolkit world map shows the faces placed per cell from the newest CHIM build; shipped in v0.0.57.
+
+**Fixes**
+
+- [x] Fixed a crash when the character restart debug command is used after the Halloween scene in Seyda
+  Neen ([HORS-AFTER-HALLOWEEN-CRASH-58](BUGS.md)); a new server resets the scene and the ambient sound slots, and the
+  restart lands in Seyda Neen ([HORS-AFTER-HALLOWEEN-STAYS-ARENA-58](BUGS.md)).
+- [x] The story-point debug command works from the main menu, starting a game at that point of the story,
+  so a test needs no game started first ([HORS-FROM-MENU-58](BUGS.md)); checked in game.
+- [x] The cliff racer is drawn whole again: wings joined to the body, no stray spike; every creature
+  model checked for the same fault ([CREATURE-RACER-MESH-SPIKE-58](BUGS.md)). The netch bull's reduced model still
+  loses a stretch of one leg ([CREATURE-NETCH-BULL-LEG-REDUCED-58](BUGS.md)).
+- [x] A stop of the test run a few seconds after a load, first taken for a talk box, is traced to the known emulator
+  disk stall ([SMOKE-TALK-BOX-BLOCKS-REMOTE-57](BUGS.md)).
+- [x] The FS-UAE and WinUAE presets show only the drawn 320x200 picture, filling a widescreen monitor at no cost to
+  the game.
+- [x] An NTSC Amiga no longer stops at start: without a PAL screen mode the game takes the default
+  monitor's mode ([VIDEO-NTSC-NO-PAL-MODE-58](BUGS.md)).
+- [x] Tree sprites no longer draw in front of the wall behind them: the dark wedge at the Seyda Neen
+  shore wall is gone ([SEYDA-WALL-SHAPE-31](BUGS.md)); the flora cards are pushed back only at the trunk base.
+- [x] The game's scripts run: the engine takes up to 16,384 scripts (8,618 are kept) and the builder refuses a script
+  file over the engine's limits ([MWSCRIPT-REFUSED-SCRIPT-COUNT-58](BUGS.md)); checked in game.
+- [x] The game's text macros (the player's name, race, class and the like) are filled in books, the journal and
+  messages ([BOOK-TEXT-MACROS-58](BUGS.md)); not yet checked in game. Dialogue texts fill them at run time and
+  action-key macros show the action's word: both in the next version.
+
+**Performance history and builds**
+
+- [ ] A per-version table of boot time, load times and the standard Halloween benchmark, on the build machine and on a
+  Raspberry Pi 4 running Amiberry, filled in by every build.
+- [ ] The actor-library build stage uses all the cores it is allowed instead of about eight, with an early check that
+  a stage's worker count follows its allowed cores ([BUILD-ACTOR-LIBRARY-UNDERUSED-54](BUGS.md)).
+- [ ] The CHIM frame heap report becomes identical between a reused build and a build from scratch, so the next
+  comparison differs only in times.
+- [ ] A whole-world build checks the machine's memory before it starts and warns or refuses on a 15 to 16 GiB machine;
+  the build docs state the real minimum ([BUILD-CHIM-MAIN-MEMORY-46](BUGS.md)).
+- [x] The build monitor shows a build whose stages all passed but whose performance guard failed as its own amber
+  state, not as a failed build ([PERF-GUARD-RESIDENT-BUSY-HOST-57](BUGS.md)); shipped in dev4.
+- [x] The Raspberry Pi boot stick no longer prints a misleading first-login warning, and its update script labels the
+  verified image hash clearly.
+- [x] The Toolkit build monitor shows one overall progress bar with the percentage and the expected finish time;
+  shipped in dev4.
+- [x] The Toolkit build monitor also lists the gates, test sessions and other jobs using the machine, with their cores,
+  so its core count matches the machine's real load; shipped in dev4.
+- [x] The build monitor's stage timeline gets two checkboxes, Cores used and RAM usage, both on by default, each in
+  its line's colour, to show or hide that line; shipped in dev4.
+- [ ] The world-map tracker is fed by every build; the one remaining odd cell on the map is explained or registered.
+- [ ] Builder fixes: whole mesh-table keys, building under memory pressure without dying, a less pessimistic plan, and
+  a start-up memory check with an hours estimate.
+- [ ] The build garbage collector ages its unit cache, keeping what the kept runs use, and older material is archived
+  off the build volume.
+- [ ] The release kit validation runs its independent cases side by side on all cores instead of one after another.
+- [ ] One GitHub check run per release: tag pushes no longer rerun the full suite.
+- [ ] Stale topic pages are refreshed or moved to the history folder, and the docs index shows each page's
+  last-updated line.
+- [ ] The project status card lists every drive in use, the archive drive included.
+- [ ] Six bugs deferred out of v0.0.55 are each fixed or have their deferral renewed with a stated reason.
+- [ ] A tool that makes a Raspberry Pi boot stick with Amiberry after a successful build, from the player's own game
+  and ROM; no image is published.
+- [ ] Later: the builder builds both expansions, interiors and exteriors, Bloodmoon first, with the base game still
+  buildable without them.
+- [x] A section on running the game on a PiStorm-accelerated Amiga, with the Raspberry Pi 4 results as the yardstick;
+  shipped in v0.0.57.
+
+**Release checks**
+
+- [ ] In progress: the release check also verifies two kinds of claim in the release notes: the mention of a build from scratch,
+  and any claim of full core use against the build measurements.
+- [x] The commit check refuses assistant and model names in public text and in file and folder names, in any case;
+  shipped in v0.0.57.
+- [ ] A build from scratch of the release line, recorded with its result; the v0.0.57 one matched the release image,
+  and v0.0.58 repeats the proof before its final.
+- [ ] A from-scratch build of each release line is made and recorded, as proof that the shipped image can be
+  reproduced.
 
 ## v0.0.56: released 29 October 2026; v0.0.57 next
 

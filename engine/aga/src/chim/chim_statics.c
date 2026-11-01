@@ -695,6 +695,7 @@ static int Place (chim_statics_t *L, chim_static_t *s)
 	s->ent.skinnum = s->skin;
 	s->ent.effects = 0;
 	s->ent.aw_sprite_scale = s->scale;
+	s->ent.aw_flora = s->flora;
 	s->ent.efrag = NULL;
 	s->leaves = 0;
 	s->placed = 1;

@@ -177,6 +177,7 @@ void AW_ViewPOV(aw_view_t *v,const aw_view_rules_t *r,int held,float dt) {
 void AW_ViewPOVTap(aw_view_t *v,const aw_view_rules_t *r) {
     AW_ViewPOV(v,r,1,.001f);AW_ViewPOV(v,r,0,0);
 }
+int AW_ViewVanityAllowed(int enabled,int body,int arena) {return enabled && body && !arena;}
 void AW_ViewIdle(aw_view_t *v,const aw_view_rules_t *r,int input,int allowed,float dt) {
     if(v->mode==AW_VIEW_DEATH)return;
     if(input)v->idle=0;else v->idle+=dt;

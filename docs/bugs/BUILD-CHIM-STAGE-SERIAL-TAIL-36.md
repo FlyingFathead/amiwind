@@ -32,7 +32,7 @@
 | Persists in | v0.0.36-dev3, v0.0.49-dev1, v0.0.50-dev1 (last seen) |
 | Severity | high: About 10 minutes of one-core work in every chim stage of the coast build, on 24 held workers, redone on every build |
 | Family | Build speed (`build-speed`) |
-| Deferred by the maintainer | 2026-10-31: the maintainer, desktop chat, asked whether the world stage's tail goes to v0.0.58 as well: 'Yes, v0.0.58 too' |
+| Deferred by the maintainer | 2026-11-01: deferred by the maintainer to v0.0.59 with the build-speed work (a build speed issue, no effect on the game) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |
 | Playtest version | v0.0.36-dev3 |
 | From commit | source 3b5e7a9, engine 3b5e7a9, CHIM world 3b5e7a9 |

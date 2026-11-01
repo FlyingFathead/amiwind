@@ -86,6 +86,28 @@ class BuildSummaryTests(unittest.TestCase):
             self.assertIn('All 17 Morrowind GOTY videos found and included', captured.getvalue())
             self.assertEqual(json.loads((root / 'build-summary.json').read_text())['coverage_scope'], 'final-staged-image')
 
+    def test_voice_coverage_line_is_in_every_report(self):
+        """VOICE-COVERAGE-58: the voice table's coverage line goes into the report, or says it was not recorded."""
+        line = 'Voice coverage: NPCs 2/2 voiced, creatures 1/1 with sounds, unmapped: none'
+        with tempfile.TemporaryDirectory() as temp, contextlib.redirect_stdout(io.StringIO()) as captured:
+            root = Path(temp); (root / 'image').mkdir()
+            (root / 'image' / 'npc-voice-table.json').write_text(json.dumps({'coverage_line': line}), encoding='utf-8')
+            result = build_summary.BuildSummary(root, 'test', 'AGA image').finish('failed')
+            self.assertEqual(result['voice_coverage']['line'], line)
+            self.assertIn(line, captured.getvalue())
+        with tempfile.TemporaryDirectory() as temp, contextlib.redirect_stdout(io.StringIO()) as captured:
+            (Path(temp) / 'image').mkdir()
+            (Path(temp) / 'image' / 'npc-voice-table.json').write_text(json.dumps({'coverage': {
+                'npcs_total': 3, 'npcs_voiced': 2, 'creatures_total': 1, 'creatures_sounded': 1,
+                'npcs_unmapped': {'mute guy': 'left out'}, 'creatures_unmapped': {}}}), encoding='utf-8')
+            build_summary.BuildSummary(Path(temp), 'test', 'AGA image').finish('failed')
+            self.assertIn('NPCs 2/3 voiced', captured.getvalue())
+            self.assertIn('mute guy (left out)', captured.getvalue())
+        with tempfile.TemporaryDirectory() as temp, contextlib.redirect_stdout(io.StringIO()) as captured:
+            result = build_summary.BuildSummary(Path(temp), 'test', 'AGA image').finish('failed')
+            self.assertIsNone(result['voice_coverage'])
+            self.assertIn('Voice coverage not recorded', captured.getvalue())
+
     def test_staged_report_on_failed_build_never_claims_final_video_completeness(self):
         with tempfile.TemporaryDirectory() as temp, contextlib.redirect_stdout(io.StringIO()) as captured:
             root = Path(temp)

@@ -1,6 +1,6 @@
 # Voices and sounds
 
-_Last updated with AmiWind v0.0.58-dev1 (31 October 2026)._
+_Last updated with AmiWind v0.0.58-dev3 (31 October 2026)._
 
 <!-- Generated whole by tools/voice_features.py render from docs/voice-features.json; do not edit by hand. -->
 
@@ -27,7 +27,7 @@ The v0.0.57 release image's voice table, read back: 2,673 NPCs (2,675 from v0.0.
 | Moment | State | Mapped | Proof | Bugs |
 | --- | --- | --- | --- | --- |
 | Hello: the greeting said as the player comes near | `in-source` | the voice table's first match for every NPC, town residents too (world.qc aw_greet, aw_glut.c AW_GlutSay); no gap across all actors since v0.0.58 | native test tests/aga_glut_test.c (glue: the hello said with its voice, quiet when the build lacks the file); tests/test_greeting_lut.py EngineSource; not yet heard in a build | [NPC-GREETING-PICK-33](bugs/NPC-GREETING-PICK-33.md) |
-| Conversation greeting (Greeting 0 to 9) | `mapped` | voice table greeting lists; the dialogue window opens with it | tests/test_greeting_lut.py conversation greeting lists; the v0.0.57 release table read back: all 26 Dreamers open with their own Sixth House greeting | [NPC-DREAMER-GREETING-DEFAULT-42](bugs/NPC-DREAMER-GREETING-DEFAULT-42.md) |
+| Conversation greeting (Greeting 0 to 9) | `mapped` | voice table greeting lists; the dialogue window opens with the greeting picked at talk time and says that INFO's own voice when it has one (else silent, as in the original) | tests/test_greeting_lut.py conversation greeting lists and the native greeting voice check in tests/aga_glut_test.c; the v0.0.57 release table read back: all 26 Dreamers open with their own Sixth House greeting | [NPC-DREAMER-GREETING-DEFAULT-42](bugs/NPC-DREAMER-GREETING-DEFAULT-42.md) |
 | Idle lines | `mapped` | world.qc aw_npc_idle calls the idle bark (OpenMW Actors::playIdleDialogue odds, sight and range in aw_anim.c) | not yet heard in a build | [NPC-VOICE-BARKS-33](bugs/NPC-VOICE-BARKS-33.md) |
 | Attack: the fight starts (always) and a new swing (10 %) | `mapped` | aw_combat.c voice hook to aw_anim.c combat_voice | native glue test plays an attack bark; not yet heard in a build | [NPC-VOICE-BARKS-33](bugs/NPC-VOICE-BARKS-33.md), [COMBAT-VOICES-SILENT-33](bugs/COMBAT-VOICES-SILENT-33.md) |
 | Hit: health lost (30 %) and death (always) | `mapped` | aw_combat.c voice hook (AW_VOICE_HIT, AW_VOICE_DEATH) | not yet heard in a build | [NPC-VOICE-BARKS-33](bugs/NPC-VOICE-BARKS-33.md), [COMBAT-VOICES-SILENT-33](bugs/COMBAT-VOICES-SILENT-33.md) |

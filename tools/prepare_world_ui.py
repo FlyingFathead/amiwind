@@ -14,6 +14,8 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
 from PIL import Image
 from mwad.audit import records, subrecords, string
 from mwad.paths import ensure_external, child_ci
+sys.path.insert(0,str(Path(__file__).resolve().parent))
+import text_defines   # tools/text_defines.py (not under mwad: an older mwad may already be loaded in tests)
 from build_scratch import scratch_dir
 
 WORLD_UI_FILES = ('map.awm', 'journal.awj', 'entries.dat', 'quests.awq', 'region-names.awn', 'region-weather.aww',
@@ -377,6 +379,7 @@ def journal_assets(raw):
             if len(f.get('DATA',b''))!=12:raise ValueError('Malformed journal INFO data')
             stage=struct.unpack_from('<i',f['DATA'],4)[0]
             text=string(f['NAME']).replace('\r\n','\n').replace('\r','\n')
+            text,_=text_defines.encode(text)   # the engine's define codes (BOOK-TEXT-MACROS-58, aw_textdef.c)
             body=text.encode('cp1252')+b'\0'
             if len(body)>8192 or b'\0' in body[:-1]:raise ValueError('Journal entry exceeds runtime text bounds')
             key=(quest,stage)

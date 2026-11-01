@@ -256,6 +256,52 @@ class MapCountTests(unittest.TestCase):
             self.assertEqual(mel.audit_maps(maps)['per_map']['bm001']['edicts_kept'], 4)
 
 
+class RoomMapModelTests(unittest.TestCase):
+    """The census office's 124 small items took its map to 284 models (each lit item its own inline model) and the
+    image preflight refused it. The office now shares one model per equal item and its stage refuses a map over
+    CENSUS_MODEL_LIMIT itself, before the image step (late failure, early check)."""
+
+    def test_the_room_stage_counts_its_own_map(self):
+        import prepare_census as pc
+        table = mel.limits()
+        self.assertLess(pc.CENSUS_MODEL_LIMIT, table['max_models'])
+        self.assertEqual(pc.FIXED_MODEL_SLOTS, 1 + len(mel.spawn_rules()['worldspawn_models']) + mel.RUNTIME_MODELS)
+        rows = world({'classname': 'aw_npc', 'model': 'progs/np_census.mdl'}, {'classname': 'func_wall', 'model': '*1'})
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / 'census.bsp'
+            path.write_bytes(bsp(rows, models=5))
+            self.assertEqual(pc.check_model_room(path)['models'], mel.count(bsp(rows, models=5))['models'])
+        with tempfile.TemporaryDirectory() as temp:
+            maps = Path(temp) / 'id1/maps'
+            maps.mkdir(parents=True)
+            fixed = 2 + len(mel.spawn_rules()['worldspawn_models']) + mel.RUNTIME_MODELS
+            ok = maps / 'census.bsp'
+            ok.write_bytes(bsp(world(), models=pc.CENSUS_MODEL_LIMIT - fixed + 1))
+            self.assertEqual(pc.check_model_room(ok)['models'], pc.CENSUS_MODEL_LIMIT)
+            ok.write_bytes(bsp(world(), models=pc.CENSUS_MODEL_LIMIT - fixed + 2))
+            with self.assertRaisesRegex(ValueError, 'census.bsp: %d models' % (pc.CENSUS_MODEL_LIMIT + 1)):
+                pc.check_model_room(ok)
+            ok.write_bytes(bsp(world(), models=284 - fixed + 1))     # the refused dev4 office
+            with self.assertRaisesRegex(ValueError, 'MAX_MODELS'):
+                pc.check_model_room(ok)
+        source = (ROOT / 'tools/prepare_census.py').read_text()
+        self.assertIn('counts=check_model_room(target)', source)
+        self.assertLess(source.index('with items_share_models(taken):'), source.index('report=append_meshes('))
+
+    def test_equal_items_share_one_model_on_a_lit_map(self):
+        import prepare_census as pc
+        import prepare_mesh_bsp as pmb
+        lighting = {'lights': [1]}
+        item = {'number': 7, 'model_index': 3, 'scale': 1.0, 'rotation_radians': [0, 0, 1.0]}
+        other = dict(item, number=8, rotation_radians=[0, 0, 2.0])
+        self.assertNotEqual(pmb._instance_key(item, lighting), pmb._instance_key(other, lighting))
+        with pc.items_share_models({7, 8}):
+            self.assertEqual(pmb._instance_key(item, lighting), pmb._instance_key(other, lighting))
+            furniture = dict(item, number=9)
+            self.assertEqual(pmb._instance_key(furniture, lighting)[-1], 9)     # furniture keeps its own bake
+        self.assertEqual(pmb._instance_key(item, lighting)[-1], 7)               # restored after the stage
+
+
 class BudgetTests(unittest.TestCase):
     def test_every_config_budget_fits_the_engine(self):
         budgets = mel.check_config_budgets()

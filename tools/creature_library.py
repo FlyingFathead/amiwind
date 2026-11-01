@@ -148,6 +148,9 @@ def bake(data, palette, meshes, out_id1, jobs=1, method=DEFAULT_METHOD, bipedal=
         print('Creature library: %s -> %s (%s, %.1f s)' % (key, record['model'], ', '.join(
             '%s %d bytes %d frames' % (r, record[r + '_bytes'], record[r + '_frames']) for r in record['roles']),
             seconds), flush=True)
+        if record.get('kept_whole') or record.get('lost_surface'):
+            print('Creature library: %s reduction check: kept whole %s, surface still lost %s' % (
+                key, record.get('kept_whole') or 'none', record.get('lost_surface') or 'none'), flush=True)
     return done, failed
 
 
@@ -201,6 +204,57 @@ def bake_skeletal(data, palette, app, bipedal):
               'scaled_bones': rep['scaled_bones'], 'repeated_node_names': rep['repeated_node_names'],
               'sha256': rep['model_sha256'], 'table_sha256': rep['table_sha256']}
     return {'files': files, 'record': record}
+
+
+# A shape the reduction lost surface of is baked again with more of its faces kept, at most this many rounds
+# (CREATURE-RACER-MESH-SPIKE-58); only shapes up to KEEP_WHOLE_FACES are raised (a thin chain, a fin, a claw).
+KEEP_ROUNDS = 3
+KEEP_WHOLE_FACES = 128
+KEEP_BUDGET_CAP = 600           # below the alias face limit (666) the engine reads
+WHOLE_VERTEX_LIMIT = 1999       # a shared-vertex model takes the renderer's original alias path (no triangle cap)
+
+
+def checked_bake(bake_model, shapes, materials, textures, palette, budget, minimum_faces, whole=False,
+                 whole_model=None):
+    """npc_geometry.bake with the lost-surface check (npc_geometry.lost_shapes): a small shape whose faces the
+    reduction collapsed (the cliff racer's tail: its vertices kept, its lower faces gone, the tip floating free) is
+    kept whole in the next round, while the bake still fits; the best fitting result is kept. Returns (frames, faces,
+    uv, skin, {'kept_whole': [names], 'lost': {name: (samples, worst)}})."""
+    from npc_geometry import lost_shapes, shared_vertex_mdl
+    if whole:
+        # the profile's 'whole': every source triangle on its source vertices and the original textures in one skin
+        # atlas (npc_geometry.shared_vertex_mdl, Dagoth Ur's encoding): nothing reduced, no seam between faces
+        total = sum(len(s['faces']) for s in shapes)
+        vertices = sum(s['positions'].shape[1] for s in shapes)
+        if vertices > WHOLE_VERTEX_LIMIT:
+            raise ValueError('A whole creature takes at most %d vertices, not %d' % (WHOLE_VERTEX_LIMIT, vertices))
+        result = (whole_model or shared_vertex_mdl)(shapes, materials, textures, palette)
+        lost = lost_shapes(shapes, result[0][0], result[1])
+        return tuple(result) + ({'kept_whole': ['all'], 'lost': lost, 'budget': total},)
+    minimum = dict(minimum_faces or {})
+    kept = []
+    result = bake_model(shapes, materials, textures, palette, budget=budget, minimum_faces=minimum or None)
+    lost = lost_shapes(shapes, result[0][0], result[1])
+    worst = max((w for _, w in lost.values()), default=0.0)
+    for _ in range(KEEP_ROUNDS):
+        raise_ = [s for s in shapes if s.get('name') in lost and len(s['faces']) <= KEEP_WHOLE_FACES
+                  and minimum.get(s['name'], 0) < len(s['faces'])]
+        if not raise_:
+            break
+        trial = dict(minimum, **{s['name']: len(s['faces']) for s in raise_})
+        # the kept faces come on top of the budget (up to the alias limit), so the other shapes do not pay for them
+        grown = min(KEEP_BUDGET_CAP, budget + sum(len(s['faces']) for s in raise_))
+        try:
+            again = bake_model(shapes, materials, textures, palette, budget=grown, minimum_faces=trial)
+        except ValueError:
+            break
+        lost2 = lost_shapes(shapes, again[0][0], again[1])
+        worst2 = max((w for _, w in lost2.values()), default=0.0)
+        if worst2 >= worst:
+            break               # no better: the first bake stands
+        minimum, result, lost, worst, budget = trial, again, lost2, worst2, grown
+        kept += [s['name'] for s in raise_]
+    return result + ({'kept_whole': kept, 'lost': lost, 'budget': budget},)
 
 
 def bake_kf(data, palette, app, bipedal, scale=1.0, profile=None, corpse=False):
@@ -276,8 +330,9 @@ def bake_kf(data, palette, app, bipedal, scale=1.0, profile=None, corpse=False):
     budgets = (profile['budget'],) if profile else creature_residents.BUDGETS
     for budget in budgets:
         try:
-            frames, faces, uv, skin = bake_model(shapes, materials, textures, palette, budget=budget,
-                                                 minimum_faces=(profile or {}).get('minimum_faces') or None)
+            frames, faces, uv, skin, check = checked_bake(bake_model, shapes, materials, textures, palette, budget,
+                                                          (profile or {}).get('minimum_faces'),
+                                                          whole=bool((profile or {}).get('whole')))
             mover = animated_mdl(frames, faces, uv, skin)
             break
         except ValueError as error:
@@ -304,7 +359,8 @@ def bake_kf(data, palette, app, bipedal, scale=1.0, profile=None, corpse=False):
               'skin': list(skin.size), 'step': float(groups[0]['step']), 'idle': 'idle',
               'groups': [{k: g[k] for k in ('name', 'count', 'source') if k in g} for g in groups],
               'groups_from_idle': [g['name'] for g in groups if g.get('source') == 'idle'],
-              'repeated_node_names': rig.duplicates,
+              'repeated_node_names': rig.duplicates, 'kept_whole': check['kept_whole'],
+              'lost_surface': {k: list(v) for k, v in check['lost'].items()},
               'sha256': hashlib.sha256(standing).hexdigest(), 'mover_sha256': hashlib.sha256(mover).hexdigest()}
     return {'files': files, 'record': record}
 

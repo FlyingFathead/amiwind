@@ -68,6 +68,13 @@ static void vanity(void) {
     AW_ViewIdle(&v,&r,1,1,.1f);assert(v.mode==AW_VIEW_THIRD);
     /* the death camera keeps its mode */
     v.mode=AW_VIEW_DEATH;for(i=0;i<400;i++)AW_ViewIdle(&v,&r,0,1,.1f);assert(v.mode==AW_VIEW_DEATH);
+    /* CREATURE-SOUNDS-CLIFFRACER-SILENT-58: no orbit while the combat playground or an Arena fight runs (its full
+     * view would stop the playground's clock: the sounds mode went silent 30 s after the last key) */
+    assert(AW_ViewVanityAllowed(1,1,0) && !AW_ViewVanityAllowed(1,1,1));
+    assert(!AW_ViewVanityAllowed(0,1,0) && !AW_ViewVanityAllowed(1,0,0));
+    AW_ViewReset(&v,&r);
+    for(i=0;i<400;i++)AW_ViewIdle(&v,&r,0,AW_ViewVanityAllowed(1,1,1),.1f);
+    assert(v.mode==AW_VIEW_FIRST);
 }
 static void zoom(void) {
     aw_view_t v;

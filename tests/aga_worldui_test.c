@@ -7,6 +7,8 @@
 #include <assert.h>
 server_t sv;server_static_t svs;client_state_t cl;client_static_t cls;viddef_t vid;
 aw_story_t aw_story;aw_character_t aw_character;
+#include "aw_textdef.h"
+void AW_TextDefinesPlayer(aw_textdef_values_t *v){memset(v,0,sizeof(*v));v->pc_name=aw_story.name;}
 aw_race_t aw_races[16];aw_class_t aw_classes[32];
 aw_birth_t aw_births[16];aw_part_t aw_parts[384];
 int aw_race_count=1,aw_class_count=1,aw_birth_count=1,aw_part_count=2;

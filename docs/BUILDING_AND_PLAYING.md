@@ -1,6 +1,6 @@
 # Building and playing
 
-_Last updated with AmiWind v0.0.55 (29 October 2026)._
+_Last updated with AmiWind v0.0.58 (31 October 2026)._
 
 How to build AmiWind from your own Morrowind copy and run it in an emulator. The short version is in the [README](../README.md#build-it-from-your-own-morrowind).
 
@@ -90,6 +90,35 @@ series, finished scratch, cache objects nothing uses any more) and deletes nothi
 add `--delete` to remove exactly what it lists as expired. See
 [free disk space](BUILD_CACHE.md#free-disk-space).
 
+### What a build costs: time and machine
+
+Plan for a first build to take hours and to use the whole machine.
+
+| Kind of build | Measured time | What it means |
+| --- | --- | --- |
+| First build from scratch (`--clean`, nothing reused, empty cache) | about 265 minutes (4 h 25 min) for v0.0.57; 323 minutes for v0.0.51 | Every stage runs. Measured with up to 24 cores and 44 GiB of memory on a 12-core / 24-thread desktop CPU with 64 GB of RAM. |
+| Rebuild that reuses a previous run (`--reuse-from`) | from about 8 minutes to two hours; most recent full builds took 20 to 75 minutes | Only the stages whose inputs changed run again. The time depends on what changed: a version label alone is cheap, a change to the CHIM world or the models is not. |
+| Smaller test build ([MiniWind](MINIWIND.md)) | minutes: 3 to 25 minutes for recent ones, reusing a previous run | One spot of the world instead of the whole island. |
+
+Why the difference: every stage is keyed by its inputs (your game files, the
+builder's source and the options). A stage whose inputs have not changed is taken from
+the earlier run or from the build cache instead of being built again, so a rebuild pays
+only for what changed. A from-scratch build has nothing to take. The result is the
+same either way: the v0.0.57 from-scratch image matched the image built with reuse
+file by file, apart from build records such as run names, times and cache states.
+
+Times scale with the number of cores: the heavy stages (the CHIM world, the rooms, the
+NPC gallery and the open-world terrain) run in parallel, and the figures above come
+from 24 cores. With fewer cores expect proportionally longer builds; `--jobs N` sets the
+worker count, and `./build.sh status out/build/NAME` shows the cores in use and an ETA.
+The disk grows by one run folder per build, see the disk space note above.
+
+**Memory:** the figures above used up to 44 GiB. 16 GiB of RAM is not enough today for
+a whole build: a tester's build on a machine with 15 GiB of RAM and 14 GiB of swap
+ran out of memory and stopped after about 38 hours
+([BUILD-CHIM-MAIN-MEMORY-46](bugs/BUILD-CHIM-MAIN-MEMORY-46.md)). The least memory a
+whole build needs is still being worked out (plan item PLAN-16GB-CHECK); until it is
+measured, no smaller figure is promised.
 A normal build includes everything the release ships; no extra option is
 needed. From v0.0.33 the default builder is CHIM, with Balmora and Seyda Neen on
 CHIM, both converted from your own data (from v0.0.35 the recorded v0.0.31

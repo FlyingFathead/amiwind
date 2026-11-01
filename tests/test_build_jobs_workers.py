@@ -39,7 +39,10 @@ TOOLS = {k: '/tools/' + k for k in ('qbsp', 'vis', 'light', 'qcc', 'ffmpeg', 'xd
 # Stages whose tool has no worker pool: one process each, budgeted as one slot.
 SERIAL_BY_DESIGN = {'setup', 'terrain', 'npcs', 'hands', 'dialogue-lookup', 'door-audio',
                     'reading', 'opening-references', 'world-ui', 'cell-progress',  # cell-progress: one ingest pass
-                    'mwscript'}  # mwscript: one unit, the whole program (member access needs every script); seconds
+                    'mwscript',  # mwscript: one unit, the whole program (member access needs every script); seconds
+                    'focus',     # focus: one pass over the base master (FOCUS-BOX-58); seconds
+                    'books',     # books: one pass over the base master (BOOK-READER-58); seconds
+                    'chargen'}   # chargen: reads one ini file (CHARGEN-CENSUS-57); well under a second
 # Independent per-item loops not yet in the pool (tracked; remove when pooled).
 SERIAL_NOT_YET_POOLED = set()
 

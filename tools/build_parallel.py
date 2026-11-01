@@ -1164,6 +1164,12 @@ DEPENDENCIES = {
     'media': (), 'music': (), 'engine': (),
     # The compiled game scripts index the media catalogue's files and the soundtrack's tracks (no audio copied).
     'mwscript': ('media', 'music'),
+    # The focus table (FOCUS-BOX-58): the game data only.
+    'focus': (),
+    # The book texts (BOOK-READER-58): the game data only.
+    'books': (),
+    # The class questions (CHARGEN-CENSUS-57): the install's Morrowind.ini only.
+    'chargen': (),
     'image': ('world-terrain', 'world-scenery', 'npc-gallery', 'music', 'media', 'engine', 'dialogue-lookup'),
     'dry-run-image': ('engine',),
 }
@@ -1240,6 +1246,12 @@ def stage_dependencies(steps, skipped=()):
             deps = (*deps, 'harvest')
         if name == 'image' and 'mwscript' in names:
             deps = (*deps, 'mwscript')
+        if name == 'image' and 'focus' in names:
+            deps = (*deps, 'focus')
+        if name == 'image' and 'books' in names:
+            deps = (*deps, 'books')
+        if name == 'image' and 'chargen' in names:
+            deps = (*deps, 'chargen')
         # the actor library (--chim-actor-table on only) reads the census palette and the CHIM towns' residents
         if name == 'actor-library':
             deps = ('census', *(n for n in names if n.startswith('chim-town-')))

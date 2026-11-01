@@ -33,6 +33,7 @@ class Assets:
             self.files[icons.HEAD % piece] = png(size, (150, 120, 60, 255) if piece == 'middle' else (220, 200, 140, 255))
         self.files[icons.MAGIC_BACKGROUND] = png((64, 64), (0, 0, 255, 255))
         self.files['icons/k/stealth_handtohand.dds'] = png((32, 32), (250, 200, 150, 255))
+        self.files['icons/k/stealth_sneak.dds'] = png((32, 32), (200, 200, 200, 255))   # SNEAK-58 indicator
         self.files['icons/w/test_sword.dds'] = png((32, 32), (0, 255, 0, 255))
         self.files['icons/c/test_ring.dds'] = png((32, 32), (255, 0, 0, 0))   # fully transparent: backdrop shows
         for name in missing: self.files.pop(name, None)
@@ -87,8 +88,9 @@ class IconTableTests(unittest.TestCase):
         self.assertEqual(keys, sorted(keys))           # binary-searchable (aw_icons.c)
         self.assertEqual(set(rows), {'hud:box', 'hud:bar', 'hud:track:weapon', 'hud:track:magic', 'skill:26',
                                      'item:test sword', 'item:test_ring', 'ui:head:block', 'ui:head:left',
-                                     'ui:head:right'})
+                                     'ui:head:right', 'hud:sneak'})
         sizes = {key: picture(id1, digest)[1:3] for key, (_, digest) in rows.items()}
+        self.assertEqual(sizes['hud:sneak'], (18, 18))   # SNEAK-58: the indicator, the HUD icon size
         self.assertEqual(sizes['hud:box'], (20, 20)); self.assertEqual(sizes['hud:bar'], (20, 4))
         self.assertEqual(sizes['hud:track:weapon'], (18, 2)); self.assertEqual(sizes['skill:26'], (18, 18))
         self.assertEqual(sizes['item:test sword'], (18, 18))

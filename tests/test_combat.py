@@ -61,6 +61,12 @@ class CombatSourceContractTests(unittest.TestCase):
                 self.assertIsNone(re.search(r'\b(malloc|calloc|realloc|Hunk_\w+|Z_Malloc|Cache_Alloc)\s*\(', text))
                 self.assertIsNone(re.search(r'\b(rand|srand|random)\s*\(', text))
 
+    def test_combat_sounds_on_and_flee_off_by_default(self):
+        # COMBAT-SOUNDS-RULE-OFF-58: the swing sounds as OpenMW plays them are a shipped feature, default on;
+        # the flee rule stays an A/B switch, default off. Order follows the enum in aw_combat.h.
+        self.assertIn('enum {AW_RULE_FLEE,AW_RULE_SOUNDS,AW_RULE_COUNT};', (SRC / 'aw_combat.h').read_text())
+        self.assertRegex(code('aw_combat.c'), r'static int rules\[AW_RULE_COUNT\]=\{0,1\};')
+
     def test_settings_names_match_the_builder(self):
         names = re.findall(r'"(\w+)"', code('aw_combat_rules.c').split('names[AW_COMBAT_SETTING_COUNT]={')[1].split('};')[0])
         import prepare_combat
@@ -390,9 +396,9 @@ class CombatBuilderTests(unittest.TestCase):
         self.assertEqual(tuple(names), prepare_combat.AI_SETTINGS)
         count = int(re.search(r'#define AW_COMBAT_AI_COUNT (\d+)', code('aw_combat.h')).group(1))
         self.assertEqual(count, len(prepare_combat.AI_SETTINGS))
-        # new behaviour off by default (A/B rule): the Flee and sounds rules are plain switches, zero at start (no
-        # console variables: the resident registry budget)
-        self.assertIn('static int rules[AW_RULE_COUNT];', code('aw_combat.c'))
+        # the Flee and sounds rules are plain switches (no console variables: the resident registry budget); Flee
+        # off at start (A/B), sounds on since v0.0.58 (COMBAT-SOUNDS-RULE-OFF-58, test_combat_sounds_on_and_flee_off)
+        self.assertIn('static int rules[AW_RULE_COUNT]={0,1};', code('aw_combat.c'))
         self.assertNotIn('aw_combat_flee', code('aw_combat.c'))
 
     def test_sound_generators_follow_openmw(self):

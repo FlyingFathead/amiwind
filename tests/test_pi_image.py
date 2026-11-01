@@ -49,6 +49,14 @@ class PiImageTests(unittest.TestCase):
                        'getty@tty2', 'id -u amiwind', 'sort -V'):
             self.assertIn(lesson, s, lesson)
 
+    def test_no_first_boot_ssh_banner(self):
+        # PI-STICK-LOGIN-NOISE-58: Raspberry Pi OS's first-boot wizard leaves a Banner in sshd_config.d that tells
+        # every SSH login "SSH may not work until a valid user has been set up"; with our key-only user it is wrong
+        # and buries the real output, so the image leaves it out
+        s = SCRIPT.read_text(encoding='utf-8')
+        wizard = s.index('systemctl disable userconfig.service')
+        self.assertIn('rm -f "$R/etc/ssh/sshd_config.d/rename_user.conf"', s[wizard:wizard + 400])
+
     def test_doc_warns_about_the_overclock(self):
         d = (ROOT / 'docs/PI_BOOT_IMAGE.md').read_text(encoding='utf-8')
         self.assertIn('⚠️ **AmiWind is measured on a Pi 4 at 2.0 GHz, and the image runs a Pi 4 at 2.0 GHz by default.**', d)

@@ -205,6 +205,13 @@ static void stop(int quiet) {
     if(hw.on && !quiet)Con_Printf("Halloween scene stopped.\n");
     hw.on=hw.count=hw.photo=hw.bench=hw.intro=0;
 }
+/* SV_SpawnServer: the server's edicts are new even when a map reloads into itself (the world model stays cached, so
+ * the tick's world check does not see it: 'dbg aw hors 0' in Seyda Neen after the scene, NUM_FOR_EDICT: bad pointer,
+ * HORS-AFTER-HALLOWEEN-CRASH-58). The scene ends without touching its old edicts. */
+void AW_HalloweenServerReset(void) {
+    if(hw.on)restore_settings();
+    hw.on=hw.count=hw.photo=hw.bench=hw.intro=0;hw.world=NULL;
+}
 
 static float group_seconds(const aw_skel_table_t *t,int g) {
     aw_skel_group_t s;

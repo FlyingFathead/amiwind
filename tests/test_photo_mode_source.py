@@ -178,7 +178,7 @@ class PhotoModeSourceTests(unittest.TestCase):
         keymaps = (ROOT / 'config' / 'keymaps.cfg').read_text(encoding='utf-8')
         self.assertIn('bind "F10" toggleconsole', keymaps)
         self.assertIn('bind "f" "impulse 202"', keymaps)
-        self.assertIn('bind "CTRL" +aw_fastflight', keymaps)
+        self.assertIn('bind "CTRL" +aw_sneak', keymaps)   # SNEAK-58: sneak; fast flight in debug noclip
         self.assertNotRegex(keymaps.lower(), r'bind "?(h|ctrl\+f|ctrl\+h)"? ')
         event = body(source('keys.c'), 'Key_Event')
         console = event.index("key == '`' || key == K_F10")

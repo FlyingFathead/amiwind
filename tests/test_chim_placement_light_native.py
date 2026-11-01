@@ -37,7 +37,7 @@ class PlacementLightSourceTests(unittest.TestCase):
         render = (SOURCE / 'render.h').read_text()
         body = render[render.index('typedef struct entity_s'):render.index('} entity_t;')]
         # appended: every earlier member keeps the offset the assembly uses
-        self.assertRegex(body.rstrip(), r'(?s)int aw_light;\s*(/\*.*?\*/\s*)?int aw_tint;$', body[-300:])
+        self.assertRegex(body.rstrip(), r'(?s)int aw_light;\s*(/\*.*?\*/\s*)?int aw_tint;\s*(/\*.*?\*/\s*)?int aw_flora;$', body[-500:])
         chunks = (SOURCE / 'chim/chim_chunks.c').read_text()
         self.assertIn('p->ent.aw_light = ChimFormat_RecordLight (chim_world.minor, r.flags);', chunks)
         self.assertIn('p->ent.aw_light = from->ent.aw_light;', chunks)

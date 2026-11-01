@@ -10,6 +10,7 @@ converted picture:  key -> source path(s) -> picture SHA-256 -> picture file.
                     original item widget draws it
   skill:26          the hand-to-hand icon shown when unarmed
                     (icons/k/stealth_handtohand.dds)
+  hud:sneak         the sneak indicator shown while sneaking (icons/k/stealth_sneak.dds)
   hud:box           the HUD weapon/magic box: black interior inside the thin
                     menu border (textures/menu_thin_border_*.dds)
   hud:bar           the frame of the small bar under a box (same thin border,
@@ -64,6 +65,8 @@ ICON = BOX - 2 * BORDER          # 18: the 32x32 icon area inside the box
 BAR_H = 4           # 6 * 24/42, rounded: 1-pixel border, 2-pixel track
 TRACK_H = BAR_H - 2 * BORDER
 HAND_TO_HAND = ('skill:26', 'icons/k/stealth_handtohand.dds')
+# SNEAK-58: the original HUD's sneak indicator (OpenMW 0.51 openmw_hud.layout SneakBox shows this picture).
+SNEAK = ('hud:sneak', 'icons/k/stealth_sneak.dds')
 MAGIC_BACKGROUND = 'textures/menu_icon_magic.dds'
 THIN = 'textures/menu_thin_border_%s.dds'
 BAR_TEXTURE = 'textures/menu_bar_gray.dds'
@@ -305,6 +308,10 @@ def prepare(assets, id1, items, palette, colours, inventory=None, jobs=1):
         source, image = read_icon(assets, HAND_TO_HAND[1]); store(HAND_TO_HAND[0], source, icon_picture(image, palette))
     attempt(HAND_TO_HAND[0], hand)
 
+    def sneak():
+        source, image = read_icon(assets, SNEAK[1]); store(SNEAK[0], source, icon_picture(image, palette))
+    attempt(SNEAK[0], sneak)
+
     # Item icons: read the originals here (one archive reader), convert in a process pool.
     jobs_list = []
     def queue(key, source_icon, background_name, size, cell=False):
@@ -383,4 +390,14 @@ def hud_settings(settings):
     name = settings.get('sskillhandtohand')
     if isinstance(name, str) and name and len(name) < 64 and all(32 <= ord(c) < 127 for c in name):
         text += 'sSkillHandtohand %s\n' % name; info['hand_to_hand'] = name
+    # The focus box (FOCUS-BOX-58): the activation distance in game units (GMST iMaxActivateDist; OpenMW
+    # mwworld/worldimp.cpp getMaxActivationDistance) and the box's labels (GMST sWeight, sValue).
+    reach = settings.get('imaxactivatedist')
+    if isinstance(reach, int) and 1 <= reach <= 100000:
+        text += 'iMaxActivateDist %d\n' % reach; info['activate_distance'] = reach
+    # STEAL-PROMPT-58: the "E: Take" prompt's word (GMST sTake).
+    for key, gmst in (('sweight', 'sWeight'), ('svalue', 'sValue'), ('stake', 'sTake')):
+        label = settings.get(key)
+        if isinstance(label, str) and label and len(label) < 32 and all(32 <= ord(c) < 127 for c in label):
+            text += '%s %s\n' % (gmst, label); info[key] = label
     return text, info

@@ -815,7 +815,7 @@ void AW_ViewFrame(void) {
         }
         input=input_seen || pov_down || pov_tapped || turned || cl.velocity[0] || cl.velocity[1] || cl.velocity[2];
         mode_before=view.mode;
-        AW_ViewIdle(&view,&rules,input,(vanity_cvar.value || vanity_forced) && body_ready(),dt);
+        AW_ViewIdle(&view,&rules,input,AW_ViewVanityAllowed(vanity_cvar.value || vanity_forced,body_ready(),AW_ArenaActive()),dt);
         if(view.mode!=AW_VIEW_VANITY)vanity_forced=0;
         if(mode_before==AW_VIEW_VANITY && view.mode!=AW_VIEW_VANITY)view.orbit_yaw=view.orbit_pitch=0;
         else if(mode_before!=AW_VIEW_VANITY && view.mode==AW_VIEW_VANITY)VectorCopy(cl.viewangles,anchor);

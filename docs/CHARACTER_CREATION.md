@@ -1,17 +1,23 @@
 # Next milestone: dock and Census Office character creation
 
-_Last updated with AmiWind v0.0.57-dev2 (30 October 2026)._
+_Last updated with AmiWind v0.0.58 (1 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [Census Office registration plan (v0.0.58)](#census-office-registration-plan-v0058)
+  - [Class questions and the own class (step c)](#class-questions-and-the-own-class-step-c)
 - [Original source audit](#original-source-audit)
+  - [Authored barriers](#authored-barriers)
+  - [Persistent rule: opening access is conditional world state](#persistent-rule-opening-access-is-conditional-world-state)
 - [Diagnostic race shortcut, 14 October 2026](#diagnostic-race-shortcut-14-october-2026)
 - [Deliverable sequence](#deliverable-sequence)
 - [Character record and OpenMW comparison](#character-record-and-openmw-comparison)
+  - [View Stats on the race page (v0.0.57)](#view-stats-on-the-race-page-v0057)
 - [Acceptance before the next playable](#acceptance-before-the-next-playable)
 - [References inspected](#references-inspected)
 - [Class mechanics reference checklist](#class-mechanics-reference-checklist)
+  - [Independent action and container facts (v0.0.21-dev3)](#independent-action-and-container-facts-v0021-dev3)
 - [dev4 confirmation and review navigation](#dev4-confirmation-and-review-navigation)
 - [dev5 playtest follow-up](#dev5-playtest-follow-up)
 - [Character UI V2: completion controls and remaining artwork](#character-ui-v2-completion-controls-and-remaining-artwork)
@@ -26,6 +32,68 @@ NPCs retain individual local state and timers. A general script/condition
 interpreter and full dialogue-topic state remain future work.
 The maintainer chose maintenance first on 28 September 2026, then this work. Keep
 [the intermittent freezes](BUGS.md) open throughout implementation and testing.
+
+## Census Office registration plan (v0.0.58)
+
+The original registers the character in this order (the CharGen scripts in
+Morrowind.esm): race and appearance on the dock, then in the Census Office the
+class (chosen from the list, by answering the questions, or made by the player),
+the birthsign, and the review sheet. The engine already has the race page, a
+class page, a birthsign page and a review page; this work completes them.
+
+| Step | Content | Data | State |
+| --- | --- | --- | --- |
+| (a) | Class list: the playable classes as a scrolled list, chosen by arrows or a click; beside it the class's specialization, two favored attributes, five major and five minor skills. Review sheet: name and level, race, class and sign, the eight attributes, health, magicka and fatigue, then the skills grouped major, minor and miscellaneous. | CLAS and SKIL records in `character/catalog.awc` (unchanged) | done |
+| (b) | Birthsign page: the signs as a scrolled, clickable list beside the sign's picture and its abilities, powers and spells by name and kind. The names are read once each time another sign is shown, never while drawing; a spell without a name shows its record ID. | BSGN records; spell names from `character/spells.aws` (unchanged) | done |
+| (c) | The class questions: Q or the Questions button on the class page asks the ten questions; each first answer counts toward combat, each second toward magic, each third toward stealth, and the original's rule turns the three counts into a class, which the list then shows chosen. The own class: M or the Make own button sets the specialization, two different favored attributes and five major and five minor skills, all different; OK makes "Custom class". | The questions come from the install's `Morrowind.ini` through a build stage of its own (`tools/prepare_chargen.py`, `character/questions.awq`); the rule is engine code | done |
+
+### Class questions and the own class (step c)
+
+The original keeps the ten questions in the install's `Morrowind.ini`
+(sections `[Question 1]` to `[Question 10]`), not in `Morrowind.esm`. The
+builder looks for that file beside the `Data Files` folder or inside it, and
+its stage depends on nothing else, so no other stage's cache key changes. When
+the install has no `Morrowind.ini` (a game data folder copied on its own), the
+stage writes an empty question file: the class page then shows the Questions
+button greyed out and offers only the list and the own class. Greyed out means a
+dotted dark overlay across the button: a dimmer text colour alone did not show,
+because the menu font recolours only the brightest shade of each letter
+(CHARGEN-BIRTHSIGN-REVIEW-58, seen on v0.0.58-dev5).
+
+The debug pages (`dbg characterchange PAGE`, `dbg quickchar ...`) keep the
+original order: a page asked for while another is still open replaces it, the
+open one closing unchanged, and a review asked for before any name was given
+asks for the name first. The review sheet never shows an empty name.
+
+The class the answers give follows the original's rule, as OpenMW 0.51 applies
+it: eight or more answers of one kind give the Warrior, Mage or Thief; otherwise
+the combat count, then the magic count, then the stealth count picks the class,
+some counts split further by another count. The rule is engine code, not game
+data. Escape leaves the questions or the own class and returns to the list
+unchanged.
+
+The own class is held in the slot after the game's classes. Its ID carries its
+whole definition (specialization, favored attributes, skills), so a save names
+it like any other class and the save format is unchanged. The own class has a
+fixed name, "Custom class"; typing a name is not supported yet. The questions
+take memory only while they are being asked (at most 6 KB).
+
+Not yet compared: the class each set of answers gives has not yet been checked
+side by side against OpenMW 0.51 running the same answers.
+
+Starting values follow the original's rules (checked against OpenMW 0.51):
+attributes are the race's for the chosen sex, plus 10 for each favored
+attribute; every skill starts at 5, plus the race's bonus, plus 5 when it is of
+the class's specialization, plus 25 for a major or 10 for a minor skill. Health
+is half of Strength plus Endurance; magicka is Intelligence times one plus the
+race's and the sign's magicka bonuses (a tenth per point); fatigue is Strength,
+Willpower, Agility and Endurance added together.
+
+Steps (a) and (b) add no data: the pages read the catalogue the race page
+already holds and the existing spell name table. The resident cost is the added
+code, a few counters and about 300 bytes for the shown sign's spell names. No
+builder stage changes in steps (a) and (b); step (c) adds the question stage
+and the image's copy of its file, and no other stage's key changes.
 
 ## Original source audit
 

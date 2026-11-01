@@ -29,6 +29,8 @@
     "r/cliffracer.nif": {
       "id": "cliffracer-authored-idle-v1",
       "reason": "Use the authored airborne idle entry pose, without approximating unsupported animation curves.",
+      "whole": true,
+      "whole_reason": "CREATURE-RACER-MESH-SPIKE-58: every reduction of the racer's thin wing membranes and tail left holes; the creature library bakes its 965 triangles whole on their 667 source vertices with the original textures (the shared-vertex encoding).",
       "budget": 480,
       "minimum_faces": {},
       "pose_event": "idle: start",

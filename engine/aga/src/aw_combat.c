@@ -107,11 +107,11 @@ static cvar_t block_cvar={"aw_combat_block","1",true};
  * 0 (default) = a fighter flees only when it cannot reach the player (the earlier rule); 1 = also when its flee
  * rating beats its best action, and a fleeing fighter runs again whenever the player comes within reach. The
  * combat playground's aggro and group modes switch it on for their session.
- * The swing's sounds as OpenMW plays them (AW_CombatSwingSounds, docs/COMBAT.md "Sounds"): 0 (default) = the earlier
- * sounds (one per outcome), 1 = every swing its swing sound, the armour hit sound of the piece struck, the miss sound
+ * The swing's sounds as OpenMW plays them (AW_CombatSwingSounds, docs/COMBAT.md "Sounds"): 0 = the earlier
+ * sounds (one per outcome), 1 (default since v0.0.58, COMBAT-SOUNDS-RULE-OFF-58) = every swing its swing sound, the armour hit sound of the piece struck, the miss sound
  * for the player's misses only, the two punch sounds. The combat playground's modes switch it on for their session.
  * Both switches are AW_CombatRule's (dbg combat flee|sounds on/off), not console variables. */
-static int rules[AW_RULE_COUNT];
+static int rules[AW_RULE_COUNT]={0,1};              /* flee off (A/B), sounds on (shipped features default on) */
 #define flee_on rules[AW_RULE_FLEE]
 #define sounds_on rules[AW_RULE_SOUNDS]
 int AW_CombatRule(int rule,int on) {

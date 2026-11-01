@@ -141,6 +141,15 @@ float R_SpriteEntityScale(const entity_t *ent)
            ent->aw_sprite_scale > 0 ? ent->aw_sprite_scale : 1;
 }
 
+float R_SpriteDepthScale(const entity_t *ent, float dist, float width)
+{
+    float push;
+    if (!ent || !ent->aw_flora || !(dist > 0) || !(width > 0))
+        return 1;
+    push = width * AW_FLORA_DEPTH_PUSH_FRAC;
+    return isfinite(push) ? dist / (dist + push) : 1;
+}
+
 void R_SetupAndDrawSprite ()
 {
 	int			i, nump;

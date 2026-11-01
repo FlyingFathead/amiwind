@@ -363,6 +363,8 @@ int main(int count,char **values){
  assert(!strcmp(output,"aw_debug_hud on\n"));
  assert(AW_DebugTranslate(4,hud_type,output,sizeof(output))==1 && !strcmp(output,"aw_debug_hud_type 2\n"));
  assert(AW_DebugTranslate(4,hors,output,sizeof(output))==1 && !strcmp(output,"aw_debug_hors 0\n"));
+ /* the bare form reaches the command too (HORS-AFTER-HALLOWEEN-STAYS-ARENA-58: it means preset 0 there) */
+ assert(AW_DebugTranslate(3,hors,output,sizeof(output))==1 && !strcmp(output,"aw_debug_hors\n"));
  assert(AW_ParseBoolean("TRUE")==1 && AW_ParseBoolean("on")==1 && AW_ParseBoolean("1")==1);
  assert(AW_ParseBoolean("FALSE")==0 && AW_ParseBoolean("off")==0 && AW_ParseBoolean("0")==0);
  assert(AW_ParseBoolean("2")==-1 && AW_ParseBoolean("truth")==-1);

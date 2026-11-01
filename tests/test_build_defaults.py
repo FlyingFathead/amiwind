@@ -67,6 +67,12 @@ SHIPPED_STAGES = {
     # v0.0.48 (MWSCRIPT-AUDIO-FIRST-48): every script compiled (docs/MWSCRIPT_BYTECODE.md); the engine runs it with
     # aw_mwscript on (on by default since v0.0.57)
     'mwscript': 'mwscript.awm (the compiled game scripts)',
+    # v0.0.58 (FOCUS-BOX-58): the framed box of placed items, actors and doors
+    'focus': 'focus.awf (the focus table)',
+    # v0.0.58 (BOOK-READER-58): the readable books' texts for the book reader
+    'books': 'books.awb (the book texts)',
+    # v0.0.58 (CHARGEN-CENSUS-57): the class questions from the install's Morrowind.ini
+    'chargen': 'character/questions.awq (the class questions)',
     'image': 'the HDF images',
     # v0.0.33, the first CHIM release: Balmora and Seyda Neen as a CHIM world (config/build-defaults.json).
     'chim': 'CHIM world (chim/world.cwi, frame maps of Balmora and Seyda Neen)',
@@ -82,6 +88,9 @@ SHIPPED_IMAGE_OPTIONS = {
     '--hands': '3d',
     '--hand-catalog': str(RUN / 'hand-catalog'),
     '--mwscript': str(RUN / 'mwscript'),
+    '--focus': str(RUN / 'focus'),
+    '--books': str(RUN / 'books'),
+    '--chargen': str(RUN / 'chargen'),
     '--harvest': str(RUN / 'harvest'),
     '--hidden-surface-cull': 'true',
     '--local-skybox': 'false',

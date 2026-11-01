@@ -21,8 +21,10 @@ static void hook(void) {
     aw_msgbox_key=AW_MsgBoxGameKey;aw_msgbox_draw=AW_MsgBoxDraw;aw_msgbox_active=AW_MsgBoxActive;
     ready=1;
 }
-void AW_MsgBoxShow(const char *text,const char *const *buttons,int count) {
+void AW_MsgBoxShow(const char *raw,const char *const *buttons,int count) {
+    static char text[1024];
     hook();
+    AW_ExpandDialogue(text,sizeof(text),raw);    /* the text defines (BOOK-TEXT-MACROS-58), as OpenMW's message boxes */
     if(count<1){AW_UIPickupNotice(text,AW_MsgBoxSeconds(text));return;}
     AW_MsgBoxOpen(&box,text,buttons,count);
     Con_DPrintf("MessageBox: %s (%d buttons)\n",text,count);

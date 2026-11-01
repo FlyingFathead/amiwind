@@ -30,9 +30,12 @@ LEGACY_PLAN = (
     ('seam-audit', 'seam_audit.py'), ('world-scenery-assets', 'world_scenery.py'), ('world-scenery', 'prepare_world_scenery.py'),
     ('media', 'prepare_media_assets.py'), ('music', 'prepare_music.py'), ('engine', 'build_aga.py'),
     ('world-flora-assets', 'prepare_tree_sprites.py'), ('world-flora', 'prepare_world_flora.py'),
-    ('harvest', 'harvest_build.py'), ('hand-catalog', 'prepare_hand_catalog.py'), ('image', 'build_aga.py'))
+    ('harvest', 'harvest_build.py'), ('hand-catalog', 'prepare_hand_catalog.py'),
+    # v0.0.58: the class questions (CHARGEN-CENSUS-57), a stage of its own read only by the image
+    ('chargen', 'prepare_chargen.py'), ('image', 'build_aga.py'))
 LEGACY_IMAGE_OPTIONS = (
-    '--balmora-cache', '--balmora-scenery', '--canonical-land-source', '--data-files', '--engine', '--entity-baseline',
+    '--balmora-cache', '--balmora-scenery', '--canonical-land-source', '--chargen', '--data-files', '--engine',
+    '--entity-baseline',
     '--file-aliases', '--gallery', '--halloween', '--hand-catalog', '--hands', '--harvest', '--hidden-surface-cull',
     '--jobs', '--light',
     '--local-skybox', '--map-budget-policy', '--media', '--music', '--out', '--qbsp', '--qcc', '--rdbtool', '--scene',

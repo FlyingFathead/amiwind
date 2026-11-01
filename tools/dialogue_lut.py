@@ -38,7 +38,7 @@ for _p in (ROOT / 'tools', ROOT / 'src'):
 import greeting_lut as G  # noqa: E402  (the voice table: NPC order, condition opcodes, strings)
 
 MAGIC = b'AWDL'
-VERSION = 2                      # 2: the NPCs' service words, the last section (aw_dial.h AW_DIAL_VERSION)
+VERSION = 3                      # 3: the factions' rank requirements, the last section (aw_dial.h AW_DIAL_VERSION)
 NAME = 'dialogue.lut'
 HEADER = 96
 # after the magic: version, functions; then the counts of topics, npcs, row bytes, list sets, list set items, lists,
@@ -110,6 +110,29 @@ def rank_names(kinds, ids):
         names = [string(d, 'RNAM', errors='replace') for tag, d in kinds['FACT'][k] if tag == 'RNAM'][:RANKS]
         out.append(names + [''] * (RANKS - len(names)))
     return out
+
+
+RANK_REQ = 112                   # a faction's rank requirements (aw_dial.h AW_DIAL_RANK_REQ)
+
+
+def rank_requirements(kinds, ids):
+    """[RANK_REQ bytes] of the factions IDS from FACT FADT (two favoured attributes, the rank data of ten ranks:
+    attribute 1, attribute 2, first skill, second skill, faction reputation; seven favoured skills): u8 attribute x2,
+    u8 skill x7 (255 none), 3 zeros, then per rank five s16. What RankRequirement reads (the rule of OpenMW's
+    hasFactionRank*Requirements, our own code). A faction without FADT gets zeros (every requirement met)."""
+    from mwad.esm import first
+    out = []
+    for k in ids:
+        data = first(kinds['FACT'][k], 'FADT')
+        if len(data) < 240:
+            out.append(bytes(2) + bytes([255] * 7) + bytes(3 + 100))
+            continue
+        attrs = struct.unpack_from('<2i', data, 0)
+        ranks = struct.unpack_from('<50i', data, 8)
+        skills = struct.unpack_from('<7i', data, 208)
+        head = bytes(a if 0 <= a < 8 else 255 for a in attrs) + bytes(s if 0 <= s < SKILLS else 255 for s in skills)
+        out.append(head + bytes(3) + struct.pack('>50h', *(max(-32768, min(32767, v)) for v in ranks)))
+    return out
 # The topics a new character knows: the ones the census captain's answers add (their result scripts' AddTopic; the
 # original's character generation, which every new game passes; Morrowind.esm: Caius Cosades, South Wall, latest
 # rumors, little advice, little secret, my trade, services, someone in particular, specific place). Read from the
@@ -134,8 +157,10 @@ LINK_BYTES = 6
 LIST_ROW = '>IHH'                # first item, items, 0 (list sets and lists)
 QUEST_ROW = '>IIHH'              # quest id (topic strings), first journal entry, entries, 0
 JOURNAL_ROW = '>HBBI'            # index, flags, 0, text offset
-KIND_TOPIC, KIND_PERSUASION = 0, 3
-DIAL_TYPES = (KIND_TOPIC, KIND_PERSUASION)
+KIND_TOPIC, KIND_GREETING, KIND_PERSUASION = 0, 2, 3
+# Greeting 0..9 are table topics too: the engine picks the greeting when the conversation opens, with the run-time
+# conditions and the derived disposition (OpenMW DialogueManager::startDialogue), and never lists them
+DIAL_TYPES = (KIND_TOPIC, KIND_GREETING, KIND_PERSUASION)
 DIAL_JOURNAL = 4
 QUEST_NAME, QUEST_FINISHED, QUEST_RESTART = 1, 2, 4
 ENTRY_LAST = G.ENTRY_LAST
@@ -169,8 +194,8 @@ from mwad.dialogue import Context as _Context, RUNTIME as _RUNTIME  # noqa: E402
 
 
 class TopicContext(_Context):
-    """mwad.dialogue.Context for a conversation topic: Choice is decided while the game runs (the greeting's
-    context fixes it to 'no choice open')."""
+    """mwad.dialogue.Context for a conversation topic or greeting: Choice is decided while the game runs (no choice
+    is open when a greeting is picked)."""
 
     def __init__(self, kinds, ident, cell):
         _Context.__init__(self, kinds, ident, cell=cell)
@@ -409,7 +434,8 @@ UI_TEXTS = (('sPersuasion', 'Persuasion'), ('sAdmire', 'Admire'), ('sIntimidate'
             ('sItemCastOnce', 'Cast Once'), ('sItemCastWhenStrikes', 'Cast When Strikes'),
             ('sItemCastWhenUsed', 'Cast When Used'), ('sItemCastConstant', 'Constant Effect'), ('sCastCost', 'Cast Cost'),
             ('sEnchantmentMenu12', 'You have successfully created an enchanted item'), ('sItem', 'Item'),
-            ('sSoulGem', 'Soul'), ('sEnchantmentMenu6', 'Chance')) + tuple(
+            ('sSoulGem', 'Soul'), ('sEnchantmentMenu6', 'Chance'),
+            ('sJournalEntry', 'Your journal has been updated.')) + tuple(
     ('sSkill' + n, s) for n, s in (
         ('Block', 'Block'), ('Armorer', 'Armorer'), ('Mediumarmor', 'Medium Armor'), ('Heavyarmor', 'Heavy Armor'),
         ('Bluntweapon', 'Blunt Weapon'), ('Longblade', 'Long Blade'), ('Axe', 'Axe'), ('Spear', 'Spear'),
@@ -607,7 +633,8 @@ def tables(kinds, topics, dials, names, masks, order):
             'start': start_topics(topics, names),
             'settings': settings_of(kinds)[0], 'settings_missing': settings_of(kinds)[1],
             'faction_ids': factions_of(kinds)[0], 'reactions': factions_of(kinds)[1],
-            'rank_names': rank_names(kinds, factions_of(kinds)[0])}
+            'rank_names': rank_names(kinds, factions_of(kinds)[0]),
+            'rank_reqs': rank_requirements(kinds, factions_of(kinds)[0])}
 
 
 def _pad(raw):
@@ -660,7 +687,8 @@ def sections(t):
         ('services', b''.join(struct.pack('>I', s) for s in t['services']), ON_DISK),
         ('skill_attributes', _pad(bytes(t['skill_attributes'])), ON_DISK),
         ('ui_texts', b''.join(s.encode('cp1252', 'replace')[:UI_TEXT - 1].ljust(UI_TEXT, b'\0')
-                              for s in t['ui_texts']), ON_DISK)]
+                              for s in t['ui_texts']), ON_DISK),
+        ('rank_reqs', b''.join(t['rank_reqs']), ON_DISK)]
 
 
 def pack(t):
@@ -712,6 +740,7 @@ def read(raw):
     services = list(struct.unpack('>%dI' % npcs, take(4 * npcs)))
     skill_attributes = list(take(len(_pad(bytes(SKILLS))))[:SKILLS])
     ui_texts = [take(UI_TEXT).rstrip(b'\0').decode('cp1252') for _ in UI_TEXTS]
+    rank_reqs = [take(RANK_REQ) for _ in range(nfactions)]
     if at != len(raw):
         raise ValueError('AWDL size mismatch')
 
@@ -720,7 +749,7 @@ def read(raw):
     out = {'resident_bytes': resident, 'conversation_bytes': conversation, 'bytes': len(raw), 'order_sha': order_sha,
            'services': services, 'skill_attributes': skill_attributes, 'ui_texts': ui_texts,
            'info_refusal': None if info_refusal == NONE16 else info_refusal, 'start': start,
-           'settings': settings, 'factions': faction_ids, 'reactions': reactions,
+           'settings': settings, 'factions': faction_ids, 'reactions': reactions, 'rank_reqs': rank_reqs,
            'rank_names': [[rank_raw[(f * RANKS + r) * FACTION_ID:(f * RANKS + r + 1) * FACTION_ID].rstrip(b'\0')
                            .decode('cp1252') for r in range(RANKS)] for f in range(nfactions)],
            'fixture': {i: v for i, v in enumerate(struct.unpack('>%di' % functions, fixture_raw))
@@ -750,11 +779,28 @@ def read(raw):
     return out
 
 
+def rank_requirement(table, faction, rank, attributes, skills, reputation):
+    """RankRequirement for the player at RANK (-1 not a member) of FACTION (the reference of aw_dial.c
+    AW_DialRankRequirement; the rule of OpenMW's hasFactionRank*Requirements, our own code): +1 attributes and the
+    best two favoured skills, +2 the faction reputation; 0 at the last rank or for an unknown faction."""
+    ids = table['factions']
+    nxt = 0 if rank < 0 else rank + 1
+    if faction is None or faction.casefold() not in ids or nxt >= RANKS:
+        return 0
+    raw = table['rank_reqs'][ids.index(faction.casefold())]
+    attr1, attr2, first, second, rep = struct.unpack_from('>5h', raw, 12 + 10 * nxt)
+    ok = all(raw[k] >= 8 or attributes[raw[k]] >= want for k, want in ((0, attr1), (1, attr2)))
+    values = sorted((skills[s] for s in raw[2:9] if s < SKILLS), reverse=True)
+    if ok and values:
+        ok = values[0] >= first and (len(values) < 2 or values[1] >= second)
+    return (1 if ok else 0) + (2 if reputation >= rep else 0)
+
+
 def derived_disposition(table, base, same_race, personality, bounty, faction, ranks, diseased=False,
-                        weapon_drawn=False, clamp=True):
+                        weapon_drawn=False, clamp=True, charm=0.0):
     """The NPC's disposition toward the player as the engine works it out (aw_dial.c AW_DialDisposition; the rule of
     OpenMW's MechanicsManager::getDerivedDisposition, our own code): RANKS {folded faction: (rank, expelled)} of the
-    player; FACTION the speaker's folded faction id or None."""
+    player; FACTION the speaker's folded faction id or None; CHARM the magnitude of Charm on the NPC."""
     s = table['settings']
     ids = table['factions']
 
@@ -784,7 +830,8 @@ def derived_disposition(table, base, same_race, personality, bounty, faction, ra
         x = f32(x + s['fDispDiseaseMod'])
     if weapon_drawn:
         x = f32(x + s['fDispWeaponDrawn'])
-    x = int(x)                       # toward zero, as a C cast
+    x = f32(x + charm)
+    x = int(x)                      # toward zero, as a C cast
     return max(0, min(100, x)) if clamp else x
 
 
@@ -1135,13 +1182,13 @@ AMIGA_ANSWER = 24                # sizeof(aw_dial_answer_t) on the 68k (engine/a
 # by name (mwad.dialogue FUNCTIONS); every other function reads its start-of-game value when the fixture knows one,
 # else it never passes. Kept in step with the engine by tests/test_dialogue_features.py.
 LIVE_FUNCTIONS = ('Health_Percent', 'PcHealthPercent', 'PcHealth', 'TalkedToPc', 'FactionRankDifference', 'Choice',
-                  'PcReputation', 'PcCrimeLevel', 'PcExpelled', 'SameFaction', 'PcLevel', 'PcGender', 'PcStrength',
+                  'RankRequirement', 'PcReputation', 'PcCrimeLevel', 'PcExpelled', 'SameFaction', 'PcLevel', 'PcGender', 'PcStrength',
                   'PcIntelligence', 'PcWillpower', 'PcAgility', 'PcSpeed', 'PcEndurance', 'PcPersonality', 'PcLuck',
                   'PcBlock', 'PcArmorer', 'PcMediumArmor', 'PcHeavyArmor', 'PcBluntWeapon', 'PcLongBlade', 'PcAxe',
                   'PcSpear', 'PcAthletics', 'PcEnchant', 'PcDestruction', 'PcAlteration', 'PcIllusion',
                   'PcConjuration', 'PcMysticism', 'PcRestoration', 'PcAlchemy', 'PcUnarmored', 'PcSecurity', 'PcSneak',
                   'PcAcrobatics', 'PcLightArmor', 'PcShortBlade', 'PcMarksman', 'PcMercantile', 'PcSpeechcraft',
-                  'PcHandToHand')
+                  'PcHandToHand', 'SameSex', 'SameRace', 'ShouldAttack')
 
 
 def coverage(table):

@@ -80,7 +80,9 @@ Family: Boot and engine start-up (`boot-startup`). The boot check and engine sta
 - [ENGINE-ARGS-32](ENGINE-ARGS-32.md): The C start-up passes no arguments from the boot shell
 - [ENGINE-CRASH-EXIT-KEYBOARD-36](ENGINE-CRASH-EXIT-KEYBOARD-36.md): After AmiWind crashes, the AmigaDOS shell mangles typing: shift/caps latched, M and N never appear
 - [ENGINE-STACK-UNCHECKED-35](ENGINE-STACK-UNCHECKED-35.md): The engine never checked the stack it was started with; the pak directory alone needs 128 KiB
+- HORS-AFTER-HALLOWEEN-CRASH-58 (no report page): dbg aw hors 0 after the Halloween benchmark crashes the game: NUM_FOR_EDICT: bad pointer
 - [LAUNCHER-GL-CONTEXT-FALLBACK-36](LAUNCHER-GL-CONTEXT-FALLBACK-36.md): When FS-UAE cannot create an OpenGL context, the Linux launcher ends in a raw X error instead of explaining it and offering software rendering
 - [NET-UDP-INIT-CRASH-32](NET-UDP-INIT-CRASH-32.md): UDP network start-up can stop the game at boot when bsdsocket.library is present
+- VIDEO-NTSC-NO-PAL-MODE-58 (no report page): On an NTSC machine the game stops at start: it asks for a PAL screen mode by name
 
 <!-- END GENERATED CATEGORY -->

@@ -1708,6 +1708,29 @@ static void roomdoor(void){
     printf("roomdoor ok%c",10);
 }
 
+/* PICKUP-PLACED-58: a placed item taken from a CHIM room (chim_room.c
+ * ChimRoom_Hide): the plain box (reference 1002) leaves the room, not solid
+ * and its efrags gone, only once; a reference with a cut piece's bits matches
+ * its source; Enable brings it back solid; another reference changes nothing. */
+static void roomtake(void){
+    int before;
+    reset_engine();Chim_Init();
+    begin_map(room_map);assert(ChimRoom_Active());frame_at(64,64,40);
+    assert(door_solid(-100,-100));
+    before=aw_efrags_used;
+    assert(ChimRoom_Hide(4242,1)==0 && door_solid(-100,-100));
+    assert(ChimRoom_Hide(1002,1)==1);
+    assert(!door_solid(-100,-100));
+    assert(aw_efrags_used<=before);
+    assert(ChimRoom_Hide(1002,1)==0);               /* already out */
+    frame_at(64,64,40);assert(!door_solid(-100,-100));
+    assert(ChimRoom_Hide(1002,0)==1 && door_solid(-100,-100));
+    assert(ChimRoom_Hide(0,1)==0);
+    end_map();
+    assert(ChimRoom_Hide(1002,1)==0);               /* no room */
+    printf("roomtake ok%c",10);
+}
+
 /* A CHIM room whose models do not fit the map's zone and the cache banks
  * grows (chim_world.c Chim_RoomGrow through chim_room.c ChimRoom_Begin,
  * ROOM-AKULAKHAN-HEAP-52): first a bank of the free Fast RAM (the largest
@@ -2485,6 +2508,7 @@ int main(int argc,char **argv){
     else if(!strcmp(argv[1],"story"))story();
     else if(!strcmp(argv[1],"door"))door();
     else if(!strcmp(argv[1],"roomdoor"))roomdoor();
+    else if(!strcmp(argv[1],"roomtake"))roomtake();
     else if(!strcmp(argv[1],"roomgrow"))roomgrow();
     else if(!strcmp(argv[1],"placed"))placed_world();
     else if(!strcmp(argv[1],"catalogue"))catalogue_dump();

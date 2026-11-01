@@ -68,14 +68,16 @@ class ReleaseFeatures(unittest.TestCase):
 
     def test_new_features_are_made_by_their_builder(self):
         new = self.config['new_features']
-        self.assertEqual({f['id'] for f in new}, {'chim-world', 'chim-frame-maps'})
+        # focus: the focus table (v0.0.58, FOCUS-BOX-58), not in the last release's payload yet
+        # books: the book texts (v0.0.58, BOOK-READER-58), with the focus table
+        self.assertEqual({f['id'] for f in new}, {'chim-world', 'chim-frame-maps', 'focus', 'books'})
         legacy = dict(default_steps('--builder', 'legacy'))
         chim = dict(default_steps('--builder', 'chim'))
         for feature in new:
             with self.subTest(feature=feature['id']):
                 self.assertEqual(feature['builder'], 'chim')
                 self.assertEqual(set(feature['steps']) - set(chim), set())
-                self.assertIn('chim', set(feature['steps']) - set(legacy))      # opt-in: not a legacy step
+                self.assertTrue(set(feature['steps']) - set(legacy))            # opt-in: not a legacy step
                 for flag in feature.get('image_options', []):
                     self.assertEqual(chim['image'].count(flag), 1)
                     self.assertEqual(legacy['image'].count(flag), 0)
@@ -94,12 +96,12 @@ class ReleaseFeatures(unittest.TestCase):
     def test_chim_payload_needs_the_chim_features(self):
         base = [example(c) for c in self.baseline['classes']]
         chim = ['id1/chim/world.cwi', 'id1/chim/frames/x-03/y-02/frame.ccf',
-                'id1/chim/frames/x-03/y-02/s00.ccs', 'id1/maps/balmora-chim.bsp']
+                'id1/chim/frames/x-03/y-02/s00.ccs', 'id1/maps/balmora-chim.bsp', 'id1/focus.awf', 'id1/books.awb']
         legacy = coverage.compare(base, self.config, self.baseline)
         self.assertFalse(coverage.failed(legacy), legacy)
         self.assertEqual(legacy['builder'], 'legacy')
         missing = coverage.compare(base, self.config, self.baseline, 'chim')
-        self.assertEqual(missing['missing_features'], ['chim-world', 'chim-frame-maps'])
+        self.assertEqual(missing['missing_features'], ['chim-world', 'chim-frame-maps', 'focus', 'books'])
         self.assertTrue(coverage.failed(missing))
         complete = coverage.compare(base + chim, self.config, self.baseline, 'chim')
         self.assertFalse(coverage.failed(complete), complete)

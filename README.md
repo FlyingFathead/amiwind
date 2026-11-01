@@ -4,7 +4,7 @@
 
 # AmiWind
 
-_Last updated with AmiWind v0.0.58-dev2 (31 October 2026)._
+_Last updated with AmiWind v0.0.58 (1 November 2026)._
 
 An unofficial, experimental RPG engine and enthusiast project bringing Morrowind
 to the Commodore Amiga, featuring CHIM: an AmiQuake-based engine and an asset
@@ -25,14 +25,18 @@ Like community projects such as
 
 More in the [gallery](docs/GALLERY.md).
 
-## Where AmiWind stands (31 October 2026)
+## Where AmiWind stands (1 November 2026)
 
-The newest release is **v0.0.57: Remembering The Emperor**, dedicated to the memory of Sir Patrick Stewart, the voice
-of Emperor Uriel Septim VII: you can talk to Vvardenfell's people, who answer with the game's own words, and they and
-its creatures wander, walk and run with their feet on the ground,
-every resident animates, creatures attack with their own moves, guards light their torches at night, 957 of the game's
-1,207 scripts run whole, and the busiest places are lighter to draw with the fog at 300 by default, running on CHIM
-Engine v0.2.2 ([release notes](docs/releases/notes/RELEASE-v0.0.57.md)). The project's own builds have had every exterior cell of Vvardenfell on CHIM since v0.0.43 (a build from the
+The newest release is **v0.0.58: Time To Talk**: most of the original's dialogue window works (links in the text,
+persuasion, the services such as barter, training, travel, repair, spellmaking and enchanting, choices, journal topic
+pages), character creation at the Census and Excise Office follows the original's pages (class list, questions or a
+class of your own, birthsign, review sheet), aiming at an item or door shows a box, placed items can be taken
+("E: Take", a red "E: Steal" when owned), books and letters are read in place, Left Ctrl sneaks, and creatures and
+fights have their own sounds, running on CHIM Engine v0.2.2
+([release notes](docs/releases/notes/RELEASE-v0.0.58.md)). The one before it, **v0.0.57: Remembering The Emperor**,
+dedicated to the memory of Sir Patrick Stewart, the voice of Emperor Uriel Septim VII, brought the first
+conversations, walking and running with the feet on the ground, torches for the guards and 957 of the game's 1,207
+scripts running whole ([release notes](docs/releases/notes/RELEASE-v0.0.57.md)). The project's own builds have had every exterior cell of Vvardenfell on CHIM since v0.0.43 (a build from the
 repository does so only from v0.0.47, when the cell list became part of the repository and the default): 1,409
 cells, counting the 61 in the town frames (1,348 are one-cell region frames; 1,292 land cells, 98 sea-floor cells
 and 19 open-sea cells), with no classic region maps left outdoors. What these numbers count:
@@ -41,17 +45,29 @@ and 19 open-sea cells), with no classic region maps left outdoors. What these nu
 prison and the census office) is built as a CHIM room, with the people the game places in them. Solstheim is not
 converted.
 
-The development line is at **v0.0.58-dev2** (31 October 2026): on top of dev1's links, persuasion, services and
-creature sounds, the scripts of answers run (choices, Goodbye), Enchanting, your own pain and death lines, and steadier
-builds, for testing in game ([dev2 notes](docs/releases/notes/RELEASE-v0.0.58-dev2.md),
-[dev1 notes](docs/releases/notes/RELEASE-v0.0.58-dev1.md)).
+What comes next is in the [roadmap](docs/ROADMAP.md): v0.0.59 takes the parts of v0.0.58 that are not done: world
+models and object placement (every item with its own model, every placed item in its place, a larger model table per
+map), what the player wears and wields on the body, the crime system, player casting and weapons, levelling with the
+original's level-up box, the full trade window, characters placed by scripts, saves that keep everything and the save
+import, lighter large interiors, the game's area sounds and Morrowind's own mouse cursor.
 
-What comes next is in the [roadmap](docs/ROADMAP.md): v0.0.58, "Time To Talk", is the conversation and the character:
-the rest of the conversation (choices, every quest's journal, the services still missing), levelling as in the original
-with its level-up box and sound, character creation at the Census Office as in the original, the box you see when you
-aim at something, every voice and sound in place and heard, the game's area sounds and Morrowind's own mouse cursor,
-and a performance history per version. Characters placed by scripts, more weapons, lighter large interiors, the rooms
-that still load in on arrival and the save import move to v0.0.59.
+### What v0.0.58 changed
+
+Dialogue: topic names in an answer are links; Admire, Intimidate, Taunt and Bribe work with the original's rules;
+Travel, Training, Spells, Barter, Repair, Spellmaking and Enchanting open from the conversation; answers run their
+scripts (choices, faction reactions); the greeting is picked at talk time; the journal's topic pages open the
+dialogue. Character creation has a scrolled class list, the birthsign page, the install's class questions, a class of
+your own and the review sheet. Aiming at something shows a box (name, weight and value for an item), placed items can
+be taken, books and letters are read in place, and Left Ctrl sneaks. Creatures make their own sounds and the combat
+sounds are on by default. The cliff racer is drawn whole, an NTSC machine starts, the presets show only the drawn
+picture, and the AmiWind Toolkit's build monitor shows progress, gates and tests with their cores. The game's scripts
+run, and a played character creation, a stolen item kept through a save and the debug restart from the main menu were
+checked in game; the filled text macros in books and the journal, taking a free item, the aim box on doors, the
+Fargoth greeting, your own footsteps, the creature sound test, the class questions with the install's data, a class of
+your own and the class list are not yet checked in game. Known limits: the back-room table of the Census and Excise Office is
+not drawn, casting waits for v0.0.59, dialogue texts still fill the player's name at run time (action-key macros show
+the action's word, not the bound key), and the aim box measures the reach to an item's origin. Full list:
+[v0.0.58 release notes](docs/releases/notes/RELEASE-v0.0.58.md).
 
 ### What v0.0.57 changed
 

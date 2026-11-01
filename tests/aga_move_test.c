@@ -23,7 +23,7 @@ extern void (*aw_move_after)(float seconds);
 cvar_t sv_friction={"sv_friction","4"},sv_stopspeed={"sv_stopspeed","100"};
 cvar_t cl_forwardspeed={"cl_forwardspeed","120"},cl_backspeed={"cl_backspeed","120"};
 cvar_t cl_sidespeed={"cl_sidespeed","120"},cl_upspeed={"cl_upspeed","200"},cl_movespeedkey={"cl_movespeedkey","1.8"};
-kbutton_t in_speed;
+kbutton_t in_speed,in_sneak;
 double host_frametime;
 server_t sv;
 server_static_t svs;
@@ -159,6 +159,19 @@ int main(void){
     fatigue=3;ground(120,0,1);aw_move_after(1);assert(fatigue==0);
     fatigue=200;player.v.flags=FL_ONGROUND|FL_GODMODE;ground(120,0,1);aw_move_after(1);assert(fatigue==200);
     player.v.flags=FL_ONGROUND;
+
+    /* SNEAK-58: the sneak key held: walk x fSneakSpeedMultiplier (0.75), Shift does not run, one second of sneaking
+     * costs fFatigueSneakBase (1.5; nothing carried); swimming stands up (no sneak, no sneak cost). */
+    in_sneak.state=1;assert(AW_MoveSneaking());
+    {extern float (*aw_view_sneak)(void);assert(aw_view_sneak && aw_view_sneak()==1);}   /* the lowered eye */
+    assert(near(ground(120,0,0),46.875f*originals.fSneakSpeedMultiplier));
+    assert(near(ground(120,0,1),46.875f*originals.fSneakSpeedMultiplier));
+    fatigue=200;ground(120,0,0);aw_move_after(1);assert(near(fatigue,200-originals.fFatigueSneakBase));
+    fatigue=200;ground(0,0,0);aw_move_after(1);assert(fatigue==200);       /* standing still: no cost */
+    player.v.waterlevel=2;assert(!AW_MoveSneaking());player.v.waterlevel=0;
+    player.v.movetype=MOVETYPE_NOCLIP;assert(!AW_MoveSneaking());player.v.movetype=MOVETYPE_WALK;
+    in_sneak.state=0;assert(!AW_MoveSneaking() && near(ground(120,0,0),46.875f));
+    fatigue=200;
 
     /* Superspeed: exactly the old numbers and no fatigue cost; the words; off restores the rules. */
     run("superspeed","on");assert(AW_MoveSuperspeed());

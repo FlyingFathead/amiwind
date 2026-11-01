@@ -15,13 +15,17 @@
 #include "aw_mwcode.h"
 #include "aw_tryalloc.h"
 
-#define MAX_SCRIPTS 2048
+/* MWSCRIPT-REFUSED-SCRIPT-COUNT-58: the dialogue result scripts (_dlg_N, one per distinct result text) are scripts of
+ * the file too: 8,618 in v0.0.58-dev5, so the old 2,048 refused every file since they came in. 16,384 slots cost
+ * 3 bytes each here (about 48 KB, taken once at load); tools/mwscript/awms.py ENGINE_MAX_SCRIPTS refuses a bigger
+ * file at build time. */
+#define MAX_SCRIPTS 16384
 #define MAX_GLOBALS 512
 #define MAX_CODE 8192           /* longest single script the load check accepts */
 
 typedef struct {uint32_t reference;uint16_t script,count,at;} parked_t;
 
-/* The interpreter's tables (about 75 KB) exist only once the scripts are switched on and loaded: one block taken
+/* The interpreter's tables (about 120 KB) exist only once the scripts are switched on and loaded: one block taken
  * at load (AW_MwvmLoad), kept for the session; a game that never switches them on spends nothing. */
 typedef struct {
     const unsigned char *base;unsigned long bytes;const aw_mwvm_host_t *host;
@@ -228,6 +232,12 @@ void AW_MwvmConfig(uint32_t *range,int *ops_frame,int *ops_run){
 int32_t AW_MwvmGlobalInt(int g){return ON && g>=0 && g<vm.nglob?vm.globals[g].i:0;}
 float AW_MwvmGlobalFloat(int g){return ON && g>=0 && g<vm.nglob?vm.globals[g].f:0;}
 int AW_MwvmGlobalCount(void){return ON?vm.nglob:0;}
+/* GLOB row: u8 type (0 short, 1 long, 2 float), u8 0, u16 name string, u32 initial value (tools/mwscript/awms.py) */
+int AW_MwvmGlobalName(int g,int *type){
+    if(!ON || g<0 || g>=vm.nglob)return -1;
+    if(type)*type=vm.glob[8*g];
+    return (int)U16(vm.glob+8*g+2);
+}
 const aw_mwvm_stats_t *AW_MwvmStats(void){return ON?&vm.stats:&no_stats;}
 unsigned long AW_MwvmFunctionCalls(int f){return ON && f>=0 && f<AWM_FUNCTIONS?vm.fcalls[f]:0;}
 int AW_MwvmFunctionName(int f){return ON && f>=0 && f<AWM_FUNCTIONS?(int)vm.fname[f]-1:-1;}

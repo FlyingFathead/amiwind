@@ -18,8 +18,8 @@
  * Memory: the table's resident index once per session (about 25 KB on Morrowind.esm) and the known-topic set (one
  * bit per topic); while a conversation is open, its buffer (AW_DIAL_BUFFER), the shown topics' names and the
  * conversation text; all freed when it ends. The file stays open while the conversation does.
- * Not yet (later steps of the design): result scripts and choices, disposition changes and persuasion, saving the
- * known topics, topics named in the greeting.
+ * The greeting is picked when the conversation opens (Greeting 0..9 of the table, with the derived disposition), its
+ * links made known and its result script run; the known topics follow the set the scripts save (AddTopic, AWKT).
  */
 #include "quakedef.h"
 #include "aw_dial.h"
@@ -30,6 +30,7 @@
 #include "aw_statswin.h"
 #include "aw_tryalloc.h"
 #include "aw_talk.h"
+#include "aw_msgbox.h"
 
 #define BOX_X 8
 #define BOX_Y 6
@@ -185,6 +186,35 @@ static int read_file(void *user,long offset,void *out,long bytes) {
     if(!file || offset<0 || bytes<0 || fseek(file,file_start+offset,SEEK_SET))return 0;
     return bytes==0 || (long)fread(out,1,(size_t)bytes,file)==bytes;
 }
+/* The known topics saved with the game (DIALOGUE-COMPLETE-58): the scripts keep them by their topic rows (AddTopic;
+ * the save's AWKT, aw_mwhost.c); TOPIC_MAP (2 bytes per table topic, made once, with the file open) gives each Topic
+ * kind topic its row by name. Each conversation opens with the set the scripts hold (a loaded game, AddTopic since);
+ * a topic learned here joins it. Without the scripts' file: this session's set only, as before. */
+int AW_MwscriptTopicKnown(int row);
+void AW_MwscriptTopicLearn(int row);
+int AW_MwscriptTopicHashes(unsigned long *out,int max);
+static unsigned short *topic_map;static int map_state;   /* 0 not tried, 1 made, -1 none */
+static void topics_sync(void) {
+    if(!map_state){
+        unsigned long *hashes;int rows=AW_MwscriptTopicHashes(NULL,0);
+        if(rows<=0)return;           /* the scripts' file not loaded (yet): tried again at the next conversation */
+        map_state=-1;
+        if(rows>0 && rows<(int)AW_DIAL_NO_ROW && (hashes=(unsigned long *)AW_TryMalloc(sizeof(unsigned long)*(size_t)rows))!=NULL){
+            if((rows=AW_MwscriptTopicHashes(hashes,rows))>0 &&
+               (topic_map=(unsigned short *)AW_TryMalloc(sizeof(unsigned short)*(size_t)(table.topics>0?table.topics:1)))!=NULL){
+                int mapped=AW_DialTopicMap(&table,read_file,NULL,hashes,rows,topic_map);
+                if(mapped>0){map_state=1;Con_DPrintf("Dialogue: %d topics follow the saved known-topic set\n",mapped);}
+                else{free(topic_map);topic_map=NULL;}
+            }
+            free(hashes);
+        }
+    }
+    if(map_state>0)AW_DialKnownSync(&table,known,topic_map,AW_MwscriptTopicKnown);
+}
+static void know(int topic) {
+    AW_DialKnow(&table,known,topic);
+    if(map_state>0 && topic>=0 && topic<table.topics && topic_map[topic]!=(unsigned short)AW_DIAL_NO_ROW)AW_MwscriptTopicLearn(topic_map[topic]);
+}
 static void read_string(long at,char *out,int capacity) {
     int n;
     out[0]=0;
@@ -268,6 +298,19 @@ static const char *label(void *ctx,int r){
     if((k=AW_DialFind(&conv,list[r]))<0)return "";
     return names+NAME_CHARS*k;
 }
+/* Exhausted topics (OpenMW DialogueWindow::updateTopicFormat via the journal): the answer this NPC would give now is
+ * on its topic's journal page already, and none of the topics it names is unknown to the player. Drawn dimmer, still
+ * chosen as any topic. Worked out once per list (the spans read the answer from disk), not per drawn frame. */
+static unsigned char spent[AW_DIAL_MAX_TOPICS];
+static int topic_spent(int topic){
+    int refused=0,answer,i,n;aw_dial_span_t spans[PARA_SPANS];
+    if(AW_DialTopicKind(&table,topic)!=AW_DIAL_KIND_TOPIC)return 0;
+    if((answer=AW_DialPick(&conv,topic,&state,&refused))<0 || refused)return 0;
+    if(!AW_DialHeardHas((int)conv.answer[answer].entry))return 0;
+    n=AW_DialSpans(&conv,answer,read_file,NULL,spans,PARA_SPANS);
+    for(i=0;i<n;i++)if(!AW_DialKnows(&table,known,spans[i].topic))return 0;
+    return 1;
+}
 static void refresh(void){
     int keep=AW_ListBoxSelected(&box),at=keep>=0 && keep<listed?list[keep]:-99,i,j;
     if(goodbye_only){listed=0;}
@@ -329,6 +372,7 @@ static void refresh(void){
         }
         listed=fixed+AW_DialTopicList(&conv,known,&state,list+fixed,AW_DIAL_MAX_TOPICS-fixed);
     }
+    for(i=0;i<listed;i++)spent[i]=(unsigned char)(list[i]>=0 && mode==0 && !choice_count && topic_spent(list[i]));
     AW_ListBoxReset(&box,listed,label,NULL,shown,list_rows());
     for(i=0;i<box.shown_count;i++)if(list[box.shown[i]]==at){box.selection=i;break;}
 }
@@ -482,7 +526,7 @@ static void draw(void){
     for(i=0;i<rows && box.top+i<box.shown_count;i++){
         y=list_y()+i*row_h();
         if(box.top+i==box.selection)AW_UIFill(list_x(),y-1,LIST_W,row_h(),pick);
-        if(greyed(box.shown[box.top+i])){
+        if(greyed(box.shown[box.top+i]) || (box.shown[box.top+i]<listed && spent[box.shown[box.top+i]])){
             const char *s=label(NULL,box.shown[box.top+i]);int x=list_x()+2,g=AW_UIColor(96,90,80);
             for(;*s && x+char_w()<=right;s++,x+=char_w())char_in(x,y,(unsigned char)*s,g);
         }else text(list_x()+2,y,label(NULL,box.shown[box.top+i]),right);
@@ -514,6 +558,10 @@ static void result_choice(const char **texts,int ntexts,const aw_mwcell_t *numbe
     for(i=0;i<ntexts && i<count && choice_count<CHOICES;i++){
         Q_snprintf(choice_text[choice_count],sizeof(choice_text[0]),"%s",texts[i]);choice_number[choice_count++]=numbers[i].i;}
 }
+/* ClearInfoActor (OpenMW clearInfoActor: the last entry this speaker added to the topic's journal page goes) */
+static void result_clear(void){
+    if(choice_topic>=0)AW_DialHeardRemoveLast(choice_topic,speaker?pr_strings+speaker->v.netname:"");
+}
 /* the answer's result script, run once it is shown (OpenMW DialogueManager::executeScript after the text) */
 static void run_result(int answer,int topic){
     static char script[RESULT_TEXT];long at=AW_DialScriptAt(&conv,answer);int n;   /* static: the 68k stack is small */
@@ -521,17 +569,16 @@ static void run_result(int answer,int topic){
     read_string(at,script,sizeof(script));
     if((n=(int)strlen(script))<=0)return;
     choice_count=0;choice_topic=topic;
-    aw_dial_result_choice=result_choice;
+    aw_dial_result_choice=result_choice;aw_dial_result_clear=result_clear;
     AW_MwscriptRunResult(speaker_record,speaker_reference,script,n);
-    aw_dial_result_choice=NULL;
+    aw_dial_result_choice=NULL;aw_dial_result_clear=NULL;
     dispose();                       /* a result may change the disposition (ModDisposition, SetDisposition) */
 }
-static void answer_of(int topic,const char *heading){
-    int k=AW_DialFind(&conv,topic),answer,i,n,found;char raw[1024],marked[1100],ranked[1100],filled[1100],plain[1100];
-    char name[NAME_CHARS];aw_dial_span_t spans[PARA_SPANS],kept[PARA_SPANS];
-    if(k<0 || (answer=AW_DialAnswer(&conv,topic,&state))<0){if(heading)append(heading,1);return;}
-    Q_snprintf(name,sizeof(name),"%s",heading?heading:names+NAME_CHARS*k);
-    append(name,1);
+/* an answer's text into the conversation with its links (the spans kept through the define filling), the topics it
+ * names made known */
+static void show_answer(int answer){
+    int i,n,found;static char raw[1024],marked[1100],ranked[1100],filled[1100],plain[1100];   /* static: small stack */
+    aw_dial_span_t spans[PARA_SPANS],kept[PARA_SPANS];
     read_string(AW_DialTextAt(&conv,answer),raw,sizeof(raw));
     n=AW_DialSpans(&conv,answer,read_file,NULL,spans,PARA_SPANS);
     AW_DialMarkSpans(raw,spans,n,marked,sizeof(marked));
@@ -539,9 +586,44 @@ static void answer_of(int topic,const char *heading){
     AW_GlutFill(speaker,row,ranked,filled,sizeof(filled));
     AW_DialTakeSpans(filled,spans,n,plain,sizeof(plain),kept,&found);
     append_spans(plain,0,kept,found);
-    for(i=0;i<n;i++)AW_DialKnow(&table,known,spans[i].topic);
+    for(i=0;i<n;i++)know(spans[i].topic);
+}
+/* The greeting (OpenMW DialogueManager::startDialogue): the first Greeting topic's answer this speaker passes now,
+ * shown, its topics made known and its result script run. 0 when the table has none for this speaker (then the
+ * voice table's line is shown, as before). */
+static int greet(void){
+    int topic,answer;
+    conv.cond.choice=-1;
+    if((answer=AW_DialGreeting(&conv,&state,&topic))<0)return 0;
+    show_answer(answer);
+    {   /* the spoken greeting follows the picked one (VOICE-COVERAGE-58): that INFO's voice from the voice table */
+        static char raw[1024];
+        read_string(AW_DialTextAt(&conv,answer),raw,sizeof(raw));
+        AW_GlutGreetVoice(speaker,raw);
+    }
+    run_result(answer,topic);
+    conv.cond.choice=-1;
+    topics_sync();                   /* the result's AddTopic */
+    return 1;
+}
+static void answer_of(int topic,const char *heading){
+    int k=AW_DialFind(&conv,topic),answer;
+    char name[NAME_CHARS];
+    if(k<0 || (answer=AW_DialAnswer(&conv,topic,&state))<0){if(heading)append(heading,1);return;}
+    Q_snprintf(name,sizeof(name),"%s",heading?heading:names+NAME_CHARS*k);
+    append(name,1);
+    show_answer(answer);
+    {   /* the journal's topic page (OpenMW Journal::addTopic): a Topic answer, not the Info Refusal one */
+        int refused=0;
+        if(AW_DialTopicKind(&table,topic)==AW_DIAL_KIND_TOPIC && AW_DialPick(&conv,topic,&state,&refused)==answer){
+            int got=AW_DialHeardAdd((int)conv.answer[answer].entry,topic,speaker?pr_strings+speaker->v.netname:"");
+            if(got==2)Con_DPrintf("Journal: the topic pages are full (12000 entries); the oldest entry of a topic with a newer one gave way\n");
+            else if(!got)Con_DPrintf("Journal: no memory for a topic page entry\n");
+        }
+    }
     run_result(answer,topic);
     conv.cond.choice=-1;             /* a choice holds for the one answer it picks */
+    topics_sync();                   /* the result's AddTopic */
     refresh();
 }
 static void ask_topic(int topic){answer_of(topic,NULL);}
@@ -1024,9 +1106,12 @@ int AW_DialWindowOpen(edict_t *e,const char *greeting,int again){
         if(at>=0 && read_file(NULL,at,names+NAME_CHARS*k,length))names[NAME_CHARS*k+length]=0;
     }
     speaker=e;history_len=0;nparas=0;nhits=0;focus=-1;scroll=0;
-    {char ranked[1024];
-     rank_defines(greeting && *greeting?greeting:"...",ranked,sizeof(ranked));
-     append(ranked,0);}
+    topics_sync();                   /* the saved known topics: a loaded game, AddTopic since the last conversation */
+    if(!greet()){                    /* the voice table's line when the dialogue table has no greeting for this speaker */
+        char ranked[1024];
+        rank_defines(greeting && *greeting?greeting:"...",ranked,sizeof(ranked));
+        append(ranked,0);
+    }
     memset(&box,0,sizeof(box));
     refresh();
     if(key_dest==key_console)key_dest=key_game;
@@ -1035,6 +1120,58 @@ int AW_DialWindowOpen(edict_t *e,const char *greeting,int again){
     return 1;
 }
 int AW_DialWindowActive(void){return active;}
+/* RankRequirement (FACTION-RANK-58, aw_mwhost.c's live conditions): the faction's requirement row read from the
+ * table (the open conversation's file, else opened for the read), the last row kept (116 bytes for the session) so a
+ * greeting's or a topic's conditions read the disk once per faction in a row. */
+static long rank_req_at=-1;static unsigned char rank_req_row[AW_DIAL_RANK_REQ];
+static int read_rank_req(void *user,long offset,void *out,long bytes){
+    FILE *f=file;long start=file_start;int ok;
+    (void)user;
+    if(bytes!=AW_DIAL_RANK_REQ || offset<0)return 0;
+    if(offset!=rank_req_at){
+        if(!f){if(COM_FOpenFile((char *)path,&f)<=0 || !f){if(f)fclose(f);return 0;}start=ftell(f);}
+        ok=!fseek(f,start+offset,SEEK_SET) && fread(rank_req_row,1,AW_DIAL_RANK_REQ,f)==AW_DIAL_RANK_REQ;
+        if(f!=file)fclose(f);
+        if(!ok){rank_req_at=-1;return 0;}
+        rank_req_at=offset;
+    }
+    memcpy(out,rank_req_row,AW_DIAL_RANK_REQ);
+    return 1;
+}
+int AW_DialWindowRankRequirement(const char *faction,int rank,const short *attributes,const short *skills,int reputation){
+    if(!load())return 0;
+    return AW_DialRankRequirement(&table,faction,rank,attributes,skills,reputation,read_rank_req,NULL);
+}
+/* The journal's topic pages (aw_worldui.c): a topic's name and a heard entry's text from the table, the file opened
+ * for the read when no conversation holds it. 1 read. */
+static int read_journal(long at,char *out,int capacity){
+    FILE *f=file;long start=file_start;int n;
+    out[0]=0;
+    if(at<0)return 0;
+    if(!f){if(COM_FOpenFile((char *)path,&f)<=0 || !f){if(f)fclose(f);return 0;}start=ftell(f);}
+    n=fseek(f,start+at,SEEK_SET)?0:(int)fread(out,1,(size_t)(capacity-1),f);
+    if(f!=file)fclose(f);
+    out[n<0?0:n]=0;
+    return n>0;
+}
+int AW_DialWindowTopicName(int topic,char *out,int capacity){
+    int length;long at;
+    out[0]=0;
+    if(!load() || (at=AW_DialTopicName(&table,topic,&length))<0)return 0;
+    if(!read_journal(at,out,capacity))return 0;
+    if(length<capacity)out[length]=0;
+    return 1;
+}
+int AW_DialWindowEntryText(int entry,char *out,int capacity){
+    unsigned char entry_row[AW_DIAL_ENTRY_ROW+1];char raw[1024];long text;int i,k=0;
+    out[0]=0;
+    if(!load() || entry<0 || entry>=table.entries || !read_journal(table.at_entries+(long)AW_DIAL_ENTRY_ROW*entry,(char *)entry_row,sizeof(entry_row)))return 0;
+    text=((long)entry_row[0]<<24)|((long)entry_row[1]<<16)|((long)entry_row[2]<<8)|entry_row[3];
+    if(text==(long)AW_DIAL_NONE32 || !read_journal(table.at_texts+text,raw,sizeof(raw)))return 0;
+    for(i=0;raw[i] && k<capacity-1;i++)if(raw[i]!=0x40 && raw[i]!=0x23)out[k++]=raw[i];   /* the link markers dropped */
+    out[k]=0;
+    return 1;
+}
 /* the NPC's own facts into C, once, when its slot is made (the cell's load): the only reads of the aggro's disposition */
 void AW_DialNpcPrepare(edict_t *e,aw_dial_npc_cache_t *c){
     aw_dial_facts_t f;eval_t *id,*ref;aw_glut_cond_t cond;aw_glut_state_t s;
@@ -1084,4 +1221,47 @@ void AW_DialWindowTalk(const char *want){
     Con_Printf("Talk: %s (%.0f units)\n",pr_strings+best->v.netname,best_d);
     if(!AW_DialWindowOpen(best,text,count && count->_float>1))Con_Printf("Talk: no dialogue window for this NPC.\n");
 }
-void AW_DialWindowInit(void){}
+static int journal_entry_filled(int entry,char *out,int capacity){   /* the entry with its %-values filled */
+    char said[1024];
+    if(!AW_DialWindowEntryText(entry,said,sizeof(said)))return 0;
+    AW_ExpandDialogue(out,capacity,said);
+    return 1;
+}
+static int journal_read(void *user,long offset,void *out,long bytes){   /* aw_dial_read_t over read_journal */
+    char buf[AW_DIAL_ENTRY_ROW+AW_DIAL_LINK_ROW+2];
+    (void)user;
+    if(bytes<=0 || bytes>(long)sizeof(buf)-1 || !read_journal(offset,buf,(int)bytes+1))return 0;
+    memcpy(out,buf,(size_t)bytes);
+    return 1;
+}
+/* The journal's links (OpenMW JournalWindow: the topic names in a page are links to their topic pages): the entry with
+ * AW_DIAL_LINK_OPEN/CLOSE around each of its builder-made spans, its %-values filled, the spans' topics into TOPICS in
+ * the same order. The number of links, -1 when the entry cannot be read. Read from disk; nothing kept. */
+static int journal_entry_marked(int entry,char *out,int capacity,unsigned short *topics,int max){
+    unsigned char entry_row[AW_DIAL_ENTRY_ROW+1];char raw[1024],marked[1100],plain[1100];aw_dial_span_t spans[PARA_SPANS];
+    long text;int n,i,k=0;
+    out[0]=0;
+    if(!load() || entry<0 || entry>=table.entries || !read_journal(table.at_entries+(long)AW_DIAL_ENTRY_ROW*entry,(char *)entry_row,sizeof(entry_row)))return -1;
+    text=((long)entry_row[0]<<24)|((long)entry_row[1]<<16)|((long)entry_row[2]<<8)|entry_row[3];
+    if(text==(long)AW_DIAL_NONE32 || !read_journal(table.at_texts+text,raw,sizeof(raw)))return -1;
+    n=AW_DialEntrySpans(&table,entry_row,journal_read,NULL,spans,PARA_SPANS);
+    AW_DialMarkSpans(raw,spans,n,marked,sizeof(marked));
+    for(i=0;marked[i] && k<(int)sizeof(plain)-1;i++)if(marked[i]!=0x40 && marked[i]!=0x23)plain[k++]=marked[i];
+    plain[k]=0;
+    AW_ExpandDialogue(out,capacity,plain);
+    for(i=0;i<n && i<max;i++)topics[i]=spans[i].topic;
+    return n<max?n:max;
+}
+/* "Your journal has been updated." (OpenMW Journal::addEntry: messageBox #{sJournalEntry}, no sound of its own): the
+ * game's own GMST from the table's words, shown as a timed notice; 1 read, nothing kept */
+static void journal_updated(void){
+    char words[AW_DIAL_UI_TEXT+1];
+    if(!load() || !read_journal(table.at_ui_texts+(long)AW_DIAL_UI_TEXT*AW_DIAL_TEXT_JOURNAL_ENTRY,words,sizeof(words)))return;
+    words[AW_DIAL_UI_TEXT-1]=0;
+    if(words[0])AW_MsgBoxShow(words,NULL,0);
+}
+void AW_DialWindowInit(void){   /* the journal book's topic pages read through these (aw_worldui.c) */
+    aw_journal_heard_count=AW_DialHeardCount;aw_journal_heard_at=AW_DialHeardAt;
+    aw_journal_topic_name=AW_DialWindowTopicName;aw_journal_entry_text=journal_entry_filled;
+    aw_journal_entry_marked=journal_entry_marked;aw_journal_updated=journal_updated;
+}

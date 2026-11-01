@@ -54,3 +54,6 @@ gfx_vsync=false
 gfx_framerate=1
 gfx_resolution=hires
 gfx_linemode=double2
+; Auto crop: show only the drawn 320x200 picture (exactly 16:10), not the PAL screen's empty border; no cost to the
+; game. Display panel, "Auto crop", to turn it off.
+gfx_auto_crop=true

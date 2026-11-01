@@ -81,7 +81,8 @@ TOPICS = {
     'thief': [info('s1', 'Thief!', sound='vo\\d\\m\\thf_dm.mp3')],
     'greeting 0': [info('g1', 'About that ring...', kind=2, scvr=[JOURNAL])],
     'greeting 1': [info('g2', 'Hello, %PCName. I am Fargoth.', kind=2, ONAM='fargoth', scvr=[TALKED]),
-                   info('g3', 'I am %Name, a %Class of the %Faction.', kind=2, CNAM='Mage')],
+                   info('g3', 'I am %Name, a %Class of the %Faction.', kind=2, CNAM='Mage',
+                        sound='vo\\b\\f\\grt_mage.mp3')],     # a voiced greeting (VOICE-COVERAGE-58)
     'greeting 9': [info('g4', 'What do you want, %PCRace?', kind=2)],
 }
 
@@ -539,7 +540,7 @@ class NativeVoiceTable(unittest.TestCase):
 
     def test_engine_glue_greet_trigger(self):
         present = [voice_pool_name(s)[6:22] for s in ('vo\\d\\m\\hlo_dm.mp3', 'vo\\b\\m\\hlo_bm.mp3',
-                                                      'vo\\d\\m\\atk_dm.mp3')]
+                                                      'vo\\d\\m\\atk_dm.mp3', 'vo\\b\\f\\grt_mage.mp3')]
         t = self.t
         row = dict((i.casefold(), r) for i, r in t['creatures'])['rat']
         moan = row[G.SNDG_MOMENTS.index('MOAN')]

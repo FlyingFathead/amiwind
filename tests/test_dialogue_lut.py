@@ -73,13 +73,26 @@ TOPICS = {
     'a1_fargoth': [journal_info('j0', 0, 'Fargoth\'s Ring', name=True),
                    journal_info('j2', 20, 'I gave the ring back.', finished=True),
                    journal_info('j1', 10, 'I found a ring.')],
-    'greeting 0': [info('g1', 'Hello.', kind=2)],
+    # the greetings: picked when the conversation opens (journal-gated, disposition-gated, a race's; then the next
+    # Greeting topic), their result scripts and links kept like a topic's
+    'greeting 0': [info('g0', 'About that ring...', kind=2, scvr=[JOURNAL]),
+                   info('g1', 'Ah, you again. Ask about @my ring#.', kind=2, ONAM='fargoth', disp=70),
+                   result(info('g2', 'Hello, sera.', kind=2, RNAM='Dark Elf'), 'AddTopic "Help"')],
+    'greeting 1': [info('g3', 'Greetings, traveller.', kind=2, CNAM='Mage', disp=40),
+                   info('g4', 'What do you want?', kind=2, RNAM='Breton')],
     'hello': [info('h1', 'Hi.', kind=1)],
 }
 DIALS = {'background': ('Background', 0), 'my ring': ('my ring', 0), 'help': ('Help', 0),
          'latest rumors': ('latest rumors', 0), 'info refusal': ('Info Refusal', 0),
          'admire success': ('Admire Success', 3), 'a1_fargoth': ('A1_Fargoth', 4), 'greeting 0': ('Greeting 0', 2),
-         'hello': ('Hello', 1)}
+         'greeting 1': ('Greeting 1', 2), 'hello': ('Hello', 1)}
+
+
+# the Mages Guild's FADT (FACTION-RANK-58): Intelligence and Willpower; rank R asks attributes 30+5R, skills 10+5R
+# and 5+5R, faction reputation 3R; favoured skills Destruction .. Restoration (one slot empty)
+MAGES_FADT = (struct.pack('<2i', 1, 2) + b''.join(struct.pack('<5i', 30 + 5 * r, 30 + 5 * r, 10 + 5 * r, 5 + 5 * r, 3 * r)
+                                                  for r in range(10)) +
+              struct.pack('<7i', 10, 11, 12, 13, 14, 15, -1) + struct.pack('<i', 0))
 
 
 def kinds():
@@ -92,7 +105,8 @@ def kinds():
                                    for n, v in DISPOSITION_SETTINGS.items()})
     k['FACT'] = dict(k['FACT'])
     k['FACT']['mages guild'] = k['FACT']['mages guild'] + [f('ANAM', 'Mages Guild'), ('INTV', struct.pack('<i', 3)),
-                                                           f('ANAM', 'Fighters Guild'), ('INTV', struct.pack('<i', -2))]
+                                                           f('ANAM', 'Fighters Guild'), ('INTV', struct.pack('<i', -2)),
+                                                           ('FADT', MAGES_FADT)]
     k['FACT']['fighters guild'] = [f('NAME', 'Fighters Guild'), f('FNAM', 'Fighters Guild'),
                                    f('ANAM', 'Mages Guild'), ('INTV', struct.pack('<i', 1))]
     return k
@@ -228,6 +242,17 @@ def ref_list(t, npc, known, state):
     return out
 
 
+def ref_greeting(t, npc, state):
+    """The greeting entry (OpenMW startDialogue: the first Greeting topic in order with a passing answer, no Info
+    Refusal fallback), -1 none."""
+    for topic in sorted(t['rows'][npc]):
+        if t['topics'][topic][1] == D.KIND_GREETING:
+            got, _refused = ref_pick(t, npc, topic, state)
+            if got >= 0:
+                return got
+    return -1
+
+
 def ref_answer(t, npc, topic, state):
     got, refused = ref_pick(t, npc, topic, state)
     if got < 0 and refused and t['info_refusal'] is not None and topic != t['info_refusal']:
@@ -247,10 +272,32 @@ class DialogueTable(unittest.TestCase):
         return [a[0] for a in D.answers(self.t, self.order.index(ident), self.names.index(name))]
 
     def test_topics_sorted_by_name_with_kinds(self):
-        self.assertEqual(self.t['topics'], [('Admire Success', 3), ('Background', 0), ('Help', 0),
-                                            ('Info Refusal', 0), ('latest rumors', 0), ('my ring', 0)])
-        self.assertEqual(self.t['info_refusal'], 3)
+        self.assertEqual(self.t['topics'], [('Admire Success', 3), ('Background', 0), ('Greeting 0', 2),
+                                            ('Greeting 1', 2), ('Help', 0), ('Info Refusal', 0), ('latest rumors', 0),
+                                            ('my ring', 0)])
+        self.assertEqual(self.t['info_refusal'], 5)
         self.assertEqual(self.report['npcs'], len(NPCS))
+
+    def test_greeting_candidates_kept_with_their_conditions(self):
+        # the table keeps every greeting an NPC may say with its run-time conditions, never one chosen line
+        g0 = self.names.index('Greeting 0')
+        found = D.answers(self.t, self.order.index('fargoth'), g0)
+        self.assertEqual([a[0] for a in found], ['About that ring...', 'Ah, you again. Ask about my ring.'])
+        self.assertEqual(found[1][3], [(G.OP_DISP, 3, 0, 70)])
+        self.assertEqual(found[1][2], [(25, 7, self.names.index('my ring'))])
+        dunmer = D.answers(self.t, self.order.index('dunmer_f'), g0)
+        self.assertEqual(dunmer[-1][:2], ('Hello, sera.', 'AddTopic "Help"'))
+        t, state = self.t, {'choice': -1, 'random': 50, 'disposition': 50}
+
+        def said(ident, **change):
+            e = ref_greeting(t, self.order.index(ident), dict(state, **change))
+            return t['text'](t['entries'][e][0]) if e >= 0 else None
+        self.assertEqual(said('fargoth', disposition=80), 'Ah, you again. Ask about my ring.')
+        self.assertEqual(said('fargoth'), None)                      # below 70 and no other greeting for him
+        self.assertEqual(said('dunmer_f'), 'Hello, sera.')
+        self.assertEqual(said('mage'), 'Greetings, traveller.')      # Greeting 0 has none for her: Greeting 1
+        self.assertEqual(said('mage', disposition=10), 'What do you want?')   # a Breton: the next answer
+        self.assertEqual(said('breton_m'), 'What do you want?')
 
     def test_static_filters(self):
         member = 'Welcome, guild member.'          # the player's faction test is left for run time, for everyone
@@ -346,6 +393,22 @@ class DialogueTable(unittest.TestCase):
         self.assertEqual(mages[:4], ['Associate', 'Apprentice', 'Journeyman', ''])
         self.assertEqual(len(mages), D.RANKS)
 
+    def test_rank_requirement_rule(self):
+        t, stats = self.t, [40] * 27
+        # not a member: rank 0's requirements (30, 10 and 5, reputation 0): both met
+        self.assertEqual(D.rank_requirement(t, 'mages guild', -1, [40] * 8, stats, 0), 3)
+        # rank 3 asks 50 attributes, 30 and 25 skills, reputation 12 for rank 4: the skills met, not the rest
+        self.assertEqual(D.rank_requirement(t, 'Mages Guild', 3, [40] * 8, stats, 11), 0)
+        self.assertEqual(D.rank_requirement(t, 'Mages Guild', 3, [50] * 8, stats, 12), 3)
+        # the second-best favoured skill short: the skill part fails
+        low = [0] * 27
+        low[10] = 99
+        self.assertEqual(D.rank_requirement(t, 'mages guild', 3, [50] * 8, low, 12), 2)
+        # the last rank, an unknown faction, a faction with no FADT (zeros: met)
+        self.assertEqual(D.rank_requirement(t, 'mages guild', 9, [99] * 8, [99] * 27, 99), 0)
+        self.assertEqual(D.rank_requirement(t, 'no such faction', 0, [99] * 8, [99] * 27, 99), 0)
+        self.assertEqual(D.rank_requirement(t, 'fighters guild', 0, [0] * 8, [0] * 27, 0), 3)
+
     def test_persuasion_rule(self):
         t = self.t
         keys = ('personality', 'luck', 'reputation', 'speechcraft', 'mercantile', 'level', 'fatigue')
@@ -439,6 +502,7 @@ class ImageStep(unittest.TestCase):
                               ('LIST_ROW', struct.calcsize(D.LIST_ROW)), ('QUEST_ROW', struct.calcsize(D.QUEST_ROW)),
                               ('JOURNAL_ROW', struct.calcsize(D.JOURNAL_ROW)), ('ENTRY_LAST', D.ENTRY_LAST),
                               ('KIND_TOPIC', D.KIND_TOPIC), ('KIND_PERSUASION', D.KIND_PERSUASION),
+                              ('KIND_GREETING', D.KIND_GREETING),
                               ('BUFFER', D.BUFFER_BUDGET)):
             self.assertRegex(header, r'#define AW_DIAL_%s %d\b' % (define, value))
         self.assertEqual(struct.calcsize(D.HEADER_FORMAT) + 4, D.HEADER)
@@ -497,6 +561,9 @@ class NativeDialogue(unittest.TestCase):
                             links, spans = link_fields(t, got)
                             lines.append('answer\t%s\t%d\t%d\t%d\t%d\t%d\t%s\t%s\t%s\t%s' % (
                                 ident, topic, disposition, choice, random, got, text, script, links, spans))
+            for disposition in (0, 39, 40, 69, 70, 100):
+                lines.append('greet\t%s\t%d\t%d' % (ident, disposition, ref_greeting(
+                    t, npc, {'choice': -1, 'random': 50, 'disposition': disposition})))
             for disposition in (0, 50, 100):
                 for which, known in (('all', set(range(len(names)))), ('start', set(t['start']))):
                     state = {'choice': -1, 'random': 50, 'disposition': disposition}
@@ -554,10 +621,23 @@ class NativeDialogue(unittest.TestCase):
                 ','.join('%s:%d:%d' % (k, r, e) for k, (r, e) in sorted(ranks.items())) or '-', diseased,
                 weapon, want))
         lines.append('reactreset')
+        # the journal's topic pages: an answer once, ClearInfoActor takes the speaker's last, a save, the bound
+        lines.append('heard\t1 1 1 1 1 5:1:Fargoth 9:1:Hrisskar 7:2:Fargoth full 2 12000 first 1')
         for faction, names in zip(t['factions'], t['rank_names']):
             for rank, name in enumerate(names):
                 lines.append('rank\t%s\t%d\t%s' % (faction.upper() if rank == 1 else faction, rank, name or '-'))
         lines.append('rank\tno such faction\t0\t-')
+        # RankRequirement (FACTION-RANK-58): the engine against the reference over ranks, stats and reputations
+        for faction in ('Mages Guild', 'fighters guild', 'no such faction'):
+            for rank in (-1, 0, 3, 8, 9):
+                for level in (0, 34, 45, 90):
+                    attributes = [level] * 8
+                    skills = [level] * 27
+                    skills[13] = level + 20                          # one favoured skill ahead of the others
+                    for rep in (0, 3, 12):
+                        want = D.rank_requirement(t, faction, rank, attributes, skills, rep)
+                        lines.append('rankreq\t%s\t%d\t%s\t%s\t%d\t%d' % (
+                            faction, rank, ','.join(map(str, attributes)), ','.join(map(str, skills)), rep, want))
         for text, pc, nxt, cell, want in (
                 ('You are %PCRank; next %NextPCRank. In %Cell, %PCName.', 'Associate', 'Apprentice', 'Seyda Neen',
                  'You are Associate; next Apprentice. In Seyda Neen, %PCName.'),
@@ -640,6 +720,17 @@ class NativeDialogue(unittest.TestCase):
                 ('Ask about %NextPCRank now', '10:11:1', 'Ask about Apprentice now', '10:10:1')):
             lines.append('spanfill\t%s\t%s\tAssociate\tApprentice\tBalmora\t%s\t%s' % (text, spans, want_text, want_spans))
         lines.append('start\t%s' % (','.join(map(str, t['start'])) or '-'))
+        # the known topics by the scripts' topic rows (AddTopic, saved as AWKT): rows sorted by folded name with a
+        # topic this table lacks; a known row marks its topic, an unknown row clears a mapped topic, a topic with no
+        # row (Persuasion) keeps its bit, the start topics stay
+        names = [n for n, _ in t['topics']]
+        rows = sorted([n.casefold() for n, k in t['topics'] if k == D.KIND_TOPIC] + ['zz not here'])
+        rows[rows.index('my ring')] = 'My Ring'                     # the name's case does not matter
+        help_row = rows.index('help')
+        preset = [names.index('Admire Success'), names.index('latest rumors')]
+        want = sorted(set(t['start']) | {names.index('Help'), names.index('Admire Success')})
+        lines.append('topicmap\t%s\t%d,%d\t%s\t%s' % ('|'.join(rows), help_row, rows.index('zz not here'),
+                                                     ','.join(map(str, preset)), ','.join(map(str, want))))
         for cols, text, want in ((10, 'Hello there outlander', 'Hello|there|outlander'),
                                  (5, 'abcdefgh ij', 'abcde|fgh|ij'), (11, 'one two\nthree', 'one two|three'),
                                  (8, 'a\n\nb', 'a|~|b'), (24, 'short', 'short')):

@@ -232,7 +232,8 @@ class ViewEngineContracts(unittest.TestCase):
         self.assertIn('rules.vanity_delay=d;', command)                  # test delay: the rules, not the cvar or file
         self.assertIn('rules.vanity_delay=vanity_delay_setting=v;', view)  # the game's own fVanityDelay is kept
         # an orbit started by hand runs also with the automatic orbit off, until any input
-        self.assertIn('(vanity_cvar.value || vanity_forced) && body_ready()', view)
+        # and never while the combat playground or an Arena fight runs (CREATURE-SOUNDS-CLIFFRACER-SILENT-58)
+        self.assertIn('AW_ViewVanityAllowed(vanity_cvar.value || vanity_forced,body_ready(),AW_ArenaActive())', view)
         self.assertIn('vanity_start();', body(view, 'static void command(void)'))   # dbg camera vanity now stays
         # console keys are not play input (the orbit started from the console survives closing it)
         self.assertIn('if(down && key_dest==key_game)input_seen=1;', body(view, 'void AW_ViewInput'))

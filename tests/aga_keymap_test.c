@@ -22,7 +22,7 @@ int AW_ConsoleCharHeight(void){return 8;} int AW_ConsoleCharWidth(void){return 4
 /* Photo mode stub: active, it claims Ctrl+F and Ctrl+H only. */
 static int photo_active,photo_keys;
 int AW_PhotoKey(int k){if(!photo_active || (k!='f' && k!='h'))return 0;photo_keys++;return 1;}
-extern char *keybindings[256];extern char key_lines[32][256];extern int edit_line,key_linepos;
+extern char *keybindings[256];void AW_ControlsMigrate(void);extern char key_lines[32][256];extern int edit_line,key_linepos;
 static void tap(int key){Key_Event(key,true);Key_Event(key,false);}
 static void scroll_limits(void){
  int i,before=warnings;queued[0]=0;con_backscroll=0;
@@ -63,10 +63,12 @@ int main(void){
  /* Shift+V no longer cycles the draw distance (a latched Shift, AW25-05, made plain V do it). */
  queued[0]=0;Key_Event(K_SHIFT,true);tap('v');Key_Event(K_SHIFT,false);
  assert(strcmp(queued,"aw_viewdistance_cycle\n"));
- Key_SetBinding(K_ALTM,"aw_desktop");Key_SetBinding(K_CTRL,"+aw_fastflight");
+ /* SNEAK-58: a saved +aw_fastflight key becomes +aw_sneak (the command it was replaced by) */
+ Key_SetBinding(K_CTRL,"+aw_fastflight");AW_ControlsMigrate();assert(!strcmp(keybindings[K_CTRL],"+aw_sneak"));
+ Key_SetBinding(K_ALTM,"aw_desktop");Key_SetBinding(K_CTRL,"+aw_sneak");
  queued[0]=0;tap('m');assert(!strcmp(queued,"aw_worldmap\n"));
  queued[0]=0;Key_Event(K_ALT,true);tap('m');Key_Event(K_ALT,false);assert(!strcmp(queued,"aw_desktop\n"));
- queued[0]=0;tap(K_CTRL);assert(strstr(queued,"+aw_fastflight") && strstr(queued,"-aw_fastflight"));
+ queued[0]=0;tap(K_CTRL);assert(strstr(queued,"+aw_sneak") && strstr(queued,"-aw_sneak"));
  key_dest=key_console;queued[0]=0;tap('m');tap('n');assert(!queued[0]);
  assert(!strcmp(key_lines[edit_line],"]mn"));
  Key_Event(K_ALT,true);tap('m');Key_Event(K_ALT,false);assert(!queued[0] && !strcmp(key_lines[edit_line],"]mnm"));
@@ -74,7 +76,7 @@ int main(void){
   * plain F (hands) and Ctrl (fast flight) keep their bindings, F10 stays the console key. */
  key_dest=key_game;Key_SetBinding('f',"impulse 202");Key_SetBinding('h',"");
  queued[0]=0;Key_Event(K_CTRL,true);tap('f');Key_Event(K_CTRL,false);
- assert(!photo_keys && strstr(queued,"impulse 202") && strstr(queued,"+aw_fastflight"));
+ assert(!photo_keys && strstr(queued,"impulse 202") && strstr(queued,"+aw_sneak"));
  photo_active=1;queued[0]=0;tap('f');assert(!photo_keys && !strcmp(queued,"impulse 202\n"));
  queued[0]=0;Key_Event(K_CTRL,true);tap('f');tap('h');Key_Event(K_CTRL,false);
  assert(photo_keys==2 && !strstr(queued,"impulse 202"));

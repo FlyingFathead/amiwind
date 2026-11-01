@@ -31,7 +31,7 @@ static int settings_state;      /* 0 not read, 1 from the image, 2 the original'
 static struct {char id[64];float male,female;} races[RACES];
 static int race_count;
 static float last_factor;       /* the last move's input 0..1 (fatigue cost scale) */
-static int last_swimming,last_running,prev_ground;
+static int last_swimming,last_running,last_sneaking,prev_ground;
 static unsigned long carried_key;
 static float carried_weight;
 
@@ -40,6 +40,14 @@ extern int (*aw_move_water)(float forwardmove,float sidemove,float upmove,float 
 extern void (*aw_move_after)(float seconds);
 
 int AW_MoveSuperspeed(void) {return superspeed.value!=0;}
+/* SNEAK-58: the sneak key held (+aw_sneak, Left Ctrl) by a player on foot in the game: not swimming (the original
+ * and OpenMW 0.51 stand up in water), not in noclip (there the key is fast flight), not knocked down or dead. */
+int AW_MoveSneaking(void) {
+    edict_t *p=sv.active && svs.clients?svs.clients[0].edict:NULL;
+    /* menus clear the held key (cl_input.c IN_AWClearButtons) */
+    return p && (in_sneak.state&1) && p->v.movetype==MOVETYPE_WALK && p->v.waterlevel<2 &&
+           p->v.health>0 && !AW_CombatPlayerKnocked();
+}
 
 /* combat/settings.txt: "move NAME VALUE" and "moverace MALE FEMALE RACE ID" lines.
  * Honours COM_FOpenFile's member size (the file may sit inside a pak). */
@@ -108,11 +116,12 @@ void AW_MovePlayerInputs(aw_move_inputs_t *in) {
         for(i=0;i<race_count;i++)if(!Q_strcasecmp(races[i].id,aw_races[aw_character.race].id)){
             in->scale=aw_character.female?races[i].female:races[i].male;break;}
     in->running=(in_speed.state&1)!=0;
+    in->sneaking=AW_MoveSneaking();
     in->knocked=AW_CombatPlayerKnocked();
     in->dead=p && p->v.health<=0;
     in->godmode=p && ((int)p->v.flags&FL_GODMODE);
     in->fatigue=AW_CombatPlayerFatigue(&in->fatigue_max);
-    /* sneaking, paralysis, Feather/Burden, Levitate, Swift Swim, Jump, Slowfall,
+    /* paralysis, Feather/Burden, Levitate, Swift Swim, Jump, Slowfall,
      * Water Walking: no input or magic effect in the engine yet (0 = no effect). */
 }
 /* The command's input as a fraction of full input on each axis (Shift scales
@@ -128,7 +137,7 @@ static void ground(float *forwardmove,float *sidemove) {
     x=axis(*sidemove,cl_sidespeed.value*run);
     len=sqrt(x*x+y*y);
     if(len<=0){*forwardmove=*sidemove=0;return;}
-    last_factor=len>1?1:len;last_swimming=0;last_running=in.running;
+    last_factor=len>1?1:len;last_swimming=0;last_running=in.running;last_sneaking=in.sneaking;
     speed=AW_MoveCurrentSpeed(&settings,&in,last_factor,AW_MoveStrafing(y,x))*AW_MOVE_UNIT_SCALE;
     *forwardmove=y/len*speed;*sidemove=x/len*speed;
 }
@@ -136,13 +145,13 @@ static int water(float forwardmove,float sidemove,float upmove,float *wishspeed)
     aw_move_inputs_t in;float x,y,z,len,run;
     last_factor=0;
     if(AW_MoveSuperspeed())return 0;
-    AW_MovePlayerInputs(&in);in.swimming=1;
+    AW_MovePlayerInputs(&in);in.swimming=1;in.sneaking=0;
     run=in.running?cl_movespeedkey.value:1;
     y=axis(forwardmove,(forwardmove>=0?cl_forwardspeed.value:cl_backspeed.value)*run);
     x=axis(sidemove,cl_sidespeed.value*run);
     z=axis(upmove,cl_upspeed.value*run);
     len=sqrt(x*x+y*y+z*z);
-    last_factor=len>1?1:len;last_swimming=1;last_running=in.running;
+    last_factor=len>1?1:len;last_swimming=1;last_running=in.running;last_sneaking=0;
     *wishspeed=AW_MoveCurrentSpeed(&settings,&in,last_factor,AW_MoveStrafing(y,x))*AW_MOVE_UNIT_SCALE;
     return 1;
 }
@@ -156,12 +165,15 @@ static void after(float seconds) {
     jumped=prev_ground && !ground_now && p->v.velocity[2]>0 && p->v.button2;
     prev_ground=ground_now;
     if(AW_MoveSuperspeed() || (last_factor<=0 && !jumped)){last_factor=0;return;}
-    AW_MovePlayerInputs(&in);in.swimming=last_swimming;in.running=last_running;
+    AW_MovePlayerInputs(&in);in.swimming=last_swimming;in.running=last_running;in.sneaking=last_sneaking;
     loss=AW_MoveMaxSpeed(&settings,&in)>0?AW_MoveFatigueRate(&settings,&in)*last_factor*seconds:0;
     if(jumped)loss+=AW_MoveJumpFatigue(&settings,&in);
     last_factor=0;
     if(loss>0)AW_CombatPlayerFatigueLoss(loss);
 }
+/* view.c: the lowered eye while sneaking (SNEAK-58) */
+extern float (*aw_view_sneak)(void);
+static float view_sneak(void) {return AW_MoveSneaking()?1.0f:0.0f;}
 static int toggle_word(char *text) {
     if(!Q_strcasecmp(text,"on") || !Q_strcasecmp(text,"true") || !strcmp(text,"1"))return 1;
     if(!Q_strcasecmp(text,"off") || !Q_strcasecmp(text,"false") || !strcmp(text,"0"))return 0;
@@ -187,5 +199,5 @@ static void superspeed_command(void) {
 void AW_MoveInit(void) {
     Cvar_RegisterVariable(&superspeed);
     Cmd_AddCommand("superspeed",superspeed_command);
-    aw_move_ground=ground;aw_move_water=water;aw_move_after=after;
+    aw_move_ground=ground;aw_move_water=water;aw_move_after=after;aw_view_sneak=view_sneak;
 }

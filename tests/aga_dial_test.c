@@ -53,6 +53,8 @@ static int lf(const aw_glut_cond_t *c,unsigned fn,long *o){(void)c;(void)fn;(voi
 static int ll(const aw_glut_cond_t *c,int slot,int is_float,float *o){char n[16];long v;(void)c;(void)is_float;sprintf(n,"%d",slot);live_find("local",n,&v);*o=(float)v;return 1;}
 static const aw_glut_live_t stub_live={lj,ld,li,lr,lg,lf,ll};
 /* the player's ranks of a "disp" line: faction:rank:expelled,... */
+static unsigned char known_rows[64];      /* topicmap: the script topic rows known */
+static int row_known(int row){return row>=0 && row<64 && known_rows[row];}
 static char disp_ranks[512];
 static int disp_rank(const char *faction,int *expelled){
     const char *p=disp_ranks;size_t n=strlen(faction);
@@ -126,6 +128,39 @@ int main(int argc,char **argv) {
             for(k=0;k<nl;k++)sprintf(spans+strlen(spans),"%s%u:%u:%u",k?",":"",sp[k].offset,sp[k].length,sp[k].topic);
             if(!nl)strcpy(spans,"-");
             if(strcmp(spans,f[10])){fprintf(stderr,"answer %s topic %s spans %s, want %s\n",f[1],f[2],spans,f[10]);return 1;}
+            if(entry>=0){   /* the journal's links: the entry row gives the same spans as the answer (journal-links) */
+                unsigned char row[AW_DIAL_ENTRY_ROW];aw_dial_span_t je[64];int nj;
+                assert(read_mem(&file,d.at_entries+(long)AW_DIAL_ENTRY_ROW*entry,row,AW_DIAL_ENTRY_ROW));
+                nj=AW_DialEntrySpans(&d,row,read_mem,&file,je,64);
+                assert(nj==nl);
+                for(k=0;k<nl;k++)assert(je[k].offset==sp[k].offset && je[k].length==sp[k].length && je[k].topic==sp[k].topic);
+            }
+        }else if(!strcmp(f[0],"greet")){         /* greet ID DISP ENTRY|-1: the greeting when the conversation opens */
+            aw_glut_state_t s;int npc=AW_GlutFind(&g,f[1]),got,topic,entry;
+            assert(n==4 && npc==opened);
+            memset(&s,0,sizeof(s));s.random100=50;s.speaker_health_percent=s.player_health_percent=s.player_health=100;
+            conv.cond.disposition=atoi(f[2]);conv.cond.choice=-1;
+            got=AW_DialGreeting(&conv,&s,&topic);
+            entry=got<0?-1:(int)conv.answer[got].entry;
+            if(entry!=atoi(f[3]) || (got>=0)!=(AW_DialTopicKind(&d,topic)==AW_DIAL_KIND_GREETING)){
+                fprintf(stderr,"greet %s disp %s: %d (topic %d), want %s\n",f[1],f[2],entry,topic,f[3]);return 1;}
+        }else if(!strcmp(f[0],"topicmap")){      /* topicmap ROW|NAMES KNOWN-ROWS PRESET WANT: the saved topics by name */
+            static unsigned long hashes[64];static unsigned short map[4096];static unsigned char known[8192];
+            char *names[64],*q;int rows=0,k;char got[1024];
+            assert(n==5 && d.topics<=4096);
+            for(q=strtok(f[1],"|");q && rows<64;q=strtok(NULL,"|"))names[rows++]=q;
+            for(k=0;k<rows;k++)hashes[k]=AW_DialNameHash(names[k],(int)strlen(names[k]));
+            assert(AW_DialNameHash("My Ring",7)==AW_DialNameHash("my ring",7));
+            memset(known_rows,0,sizeof(known_rows));
+            for(q=strtok(f[2],",");q;q=strtok(NULL,","))if(strcmp(q,"-"))known_rows[atoi(q)]=1;
+            memset(known,0,sizeof(known));
+            for(q=strtok(f[3],",");q;q=strtok(NULL,","))if(strcmp(q,"-"))AW_DialKnow(&d,known,atoi(q));
+            if(AW_DialTopicMap(&d,read_mem,&file,hashes,rows,map)<0){fprintf(stderr,"topicmap: a read failed\n");return 1;}
+            AW_DialKnownSync(&d,known,map,row_known);
+            got[0]=0;
+            for(k=0;k<d.topics;k++)if(AW_DialKnows(&d,known,k))sprintf(got+strlen(got),"%s%d",got[0]?",":"",k);
+            if(!got[0])strcpy(got,"-");
+            if(strcmp(got,f[4])){fprintf(stderr,"topicmap: %s, want %s\n",got,f[4]);return 1;}
         }else if(!strcmp(f[0],"list")){          /* list ID DISP KNOWN(all|start) TOPIC,..|- */
             aw_glut_state_t s;int npc=AW_GlutFind(&g,f[1]),out[AW_DIAL_MAX_TOPICS],m,k;char got[4096];
             static unsigned char known[8192];
@@ -140,6 +175,7 @@ int main(int argc,char **argv) {
         }else if(!strcmp(f[0],"disp")){          /* disp BASE RACE PERSONALITY BOUNTY FACTION RANKS DISEASED WEAPON CLAMP WANT */
             aw_dial_facts_t facts;int got;
             assert(n==11);
+            memset(&facts,0,sizeof(facts));   /* no Charm here (tests/aga_dial_rules_test.c checks it) */
             facts.base=atoi(f[1]);facts.same_race=atoi(f[2]);facts.personality=(float)atof(f[3]);facts.bounty=atoi(f[4]);
             facts.faction=strcmp(f[5],"-")?f[5]:NULL;strcpy(disp_ranks,strcmp(f[6],"-")?f[6]:"");
             facts.diseased=atoi(f[7]);facts.weapon_drawn=atoi(f[8]);facts.rank=disp_rank;
@@ -162,6 +198,23 @@ int main(int argc,char **argv) {
             if(got!=strtoul(f[2],NULL,10)){fprintf(stderr,"services %s: %lu, want %s\n",f[1],got,f[2]);return 1;}
         }else if(!strcmp(f[0],"reactmod")){      /* reactmod A B VALUE SET: a script's faction reaction change */
             assert(n==5 && AW_DialReactionChange(f[1],f[2],atoi(f[3]),atoi(f[4])));
+        }else if(!strcmp(f[0],"heard")){         /* heard: the journal's topic pages (add, once, ClearInfoActor, a save) */
+            static unsigned char blob[1<<16];int e,tp,k,m,a,b,c;const char *sp;char got[256];
+            AW_DialHeardReset();
+            a=AW_DialHeardAdd(5,1,"Fargoth");b=AW_DialHeardAdd(5,1,"Fargoth");c=AW_DialHeardAdd(9,1,"Hrisskar");
+            AW_DialHeardAdd(7,2,"Fargoth");AW_DialHeardAdd(8,1,"Fargoth");
+            assert(AW_DialHeardHas(8) && AW_DialHeardHas(9) && !AW_DialHeardHas(6));   /* an exhausted topic's test */
+            k=AW_DialHeardRemoveLast(1,"fargoth");          /* the last of Fargoth on topic 1: entry 8 */
+            assert(!AW_DialHeardHas(8));
+            m=AW_DialHeardExport(blob,sizeof(blob));AW_DialHeardReset();
+            sprintf(got,"%d %d %d %d %d",a,b,c,k,AW_DialHeardImport(blob,m)==m);
+            for(k=0;k<AW_DialHeardCount();k++){AW_DialHeardAt(k,&e,&tp,&sp);sprintf(got+strlen(got)," %d:%d:%s",e,tp,sp);}
+            /* the bound: the oldest of the fullest topic gives way, never a refusal */
+            AW_DialHeardReset();for(k=0;k<12000;k++)AW_DialHeardAdd(k,k<11000?3:4,"X");
+            m=AW_DialHeardAdd(20000,4,"X");AW_DialHeardAt(0,&e,&tp,&sp);
+            sprintf(got+strlen(got)," full %d %d first %d",m,AW_DialHeardCount(),e);
+            AW_DialHeardReset();
+            if(strcmp(got,f[1])){fprintf(stderr,"heard: %s, want %s\n",got,f[1]);return 1;}
         }else if(!strcmp(f[0],"reactreset")){
             unsigned char blob[256];int k=AW_DialReactionsExport(blob,sizeof(blob)),m;
             m=AW_DialReactionsImport(blob,k);   /* through a save and back: the same changes */
@@ -173,6 +226,13 @@ int main(int argc,char **argv) {
             string_at(&file,at,got,sizeof(got));
             if(at>=0 && !got[0])strcpy(got,"-");
             if(strcmp(got,f[3])){fprintf(stderr,"rank %s %s: %s, want %s\n",f[1],f[2],got,f[3]);return 1;}
+        }else if(!strcmp(f[0],"rankreq")){       /* rankreq FACTION RANK ATTRIBUTES(8) SKILLS(27) REPUTATION WANT */
+            short attributes[8],skills[27];const char *s;int k,got;
+            assert(n==7);
+            for(s=f[3],k=0;k<8;k++){attributes[k]=(short)strtol(s,(char **)&s,10);if(*s==',')s++;}
+            for(s=f[4],k=0;k<27;k++){skills[k]=(short)strtol(s,(char **)&s,10);if(*s==',')s++;}
+            got=AW_DialRankRequirement(&d,f[1],atoi(f[2]),attributes,skills,atoi(f[5]),read_mem,&file);
+            if(got!=atoi(f[6])){fprintf(stderr,"rankreq %s %s rep %s: %d, want %s\n",f[1],f[2],f[5],got,f[6]);return 1;}
         }else if(!strcmp(f[0],"persuade")){      /* persuade KIND PLAYER(7) NPC(7) DISP ROLL FIGHT FLEE "success temp perm fight flee" */
             aw_dial_person_t who[2];aw_dial_persuasion_t r;char got[64];int w;
             assert(n==9);

@@ -12,6 +12,7 @@
 #include "aw_world.h"
 #include "aw_statswin.h"
 #include "aw_tryalloc.h"
+#include "aw_textdef.h"
 #include <stdint.h>
 /* AWM1: header, areas, pixels. AWM2 adds the LAVA section (docs/WORLD_MAP_AND_JOURNAL.md "Map file formats"). */
 #define LAVA_POOLS_MAX 2048
@@ -81,12 +82,20 @@ static int lava_count,lava_colour,lava_painted;
 static float teleport_point[3];
 static const char *teleport_message;
 static char teleport_region[64];
+#define BOOK_TOPICS 256       /* the topics the reader lists (sorted by name) */
+#define BOOK_LINKS 512        /* the links one topic page holds (its text is 16 KB; the spans are a few per entry) */
+#define BOOK_HITS 96          /* the link pieces drawn on one spread */
 static char opened_scene[64];
 static struct {char id[16],title[32];float x,y,scale;} areas[8];
 typedef struct {
     char raw[8192],text[16384],titles[AW_STATE_VALUES][96];unsigned short pages[BOOK_PAGES];
     int count,spread,entry,filter,index_mode,index_top,selection,title_rows,index_end;
     int index_x[AW_STATE_VALUES],index_y[AW_STATE_VALUES],index_rows[AW_STATE_VALUES];
+    /* the topic pages (OpenMW's journal Topics): the topics heard, by name; the one being read */
+    int topics,topic_top,topic_sel,topic_open;short topic_id[BOOK_TOPICS];char topic_name[BOOK_TOPICS][40];
+    /* the page's links (OpenMW JournalWindow): the topic of the n-th link mark in text, and where the drawn ones are */
+    int links,hits;unsigned short link_topic[BOOK_LINKS];
+    struct {short x,y,w;short link;} hit[BOOK_HITS];
 } book_t;
 static book_t *book;
 extern int scr_copyeverything;
@@ -637,17 +646,13 @@ static int entry_text(const char *id,int stage,char *out,int capacity){
     fclose(f);
     return found && !out[length-1] && !memchr(out,0,length-1);
 }
+/* The entry's text defines through the one getter table (aw_textdef.c, BOOK-TEXT-MACROS-58); 0 when the filled
+ * text would not fit (as before: the entry is not shown cut). */
 static int expand_entry(void){
-    const char *p=book->raw,*value;int n=0,skip;
-    while(*p){
-        value=NULL;skip=0;
-        if(!strncmp(p,"%PCName",7)){value=aw_story.name;skip=7;}
-        else if(aw_character.valid && !strncmp(p,"%PCRace",7)){value=aw_races[aw_character.race].name;skip=7;}
-        else if(aw_character.valid && !strncmp(p,"%PCClass",8)){value=aw_classes[aw_character.clas].name;skip=8;}
-        if(value){while(*value){if(n>=(int)sizeof(book->text)-1)return 0;book->text[n++]=*value++;}p+=skip;}
-        else {if(n>=(int)sizeof(book->text)-1)return 0;book->text[n++]=*p++;}
-    }
-    book->text[n]=0;return 1;
+    aw_textdef_values_t v;int n;
+    AW_TextDefinesPlayer(&v);
+    n=AW_TextDefines(book->text,(int)sizeof(book->text),book->raw,&v);
+    return n<(int)sizeof(book->text)-1;
 }
 static int eligible(int i){return i>=0 && i<aw_state.journal_count && (book->filter<0 || aw_state.journal[i].quest==book->filter);}
 static int next_entry(int i,int step){for(i+=step;i>=0 && i<aw_state.journal_count;i+=step)if(eligible(i))return i;return -1;}
@@ -691,6 +696,83 @@ static void load_entry(int index){
     }
     AW_UIBookEnd();
     if(*p){strcpy(book->text,"This entry exceeds the reader's page capacity. Its saved history remains intact.");book->count=1;book->pages[0]=0;}
+    if(!book->count){book->count=1;book->pages[0]=0;}
+}
+/* the dialogue's journal pages (aw_dialwin.c sets these at start; none in the tools' native tests) */
+int (*aw_journal_heard_count)(void);
+int (*aw_journal_heard_at)(int i,int *entry,int *topic,const char **speaker);
+int (*aw_journal_topic_name)(int topic,char *out,int capacity);
+int (*aw_journal_entry_text)(int entry,char *out,int capacity);
+int (*aw_journal_entry_marked)(int entry,char *out,int capacity,unsigned short *topics,int max);
+/* the topics the journal's pages hold (aw_dial.c AW_DialHeard*), by name (any case), each once */
+static void topic_list(void){
+    int i,j,entry,topic;const char *speaker;
+    book->topics=0;
+    if(!aw_journal_heard_count || !aw_journal_heard_at || !aw_journal_topic_name)return;
+    for(i=0;i<aw_journal_heard_count() && book->topics<BOOK_TOPICS;i++){
+        aw_journal_heard_at(i,&entry,&topic,&speaker);
+        for(j=0;j<book->topics && book->topic_id[j]!=topic;j++);
+        if(j<book->topics)continue;
+        if(!aw_journal_topic_name(topic,book->topic_name[book->topics],sizeof(book->topic_name[0])))
+            sprintf(book->topic_name[book->topics],"Topic %d",topic);
+        for(j=book->topics;j>0 && Q_strcasecmp(book->topic_name[j-1],book->topic_name[book->topics])>0;j--);
+        if(j<book->topics){   /* insert sorted */
+            char name[40];strcpy(name,book->topic_name[book->topics]);
+            memmove(book->topic_name+j+1,book->topic_name+j,sizeof(book->topic_name[0])*(size_t)(book->topics-j));
+            memmove(book->topic_id+j+1,book->topic_id+j,sizeof(book->topic_id[0])*(size_t)(book->topics-j));
+            strcpy(book->topic_name[j],name);
+        }
+        book->topic_id[j]=(short)topic;book->topics++;
+    }
+}
+/* the topic list's row of TOPIC, -1 when the journal has no page for it (then its name is not a link) */
+static int topic_row(int topic){
+    int j;
+    for(j=0;j<book->topics;j++)if(book->topic_id[j]==topic)return j;
+    return -1;
+}
+/* One line of a topic page with its links: a link's words in the link colour and kept as a hit box (the marks give the
+ * link's number in the page, *OPENS counts the marks before, *INSIDE whether a link runs on from the line before). */
+static void linked_line(int x,int y,const char *line,int *opens,int *inside,int ink,int link_ink){
+    char one[2];int start=x,c,row;
+    one[1]=0;
+    for(;;line++){
+        c=(unsigned char)*line;
+        row=*inside && *opens>0 && *opens-1<book->links?topic_row(book->link_topic[*opens-1]):-1;
+        if((!c || c==3) && row>=0 && x>start && book->hits<BOOK_HITS){   /* the piece of the link that ends here */
+            book->hit[book->hits].x=(short)start;book->hit[book->hits].y=(short)y;book->hit[book->hits].w=(short)(x-start);
+            book->hit[book->hits].link=(short)(*opens-1);book->hits++;
+        }
+        if(!c)break;
+        if(c==2){*inside=1;(*opens)++;start=x;continue;}
+        if(c==3){*inside=0;start=x;continue;}
+        one[0]=(char)c;AW_UIText(x,y,one,row>=0?link_ink:ink);x+=AW_UIWidth(one);
+    }
+}
+/* a topic's page: every entry heard, "Speaker: text", in the order heard (the defines filled as they read now) */
+static void load_topic(int k){
+    int i,n=0,entry,topic;const char *speaker,*p,*before;char line[160],said[1024],filled[1100];
+    book->topic_open=k;book->entry=-2;book->spread=0;book->count=0;book->text[0]=0;book->links=0;
+    for(i=0;aw_journal_heard_count && aw_journal_entry_text && i<aw_journal_heard_count();i++){
+        aw_journal_heard_at(i,&entry,&topic,&speaker);
+        if(topic!=book->topic_id[k])continue;
+        if(aw_journal_entry_marked){   /* the text with its links marked, their topics kept in mark order */
+            int got=aw_journal_entry_marked(entry,said,sizeof(said),book->link_topic+book->links,BOOK_LINKS-book->links);
+            if(got<0)continue;
+            if(book->links+got<=BOOK_LINKS)book->links+=got;
+        }else if(!aw_journal_entry_text(entry,said,sizeof(said)))continue;
+        Q_snprintf(filled,sizeof(filled),"%s",said);   /* the readers give the text with its %-values filled */
+        n+=Q_snprintf(book->text+n,sizeof(book->text)-(size_t)n,"%s%s: %s",n?"\n\n":"",speaker,filled);
+        if(n>=(int)sizeof(book->text)-1)break;
+    }
+    AW_UIBookBegin();book->title_rows=1;
+    p=book->text;
+    while(*p && book->count<BOOK_PAGES){
+        book->pages[book->count++]=(unsigned short)(p-book->text);before=p;
+        for(i=0;i<page_lines(book->count-1) && *p;i++){before=p;p=AW_UILine(p,BOOK_WIDTH,line,sizeof(line));if(p==before)break;}
+        if(page_lines(book->count-1)>0 && p==before && *p)break;
+    }
+    AW_UIBookEnd();
     if(!book->count){book->count=1;book->pages[0]=0;}
 }
 static void quest_titles(void){
@@ -807,10 +889,25 @@ int AW_WorldUIKey(int key,int down){
                 }else if(mouse_y>=184)close_panel();
             }
         }
+    }else if(book->index_mode==2){
+        if(key==K_TAB){book->index_mode=0;load_entry(aw_state.journal_count-1);return 1;}
+        if(key==K_UPARROW || key==K_MWHEELUP)book->topic_sel--;
+        if(key==K_DOWNARROW || key==K_MWHEELDOWN)book->topic_sel++;
+        if(key==K_PGUP)book->topic_sel-=22;
+        if(key==K_PGDN)book->topic_sel+=22;
+        if(key==K_MOUSE1 && mouse_y>=40 && mouse_y<172){
+            int k=book->topic_top+(mouse_x>=170?11:0)+(mouse_y-40)/12;
+            if(k<book->topics){book->topic_sel=k;key=K_ENTER;}
+        }
+        book->topic_sel=minmax(book->topic_sel,0,book->topics?book->topics-1:0);
+        if(book->topic_sel<book->topic_top)book->topic_top=book->topic_sel;
+        if(book->topic_sel>=book->topic_top+22)book->topic_top=book->topic_sel-21;
+        if(key==K_ENTER && book->topics){book->index_mode=0;load_topic(book->topic_sel);}
+        return 1;
     }else if(book->index_mode){
         n=aw_state.count[AW_JOURNAL];
         AW_UIBookBegin();index_layout();AW_UIBookEnd();
-        if(key==K_TAB){book->index_mode=0;return 1;}
+        if(key==K_TAB){book->index_mode=2;topic_list();book->topic_sel=book->topic_top=0;return 1;}
         if(key==K_UPARROW || key==K_MWHEELUP)book->selection--;
         if(key==K_DOWNARROW || key==K_MWHEELDOWN)book->selection++;
         if(key==K_PGUP)book->selection-=(book->index_end-book->index_top);
@@ -838,6 +935,14 @@ int AW_WorldUIKey(int key,int down){
     }else{
         if(key==K_TAB){book->index_mode=1;book->selection=book->index_top=0;return 1;}
         if(key==K_BACKSPACE){book->filter=-1;load_entry(aw_state.journal_count-1);return 1;}
+        if(key==K_MOUSE1 && book->entry==-2){   /* a link on a topic page opens that topic's page */
+            int h,row;
+            for(h=0;h<book->hits;h++)
+                if(mouse_x>=book->hit[h].x && mouse_x<book->hit[h].x+book->hit[h].w && mouse_y>=book->hit[h].y && mouse_y<book->hit[h].y+14 &&
+                   book->hit[h].link<book->links && (row=topic_row(book->link_topic[book->hit[h].link]))>=0){
+                    book->hits=0;load_topic(row);return 1;
+                }
+        }
         if(key==K_MOUSE1){
             if(mouse_y>=26 && mouse_y<26+book->title_rows*14 && mouse_x>=14 && mouse_x<146 && book->entry>=0){
                 book->filter=aw_state.journal[book->entry].quest;load_entry(next_entry(aw_state.journal_count,-1));return 1;
@@ -1049,7 +1154,16 @@ static void journal_draw(void){
     AW_UIFill(5,5,153,190,AW_UIColor(223,207,166));AW_UIFill(162,5,153,190,AW_UIColor(232,217,180));
     AW_UIFill(158,5,4,190,AW_UIColor(92,70,43));
     AW_UIBookBegin();
-    if(book->index_mode){
+    if(book->index_mode==2){
+        AW_UITextBox(14,12,BOOK_WIDTH,14,"Topics",ink);
+        for(j=0;j<22 && book->topic_top+j<book->topics;j++){
+            i=book->topic_top+j;x=j<11?14:170;y=40+(j%11)*12;
+            if(i==book->topic_sel)AW_UIFill(x-4,y,140,12,AW_UIColor(203,186,145));
+            AW_UITextBox(x,y,BOOK_WIDTH,12,book->topic_name[i],gold);
+        }
+        if(!book->topics)AW_UITextBox(14,42,BOOK_WIDTH,14,"No topics yet.",ink);
+        AW_UITextBox(14,176,BOOK_WIDTH,12,"Tab: return",ink);
+    }else if(book->index_mode){
         AW_UITextBox(14,12,BOOK_WIDTH,14,"Quests",ink);
         AW_UITextBox(170,12,BOOK_WIDTH,14,"Journal",ink);
         index_layout();
@@ -1077,11 +1191,21 @@ static void journal_draw(void){
                 p=AW_UILine(p,BOOK_WIDTH,line,sizeof(line));
                 AW_UITextBox(14,26+i*14,BOOK_WIDTH,14,line,gold);
             }
+        }else if(entry==-2 && book->topic_open>=0 && book->topic_open<book->topics){
+            AW_UIText(14,12,book->topic_name[book->topic_open],gold);
         }else AW_UIText(14,12,"Journal",ink);
+        book->hits=0;
         for(j=0;j<2;j++){
             page=book->spread+j;if(page>=book->count)continue;p=book->text+book->pages[page];
             y=44+(j?0:(book->title_rows-1)*14);
-            for(i=0;i<page_lines(page) && *p;i++){p=AW_UILine(p,BOOK_WIDTH,line,sizeof(line));AW_UIText(14+j*156,y+i*14,line,ink);}
+            if(entry==-2){   /* a topic page: its links (the marks before this page say where the count stands) */
+                int opens=0,inside=0;const char *q;
+                for(q=book->text;q<p;q++){if(*q==2){opens++;inside=1;}else if(*q==3)inside=0;}
+                for(i=0;i<page_lines(page) && *p;i++){
+                    p=AW_UILine(p,BOOK_WIDTH,line,sizeof(line));
+                    linked_line(14+j*156,y+i*14,line,&opens,&inside,ink,AW_UIColor(112,126,207));
+                }
+            }else for(i=0;i<page_lines(page) && *p;i++){p=AW_UILine(p,BOOK_WIDTH,line,sizeof(line));AW_UIText(14+j*156,y+i*14,line,ink);}
         }
         AW_UIText(14,176,"< Previous",gold);AW_UIText(239,176,"Next >",gold);
         AW_UITextBox(102,174,44,14,"Quests",gold);

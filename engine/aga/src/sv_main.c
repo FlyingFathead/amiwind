@@ -25,6 +25,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "aw_animpick.h"
 #include "amiwind_version.h"
 #include "aw_spike.h"
+#include "aw_ambient.h"
 
 server_t		sv;
 server_static_t	svs;
@@ -1159,6 +1160,8 @@ void SV_SpawnServer (char *server)
 
     memset (&sv, 0, sizeof(sv));
     AW_AnimSceneReset();   /* same-map reloads also need fresh mover precaches */
+    AW_HalloweenServerReset();   /* and drop every edict pointer kept from the old server (HORS-AFTER-HALLOWEEN-CRASH-58) */
+    AW_AmbientServerReset();
     if(aw_inspect_reset)aw_inspect_reset();
 
     COM_FormatPath (sv.name, sizeof(sv.name), "%s", server);	/* fits: SV_MapNameFits */

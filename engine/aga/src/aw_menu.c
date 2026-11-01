@@ -183,7 +183,7 @@ static void invert_toggle(void){Cvar_SetValue("m_pitch",-Cvar_VariableValue("m_p
 typedef struct {const char *name,*command,*planned_keys;} control_t;
 static const control_t controls[]={
     {"Forward","+forward"},{"Back","+back"},{"Strafe left","+moveleft"},{"Strafe right","+moveright"},
-    {"Turn left","+left"},{"Turn right","+right"},{"Jump","+jump"},{"Run","+speed"},
+    {"Turn left","+left"},{"Turn right","+right"},{"Jump","+jump"},{"Run","+speed"},{"Sneak","+aw_sneak"},
     {"Use","+aw_use"},{"Attack","+attack"},{"Block","+aw_alt"},{"Hands","impulse 202"},{"Torch","aw_torch"},
     {"Map","aw_worldmap"},{"Journal","aw_journal"},{"Wait","aw_wait"},
     {"Quick save","aw_quicksave"},{"Quick load","aw_quickload"},

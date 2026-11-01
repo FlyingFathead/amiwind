@@ -105,6 +105,8 @@ chroot "$R" dpkg -s amiberry | grep -E '^(Package|Version):'
 chroot "$R" id amiwind >/dev/null 2>&1 || chroot "$R" useradd -m -s /bin/bash -G video,render,input,audio,plugdev amiwind
 chroot "$R" passwd -l amiwind >/dev/null
 chroot "$R" systemctl disable userconfig.service >/dev/null 2>&1 || true
+# the wizard's SSH banner ("SSH may not work until a valid user has been set up") is wrong once amiwind exists
+rm -f "$R/etc/ssh/sshd_config.d/rename_user.conf"
 [ -d "$R/etc/cloud" ] && touch "$R/etc/cloud/cloud-init.disabled"
 if [ -n "$SSH_KEY" ]; then
   install -d -m 700 "$R/home/amiwind/.ssh"; install -m 600 "$SSH_KEY" "$R/home/amiwind/.ssh/authorized_keys"

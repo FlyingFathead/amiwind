@@ -1,10 +1,11 @@
 # Changelog
 
-_Last updated with AmiWind v0.0.57 (31 October 2026)._
+_Last updated with AmiWind v0.0.58 (1 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.58: Time To Talk, 1 November 2026](#v0058-time-to-talk-1-november-2026)
 - [v0.0.57: Remembering The Emperor, 31 October 2026](#v0057-remembering-the-emperor-31-october-2026)
 - [v0.0.56: Some Velvet Morning, 29 October 2026](#v0056-some-velvet-morning-29-october-2026)
 - [v0.0.55: Sky Is Turning Red (Among Other Things), 29 October 2026](#v0055-sky-is-turning-red-among-other-things-29-october-2026)
@@ -165,6 +166,28 @@ _Last updated with AmiWind v0.0.57 (31 October 2026)._
 - [CHIM source candidate - 14 October 2026, v0.0.40-dev1](#chim-source-candidate---14-october-2026-v0040-dev1)
 
 <!-- contents end -->
+
+## v0.0.58: Time To Talk, 1 November 2026
+
+- Dialogue: topic names in answers are links; persuasion (admire, intimidate, taunt, bribe); the services travel,
+  training, spells, barter, repair and spellmaking; enchanting; answers that run their scripts (choices, Goodbye-only
+  endings, faction reactions); the greeting picked at talk time; journal topic pages with links and a "journal
+  updated" notice; faction rank checks and more live conditions.
+- Character creation: a scrolled class list, the birthsign page, the install's class questions, a class of your own
+  and the review sheet.
+- The world: an aim box for items and doors; placed items can be picked up ("E: Take", a red "E: Steal" when
+  owned); books and letters are read in place ("E: Read"); the Census and Excise Office's small items; sneaking on
+  Left Ctrl.
+- Creatures and sound: the cliff racer is drawn whole; creatures make their own sounds; combat sounds on by default;
+  voices and a sound table that no longer fills up.
+- Fixes: the game's scripts run (the engine had refused the script file for its size); taking items works, an owned
+  item as stolen; character creation runs in order and shows the chosen name; the game's text macros are filled in
+  books, the journal and messages; the character restart command after the Halloween scene and from the main menu; an
+  NTSC machine starts; presets show only the drawn 320x200 picture; the Seyda Neen shore wall gap.
+- Builds and the Toolkit (0.1.19): steadier, faster builds, voice coverage in the build report, and a build monitor
+  with a progress bar, a machine view and an amber "passed, perf guard failed" state.
+- The sixth development snapshot (dev6) with its final version number; the rest moved to v0.0.59
+  ([release notes](releases/notes/RELEASE-v0.0.58.md)).
 
 ## v0.0.57: Remembering The Emperor, 31 October 2026
 

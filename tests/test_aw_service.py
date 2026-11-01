@@ -594,6 +594,7 @@ class ServiceTests(unittest.TestCase):
         self.assertIn('parallel -> serial', result['steps']['perf-guard']['detail'])
         self.assertEqual(result['failed_stage'], 'perf-guard')
         self.assertEqual(result['failed_steps'], ['perf-guard'])
+        self.assertEqual(result['outcome'], 'passed-perf-guard-failed')      # status stays failed; the monitor shows amber
         # the stages passed: their stair walks still become reusable records
         self.assertTrue(result['steps']['stair-records']['ok'])
         self.assertIn('FAILED (1 failing), 1 waived (X-36)', aw.perf_guard_text(result['perf_guard']))
@@ -605,6 +606,7 @@ class ServiceTests(unittest.TestCase):
         self.assertTrue(result['steps']['build']['ok'], result['steps']['build'])
         self.assertFalse(result['steps']['size-guard']['ok'])
         self.assertEqual(result['failed_stage'], 'size-guard')
+        self.assertNotIn('outcome', result)                                  # only a perf-guard-only failure has one
         self.assertTrue(result['steps']['stair-records']['ok'])
 
     def test_exit_3_with_a_failed_stage_is_a_failed_build(self):
@@ -613,6 +615,7 @@ class ServiceTests(unittest.TestCase):
         code, result, _ = self.submit(self.request(), FakeRunner(build_exit=3, summary=summary))
         self.assertEqual(result['status'], 'failed')
         self.assertFalse(result['steps']['build']['ok'])
+        self.assertNotIn('outcome', result)
         self.assertNotIn('perf-guard', result['steps'])
 
     def test_a_builder_without_the_perf_guard_passes_and_says_so(self):

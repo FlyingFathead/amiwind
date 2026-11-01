@@ -449,6 +449,7 @@ void AW_ConsoleSetSmall(int value);
 int AW_ConsoleCharWidth(void);
 int AW_ConsoleCharHeight(void);
 void AW_ConsoleCharacter(int x,int y,int c);
+void AW_ConsoleCharacterRed(int x,int y,int c,int red);
 void AW_SmallString(int x,int y,const char *text);
 void AW_SmallStringColor(int,int,int,const char *,int);
 int AW_LightGalleryDraw(void);
@@ -494,6 +495,13 @@ int AW_MwscriptSpeedAttribute(struct edict_s *e);
 /* Object state the scripts set (aw_mwhost.c): 1 when Disable hid the placement REFERENCE; its lock level, or
  * ORIGINAL when no script set one (0 unlocked .. 100). */
 int AW_ObjectDisabled(unsigned int reference);
+/* PICKUP-PLACED-58: the player takes the placed item REFERENCE (STOLEN 1: it had an owner, kept for CRIME-59): it is
+ * disabled (saved with the object state) and hidden, its edict or its CHIM room placements; 0 when nothing of it is
+ * on this map to hide (an exterior CHIM static: not yet). */
+int AW_ObjectTake(unsigned int reference,int stolen);
+int ChimRoom_Hide(unsigned reference,int hide);   /* chim/chim_room.c: a room's placements of REFERENCE out (1) or back */
+int ChimRoom_Has(unsigned reference);             /* chim/chim_room.c: the loaded room's drawn placements of REFERENCE */
+void AW_MwscriptRoomShift(float shift[3]);
 int AW_ObjectLockLevel(unsigned int reference,int original);
 int AW_MusicScriptTrack(int track);
 void AW_SceneTick(void);
@@ -627,6 +635,7 @@ void AW_UIVoiceSubtitle(const char *name,const char *text,double duration);
 int AW_SceneUIOption(int option,int change);
 void AW_UITargetName(const char *name);
 void AW_UIObjectName(const char *name,int style);
+void AW_UIFocusBox(const char *name,const char *line2,const char *line3,int owned);
 int AW_IntroPromptActive(void);
 const char *AW_SceneTargetName(void);
 edict_t *AW_NPCTarget(edict_t *player,vec3_t angles);
@@ -696,7 +705,9 @@ int AW_DemoWindKey(int key,int down);
 void AW_HalloweenInit(void);
 void AW_HalloweenTick(void);
 void AW_HalloweenDraw(void);
-int AW_HalloweenCamera(float origin[3],float angles[3]);/* Debug companion (aw_companion.c). */
+int AW_HalloweenCamera(float origin[3],float angles[3]);
+void AW_HalloweenServerReset(void);
+/* Debug companion (aw_companion.c). */
 void AW_CompanionInit(void);
 void AW_CompanionPhysics(void);
 void AW_CompanionSceneSpawn(edict_t *player);

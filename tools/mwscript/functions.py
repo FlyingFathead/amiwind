@@ -430,8 +430,11 @@ HOST = {'getpccrimelevel', 'setpccrimelevel', 'modpccrimelevel',
         'modfactionreaction', 'setfactionreaction',
         # v0.0.58: ShowMap records the revealed place (aw_actorstate.c AW_RevealedAdd, saved) for the map's place
         # markers (INGAME-MAP-ORIGINAL-57: shown when the map has them)
-        'showmap'}
-HOST_EFFECTS = {'showmap', 'choice', 'goodbye', 'modfactionreaction', 'setfactionreaction', 'forcegreeting', 'rotate', 'aitravel', 'aifollow', 'position','playgroup', 'loopgroup', 'addtopic', 'cast','setpccrimelevel', 'modpccrimelevel', 'setreputation', 'modreputation', 'pcraiserank',
+        'showmap',
+        # v0.0.58: ClearInfoActor in a result script: the speaker's last entry on the topic's journal page goes
+        # (aw_dial.c AW_DialHeardRemoveLast; OpenMW DialogueManager::clearInfoActor)
+        'clearinfoactor'}
+HOST_EFFECTS = {'showmap', 'clearinfoactor', 'choice', 'goodbye', 'modfactionreaction', 'setfactionreaction', 'forcegreeting', 'rotate', 'aitravel', 'aifollow', 'position','playgroup', 'loopgroup', 'addtopic', 'cast','setpccrimelevel', 'modpccrimelevel', 'setreputation', 'modreputation', 'pcraiserank',
                 'pclowerrank', 'pcjoinfaction', 'pcexpell', 'pcclearexpelled', 'setpcfacrep', 'modpcfacrep'}
 
 # Groups the measurement reports as "the engine does not have it yet" (the brief's list), and the rest.

@@ -103,6 +103,21 @@ int AW_InventoryBootstrap(void);
 int AW_InventoryDropHere(const aw_inventory_item_t *,int32_t count);
 int AW_InventoryUse(void);
 const char *AW_InventoryHint(void);
+/* The focus box (FOCUS-BOX-58): the aimed ground item within the activation distance, its name and the box's
+ * "Weight: x" and "Value: y" lines; owned 1 when taking it would be theft. 0 when no item is aimed at. */
+int AW_InventoryFocus(const char **name,char *weight_line,char *value_line,int line_size,int *owned);
+float AW_ActivateDistance(void);
+/* The same for things placed in the loaded room (id1/focus.awf): items with weight and value, actors and doors with
+ * their name only (empty lines). */
+int AW_PlacedFocus(const char **name,char *weight_line,char *value_line,int line_size,int *owned);
+/* STEAL-PROMPT-58: "E: Take" or "E: Steal" (*steal 1) for the aimed takeable item; 0 for none. */
+int AW_ItemPrompt(char *line,int size,int *steal);
+/* The book reader's entry (NULL until it exists): opens the readable book placed as REFERENCE; 1 when it opened. */
+extern int (*aw_book_reader)(unsigned reference);
+/* BOOK-READER-58: the placed book's record id (FOCUS id, 33 bytes) and ownership; 1 when it is in the focus table. */
+int AW_PlacedBook(unsigned reference,char *id,int *owned);
+/* BOOK-READER-58: take the placed item REFERENCE as E on it would (owned: stolen); 1 when taken or refused. */
+int AW_PlacedTake(unsigned reference);
 void AW_InventorySpawn(void);
 void AW_InventoryOpen(void);
 #endif

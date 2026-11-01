@@ -1,6 +1,6 @@
 # AmiWind Toolkit
 
-_Last updated with AmiWind v0.0.55 (29 October 2026)._
+_Last updated with AmiWind v0.0.58 (1 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -588,6 +588,9 @@ the build-side ingest and the live tracker's prompt, files and server lifecycle,
 
 The **Monitor** tab (`amiwind-toolkit/monitor.html`) follows a build as it runs, in any browser, phones included:
 
+- **Overall progress bar:** at the top of Progress, one bar for the whole build with the percentage and, while it
+  runs, the expected finish time (local time with its offset and in UTC) and the time left; green when the build
+  passed, red when it failed;
 - **Progress:** status, percent done, stages passed, running, pending and failed, elapsed time, the time left and the
   finish time in rows of their own (the finish time in local time with its offset and in UTC, both dated), the ETA's
   basis (critical path or history) and the cores in use now, from the run's `build-progress.json`. Under "Cores now" a
@@ -625,9 +628,18 @@ The **Monitor** tab (`amiwind-toolkit/monitor.html`) follows a build as it runs,
   with a dot at the peak, live from `build-progress.json` and for a finished run from its `build-profile.json`. Hover shows a cursor across every row with the time, the cores, the stage
   and sections running then; click or tap a red stretch to select it (highlighted, with a list of what ran in it),
   arrows step to the next or previous stretch, Esc clears. Wheel zooms the time axis, drag pans, **Reset zoom** shows
-  the whole run, and **Fullscreen** fills the screen (a maximised panel where the browser has no fullscreen);
+  the whole run, and **Fullscreen** fills the screen (a maximised panel where the browser has no fullscreen). Two
+  checkboxes in the Timeline controls, **Cores used** (blue line) and **RAM usage** (orange line), both on by default,
+  show or hide their line, each shown in its line's colour;
+- **Machine:** with `--machine-jobs`, every job using the machine and not only builds: gates, test sessions,
+  pregates and master builder jobs (containers named `amiwind-gate-*`, `aw-*` and `aw-pregate-*`), each with its kind,
+  cores in use and memory, and the total against the machine's cores, so the core count matches the machine's real
+  load. One `docker stats --no-stream` call, read-only, repeated at most every few seconds;
 - **Recent builds and gates:** the newest master builder results, when the server is given them. A 🔍 on a row whose run
   the monitor can read (and a click on its name) opens that run and highlights the row; gates have no run of their own.
+  A build whose stages all passed and whose only failed step is the performance guard shows as **passed, perf guard
+  failed** in amber, with the failing sections on hover, not as failed; the result record keeps `status` `failed` and
+  adds `outcome` `passed-perf-guard-failed`. A performance-only failure does not block a build.
 - **Reload:** the open tab is kept in the address (`#monitor`), so a reload of the Toolkit opens it again.
 - **Build run:** the run list is read again every 15 seconds and with **Refresh**, keeping your choice; runs that
   appeared after the page opened are marked "new", and **follow latest** switches to the newest running build.
@@ -635,7 +647,7 @@ The **Monitor** tab (`amiwind-toolkit/monitor.html`) follows a build as it runs,
 Start it with the Toolkit server:
 
 ```bash
-python3 tools/toolkit_serve.py --builds BUILDS_DIR [--results DIR] [--console-logs DIR] --open
+python3 tools/toolkit_serve.py --builds BUILDS_DIR [--results DIR] [--console-logs DIR] [--machine-jobs] --open
 ```
 
 `BUILDS_DIR` is the folder holding your build runs. **Docker builds** (`tools/run_docker.py`,
@@ -658,7 +670,8 @@ your build logs), so only do it on a network you trust. It prints a warning when
 
 Read-only by construction:
 
-- the `/monitor/` endpoints answer GET only; nothing runs a command, starts, stops or writes anything;
+- the `/monitor/` endpoints answer GET only; nothing starts, stops or writes anything (only with `--machine-jobs` the
+  server runs two fixed, read-only calls, `docker stats --no-stream` and `docker info`, that no page request can change);
 - every request names a run and a log (or a stage trace) by a strict name pattern, checked by the server and again by the reader, and
   must resolve inside the builds folder (no `..`, no path separators, no symbolic links); logs are read in capped byte
   ranges; `build-state.json` is summarised (stage names, status, times), never sent whole;

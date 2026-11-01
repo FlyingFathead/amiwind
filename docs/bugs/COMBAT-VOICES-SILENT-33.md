@@ -87,6 +87,7 @@ Family: Music and sound (`audio`). The mixer must stay fed through loads and sce
 - [COMBAT-MUSIC-AIR-SWING-35](COMBAT-MUSIC-AIR-SWING-35.md): Swinging at the air starts the combat music; it should start only when the player attacks a valid combat target (an NPC or creature)
 - COMBAT-SOUNDS-RULE-OFF-58 (no report page): The original's combat sounds are switched off by default: normal play hears one sound per outcome, not OpenMW's set (swing swish, the armour piece struck, blocks, punches, criticals)
 - CREATURE-ANIM-SOUND-54 (no report page): A creature's sound generators from its animations are not played
+- CREATURE-SOUNDS-CLIFFRACER-SILENT-58 (no report page): The combat playground stops after 30 s without input: the idle vanity camera's full view skips the playground, so the sounds mode goes silent
 - CUSTOM-OST-SLOT-53 (no report page): Requested: a custom OST slot: the user's own track built into the image and a player routine for it, apart from the playlist
 - DOOR-AUDIO-SECOND-COPY-48 (no report page): The door audio stage converts its own copies of the 10 door sounds the media stage already converted (166,338 bytes stored twice)
 - [ENGINE-MUSIC-NO-OFF-SWITCH-36](ENGINE-MUSIC-NO-OFF-SWITCH-36.md): The soundtrack has no off switch: music can only be disabled by deleting music/playlist.txt from the image

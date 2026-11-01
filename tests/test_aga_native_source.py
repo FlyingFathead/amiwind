@@ -317,6 +317,12 @@ class NativeSourceTests(unittest.TestCase):
         self.compile_run('aga_hud_icons_test.c', [Path(SOURCE)/'src/aw_icons.c'],
             cflags=['-Wall','-Werror=implicit-function-declaration','-fsanitize=address,undefined','-fno-sanitize-recover=all'])
 
+    def test_placed_item_pickup_through_the_use_path(self):
+        # PICKUP-PLACED-58: the real focus and item tables, aim, reach and take (AW_InventoryUse)
+        self.compile_run('aga_focus_pickup_test.c', [Path(SOURCE)/'src'/n for n in
+            ('aw_inventory.c','aw_state.c','mathlib.c')],
+            cflags=['-fsanitize=address,undefined','-fno-sanitize-recover=all'])
+
     def test_inventory_real_drop_placement_capacity_and_no_loss(self):
         self.compile_run('aga_inventory_placement_test.c', [Path(SOURCE)/'src'/n for n in
             ('aw_inventory.c','aw_state.c','mathlib.c')],
@@ -332,8 +338,8 @@ class NativeSourceTests(unittest.TestCase):
 
     def test_inventory_fullscreen_events_real_equip_atomic_drop_and_exit(self):
         self.compile_run('aga_inventory_ui_test.c', [Path(SOURCE)/'src'/n for n in
-            ('aw_worldui.c','aw_inventory.c','aw_harvest.c','aw_state.c','aw_save_codec.c','mathlib.c','common.c')],
-            defines=['AW_INVENTORY_RULES_ONLY'],
+            ('aw_worldui.c','aw_textdef.c','aw_inventory.c','aw_harvest.c','aw_state.c','aw_save_codec.c','mathlib.c','common.c')],
+            defines=['AW_INVENTORY_RULES_ONLY','AW_TEXTDEF_HOST_TEST'],
             cflags=['-Wl,--wrap=COM_FOpenFile','-Werror=implicit-function-declaration','-fsanitize=undefined,float-cast-overflow','-fno-sanitize-recover=all'])
 
     def test_stats_and_magic_windows_content_grouping_keys_and_live_update(self):
@@ -343,8 +349,8 @@ class NativeSourceTests(unittest.TestCase):
                     '-fsanitize=address,undefined','-fno-sanitize-recover=all'])
 
     def test_world_map_journal_disk_bounds_navigation_and_modal_exit(self):
-        self.compile_run('aga_worldui_test.c', [Path(SOURCE)/'src'/n for n in ('aw_worldui.c','aw_inventory.c','aw_state.c','aw_save_codec.c','mathlib.c')],
-            defines=['AW_INVENTORY_RULES_ONLY'], cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])
+        self.compile_run('aga_worldui_test.c', [Path(SOURCE)/'src'/n for n in ('aw_worldui.c','aw_textdef.c','aw_inventory.c','aw_state.c','aw_save_codec.c','mathlib.c')],
+            defines=['AW_INVENTORY_RULES_ONLY','AW_TEXTDEF_HOST_TEST'], cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])
 
     def test_mouse_event_order_accumulation_modal_reset_and_signed_deltas(self):
         cases = ('same_batch_tabs', 'sequential_clamp', 'game_accumulation',
@@ -353,8 +359,8 @@ class NativeSourceTests(unittest.TestCase):
                                    ('gnu99', ('signed_game', 'filter', 'bounds'))):
             with self.subTest(standard=standard):
                 self.compile_run('aga_mouse_event_test.c', [Path(SOURCE)/'src'/n for n in
-                    ('in_amiga.c', 'cl_input.c', 'aw_worldui.c', 'aw_inventory.c', 'aw_state.c', 'aw_save_codec.c', 'mathlib.c')],
-                    defines=['AW_INVENTORY_RULES_ONLY'], cflags=['-fsanitize=undefined,float-cast-overflow', '-fno-sanitize-recover=all'],
+                    ('in_amiga.c', 'cl_input.c', 'aw_worldui.c', 'aw_textdef.c', 'aw_inventory.c', 'aw_state.c', 'aw_save_codec.c', 'mathlib.c')],
+                    defines=['AW_INVENTORY_RULES_ONLY', 'AW_TEXTDEF_HOST_TEST'], cflags=['-fsanitize=undefined,float-cast-overflow', '-fno-sanitize-recover=all'],
                     standard=standard, argument_sets=[(case,) for case in selected])
 
     def test_world_ui_drag_cancels_on_focus_loss_without_lost_release(self):
@@ -374,13 +380,18 @@ class NativeSourceTests(unittest.TestCase):
                                + branches[0].strip() + '}\n')
             self.compile_run('aga_map_focus_test.c',
                 [*[Path(SOURCE)/'src'/n for n in
-                   ('in_amiga.c', 'cl_input.c', 'keys.c', 'aw_worldui.c', 'aw_inventory.c', 'aw_state.c', 'mathlib.c')], adapter],
-                defines=['AW_INVENTORY_RULES_ONLY'], cflags=['-fsanitize=undefined,float-cast-overflow', '-fno-sanitize-recover=all'],
+                   ('in_amiga.c', 'cl_input.c', 'keys.c', 'aw_worldui.c', 'aw_textdef.c', 'aw_inventory.c', 'aw_state.c', 'mathlib.c')], adapter],
+                defines=['AW_INVENTORY_RULES_ONLY', 'AW_TEXTDEF_HOST_TEST'], cflags=['-fsanitize=undefined,float-cast-overflow', '-fno-sanitize-recover=all'],
                 argument_sets=[(case,) for case in cases])
 
     def test_journal_history_dates_duplicates_and_capacity_transaction(self):
         self.compile_run('aga_journal_state_test.c', [Path(SOURCE)/'src/aw_state.c'],
             cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])
+
+    def test_dialogue_speaker_functions_and_disposition_terms(self):
+        # DIALOGUE-COMPLETE-58: SameSex, SameRace, ShouldAttack through the shared evaluator; disease, drawn weapon, Charm
+        self.compile_run('aga_dial_rules_test.c', [Path(SOURCE)/'src/aw_dial.c', Path(SOURCE)/'src/aw_glut.c'],
+            defines=['AW_GLUT_HOST_TEST'], cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])
 
     def test_prefetch_byte_identity_cancellation_eviction_and_low_memory_fallback(self):
         self.compile_run('aga_stream_test.c', [Path(SOURCE)/'src/aw_stream.c'],
@@ -496,6 +507,12 @@ class NativeSourceTests(unittest.TestCase):
 
     def test_character_stats_conditional_state_and_save_corruption(self):
         self.compile_run('aga_character_state_test.c', [Path(SOURCE)/'src'/n for n in
+            ('aw_character.c','aw_story.c','aw_state.c','aw_save_codec.c','aw_clock.c')],
+            cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])
+
+    def test_chargen_class_list_and_review_sheet(self):
+        # CHARGEN-CENSUS-57 (a): class list with details; review sheet with derived stats and grouped skills
+        self.compile_run('aga_chargen_class_review_test.c', [Path(SOURCE)/'src'/n for n in
             ('aw_character.c','aw_story.c','aw_state.c','aw_save_codec.c','aw_clock.c')],
             cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])
 

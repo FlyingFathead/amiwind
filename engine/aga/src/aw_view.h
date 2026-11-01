@@ -79,6 +79,10 @@ void AW_ViewPOVTap(aw_view_t *v,const aw_view_rules_t *r);
 /* One frame of the idle clock and the vanity orbit (camera.lua updateIdleTimer + updateVanity):
  * input = any key, mouse or movement this frame; allowed = vanity may start (alive, in game, enabled). */
 void AW_ViewIdle(aw_view_t *v,const aw_view_rules_t *r,int input,int allowed,float dt);
+/* May the vanity orbit run: switched on (or started by hand), a player body, and no combat playground or Arena
+ * fight: the orbit's full view skips the playground's drawing, which also runs its clock (the sounds mode went
+ * silent after 30 s without input, CREATURE-SOUNDS-CLIFFRACER-SILENT-58). */
+int AW_ViewVanityAllowed(int enabled,int body,int arena);
 /* The wheel (camera.lua zoom): delta > 0 zooms in (10 per click in the original, here r->zoom_step). */
 void AW_ViewZoom(aw_view_t *v,const aw_view_rules_t *r,float delta);
 /* The camera stands behind the player (every mode but first person). */

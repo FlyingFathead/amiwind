@@ -23,7 +23,7 @@ static const struct {const char *command,*action;} help_bindings[]={
     {"toggleconsole","Console"},{"aw_quick_help","Quick help"},{"togglemenu","Pause menu"},
     {"aw_worldmap","World map"},{"aw_journal","Journal"},
     {"aw_music_next","Next music track"},{"aw_music_previous","Previous music track"},
-    {"aw_music_mode","Music mode"},{"+aw_fastflight","Fast flight (debug)"},
+    {"aw_music_mode","Music mode"},{"+aw_sneak","Sneak (fast flight in debug noclip)"},
     {"aw_desktop","Desktop (debug)"}
 };
 #define HELP_COUNT ((int)(sizeof(help_bindings)/sizeof(help_bindings[0])))

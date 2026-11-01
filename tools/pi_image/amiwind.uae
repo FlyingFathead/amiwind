@@ -29,5 +29,8 @@ z3mem_size=32
 fastmem_size=0
 bogomem_size=0
 gfx_fullscreen_amiga=true
+# crop to the drawn 320x200 picture (the PAL screen's empty border is not shown): it fills a 16:9 or 16:10 monitor far
+# better and costs the game nothing (tried on the Pi 4B stick, 31 October 2026)
+amiberry.gfx_auto_crop=true
 sound_output=exact
 hardfile2=rw,DH0:/opt/amiwind/current.hdf,0,0,0,512,0,,uae0

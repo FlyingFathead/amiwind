@@ -31,6 +31,8 @@
 #include "aw_glut.h"
 #include "aw_dial.h"
 #include "aw_inventory.h"
+#include "aw_move.h"
+#include "aw_textdef.h"
 #include <ctype.h>
 
 #define FILE_NAME "mwscript.awm"
@@ -46,7 +48,7 @@ static cvar_t mwscript={"aw_mwscript","1",true};
 static unsigned char *resident;static unsigned long resident_bytes,file_bytes;
 static const char *load_why="not read yet";   /* the console answer (dbg mwscript): why the file is not loaded */
 static int load_failed,attached_map;
-static char map_name[64];static void *map_model;
+static char map_name[64];static void *map_model,*script_model;   /* the map the objects / the scripts attached to */
 static char *topic_names;static int *topic_offsets;static int32_t *topic_values;
 typedef struct {int used,instance,looping,sound,channel,entity;float until,volume;vec3_t origin;} loop_t;
 static loop_t loops[LOOPS];
@@ -73,6 +75,23 @@ static int read_string(int index,char *out,int capacity){
     n=read_string_from(f,ftell(f),index,out,capacity);
     fclose(f);return n;
 }
+/* The globals' names for the text defines (aw_textdef.c, BOOK-TEXT-MACROS-58): COUNT rows of SIZE bytes, the file
+ * opened once; a name that does not fit or cannot be read is left empty. Returns the rows filled. */
+int AW_MwscriptGlobalPrefix(const char *text,int run,int *length){
+    FILE *f=NULL;long base;int g,count=AW_MwvmGlobalCount(),index,n,k,best=-1;char name[64];
+    *length=0;
+    if(count<=0 || run<=0)return -1;
+    if(COM_FOpenFile(FILE_NAME,&f)<=0 || !f){if(f)fclose(f);return -1;}
+    base=ftell(f);
+    for(g=0;g<count;g++){
+        if((index=AW_MwvmGlobalName(g,NULL))<0 || (n=read_string_from(f,base,index,name,sizeof(name)))<=*length || n>run)continue;
+        for(k=0;k<n && (name[k]|((name[k]>='A' && name[k]<='Z')?32:0))==(text[k]|((text[k]>='A' && text[k]<='Z')?32:0));k++);
+        if(k==n){best=g;*length=n;}
+    }
+    fclose(f);
+    return best;
+}
+int AW_MwscriptGlobalType(int global){int type=-1;return AW_MwvmGlobalName(global,&type)<0?-1:type;}
 /* Item ids the player's inventory queries name: kept after the first read (a script asks every frame). */
 #define ID_CACHE 16
 static struct {int index;char id[64];} id_cache[ID_CACHE];static int id_cache_next;
@@ -192,6 +211,8 @@ static int32_t host_query(int instance,int query,int operand){
     if(query==AWQ_ITEM_COUNT && (id=cached_id(operand))!=NULL)return AW_StateGet(&aw_state,AW_ITEM,id);
     return 0;   /* the other queries are not available yet (the compiler marks such scripts VOLATILE) */
 }
+/* the journal-updated notice (aw_dialwin.c sets it at start: the game's sJournalEntry; none in the native tests) */
+void (*aw_journal_updated)(void);
 static int32_t host_journal_get(int topic){
     int32_t story;
     if(topic<0 || topic>=AW_MwvmTopicCount() || !topic_values)return 0;
@@ -204,7 +225,11 @@ static void host_journal_set(int topic,int32_t index,int advance){
     name=topic_names+topic_offsets[topic];
     if(advance){
         if(index<=host_journal_get(topic))return;
-        topic_values[topic]=index;AW_JournalAdd(&aw_state,name,index);   /* the journal UI's copy, while it has room */
+        {
+            unsigned owed=AW_JournalNotices();
+            topic_values[topic]=index;AW_JournalAdd(&aw_state,name,index);   /* the journal UI's copy, while it has room */
+            if(AW_JournalNotices()!=owed && aw_journal_updated)aw_journal_updated();   /* "Your journal has been updated." */
+        }
     }else{
         topic_values[topic]=index;AW_StateSet(&aw_state,AW_JOURNAL,name,index);
     }
@@ -227,6 +252,7 @@ static void host_warn(const char *what,int script){
 typedef struct {
     uint32_t ref;
     unsigned char disabled,lock_set,level,last_level;   /* level 0 unlocked .. 100 */
+    unsigned char stolen;                               /* PICKUP-PLACED-58: taken by the player from an owner */
     int entity,map;                                     /* the edict hidden, on attach number MAP */
     float model,solid;                                  /* what it had before */
 } object_t;
@@ -249,6 +275,7 @@ static uint32_t target_reference(int instance,int target){
 }
 static void object_hide(object_t *o){
     int number=entity_of_reference(o->ref);edict_t *e=edict_of(number);
+    ChimRoom_Hide(o->ref,1);           /* its placements in a CHIM room (no edict) leave too */
     if(!e || e->free)return;
     if(o->entity!=number || o->map!=attached_map || e->v.modelindex){
         o->model=e->v.modelindex;o->solid=e->v.solid;o->entity=number;o->map=attached_map;
@@ -257,6 +284,7 @@ static void object_hide(object_t *o){
 }
 static void object_show(object_t *o){
     edict_t *e=edict_of(o->entity);
+    ChimRoom_Hide(o->ref,0);
     if(!e || e->free || o->map!=attached_map)return;    /* hidden on another map: this one never hid it */
     e->v.modelindex=o->model;e->v.solid=o->solid;SV_LinkEdict(e,false);o->entity=-1;
 }
@@ -346,6 +374,20 @@ static void object_activate(uint32_t reference){
     AW_SceneActivate(reference);    /* a load door of this map; other objects' own use: not yet */
 }
 int AW_ObjectDisabled(unsigned int reference){object_t *o=object_find(reference,0);return o && o->disabled;}
+/* PICKUP-PLACED-58: the player takes a placed item. Like the original and OpenMW 0.51 the reference leaves the world
+ * for good: here it is disabled (the object state above, kept in saved games, hidden again at every map) and hidden
+ * now, its edict or its CHIM room placements. Refused (0) when nothing of it can be hidden on this map, so the item
+ * never sits in the inventory and on the table at once. The owner mark stays for the session (CRIME-59). */
+int AW_ObjectTake(unsigned int reference,int stolen){
+    object_t *o;int number;edict_t *e;int room;
+    if(!reference || reference>0xFFFFFFu || AW_ObjectDisabled(reference))return 0;
+    number=entity_of_reference(reference);e=edict_of(number);
+    room=ChimRoom_Hide(reference,1);
+    if(!room && (!e || e->free))return 0;
+    if(!(o=object_find(reference,1))){if(room)ChimRoom_Hide(reference,0);return 0;}
+    o->disabled=1;o->stolen=stolen?1:0;object_hide(o);
+    return 1;
+}
 int AW_ObjectLockLevel(unsigned int reference,int original){
     object_t *o=object_find(reference,0);
     return o && o->lock_set?o->level:original;
@@ -660,6 +702,9 @@ static int pc_kind,pc_x,pc_y;
 static long map_room;                /* the loaded room's stable number, 0 outdoors (attach_map) */
 static float room_shift[3];          /* a room map's local position = game position / 4 + this (attach_map) */
 static int host_player_cell(int *x,int *y){*x=pc_x;*y=pc_y;return pc_kind;}
+/* The loaded room map's shift (map units = game units / 4 + shift), found when the map attached; the focus box's
+ * placed rows use it (aw_inventory.c). 0 outdoors or before the scripts attached this map. */
+void AW_MwscriptRoomShift(float shift[3]){int i;for(i=0;i<3;i++)shift[i]=room_shift[i];}
 static void to_game_units(const vec3_t local,float out[3]){
     int i;
     if(AW_WorldToSource(sv.name,local,out))return;            /* an outdoor map: its own origin */
@@ -712,6 +757,27 @@ dfunction_t *ED_FindFunction(char *name);
 static unsigned char *known_topics;static int topic_rows,topic_bytes;
 int AW_MwscriptTopicKnown(int row);   /* the dialogue window's question (DIALOGUE-57): 1 when row ROW is known */
 int AW_MwscriptTopicKnown(int row){return row>=0 && row<topic_rows && known_topics && (known_topics[row>>3]>>(row&7)&1);}
+/* The dialogue window learns a topic (a link in an answer or greeting): it joins the saved set (DIALOGUE-COMPLETE-58) */
+void AW_MwscriptTopicLearn(int row);
+void AW_MwscriptTopicLearn(int row){if(row>=0 && row<topic_rows && known_topics)known_topics[row>>3]|=(unsigned char)(1<<(row&7));}
+/* The name hash of every TOPC row (aw_dial.c AW_DialNameHash) into OUT (at most MAX): the rows, 0 without the file's
+ * topics; OUT NULL: only the number of rows. One open of the file; for the dialogue window's map from its topics to these rows, made once. */
+int AW_MwscriptTopicHashes(unsigned long *out,int max);
+int AW_MwscriptTopicHashes(unsigned long *out,int max){
+    FILE *f=NULL;long base;uint32_t off,rows,bytes,r;unsigned char id[2];char name[256];int n;
+    if(!out)return known_topics?topic_rows:0;              /* the rows, for the caller's array */
+    if(!known_topics || topic_rows<=0 || topic_rows>max || !AW_MwvmSection("TOPC",&off,&rows,&bytes) ||
+       (int)rows!=topic_rows)return 0;
+    if(COM_FOpenFile(FILE_NAME,&f)<=0 || !f){if(f)fclose(f);return 0;}
+    base=ftell(f);
+    for(r=0;r<rows;r++){
+        if(fseek(f,base+(long)off+2L*(long)r,SEEK_SET) || fread(id,1,2,f)!=2){fclose(f);return 0;}
+        n=read_string_from(f,base,(id[0]<<8)|id[1],name,sizeof(name));
+        out[r]=AW_DialNameHash(name,n);
+    }
+    fclose(f);
+    return (int)rows;
+}
 /* ForceGreeting's act on actor E (see AWF_FORCEGREETING below); 1 when the greeting was played */
 static int force_greeting(edict_t *e){
     dfunction_t *greet;int self,other;
@@ -739,6 +805,7 @@ static int same_id(const char *a,const char *b){
 }
 /* the dialogue window's Choice and Goodbye (aw_dialwin.c sets it while a result script runs): TEXTS NULL = Goodbye */
 void (*aw_dial_result_choice)(const char **texts,int ntexts,const aw_mwcell_t *numbers,int count);
+void (*aw_dial_result_clear)(void);
 static int host_call(int instance,int target,int function,const aw_mwcell_t *numbers,int count,
                      const unsigned char *strings,int nstrings,aw_mwcell_t *result){
     char own[64];const char *faction;int value=count>0?numbers[0].i:0;
@@ -788,6 +855,9 @@ static int host_call(int instance,int target,int function,const aw_mwcell_t *num
         if(!AW_DialReactionChange(a,b,numbers[count-1].i,function==AWF_SETFACTIONREACTION)){
             Con_DPrintf("MWScript: faction reaction changes are full (32); %s toward %s not kept\n",a,b);return 0;}
         AW_MwvmStateChanged();return 1;}
+    case AWF_CLEARINFOACTOR:
+        if(!aw_dial_result_clear)return 0;   /* outside a conversation: nothing */
+        aw_dial_result_clear();return 1;
     case AWF_SHOWMAP:{
         /* ShowMap TEXT: the exterior cells whose name holds TEXT become known on the map (OpenMW OpShowMap); kept
          * for the map's place markers (INGAME-MAP-ORIGINAL-57), which do not exist yet */
@@ -972,7 +1042,7 @@ static const aw_mwvm_host_t host={host_sound,host_sound_playing,host_say,host_sa
     host_position,host_player_move,host_ai_package};
 
 /* The dialogue conditions' live state (aw_glut.h aw_glut_live, DIALOGUE-57): what the scripts keep, read by name.
- * Not yet: script locals, SameRace, SameSex, RankRequirement, globals by name (they keep the start value). */
+ * RankRequirement reads the factions' rank requirements from the dialogue table (aw_dialwin.c, FACTION-RANK-58). */
 static int live_journal(const char *quest,long *out){
     int i,n=AW_MwvmTopicCount();long best=AW_StateGet(&aw_state,AW_JOURNAL,(char *)quest);
     for(i=0;topic_values && topic_names && i<n;i++)
@@ -986,12 +1056,39 @@ static int live_dead(const char *actor,long *out){
 }
 static int live_item(const char *item,long *out){*out=AW_StateGet(&aw_state,AW_ITEM,(char *)item);return 1;}
 static int live_rank(const char *faction,long *out){*out=AW_StandingRank(faction);return 1;}
+/* SameSex, SameRace and ShouldAttack (aw_dial.c AW_DialPairFunction): the speaker's record (an NPC) against the
+ * player's sheet; ShouldAttack is the speaker's Fight rating toward the player with the condition's disposition (the
+ * conversation's derived one), as the world's aggro works it out (aw_ambient.c). 0 when the speaker is not known. */
+static int speaker_pair(const aw_glut_cond_t *c,unsigned fn,long *out){
+    aw_dial_pair_t p;edict_t *e,*player;eval_t *v,*r;int row;aw_actor_base_t b;aw_actor_t *a;char race[64];
+    memset(&p,0,sizeof(p));p.fight_rating=-1;
+    if(!aw_character.valid || c->speaker<=0 || c->speaker>=sv.num_edicts || !AW_MwscriptActors())return 0;
+    e=EDICT_NUM(c->speaker);
+    if(e->free || !(v=GetEdictFieldValue(e,"aw_source_id")) || !v->string || (row=AW_ActorFind(pr_strings+v->string))<0 ||
+       !AW_ActorBase(row,&b) || b.kind!=0)return 0;
+    p.known=1;p.player_female=aw_character.female!=0;p.speaker_female=(b.flags&AWR_FEMALE)!=0;
+    if(aw_character.race>=0 && aw_character.race<aw_race_count)p.player_race=aw_races[aw_character.race].id;
+    if(b.race!=AW_ACTOR_NONE && read_string(b.race,race,sizeof(race)))p.speaker_race=race;
+    if(fn==AW_DIAL_FN_SHOULD_ATTACK && AW_CombatAiLoaded() && svs.maxclients>0 && (player=svs.clients[0].edict)!=NULL){
+        vec3_t d;int fight=b.fight;
+        r=GetEdictFieldValue(e,"aw_ref");
+        if(r && (a=AW_ActorGet((uint32_t)r->_float,row,0))!=NULL)fight=(int)AW_ActorStat(a,AWA_FIGHT);
+        VectorSubtract(e->v.origin,player->v.origin,d);
+        p.fight_rating=AW_CombatFightRating(&aw_combat_ai,fight,c->disposition,(float)Length(d)/AW_MOVE_UNIT_SCALE);
+    }
+    return AW_DialPairFunction(&p,fn,out);
+}
 /* SCVR function numbers (mwad.dialogue FUNCTIONS): the player's standing and the character's stats */
 static int live_function(const aw_glut_cond_t *c,unsigned fn,long *out){
+    if(fn==44 || fn==45 || fn==71)return speaker_pair(c,fn,out);        /* SameSex, SameRace, ShouldAttack */
     if(fn==5){*out=AW_StandingReputation();return 1;}                      /* PcReputation */
     if(fn==43){*out=AW_StandingCrime();return 1;}                          /* PcCrimeLevel */
     if(fn==39){*out=c->faction?AW_StandingExpelled(c->faction):0;return 1;} /* PcExpelled (the speaker's faction) */
     if(fn==46){*out=c->faction && AW_StandingRank(c->faction)>=0;return 1;} /* SameFaction */
+    if(fn==2){                                                             /* RankRequirement (the speaker's faction) */
+        *out=c->faction && aw_character.valid?AW_DialWindowRankRequirement(c->faction,AW_StandingRank(c->faction),
+            aw_character.attributes,aw_character.skills,AW_StandingFactionReputation(c->faction)):0;
+        return 1;}
     if(!aw_character.valid)return 0;
     if(fn==6){*out=aw_character.level;return 1;}                           /* PcLevel */
     if(fn==38){*out=aw_character.female?1:0;return 1;}                      /* PcGender: 1 female (OpenMW) */
@@ -1031,13 +1128,31 @@ static int live_global(const char *name,float *out){
 }
 /* The disposition's facts of a speaker (aw_dial.h aw_dial_facts_t; DIALOGUE-57): its own disposition from the actor
  * record (the scripts' SetDisposition and ModDisposition included) when the actor table has it, else BASE; same race,
- * the player's Personality, crime level, faction ranks. Not yet: disease, a drawn weapon, Charm (0). */
+ * the player's Personality, crime level, faction ranks, a disease (a common or a blight one in the player's spells,
+ * OpenMW hasCommonDisease / hasBlightDisease) and a drawn weapon (the hands up without a torch: OpenMW's draw state
+ * Weapon). Charm: the magnitude of a Charm effect on the NPC; no effect can land on an NPC before player casting
+ * (PLAYER-CASTING-59), so it is 0 until then. */
 static int standing_rank(const char *faction,int *expelled){*expelled=AW_StandingExpelled(faction);return AW_StandingRank(faction);}
+static int player_diseased=-1;   /* the last read (a disk read: never on the engage tick), -1 not read yet */
+static int disposition_diseased(int read){
+    aw_actor_t *p;
+    if(read && AW_MwscriptActors() && (p=AW_ActorPlayer())!=NULL)
+        player_diseased=AW_ActorHasSpellType(p,2) || AW_ActorHasSpellType(p,3);
+    return player_diseased>0;
+}
+static int disposition_weapon_drawn(void){
+    edict_t *p;eval_t *goal,*torch;
+    if(!sv.active || svs.maxclients<1 || !(p=svs.clients[0].edict))return 0;
+    goal=GetEdictFieldValue(p,"aw_hand_goal");torch=GetEdictFieldValue(p,"aw_torch");
+    return goal && goal->_float==1 && !(torch && torch->_float!=0);
+}
+static float disposition_charm(unsigned long reference){(void)reference;return 0;}
 void AW_MwscriptDispositionFacts(const char *record,unsigned long reference,int base,const char *faction,aw_dial_facts_t *f){
     int row=-1;aw_actor_base_t b;aw_actor_t *a;char race[64];
     memset(f,0,sizeof(*f));
     f->base=base;f->faction=faction;f->rank=standing_rank;f->bounty=AW_StandingCrime();
     f->personality=aw_character.valid?(float)aw_character.attributes[6]:50.0f;
+    f->diseased=disposition_diseased(1);f->weapon_drawn=disposition_weapon_drawn();f->charm=disposition_charm(reference);
     if(!AW_MwscriptActors() || !record || (row=AW_ActorFind(record))<0 || !AW_ActorBase(row,&b))return;
     if(reference && (a=AW_ActorGet((uint32_t)reference,row,0))!=NULL)f->base=(int)AW_ActorStat(a,AWA_DISPOSITION);
     if(aw_character.valid && b.race!=AW_ACTOR_NONE && read_string(b.race,race,sizeof(race)))
@@ -1150,14 +1265,10 @@ static unsigned char room_rows[ROOM_ROWS][24];
 static int compare_refs(const void *a,const void *b){
     uint32_t x=*(const uint32_t *)a,y=*(const uint32_t *)b;return x<y?-1:x>y;
 }
-static void attach_map(void){
-    FILE *f=NULL;int length,i,k,nroom=0,anchored=0;long base,room;uint32_t offset,rows,bytes,r;unsigned char row[24];
-    vec3_t local,shift;float source[3];edict_t *e;eval_t *v;int outdoors;
-    AW_MwvmBeginMap();
-    {float zero[3]={0,0,0};vec3_t at;    /* the player's cell: a room's number (its shift comes with the bindings) */
-     map_room=AW_SourceToWorld(sv.name,zero,at)?0:map_cell_number();room_shift[0]=room_shift[1]=room_shift[2]=0;}
-    for(i=0;i<LOOPS;i++)if(loops[i].used){S_StopSound(loops[i].entity,loops[i].channel);loops[i].used=0;}
-    memset(says,0,sizeof(says));
+/* A new map, with or without the scripts (PICKUP-E-OWNED-NO-TAKE-58: the taken items are object state too, so this
+ * runs while the scripts are off or refused): the edicts by reference, and what was disabled or taken stays hidden. */
+static void attach_objects(void){
+    int i;edict_t *e;eval_t *v;
     edict_ref_count=0;
     for(i=1;i<sv.num_edicts && edict_ref_count<EDICT_REFS;i++){
         e=EDICT_NUM(i);if(e->free)continue;
@@ -1165,8 +1276,17 @@ static void attach_map(void){
         edict_refs[edict_ref_count].ref=(uint32_t)v->_float;edict_refs[edict_ref_count++].entity=i;
     }
     qsort(edict_refs,edict_ref_count,sizeof(edict_refs[0]),compare_refs);
-    /* the object state: what a script disabled stays hidden on this map too */
+    /* the object state: what a script disabled or the player took stays hidden on this map too */
     for(i=0;i<object_count;i++)if(objects[i].disabled){objects[i].entity=-1;object_hide(&objects[i]);}
+}
+static void attach_map(void){
+    FILE *f=NULL;int length,i,k,nroom=0,anchored=0;long base,room;uint32_t offset,rows,bytes,r;unsigned char row[24];
+    vec3_t local,shift;float source[3];edict_t *e;int outdoors;
+    AW_MwvmBeginMap();
+    {float zero[3]={0,0,0};vec3_t at;    /* the player's cell: a room's number (its shift comes with the bindings) */
+     map_room=AW_SourceToWorld(sv.name,zero,at)?0:map_cell_number();room_shift[0]=room_shift[1]=room_shift[2]=0;}
+    for(i=0;i<LOOPS;i++)if(loops[i].used){S_StopSound(loops[i].entity,loops[i].channel);loops[i].used=0;}
+    memset(says,0,sizeof(says));
     if(!AW_MwvmSection("BIND",&offset,&rows,&bytes))return;
     length=COM_FOpenFile(FILE_NAME,&f);if(!f)return;
     base=ftell(f);
@@ -1224,12 +1344,14 @@ static void attach_map(void){
 void AW_MwscriptTick(float dt){
     int k,n,i;vec3_t player;
     /* no game running (a load, the main menu): a script's message box goes with it */
-    if(!mwscript.value || !sv.active || cls.signon!=SIGNONS || !sv_player){AW_MsgBoxClear();return;}
-    if(!load())return;
+    if(!sv.active || cls.signon!=SIGNONS || !sv_player){AW_MsgBoxClear();return;}
     if(sv.worldmodel!=map_model || strcmp(sv.name,map_name)){
         map_model=sv.worldmodel;Q_strcpy_bounded(map_name,sv.name,sizeof(map_name));
-        attached_map++;attach_map();   /* the count first: what attach hides belongs to this map */
+        attached_map++;attach_objects();script_model=NULL;   /* the count first: what attach hides belongs to this map */
     }
+    if(!mwscript.value){AW_MsgBoxClear();return;}
+    if(!load())return;
+    if(script_model!=map_model){script_model=map_model;attach_map();}
     n=AW_MwvmInstanceCount();
     for(k=0;k<n;k++){
         aw_mwvm_instance_t *in=AW_MwvmInstance(k);edict_t *e;
@@ -1430,6 +1552,9 @@ static int actors_export(unsigned char *out,int capacity){
      t+=k;
      k=AW_RevealedExport(out+n+s+t,capacity-n-s-t-8);       /* places revealed by ShowMap (AWMP) */
      if(k<0)return -1;
+     t+=k;
+     k=AW_DialHeardExport(out+n+s+t,capacity-n-s-t-8);       /* the journal's topic pages (AWTP) */
+     if(k<0)return -1;
      t+=k;}
     if(aw_mwscript_packages_export){   /* the actors' travel and follow packages (aw_ambient.c, SAVEGAME-COMPLETE-57) */
         int k=aw_mwscript_packages_export(out+n+s+t,capacity-n-s-t-8);
@@ -1440,7 +1565,7 @@ static int actors_export(unsigned char *out,int capacity){
 }
 static void actors_import(const unsigned char *data,int bytes){
     int actors=bytes;
-    AW_StandingReset();AW_EffectsReset();AW_SoldReset();AW_MadeReset();AW_GemsReset();AW_DialReactionsReset();AW_RevealedReset();
+    AW_StandingReset();AW_EffectsReset();AW_SoldReset();AW_MadeReset();AW_GemsReset();AW_DialReactionsReset();AW_RevealedReset();AW_DialHeardReset();
     if(aw_mwscript_packages_import)aw_mwscript_packages_import(NULL,0);   /* none until the save's block says */
     if(topic_bytes)memset(known_topics,0,topic_bytes);
     if(data && bytes>=8 && !memcmp(data+bytes-4,"AWTR",4)){
@@ -1483,6 +1608,10 @@ static void actors_import(const unsigned char *data,int bytes){
                     int k=AW_RevealedImport(p+rest,(int)(tail-rest));
                     if(k<0)Con_Printf("Saved revealed places unreadable: none kept.\n");else rest+=(unsigned long)k;
                 }
+                if(rest+8<=tail && !memcmp(p+rest,"AWTP",4)){   /* the journal's topic pages (v0.0.58) */
+                    int k=AW_DialHeardImport(p+rest,(int)(tail-rest));
+                    if(k<0)Con_Printf("Saved journal topic pages unreadable: none kept.\n");else rest+=(unsigned long)k;
+                }
                 if(rest+6<=tail && !memcmp(p+rest,"AWPK",4) && aw_mwscript_packages_import &&
                    !aw_mwscript_packages_import(p+rest,(int)(tail-rest)))Con_Printf("Saved actor packages unreadable: none kept.\n");
             }
@@ -1522,6 +1651,7 @@ void AW_MwscriptDispositionNow(int actor_row,unsigned long reference,int base,aw
     aw_actor_t *a;
     f->base=base;f->rank=standing_rank;f->bounty=AW_StandingCrime();
     f->personality=aw_character.valid?(float)aw_character.attributes[6]:50.0f;
+    f->diseased=disposition_diseased(0);f->weapon_drawn=disposition_weapon_drawn();f->charm=disposition_charm(reference);
     if(reference && actor_row>=0 && AW_MwscriptActors() && (a=AW_ActorGet((uint32_t)reference,actor_row,0))!=NULL)
         f->base=(int)AW_ActorStat(a,AWA_DISPOSITION);
 }

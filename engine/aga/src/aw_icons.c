@@ -6,6 +6,7 @@
 #include "aw_icons.h"
 #include "aw_inventory.h"
 #include "aw_story.h"
+#include "aw_move.h"
 #define ICON_ROW 160
 aw_icon_stats_t aw_icon_stats;
 static int icon_compare(const char *a,const char *b){
@@ -105,7 +106,7 @@ void AW_IconDraw(const aw_icon_t *icon,int x,int y){
 #define HUD_BOX 20
 #define HUD_BAR 4
 static cvar_t hud_icons={"aw_hud_icons","1",true};
-enum {SLOT_BOX,SLOT_BAR,SLOT_TRACK_WEAPON,SLOT_TRACK_MAGIC,SLOT_WEAPON,SLOT_MAGIC,SLOTS};
+enum {SLOT_BOX,SLOT_BAR,SLOT_TRACK_WEAPON,SLOT_TRACK_MAGIC,SLOT_WEAPON,SLOT_MAGIC,SLOT_SNEAK,SLOTS};
 static aw_icon_t hud_slot[SLOTS];
 static int hud_frame(int x,int y) {
     if(!AW_IconLoad(&hud_slot[SLOT_BOX],"hud:box") || !AW_IconLoad(&hud_slot[SLOT_BAR],"hud:bar") ||
@@ -143,6 +144,9 @@ static int hud_original_boxes(int y,int boxes) {
             hud_track(SLOT_TRACK_MAGIC,"hud:track:magic",x+1,y+HUD_BOX+1,AW_MagicCharge(&aw_state,&item)/item.charge_max);
         }
     }
+    /* SNEAK-58: the original's sneak indicator (hud:sneak) beside the boxes while the player sneaks; it loads on the
+     * first sneak only. Detection by onlookers (the original hides it when seen) comes with the Sneak rule. */
+    if(boxes && AW_MoveSneaking())hud_icon(SLOT_SNEAK,"hud:sneak",130,y+1);
     return 1;
 }
 /* Both methods are timed here, so aw_icons reports a same-session A/B of

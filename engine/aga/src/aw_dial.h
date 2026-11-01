@@ -14,7 +14,7 @@
 #include "aw_actorstate.h"
 #include "aw_glut.h"
 
-#define AW_DIAL_VERSION 2   /* 2: the NPCs' service words (the last section); a version 1 table is refused */
+#define AW_DIAL_VERSION 3   /* 3: the factions' rank requirements (the last section); older tables are refused */
 #define AW_DIAL_HEADER 96
 #define AW_DIAL_TOPIC_ROW 8        /* u32 name offset (topic strings), u8 name length, u8 kind, u16 0 */
 #define AW_DIAL_ENTRY_ROW 20       /* u32 text, u32 first condition, u32 script, u32 first link, u16 links, u8 conditions, u8 flags */
@@ -23,7 +23,9 @@
 #define AW_DIAL_JOURNAL_ROW 8      /* u16 index, u8 flags, u8 0, u32 text */
 #define AW_DIAL_ENTRY_LAST 1       /* no run-time condition: nothing after it can be said */
 #define AW_DIAL_KIND_TOPIC 0
+#define AW_DIAL_KIND_GREETING 2    /* Greeting 0..9: chosen when the conversation opens, never listed */
 #define AW_DIAL_KIND_PERSUASION 3
+#define AW_DIAL_NO_ROW 0xFFFFu     /* a topic with no script topic row (AW_DialTopicMap) */
 #define AW_DIAL_MAX_TOPICS 512     /* one NPC's topics (Morrowind.esm: at most 258) */
 #define AW_DIAL_MAX_MERGE 64       /* lists merged per topic and NPC */
 #define AW_DIAL_NONE32 0xFFFFFFFFul
@@ -39,7 +41,7 @@ typedef struct {
     /* file offsets of the sections after the resident part */
     long at_conversation, conversation_bytes, at_rows, at_listsets, at_listset_items, at_lists, at_list_items,
         at_entries, at_conds, at_links, at_quests, at_journal, at_ranks, at_tstrings, at_scripts, at_texts,
-         at_services, at_skill_attributes, at_ui_texts;
+         at_services, at_skill_attributes, at_ui_texts, at_rank_reqs;
     const unsigned char *topic, *npc_offset, *fixture, *known, *start;
     int starts;                    /* the topics a new character knows (the census captain's AddTopic) */
     const unsigned char *settings, *faction, *reaction;   /* the game settings, faction ids, faction reactions */
@@ -72,6 +74,12 @@ typedef struct {
 #define AW_DIAL_RANKS 10           /* a faction's rank names on disk, AW_DIAL_FACTION_ID bytes each */
 /* The file offset of faction FACTION's rank RANK name (0..9), -1 when the table has no such faction. */
 long AW_DialRankAt(const aw_dial_t *d,const char *faction,int rank);
+/* RankRequirement (FACTION-RANK-58; the rule of OpenMW's filter.cpp and hasFactionRankSkillRequirements /
+ * hasFactionRankReputationRequirements, our own code): for the player at RANK (-1 not a member) of the speaker's
+ * FACTION, the next rank's requirements read from disk (AW_DIAL_RANK_REQ bytes, nothing kept): +1 when the two
+ * favoured attributes (base) and the best two favoured skills meet it, +2 when the faction reputation REPUTATION does;
+ * 0 at the last rank, for an unknown faction or a failed read. ATTRIBUTES[8], SKILLS[27]: the player's. */
+#define AW_DIAL_RANK_REQ 112       /* the prototype follows aw_dial_read_t below */
 /* The rank defines (OpenMW's rule, our own code): %PCRank is the player's rank name in the speaker's faction (rank 0
  * when not a member), %NextPCRank the one after it (at most the tenth), "%" when the speaker has no faction; %Cell
  * the player's cell. Replaces them (any case) in SOURCE, the other defines kept for AW_GlutExpand. */
@@ -84,15 +92,42 @@ typedef struct {
     int same_race;                 /* the player is of the NPC's race */
     float personality;             /* the player's Personality */
     int bounty;                    /* the player's crime level */
-    int diseased, weapon_drawn;
+    int diseased;                  /* the player has a common or a blight disease (fDispDiseaseMod) */
+    int weapon_drawn;              /* the player holds a weapon drawn (fDispWeaponDrawn) */
+    float charm;                   /* the magnitude of Charm on the NPC (added as it is) */
     const char *faction;           /* the NPC's faction id (folded), NULL none */
     /* the player's rank in a faction (-1 not a member) and whether expelled */
     int (*rank)(const char *faction,int *expelled);
 } aw_dial_facts_t;
 /* The NPC's disposition toward the player, clamped to 0..100 when CLAMP. */
 int AW_DialDisposition(const aw_dial_t *d,const aw_dial_facts_t *f,int clamp);
+/* The SCVR functions that compare the speaker with the player (the rule of OpenMW mwdialogue/filter.cpp, our own
+ * code): SameSex, SameRace and ShouldAttack (isAggressive: the speaker's Fight rating toward the player with the
+ * conversation's disposition reaches 100). RankRequirement: AW_DialRankRequirement. Numbers: mwad.dialogue FUNCTIONS. */
+#define AW_DIAL_FN_SAME_SEX 44
+#define AW_DIAL_FN_SAME_RACE 45
+#define AW_DIAL_FN_SHOULD_ATTACK 71
+typedef struct {
+    int known;                     /* the speaker's record and the player's sheet were read */
+    int player_female, speaker_female;
+    const char *player_race, *speaker_race;   /* race record ids, NULL none */
+    int fight_rating;              /* the speaker's Fight rating toward the player, -1 not known */
+} aw_dial_pair_t;
+/* 1 and *OUT for one of the three, 0 when FN is another function or the facts are not known. */
+int AW_DialPairFunction(const aw_dial_pair_t *p,unsigned fn,long *out);
 /* The scripts' faction reaction changes (ModFactionReaction: VALUE added; SetFactionReaction: SET), A toward B, kept
  * for the game (32 at most) and saved (AWFR); the disposition reads them. */
+/* The journal's topic pages: the answers heard (entry, topic, speaker's name), each answer once, bounded (aw_dial.c);
+ * Add: 1 kept, 2 kept and an old entry gave way (the caller logs it), 0 not kept; RemoveLast: ClearInfoActor. */
+#define AW_DIAL_SPEAKER_NAME 32
+void AW_DialHeardReset(void);
+int AW_DialHeardCount(void);
+int AW_DialHeardAt(int i,int *entry,int *topic,const char **speaker);
+int AW_DialHeardAdd(int entry,int topic,const char *speaker);
+int AW_DialHeardRemoveLast(int topic,const char *speaker);
+int AW_DialHeardHas(int entry);
+int AW_DialHeardExport(unsigned char *out,int capacity);
+int AW_DialHeardImport(const unsigned char *p,int bytes);
 void AW_DialReactionsReset(void);
 int AW_DialReactionChange(const char *a,const char *b,int value,int set);
 int AW_DialReactionsExport(unsigned char *out,int capacity);
@@ -104,6 +139,8 @@ float AW_DialSetting(const aw_dial_t *d,int setting);
 
 /* Reads BYTES at a file OFFSET into OUT: 1 done, 0 failed (the engine: the open file; the host test: memory). */
 typedef int (*aw_dial_read_t)(void *user,long offset,void *out,long bytes);
+int AW_DialRankRequirement(const aw_dial_t *d,const char *faction,int rank,const short *attributes,const short *skills,
+                           int reputation,aw_dial_read_t read,void *user);
 
 typedef struct {
     unsigned long entry;           /* the file's entry index (the same INFO as some NPCs see it) */
@@ -141,6 +178,19 @@ int AW_DialKnows(const aw_dial_t *d,const unsigned char *known,int topic);
 /* The topic list of an open conversation (OpenMW getAvailableTopics: known AND this actor has an answer, a refusal
  * counting; Topic kind only), in the table's order (by name): the count, topic numbers into OUT (at most MAX). */
 int AW_DialTopicList(const aw_dial_conv_t *c,const unsigned char *known,const aw_glut_state_t *s,int *out,int max);
+/* The greeting when a conversation opens (the rule of OpenMW's DialogueManager::startDialogue, our own code): the
+ * first Greeting-kind topic, in the table's order, with an answer this speaker passes now (the derived disposition,
+ * no choice open), with no fallback to Info Refusal. The answer, -1 none; *TOPIC its topic. */
+int AW_DialGreeting(const aw_dial_conv_t *c,const aw_glut_state_t *s,int *topic);
+/* The known topics are kept by the scripts' topic rows (AddTopic; saved with the game as AWKT), matched to this
+ * table's Topic-kind topics by name: the hash of a name (32-bit FNV-1a over its bytes, A-Z folded); MAP (one u16 per
+ * table topic, the caller's) gets each Topic-kind topic's row among HASHES (ROWS, a row's name hash each) or
+ * AW_DIAL_NO_ROW: the topics mapped, -1 when a name read fails. KnownSync: KNOWN follows the rows KNOWS reports for
+ * every mapped topic, keeps its bits for the others, and holds the start topics. */
+unsigned long AW_DialNameHash(const char *name,int length);
+int AW_DialTopicMap(const aw_dial_t *d,aw_dial_read_t read,void *user,const unsigned long *hashes,int rows,
+                    unsigned short *map);
+void AW_DialKnownSync(const aw_dial_t *d,unsigned char *known,const unsigned short *map,int (*knows)(int row));
 /* A topic's kind (AW_DIAL_KIND_*) and its name's place in the file (for the window's list), -1 for a bad topic. */
 int AW_DialTopicKind(const aw_dial_t *d,int topic);
 long AW_DialTopicName(const aw_dial_t *d,int topic,int *length);
@@ -167,6 +217,7 @@ int AW_DialLinks(const aw_dial_conv_t *c,int answer,aw_dial_read_t read,void *us
 #define AW_DIAL_LINK_ROW 6
 typedef struct {unsigned short offset,length,topic;} aw_dial_span_t;
 int AW_DialSpans(const aw_dial_conv_t *c,int answer,aw_dial_read_t read,void *user,aw_dial_span_t *out,int max);
+int AW_DialEntrySpans(const aw_dial_t *d,const unsigned char *entry_row,aw_dial_read_t read,void *user,aw_dial_span_t *out,int max);
 /* The services NPC ROW offers (OpenMW's ESM::NPC bits; tools/dialogue_lut.py services_of): one read, when a
  * conversation opens. 0 none. */
 #define AW_DIAL_SERVICE_BARTER 0x037FFUL      /* AllItems: any of these, the Barter entry */
@@ -190,7 +241,7 @@ enum {AW_DIAL_TEXT_PERSUASION,AW_DIAL_TEXT_ADMIRE,AW_DIAL_TEXT_INTIMIDATE,AW_DIA
       AW_DIAL_TEXT_POINT_COST,AW_DIAL_TEXT_NEED_ENCH_EFFECT,AW_DIAL_TEXT_NEED_SOUL,AW_DIAL_TEXT_NEED_ITEM,
       AW_DIAL_TEXT_TOO_MUCH,AW_DIAL_TEXT_CAST_ONCE,AW_DIAL_TEXT_CAST_STRIKES,AW_DIAL_TEXT_CAST_USED,
       AW_DIAL_TEXT_CAST_CONSTANT,AW_DIAL_TEXT_CAST_COST,AW_DIAL_TEXT_ENCHANT_DONE,AW_DIAL_TEXT_ITEM,AW_DIAL_TEXT_SOUL,
-      AW_DIAL_TEXT_CHANCE,AW_DIAL_TEXT_SKILL0,AW_DIAL_TEXTS=AW_DIAL_TEXT_SKILL0+27};
+      AW_DIAL_TEXT_CHANCE,AW_DIAL_TEXT_JOURNAL_ENTRY,AW_DIAL_TEXT_SKILL0,AW_DIAL_TEXTS=AW_DIAL_TEXT_SKILL0+27};
 #define AW_DIAL_UI_TEXT 48
 int AW_DialUiTexts(const aw_dial_t *d,aw_dial_read_t read,void *user,char *out);
 /* the attribute skill SKILL is governed by (0..7, the SKIL record), -1 unknown */
@@ -284,6 +335,17 @@ int AW_MwscriptKnownEffects(aw_spell_effect_t *out,int max);
  * compile (said in the log) */
 int AW_MwscriptRunResult(const char *record,unsigned long reference,const char *text,int length);
 extern void (*aw_dial_result_choice)(const char **texts,int ntexts,const aw_mwcell_t *numbers,int count);
+extern void (*aw_dial_result_clear)(void);       /* ClearInfoActor while a result runs */
+/* the journal's topic pages read the table (aw_dialwin.c): a topic's name, a heard entry's text; 1 read */
+int AW_DialWindowTopicName(int topic,char *out,int capacity);
+int AW_DialWindowEntryText(int entry,char *out,int capacity);
+/* the journal book's way to them (aw_worldui.c defines these; AW_DialWindowInit sets them) */
+extern int (*aw_journal_heard_count)(void);
+extern int (*aw_journal_heard_at)(int i,int *entry,int *topic,const char **speaker);
+extern int (*aw_journal_topic_name)(int topic,char *out,int capacity);
+extern int (*aw_journal_entry_text)(int entry,char *out,int capacity);
+extern void (*aw_journal_updated)(void);   /* aw_mwhost.c defines it: a quest's journal index rose */
+extern int (*aw_journal_entry_marked)(int entry,char *out,int capacity,unsigned short *topics,int max);
 /* Enchanting: the player's enchantable things (points, kind AW_DIAL_ENCHANT_*); making MADE with filled gem GEM */
 int AW_MwscriptEnchantables(aw_dial_ware_t *out,int *points,int *kind,int max);
 int AW_MwscriptEnchant(const aw_made_item_t *made,int gem);
@@ -305,4 +367,6 @@ void AW_MwscriptDispositionNow(int actor_row,unsigned long reference,int base,aw
 /* the NPC's row in the actor file (a binary search on disk: once, with the cache), -1 none */
 int AW_MwscriptActorRow(const char *record);
 int AW_DialWindowActive(void);
+/* RankRequirement from the loaded table (AW_DialRankRequirement; 0 without the table) */
+int AW_DialWindowRankRequirement(const char *faction,int rank,const short *attributes,const short *skills,int reputation);
 #endif

@@ -101,6 +101,9 @@ int AW_QuickCharOpen(int wanted,aw_quickchar_done_t on_done){
     if(!AW_CharacterLoad()){Con_Printf("Quick character: character catalogue unavailable.\n");return 0;}
     if(!aw_character.valid)AW_CharacterReset();
     if(!aw_character.valid){Con_Printf("Quick character: character catalogue unavailable.\n");return 0;}
+    /* the original's order starts with the name: a review with no name yet asks for it first
+     * (CHARGEN-BIRTHSIGN-REVIEW-58: the review sheet showed ", level 1") */
+    if((wanted&AW_QC_REVIEW) && !aw_story.name[0])wanted|=AW_QC_NAME;
     strncpy(name,aw_story.name[0]?aw_story.name:"Player",sizeof(name)-1);name[sizeof(name)-1]=0;
     active=1;pages=wanted;page=0;done=on_done;
     say(GREETING);
@@ -161,6 +164,10 @@ static void quickchar_command(void){
     wanted=n>1?AW_QuickCharPages(n,argv,1):AW_QC_ALL;
     if(!wanted){Con_Printf("Usage: dbg %s [name race class birthsign review | all]\n",command);return;}
     if(key_dest==key_console)Con_ToggleConsole_f();
+    /* a page still open (its "Really choose" box included) gives way to the one asked for now; it used to refuse
+     * silently and leave the old box on screen (CHARGEN-BIRTHSIGN-REVIEW-58: the birthsign step showed the class
+     * page's confirm box) */
+    if(active)finish(0);
     if(!AW_QuickCharOpen(wanted|AW_QC_VOICE,on_debug_done) && key_dest==key_game && !sv.active)Cbuf_AddText("aw_main_menu\n");
 }
 /* aw_quickchar_set FIELD VALUE [N]: a fully specified character without menus, for

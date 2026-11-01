@@ -130,6 +130,18 @@ void AW_SmallStringColor(int x,int y,int width,const char *text,int color) {
         }
     }
 }
+/* STEAL-PROMPT-58: a console character in a warning colour (the red "E: Steal" prompt): the small font in palette
+ * index RED, the large font from the character set's coloured half (Quake's conchars, characters 128-255). */
+void AW_ConsoleCharacterRed(int x,int y,int c,int red) {
+    int r,col,bits;byte *p;c&=127;
+    if(!small){Draw_Character(x,y,c|128);return;}
+    if(c<32 || c>126)return;
+    for(r=0;r<5;r++) {
+        if(y+r<0 || y+r>=(int)vid.conheight)continue;
+        bits=glyphs[c-32][r];p=vid.conbuffer+(y+r)*vid.conrowbytes;
+        for(col=0;col<3;col++)if(x+col>=0 && x+col<(int)vid.conwidth && (bits&(4>>col)))p[x+col]=(byte)red;
+    }
+}
 void AW_ConsoleCharacter(int x,int y,int c) {
     int r,col,bits;byte *p;c&=127;
     if(!small){Draw_Character(x,y,c);return;}

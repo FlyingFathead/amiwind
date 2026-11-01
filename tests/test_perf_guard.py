@@ -71,6 +71,36 @@ class PerfGuardTests(unittest.TestCase):
         quiet = profile('new2', [section('parallel map: build_resident', 129, 4.67, items=15)], stage='chim-town-balmora')
         self.assertEqual(judge(quiet, [before])['rows'][0]['verdict'], perf_guard.FAIL)
 
+    def test_fewer_cores_than_the_baseline_are_judged_on_cpu_per_unit(self):
+        # PERF-GUARD-RESIDENT-BUSY-HOST-57: the chim-town build_resident rows ran on about half their baseline's cores
+        # (beside the build's own stages and the gates) with less CPU, and failed on wall time in three builds.
+        # Baseline v0.0.57-dev4: balmora 15 units 52 s, 536 s CPU; vivec_city 39 units 62 s, 1,270 s CPU.
+        def town(run, stage, wall, cpu, units, held=None):
+            # held: the cores the stage held (its share beside the build's other stages), default all 24
+            return profile(run, [section('parallel map: build_resident', wall, round(cpu / wall, 2), items=units)],
+                           stage=stage, jobs=held or 24)
+        cases = [('chim-town-balmora', 52, 536, 15, [('rel', 86, 488), ('dev5', 129, 520), ('dev1', 101, 500)]),
+                 ('chim-town-vivec_city', 62, 1270, 39, [('rel', 98, 1076), ('dev5', 147, 1200), ('dev1', 118, 1150)])]
+        # the release figures are the measured ones; dev5's and dev1's CPU are taken at about the release's (their
+        # run files hold the wall time only), the same code on fewer cores
+        for stage, wall, cpu, units, builds in cases:
+            before = town('dev4', stage, wall, cpu, units)
+            for run, now_wall, now_cpu in builds:
+                with self.subTest(stage=stage, run=run):
+                    held = int(now_cpu / now_wall) + 1           # the share it held: about the cores it used
+                    row = judge(town(run, stage, now_wall, now_cpu, units, held), [before])['rows'][0]
+                    self.assertEqual(row['verdict'], perf_guard.OK, row['reasons'])
+                    self.assertTrue(any(r.startswith('basis: CPU per unit') for r in row['reasons']), row['reasons'])
+            # a real slowdown: more CPU per unit (50 % more) on the fewer cores fails
+            row = judge(town('slow', stage, wall * 3, cpu * 1.5, units, int(cpu * 1.5 / (wall * 3)) + 1),
+                        [before])['rows'][0]
+            self.assertEqual(row['verdict'], perf_guard.FAIL, row['reasons'])
+            self.assertTrue(any(r.startswith('slower in CPU per unit') for r in row['reasons']), row['reasons'])
+        # the same cores as the baseline: wall time, named so
+        before = profile('old', [section('parallel map: bake', 100, 10.0, items=40)])
+        row = judge(profile('new', [section('parallel map: bake', 102, 10.5, items=40)]), [before])['rows'][0]
+        self.assertTrue(any(r.startswith('basis: wall time') for r in row['reasons']), row['reasons'])
+
     def test_the_same_work_staying_parallel_passes(self):
         before = profile('old', [section('parallel map: walk', 300, 11.6, items=270)])
         now = profile('new', [section('parallel map: walk', 310, 12.0, items=270)])

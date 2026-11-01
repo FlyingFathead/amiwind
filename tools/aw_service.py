@@ -1260,6 +1260,11 @@ def finish_build(config, request, run_name, lease, started, t0, facts, steps, no
     # records then stay candidates and the next build walks those stairs again)
     status = 'passed' if all(step['ok'] for name, step in steps.items()
                              if name not in ('perf-ingest', 'stair-records')) else 'failed'
+    # a build whose stages all passed and whose only failed step is the perf guard keeps status failed (every reader of
+    # the record stays correct) and says so in `outcome`, which the Toolkit monitor shows as its own amber state
+    if status == 'failed' and steps.get('build', {}).get('ok') is True and \
+            [n for n, s in steps.items() if not s['ok'] and n not in ('perf-ingest', 'stair-records')] == ['perf-guard']:
+        fields['outcome'] = 'passed-perf-guard-failed'
     recipe = fields.pop('recipe', None) or {}
     # 'saved' is internal: never in the result document (a failed build's recipe has it too)
     saved = recipe.pop('saved', None)

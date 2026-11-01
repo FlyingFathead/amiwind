@@ -17,7 +17,7 @@ function node(tag) {
 function element(id) {
   if (!elements.has(id)) {
     const e = node(['run', 'logpick'].includes(id) ? 'select' : 'div');
-    if (id === 'follow') e.checked = true;
+    if (['follow', 'showcores', 'showram'].includes(id)) e.checked = true;
     elements.set(id, e);
   }
   return elements.get(id);
@@ -46,6 +46,30 @@ setTimeout(async () => {
     timeline: element('timelinenote').textContent, chart: element('timelinechart').innerHTML};
   // red stretches: under 2.5 cores held 30 s or more
   out.red = JSON.parse(vm.runInContext('JSON.stringify(redStretches([[0,1],[10,2],[40,1],[50,5],[60,2],[70,2],[80,6],[90,1],[100,1],[130,1]],2.5,30))', context));
+  // the overall progress bar (percent and expected finish), then the finished and the missing-progress states
+  out.overall = {hidden: element('overall').hidden, width: element('overallfill').style.width, text: element('overalltext').textContent,
+    now: element('overallbar')['aria-valuenow']};
+  vm.runInContext('renderOverall({status:"passed",counts:{passed:3,total:4}})', context);
+  out.overallDone = {width: element('overallfill').style.width, cls: element('overallfill').className, text: element('overalltext').textContent};
+  vm.runInContext('renderOverall(null)', context);
+  out.overallNone = element('overall').hidden;
+  // a result row of a build whose stages passed and whose perf guard failed: its own amber state, sections on hover
+  out.perfCell = JSON.parse(vm.runInContext('JSON.stringify((c => ({text: c.textContent, cls: c.className, title: c.title}))(resultStatusCell({outcome:"passed-perf-guard-failed",status:"failed",perf_failing:["fog 12 %","draw 9 %"]})))', context));
+  out.failedCell = JSON.parse(vm.runInContext('JSON.stringify((c => ({text: c.textContent, cls: c.className}))(resultStatusCell({status:"failed"})))', context));
+  // the machine view
+  vm.runInContext('renderMachine({ok:true,jobs:[{name:"amiwind-gate-5320",kind:"gate",cpu_pct:350,cores:3.5,mem:"1GiB"},{name:"aw-pregate-x",kind:"pregate",cpu_pct:100,cores:1,mem:"2GiB"}],cores_used:4.5,machine_cores:24})', context);
+  out.machine = {hidden: element('machine').hidden, note: element('machinenote').textContent, rows: element('machinejobs').children[0].children.length};
+  vm.runInContext('renderMachine({ok:false})', context);
+  out.machineOff = element('machine').hidden;
+  // the timeline's two checkboxes: each line shows or hides by its box (both on by default)
+  const bars = '[{name:"chim",status:"passed",start:0,end:200}]', mem = '[[0,1],[100,2],[200,3]]', cores = '[[0,4],[100,5],[200,6]]';
+  const draw = () => { vm.runInContext('renderTimeline(' + bars + ',{cores:' + cores + ',memory:' + mem + ',memLimit:4,now:200,label:"t"})', context);
+    const h = element('timelinechart').innerHTML; return {cores: h.includes('stroke="#8bd5ff"'), ram: h.includes('stroke="#ffb454"')}; };
+  out.linesBoth = draw();
+  element('showcores').checked = false; out.linesNoCores = draw();
+  element('showcores').checked = true; element('showram').checked = false; out.linesNoRam = draw();
+  element('showcores').checked = false; out.linesNone = draw();
+  element('showcores').checked = true; element('showram').checked = true;
   // a finished-run timeline with a red stretch: select it, then fullscreen on and off (the overlay fallback)
   vm.runInContext('renderTimeline([{name:"chim",status:"passed",start:0,end:200}],{cores:[[0,1],[10,1],[60,1],[70,9],[200,9]],now:200,label:"t"})', context);
   out.redLine = element('timelinechart').innerHTML.includes('stroke="#ff4040"');

@@ -40,6 +40,7 @@ static void parse_scale(model_t *sprite,float scale,qboolean custom,int bytes){
     free_efrags(pool,8);net_message.data=msg;net_message.cursize=bytes;msg_readcount=0;msg_badread=false;
     CL_ParseStatic(custom);
     assert(cl.num_statics==1);assert(cl_static_entities[0].origin[0]==(custom?6000:0));assert(cl_static_entities[0].aw_sprite_scale==(custom?scale:1));
+    assert(cl_static_entities[0].aw_flora==(custom?1:0));
     assert(leaf.efrags && leaf.efrags->entity==&cl_static_entities[0]);
 }
 int main(void){
@@ -56,6 +57,16 @@ int main(void){
     left.contents=right.contents=CONTENTS_EMPTY;world.nodes=&node;cl.worldmodel=&world;ent.origin[0]=60;
     free_efrags(pool,8);R_AddEfrags(&ent);assert(right.efrags && !left.efrags);
     ent.efrag=NULL;right.efrags=NULL;ent.aw_sprite_scale=2;free_efrags(pool,8);R_AddEfrags(&ent);assert(right.efrags && left.efrags);
+    /* SEYDA-WALL-SHAPE-31: a flora card tests depth about a trunk's width (1/8 of its width) behind its plane;
+     * every other sprite keeps its depth. A wall 10 units nearer than a 400-wide card's plane at 500 stays in front. */
+    {
+        entity_t card={0};float k;
+        card.model=&sprite;assert(R_SpriteDepthScale(&card,500,400)==1);
+        card.aw_flora=1;k=R_SpriteDepthScale(&card,500,400);
+        assert(fabs(k-500.0/550.0)<1e-5);assert(k/500<1/490.0f);
+        assert(R_SpriteDepthScale(&card,0,400)==1 && R_SpriteDepthScale(&card,500,0)==1 && R_SpriteDepthScale(NULL,500,400)==1);
+        assert(R_SpriteDepthScale(&card,500,NAN)==1 && R_SpriteDepthScale(&card,500,INFINITY)==1);
+    }
     parse_scale(&sprite,.25f,true,32);parse_scale(&sprite,3.5f,true,32);parse_scale(&sprite,0,false,13);
     expect_error=1;
     if(!setjmp(failure)){parse_scale(&sprite,2,true,31);assert(0);}

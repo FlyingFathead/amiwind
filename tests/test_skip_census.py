@@ -211,6 +211,19 @@ class EngineSources(unittest.TestCase):
         self.assertRegex(intro, r'if\(AW_SkipCensus\(\)\)\{Cbuf_AddText\("aw_quick_start')
         self.assertIn('static cvar_t skip_census={"aw_skip_census","0"};', (SRC / 'aw_quickchar.c').read_text(encoding='utf-8'))
 
+    def test_hors_from_the_main_menu_takes_the_census_skip_start(self):
+        # HORS-FROM-MENU-58: dbg aw hors 0 at the main menu did nothing ("During play" only); with no game running it
+        # now starts one through the census skip's quick start (the Hors character, Seyda Neen after the census)
+        scene = (SRC / 'aw_scene.c').read_text(encoding='utf-8')
+        hors = scene.split('static void hors_command(void) {')[1].split('\n}\n')[0]
+        menu = hors.split('if(!sv.active || !svs.clients){')[1].split('\n    }')[0]
+        self.assertIn('quick_character()', menu)
+        self.assertIn('quick_go(&r,"Seyda Neen");', menu)
+        self.assertIn('r.arrival[2]=64;r.yaw=90;', menu)                  # the same arrival as in play
+        catalogue = (ROOT / 'config/debug-commands.txt').read_text(encoding='utf-8')
+        self.assertIn('PLAYTESTING|aw hors|aw_debug_hors|0 (new Hors, Nord / Barbarian / Steed, after Census; '
+                      'in play or from the main menu)', catalogue)
+
     @unittest.expectedFailure  # EXPERIMENTAL, unfinished: the quick character screen work in progress
     # (docs/EXPERIMENTAL_FLAGS.md); this check passes once that part is written
     def test_console_commands_are_documented(self):

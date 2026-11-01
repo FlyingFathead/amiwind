@@ -180,7 +180,7 @@ static void check_controls(void){
  M_Keydown(K_ENTER);M_Keydown('W');assert(!strcmp(keybindings['w'],"+forward") && !strcmp(keybindings['k'],"+forward"));
  M_Keydown(K_DEL);assert(!*keybindings['w'] && !*keybindings['k']);
  for(i=0;i<40;i++)M_Keydown(K_DOWNARROW);
- up(1);assert(highlight_y==150 && scroll_total==30 && scroll_top==23); /* Reset to defaults is the last row (Stats and Magic rows included) */
+ up(1);assert(highlight_y==150 && scroll_total==31 && scroll_top==24); /* Reset to defaults is the last row (Stats, Magic and Sneak rows included) */
  M_Keydown(K_ENTER);assert(!strcmp(queued,"exec keymaps-default.cfg\n"));changes--;
  /* Blocking, Dice rolls, Combat style above it: Enter and the arrows switch the three options */
  M_Keydown(K_UPARROW);M_Keydown(K_ENTER);assert(combat_block==0 && combat_dice==1 && combat_miss==1);

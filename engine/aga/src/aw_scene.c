@@ -821,14 +821,26 @@ static const char *npc_hint(void)
 }
 /* npc_interaction_layout_template_001: Morrowind name, console action below. */
 void AW_SceneDraw(void) {
-    int i,y,w,cw,npc=0;char line[80];edict_t *driver;const char *name=NULL,*action=NULL;extern int scr_copyeverything;
+    static int red=-1;int i,y,w,cw,npc=0,steal=0;char line[80],take[48];edict_t *driver;const char *name=NULL,*action=NULL;extern int scr_copyeverything;
     if(!AW_UISpeakerAtRight() || target_style.value!=2)AW_UIObjectName(AW_SceneTargetName(),(int)target_style.value);
     if(key_dest!=key_game || pending || AW_IntroUse() || AW_PlayerDead() || !sv.active ||
        svs.maxclients!=1 || !svs.clients || cls.state!=ca_connected ||
        svs.clients[0].edict->v.movetype!=MOVETYPE_WALK)return;
     driver=travel_target();
+    /* FOCUS-BOX-58: an aimed ground item or door within the activation distance gets the original's framed box.
+     * FOCUS-BOX-NO-ACTORS-58: a creature or a person gets none: their name already shows under the view; aimed at
+     * one, no item box shows either. */
+    {
+        const char *focus_name;char weight[48],value[48];int owned;
+        if(!driver && !npc_hint() &&
+           (AW_InventoryFocus(&focus_name,weight,value,sizeof(weight),&owned) ||
+            AW_PlacedFocus(&focus_name,weight,value,sizeof(weight),&owned)))
+            AW_UIFocusBox(focus_name,weight,value,owned);
+    }
     if(driver){name=pr_strings+driver->v.netname;action="E: Talk";npc=1;}
-    else if(!npc_hint() && ((name=AW_InventoryHint())!=NULL || (name=AW_HarvestHint())!=NULL)){action="E: Pick";npc=1;}
+    /* STEAL-PROMPT-58: an aimed takeable item (its name is in the focus box): "E: Take", or "E: Steal" in red */
+    else if(!npc_hint() && AW_ItemPrompt(take,sizeof(take),&steal)){name="";action=take;npc=1;}
+    else if(!npc_hint() && (name=AW_HarvestHint())!=NULL){action="E: Pick";npc=1;}
     else if(!AW_OpeningHint(&name,&action)){
         i=aimed_door();
         if(i>=0){
@@ -853,7 +865,11 @@ void AW_SceneDraw(void) {
     if(!npc && (!AW_UISpeakerAtRight() || label_style.value!=2))AW_UIObjectName(name,(int)label_style.value);
     if(!action)return;
     sprintf(line,"(%s)",action);cw=AW_ConsoleCharWidth();w=strlen(line)*cw;
-    for(i=0;line[i];i++)AW_ConsoleCharacter(vid.width-w-6+i*cw,y+19,(unsigned char)line[i]);
+    if(steal && red<0)red=AW_UIColor(220,40,40);   /* the focus box's red name (aw_ui.c AW_UIFocusBox) */
+    for(i=0;line[i];i++){
+        if(steal)AW_ConsoleCharacterRed(vid.width-w-6+i*cw,y+19,(unsigned char)line[i],red);
+        else AW_ConsoleCharacter(vid.width-w-6+i*cw,y+19,(unsigned char)line[i]);
+    }
     scr_copyeverything=1;
 }
 static void door_status(void) {
@@ -1299,10 +1315,22 @@ static void scene_command(void) {
     else {r.arrival[0]=0;r.arrival[1]=0;r.arrival[2]=64;r.yaw=90;}
     load_scene(&r,1);
 }
+static int quick_character(void);
+static void quick_go(aw_scene_link_t *r,const char *title);
 static void hors_command(void) {
     aw_scene_link_t r;
-    if(!sv.active || !svs.clients || pending || Cmd_Argc()!=2 || strcmp(Cmd_Argv(1),"0")){
-        Con_Printf("During play: dbg aw hors 0 (restart after Census in Seyda Neen)\n");return;
+    /* 'dbg aw hors' alone means preset 0: the bare command used to print this usage and leave the player where they
+     * stood (the Arena Pit after the playground and the Halloween scene, HORS-AFTER-HALLOWEEN-STAYS-ARENA-58) */
+    if(Cmd_Argc()>2 || (Cmd_Argc()==2 && strcmp(Cmd_Argv(1),"0"))){
+        Con_Printf("dbg aw hors [0]: a new Hors after Census in Seyda Neen (in play, or from the main menu)\n");return;
+    }
+    if(pending){Con_Printf("dbg aw hors: a scene is still loading; try again when it has arrived.\n");return;}
+    if(!sv.active || !svs.clients){
+        /* From the main menu (HORS-FROM-MENU-58): a fresh game straight to that point of the story, the census
+         * skip's own quick start (Hors, Seyda Neen after the census), so a test needs no game started first. */
+        if(!quick_character()){Con_Printf("Hors preset: character catalogue unavailable.\n");return;}
+        memset(&r,0,sizeof(r));copy_name(r.target,sizeof(r.target),"seyda");r.arrival[2]=64;r.yaw=90;
+        Con_Printf("Created Hors: Nord, Barbarian, The Steed; after Census.\n");quick_go(&r,"Seyda Neen");return;
     }
     if(!AW_CharacterHors()){Con_Printf("Hors preset: character catalogue unavailable.\n");return;}
     door_ready=0;door_close=0;

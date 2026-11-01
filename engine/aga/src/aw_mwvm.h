@@ -154,5 +154,7 @@ const aw_mwvm_stats_t *AW_MwvmStats(void);
 int32_t AW_MwvmGlobalInt(int global);
 float AW_MwvmGlobalFloat(int global);
 int AW_MwvmGlobalCount(void);
+/* A global's name (a string index, -1 for a bad number) and its TYPE (0 short, 1 long, 2 float) when TYPE is set. */
+int AW_MwvmGlobalName(int global,int *type);
 aw_mwcell_t AW_MwvmLocal(int instance,int slot);
 #endif

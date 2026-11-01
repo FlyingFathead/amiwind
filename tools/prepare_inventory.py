@@ -88,7 +88,7 @@ def source_items(data):
         if kind=='GMST':
             key=text(fields,'NAME').casefold();value=first(fields,'FLTV') or first(fields,'INTV')
             if len(value)==4:settings[key]=struct.unpack('<f' if first(fields,'FLTV') else '<i',value)[0]
-            elif key=='sskillhandtohand':settings[key]=text(fields,'STRV')
+            elif key in ('sskillhandtohand','sweight','svalue','stake'):settings[key]=text(fields,'STRV')
             continue
         if kind=='SCPT':
             header=first(fields,'SCHD');name=header[:32].split(b'\0')[0].decode('cp1252').casefold()

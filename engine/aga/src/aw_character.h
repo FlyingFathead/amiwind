@@ -37,6 +37,11 @@ int AW_CharacterHors(void);
  * name: the quick start of a direct-start build (tools/direct_start.py). 0 when an ID is
  * not in the catalogue. AW_CharacterHors is the Nord Barbarian preset. */
 int AW_CharacterPreset(const char *race,const char *clas,const char *birth,int female,const char *name);
+/* CHARGEN-CENSUS-57 (c): the player's own class, in the slot after the catalogue's (its ID holds its definition);
+ * the class count with that slot; the class the ten questions give for the combat/magic/stealth answer counts. */
+int AW_CharacterClassCount(void);
+int AW_CharacterCustomDefine(const aw_class_t *k);
+int AW_CharacterQuizClass(int combat,int magic,int stealth);
 int AW_CharacterOpen(int kind);
 /* The same menu; confirm 0 accepts with Enter, without the "Really choose" box
  * (the quick character screen's pages before its last, aw_quickchar.c). */

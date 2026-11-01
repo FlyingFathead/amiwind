@@ -30,7 +30,8 @@ AREAS = [('conversation', 'The conversation'), ('conditions', 'Conditions'), ('d
          ('window', 'The window'), ('scripts', 'Result scripts'), ('journal', 'The journal'),
          ('persuasion', 'Persuasion and Fight'), ('services', 'Services'), ('speakers', 'Speakers and add-ons'),
          ('voice', 'Voice'), ('verification', 'Verification')]
-KEYS = {'id', 'name', 'area', 'state', 'what', 'proof', 'missing', 'bugs', 'deferral'}
+KEYS = {'id', 'name', 'area', 'state', 'what', 'proof', 'missing', 'bugs', 'deferral', 'waits'}
+WAIT_RE = re.compile(r'^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+$')   # a work item the row waits on (the version's TODO id)
 REQUIRED = {'id', 'name', 'area', 'state', 'what', 'bugs'}
 ID_RE = re.compile(r'^[a-z0-9]+(?:-[a-z0-9]+)*$')
 BUG_RE = re.compile(r'^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+$')
@@ -98,6 +99,12 @@ def problems(doc, bug_ids=None):
         if d is not None and (not isinstance(d, dict) or not d.get('words') or
                               not re.match(r'^\d{4}-\d\d-\d\d$', str(d.get('date', '')))):
             out.append('%s: a deferral holds the maintainer\'s words and its date' % fid)
+        w = f.get('waits')
+        if w is not None and (not isinstance(w, list) or not w or not all(isinstance(x, str) and WAIT_RE.match(x)
+                                                                           for x in w)):
+            out.append('%s: waits lists the work item IDs the row waits on' % fid)
+        if w and f.get('state') == 'done':
+            out.append('%s: a done row waits on nothing' % fid)
         for b in f.get('bugs', []):
             if not BUG_RE.match(b):
                 out.append('%s: bad register ID %s' % (fid, b))
@@ -150,7 +157,10 @@ def render(doc):
                                   if f.get('deferral') else '')
             bugs = ', '.join('[%s](bugs/%s.md)' % (b, b) if (ROOT / 'docs' / 'bugs' / ('%s.md' % b)).is_file()
                              else b for b in f['bugs']) or '-'
-            cells = [f['name'], state, f['what'], f.get('proof') or '-', f.get('missing') or '-', bugs]
+            missing = f.get('missing') or ''
+            if f.get('waits'):
+                missing = (missing + ' ' if missing else '') + 'Waits on: %s.' % ', '.join(f['waits'])
+            cells = [f['name'], state, f['what'], f.get('proof') or '-', missing or '-', bugs]
             lines.append('| ' + ' | '.join(x.replace('|', '/').replace('\n', ' ') for x in cells) + ' |')
         lines.append('')
     return '\n'.join(lines).rstrip('\n') + '\n'

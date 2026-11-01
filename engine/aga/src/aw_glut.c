@@ -165,8 +165,13 @@ static int value(const aw_glut_cond_t *c,unsigned fn,const aw_glut_state_t *s,lo
     case AW_GLUT_FN_PC_HEALTH_PERCENT:*out=s->player_health_percent;return 1;
     case AW_GLUT_FN_PC_HEALTH:*out=s->player_health;return 1;
     case AW_GLUT_FN_TALKED_TO_PC:*out=s->talked!=0;return 1;
-    /* the player holds no rank in any faction yet (no faction system): -1 - the speaker's rank */
-    case AW_GLUT_FN_FACTION_RANK_DIFFERENCE:*out=c->rank<0?0:-1-c->rank;return 1;
+    /* the player's rank in the speaker's faction (-1 not a member, the scripts' PCRaiseRank and friends keep it)
+     * minus the speaker's; 0 for a factionless speaker */
+    case AW_GLUT_FN_FACTION_RANK_DIFFERENCE:{
+        long mine=-1;
+        if(c->rank<0){*out=0;return 1;}
+        if(c->faction && aw_glut_live && aw_glut_live->pc_rank && !aw_glut_live->pc_rank(c->faction,&mine))mine=-1;
+        *out=mine-c->rank;return 1;}
     /* the pick of the open Choice (OpenMW filter.cpp: the dialogue's choice, -1 when none is open) */
     case AW_GLUT_FN_CHOICE:*out=c->choice;return 1;
     }
@@ -284,6 +289,47 @@ int AW_GlutPick(const aw_glut_t *g,int npc,int topic,const aw_glut_state_t *s,in
     return picks[roll%count];
 }
 
+int AW_GlutCandidates(const aw_glut_t *g,int npc,int topic,int *out,int max) {
+    unsigned at[AW_GLUT_MAX_LISTS],end[AW_GLUT_MAX_LISTS];
+    unsigned set,ls,n,k;int file_topic,count=0;unsigned long first;
+    if(!g->data || npc<0 || npc>=g->npcs || topic<0 || topic>=AW_GLUT_TOPICS || (file_topic=g->topic_of[topic])<0)return 0;
+    set=rd16(g->npc+AW_GLUT_NPC_ROW*npc+8);
+    ls=rd16(g->set+2*((long)set*g->topics+file_topic));
+    if(ls==NONE16)return 0;
+    first=rd32(g->listset+8*ls);n=rd16(g->listset+8*ls+4);
+    for(k=0;k<n;k++){
+        unsigned list=rd16(g->listset_item+2*(first+k));
+        at[k]=(unsigned)rd32(g->list+8*list);end[k]=at[k]+rd16(g->list+8*list+4);
+    }
+    while(count<max){                /* the same merge as AW_GlutPick, no condition tested */
+        unsigned best=NONE16,from=0,e;
+        for(k=0;k<n;k++)if(at[k]<end[k]){
+            e=rd16(g->list_item+2*at[k]);
+            if(e<best){best=e;from=k;}
+        }
+        if(best==NONE16)break;
+        at[from]++;
+        out[count++]=(int)best;
+    }
+    return count;
+}
+/* letters and digits only, ASCII letters folded: the link marks ('@name#'), pseudo-asterisks and spacing the
+ * dialogue table drops from the shown text do not count */
+static int line_char(const char **p) {
+    int c;
+    while((c=(unsigned char)**p)!=0){
+        (*p)++;
+        if((c>='0' && c<='9') || (c>='a' && c<='z') || c>=0x80)return c;
+        if(c>='A' && c<='Z')return c+32;
+    }
+    return 0;
+}
+int AW_GlutSameLine(const char *voice,const char *shown) {
+    int a,b,n=0;
+    if(!voice || !shown)return 0;
+    do{a=line_char(&voice);b=line_char(&shown);if(a!=b)return 0;n++;}while(a);
+    return n>1;                      /* an empty line matches nothing */
+}
 int AW_GlutSound(const aw_glut_t *g,int entry,unsigned char hash[8]) {
     unsigned s;
     if(entry<0 || entry>=g->entries || (s=rd16(g->entry+12*entry+8))==NONE16)return 0;
@@ -561,6 +607,33 @@ int AW_GlutSay(edict_t *e,int topic,int talked) {
     return 1;
 }
 const char *AW_GlutText(void) {return said;}
+/* The conversation greeting's voice (VOICE-COVERAGE-58; OpenMW DialogueManager::startDialogue says the picked INFO's
+ * sound): the voice table's Greeting entry of this speaker whose line is the one shown (AW_GlutSameLine; both tables
+ * hold the same INFO records), its voice played; that INFO without a voice: silent, as in the original. No entry
+ * with that line: the voice table's own greeting pick, the previous method. One file open, the candidates' texts
+ * read until the match; nothing kept. 1 when a voice was started. */
+int AW_GlutGreetVoice(edict_t *e,const char *shown) {
+    static int list[AW_GLUT_MAX_PICKS*4];
+    int row=AW_GlutNpcOf(e),n,k,entry=-1;aw_glut_state_t s;unsigned char hash[8];FILE *f=NULL;long start;
+    static char text[1024];
+    if(row<0 || !shown || AW_PlayerDead())return 0;
+    n=AW_GlutCandidates(&table,row,AW_GLUT_GREETING,list,(int)(sizeof(list)/sizeof(list[0])));
+    if(n>0 && COM_FOpenFile((char *)path,&f)>=0 && f){
+        start=ftell(f);
+        for(k=0;k<n && entry<0;k++){
+            long offset=AW_GlutTextOffset(&table,list[k]);int got;
+            if(offset<0 || fseek(f,start+table.text_base+offset,SEEK_SET))continue;
+            got=(int)fread(text,1,sizeof(text)-1,f);text[got<0?0:got]=0;
+            if(AW_GlutSameLine(text,shown))entry=list[k];
+        }
+        fclose(f);
+    }else if(f)fclose(f);
+    if(entry<0){                     /* no entry with the shown line: the voice table's pick */
+        state_of(e,0,&s);
+        if((entry=AW_GlutPick(&table,row,AW_GLUT_GREETING,&s,0,0))<0)return 0;
+    }
+    return AW_GlutSound(&table,entry,hash) && AW_VoicePlay(e,hash)>0;
+}
 int AW_GlutBark(edict_t *e,int row,int topic,int pick_random,unsigned char hash[8]) {
     aw_glut_state_t s;int entry;
     state_of(e,0,&s);

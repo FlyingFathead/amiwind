@@ -16,6 +16,9 @@ extern int AW_SceneryCount(void);
 #include "aw_inventory.h"
 #include "aw_tryalloc.h"
 #include "aw_actorstate.h"
+/* aw_world.h (its other prototypes need the full server headers, which the native tests replace) */
+int AW_WorldToSource(const char *,const float *,float *);
+int AW_SourceToWorld(const char *,const float *,float *);
 #if AW_STATE_VALUES > 32
 #error Inventory condition bitset requires AW_STATE_VALUES <= 32
 #endif
@@ -690,14 +693,47 @@ int AW_InventoryDropHere(const aw_inventory_item_t *item,int32_t count){
     AW_UIPickupNotice(item->name,2);return 1;
 }
 
+/* gfx/hud-settings.txt lines "<GMST> <value>" (tools/prepare_icons.py hud_settings), the file read once. */
+static int hud_setting(const char *key,char *out,int size){
+    static char text[512];static int loaded;
+    FILE *f=NULL;int n;const char *p;size_t k=strlen(key);
+    if(!loaded){
+        loaded=1;text[0]=0;n=COM_FOpenFile("gfx/hud-settings.txt",&f);
+        if(f){if(n>0 && n<(int)sizeof(text) && fread(text,1,n,f)==(size_t)n)text[n]=0;else text[0]=0;fclose(f);}
+    }
+    for(p=text;*p;){
+        if(!strncmp(p,key,k) && p[k]==' '){
+            p+=k+1;for(n=0;n<size-1 && p[n] && p[n]!='\n' && p[n]!='\r';n++)out[n]=p[n];
+            out[n]=0;return n>0;
+        }
+        p=strchr(p,'\n');if(!p)break;p++;
+    }
+    return 0;
+}
+/* The activation distance (GMST iMaxActivateDist, game units) in map units (a quarter scale, aw_mwhost.c
+ * to_game_units). Data built before FOCUS-BOX-58 lacks the line: the original's own setting, 192, said once. */
+float AW_ActivateDistance(void){
+    static float reach=-1;char value[32];int n;
+    if(reach>0)return reach;
+    n=hud_setting("iMaxActivateDist",value,sizeof(value))?atoi(value):0;
+    if(n<1 || n>100000){Con_Printf("Activation distance not in this build's data; the original's 192 used.\n");n=192;}
+    reach=n*0.25f;return reach;
+}
+/* OpenMW 0.51 shows weights with up to two decimals, trailing zeros dropped (mwgui/tooltips.cpp toString). */
+static void weight_text(float weight,char *out,int size){
+    int n;Q_snprintf(out,size,"%.2f",weight);n=strlen(out);
+    while(n>0 && out[n-1]=='0')out[--n]=0;
+    if(n>0 && out[n-1]=='.')out[--n]=0;
+}
 static int inv_target(void){
-    int i,best=-1;float distance=50,along,side;edict_t *p;vec3_t f,r,u,eye,delta;trace_t tr;
+    int i,best=-1;float distance=AW_ActivateDistance(),along,side;edict_t *p;vec3_t f,r,u,eye,delta;trace_t tr;
     if(!sv.active || svs.maxclients!=1 || !svs.clients || !(p=svs.clients[0].edict))return -1;
     inv_level();VectorCopy(p->v.origin,eye);eye[2]+=p->v.view_ofs[2];
     AngleVectors(p->v.v_angle,f,r,u);
     for(i=0;i<AW_INVENTORY_DROPS;i++)if(drop_entity[i] && !drop_entity[i]->free && aw_state.inventory.dropped[i].count>0){
         VectorSubtract(drop_entity[i]->v.origin,eye,delta);along=DotProduct(delta,f);
-        if(along<0 || along>distance)continue;
+        /* within the activation distance from the eye (not only along the view) */
+        if(along<0 || along>distance || DotProduct(delta,delta)>distance*distance)continue;
         side=DotProduct(delta,delta)-along*along;if(side>64)continue;
         tr=SV_Move(eye,vec3_origin,vec3_origin,drop_entity[i]->v.origin,MOVE_NOMONSTERS,p);
         if(tr.fraction<1)continue;
@@ -706,8 +742,287 @@ static int inv_target(void){
     return best;
 }
 const char *AW_InventoryHint(void){int i=inv_target();return i<0?NULL:drop_label[i];}
+int AW_InventoryFocus(const char **name,char *weight_line,char *value_line,int line_size,int *owned){
+    static char cached_id[64],label_weight[32],label_value[32];static aw_inventory_item_t item;static int cached_ok,labels;
+    char number[24];int i=inv_target();
+    if(i<0 || !name || !weight_line || !value_line || line_size<2)return 0;
+    if(!labels){
+        labels=1;
+        if(!hud_setting("sWeight",label_weight,sizeof(label_weight)))strcpy(label_weight,"Weight");
+        if(!hud_setting("sValue",label_value,sizeof(label_value)))strcpy(label_value,"Value");
+    }
+    /* one catalogue read per newly aimed item, not per frame */
+    if(strcmp(cached_id,aw_state.inventory.dropped[i].id)){
+        Q_strcpy_bounded(cached_id,aw_state.inventory.dropped[i].id,sizeof(cached_id));
+        cached_ok=AW_InventoryRead(cached_id,&item);
+    }
+    *name=drop_label[i];weight_line[0]=value_line[0]=0;
+    if(cached_ok){
+        weight_text(item.weight,number,sizeof(number));
+        Q_snprintf(weight_line,line_size,"%s: %s",label_weight,number);
+        Q_snprintf(value_line,line_size,"%s: %d",label_value,item.value);
+    }
+    /* the player's own dropped items are never theft */
+    if(owned)*owned=0;
+    return 1;
+}
+/* Placed things (FOCUS-BOX-58): id1/focus.awf (tools/prepare_focus.py), the loaded room's rows read once per map,
+ * outdoors the rows of the player's exterior cell and its neighbours (focus_load).
+ * Positions are game units; the room map is a quarter scale plus its shift (aw_mwhost.c AW_MwscriptRoomShift, the
+ * same shift the scripts' placements use). Rows whose reference has an edict here (aw_ref: actors, doors) are left
+ * to that edict's own targeting; an object a script disabled shows no box. */
+#define FOCUS_ROWS 1024
+#define FOCUS_ROW 64
+#define FOCUS_ROW2 96          /* AWF2 (PICKUP-PLACED-58): the AWF1 row, then the item's record id (32 bytes) */
+#define FOCUS_ID 32
+/* The row's action code (byte 2, tools/prepare_focus.py ACT_*): bits 0-1 the kind, bit 2 owned, bit 3 magic scroll. */
+#define FOCUS_ACT_TAKE 1
+#define FOCUS_ACT_READ 2
+#define FOCUS_ACT_TALK 3
+#define FOCUS_ACT_OWNED 4
+#define FOCUS_ACT_MAGIC_SCROLL 8
+static int focus_stride=FOCUS_ROW;
+typedef struct {vec3_t at;float weight;int value;unsigned reference;char kind,owned,edict,live,action,name[37];} focus_row_t;
+static focus_row_t *focus_rows;
+static int focus_count;
+static model_t *focus_world;
+static unsigned long focus_u32(const byte *p){return (unsigned long)p[0]|((unsigned long)p[1]<<8)|((unsigned long)p[2]<<16)|((unsigned long)p[3]<<24);}
+static long focus_room(void){
+    const char *p=sv.worldmodel?sv.worldmodel->entities:NULL,*key,*end;long n=0;
+    if(!p)return 0;
+    key=strstr(p,"\"_aw_cell_int\"");end=strchr(p,'}');
+    if(!key || !end || key>end)return 0;
+    key+=14;while(*key==' ' || *key=='\t')key++;
+    if(*key!='"')return 0;
+    for(key++;*key>='0' && *key<='9' && n<100000;key++)n=n*10+(*key-'0');
+    return *key=='"'?n:0;
+}
+/* Outdoors (an open-world or CHIM frame map, AW_SourceToWorld): the rows of the exterior cell the player stands in
+ * and its eight neighbours (the activation distance is far below a cell), read again when the player's cell
+ * changes. The key is tools/prepare_focus.py exterior_key. */
+#define FOCUS_CELL 8192.0f
+#define FOCUS_GRID_BIAS 2048
+static int focus_outdoor,focus_gx,focus_gy;
+static unsigned long focus_exterior_key(int gx,int gy){
+    return 0x80000000ul|((unsigned long)((gx+FOCUS_GRID_BIAS)&0xFFF)<<12)|(unsigned long)((gy+FOCUS_GRID_BIAS)&0xFFF);
+}
+/* Append one key's rows (game units) to the table; 0 on a bad file. With WANT set nothing is appended: the record
+ * id of item row WANT goes to ID (AWF2 only; ID stays empty when the row is not there). */
+static int focus_read_key_id(FILE *f,long base,unsigned long rooms,unsigned long key,unsigned want,char *id){
+    byte head[12],row[FOCUS_ROW2];int lo,hi,mid,i,j;unsigned long number,first=0,rows=0;
+    for(lo=0,hi=(int)rooms-1;lo<=hi;){
+        mid=(lo+hi)/2;
+        if(fseek(f,base+8+mid*12L,SEEK_SET) || fread(head,1,12,f)!=12)return 0;
+        number=focus_u32(head);
+        if(number==key){first=focus_u32(head+4);rows=focus_u32(head+8);break;}
+        if(number<key)lo=mid+1;else hi=mid-1;
+    }
+    if(!rows)return 1;
+    if(rows>FOCUS_ROWS || fseek(f,base+8+(long)rooms*12+(long)first*focus_stride,SEEK_SET))return 0;
+    for(i=0;i<(int)rows && (want || focus_count<FOCUS_ROWS);i++){
+        focus_row_t *r;unsigned long bits;
+        if(fread(row,1,focus_stride,f)!=(size_t)focus_stride)break;
+        if(want){
+            if(row[0]!='I' || focus_u32(row+4)!=want || focus_stride!=FOCUS_ROW2)continue;
+            memcpy(id,row+FOCUS_ROW,FOCUS_ID);id[FOCUS_ID]=0;
+            for(j=0;id[j];j++)if((unsigned char)id[j]<32 || (unsigned char)id[j]>126)id[0]=0;
+            return 1;
+        }
+        if(row[0]!='I' && row[0]!='A' && row[0]!='D')continue;
+        r=&focus_rows[focus_count];
+        r->kind=(char)row[0];r->owned=row[1]?1:0;r->edict=0;r->reference=(unsigned)focus_u32(row+4);
+        /* STEAL-PROMPT-58: the builder's action code (prepare_focus.py); an older file has 0: an item is taken */
+        r->action=(char)(row[2]?row[2]:row[0]=='I'?FOCUS_ACT_TAKE|(row[1]?FOCUS_ACT_OWNED:0):0);
+        for(j=0;j<3;j++)r->at[j]=(float)(int32_t)focus_u32(row+8+4*j);
+        bits=focus_u32(row+20);memcpy(&r->weight,&bits,4);r->value=(int)(int32_t)focus_u32(row+24);
+        memcpy(r->name,row+28,36);r->name[36]=0;
+        for(j=0;r->name[j];j++)if((unsigned char)r->name[j]<32)r->name[j]=' ';
+        if(!r->name[0] || !(r->weight>=0 && r->weight<1000000))continue;
+        focus_count++;
+    }
+    return 1;
+}
+static int focus_read_key(FILE *f,long base,unsigned long rooms,unsigned long key){
+    return focus_read_key_id(f,base,rooms,key,0,NULL);
+}
+/* Open focus.awf at its index: the file, its base and room count; NULL on a file this engine does not read. */
+static FILE *focus_open(long *base,unsigned long *rooms){
+    FILE *f=NULL;byte head[8];int length=COM_FOpenFile("focus.awf",&f);
+    if(!f)return NULL;
+    *base=ftell(f);
+    if(length<8 || fread(head,1,8,f)!=8 || (memcmp(head,"AWF1",4) && memcmp(head,"AWF2",4))){fclose(f);return NULL;}
+    focus_stride=head[3]=='2'?FOCUS_ROW2:FOCUS_ROW;
+    *rooms=focus_u32(head+4);
+    if(*rooms>65535 || 8+*rooms*12>(unsigned long)length){fclose(f);return NULL;}
+    return f;
+}
+static void focus_load(void){
+    FILE *f=NULL;long base,room=0;int i,j,dx,dy,ok=1;
+    unsigned long rooms;edict_t *e;eval_t *v;vec3_t game,local;
+    focus_world=sv.worldmodel;focus_count=0;focus_outdoor=0;
+    if(svs.clients && svs.clients[0].edict && AW_WorldToSource(sv.name,svs.clients[0].edict->v.origin,game)){
+        focus_outdoor=1;focus_gx=(int)floor(game[0]/FOCUS_CELL);focus_gy=(int)floor(game[1]/FOCUS_CELL);
+    }else if(!(room=focus_room()))return;
+    if(!focus_rows && !(focus_rows=(focus_row_t *)AW_TryMalloc(FOCUS_ROWS*sizeof(focus_row_t))))return;
+    if(!(f=focus_open(&base,&rooms)))return;
+    if(!focus_outdoor)ok=focus_read_key(f,base,rooms,(unsigned long)room);
+    else for(dx=-1;dx<=1 && ok;dx++)for(dy=-1;dy<=1 && ok;dy++)
+        ok=focus_read_key(f,base,rooms,focus_exterior_key(focus_gx+dx,focus_gy+dy));
+    fclose(f);
+    if(!ok){focus_count=0;return;}
+    /* to this map's units: outdoors the map's own origin, a room a quarter scale (its shift is added when aimed) */
+    for(j=0;j<focus_count;j++){
+        if(!focus_outdoor)VectorScale(focus_rows[j].at,.25f,focus_rows[j].at);
+        else if(AW_SourceToWorld(sv.name,focus_rows[j].at,local)){VectorCopy(local,focus_rows[j].at);}
+        else focus_rows[j].edict=1;
+    }
+    /* the actors and doors that have an edict of their own (an item's edict, a compiled room's placed static, has no
+     * targeting of its own: its row stays) */
+    for(j=0;j<focus_count;j++)focus_rows[j].live=0;
+    for(i=1;i<sv.num_edicts;i++){
+        e=EDICT_NUM(i);if(e->free)continue;
+        v=GetEdictFieldValue(e,"aw_ref");if(!v || v->_float<=0)continue;
+        for(j=0;j<focus_count;j++)if(focus_rows[j].reference==(unsigned)v->_float){
+            if(focus_rows[j].kind!='I')focus_rows[j].edict=1;else focus_rows[j].live=1;
+        }
+    }
+    /* In a room an item row counts only when the room draws the item: an edict that carries its reference or a
+     * placement of the CHIM room. A compiled Quake room (the opening's Census Office) leaves the small items out
+     * (INTERIOR-PLACED-ITEMS-47): their rows showed the box over an empty table and E had nothing to take. */
+    if(!focus_outdoor)for(j=0;j<focus_count;j++)
+        if(focus_rows[j].kind=='I' && !focus_rows[j].live && !ChimRoom_Has(focus_rows[j].reference))focus_rows[j].edict=1;
+}
+/* Read again on a new map, or outdoors when the player has walked into another cell. */
+static void focus_refresh(const edict_t *p){
+    vec3_t game;
+    if(focus_world!=sv.worldmodel){focus_load();return;}
+    if(focus_outdoor && AW_WorldToSource(sv.name,p->v.origin,game) &&
+       ((int)floor(game[0]/FOCUS_CELL)!=focus_gx || (int)floor(game[1]/FOCUS_CELL)!=focus_gy))focus_load();
+}
+/* The placed row aimed at within reach, -1 none. */
+static int placed_target(void){
+    int i,best=-1;float reach=AW_ActivateDistance(),nearest,along,side,length,shift[3];edict_t *p;vec3_t f,r,u,eye,delta,at;
+    trace_t tr;
+    if(!sv.active || svs.maxclients!=1 || !svs.clients || !(p=svs.clients[0].edict))return -1;
+    focus_refresh(p);
+    if(!focus_count)return -1;
+    VectorCopy(p->v.origin,eye);eye[2]+=p->v.view_ofs[2];AngleVectors(p->v.v_angle,f,r,u);
+    if(focus_outdoor)shift[0]=shift[1]=shift[2]=0;else AW_MwscriptRoomShift(shift);
+    nearest=reach;
+    for(i=0;i<focus_count;i++){
+        focus_row_t *row=&focus_rows[i];
+        if(row->edict || AW_ObjectDisabled(row->reference))continue;
+        VectorAdd(row->at,shift,at);VectorSubtract(at,eye,delta);along=DotProduct(delta,f);length=DotProduct(delta,delta);
+        if(along<=0 || along>nearest || length>reach*reach)continue;
+        side=length-along*along;
+        if(side>(row->kind=='I'?16.0f:36.0f))continue;     /* close to the crosshair line (map units squared) */
+        tr=SV_Move(eye,vec3_origin,vec3_origin,at,MOVE_NOMONSTERS,p);
+        if(tr.fraction<1 && (1-tr.fraction)*sqrt(length)>6)continue;      /* a wall between: not in view */
+        nearest=along;best=i;
+    }
+    return best;
+}
+int AW_PlacedFocus(const char **name,char *weight_line,char *value_line,int line_size,int *owned){
+    static char label_weight[32],label_value[32];static int labels;
+    int best;char number[24];
+    if(!name || !weight_line || !value_line || line_size<2 || (best=placed_target())<0)return 0;
+    if(focus_rows[best].kind=='A')return 0;   /* FOCUS-BOX-NO-ACTORS-58: items and doors only */
+    if(!labels){
+        labels=1;
+        if(!hud_setting("sWeight",label_weight,sizeof(label_weight)))strcpy(label_weight,"Weight");
+        if(!hud_setting("sValue",label_value,sizeof(label_value)))strcpy(label_value,"Value");
+    }
+    *name=focus_rows[best].name;weight_line[0]=value_line[0]=0;
+    if(focus_rows[best].kind=='I'){
+        weight_text(focus_rows[best].weight,number,sizeof(number));
+        Q_snprintf(weight_line,line_size,"%s: %s",label_weight,number);
+        Q_snprintf(value_line,line_size,"%s: %d",label_value,focus_rows[best].value);
+    }
+    if(owned)*owned=focus_rows[best].owned;
+    return 1;
+}
+/* STEAL-PROMPT-58: the action line under an aimed item that the activate key takes: "E: Take" for a dropped item or
+ * an unowned placed item, "E: Steal" (*steal 1, drawn red) when taking it would be theft. The word "Take" is the
+ * game's GMST sTake (gfx/hud-settings.txt); the original has no GMST for the steal prompt. 0 for no takeable item. */
+/* The prompt is decided at build time: the row's action code (kind and owned bits) indexes this table once built;
+ * nothing is looked up per frame. A readable book reads "E: Read" (red when owned: it belongs to someone) once the
+ * book reader is there (aw_book_reader); until then E takes it, so it prompts like any item. */
+int (*aw_book_reader)(unsigned reference);
+static char prompts[8][40];
+int AW_ItemPrompt(char *line,int size,int *steal){
+    static int labels;int best,code;
+    if(!line || size<2 || !steal)return 0;
+    if(!labels){
+        char take[32];labels=1;
+        if(!hud_setting("sTake",take,sizeof(take)))strcpy(take,"Take");
+        Q_snprintf(prompts[FOCUS_ACT_TAKE],sizeof(prompts[0]),"E: %s",take);
+        strcpy(prompts[FOCUS_ACT_TAKE|FOCUS_ACT_OWNED],"E: Steal");
+        strcpy(prompts[FOCUS_ACT_READ],"E: Read");strcpy(prompts[FOCUS_ACT_READ|FOCUS_ACT_OWNED],"E: Read");
+    }
+    code=FOCUS_ACT_TAKE;
+    if(inv_target()<0){
+        if((best=placed_target())<0 || focus_rows[best].kind!='I')return 0;
+        code=focus_rows[best].action&7;
+        if((code&3)==FOCUS_ACT_READ && !aw_book_reader)code=FOCUS_ACT_TAKE|(code&FOCUS_ACT_OWNED);
+    }
+    if(!prompts[code][0])return 0;
+    *steal=(code&FOCUS_ACT_OWNED)!=0;
+    Q_strcpy_bounded(line,prompts[code],(size_t)size);
+    return 1;
+}
+/* PICKUP-PLACED-58: the activate key on a placed item in reach takes it, as the original and OpenMW 0.51 do: its
+ * record id from focus.awf (AWF2), one into the inventory, the placement disabled and hidden through the object state
+ * (aw_mwhost.c AW_ObjectTake: saved, hidden again on every map). An owned item is marked stolen there (CRIME-59).
+ * 1 when the key was used here (taken, or refused with a line). */
+static int placed_id(unsigned reference,char *id){
+    FILE *f;long base;unsigned long rooms;int dx,dy;long room;
+    id[0]=0;
+    if(!(f=focus_open(&base,&rooms)))return 0;
+    if(!focus_outdoor){if((room=focus_room())!=0)focus_read_key_id(f,base,rooms,(unsigned long)room,reference,id);}
+    else for(dx=-1;dx<=1 && !id[0];dx++)for(dy=-1;dy<=1 && !id[0];dy++)
+        focus_read_key_id(f,base,rooms,focus_exterior_key(focus_gx+dx,focus_gy+dy),reference,id);
+    fclose(f);
+    return id[0]!=0;
+}
+static focus_row_t *placed_row(unsigned reference){
+    int i;
+    for(i=0;i<focus_count;i++)if(focus_rows[i].kind=='I' && focus_rows[i].reference==reference)return &focus_rows[i];
+    return NULL;
+}
+static int take_row(focus_row_t *);
+/* BOOK-READER-58: the record id and ownership of the placed book REFERENCE in the current focus table (the reader
+ * asks when it opens); 0 when it is not there. */
+int AW_PlacedBook(unsigned reference,char *id,int *owned){
+    focus_row_t *row=placed_row(reference);
+    if(!id)return 0;
+    id[0]=0;
+    if(!row || !placed_id(reference,id))return 0;
+    if(owned)*owned=row->owned!=0;
+    return 1;
+}
+/* BOOK-READER-58: the reader's Take: the same path as E on the item (owned taking marked for CRIME-59). */
+int AW_PlacedTake(unsigned reference){
+    focus_row_t *row=placed_row(reference);
+    return row && !AW_ObjectDisabled(reference)?take_row(row):0;
+}
+static int placed_use(void){
+    int best=placed_target();focus_row_t *row;
+    if(best<0 || (row=&focus_rows[best])->kind!='I')return 0;
+    /* a readable book opens the reader (reading is free); Take or Steal is inside it */
+    if((row->action&3)==FOCUS_ACT_READ && aw_book_reader && aw_book_reader(row->reference))return 1;
+    return take_row(row);
+}
+static int take_row(focus_row_t *row){
+    aw_inventory_item_t item;char id[FOCUS_ID+1];
+    if(!placed_id(row->reference,id) || !AW_InventoryRead(id,&item))return 0;
+    if(!AW_ItemAdd(&aw_state,item.id,1)){AW_UISubtitle(row->name,"Cannot collect: inventory capacity.",3);return 1;}
+    if(!AW_ObjectTake(row->reference,row->owned)){AW_ItemAdd(&aw_state,item.id,-1);return 0;}
+    aw_state.inventory.initialized=1;
+    AW_UIPickupNotice(row->name,3);AW_CombatEquipmentChanged();
+    return 1;
+}
 int AW_InventoryUse(void){
-    int i=inv_target();if(i<0)return 0;
+    int i=inv_target();if(i<0)return placed_use();
     if(!AW_InventoryPickup(&aw_state,i)){AW_UISubtitle(drop_label[i],"Cannot collect: inventory capacity.",3);return 1;}
     AW_UIPickupNotice(drop_label[i],3);AW_CombatEquipmentChanged();ED_Free(drop_entity[i]);drop_entity[i]=NULL;return 1;
 }

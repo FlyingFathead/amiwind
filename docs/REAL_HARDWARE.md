@@ -1,6 +1,6 @@
 # Running AmiWind on real Amiga hardware
 
-_Last updated with AmiWind v0.0.57-dev1 (30 October 2026)._
+_Last updated with AmiWind v0.0.58 (31 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -24,7 +24,9 @@ _Last updated with AmiWind v0.0.57-dev1 (30 October 2026)._
   - [What it does not say](#what-it-does-not-say)
   - [On paper](#on-paper)
   - [The PiStorm project's own DoomAttack figures](#the-pistorm-projects-own-doomattack-figures)
+  - [What the published PiStorm numbers mean](#what-the-published-pistorm-numbers-mean)
   - [Our number to compare with](#our-number-to-compare-with)
+  - [The Pi 4B boot stick as a reference: measured](#the-pi-4b-boot-stick-as-a-reference-measured)
 - [What to send back](#what-to-send-back)
 
 <!-- contents end -->
@@ -475,14 +477,43 @@ timedemo graphs, in frames per second:
 
 How we read it:
 
-- **The AGA screen is capped by the chip bus.** The Pi 4B, with a much faster CPU than the Pi 3A+, is barely above
-  it (57.4 against 55.2): the screen update, not the CPU, sets the figure.
-- **The CPU is not the limit.** On the RTG screen, which does not go through the chipset, the Pi 4B reaches about
-  400 against 46.8 for a 68060 at 100 MHz: about 8.5 times the CPU speed of that 68060.
-- **For AmiWind**, the AGA ceiling on a Pi 4 PiStorm is likely in the same range, the 50s, as an upper bound on
-  what the screen can show, however cheap the 3D work becomes. The way past it is the RTG screen: the engine's RTG
-  path is still slow (ENGINE-RTG-SLOW-PATH-52 in the [bug register](BUGS.md)), and fixing that is the lever.
-  This is a projection from another program's figures until a real run.
+- **For DoomAttack, the AGA screen sets the figure.** The Pi 4B, with a much faster CPU than the Pi 3A+, is barely
+  above it (57.4 against 55.2): in that program the screen update, not the CPU, is the limit.
+- **For DoomAttack on RTG, the CPU is not the limit.** On the RTG screen, which does not go through the chipset, the
+  Pi 4B reaches about 400 against 46.8 for a 68060 at 100 MHz.
+- **For AmiWind this is a hypothesis, not a measurement.** DoomAttack's AGA figure is that program's ceiling, not a
+  general AGA ceiling: AmiWind draws its screen differently, so its own limit on a PiStorm may be higher or lower. That
+  the CPU side is ample is likewise a hypothesis until AmiWind's own workload runs there. What it suggests is where to
+  look: how much of an AmiWind frame goes to drawing on the AGA screen, and the RTG screen as the way past it (the
+  engine's RTG path is still slow: ENGINE-RTG-SLOW-PATH-52 in the [bug register](BUGS.md)).
+
+### What the published PiStorm numbers mean
+
+AmiWind needs a 68040 with its FPU (and 32 MB of Fast RAM), so the only PiStorm setup that runs it is Emu68 emulating a
+68040. Figures for a 68020 setting, or for the older Musashi emulator, describe machines that cannot run the game.
+
+| Figure | Where it comes from | What it is |
+| --- | --- | --- |
+| 23.44 MIPS, A500 PiStorm | AMIGAstore's A500 PiStorm page (https://amigastore.eu/853-pistorm.html), "CPU accelerator (23,44 MIPS)", read 31 October 2026 | A shop figure; the page names neither the emulator nor the CPU setting behind it. Not an AmiWind setup. |
+| "2000 MIPS" with a Pi 4, A1200 PiStorm32 Lite | AMIGAstore's A1200 page (https://amigastore.eu/937-pistorm32-lite-amiga-1200.html), "68040 and 2000 MIPS with Raspberry 4"; RetroPassion (https://www.retropassion.co.uk/product/pistorm32-lite-a1200), "up to a 68040 and using a Pi4 you could see 2000 Plus Mips", read 31 October 2026 | Shop figures for the 68040 setting: the setting AmiWind needs. |
+| 2,333 MIPS, A1200 PiStorm32 Lite, Pi 4 at 2.2 GHz | A user's blog (https://blog.stef.be/pistorm32lite), as reported in search results on 31 October 2026; the page itself not re-read by us | One SysInfo run on an overclocked Pi 4. |
+| DoomAttack frames per second | The PiStorm project's own benchmark page (https://pistorm.github.io/docs/benchmarks/), the graphs re-read on 31 October 2026 | The table above: a real program, the same demo on every machine. |
+
+How to read them:
+
+- **SysInfo MIPS are a weak measure.** The PiStorm project's benchmark page says itself that synthetic benchmarks
+  should not be trusted as a reliable performance measure and that the SysInfo speed test is one of the least reliable
+  on the Amiga, and that results only compare when the same SysInfo version is used.
+- **MIPS do not turn into AmiWind frames.** The AGA screen goes through the real Amiga's chip bus; the DoomAttack
+  figures above show a Pi 4 barely ahead of a Pi 3A+ on AGA. The labels on that page name only "PiStorm" and the Pi
+  model; since the test uses an AGA screen, the machine was an AGA Amiga (an A1200 is the likely one), but the page
+  does not say which board.
+- **The number that counts is AmiWind's own** (below): `aw bench halloween`, plus `awbench`, on the same machine.
+  SysInfo is useful only as a bridge to the shop and blog figures above, run with the same SysInfo version on both.
+
+The PiStorm project's FOSDEM 2024 talk, with slides, is a good overview of the hardware and of Emu68 (FOSDEM 2024 archive,
+"PiStorm: the evolution of an open source Amiga accelerator"); its figures are not repeated here because we have not
+checked them against the slides.
 
 ### Our number to compare with
 
@@ -494,6 +525,50 @@ throughput, on the PiStorm, and put the result beside the same machine's DoomAtt
 A first report from a PiStorm (which board, which Pi, the Emu68 version and its JIT settings, Fast RAM, the
 `aw bench halloween` line, the `awbench` results and, if you have it, the DoomAttack figure, and whether the screen
 was AGA or RTG) would turn this section into measurements. See [what to send back](#what-to-send-back).
+
+### The Pi 4B boot stick as a reference: measured
+
+Until a PiStorm report arrives, the project's own [Pi 4B boot stick](#raspberry-pi-with-amiberry) serves as the
+reference machine. On 31 October 2026 it ran the PiStorm benchmark page's DoomAttack timedemo exactly as that page
+runs it (the archive the page links, `doomattack -forcedemo -timedemo demo3`, frames per second = 35 x 2134 /
+realticks), on Amiberry with the stick's AmiWind settings: AGA, 68040 with FPU, JIT, 32 MB Fast RAM, the `c2p_040`
+routine, the Pi's ARM cores at 2.0 GHz (read during the run: about 44 °C, never throttled).
+
+| DoomAttack timedemo, AGA low resolution | Frames per second |
+| --- | --- |
+| **Pi 4B boot stick, Amiberry, 2.0 GHz, NTSC (measured by us)** | **56.9** (2134 tics in 1313) |
+| **Pi 4B boot stick, Amiberry, 2.0 GHz, PAL (measured by us)** | **47.7** (2134 tics in 1565) |
+| PiStorm, Pi 4B at 2.2 GHz (the PiStorm page) | 57.4 |
+| PiStorm, Pi 3A+ at 1.4 GHz (the PiStorm page) | 55.2 |
+| 68060 at 100 MHz (the PiStorm page) | 34.3 |
+
+What it shows:
+
+- **On an AGA screen these machines are in the same class.** The stick lands within one frame per second of a
+  PiStorm with a Pi 4B, and a little above the Pi 3A+.
+- **The AGA figure is capped by the screen refresh.** NTSC (60 Hz) against PAL (50 Hz) gives 56.9 against 47.7, almost
+  exactly the ratio of the two refresh rates: on a fast CPU, DoomAttack waits for the display, so the AGA figure cannot
+  tell how fast the CPU is. An RTG run would; the stick has no RTG board set up yet. Most Amigas in Europe run PAL
+  (50 Hz), so for them the ceiling is the PAL line (47.7), not the NTSC one.
+- **The screen copy is the same work as AmiWind's.** DoomAttack and AmiWind both convert a 320x200, 8-bit picture into
+  the AGA screen in Chip RAM every frame (64,000 bytes). On a real PiStorm A1200 that copy, through the real chip bus,
+  already runs at about 57 frames a second, above the frame rates AmiWind reaches on the stick (about 10 to 50).
+- **The heavy places are far below that ceiling.** On the same stick, Seyda Neen with the Halloween bench scene
+  (`aw bench halloween`) ran at about 4 to 5 frames a second (31 October 2026): there the drawing of the town and
+  its cast sets the frame rate, not the screen copy. That is the case the render-cost work aims at
+  ([PRISON-SHIP-RENDER-COST-56](bugs/PRISON-SHIP-RENDER-COST-56.md)).
+
+**Our estimate (not a measurement):** if AmiWind plays well on the Pi 4B boot stick, it should play about as well on a
+PiStorm32 Lite with a Pi 4B running Emu68 as a 68040 with its FPU. The part the Pi cannot speed up, the copy to the
+AGA screen, is shown above to keep up; the CPU part runs on Emu68, which has the whole Pi to itself where Amiberry
+shares it with Linux and the emulated chipset. What could still differ: Emu68's and Amiberry's translators handle
+AmiWind's floating-point code differently, and the PiStorm's link to the Amiga adds its own cost to every Chip RAM
+access. Settings that emulate a 68020, or the older Musashi emulator, do not run AmiWind at all. The first real
+PiStorm run replaces this paragraph ([what to send back](#what-to-send-back)).
+
+Still to come on the stick: AmiWind's own `aw bench halloween` beside these numbers, and SysInfo (one version on every
+machine) as the bridge to the shop and blog MIPS figures. How to run DoomAttack on the stick yourself:
+[your own AmiWind boot stick](PI_BOOT_IMAGE.md#running-other-amiga-benchmarks-on-the-stick).
 
 ## What to send back
 

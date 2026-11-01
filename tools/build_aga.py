@@ -267,6 +267,63 @@ def install_mwscript(stage, id1):
             'unit_key': receipt.get('unit_key'), 'cache': receipt.get('cache')}
 
 
+def install_chargen(stage, id1):
+    """Put the class questions (prepare_chargen.py, CHARGEN-CENSUS-57) into the payload: id1/character/questions.awq,
+    checked against its stage receipt and its AWQ1 header; copied."""
+    stage = Path(stage)
+    receipt = json.loads((stage/'chargen-receipt.json').read_text(encoding='utf-8'))
+    source = stage/'id1'/'character'/'questions.awq'
+    raw = source.read_bytes()
+    if hashlib.sha256(raw).hexdigest() != receipt.get('sha256') or raw[:4] != b'AWQ1':
+        raise ValueError(f'Class questions differ from their stage receipt: {source}')
+    target = Path(id1)/'character'/'questions.awq'
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(source, target)
+    return {'file': 'id1/character/questions.awq', 'sha256': receipt['sha256'], 'bytes': len(raw),
+            'questions': receipt.get('questions'), 'ini': receipt.get('ini')}
+
+
+def install_focus(stage, id1):
+    """Put the focus table (prepare_focus.py, FOCUS-BOX-58) into the payload: id1/focus.awf, checked against its stage
+    receipt and its AWF2 header (AWF1 from an earlier stage run still reads: no record ids, nothing to take);
+    hard-linked where it can be, else copied."""
+    stage = Path(stage)
+    receipt = json.loads((stage/'focus-receipt.json').read_text(encoding='utf-8'))
+    source = stage/'id1'/'focus.awf'
+    raw = source.read_bytes()
+    if hashlib.sha256(raw).hexdigest() != receipt.get('sha256') or raw[:4] not in (b'AWF1', b'AWF2'):
+        raise ValueError(f'Focus table differs from its stage receipt: {source}')
+    target = Path(id1)/'focus.awf'
+    if target.exists():
+        target.unlink()
+    try:
+        os.link(source, target);how = 'linked'
+    except OSError:
+        shutil.copyfile(source, target);how = 'copied'
+    return {'file': 'id1/focus.awf', 'sha256': receipt['sha256'], 'bytes': len(raw), 'rooms': receipt.get('rooms'),
+            'rows': receipt.get('rows'), 'how': how}
+
+
+def install_books(stage, id1):
+    """Put the book texts (prepare_books.py, BOOK-READER-58) into the payload: id1/books.awb, checked against its
+    stage receipt and its AWB1 header; hard-linked where it can be, else copied."""
+    stage = Path(stage)
+    receipt = json.loads((stage/'books-receipt.json').read_text(encoding='utf-8'))
+    source = stage/'id1'/'books.awb'
+    raw = source.read_bytes()
+    if hashlib.sha256(raw).hexdigest() != receipt.get('sha256') or raw[:4] != b'AWB1':
+        raise ValueError(f'Book texts differ from their stage receipt: {source}')
+    target = Path(id1)/'books.awb'
+    if target.exists():
+        target.unlink()
+    try:
+        os.link(source, target);how = 'linked'
+    except OSError:
+        shutil.copyfile(source, target);how = 'copied'
+    return {'file': 'id1/books.awb', 'sha256': receipt['sha256'], 'bytes': len(raw), 'books': receipt.get('books'),
+            'books_with_pictures': receipt.get('books_with_pictures'), 'how': how}
+
+
 def stage_debug_catalogues(id1, debug_luma=False):
     """Required on-disk metadata: fail the build instead of shipping broken dbg."""
     # camera-marks.txt: the public camera marks of dbg cam recall (docs/CAMERA_MARKS.md), checked as the engine reads them.
@@ -2847,6 +2904,15 @@ def finalize_image(args):
     if getattr(args,'mwscript',None):
         (out/'mwscript-staging.json').write_text(json.dumps(install_mwscript(args.mwscript,boot/'id1'),indent=2)+'\n',
                                                  encoding='utf-8',newline='\n')
+    if getattr(args,'focus',None):
+        (out/'focus-staging.json').write_text(json.dumps(install_focus(args.focus,boot/'id1'),indent=2)+'\n',
+                                              encoding='utf-8',newline='\n')
+    if getattr(args,'books',None):
+        (out/'books-staging.json').write_text(json.dumps(install_books(args.books,boot/'id1'),indent=2)+'\n',
+                                              encoding='utf-8',newline='\n')
+    if getattr(args,'chargen',None):
+        (out/'chargen-staging.json').write_text(json.dumps(install_chargen(args.chargen,boot/'id1'),indent=2)+'\n',
+                                                encoding='utf-8',newline='\n')
     if getattr(args,'hand_catalog',None):
         # Per-race hands after the sky palette bank: converted against this final
         # palette, so no remap touches them (BUILD-HANDS-NOT-BUILT-32).
@@ -3542,6 +3608,9 @@ def main():
     i.add_argument('--harvest',type=Path,help='Harvest source from harvest_build.py prepare (builder step harvest); the builder default')
     i.add_argument('--hand-catalog',type=Path,help='Per-race first-person hand catalogue from prepare_hand_catalog.py --runtime-palette; the builder default')
     i.add_argument('--mwscript',type=Path,help='The compiled game scripts from prepare_mwscript.py (id1/mwscript.awm; docs/MWSCRIPT_BYTECODE.md); the builder default')
+    i.add_argument('--chargen',type=Path,help='The class questions from prepare_chargen.py (id1/character/questions.awq); the builder default')
+    i.add_argument('--books',type=Path,help='The book texts from prepare_books.py (id1/books.awb: the reader\'s readable books); the builder default')
+    i.add_argument('--focus',type=Path,help='The focus table from prepare_focus.py (id1/focus.awf: the framed box of placed things); the builder default')
     i.add_argument('--chim-actor-table', choices=('off', 'on'), default='off',
                    help='write the CHIM actor table (maps/chim-actors.cca: every exterior NPC and creature reference, '
                         'for the type 1 window; CHIM-EXTERIOR-ACTORS-MISSING-46); off (the default of this step): none; '

@@ -35,7 +35,13 @@ h2{font-size:15px;margin:0 0 8px;color:#ffe28a}
 #logbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}
 table{border-collapse:collapse;width:100%;font-size:12px}
 td,th{padding:3px 6px;border-bottom:1px solid #243649;text-align:left;vertical-align:top}
-td.passed{color:#7dffa6}td.failed{color:#ff7070}td.running{color:#8bd5ff}
+td.passed{color:#7dffa6}td.failed{color:#ff7070}td.running{color:#8bd5ff}td.perfonly{color:#ffb454}
+#status.perfonly{color:#ffb454}
+#overall{margin:0 0 10px}#overall .obar{position:relative;height:16px;background:#0d1620;border:1px solid #2c4256;border-radius:4px;overflow:hidden}
+#overall .obar i{position:absolute;top:0;bottom:0;left:0;background:#38a9e8}#overall .obar i.passed{background:#3fbf7a}#overall .obar i.failed{background:#e04848}
+#overall .otext{margin-top:3px;font-size:13px}
+#machine .mhead{margin:0 0 6px}#machine table td.num{text-align:right;white-space:nowrap}
+.tlchk{display:inline-flex;gap:4px;align-items:center}.tlchk i{display:inline-block;width:14px;height:3px;border-radius:2px}
 .lens{background:none;border:0;cursor:pointer;padding:0 2px;font-size:12px}.runlink{cursor:pointer;text-decoration:underline dotted}tr.picked td{background:#22384d}.right{min-width:0}#timeline{max-width:100%}#acttail{margin:6px 0 4px;max-height:12em;overflow:auto;background:#0b121a;border:1px solid #2c4256;border-radius:6px;padding:6px;font:11px/1.3 ui-monospace,Consolas,monospace;white-space:pre-wrap;word-break:break-all}.silent{color:#ffb070;font-weight:600}.red{color:#ff5050;font-weight:700}#timelinechart{overflow:hidden;touch-action:none;cursor:crosshair}#timelinechart svg{display:block}#tlbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:6px}#tlbar input{background:#203346;color:#edf3fa;border:1px solid #456;border-radius:4px}#timelinedetail{margin:6px 0 0;white-space:pre-wrap;font:11px/1.35 ui-monospace,Consolas,monospace;color:#ffe9b0}#timelinedetail:empty{display:none}#timeline.maximized{position:fixed;inset:0;z-index:1000;margin:0;border-radius:0;overflow:auto;background:#162433}#timeline:fullscreen{overflow:auto;background:#162433}#timelinechart rect{cursor:pointer}#timelinetip{min-height:1.4em;margin-top:4px}
 .error{color:#ffaaaa}
 </style>
@@ -62,12 +68,18 @@ td.passed{color:#7dffa6}td.failed{color:#ff7070}td.running{color:#8bd5ff}
   <div>
     <section>
       <h2>Progress</h2>
+      <div id="overall" hidden><div class="obar" id="overallbar" role="progressbar" aria-label="Overall progress" aria-valuemin="0" aria-valuemax="100"><i id="overallfill"></i></div><div class="otext" id="overalltext"></div></div>
       <div class="kv" id="facts"><b>Run</b><span>-</span></div>
     </section>
     <section style="margin-top:12px">
       <h2>Stages</h2>
       <div class="muted" id="stagenote">Elapsed (colour) against expected (grey).</div>
       <div id="stages"></div>
+    </section>
+    <section style="margin-top:12px" id="machine" hidden>
+      <h2>Machine</h2>
+      <div class="muted mhead" id="machinenote">Every job using the machine: gates, test sessions, pregates and builds.</div>
+      <div id="machinejobs"></div>
     </section>
     <section style="margin-top:12px">
       <h2>Recent builds and gates</h2>
@@ -99,6 +111,8 @@ td.passed{color:#7dffa6}td.failed{color:#ff7070}td.running{color:#8bd5ff}
       <button id="tlreset" title="Show the whole run">Reset zoom</button>
       <label class="muted">red under <input id="redth" type="number" min="0.5" step="0.5" value="2.5" style="width:4em"> cores</label>
       <label class="muted">for <input id="redmin" type="number" min="0" step="5" value="30" style="width:4em"> s</label>
+      <label class="chk tlchk"><input type="checkbox" id="showcores" checked autocomplete="off"> <i style="background:#8bd5ff"></i>Cores used</label>
+      <label class="chk tlchk"><input type="checkbox" id="showram" checked autocomplete="off"> <i style="background:#ffb454"></i>RAM usage</label>
     </div>
     <div class="muted" id="timelinenote">Waiting for the build's stage times.</div>
     <div id="timelinechart" tabindex="0" aria-label="Stage timeline: arrows step through red stretches"></div>
@@ -162,10 +176,31 @@ function lowNow() {
 }
 const RAM_ORANGE = 0.20, RAM_RED = 0.10;   // the RAM line's colours: under this share of the limit available
 const DISK_ORANGE = 0.20;                  // the Disk line turns orange under this share free (red: the build's own low flag)
+// One overall progress bar above the facts: the build's percentage (build-progress.json `percent`; without it, the
+// passed share of the stages) and, while it runs, the expected finish time and the time left.
+function overallPercent(p) {
+  if (!p) return null;
+  if (Number.isFinite(p.percent)) return Math.max(0, Math.min(100, p.percent));
+  const c = p.counts || {};
+  return c.total > 0 ? Math.max(0, Math.min(100, 100 * (c.passed || 0) / c.total)) : null;
+}
+function renderOverall(p) {
+  const box = $('overall'), pct = overallPercent(p);
+  if (pct == null) { box.hidden = true; return; }
+  box.hidden = false;
+  const bar = $('overallbar'), fill = $('overallfill'), running = p.status === 'running';
+  fill.style.width = pct + '%';
+  fill.className = p.status === 'passed' ? 'passed' : p.status === 'failed' ? 'failed' : '';
+  bar.setAttribute('aria-valuenow', String(Math.round(pct)));
+  $('overalltext').textContent = pct.toFixed(pct % 1 ? 1 : 0) + ' % done' + (running
+    ? (p.eta_at ? ' · expected finish ' + fullStamp(p.eta_at) : '') + (Number.isFinite(p.eta_seconds) ? ' · ' + fmtS(p.eta_seconds) + ' left' : '')
+    : ' · ' + (p.status || '-'));
+}
 function renderProgress(p) {
   const status = p ? p.status || '-' : 'no build-progress.json';
   $('status').textContent = status; $('status').className = 'big ' + (p ? p.status : '');
-  if (!p) { kv([['Run', S.run || '-']]); $('stages').replaceChildren(); return; }
+  if (!p) { kv([['Run', S.run || '-']]); $('stages').replaceChildren(); renderOverall(null); return; }
+  renderOverall(p);
   const c = p.counts || {}, running = (p.stages || []).filter(s => s.status === 'running').map(s => s.name);
   const ageS = p.updated_epoch ? Date.now() / 1000 - p.updated_epoch : NaN;
   $('updated').textContent = p.updated_at ? 'updated ' + fullStamp(p.updated_at) + (Number.isFinite(ageS) ? ' (' + fmtS(ageS) + ' ago)' : '') : '';
@@ -305,6 +340,11 @@ function redStretches(series, threshold, min) {
   if (cur && cur.end - cur.start >= min) out.push(cur);
   return out.map(r => ({start: r.start, end: r.end, mean: Math.round(100 * r.sum / r.n) / 100}));
 }
+// Which lines the stage timeline draws: the two checkboxes of the Timeline controls (a missing box counts as on).
+function timelineLines() {
+  const on = id => { const e = $(id); return !e || e.checked !== false; };
+  return {cores: on('showcores'), ram: on('showram')};
+}
 function redSettings() {
   const th = Number($('redth') && $('redth').value), mn = Number($('redmin') && $('redmin').value);
   return {threshold: Number.isFinite(th) && th > 0 ? th : 2.5, min: Number.isFinite(mn) && mn >= 0 ? mn : 30};
@@ -372,10 +412,12 @@ function renderTimeline(bars, opts) {
   for (const b of bars) if (!Number.isFinite(b.end)) b.end = Number.isFinite(opts.now) ? Math.max(b.start, opts.now) : b.start;
   const span = Math.max(1, opts.now || 0, ...bars.map(b => b.end));
   const view = S.view && S.view.t1 > S.view.t0 ? S.view : {t0: 0, t1: span};
-  const cores = opts.cores && opts.cores.length > 1 ? opts.cores : (opts.live && S.liveCores && S.liveCores.length > 1 ? S.liveCores : null);
+  // "Cores used" and "RAM usage" in Timeline controls (both on by default): each shows or hides its line
+  const showCores = timelineLines().cores, showRam = timelineLines().ram;
+  const cores = !showCores ? null : opts.cores && opts.cores.length > 1 ? opts.cores : (opts.live && S.liveCores && S.liveCores.length > 1 ? S.liveCores : null);
   const red = cores ? redStretches(cores, redSettings().threshold, redSettings().min) : [];
   S.red = red;
-  const mem = opts.memory && opts.memory.length > 1 ? opts.memory : (opts.live && S.liveMemory && S.liveMemory.length > 1 ? S.liveMemory : null);
+  const mem = !showRam ? null : opts.memory && opts.memory.length > 1 ? opts.memory : (opts.live && S.liveMemory && S.liveMemory.length > 1 ? S.liveMemory : null);
   const anySections = bars.some(b => secs[b.name] && ((secs[b.name].sections || []).length || (secs[b.name].trace || []).length));
   const rows = lanes(bars), full = !!S.full;
   const W = Math.max(600, (chart.clientWidth || 900) - 2);
@@ -543,6 +585,40 @@ function profileBars(t) {
   return (t && t.stages || []).map(s => ({name: s.name, status: s.status, start: s.start, end: s.end, cores: s.cores_avg, jobs: s.jobs,
     reused: (s.wall || 0) < 1 && s.status === 'passed'}));
 }
+// The status of a result row. A build whose stages all passed and whose only failed step is the perf guard
+// (outcome "passed-perf-guard-failed") is its own amber state; the failing sections are in the hover text.
+function resultStatusCell(r) {
+  if (r.outcome === 'passed-perf-guard-failed') {
+    const td = el('td', 'perfonly', 'passed, perf guard failed');
+    td.title = 'All stages passed; the performance guard failed' + (r.perf_failing && r.perf_failing.length ? ': ' + r.perf_failing.join(' | ') : '') +
+      '. A performance-only failure does not block the build.';
+    return td;
+  }
+  return el('td', r.status || '', r.status || '');
+}
+// The machine view: every job using the machine (gates, test sessions, pregates, master builder jobs) with its cores,
+// from /monitor/machine.json (the server started with --machine-jobs).
+function renderMachine(m) {
+  const box = $('machine');
+  if (!m || !m.ok) { box.hidden = true; return; }
+  box.hidden = false;
+  $('machinenote').textContent = m.jobs.length + ' job' + (m.jobs.length === 1 ? '' : 's') + ' using ' + m.cores_used.toFixed(1) + ' cores' +
+    (m.machine_cores ? ' of ' + m.machine_cores + ' on the machine' : '') + '.';
+  const table = el('table'), head = el('tr');
+  for (const h of ['job', 'kind', 'cores', 'memory']) head.append(el('th', '', h));
+  table.append(head);
+  for (const j of m.jobs) {
+    const tr = el('tr'), n = el('td', '', j.name);
+    n.title = j.name + ' · ' + j.cpu_pct + ' % of one core';
+    tr.append(n, el('td', '', j.kind), el('td', 'num', j.cores.toFixed(2)), el('td', 'num', j.mem || '-'));
+    table.append(tr);
+  }
+  $('machinejobs').replaceChildren(m.jobs.length ? table : el('div', 'muted', 'No gate, test or build job is running.'));
+}
+async function refreshMachine() {
+  if (!S.machine) return;
+  try { renderMachine(await get('/monitor/machine.json')); } catch (e) { /* the next poll tries again */ }
+}
 function renderResults(rows) {
   if (!rows || !rows.length) { $('results').textContent = 'No results.'; return; }
   S.resultRows = rows;
@@ -564,7 +640,7 @@ function renderResults(rows) {
     if (known.has(name)) { label.onclick = () => openRun(name); label.title = 'Open in the monitor'; }
     if (name && name === S.run) tr.className = 'picked';
     tr.append(lens, el('td', '', String(r.finished || '').slice(5, 16)), el('td', '', (r.kind || '') + (r.gate ? ' ' + r.gate : '') + (r.dry_run ? ' (dry run)' : '')),
-      el('td', r.status || '', r.status || ''), el('td', '', fmtS(r.seconds)), label);
+      resultStatusCell(r), el('td', '', fmtS(r.seconds)), label);
     table.append(tr);
   }
   $('results').replaceChildren(table);
@@ -785,6 +861,10 @@ async function start() {
     const cfg = await get('/monitor/config.json');
     if (!cfg.builds) { $('status').textContent = 'no build source'; $('updated').textContent = 'start the Toolkit server with --builds DIR (or --builds-command)'; }
     const r = await get('/monitor/results.json'); renderResults(r.results);
+    if (cfg.machine && !S.machine) {          // the machine view (--machine-jobs): read now and every 5 s
+      S.machine = true; refreshMachine();
+      if (typeof setInterval === 'function') setInterval(() => { if (!document.hidden) refreshMachine(); }, 5000);
+    }
     if (!cfg.builds) return;
     // "follow latest" and "follow the running stage" are remembered in this browser (FOLLOW_KEY); with nothing saved
     // both are on, so a load or a reload follows the newest running build and its running stage, and a running build
@@ -837,7 +917,7 @@ $('pause').onclick = () => { S.paused = !S.paused; $('pause').setAttribute('aria
   });
   $('tlfull').onclick = toggleFullscreen;
   $('tlreset').onclick = resetZoom;
-  $('redth').onchange = $('redmin').onchange = () => { if (S.tl) renderTimeline(S.tl.bars, S.tl.opts); };
+  $('redth').onchange = $('redmin').onchange = $('showcores').onchange = $('showram').onchange = () => { if (S.tl) renderTimeline(S.tl.bars, S.tl.opts); };
   document.addEventListener('fullscreenchange', () => { S.full = !!document.fullscreenElement || ($('timeline').className || '').includes('maximized'); if (S.tl) renderTimeline(S.tl.bars, S.tl.opts); });
   if (window.addEventListener) window.addEventListener('resize', () => { if (S.tl) renderTimeline(S.tl.bars, S.tl.opts); });
 })();

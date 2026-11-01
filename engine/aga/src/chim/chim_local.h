@@ -342,6 +342,7 @@ float ChimChunks_HingeRadius (const chim_place_t *p);
  * a room runs, ChimChunks_DoorYaw and ChimChunks_DoorClip come here. */
 int ChimRoom_DoorYaw (unsigned pid, float yaw);
 int ChimRoom_DoorClip (unsigned pid, vec3_t start, vec3_t mins, vec3_t maxs, vec3_t end, trace_t *trace);
+int ChimRoom_Hide (unsigned reference, int hide);	/* also in quakedef.h, for aw_mwhost.c */
 void ChimChunks_Streaming (int *margin, unsigned long *urgent_loads, int *ahead);
 float ChimChunks_ActiveRadius (void);
 float ChimChunks_LoadRadius (void);

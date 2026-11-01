@@ -338,6 +338,15 @@ class ResultKeyTests(unittest.TestCase):
         self.assertIn("b'xyz'", str(caught.exception))
 
 
+class EngineLimitTests(unittest.TestCase):
+    def test_builder_limits_are_the_engines(self):
+        # MWSCRIPT-REFUSED-SCRIPT-COUNT-58: the builder refuses what the interpreter would refuse
+        vm = (ROOT / 'engine/aga/src/aw_mwvm.c').read_text(encoding='utf-8')
+        self.assertEqual(int(re.search(r'#define MAX_SCRIPTS (\d+)', vm).group(1)), awms.ENGINE_MAX_SCRIPTS)
+        self.assertEqual(int(re.search(r'#define MAX_GLOBALS (\d+)', vm).group(1)), awms.ENGINE_MAX_GLOBALS)
+        self.assertGreaterEqual(awms.ENGINE_MAX_SCRIPTS, 8618)    # v0.0.58-dev5's file with its dialogue scripts
+
+
 class LexerParserTests(unittest.TestCase):
     def test_tolerances(self):
         warnings = []
@@ -729,6 +738,31 @@ class InterpreterTests(unittest.TestCase):
         self.assertIn('done 7', out)
         self.assertTrue(any(l.split()[1:3] == ['call', '22'] for l in out), out)
         self.assertIn('missing -1', out)
+
+    def test_a_file_with_the_dialogue_scripts_loads(self):
+        # MWSCRIPT-REFUSED-SCRIPT-COUNT-58: the dialogue result scripts made v0.0.58-dev5's file 8,618 scripts and the
+        # interpreter refused every file over 2,048, so no script ran. A file of 9,000 one-opcode scripts loads; one
+        # over the engine's limit is refused there and by the builder first.
+        def awm(count):
+            code = bytes([OPCODES['END'][0]])
+            sections = {'CONF': (struct.pack('>IHH', 12288, 4000, 2000), 1),
+                        'SCRP': (struct.pack('>HBBHHII', 0, 0, 0, 0, 0, 0, 1) * count, count), 'CODE': (code, count)}
+            tags = ('CONF', 'GLOB', 'JRNL', 'SNDS', 'VOIC', 'MUSI', 'OBJS', 'SCRP', 'STRT', 'CODE', 'BIND')
+            head = 16 + 16 * len(tags)
+            directory, body = b'', b''
+            for tag in tags:
+                data, rows = sections.get(tag, (b'', 0))
+                directory += tag.encode() + struct.pack('>III', head + len(body), rows, len(data))
+                body += data + b'\0' * (-len(data) % 4)
+            return b'AWMS' + struct.pack('>HHII', 1, len(tags), head + len(body), head + len(body)) + directory + body
+        for count, loads in ((9000, True), (awms.ENGINE_MAX_SCRIPTS + 1, False)):
+            path = self.tmp / ('many-%d.awm' % count)
+            path.write_bytes(awm(count))
+            r = subprocess.run([str(self.tmp / 'h'), str(path), '0', '0.25'], capture_output=True, text=True)
+            self.assertEqual(r.returncode == 0, loads, r.stdout + r.stderr)
+        with self.assertRaises(ValueError):
+            awms.check_limits(awms.ENGINE_MAX_SCRIPTS + 1, 0)
+        awms.check_limits(awms.ENGINE_MAX_SCRIPTS, awms.ENGINE_MAX_GLOBALS)
 
     def test_handwritten_scripts_do_not_attach(self):
         out = self.run_vm(1)
