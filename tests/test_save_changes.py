@@ -56,7 +56,9 @@ class WiringTests(unittest.TestCase):
         # a load hands the list over before the window spawns, folding an old save's actor rows
         self.assertLess(save.index('AW_SaveFoldActors(&world,&pending_changes)'),
                         save.index('AW_BarrierLoad();AW_OpeningSpawn();'))
-        self.assertIn('AW_SaveEncodeChanges(raw,AW_SAVE_BYTES,&world,&save_changes)', save)
+        # the buffer is AW_SAVE_BYTES plus the world change list's own bytes (CELL-CHANGES-59)
+        self.assertIn('AW_SaveEncodeChanges(raw,capacity,&world,&save_changes)', save)
+        self.assertIn('capacity+=need+8;', save)
         # object state (v0.0.51, the scripts' Disable and Lock): merged after the actors' export, read after their
         # import, set by the script host
         host = (SRC / 'aw_mwhost.c').read_text(encoding='utf-8')

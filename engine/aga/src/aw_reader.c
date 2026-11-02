@@ -238,11 +238,11 @@ void AW_ReaderDraw(void)
         AW_UIBox(BOOK_CLOSE_X,BOOK_BUTTON_Y,BOOK_BUTTON_W,BOOK_BUTTON_H);
         Q_snprintf(line,sizeof(line),"Esc: %s",book_close);
         AW_UITextBox(BOOK_CLOSE_X,BOOK_BUTTON_Y,BOOK_BUTTON_W,BOOK_BUTTON_H,line,AW_UIColor(255,255,255));
-        AW_UIFill(mouse_x,mouse_y,2,6,ink);AW_UIFill(mouse_x,mouse_y,6,2,ink);
+        if(!AW_UICursor(mouse_x,mouse_y)){AW_UIFill(mouse_x,mouse_y,2,6,ink);AW_UIFill(mouse_x,mouse_y,6,2,ink);}
         return;
     }
     sprintf(line,"< %ld/%ld >  Enter: %s  Esc: close",(long)page+1,(long)page_count,
             action==1?"Take":action==2?"Duties":action==3?"Accept":"Close");
     AW_UIBookBegin();AW_UITextBox(10,168,300,22,line,ink);AW_UIBookEnd();
-    AW_UIFill(mouse_x,mouse_y,2,6,ink);AW_UIFill(mouse_x,mouse_y,6,2,ink);
+    if(!AW_UICursor(mouse_x,mouse_y)){AW_UIFill(mouse_x,mouse_y,2,6,ink);AW_UIFill(mouse_x,mouse_y,6,2,ink);}
 }

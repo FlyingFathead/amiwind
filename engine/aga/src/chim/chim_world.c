@@ -1428,6 +1428,16 @@ static int Source (const float *local, float *world)
 	world[2] = local[2] * 4;
 	return 1;
 }
+/* The other way: original coordinates to this frame's map units (aw_inventory.c: focus rows and placed items). */
+static int Local (const float *world, float *local)
+{
+	if (!active)
+		return 0;
+	local[0] = (world[0] - chim_frame.frame.centre[0]) * 0.25f;
+	local[1] = (world[1] - chim_frame.frame.centre[1]) * 0.25f;
+	local[2] = world[2] * 0.25f;
+	return 1;
+}
 
 /* ---------------------------------------------------------------- teleport */
 
@@ -2067,6 +2077,8 @@ void Chim_Init (void)
 	aw_chim_town_map = TownMap;
 	aw_chim_entity = ChimStatics_Capture;
 	aw_chim_source = Source;
+	aw_focus_chim_source = Source;
+	aw_focus_chim_local = Local;
 	aw_chim_cross = Cross;
 	aw_chim_recentre = Recentre;
 #ifdef AMIGA

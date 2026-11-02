@@ -34,7 +34,7 @@ static void hud_box(byte *out,int x){
 }
 
 static int guard_state;static int test_guard(void){return guard_state;}
-static cvar_t *loading_parameter,*region_parameter,*delay_parameter,*hud_parameter;
+static cvar_t *loading_parameter,*region_parameter,*delay_parameter,*hud_parameter,*cursor_parameter;
 static double loading_clock;
 double Sys_FloatTime(void){return loading_clock;}
 static int queued_prison;
@@ -50,10 +50,45 @@ int COM_FOpenFile(char *name,FILE **f){char p[1024];int n;file_reads++;sprintf(p
 void Con_Printf(char *fmt,...){}
 void CDAudio_Update(void){}
 void S_ExtraUpdate(void){}
-void Cvar_RegisterVariable(cvar_t *c){c->value=atof(c->string);if(!strcmp(c->name,"aw_loading_style"))loading_parameter=c;else if(!strcmp(c->name,"aw_region_loading"))region_parameter=c;else if(!strcmp(c->name,"aw_region_loading_delay"))delay_parameter=c;else if(!strcmp(c->name,"aw_ui_hud"))hud_parameter=c;}
+void Cvar_RegisterVariable(cvar_t *c){c->value=atof(c->string);if(!strcmp(c->name,"aw_loading_style"))loading_parameter=c;else if(!strcmp(c->name,"aw_region_loading"))region_parameter=c;else if(!strcmp(c->name,"aw_region_loading_delay"))delay_parameter=c;else if(!strcmp(c->name,"aw_ui_hud"))hud_parameter=c;else if(!strcmp(c->name,"aw_cursor_type"))cursor_parameter=c;}
 int AW_LoadingScreen(void){return 1;}
 int AW_MenuFrontEnd(void){return 0;}
-void Cvar_SetValue(char *s,float v){if(region_parameter && !strcmp(s,region_parameter->name))region_parameter->value=v;}
+void Cvar_SetValue(char *s,float v){if(region_parameter && !strcmp(s,region_parameter->name))region_parameter->value=v;
+ if(cursor_parameter && !strcmp(s,cursor_parameter->name))cursor_parameter->value=v;}
+/* CURSOR-MW-58: Morrowind's pointer from gfx/cursor.awc (AWC1: width, height, the tip, then indices, 255 clear).
+ * art: 1 a valid file (4x3, tip at 1,0), 0 none in the image, -1 a corrupt one (tip outside the art). Without a
+ * usable file, or with aw_cursor_type 1, AW_UICursor draws nothing and returns 0: the window draws AmiWind's cursor. */
+static void check_cursor(int art){
+ static const byte pixels[12]={255,7,255,255, 7,7,7,255, 255,255,255,9};
+ byte file[8+12];char path[160];FILE *f;int i;
+ memcpy(file,"AWC1",4);file[4]=4;file[5]=3;file[6]=art<0?4:1;file[7]=0;memcpy(file+8,pixels,12);
+ sprintf(path,"%s/gfx/cursor.awc",directory);
+ if(art){f=fopen(path,"wb");assert(f);assert(fwrite(file,1,sizeof(file),f)==sizeof(file));fclose(f);}
+ assert(cursor_parameter && cursor_parameter->archive && !strcmp(cursor_parameter->string,"2"));
+ assert(cursor_parameter->value==2 && AW_UICursorType()==2);
+ memset(frame,137,sizeof(frame));
+ if(art>0){
+  assert(AW_UICursorAvailable() && AW_UICursor(50,60));
+  /* the tip (1,0) lands on the pointer; clear pixels keep what was under them */
+  assert(vid.buffer[60*320+50]==7 && vid.buffer[60*320+49]==137 && vid.buffer[60*320+51]==137);
+  assert(vid.buffer[61*320+49]==7 && vid.buffer[61*320+51]==7 && vid.buffer[61*320+52]==137);
+  assert(vid.buffer[62*320+52]==9 && vid.buffer[62*320+49]==137);
+  /* at the screen's edges the art is clipped, nothing outside the frame is written */
+  assert(AW_UICursor(319,199) && AW_UICursor(0,0) && AW_UICursor(-5,-5) && AW_UICursor(400,300));
+  assert(vid.buffer[199*320+319]==7 && frame[0]==137 && frame[1]==137 && frame[64002]==137 && frame[64003]==137);
+ }else{
+  assert(!AW_UICursorAvailable() && !AW_UICursor(50,60));
+  for(i=0;i<(int)sizeof(frame);i++)assert(frame[i]==137);
+ }
+ /* aw_cursor_type 1: AmiWind's cursor; the setting is saved (archive) and anything else reads as Morrowind's (2) */
+ AW_UICursorTypeSet(1);assert(cursor_parameter->value==1 && AW_UICursorType()==1);
+ memset(frame,137,sizeof(frame));assert(!AW_UICursor(50,60));
+ for(i=0;i<(int)sizeof(frame);i++)assert(frame[i]==137);
+ AW_UICursorTypeSet(7);assert(cursor_parameter->value==2 && AW_UICursorType()==2);
+ cursor_parameter->value=0;assert(AW_UICursorType()==2);cursor_parameter->value=2;
+ assert(!AW_UICursor(50,60)==(art<=0));
+ if(art)unlink(path);
+}
 void Cmd_AddCommand(char *s,void(*f)(void)){}
 char *Cmd_Argv(int i){return "";}
 int Cmd_Argc(void){return 0;}
@@ -303,6 +338,7 @@ int main(int argc,char **argv){
  for(i=0;i<768;i++)assert(!AW_UIMenuPalette()[i]);
  AW_BeginLoadingStyle();AW_UILoading();
  for(i=0;i<64000;i++)assert(!vid.buffer[i]);
+ check_cursor(argc>1 && !strcmp(argv[1],"nocursor")?0:argc>1 && !strcmp(argv[1],"badcursor")?-1:1);
  sprintf(path,"%s/gfx/magic14.awf",directory);unlink(path);sprintf(path,"%s/gfx/book12.awf",directory);unlink(path);
  sprintf(path,"%s/gfx",directory);rmdir(path);rmdir(directory);return 0;
 }

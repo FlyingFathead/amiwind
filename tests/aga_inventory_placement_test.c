@@ -4,6 +4,8 @@
  * Thus thin walls/holes are tested independently of a sampled ray oracle. */
 #include "quakedef.h"
 #include "aw_inventory.h"
+#include "aw_ledger.h"
+#include "aw_maps.h"
 #include <assert.h>
 server_t sv;server_static_t svs;client_state_t cl;client_static_t cls;
 static client_t client;
@@ -86,7 +88,8 @@ static void refused(void){
     before=aw_state;assert(!AW_InventoryDropHere(&item,1));assert(!memcmp(&before,&aw_state,sizeof(before)));assert(allocations==allocated);
 }
 int main(void){
-    int i;
+    int i,before;
+    aw_ledger_on=0;     /* first the old method: the fixed table of 32 drops keyed by map name (kept selectable) */
     reset(0);assert(AW_InventoryDropHere(&item,1));assert(links==1 && notices==1);
     assert(AW_StateGet(&aw_state,AW_ITEM,item.id)==1 && aw_state.inventory.dropped[0].count==1);
     assert(aw_state.inventory.dropped[0].position[2]>.0f);
@@ -106,19 +109,50 @@ int main(void){
     refused();assert(!trace_calls);
     reset(0);
     for(i=0;i<AW_INVENTORY_MODELS;i++){
-        sprintf(item.id,"fixture%ld",(long)i);sprintf(item.model,"progs/inv/fixture%ld.mdl",(long)i);
+        /* one carried id (the state holds 32), a new model each time: the model cap is what is counted */
+        strcpy(item.id,"fixture0");sprintf(item.model,"progs/inv/fixture%ld.mdl",(long)i);
         if(i)assert(AW_ItemAdd(&aw_state,item.id,1));
         assert(AW_InventoryDropHere(&item,1));
+        /* picked up again (the ground records free; the model keeps its slot until the level changes) */
+        memset(aw_state.inventory.dropped,0,sizeof(aw_state.inventory.dropped));
     }
-    sprintf(item.id,"fixture%ld",(long)i);sprintf(item.model,"progs/inv/fixture%ld.mdl",(long)i);
-    assert(AW_ItemAdd(&aw_state,item.id,1));refused();assert(strstr(AW_InventoryDropReason(),"16"));
+    strcpy(item.id,"fixture0");sprintf(item.model,"progs/inv/fixture%ld.mdl",(long)i);
+    assert(AW_ItemAdd(&aw_state,item.id,1));refused();assert(strstr(AW_InventoryDropReason(),"limit"));
     /* Existing model slot still works after the distinct-model cap, no duplicate slot. */
     strcpy(item.id,"fixture0");strcpy(item.model,"progs/inv/fixture0.mdl");assert(AW_InventoryDropHere(&item,1));
+    /* A map that leaves no free slot below MAX_MODELS less the kept one refuses a new model (ITEM-WORLD-MODELS-58). */
+    reset(0);
+    {static char names[MAX_MODELS][16];
+     for(i=1;i<MAX_MODELS-AW_INVENTORY_KEEP_MODELS;i++){sprintf(names[i],"m%ld",(long)i);sv.model_precache[i]=names[i];}}
+    refused();assert(strstr(AW_InventoryDropReason(),"table full"));
+    sv.model_precache[MAX_MODELS-AW_INVENTORY_KEEP_MODELS-1]=NULL;assert(AW_InventoryDropHere(&item,1));
     reset(2);
     /* Long localY footprint fits edge at yaw0, but yaw90 rotates its long axis over the unsupported edge. */
     item_model.mins[0]=-.25f;item_model.maxs[0]=.25f;item_model.mins[1]=-4;item_model.maxs[1]=4;
     entities[1].v.v_angle[1]=90;entities[1].v.origin[0]=24;entities[1].v.origin[1]=-24;
     refused();
+    /* CELL-CHANGES-59, the world change list (the default): the drop is a row of the list at this place (a scene
+     * here: this fixture's map has no outdoor conversion and no room number) and its edict is shown; a streamed map
+     * is checked by point traces instead of refused; the list has no 32-drop ceiling, one map shows 32 at most; a map
+     * of another place shows none of them, the map of their place shows them again */
+    aw_ledger_on=1;AW_LedgerClear(&aw_ledger);
+    reset(0);assert(AW_InventoryDropHere(&item,1) && links==1 && notices==1);
+    assert(aw_ledger.count==1 && aw_ledger.row[0].key==(AW_LEDGER_PLAYER|1) && aw_ledger.row[0].fields==AW_LEDGER_DROPPED);
+    assert(aw_ledger.row[0].at==AW_AT_SCENE && aw_ledger.row[0].where==AW_MapId("seyda") && !strcmp(aw_ledger.row[0].extra->item,"fixture0"));
+    assert(!aw_state.inventory.dropped[0].count && AW_StateGet(&aw_state,AW_ITEM,item.id)==1);
+    AW_LedgerClear(&aw_ledger);
+    reset(0);streamed=1;assert(AW_InventoryDropHere(&item,1) && aw_ledger.count==1 && trace_calls>=6);
+    reset(0);streamed=1;wet=1;refused();assert(aw_ledger.count==1);              /* the traces still see the water */
+    AW_LedgerClear(&aw_ledger);
+    reset(0);assert(AW_ItemAdd(&aw_state,item.id,40));
+    for(i=0;i<AW_INVENTORY_DROPS;i++)assert(AW_InventoryDropHere(&item,1));
+    refused();assert(strstr(AW_InventoryDropReason(),"limit") && aw_ledger.count==AW_INVENTORY_DROPS);
+    /* another map: none of this place's drops is shown there (this fixture has no item catalogue, so the showing
+     * itself is the in-game check's) and a drop there is no longer held back by this map's 32 */
+    strcpy(sv.name,"census");before=allocations;AW_InventorySpawn();assert(allocations==before);
+    assert(AW_InventoryDropHere(&item,1) && aw_ledger.count==AW_INVENTORY_DROPS+1);
+    assert(aw_ledger.row[AW_INVENTORY_DROPS].where==AW_MapId("census"));
+    AW_LedgerClear(&aw_ledger);
     puts("Real drop: thin wall/hole/edge, forward path, rotated footprint, allocator quarantine,32drop/16model admission and no-loss passed.");
     return 0;
 }

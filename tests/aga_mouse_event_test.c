@@ -46,6 +46,7 @@ void AW_ConsoleCharacter(int x,int y,int c){int n=strlen(drawn);assert(n<16383);
 void AW_UIFill(int x,int y,int w,int h,int c){if(c==AW_UIColor(255,32,32))red_pixels++;assert(x>=0 && y>=0 && x+w<=320 && y+h<=200);if(w==9 && h==1){marker_x=x+4;marker_y=y;}}
 void AW_UIScrollbar(int x,int y,int h,int total,int visible,int top){}
 int AW_UIScrollHit(int mx,int my,int x,int y,int h,int total,int visible,int top){return -1;}
+int AW_UICursor(int x,int y){(void)x;(void)y;return 0;}   /* aw_ui.c (CURSOR-MW-58): no Morrowind pointer here */
 void AW_UIBookBegin(void){}
 void AW_UIBookEnd(void){}
 int AW_UIWidth(const char *s){return (int)strlen(s)*6;}

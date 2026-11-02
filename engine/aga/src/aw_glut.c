@@ -416,6 +416,16 @@ void AW_GlutExpand(const aw_glut_t *g,int npc,const char *name,const char *p,cha
     out[n]=0;
 }
 
+/* The speaker's values for the one getter table (aw_textdef.c; TEXT-MACROS-DIALOGUE-CODES-59): the NPC row's define
+ * slots (0 class, 1 race, 2 faction, 3 rank, 4 home cell) and NAME, the same values AW_GlutExpand writes, with no
+ * text scanned. V's other fields are left as they are. */
+void AW_GlutSpeakerValues(const aw_glut_t *g,int npc,const char *name,aw_textdef_values_t *v) {
+    const char *slot[5];int k,ok=npc>=0 && npc<g->npcs;
+    for(k=0;k<5;k++)slot[k]=name_of(g,ok?rd16(g->npc+AW_GLUT_NPC_ROW*npc+10+2*k):NONE16);
+    v->speaker=1;v->name=name;
+    v->clas=slot[0];v->race=slot[1];v->faction=slot[2];v->rank=slot[3];v->cell=slot[4];
+}
+
 #ifndef AW_GLUT_HOST_TEST
 #include "quakedef.h"
 #include "aw_anim.h"
@@ -424,6 +434,12 @@ void AW_GlutExpand(const aw_glut_t *g,int npc,const char *name,const char *p,cha
 #include "aw_character.h"
 
 static cvar_t lut_on={"aw_npc_voice_lut","1",true};   /* 0: the previous method (per-model bark lines only) */
+/* 1: a spoken or shown line's defines filled in one pass through the getter table (TEXT-MACROS-DIALOGUE-CODES-59);
+ * 0: the previous chain (AW_GlutExpand, then AW_ExpandDialogue). A compile switch, not a cvar: no resident
+ * registration added (tests/resident_registry_budget.json). */
+#ifndef AW_TEXT_LUT
+#define AW_TEXT_LUT 1
+#endif
 static aw_glut_t table;
 static unsigned char *resident;
 static int loaded;                /* 0 not tried, 1 usable, -1 unavailable (logged once) */
@@ -590,11 +606,16 @@ static int read_text(int entry,char *out,int capacity) {
     out[n]=0;
     return (int)strlen(out);
 }
+int AW_GlutDefineValues(edict_t *e,int row,aw_textdef_values_t *v) {
+    if(!AW_TEXT_LUT)return 0;
+    AW_TextDefinesPlayer(v);
+    AW_GlutSpeakerValues(&table,row,pr_strings+e->v.netname,v);
+    return 1;
+}
 static void line_of(edict_t *e,int row,int entry,char *out,int capacity) {
-    char raw[1024],speaker[1024];
+    char raw[1024];
     if(!read_text(entry,raw,sizeof(raw))){out[0]=0;return;}
-    AW_GlutExpand(&table,row,pr_strings+e->v.netname,raw,speaker,sizeof(speaker));
-    AW_ExpandDialogue(out,capacity,speaker);
+    AW_GlutFill(e,row,raw,out,capacity);
 }
 int AW_GlutSay(edict_t *e,int topic,int talked) {
     int row=AW_GlutNpcOf(e),entry;aw_glut_state_t s;unsigned char hash[8];
@@ -651,7 +672,8 @@ int AW_GlutSpeaker(edict_t *e,int talked,aw_glut_cond_t *c,aw_glut_state_t *s) {
     return row;
 }
 void AW_GlutFill(edict_t *e,int row,const char *raw,char *out,int capacity) {
-    char speaker[1024];
+    char speaker[1024];aw_textdef_values_t v;
+    if(AW_GlutDefineValues(e,row,&v)){AW_TextDefines(out,capacity,raw,&v);return;}   /* one pass */
     AW_GlutExpand(&table,row,pr_strings+e->v.netname,raw,speaker,sizeof(speaker));
     AW_ExpandDialogue(out,capacity,speaker);
 }

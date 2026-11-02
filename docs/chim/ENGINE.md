@@ -1,6 +1,6 @@
 # CHIM engine: shared models, chunk placements and the ring loader
 
-_Last updated with AmiWind v0.0.48-dev1 (22 October 2026)._
+_Last updated with AmiWind v0.0.58-dev4 (1 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -158,9 +158,11 @@ re-centring" below.
 
 ## Limits that do not apply
 
-- `MAX_MOD_KNOWN` (256) and the edge-cache model limit: shared models never
-  take a `mod_known` slot. How many are resident depends on memory only.
-- `MAX_MODELS` (a byte on the network): placements never send a model index.
+- `MAX_MOD_KNOWN` (512, the same number as `MAX_MODELS`) and the edge-cache
+  model limit: shared models never take a `mod_known` slot. How many are
+  resident depends on memory only.
+- `MAX_MODELS` (512 since v0.0.59; a short on the network,
+  ENGINE-MODEL-TABLE-58): placements never send a model index.
 - `MAX_EDICTS` and the 16-leaf limit for edicts (`MAX_ENT_LEAFS`):
   placements are not edicts. Efrags have no per-entity leaf limit; the pool
   grows in pages up to 65,536 links (`AW_EFRAG_LIMIT`).

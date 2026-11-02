@@ -100,7 +100,8 @@ ELIGIBLE = SUCCESS + DONE_SEA
 # The release the eligible figure is for is derived, never written here: the upcoming plan release when it is not older than
 # the version in development (the repository's VERSION file), else that version (TOOLKIT-LEGEND-STATES-UNCLEAR-48: a stale
 # plan named v0.0.41 while v0.0.48 was in development).
-VERSION_FILE = Path(__file__).resolve().parents[1] / 'VERSION'
+# (the file is named in working_version alone, not at import: a stage key counts it then only as working_release
+# shows it, BUILD-CHIM-KEY-VERSION-48)
 # The "eligible" selector of the release tool and the Toolkit preset: eligible statuses plus empty sea (done = usable).
 ELIGIBLE_SELECT = tuple(dict.fromkeys(tuple(ELIGIBLE) + DONE_SEA))
 # Two completion levels (maintainer, 2026-10-09). Terrain complete: all audits pass and every placed object except actors is
@@ -596,9 +597,17 @@ def group_line(f):
 def working_version(path=None):
     """The version in development, from the repository's VERSION file ('0.0.48-dev2'), or None."""
     try:
-        return Path(path or VERSION_FILE).read_text(encoding='utf-8').strip() or None
+        return Path(path or Path(__file__).resolve().parents[1] / 'VERSION').read_text(encoding='utf-8').strip() or None
     except OSError:
         return None
+
+
+def working_release(path=None):
+    """The release name of the version in development ('0.0.48-dev2' -> 'v0.0.48'), or None. The tracker data shows
+    only this, so a stage key counts the VERSION file as its release line (build_cache.VERSION_RELEASE_UNITS): a dev
+    or rc number change re-keys no tracker stage (BUILD-CHIM-KEY-VERSION-48)."""
+    version = working_version(path)
+    return ('v' + version.lstrip('v').split('-')[0]) if version else None
 
 
 def eligible_release(plan_next, version):
@@ -654,7 +663,7 @@ def headline(cells):
     out['eligible'] = out['done']      # every done status, empty sea included (= done)
     sea_only = sum(1 for c in cells.values() if not c['land'] and c['chim']['bucket'] in SEA_BUCKETS)
     out['map_cells'] = len(land) + sea_only      # land cells + sea cells without LAND (the map's cells)
-    out['eligible_release'] = eligible_release(None, working_version())
+    out['eligible_release'] = eligible_release(None, working_release())
     out.update({'land_cells': len(land), 'passed': passed,
                 'percent': round(100.0 * passed / len(land), 2) if land else 0.0,
                 'converted': sum(1 for c in land if c['chim']['converted']),
@@ -1391,7 +1400,7 @@ def ingest(out, progress=None, metrics=None, cells_detail=None, census=None, chi
     PL.attach(cells, plan_doc)
     plans = PL.summary(cells, plan_doc)
     # The release the "eligible" figure is for: the upcoming plan release (data), the old constant only while there is no plan.
-    head['eligible_release'] = eligible_release(PL.next_release(plan_doc), working_version())
+    head['eligible_release'] = eligible_release(PL.next_release(plan_doc), working_release())
     interiors, entrances = build_interiors(census, metrics, cells, (cells_detail or {}).get('pois'), bugs, our_maps(config_dir))
     # Interiors, additive (tools/cell_progress_rooms.py): a state per room and counts per island from the door graph.
     interior_rooms = None

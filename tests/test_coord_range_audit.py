@@ -58,7 +58,8 @@ class CoordRangeAuditTests(unittest.TestCase):
         scene = (ROOT / 'engine/aga/src/aw_scene.c').read_text(encoding='utf-8')
         self.assertIn('fabs(local[2])<AW_COORD_BOUND', scene)
         protocol = (ROOT / 'engine/aga/src/protocol.h').read_text(encoding='utf-8')
-        self.assertIn('#define\tPROTOCOL_VERSION\tAW_COORD_PROTOCOL', protocol)
+        # the coordinate protocol plus the short model index (ENGINE-MODEL-TABLE-58)
+        self.assertIn('#define\tPROTOCOL_VERSION\t(AW_COORD_PROTOCOL + AW_MODEL_INDEX_PROTOCOL)', protocol)
         common = (ROOT / 'engine/aga/src/common.c').read_text(encoding='utf-8')
         self.assertIn('MSG_WriteShort (sb, (int)(f*8));', common)          # the narrow default stays Quake's
         self.assertIn('return MSG_ReadShort() * (1.0/8);', common)

@@ -95,9 +95,10 @@ static int tab,focus;
 #define BACK_H 20
 /* Prefs and Video rows (Prefs: the HUD and gameplay; Video: view, loading, memory). */
 enum {ROW_CROSSHAIR,ROW_COLOUR,ROW_SHAPE,ROW_FRAME,ROW_FONT,ROW_VOICE,ROW_DIALOGUE,ROW_AIMED,ROW_NPC,ROW_OBJECTS,
-    ROW_AUTOSAVE,ROW_FOG,ROW_RESET,ROW_FAR,ROW_PHOTO,ROW_AREA,ROW_METHOD,ROW_BUFFER,ROW_MEMORY,ROW_GRAPHICS};
-static const unsigned char prefs_rows[]={ROW_CROSSHAIR,ROW_COLOUR,ROW_SHAPE,ROW_FRAME,ROW_FONT,ROW_VOICE,ROW_DIALOGUE,
-    ROW_AIMED,ROW_NPC,ROW_OBJECTS,ROW_AUTOSAVE};
+    ROW_AUTOSAVE,ROW_FOG,ROW_RESET,ROW_FAR,ROW_PHOTO,ROW_AREA,ROW_METHOD,ROW_BUFFER,ROW_MEMORY,ROW_GRAPHICS,ROW_CURSOR};
+/* Mouse cursor (CURSOR-MW-58): Morrowind's own pointer or AmiWind's, beside the crosshair's choices. */
+static const unsigned char prefs_rows[]={ROW_CROSSHAIR,ROW_COLOUR,ROW_SHAPE,ROW_CURSOR,ROW_FRAME,ROW_FONT,ROW_VOICE,
+    ROW_DIALOGUE,ROW_AIMED,ROW_NPC,ROW_OBJECTS,ROW_AUTOSAVE};
 static const unsigned char video_rows[]={ROW_FOG,ROW_RESET,ROW_FAR,ROW_PHOTO,ROW_AREA,ROW_METHOD,ROW_BUFFER,ROW_MEMORY
 #if defined(AMIWIND_DEBUG_LUMA) && AMIWIND_DEBUG_LUMA
     ,ROW_GRAPHICS
@@ -341,6 +342,7 @@ static void prefs_video_change(int id,int direction,int enter){
     case ROW_CROSSHAIR:AW_CrosshairSet(!AW_CrosshairShown());break;
     case ROW_COLOUR:AW_CrosshairStyleSet(0,AW_CrosshairStyle(0)+direction);break;
     case ROW_SHAPE:AW_CrosshairStyleSet(1,AW_CrosshairStyle(1)+direction);break;
+    case ROW_CURSOR:AW_UICursorTypeSet(3-AW_UICursorType());break;
     case ROW_FRAME:AW_UIFrameToggle();break;
     case ROW_FONT:font_step(direction);break;
     case ROW_VOICE:AW_UIVoiceNamesToggle();break;
@@ -609,7 +611,7 @@ static void header(void){
     for(i=0;i<n;i++)AW_UITextBox(10,5+i*(h+4),300,h+4,lines[i],colours[1]);
 }
 static void cursor(void){
-    if(!mouse_visible)return;
+    if(!mouse_visible || AW_UICursor(mouse_x,mouse_y))return;   /* Morrowind's own pointer (CURSOR-MW-58) */
     AW_UIFill(mouse_x,mouse_y,2,6,colours[1]);AW_UIFill(mouse_x,mouse_y,6,2,colours[1]);
 }
 static void rail(int x,int y,int w,int filled){
@@ -622,6 +624,7 @@ static void prefs_video_line(int id,char *line){
     case ROW_CROSSHAIR:strcpy(line,AW_CrosshairShown()?"Show crosshairs: On":"Show crosshairs: Off");break;
     case ROW_COLOUR:sprintf(line,"Crosshair colour: %s",AW_CrosshairStyleName(0,AW_CrosshairStyle(0)));break;
     case ROW_SHAPE:sprintf(line,"Crosshair shape: %s",AW_CrosshairStyleName(1,AW_CrosshairStyle(1)));break;
+    case ROW_CURSOR:strcpy(line,AW_UICursorType()==2?"Mouse cursor: Morrowind":"Mouse cursor: AmiWind");break;
     case ROW_FRAME:strcpy(line,AW_UIFrameEnabled()?"Gold frame: On":"Gold frame: Off");break;
     case ROW_FONT:value=AW_UIFontSize();if(value)sprintf(line,"UI font: %ld px",(long)value);else strcpy(line,"UI font: fallback");break;
     case ROW_VOICE:strcpy(line,AW_UIVoiceStyle()==2?"Voice identity: Aim only":AW_UIVoiceNames()?"Voice speaker names: On":"Voice speaker names: Off");break;

@@ -45,6 +45,9 @@ int AW_UIColor(int r,int g,int b){return (r+g+b)%256;}
 /* aw_ui.c's arrow from gfx/ui.awu (UI-MAP-PLAYER-ARROW-51): a test arrow when arrow_on, else none (the old cross) */
 static byte arrow_pixels[16*64];static int arrow_on;
 const byte *AW_UIMapArrow(void){return arrow_on?arrow_pixels:NULL;}
+/* aw_ui.c's mouse cursor (CURSOR-MW-58): 1 = Morrowind's pointer drawn there, 0 = this window draws AmiWind's own */
+static int cursor_calls,cursor_mw,own_cursor;
+int AW_UICursor(int x,int y){assert(x>=0 && x<=312 && y>=0 && y<=192);cursor_calls++;return cursor_mw;}
 int AW_ConsoleCharWidth(void){return char_width;}
 void AW_ConsoleCharacter(int x,int y,int c){int n=strlen(drawn);assert(n<16383);drawn[n]=c;drawn[n+1]=0;
     if(y==188 && x>=96){n=strlen(footer);assert(n<79);if(!n)footer_left=x;footer[n]=c;footer[n+1]=0;footer_right=x+char_width;}
@@ -56,6 +59,7 @@ void AW_UIFill(int x,int y,int w,int h,int c){
         assert(x>=4 && x<316 && y>=19 && y<173);
     }
     if(w==72 && h==15){button_x=x;button_y=y;}
+    if(c==AW_UIColor(255,245,190) && w==1 && h==6)own_cursor++;   /* AmiWind's cursor, its light stroke */
 if(c==AW_UIColor(255,32,32))red_pixels++;assert(x>=0 && y>=0 && x+w<=320 && y+h<=200);if(w==9 && h==1){marker_x=x+4;marker_y=y;}}
 void AW_UIScrollbar(int x,int y,int h,int total,int visible,int top){}
 int AW_UIScrollHit(int mx,int my,int x,int y,int h,int total,int visible,int top){return -1;}
@@ -375,6 +379,10 @@ int main(void){
     assert(AW_JournalAdd(&aw_state,"quest",1));assert(AW_JournalAdd(&aw_state,"quest",10));
     journal_command();draw();assert(strstr(drawn,"Another earned event."));
     assert(strstr(drawn,title) && heading_rows>1);
+    /* CURSOR-MW-58: every window asks aw_ui.c for Morrowind's pointer first; only without it (aw_cursor_type 1, or no
+     * gfx/cursor.awc in the image) does it draw AmiWind's own cursor. */
+    cursor_calls=own_cursor=0;cursor_mw=1;draw();assert(cursor_calls==1 && !own_cursor);
+    cursor_mw=0;draw();assert(cursor_calls==2 && own_cursor==1);
     before=opens;AW_WorldUIMouse(40,-70);AW_WorldUIKey(K_MOUSE1,1);assert(opens==before); /* Right-page heading is not a quest link. */
     AW_WorldUIMouse(-150,0);AW_WorldUIKey(K_MOUSE1,1);assert(opens>before); /* Left heading follows the quest. */
     AW_WorldUIKey(K_LEFTARROW,1);draw();assert(strstr(drawn,"Welcome Hors."));

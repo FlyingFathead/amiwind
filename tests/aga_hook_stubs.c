@@ -121,6 +121,8 @@ WEAK void AW_CombatEquipmentStore(void){}
 WEAK void AW_CombatEquipmentChanged(void){}
 
 WEAK void AW_UIBox(int x,int y,int w,int h){(void)x;(void)y;(void)w;(void)h;}
+/* Morrowind's mouse pointer (aw_ui.c, CURSOR-MW-58): fixtures without aw_ui.c draw their window's own cursor. */
+WEAK int AW_UICursor(int x,int y){(void)x;(void)y;return 0;}
 WEAK void AW_UISmallBegin(void){}
 WEAK void AW_UISmallEnd(void){}
 WEAK int Q_strcasecmp(char *a,char *b){return strcasecmp(a,b);}

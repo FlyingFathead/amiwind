@@ -21,8 +21,16 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "aw_coord.h"
 
-// AW_COORD_PROTOCOL: 1015 with wide coordinates (the default), 15 with AW_COORD_NARROW (aw_coord.h)
-#define	PROTOCOL_VERSION	AW_COORD_PROTOCOL
+/* AW_COORD_PROTOCOL: 1015 with wide coordinates (the default), 15 with AW_COORD_NARROW (aw_coord.h).
+ * AW_MODEL_INDEX_PROTOCOL: a model index (entity updates, baselines, static entities, the view weapon) travels
+ * as an unsigned short, so MAX_MODELS (quakedef.h) may pass 256 (ENGINE-MODEL-TABLE-58). It adds one to the
+ * protocol: 1016 / 16, so an engine with byte indices (1015 / 15) and one with shorts never read each other's
+ * messages or demos. */
+#define	AW_MODEL_INDEX_PROTOCOL	1
+#define	PROTOCOL_VERSION	(AW_COORD_PROTOCOL + AW_MODEL_INDEX_PROTOCOL)
+
+#define	MSG_WriteModel(sb, index)	MSG_WriteShort ((sb), (index))
+#define	MSG_ReadModel()	((int)(unsigned short)MSG_ReadShort ())
 
 // if the high bit of the servercmd is set, the low bits are fast update flags:
 #define	U_MOREBITS	(1<<0)

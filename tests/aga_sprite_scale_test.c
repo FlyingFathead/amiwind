@@ -27,14 +27,16 @@ void Con_Printf(char *fmt,...){assert(strstr(fmt,"SPRITE-BAD-TYPE") && "unexpect
 extern unsigned long aw_bad_sprite_skips;
 extern int R_SpriteDrawable(const entity_t *ent);
 int MSG_ReadByte(void){if(msg_readcount>=net_message.cursize){msg_badread=true;return -1;}return net_message.data[msg_readcount++];}
+int MSG_ReadShort(void){int a=MSG_ReadByte(),b=MSG_ReadByte();return (short)(a|(b<<8));}
 float MSG_ReadCoord(void){int a=MSG_ReadByte(),b=MSG_ReadByte();return (short)(a|(b<<8))/8.0f;}
 float MSG_ReadAngle(void){return MSG_ReadByte()*360.0f/256;}
 float MSG_ReadFloat(void){float f;assert(msg_readcount+4<=net_message.cursize);memcpy(&f,net_message.data+msg_readcount,4);msg_readcount+=4;return f;}
 static void free_efrags(efrag_t *pool,int n){int i;memset(pool,0,n*sizeof(*pool));for(i=0;i<n-1;i++)pool[i].entnext=&pool[i+1];cl.free_efrags=pool;}
 static void parse_scale(model_t *sprite,float scale,qboolean custom,int bytes){
-    static byte msg[32];static efrag_t pool[8];static mleaf_t leaf;static model_t world;
+    /* the model index is a short (protocol.h MSG_ReadModel, ENGINE-MODEL-TABLE-58): one byte more than Quake's */
+    static byte msg[36];static efrag_t pool[8];static mleaf_t leaf;static model_t world;
     memset(msg,0,sizeof(msg));msg[0]=1;
-    if(custom){float x=6000;memcpy(msg+4,&x,4);memcpy(msg+28,&scale,4);}
+    if(custom){float x=6000;memcpy(msg+5,&x,4);memcpy(msg+29,&scale,4);}
     memset(&cl,0,sizeof(cl));memset(&leaf,0,sizeof(leaf));leaf.contents=CONTENTS_EMPTY;
     world.nodes=(mnode_t *)&leaf;cl.worldmodel=&world;cl.model_precache[1]=sprite;
     free_efrags(pool,8);net_message.data=msg;net_message.cursize=bytes;msg_readcount=0;msg_badread=false;
@@ -67,16 +69,16 @@ int main(void){
         assert(R_SpriteDepthScale(&card,0,400)==1 && R_SpriteDepthScale(&card,500,0)==1 && R_SpriteDepthScale(NULL,500,400)==1);
         assert(R_SpriteDepthScale(&card,500,NAN)==1 && R_SpriteDepthScale(&card,500,INFINITY)==1);
     }
-    parse_scale(&sprite,.25f,true,32);parse_scale(&sprite,3.5f,true,32);parse_scale(&sprite,0,false,13);
+    parse_scale(&sprite,.25f,true,33);parse_scale(&sprite,3.5f,true,33);parse_scale(&sprite,0,false,14);
     expect_error=1;
-    if(!setjmp(failure)){parse_scale(&sprite,2,true,31);assert(0);}
-    if(!setjmp(failure)){parse_scale(&sprite,0,true,32);assert(0);}
-    if(!setjmp(failure)){parse_scale(&sprite,-2,true,32);assert(0);}
-    if(!setjmp(failure)){parse_scale(&sprite,NAN,true,32);assert(0);}
-    if(!setjmp(failure)){parse_scale(&sprite,INFINITY,true,32);assert(0);}
+    if(!setjmp(failure)){parse_scale(&sprite,2,true,32);assert(0);}
+    if(!setjmp(failure)){parse_scale(&sprite,0,true,33);assert(0);}
+    if(!setjmp(failure)){parse_scale(&sprite,-2,true,33);assert(0);}
+    if(!setjmp(failure)){parse_scale(&sprite,NAN,true,33);assert(0);}
+    if(!setjmp(failure)){parse_scale(&sprite,INFINITY,true,33);assert(0);}
     if(!setjmp(failure)){parse_scale(&sprite,1,true,3);assert(0);}
     sprite.type=mod_alias;
-    if(!setjmp(failure)){parse_scale(&sprite,1,true,32);assert(0);}
+    if(!setjmp(failure)){parse_scale(&sprite,1,true,33);assert(0);}
     /* SPRITE-BAD-TYPE-THREADED-56: a sprite model whose data is no sprite (freed or reused memory) is left out of
      * the frame, never Sys_Error; the console names it once per model. */
     {

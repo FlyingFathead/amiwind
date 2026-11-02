@@ -1,11 +1,12 @@
 # Inventory
 
-_Last updated with AmiWind v0.0.54-dev1 (27 October 2026)._
+_Last updated with AmiWind v0.0.59-dev1 (1 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [Items and actions](#items-and-actions)
+- [World models](#world-models)
 - [Debug torch (test only)](#debug-torch-test-only)
 - [Appearance and implementation boundary](#appearance-and-implementation-boundary)
 - [Next inventory pass: v0.0.40-dev2, 14 October 2026](#next-inventory-pass-v0040-dev2-14-october-2026)
@@ -27,8 +28,12 @@ on the left and carried items on the right.
 ## Items and actions
 
 The existing state capacity is 32 distinct carried IDs and 32 persistent ground
-stacks. A loaded level admits at most 16 distinct new inventory model precaches;
-repeated models reuse their slot, and scene changes reset this runtime cache.
+stacks. A loaded level admits up to 64 distinct new item models for dropped items
+(`AW_INVENTORY_MODELS`). Every map is built with room for 16 of them in its model
+table (`AW_INVENTORY_MODELS_GUARANTEED`, counted by the map limits check); past
+those a drop takes only slots the map leaves free, keeps one slot for the arena
+opponent, and is refused with "World model table full; kept." when none is left.
+Repeated models reuse their slot, and scene changes reset this runtime cache.
 These are separate capacities; no unsupported expansion is implied. The item list reads actual AW_ITEM ownership and source-derived identities,
 names, categories, quantities, weights, values and converted icons. All, Weapons,
 Armour, Clothing, Potions, Ingredients, Books and Misc tabs filter the list;
@@ -81,6 +86,35 @@ dbg inventory grant steel_shield 1 to grant actual catalogue items. These are
 diagnostics, not starter inventory or accepted gameplay acquisition. Character
 change and grants use the on-demand debug catalogue; the I action adds one
 32-byte resident command record.
+
+## World models
+
+Every item the catalogue holds has its own world model when it lies on the
+ground. The build stage `item-models` (`tools/prepare_item_models.py`) converts
+each distinct original mesh once, on every core, into one alias model under
+`progs/items/`, and writes the table `progs/items/models.awt` (the mesh path and
+its model, one line each). Every item naming the same mesh shares that one file;
+the same table is meant for placed objects as well. Each model's skin is cut to
+the part its texture coordinates reach, which takes the set from about 124 MB to
+about 48 MB (880 models). Nothing of it is resident: the engine loads a model
+from disk only when an item is dropped. Each mesh's result is cached on its own,
+so a later build converts only what changed.
+
+`tools/item_census.py` checks this per kind of item (weapons, armour, clothing,
+potions, ingredients, books, misc items, gold, keys, carried lights, apparatus,
+lockpicks, probes, repair tools): how many item records the game data holds, how
+many have a catalogue row, a picture and a world model in the table, and, with
+`--id1`, how many an image carries and draws. It exits with a failure when a
+kind has items missing from the catalogue, a mesh without a model, or no model or
+picture at all; `tests/test_item_census.py` keeps the rule. The spell-effect
+pseudo weapons are not items. Measured on the game data of 1 November 2026: all
+2,910 item records are catalogued and every one names a model that the table
+holds; two records name no picture. A build made before the model table
+converted only ten models.
+
+The catalogue also holds apparatus, lockpicks, probes, repair tools (weight,
+value, and the apparatus type) and every light that can be carried (weight,
+value, burn time, radius and colour; equipped in the left hand like the torch).
 
 ## Debug torch (test only)
 

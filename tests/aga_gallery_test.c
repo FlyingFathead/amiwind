@@ -55,6 +55,7 @@ void AW_SaveSnapshotRestore(const aw_save_t *out){restores++;character=out->char
 int Q_strcasecmp(char *a,char *b){return strcasecmp(a,b);}
 void AW_UIFill(int x,int y,int w,int h,int color){}
 int AW_UIColor(int r,int g,int b){return 0;}
+int AW_UICursor(int x,int y){(void)x;(void)y;return 0;}   /* aw_ui.c (CURSOR-MW-58): AmiWind's own cursor here */
 void AW_UIBox(int x,int y,int w,int h){}
 void AW_UIScrollbar(int x,int y,int h,int total,int visible,int top){}
 int AW_UIScrollHit(int mx,int my,int x,int y,int height,int total,int visible,int top){

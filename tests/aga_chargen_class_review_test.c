@@ -20,6 +20,7 @@ void AW_UIFill(int x,int y,int w,int h,int color){
     if(w==1 && h==1 && x>=128 && x<216 && y>=132 && y<150)grey_dots++;
 }
 void AW_UIBox(int x,int y,int w,int h){assert(x>=0 && y>=0 && x+w<=320 && y+h<=200);}
+int AW_UICursor(int x,int y){(void)x;(void)y;return 0;}   /* aw_ui.c (CURSOR-MW-58): AmiWind's own cursor here */
 static char seen[64][96];static int seen_count;
 void AW_UITextBox(int x,int y,int w,int h,const char *s,int color){
     assert(x>=0 && y>=0 && x+w<=320 && y+h<=200 && strlen(s)<96);

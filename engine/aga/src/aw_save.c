@@ -8,6 +8,7 @@
 #include "aw_region.h"
 #include "aw_maps.h"
 #include "aw_tryalloc.h"	/* the 256 KB save buffers: malloc would trap on a full machine (SDK-MALLOC-TRAPS-52) */
+#include "aw_ledger.h"
 #ifdef AMIGA
 #include <proto/dos.h>
 #else
@@ -20,6 +21,8 @@ static aw_save_t world,pending;
 /* The world-state change list of a save (feature 8): written from aw_actors.c's export, read back at a load and
  * handed to its import before the window spawns (static: off the Amiga task stack). */
 static aw_changes_t save_changes,pending_changes;
+/* a loaded save's world change list (feature 32, CELL-CHANGES-59), handed to the session's list at the load */
+static aw_ledger_t pending_ledger;
 /* the actor record's block (feature 16), one buffer for a save and one for a loaded save */
 static unsigned char save_actor_block[AW_SAVE_ACTOR_BYTES],pending_actor_block[AW_SAVE_ACTOR_BYTES];
 static int loading,scheduled,content_ready;
@@ -59,14 +62,31 @@ static int read_file(uint32_t profile,int slot,int generation,aw_save_t *state)
 {
     return read_file_changes(profile,slot,generation,state,NULL);
 }
+/* A save file's bytes in a buffer of its own size (CELL-CHANGES-59: a save with the world change list may be larger
+ * than AW_SAVE_BYTES, up to AW_SAVE_MAX_BYTES); NULL when it is larger, unreadable or memory says no. The caller
+ * frees it. */
+static byte *read_whole(FILE *f,int *size)
+{
+    /* the same reads as before the list for a save of up to AW_SAVE_BYTES (one fread, one fgetc; no seek: the
+     * emulator's disk handler is where CHIM-SEYDA-BALMORA-LOAD-HANG-43 stalls); a larger save grows the buffer */
+    unsigned long n=AW_SAVE_BYTES;byte *raw=(byte *)AW_TryMalloc(n),*grown;int extra;
+    if(!raw)return NULL;
+    *size=(int)fread(raw,1,n,f);
+    while(*size==(int)n && !ferror(f) && (extra=fgetc(f))!=EOF){
+        if(n*2>AW_SAVE_MAX_BYTES || !(grown=(byte *)AW_TryRealloc(raw,n*2))){free(raw);return NULL;}
+        raw=grown;raw[n]=(byte)extra;
+        *size=(int)n+1+(int)fread(raw+n+1,1,n-1,f);n*=2;
+    }
+    if(ferror(f) || *size<12){free(raw);return NULL;}
+    return raw;
+}
 static int read_file_changes(uint32_t profile,int slot,int generation,aw_save_t *state,aw_changes_t *changes)
 {
-    char filename[384];byte *raw;FILE *f;int n,extra,ok;
+    char filename[384];byte *raw;FILE *f;int n=0,ok;
     if(!path(filename,sizeof(filename),profile,slot,generation))return 0;
     f=fopen(filename,"rb");if(!f)return 0;
-    raw=(byte *)AW_TryMalloc(AW_SAVE_BYTES);if(!raw){fclose(f);return 0;}
-    n=fread(raw,1,AW_SAVE_BYTES,f);extra=fgetc(f);ok=!ferror(f) && extra==EOF;
-    fclose(f);
+    raw=read_whole(f,&n);ok=raw!=NULL;
+    fclose(f);if(!raw)return 0;
     ok=ok && AW_SaveDecodeChanges(raw,n,state,changes) && state->profile==profile &&
         content() && !memcmp(state->content,content_id,32);
     free(raw);return ok;
@@ -139,6 +159,9 @@ void AW_SaveSpawn(void)
          * entries it can place (cells) before the window spawns its actors */
         if(!pending_changes.count)AW_SaveFoldActors(&world,&pending_changes);
         if(aw_save_changes_import)aw_save_changes_import(&pending_changes);
+        /* the world change list of the save (empty for an older save): the session's from now on; then an older
+         * save's object entries and dropped items join it (aw_mwhost.c, aw_inventory.c) */
+        AW_LedgerMove(&aw_ledger,&pending_ledger);
         if(aw_save_objects_import)aw_save_objects_import(&pending_changes);
         if(aw_save_actors_import)aw_save_actors_import(pending_changes.actors,pending_changes.actor_bytes);
         AW_BarrierLoad();AW_OpeningSpawn();
@@ -169,7 +192,8 @@ void AW_SaveSpawn(void)
         loading=0;scheduled=0;last_auto=realtime;Con_Printf("Game restored: %s.\n",aw_story.name);
     }else AW_SaveSchedule();
 }
-void AW_SaveReset(void){memset(&world,0,sizeof(world));loading=scheduled=0;last_auto=realtime;}
+/* A new game: no saved state, and the world as in the game data (the world change list emptied, CELL-CHANGES-59). */
+void AW_SaveReset(void){memset(&world,0,sizeof(world));loading=scheduled=0;last_auto=realtime;AW_LedgerClear(&aw_ledger);}
 int AW_SaveAllowed(void)
 {
     return sv.active && svs.maxclients==1 && aw_story.stage==AW_STAGE_RELEASED && aw_character.valid &&
@@ -220,7 +244,7 @@ static int make_profile(void)
 int AW_SaveWrite(int slot)
 {
     byte *raw;aw_save_t check;char filename[384],label[32];
-    FILE *f;int n,side,ok,i;edict_t *p;uint32_t equipment;
+    FILE *f;int n,side,ok,i,capacity;edict_t *p;uint32_t equipment;
     if(!AW_SaveAllowed() || slot<0 || slot>20 || !content() || !make_profile()){
         Con_Printf("Save unavailable: complete registration and release first, and check the writable save folder.\n");return 0;
     }
@@ -236,10 +260,18 @@ int AW_SaveWrite(int slot)
     world.sequence++;
     sprintf(label,slot>=5?"Autosave %ld":slot?"Manual %ld":"Quicksave",(long)(slot>=5?slot-4:slot));
     memset(world.label,0,sizeof(world.label));strcpy(world.label,label);
-    /* Keep larger serialized storage off the fixed Amiga task stack. */
-    raw=(byte *)AW_TryMalloc(AW_SAVE_BYTES);
+    /* Keep larger serialized storage off the fixed Amiga task stack. The world change list (CELL-CHANGES-59) adds
+     * its own bytes to the buffer: a save is never refused because the list is long. */
+    capacity=AW_SAVE_BYTES;
+    if(aw_ledger.count>0){
+        int need=AW_LedgerEncode(&aw_ledger,NULL,0);
+        if(need<=0 || need>AW_SAVE_MAX_BYTES-AW_SAVE_BYTES-8){
+            Con_Printf("Save world change list invalid (%d rows); previous saves retained.\n",aw_ledger.count);return 0;}
+        capacity+=need+8;
+    }
+    raw=(byte *)AW_TryMalloc((unsigned long)capacity);
     if(!raw){Con_Printf("Save skipped: not enough free memory for its buffer; previous saves retained.\n");return 0;}
-    save_changes.count=0;
+    save_changes.count=0;save_changes.ledger=&aw_ledger;
     if((aw_save_changes_export && aw_save_changes_export(&save_changes)<0) ||
        (aw_save_objects_export && aw_save_objects_export(&save_changes)<0)){
         free(raw);Con_Printf("Save change list incomplete; previous saves retained.\n");return 0;
@@ -248,7 +280,7 @@ int AW_SaveWrite(int slot)
     if(aw_save_actors_export && (save_changes.actor_bytes=aw_save_actors_export(save_actor_block,AW_SAVE_ACTOR_BYTES))<0){
         free(raw);Con_Printf("Save actor records too large; previous saves retained.\n");return 0;
     }
-    n=AW_SaveEncodeChanges(raw,AW_SAVE_BYTES,&world,&save_changes);if(!n){free(raw);Con_Printf("Save state validation failed; previous saves retained.\n");return 0;}
+    n=AW_SaveEncodeChanges(raw,capacity,&world,&save_changes);if(!n){free(raw);Con_Printf("Save state validation failed; previous saves retained.\n");return 0;}
     side=newest(world.profile,slot,&check);side=side==0?1:0;
     if(!path(filename,sizeof(filename),world.profile,slot,side)){free(raw);return 0;}
     f=fopen(filename,"wb");if(!f){free(raw);return 0;}
@@ -272,6 +304,7 @@ int AW_SaveRead(uint32_t profile,int slot)
     aw_save_t candidate,other;char map[40];int n,i,generation;
     pending_changes.actors=pending_actor_block;pending_changes.actor_capacity=AW_SAVE_ACTOR_BYTES;
     pending_changes.actor_bytes=0;
+    AW_LedgerClear(&pending_ledger);pending_changes.ledger=&pending_ledger;
     if(!AW_CharacterLoad() || !content() || (generation=newest(profile,slot,&candidate))<0 ||
        !read_file_changes(profile,slot,generation,&candidate,&pending_changes)){
         Con_Printf("No valid compatible save generation; current game retained.\n");return 0;
@@ -340,17 +373,18 @@ int AW_SaveDescription(uint32_t profile,int slot,char *out,int capacity)
  * cannot read), a save of other game data or another build's content, or a loadable save. */
 int AW_SaveSlotState(uint32_t profile,int slot)
 {
-    char filename[384];byte *raw;FILE *f;int n,generation,best=AW_SLOT_EMPTY,state;aw_save_t *info;
-    raw=(byte *)AW_TryMalloc(AW_SAVE_BYTES);info=raw?(aw_save_t *)AW_TryMalloc(sizeof(aw_save_t)):NULL;
-    if(!raw || !info){free(raw);free(info);return AW_SLOT_EMPTY;}
+    char filename[384];byte *raw;FILE *f;int n=0,generation,best=AW_SLOT_EMPTY,state;aw_save_t *info;
+    info=(aw_save_t *)AW_TryMalloc(sizeof(aw_save_t));
+    if(!info)return AW_SLOT_EMPTY;
     for(generation=0;generation<2;generation++){
         if(!path(filename,sizeof(filename),profile,slot,generation) || !(f=fopen(filename,"rb")))continue;
-        n=fread(raw,1,AW_SAVE_BYTES,f);fclose(f);
-        if(!AW_SaveDecodeChanges(raw,n,info,NULL) || info->profile!=profile)state=AW_SLOT_UNREADABLE;
+        raw=read_whole(f,&n);fclose(f);
+        if(!raw || !AW_SaveDecodeChanges(raw,n,info,NULL) || info->profile!=profile)state=AW_SLOT_UNREADABLE;
         else state=content() && !memcmp(info->content,content_id,32)?AW_SLOT_OK:AW_SLOT_OTHER_DATA;
+        free(raw);
         if(state>best)best=state;
     }
-    free(raw);free(info);return best;
+    free(info);return best;
 }
 static int profile_entry(const char *directory,const char *entry,uint32_t *id,char name[32])
 {
@@ -408,4 +442,5 @@ static void quickload(void){if(world.profile)AW_SaveRead(world.profile,0);else C
 void AW_SaveInit(void)
 {
     Cvar_RegisterVariable(&autosaves);Cmd_AddCommand("aw_quicksave",quicksave);Cmd_AddCommand("aw_quickload",quickload);
+    aw_save_ledger_rows=AW_LedgerRows;aw_save_ledger_encode=AW_LedgerEncode;aw_save_ledger_decode=AW_LedgerDecode;
 }

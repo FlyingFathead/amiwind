@@ -73,6 +73,8 @@ SHIPPED_STAGES = {
     'books': 'books.awb (the book texts)',
     # v0.0.58 (CHARGEN-CENSUS-57): the class questions from the install's Morrowind.ini
     'chargen': 'character/questions.awq (the class questions)',
+    # v0.0.58 (ITEM-WORLD-MODELS-58): every item's world model, one per mesh, keyed by the mesh path
+    'item-models': 'progs/items/*.mdl and models.awt (the item model table)',
     'image': 'the HDF images',
     # v0.0.33, the first CHIM release: Balmora and Seyda Neen as a CHIM world (config/build-defaults.json).
     'chim': 'CHIM world (chim/world.cwi, frame maps of Balmora and Seyda Neen)',
@@ -91,6 +93,7 @@ SHIPPED_IMAGE_OPTIONS = {
     '--focus': str(RUN / 'focus'),
     '--books': str(RUN / 'books'),
     '--chargen': str(RUN / 'chargen'),
+    '--item-models': str(RUN / 'item-models'),
     '--harvest': str(RUN / 'harvest'),
     '--hidden-surface-cull': 'true',
     '--local-skybox': 'false',

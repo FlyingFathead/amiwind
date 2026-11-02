@@ -21,6 +21,7 @@ for p in (ROOT / 'src', ROOT / 'tools'):
         sys.path.insert(0, str(p))
 
 import greeting_lut as G  # noqa: E402
+import text_defines  # noqa: E402
 import mwad.dialogue as dialogue  # noqa: E402
 from npc_anim import voice_pool_name  # noqa: E402
 
@@ -162,13 +163,14 @@ class VoiceTable(unittest.TestCase):
         self.assertEqual(self.t['names'][journal[2][0][2]], 'a1_fargoth')
 
     def test_conversation_greeting_lists(self):
+        # the defines are written as the engine's codes (TEXT-MACROS-DIALOGUE-CODES-59, tools/text_defines.py)
         self.assertEqual([x[0] for x in G.lines(self.t, 'fargoth', 'greeting')],
-                         ['About that ring...', 'Hello, %PCName. I am Fargoth.', 'What do you want, %PCRace?'])
+                         ['About that ring...', 'Hello, \x01\x06. I am Fargoth.', 'What do you want, \x01\x07?'])
         talked = G.lines(self.t, 'fargoth', 'greeting')[1][2]
         self.assertEqual(talked, [(G.OP_FUNC, 0, dialogue.FUNCTIONS.index('TalkedToPc'), 0)])
-        # the speaker's defines stay in the text: the engine fills them from the NPC row
+        # the speaker's defines stay in the text (as codes): the engine fills them from the NPC row
         self.assertEqual([x[0] for x in G.lines(self.t, 'mage', 'greeting')],
-                         ['About that ring...', 'I am %Name, a %Class of the %Faction.'])
+                         ['About that ring...', 'I am \x01\x0d, a \x01\x09 of the \x01\x04.'])
 
     def test_lists_match_the_filter_for_every_npc_and_topic(self):
         k = kinds()
@@ -177,7 +179,7 @@ class VoiceTable(unittest.TestCase):
                 with self.subTest(npc=ident, topic=topic):
                     got = [(line or '', '' if sound is None else sound, len(conds))
                            for line, sound, conds in G.lines(self.t, ident, topic)]
-                    want = [(line, voice_pool_name(sound)[6:22] if sound else '', n)
+                    want = [(text_defines.encode(line)[0], voice_pool_name(sound)[6:22] if sound else '', n)
                             for line, sound, n in brute_force(k, ident, topic)]
                     self.assertEqual(got, want)
 
@@ -486,7 +488,9 @@ class NativeVoiceTable(unittest.TestCase):
         common = ['cc', '-std=gnu89', '-O1', '-Wall', '-Wno-unused', '-fsanitize=undefined',
                   '-fno-sanitize-recover=all', '-include', str(ROOT / 'tests/aga_test_files.h'), '-I' + str(tmp),
                   '-I' + str(src), str(ROOT / 'tests/aga_glut_test.c'), str(src / 'aw_glut.c')]
-        for name, extra in (('pure', ['-DAW_GLUT_HOST_TEST']), ('glue', [str(src / 'aw_anim.c'), str(src / 'mathlib.c')])):
+        for name, extra in (('pure', ['-DAW_GLUT_HOST_TEST']),
+                            ('glue', [str(src / 'aw_anim.c'), str(src / 'mathlib.c'), '-DAW_TEXTDEF_HOST_TEST',
+                                      str(src / 'aw_textdef.c')])):
             result = subprocess.run(common + extra + ['-lm', '-o', str(tmp / name)], capture_output=True, text=True)
             assert result.returncode == 0, result.stderr
 

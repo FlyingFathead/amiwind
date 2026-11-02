@@ -47,6 +47,7 @@ void AW_UIFill(int x,int y,int w,int h,int c){if(c==AW_UIColor(255,32,32))red_pi
 void AW_UIScrollbar(int x,int y,int h,int total,int visible,int top){}
 static int scroll_hits;
 int AW_UIScrollHit(int mx,int my,int x,int y,int h,int total,int visible,int top){scroll_hits++;return -1;}
+int AW_UICursor(int x,int y){(void)x;(void)y;return 0;}   /* aw_ui.c (CURSOR-MW-58): no Morrowind pointer here */
 void AW_UIBookBegin(void){}
 void AW_UIBookEnd(void){}
 int AW_UIWidth(const char *s){return (int)strlen(s)*6;}

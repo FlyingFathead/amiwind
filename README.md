@@ -4,7 +4,7 @@
 
 # AmiWind
 
-_Last updated with AmiWind v0.0.58 (1 November 2026)._
+_Last updated with AmiWind v0.0.59-dev4 (2 November 2026)._
 
 An unofficial, experimental RPG engine and enthusiast project bringing Morrowind
 to the Commodore Amiga, featuring CHIM: an AmiQuake-based engine and an asset
@@ -44,6 +44,13 @@ and 19 open-sea cells), with no classic region maps left outdoors. What these nu
 [CHIM Progress Tracker](docs/chim/PROGRESS_TRACKER.md). Since v0.0.48 every interior of the base game but two (the
 prison and the census office) is built as a CHIM room, with the people the game places in them. Solstheim is not
 converted.
+
+The development line is at **v0.0.59-dev4** (2 November 2026): the items of the world are placed from one shared
+model table in rooms and outdoors and can be taken, the world remembers what the player takes, drops or moves
+across rooms, outdoor areas and saved games, dropping items works on the streamed towns, and the mouse cursor
+is the original game's; with every item's world model, the 512 model table, compact text macros and the
+dialogue fixes of the earlier snapshots, for testing in game ([dev4 notes](docs/releases/notes/RELEASE-v0.0.59-dev4.md),
+[dev3 notes](docs/releases/notes/RELEASE-v0.0.59-dev3.md)).
 
 What comes next is in the [roadmap](docs/ROADMAP.md): v0.0.59 takes the parts of v0.0.58 that are not done: world
 models and object placement (every item with its own model, every placed item in its place, a larger model table per

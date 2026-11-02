@@ -27,7 +27,10 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'src'))
 from mwad.esm import records, subrecords, string, first
 from mwad.paths import resolve_data_files, child_ci
+sys.path.insert(0, str(ROOT / 'tools'))
+from ref_identity import stable_ref
 
+MASTER = 'Morrowind.esm'   # the content file the lists read (its references' stable ids: tools/ref_identity.py)
 ITEM_DATA = {   # record -> (data subrecord, struct of its weight and value, offset)
     'WEAP': ('WPDT', '<fi', 0), 'ARMO': ('AODT', '<xxxxfi', 0), 'CLOT': ('CTDT', '<xxxxfH', 0),
     'ALCH': ('ALDT', '<fi', 0), 'INGR': ('IRDT', '<fi', 0), 'BOOK': ('BKDT', '<fi', 0), 'MISC': ('MCDT', '<fi', 0),
@@ -176,7 +179,10 @@ def placements(raw, objects, numbers):
                         name = places.get((math.floor(dx / CELL), math.floor(dy / CELL))) or name
                 else:
                     continue          # a door that only opens: the hinged doors say their own name
-            rows.append((kind, owned, ref['number'], x, y, z, weight, value, name, ident if kind == 'I' else '',
+            # the stable reference id (tools/ref_identity.py, CELL-CHANGES-59): the list reads Morrowind.esm alone,
+            # whose own numbers are their ids
+            rows.append((kind, owned, stable_ref(MASTER, ref['number']), x, y, z, weight, value, name,
+                         ident if kind == 'I' else '',
                          action_code(action, owned)))
     return rooms
 

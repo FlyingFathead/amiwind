@@ -187,8 +187,50 @@ model_t *Mod_LoadModel (model_t *mod, qboolean crash);
 byte	mod_novis[MAX_MAP_LEAFS/8];
 
 #define	MAX_MOD_KNOWN	AW_EDGE_CACHE_MODEL_LIMIT
-model_t	mod_known[MAX_MOD_KNOWN];
+/* ENGINE-MODEL-TABLE-58: the first MOD_KNOWN_BASE slots are static, as Quake's whole table was; the slots up to
+ * MAX_MOD_KNOWN come in pages of MOD_KNOWN_PAGE, allocated only when a map loads more models than the base
+ * holds, and kept for the session (a model_t is referred to by pointer). A map within 256 models costs nothing. */
+#define	MOD_KNOWN_BASE	256
+#define	MOD_KNOWN_PAGE	64
+#if MAX_MOD_KNOWN <= MOD_KNOWN_BASE
+#error "MAX_MOD_KNOWN must be above MOD_KNOWN_BASE (or drop the pages)"
+#endif
+#define	MOD_KNOWN_PAGES	((MAX_MOD_KNOWN - MOD_KNOWN_BASE + MOD_KNOWN_PAGE - 1) / MOD_KNOWN_PAGE)
+/* the resident registry's numbers (tools/resident_registry.py reads digits only): the pages, and one page's bytes
+ * on the 68k (64 model_t of 400 bytes). Raising MAX_MODELS raises the pages here and the resident budget. */
+#define	AW_MOD_KNOWN_PAGES	4
+#define	AW_MOD_KNOWN_PAGE_BYTES	25600
+#if AW_MOD_KNOWN_PAGES != MOD_KNOWN_PAGES
+#error "AW_MOD_KNOWN_PAGES must be the pages MAX_MODELS needs past MOD_KNOWN_BASE"
+#endif
+#if defined(__m68k__)
+typedef char aw_mod_known_page_fits[(sizeof(model_t) * MOD_KNOWN_PAGE <= AW_MOD_KNOWN_PAGE_BYTES) ? 1 : -1];
+#endif
+model_t	mod_known[MOD_KNOWN_BASE];
+static model_t	*mod_known_pages[MOD_KNOWN_PAGES];
 int		mod_numknown;
+AW_RESIDENT_GROWS("loaded models past 256 (ENGINE-MODEL-TABLE-58)",AW_MOD_KNOWN_PAGES,AW_MOD_KNOWN_PAGE_BYTES);
+
+/* slot I of the loaded-model table (I < mod_numknown) */
+model_t *Mod_Known (int i)
+{
+    if (i < MOD_KNOWN_BASE)
+        return &mod_known[i];
+    i -= MOD_KNOWN_BASE;
+    return &mod_known_pages[i / MOD_KNOWN_PAGE][i % MOD_KNOWN_PAGE];
+}
+
+/* make slot I (== mod_numknown) usable: false when its page cannot be allocated */
+static qboolean Mod_KnownGrow (int i)
+{
+    int page;
+    if (i < MOD_KNOWN_BASE)
+        return true;
+    page = (i - MOD_KNOWN_BASE) / MOD_KNOWN_PAGE;
+    if (!mod_known_pages[page])
+        mod_known_pages[page] = (model_t *)AW_TryCalloc (MOD_KNOWN_PAGE, sizeof(model_t));
+    return mod_known_pages[page] != NULL;
+}
 
 // values for model_t's needload
 #define NL_PRESENT		0
@@ -323,7 +365,8 @@ void Mod_ClearAll (void)
     model_t	*mod;
 
 
-    for (i=0 , mod=mod_known ; i<mod_numknown ; i++, mod++) {
+    for (i=0 ; i<mod_numknown ; i++) {
+        mod = Mod_Known (i);
         /* Inspection visits release the previous actor and footprint payloads. */
         if (mod->type == mod_alias && !strncmp(mod->name,"gallery/",8) && mod->cache.data)
             Cache_Free (&mod->cache);
@@ -345,9 +388,11 @@ qboolean Mod_CanFindName(const char *name)
 {
     int i;
     if(!name || !name[0])return false;
-    if(mod_numknown<MAX_MOD_KNOWN)return true;
+    if(mod_numknown<MOD_KNOWN_BASE)return true;
     for(i=0;i<mod_numknown;i++)
-        if(!strcmp(mod_known[i].name,name) || mod_known[i].needload==NL_UNREFERENCED)return true;
+        if(!strcmp(Mod_Known(i)->name,name) || Mod_Known(i)->needload==NL_UNREFERENCED)return true;
+    /* optional assets never grow the table past its static base (ENGINE-MODEL-TABLE-58): the pages are for
+     * the models a map precaches */
     return false;
 }
 void Mod_ReleaseAlias(model_t *mod)
@@ -361,7 +406,7 @@ void Mod_ReleaseAlias(model_t *mod)
 model_t *Mod_FindName (char *name)
 {
     int		i;
-    model_t	*mod;
+    model_t	*mod = NULL;
     model_t	*avail = NULL;
 
     if (!name[0])
@@ -370,8 +415,9 @@ model_t *Mod_FindName (char *name)
 //
 // search the currently loaded models
 //
-    for (i=0 , mod=mod_known ; i<mod_numknown ; i++, mod++)
+    for (i=0 ; i<mod_numknown ; i++)
     {
+        mod = Mod_Known (i);
         if (!strcmp (mod->name, name) )
             break;
         if (mod->needload == NL_UNREFERENCED)
@@ -381,20 +427,21 @@ model_t *Mod_FindName (char *name)
 
     if (i == mod_numknown)
     {
-        if (mod_numknown == MAX_MOD_KNOWN)
+        /* past the static base an unreferenced slot is reused before a page is allocated, so a session of
+         * small maps never grows the table (ENGINE-MODEL-TABLE-58); within the base, Quake's rule */
+        if (mod_numknown >= MOD_KNOWN_BASE && avail)
         {
-            if (avail)
-            {
-                mod = avail;
-                if (mod->type == mod_alias)
-                    if (Cache_Check (&mod->cache))
-                        Cache_Free (&mod->cache);
-            }
-            else
-                Sys_Error ("mod_numknown == MAX_MOD_KNOWN");
+            mod = avail;
+            if (mod->type == mod_alias)
+                if (Cache_Check (&mod->cache))
+                    Cache_Free (&mod->cache);
         }
+        else if (mod_numknown == MAX_MOD_KNOWN)
+            Sys_Error ("mod_numknown == MAX_MOD_KNOWN");
+        else if (!Mod_KnownGrow (mod_numknown))
+            Sys_Error ("Mod_FindName: no memory for loaded-model slot %d", mod_numknown);
         else
-            mod_numknown++;
+            mod = Mod_Known (mod_numknown++);
         strcpy (mod->name, name);
         mod->needload = NL_NEEDS_LOADED;
     }
@@ -3197,8 +3244,9 @@ void Mod_Print (void)
     model_t	*mod;
 
     Con_Printf ("Cached models:\n");
-    for (i=0, mod=mod_known ; i < mod_numknown ; i++, mod++)
+    for (i=0 ; i < mod_numknown ; i++)
     {
+        mod = Mod_Known (i);
         Con_Printf ("%8p : %s",mod->cache.data, mod->name);
         if (mod->needload & NL_UNREFERENCED)
             Con_Printf (" (!R)");

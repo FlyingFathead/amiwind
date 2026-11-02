@@ -97,7 +97,8 @@ typedef struct
 	unsigned short	v[2];
 } medge_t;
 #define AW_EDGE_CACHE_SPLIT 1
-#define AW_EDGE_CACHE_MODEL_LIMIT 256
+/* the loaded-model table (model.c mod_known) holds every model a map precaches (ENGINE-MODEL-TABLE-58) */
+#define AW_EDGE_CACHE_MODEL_LIMIT MAX_MODELS
 
 typedef struct
 {
@@ -393,6 +394,8 @@ void	Mod_Init (void);
 void	Mod_ClearAll (void);
 model_t *Mod_ForName (char *name, qboolean crash);
 qboolean Mod_CanFindName(const char *name);
+/* slot I (< mod_numknown) of the loaded-model table: 256 static slots, then pages (ENGINE-MODEL-TABLE-58) */
+model_t *Mod_Known (int i);
 /* Free an alias model's cached data and let Mod_FindName reuse its slot. */
 void Mod_ReleaseAlias(model_t *mod);
 void	*Mod_Extradata (model_t *mod);	// handles caching

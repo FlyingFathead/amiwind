@@ -211,6 +211,8 @@ void AW_UISubtitle(const char *name,const char *text,double duration){strncpy(su
 int (*aw_chim_view_reach)(void);
 /* aw_hud.c: original coordinates on the active frame (the debug HUD's GLOBAL row and cell). */
 int (*aw_chim_source)(const float *local,float *world);
+int (*aw_focus_chim_source)(const float *local,float *game);   /* aw_inventory.c (placed items on a frame map) */
+int (*aw_focus_chim_local)(const float *game,float *local);
 /* aw_scene.c: a crossing into another frame's cell streams (type 1 crossings, CHIM's window). */
 int (*aw_chim_cross)(const float *origin,int *cx,int *cy);
 int (*aw_chim_recentre)(int cx,int cy,const float *d,int apply);

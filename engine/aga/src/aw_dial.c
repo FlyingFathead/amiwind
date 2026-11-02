@@ -9,8 +9,10 @@
  * The pure part has no engine dependencies and allocates nothing: the conversation lives in the caller's buffer.
  */
 #include <math.h>
+#include <stdlib.h>
 #include <string.h>
 #include "aw_dial.h"
+#include "aw_textdef.h"
 #include "aw_tryalloc.h"
 
 static unsigned rd16(const unsigned char *p) {return (unsigned)p[0]<<8|p[1];}
@@ -670,18 +672,51 @@ unsigned long AW_DialNameHash(const char *name,int length) {
     }
     return h;
 }
+/* DIALOGUE-OPEN-STALL-58: the map was made with one disk read per topic and a search through every row per topic
+ * (about 3 s for Morrowind.esm on the first conversation, FS-UAE at 32 MB Fast). Now the topic names come in one read
+ * (TOPIC_MAP_RUN bytes at most, freed at once; over that, one read per topic as before) and the rows are found by a
+ * binary search over their hashes sorted once (2 bytes per row, freed at once). The same row as before: the first
+ * row with the hash. */
+#define TOPIC_MAP_RUN (512L*1024L)
+static const unsigned long *sort_hashes;
+static int by_hash(const void *a,const void *b) {
+    unsigned short x=*(const unsigned short *)a,y=*(const unsigned short *)b;
+    if(sort_hashes[x]!=sort_hashes[y])return sort_hashes[x]<sort_hashes[y]?-1:1;
+    return x<y?-1:x>y;
+}
 int AW_DialTopicMap(const aw_dial_t *d,aw_dial_read_t read,void *user,const unsigned long *hashes,int rows,
                     unsigned short *map) {
-    long t;int r,mapped=0;char name[256];
+    long t,first=-1,end=-1;int r,mapped=0;char name[256];unsigned short *order=NULL;char *names=NULL;
     if(!d->data || !map)return 0;
+    if(rows>(int)AW_DIAL_NO_ROW)rows=(int)AW_DIAL_NO_ROW;
+    for(t=0;t<d->topics;t++){
+        int length;long at;
+        if(AW_DialTopicKind(d,(int)t)!=AW_DIAL_KIND_TOPIC || (at=AW_DialTopicName(d,(int)t,&length))<0 || length<1)continue;
+        if(first<0 || at<first)first=at;
+        if(at+length>end)end=at+length;
+    }
+    if(first>=0 && end-first<=TOPIC_MAP_RUN && (names=(char *)AW_TryMalloc((size_t)(end-first)))!=NULL &&
+       !read(user,first,names,end-first)){free(names);names=NULL;}
+    if(rows>0 && (order=(unsigned short *)AW_TryMalloc(sizeof(unsigned short)*(size_t)rows))!=NULL){
+        for(r=0;r<rows;r++)order[r]=(unsigned short)r;
+        sort_hashes=hashes;qsort(order,(size_t)rows,sizeof(order[0]),by_hash);
+    }
     for(t=0;t<d->topics;t++){
         int length;long at;unsigned long h;
         map[t]=AW_DIAL_NO_ROW;
         if(AW_DialTopicKind(d,(int)t)!=AW_DIAL_KIND_TOPIC || (at=AW_DialTopicName(d,(int)t,&length))<0 || length<1)continue;
-        if(!read(user,at,name,length))return -1;
+        if(length>(int)sizeof(name))length=(int)sizeof(name);
+        if(names)memcpy(name,names+(at-first),(size_t)length);
+        else if(!read(user,at,name,length)){free(order);return -1;}
         h=AW_DialNameHash(name,length);
-        for(r=0;r<rows && r<(int)AW_DIAL_NO_ROW;r++)if(hashes[r]==h){map[t]=(unsigned short)r;mapped++;break;}
+        if(order){                       /* the first row with the hash: lower bound over (hash, row) */
+            int lo=0,hi=rows;
+            while(lo<hi){int mid=(lo+hi)/2;if(hashes[order[mid]]<h)lo=mid+1;else hi=mid;}
+            if(lo<rows && hashes[order[lo]]==h){map[t]=order[lo];mapped++;}
+        }
+        else for(r=0;r<rows;r++)if(hashes[r]==h){map[t]=(unsigned short)r;mapped++;break;}
     }
+    free(order);free(names);
     return mapped;
 }
 void AW_DialKnownSync(const aw_dial_t *d,unsigned char *known,const unsigned short *map,int (*knows)(int row)) {
@@ -763,8 +798,14 @@ int AW_DialMarkSpans(const char *text,const aw_dial_span_t *spans,int n,char *ou
     int at=0,k=0,o=0;
     if(capacity<=0)return 0;
     for(;text[at] && o<capacity-1;at++){
+        int code=AW_TEXTDEF_CODE_BYTES(text+at);
         while(k<n && at==spans[k].offset+spans[k].length && o<capacity-1){out[o++]=AW_DIAL_LINK_CLOSE;k++;}
         if(k<n && at==spans[k].offset && o<capacity-1)out[o++]=AW_DIAL_LINK_OPEN;
+        if(code){                    /* a text define's code (aw_textdef.h), whole: its later bytes may equal a mark */
+            if(o+code>capacity-1)break;
+            memcpy(out+o,text+at,(size_t)code);o+=code;at+=code-1;
+            continue;
+        }
         if(o<capacity-1 && text[at]!=AW_DIAL_LINK_OPEN && text[at]!=AW_DIAL_LINK_CLOSE)out[o++]=text[at];
     }
     if(k<n && at==spans[k].offset+spans[k].length && o<capacity-1)out[o++]=AW_DIAL_LINK_CLOSE;

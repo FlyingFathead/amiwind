@@ -108,7 +108,9 @@ static void text(int x,int y,const char *s,int right){
     for(;*s && x+w<=right;s++,x+=w)AW_ConsoleCharacter(x,y,(unsigned char)*s);
 }
 static void cursor(void){
-    int x=minmax(mouse_x,0,312),y=minmax(mouse_y,0,192),c=AW_UIColor(255,245,190),dark=AW_UIColor(0,0,0);
+    int x=minmax(mouse_x,0,312),y=minmax(mouse_y,0,192),c,dark;
+    if(AW_UICursor(x,y))return;   /* Morrowind's own pointer (CURSOR-MW-58); else AmiWind's below */
+    c=AW_UIColor(255,245,190);dark=AW_UIColor(0,0,0);
     AW_UIFill(x,y,3,8,dark);AW_UIFill(x,y,8,3,dark);
     AW_UIFill(x+1,y+1,1,6,c);AW_UIFill(x+1,y+1,6,1,c);
 }

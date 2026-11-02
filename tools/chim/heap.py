@@ -1428,7 +1428,7 @@ def require_heap(out, sdk=None, sizes=None, report_path=None, zone_kib=None, poo
     if links:
         f = links[0]
         raise ValueError('CHIM heap gate failed: %s places %d placements in one active ring, more than the %d '
-                         'efrag links CHIM may use (client.h AW_EFRAG_LIMIT less CHIM_EFRAG_RESERVE); see %s'
+                         'efrag links CHIM may use (engine AW_EFRAG_LIMIT less CHIM_EFRAG_RESERVE); see %s'
                          % (f['frame'], f['efrags']['ring_placements_peak'], f['efrags']['budget_links'],
                             report_path))
     if bad:

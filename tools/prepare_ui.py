@@ -16,6 +16,47 @@ from PIL import Image, ImageDraw, ImageFont
 
 # The map's player arrow in gfx/ui.awu (engine/aga/src/aw_worldui.c MAP_ARROW_*): 16x16 at 0,48.
 ARROW, ARROW_X, ARROW_Y = 16, 0, 48
+# CURSOR-MW-58: the original's mouse pointer, textures/tx_cursor.dds in Morrowind.bsa (32x32; the arrow the original
+# and OpenMW draw over every window), box-filtered to 16x16 like the map arrow and written as gfx/cursor.awc
+# (engine/aga/src/aw_ui.c AW_UICursor): b'AWC1', width, height, the tip's x and y (the first drawn pixel, top row
+# first), then width*height palette indices, 255 clear (a pixel under half cover). Not in the player's data, or not
+# readable: no file is written and the engine keeps AmiWind's own cursor.
+CURSOR, CURSOR_SOURCE, CURSOR_FILE = 16, 'textures/tx_cursor.dds', 'cursor.awc'
+
+
+def cursor_packet(raw, palette):
+    """The gfx/cursor.awc bytes of the original's pointer texture RAW, in the 256-colour PALETTE."""
+    import io
+    import numpy as np
+    from prepare_icons import quantise
+    art = Image.open(io.BytesIO(raw)).convert('RGBA').resize((CURSOR, CURSOR), Image.Resampling.BOX)
+    rgba = np.asarray(art, dtype=np.float64).reshape(-1, 4) / 255.0
+    colours = quantise(rgba[:, :3], palette)
+    # half cover or more is drawn (127 of 255: a half-covered box rounds either way)
+    pixels = bytes(colours[i] if rgba[i, 3] * 255 >= 126.5 else 255 for i in range(CURSOR * CURSOR))
+    tip = next((i for i, p in enumerate(pixels) if p != 255), None)
+    if tip is None:
+        raise ValueError(CURSOR_SOURCE + ': no pointer pixels')
+    return b'AWC1' + bytes((CURSOR, CURSOR, tip % CURSOR, tip // CURSOR)) + pixels
+
+
+def write_cursor(assets, palette, out):
+    """Write gfx/cursor.awc from the player's own data; (record, the palette indices it uses). Missing or unreadable
+    in the data: no file (a stale one is removed), a record saying why, and nothing fails."""
+    target = Path(out) / CURSOR_FILE
+    try:
+        raw = assets.read(CURSOR_SOURCE)
+        packet = cursor_packet(raw, palette)
+    except (KeyError, OSError, ValueError) as exc:
+        if target.exists():
+            target.unlink()
+        print('Warning: the original mouse pointer (%s) is not in the game data (%s); the game keeps the AmiWind '
+              'cursor.' % (CURSOR_SOURCE, exc.__class__.__name__), flush=True)
+        return {'source': CURSOR_SOURCE, 'output': None, 'reason': 'not in the game data'}, set()
+    target.write_bytes(packet)
+    return ({'source': CURSOR_SOURCE, 'source_sha256': hashlib.sha256(raw).hexdigest(), 'output': CURSOR_FILE,
+             'size': [CURSOR, CURSOR], 'tip': [packet[6], packet[7]]},
+            {p for p in packet[8:] if p != 255})
 
 
 def sha(path):
@@ -276,10 +317,14 @@ def convert(data, palette_path, out):
     sources[path] = hashlib.sha256(raw).hexdigest()
     indexed = Image.frombytes('P',(64,64),bytes(pixels))
     (out/'ui.awu').write_bytes(b'AWU1'+struct.pack('<HH',64,64)+indexed.tobytes())
+    # The original's mouse pointer (CURSOR-MW-58): gfx/cursor.awc, or no file when the data has none.
+    cursor_record, cursor_colours = write_cursor(assets, palette, out)
+    if cursor_record['output']: sources[CURSOR_SOURCE] = cursor_record['source_sha256']
     path='textures/menu_morrowind.dds';raw=assets.read(path)
     background=Image.open(io.BytesIO(raw)).convert('RGB').resize((320,200),Image.Resampling.BOX)
-    # Front-end artwork has its own palette; preserve every UI atlas/text color.
-    protected=set(indexed.tobytes())|{254,255}
+    # Front-end artwork has its own palette; preserve every UI atlas/text color (and the pointer's: it is drawn over
+    # the menu art too).
+    protected=set(indexed.tobytes())|{254,255}|cursor_colours
     for rgb in ((0,0,0),(76,67,46),(151,131,87),(223,199,144),(115,108,89),
                 (22,20,18),(210,184,121),(114,114,114),(62,53,36)):
         protected.add(min(range(256),key=lambda i:sum((palette[i*3+c]-rgb[c])**2 for c in range(3))))
@@ -322,7 +367,7 @@ def convert(data, palette_path, out):
               'font_families':font_report, 'sources':sources,
               'encoding':'CP1252 game strings; preferred TTF or Bethesda bitmap fallback per family',
               'variants':[16,14,12], 'coverage':'three ink shades and transparent; packed 2-bit',
-              'loading_screens':loading}
+              'loading_screens':loading, 'cursor':cursor_record}
     (out/'ui-conversion.json').write_text(json.dumps(report,indent=2)+'\n')
     return report
 

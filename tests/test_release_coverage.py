@@ -70,7 +70,8 @@ class ReleaseFeatures(unittest.TestCase):
         new = self.config['new_features']
         # focus: the focus table (v0.0.58, FOCUS-BOX-58), not in the last release's payload yet
         # books: the book texts (v0.0.58, BOOK-READER-58), with the focus table
-        self.assertEqual({f['id'] for f in new}, {'chim-world', 'chim-frame-maps', 'focus', 'books'})
+        # item-models: the item model table (ITEM-WORLD-MODELS-58), likewise
+        self.assertEqual({f['id'] for f in new}, {'chim-world', 'chim-frame-maps', 'focus', 'books', 'item-models'})
         legacy = dict(default_steps('--builder', 'legacy'))
         chim = dict(default_steps('--builder', 'chim'))
         for feature in new:
@@ -96,12 +97,14 @@ class ReleaseFeatures(unittest.TestCase):
     def test_chim_payload_needs_the_chim_features(self):
         base = [example(c) for c in self.baseline['classes']]
         chim = ['id1/chim/world.cwi', 'id1/chim/frames/x-03/y-02/frame.ccf',
-                'id1/chim/frames/x-03/y-02/s00.ccs', 'id1/maps/balmora-chim.bsp', 'id1/focus.awf', 'id1/books.awb']
+                'id1/chim/frames/x-03/y-02/s00.ccs', 'id1/maps/balmora-chim.bsp', 'id1/focus.awf', 'id1/books.awb',
+                'id1/progs/items/models.awt', 'id1/progs/items/m0123456789abcdef.mdl']
         legacy = coverage.compare(base, self.config, self.baseline)
         self.assertFalse(coverage.failed(legacy), legacy)
         self.assertEqual(legacy['builder'], 'legacy')
         missing = coverage.compare(base, self.config, self.baseline, 'chim')
-        self.assertEqual(missing['missing_features'], ['chim-world', 'chim-frame-maps', 'focus', 'books'])
+        self.assertEqual(missing['missing_features'],
+                         ['chim-world', 'chim-frame-maps', 'focus', 'books', 'item-models'])
         self.assertTrue(coverage.failed(missing))
         complete = coverage.compare(base + chim, self.config, self.baseline, 'chim')
         self.assertFalse(coverage.failed(complete), complete)

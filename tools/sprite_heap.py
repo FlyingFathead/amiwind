@@ -97,7 +97,8 @@ def inspect_sprites(entity_bytes,asset_root,sizes,static_limit=None):
         # zone, not the Hunk (the frame map's _chim_hunk_rest states that)
         if is_streamed_static(ent,frame_map):continue
         classname=ent.get('classname','')
-        signon += 33 if classname=='aw_flora' else (14 if classname=='aw_static' else 16)+wide
+        # one byte more each since the model index is a short (protocol.h MSG_WriteModel, ENGINE-MODEL-TABLE-58)
+        signon += 34 if classname=='aw_flora' else (15 if classname=='aw_static' else 17)+wide
         model=ent.get('model','')
         if not model.lower().endswith('.spr'):continue
         p=PurePosixPath(model)
@@ -148,6 +149,22 @@ def efrag_pool_profile(source):
         match=re.search(r'^\s*#define\s+'+macro+r'\s+(\d+)\b',source,re.M)
         if not match:raise ValueError('Missing efrag allocation policy: '+macro)
         values[key]=int(match[1])
+    return _efrag_policy_checked(values)
+
+
+def efrag_pool_policy(source=None):
+    """efrag_pool_profile of the engine's client.h, read as its four #define lines (engine_limits.define). A stage
+    key then counts those lines, not the whole header: a new engine declaration in client.h re-converted the CHIM
+    world (BUILD-STAGE-KEY-CLIENT-H-58)."""
+    import engine_limits as EL
+    src=EL.SOURCE if source is None else source
+    return _efrag_policy_checked({'base_links':EL.define('client.h','MAX_EFRAGS',src),
+                                  'page_links':EL.define('client.h','AW_EFRAG_PAGE_LINKS',src),
+                                  'max_links':EL.define('client.h','AW_EFRAG_LIMIT',src),
+                                  'max_statics':EL.define('client.h','MAX_STATIC_ENTITIES',src)})
+
+
+def _efrag_policy_checked(values):
     if (min(values.values())<=0 or values['max_links']<values['base_links'] or
             (values['max_links']-values['base_links'])%values['page_links']):
         raise ValueError('Invalid efrag allocation policy')

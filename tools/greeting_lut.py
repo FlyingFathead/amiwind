@@ -39,6 +39,8 @@ for _p in (ROOT / 'tools', ROOT / 'src'):
         sys.path.remove(str(_p))
     sys.path.insert(0, str(_p))
 
+import text_defines  # noqa: E402  (the engine's define codes, aw_textdef.c)
+
 MAGIC = b'AWGL'
 VERSION = 2                      # 2: the creature sound rows and the named sound slots (docs/NPC_DEFAULTS.md)
 NAME = 'npc-voices.lut'
@@ -500,7 +502,9 @@ def tables(kinds, names, masks, order, facts, resolve, settings, creature_rows=(
         if sound:
             pool = resolve(sound)
             s = sounds.setdefault(pool, len(sounds))
-        entries.append(struct.pack('>IIHBB', texts.add(line) if line else NONE32, first, s, len(runtime),
+        # the defines as the engine's codes (TEXT-MACROS-DIALOGUE-CODES-59): filled in one pass (aw_textdef.c)
+        entries.append(struct.pack('>IIHBB', texts.add(text_defines.encode(line)[0]) if line else NONE32, first, s,
+                                   len(runtime),
                                    0 if runtime else ENTRY_LAST))
     list_rows, list_items, list_of = [], [], {}
     for group in sorted(kept, key=lambda g: (g[0], entry_index[kept[g][0]], g[1])):
@@ -930,7 +934,7 @@ def image_step(data, id1, out=None, jobs=1, media=None):
     lengths = media_lengths(media) if media is not None else None
     inputs['media_lengths_sha256'] = None if lengths is None else hashlib.sha256(
         json.dumps(lengths, sort_keys=True).encode()).hexdigest()
-    cache = UnitCache.open('npc-voice-table', {'format': 'AWGL%d' % VERSION}, __file__)
+    cache = UnitCache.open('npc-voice-table', {'format': 'AWGL%d' % VERSION}, __file__, text_defines.__file__)
     target = Path(id1) / NAME
     t0 = time.time()
     print('Voice table: start (1 unit cache lookup, then %d jobs if built)' % jobs, flush=True)

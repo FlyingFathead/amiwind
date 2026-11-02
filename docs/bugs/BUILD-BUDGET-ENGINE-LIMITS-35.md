@@ -18,11 +18,12 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.58-dev4 (1 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [Update: 1 November 2026, the model table holds 512](#update-1-november-2026-the-model-table-holds-512)
 - [Status: 10 October 2026](#status-10-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -35,6 +36,19 @@ _Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 - [Bugs in the same category](#bugs-in-the-same-category)
 
 <!-- contents end -->
+
+## Update: 1 November 2026, the model table holds 512
+
+`MAX_MODELS` (`quakedef.h`) is 512 from v0.0.59 on (ENGINE-MODEL-TABLE-58), one define; it was 256. The Census
+Office map needed more than 256 model precaches once its small items were placed, so they were left out of
+v0.0.58-dev4. A model index now travels as a short in every message that carries one (entity updates,
+baselines, static entities, the view weapon), so the protocol number went up by one (1016, or 16 with narrow
+coordinates): an older engine and a newer one never read each other's messages or demos. Saved games are not
+affected: they store entity fields as text, and loading respawns the map, which precaches its models in the
+same order. The first 256 loaded-model slots stay static; slots 257 to 512 are allocated
+in pages of 64 only when a map loads more than 256 models. `tools/map_engine_limits.py` reads the define, so
+the builder's per-map gate follows it; `tests/test_map_engine_limits.py` checks the define and a map of 300
+models. No map of the v0.0.58-dev4 image is near 512 (the highest is 161 models).
 
 ## Status: 10 October 2026
 

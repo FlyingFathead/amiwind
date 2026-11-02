@@ -162,6 +162,8 @@ void AW_ExpandDialogue(char *out,int capacity,const char *source){
     if(!p){strncpy(out,source,(size_t)capacity-1);out[capacity-1]=0;return;}
     snprintf(out,(size_t)capacity,"%.*sNerevar%s",(int)(p-source),source,p+7);
 }
+/* the one-pass fill (aw_textdef.c, linked with AW_TEXTDEF_HOST_TEST): the player's values, only the name here */
+void AW_TextDefinesPlayer(aw_textdef_values_t *v){memset(v,0,sizeof(*v));v->pc_name="Nerevar";v->pc_race="Dark Elf";}
 int COM_FOpenFile(char *p,FILE **f){
     char hex[17];
     *f=NULL;
@@ -225,7 +227,7 @@ int main(int argc,char **argv){
     assert(!AW_GlutSay(&edicts[5],AW_GLUT_HELLO,0) && !strcmp(AW_GlutText(),""));
     /* the conversation greeting: the journal line is closed at the start; the speaker's and player's defines */
     assert(AW_GlutConverse(&edicts[4],0,text,sizeof(text)) && !strcmp(text,"I am Edwinna, a Mage of the Mages Guild."));
-    assert(AW_GlutConverse(&edicts[2],0,text,sizeof(text)) && !strcmp(text,"What do you want, %PCRace?"));
+    assert(AW_GlutConverse(&edicts[2],0,text,sizeof(text)) && !strcmp(text,"What do you want, Dark Elf?"));
     /* barks through the table (a town resident too): Attack always said, its file present */
     realtime=10;before=played;
     assert(AW_VoiceSay(&edicts[4],AW_VOICE_ATTACK_LINE,10000) && played==before+1);
@@ -235,9 +237,9 @@ int main(int argc,char **argv){
        the dialogue table's link marks) is its voiced Greeting 1 INFO; the Dunmer's shown line is an INFO with no
        voice: silent, as in the original; a line the voice table lacks: the table's own pick (the previous method) */
     before=played;
-    assert(AW_GlutGreetVoice(&edicts[4],"I am %Name, a %Class of the @%Faction#.") && played==before+1);
+    assert(AW_GlutGreetVoice(&edicts[4],"I am \001\015, a \001\011 of the @\001\004#.") && played==before+1);
     realtime=30;before=played;
-    assert(!AW_GlutGreetVoice(&edicts[2],"What do you want, %PCRace?") && played==before);
+    assert(!AW_GlutGreetVoice(&edicts[2],"What do you want, \001\007?") && played==before);
     assert(AW_GlutGreetVoice(&edicts[4],"A line of another table.") && played==before+1);
     realtime=40;before=played;
     assert(!AW_GlutGreetVoice(&edicts[5],"Hello.") && !AW_GlutGreetVoice(&edicts[4],NULL) && played==before);

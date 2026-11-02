@@ -11,6 +11,9 @@ int (*aw_save_objects_export)(aw_changes_t *changes);
 void (*aw_save_objects_import)(const aw_changes_t *changes);
 int (*aw_save_actors_export)(unsigned char *out,int capacity);
 void (*aw_save_actors_import)(const unsigned char *data,int bytes);
+int (*aw_save_ledger_rows)(const struct aw_ledger_s *ledger);
+int (*aw_save_ledger_encode)(const struct aw_ledger_s *ledger,unsigned char *out,int capacity);
+int (*aw_save_ledger_decode)(const unsigned char *data,int size,struct aw_ledger_s *into);
 /* AWS4 feature bit 16: the actor record's block, u32 length then its bytes (checked by aw_actorstate.c's import);
  * read straight into the caller's buffer (its contents count only when the decode succeeds) */
 static int actor_scratch_bytes;
@@ -297,11 +300,12 @@ int AW_SaveEncodeChanges(unsigned char *out,int capacity,const aw_save_t *state,
 {
     aw_save_t copy=*state;uint32_t size=0,crc;int listed=changes && changes->count>0;
     int actors=changes && changes->actors && changes->actor_bytes>0;
-    if(capacity<12 || capacity>AW_SAVE_BYTES)return 0;
+    int ledgered=changes && changes->ledger && aw_save_ledger_rows && aw_save_ledger_rows(changes->ledger)>0;
+    if(capacity<12 || capacity>AW_SAVE_MAX_BYTES)return 0;
     writing=out;reading=NULL;at=12;end=capacity;error=0;
     memset(out,0,capacity);fields(&copy);if(!error)journal_fields(&copy.state);
     {uint32_t features=(copy.state.harvest.slots?1U:0U)|(inventory_used(&copy.state.inventory)?2U:0U)|
-        (magic_used(&copy.state.magic)?4U:0U)|(listed?8U:0U)|(actors?16U:0U);word(&features);}
+        (magic_used(&copy.state.magic)?4U:0U)|(listed?8U:0U)|(actors?16U:0U)|(ledgered?32U:0U);word(&features);}
     if(!error && copy.state.harvest.slots)harvest_fields(&copy.state.harvest);
     if(!copy.state.harvest.slots){
         int i;for(i=0;i<32;i++)if(copy.state.harvest.catalogue[i])error=1;
@@ -324,6 +328,15 @@ int AW_SaveEncodeChanges(unsigned char *out,int capacity,const aw_save_t *state,
         if(n>AW_SAVE_ACTOR_BYTES || changes->actor_bytes>changes->actor_capacity)return 0;
         word(&n);bytes(changes->actors,(int)n);
     }
+    /* feature 32: u32 length, then the world change list's own form (aw_ledger.c), checked row by row */
+    if(!error && ledgered){
+        int need=aw_save_ledger_encode?aw_save_ledger_encode(changes->ledger,NULL,0):0;uint32_t n=(uint32_t)need;
+        if(need<=0)return 0;
+        word(&n);
+        if(error || at>end-need)return 0;
+        if(aw_save_ledger_encode(changes->ledger,out+at,need)!=need)return 0;
+        at+=need;
+    }
     if(error)return 0;
     size=at;memcpy(out,"AWS4",4);at=4;word(&size);
     crc=crc32(out+12,size-12);word(&crc);return size;
@@ -335,14 +348,14 @@ int AW_SaveDecode(const unsigned char *data,int size,aw_save_t *out)
 int AW_SaveDecodeChanges(const unsigned char *data,int size,aw_save_t *out,aw_changes_t *changes)
 {
     aw_save_t candidate;uint32_t length=0,crc=0,features=0;
-    if(size<12 || size>AW_SAVE_BYTES || (memcmp(data,"AWS1",4) && memcmp(data,"AWS2",4) && memcmp(data,"AWS3",4) && memcmp(data,"AWS4",4)))return 0;
+    if(size<12 || size>AW_SAVE_MAX_BYTES || (memcmp(data,"AWS1",4) && memcmp(data,"AWS2",4) && memcmp(data,"AWS3",4) && memcmp(data,"AWS4",4)))return 0;
     writing=NULL;reading=data;at=4;end=size;error=0;word(&length);word(&crc);
     if(length!=(uint32_t)size || crc!=crc32(data+12,size-12))return 0;
     memset(&candidate,0,sizeof(candidate));fields(&candidate);
     /* Older saves have quest indices but no chronological evidence. Do not
      * fabricate earlier entries or dates when decoding them. */
     if(!error && data[3]!='1')journal_fields(&candidate.state);
-    if(!error && data[3]=='4'){word(&features);if(features>31)error=1;}
+    if(!error && data[3]=='4'){word(&features);if(features>63)error=1;}
     if(!error && (data[3]=='3' || (data[3]=='4' && (features&1))))harvest_fields(&candidate.state.harvest);
     if(!error && data[3]=='4'){
         word(&candidate.equipment);
@@ -361,6 +374,17 @@ int AW_SaveDecodeChanges(const unsigned char *data,int size,aw_save_t *out,aw_ch
             if(changes && changes->actors && (int)n<=changes->actor_capacity){
                 memcpy(changes->actors,reading+at,n);actor_scratch_bytes=(int)n;}
             at+=(int)n;
+        }
+    }
+    /* feature 32 (CELL-CHANGES-59): the world change list, read into the caller's list only when the whole save is
+     * good (it is the last section: nothing after it can still refuse); without a list it is checked, not kept */
+    if(!error && data[3]=='4' && (features&32)){
+        uint32_t n=0;const unsigned char *list;
+        word(&n);
+        if(error || n<8 || at>end-(int)n)error=1;
+        else{
+            list=reading+at;at+=(int)n;
+            if(at!=size || !aw_save_ledger_decode || !aw_save_ledger_decode(list,(int)n,changes?changes->ledger:NULL))error=1;
         }
     }
     if(error || at!=size)return 0;

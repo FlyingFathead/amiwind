@@ -171,6 +171,10 @@ NEUTRAL_EDITS = {
     'a status print in chim_world.c': (SRC + 'chim/chim_world.c', lambda text: text.replace(
         'Con_Printf ("CHIM: room %s: %lu KiB of Fast RAM free',
         'Con_Printf ("CHIM: status diagnostic\\n");\n\t\t\tCon_Printf ("CHIM: room %s: %lu KiB of Fast RAM free', 1)),
+    # BUILD-STAGE-KEY-CLIENT-H-58: a new input button in client.h (the sneak key of v0.0.58-dev5) re-converted the
+    # CHIM world and its interiors, because the heap audit read client.h whole for four efrag #define lines
+    'a new input button in client.h': (SRC + 'client.h', lambda text: re.sub(
+        r'(extern\s+kbutton_t\s+in_speed\s*;)', r'\1\nextern kbutton_t in_aw_key_test;', text, count=1)),
 }
 # edits of what the world build reads: each must re-key the CHIM world
 READ_EDITS = {
@@ -180,6 +184,8 @@ READ_EDITS = {
         '} entity_t;', '    int aw_probe_field;\n} entity_t;', 1)),
     'chim_world.c chim_zone_kib default (engine_limits.cvar_default)': (SRC + 'chim/chim_world.c', lambda text: re.sub(
         r'(\{"chim_zone_kib", ")(\d+)', lambda m: m.group(1) + str(int(m.group(2)) + 16), text, count=1)),
+    'client.h AW_EFRAG_LIMIT (the heap audit efrag policy)': (SRC + 'client.h', lambda text: re.sub(
+        r'(#define\s+AW_EFRAG_LIMIT\s+)(\d+)', lambda m: m.group(1) + str(int(m.group(2)) + 64), text, count=1)),
 }
 
 
@@ -225,6 +231,12 @@ class EngineFactsRepositoryTests(unittest.TestCase):
         for name in ('cl_main.c', 'host.c', 'zone.c', 'r_efrag.c'):
             self.assertNotIn(SRC + name, files)
         self.assertTrue(str(self.key('chim_build.py')[SRC + 'quakedef.h']).startswith(engine_facts.PREFIX))
+
+    def test_the_world_keys_client_h_by_its_facts(self):
+        # BUILD-STAGE-KEY-CLIENT-H-58: no stage of the CHIM world reads client.h whole
+        for script in ('chim_build.py', 'chim_interiors.py'):
+            value = self.key(script).get(SRC + 'client.h')
+            self.assertTrue(value is None or str(value).startswith(engine_facts.PREFIX), script)
 
     def test_every_define_reader_reads_one_define_by_its_name(self):
         found = {}

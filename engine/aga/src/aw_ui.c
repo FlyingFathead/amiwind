@@ -347,6 +347,41 @@ const byte *AW_UIMapArrow(void) {
     a=skin+8+48*64;
     return skin_ready && a[0]==255?a:NULL;
 }
+/* CURSOR-MW-58: the mouse cursor in every window. Morrowind's own pointer (textures/tx_cursor.dds, converted by
+ * tools/prepare_ui.py into gfx/cursor.awc: "AWC1", width, height, the tip's x and y, then width*height palette
+ * indices, 255 clear) is the default (aw_cursor_type 2, saved); 1 = AmiWind's drawn cursor, the callers' own. An image
+ * without the file (no game data cursor) always gets AmiWind's. Read once, on the first window that draws a cursor. */
+#define CURSOR_MAX 32
+static cvar_t cursor_type={"aw_cursor_type","2",true};
+static byte cursor_art[8+CURSOR_MAX*CURSOR_MAX];
+static int cursor_state;   /* 0 not read yet, 1 ready, -1 none in this image */
+static int cursor_valid(const byte *p,int n) {
+    int i,w,h;
+    if(n<9 || memcmp(p,"AWC1",4))return 0;
+    w=p[4];h=p[5];
+    if(w<1 || h<1 || w>CURSOR_MAX || h>CURSOR_MAX || p[6]>=w || p[7]>=h || n!=8+w*h)return 0;
+    for(i=0;i<w*h;i++)if(p[8+i]!=255)return 1;
+    return 0;
+}
+int AW_UICursorAvailable(void) {
+    if(!cursor_state)cursor_state=cursor_valid(cursor_art,read_asset("gfx/cursor.awc",cursor_art,sizeof(cursor_art)))?1:-1;
+    return cursor_state>0;
+}
+int AW_UICursorType(void){return cursor_type.value==1?1:2;}
+void AW_UICursorTypeSet(int type){Cvar_SetValue(cursor_type.name,type==1?1:2);scr_copyeverything=1;}
+int AW_UICursor(int x,int y) {
+    int w,h,xx,yy,sx,sy;const byte *src;byte c;
+    if(AW_UICursorType()!=2 || !AW_UICursorAvailable() || !vid.buffer)return 0;
+    w=cursor_art[4];h=cursor_art[5];x-=cursor_art[6];y-=cursor_art[7];src=cursor_art+8;
+    for(yy=0;yy<h;yy++){
+        sy=y+yy;if(sy<0 || sy>=(int)vid.height)continue;
+        for(xx=0;xx<w;xx++){
+            sx=x+xx;c=src[yy*w+xx];
+            if(c!=255 && sx>=0 && sx<(int)vid.width)vid.buffer[sy*vid.rowbytes+sx]=c;
+        }
+    }
+    return 1;
+}
 int AW_UIFontSize(void){initialize();return font_bytes?font_height:0;}
 int AW_UISetFontSize(int size){
     initialize();
@@ -905,6 +940,7 @@ void AW_UIInit(void) {
     Cvar_RegisterVariable(&voice_names);
     Cvar_RegisterVariable(&voice_style);
     Cvar_RegisterVariable(&animate_item_pickups);
+    Cvar_RegisterVariable(&cursor_type);
     Cmd_AddCommand("aw_dialogue_method",dialogue_command);Cmd_AddCommand("aw_dialogue_layout",layout_command);
     Cmd_AddCommand("aw_ui_ink",ink_command);Cmd_AddCommand("aw_ui_select",font_command);Cmd_AddCommand("aw_ui_preview",preview);
 }

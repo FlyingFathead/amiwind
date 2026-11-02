@@ -1170,6 +1170,8 @@ DEPENDENCIES = {
     'books': (),
     # The class questions (CHARGEN-CENSUS-57): the install's Morrowind.ini only.
     'chargen': (),
+    # The item model table (ITEM-WORLD-MODELS-58): the game data and the census palette.
+    'item-models': ('census',),
     'image': ('world-terrain', 'world-scenery', 'npc-gallery', 'music', 'media', 'engine', 'dialogue-lookup'),
     'dry-run-image': ('engine',),
 }
@@ -1252,6 +1254,8 @@ def stage_dependencies(steps, skipped=()):
             deps = (*deps, 'books')
         if name == 'image' and 'chargen' in names:
             deps = (*deps, 'chargen')
+        if name == 'image' and 'item-models' in names:
+            deps = (*deps, 'item-models')
         # the actor library (--chim-actor-table on only) reads the census palette and the CHIM towns' residents
         if name == 'actor-library':
             deps = ('census', *(n for n in names if n.startswith('chim-town-')))

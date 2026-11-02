@@ -16,6 +16,7 @@ cvar_t volume={"volume","0.7",true,false,.7f},bgmvolume={"bgmvolume","1",true,fa
 cvar_t effectsvolume={"effectsvolume","0.75",true,false,.75f},dialoguevolume={"dialoguevolume","1",true,false,1};
 static int audio_sets;
 static int highlight_y,highlight_w,scroll_top,scroll_total;
+static int own_cursor;   /* the menu's own (AmiWind) cursor strokes drawn: AW_UICursor below said no */
 /* Controls > Combat style / Dice rolls / Blocking (aw_combat.c's saved options). */
 static float combat_miss=1,combat_dice=1,combat_block=1;
 /* Video > Far detail (aw_cull, aw_fog.c; the engine default 4 = Strong). */
@@ -62,11 +63,16 @@ void Cbuf_AddText(char *s){if(!strcmp(s,"quit\n"))quit++;else{strcpy(queued,s);c
 int AW_UIBackground(void){return 1;}int AW_UILogo(int x,int y){assert(x==60 && y==10);return 1;}
 int AW_UIWidth(const char *s){return strlen(s)*7;}
 int AW_UIColor(int r,int g,int b){return r;}
-void AW_UIFill(int x,int y,int w,int h,int c){if(c==62){highlight_y=y;highlight_w=w;}}
+void AW_UIFill(int x,int y,int w,int h,int c){if(c==62){highlight_y=y;highlight_w=w;}if(c==210 && w==2 && h==6)own_cursor++;}
 void AW_UIScrollbar(int x,int y,int h,int total,int visible,int top){assert(x>=0 && x+10<=320 && y+h<=200);assert(top>=0 && top+visible<=total);scroll_top=top;scroll_total=total;}
 int AW_UIScrollHit(int mx,int my,int x,int y,int h,int total,int visible,int top){return -1;}
 /* What the Options page drew: labels by their start, every tab and box. */
-static char crosshair_label[64],photo_label[64],far_label[64],colour_label[64],shape_label[64],invert_label[64];
+static char crosshair_label[64],photo_label[64],far_label[64],colour_label[64],shape_label[64],invert_label[64],cursor_label[64];
+/* The mouse cursor (aw_ui.c, CURSOR-MW-58): aw_cursor_type 2 = Morrowind's pointer (drawn when the image has it), 1 = AmiWind's. */
+static int cursor_kind=2,cursor_calls,cursor_art=1;
+int AW_UICursorType(void){return cursor_kind;}
+void AW_UICursorTypeSet(int type){assert(type==1 || type==2);cursor_kind=type;}
+int AW_UICursor(int x,int y){assert(x>=0 && x<320 && y>=0 && y<200);cursor_calls++;return cursor_kind==2 && cursor_art;}
 static char sens_value[16],help[64];static int photo_colour,tabs_drawn,audio_draws,boxes,full_box,preview_x,previews;
 void AW_UITextBox(int x,int y,int w,int h,const char *s,int c){assert(y>=0 && y+h<=200 && x>=0 && x+w<=320);
  if(!strcmp(s,"Prefs") || !strcmp(s,"Controls") || !strcmp(s,"Video"))tabs_drawn++;
@@ -74,6 +80,7 @@ void AW_UITextBox(int x,int y,int w,int h,const char *s,int c){assert(y>=0 && y+
  if(!strncmp(s,"Show crosshairs",15))strcpy(crosshair_label,s);
  if(!strncmp(s,"Crosshair colour",16))strcpy(colour_label,s);
  if(!strncmp(s,"Crosshair shape",15))strcpy(shape_label,s);
+ if(!strncmp(s,"Mouse cursor",12))strcpy(cursor_label,s);
  if(!strncmp(s,"Invert Y axis",13))strcpy(invert_label,s);
  if(x==252)strcpy(sens_value,s); /* the value beside the sensitivity rail */
  if(x==10 && y==176)strcpy(help,s);
@@ -106,6 +113,7 @@ static void click(int x,int y){AW_MenuMouse(x-mx,y-my);mx=x;my=y;M_Keydown(K_MOU
 /* Options opens on the tab row of the page last shown; a click picks a page. */
 static void open_options(void){open_pause();click(100,54+4*19+18);mx=160;my=100;M_Draw();}
 static void page(int n){click(8+n*76+10,6+5);M_Draw();assert(highlight_y==9 && highlight_w==66);}   /* the tab is highlighted */
+static void wiggle(void){AW_MenuMouse(1,0);mx++;}
 static void down(int n){while(n--)M_Keydown(K_DOWNARROW);M_Draw();}
 static void up(int n){while(n--)M_Keydown(K_UPARROW);M_Draw();}
 /* The panel: edge to edge, four framed tabs, one framed group, Back; the world is not drawn. */
@@ -133,14 +141,26 @@ static void check_prefs(void){
  M_Keydown(K_ENTER);M_Draw();assert(!strcmp(colour_label,"Crosshair colour: Warm white"));
  down(1);M_Keydown(K_RIGHTARROW);M_Draw();assert(!strcmp(shape_label,"Crosshair shape: Open cross") && highlight_y==74);
  M_Keydown(K_LEFTARROW);
+ /* Mouse cursor (CURSOR-MW-58), under the crosshair's rows: Morrowind's by default; Enter and the arrows switch
+  * between Morrowind and AmiWind (aw_cursor_type 2 / 1). Morrowind's is drawn by aw_ui.c; with AmiWind's, or when
+  * the image has no Morrowind cursor, the menu draws its own. */
+ down(1);assert(!strcmp(cursor_label,"Mouse cursor: Morrowind") && highlight_y==93);
+ /* A key hides the pointer; a small move over the tab row shows it again without changing the selected row. */
+ cursor_calls=own_cursor=0;M_Draw();assert(!cursor_calls && !own_cursor);
+ wiggle();M_Draw();assert(cursor_calls==1 && !own_cursor && highlight_y==93);
+ M_Keydown(K_ENTER);wiggle();M_Draw();assert(cursor_kind==1 && !strcmp(cursor_label,"Mouse cursor: AmiWind") && own_cursor==1);
+ M_Keydown(K_RIGHTARROW);wiggle();M_Draw();assert(cursor_kind==2 && !strcmp(cursor_label,"Mouse cursor: Morrowind") && own_cursor==1);
+ M_Keydown(K_LEFTARROW);assert(cursor_kind==1);M_Keydown(K_LEFTARROW);assert(cursor_kind==2);
+ cursor_art=0;wiggle();M_Draw();assert(own_cursor==2 && !strcmp(cursor_label,"Mouse cursor: Morrowind"));cursor_art=1;
+ assert(highlight_y==93);
  down(1);M_Keydown(K_ENTER);assert(gold_frame);M_Keydown(K_ENTER);assert(!gold_frame);
  down(1); /* UI font */
  down(1);M_Keydown(K_ENTER);assert(AW_UIVoiceNames());
  down(1);M_Keydown(K_RIGHTARROW);assert(AW_UIDialogueMethod()==3);
  down(1);M_Keydown(K_ENTER);assert(!AW_SceneUIOption(0,0));
- down(1);assert(scroll_top==2 && highlight_y==36+6*19);M_Keydown(K_RIGHTARROW);assert(AW_SceneUIOption(1,0)==3);
+ down(1);assert(scroll_top==3 && highlight_y==36+6*19);M_Keydown(K_RIGHTARROW);assert(AW_SceneUIOption(1,0)==3);
  down(1);M_Keydown(K_RIGHTARROW);assert(AW_SceneUIOption(2,0)==2);
- down(1);assert(scroll_total==11 && scroll_top==4 && highlight_y==150); /* Autosave history, the last row */
+ down(1);assert(scroll_total==12 && scroll_top==5 && highlight_y==150); /* Autosave history, the last row */
  /* Past the last row: Back, which holds; Up returns to the last row, Up past the first to the tabs. */
  down(3);assert(highlight_y==179 && highlight_w==74 && !strcmp(help,"Enter: back to the menu"));
  up(1);assert(highlight_y==150 && highlight_w==280);

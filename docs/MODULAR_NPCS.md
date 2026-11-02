@@ -1,6 +1,6 @@
 # Modular NPCs: every body part stored once, assembled per actor
 
-_Last updated with AmiWind v0.0.57-dev1 (30 October 2026)._
+_Last updated with AmiWind v0.0.58-dev4 (1 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -734,7 +734,7 @@ and frame.
   could share the transform and light of the parent and still pay the skin and
   frame setup per part.
 - **Limits:** `MAX_VISEDICTS` (1,112) holds about 58 actors of 19 parts;
-  `MAX_MOD_KNOWN` (256) must hold every distinct part on screen, where today it
+  `MAX_MOD_KNOWN` (512 since v0.0.59) must hold every distinct part on screen, where today it
   holds one model per actor.
 - **Equipment change:** instant (drop or swap a part entity).
 

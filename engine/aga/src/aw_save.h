@@ -4,9 +4,14 @@
 #include <stdint.h>
 #include "aw_story.h"
 #include "aw_character.h"
+struct aw_ledger_s;
 /* 256 KiB (was 64 KiB): room for the world-state change list (feature 8); a save without changes is the same
  * bytes as before, and any save of the old size limit still loads. */
 #define AW_SAVE_BYTES 262144
+/* CELL-CHANGES-59: a save with the world change list (feature 32) is AW_SAVE_BYTES plus the list's own bytes, so a
+ * long game never meets a full save; a file is read only up to this many bytes (the list's own ceiling,
+ * aw_ledger.h AW_LEDGER_ROWS rows, needs far less). */
+#define AW_SAVE_MAX_BYTES 4194304
 #define AW_SAVE_ACTORS 256
 /* The world-state change list (CHIM type 1 actors: aw_actors.c), AWS4 feature bit 8; an older reader refuses a save
  * that has it. Key rule (template S0d): bits 0-23 the game's reference, bit 31 a builder-made object (the intro
@@ -46,6 +51,9 @@ typedef struct {
     /* the actor block: a caller's buffer of ACTOR_CAPACITY bytes, ACTOR_BYTES used (0: none); NULL: not wanted */
     unsigned char *actors;
     int actor_bytes,actor_capacity;
+    /* AWS4 feature bit 32 (CELL-CHANGES-59): the world change list of objects (aw_ledger.h), written when it has a
+     * row, read back into it (NULL: checked, not kept); an older reader refuses a save that has it */
+    struct aw_ledger_s *ledger;
 } aw_changes_t;
 
 #define AW_EQUIPMENT_DRAWN 1U
@@ -109,13 +117,21 @@ uint32_t AW_SaveChangeKey(uint32_t reference);
 extern int (*aw_save_changes_export)(aw_changes_t *changes);
 extern void (*aw_save_changes_import)(const aw_changes_t *changes);
 /* aw_mwhost.c sets these: the object state (AW_CHANGE_DISABLED, AW_CHANGE_LOCK) merged by key into the list the
- * actors exported (after it), and read from a loaded save's list (after the actors' import). */
+ * actors exported (after it), and read from a loaded save's list (after the actors' import). With the world change
+ * list on (aw_placed ledger, the default) the export adds nothing (the objects are in feature 32) and the import
+ * reads an older save's object entries into the list. */
 extern int (*aw_save_objects_export)(aw_changes_t *changes);
 extern void (*aw_save_objects_import)(const aw_changes_t *changes);
 /* aw_mwhost.c sets these: the actor record's block (feature 16): export the bytes (0 none, -1 too small), import a
  * loaded save's block (BYTES 0: none, the records start from their rows). */
 extern int (*aw_save_actors_export)(unsigned char *out,int capacity);
 extern void (*aw_save_actors_import)(const unsigned char *data,int bytes);
+/* aw_save.c AW_SaveInit sets these to aw_ledger.c's (CELL-CHANGES-59; NULL in the codec's tests that do not link
+ * it): the rows of a list, its saved form (aw_ledger.h AW_LedgerEncode / AW_LedgerDecode). Without them a list is
+ * not written and a save that has one does not decode. */
+extern int (*aw_save_ledger_rows)(const struct aw_ledger_s *ledger);
+extern int (*aw_save_ledger_encode)(const struct aw_ledger_s *ledger,unsigned char *out,int capacity);
+extern int (*aw_save_ledger_decode)(const unsigned char *data,int size,struct aw_ledger_s *into);
 /* aw_scene.c AW_SceneSaveEntryRefuse (bound in aw_debug.c; NULL: no check): 1 when the saved scene and position lie
  * in a place marked for more Fast RAM than this start has; the refusal screen is up (CHIM-32MB-SAVE-ENTRY-48). */
 extern int (*aw_save_entry_refuse)(const char *scene,const float *position);

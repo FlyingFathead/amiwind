@@ -28,7 +28,7 @@
    "id": "ui",
    "description": "Original-font UI, menu and loading backgrounds, logo",
    "steps": ["image"],
-   "patterns": ["id1/gfx/ui.awu", "id1/gfx/ui-conversion.json", "id1/gfx/ui-palette.json", "id1/gfx/menu.awb",
+   "patterns": ["id1/gfx/ui.awu", "id1/gfx/cursor.awc", "id1/gfx/ui-conversion.json", "id1/gfx/ui-palette.json", "id1/gfx/menu.awb",
                 "id1/gfx/loading[0-9]*.awb", "id1/gfx/magic[0-9]*.awf", "id1/gfx/magicclear[0-9]*.awf",
                 "id1/gfx/gothic[0-9]*.awf", "id1/gfx/gothicbig[0-9]*.awf", "id1/gfx/daedric[0-9]*.awf",
                 "id1/gfx/book[0-9]*.awf", "id1/gfx/amiwind.awi", "id1/intro/amiwind.awv"]
@@ -229,6 +229,14 @@
    "steps": ["books", "image"],
    "image_options": ["--books"],
    "patterns": ["id1/books.awb"]
+  },
+  {
+   "id": "item-models",
+   "builder": "chim",
+   "description": "Item model table (AWT1, v0.0.58): every carriable item's world model, one alias model per original mesh path, shared by every item that names it; loaded from disk only when an item lies on the ground",
+   "steps": ["item-models", "image"],
+   "image_options": ["--item-models"],
+   "patterns": ["id1/progs/items/models.awt", "id1/progs/items/m*.mdl"]
   }
  ]
 }

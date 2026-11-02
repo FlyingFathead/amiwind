@@ -19,6 +19,11 @@ extern int AW_SceneryCount(void);
 /* aw_world.h (its other prototypes need the full server headers, which the native tests replace) */
 int AW_WorldToSource(const char *,const float *,float *);
 int AW_SourceToWorld(const char *,const float *,float *);
+/* PLACED-ITEMS-OUTDOORS-FIRST-FRAME-59: a CHIM frame map (Seyda Neen, the towns, the regions) has no entry in the
+ * open-world region table, so AW_WorldToSource / AW_SourceToWorld said no there and its focus rows and placed items
+ * were never read outdoors. chim/chim_world.c sets these for the loaded frame (NULL: no CHIM, as in the tools' tests). */
+int (*aw_focus_chim_source)(const float *local,float *game);
+int (*aw_focus_chim_local)(const float *game,float *local);
 #if AW_STATE_VALUES > 32
 #error Inventory condition bitset requires AW_STATE_VALUES <= 32
 #endif
@@ -219,6 +224,8 @@ int AW_InventoryPickup(aw_state_t *s,int index){
 }
 
 #ifndef AW_INVENTORY_RULES_ONLY
+#include "aw_ledger.h"
+#include "aw_maps.h"
 #define INV_ROW 512
 static edict_t *drop_entity[AW_INVENTORY_DROPS];
 static char drop_label[AW_INVENTORY_DROPS][96];
@@ -227,6 +234,32 @@ static char model_names[AW_INVENTORY_MODELS][64];
 static int model_names_used;
 static const char *drop_reason="Cannot place item here; kept.";
 const char *AW_InventoryDropReason(void){return drop_reason;}
+/* CELL-CHANGES-59: the drops of the world change list this map shows (aw_ledger_drops.c keeps the rows, map-wide,
+ * with no ceiling; these edicts are this map's: made at every map and again when the outdoor cell is read again).
+ * One map shows at most AW_INVENTORY_DROPS of them at once: the edicts every map keeps for drops
+ * (tools/map_engine_limits.py runtime_edicts). */
+typedef struct {uint32_t key;edict_t *e;char label[96];} map_drop_t;
+#define MAP_DROP_BYTES 104
+AW_RESIDENT_GROWS("drops shown on the loaded map (CELL-CHANGES-59)",AW_INVENTORY_DROPS,MAP_DROP_BYTES);
+static map_drop_t *map_drops;static int map_drop_count;
+/* room for one more entry; 0 when the map's drop edicts are used up or memory says no */
+static int map_drop_room(void){
+    if(map_drop_count>=AW_INVENTORY_DROPS)return 0;
+    if(!map_drops && !(map_drops=(map_drop_t *)AW_TryMalloc(AW_INVENTORY_DROPS*sizeof(map_drop_t))))return 0;
+    return 1;
+}
+static void map_drop_add(uint32_t key,edict_t *e,const char *label){
+    map_drop_t *d=&map_drops[map_drop_count++];
+    d->key=key;d->e=e;Q_strcpy_bounded(d->label,label,sizeof(d->label));
+}
+static void ledger_drop_entity(edict_t *e,int model,const float *at,float yaw){
+    e->v.classname=ED_NewString("aw_inventory_drop")-pr_strings;
+    e->v.model=sv.model_precache[model]-pr_strings;e->v.modelindex=model;
+    e->v.movetype=MOVETYPE_NONE;e->v.solid=SOLID_NOT;
+    VectorCopy(at,e->v.origin);VectorCopy(at,e->v.oldorigin);
+    e->v.angles[0]=e->v.angles[2]=0;e->v.angles[1]=yaw;
+    SV_LinkEdict(e,false);
+}
 static unsigned long inv_u32(const byte *p){return (unsigned long)p[0]|((unsigned long)p[1]<<8)|((unsigned long)p[2]<<16)|((unsigned long)p[3]<<24);}
 static int inv_field(char *out,const byte *raw,int n){
     int i;if(!memchr(raw,0,n))return 0;
@@ -309,7 +342,9 @@ int AW_InventoryRead(const char *id,aw_inventory_item_t *out){
                    (AW_InventoryArmourSlot(value.subtype)<0 || value.slots!=(1U<<AW_InventoryArmourSlot(value.subtype)) ||
                     !(value.health>0) || value.armor_skill_base<1))goto bad;
             }
-            if((value.model[0] && (strncmp(value.model,"progs/inv/",10) || strstr(value.model,".."))) ||
+            /* a world model from the item model table (progs/items/, ITEM-WORLD-MODELS-58) or a tool run's own (progs/inv/) */
+            if((value.model[0] && ((strncmp(value.model,"progs/inv/",10) && strncmp(value.model,"progs/items/",12)) ||
+                                   strstr(value.model,".."))) ||
                (value.icon[0] && (strncmp(value.icon,"gfx/inv/",8) || strstr(value.icon,".."))))goto bad;
             fclose(f);*out=value;return 1;
         }
@@ -508,6 +543,7 @@ static void inv_level(void){
     if(inventory_world!=sv.worldmodel){
         inventory_world=sv.worldmodel;model_names_used=0;
         memset(drop_entity,0,sizeof(drop_entity));memset(drop_label,0,sizeof(drop_label));
+        map_drop_count=0;
     }
 }
 /* Inventory is local single-player only. AmiQuake's alias loader/cache and
@@ -518,8 +554,8 @@ static int inv_model(const aw_inventory_item_t *item){
     int i;model_t *m;
     inv_level();if(!item->model[0] || svs.maxclients!=1)return 0;
     for(i=1;i<MAX_MODELS && sv.model_precache[i];i++)if(!strcmp(sv.model_precache[i],item->model))return i;
-    if(i>=MAX_MODELS){drop_reason="World model table full; kept.";return 0;}
-    if(model_names_used>=AW_INVENTORY_MODELS){drop_reason="Scene item model limit (16); kept.";return 0;}
+    if(i>=MAX_MODELS-AW_INVENTORY_KEEP_MODELS){drop_reason="World model table full; kept.";return 0;}
+    if(model_names_used>=AW_INVENTORY_MODELS){drop_reason="Scene item model limit reached; kept.";return 0;}
     m=Mod_ForName((char *)item->model,false);
     if(!m || m->type!=mod_alias || !Cache_Check(&m->cache)){
         drop_reason="Item model unavailable; kept.";return 0;
@@ -546,12 +582,34 @@ static void inv_entity(edict_t *e,int index,int model){
     e->v.angles[0]=e->v.angles[2]=0;e->v.angles[1]=d->yaw;
     drop_entity[index]=e;SV_LinkEdict(e,false);
 }
+/* CELL-CHANGES-59: the list's drops this map shows and does not show yet (outdoors: any map that converts the drop's
+ * game units to a spot inside its world, a CHIM frame or an open-world region; in a room: the room of its number). */
+static void ledger_spawn(void){
+    int i,j,model;aw_inventory_item_t item;vec3_t local;
+    if(!aw_ledger_on || !sv.active || svs.maxclients!=1)return;
+    for(i=AW_LedgerFrom(&aw_ledger,AW_LEDGER_PLAYER);i<aw_ledger.count && !(aw_ledger.row[i].key&AW_LEDGER_BUILDER);i++){
+        aw_ledger_row_t *r=&aw_ledger.row[i];aw_ledger_extra_t *x=r->extra;edict_t *e;
+        if(!(r->fields&AW_LEDGER_DROPPED) || !x)continue;
+        for(j=0;j<map_drop_count && map_drops[j].key!=r->key;j++);
+        if(j<map_drop_count || !AW_PlacedLocal(r->at,r->where,x->position,local))continue;
+        if(!AW_InventoryRead(x->item,&item) || !(model=inv_model(&item)) || !inv_edict_available() || !map_drop_room()){
+            Con_Printf("Inventory: dropped item %s kept in the world change list; model/entity unavailable.\n",x->item);continue;
+        }
+        e=ED_Alloc();map_drop_add(r->key,e,item.name);ledger_drop_entity(e,model,local,x->yaw);
+    }
+}
 void AW_InventorySpawn(void){
     int i,model;aw_inventory_item_t item;
     /* Called after a fresh server/map restore. Old edict addresses can now
      * belong to unrelated actors, even when the cached worldmodel is equal. */
     inventory_world=sv.worldmodel;model_names_used=0;
     memset(drop_entity,0,sizeof(drop_entity));memset(drop_label,0,sizeof(drop_label));
+    map_drop_count=0;
+    if(aw_ledger_on){
+        /* an older save's drops (keyed by map name) join the list once; then the list's drops of this map */
+        if((i=AW_LedgerAdoptDrops(&aw_state,&aw_ledger))>0)Con_Printf("Inventory: %d dropped items of the save moved to the world change list.\n",i);
+        ledger_spawn();return;
+    }
     for(i=0;i<AW_INVENTORY_DROPS;i++){
         aw_dropped_item_t *d=&aw_state.inventory.dropped[i];
         if(d->count<1 || strcmp(d->scene,sv.name))continue;
@@ -631,21 +689,41 @@ static int inv_support(const float low[3],const float high[3]){
     }
     return 0;
 }
+/* CELL-CHANGES-59: on a streamed (CHIM) map the hull query below sees only the frame's own BSP, not the streamed
+ * ground and models (DROP-CHIM-REFUSED-59); there the footprint is checked with point traces, which see all of it
+ * (SV_Move): under each bottom corner of the item and its centre dry, walkable ground within a few units, and no
+ * corner starting inside something solid (a wall, a crate). */
+static int inv_trace_support(const float position[3],const float mins[3],const float maxs[3],edict_t *p){
+    int corner;vec3_t start,end;trace_t tr;float bottom=position[2]+mins[2];
+    for(corner=0;corner<5;corner++){
+        start[0]=position[0]+(corner==4?0:(corner&1)?maxs[0]:mins[0]);
+        start[1]=position[1]+(corner==4?0:(corner&2)?maxs[1]:mins[1]);
+        start[2]=bottom+8;VectorCopy(start,end);end[2]=bottom-6;
+        tr=SV_Move(start,vec3_origin,vec3_origin,end,MOVE_NORMAL,p);
+        if(tr.startsolid || tr.allsolid || tr.fraction>=1 || tr.plane.normal[2]<.69f ||
+           SV_PointContents(tr.endpos)<=CONTENTS_WATER)return 0;
+    }
+    return 1;
+}
 int AW_InventoryDropHere(const aw_inventory_item_t *item,int32_t count){
     edict_t *p,*e;trace_t tr;vec3_t forward,right,up,eye,start,end,position,mins,maxs,low,high,swept_low,swept_high,point;
-    int model,index,j,corner;float yaw;
+    int model,index,j,corner,chim;float yaw;
     drop_reason="Cannot drop this item here; kept.";
     if(!item || !(item->flags&AW_INV_DROP) || !sv.active || svs.maxclients!=1 ||
        !svs.clients || !(p=svs.clients[0].edict) || p->v.health<=0 ||
        p->v.movetype!=MOVETYPE_WALK || p->v.waterlevel>=2)return 0;
     /* Point traces include streamed/scenery/barrier collision, but the full
      * footprint query below currently certifies only BSP world/brush volumes.
-     * Refuse that unsupported context before model/entity/ownership admission. */
-    if(Chim_Active() || AW_SceneryCount()>0 || AW_StoryRestricted()){
+     * Refuse that unsupported context before model/entity/ownership admission.
+     * CELL-CHANGES-59: with the world change list a CHIM map's drop is checked by point traces (inv_trace_support). */
+    chim=Chim_Active();
+    if((chim && !aw_ledger_on) || AW_SceneryCount()>0 || AW_StoryRestricted()){
         drop_reason="Cannot place items in this area yet; kept.";return 0;
     }
-    for(j=0;j<AW_INVENTORY_DROPS && aw_state.inventory.dropped[j].count;j++);
-    if(j==AW_INVENTORY_DROPS){drop_reason="Ground item limit (32); kept.";return 0;}
+    if(!aw_ledger_on){     /* the old fixed table: 32 drops (the world change list has no such ceiling) */
+        for(j=0;j<AW_INVENTORY_DROPS && aw_state.inventory.dropped[j].count;j++);
+        if(j==AW_INVENTORY_DROPS){drop_reason="Ground item limit (32); kept.";return 0;}
+    }else if(!map_drop_room()){drop_reason="Ground item limit (32) on this map; kept.";return 0;}
     if(!inv_edict_available()){drop_reason="No available world entity; kept.";return 0;}
     model=inv_model(item);if(!model)return 0;
     VectorCopy(p->v.origin,eye);eye[2]+=p->v.view_ofs[2];
@@ -679,6 +757,10 @@ int AW_InventoryDropHere(const aw_inventory_item_t *item,int32_t count){
         swept_low[j]=low[j]<eye[j]+mins[j]?low[j]:eye[j]+mins[j];
         swept_high[j]=high[j]>eye[j]+maxs[j]?high[j]:eye[j]+maxs[j];
     }
+    if(chim){
+        drop_reason="Item footprint unsupported; kept.";
+        if(!inv_trace_support(position,mins,maxs,p))return 0;
+    }else{
     drop_reason="Item path or footprint obstructed; kept.";
     if(!inv_space_clear(swept_low,swept_high,p) || !inv_space_clear(low,high,p))return 0;
     /* Require the whole footprint's shallow support slab inside one dry solid
@@ -686,7 +768,19 @@ int AW_InventoryDropHere(const aw_inventory_item_t *item,int32_t count){
     high[2]=low[2]-.125f;low[2]-=.25f;
     drop_reason="Item footprint unsupported; kept.";
     if(!inv_support(low,high))return 0;
+    }
     AW_CombatEquipmentStore();
+    if(aw_ledger_on){
+        /* CELL-CHANGES-59: the drop is a row of the world change list at this place (aw_ledger_drops.c) */
+        int at;int32_t where;float game[3];uint32_t key;
+        drop_reason="Cannot place items here; kept.";
+        if(!AW_PlacedWhere(position,&at,&where,game))return 0;
+        e=ED_Alloc();
+        if(!(key=AW_LedgerDrop(&aw_state,&aw_ledger,item,count,at,where,game,yaw))){
+            ED_Free(e);drop_reason="Inventory transfer refused; kept.";return 0;}
+        map_drop_add(key,e,item->name);ledger_drop_entity(e,model,position,yaw);AW_CombatEquipmentChanged();
+        AW_UIPickupNotice(item->name,2);return 1;
+    }
     e=ED_Alloc();index=AW_InventoryDrop(&aw_state,item,count,sv.name,position,yaw);
     if(index<0){ED_Free(e);drop_reason="Inventory transfer refused; kept.";return 0;}
     strcpy(drop_label[index],item->name);inv_entity(e,index,model);AW_CombatEquipmentChanged();
@@ -741,22 +835,48 @@ static int inv_target(void){
     }
     return best;
 }
-const char *AW_InventoryHint(void){int i=inv_target();return i<0?NULL:drop_label[i];}
+/* CELL-CHANGES-59: the same aim over the drops of the world change list this map shows */
+static int ledger_target(void){
+    int i,best=-1;float distance=AW_ActivateDistance(),along,side;edict_t *p,*e;vec3_t f,r,u,eye,delta;trace_t tr;
+    if(!sv.active || svs.maxclients!=1 || !svs.clients || !(p=svs.clients[0].edict))return -1;
+    inv_level();VectorCopy(p->v.origin,eye);eye[2]+=p->v.view_ofs[2];
+    AngleVectors(p->v.v_angle,f,r,u);
+    for(i=0;i<map_drop_count;i++){
+        if(!map_drops[i].key || !(e=map_drops[i].e) || e->free)continue;
+        VectorSubtract(e->v.origin,eye,delta);along=DotProduct(delta,f);
+        if(along<0 || along>distance || DotProduct(delta,delta)>distance*distance)continue;
+        side=DotProduct(delta,delta)-along*along;if(side>64)continue;
+        tr=SV_Move(eye,vec3_origin,vec3_origin,e->v.origin,MOVE_NOMONSTERS,p);
+        if(tr.fraction<1)continue;
+        distance=along;best=i;
+    }
+    return best;
+}
+/* the aimed drop of either store, -1 none */
+static int drop_aimed(void){return aw_ledger_on?ledger_target():inv_target();}
+const char *AW_InventoryHint(void){
+    int i=drop_aimed();
+    return i<0?NULL:aw_ledger_on?map_drops[i].label:drop_label[i];
+}
 int AW_InventoryFocus(const char **name,char *weight_line,char *value_line,int line_size,int *owned){
     static char cached_id[64],label_weight[32],label_value[32];static aw_inventory_item_t item;static int cached_ok,labels;
-    char number[24];int i=inv_target();
-    if(i<0 || !name || !weight_line || !value_line || line_size<2)return 0;
+    char number[24];int i=drop_aimed();const char *id=NULL,*label=NULL;
+    if(i>=0 && aw_ledger_on){
+        int k=AW_LedgerFind(&aw_ledger,map_drops[i].key);
+        if(k>=0 && aw_ledger.row[k].extra){id=aw_ledger.row[k].extra->item;label=map_drops[i].label;}
+    }else if(i>=0){id=aw_state.inventory.dropped[i].id;label=drop_label[i];}
+    if(!id || !name || !weight_line || !value_line || line_size<2)return 0;
     if(!labels){
         labels=1;
         if(!hud_setting("sWeight",label_weight,sizeof(label_weight)))strcpy(label_weight,"Weight");
         if(!hud_setting("sValue",label_value,sizeof(label_value)))strcpy(label_value,"Value");
     }
     /* one catalogue read per newly aimed item, not per frame */
-    if(strcmp(cached_id,aw_state.inventory.dropped[i].id)){
-        Q_strcpy_bounded(cached_id,aw_state.inventory.dropped[i].id,sizeof(cached_id));
+    if(strcmp(cached_id,id)){
+        Q_strcpy_bounded(cached_id,id,sizeof(cached_id));
         cached_ok=AW_InventoryRead(cached_id,&item);
     }
-    *name=drop_label[i];weight_line[0]=value_line[0]=0;
+    *name=label;weight_line[0]=value_line[0]=0;
     if(cached_ok){
         weight_text(item.weight,number,sizeof(number));
         Q_snprintf(weight_line,line_size,"%s: %s",label_weight,number);
@@ -782,7 +902,7 @@ int AW_InventoryFocus(const char **name,char *weight_line,char *value_line,int l
 #define FOCUS_ACT_OWNED 4
 #define FOCUS_ACT_MAGIC_SCROLL 8
 static int focus_stride=FOCUS_ROW;
-typedef struct {vec3_t at;float weight;int value;unsigned reference;char kind,owned,edict,live,action,name[37];} focus_row_t;
+typedef struct {vec3_t at;float weight;int value;unsigned reference;char kind,owned,edict,live,action,name[37];short drawn;} focus_row_t;
 static focus_row_t *focus_rows;
 static int focus_count;
 static model_t *focus_world;
@@ -856,11 +976,138 @@ static FILE *focus_open(long *base,unsigned long *rooms){
     if(*rooms>65535 || 8+*rooms*12>(unsigned long)length){fclose(f);return NULL;}
     return f;
 }
+/* WORLD-OBJECT-PLACEMENT-59: the items the original placed in a room or an exterior cell, drawn by reference to the
+ * shared item model table (progs/items/placed.awp, tools/prepare_item_models.py pack_placed). Only focus rows the map
+ * does not draw itself get one (a CHIM room's own placement or a compiled room's edict stay theirs), so the aim box,
+ * E and the object state (taken or disabled: not drawn) work on them as on any placed item. The list is read here
+ * with the focus rows; the drawing (client entities, the per-level model room) is aw_placed.c, reached through
+ * aw_placed_admit (NULL: nothing drawn, as in the tools' tests). */
+/* Map units <-> the original game's coordinates outdoors: an open-world region map, else the loaded CHIM frame. */
+static int focus_to_source(const float *local,float *game){
+    return AW_WorldToSource(sv.name,local,game) || (aw_focus_chim_source && aw_focus_chim_source(local,game));
+}
+static int focus_to_local(const float *game,float *local){
+    return AW_SourceToWorld(sv.name,game,local) || (aw_focus_chim_local && aw_focus_chim_local(game,local));
+}
+/* CELL-CHANGES-59 (aw_ledger.h): the place of a map position for the world change list. Outdoors (an open-world
+ * region or the loaded CHIM frame: one rule for every frame) the exterior cell and the original's game units, so any
+ * map that shows the spot finds it; in a numbered room the room and the room's own game units (the map's quarter
+ * scale and shift taken off, the scripts' rule); else the scene id and map units. */
+int AW_PlacedWhere(const float *local,int *at,int32_t *where,float *game){
+    float g[3];long room;int scene,i;vec3_t shift;
+    if(focus_to_source(local,g)){
+        int cx=(int)floor(g[0]/FOCUS_CELL),cy=(int)floor(g[1]/FOCUS_CELL);
+        if(cx<-1024 || cx>1024 || cy<-1024 || cy>1024)return 0;
+        *at=AW_AT_CELL;*where=(int32_t)(((uint32_t)(cx&0xffff)<<16)|(uint32_t)(cy&0xffff));
+        if(game)VectorCopy(g,game);
+        return 1;
+    }
+    if((room=focus_room())>0){
+        AW_MwscriptRoomShift(shift);
+        *at=AW_AT_ROOM;*where=(int32_t)room;
+        if(game)for(i=0;i<3;i++)game[i]=(local[i]-shift[i])*4;
+        return 1;
+    }
+    if((scene=AW_MapId(sv.name))>=0 && scene<=0xFFFF){*at=AW_AT_SCENE;*where=scene;if(game)VectorCopy(local,game);return 1;}
+    return 0;
+}
+/* The other way: a row's position on this map, 0 when its place is not on this map (outdoors: the spot converts and
+ * lies inside this map's world, not in its solid outside). */
+int AW_PlacedLocal(int at,int32_t where,const float *game,float *local){
+    long room;vec3_t shift;int i;
+    switch(at){
+    case AW_AT_CELL:
+        if(!focus_to_local(game,local))return 0;
+        for(i=0;i<3;i++)if(!(local[i]>-32000 && local[i]<32000))return 0;
+        return SV_PointContents(local)!=CONTENTS_SOLID;
+    case AW_AT_ROOM:
+        if((room=focus_room())<=0 || room!=where)return 0;
+        AW_MwscriptRoomShift(shift);
+        for(i=0;i<3;i++)local[i]=game[i]*.25f+shift[i];
+        return 1;
+    case AW_AT_SCENE:
+        if(where!=AW_MapId(sv.name))return 0;
+        VectorCopy(game,local);
+        return 1;
+    }
+    return 0;
+}
+#define PLACED_ROW 48
+#define PLACED_FILE "progs/items/placed.awp"
+int (*aw_placed_begin)(void);
+int (*aw_placed_admit)(unsigned reference,const char *stem,const float local[3],const float angles[3],float scale);
+/* What the last read of the list saw (aw_placed status): keys read, rows, rows without an item row in the focus table,
+ * rows the map draws itself, rows outside this map, rows offered. */
+static int placed_seen[6];
+void AW_PlacedReadStats(int out[6]){memcpy(out,placed_seen,sizeof(placed_seen));out[0]=focus_outdoor?-out[0]:out[0];}
+/* One key's rows: each row whose reference is an item row of the focus table that nothing draws is offered. */
+static int placed_read_key(FILE *f,long base,unsigned long keys,long length,unsigned long key){
+    byte head[16],row[PLACED_ROW];int lo,hi,mid,i,j,k,refused=0;unsigned long number,first=0,rows=0,bits;
+    for(lo=0,hi=(int)keys-1;lo<=hi;){
+        mid=(lo+hi)/2;
+        if(fseek(f,base+8+mid*16L,SEEK_SET) || fread(head,1,16,f)!=16)return 0;
+        number=focus_u32(head);
+        if(number==key){first=focus_u32(head+4);rows=focus_u32(head+8);break;}
+        if(number<key)lo=mid+1;else hi=mid-1;
+    }
+    if(!rows || rows>FOCUS_ROWS || 8+keys*16+(first+rows)*PLACED_ROW>(unsigned long)length ||
+       fseek(f,base+8+(long)keys*16+(long)first*PLACED_ROW,SEEK_SET))return 0;
+    placed_seen[0]++;placed_seen[1]+=(int)rows;
+    for(i=0;i<(int)rows;i++){
+        unsigned reference;float v[6],scale;vec3_t local;char stem[17];
+        if(fread(row,1,PLACED_ROW,f)!=PLACED_ROW)break;
+        reference=(unsigned)focus_u32(row);
+        for(j=0;j<focus_count;j++)if(focus_rows[j].kind=='I' && focus_rows[j].reference==reference)break;
+        /* indoors only an item the room does not draw (edict set by focus_load); outdoors every item row */
+        if(j==focus_count){placed_seen[2]++;continue;}
+        if(focus_rows[j].drawn || focus_rows[j].live || (!focus_outdoor && !focus_rows[j].edict)){placed_seen[3]++;continue;}
+        for(k=0;k<6;k++){bits=focus_u32(row+8+4*k);memcpy(&v[k],&bits,4);}
+        /* CELL-CHANGES-59: a placed item the world change list says was moved lies where it was left */
+        if(aw_ledger_on && (k=AW_LedgerFind(&aw_ledger,reference))>=0 &&
+           (aw_ledger.row[k].fields&AW_LEDGER_MOVED) && aw_ledger.row[k].extra){
+            VectorCopy(aw_ledger.row[k].extra->position,v);v[4]=aw_ledger.row[k].extra->yaw;
+        }
+        scale=(float)(row[6]|(row[7]<<8))/(float)(1<<12);       /* twelve fraction bits (pack_placed) */
+        if(!(scale>0) || !(v[0]==v[0] && v[1]==v[1] && v[2]==v[2]))continue;
+        if(!focus_outdoor)VectorScale(v,.25f,local);
+        else if(!focus_to_local(v,local)){placed_seen[4]++;continue;}
+        placed_seen[5]++;
+        memcpy(stem,row+32,16);stem[16]=0;
+        if((k=aw_placed_admit(reference,stem,local,v+3,scale))<=0){refused++;continue;}
+        focus_rows[j].drawn=(short)k;focus_rows[j].edict=0;
+    }
+    return refused;
+}
+/* After focus_load (the rows in this map's units): the placed items of the room, or of the 3 x 3 exterior cells. */
+static void placed_load(void){
+    FILE *f=NULL;byte head[8];long base,room;unsigned long keys;int length,dx,dy,j,refused=0;
+    for(j=0;j<focus_count;j++)focus_rows[j].drawn=0;
+    memset(placed_seen,0,sizeof(placed_seen));
+    if(!aw_placed_begin || !aw_placed_admit || !aw_placed_begin() || !focus_count)return;
+    length=COM_FOpenFile(PLACED_FILE,&f);
+    if(!f)return;
+    base=ftell(f);
+    if(length<8 || fread(head,1,8,f)!=8 || memcmp(head,"AWP1",4) || (keys=focus_u32(head+4))>65535 ||
+       8+keys*16>(unsigned long)length){fclose(f);Con_Printf("Placed items: %s is not a list this engine reads.\n",PLACED_FILE);return;}
+    if(!focus_outdoor){if((room=focus_room())!=0)refused=placed_read_key(f,base,keys,length,(unsigned long)room);}
+    else for(dx=-1;dx<=1;dx++)for(dy=-1;dy<=1;dy++)
+        refused+=placed_read_key(f,base,keys,length,focus_exterior_key(focus_gx+dx,focus_gy+dy));
+    fclose(f);
+    if(refused)Con_Printf("Placed items: %d not drawn (their models do not fit the level's room of %d).\n",refused,AW_PLACED_MODELS);
+}
+static void focus_refresh(const edict_t *p);
+/* aw_placed.c, once per client frame: the focus table (and with it the placed list) read again on a new map or a new
+ * exterior cell; 1 outdoors (no room shift). */
+int AW_PlacedRefresh(void){
+    if(sv.active && svs.maxclients==1 && svs.clients && svs.clients[0].edict)focus_refresh(svs.clients[0].edict);
+    return focus_outdoor;
+}
 static void focus_load(void){
     FILE *f=NULL;long base,room=0;int i,j,dx,dy,ok=1;
     unsigned long rooms;edict_t *e;eval_t *v;vec3_t game,local;
     focus_world=sv.worldmodel;focus_count=0;focus_outdoor=0;
-    if(svs.clients && svs.clients[0].edict && AW_WorldToSource(sv.name,svs.clients[0].edict->v.origin,game)){
+    if(aw_placed_begin)aw_placed_begin();      /* a new map or cell: nothing drawn until the list is read again */
+    if(svs.clients && svs.clients[0].edict && focus_to_source(svs.clients[0].edict->v.origin,game)){
         focus_outdoor=1;focus_gx=(int)floor(game[0]/FOCUS_CELL);focus_gy=(int)floor(game[1]/FOCUS_CELL);
     }else if(!(room=focus_room()))return;
     if(!focus_rows && !(focus_rows=(focus_row_t *)AW_TryMalloc(FOCUS_ROWS*sizeof(focus_row_t))))return;
@@ -873,7 +1120,7 @@ static void focus_load(void){
     /* to this map's units: outdoors the map's own origin, a room a quarter scale (its shift is added when aimed) */
     for(j=0;j<focus_count;j++){
         if(!focus_outdoor)VectorScale(focus_rows[j].at,.25f,focus_rows[j].at);
-        else if(AW_SourceToWorld(sv.name,focus_rows[j].at,local)){VectorCopy(local,focus_rows[j].at);}
+        else if(focus_to_local(focus_rows[j].at,local)){VectorCopy(local,focus_rows[j].at);}
         else focus_rows[j].edict=1;
     }
     /* the actors and doors that have an edict of their own (an item's edict, a compiled room's placed static, has no
@@ -891,12 +1138,18 @@ static void focus_load(void){
      * (INTERIOR-PLACED-ITEMS-47): their rows showed the box over an empty table and E had nothing to take. */
     if(!focus_outdoor)for(j=0;j<focus_count;j++)
         if(focus_rows[j].kind=='I' && !focus_rows[j].live && !ChimRoom_Has(focus_rows[j].reference))focus_rows[j].edict=1;
+    placed_load();
+    ledger_spawn();    /* CELL-CHANGES-59: a drop whose spot this map could not place at its start (outdoors, first frame) */
 }
 /* Read again on a new map, or outdoors when the player has walked into another cell. */
 static void focus_refresh(const edict_t *p){
     vec3_t game;
     if(focus_world!=sv.worldmodel){focus_load();return;}
-    if(focus_outdoor && AW_WorldToSource(sv.name,p->v.origin,game) &&
+    /* PLACED-ITEMS-OUTDOORS-FIRST-FRAME-59: read in the first frame after a map change, before the player stands at
+     * the arrival, an outdoor map could look like a room without a number and was never read again: read it again
+     * as soon as the player's spot says outdoors */
+    if(!focus_outdoor && focus_to_source(p->v.origin,game)){focus_load();return;}
+    if(focus_outdoor && focus_to_source(p->v.origin,game) &&
        ((int)floor(game[0]/FOCUS_CELL)!=focus_gx || (int)floor(game[1]/FOCUS_CELL)!=focus_gy))focus_load();
 }
 /* The placed row aimed at within reach, -1 none. */
@@ -960,7 +1213,7 @@ int AW_ItemPrompt(char *line,int size,int *steal){
         strcpy(prompts[FOCUS_ACT_READ],"E: Read");strcpy(prompts[FOCUS_ACT_READ|FOCUS_ACT_OWNED],"E: Read");
     }
     code=FOCUS_ACT_TAKE;
-    if(inv_target()<0){
+    if(drop_aimed()<0){
         if((best=placed_target())<0 || focus_rows[best].kind!='I')return 0;
         code=focus_rows[best].action&7;
         if((code&3)==FOCUS_ACT_READ && !aw_book_reader)code=FOCUS_ACT_TAKE|(code&FOCUS_ACT_OWNED);
@@ -1022,7 +1275,17 @@ static int take_row(focus_row_t *row){
     return 1;
 }
 int AW_InventoryUse(void){
-    int i=inv_target();if(i<0)return placed_use();
+    int i;
+    if(aw_ledger_on){
+        /* CELL-CHANGES-59: a drop of the world change list comes back and its row goes */
+        if((i=ledger_target())<0)return placed_use();
+        if(!AW_LedgerPickup(&aw_state,&aw_ledger,map_drops[i].key)){
+            AW_UISubtitle(map_drops[i].label,"Cannot collect: inventory capacity.",3);return 1;}
+        AW_UIPickupNotice(map_drops[i].label,3);AW_CombatEquipmentChanged();    /* the notice keeps its own copy */
+        ED_Free(map_drops[i].e);map_drops[i]=map_drops[--map_drop_count];
+        return 1;
+    }
+    i=inv_target();if(i<0)return placed_use();
     if(!AW_InventoryPickup(&aw_state,i)){AW_UISubtitle(drop_label[i],"Cannot collect: inventory capacity.",3);return 1;}
     AW_UIPickupNotice(drop_label[i],3);AW_CombatEquipmentChanged();ED_Free(drop_entity[i]);drop_entity[i]=NULL;return 1;
 }

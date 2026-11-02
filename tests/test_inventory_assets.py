@@ -36,17 +36,24 @@ class InventoryAssetsTests(unittest.TestCase):
     def test_debug_torch_row_from_the_original_torch_never_burns_out(self):
         # The debug torch (test only): one row made from LIGH "torch" (model, icon, weight, value, radius,
         # colour), burn time -1 (OpenMW: an infinite light), left hand, a carried light; the original
-        # record keeps its own burn time in the receipt. Other lights are not catalogued.
+        # record keeps its own burn time in the receipt. Carried lights are catalogued too (ITEM-WORLD-MODELS-58);
+        # a fixed light (LHDT flag 2 clear) is not.
         lhdt=struct.pack('<fiii4Bi',3.,5,210,256,245,140,40,0,115)
+        fixed=struct.pack('<fiii4Bi',0.,0,-1,128,255,255,255,0,0)
         raw=record('LIGH',[('NAME',text('torch')),('MODL',text('l\\light_torch10.nif')),('FNAM',text('Torch')),
                            ('ITEX',text('l\\light_torch10.tga')),('LHDT',lhdt)])
         raw+=record('LIGH',[('NAME',text('light_com_candle_01')),('LHDT',lhdt)])
+        raw+=record('LIGH',[('NAME',text('light_fixed')),('LHDT',fixed)])
         with tempfile.TemporaryDirectory() as tmp:
             base=Path(tmp);(base/'Morrowind.esm').write_bytes(raw)
             with patch.object(inv,'resolve_data_files',return_value=base):
                 report=inv.prepare(base,base/'id1',palette=b'\0'*768,models=False)
             items=base.joinpath('id1/inventory/items.awi').read_bytes()
-        self.assertEqual(struct.unpack_from('<I',items,4)[0],1)
+        self.assertEqual(struct.unpack_from('<I',items,4)[0],3)
+        rows={items[8+i*512:8+i*512+64].split(b'\0')[0]:items[8+i*512:8+(i+1)*512] for i in range(3)}
+        self.assertEqual(set(rows),{b'aw_debug_torch',b'light_com_candle_01',b'torch'})
+        self.assertEqual(struct.unpack_from('<iiifII',rows[b'torch'],160),(7,256,5,3.,1<<17,1|4|32))
+        self.assertEqual(struct.unpack_from('<i3BB',rows[b'torch'],504),(210,245,140,40,0))   # its own burn time
         row=items[8:8+512]
         self.assertEqual(row[:64].split(b'\0')[0],b'aw_debug_torch')
         self.assertEqual(row[64:160].split(b'\0')[0],b'Debug torch (test only)')
@@ -61,6 +68,37 @@ class InventoryAssetsTests(unittest.TestCase):
             with patch.object(inv,'resolve_data_files',return_value=base):
                 report=inv.prepare(base,base/'id1',palette=b'\0'*768,models=False)
             self.assertIsNone(report['debug_torch'])   # no original torch: no row, nothing invented
+
+    def test_tools_are_catalogued_with_weight_value_and_kind(self):
+        # APPA, LOCK, PROB, REPA (ITEM-WORLD-MODELS-58): weight and value from their own data layouts.
+        raw=record('APPA',[('NAME',text('apparatus_a_mortar_01')),('MODL',text('m\\apparatus_a_mortar_01.nif')),
+                           ('AADT',struct.pack('<iffi',0,.5,1.,10))])
+        raw+=record('LOCK',[('NAME',text('pick_apprentice_01')),('LKDT',struct.pack('<fifi',.25,20,1.,25))])
+        raw+=record('PROB',[('NAME',text('probe_bent')),('PBDT',struct.pack('<fifi',.5,6,.5,10))])
+        raw+=record('REPA',[('NAME',text('hammer_repair')),('RIDT',struct.pack('<fiif',3.,10,20,1.))])
+        with tempfile.TemporaryDirectory() as tmp:
+            base=Path(tmp);(base/'Morrowind.esm').write_bytes(raw)
+            with patch.object(inv,'resolve_data_files',return_value=base):
+                inv.prepare(base,base/'id1',palette=b'\0'*768,models=False)
+            items=base.joinpath('id1/inventory/items.awi').read_bytes()
+        rows={items[8+i*512:8+i*512+64].split(b'\0')[0]:struct.unpack_from('<iiif',items,8+i*512+160) for i in range(4)}
+        self.assertEqual(rows,{b'apparatus_a_mortar_01':(7,0,10,1.),b'pick_apprentice_01':(7,-1,20,.25),
+                               b'probe_bent':(7,-1,6,.5),b'hammer_repair':(7,-1,10,3.)})
+
+    def test_model_table_names_each_item_model_by_mesh(self):
+        # One model per mesh path, shared by every item that names it (ITEM-WORLD-MODELS-58).
+        raw=record('MISC',[('NAME',text('key_a')),('MODL',text('m\\Key_Standard_01.nif')),('MCDT',struct.pack('<fii',.1,1,1))])
+        raw+=record('MISC',[('NAME',text('key_b')),('MODL',text('M/key_standard_01.nif')),('MCDT',struct.pack('<fii',.1,1,1))])
+        raw+=record('MISC',[('NAME',text('odd')),('MODL',text('m\\odd.nif')),('MCDT',struct.pack('<fii',.1,1,0))])
+        table={inv.mesh_key('m\\key_standard_01.nif'):'progs/items/m0000000000000001.mdl'}
+        with tempfile.TemporaryDirectory() as tmp:
+            base=Path(tmp);(base/'Morrowind.esm').write_bytes(raw)
+            with patch.object(inv,'resolve_data_files',return_value=base):
+                report=inv.prepare(base,base/'id1',palette=b'\0'*768,models=False,model_table=table)
+            items=base.joinpath('id1/inventory/items.awi').read_bytes()
+        models={items[8+i*512:8+i*512+64].split(b'\0')[0]:items[8+i*512+184:8+i*512+248].split(b'\0')[0] for i in range(3)}
+        self.assertEqual(models,{b'key_a':b'progs/items/m0000000000000001.mdl',b'key_b':b'progs/items/m0000000000000001.mdl',b'odd':b''})
+        self.assertEqual(report['held'],{'odd':{'model':'not in the item model table'}})
 
     def test_script_proof_requires_first_executable_registration_guard(self):
         source='Begin ring\nshort state\nshort OnPCAdd\nif ( CharGenState == -1 )\n return\nendif\nset state to 1\nEnd'

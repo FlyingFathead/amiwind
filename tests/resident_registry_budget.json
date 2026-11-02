@@ -3,21 +3,21 @@
  "note": "Ratchet: tests/test_resident_registry.py fails above these numbers and asks for them to be lowered when the engine needs less. Raise only with a dated, maintainer-approved reason.",
  "totals": {
   "commands": {
-   "count": 287,
-   "hunk_bytes": 9184
+   "count": 288,
+   "hunk_bytes": 9216
   },
   "cvars": {
-   "count": 352,
-   "static_bytes": 8448,
-   "zone_bytes": 11488
+   "count": 353,
+   "static_bytes": 8472,
+   "zone_bytes": 11520
   },
   "tables": {
    "count": 0,
    "bytes": 0
   },
   "growing": {
-   "count": 7,
-   "worst_bytes": 183360
+   "count": 13,
+   "worst_bytes": 1677344
   }
  },
  "reasons": [
@@ -67,7 +67,12 @@
   "2026-10-31: filled soul gems (64 x 44 bytes = 2,816), nothing until the first is filled; part of the coordinator-approved made-things design (Enchanting)",
   "2026-10-31: the maintainer (TG): 'by default the player's own footstep sounds could be turned on (or off) from sound options menu or dbg console' (PLAYER-FOOTSTEPS-NONE-58: dbg footsteps, aw_player_footsteps, its stride and volume)",
   "2026-10-31: places revealed by ShowMap (128 x 32 bytes = 4,096), nothing until the first ShowMap; the coordinator asked for the data to be kept for the map place markers (INGAME-MAP-ORIGINAL-57)",
-  "2026-10-31: the journal topic pages, sized from the data (16,796 Topic answers in the three masters, each heard once): at most 12,000 entries x 6 bytes and 1,024 speaker names x 32 bytes, worst 104,768 bytes, a few KB in a long game, growing from 256; the coordinator approved the plan"
+  "2026-10-31: the journal topic pages, sized from the data (16,796 Topic answers in the three masters, each heard once): at most 12,000 entries x 6 bytes and 1,024 speaker names x 32 bytes, worst 104,768 bytes, a few KB in a long game, growing from 256; the coordinator approved the plan",
+  "2026-11-01: the model table raised from 256 to 512 by the maintainer's decision (ENGINE-MODEL-TABLE-58): the first 256 loaded-model slots stay static as before; slots 257-512 come in 4 pages of 64 x 400 bytes (25,600 each), allocated only when a map loads more than 256 models, worst 102,400 bytes",
+  "2026-11-01: the maintainer asked for a mapping system that auto-places every in-world object (WORLD-OBJECT-PLACEMENT-59); one console command, aw_placed, shows what is drawn and turns it off for an A/B",
+  "2026-11-01: the maintainer asked for a mapping system that auto-places every in-world object (WORLD-OBJECT-PLACEMENT-59); one console command, aw_placed, shows what is drawn and turns it off for an A/B",
+  "2026-11-02: aw_cursor_type, the saved mouse cursor setting the maintainer asked for (31 October and 1 November 2026: the original game's pointer by default, the current cursor as the fallback, the choice in the Options menu and on the console; CURSOR-MW-58): one console variable, 24 structure bytes and 32 zone bytes; dbg cursortype routes to it through the on-disk catalogue, no command.",
+  "2026-11-02: CELL-CHANGES-59, the maintainer asked for the continuity of changed cells, map-wide (one world change list for every exterior cell, room and CHIM frame, kept for the session and in the save, with no 2,048-entry or 1,024-object ceiling): four growing allocations, no command, no cvar (aw_placed ledger is a subcommand of aw_placed). The list's rows, 32,768 at most x 20 bytes; their position and drop blocks, 4,096 x 96; the edicts the loaded map hides, MAX_EDICTS x 20; the drops one map shows, 32 x 104. Measured: a late original game changes about 7,700 references, about 154 KB of rows on the Amiga; the worst case is about 1.1 MB. Raised on the worker branch v0.0.59-cellchanges; the maintainer approves it at merge."
  ],
  "entries": {
   "commands": [
@@ -210,6 +215,7 @@
    "aw_npcs",
    "aw_photomode",
    "aw_pickcompanion",
+   "aw_placed",
    "aw_player_footsteps_cmd",
    "aw_pos",
    "aw_probe",
@@ -421,6 +427,7 @@
    "aw_crosshair_colour",
    "aw_crosshair_shape",
    "aw_cull",
+   "aw_cursor_type",
    "aw_day_clouds",
    "aw_daynight",
    "aw_daynightcycle",
@@ -716,12 +723,18 @@
   "tables": [],
   "growing": [
    "barter sold things (BARTER-SOLD-ITEM-LOST-58)",
+   "drops shown on the loaded map (CELL-CHANGES-59)",
    "enchanted items (Enchanting)",
    "filled soul gems (Enchanting)",
+   "hidden edicts of the loaded map (CELL-CHANGES-59)",
    "journal topic entries",
    "journal topic speakers",
+   "loaded models past 256 (ENGINE-MODEL-TABLE-58)",
    "made spells (Spellmaking)",
-   "places revealed by ShowMap"
+   "placed items (WORLD-OBJECT-PLACEMENT-59)",
+   "places revealed by ShowMap",
+   "world change list positions and drops (CELL-CHANGES-59)",
+   "world change list rows (CELL-CHANGES-59)"
   ]
  }
 }

@@ -538,17 +538,37 @@ static void draw(void){
      text(list_x()+(LIST_W-glyphs*char_w())/2,button_y(),g,right);}
 }
 /* %PCRank, %NextPCRank and %Cell of this conversation (aw_dial.c AW_DialFillDefines) */
-static void rank_defines(const char *in,char *out,int capacity){
-    char pc[AW_DIAL_FACTION_ID]="%",next[AW_DIAL_FACTION_ID]="%",cell[64];const char *slash;int rank=-1,expelled=0;
+#define CELL_CHARS 64
+/* PC (and NEXT, AW_DIAL_FACTION_ID bytes each): the player's rank and the next in the speaker's faction, "%" without
+ * one; CELL (CELL_CHARS): the player's cell */
+static void rank_values(char *pc,char *next,char *cell){
+    const char *slash;int rank=-1,expelled=0;
+    strcpy(pc,"%");strcpy(next,"%");
     if(facts.faction && facts.rank){
         rank=facts.rank(facts.faction,&expelled);
-        read_string(AW_DialRankAt(&table,facts.faction,rank<0?0:rank),pc,sizeof(pc));
-        read_string(AW_DialRankAt(&table,facts.faction,rank+1>AW_DIAL_RANKS-1?AW_DIAL_RANKS-1:rank+1),next,sizeof(next));
+        read_string(AW_DialRankAt(&table,facts.faction,rank<0?0:rank),pc,AW_DIAL_FACTION_ID);
+        read_string(AW_DialRankAt(&table,facts.faction,rank+1>AW_DIAL_RANKS-1?AW_DIAL_RANKS-1:rank+1),next,
+                    AW_DIAL_FACTION_ID);
     }
     /* the player's cell: the place name the HUD shows (the map's message, "AmiWind / Seyda Neen") */
     slash=strrchr(cl.levelname,'/');
-    strncpy(cell,slash?slash+1+(slash[1]==' '):cl.levelname,sizeof(cell)-1);cell[sizeof(cell)-1]=0;
+    strncpy(cell,slash?slash+1+(slash[1]==' '):cl.levelname,CELL_CHARS-1);cell[CELL_CHARS-1]=0;
+}
+static void rank_defines(const char *in,char *out,int capacity){
+    char pc[AW_DIAL_FACTION_ID],next[AW_DIAL_FACTION_ID],cell[CELL_CHARS];
+    rank_values(pc,next,cell);
     AW_DialFillDefines(in,out,capacity,pc,next,cell);
+}
+/* A line of this conversation with every define filled in one pass through the getter table (aw_textdef.c,
+ * TEXT-MACROS-DIALOGUE-CODES-59: the builder's codes, no name search; the link marks kept): the player's values, the
+ * speaker's, the conversation's ranks and the player's cell. 0 when that is off (aw_text_lut 0): the previous chain. */
+static int fill_line(const char *in,char *out,int capacity){
+    aw_textdef_values_t v;char pc[AW_DIAL_FACTION_ID],next[AW_DIAL_FACTION_ID],cell[CELL_CHARS];
+    if(!speaker || !AW_GlutDefineValues(speaker,row,&v))return 0;
+    rank_values(pc,next,cell);
+    v.pc_rank=pc;v.pc_next_rank=next;v.cell=cell;
+    AW_TextDefines(out,capacity,in,&v);
+    return 1;
 }
 /* Ask TOPIC (a row of the list or a link): its name as a heading, the answer under it with its links (the spans kept
  * through the define filling), the topics it names made known. A link to a topic this NPC does not answer: nothing. */
@@ -582,8 +602,10 @@ static void show_answer(int answer){
     read_string(AW_DialTextAt(&conv,answer),raw,sizeof(raw));
     n=AW_DialSpans(&conv,answer,read_file,NULL,spans,PARA_SPANS);
     AW_DialMarkSpans(raw,spans,n,marked,sizeof(marked));
-    rank_defines(marked,ranked,sizeof(ranked));
-    AW_GlutFill(speaker,row,ranked,filled,sizeof(filled));
+    if(!fill_line(marked,filled,sizeof(filled))){        /* aw_text_lut 0: the previous chain of three scans */
+        rank_defines(marked,ranked,sizeof(ranked));
+        AW_GlutFill(speaker,row,ranked,filled,sizeof(filled));
+    }
     AW_DialTakeSpans(filled,spans,n,plain,sizeof(plain),kept,&found);
     append_spans(plain,0,kept,found);
     for(i=0;i<n;i++)know(spans[i].topic);
@@ -1109,7 +1131,8 @@ int AW_DialWindowOpen(edict_t *e,const char *greeting,int again){
     topics_sync();                   /* the saved known topics: a loaded game, AddTopic since the last conversation */
     if(!greet()){                    /* the voice table's line when the dialogue table has no greeting for this speaker */
         char ranked[1024];
-        rank_defines(greeting && *greeting?greeting:"...",ranked,sizeof(ranked));
+        if(!fill_line(greeting && *greeting?greeting:"...",ranked,sizeof(ranked)))
+            rank_defines(greeting && *greeting?greeting:"...",ranked,sizeof(ranked));
         append(ranked,0);
     }
     memset(&box,0,sizeof(box));

@@ -14,7 +14,9 @@ static model_t world,world2;
 char *pr_strings;
 static char strings[16];
 static int room_draws,taken,take_reference,notices,disabled;
-static byte focus_file[8+12+96],item_file[8+512];
+static byte focus_file[8+12+96],item_file[8+512],placed_file[8+16+48];
+static int placed_size;
+static void put32(byte *p,unsigned long v);
 static const char hud_text[]="iMaxActivateDist 192\nsWeight Weight\nsValue Value\nsTake Grab\n";
 #define QUILL 406347u
 void Con_Printf(char *format,...){(void)format;}
@@ -31,7 +33,25 @@ int COM_FOpenFile(char *name,FILE **file){
     if(!strcmp(name,"focus.awf"))return serve(focus_file,sizeof(focus_file),file);
     if(!strcmp(name,"inventory/items.awi"))return serve(item_file,sizeof(item_file),file);
     if(!strcmp(name,"gfx/hud-settings.txt"))return serve(hud_text,sizeof(hud_text)-1,file);
+    if(!strcmp(name,"progs/items/placed.awp") && placed_size)return serve(placed_file,placed_size,file);
     return -1;
+}
+/* WORLD-OBJECT-PLACEMENT-59: the placed item list (tools/prepare_item_models.py pack_placed) and the drawing side's
+ * hooks (aw_placed.c in the game): what was offered, where and with which model. */
+static int admitted,refuse_models;static unsigned admitted_ref;static float admitted_at[3],admitted_scale;static char admitted_stem[17];
+static int fake_begin(void){admitted=0;return 1;}
+static int fake_admit(unsigned reference,const char *stem,const float local[3],const float angles[3],float scale){
+    (void)angles;if(refuse_models)return 0;
+    admitted_ref=reference;memcpy(admitted_at,local,sizeof(admitted_at));admitted_scale=scale;strcpy(admitted_stem,stem);
+    return ++admitted;
+}
+static void placed_table(unsigned reference){
+    byte *row=placed_file+8+16;float v[6]={80,0,116,0,90,0};int k;unsigned long bits;
+    memset(placed_file,0,sizeof(placed_file));memcpy(placed_file,"AWP1",4);put32(placed_file+4,1);
+    put32(placed_file+8,763);put32(placed_file+12,0);put32(placed_file+16,1);put32(placed_file+20,1);
+    put32(row,reference);row[4]=0;row[5]=0;row[6]=0x00;row[7]=0x18;          /* model row 0, scale 0x1800 = 1.5 */
+    for(k=0;k<6;k++){memcpy(&bits,&v[k],4);put32(row+8+4*k,bits);}
+    memcpy(row+32,"0123456789abcdef",16);placed_size=sizeof(placed_file);
 }
 int AW_WorldToSource(const char *name,const float *local,float *out){(void)name;(void)local;(void)out;return 0;}
 int AW_SourceToWorld(const char *name,const float *in,float *local){(void)name;(void)in;(void)local;return 0;}
@@ -43,6 +63,13 @@ void AW_UIPickupNotice(const char *name,double duration){(void)duration;assert(!
 void AW_UISubtitle(const char *speaker,const char *text,double duration){(void)speaker;(void)text;(void)duration;assert(0);}
 void AW_CombatEquipmentChanged(void){}
 void ED_Free(edict_t *e){(void)e;assert(0);}   /* a dropped item's edict: none here */
+/* the world change list's drops (CELL-CHANGES-59) are read at every map too: none here, so none is ever shown */
+edict_t *ED_Alloc(void){assert(0);return NULL;}
+char *ED_NewString(char *s){(void)s;assert(0);return NULL;}
+void SV_LinkEdict(edict_t *e,qboolean triggers){(void)e;(void)triggers;assert(0);}
+model_t *Mod_ForName(char *name,qboolean crash){(void)name;(void)crash;assert(0);return NULL;}
+void *Cache_Check(cache_user_t *c){(void)c;assert(0);return NULL;}
+int SV_PointContents(vec3_t p){(void)p;assert(0);return 0;}
 trace_t SV_Move(vec3_t start,vec3_t mins,vec3_t maxs,vec3_t end,int type,edict_t *pass){
     trace_t tr;(void)start;(void)mins;(void)maxs;(void)type;(void)pass;
     memset(&tr,0,sizeof(tr));tr.fraction=1;VectorCopy(end,tr.endpos);return tr;
@@ -118,6 +145,26 @@ int main(void){
     assert(!AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned));
     assert(!AW_InventoryUse() && !taken);
     focus_file[8+12]='I';
-    puts("Placed pickup through the use key's path: box, take, no second take, no box for an item the room leaves out.");
+    /* WORLD-OBJECT-PLACEMENT-59: the room leaves the quill out, the placed list draws it by reference to the shared
+     * model: offered once at its map position (a quarter of the game units), its model and scale; then the box and
+     * E work on it as on a drawn item */
+    placed_table(QUILL);aw_placed_begin=fake_begin;aw_placed_admit=fake_admit;
+    level(0);
+    assert(AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned) && !strcmp(name,"Quill Pen"));
+    assert(admitted==1 && admitted_ref==QUILL && !strcmp(admitted_stem,"0123456789abcdef"));
+    assert(admitted_at[0]==20 && admitted_at[1]==0 && admitted_at[2]==29 && admitted_scale==1.5f);
+    assert(AW_InventoryUse() && taken==1 && take_reference==(int)QUILL);
+    assert(!AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned));     /* taken: disabled, no box */
+    /* a room that draws the item itself: nothing offered (no second copy) */
+    level(1);assert(AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned) && admitted==0);
+    /* the level's model room used up: the row is not drawn, so no box over an empty table */
+    refuse_models=1;level(0);
+    assert(!AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned) && admitted==0);
+    /* another reference in the list than in the room: nothing */
+    refuse_models=0;placed_table(QUILL+1);level(0);
+    assert(!AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned) && admitted==0);
+    aw_placed_begin=NULL;aw_placed_admit=NULL;
+    puts("Placed pickup through the use key's path: box, take, no second take, no box for an item the room leaves out; "
+         "the placed list draws the left-out item by reference and it is taken the same way.");
     return 0;
 }

@@ -1,16 +1,16 @@
 # CHIM Engine tracker
 
-_Generated from `docs/bugs/bugs.json` with AmiWind v0.0.58._
+_Generated from `docs/bugs/bugs.json` with AmiWind v0.0.59-dev4._
 
 <!-- Generated whole by tools/bug_register.py render from docs/bugs/bugs.json and docs/BUG_JOURNAL.md; do not edit by hand. -->
 
 Every bug of the CHIM engine: its streaming and memory, world format, builder, stairs and collision on CHIM worlds, rendering and performance. Generated together with the [bug register](../BUGS.md) from [`bugs.json`](bugs.json); a test fails when this page is stale or a CHIM bug is missing. Which bugs appear here and how to add one: [CHIM bugs](README.md#chim-bugs). Design: [world streamer](../WORLD_STREAMER.md).
 
-CHIM version: 0.2.2. 359 CHIM bugs: 180 open, 162 fixed, 17 closed.
+CHIM version: 0.2.2. 360 CHIM bugs: 181 open, 162 fixed, 17 closed.
 
 | Part | Open | Fixed | Closed |
 | --- | --- | --- | --- |
-| [Engine streaming and memory](#engine-streaming-and-memory) | 26 | 26 | 2 |
+| [Engine streaming and memory](#engine-streaming-and-memory) | 27 | 26 | 2 |
 | [World format](#world-format) | 3 | 4 | 0 |
 | [Builder](#builder) | 100 | 108 | 11 |
 | [Stairs and collision on CHIM worlds](#stairs-and-collision-on-chim-worlds) | 19 | 10 | 2 |
@@ -21,9 +21,9 @@ CHIM version: 0.2.2. 359 CHIM bugs: 180 open, 162 fixed, 17 closed.
 
 Bugs reported two or more times. Most reports first. Each has its report lines on its page.
 
-- [BUILD-CHIM-STAGE-SERIAL-TAIL-36](BUILD-CHIM-STAGE-SERIAL-TAIL-36.md): After the parallel world build the chim stage ran its validation, heap gate and zone walk on one core (about 10 minutes of the 270-frame coast build) (reported 13 times, open)
+- [BUILD-CHIM-STAGE-SERIAL-TAIL-36](BUILD-CHIM-STAGE-SERIAL-TAIL-36.md): After the parallel world build the chim stage ran its validation, heap gate and zone walk on one core (about 10 minutes of the 270-frame coast build) (reported 14 times, open)
 - [BUILD-CHIM-CELLS-PRIVATE-LIST-47](BUILD-CHIM-CELLS-PRIVATE-LIST-47.md): The releases' CHIM cell list was not in the source tree; public builds had no CHIM exterior cells (reported 11 times, fixed)
-- [CHIM-SEYDA-BALMORA-LOAD-HANG-43](CHIM-SEYDA-BALMORA-LOAD-HANG-43.md): Travelling from Seyda Neen to Balmora sometimes hangs on the Loading screen (boot smoke, 2 of about 5 runs) (reported 8 times, open)
+- [CHIM-SEYDA-BALMORA-LOAD-HANG-43](CHIM-SEYDA-BALMORA-LOAD-HANG-43.md): Travelling from Seyda Neen to Balmora sometimes hangs on the Loading screen (boot smoke, 2 of about 5 runs) (reported 10 times, open)
 - [CHIM-AZURA-FLOATING-FLORA-43](CHIM-AZURA-FLOATING-FLORA-43.md): Plant or tree pieces hang in the air at Azura's Coast (cell 16,7) (reported 7 times, open)
 - [BUILD-CHIM-SERIAL-SECTIONS-44](BUILD-CHIM-SERIAL-SECTIONS-44.md): The CHIM stage runs several sections on one core while units wait: visibility rows starve their workers (reported 6 times, open)
 - [BUILD-PIPELINE-UNDERUTILIZATION-36](BUILD-PIPELINE-UNDERUTILIZATION-36.md): Umbrella: several builder phases run on one core while the rest of the machine idles, and some do work the build no longer needs (reported 5 times, open)
@@ -97,6 +97,7 @@ Newest first: the last 10 [journal](../BUG_JOURNAL.md) entries that name a CHIM 
 | [CHIM-COURT-BARREL-USE-33](CHIM-COURT-BARREL-USE-33.md) | Census courtyard on CHIM: Fargoth's ring barrel cannot be used, so the opening cannot proceed | open | critical | 9 October 2026, in v0.0.33 | - | v0.0.33 final image (final3-4b26ffc): CHIM 0.1.0, format 0.5, engine 4b26ffc, source 4b26ffc, world 4b26ffc | 16 October 2026: Fix shipped in v0.0.33 (edeeda7): frame maps keep the courtyard barrel marker; tests pass; in-game check that the opening proceeds not recorded. |
 | [CHIM-CROSSING-SLUGGISH-43](CHIM-CROSSING-SLUGGISH-43.md) | Crossing between CHIM cells is sluggish, worst at cell corners | open | high | 19 October 2026, in v0.0.43-dev2 | - | 2026_10_18_v0.0.43-dev2_full-batch3_b55a5ce: CHIM 0.2.1, format 0.7, engine b55a5ce, source b55a5ce, world b55a5ce | Type 1 prototype (branch v0.0.46-stream-type1, chim crossing 1, off by default) measured 20 October 2026, then corrected: the figures (worst frame after a crossing 83 to 42 ms at 128 MB, 373 to 66 ms at 16 MB) are not like for like, because type 1 creates no entities (people, creatures, doors, plants) in the frames it joins and type 0 does. Not the default until it carries entities. (full text: the register) |
 | [CHIM-CROSSING-SYNC-LOAD-43](CHIM-CROSSING-SYNC-LOAD-43.md) | Every open-world cell crossing re-reads the world index and every earlier frame header in the main loop, then primes the ring with hundreds of small reads: 0.3-1.1 s pauses | open | high | 18 October 2026, in v0.0.43-dev2 | - | 2026_10_18_v0.0.43-dev2_full-batch3_b55a5ce: CHIM 0.2.1, format 0.7, engine b55a5ce, source b55a5ce, world b55a5ce | Repair shipped in v0.0.45 (merge 1557f6c8, v0.0.43-prefetch, gate 2989): with extra Fast RAM the world index and frame placement counts stay in RAM and the cells ahead are read into spare RAM; FS-UAE (JIT, 128 MiB, dev2 data, one route): crossing median 452-454 ms to 209-260 ms, seconds with a frame of 300 ms or more 10-11 to 2-5 of 178, a four-cell corner 413-426 ms to 146-239 ms; 16 MiB unchanged. Open until the crossing figures are re-measured on the shipped image as the page asks. |
+| [CHIM-FRAME-SOURCE-CONVERSION-59](CHIM-FRAME-SOURCE-CONVERSION-59.md) | On CHIM frame maps the conversion to the game's coordinates says no for most engine callers | open | medium | 2 November 2026, in v0.0.59-dev3 | - | source: CHIM 0.2.2, engine 9470ca9, source 9470ca9, format, world not recorded | Open. Only the region table is asked (AW_WorldToSource / AW_SourceToWorld); the loaded CHIM frame's own conversion is asked only by the position overlay and, since branch v0.0.59-placement, by the aim rows and placed items. (full text: the register) |
 | [CHIM-FRAME-WORLD-BOUNDS-33](CHIM-FRAME-WORLD-BOUNDS-33.md) | A CHIM frame map must carry an empty world whose bounds cover the frame | open | medium | 8 October 2026, in v0.0.33-dev | - | source: CHIM 0.1.0, format, engine, source, world not recorded | Open: found by the second CHIM engine slice |
 | [CHIM-INTRO-TP-OTHER-TOWN-33](CHIM-INTRO-TP-OTHER-TOWN-33.md) | During the intro stages, travelling to Balmora on CHIM loads Seyda Neen's intro-docks frame map: the player lands in empty water | open | high | 9 October 2026, in v0.0.33 | - | v0.0.33 final image (final2-f583c7b): CHIM 0.1.0, format 0.5, engine f583c7b, source f583c7b, world f583c7b | 16 October 2026: Fix shipped in v0.0.33 (4b26ffc): intro docks frame map only for Seyda Neen; tests/aga_region_test.c; in-game teleport check on a shipped image not recorded. |
 | [CHIM-PACK-DIRS-33](CHIM-PACK-DIRS-33.md) | CHIM pack directories are fully resident and would grow to about 400 KB for the island | open | medium | 8 October 2026, in v0.0.33-dev | - | source: CHIM 0.1.0, format, engine, source, world not recorded | Open: found by the first CHIM engine slice |

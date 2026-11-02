@@ -286,9 +286,9 @@ def compile_target_sizes(sdk):
         raise ValueError('Target ABI probe did not provide valid sizes: ' + ', '.join(missing))
     if (sizes.get('pointer'), sizes.get('short'), sizes.get('int'), sizes.get('hunk')) != (4, 2, 4, 16):
         raise ValueError('Unexpected Amiga ABI core sizes; refusing to estimate')
-    from sprite_heap import sprite_loader_profile, efrag_pool_profile
+    from sprite_heap import sprite_loader_profile, efrag_pool_policy
     sprite_policy = sprite_loader_profile((ROOT / 'engine/aga/src/model.c').read_text(encoding='utf-8'))
-    efrag_policy = efrag_pool_profile((ROOT / 'engine/aga/src/client.h').read_text(encoding='utf-8'))
+    efrag_policy = efrag_pool_policy(ROOT / 'engine/aga/src')
     sizes['sprite_streaming'] = sprite_policy['sprite_streaming']
     slice_policy = bsp_slice_policy((ROOT / 'engine/aga/src/model.c').read_text(encoding='utf-8'))
     sizes['bsp_slice_bytes'] = slice_policy['slice_bytes']
@@ -711,8 +711,8 @@ def inspect_maps(maps, sizes, baseline_reserve_bytes=BASELINE_RESERVE_BYTES,
     guards=guard_profile(maps.parent,sizes)
     from harvest_heap import profile as harvest_profile
     harvest=harvest_profile(maps.parent,sizes)
-    from sprite_heap import efrag_pool_profile
-    efrag_policy=efrag_pool_profile((ROOT/'engine/aga/src/client.h').read_text(encoding='utf-8'))
+    from sprite_heap import efrag_pool_policy
+    efrag_policy=efrag_pool_policy(ROOT/'engine/aga/src')
     # Every map's estimate is independent: chunks run in up to `jobs` workers
     # (shared pool, tools/build_parallel.py); rows keep sorted map order.
     from build_parallel import ordered_map

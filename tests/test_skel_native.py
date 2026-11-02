@@ -273,7 +273,12 @@ class SkelSourceTests(unittest.TestCase):
         save = (SOURCE / 'aw_save.c').read_text()
         self.assertIn('#include "aw_tryalloc.h"', save)
         self.assertNotIn('malloc(AW_SAVE_BYTES)', save.replace('AW_TryMalloc(AW_SAVE_BYTES)', ''))
-        self.assertEqual(save.count('AW_TryMalloc(AW_SAVE_BYTES)'), 3)
+        # CELL-CHANGES-59: a save with the world change list is larger than AW_SAVE_BYTES; the write buffer is the
+        # save's own size and a read buffer the file's, both through AW_TryMalloc, no plain malloc anywhere
+        self.assertEqual(save.count('AW_TryMalloc((unsigned long)capacity)'), 1)
+        self.assertEqual(save.count('AW_TryMalloc(n)'), 1)
+        self.assertNotIn('fseek(', save)       # the save reads never seek (as before the list)
+        self.assertNotRegex(save, r'(?<!Try)malloc\s*\(')
 
 
 @unittest.skipIf(os.name == 'nt', 'native fixtures run in the Linux Docker gate')

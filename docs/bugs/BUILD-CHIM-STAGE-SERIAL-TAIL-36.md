@@ -2,7 +2,7 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 13 times; something has to be done
+## PERSISTING: reported 14 times; something has to be done
 
 - Reported with v0.0.36-dev3 at 2026-10-11 01:43 +0300: maintainer via the Monitor: chim 19.0-29.1 min on about 1 core in the 270-frame coast build; validation 8 min, heap gate and zone walk 1 min each (file times)
 - Reported with v0.0.36-dev4 at 2026-10-11 10:20 +0300: perf guard seed: CHIM heap gate 295 s on 0.94 of 12 cores in the dev4 whole-city Vivec MiniWind (e7a8e82); the chim-speed repair has not reached the line
@@ -17,6 +17,7 @@
 - Reported with v0.0.53-dev3 at 2026-10-27 17:51 +0200: PERSISTING (27 October 2026, the persisting worker): the v0.0.53-dev3 validation took 2 min 15 s on 4.86 of 13 cores, and the world pack took 2 min 58 s on 0.99 of a core. The fix rides the batched world rebuild.
 - Reported with v0.0.54-dev1 at 2026-10-28 01:48 +0200: PERSISTING (27 October 2026 evening): the CHIM zone walk gate ran 77 s on 0.96 of 7 cores; its waiver had expired on 14 October 2026, so the perf guard failed a MiniWind. Passed to the builder worker.
 - Reported with v0.0.54-dev2 at 2026-10-28 04:51 +0200: The builder's detector: chim ran on 7.4 of 24 cores for 150 s with 1351 units queued and 0 running, between the far-terrain and cut-group phases; chim's end 166 s on one core.
+- Reported with v0.0.59-dev3 at 2026-11-02 02:43 +0200: Seen again in 2026_11_02_v0.0.59-dev3_full-v0.0.59-dev3_0ce2752: the chim stage ran 17m38s at 15.1 of 23.5 cores, under half its cores with units queued twice, longest 3m31s. Its resource plan held it to 18 of 24 workers for memory (about 775 MiB each beside a 20 GiB parent).
 
 <!-- END GENERATED PERSISTING -->
 
@@ -45,7 +46,7 @@ _Last updated with AmiWind v0.0.51 (25 October 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 13 times; something has to be done](#persisting-reported-13-times-something-has-to-be-done)
+- [PERSISTING: reported 14 times; something has to be done](#persisting-reported-14-times-something-has-to-be-done)
 - [Status: 25 October 2026 (v0.0.51)](#status-25-october-2026-v0051)
 - [Status: 23 October 2026 (v0.0.48)](#status-23-october-2026-v0048)
 - [Status: 16 October 2026](#status-16-october-2026)

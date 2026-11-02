@@ -1,7 +1,7 @@
 """Every output map fits the engine's per-map tables; town budgets only tighten them (BUILD-BUDGET-ENGINE-LIMITS-35).
 
 The town configs set "entity_budget": 1000 and "model_budget": 220 while the engine holds MAX_EDICTS 600
-edicts and MAX_MODELS 256 model precaches. On a scenery town's region maps the func_walls go to the scenery
+edicts and MAX_MODELS 512 model precaches (256 before ENGINE-MODEL-TABLE-58). On a scenery town's region maps the func_walls go to the scenery
 catalogue (aw_scenery.c, AW_SCENERY_MAX_PLACEMENTS), not to edicts; everywhere else they are edicts. These
 tests keep tools/map_engine_limits.py in step with the engine and the QuakeC it reads."""
 from pathlib import Path
@@ -48,6 +48,14 @@ class EngineLimitsTests(unittest.TestCase):
         self.assertEqual(table['entity_room'], table['max_edicts'] - table['fixed_edicts'])
         self.assertEqual(table['model_room'], table['max_models'] - table['fixed_models'])
 
+    def test_model_table_is_512_and_a_300_model_map_passes(self):
+        # ENGINE-MODEL-TABLE-58: one define; a map over the old 256 passes the gate
+        table = mel.limits()
+        self.assertEqual(table['max_models'], 512)
+        refused, c = mel.check(bsp(world(), models=300), 'vf0001')
+        self.assertEqual(refused, [], c)
+        self.assertGreater(c['models'], 256)
+
     def test_scenery_catalogue_uses_the_define(self):
         text = (SRC / 'aw_scenery.c').read_text()
         self.assertIn('capacity>AW_SCENERY_MAX_PLACEMENTS', text)
@@ -67,8 +75,12 @@ class EngineLimitsTests(unittest.TestCase):
         # window's edicts are an open item, docs/chim/CELL_CROSSINGS.md "Weak points").
         # The Halloween scene (aw_halloween.c, HALLOWEEN-SCENE-53; a MiniWind test scene) takes no reserved slot: it
         # checks for a free edict before each actor and leaves the rest out when the map is full.
+        # aw_inventory.c: the drops, of the old fixed table (two) and of the world change list (two, CELL-CHANGES-59);
+        # one map shows at most AW_INVENTORY_DROPS of either (map_drop_room), the 32 below
         self.assertEqual(sorted(sites), ['aw_actors.c', 'aw_actors.c', 'aw_arena.c', 'aw_companion.c', 'aw_halloween.c',
-                                         'aw_inventory.c', 'aw_inventory.c', 'aw_items.c', 'aw_items.c'])
+                                         'aw_inventory.c', 'aw_inventory.c', 'aw_inventory.c', 'aw_inventory.c',
+                                         'aw_items.c', 'aw_items.c'])
+        self.assertIn('if(map_drop_count>=AW_INVENTORY_DROPS)return 0;', (SRC / 'aw_inventory.c').read_text())
         self.assertIn('if(!edict_available()){', (SRC / 'aw_halloween.c').read_text())
         # one each for the companion and the arena foe; aw_items.c one per carried item of every hostile, and one
         # per carried light of a skeletal guard (its torch, at most AW_ITEMS_CARRIERS: SKEL-ITEM-TAGS-52)
@@ -100,7 +112,11 @@ class EngineLimitsTests(unittest.TestCase):
         self.assertIn("sv.state!=ss_loading || lazies>=MOVERS", (SRC / 'aw_anim.c').read_text())
         # aw_items.c precaches only while the map loads, from the .tag files model_extras reads
         self.assertIn("sv.state!=ss_loading", (SRC / 'aw_items.c').read_text())
-        self.assertEqual(mel.RUNTIME_MODELS, 1 + 16)
+        # the arena's slot and the dropped items' guaranteed room; more drops take only free slots (ITEM-WORLD-MODELS-58)
+        # and the placed items' room per level (WORLD-OBJECT-PLACEMENT-59: aw_inventory.c placed_model)
+        self.assertEqual(mel.RUNTIME_MODELS, 1 + 16 + 96)
+        self.assertIn('placed_models_used>=AW_PLACED_MODELS', (SRC/'aw_placed.c').read_text())
+        self.assertIn('i>=MAX_MODELS-AW_INVENTORY_KEEP_MODELS', (SRC/'aw_inventory.c').read_text())
         inventory = (SRC/'aw_inventory.c').read_text()
         self.assertIn('model_names_used>=AW_INVENTORY_MODELS', inventory)
         self.assertIn('model_names[AW_INVENTORY_MODELS][64]', inventory)
@@ -281,7 +297,11 @@ class RoomMapModelTests(unittest.TestCase):
             ok.write_bytes(bsp(world(), models=pc.CENSUS_MODEL_LIMIT - fixed + 2))
             with self.assertRaisesRegex(ValueError, 'census.bsp: %d models' % (pc.CENSUS_MODEL_LIMIT + 1)):
                 pc.check_model_room(ok)
-            ok.write_bytes(bsp(world(), models=284 - fixed + 1))     # the refused dev4 office
+            # the dev4 office's own 284 models (refused under the old 256 table) fit the 512 table with the
+            # placed items' room; a map past the table is still refused here
+            ok.write_bytes(bsp(world(), models=284 - 20 + 1))
+            self.assertEqual(pc.check_model_room(ok)['models'], 284 - 20 + 1 + pc.FIXED_MODEL_SLOTS)
+            ok.write_bytes(bsp(world(), models=table['max_models'] - fixed + 2))
             with self.assertRaisesRegex(ValueError, 'MAX_MODELS'):
                 pc.check_model_room(ok)
         source = (ROOT / 'tools/prepare_census.py').read_text()

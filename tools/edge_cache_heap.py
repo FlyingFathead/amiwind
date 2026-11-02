@@ -63,9 +63,12 @@ import struct
 # Re-pinned 2026-10-30 for ANIMKIT-COVERAGE-35 (model.c): the generic alias loader sizes and keeps a skeletal model's
 # block after its rest frame and links it through the aw_alias_skel_link hook; edge-cache code and brush loaders are
 # byte-identical.
+# Re-pinned 2026-11-01 for ENGINE-MODEL-TABLE-58 (model.c, model.h): MAX_MODELS 512; mod_known keeps 256 static slots
+# (model_slot_capacity below) and pages the rest only when a map needs them; edge-cache code and brush loaders are
+# byte-identical.
 SOURCE_HASHES={
-    'model.c':'426da51737baabdcfd340358faff96741998bb980a3b896026c3be094d973ae1',
-    'model.h':'bc905ee0a36fafb68eb1376b68670f24de270931ca8ba736ca29ab7e1178440a',
+    'model.c':'dc882f24752a953f769370a23957cb300eb5bd7ac7c699ef048e0eb77084a1be',
+    'model.h':'34d8a139baba066b2d775a591b35fc4cd1e8a7326d34ca7759d036a1654244f8',
     'r_draw.c':'08464e4c3bbb98ed197f7c42c5b013818d2ef4fffd1a5727ed9a6a4c3385cce4',
     'asm_draw.h':'15dafafe33898852972379fc48524346c287a342ba95f17c01becdc75926eba1',
 }

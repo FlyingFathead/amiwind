@@ -119,8 +119,10 @@ void	VID_UnlockBuffer (void);
 //
 #define	MAX_EDICTS		600			// FIXME: ouch! ouch! ouch!
 #define	MAX_LIGHTSTYLES	64
-#define	MAX_MODELS		256			// these are sent over the net as bytes
-#define	MAX_SOUNDS		256			// so they cannot be blindly increased
+/* MAX_MODELS: model precaches per map (ENGINE-MODEL-TABLE-58). A model index travels as a short
+ * (protocol.h MSG_WriteModel), so raising it is this one line, up to 65535. */
+#define	MAX_MODELS		512
+#define	MAX_SOUNDS		256			// sent over the net as bytes, so it cannot be blindly increased
 
 #define	SAVEGAME_COMMENT_LENGTH	39
 
@@ -571,6 +573,13 @@ byte *AW_UIMenuPalette(void);
 int AW_UIColor(int,int,int);
 /* aw_ui.c: the original map arrow (16x16 in gfx/ui.awu, rows 64 bytes apart, 255 clear), NULL when absent. */
 const byte *AW_UIMapArrow(void);
+/* aw_ui.c (CURSOR-MW-58): the mouse cursor. aw_cursor_type 2 (default) = Morrowind's own (gfx/cursor.awc, from
+ * textures/tx_cursor.dds), 1 = AmiWind's drawn cursor. AW_UICursor draws Morrowind's with its tip at x,y and returns 1;
+ * 0 when type 1 is chosen or the image has no gfx/cursor.awc: the caller draws its own cursor. */
+int AW_UICursor(int x,int y);
+int AW_UICursorType(void);
+void AW_UICursorTypeSet(int type);
+int AW_UICursorAvailable(void);
 void AW_UIFill(int,int,int,int,int);
 void AW_UIScrollbar(int,int,int,int,int,int);
 int AW_UIScrollHit(int,int,int,int,int,int,int,int);

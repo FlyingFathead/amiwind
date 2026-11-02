@@ -8,6 +8,7 @@
  */
 #ifndef AW_GLUT_H
 #define AW_GLUT_H
+#include "aw_textdef.h"
 
 /* Topics the engine asks for (the file names its topics; the known ones are matched by name at load). */
 enum {AW_GLUT_HELLO, AW_GLUT_IDLE, AW_GLUT_INTRUDER, AW_GLUT_THIEF, AW_GLUT_HIT, AW_GLUT_ATTACK, AW_GLUT_FLEE,
@@ -178,6 +179,9 @@ long AW_GlutTextOffset(const aw_glut_t *g,int entry);
 /* The speaker's text defines (%Name = name, %Class, %Race, %Faction, %Rank, %Cell from the NPC row) filled in;
  * the player's (%PCName, %PCRace, %PCClass) kept for AW_ExpandDialogue. */
 void AW_GlutExpand(const aw_glut_t *g,int npc,const char *name,const char *source,char *out,int capacity);
+/* The same speaker values for the one getter table (aw_textdef.c): V's speaker fields set (speaker 1, the NPC
+ * row's home cell as %Cell), the rest of V kept; the text is then filled in one pass (AW_TextDefines). */
+void AW_GlutSpeakerValues(const aw_glut_t *g,int npc,const char *name,aw_textdef_values_t *v);
 
 /* Engine part (aw_glut.c without AW_GLUT_HOST_TEST): */
 struct edict_s;
@@ -201,6 +205,9 @@ int AW_GlutBark(struct edict_s *e,int npc,int topic,int pick_random,unsigned cha
  * a text with the speaker's and the player's defines filled. */
 int AW_GlutSpeaker(struct edict_s *e,int talked,aw_glut_cond_t *c,aw_glut_state_t *s);
 void AW_GlutFill(struct edict_s *e,int row,const char *raw,char *out,int capacity);
+/* The player's and this speaker's values (aw_textdef.c AW_TextDefinesPlayer + AW_GlutSpeakerValues) for a one-pass
+ * fill; 0 when the one-pass fill is off (aw_text_lut 0: the previous chain of scans, AW_GlutFill). */
+int AW_GlutDefineValues(struct edict_s *e,int row,aw_textdef_values_t *v);
 /* The conversation greeting text of a manual talk for an NPC without its own (aw_converse): 1 and the text. */
 int AW_GlutConverse(struct edict_s *e,int again,char *out,int capacity);
 #endif

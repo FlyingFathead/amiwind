@@ -896,5 +896,5 @@ void AW_CharacterDraw(void)
         AW_UITextBox(44,143,112,23,"Go back",gold);
         AW_UITextBox(164,143,112,23,"Choose",gold);AW_UISmallEnd();
     }
-    if(mouse_visible){AW_UIFill(mouse_x,mouse_y,2,6,gold);AW_UIFill(mouse_x,mouse_y,6,2,gold);}
+    if(mouse_visible && !AW_UICursor(mouse_x,mouse_y)){AW_UIFill(mouse_x,mouse_y,2,6,gold);AW_UIFill(mouse_x,mouse_y,6,2,gold);}
 }

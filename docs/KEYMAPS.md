@@ -1,6 +1,6 @@
 # Keyboard and command reference
 
-_Last updated with AmiWind v0.0.58-dev4 (1 November 2026)._
+_Last updated with AmiWind v0.0.59-dev3 (2 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -52,8 +52,8 @@ world is not drawn while Options is open.
 
 ```text
 [ Prefs ]  [ Audio ]  [ Controls ]  [ Video ]
-Prefs     Show crosshairs, Crosshair colour, Crosshair shape, Gold frame,
-          UI font, Voice speaker names, Dialogue style, Aimed NPC names,
+Prefs     Show crosshairs, Crosshair colour, Crosshair shape, Mouse cursor,
+          Gold frame, UI font, Voice speaker names, Dialogue style, Aimed NPC names,
           NPC (name place), Objects (name place), Autosave history
 Audio     Master, Music, Effects, Dialogue (sliders)
 Controls  Mouse sensitivity (slider), Invert Y axis, the gameplay actions,
@@ -64,6 +64,14 @@ Video     Fog distance, Reset distance, Far detail, Photo mode, Area loading,
 
 Until v0.0.48 these were one list with Interface..., Audio... and Controls...
 sub-menus; every setting kept its name and its saved value.
+
+Prefs > Mouse cursor chooses the pointer every window draws (inventory, journal,
+map, stats, dialogue, list boxes, books, character creation and these menus):
+Morrowind (the default) is the original game's own pointer, converted from your
+game data (`textures/tx_cursor.dds`) when the image is built; AmiWind is the
+small drawn cursor of earlier releases. An image built without the original's
+pointer always shows AmiWind's. `dbg cursortype 2` and `dbg cursortype 1` do the
+same from the console; the choice is saved in `config.cfg` (`aw_cursor_type`).
 
 ## Options > Controls
 

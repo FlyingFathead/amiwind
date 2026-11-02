@@ -2,10 +2,11 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 2 times; something has to be done
+## PERSISTING: reported 3 times; something has to be done
 
 - Reported with v0.0.57-dev5 at 2026-10-30 20:32 +0000: ForceGreeting ruled out: the 1,207 scripts run through the interpreter with the player near every actor in Ald'ruhn, Balmora and Seyda Neen called it 0 times; in game (an engine logging every ForceGreeting, 32 MB Fast, no keys, Ald'ruhn noon and midnight, Balmora) still 0 and no box. Next suspect: the older automatic hello in world.qc aw_npc_idle.
 - Reported with v0.0.58-dev6 at 2026-11-01 (time not recorded): Seen again on the v0.0.58-dev6 recheck, twice: after dbg npcs talk fargoth the session runner reports game stalled (seyda-chim, realtime frozen) as soon as the talk box opens; no greeting still could be taken.
+- Reported with v0.0.58 at 2026-11-01 23:15 +0200: Seen again on the v0.0.58 release image: the cause is DIALOGUE-OPEN-STALL-58, not the emulator disk stall. With the FS-UAE monitor the processor is busy (no exec idle), the game in a file call held by DH0; the window opens after the long stall, so the session's game-clock check failed while the conversation was being read.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -34,7 +35,7 @@ _Last updated with AmiWind v0.0.58 (1 November 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
 - [Status: 1 November 2026](#status-1-november-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -193,5 +194,9 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - [TOOLKIT-TEST-POINTERLOCK-31](TOOLKIT-TEST-POINTERLOCK-31.md): Inspector test left pointer lock set, breaking later drag checks
 - TOOLS-UNPINNED-WRITER-ATMOS-54 (no report page): tools/particle_emitters.py wrote JSON without pinned line endings
 - TRACKER-BUGS-PAGE-SIZE-58 (no report page): docs/BUGS.md lists every bug with its whole status, archived ones too, so the archive rotation cannot keep it under its size limit: it reached 95.06 % of 1 MiB
+
+Related bugs in other categories:
+
+- DIALOGUE-OPEN-STALL-58 (no report page): Opening a conversation hangs the game for many seconds
 
 <!-- END GENERATED CATEGORY -->

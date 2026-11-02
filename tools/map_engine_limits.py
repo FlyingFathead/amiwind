@@ -59,7 +59,14 @@ def runtime_edicts(source=None):
 # Inventory retains up to AW_INVENTORY_DROPS persistent world entities.
 # Model precache slots engine code may add at run time: the arena opponent's model (aw_arena.c; it
 # reports "model table full" instead of failing, but the gate keeps its slot free).
-RUNTIME_MODELS = 1 + engine_limits.define('aw_inventory.h', 'AW_INVENTORY_MODELS')
+# Dropped items: the room every map keeps for them (AW_INVENTORY_MODELS_GUARANTEED); the engine admits more, up to
+# AW_INVENTORY_MODELS, only from slots the map leaves free, refusing gracefully when none is (ITEM-WORLD-MODELS-58).
+# Placed items (WORLD-OBJECT-PLACEMENT-59): the engine loads up to AW_PLACED_MODELS item models per level into the
+# loaded-model table (model.c, sized MAX_MODELS like the precaches); every map keeps that room, and the item-models
+# stage refuses a room or exterior neighbourhood that names more (prepare_item_models.check_placed).
+RUNTIME_MODELS = (engine_limits.define('aw_inventory.h', 'AW_INVENTORY_KEEP_MODELS')
+                  + engine_limits.define('aw_inventory.h', 'AW_INVENTORY_MODELS_GUARANTEED')
+                  + engine_limits.define('aw_inventory.h', 'AW_PLACED_MODELS'))
 TOWN_TABLE = ROOT / 'engine/aga/src/aw_town_table.h'
 ENTITY = re.compile(r'\{([^{}]*)\}')
 FIELD = re.compile(r'"([^"\n]*)"\s+"([^"\n]*)"')

@@ -211,7 +211,9 @@ void CL_ParseServerInfo (void)
 	char	*str;
 	int		i;
 	int		nummodels, numsounds;
-	char	model_precache[MAX_MODELS][MAX_QPATH];
+	/* the model names are read again from the message when they load (models_at), not copied: a copy of
+	 * MAX_MODELS names would be 32 KB at 512 (ENGINE-MODEL-TABLE-58) */
+	int		models_at, after_lists;
 	char	sound_precache[MAX_SOUNDS][MAX_QPATH];
 
 	Con_DPrintf ("Serverinfo packet received.\n");
@@ -257,6 +259,7 @@ void CL_ParseServerInfo (void)
 
 // precache models
 	memset (cl.model_precache, 0, sizeof(cl.model_precache));
+	models_at = msg_readcount;
 	for (nummodels=1 ; ; nummodels++)
 	{
 		str = MSG_ReadString ();
@@ -271,7 +274,6 @@ void CL_ParseServerInfo (void)
 		   the session (ENGINE-ENTITY-TEXT-UNBOUNDED-35) */
 		if (strlen (str) >= MAX_QPATH)
 			Host_Error ("Server sent a model name longer than %d characters", MAX_QPATH - 1);
-		strcpy (model_precache[nummodels], str);
 		Mod_TouchModel (str);
 	}
 
@@ -298,17 +300,24 @@ void CL_ParseServerInfo (void)
 //
 
 	aw_load_phase = "client: models";
+	after_lists = msg_readcount;
 	for (i=1 ; i<nummodels ; i++)
 	{
+		char	name[MAX_QPATH];
+		msg_readcount = models_at;		/* the next name, as checked above */
+		strcpy (name, MSG_ReadString ());
+		models_at = msg_readcount;
 		/* animation kit mover models load only while an actor moves (aw_anim.c) */
-		cl.model_precache[i] = AW_AnimLazy (model_precache[i]) ? Mod_FindName (model_precache[i]) : Mod_ForName (model_precache[i], false);
+		cl.model_precache[i] = AW_AnimLazy (name) ? Mod_FindName (name) : Mod_ForName (name, false);
 		if (cl.model_precache[i] == NULL)
 		{
-			Con_Printf("Model %s not found\n", model_precache[i]);
+			Con_Printf("Model %s not found\n", name);
+			msg_readcount = after_lists;
 			return;
 		}
 		CL_KeepaliveMessage ();
 	}
+	msg_readcount = after_lists;
 
 	aw_load_phase = "client: sounds";
 	S_BeginPrecaching ();
@@ -392,7 +401,7 @@ void CL_ParseUpdate (int bits)
 
 	if (bits & U_MODEL)
 	{
-		modnum = MSG_ReadByte ();
+		modnum = MSG_ReadModel ();
 		if (modnum >= MAX_MODELS)
 			Host_Error ("CL_ParseModel: bad modnum");
 	}
@@ -539,7 +548,9 @@ void CL_ParseBaseline (entity_t *ent)
 {
 	int			i;
 
-	ent->baseline.modelindex = MSG_ReadByte ();
+	ent->baseline.modelindex = MSG_ReadModel ();
+	if (ent->baseline.modelindex >= MAX_MODELS)
+		Host_Error ("CL_ParseBaseline: bad modnum");
 	ent->baseline.frame = MSG_ReadByte ();
 	ent->baseline.colormap = MSG_ReadByte();
 	ent->baseline.skin = MSG_ReadByte();
@@ -616,7 +627,11 @@ void CL_ParseClientdata (int bits)
 	}
 
 	if (bits & SU_WEAPON)
-		i = MSG_ReadByte ();
+	{
+		i = MSG_ReadModel ();
+		if (i >= MAX_MODELS)
+			Host_Error ("CL_ParseClientdata: bad weapon modnum");
+	}
 	else
 		i = 0;
 	if (cl.stats[STAT_WEAPON] != i)
@@ -723,9 +738,10 @@ void CL_ParseStatic (qboolean scaled)
 	ent = &cl_static_entities[i];
 	cl.num_statics++;
     if (scaled) {
-        if (msg_readcount > net_message.cursize - 32)
+        /* a short model index, three bytes, six pose floats and the scale float */
+        if (msg_readcount > net_message.cursize - 33)
             Host_Error("Truncated aw_flora static message");
-        ent->baseline.modelindex = MSG_ReadByte();
+        ent->baseline.modelindex = MSG_ReadModel();
         ent->baseline.frame = MSG_ReadByte();
         ent->baseline.colormap = MSG_ReadByte();
         ent->baseline.skin = MSG_ReadByte();

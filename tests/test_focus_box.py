@@ -123,7 +123,12 @@ class FocusTableTests(unittest.TestCase):
         self.assertRegex(inventory, r'#define FOCUS_GRID_BIAS 2048\b')
         self.assertRegex(inventory, r'#define FOCUS_CELL 8192\.0f')
         load = body(inventory, 'static void focus_load(void)')
-        self.assertIn('AW_SourceToWorld(', load)                 # outdoor rows in this map's own units
+        # outdoor rows in this map's own units: the region table, else the loaded CHIM frame
+        # (PLACED-ITEMS-OUTDOORS-FIRST-FRAME-59)
+        self.assertIn('focus_to_local(', load)
+        convert = body(inventory, 'static int focus_to_local(')
+        self.assertIn('AW_SourceToWorld(', convert)
+        self.assertIn('aw_focus_chim_local', convert)
         self.assertIn('dx<=1', load)                              # the player's cell and its neighbours only
 
     def test_books_are_read_and_magic_scrolls_are_taken(self):
@@ -236,7 +241,9 @@ class EngineTests(unittest.TestCase):
         self.assertIn('"sValue"', focus)
         self.assertIn('item.weight', focus)
         self.assertIn('item.value', focus)
-        self.assertIn('inv_target()', focus)
+        # the aimed drop of either store: the world change list's (CELL-CHANGES-59) or the old fixed table's
+        self.assertIn('drop_aimed()', focus)
+        self.assertIn('return aw_ledger_on?ledger_target():inv_target();', self.inventory)
 
     def test_scene_draws_the_framed_box(self):
         draw = body(self.scene, 'void AW_SceneDraw(void)')

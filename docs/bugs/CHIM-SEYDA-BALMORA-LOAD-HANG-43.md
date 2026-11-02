@@ -2,7 +2,7 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 8 times; something has to be done
+## PERSISTING: reported 10 times; something has to be done
 
 - Reported with v0.0.46 at 2026-10-20 20:09 +0300: Listed under Known in this build in the v0.0.46 release notes (still open at the release).
 - Reported with v0.0.53-dev2 at 2026-10-26 (time not recorded): 19:14 UTC door sample: the Yassu Mine room load (ri9f4c8ccd45) stopped after its BSP while a gate ran its emulator; the next try loaded in 7.6 s
@@ -11,7 +11,9 @@
 - Reported with v0.0.58-dev3 at 2026-10-31 23:42 +0000: Also seen in play, not only on a load: in gates 4698, 4845, 4897 and 4954 the game stopped a few seconds after arriving in Seyda Neen (game clock still, the same frame on screen, no command taken), and gate 4932 examined such a stop: processor idle, the file request held by DH0. SMOKE-TALK-BOX-BLOCKS-REMOTE-57 and SMOKE-SEYDA-AGAIN-NOT-IN-PLAY-58 are closed as duplicates of this entry.
 - Reported with v0.0.58 at 2026-11-01 (time not recorded): Seen again twice on v0.0.58 images: the boot smoke of the release build stopped with Seyda Neen not loaded, the game waiting on the emulator's disk request (held by DH0, the CPU idle); an in-game check session on the dev6 image stopped the same way before Seyda Neen. The rerun of the smoke is the next step.
 - Reported with v0.0.58 at 2026-11-01 (time not recorded): And again on the release smoke's rerun: Seyda Neen loaded twice and Balmora twice, then the third Seyda Neen load from Balmora did not finish within the limit; the game kept running server frames on the Loading screen (no disk wait this time).
+- Reported with v0.0.59-dev1 at 2026-11-01 (time not recorded): Seen again on the v0.0.59-dev1 delivery: the release hops session froze on its first map (Balmora) about 17 s in, before the first hop, after waiting for a gate's emulator run; the 32 MB boot smoke of the same image had passed. The hops step was rerun.
 - Reported with v0.0.58 at 2026-11-01 03:04 +0200: Seen again in gate 5233 (source b1d45efd, a character menu change): the boot smoke got no answer to aw_music_status after the second load; all five samples showed the game waiting on a DH0 file request in exec idle. The same commit passed gate 5234 right after.
+- Reported with v0.0.58-dev4 at 2026-11-01 07:49 +0000: Seen again in a gate boot smoke on the model-table branch (2bf629a1): after the Seyda Neen load the game stopped taking console commands for 60 seconds (the emulator disk stall pattern); the suite and the engine build passed. The gate was run again.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -40,7 +42,7 @@ _Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 8 times; something has to be done](#persisting-reported-8-times-something-has-to-be-done)
+- [PERSISTING: reported 10 times; something has to be done](#persisting-reported-10-times-something-has-to-be-done)
 - [Symptom](#symptom)
 - [Where](#where)
 - [How it happened](#how-it-happened)

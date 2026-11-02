@@ -12,7 +12,7 @@ static const char *const names[AW_TD_COUNT] = {
     "actionslideright", "actionreadymagic", "actionprevweapon", "actionnextweapon", "actiontogglerun",
     "actionslideleft", "actionreadyitem", "actionprevspell", "actionnextspell", "actionrestmenu", "actionmenumode",
     "actionactivate", "actionjournal", "actionforward", "actioncrouch", "actionjump", "actionback", "actionuse",
-    "actionrun"
+    "actionrun", "gamehour"
 };
 /* The action's own word when no key is known (the original's settings names). */
 static const char *const action_words[AW_TD_ACTIONS] = {
@@ -34,8 +34,10 @@ int AW_TextDefineMatch(const char *text, int *length)
 {
     int k, n;
     if ((n = prefix(text, names[AW_TD_PCCRIMELEVEL])) > 0) { *length = n; return AW_TD_PCCRIMELEVEL; }
-    for (k = AW_TD_ACTION_FIRST; k < AW_TD_COUNT; k++) if ((n = prefix(text, names[k])) > 0) { *length = n; return k; }
+    for (k = AW_TD_ACTION_FIRST; k < AW_TD_GAMEHOUR; k++) if ((n = prefix(text, names[k])) > 0) { *length = n; return k; }
     for (k = AW_TD_NEXTPCRANK; k < AW_TD_ACTION_FIRST; k++) if ((n = prefix(text, names[k])) > 0) { *length = n; return k; }
+    /* the globals' place in OpenMW's order (no global name starts with "gamehour" in the masters) */
+    if ((n = prefix(text, names[AW_TD_GAMEHOUR])) > 0) { *length = n; return AW_TD_GAMEHOUR; }
     *length = 0;
     return -1;
 }
@@ -54,9 +56,17 @@ void AW_TextDefineValue(int id, const aw_textdef_values_t *v, char *out, int cap
     if (capacity <= 0) return;
     out[0] = 0;
     if (!v) return;
-    if (id >= AW_TD_ACTION_FIRST && id < AW_TD_COUNT) {
+    if (id >= AW_TD_ACTION_FIRST && id < AW_TD_GAMEHOUR) {
         s = v->action_key ? v->action_key(id - AW_TD_ACTION_FIRST) : NULL;
         put(out, capacity, s ? s : action_words[id - AW_TD_ACTION_FIRST]);
+        return;
+    }
+    if (id == AW_TD_GAMEHOUR) {
+        int length = 0, g;
+        if (v->clock) { snprintf(out, (size_t)capacity, "%g", (double)v->game_hour); return; }
+        /* no clock (a fixture): the global of that name, as OpenMW reads it */
+        if (v->global_prefix && v->global_text && (g = v->global_prefix("GameHour", 8, &length)) >= 0 && length == 8)
+            v->global_text(g, out, capacity);
         return;
     }
     switch (id) {
@@ -133,6 +143,8 @@ int AW_TextDefines(char *out, int capacity, const char *p, const aw_textdef_valu
 #include "aw_character.h"
 #include "aw_pcstanding.h"
 #include "aw_mwvm.h"
+#include "aw_clock.h"
+#include "aw_state.h"
 
 /* A written global define (%GameHour) is looked up on disk, nothing kept: the builder codes the defines it knows
  * (AW_TEXTDEF_GLOBAL), so this runs only for a text that was not converted. */
@@ -140,6 +152,31 @@ static void global_text(int g, char *out, int capacity)
 {
     if (AW_MwscriptGlobalType(g) == 2) snprintf(out, (size_t)capacity, "%g", (double)AW_MwvmGlobalFloat(g));
     else snprintf(out, (size_t)capacity, "%ld", (long)AW_MwvmGlobalInt(g));
+}
+/* The command each action is bound to (config/keymaps.cfg; the original's action names, action_words above), NULL
+ * where the game has no such command yet. */
+static const char *const action_commands[AW_TD_ACTIONS] = {
+    "+moveright", NULL, NULL, NULL, NULL, "+moveleft", "impulse 202", NULL, NULL, "aw_wait", "aw_inventory",
+    "+aw_use", "aw_journal", "+forward", "+aw_sneak", "+jump", "+back", "+attack", "+speed"
+};
+/* The first key (lowest key number, so a letter before the arrows) bound to the action's command, a single letter in
+ * upper case as the original's settings show it; a loop over the 256 bindings, run only for a text holding an action
+ * define. */
+const char *AW_TextDefineBoundKey(int action)
+{
+    static char key[16];
+    int k;
+    const char *name;
+    if (action < 0 || action >= AW_TD_ACTIONS || !action_commands[action]) return NULL;
+    for (k = 0; k < 256; k++) {
+        if (!keybindings[k] || Q_strcasecmp(keybindings[k], (char *)action_commands[action])) continue;
+        if (!(name = Key_KeynumToString(k)) || !*name) continue;
+        strncpy(key, name, sizeof(key) - 1);
+        key[sizeof(key) - 1] = 0;
+        if (key[0] >= 'a' && key[0] <= 'z' && !key[1]) key[0] = (char)(key[0] - 'a' + 'A');
+        return key;
+    }
+    return NULL;
 }
 static char cell_name[64];
 void AW_TextDefinesPlayer(aw_textdef_values_t *v)
@@ -159,5 +196,9 @@ void AW_TextDefinesPlayer(aw_textdef_values_t *v)
     v->cell = cell_name;
     v->global_prefix = AW_MwscriptGlobalPrefix;
     v->global_text = global_text;
+    v->action_key = AW_TextDefineBoundKey;
+    /* %GameHour: the clock's hour of the day (OpenMW's GameHour global follows the clock) */
+    v->clock = AW_ClockEnsure();
+    v->game_hour = v->clock ? (float)(AW_StateGet(&aw_state, AW_GLOBAL, "amiwind:clock:ms") / 3600000.0) : 0;
 }
 #endif

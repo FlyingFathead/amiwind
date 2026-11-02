@@ -21,6 +21,9 @@ void (*aw_chim_map_end)(void);
 void (*aw_demo_map_begin)(void);
 void (*aw_chim_link)(void);
 void (*aw_chim_clip)(vec3_t,vec3_t,vec3_t,vec3_t,trace_t *);
+/* The placed items drawn by reference to the shared item models (aw_placed.c AW_PlacedLink, WORLD-OBJECT-PLACEMENT-59):
+ * linked with the scenery every client frame; NULL until AW_PlacedInit. */
+void (*aw_placed_link)(void);
 typedef struct {
     entity_t render;
     vec3_t mins,maxs;
@@ -80,6 +83,7 @@ void AW_SceneryLink(void)
 {
     int i;
     if(aw_chim_link)aw_chim_link();
+    if(aw_placed_link)aw_placed_link();
     if(!sv.active || !AW_SceneryMapEnabled(sv.name))return;
     if(cl_numvisedicts+count>MAX_VISEDICTS)Host_Error("Balmora visible entity budget exceeded");
     for(i=0;i<count;i++)cl_visedicts[cl_numvisedicts++]=&placements[i].render;

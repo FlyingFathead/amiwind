@@ -1,7 +1,20 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #ifndef AW_INVENTORY_H
 #define AW_INVENTORY_H
-#define AW_INVENTORY_MODELS 16
+/* Dropped items' world models a scene may add to the model table (ITEM-WORLD-MODELS-58): up to
+ * AW_INVENTORY_MODELS distinct models, each only while a free slot stays below MAX_MODELS less
+ * AW_INVENTORY_KEEP_MODELS (the arena opponent's slot). Every map is built with room for
+ * AW_INVENTORY_MODELS_GUARANTEED of them (tools/map_engine_limits.py RUNTIME_MODELS); past that a drop
+ * takes what the map leaves free and refuses with "World model table full; kept." when nothing is. */
+#define AW_INVENTORY_MODELS 64
+#define AW_INVENTORY_MODELS_GUARANTEED 16
+#define AW_INVENTORY_KEEP_MODELS 1
+/* Placed items (WORLD-OBJECT-PLACEMENT-59, progs/items/placed.awp): the distinct item models a level may load for
+ * the items the original placed in its room or its exterior cells (the shared item model table; every row is a
+ * reference to one of them, never a copy). Every map is built with this room (tools/map_engine_limits.py
+ * RUNTIME_MODELS) and the item-models stage refuses a room or exterior neighbourhood that names more
+ * (tools/prepare_item_models.py PLACED_MODELS). */
+#define AW_PLACED_MODELS 96
 #include "aw_state.h"
 enum {AW_INV_ALL,AW_INV_WEAPON,AW_INV_ARMOUR,AW_INV_CLOTHING,AW_INV_POTION,
       AW_INV_INGREDIENT,AW_INV_BOOK,AW_INV_MISC};
@@ -89,6 +102,16 @@ int AW_InventoryUnequip(aw_state_t *,const char *id);
 int AW_InventoryDrop(aw_state_t *,const aw_inventory_item_t *,int32_t count,
                      const char *scene,const float position[3],float yaw);
 int AW_InventoryPickup(aw_state_t *,int drop);
+/* CELL-CHANGES-59 (aw_ledger_drops.c): the same rules on the world change list (aw_ledger.h). A drop: COUNT leaves
+ * the inventory and a row (key bit 30 + the next serial, DROPPED) lies at AT / WHERE, POSITION (the place's units,
+ * aw_ledger.h), YAW; the row's key, 0 when refused (nothing changed). A pickup: the row's items come back and the row
+ * goes; 0 when refused. An older save's dropped[] (keyed by map name) moves onto the list as SCENE rows; returns how
+ * many moved. */
+struct aw_ledger_s;
+uint32_t AW_LedgerDrop(aw_state_t *,struct aw_ledger_s *,const aw_inventory_item_t *,int32_t count,
+                       int at,int32_t where,const float position[3],float yaw);
+int AW_LedgerPickup(aw_state_t *,struct aw_ledger_s *,uint32_t key);
+int AW_LedgerAdoptDrops(aw_state_t *,struct aw_ledger_s *);
 /* Declarations remain visible to pure-rule/UI fixtures; the implementation
  * switch changes linked code, never the callable ABI. */
 /* Ordered ASCII case-insensitive comparison; unlike Quake equality helpers. */
@@ -118,6 +141,16 @@ extern int (*aw_book_reader)(unsigned reference);
 int AW_PlacedBook(unsigned reference,char *id,int *owned);
 /* BOOK-READER-58: take the placed item REFERENCE as E on it would (owned: stolen); 1 when taken or refused. */
 int AW_PlacedTake(unsigned reference);
+/* WORLD-OBJECT-PLACEMENT-59: the placed item list (progs/items/placed.awp) is read with the focus rows; each row the
+ * map does not draw itself is offered to aw_placed_admit (aw_placed.c: returns its drawn index + 1, 0 when it is not
+ * drawn); aw_placed_begin forgets the drawn set and returns 0 when nothing is to be drawn. NULL: nothing is. */
+extern int (*aw_placed_begin)(void);
+extern int (*aw_placed_admit)(unsigned reference,const char *stem,const float local[3],const float angles[3],float scale);
+/* Once per client frame (aw_placed.c): read the focus table again when the map or exterior cell changed; 1 outdoors. */
+int AW_PlacedRefresh(void);
+/* What the last read of the placed list saw: keys read (negative outdoors), rows, rows with no item row in the focus
+ * table, rows the map draws itself, rows outside this map, rows offered. */
+void AW_PlacedReadStats(int out[6]);
 void AW_InventorySpawn(void);
 void AW_InventoryOpen(void);
 #endif

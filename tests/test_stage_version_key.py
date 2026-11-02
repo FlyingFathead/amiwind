@@ -150,6 +150,59 @@ class VersionKeyTests(unittest.TestCase):
         self.assertEqual(changed, ['stage_shows.py'])
 
 
+TRACKER_MODULE = '''
+from pathlib import Path
+
+
+def working_version(path=None):
+    return Path(path or Path(__file__).resolve().parents[1] / 'VERSION').read_text(encoding='utf-8').strip()
+
+
+def working_release(path=None):
+    return 'v' + working_version(path).split('-')[0]
+'''
+TRACKER_STAGE = '''
+import cell_progress
+print(cell_progress.working_release())
+'''
+
+
+class ReleaseLineKeyTests(unittest.TestCase):
+    """BUILD-CHIM-KEY-VERSION-48 (v0.0.58-dev5): the tracker shows only the release name, so a dev or rc label change
+    re-keys no cell-progress stage; a new release still does."""
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.repository = Path(self.temp.name) / 'repo'
+        tools = self.repository / 'tools'
+        tools.mkdir(parents=True)
+        (tools / 'cell_progress.py').write_text(TRACKER_MODULE, encoding='utf-8')
+        (tools / 'stage_tracker.py').write_text(TRACKER_STAGE, encoding='utf-8')
+
+    def tearDown(self):
+        self.temp.cleanup()
+
+    def key(self, version):
+        (self.repository / 'VERSION').write_text(version + '\n', encoding='utf-8')
+        index = build_cache.SourceIndex(self.repository, top_format=build_cache.STAGE_TOP_FORMAT)
+        selected, uncertain = index.selection(self.repository / 'tools' / 'stage_tracker.py')
+        self.assertFalse(uncertain)
+        return selected
+
+    def test_a_dev_label_change_keeps_the_key(self):
+        self.assertIn('VERSION', self.key('0.0.58-dev5'))
+        self.assertEqual(self.key('0.0.58-dev5'), self.key('0.0.58-dev6'))
+        self.assertEqual(self.key('0.0.58-dev5'), self.key('0.0.58'))
+
+    def test_a_new_release_rekeys(self):
+        self.assertNotEqual(self.key('0.0.58-dev5'), self.key('0.0.59-dev1'))
+
+    def test_the_repository_tracker_keys_the_release_line(self):
+        index = build_cache.SourceIndex(ROOT, top_format=build_cache.STAGE_TOP_FORMAT)
+        selected, _ = index.selection(ROOT / 'tools' / 'cell_progress_build.py')
+        self.assertEqual(selected.get('VERSION'), index.release_line_digest())
+
+
 class RunVersionTests(unittest.TestCase):
     def test_the_builder_value_comes_first(self):
         old = os.environ.get('AMIWIND_RUN_VERSION')

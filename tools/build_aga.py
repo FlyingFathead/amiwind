@@ -79,7 +79,7 @@ HEAP_LOADER_SOURCE_PATHS = (
     'src/common.c', 'src/sys_amiga.c',
     'src/aw_guard_torch.c', 'src/aw_torch.c',
     'src/aw_harvest.c', 'src/aw_harvest.h', 'src/aw_harvest_runtime.c', 'src/aw_harvest_runtime.h',
-    'src/aw_harvest_proxy.c', 'src/aw_harvest_proxy.h',
+    'src/aw_harvest_proxy.c', 'src/aw_harvest_proxy.h', 'src/aw_placed.c', 'src/aw_placed.h',
     'src/aw_section.c', 'src/aw_section.h', 'src/aw_maps.h', 'src/aw_region.c',
     'src/aw_mappath.c', 'src/aw_mappath.h',
     'src/aw_town.h', 'src/aw_town_table.h',
@@ -281,6 +281,38 @@ def install_chargen(stage, id1):
     shutil.copyfile(source, target)
     return {'file': 'id1/character/questions.awq', 'sha256': receipt['sha256'], 'bytes': len(raw),
             'questions': receipt.get('questions'), 'ini': receipt.get('ini')}
+
+
+def install_item_models(stage, id1):
+    """Put the item model table (prepare_item_models.py, ITEM-WORLD-MODELS-58) into the payload: id1/progs/items/
+    (one alias model per mesh and models.awt), each file checked against its stage receipt; copied. Returns
+    ({mesh key: payload path}, staging record)."""
+    from prepare_item_models import read_table
+    stage = Path(stage)
+    receipt = json.loads((stage/'item-models-receipt.json').read_text(encoding='utf-8'))
+    if receipt.get('palette_sha256') != hashlib.sha256((Path(id1)/'gfx/palette.lmp').read_bytes()).hexdigest():
+        raise ValueError('Item models were converted with another palette than this image; rebuild the item-models '
+                         'stage from the same scene')
+    table_raw = (stage/'id1'/receipt['table']).read_bytes()
+    if hashlib.sha256(table_raw).hexdigest() != receipt.get('table_sha256'):
+        raise ValueError('Item model table differs from its stage receipt')
+    table = read_table(table_raw)
+    if sorted(table.values()) != sorted(m['path'] for m in receipt['models'].values()):
+        raise ValueError('Item model table and receipt name different files')
+    for key, row in receipt['models'].items():
+        raw = (stage/'id1'/row['path']).read_bytes()
+        if hashlib.sha256(raw).hexdigest() != row['sha256'] or raw[:4] != b'IDPO' or table.get(key) != row['path']:
+            raise ValueError('Item model differs from its stage receipt: ' + row['path'])
+        target = Path(id1)/row['path']
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(raw)
+    (Path(id1)/receipt['table']).write_bytes(table_raw)
+    staged = {'table': 'id1/' + receipt['table'], 'models': len(table), 'bytes': receipt['bytes'],
+              'bytes_before_squeeze': receipt['bytes_before_squeeze'], 'held': len(receipt['held']),
+              'table_sha256': receipt['table_sha256']}
+    from prepare_item_models import install_placed
+    staged.update(install_placed(stage, id1, receipt, table))
+    return table, staged
 
 
 def install_focus(stage, id1):
@@ -2131,7 +2163,13 @@ def image(args):
     (out/'player-view.json').write_text(json.dumps(view_report,indent=2)+'\n',encoding='utf-8',newline='\n')
     from prepare_inventory import prepare as prepare_inventory
     print('Converting original inventory metadata and selected item resources...',flush=True)
-    inventory_report=prepare_inventory(args.data_files,boot/'id1',jobs=jobs)
+    # The item model table (ITEM-WORLD-MODELS-58): every item's world model from its own stage, installed first so
+    # the catalogue names each item's model; without the stage only the selected items' models, as before.
+    item_model_table=None
+    if getattr(args,'item_models',None):
+        item_model_table,item_models_staging=install_item_models(args.item_models,boot/'id1')
+        (out/'item-models-staging.json').write_text(json.dumps(item_models_staging,indent=2)+'\n',encoding='utf-8',newline='\n')
+    inventory_report=prepare_inventory(args.data_files,boot/'id1',jobs=jobs,model_table=item_model_table)
     (out/'inventory-data.json').write_text(json.dumps(inventory_report,indent=2)+'\n',encoding='utf-8',newline='\n')
     # The Halloween scene (dbg halloween, docs/HALLOWEEN.md): its cast on their shared tables, installed here (made
     # in the worker started above). A --halloween image: every full-world build (tools/build.py adds it unless
@@ -3608,6 +3646,7 @@ def main():
     i.add_argument('--harvest',type=Path,help='Harvest source from harvest_build.py prepare (builder step harvest); the builder default')
     i.add_argument('--hand-catalog',type=Path,help='Per-race first-person hand catalogue from prepare_hand_catalog.py --runtime-palette; the builder default')
     i.add_argument('--mwscript',type=Path,help='The compiled game scripts from prepare_mwscript.py (id1/mwscript.awm; docs/MWSCRIPT_BYTECODE.md); the builder default')
+    i.add_argument('--item-models',type=Path,help='The item model table from prepare_item_models.py (id1/progs/items/: every item world model, keyed by mesh path); the builder default')
     i.add_argument('--chargen',type=Path,help='The class questions from prepare_chargen.py (id1/character/questions.awq); the builder default')
     i.add_argument('--books',type=Path,help='The book texts from prepare_books.py (id1/books.awb: the reader\'s readable books); the builder default')
     i.add_argument('--focus',type=Path,help='The focus table from prepare_focus.py (id1/focus.awf: the framed box of placed things); the builder default')

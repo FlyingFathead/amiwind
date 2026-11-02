@@ -206,6 +206,7 @@ class ChimStageTests(unittest.TestCase):
         self.assertEqual([n for n in names if n not in ('chim', 'cell-progress', 'chim-town-balmora', 'chim-town-seyda',
                                                         'chim-town-vivec_city', 'chim-rooms-vivec_city',
                                                         'actor-library', 'chim-interiors', 'mwscript', 'focus', 'books',
+                                                        'item-models',     # ITEM-WORLD-MODELS-58, CHIM builder only
                                                         # every room batch, by default since v0.0.48
                                                         'chim-room-batches')],
                          # NPC Gallery v2.0 (NPC-GALLERY-V2): no npc-gallery stage on the CHIM builder; the legacy

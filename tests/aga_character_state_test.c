@@ -20,6 +20,7 @@ void AW_UIFill(int x,int y,int w,int h,int color){
     for(row=y;row<y+h;row++)memset(vid.buffer+row*vid.rowbytes+x,color,w);
 }
 void AW_UIBox(int x,int y,int w,int h){}
+int AW_UICursor(int x,int y){(void)x;(void)y;return 0;}   /* aw_ui.c (CURSOR-MW-58): AmiWind's own cursor here */
 void AW_UITextBox(int x,int y,int w,int h,const char *s,int color){if(!strcmp(s,"OK")){assert(x==248 && y==166 && w==60 && h==22);ok_drawn++;}}
 void AW_UISmallBegin(void){}void AW_UISmallEnd(void){}
 void AW_BirthArt(int index,int x,int y){}

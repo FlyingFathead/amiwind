@@ -823,7 +823,7 @@ void AW_GalleryDraw(void) {
         AW_UIScrollbar(vid.width-18,22+3*h,rows*(2*h+2),page_total,rows,page_top);
         if(notice[0])text_at(8,vid.height-h-5,notice,(vid.width-16)/w);
         else text_at(8,vid.height-h-5,"Wheel/page keys; click to show",(vid.width-16)/w);
-        if(mouse_visible){
+        if(mouse_visible && !AW_UICursor(mouse_x,mouse_y)){
             int ink=AW_UIColor(255,230,160),dark=AW_UIColor(0,0,0);
             AW_UIFill(mouse_x,mouse_y,2,9,dark);AW_UIFill(mouse_x,mouse_y,7,2,dark);
             AW_UIFill(mouse_x+1,mouse_y+1,1,7,ink);AW_UIFill(mouse_x+1,mouse_y+1,5,1,ink);

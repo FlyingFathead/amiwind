@@ -1,6 +1,6 @@
 # World streamer: every asset stored once
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.58-dev4 (1 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -255,8 +255,8 @@ hardware numbers are still needed.
 - Load hitches on slow IDE: the worst crossings (entering a town, many new
   models) are one to two megabytes; at 1-2 MB/s that is longer than the time
   to walk 256 units, so reads are sliced between frames and start early.
-- Model slots: `MAX_MODELS` (256, a byte on the wire) and the 256-entry
-  `mod_known` / edge cache limit. A 256-unit ring with shared models places
+- Model slots: `MAX_MODELS` (512 since v0.0.59, a short on the wire; 256 and
+  a byte before) and the `mod_known` / edge cache limit of the same size. A 256-unit ring with shared models places
   fewer distinct models than today's largest region; per-chunk copies would
   exceed 256 in dense towns.
 - Fragmentation of the model zone; a compaction pass is the fallback.

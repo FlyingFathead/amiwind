@@ -1613,7 +1613,7 @@ void PF_makestatic (void)
         if (!flora) scale = 1; /* legacy static entities retain original protocol */
         MSG_WriteByte(&sv.signon, flora ? svc_aw_spawnstatic : svc_spawnstatic);
 
-    MSG_WriteByte (&sv.signon, SV_ModelIndex(pr_strings + ent->v.model));
+    MSG_WriteModel (&sv.signon, SV_ModelIndex(pr_strings + ent->v.model));
 
     MSG_WriteByte (&sv.signon, ent->v.frame);
     MSG_WriteByte (&sv.signon, ent->v.colormap);

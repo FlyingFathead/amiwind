@@ -568,7 +568,7 @@ void SV_WriteEntitiesToClient (edict_t	*clent, sizebuf_t *msg)
             MSG_WriteByte (msg,e);
 
         if (bits & U_MODEL)
-            MSG_WriteByte (msg,	ent->v.modelindex);
+            MSG_WriteModel (msg, (int)ent->v.modelindex);
         if (bits & U_FRAME)
             MSG_WriteByte (msg, frame & 255);
         if (bits & U_COLORMAP)
@@ -738,7 +738,7 @@ void SV_WriteClientdataToMessage (edict_t *ent, sizebuf_t *msg)
     if (bits & SU_ARMOR)
         MSG_WriteByte (msg, ent->v.armorvalue);
     if (bits & SU_WEAPON)
-        MSG_WriteByte (msg, SV_ModelIndex(pr_strings+ent->v.weaponmodel));
+        MSG_WriteModel (msg, SV_ModelIndex(pr_strings+ent->v.weaponmodel));
 
     MSG_WriteShort (msg, ent->v.health);
     MSG_WriteByte (msg, ent->v.currentammo);
@@ -1017,7 +1017,7 @@ void SV_CreateBaseline (void)
         MSG_WriteByte (&sv.signon,svc_spawnbaseline);
         MSG_WriteShort (&sv.signon,entnum);
 
-        MSG_WriteByte (&sv.signon, svent->baseline.modelindex);
+        MSG_WriteModel (&sv.signon, svent->baseline.modelindex);
         MSG_WriteByte (&sv.signon, svent->baseline.frame);
         MSG_WriteByte (&sv.signon, svent->baseline.colormap);
         MSG_WriteByte (&sv.signon, svent->baseline.skin);

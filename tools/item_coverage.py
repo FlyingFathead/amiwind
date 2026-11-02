@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Item coverage: is every item of the three masters in AmiWind's tables and image? (docs/NPC_DEFAULTS.md)
 
-For every WEAP, ARMO, CLOT, MISC, BOOK, ALCH, INGR, LOCK, PROB, REPA and LIGH record of Morrowind, Tribunal and
+For every WEAP, ARMO, CLOT, MISC, BOOK, ALCH, INGR, APPA, LOCK, PROB, REPA and LIGH record of Morrowind, Tribunal and
 Bloodmoon (the last master's record of an id wins, a deleted record removes it, as in the game) it answers:
 
   actor table   in the shared item table AITM of id1/mwscript.awm (carried by an actor or named by a script;
@@ -35,7 +35,7 @@ sys.path[:0] = [str(ROOT / 'src'), str(ROOT / 'tools')]   # src first: the mwad 
 from mwad.esm import records, subrecords, string, is_deleted  # noqa: E402
 
 MASTERS = ('Morrowind.esm', 'Tribunal.esm', 'Bloodmoon.esm')
-TYPES = ('WEAP', 'ARMO', 'CLOT', 'MISC', 'BOOK', 'ALCH', 'INGR', 'LOCK', 'PROB', 'REPA', 'LIGH')
+TYPES = ('WEAP', 'ARMO', 'CLOT', 'MISC', 'BOOK', 'ALCH', 'INGR', 'APPA', 'LOCK', 'PROB', 'REPA', 'LIGH')
 COLUMNS = ('records', 'actor_table', 'carried', 'catalogue', 'ground_model', 'icon', 'held_model', 'placed',
            'takeable')
 SHIELD = 8            # ARMO type 8: a shield (held on the shield bone)
@@ -70,8 +70,11 @@ def read_masters(data_files):
                 if not key:
                     continue
                 kind, carry = -1, True
-                data = fields.get({'WEAP': 'WPDT', 'ARMO': 'AODT', 'CLOT': 'CTDT', 'LIGH': 'LHDT'}.get(tag, ''), b'')
-                if tag == 'WEAP' and len(data) >= 10:
+                data = fields.get({'WEAP': 'WPDT', 'ARMO': 'AODT', 'CLOT': 'CTDT', 'LIGH': 'LHDT',
+                                   'MISC': 'MCDT'}.get(tag, ''), b'')
+                if tag == 'MISC' and len(data) >= 12:
+                    kind = 1 if struct.unpack_from('<i', data, 8)[0] else 0   # MISC 'type': 1 = the key flag (item_census)
+                elif tag == 'WEAP' and len(data) >= 10:
                     kind = struct.unpack_from('<h', data, 8)[0]
                 elif tag in ('ARMO', 'CLOT') and len(data) >= 4:
                     kind = struct.unpack_from('<i', data)[0]

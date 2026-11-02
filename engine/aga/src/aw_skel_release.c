@@ -9,8 +9,7 @@
 #include "aw_skel.h"
 #include "aw_fastrelease.h"
 
-extern model_t	mod_known[];
-extern int		mod_numknown;
+extern int		mod_numknown;	/* slots through Mod_Known (model.c, ENGINE-MODEL-TABLE-58) */
 
 static unsigned long AW_SkelReleaseAll (void)
 {
@@ -18,7 +17,7 @@ static unsigned long AW_SkelReleaseAll (void)
 	int i, flushed = 0;
 	for (i=0 ; i<mod_numknown ; i++)
 	{
-		model_t *m = &mod_known[i];
+		model_t *m = Mod_Known (i);
 		const aliashdr_t *h;
 		if (m->type != mod_alias || !(h = (const aliashdr_t *)Cache_Check (&m->cache)) || !h->aw_skel)
 			continue;

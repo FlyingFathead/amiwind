@@ -36,6 +36,7 @@ for _p in (ROOT / 'tools', ROOT / 'src'):
     sys.path.insert(0, str(_p))
 
 import greeting_lut as G  # noqa: E402  (the voice table: NPC order, condition opcodes, strings)
+import text_defines  # noqa: E402  (the engine's define codes, aw_textdef.c)
 
 MAGIC = b'AWDL'
 VERSION = 3                      # 3: the factions' rank requirements, the last section (aw_dial.h AW_DIAL_VERSION)
@@ -570,6 +571,9 @@ def tables(kinds, topics, dials, names, masks, order):
         first = len(conds)
         conds += [condition(*c) for c in runtime]
         line, found = spans_of(line) if line else ('', [])
+        # the defines as the engine's codes, the links moved with them (TEXT-MACROS-DIALOGUE-CODES-59): filled in one
+        # pass with no name search (aw_textdef.c)
+        line, found, _ = text_defines.encode_spans(line, found)
         if any(s + n > 0xFFFF for s, n, _ in found):
             raise ValueError('A link past 64 KB of text')
         entries.append(struct.pack(ENTRY_ROW, texts.add(line) if line else NONE32, first,
@@ -1306,7 +1310,7 @@ def image_step(data, id1, out=None, jobs=1):
     inputs = {'master_sha256': sha256_file(master)}
     import mwad.dialogue
     cache = UnitCache.open('dialogue-table', {'format': 'AWDL%d' % VERSION}, __file__, G.__file__,
-                           mwad.dialogue.__file__)
+                           mwad.dialogue.__file__, text_defines.__file__)
     target = Path(id1) / NAME
     t0 = time.time()
     print('Dialogue table: start (1 unit cache lookup, then %d jobs if built)' % jobs, flush=True)

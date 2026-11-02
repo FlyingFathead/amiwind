@@ -1,6 +1,6 @@
 # Cell crossings: how the engine moves from one CHIM frame to the next
 
-_Last updated with AmiWind v0.0.47 (21 October 2026)._
+_Last updated with AmiWind v0.0.58-dev4 (1 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -198,7 +198,8 @@ Measured one at a time against today's method before any is kept. The timeline a
   strings, for example, are allocated on the level's memory and only freed when that memory is reset
   (`pr_edict.c` `ED_NewString`, `host.c`). Entities that come and go need shared or separately reclaimable memory.
   The test: walking the same small area again and again keeps memory within a bounded range.
-- **Model and sound lists.** Quake's lists hold 256 models and 256 sounds, with byte-sized indices. CHIM scenery
+- **Model and sound lists.** The model list holds 512 models (a short index since v0.0.59,
+  ENGINE-MODEL-TABLE-58); Quake's sound list holds 256 sounds with a byte index. CHIM scenery
   already needs no list entries; actors, animations, sounds and scripted entities do. Freeing an asset's loaded data
   and reusing its list entry are different things: an entity can still refer to an entry (a client falls back to
   its baseline model), so entries get stable identities and are reused only when nothing refers to them, or the

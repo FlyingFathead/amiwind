@@ -82,7 +82,7 @@ class SpriteHeapTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'signon capacity'):
                 inspect_sprites(raw,root,{**SIZES,'signon_capacity':8192})
             report=inspect_sprites(raw,root,{**SIZES,'signon_capacity':16380})
-            self.assertEqual(report['signon_upper_bound_bytes'],266*33+1024)
+            self.assertEqual(report['signon_upper_bound_bytes'],266*34+1024)   # a short model index (ENGINE-MODEL-TABLE-58)
             self.assertGreater(report['signon_margin_bytes'],0)
             with self.assertRaisesRegex(ValueError,'signon capacity'):
                 inspect_sprites(ent*480+b'{"classname" "func_wall"}\n'*100,root,SIZES)

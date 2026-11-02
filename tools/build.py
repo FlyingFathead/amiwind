@@ -629,6 +629,16 @@ def chargen_steps(args, tool, run):
     return step, ['--chargen', str(run / 'chargen')]
 
 
+def item_model_steps(args, tool, run, jobs=None):
+    """The item model table stage and its image option (ITEM-WORLD-MODELS-58): every carriable item's world model,
+    one per distinct mesh, keyed by the mesh path, on the census palette; a stage of its own after the census, so no
+    other stage's key changes; each mesh's result is cached on its own (pass cache)."""
+    step = ('item-models', tool('prepare_item_models.py', '--data-files', args.data_files,
+                                '--palette', run / 'intro-scene/id1/gfx/palette.lmp', '--out', run / 'item-models',
+                                '--jobs', resolve_jobs(args.jobs if jobs is None else jobs)))
+    return step, ['--item-models', str(run / 'item-models')]
+
+
 def harvest_status(args):
     """Harvestable mushrooms in this build: (built, status).
 
@@ -1288,6 +1298,13 @@ def commands(args, tools, run):
     # (not in a retained-run image recovery: that run's stage set is fixed, tools/recover_image.py)
     if args.stage == 'aga' and any(name == 'image' for name, _ in steps) and not getattr(args, 'recover_image_from', None):
         step, options = chargen_steps(args, tool, run)
+        image_index = next(i for i, (name, _) in enumerate(steps) if name == 'image')
+        steps.insert(image_index, step)
+        steps = [(name, command + options if name == 'image' else command) for name, command in steps]
+    # the item model table (ITEM-WORLD-MODELS-58): the CHIM builder's images, as the focus table
+    if (focus_status(args)[0] and any(name == 'image' for name, _ in steps) and any(name == 'census' for name, _ in steps)
+            and not getattr(args, 'recover_image_from', None)):
+        step, options = item_model_steps(args, tool, run, jobs)
         image_index = next(i for i, (name, _) in enumerate(steps) if name == 'image')
         steps.insert(image_index, step)
         steps = [(name, command + options if name == 'image' else command) for name, command in steps]

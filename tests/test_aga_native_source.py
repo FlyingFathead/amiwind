@@ -123,11 +123,11 @@ class NativeSourceTests(unittest.TestCase):
 
     def test_first_save_description_loads_character_catalogue(self):
         self.compile_run('aga_save_frontmenu_test.c', [Path(SOURCE)/'src'/n for n in
-            ('aw_save.c', 'aw_save_codec.c')])
+            ('aw_save.c', 'aw_save_codec.c', 'aw_ledger.c')])
 
     def test_autosave_preserves_safe_checkpoint_through_lava_and_arrival(self):
         self.compile_run('aga_autosave_safety_test.c', [Path(SOURCE)/'src'/n for n in
-            ('aw_save.c', 'aw_save_codec.c', 'mathlib.c')],
+            ('aw_save.c', 'aw_save_codec.c', 'aw_ledger.c', 'mathlib.c')],
             cflags=['-fsanitize=undefined', '-fno-sanitize-recover=all'])
 
     def test_harvest_original_loot_transaction_capacity_and_save_persistence(self):
@@ -320,12 +320,13 @@ class NativeSourceTests(unittest.TestCase):
     def test_placed_item_pickup_through_the_use_path(self):
         # PICKUP-PLACED-58: the real focus and item tables, aim, reach and take (AW_InventoryUse)
         self.compile_run('aga_focus_pickup_test.c', [Path(SOURCE)/'src'/n for n in
-            ('aw_inventory.c','aw_state.c','mathlib.c')],
+            ('aw_inventory.c','aw_state.c','aw_ledger.c','aw_ledger_drops.c','mathlib.c')],
             cflags=['-fsanitize=address,undefined','-fno-sanitize-recover=all'])
 
     def test_inventory_real_drop_placement_capacity_and_no_loss(self):
+        # the old fixed table (aw_ledger_on 0) and the world change list (CELL-CHANGES-59), both through the real drop
         self.compile_run('aga_inventory_placement_test.c', [Path(SOURCE)/'src'/n for n in
-            ('aw_inventory.c','aw_state.c','mathlib.c')],
+            ('aw_inventory.c','aw_state.c','aw_ledger.c','aw_ledger_drops.c','mathlib.c')],
             cflags=['-fsanitize=address,undefined,float-cast-overflow','-fno-sanitize-recover=all'])
 
     def test_inventory_actual_alias_preview_gear_depth_bounds_and_release(self):
@@ -587,7 +588,9 @@ class NativeSourceTests(unittest.TestCase):
     def test_ui_bounds_and_corrupt_fonts(self):
         self.compile_run("aga_ui_test.c", [Path(SOURCE)/'src'/n for n in
             ('aw_ui.c','aw_intro.c','aw_inventory.c','aw_story.c','aw_state.c')],
-            cflags=['-Wl,--wrap=malloc','-fsanitize=undefined','-fno-sanitize-recover=all'])
+            cflags=['-Wl,--wrap=malloc','-fsanitize=undefined','-fno-sanitize-recover=all'],
+            # CURSOR-MW-58: Morrowind's pointer in the image, none, and a corrupt file (both: AmiWind's cursor)
+            argument_sets=[(), ('nocursor',), ('badcursor',)])
 
     def test_noclip_has_no_bob_or_roll_and_walking_gets_them_back(self):
         # NOCLIP-BOB-DEFAULT-42
@@ -731,6 +734,16 @@ class NativeSourceTests(unittest.TestCase):
 
     def test_dense_flora_signon_round_trip_at_buffer_capacity(self):
         self.compile_run('aga_flora_signon_test.c', [Path(SOURCE)/'src'/n for n in ('net_loop.c','common.c')])
+
+    def test_model_index_over_255_round_trips(self):
+        # ENGINE-MODEL-TABLE-58: MAX_MODELS 512, the index a short on the wire, every model table sized by it
+        self.compile_run('aga_model_index_test.c', [Path(SOURCE)/'src/common.c'])
+        src = Path(SOURCE)/'src'
+        for name in ('sv_main.c', 'pr_cmds.c', 'cl_parse.c'):
+            text = (src/name).read_text(encoding='utf-8', errors='replace')
+            self.assertNotRegex(text, r'MSG_WriteByte\s*\([^;]*(modelindex|SV_ModelIndex)', name)
+            self.assertNotRegex(text, r'modelindex\s*=\s*MSG_ReadByte', name)
+        self.assertIn('MSG_ReadModel ();\n\t\tif (modnum >= MAX_MODELS)', (src/'cl_parse.c').read_text())
 
     def compile_run(self, fixture, sources, defines=(), cflags=(), arguments=(),
                     standard='gnu89', argument_sets=None):

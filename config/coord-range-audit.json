@@ -15,6 +15,12 @@
    "note": "the centre of an original Morrowind cell in original coordinates (half the cell's 8,192), for AW_CellMap (type 1 crossings), not a map-space position against the coordinate range"
   },
   {
+   "file": "engine/aga/src/aw_ledger.h",
+   "contains": "#define AW_LEDGER_EXTRAS 4096",
+   "class": "unrelated",
+   "note": "the most rows of the world change list with a position block (CELL-CHANGES-59): a count, not a position"
+  },
+  {
    "file": "engine/aga/src/aw_excluded.c",
    "contains": "if(n<5 || n>4096 || !fget",
    "class": "unrelated",

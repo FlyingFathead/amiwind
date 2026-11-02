@@ -109,13 +109,14 @@ def source_items(data):
         tag={'WEAP':'WPDT','ARMO':'AODT','CLOT':'CTDT','ALCH':'ALDT','INGR':'IRDT',
              'BOOK':'BKDT','MISC':'MCDT','LIGH':'LHDT','APPA':'AADT','LOCK':'LKDT','PROB':'PBDT','REPA':'RIDT'}[kind]
         raw=first(fields,tag)
-        if kind=='CLOT' and len(raw)==12:subtype,weight,value,_=struct.unpack('<ifHH',raw)
+        if kind=='LIGH':pass
+        elif kind=='CLOT' and len(raw)==12:subtype,weight,value,_=struct.unpack('<ifHH',raw)
         elif kind=='ARMO' and len(raw)>=24:subtype,weight,value=struct.unpack_from('<ifi',raw)
         elif kind=='WEAP' and len(raw)==32:weight,value,subtype=struct.unpack_from('<fih',raw)
         elif kind in ('BOOK','MISC','INGR','ALCH') and len(raw)>=8:weight,value=struct.unpack_from('<fi',raw)
-        elif kind=='LIGH' and identifier==DEBUG_TORCH_SOURCE and len(raw)==24:
-            # LHDT: weight, value, time, radius, colour RGBA, flags. Only the debug torch's source is
-            # catalogued; carried lights in general are not inventory items yet.
+        if kind=='LIGH' and identifier==DEBUG_TORCH_SOURCE and len(raw)==24:
+            # LHDT: weight, value, time, radius, colour RGBA, flags. The debug torch is made from the original
+            # torch; the torch itself is catalogued below as any carried light.
             weight,value,time,radius=struct.unpack_from('<fiii',raw)
             if not (math.isfinite(weight) and weight>=0 and value>=0 and 1<=radius<=65535):
                 raise ValueError('Invalid original torch light record')
@@ -123,12 +124,26 @@ def source_items(data):
                 subtype=radius,weight=weight,value=value,source_model=text(fields,'MODL'),
                 source_icon=text(fields,'ITEX'),script='',raw=raw,enchantment='',parts=False,
                 light=dict(source=identifier,time=LIGHT_INFINITE,source_time=time,radius=radius,colour=list(raw[16:19])))
+        if kind=='LIGH':
+            if len(raw)!=24:continue
+            # A carried light (LHDT flag 2, "can carry"): weight, value, burn time, radius, colour, as the torch
+            # above. A burn time below 1 is a light that never runs out (OpenMW: time -1). Fixed lights stay scenery.
+            weight,value,time,radius=struct.unpack_from('<fiii',raw)
+            if not struct.unpack_from('<I',raw,20)[0]&2:continue
+            light=dict(source=identifier,time=LIGHT_INFINITE if time<1 else min(time,1000000),source_time=time,
+                       radius=max(1,min(65535,radius)),colour=list(raw[16:19]))
+            if not (math.isfinite(weight) and weight>=0 and value>=0):raise ValueError('Invalid item weight/value '+identifier)
+            result[identifier]=dict(id=identifier,name=name,category=KINDS[kind],kind=kind,subtype=light['radius'],
+                weight=weight,value=value,source_model=text(fields,'MODL'),source_icon=text(fields,'ITEX'),
+                script=text(fields,'SCRI').casefold(),raw=raw,enchantment='',parts=False,light=light)
             continue
-        elif kind in ('APPA','LOCK','PROB','REPA') and len(raw)>=12:
-            # These records have different layouts; preserve their identity but
-            # leave unsupported metadata absent until explicitly decoded.
-            continue
-        else:continue
+        if kind in ('APPA','LOCK','PROB','REPA') and len(raw)==16:
+            # Tools (OpenMW esm3 loadappa/loadlock/loadprob/loadrepa): AADT type, quality, weight, value;
+            # LKDT and PBDT weight, value, quality, uses; RIDT weight, value, uses, quality. The subtype is the
+            # apparatus type (0 mortar, 1 alembic, 2 calcinator, 3 retort), -1 for the others.
+            if kind=='APPA':subtype,_,weight,value=struct.unpack('<iffi',raw)
+            else:weight,value=struct.unpack_from('<fi',raw)
+        if weight is None:continue          # a record whose data this does not decode
         if not math.isfinite(weight) or weight<0 or value<0:raise ValueError('Invalid item weight/value '+identifier)
         result[identifier]=dict(id=identifier,name=name,category=KINDS[kind],kind=kind,
             subtype=subtype,weight=weight,value=value,source_model=text(fields,'MODL'),
@@ -150,7 +165,14 @@ def enchant_capacity(kind,raw):
     if kind=='BOOK' and len(raw)>=20:return max(0,min(0xFFFF,struct.unpack_from('<i',raw,16)[0]))
     return 0
 
-def prepare(data_files,id1,selected=(),palette=None,models=True,jobs=None):
+def mesh_key(path):
+    """The key of a world model in the item model table: the original mesh path, lower case, forward slashes
+    (the same key for an inventory item now and for a placed object later)."""
+    return str(path).replace('\\','/').strip().casefold()
+
+def prepare(data_files,id1,selected=(),palette=None,models=True,jobs=None,model_table=None):
+    """MODEL_TABLE: {mesh_key: payload .mdl path} of the item-models stage (prepare_item_models.py), installed
+    before this runs; None converts only the selected items' models here (a tool run alone)."""
     data=resolve_data_files(Path(data_files));id1=Path(id1)
     items,enchantments,scripts,settings,initial,charges=source_items(data);selected=set(s.casefold() for s in selected)
     if not selected:
@@ -211,16 +233,24 @@ def prepare(data_files,id1,selected=(),palette=None,models=True,jobs=None):
             slots=1<<SLOT_LEFT;flags|=1|4|FLAG_LIGHT
         if item['script']:flags|=8
         if item['enchantment'] and enchantments.get(item['enchantment'],[None])[0]==3:flags|=16
+        if model_table is not None and item['source_model']:
+            # Every item's own world model from the item-models stage's table (one file per distinct mesh,
+            # keyed by the mesh path): on disk only, loaded when the item lies on the ground (aw_inventory.c inv_model).
+            model=model_table.get(mesh_key(item['source_model']),'')
+            if model:
+                if inert:flags|=2
+                if inert and not item['enchantment'] and (item['kind']=='WEAP' and item['subtype'] in (0,1,2,3,4,5,6,7,8) or item['kind']=='ARMO' and item['subtype']==8):flags|=4
+            else:report['held'].setdefault(identifier,{})['model']='not in the item model table'
         if models and identifier in selected:
             stem=hashlib.sha256(identifier.encode()).hexdigest()[:16]
-            if item['source_model']:
+            if model_table is None and item['source_model']:
+                # Without the item-models stage (a tool run alone): the selected items' models, as before.
                 try:
                     raw=item_model(assets,{'slot':25,'id':identifier,'mesh':item['source_model'],'attach':'','filter':''},palette,nif)
                     model='progs/inv/i'+stem+'.mdl';out=id1/model;out.parent.mkdir(parents=True,exist_ok=True);out.write_bytes(raw)
                     report['models'][identifier]={'path':model,'sha256':hashlib.sha256(raw).hexdigest(),'bytes':len(raw)}
                     if inert:flags|=2
                     if inert and not item['enchantment'] and (item['kind']=='WEAP' and item['subtype'] in (0,1,2,3,4,5,6,7,8) or item['kind']=='ARMO' and item['subtype']==8):flags|=4
-
                 except (ValueError,KeyError,OSError) as error:report['held'].setdefault(identifier,{})['model']=str(error)
             if item['source_icon']:
                 try:

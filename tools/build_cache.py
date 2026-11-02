@@ -242,6 +242,13 @@ CHIM_LABEL_HIDDEN_UNITS = frozenset({('tools/chim/zone_sim.py', 'build_library')
 VERSION_FILE = 'VERSION'
 VERSION_HIDDEN_UNITS = frozenset({('tools/project_version.py', 'run_version'),
                                   ('tools/chim/zone_sim.py', 'build_library')})
+# Units whose output holds only the release name of the version ('0.0.58-dev5' -> 'v0.0.58'): a reach that names the
+# VERSION file only through these (and VERSION_HIDDEN_UNITS) keys it as its release line (release_line_digest), so a
+# dev or rc number change re-keys none of it (BUILD-CHIM-KEY-VERSION-48, v0.0.58-dev5: the cell-progress stage
+# rebuilt for every dev label because its headline names the release the eligible cells are for). Explicit, tested
+# in tests/test_stage_version_key.py:
+# - cell_progress.working_release: the tracker headline's eligible release.
+VERSION_RELEASE_UNITS = frozenset({('tools/cell_progress.py', 'working_release')})
 # Pool scheduling functions: how many units run at once, in which order and how long a pool waits before it starts
 # more. They hand each unit to the same function with the same item and return its result, so no output depends on
 # their code. Unlike OUTPUT_NEUTRAL_UNITS they are still followed (what they call, such as worker_environment(),
@@ -634,15 +641,34 @@ class SourceIndex:
         if key not in self._closures:
             start = script.relative_to(self.root.resolve()).as_posix()
             self._closures[key] = self._closure_symbols(start, key, entry=function, stop=VERSION_HIDDEN_UNITS)
-        return self._closures[key][2] or VERSION_FILE in self._closures[key][1]
+        if not (self._closures[key][2] or VERSION_FILE in self._closures[key][1]):
+            return False
+        release = key + '::release'
+        if release not in self._closures:
+            start = script.relative_to(self.root.resolve()).as_posix()
+            self._closures[release] = self._closure_symbols(start, release, entry=function,
+                                                            stop=VERSION_HIDDEN_UNITS | VERSION_RELEASE_UNITS)
+        found = self._closures[release]
+        return True if found[2] or VERSION_FILE in found[1] else 'release'
+
+    def release_line_digest(self):
+        """SHA-256 of the VERSION file's release line ('0.0.58-dev5' -> 'release v0.0.58'), for the keys whose reach
+        shows only the release name (VERSION_RELEASE_UNITS)."""
+        text = (self.root / VERSION_FILE).read_text(encoding='utf-8', errors='replace').strip()
+        line = 'release v' + text.lstrip('v').split('-')[0]
+        return hashlib.sha256(line.encode('utf-8')).hexdigest()
 
     def _keyed_source(self, path, shows_label, names_version=None):
         """(counts, value) of a whole-file source PATH in a key: the CHIM label as its compatibility line and the table
         in no key (BUILD-CHIM-LABEL-IN-KEYS-48), unless SHOWS_LABEL() (shows_chim_label, asked only for these two
         files) or the index keys the raw label (chim_label_keys); the VERSION file only when NAMES_VERSION()
         (names_version: a reach that reads it only through VERSION_HIDDEN_UNITS keys it nowhere)."""
-        if path == VERSION_FILE and names_version is not None and not names_version():
-            return False, None
+        if path == VERSION_FILE and names_version is not None:
+            named = names_version()
+            if not named:
+                return False, None
+            if named == 'release':
+                return True, self.release_line_digest()
         if not self.chim_label_keys and path in (CHIM_LABEL_FILE, CHIM_COMPAT_TABLE) and not shows_label():
             if path == CHIM_COMPAT_TABLE:
                 return False, None

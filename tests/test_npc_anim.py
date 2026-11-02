@@ -573,7 +573,7 @@ class MoverTests(unittest.TestCase):
         anim = (SRC / 'aw_anim.c').read_text(encoding='utf-8')
         self.assertIn('Mod_FindName(sv.model_precache[i]);', anim)       # registered by name, not loaded
         self.assertIn('Cache_Free(&m->cache)', anim)                       # memory back when it stops
-        self.assertIn('AW_AnimLazy (model_precache[i]) ? Mod_FindName', (SRC / 'cl_parse.c').read_text(encoding='latin-1'))
+        self.assertIn('AW_AnimLazy (name) ? Mod_FindName', (SRC / 'cl_parse.c').read_text(encoding='latin-1'))
         self.assertIn('AW_AnimSaveSwap (1);', (SRC / 'host_cmd.c').read_text(encoding='latin-1'))
         self.assertIn('AW_AnimMover(e,1);', (SRC / 'aw_companion.c').read_text(encoding='utf-8'))
         combat = (SRC / 'aw_combat.c').read_text(encoding='utf-8')

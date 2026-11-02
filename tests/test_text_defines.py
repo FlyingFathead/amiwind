@@ -40,7 +40,7 @@ static void show(const char *label, const char *text, const aw_textdef_values_t 
 }
 int main(void){
     aw_textdef_values_t pc, talk;
-    char coded[64], small[8];
+    char coded[96], small[8];
     memset(&pc, 0, sizeof(pc));
     pc.pc_name = "Hors"; pc.pc_race = "Dark Elf"; pc.pc_class = "Battlemage"; pc.cell = "Seyda Neen";
     pc.pc_crime = 40; pc.global_prefix = global_prefix; pc.global_text = global_text; pc.action_key = action_key;
@@ -57,8 +57,22 @@ int main(void){
     show("globals", "%GameHour %DaysPassed %Day %PCVampire", &pc);
     show("unknown", "%PCClothes 50% off %% %", &pc);
     show("action", "%ActionActivate %ActionJump", &pc);
-    snprintf(coded, sizeof(coded), "A\001%cB\002%c%cC", AW_TD_PCNAME + 1, 1, 3);
+    snprintf(coded, sizeof(coded), "A\001%cB\004%c%cC", AW_TD_PCNAME + 1, 1, 3);
     show("coded", coded, &pc);
+    /* the dialogue's link marks (2 and 3) pass through untouched, also right after a code */
+    snprintf(coded, sizeof(coded), "Ask \002Balmora\003 \001%c\002x\003", AW_TD_PCNAME + 1);
+    show("marks", coded, &talk);
+    /* %GameHour: the clock's hour when the values carry the clock, coded or written */
+    {
+        aw_textdef_values_t clock = talk;
+        clock.clock = 1; clock.game_hour = 9.25f;
+        snprintf(coded, sizeof(coded), "\001%c|%%GameHour", AW_TD_GAMEHOUR + 1);
+        show("clock", coded, &clock);
+    }
+    /* every speaker define coded, in one pass */
+    snprintf(coded, sizeof(coded), "\001%c \001%c \001%c \001%c \001%c \001%c", AW_TD_NAME + 1, AW_TD_RACE + 1,
+             AW_TD_CLASS + 1, AW_TD_FACTION + 1, AW_TD_RANK + 1, AW_TD_PCRANK + 1);
+    show("speaker-coded", coded, &talk);
     AW_TextDefines(small, sizeof(small), "%PCName%PCName", &pc);
     printf("small|%s\n", small);
     show("null", "%PCName.", NULL);
@@ -112,17 +126,36 @@ class TextDefineTests(unittest.TestCase):
     def test_unknown_defines_print_as_written(self):
         self.assertEqual(self.out['unknown'], '%PCClothes 50% off %% %')
 
+    def test_global_names_read_once(self):
+        # DIALOGUE-OPEN-STALL-58: the global names are kept after one read, not looked up on disk per define
+        host = (SRC / 'aw_mwhost.c').read_text(encoding='utf-8')
+        body = host[host.index('int AW_MwscriptGlobalPrefix('):]
+        body = body[:body.index('\n}\n')]
+        self.assertIn('global_names_load();', body)
+        self.assertNotIn('COM_FOpenFile', body)
+        self.assertNotIn('read_string_from', body)
+
     def test_action_bindings(self):
         self.assertEqual(self.out['action'], 'E Jump')
 
     def test_builder_codes(self):
-        # code 1 = the getter after it; code 2 = global (1-1)*255 + (3-1) = 2 (GameHour)
+        # code 1 = the getter after it; code 4 = global (1-1)*255 + (3-1) = 2 (GameHour)
         self.assertEqual(self.out['coded'], 'AHorsB13.5C')
+
+    def test_dialogue_link_marks_pass_through(self):
+        # DIALOGUE-LINK-MARK-AS-DEFINE-58: the link mark 2 was read as the global code and ate the link's first letters
+        self.assertEqual(self.out['marks'], 'Ask \x02Balmora\x03 Hors\x02x\x03')
+
+    def test_game_hour_from_the_clock(self):
+        self.assertEqual(self.out['clock'], '9.25|9.25')
+
+    def test_speaker_defines_coded(self):
+        self.assertEqual(self.out['speaker-coded'], 'Sellus Gravius Imperial Guard Imperial Legion Knight Errant Recruit')
 
     def test_capacity_and_no_values(self):
         self.assertEqual(self.out['small'], 'HorsHor')
         self.assertEqual(self.out['null'], '.')
-        self.assertEqual(self.out['names'], 'pcname actionrun 32')
+        self.assertEqual(self.out['names'], 'pcname gamehour 33')
 
 
 class BuilderCodeTests(unittest.TestCase):
@@ -149,8 +182,27 @@ class BuilderCodeTests(unittest.TestCase):
         self.assertEqual(text, 'Name: \x01\x06 Race: \x01\x07 Class: \x01\x05')
 
     def test_globals_unknown_and_lone_percent_stay(self):
-        self.assertEqual(self.td.encode('%GameHour 50% %PCClothes'), ('%GameHour 50% %PCClothes', 0))
+        self.assertEqual(self.td.encode('%DaysPassed 50% %PCClothes'), ('%DaysPassed 50% %PCClothes', 0))
         self.assertEqual(self.td.encode('^actionactivate %pccrimelevel')[0], '\x01\x19 \x01\x01')
+
+    def test_game_hour_coded(self):
+        # TEXT-MACROS-DIALOGUE-CODES-59: the clock's getter, the last of the table (33 = 1 + 32)
+        self.assertEqual(self.td.encode('It is %GameHour.'), ('It is \x01\x21.', 1))
+
+    def test_spans_move_with_the_codes(self):
+        # 'As a %PCRank you know my ring.': the link 'my ring' at 22 moves to 22 - len('%PCRank') + 2 = 17
+        text, spans, count = self.td.encode_spans('As a %PCRank you know my ring.', [(22, 7, 5)])
+        self.assertEqual((text, spans, count), ('As a \x01\x08 you know my ring.', [(17, 7, 5)], 1))
+        self.assertEqual(text[17:24], 'my ring')
+        # a define inside a link moves its end; a define a link starts or ends inside stays written
+        self.assertEqual(self.td.encode_spans('see %Name now', [(4, 9, 1)])[1], [(4, 6, 1)])
+        self.assertEqual(self.td.encode_spans('see %Name now', [(6, 3, 1)]), ('see %Name now', [(6, 3, 1)], 0))
+
+    def test_dialogue_stages_write_codes(self):
+        for name in ('dialogue_lut.py', 'greeting_lut.py'):
+            source = (ROOT / 'tools' / name).read_text(encoding='utf-8')
+            self.assertIn('text_defines.', source)
+            self.assertIn('text_defines.__file__', source)      # the stage's cache key follows the table
 
     def test_stages_write_codes(self):
         import struct
@@ -187,7 +239,22 @@ class TextDefineWiringTests(unittest.TestCase):
 
     def test_dialogue_goes_through_the_table(self):
         glut = self.code('aw_glut.c')
-        self.assertIn('AW_ExpandDialogue(out,capacity,speaker);', glut)
+        self.assertIn('AW_ExpandDialogue(out,capacity,speaker);', glut)     # the previous chain, aw_text_lut 0
+        # one pass (TEXT-MACROS-DIALOGUE-CODES-59): the voice table's lines and the conversation's answers
+        self.assertIn('if(AW_GlutDefineValues(e,row,&v)){AW_TextDefines(out,capacity,raw,&v);return;}', glut)
+        self.assertIn('if(!fill_line(marked,filled,sizeof(filled))){', self.code('aw_dialwin.c'))
+        # the link marking keeps a code whole
+        self.assertIn('int code=AW_TEXTDEF_CODE_BYTES(text+at);', self.code('aw_dial.c'))
+
+    def test_action_keys_from_the_bindings(self):
+        textdef = self.code('aw_textdef.c')
+        self.assertIn('v->action_key = AW_TextDefineBoundKey;', textdef)
+        keymaps = (ROOT / 'config/keymaps.cfg').read_text(encoding='utf-8')
+        table = textdef[textdef.index('action_commands[AW_TD_ACTIONS]'):]
+        table = table[:table.index('};')]
+        import re
+        for command in re.findall(r'"([^"]+)"', table):
+            self.assertIn(command, keymaps)        # every command the table names is bound by default
 
     def test_player_values_from_the_character(self):
         textdef = self.code('aw_textdef.c')

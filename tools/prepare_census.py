@@ -40,8 +40,8 @@ def is_census_item(ref):
 @contextlib.contextmanager
 def items_share_models(numbers):
     """Equal item placements share one model even on the lit office map: one model slot per item model, not per item.
-    The network model index is a byte, so the engine holds 256 models (BUILD-BUDGET-ENGINE-LIMITS-35); with an own
-    lit model each, the 124 items took the office to 284. The shared bake is the first equal item's lightmap.
+    The engine held 256 models then (a byte model index; 512 since ENGINE-MODEL-TABLE-58, BUILD-BUDGET-ENGINE-LIMITS-35);
+    with an own lit model each, the 124 items took the office to 284. The shared bake is the first equal item's lightmap.
     Scoped to this converter so no other map's placements change."""
     import prepare_mesh_bsp
     original=prepare_mesh_bsp._instance_key
@@ -52,14 +52,16 @@ def items_share_models(numbers):
     finally:prepare_mesh_bsp._instance_key=original
 
 
-# The engine's MAX_MODELS is 256 (byte model index); the office keeps a margin under it.
-CENSUS_MODEL_LIMIT = 240
+# The engine's MAX_MODELS is 512 (ENGINE-MODEL-TABLE-58: a 16-bit model index on the local path); the office keeps a
+# margin under it.
+CENSUS_MODEL_LIMIT = 480
 
 
 # Model slots the map does not name: slot 0, the worldspawn precaches (player, view model) and the engine's
-# run-time slots. tests/test_map_engine_limits.py keeps it equal to map_engine_limits' count; the engine source
-# is not read here, so an engine edit does not re-key this stage.
-FIXED_MODEL_SLOTS = 20
+# run-time slots (the arena's, the dropped items' and the placed items' room, WORLD-OBJECT-PLACEMENT-59).
+# tests/test_map_engine_limits.py keeps it equal to map_engine_limits' count; the engine source is not read here,
+# so an engine edit does not re-key this stage.
+FIXED_MODEL_SLOTS = 116
 
 
 def check_model_room(path, limit=CENSUS_MODEL_LIMIT):
@@ -74,7 +76,7 @@ def check_model_room(path, limit=CENSUS_MODEL_LIMIT):
     named={m for m in re.findall(r'"model"\s+"([^"\n]*)"',text) if m and not m.startswith('*')}
     models=FIXED_MODEL_SLOTS+models_size//64+len(named)
     if models>limit:
-        raise ValueError('%s: %d models, the office keeps under %d (the engine holds 256: MAX_MODELS)'%(
+        raise ValueError('%s: %d models, the office keeps under %d (the engine holds 512: MAX_MODELS)'%(
             Path(path).name,models,limit))
     return {'models':models}
 

@@ -33,6 +33,8 @@
 #include "aw_inventory.h"
 #include "aw_move.h"
 #include "aw_textdef.h"
+#include "aw_ledger.h"
+#include "aw_maps.h"
 #include <ctype.h>
 
 #define FILE_NAME "mwscript.awm"
@@ -75,20 +77,79 @@ static int read_string(int index,char *out,int capacity){
     n=read_string_from(f,ftell(f),index,out,capacity);
     fclose(f);return n;
 }
-/* The globals' names for the text defines (aw_textdef.c, BOOK-TEXT-MACROS-58): COUNT rows of SIZE bytes, the file
- * opened once; a name that does not fit or cannot be read is left empty. Returns the rows filled. */
-int AW_MwscriptGlobalPrefix(const char *text,int run,int *length){
-    FILE *f=NULL;long base;int g,count=AW_MwvmGlobalCount(),index,n,k,best=-1;char name[64];
-    *length=0;
-    if(count<=0 || run<=0)return -1;
-    if(COM_FOpenFile(FILE_NAME,&f)<=0 || !f){if(f)fclose(f);return -1;}
-    base=ftell(f);
+/* The globals' names for the text defines (aw_textdef.c, BOOK-TEXT-MACROS-58), read ONCE and kept (32 bytes per
+ * global, at most 512 globals: 16 KB at most). DIALOGUE-OPEN-STALL-58: the first version opened the compiled
+ * scripts' file and seeked to every global's name for every define it did not know, so one conversation line could
+ * cost thousands of disk seeks on an Amiga file system and the game stood still for many seconds when a
+ * conversation opened. The one load reads two runs of the file in one read each (the string offsets of the globals'
+ * names, then the strings between the first and the last of them, 256 KB at most, freed at once): a storm of single
+ * seeks also met the emulator's disk stall (CHIM-SEYDA-BALMORA-LOAD-HANG-43). NAMES: NUL-separated; OFFSETS[g] the
+ * start of global G's name, -1 none. */
+#define GLOBAL_NAMES_RUN (256L*1024L)
+static char *global_names;static short *global_offsets;static int global_count=-1;
+static uint32_t rd_be32(const unsigned char *p){return ((uint32_t)p[0]<<24)|((uint32_t)p[1]<<16)|((uint32_t)p[2]<<8)|p[3];}
+static void global_names_load(void){
+    FILE *f=NULL;long base;int g,count=AW_MwvmGlobalCount(),index,n,used=0,lo=-1,hi=-1;
+    uint32_t offset,rows,bytes,first=0,last=0,at;unsigned char *table=NULL,*text=NULL;long span;
+    if(global_count==count)return;
+    free(global_names);free(global_offsets);global_names=NULL;global_offsets=NULL;global_count=count;
+    if(count<=0)return;
+    if(!(global_offsets=(short *)AW_TryMalloc(sizeof(short)*(size_t)count)) ||
+       !(global_names=(char *)AW_TryMalloc((size_t)count*32))){
+        free(global_offsets);global_offsets=NULL;global_count=0;return;
+    }
     for(g=0;g<count;g++){
-        if((index=AW_MwvmGlobalName(g,NULL))<0 || (n=read_string_from(f,base,index,name,sizeof(name)))<=*length || n>run)continue;
+        global_offsets[g]=-1;
+        if((index=AW_MwvmGlobalName(g,NULL))<0)continue;
+        if(lo<0 || index<lo)lo=index;
+        if(index>hi)hi=index;
+    }
+    if(lo<0 || !AW_MwvmSection("STRS",&offset,&rows,&bytes) || (uint32_t)hi>=rows)return;
+    if(COM_FOpenFile(FILE_NAME,&f)<=0 || !f){if(f)fclose(f);return;}
+    base=ftell(f);
+    span=4L*(hi-lo+1);   /* 1: the offsets of the globals' names, one read */
+    if(span<=GLOBAL_NAMES_RUN && (table=(unsigned char *)AW_TryMalloc((size_t)span))!=NULL &&
+       !fseek(f,base+(long)offset+4L*lo,SEEK_SET) && fread(table,1,(size_t)span,f)==(size_t)span){
+        int seen=0;
+        for(g=0;g<count;g++){
+            if((index=AW_MwvmGlobalName(g,NULL))<0)continue;
+            at=rd_be32(table+4*(index-lo));
+            if(!seen){first=last=at;seen=1;}
+            if(at<first)first=at;
+            if(at>last)last=at;
+        }
+        span=(long)(last-first)+64;   /* 2: the strings from the first name to the end of the last, one read */
+        if(span<=GLOBAL_NAMES_RUN && (text=(unsigned char *)AW_TryMalloc((size_t)span+1))!=NULL &&
+           !fseek(f,base+(long)offset+4L*rows+(long)first,SEEK_SET)){
+            span=(long)fread(text,1,(size_t)span,f);text[span]=0;
+            for(g=0;g<count;g++){   /* a name over 31 characters is never a define */
+                const char *name;
+                if((index=AW_MwvmGlobalName(g,NULL))<0)continue;
+                at=rd_be32(table+4*(index-lo))-first;
+                if((long)at>=span)continue;
+                name=(const char *)text+at;
+                for(n=0;(long)at+n<span && name[n];n++);
+                if(n<=0 || n>31 || (long)at+n>=span || used+n+1>count*32)continue;
+                global_offsets[g]=(short)used;memcpy(global_names+used,name,(size_t)n);global_names[used+n]=0;used+=n+1;
+            }
+        }
+    }
+    free(table);free(text);
+    fclose(f);
+}
+int AW_MwscriptGlobalPrefix(const char *text,int run,int *length){
+    int g,n,k,best=-1;const char *name;
+    *length=0;
+    if(run<=0)return -1;
+    global_names_load();
+    if(!global_names || !global_offsets)return -1;
+    for(g=0;g<global_count;g++){
+        if(global_offsets[g]<0)continue;
+        name=global_names+global_offsets[g];n=(int)strlen(name);
+        if(n<=*length || n>run)continue;
         for(k=0;k<n && (name[k]|((name[k]>='A' && name[k]<='Z')?32:0))==(text[k]|((text[k]>='A' && text[k]<='Z')?32:0));k++);
         if(k==n){best=g;*length=n;}
     }
-    fclose(f);
     return best;
 }
 int AW_MwscriptGlobalType(int global){int type=-1;return AW_MwvmGlobalName(global,&type)<0?-1:type;}
@@ -288,9 +349,156 @@ static void object_show(object_t *o){
     if(!e || e->free || o->map!=attached_map)return;    /* hidden on another map: this one never hid it */
     e->v.modelindex=o->model;e->v.solid=o->solid;SV_LinkEdict(e,false);o->entity=-1;
 }
+/* --- CELL-CHANGES-59: the object state on the world change list (aw_ledger.h; the default, aw_placed ledger on). One
+ * sorted list for the whole world keyed by the stable reference id, every exterior cell, room and CHIM frame alike,
+ * kept for the session and written into the save (feature 32). TAKEN (the player took it) and DISABLED (a script's
+ * Disable) are separate fields, so Enable never brings back a taken item (SAVE-TAKEN-DISABLED-ONE-FLAG-59); there is no
+ * 1,024-object or 2,048-entry ceiling. The fixed table above is the old method, kept selectable (aw_placed ledger off).
+ * An edict hidden on this map keeps what it had here, to be shown again by an Enable on the same map. --- */
+typedef struct {uint32_t ref;int entity,map;float model,solid;} hidden_t;
+#define HIDDEN_BYTES 20
+AW_RESIDENT_GROWS("hidden edicts of the loaded map (CELL-CHANGES-59)",MAX_EDICTS,HIDDEN_BYTES);
+static hidden_t *hidden;static int hidden_count,hidden_capacity;
+static unsigned long ledger_hidden,ledger_refused;
+extern int (*aw_object_drawn)(unsigned reference);
+static long map_cell_number(void);
+static hidden_t *hidden_find(uint32_t ref,int create){
+    int i;hidden_t *grown;
+    for(i=0;i<hidden_count;i++)if(hidden[i].ref==ref && hidden[i].map==attached_map)return &hidden[i];
+    if(!create)return NULL;
+    if(hidden_count==hidden_capacity){
+        if(hidden_capacity+64>MAX_EDICTS ||
+           !(grown=(hidden_t *)AW_TryRealloc(hidden,(unsigned long)(hidden_capacity+64)*sizeof(hidden_t))))return NULL;
+        hidden=grown;hidden_capacity+=64;
+    }
+    memset(&hidden[hidden_count],0,sizeof(hidden_t));
+    hidden[hidden_count].ref=ref;hidden[hidden_count].entity=-1;hidden[hidden_count].map=attached_map;
+    return &hidden[hidden_count++];
+}
+/* REF leaves this map: its edict (what it had is kept to show it again) and its CHIM room placements */
+static void ledger_hide(uint32_t ref){
+    int number=entity_of_reference(ref);edict_t *e=edict_of(number);hidden_t *h;
+    ChimRoom_Hide(ref,1);
+    if(!e || e->free || hidden_find(ref,0))return;
+    if(!(h=hidden_find(ref,1))){ledger_refused++;return;}
+    h->entity=number;h->model=e->v.modelindex;h->solid=e->v.solid;
+    e->v.modelindex=0;e->v.solid=SOLID_NOT;SV_LinkEdict(e,false);ledger_hidden++;
+}
+static void ledger_show(uint32_t ref){
+    hidden_t *h=hidden_find(ref,0);edict_t *e;
+    ChimRoom_Hide(ref,0);
+    if(!h)return;                      /* hidden on another map: this one never hid it */
+    e=edict_of(h->entity);
+    if(e && !e->free){e->v.modelindex=h->model;e->v.solid=h->solid;SV_LinkEdict(e,false);}
+    *h=hidden[--hidden_count];
+}
+/* The row of REF, NULL when the list has none */
+static aw_ledger_row_t *ledger_row(uint32_t ref){
+    int i=AW_LedgerFind(&aw_ledger,ref);
+    return i<0?NULL:&aw_ledger.row[i];
+}
+/* the place of a row made here: where the player stands (the cell, the room or the scene; aw_inventory.c) */
+static void ledger_place(aw_ledger_row_t *r){
+    int at;int32_t where;
+    if(sv_player && AW_PlacedWhere(sv_player->v.origin,&at,&where,NULL))AW_LedgerSetPlace(&aw_ledger,r,at,where);
+}
+static int32_t ledger_object(uint32_t ref,int op,int32_t value){
+    aw_ledger_row_t *r=ledger_row(ref);
+    switch(op){
+    case AWM_ENABLE:
+        if(r && (r->fields&AW_LEDGER_DISABLED)){
+            r->fields&=~AW_LEDGER_DISABLED;
+            if(!(r->fields&AW_LEDGER_TAKEN))ledger_show(ref);   /* a taken item stays taken */
+            AW_LedgerTidy(&aw_ledger,ref);
+        }
+        return 0;
+    case AWM_DISABLE:
+        if(r && (r->fields&AW_LEDGER_DISABLED))return 0;
+        if(!(r=AW_LedgerPut(&aw_ledger,ref))){ledger_refused++;return 0;}
+        r->fields|=AW_LEDGER_DISABLED;ledger_hide(ref);    /* its place: unknown (read on every map) */
+        return 0;
+    case AWM_GETDISABLED:
+        return r && (r->fields&AW_LEDGER_DISABLED);       /* OpenMW: a taken reference is not "disabled" */
+    case AWM_LOCK:
+        if(!(r=AW_LedgerPut(&aw_ledger,ref))){ledger_refused++;return 0;}
+        if(value<0)value=r->last_lock?r->last_lock:100;
+        if(value>100)value=100;
+        r->fields|=AW_LEDGER_LOCK;r->lock=(uint8_t)value;if(value)r->last_lock=(uint8_t)value;
+        return 0;
+    case AWM_UNLOCK:
+        if(!(r=AW_LedgerPut(&aw_ledger,ref))){ledger_refused++;return 0;}
+        if((r->fields&AW_LEDGER_LOCK) && r->lock)r->last_lock=r->lock;
+        r->fields|=AW_LEDGER_LOCK;r->lock=0;
+        return 0;
+    }
+    return 0;
+}
+static int ledger_take(uint32_t reference,int stolen){
+    int number,room;edict_t *e;aw_ledger_row_t *r=ledger_row(reference);
+    if(r && (r->fields&(AW_LEDGER_TAKEN|AW_LEDGER_DISABLED)))return 0;
+    number=entity_of_reference(reference);e=edict_of(number);
+    room=ChimRoom_Hide(reference,1);
+    if(!room && (!e || e->free) && !(aw_object_drawn && aw_object_drawn(reference)))return 0;
+    if(!(r=AW_LedgerPut(&aw_ledger,reference))){if(room)ChimRoom_Hide(reference,0);ledger_refused++;return 0;}
+    r->fields|=AW_LEDGER_TAKEN|(stolen?AW_LEDGER_STOLEN:0);
+    ledger_place(r);ledger_hide(reference);
+    return 1;
+}
+/* A new map: what an earlier map hid is that map's; the edicts of this map the list says are gone (taken or
+ * disabled) are hidden, and the rows of this room or scene and those of no known place take their room placements
+ * (no edict) out. Only this map's rows are read: the edicts by reference, the rows by their place. */
+static void ledger_attach(void){
+    int i,j,n,first,k;long room=map_cell_number();
+    static const int kinds[3]={AW_AT_ROOM,AW_AT_SCENE,AW_AT_ANY};int32_t places[3];
+    hidden_count=0;
+    if(!aw_ledger.count)return;
+    for(i=0;i<edict_ref_count;i++){
+        k=AW_LedgerFind(&aw_ledger,edict_refs[i].ref);
+        if(k>=0 && (aw_ledger.row[k].fields&(AW_LEDGER_TAKEN|AW_LEDGER_DISABLED)))ledger_hide(edict_refs[i].ref);
+    }
+    places[0]=(int32_t)room;places[1]=AW_MapId(sv.name);places[2]=0;
+    for(j=0;j<3;j++){
+        if((j==0 && room<=0) || (j==1 && places[1]<0))continue;
+        n=AW_LedgerPlace(&aw_ledger,kinds[j],places[j],&first);
+        for(i=0;i<n;i++){
+            aw_ledger_row_t *r=AW_LedgerPlaceRow(&aw_ledger,first+i);
+            if(r && (r->fields&(AW_LEDGER_TAKEN|AW_LEDGER_DISABLED)))ledger_hide(r->key);
+        }
+    }
+}
+/* an older save's object entries (feature 8): their one flag meant taken or disabled; read as DISABLED, what it did
+ * then (Enable could bring it back), and only for keys the save's own list does not hold */
+static void ledger_import(const aw_changes_t *in){
+    int i;aw_ledger_row_t *r;
+    for(i=0;i<in->count;i++){
+        const aw_change_t *e=&in->entry[i];
+        if(!(e->flags&(AW_CHANGE_DISABLED|AW_CHANGE_LOCK)) || (e->key&AW_CHANGE_BUILDER) ||
+           AW_LedgerFind(&aw_ledger,e->key)>=0)continue;
+        if(!(r=AW_LedgerPut(&aw_ledger,e->key))){ledger_refused++;break;}
+        if(e->flags&AW_CHANGE_DISABLED)r->fields|=AW_LEDGER_DISABLED;
+        if(e->flags&AW_CHANGE_LOCK){
+            r->fields|=AW_LEDGER_LOCK;r->lock=r->last_lock=(uint8_t)((e->flags&AW_CHANGE_LOCK_LEVEL)>>AW_CHANGE_LOCK_SHIFT);
+        }
+    }
+    hidden_count=0;
+}
+/* aw_placed ledger and aw_mwscript_status: the world change list's rows by field, its resident bytes */
+void AW_MwscriptLedgerStatus(void){
+    int i,n[7]={0,0,0,0,0,0,0};
+    for(i=0;i<aw_ledger.count;i++){
+        unsigned f=aw_ledger.row[i].fields;int k;
+        for(k=0;k<7;k++)if(f&(1U<<k))n[k]++;
+    }
+    Con_Printf("world change list %s: %d rows (taken %d, disabled %d, locks %d, stolen %d, moved %d, drops %d), "
+               "%lu bytes resident, %lu refused; this map hid %d edicts (%lu in the session, %lu not kept)\n",
+               aw_ledger_on?"on":"off (the fixed tables)",aw_ledger.count,n[0],n[1],n[2],n[3],n[4],n[5],
+               AW_LedgerResident(&aw_ledger)+(unsigned long)hidden_capacity*sizeof(hidden_t),
+               aw_ledger.refused,hidden_count,ledger_hidden,ledger_refused);
+}
 static int32_t host_object(int instance,int target,int op,int32_t value){
     uint32_t ref=target_reference(instance,target);object_t *o;
     if(!ref)return 0;
+    if(aw_ledger_on && op!=AWM_ACTIVATE && op!=AWM_GETLOCKED)return ledger_object(ref,op,value);
     switch(op){
     case AWM_ENABLE:
         if((o=object_find(ref,0))!=NULL && o->disabled){o->disabled=0;object_show(o);}
@@ -373,28 +581,42 @@ static void object_activate(uint32_t reference){
     if(AW_HingedDoorActivate(reference))return;
     AW_SceneActivate(reference);    /* a load door of this map; other objects' own use: not yet */
 }
-int AW_ObjectDisabled(unsigned int reference){object_t *o=object_find(reference,0);return o && o->disabled;}
+/* gone from the world: taken or disabled (not drawn, no aim box, no actor spawned) */
+int AW_ObjectDisabled(unsigned int reference){
+    object_t *o;
+    if(aw_ledger_on){aw_ledger_row_t *r=ledger_row(reference);return r && (r->fields&(AW_LEDGER_TAKEN|AW_LEDGER_DISABLED));}
+    o=object_find(reference,0);return o && o->disabled;
+}
 /* PICKUP-PLACED-58: the player takes a placed item. Like the original and OpenMW 0.51 the reference leaves the world
  * for good: here it is disabled (the object state above, kept in saved games, hidden again at every map) and hidden
  * now, its edict or its CHIM room placements. Refused (0) when nothing of it can be hidden on this map, so the item
  * never sits in the inventory and on the table at once. The owner mark stays for the session (CRIME-59). */
+/* WORLD-OBJECT-PLACEMENT-59 (aw_placed.c sets it): the reference is one of the placed items drawn by reference to the
+ * shared item models; disabling it is what hides it (it is linked only while not disabled). */
+int (*aw_object_drawn)(unsigned reference);
 int AW_ObjectTake(unsigned int reference,int stolen){
     object_t *o;int number;edict_t *e;int room;
     if(!reference || reference>0xFFFFFFu || AW_ObjectDisabled(reference))return 0;
+    if(aw_ledger_on)return ledger_take(reference,stolen);       /* CELL-CHANGES-59: TAKEN on the world change list */
     number=entity_of_reference(reference);e=edict_of(number);
     room=ChimRoom_Hide(reference,1);
-    if(!room && (!e || e->free))return 0;
+    if(!room && (!e || e->free) && !(aw_object_drawn && aw_object_drawn(reference)))return 0;
     if(!(o=object_find(reference,1))){if(room)ChimRoom_Hide(reference,0);return 0;}
     o->disabled=1;o->stolen=stolen?1:0;object_hide(o);
     return 1;
 }
 int AW_ObjectLockLevel(unsigned int reference,int original){
-    object_t *o=object_find(reference,0);
+    object_t *o;
+    if(aw_ledger_on){aw_ledger_row_t *r=ledger_row(reference);return r && (r->fields&AW_LEDGER_LOCK)?r->lock:original;}
+    o=object_find(reference,0);
     return o && o->lock_set?o->level:original;
 }
-/* Saved games: merged by key into the change list the actors exported. */
+/* Saved games: merged by key into the change list the actors exported. With the world change list on, the objects
+ * are its rows (feature 32, aw_save.c) and nothing is added here: the 2,048-entry list holds the actors alone, so it
+ * never fills over the objects and refuses the save (SAVE-CHANGES-FULL-REFUSES-SAVE-59). */
 static int objects_export(aw_changes_t *out){
     int i,j;uint32_t flags,key;
+    if(aw_ledger_on)return out->count;
     for(i=0;i<object_count;i++){
         const object_t *o=&objects[i];
         flags=(o->disabled?AW_CHANGE_DISABLED:0)|
@@ -412,6 +634,7 @@ static int objects_export(aw_changes_t *out){
 }
 static void objects_import(const aw_changes_t *in){
     int i;object_t *o;
+    if(aw_ledger_on){ledger_import(in);map_model=NULL;return;}
     object_count=0;
     for(i=0;i<in->count;i++){
         const aw_change_t *e=&in->entry[i];
@@ -763,6 +986,43 @@ void AW_MwscriptTopicLearn(int row){if(row>=0 && row<topic_rows && known_topics)
 /* The name hash of every TOPC row (aw_dial.c AW_DialNameHash) into OUT (at most MAX): the rows, 0 without the file's
  * topics; OUT NULL: only the number of rows. One open of the file; for the dialogue window's map from its topics to these rows, made once. */
 int AW_MwscriptTopicHashes(unsigned long *out,int max);
+/* DIALOGUE-OPEN-STALL-58: this read every topic's name with three seeks of its own (about 12 s for Morrowind.esm's
+ * topics on the first conversation of a session, measured in FS-UAE at 32 MB Fast). Now three reads in a row: the
+ * rows' string numbers, their string offsets (the slice between the lowest and the highest), the strings between the
+ * first and the last of them; TOPIC_RUN bytes at most each, freed at once. Over that: the old row by row read. */
+#define TOPIC_RUN (512L*1024L)
+static int topic_hashes_bulk(FILE *f,long base,uint32_t off,uint32_t rows,unsigned long *out){
+    uint32_t soff,srows,sbytes,r,first=0,last=0,at;unsigned char *ids=NULL,*offs=NULL,*text=NULL;
+    int lo=-1,hi=-1,ok=0,s,n;long span;
+    if(!AW_MwvmSection("STRS",&soff,&srows,&sbytes) || 2L*(long)rows>TOPIC_RUN ||
+       !(ids=(unsigned char *)AW_TryMalloc(2*(size_t)rows)))return 0;
+    if(fseek(f,base+(long)off,SEEK_SET) || fread(ids,1,2*(size_t)rows,f)!=2*(size_t)rows)goto done;
+    for(r=0;r<rows;r++){s=(ids[2*r]<<8)|ids[2*r+1];if(lo<0 || s<lo)lo=s;if(s>hi)hi=s;}
+    if(lo<0 || (uint32_t)hi>=srows || 4L*(hi-lo+1)>TOPIC_RUN || !(offs=(unsigned char *)AW_TryMalloc(4*(size_t)(hi-lo+1))) ||
+       fseek(f,base+(long)soff+4L*lo,SEEK_SET) || fread(offs,1,4*(size_t)(hi-lo+1),f)!=4*(size_t)(hi-lo+1))goto done;
+    for(r=0;r<rows;r++){
+        s=(ids[2*r]<<8)|ids[2*r+1];at=rd_be32(offs+4*(s-lo));
+        if(!r){first=last=at;}
+        if(at<first)first=at;
+        if(at>last)last=at;
+    }
+    span=(long)(last-first)+256;
+    if(span>TOPIC_RUN || !(text=(unsigned char *)AW_TryMalloc((size_t)span+1)) ||
+       fseek(f,base+(long)soff+4L*(long)srows+(long)first,SEEK_SET))goto done;
+    span=(long)fread(text,1,(size_t)span,f);text[span]=0;
+    for(r=0;r<rows;r++){
+        const char *name;
+        s=(ids[2*r]<<8)|ids[2*r+1];at=rd_be32(offs+4*(s-lo))-first;
+        if((long)at>=span)goto done;
+        name=(const char *)text+at;
+        for(n=0;(long)at+n<span && name[n] && n<255;n++);
+        out[r]=AW_DialNameHash(name,n);
+    }
+    ok=1;
+done:
+    free(ids);free(offs);free(text);
+    return ok;
+}
 int AW_MwscriptTopicHashes(unsigned long *out,int max){
     FILE *f=NULL;long base;uint32_t off,rows,bytes,r;unsigned char id[2];char name[256];int n;
     if(!out)return known_topics?topic_rows:0;              /* the rows, for the caller's array */
@@ -770,11 +1030,12 @@ int AW_MwscriptTopicHashes(unsigned long *out,int max){
        (int)rows!=topic_rows)return 0;
     if(COM_FOpenFile(FILE_NAME,&f)<=0 || !f){if(f)fclose(f);return 0;}
     base=ftell(f);
-    for(r=0;r<rows;r++){
-        if(fseek(f,base+(long)off+2L*(long)r,SEEK_SET) || fread(id,1,2,f)!=2){fclose(f);return 0;}
-        n=read_string_from(f,base,(id[0]<<8)|id[1],name,sizeof(name));
-        out[r]=AW_DialNameHash(name,n);
-    }
+    if(!topic_hashes_bulk(f,base,off,rows,out))
+        for(r=0;r<rows;r++){
+            if(fseek(f,base+(long)off+2L*(long)r,SEEK_SET) || fread(id,1,2,f)!=2){fclose(f);return 0;}
+            n=read_string_from(f,base,(id[0]<<8)|id[1],name,sizeof(name));
+            out[r]=AW_DialNameHash(name,n);
+        }
     fclose(f);
     return (int)rows;
 }
@@ -1277,6 +1538,7 @@ static void attach_objects(void){
     }
     qsort(edict_refs,edict_ref_count,sizeof(edict_refs[0]),compare_refs);
     /* the object state: what a script disabled or the player took stays hidden on this map too */
+    if(aw_ledger_on){ledger_attach();return;}      /* CELL-CHANGES-59: this map's rows of the world change list */
     for(i=0;i<object_count;i++)if(objects[i].disabled){objects[i].entity=-1;object_hide(&objects[i]);}
 }
 static void attach_map(void){
@@ -1422,6 +1684,7 @@ static void status_counts(void){
      Con_Printf("object state: %d disabled, %d locks set (%d of %d kept; %lu hidden, %lu over the table); uses taken by "
                 "OnActivate %lu, Activate %lu\n",disabled,locks,object_count,OBJECTS,objects_hidden,objects_full,
                 intercepted,activated);}
+    AW_MwscriptLedgerStatus();
     {const aw_actorstate_stats_t *a=AW_ActorStateStats();
      Con_Printf("actor record: %d actors, %lu bytes kept; calls %lu (%lu with no actor), records made %lu, changed %lu, "
                 "dropped %lu, full %lu, disk reads %lu; combat started %lu stopped %lu; wanders %lu\n",AW_ActorCount(),
