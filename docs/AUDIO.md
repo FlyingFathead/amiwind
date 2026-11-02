@@ -1,10 +1,11 @@
 # Streamed music and speech
 
-_Last updated with AmiWind v0.0.58 (31 October 2026)._
+_Last updated with AmiWind v0.0.59-dev4 (2 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [Sound events and the coverage line: 2 November 2026](#sound-events-and-the-coverage-line-2-november-2026)
 - [The mixer's limits: 31 October 2026](#the-mixers-limits-31-october-2026)
 - [Every NPC's voice lines: 23 October 2026](#every-npcs-voice-lines-23-october-2026)
 - [Sounds the game's scripts start: 23 October 2026](#sounds-the-games-scripts-start-23-october-2026)
@@ -26,6 +27,18 @@ _Last updated with AmiWind v0.0.58 (31 October 2026)._
 - [RC1 Audio options candidate](#rc1-audio-options-candidate)
 
 <!-- contents end -->
+
+## Sound events and the coverage line: 2 November 2026
+
+Every voice and sound moment of the game has one named engine hook that plays the sound the voice table maps for it
+(34 events: the Voice topics, your pain line, the melee, ranged and spell sounds, knockdown and death, the creature
+moments). `dbg sound MOMENT [N]` plays one on the actor you aim at; the list and what each plays are in
+[COMBAT.md](COMBAT.md) "Sound events", the state of each moment on [VOICE_FEATURES.md](VOICE_FEATURES.md). The voice
+table gained the critical strike and each magic school's cast, hit and failure as named sounds, and the Alarm topic.
+
+Every build's report carries the voice coverage line: NPCs with a voice and creatures with a sound out of all, then
+each character, creature moment, named sound and sound record without a sound, by name (sound records are judged
+when the build has its media catalogue).
 
 ## The mixer's limits: 31 October 2026
 

@@ -16,6 +16,9 @@ void AW_TorchReleaseLegacyCache(void){torch_releases++;}
 int AW_TorchFrame(void){return metadata_active?6:2;}
 int AW_TorchEquipped(void){return torch;}
 void Con_Printf(char *fmt,...){warnings++;}
+/* The first-person weapon table loads only with an equipped weapon (none here): never reached. */
+int Hunk_LowMark(void){assert(0);return 0;}
+void Hunk_FreeToLowMark(int mark){(void)mark;assert(0);}
 static const char *names[]={"nord_m","nord_f","khajiit_m"};
 byte *COM_LoadHunkFile(char *name){assert(!strcmp(name,"gfx/hand-models.awh"));com_filesize=sizeof(raw);return raw;}
 qboolean Mod_CanFindName(const char *name){return slots;}

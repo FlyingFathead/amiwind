@@ -1,6 +1,6 @@
 # Proposed approach: persistent world state and disk loading
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.59-dev4 (2 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -151,6 +151,12 @@ recorded source/content namespace. A mesh name identifies an asset, not a unique
 placed object; a RAM address, array position or current XYZ is also unsuitable.
 Moving an object must not change its identity. Dynamically created objects need
 a separate persistent ID allocation scheme.
+
+Implemented since v0.0.59-dev4 (first part): the world change list. One sorted list for the whole world holds the
+objects the player took, dropped or moved and the objects a script disabled or locked, keyed by the stable reference id
+the builder gives every placed reference. It is kept across rooms, outdoor areas, CHIM frames and saved games, with
+only the changes stored; the other rows of the table above (containers, doors beyond lock state, the journal, script
+state, actors) follow in later parts. Details: [SAVEGAME_PLAN.md](SAVEGAME_PLAN.md), "The world change list".
 
 Absence from the change store means "use the base state". Explicit removal needs
 a tombstone so a taken item does not reappear whenever its cell reloads. An

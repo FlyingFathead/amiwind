@@ -1,6 +1,6 @@
 # Combat and the Vivec Arena minigame
 
-_Last updated with AmiWind v0.0.58-dev2 (31 October 2026)._
+_Last updated with AmiWind v0.0.59-dev4 (2 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -298,7 +298,7 @@ and Options > Audio); NPC and creature footsteps play with the rule. With it on:
 | A punch tires (no health damage) | Hand To Hand Hit or Hand To Hand Hit 2 | `combat.cpp` getHandToHandDamage |
 | A blow takes health | the armour piece struck: Light, Medium or Heavy Armor Hit (none for an empty slot), then Health Damage | `combat/local.lua` pickRandomArmor, applyArmor, onHit |
 | A critical strike | critical damage | `npc.cpp` hit |
-| Knocked down or killed | Body Fall Medium (the earlier sound; the original plays it from the animation) | |
+| Knocked down or killed | Body Fall Medium (the earlier sound; the original plays it from the animation) | `character.cpp` |
 | NPC footsteps | FootBare, FootLight, FootMed or FootHeavy Left and Right by the boots worn; FootWater and Swim in water | `npc.cpp` getSoundIdFromSndGen ([ANIMATION.md](ANIMATION.md)) |
 
 The piece struck is picked as OpenMW picks it: cuirass 30 %, helmet, greaves, boots and each pauldron 10 %, each
@@ -314,6 +314,32 @@ use the same table.
 Voices: the layer calls one voice hook per event (the fight starts, the NPC swings, takes a hit, flees, dies);
 the character animation kit plays the original combat lines through it (the "hit" voice when an NPC loses
 health, OpenMW `npc.cpp` onHit).
+
+Sound events: every voice and sound moment has one named engine hook (`aw_glut.c` AW_SoundEvent), which plays the
+sound the voice table maps for it: the speaker's line of a Voice topic (picked by the original's filter), a named
+sound, or a creature's sound generator moment. `dbg sound MOMENT [N]` plays any of them on the actor you aim at
+(else on you); `dbg sound list` shows what each plays in this build. The combat work of v0.0.60 calls these hooks;
+until then the moments it needs (ranged weapons, casting) are proven through `dbg sound`. The tracker page is
+[VOICE_FEATURES.md](VOICE_FEATURES.md).
+
+| Moment | Plays | N |
+| --- | --- | --- |
+| hello, idle, intruder, thief, hit, attack, flee, alarm | the speaker's line of that Voice topic | |
+| taunt | the speaker's Attack line | |
+| pain | your own Hit line, by your race and sex | |
+| swish, miss, damage, critical | Weapon Swish, miss, Health Damage, critical damage | |
+| armorhit, block | Light, Medium or Heavy Armor Hit (a block: the shield's) | 0 light, 1 medium, 2 heavy |
+| punch, punch2 | Hand To Hand Hit, Hand To Hand Hit 2 | |
+| bowdraw, bowshoot, crossbowdraw, crossbowshoot | bowPull, bowShoot, crossbowPull, crossbowShoot (`character.cpp`) | |
+| throw | Weapon Swish (a thrown weapon's release, `character.cpp`) | |
+| projectilehit | Health Damage (a projectile striking an actor takes the hit sounds, `projectile.cpp`) | |
+| cast, spellhit, spellfail | the school's cast, hit and Spell Failure sound (`spellcasting.cpp`) | the school, 0 Alteration .. 5 Restoration (default 2, Destruction) |
+| knockdown, death | Body Fall Small, Medium or Large | 0 small, 1 medium (default), 2 large |
+| creatureattack, roar, moan, scream, land | the creature's sound generator (an attack plays its roar) | |
+
+The Intruder and Thief lines have their hooks, but no game event raises them yet: there is no witness or trespass
+detection. The data's one Alarm line has no NPC that can say it. Every build's report names what is not mapped
+(the voice coverage line: NPCs and creatures without a sound, creature moments, named sounds and sound records).
 
 The enemy's bar is yellow: the reserved UI palette bank (indices 225..253)
 holds the yellow bar's colours since format 2 of the bank; the sky palette's
@@ -344,12 +370,12 @@ the four fighters (about 0.3 MB each).
   bone's position from a tag table beside the resident's model (<model>.tag,
   tools/npc_items.py, engine/aga/src/aw_items.c). The item keeps its own size
   (the original also stretches it with the actor's race width and height).
-- There are no first-person weapon or shield views yet: a weapon loadout
-  (`dbgmode arenapit loadout sword_shield`, config/arena_player.json) fights
-  with the weapon's rules while the view shows the hands. The views need the
-  weapon mesh on the first-person weapon bone and the original first-person
-  weapon groups (idle, equip and the three attacks per one-handed,
-  two-handed and two-handed-wide class).
+- First-person weapon views are partial. Since v0.0.59 an equipped melee weapon is drawn in the hands in the
+  original's three stances (one-handed, two-handed close, two-handed wide; see
+  [FIRST_PERSON_HANDS.md](FIRST_PERSON_HANDS.md)); bows, crossbows and thrown weapons keep the bare hands. A weapon loadout
+  (`dbgmode arenapit loadout sword_shield`, config/arena_player.json) fights with the weapon's rules. The rest of the
+  weapon work (every weapon type in both views, the first-person hands per weapon, the draw and punch arm layers) is
+  planned for v0.0.60.
 - The world's NPCs do not yet start fights on their own (their disposition toward the player is not modelled);
   creatures that wander do since v0.0.57, at most four at once; in a larger pack the next one joins as soon as one
   falls (a fallen fighter's slot is reused and its death kept, COMBAT-PACK-SLOTS-57). Alarms are not in. Fleeing by the Flee rating is in, behind `dbg combat flee on` (off by default).

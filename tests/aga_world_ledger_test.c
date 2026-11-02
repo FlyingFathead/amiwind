@@ -54,7 +54,16 @@ static aw_ledger_row_t *row(aw_ledger_t *l,uint32_t key,unsigned fields,int at,i
 static int same(const aw_ledger_t *a,const aw_ledger_t *b)
 {
     int i;
-    if(a->count!=b->count)return 0;
+    if(a->count!=b->count || a->stolen_count!=b->stolen_count || a->content_count!=b->content_count ||
+       a->rank_count!=b->rank_count)return 0;
+    for(i=0;i<a->content_count;i++)
+        if(a->content[i].key!=b->content[i].key || strcmp(a->content[i].item,b->content[i].item) ||
+           a->content[i].count!=b->content[i].count)return 0;
+    for(i=0;i<a->rank_count;i++)if(a->rank[i].key!=b->rank[i].key || a->rank[i].rank!=b->rank[i].rank)return 0;
+    for(i=0;i<a->stolen_count;i++){
+        const aw_ledger_stolen_t *x=&a->stolen[i],*y=&b->stolen[i];
+        if(strcmp(x->item,y->item) || strcmp(x->owner,y->owner) || x->faction!=y->faction || x->count!=y->count)return 0;
+    }
     for(i=0;i<a->count;i++){
         const aw_ledger_row_t *x=&a->row[i],*y=&b->row[i];
         if(x->key!=y->key || x->fields!=y->fields || x->at!=y->at || x->where!=y->where || x->lock!=y->lock ||
@@ -179,7 +188,8 @@ int main(int argc,char **argv)
         {0x01000005,AW_LEDGER_TAKEN,AW_AT_ANY,0},{0x20000005,AW_LEDGER_TAKEN,AW_AT_ANY,0},
         {5,AW_LEDGER_DROPPED,AW_AT_ROOM,3},{AW_LEDGER_PLAYER|5,AW_LEDGER_TAKEN,AW_AT_ROOM,3},
         {AW_LEDGER_PLAYER|AW_LEDGER_BUILDER|5,AW_LEDGER_DROPPED,AW_AT_ROOM,3},
-        {5,AW_LEDGER_CONDITION|AW_LEDGER_TAKEN,AW_AT_ROOM,3},{5,0x80,AW_AT_ROOM,3},
+        {5,AW_LEDGER_CONDITION|AW_LEDGER_TAKEN,AW_AT_ROOM,3},
+        {AW_LEDGER_PLAYER|5,AW_LEDGER_DROPPED|AW_LEDGER_OPEN,AW_AT_ROOM,3},      /* a drop is never an open door */
         {5,AW_LEDGER_TAKEN,AW_AT_ROOM,0},{5,AW_LEDGER_TAKEN,AW_AT_ANY,4},{5,AW_LEDGER_TAKEN,AW_AT_CELL,0x7fff0000},
         {5,AW_LEDGER_TAKEN,AW_AT_SCENE,0x10000},{5,AW_LEDGER_TAKEN,9,0}};
      for(i=0;i<(int)(sizeof(bad)/sizeof(bad[0]));i++){
@@ -278,6 +288,124 @@ int main(int argc,char **argv)
      assert(AW_LedgerAdoptDrops(&inv,&list)==0);
      save_trip(&list);
      fprintf(o,"drops %d rows, save %d bytes\n",list.count,size);}
+
+    /* 9. slice 2: doors, locks, the stolen mark. OPEN alone and with a lock survives a save and a load; a list without
+     * OPEN or a stolen pair keeps the first form (an engine of slice 1 reads it), one with them takes the second, which
+     * the first never carried; the stolen pairs: added, folded, counted, given back, never gold, kept across a drop, a
+     * pickup and a save, alone a reason to save; refused when broken */
+    {static aw_ledger_t s;int k;aw_inventory_item_t q;float at[3]={1,2,3};uint32_t key;
+     AW_LedgerClear(&other_list);r=row(&other_list,51,AW_LEDGER_LOCK,AW_AT_ROOM,3);
+     k=AW_LedgerEncode(&other_list,one,sizeof(one));assert(k>0 && !memcmp(one,"AWL1",4));
+     r->fields|=AW_LEDGER_OPEN;row(&other_list,52,AW_LEDGER_OPEN,AW_AT_CELL,cell(-2,-9));
+     k=AW_LedgerEncode(&other_list,one,sizeof(one));assert(k>0 && !memcmp(one,"AWL2",4));
+     one[3]='1';assert(!AW_LedgerDecode(one,k,&got));one[3]='2';          /* the first form never had OPEN */
+     round_trip(&other_list);save_trip(&other_list);
+     assert(got.count==2 && got.row[0].fields==(AW_LEDGER_LOCK|AW_LEDGER_OPEN) && got.row[0].lock==51 &&
+            got.row[1].fields==AW_LEDGER_OPEN && !got.stolen_count);
+     /* a lock alone: a script's Lock, a key's Unlock (level 0, the last level kept) */
+     AW_LedgerClear(&other_list);r=row(&other_list,53,AW_LEDGER_LOCK,AW_AT_ANY,0);r->lock=0;r->last_lock=40;
+     save_trip(&other_list);assert(got.row[0].lock==0 && got.row[0].last_lock==40);
+     fprintf(o,"doors and locks ok\n");
+     /* the stolen pairs */
+     assert(AW_LedgerStolenAdd(&s,"Misc_Quill","Fargoth",0,1)==1);
+     assert(AW_LedgerStolenAdd(&s,"misc_quill","fargoth",0,2)==3);          /* folded: the same pair */
+     assert(AW_LedgerStolenAdd(&s,"misc_quill","Hlaalu",1,1)==1);           /* a faction: a pair of its own */
+     assert(AW_LedgerStolenAdd(&s,"misc_quill","hlaalu",0,1)==1);           /* an owner of that name: another */
+     assert(AW_LedgerStolenAdd(&s,"iron dagger","fargoth",0,1)==1);
+     assert(!AW_LedgerStolenAdd(&s,"Gold_001","fargoth",0,5) && !AW_LedgerStolenAdd(&s,"","fargoth",0,1) &&
+            !AW_LedgerStolenAdd(&s,"misc_quill","",0,1) && !AW_LedgerStolenAdd(&s,"misc_quill",NULL,0,1) &&
+            !AW_LedgerStolenAdd(&s,"x23456789012345678901234567890123","fargoth",0,1) &&
+            !AW_LedgerStolenAdd(&s,"misc_quill","fargoth",0,0) && !AW_LedgerStolenAdd(&s,"misc_cup","fargoth",0,-1));
+     assert(s.stolen_count==4 && AW_LedgerStolenCount(&s,"MISC_QUILL",NULL,0)==5 &&
+            AW_LedgerStolenCount(&s,"misc_quill","fargoth",0)==3 && AW_LedgerStolenCount(&s,"misc_quill","hlaalu",1)==1 &&
+            AW_LedgerStolenCount(&s,"misc_cup",NULL,0)==0 && !s.count && AW_LedgerRows(&s)==4);
+     for(i=1;i<s.stolen_count;i++)assert(strcmp(s.stolen[i-1].item,s.stolen[i].item)<=0);
+     k=AW_LedgerEncode(&s,one,sizeof(one));assert(k>0 && !memcmp(one,"AWL2",4));
+     round_trip(&s);
+     n=save_trip(&s);assert(!got.count && got.stolen_count==4 && AW_LedgerStolenCount(&got,"misc_quill","fargoth",0)==3);
+     /* the mark goes with the item: dropped (a row of the list), saved, picked up, the pairs never change */
+     memset(&q,0,sizeof(q));strcpy(q.id,"misc_quill");strcpy(q.model,"progs/items/x.mdl");q.flags=AW_INV_DROP;
+     memset(&inv,0,sizeof(inv));assert(AW_ItemAdd(&inv,q.id,3));
+     key=AW_LedgerDrop(&inv,&s,&q,1,AW_AT_CELL,cell(-2,-9),at,0);assert(key && s.count==1);
+     save_trip(&s);assert(got.count==1 && AW_LedgerStolenCount(&got,"misc_quill","fargoth",0)==3);
+     assert(AW_LedgerPickup(&inv,&s,key) && !s.count && AW_LedgerStolenCount(&s,"misc_quill",NULL,0)==5);
+     /* given back (CRIME-59 later: returned or confiscated): the count falls, a pair at 0 goes, never below */
+     assert(AW_LedgerStolenAdd(&s,"misc_quill","fargoth",0,-2)==1);
+     assert(AW_LedgerStolenAdd(&s,"misc_quill","hlaalu",1,-5)==0 && s.stolen_count==3);
+     assert(AW_LedgerStolenCount(&s,"misc_quill",NULL,0)==2);
+     /* refused on reading: a pair not folded, out of order, a faction flag past 1, a count of 0, cut bytes, nothing
+      * at all; a refused read leaves the list it was to fill as it was */
+     k=AW_LedgerEncode(&s,one,sizeof(one));assert(k>0);
+     AW_LedgerClear(&got);assert(AW_LedgerDecode(one,k,&got) && got.stolen_count==3);
+     assert(one[12]==11 && one[13]=='i');                                   /* "iron dagger" comes first */
+     one[13]='I';assert(!AW_LedgerDecode(one,k,&got) && got.stolen_count==3);one[13]='i';
+     one[13]='z';assert(!AW_LedgerDecode(one,k,&got));one[13]='i';        /* after the quills: out of order */
+     assert(one[12+1+11]==7 && one[12+1+11+1+7]==0);                        /* "fargoth", a person */
+     one[12+1+11+1+7]=2;assert(!AW_LedgerDecode(one,k,&got));one[12+1+11+1+7]=0;
+     assert(one[12+1+11+1+7+1]==1);
+     one[12+1+11+1+7+1]=0;assert(!AW_LedgerDecode(one,k,&got));one[12+1+11+1+7+1]=1;
+     assert(!AW_LedgerDecode(one,k-1,&got) && !AW_LedgerDecode(one,k+1,&got));
+     memcpy(two,"AWL2\0\0\0\0\0\0\0\0",12);assert(!AW_LedgerDecode(two,12,&got));
+     assert(AW_LedgerDecode(one,k,&got) && same(&s,&got));
+     fprintf(o,"stolen %d pairs, save %d bytes\n",s.stolen_count,n);
+     AW_LedgerClear(&s);}
+
+    /* 10. slice 3: container deltas and NPC ranks. Deltas against the data: taken out (< 0), put in (> 0), folded,
+     * summed, an entry back at 0 goes; kept per container; the third form only when there is one, and an older list
+     * keeps its form; 3,000 deltas past any small table; the stolen mark of slice 2 with them; ranks set, kept, saved;
+     * refusals on writing and reading */
+    {static aw_ledger_t c;int k,first,m;
+     assert(AW_LedgerContentAdd(&c,1001,"Potion_Restore_Health",-2)==-2);
+     assert(AW_LedgerContentAdd(&c,1001,"potion_restore_health",-1)==-3);   /* folded: the same entry */
+     assert(AW_LedgerContentAdd(&c,1001,"gold_001",-25)==-25);             /* a container's gold is an item */
+     assert(AW_LedgerContentAdd(&c,1001,"misc_quill",1)==1);               /* put in: the data had none */
+     assert(AW_LedgerContentAdd(&c,1000,"misc_quill",4)==4);
+     assert(AW_LedgerContentAdd(&c,1001,"misc_quill",-1)==0 && c.content_count==3);   /* back as in the data */
+     assert(!AW_LedgerContentAdd(&c,AW_LEDGER_PLAYER|5,"misc_quill",1) && !AW_LedgerContentAdd(&c,0x01000005,"misc_quill",1) &&
+            !AW_LedgerContentAdd(&c,0,"misc_quill",1) && !AW_LedgerContentAdd(&c,7,"",1) && !AW_LedgerContentAdd(&c,7,"misc",0) &&
+            !AW_LedgerContentAdd(&c,7,"x23456789012345678901234567890123",1));
+     assert(AW_LedgerContentDelta(&c,1001,"POTION_RESTORE_HEALTH")==-3 && AW_LedgerContentDelta(&c,1002,"misc_quill")==0);
+     assert(AW_LedgerContentOf(&c,1001,&first)==2 && c.content[first].key==1001 && AW_LedgerContentOf(&c,999,&first)==0);
+     k=AW_LedgerEncode(&c,one,sizeof(one));assert(k>0 && !memcmp(one,"AWL3",4));
+     round_trip(&c);save_trip(&c);assert(AW_LedgerContentDelta(&got,1000,"misc_quill")==4);
+     /* with rows, stolen pairs, a builder-made container */
+     row(&c,77,AW_LEDGER_TAKEN|AW_LEDGER_OPEN,AW_AT_ROOM,3);AW_LedgerStolenAdd(&c,"potion_restore_health","arrille",0,3);
+     assert(AW_LedgerContentAdd(&c,AW_LEDGER_BUILDER|9,"iron dagger",-1)==-1);
+     /* NPC ranks */
+     assert(AW_LedgerRank(&c,4242)==-1 && AW_LedgerRankSet(&c,4242,3) && AW_LedgerRank(&c,4242)==3);
+     assert(AW_LedgerRankSet(&c,4242,4) && AW_LedgerRank(&c,4242)==4 && c.rank_count==1);
+     assert(AW_LedgerRankSet(&c,17,0) && c.rank[0].key==17 && !AW_LedgerRankSet(&c,18,-1) &&
+            !AW_LedgerRankSet(&c,18,AW_LEDGER_RANK_TOP+1) && !AW_LedgerRankSet(&c,AW_LEDGER_PLAYER|1,1));
+     round_trip(&c);m=save_trip(&c);
+     assert(got.count==1 && got.stolen_count==1 && AW_LedgerRank(&got,4242)==4 && AW_LedgerRank(&got,17)==0 &&
+            AW_LedgerContentDelta(&got,AW_LEDGER_BUILDER|9,"iron dagger")==-1);
+     /* ranks alone are a reason for the third form and for a save */
+     AW_LedgerClear(&other_list);AW_LedgerRankSet(&other_list,5,2);assert(AW_LedgerRows(&other_list)==1);
+     k=AW_LedgerEncode(&other_list,one,sizeof(one));assert(k==4+4+4+4+4+5 && !memcmp(one,"AWL3",4));
+     save_trip(&other_list);
+     /* an older list keeps its form: no delta, no rank, no "AWL3" */
+     AW_LedgerClear(&other_list);row(&other_list,51,AW_LEDGER_TAKEN,AW_AT_ROOM,3);
+     assert(AW_LedgerEncode(&other_list,one,sizeof(one))>0 && !memcmp(one,"AWL1",4));
+     /* reading refusals: the second form has no deltas, an empty third form, a count of 0, out of order, not folded,
+      * a key with bit 30, cut bytes */
+     AW_LedgerClear(&other_list);AW_LedgerContentAdd(&other_list,300,"misc_quill",-1);AW_LedgerContentAdd(&other_list,301,"misc_cup",2);
+     k=AW_LedgerEncode(&other_list,one,sizeof(one));assert(k>0);
+     /* AWL3, 0 rows, 0 pairs, 2 deltas: the first at 16: key, len, id, count */
+     assert(one[16]==44 && one[20]==10 && one[21]=='m');
+     one[3]='2';assert(!AW_LedgerDecode(one,k,&got));one[3]='3';
+     one[21]='M';assert(!AW_LedgerDecode(one,k,&got));one[21]='m';
+     memcpy(two,one,(size_t)k);two[16]=46;assert(!AW_LedgerDecode(two,k,&got));                /* 302 after 301 */
+     memcpy(two,one,(size_t)k);two[19]=0x40;assert(!AW_LedgerDecode(two,k,&got));             /* key bit 30 */
+     memcpy(two,one,(size_t)k);memset(two+31,0,4);assert(!AW_LedgerDecode(two,k,&got));        /* a count of 0 */
+     assert(!AW_LedgerDecode(one,k-1,&got) && !AW_LedgerDecode(one,k+1,&got));
+     memcpy(two,"AWL3\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0",20);assert(!AW_LedgerDecode(two,20,&got));
+     assert(AW_LedgerDecode(one,k,&got) && same(&other_list,&got));
+     /* 3,000 deltas over 1,000 containers: no small ceiling */
+     AW_LedgerClear(&other_list);
+     for(i=0;i<3000;i++){char id[16];sprintf(id,"item_%d",i%3);assert(AW_LedgerContentAdd(&other_list,(uint32_t)(i/3+1),id,i%2?2:-1));}
+     assert(other_list.content_count==3000);n=round_trip(&other_list);save_trip(&other_list);
+     fprintf(o,"containers %d deltas %d bytes, ranks %d, save %d bytes\n",other_list.content_count,n,c.rank_count,m);
+     AW_LedgerClear(&c);AW_LedgerClear(&other_list);}
 
     AW_LedgerClear(&list);AW_LedgerClear(&got);AW_LedgerClear(&other_list);
     fprintf(o,"done\n");

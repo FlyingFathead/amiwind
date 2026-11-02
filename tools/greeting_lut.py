@@ -61,6 +61,8 @@ SOUN_ROW = '>8sHBBHH'
 # by tests/test_greeting_lut.py). A creature row: u32 id string offset, 8 x u16 Sounds index. A slot: u16 Sounds index.
 CREATURE_ROW = '>I8H'
 SNDG_MOMENTS = ('LEFT_FOOT', 'RIGHT_FOOT', 'SWIM_LEFT', 'SWIM_RIGHT', 'MOAN', 'ROAR', 'SCREAM', 'LAND')
+# The magic schools in the original's order (ESM::MagicEffect school index; OpenMW spellcasting.cpp)
+SPELL_SCHOOLS = ('Alteration', 'Conjuration', 'Destruction', 'Illusion', 'Mysticism', 'Restoration')
 # (slot, the SOUN record the engine plays by name: rule from OpenMW mwmechanics/combat.cpp, character.cpp and the
 # mwclass item classes' getUpSoundId/getDownSoundId)
 SOUND_SLOTS = (
@@ -81,13 +83,20 @@ SOUND_SLOTS = (
                        'Clothes', 'Gold', 'Ingredient', 'Lockpick', 'Misc', 'Potion', 'Probe', 'Repair', 'Ring',
                        'Weapon Blunt', 'Weapon Bow', 'Weapon Crossbow', 'Weapon Longblade', 'Weapon Shortblade',
                        'Weapon Spear')
-          for way in ('Up', 'Down'))
+          for way in ('Up', 'Down')) + (
+    # a critical strike (OpenMW mwmechanics/combat.cpp) and each school's cast, hit and failure (OpenMW
+    # mwmechanics/spellcasting.cpp, the magic effect's school sounds; VOICE-COVERAGE-58: the sound events of v0.0.60's
+    # casting, proven through the hook before then)
+    ('CRITICAL_DAMAGE', 'critical damage'),
+) + tuple(item for school in SPELL_SCHOOLS for item in (
+    ('%s_CAST' % school.upper(), '%s cast' % school), ('%s_HIT' % school.upper(), '%s hit' % school),
+    ('%s_FAIL' % school.upper(), 'Spell Failure %s' % school)))
 SOUND_MASTERS = ('Morrowind.esm', 'Tribunal.esm', 'Bloodmoon.esm')
 NONE16 = 0xFFFF
 NONE32 = 0xFFFFFFFF
 # The Voice topics the engine knows by name first (engine/aga/src/aw_glut.h AW_GLUT_*), then any other in ID order;
 # the conversation greeting (Greeting 0-9) is the last topic, named GREETING.
-KNOWN_VOICE_TOPICS = ('hello', 'idle', 'intruder', 'thief', 'hit', 'attack', 'flee')
+KNOWN_VOICE_TOPICS = ('hello', 'idle', 'intruder', 'thief', 'hit', 'attack', 'flee', 'alarm')
 GREETING = 'greeting'
 SCALE = 0.25                     # original units to Quake units (tools/prepare_quake.py SCALE)
 NO_CELL = '\0'                   # the cell of an NPC with no single home cell: no cell name starts with it
@@ -273,7 +282,7 @@ def sound_table(data, resolve, media=None):
     def pool(soun):
         rec = sounds.get((soun or '').casefold())
         return resolve(rec['file']) if rec and rec['file'] else None
-    rows, own, generic_used, none = [], 0, 0, 0
+    rows, own, generic_used, none, unmapped_moments = [], 0, 0, 0, []
     for ident, original, model in creatures:
         row = []
         for moment in range(len(SNDG_MOMENTS)):
@@ -288,7 +297,9 @@ def sound_table(data, resolve, media=None):
             if not pick and gens.get(('', moment)):
                 pick, generic_used = gens[('', moment)], generic_used + 1
             row.append(pool(pick[0]) if pick else None)
-            none += row[-1] is None
+            if row[-1] is None:
+                none += 1
+                unmapped_moments.append('%s:%s' % (ident, SNDG_MOMENTS[moment]))
         rows.append((ident, row))
     slots = [pool(soun) for _slot, soun in SOUND_SLOTS]
     # the SOUN rows: the compiled scripts' sounds (PlaySound, PlayLoopSound, StopSound ...) by the same resolution
@@ -302,7 +313,7 @@ def sound_table(data, resolve, media=None):
     if catalogue is not None and catalogue.is_file():
         from mwscript.media import MediaMap
         mapper = MediaMap.from_files(SimpleNamespace(sounds=sounds), catalogue)
-    soun_rows, mapped = [], 0
+    soun_rows, mapped, soun_unmapped = [], 0, []
     for key in soun_order(sounds):
         rec = sounds[key]
         near, far = hearing.sound_range(rec)
@@ -316,12 +327,16 @@ def sound_table(data, resolve, media=None):
             hash8, centis = (bytes.fromhex(name[1:17]) if name else bytes(8)), 0
         flag = SOUND_MAPPED if mapper is not None and name else 0
         mapped += bool(flag)
+        if mapper is not None and not flag:
+            soun_unmapped.append(rec['id'])
         soun_rows.append(struct.pack(SOUN_ROW, hash8, centis, rec['volume'] & 255, flag, min(near, NONE16),
                                      min(far, NONE16)))
     report = {'creatures': len(rows), 'generators': sum(len(v) for v in gens.values()),
               'moments_own': own, 'moments_generic': generic_used, 'moments_none': none,
               'slots': len(slots), 'slots_missing': [s for (s, _), p in zip(SOUND_SLOTS, slots) if p is None],
-              'soun_rows': len(soun_rows), 'soun_mapped': mapped, 'catalogue': mapper is not None}
+              'soun_rows': len(soun_rows), 'soun_mapped': mapped, 'catalogue': mapper is not None,
+              # VOICE-COVERAGE-58: named, for the coverage line (SOUN rows only with a media catalogue to judge by)
+              'moments_unmapped': unmapped_moments, 'soun_unmapped': soun_unmapped if mapper is not None else None}
     return rows, slots, soun_rows, report
 
 
@@ -770,6 +785,12 @@ def build(kinds, topics, homes=None, resolve=None, masks=None, left=None, sound=
     report['table_bytes'].update(listset_items=2 * len(t['listset_items']), list_items=2 * len(t['list_items']),
                                  strings=len(t['strings']), texts=len(t['texts']))
     report['coverage'] = coverage(kinds, keep, masks, left, rows)
+    if sound_report:
+        # the creature moments, named slots and SOUN rows without a sound, named (VOICE-COVERAGE-58)
+        report['coverage'].update(moments_unmapped=list(sound_report.get('moments_unmapped') or ()),
+                                  slots_unmapped=list(sound_report.get('slots_missing') or ()),
+                                  soun_unmapped=sound_report.get('soun_unmapped'),
+                                  soun_total=sound_report.get('soun_rows', 0))
     report['player_voices'] = player_voices(kinds, keep, hit_sets_of(raw))
     return raw, report
 
@@ -855,10 +876,22 @@ def coverage(kinds, keep, masks, left, creature_rows):
 def coverage_line(c):
     """One line for the build log and the report: 'Voice coverage: NPCs 2675/2675 voiced, creatures ...'."""
     named = sorted(list(c['npcs_unmapped']) + list(c['creatures_unmapped']))
-    return 'Voice coverage: NPCs %d/%d voiced, creatures %d/%d with sounds, unmapped: %s' % (
+    line = 'Voice coverage: NPCs %d/%d voiced, creatures %d/%d with sounds, unmapped: %s' % (
         c['npcs_voiced'], c['npcs_total'], c['creatures_sounded'], c['creatures_total'],
         ', '.join('%s (%s)' % (i, c['npcs_unmapped'].get(i) or c['creatures_unmapped'].get(i) or 'NO REASON')
                   for i in named) or 'none')
+    # the sound table's part (a table built with the sound table): creature moments without a sound, named slots
+    # whose SOUN record the data lacks, SOUN rows the media stage did not convert; each named
+    if 'moments_unmapped' in c:
+        line += '; moments unmapped: %s' % (', '.join(c['moments_unmapped']) or 'none')
+        line += '; named sounds unmapped: %s' % (', '.join(c['slots_unmapped']) or 'none')
+        if c.get('soun_unmapped') is None:
+            line += '; SOUN rows: %d, not judged (no media catalogue)' % c.get('soun_total', 0)
+        else:
+            line += '; SOUN rows %d/%d mapped, unmapped: %s' % (
+                c.get('soun_total', 0) - len(c['soun_unmapped']), c.get('soun_total', 0),
+                ', '.join(c['soun_unmapped']) or 'none')
+    return line
 
 
 def unexplained(c):

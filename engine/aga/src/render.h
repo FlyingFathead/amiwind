@@ -86,9 +86,14 @@ typedef struct entity_s
      * trunk's width so the trunk base no longer draws over a wall standing
      * just behind the card's centre (SEYDA-WALL-SHAPE-31). */
     int aw_flora;
+    /* With AW_EF_ALIAS_SCALE on an alias: the height scale when above 0 (x and y take aw_sprite_scale): the
+     * assembled player body's parts at the race's weight and height (aw_player_parts.h); 0 = uniform, as before. */
+    float aw_alias_zscale;
 } entity_t;
 
 float R_SpriteEntityScale(const entity_t *ent);
+/* An alias entity's scale on one axis (0 x, 1 y, 2 z): R_SpriteEntityScale, the z axis aw_alias_zscale when set. */
+float R_AliasAxisScale(const entity_t *ent, int axis);
 /* Flora cards: the push is this share of the card's world width, and it
  * applies only to the bottom AW_FLORA_BASE_SHARE of the card's rows (the
  * trunk base); the canopy and upper trunk keep the plane's depth, so a card

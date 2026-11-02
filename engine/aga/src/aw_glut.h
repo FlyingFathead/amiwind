@@ -12,7 +12,7 @@
 
 /* Topics the engine asks for (the file names its topics; the known ones are matched by name at load). */
 enum {AW_GLUT_HELLO, AW_GLUT_IDLE, AW_GLUT_INTRUDER, AW_GLUT_THIEF, AW_GLUT_HIT, AW_GLUT_ATTACK, AW_GLUT_FLEE,
-      AW_GLUT_GREETING, AW_GLUT_TOPICS};
+      AW_GLUT_ALARM, AW_GLUT_GREETING, AW_GLUT_TOPICS};
 /* Condition opcodes (tools/greeting_lut.py OP_*; the opcode table of docs/NPC_VOICE_TABLE.md). */
 enum {AW_GLUT_OP_FUNC=1, AW_GLUT_OP_GLOBAL, AW_GLUT_OP_LOCAL, AW_GLUT_OP_NOTLOCAL, AW_GLUT_OP_JOURNAL,
       AW_GLUT_OP_ITEM, AW_GLUT_OP_DEAD, AW_GLUT_OP_CELL, AW_GLUT_OP_DISP, AW_GLUT_OP_PCFACTION,
@@ -65,8 +65,47 @@ enum {
     AW_SLOT_ITEM_WEAPON_CROSSBOW_DOWN, AW_SLOT_ITEM_WEAPON_LONGBLADE_UP, AW_SLOT_ITEM_WEAPON_LONGBLADE_DOWN,
     AW_SLOT_ITEM_WEAPON_SHORTBLADE_UP, AW_SLOT_ITEM_WEAPON_SHORTBLADE_DOWN, AW_SLOT_ITEM_WEAPON_SPEAR_UP,
     AW_SLOT_ITEM_WEAPON_SPEAR_DOWN,
+    /* a critical strike; each magic school's cast, hit and failure (school order: tools/greeting_lut.py SPELL_SCHOOLS) */
+    AW_SLOT_CRITICAL_DAMAGE,
+    AW_SLOT_ALTERATION_CAST, AW_SLOT_ALTERATION_HIT, AW_SLOT_ALTERATION_FAIL,
+    AW_SLOT_CONJURATION_CAST, AW_SLOT_CONJURATION_HIT, AW_SLOT_CONJURATION_FAIL,
+    AW_SLOT_DESTRUCTION_CAST, AW_SLOT_DESTRUCTION_HIT, AW_SLOT_DESTRUCTION_FAIL,
+    AW_SLOT_ILLUSION_CAST, AW_SLOT_ILLUSION_HIT, AW_SLOT_ILLUSION_FAIL,
+    AW_SLOT_MYSTICISM_CAST, AW_SLOT_MYSTICISM_HIT, AW_SLOT_MYSTICISM_FAIL,
+    AW_SLOT_RESTORATION_CAST, AW_SLOT_RESTORATION_HIT, AW_SLOT_RESTORATION_FAIL,
     AW_SLOTS
 };
+
+/* THE SOUND EVENTS (VOICE-COVERAGE-58; docs/COMBAT.md "Sound events"): one named event per moment the original plays
+ * a sound, each resolved to the voice table's mapped sound: a voice topic of the speaker (picked by the original's
+ * filter), a named slot, or a creature's sound generator moment. The game calls AW_SoundEvent; dbg sound MOMENT [N]
+ * triggers any of them (the moments that wait for v0.0.60's casting and ranged weapons are proven through it).
+ * An event with ARGS > 1 takes N in 0..ARGS-1 (armour class 0 light, 1 medium, 2 heavy; body size 0 small, 1 medium,
+ * 2 large; the school in SPELL_SCHOOLS order) and plays BASE + STRIDE x N; without N, DEFLT. */
+enum {AW_SEK_VOICE, AW_SEK_PLAYER_VOICE, AW_SEK_SLOT, AW_SEK_CREATURE};
+enum {
+    AW_SE_HELLO, AW_SE_IDLE, AW_SE_INTRUDER, AW_SE_THIEF, AW_SE_HIT, AW_SE_ATTACK, AW_SE_FLEE, AW_SE_ALARM,
+    AW_SE_PAIN, AW_SE_TAUNT,
+    AW_SE_SWISH, AW_SE_MISS, AW_SE_ARMOR_HIT, AW_SE_HEALTH_DAMAGE, AW_SE_CRITICAL, AW_SE_BLOCK, AW_SE_PUNCH,
+    AW_SE_PUNCH2,
+    AW_SE_BOW_DRAW, AW_SE_BOW_SHOOT, AW_SE_CROSSBOW_DRAW, AW_SE_CROSSBOW_SHOOT, AW_SE_THROW, AW_SE_PROJECTILE_HIT,
+    AW_SE_CAST, AW_SE_SPELL_HIT, AW_SE_SPELL_FAIL,
+    AW_SE_KNOCKDOWN, AW_SE_DEATH,
+    AW_SE_CREATURE_ATTACK, AW_SE_ROAR, AW_SE_MOAN, AW_SE_SCREAM, AW_SE_LAND,
+    AW_SOUND_EVENTS
+};
+typedef struct {
+    const char *name;              /* the dbg word and the docs' row */
+    unsigned char kind;            /* AW_SEK_* */
+    unsigned char args, stride, deflt;
+    short base;                    /* the AW_GLUT_* topic, AW_SLOT_* slot or AW_SNDG_* moment */
+} aw_sound_event_t;
+extern const aw_sound_event_t aw_sound_events[AW_SOUND_EVENTS];
+/* The event of a dbg word (case-insensitive), -1 none. */
+int AW_SoundEventFind(const char *name);
+/* What event E with argument ARG (-1: its default; clamped to 0..args-1) plays: *kind (AW_SEK_*) and the topic, slot
+ * or moment; 1, or 0 for a bad event. */
+int AW_SoundEventResolve(int event,int arg,int *kind,int *index);
 #define AW_GLUT_MAX_LISTS 32       /* lists merged per topic and NPC (the data: at most 21) */
 #define AW_GLUT_MAX_PICKS 64       /* entries kept for the random-pick option */
 
@@ -210,4 +249,10 @@ void AW_GlutFill(struct edict_s *e,int row,const char *raw,char *out,int capacit
 int AW_GlutDefineValues(struct edict_s *e,int row,aw_textdef_values_t *v);
 /* The conversation greeting text of a manual talk for an NPC without its own (aw_converse): 1 and the text. */
 int AW_GlutConverse(struct edict_s *e,int again,char *out,int capacity);
+/* THE SOUND EVENT HOOK (aw_sound_events above): play EVENT for E with ARG (-1 default). A voice event speaks E's
+ * line (an NPC in the table; AW_SE_PAIN is always the player's own line by race and sex), a slot event sounds at E
+ * (NULL: at the player), a creature event plays E's sound generator moment. 1 when a sound started; 0 when nothing
+ * plays (no line passes, no sound mapped, the file not in this build, the speaker busy); -1 when the event cannot
+ * run (bad event, no table, no speaker of that kind). WHAT (may be NULL, >= 64 bytes) gets the sound or the reason. */
+int AW_SoundEvent(int event,struct edict_s *e,int arg,char *what);
 #endif

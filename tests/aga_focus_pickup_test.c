@@ -6,6 +6,7 @@
  * (INTERIOR-PLACED-ITEMS-47, the Census Office). */
 #include "quakedef.h"
 #include "aw_inventory.h"
+#include "aw_ledger.h"
 #include <assert.h>
 server_t sv;server_static_t svs;client_state_t cl;client_static_t cls;
 static client_t client;
@@ -14,8 +15,8 @@ static model_t world,world2;
 char *pr_strings;
 static char strings[16];
 static int room_draws,taken,take_reference,notices,disabled;
-static byte focus_file[8+12+96],item_file[8+512],placed_file[8+16+48];
-static int placed_size;
+static byte focus_file[8+12+96+28],item_file[8+512],placed_file[8+16+48];
+static int placed_size,focus_size=8+12+96;   /* AWF2: the rows alone; AWF3 (CELL-CHANGES-59): the owners list too */
 static void put32(byte *p,unsigned long v);
 static const char hud_text[]="iMaxActivateDist 192\nsWeight Weight\nsValue Value\nsTake Grab\n";
 #define QUILL 406347u
@@ -30,7 +31,7 @@ static int serve(const void *data,int size,FILE **file){
 }
 int COM_FOpenFile(char *name,FILE **file){
     *file=NULL;
-    if(!strcmp(name,"focus.awf"))return serve(focus_file,sizeof(focus_file),file);
+    if(!strcmp(name,"focus.awf"))return serve(focus_file,focus_size,file);
     if(!strcmp(name,"inventory/items.awi"))return serve(item_file,sizeof(item_file),file);
     if(!strcmp(name,"gfx/hud-settings.txt"))return serve(hud_text,sizeof(hud_text)-1,file);
     if(!strcmp(name,"progs/items/placed.awp") && placed_size)return serve(placed_file,placed_size,file);
@@ -164,6 +165,29 @@ int main(void){
     refuse_models=0;placed_table(QUILL+1);level(0);
     assert(!AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned) && admitted==0);
     aw_placed_begin=NULL;aw_placed_admit=NULL;
+    /* CELL-CHANGES-59 slice 2: AWF3, the owners list after the rows: the owned quill taken is stolen from its owner,
+     * the pair (misc_quill, fargoth) on the world change list; a faction owner is a pair of its own; an unowned take,
+     * an AWF2 table (no owner list) and the old method (aw_placed ledger off) add none */
+    {byte *t;
+     tables();memcpy(focus_file,"AWF3",4);
+     t=focus_file+8+12+96;memcpy(t,"AWO1",4);put32(t+4,1);put32(t+8,QUILL);t[12]=t[13]=t[14]=t[15]=0;
+     put32(t+16,8);memcpy(t+20,"fargoth",8);focus_size=8+12+96+28;
+     AW_LedgerClear(&aw_ledger);level(1);
+     assert(AW_InventoryUse() && taken==1);
+     assert(aw_ledger.stolen_count==1 && AW_LedgerStolenCount(&aw_ledger,"misc_quill","fargoth",0)==1);
+     t[14]=1;AW_LedgerClear(&aw_ledger);level(1);
+     assert(AW_InventoryUse() && AW_LedgerStolenCount(&aw_ledger,"misc_quill","fargoth",1)==1 &&
+            !AW_LedgerStolenCount(&aw_ledger,"misc_quill","fargoth",0));
+     focus_file[8+12+1]=0;AW_LedgerClear(&aw_ledger);level(1);
+     assert(AW_InventoryUse() && taken==1 && !aw_ledger.stolen_count);
+     focus_file[8+12+1]=1;memcpy(focus_file,"AWF2",4);AW_LedgerClear(&aw_ledger);level(1);
+     assert(AW_InventoryUse() && taken==1 && !aw_ledger.stolen_count);
+     memcpy(focus_file,"AWF3",4);aw_ledger_on=0;AW_LedgerClear(&aw_ledger);level(1);
+     assert(AW_InventoryUse() && taken==1 && !aw_ledger.stolen_count);aw_ledger_on=1;
+     /* a list that names another reference: no owner, no pair */
+     put32(t+8,QUILL+1);AW_LedgerClear(&aw_ledger);level(1);
+     assert(AW_InventoryUse() && taken==1 && !aw_ledger.stolen_count);
+     AW_LedgerClear(&aw_ledger);focus_size=8+12+96;}
     puts("Placed pickup through the use key's path: box, take, no second take, no box for an item the room leaves out; "
          "the placed list draws the left-out item by reference and it is taken the same way.");
     return 0;

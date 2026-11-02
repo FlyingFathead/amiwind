@@ -10,7 +10,19 @@ static char buffer[8192];static cvar_t *vars[4];static int nvars;
 void Cbuf_AddText(char *t){strcat(buffer,t);}
 void Cvar_RegisterVariable(cvar_t *v){vars[nvars++]=v;v->value=(float)atof(v->string);}
 void Cvar_Set(char *n,char *v){int i;for(i=0;i<nvars;i++)if(!strcmp(vars[i]->name,n)){vars[i]->string=v;vars[i]->value=(float)atof(v);}}
+#ifndef AW_FRAME_MAP
 int AW_WorldToSource(const char *n,const float *l,float *g){(void)n;g[0]=l[0]*4;g[1]=l[1]*4;g[2]=l[2]*4;return 1;}
+#else
+/* CHIM-FRAME-SOURCE-CONVERSION-59: the state file's GLOBAL line on a CHIM frame map, through the real shared
+ * conversion (aw_world.c) on a disk without the region table; a stand-in for chim_world.c's frame hook: map seyda,
+ * centre 1000 -2000. */
+extern int (*aw_world_chim_source)(const char *,const float *,float *);
+static int frame_source(const char *n,const float *l,float *w){
+    if(strcmp(n,"seyda"))return 0;w[0]=l[0]*4+1000;w[1]=l[1]*4-2000;w[2]=l[2]*4;return 1;}
+int COM_FOpenFile(char *name,FILE **out){(void)name;*out=NULL;return -1;}   /* no region table, no region names */
+int AW_SceneMapSize(const char *n,char *p,int s){(void)n;if(p && s>0)p[0]=0;return -1;}
+void Con_Printf(char *fmt,...){(void)fmt;}
+#endif
 const char *AW_SceneName(void){return "vf0573";}   /* aw_scene.c: the scene the player stands in (type 1 crossings) */
 int AW_ClockEnsure(void){return 1;}
 void AW_ClockDate(int *y,int *mo,int *d,int *h,int *mi){*y=427;*mo=8;*d=16;*h=1;*mi=19;}
@@ -42,6 +54,16 @@ int main(void){
     held=1;realtime=2.2;AW_RemotePoll();
     f=fopen(state,"r");n=fread(text,1,sizeof text-1,f);fclose(f);text[n]=0;assert(strstr(text,"daynight off\n"));
     assert(strstr(AW_RemoteConsoleLog(),"console.log"));
+#ifdef AW_FRAME_MAP
+    aw_world_chim_source=frame_source;sv.active=1;strcpy(sv.name,"seyda");
+    r_refdef.vieworg[0]=10;r_refdef.vieworg[1]=20;r_refdef.vieworg[2]=30;
+    realtime=3.0;AW_RemotePoll();
+    f=fopen(state,"r");n=fread(text,1,sizeof text-1,f);fclose(f);text[n]=0;assert(strstr(text,"global 1040 -1920 120\n"));
+    strcpy(sv.name,"vf0001");realtime=4.0;AW_RemotePoll();   /* not the loaded frame map: no GLOBAL line */
+    f=fopen(state,"r");n=fread(text,1,sizeof text-1,f);fclose(f);text[n]=0;assert(!strstr(text,"global "));
+    sv.active=0;aw_world_chim_source=NULL;
+    puts("remote console on a CHIM frame map: the GLOBAL line through the shared conversion");
+#endif
     remove(state);snprintf(text,sizeof text,"rmdir %s",dir);assert(!system(text));
     puts("remote console: off by default, command file once, state file, period");
     return 0;

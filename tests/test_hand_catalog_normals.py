@@ -28,8 +28,9 @@ class CatalogNormalTests(unittest.TestCase):
             palette.write_bytes(bytes(768))
             output = root / 'output'
 
-            def hands(*args):
-                return raw, {'sha256': original_hash, 'bytes': len(raw), 'clips': {'idle': 8}}
+            def hands(*args, stance='hh'):
+                return raw, {'sha256': original_hash, 'bytes': len(raw), 'clips': {'idle': 8},
+                             'frames': 28, 'triangles': 1, 'vertices': 3}
 
             def torch(data, stage, **kwargs):
                 (stage / 'progs').mkdir()
@@ -42,6 +43,7 @@ class CatalogNormalTests(unittest.TestCase):
                  patch.object(catalog, 'first', return_value=struct.pack('<16xI', 1)), \
                  patch.object(catalog, 'bake_appearance', side_effect=hands), \
                  patch.object(catalog, 'prepare_torch', side_effect=torch), \
+                 patch.object(catalog, 'weapon_view_tags', return_value=[[[0.0] * 6] * 28] * 3), \
                  patch.object(catalog, 'normal_table', return_value=table) as load_table:
                 source.return_value.kinds = {'RACE': {'nord': object()}}
                 result = catalog.prepare(root / 'owned', palette, output, topology=topology, normal_mode=normal_mode,
@@ -80,9 +82,10 @@ class CatalogNormalTests(unittest.TestCase):
             palette.write_bytes(bytes(768))
             output = root / 'output'
 
-            def hands(assets, kinds, palette, race, female, *args):
+            def hands(assets, kinds, palette, race, female, *args, stance='hh'):
                 raw = model()[:-1] + bytes([len(race) + female])
-                return raw, {'sha256': hashlib.sha256(raw).hexdigest(), 'bytes': len(raw), 'clips': {'idle': 8}}
+                return raw, {'sha256': hashlib.sha256(raw).hexdigest(), 'bytes': len(raw), 'clips': {'idle': 8},
+                             'frames': 28, 'triangles': 1, 'vertices': 3}
 
             def torch(data, stage, race=None, female=False, **kwargs):
                 (stage / 'progs').mkdir()
@@ -99,6 +102,7 @@ class CatalogNormalTests(unittest.TestCase):
                  patch.object(catalog, 'bake_appearance', side_effect=hands), \
                  patch.object(catalog, 'prepare_torch', side_effect=torch), \
                  patch.object(catalog, 'normal_table', return_value=table), \
+                 patch.object(catalog, 'weapon_view_tags', return_value=[[[0.0] * 6] * 28] * 3), \
                  patch.object(build_parallel, 'process_pool', side_effect=pool):
                 source.return_value.kinds = {'RACE': {'nord': object(), 'breton': object(), 'khajiit': object()}}
                 catalog._SOURCES.clear()
@@ -114,7 +118,9 @@ class CatalogNormalTests(unittest.TestCase):
         parallel = self.bake_tree(4, sizes)
         self.assertEqual(sizes, [4])
         self.assertEqual(parallel, serial)
-        self.assertEqual(len([name for name in serial[1] if name.startswith('progs/hands/')]), 12)
+        # hands + torch arms + the three armed stances (PLAYER-GEAR-VISUAL-59) for 3 races x 2 sexes
+        self.assertEqual(len([name for name in serial[1] if name.startswith('progs/hands/')]), 30)
+        self.assertIn('gfx/hand-weapons.aww', serial[1])
 
     def test_source_outputs_and_every_hash_use_surface_normal_bytes(self):
         self.assertEqual(self.generate('source'), ('surface', True))

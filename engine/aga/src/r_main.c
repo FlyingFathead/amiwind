@@ -671,6 +671,9 @@ R_DrawViewModel
 */
 /* aw_view.c: third person hides the first-person hands, weapon and torch (as GLQuake's chase_active). */
 int (*aw_view_hide_hands)(void);
+/* aw_view.c: the further parts of the first-person arms drawn this frame (I from 1), NULL after the last (and in
+ * fixtures without it). */
+struct model_s *(*aw_view_hand_part)(int i);
 void R_DrawViewModel (void)
 {
     entity_t saved_view;
@@ -758,7 +761,27 @@ void R_DrawViewModel (void)
      * alias renderer gives this entity its viewmodel depth scale. Restore all
      * shared entity state before returning to the rest of the renderer. */
     saved_view=cl.viewent;saved_current=currententity;
+    /* The first-person arms from parts (aw_view.c, PLAYER-GEAR-VISUAL-59): the further parts at the first one's
+     * frame and place; the bones are posed once for all of them (r_alias.c). */
+    if(aw_view_hand_part){
+        int part;struct model_s *m;
+        for(part=1;;part++){
+            cl.viewent=saved_view;
+            if(!(m=aw_view_hand_part(part)))break;
+            cl.viewent.model=m;currententity=&cl.viewent;
+            R_AliasDrawModel(&r_viewlighting);
+        }
+        cl.viewent=saved_view;currententity=&cl.viewent;
+    }
     if(AW_HandBlockItemApply()){
+        currententity=&cl.viewent;
+        VectorCopy(currententity->origin,r_entorigin);
+        VectorSubtract(r_origin,r_entorigin,modelorg);
+        R_AliasDrawModel(&r_viewlighting);
+    }
+    cl.viewent=saved_view;
+    /* The equipped weapon on the stance arms' Weapon Bone tag (PLAYER-GEAR-VISUAL-59): one alias, only while armed. */
+    if(AW_HandWeaponItemApply()){
         currententity=&cl.viewent;
         VectorCopy(currententity->origin,r_entorigin);
         VectorSubtract(r_origin,r_entorigin,modelorg);
@@ -1190,7 +1213,7 @@ SetVisibilityByPassages ();
     AW_GuardTorchDraw(); /* Same world camera/depth, before hands and water warp. */
     AW_StaticFlamesDraw();
     AW_LavaEmbersDraw();
-    AW_Mark(4);R_DrawViewModel();AW_EndMark(4);
+    { double hands_t0; AW_RT_BEGIN(hands_t0); AW_Mark(4);R_DrawViewModel();AW_EndMark(4); AW_RT_END(RT_HANDS, hands_t0); }
 	if (r_dowarp)
 		D_WarpScreen ();
 

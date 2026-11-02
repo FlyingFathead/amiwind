@@ -1,5 +1,14 @@
 # SEYDA-LOAD-HANG-30: rare freeze while loading in Seyda Neen
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 2 times; something has to be done
+
+- Reported with v0.0.59-dev4 at 2026-11-02 (time not recorded): Gate boot smoke 5665 at 2026-11-02 12:57 +0200 / 2026-11-02 10:57 UTC (worker branch v0.0.59-cellchanges2, FS-UAE, 32 MB Fast): the second Seyda Neen load after Balmora stopped after the title line and the smoke timed out; the same commit passed the next gate (5666).
+- Reported with v0.0.59-dev4 at 2026-11-02 15:23 +0200: Gate 5735 boot smoke on integ 80a1aed8 (a register-only commit): seyda was not in play (screen game, signon 0, world leaves 0, map none); the other five gate parts passed; rerun as gate 5736.
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |

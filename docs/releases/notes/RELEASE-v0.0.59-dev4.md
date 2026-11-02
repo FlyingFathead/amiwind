@@ -15,7 +15,8 @@ testing in game.
   model each. They can be aimed at and taken.
 - **The world remembers.** One list for the whole world keeps what the player changes: items taken, dropped or moved,
   objects a script disables or locks, the stolen mark. It holds across rooms, outdoor areas and saved games, with only
-  the changes stored and no fixed limit. Saves made with earlier snapshots still load.
+  the changes stored, up to 32,768 changes (the earlier tables held 1,024 objects and 32 dropped items). Saves made
+  with earlier snapshots still load.
 - **Dropping items outdoors works on the streamed towns.** A drop was refused on every streamed map.
 - **The original mouse cursor.** The mouse cursor is the original game's, taken from your copy of the game when the
   game is built, in every window. The previous cursor stays selectable: Options, Prefs, Mouse cursor, or

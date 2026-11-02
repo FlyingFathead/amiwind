@@ -76,6 +76,7 @@ static void every_entry_translates(void){
   /* dbg fog rule / dbg cut groups print aw_cull with no argument (switch bits) */
   snprintf(expect,sizeof expect,"%s%s\n",handler,
        !strcmp(bar1+1,"characterchange")?" appearance":!strcmp(bar1+1,"inventory grant")?" grant":
+       !strcmp(bar1+1,"give weapons")?" give weapons":
        !strcmp(bar1+1,"door roulette")?" roulette":!strcmp(bar1+1,"doorlocks")?" locks":
        !strcmp(bar1+1,"creatures")?" actors creatures":!strcmp(bar1+1,"mwscript")?" about":
        (!strcmp(bar1+1,"set race") || !strcmp(bar1+1,"set playerrace"))?" playerrace":"");
@@ -393,6 +394,14 @@ int main(int count,char **values){
   assert(AW_DebugTranslate(3,all,output,sizeof(output))==1 && !strcmp(output,"aw_quickchar all\n"));
   assert(AW_DebugTranslate(5,grant,output,sizeof(output))==1 && !strcmp(output,"aw_inventory grant \"steel longsword\" 1\n"));
   grant[3]="steel;quit";assert(!AW_DebugTranslate(5,grant,output,sizeof(output)));
+  { /* DBG-GIVE-WEAPONS-59: dbg give weapons [stats] reaches the inventory command; any other word is refused */
+   char *kit[]={"dbg","give","weapons","stats","more"};
+   assert(AW_DebugTranslate(3,kit,output,sizeof(output))==1 && !strcmp(output,"aw_inventory give weapons\n"));
+   assert(AW_DebugTranslate(4,kit,output,sizeof(output))==1 && !strcmp(output,"aw_inventory give weapons stats\n"));
+   kit[3]="STATS";assert(AW_DebugTranslate(4,kit,output,sizeof(output))==1 && !strcmp(output,"aw_inventory give weapons STATS\n"));
+   assert(!AW_DebugTranslate(5,kit,output,sizeof(output)));
+   kit[3]="all";assert(!AW_DebugTranslate(4,kit,output,sizeof(output)));
+  }
   { /* dbg door roulette [SEED]: the teleport command's roulette, no resident command of its own; plain dbg door
      * stays the hinged door */
    char *roulette[]={"dbg","door","roulette","1234"},*door[]={"dbg","door","status"};

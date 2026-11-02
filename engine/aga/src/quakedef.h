@@ -828,6 +828,7 @@ const char *AW_SceneWorldModel(const char *name);
 int AW_ViewEquipmentReady(void);
 int AW_ViewInventoryEquipment(model_t *models[2],float origins[2][3],float angles[2][3]);
 extern int (*aw_hand_block_item)(char id[64],char model[64]);
+extern int (*aw_hand_weapon_item)(int *weapon,char model[64]);
 int AW_ViewInventoryBody(model_t **model,int *frame);
 int AW_ViewInventoryHeld(model_t **model,int *frame);   /* the carried torch with the torch pose */
 int AW_InventoryPreviewDraw(model_t *model,int frame,int x,int y,int width,int height,float angle);

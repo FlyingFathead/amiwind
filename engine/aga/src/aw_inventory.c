@@ -20,10 +20,9 @@ extern int AW_SceneryCount(void);
 int AW_WorldToSource(const char *,const float *,float *);
 int AW_SourceToWorld(const char *,const float *,float *);
 /* PLACED-ITEMS-OUTDOORS-FIRST-FRAME-59: a CHIM frame map (Seyda Neen, the towns, the regions) has no entry in the
- * open-world region table, so AW_WorldToSource / AW_SourceToWorld said no there and its focus rows and placed items
- * were never read outdoors. chim/chim_world.c sets these for the loaded frame (NULL: no CHIM, as in the tools' tests). */
-int (*aw_focus_chim_source)(const float *local,float *game);
-int (*aw_focus_chim_local)(const float *game,float *local);
+ * open-world region table, so the region table alone said no there and its focus rows and placed items were never
+ * read outdoors. Since CHIM-FRAME-SOURCE-CONVERSION-59 AW_WorldToSource / AW_SourceToWorld themselves ask the loaded
+ * CHIM frame after the region table (aw_world.c), for every caller; this file's own frame hooks went into that. */
 #if AW_STATE_VALUES > 32
 #error Inventory condition bitset requires AW_STATE_VALUES <= 32
 #endif
@@ -222,6 +221,101 @@ int AW_InventoryPickup(aw_state_t *s,int index){
     if(d->condition_known){s->inventory.condition_known|=1U<<item_index;s->inventory.condition[item_index]=incoming;}
     s->inventory.initialized=1;memset(d,0,sizeof(*d));return 1;
 }
+/* dbg give weapons (DBG-GIVE-WEAPONS-59): the builder's weapon kit table (aw_inventory.h). Text the builder wrote,
+ * checked field by field; the engine formats nothing of its own, it only lines the fields up for the console. */
+static int kit_field(char *out,const char *s,int n,int size,int spaces){
+    int i;unsigned char c;
+    if(n<1 || n>=size)return 0;
+    for(i=0;i<n;i++){
+        c=(unsigned char)s[i];
+        if(c<32 || c>126 || c=='|' || c=='"' || (!spaces && c==' '))return 0;
+    }
+    memcpy(out,s,n);out[n]=0;return 1;
+}
+int AW_WeaponKitParse(const char *text,int length,aw_kit_row_t *rows,int max){
+    const char *p,*end,*line,*eol,*q,*f[15];int k,i,j,n=0,header=0,len[15];aw_kit_row_t *r;
+    if(!text || length<6 || !rows || max<1)return -1;
+    for(p=text,end=text+length;p<end;){
+        line=p;eol=(const char *)memchr(p,'\n',end-p);if(!eol)eol=end;
+        p=eol<end?eol+1:end;k=(int)(eol-line);if(k>0 && line[k-1]=='\r')k--;
+        if(!header){if(k!=6 || memcmp(line,"AWKIT1",6))return -1;header=1;continue;}
+        if(!k || line[0]=='#')continue;
+        if(n>=max)return -1;
+        f[0]=line;i=1;
+        for(q=line;q<line+k;q++)if(*q=='|'){if(i>=15)return -1;f[i++]=q+1;}
+        if(i!=15)return -1;
+        for(j=0;j<15;j++)len[j]=(int)((j<14?f[j+1]-1:line+k)-f[j]);
+        r=&rows[n];memset(r,0,sizeof(*r));
+        if(!kit_field(r->id,f[0],len[0],64,1) || !kit_field(r->type,f[3],len[3],sizeof(r->type),1) ||
+           !kit_field(r->name,f[4],len[4],sizeof(r->name),1))return -1;
+        for(j=0;r->id[j];j++)if(r->id[j]>='A' && r->id[j]<='Z')return -1;   /* catalogue ids are lower case */
+        if(len[1]<1 || len[1]>3)return -1;
+        for(j=0;j<len[1];j++){if(f[1][j]<'0' || f[1][j]>'9')return -1;r->count=r->count*10+f[1][j]-'0';}
+        if(r->count<1 || len[2]!=1 || !strchr("WRTAS",f[2][0]))return -1;
+        r->kind=f[2][0];
+        for(j=0;j<AW_WEAPON_KIT_STATS;j++)if(!kit_field(r->stat[j],f[5+j],len[5+j],12,0))return -1;
+        for(j=0;j<n;j++)if(!strcmp(rows[j].id,r->id))return -1;
+        n++;
+    }
+    return header && n>0?n:-1;
+}
+/* how many new item kinds (AW_ITEM entries) the kit needs; -1 when a count would overflow */
+int AW_WeaponKitNeeds(const aw_state_t *s,const aw_kit_row_t *rows,int n){
+    int i,need=0;
+    if(!s || !rows || n<1)return -1;
+    for(i=0;i<n;i++){
+        if(AW_StateGet(s,AW_ITEM,rows[i].id)>INT32_MAX-rows[i].count)return -1;
+        if(inv_item_index(s,rows[i].id)<0)need++;
+    }
+    return need;
+}
+/* The whole kit or nothing: the room is checked first (AW_STATE_VALUES item kinds), then every row is added as
+ * dbg inventory grant adds one; saved like any grant (the AW_ITEM counts are the save's). */
+int AW_WeaponKitGrant(aw_state_t *s,const aw_kit_row_t *rows,int n){
+    int i,need=AW_WeaponKitNeeds(s,rows,n);
+    if(need<0 || need>AW_STATE_VALUES-s->count[AW_ITEM])return 0;
+    for(i=0;i<n;i++)if(!AW_ItemAdd(s,rows[i].id,rows[i].count)){
+        while(--i>=0)AW_ItemAdd(s,rows[i].id,-rows[i].count);   /* not reached after the room check */
+        return 0;
+    }
+    return 1;
+}
+/* one "label value" token onto the row's lines: a new line (indented two) when it would pass WIDTH */
+static int kit_token(char *out,int size,int *used,int *column,int width,const char *a,const char *b){
+    int na=(int)strlen(a),nb=b?(int)strlen(b):0,n=na+(nb?nb+1:0),gap=*column>0;
+    if(gap && *column+1+n>width){
+        if(*used+3>=size)return 0;
+        out[(*used)++]='\n';out[(*used)++]=' ';out[(*used)++]=' ';*column=2;gap=0;
+    }
+    if(*used+gap+n>=size)return 0;
+    if(gap)out[(*used)++]=' ';
+    memcpy(out+*used,a,na);*used+=na;
+    if(nb){out[(*used)++]=' ';memcpy(out+*used,b,nb);*used+=nb;}
+    *column+=gap+n;out[*used]=0;return 1;
+}
+int AW_WeaponKitLines(const aw_kit_row_t *row,int equippable,int width,char *out,int size){
+    static const char *labels[AW_WEAPON_KIT_STATS]={"chop","slash","thrust","speed","reach","weight","value","health",
+        "ench","armour"};
+    char head[64],type[28],id[68];int used=0,column=0,j,lines=1;
+    if(!row || !out || size<2)return -1;
+    if(width<20)width=20;
+    out[0]=0;strcpy(head,row->name);
+    if(row->count>1){
+        int n=(int)strlen(head),c=row->count;char digits[4];int d=0;
+        do{digits[d++]=(char)('0'+c%10);c/=10;}while(c && d<3);
+        head[n++]=' ';head[n++]='x';while(d)head[n++]=digits[--d];head[n]=0;
+    }
+    strcpy(type,"(");strcat(type,row->type);strcat(type,")");
+    strcpy(id,"\"");strcat(id,row->id);strcat(id,"\"");
+    if(!kit_token(out,size,&used,&column,width,head,NULL) || !kit_token(out,size,&used,&column,width,type,NULL))return -1;
+    for(j=0;j<AW_WEAPON_KIT_STATS;j++){
+        if(!strcmp(row->stat[j],"-"))continue;
+        if(!kit_token(out,size,&used,&column,width,!j && row->kind!='W'?"damage":labels[j],row->stat[j]))return -1;
+    }
+    if(!kit_token(out,size,&used,&column,width,equippable?"equip":"carry",id))return -1;
+    for(j=0;out[j];j++)if(out[j]=='\n')lines++;
+    return lines;
+}
 
 #ifndef AW_INVENTORY_RULES_ONLY
 #include "aw_ledger.h"
@@ -416,6 +510,13 @@ static int inv_block_item(char id[64],char model[64]){
        item.subtype!=8 || !item.model[0])return 0;
     strcpy(id,item.id);strcpy(model,item.model);return 1;
 }
+/* The right-hand weapon for the first-person arms (aw_hand_models.c, PLAYER-GEAR-VISUAL-59). */
+static int inv_weapon_item(int *weapon,char model[64]){
+    aw_inventory_item_t item;
+    if(!AW_InventoryEquippedItem(AW_SLOT_RIGHT,&item) || item.category!=AW_INV_WEAPON || item.weapon<=0 ||
+       !item.model[0])return 0;
+    *weapon=item.weapon;strcpy(model,item.model);return 1;
+}
 static float inv_condition(const char *id){
     int index=inv_item_index(&aw_state,id);
     return index>=0 && (aw_state.inventory.condition_known&(1U<<index))?aw_state.inventory.condition[index]:1;
@@ -525,8 +626,79 @@ static void inv_combat(aw_fighter_t *sheet){
         }
     }
 }
+/* dbg give weapons [stats] (DBG-GIVE-WEAPONS-59): the builder's kit (inventory/weapon-kit.txt), read on the command
+ * and freed after it; every row must be a catalogue item. GIVE: all of it at once or nothing, saved like any grant.
+ * Then the table, from the records' own numbers, lined up to the console width. */
+#define WEAPON_KIT_FILE "inventory/weapon-kit.txt"
+#define WEAPON_KIT_BYTES 8192
+static void weapon_kit(int give){
+    FILE *f=NULL;char *text=NULL,lines[512];aw_kit_row_t *rows=NULL;aw_inventory_item_t item;
+    /* one less than the console's width: a line that fills it exactly is followed by an empty one (Con_Print wraps
+     * at the width, then the line's own new line) */
+    int size,n,i,need,width=AW_ConsoleWidth()-1,equippable[AW_WEAPON_KIT_ROWS];
+    size=COM_FOpenFile(WEAPON_KIT_FILE,&f);
+    if(!f){Con_Printf("No weapon kit in this build's data (%s).\n",WEAPON_KIT_FILE);return;}
+    if(size<6 || size>WEAPON_KIT_BYTES || !(text=(char *)AW_TryMalloc(size)) ||
+       !(rows=(aw_kit_row_t *)AW_TryMalloc(AW_WEAPON_KIT_ROWS*sizeof(*rows))) || fread(text,1,size,f)!=(size_t)size){
+        fclose(f);free(text);free(rows);Con_Printf("Weapon kit unreadable (%s); nothing given.\n",WEAPON_KIT_FILE);return;
+    }
+    fclose(f);n=AW_WeaponKitParse(text,size,rows,AW_WEAPON_KIT_ROWS);free(text);
+    if(n<1){free(rows);Con_Printf("Weapon kit malformed (%s); nothing given.\n",WEAPON_KIT_FILE);return;}
+    for(i=0;i<n;i++){
+        if(!AW_InventoryRead(rows[i].id,&item)){
+            Con_Printf("Weapon kit refused: \"%s\" is not in the item catalogue; nothing given.\n",rows[i].id);free(rows);return;
+        }
+        equippable[i]=(item.flags&(AW_INV_EQUIP|AW_INV_EQUIP_SUPPORTED))==(AW_INV_EQUIP|AW_INV_EQUIP_SUPPORTED);
+    }
+    if(give){
+        if(!sv.active || svs.maxclients!=1){free(rows);Con_Printf("Weapon kit: start or load a game first.\n");return;}
+        need=AW_WeaponKitNeeds(&aw_state,rows,n);
+        if(!AW_WeaponKitGrant(&aw_state,rows,n)){
+            Con_Printf("Weapon kit refused: it needs %d more kinds of item, %d free of %d; nothing given.\n",
+                       need,AW_STATE_VALUES-aw_state.count[AW_ITEM],AW_STATE_VALUES);
+            free(rows);return;
+        }
+        Con_Printf("DIAGNOSTIC weapon kit given: %d items (dbg give weapons stats shows this again).\n",n);
+    }
+    Con_Printf("Weapon kit, stats from the game's records:\n");
+    for(i=0;i<n;i++){
+        if(AW_WeaponKitLines(&rows[i],equippable[i],width,lines,sizeof(lines))<1)continue;
+        Con_Printf("%s\n",lines);
+    }
+    Con_Printf("equip: aw_inventory equip \"ID\" or I; carry: not equippable yet\n");
+    free(rows);
+}
 void AW_InventoryGrantCommand(void){
     aw_inventory_item_t item;int n;
+    if(cmd_source==src_command && (Cmd_Argc()==3 || Cmd_Argc()==4) && !Q_strcasecmp(Cmd_Argv(1),"give") &&
+       !Q_strcasecmp(Cmd_Argv(2),"weapons")){
+        if(Cmd_Argc()==4 && Q_strcasecmp(Cmd_Argv(3),"stats")){Con_Printf("dbg give weapons [stats]\n");return;}
+        weapon_kit(Cmd_Argc()==3);return;
+    }
+    /* dbg inventory equip "<id>": equip a carried item as the inventory window's E does (tests of first- and
+     * third-person gear, PLAYER-GEAR-VISUAL-59); the same rules, refused when the window would refuse it. */
+    if(cmd_source==src_command && sv.active && svs.maxclients==1 && Cmd_Argc()==3 && !Q_strcasecmp(Cmd_Argv(1),"equip")){
+        if(!AW_InventoryRead(Cmd_Argv(2),&item) || AW_StateGet(&aw_state,AW_ITEM,item.id)<1 || !AW_InventoryCanEquip(&item)){
+            Con_Printf("Diagnostic inventory equip refused.\n");return;
+        }
+        AW_CombatEquipmentStore();
+        if(!AW_InventoryEquipped(&aw_state,item.id) && !AW_InventoryEquip(&aw_state,&item)){
+            Con_Printf("Diagnostic inventory equip refused.\n");return;
+        }
+        AW_CombatEquipmentChanged();Con_Printf("DIAGNOSTIC inventory equip: %s.\n",item.id);return;
+    }
+    /* aw_inventory drop "<id>" [N] (CELL-CHANGES-59 slice 2, test sessions): drop a carried item in front of the
+     * player through the inventory window's own drop (AW_InventoryDropHere: its checks, the world change list) */
+    if(cmd_source==src_command && sv.active && svs.maxclients==1 && (Cmd_Argc()==3 || Cmd_Argc()==4) &&
+       !Q_strcasecmp(Cmd_Argv(1),"drop")){
+        n=Cmd_Argc()==4?Q_atoi(Cmd_Argv(3)):1;
+        if(n<1 || !AW_InventoryRead(Cmd_Argv(2),&item) || AW_StateGet(&aw_state,AW_ITEM,item.id)<n ||
+           !AW_InventoryDropHere(&item,n)){
+            Con_Printf("Diagnostic inventory drop refused.\n");return;
+        }
+        Con_Printf("DIAGNOSTIC inventory drop: %s -%d, now %ld.\n",item.id,n,(long)AW_StateGet(&aw_state,AW_ITEM,item.id));
+        return;
+    }
     if(cmd_source!=src_command || !sv.active || svs.maxclients!=1 || Cmd_Argc()!=4 || Q_strcasecmp(Cmd_Argv(1),"grant"))return;
     n=Q_atoi(Cmd_Argv(3));
     if(n<1 || n>999 || !AW_InventoryRead(Cmd_Argv(2),&item) || !AW_ItemAdd(&aw_state,item.id,n)){
@@ -535,7 +707,7 @@ void AW_InventoryGrantCommand(void){
     Con_Printf("DIAGNOSTIC inventory grant: %s +%d, now %ld.\n",item.id,n,(long)AW_StateGet(&aw_state,AW_ITEM,item.id));
 }
 void AW_InventoryInit(void){
-    aw_combat_equipment=inv_combat;aw_combat_equipment_store=inv_store;aw_hand_block_item=inv_block_item;
+    aw_combat_equipment=inv_combat;aw_combat_equipment_store=inv_store;aw_hand_block_item=inv_block_item;aw_hand_weapon_item=inv_weapon_item;
     aw_inventory_hand_item=AW_InventoryEquippedItem;
     aw_magic_frame=AW_MagicFrame;
 }
@@ -948,7 +1120,7 @@ static int focus_read_key_id(FILE *f,long base,unsigned long rooms,unsigned long
             for(j=0;id[j];j++)if((unsigned char)id[j]<32 || (unsigned char)id[j]>126)id[0]=0;
             return 1;
         }
-        if(row[0]!='I' && row[0]!='A' && row[0]!='D')continue;
+        if(row[0]!='I' && row[0]!='A' && row[0]!='D' && row[0]!='C')continue;   /* 'C' a container (slice 3) */
         r=&focus_rows[focus_count];
         r->kind=(char)row[0];r->owned=row[1]?1:0;r->edict=0;r->reference=(unsigned)focus_u32(row+4);
         /* STEAL-PROMPT-58: the builder's action code (prepare_focus.py); an older file has 0: an item is taken */
@@ -966,15 +1138,195 @@ static int focus_read_key(FILE *f,long base,unsigned long rooms,unsigned long ke
     return focus_read_key_id(f,base,rooms,key,0,NULL);
 }
 /* Open focus.awf at its index: the file, its base and room count; NULL on a file this engine does not read. */
+/* AWF3 (CELL-CHANGES-59 slice 2): the AWF2 rows, then the owner list (placed_owner); its length for the owner list */
+static int focus_owners;static long focus_length;
 static FILE *focus_open(long *base,unsigned long *rooms){
     FILE *f=NULL;byte head[8];int length=COM_FOpenFile("focus.awf",&f);
     if(!f)return NULL;
     *base=ftell(f);
-    if(length<8 || fread(head,1,8,f)!=8 || (memcmp(head,"AWF1",4) && memcmp(head,"AWF2",4))){fclose(f);return NULL;}
-    focus_stride=head[3]=='2'?FOCUS_ROW2:FOCUS_ROW;
+    if(length<8 || fread(head,1,8,f)!=8 ||
+       (memcmp(head,"AWF1",4) && memcmp(head,"AWF2",4) && memcmp(head,"AWF3",4))){fclose(f);return NULL;}
+    focus_stride=head[3]=='2' || head[3]=='3'?FOCUS_ROW2:FOCUS_ROW;
+    focus_owners=head[3]=='3';focus_length=length;
     *rooms=focus_u32(head+4);
     if(*rooms>65535 || 8+*rooms*12>(unsigned long)length){fclose(f);return NULL;}
     return f;
+}
+/* CELL-CHANGES-59 slice 2: the owner of the placed item REFERENCE, from focus.awf's owner list (AWF3,
+ * tools/prepare_focus.py): after the rows, "AWO1" u32 n, n x {u32 reference, u16 name offset, u8 flags (bit 0: a
+ * faction), u8 0} ascending, u32 pool bytes, the pool of NUL-ended ids. OWNER gets AW_LEDGER_STOLEN_ID+1 bytes at most;
+ * 0 when the file has no list (AWF1/AWF2) or does not name the reference. Read on the take only, nothing resident. */
+static int placed_owner(unsigned reference,char *owner,int *faction){
+    FILE *f;long base,at,end;unsigned long rooms,n,pool;byte b[12];int lo,hi,mid,i,found=0;
+    owner[0]=0;*faction=0;
+    if(!(f=focus_open(&base,&rooms)))return 0;
+    end=base+focus_length;
+    if(!focus_owners || !rooms || fseek(f,base+8+(long)(rooms-1)*12,SEEK_SET) || fread(b,1,12,f)!=12){fclose(f);return 0;}
+    at=base+8+(long)rooms*12+(long)(focus_u32(b+4)+focus_u32(b+8))*FOCUS_ROW2;
+    if(at+8>end || fseek(f,at,SEEK_SET) || fread(b,1,8,f)!=8 || memcmp(b,"AWO1",4) || (n=focus_u32(b+4))>1048576 ||
+       at+8+(long)n*8+4>end){fclose(f);return 0;}
+    for(lo=0,hi=(int)n-1;lo<=hi && !found;){
+        mid=(lo+hi)/2;
+        if(fseek(f,at+8+mid*8L,SEEK_SET) || fread(b,1,8,f)!=8)break;
+        if(focus_u32(b)==reference)found=1;else if(focus_u32(b)<reference)lo=mid+1;else hi=mid-1;
+    }
+    if(found){
+        unsigned offset=(unsigned)(b[4]|(b[5]<<8));char name[AW_LEDGER_STOLEN_ID+2];
+        *faction=b[6]&1;found=0;
+        if(!fseek(f,at+8+(long)n*8,SEEK_SET) && fread(b,1,4,f)==4 && (pool=focus_u32(b))<=65536 &&
+           at+12+(long)n*8+(long)pool<=end && offset<pool && !fseek(f,at+12+(long)n*8+offset,SEEK_SET)){
+            memset(name,0,sizeof(name));
+            if(fread(name,1,sizeof(name)-1,f)>0){
+                for(i=0;i<=AW_LEDGER_STOLEN_ID && name[i] && (unsigned char)name[i]>=32 && (unsigned char)name[i]<=126;i++);
+                if(i>0 && i<=AW_LEDGER_STOLEN_ID && !name[i]){memcpy(owner,name,(size_t)i+1);found=1;}
+            }
+        }
+    }
+    fclose(f);
+    return found;
+}
+/* CELL-CHANGES-59 slice 3: a placed container's contents in the game data, from focus.awf's contents list (after the
+ * owners list; tools/prepare_focus.py "AWC1": n x {u32 reference, u32 first, u16 items, u8 flags, u8 0} ascending,
+ * u32 items, items x {char id[32], i32 count}). Read on demand (nothing resident); -1 when the file has no list or
+ * does not name REFERENCE (not a container), else the entries (at most MAX) in OUT. */
+static int container_base(unsigned reference,aw_container_item_t *out,int max,int *flags){
+    FILE *f;long base,at,end;unsigned long rooms,n,pool,items,first=0;byte b[12];int lo,hi,mid,found=0,k=-1,i,j;
+    if(flags)*flags=0;
+    if(!(f=focus_open(&base,&rooms)))return -1;
+    end=base+focus_length;
+    if(!focus_owners || !rooms || fseek(f,base+8+(long)(rooms-1)*12,SEEK_SET) || fread(b,1,12,f)!=12)goto done;
+    at=base+8+(long)rooms*12+(long)(focus_u32(b+4)+focus_u32(b+8))*FOCUS_ROW2;
+    if(at+8>end || fseek(f,at,SEEK_SET) || fread(b,1,8,f)!=8 || memcmp(b,"AWO1",4) || (n=focus_u32(b+4))>1048576 ||
+       at+12+(long)n*8>end || fseek(f,at+8+(long)n*8,SEEK_SET) || fread(b,1,4,f)!=4 || (pool=focus_u32(b))>65536)goto done;
+    at+=12+(long)n*8+(long)pool;
+    if(at+8>end || fseek(f,at,SEEK_SET) || fread(b,1,8,f)!=8 || memcmp(b,"AWC1",4) || (n=focus_u32(b+4))>1048576 ||
+       at+12+(long)n*12>end)goto done;
+    for(lo=0,hi=(int)n-1;lo<=hi && !found;){
+        mid=(lo+hi)/2;
+        if(fseek(f,at+8+mid*12L,SEEK_SET) || fread(b,1,12,f)!=12)goto done;
+        if(focus_u32(b)==reference)found=1;else if(focus_u32(b)<reference)lo=mid+1;else hi=mid-1;
+    }
+    if(!found)goto done;
+    first=focus_u32(b+4);k=b[8]|(b[9]<<8);if(flags)*flags=b[10];
+    if(fseek(f,at+8+(long)n*12,SEEK_SET) || fread(b,1,4,f)!=4 || first+k>(items=focus_u32(b)) ||
+       at+12+(long)n*12+(long)items*36>end){k=-1;goto done;}
+    if(k>max)k=max;
+    for(i=0;i<k;i++){
+        byte row[FOCUS_ID+4];
+        if(fseek(f,at+12+(long)n*12+(long)(first+i)*36,SEEK_SET) || fread(row,1,sizeof(row),f)!=sizeof(row)){k=i;break;}
+        memcpy(out[i].id,row,FOCUS_ID);out[i].id[FOCUS_ID]=0;
+        for(j=0;out[i].id[j];j++)if((unsigned char)out[i].id[j]<32 || (unsigned char)out[i].id[j]>126)out[i].id[0]=0;
+        out[i].count=(int)(int32_t)focus_u32(row+FOCUS_ID);
+    }
+done:
+    fclose(f);
+    return k;
+}
+/* the game's ids are case-blind */
+static int same_id_ci(const char *a,const char *b){
+    for(;*a && *b;a++,b++){
+        int x=(unsigned char)*a,y=(unsigned char)*b;
+        if(x>='A' && x<='Z')x+=32;
+        if(y>='A' && y<='Z')y+=32;
+        if(x!=y)return 0;
+    }
+    return *a==*b;
+}
+/* The contents now: the data's list with the world change list's deltas (an entry at 0 or below is gone), then what
+ * was put in that the data has none of. -1 when REFERENCE is no container of focus.awf. */
+int AW_ContainerContents(unsigned reference,aw_container_item_t *out,int max,int *flags){
+    int n=container_base(reference,out,max,flags),i,k,first,m;
+    if(n<0)return -1;
+    for(i=k=0;i<n;i++){
+        if(!out[i].id[0])continue;
+        out[i].count+=aw_ledger_on?AW_LedgerContentDelta(&aw_ledger,reference,out[i].id):0;
+        if(out[i].count>0)out[k++]=out[i];
+    }
+    if(!aw_ledger_on)return k;
+    m=AW_LedgerContentOf(&aw_ledger,reference,&first);
+    for(i=first;i<first+m && k<max;i++){
+        int j;const aw_ledger_content_t *c=&aw_ledger.content[i];
+        if(c->count<=0)continue;
+        for(j=0;j<n;j++)if(same_id_ci(out[j].id,c->item))break;
+        if(j<n)continue;            /* a data entry: counted above */
+        Q_strcpy_bounded(out[k].id,c->item,sizeof(out[k].id));out[k].count=c->count;k++;
+    }
+    return k;
+}
+int AW_ContainerCount(unsigned reference,const char *id){
+    aw_container_item_t items[AW_CONTAINER_ITEMS];int n=AW_ContainerContents(reference,items,AW_CONTAINER_ITEMS,NULL),i;
+    for(i=0;i<n;i++)if(same_id_ci(items[i].id,id))return items[i].count;
+    return n<0?-1:0;
+}
+/* COUNT (> 0 put in, < 0 taken out) of ID into container REFERENCE on the world change list; what was moved (taking
+ * stops at what it holds). OWNER_MARK: a take from an owned container is stolen from its owner (slice 2's pairs).
+ * The player's inventory is not touched here (the console's take and put do that). */
+int AW_ContainerChange(unsigned reference,const char *id,int count,int owner_mark){
+    int have=AW_ContainerCount(reference,id);
+    if(have<0 || !aw_ledger_on || !count || !id || !id[0])return 0;
+    if(count<0 && -count>have)count=-have;
+    if(!count)return 0;
+    AW_LedgerContentAdd(&aw_ledger,reference,id,count);
+    if(count<0 && owner_mark){
+        char owner[AW_LEDGER_STOLEN_ID+1];int faction;
+        if(placed_owner(reference,owner,&faction))AW_LedgerStolenAdd(&aw_ledger,id,owner,faction,-count);
+    }
+    return count<0?-count:count;
+}
+static int placed_target(void);
+static void focus_refresh(const edict_t *p);
+/* The container the console acts on: the aimed one, else the nearest container row of this room or cell. */
+static focus_row_t *container_row(void){
+    int i,best=placed_target();float d,nearest=1e30f,shift[3];vec3_t at,delta;edict_t *p;
+    if(best>=0 && focus_rows[best].kind=='C')return &focus_rows[best];
+    if(!sv.active || !svs.clients || !(p=svs.clients[0].edict))return NULL;
+    focus_refresh(p);
+    if(focus_outdoor)shift[0]=shift[1]=shift[2]=0;else AW_MwscriptRoomShift(shift);
+    for(best=-1,i=0;i<focus_count;i++){
+        if(focus_rows[i].kind!='C')continue;
+        VectorAdd(focus_rows[i].at,shift,at);VectorSubtract(at,p->v.origin,delta);d=DotProduct(delta,delta);
+        if(d<nearest){nearest=d;best=i;}
+    }
+    return best<0?NULL:&focus_rows[best];
+}
+/* aw_placed container [take ID [N] | put ID [N] | all] (CELL-CHANGES-59 slice 3; the container window itself is
+ * not there yet): the aimed or nearest container's contents now, a take into the inventory (owned: stolen), a put
+ * from it; all: every container delta on the world change list. */
+void AW_ContainerCommand(void){
+    const char *a=Cmd_Argc()>2?Cmd_Argv(2):"";focus_row_t *row;aw_container_item_t items[AW_CONTAINER_ITEMS];
+    int n,i,flags,count=Cmd_Argc()>4?atoi(Cmd_Argv(4)):1;
+    if(!strcmp(a,"all")){
+        Con_Printf("Container deltas on the world change list: %d\n",aw_ledger.content_count);
+        for(i=0;i<aw_ledger.content_count;i++)
+            Con_Printf("  container %u: %s %+d\n",(unsigned)aw_ledger.content[i].key,aw_ledger.content[i].item,
+                       (int)aw_ledger.content[i].count);
+        return;
+    }
+    if(!(row=container_row())){Con_Printf("aw_placed container: no container in this room or cell.\n");return;}
+    if((!strcmp(a,"take") || !strcmp(a,"put")) && Cmd_Argc()>3){
+        aw_inventory_item_t item;const char *id=Cmd_Argv(3);int moved;
+        if(count<1 || !AW_InventoryRead(id,&item)){Con_Printf("aw_placed container: %s is no item.\n",id);return;}
+        if(!strcmp(a,"take")){
+            n=AW_ContainerCount(row->reference,item.id);if(count>n)count=n;
+            if(count<1){Con_Printf("%s holds no %s.\n",row->name,item.id);return;}
+            if(!AW_ItemAdd(&aw_state,item.id,count)){Con_Printf("Cannot collect: inventory capacity.\n");return;}
+            moved=AW_ContainerChange(row->reference,item.id,-count,row->owned);
+            if(moved<count)AW_ItemAdd(&aw_state,item.id,moved-count);
+            aw_state.inventory.initialized=1;
+            Con_Printf("Took %d %s from %s (container %u)%s.\n",moved,item.id,row->name,row->reference,row->owned?", stolen":"");
+        }else{
+            if(AW_StateGet(&aw_state,AW_ITEM,item.id)<count){Con_Printf("You do not carry %d %s.\n",count,item.id);return;}
+            if(!AW_ContainerChange(row->reference,item.id,count,0)){Con_Printf("aw_placed container: not kept.\n");return;}
+            AW_ItemAdd(&aw_state,item.id,-count);
+            Con_Printf("Put %d %s into %s (container %u).\n",count,item.id,row->name,row->reference);
+        }
+        AW_CombatEquipmentChanged();
+    }
+    n=AW_ContainerContents(row->reference,items,AW_CONTAINER_ITEMS,&flags);
+    Con_Printf("Container %u, %s%s: %d kinds of item%s%s\n",row->reference,row->name,row->owned?" (owned)":"",n<0?0:n,
+               flags&1?", restocks (not yet)":"",flags&2?", a levelled list left as the data has it":"");
+    for(i=0;i<n;i++)Con_Printf("  %s %d (change %+d)\n",items[i].id,items[i].count,
+                               AW_LedgerContentDelta(&aw_ledger,row->reference,items[i].id));
 }
 /* WORLD-OBJECT-PLACEMENT-59: the items the original placed in a room or an exterior cell, drawn by reference to the
  * shared item model table (progs/items/placed.awp, tools/prepare_item_models.py pack_placed). Only focus rows the map
@@ -982,12 +1334,13 @@ static FILE *focus_open(long *base,unsigned long *rooms){
  * E and the object state (taken or disabled: not drawn) work on them as on any placed item. The list is read here
  * with the focus rows; the drawing (client entities, the per-level model room) is aw_placed.c, reached through
  * aw_placed_admit (NULL: nothing drawn, as in the tools' tests). */
-/* Map units <-> the original game's coordinates outdoors: an open-world region map, else the loaded CHIM frame. */
+/* Map units <-> the original game's coordinates outdoors: an open-world region map, else the loaded CHIM frame (the
+ * shared conversion, aw_world.c: the region table first, then the frame; CHIM-FRAME-SOURCE-CONVERSION-59). */
 static int focus_to_source(const float *local,float *game){
-    return AW_WorldToSource(sv.name,local,game) || (aw_focus_chim_source && aw_focus_chim_source(local,game));
+    return AW_WorldToSource(sv.name,local,game);
 }
 static int focus_to_local(const float *game,float *local){
-    return AW_SourceToWorld(sv.name,game,local) || (aw_focus_chim_local && aw_focus_chim_local(game,local));
+    return AW_SourceToWorld(sv.name,game,local);
 }
 /* CELL-CHANGES-59 (aw_ledger.h): the place of a map position for the world change list. Outdoors (an open-world
  * region or the loaded CHIM frame: one rule for every frame) the exterior cell and the original's game units, so any
@@ -1270,6 +1623,12 @@ static int take_row(focus_row_t *row){
     if(!placed_id(row->reference,id) || !AW_InventoryRead(id,&item))return 0;
     if(!AW_ItemAdd(&aw_state,item.id,1)){AW_UISubtitle(row->name,"Cannot collect: inventory capacity.",3);return 1;}
     if(!AW_ObjectTake(row->reference,row->owned)){AW_ItemAdd(&aw_state,item.id,-1);return 0;}
+    /* CELL-CHANGES-59 slice 2: an owned item is stolen from its owner (the reference's owner, else its faction): the
+     * pair (item, owner) on the world change list, kept wherever the item goes; the crime itself is CRIME-59 */
+    if(row->owned && aw_ledger_on){
+        char owner[AW_LEDGER_STOLEN_ID+1];int faction;
+        if(placed_owner(row->reference,owner,&faction))AW_LedgerStolenAdd(&aw_ledger,item.id,owner,faction,1);
+    }
     aw_state.inventory.initialized=1;
     AW_UIPickupNotice(row->name,3);AW_CombatEquipmentChanged();
     return 1;

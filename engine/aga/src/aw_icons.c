@@ -123,9 +123,17 @@ static void hud_track(int slot,const char *key,int x,int y,float fraction) {
     if(x<0 || y<0 || x+fill>(int)vid.width || y+t->h>(int)vid.height)return;
     for(yy=0;yy<t->h;yy++)memcpy(vid.buffer+(y+yy)*vid.rowbytes+x,t->pixels+yy*t->w,fill);
 }
+/* HUD-WEAPON-BOX-EMPTY-59: an item without its own 18 x 18 HUD picture (images up to v0.0.59-dev4 made them only for
+ * the starting closure) shows its inventory picture (inv:<id>, 16 x 16, every catalogue item has one), centred. */
+static aw_icon_t hud_fallback[2];
 static void hud_icon(int slot,const char *key,int x,int y) {
-    aw_icon_t *t=&hud_slot[slot];
-    if(AW_IconLoad(t,key) && t->w==HUD_BOX-2 && t->h==HUD_BOX-2)AW_IconDraw(t,x,y);
+    aw_icon_t *t=&hud_slot[slot],*f;char inv[72];
+    if(AW_IconLoad(t,key) && t->w==HUD_BOX-2 && t->h==HUD_BOX-2){AW_IconDraw(t,x,y);return;}
+    if(strncmp(key,"item:",5) || (slot!=SLOT_WEAPON && slot!=SLOT_MAGIC) || strlen(key)+3>=sizeof(inv))return;
+    f=&hud_fallback[slot==SLOT_MAGIC];
+    sprintf(inv,"inv:%s",key+5);
+    if(AW_IconLoad(f,inv) && f->w<=HUD_BOX-2 && f->h<=HUD_BOX-2)
+        AW_IconDraw(f,x+(HUD_BOX-2-f->w)/2,y+(HUD_BOX-2-f->h)/2);
 }
 static int hud_original_boxes(int y,int boxes) {
     aw_inventory_item_t item;char key[72];int x;

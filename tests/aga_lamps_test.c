@@ -27,9 +27,22 @@ void Cvar_RegisterVariable(cvar_t *v){v->value=atof(v->string);
     else if(!strcmp(v->name,"aw_campfires")){assert(v->value==1 && !v->archive);campfire_cvar=v;}
     else{assert(!strcmp(v->name,"aw_warm_light"));warm_cvar=v;}}
 int AW_GuardTorchNight(void){return night;}
+#ifndef AW_FRAME_MAP
 /* Local frame: original coordinates / 4, region origin (0,0,0). */
 int AW_WorldToSource(const char *name,const float *local,float *world){int k;for(k=0;k<3;k++)world[k]=local[k]*4;return 1;}
 int AW_SourceToWorld(const char *name,const float *world,float *local){int k;for(k=0;k<3;k++)local[k]=world[k]*.25f;return 1;}
+#else
+/* CHIM-FRAME-SOURCE-CONVERSION-59: the same lamps on a CHIM frame map. The real shared conversion (aw_world.c) is
+ * linked; the disk has no region table (as a MiniWind of a streamed town), so every conversion comes from the loaded
+ * frame, here a stand-in for chim_world.c's hooks: map balmora, centre 0 0 (the same numbers as the region stub). */
+#include "aw_world.h"
+extern int (*aw_world_chim_source)(const char *,const float *,float *);
+extern int (*aw_world_chim_local)(const char *,const float *,float *);
+static int frame_calls,region_asks;
+static int frame_source(const char *n,const float *l,float *w){int k;frame_calls++;if(strcmp(n,"balmora"))return 0;for(k=0;k<3;k++)w[k]=l[k]*4;return 1;}
+static int frame_local(const char *n,const float *w,float *l){int k;frame_calls++;if(strcmp(n,"balmora"))return 0;for(k=0;k<3;k++)l[k]=w[k]*.25f;return 1;}
+int AW_SceneMapSize(const char *n,char *p,int s){(void)n;if(p && s>0)p[0]=0;return -1;}
+#endif
 dlight_t *CL_AllocDlight(int key){int i;
     for(i=0;i<MAX_DLIGHTS;i++)if(cl_dlights[i].key==key){memset(&cl_dlights[i],0,sizeof cl_dlights[i]);cl_dlights[i].key=key;return &cl_dlights[i];}
     for(i=0;i<MAX_DLIGHTS;i++)if(!cl_dlights[i].key || cl_dlights[i].die<cl.time){memset(&cl_dlights[i],0,sizeof cl_dlights[i]);cl_dlights[i].key=key;return &cl_dlights[i];}
@@ -43,6 +56,9 @@ static void row_class(FILE *f,int cx,int cy,float x,float y,float z,int radius,i
 static void row(FILE *f,int cx,int cy,float x,float y,float z,int radius){row_class(f,cx,cy,x,y,z,radius,1);}
 int COM_FOpenFile(char *name,FILE **out){
     FILE *f;unsigned count=5;
+#ifdef AW_FRAME_MAP
+    if(!strcmp(name,"world/regions.awr")){region_asks++;*out=NULL;return -1;}   /* no region table on this disk */
+#endif
     if(!strcmp(name,"world/night-windows.txt")){
         static const char list[]="bm001 surface9\nbm019 surface43 glass_w surface7\r\nsn000 surface43\n";
         window_opens++;f=tmpfile();assert(f);fputs(list,f);rewind(f);*out=f;return (int)strlen(list);
@@ -70,6 +86,9 @@ static void frame(void){cl.time+=1;AW_LampUpdate();}
 void AW_RemoteInit(void){}
 void AW_FogLocationInit(void){}
 int main(void){
+#ifdef AW_FRAME_MAP
+    aw_world_chim_source=frame_source;aw_world_chim_local=frame_local;
+#endif
     AW_LampInit();assert(lamp_cvar && lamp_cvar->value==2 && lamp_cvar->archive);
     assert(window_cvar && !strcmp(window_cvar->name,"aw_night_window_lights") && window_cvar->value==1 && window_cvar->archive);
     assert(warm_cvar && warm_cvar->value==1 && warm_cvar->archive);
@@ -122,6 +141,12 @@ int main(void){
         strcpy(world.name,"maps/vf0001.bsp");cl.worldmodel=NULL;frame();cl.worldmodel=&world;frame();
         assert(window_opens==2 && r_night_window_count==0 && !r_night_windows_on);
     }
+#ifdef AW_FRAME_MAP
+    /* every conversion went through the frame (the region table was asked once and is missing) */
+    assert(region_asks==1 && frame_calls>20);
+    {float l[3]={10,0,0},w[3];strcpy(sv.name,"vf0001");assert(!AW_WorldToSource(sv.name,l,w));}  /* not the frame */
+    puts("night lamps on a CHIM frame map: the same lamps through the shared conversion");
+#endif
     puts("night lamps: per-cell table, nearest lit at night, torch radius, switches, dbg campfires, corrupt table, cache overflow, night windows");
     return 0;
 }

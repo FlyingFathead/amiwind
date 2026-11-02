@@ -95,6 +95,27 @@ int AW_InventoryEquippedWeaponType(void);
 /* The catalogue row of what a hand (AW_SLOT_RIGHT / AW_SLOT_LEFT) of the player holds, for AW_InventoryEquip's conflict
  * rule (set by AW_InventoryInit to AW_InventoryEquippedItem; NULL: no conflict rule, the pure fixtures). */
 extern int (*aw_inventory_hand_item)(int slot,aw_inventory_item_t *out);
+/* dbg give weapons (DBG-GIVE-WEAPONS-59): the weapon kit the builder chose from the game's records
+ * (inventory/weapon-kit.txt, tools/prepare_weapon_kit.py), read on the command only, nothing resident. A row: the
+ * item's catalogue id, how many, its kind (W melee, R bow or crossbow, T thrown, A arrows or bolts, S shield), a type
+ * label, its name and ten stats as the builder wrote them ("-": not for this kind): chop, slash, thrust (bow,
+ * crossbow, thrown and ammunition: chop = their damage), speed, reach, weight, value, health, enchantment points,
+ * armour. Pure rules: parse the file (rows, -1 when malformed); the new item kinds the kit needs (-1 when a count
+ * would overflow); give it all or nothing (1 given, 0 refused with the state unchanged); one row's console lines,
+ * "label value" tokens wrapped so no line is longer than WIDTH (a single token longer than WIDTH stands alone), the
+ * last token `equip "ID"` (equippable now) or `carry "ID"` (the lines, -1 when OUT is too small). AW_ConsoleWidth
+ * (aw_console.c): the console's characters per line. */
+int AW_ConsoleWidth(void);
+#define AW_WEAPON_KIT_ROWS 20
+#define AW_WEAPON_KIT_STATS 10
+typedef struct {
+    char id[64],type[24],name[48],stat[AW_WEAPON_KIT_STATS][12];
+    int count;char kind;
+} aw_kit_row_t;
+int AW_WeaponKitParse(const char *text,int length,aw_kit_row_t *rows,int max);
+int AW_WeaponKitNeeds(const aw_state_t *,const aw_kit_row_t *rows,int n);
+int AW_WeaponKitGrant(aw_state_t *,const aw_kit_row_t *rows,int n);
+int AW_WeaponKitLines(const aw_kit_row_t *row,int equippable,int width,char *out,int size);
 int AW_InventoryEquipped(const aw_state_t *,const char *id);
 int AW_InventoryEquipSlot(aw_state_t *,const aw_inventory_item_t *,int slot);
 int AW_InventoryEquip(aw_state_t *,const aw_inventory_item_t *);
@@ -153,4 +174,14 @@ int AW_PlacedRefresh(void);
 void AW_PlacedReadStats(int out[6]);
 void AW_InventorySpawn(void);
 void AW_InventoryOpen(void);
+/* CELL-CHANGES-59 slice 3: placed containers (focus.awf 'C' rows and its AWC1 contents list, read on demand) and the
+ * world change list's deltas. Contents: the data's list with the deltas, -1 for no container; Count: one id's (-1 no
+ * container); Change: COUNT in (> 0) or out (< 0) on the list, what moved (OWNER_MARK: a take is stolen from the
+ * owner); Command: aw_placed container ... */
+#define AW_CONTAINER_ITEMS 64
+typedef struct {char id[33];int count;} aw_container_item_t;
+int AW_ContainerContents(unsigned reference,aw_container_item_t *out,int max,int *flags);
+int AW_ContainerCount(unsigned reference,const char *id);
+int AW_ContainerChange(unsigned reference,const char *id,int count,int owner_mark);
+void AW_ContainerCommand(void);
 #endif

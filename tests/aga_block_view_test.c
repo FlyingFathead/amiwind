@@ -87,5 +87,23 @@ int main(int argc,char **argv){
     frame=AW_BlockPlayback(&a,&c,0,.5f,.05f);assert(frame>=a.hold && frame<8);
     for(i=0;i<5;i++)transform_case(base[i],local[i]);
     poles();
+    {   /* First-person weapons (PLAYER-GEAR-VISUAL-59): stance by weapon value, the tag table, item paths. */
+        static unsigned char w[8+3*28*24];static aw_hand_weapons_t h;int s;
+        assert(AW_HandStance(0)==-1 && AW_HandStance(1)==0 && AW_HandStance(2)==0 && AW_HandStance(4)==0 && AW_HandStance(8)==0);
+        assert(AW_HandStance(3)==1 && AW_HandStance(5)==1 && AW_HandStance(9)==1 && AW_HandStance(6)==2 && AW_HandStance(7)==2);
+        for(s=10;s<16;s++)assert(AW_HandStance(s)==-1);
+        memset(w,0,sizeof(w));memcpy(w,"AWW1",4);w[5]=3;w[7]=28;
+        put32(w+8+(2*28+27)*24,(unsigned long)(-5*65536L));put32(w+8+(2*28+27)*24+20,90*65536UL);
+        assert(AW_HandWeaponsDecode(&h,w,sizeof(w)) && h.stances==3);
+        assert(fabs(h.tag[2][27][0]+5)<.00001 && fabs(h.tag[2][27][5]-90)<.00001);
+        assert(!AW_HandWeaponsDecode(&h,w,sizeof(w)-1) && !h.stances);
+        w[7]=27;assert(!AW_HandWeaponsDecode(&h,w,sizeof(w)));w[7]=28;
+        w[5]=4;assert(!AW_HandWeaponsDecode(&h,w,sizeof(w)));w[5]=1;
+        assert(AW_HandWeaponsDecode(&h,w,8+28*24) && h.stances==1);w[5]=3;
+        put32(w+8+4,129*65536UL);assert(!AW_HandWeaponsDecode(&h,w,sizeof(w)));put32(w+8+4,0);
+        assert(AW_HandItemPath("progs/inv/steel_shield.mdl") && AW_HandItemPath("progs/items/m0123456789abcdef.mdl"));
+        assert(!AW_HandItemPath("progs/hands/nord_m.mdl") && !AW_HandItemPath("progs/items/../x.mdl") &&
+               !AW_HandItemPath("progs/items/M01.mdl") && !AW_HandItemPath("progs/items/m01.bsp") && !AW_HandItemPath(NULL));
+    }
     puts("Block metadata/timing and 1925 matrix/translation cases including both poles passed.");return 0;
 }

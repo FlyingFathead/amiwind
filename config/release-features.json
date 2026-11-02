@@ -217,7 +217,7 @@
   {
    "id": "focus",
    "builder": "chim",
-   "description": "Focus table (AWF2, v0.0.58): name, weight, value, owner and record id of every item, actor and door placed in a room, for the framed box and for taking placed items",
+   "description": "Focus table (AWF3, v0.0.59; AWF2 v0.0.58): name, weight, value, owner and record id of every item, actor and door placed in a room, for the framed box and for taking placed items, and whom an owned item is stolen from",
    "steps": ["focus", "image"],
    "image_options": ["--focus"],
    "patterns": ["id1/focus.awf"]

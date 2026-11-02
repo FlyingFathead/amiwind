@@ -317,13 +317,13 @@ def install_item_models(stage, id1):
 
 def install_focus(stage, id1):
     """Put the focus table (prepare_focus.py, FOCUS-BOX-58) into the payload: id1/focus.awf, checked against its stage
-    receipt and its AWF2 header (AWF1 from an earlier stage run still reads: no record ids, nothing to take);
+    receipt and its AWF3 header (AWF2 and AWF1 from an earlier stage run still read: no owners, then no record ids);
     hard-linked where it can be, else copied."""
     stage = Path(stage)
     receipt = json.loads((stage/'focus-receipt.json').read_text(encoding='utf-8'))
     source = stage/'id1'/'focus.awf'
     raw = source.read_bytes()
-    if hashlib.sha256(raw).hexdigest() != receipt.get('sha256') or raw[:4] not in (b'AWF1', b'AWF2'):
+    if hashlib.sha256(raw).hexdigest() != receipt.get('sha256') or raw[:4] not in (b'AWF1', b'AWF2', b'AWF3'):
         raise ValueError(f'Focus table differs from its stage receipt: {source}')
     target = Path(id1)/'focus.awf'
     if target.exists():
@@ -2143,11 +2143,9 @@ def image(args):
         shutil.rmtree(halloween_stage,ignore_errors=True);halloween_stage.mkdir(parents=True)
         print('Halloween scene: the cast (skeletons, dancers, Dagoth Ur) on their animation tables...',flush=True)
         halloween_job=Background(halloween_cast.stage_cast,args.data_files,boot/'id1',halloween_stage,jobs,jobs=jobs)
-    # The player's view (docs/THIRD_PERSON.md): the camera and death-scene game settings, and the player's body per
-    # playable race and sex for third person (--player-body on|off, tools/prepare_player_view.py). It writes only
-    # view/settings.txt and progs/body/ and reads the game data and the palette: a spawned worker beside the combat
-    # data (combat/, sound/combat/, arena/), with its own worker pool (BUILD-IMAGE-FINALIZE-UNDERUSED-48: 8.4 s on one
-    # core after the combat data in the v0.0.54-dev1 magic MiniWind). One job: here, as before.
+    # The player's view (docs/THIRD_PERSON.md): camera and death-scene settings, the bodies (--player-body on|off,
+    # tools/prepare_player_view.py) in a spawned worker beside the combat data (BUILD-IMAGE-FINALIZE-UNDERUSED-48),
+    # then the first-person arm parts (tools/prepare_player_fp_parts.py image_step).
     from prepare_player_view import prepare_image as prepare_player_view_image
     print('Converting the player view data (camera settings, player bodies)...',flush=True)
     view_job=Background(prepare_player_view_image,args.data_files,boot/'id1',jobs,
@@ -2161,6 +2159,8 @@ def image(args):
     (out/'combat-data.json').write_text(json.dumps(combat_report,indent=2)+'\n',encoding='utf-8',newline='\n')
     view_report=view_job.result()
     (out/'player-view.json').write_text(json.dumps(view_report,indent=2)+'\n',encoding='utf-8',newline='\n')
+    if not getattr(args,'no_player_body',False):
+        from prepare_player_fp_parts import image_step;image_step(args.data_files,boot/'id1',out,jobs)
     from prepare_inventory import prepare as prepare_inventory
     print('Converting original inventory metadata and selected item resources...',flush=True)
     # The item model table (ITEM-WORLD-MODELS-58): every item's world model from its own stage, installed first so

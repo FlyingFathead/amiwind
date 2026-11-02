@@ -95,12 +95,14 @@ class PlacedItemTests(unittest.TestCase):
         source = (ROOT / 'engine/aga/src/aw_inventory.c').read_text(encoding='utf-8')
         body = re.search(r'static void focus_refresh\(const edict_t \*p\)\{(.*?)\n\}', source, re.S).group(1)
         self.assertIn('if(!focus_outdoor && focus_to_source(p->v.origin,game)){focus_load();return;}', body)
-        # and a CHIM frame map counts as outdoors (the open-world region table has no entry for it)
-        self.assertIn('aw_focus_chim_source && aw_focus_chim_source(local,game)', source)
+        # and a CHIM frame map counts as outdoors (the open-world region table has no entry for it): through the shared
+        # conversion, which asks the loaded frame after the region table (CHIM-FRAME-SOURCE-CONVERSION-59)
+        convert = source.split('static int focus_to_source', 1)[1].split('\n}', 1)[0]
+        self.assertIn('return AW_WorldToSource(sv.name,local,game);', convert)
         world = (ROOT / 'engine/aga/src/chim/chim_world.c').read_text(encoding='utf-8')
-        self.assertIn('aw_focus_chim_source = Source;', world)
-        self.assertIn('aw_focus_chim_local = Local;', world)
-        self.assertNotIn('AW_WorldToSource(sv.name', source.split('static int focus_to_source', 1)[1].split('\n}', 1)[1])
+        self.assertIn('aw_world_chim_source = FrameSource;', world)
+        self.assertIn('aw_world_chim_local = FrameLocal;', world)
+        self.assertNotIn('aw_focus_chim', source)
         self.assertIn('outdoor=AW_PlacedRefresh();', (ROOT / 'engine/aga/src/aw_placed.c').read_text(encoding='utf-8'))
 
     def test_alias_angles_turn_the_model_as_the_placement(self):

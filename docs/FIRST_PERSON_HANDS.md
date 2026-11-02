@@ -1,6 +1,6 @@
 # First-person geometry and sprite experiment
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.59-dev1 (1 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -17,6 +17,7 @@ _Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 - [Connected surfaces before a smaller triangle budget](#connected-surfaces-before-a-smaller-triangle-budget)
 - [Detailed-model depth arithmetic candidate](#detailed-model-depth-arithmetic-candidate)
 - [Investigation: first-person hands rendered as sprites](#investigation-first-person-hands-rendered-as-sprites)
+- [The equipped weapon in first person (v0.0.59)](#the-equipped-weapon-in-first-person-v0059)
 
 <!-- contents end -->
 
@@ -360,3 +361,26 @@ RC1. Continue the current connected-mesh and animation acceptance checks.
 - Preserve the mesh profile for A/B and rollback. Choose a default only after
   native standing, walking, punching and torch tests across supported race/sex
   combinations. Sprite conversion has not yet been implemented or validated.
+
+## The equipped weapon in first person (v0.0.59)
+
+The hand catalogue stage now also bakes, for every race and sex, one arms model
+per weapon stance of the original first-person animation: one-handed
+(`<hands>_1h.mdl`: short blades, one-handed long blades, blunt weapons and axes),
+two-handed close (`_2c.mdl`: two-handed long blades, blunt weapons and axes) and
+two-handed wide (`_2w.mdl`: staffs, warhammers and spears). Each keeps the bare
+hands' 28-frame contract (idle 8, draw 6, lower 4, swing 10), so the hand state
+machine is unchanged. One table, `gfx/hand-weapons.aww`, holds the Weapon Bone
+placement for every stance and frame.
+
+When the player has a melee weapon equipped in the right hand, the engine shows
+that stance's arms instead of the bare hands and draws the weapon's own model
+(the one shared model of its mesh) on the Weapon Bone: one extra model, only
+while armed. Bows, crossbows and thrown weapons keep the bare hands for now. The
+arms and the weapon model are loaded only while that weapon is equipped; if a
+file is missing the bare hands stay, with one console line. The first-person
+shield block also accepts the shared item models.
+
+The cost is measured with `dbg rcount`: the line's `hd` field is the time of the
+first-person view model per frame (hands, torch, shield or weapon), compared at a
+fixed pose with the bare hands and the same view armed.

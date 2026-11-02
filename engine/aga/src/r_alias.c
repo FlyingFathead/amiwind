@@ -412,13 +412,14 @@ void R_AliasSetUpTransform (int trivial_accept)
     angles[YAW] = currententity->angles[YAW];
     AngleVectors (angles, alias_forward, alias_right, alias_up);
 
-    tmatrix[0][0] = pmdl->scale[0] * R_SpriteEntityScale(currententity);
-    tmatrix[1][1] = pmdl->scale[1] * R_SpriteEntityScale(currententity);
-    tmatrix[2][2] = pmdl->scale[2] * R_SpriteEntityScale(currententity);
+    /* per axis: a model's x y z may take a scale each (the assembled player body's weight and height) */
+    tmatrix[0][0] = pmdl->scale[0] * R_AliasAxisScale(currententity, 0);
+    tmatrix[1][1] = pmdl->scale[1] * R_AliasAxisScale(currententity, 1);
+    tmatrix[2][2] = pmdl->scale[2] * R_AliasAxisScale(currententity, 2);
 
-    tmatrix[0][3] = pmdl->scale_origin[0] * R_SpriteEntityScale(currententity);
-    tmatrix[1][3] = pmdl->scale_origin[1] * R_SpriteEntityScale(currententity);
-    tmatrix[2][3] = pmdl->scale_origin[2] * R_SpriteEntityScale(currententity);
+    tmatrix[0][3] = pmdl->scale_origin[0] * R_AliasAxisScale(currententity, 0);
+    tmatrix[1][3] = pmdl->scale_origin[1] * R_AliasAxisScale(currententity, 1);
+    tmatrix[2][3] = pmdl->scale_origin[2] * R_AliasAxisScale(currententity, 2);
 
 // TODO: can do this with simple matrix rearrangement
 
@@ -449,9 +450,13 @@ void R_AliasSetUpTransform (int trivial_accept)
     R_ConcatTransforms (viewmatrix, rotationmatrix, aliastransform);
 
     aw_fist_clip_scale = 1.0f;
-    if (currententity == &cl.viewent && pmdl->numframes == 28 &&
-        (!strcmp(currententity->model->name, "progs/v_nord.mdl") ||
-         !strncmp(currententity->model->name, "progs/hands/", 12)))
+    /* the hands' near clip: the baked arms (28 frames) and the arms from parts (skeletal: aw_view.c, the only
+     * skeletal models drawn as the view model) */
+    if (currententity == &cl.viewent &&
+        ((pmdl->numframes == 28 &&
+          (!strcmp(currententity->model->name, "progs/v_nord.mdl") ||
+           !strncmp(currententity->model->name, "progs/hands/", 12))) ||
+         (paliashdr && paliashdr->aw_skel)))
     {
         int row, column;
         aw_fist_clip_scale = 4.0f;
@@ -762,6 +767,11 @@ static aw_posed_t	aw_posed_kept[AW_POSE_CACHE];
 static aw_posed_t	*aw_posed = aw_posed_kept;
 static int			aw_pose_slots = AW_POSE_CACHE, aw_pose_grown;
 static unsigned		aw_pose_clock;	/* counts the cache's uses (its own: no renderer state needed) */
+/* the table, key and layers of the bones R_AliasSkelFrame posed last (its static world); cleared with the cache, as
+ * the tables are given back with it (a table loaded again at the same address is never taken for the old one) */
+static const aw_skel_table_t	*posed_table;
+static int			posed_key, posed_roots[AW_SKEL_LAYERS];
+static float		posed_layers[AW_SKEL_LAYERS];
 int	aw_pose_hits, aw_pose_misses;	/* frames drawn from the cache and posed: for a measurement or a dbg line */
 
 static int R_AliasSkelFrame (void)
@@ -807,8 +817,18 @@ static int R_AliasSkelFrame (void)
     rest = (trivertx_t *)((byte *)paliashdr + paliashdr->frames[0].frame);
     {
         double t0;				/* the posing's two halves timed for dbg rcount (its "kp" field) */
+        /* the bones of the last pose kept: the assembled player body's parts (aw_player_parts.h) are several models
+         * on one table at one frame, so the bones are posed once for all of them, only the vertices per part */
         AW_RT_BEGIN(t0);
-        AW_SkelPoseLayers (table, (float)frame, AW_SKEL_LAYERS, layers, roots, world);
+        if (table != posed_table || key != posed_key || memcmp (roots, posed_roots, sizeof(posed_roots)) ||
+            memcmp (layers, posed_layers, sizeof(posed_layers)))
+        {
+            AW_SkelPoseLayers (table, (float)frame, AW_SKEL_LAYERS, layers, roots, world);
+            posed_table = table;
+            posed_key = key;
+            memcpy (posed_roots, roots, sizeof(posed_roots));
+            memcpy (posed_layers, layers, sizeof(posed_layers));
+        }
         AW_RT_END(RT_SKELPOSE, t0);
         AW_RT_BEGIN(t0);
         AW_SkelPoseVerts (block.data, &rest[0].lightnormalindex, sizeof(trivertx_t), pmdl->numverts, block.rest_scale,
@@ -850,6 +870,7 @@ unsigned long R_AliasPoseCacheRelease (void)
         aw_pose_slots = AW_POSE_CACHE;
     }
     aw_pose_grown = 0;			/* asked again at the next skeletal draw, when memory allows */
+    posed_table = NULL;			/* the bones posed last belong to a table being given back */
     memset (aw_posed_kept, 0, sizeof(aw_posed_kept));	/* their models are flushed: no slot may match a new one */
     return given;
 }

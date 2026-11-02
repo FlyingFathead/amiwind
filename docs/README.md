@@ -1,6 +1,6 @@
 # AmiWind documentation
 
-_Generated from `docs/README.topics.json` with AmiWind v0.0.59-dev4._
+_Generated from `docs/README.topics.json` with AmiWind v0.0.59-dev5._
 
 Every document of the project, by topic, with the version and date of its last update. A document marked "needs a refresh" predates the current state of its subject and is due for a review; its facts may be out of date. Release notes and whitespace baselines are listed in [releases](releases/README.md); one-off records and replaced documents in [history](history/README.md).
 
@@ -72,7 +72,7 @@ Every document of the project, by topic, with the version and date of its last u
 | [EXPERIMENTAL_FLAGS.md](EXPERIMENTAL_FLAGS.md) | Experimental flags | v0.0.56 (30 October 2026) |
 | [CRASH_REPORTING.md](CRASH_REPORTING.md) | Fatal error reports | v0.0.28 (4 October 2026), needs a refresh |
 | [DEBUG_OVERLAYS.md](DEBUG_OVERLAYS.md) | Development overlays | v0.0.57-dev3 (30 October 2026) |
-| [AMIWIND_CONSOLE_COMMANDS.md](AMIWIND_CONSOLE_COMMANDS.md) | AmiWind console commands | generated (v0.0.59-dev4) |
+| [AMIWIND_CONSOLE_COMMANDS.md](AMIWIND_CONSOLE_COMMANDS.md) | AmiWind console commands | generated (v0.0.59-dev5) |
 | [MEMORY_ALLOCATION.md](MEMORY_ALLOCATION.md) | Memory allocation and heap clearance | v0.0.42-dev1 (17 October 2026), needs a refresh |
 | [HEAP_WATCHER.md](HEAP_WATCHER.md) | Heap watcher: build estimates and complete scene lifecycles | v0.0.42-dev1 (17 October 2026), needs a refresh |
 | [COLLISION_MESHES.md](COLLISION_MESHES.md) | Morrowind collision meshes: where they are and how AmiWind uses them | v0.0.54 (27 October 2026) |
@@ -82,8 +82,8 @@ Every document of the project, by topic, with the version and date of its last u
 | [STAIR_RAMP_WALKABILITY.md](STAIR_RAMP_WALKABILITY.md) | Recurring stair failure: authored ramps below the walkable-floor cutoff | v0.0.42-dev1 (17 October 2026), needs a refresh |
 | [TRANSLATION_LAYER.md](TRANSLATION_LAYER.md) | AmiWind: host conversion and native runtime | v0.0.42-dev1 (17 October 2026), needs a refresh |
 | [MWSCRIPT_BYTECODE.md](MWSCRIPT_BYTECODE.md) | MWScript compiled by the builder | v0.0.57 (31 October 2026) |
-| [SAVEGAME_PLAN.md](SAVEGAME_PLAN.md) | Save/load milestone: compact state and a manageable save list | v0.0.57-dev1 (30 October 2026), needs a refresh |
-| [PERSISTENCE_AND_STREAMING.md](PERSISTENCE_AND_STREAMING.md) | Proposed approach: persistent world state and disk loading | v0.0.42-dev1 (17 October 2026), needs a refresh |
+| [SAVEGAME_PLAN.md](SAVEGAME_PLAN.md) | Save/load milestone: compact state and a manageable save list | v0.0.59-dev4 (2 November 2026), needs a refresh |
+| [PERSISTENCE_AND_STREAMING.md](PERSISTENCE_AND_STREAMING.md) | Proposed approach: persistent world state and disk loading | v0.0.59-dev4 (2 November 2026), needs a refresh |
 | [DATA_STREAMING.md](DATA_STREAMING.md) | Data streaming: how AmiWind loads the world today | v0.0.32-dev1 (8 October 2026), needs a refresh |
 | [NODE_RESIDENCY.md](NODE_RESIDENCY.md) | Renderer nodes and point-collision nodes | v0.0.30 (7 October 2026), needs a refresh |
 | [OPENMW_BAKER.md](OPENMW_BAKER.md) | OpenMW as the host-side character baker | v? (28 September 2026), needs a refresh |
@@ -162,13 +162,13 @@ Every document of the project, by topic, with the version and date of its last u
 | [NPC_GROUND_CONTACT.md](NPC_GROUND_CONTACT.md) | Initial NPC placement and ground-contact workflow | v0.0.48-rc1 (23 October 2026) |
 | [NPC_MODEL_CACHE.md](NPC_MODEL_CACHE.md) | Persistent NPC model conversion cache | v0.0.54-dev1 (27 October 2026) |
 | [NPC_PATHFINDING.md](NPC_PATHFINDING.md) | NPC pathfinding: how NPCs find their way | v0.0.57-dev1 (30 October 2026) |
-| [FIRST_PERSON_HANDS.md](FIRST_PERSON_HANDS.md) | First-person geometry and sprite experiment | v0.0.42-dev1 (17 October 2026), needs a refresh |
-| [THIRD_PERSON.md](THIRD_PERSON.md) | Third person, vanity camera and the death scene | v0.0.48-dev2 (22 October 2026) |
+| [FIRST_PERSON_HANDS.md](FIRST_PERSON_HANDS.md) | First-person geometry and sprite experiment | v0.0.59-dev1 (1 November 2026), needs a refresh |
+| [THIRD_PERSON.md](THIRD_PERSON.md) | Third person, vanity camera and the death scene | v0.0.59-dev4 (2 November 2026) |
 | [PLAYER_MOVEMENT.md](PLAYER_MOVEMENT.md) | Player scale, collision and camera motion | v0.0.48-dev2 (23 October 2026) |
 | [MOVEMENT_SPEED_STUDY.md](MOVEMENT_SPEED_STUDY.md) | Movement speed study | v0.0.48-dev2 (23 October 2026) |
-| [COMBAT.md](COMBAT.md) | Combat and the Vivec Arena minigame | v0.0.58-dev2 (31 October 2026) |
+| [COMBAT.md](COMBAT.md) | Combat and the Vivec Arena minigame | v0.0.59-dev4 (2 November 2026) |
 | [MAGIC_EFFECTS.md](MAGIC_EFFECTS.md) | Magic effects | v0.0.54-dev1 (27 October 2026) |
-| [INVENTORY.md](INVENTORY.md) | Inventory | v0.0.59-dev1 (1 November 2026) |
+| [INVENTORY.md](INVENTORY.md) | Inventory | v0.0.59-dev4 (2 November 2026) |
 | [HUNTER_STUDY.md](HUNTER_STUDY.md) | Hunter as an optimization study | v0.0.42-dev1 (17 October 2026), needs a refresh |
 | [FACE_VALIDATION.md](FACE_VALIDATION.md) | Face validation | v0.0.32-dev1 (8 October 2026), needs a refresh |
 | [MESH_TIPS_AND_TRICKS.md](MESH_TIPS_AND_TRICKS.md) | Mesh tips and tricks: expensive scenery | v0.0.42-dev1 (17 October 2026), needs a refresh |
@@ -177,14 +177,14 @@ Every document of the project, by topic, with the version and date of its last u
 
 | Document | Title | Last updated |
 | --- | --- | --- |
-| [AUDIO.md](AUDIO.md) | Streamed music and speech | v0.0.58 (31 October 2026) |
+| [AUDIO.md](AUDIO.md) | Streamed music and speech | v0.0.59-dev4 (2 November 2026) |
 | [NPC_VOICE_TABLE.md](NPC_VOICE_TABLE.md) | NPC voice table (AWGL1) | v0.0.58 (31 October 2026) |
 | [VOICED_DIALOGUE.md](VOICED_DIALOGUE.md) | Voiced dialogue: event lookup and runtime plan | v0.0.48-dev2 (23 October 2026) |
 | [DIALOGUE_AND_WAIT.md](DIALOGUE_AND_WAIT.md) | Dialogue, character confirmation and waiting — v0.0.23-dev4 | v0.0.36 (11 October 2026), needs a refresh |
 | [DIALOGUE_DESIGN.md](DIALOGUE_DESIGN.md) | Dialogue: design (topics, conditions, choices, disposition, journal) | v0.0.58-dev3 (1 November 2026) |
-| [DIALOGUE_FEATURES.md](DIALOGUE_FEATURES.md) | Dialogue features | v0.0.59-dev4 (31 October 2026) |
+| [DIALOGUE_FEATURES.md](DIALOGUE_FEATURES.md) | Dialogue features | v0.0.59-dev5 (31 October 2026) |
 | [dialogue-features.json](dialogue-features.json) | dialogue-features.json | data file |
-| [VOICE_FEATURES.md](VOICE_FEATURES.md) | Voices and sounds | v0.0.58-dev3 (31 October 2026) |
+| [VOICE_FEATURES.md](VOICE_FEATURES.md) | Voices and sounds | v0.0.59-dev4 (2 November 2026) |
 | [voice-features.json](voice-features.json) | voice-features.json | data file |
 | [DIALOGUE_LOOKUPS.md](DIALOGUE_LOOKUPS.md) | Ordered voice-record lookup export | v0.0.42-dev1 (17 October 2026), needs a refresh |
 | [WAIT_AND_REST.md](WAIT_AND_REST.md) | Waiting and resting: the original's rules | v0.0.42-dev1 (17 October 2026), needs a refresh |
@@ -233,7 +233,7 @@ Every document of the project, by topic, with the version and date of its last u
 
 | Document | Title | Last updated |
 | --- | --- | --- |
-| [BUGS.md](BUGS.md) | Bug register | generated (v0.0.59-dev4) |
+| [BUGS.md](BUGS.md) | Bug register | generated (v0.0.59-dev5) |
 | [BUG_JOURNAL.md](BUG_JOURNAL.md) | Bug journal | v0.0.48-dev2 (23 October 2026) |
 
 ## Releases
@@ -241,7 +241,7 @@ Every document of the project, by topic, with the version and date of its last u
 | Document | Title | Last updated |
 | --- | --- | --- |
 | [CHANGELOG.md](CHANGELOG.md) | Changelog | v0.0.58 (1 November 2026) |
-| [ROADMAP.md](ROADMAP.md) | Roadmap and implementation options | v0.0.58 (1 November 2026) |
+| [ROADMAP.md](ROADMAP.md) | Roadmap and implementation options | v0.0.59-dev4 (2 November 2026) |
 | [RELEASE_WORKFLOW.md](RELEASE_WORKFLOW.md) | AmiWind release workflow | v0.0.54 (28 October 2026) |
 | [CI.md](CI.md) | Build audit and the local pipeline | v0.0.54 (27 October 2026) |
 | [CI_DRY_RUN.md](CI_DRY_RUN.md) | Asset-free compilation and boot image | v0.0.54 (27 October 2026) |

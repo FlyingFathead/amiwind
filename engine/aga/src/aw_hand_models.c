@@ -102,6 +102,41 @@ void AW_BlockCompose(const float base_origin[3],const float base_angles[3],const
         }else angles[2]=(float)(Q_atan2(m[1][2],m[2][2])*57.29577951308232);
     }else {angles[1]=(float)(Q_atan2(-m[1][0],m[1][1])*57.29577951308232);angles[2]=0;}
 }
+int AW_HandStance(int weapon) {
+    /* weapon = 1 + the WEAP type: short blade 0, long blade 1, blunt 3 and axe 7 are one-handed; long blade 2,
+     * blunt 4 and axe 8 two-handed close; blunt 5 and spear 6 two-handed wide (the original's idle1h/idle2c/idle2w). */
+    switch(weapon){
+    case 1:case 2:case 4:case 8:return 0;
+    case 3:case 5:case 9:return 1;
+    case 6:case 7:return 2;
+    }
+    return -1;
+}
+int AW_HandWeaponsDecode(aw_hand_weapons_t *out,const unsigned char *raw,int size) {
+    aw_hand_weapons_t t;int s,f,j;const unsigned char *p;
+    if(!out)return 0;
+    memset(out,0,sizeof(*out));memset(&t,0,sizeof(t));
+    if(!raw || size<8 || memcmp(raw,"AWW1",4) || raw[4] || raw[6] || raw[7]!=AW_HAND_WEAPON_FRAMES)return 0;
+    t.stances=raw[5];
+    if(t.stances<1 || t.stances>AW_HAND_STANCES || size!=8+t.stances*AW_HAND_WEAPON_FRAMES*24)return 0;
+    for(s=0;s<t.stances;s++)for(f=0;f<AW_HAND_WEAPON_FRAMES;f++){
+        p=raw+8+(s*AW_HAND_WEAPON_FRAMES+f)*24;
+        for(j=0;j<6;j++){
+            t.tag[s][f][j]=(float)(int)block_u32(p+j*4)/65536.0f;
+            if(fabs(t.tag[s][f][j])>(j<3?128.0f:720.0f))return 0;
+        }
+    }
+    *out=t;return 1;
+}
+int AW_HandItemPath(const char *s) {
+    int i,n=0,prefix;
+    if(!s)return 0;
+    while(n<64 && s[n])n++;
+    prefix=!strncmp(s,"progs/inv/",10)?10:!strncmp(s,"progs/items/",12)?12:0;
+    if(!prefix || n<prefix+5 || n>=64 || strstr(s,"..") || strcmp(s+n-4,".mdl"))return 0;
+    for(i=0;i<n;i++)if(!((s[i]>='a' && s[i]<='z') || (s[i]>='0' && s[i]<='9') || s[i]=='_' || s[i]=='/' || s[i]=='.'))return 0;
+    return 1;
+}
 
 #ifndef AW_BLOCK_HOST_TEST
 #include "quakedef.h"
@@ -110,6 +145,7 @@ void AW_BlockCompose(const float base_origin[3],const float base_angles[3],const
 #include "aw_torch.h"
 #include "aw_combat.h"
 static void block_reset(void);
+static void weapon_reset(void);
 static int probe_frames(const char *,int);
 
 #define MAX_HAND_APPEARANCES 32
@@ -122,7 +158,7 @@ static model_t *hand_model,*torch_model;
 void AW_HandModelsReset(void)
 {
     selected=-2;pair_valid=0;hand_model=torch_model=NULL;AW_TorchUseHandAssets(0);
-    block_reset();
+    block_reset();weapon_reset();
 }
 
 /* Optional first-person guard: the same alias renderer and depth as the hands,
@@ -137,12 +173,9 @@ static void block_reset(void) {
     block_loaded=block_bad=block_visible=0;block_index=-1;block_arms=block_item=NULL;
     block_id[0]=block_path[0]=0;memset(&block_clock,0,sizeof(block_clock));
 }
-static int block_equipment_path(const char *s) {
-    int i,n=0;while(n<64 && s[n])n++;
-    if(n<18 || n>=64 || strncmp(s,"progs/inv/",10) || strstr(s,"..") || strcmp(s+n-4,".mdl"))return 0;
-    for(i=0;i<n;i++)if(!((s[i]>='a' && s[i]<='z') || (s[i]>='0' && s[i]<='9') || s[i]=='_' || s[i]=='/' || s[i]=='.'))return 0;
-    return 1;
-}
+/* The equipped shield's model: the inventory's own (progs/inv/) or, since the item model table
+ * (ITEM-WORLD-MODELS-58), the one shared model of its mesh (progs/items/). */
+static int block_equipment_path(const char *s) {return AW_HandItemPath(s);}
 int AW_HandBlockApply(void) {
 #if !AMIWIND_SPRITE_HANDS
     char id[64]={0},path[64]={0};const char *race="nord";int female=0,i,index=-1,mark;
@@ -278,11 +311,88 @@ static int probe_frames(const char *name,int frames)
        little32(header+68)==(unsigned int)frames;
     fclose(file);return ok;
 }
+/* First-person weapons (aw_hand_models.h): the stance arms of the selected appearance and the equipped weapon's own
+ * model, both loaded only while that weapon is equipped; a missing or invalid file falls back to the bare hands once,
+ * with one console line. */
+int (*aw_hand_weapon_item)(int *weapon,char model[64]);
+/* The first-person arms from parts (aw_view.c hand_parts_apply, PLAYER-GEAR-VISUAL-59): NULL in fixtures without it. */
+int (*aw_hand_parts_apply)(const char *race,int female,int stance,int frame);
+static aw_hand_weapons_t weapon_data;
+static model_t *stance_model,*weapon_model;
+/* the view model the weapon rides this frame (the stance arms, or the first part of the arms from parts) and the
+ * first frame of its stance (0 for the stance arms; the stance's row of the first-person table for the parts) */
+static model_t *weapon_base;
+static int weapon_frame_base;
+static int weapon_loaded,weapon_bad,weapon_visible,weapon_stance=-1;
+static int weapon_arms=-1;    /* the stance arms' file: -1 not probed yet, 0 missing, 1 there */
+static char stance_path[64],weapon_path[64];
+static void weapon_reset(void) {
+    weapon_loaded=weapon_bad=weapon_visible=0;weapon_stance=weapon_arms=-1;stance_model=weapon_model=weapon_base=NULL;
+    stance_path[0]=weapon_path[0]=0;weapon_frame_base=0;
+}
+/* WITH_ARMS 1: the stance arms of the appearance and the weapon (the baked arms); 0: the weapon alone (the arms from
+ * parts pose the stance themselves). 1 = the weapon is shown. */
+static int hand_weapon(int index,int with_arms) {
+    static const char *suffix[AW_HAND_STANCES]={"_1h.mdl","_2c.mdl","_2w.mdl"};
+    char path[64]={0},arms[64];int weapon=0,stance,n,mark;byte *raw;
+    weapon_visible=0;
+    if(!aw_hand_weapon_item || !aw_hand_weapon_item(&weapon,path) || !memchr(path,0,sizeof(path)) ||
+       (stance=AW_HandStance(weapon))<0 || !AW_HandItemPath(path))return 0;
+    if(!weapon_loaded){
+        weapon_loaded=1;mark=Hunk_LowMark();raw=COM_LoadHunkFile("gfx/hand-weapons.aww");
+        if(!AW_HandWeaponsDecode(&weapon_data,raw,com_filesize)){
+            weapon_data.stances=0;Con_Printf("First-person weapon assets unavailable; showing the bare hands.\n");
+        }
+        Hunk_FreeToLowMark(mark);
+    }
+    if(stance>=weapon_data.stances)return 0;
+    n=(int)strlen(appearances[index].hand);
+    if(n<5 || n-4+7>=(int)sizeof(arms))return 0;
+    memcpy(arms,appearances[index].hand,n-4);strcpy(arms+n-4,suffix[stance]);
+    if(stance!=weapon_stance || strcmp(arms,stance_path) || strcmp(path,weapon_path)){
+        if(stance_model && stance_path[0])release_owned(stance_model,stance_path);
+        weapon_stance=stance;strcpy(stance_path,arms);strcpy(weapon_path,path);stance_model=weapon_model=NULL;
+        weapon_arms=-1;                       /* the stance arms' file: probed when first wanted */
+        weapon_bad=!probe_frames(path,1);
+        if(weapon_bad)Con_Printf("First-person arms or the equipped weapon's model unavailable; showing the bare hands.\n");
+    }
+    if(weapon_bad)return 0;
+    if(with_arms && weapon_arms<0){
+        weapon_arms=probe_frames(arms,AW_HAND_WEAPON_FRAMES);
+        if(!weapon_arms)Con_Printf("First-person arms or the equipped weapon's model unavailable; showing the bare hands.\n");
+    }
+    if(with_arms && !weapon_arms)return 0;
+    if(with_arms && !stance_model){
+        if(!Mod_CanFindName(arms)){weapon_bad=1;Con_Printf("First-person weapon model slots unavailable; showing the bare hands.\n");return 0;}
+        stance_model=Mod_ForName(arms,false);
+    }
+    if(!weapon_model){
+        if(!Mod_CanFindName(path)){weapon_bad=1;Con_Printf("First-person weapon model slots unavailable; showing the bare hands.\n");return 0;}
+        weapon_model=Mod_ForName(path,false);
+    }
+    if((with_arms && (!stance_model || stance_model->type!=mod_alias || stance_model->numframes!=AW_HAND_WEAPON_FRAMES ||
+                      strcmp(stance_model->name,arms))) ||
+       !weapon_model || weapon_model->type!=mod_alias || weapon_model->numframes!=1 || strcmp(weapon_model->name,path)){
+        weapon_bad=1;Con_Printf("Invalid first-person weapon model; showing the bare hands.\n");return 0;
+    }
+    weapon_visible=1;return 1;
+}
+int AW_HandWeaponItemApply(void) {
+    float origin[3],angles[3];int frame=cl.viewent.frame-weapon_frame_base;
+    if(!weapon_visible || !weapon_model || weapon_stance<0 || weapon_stance>=weapon_data.stances || !weapon_base ||
+       cl.viewent.model!=weapon_base)return 0;
+    if(frame<0)frame=0;
+    if(frame>=AW_HAND_WEAPON_FRAMES)frame=AW_HAND_WEAPON_FRAMES-1;
+    AW_BlockCompose(cl.viewent.origin,cl.viewent.angles,weapon_data.tag[weapon_stance][frame],origin,angles);
+    cl.viewent.model=weapon_model;cl.viewent.frame=0;
+    VectorCopy(origin,cl.viewent.origin);VectorCopy(angles,cl.viewent.angles);return 1;
+}
 int AW_HandModelsApply(void)
 {
 #if !AMIWIND_SPRITE_HANDS
     const char *race="nord",*path;int female=0,index=-1,i,equipped,frames;
     model_t **wanted,*base=cl.viewent.model;
+    weapon_visible=0;weapon_base=NULL;weapon_frame_base=0;
     AW_TorchUseHandAssets(0);
     if(!appearance_count || !base)return 0;
     /* Do not replace an actual weapon or other custom viewmodel. */
@@ -298,6 +408,8 @@ int AW_HandModelsApply(void)
             release_owned(hand_model,appearances[selected].hand);
             release_owned(torch_model,appearances[selected].torch);
         }
+        if(stance_model && stance_path[0])release_owned(stance_model,stance_path);
+        weapon_stance=-1;stance_model=weapon_model=NULL;stance_path[0]=weapon_path[0]=0;weapon_bad=0;
         selected=index;hand_model=torch_model=NULL;pair_valid=0;
         if(index>=0){
             pair_valid=probe_frames(appearances[index].hand,28) &&
@@ -308,6 +420,23 @@ int AW_HandModelsApply(void)
     }
     if(!pair_valid || index<0)return 0;
     equipped=AW_TorchEquipped();frames=equipped?8:28;
+    /* The arms from parts (PLAYER-GEAR-VISUAL-59, aw_view.c): what the hands wear, at the stance of the drawn weapon
+     * (the weapon alone loads here: the parts pose the stance). Unavailable or aw_hand_parts 0: the baked arms below,
+     * the previous method. The carried torch keeps its baked arms. */
+    if(!equipped && aw_hand_parts_apply){
+        int armed=hand_weapon(index,0),stance=armed?weapon_stance+1:0,frame=cl.viewent.frame;
+        if(aw_hand_parts_apply(race,female,stance,frame)){
+            if(armed){weapon_base=cl.viewent.model;weapon_frame_base=stance*AW_HAND_WEAPON_FRAMES;}
+            AW_TorchUseHandAssets(1);release_owned(base,"progs/v_nord.mdl");AW_TorchReleaseLegacyCache();
+            return 1;
+        }
+        weapon_visible=0;
+    }
+    if(!equipped && hand_weapon(index,1)){
+        cl.viewent.model=stance_model;weapon_base=stance_model;AW_TorchUseHandAssets(1);
+        release_owned(base,"progs/v_nord.mdl");AW_TorchReleaseLegacyCache();
+        return 1;
+    }
     path=equipped?appearances[index].torch:appearances[index].hand;
     wanted=equipped?&torch_model:&hand_model;
     if(*wanted && (strcmp((*wanted)->name,path) || (*wanted)->type!=mod_alias ||

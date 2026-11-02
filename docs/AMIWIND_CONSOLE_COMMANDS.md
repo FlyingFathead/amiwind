@@ -1,6 +1,6 @@
 # AmiWind console commands
 
-_Generated from `config/debug-commands.txt` with AmiWind v0.0.59-dev4._
+_Generated from `config/debug-commands.txt` with AmiWind v0.0.59-dev5._
 
 Open the console with F10 or the backquote key and type
 a command, for example `dbg headlamp on`. This page is generated from
@@ -27,6 +27,7 @@ Type: "dbg help" for help.
 | `dbg music custom` | - | [play / stop; no argument: status] the custom OST player (an image built with --custom-ost FILE): play your own track alone, the playlist and its auto-advance waiting; stop gives the playlist back; without a custom track: silence, never the OST |
 | `dbg mwscript` | `dbg mwscript status` | [on/off, true/false or 1/0; no argument: what it does] (default on, saved) the game's compiled scripts (docs/MWSCRIPT_BYTECODE.md): sounds, NPC lines, music cues, journal, globals, object state, AIWander; not-yet functions logged once. Answers with the file (id1/mwscript.awm: format, scripts, bytes kept) and the counts |
 | `dbg ost play` | - | 00..98 / original music filename stem (spaces as underscores) |
+| `dbg sound` | - | [MOMENT [N] / list] a sound event on the actor aimed at, else you:hello idle intruder thief hit attack flee alarm taunt pain swish miss armorhit block damage critical punch punch2 bowdraw bowshoot crossbowdraw crossbowshoot throw projectilehit cast spellhit spellfail knockdown death creatureattack roar moan scream land; N: class, school, size |
 
 ## Video
 
@@ -74,9 +75,9 @@ Type: "dbg help" for help.
 | `dbg creatures` | - | [on/off, true/false or 1/0; no argument: status] the outdoor creatures (default on; not saved): off removes the wild creatures alive (their state kept) and spawns none, to compare frame rate, memory and behaviour; on brings them back as their cells join again |
 | `dbg daycycle gallery` | - | [here/off] (eight-stage camera tour; here keeps this view; Esc returns) |
 | `dbg demowind` | - | [on / off / next / prev / effect 1-2 / dist 0-7 / status] DemoWind (docs/DEMOWIND.md): the effects test kit, fullscreen, no world; each effect with its ms a frame and bytes on screen; Left/Right effect, Up/Down distance to Red Mountain, Esc off |
+| `dbg give weapons` | `dbg inventory grant` | [stats] a kit of the game's own weapons, one of every type (blades, blunt, staff, spear, axes, bow, crossbow, thrown, arrows, bolts) and a light and a heavy shield, given at once and saved like any grant, with each one's stats from its record; stats: the table only (docs/INVENTORY.md) |
 | `dbg halloween` | - | [dagoth / skeletons / bench [skeletons] / fps on/off / camera wide/director / stop / status] Halloween scene (docs/HALLOWEEN.md, an image with the cast): skeletons, Desele's dancers, Dagoth Ur dance on the beat; dagoth (default) or skeletons alone; bench: the standard benchmark, one result line |
 | `dbg halloweentest` | - | [same words as halloween] the Halloween scene with the FPS counter on (bottom left) |
-| `dbg inventory grant` | - | <quoted source item ID> <1..999> explicit diagnostic grant of actual catalogue items (not saved defaults) |
 | `dbg lightgallery` | - | [off] lighting switches at this spot in a strip below the view: night mode, tint, lamps, glow, headlamp, horizon veil, time preview; arrows change, Esc done |
 | `dbg nightgallery` | - | [here/off] (23:00 wide view, Masser, Secunda, stars; Esc returns) |
 | `dbg set playerrace` | `dbg set race` | [ID / NAME / list] zero-based race list; switch appearance in place; retain gender/class/name/equipment/level/stats; choose valid head and hair |

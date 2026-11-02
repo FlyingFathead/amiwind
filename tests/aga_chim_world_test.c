@@ -211,8 +211,10 @@ void AW_UISubtitle(const char *name,const char *text,double duration){strncpy(su
 int (*aw_chim_view_reach)(void);
 /* aw_hud.c: original coordinates on the active frame (the debug HUD's GLOBAL row and cell). */
 int (*aw_chim_source)(const float *local,float *world);
-int (*aw_focus_chim_source)(const float *local,float *game);   /* aw_inventory.c (placed items on a frame map) */
-int (*aw_focus_chim_local)(const float *game,float *local);
+/* aw_world.c: the shared conversion's frame half (CHIM-FRAME-SOURCE-CONVERSION-59) */
+int (*aw_world_chim_source)(const char *name,const float *local,float *world);
+int (*aw_world_chim_local)(const char *name,const float *world,float *local);
+int (*aw_world_chim_contains)(const char *name,const float *local);
 /* aw_scene.c: a crossing into another frame's cell streams (type 1 crossings, CHIM's window). */
 int (*aw_chim_cross)(const float *origin,int *cx,int *cy);
 int (*aw_chim_recentre)(int cx,int cy,const float *d,int apply);
@@ -479,6 +481,7 @@ static void legacy(void){
     reset_engine();Chim_Init();
     assert(!aw_chim_map_begin && !aw_chim_link && !aw_chim_clip && !aw_chim_player && !aw_chim_map_end);
     assert(!aw_chim_frozen && !aw_chim_spawn && !aw_chim_rcount && !aw_chim_town_map && !aw_chim_source && !aw_chim_pick);
+    assert(!aw_world_chim_source && !aw_world_chim_local && !aw_world_chim_contains);  /* the region table alone */
     begin_map(frame_map);frame_at(0,0,40);
     assert(!Chim_Active() && low==0 && opens==0);
     printf("legacy ok\n");
@@ -490,6 +493,11 @@ static void inactive(void){
     assert(aw_chim_pick);
     assert(aw_chim_frozen && aw_chim_spawn && aw_chim_rcount && aw_chim_town_map && aw_chim_source);
     {float l[3]={1,2,3},w[3];assert(!aw_chim_source(l,w));} /* no frame map yet */
+    {   /* the shared conversion's frame half: set, and silent before any frame map */
+        float l[3]={1,2,3},w[3];assert(aw_world_chim_source && aw_world_chim_local && aw_world_chim_contains);
+        assert(!aw_world_chim_source("chimtest",l,w) && !aw_world_chim_local("chimtest",l,w) &&
+               !aw_world_chim_contains("chimtest",l));
+    }
     {   /* A town runs as its CHIM frame map when maps/<town>-chim.bsp exists. */
         FILE *f;mkdir("maps",0777);f=fopen("maps/balmora-chim.bsp","wb");assert(f);fputs("x",f);fclose(f);
         assert(!strcmp(aw_chim_town_map("balmora"),"maps/balmora-chim.bsp"));
@@ -530,6 +538,21 @@ static void ring(void){
         float l[3]={10,-3.5f,5},w[3];
         assert(aw_chim_source(l,w));
         assert(w[0]==40+chim_frame.frame.centre[0] && w[1]==-14+chim_frame.frame.centre[1] && w[2]==20);
+    }
+    {   /* CHIM-FRAME-SOURCE-CONVERSION-59: the shared conversion's frame half answers for this frame map only, both
+         * ways (one the inverse of the other), finite numbers only, inside the chunk grid only. */
+        float l[3]={10,-3.5f,5},w[3],back[3],far[3]={1e6f,0,0},bad[3]={0,0,NAN},edge[3];
+        assert(aw_world_chim_source("chimtest",l,w));
+        assert(w[0]==40+chim_frame.frame.centre[0] && w[1]==-14+chim_frame.frame.centre[1] && w[2]==20);
+        assert(aw_world_chim_local("chimtest",w,back) && back[0]==l[0] && back[1]==l[1] && back[2]==l[2]);
+        assert(!aw_world_chim_source("vf0000",l,w) && !aw_world_chim_local("seyda",w,back));  /* another map */
+        assert(!aw_world_chim_source(NULL,l,w) && !aw_world_chim_source("chimtest",bad,w) &&
+               !aw_world_chim_local("chimtest",bad,back));
+        assert(aw_world_chim_contains("chimtest",l) && !aw_world_chim_contains("chimtest",far));
+        assert(!aw_world_chim_contains("vf0000",l) && !aw_world_chim_contains("chimtest",bad));
+        edge[0]=chim_frame.frame.low[0]+10;edge[1]=0;edge[2]=0;assert(!aw_world_chim_contains("chimtest",edge));
+        edge[0]=chim_frame.frame.low[0]+30;assert(aw_world_chim_contains("chimtest",edge));
+        printf("frame conversion ok\n");
     }
     /* Prime: the whole ring is loaded before the first frame. */
     frame_at(64,64,40);
@@ -753,6 +776,7 @@ static void ring(void){
         assert(s.banks==0 && s.blocks==0);
     }
     assert(!Chim_Active());
+    {float l[3]={10,-3.5f,5},w[3];assert(!aw_world_chim_source("chimtest",l,w) && !aw_world_chim_contains("chimtest",l));}
     printf("ring ok\n");
 }
 

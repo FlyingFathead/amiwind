@@ -1251,9 +1251,28 @@ def ground_grid(lo, hi, ground):
     return lo, step
 
 
+def weld_shared(frames, faces, uv, skin):
+    """One vertex for every set of vertices equal in every frame (the shape-tag frame included, so two shapes never
+    share one) and in texture coordinate; the triangles keep their order and winding. A model's vertex is posed once
+    per frame however many triangles use it (FP-ARMS-PARTS-COST-59). Returns (frames, faces, uv, skin)."""
+    frames = np.asarray(frames, float)
+    uv = np.asarray(uv)
+    nf, nv, _ = frames.shape
+    keyed = np.concatenate((frames.transpose(1, 0, 2).reshape(nv, nf * 3), np.asarray(uv, float)), axis=1)
+    keyed = keyed + 0.0     # negative zero equals zero
+    _, first, inverse = np.unique(keyed, axis=0, return_index=True, return_inverse=True)
+    inverse = np.asarray(inverse).reshape(-1)
+    # the kept vertices in their first use's order (a stable model for the same input)
+    order = np.argsort(first, kind='stable')
+    rank = np.empty(len(order), int)
+    rank[order] = np.arange(len(order))
+    keep = first[order]
+    return frames[:, keep], rank[inverse][np.asarray(faces)], uv[keep], skin
+
+
 def skeletal_from_shapes(shapes, materials, textures, palette, sources, rest_world, actor_scale, table_bytes,
                          bone_names, table_path=SKEL_TABLE_PATH, budgets=RESIDENT_BUDGETS, every=BOX_EVERY,
-                         vertex_limit=SKEL_VERTEX_LIMIT, parents=None, **bake_args):
+                         vertex_limit=SKEL_VERTEX_LIMIT, parents=None, topology='reduced', **bake_args):
     """A skeletal model from an appearance assembled as today's resident (npc_geometry.assemble at its sample
     times, frame 0 the rest pose) and the same appearance's export_actor shapes. The reduction and atlas are
     npc_geometry.bake's, unchanged, on the same inputs, down the resident budget ladder; one frame is added to its
@@ -1262,8 +1281,13 @@ def skeletal_from_shapes(shapes, materials, textures, palette, sources, rest_wor
     pure translation, so the added frame minus frame 0 names the shape; reference_frames keeps the face quotas of
     the frames without it. The box: the model's vertices posed at box_frames of the table and scaled by the actor.
     parents: the skeleton's {node: parent}; given, a shape on nodes the table lacks rides their nearest kept
-    ancestors (onto_kept: the stick figure). Returns (MDL bytes, report)."""
+    ancestors (onto_kept: the stick figure). topology 'source' (the first-person arm parts, FP-ARMS-PARTS-COST-59):
+    no reduction and no face tiles; the authored vertices and texture coordinates in a repeated-texture atlas
+    (hand_geometry.bake_source_hands, as the baked arms), then welded (weld_shared), so a vertex is posed once
+    however many triangles use it. Returns (MDL bytes, report)."""
     from npc_geometry import bake
+    if topology not in ('reduced', 'source'):
+        raise ValueError('Unknown skeletal topology %r' % (topology,))
     if len(sources) != len(shapes):
         raise ValueError('export_actor and assemble disagree on the shapes (%d, %d)' % (len(sources), len(shapes)))
     actor_scale = np.asarray(actor_scale, float)
@@ -1275,13 +1299,19 @@ def skeletal_from_shapes(shapes, materials, textures, palette, sources, rest_wor
         rest = shape['positions'][0]
         tagged.append({**shape, 'positions': np.concatenate((shape['positions'],
                                                               (rest + [(k + 1) * SHAPE_TAG, 0, 0])[None]))})
-    # a whole hair may take a resident past 666 faces: the stream reader takes it (SKEL-VERTEX-LIMIT-52)
-    bake_args.setdefault('whole_limit', SKEL_FACE_LIMIT)
+    if topology == 'source':
+        from hand_geometry import bake_source_hands
+        frames, faces, uv, skin_image = weld_shared(*bake_source_hands(tagged, materials, textures, palette))
+        budget = None
+        ladder = []
+    else:
+        # a whole hair may take a resident past 666 faces: the stream reader takes it (SKEL-VERTEX-LIMIT-52)
+        bake_args.setdefault('whole_limit', SKEL_FACE_LIMIT)
+        ladder = [(b, bake_args['whole_limit']) for b in budgets]
+        if bake_args['whole_limit']:
+            ladder += [(b, 0) for b in budgets]
     # the ladder with the whole hair first; an outfit that fits no budget with it goes down the ladder again with the
     # hair's whole only within the standard face limit (npc_geometry._budget_quotas)
-    ladder = [(b, bake_args['whole_limit']) for b in budgets]
-    if bake_args['whole_limit']:
-        ladder += [(b, 0) for b in budgets]
     for step, (budget, whole) in enumerate(ladder):
         bake_args['whole_limit'] = whole
         try:
@@ -1335,7 +1365,7 @@ def skeletal_from_shapes(shapes, materials, textures, palette, sources, rest_wor
                         step / actor_scale)
     model = skeletal_mdl(rest_model, faces, uv, skin_image, lo, step, block, vertex_limit)
     return model, {'vertices': len(rest), 'faces': len(faces), 'bytes': len(model), 'block_bytes': len(block),
-                   'budget': budget, 'box_frames': len(picked), 'box_lo': lo.tolist(), 'box_step': step.tolist(),
+                   'budget': budget, 'topology': topology, 'box_frames': len(picked), 'box_lo': lo.tolist(), 'box_step': step.tolist(),
                    'kept_vertices': int(np.sum(distance < 1e-4)), 'moved_vertices': int(np.sum(distance >= 1e-4)),
                    'largest_move': float(distance.max()), 'joint_vertices': int(np.sum(second >= 0)),
                    'shape_of': shape_of, 'distance': distance, 'nearest': nearest, 'rest_model': rest_model}

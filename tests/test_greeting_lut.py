@@ -371,6 +371,37 @@ class SoundTable(unittest.TestCase):
         self.assertEqual((heavy[0], heavy[1], heavy[3]), (bytes(8), 0, 0))   # not converted: no file, not mapped
         self.assertEqual(self.sound_report['soun_mapped'], 2)
 
+    def test_coverage_line_names_unmapped_moments_slots_and_soun_rows(self):
+        # VOICE-COVERAGE-58: every creature moment, named sound and SOUN row without a sound is named in the line
+        c = self.report['coverage']
+        self.assertIn('rat:SWIM_LEFT', c['moments_unmapped'])
+        self.assertEqual(len(c['moments_unmapped']), self.sound_report['moments_none'])
+        self.assertIn('MISS', c['slots_unmapped'])
+        self.assertIn('ALTERATION_CAST', c['slots_unmapped'])          # the fixture has no school sounds
+        self.assertEqual(c['soun_total'], 7)
+        self.assertEqual(len(c['soun_unmapped']), 7 - self.sound_report['soun_mapped'])
+        self.assertIn('heavy armor hit', [s.casefold() for s in c['soun_unmapped']])
+        line = G.coverage_line(c)
+        self.assertIn('moments unmapped: ', line)
+        self.assertIn('rat:SWIM_LEFT', line)
+        self.assertIn('named sounds unmapped: ', line)
+        self.assertIn('SOUN rows 2/7 mapped, unmapped: ', line)
+        # without a media catalogue the SOUN rows are counted, not judged
+        sound, lengths = sound_fixture(media=False)
+        _raw, report = G.build(kinds(), TOPICS, sound=sound, lengths=lengths)
+        self.assertIsNone(report['coverage']['soun_unmapped'])
+        self.assertIn('SOUN rows: 7, not judged (no media catalogue)', G.coverage_line(report['coverage']))
+
+    def test_school_and_critical_slots(self):
+        # the sound events of casting (v0.0.60) read these named slots: each school's cast, hit and failure
+        names = [s for s, _ in G.SOUND_SLOTS]
+        for school in G.SPELL_SCHOOLS:
+            k = names.index('%s_CAST' % school.upper())
+            self.assertEqual(names[k:k + 3], ['%s_%s' % (school.upper(), p) for p in ('CAST', 'HIT', 'FAIL')])
+        self.assertEqual(dict(G.SOUND_SLOTS)['CRITICAL_DAMAGE'], 'critical damage')
+        self.assertEqual(dict(G.SOUND_SLOTS)['DESTRUCTION_FAIL'], 'Spell Failure Destruction')
+        self.assertIn('alarm', G.KNOWN_VOICE_TOPICS)
+
     def test_sound_rows_carry_length_and_mapped(self):
         named = dict(zip((s for s, _ in G.SOUND_SLOTS), self.t['slots']))
         _hash, centis, flags = self.t['sound_rows'][named['WEAPON_SWISH']]

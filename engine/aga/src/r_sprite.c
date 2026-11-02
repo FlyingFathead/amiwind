@@ -136,9 +136,25 @@ R_SetupAndDrawSprite
 float R_SpriteEntityScale(const entity_t *ent)
 {
     /* Existing dynamic and legacy entities are zero-initialized. */
-    return ent && ent->model && (ent->model->type == mod_sprite ||
+    float s = ent && ent->model && (ent->model->type == mod_sprite ||
            (ent->model->type == mod_alias && (ent->effects & AW_EF_ALIAS_SCALE))) &&
            ent->aw_sprite_scale > 0 ? ent->aw_sprite_scale : 1;
+    /* a height scale of its own (the assembled player body): the larger of the two, so a cull or a box on this one
+     * number still holds the whole model */
+    if (ent && ent->model && ent->model->type == mod_alias && (ent->effects & AW_EF_ALIAS_SCALE) &&
+        ent->aw_alias_zscale > s)
+        s = ent->aw_alias_zscale;
+    return s;
+}
+
+float R_AliasAxisScale(const entity_t *ent, int axis)
+{
+    float s = ent && ent->model && ent->model->type == mod_alias && (ent->effects & AW_EF_ALIAS_SCALE) &&
+              ent->aw_sprite_scale > 0 ? ent->aw_sprite_scale : 1;
+    if (axis == 2 && ent && ent->model && ent->model->type == mod_alias && (ent->effects & AW_EF_ALIAS_SCALE) &&
+        ent->aw_alias_zscale > 0)
+        s = ent->aw_alias_zscale;
+    return s;
 }
 
 float R_SpriteDepthScale(const entity_t *ent, float dist, float width)

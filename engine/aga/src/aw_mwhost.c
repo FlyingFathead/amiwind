@@ -402,6 +402,11 @@ static void ledger_place(aw_ledger_row_t *r){
     int at;int32_t where;
     if(sv_player && AW_PlacedWhere(sv_player->v.origin,&at,&where,NULL))AW_LedgerSetPlace(&aw_ledger,r,at,where);
 }
+/* a reference's own lock level in the game data (a door's; 0 unlocked or not known, at most 100) */
+static int ledger_data_lock(uint32_t ref){
+    int level=AW_HingedDoorOriginalLock(ref);
+    return level<=0?0:level>100?100:level;
+}
 static int32_t ledger_object(uint32_t ref,int op,int32_t value){
     aw_ledger_row_t *r=ledger_row(ref);
     switch(op){
@@ -421,13 +426,16 @@ static int32_t ledger_object(uint32_t ref,int op,int32_t value){
         return r && (r->fields&AW_LEDGER_DISABLED);       /* OpenMW: a taken reference is not "disabled" */
     case AWM_LOCK:
         if(!(r=AW_LedgerPut(&aw_ledger,ref))){ledger_refused++;return 0;}
-        if(value<0)value=r->last_lock?r->last_lock:100;
+        /* Lock without a level: the level it had last, else its own level in the game data, else 100 */
+        if(value<0)value=r->last_lock?r->last_lock:ledger_data_lock(ref)>0?ledger_data_lock(ref):100;
         if(value>100)value=100;
         r->fields|=AW_LEDGER_LOCK;r->lock=(uint8_t)value;if(value)r->last_lock=(uint8_t)value;
         return 0;
     case AWM_UNLOCK:
         if(!(r=AW_LedgerPut(&aw_ledger,ref))){ledger_refused++;return 0;}
+        /* the level is kept for a later Lock (OpenMW 0.51 CellRef::unlock keeps it): the list's, else the game data's */
         if((r->fields&AW_LEDGER_LOCK) && r->lock)r->last_lock=r->lock;
+        else if(!(r->fields&AW_LEDGER_LOCK) && ledger_data_lock(ref)>0)r->last_lock=(uint8_t)ledger_data_lock(ref);
         r->fields|=AW_LEDGER_LOCK;r->lock=0;
         return 0;
     }
@@ -484,20 +492,66 @@ static void ledger_import(const aw_changes_t *in){
 }
 /* aw_placed ledger and aw_mwscript_status: the world change list's rows by field, its resident bytes */
 void AW_MwscriptLedgerStatus(void){
-    int i,n[7]={0,0,0,0,0,0,0};
+    int i,n[8]={0,0,0,0,0,0,0,0};
     for(i=0;i<aw_ledger.count;i++){
         unsigned f=aw_ledger.row[i].fields;int k;
-        for(k=0;k<7;k++)if(f&(1U<<k))n[k]++;
+        for(k=0;k<8;k++)if(f&(1U<<k))n[k]++;
     }
-    Con_Printf("world change list %s: %d rows (taken %d, disabled %d, locks %d, stolen %d, moved %d, drops %d), "
-               "%lu bytes resident, %lu refused; this map hid %d edicts (%lu in the session, %lu not kept)\n",
-               aw_ledger_on?"on":"off (the fixed tables)",aw_ledger.count,n[0],n[1],n[2],n[3],n[4],n[5],
-               AW_LedgerResident(&aw_ledger)+(unsigned long)hidden_capacity*sizeof(hidden_t),
+    Con_Printf("world change list %s: %d rows (taken %d, disabled %d, locks %d, stolen %d, moved %d, drops %d, "
+               "open doors %d), %d stolen pairs, %lu bytes resident, %lu refused; this map hid %d edicts (%lu in the "
+               "session, %lu not kept)\n",
+               aw_ledger_on?"on":"off (the fixed tables)",aw_ledger.count,n[0],n[1],n[2],n[3],n[4],n[5],n[7],
+               aw_ledger.stolen_count,AW_LedgerResident(&aw_ledger)+(unsigned long)hidden_capacity*sizeof(hidden_t),
                aw_ledger.refused,hidden_count,ledger_hidden,ledger_refused);
+    /* slice 2: the locks and open doors of the list, and the stolen pairs (item, owner, count), the first 16 each */
+    for(i=0,n[0]=0;i<aw_ledger.count && n[0]<16;i++){
+        const aw_ledger_row_t *r=&aw_ledger.row[i];
+        if(!(r->fields&(AW_LEDGER_LOCK|AW_LEDGER_OPEN)))continue;
+        n[0]++;
+        if(r->fields&AW_LEDGER_LOCK)
+            Con_Printf("  ref %lu %s lock %d (last %d)%s\n",(unsigned long)r->key,r->lock?"locked":"unlocked",(int)r->lock,
+                       (int)r->last_lock,(r->fields&AW_LEDGER_OPEN)?" open":"");
+        else Con_Printf("  ref %lu door open\n",(unsigned long)r->key);
+    }
+    for(i=0;i<aw_ledger.stolen_count && i<16;i++)
+        Con_Printf("  stolen %s from %s%s: %ld\n",aw_ledger.stolen[i].item,aw_ledger.stolen[i].faction?"faction ":"",
+                   aw_ledger.stolen[i].owner,(long)aw_ledger.stolen[i].count);
 }
+/* CELL-CHANGES-59 slice 2: a hinged door's pose on the world change list (aw_hinged_door.c through aw_door_open). SET
+ * 1: it opens (the use turns it open), 0: it closes (the row goes when nothing else is on it), -1: asks, 1 when the
+ * list holds it open. The use's direction is recorded at the use, so a save taken while it turns keeps where it goes
+ * (OpenMW 0.51 keeps a door's state on its reference). With the list off (the old method) no door pose is kept: -1. */
+static int door_open(unsigned reference,int set){
+    aw_ledger_row_t *r;
+    if(!aw_ledger_on || !reference || reference>0xFFFFFFu)return -1;
+    r=ledger_row(reference);
+    if(set<0)return r && (r->fields&AW_LEDGER_OPEN)?1:0;
+    if(set){
+        if(r && (r->fields&AW_LEDGER_OPEN))return 1;
+        if(!(r=AW_LedgerPut(&aw_ledger,reference))){ledger_refused++;return 0;}
+        r->fields|=AW_LEDGER_OPEN;ledger_place(r);
+        return 1;
+    }
+    if(r && (r->fields&AW_LEDGER_OPEN)){r->fields&=~AW_LEDGER_OPEN;AW_LedgerTidy(&aw_ledger,reference);}
+    return 0;
+}
+static int32_t object_op(uint32_t ref,int op,int32_t value);
 static int32_t host_object(int instance,int target,int op,int32_t value){
-    uint32_t ref=target_reference(instance,target);object_t *o;
+    uint32_t ref=target_reference(instance,target);
     if(!ref)return 0;
+    return object_op(ref,op,value);
+}
+/* CELL-CHANGES-59 slice 2: a lock change that is not a script's own line (aw_hinged_door.c through aw_object_lock):
+ * the player's key opening a lock (OpenMW 0.51 mwclass/door.cpp and container.cpp: the key unlocks the reference, its
+ * level kept for a later Lock), and the console's Lock / Unlock on the door under the crosshair. LOCK 1: Lock LEVEL
+ * (-1: the level it had last); 0: Unlock. The same path as a script's, so it is kept and saved the same way. */
+int AW_ObjectLock(unsigned reference,int lock,int level){
+    if(!reference || reference>0xFFFFFFu)return 0;
+    object_op(reference,lock?AWM_LOCK:AWM_UNLOCK,lock?level:0);
+    return 1;
+}
+static int32_t object_op(uint32_t ref,int op,int32_t value){
+    object_t *o;
     if(aw_ledger_on && op!=AWM_ACTIVATE && op!=AWM_GETLOCKED)return ledger_object(ref,op,value);
     switch(op){
     case AWM_ENABLE:
@@ -793,6 +847,21 @@ static void folded_item_id(int item,char *out,int capacity){
 static int32_t host_item(int instance,int target,int verb,int item,int32_t count){
     edict_t *e;aw_actor_t *a=actor_of(instance,target,&e);aw_item_t it;
     actor_calls++;
+    if(!a && target>=0 && aw_ledger_on){
+        /* CELL-CHANGES-59 slice 3: a placed container (OpenMW 0.51 containerextensions.cpp OpAddItem, OpRemoveItem,
+         * OpGetItemCount on a container's store): its data contents with the world change list's deltas; RemoveItem
+         * takes up to what it holds; kept and saved. A script's change is never theft. */
+        uint32_t ref=AW_MwvmObjectReference(target);char id[64];int have;
+        folded_item_id(item,id,sizeof(id));
+        if(ref && id[0] && (have=AW_ContainerCount(ref,id))>=0){
+            if(count<0)count=(int32_t)(uint16_t)count;
+            if(verb==1 || verb==2){
+                if(count)AW_ContainerChange(ref,id,verb==1?count:-count,0);
+                AW_MwvmStateChanged();have=AW_ContainerCount(ref,id);
+            }
+            return have<0?0:have;
+        }
+    }
     if(!a){actor_misses++;return 0;}
     if(verb && (!AW_ActorItem(item,&it) || it.kind==AWK_UNKNOWN))return 0;   /* an id no record has (OpenMW: refused) */
     if(a->reference==AW_ACTOR_PLAYER_REF){
@@ -1064,6 +1133,27 @@ static int same_id(const char *a,const char *b){
     for(;*a && *b;a++,b++)if(tolower((unsigned char)*a)!=tolower((unsigned char)*b))return 0;
     return *a==*b;
 }
+/* RaiseRank (RAISE 1) / LowerRank on NPC record A (see AWF_RAISERANK below): the rank now, -1 nothing to change (no
+ * NPC, the player, no faction, LowerRank at 0), -2 not kept */
+static int npc_rank_change(aw_actor_t *a,int raise){
+    aw_actor_base_t b;int now,rank;
+    if(!aw_ledger_on || !a || a->reference==AW_ACTOR_PLAYER_REF || !AW_ActorBase(a->base,&b) || b.kind!=0 ||
+       b.faction==AW_ACTOR_NONE)return -1;
+    now=AW_LedgerRank(&aw_ledger,a->reference);
+    if(raise)rank=(now>=0?now:b.rank)+1;
+    else if(now==0)return -1;
+    else rank=now>0?now-1:(b.rank-1>0?b.rank-1:0);
+    if(rank>AW_LEDGER_RANK_TOP)rank=AW_LEDGER_RANK_TOP;
+    return AW_LedgerRankSet(&aw_ledger,a->reference,rank)?rank:-2;
+}
+/* The rank the world change list keeps for the NPC of edict E (RaiseRank / LowerRank), -1 none: the dialogue's speaker
+ * rank (aw_glut.c AW_GlutSpeaker) */
+int AW_MwscriptNpcRank(edict_t *e);
+int AW_MwscriptNpcRank(edict_t *e){
+    eval_t *v;
+    if(!e || e->free || !aw_ledger_on || !(v=GetEdictFieldValue(e,"aw_ref")) || v->_float<=0)return -1;
+    return AW_LedgerRank(&aw_ledger,(uint32_t)v->_float);
+}
 /* the dialogue window's Choice and Goodbye (aw_dialwin.c sets it while a result script runs): TEXTS NULL = Goodbye */
 void (*aw_dial_result_choice)(const char **texts,int ntexts,const aw_mwcell_t *numbers,int count);
 void (*aw_dial_result_clear)(void);
@@ -1101,6 +1191,16 @@ static int host_call(int instance,int target,int function,const aw_mwcell_t *num
         else if(function==AWF_PCJOINFACTION)AW_StandingJoin(faction);
         else AW_StandingSetExpelled(faction,function==AWF_PCEXPELL);
         AW_MwvmStateChanged();return 1;
+    case AWF_RAISERANK:case AWF_LOWERRANK:{
+        /* RaiseRank / LowerRank on an NPC (OpenMW 0.51 statsextensions.cpp OpRaiseRank, OpLowerRank): the NPC's rank in
+         * its own faction; nothing on the player or a factionless NPC; a rank changed before goes on from there, else
+         * from its record's; LowerRank stops at 0, RaiseRank has no top (the saved byte has: AW_LEDGER_RANK_TOP). Kept
+         * on the world change list by the NPC's reference (CELL-CHANGES-59), saved; the dialogue reads it. */
+        edict_t *e;aw_actor_t *a=target==AW_MWVM_PLAYER?NULL:actor_of(instance,target,&e);
+        int r=npc_rank_change(a,function==AWF_RAISERANK);
+        if(r==-2){Con_DPrintf("MWScript: an NPC rank not kept (list full)\n");return 0;}
+        if(r<0){standing_misses++;return 1;}
+        standing_calls++;AW_MwvmStateChanged();return 1;}
     case AWF_GETPCFACREP:case AWF_SETPCFACREP:case AWF_MODPCFACREP:
         faction=call_string(strings,nstrings,0);
         if(!faction)faction=actor_faction(instance,target,own,sizeof(own));
@@ -1545,6 +1645,9 @@ static void attach_map(void){
     FILE *f=NULL;int length,i,k,nroom=0,anchored=0;long base,room;uint32_t offset,rows,bytes,r;unsigned char row[24];
     vec3_t local,shift;float source[3];edict_t *e;int outdoors;
     AW_MwvmBeginMap();
+    /* Room or outdoors: outdoors when the shared conversion (aw_world.c) knows this map, a region map or, since
+     * CHIM-FRAME-SOURCE-CONVERSION-59, the loaded CHIM frame map (a streamed town counts as outdoors, its placements
+     * and GetPCCell by the original's exterior cells); a room map (compiled or a CHIM room) has neither. */
     {float zero[3]={0,0,0};vec3_t at;    /* the player's cell: a room's number (its shift comes with the bindings) */
      map_room=AW_SourceToWorld(sv.name,zero,at)?0:map_cell_number();room_shift[0]=room_shift[1]=room_shift[2]=0;}
     for(i=0;i<LOOPS;i++)if(loops[i].used){S_StopSound(loops[i].entity,loops[i].channel);loops[i].used=0;}
@@ -1745,6 +1848,17 @@ static void status(void){
             Con_Printf("dbg mwscript call journal: %s %ld\n",topic_names+topic_offsets[found],(long)host_journal_get(found));
             return;
         }
+        if(!Q_strcasecmp(f,"raiserank") || !Q_strcasecmp(f,"lowerrank")){
+            /* the NPC under the crosshair, as a script's RaiseRank / LowerRank on it (DIALOGUE-COMPLETE-58) */
+            edict_t *e=sv_player?AW_NPCTarget(sv_player,sv_player->v.v_angle):NULL;eval_t *v;aw_actor_t *npc=NULL;int row,now;
+            if(e && AW_MwscriptActors() && (v=GetEdictFieldValue(e,"aw_ref"))!=NULL && v->_float>0 &&
+               (row=row_of_edict(e))!=AW_ACTOR_NONE)npc=AW_ActorGet((uint32_t)v->_float,row,1);
+            now=npc_rank_change(npc,!Q_strcasecmp(f,"raiserank"));
+            if(now>=0)AW_MwvmStateChanged();
+            Con_Printf("dbg mwscript call %s: %s, rank %s%d\n",f,e?pr_strings+e->v.netname:"no actor under the crosshair",
+                       now>=0?"now ":"unchanged ",now>=0?now:AW_MwscriptNpcRank(e));
+            return;
+        }
         if(!Q_strcasecmp(f,"forcegreeting")){   /* the actor under the crosshair greets, as a script's ForceGreeting */
             edict_t *e=sv_player?AW_NPCTarget(sv_player,sv_player->v.v_angle):NULL;
             Con_Printf("dbg mwscript call forcegreeting: %s (%s)\n",force_greeting(e)?"greeting played":"not possible",
@@ -1889,6 +2003,7 @@ void AW_MwscriptInit(void){
     aw_save_actors_export=actors_export;aw_save_actors_import=actors_import;   /* the actor record (feature 16) */
     aw_save_objects_export=objects_export;aw_save_objects_import=objects_import;
     aw_object_lock_level=AW_ObjectLockLevel;   /* the doors read a script's Lock and Unlock */
+    aw_object_lock=AW_ObjectLock;aw_door_open=door_open;   /* CELL-CHANGES-59 slice 2: the key's unlock, door poses */
     aw_scene_intercept=aw_hinged_intercept=object_intercept;   /* OnActivate takes a door's use */
     aw_actor_disabled=AW_ObjectDisabled;   /* the CHIM window spawns no disabled actor */
     aw_inventory_made_item=AW_MadeItemAt;   /* enchanted items (aw_made_N) read through the inventory */

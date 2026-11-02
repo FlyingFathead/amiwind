@@ -47,7 +47,9 @@ enum {
  * and day/night sky pixel pass (AW_FogDraw, inside RT_VIEW). RT_SKELPOSE / RT_SKELVERTS: a skeletal actor's
  * posing, the bones from the table (AW_SkelPose) and the vertices (AW_SkelPoseVerts), inside RT_ALIAS
  * (SKEL-RUNTIME-COST-52); the line's "kp" field, with the poses made and drawn from the pose cache. */
-enum { RT_WORLD, RT_BMODELS, RT_SCAN, RT_DRAW, RT_ALIAS, RT_VIEW, RT_SKY, RT_FOG, RT_SKELPOSE, RT_SKELVERTS, RT_TIMERS };
+/* RT_HANDS: the first-person view model (R_DrawViewModel: the hands, a torch, a shield or a weapon), inside RT_VIEW;
+ * the line's "hd" field (PLAYER-GEAR-VISUAL-59: the hand cost measured before and after any first-person change). */
+enum { RT_WORLD, RT_BMODELS, RT_SCAN, RT_DRAW, RT_ALIAS, RT_VIEW, RT_SKY, RT_FOG, RT_SKELPOSE, RT_SKELVERTS, RT_HANDS, RT_TIMERS };
 
 #ifdef AMIGA
 extern long aw_rcount[RC_COUNTERS];

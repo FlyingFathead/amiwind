@@ -2,7 +2,7 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 10 times; something has to be done
+## PERSISTING: reported 13 times; something has to be done
 
 - Reported with v0.0.46 at 2026-10-20 20:09 +0300: Listed under Known in this build in the v0.0.46 release notes (still open at the release).
 - Reported with v0.0.53-dev2 at 2026-10-26 (time not recorded): 19:14 UTC door sample: the Yassu Mine room load (ri9f4c8ccd45) stopped after its BSP while a gate ran its emulator; the next try loaded in 7.6 s
@@ -14,6 +14,9 @@
 - Reported with v0.0.59-dev1 at 2026-11-01 (time not recorded): Seen again on the v0.0.59-dev1 delivery: the release hops session froze on its first map (Balmora) about 17 s in, before the first hop, after waiting for a gate's emulator run; the 32 MB boot smoke of the same image had passed. The hops step was rerun.
 - Reported with v0.0.58 at 2026-11-01 03:04 +0200: Seen again in gate 5233 (source b1d45efd, a character menu change): the boot smoke got no answer to aw_music_status after the second load; all five samples showed the game waiting on a DH0 file request in exec idle. The same commit passed gate 5234 right after.
 - Reported with v0.0.58-dev4 at 2026-11-01 07:49 +0000: Seen again in a gate boot smoke on the model-table branch (2bf629a1): after the Seyda Neen load the game stopped taking console commands for 60 seconds (the emulator disk stall pattern); the suite and the engine build passed. The gate was run again.
+- Reported with v0.0.59-dev4 at 2026-11-02 (time not recorded): MiniWind proof session proof2 of CELL-CHANGES-59 at 2026-11-02 13:28 +0200 / 2026-11-02 11:28 UTC (FS-UAE, 32 MB Fast, the host busy with a gate suite and a reuse audit): after a quickload in Arrille's Tradehouse, dbg tp seydaneen loaded Seyda Neen and the game then stopped taking commands for 60 s; five PC samples in exec idle, waiting on SIGF_DOS with the request held by DH0.
+- Reported with v0.0.59-dev4 at 2026-11-02 12:44 +0200: FS-UAE sessions at 32 MB Fast on the seyda MiniWind (slice 1 image cc5b049 and the first-person arms image f983e6b alike) stopped on the emulator disk stall (game waits on SIGF_DOS, request held by DH0) in 6 of 9 runs between 11:57 and 12:44 +0200, with and without builds sharing the volume; the frame rate fell from about 6 to about 1 fps over the minute before each stall. Same scripts passed this morning.
+- Reported with v0.0.59-dev4 at 2026-11-02 14:49 +0200: Emulator disk stall during a first-person cost session in the Seyda Neen MiniWind (FS-UAE, 32 MB Fast, JIT); the same script ran through on the next try.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -42,7 +45,7 @@ _Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 10 times; something has to be done](#persisting-reported-10-times-something-has-to-be-done)
+- [PERSISTING: reported 13 times; something has to be done](#persisting-reported-13-times-something-has-to-be-done)
 - [Symptom](#symptom)
 - [Where](#where)
 - [How it happened](#how-it-happened)

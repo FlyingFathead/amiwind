@@ -87,14 +87,17 @@ def hand_kinds(master):
     return {kind:kinds[kind] for kind in ('RACE','BODY')}
 
 
-def bake_appearance(assets, kinds, palette, race='nord', female=False, budget=320, topology='reduced', skeleton=None):
+def bake_appearance(assets, kinds, palette, race='nord', female=False, budget=320, topology='reduced', skeleton=None,
+                    stance='hh'):
     """Bake one owned appearance without copying or modifying a scene.
-    skeleton: Skeleton(assets, 'meshes/base_anim.1st.nif') when already read."""
+    skeleton: Skeleton(assets, 'meshes/base_anim.1st.nif') when already read.
+    stance: the first-person stance ('hh' bare hands; '1h', '2c', '2w' the armed arms, PLAYER-GEAR-VISUAL-59),
+    the same 28-frame contract for every stance."""
     if budget not in (320,480):raise ValueError('Hand budget must be 320 or 480')
     if topology not in ('reduced','source'):raise ValueError('Unknown hand topology profile')
     race=str(race).casefold();parts=appearance_parts(kinds,race,female)
     if skeleton is None:skeleton=Skeleton(assets,'meshes/base_anim.1st.nif')
-    times,clips=sample_clips(skeleton.events)
+    times,clips=sample_clips(skeleton.events,stance)
     shapes,materials,textures=assemble(assets,{'parts':parts,'weight':1,'height':1},skeleton,times)
     camera=skeleton.pose(float(times[0]))('Camera')[3,:3]*.25
     race_data=first(kinds['RACE'][race],'RADT')
@@ -110,7 +113,7 @@ def bake_appearance(assets, kinds, palette, race='nord', female=False, budget=32
         frames,faces,uv,skin=bake(shapes,materials,textures,palette,budget=budget)
     raw=animated_mdl(frames,faces,uv,skin,vertex_limit=1999)
     report={'scope':'Owned race/sex first-person unarmed appearance; visual animation only, no combat rules',
-            'race':race,'female':female,'budget':budget,'topology':topology,
+            'race':race,'female':female,'budget':budget,'topology':topology,'stance':stance,
             'model':'progs/v_nord.mdl','bytes':len(raw),'sha256':hashlib.sha256(raw).hexdigest(),
             'parts':parts,'skeleton':'meshes/base_anim.1st.nif','camera_origin_scaled':camera.tolist(),
             'race_height':height,'eye_above_feet':eye_height+16.625,'eye_above_origin':eye_height,

@@ -194,7 +194,7 @@ def prepare(data_files,id1,selected=(),palette=None,models=True,jobs=None,model_
         from prepare_scenery import nif_reader
         nif=nif_reader()
         assets=Assets(data,BSA(child_ci(data,'Morrowind.bsa')))
-    rows=[];inventory_icons={}
+    rows=[];inventory_icons={};row_flags={}
     for identifier,item in sorted(items.items()):
         model=icon='';slots=flags=0
         inert=not item['script'] or script_inert_after_registration(scripts.get(item['script'],''))
@@ -207,6 +207,10 @@ def prepare(data_files,id1,selected=(),palette=None,models=True,jobs=None,model_
             # never applied merely by wearing the item.
             enchant=enchantments.get(item['enchantment']) if item['enchantment'] else None
             if item['subtype'] in (8,9) and not item['parts'] and inert and (not item['enchantment'] or (enchant and enchant[0]==2)):flags|=4
+            # Clothing with body parts (shirts, pants, shoes, robes, skirts, gloves): the player's assembled body
+            # shows them (PLAYER-GEAR-VISUAL-59, tools/prepare_player_parts.py), so they are worn by the same rule
+            # (nothing else happens when worn).
+            elif item['parts'] and inert and (not item['enchantment'] or (enchant and enchant[0]==2)):flags|=4
         combat=[0,26,*([0]*6),0.,0.,0.,0.,0,0]
         if item['kind']=='WEAP' and item['subtype'] in (0,1,2,3,4,5,6,7,8):
             from prepare_combat import WEAPON_SKILL
@@ -273,6 +277,7 @@ def prepare(data_files,id1,selected=(),palette=None,models=True,jobs=None,model_
         # Every catalogue item can be owned (pickup, reward, grant): its inventory icon (UI-ICONS-INVENTORY-42).
         if item['source_icon']:inventory_icons[identifier]={'source_icon':item['source_icon'],
             'enchanted':bool(item['enchantment']),'equippable':bool(flags&1)}
+        row_flags[identifier]=flags
         row=safe_text(identifier,64)+safe_text(item['name'],96)+struct.pack('<iiifII',item['category'],item['subtype'],item['value'],item['weight'],slots,flags)
         row+=safe_text(model,64)+safe_text(icon,64)+safe_text(item['enchantment'],64)+safe_text(item['script'],64)
         # Bytes 496..511 (zero in older catalogues): the enchantment's kind (0 none, else ENDT
@@ -301,12 +306,19 @@ def prepare(data_files,id1,selected=(),palette=None,models=True,jobs=None,model_
     report['debug_torch']=({'id':DEBUG_TORCH_ID,'name':DEBUG_TORCH_NAME,**items[DEBUG_TORCH_ID]['light']}
                            if DEBUG_TORCH_ID in items else None)
     report['catalogue_sha256']=hashlib.sha256(out.read_bytes()).hexdigest()
+    # dbg give weapons (DBG-GIVE-WEAPONS-59): one plain item of every weapon type and two shields, chosen from the
+    # records by a rule (tools/prepare_weapon_kit.py), every one a row of the catalogue just written.
+    from prepare_weapon_kit import write_kit
+    report['weapon_kit']=write_kit(id1,items,settings,row_flags,child_ci(data,'Morrowind.esm').read_bytes())
     if models:
         # One icon lookup table for the HUD boxes and the inventory (tools/prepare_icons.py):
         # the same referenced closure as the staged inventory resources.
         from prepare_icons import prepare as prepare_icons, hud_settings, ini_colours
+        # HUD-WEAPON-BOX-EMPTY-59: every weapon that can be equipped gets its HUD picture too (the box showed
+        # nothing for a weapon outside the starting closure; the engine falls back to the inventory picture)
+        hud_ids=set(selected)|{i for i,item in items.items() if item['kind']=='WEAP' and row_flags.get(i,0)&1}
         closure={i:{'source_icon':items[i]['source_icon'],'enchanted':bool(items[i]['enchantment'])}
-                 for i in sorted(selected) if i in items}
+                 for i in sorted(hud_ids) if i in items}
         colours,report['hud_colours']=ini_colours(data)
         import os
         report['icon_table']=prepare_icons(assets,id1,closure,palette,colours,inventory_icons,jobs or os.cpu_count() or 1)

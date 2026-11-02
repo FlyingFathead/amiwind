@@ -1,6 +1,6 @@
 # Save/load milestone: compact state and a manageable save list
 
-_Last updated with AmiWind v0.0.57-dev1 (30 October 2026)._
+_Last updated with AmiWind v0.0.59-dev4 (2 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -11,6 +11,7 @@ _Last updated with AmiWind v0.0.57-dev1 (30 October 2026)._
 - [Sanity check against original saves and OpenMW](#sanity-check-against-original-saves-and-openmw)
 - [Planned: importing original and OpenMW saves](#planned-importing-original-and-openmw-saves)
 - [Actors in rooms and their packages (v0.0.57)](#actors-in-rooms-and-their-packages-v0057)
+- [The world change list (v0.0.59)](#the-world-change-list-v0059)
 - [References inspected](#references-inspected)
 
 <!-- contents end -->
@@ -23,6 +24,7 @@ manual slots, 0–16 autosaves (default 3) and dual validated generations are
 implemented. Native filesystem and failure acceptance are recorded with the
 playtest evidence. The design below remains the broader target; named manual
 saves, general object deltas and controlled original ESS comparisons are pending.
+Since v0.0.59-dev4 a world change list keeps taken, dropped, moved, disabled and locked objects (below).
 See [checkpoint limits](releases/notes/RELEASE-v0.0.21-dev1.md). Requested 28 September 2026. Deliver with the next dock/Census milestone once its character
 record is authoritative: attributes set and the game saveable/loadable. See [character creation](CHARACTER_CREATION.md) and
 [world persistence](PERSISTENCE_AND_STREAMING.md).
@@ -164,6 +166,57 @@ follow packages started by the scripts (AITravel, AIFollow) are saved as their o
 the actor, the state, the target point, the followed actor, the hours left) and started again when the actor is in
 the map; OpenMW keeps the whole package sequence in the actor's state (components/esm3/aisequence.cpp), here only those
 two. Kept by `tests/aga_save_changes_test.c` (a room entry round trip and its refusals).
+
+## The world change list (v0.0.59)
+
+The first part of "every change to the world as a compact list against the game's data" is in (CELL-CHANGES-59,
+shipped in v0.0.59-dev4). One sorted list for the whole world, every outdoor cell, room and CHIM frame, holds only
+what the player or a script changed on a placed object, for the whole session, and is written into the save as its
+own block (feature bit 32 of the AWS4 save). The game data is the base: a row holds only the fields that differ from it,
+and no row means "as in the data", the rule of the original's saves and of OpenMW 0.51's cell store.
+
+- **Identity.** The builder gives every placed reference a stable id made from its content file's index and its
+  reference number, so a save names the same object whatever the map or the order of loading. A thing the player
+  dropped is keyed by its inventory serial.
+- **What a row keeps.** Taken, disabled by a script, locked (with the level), stolen from an owner, moved (position and
+  facing), and dropped (item, count, position, facing, condition). Taken and disabled are separate marks, so a script's
+  Enable never brings back what the player took.
+- **Where it lives.** Rows grow in steps in memory up to 32,768 rows (a late original game changes about 7,700
+  references), and a second order by place (outdoor cell, room or scene) means a map load reads only its own rows. A
+  save is read and checked in full before it replaces anything, and saves made with earlier snapshots still load.
+- **Selectable.** `aw_placed ledger off` returns to the earlier fixed tables from the next new game or load.
+
+Checked in game at 32 MB Fast RAM: an item taken in a room stays taken across a map change and a quick load, and an
+outdoor drop is kept. Not yet checked: frame to frame, an outdoor take after a load, moved objects and the rows on
+disk.
+
+Second part (v0.0.59): a hinged door left open stays open, a lock or unlock by a script, the console or the player's key
+is kept, and an owned item taken is recorded as stolen from its owner (by item and owner, so the mark goes with the
+item through drops, map changes and saves).
+
+Third part (v0.0.59): container contents and NPC ranks on the same list.
+
+- **Containers.** What the player or a script takes out of or puts into a placed container is kept per container as
+  the difference against its game-data contents (one entry per container and item, with a signed count), the rule of
+  OpenMW 0.51's container store: a container never touched has no entry and shows the data's contents. The data's
+  contents are read from disk only when a container is looked at (the focus table's contents list); nothing of them stays
+  in memory. Taking from an owned container is theft and marks the item stolen from whom it belongs to, as for a placed item. A
+  script's AddItem, RemoveItem and GetItemCount on a container use the same entries. There is no container window yet:
+  `aw_placed container` lists the aimed or nearest container's contents and takes or puts items
+  (`aw_placed container take ID [N]`, `put ID [N]`, `all` for every changed container).
+- **NPC ranks.** A script's RaiseRank or LowerRank changes the NPC's rank in its own faction (OpenMW 0.51's rule: a rank
+  changed before goes on from there, LowerRank stops at 0, nothing on the player or a factionless NPC); the rank is kept
+  by the NPC's reference and saved, and the conversation reads it (the speaker's rank in conditions and text).
+- **Not yet.** Respawning containers keep what was taken (no restock), and levelled lists inside containers are not
+  resolved and cannot be taken; both come with the respawn part.
+- **Saved form.** The list's third form is written only when it holds a container change or a rank, so a save without
+  them stays readable by the earlier engines; every earlier save loads.
+
+Next parts, in order: the journal, the engine's facts
+and the globals, which now sit in fixed arrays of 32, and a digest of the topic table; script locals and running global
+scripts; the actor pool limits; respawn and migration when the game content changes. What scripts and conversations
+change (dispositions, topics learned, journal stages, script values) is not yet kept across saved games
+([MWSCRIPT-STATE-NOT-SAVED-48](bugs/MWSCRIPT-STATE-NOT-SAVED-48.md)). The save import above builds on this list.
 
 ## References inspected
 

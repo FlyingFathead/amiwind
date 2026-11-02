@@ -23,7 +23,8 @@ Bare-hand ready idle/walk/run/jump use the corresponding original hh sections;
 equip/lower and punch are baked over independently advancing movement poses.
 A separate torch-held body overlays the original left-clavicle torch pose on locomotion.
 A separate water body carries the original idle-swim and forward-swim groups without reducing their frames.
-Not yet: the character's chosen head and hair and the inventory's worn equipment.
+The baked bodies are the previous method: the game's default body is assembled from parts by what is worn
+(tools/prepare_player_parts.py: the chosen head and hair, the clothing and armour worn), written by this step too.
 
 The 80 bakes (body, torch body, water body, inventory poses per race and sex) run in one worker pool for the whole
 step, longest first, and each is kept in the image unit cache (tools/pass_cache.py UnitCache 'player-view') by the
@@ -771,7 +772,17 @@ def prepare_image(data_files, id1, jobs=None, bodies=True):
     beside the combat data, which neither reads nor writes view/ or progs/body/ (BUILD-IMAGE-FINALIZE-UNDERUSED-48)."""
     import build_profile
     with build_profile.phase('Image: player view', detail='beside the combat data'):
-        return prepare(data_files, id1, jobs=jobs, bodies=bodies)
+        report = prepare(data_files, id1, jobs=jobs, bodies=bodies)
+    if bodies:
+        # The body assembled from parts by what is worn (PLAYER-GEAR-VISUAL-59, the game's default; the baked bodies
+        # stay for aw_player_body_parts 0, the carried torch and swimming): one shared model per part mesh, the
+        # recipe (tools/prepare_player_parts.py), its own unit cache and pool.
+        import prepare_player_parts
+        from mwad.paths import resolve_data_files
+        with build_profile.phase('Image: player parts', detail='beside the combat data'):
+            report['parts'] = prepare_player_parts.prepare(resolve_data_files(Path(data_files)), Path(id1),
+                                                           (Path(id1) / 'gfx/palette.lmp').read_bytes(), jobs=jobs)
+    return report
 
 
 def main():

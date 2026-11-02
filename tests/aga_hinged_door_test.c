@@ -57,9 +57,9 @@ void S_StartSound(int entnum,int channel,sfx_t *s,vec3_t origin,float volume,flo
 void S_StopSound(int entnum,int channel){(void)entnum;assert(channel==6);stopped++;}
 float Cvar_VariableValue(char *name){assert(!strcmp(name,"aw_door_sounds"));return 1;}
 void Cmd_AddCommand(char *name,xcommand_t f){assert(!strcmp(name,"aw_hinged_door"));door_command=f;}
-static char *argv2;
-int Cmd_Argc(void){return argv2?3:argv1?2:1;}
-char *Cmd_Argv(int i){return i==1 && argv1?argv1:i==2 && argv2?argv2:"";}
+static char *argv2,*argv3;
+int Cmd_Argc(void){return argv3?4:argv2?3:argv1?2:1;}
+char *Cmd_Argv(int i){return i==1 && argv1?argv1:i==2 && argv2?argv2:i==3 && argv3?argv3:"";}
 void Con_Printf(char *fmt,...){va_list ap;va_start(ap,fmt);vprintf(fmt,ap);va_end(ap);}
 void Con_DPrintf(char *fmt,...){(void)fmt;}
 void Sys_Error(char *fmt,...){va_list ap;va_start(ap,fmt);vfprintf(stderr,fmt,ap);va_end(ap);exit(2);}
@@ -442,9 +442,91 @@ static void locks_mode(void){
     printf("locks ok\n");
 }
 
+/* CELL-CHANGES-59 slice 2: the doors' poses and the lock changes kept on the world change list, through the hooks
+ * (aw_mwhost.c door_open and AW_ObjectLock in the engine; a stand-in list here): a door opened stands open when its
+ * map comes back (left and entered again, or a loaded save) and closed when it was closed; the direction of the use
+ * is what is kept (a reversed turn keeps closed); a recorded open placement door comes back turned; the player's key
+ * unlocks for good (no key needed after); god mode unlocks nothing; dbg door lock / unlock on the aimed door. */
+static unsigned kept_open[8];static int kept_count,lock_calls,lock_last_lock;static unsigned lock_last_ref;
+static int kept_door(unsigned reference,int set){
+    int i;
+    for(i=0;i<kept_count && kept_open[i]!=reference;i++);
+    if(set<0)return i<kept_count;
+    if(set && i==kept_count){assert(kept_count<8);kept_open[kept_count++]=reference;}
+    if(!set && i<kept_count)kept_open[i]=kept_open[--kept_count];
+    return set;
+}
+static int kept_lock(unsigned reference,int lock,int level){
+    lock_calls++;lock_last_ref=reference;lock_last_lock=lock;
+    script_ref=reference;script_level=lock?(level<0?50:level):0;
+    return 1;
+}
+static void kept_mode(void){
+    const char *name,*action;edict_t *d=&edicts[1];float yaw;int i;
+    table=locked_table;setup();AW_HingedDoorInit();
+    aw_door_open=kept_door;aw_object_lock=kept_lock;aw_object_lock_level=script_lock;script_ref=0;
+    AW_HingedDoorMapBegin();AW_HingedDoorSpawn();
+    /* opened: kept at the use */
+    assert(AW_HingedDoorUse() && kept_count==1 && kept_open[0]==100);
+    tick(.1,10);assert(d->v.angles[1]==-90);
+    /* the map again: it stands open, its collision with it */
+    AW_HingedDoorMapBegin();d->v.angles[1]=0;SV_LinkEdict(d,false);AW_HingedDoorSpawn();
+    assert(d->v.angles[1]==-90 && !solid_at(d,2,16,24));
+    place_player(45,-2,180);
+    assert(AW_HingedDoorHint(&name,&action) && !strcmp(action,"Close: E"));
+    /* closed: no longer kept; the map again: closed */
+    assert(AW_HingedDoorUse() && kept_count==0);tick(.1,10);assert(d->v.angles[1]==0);
+    AW_HingedDoorMapBegin();AW_HingedDoorSpawn();assert(d->v.angles[1]==0 && solid_at(d,2,16,24));
+    /* a turn reversed half way: where it goes now is kept (closed) */
+    place_player(40,16,180);
+    assert(AW_HingedDoorUse() && kept_count==1);tick(.1,3);
+    assert(AW_HingedDoorUse() && kept_count==0);tick(.1,5);assert(d->v.angles[1]==0);
+    /* aw_hinged_door lock N [level] / unlock [N] (door N of the list, else the aimed one): kept like a script's */
+    argv1="lock";argv2="0";argv3="30";door_command();argv3=NULL;
+    assert(lock_calls==1 && lock_last_ref==100 && lock_last_lock==1 && script_level==30);
+    assert(AW_HingedDoorHint(&name,&action) && !strcmp(action,"Locked"));
+    /* use N while it is locked: the lock holds, nothing turns, nothing kept */
+    argv1="use";door_command();assert(kept_count==0 && !d->v.angles[1]);
+    argv1="lock";argv2=NULL;door_command();assert(lock_calls==2 && script_level==50);   /* aimed, no level: the last */
+    argv1="unlock";door_command();
+    assert(lock_calls==3 && lock_last_lock==0 && AW_HingedDoorHint(&name,&action) && !strcmp(action,"Open: E"));
+    /* use N unlocked: it opens and is kept, as with E; again: it closes */
+    argv2="0";argv1="use";door_command();assert(kept_count==1);tick(.1,10);assert(d->v.angles[1]==-90);
+    door_command();assert(kept_count==0);tick(.1,10);assert(d->v.angles[1]==0);
+    argv2="7";argv1="lock";i=lock_calls;door_command();assert(lock_calls==i);     /* no door 7: nothing */
+    argv1=argv2=NULL;
+    /* a CHIM placement door kept open comes back turned; one not kept as placed */
+    kept_open[0]=100;kept_count=1;AW_HingedDoorMapBegin();
+    yaw=30;assert(AW_HingedDoorPlacement(7,100,d->v.origin,32.2f,&yaw) && yaw==30-90);
+    yaw=30;assert(AW_HingedDoorPlacement(9,200,d->v.origin,32.2f,&yaw) && yaw==30);
+    kept_count=0;
+    /* the player's key unlocks the door for good (OpenMW: the reference is unlocked); after it no key is needed */
+    AW_HingedDoorMapBegin();AW_HingedDoorSpawn();script_ref=0;
+    place_player(340,16,180);carry_key(1);
+    assert(AW_HingedDoorHint(&name,&action) && !strcmp(action,"Locked"));
+    i=lock_calls;assert(AW_HingedDoorUse() && lock_calls==i+1 && lock_last_ref==200 && lock_last_lock==0);
+    tick(.1,10);assert(edicts[3].v.angles[1]==-90);carry_key(0);
+    AW_HingedDoorMapBegin();edicts[3].v.angles[1]=0;SV_LinkEdict(&edicts[3],false);AW_HingedDoorSpawn();
+    assert(edicts[3].v.angles[1]==-90);
+    place_player(345,-2,180);assert(AW_HingedDoorHint(&name,&action) && !strcmp(action,"Close: E"));
+    /* a load door's key the same; god mode goes through but unlocks nothing */
+    carry_key(1);i=lock_calls;
+    assert(!AW_HingedDoorLoadLock(5001,1) && lock_calls==i+1 && lock_last_ref==5001 && lock_last_lock==0);
+    carry_key(0);assert(!AW_HingedDoorLoadLock(5001,0));
+    edicts[2].v.flags=FL_GODMODE;i=lock_calls;
+    assert(!AW_HingedDoorLoadLock(5000,1) && lock_calls==i);edicts[2].v.flags=0;
+    /* aw_hinged_door go N (test sessions): the player in front of door N, aimed at it */
+    argv1="go";argv2="0";door_command();argv1=argv2=NULL;
+    assert(AW_HingedDoorHint(&name,&action) && !strcmp(name,"Door") && !strcmp(action,"Open: E"));
+    assert(fabs(edicts[2].v.origin[0]-40)<.5f && fabs(edicts[2].v.origin[1]-16.1f)<.5f);
+    aw_door_open=NULL;aw_object_lock=NULL;aw_object_lock_level=NULL;
+    printf("kept ok\n");
+}
+
 int main(int argc,char **argv){
     assert(argc==2);
     if(!strcmp(argv[1],"locks")){locks_mode();return 0;}
+    if(!strcmp(argv[1],"kept")){kept_mode();return 0;}
     if(!strcmp(argv[1],"table"))table_mode();
     else if(!strcmp(argv[1],"badtable"))bad_table_mode();
     else if(!strcmp(argv[1],"door"))door_mode();

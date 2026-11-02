@@ -22,7 +22,7 @@ static unsigned char *slurp(const char *path,long *size) {
     return d;
 }
 static int topic_of(const char *name) {
-    static const char *const names[]={"hello","idle","intruder","thief","hit","attack","flee","greeting"};
+    static const char *const names[]={"hello","idle","intruder","thief","hit","attack","flee","alarm","greeting"};
     int i;for(i=0;i<AW_GLUT_TOPICS;i++)if(!strcmp(names[i],name))return i;
     assert(0);return -1;
 }
@@ -35,6 +35,31 @@ int main(int argc,char **argv) {
     assert(AW_GlutOpen(&g,data,resident,size));
     /* a truncated resident part, or one past the file, is refused */
     {aw_glut_t bad;assert(!AW_GlutOpen(&bad,data,resident-4,size));assert(!AW_GlutOpen(&bad,data,resident,size+4));}
+    /* the sound events (VOICE-COVERAGE-58): every one resolves inside its table part, names are unique, found
+     * case-insensitively; the argument picks the class, size or school and is clamped */
+    {int i,j,kind,index;
+     for(i=0;i<AW_SOUND_EVENTS;i++){
+         assert(AW_SoundEventFind(aw_sound_events[i].name)==i);
+         for(j=0;j<i;j++)assert(strcmp(aw_sound_events[i].name,aw_sound_events[j].name));
+         for(j=-1;j<=aw_sound_events[i].args;j++){
+             assert(AW_SoundEventResolve(i,j,&kind,&index));
+             if(kind==AW_SEK_SLOT)assert(index>=0 && index<AW_SLOTS);
+             else if(kind==AW_SEK_CREATURE)assert(index>=0 && index<AW_SNDG_MOMENTS);
+             else assert(index>=0 && index<AW_GLUT_GREETING);
+         }
+     }
+     assert(AW_SoundEventFind("BowShoot")==AW_SE_BOW_SHOOT && AW_SoundEventFind("bow")==-1 && AW_SoundEventFind(NULL)==-1);
+     assert(!AW_SoundEventResolve(AW_SOUND_EVENTS,0,&kind,&index) && !AW_SoundEventResolve(-1,0,&kind,&index));
+     AW_SoundEventResolve(AW_SE_CAST,-1,&kind,&index);assert(kind==AW_SEK_SLOT && index==AW_SLOT_DESTRUCTION_CAST);
+     AW_SoundEventResolve(AW_SE_SPELL_HIT,5,&kind,&index);assert(index==AW_SLOT_RESTORATION_HIT);
+     AW_SoundEventResolve(AW_SE_SPELL_FAIL,0,&kind,&index);assert(index==AW_SLOT_ALTERATION_FAIL);
+     AW_SoundEventResolve(AW_SE_BLOCK,2,&kind,&index);assert(index==AW_SLOT_HEAVY_ARMOR_HIT);
+     AW_SoundEventResolve(AW_SE_ARMOR_HIT,9,&kind,&index);assert(index==AW_SLOT_HEAVY_ARMOR_HIT);
+     AW_SoundEventResolve(AW_SE_DEATH,-1,&kind,&index);assert(index==AW_SLOT_BODY_FALL_MEDIUM);
+     AW_SoundEventResolve(AW_SE_PAIN,-1,&kind,&index);assert(kind==AW_SEK_PLAYER_VOICE && index==AW_GLUT_HIT);
+     AW_SoundEventResolve(AW_SE_CREATURE_ATTACK,-1,&kind,&index);assert(kind==AW_SEK_CREATURE && index==AW_SNDG_ROAR);
+     /* this table's swish slot resolves to a sound when the fixture has it */
+     AW_SoundEventResolve(AW_SE_SWISH,-1,&kind,&index);assert(AW_GlutSlotSound(&g,index)>=-1);}
     x=fopen(argv[3],"r");assert(x);
     while(fgets(line,sizeof(line),x)){
         char *f[8];int n=0;char *p=strtok(line,"\t\n");
@@ -156,6 +181,7 @@ void Con_DPrintf(char *f,...){(void)f;}
 void Sys_Error(char *f,...){(void)f;abort();}
 int AW_CombatHealthPercent(edict_t *e){(void)e;return -1;}
 int AW_MwscriptActorFaction(const char *record,char *out,int capacity){(void)record;(void)capacity;out[0]=0;return 0;}
+int AW_MwscriptNpcRank(edict_t *e){(void)e;return -1;}
 void AW_ExpandDialogue(char *out,int capacity,const char *source){
     /* the player's defines: only %PCName here */
     const char *p=strstr(source,"%PCName");
@@ -178,7 +204,10 @@ int COM_FOpenFile(char *p,FILE **f){
 int SV_PointContents(vec3_t p){(void)p;return CONTENTS_EMPTY;}
 trace_t SV_Move(vec3_t a,vec3_t mi,vec3_t ma,vec3_t b,int t,edict_t *e){trace_t x;(void)a;(void)mi;(void)ma;(void)b;(void)t;(void)e;memset(&x,0,sizeof(x));x.fraction=1;return x;}
 void SV_StartSound(edict_t *e,int c,char *s,int v,float a){(void)e;(void)c;(void)s;(void)v;(void)a;}
-void S_StartSound(int e,int c,sfx_t *s,vec3_t o,float v,float a){(void)o;(void)v;(void)a;assert(c==2 && s==&sample && e>=2);played++;}
+static int last_channel;
+void S_StartSound(int e,int c,sfx_t *s,vec3_t o,float v,float a){(void)o;(void)v;(void)a;assert((c==2 || c==4) && s==&sample && e>=1);last_channel=c;played++;}
+edict_t *AW_NPCTargetReach(edict_t *p,vec3_t angles,float reach){(void)p;(void)angles;(void)reach;return NULL;}
+int Q_atoi(char *s){return atoi(s);}
 sfx_t *S_PrecacheSound(char *s){strcpy(last_sound,s);precached_ok++;return &sample;}
 sfxcache_t *S_LoadSound(sfx_t *s){(void)s;return &cache;}
 edict_t *EDICT_NUM(int n){assert(n>=0 && n<6);return &edicts[n];}
@@ -280,6 +309,30 @@ int main(int argc,char **argv){
     actor(2,"breton_m","Jean",NULL,0);
     assert(AW_GlutNpcOf(&edicts[1])>=0 && AW_GlutNpcOf(&edicts[1])==AW_GlutNpcOf(&edicts[2]));
     aw_character.race=1;assert(AW_GlutNpcOf(&edicts[1])<0);
+    /* THE SOUND EVENT HOOK (VOICE-COVERAGE-58): a voice event speaks the NPC's line on the voice channel; pain is the
+       player's own line; a slot event sounds on the body channel when the build has its file; a creature event plays
+       its generator moment; the wrong speaker or a bad event cannot run */
+    {char what[96];
+     actor(4,"mage","Edwinna","npc/a_town.wav",30);
+     realtime=100;before=played;
+     assert(AW_SoundEvent(AW_SE_ATTACK,&edicts[4],-1,what)==1 && played==before+1 && last_channel==2);
+     assert(!strncmp(what,"pool/a",6));
+     realtime=200;
+     assert(AW_SoundEvent(AW_SE_ATTACK,&edicts[5],-1,what)==-1 && !strcmp(what,"not an NPC of the voice table"));
+     aw_character.race=0;realtime=300;before=played;
+     assert(AW_SoundEvent(AW_SE_PAIN,&edicts[4],-1,what)>=0);          /* the player's line, whoever is aimed at */
+     assert(AW_SoundEvent(-1,&edicts[4],-1,what)==-1 && AW_SoundEvent(AW_SOUND_EVENTS,NULL,0,what)==-1);
+     before=played;
+     {int r=AW_SoundEvent(AW_SE_SWISH,&edicts[4],-1,what);
+      /* the fixture's swish is converted only when its file is in this build's pool */
+      assert(r==1?played==before+1 && last_channel==4:r==0 && played==before);}
+     before=played;
+     assert(AW_SoundEvent(AW_SE_MISS,&edicts[4],-1,what)==0 && !strcmp(what,"no sound mapped for it") && played==before);
+     actor(3,"RAT","Rat",NULL,0);before=played;
+     {int r=AW_SoundEvent(AW_SE_MOAN,&edicts[3],-1,what);
+      assert(strcmp(argv[4],"-")?r==1 && played==before+1 && last_channel==2 && !strcmp(what,argv[4]):r==0);}
+     assert(AW_SoundEvent(AW_SE_ROAR,&edicts[4],-1,what)==-1);         /* an NPC is not a creature */
+     cls.state=ca_disconnected;assert(AW_SoundEvent(AW_SE_SWISH,&edicts[4],-1,what)==-1);cls.state=ca_connected;}
     printf("glue ok\n");
     return 0;
 }

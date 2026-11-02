@@ -1,6 +1,6 @@
 # Third person, vanity camera and the death scene
 
-_Last updated with AmiWind v0.0.48-dev2 (22 October 2026)._
+_Last updated with AmiWind v0.0.59-dev4 (2 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -9,6 +9,8 @@ _Last updated with AmiWind v0.0.48-dev2 (22 October 2026)._
 - [The death scene](#the-death-scene)
 - [Sources](#sources)
 - [The player's body](#the-players-body)
+- [The assembled body](#the-assembled-body)
+- [First-person arms](#first-person-arms)
 - [Console](#console)
 - [Build switches](#build-switches)
 
@@ -140,9 +142,82 @@ ready/lower, movement, jump and camera changes were inspected in one scene.
 Other appearances, matched original-game motion, memory and performance
 acceptance remain unverified.
 
-Not yet (the next steps): the character's own chosen head and hair, the clothes and armour actually worn,
-punch transitions, armed-weapon and torch poses, verified equip/lower playback, other weapon-specific jump variants, and more walk/run frames (the 512 KB model budget is mostly the skin page, so the walk and run
+This baked body is the previous method since v0.0.59: the default body is assembled from what is worn (below), with
+the character's own head and hair. Not yet on either body (the next steps): punch transitions on the assembled body, armed-weapon and torch poses, verified equip/lower playback, other weapon-specific jump variants, and more walk/run frames (the 512 KB model budget is mostly the skin page, so the walk and run
 cycles keep 3 to 5 frames).
+
+## The assembled body
+
+Since v0.0.59 the third-person body is, by default, put together from parts by what the player wears, as the
+original does: the race's own skin parts per slot, the head and hair chosen at character creation, and over them the
+body parts of the clothing and armour worn, slot by slot by the original's priority (armour over clothing, a robe or
+skirt over what it covers, a helmet hiding the hair). Changing a shirt, boots, a cuirass or a helmet changes the body
+at once. The equipped weapon shows in the right hand while it is drawn, and a shield on the left arm whenever one is
+worn, except while a two-handed weapon is drawn (the rule OpenMW follows in `actoranimation.cpp`
+`updateCarriedLeftVisible`; the original shows no weapon at the hip).
+
+How it is built (`tools/prepare_player_parts.py`, in the image step beside the baked bodies):
+
+- Every body part mesh of the playable races and of every clothing and armour piece becomes **one model in the
+  shared model table** (`progs/parts/`), whoever wears it: a skeletal model of one rest pose on the shared humanoid
+  animation table (`progs/humanoid.awsk`, the beast races `progs/humanoid_kna.awsk`), so skinned pieces such as
+  cuirasses, shirts and gauntlets bend with the body as the rigid ones (helmets, boots) do. Each part is built at the
+  unit size; the game scales the whole body by the race's weight and height after posing, as the original scales
+  the actor.
+- Each part has a triangle cap by its slot (head 96, chest 72, an upper leg 32, a wrist 12 and so on), so the body in
+  the starting clothes stays near the baked body's cost; its skin is cut to the rows it uses.
+- `view/parts.txt` (the recipe table) lists per race and sex its scale and skin parts, the heads and hairs it may
+  choose, and per clothing or armour piece its parts per slot (male and female, human and beast).
+- About 2,200 part models, about 42 MB on the disk; each is a unit of the image unit cache (`player-parts`), so a
+  rebuild with the same inputs takes them from there.
+
+In the game (`engine/aga/src/aw_player_parts.c`, `aw_view.c`): the recipe is read only when the race, sex, head,
+hair or a worn item changes, and not kept in memory; the parts load as ordinary models (about 0.3 MB for a full
+outfit). Every part draws at the body's frame of the shared table; the bones are posed once per frame for all of
+them, the vertices per part. The body plays the same groups as the baked one (idle, walk, run, jump, the block,
+death and the hand-to-hand ready sections).
+
+The baked body stays selectable (`aw_player_body_parts 0`, saved, or `dbg camera parts off`), and it is still the
+body while a torch is carried or while swimming (their own baked poses). Not yet on the assembled body: the
+draw/lower and punch arm layers of the baked body, armed stances per weapon class and the torch pose.
+
+## First-person arms
+
+Since v0.0.59 the first-person arms are, by default, put together from the same kind of parts: the race's own hand,
+wrist, forearm and upper-arm parts, and over them the parts the worn gloves, gauntlets, bracers, shirt sleeves and
+cuirasses give those slots, by the same priority as the body. Where the game has a first-person version of a part (a
+record of the same name ending in `.1st`: the race's hands, the gloves and most gauntlets), that version is used, as
+the original does (the rule OpenMW follows in `npcanimation.cpp`). A robe shows its own first-person sleeves (its
+`.1st` chest record) and covers the arms under them; a robe without one leaves the arms as they are. Changing gloves
+or gauntlets in the inventory changes the hands at once. The drawn weapon is held in the same stances as before.
+
+How it is built (`tools/prepare_player_fp_parts.py`, in the image step after the player view):
+
+- The first-person skeleton (`meshes/base_anim.1st.nif`) becomes a small animation table of its two arms, every finger
+  joint kept (`progs/humanoid_1st.awsk`, 42 bones, 112 frames, about 30 KB): 28 frames for each of the four stances
+  (bare hands, one-handed, two-handed close, two-handed wide) in the same frame order the baked arms use. Its root
+  carries the view (the camera of each stance turned to the view axes), so a posed part is already where the baked
+  arms are drawn and the drawn weapon sits on the Weapon Bone as before.
+- Every arm part mesh of the playable races and of every worn piece becomes one model in the shared model table
+  (`progs/parts/`, separate from the body's). A part keeps its authored triangles and vertices, each vertex shared by
+  the triangles that use it, as the baked arms do (the textures in one small atlas per part); a part that the shared
+  form cannot take, or one with more than twice its slot's cap of triangles (a hand 320, a forearm 120, an upper arm
+  80, a wrist 48), is reduced to that cap instead. A race's bare arms are 852 vertices on 1,172 triangles; the
+  reduced form of the first version gave every triangle its own three vertices (2,988 on 996).
+- `view/parts_1st.txt` (the recipe, the body's format) lists per race and sex its arm parts and per piece its parts.
+- 456 part models (357 in the shared form), about 24 MB on the disk; each is a unit of the image unit cache
+  (`player-fp-parts`).
+
+In the game (`aw_view.c`, `aw_hand_models.c`, `r_main.c`): the recipe is read only when the race, sex or a worn item
+changes, and not kept in memory. The first part is the view model at the hands' frame of the stance, the others are
+drawn at the same frame and place; the bones are posed once per frame for all of them. Measured at 32 MB Fast on
+FS-UAE with the JIT, the bare hands raised at the same pose and clothes in Seyda Neen, both in one session: the arms
+take about 0.35 ms a frame from parts and about 0.35 ms baked (15-second samples: 0.34 to 0.38 ms from parts, 0.34 to
+0.35 ms baked). The first version, with unshared vertices, took about 0.5 ms against 0.36 ms. Not measured yet on
+the Pi 4B or a 68040.
+
+The baked arms stay selectable (`aw_hand_parts 0`, saved, or `dbg camera hands off`), and they are still the arms
+while a torch is carried and while the shield is raised to guard (their own baked poses).
 
 ## Console
 
@@ -157,6 +232,8 @@ cycles keep 3 to 5 frames).
 | `dbg camera death on/off` | The death camera; off keeps the first-person death view (the previous method). |
 | `dbg camera retry on/off` | "Retry fight" after a lost fight (`aw_death_retry`). |
 | `dbg camera body on/off` | Draw the body; off means first person only (`aw_player_body`). |
+| `dbg camera parts on/off` | The body assembled from what is worn (on, the default) or the baked body (off); `aw_player_body_parts`, saved. `dbg camera` lists the assembled body's parts, its scale and the last assembly's time. |
+| `dbg camera hands on/off` | The first-person arms assembled from what is worn (on, the default) or the baked arms (off); `aw_hand_parts`, saved. `dbg camera` lists the arms' parts, their frame and the last assembly's time. |
 | `dbg camera die` | Test the death scene: the player dies as from world damage (like lava). |
 
 `dbg vanitycamera` (alias `dbg vanitycam`), the vanity camera on its own:

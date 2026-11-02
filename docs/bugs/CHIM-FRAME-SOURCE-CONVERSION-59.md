@@ -9,7 +9,7 @@
 | Where | Every CHIM frame map (towns on CHIM, regions): engine callers of the region-table conversion |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.59-dev3 (last seen) |
+| Persists in | fixed in v0.0.59 |
 | Severity | medium: Features that need the game's coordinates outdoors fall back or do nothing on frame maps; no crash or data loss |
 | Family | Game logic (QuakeC) and saves (`game-logic`) |
 | CHIM | Engine streaming and memory ([CHIM Engine tracker](CHIM_TRACKER.md)) |
@@ -23,10 +23,26 @@
 
 _Last updated with AmiWind v0.0.59-dev4 (2 November 2026)._
 
+<!-- contents start -->
+## Contents
+
+- [Status: 2 November 2026](#status-2-november-2026)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Related](#related)
+- [Prevention](#prevention)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
+
 ## Status: 2 November 2026
 
-Open. The placed-items path is fixed (it asks the loaded CHIM frame after the region table); the other callers wait for
-one shared conversion.
+Fixed in v0.0.59. One shared conversion asks the region table first and the loaded CHIM frame second, for every caller.
 
 ## Symptom
 
@@ -57,12 +73,36 @@ finds no place.
 
 ## Repair
 
-Planned: one shared conversion that asks the region table first and the loaded CHIM frame second, every caller moved
-onto it, the script host's map-load decision first.
+AW_WorldToSource, AW_SourceToWorld and AW_WorldContains now ask the region table first and then the CHIM frame map
+that is loaded. The frame answers only for its own map and only for finite numbers, so a question about another map
+(for example a teleport's target) still gets the region table's answer alone. Region maps, the towns' handoff rows and
+rooms give exactly the same results as before. Every caller gets the frame through these functions; the placed items'
+own frame lookup was moved onto them. The script host now treats a streamed town as outdoors: its scripted placements
+attach and GetPCCell reports the exterior cell.
+
+The region-table-only lookup is kept as AW_RegionWorldToSource / AW_RegionSourceToWorld, and an engine built with
+CHIM_FRAME_SOURCE 0 uses it for every caller (the method before this fix, for an A/B).
+
+What the frame cannot give: a frame map that is not the loaded one has no frame to ask, so crossings and teleports to
+another map keep using the region table (AW_WorldDestination, AW_WorldMapTarget); a frame map that loads without its
+chunks (the far terrain left as the floor after a memory shortfall) has no active frame and converts nothing, as before.
 
 ## Verification
 
-Not yet: a test per kind of caller on a frame map, and an in-game check of scripts and lamps on a streamed town.
+- Native tests: frame maps through the shared conversion (region rows unchanged with the frame present, the frame both
+  ways, the script host's room-or-outdoor decision and its placement bounds, rooms still rooms); the frame's own half
+  on a synthetic CHIM world (its map only, finite numbers only, inside its chunk grid, nothing after the map ends);
+  the night lamps and the remote state file's GLOBAL line on a frame map without a region table; a source test that
+  refuses a direct region-table lookup outside the shared conversion.
+- In game, 32 MB Fast, Seyda Neen MiniWind, the same script before and after the change: after it the script host
+  attached 35 outdoor scripted placements (before: 0) and reports the player's cell -2,-9 (before: none), and at night
+  the lamp table around cell -2,-9 is read (69 lamps; before: never read). A bottle dropped at the arrival and a cup
+  taken outdoors were both kept after a visit to Arrille's Tradehouse, as before.
+
+## Related
+
+MWSCRIPT-ROTATE-NO-ENTITY-59: with the outdoor placements of a streamed town attached, their Rotate calls are now
+visible as not carried out (the streamed scenery has no entity to turn).
 
 ## Prevention
 
@@ -113,6 +153,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - MWSCRIPT-INTERIOR-PLACEMENTS-48 (no report page): Scripted placements in rooms that have no edict are not attached: the engine has no room identity to match them (3,612 of 4,907 bindings are in rooms)
 - MWSCRIPT-OLD-CONFIG-OFF-57 (no report page): An install whose saved config holds aw_mwscript 0 keeps compiled scripts off after the default turned on
 - MWSCRIPT-REFUSED-SCRIPT-COUNT-58 (no report page): The compiled game scripts are refused at load since the dialogue result scripts joined the file: no script runs
+- MWSCRIPT-ROTATE-NO-ENTITY-59 (no report page): A script's Rotate on a streamed outdoor object without an entity is not carried out: the object does not turn
 - MWSCRIPT-STANDING-NOT-SAVED-57 (no report page): The players standing the scripts change (crime level, reputation, faction ranks, expelled marks, faction reputation) is not in saved games
 - [MWSCRIPT-STATE-NOT-SAVED-48](MWSCRIPT-STATE-NOT-SAVED-48.md): The compiled scripts' values (globals, object and script locals, journal indexes) are not in saved games
 - [PHYSICS-GRAVITY-SCALE-36](PHYSICS-GRAVITY-SCALE-36.md): Gravity is Quake's 800 although the world is scaled 0.25: jumps and falls are several times faster than the original

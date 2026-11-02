@@ -105,6 +105,11 @@ static int route_format(route_t *r,int argc,char **argv,int j,char *out,int capa
         if(used+7>capacity)return 0;
         strcpy(out+used," grant");used+=6;
     }
+    /* dbg give weapons [stats] (DBG-GIVE-WEAPONS-59): the inventory command's weapon kit, no resident command of its own */
+    if(!strcmp(r->command,"aw_inventory") && !strcmp(r->words,"give weapons")){
+        if(argc-j>1 || (argc>j && Q_strcasecmp(argv[j],"stats")) || used+14>capacity)return 0;
+        strcpy(out+used," give weapons");used+=13;
+    }
     /* dbg creatures [on/off]: "chim actors creatures", no resident command or cvar of its own (aw_actors.c) */
     if(!strcmp(r->command,"chim") && !strcmp(r->words,"creatures")){
         if(argc-j>1 || used+20>capacity)return 0;
@@ -188,6 +193,13 @@ int AW_DebugTranslate(int argc,char **argv,char *out,int capacity) {
  * floor test, dbg combattest gallery, explains itself when used). */
 static const char *availability(int omitted,const route_t *r) {
     return omitted && !strcmp(r->command,"aw_charplane")?" (not in this build)":"";
+}
+/* the console's characters per line for tables printed elsewhere (dbg give weapons, aw_inventory.c; declared in
+ * aw_inventory.h) */
+int AW_ConsoleWidth(void);
+int AW_ConsoleWidth(void) {
+    int width=con_linewidth;
+    return width<1?38:width>128?128:width;
 }
 static void catalogue_error(void) {
     Con_Printf("Debug catalogue missing/invalid: debug-commands.txt\n");

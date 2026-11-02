@@ -1,11 +1,12 @@
 # Inventory
 
-_Last updated with AmiWind v0.0.59-dev1 (1 November 2026)._
+_Last updated with AmiWind v0.0.59-dev4 (2 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [Items and actions](#items-and-actions)
+  - [Weapon kit for testing (dbg give weapons)](#weapon-kit-for-testing-dbg-give-weapons)
 - [World models](#world-models)
 - [Debug torch (test only)](#debug-torch-test-only)
 - [Appearance and implementation boundary](#appearance-and-implementation-boundary)
@@ -63,7 +64,8 @@ equippable yet. The armour rating is the original weighting (`mwclass/npc.cpp` g
 shield, helmet, greaves, boots and each pauldron 0.1; each gauntlet 0.05; an empty slot counts the Unarmored skill.
 A piece rates its armour times the skill of its class (light, medium or heavy, by its weight) over iBaseArmorSkill,
 times its condition. Each worn piece also gives the hit sound of a blow landing on it ([COMBAT.md](COMBAT.md)
-"Sounds"). The body does not show worn armour yet (the player body work, PLAYER-BODY-ALL-ANIMS). A two-handed weapon
+"Sounds"). Since v0.0.59 the third-person body shows what is worn, assembled from parts by slot
+([THIRD_PERSON.md](THIRD_PERSON.md)); the first-person hands do not yet show gloves or bracers. A two-handed weapon
 and a shield exclude each other: equipping one takes the other off and back to the pack (`actionequip.cpp`,
 `weapon.cpp` and `armor.cpp` canBeEquipped). Not yet: the rule that beast races cannot wear helmets that cover the
 head or boots (armor.cpp). The engine's call `AW_InventoryEquippedWeaponType()` gives the type of the weapon in the
@@ -73,19 +75,52 @@ A drop transfers one actual item into a persistent world record with its source
 ID, count, scene, placement, yaw and condition. The converted ground model must
 load, an entity must satisfy the engine allocator reuse rule, and the complete
 swept footprint must have clear space and dry solid support before ownership
-changes. The current safe development boundary supports plain BSP placement.
-Active CHIM, captured-scenery and restricted-story scenes refuse placement with
+changes. Drops work in plain BSP scenes, in rooms and, since v0.0.59-dev4, on the streamed CHIM towns (a drop was
+refused on every streamed map before). Scenes that cannot take a drop refuse placement with
 "Cannot place items in this area yet; kept." Full-game CHIM/scenery drop support
 remains open under [UI-INVENTORY-INTEGRATION-40](bugs/UI-INVENTORY-INTEGRATION-40.md).
 Refused placement retains the item, quantity and condition. Aim at the dropped item
 and press E to pick it up. Full inventory or incompatible condition retains the
-world item. Save/load and scene re-entry restore the records.
+world item. Save/load and scene re-entry restore the records: drops are rows of the world change list
+([PERSISTENCE_AND_STREAMING.md](PERSISTENCE_AND_STREAMING.md)), which holds across rooms, outdoor areas and saves; the
+older table of 32 ground stacks stays selectable (`aw_placed ledger off`). Dropping every kind of item is not yet
+checked in game on the dev4 image.
 
 For explicit testing, use dbg inventory grant "steel longsword" 1 and
 dbg inventory grant steel_shield 1 to grant actual catalogue items. These are
 diagnostics, not starter inventory or accepted gameplay acquisition. Character
 change and grants use the on-demand debug catalogue; the I action adds one
-32-byte resident command record.
+32-byte resident command record. The console line aw_inventory equip "steel longsword"
+then equips a carried item by the same rules as E in the inventory window (used by
+the scripted first- and third-person gear checks).
+
+### Weapon kit for testing (dbg give weapons)
+
+`dbg give weapons` gives one of the game's own weapons of every weapon type (short
+blade, long blade one- and two-handed, blunt one- and two-handed, staff, spear, axe
+one- and two-handed, bow, crossbow, thrown weapons, arrows and bolts) plus a light
+and a heavy shield, all at once, and prints each one's stats on the console from
+its record: chop, slash and thrust damage (for bows, crossbows, thrown weapons and
+ammunition, their damage), speed, reach, weight, value, health, enchantment points,
+and armour for the shields. `dbg give weapons stats` prints the table again without
+giving anything. Each row ends with `equip "ID"` (equippable now, with
+`aw_inventory equip "ID"` or the inventory window) or `carry "ID"` (bows, crossbows,
+thrown weapons and ammunition are carried only until ranged combat exists). The
+lines wrap to the console's width.
+
+The items are chosen when the image is built, by a rule, not by a list
+(`tools/prepare_weapon_kit.py`): per type, the plain items (no enchantment, no
+script, a name, a world model and an icon), iron, steel or chitin first, then the
+one the game's records name most often (placed references, NPC, creature and
+container inventories, levelled lists), then the cheaper one. On the original game
+data that gives, for example, the iron dagger, steel longsword, steel claymore,
+chitin short bow, steel crossbow with steel bolts, the chitin shield and the steel
+shield. The choice is written to `inventory/weapon-kit.txt` (about 1 KB) and named
+in the build receipt (`inventory-data.json` "weapon_kit"); the engine reads it only
+when the command runs. The kit is given whole or not at all: it needs up to 16
+kinds of item of the inventory's 32, and a full inventory refuses it with the
+numbers. The items are an ordinary grant, saved and loaded like any other.
+Tests: `tests/test_weapon_kit.py` and `tests/aga_weapon_kit_test.c`.
 
 ## World models
 
@@ -94,7 +129,8 @@ ground. The build stage `item-models` (`tools/prepare_item_models.py`) converts
 each distinct original mesh once, on every core, into one alias model under
 `progs/items/`, and writes the table `progs/items/models.awt` (the mesh path and
 its model, one line each). Every item naming the same mesh shares that one file;
-the same table is meant for placed objects as well. Each model's skin is cut to
+the same table draws the items the game data places in rooms and outdoors (v0.0.59-dev4), which can be aimed at and
+taken. Each model's skin is cut to
 the part its texture coordinates reach, which takes the set from about 124 MB to
 about 48 MB (880 models). Nothing of it is resident: the engine loads a model
 from disk only when an item is dropped. Each mesh's result is cached on its own,

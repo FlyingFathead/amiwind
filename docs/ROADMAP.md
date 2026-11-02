@@ -1,11 +1,12 @@
 # Roadmap and implementation options
 
-_Last updated with AmiWind v0.0.58 (1 November 2026)._
+_Last updated with AmiWind v0.0.59-dev4 (2 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
-- [v0.0.58: released 1 November 2026; v0.0.59 next](#v0058-released-1-november-2026-v0059-next)
+- [v0.0.59: in development, dev4 published 2 November 2026; v0.0.60 next](#v0059-in-development-dev4-published-2-november-2026-v0060-next)
+- [v0.0.58: released 1 November 2026](#v0058-released-1-november-2026)
 - [v0.0.57: released 31 October 2026; v0.0.58 next](#v0057-released-31-october-2026-v0058-next)
   - [The v0.0.58 list, item by item](#the-v0058-list-item-by-item)
 - [v0.0.56: released 29 October 2026; v0.0.57 next](#v0056-released-29-october-2026-v0057-next)
@@ -107,7 +108,68 @@ _Last updated with AmiWind v0.0.58 (1 November 2026)._
 
 15 October 2026: exact-source validation completed 4,231 tests: 4,225 passed, three Windows-only skips and three tracked Census expected failures. The 71 focused tests and original-data readback across nine frame positions passed, consistently hiding 33 of 158 original references at stronghold state 6 while preserving unknown scripts. All 243 player resources are reusable after exact producer, input and file verification. Complete combined-world conversion, native comparison, packaging and shipment remain pending; coverage counts are unchanged.
 
-## v0.0.58: released 1 November 2026; v0.0.59 next
+## v0.0.59: in development, dev4 published 2 November 2026; v0.0.60 next
+
+The development line is at v0.0.59-dev4. The state below is the project's tracker for v0.0.59; the release notes of
+each snapshot are [dev1](releases/notes/RELEASE-v0.0.59-dev1.md), [dev2](releases/notes/RELEASE-v0.0.59-dev2.md),
+[dev3](releases/notes/RELEASE-v0.0.59-dev3.md) and [dev4](releases/notes/RELEASE-v0.0.59-dev4.md). Each snapshot
+carries everything of the ones before it.
+
+**Done on the dev line (dev1 to dev4):**
+
+- **A world model for every item,** 880 distinct models in one shared table, with a builder check of every carriable
+  item, and a model table of 512 entries per map (it held 256). Shipped in dev1 to dev4.
+- **Items in their places.** The items the game data places in the world are drawn from the shared table in rooms and
+  outdoors and can be aimed at and taken. Shipped in dev4.
+- **The world change list, first part.** One list for the whole world keeps what the player changes (items taken,
+  dropped or moved, objects a script disables or locks, the stolen mark) across rooms, outdoor areas and saved games.
+  Dropping works on the streamed towns. Shipped in dev4.
+- **Text macros as compact codes in dialogue,** with the bound key shown for action words; the first conversation
+  opens at once again (the v0.0.58 stall); topic words show whole and as links. Shipped in dev2 to dev4.
+- **Fewer rebuilds:** an engine-only change or a development label change no longer rebuilds the CHIM world, its
+  rooms or the progress pages. Shipped in dev1 to dev4.
+- **Morrowind's own mouse cursor** from your game data in every window, with the previous cursor as the fallback and a
+  choice in the Options menu. Shipped in dev4.
+
+**In the line, not yet in a published snapshot:**
+
+- **The player's body.** The third-person body is assembled from parts by what is worn (2,156 part models in the
+  shared table), armour over clothing, the drawn weapon in the right hand and the shield on the left arm; the baked
+  body stays selectable. The first-person hands show the equipped melee weapon in the original's three stances.
+  Left: first-person gloves and bracers from the parts, the stances per weapon class with the draw and punch layers,
+  and the torch pose on the parts.
+- **One shared conversion between map units and the original's coordinates,** so scripts, lamps, weather and the
+  camera find the right place on every map, the streamed towns included.
+
+**In progress:**
+
+- The checks on the dev4 image: dropping every kind of item indoors and outdoors and picking it up again across a
+  save, the time of day and an action key in a text, the mouse cursor in the windows.
+- The world change list's next parts: doors, locks and the stolen and owner ledger; container contents; the journal,
+  engine facts and globals; script locals and running global scripts; the actor pool limits; respawn and migration
+  when the content changes.
+- The debug command that gives a kit of every weapon type with each weapon's stats, for testing.
+- Keying the CHIM stages by what they read, so that a change to a text macro no longer rebuilds the CHIM world and the
+  rooms.
+
+**Left:**
+
+- **Voices and sounds in place:** every character voice line and creature sound mapped into the world and heard in
+  game, with a tracker page for each kind and its proof. v0.0.59 maps every voice and sound moment with its engine
+  hook, the combat ones included; v0.0.60 plays the combat ones in play.
+- **The conversation, complete,** with a tracker page listing each part, its state and its proof; the remaining
+  checks on the v0.0.58 dialogue, and the rank changes an NPC script can make.
+- **Levelling as in the original,** with the level-up box.
+- An index of every item you can pick up (cell, position, item and owner), a scripted check of the silver tray in the
+  Census and Excise Office, and the two release checks on the notes' claims about builds from scratch and core use.
+- A separate patch for v0.0.58 with the conversation fix waits for the maintainer's decision; the fix is in dev3 and
+  dev4.
+
+**Moved to v0.0.60,** with the combat work: weapons and shields of every type in first and third person with a debug
+weapon menu, the first-person hands per weapon type, the cliff racer's strikes at the right size, player casting, the
+spell-effect system and the crime system.
+
+## v0.0.58: released 1 November 2026
 
 v0.0.58, "Time To Talk", shipped as its sixth development snapshot: links, persuasion, the services, enchanting,
 choices and journal topic pages in the dialogue window; character creation with the class list, questions or a class
@@ -121,7 +183,7 @@ restart from the main menu. Not yet checked in game: the filled text macros in b
 item, the aim box on doors, the Fargoth greeting, your own footsteps, the creature sound test, and character creation's
 class questions with the install's data, a class of your own and the class list.
 
-**v0.0.59 next.** What v0.0.58 planned and did not finish moves, openly, to v0.0.59, with the same list below: world
+**Moved to v0.0.59 at the release.** What v0.0.58 planned and did not finish moves, openly, to v0.0.59, with the same list below: world
 models and object placement (every item with its own model when dropped or placed, every placed item in its place from
 one shared model table, and more models per map than the present limit of 256), what the player wears and wields on
 the body in first and third person, the crime system, player casting and the spell-effect system, weapons of every

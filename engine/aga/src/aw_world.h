@@ -2,8 +2,12 @@
 #ifndef AW_WORLD_H
 #define AW_WORLD_H
 int AW_WorldDestination(const char *,const float *,char *,float *);
+/* The shared conversion (CHIM-FRAME-SOURCE-CONVERSION-59): the region table first, then the loaded CHIM frame. */
 int AW_WorldToSource(const char *,const float *,float *);
 int AW_SourceToWorld(const char *,const float *,float *);
+/* The region table alone, the shared conversion's first half; no other file calls these. */
+int AW_RegionWorldToSource(const char *,const float *,float *);
+int AW_RegionSourceToWorld(const char *,const float *,float *);
 int AW_WorldMapTarget(const float *,char *,float *);
 int AW_CellMap(int,int,char *,int);
 const char *AW_SceneName(void);

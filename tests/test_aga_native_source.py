@@ -488,6 +488,18 @@ class NativeSourceTests(unittest.TestCase):
         self.compile_run('aga_remote_test.c', [Path(SOURCE)/'src/aw_remote.c'],
             cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])
 
+    # CHIM-FRAME-SOURCE-CONVERSION-59: callers on a CHIM frame map, through the real shared conversion (aw_world.c)
+    # on a disk without the region table: the lighting kind (night lamps, both directions) and the readout kind (the
+    # remote state file's GLOBAL line); the script host's map-load decision is in aga_world_regions_test.c (frame_maps),
+    # the frame's own half in aga_chim_world_test.c (ring).
+    def test_night_lamps_on_a_chim_frame_map(self):
+        self.compile_run('aga_lamps_test.c', [Path(SOURCE)/'src/aw_lamps.c', Path(SOURCE)/'src/aw_world.c'],
+            defines=['AW_FRAME_MAP'], cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])
+
+    def test_remote_state_global_line_on_a_chim_frame_map(self):
+        self.compile_run('aga_remote_test.c', [Path(SOURCE)/'src/aw_remote.c', Path(SOURCE)/'src/aw_world.c'],
+            defines=['AW_FRAME_MAP'], cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])
+
     def test_wait_cancel_bounds_calendar_and_debug_time(self):
         self.compile_run('aga_wait_test.c', [Path(SOURCE)/'src'/n for n in
             ('aw_wait.c','aw_clock.c','aw_state.c','view.c','r_sky.c','mathlib.c')],
@@ -621,7 +633,7 @@ class NativeSourceTests(unittest.TestCase):
         # AW-20260928-12: ordinary hinged doors on the engine's own collision (world.c), 90 degrees in one second.
         self.compile_run("aga_hinged_door_test.c", [ROOT/"engine/aga/src/aw_hinged_door.c", Path(SOURCE)/"src/world.c",
                                                     Path(SOURCE)/"src/mathlib.c"],
-                         argument_sets=[["table"], ["badtable"], ["door"], ["chim"], ["census"], ["locks"]],
+                         argument_sets=[["table"], ["badtable"], ["door"], ["chim"], ["census"], ["locks"], ["kept"]],
                          cflags=["-fsanitize=undefined", "-fno-sanitize-recover=all"])
 
     def test_talk_rule_combat_dead_knocked_calm_and_one_read_a_frame(self):

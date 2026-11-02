@@ -155,18 +155,40 @@ static int inside(const float *point,const float *box,float margin){
     int k;for(k=0;k<2;k++)if(!(point[k]>=box[k]-margin && point[k]<box[k+2]+margin))return 0;
     return 1;
 }
-int AW_WorldToSource(const char *name,const float *local,float *world){
+/* CHIM-FRAME-SOURCE-CONVERSION-59: a CHIM frame map (the towns on CHIM, the streamed regions) has no row in the
+ * open-world region table; its own conversion lives with the loaded frame. Chim_Init (chim/chim_world.c) sets these
+ * hooks; each answers only for the frame map that is loaded (NAME is that map's name) and only while chim_frame_source
+ * is 1 (0: the region table alone, the method before v0.0.59, for an A/B). NULL without CHIM data (legacy disks, the
+ * native fixtures): every answer is then the region table's, as before. */
+int (*aw_world_chim_source)(const char *name,const float *local,float *world);
+int (*aw_world_chim_local)(const char *name,const float *world,float *local);
+int (*aw_world_chim_contains)(const char *name,const float *local);
+/* The region table alone (the open-world region maps and the towns' handoff rows). Called only by the shared
+ * conversion below; every other file asks AW_WorldToSource / AW_SourceToWorld (tests/test_frame_conversion.py). */
+int AW_RegionWorldToSource(const char *name,const float *local,float *world){
     terrain_region_t *r=source(name);int k;if(!r)return 0;
     for(k=0;k<3;k++)if(!isfinite(local[k]))return 0;
     for(k=0;k<3;k++)world[k]=(local[k]+r->origin[k])*4;
     return 1;
 }
-/* Inverse of AW_WorldToSource: original coordinates to this map's local ones. */
-int AW_SourceToWorld(const char *name,const float *world,float *local){
+int AW_RegionSourceToWorld(const char *name,const float *world,float *local){
     terrain_region_t *r=source(name);int k;if(!r)return 0;
     for(k=0;k<3;k++)if(!isfinite(world[k]))return 0;
     for(k=0;k<3;k++)local[k]=world[k]*.25f-r->origin[k];
     return 1;
+}
+/* The one conversion every caller uses: map units of the map NAME to the original game's coordinates. The region
+ * table first (a region map, a town's handoff row: answers as before, so region maps and rooms are unchanged), then
+ * the loaded CHIM frame. Costs on a region map or a room nothing more than before; on a frame map one pointer test and
+ * one name compare after the region table said no. */
+int AW_WorldToSource(const char *name,const float *local,float *world){
+    if(AW_RegionWorldToSource(name,local,world))return 1;
+    return aw_world_chim_source && aw_world_chim_source(name,local,world);
+}
+/* Inverse of AW_WorldToSource: original coordinates to this map's local ones (the same order). */
+int AW_SourceToWorld(const char *name,const float *world,float *local){
+    if(AW_RegionSourceToWorld(name,world,local))return 1;
+    return aw_world_chim_local && aw_world_chim_local(name,world,local);
 }
 /* World bounds (aw_bounds.c): the map-unit centre of every open-world map's
  * core, the lookup table of the cells the world holds. Returns the count (0:
@@ -180,9 +202,11 @@ int AW_WorldRegionCentres(float *xy,int max){
     }
     return count;
 }
+/* Inside the map's terrain: a region row's cover, else the loaded CHIM frame's chunk grid (the same 24-unit margin). */
 int AW_WorldContains(const char *name,const float *local){
     terrain_region_t *r=source(name);
-    return r && inside(local,r->cover,-24);
+    if(r)return inside(local,r->cover,-24);
+    return aw_world_chim_contains && aw_world_chim_contains(name,local);
 }
 int AW_WorldDestination(const char *name,const float *local,char *target,float *arrival){
     terrain_region_t *from,*to=NULL;float global[3],point[3];int i,k,id;

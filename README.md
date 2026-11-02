@@ -4,7 +4,7 @@
 
 # AmiWind
 
-_Last updated with AmiWind v0.0.59-dev4 (2 November 2026)._
+_Last updated with AmiWind v0.0.59-dev5 (2 November 2026)._
 
 An unofficial, experimental RPG engine and enthusiast project bringing Morrowind
 to the Commodore Amiga, featuring CHIM: an AmiQuake-based engine and an asset
@@ -45,18 +45,21 @@ and 19 open-sea cells), with no classic region maps left outdoors. What these nu
 prison and the census office) is built as a CHIM room, with the people the game places in them. Solstheim is not
 converted.
 
-The development line is at **v0.0.59-dev4** (2 November 2026): the items of the world are placed from one shared
-model table in rooms and outdoors and can be taken, the world remembers what the player takes, drops or moves
-across rooms, outdoor areas and saved games, dropping items works on the streamed towns, and the mouse cursor
-is the original game's; with every item's world model, the 512 model table, compact text macros and the
-dialogue fixes of the earlier snapshots, for testing in game ([dev4 notes](docs/releases/notes/RELEASE-v0.0.59-dev4.md),
-[dev3 notes](docs/releases/notes/RELEASE-v0.0.59-dev3.md)).
+The development line is at **v0.0.59-dev5** (2 November 2026): the player's third-person body and first-person
+arms are assembled from parts, `dbg give weapons` gives a kit of every weapon type, the HUD weapon box shows every
+weapon, 34 named sound events can be triggered from the console, the world change list also keeps open doors, locks,
+the stolen mark, container contents and NPC faction ranks across maps and saved games, and one shared conversion
+between map and game coordinates serves the engine on every map; with the placed items, the original mouse cursor,
+the 512 model table and the dialogue fixes of the earlier snapshots, for testing in game
+([dev5 notes](docs/releases/notes/RELEASE-v0.0.59-dev5.md), [dev4 notes](docs/releases/notes/RELEASE-v0.0.59-dev4.md)).
 
-What comes next is in the [roadmap](docs/ROADMAP.md): v0.0.59 takes the parts of v0.0.58 that are not done: world
-models and object placement (every item with its own model, every placed item in its place, a larger model table per
-map), what the player wears and wields on the body, the crime system, player casting and weapons, levelling with the
-original's level-up box, the full trade window, characters placed by scripts, saves that keep everything and the save
-import, lighter large interiors, the game's area sounds and Morrowind's own mouse cursor.
+What comes next is in the [roadmap](docs/ROADMAP.md): the rest of v0.0.59 is what the player wears and wields on the
+body (the third-person body assembled from parts is in the development line since dev4), the world change list
+extended to doors, containers, the journal and script state, the debug command that gives a kit of weapons, levelling
+with the original's level-up box, the voice and sound coverage and the checks of the conversation. Weapons of every
+type in both views, the first-person hands per weapon, the cliff racer's strikes, player casting, the spell-effect
+system and the crime system moved to v0.0.60. Items that are in no version's list yet stay in the backlog until they
+are scheduled.
 
 ### What v0.0.58 changed
 

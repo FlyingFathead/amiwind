@@ -15,10 +15,11 @@ const char *(*aw_hand_to_hand_name)(void);
 int (*aw_inventory_row_icon)(int slot,const char *id,int equipped,int x,int y);
 static byte screen[200][320];
 static int opens,placeholders,armed,selected;
+static const char *armed_id="steel longsword";
 static float condition=.5f,charge=5;
-static const char *keys[]={"hud:bar","hud:box","hud:sneak","hud:track:magic","hud:track:weapon","inv:steel longsword","inv:steel longsword:equip","item:steel longsword","item:test_ring","skill:26","ui:head:block","ui:head:left","ui:head:right"};
-static const int sizes[][3]={{20,4,11},{20,20,12},{18,18,23},{18,2,13},{18,2,14},{16,16,21},{16,16,22},{18,18,15},{18,18,16},{18,18,17},{154,12,18},{1,12,19},{1,12,20}};
-#define ROWS 13
+static const char *keys[]={"hud:bar","hud:box","hud:sneak","hud:track:magic","hud:track:weapon","inv:iron claymore","inv:steel longsword","inv:steel longsword:equip","item:steel longsword","item:test_ring","skill:26","ui:head:block","ui:head:left","ui:head:right"};
+static const int sizes[][3]={{20,4,11},{20,20,12},{18,18,23},{18,2,13},{18,2,14},{16,16,24},{16,16,21},{16,16,22},{18,18,15},{18,18,16},{18,18,17},{154,12,18},{1,12,19},{1,12,20}};
+#define ROWS 14
 static int sneaking;
 int AW_MoveSneaking(void){return sneaking;}
 static FILE *memory(const byte *p,int n,FILE **out){FILE *f=tmpfile();assert(f);assert(fwrite(p,1,n,f)==(size_t)n);fseek(f,0,SEEK_SET);*out=f;return f;}
@@ -79,7 +80,7 @@ void AW_UITextCentred(int x,int y,int w,int h,const char *text,int c){(void)text
 void AW_UIFill(int x,int y,int w,int h,int c){int i,j;for(j=y;j<y+h;j++)for(i=x;i<x+w;i++)screen[j][i]=(byte)c;}
 int AW_InventoryEquippedItem(int slot,aw_inventory_item_t *out){
     if(!armed || slot!=AW_SLOT_RIGHT)return 0;
-    memset(out,0,sizeof(*out));strcpy(out->id,"steel longsword");out->category=AW_INV_WEAPON;out->health=900;return 1;
+    memset(out,0,sizeof(*out));strcpy(out->id,armed_id);out->category=AW_INV_WEAPON;out->health=900;return 1;
 }
 float AW_InventoryCondition(const char *id){(void)id;return condition;}
 int AW_MagicSelectedItem(aw_inventory_item_t *out){
@@ -115,6 +116,13 @@ int main(void){
     /* SNEAK-58: the sneak indicator beside the boxes only while sneaking */
     memset(screen,0,sizeof(screen));assert(aw_hud_item_boxes(y,AW_HUD_ALL));assert(count(130,y+1,18,18,23)==0);
     sneaking=1;assert(aw_hud_item_boxes(y,AW_HUD_ALL));assert(count(130,y+1,18,18,23)==18*18);sneaking=0;
+    /* HUD-WEAPON-BOX-EMPTY-59: a weapon without its own HUD picture shows its 16 x 16 inventory picture, centred in
+     * the 18 x 18 interior; read once, not every frame. */
+    memset(screen,0,sizeof(screen));armed_id="iron claymore";assert(aw_hud_item_boxes(y,AW_HUD_ALL));
+    assert(count(87,y+2,16,16,24)==16*16 && count(86,y+1,18,18,24)==16*16);
+    reads=opens;for(i=0;i<8;i++)assert(aw_hud_item_boxes(y,AW_HUD_ALL));assert(opens==reads);
+    armed_id="no such weapon";memset(screen,0,sizeof(screen));assert(aw_hud_item_boxes(y,AW_HUD_ALL));
+    assert(count(86,y+1,18,18,12)==18*18);armed_id="steel longsword";
     /* An unknown key fails once and is not looked up again every frame. */
     {aw_icon_t slot;memset(&slot,0,sizeof(slot));assert(!AW_IconLoad(&slot,"item:none"));reads=opens;
      assert(!AW_IconLoad(&slot,"item:none"));assert(opens==reads);}

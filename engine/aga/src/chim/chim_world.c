@@ -126,6 +126,7 @@ int (*aw_chim_door_clip)(unsigned pid, vec3_t start, vec3_t mins, vec3_t maxs, v
 
 static int		available;			/* chim/world.cwi exists */
 static int		active;				/* the current map is a CHIM frame */
+static char		frame_map[MAX_QPATH];	/* its name while active (FrameMap: the shared conversion), else empty */
 static int		primed, tick_frame = -1;
 static int		map_bank = -1, cache_bank = -1;
 static void		*cache_memory;
@@ -822,6 +823,7 @@ static void MapEnd (void)
 	RoomGrowEnd ();
 	map_bank = -1;
 	active = primed = 0;
+	frame_map[0] = 0;
 	tick_frame = -1;
 }
 
@@ -1150,6 +1152,7 @@ static void MapBeginWork (const char *entities, double spike_t0)
 		return;
 	}
 	active = 1;
+	Q_strcpy_bounded (frame_map, MapName (), sizeof(frame_map));
 	hunk_mark = -1;
 	{
 		char edge[16];
@@ -1428,7 +1431,7 @@ static int Source (const float *local, float *world)
 	world[2] = local[2] * 4;
 	return 1;
 }
-/* The other way: original coordinates to this frame's map units (aw_inventory.c: focus rows and placed items). */
+/* The other way: original coordinates to this frame's map units. */
 static int Local (const float *world, float *local)
 {
 	if (!active)
@@ -1436,6 +1439,44 @@ static int Local (const float *world, float *local)
 	local[0] = (world[0] - chim_frame.frame.centre[0]) * 0.25f;
 	local[1] = (world[1] - chim_frame.frame.centre[1]) * 0.25f;
 	local[2] = world[2] * 0.25f;
+	return 1;
+}
+
+/* CHIM-FRAME-SOURCE-CONVERSION-59: the shared conversion's second half (aw_world.c AW_WorldToSource,
+ * AW_SourceToWorld, AW_WorldContains ask these after the region table). They answer only for the frame map that is
+ * loaded (frame_map, its name when the frame came up) and only for finite numbers, so a caller asking about another
+ * map (aw_scene.c: a teleport's target map) or a stale name between two maps gets the region table's answer alone.
+ * CHIM_FRAME_SOURCE 0 (compile switch, -DCHIM_FRAME_SOURCE=0): the hooks are not set, every caller gets the region
+ * table alone (the method up to v0.0.59-dev2; kept for an A/B, no console variable: ENGINE-RESIDENT-REGISTRY-GROWTH-36). */
+#ifndef CHIM_FRAME_SOURCE
+#define CHIM_FRAME_SOURCE	1
+#endif
+static int FrameMap (const char *name, const float *v)
+{
+	return active && frame_map[0] && name && !strcmp (name, frame_map) &&
+		isfinite (v[0]) && isfinite (v[1]) && isfinite (v[2]);
+}
+static int FrameSource (const char *name, const float *local, float *world)
+{
+	return FrameMap (name, local) && Source (local, world);
+}
+static int FrameLocal (const char *name, const float *world, float *local)
+{
+	return FrameMap (name, world) && Local (world, local);
+}
+/* Inside the frame's chunk grid (map units), less the region rows' 24-unit margin (aw_world.c AW_WorldContains). */
+static int FrameContains (const char *name, const float *local)
+{
+	int k, n;
+	if (!FrameMap (name, local) || chim_frame.frame.grain <= 0)
+		return 0;
+	for (k=0 ; k<2 ; k++)
+	{
+		n = k ? chim_frame.frame.ny : chim_frame.frame.nx;
+		if (!(local[k] >= chim_frame.frame.low[k] + 24 &&
+			local[k] < chim_frame.frame.low[k] + (float)n * chim_frame.frame.grain - 24))
+			return 0;
+	}
 	return 1;
 }
 
@@ -2077,8 +2118,11 @@ void Chim_Init (void)
 	aw_chim_town_map = TownMap;
 	aw_chim_entity = ChimStatics_Capture;
 	aw_chim_source = Source;
-	aw_focus_chim_source = Source;
-	aw_focus_chim_local = Local;
+#if CHIM_FRAME_SOURCE
+	aw_world_chim_source = FrameSource;
+	aw_world_chim_local = FrameLocal;
+	aw_world_chim_contains = FrameContains;
+#endif
 	aw_chim_cross = Cross;
 	aw_chim_recentre = Recentre;
 #ifdef AMIGA

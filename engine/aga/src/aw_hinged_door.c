@@ -147,6 +147,15 @@ static int original_lock(int row){
 /* A script's Lock and Unlock (aw_mwhost.c, set there; NULL in builds and tests without it): the level the scripts
  * left on REFERENCE, ORIGINAL when they set none. */
 int (*aw_object_lock_level)(unsigned reference,int original);
+/* CELL-CHANGES-59 slice 2 (aw_hinged_door.h; aw_mwhost.c sets them): a lock change kept on the world change list, and
+ * a door's pose there. */
+int (*aw_object_lock)(unsigned reference,int lock,int level);
+int (*aw_door_open)(unsigned reference,int set);
+/* The pose the door comes back in: open when the world change list holds it open, or (the census hall door, and an
+ * older save) when the story says so. */
+static int saved_open(unsigned reference){
+    return (aw_door_open && aw_door_open(reference,-1)==1) || story(reference,AW_HINGE_STORY_SPAWN)==1;
+}
 /* Locked now: the story's word where it has one (the opening), else a script's lock, else the table's flag. */
 static int locked(const hd_door_t *d){
     int s=story(d->ref,AW_HINGE_STORY_LOCK),original=original_lock(d->row);
@@ -183,7 +192,10 @@ static int lock_pass(unsigned reference){
         memset(&item,0,sizeof(item));
         snprintf(text,sizeof(text),"%s %s",AW_InventoryRead(key,&item) && item.name[0]?item.name:key,
                  key_used[0]?key_used:"used to open lock");
-        AW_UISubtitle("",text,3);return 1;
+        AW_UISubtitle("",text,3);
+        /* the key unlocks it for good (OpenMW 0.51 door.cpp: the reference is unlocked, its level kept for a Lock) */
+        if(aw_object_lock)aw_object_lock(reference,0,0);
+        return 1;
     }
     p=sv.active && svs.clients?svs.clients[0].edict:NULL;
     if(p && ((int)p->v.flags&FL_GODMODE)){AW_UISubtitle("",AW_DOOR_GOD_TEXT,4);return 1;}
@@ -327,6 +339,7 @@ static int use_door(hd_door_t *d,int force){
     if(!d->dir){d->dir=d->amount>0?-1:1;moving++;}
     else d->dir=(signed char)-d->dir;
     d->held=0;
+    if(aw_door_open)aw_door_open(d->ref,d->dir>0);    /* where it goes, kept across maps and saves */
     if(d->dir>0)story(d->ref,AW_HINGE_STORY_OPEN);
     play(d,d->dir>0?b->open:b->close);
     return 1;
@@ -389,10 +402,11 @@ void AW_HingedDoorSpawn(void){
         for(j=0;j<placed_count;j++)
             if(!placed[j].edict && placed[j].ref==(unsigned)v->_float){e->v.solid=SOLID_NOT;SV_LinkEdict(e,false);break;}
     }
-    /* The story's saved pose (the census hall door: aw_story.hall_open). */
+    /* The saved pose: the world change list's open doors (CELL-CHANGES-59), and the story's (the census hall door:
+     * aw_story.hall_open, which an older save carries alone). */
     for(i=0;i<placed_count;i++){
         d=&placed[i];
-        if(d->dir || d->amount>0 || story(d->ref,AW_HINGE_STORY_SPAWN)!=1)continue;
+        if(d->dir || d->amount>0 || !saved_open(d->ref))continue;
         d->amount=AW_HINGE_OPEN_DEGREES;pose(d,d->amount);
     }
 }
@@ -406,11 +420,42 @@ int AW_HingedDoorPlacement(unsigned pid,unsigned reference,const float *origin,f
     d=add(reference,row,origin,radius,*yaw);
     if(!d)return 0;
     d->pid=pid;
+    /* a door left open (the world change list, or the story's) comes back open in its placement too */
+    if(saved_open(reference)){d->amount=AW_HINGE_OPEN_DEGREES;*yaw=d->closed-d->amount;}
     return 1;
 }
 void AW_HingedDoorRecentre(const float *d){
     int i,k;
     for(i=0;i<placed_count;i++)if(!placed[i].edict)for(k=0;k<2;k++)placed[i].origin[k]-=d[k];
+}
+/* aw_hinged_door go [N] (test sessions, CELL-CHANGES-59 slice 2): the player 40 units in front of door N of the list
+ * (on the side they stand), the eye 8 units above its origin, aimed at its middle; the side of the hinge the door's
+ * leaf lies on is tried both ways (and the other face last); when none of them aims at it, the first spot is kept (for
+ * a picture). The spot is not checked for room to stand: noclip after it. 1 when the door is under the crosshair. */
+static int go_door(int k){
+    hd_door_t *d;edict_t *p;float c,s,side,leaf,eye_z;vec3_t mid,delta,angles,forward,right,up;int tries;
+    if(k<0 || k>=placed_count || !sv.active || !svs.clients || !(p=svs.clients[0].edict))return 0;
+    /* the door's facing through the engine's own AngleVectors (no libm sin/cos: 68040-unimplemented paths) */
+    d=&placed[k];angles[0]=angles[2]=0;angles[1]=d->closed-d->amount;AngleVectors(angles,forward,right,up);
+    c=forward[0];s=forward[1];
+    side=(p->v.origin[0]-d->origin[0])*c+(p->v.origin[1]-d->origin[1])*s>=0?1.f:-1.f;
+    eye_z=d->origin[2]+8;
+    for(tries=0;tries<5;tries++){
+        leaf=d->radius*.5f*((tries&1)?-1.f:1.f);
+        mid[0]=d->origin[0]-s*leaf;mid[1]=d->origin[1]+c*leaf;mid[2]=eye_z;
+        p->v.origin[0]=mid[0]+((tries&2)?-side:side)*40*c;p->v.origin[1]=mid[1]+((tries&2)?-side:side)*40*s;
+        p->v.origin[2]=eye_z-p->v.view_ofs[2];SV_LinkEdict(p,false);
+        VectorSubtract(mid,p->v.origin,delta);delta[2]-=p->v.view_ofs[2];
+        cl.viewangles[0]=0;cl.viewangles[1]=(float)(atan2(delta[1],delta[0])*180/M_PI);cl.viewangles[2]=0;
+        if(tries<4 && aimed()==d)return 1;      /* the fifth: back to the first spot, not aimed */
+    }
+    return 0;
+}
+/* the door of a test command: the door number N given as the argument at ARG, else the one under the crosshair */
+static hd_door_t *chosen(int arg){
+    int k=-1;
+    if(Cmd_Argc()>arg && Q_sscanf(Cmd_Argv(arg),"%d",&k)==1)return k>=0 && k<placed_count?&placed[k]:NULL;
+    return aimed();
 }
 /* dbg door: open or close the door under the crosshair, locks ignored;
  * "status" counts, "list" each door of the map. */
@@ -429,6 +474,36 @@ static void command(void){
                    door_locks?"on":"off: every lock ignored",(long)lock_count);
         return;
     }
+    /* CELL-CHANGES-59 slice 2, test sessions (N: the door's number in "list"; without it the door under the crosshair):
+     *   go [N]                 the player in front of it (go_door)
+     *   use [N]                the player's use of it (its lock holds, as E: a script's Activate, OpenMW's rule)
+     *   lock [N [level]]       the console's Lock (no level: the level it had last), kept like a script's
+     *   unlock [N]             the console's Unlock, kept the same way */
+    if(!Q_strcasecmp(a,"use")){
+        if(!(d=chosen(2))){Con_Printf("No such hinged door here (%ld doors).\n",(long)placed_count);return;}
+        use_door(d,0);
+        Con_Printf("Door %lu %s.\n",(unsigned long)d->ref,d->dir>0?"opening":d->dir<0?"closing":"stays as it is (locked)");
+        return;
+    }
+    if(!Q_strcasecmp(a,"go")){
+        int k=0;
+        if(Cmd_Argc()>2 && Q_sscanf(Cmd_Argv(2),"%d",&k)!=1)k=-1;
+        if(k<0 || k>=placed_count){Con_Printf("aw_hinged_door go: %ld doors here.\n",(long)placed_count);return;}
+        Con_Printf("aw_hinged_door go: door %lu %s.\n",(unsigned long)placed[k].ref,
+                   go_door(k)?"under the crosshair":"not under the crosshair from its front");
+        return;
+    }
+    if(!Q_strcasecmp(a,"lock") || !Q_strcasecmp(a,"unlock")){
+        int lock=!Q_strcasecmp(a,"lock"),level=-1;
+        if(Cmd_Argc()>3 && Q_sscanf(Cmd_Argv(3),"%d",&level)!=1)level=-1;
+        d=chosen(2);
+        if(!d){Con_Printf("No such hinged door here (%ld doors).\n",(long)placed_count);return;}
+        if(!aw_object_lock || !aw_object_lock(d->ref,lock,level<0?-1:level>100?100:level)){
+            Con_Printf("Locks are not kept in this build.\n");return;}
+        Con_Printf("Door %lu %s%s.\n",(unsigned long)d->ref,locked(d)?"locked":"unlocked",
+                   lock && !door_locks?" (dbg doorlocks off: every lock ignored)":"");
+        return;
+    }
     if(list || !Q_strcasecmp(a,"status")){
         int edicts=0;
         for(i=0;i<placed_count;i++)edicts+=placed[i].edict!=0;
@@ -438,7 +513,9 @@ static void command(void){
         for(i=0;list && i<placed_count;i++){
             d=&placed[i];
             Con_Printf("  %lu %s %ld/90 deg%s lock %ld%s%s%s at %ld %ld %ld\n",(unsigned long)d->ref,d->edict?"edict":"CHIM",
-                (long)d->amount,d->dir>0?" opening":d->dir<0?" closing":"",(long)rows[d->row].lock,
+                (long)d->amount,d->dir>0?" opening":d->dir<0?" closing":"",
+                /* the level now: a script's or the console's (the world change list), else the game data's */
+                (long)(aw_object_lock_level?aw_object_lock_level(d->ref,original_lock(d->row)):original_lock(d->row)),
                 locked(d)?" locked":"",story(d->ref,AW_HINGE_STORY_LOCK)>=0?" (story)":"",
                 rows[d->row].flags&AW_HINGE_TRAP?" trap":"",
                 (long)d->origin[0],(long)d->origin[1],(long)d->origin[2]);

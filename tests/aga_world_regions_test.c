@@ -48,8 +48,57 @@ int COM_FOpenFile(char *name,FILE **out){
 }
 /* aw_region.c AW_SceneMapSize: the scene's own map (no CHIM frame maps in this test). */
 int AW_SceneMapSize(const char *n,char *p,int s){char b[64];FILE *f=NULL;int k;sprintf(b,"maps/%s.bsp",n);k=COM_FOpenFile(b,&f);if(f)fclose(f);else k=-1;if(p && s>0){strncpy(p,b,s-1);p[s-1]=0;}return k;}
+/* CHIM-FRAME-SOURCE-CONVERSION-59: a stand-in for the loaded CHIM frame (chim_world.c FrameSource / FrameLocal /
+ * FrameContains): frame map FRAME_NAME, centre (-8000, 12000), chunk grid -512..512; answers for that map only. */
+extern int (*aw_world_chim_source)(const char *,const float *,float *);   /* aw_world.c (chim/chim.h) */
+extern int (*aw_world_chim_local)(const char *,const float *,float *);
+extern int (*aw_world_chim_contains)(const char *,const float *);
+static const char *frame_name="seyda_chim";static int frame_calls;
+static int frame_source(const char *n,const float *l,float *w){
+    frame_calls++;if(!n || strcmp(n,frame_name))return 0;
+    w[0]=l[0]*4-8000;w[1]=l[1]*4+12000;w[2]=l[2]*4;return 1;}
+static int frame_local(const char *n,const float *w,float *l){
+    frame_calls++;if(!n || strcmp(n,frame_name))return 0;
+    l[0]=(w[0]+8000)*.25f;l[1]=(w[1]-12000)*.25f;l[2]=w[2]*.25f;return 1;}
+static int frame_contains(const char *n,const float *l){
+    frame_calls++;return n && !strcmp(n,frame_name) && fabs(l[0])<488 && fabs(l[1])<488;}
+/* Region maps and a town's handoff row answer exactly as with the region table alone, the frame is never asked for
+ * them; a frame map converts both ways through the frame; a room map is a room either way. The script host's
+ * room-or-outdoor decision at map load (aw_mwhost.c attach_map: AW_SourceToWorld(sv.name, 0 0 0), then
+ * AW_WorldContains for every outdoor placement) is checked here with its own calls. */
+static void frame_maps(void){
+    float l[3]={100,-50,20},w[3],r[3],back[3],zero[3]={0,0,0},at[3],out[3]={600,0,0};
+    const char *region[]={"vf0000","vf0001","seyda","balmora","vivec_arena"};int i;
+    aw_world_chim_source=NULL;aw_world_chim_local=NULL;aw_world_chim_contains=NULL;
+    for(i=0;i<5;i++){
+        float w0[3],l0[3];int s0,t0,c0,s1,t1,c1;
+        s0=AW_WorldToSource(region[i],l,w0);t0=AW_SourceToWorld(region[i],w0,l0);c0=AW_WorldContains(region[i],l);
+        assert(s0==AW_RegionWorldToSource(region[i],l,r) && (!s0 || !memcmp(r,w0,sizeof r)));
+        aw_world_chim_source=frame_source;aw_world_chim_local=frame_local;aw_world_chim_contains=frame_contains;
+        frame_name=region[i];frame_calls=0;  /* even when the loaded frame map has that name: the region row wins */
+        s1=AW_WorldToSource(region[i],l,w);t1=AW_SourceToWorld(region[i],w,back);c1=AW_WorldContains(region[i],l);
+        assert(s0 && s1 && t0 && t1 && c0==c1 && !memcmp(w,w0,sizeof w) && !memcmp(back,l0,sizeof back) && !frame_calls);
+        aw_world_chim_source=NULL;aw_world_chim_local=NULL;aw_world_chim_contains=NULL;
+    }
+    frame_name="seyda_chim";
+    /* no frame hooks (a legacy disk): a frame map is not known, a room stays a room */
+    assert(!AW_WorldToSource("seyda_chim",l,w) && !AW_SourceToWorld("seyda_chim",zero,at) && !AW_WorldContains("seyda_chim",l));
+    aw_world_chim_source=frame_source;aw_world_chim_local=frame_local;aw_world_chim_contains=frame_contains;
+    assert(AW_WorldToSource("seyda_chim",l,w) && w[0]==400-8000 && w[1]==-200+12000 && w[2]==80);
+    assert(AW_SourceToWorld("seyda_chim",w,back) && back[0]==l[0] && back[1]==l[1] && back[2]==l[2]);
+    /* the script host: a frame town is outdoors, its placements inside the frame attach, outside it do not */
+    assert(AW_SourceToWorld("seyda_chim",zero,at) && at[0]==2000 && at[1]==-3000);
+    assert(AW_WorldContains("seyda_chim",l) && !AW_WorldContains("seyda_chim",out));
+    /* a room map (no region row, not the loaded frame): still a room */
+    assert(!AW_SourceToWorld("census",zero,at) && !AW_WorldToSource("census",l,w) && !AW_WorldContains("census",l));
+    /* another frame map than the loaded one: not converted (aw_scene.c teleport targets) */
+    assert(!AW_SourceToWorld("balmora_chim",zero,at));
+    aw_world_chim_source=NULL;aw_world_chim_local=NULL;aw_world_chim_contains=NULL;
+    puts("frame maps: region rows unchanged, the loaded frame both ways, rooms stay rooms");
+}
 int main(void){
     float a[3]={240,0,40},b[3],c[3],source[3];char target[16];int before;
+    frame_maps();
     assert(AW_MapId("vf0000")==AW_MAP_COUNT);
     /* Outdoor save IDs stay fixed when interior sections are appended. */
     assert(AW_MapId("vf8191")==8251 && AW_INTERIOR_MAP_BASE==8252);

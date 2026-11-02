@@ -58,6 +58,15 @@ int AW_HingedDoorRow(unsigned reference);
  * lock (aw_mwhost.c sets it: the level the scripts left, ORIGINAL when none). */
 int AW_HingedDoorOriginalLock(unsigned reference);
 extern int (*aw_object_lock_level)(unsigned reference,int original);
+/* CELL-CHANGES-59 slice 2 (aw_mwhost.c sets them; NULL in builds and tests without it):
+ *   aw_object_lock  a lock change kept like a script's: LOCK 1 Lock LEVEL (-1 the level it had last), 0 Unlock. The
+ *                   player's key unlocks the door it opens (OpenMW 0.51 mwclass/door.cpp: the key unlocks the
+ *                   reference); dbg door lock / unlock on the door under the crosshair.
+ *   aw_door_open    a door's pose on the world change list: SET 1 open, 0 closed, -1 asks (1 open). A door recorded
+ *                   open stands open when its map or placement comes back, before and after a save. */
+extern int (*aw_object_lock)(unsigned reference,int lock,int level);
+extern int (*aw_door_open)(unsigned reference,int set);
+int AW_ObjectLock(unsigned reference,int lock,int level);
 /* DEBUG-GOD-LOCKED-DOORS-51: a load door's lock (the table's K rows; aw_scene.c through aw_load_door_lock).
  * USE 0: 1 when locked now; USE 1: the player's use, 1 = refused (LockedDoor played), 0 = through (unlocked,
  * the key, god mode with AW_DOOR_GOD_TEXT in the message box, dbg doorlocks off). */

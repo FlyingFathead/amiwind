@@ -9,6 +9,14 @@ int hunk_size=8*1024*1024,hunk_low_used,hunk_high_used,com_filesize;double realt
 static model_t world,portrait,gear,held_torch;static int held_loads;
 static int right_type=-1,shield=1,loads,frees,tag_frame=-1,wrong_frames,missing,torch;
 int AW_TorchEquipped(void){return torch;}
+/* The assembled body (PLAYER-GEAR-VISUAL-59): off in this fixture (aw_player_body_parts unregistered, 0), so the
+ * baked body and its inventory poses are what is tested here; tests/test_player_parts.py covers the parts. */
+aw_part_t aw_parts[384];int aw_part_count;aw_state_t aw_state;
+void Q_strncpy(char *d,char *s,int n){strncpy(d,s,(size_t)n);}
+int AW_PartsAssemble(const char *t,long n,const char *r,int f,const char *h,const char *k,const char *const *i,int c,
+                     aw_parts_body_t *o){(void)t;(void)n;(void)r;(void)f;(void)h;(void)k;(void)i;(void)c;(void)o;assert(0);return 0;}
+const aw_skel_table_t *AW_SkelTableFor(const char *name){(void)name;assert(0);return NULL;}
+void *Mod_Extradata(model_t *m){(void)m;assert(0);return NULL;}
 int Hunk_LowMark(void){return 0;}
 void Hunk_FreeToLowMark(int n){(void)n;}
 byte *COM_LoadHunkFile(char *path){(void)path;return NULL;}

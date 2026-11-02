@@ -566,5 +566,89 @@ class PreviewTests(unittest.TestCase):
         self.assertGreater(len(set(frames[0].getdata())), 2)        # something was drawn
 
 
+class SharedVertexTests(unittest.TestCase):
+    """FP-ARMS-PARTS-COST-59: the first-person arm parts keep their authored vertices, shared between triangles
+    (topology 'source', weld_shared): the vertex count is the source's, and every triangle corner posed as the
+    engine poses it is byte for byte the corner of the same model with every triangle on its own three vertices."""
+
+    def test_weld_merges_only_vertices_equal_in_every_frame_and_texture_coordinate(self):
+        frames = np.zeros((2, 6, 3))
+        frames[:, :, 0] = [0, 1, 0, 0, 1, 0]
+        frames[:, :, 1] = [0, 0, 1, 0, 0, 1]
+        frames[1, 5, 2] = 1.0                  # the sixth moves in frame 1: not the third's twin
+        frames[0, 3, 0] = -0.0                 # negative zero is zero
+        uv = np.array([[0, 0], [1, 0], [0, 1], [0, 0], [1, 0], [0, 1]])
+        uv[4] = (2, 0)                         # the fifth has another texture coordinate
+        faces = np.array([[0, 1, 2], [3, 4, 5]])
+        f, t, u, skin = weld_args = S.weld_shared(frames, faces, uv, 'skin')
+        self.assertEqual(skin, 'skin')
+        self.assertEqual(f.shape, (2, 5, 3))
+        self.assertEqual(t.tolist(), [[0, 1, 2], [0, 3, 4]])
+        np.testing.assert_array_equal(f[:, t], frames[:, faces])
+        np.testing.assert_array_equal(u[t], uv[faces])
+        self.assertEqual(len(weld_args), 4)
+
+    def setUp(self):
+        if self._testMethodName.startswith('test_weld'):
+            return
+        try:
+            import scipy  # noqa: F401
+            from PIL import Image  # noqa: F401
+        except ImportError:
+            self.skipTest('Install optional NPC conversion dependencies')
+        base = SkeletalModelTests('test_one_rest_frame_and_the_block_after_a_standard_mdl')
+        base.setUp()
+        self.base = base
+        self.materials = [{'texture_index': None, 'diffuse': [1., 1., 1.], 'alpha': 1.}]
+        self.args = (base.shapes, self.materials, {}, bytes(range(256)) * 3, base.sources, base.skeleton.pose(0.0),
+                     base.SCALE, base.table, base.report['bone_names'])
+
+    def source_model(self, weld=True):
+        from unittest.mock import patch
+        if weld:
+            return S.skeletal_from_shapes(*self.args, topology='source')
+        with patch.object(S, 'weld_shared', lambda *a: a):
+            # one vertex per triangle corner: the face-tile bake's layout on the same authored triangles
+            def unshared(frames, faces, uv, skin):
+                faces = np.asarray(faces)
+                return frames[:, faces.reshape(-1)], np.arange(faces.size).reshape(-1, 3), uv[faces.reshape(-1)], skin
+            with patch.object(S, 'weld_shared', unshared):
+                return S.skeletal_from_shapes(*self.args, topology='source')
+
+    def test_source_topology_keeps_the_authored_shared_vertices(self):
+        model, facts = self.source_model()
+        m = S.read_skeletal(model)
+        source_vertices = sum(len(s['uv']) for s in self.base.shapes)
+        source_faces = sum(len(s['faces']) for s in self.base.shapes)
+        self.assertEqual(facts['topology'], 'source')
+        self.assertEqual((m['nv'], m['nt']), (source_vertices, source_faces))
+        self.assertLess(m['nv'], 3 * m['nt'] / 2)
+        self.assertEqual(facts['kept_vertices'], m['nv'])           # every vertex an authored one, bones exact
+        loose, _ = self.source_model(weld=False)
+        self.assertEqual(S.read_skeletal(loose)['nv'], 3 * source_faces)
+
+    def test_every_pose_is_byte_identical_to_the_unshared_model(self):
+        shared = S.read_skeletal(self.source_model()[0])
+        loose = S.read_skeletal(self.source_model(weld=False)[0])
+
+        def corners(model, raw):
+            n = model['nv']
+            at = model['standard'] - n * 4 - 28 - model['nt'] * 16     # one frame: type, box and name, vertices
+            tris = np.frombuffer(raw, '<i4', model['nt'] * 4, at).reshape(-1, 4)[:, 1:]
+            return tris
+        shared_raw = self.source_model()[0]
+        loose_raw = self.source_model(weld=False)[0]
+        ts, tl = corners(shared, shared_raw), corners(loose, loose_raw)
+        self.assertEqual(len(ts), len(tl))
+        np.testing.assert_array_equal(shared['rest_bytes'][ts], loose['rest_bytes'][tl])
+        table = S.read_table(self.base.table)
+        for frame in range(table['frames']):
+            np.testing.assert_array_equal(S.engine_pose(shared, table, frame)[ts], S.engine_pose(loose, table, frame)[tl])
+
+    def test_an_unknown_topology_is_refused(self):
+        with self.assertRaises(ValueError):
+            S.skeletal_from_shapes(*self.args, topology='tiles')
+
+
 if __name__ == '__main__':
     unittest.main()

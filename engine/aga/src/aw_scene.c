@@ -517,6 +517,9 @@ int AW_MapTeleportAt(const float *source_position,int use_height) {
     memset(&r,0,sizeof(r));
     if(!AW_WorldMapTarget(source_position,r.target,r.arrival))return 0;
     if(use_height){
+        /* The target map's own units: the shared conversion answers for a region map, or for the CHIM frame map only
+         * while it is the loaded one (a frame map not yet loaded has no frame to ask: its height then comes from the
+         * region table's row of that town, or the teleport is refused, as before; CHIM-FRAME-SOURCE-CONVERSION-59). */
         if(!AW_SourceToWorld(r.target,source_position,local) || !(fabs(local[2])<AW_COORD_BOUND))return 0;
         r.arrival[2]=local[2];
     }

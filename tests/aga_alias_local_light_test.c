@@ -50,6 +50,7 @@ int AW_NpcLodResident(int *bytes){if(bytes)*bytes=0;return 0;}
 int AW_HandModelsApply(void){return 1;}
 void AW_TorchViewModel(void){assert(0);}
 float R_SpriteEntityScale(const entity_t *e){return 1;}
+float R_AliasAxisScale(const entity_t *e,int axis){(void)e;(void)axis;return 1;}
 qboolean AcceptAliasBBox(void){currententity->trivial_accept=0;return true;}
 void CaptureAliasDraw(alight_t *light){received=*light;draws++;R_AliasDrawModel(light);}
 int R_LightPoint(vec3_t p){return world_light;}

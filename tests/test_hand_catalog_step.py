@@ -122,9 +122,9 @@ class RuntimePalette(unittest.TestCase):
         final = overlay.banked_palette(scene_palette())
         used = []
 
-        def hands(assets, kinds, palette, *args):
+        def hands(assets, kinds, palette, *args, stance='hh'):
             used.append(palette)
-            return b'hand', {'sha256': sha(b'hand'), 'clips': {'idle': 8}}
+            return b'hand', {'sha256': sha(b'hand'), 'clips': {'idle': 8}, 'frames': 28, 'triangles': 1, 'vertices': 3}
 
         def torch(data, stage, **kwargs):
             used.append((stage / 'gfx/palette.lmp').read_bytes())
@@ -146,10 +146,12 @@ class RuntimePalette(unittest.TestCase):
                  patch.object(catalog, 'bake_appearance', side_effect=hands), \
                  patch.object(catalog, 'prepare_torch', side_effect=torch), \
                  patch('prepare_block_view.prepare', side_effect=block) as block_bake, \
+                 patch.object(catalog, 'weapon_view_tags', return_value=[[[0.0] * 6] * 28] * 3), \
                  patch.object(catalog, 'runtime_palette', return_value=final):
                 source.return_value.kinds = {'RACE': {'nord': object()}}
                 result = catalog.prepare(root / 'owned', root / 'palette.lmp', root / 'out', runtime=True, jobs=1)
-        self.assertEqual(used, [final] * 5)
+        # 2 appearances x (bare hands + 3 armed stances) + 2 torch arms + the block view, all on the final palette
+        self.assertEqual(used, [final] * 11)
         block_bake.assert_called_once()
         self.assertEqual(len(result['block_view']['appearances']), 2)
         self.assertEqual(result['block_view']['palette_sha256'], sha(final))
@@ -169,6 +171,34 @@ class Install(unittest.TestCase):
             for path in ('progs/hands/nord_m.mdl', 'progs/hands/orc_f_t.mdl', 'gfx/hand-models.awh', 'gfx/hand-torch.awt',
                          'progs/hands/orc_f_b.mdl', 'gfx/block-models.awb'):
                 self.assertEqual((id1 / path).read_bytes(), (out / path).read_bytes())
+
+    def test_installs_the_armed_stances_and_weapon_table(self):
+        # PLAYER-GEAR-VISUAL-59: every appearance's three armed arms and the one AWW1 table, all or nothing.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            out = make_catalog(root, scene_palette())
+            report = json.loads((out / 'hand-catalog-report.json').read_text(encoding='utf-8'))
+            for entry in report['entries']:
+                entry['stances'] = {}
+                for stance in catalog.WEAPON_STANCES:
+                    path = catalog.stance_path(entry['race'], entry['female'], stance)
+                    raw = ('armed-' + path).encode()
+                    (out / path).write_bytes(raw)
+                    entry['stances'][stance] = {'model': path, 'sha256': sha(raw), 'bytes': len(raw)}
+            meta = catalog.pack_weapon_tags([[[0.0] * 6] * 28] * 3)
+            (out / catalog.WEAPON_METADATA).write_bytes(meta)
+            report['weapon_view'] = {'metadata': catalog.WEAPON_METADATA, 'metadata_sha256': sha(meta),
+                                     'stances': list(catalog.WEAPON_STANCES)}
+            (out / 'hand-catalog-report.json').write_text(json.dumps(report), encoding='utf-8')
+            id1 = stage(root, scene_palette())
+            result = catalog.install(out, id1)
+            self.assertEqual(result['files'], 15 + 4 * 3 + 1)
+            self.assertEqual((id1 / 'progs/hands/orc_f_2w.mdl').read_bytes(), b'armed-progs/hands/orc_f_2w.mdl')
+            self.assertEqual((id1 / 'gfx/hand-weapons.aww').read_bytes(), meta)
+            del report['entries'][0]['stances']['1h']
+            (out / 'hand-catalog-report.json').write_text(json.dumps(report), encoding='utf-8')
+            with self.assertRaisesRegex(ValueError, 'armed arms'):
+                catalog.install(out, stage(root / 'second', scene_palette()))
 
     def test_other_palette_installs_nothing(self):
         with tempfile.TemporaryDirectory() as tmp:

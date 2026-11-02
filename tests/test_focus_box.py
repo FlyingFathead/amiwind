@@ -127,8 +127,7 @@ class FocusTableTests(unittest.TestCase):
         # (PLACED-ITEMS-OUTDOORS-FIRST-FRAME-59)
         self.assertIn('focus_to_local(', load)
         convert = body(inventory, 'static int focus_to_local(')
-        self.assertIn('AW_SourceToWorld(', convert)
-        self.assertIn('aw_focus_chim_local', convert)
+        self.assertIn('AW_SourceToWorld(', convert)       # the shared conversion: region table, then the CHIM frame
         self.assertIn('dx<=1', load)                              # the player's cell and its neighbours only
 
     def test_books_are_read_and_magic_scrolls_are_taken(self):
@@ -146,6 +145,69 @@ class FocusTableTests(unittest.TestCase):
         self.assertEqual(rows, {30: focus.ACT_READ, 31: focus.ACT_READ | focus.ACT_OWNED,
                                 32: focus.ACT_TAKE | focus.ACT_MAGIC_SCROLL,
                                 33: focus.ACT_TAKE | focus.ACT_MAGIC_SCROLL | focus.ACT_OWNED})
+
+    def test_owner_of_an_owned_item(self):
+        """CELL-CHANGES-59 slice 2: whom an owned item is stolen from: the placement's owner (ANAM), else its owning
+        faction (CNAM); an unowned item or a thing that is no item has none. The list after the rows (AWF3)."""
+        import prepare_focus as focus
+        rows = {r[2]: r for r in focus.placements(self.MASTER, focus.objects_of(self.MASTER), {'test office': 7})[7]}
+        self.assertEqual(rows[11][11], ('clerk', 0))
+        self.assertIsNone(rows[10][11])
+        self.assertIsNone(rows[13][11])
+        self.assertEqual(focus.owner_of({'CNAM': z('Hlaalu')}), ('hlaalu', 1))
+        self.assertEqual(focus.owner_of({'ANAM': z('Fargoth'), 'CNAM': z('Hlaalu')}), ('fargoth', 0))
+        self.assertIsNone(focus.owner_of({'ANAM': z('x' * 33)}))
+        tail = focus.owner_list({20: ('fargoth', 0), 10: ('hlaalu', 1), 30: ('fargoth', 0)})
+        self.assertEqual(tail[:8], b'AWO1' + struct.pack('<I', 3))
+        entries = [struct.unpack_from('<IHBB', tail, 8 + 8 * i) for i in range(3)]
+        self.assertEqual([e[0] for e in entries], [10, 20, 30])                # ascending reference
+        self.assertEqual(entries[1][1], entries[2][1])                          # one pool entry per owner
+        pool_size = struct.unpack_from('<I', tail, 32)[0]
+        pool = tail[36:]
+        self.assertEqual(len(pool), pool_size)
+        self.assertEqual(pool[entries[0][1]:].split(b'\0')[0], b'hlaalu')
+        self.assertEqual(entries[0][2], 1)
+
+    def test_engine_reads_the_owner_list(self):
+        import prepare_focus as focus
+        inventory = (SRC / 'aw_inventory.c').read_text(encoding='utf-8')
+        self.assertIn('"AWF3"', inventory)
+        owner = body(inventory, 'static int placed_owner(unsigned reference,char *owner,int *faction)')
+        self.assertIn('"AWO1"', owner)
+        self.assertIn('pool=focus_u32(b))<=%d' % focus.OWNER_POOL, owner)
+        self.assertIn("b'AWF3'", (ROOT / 'tools/build_aga.py').read_text(encoding='utf-8'))
+        self.assertEqual(focus.OWNER_ID, 32)
+        self.assertRegex((SRC / 'aw_ledger.h').read_text(encoding='utf-8'), r'#define AW_LEDGER_STOLEN_ID 32\b')
+
+    def test_containers_and_their_contents(self):
+        """CELL-CHANGES-59 slice 3: a placed container is a 'C' row (owned like an item); its record's NPCO list goes
+        into the contents list after the owners list (a restocking count made positive, a levelled list left out)."""
+        import prepare_focus as focus
+
+        def npco(count, ident):
+            return sub('NPCO', struct.pack('<i', count) + ident.encode('ascii').ljust(32, b'\0'))
+        master = self.MASTER + b''.join([
+            rec('LEVI', sub('NAME', z('l_loot'))),
+            rec('CONT', sub('NAME', z('chest_a')), sub('FNAM', z('Chest')), npco(2, 'test_cup'), npco(-3, 'test_dagger'),
+                npco(1, 'l_loot')),
+            rec('CELL', sub('NAME', z('Store')), sub('DATA', struct.pack('<Iii', 1, 0, 0)),
+                ref(40, 'chest_a', (1, 1, 1), sub('ANAM', z('clerk'))), ref(41, 'chest_a', (2, 2, 2)))])
+        objects = focus.objects_of(master)
+        self.assertEqual(objects['chest_a'][0], 'C')
+        self.assertEqual(objects['chest_a'][5:], ([('test_cup', 2), ('test_dagger', 3)], 3))
+        rows = {r[2]: r for r in focus.placements(master, objects, {'store': 9})[9]}
+        self.assertEqual((rows[40][0], rows[40][1], rows[40][11]), ('C', 1, ('clerk', 0)))
+        self.assertEqual(rows[41][1], 0)
+        tail = focus.contents_list({41: rows[41][12], 40: rows[40][12]})
+        self.assertEqual(tail[:8], b'AWC1' + struct.pack('<I', 2))
+        self.assertEqual(struct.unpack_from('<IIHBB', tail, 8), (40, 0, 2, 3, 0))
+        self.assertEqual(struct.unpack_from('<IIHBB', tail, 20), (41, 2, 2, 3, 0))
+        self.assertEqual(struct.unpack_from('<I', tail, 32)[0], 4)
+        self.assertEqual(tail[36:68].rstrip(b'\0'), b'test_cup')
+        self.assertEqual(struct.unpack_from('<i', tail, 68)[0], 2)
+        inventory = (SRC / 'aw_inventory.c').read_text(encoding='utf-8')
+        self.assertIn('"AWC1"', body(inventory, 'static int container_base('))
+        self.assertIn("row[0]!='C'", inventory)
 
     def test_row_layout(self):
         import prepare_focus as focus

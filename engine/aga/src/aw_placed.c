@@ -150,6 +150,7 @@ static void ledger_command(void){
 static void placed_command(void){
     const char *a=Cmd_Argc()>1?Cmd_Argv(1):"status";
     if(!strcmp(a,"ledger")){ledger_command();return;}
+    if(!strcmp(a,"container")){AW_ContainerCommand();return;}   /* CELL-CHANGES-59 slice 3 */
     if(!strcmp(a,"look") || !strcmp(a,"go"))look_command(!strcmp(a,"go"));
     else if(!strcmp(a,"on") || !strcmp(a,"off")){placed_on=!strcmp(a,"on");Con_Printf("Placed items %s from the next map.\n",a);}
     else status_command();

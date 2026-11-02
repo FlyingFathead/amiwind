@@ -15,6 +15,7 @@ void Con_DPrintf(char *f,...){}
 void Sys_Error(char *fmt,...){abort();}
 void *Mod_Extradata(model_t *m){return bank;}
 float R_SpriteEntityScale(const entity_t *e){return 1;}
+float R_AliasAxisScale(const entity_t *e,int axis){(void)e;(void)axis;return 1;}
 int AW_AliasBudgetAllows(int v,int t){return v==3 && t==1;}
 void D_PolysetUpdateTables(void){assert(0);}
 void D_PolysetDrawFinalVerts(finalvert_t *v,int n){assert(0);}

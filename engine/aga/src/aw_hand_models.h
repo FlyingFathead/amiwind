@@ -20,6 +20,28 @@ void AW_BlockCompose(const float base_origin[3],const float base_angles[3],
 extern int (*aw_hand_block_item)(char id[64],char model[64]);
 int AW_HandBlockApply(void);
 int AW_HandBlockItemApply(void);
+/* First-person weapons (PLAYER-GEAR-VISUAL-59, FIRST-PERSON-WEAPONS-56): the player's equipped melee weapon in the
+ * hand. The builder (tools/prepare_hand_catalog.py) bakes, per appearance, one arms model per stance of
+ * base_anim.1st.nif with the same 28-frame contract as the bare hands (idle 8, draw 6, lower 4, swing 10):
+ * <hands model stem>_1h.mdl (one-handed), _2c.mdl (two-handed close), _2w.mdl (two-handed wide); and once,
+ * gfx/hand-weapons.aww: "AWW1", 0, the stance count, 0, the frame count (28), then per stance and frame the Weapon
+ * Bone tag in the view model's space (origin, angles: 6 big-endian 16.16 values, the AWB1 tag form). The weapon
+ * itself is the item's own model (one per mesh, the item model table), drawn as one more alias entity on that tag,
+ * only while armed: the bare-hand frame costs nothing more. */
+#define AW_HAND_STANCES 3
+#define AW_HAND_WEAPON_FRAMES 28
+typedef struct {int stances;float tag[AW_HAND_STANCES][AW_HAND_WEAPON_FRAMES][6];} aw_hand_weapons_t;
+/* The stance of an inventory item's weapon value (1 + the record's weapon type; 0 none): 0 one-handed, 1 two-handed
+ * close, 2 two-handed wide, -1 none (hand to hand, bows, crossbows, thrown, ammunition). Pure. */
+int AW_HandStance(int weapon);
+/* 1 and OUT filled when RAW is a complete gfx/hand-weapons.aww. Pure. */
+int AW_HandWeaponsDecode(aw_hand_weapons_t *out,const unsigned char *raw,int size);
+/* An item model path the hands may draw: progs/inv/ or progs/items/, lower case, ".mdl", no "..". Pure. */
+int AW_HandItemPath(const char *path);
+/* Inventory installs this: 1 with the weapon value and model of the right-hand weapon the player has equipped. */
+extern int (*aw_hand_weapon_item)(int *weapon,char model[64]);
+/* After the hands are drawn: 1 with cl.viewent set to the equipped weapon on its tag for this frame. */
+int AW_HandWeaponItemApply(void);
 /* The first-person hand clips (FIRST-PERSON-HANDS-IN-C-54): the builder writes them to gfx/hand-anims.txt in the image
  * (tools/hand_metadata.py hand_table; read by aw_hands.c), never into a map's worldspawn or the QuakeC, so a change to the hands rebuilds
  * the image only. Text: "AWHA1", then "clip NAME FIRST COUNT DURATION" for idle, draw, lower and punch (frames of the

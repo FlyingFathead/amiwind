@@ -32,6 +32,32 @@ class BlockSourceContract(unittest.TestCase):
         self.assertEqual(len(raw), 372)
         self.assertEqual(struct.unpack_from('>I', raw, 16+2*28)[0], 300)
 
+    def test_weapon_tag_table_matches_the_engine_contract(self):
+        # PLAYER-GEAR-VISUAL-59: AWW1 = 8 header bytes, then stance x 28 frames x 6 big-endian 16.16 values.
+        import numpy as np
+        import prepare_hand_catalog as catalog
+        tags = np.zeros((3, 28, 6))
+        tags[2, 27] = [-5, 1.5, 2, 0, 90, -45]
+        raw = catalog.pack_weapon_tags(tags)
+        self.assertEqual(raw[:8], b'AWW1\x00\x03\x00\x1c')
+        self.assertEqual(len(raw), 8 + 3 * 28 * 24)
+        self.assertEqual(struct.unpack_from('>6i', raw, 8 + (2 * 28 + 27) * 24),
+                         (-5 * 65536, 98304, 131072, 0, 90 * 65536, -45 * 65536))
+        for bad in (np.zeros((3, 27, 6)), np.full((1, 28, 6), 129.), np.zeros((4, 28, 6))):
+            with self.assertRaises(ValueError):
+                catalog.pack_weapon_tags(bad)
+        self.assertEqual(catalog.stance_path('dark elf', True, '2w'), 'progs/hands/dark_elf_f_2w.mdl')
+        self.assertEqual(catalog.WEAPON_STANCES, ('1h', '2c', '2w'))
+        with self.assertRaises(ValueError):
+            catalog.stance_path('nord', False, 'hh')
+        source = (ROOT / 'engine/aga/src/aw_hand_models.c').read_text(encoding='utf-8')
+        self.assertIn('"_1h.mdl","_2c.mdl","_2w.mdl"', source)
+
+    def test_armed_stances_keep_the_hand_frame_contract(self):
+        import prepare_hands as hands
+        counts = [sum(c[3] for c in hands.stance_clips(s)) for s in ('hh', '1h', '2c', '2w')]
+        self.assertEqual(counts, [28, 28, 28, 28])
+
     def test_block_layer_keeps_camera_and_right_hand_outside_the_left_arm_mask(self):
         import numpy as np
         import prepare_block_view as block

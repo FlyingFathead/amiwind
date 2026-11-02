@@ -3,9 +3,9 @@
 Development snapshot, 1 November 2026, in development. Running on CHIM Engine v0.2.2. Previous release:
 [v0.0.58](RELEASE-v0.0.58.md).
 
-The second snapshot of v0.0.59 and the first one published: the dev1 snapshot was built and checked but not
-published (it predates the v0.0.58 release on GitHub), so everything of dev1 is in this one too
-([dev1 notes](RELEASE-v0.0.59-dev1.md)). The game needs 32 MB of Fast RAM, and the emulator presets of this snapshot
+The second snapshot of v0.0.59. It was not published: its build was stopped, and dev3 carries its contents. The dev1
+snapshot was built and checked but not published either (it predates the v0.0.58 release on GitHub), so everything
+of dev1 is in this one too ([dev1 notes](RELEASE-v0.0.59-dev1.md)). The game needs 32 MB of Fast RAM, and the emulator presets of this snapshot
 have it. This snapshot is for testing in game.
 
 ## New since v0.0.58

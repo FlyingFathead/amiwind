@@ -520,6 +520,8 @@ class ChimWorldTests(unittest.TestCase):
         out = self.run_world(['ring'])[0]
         self.assertIn('reach copies ok', out)
         self.assertIn('ring ok', out)
+        # the shared conversion's frame half (CHIM-FRAME-SOURCE-CONVERSION-59, aw_world.c)
+        self.assertIn('frame conversion ok', out)
         # Three distinct models were placed six times: each read once.
         walk = [l for l in out.splitlines() if l.startswith('walk:')][0]
         self.assertIn('model loads 1,', walk)

@@ -263,7 +263,7 @@ int AW_SaveWrite(int slot)
     /* Keep larger serialized storage off the fixed Amiga task stack. The world change list (CELL-CHANGES-59) adds
      * its own bytes to the buffer: a save is never refused because the list is long. */
     capacity=AW_SAVE_BYTES;
-    if(aw_ledger.count>0){
+    if(AW_LedgerRows(&aw_ledger)>0){      /* its rows, or its stolen pairs alone (slice 2) */
         int need=AW_LedgerEncode(&aw_ledger,NULL,0);
         if(need<=0 || need>AW_SAVE_MAX_BYTES-AW_SAVE_BYTES-8){
             Con_Printf("Save world change list invalid (%d rows); previous saves retained.\n",aw_ledger.count);return 0;}

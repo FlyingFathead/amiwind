@@ -634,8 +634,9 @@ void CL_RelinkEntities (void)
 		/* A player-only equipment proxy; never change this loop's entity cursor. */
 		if (i == cl.viewentity && aw_view_held)
 		{
+            /* up to 2 held items, or the assembled body's other parts and its items (aw_view.c view_held) */
             entity_t *player_draw=draw;int held;
-            for(held=0;held<2;held++){
+            for(held=0;held<32;held++){
                 draw=aw_view_held(player_draw);if(!draw)break;
                 if(cl_numvisedicts<MAX_VISEDICTS)cl_visedicts[cl_numvisedicts++]=draw;
                 else AW_VisedictDropped();

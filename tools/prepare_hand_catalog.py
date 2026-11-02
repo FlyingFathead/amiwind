@@ -16,6 +16,46 @@ from prepare_torch import TorchSource,prepare as prepare_torch
 from prepare_hand_normals import normal_table,rewrite as rewrite_normals
 
 RECORD_SIZE=196
+# The armed first-person stances (PLAYER-GEAR-VISUAL-59): one arms model per stance and appearance, beside the bare
+# hands, and one Weapon Bone tag table for all appearances (engine/aga/src/aw_hand_models.h, gfx/hand-weapons.aww).
+# The order is the engine's stance index (0 one-handed, 1 two-handed close, 2 two-handed wide).
+WEAPON_STANCES=('1h','2c','2w')
+WEAPON_FRAMES=28
+WEAPON_METADATA='gfx/hand-weapons.aww'
+
+def stance_path(race,female,stance):
+    if stance not in WEAPON_STANCES:raise ValueError('Unknown armed stance '+str(stance))
+    return model_paths(race,female)[0][:-4]+'_'+stance+'.mdl'
+
+def stance_weapon_tags(skeleton,stance):
+    """The Weapon Bone (origin, angles) per frame of STANCE's arms, in the space prepare_hands bakes the arms in
+    (the stance's first Camera, then the view axes): npc_items.view_tags, as the block view does for the shield."""
+    import numpy as np
+    from prepare_hands import sample_clips
+    from npc_items import view_tags
+    times,_=sample_clips(skeleton.events,stance)
+    camera=skeleton.pose(float(times[0]))('Camera')[3,:3]*.25
+    tags=np.array(view_tags(skeleton,times,camera,{'weapon':True,'shield':None}))[:,:6]
+    if tags.shape!=(WEAPON_FRAMES,6):raise ValueError('Armed stance frame count differs from the hand contract')
+    return tags
+
+def weapon_view_tags(source):
+    """One Weapon Bone table for every appearance (the skeleton, base_anim.1st.nif, is shared, as for the block
+    view): per stance of WEAPON_STANCES, 28 frames of six values."""
+    from npc_geometry import Skeleton
+    skeleton=Skeleton(source.assets,'meshes/base_anim.1st.nif')
+    return [stance_weapon_tags(skeleton,stance) for stance in WEAPON_STANCES]
+
+def pack_weapon_tags(tags):
+    """AWW1: magic, 0, stance count, 0, frames (28), then per stance and frame six big-endian 16.16 values."""
+    import numpy as np
+    tags=np.asarray(tags,float)
+    if (tags.ndim!=3 or not 1<=tags.shape[0]<=len(WEAPON_STANCES) or tags.shape[1:]!=(WEAPON_FRAMES,6)
+            or not np.isfinite(tags).all() or np.max(abs(tags[:,:,:3]))>128 or np.max(abs(tags[:,:,3:]))>720):
+        raise ValueError('First-person weapon tags outside runtime bounds')
+    raw=bytearray(b'AWW1'+bytes((0,tags.shape[0],0,WEAPON_FRAMES)))
+    for value in np.rint(tags*65536).astype(np.int64).reshape(-1):raw.extend(struct.pack('>i',int(value)))
+    return bytes(raw)
 
 def model_paths(race,female):
     slug=race.casefold().replace(' ','_')
@@ -72,10 +112,23 @@ def _bake_pair(task):
         # describe the same final bytes as the installed catalogue.
         (stage/'progs/v_torch.mdl').write_bytes(torch_raw)
     (out/torch).write_bytes(torch_raw)
-    (out/'reports'/(Path(hand).stem+'.json')).write_text(json.dumps({'hands':report,'torch':torch_report},indent=2)+'\n')
+    # The armed arms (PLAYER-GEAR-VISUAL-59): the same appearance in each weapon stance, loaded only while armed.
+    stances={};stance_reports={}
+    for stance in WEAPON_STANCES:
+        armed,armed_report=bake_appearance(source.assets,source.kinds,palette,race,female,budget,topology,stance=stance)
+        if surface_normals:
+            armed,normal_report=rewrite_normals(armed,table)
+            armed_report['lighting_normals']=normal_report
+        if armed_report['frames']!=WEAPON_FRAMES or len(armed)>512*1024:
+            raise ValueError('Armed arms outside the hand model contract: '+race+' '+stance)
+        path=stance_path(race,female,stance);(out/path).write_bytes(armed);armed_report['model']=path
+        stances[stance]={'model':path,'sha256':hashlib.sha256(armed).hexdigest(),'bytes':len(armed),
+                         'triangles':armed_report['triangles'],'vertices':armed_report['vertices']}
+        stance_reports[stance]=armed_report
+    (out/'reports'/(Path(hand).stem+'.json')).write_text(json.dumps({'hands':report,'torch':torch_report,'armed':stance_reports},indent=2)+'\n')
     return report['clips'],meta,{'race':race,'female':female,'hand_model':hand,'torch_model':torch,
                                  'hand_sha256':hashlib.sha256(raw).hexdigest(),'torch_sha256':hashlib.sha256(torch_raw).hexdigest(),
-                                 'hand_bytes':len(raw),'torch_bytes':len(torch_raw)}
+                                 'hand_bytes':len(raw),'torch_bytes':len(torch_raw),'stances':stances}
 
 
 def prepare(data_files,palette_path,out,budget=320,topology='reduced',normal_mode='auto',runtime=False,jobs=None):
@@ -116,6 +169,10 @@ def prepare(data_files,palette_path,out,budget=320,topology='reduced',normal_mod
         entries.append(entry)
     (out/'gfx/hand-torch.awt').write_bytes(common_torch)
     catalog=pack_catalog(entries);(out/'gfx/hand-models.awh').write_bytes(catalog)
+    weapon_tags=weapon_view_tags(source)
+    weapon_meta=pack_weapon_tags(weapon_tags);(out/WEAPON_METADATA).write_bytes(weapon_meta)
+    weapon_view={'metadata':WEAPON_METADATA,'metadata_sha256':hashlib.sha256(weapon_meta).hexdigest(),
+                 'stances':list(WEAPON_STANCES),'frames':WEAPON_FRAMES,'tags':[[list(map(float,row)) for row in t] for t in weapon_tags]}
     # The normal 3D hand stage also owns its matching first-person block arms.
     # Use these exact final palette bytes, rather than the earlier scene palette.
     from prepare_block_view import prepare as prepare_block_view
@@ -126,7 +183,7 @@ def prepare(data_files,palette_path,out,budget=320,topology='reduced',normal_mod
             'catalog_sha256':hashlib.sha256(catalog).hexdigest(),'torch_metadata_sha256':hashlib.sha256(common_torch).hexdigest(),
             'torch_metadata':'gfx/hand-torch.awt',
             'palette_sha256':hashlib.sha256(palette).hexdigest(),'scene_palette_sha256':scene_palette_sha256,
-            'runtime_palette':bool(runtime),'block_view':block_view,
+            'runtime_palette':bool(runtime),'block_view':block_view,'weapon_view':weapon_view,
             'scope':'Owned race/sex 3D hand and torch models. Install matching models, catalogue and shared torch metadata together; legacy v_nord remains available.'}
     (out/'hand-catalog-report.json').write_text(json.dumps(result,indent=2)+'\n');return result
 
@@ -186,6 +243,20 @@ def install(catalog,id1):
     if len(actual)!=len(expected) or set(actual)!=expected:
         raise ValueError('Block appearances differ from the hand catalogue')
     files['gfx/block-models.awb']=block['metadata_sha256']
+    # The armed arms and their Weapon Bone table (PLAYER-GEAR-VISUAL-59): all of them or none (an older catalogue).
+    weapon=report.get('weapon_view')
+    if weapon is not None:
+        if not isinstance(weapon,dict) or weapon.get('metadata')!=WEAPON_METADATA or list(weapon.get('stances',[]))!=list(WEAPON_STANCES):
+            raise ValueError('Invalid first-person weapon assets in the hand catalogue')
+        for entry in report['entries']:
+            stances=entry.get('stances') or {}
+            if sorted(stances)!=sorted(WEAPON_STANCES):raise ValueError('Hand catalogue entry lacks its armed arms')
+            for stance,row in stances.items():
+                path=row['model']
+                if path!=stance_path(entry['race'],entry['female'],stance) or path in files:
+                    raise ValueError('Invalid armed arms model path')
+                files[path]=row['sha256']
+        files[WEAPON_METADATA]=weapon['metadata_sha256']
     files['gfx/hand-models.awh']=report['catalog_sha256'];files['gfx/hand-torch.awt']=report['torch_metadata_sha256']
     payload={}
     for path,digest in files.items():

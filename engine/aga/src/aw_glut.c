@@ -21,7 +21,53 @@ static long sx32(unsigned long u) {return u&0x80000000ul?-(long)(0xFFFFFFFFul-u)
 static long pad4(long n) {return (n+3)&~3L;}
 static int lower(int c) {return c>='A' && c<='Z'?c+32:c;}
 static const char *const known_topics[AW_GLUT_TOPICS]={"hello","idle","intruder","thief","hit","attack","flee",
-    "greeting"};
+    "alarm","greeting"};
+
+/* The sound events (aw_glut.h; docs/COMBAT.md "Sound events"). Sources: OpenMW 0.51 mwmechanics/combat.cpp (swish,
+ * miss, the armour piece struck, Health Damage, critical damage, Hand To Hand Hit, the shield's armour hit on a block),
+ * character.cpp (bowPull/bowShoot, crossbowPull/crossbowShoot; a thrown weapon's release plays Weapon Swish; the
+ * knockdown and death keys' Body Fall), projectile.cpp (a projectile striking an actor: its hit sounds),
+ * spellcasting.cpp (the school's cast, hit and Spell Failure sounds), mwclass/npc.cpp and actors.cpp (the Voice
+ * topics; the player's pain = his Hit line), mwclass/creature.cpp getSoundIdFromSndGen (a creature's attack plays the
+ * roar key of its attack group). */
+const aw_sound_event_t aw_sound_events[AW_SOUND_EVENTS]={
+    {"hello",AW_SEK_VOICE,1,0,0,AW_GLUT_HELLO},{"idle",AW_SEK_VOICE,1,0,0,AW_GLUT_IDLE},
+    {"intruder",AW_SEK_VOICE,1,0,0,AW_GLUT_INTRUDER},{"thief",AW_SEK_VOICE,1,0,0,AW_GLUT_THIEF},
+    {"hit",AW_SEK_VOICE,1,0,0,AW_GLUT_HIT},{"attack",AW_SEK_VOICE,1,0,0,AW_GLUT_ATTACK},
+    {"flee",AW_SEK_VOICE,1,0,0,AW_GLUT_FLEE},{"alarm",AW_SEK_VOICE,1,0,0,AW_GLUT_ALARM},
+    {"pain",AW_SEK_PLAYER_VOICE,1,0,0,AW_GLUT_HIT},{"taunt",AW_SEK_VOICE,1,0,0,AW_GLUT_ATTACK},
+    {"swish",AW_SEK_SLOT,1,0,0,AW_SLOT_WEAPON_SWISH},{"miss",AW_SEK_SLOT,1,0,0,AW_SLOT_MISS},
+    {"armorhit",AW_SEK_SLOT,3,1,0,AW_SLOT_LIGHT_ARMOR_HIT},{"damage",AW_SEK_SLOT,1,0,0,AW_SLOT_HEALTH_DAMAGE},
+    {"critical",AW_SEK_SLOT,1,0,0,AW_SLOT_CRITICAL_DAMAGE},{"block",AW_SEK_SLOT,3,1,0,AW_SLOT_LIGHT_ARMOR_HIT},
+    {"punch",AW_SEK_SLOT,1,0,0,AW_SLOT_HAND_TO_HAND_HIT},{"punch2",AW_SEK_SLOT,1,0,0,AW_SLOT_HAND_TO_HAND_HIT_2},
+    {"bowdraw",AW_SEK_SLOT,1,0,0,AW_SLOT_BOW_PULL},{"bowshoot",AW_SEK_SLOT,1,0,0,AW_SLOT_BOW_SHOOT},
+    {"crossbowdraw",AW_SEK_SLOT,1,0,0,AW_SLOT_CROSSBOW_PULL},{"crossbowshoot",AW_SEK_SLOT,1,0,0,AW_SLOT_CROSSBOW_SHOOT},
+    {"throw",AW_SEK_SLOT,1,0,0,AW_SLOT_WEAPON_SWISH},{"projectilehit",AW_SEK_SLOT,1,0,0,AW_SLOT_HEALTH_DAMAGE},
+    {"cast",AW_SEK_SLOT,6,3,2,AW_SLOT_ALTERATION_CAST},{"spellhit",AW_SEK_SLOT,6,3,2,AW_SLOT_ALTERATION_HIT},
+    {"spellfail",AW_SEK_SLOT,6,3,2,AW_SLOT_ALTERATION_FAIL},
+    {"knockdown",AW_SEK_SLOT,3,1,1,AW_SLOT_BODY_FALL_SMALL},{"death",AW_SEK_SLOT,3,1,1,AW_SLOT_BODY_FALL_SMALL},
+    {"creatureattack",AW_SEK_CREATURE,1,0,0,AW_SNDG_ROAR},{"roar",AW_SEK_CREATURE,1,0,0,AW_SNDG_ROAR},
+    {"moan",AW_SEK_CREATURE,1,0,0,AW_SNDG_MOAN},{"scream",AW_SEK_CREATURE,1,0,0,AW_SNDG_SCREAM},
+    {"land",AW_SEK_CREATURE,1,0,0,AW_SNDG_LAND}};
+int AW_SoundEventFind(const char *name) {
+    int i,k;
+    if(!name)return -1;
+    for(i=0;i<AW_SOUND_EVENTS;i++){
+        const char *a=aw_sound_events[i].name;
+        for(k=0;a[k] && lower((unsigned char)name[k])==a[k];k++);
+        if(!a[k] && !name[k])return i;
+    }
+    return -1;
+}
+int AW_SoundEventResolve(int event,int arg,int *kind,int *index) {
+    const aw_sound_event_t *s;
+    if(event<0 || event>=AW_SOUND_EVENTS || !kind || !index)return 0;
+    s=&aw_sound_events[event];
+    if(arg<0)arg=s->deflt;
+    if(arg>=s->args)arg=s->args-1;
+    *kind=s->kind;*index=s->base+s->stride*arg;
+    return 1;
+}
 
 long AW_GlutResidentSize(const unsigned char *h,long file_size) {
     long size;unsigned long texts;
@@ -451,10 +497,12 @@ static int creature_sound(edict_t *e,int moment,char *out,int size);
 static cvar_t player_steps,player_stride,player_step_volume;
 static void player_footsteps(void);
 static void player_footsteps_cmd(void);
+static void sound_event_cmd(void);
 void AW_GlutInit(void) {
     Cvar_RegisterVariable(&lut_on);
     Cvar_RegisterVariable(&player_steps);Cvar_RegisterVariable(&player_stride);Cvar_RegisterVariable(&player_step_volume);
     Cmd_AddCommand("aw_player_footsteps_cmd",player_footsteps_cmd);
+    Cmd_AddCommand("aw_sound_event",sound_event_cmd);       /* dbg sound: every sound event's trigger, one command */
     aw_voice_table_row=AW_GlutNpcOf;aw_voice_table_bark=AW_GlutBark;
     aw_creature_sound=creature_sound;aw_player_steps=player_footsteps;
 }
@@ -570,6 +618,68 @@ static void player_footsteps_cmd(void) {
     else if(*a){Con_Printf("dbg footsteps: on/off (your own footsteps; default off, saved; also Options > Audio)\n");return;}
     Con_Printf("Your footsteps: %s (NPC and creature footsteps: aw_npc_footsteps)\n",player_steps.value?"on":"off");
 }
+/* THE SOUND EVENT HOOK (aw_glut.h AW_SoundEvent; VOICE-COVERAGE-58). */
+static void said_what(char *what,const char *text) {if(what){what[0]=0;strncat(what,text,63);}}
+int AW_SoundEvent(int event,edict_t *e,int arg,char *what) {
+    int kind,index,row,sound;unsigned char hash[8];char pool[AW_GLUT_POOL_PATH];sfx_t *sfx;
+    edict_t *p=svs.maxclients>0?EDICT_NUM(1):NULL;
+    if(!AW_SoundEventResolve(event,arg,&kind,&index)){said_what(what,"no such sound event");return -1;}
+    if(!lut_on.value || !load()){said_what(what,"no voice table in this build");return -1;}
+    if(cls.state!=ca_connected){said_what(what,"not in a game");return -1;}
+    if(kind==AW_SEK_PLAYER_VOICE)e=p;
+    if(!e)e=p;
+    if(!e || e->free){said_what(what,"no actor");return -1;}
+    switch(kind){
+    case AW_SEK_VOICE:case AW_SEK_PLAYER_VOICE:
+        if((row=AW_GlutNpcOf(e))<0){said_what(what,kind==AW_SEK_VOICE?"not an NPC of the voice table":
+                                                  "no voice for the player's race and sex");return -1;}
+        if((sound=AW_GlutBark(e,row,index,0,hash))<0){said_what(what,"no line of that topic passes");return 0;}
+        if(!sound){said_what(what,"the line has no sound");return 0;}
+        if(what){static const char hex[]="0123456789abcdef";int i;strcpy(what,"pool/a");
+            for(i=0;i<8;i++){what[6+2*i]=hex[hash[i]>>4];what[7+2*i]=hex[hash[i]&15];}strcpy(what+22,".wav");}
+        if(!AW_VoicePlay(e,hash)){if(what)strcat(what," (not played: busy or not in this build)");return 0;}
+        return 1;
+    case AW_SEK_SLOT:
+        if((sound=AW_GlutSlotSound(&table,index))<0){said_what(what,"no sound mapped for it");return 0;}
+        break;
+    default:
+        if((row=AW_GlutCreatureFind(&table,source_id(e)))<0){said_what(what,"not a creature of the voice table");return -1;}
+        if((sound=AW_GlutCreatureSound(&table,row,index))<0){said_what(what,"the creature has no such sound");return 0;}
+        break;
+    }
+    if(!AW_GlutSoundMapped(&table,sound) || !AW_GlutPoolPath(&table,sound,pool,sizeof(pool))){
+        said_what(what,"its file is not in this build");return 0;
+    }
+    said_what(what,pool+6);
+    if(!(sfx=S_PrecacheSound(pool+6)))return 0;
+    /* a creature's moan, roar and scream on the voice channel (as aw_anim.c emit), everything else on the body's */
+    S_StartSound(NUM_FOR_EDICT(e),kind==AW_SEK_CREATURE && index!=AW_SNDG_LAND?2:4,sfx,e->v.origin,1,1);
+    return 1;
+}
+/* dbg sound [MOMENT [N] / list]: the event on the actor you aim at (512 units), else on you; no argument or list:
+ * every moment and what it plays here. */
+static void sound_event_cmd(void) {
+    const char *a=Cmd_Argc()>1?Cmd_Argv(1):"";int event,arg=-1,r,i,kind,index;char what[96];
+    edict_t *p=svs.maxclients>0 && sv.active?EDICT_NUM(1):NULL,*e=NULL;
+    if(!*a || !Q_strcasecmp((char *)a,"list")){
+        Con_Printf("Sound events (dbg sound MOMENT [N] on the actor you aim at, else on you):\n");
+        for(i=0;i<AW_SOUND_EVENTS;i++){
+            static const char *const kinds[]={"voice","your voice","sound","creature"};
+            int s=-1;AW_SoundEventResolve(i,-1,&kind,&index);
+            if(kind==AW_SEK_SLOT && load())s=AW_GlutSlotSound(&table,index);
+            Con_Printf(" %-14s %s%s%s\n",aw_sound_events[i].name,kinds[kind],aw_sound_events[i].args>1?" [N]":"",
+                       kind!=AW_SEK_SLOT?"":s<0?": none mapped":AW_GlutSoundMapped(&table,s)>0?"":": not in this build");
+        }
+        return;
+    }
+    if((event=AW_SoundEventFind(a))<0){Con_Printf("dbg sound: no moment '%s' (dbg sound list)\n",a);return;}
+    if(Cmd_Argc()>2)arg=Q_atoi(Cmd_Argv(2));
+    if(p && !p->free){vec3_t angles;VectorCopy(cl.viewangles,angles);e=AW_NPCTargetReach(p,angles,512);}
+    r=AW_SoundEvent(event,e,arg,what);
+    Con_Printf("Sound event %s on %s: %s %s\n",aw_sound_events[event].name,
+               e && aw_sound_events[event].kind!=AW_SEK_PLAYER_VOICE?"the actor aimed at":"you",
+               r>0?"played":r==0?"silent,":"cannot run,",what);
+}
 static void set_float(edict_t *e,char *field,float value) {
     eval_t *v=GetEdictFieldValue(e,field);
     if(v)v->_float=value;
@@ -662,10 +772,13 @@ int AW_GlutBark(edict_t *e,int row,int topic,int pick_random,unsigned char hash[
     return AW_GlutSound(&table,entry,hash);
 }
 int AW_MwscriptActorFaction(const char *record,char *out,int capacity);   /* aw_mwhost.c */
+int AW_MwscriptNpcRank(edict_t *e);                                         /* aw_mwhost.c */
 int AW_GlutSpeaker(edict_t *e,int talked,aw_glut_cond_t *c,aw_glut_state_t *s) {
-    static char faction[64];int row=AW_GlutNpcOf(e);
+    static char faction[64];int row=AW_GlutNpcOf(e),kept;
     if(row<0)return -1;
     AW_GlutCondOf(&table,row,c);
+    /* a script's RaiseRank / LowerRank on this NPC (CELL-CHANGES-59, saved) over its record's rank */
+    if(c->rank>=0 && (kept=AW_MwscriptNpcRank(e))>=0)c->rank=kept;
     state_of(e,talked,s);
     c->speaker=NUM_FOR_EDICT(e);
     c->faction=AW_MwscriptActorFaction(source_id(e),faction,sizeof(faction))?faction:NULL;

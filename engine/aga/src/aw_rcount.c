@@ -340,7 +340,7 @@ static void format_line(double seconds)
         "%ld frames fps10 %ld | bm %ld/%ld/%ld/%ld/%ld bf %ld/%ld cf %ld frag %ld/%ld lf %ld wf %ld"
         " | q %ld/%ld/%ld e %ld/%ld/%ld s %ld sp %ld | sc %ld/%ld scb %ld/%ld al %ld"
         " | us %ld/%ld/%ld/%ld/%ld/%ld/%ld pk %ld | vd %ld ne %ld/%ld | at %ld ln %ld/%ld/%ld"
-        " | ft %ld/%ld/%ld %ld/%ld/%ld/%ld sk %ld/%ld kp %ld/%ld %ld/%ld",
+        " | ft %ld/%ld/%ld %ld/%ld/%ld/%ld sk %ld/%ld kp %ld/%ld %ld/%ld hd %ld",
         frames, seconds > 0 ? (long)(frames * 10.0 / seconds) : 0L,
         avg(sum[RC_BM_PASSES]), avg(sum[RC_BM_VISIBLE]), avg(sum[RC_BM_INVIEW]),
         avg(sum[RC_BM_CLIPPED]), avg(sum[RC_BM_ONELEAF]),
@@ -357,7 +357,7 @@ static void format_line(double seconds)
         avg(sum[RC_ALIAS_TRIS]), avg(sum[RC_LOD_NEAR]), avg(sum[RC_LOD_COARSE]), avg(sum[RC_LOD_SLOTS]),
         avg(sum[RC_FAR_FOG_ON]), avg(sum[RC_FAR_FOG_DEPTH]), avg(sum[RC_FAR_FOG_WHY]), avg(sum[RC_FAR_FOG_MODELS]), avg(sum[RC_FAR_FOG_FACES]), avg(sum[RC_FAR_SIZE]), avg(sum[RC_FAR_DETAIL]),
         us(time_sum[RT_SKY]), us(time_sum[RT_FOG]),
-        us(time_sum[RT_SKELPOSE]), us(time_sum[RT_SKELVERTS]), avg(skel_poses), avg(skel_hits));
+        us(time_sum[RT_SKELPOSE]), us(time_sum[RT_SKELVERTS]), avg(skel_poses), avg(skel_hits), us(time_sum[RT_HANDS]));
     if (aw_chim_rcount) {
         int used = (int)strlen(line);
         aw_chim_rcount(line + used, (int)sizeof line - used, frames);

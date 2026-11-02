@@ -32,6 +32,23 @@ class VoiceFeatures(unittest.TestCase):
                        'moan', 'roar', 'scream', 'land', 'footsteps', 'swish', 'punch', 'spell', 'tribunal'):
             self.assertIn(moment, text)
 
+    def test_every_sound_event_hook_has_its_row(self):
+        """VOICE-COVERAGE-58: every named sound event of the engine (aw_glut.c aw_sound_events) is named by a row
+        with its dbg trigger, and the catalogue has the one dbg sound row that triggers them."""
+        import re
+        code = (ROOT / 'engine/aga/src/aw_glut.c').read_text(encoding='latin-1')
+        table = code[code.index('const aw_sound_event_t aw_sound_events'):code.index('int AW_SoundEventFind')]
+        events = re.findall(r'\{"(\w+)",AW_SEK_', table)
+        header = (ROOT / 'engine/aga/src/aw_glut.h').read_text(encoding='utf-8')
+        count = len(re.findall(r'\bAW_SE_\w+', header[header.index('AW_SE_HELLO'):header.index('AW_SOUND_EVENTS')]))
+        self.assertEqual(len(events), count)
+        hooked = ' '.join(r['mapped'] for r in self.doc['rows'] if 'dbg sound' in r['mapped'])
+        for name in events:
+            self.assertRegex(hooked, r'\b%s\b' % name, name)
+        catalogue = (ROOT / 'config/debug-commands.txt').read_text(encoding='utf-8')
+        self.assertIn('AUDIO|sound|aw_sound_event|', catalogue)
+        self.assertIn('Cmd_AddCommand("aw_sound_event",', code)
+
     def test_out_of_scope_says_why(self):
         for row in self.doc['rows']:
             if row['state'] in ('out-of-scope', 'silent-by-design'):

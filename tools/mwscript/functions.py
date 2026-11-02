@@ -433,8 +433,11 @@ HOST = {'getpccrimelevel', 'setpccrimelevel', 'modpccrimelevel',
         'showmap',
         # v0.0.58: ClearInfoActor in a result script: the speaker's last entry on the topic's journal page goes
         # (aw_dial.c AW_DialHeardRemoveLast; OpenMW DialogueManager::clearInfoActor)
-        'clearinfoactor'}
-HOST_EFFECTS = {'showmap', 'clearinfoactor', 'choice', 'goodbye', 'modfactionreaction', 'setfactionreaction', 'forcegreeting', 'rotate', 'aitravel', 'aifollow', 'position','playgroup', 'loopgroup', 'addtopic', 'cast','setpccrimelevel', 'modpccrimelevel', 'setreputation', 'modreputation', 'pcraiserank',
+        'clearinfoactor',
+        # v0.0.59: RaiseRank / LowerRank of an NPC in its own faction, kept on the world change list by its
+        # reference and saved (aw_mwhost.c; OpenMW statsextensions.cpp OpRaiseRank, OpLowerRank)
+        'raiserank', 'lowerrank'}
+HOST_EFFECTS = {'raiserank', 'lowerrank', 'showmap', 'clearinfoactor', 'choice', 'goodbye', 'modfactionreaction', 'setfactionreaction', 'forcegreeting', 'rotate', 'aitravel', 'aifollow', 'position','playgroup', 'loopgroup', 'addtopic', 'cast','setpccrimelevel', 'modpccrimelevel', 'setreputation', 'modreputation', 'pcraiserank',
                 'pclowerrank', 'pcjoinfaction', 'pcexpell', 'pcclearexpelled', 'setpcfacrep', 'modpcfacrep'}
 
 # Groups the measurement reports as "the engine does not have it yet" (the brief's list), and the rest.

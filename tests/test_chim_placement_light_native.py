@@ -37,7 +37,9 @@ class PlacementLightSourceTests(unittest.TestCase):
         render = (SOURCE / 'render.h').read_text()
         body = render[render.index('typedef struct entity_s'):render.index('} entity_t;')]
         # appended: every earlier member keeps the offset the assembly uses
-        self.assertRegex(body.rstrip(), r'(?s)int aw_light;\s*(/\*.*?\*/\s*)?int aw_tint;\s*(/\*.*?\*/\s*)?int aw_flora;$', body[-500:])
+        # (the assembled player body's height scale is appended after them: PLAYER-GEAR-VISUAL-59)
+        self.assertRegex(body.rstrip(), r'(?s)int aw_light;\s*(/\*.*?\*/\s*)?int aw_tint;\s*(/\*.*?\*/\s*)?int aw_flora;'
+                                        r'(\s*/\*.*?\*/\s*float aw_alias_zscale;)?$', body[-800:])
         chunks = (SOURCE / 'chim/chim_chunks.c').read_text()
         self.assertIn('p->ent.aw_light = ChimFormat_RecordLight (chim_world.minor, r.flags);', chunks)
         self.assertIn('p->ent.aw_light = from->ent.aw_light;', chunks)
