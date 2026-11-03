@@ -46,7 +46,9 @@ class FakeRunner:
     """Answers every container command by its --name; records what ran."""
 
     def __init__(self, check=CHECK_OK, check_exit=0, build_exit=0, summary=None, inputs=None, existing=(),
-                 records_exit=0, guard=None, guard_exit=0, guard_err=''):
+                 records_exit=0, guard=None, guard_exit=0, guard_err='', ide=None, ide_exit=0):
+        self.ide = ide if ide is not None else {'verdict': 'passed', 'detail': '1 drive(s) whole IDE cylinders'}
+        self.ide_exit = ide_exit
         self.check, self.check_exit, self.build_exit = check, check_exit, build_exit
         self.guard = guard if guard is not None else {'verdict': 'passed', 'failed': 0, 'waived': 0, 'busy': 0,
                                                       'sections': 12, 'failing': [], 'waivers': []}
@@ -84,6 +86,8 @@ class FakeRunner:
             if self.guard_err:
                 return self.guard_exit, '', self.guard_err
             return self.guard_exit, json.dumps(self.guard) + '\n', ''
+        if '-ide-cylinders-' in name:
+            return self.ide_exit, json.dumps(self.ide) + '\n', ''
         if '-stair-records-' in name:
             if self.records_exit:
                 return self.records_exit, '', "python3: can't open file 'tools/stair_records.py'\n"
@@ -288,8 +292,8 @@ class ServiceTests(unittest.TestCase):
         self.assertEqual(result['reuse']['planned_reuse'], 34)
         self.assertEqual(result['reuse']['diff_files'], 1)
         self.assertEqual(sorted(result['steps']),
-                         sorted(['checks', 'stage-source', 'check', 'build', 'summary', 'perf-guard', 'stair-records',
-                                 'trial-log',
+                         sorted(['checks', 'stage-source', 'check', 'build', 'summary', 'perf-guard', 'ide-cylinders',
+                                 'stair-records', 'trial-log',
                                  'perf-ingest']))
         # a passed build's stair-walk records become master-checked (tools/stair_records.py promote)
         self.assertEqual(result['stair_walk']['marked'], 270)
@@ -599,6 +603,44 @@ class ServiceTests(unittest.TestCase):
         self.assertTrue(result['steps']['stair-records']['ok'])
         self.assertIn('FAILED (1 failing), 1 waived (X-36)', aw.perf_guard_text(result['perf_guard']))
 
+    # ---- IDE cylinders (IMAGE-IDE-CYLINDER-TAIL-59): every built image is whole IDE cylinders
+
+    def test_a_passed_build_has_the_ide_cylinder_step(self):
+        code, result, runner = self.submit(self.request())
+        self.assertEqual((code, result['status']), (0, 'passed'))
+        self.assertTrue(result['steps']['ide-cylinders']['ok'])
+        self.assertTrue(any('tools/ide_cylinders.py check' in c for c in result['commands']))
+
+    def test_an_image_that_is_not_whole_ide_cylinders_fails_the_build_result(self):
+        ide = {'verdict': 'failed', 'detail': 'IDE cylinder gate: drive d.hdf is 3208675328 bytes, not whole IDE '
+                                              'cylinders'}
+        code, result, _ = self.submit(self.request(), FakeRunner(ide=ide, ide_exit=1))
+        self.assertEqual(result['status'], 'failed')
+        self.assertNotEqual(code, 0)
+        self.assertFalse(result['steps']['ide-cylinders']['ok'])
+        self.assertIn('not whole IDE cylinders', result['steps']['ide-cylinders']['detail'])
+        self.assertEqual(result['failed_stage'], 'ide-cylinders')
+
+    def test_a_build_without_an_image_passes_the_ide_check(self):
+        ide = {'verdict': 'no-drives', 'detail': 'no drive file found'}
+        code, result, _ = self.submit(self.request(), FakeRunner(ide=ide))
+        self.assertEqual((code, result['status']), (0, 'passed'))
+
+    def test_a_builder_without_the_ide_check_passes_and_says_so(self):
+        runner = FakeRunner(ide_exit=2)
+        runner.ide = None
+        original = runner.capture
+
+        def capture(command, timeout=None):
+            if '-ide-cylinders-' in FakeRunner.name(command):
+                runner.ran.append(FakeRunner.name(command))
+                return 2, '', "python3: can't open file '/src/tools/ide_cylinders.py': No such file or directory\n"
+            return original(command, timeout)
+        runner.capture = capture
+        code, result, _ = self.submit(self.request(), runner)
+        self.assertEqual((code, result['status']), (0, 'passed'))
+        self.assertIn('no IDE cylinder check', result['steps']['ide-cylinders']['detail'])
+
     def test_a_failed_size_guard_fails_the_result_but_keeps_the_stages(self):
         code, result, _ = self.submit(self.request(), FakeRunner(build_exit=4))
         self.assertEqual(result['status'], 'failed')
@@ -680,7 +722,7 @@ class ServiceTests(unittest.TestCase):
         code, result, runner = self.submit(self.request(), runner, dry_run=True)
         self.assertEqual((code, result['dry_run']), (0, True))
         self.assertEqual([name for name in runner.ran if '-ls-' not in name], [])
-        self.assertEqual(len(result['commands']), 7)  # source, check, build, summary, perf guard, stair records, ingest
+        self.assertEqual(len(result['commands']), 8)  # source, check, build, summary, perf guard, ide cylinders, stair records, ingest
         self.assertFalse((self.base / 'trials' / 'TRIALS.jsonl').exists())
         state = aw.load_state(self.config)
         self.assertEqual(state['run_names'], [])  # a dry run spends no name

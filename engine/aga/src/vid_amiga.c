@@ -804,8 +804,12 @@ void	VID_Update (vrect_t *rects)
           rows = r->y + r->height;
       if (rows > (int)vid.height)
         rows = vid.height;
-      if (rows > 0)
+      if (rows > 0) {
+        double c2p_t0;   /* FRAME-WAIT-COUNTERS-59: the chip RAM copy */
+        AW_WAIT_BEGIN (c2p_t0);
         aw_c2p (nextc2p, nextsbuffer->sb_BitMap, vid.buffer, vid.width, rows);
+        AW_WAIT_END (AW_WAIT_C2P, c2p_t0);
+      }
       AW_C2PRows (rows, vid.height);
     }
     AW_EndMark(2);
@@ -834,7 +838,12 @@ void	VID_Update (vrect_t *rects)
   if (do_fps)
     video_do_fps (&rp, 0);
   if (is_native_mode) {
-    if (ChangeScreenBuffer (video_screen, nextsbuffer)) {
+    double vbl_t0;   /* FRAME-WAIT-COUNTERS-59: the buffer swap (no vertical blank wait in play) */
+    int swapped;
+    AW_WAIT_BEGIN (vbl_t0);
+    swapped = ChangeScreenBuffer (video_screen, nextsbuffer);
+    AW_WAIT_END (AW_WAIT_VBL, vbl_t0);
+    if (swapped) {
       if (nextsbuffer == sbuffer[0]) {
         nextsbuffer = sbuffer[1];
 #ifndef __PPC__

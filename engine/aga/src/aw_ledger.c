@@ -24,7 +24,47 @@ AW_RESIDENT_GROWS("NPC faction ranks (CELL-CHANGES-59)",AW_LEDGER_RANKS_MAX,AW_L
 #define CONTENT_STEP 32                 /* the container deltas and the ranks grow by this many */
 aw_ledger_t aw_ledger;
 int aw_ledger_on=1;
-int AW_LedgerRows(const aw_ledger_t *l){return l->count+l->stolen_count+l->content_count+l->rank_count;}
+aw_ledger_events_t aw_ledger_events;
+typedef char ledger_value_fits[(sizeof(aw_ledger_value_t)<=AW_LEDGER_VALUE_BYTES)?1:-1];
+typedef char ledger_fact_fits[(sizeof(aw_ledger_fact_t)<=AW_LEDGER_FACT_BYTES)?1:-1];
+AW_RESIDENT_GROWS("script globals, quest stages, known topics, dispositions (CELL-CHANGES-59)",AW_LEDGER_VALUES_ALL,AW_LEDGER_VALUE_BYTES);
+AW_RESIDENT_GROWS("engine named facts past 32 (CELL-CHANGES-59)",AW_LEDGER_FACTS_MAX,AW_LEDGER_FACT_BYTES);
+typedef char ledger_local_fits[(sizeof(aw_ledger_local_t)<=AW_LEDGER_LOCAL_BYTES)?1:-1];
+typedef char ledger_script_fits[(sizeof(aw_ledger_script_t)<=AW_LEDGER_SCRIPT_BYTES)?1:-1];
+AW_RESIDENT_GROWS("script locals (CELL-CHANGES-59)",AW_LEDGER_LOCALS_MAX,AW_LEDGER_LOCAL_BYTES);
+AW_RESIDENT_GROWS("running global scripts (CELL-CHANGES-59)",AW_LEDGER_SCRIPTS_MAX,AW_LEDGER_SCRIPT_BYTES);
+static int slice4(const aw_ledger_t *l){
+    int t,n=l->fact_count;
+    for(t=0;t<AW_LEDGER_TABLES;t++)n+=l->value_count[t];
+    return n;
+}
+static int slice5(const aw_ledger_t *l){return l->local_count+l->script_count;}
+typedef char ledger_actor_fits[(sizeof(aw_ledger_actor_t)<=AW_LEDGER_ACTOR_BYTES)?1:-1];
+AW_RESIDENT_GROWS("changed actors: death, place, health, hostility (CELL-CHANGES-59 slice 6)",AW_LEDGER_ACTORS_MAX,AW_LEDGER_ACTOR_BYTES);
+AW_RESIDENT_GROWS("changed actor records kept for the save (CELL-CHANGES-59 slice 6)",1,AW_LEDGER_RECORDS_MAX);
+static unsigned actor_fields(const aw_ledger_actor_t *a){
+    return (a->dead?AW_LEDGER_ACTOR_DEAD:0U)|(a->moved?AW_LEDGER_ACTOR_MOVED:0U)|(a->fight?AW_LEDGER_ACTOR_FIGHT:0U)|
+           (a->follow?AW_LEDGER_ACTOR_FOLLOW:0U)|(a->pick?AW_LEDGER_ACTOR_PICK:0U);
+}
+static int actors_kept(const aw_ledger_t *l){
+    int i,n=0;
+    for(i=0;i<l->actor_count;i++)if(actor_fields(&l->actor[i]))n++;
+    return n;
+}
+static int slice6(const aw_ledger_t *l){return actors_kept(l)+(l->records_bytes>0);}
+/* slice 7: what only the seventh form can hold (the files and idents describe the rest; alone they make no save) */
+typedef char ledger_stamp_fits[(sizeof(aw_ledger_stamp_t)<=AW_LEDGER_STAMP_BYTES)?1:-1];
+typedef char ledger_ident_fits[(sizeof(aw_ledger_ident_t)<=AW_LEDGER_IDENT_BYTES)?1:-1];
+AW_RESIDENT_GROWS("places' container refill times (CELL-CHANGES-59 slice 7)",AW_LEDGER_STAMPS_MAX,AW_LEDGER_STAMP_BYTES);
+AW_RESIDENT_GROWS("record hashes of the references the list names (CELL-CHANGES-59 slice 7)",AW_LEDGER_IDENTS_MAX,AW_LEDGER_IDENT_BYTES);
+static int died_kept(const aw_ledger_t *l){
+    int i;
+    for(i=0;i<l->actor_count;i++)if(l->actor[i].dead && l->actor[i].died>0)return 1;
+    return 0;
+}
+static int slice7(const aw_ledger_t *l){return l->file_count+l->ident_count+l->stamp_count+died_kept(l);}
+int AW_LedgerRows(const aw_ledger_t *l){return l->count+l->stolen_count+l->content_count+l->rank_count+slice4(l)+slice5(l)+slice6(l)+
+                                               l->stamp_count;}
 
 int AW_LedgerFind(const aw_ledger_t *l,uint32_t key){
     int lo=0,hi=l->count-1,mid;
@@ -77,7 +117,9 @@ void AW_LedgerTidy(aw_ledger_t *l,uint32_t key){
 void AW_LedgerClear(aw_ledger_t *l){
     int i;
     for(i=0;i<l->count;i++)free(l->row[i].extra);
-    free(l->row);free(l->place);free(l->stolen);free(l->content);free(l->rank);
+    free(l->row);free(l->place);free(l->stolen);free(l->content);free(l->rank);free(l->fact);free(l->local);free(l->script);
+    free(l->actor);free(l->records);free(l->stamp);free(l->ident);
+    for(i=0;i<AW_LEDGER_TABLES;i++)free(l->value[i]);
     memset(l,0,sizeof(*l));
 }
 void AW_LedgerMove(aw_ledger_t *to,aw_ledger_t *from){
@@ -124,7 +166,12 @@ aw_ledger_row_t *AW_LedgerPlaceRow(aw_ledger_t *l,int position){
 unsigned long AW_LedgerResident(const aw_ledger_t *l){
     return (unsigned long)l->capacity*sizeof(aw_ledger_row_t)+(unsigned long)l->place_capacity*sizeof(int)+
         (unsigned long)l->extras*sizeof(aw_ledger_extra_t)+(unsigned long)l->stolen_capacity*sizeof(aw_ledger_stolen_t)+
-        (unsigned long)l->content_capacity*sizeof(aw_ledger_content_t)+(unsigned long)l->rank_capacity*sizeof(aw_ledger_rank_t);
+        (unsigned long)l->content_capacity*sizeof(aw_ledger_content_t)+(unsigned long)l->rank_capacity*sizeof(aw_ledger_rank_t)+
+        (unsigned long)(l->value_capacity[0]+l->value_capacity[1]+l->value_capacity[2]+l->value_capacity[3])*
+        sizeof(aw_ledger_value_t)+(unsigned long)l->fact_capacity*sizeof(aw_ledger_fact_t)+
+        (unsigned long)l->local_capacity*sizeof(aw_ledger_local_t)+(unsigned long)l->script_capacity*sizeof(aw_ledger_script_t)+
+        (unsigned long)l->actor_capacity*sizeof(aw_ledger_actor_t)+(unsigned long)l->records_bytes+
+        (unsigned long)l->stamp_capacity*sizeof(aw_ledger_stamp_t)+(unsigned long)l->ident_capacity*sizeof(aw_ledger_ident_t);
 }
 
 /* --- the stolen pairs (aw_ledger.h) --- */
@@ -277,10 +324,464 @@ int AW_LedgerRankSet(aw_ledger_t *l,uint32_t key,int rank){
     return 1;
 }
 
+/* --- slice 4: the script and dialogue tables and the named facts (aw_ledger.h) --- */
+uint32_t AW_LedgerNameHash(const char *id){
+    uint32_t h=2166136261u;
+    for(;id && *id;id++){
+        unsigned char c=(unsigned char)*id;
+        if(c>='A' && c<='Z')c=(unsigned char)(c+32);
+        h=(h^c)*16777619u;
+    }
+    return h?h:1;
+}
+/* a key and a value TABLE can keep */
+static int value_ok(int table,uint32_t key,int32_t value){
+    if(table<0 || table>=AW_LEDGER_TABLES || !key)return 0;
+    if(table==AW_LEDGER_QUESTS)return value!=0;
+    if(table==AW_LEDGER_TOPICS)return value==1;
+    if(table==AW_LEDGER_DISPOSITIONS)return content_key_ok(key) && value>=-32768 && value<=32767;
+    return 1;
+}
+static int value_from(const aw_ledger_t *l,int table,uint32_t key){
+    int lo=0,hi=l->value_count[table];const aw_ledger_value_t *v=l->value[table];
+    while(lo<hi){int mid=(lo+hi)/2;if(v[mid].key<key)lo=mid+1;else hi=mid;}
+    return lo;
+}
+int AW_LedgerValue(const aw_ledger_t *l,int table,uint32_t key,int32_t *out){
+    int at;
+    if(table<0 || table>=AW_LEDGER_TABLES)return 0;
+    at=value_from(l,table,key);
+    if(at>=l->value_count[table] || l->value[table][at].key!=key)return 0;
+    if(out)*out=l->value[table][at].value;
+    return 1;
+}
+void AW_LedgerValueDrop(aw_ledger_t *l,int table,uint32_t key){
+    int at;aw_ledger_value_t *v;
+    if(table<0 || table>=AW_LEDGER_TABLES)return;
+    at=value_from(l,table,key);v=l->value[table];
+    if(at>=l->value_count[table] || v[at].key!=key)return;
+    memmove(&v[at],&v[at+1],(size_t)(l->value_count[table]-at-1)*sizeof(*v));l->value_count[table]--;
+}
+int AW_LedgerValueSet(aw_ledger_t *l,int table,uint32_t key,int32_t value){
+    int at;aw_ledger_value_t *v;
+    if(table==AW_LEDGER_QUESTS && key && !value){AW_LedgerValueDrop(l,table,key);return 1;}   /* back at the start */
+    if(!value_ok(table,key,value))return 0;
+    at=value_from(l,table,key);
+    if(at<l->value_count[table] && l->value[table][at].key==key){l->value[table][at].value=value;return 1;}
+    if(l->value_count[table]>=AW_LEDGER_VALUES_MAX){l->refused++;return 0;}
+    if(l->value_count[table]==l->value_capacity[table]){
+        int want=l->value_capacity[table]?l->value_capacity[table]*2:CONTENT_STEP;
+        if(want>AW_LEDGER_VALUES_MAX)want=AW_LEDGER_VALUES_MAX;
+        v=(aw_ledger_value_t *)AW_TryRealloc(l->value[table],(unsigned long)want*sizeof(aw_ledger_value_t));
+        if(!v){l->refused++;return 0;}
+        l->value[table]=v;l->value_capacity[table]=want;
+    }
+    v=l->value[table];
+    memmove(&v[at+1],&v[at],(size_t)(l->value_count[table]-at)*sizeof(*v));
+    v[at].key=key;v[at].value=value;l->value_count[table]++;
+    return 1;
+}
+void AW_LedgerValueClear(aw_ledger_t *l,int table){
+    if(table<0 || table>=AW_LEDGER_TABLES)return;
+    free(l->value[table]);l->value[table]=NULL;l->value_count[table]=l->value_capacity[table]=0;
+}
+/* a fact's id folded into OUT (printable, 1 .. AW_LEDGER_FACT_ID characters) */
+static int fact_id(char *out,const char *in){
+    int i;
+    if(!in || !in[0])return 0;
+    for(i=0;in[i];i++){
+        unsigned char c=(unsigned char)in[i];
+        if(i>=AW_LEDGER_FACT_ID || c<32 || c>126)return 0;
+        out[i]=(char)(c>='A' && c<='Z'?c+32:c);
+    }
+    out[i]=0;
+    return 1;
+}
+static int fact_from(const aw_ledger_t *l,const char *id){
+    int lo=0,hi=l->fact_count;
+    while(lo<hi){int mid=(lo+hi)/2;if(strcmp(l->fact[mid].id,id)<0)lo=mid+1;else hi=mid;}
+    return lo;
+}
+int AW_LedgerFact(const aw_ledger_t *l,const char *id,int32_t *out){
+    char f[AW_LEDGER_FACT_ID+1];int at;
+    if(!fact_id(f,id))return 0;
+    at=fact_from(l,f);
+    if(at>=l->fact_count || strcmp(l->fact[at].id,f))return 0;
+    if(out)*out=l->fact[at].value;
+    return 1;
+}
+int AW_LedgerFactSet(aw_ledger_t *l,const char *id,int32_t value){
+    char f[AW_LEDGER_FACT_ID+1];int at;aw_ledger_fact_t *x;
+    if(!fact_id(f,id))return 0;
+    at=fact_from(l,f);
+    if(at<l->fact_count && !strcmp(l->fact[at].id,f)){l->fact[at].value=value;return 1;}
+    if(l->fact_count>=AW_LEDGER_FACTS_MAX){l->refused++;return 0;}
+    if(l->fact_count==l->fact_capacity){
+        int want=l->fact_capacity+CONTENT_STEP;
+        if(want>AW_LEDGER_FACTS_MAX)want=AW_LEDGER_FACTS_MAX;
+        x=(aw_ledger_fact_t *)AW_TryRealloc(l->fact,(unsigned long)want*sizeof(aw_ledger_fact_t));
+        if(!x){l->refused++;return 0;}
+        l->fact=x;l->fact_capacity=want;
+    }
+    x=&l->fact[at];
+    memmove(x+1,x,(size_t)(l->fact_count-at)*sizeof(*x));
+    memset(x,0,sizeof(*x));strcpy(x->id,f);x->value=value;l->fact_count++;
+    return 1;
+}
+
+/* --- slice 5: the scripts' locals and the running global scripts (aw_ledger.h) --- */
+static int local_ok(int global,uint32_t key,uint32_t script,int hint,int slot){
+    if(!script || hint<0 || hint>0xFFFF || slot<0 || slot>255 || (global!=0 && global!=1))return 0;
+    return global?key==script:content_key_ok(key);
+}
+static int local_order(int global,uint32_t key,int slot,const aw_ledger_local_t *x){
+    if(global!=(int)x->global)return global<(int)x->global?-1:1;
+    if(key!=x->key)return key<x->key?-1:1;
+    return slot-(int)x->slot;
+}
+static int local_from(const aw_ledger_t *l,int global,uint32_t key,int slot){
+    int lo=0,hi=l->local_count;
+    while(lo<hi){int mid=(lo+hi)/2;if(local_order(global,key,slot,&l->local[mid])>0)lo=mid+1;else hi=mid;}
+    return lo;
+}
+int AW_LedgerLocal(const aw_ledger_t *l,int global,uint32_t key,int slot,int32_t *out){
+    int at=local_from(l,global,key,slot);
+    if(at>=l->local_count || local_order(global,key,slot,&l->local[at]))return 0;
+    if(out)*out=l->local[at].value;
+    return 1;
+}
+int AW_LedgerLocalSet(aw_ledger_t *l,int global,uint32_t key,uint32_t script,int hint,int slot,int32_t value){
+    int at;aw_ledger_local_t *x;
+    if(!local_ok(global,key,script,hint,slot)){l->refused++;return 0;}
+    at=local_from(l,global,key,slot);x=l->local;
+    if(at<l->local_count && !local_order(global,key,slot,&x[at])){
+        if(value){x[at].value=value;x[at].script=script;x[at].hint=(uint16_t)hint;return 1;}
+        memmove(&x[at],&x[at+1],(size_t)(l->local_count-at-1)*sizeof(*x));l->local_count--;   /* back at its start */
+        return 1;
+    }
+    if(!value)return 1;
+    if(l->local_count>=AW_LEDGER_LOCALS_MAX){l->refused++;return 0;}
+    if(l->local_count==l->local_capacity){
+        int want=l->local_capacity?l->local_capacity*2:CONTENT_STEP;
+        if(want>AW_LEDGER_LOCALS_MAX)want=AW_LEDGER_LOCALS_MAX;
+        x=(aw_ledger_local_t *)AW_TryRealloc(l->local,(unsigned long)want*sizeof(aw_ledger_local_t));
+        if(!x){l->refused++;return 0;}
+        l->local=x;l->local_capacity=want;
+    }
+    x=&l->local[at];
+    memmove(x+1,x,(size_t)(l->local_count-at)*sizeof(*x));
+    memset(x,0,sizeof(*x));x->global=(uint8_t)global;x->key=key;x->script=script;x->hint=(uint16_t)hint;
+    x->slot=(uint8_t)slot;x->value=value;l->local_count++;
+    return 1;
+}
+static int script_from(const aw_ledger_t *l,uint32_t script){
+    int lo=0,hi=l->script_count;
+    while(lo<hi){int mid=(lo+hi)/2;if(l->script[mid].script<script)lo=mid+1;else hi=mid;}
+    return lo;
+}
+int AW_LedgerScriptSet(aw_ledger_t *l,uint32_t script,int hint,int running){
+    int at;aw_ledger_script_t *x;
+    if(!script || hint<0 || hint>0xFFFF || (running!=0 && running!=1)){l->refused++;return 0;}
+    at=script_from(l,script);
+    if(at<l->script_count && l->script[at].script==script){
+        l->script[at].hint=(uint16_t)hint;l->script[at].running=(uint8_t)running;return 1;}
+    if(l->script_count>=AW_LEDGER_SCRIPTS_MAX){l->refused++;return 0;}
+    if(l->script_count==l->script_capacity){
+        int want=l->script_capacity+CONTENT_STEP;
+        if(want>AW_LEDGER_SCRIPTS_MAX)want=AW_LEDGER_SCRIPTS_MAX;
+        x=(aw_ledger_script_t *)AW_TryRealloc(l->script,(unsigned long)want*sizeof(aw_ledger_script_t));
+        if(!x){l->refused++;return 0;}
+        l->script=x;l->script_capacity=want;
+    }
+    x=&l->script[at];
+    memmove(x+1,x,(size_t)(l->script_count-at)*sizeof(*x));
+    memset(x,0,sizeof(*x));x->script=script;x->hint=(uint16_t)hint;x->running=(uint8_t)running;l->script_count++;
+    return 1;
+}
+void AW_LedgerLocalsClear(aw_ledger_t *l){
+    free(l->local);free(l->script);l->local=NULL;l->script=NULL;
+    l->local_count=l->local_capacity=l->script_count=l->script_capacity=0;
+}
+
+/* --- slice 6: the actors (aw_ledger.h) --- */
+#define ACTOR_KEY_OK(k) ((k)!=0 && !((k)&0xFF000000U))
+aw_ledger_actor_t *AW_LedgerActor(aw_ledger_t *l,uint32_t key,int make){
+    int lo=0,hi=l->actor_count;aw_ledger_actor_t *x;
+    if(!ACTOR_KEY_OK(key)){if(make)l->refused++;return NULL;}
+    while(lo<hi){int mid=(lo+hi)/2;if(l->actor[mid].key<key)lo=mid+1;else hi=mid;}
+    if(lo<l->actor_count && l->actor[lo].key==key)return &l->actor[lo];
+    if(!make)return NULL;
+    if(l->actor_count>=AW_LEDGER_ACTORS_MAX){l->refused++;return NULL;}
+    if(l->actor_count==l->actor_capacity){
+        int want=l->actor_capacity?l->actor_capacity*2:64;
+        if(want>AW_LEDGER_ACTORS_MAX)want=AW_LEDGER_ACTORS_MAX;
+        x=(aw_ledger_actor_t *)AW_TryRealloc(l->actor,(unsigned long)want*sizeof(aw_ledger_actor_t));
+        if(!x){l->refused++;return NULL;}
+        l->actor=x;l->actor_capacity=want;
+    }
+    x=&l->actor[lo];
+    memmove(x+1,x,(size_t)(l->actor_count-lo)*sizeof(*x));
+    memset(x,0,sizeof(*x));x->key=key;l->actor_count++;
+    return x;
+}
+int AW_LedgerRecordsSet(aw_ledger_t *l,const unsigned char *bytes,int count){
+    unsigned char *copy=NULL;
+    if(count<0 || count>AW_LEDGER_RECORDS_MAX || (count && (!bytes || count<8 || memcmp(bytes,"AWAR",4)))){l->refused++;return 0;}
+    if(count && !(copy=(unsigned char *)AW_TryMalloc((unsigned long)count))){l->refused++;return 0;}
+    if(count)memcpy(copy,bytes,(size_t)count);
+    free(l->records);l->records=copy;l->records_bytes=count;
+    return 1;
+}
+void AW_LedgerActorsClear(aw_ledger_t *l){
+    free(l->actor);free(l->records);l->actor=NULL;l->records=NULL;
+    l->actor_count=l->actor_capacity=l->records_bytes=0;
+}
+
+/* --- slice 7: respawn (aw_ledger.h) --- */
+int AW_LedgerActorRespawns(const aw_ledger_actor_t *a,int respawns,float now,const aw_ledger_respawn_t *r){
+    float delay,died;
+    if(!a || !r || !a->dead || (!respawns && !a->pick))return 0;
+    delay=r->respawn_delay<r->clear_delay?r->respawn_delay:r->clear_delay;   /* the body was not cleared away */
+    died=a->died>0?a->died:a->hours;
+    return died+delay<=now;
+}
+void AW_LedgerActorReset(aw_ledger_actor_t *a){
+    uint32_t key=a->key;
+    memset(a,0,sizeof(*a));a->key=key;
+}
+static int stamp_order(int at,int32_t where,const aw_ledger_stamp_t *s){
+    if(at!=(int)s->at)return at<(int)s->at?-1:1;
+    return where<s->where?-1:where>s->where;
+}
+static int stamp_from(const aw_ledger_t *l,int at,int32_t where){
+    int lo=0,hi=l->stamp_count;
+    while(lo<hi){int mid=(lo+hi)/2;if(stamp_order(at,where,&l->stamp[mid])>0)lo=mid+1;else hi=mid;}
+    return lo;
+}
+float AW_LedgerPlaceStamp(const aw_ledger_t *l,int at,int32_t where){
+    int i=stamp_from(l,at,where);
+    return i<l->stamp_count && !stamp_order(at,where,&l->stamp[i])?l->stamp[i].hours:0;
+}
+static int stamp_ok(int at,int32_t where,float hours){
+    if(!(hours>0 && hours<=10000000))return 0;
+    if(at==AW_AT_CELL){
+        int cx=(int16_t)((uint32_t)where>>16),cy=(int16_t)((uint32_t)where&0xffffU);
+        return cx>=-1024 && cx<=1024 && cy>=-1024 && cy<=1024;
+    }
+    return at==AW_AT_ROOM && where>=1 && where<=0xFFFFFF;
+}
+static int stamp_set(aw_ledger_t *l,int at,int32_t where,float hours){
+    int i;aw_ledger_stamp_t *s;
+    if(!stamp_ok(at,where,hours)){l->refused++;return 0;}
+    i=stamp_from(l,at,where);
+    if(i<l->stamp_count && !stamp_order(at,where,&l->stamp[i])){l->stamp[i].hours=hours;return 1;}
+    if(l->stamp_count>=AW_LEDGER_STAMPS_MAX){l->refused++;return 0;}
+    if(l->stamp_count==l->stamp_capacity){
+        int want=l->stamp_capacity?l->stamp_capacity*2:CONTENT_STEP;
+        if(want>AW_LEDGER_STAMPS_MAX)want=AW_LEDGER_STAMPS_MAX;
+        s=(aw_ledger_stamp_t *)AW_TryRealloc(l->stamp,(unsigned long)want*sizeof(aw_ledger_stamp_t));
+        if(!s){l->refused++;return 0;}
+        l->stamp=s;l->stamp_capacity=want;
+    }
+    s=&l->stamp[i];
+    memmove(s+1,s,(size_t)(l->stamp_count-i)*sizeof(*s));
+    memset(s,0,sizeof(*s));s->at=(uint8_t)at;s->where=where;s->hours=hours;l->stamp_count++;
+    return 1;
+}
+int AW_LedgerRespawnPlace(aw_ledger_t *l,int at,int32_t where,float now,int months){
+    if(months<1 || !(now>0) || (at!=AW_AT_CELL && at!=AW_AT_ROOM))return 0;
+    if(now-AW_LedgerPlaceStamp(l,at,where)<=24.0f*30.0f*(float)months)return 0;
+    stamp_set(l,at,where,now);      /* refused (memory): the refill still happens, the next one comes as for a new place */
+    return 1;
+}
+int AW_LedgerContentDrop(aw_ledger_t *l,uint32_t key){
+    int first,n=AW_LedgerContentOf(l,key,&first);
+    if(n<=0)return 0;
+    memmove(&l->content[first],&l->content[first+n],(size_t)(l->content_count-first-n)*sizeof(aw_ledger_content_t));
+    l->content_count-=n;
+    return n;
+}
+
+/* --- slice 7: identity (aw_ledger.h) --- */
+#define IDENT_KEY_OK(k) (((k)&AW_LEDGER_ID) && !((k)&0xFF000000U))
+static int ident_from(const aw_ledger_t *l,uint32_t key){
+    int lo=0,hi=l->ident_count;
+    while(lo<hi){int mid=(lo+hi)/2;if(l->ident[mid].key<key)lo=mid+1;else hi=mid;}
+    return lo;
+}
+int AW_LedgerIdent(const aw_ledger_t *l,uint32_t key,uint32_t *record){
+    int i=ident_from(l,key);
+    if(i>=l->ident_count || l->ident[i].key!=key)return 0;
+    if(record)*record=l->ident[i].record;
+    return 1;
+}
+int AW_LedgerIdentSet(aw_ledger_t *l,uint32_t key,uint32_t record){
+    int i;aw_ledger_ident_t *x;
+    if(!IDENT_KEY_OK(key) || !record){l->refused++;return 0;}
+    i=ident_from(l,key);
+    if(i<l->ident_count && l->ident[i].key==key){l->ident[i].record=record;return 1;}
+    if(l->ident_count>=AW_LEDGER_IDENTS_MAX){l->refused++;return 0;}
+    if(l->ident_count==l->ident_capacity){
+        int want=l->ident_capacity?l->ident_capacity*2:64;
+        if(want>AW_LEDGER_IDENTS_MAX)want=AW_LEDGER_IDENTS_MAX;
+        x=(aw_ledger_ident_t *)AW_TryRealloc(l->ident,(unsigned long)want*sizeof(aw_ledger_ident_t));
+        if(!x){l->refused++;return 0;}
+        l->ident=x;l->ident_capacity=want;
+    }
+    x=&l->ident[i];
+    memmove(x+1,x,(size_t)(l->ident_count-i)*sizeof(*x));
+    x->key=key;x->record=record;l->ident_count++;
+    return 1;
+}
+static int key_order(const void *a,const void *b){
+    uint32_t x=*(const uint32_t *)a,y=*(const uint32_t *)b;
+    return x<y?-1:x>y;
+}
+/* every reference key the list names (placed references only: no drop, no builder-made key), sorted, once each; the
+ * count, -1 no memory. *OUT is the caller's to free. */
+static int named_keys(const aw_ledger_t *l,uint32_t **out){
+    int i,t,n=0,m=0;uint32_t *k;
+    n=l->count+l->content_count+l->rank_count+l->value_count[AW_LEDGER_DISPOSITIONS]+l->local_count+l->actor_count;
+    *out=NULL;
+    if(!n)return 0;
+    if(!(k=(uint32_t *)AW_TryMalloc((unsigned long)n*sizeof(uint32_t))))return -1;
+    for(i=0;i<l->count;i++)if(IDENT_KEY_OK(l->row[i].key))k[m++]=l->row[i].key;
+    for(i=0;i<l->content_count;i++)k[m++]=l->content[i].key;
+    for(i=0;i<l->rank_count;i++)k[m++]=l->rank[i].key;
+    t=AW_LEDGER_DISPOSITIONS;
+    for(i=0;i<l->value_count[t];i++)k[m++]=l->value[t][i].key;
+    for(i=0;i<l->local_count;i++)if(!l->local[i].global)k[m++]=l->local[i].key;
+    for(i=0;i<l->actor_count;i++)if(actor_fields(&l->actor[i]))k[m++]=l->actor[i].key;
+    for(i=n=0;i<m;i++)if(IDENT_KEY_OK(k[i]))k[n++]=k[i];
+    qsort(k,(size_t)n,sizeof(uint32_t),key_order);
+    for(i=m=0;i<n;i++)if(!m || k[i]!=k[m-1])k[m++]=k[i];
+    *out=k;
+    return m;
+}
+int AW_LedgerIdentRefresh(aw_ledger_t *l,aw_ledger_lookup_t lookup,void *context){
+    uint32_t *keys,record;int n=named_keys(l,&keys),i,m=0;aw_ledger_ident_t *made;
+    if(n<0)return 0;
+    if(!n){free(l->ident);l->ident=NULL;l->ident_count=l->ident_capacity=0;return 1;}
+    if(!(made=(aw_ledger_ident_t *)AW_TryMalloc((unsigned long)n*sizeof(aw_ledger_ident_t)))){free(keys);return 0;}
+    for(i=0;i<n;i++){
+        if(!AW_LedgerIdent(l,keys[i],&record) && !(lookup && lookup(context,keys[i],&record) && record))continue;
+        made[m].key=keys[i];made[m].record=record;m++;
+    }
+    free(keys);free(l->ident);
+    l->ident=made;l->ident_count=m;l->ident_capacity=n;
+    return 1;
+}
+static int file_name_ok(const char *s){
+    int i;
+    for(i=0;s[i];i++)if((unsigned char)s[i]<32 || (unsigned char)s[i]>126 || i>=AW_LEDGER_FILE_NAME)return 0;
+    return i>0;
+}
+void AW_LedgerFilesSet(aw_ledger_t *l,const aw_ledger_file_t *files,int count){
+    int i,n=0;
+    memset(l->file,0,sizeof(l->file));
+    for(i=0;files && i<count && n<AW_LEDGER_FILES_MAX;i++){
+        if(files[i].index>31 || !file_name_ok(files[i].name) || (n && files[i].index<=l->file[n-1].index))continue;
+        l->file[n++]=files[i];
+    }
+    l->file_count=n;
+}
+
+/* --- slice 7: migration (aw_ledger.h) --- */
+static int same_name(const char *a,const char *b){
+    for(;*a && *b;a++,b++){
+        int x=(unsigned char)*a,y=(unsigned char)*b;
+        if(x>='A' && x<='Z')x+=32;
+        if(y>='A' && y<='Z')y+=32;
+        if(x!=y)return 0;
+    }
+    return *a==*b;
+}
+typedef struct {
+    const aw_ledger_t *saved;     /* the save's idents and files, as loaded */
+    const aw_ledger_file_t *now;int now_count;
+    aw_ledger_lookup_t lookup;void *context;
+    uint32_t missing;             /* bit per saved file index this game lacks */
+} migrate_t;
+/* KEY of the save still names the same thing in this game */
+static int still_there(const migrate_t *m,uint32_t key){
+    uint32_t index=(key&AW_LEDGER_ID)>>20,record=0,saved;
+    if(!IDENT_KEY_OK(key) || index>31 || (m->missing&(1U<<index)))return 0;
+    if(!m->lookup || !m->lookup(m->context,key,&record))return 0;
+    return !AW_LedgerIdent(m->saved,key,&saved) || saved==record;
+}
+unsigned long AW_LedgerMigrate(aw_ledger_t *l,const aw_ledger_file_t *now,int now_count,aw_ledger_lookup_t lookup,
+                               void *context,int (*item_ok)(void *context,const char *id),aw_ledger_dropped_t *out){
+    migrate_t m;aw_ledger_dropped_t d;int i,j,k,t;unsigned long all;aw_ledger_t old;
+    memset(&d,0,sizeof(d));memset(&m,0,sizeof(m));
+    old=*l;                        /* the save's idents and files, read while L changes (only rows move below) */
+    m.saved=&old;m.now=now;m.now_count=now_count;m.lookup=lookup;m.context=context;
+    /* the save's content files by name: one this game lacks drops every change of it; a save without a list was made
+     * with the files of the fixed indices (tools/ref_identity.py): the same name at the same index */
+    for(i=0;i<l->file_count;i++){
+        for(j=0;j<now_count && !same_name(now[j].name,l->file[i].name);j++);
+        if(j==now_count || now[j].index!=l->file[i].index){m.missing|=1U<<l->file[i].index;d.files++;}
+    }
+    for(i=k=0;i<l->count;i++){
+        aw_ledger_row_t *r=&l->row[i];int keep;
+        if(r->key&AW_LEDGER_BUILDER)keep=1;
+        else if(r->key&AW_LEDGER_PLAYER)keep=!item_ok || !r->extra || item_ok(context,r->extra->item);
+        else keep=still_there(&m,r->key);
+        if(!keep){
+            if(r->key&AW_LEDGER_PLAYER)d.drops++;else d.objects++;
+            if(r->extra){free(r->extra);l->extras--;}
+            continue;
+        }
+        l->row[k++]=*r;
+    }
+    if(k!=l->count){l->count=k;l->placed=0;}
+    for(i=k=0;i<l->content_count;i++){
+        if(!still_there(&m,l->content[i].key) || (item_ok && !item_ok(context,l->content[i].item))){d.containers++;continue;}
+        l->content[k++]=l->content[i];
+    }
+    l->content_count=k;
+    for(i=k=0;i<l->stolen_count;i++){
+        if(item_ok && !item_ok(context,l->stolen[i].item)){d.stolen++;continue;}
+        l->stolen[k++]=l->stolen[i];
+    }
+    l->stolen_count=k;
+    for(i=k=0;i<l->rank_count;i++){
+        if(!still_there(&m,l->rank[i].key)){d.ranks++;continue;}
+        l->rank[k++]=l->rank[i];
+    }
+    l->rank_count=k;
+    t=AW_LEDGER_DISPOSITIONS;
+    for(i=k=0;i<l->value_count[t];i++){
+        if(!still_there(&m,l->value[t][i].key)){d.dispositions++;continue;}
+        l->value[t][k++]=l->value[t][i];
+    }
+    l->value_count[t]=k;
+    for(i=k=0;i<l->local_count;i++){
+        if(!l->local[i].global && !still_there(&m,l->local[i].key)){d.locals++;continue;}
+        l->local[k++]=l->local[i];
+    }
+    l->local_count=k;
+    for(i=k=0;i<l->actor_count;i++){
+        aw_ledger_actor_t *a=&l->actor[i];
+        if(!actor_fields(a))continue;
+        if(!still_there(&m,a->key)){d.actors++;continue;}
+        if(a->pick){a->pick=0;d.picks++;}   /* a base row of the save's actor table: rolled again here */
+        if(actor_fields(a))l->actor[k++]=*a;
+    }
+    l->actor_count=k;
+    /* the idents of what stays are this game's; the files are this game's */
+    free(l->ident);l->ident=NULL;l->ident_count=l->ident_capacity=0;
+    AW_LedgerIdentRefresh(l,lookup,context);
+    AW_LedgerFilesSet(l,now,now_count);
+    all=d.objects+d.containers+d.ranks+d.dispositions+d.locals+d.actors+d.picks+d.drops+d.stolen;
+    if(out)*out=d;
+    return all;
+}
+
 /* --- the saved form --- */
 static unsigned char *put_at;
 static const unsigned char *get_at;
 static int pos,limit,bad,form;        /* form: 1 "AWL1", 2 "AWL2" (OPEN and the stolen pairs) */
+static int died_rows;                 /* slice 7: actor rows read with DIED */
 static void raw(void *value,int n){
     if(n<0 || pos>limit-n){bad=1;pos=limit;return;}
     if(put_at)memcpy(put_at+pos,value,(size_t)n);
@@ -380,6 +881,92 @@ static void rank_fields(aw_ledger_rank_t *r,const aw_ledger_rank_t *previous){
     if(bad)return;
     if(!content_key_ok(r->key) || (previous && r->key<=previous->key))bad=1;
 }
+/* slice 4: one table entry both ways (TOPICS: the key alone), one named fact both ways */
+static void value_fields(int table,aw_ledger_value_t *v,const aw_ledger_value_t *previous){
+    uint32_t value=(uint32_t)v->value;
+    u32(&v->key);
+    if(table!=AW_LEDGER_TOPICS){u32(&value);v->value=(int32_t)value;}else v->value=1;
+    if(bad)return;
+    if(!value_ok(table,v->key,v->value) || (previous && v->key<=previous->key))bad=1;
+}
+static void fact_fields(aw_ledger_fact_t *x,const aw_ledger_fact_t *previous){
+    unsigned char n=0;char folded[AW_LEDGER_FACT_ID+1];uint32_t value=(uint32_t)x->value;
+    if(!get_at){if(!fact_id(folded,x->id) || strcmp(folded,x->id)){bad=1;return;}n=(unsigned char)strlen(x->id);}
+    raw(&n,1);
+    if(bad || n<1 || n>AW_LEDGER_FACT_ID){bad=1;return;}
+    if(get_at)memset(x->id,0,sizeof(x->id));
+    raw(x->id,n);u32(&value);x->value=(int32_t)value;
+    if(bad)return;
+    if((get_at && (!fact_id(folded,x->id) || strcmp(folded,x->id))) || (previous && strcmp(x->id,previous->id)<=0))bad=1;
+}
+/* slice 5: a u16 both ways; one running global script both ways; one local both ways (PREVIOUS as above) */
+static void u16(uint16_t *v){
+    unsigned char b[2];
+    b[0]=(unsigned char)*v;b[1]=(unsigned char)(*v>>8);raw(b,2);
+    if(get_at && !bad)*v=(uint16_t)(b[0]|(b[1]<<8));
+}
+static void script_fields(aw_ledger_script_t *x,const aw_ledger_script_t *previous){
+    u32(&x->script);u16(&x->hint);raw(&x->running,1);
+    if(bad)return;
+    if(!x->script || x->running>1 || (previous && x->script<=previous->script))bad=1;
+}
+static void local_fields(aw_ledger_local_t *x,const aw_ledger_local_t *previous){
+    uint32_t value=(uint32_t)x->value;
+    raw(&x->global,1);u32(&x->key);u32(&x->script);u16(&x->hint);raw(&x->slot,1);u32(&value);x->value=(int32_t)value;
+    if(bad)return;
+    if(x->global>1 || !local_ok(x->global,x->key,x->script,x->hint,x->slot) || !x->value ||
+       (previous && local_order(x->global,x->key,x->slot,previous)<=0))bad=1;
+}
+/* slice 6: one actor row both ways (PREVIOUS the key before it, 0 for the first) */
+static void actor_row_fields(aw_ledger_actor_t *a,uint32_t previous){
+    unsigned char f=(unsigned char)(actor_fields(a)|(form>=7 && a->dead && a->died>0?AW_LEDGER_ACTOR_DIED:0U));
+    uint32_t room=(uint32_t)a->room;
+    u32(&a->key);raw(&f,1);
+    if(bad)return;
+    if(!ACTOR_KEY_OK(a->key) || a->key<=previous || !(f&AW_LEDGER_ACTOR_FIELDS) ||
+       (f&~(form>=7?(AW_LEDGER_ACTOR_FIELDS|AW_LEDGER_ACTOR_DIED):AW_LEDGER_ACTOR_FIELDS)) ||
+       ((f&AW_LEDGER_ACTOR_DIED) && !(f&AW_LEDGER_ACTOR_DEAD))){bad=1;return;}
+    if(get_at){a->dead=(f&AW_LEDGER_ACTOR_DEAD)?1:0;a->moved=(f&AW_LEDGER_ACTOR_MOVED)?1:0;
+        a->fight=(f&AW_LEDGER_ACTOR_FIGHT)?1:0;a->follow=(f&AW_LEDGER_ACTOR_FOLLOW)?1:0;}
+    if(f&AW_LEDGER_ACTOR_PICK){
+        u16(&a->pick);
+        if(!bad && (a->pick<1 || a->pick>0x8001U))bad=1;
+    }else if(get_at)a->pick=0;
+    if(bad)return;
+    if(f&AW_LEDGER_ACTOR_MOVED){
+        f32(&a->origin[0],-1000000,1000000);f32(&a->origin[1],-1000000,1000000);f32(&a->origin[2],-1000000,1000000);
+        f32(&a->angles[1],-720,720);f32(&a->health,-10000,100000);f32(&a->hours,0,10000000);
+        u32(&room);a->room=(int32_t)room;
+        if(!bad && (a->room<0 || a->room>0xFFFFFF))bad=1;
+    }
+    if(f&AW_LEDGER_ACTOR_DIED){
+        f32(&a->died,0,10000000);
+        if(!bad && !(a->died>0))bad=1;
+    }else if(get_at)a->died=0;
+}
+/* slice 7: one content file, one ident, one place's refill time, each both ways (PREVIOUS as above) */
+static void file_fields(aw_ledger_file_t *x,const aw_ledger_file_t *previous){
+    unsigned char n=0;uint32_t refs=x->references;
+    raw(&x->index,1);
+    if(!get_at){if(!file_name_ok(x->name)){bad=1;return;}n=(unsigned char)strlen(x->name);}
+    raw(&n,1);
+    if(bad || n<1 || n>AW_LEDGER_FILE_NAME){bad=1;return;}
+    if(get_at)memset(x->name,0,sizeof(x->name));
+    raw(x->name,n);u32(&refs);x->references=refs;raw(x->digest,8);
+    if(bad)return;
+    if(x->index>31 || !file_name_ok(x->name) || (previous && x->index<=previous->index))bad=1;
+}
+static void ident_fields(aw_ledger_ident_t *x,const aw_ledger_ident_t *previous){
+    u32(&x->key);u32(&x->record);
+    if(bad)return;
+    if(!IDENT_KEY_OK(x->key) || !x->record || (previous && x->key<=previous->key))bad=1;
+}
+static void stamp_fields(aw_ledger_stamp_t *x,const aw_ledger_stamp_t *previous){
+    uint32_t where=(uint32_t)x->where;
+    raw(&x->at,1);u32(&where);x->where=(int32_t)where;f32(&x->hours,0,10000000);
+    if(bad)return;
+    if(!stamp_ok(x->at,x->where,x->hours) || (previous && stamp_order(x->at,x->where,previous)<=0))bad=1;
+}
 int AW_LedgerEncode(const aw_ledger_t *l,unsigned char *out,int capacity){
     uint32_t n=(uint32_t)l->count,previous=0,m=(uint32_t)l->stolen_count;int i;
     put_at=out;get_at=NULL;pos=0;limit=out?capacity:0x7FFFFFFF;bad=0;
@@ -387,7 +974,11 @@ int AW_LedgerEncode(const aw_ledger_t *l,unsigned char *out,int capacity){
     form=l->stolen_count?2:1;
     for(i=0;i<l->count && form==1;i++)if(l->row[i].fields&AW_LEDGER_OPEN)form=2;
     if(l->content_count || l->rank_count)form=3;       /* slice 3: only then, so slice 1 and 2 engines read the rest */
-    raw((void *)(form==3?"AWL3":form==2?"AWL2":"AWL1"),4);u32(&n);
+    if(slice4(l))form=4;                               /* slice 4: the same rule */
+    if(slice5(l))form=5;                               /* slice 5: the same rule */
+    if(slice6(l))form=6;                               /* slice 6: the same rule */
+    if(slice7(l))form=7;                               /* slice 7: the same rule */
+    raw((void *)(form==7?"AWL7":form==6?"AWL6":form==5?"AWL5":form==4?"AWL4":form==3?"AWL3":form==2?"AWL2":"AWL1"),4);u32(&n);
     for(i=0;i<l->count && !bad;i++){
         aw_ledger_row_t r=l->row[i];aw_ledger_extra_t x;
         if(r.extra)x=*r.extra;else memset(&x,0,sizeof(x));
@@ -400,7 +991,7 @@ int AW_LedgerEncode(const aw_ledger_t *l,unsigned char *out,int capacity){
             pair_fields(&s,i?&l->stolen[i-1]:NULL);
         }
     }
-    if(form==3 && !bad){
+    if(form>=3 && !bad){
         uint32_t c=(uint32_t)l->content_count,k=(uint32_t)l->rank_count;
         u32(&c);
         for(i=0;i<l->content_count && !bad;i++){
@@ -414,15 +1005,80 @@ int AW_LedgerEncode(const aw_ledger_t *l,unsigned char *out,int capacity){
             rank_fields(&x,i?&l->rank[i-1]:NULL);
         }
     }
+    if(form>=4 && !bad){
+        int t;uint32_t k;
+        for(t=0;t<AW_LEDGER_TABLES && !bad;t++){
+            k=(uint32_t)l->value_count[t];u32(&k);
+            for(i=0;i<l->value_count[t] && !bad;i++){
+                aw_ledger_value_t x=l->value[t][i];
+                value_fields(t,&x,i?&l->value[t][i-1]:NULL);
+            }
+        }
+        k=(uint32_t)l->fact_count;
+        if(!bad)u32(&k);
+        for(i=0;i<l->fact_count && !bad;i++){
+            aw_ledger_fact_t x=l->fact[i];
+            fact_fields(&x,i?&l->fact[i-1]:NULL);
+        }
+    }
+    if(form>=5 && !bad){
+        uint32_t k=(uint32_t)l->script_count;
+        u32(&k);
+        for(i=0;i<l->script_count && !bad;i++){
+            aw_ledger_script_t x=l->script[i];
+            script_fields(&x,i?&l->script[i-1]:NULL);
+        }
+        k=(uint32_t)l->local_count;
+        if(!bad)u32(&k);
+        for(i=0;i<l->local_count && !bad;i++){
+            aw_ledger_local_t x=l->local[i];
+            local_fields(&x,i?&l->local[i-1]:NULL);
+        }
+    }
+    if(form>=6 && !bad){
+        uint32_t k=(uint32_t)actors_kept(l),last=0,b=(uint32_t)l->records_bytes;
+        u32(&k);
+        for(i=0;i<l->actor_count && !bad;i++){
+            aw_ledger_actor_t x=l->actor[i];
+            if(!actor_fields(&x))continue;            /* nothing kept on it: not saved */
+            actor_row_fields(&x,last);last=x.key;
+        }
+        if(!bad)u32(&b);
+        if(!bad && b){
+            if(b>AW_LEDGER_RECORDS_MAX || b<8 || memcmp(l->records,"AWAR",4))bad=1;
+            else raw(l->records,(int)b);
+        }
+    }
+    if(form==7 && !bad){
+        unsigned char f=(unsigned char)l->file_count;uint32_t k;
+        raw(&f,1);
+        for(i=0;i<l->file_count && !bad;i++){
+            aw_ledger_file_t x=l->file[i];
+            file_fields(&x,i?&l->file[i-1]:NULL);
+        }
+        k=(uint32_t)l->ident_count;
+        if(!bad)u32(&k);
+        for(i=0;i<l->ident_count && !bad;i++){
+            aw_ledger_ident_t x=l->ident[i];
+            ident_fields(&x,i?&l->ident[i-1]:NULL);
+        }
+        k=(uint32_t)l->stamp_count;
+        if(!bad)u32(&k);
+        for(i=0;i<l->stamp_count && !bad;i++){
+            aw_ledger_stamp_t x=l->stamp[i];
+            stamp_fields(&x,i?&l->stamp[i-1]:NULL);
+        }
+    }
     put_at=NULL;
     return bad?0:pos;
 }
 int AW_LedgerDecode(const unsigned char *data,int size,aw_ledger_t *into){
     aw_ledger_t made;uint32_t n=0,previous=0,i;unsigned char magic[4];
     memset(&made,0,sizeof(made));
-    put_at=NULL;get_at=data;pos=0;limit=size;bad=0;
+    put_at=NULL;get_at=data;pos=0;limit=size;bad=0;died_rows=0;
     raw(magic,4);u32(&n);
-    form=bad?0:!memcmp(magic,"AWL1",4)?1:!memcmp(magic,"AWL2",4)?2:!memcmp(magic,"AWL3",4)?3:0;
+    form=bad?0:!memcmp(magic,"AWL1",4)?1:!memcmp(magic,"AWL2",4)?2:!memcmp(magic,"AWL3",4)?3:!memcmp(magic,"AWL4",4)?4:
+         !memcmp(magic,"AWL5",4)?5:!memcmp(magic,"AWL6",4)?6:!memcmp(magic,"AWL7",4)?7:0;
     if(!form || (form==1 && n<1) || n>AW_LEDGER_ROWS || (unsigned long)n*12>(unsigned long)size){get_at=NULL;return 0;}
     for(i=0;i<n && !bad;i++){
         aw_ledger_row_t r;aw_ledger_extra_t x,*keep;
@@ -452,7 +1108,7 @@ int AW_LedgerDecode(const unsigned char *data,int size,aw_ledger_t *into){
             if(into && AW_LedgerStolenAdd(&made,s.item,s.owner,s.faction,s.count)!=s.count)bad=1;
         }
     }
-    if(form==3 && !bad){
+    if(form>=3 && !bad){
         uint32_t c=0,k=0;aw_ledger_content_t lc;aw_ledger_rank_t lr;
         memset(&lc,0,sizeof(lc));memset(&lr,0,sizeof(lr));
         u32(&c);
@@ -466,7 +1122,7 @@ int AW_LedgerDecode(const unsigned char *data,int size,aw_ledger_t *into){
             if(into && AW_LedgerContentAdd(&made,x.key,x.item,x.count)!=x.count)bad=1;
         }
         if(!bad)u32(&k);
-        if(!bad && (k>AW_LEDGER_RANKS_MAX || (unsigned long)k*5>(unsigned long)size || (!c && !k)))bad=1;
+        if(!bad && (k>AW_LEDGER_RANKS_MAX || (unsigned long)k*5>(unsigned long)size || (form==3 && !c && !k)))bad=1;
         for(i=0;i<k && !bad;i++){
             aw_ledger_rank_t x;
             memset(&x,0,sizeof(x));
@@ -476,8 +1132,200 @@ int AW_LedgerDecode(const unsigned char *data,int size,aw_ledger_t *into){
             if(into && !AW_LedgerRankSet(&made,x.key,x.rank))bad=1;
         }
     }
+    if(form>=4 && !bad){
+        int t;uint32_t k=0,any=0;
+        for(t=0;t<AW_LEDGER_TABLES && !bad;t++){
+            aw_ledger_value_t last;
+            memset(&last,0,sizeof(last));k=0;u32(&k);
+            if(!bad && (k>AW_LEDGER_VALUES_MAX || (unsigned long)k*4>(unsigned long)size))bad=1;
+            any+=k;
+            for(i=0;i<k && !bad;i++){
+                aw_ledger_value_t x;
+                memset(&x,0,sizeof(x));
+                value_fields(t,&x,i?&last:NULL);
+                if(bad)break;
+                last=x;
+                if(into && !AW_LedgerValueSet(&made,t,x.key,x.value))bad=1;
+            }
+        }
+        k=0;
+        if(!bad)u32(&k);
+        if(!bad && (k>AW_LEDGER_FACTS_MAX || (unsigned long)k*6>(unsigned long)size || (form==4 && !(any+k))))bad=1;
+        {aw_ledger_fact_t last;
+         memset(&last,0,sizeof(last));
+         for(i=0;i<k && !bad;i++){
+             aw_ledger_fact_t x;
+             memset(&x,0,sizeof(x));
+             fact_fields(&x,i?&last:NULL);
+             if(bad)break;
+             last=x;
+             if(into && !AW_LedgerFactSet(&made,x.id,x.value))bad=1;
+         }}
+    }
+    if(form>=5 && !bad){
+        uint32_t k=0,m=0;aw_ledger_script_t ls;aw_ledger_local_t ll;
+        memset(&ls,0,sizeof(ls));memset(&ll,0,sizeof(ll));
+        u32(&k);
+        if(!bad && (k>AW_LEDGER_SCRIPTS_MAX || (unsigned long)k*7>(unsigned long)size))bad=1;
+        for(i=0;i<k && !bad;i++){
+            aw_ledger_script_t x;
+            memset(&x,0,sizeof(x));
+            script_fields(&x,i?&ls:NULL);
+            if(bad)break;
+            ls=x;
+            if(into && !AW_LedgerScriptSet(&made,x.script,x.hint,x.running))bad=1;
+        }
+        if(!bad)u32(&m);
+        if(!bad && (m>AW_LEDGER_LOCALS_MAX || (unsigned long)m*16>(unsigned long)size || (form==5 && !(k+m))))bad=1;
+        for(i=0;i<m && !bad;i++){
+            aw_ledger_local_t x;
+            memset(&x,0,sizeof(x));
+            local_fields(&x,i?&ll:NULL);
+            if(bad)break;
+            ll=x;
+            if(into && !AW_LedgerLocalSet(&made,x.global,x.key,x.script,x.hint,x.slot,x.value))bad=1;
+        }
+    }
+    if(form>=6 && !bad){
+        uint32_t k=0,b=0,last=0;
+        u32(&k);
+        if(!bad && (k>AW_LEDGER_ACTORS_MAX || (unsigned long)k*5>(unsigned long)size))bad=1;
+        for(i=0;i<k && !bad;i++){
+            aw_ledger_actor_t x,*row;
+            memset(&x,0,sizeof(x));
+            actor_row_fields(&x,last);
+            if(bad)break;
+            last=x.key;
+            if(x.died>0)died_rows++;
+            if(into){
+                if(!(row=AW_LedgerActor(&made,x.key,1))){bad=1;break;}
+                *row=x;
+            }
+        }
+        if(!bad)u32(&b);
+        if(!bad && (b>AW_LEDGER_RECORDS_MAX || (b && b<8) || b>(uint32_t)(size-pos) || (form==6 && !(k+b))))bad=1;
+        if(!bad && b){
+            if(memcmp(data+pos,"AWAR",4))bad=1;
+            else{
+                if(into && !AW_LedgerRecordsSet(&made,data+pos,(int)b))bad=1;
+                pos+=(int)b;
+            }
+        }
+    }
+    if(form==7 && !bad){
+        unsigned char f=0;uint32_t k=0,s=0;aw_ledger_file_t lf;aw_ledger_ident_t li;aw_ledger_stamp_t ls;int died=0;
+        memset(&lf,0,sizeof(lf));memset(&li,0,sizeof(li));memset(&ls,0,sizeof(ls));
+        raw(&f,1);
+        if(!bad && f>AW_LEDGER_FILES_MAX)bad=1;
+        for(i=0;i<f && !bad;i++){
+            aw_ledger_file_t x;
+            memset(&x,0,sizeof(x));
+            file_fields(&x,i?&lf:NULL);
+            if(bad)break;
+            lf=x;
+            if(into)made.file[made.file_count++]=x;
+        }
+        if(!bad)u32(&k);
+        if(!bad && (k>AW_LEDGER_IDENTS_MAX || (unsigned long)k*8>(unsigned long)size))bad=1;
+        for(i=0;i<k && !bad;i++){
+            aw_ledger_ident_t x;
+            memset(&x,0,sizeof(x));
+            ident_fields(&x,i?&li:NULL);
+            if(bad)break;
+            li=x;
+            if(into && !AW_LedgerIdentSet(&made,x.key,x.record))bad=1;
+        }
+        if(!bad)u32(&s);
+        if(!bad && (s>AW_LEDGER_STAMPS_MAX || (unsigned long)s*9>(unsigned long)size))bad=1;
+        for(i=0;i<s && !bad;i++){
+            aw_ledger_stamp_t x;
+            memset(&x,0,sizeof(x));
+            stamp_fields(&x,i?&ls:NULL);
+            if(bad)break;
+            ls=x;
+            if(into && !stamp_set(&made,x.at,x.where,x.hours))bad=1;
+        }
+        /* a seventh form holds something only it can (else it would have been written as an earlier one) */
+        died=died_rows;
+        if(!bad && !(f+k+s) && !died)bad=1;
+    }
     get_at=NULL;
     if(bad || pos!=size){AW_LedgerClear(&made);return 0;}
     if(into)AW_LedgerMove(into,&made);
     return 1;
+}
+
+/* --- slice 7: the build's reference identity table (aw_ledger.h) --- */
+AW_RESIDENT_GROWS("reference identity table's block index (CELL-CHANGES-59 slice 7)",AW_REFS_BLOCKS_MAX,4);
+AW_RESIDENT_GROWS("reference identity table's one block of rows (CELL-CHANGES-59 slice 7)",1,AW_REFS_BLOCK_BYTES);
+static uint32_t le32(const unsigned char *p){
+    return (uint32_t)p[0]|((uint32_t)p[1]<<8)|((uint32_t)p[2]<<16)|((uint32_t)p[3]<<24);
+}
+void AW_RefsClose(aw_refs_t *r){
+    free(r->first);free(r->block);
+    memset(r,0,sizeof(*r));
+}
+int AW_RefsOpen(aw_refs_t *r,int (*read)(void *context,long at,void *out,long bytes),void *context,long at,long end){
+    unsigned char b[48];int i,n;float f;
+    memset(r,0,sizeof(*r));
+    if(!read || at<0 || end-at<9 || read(context,at,b,5) || memcmp(b,"AWI1",4) || b[4]>AW_LEDGER_FILES_MAX)return 0;
+    n=b[4];at+=5;
+    for(i=0;i<n;i++){
+        aw_ledger_file_t *x=&r->file[i];
+        if(end-at<2 || read(context,at,b,2) || b[1]<1 || b[1]>AW_LEDGER_FILE_NAME)goto bad;
+        x->index=b[0];
+        if(end-at<2+b[1]+12 || read(context,at+2,x->name,b[1]))goto bad;
+        x->name[b[1]]=0;at+=2+b[1];
+        if(read(context,at,b,12))goto bad;
+        x->references=le32(b);memcpy(x->digest,b+4,8);at+=12;
+        if(!file_name_ok(x->name) || x->index>31 || (i && x->index<=r->file[i-1].index))goto bad;
+    }
+    r->file_count=n;
+    if(end-at<24 || read(context,at,b,24))goto bad;
+    r->respawn.months=(int)le32(b);
+    {uint32_t u=le32(b+4);memcpy(&f,&u,4);r->respawn.respawn_delay=f;u=le32(b+8);memcpy(&f,&u,4);r->respawn.clear_delay=f;}
+    r->rows=le32(b+12);r->step=le32(b+16);r->blocks=le32(b+20);at+=24;
+    if(r->respawn.months<1 || r->respawn.months>1000 || !(r->respawn.respawn_delay>=0 && r->respawn.respawn_delay<100000) ||
+       !(r->respawn.clear_delay>=0 && r->respawn.clear_delay<100000) || r->rows>AW_REFS_ROWS_MAX || r->step<1 ||
+       r->step>AW_REFS_STEP_MAX || r->blocks!=(r->rows+r->step-1)/r->step || r->blocks>AW_REFS_BLOCKS_MAX ||
+       end-at<(long)r->blocks*4+(long)r->rows*8)goto bad;
+    if(r->blocks){
+        if(!(r->first=(uint32_t *)AW_TryMalloc((unsigned long)r->blocks*4)) ||
+           read(context,at,r->first,(long)r->blocks*4))goto bad;
+        for(i=0;i<(int)r->blocks;i++){
+            r->first[i]=le32((unsigned char *)&r->first[i]);
+            if(i && r->first[i]<=r->first[i-1])goto bad;
+        }
+    }
+    r->rows_at=at+(long)r->blocks*4;r->read=read;r->context=context;r->cached=-1;
+    return 1;
+bad:
+    AW_RefsClose(r);
+    return 0;
+}
+int AW_RefsFind(aw_refs_t *r,uint32_t key,uint32_t *record,uint32_t *flags){
+    int lo=0,hi,mid;uint32_t n,k;long block;
+    if(!r || !r->first || !key || (key&0xFF000000U))return 0;
+    r->lookups++;
+    hi=(int)r->blocks-1;
+    if(key<r->first[0])return 0;
+    while(lo<hi){mid=(lo+hi+1)/2;if(r->first[mid]<=key)lo=mid;else hi=mid-1;}
+    block=lo;
+    n=(uint32_t)block+1==r->blocks?r->rows-(uint32_t)block*r->step:r->step;
+    if(r->cached!=block){
+        if(!r->block && !(r->block=(unsigned char *)AW_TryMalloc((unsigned long)r->step*8)))return 0;
+        r->reads++;
+        if(r->read(r->context,r->rows_at+block*(long)r->step*8,r->block,(long)n*8)){r->cached=-1;return 0;}
+        r->cached=block;
+    }
+    for(lo=0,hi=(int)n-1;lo<=hi;){
+        mid=(lo+hi)/2;k=le32(r->block+mid*8)&0xFFFFFFU;
+        if(k==key){
+            if(record)*record=le32(r->block+mid*8+4);
+            if(flags)*flags=le32(r->block+mid*8)&0xFF000000U;
+            return 1;
+        }
+        if(k<key)lo=mid+1;else hi=mid-1;
+    }
+    return 0;
 }

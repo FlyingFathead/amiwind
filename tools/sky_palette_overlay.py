@@ -18,7 +18,10 @@ OPAQUE={'.cfg','.dat','.json','.lip','.rc','.tsv','.txt','.wav','.awc','.awj','.
         '.awsk',
         # CHIM rooms (tools/chim/interior.py, docs/chim/INTERIOR_STORE.md): the room store's index and packs and the room
         # records, written by the same CHIM pipeline as the world partition, which is never overlaid either.
-        '.cwi','.ccs','.crm'}
+        '.cwi','.ccs','.crm',
+        # residents' recipe tables (tools/npc_recipes.py, BUILD-NPC-RECIPES-PER-CELL-59): a place's table, the cells'
+        # pack and the resident directory; id hashes, indices and names, no pixels
+        '.awnb','.awnp','.awnd'}
 # Every extension spans() parses as indexed pixels or metadata (besides OPAQUE and the named files below).
 # .awk: a shared actor skin (tools/payload_share.py): indexed pixels only; a model that points to one carries no
 # pixels of its own (skin type AWSK, IMAGE-ACTOR-SKIN-REPEATS-46).

@@ -9,6 +9,7 @@
 #include "aw_move.h"
 #define ICON_ROW 160
 aw_icon_stats_t aw_icon_stats;
+static int icons_direct;   /* AREA-TABLES-59: a read for the area tables' picture cache goes to the pack itself */
 static int icon_compare(const char *a,const char *b){
     unsigned x,y;
     do{
@@ -47,6 +48,15 @@ static int picture_load(const char *key,int *w_out,int *h_out,byte *pixels,int m
     static const char hex[]="0123456789abcdef";
     char path[40];byte digest[32],head[8];FILE *f=NULL;int i,size,w,h,ok=0,length;long offset,base;
     aw_icon_stats.lookups++;
+    /* AREA-TABLES-59: an item's picture from the loaded area tables (no file search); a miss searches the table and
+     * counts as a fallback */
+    if(!icons_direct){
+        switch(AW_AreaIcon(key,w_out,h_out,pixels,maxw,maxh)){
+        case 1:aw_icon_stats.area++;return 1;
+        case -1:aw_icon_stats.area++;aw_icon_stats.misses++;return 0;   /* the area knows it has none */
+        }
+        AW_AreaIconFallback(key);
+    }
     if(!icon_digest(key,digest,&offset,&length)){aw_icon_stats.misses++;return 0;}
     if(offset>=0){
         size=COM_FOpenFile("gfx/icons.awp",&f);if(!f){aw_icon_stats.misses++;return 0;}
@@ -168,8 +178,8 @@ static int hud_item_boxes(int y,int boxes) {
 }
 void AW_IconStats(void) {
     int k;
-    Con_Printf("Icons: %u table lookups, %u picture reads, %u missing, %u draws; HUD slots %d bytes resident.\n",
-        aw_icon_stats.lookups,aw_icon_stats.reads,aw_icon_stats.misses,aw_icon_stats.draws,(int)sizeof(hud_slot));
+    Con_Printf("Icons: %u table lookups, %u picture reads, %u missing, %u draws, %u from the area tables; HUD slots %d bytes resident.\n",
+        aw_icon_stats.lookups,aw_icon_stats.reads,aw_icon_stats.misses,aw_icon_stats.draws,aw_icon_stats.area,(int)sizeof(hud_slot));
     for(k=0;k<2;k++)if(aw_icon_stats.frames[k])
         Con_Printf("HUD boxes, %s: %u frames, %d microseconds per frame.\n",k?"original icons":"placeholders",
             aw_icon_stats.frames[k],(int)(aw_icon_stats.seconds[k]*1e6/aw_icon_stats.frames[k]));
@@ -257,6 +267,13 @@ static int inventory_row_icon(int slot,const char *id,int equipped,int x,int y){
     if(t->w!=16 || t->h!=16)return 0;
     AW_IconDraw(t,x,y);return 1;
 }
+/* AREA-TABLES-59: the pack's own read for the carried items' pictures, taken while an area loads (aw_inventory.c) */
+static int area_picture_read(const char *key,int *w,int *h,byte *pixels,int maxw,int maxh){
+    int ok;
+    icons_direct=1;ok=picture_load(key,w,h,pixels,maxw,maxh);icons_direct=0;
+    return ok;
+}
 void AW_IconsInit(void) {
+    aw_area_picture_read=area_picture_read;
     Cvar_RegisterVariable(&hud_icons);Cmd_AddCommand("aw_magic",AW_MagicCommand);aw_hud_item_boxes=hud_item_boxes;aw_title_bar=title_bar;aw_hand_to_hand_name=hand_to_hand_name;aw_inventory_row_icon=inventory_row_icon;
 }

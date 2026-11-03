@@ -512,6 +512,41 @@ long AW_DialTopicName(const aw_dial_t *d,int topic,int *length) {
     return d->at_tstrings+(long)rd32(r);
 }
 
+void AW_DialCacheReset(aw_dial_cache_t *c) {
+    int i;
+    for(i=0;i<AW_DIAL_CACHE_BLOCKS;i++){c->at[i]=-1;c->length[i]=0;c->used[i]=0;}
+    c->clock=0;
+}
+void AW_DialCacheInit(aw_dial_cache_t *c,aw_dial_read_t read,void *user,long size) {
+    c->read=read;c->user=user;c->size=size;c->inner_reads=c->hits=0;
+    AW_DialCacheReset(c);
+}
+int AW_DialCacheRead(void *cache,long offset,void *out,long bytes) {
+    aw_dial_cache_t *c=(aw_dial_cache_t *)cache;unsigned char *o=(unsigned char *)out;
+    if(!c || !c->read || offset<0 || bytes<0)return 0;
+    if(bytes==0)return 1;
+    if(offset+bytes>c->size)return 0;
+    if(bytes>=AW_DIAL_CACHE_BLOCK){c->inner_reads++;return c->read(c->user,offset,out,bytes);}
+    while(bytes>0){
+        long base=offset-offset%AW_DIAL_CACHE_BLOCK,piece;int i,b=-1,old=0;
+        for(i=0;i<AW_DIAL_CACHE_BLOCKS;i++){
+            if(c->at[i]==base){b=i;break;}
+            if(c->used[i]<c->used[old])old=i;
+        }
+        if(b<0){
+            long length=c->size-base<AW_DIAL_CACHE_BLOCK?c->size-base:AW_DIAL_CACHE_BLOCK;
+            b=old;c->at[b]=-1;c->inner_reads++;
+            if(!c->read(c->user,base,c->block[b],length))return 0;
+            c->at[b]=base;c->length[b]=length;
+        }else c->hits++;
+        c->used[b]=++c->clock;
+        piece=base+c->length[b]-offset;if(piece>bytes)piece=bytes;
+        memcpy(o,c->block[b]+(offset-base),(size_t)piece);
+        o+=piece;offset+=piece;bytes-=piece;
+    }
+    return 1;
+}
+
 /* A buffer cut into aligned pieces from the front (the answers: one array) and from the back (their conditions). */
 typedef struct {unsigned char *at;long left;} arena_t;
 static long pad8(long n) {return (n+7)&~7L;}  /* every piece aligned for its pointers (the buffer's start is) */

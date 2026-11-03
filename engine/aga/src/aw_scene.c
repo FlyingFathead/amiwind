@@ -822,11 +822,13 @@ static const char *npc_hint(void)
     v=GetEdictFieldValue(e,"aw_intro_role");if(v && v->_float)return NULL;
     return pr_strings+e->v.netname;
 }
+/* CONTAINER-WINDOW-59: 1 while the container strip is open (aw_cstrip.c sets it): no prompt or box under it */
+int (*aw_cstrip_open_now)(void);
 /* npc_interaction_layout_template_001: Morrowind name, console action below. */
 void AW_SceneDraw(void) {
     static int red=-1;int i,y,w,cw,npc=0,steal=0;char line[80],take[48];edict_t *driver;const char *name=NULL,*action=NULL;extern int scr_copyeverything;
     if(!AW_UISpeakerAtRight() || target_style.value!=2)AW_UIObjectName(AW_SceneTargetName(),(int)target_style.value);
-    if(key_dest!=key_game || pending || AW_IntroUse() || AW_PlayerDead() || !sv.active ||
+    if(key_dest!=key_game || pending || AW_IntroUse() || AW_PlayerDead() || !sv.active || (aw_cstrip_open_now && aw_cstrip_open_now()) ||
        svs.maxclients!=1 || !svs.clients || cls.state!=ca_connected ||
        svs.clients[0].edict->v.movetype!=MOVETYPE_WALK)return;
     driver=travel_target();

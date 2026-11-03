@@ -2,9 +2,11 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 2 times; something has to be done
+## PERSISTING: reported 4 times; something has to be done
 
 - Reported with v0.0.59-dev4 at 2026-11-02 (time not recorded): Gate boot smoke 5665 at 2026-11-02 12:57 +0200 / 2026-11-02 10:57 UTC (worker branch v0.0.59-cellchanges2, FS-UAE, 32 MB Fast): the second Seyda Neen load after Balmora stopped after the title line and the smoke timed out; the same commit passed the next gate (5666).
+- Reported with v0.0.59-dev5 at 2026-11-02 (time not recorded): Gate 5863 (v0.0.59-preview 28cea448) boot smoke: the third seyda load stopped at signon 3; the suite passed and gate 5864 on the same commit passed unchanged.
+- Reported with v0.0.59-dev5 at 2026-11-02 (time not recorded)
 - Reported with v0.0.59-dev4 at 2026-11-02 15:23 +0200: Gate 5735 boot smoke on integ 80a1aed8 (a register-only commit): seyda was not in play (screen game, signon 0, world leaves 0, map none); the other five gate parts passed; rerun as gate 5736.
 
 <!-- END GENERATED PERSISTING -->
@@ -100,6 +102,7 @@ the same streaming path being starved during loads.
 
 Family: Loading and disk reads (`disk-loading`). Load time follows bytes read and seeks on FFS; measured with read counters, not wall time alone. See [families](README.md#families).
 
+- AREA-DATA-CHUNKS-59 (no report page): Requested: all game data in area chunks loaded with the area, not island-wide files read during play
 - [CENSUS-LOAD-SLOW-32](CENSUS-LOAD-SLOW-32.md): The Census and Excise Office takes 8-10 s to load in FS-UAE; other scenes 0.2-1.5 s
 - [CHIM-CROSSING-SYNC-LOAD-43](CHIM-CROSSING-SYNC-LOAD-43.md): Every open-world cell crossing re-reads the world index and every earlier frame header in the main loop, then primes the ring with hundreds of small reads: 0.3-1.1 s pauses
 - [CHIM-READ-RUNS-33](CHIM-READ-RUNS-33.md): CHIM crossings read little but in many separate runs, so FFS seeks dominate

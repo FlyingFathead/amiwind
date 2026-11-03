@@ -708,6 +708,10 @@ def prepare(data_files, id1, jobs=None, fighters=None):
     config = json.loads((ROOT / 'config/arena_fighters.json').read_text(encoding='utf-8'))
     text_casts, report['playground_casts'] = casts_file(kinds, config.get('playground_casts') or {})
     (id1 / 'arena/casts.txt').write_text(text_casts, encoding='ascii', newline='\n')
+    # Levelling (LEVEL-UP-58, docs/CHARACTER_CREATION.md "Levelling"): the stats the rolls above read rise by the
+    # original's levelling rules; their settings, skill records, level-up pictures and sound, in the same step.
+    from prepare_levelup import prepare as prepare_levelup
+    report['levelup'] = prepare_levelup(data_files, id1)
     chosen = fighters if fighters is not None else [row['id'] for row in config['fighters']]
     if chosen:
         from build_jobs import resolve_jobs

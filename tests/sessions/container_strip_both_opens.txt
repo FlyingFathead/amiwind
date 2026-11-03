@@ -1,0 +1,66 @@
+# The container strip opened both ways (CONTAINER-STRIP-TAKE-STALL-59; docs/INVENTORY.md "The container strip").
+# A seyda MiniWind or a full image, FS-UAE at 32 MB Fast, started with --map seyda. A character after the census
+# (dbg aw hors), then Arrille's Tradehouse at its arrival. First the console opens Arrille's basket 331661 (owned):
+# E three times takes three (stolen; the console says nothing about a slow take), Tab and E put one back, Esc closes;
+# quicksave, quickload, the basket's contents and the ledger again (the take and the put kept). Then the same basket
+# opened by aim and E (noclip kept on while aimed), one more take, Esc. Each "wait 2" after a key fails the session
+# when the game clock stands still, so a take that holds the frame shows as a stall.
+wait 8
+cmd dbg all on
+cmd dbg headlamp off
+cmd dbg god on
+cmd dbg aw hors
+wait 60
+cmd dbg scene tradehouse
+wait 60
+state map
+cmd aw_placed container 331661
+cmd aw_placed container 331661 open
+wait 3
+shot s1-console-open
+key e
+wait 2
+shot s2-take1
+key e
+wait 2
+key e
+wait 2
+shot s3-take3
+key Tab
+wait 1
+key e
+wait 2
+shot s4-put1
+key Escape
+wait 1
+cmd aw_placed container 331661
+cmd aw_placed ledger
+wait 2
+shot s5-closed
+cmd aw_quicksave
+wait 4
+cmd aw_quickload
+key Return
+key Return
+wait 60
+state map
+cmd aw_placed container 331661
+cmd aw_placed ledger
+wait 2
+shot s6-after-load
+cmd dbg noclip
+cmd aw_placed container 331661 aim
+wait 3
+shot s7-aimed
+key e
+wait 3
+shot s8-e-open
+key e
+wait 2
+shot s9-e-take
+key Escape
+wait 1
+cmd dbg noclip
+cmd aw_placed container 331661
+wait 2
+shot s10-end

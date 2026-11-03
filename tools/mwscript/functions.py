@@ -436,8 +436,12 @@ HOST = {'getpccrimelevel', 'setpccrimelevel', 'modpccrimelevel',
         'clearinfoactor',
         # v0.0.59: RaiseRank / LowerRank of an NPC in its own faction, kept on the world change list by its
         # reference and saved (aw_mwhost.c; OpenMW statsextensions.cpp OpRaiseRank, OpLowerRank)
-        'raiserank', 'lowerrank'}
-HOST_EFFECTS = {'raiserank', 'lowerrank', 'showmap', 'clearinfoactor', 'choice', 'goodbye', 'modfactionreaction', 'setfactionreaction', 'forcegreeting', 'rotate', 'aitravel', 'aifollow', 'position','playgroup', 'loopgroup', 'addtopic', 'cast','setpccrimelevel', 'modpccrimelevel', 'setreputation', 'modreputation', 'pcraiserank',
+        'raiserank', 'lowerrank',
+        # v0.0.59: ShowRestMenu on a bed (the rest window with the bed, its ownership checked) and GetPCSleep (the
+        # window open in rest mode): aw_wait.c AW_RestOpen, AW_RestSleeping (REST-WAIT-59; OpenMW guiextensions.cpp
+        # OpShowRestMenu, statsextensions.cpp OpGetPCSleep)
+        'showrestmenu', 'getpcsleep'}
+HOST_EFFECTS = {'showrestmenu', 'raiserank', 'lowerrank', 'showmap', 'clearinfoactor', 'choice', 'goodbye', 'modfactionreaction', 'setfactionreaction', 'forcegreeting', 'rotate', 'aitravel', 'aifollow', 'position','playgroup', 'loopgroup', 'addtopic', 'cast','setpccrimelevel', 'modpccrimelevel', 'setreputation', 'modreputation', 'pcraiserank',
                 'pclowerrank', 'pcjoinfaction', 'pcexpell', 'pcclearexpelled', 'setpcfacrep', 'modpcfacrep'}
 
 # Groups the measurement reports as "the engine does not have it yet" (the brief's list), and the rest.

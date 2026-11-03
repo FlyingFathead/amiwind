@@ -40,6 +40,9 @@ done
 [ "$(uname -m)" = aarch64 ] || die "run it on a Raspberry Pi or another arm64 Linux machine (the chroot runs the image's own programs)"
 [ -f "$KICK" ] || die "--kickstart: no such file: $KICK"
 [ -f "$HDF" ] || die "--hdf: no such file: $HDF"
+# IMAGE-IDE-CYLINDER-TAIL-59: an IDE port reads a drive as whole cylinders of 16 heads x 63 sectors (516096 bytes);
+# the builder pads every drive to that, so an image of any other size was cut or made by hand.
+[ $(( $(stat -c %s "$HDF") % 516096 )) -eq 0 ] || die "--hdf: $HDF is not whole IDE cylinders (a multiple of 516096 bytes): use the image as the builder wrote it"
 case "$(basename "$HDF")" in AmiWind-v*.hdf) ;; *) die "--hdf: the file name must be AmiWind-v<version>.hdf (the start banner reads the version from it)" ;; esac
 [ "$(stat -c %s "$KICK")" = 524288 ] || die "--kickstart: a Kickstart 3.1 ROM is 524288 bytes; $KICK is not"
 case "$FAST_MB" in 32|64|128|256) ;; *) die "--fast-mb: 32, 64, 128 or 256 (32 MB of Fast RAM is AmiWind's minimum)" ;; esac

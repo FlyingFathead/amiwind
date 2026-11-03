@@ -479,8 +479,7 @@ class BugTrackerTest(unittest.TestCase):
         self.assertTrue(bug_register.archivable(base))
         self.assertTrue(bug_register.archivable(dict(base, state='closed')))
         self.assertFalse(bug_register.archivable(dict(base, state='open')))
-        # the rotation reaches v0.0.57 since the v0.0.58 dev line, 31 October 2026 (bugs-v0.0.55-v0.0.57.json);
-        # later series stay live
+        # the rotation reaches v0.0.59 since 3 November 2026 (bugs-v0.0.59.json); later series stay live
         self.assertTrue(bug_register.archivable(dict(base, found_in='v0.0.36')))
         self.assertTrue(bug_register.archivable(dict(base, found_in='v0.0.40')))
         self.assertTrue(bug_register.archivable(dict(base, found_in='v0.0.42')))
@@ -488,13 +487,18 @@ class BugTrackerTest(unittest.TestCase):
         self.assertTrue(bug_register.archivable(dict(base, found_in='v0.0.51')))
         self.assertTrue(bug_register.archivable(dict(base, found_in='v0.0.54')))
         self.assertTrue(bug_register.archivable(dict(base, found_in='v0.0.57-dev5')))
-        self.assertFalse(bug_register.archivable(dict(base, found_in='v0.0.58')))
+        self.assertTrue(bug_register.archivable(dict(base, found_in='v0.0.58')))
+        self.assertTrue(bug_register.archivable(dict(base, found_in='v0.0.58-dev4')))
+        self.assertTrue(bug_register.archivable(dict(base, found_in='v0.0.59')))
+        self.assertTrue(bug_register.archivable(dict(base, found_in='v0.0.59-dev1')))
+        self.assertFalse(bug_register.archivable(dict(base, found_in='v0.0.60')))
+        self.assertFalse(bug_register.archivable(dict(base, found_in='v0.0.60-dev1')))
         self.assertFalse(bug_register.archivable(dict(base, found_in='v0.0.36'), up_to=35))
         self.assertFalse(bug_register.archivable(dict(base, found_in='unknown', id='AW-20261010-01')))
         two = [{'version': 'v0.0.33', 'at': '2026-10-09'}, {'version': 'v0.0.36-dev3', 'at': '2026-10-11'}]
         self.assertFalse(bug_register.archivable(dict(base, reports=two)), 'a persisting bug stays in bugs.json')
-        live, old = bug_register.split([base, dict(base, id='BUILD-ROT-58', found_in='v0.0.58')])
-        self.assertEqual([b['id'] for b in live], ['BUILD-ROT-58'])
+        live, old = bug_register.split([base, dict(base, id='BUILD-ROT-60', found_in='v0.0.60')])
+        self.assertEqual([b['id'] for b in live], ['BUILD-ROT-60'])
         self.assertEqual([b['id'] for b in old], ['BUILD-ROT-33'])
 
     def test_status_cell_keeps_open_bugs_whole(self):

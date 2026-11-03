@@ -1,10 +1,10 @@
 # Comparisons: other big PC games on the Amiga
 
-_Last updated with AmiWind v0.0.41 (16 October 2026)._
+_Last updated with AmiWind v0.0.59-dev6 (3 November 2026)._
 
-Reference points for what AmiWind attempts: other PC role-playing and 3D games that run on Amiga hardware
-today, what they need, and how fast they run. Figures are as published by their authors or sellers, with the
-date they were read; AmiWind's own figures are linked to where they were measured.
+Other projects that bring 3D games, and games never released for the Amiga, to the platform: what they run on and
+how they get there. Figures are as published by their authors or sellers, with the date they were read; AmiWind's
+own figures are linked to where they were measured.
 
 ## GemRB (Baldur's Gate, Icewind Dale, Planescape: Torment)
 
@@ -27,12 +27,44 @@ Its stated minimum for AmigaOS 3 is a Vampire V4, with a PiStorm 3 or 4 recommen
 memory on the Workbench. The PowerPC versions reach 10 to 30 frames per second from an 800 MHz MicroAmigaOne to a
 2 GHz AmigaOne X5000, and about 25 with WarpOS on an 800 MHz G3 or 450 MHz G4 card.
 
-Two things make these numbers possible, and both differ from AmiWind's target:
+Two things account for these numbers, and both differ from AmiWind's approach:
 
 - **A 2D engine.** The Infinity Engine draws pre-rendered backgrounds and sprites. There is no 3D world to
   transform, clip and texture every frame.
 - **A graphics card screen (RTG).** The 1024x768 modes are chunky RTG screens. The frame never goes through the
   AGA chipset's planar conversion or the chip memory bus.
+
+## OpenLara (Tomb Raider)
+
+[OpenLara](https://github.com/XProger/OpenLara) is an open-source (BSD-2-Clause) engine for the classic Tomb Raider
+games, by Timur "XProger" Gagiev and contributors. A port for AmigaOS 3 by Arcziii, based on a MorphOS port by
+BeWorld2018 and BSzili, is offered on [itch.io](https://arcziii.itch.io/tomb-raider) (page and
+[devlog](https://arcziii.itch.io/tomb-raider/devlog/1730899/history) read 3 November 2026). It plays from the
+player's own copy of the game data. Builds exist for MiniGL (minigl.library by Hedeon), for ogles2.library
+(by RTyper and ladislawv, [project page](https://github.com/ladislawv/ogles2), read 3 November 2026), and an early
+test build for a Voodoo3 card with Warp3D, so far tried only in an emulator. A Tomb Raider II build is in progress.
+
+Stated requirements: AmigaOS 3, a PiStorm with Emu68, an RTG screen, AHI sound and the 3D library, which is not
+bundled. The ogles2 build is for a PiStorm with a Raspberry Pi 4 or Compute Module 4. Resolutions go up to 1920x1080
+in 16, 24 or 32 bits. The page gives no processor or memory figures and no frame rates; the port only has an option
+that writes a frame rate line to its log. Its shader renderer (water, reflections, shadow maps, fog, optional 4x
+multisampling) defaults to low shadow and water settings on PiStorm. The ogles2 build ships its own copy of
+ogles2.library, a shader compiler for the Pi's V3D graphics chip and a set of precompiled shaders; both builds are
+68k programs that use the floating-point unit for the game's own calculations (checked in the Tomb Raider II beta 2
+archives, 3 November 2026). OpenLara is under the BSD 2-Clause licence; AmiWind shares no code with it or with its
+Amiga port.
+
+It reaches these resolutions by two means:
+
+- **The Pi's graphics chip does the drawing.** ogles2.library offers OpenGL ES 2.0 to 68k programs and draws with the
+  Raspberry Pi 4's V3D GPU, while Emu68 runs the 68k code on the Pi's processor. The 68k side runs game logic and
+  issues drawing calls.
+- **A graphics card screen (RTG).** The frame is a 32-bit chunky screen and does not go through the AGA chipset.
+
+AmiWind takes a different route to a different target: it draws Morrowind's 3D world in software on the 68k
+processor and writes the frame through AGA, for the classic machines (68040 and 68060 with 32 MB Fast RAM). The
+[FAQ](FAQ.md#why-not-use-pistorm32-rtg-and-minigl) describes what a PiStorm, RTG and 3D library route would mean for
+AmiWind.
 
 ## What the original games asked of a PC
 

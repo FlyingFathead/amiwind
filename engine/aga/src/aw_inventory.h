@@ -138,6 +138,9 @@ int AW_LedgerAdoptDrops(aw_state_t *,struct aw_ledger_s *);
 /* Ordered ASCII case-insensitive comparison; unlike Quake equality helpers. */
 int AW_InventoryCompare(const char *,const char *);
 int AW_InventoryRead(const char *,aw_inventory_item_t *);
+/* several reads in a row share one open of the item file (TRADEHOUSE-LONG-FRAME-59): Begin, the reads, End */
+void AW_InventoryBatchBegin(void);
+void AW_InventoryBatchEnd(void);
 int AW_InventoryEquippedItem(int slot,aw_inventory_item_t *out);
 int AW_InventoryCanEquip(const aw_inventory_item_t *item);
 void AW_InventoryInit(void);
@@ -182,6 +185,44 @@ void AW_InventoryOpen(void);
 typedef struct {char id[33];int count;} aw_container_item_t;
 int AW_ContainerContents(unsigned reference,aw_container_item_t *out,int max,int *flags);
 int AW_ContainerCount(unsigned reference,const char *id);
+/* CONTAINER-STRIP-TAKE-STALL-59: the open strip holds its container: the data's contents and owner read once and
+ * kept until Release (or a new place); 0 when there was no room (the reads then stay per call). FileReads: how many
+ * focus.awf container reads ran (for the native test). */
+int AW_ContainerHold(unsigned reference);
+void AW_ContainerRelease(void);
+unsigned long AW_ContainerFileReads(void);
+/* AREA-TABLES-59: the per-area lookup tables (id1/areas.awa, tools/prepare_area_tables.py), loaded with the room or
+ * the exterior cells. An item's strip picture ("item:<id>") from them (1 found, -1 the item is there without a
+ * picture, 0 not known: search the icon table); the icon search's miss counted;
+ * a container record's flags (8 trapped, 16 its record respawns; -1 none loaded); aw_placed areas; the fallback
+ * searches of the island-wide files in play since start. */
+int AW_AreaIcon(const char *key,int *w,int *h,unsigned char *pixels,int maxw,int maxh);
+void AW_AreaIconFallback(const char *key);
+int AW_AreaContainerFlags(unsigned reference);
+/* the icon pack's reader (aw_icons.c sets it in AW_IconsInit): the carried items' pictures are read with an area load */
+extern int (*aw_area_picture_read)(const char *key,int *w,int *h,unsigned char *pixels,int maxw,int maxh);
+void AW_AreaStatus(void);
+unsigned long AW_AreaFallbacks(void);
+/* loads, areas kept on leaving, taken back from the cache, narrow loads, bytes read, areas of the place now */
+void AW_AreaStats(unsigned long out[6]);
+/* the memory policy's call: cached area tables (areas left, narrow loads) freed, least recently used first, until
+ * WANTED bytes are free; the bytes freed (the world change list is never touched) */
+long AW_AreaCacheTrim(long wanted);
 int AW_ContainerChange(unsigned reference,const char *id,int count,int owner_mark);
 void AW_ContainerCommand(void);
+/* CONTAINER-WINDOW-59: COUNT of ID out of container REFERENCE into the inventory (OWNED: stolen from its owner) or
+ * from the inventory into it, through the deltas above; what moved, 0 refused with nothing changed (*WHY a word). */
+int AW_ContainerTake(unsigned reference,const char *id,int count,int owned,const char **why);
+int AW_ContainerPut(unsigned reference,const char *id,int count,const char **why);
+/* The strip's hooks (aw_cstrip.c sets them; NULL: E opens nothing, the data's lock stands): open the strip on an
+ * aimed, unlocked container (1 opened); the lock level now from the data's (AW_ObjectLockLevel). */
+extern int (*aw_container_open)(unsigned reference,const char *name,int owned);
+extern int (*aw_container_lock)(unsigned reference,int original);
+/* CELL-CHANGES-59 slice 7 (aw_ledger.h): a save's record hashes and content files from the build's reference identity
+ * table; a save of other game data migrated (-1: no table, refused; else the changes dropped, by part in OUT); a placed
+ * reference's flags (AW_REFS_RESPAWN, AW_REFS_LEVELLED; 0 none or no table). */
+struct aw_ledger_s;
+void AW_PlacedIdentRefresh(struct aw_ledger_s *l);
+long AW_PlacedMigrate(struct aw_ledger_s *l,void *dropped);
+uint32_t AW_PlacedRefFlags(uint32_t key);
 #endif

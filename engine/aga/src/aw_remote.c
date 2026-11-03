@@ -24,8 +24,31 @@ int AW_GuardTorchNight(void);
 #define REMOTE_PERIOD .5
 static cvar_t aw_remote={"aw_remote","0"};
 static cvar_t aw_remote_dir={"aw_remote_dir","AWCTL:"};
-static double next_poll;
+static double next_poll,next_busy;
 static long command_files;
+/* LOAD-STALL-SESSIONS-59: "ticks" advances on every host frame and on every long-work heartbeat
+ * (AW_RemoteBusy), so a reader tells a paused game clock (a window open, a long step inside one
+ * frame) from a dead engine. The screen line names an open window by the engine's own names
+ * (the dialogue window opens as a world-UI panel, so it is asked first; another panel such as the
+ * stats or the container strip is "window"); with none, game / menu / message by key_dest. */
+static unsigned long ticks;
+int AW_DialWindowActive(void);int AW_LevelupBoxActive(void);int AW_MsgBoxActive(void);
+int AW_ListBoxActive(void);int AW_QuickCharActive(void);int AW_CharacterActive(void);int AW_SaveMenuActive(void);
+static const char *screen_name(void)
+{
+    const char *w;
+    if(key_dest==key_console)return "console";
+    if(AW_DialWindowActive())return "dialogue";
+    if(AW_WorldUIActive())return AW_WorldUIName();
+    if(AW_LevelupBoxActive())return "levelup";
+    w=AW_WaitWindowName();if(w && *w)return w;
+    if(AW_SaveMenuActive())return "save";
+    if(AW_CharacterActive() || AW_QuickCharActive())return "character";
+    if(AW_ReaderActive())return "book";
+    if(AW_MsgBoxActive())return "messagebox";
+    if(AW_ListBoxActive())return "listbox";
+    return key_dest==key_game?"game":key_dest==key_menu?"menu":"message";
+}
 int AW_RemoteLogging(void){return aw_remote.value>0;}
 static void remote_path(char *out,int size,const char *name)
 {
@@ -68,7 +91,7 @@ static void write_state(void)
     remote_path(path,sizeof path,"state.txt");
     f=fopen(path,"w");if(!f)return;
     have_global=sv.active && AW_WorldToSource(sv.name,r_refdef.vieworg,global);
-    fprintf(f,"commands %ld\nrealtime %s\nframe_ms %s\n",command_files,fixed(a,realtime,2),fixed(b,host_frametime*1000.0,1));
+    fprintf(f,"commands %ld\nrealtime %s\nframe_ms %s\nticks %lu\n",command_files,fixed(a,realtime,2),fixed(b,host_frametime*1000.0,1),ticks);
     fprintf(f,"map %s\nserver %s\n",cl.worldmodel?cl.worldmodel->name:"none",sv.active?sv.name:"none");
     /* The scene the player stands in: after a streamed (type 1) crossing the frame entered, else the running map. */
     fprintf(f,"scene %s\n",AW_SceneName());
@@ -81,8 +104,8 @@ static void write_state(void)
     {extern int aw_efrags_bad;fprintf(f,"efrags_bad %d\n",aw_efrags_bad);}
     /* What the screen shows (SMOKE-PASSES-WITHOUT-MAP-36): a loaded server under the title menu
      * is not a played map. screen game = in play; world_leafs = the client's world model. */
-    fprintf(f,"screen %s\nsignon %d\nworld_leafs %d\n",key_dest==key_game?"game":key_dest==key_menu?"menu":
-        key_dest==key_console?"console":"message",cls.signon,cl.worldmodel?cl.worldmodel->numleafs:0);   /* the efrag safety net (CHIM-FRAME-EDGE-EFRAG-CRASH-36) */
+    fprintf(f,"screen %s\nsignon %d\nworld_leafs %d\n",screen_name(),
+        cls.signon,cl.worldmodel?cl.worldmodel->numleafs:0);   /* the efrag safety net (CHIM-FRAME-EDGE-EFRAG-CRASH-36) */
     if(*AW_RCountLine())fprintf(f,"rcount %s\n",AW_RCountLine());
     if(*AW_RProfLine())fprintf(f,"rprof %s\n",AW_RProfLine());
     fputs("end\n",f);
@@ -90,9 +113,20 @@ static void write_state(void)
 }
 void AW_RemotePoll(void)
 {
+    ticks++;
     if(aw_remote.value<=0 || realtime<next_poll)return;
     next_poll=realtime+REMOTE_PERIOD;
     run_commands();
+    write_state();
+}
+/* A heartbeat from long work inside one frame (S_ExtraUpdate's callers: catalogue reads, loads)
+ * and from the modal loops that run their own key loop: the state file only, no command file,
+ * at most twice a second of NOW (Sys_FloatTime: realtime stands still inside the frame). */
+void AW_RemoteBusy(double now)
+{
+    ticks++;
+    if(aw_remote.value<=0 || now<next_busy)return;
+    next_busy=now+REMOTE_PERIOD;
     write_state();
 }
 void AW_RemoteInit(void)

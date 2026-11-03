@@ -1,6 +1,6 @@
 # Inventory
 
-_Last updated with AmiWind v0.0.59-dev4 (2 November 2026)._
+_Last updated with AmiWind v0.0.59-dev6 (3 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -8,6 +8,8 @@ _Last updated with AmiWind v0.0.59-dev4 (2 November 2026)._
 - [Items and actions](#items-and-actions)
   - [Weapon kit for testing (dbg give weapons)](#weapon-kit-for-testing-dbg-give-weapons)
 - [World models](#world-models)
+- [The container strip](#the-container-strip)
+  - [Where container data comes from (AREA-TABLES-59)](#where-container-data-comes-from-area-tables-59)
 - [Debug torch (test only)](#debug-torch-test-only)
 - [Appearance and implementation boundary](#appearance-and-implementation-boundary)
 - [Next inventory pass: v0.0.40-dev2, 14 October 2026](#next-inventory-pass-v0040-dev2-14-october-2026)
@@ -152,6 +154,76 @@ The catalogue also holds apparatus, lockpicks, probes, repair tools (weight,
 value, and the apparatus type) and every light that can be carried (weight,
 value, burn time, radius and colour; equipped in the left hand like the torch).
 
+## The container strip
+
+Placed containers (baskets, crates, barrels, chests, urns, sacks, cupboards,
+desks, closets, the corpse and mummy containers and the rest) can be opened. Aim
+at one within the activation distance: the focus box names it and the line under
+the view reads "E: Open", or "E: Steal" in red when it belongs to someone (opening
+is free, taking from it is theft). A locked container reads "Locked", its box
+shows "Lock Level: N" as the original's tooltip does, and E does not open it; the
+lock level comes from the placement in the game data, and a script's Lock or
+Unlock on the world change list overrides it. Organic containers (flora) are not
+opened: E picks them as before.
+
+E opens the strip: a box along the bottom of the screen, up to the view, with a
+title row (the container's name, red when owned; the Inventory side; Take All;
+Close), one row of cells with each item's picture and count, the selected item's
+name, and the keys.
+
+| Key | In the strip |
+|---|---|
+| A / D, Left / Right | select the previous / next item (Page Up / Down: a row of cells) |
+| E, Enter | take one (on the Inventory side: put one in) |
+| Q | take (or put) the whole stack |
+| T | take everything |
+| Tab, W / S, Up / Down, 1 / 2 | the container side or the Inventory side |
+| Esc | close |
+
+The mouse: a cell selects its item, the selected cell again takes (or puts) one;
+the title row's side names, Take All and Close are buttons. Taking from an owned
+container marks the items stolen from its owner (the world change list's stolen
+pairs). Every take and put is a container delta on the world change list, so the
+contents stay changed across maps and in saves. The console's `aw_placed container`
+shows the aimed or nearest container's contents and lock; `aw_placed container open`
+opens its strip as E would; `aw_placed container take ID [N]` and `put ID [N]` move
+items the same way.
+
+The strip is assembled when it opens and freed when it closes: nothing of it is
+resident while it is closed, and it adds no console command or variable. The
+container's contents and owner are read from the image's focus table once, when
+the strip opens, and kept until it closes, so a take or a put reads nothing from
+the disk again (CONTAINER-STRIP-TAKE-STALL-59); a take or put that still holds the
+frame for 100 ms or more says so in the console. While the strip is open the
+whole screen is copied out only for two frames after a change (a key, the mouse,
+a take or a put), otherwise only the view (CONTAINER-STRIP-REDRAW-COST-59). E and
+`aw_placed container REF open` open the strip the same way. Bodies of dead people
+and creatures are not containers in this pass: their carried items are not in the
+data the engine reads, so they cannot be opened yet. Tests:
+`tests/aga_container_strip_test.c`, `tests/aga_container_strip_open_test.c` (the
+real strip opened both ways) and `tests/test_focus_box.py`; in game:
+`tests/sessions/container_strip_both_opens.txt`.
+
+### Where container data comes from (AREA-TABLES-59)
+
+The builder writes one small binary table per room and per exterior cell into
+one pack, `id1/areas.awa` (`tools/prepare_area_tables.py`): the area's placed
+rows, its containers (contents, owner, lock level, trap and refill flags), the
+owners it names, the catalogue records of every item its containers hold, its
+placed items and its keys, and those items' strip pictures. The pack's index sits
+at its head and stays in memory, so an area costs one seek and one read; it is
+loaded with its room, or outdoors with the player's cell and its eight
+neighbours. Opening a container, a take or a put, the strip's names and
+pictures, a placed item's take and its owner then read only memory. Areas the
+player has left stay in a small cache (16 areas, at most 256 KiB) and come back
+without a read; the cache is emptied first when memory is short. A lookup
+outside the loaded areas (an item carried from elsewhere, a container a script
+names) goes through a small directory held in memory (8 bytes per item) to the
+one area that has it, never through the island-wide files. When the pack is
+missing the engine searches `focus.awf` and `inventory/items.awi` as before and
+counts each such search; `aw_placed areas` shows the loaded areas, their bytes
+and load times, the cache and that count. Tests: `tests/aga_area_tables_test.c`.
+
 ## Debug torch (test only)
 
 While AmiWind is a preview, the player leaves the census office with a torch that never burns out: the
@@ -200,8 +272,8 @@ required work in the [equipment roadmap](CHARACTER_EQUIPMENT_ROADMAP.md).
 Unsupported worn clothing cannot be removed through this modal while its baked
 appearance would remain unchanged. Carried-light inventory ownership, arbitrary
 item resource conversion, two-handed animation/presentation, enchanted item use,
-constant effects, scripted equip/drop events, quantity dialogs, containers and
-corpse looting remain incomplete. Missing models, tags or metadata disable the
+constant effects, scripted equip/drop events, quantity dialogs and corpse looting
+remain incomplete (containers: see the container strip above). Missing models, tags or metadata disable the
 corresponding action instead of substituting unrelated values or appearance.
 
 The converter writes a bounded, sorted AWI2 catalogue and selected original

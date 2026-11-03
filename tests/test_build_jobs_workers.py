@@ -42,6 +42,7 @@ SERIAL_BY_DESIGN = {'setup', 'terrain', 'npcs', 'hands', 'dialogue-lookup', 'doo
                     'mwscript',  # mwscript: one unit, the whole program (member access needs every script); seconds
                     'focus',     # focus: one pass over the base master (FOCUS-BOX-58); seconds
                     'books',     # books: one pass over the base master (BOOK-READER-58); seconds
+                    'items-index',  # items index: one pass over the base master (ITEMS-INDEX-57); seconds
                     'chargen'}   # chargen: reads one ini file (CHARGEN-CENSUS-57); well under a second
 # Independent per-item loops not yet in the pool (tracked; remove when pooled).
 SERIAL_NOT_YET_POOLED = set()

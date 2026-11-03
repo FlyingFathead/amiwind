@@ -1,6 +1,6 @@
 # WinUAE setup
 
-_Last updated with AmiWind v0.0.49-dev1 (24 October 2026)._
+_Last updated with AmiWind v0.0.59 (3 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -101,6 +101,9 @@ opens the GUI. It deliberately leaves the ROM path empty and mounts no disk.
 In ROM, select your complete licensed A1200 Kickstart 3.1 ROM. In CD & Hard
 drives, add every HDF listed in your build summary as an RDB hardfile on the
 UAE controller, with the boot disk first. Save a private configured copy and Start.
+If you attach the HDFs to the A1200 IDE port instead, the drive files must be
+whole IDE cylinders; the builder pads them (see
+[Drive size and IDE cylinders](STORAGE.md#drive-size-and-ide-cylinders)).
 
 To produce the playable HDF, follow the [Linux](LINUX_BUILD.md) or
 [Windows / WSL build guide](WINDOWS_BUILD.md) with your own Morrowind files.

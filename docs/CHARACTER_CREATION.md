@@ -1,6 +1,6 @@
 # Next milestone: dock and Census Office character creation
 
-_Last updated with AmiWind v0.0.58 (1 November 2026)._
+_Last updated with AmiWind v0.0.59-dev5 (3 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -21,6 +21,7 @@ _Last updated with AmiWind v0.0.58 (1 November 2026)._
 - [dev4 confirmation and review navigation](#dev4-confirmation-and-review-navigation)
 - [dev5 playtest follow-up](#dev5-playtest-follow-up)
 - [Character UI V2: completion controls and remaining artwork](#character-ui-v2-completion-controls-and-remaining-artwork)
+- [Levelling](#levelling)
 
 <!-- contents end -->
 
@@ -366,3 +367,82 @@ Missing components requested on 5 October 2026:
 The maintainer confirmed appearance/head rotation and class selection work in the
 preceding target build. That observation does not verify the new V2 controls,
 class artwork or custom-class functionality.
+
+## Levelling
+
+Since v0.0.59 the character levels up as in the original game. The rules are the original's, written
+independently; OpenMW 0.51 is the reference used to check them (`files/data-mw/scripts/omw/playerskillhandlers.lua`,
+`apps/openmw/mwgui/levelupdialog.cpp`, `apps/openmw/mwmechanics/npcstats.cpp`). Every number is read from your own
+master file when the image is built (`levelup/settings.txt`, written by `tools/prepare_levelup.py`); nothing of the
+game is kept in the source tree.
+
+**Skills rise with use.** Each use adds the skill's own use value (the skill record's four values, one per kind of
+use) divided by the progress the skill needs for its next point: (current value + 1) x fMajorSkillBonus (0.75) for a
+major skill, fMinorSkillBonus (1.0) for a minor one, fMiscSkillBonus (1.25) for the rest, and x fSpecialSkillBonus
+(0.8) when the skill belongs to your class's specialization. When the progress reaches the requirement the skill
+rises by one, the game's "Your ... skill increased to ..." line shows and the skill-raise sound plays. A skill at
+100 gains nothing.
+
+| Use reported today | Skill | Kind of use |
+| --- | --- | --- |
+| Your blow lands | the weapon's skill, Hand-to-hand for fists | successful hit |
+| You block a blow | Block | successful block |
+| A blow hurts you | the armour skill of the piece it lands on, Unarmored for an empty slot | hit by an opponent |
+| You jump | Acrobatics | jump |
+| A second of running on the ground (not sneaking) | Athletics | run one second |
+| A second of swimming | Athletics | swim one second |
+| A trainer's lesson | the skill trained (one point, its progress kept) | trainer |
+| A persuasion in conversation (admire, intimidate, taunt, bribe) | Speechcraft | success or failure |
+| A trade accepted in Barter | Mercantile | success, scaled by the share haggled (0 at the merchant's own price) |
+
+The other uses of the original wait for their part of the game; until then `dbg levelup use SKILL [N [TYPE]]` raises
+any skill by the same rules. Where each will report:
+
+| Use | Skill | Waits for |
+| --- | --- | --- |
+| Casting a spell | the spell's school | spell casting (today only the test casts) |
+| Using or recharging a magic item, casting on strike, making one | Enchant | casting from items, recharging, the enchanting window of your own |
+| Making a potion, eating an ingredient | Alchemy | the alchemy window, eating from the inventory |
+| Picking a lock, disarming a trap | Security | lockpicks and probes (doors are locked by the debug switch only) |
+| Not being noticed while sneaking, picking a pocket | Sneak | the detection rule and pickpocketing |
+| Haggling a better price | Mercantile | an offer you can change: every accepted trade already reports its use, scaled by the share haggled, and Barter takes the merchant's own price today, so it adds nothing yet (as in the original) |
+| Repairing with a hammer | Armorer | repairing your own items (a merchant's repair trains nothing) |
+| Ranged hits | Marksman | bows, crossbows and thrown weapons in combat |
+| Taking fall damage | Acrobatics | fall damage |
+
+**Level progress.** Every rise of a major or minor skill adds iLevelupMajorMult or iLevelupMinorMult (1) to the
+level progress; misc skills add nothing. Every rise also counts for the skill's governing attribute
+(iLevelupMajorMultAttribute, iLevelupMinorMultAttribute, iLevelupMiscMultAttriubte) and for its specialization. When
+the level progress reaches iLevelupTotal (10), the game's "You should rest and meditate on what you've learned."
+shows. The Stats window (P) shows the level progress as a bar under the level.
+
+**The level-up box** opens when a rest ends with the level-up due. Until resting itself lands,
+`dbg levelup rest [HOURS]` rests (moves the clock) and opens it. The box shows the level's picture (by how your
+raises split over combat, magic and stealth, as the original picks it), "You have ascended to Level N", the level's
+own sentence (from the install's Morrowind.ini when it has one, else the game's general line), the three gold coins,
+and the eight attributes with their multipliers: x2 to x5 by the number of raises of each attribute since the last
+level (iLevelUp01Mult .. iLevelUp10Mult). Click an attribute (or press 1 to 8) to place a coin on it; click it again
+to take the coin back; a fourth pick replaces the last. Fewer coins are given when fewer than three attributes are
+below 100. OK (or Enter) is accepted only with every coin placed. The level-up music plays when the box opens.
+
+On OK each picked attribute rises by its multiplier (at most 100), the level rises by one, health (maximum and
+current) grows by a tenth of Endurance (fLevelUpHealthEndMult, after this level's raise), the level progress drops by
+iLevelupTotal (any extra carries over) and the attribute and specialization counts start again. The raised stats are
+your character's own, so the combat rolls ([COMBAT.md](COMBAT.md)), fatigue and the Stats window use them at once.
+
+**Saved.** Each skill's progress, the level progress and the counts travel with the save (save format AWS4 feature
+64; older saves load with all of it at 0).
+
+**Debug route** (`dbg levelup`, also `dbg skill progress`; saved like play):
+
+| Command | What it does |
+| --- | --- |
+| `dbg levelup` | level, level progress, each attribute's raises and multiplier, every skill's value, progress and requirement |
+| `dbg levelup use SKILL [N [TYPE]]` | N uses of a skill (name, its start, or 0..26) by the rules above; TYPE 0..3 the kind of use |
+| `dbg levelup raise SKILL [N]` | N rises of a skill, as if by use |
+| `dbg levelup check` | the level-up box, when it is due |
+| `dbg levelup rest [HOURS]` | rest HOURS (default 8), then the level-up box when it is due |
+
+As in the original, the box has no cancel: Esc does nothing, the box stays until every coin is placed and OK is
+pressed. Only the console key (a debugging aid) closes it; the level-up then stays due and the next rest opens the box
+again. Not yet: jail time and skill books come with those parts of the game.

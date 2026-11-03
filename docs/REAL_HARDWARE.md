@@ -1,6 +1,6 @@
 # Running AmiWind on real Amiga hardware
 
-_Last updated with AmiWind v0.0.58 (31 October 2026)._
+_Last updated with AmiWind v0.0.59-dev6 (3 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -235,7 +235,7 @@ These are in the engine now ([CHIM engine](chim/ENGINE.md), [memory guide](chim/
 | `-heapmb N` (start argument) | The game heap in MiB for this start (1 to 2047), used as asked. | automatic: 11 (the built size), up to 24 with plenty of Fast RAM |
 | `chim prefetch 0` / `1` (console, not saved) | 1: read the cells ahead into spare Fast RAM and keep the world index there (only with extra RAM); 0: every read from the disk, the first method. `chim prefetch` alone prints what it did. | 1 |
 | `chim prefetch mib N` / `kib N` | The most it reads ahead, in MiB (also at most a quarter of CHIM's cache); how much it reads per frame, in KiB (one 32 KiB block at least), only in frames where nothing else is read. | 24 / 32 |
-| `chim spikes MS` (console) | Prints one console line for every frame of MS milliseconds or more, naming what ran in it (map start, index, ring prime, reads, sounds); `chim spikes report` sums them; `chim zone` prints the engine's small memory zone. For measurements. | 0 (off) |
+| `chim spikes MS` (console) | Prints one console line for every frame of MS milliseconds or more, naming what ran in it (map start, index, ring prime, reads, sounds); `chim spikes report` sums them. Each line, and every frame of 2 seconds or more (a "Long frame" line, printed even with spikes off), also shows the frame's disk, screen copy and buffer swap waits ([frame waits](performance/FRAME-WAITS.md)); `chim zone` prints the engine's small memory zone. For measurements. | 0 (off) |
 | `chim_prefetch` | How far ahead of the visible ring CHIM loads chunks (-1: the world's own value). | -1 |
 | `chim_lookahead` | Loads ahead in the direction you walk (-1: the world's prefetch margin, two or three times that with an automatic cache of 8 or 32 MiB and more). | -1 |
 | `chim_prefetch_room` | Prefetch only into free memory, so it never pushes out what is in use. | 1 |

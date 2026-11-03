@@ -33,7 +33,7 @@
 | Persists in | v0.0.36-dev3, v0.0.49-dev1, v0.0.50-dev1 (last seen) |
 | Severity | high: About 10 minutes of one-core work in every chim stage of the coast build, on 24 held workers, redone on every build |
 | Family | Build speed (`build-speed`) |
-| Deferred by the maintainer | 2026-11-01: deferred by the maintainer to v0.0.59 with the build-speed work (a build speed issue, no effect on the game) |
+| Deferred by the maintainer | 2026-11-03: accepted for v0.0.59 as an exception: about 2.5 min of one-core CHIM work per full build (96 s terrain records), builder speed only; terrain records onto the pool in v0.0.60 |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |
 | Playtest version | v0.0.36-dev3 |
 | From commit | source 3b5e7a9, engine 3b5e7a9, CHIM world 3b5e7a9 |
@@ -41,13 +41,13 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.51 (25 October 2026)._
+_Last updated with AmiWind v0.0.59 (3 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [PERSISTING: reported 14 times; something has to be done](#persisting-reported-14-times-something-has-to-be-done)
-- [Status: 25 October 2026 (v0.0.51)](#status-25-october-2026-v0051)
+- [Status: 3 November 2026 (v0.0.59)](#status-3-november-2026-v0059)
 - [Status: 23 October 2026 (v0.0.48)](#status-23-october-2026-v0048)
 - [Status: 16 October 2026](#status-16-october-2026)
 - [Status: 11 October 2026](#status-11-october-2026)
@@ -63,7 +63,47 @@ _Last updated with AmiWind v0.0.51 (25 October 2026)._
 
 <!-- contents end -->
 
-## Status: 25 October 2026 (v0.0.51)
+## Status: 3 November 2026 (v0.0.59)
+
+Open. In the v0.0.59-dev3 full build (1,351 frames) the stage's under-half stretches were:
+
+- the CHIM world pack: 2 min 14 s on one core (1 min 45 s to 4 min 36 s in every full build since v0.0.57), with
+  the aprons step (12 s, one core) and the source and receipt step (18 s, 3.2 cores) beside it. The builder's
+  detector counted about 3 minutes here with no unit running;
+- the CHIM validation: 1 min 48 s on 6.0 of 23 cores (main-process work, as in the 25 October status).
+
+The stats, heap gate and zone walk were not among them (18.3, pool and 19.8 cores).
+
+Tried on branch v0.0.59-chimtail: the pack now takes each record's place in its sector file from the record sizes
+instead of building the file and parsing it again (and building it twice with terrain references), and writes each
+placement record once per frame instead of once per chunk it reaches. Same files
+(`tests/test_chim_pack_layout.py` compares both methods byte for byte). Measured on the Seyda MiniWind (one town
+frame): the pack took 2.2 s, the same as before (2.0 to 2.2 s), so those steps are not where its time goes. The
+pack's time has to be profiled in a full build before the next change; the order of ids (handed out as the walk
+first meets them) still keeps it on one core.
+
+Changed on the same branch, not yet measured in a full build:
+
+- The pack is split in two passes. A first walk hands out the texture ids in the same order (so every id and every
+  record's home stay the same); then each frame's terrain and model images, with their texture ids filled in and
+  their SHA-256, are made on the worker pool, frame by frame in pack order, while the walk packs the frames before
+  it. The walk keeps the id order, the records, the sector files and the index. Its files are compared and written
+  on threads. `AMIWIND_CHIM_PACK_IMAGES=serial` keeps the method before.
+- The pack prints its parts: `CHIM world: pack texture ids` (time, cores), then one `CHIM world: pack` line with
+  the seconds of each part, slowest first (waiting for images, terrain images, model images and ids, placement,
+  chunk and terrain records, sector files, frame files), then `CHIM world: pack index and write`.
+- Validation: the chunks' visibility rows are decoded with each frame's cross-checks on the workers instead of in
+  the main process, and the cross-check results are handed back as they finish and put in frame order from a plain
+  table, without the in-order map's scan of every held result (BUILD-ORDERED-MAP-SCAN-51). Its main process prints
+  each part as a timed phase (load world, texture and model checks, variant audit, source ownership and chunk
+  checks, frame set-up, cross-checks with the time spent waiting for the workers, whole-world checks).
+- Same output: `tests/test_chim_pack_layout.py` builds three frames, and frames with terrain references, in all
+  three ways (one walk, both passes in one process, both passes on two workers) and compares every file and the
+  receipt; `tests/test_chim_check_pool.py` compares the serial and pool validation reports byte for byte and checks
+  that a broken visibility row keeps its failure in place.
+
+A one-frame MiniWind cannot show these steps (the pack of one town frame takes about 2 s). The next full build's log
+gives the parts and their cores; the bug stays open until it shows the pack and the validation off one core.
 
 Fixed in part. CHIM validation was timed phase by phase on the v0.0.51-dev1 world (22 cores, 1,351 frames): its
 main process did about 96 s of its 116 s.
@@ -230,7 +270,9 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-CACHE-TRACE-PYTHONPATH-33](BUILD-CACHE-TRACE-PYTHONPATH-33.md): The stage read trace refused reuse of a reused run when another checkout was on PYTHONPATH
 - [BUILD-CHIM-CONVERTER-CHANGE-FULL-REBUILD-46](BUILD-CHIM-CONVERTER-CHANGE-FULL-REBUILD-46.md): A change in the shared collision converter rebuilds every CHIM frame and everything after it, even where the output is identical
 - [BUILD-CHIM-FRAME-SWAP-LATE-36](BUILD-CHIM-FRAME-SWAP-LATE-36.md): The image step builds 335 legacy maps of cells already on CHIM, then removes them before packing
+- BUILD-CHIM-KEY-SKY-OVERLAY-TABLE-59 (no report page): The CHIM world stage and its ocean units are keyed by the whole sky palette overlay module, so a new image file extension rebuilds the CHIM world
 - [BUILD-CHIM-MAIN-MEMORY-46](BUILD-CHIM-MAIN-MEMORY-46.md): The CHIM stage main process holds so much memory that the memory guard starves its own workers
+- BUILD-CHIM-POOL-MEMORY-THROTTLE-59 (no report page): A CHIM stage rebuild runs its area pool on 8 of 24 workers because the stage's parent and the stages beside it hold most of the build's memory
 - [BUILD-CHIM-REGION-FRAMES-TAIL-43](BUILD-CHIM-REGION-FRAMES-TAIL-43.md): The CHIM region-frame step runs its last frames on one worker while the other cores sit idle
 - [BUILD-CHIM-SERIAL-SECTIONS-44](BUILD-CHIM-SERIAL-SECTIONS-44.md): The CHIM stage runs several sections on one core while units wait: visibility rows starve their workers
 - [BUILD-CHIM-SOURCE-REPEAT-41](BUILD-CHIM-SOURCE-REPEAT-41.md): The CHIM stage parsed the whole master and read the same models again for every area: 723 source stages took 24,500 CPU seconds

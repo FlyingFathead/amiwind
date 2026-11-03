@@ -589,7 +589,7 @@ void _Host_ServerFrame (void)
     pr_global_struct->frametime = host_frametime;
 
 // read client messages
-    SV_RunClients ();
+    AW_SPIKE_STAGE (AW_SP_RUNCLIENTS, SV_RunClients ());
 
 // move things around and think
 // always pause in single player if in console or menus
@@ -624,7 +624,7 @@ void Host_ServerFrame (void)
     host_frametime = save_host_frametime;
 
 // send all messages to the clients
-    SV_SendClientMessages ();
+    AW_SPIKE_STAGE (AW_SP_SENDMSG, SV_SendClientMessages ());
 }
 
 #else
@@ -641,7 +641,7 @@ void Host_ServerFrame (void)
     SV_CheckForNewClients ();
 
 // read client messages
-    SV_RunClients ();
+    AW_SPIKE_STAGE (AW_SP_RUNCLIENTS, SV_RunClients ());
 
 // move things around and think
 // always pause in single player if in console or menus
@@ -649,7 +649,7 @@ void Host_ServerFrame (void)
         SV_Physics ();
 
 // send all messages to the clients
-    SV_SendClientMessages ();
+    AW_SPIKE_STAGE (AW_SP_SENDMSG, SV_SendClientMessages ());
 }
 
 #endif
@@ -680,11 +680,11 @@ void _Host_Frame (float time)
         return;			// don't run too fast, or packets will flood out
 
 // get new key events
-    Sys_SendKeyEvents ();
+    AW_SPIKE_STAGE (AW_SP_INPUT, Sys_SendKeyEvents ());
 
 // allow mice or other external controllers to add commands
-    IN_Commands ();
-    AW_RemotePoll ();	// headless test sessions: command file, state file
+    AW_SPIKE_STAGE (AW_SP_INPUT, IN_Commands ());
+    AW_SPIKE_STAGE (AW_SP_REMOTE, AW_RemotePoll ());	// headless test sessions: command file, state file
 
 // Do not run queued commands or world simulation during debug playback.
     if(AW_MovieDebugActive()) {
@@ -706,14 +706,14 @@ void _Host_Frame (float time)
 
     /* Keep input/audio/presentation time live while world clocks stand still. */
     aw_load_phase = "frame: modal";S_LoadingMark ();
-    AW_ModalFrame();
+    AW_SPIKE_STAGE (AW_SP_MODAL, AW_ModalFrame());
     aw_load_phase = "frame: network";S_LoadingMark ();
-    NET_Poll();
+    AW_SPIKE_STAGE (AW_SP_NET, NET_Poll());
 
 // if running the server locally, make intentions now
     aw_load_phase = "frame: send commands";S_LoadingMark ();
     if (sv.active)
-        CL_SendCmd ();
+        AW_SPIKE_STAGE (AW_SP_NET, CL_SendCmd ());
 
 //-------------------
 //
@@ -723,7 +723,7 @@ void _Host_Frame (float time)
 
 // check for commands typed to the host
     aw_load_phase = "frame: console";S_LoadingMark ();
-    Host_GetConsoleCommands ();
+    AW_SPIKE_STAGE (AW_SP_HOSTCON, Host_GetConsoleCommands ());
 
     if (sv.active) {
         aw_load_phase = "frame: server";S_LoadingMark ();
@@ -757,13 +757,13 @@ void _Host_Frame (float time)
 
     /* Modal freeze/blackout never gate soundtrack or mixer servicing.
      * Stopping music belongs to an explicit music stop or shutdown. */
-    CDAudio_Update();
-    S_ExtraUpdate();
+    AW_SPIKE_STAGE (AW_SP_AUDIOX, CDAudio_Update());
+    AW_SPIKE_STAGE (AW_SP_AUDIOX, S_ExtraUpdate());
     aw_load_phase = "frame: screen";
     AW_SPIKE_STAGE (AW_SP_SCREEN, SCR_UpdateScreen ());
     aw_load_phase = "frame: after the screen";
 
-    AW_StreamPresented();
+    AW_SPIKE_STAGE (AW_SP_AUDIOX, AW_StreamPresented());
 
     if (host_speeds.value)
         time2 = Sys_FloatTime ();
@@ -780,20 +780,30 @@ void _Host_Frame (float time)
 
     AW_EndMark(3);
     aw_load_phase = "frame: ticks (save, intro, wait)";
-    AW_QuickCharTick();
-    AW_TestBoxFrame();AW_TestPollFrame();
-    if(!AW_ModalWorldFrozen())AW_IntroTick();
-    if(!AW_ModalWorldFrozen())AW_WaitTick();
-    AW_AnimKitTick();
-    AW_HalloweenTick();
+    {
+        double aw_tk0_;	/* the small ticks, timed together (TRADEHOUSE-LONG-FRAME-59) */
+        AW_SPIKE_BEGIN (aw_tk0_);
+        AW_QuickCharTick();
+        AW_TestBoxFrame();AW_TestPollFrame();
+        if(!AW_ModalWorldFrozen())AW_IntroTick();
+        if(!AW_ModalWorldFrozen())AW_WaitTick();
+        AW_AnimKitTick();
+        AW_HalloweenTick();
+        AW_SPIKE_END (AW_SP_TICKS, aw_tk0_, 0);
+    }
     AW_SPIKE_STAGE (AW_SP_SAVE, AW_SaveTick());
     if(!AW_ModalWorldFrozen())AW_SPIKE_STAGE (AW_SP_SCENE, AW_SceneTick());
     /* Compiled game scripts (experimental, aw_mwscript): MenuMode scripts still run under a modal screen. */
-    AW_MwscriptTick(AW_ModalWorldFrozen()?0.0f:(float)host_frametime);
-    CDAudio_Update();
-    AW_ProfileFrame();
-    AW_FpuCountFrame();
-    AW_RCountFrame();
+    AW_SPIKE_STAGE (AW_SP_MWSCRIPT, AW_MwscriptTick(AW_ModalWorldFrozen()?0.0f:(float)host_frametime));
+    {
+        double aw_tl0_;
+        AW_SPIKE_BEGIN (aw_tl0_);
+        CDAudio_Update();
+        AW_ProfileFrame();
+        AW_FpuCountFrame();
+        AW_RCountFrame();
+        AW_SPIKE_END (AW_SP_TAIL, aw_tl0_, 0);
+    }
     AW_SpikeFrame();
 
     if (host_speeds.value)
@@ -921,9 +931,14 @@ void Host_InitVCR (quakeparms_t *parms)
 Host_Init
 ====================
 */
+/* LOAD-STALL-SESSIONS-59: long work inside one frame calls S_ExtraUpdate; the remote state file
+ * follows it (ticks advance, realtime stands), so a test session tells it from a dead engine. */
+extern void (*S_ExtraUpdateHook)(void);
+static void Host_RemoteBusy (void) {AW_RemoteBusy (Sys_FloatTime ());}
 void Host_Init (quakeparms_t *parms)
 {
 
+    S_ExtraUpdateHook = Host_RemoteBusy;
     if (standard_quake)
         minimum_memory = MINIMUM_MEMORY;
     else

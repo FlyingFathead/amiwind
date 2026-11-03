@@ -36,8 +36,18 @@ class DefaultFastRamTests(unittest.TestCase):
     def test_boot_ends_the_logo_before_typing(self):
         # SMOKE-M-KEY-SKIPS-CHIM-CACHE-57: the m of a command typed onto the start-up logo answered its memory notice
         # (CHIM cache off for that start); Escape ends the logo before the first console line
-        line = next(l for l in engine_smoke.PROBE.splitlines() if 'con "aw_remote 1"' in l)
-        self.assertLess(line.index('key Escape'), line.index('con "aw_remote 1"'))
+        # PERSISTING in v0.0.59: on a busy host the logo began after that Escape; the boot loop now only presses Escape
+        # (the play copy's autoexec turns the remote on) and types the command only after 90 s
+        lines = engine_smoke.PROBE.splitlines()
+        i = next(k for k, l in enumerate(lines) if 'con "aw_remote 1"' in l)
+        self.assertIn('$((90*K))', lines[i])
+        self.assertIn('key Escape', lines[i - 1])
+        with open(engine_smoke.__file__, encoding='utf-8') as f:
+            self.assertIn("printf 'aw_remote 1", f.read())    # the autoexec the boot loop relies on
+
+    def test_zone_full_names_a_skipped_cache(self):
+        self.assertIn('SMOKE-M-KEY-SKIPS-CHIM-CACHE-57', engine_smoke.PROBE)
+        self.assertIn('CHIM cache off (skipped for this start)', engine_smoke.PROBE)
 
     def test_sweep_step_is_logged_and_can_fail_the_smoke(self):
         """ENTITY-SWEEP-AB: dbg sweep's SWEEP RESULT line in the smoke; --sweep fail makes a FAIL result fatal."""
@@ -69,7 +79,9 @@ class EngineSmokeTests(unittest.TestCase):
     def test_probe_steps(self):
         text = engine_smoke.PROBE
         self.assertNotIn('\r', text)
-        for needle in ('jit_compiler = 1', 'hard_drive_1_read_only = 1', 'rc "map $MAP1"', 'aw_music_status off',
+        for needle in ('jit_compiler = 1', 'hard_drive_1_read_only = 1',
+                       # CHIM-SEYDA-BALMORA-LOAD-HANG-43: the disks on the emulated A1200 IDE, not uaehf.device
+                       'hard_drive_0_controller = ide0', 'hard_drive_1_controller = ide1','rc "map $MAP1"', 'aw_music_status off',
                        'aw_music_status on', 'rc "dbg tp $TP"', 'finish "PASS boot', 'FAIL emulator exited', 'FAIL music read while off',
                        # a one-area image (the whole-city Vivec MiniWind): --tp "same X Y" teleports inside --map
                        'rc "dbg tp ${TP#same }"', 'left $MAP1',
@@ -149,6 +161,12 @@ class EngineSmokeTests(unittest.TestCase):
         self.assertEqual(classify(idle, tasks, [0x00F8161A])[0], 'unknown')
         self.assertEqual(classify(idle, [('Initial CLI', 0x4000F8A8, 0x10, True)] + tasks[1:], stack)[0], 'unknown')
         self.assertEqual(classify([], tasks, stack)[0], 'unknown')
+        # ARRIVAL-LONG-FRAME-DEV6-59: three samples or more, none idle: the processor works (a long frame), even with
+        # the game in a file call; a real deadlock (every sample idle, a request held) stays the disk stall
+        self.assertEqual(classify([0x00F811BC, 0x00FA838C, 0x00F828D2, 0x00F811BC], tasks, stack)[0], 'busy')
+        self.assertEqual(classify(idle, tasks, stack)[0], 'emulator-disk')
+        self.assertEqual(classify([0x00F811BC, 0x00FA838C], tasks, stack)[0], 'unknown')
+        self.assertIn('FAIL long frame (busy)', engine_smoke.PROBE)
 
     def test_emulator_disk_stall_is_retried_once(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -216,6 +234,47 @@ class EngineSmokeTests(unittest.TestCase):
             state.write_text('commands 3\nrealtime 6', encoding='utf-8', newline='\n')
             done = subprocess.run(['sh', str(script)], capture_output=True, text=True, timeout=120)
             self.assertEqual(done.stdout.strip(), '')
+
+    @unittest.skipUnless(shutil.which('sh'), 'a POSIX shell is required')
+    def test_a_window_with_ticks_moving_is_not_a_stall(self):
+        """LOAD-STALL-SESSIONS-59: realtime standing while the engine's ticks move and a window is open (screen not
+        game) passes the wait; neither moving, or the game screen with only ticks moving, is a stall as before."""
+        text = engine_smoke.PROBE
+        start = text.index('play(){')
+        end = text.index('(realtime $r1 -> $r2)"; }', start) + len('(realtime $r1 -> $r2)"; }')
+        body = text[start:end]
+
+        def verdict(before, after):
+            stubs = ('P=1\nK=1\nst(){ if [ $P = 1 ]; then set -- "$1" %s; else set -- "$1" %s; fi\n'
+                     '  case "$1" in realtime) echo "$2";; ticks) echo "$3";; screen) echo "$4";; esac; }\n'
+                     'alive(){ return 0; }\nsleep(){ P=2; }\nlog(){ echo "log $*"; }\n'
+                     'finish(){ echo "$1"; exit 0; }\n') % (before, after)
+            done = subprocess.run(['sh', '-c', stubs + body + '\nplay 3 "a script"\necho ok\n'],
+                                  capture_output=True, text=True, timeout=60)
+            return done.stdout.strip().splitlines()[-1]
+        self.assertEqual(verdict('71.20 10 game', '74.20 50 game'), 'ok')
+        self.assertEqual(verdict('71.20 10 inventory', '71.20 14 inventory'), 'ok')
+        self.assertEqual(verdict('71.20 10 inventory', '71.20 10 inventory'),
+                         'FAIL game stalled during a script (realtime 71.20 -> 71.20)')
+        # ARRIVAL-LONG-FRAME-DEV6-59: the game screen with only the ticks moving is a long frame (busy): it gets the
+        # grace and, when realtime never moves again, fails as a long frame, never as a stall
+        self.assertEqual(verdict('71.20 10 game', '71.20 14 game'),
+                         'FAIL long frame (busy) during a script: realtime stood at 71.20 for 3 s and 60 s more while '
+                         'the engine ran (ticks 10 -> 14), not a disk stall')
+        # ... and passes, named a long frame, when realtime moves again inside the grace
+        stubs = ('K=1\nN=0\nst(){ case "$1" in realtime) [ $N -ge 6 ] && echo 75.00 || echo 71.20;; '
+                 'ticks) echo $((10+N));; screen) echo game;; esac; }\n'
+                 'alive(){ return 0; }\nsleep(){ N=$((N+1)); }\nlog(){ echo "log $*"; }\nfinish(){ echo "$1"; exit 0; }\n')
+        done = subprocess.run(['sh', '-c', stubs + body + '\nplay 3 "a script"\necho ok\n'],
+                              capture_output=True, text=True, timeout=60)
+        lines = done.stdout.strip().splitlines()
+        self.assertEqual(lines[-1], 'ok')
+        self.assertTrue(lines[-2].startswith('log long frame (busy) during a script: realtime stood at 71.20'), lines)
+        # an engine without the ticks line: as before
+        self.assertEqual(verdict('71.20 "" menu', '71.20 "" menu'),
+                         'FAIL game stalled during a script (realtime 71.20 -> 71.20)')
+        # the session patch (fsuae_session.py STALL_FROM) still finds its line exactly once
+        self.assertEqual(text.count('|| finish "FAIL game stalled during $2 (realtime $r1 -> $r2)"; }'), 1)
 
     @unittest.skipUnless(shutil.which('sh'), 'a POSIX shell is required')
     def test_zone_full_fails_a_pass_from_32_mb(self):

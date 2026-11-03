@@ -607,6 +607,13 @@ def books_steps(args, tool, run):
     return step, ['--books', str(run / 'books')]
 
 
+def items_index_steps(args, tool, run):
+    """The items index stage (ITEMS-INDEX-57): every placed item the player can pick up, by cell, kind and owner
+    (tools/items_index.py build). Game data only, keyed by content; a build output, not an image input."""
+    return ('items-index', tool('items_index.py', 'build', '--data-files', args.data_files,
+                                '--out', run / 'items-index'))
+
+
 def install_ini(data_files):
     """The install's Morrowind.ini (the class questions, CHARGEN-CENSUS-57), beside Data Files or in it; None when
     the install has none (a game data folder copied alone)."""
@@ -1295,6 +1302,10 @@ def commands(args, tools, run):
         image_index = next(i for i, (name, _) in enumerate(steps) if name == 'image')
         steps.insert(image_index, step)
         steps = [(name, command + options if name == 'image' else command) for name, command in steps]
+        # ITEMS-INDEX-57: the items index, beside the focus table; the image does not read it (a MiniWind test
+        # spot leaves it out: tools/miniwind_plan.py OMITTED)
+        image_index = next(i for i, (name, _) in enumerate(steps) if name == 'image')
+        steps.insert(image_index, items_index_steps(args, tool, run))
     # (not in a retained-run image recovery: that run's stage set is fixed, tools/recover_image.py)
     if args.stage == 'aga' and any(name == 'image' for name, _ in steps) and not getattr(args, 'recover_image_from', None):
         step, options = chargen_steps(args, tool, run)
@@ -1909,6 +1920,10 @@ def resource_preflight(args, steps, metadata):
                                  'advisory': (doc['advisory'] or {}).get('text'), 'refusals': doc['refusals']}
     metadata['resource_plan_units'] = {r['stage']: r['worker_mib'] for r in doc['stages'] if r['worker_mib'] >= 64}
     metadata['resource_plan_parents'] = {r['stage']: r['parent_mib'] for r in doc['stages'] if r['worker_mib'] >= 64}
+    # BUILD-CHIM-POOL-MEMORY-THROTTLE-59: stages the plan runs alone, and the memory-heavy stages held back beside them
+    if doc.get('alone'):
+        metadata['resource_plan_alone'] = list(doc['alone'])
+        metadata['resource_plan_heavy'] = list(doc.get('memory_heavy') or doc['alone'])
     if doc['refusals']:
         if mode == 'fail':
             raise ValueError('Resource plan refused the build before any stage (WILL NOT FIT):\n  '

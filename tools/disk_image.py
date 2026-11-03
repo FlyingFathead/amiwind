@@ -55,6 +55,9 @@ def write_hdf(out, version, layout, xdftool, rdbtool):
         command += ["+", "addimg", str(path), "name=" + part["device"], f"bootable={int(index == 0)}", "pri=0"]
     for part_image in partition_images:check_image(part_image,normalize=True)
     subprocess.run(command, check=True, capture_output=True)
+    from world_volumes import pad_to_ide_cylinders, require_ide_cylinders
+    pad_to_ide_cylinders(image)           # whole IDE cylinders (IMAGE-IDE-CYLINDER-TAIL-59)
+    require_ide_cylinders(image.name, image.stat().st_size, [])
     check = out / "disk-readback.tmp"
     for device, name, original in files:
         subprocess.run([xdftool, str(image), "open", "part=" + device, "+", "read", name, str(check)],

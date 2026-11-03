@@ -3,21 +3,21 @@
  "note": "Ratchet: tests/test_resident_registry.py fails above these numbers and asks for them to be lowered when the engine needs less. Raise only with a dated, maintainer-approved reason.",
  "totals": {
   "commands": {
-   "count": 289,
-   "hunk_bytes": 9248
+   "count": 290,
+   "hunk_bytes": 9280
   },
   "cvars": {
-   "count": 355,
-   "static_bytes": 8520,
-   "zone_bytes": 11584
+   "count": 356,
+   "static_bytes": 8544,
+   "zone_bytes": 11616
   },
   "tables": {
    "count": 0,
    "bytes": 0
   },
   "growing": {
-   "count": 16,
-   "worst_bytes": 2127904
+   "count": 30,
+   "worst_bytes": 7652384
   }
  },
  "reasons": [
@@ -77,7 +77,14 @@
   "2026-11-02: aw_player_body_parts, the saved choice between the player's body assembled from parts by what is worn (the default) and the baked body (the previous method): the maintainer asked for the third-person body and hands to show the clothing, armour and weapons worn instead of a pre-baked body (app chat 1 and 2 November 2026, PLAYER-GEAR-VISUAL-59); one cvar, 24 static and 32 zone bytes.",
   "2026-11-02: VOICE-COVERAGE-58, decided by the maintainer (2 November 2026): every sound moment gets its engine hook with a dbg trigger, ready for the v0.0.60 combat work: aw_sound_event, one command record (32 hunk bytes) behind the one catalogue row dbg sound MOMENT [N] for all 34 sound events; no cvars, no static table of 1 KiB or more (the event table is 34 rows of 12 bytes).",
   "2026-11-02: aw_hand_parts, the saved choice between the first-person arms assembled from parts by what is worn (the default) and the baked arms (the previous method): the maintainer asked for the hands to show the gloves, gauntlets and bracers worn (app chat 1 and 2 November 2026, PLAYER-GEAR-VISUAL-59); one cvar, 24 static and 32 zone bytes. Raised on the worker branch v0.0.59-fphands; the maintainer approves it at merge.",
-  "2026-11-02: CELL-CHANGES-59 slice 3 (container deltas) and the NPC rank changes of DIALOGUE-COMPLETE-58, on the world change list (the continuity ask of 2 November 2026): two growing allocations, nothing until the first change: container deltas (what was taken out or put in, per container and item, against the game data; OpenMW 0.51 rule) at most 8,192 x 44 bytes = 360,448 bytes worst, NPC ranks changed by RaiseRank/LowerRank at most 2,048 x 8 bytes = 16,384 bytes worst. The contents of the game data are read from disk on demand (focus.awf AWC1), nothing resident; aw_placed container is a subcommand of the existing aw_placed (no command, no cvar). Raised on the worker branch v0.0.59-cellchanges3; the maintainer approves it at merge."
+  "2026-11-02: CELL-CHANGES-59 slice 3 (container deltas) and the NPC rank changes of DIALOGUE-COMPLETE-58, on the world change list (the continuity ask of 2 November 2026): two growing allocations, nothing until the first change: container deltas (what was taken out or put in, per container and item, against the game data; OpenMW 0.51 rule) at most 8,192 x 44 bytes = 360,448 bytes worst, NPC ranks changed by RaiseRank/LowerRank at most 2,048 x 8 bytes = 16,384 bytes worst. The contents of the game data are read from disk on demand (focus.awf AWC1), nothing resident; aw_placed container is a subcommand of the existing aw_placed (no command, no cvar). Raised on the worker branch v0.0.59-cellchanges3; the maintainer approves it at merge.",
+  "2026-11-02: CELL-CHANGES-59 slice 4 (what scripts and dialogue change, the continuity ask of 2 November 2026: an NPC's disposition, topics learned, journal stages, globals), on the world change list: two growing allocations, nothing until the first change: four tables of (key, value) for the scripts' changed globals, quest stages, known topics and NPC dispositions, at most 4 x 8,192 x 8 bytes = 262,144 bytes worst (the game has 143 globals, 632 quests and about 2,400 topics: about 25 KB when all are touched), and the engine's named facts past the 32 slots of the state table, at most 1,024 x 68 bytes = 69,632 bytes worst. Names are read on demand from the compiled scripts' file at a save and a load, nothing resident. Raised on the worker branch v0.0.59-cellchanges4; the maintainer approves it at merge.",
+  "2026-11-02: CELL-CHANGES-59 slice 5 (the scripts' own state, the continuity ask of 2 November 2026: script locals of objects and NPCs, and the global scripts started or stopped; MWSCRIPT-STATE-NOT-SAVED-48), on the world change list: three growing allocations, nothing until the first save: the script locals that differ from their start (0), at most 8,192 x 16 bytes = 131,072 bytes worst (the game places 2,115 references whose script has locals, 7,388 values in all); the global scripts whose running state changed, at most 2,048 x 8 bytes = 16,384 bytes worst; the name hashes of the scripts met at a save or a load, read from disk once each, at most 2,048 x 8 bytes = 16,384 bytes worst. The interpreter's parking store grows from 512 objects and 4,096 values to 2,304 and 8,192 inside its one block taken at load (about 37 KB), so a whole game's objects keep their values. dbg mwscript call setlocal / getlocal / startscript / stopscript / scriptrunning / globallocal are subcommands of the existing aw_mwscript_status (no command, no cvar). Raised on the worker branch v0.0.59-cellchanges5; the maintainer approves it at merge.",
+  "2026-11-02: CELL-CHANGES-59 slice 6 (the actors, ACTOR-STATE-POOL-LIMITS-54; the continuity ask of 2 November 2026: what happens to actors is kept map-wide and in saves): four growing allocations, nothing until the first change: the actor rows of the world change list (killed, moved with health, hostile, companion, levelled roll; they replace the fixed 2,048-entry list of aw_actors.c, about 96 KB of BSS, which is gone), at most 8,192 x 48 bytes = 393,216 bytes worst; the actor records past the first block of 128 (a changed record is never dropped any more; the pool used to refuse the 129th), at most 8,064 x 200 bytes = 1,612,800 bytes worst; their item and spell changes (were 12 and 8 per actor, fixed in every record), at most 16,384 x 4 bytes = 65,536 bytes worst; the changed records' saved bytes, held only from a save's start to its write and from a load to its first frame, at most 2,097,152 bytes worst. The game's actor table has 3,437 bases (2,673 NPCs placed); a late game changes a few hundred to about 3,000 actors, about 0.1 to 0.7 MB. chim actors hurt N is a subcommand of the existing chim command (no command, no cvar). Raised on the worker branch v0.0.59-cellchanges6; the maintainer approves it at merge.",
+  "2026-11-02: LEVEL-UP-58, levelling as in the original (maintainer request of 31 October 2026, tracker item LEVEL-UP-58: skills rising with use, the level-up box, the stats feeding the rolls): aw_levelup, one command record (32 hunk bytes) for dbg levelup (show / use / raise / check / rest), the dbg routes the brief asks for to raise skill progress and force the level-up check; the catalogue rows levelup and skill progress point at it. No cvar, no static table: the rules (about 600 bytes) load from levelup/settings.txt, the game's lines are read from disk when shown, the box's pictures only while it is open. Raised on the worker branch v0.0.59-levelup; the maintainer approves it at merge.",
+  "2026-11-02: the dated journal history on the world change list (JOURNAL-ORIGINAL-VIEW-59, decided by the maintainer: no 32-quest limit), at most 8,192 entries of 16 bytes, only what was earned",
+  "2026-11-03: CELL-CHANGES-59 slice 7 (respawn and content-change migration; the continuity ask of 2 November 2026): four growing allocations and one wider row, nothing until first use: the places' container refill times (OpenMW 0.51 CellStore::respawn keeps one per cell), at most 8,192 x 12 bytes = 98,304 worst (the game: about 1,400 exterior cells and 1,000 rooms); the record hash of every reference the change list names (a save of other game data is checked against them), at most 65,536 x 8 bytes = 524,288 worst (a late game names a few thousand); the build's reference identity table's block index, at most 16,384 x 4 bytes = 65,536 worst (Morrowind.esm: 1,235 blocks, about 5 KB) and one block of rows, 8,192 bytes; the actor row gains its time of death (48 to 52 bytes, 8,192 rows: +32,768 worst). aw_placed pass HOURS is a subcommand of the existing aw_placed command (no command, no cvar). Raised on the worker branch v0.0.59-cellchanges7; the maintainer approves it at merge.",
+  "2026-11-03: aw_player_cache, the A/B switch of the cached player body the maintainer asked for (ARRIVAL-LONG-FRAME-DEV6-59)"
  ],
  "entries": {
   "commands": [
@@ -194,6 +201,7 @@
    "aw_journal",
    "aw_label_style",
    "aw_lamp_status",
+   "aw_levelup",
    "aw_light_hue_set",
    "aw_light_probe",
    "aw_lightgallery",
@@ -513,6 +521,7 @@
    "aw_photomode_ui",
    "aw_player_body",
    "aw_player_body_parts",
+   "aw_player_cache",
    "aw_player_footstep_stride",
    "aw_player_footstep_volume",
    "aw_player_footsteps",
@@ -731,10 +740,16 @@
   "tables": [],
   "growing": [
    "NPC faction ranks (CELL-CHANGES-59)",
+   "actor item and spell changes (ACTOR-STATE-POOL-LIMITS-54)",
+   "actor records past the first block (ACTOR-STATE-POOL-LIMITS-54)",
    "barter sold things (BARTER-SOLD-ITEM-LOST-58)",
+   "changed actor records kept for the save (CELL-CHANGES-59 slice 6)",
+   "changed actors: death, place, health, hostility (CELL-CHANGES-59 slice 6)",
    "container deltas (CELL-CHANGES-59)",
+   "dated journal history (JOURNAL-ORIGINAL-VIEW-59)",
    "drops shown on the loaded map (CELL-CHANGES-59)",
    "enchanted items (Enchanting)",
+   "engine named facts past 32 (CELL-CHANGES-59)",
    "filled soul gems (Enchanting)",
    "hidden edicts of the loaded map (CELL-CHANGES-59)",
    "journal topic entries",
@@ -743,6 +758,14 @@
    "made spells (Spellmaking)",
    "placed items (WORLD-OBJECT-PLACEMENT-59)",
    "places revealed by ShowMap",
+   "places' container refill times (CELL-CHANGES-59 slice 7)",
+   "record hashes of the references the list names (CELL-CHANGES-59 slice 7)",
+   "reference identity table's block index (CELL-CHANGES-59 slice 7)",
+   "reference identity table's one block of rows (CELL-CHANGES-59 slice 7)",
+   "running global scripts (CELL-CHANGES-59)",
+   "script globals, quest stages, known topics, dispositions (CELL-CHANGES-59)",
+   "script locals (CELL-CHANGES-59)",
+   "script name hashes met (CELL-CHANGES-59)",
    "stolen items by owner (CELL-CHANGES-59)",
    "world change list positions and drops (CELL-CHANGES-59)",
    "world change list rows (CELL-CHANGES-59)"

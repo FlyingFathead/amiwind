@@ -28,7 +28,8 @@ void AW_IconDraw(const aw_icon_t *icon,int x,int y);
 /* Statistics for the cost check (dbg/console aw_icons): table lookups and
  * picture reads since start, failed lookups; HUD box time per method
  * (0 placeholders, 1 original icons). */
-typedef struct {unsigned lookups,reads,misses,draws,frames[2];double seconds[2];} aw_icon_stats_t;
+/* area: item pictures answered by the loaded area tables (AREA-TABLES-59) */
+typedef struct {unsigned lookups,reads,misses,draws,frames[2];double seconds[2];unsigned area;} aw_icon_stats_t;
 extern aw_icon_stats_t aw_icon_stats;
 /* Prints the statistics (console: aw_magic stats). */
 void AW_IconStats(void);

@@ -1168,6 +1168,8 @@ DEPENDENCIES = {
     'focus': (),
     # The book texts (BOOK-READER-58): the game data only.
     'books': (),
+    # The items index (ITEMS-INDEX-57): the game data only; a build output, no stage reads it.
+    'items-index': (),
     # The class questions (CHARGEN-CENSUS-57): the install's Morrowind.ini only.
     'chargen': (),
     # The item model table (ITEM-WORLD-MODELS-58): the game data and the census palette.
@@ -1401,6 +1403,10 @@ def execute_parallel(steps, run, metadata, root):
     profile = build_profile.start(run, steps, metadata, dependencies)
     from resource_plan import SchedulerGuard   # key-neutral module (build_cache.INSTRUMENTATION_MODULES)
     guard = SchedulerGuard(budget, metadata.get('resource_plan_units'), parents=metadata.get('resource_plan_parents'))
+    from resource_plan import alone_hold
+    alone_stages = list(metadata.get('resource_plan_alone') or ())
+    heavy_stages = list(metadata.get('resource_plan_heavy') or ())
+    alone_said = [()]
     # live supervisor (key-neutral modules): free cores to queued work, underuse named (BUILD-STAGE-ALLOWANCE-STUCK-43)
     from stage_watch import StageWatch, lend_shares
     import build_digest
@@ -1414,6 +1420,18 @@ def execute_parallel(steps, run, metadata, root):
     try:
         while pending or active:
             ready = [item for item in pending if set(dependencies[item[1][0]]) <= passed]
+            if alone_stages:
+                # BUILD-CHIM-POOL-MEMORY-THROTTLE-59: a stage the plan runs alone gets the memory without the other
+                # memory-heavy stages; they wait and run at full width after it
+                hold, order = alone_hold([item[1][0] for item in ready], list(active), alone_stages, heavy_stages)
+                by_name = {item[1][0]: item for item in ready}
+                ready = [by_name[n] for n in order if n not in hold]
+                said = tuple(sorted(hold))
+                if hold and said != alone_said[0]:
+                    print('Scheduler: runs alone (resource plan): %s; holding %s until it is done'
+                          % (', '.join(n for n in alone_stages if n in active or n in by_name), ', '.join(said)),
+                          flush=True)
+                alone_said[0] = said
             pooled_now = {n: s['allowance'] for n, s in active.items() if s['parallel']}
             if pooled_now:
                 guard.tick(pooled_now, {n: s.get('share', s['allowance']) for n, s in active.items() if s['parallel']})

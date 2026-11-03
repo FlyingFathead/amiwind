@@ -406,6 +406,9 @@ int AW_CharacterRebuild(aw_character_t *c)
     c->maximum[2]=0;
     for(i=0;i<6;i++)if(i!=1 && i!=4)c->maximum[2]+=c->attributes[i]+c->modifiers[i];
     for(i=0;i<3;i++)c->current[i]=c->maximum[i];
+    /* a rebuilt sheet starts its levelling afresh (LEVEL-UP-58) */
+    memset(c->progress,0,sizeof(c->progress));c->level_progress=0;
+    memset(c->raises,0,sizeof(c->raises));memset(c->special,0,sizeof(c->special));
     c->level=1;c->valid=1;return 1;
 }
 

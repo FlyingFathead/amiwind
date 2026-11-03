@@ -1,6 +1,6 @@
 # Proposed approach: persistent world state and disk loading
 
-_Last updated with AmiWind v0.0.59-dev4 (2 November 2026)._
+_Last updated with AmiWind v0.0.59-dev6 (3 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -10,6 +10,7 @@ _Last updated with AmiWind v0.0.59-dev4 (2 November 2026)._
 - [Separate base content from saved changes](#separate-base-content-from-saved-changes)
 - [Cell load and unload](#cell-load-and-unload)
 - [Memory and disk access](#memory-and-disk-access)
+- [New approach being tried: all game data in area chunks (November 2026)](#new-approach-being-tried-all-game-data-in-area-chunks-november-2026)
 - [Save format and recovery](#save-format-and-recovery)
 - [Proposed implementation stages](#proposed-implementation-stages)
 - [Maintainer acceptance: 30 September 2026](#maintainer-acceptance-30-september-2026)
@@ -207,6 +208,38 @@ read sizes are initial experiments. Small synchronous reads can still stall;
 they are not asynchronous streaming. Investigate prefetch and asynchronous I/O
 only after measuring the current path and defining safe cancellation/failure
 behavior.
+
+## New approach being tried: all game data in area chunks (November 2026)
+
+The CHIM world streamer already loads the world's geometry in chunks that come into memory with the area that needs
+them and leave with it. In v0.0.59 that idea is being extended to the rest of the game's data, after measurements
+showed that lookups in island-wide files cost seconds on the emulated disk (one take from a container took about
+7 seconds before the fixes, and opening a conversation about 3.4 seconds).
+
+- **The smallest unit.** Each piece of data is stored with the smallest thing that needs it: a container's contents
+  with that container, a resident's appearance with that resident, an item's name and picture with its item.
+- **Small tables per area.** Each exterior cell and each interior has its own compact binary tables of what is in it.
+  A cell's tables load with the cell and with the neighbouring cells loaded ahead of the player; an interior's load on
+  entering it. A lookup searches only the tables loaded at that moment (at the corner of several cells, those few).
+- **Interiors are separate.** Nothing of an interior is loaded while the player is outside, and nothing outside is
+  searched while inside.
+- **Lookups from anywhere.** When something far away is needed (an item the player carries, a person a quest names),
+  a small directory says which table holds it, and only that one table is read.
+- **Keep what memory allows.** When the player leaves an area, what is kept depends on free memory: everything
+  (geometry, tables, changes); or the tables and changes; or only the changes. Changes are never thrown away.
+  Everything else is read again from the game data when needed.
+- **Disk only as a last resort.** An A1200's IDE port moves roughly 1 to 5 MB/s, and on the Amiga's file system each
+  file opened costs a directory search on top of that. The emulators used for testing move data far faster (about
+  90 MB/s), so they make disk work look cheaper than it is on real hardware. The list of changes is small (a few
+  kilobytes), so it stays in memory; only on very little memory would it go to disk, as one file kept open and written
+  once per area left. Real-hardware measurements of the IDE rate and of the cost of opening a file are planned.
+- **Every part is judged by its cost.** Before it is built, each part states what it costs in memory at 32 MB of Fast
+  RAM, processor time per frame and per event on a 68040, files opened and bytes read, and drawing. Getting it working
+  comes first; making it as cheap as possible follows straight after.
+
+The first parts in v0.0.59 are the residents' appearance tables and the container and item tables; dialogue per
+resident and the remaining world data follow in v0.0.60. Each part is measured against the old path and can be
+switched back.
 
 ## Save format and recovery
 

@@ -121,6 +121,9 @@ typedef struct cache_user_s
 void Cache_Flush (void);
 
 void *Cache_Check (cache_user_t *c);
+/* AmiWind: keep a block out of the LRU (never evicted for room; ARRIVAL-LONG-FRAME-DEV6-59) or put it back */
+void Cache_Pin (cache_user_t *c, int on);
+extern unsigned long aw_cache_pinned_bytes;
 /* AmiWind: largest block Cache_Alloc could take now without evicting (read-only). */
 int Cache_LargestFree (void);
 // returns the cached data, and moves to the head of the LRU list

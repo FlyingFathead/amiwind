@@ -24,6 +24,7 @@ OMITTED = {
     'world-scenery': 'open world: rocks and giant mushrooms',
     'world-flora-assets': 'world flora (trees and grass need the open-world terrain)',
     'world-flora': 'world flora (trees and grass need the open-world terrain)',
+    'items-index': 'items index (an island-wide build output for docs/ITEMS_INDEX.md, not an image input)',
 }
 EXTRA_TOWN_REASON = 'extra town (not Balmora)'
 # Stages the exterior scope leaves out as well. The scene chain before Balmora

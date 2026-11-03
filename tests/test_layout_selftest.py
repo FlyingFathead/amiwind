@@ -54,7 +54,7 @@ class LayoutSelfTest(unittest.TestCase):
         self.assertIn('file id1/maps/vf0000.bsp is 2500000000 bytes', rows['file-over-1gib']['message'])
         self.assertIn('DW0 is 2147483648 bytes', rows['partition-over-2gib']['message'])
         self.assertIn('DW1 starts at %d' % (2304 * MIB + wv.RDB_BYTES), rows['start-past-2gib']['message'])
-        self.assertIn('drive selftest.hdf (planned) is %d bytes' % (4096 * MIB + wv.RDB_BYTES),
+        self.assertIn('drive selftest.hdf (planned) is %d bytes' % wv.ide_cylinder_bytes(4096 * MIB + wv.RDB_BYTES),
                       rows['drive-over-4gib']['message'])
         # Just under every limit: 1 GiB - 1 byte file, 1920 MiB partitions, a start at 1920 MiB + 32 KiB,
         # a 3840 MiB + 32 KiB drive (the largest the 128 MiB partition grid allows).
@@ -148,7 +148,8 @@ class LayoutSelfTest(unittest.TestCase):
         self.assertEqual([p['partition'] for p in layout[0]['partitions']], ['DH0', 'DW0'])
         self.assertEqual(layout[0]['partitions'][1]['start_bytes'], 128 * MIB + wv.RDB_BYTES)
         self.assertEqual(layout[0]['partitions'][1]['largest_file'], 'id1/maps/vf0000.bsp')
-        self.assertEqual(layout[0]['bytes'], 256 * MIB + wv.RDB_BYTES)
+        # the drive is padded to whole IDE cylinders (KHUUL-HOP-STALL-59)
+        self.assertEqual(layout[0]['bytes'], wv.ide_cylinder_bytes(256 * MIB + wv.RDB_BYTES))
         self.assert_clean()
         self.assertLess(time.monotonic() - started, 60)
 
@@ -200,15 +201,17 @@ class DryRunImageLayout(unittest.TestCase):
             check_image(part, normalize=True)  # as the dry run does before rdbtool
             subprocess.run([RDBTOOL, str(image), 'create', 'chs=257,1,64', '+', 'init', '+', 'addimg', str(part),
                             'name=DH0', 'bootable=1', 'pri=0'], check=True, stdout=subprocess.DEVNULL)
+            wv.pad_to_ide_cylinders(image)   # as the dry run does (IMAGE-IDE-CYLINDER-TAIL-59)
+            padded = wv.ide_cylinder_bytes(8 * MIB + wv.RDB_BYTES)
             record = build_dry_run.gate_dry_run_image(image, boot, sorted(payload))
             self.assertTrue(record['ok'])
             self.assertEqual(record['file'], 'dry-run.hdf')
-            self.assertEqual(record['bytes'], 8 * MIB + wv.RDB_BYTES)
+            self.assertEqual(record['bytes'], padded)
             self.assertEqual(record['partitions'][0]['partition'], 'DH0')
             self.assertEqual(record['partitions'][0]['start_bytes'], wv.RDB_BYTES)
             self.assertEqual(record['partitions'][0]['largest_file'], 'C/AmiWind')
             # Over a limit, the dry run is refused like any image (a limit lowered for the test).
-            refusal = 'drive dry-run.hdf is %d bytes' % (8 * MIB + wv.RDB_BYTES)
+            refusal = 'drive dry-run.hdf is %d bytes' % padded
             with patch.object(wv, 'DRIVE_SIZE_LIMIT', 4 * MIB), self.assertRaisesRegex(ValueError, refusal):
                 build_dry_run.gate_dry_run_image(image, boot, sorted(payload))
 

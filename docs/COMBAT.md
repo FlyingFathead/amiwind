@@ -1,6 +1,6 @@
 # Combat and the Vivec Arena minigame
 
-_Last updated with AmiWind v0.0.59-dev4 (2 November 2026)._
+_Last updated with AmiWind v0.0.59-dev5 (2 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -215,6 +215,11 @@ your own master file when the image is built.
   swings.
 - Rolls come from one seeded generator per fight (xorshift, 4 bytes), so a
   seed replays a fight swing for swing when both fighters act the same.
+- Levelling: your stats in these rolls are your character's own (skills, attributes, level), so a skill or
+  attribute raised by levelling changes your hit, block and damage chances from the next fight on. Your blows that
+  land train their weapon's skill (Hand-to-hand for fists), a block trains Block, and a blow that hurts you trains
+  the armour skill of the piece it lands on (Unarmored for an empty slot). Reference: `combat/local.lua`. The rules
+  of the training and the level-up: [Levelling](CHARACTER_CREATION.md#levelling).
 
 ## Blocking
 

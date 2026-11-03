@@ -29,6 +29,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 XDF = '/opt/amiwind-tools/venv/bin/xdftool'
+IDE_CYLINDER_BYTES = 16 * 63 * 512      # an IDE port reads whole cylinders (IMAGE-IDE-CYLINDER-TAIL-59)
 # The maintainer, 2026-10-27 17:24 +0200 / 2026-10-27 15:24 UTC:"WE RUN AT 32MB FAST BY DEFAULT FROM NOW ON" (the game's minimum)
 DEFAULT_FAST_MB = 32
 
@@ -63,6 +64,7 @@ zorro_iii_memory = $((FASTMB * 1024))
 kickstart_file = /roms/$KICK
 hard_drive_0 = /w/play-boot.hdf
 hard_drive_0_type = hdf
+hard_drive_0_controller = ide0
 hard_drive_2 = $R/awctl
 hard_drive_2_label = AWCTL
 hard_drive_2_priority = -128
@@ -79,7 +81,7 @@ screenshots_output_dir = $R/shots
 base_dir = $R/home
 CFG
 if [ -n "${WORLD:-}" ]; then
-  printf 'hard_drive_1 = /img/%s\nhard_drive_1_type = hdf\nhard_drive_1_read_only = 1\n' "$WORLD" >> $R/smoke.fs-uae
+  printf 'hard_drive_1 = /img/%s\nhard_drive_1_type = hdf\nhard_drive_1_read_only = 1\nhard_drive_1_controller = ide1\n' "$WORLD" >> $R/smoke.fs-uae
 fi
 K=1
 if [ "$PROF" = interp ]; then printf 'jit_compiler = 0\nuae_cpu_speed = max\n' >> $R/smoke.fs-uae; K=3
@@ -145,16 +147,31 @@ zonefull(){ grep -c "CHIM: .*zone full" $R/awctl/console.log 2>/dev/null; }
 # so the outer script's own finish afterwards must not write a second result over it
 finish(){ [ -e $R/finished ] && exit 0; : > $R/finished; case "$1" in PASS*) b=$(st efrags_bad); [ -n "$b" ] && [ "$b" != 0 ] && set -- "FAIL efrag safety net used $b times (console: Efrag safety net)"
     z=$(zonefull); [ "${z:-0}" -gt 0 ] && [ "$FASTMB" -ge 32 ] && [ "${ZONEFULL:-fail}" != allow ] && case "$1" in PASS*)
-      set -- "FAIL CHIM zone full $z times at $FASTMB MB of Fast RAM (none allowed from 32 MB: CHIM-ZONE-BUDGET-33)";; esac
+      if grep -q 'CHIM cache off (skipped for this start)' $R/awctl/console.log 2>/dev/null; then
+        set -- "FAIL CHIM zone full $z times at $FASTMB MB of Fast RAM, with the CHIM cache skipped for this start by a key the smoke sent onto the startup logo (SMOKE-M-KEY-SKIPS-CHIM-CACHE-57)"
+      else set -- "FAIL CHIM zone full $z times at $FASTMB MB of Fast RAM (none allowed from 32 MB: CHIM-ZONE-BUDGET-33)"; fi;; esac
     [ "$(st screen)" = game ] || set -- "FAIL the run ended outside play: screen $(st screen) (map $(st map))";; esac
   recstop; cp $R/home/Cache/Logs/fs-uae.log.txt $R/logs/fs-uae.log.txt 2>/dev/null
   grep -E "Caught illegal|Fault address|Suspicious" $R/logs/fs-uae.log.txt 2>/dev/null | tail -12 > $R/logs/emulator-faults.txt
   cp $R/awctl/console.log $R/logs/console.log 2>/dev/null; alive && shot final
   kill $FP 2>/dev/null; sleep 2; kill $XP 2>/dev/null; log "smoke RESULT $1"; exit 0; }
-# play S: S seconds of game time; the emulator must stay up and the game clock must move
-play(){ r1=$(st realtime); s=0
+# play S: S seconds of game time; the emulator must stay up and the game clock must move. A window open (screen not
+# "game": inventory, journal, rest, dialogue, ...) whose realtime stood still while the engine's ticks moved is long
+# work inside one frame, not a stall (LOAD-STALL-SESSIONS-59); with neither moving it is a stall as before.
+play(){ r1=$(st realtime); t1=$(st ticks); s=0
   while [ $s -lt $(($1*K)) ]; do alive || finish "FAIL emulator exited during $2 (map $(st map))"; sleep 1; s=$((s+1)); done
-  r2=$(st realtime); [ -n "$r2" ] && [ "$r1" != "$r2" ] || finish "FAIL game stalled during $2 (realtime $r1 -> $r2)"; }
+  r2=$(st realtime); t2=$(st ticks); w=$(st screen)
+  [ -n "$r2" ] && [ "$r1" = "$r2" ] && [ -n "$t2" ] && [ "$t1" != "$t2" ] && [ -n "$w" ] && [ "$w" != game ] &&
+    { log "window $w during $2: realtime $r1 -> $r2, ticks $t1 -> $t2 (the engine runs)"; return 0; }
+  # ARRIVAL-LONG-FRAME-DEV6-59: realtime standing on the game screen while the ticks move is long work inside one
+  # frame (the engine's busy heartbeat), not a disk stall: it gets BUSY_GRACE seconds (60) for the frame to end and is
+  # named "long frame (busy)"; a stop with the ticks standing too goes on to the stall examination below as before
+  if [ -n "$r2" ] && [ "$r1" = "$r2" ] && [ -n "$t2" ] && [ "$t1" != "$t2" ]; then g=0
+    while [ $g -lt $((${BUSY_GRACE:-60}*K)) ] && [ "$(st realtime)" = "$r1" ]; do alive || finish "FAIL emulator exited during a long frame in $2"; sleep 1; g=$((g+1)); done
+    r2=$(st realtime)
+    [ -n "$r2" ] && [ "$r2" != "$r1" ] && { log "long frame (busy) during $2: realtime stood at $r1 for $1 s and $g s more while the engine ran (ticks $t1 -> $t2)"; return 0; }
+    finish "FAIL long frame (busy) during $2: realtime stood at $r1 for $1 s and ${BUSY_GRACE:-60} s more while the engine ran (ticks $t1 -> $t2), not a disk stall"; fi
+  [ -n "$r2" ] && [ "$r1" != "$r2" ] || finish "FAIL game stalled during $2 (realtime $r1 -> $r2)"; }
 # inplay WHAT: the map is in play, not only loaded under a menu (SMOKE-PASSES-WITHOUT-MAP-36): within 30 s the
 # client has its world (signon 4, world leaves) and the screen is the game. An engine without these state lines fails.
 inplay(){ s=0; while [ $s -lt $((30*K)) ]; do alive || finish "FAIL emulator exited before $1 was in play"
@@ -165,7 +182,8 @@ inplay(){ s=0; while [ $s -lt $((30*K)) ]; do alive || finish "FAIL emulator exi
 # processor idle, the game's file request taken by a handler and never answered, CHIM-SEYDA-BALMORA-LOAD-HANG-43)
 # is named as such; the launcher retries such a run once on a fresh play copy.
 stall(){ S=$( (python3 $R/stall.py 5 || echo 'STALL unknown: stall check could not run') 2>/dev/null | tail -n 1); log "$S"
-  case "$S" in "STALL emulator-disk"*) finish "FAIL emulator disk stall (CHIM-SEYDA-BALMORA-LOAD-HANG-43) $1: ${S#STALL emulator-disk: }";; esac
+  case "$S" in "STALL emulator-disk"*) finish "FAIL emulator disk stall (CHIM-SEYDA-BALMORA-LOAD-HANG-43) $1: ${S#STALL emulator-disk: }";;
+    "STALL busy"*) finish "FAIL long frame (busy) $1: ${S#STALL busy: }";; esac
   finish "FAIL $1 ($S)"; }
 # loaded SERVER: wait (max 150 s) for the map to run
 loaded(){ s=0; while [ $s -lt $((150*K)) ]; do alive || finish "FAIL emulator exited loading $1";
@@ -176,7 +194,13 @@ n=0; while [ ! -s $R/awctl/state.txt ] && [ $n -lt $((200*K)) ]; do
   # Escape first: the start-up logo takes every key, and its memory notice reads M as "not now" (the CHIM cache off
   # for this start): the m of "aw_remote" typed onto the logo failed gate smokes with the zone full
   # (SMOKE-M-KEY-SKIPS-CHIM-CACHE-57). Escape ends the logo before anything is typed.
-  alive || finish "FAIL emulator exited during boot"; key Escape; sleep 1; con "aw_remote 1"; sleep 2; key Escape; sleep $((8*K)); n=$((n+3+8*K)); done
+  # PERSISTING 2026-11-03: on a busy host the game was still loading when that Escape came, the logo started after it
+  # and the typed m still skipped the cache (gates 5916, 6201, 6202, 6222, 6262: "remote up after 21-22 s"). The play
+  # copy's id1/autoexec.cfg already turns the remote on, so the smoke now only presses Escape while it waits, and types
+  # "aw_remote 1" only as a late fallback, after 90 s, when any logo is long gone.
+  alive || finish "FAIL emulator exited during boot"; key Escape; sleep 2
+  if [ $n -ge $((90*K)) ]; then con "aw_remote 1"; sleep 2; key Escape; fi
+  sleep $((2*K)); n=$((n+2+2*K)); done
 [ -s $R/awctl/state.txt ] || finish "FAIL no remote control after boot"
 log "boot: remote up after $(( $(date +%s) - t0 )) s"; shot menu
 if [ "${START:-map}" = enter ] || [ "${START:-map}" = auto ]; then  # a MiniWind image starts its own scene; Enter through its quick character pages
@@ -350,6 +374,10 @@ def classify(pcs, tasks, stack):
         holder or 'none found')
     if pcs and len(idle) == len(pcs) and game and game[2] & 0x100 and holder:
         return 'emulator-disk', details
+    # ARRIVAL-LONG-FRAME-DEV6-59: three samples or more and none in exec idle: the processor is working (a long run of
+    # file and game work inside one frame), not a request nobody answers
+    if len(pcs) >= 3 and not idle:
+        return 'busy', details
     return 'unknown', details
 
 
@@ -478,6 +506,8 @@ def main(argv=None):
     prep = f'''set -e
 rm -rf /vol/{scratch}; mkdir -p /vol/{scratch}
 B=$(ls /vol/{args.image_dir}/*.hdf | grep -v world | head -1); [ -n "$B" ]
+for F in /vol/{args.image_dir}/*.hdf; do s=$(stat -c %s "$F"); if [ $((s % {IDE_CYLINDER_BYTES})) -ne 0 ]; then echo "ide-cylinders=FAILED $(basename "$F") $s"; exit 3; fi; done
+echo "ide-cylinders=ok"
 dd if="$B" of=/vol/{scratch}/play-boot.hdf bs=4M iflag=direct oflag=direct conv=sparse status=none; chmod u+w /vol/{scratch}/play-boot.hdf
 W=$(ls /vol/{args.image_dir}/*world-01.hdf 2>/dev/null | head -1 || true); echo "world=$(basename "$W" 2>/dev/null)"
 X={XDF}; D=/vol/{scratch}/play-boot.hdf
@@ -495,6 +525,15 @@ echo "readback=$(sha256sum /tmp/back | cut -d' ' -f1)"'''
                    '-v', f'{args.volume}:/vol', '-v', f'{out}:/t:ro', args.builder_image, 'sh', '-c', prep,
                    check=False)
         (out / 'prep.log').write_text(r.stdout, encoding='utf-8', newline='\n')
+        bad = re.search(r'^ide-cylinders=FAILED (\S+) (\d+)', r.stdout, re.M)
+        if bad:
+            # IMAGE-IDE-CYLINDER-TAIL-59: the emulated IDE port hides the last blocks of such a drive; the load
+            # then waits for ever on Kickstart's read-error requester. Refuse before booting.
+            print('engine smoke: the smoke image drive %s is %s bytes, not whole IDE cylinders (a multiple of %d): '
+                  'refused before boot (IMAGE-IDE-CYLINDER-TAIL-59); pad the fixture with zeros'
+                  % (bad.group(1), bad.group(2), IDE_CYLINDER_BYTES))
+            print('smoke-exit=2')
+            return 2
         world = re.search(r'^world=(\S*)', r.stdout, re.M)
         back = re.search(r'^readback=([0-9a-f]{64})', r.stdout, re.M)
         if r.returncode or not back or back.group(1) != want:

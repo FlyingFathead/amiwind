@@ -319,6 +319,84 @@ def history_row(stage, largest, total, jobs, container, run, worker=None):
             'wall': 60.0, 'cores': 4.0, 'run': run, 'stage': stage}
 
 
+class RunsAloneTests(unittest.TestCase):
+    """BUILD-CHIM-POOL-MEMORY-THROTTLE-59: v0.0.59-dev6 planned the CHIM area pass at 1 of 24 workers ("memory holds 1
+    workers at about 775 MiB each beside a 24907 MiB parent and 19842 MiB the stages beside it held") and ran it at a
+    pool allowance of 8 for 27 min. A pool stage throttled by the stages beside it runs alone."""
+    STEPS = [('media', ['python3', 'tools/media.py', '--jobs', '24']),
+             ('music', ['python3', 'tools/music.py']),
+             ('chim', ['python3', 'tools/chim_build.py', '--jobs', '24'])]
+
+    def gathered(self):
+        # chim: 24,907 MiB parent, 775 MiB a worker, measured with 19,842 MiB held beside it; media: a 6 GB pool stage
+        chim = dict(measured(24907, 24907 + 24 * 775, 24, wall=1645, cores=10.8),
+                    container_mib=24907 + 24 * 775 + 19842)
+        return {'stages': {'chim': [chim], 'media': [measured(500, 500 + 24 * 250, 24, wall=300, cores=20)]},
+                'stair': None, 'runs': ['/vol/ws8/build/r1']}
+
+    def test_a_pool_stage_throttled_by_its_neighbours_runs_alone(self):
+        # the build lease planned for v0.0.59 builds: 48 GB, passed in as the lease, never a fixed number
+        doc = rp.plan(self.STEPS, {'media', 'music', 'chim'}, 24, got(48, 24), self.gathered())
+        rows = {r['stage']: r for r in doc['stages']}
+        chim = rows['chim']
+        self.assertTrue(chim['alone'])
+        self.assertEqual(chim['beside_mib'], 0.0)
+        alone = int((48 * 1024 * 0.8 - 24907) // 775)
+        self.assertEqual(chim['workers'], min(24, alone))
+        before = rp.plan(self.STEPS, {'media', 'music', 'chim'}, 24, got(48, 24), self.gathered(), alone=False)
+        old = {r['stage']: r for r in before['stages']}['chim']
+        self.assertLess(old['workers'], chim['workers'])
+        self.assertNotIn('alone', old)
+        self.assertTrue(chim['reasons'][0].startswith('runs alone: '))
+        self.assertTrue(any('chim' in line and 'runs alone: ' in line for line in rp.checklist(doc)))
+        self.assertEqual(doc['alone'], ['chim'])
+        self.assertEqual(doc['memory_heavy'], ['chim', 'media'])     # music (512 MiB, no data) is light
+        self.assertNotIn('alone', rows['media'])
+        self.assertEqual(rp.validate(doc), [])
+
+    def test_a_stage_throttled_with_nothing_beside_it_does_not_run_alone(self):
+        gathered = self.gathered()
+        gathered['stages']['chim'][0].pop('container_mib')
+        doc = rp.plan(self.STEPS, {'media', 'music', 'chim'}, 24, got(40, 24), gathered)
+        self.assertNotIn('alone', doc)
+        self.assertEqual({r['stage']: r for r in doc['stages']}['chim']['status'], 'WILL THROTTLE')
+
+    def test_the_hold_rules(self):
+        hold = rp.alone_hold
+        # the alone stage ready, a heavy stage running: it waits, no further heavy stage starts, light ones do
+        self.assertEqual(hold(['chim', 'media', 'music'], ['scene'], ['chim'], ['chim', 'media', 'scene'])[0],
+                         {'chim', 'media'})
+        # nothing heavy running: the alone stage starts first, the other heavy stage waits
+        held, order = hold(['media', 'music', 'chim'], [], ['chim'], ['chim', 'media'])
+        self.assertEqual((held, order[0]), ({'media'}, 'chim'))
+        # the alone stage running: heavy stages wait, light ones run
+        self.assertEqual(hold(['media', 'music'], ['chim'], ['chim'], ['chim', 'media'])[0], {'media'})
+        # after it: nothing held
+        self.assertEqual(hold(['media', 'music'], [], ['chim'], ['chim', 'media'])[0], set())
+        self.assertEqual(hold(['media'], ['chim'], [], [])[0], set())
+
+    def test_the_scheduler_runs_it_alone(self):
+        from build_parallel import execute_parallel
+        stamp = ('import json, sys, time\nt0 = time.time(); time.sleep(.4)\n'
+                 'open(sys.argv[1], "a").write(json.dumps([sys.argv[2], t0, time.time()]) + "\\n")\n')
+        with tempfile.TemporaryDirectory() as temp:
+            out = Path(temp) / 'spans.jsonl'
+            steps = [('media', [sys.executable, '-c', stamp, str(out), 'media', '--jobs', '4']),
+                     ('music', [sys.executable, '-c', stamp, str(out), 'music']),
+                     ('world-survey', [sys.executable, '-c', stamp, str(out), 'world-survey', '--jobs', '4'])]
+            meta = {'compiler_jobs': 6, 'resource_plan_alone': ['world-survey'],
+                    'resource_plan_heavy': ['media', 'world-survey']}
+            printed = io.StringIO()
+            with contextlib.redirect_stdout(printed):
+                execute_parallel(steps, Path(temp) / 'run', meta, ROOT)
+            spans = {name: (a, b) for name, a, b in map(json.loads, out.read_text().splitlines())}
+        survey, media, music = spans['world-survey'], spans['media'], spans['music']
+        self.assertLessEqual(survey[1], media[0])                     # media waited until the alone stage was done
+        self.assertLess(music[0], survey[1])                          # the light stage ran beside it
+        self.assertIn('Scheduler: runs alone (resource plan): world-survey; holding media', printed.getvalue())
+        self.assertIn('Build [3/3]: world-survey, 5 worker(s)', printed.getvalue())   # all but music's one
+
+
 FULL = '/vol/ws8/build/2026_10_27_v0.0.53_final_45f4c426'
 MINI = '/vol/ws8/build/2026_10_26_v0.0.53-dev2_miniwind-halloween_5989e142'
 # BUILD-PLAN-MWSCRIPT-32GB-54: the history row as v0.0.48-dev2 try14 wrote it (the container's peak taken for a 0.7 s

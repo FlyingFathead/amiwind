@@ -457,12 +457,6 @@
    "contains": "AW_MWVM_CELLS 4096",
    "class": "unrelated",
    "note": "the compiled-script machine's value cells (locals of attached objects and global scripts), a count, not a position"
-  },
-  {
-   "file": "engine/aga/src/aw_mwvm.h",
-   "contains": "AW_MWVM_PARK_CELLS 4096",
-   "class": "unrelated",
-   "note": "the compiled-script machine's parked value cells (locals kept for objects off the map), a count, not a position"
   }
  ]
 }

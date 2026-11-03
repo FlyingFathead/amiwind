@@ -4,6 +4,8 @@
 #include "aw_story.h"
 #include "aw_character.h"
 #include "aw_save.h"
+#include "aw_jhist.h"
+#include "aw_ledger.h"
 #include <assert.h>
 server_t sv;server_static_t svs;client_state_t cl;client_static_t cls;viddef_t vid;
 aw_story_t aw_story;aw_character_t aw_character;
@@ -375,9 +377,22 @@ int main(void){
       cl.viewangles[YAW]=0;arrow_on=0;draw();assert(marker_x==x && marker_y==y);}
      AW_WorldUIKey('m',1);strcpy(sv.name,"balmora");player.v.origin[0]=player.v.origin[1]=player.v.origin[2]=0;
     }
-    journal_command();draw();assert(strstr(drawn,"No dated journal"));AW_WorldUIKey('j',1);
+    journal_command();draw();assert(strstr(drawn,"No entries yet."));AW_WorldUIKey('j',1);
     assert(AW_JournalAdd(&aw_state,"quest",1));assert(AW_JournalAdd(&aw_state,"quest",10));
-    journal_command();draw();assert(strstr(drawn,"Another earned event."));
+    /* the book reads the dated history on the world change list (aw_jhist.h), as the engine's Journal writes it */
+    assert(AW_JHistAdd(&aw_jhist,AW_LedgerNameHash("quest"),1,0,0)==2 && AW_JHistAdd(&aw_jhist,AW_LedgerNameHash("quest"),10,0,5)==2);
+    /* JOURNAL-ORIGINAL-VIEW-59: J opens the original dated journal, both entries under the first day's heading in the
+     * original form, the Topics and Quests buttons in its row; the quest index is the view by subject (Q / Tab) */
+    journal_command();draw();
+    assert(strstr(drawn,"16 Last Seed (Day 1)") && strstr(drawn,"Welcome Hors.") && strstr(drawn,"Another earned event."));
+    assert(strstr(drawn,"Topics") && strstr(drawn,"Quests") && strstr(drawn,"Close") && strstr(drawn,"Page 1/1") && !strstr(drawn,title));
+    before=opens;draw();assert(opens==before); /* Drawing never fetches text. */
+    AW_WorldUIKey('t',1);draw();assert(strstr(drawn,"Topics") && strstr(drawn,"Back"));
+    AW_WorldUIKey(K_TAB,1);draw();assert(strstr(drawn,"16 Last Seed (Day 1)"));
+    AW_WorldUIKey('q',1);draw();assert(strstr(drawn,"By subject") && strstr(drawn,title));
+    AW_WorldUIKey('q',1);draw();assert(strstr(drawn,"Page 1/1"));   /* Q again: back to the dated journal */
+    AW_WorldUIKey(K_TAB,1);AW_WorldUIKey(K_ENTER,1);draw();
+    assert(strstr(drawn,"Another earned event.") && strstr(drawn,"16 Last Seed (Day 1)"));
     assert(strstr(drawn,title) && heading_rows>1);
     /* CURSOR-MW-58: every window asks aw_ui.c for Morrowind's pointer first; only without it (aw_cursor_type 1, or no
      * gfx/cursor.awc in the image) does it draw AmiWind's own cursor. */
@@ -387,9 +402,7 @@ int main(void){
     AW_WorldUIMouse(-150,0);AW_WorldUIKey(K_MOUSE1,1);assert(opens>before); /* Left heading follows the quest. */
     AW_WorldUIKey(K_LEFTARROW,1);draw();assert(strstr(drawn,"Welcome Hors."));
     before=opens;draw();assert(opens==before); /* Drawing never fetches text. */
-    AW_WorldUIKey(K_TAB,1);draw();assert(strstr(drawn,"Quests") && strstr(drawn,title));
-    AW_WorldUIKey(K_ENTER,1);draw();assert(strstr(drawn,"Another earned event."));
-    AW_WorldUIKey(K_BACKSPACE,1);draw();assert(strstr(drawn,"2/2"));
+    AW_WorldUIKey(K_BACKSPACE,1);draw();assert(strstr(drawn,"Page 1/1") && strstr(drawn,"16 Last Seed (Day 1)"));
     assert(!AW_WorldUIKey(K_F10,1));assert(!AW_WorldUIActive() && key_dest==key_game);
     assert(aw_state.journal_count==2 && AW_StateGet(&aw_state,AW_JOURNAL,"quest")==10);
     map_command();key_dest=key_game;assert(!AW_WorldUIDraw() && !AW_WorldUIActive());

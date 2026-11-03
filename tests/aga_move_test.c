@@ -70,6 +70,12 @@ static float fatigue=200;static int knocked;
 int AW_CombatPlayerKnocked(void){return knocked;}
 float AW_CombatPlayerFatigue(float *maximum){if(maximum)*maximum=200;return fatigue;}
 void AW_CombatPlayerFatigueLoss(float loss){fatigue=AW_MoveFatigueAfter(fatigue,loss);}
+/* aw_levelup.c (LEVEL-UP-58): the jumps and the seconds of running/swimming the movement reports. */
+static int jumps_reported;static float run_reported,swim_reported;
+int AW_LevelupUse(int skill_index,int use,float scale){assert(skill_index==20 && use==0 && scale==1);jumps_reported++;return 0;}
+void AW_LevelupMoveSeconds(int running,int swimming,float seconds){
+    if(swimming)swim_reported+=seconds;else if(running)run_reported+=seconds;
+}
 
 static int near(float a,float b){return fabs(a-b)<=.002f*(fabs(b)>1?fabs(b):1);}
 /* The wished ground speed for this command (SV_AirMove, airborne so only the wish is read). */
@@ -155,6 +161,8 @@ int main(void){
     ground(0,0,0);player.v.flags=0;player.v.velocity[2]=200;player.v.button2=1;
     aw_move_after(0);assert(near(fatigue,190));
     aw_move_after(0);assert(near(fatigue,190));               /* still in the air: one jump, one cost */
+    /* LEVEL-UP-58: one jump reported (Acrobatics), the second of running reported, walking not */
+    assert(jumps_reported==1 && run_reported==1 && swim_reported==0);
     player.v.flags=FL_ONGROUND;player.v.velocity[2]=0;player.v.button2=0;aw_move_after(0);
     fatigue=3;ground(120,0,1);aw_move_after(1);assert(fatigue==0);
     fatigue=200;player.v.flags=FL_ONGROUND|FL_GODMODE;ground(120,0,1);aw_move_after(1);assert(fatigue==200);

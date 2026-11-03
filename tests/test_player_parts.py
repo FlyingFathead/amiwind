@@ -180,6 +180,34 @@ class EngineWiring(unittest.TestCase):
         self.assertIn("elif item['parts'] and inert and (not item['enchantment'] or (enchant and enchant[0]==2)):flags|=4",
                       inventory)
 
+    def test_inventory_picture_draws_the_assembled_parts(self):
+        # INVENTORY-PREVIEW-BAKED-BODY-59: the inventory picture draws the parts the third-person view draws (the same
+        # parts_ready assembly, only on a change), posed at the original's inventory group on the shared table, the
+        # items on the table's bones; the baked companion stays selectable with the body's switch
+        # (aw_player_body_parts 0; no setting of its own: the resident registry's budget)
+        view = (SRC / 'aw_view.c').read_text(encoding='utf-8')
+        self.assertNotIn('aw_inventory_preview_parts', view)
+        body = view[view.index('int AW_ViewInventoryBody('):view.index('static float death_seconds(')]
+        self.assertIn('if(body_parts && parts_table && part_models[0])', body)
+        self.assertIn('parts_inventory_frame(type,&inventory_left)', body)
+        self.assertIn('*model=part_models[0]', body)
+        self.assertIn('"_i.mdl"', body)                      # the previous method, kept
+        self.assertIn('AW_SkelBoneTag(', view[view.index('static int parts_inventory_items('):])
+        head = (SRC / 'aw_head.c').read_text(encoding='utf-8')
+        draw = head[head.index('int AW_InventoryPreviewDraw('):]
+        self.assertIn('AW_ViewInventoryParts(', draw)
+        self.assertIn('AW_SkelPoseVerts(', head[head.index('static int inventory_alias('):head.index('int AW_InventoryPreviewDraw(')])
+
+    def test_journal_book_reads_the_kept_quest_stages(self):
+        # JOURNAL-BOOK-32-QUESTS-59: the book's quests from the world change list (the scripts' live stages exported
+        # first, as a save does), not the 32-slot table; the native test is tests/aga_questbook_test.c
+        ui = (SRC / 'aw_worldui.c').read_text(encoding='utf-8')
+        build = ui[ui.index('static int book_quests('):ui.index('static void book_shown(')]
+        self.assertIn('aw_save_script_export(&aw_ledger)', build)
+        self.assertIn('AW_QuestBookBuild(&book->qb', build)
+        self.assertNotIn('titles[AW_STATE_VALUES]', ui)
+        self.assertIn('aw_questbook.c', (ROOT / 'engine/aga/Makefile').read_text(encoding='utf-8'))
+
     def test_per_axis_alias_scale_and_one_bone_pose_for_all_parts(self):
         alias = (SRC / 'r_alias.c').read_text(encoding='utf-8')
         for axis in range(3):

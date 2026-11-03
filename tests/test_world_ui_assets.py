@@ -158,15 +158,21 @@ class WorldUIAssetsTests(unittest.TestCase):
                 validate(scene/'id1')
 
     def test_sorted_journal_offsets_and_original_identity(self):
-        raw=self.master()+journal(10,b'Second\0')+journal(1,b'Hello %PCName.\0')
+        # JOURNAL-BOOK-32-QUESTS-59: AWJ2, 80-byte rows: AWJ1's and the INFO's quest status (1 QSTF finished,
+        # 2 QSTR restart, 4 QSTN name), so the book lists finished quests as OpenMW 0.51 does
+        finished=record('INFO',sub('DATA',struct.pack('<iibbbb',4,10,-1,-1,-1,0))+sub('NAME',b'Second\0')+sub('QSTF',b'\1'))
+        raw=self.master()+finished+journal(1,b'Hello %PCName.\0')
         index,blob,count=journal_assets(raw)
-        self.assertEqual(count,1);self.assertEqual(index[:8],b'AWJ1'+struct.pack('<I',2))
-        stages=[]
-        for at in (8,84):
+        self.assertEqual(count,1);self.assertEqual(index[:8],b'AWJ2'+struct.pack('<I',2))
+        self.assertEqual(len(index),8+2*80)
+        stages,flags=[],[]
+        for at in (8,88):
             self.assertEqual(index[at:at+64].rstrip(b'\0'),b'test_helloworld')
-            stage,offset,size=struct.unpack_from('<iII',index,at+64);stages.append(stage)
+            stage,offset,size,flag=struct.unpack_from('<iIII',index,at+64);stages.append(stage);flags.append(flag)
             self.assertTrue(blob[offset:offset+size].endswith(b'\0'))
-        self.assertEqual(stages,[1,10])
+        self.assertEqual(stages,[1,10]);self.assertEqual(flags,[0,1])
+        engine=(Path(__file__).resolve().parents[1]/'engine/aga/src/aw_worldui.c').read_text(encoding='utf-8')
+        self.assertIn('"AWJ2"',engine);self.assertIn('"AWJ1"',engine)   # both forms read
         labels=quest_labels(raw,{})
         self.assertEqual(labels[72:].rstrip(b'\0'),b'Hello World')
     def test_ambiguous_stages_and_oversized_text_fail_closed(self):

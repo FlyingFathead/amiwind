@@ -369,6 +369,18 @@ def sector_file(records, version=FORMAT_VERSION):
     return bytes(out)
 
 
+def sector_layout(records):
+    """({(kind, id): offset}, file bytes) of the sector file sector_file(records) writes, from the records' sizes
+    alone: the pack needs only where each record lands, and a record's place does not depend on its bytes
+    (BUILD-CHIM-STAGE-SERIAL-TAIL-36: the pack built every sector file and parsed it again to learn this)."""
+    at = align(HEADER.size + len(records) * RECORD_ENTRY.size)
+    offsets = {}
+    for kind, rid, data in records:
+        offsets[(kind, rid)] = at
+        at += align(len(data))
+    return offsets, at
+
+
 def read_sector(data):
     """Records of a sector file in file order: [{kind, id, offset, bytes, data}]; checks that the
     records tile the data area exactly (each one once, no gaps beyond 4-byte padding, no overlaps)."""

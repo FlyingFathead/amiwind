@@ -30,6 +30,7 @@ import os
 import statistics
 import struct
 import sys
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -1189,6 +1190,18 @@ def _frame_cross_checks(task):
     placement, chunks per placement, placement rows {cell: pids}, ring {cell: cells})."""
     from world_chunk_estimate import placed_box
     owners, copies, order, trees, vis = task['owners'], task['copies'], task['order'], task['trees'], task['vis']
+    pvs_fails = {}
+    if vis is None:
+        # the chunks' PVS rows decoded here, on the worker (they were decoded in the main process before;
+        # BUILD-CHIM-STAGE-SERIAL-TAIL-36): the same sets, the same failure texts (put back in their place there)
+        vis = {}
+        nbytes = (len(order) + 7) // 8
+        for cell, raw in task['pvs']:
+            try:
+                vis[cell] = {order[k] for k in set_bits(decompress_row(raw, nbytes), len(order))}
+            except ValueError as e:
+                pvs_fails[cell] = 'chunk %d,%d: PVS row: %s' % (cell[0], cell[1], e)
+                vis[cell] = set()
     trees = {k: _plain_tree(t) for k, t in trees.items()}     # packed between the processes (PackedNodes)
     g, lx, ly, nx, ny = task['grid']
     nmodels, bounds, hidden, offs = task['models'], task['bounds'], task['hidden'], task['offs']
@@ -1258,7 +1271,27 @@ def _frame_cross_checks(task):
         rows_fails.check(near <= seen, 'chunk %d,%d: placement row misses a placement next to the chunk' % cell)
         pvl[cell] = seen
     ring = {c: {(c[0] + dx, c[1] + dy) for dx, dy in offs} & set(vis) for c in vis}
-    return fails, rows_fails, leaf_counts, chunk_counts, pvl, ring
+    return fails, rows_fails, leaf_counts, chunk_counts, pvl, ring, vis, pvs_fails
+
+
+def _indexed_cross_checks(item):
+    """Worker: (index, _frame_cross_checks of the task), for the in-order hand-back in validate()."""
+    return item[0], _frame_cross_checks(item[1])
+
+
+def _in_input_order(found):
+    """Results of (index, result) pairs that come back as they finish, handed on in index order (each held only
+    until its turn). The pool map that keeps its own order scanned every held future on each turn (about 16 s of
+    the main process with 1,351 frames, BUILD-ORDERED-MAP-SCAN-51); this holds plain results in a dict."""
+    held, following = {}, 0
+    for index, result in found:
+        held[index] = result
+        while following in held:
+            yield held.pop(following)
+            following += 1
+    if held:
+        raise RuntimeError('validation cross-checks: results %s came back without the ones before them'
+                           % sorted(held)[:5])
 
 
 def check_cache(counted=False):
@@ -1295,8 +1328,20 @@ def validate(out, source=None, palette=None, jobs=1, cross_checks='pool'):
     if cross_checks not in ('pool', 'serial'):
         raise ValueError('cross_checks: pool or serial, not %r' % (cross_checks,))
     from world_chunk_estimate import placed_box
+    import build_profile      # the main process's parts as timed phases: time and cores in the build log
+    current = [None]
+
+    def part_phase(name, detail=None):
+        if current[0] is not None:
+            current[0].__exit__(None, None, None)
+        # on stderr, with the validation's progress lines (stdout carries the report of tools/chim/validate.py)
+        current[0] = build_profile.phase('CHIM validation: ' + name, detail, stream=sys.stderr).__enter__() \
+            if name else None
+        return current[0]
     fails = Failures()
+    part_phase('load world')
     settings, files, sizes, textures, models, frames = load_world(out, fails, jobs)
+    part_phase('textures and model checks', '%d textures, %d models' % (len(textures), len(models)))
     # textures: well formed and stored once
     tex_content = collections.Counter()
     for i, t in enumerate(textures):
@@ -1336,6 +1381,7 @@ def validate(out, source=None, palette=None, jobs=1, cross_checks='pool'):
             used_tex.update(refs)
             model_bounds.append(bounds)
     del rows, groups
+    part_phase('variant audit')
     # every baked variant against its mesh's base (chim.variant_audit, CHIM-STRIDER-SCALED-SEAMS-36): a reference
     # model's variants must all be its base transformed, with its vertices and edges; other meshes are reported
     from chim.variant_audit import audit_models, reference_stems
@@ -1348,6 +1394,7 @@ def validate(out, source=None, palette=None, jobs=1, cross_checks='pool'):
         if row['mesh'] in references:
             fails.append('model %s: %d open edges, its base %s %d (vertices not shared as in the base)' % (
                 row['variant'], row['topology']['open_edges'], row['base'], row['base_topology']['open_edges']))
+    part_phase('source ownership and chunk checks', '%d frames' % len(frames))
     # chunks and placements
     all_refs = set()
     used_models = set()
@@ -1405,6 +1452,8 @@ def validate(out, source=None, palette=None, jobs=1, cross_checks='pool'):
     # (homes in the pack walk, placements owned by two frames) stay here, between the parts.
     from asset_census import ring_offsets
     import progress_line
+    setup_timer = part_phase('frame set-up', '%d frames' % len(frames))
+    current[0] = None          # ended below with its summary
     offs = None
     states = []
     for (path, frame, chunks), results in zip(frames, checked):
@@ -1413,8 +1462,7 @@ def validate(out, source=None, palette=None, jobs=1, cross_checks='pool'):
         order = F.sector_order(nx, ny, frame['sector_chunks'])[0]
         owners = collections.defaultdict(list)
         copies = collections.defaultdict(list)
-        trees, vis = {}, {}
-        nbytes = (len(order) + 7) // 8
+        trees, pvs_rows, pvs_at = {}, [], []
         frame_chunks = []
         for c, done in zip(chunks, results):
             part1.check(F.render_extent(c['image']) >= c['image_render'], path + ': chunk %d collision before render'
@@ -1425,12 +1473,9 @@ def validate(out, source=None, palette=None, jobs=1, cross_checks='pool'):
             trees[(c['cx'], c['cy'])] = done['tree']
             part1.check(c['leaves'] == len(trees[(c['cx'], c['cy'])][1]) - 1,
                         'chunk %d,%d: head leaf count differs from its subtree' % (c['cx'], c['cy']))
-            try:
-                row = decompress_row(c['pvs'], nbytes)
-                vis[(c['cx'], c['cy'])] = {order[k] for k in set_bits(row, len(order))}
-            except ValueError as e:
-                part1.append('chunk %d,%d: PVS row: %s' % (c['cx'], c['cy'], e))
-                vis[(c['cx'], c['cy'])] = set()
+            # the PVS row is decoded with the frame's cross-checks (on the workers); a failure goes back here
+            pvs_rows.append(((c['cx'], c['cy']), c['pvs']))
+            pvs_at.append((len(part1), (c['cx'], c['cy'])))
             if sections.get(path) is not None:
                 part1.extend(done['coverage_fails'])
                 terrain_tiles += done['tiles']
@@ -1458,19 +1503,32 @@ def validate(out, source=None, palette=None, jobs=1, cross_checks='pool'):
         task = {'owners': dict(owners), 'copies': dict(copies), 'order': order, 'grid': (g, lx, ly, nx, ny),
                 'models': len(models), 'bounds': {m: model_bounds[m] for m in used_here}, 'trees': trees,
                 'hidden': None if section is None else section.get('story_hidden', []), 'offs': offs[1],
-                'vis': vis, 'rows': [((c['cx'], c['cy']), c['owned'] + c['reach'], c['pvl']) for c in chunks],
+                'vis': None, 'pvs': pvs_rows,
+                'rows': [((c['cx'], c['cy']), c['owned'] + c['reach'], c['pvl']) for c in chunks],
                 'owned_total': frame['owned_total']}
-        states.append((path, frame, part1, frame_chunks, task))
+        states.append((path, frame, part1, frame_chunks, task, pvs_at))
     del checked
+    setup_timer.done('CHIM validation: frame set-up: %d frames' % len(states))
+    setup_timer.__exit__(None, None, None)
     tasks = [state[4] for state in states]
+    cross_timer = build_profile.phase('CHIM validation: cross-checks', '%d frames' % len(tasks),
+                                      stream=sys.stderr).__enter__()
     if cross_checks == 'pool' and jobs > 1 and len(tasks) > 1:
-        from build_parallel import ordered_map
-        crossed = ordered_map(_frame_cross_checks, tasks, min(int(jobs), len(tasks)),
-                              cost=lambda t: sum(len(r[1]) for r in t['rows']) + len(t['rows']))
+        # results as they finish, handed on in frame order here (BUILD-ORDERED-MAP-SCAN-51)
+        from build_parallel import completed_map
+        crossed = _in_input_order(completed_map(
+            _indexed_cross_checks, list(enumerate(tasks)), min(int(jobs), len(tasks)),
+            cost=lambda it: sum(len(r[1]) for r in it[1]['rows']) + len(it[1]['rows'])))
     else:
         crossed = map(_frame_cross_checks, tasks)
-    for number, ((path, frame, part1, frame_chunks, task), (part2, part3, leaves_of, chunks_of, pvl, ring)) in \
-            enumerate(zip(states, crossed), 1):
+    waited, t0 = 0.0, time.perf_counter()
+    for number, ((path, frame, part1, frame_chunks, task, pvs_at),
+                 (part2, part3, leaves_of, chunks_of, pvl, ring, vis, pvs_fails)) in enumerate(zip(states, crossed), 1):
+        waited += time.perf_counter() - t0
+        for at, cell in reversed(pvs_at):
+            if cell in pvs_fails:
+                part1.insert(at, pvs_fails[cell])
+        task['vis'] = vis
         first_failure = len(fails)          # this frame's failures get its name (BUILD-CHIM-VALIDATE-LATE-36)
         fails.extend(part1)
         # home rule: every model and texture lives in the sector where the pack walk first meets it
@@ -1504,6 +1562,12 @@ def validate(out, source=None, palette=None, jobs=1, cross_checks='pool'):
         if len(states) > 1:
             progress_line.emit('CHIM validation', path, '%d failures' % (len(fails) - first_failure),
                                (number, len(states), 'frames'), stream=sys.stderr)
+        t0 = time.perf_counter()
+    cross_timer.done('CHIM validation: cross-checks: %d frames; main process waited %.1fs for the workers, worked '
+                     '%.1fs on the frames in order' % (len(states), waited,
+                                                      time.perf_counter() - cross_timer.start - waited))
+    cross_timer.__exit__(None, None, None)
+    part_phase('whole-world checks')
     pids.sort()
     fails.check(pids == list(range(len(pids))) and len(pids) == settings['placements'],
                 'placement ids are not 0..n-1 once each')
@@ -1522,6 +1586,7 @@ def validate(out, source=None, palette=None, jobs=1, cross_checks='pool'):
     world = {'settings': settings, 'files': files, 'sizes': sizes, 'textures': textures, 'models': models,
              'frames': frames, 'chunks': per_chunk, 'leaf_counts': leaf_counts, 'chunk_counts': chunk_counts,
              'visibility': visibility, 'seam_samples': seam_samples, 'variant_audit': variant_summary(variant_report)}
+    part_phase(None)
     return fails, world
 
 

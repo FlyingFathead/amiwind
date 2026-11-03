@@ -295,7 +295,30 @@ def write_if_changed(path, data):
     return True
 
 
-SECTOR_GROUP = 64       # sector files per subdirectory of a frame too large for one FFS directory
+PACK_RECORD_REUSE = True    # False: every placement row written again per chunk (the method before; tests compare)
+
+# The pack's brush images (BUILD-CHIM-STAGE-SERIAL-TAIL-36): 'workers' (default): the texture ids are handed out
+# first in one cheap walk in the same order, then every frame's terrain and model images with their texture ids
+# filled in and their SHA-256 are made on the worker pool while the walk packs the frames before it; 'here': the
+# same two passes in this process (tests); 'serial': the method before (each image made where the walk meets it).
+PACK_IMAGES_ENV = 'AMIWIND_CHIM_PACK_IMAGES'
+PACK_IMAGES_MODES = ('workers', 'here', 'serial')
+
+
+def _pack_image(lumps, ids):
+    image, render = resolved_image(lumps, ids, lambda t: t)
+    return image, render, hashlib.sha256(image).hexdigest()
+
+
+def _pack_images_task(task):
+    """Worker of the pack: one frame's terrain and model images with global texture ids, and their SHA-256.
+    TASK: ([(chunk, lumps, ids)], [(variant key, lumps, ids)]). Returns ({chunk: (image, render, sha256)},
+    {key: (image, render, sha256)}): the bytes resolved_image gives in the walk."""
+    terrain, variants = task
+    return ({c: _pack_image(lumps, ids) for c, lumps, ids in terrain},
+            {k: _pack_image(lumps, ids) for k, lumps, ids in variants})
+
+SECTOR_GROUP = 64      # sector files per subdirectory of a frame too large for one FFS directory
 
 
 def sector_path(index, count):
@@ -760,8 +783,18 @@ def build_frames(out, frames, settings=None, terrain_light=12, jobs=1, cache=Non
     generate_on = False if not terc_on else generate_on
     terrain_content, terrain_records, terrain_at = {}, [], {}
 
+    import time
+    took = {}       # the pack's parts in seconds (one line at its end; BUILD-CHIM-STAGE-SERIAL-TAIL-36)
+
+    def clock(part, since):
+        now = time.perf_counter()
+        took[part] = took.get(part, 0.0) + now - since
+        return now
+    made_images = {}     # (frame index, 'T' chunk | 'M' variant key) -> (image, render, sha256) from the workers
+
     def texture_id_of(fi, key):
         if (fi, key) not in texture_ids:
+            t0 = time.perf_counter()
             src = frames[fi]['textures'][key]
             mip = src['miptex']
             engine = mip[:16].split(b'\0')[0].decode('ascii') if src['engine'] is None else \
@@ -780,13 +813,19 @@ def build_frames(out, frames, settings=None, terrain_light=12, jobs=1, cache=Non
                 texture_records.append((identity, named, *src['size']))
                 homed['textures'].append(texture_content[digest])
             texture_ids[(fi, key)] = texture_content[digest]
+            clock('texture ids', t0)
         return texture_ids[(fi, key)]
 
     def model_id_of(fi, key):
         if (fi, key) not in model_ids:
+            t0 = time.perf_counter()
             v = frames[fi]['variants'][key]
-            image, render = resolved_image(v['lumps'], v['texture_keys'], lambda k: texture_id_of(fi, k))
-            digest = hashlib.sha256(image).hexdigest()
+            if (fi, 'M', key) in made_images:
+                image, render, digest = made_images.pop((fi, 'M', key))
+            else:
+                image, render = resolved_image(v['lumps'], v['texture_keys'], lambda k: texture_id_of(fi, k))
+                digest = hashlib.sha256(image).hexdigest()
+            t0 = clock('model images', t0)
             if digest not in model_content:
                 # a name is unique in the world: another frame's different model of the same name gets #n
                 name, n = v['name'], 1
@@ -800,6 +839,7 @@ def build_frames(out, frames, settings=None, terrain_light=12, jobs=1, cache=Non
             else:
                 aliases.append([v['name'], model_records[model_content[digest]][0]])
             model_ids[(fi, key)] = model_content[digest]
+            clock('model ids', t0)
         return model_ids[(fi, key)]
     files, written, frame_recs, terrain_info = [], [], [], {}
     model_at, texture_at = {}, {}
@@ -838,16 +878,79 @@ def build_frames(out, frames, settings=None, terrain_light=12, jobs=1, cache=Non
                 version = max(version, PL.FORMAT_VERSION)
             print('CHIM world: placement light: %d of %d placements lit by %d sources (world format %d.%d)'
                   % (len(light_levels), pid, len(light_sources), *version), flush=True)
+    # The pack walk stays in this process: model, texture and terrain ids are handed out in the order the walk first
+    # meets them and every sector holds the records first met there, so each frame depends on the ids of every frame
+    # before it. The parts that do not depend on the ids (the packed visibility rows, the terrain shift checks) were
+    # made on the workers with the rows (frame_rows). The brush images (texture ids filled in, SHA-256) depend only
+    # on the texture ids: those are handed out first in one cheap walk in the same order (same ids), then the
+    # images are made on the workers, frame by frame in pack order, while the walk packs (PACK_IMAGES_ENV).
+    images_mode = os.environ.get(PACK_IMAGES_ENV, 'workers')
+    if images_mode not in PACK_IMAGES_MODES:
+        raise ValueError('%s=%s: choose %s' % (PACK_IMAGES_ENV, images_mode, ' or '.join(PACK_IMAGES_MODES)))
+    from build_parallel import stage_ceiling
+    if images_mode == 'workers' and (len(frames) <= 1 or stage_ceiling(jobs) <= 1):
+        images_mode = 'here' if len(frames) > 1 else 'serial'
+    homed_textures = {}      # (frame index, sector) -> texture ids first met there (the ids walk)
+    image_tasks = []
+    if images_mode != 'serial':
+        with build_profile.phase('CHIM world: pack texture ids', '%d frames, one walk in pack order (serial: '
+                                 'the ids follow the order the walk first meets them)' % len(frames)) as ids_timer:
+            for fi, layout in zip(order, layouts):
+                world, by_chunk = layout[0], layout[1]
+                terrain, variants = frames[fi]['terrain'], frames[fi]['variants']
+                met, met_keys, met_pids, S = [], set(), set(), world.sector_chunks
+                tasks_t = []
+                for si in range(len(world.sectors)):
+                    homed['textures'] = []
+                    for c in world.order[si * S * S:(si + 1) * S * S]:
+                        tasks_t.append((c, terrain[c]['lumps'],
+                                        [texture_id_of(fi, k) for k in terrain[c]['texture_keys']]))
+                        for kind in ('owned', 'reach'):
+                            for p in sorted(by_chunk[c][kind], key=lambda q: q['_pid']):
+                                if p['_pid'] in met_pids:
+                                    continue
+                                met_pids.add(p['_pid'])
+                                key = p['variant']
+                                if key in met_keys:
+                                    continue
+                                met_keys.add(key)
+                                met.append(key)
+                                for k in variants[key]['texture_keys']:
+                                    texture_id_of(fi, k)
+                    homed_textures[(fi, si)] = homed['textures']
+                image_tasks.append((tasks_t, [(k, variants[k]['lumps'],
+                                               [texture_ids[(fi, t)] for t in variants[k]['texture_keys']])
+                                              for k in met]))
+                ids_timer.step()
+            ids_timer.done('CHIM world: pack texture ids: %d textures, %d frames' % (len(texture_records),
+                                                                                      len(frames)))
+    if images_mode == 'workers':
+        from build_parallel import ordered_map
+        jobs_images = stage_ceiling(jobs)
+        images_iter = ordered_map(_pack_images_task, image_tasks, max(1, min(jobs_images, len(image_tasks))),
+                                  cost=lambda t: len(t[0]) + len(t[1]))
+    elif images_mode == 'here':
+        images_iter = map(_pack_images_task, image_tasks)
+    else:
+        images_iter = iter([None] * len(frames))
     pack_timer = build_profile.phase('CHIM world: pack', '%d frames' % len(frames)).__enter__()
-    # The pack itself stays one walk in this process: model, texture and terrain ids are handed out in the order
-    # the walk first meets them and every sector holds the records first met there, so each frame depends on the
-    # ids of every frame before it (inherently serial). The parts that do not depend on the ids (the packed
-    # visibility rows, the terrain shift checks) were made on the workers with the rows (frame_rows).
     if len(frames) > 1:
         print('CHIM world: pack: one walk in pack order (ids are handed out as the walk first meets them: serial); '
-              'visibility rows and terrain shift checks %s' % (
-                  'came packed from the workers' if all(len(v) == 2 for v in visible) else 'packed here'), flush=True)
+              'visibility rows and terrain shift checks %s; brush images %s' % (
+                  'came packed from the workers' if all(len(v) == 2 for v in visible) else 'packed here',
+                  {'workers': 'made on %d workers ahead of the walk' % stage_ceiling(jobs),
+                   'here': 'made in this process ahead of the walk',
+                   'serial': 'made where the walk meets them'}[images_mode]), flush=True)
     for fi, layout, rows_of, refused in zip(order, layouts, visible, refusals):
+        t0 = time.perf_counter()
+        images = next(images_iter)
+        if images is not None:
+            terrain_made, models_made = images
+            for key, made in models_made.items():
+                made_images[(fi, 'M', key)] = made
+        else:
+            terrain_made = {}
+        clock('waiting for images', t0)
         if len(rows_of) == 2:
             packed, vis_stats = rows_of
         else:
@@ -869,20 +972,45 @@ def build_frames(out, frames, settings=None, terrain_light=12, jobs=1, cache=Non
             first_row = len(files) + 1                     # the frame file's row; its sectors follow
             # format 0.9 (chim.reach): every chunk's references to its frame's owner records
             refs_of = RI.frame_refs(by_chunk, world.chunk_index) if reach_refs else None
+            # A placement's record has the same bytes in its owner chunk and in every chunk it reaches (nothing in it
+            # depends on the chunk), so it is written once per frame and reused (BUILD-CHIM-STAGE-SERIAL-TAIL-36).
+            # Its model id is still asked for where the walk first meets it, so the ids keep their order.
+            made_records = {}
+
+            def record_of(p):
+                pid_ = p['_pid']
+                if pid_ not in made_records or not PACK_RECORD_REUSE:
+                    made_records[pid_] = PL.with_light(
+                        write_record(pid_, p['ref'], model_id_of(fi, p['variant']), p['origin'],
+                                     (p.get('angles') or (0.0, p['yaw'], 0.0)) if placed else p['yaw'],
+                                     world.chunk_index[p['_owner']], p['cell'][0] - cell[0],
+                                     p['cell'][1] - cell[1], p['_box'], p['_leaves'],
+                                     p.get('story_hidden', False)),
+                        light_levels.get(pid_, 0))
+                return made_records[pid_]
             for si, sector in enumerate(world.sectors):
-                homed['textures'], homed['models'], homed['terrain'] = [], [], []
+                homed['textures'], homed['models'], homed['terrain'] = \
+                    homed_textures.get((fi, si), []), [], []
                 records, chunk_meta, ref_at = [], [], {}
                 for c in world.order[si * S * S:(si + 1) * S * S]:
+                    t0 = time.perf_counter()
                     info = terrain[c]['info']
-                    image, image_render = resolved_image(terrain[c]['lumps'], terrain[c]['texture_keys'],
-                                                         lambda k: texture_id_of(fi, k))
+                    if c in terrain_made:
+                        image, image_render, digest = terrain_made[c]
+                    else:
+                        image, image_render = resolved_image(terrain[c]['lumps'], terrain[c]['texture_keys'],
+                                                             lambda k: texture_id_of(fi, k))
+                        digest = None
+                    t0 = clock('terrain images', t0)
                     referenced = 'offset' in terrain[c]
                     if referenced:
                         shift = terrain[c]['offset']
                         why = refused[c] if refused is not None else F.refuse_shift(image, shift)
                         if why:
                             raise ValueError('Chunk %s of frame %s: terrain cannot be referenced: %s' % (c, cell, why))
-                        digest = hashlib.sha256(image).hexdigest()
+                        if digest is None:
+                            digest = hashlib.sha256(image).hexdigest()
+                        t0 = clock('terrain images', t0)
                         if digest not in terrain_content:
                             terrain_content[digest] = len(terrain_records)
                             # format 0.11 record version 2: the converter's own triangles of this chunk,
@@ -904,16 +1032,11 @@ def build_frames(out, frames, settings=None, terrain_light=12, jobs=1, cache=Non
                                 terrain_records.append((image, image_render))
                             homed['terrain'].append(terrain_content[digest])
                         ref_at[c] = (terrain_content[digest], shift)
+                    t0 = clock('terrain records', t0)
                     rows = {}
                     for kind in ('owned', 'reach'):
-                        rows[kind] = [PL.with_light(
-                                          write_record(p['_pid'], p['ref'], model_id_of(fi, p['variant']), p['origin'],
-                                                       (p.get('angles') or (0.0, p['yaw'], 0.0)) if placed else p['yaw'],
-                                                       world.chunk_index[p['_owner']], p['cell'][0] - cell[0],
-                                                       p['cell'][1] - cell[1], p['_box'], p['_leaves'],
-                                                       p.get('story_hidden', False)),
-                                          light_levels.get(p['_pid'], 0))
-                                      for p in sorted(by_chunk[c][kind], key=lambda q: q['_pid'])]
+                        rows[kind] = [record_of(p) for p in sorted(by_chunk[c][kind], key=lambda q: q['_pid'])]
+                    t0 = clock('placement records (with model ids and images)', t0)
                     if reach_refs:
                         rows['reach'] = refs_of[c]      # format 0.9: references in place of the reach copies
                     if packed is not None:
@@ -940,15 +1063,19 @@ def build_frames(out, frames, settings=None, terrain_light=12, jobs=1, cache=Non
                                        int(math.floor(info['zmin'])), int(math.ceil(info['zmax']))))
                     terrain_info['%d,%d/%d,%d' % (cell[0], cell[1], c[0], c[1])] = \
                         {k: v for k, v in info.items() if k != 'tree'}
+                    clock('chunk records', t0)
+                t0 = time.perf_counter()
                 # Terrain, models and textures first needed in this sector live here, after its chunks.
                 records += [(b'TERR', tid, terrain_records[tid][0]) for tid in homed['terrain']]
                 records += [(b'MODL', mid, model_records[mid][1]) for mid in homed['models']]
                 records += [(b'TEXR', tid, texture_records[tid][1]) for tid in homed['textures']]
-                blob = F.sector_file(records, version)
-                if len(blob) > F.FFS_MAX_PACK:
+                # where each record lands, from the sizes alone (F.sector_layout): the sector file is built once,
+                # after its references are filled in (they have a fixed size, so the layout stays); before, it was
+                # built, parsed again for the offsets and, with references, built a second time
+                offsets, sector_bytes = F.sector_layout(records)
+                if sector_bytes > F.FFS_MAX_PACK:
                     raise ValueError('Sector file exceeds the 1 GiB file limit')
                 file_row = first_row + si
-                offsets = {(r['kind'], r['id']): r['offset'] for r in F.read_sector(blob)}
                 if refs:
                     for tid in homed['terrain']:
                         terrain_at[tid] = (file_row, offsets[(b'TERR', tid)])
@@ -963,7 +1090,10 @@ def build_frames(out, frames, settings=None, terrain_light=12, jobs=1, cache=Non
                         image, image_render = terrain_records[tid]
                         records[k] = (kind, cid, data[:at] + F.terrain_ref(
                             tid, terrain_at[tid][0], terrain_at[tid][1], len(image), image_render, shift))
-                    blob = F.sector_file(records, version)
+                blob = F.sector_file(records, version)
+                if len(blob) != sector_bytes:
+                    raise ValueError('Sector file of frame %s: %d bytes, its layout said %d' % (cell, len(blob),
+                                                                                              sector_bytes))
                 for c, render, collision, owned, reach, zmin, zmax in chunk_meta:
                     chunk_rows.append((c[0], c[1], si, offsets[(b'CHNK', world.chunk_index[c])], render, collision,
                                        owned, reach, zmin, zmax))
@@ -973,6 +1103,8 @@ def build_frames(out, frames, settings=None, terrain_light=12, jobs=1, cache=Non
                     texture_at[tid] = (file_row, offsets[(b'TEXR', tid)])
                 sector_rows.append((sector[0], sector[1], len(blob), F.crc32(blob)))
                 sector_blobs.append(('%s/%s' % (fdir, sector_path(si, len(world.sectors))), blob, len(records)))
+                clock('sector files', t0)
+            t0 = time.perf_counter()
             frame_rec = {'cell': cell, 'centre': world.frame['centre'], 'low': world.frame['low'],
                          'grain': world.settings['grain'], 'nx': world.nx, 'ny': world.ny, 'sector_chunks': S,
                          'owned_total': owned_total}
@@ -987,13 +1119,19 @@ def build_frames(out, frames, settings=None, terrain_light=12, jobs=1, cache=Non
             reach_total += sum(len(v['reach']) for v in by_chunk.values())
             over_total += sum(1 for p in rows_in if p['_leaves'] > F.MAX_ENT_LEAFS)
             largest = max([largest] + [r[2] for r in sector_rows])
+            clock('frame files', t0)
         if len(frames) > 1:
             # one line per frame: the visibility rows and the pack of a world of hundreds of frames are minutes
             # of work (fixlist B2: dev5 printed nothing here)
             progress_line.emit('CHIM world frames', fdir, '%d placements, %d chunks, %d sectors'
                                % (owned_total, len(chunk_rows), len(sector_rows)),
                                (len(frame_recs), len(frames), 'frames'))
+    # the walk's parts, slowest first ('waiting for images': the walk ahead of the workers; with the images made
+    # here, 'model images' includes the texture ids it hands out)
+    pack_timer.done('CHIM world: pack: %d frames; parts: %s' % (len(frames), ', '.join(
+        '%s %.1fs' % (k, v) for k, v in sorted(took.items(), key=lambda kv: -kv[1])) or 'none'))
     pack_timer.__exit__(None, None, None)
+    write_timer = build_profile.phase('CHIM world: pack index and write', '%d files' % (len(written) + 1)).__enter__()
     with section('pack assembly'):
         if len(model_records) > 65535 or len(texture_records) > 65535:
             raise ValueError('Model or texture count beyond format 0.2 ids')
@@ -1008,8 +1146,24 @@ def build_frames(out, frames, settings=None, terrain_light=12, jobs=1, cache=Non
     with section('pack write'):
         # Written whole, one after another, in the order they are read: the index, then
         # per frame its frame file and its sector files in pack order (docs/chim/WORLD_FORMAT.md).
-        changed = [rel for rel, blob in [('world.cwi', index)] + written if write_if_changed(root / rel, blob)]
-        removed = remove_stale(root, {rel for rel, _ in [('world.cwi', index)] + written})
+        # Each file is compared with the one there and written on its own: threads (file I/O; the same files, the
+        # list of rewritten ones in the same order)
+        allw = [('world.cwi', index)] + written
+        t0 = time.perf_counter()
+        if len(allw) > 64 and stage_ceiling(jobs) > 1:
+            from concurrent.futures import ThreadPoolExecutor
+            with ThreadPoolExecutor(max(2, min(16, stage_ceiling(jobs)))) as ex:
+                flags = list(ex.map(lambda rb: write_if_changed(root / rb[0], rb[1]), allw))
+        else:
+            flags = [write_if_changed(root / rel, blob) for rel, blob in allw]
+        changed = [rel for (rel, _), f in zip(allw, flags) if f]
+        t0 = clock('write', t0)
+        removed = remove_stale(root, {rel for rel, _ in allw})
+        clock('stale check', t0)
+    write_timer.done('CHIM world: pack index and write: %d files, %d rewritten, %d removed; write %.1fs, '
+                     'stale check %.1fs' % (len(allw), len(changed), len(removed), took['write'],
+                                            took['stale check']))
+    write_timer.__exit__(None, None, None)
 
     def plain(rec):
         return {k: list(v) if isinstance(v, tuple) else v for k, v in rec.items()}

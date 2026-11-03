@@ -1,6 +1,6 @@
 # Modular NPCs: every body part stored once, assembled per actor
 
-_Last updated with AmiWind v0.0.58-dev4 (1 November 2026)._
+_Last updated with AmiWind v0.0.59-dev6 (3 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -25,6 +25,8 @@ _Last updated with AmiWind v0.0.58-dev4 (1 November 2026)._
 - [Getting NPC movement right](#getting-npc-movement-right)
 - [Runtime method A: load-time composition](#runtime-method-a-load-time-composition)
 - [Runtime method B: attached parts as follower entities](#runtime-method-b-attached-parts-as-follower-entities)
+- [Stage: residents from parts (v0.0.59)](#stage-residents-from-parts-v0059)
+  - [Residents from parts: when their data is loaded](#residents-from-parts-when-their-data-is-loaded)
 - [Comparison](#comparison)
 - [Visibility and frame cost](#visibility-and-frame-cost)
 - [Recommendation and staged plan](#recommendation-and-staged-plan)
@@ -737,6 +739,58 @@ and frame.
   `MAX_MOD_KNOWN` (512 since v0.0.59) must hold every distinct part on screen, where today it
   holds one model per actor.
 - **Equipment change:** instant (drop or swap a part entity).
+
+## Stage: residents from parts (v0.0.59)
+
+The first runtime stage of method B on the player's parts library (the assembled player body, [THIRD_PERSON.md](THIRD_PERSON.md)),
+for Seyda Neen's residents only. Off by default; `dbg camera npcs on/off` switches it, `dbg camera npcs` prints its counters.
+
+- **Builder:** every stage that prepares residents writes one small binary recipe table per place
+  (`tools/npc_recipes.py`): the exterior cells' tables together in one pack, `view/npc_parts/cells.awnp`, with an index
+  at its head, and a room's table as `view/npc_parts/<map>.awnb`. A table has one 42-byte record per resident placed
+  there (an id hash, race and sex, head, hair and the worn items as indices into the table's own few names), the same
+  choices the fused bake makes.
+  In the first test build, 20 residents got a recipe and 12 kept their fused model.
+- **Engine:** `aw_npc_parts.c` assembles a resident's parts from the recipe and the player's part library when it is
+  first drawn, then draws each part at the resident's own frame of the shared table. The fused model stays the server
+  model (collision, animation, held items) and the drawing fallback.
+- **Not covered yet:** women of the human races (their own female table), residents with their own animation file,
+  residents dead at the start, the head turning of the fused model, and any town besides Seyda Neen.
+
+Measured on 2 November 2026 at the Seyda Neen arrival. Both sides used the same MiniWind image, the same view and
+FS-UAE with JIT at 32 MB Fast, in separate short sessions back to back, with the host 32-56 % busy:
+
+| | Fused models | From parts |
+|---|---|---|
+| Frame time | 24.1 ms (31.5 fps over 34 frames) | 100 ms or more (1 frame in the 3-second window) |
+| Residents in view | the same 14, one model each | 10 from 193 parts, 4 fused |
+| Engine time to assemble 8 residents and load their parts | none | 1,478 ms in one frame |
+
+The parts side was measured while its part models were still loading, so its steady frame time is not known yet.
+The cost is already clear: about 19 separate part models per resident, each drawn and set up on its own, against
+one model per fused resident. The 20 residents use 351 distinct part models (5.17 MB, already in the image for the
+player) against 5.27 MB of fused models. Those bytes are saved only once the fused models leave the image.
+
+Default: fused. Next steps before the parts path can win:
+- merge the rigid parts that share a bone, and merge the skin parts, into one model per resident when it is assembled;
+- load the parts in the background over several frames;
+- measure the steady state again, and on the Pi 4B.
+
+### Residents from parts: when their data is loaded
+
+The recipes are loaded the way the residents themselves are. Outdoors, the pack's index is read once (12 bytes a
+cell), and a cell's table is read with one seek and one read when the streamer
+brings that cell's frame into its window, at the same moment the cell's residents are queued, and is let go when the
+frame leaves the window; the starting town's own cell is read with the map. Indoors, a room's table is read on entering the room
+and freed with the room's map. Nothing island-wide is held, and no recipe is read from disk during play beyond those
+loads; a resident whose place has no table keeps its fused model. While residents from parts are off, nothing is read;
+switching them on reads the tables of the places loaded at that moment. The console prints each table read and freed
+(residents, bytes, time) and `dbg camera npcs` adds the totals. A small resident directory
+(`view/npc_parts/dir.awnd`, 6 bytes a resident plus the place names) says which place's table holds each resident: a
+resident drawn outside the places loaded now, for example one a script moved, reads only that one table into a
+small cache, never all of them. The same small cache keeps the tables of places just left (up to 16 tables and
+64 KB for now, the oldest let go first), so walking back into a cell or a room reads nothing again. This replaces the one recipe file for the whole image
+(BUILD-NPC-RECIPES-PER-CELL-59).
 
 ## Comparison
 

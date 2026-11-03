@@ -52,21 +52,17 @@ void (*aw_ambient_cmd)(void);
 #include "aw_state.h"
 
 #define AI_RANGE		1792.0f		/* local units: OpenMW's actors processing range 7168 x 0.25 */
-#define MAX_CHANGES		2048
 
-typedef struct
-{
-	float	ref;
-	vec3_t	origin, angles;		/* origin: ISLAND position (session + origin cell), so a recentre keeps it */
-	unsigned char	dead, moved, fight, follow;
-	unsigned short	pick;		/* a levelled reference's roll: 0 not rolled, 1 nothing, 2 + the base it gave */
-	float	health, hours;		/* health when left (moved); game hours when captured */
-	long	room;			/* v0.0.57: the room's stable number when captured in a room (origin room-local), else 0 */
-} change_t;
+/* CELL-CHANGES-59 slice 6 (ACTOR-STATE-POOL-LIMITS-54): the actors' changes are rows of the world change list
+ * (aw_ledger.h ACTORS), one per reference, sorted, no 2,048 ceiling: origin is the ISLAND position (session + origin
+ * cell) so a recentre keeps it, or room-local with ROOM; pick a levelled reference's roll (0 not rolled, 1 nothing,
+ * 2 + the base it gave); health when left (moved); hours the game time when captured. */
+#include "aw_ledger.h"
+typedef aw_ledger_actor_t change_t;
+#define nchanges	(aw_ledger.actor_count)
+#define changes		(aw_ledger.actor)
 static long RoomNumber (void);
 
-static change_t	changes[MAX_CHANGES];
-static int		nchanges;
 static aw_changes_t	carried;		/* loaded change entries this module does not place (kept for the next save) */
 static int			apply_pending;	/* a load's changes wait for the next window tick (ApplyLoaded) */
 static void ApplyLoaded (void);
@@ -124,19 +120,13 @@ static float RefOf (edict_t *e)
 	return v ? v->_float : 0;
 }
 
+/* The row of a reference (MAKE: made when missing; NULL when the list cannot take it). The pointer holds until the
+ * next made row. */
 static change_t *Change (float ref, int make)
 {
-	int i;
-	if (!ref)
+	if (!(ref >= 1 && ref <= 16777215.0f))
 		return NULL;
-	for (i=0 ; i<nchanges ; i++)
-		if (changes[i].ref == ref)
-			return &changes[i];
-	if (!make || nchanges == MAX_CHANGES)
-		return NULL;
-	memset (&changes[nchanges], 0, sizeof(change_t));
-	changes[nchanges].ref = ref;
-	return &changes[nchanges++];
+	return AW_LedgerActor (&aw_ledger, (uint32_t)ref, make);
 }
 
 static edict_t *Player (void)
@@ -240,7 +230,10 @@ static void Capture (edict_t *e, change_t *c)
 	float h = e->v.health, d[3];
 	int state = AW_CombatSlotState (e, &h);
 	IslandOffset (d);
-	/* death stays (no respawn yet): an actor a level change spawned again from its map is not alive again */
+	/* death stays until its respawn (slice 7, Respawned): an actor a level change spawned again from its map is not
+	 * alive again; the time it is first kept dead is its time of death */
+	if (!c->dead && state == 2)
+		c->died = GameHours () > 0 ? GameHours () : 0;
 	c->dead = c->dead || state == 2;
 	c->fight = state == 1;
 	c->follow = AW_CompanionEdict (e) ? 1 : 0;
@@ -251,7 +244,42 @@ static void Capture (edict_t *e, change_t *c)
 		d[0] = d[1] = d[2] = 0;		/* a room keeps its own coordinates */
 	VectorAdd (e->v.origin, d, c->origin);
 	VectorCopy (e->v.angles, c->angles);
+	c->angles[1] = anglemod (c->angles[1]);
+	/* within the saved form's checks (aw_ledger.c), so one odd value never refuses the whole save */
+	if (!(c->health >= -10000 && c->health <= 100000))
+		c->health = c->health > 0 ? 100000 : -10000;
 	c->hours = GameHours ();
+	if (!(c->hours >= 0 && c->hours <= 10000000))
+		c->hours = 0;
+}
+
+/* CELL-CHANGES-59 slice 7, respawn (aw_ledger.h; the rules of OpenMW 0.51 Creature::respawn, Npc::respawn and
+ * CreatureLevList::respawn, run at the cell's load): a dead actor whose reference is a levelled creature list's, or whose
+ * record is flagged Respawn (the build's reference identity table), comes back as the game data has it once
+ * min(fCorpseRespawnDelay, fCorpseClearDelay) game hours have passed since its death: its row goes back to nothing
+ * (a levelled list rolls again) and its live record goes. Any other dead actor stays dead. 1 when it came back. */
+/* aw_mwhost.c binds these (NULL in builds and tests without them: no flags known, the GMSTs' defaults, no record) */
+uint32_t (*aw_actors_ref_flags)(uint32_t key, aw_ledger_respawn_t *rule);
+int (*aw_actors_forget)(uint32_t reference);
+static uint32_t RefFlags (uint32_t key, aw_ledger_respawn_t *rule)
+{
+	return aw_actors_ref_flags ? aw_actors_ref_flags (key, rule) : 0;
+}
+static int Respawned (change_t *c)
+{
+	aw_ledger_respawn_t rule = AW_LEDGER_RESPAWN_DEFAULT;
+	uint32_t flags;
+	if (!c || !c->dead)
+		return 0;
+	flags = RefFlags (c->key, &rule);
+	if (!AW_LedgerActorRespawns (c, (flags & (AW_REFS_RESPAWN | AW_REFS_LEVELLED)) != 0, GameHours (), &rule))
+		return 0;
+	if (aw_actors_forget)
+		aw_actors_forget (c->key);
+	AW_LedgerActorReset (c);
+	aw_ledger_events.actors++;
+	Con_Printf ("Respawn: actor %lu is back as the game data has it.\n", (unsigned long)c->key);
+	return 1;
 }
 
 static void Release (edict_t *e)
@@ -460,6 +488,7 @@ static int SpawnOne (pending_t *q)
 	}
 	ref = RefOf (ent);
 	c = Change (ref, 0);
+	Respawned (c);			/* slice 7: a dead one whose time has come is back */
 	if (c && c->dead)
 	{
 		ED_Free (ent);
@@ -641,6 +670,7 @@ static void TableJoin (int cx, int cy, const float *offset)
 			change_t *c = Change ((float)r.key, 0);
 			unsigned pick;
 			table.levelled++;
+			Respawned (c);		/* slice 7: its creature dead long enough: the list rolls again */
 			if (c && c->pick)
 			{
 				pick = c->pick;
@@ -732,6 +762,7 @@ static void LevelledEntity (edict_t *ent)
 		return;
 	table.levelled++;
 	c = Change (ref, 0);
+	Respawned (c);			/* slice 7: as TableJoin */
 	if (c && c->pick)
 	{
 		pick = c->pick;
@@ -796,6 +827,7 @@ static void Join (int cx, int cy, const char *map, const float *offset)
 
 	if (!sv.active)
 		return;
+	AW_NpcPartsCell (cx, cy, 1);	/* the cell's residents' recipe table comes with them (aw_npc_parts.c) */
 	if (table_on)
 	{
 		TableJoin (cx, cy, offset);
@@ -942,6 +974,7 @@ static void Leave (int cx, int cy)
 	edict_t *e;
 	if (!sv.active)
 		return;
+	AW_NpcPartsCell (cx, cy, 0);	/* the cell's recipe table goes with the cell (a resident kept alive keeps its parts) */
 	for (i=npending-1 ; i>=0 ; i--)
 		if (pending[i].cx == cx && pending[i].cy == cy)
 		{
@@ -980,6 +1013,7 @@ static void Leave (int cx, int cy)
 /* A room (no CHIM window, so no window tick): on a new map or after a load, the room's actors take their change
  * entries (SAVEGAME-COMPLETE-57: an actor moved in a room is where it was left after a save and a reload, and after
  * leaving and coming back); when the room is left, its actors' state goes into the change list (Capture). */
+static char tick_map[64];		/* the map of the last window tick (Tick) */
 void AW_ActorsRoomTick (void)
 {
 	static char map[64];
@@ -991,6 +1025,12 @@ void AW_ActorsRoomTick (void)
 	{
 		Q_strncpy (map, sv.name, sizeof(map) - 1);
 		room = RoomNumber ();
+		if (room)
+			AW_NpcPartsRoom (sv.name);	/* the room's residents' recipe table (aw_npc_parts.c); goes with the map */
+		/* ACTORS-TOWN-ROOM-RETURN-59: the window's map memory goes, so the town entered again from this room applies
+		 * the change list to its own residents (a killed one stays dead) */
+		if (room)
+			tick_map[0] = 0;
 		if (room && nchanges)
 			apply_pending = 1;
 	}
@@ -1021,18 +1061,37 @@ static void Tick (void)
 		return;
 	{
 		/* a new map (a level change into a town frame, or a load): the actors its own entities spawned take
-		 * their change list state (a killed resident stays dead, as a joining frame's do: SpawnOne) */
-		static char map[64];
-		if (strncmp (map, sv.name, sizeof(map) - 1))
+		 * their change list state (a killed resident stays dead, as a joining frame's do: SpawnOne); a room in
+		 * between (no window tick there) clears it, so the same town map entered again is a new map too */
+		if (strncmp (tick_map, sv.name, sizeof(tick_map) - 1))
 		{
-			Q_strncpy (map, sv.name, sizeof(map) - 1);
+			Q_strncpy (tick_map, sv.name, sizeof(tick_map) - 1);
 			MarkHome ();
+			{
+				/* the home frame's own residents came with the map (no join): its cell's recipe table now */
+				int hx, hy, hheld;
+				if (HomeCell (&hx, &hy, &hheld))
+					AW_NpcPartsCell (hx, hy, 1);
+			}
 			if (nchanges)
 				apply_pending = 1;
 		}
 	}
 	if (apply_pending)
 		ApplyLoaded ();
+	/* CELL-CHANGES-59 slice 6: an actor killed or in a fight (hurt) is recorded on the list as it stands, every tick
+	 * (only the few with a combat slot), so a level change that frees the town frame's own residents without a release
+	 * keeps it (a room does the same for all its actors, AW_ActorsRoomTick) */
+	for (i=1 ; i<sv.num_edicts ; i++)
+	{
+		e = EDICT_NUM(i);
+		if (IsActor (e) && AW_CombatSlotState (e, NULL) != 0)
+		{
+			change_t *c = Change (RefOf (e), 1);
+			if (c)
+				Capture (e, c);
+		}
+	}
 	SpawnQueued ();
 	if (++n % 10)
 		return;
@@ -1107,7 +1166,8 @@ static int CmpFloat (const void *a, const void *b)
 
 static void Hash (const char *label)
 {
-	static float refs[MAX_EDICTS], dead[MAX_CHANGES + MAX_EDICTS];
+	static float refs[MAX_EDICTS];
+	float *dead;
 	static char lines[MAX_EDICTS][128];
 	int i, j, n = 0, nd = 0, ox, oy, pcx, pcy, ecx, ecy, state, comp;
 	unsigned h = 2166136261u;
@@ -1117,6 +1177,11 @@ static void Hash (const char *label)
 	if (!p || !ChimChunks_OriginCell (&ox, &oy))
 	{
 		Con_Printf ("hash %s: no player or no CHIM region frame\n", label);
+		return;
+	}
+	if (!(dead = (float *)AW_TryMalloc (sizeof(float) * (unsigned long)(nchanges + MAX_EDICTS))))
+	{
+		Con_Printf ("hash %s: no memory\n", label);
 		return;
 	}
 	pcx = ox + (int)floor ((p->v.origin[0] + 1024) / 2048.0f);
@@ -1151,24 +1216,16 @@ static void Hash (const char *label)
 	}
 	for (i=0 ; i<nchanges ; i++)
 		if (changes[i].dead)
-			dead[nd++] = changes[i].ref;
-	/* the levelled picks (only with the actor table's lists): one line each, by reference (a load restores the
-	 * change list sorted, so the hash must not depend on the order the entries were made in) */
-	{
-		static float picked[MAX_CHANGES];
-		int np = 0;
-		for (i=0 ; i<nchanges ; i++)
-			if (changes[i].pick)
-				picked[np++] = changes[i].ref;
-		qsort (picked, np, sizeof(float), CmpFloat);
-		for (i=0 ; i<np ; i++)
+			dead[nd++] = (float)changes[i].key;
+	/* the levelled picks (only with the actor table's lists): one line each, by reference (the rows are sorted by
+	 * reference, so the hash does not depend on the order the entries were made in) */
+	for (i=0 ; i<nchanges ; i++)
+		if (changes[i].pick)
 		{
-			change_t *c = Change (picked[i], 0);
-			snprintf (buf, sizeof(buf), "pick %.0f %ld", picked[i], (long)c->pick - 2);
+			snprintf (buf, sizeof(buf), "pick %lu %ld", (unsigned long)changes[i].key, (long)changes[i].pick - 2);
 			Con_Printf ("hash %s %s\n", label, buf);
 			h = Fnv (h, buf);
 		}
-	}
 	/* sort the lines by reference id (insertion sort: few) */
 	for (i=1 ; i<n ; i++)
 		for (j=i ; j>0 && refs[j-1] > refs[j] ; j--)
@@ -1190,6 +1247,7 @@ static void Hash (const char *label)
 			h = Fnv (h, buf);
 		}
 	Con_Printf ("hash %s = %08lx (%ld actors, player cell %ld %ld)\n", label, (unsigned long)h, (long)n, (long)pcx, (long)pcy);
+	free (dead);
 }
 
 static void Command (void)
@@ -1286,9 +1344,49 @@ static void Command (void)
 	}
 	if (!sv.active)
 		return;
-	if (Cmd_Argc () == 3 && (!strcmp (a, "fight") || !strcmp (a, "kill")))
+	/* CELL-CHANGES-59 slice 7 checks: "chim actors near" lists the nearest actors with their references and whether they
+	 * respawn (the record flag or a levelled list, the build's reference identity table); "chim actors kill REF" kills
+	 * the actor of that reference */
+	if (Cmd_Argc () == 3 && !strcmp (a, "near"))
 	{
-		/* the nearest resident that has a combat sheet */
+		edict_t *p = Player ();
+		int shown = 0;
+		ntried = 0;
+		while (p && shown < 12 && (e = Nearest ()) != NULL && ntried < MAX_EDICTS)
+		{
+			aw_ledger_respawn_t rule;
+			uint32_t fl = RefFlags ((uint32_t)RefOf (e), &rule);
+			vec3_t v;
+			tried[ntried++] = e;
+			VectorSubtract (e->v.origin, p->v.origin, v);
+			Con_Printf ("  actor %.0f %s at %.0f: %s\n", RefOf (e), e->v.netname ? pr_strings + e->v.netname : "?", Length (v),
+				fl & AW_REFS_LEVELLED ? "a levelled creature: respawns" : fl & AW_REFS_RESPAWN ? "flagged Respawn: respawns" :
+				"does not respawn");
+			shown++;
+		}
+		return;
+	}
+	if (Cmd_Argc () == 4 && !strcmp (a, "kill"))
+	{
+		float want = (float)Q_atof (Cmd_Argv (3));
+		int k;
+		for (k=1 ; k<sv.num_edicts ; k++)
+		{
+			e = EDICT_NUM(k);
+			if (IsActor (e) && RefOf (e) == want && AW_CombatSlotState (e, NULL) != 2 && AW_CombatTestEngage (e, 1))
+			{
+				Con_Printf ("chim actors kill: %s (ref %.0f) at %.1f game hours\n", e->v.netname ? pr_strings + e->v.netname : "?",
+					RefOf (e), GameHours ());
+				return;
+			}
+		}
+		Con_Printf ("chim actors kill: no living actor of reference %s here\n", Cmd_Argv (3));
+		return;
+	}
+	if ((Cmd_Argc () == 3 && (!strcmp (a, "fight") || !strcmp (a, "kill"))) || (Cmd_Argc () == 4 && !strcmp (a, "hurt")))
+	{
+		/* the nearest resident that has a combat sheet; hurt N: a fight with its health set to N (CELL-CHANGES-59
+		 * slice 6 checks: a hurt actor keeps its health across a map change and a load) */
 		ntried = 0;
 		while ((e = Nearest ()) != NULL && !AW_CombatTestEngage (e, a[0] == 'k') && ntried < MAX_EDICTS)
 			tried[ntried++] = e;
@@ -1297,6 +1395,8 @@ static void Command (void)
 			Con_Printf ("chim actors %s: no resident with a combat sheet near\n", a);
 			return;
 		}
+		if (a[0] == 'h')
+			AW_CombatSetHealth (e, (float)Q_atof (Cmd_Argv (3)));
 		Con_Printf ("chim actors %s: %s (ref %.0f, edict %ld)\n", a, e->v.netname ? pr_strings + e->v.netname : "?",
 			RefOf (e), (long)NUM_FOR_EDICT(e));
 		return;
@@ -1340,7 +1440,7 @@ static void Command (void)
 	}
 	if (Cmd_Argc () == 3 && !strcmp (a, "clear"))
 	{
-		nchanges = 0;
+		AW_LedgerActorsClear (&aw_ledger);
 		carried.count = 0;
 		Con_Printf ("chim actors: change list cleared\n");
 		return;
@@ -1392,10 +1492,10 @@ static aw_change_t *Entry (aw_changes_t *out, uint32_t key)
 
 static int ToEntry (const change_t *c, aw_changes_t *out)
 {
-	uint32_t ref = (uint32_t)c->ref, flags;
+	uint32_t ref = c->key, flags;
 	aw_change_t *e;
 	int cx, cy;
-	if (!c->ref || c->ref < 0 || ref > 0xFFFFFFu)
+	if (!ref || ref > 0xFFFFFFu)
 		return 1;
 	flags = (c->dead ? AW_CHANGE_DEAD : 0) | (c->moved ? AW_CHANGE_MOVED : 0) | (c->fight ? AW_CHANGE_FIGHT : 0) |
 		(c->follow ? AW_CHANGE_FOLLOW : 0) | (c->pick ? AW_CHANGE_PICK : 0);
@@ -1429,23 +1529,25 @@ static int SaveExport (aw_changes_t *out)
 	out->count = 0;
 	for (i=0 ; i<carried.count ; i++)
 		out->entry[out->count++] = carried.entry[i];
-	for (i=0 ; i<nchanges ; i++)
-		if (!ToEntry (&changes[i], out))
-			return -1;
+	/* slice 6: the rows of the actors let go are in the world change list (feature 32, AWL6); here only the actors
+	 * alive in the session now (at most the edicts), whose capture replaces their row at a load */
 	if (sv.active)
 		for (i=1 ; i<sv.num_edicts ; i++)
 		{
 			e = EDICT_NUM(i);
-			if (!IsActor (e) || !RefOf (e))
+			if (!IsActor (e) || !(RefOf (e) >= 1 && RefOf (e) <= 16777215.0f))
 				continue;
 			memset (&live, 0, sizeof(live));
-			live.ref = RefOf (e);
+			live.key = (uint32_t)RefOf (e);
 			{
-				change_t *c = Change (live.ref, 0);
+				change_t *c = Change (RefOf (e), 0);
 				if (c)
 				{
-					live.pick = c->pick;
-					live.dead = c->dead;
+					/* it has a row already (killed, hurt, moved before): the row is what is saved; one in a fight is
+					 * brought up to now in place (the list's size, counted before this, does not change) */
+					if (AW_CombatSlotState (e, NULL) != 0)
+						Capture (e, c);
+					continue;
 				}
 			}
 			Capture (e, &live);
@@ -1455,11 +1557,14 @@ static int SaveExport (aw_changes_t *out)
 	return out->count;
 }
 
-/* A loaded save's change list becomes the session's (before the window spawns its actors). */
+/* A loaded save's change list becomes the session's (before the window spawns its actors): the save's world change
+ * list (IN->ledger, the session's once aw_save.c moves it in) already holds the rows of AWL6; the entries of feature 8
+ * (the actors alive at the save, and every actor row of a save made before slice 6: migrated) are put into it, an
+ * entry replacing the row of its reference. */
 static void SaveImport (const aw_changes_t *in)
 {
 	int i;
-	nchanges = 0;
+	aw_ledger_t *into = in->ledger ? in->ledger : &aw_ledger;
 	carried.count = 0;
 	for (i=0 ; i<in->count ; i++)
 	{
@@ -1467,14 +1572,16 @@ static void SaveImport (const aw_changes_t *in)
 		change_t *c;
 		if (e->flags & AW_CHANGE_SCENE)
 			continue;		/* an old save's actor row (AW_SaveFoldActors): the save's actor rows keep it */
-		if ((e->key & AW_CHANGE_BUILDER) || nchanges == MAX_CHANGES)
+		if (!(e->key & AW_CHANGE_BUILDER) && !(e->flags & (AW_CHANGE_DEAD | AW_CHANGE_MOVED | AW_CHANGE_FIGHT |
+			AW_CHANGE_FOLLOW | AW_CHANGE_PICK)))
+			continue;		/* an object's entry (aw_mwhost.c reads it): nothing of an actor */
+		if ((e->key & AW_CHANGE_BUILDER) || !(c = AW_LedgerActor (into, e->key, 1)))
 		{
 			carried.entry[carried.count++] = *e;	/* not this module's: kept for the next save */
 			continue;
 		}
-		c = &changes[nchanges++];
 		memset (c, 0, sizeof(*c));
-		c->ref = (float)e->key;
+		c->key = e->key;
 		c->dead = (e->flags & AW_CHANGE_DEAD) ? 1 : 0;
 		c->moved = (e->flags & AW_CHANGE_MOVED) ? 1 : 0;
 		c->fight = (e->flags & AW_CHANGE_FIGHT) ? 1 : 0;
@@ -1485,10 +1592,10 @@ static void SaveImport (const aw_changes_t *in)
 		c->angles[1] = e->yaw;
 		c->health = e->health;
 		c->hours = e->hours;
-		c->room = (e->flags & AW_CHANGE_ROOM) ? (long)e->where : 0;
+		c->room = (e->flags & AW_CHANGE_ROOM) ? (int32_t)e->where : 0;
 	}
 	apply_pending = 1;
-	Con_Printf ("actors: %d changes from the save (%d carried for other modules)\n", nchanges, carried.count);
+	Con_Printf ("actors: %d changes from the save (%d carried for other modules)\n", into->actor_count, carried.count);
 }
 
 /* After a load or a level change, at the first window tick (the scene's combat set-up has run by then): the actors
@@ -1507,6 +1614,8 @@ static void ApplyLoaded (void)
 		change_t *c;
 		if (!IsActor (e) || !(c = Change (RefOf (e), 0)))
 			continue;
+		if (Respawned (c))
+			continue;		/* slice 7: the map spawned it as the game data has it */
 		if (c->moved && c->room != RoomNumber ())
 			;			/* captured in another room (or outdoors): its position belongs there */
 		else if (c->moved && c->room)
@@ -1537,7 +1646,11 @@ static void Died (edict_t *e)
 {
 	change_t *c = Change (RefOf (e), 1);
 	if (c)
+	{
+		if (!c->dead)
+			c->died = GameHours () > 0 ? GameHours () : 0;		/* slice 7: the time of death */
 		c->dead = 1;
+	}
 }
 
 void AW_ActorsInit (void)

@@ -3,6 +3,8 @@
 #include "quakedef.h"
 #include "aw_character.h"
 #include "aw_tryalloc.h"
+#include "aw_skel.h"
+#include "aw_player_parts.h"
 #define HEAD_FACES 480
 static byte mesh[2][6+HEAD_FACES*82];
 static int faces[2],loaded[2]={-1,-1};
@@ -111,15 +113,42 @@ void AW_HeadDraw(int x,int y,int width,int height,float angle)
  * method above and AmiQuake's model cache, frame/skin/seam representation.
  * It never changes the world's refdef, renderer lists, camera or simulation. */
 static short *inventory_depth;
-void AW_InventoryPreviewClear(void){free(inventory_depth);inventory_depth=NULL;AW_ViewInventoryClear();}
+/* INVENTORY-PREVIEW-BAKED-BODY-59: the assembled body's parts are skeletal models (aw_skel.h): each is posed here at
+ * the picture's table frame into this scratch frame (the bones once per picture), as r_alias.c R_AliasSkelFrame
+ * poses them for the third-person view; freed with the depth buffer. */
+#define INVENTORY_VERTS 3072          /* r_local.h MAXALIASVERTS */
+#define INVENTORY_PARTS (AW_PARTS_MAX+3)
+static trivertx_t *inventory_posed;
+static float inventory_world[AW_SKEL_MAX_BONES][3][4];
+static const void *inventory_posed_table;static int inventory_posed_frame=-1;
+void AW_InventoryPreviewClear(void){
+    free(inventory_depth);inventory_depth=NULL;free(inventory_posed);inventory_posed=NULL;
+    inventory_posed_table=NULL;inventory_posed_frame=-1;AW_ViewInventoryClear();
+}
 typedef struct {
-    model_t *model;int frame;float origin[3],forward[3],right[3],up[3];
+    model_t *model;int frame;float origin[3],forward[3],right[3],up[3],scale[3];
 } inventory_part_t;
 static int inventory_alias(inventory_part_t *part,aliashdr_t **header,mdl_t **mdl,trivertx_t **verts){
     aliashdr_t *h=(aliashdr_t *)Mod_Extradata(part->model);mdl_t *m;
     if(!h)return 0;
     m=(mdl_t *)((byte *)h+h->model);
-    if(part->frame<0 || part->frame>=m->numframes || m->numverts<1 || m->numtris<1)return 0;
+    if(m->numverts<1 || m->numtris<1)return 0;
+    if(h->aw_skel){
+        const aw_skel_table_t *t=(const aw_skel_table_t *)h->aw_skel_table;aw_skel_block_t block;trivertx_t *rest;
+        if(!t || part->frame<0 || part->frame>=t->frames || m->numverts>INVENTORY_VERTS ||
+           h->frames[0].type!=ALIAS_SINGLE)return 0;
+        if(!inventory_posed && !(inventory_posed=(trivertx_t *)AW_TryMalloc(INVENTORY_VERTS*sizeof(trivertx_t))))return 0;
+        if(!AW_SkelBlockHead((byte *)h+h->aw_skel,AW_SKEL_BLOCK_HEAD+(long)m->numverts*AW_SKEL_VERT_BYTES,m->numverts,&block))
+            return 0;
+        if(inventory_posed_table!=(const void *)t || inventory_posed_frame!=part->frame){
+            AW_SkelPose(t,(float)part->frame,inventory_world);inventory_posed_table=t;inventory_posed_frame=part->frame;
+        }
+        rest=(trivertx_t *)((byte *)h+h->frames[0].frame);
+        AW_SkelPoseVerts(block.data,&rest[0].lightnormalindex,sizeof(trivertx_t),m->numverts,block.rest_scale,
+                         (const float (*)[3][4])inventory_world,block.pose_origin,block.pose_step,(unsigned char *)inventory_posed);
+        *verts=inventory_posed;*header=h;*mdl=m;return 1;
+    }
+    if(part->frame<0 || part->frame>=m->numframes)return 0;
     if(h->frames[part->frame].type==ALIAS_GROUP){
         maliasgroup_t *g=(maliasgroup_t *)((byte *)h+h->frames[part->frame].frame);
         *verts=(trivertx_t *)((byte *)h+g->frames[0].frame);
@@ -128,11 +157,12 @@ static int inventory_alias(inventory_part_t *part,aliashdr_t **header,mdl_t **md
 }
 static void inventory_point(const inventory_part_t *part,const mdl_t *m,const trivertx_t *v,float point[3]){
     float local[3];int k;
-    for(k=0;k<3;k++)local[k]=v->v[k]*m->scale[k]+m->scale_origin[k];
+    for(k=0;k<3;k++)local[k]=(v->v[k]*m->scale[k]+m->scale_origin[k])*part->scale[k];
     for(k=0;k<3;k++)point[k]=part->origin[k]+local[0]*part->forward[k]-local[1]*part->right[k]+local[2]*part->up[k];
 }
 int AW_InventoryPreviewDraw(model_t *model,int frame,int x,int y,int width,int height,float angle){
-    inventory_part_t part[3];model_t *gear[2];float origins[2][3],angles[2][3],point[3],zero[3]={0,0,0};
+    inventory_part_t part[INVENTORY_PARTS];model_t *gear[2],*more[AW_PARTS_MAX];
+    float origins[2][3],angles[2][3],point[3],zero[3]={0,0,0},body_scale[3]={1,1,1};
     aliashdr_t *h;mdl_t *m;trivertx_t *v;mtriangle_t *tri;stvert_t *st;
     maliasskindesc_t *sd;byte *skin;int i,j,k,which,count=1,n,xx,yy,x0,y0,x1,y1,ix,iy,z;
     float low[3],high[3],centre[3],points[3][3],uv[3][2],scale,cs,snv;
@@ -141,13 +171,22 @@ int AW_InventoryPreviewDraw(model_t *model,int frame,int x,int y,int width,int h
        x<0 || y<0 || x+width>(int)vid.width || y+height>(int)vid.height)return 0;
     memset(part,0,sizeof(part));part[0].model=model;part[0].frame=frame;
     AngleVectors(zero,part[0].forward,part[0].right,part[0].up);
+    /* the assembled body (INVENTORY-PREVIEW-BAKED-BODY-59): every further part at the same table frame and the race's
+     * scale; the baked companion has none (-1) and its unit scale */
+    n=AW_ViewInventoryParts(more,AW_PARTS_MAX,body_scale);
+    VectorCopy(body_scale,part[0].scale);
+    for(i=0;i<n && count<INVENTORY_PARTS-3;i++){
+        part[count]=part[0];part[count].model=more[i];count++;
+    }
     n=AW_ViewInventoryEquipment(gear,origins,angles);
-    for(i=0;i<n && count<3;i++){
+    for(i=0;i<n && count<INVENTORY_PARTS;i++){
         part[count].model=gear[i];part[count].frame=0;VectorCopy(origins[i],part[count].origin);
+        part[count].scale[0]=part[count].scale[1]=part[count].scale[2]=1;
         AngleVectors(angles[i],part[count].forward,part[count].right,part[count].up);count++;
     }
     /* The carried torch shares the torch body's frame and placement (PLAYER-TORCH-THIRDPERSON-38). */
-    if(count<3 && AW_ViewInventoryHeld(&part[count].model,&part[count].frame)){
+    if(count<INVENTORY_PARTS && AW_ViewInventoryHeld(&part[count].model,&part[count].frame)){
+        part[count].scale[0]=part[count].scale[1]=part[count].scale[2]=1;
         AngleVectors(zero,part[count].forward,part[count].right,part[count].up);count++;
     }
     if(!inventory_depth)inventory_depth=(short *)AW_TryMalloc(122*168*sizeof(short));

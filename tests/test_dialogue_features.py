@@ -114,6 +114,21 @@ class Tracker(unittest.TestCase):
         self.assertIn('AW_SceneTravelOffers(speaker)', window)
         self.assertIn('AW_SceneTravelWith(e)', window)
 
+    def test_script_strings_read_once(self):
+        # DIALOGUE-CLOSE-FRAME-FREEZE-59: a conversation's greeting reads the speaker's race for every SameRace /
+        # SameSex test; each read_string opened id1/mwscript.awm, so opening a talk stood still ~14 s. The short
+        # strings are kept after the first read: the cache is looked up before the file is opened, a cut string is
+        # never kept, the cache is reset when the file loads, and the window's open time is in the console.
+        host = (ROOT / 'engine/aga/src/aw_mwhost.c').read_text(encoding='utf-8')
+        body = host.split('static int read_string(int index,char *out,int capacity){', 1)[1].split('\n}\n', 1)[0]
+        self.assertLess(body.index('str_cache[i].index==index'), body.index('COM_FOpenFile'))
+        self.assertIn('n<capacity-1', body.split('COM_FOpenFile', 1)[1])
+        load = host.split('static int load(void){', 1)[1].split('\n}\n', 1)[0]
+        self.assertIn('string_cache_clear();', load)
+        window = (ROOT / 'engine/aga/src/aw_dialwin.c').read_text(encoding='utf-8')
+        opened = window.split('int AW_DialWindowOpen(edict_t *e,const char *greeting,int again){', 1)[1]
+        self.assertIn('Dialogue: window open in %d ms', opened.split('\n}\n', 1)[0])
+
 
 if __name__ == '__main__':
     unittest.main()

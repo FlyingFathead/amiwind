@@ -65,6 +65,8 @@ int AW_IntroImpulse(int impulse){return impulse;}
 void AW_GuardTorchLoadAssets(const byte *data){assert(data==assets);}
 void AW_GuardTorchInit(void){}
 void AW_GuardTorchUpdate(void){}
+void AW_NpcPartsReset(void){}
+void AW_NpcPartsUpdate(void){}
 void AW_LampInit(void){}void AW_LampUpdate(void){}
 void Cmd_AddCommand(char *name,void (*fn)(void)){
     if(!strcmp(name,"aw_torch_radius_set"))set_radius=fn;

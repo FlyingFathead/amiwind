@@ -264,7 +264,8 @@ int main(int argc,char **argv){
      m=AW_ActorSpells(x,held,8);P("held %d",m);for(k=0;k<m;k++)P(" %d",held[k]);P("\n");
      {int it[8],ct[8],eq[8];char id[40];m=AW_ActorItems(x,it,ct,eq,8);P("stock %d",m);
       for(k=0;k<m;k++){AW_ActorItemId(it[k],id,sizeof(id));P(" %s:%d",id,ct[k]);}P("\n");}}
-    /* the pool: unchanged records give way, changed ones stay */
+    /* the pool: unchanged records give way, changed ones stay; when every record is changed the pool takes a new
+     * block (ACTOR-STATE-POOL-LIMITS-54: it used to refuse the 129th) */
     AW_ActorStateImport(NULL,0);
     for(i=0;i<AW_ACTOR_POOL+10;i++)if(!AW_ActorGet(5000+i,row,1))break;
     P("pool %d evicted %lu\n",i,AW_ActorStateStats()->evicted);
@@ -314,6 +315,36 @@ int main(int argc,char **argv){
      len=AW_RevealedExport(blob,sizeof(blob));AW_RevealedReset();
      P("revealed %d count",k);k=AW_RevealedImport(blob,len);P(" %d export %d import %d %s %s\n",AW_RevealedCount(),len,k,
        AW_RevealedAt(0),AW_RevealedAt(1));AW_RevealedReset();}
+    /* slice 6 (CELL-CHANGES-59, ACTOR-STATE-POOL-LIMITS-54): every record changed up to AW_ACTOR_POOL_MAX (the game:
+     * 3,437 actor bases, 2,673 NPCs placed), half killed, half hurt, a third hostile, each with an item change; the
+     * next one refused; the records as "AWAR" and the dead counts alone as AWAS1, read back after an emptied pool;
+     * refusals add nothing */
+    {static unsigned char big[2200000];int k,m,changed,live,rat=AW_ActorFind("test_rat");aw_actor_t *x;
+     AW_ActorStateImport(NULL,0);
+     for(i=0;i<AW_ACTOR_POOL_MAX;i++){x=AW_ActorGet(20000+(uint32_t)i,i%2?row:rat,1);if(!x)break;
+         if(i%2)AW_ActorModCurrent(x,AWA_HEALTH,-7);else AW_ActorKill(x);
+         if(!AW_ActorAddItem(x,ring,1))break;
+         if(i%3==0)AW_ActorSetStat(x,AWA_FIGHT,100);}
+     k=AW_ActorGet(99999,row,1)==NULL;live=AW_ActorStateLive(&changed);
+     m=AW_ActorStateExportRecords(big,sizeof(big));n=AW_ActorStateExportCounts(save,sizeof(save));
+     P("big %d full %d live %d changed %d records %d need %d counts %d",i,k,live,changed,m,AW_ActorStateExportRecords(NULL,0),n);
+     k=AW_ActorStateImport(save,n);live=AW_ActorStateLive(&changed);P(" emptied %d live %d deadcount %d",k,live,AW_ActorDeadCount(rat));
+     k=AW_ActorStateImportRecords(big,m);live=AW_ActorStateLive(&changed);
+     x=AW_ActorGet(20001,row,0);
+     P(" import %d live %d changed %d health %.0f",k,live,changed,x?AW_ActorStat(x,AWA_HEALTH):-1.0f);
+     x=AW_ActorGet(20000,rat,0);
+     P(" dead %.0f fight %.0f ring %d",x?AW_ActorStat(x,AWA_DEAD):-1.0f,x?AW_ActorStat(x,AWA_FIGHT):-1.0f,x?AW_ActorItemCount(x,ring):-1);
+     x=AW_ActorGet(20000+AW_ACTOR_POOL_MAX-1,row,0);P(" last %d",x!=NULL);
+     /* refusals: cut, a longer block, a wrong version, no records, a block that is not AWAR; nothing added */
+     AW_ActorStateImport(save,n);
+     k=AW_ActorStateImportRecords(big,m-1)+AW_ActorStateImportRecords(big,m+1);
+     big[4]=2;k+=AW_ActorStateImportRecords(big,m);big[4]=1;
+     memcpy(save+4096,"AWAR\1\0\0\0\0\0\0\0",12);k+=AW_ActorStateImportRecords(save+4096,12);
+     k+=AW_ActorStateImportRecords(save,n);
+     live=AW_ActorStateLive(&changed);P(" refused %d live %d",k,live);
+     /* one bad record among good ones (an item past the table) refuses the whole block */
+     big[12+186+182]=0xFF;big[12+186+183]=0xFF;k=AW_ActorStateImportRecords(big,m);live=AW_ActorStateLive(&changed);
+     P(" badrecord %d live %d empty %d\n",k,live,AW_ActorStateImportRecords(NULL,0));}
     AW_ActorStateClose();free(file);return 0;
 }
 '''
@@ -416,9 +447,18 @@ class EngineTests(unittest.TestCase):
 
     def test_pool(self):
         self.assertEqual(self.out[33], 'pool %d evicted 10' % (128 + 10))
-        self.assertEqual(self.out[34], 'changed 128 full 1')
+        # ACTOR-STATE-POOL-LIMITS-54: 128 changed records and one more: a second block, not a refusal
+        self.assertEqual(self.out[34], 'changed 128 full 0')
         self.assertTrue(self.out[35].startswith('player 1 resident '))
-        self.assertLess(int(self.out[35].split()[3]), 40000)
+        self.assertLess(int(self.out[35].split()[3]), 2 * 128 * 300 + 4000)
+
+    def test_pool_at_the_games_counts(self):
+        # CELL-CHANGES-59 slice 6: 8,192 changed records (the game: 3,437 actor bases, 2,673 NPCs placed), each with an
+        # item change: 12 + 8,192 x (182 + 4) bytes of AWAR; the dead counts alone 10 + 4; an emptied pool takes them
+        # back whole; every refusal adds nothing; one bad record refuses the block
+        self.assertEqual(self.out[42], 'big 8192 full 1 live 8192 changed 8192 records 1523724 need 1523724 counts 14 '
+                                       'emptied 1 live 0 deadcount 4096 import 1 live 8192 changed 8192 health 43 '
+                                       'dead 1 fight 100 ring 1 last 1 refused 0 live 0 badrecord 0 live 0 empty 1')
 
 
 if __name__ == '__main__':

@@ -145,12 +145,26 @@ static void ledger_command(void){
     }
     AW_MwscriptLedgerStatus();
 }
+/* aw_placed pass HOURS (CELL-CHANGES-59 slice 7, a check command): the game clock goes on HOURS game hours (at most
+ * 100,000), as waiting and resting move it (aw_clock.c AW_ClockAdvance, a day at a time), for the respawn checks;
+ * nothing else of a rest happens (no healing, no recharge). */
+int AW_ClockAdvance(int milliseconds);
+static void pass_command(void){
+    double h=Cmd_Argc()>2?Q_atof(Cmd_Argv(2)):0,left;
+    if(!(h>0 && h<=100000)){Con_Printf("aw_placed pass HOURS: 1 to 100000 game hours.\n");return;}
+    for(left=h;left>0;left-=24)
+        if(!AW_ClockAdvance(left>=24?86400000:(int)(left*3600000.0))){Con_Printf("aw_placed pass: the clock stops here.\n");break;}
+    Con_Printf("aw_placed pass: %.1f game hours passed; now %.1f.\n",h,AW_LedgerGameHours());
+}
 /* One console command (the resident registry counts each): aw_placed [status | look [N] | go [N] | on | off |
- * ledger [on|off]]. Off draws no placed item from the next map or cell on (an A/B of their cost); not saved. */
+ * ledger [on|off] | container ... | pass HOURS]. Off draws no placed item from the next map or cell on (an A/B of their
+ * cost); not saved. */
 static void placed_command(void){
     const char *a=Cmd_Argc()>1?Cmd_Argv(1):"status";
     if(!strcmp(a,"ledger")){ledger_command();return;}
+    if(!strcmp(a,"pass")){pass_command();return;}
     if(!strcmp(a,"container")){AW_ContainerCommand();return;}   /* CELL-CHANGES-59 slice 3 */
+    if(!strcmp(a,"areas")){AW_AreaStatus();return;}             /* AREA-TABLES-59 */
     if(!strcmp(a,"look") || !strcmp(a,"go"))look_command(!strcmp(a,"go"));
     else if(!strcmp(a,"on") || !strcmp(a,"off")){placed_on=!strcmp(a,"on");Con_Printf("Placed items %s from the next map.\n",a);}
     else status_command();
@@ -158,6 +172,7 @@ static void placed_command(void){
 void AW_PlacedInit(void){
     Cmd_AddCommand("aw_placed",placed_command);
     aw_placed_begin=placed_begin;aw_placed_admit=placed_admit;aw_object_drawn=placed_drawn;aw_placed_link=AW_PlacedLink;
+    AW_CStripInit();     /* CONTAINER-WINDOW-59: E on a container opens its strip */
 }
 void AW_PlacedLink(void){
     int i,outdoor;vec3_t shift;

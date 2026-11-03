@@ -49,6 +49,11 @@ typedef struct {
     aw_magic_state_t magic;
 } aw_state_t;
 extern aw_state_t aw_state;
+/* CELL-CHANGES-59 slice 4 (AW-STATE-32-SLOTS-48): the named globals (the engine's "amiwind:..." facts) past the 32
+ * AW_GLOBAL slots live in the world change list's named facts (aw_ledger.h), saved with it; aw_save.c sets these
+ * (NULL, as in the native tests: a 33rd is refused as before). A fact already there stays there. */
+extern int (*aw_state_fact_get)(const char *id,int32_t *out);
+extern int (*aw_state_fact_set)(const char *id,int32_t value);
 void AW_StateReset(void);
 int32_t AW_StateGet(const aw_state_t *state,int kind,const char *id);
 int AW_StateSet(aw_state_t *state,int kind,const char *id,int32_t value);

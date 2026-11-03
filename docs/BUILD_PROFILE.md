@@ -1,6 +1,6 @@
 # Build profile and stage reuse
 
-_Last updated with AmiWind v0.0.58 (31 October 2026)._
+_Last updated with AmiWind v0.0.59 (3 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -335,6 +335,17 @@ Where the numbers come from, said on every line in brackets:
   (`lease_gb_full_speed`). Origin: the v0.0.42 final's chim stage was planned at
   21 GB alone and met 26.5 of 28 GiB in use beside the NPC gallery and the world
   terrain (BUILD-SCHEDULER-MEMORY-STARVED-42).
+- **runs alone**: a pool stage that memory would throttle only because of the
+  memory held beside it, and that fits more workers with nothing beside it, is
+  planned without that memory, and its line says `runs alone: ...`. The
+  scheduler then starts no other memory-heavy stage (a full-speed peak of
+  1 GiB or more) beside it: when it is ready it starts first, or waits for the
+  memory-heavy stages already running to end; the others wait until it is done
+  and then run at full width. Light stages still run beside it. The plan
+  records `alone` and `memory_heavy`; the sizes come from the memory the build
+  is given (its lease), never from fixed numbers. Origin: the v0.0.59-dev6
+  full build ran its CHIM area pass at 8 of 24 workers for 27 minutes beside
+  about 19.8 GB held by other stages (BUILD-CHIM-POOL-MEMORY-THROTTLE-59).
 
 Wall times are the measured wall fitted with Amdahl's law (the stage's average
 busy cores on its workers give its parallel share), so a stage that kept one

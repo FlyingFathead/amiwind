@@ -1,6 +1,6 @@
 # aw: the master builder command line
 
-_Last updated with AmiWind v0.0.54-dev2 (28 October 2026)._
+_Last updated with AmiWind v0.0.59 (3 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -273,7 +273,11 @@ the result's `stair_walk` counts the records marked and the maps and frames the 
 reused and walked; `aw status` shows those counts with each recent build. The step `perf-guard` reads the
 verdict the builder's perf guard wrote (`tools/perf_guard.py show RUN --json`, result field `perf_guard`): a failed
 guard fails the result (failed stage `perf-guard`; the build's stages passed, so its stair walks are still marked),
-and `aw status` shows the verdict and the waivers ([Perf guard](BUILD_PROFILE.md#perf-guard)). A run whose CHIM heap reports
+and `aw status` shows the verdict and the waivers ([Perf guard](BUILD_PROFILE.md#perf-guard)). The step
+`ide-cylinders` runs `tools/ide_cylinders.py check RUN/image --json` on the built image, the same IDE cylinder rule as
+the builder's [image layout gate](STORAGE.md#the-image-layout-gate): a drive file that is not whole cylinders of 16 heads
+x 63 sectors fails the result (failed stage `ide-cylinders`); a build without an image passes with that said, and a
+builder older than the check passes with that said. A run whose CHIM heap reports
 (`chim*/chim-heap.json`) hold frames over the memory budget lists every one of them in the result field
 `over_budget`, worst first, with how many bytes each is over; `aw submit` and `aw status` print them. Hashed stair walks
 are mandatory: once the published builder head has the records layer (`tools/stair_records.py`),

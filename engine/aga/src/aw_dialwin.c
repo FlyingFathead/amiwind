@@ -31,6 +31,7 @@
 #include "aw_tryalloc.h"
 #include "aw_talk.h"
 #include "aw_msgbox.h"
+#include "aw_levelup.h"
 
 #define BOX_X 8
 #define BOX_Y 6
@@ -142,7 +143,7 @@ static int original_base,current_base,permanent_change;
 static char speaker_record[64];static unsigned long speaker_reference;
 static edict_t *speaker;
 static FILE *file;
-static long file_start;
+static long file_start,file_size;
 static unsigned char *buffer;
 static char *names,*history;        /* names: NAME_CHARS per topic of the NPC's row */
 static int history_len,nparas,nhits,focus=-1;   /* focus: the Tab-chosen link (an index into hits), -1 none */
@@ -176,15 +177,26 @@ static int load(void) {
         fclose(f);free(resident);resident=NULL;memset(&table,0,sizeof(table));Con_Printf("Dialogue: %s is damaged (its sections do not add up to the file): no dialogue\n",path);return 0;
     }
     fclose(f);
+    file_size=size;
     AW_DialKnownStart(&table,known);
     Con_DPrintf("Dialogue: %ld topics, %ld NPC rows, %ld bytes resident\n",table.topics,table.npcs,resident_size);
     loaded=1;
     return 1;
 }
-static int read_file(void *user,long offset,void *out,long bytes) {
-    (void)user;
+static unsigned long file_reads;   /* DIALOGUE-CLOSE-FRAME-FREEZE-59: reads of the dialogue table per open phase */
+static int read_disk(void *user,long offset,void *out,long bytes) {
+    (void)user;file_reads++;
     if(!file || offset<0 || bytes<0 || fseek(file,file_start+offset,SEEK_SET))return 0;
     return bytes==0 || (long)fread(out,1,(size_t)bytes,file)==bytes;
+}
+/* DIALOGUE-CLOSE-FRAME-FREEZE-59: the conversation's reads go through a block cache (aw_dial.c), made fresh at each
+ * open; the open read every list item, entry and condition row of the speaker one seek at a time (about 6 s on FS-UAE
+ * at 32 MB Fast). `dbg npcs talkcache off` reads straight from the file again, for a like-for-like measurement. */
+static aw_dial_cache_t *read_cache;static int read_cache_on=1;
+void AW_DialWindowReadCache(int on){read_cache_on=on;Con_Printf("Dialogue: read cache %s\n",on?"on":"off");}
+static int read_file(void *user,long offset,void *out,long bytes) {
+    if(read_cache_on && read_cache && file)return AW_DialCacheRead(read_cache,offset,out,bytes);
+    return read_disk(user,offset,out,bytes);
 }
 /* The known topics saved with the game (DIALOGUE-COMPLETE-58): the scripts keep them by their topic rows (AddTopic;
  * the save's AWKT, aw_mwhost.c); TOPIC_MAP (2 bytes per table topic, made once, with the file open) gives each Topic
@@ -407,6 +419,9 @@ static void persuade(int kind){
     AW_DialPersuade(&table,kind,&player,&npc,disposition,rand()%100,fight,flee,&r);
     if(r.temp>0 && r.perm>0 && original_base+r.perm+permanent_change<0)r.perm=-(original_base+permanent_change);
     current_base+=r.temp;permanent_change+=r.perm;
+    /* LEVEL-UP-58: every persuasion (bribes too) trains Speechcraft, by its success or failure use value (OpenMW
+     * dialoguemanagerimp.cpp persuade: Speechcraft_Success / Speechcraft_Fail) */
+    AW_LevelupUse(25,r.success?0:1,1);
     dispose();
     if(r.fight!=fight || r.flee!=flee)AW_MwscriptSetSpeaker(speaker_record,speaker_reference,-1,r.fight,r.flee);
     if(r.success && bribe_gold[kind])AW_MwscriptPlayerGold(-bribe_gold[kind]);
@@ -696,9 +711,16 @@ static void barter_open(int page){
     ware_count=k;mode=page;refresh();
 }
 static void trade(int k){
+    int price,buying=mode==4;
     if(k<0 || k>=ware_count)return;
     if(mode==4 && AW_MwscriptPlayerGold(0)<ware_price[k])return;
-    if(AW_MwscriptTrade(speaker_record,speaker_reference,&wares[k],mode==4,ware_price[k]))barter_open(mode);
+    price=ware_price[k];
+    if(AW_MwscriptTrade(speaker_record,speaker_reference,&wares[k],buying,price)){
+        /* LEVEL-UP-58: Mercantile_Success once per accepted trade, scaled by the share haggled (OpenMW
+         * tradewindow.cpp); these pages take the merchant's own price, so the scale is 0 until the offer can change */
+        AW_LevelupUse(AW_LU_MERCANTILE,AW_USE_MERCANTILE_SUCCESS,AW_LevelupMercantileScale(buying,price,price));
+        barter_open(mode);
+    }
     else if(mode==5)append("(The merchant cannot take more kinds of things in this build.)",0);
 }
 /* Repair (OpenMW MerchantRepair): the player's weapons and armour below full health, by name, each at the game's
@@ -968,9 +990,9 @@ static void train(int k){
     if(attribute>=0 && base>=AW_MwscriptPlayerAttribute(attribute)){
         append(T(AW_DIAL_TEXT_TRAINING_ATTRIBUTE,"You cannot train a skill above its governing attribute."),0);return;}
     /* LEVEL-UP-58: a trained skill counts toward level progress (OpenMW skillLevelUp with the "trainer" source: the
-     * level progress and the governing attribute's counter). When levelling lands, call it here instead of the bare
-     * raise; tests/test_dialogue_features.py test_training_waits_for_level_up keeps this note until then. */
-    AW_MwscriptPlayerSkill(which,1);
+     * level progress and the governing attribute's counter, the skill's own progress kept); the bare raise when the
+     * image has no levelling data */
+    if(!AW_LevelupRaise(which,AW_RAISE_TRAINER))AW_MwscriptPlayerSkill(which,1);
     AW_MwscriptPlayerGold(-train_price[k]);
     AW_ClockAdvance(2*3600000);
     leave_after=1;
@@ -1097,8 +1119,18 @@ static int key(int k,int mouse_x,int mouse_y){
 
 int AW_DialWindowOpen(edict_t *e,const char *greeting,int again){
     aw_glut_cond_t cond;int k;keydest_t was=key_dest;
+    double t0=Sys_FloatTime();unsigned long r0=AW_MwscriptStringReads();   /* DIALOGUE-CLOSE-FRAME-FREEZE-59: the open's cost */
+    /* per phase: ms and dialogue-table reads, printed in one line (load speaker facts file services ui converse names
+     * sync greet refresh panel) */
+    enum{PH_LOAD,PH_SPEAKER,PH_FACTS,PH_FILE,PH_SERVICES,PH_UI,PH_CONVERSE,PH_NAMES,PH_SYNC,PH_GREET,PH_REFRESH,PH_PANEL,PH_N};
+    static const char *ph_name[PH_N]={"load","speaker","facts","file","services","ui","converse","names","sync","greet",
+                                      "refresh","panel"};
+    int ph_ms[PH_N];unsigned long ph_reads[PH_N];double tp=t0;unsigned long fr=file_reads;int ph=0;
+#define PHASE() do{double tn_=Sys_FloatTime();ph_ms[ph]=(int)((tn_-tp)*1000);ph_reads[ph]=file_reads-fr;tp=tn_;fr=file_reads;ph++;}while(0)
     if(active || !e || !load())return 0;
+    PHASE();
     if((row=AW_GlutSpeaker(e,again,&cond,&state))<0 || row>=table.npcs)return 0;
+    PHASE();
     {   /* the derived disposition: the bar, and what every Disposition test of this conversation reads */
         eval_t *id=GetEdictFieldValue(e,"aw_source_id"),*ref=GetEdictFieldValue(e,"aw_ref");
         AW_MwscriptDispositionFacts(id && id->string?pr_strings+id->string:NULL,ref?(uint32_t)ref->_float:0,
@@ -1109,37 +1141,56 @@ int AW_DialWindowOpen(edict_t *e,const char *greeting,int again){
         original_base=current_base=facts.base;permanent_change=0;mode=0;fight_started=travel_after=leave_after=0;
         choice_count=0;choice_topic=-1;goodbye_only=0;train_count=sale_count=0;
     }
+    PHASE();
     if(COM_FOpenFile((char *)path,&file)<0 || !file){file=NULL;return 0;}
     file_start=ftell(file);
+    if(!read_cache)read_cache=(aw_dial_cache_t *)AW_TryMalloc(sizeof(aw_dial_cache_t));   /* kept for the session */
+    if(read_cache)AW_DialCacheInit(read_cache,read_disk,NULL,file_size);
+    PHASE();
     services=AW_DialServices(&table,row,read_file,NULL);     /* one read: the speaker's service flags */
+    PHASE();
     if((ui_texts=(char *)AW_TryMalloc((size_t)AW_DIAL_UI_TEXT*AW_DIAL_TEXTS))!=NULL &&
        !AW_DialUiTexts(&table,read_file,NULL,ui_texts)){free(ui_texts);ui_texts=NULL;}   /* else the fallback words */
     if(!(buffer=(unsigned char *)AW_TryMalloc(AW_DIAL_BUFFER)) || !(history=(char *)AW_TryMalloc(HISTORY)) ||
        !(paras=(para_t *)AW_TryMalloc(sizeof(para_t)*PARAS))){
         Con_Printf("Dialogue: not enough memory.\n");release();return 0;
     }
+    PHASE();
     if(!AW_DialConverse(&conv,&table,row,&cond,read_file,NULL,buffer,AW_DIAL_BUFFER)){
         Con_Printf("Dialogue: the conversation could not be read.\n");release();return 0;
     }
+    PHASE();
     if(!(names=(char *)AW_TryCalloc((size_t)(conv.topics>0?conv.topics:1),NAME_CHARS))){release();return 0;}
     for(k=0;k<conv.topics;k++){
         int length;long at=AW_DialTopicName(&table,conv.topic[k].topic,&length);
         if(length>NAME_CHARS-1)length=NAME_CHARS-1;
         if(at>=0 && read_file(NULL,at,names+NAME_CHARS*k,length))names[NAME_CHARS*k+length]=0;
     }
+    PHASE();
     speaker=e;history_len=0;nparas=0;nhits=0;focus=-1;scroll=0;
     topics_sync();                   /* the saved known topics: a loaded game, AddTopic since the last conversation */
+    PHASE();
     if(!greet()){                    /* the voice table's line when the dialogue table has no greeting for this speaker */
         char ranked[1024];
         if(!fill_line(greeting && *greeting?greeting:"...",ranked,sizeof(ranked)))
             rank_defines(greeting && *greeting?greeting:"...",ranked,sizeof(ranked));
         append(ranked,0);
     }
+    PHASE();
     memset(&box,0,sizeof(box));
     refresh();
+    PHASE();
     if(key_dest==key_console)key_dest=key_game;
     active=1;
     if(!AW_WorldUIOpenPanel(draw,key,closed)){key_dest=was;release();return 0;}
+    PHASE();
+#undef PHASE
+    {   char line[400];int n=0,i;
+        for(i=0;i<ph && n<(int)sizeof(line)-32;i++)
+            n+=Q_snprintf(line+n,sizeof(line)-n," %s %d/%lu",ph_name[i],ph_ms[i],ph_reads[i]);
+        Con_Printf("Dialogue: window open in %d ms, %lu script-file string reads; phases ms/reads:%s\n",
+                   (int)((Sys_FloatTime()-t0)*1000),AW_MwscriptStringReads()-r0,line);
+    }
     return 1;
 }
 int AW_DialWindowActive(void){return active;}

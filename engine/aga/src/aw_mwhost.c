@@ -34,7 +34,9 @@
 #include "aw_move.h"
 #include "aw_textdef.h"
 #include "aw_ledger.h"
+#include "aw_jhist.h"
 #include "aw_maps.h"
+#include "aw_rest.h"
 #include <ctype.h>
 
 #define FILE_NAME "mwscript.awm"
@@ -70,12 +72,43 @@ static int read_string_from(FILE *f,long base,int index,char *out,int capacity){
     while(n<capacity-1 && (c=fgetc(f))!=EOF && c)out[n++]=(char)c;
     out[n]=0;return n;
 }
+/* DIALOGUE-CLOSE-FRAME-FREEZE-59: every read_string opened the file (a directory walk and a 16 KB buffer fill on
+ * the Amiga file system, tens of ms in the emulator). A conversation's greeting tests SameRace/SameSex on every
+ * candidate INFO (speaker_pair) and the disposition reads the speaker's race, so opening a talk with Fargoth read
+ * the same race name hundreds of times and the game stood still for about 14 s. The file's strings never change
+ * while it is loaded: the short ones are kept here (STR_CACHE x 64 bytes, round robin), so a name costs one disk
+ * read per session. string_reads counts the disk reads (dbg and the dialogue's open-time line). */
+#define STR_CACHE 64
+static struct {int index;short length;char text[64];} str_cache[STR_CACHE];static int str_cache_next,str_cache_ready;
+static unsigned long string_reads;
+unsigned long AW_MwscriptStringReads(void){return string_reads;}
+/* ARRIVAL-LONG-FRAME-DEV6-59: the file is opened once and kept open while it is loaded (one handle), never once per
+ * string read (five opens, about 1 s, in the arrival frame); closed when the scripts load again */
+static FILE *str_file;static long str_base;
+static void string_cache_clear(void){int i;for(i=0;i<STR_CACHE;i++)str_cache[i].index=-1;str_cache_next=0;str_cache_ready=1;
+    if(str_file){fclose(str_file);str_file=NULL;}}
 static int read_string(int index,char *out,int capacity){
-    FILE *f=NULL;int n=0;
+    FILE *f=NULL;int n=0,i;
     out[0]=0;
-    if(COM_FOpenFile(FILE_NAME,&f)<=0 || !f){if(f)fclose(f);return 0;}
-    n=read_string_from(f,ftell(f),index,out,capacity);
-    fclose(f);return n;
+    if(capacity<1)return 0;
+    if(!str_cache_ready)string_cache_clear();
+    for(i=0;i<STR_CACHE;i++)if(str_cache[i].index==index && index>=0){
+        n=str_cache[i].length<capacity-1?str_cache[i].length:capacity-1;
+        memcpy(out,str_cache[i].text,(size_t)n);out[n]=0;return n;
+    }
+    if(!str_file){
+        extern int com_fopen_buffer;int got;
+        com_fopen_buffer=1024;got=COM_FOpenFile(FILE_NAME,&f);com_fopen_buffer=0;   /* small random reads */
+        if(got<=0 || !f){if(f)fclose(f);return 0;}
+        str_file=f;str_base=ftell(f);
+    }
+    string_reads++;
+    n=read_string_from(str_file,str_base,index,out,capacity);
+    if(n>0 && n<(int)sizeof(str_cache[0].text) && n<capacity-1){   /* the whole string (not cut by CAPACITY) is kept */
+        i=str_cache_next;str_cache_next=(str_cache_next+1)%STR_CACHE;
+        str_cache[i].index=index;str_cache[i].length=(short)n;memcpy(str_cache[i].text,out,(size_t)n+1);
+    }
+    return n;
 }
 /* The globals' names for the text defines (aw_textdef.c, BOOK-TEXT-MACROS-58), read ONCE and kept (32 bytes per
  * global, at most 512 globals: 16 KB at most). DIALOGUE-OPEN-STALL-58: the first version opened the compiled
@@ -287,9 +320,13 @@ static void host_journal_set(int topic,int32_t index,int advance){
     if(advance){
         if(index<=host_journal_get(topic))return;
         {
-            unsigned owed=AW_JournalNotices();
-            topic_values[topic]=index;AW_JournalAdd(&aw_state,name,index);   /* the journal UI's copy, while it has room */
-            if(AW_JournalNotices()!=owed && aw_journal_updated)aw_journal_updated();   /* "Your journal has been updated." */
+            unsigned owed=AW_JournalNotices();int dated;
+            int32_t days=AW_StateGet(&aw_state,AW_GLOBAL,"amiwind:clock:days"),ms=AW_StateGet(&aw_state,AW_GLOBAL,"amiwind:clock:ms");
+            if(!AW_StateGet(&aw_state,AW_GLOBAL,"amiwind:clock:ready"))ms=32400000;
+            topic_values[topic]=index;AW_JournalAdd(&aw_state,name,index);   /* the 32-slot copy, for older readers */
+            /* the dated history on the world change list (aw_jhist.h): every quest, no 32-slot limit */
+            dated=AW_JHistAdd(&aw_jhist,AW_LedgerNameHash(name),index,days,ms);
+            if((AW_JournalNotices()!=owed || dated==2) && aw_journal_updated)aw_journal_updated();   /* "Your journal has been updated." */
         }
     }else{
         topic_values[topic]=index;AW_StateSet(&aw_state,AW_JOURNAL,name,index);
@@ -490,6 +527,9 @@ static void ledger_import(const aw_changes_t *in){
     }
     hidden_count=0;
 }
+static int topic_rows_now(void);
+static void script_import(const aw_ledger_t *l);
+static unsigned long locals_kept,locals_dropped,locals_refused;
 /* aw_placed ledger and aw_mwscript_status: the world change list's rows by field, its resident bytes */
 void AW_MwscriptLedgerStatus(void){
     int i,n[8]={0,0,0,0,0,0,0,0};
@@ -503,6 +543,41 @@ void AW_MwscriptLedgerStatus(void){
                aw_ledger_on?"on":"off (the fixed tables)",aw_ledger.count,n[0],n[1],n[2],n[3],n[4],n[5],n[7],
                aw_ledger.stolen_count,AW_LedgerResident(&aw_ledger)+(unsigned long)hidden_capacity*sizeof(hidden_t),
                aw_ledger.refused,hidden_count,ledger_hidden,ledger_refused);
+    /* slice 4: the script and dialogue tables (the globals, quests and topics as of the last save or load) against the
+     * game's own counts, and the named facts */
+    Con_Printf("  slice 4: %d globals changed (of %d), %d quest stages (of %d quests), %d topics known (of %d), "
+               "%d dispositions, %d named facts\n",aw_ledger.value_count[AW_LEDGER_GLOBALS],AW_MwvmGlobalCount(),
+               aw_ledger.value_count[AW_LEDGER_QUESTS],AW_MwvmTopicCount(),aw_ledger.value_count[AW_LEDGER_TOPICS],
+               topic_rows_now(),aw_ledger.value_count[AW_LEDGER_DISPOSITIONS],aw_ledger.fact_count);
+    /* slice 5: the scripts' locals and the global scripts whose running state changed, as of the last save or load */
+    Con_Printf("  slice 5: %d script locals kept, %d global scripts started or stopped (last save: %lu kept, %lu "
+               "refused; last load: %lu dropped)\n",aw_ledger.local_count,aw_ledger.script_count,locals_kept,
+               locals_refused,locals_dropped);
+    /* slice 6: the actors' rows (killed, moved with health, hostile) and the live actor records now */
+    {int dead=0,moved=0,fight=0,live,changed=0;
+     for(i=0;i<aw_ledger.actor_count;i++){dead+=aw_ledger.actor[i].dead;moved+=aw_ledger.actor[i].moved;fight+=aw_ledger.actor[i].fight;}
+     live=AW_ActorStateLive(&changed);
+     Con_Printf("  slice 6: %d actor rows (%d dead, %d moved, %d hostile); %d actor records live, %d changed\n",
+                aw_ledger.actor_count,dead,moved,fight,live,changed);
+     for(i=0;i<aw_ledger.actor_count && i<16;i++){
+         const aw_ledger_actor_t *a=&aw_ledger.actor[i];
+         Con_Printf("  actor %lu%s%s%s%s health %.0f room %ld died %.1f h\n",(unsigned long)a->key,a->dead?" dead":"",
+                    a->moved?" moved":"",a->fight?" hostile":"",a->pick?" levelled roll":"",a->health,(long)a->room,a->died);
+     }}
+    /* slice 7: respawn and migration */
+    {const aw_ledger_events_t *v=&aw_ledger_events;
+     Con_Printf("  slice 7: respawn: %lu containers refilled in %lu place loads, %lu actors back; %d places with a refill "
+                "time, %d references with a record hash, %d content files; game hours now %.1f\n",v->containers,v->places,
+                v->actors,aw_ledger.stamp_count,aw_ledger.ident_count,aw_ledger.file_count,AW_LedgerGameHours());
+     if(v->migrations)
+         Con_Printf("  slice 7: last load of other game data dropped %lu changes (objects %lu, containers %lu, ranks %lu, "
+                    "dispositions %lu, locals %lu, actors %lu, levelled rolls %lu, drops %lu, stolen %lu; content files "
+                    "missing %lu; actor records %lu)\n",v->migrated_all,v->migrated.objects,v->migrated.containers,
+                    v->migrated.ranks,v->migrated.dispositions,v->migrated.locals,v->migrated.actors,v->migrated.picks,
+                    v->migrated.drops,v->migrated.stolen,v->migrated.files,v->records);}
+    for(i=0;i<aw_ledger.value_count[AW_LEDGER_DISPOSITIONS] && i<16;i++)
+        Con_Printf("  ref %lu disposition %ld\n",(unsigned long)aw_ledger.value[AW_LEDGER_DISPOSITIONS][i].key,
+                   (long)aw_ledger.value[AW_LEDGER_DISPOSITIONS][i].value);
     /* slice 2: the locks and open doors of the list, and the stolen pairs (item, owner, count), the first 16 each */
     for(i=0,n[0]=0;i<aw_ledger.count && n[0]<16;i++){
         const aw_ledger_row_t *r=&aw_ledger.row[i];
@@ -733,7 +808,11 @@ int AW_MwscriptActors(void){
     if(actors_failed)return 0;
     actors_failed=1;
     if(actor_file){fclose(actor_file);actor_file=NULL;}
-    length=COM_FOpenFile(FILE_NAME,&actor_file);
+    /* ARRIVAL-LONG-FRAME-DEV6-59: the actor rows are read by a binary search on disk (a few small reads per actor):
+     * a 1 KB buffer, not 16 KB refilled at every probe (about 1 s of the first play frame in Seyda Neen) */
+    {extern int com_fopen_buffer;com_fopen_buffer=1024;
+     length=COM_FOpenFile(FILE_NAME,&actor_file);
+     com_fopen_buffer=0;}
     if(!actor_file || length<16)return 0;
     actor_base=ftell(actor_file);
     if(fread(head,1,16,actor_file)!=16 || memcmp(head,"AWMS",4))return 0;
@@ -776,6 +855,38 @@ static void player_store(const aw_actor_t *a){
     aw_character.level=a->level;
     if(sv_player)sv_player->v.health=a->dyn_cur[0];
 }
+/* REST-WAIT-59 (aw_wait.c): the player's spell effects over SECONDS of passing time (a rest or a wait), as the frame's
+ * tick does (OpenMW Actors::rest: adjustMagicEffects by the elapsed time) */
+void AW_MwscriptEffectsAdvance(float seconds){
+    aw_actor_t *p;
+    if(!(seconds>0) || !AW_EffectsCount() || !(p=player_record()))return;
+    if(AW_EffectsTick(p,seconds)){player_store(p);AW_MwvmStateChanged();}
+}
+/* CELL-CHANGES-59 slice 4: an NPC's disposition changed by a script (SetDisposition, ModDisposition) or a conversation
+ * is kept by its reference on the world change list (OpenMW 0.51 npcstats: the base disposition is the NPC's own
+ * saved state), so it outlives the 128-record pool (ACTOR-STATE-POOL-LIMITS-54); back at the data's value it goes. */
+static int disposition_key_ok(uint32_t ref){return ref && ref!=AW_ACTOR_PLAYER_REF && !(ref&0x7F000000U);}
+static void disposition_keep(aw_actor_t *a){
+    aw_actor_base_t b;int now;
+    if(!a || !aw_ledger_on || !disposition_key_ok(a->reference) || !AW_ActorBase(a->base,&b) || b.kind!=0)return;
+    now=(int)AW_ActorStat(a,AWA_DISPOSITION);
+    if(now==(int)b.disposition)AW_LedgerValueDrop(&aw_ledger,AW_LEDGER_DISPOSITIONS,a->reference);
+    else AW_LedgerValueSet(&aw_ledger,AW_LEDGER_DISPOSITIONS,a->reference,now);
+}
+/* a record made again (or kept) takes the list's disposition */
+static aw_actor_t *disposition_restore(aw_actor_t *a){
+    int32_t d;
+    if(a && aw_ledger_on && a->kind==0 && disposition_key_ok(a->reference) &&
+       AW_LedgerValue(&aw_ledger,AW_LEDGER_DISPOSITIONS,a->reference,&d) && (int)AW_ActorStat(a,AWA_DISPOSITION)!=d)
+        AW_ActorSetStat(a,AWA_DISPOSITION,(float)d);
+    return a;
+}
+/* the disposition of REFERENCE when no live record has it: the list's, else BASE */
+static int disposition_kept(unsigned long reference,int base){
+    int32_t d;
+    return aw_ledger_on && disposition_key_ok((uint32_t)reference) &&
+           AW_LedgerValue(&aw_ledger,AW_LEDGER_DISPOSITIONS,(uint32_t)reference,&d)?(int)d:base;
+}
 /* The record a script's target names: the player's, its own object's, or another object's (its one placed
  * reference and the OACT table). EDICT: the actor's edict when its map has it loaded. */
 static aw_actor_t *actor_of(int instance,int target,edict_t **edict){
@@ -796,7 +907,7 @@ static aw_actor_t *actor_of(int instance,int target,edict_t **edict){
     }
     if(row==AW_ACTOR_NONE)return NULL;
     *edict=e && !e->free?e:NULL;
-    return AW_ActorGet(ref,row,1);
+    return disposition_restore(AW_ActorGet(ref,row,1));
 }
 /* an engaged NPC: its fighter sheet holds the live dynamic stats (aw_combat.c) */
 static aw_fighter_t *fighter_of(edict_t *e){return e && e!=sv_player?(aw_fighter_t *)AW_CombatFighter(e):NULL;}
@@ -833,6 +944,7 @@ static aw_mwcell_t host_actor(int instance,int target,int verb,int stat,aw_mwcel
     if(verb==AWV_SET)AW_ActorSetStat(a,stat,v);
     else if(verb==AWV_MOD)AW_ActorModStat(a,stat,v);
     else AW_ActorModCurrent(a,stat,v);
+    if(stat==AWA_DISPOSITION)disposition_keep(a);   /* slice 4: on the world change list */
     if(a->dyn_cur[0]<=0 && a->dyn_base[0]>0 && !(a->flags&AWL_DEAD) && a->reference!=AW_ACTOR_PLAYER_REF)AW_ActorKill(a);
     if(a->reference==AW_ACTOR_PLAYER_REF)player_store(a);
     to_fighter(a,f);
@@ -1049,6 +1161,7 @@ dfunction_t *ED_FindFunction(char *name);
 static unsigned char *known_topics;static int topic_rows,topic_bytes;
 int AW_MwscriptTopicKnown(int row);   /* the dialogue window's question (DIALOGUE-57): 1 when row ROW is known */
 int AW_MwscriptTopicKnown(int row){return row>=0 && row<topic_rows && known_topics && (known_topics[row>>3]>>(row&7)&1);}
+static int topic_rows_now(void){return known_topics?topic_rows:0;}
 /* The dialogue window learns a topic (a link in an answer or greeting): it joins the saved set (DIALOGUE-COMPLETE-58) */
 void AW_MwscriptTopicLearn(int row);
 void AW_MwscriptTopicLearn(int row){if(row>=0 && row<topic_rows && known_topics)known_topics[row>>3]|=(unsigned char)(1<<(row&7));}
@@ -1219,6 +1332,11 @@ static int host_call(int instance,int target,int function,const aw_mwcell_t *num
     case AWF_CLEARINFOACTOR:
         if(!aw_dial_result_clear)return 0;   /* outside a conversation: nothing */
         aw_dial_result_clear();return 1;
+    case AWF_SHOWRESTMENU:
+        /* ShowRestMenu on a bed (the bed's script, Bed_Standard): the rest window with that bed (REST-WAIT-59, aw_wait.c;
+         * OpenMW OpShowRestMenu with sleepInBed); without a reference, the window as T opens it */
+        AW_RestOpen((unsigned long)target_reference(instance,target));return 1;
+    case AWF_GETPCSLEEP:result->f=(float)AW_RestSleeping();return AW_MWVM_CALL_READ;
     case AWF_SHOWMAP:{
         /* ShowMap TEXT: the exterior cells whose name holds TEXT become known on the map (OpenMW OpShowMap); kept
          * for the map's place markers (INGAME-MAP-ORIGINAL-57), which do not exist yet */
@@ -1467,24 +1585,17 @@ static int live_local(const aw_glut_cond_t *c,int slot,int is_float,float *out){
             v=AW_MwvmLocal(k,slot);*out=is_float?v.f:(float)v.i;break;}
     return 1;
 }
-/* a global by name: the GLOB rows' names read once from the file (32 bytes each, kept for the session) */
-static char *global_names;static int global_names_tried;
+/* a global by name: the globals' names read once (global_names_load, above). DIALOGUE-GLOBAL-NAMES-CLASH-59: this
+ * had its own "static char *global_names" at file scope, which C makes the SAME variable as the one above, with
+ * another layout (32 bytes per row against packed names): whichever read first, the other read wrong names. */
 static int live_global(const char *name,float *out){
-    uint32_t off,rows,bytes;int i;
-    if(!AW_MwvmLoaded() || !AW_MwvmSection("GLOB",&off,&rows,&bytes) || off+8ul*rows>resident_bytes)return 0;
-    if(!global_names && !global_names_tried){
-        FILE *f=NULL;long base;
-        global_names_tried=1;
-        if(COM_FOpenFile(FILE_NAME,&f)>0 && f && (global_names=(char *)AW_TryCalloc(rows?rows:1,32))!=NULL){
-            base=ftell(f);
-            for(i=0;i<(int)rows;i++)
-                if(!read_string_from(f,base,(int)((resident[off+8*i+2]<<8)|resident[off+8*i+3]),global_names+32*i,32))
-                    global_names[32*i]=0;
-        }
-        if(f)fclose(f);
-    }
-    for(i=0;global_names && i<(int)rows;i++)if(same_id(global_names+32*i,name)){
-        *out=resident[off+8*i]==2?AW_MwvmGlobalFloat(i):(float)AW_MwvmGlobalInt(i);return 1;}
+    int g,type=0;
+    if(!AW_MwvmLoaded())return 0;
+    global_names_load();
+    for(g=0;global_names && global_offsets && g<global_count;g++)
+        if(global_offsets[g]>=0 && same_id(global_names+global_offsets[g],name)){
+            AW_MwvmGlobalName(g,&type);
+            *out=type==2?AW_MwvmGlobalFloat(g):(float)AW_MwvmGlobalInt(g);return 1;}
     return 0;
 }
 /* The disposition's facts of a speaker (aw_dial.h aw_dial_facts_t; DIALOGUE-57): its own disposition from the actor
@@ -1515,7 +1626,8 @@ void AW_MwscriptDispositionFacts(const char *record,unsigned long reference,int 
     f->personality=aw_character.valid?(float)aw_character.attributes[6]:50.0f;
     f->diseased=disposition_diseased(1);f->weapon_drawn=disposition_weapon_drawn();f->charm=disposition_charm(reference);
     if(!AW_MwscriptActors() || !record || (row=AW_ActorFind(record))<0 || !AW_ActorBase(row,&b))return;
-    if(reference && (a=AW_ActorGet((uint32_t)reference,row,0))!=NULL)f->base=(int)AW_ActorStat(a,AWA_DISPOSITION);
+    if(reference && (a=AW_ActorGet((uint32_t)reference,row,0))!=NULL)f->base=(int)AW_ActorStat(disposition_restore(a),AWA_DISPOSITION);
+    else f->base=disposition_kept(reference,f->base);
     if(aw_character.valid && b.race!=AW_ACTOR_NONE && read_string(b.race,race,sizeof(race)))
         f->same_race=same_id(race,aw_races[aw_character.race].id);
 }
@@ -1524,7 +1636,7 @@ void AW_MwscriptDispositionFacts(const char *record,unsigned long reference,int 
 static aw_actor_t *speaker_actor(const char *record,unsigned long reference){
     int row;
     if(!AW_MwscriptActors() || !record || (row=AW_ActorFind(record))<0)return NULL;
-    return AW_ActorGet((uint32_t)reference,row,1);
+    return disposition_restore(AW_ActorGet((uint32_t)reference,row,1));
 }
 int AW_MwscriptPersons(const char *record,unsigned long reference,aw_dial_person_t *player,aw_dial_person_t *npc,
                        int *fight,int *flee){
@@ -1547,7 +1659,7 @@ int AW_MwscriptPersons(const char *record,unsigned long reference,aw_dial_person
 void AW_MwscriptSetSpeaker(const char *record,unsigned long reference,int disposition,int fight,int flee){
     aw_actor_t *a=speaker_actor(record,reference);
     if(!a)return;
-    if(disposition>=0)AW_ActorSetStat(a,AWA_DISPOSITION,(float)disposition);
+    if(disposition>=0){AW_ActorSetStat(a,AWA_DISPOSITION,(float)disposition);disposition_keep(a);}
     if(fight>=0)AW_ActorSetStat(a,AWA_FIGHT,(float)fight);
     if(flee>=0)AW_ActorSetStat(a,AWA_FLEE,(float)flee);
     AW_MwvmStateChanged();
@@ -1573,7 +1685,7 @@ static const aw_glut_live_t live={live_journal,live_dead,live_item,live_rank,liv
 static int load(void){
     FILE *f=NULL;int length,i,n;unsigned char head[16];uint32_t wanted;char name[64];long base;
     if(resident || load_failed)return resident!=NULL;
-    load_failed=1;
+    load_failed=1;string_cache_clear();
     length=COM_FOpenFile(FILE_NAME,&f);
     if(!f){load_why="no id1/mwscript.awm in this image";Con_Printf("MWScript: no %s in this image.\n",FILE_NAME);return 0;}
     file_bytes=length>0?(unsigned long)length:0;
@@ -1594,6 +1706,35 @@ static int load(void){
         load_why="no memory for the journal names";Con_Printf("MWScript: no memory for the journal names.\n");return 0;}
     f=NULL;length=COM_FOpenFile(FILE_NAME,&f);
     base=f?ftell(f):0;     /* the file's start (inside a PAK it is not 0) */
+    /* ARRIVAL-LONG-FRAME-DEV6-59: the topics' names from the string section read ONCE into memory (one seek, one
+     * read); a name per seek refilled the 16 KB file buffer twice per topic, about 6.9 s of the first play frame */
+    {uint32_t off,rows,bytes;unsigned char *strs=NULL;
+     if(f && length>0 && AW_MwvmSection("STRS",&off,&rows,&bytes) && bytes>=4*rows && bytes<=(uint32_t)length &&
+        (strs=(unsigned char *)AW_TryMalloc(bytes))!=NULL &&
+        !fseek(f,base+(long)off,SEEK_SET) && fread(strs,1,bytes,f)==bytes){
+         for(i=0;i<n;i++){
+             int index=AW_MwvmTopicName(i),k=0;uint32_t at;
+             name[0]=0;
+             if(index>=0 && (uint32_t)index<rows){
+                 const unsigned char *b=strs+4*index;
+                 at=4*rows+(((uint32_t)b[0]<<24)|((uint32_t)b[1]<<16)|((uint32_t)b[2]<<8)|b[3]);
+                 while(at<bytes && k<(int)sizeof(name)-1 && strs[at])name[k++]=(char)strs[at++];
+                 name[k]=0;
+             }
+             topic_offsets[i]=64*i;topic_values[i]=0;strcpy(topic_names+64*i,name);
+         }
+         {   /* the first and last names checked against the per-name read (the section's bounds are right) */
+             char check[64];int t,bad=0;
+             for(t=0;t<n;t+=(n>1?n-1:1)){
+                 if(!read_string_from(f,base,AW_MwvmTopicName(t),check,sizeof(check)))check[0]=0;
+                 if(strcmp(check,topic_names+64*t))bad=1;
+                 if(n<=1)break;
+             }
+             if(bad)Con_Printf("MWScript: the journal names read at once differ from the file's; read one by one.\n");
+             else n=0;      /* done: the loop below has nothing left */
+         }
+         free(strs);
+     }else if(strs)free(strs);}
     for(i=0;i<n;i++){
         topic_offsets[i]=64*i;topic_values[i]=0;
         if(!f || length<=0 || !read_string_from(f,base,AW_MwvmTopicName(i),name,sizeof(name)))name[0]=0;
@@ -1606,6 +1747,7 @@ static int load(void){
          topic_rows=(int)rows;topic_bytes=(int)((rows+7)/8);memset(known_topics,0,topic_bytes);}}
     load_failed=0;load_why="loaded";
     aw_glut_live=&live;     /* the dialogue conditions read the scripts' state from now on */
+    script_import(&aw_ledger);   /* slice 4: the session's list (a save loaded before the scripts came) */
     Con_Printf("MWScript: %d scripts, %lu bytes kept.\n",AW_MwvmScriptCount(),resident_bytes);
     return 1;
 }
@@ -1715,8 +1857,15 @@ void AW_MwscriptTick(float dt){
         attached_map++;attach_objects();script_model=NULL;   /* the count first: what attach hides belongs to this map */
     }
     if(!mwscript.value){AW_MsgBoxClear();return;}
-    if(!load())return;
-    if(script_model!=map_model){script_model=map_model;attach_map();}
+    {   /* ARRIVAL-LONG-FRAME-DEV6-59: the parts of a first tick that take long are named */
+        double t0=Sys_FloatTime(),t1,t2;int was=resident!=NULL;
+        if(!load())return;
+        t1=Sys_FloatTime();
+        if(script_model!=map_model){script_model=map_model;attach_map();}
+        t2=Sys_FloatTime();
+        if(t2-t0>.3)Con_Printf("MWScript first tick: file %s %.0f ms, map attach %.0f ms.\n",was?"kept":"loaded",
+                               (t1-t0)*1000,(t2-t1)*1000);
+    }
     n=AW_MwvmInstanceCount();
     for(k=0;k<n;k++){
         aw_mwvm_instance_t *in=AW_MwvmInstance(k);edict_t *e;
@@ -1749,7 +1898,9 @@ void AW_MwscriptTick(float dt){
         aw_actor_t *p=player_record();
         if(p && AW_EffectsTick(p,dt)){player_store(p);AW_MwvmStateChanged();}
     }
-    AW_MwvmTick(dt,player);
+    {double t0=Sys_FloatTime();
+     AW_MwvmTick(dt,player);
+     if(Sys_FloatTime()-t0>.3)Con_Printf("MWScript tick: %.0f ms (scripts run this frame).\n",(Sys_FloatTime()-t0)*1000);}
 }
 static void status_counts(void){
     const aw_mwvm_stats_t *s=AW_MwvmStats();int k,n=AW_MwvmInstanceCount(),attached=0,global=0,active=0,looping=0;
@@ -1840,11 +1991,14 @@ static void status(void){
                        e?pr_strings+e->v.netname:"no actor under the crosshair");
             return;
         }
-        if(!Q_strcasecmp(f,"journal")){   /* "call journal QUEST INDEX": the quest's index set, as a script's Journal */
+        if(!Q_strcasecmp(f,"journal") || !Q_strcasecmp(f,"setjournalindex")){
+            /* "call journal QUEST INDEX": a script's Journal (the dated entry, the notice; a lower index is ignored);
+             * "call setjournalindex QUEST INDEX": SetJournalIndex (the index alone, no entry) */
+            int advance=!Q_strcasecmp(f,"journal");
             int t,quests=load()?AW_MwvmTopicCount():0,found=-1;
-            for(t=0;Cmd_Argc()>4 && t<quests && found<0;t++)if(topic_names && same_id(topic_names+topic_offsets[t],Cmd_Argv(3)))found=t;
-            if(found<0){Con_Printf("dbg mwscript call journal QUEST INDEX: no such quest (the file must be loaded)\n");return;}
-            host_journal_set(found,atoi(Cmd_Argv(4)),0);AW_MwvmStateChanged();
+            for(t=0;Cmd_Argc()>3 && t<quests && found<0;t++)if(topic_names && same_id(topic_names+topic_offsets[t],Cmd_Argv(3)))found=t;
+            if(found<0){Con_Printf("dbg mwscript call journal QUEST [INDEX]: no such quest (the file must be loaded)\n");return;}
+            if(Cmd_Argc()>4){host_journal_set(found,atoi(Cmd_Argv(4)),advance);AW_MwvmStateChanged();}   /* no INDEX: read it */
             Con_Printf("dbg mwscript call journal: %s %ld\n",topic_names+topic_offsets[found],(long)host_journal_get(found));
             return;
         }
@@ -1857,6 +2011,89 @@ static void status(void){
             if(now>=0)AW_MwvmStateChanged();
             Con_Printf("dbg mwscript call %s: %s, rank %s%d\n",f,e?pr_strings+e->v.netname:"no actor under the crosshair",
                        now>=0?"now ":"unchanged ",now>=0?now:AW_MwscriptNpcRank(e));
+            return;
+        }
+        if(!Q_strcasecmp(f,"setdisposition") || !Q_strcasecmp(f,"moddisposition") || !Q_strcasecmp(f,"getdisposition")){
+            /* the NPC under the crosshair, as a script's SetDisposition / ModDisposition N (CELL-CHANGES-59 slice 4) */
+            edict_t *e=sv_player?AW_NPCTarget(sv_player,sv_player->v.v_angle):NULL;eval_t *v;aw_actor_t *npc=NULL;int row;
+            if(Cmd_Argc()>4){   /* or the actor of that record id after N ("call setdisposition 70 fargoth") */
+                char id[64];int argi;id[0]=0;
+                for(argi=4;argi<Cmd_Argc();argi++){if(argi>4)strncat(id," ",sizeof(id)-strlen(id)-1);strncat(id,Cmd_Argv(argi),sizeof(id)-strlen(id)-1);}
+                e=NULL;
+                for(argi=1;argi<sv.num_edicts && !e;argi++){
+                    edict_t *x=EDICT_NUM(argi);eval_t *s;
+                    if(!x->free && (s=GetEdictFieldValue(x,"aw_source_id"))!=NULL && s->string && !Q_strcasecmp(pr_strings+s->string,id))e=x;
+                }
+            }
+            if(e && AW_MwscriptActors() && (v=GetEdictFieldValue(e,"aw_ref"))!=NULL && v->_float>0 &&
+               (row=row_of_edict(e))!=AW_ACTOR_NONE)npc=disposition_restore(AW_ActorGet((uint32_t)v->_float,row,1));
+            if(npc && Cmd_Argc()>3 && Q_strcasecmp(f,"getdisposition")){
+                if(!Q_strcasecmp(f,"setdisposition"))AW_ActorSetStat(npc,AWA_DISPOSITION,(float)atoi(Cmd_Argv(3)));
+                else AW_ActorModStat(npc,AWA_DISPOSITION,(float)atoi(Cmd_Argv(3)));
+                disposition_keep(npc);AW_MwvmStateChanged();
+            }
+            Con_Printf("dbg mwscript call %s: %s (ref %lu), disposition %d\n",f,e?pr_strings+e->v.netname:"no actor under the crosshair",
+                       npc?(unsigned long)npc->reference:0ul,npc?(int)AW_ActorStat(npc,AWA_DISPOSITION):-1);
+            return;
+        }
+        if(!Q_strcasecmp(f,"setglobal") || !Q_strcasecmp(f,"getglobal")){
+            /* "call setglobal NAME VALUE" / "call getglobal NAME": a global by its id, as a script's Set / Get */
+            int g,type=0,found=-1;
+            if(load() && Cmd_Argc()>3){
+                global_names_load();
+                for(g=0;global_names && global_offsets && g<global_count && found<0;g++)
+                    if(global_offsets[g]>=0 && same_id(global_names+global_offsets[g],Cmd_Argv(3)))found=g;
+            }
+            if(found<0){Con_Printf("dbg mwscript call %s NAME [VALUE]: no such global (the file must be loaded)\n",f);return;}
+            AW_MwvmGlobalName(found,&type);
+            if(!Q_strcasecmp(f,"setglobal") && Cmd_Argc()>4){
+                aw_mwcell_t c;
+                if(type==2)c.f=(float)Q_atof(Cmd_Argv(4));else c.i=atoi(Cmd_Argv(4));
+                AW_MwvmGlobalSetBits(found,(uint32_t)c.i);
+            }
+            Con_Printf("dbg mwscript call %s: %s = %g (data start %s)\n",f,global_names+global_offsets[found],
+                       type==2?(double)AW_MwvmGlobalFloat(found):(double)AW_MwvmGlobalInt(found),
+                       AW_MwvmGlobalBits(found)==AW_MwvmGlobalStart(found)?"same":"changed");
+            return;
+        }
+        if(!Q_strcasecmp(f,"setlocal") || !Q_strcasecmp(f,"getlocal")){
+            /* CELL-CHANGES-59 slice 5: "call setlocal VALUE [REF]" sets local 0 of REF's script (no REF: the first object
+             * attached to this map whose script has a local; remembered), "call getlocal [REF]" reads it, as a
+             * script's "set REF.local to VALUE" */
+            static uint32_t last_ref;uint32_t ref=0;int argi=!Q_strcasecmp(f,"setlocal")?4:3,script=-1,j;aw_mwcell_t v;
+            char name[64];
+            if(!load()){Con_Printf("dbg mwscript call %s: the scripts are not loaded\n",f);return;}
+            if(Cmd_Argc()>argi)ref=(uint32_t)strtoul(Cmd_Argv(argi),NULL,10);
+            else if(argi==3)ref=last_ref;
+            for(j=0;!ref && j<AW_MwvmInstanceCount();j++){
+                aw_mwvm_instance_t *in=AW_MwvmInstance(j);
+                if(in && (in->flags&(AWI_USED|AWI_GLOBAL))==AWI_USED && in->reference && AW_MwvmLocalCount(in->script)>0)
+                    ref=in->reference;
+            }
+            if(!ref || !AW_MwvmLocalGet(ref,0,&script,&v)){
+                Con_Printf("dbg mwscript call %s: no script local on reference %lu\n",f,(unsigned long)ref);return;}
+            last_ref=ref;
+            if(argi==4 && Cmd_Argc()>3){AW_MwvmLocalSet(ref,script,0,(uint32_t)atoi(Cmd_Argv(3)));AW_MwvmLocalGet(ref,0,&script,&v);}
+            read_string(AW_MwvmScriptName(script),name,sizeof(name));
+            Con_Printf("dbg mwscript call %s: ref %lu script %s (row %d, %d locals), local 0 = %ld (%g)\n",f,
+                       (unsigned long)ref,name,script,AW_MwvmLocalCount(script),(long)v.i,(double)v.f);
+            return;
+        }
+        if(!Q_strcasecmp(f,"startscript") || !Q_strcasecmp(f,"stopscript") || !Q_strcasecmp(f,"scriptrunning") ||
+           !Q_strcasecmp(f,"globallocal")){
+            /* "call startscript ROW" / "stopscript ROW" / "scriptrunning ROW", as a script's StartScript / StopScript /
+             * ScriptRunning on the script of that row; "call globallocal ROW [VALUE]": its local 0 */
+            int s=Cmd_Argc()>3?atoi(Cmd_Argv(3)):-1;char name[64];
+            if(!load() || s<0 || s>=AW_MwvmScriptCount()){Con_Printf("dbg mwscript call %s ROW: no such script row\n",f);return;}
+            if(!Q_strcasecmp(f,"startscript") || !Q_strcasecmp(f,"stopscript")){
+                AW_MwvmGlobalScriptSet(s,!Q_strcasecmp(f,"startscript"));AW_MwvmStateChanged();}
+            if(!Q_strcasecmp(f,"globallocal") && Cmd_Argc()>4)AW_MwvmGlobalScriptLocal(s,0,(uint32_t)atoi(Cmd_Argv(4)));
+            read_string(AW_MwvmScriptName(s),name,sizeof(name));
+            {int j,local=0;
+             for(j=0;j<AW_MwvmInstanceCount();j++){aw_mwvm_instance_t *in=AW_MwvmInstance(j);
+                 if(in && (in->flags&AWI_GLOBAL) && !in->reference && in->script==s && AW_MwvmLocalCount(s)>0)local=(int)AW_MwvmLocal(j,0).i;}
+             Con_Printf("dbg mwscript call %s: %s (row %d, %d locals, start script %s): %s, local 0 = %d\n",f,name,s,
+                        AW_MwvmLocalCount(s),AW_MwvmStartsAtLoad(s)?"yes":"no",AW_MwvmScriptRunning(s)?"running":"not running",local);}
             return;
         }
         if(!Q_strcasecmp(f,"forcegreeting")){   /* the actor under the crosshair greets, as a script's ForceGreeting */
@@ -1903,9 +2140,177 @@ static void status(void){
 /* The actor block of a saved game (feature 16), with the player's standing and known topics after it (v0.0.57,
  * MWSCRIPT-STANDING-NOT-SAVED-57): [actor records][AWPS standing]["AWKT" u16 rows u16 bytes, the known-topic bits]
  * [u32 bytes of the two]["AWTR"]. A save of an earlier version has no trailer: its block is the actor records. */
+/* CELL-CHANGES-59 slice 4: the scripts' globals (only those that differ from the data), every quest's stage and the
+ * topics the player knows, written into the world change list's tables before a save and read back after a load
+ * (OpenMW 0.51 globals.cpp, journalimp.cpp, dialoguemanagerimp.cpp: kept by record id; our own code). Topics by
+ * the name hash of their TOPC row, read from disk on demand (no resident copy), so a rebuilt topic table in another
+ * order keeps them. */
+static unsigned long script_refused;
+static int fact_get(const char *id,int32_t *out){return AW_LedgerFact(&aw_ledger,id,out);}
+static int fact_set(const char *id,int32_t value){return AW_LedgerFactSet(&aw_ledger,id,value);}
+static uint32_t topic_key(unsigned long h){uint32_t k=(uint32_t)(h&0xFFFFFFFFul);return k?k:1u;}
+/* the rows' name hashes, read from disk once per loaded file and kept (4 bytes a row: 2,098 rows = 8.4 KB), so a save
+ * or a load does not read the file again (the emulator's disk stall, CHIM-SEYDA-BALMORA-LOAD-HANG-43) */
+static uint32_t *topic_hash_cache;static int topic_hash_rows;
+static const uint32_t *topic_hash_table(void){
+    unsigned long *h;int i;
+    if(!known_topics || topic_rows<=0)return NULL;
+    if(topic_hash_cache && topic_hash_rows==topic_rows)return topic_hash_cache;
+    free(topic_hash_cache);topic_hash_cache=NULL;topic_hash_rows=0;
+    if(!(h=(unsigned long *)AW_TryMalloc(sizeof(unsigned long)*(size_t)topic_rows)))return NULL;
+    if(AW_MwscriptTopicHashes(h,topic_rows)==topic_rows &&
+       (topic_hash_cache=(uint32_t *)AW_TryMalloc(sizeof(uint32_t)*(size_t)topic_rows))!=NULL){
+        for(i=0;i<topic_rows;i++)topic_hash_cache[i]=topic_key(h[i]);
+        topic_hash_rows=topic_rows;
+    }
+    free(h);
+    return topic_hash_cache;
+}
+/* CELL-CHANGES-59 slice 5: the scripts' locals and the running global scripts on the list (OpenMW 0.51 livecellref.cpp,
+ * locals.cpp, globalscripts.cpp: a reference's locals are part of its saved state; a global script is saved with its
+ * running state and locals; our own code). Scripts by the name hash of their id, with their row as a hint: the name of
+ * a row is read from disk once per session and kept (SCRIPT_NAMES rows at most, 8 bytes each), so a save or a load reads
+ * only the names of the scripts it has not met yet. */
+#define SCRIPT_NAMES 2048
+AW_RESIDENT_GROWS("script name hashes met (CELL-CHANGES-59)",SCRIPT_NAMES,8);
+typedef struct {uint32_t hash;uint16_t script;} script_name_t;
+static script_name_t *script_names;static int script_name_count,script_name_capacity;
+static FILE *script_names_file;static long script_names_base;
+static uint32_t script_hash(int script){
+    int lo=0,hi=script_name_count,n;char name[64];uint32_t h;
+    if(script<0 || script>=AW_MwvmScriptCount())return 0;
+    while(lo<hi){int mid=(lo+hi)/2;if((int)script_names[mid].script<script)lo=mid+1;else hi=mid;}
+    if(lo<script_name_count && (int)script_names[lo].script==script)return script_names[lo].hash;
+    if(!script_names_file){
+        if(COM_FOpenFile(FILE_NAME,&script_names_file)<=0 || !script_names_file){
+            if(script_names_file)fclose(script_names_file);
+            script_names_file=NULL;return 0;}
+        script_names_base=ftell(script_names_file);
+    }
+    n=read_string_from(script_names_file,script_names_base,AW_MwvmScriptName(script),name,sizeof(name));
+    if(n<=0)return 0;
+    h=AW_LedgerNameHash(name);
+    if(script_name_count==script_name_capacity && script_name_capacity<SCRIPT_NAMES){
+        int want=script_name_capacity?script_name_capacity*2:64;script_name_t *grown;
+        if(want>SCRIPT_NAMES)want=SCRIPT_NAMES;
+        if((grown=(script_name_t *)AW_TryRealloc(script_names,(unsigned long)want*sizeof(script_name_t)))!=NULL){
+            script_names=grown;script_name_capacity=want;}
+    }
+    if(script_name_count<script_name_capacity){
+        memmove(&script_names[lo+1],&script_names[lo],(size_t)(script_name_count-lo)*sizeof(script_name_t));
+        script_names[lo].hash=h;script_names[lo].script=(uint16_t)script;script_name_count++;
+    }
+    return h;
+}
+static void script_names_done(void){if(script_names_file){fclose(script_names_file);script_names_file=NULL;}}
+/* one instance's values onto the list (only those that differ from 0, the start) */
+static void locals_put(void *user,uint32_t reference,int script,int global,int running,const aw_mwcell_t *cells,int count){
+    aw_ledger_t *l=(aw_ledger_t *)user;int i;uint32_t h=0;
+    if(global && running!=AW_MwvmStartsAtLoad(script)){
+        if(!(h=script_hash(script)) || !AW_LedgerScriptSet(l,h,script,running))locals_refused++;
+    }
+    for(i=0;i<count;i++){
+        if(!cells[i].i)continue;
+        if(!h && !(h=script_hash(script))){locals_refused++;return;}
+        if(AW_LedgerLocalSet(l,global,global?h:reference,h,script,i,cells[i].i))locals_kept++;else locals_refused++;
+    }
+}
+static void locals_export(aw_ledger_t *l){
+    locals_kept=locals_refused=0;
+    AW_LedgerLocalsClear(l);
+    AW_MwvmLocalsEach(locals_put,l);
+    script_names_done();
+}
+/* the row of a kept script: its hint when that row still has the name, else -1 (a rebuilt file in another order) */
+static int script_row(uint32_t hash,int hint){return script_hash(hint)==hash?hint:-1;}
+static void locals_import(const aw_ledger_t *l){
+    int i,s;
+    locals_dropped=0;
+    AW_MwvmLocalsReset();      /* a new game's start; then what the list keeps (an older save: nothing) */
+    for(i=0;i<l->script_count;i++){
+        const aw_ledger_script_t *x=&l->script[i];
+        if((s=script_row(x->script,x->hint))<0 || !AW_MwvmGlobalScriptSet(s,x->running))locals_dropped++;
+    }
+    for(i=0;i<l->local_count;i++){
+        const aw_ledger_local_t *x=&l->local[i];
+        if((s=script_row(x->script,x->hint))<0 ||
+           !(x->global?AW_MwvmGlobalScriptLocal(s,x->slot,(uint32_t)x->value):
+                       AW_MwvmLocalSet(x->key,s,x->slot,(uint32_t)x->value)))locals_dropped++;
+    }
+    script_names_done();
+}
+/* CELL-CHANGES-59 slice 6 (ACTOR-STATE-POOL-LIMITS-54): the changed actor records go into the world change list as
+ * its RECORDS part ("AWAR"), held only until the save is written; the actor block keeps the dead counts. */
+static void actor_records_export(aw_ledger_t *l){
+    int need=AW_ActorStateReady()?AW_ActorStateExportRecords(NULL,0):0;unsigned char *b;
+    AW_LedgerRecordsSet(l,NULL,0);
+    if(need<=0)return;
+    if(need>AW_LEDGER_RECORDS_MAX || !(b=(unsigned char *)AW_TryMalloc((unsigned long)need)) ){
+        Con_Printf("Saved actor records: %d bytes do not fit; changed actors start from the game data at a load.\n",need);
+        return;}
+    if(AW_ActorStateExportRecords(b,need)!=need || !AW_LedgerRecordsSet(l,b,need))
+        Con_Printf("Saved actor records could not be kept; changed actors start from the game data at a load.\n");
+    free(b);
+}
+static void script_export(aw_ledger_t *l){
+    int g,i,n;const uint32_t *h;
+    actor_records_export(l);
+    if(!resident || !AW_MwvmLoaded())return;     /* not loaded: the tables stay as the last load left them */
+    locals_export(l);
+    AW_LedgerValueClear(l,AW_LEDGER_GLOBALS);AW_LedgerValueClear(l,AW_LEDGER_QUESTS);
+    global_names_load();
+    for(g=0;g<AW_MwvmGlobalCount();g++){
+        uint32_t now=AW_MwvmGlobalBits(g);
+        if(now==AW_MwvmGlobalStart(g))continue;
+        if(!global_names || !global_offsets || global_offsets[g]<0 ||
+           !AW_LedgerValueSet(l,AW_LEDGER_GLOBALS,AW_LedgerNameHash(global_names+global_offsets[g]),(int32_t)now))script_refused++;
+    }
+    n=AW_MwvmTopicCount();
+    for(i=0;topic_values && i<n;i++){
+        int32_t v=host_journal_get(i);
+        if(v && (!topic_names[topic_offsets[i]] ||
+                 !AW_LedgerValueSet(l,AW_LEDGER_QUESTS,AW_LedgerNameHash(topic_names+topic_offsets[i]),v)))script_refused++;
+    }
+    if((h=topic_hash_table())!=NULL){      /* the file unreadable: the topics as last loaded stay */
+        AW_LedgerValueClear(l,AW_LEDGER_TOPICS);
+        for(i=0;i<topic_rows;i++)
+            if(AW_MwscriptTopicKnown(i) && !AW_LedgerValueSet(l,AW_LEDGER_TOPICS,h[i],1))script_refused++;
+    }
+}
+static void script_import(const aw_ledger_t *l){
+    int g,i,n;int32_t v;const uint32_t *h;
+    /* slice 6: the changed actor records of the save (after the actor block's dead counts and any records an older
+     * save had there), then the bytes go */
+    if(l->records_bytes){
+        if(AW_MwscriptActors() && !AW_ActorStateImportRecords(l->records,l->records_bytes))
+            Con_Printf("Saved actor records unreadable: changed actors start from the game data.\n");
+        AW_LedgerRecordsSet((aw_ledger_t *)l,NULL,0);
+    }
+    if(!resident || !AW_MwvmLoaded())return;     /* load() applies the list when the scripts come */
+    global_names_load();
+    for(g=0;g<AW_MwvmGlobalCount();g++){
+        uint32_t bits=AW_MwvmGlobalStart(g);
+        if(global_names && global_offsets && global_offsets[g]>=0 &&
+           AW_LedgerValue(l,AW_LEDGER_GLOBALS,AW_LedgerNameHash(global_names+global_offsets[g]),&v))bits=(uint32_t)v;
+        AW_MwvmGlobalSetBits(g,bits);
+    }
+    n=AW_MwvmTopicCount();
+    for(i=0;topic_values && i<n;i++){
+        int32_t story=AW_StateGet(&aw_state,AW_JOURNAL,topic_names+topic_offsets[i]);
+        topic_values[i]=AW_LedgerValue(l,AW_LEDGER_QUESTS,AW_LedgerNameHash(topic_names+topic_offsets[i]),&v)?v:0;
+        if(story>topic_values[i])topic_values[i]=story;   /* an older save's 32-slot journal, migrated */
+    }
+    if(l->value_count[AW_LEDGER_TOPICS] && (h=topic_hash_table())!=NULL){   /* else the actor block's AWKT stands */
+        memset(known_topics,0,(size_t)topic_bytes);
+        for(i=0;i<topic_rows;i++)if(AW_LedgerValue(l,AW_LEDGER_TOPICS,h[i],NULL))AW_MwscriptTopicLearn(i);
+    }
+    locals_import(l);
+    AW_MwvmStateChanged();
+}
 static void put_u32(unsigned char *p,unsigned long v){p[0]=(unsigned char)(v>>24);p[1]=(unsigned char)(v>>16);p[2]=(unsigned char)(v>>8);p[3]=(unsigned char)v;}
 static int actors_export(unsigned char *out,int capacity){
-    int n=AW_ActorStateReady()?AW_ActorStateExport(out,capacity):0,s,t;
+    /* slice 6: the dead counts only; the changed records are in the world change list (actor_records_export) */
+    int n=AW_ActorStateReady()?AW_ActorStateExportCounts(out,capacity):0,s,t;
     if(n<0)return n;
     if((s=AW_StandingExport(out+n,capacity-n))<0)return -1;
     t=6+topic_bytes;
@@ -1955,7 +2360,9 @@ static void actors_import(const unsigned char *data,int bytes){
             if(s<=0 || (unsigned long)s>tail || !AW_StandingImport(p,s))Con_Printf("Saved standing unreadable: it starts empty.\n");
             else if(tail-s>=6 && !memcmp(p+s,"AWKT",4)){
                 int rows=(p[s+4]<<8)|p[s+5],nb=(rows+7)/8;unsigned long rest;
-                if(rows==topic_rows && (unsigned long)(s+6+nb)<=tail && nb==topic_bytes){if(nb)memcpy(known_topics,p+s+6,nb);}
+                /* slice 7: a save of other game data keeps its topics by name only (the list's TOPICS), never by row */
+                if(aw_save_migrating)Con_Printf("Saved topic bits by row left out: the save is of other game data.\n");
+                else if(rows==topic_rows && (unsigned long)(s+6+nb)<=tail && nb==topic_bytes){if(nb)memcpy(known_topics,p+s+6,nb);}
                 else Con_Printf("Saved topics belong to other game data: none known.\n");
                 rest=(unsigned long)(s+6+nb);
                 /* the active spell effects after it (v0.0.57; a save without them: none active), then the actors'
@@ -1997,11 +2404,29 @@ static void actors_import(const unsigned char *data,int bytes){
     if(!AW_MwscriptActors())return;
     if(!AW_ActorStateImport(data,actors))Con_Printf("Saved actor records unreadable: actors start from the game data.\n");
 }
+/* CELL-CHANGES-59 slice 7: the save's hooks for respawn and migration (aw_save.h) */
+static int save_other_ok(void){return AW_PlacedRefs()!=NULL;}
+static void save_ident_refresh(aw_ledger_t *l){AW_PlacedIdentRefresh(l);}
+static long save_migrate(aw_ledger_t *l,void *dropped){return AW_PlacedMigrate(l,dropped);}
+static int save_drop_actor_records(void){return AW_ActorStateReady()?AW_ActorStateDropAll():0;}
+extern uint32_t (*aw_actors_ref_flags)(uint32_t key,aw_ledger_respawn_t *rule);
+extern int (*aw_actors_forget)(uint32_t reference);
+static void save_notice(const char *line){AW_UISubtitle("",line,8);}
+static uint32_t actors_ref_flags(uint32_t key,aw_ledger_respawn_t *rule){
+    aw_refs_t *r=AW_PlacedRefs();
+    if(r && rule)*rule=r->respawn;
+    return AW_PlacedRefFlags(key);
+}
 void AW_MwscriptInit(void){
     Cvar_RegisterVariable(&mwscript);
+    aw_actors_ref_flags=actors_ref_flags;aw_actors_forget=AW_ActorForget;aw_save_notice=save_notice;
+    aw_save_other_ok=save_other_ok;aw_save_ident_refresh=save_ident_refresh;aw_save_migrate=save_migrate;
+    aw_save_drop_actor_records=save_drop_actor_records;
     AW_StandingReset();AW_EffectsReset();
     aw_save_actors_export=actors_export;aw_save_actors_import=actors_import;   /* the actor record (feature 16) */
     aw_save_objects_export=objects_export;aw_save_objects_import=objects_import;
+    aw_save_script_export=script_export;aw_save_script_import=script_import;   /* CELL-CHANGES-59 slice 4 */
+    aw_state_fact_get=fact_get;aw_state_fact_set=fact_set;   /* named globals past 32: the list's facts (slice 4) */
     aw_object_lock_level=AW_ObjectLockLevel;   /* the doors read a script's Lock and Unlock */
     aw_object_lock=AW_ObjectLock;aw_door_open=door_open;   /* CELL-CHANGES-59 slice 2: the key's unlock, door poses */
     aw_scene_intercept=aw_hinged_intercept=object_intercept;   /* OnActivate takes a door's use */
@@ -2031,7 +2456,8 @@ void AW_MwscriptDispositionNow(int actor_row,unsigned long reference,int base,aw
     f->personality=aw_character.valid?(float)aw_character.attributes[6]:50.0f;
     f->diseased=disposition_diseased(0);f->weapon_drawn=disposition_weapon_drawn();f->charm=disposition_charm(reference);
     if(reference && actor_row>=0 && AW_MwscriptActors() && (a=AW_ActorGet((uint32_t)reference,actor_row,0))!=NULL)
-        f->base=(int)AW_ActorStat(a,AWA_DISPOSITION);
+        f->base=(int)AW_ActorStat(disposition_restore(a),AWA_DISPOSITION);
+    else f->base=disposition_kept(reference,f->base);
 }
 /* Training (DIALOGUE-COMPLETE-58): the speaker's skills (its actor record), the player's skill (raised by one when
  * RAISE, at most 100) and attribute */

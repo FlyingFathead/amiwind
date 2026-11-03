@@ -236,5 +236,17 @@ int main(void)
     strcpy(source.scene,"../bad");assert(!AW_SaveEncode(raw,sizeof(raw),&source));strcpy(source.scene,"seyda");
     source.character.head=384;assert(!AW_SaveEncode(raw,sizeof(raw),&source));source.character=c;
     source.character.current[0]=NAN;assert(!AW_SaveEncode(raw,sizeof(raw),&source));
+    /* LEVEL-UP-58, feature 64: the levelling travels with the save; a sheet without it writes no section */
+    source.character=c;source.actor_count=0;
+    n=AW_SaveEncode(raw,sizeof(raw),&source);assert(n>0 && AW_SaveDecode(raw,n,&decoded));
+    assert(!decoded.character.level_progress && decoded.character.progress[5]==0);
+    i=n;
+    source.character.progress[5]=.375f;source.character.progress[26]=.5f;source.character.level_progress=7;
+    source.character.raises[0]=4;source.character.raises[5]=9;source.character.special[2]=3;source.character.level=4;
+    n=AW_SaveEncode(raw,sizeof(raw),&source);assert(n==i+27*4+12*4 && AW_SaveDecode(raw,n,&decoded));
+    assert(decoded.character.progress[5]==.375f && decoded.character.progress[26]==.5f && decoded.character.level_progress==7);
+    assert(decoded.character.raises[0]==4 && decoded.character.raises[5]==9 && decoded.character.special[2]==3 && decoded.character.level==4);
+    source.character.progress[5]=1.5f;assert(!AW_SaveEncode(raw,sizeof(raw),&source));
+    source.character.progress[5]=.375f;source.character.raises[1]=-1;assert(!AW_SaveEncode(raw,sizeof(raw),&source));
     return 0;
 }

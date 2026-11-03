@@ -112,20 +112,20 @@ class PartitionStartLimitTests(unittest.TestCase):
     def test_disk_layout_gate_measures_directory_entries(self):
         # FFS-DIRECTORY-HASH-32: a directory with more entries than the 72 hash chains of one FFS directory
         # block is reported (legal but slow on a real disk); the same rule as the CHIM layout gate.
-        from world_volumes import require_disk_layout, directory_entries, DIRECTORY_HASH_CHAINS
+        from world_volumes import require_disk_layout, directory_entries, DIRECTORY_HASH_CHAINS, ide_cylinder_bytes
         import chim.format as chim_format
         self.assertEqual(DIRECTORY_HASH_CHAINS, chim_format.FFS_MAX_DIRECTORY_ENTRIES)
         self.assertEqual(directory_entries(['id1/maps/A.bsp', 'id1/maps/a.bsp', 'id1/pak0.pak']),
                          {'/': 1, 'id1': 2, 'id1/maps': 1})
         files = [dict(path='id1/maps/m%03d.bsp' % i, bytes=5) for i in range(DIRECTORY_HASH_CHAINS + 1)]
-        record = require_disk_layout('boot.hdf', 1024**3, [dict(partition='DH0', offset_bytes=RDB_BYTES,
-                                                                  bytes=512 * 1024**2)],
+        record = require_disk_layout('boot.hdf', ide_cylinder_bytes(1024**3),
+                                     [dict(partition='DH0', offset_bytes=RDB_BYTES, bytes=512 * 1024**2)],
                                      [dict(partition='DH0', files=files)])
         row = record['partitions'][0]
         self.assertEqual(row['max_directory_entries'], DIRECTORY_HASH_CHAINS + 1)
         self.assertEqual(row['crowded_directories'], {'id1/maps': DIRECTORY_HASH_CHAINS + 1})
-        record = require_disk_layout('boot.hdf', 1024**3, [dict(partition='DH0', offset_bytes=RDB_BYTES,
-                                                                  bytes=512 * 1024**2)],
+        record = require_disk_layout('boot.hdf', ide_cylinder_bytes(1024**3),
+                                     [dict(partition='DH0', offset_bytes=RDB_BYTES, bytes=512 * 1024**2)],
                                      [dict(partition='DH0', files=files[:DIRECTORY_HASH_CHAINS])])
         self.assertEqual(record['partitions'][0]['crowded_directories'], {})
 
@@ -138,7 +138,8 @@ class PartitionStartLimitTests(unittest.TestCase):
                  dict(partition='DW1', files=[dict(path='id1/maps/a.bsp', bytes=5)])]
         good = [dict(partition='DH0', offset_bytes=RDB_BYTES, bytes=1024**3),
                 dict(partition='DW1', offset_bytes=RDB_BYTES + 1024**3, bytes=512 * 1024**2)]
-        record = require_disk_layout('boot.hdf', 3 * 1024**3, good, parts)
+        from world_volumes import ide_cylinder_bytes
+        record = require_disk_layout('boot.hdf', ide_cylinder_bytes(3 * 1024**3), good, parts)
         self.assertTrue(record['ok'])
         self.assertEqual([(r['partition'], r['start_bytes'], r['largest_file']) for r in record['partitions']],
                          [('DH0', RDB_BYTES, 'id1/pak0.pak'), ('DW1', RDB_BYTES + 1024**3, 'id1/maps/a.bsp')])

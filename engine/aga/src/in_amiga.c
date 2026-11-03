@@ -65,6 +65,8 @@ void IN_AWMouseReset(void) {
   mouseX=mouseY=0;mouse_has_moved=false;
   old_mouse_x=old_mouse_y=0;
 }
+/* CONTAINER-WINDOW-59: the container strip's mouse while it is open (aw_cstrip.c sets it; 1 when it took the move) */
+int (*aw_cstrip_mouse)(int dx,int dy);
 void IN_AWMouseEvent(int dx, int dy) {
   dx=IN_AWMouseBound(dx);dy=IN_AWMouseBound(dy);
   /* UI movement must precede the next button in the SAME Intuition batch.
@@ -76,6 +78,7 @@ void IN_AWMouseEvent(int dx, int dy) {
     return;
   }
   if(AW_ReaderActive()){IN_AWMouseReset();AW_ReaderMouse(dx,dy);return;}
+  if(aw_cstrip_mouse && aw_cstrip_mouse(dx,dy)){IN_AWMouseReset();return;}   /* CONTAINER-WINDOW-59 */
   if(AW_CharacterActive()){IN_AWMouseReset();AW_CharacterMouse(dx,dy);return;}
   if(AW_GalleryModal()){IN_AWMouseReset();AW_GalleryMouse(dx,dy);return;}
   mouseX=IN_AWMouseSum(mouse_has_moved?mouseX:0,dx);

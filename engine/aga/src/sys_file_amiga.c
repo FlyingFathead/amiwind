@@ -20,6 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "quakedef.h"
 #include "errno.h"
+#include "aw_spike.h"
 
 
 #define MAX_HANDLES             10
@@ -121,7 +122,9 @@ void Sys_FileSeek (int handle, int position)
 
 int Sys_FileRead (int handle, void *dest, int count)
 {
-	return fread (dest, 1, count, sys_handles[handle]);
+	int got = fread (dest, 1, count, sys_handles[handle]);
+	AW_SpikeFileRead (got);		/* ARRIVAL-LONG-FRAME-DEV6-59 */
+	return got;
 }
 
 int Sys_FileWrite (int handle, void *data, int count)

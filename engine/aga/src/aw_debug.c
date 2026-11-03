@@ -29,6 +29,7 @@
 #include "aw_ambient.h"
 #include "aw_move.h"
 #include "aw_magic.h"
+#include "aw_levelup.h"
 void AW_CamInit(void);
 extern trace_t SV_ClipMoveToEntity(edict_t *,vec3_t,vec3_t,vec3_t,vec3_t);
 static edict_t *player(void) {
@@ -173,6 +174,8 @@ static void npcs(void) {
     int i;edict_t *p;if(!player())return;
     /* dbg npcs talk [ID]: Talk with the nearest NPC (or that record), the dialogue window (aw_dialwin.c) */
     if(Cmd_Argc()>1 && !Q_strcasecmp(Cmd_Argv(1),"talk")){AW_DialWindowTalk(Cmd_Argc()>2?Cmd_Argv(2):NULL);return;}
+    /* dbg npcs talkcache on|off: the conversation's read cache, off to measure the open as it was */
+    if(Cmd_Argc()>2 && !Q_strcasecmp(Cmd_Argv(1),"talkcache")){AW_DialWindowReadCache(Q_strcasecmp(Cmd_Argv(2),"off")!=0);return;}
     for(i=1;i<sv.num_edicts;i++) {
         p=EDICT_NUM(i);
         if(!p->free && !strcmp(pr_strings+p->v.classname,"aw_npc"))
@@ -302,7 +305,7 @@ void AW_DebugInit(void) {
     {extern int (*chim_cell_map)(int,int,char *,int);chim_cell_map=AW_CellMap;}
     {extern void (*aw_session_shift)(const float *);aw_session_shift=AW_SessionShift;}
     AW_MiniwindInit();AW_QuickCharInit();AW_TestBoxInit();
-    AW_CamInit();AW_InputDebugInit();AW_BoundsInit();AW_DoorAudioInit();AW_HingedDoorInit();aw_hinged_story=AW_OpeningHingedStory;AW_TalkInit();AW_MwscriptInit();AW_CompanionInit();AW_CombatInit();AW_AmbientInit();AW_MoveInit();AW_ActorsInit();AW_ViewInit();AW_LavaInit();AW_MagicInit();AW_AnimInit();AW_GlutInit();AW_DialWindowInit();AW_AnimKitInit();AW_HalloweenInit();AW_DemoWindInit();AW_WaitInit();AW_ConsoleInit();AW_SceneInit();AW_UIInit();AW_IconsInit();AW_IntroInit();AW_SaveInit();
+    AW_CamInit();AW_InputDebugInit();AW_BoundsInit();AW_DoorAudioInit();AW_HingedDoorInit();aw_hinged_story=AW_OpeningHingedStory;AW_TalkInit();AW_MwscriptInit();AW_CompanionInit();AW_CombatInit();AW_AmbientInit();AW_MoveInit();AW_ActorsInit();AW_ViewInit();AW_LavaInit();AW_MagicInit();AW_AnimInit();AW_GlutInit();AW_DialWindowInit();AW_AnimKitInit();AW_HalloweenInit();AW_DemoWindInit();AW_WaitInit();AW_LevelupInit();AW_ConsoleInit();AW_SceneInit();AW_UIInit();AW_IconsInit();AW_IntroInit();AW_SaveInit();
     aw_save_entry_refuse=AW_SceneSaveEntryRefuse;   /* a save in a 32 MB place on less Fast RAM (CHIM-32MB-SAVE-ENTRY-48) */
     /* a bad sprite (r_sprite.c) names the CHIM streamed static it belongs to (SPRITE-BAD-TYPE-THREADED-56) */
     {extern const char *(*aw_sprite_describe)(const entity_t *,char *,int);

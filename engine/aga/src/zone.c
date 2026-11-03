@@ -660,8 +660,13 @@ typedef struct cache_system_s
 	struct cache_system_s	*prev, *next;
 	struct cache_system_s	*lru_prev, *lru_next;	// for LRU flushing
 } cache_system_t;
+/* AmiWind (ARRIVAL-LONG-FRAME-DEV6-59): a block in use that is in no LRU list is pinned (Cache_Pin): never evicted
+ * for room. No field of its own: the header keeps its size, so cache layouts stay byte for byte. */
+#define CACHE_PINNED(cs)	((cs)->lru_next == NULL)
+unsigned long aw_cache_pinned_bytes;
 
 cache_system_t *Cache_TryAlloc (int size, qboolean nobottom);
+void Cache_UnlinkLRU (cache_system_t *cs);
 
 cache_system_t	cache_head;
 
@@ -682,6 +687,11 @@ void Cache_Move ( cache_system_t *c)
 
 		Q_memcpy ( new+1, c+1, c->size - sizeof(cache_system_t) );
 		new->user = c->user;
+		if (CACHE_PINNED (c))
+		{	// a pinned block stays pinned where it moves (out of the LRU)
+			Cache_UnlinkLRU (new);
+			aw_cache_pinned_bytes += new->size;
+		}
 		Q_memcpy (new->name, c->name, sizeof(new->name));
 		aw_cache_moves++;aw_cache_preserve_free=1;
 		Cache_Free (c->user);
@@ -1004,7 +1014,39 @@ void Cache_Free (cache_user_t *c)
 
 	c->data = NULL;
 
+	if (CACHE_PINNED (cs))
+	{	// never in the LRU list
+		aw_cache_pinned_bytes -= cs->size;
+		return;
+	}
 	Cache_UnlinkLRU (cs);
+}
+
+/*
+==============
+Cache_Pin
+
+AmiWind (ARRIVAL-LONG-FRAME-DEV6-59): ON 1 takes the block out of the LRU list, so a lack of room never evicts it
+(the player's assembled body parts: built once, kept); ON 0 puts it back. A hunk move still moves it (pinned), a
+flush still frees it. The pinned bytes in all: aw_cache_pinned_bytes.
+==============
+*/
+void Cache_Pin (cache_user_t *c, int on)
+{
+	cache_system_t	*cs;
+	if (!c || !c->data)
+		return;
+	cs = ((cache_system_t *)c->data) - 1;
+	if (on && !CACHE_PINNED (cs))
+	{
+		Cache_UnlinkLRU (cs);
+		aw_cache_pinned_bytes += cs->size;
+	}
+	else if (!on && CACHE_PINNED (cs))
+	{
+		aw_cache_pinned_bytes -= cs->size;
+		Cache_MakeLRU (cs);
+	}
 }
 
 
@@ -1023,9 +1065,12 @@ void *Cache_Check (cache_user_t *c)
 
 	cs = ((cache_system_t *)c->data) - 1;
 
-// move to head of LRU
-	Cache_UnlinkLRU (cs);
-	Cache_MakeLRU (cs);
+// move to head of LRU (a pinned block is in none)
+	if (!CACHE_PINNED (cs))
+	{
+		Cache_UnlinkLRU (cs);
+		Cache_MakeLRU (cs);
+	}
 
 	return c->data;
 }

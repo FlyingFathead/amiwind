@@ -1,0 +1,70 @@
+# The per-area lookup tables in play (AREA-TABLES-59; docs/INVENTORY.md "Where container data comes from").
+# A seyda MiniWind, FS-UAE at 32 MB Fast, started with --map seyda. A character after the census (dbg aw hors), then
+# Arrille's Tradehouse: its table loads with the room (the console line "Area tables: N areas, B bytes read in T ms").
+# Arrille's basket 331661 opened from the console: three takes and one put; each "Container strip: ... held the frame"
+# line would mark a frame of 100 ms or more. aw_placed areas then shows zero fallback searches. Out to Seyda Neen (its
+# 3 x 3 cells' tables load; the tradehouse's kept in the cache), the barrel 172851 by the dock opened and its ring
+# taken, then back into the tradehouse: taken back from the cache with no table read (0 bytes), fallbacks still zero.
+# developer 1 prints every open, take, put and the pictures' share with their times.
+wait 8
+cmd developer 1
+cmd dbg all on
+cmd dbg headlamp off
+cmd dbg god on
+cmd dbg aw hors
+wait 60
+cmd dbg scene tradehouse
+wait 60
+state map
+cmd aw_placed areas
+wait 2
+shot a1-tradehouse-areas
+cmd aw_placed container 331661 open
+wait 3
+shot a2-strip-open
+key e
+wait 2
+key e
+wait 2
+key e
+wait 2
+shot a3-took-3
+key Tab
+wait 1
+key e
+wait 2
+shot a4-put-1
+key Escape
+wait 1
+cmd aw_placed areas
+wait 2
+shot a5-areas-after-takes
+cmd dbg scene seyda
+wait 60
+state map
+cmd aw_placed areas
+wait 2
+shot a6-seyda-areas
+cmd aw_placed container 172851 open
+wait 3
+shot a7-outdoor-strip
+key e
+wait 2
+shot a8-outdoor-take
+key Escape
+wait 1
+cmd dbg scene tradehouse
+wait 60
+state map
+cmd aw_placed areas
+wait 2
+shot a9-back-in-tradehouse
+cmd aw_placed container 331661 open
+wait 3
+shot a10-strip-again
+key Escape
+wait 1
+cmd aw_magic stats
+cmd aw_placed areas
+wait 2
+shot a11-end

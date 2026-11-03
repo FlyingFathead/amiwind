@@ -4,7 +4,7 @@
 /* Remote console for headless test sessions (aw_remote.c). */
 void AW_RemoteInit(void);
 void AW_RemotePoll(void);
-int AW_RemoteLogging(void);
+void AW_RemoteBusy(double now);              /* long work inside a frame, modal key loops: state file only */int AW_RemoteLogging(void);
 const char *AW_RemoteConsoleLog(void);
 int AW_LampLitCount(void);
 int AW_LampCachedCount(void);

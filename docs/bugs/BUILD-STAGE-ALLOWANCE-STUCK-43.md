@@ -1,5 +1,14 @@
 # BUILD-STAGE-ALLOWANCE-STUCK-43: a build stage's worker allowance stays at 1 after the other stages finish
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 2 times; something has to be done
+
+- Reported with v0.0.43-dev3 at 2026-10-18 18:47 +0300: maintainer: with --jobs max there must be a checker of the cores actually free; idle cores plus queued work = grow the stage's allowance at once
+- Reported with v0.0.59-dev5 at 2026-11-02 (time not recorded): MiniWind 2026_11_02_v0.0.59-dev5_miniwind-seyda-npcparts2_d523bdc: opening-references ran alone on 1 of 8 workers (failure watcher warning).
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -24,6 +33,7 @@ _Last updated with AmiWind v0.0.45 (19 October 2026)._
 <!-- contents start -->
 ## Contents
 
+- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
 - [Status: 18 October 2026](#status-18-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -134,7 +144,9 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-CACHE-TRACE-PYTHONPATH-33](BUILD-CACHE-TRACE-PYTHONPATH-33.md): The stage read trace refused reuse of a reused run when another checkout was on PYTHONPATH
 - [BUILD-CHIM-CONVERTER-CHANGE-FULL-REBUILD-46](BUILD-CHIM-CONVERTER-CHANGE-FULL-REBUILD-46.md): A change in the shared collision converter rebuilds every CHIM frame and everything after it, even where the output is identical
 - [BUILD-CHIM-FRAME-SWAP-LATE-36](BUILD-CHIM-FRAME-SWAP-LATE-36.md): The image step builds 335 legacy maps of cells already on CHIM, then removes them before packing
+- BUILD-CHIM-KEY-SKY-OVERLAY-TABLE-59 (no report page): The CHIM world stage and its ocean units are keyed by the whole sky palette overlay module, so a new image file extension rebuilds the CHIM world
 - [BUILD-CHIM-MAIN-MEMORY-46](BUILD-CHIM-MAIN-MEMORY-46.md): The CHIM stage main process holds so much memory that the memory guard starves its own workers
+- BUILD-CHIM-POOL-MEMORY-THROTTLE-59 (no report page): A CHIM stage rebuild runs its area pool on 8 of 24 workers because the stage's parent and the stages beside it hold most of the build's memory
 - [BUILD-CHIM-REGION-FRAMES-TAIL-43](BUILD-CHIM-REGION-FRAMES-TAIL-43.md): The CHIM region-frame step runs its last frames on one worker while the other cores sit idle
 - [BUILD-CHIM-SERIAL-SECTIONS-44](BUILD-CHIM-SERIAL-SECTIONS-44.md): The CHIM stage runs several sections on one core while units wait: visibility rows starve their workers
 - [BUILD-CHIM-SOURCE-REPEAT-41](BUILD-CHIM-SOURCE-REPEAT-41.md): The CHIM stage parsed the whole master and read the same models again for every area: 723 source stages took 24,500 CPU seconds

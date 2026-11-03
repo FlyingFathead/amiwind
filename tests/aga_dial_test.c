@@ -88,6 +88,23 @@ int main(int argc,char **argv) {
     {aw_dial_t bad;assert(!AW_DialOpen(&bad,data,resident-4,size));assert(!AW_DialOpen(&bad,data,resident,size+4));}
     {long vr=AW_GlutResidentSize(voices,vsize);assert(vr>0 && AW_GlutOpen(&g,voices,vr,vsize));}
     assert(d.npcs==g.npcs);
+    {   /* the block cache gives the file's bytes for any read: inside a block, across blocks, the short last block,
+         * a read of a block or more, and refuses past the end (DIALOGUE-CLOSE-FRAME-FREEZE-59) */
+        static aw_dial_cache_t cache;static unsigned char got[3*AW_DIAL_CACHE_BLOCK];long k,before=file.reads;
+        unsigned long seed=12345;
+        AW_DialCacheInit(&cache,read_mem,&file,size);
+        for(k=0;k<20000;k++){
+            long at,n;
+            seed=seed*1103515245ul+12345ul;at=(long)((seed>>8)%(unsigned long)size);
+            seed=seed*1103515245ul+12345ul;n=(long)((seed>>8)%(k%50==0?(unsigned long)sizeof(got):64ul));
+            if(at+n>size)n=size-at;
+            assert(AW_DialCacheRead(&cache,at,got,n));
+            assert(!memcmp(got,data+at,(size_t)n));
+        }
+        assert(!AW_DialCacheRead(&cache,size-1,got,2) && AW_DialCacheRead(&cache,size,got,0));
+        assert((long)cache.inner_reads==file.reads-before && cache.hits>0);
+        file.reads=before;
+    }
     x=fopen(argv[3],"r");assert(x);
     while(fgets(line,sizeof(line),x)){
         char *f[16];int n=0;char *p=strtok(line,"\t\n");
@@ -100,6 +117,21 @@ int main(int argc,char **argv) {
             AW_GlutCondOf(&g,npc,&speaker);
             if(!AW_DialConverse(&conv,&d,npc,&speaker,read_mem,&file,buffer,sizeof(buffer))){fprintf(stderr,"converse %s failed\n",f[1]);return 1;}
             opened=npc;
+            {   /* DIALOGUE-CLOSE-FRAME-FREEZE-59: the same conversation through the block cache, with fewer reads */
+                static aw_dial_cache_t cache;static unsigned char buffer2[131072];aw_dial_conv_t c2;long before=file.reads;int a;
+                AW_DialCacheInit(&cache,read_mem,&file,size);
+                assert(AW_DialConverse(&c2,&d,npc,&speaker,AW_DialCacheRead,&cache,buffer2,sizeof(buffer2)));
+                assert(c2.topics==conv.topics && c2.answers==conv.answers);
+                for(k=0;k<conv.topics;k++)assert(c2.topic[k].topic==conv.topic[k].topic && c2.topic[k].first==conv.topic[k].first &&
+                                                 c2.topic[k].count==conv.topic[k].count);
+                for(a=0;a<conv.answers;a++){
+                    const aw_dial_answer_t *x=&conv.answer[a],*y=&c2.answer[a];
+                    assert(x->entry==y->entry && x->text==y->text && x->script==y->script && x->link==y->link &&
+                           x->links==y->links && x->conditions==y->conditions && x->flags==y->flags);
+                    assert(!x->conditions || !memcmp(x->cond,y->cond,8*(size_t)x->conditions));
+                }
+                assert((long)cache.inner_reads==file.reads-before && cache.inner_reads<=cache.hits+cache.inner_reads);
+            }
             got[0]=0;
             for(k=0;k<conv.topics;k++)sprintf(got+strlen(got),"%s%d",k?",":"",conv.topic[k].topic);
             if(!conv.topics)strcpy(got,"-");

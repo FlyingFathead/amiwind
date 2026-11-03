@@ -42,6 +42,8 @@ int com_filesize;
 void AW_GuardTorchInit(void){}
 void AW_GuardTorchLoadAssets(const byte *torch){assert(torch==torch_assets);guard_loads++;}
 void AW_GuardTorchUpdate(void){}
+void AW_NpcPartsReset(void){}
+void AW_NpcPartsUpdate(void){}
 void AW_LampInit(void){}void AW_LampUpdate(void){}
 void AW_GuardTorchDraw(void){}
 vec3_t vpn,vup,vright;

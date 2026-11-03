@@ -54,7 +54,14 @@ typedef struct {
     /* AWS4 feature bit 32 (CELL-CHANGES-59): the world change list of objects (aw_ledger.h), written when it has a
      * row, read back into it (NULL: checked, not kept); an older reader refuses a save that has it */
     struct aw_ledger_s *ledger;
+    /* AWS4 feature bit 128 (JOURNAL-ORIGINAL-VIEW-59): the dated journal history (aw_jhist.h), written when it has an
+     * entry, read back into it (NULL: checked, not kept); an older reader refuses a save that has it */
+    struct aw_jhist_s *journal;
 } aw_changes_t;
+/* aw_save.c AW_SaveInit sets these to aw_jhist.c's (NULL in the codec's tests that do not link it): without them the
+ * history is not written and a save that has one does not decode. */
+extern int (*aw_save_journal_encode)(const struct aw_jhist_s *h,unsigned char *out,int capacity);
+extern int (*aw_save_journal_decode)(const unsigned char *data,int size,struct aw_jhist_s *into);
 
 #define AW_EQUIPMENT_DRAWN 1U
 #define AW_EQUIPMENT_TORCH 2U
@@ -126,6 +133,11 @@ extern void (*aw_save_objects_import)(const aw_changes_t *changes);
  * loaded save's block (BYTES 0: none, the records start from their rows). */
 extern int (*aw_save_actors_export)(unsigned char *out,int capacity);
 extern void (*aw_save_actors_import)(const unsigned char *data,int bytes);
+/* aw_mwhost.c sets these (CELL-CHANGES-59 slice 4; NULL without the compiled scripts): before a save, the scripts'
+ * globals that differ from the data, the quest stages and the known topics are written into the list's tables; after
+ * a load, read back from them (an older save without them: the data's start, the 32-slot journal folded in). */
+extern void (*aw_save_script_export)(struct aw_ledger_s *ledger);
+extern void (*aw_save_script_import)(const struct aw_ledger_s *ledger);
 /* aw_save.c AW_SaveInit sets these to aw_ledger.c's (CELL-CHANGES-59; NULL in the codec's tests that do not link
  * it): the rows of a list, its saved form (aw_ledger.h AW_LedgerEncode / AW_LedgerDecode). Without them a list is
  * not written and a save that has one does not decode. */
@@ -135,4 +147,16 @@ extern int (*aw_save_ledger_decode)(const unsigned char *data,int size,struct aw
 /* aw_scene.c AW_SceneSaveEntryRefuse (bound in aw_debug.c; NULL: no check): 1 when the saved scene and position lie
  * in a place marked for more Fast RAM than this start has; the refusal screen is up (CHIM-32MB-SAVE-ENTRY-48). */
 extern int (*aw_save_entry_refuse)(const char *scene,const float *position);
+/* CELL-CHANGES-59 slice 7: 1 while a save of other game data or another build is being loaded (migrated: what names
+ * another build's table rows is left out) */
+extern int aw_save_migrating;
+/* the slice 7 hooks (aw_mwhost.c binds them to aw_inventory.c's reference identity table and aw_actorstate.c): a save
+ * of other game data can be migrated here; a save's record hashes and content files; a loaded list migrated (-1 no
+ * table; else the changes dropped, by part in DROPPED, an aw_ledger_dropped_t); the actor records and dead counts of
+ * another build's actor table dropped (how many) */
+extern int (*aw_save_other_ok)(void);
+extern void (*aw_save_ident_refresh)(struct aw_ledger_s *ledger);
+extern long (*aw_save_migrate)(struct aw_ledger_s *ledger,void *dropped);
+extern int (*aw_save_drop_actor_records)(void);
+extern void (*aw_save_notice)(const char *line);   /* the on-screen line of a migrated load */
 #endif

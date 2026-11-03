@@ -18,9 +18,10 @@
 | Where | Stage keys of chim, chim-town, world-flora (engine folder named by three builder modules) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | fixed in v0.0.54-dev1 |
-| Severity | medium: An engine-only edit reruns the CHIM world stages again (came back in v0.0.54-dev1), costing hours per build. |
+| Persists in | fixed in v0.0.59-dev7 |
+| Severity | high: Regressed in v0.0.59-dev6 (was medium): An engine-only edit reruns the CHIM world stages again (came back in v0.0.54-dev1), costing hours per build. |
 | Family | Build speed (`build-speed`) |
+| Came back (regression) | in v0.0.59-dev6 (fixed in v0.0.54-dev1 before) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |
 | From commit | source and engine 25b0d62 |
 | CHIM engine version | none: legacy engine |
@@ -141,7 +142,9 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-CACHE-TRACE-PYTHONPATH-33](BUILD-CACHE-TRACE-PYTHONPATH-33.md): The stage read trace refused reuse of a reused run when another checkout was on PYTHONPATH
 - [BUILD-CHIM-CONVERTER-CHANGE-FULL-REBUILD-46](BUILD-CHIM-CONVERTER-CHANGE-FULL-REBUILD-46.md): A change in the shared collision converter rebuilds every CHIM frame and everything after it, even where the output is identical
 - [BUILD-CHIM-FRAME-SWAP-LATE-36](BUILD-CHIM-FRAME-SWAP-LATE-36.md): The image step builds 335 legacy maps of cells already on CHIM, then removes them before packing
+- BUILD-CHIM-KEY-SKY-OVERLAY-TABLE-59 (no report page): The CHIM world stage and its ocean units are keyed by the whole sky palette overlay module, so a new image file extension rebuilds the CHIM world
 - [BUILD-CHIM-MAIN-MEMORY-46](BUILD-CHIM-MAIN-MEMORY-46.md): The CHIM stage main process holds so much memory that the memory guard starves its own workers
+- BUILD-CHIM-POOL-MEMORY-THROTTLE-59 (no report page): A CHIM stage rebuild runs its area pool on 8 of 24 workers because the stage's parent and the stages beside it hold most of the build's memory
 - [BUILD-CHIM-REGION-FRAMES-TAIL-43](BUILD-CHIM-REGION-FRAMES-TAIL-43.md): The CHIM region-frame step runs its last frames on one worker while the other cores sit idle
 - [BUILD-CHIM-SERIAL-SECTIONS-44](BUILD-CHIM-SERIAL-SECTIONS-44.md): The CHIM stage runs several sections on one core while units wait: visibility rows starve their workers
 - [BUILD-CHIM-SOURCE-REPEAT-41](BUILD-CHIM-SOURCE-REPEAT-41.md): The CHIM stage parsed the whole master and read the same models again for every area: 723 source stages took 24,500 CPU seconds

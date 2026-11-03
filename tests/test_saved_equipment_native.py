@@ -20,7 +20,7 @@ class SavedEquipmentTests(unittest.TestCase):
             subprocess.run(['cc','-std=gnu99','-O1','-g','-ffunction-sections','-fdata-sections',
                 '-Wl,--gc-sections','-fsanitize=address,undefined','-fno-sanitize-recover=all',
                 '-I'+str(src),str(ROOT/'tests/aga_saved_equipment_test.c'),
-                *(str(src/n) for n in ('aw_character.c','aw_state.c','aw_save_codec.c','aw_ledger.c')),
+                *(str(src/n) for n in ('aw_character.c','aw_state.c','aw_save_codec.c','aw_ledger.c','aw_jhist.c')),
                 '-lm','-o',str(binary)],check=True,capture_output=True,text=True)
             run=subprocess.run([str(binary),str(work)],capture_output=True,text=True)
             self.assertEqual(run.returncode,0,run.stdout+run.stderr)

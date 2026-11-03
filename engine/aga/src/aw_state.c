@@ -15,12 +15,15 @@ static int key(char out[64],const char *id)
     }
     out[n]=0;return n>0;
 }
+int (*aw_state_fact_get)(const char *id,int32_t *out);
+int (*aw_state_fact_set)(const char *id,int32_t value);
 void AW_StateReset(void){memset(&aw_state,0,sizeof(aw_state));}
 int32_t AW_StateGet(const aw_state_t *state,int kind,const char *id)
 {
-    char name[64];int i;
+    char name[64];int i;int32_t fact=0;
     if(kind<0 || kind>2 || !key(name,id))return 0;
     for(i=0;i<state->count[kind];i++)if(!strcmp(state->values[kind][i].id,name))return state->values[kind][i].value;
+    if(kind==AW_GLOBAL && aw_state_fact_get && aw_state_fact_get(name,&fact))return fact;
     return 0;
 }
 int AW_StateSet(aw_state_t *state,int kind,const char *id,int32_t value)
@@ -29,6 +32,9 @@ int AW_StateSet(aw_state_t *state,int kind,const char *id,int32_t value)
     if(kind<0 || kind>2 || !key(name,id) || (kind==AW_ITEM && value<0))return 0;
     for(i=0;i<state->count[kind];i++)if(!strcmp(state->values[kind][i].id,name))break;
     if(i==state->count[kind]){
+        /* a named global past the 32 slots: the world change list's named facts (slice 4) */
+        if(kind==AW_GLOBAL && aw_state_fact_set && aw_state_fact_get &&
+           (i==AW_STATE_VALUES || aw_state_fact_get(name,NULL)))return aw_state_fact_set(name,value);
         if(i==AW_STATE_VALUES)return 0;
         memset(&state->values[kind][i],0,sizeof(aw_value_t));strcpy(state->values[kind][i].id,name);state->count[kind]++;
     }

@@ -124,6 +124,7 @@ void AW_TorchLoadAssets(void)
     use_hand_torch_assets=0;hand_torch_assets=NULL;
     torch_assets=COM_LoadHunkFile("gfx/torch.awt");torch_model=NULL;torch_duration=0;source_size=com_filesize;
     AW_GuardTorchLoadAssets(AW_TorchAssetsValidate(torch_assets,source_size)?torch_assets:NULL);
+    AW_NpcPartsReset();      /* a new map: the residents' parts assembled again (their tables are the new map's) */
     if(!AW_TorchAssetsValidate(torch_assets,source_size)){torch_assets=NULL;Con_Printf("Original torch assets unavailable; rebuild the image.\n");return;}
     torch_duration=(unsigned int)read32(torch_assets+8);
 }
@@ -218,6 +219,7 @@ void AW_TorchUpdate(void)
     dlight_t *light;
     int torch;
     AW_GuardTorchUpdate();
+    AW_NpcPartsUpdate();     /* residents drawn from parts (aw_npc_parts.c) */
     AW_LampUpdate();
     item_torch();
     torch=AW_TorchEquipped();

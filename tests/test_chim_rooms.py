@@ -109,6 +109,50 @@ class Rooms(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'changed since the stage wrote it'):
                 chim_rooms.install(rooms, tmp / 'fresh')
 
+    def test_the_residents_recipe_files_merge_and_a_conflict_names_both_stages(self):
+        # BUILD-NPC-RECIPES-COLLIDE-59: each stage that prepares residents writes view/npc_parts.txt with its own;
+        # the image holds their union, sorted by id, header once; one id with two lines is refused
+        import npc_recipes
+        self.assertIn('view/npc_parts.txt', npc_recipes.MERGEABLE)
+        area = b'AWNP1\nN b_guard imperial 0 - - cuirass\nN a_smith redguard 0 h1 - shirt\n'
+        rooms_text = b'AWNP1\nN a_smith redguard 0 h1 - shirt\nN C_monk dark|elf 1 h2 hr2 robe\n'
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            id1 = tmp / 'id1'
+            (id1 / 'view').mkdir(parents=True)
+            (id1 / 'view/npc_parts.txt').write_bytes(area)
+            rooms = output(tmp / 'rooms', {'view/npc_parts.txt': rooms_text})
+            self.assertEqual(chim_rooms.install(rooms, id1)['files'], 1)
+            self.assertEqual((id1 / 'view/npc_parts.txt').read_bytes(),
+                             b'AWNP1\nN a_smith redguard 0 h1 - shirt\nN b_guard imperial 0 - - cuirass\n'
+                             b'N C_monk dark|elf 1 h2 hr2 robe\n')
+            self.assertEqual((rooms / 'id1/view/npc_parts.txt').read_bytes(), rooms_text)  # the stage untouched
+            other = output(tmp / 'other', {'view/npc_parts.txt': b'AWNP1\nN b_guard imperial 0 - - robe\n'},
+                           town='vivec_city')
+            with self.assertRaisesRegex(ValueError, 'resident b_guard has other recipes in the image .* and '
+                                                    'chim-rooms-vivec_city'):
+                chim_rooms.install(other, id1)
+        # the batch stage's install merges the same way
+        import room_batches
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            id1, stage = tmp / 'id1', tmp / 'batches'
+            (id1 / 'view').mkdir(parents=True)
+            (id1 / 'view/npc_parts.txt').write_bytes(area)
+            (stage / 'id1/view').mkdir(parents=True)
+            batch_text = b'AWNP1\nN d_trader breton 0 - - shirt\n'
+            (stage / 'id1/view/npc_parts.txt').write_bytes(batch_text)
+            (stage / room_batches.RECORD).write_text(json.dumps({
+                'format': room_batches.STAGE_FORMAT, 'rooms': [],
+                'files': {'view/npc_parts.txt': hashlib.sha256(batch_text).hexdigest()}}), encoding='utf-8')
+            for threads in ('1', '2'):
+                (id1 / 'view/npc_parts.txt').write_bytes(area)
+                with patch.dict('os.environ', {'AMIWIND_ROOM_INSTALL_THREADS': threads}):
+                    room_batches.install(stage, id1)
+                self.assertEqual((id1 / 'view/npc_parts.txt').read_bytes(),
+                                 b'AWNP1\nN a_smith redguard 0 h1 - shirt\nN b_guard imperial 0 - - cuirass\n'
+                                 b'N d_trader breton 0 - - shirt\n')
+
     def test_the_town_bank_of_the_rooms_wins_over_chim_towns(self):
         # chim_town.install keeps a door bank already in the image (the rooms' linked one)
         import chim_town

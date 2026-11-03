@@ -139,6 +139,23 @@ float AW_DialSetting(const aw_dial_t *d,int setting);
 
 /* Reads BYTES at a file OFFSET into OUT: 1 done, 0 failed (the engine: the open file; the host test: memory). */
 typedef int (*aw_dial_read_t)(void *user,long offset,void *out,long bytes);
+/* A read-through block cache over a read function (DIALOGUE-CLOSE-FRAME-FREEZE-59): a conversation's open reads
+ * thousands of small rows (list items, entries, conditions) that lie close together; each became a seek and a read of
+ * the file. Through this, a read is served from AW_DIAL_CACHE_BLOCKS aligned blocks of AW_DIAL_CACHE_BLOCK bytes
+ * (least recently used goes); a read of a block or more goes straight through. The bytes are the file's, unchanged.
+ * Use AW_DialCacheRead as the read function with the cache as USER; SIZE = the file's length (the last block is
+ * short). AW_DialCacheReset forgets the blocks (a new file). inner_reads counts the reads it passed on. */
+#define AW_DIAL_CACHE_BLOCK (4L*1024L)
+#define AW_DIAL_CACHE_BLOCKS 16
+typedef struct {
+    aw_dial_read_t read;void *user;long size;
+    long at[AW_DIAL_CACHE_BLOCKS],length[AW_DIAL_CACHE_BLOCKS];unsigned long used[AW_DIAL_CACHE_BLOCKS],clock;
+    unsigned long inner_reads,hits;
+    unsigned char block[AW_DIAL_CACHE_BLOCKS][AW_DIAL_CACHE_BLOCK];
+} aw_dial_cache_t;
+void AW_DialCacheInit(aw_dial_cache_t *c,aw_dial_read_t read,void *user,long size);
+void AW_DialCacheReset(aw_dial_cache_t *c);
+int AW_DialCacheRead(void *cache,long offset,void *out,long bytes);
 int AW_DialRankRequirement(const aw_dial_t *d,const char *faction,int rank,const short *attributes,const short *skills,
                            int reputation,aw_dial_read_t read,void *user);
 
@@ -302,6 +319,7 @@ int AW_DialWrapNext(const char **text,int cols,char *out,int capacity);
 struct edict_s;
 void AW_DialWindowInit(void);
 int AW_DialWindowOpen(struct edict_s *e,const char *greeting,int talked);
+void AW_DialWindowReadCache(int on);   /* dbg npcs talkcache on|off: the conversation's block cache (default on) */
 /* dbg npcs talk [ID]: Talk with the nearest NPC that can be talked to (or record ID), the player turned to it. */
 void AW_DialWindowTalk(const char *id);
 /* aw_mwhost.c: a speaker's disposition facts from the actor record, the character and the player's standing */
@@ -367,6 +385,8 @@ void AW_MwscriptDispositionNow(int actor_row,unsigned long reference,int base,aw
 /* the NPC's row in the actor file (a binary search on disk: once, with the cache), -1 none */
 int AW_MwscriptActorRow(const char *record);
 int AW_DialWindowActive(void);
+/* the compiled scripts' file string reads that went to disk (aw_mwhost.c read_string; cached names do not count) */
+unsigned long AW_MwscriptStringReads(void);
 /* RankRequirement from the loaded table (AW_DialRankRequirement; 0 without the table) */
 int AW_DialWindowRankRequirement(const char *faction,int rank,const short *attributes,const short *skills,int reputation);
 #endif

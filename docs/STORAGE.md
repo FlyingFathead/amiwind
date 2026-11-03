@@ -1,12 +1,14 @@
 # Storage profiles and disk-backed preprocessing
 
-_Last updated with AmiWind v0.0.46 (20 October 2026)._
+_Last updated with AmiWind v0.0.59 (3 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [Compatibility profiles](#compatibility-profiles)
 - [Current AGA image layout](#current-aga-image-layout)
+- [Drive size and IDE cylinders](#drive-size-and-ide-cylinders)
+- [The image layout gate](#the-image-layout-gate)
 - [Historical v0.0.25 single-HDF layout](#historical-v0025-single-hdf-layout)
 - [Preferred future content placement](#preferred-future-content-placement)
 - [Historical A500 image layout](#historical-a500-image-layout)
@@ -71,6 +73,58 @@ the volume carries a project icon named `AmiWind v<VERSION>` that starts the
 game from Workbench (or, built with `--workbench-icon requester`, says to boot
 from the disk). The engine binary itself has no icon. See
 [Workbench icon](WORKBENCH_ICON.md).
+
+## Drive size and IDE cylinders
+
+An IDE port reads a drive's size as whole cylinders of 16 heads x 63 sectors
+(1008 sectors, 516,096 bytes). Anything after the last whole cylinder is not
+seen: a read there fails, and Kickstart shows the requester "has a read error
+on disk block N" on the screen, which the game cannot show or answer.
+
+What happened with v0.0.59-dev6 (3 November 2026): the drive file had 6,266,944
+sectors, which IDE reads as 6217 cylinders (6,266,736 sectors). The last
+partition, AW_WORLD0 (DW0), ends at sector 6,266,880, so its last 144 sectors
+lay past what IDE sees. Khuul's files were stored there, and the teleport from
+Ald'ruhn to Khuul stopped on that requester. It did not show earlier because the
+UAE hard-file controller sees the whole file; the test sessions moved to the
+emulated A1200 IDE port on 3 November. The dev5 image has the same layout and
+stops the same way on IDE.
+
+The fix: after rdbtool writes a drive, the builder pads it with zeros to whole
+IDE cylinders (under 1008 sectors, under 0.5 MB per drive; nothing changes in
+the game). The cylinder rule is one rule of the image layout gate (below), judged
+at plan time on the padded size (the plan records it as `ide_bytes`) and again
+on the written drive. See `IMAGE-IDE-CYLINDER-TAIL-59` in the bug register.
+
+If you write an image to a CF card or an IDE drive, write the whole drive file
+(its padded size) and keep the card or drive at least as large; never cut or
+re-create the file at its unpadded length. The partition table (RDB) in the
+image describes the partitions; the padding after the last partition is empty
+and is only there so the drive's size is whole cylinders.
+
+## The image layout gate
+
+The image layout gate is one check that covers the whole image. It passes the
+image or stops the build, naming every failing rule in one message
+(`require_disk_layout` in `tools/world_volumes.py`, which the layout self-test
+exercises). It runs on the plan of every drive before any partition is written,
+and again on every drive as written (after the partition table is read back).
+The rules:
+
+| Rule | Limit |
+| --- | --- |
+| Format | The drive is an RDB; the partition table holds exactly the partitions the layout wrote (DOS1 FFS, the filesystem and every file read back first) |
+| Partition size | Each partition below 2 GiB |
+| Partition start | Each partition starts below 2 GiB of its drive (Kickstart 3.1 does not mount it otherwise) |
+| File size | Each file below 1 GiB |
+| Drive size | Each drive below 4 GiB, judged on the padded size |
+| IDE cylinders | Each drive is whole cylinders of 16 heads x 63 sectors, and every partition ends inside the last whole cylinder |
+
+The finished image is checked again where it is accepted or shipped: the master
+builder's build result has an `ide-cylinders` step (`tools/ide_cylinders.py`), the
+gate's boot smoke refuses a smoke image whose drive is not whole cylinders before
+it boots, the Raspberry Pi image script and stick update refuse such a drive, and
+the release guard checks the drives of the release image.
 
 ## Historical v0.0.25 single-HDF layout
 

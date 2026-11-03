@@ -1,6 +1,6 @@
 # Your own AmiWind boot stick for the Raspberry Pi
 
-_Last updated with AmiWind v0.0.58-dev2 (31 October 2026)._
+_Last updated with AmiWind v0.0.59 (3 November 2026)._
 
 A USB stick or SD card that starts a Raspberry Pi straight into AmiWind: power on, a short line saying
 "Starting AmiWind v... on Amiberry ... on the Raspberry Pi ...", and you are on the prison ship. It is a plain
@@ -67,7 +67,9 @@ console on the Pi (user `amiwind`) for fixing things.
 The stick has a drive labelled **AMIWIND** that any PC opens (exFAT). It holds `kick.rom` and your
 `AmiWind-v*.hdf`. Copy a newer `AmiWind-v<version>.hdf` onto it: at the next start the newest one is used, and the
 start line names it. Remove the old one when you no longer need it. Your saved games are inside the AmiWind image,
-so a new image starts without them.
+so a new image starts without them. Use the image as the builder wrote it: the image script and the stick update refuse
+a drive file that is not whole IDE cylinders (a multiple of 516,096 bytes), because the emulated IDE port cannot read
+the last blocks of such a drive ([Drive size and IDE cylinders](STORAGE.md#drive-size-and-ide-cylinders)).
 
 ## What is in it
 

@@ -7,8 +7,9 @@ static model_t body,gear,torch;
 static union {double align;byte bytes[4096];} body_data,gear_data,torch_data;
 static byte framebuffer[324*200+4];
 static int show_gear,show_torch;
+static model_t legs;static union {double align;byte bytes[4096];} legs_data;static int show_parts;
 void *Mod_Extradata(model_t *model){
-    return model==&body?body_data.bytes:model==&torch?torch_data.bytes:gear_data.bytes;
+    return model==&body?body_data.bytes:model==&torch?torch_data.bytes:model==&legs?legs_data.bytes:gear_data.bytes;
 }
 int AW_ViewInventoryEquipment(model_t *models[2],float origins[2][3],float angles[2][3]){
     if(!show_gear)return 0;
@@ -20,6 +21,14 @@ int AW_ViewInventoryEquipment(model_t *models[2],float origins[2][3],float angle
 int AW_ViewInventoryHeld(model_t **model,int *frame){
     if(!show_torch)return 0;
     *model=&torch;*frame=0;return 1;
+}
+/* INVENTORY-PREVIEW-BAKED-BODY-59: the assembled body's further parts, drawn at the body's frame and the race's scale
+ * (the baked companion has none: -1) */
+int AW_ViewInventoryParts(model_t **models,int max,float scale[3]){
+    if(!show_parts)return -1;
+    scale[0]=scale[1]=1;scale[2]=2;
+    if(max<1)return 0;
+    models[0]=&legs;return 1;
 }
 static void alias(model_t *model,byte *raw,int tall,byte color){
     aliashdr_t *h=(aliashdr_t *)raw;mdl_t *m;trivertx_t *v;stvert_t *st;mtriangle_t *tri;maliasskindesc_t *skin;
@@ -64,5 +73,18 @@ int main(void){
     memset(framebuffer,137,sizeof(framebuffer));
     assert(AW_InventoryPreviewDraw(&body,0,7,20,116,162,0));assert(colored(110)>0);
     show_torch=0;
+    /* the assembled body: the body part and a further part (here a short one beside it, scaled x2 in height as the
+     * race's height scales every part) in one picture, with the held gear */
+    alias(&legs,legs_data.bytes,16,120);show_parts=1;show_gear=1;
+    ((mdl_t *)(legs_data.bytes+((aliashdr_t *)legs_data.bytes)->model))->scale_origin[1]=-5;   /* in front of the body */
+    memset(framebuffer,137,sizeof(framebuffer));
+    assert(AW_InventoryPreviewDraw(&body,0,7,20,116,162,0));
+    assert(colored(120)>0 && colored(100)>0);
+    {   /* both parts carry the same scale: the body (the short part in front of its feet) still fills the height */
+        int x,y,min=200,max=-1;byte c;
+        for(y=0;y<200;y++)for(x=0;x<320;x++)if((c=vid.buffer[y*324+x])==70 || c==120){if(y<min)min=y;if(y>max)max=y;}
+        assert(max-min>=145);
+    }
+    show_parts=show_gear=0;
     AW_InventoryPreviewClear();AW_InventoryPreviewClear();return 0;
 }

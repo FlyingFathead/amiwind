@@ -19,6 +19,7 @@
 #include "aw_character.h"
 #include "aw_save.h"
 #include "aw_state.h"
+#include "aw_ledger.h"
 
 server_t sv;
 server_static_t svs;
@@ -304,6 +305,10 @@ int AW_CombatTestEngage (edict_t *e, int dead) {return 0;}
 int AW_CombatSetHealth (edict_t *e, float health) {return 0;}
 void AW_CombatForget (edict_t *e) {}
 int ChimChunks_OriginCell (int *cx, int *cy) {*cx = *cy = 0; return 1;}
+/* the residents' recipe tables (aw_npc_parts.c, BUILD-NPC-RECIPES-PER-CELL-59): in with a join, out with a leave */
+static int parts_cells_in, parts_cells_out, parts_rooms;
+void AW_NpcPartsCell (int cx, int cy, int in) {if (in) parts_cells_in++; else parts_cells_out++;}
+void AW_NpcPartsRoom (const char *map) {parts_rooms++;}
 /* The window's cell of a position: here the cell the test says is leaving (every actor stands in it), held by the
  * window (a tick releases nobody). */
 static int leaving_cx, leaving_cy;
@@ -388,6 +393,7 @@ static void queue_and_budget (void)
 	assert (actors_alive () == 6 && count ("spawn") == 6);
 	assert (ents[sv.num_edicts - 1].v.origin[0] >= 1024);
 	command ("budget", "1");
+	assert (parts_cells_in >= 3 && parts_rooms >= 0);	/* every join brings its cell's recipe table in */
 	puts ("queue and budget passed");
 }
 
@@ -546,7 +552,7 @@ static void save_round_trip (void)
 {
 	static const float none[2] = {0, 0};
 	static aw_changes_t saved;
-	int i, n, found = 0;
+	int i, n, pass, found = 0;
 	eval_t *v;
 	reset_level ();
 	command ("budget", "0");
@@ -559,33 +565,76 @@ static void save_round_trip (void)
 	dead_ref = 501;							/* a_near was killed */
 	ents[1].v.origin[0] = 100000;
 	chim_actors_leave (0, 0);
+	assert (parts_cells_out > 0);		/* the leaving cell's recipe table goes with it */
 	ents[1].v.origin[0] = 0;
 	dead_ref = 0;
 	assert (actors_alive () == 0);
 	assert (aw_save_changes_export && aw_save_changes_import);
-	n = aw_save_changes_export (&saved);
-	assert (n == 3 && saved.count == 3);
-	for (i=0 ; i<saved.count ; i++)
+	/* CELL-CHANGES-59 slice 6: the three let go are rows of the world change list (one killed where it fell, one
+	 * moved), not entries of the save's own list (only actors alive at the save go there) */
+	assert (aw_ledger.actor_count == 3);
+	for (i=0 ; i<aw_ledger.actor_count ; i++)
 	{
-		assert (saved.entry[i].flags & AW_CHANGE_MOVED);
-		assert (!(saved.entry[i].flags & AW_CHANGE_DEAD) == (saved.entry[i].key != 501));
+		assert (aw_ledger.actor[i].moved);
+		assert (!aw_ledger.actor[i].dead == (aw_ledger.actor[i].key != 501));
 	}
-	command ("clear", NULL);
-	aw_save_changes_import (&saved);
-	chim_actors_join (0, 0, "frame", none);
-	chim_actors_tick ();
-	assert (actors_alive () == 2);
-	for (i=2 ; i<sv.num_edicts ; i++)
-		if (!ents[i].free && (v = GetEdictFieldValue (&ents[i], "aw_ref")) != NULL)
+	n = aw_save_changes_export (&saved);
+	assert (n == 0 && saved.count == 0);
+	for (pass=0 ; pass<2 ; pass++)
+	{
+		/* pass 0: a save of this engine (the list in its sixth form); pass 1: a save made before slice 6, whose
+		 * three actor entries are migrated onto the list at the load */
+		static aw_ledger_t loaded;
+		static unsigned char bytes[65536];
+		int k;
+		AW_LedgerClear (&loaded);
+		if (!pass)
 		{
-			assert (v->_float != 501);
-			if (v->_float == 502)
+			k = AW_LedgerEncode (&aw_ledger, bytes, sizeof(bytes));
+			assert (k > 0 && !memcmp (bytes, "AWL6", 4) && AW_LedgerDecode (bytes, k, &loaded));
+			saved.count = 0;
+		}
+		else
+		{
+			saved.count = 0;
+			for (i=0 ; i<aw_ledger.actor_count ; i++)
 			{
-				assert (fabs (ents[i].v.origin[1] - 333) < 0.01f);
-				found++;
+				aw_change_t *e = &saved.entry[saved.count++];
+				memset (e, 0, sizeof(*e));
+				e->key = aw_ledger.actor[i].key;
+				e->flags = AW_CHANGE_MOVED | (aw_ledger.actor[i].dead ? AW_CHANGE_DEAD : 0);
+				memcpy (e->position, aw_ledger.actor[i].origin, sizeof(e->position));
+				e->health = aw_ledger.actor[i].health;
 			}
 		}
-	assert (found == 1);
+		saved.ledger = &loaded;
+		command ("clear", NULL);
+		assert (aw_ledger.actor_count == 0);
+		aw_save_changes_import (&saved);
+		AW_LedgerMove (&aw_ledger, &loaded);		/* as aw_save.c: the save's list is the session's */
+		assert (aw_ledger.actor_count == 3);
+		chim_actors_join (0, 0, "frame", none);
+		chim_actors_tick ();
+		assert (actors_alive () == 2);
+		found = 0;
+		for (i=2 ; i<sv.num_edicts ; i++)
+			if (!ents[i].free && (v = GetEdictFieldValue (&ents[i], "aw_ref")) != NULL)
+			{
+				assert (v->_float != 501);
+				if (v->_float == 502)
+				{
+					assert (fabs (ents[i].v.origin[1] - 333) < 0.01f);
+					found++;
+				}
+			}
+		assert (found == 1);
+		/* leave again so the next pass starts from the rows alone */
+		ents[1].v.origin[0] = 100000;
+		chim_actors_leave (0, 0);
+		ents[1].v.origin[0] = 0;
+		assert (actors_alive () == 0 && aw_ledger.actor_count == 3);
+	}
+	saved.ledger = NULL;
 	command ("budget", "1");
 	puts ("save round trip passed");
 }

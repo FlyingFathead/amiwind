@@ -18,7 +18,7 @@
 | Where | engine/aga/src/aw_mwvm.c, aw_save.c |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.48-dev2 (last seen) |
+| Persists in | fixed in v0.0.59 |
 | Severity | medium: a loaded game starts every script from its initial values while the scripts are on |
 | Family | Game logic (QuakeC) and saves (`game-logic`) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |
@@ -28,7 +28,7 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.59-dev3 (2 November 2026)._
+_Last updated with AmiWind v0.0.59-dev5 (2 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -49,8 +49,9 @@ _Last updated with AmiWind v0.0.59-dev3 (2 November 2026)._
 
 ## Status: 2 November 2026
 
-Open, persisting: reported in v0.0.48-dev2 and again in v0.0.59. Planned for v0.0.59 as part of the work that keeps
-changed world and game state across cells and saves.
+Fixed in v0.0.59 (reported in v0.0.48-dev2 and again in v0.0.59): the fourth and fifth parts of the world change list
+keep the scripts' globals, every quest's stage, the known topics, NPC dispositions, the script locals of objects and
+characters and the global scripts started or stopped, in the session and in saved games.
 
 ## Symptom
 
@@ -77,13 +78,21 @@ Let a script change a global or a quest stage past the 32nd quest, save, load: t
 
 ## Repair
 
-Planned: the script globals, the locals of objects and characters, the running scripts and the journal stages each get
-a compact table in the save, written only where they differ from the game's own data, following how OpenMW 0.51 keeps
-them (rules learned from it, own code).
+The script globals, the journal stages, the known topics, the dispositions, the locals of objects and characters and
+the running global scripts each have a compact table on the world change list, written only where they differ from the
+game's own data, following how OpenMW 0.51 keeps them (rules learned from it, own code): globals and quests by their
+record id, locals by the object's reference, global scripts by their id with their running state. A load sets every
+script value back to the start first, then the saved ones. The interpreter's store for objects away from the loaded
+map holds a whole game's worth (2,304 objects and 8,192 values; the game places 2,115 objects whose script has locals,
+7,388 values). See [the save plan](../SAVEGAME_PLAN.md#the-world-change-list-v0059).
 
 ## Verification
 
-Not yet: a save and reload round-trip test per kind of value.
+Native round trips of every table at and past the game's counts (tests/aga_world_ledger_test.c); a script host test
+keeps an object's locals across a cell change and a load and a global script started with StartScript running after
+the load (tests/test_mwscript.py). In game at 32 MB Fast on the Seyda Neen MiniWind: a quest stage, a global, a topic
+and a disposition (v0.0.59-dev4), and a script local and a started global script (v0.0.59-dev5), kept across a map
+change and across a quicksave, a change and a quickload.
 
 ## Prevention
 
@@ -95,6 +104,7 @@ Every kind of state the scripts can change gets its save and reload test before 
 
 Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and game state. See [families](README.md#families).
 
+- ACTORS-TOWN-ROOM-RETURN-59 (no report page): A town resident killed before entering a room is alive again on the way back out
 - ARENA-MERGE-54 (no report page): Requested: one arena mode: the main game's arena minigame and the combat playground merged, with NPC against NPC fights to watch
 - [AW-20260928-10](AW-20260928-10.md): Interior door animation and sound missing
 - [AW-20260928-12](AW-20260928-12.md): Downstairs interior doors cannot open
@@ -102,6 +112,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [AW-STATE-32-SLOTS-48](AW-STATE-32-SLOTS-48.md): The game state table holds 32 globals, 32 quests and 32 items; the game has 143 globals and 318 journal topics
 - AW25-06 (no report page): Quicksave shown as empty; save ordering confusing
 - [CENSUS-DOOR-STUCK-29](CENSUS-DOOR-STUCK-29.md): Player stuck after opening Census Office hall door
+- CHARGEN-TUTORIAL-ITEM-MESSAGES-59 (no report page): Character creation: taking the bread, crab meat, candle, lockpick, whiskey, note or dagger in the Census Office shows no tutorial message
 - [CHIM-COURT-BARREL-USE-33](CHIM-COURT-BARREL-USE-33.md): Census courtyard on CHIM: Fargoth's ring barrel cannot be used, so the opening cannot proceed
 - [CHIM-FRAME-SOURCE-CONVERSION-59](CHIM-FRAME-SOURCE-CONVERSION-59.md): On CHIM frame maps the conversion to the game's coordinates says no for most engine callers
 - CLOCK-01 (no report page): Automatic clock dropped fractional milliseconds each frame
@@ -120,16 +131,22 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [COMBAT-PLAYER-KNOCKDOWN-33](COMBAT-PLAYER-KNOCKDOWN-33.md): The player's knockdown and knockout exist only in the combat rules
 - [COMBAT-SETUP-DICE-BLOCK-33](COMBAT-SETUP-DICE-BLOCK-33.md): The Arena setup offers no dice/style choice before a fight, and there is no block button
 - COMBAT-THINK-COST-68040-54 (no report page): On the slow 68040 preset one combat decision step (think) costs 34 ms with one fighter and 44 ms with four
+- [CONTAINER-LEVELLED-CONTENTS-EMPTY-59](CONTAINER-LEVELLED-CONTENTS-EMPTY-59.md): Containers whose contents are levelled lists open empty
+- [CORPSE-INVENTORY-NOT-OPENABLE-59](CORPSE-INVENTORY-NOT-OPENABLE-59.md): Bodies of dead NPCs and creatures cannot be opened to take what they carried
 - [DEBUG-MAP-SAVE-VALIDATION-32](DEBUG-MAP-SAVE-VALIDATION-32.md): After a debug map load of an open-world map the autosave fails validation; two of three also report Interior spawn blocked
+- DIALOGUE-GLOBAL-NAMES-CLASH-59 (no report page): Dialogue conditions on a global could read the wrong global name table
 - [DOOR-LOAD-LOCKS-MISSING-51](DOOR-LOAD-LOCKS-MISSING-51.md): Load doors ignore the original game's locks: every door into a room opens, locked or not
 - [DOOR-TRAPS-NOT-SPRUNG-55](DOOR-TRAPS-NOT-SPRUNG-55.md): Trapped doors and containers open without their trap
 - DROP-CHIM-REFUSED-59 (no report page): Dropping an item on a streamed outdoor map is refused: Cannot place items in this area yet
+- DROP-ROOM-BRUSH-ENTITY-59 (no report page): Dropping an item in a converted room is refused: Item path or footprint obstructed
+- DROP-STACK-ONE-ROW-PER-UNIT-59 (no report page): Dropping a stack drops one piece per key press, each its own ground item, so the map's ground item limit (32) fills with single coins
 - [ENGINE-ANGLEMOD-RANGE-35](ENGINE-ANGLEMOD-RANGE-35.md): anglemod returned 360 for -360 and passed NaN and out-of-range values on
 - [ENGINE-QC-ARGS-SYSERROR-35](ENGINE-QC-ARGS-SYSERROR-35.md): Bad QuakeC sound arguments stopped the program; lightstyle had no range check
 - [INTRO-CAMERA-GATING-38](INTRO-CAMERA-GATING-38.md): Opening vanity and third-person cameras expose an unselected default race
 - [INVENTORY-CATALOG-LOOKUP-40](INVENTORY-CATALOG-LOOKUP-40.md): Inventory catalogue lookup and name sorting use an equality-only comparison
 - INVENTORY-CATALOGUE-PARTIAL-54 (no report page): The item catalogue holds Morrowind items only: no lockpicks, probes, repair tools, apparatus or carried lights
 - INVENTORY-ITEM-MODEL-PATH-59 (no report page): The inventory catalogue refuses every item whose world model comes from the item model table (progs/items/)
+- JOURNAL-BOOK-32-QUESTS-59 (no report page): The journal book lists only the quests of the old 32-slot table, although every quest's stage is now kept
 - MWSCRIPT-CELLCHANGED-VOLATILE-54 (no report page): CellChanged made the sound-marker scripts volatile: 85 percent of Vivec's per-frame script work
 - MWSCRIPT-DATA-UNKNOWN-NAMES-48 (no report page): Four Bloodmoon scripts read names declared nowhere in the game data and do not compile
 - MWSCRIPT-INTERIOR-PLACEMENTS-48 (no report page): Scripted placements in rooms that have no edict are not attached: the engine has no room identity to match them (3,612 of 4,907 bindings are in rooms)

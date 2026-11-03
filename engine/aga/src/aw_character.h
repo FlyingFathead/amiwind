@@ -19,6 +19,11 @@ typedef struct {
     int valid,race,female,head,hair,clas,birth,level;
     short attributes[8],modifiers[8],damage[8],skills[27];
     float current[3],maximum[3];
+    /* LEVEL-UP-58 (aw_levelup.h): each skill's progress toward its next point (0..1 of the requirement), the level
+     * progress (raises of major and minor skills), the raises per governing attribute and per specialization since
+     * the last level. Saved (AWS4 feature 64); a new character starts at 0. */
+    float progress[27];
+    short level_progress,raises[8],special[3];
 } aw_character_t;
 extern aw_character_t aw_character;
 extern aw_race_t aw_races[16];

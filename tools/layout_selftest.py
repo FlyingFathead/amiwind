@@ -62,7 +62,7 @@ CASES = (
          [400 * MIB, 400 * MIB], [[500 * MIB, 500 * MIB], [50 * MIB]], groups=[[0, 1]],
          note='DH0 1024 MiB, DW0 1280 MiB, DW1 128 MiB in that order on one drive'),
     case('drive-over-4gib', r'drive selftest\.hdf \(planned\) is %d bytes \(limit below %d, 4 GiB\)'
-         % (4096 * MIB + wv.RDB_BYTES, wv.DRIVE_SIZE_LIMIT),
+         % (wv.ide_cylinder_bytes(4096 * MIB + wv.RDB_BYTES), wv.DRIVE_SIZE_LIMIT),
          [750 * MIB, 750 * MIB], [[750 * MIB, 750 * MIB], [150 * MIB]], groups=[[0, 1]],
          note='DH0 1920 MiB, DW0 1920 MiB, DW1 256 MiB on one drive (a drive over 4 GiB always also '
               'has a partition starting past 2 GiB)'),

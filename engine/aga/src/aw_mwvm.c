@@ -25,7 +25,7 @@
 
 typedef struct {uint32_t reference;uint16_t script,count,at;} parked_t;
 
-/* The interpreter's tables (about 120 KB) exist only once the scripts are switched on and loaded: one block taken
+/* The interpreter's tables (about 160 KB) exist only once the scripts are switched on and loaded: one block taken
  * at load (AW_MwvmLoad), kept for the session; a game that never switches them on spends nothing. */
 typedef struct {
     const unsigned char *base;unsigned long bytes;const aw_mwvm_host_t *host;
@@ -232,6 +232,9 @@ void AW_MwvmConfig(uint32_t *range,int *ops_frame,int *ops_run){
 int32_t AW_MwvmGlobalInt(int g){return ON && g>=0 && g<vm.nglob?vm.globals[g].i:0;}
 float AW_MwvmGlobalFloat(int g){return ON && g>=0 && g<vm.nglob?vm.globals[g].f:0;}
 int AW_MwvmGlobalCount(void){return ON?vm.nglob:0;}
+uint32_t AW_MwvmGlobalBits(int g){return ON && g>=0 && g<vm.nglob?(uint32_t)vm.globals[g].i:0;}
+uint32_t AW_MwvmGlobalStart(int g){return ON && g>=0 && g<vm.nglob?u32(vm.glob+8*g+4):0;}
+void AW_MwvmGlobalSetBits(int g,uint32_t bits){if(ON && g>=0 && g<vm.nglob){vm.globals[g].i=(int32_t)bits;vm.generation++;}}
 /* GLOB row: u8 type (0 short, 1 long, 2 float), u8 0, u16 name string, u32 initial value (tools/mwscript/awms.py) */
 int AW_MwvmGlobalName(int g,int *type){
     if(!ON || g<0 || g>=vm.nglob)return -1;
@@ -336,6 +339,92 @@ void AW_MwvmStartScript(int script){
     if(!ON || script<0 || script>=vm.nscrp || !vm.runnable[script])return;
     k=global_instance(script,1);
     if(k>=0)vm.inst[k].flags|=AWI_RUNNING;
+}
+/* --- the scripts' own state for a save (CELL-CHANGES-59 slice 5, aw_mwvm.h) --- */
+static int attached_instance(uint32_t ref){
+    int k;
+    for(k=0;k<vm.ninst;k++)if((vm.inst[k].flags&(AWI_USED|AWI_GLOBAL))==AWI_USED && vm.inst[k].reference==ref)return k;
+    return -1;
+}
+int AW_MwvmStartsAtLoad(int script){
+    int i;
+    if(!ON)return 0;
+    for(i=0;i<vm.nstrt;i++)if((int)U16(vm.strt+2*i)==script)return 1;
+    return 0;
+}
+int AW_MwvmLocalCount(int script){return ON && script>=0 && script<vm.nscrp?nlocals(script):0;}
+int AW_MwvmScriptRunning(int script){
+    int k=ON && script>=0 && script<vm.nscrp?vm.global_instance[script]:-1;
+    return k>=0 && (vm.inst[k].flags&AWI_RUNNING)?1:0;
+}
+void AW_MwvmLocalsEach(void (*fn)(void *user,uint32_t reference,int script,int global,int running,
+                                  const aw_mwcell_t *cells,int count),void *user){
+    int k,s;
+    if(!ON || !fn)return;
+    for(k=0;k<vm.ninst;k++){
+        const aw_mwvm_instance_t *in=&vm.inst[k];
+        if((in->flags&(AWI_USED|AWI_GLOBAL))==AWI_USED && in->reference)
+            fn(user,in->reference,in->script,0,0,&vm.cells[in->locals],nlocals(in->script));
+    }
+    for(k=0;k<vm.nparked;k++){
+        const parked_t *p=&vm.parked[k];
+        if(attached_instance(p->reference)<0)fn(user,p->reference,p->script,0,0,&vm.park[p->at],p->count);
+    }
+    for(s=0;s<vm.nscrp;s++)
+        if((k=vm.global_instance[s])>=0)
+            fn(user,0,s,1,(vm.inst[k].flags&AWI_RUNNING)?1:0,&vm.cells[vm.inst[k].locals],nlocals(s));
+}
+void AW_MwvmLocalsReset(void){
+    int k;
+    if(!ON)return;
+    vm.nparked=0;vm.park_used=0;vm.warned_park=0;
+    for(k=0;k<vm.ninst;k++){
+        aw_mwvm_instance_t *in=&vm.inst[k];
+        if(!(in->flags&AWI_USED))continue;
+        memset(&vm.cells[in->locals],0,nlocals(in->script)*sizeof(aw_mwcell_t));
+        in->flags&=~AWI_QUIET;in->flags|=AWI_CELLCHANGED;
+        if(in->flags&AWI_GLOBAL){
+            if(AW_MwvmStartsAtLoad(in->script))in->flags|=AWI_RUNNING;else in->flags&=~AWI_RUNNING;
+        }
+    }
+    vm.generation++;
+}
+int AW_MwvmLocalSet(uint32_t reference,int script,int slot,uint32_t bits){
+    int k;parked_t *p;
+    if(!ON || !reference || script<0 || script>=vm.nscrp || slot<0 || slot>=nlocals(script))return 0;
+    if((k=attached_instance(reference))>=0){
+        if(vm.inst[k].script!=script)return 0;
+        vm.cells[vm.inst[k].locals+slot].i=(int32_t)bits;vm.inst[k].flags&=~AWI_QUIET;
+        return 1;
+    }
+    if(!(p=park_slot(reference,script)))return 0;
+    vm.park[p->at+slot].i=(int32_t)bits;
+    return 1;
+}
+int AW_MwvmLocalGet(uint32_t reference,int slot,int *script,aw_mwcell_t *out){
+    int k=ON?attached_instance(reference):-1;parked_t *p;
+    if(k>=0){
+        if(slot<0 || slot>=nlocals(vm.inst[k].script))return 0;
+        *script=vm.inst[k].script;*out=vm.cells[vm.inst[k].locals+slot];return 1;
+    }
+    if(!ON || !(p=find_parked(reference)) || slot<0 || slot>=p->count)return 0;
+    *script=p->script;*out=vm.park[p->at+slot];
+    return 1;
+}
+int AW_MwvmGlobalScriptSet(int script,int running){
+    int k;
+    if(!ON || script<0 || script>=vm.nscrp || !vm.runnable[script])return 0;
+    if((k=global_instance(script,running))<0)return !running;    /* stopped and never made: nothing to keep */
+    if(running)vm.inst[k].flags|=AWI_RUNNING;else vm.inst[k].flags&=~AWI_RUNNING;
+    vm.inst[k].flags&=~AWI_QUIET;
+    return 1;
+}
+int AW_MwvmGlobalScriptLocal(int script,int slot,uint32_t bits){
+    int k;
+    if(!ON || script<0 || script>=vm.nscrp || !vm.runnable[script] || slot<0 || slot>=nlocals(script) ||
+       (k=global_instance(script,1))<0)return 0;
+    vm.cells[vm.inst[k].locals+slot].i=(int32_t)bits;
+    return 1;
 }
 /* The cells of object OBJECT's locals (an attached object, a parked one, or a script's global instance). */
 static aw_mwcell_t *member(int object,int slot,int create){

@@ -3,7 +3,11 @@
 #include "aw_story.h"
 #include "aw_clock.h"
 #include "aw_sky.h"
+#include "aw_character.h"
+#include "aw_move.h"
+#include "aw_rest.h"
 #include <assert.h>
+#include <stdarg.h>
 viddef_t vid;
 static int glyph_width=8,glyph_height=8,capture_help;
 static char help_glyphs[480][640];
@@ -29,8 +33,32 @@ static char subtitle[256];
 /* WAIT-DURING-COMBAT-36: the one fight check (aw_combat.c) and the refusal text written by the builder */
 static int in_combat,settings_text;
 int AW_PlayerInCombat(void){return in_combat;}
+/* REST-WAIT-59: the rest data (tools/prepare_levelup.py rest_text's form) and the engine around the T window */
+static int rest_data;
+static const char rest_file[]="AWRS1\nset fRestMagicMult 0.15\nset fEndFatigueMult 0.04\nset fFatigueReturnBase 2.5\n"
+    "set fFatigueReturnMult 0.02\nset fSleepRandMod 0.25\nset fSleepRestMod 0.3\nset fEncumbranceStrMult 5\n"
+    "text sNotifyMessage1 Test: solid ground.\ntext sNotifyMessage2 Test: enemies.\ntext sNotifyMessage64 Test: not your bed.\n"
+    "text sRestIllegal Test: illegal here.\ntext sRestMenu3 Test: rest.\ntext sRest Rest\ntext sWait Wait\n"
+    "text sSleepInterrupt Test: interrupted.\nstunted wombburned\nsleepregion ex_test_sleep Test Region\n"
+    "nosleep -2 -9\nnosleepi seyda neen, census and excise office\n"
+    "bed 100 -2|-|-|draren thiralas\nbed 101 -2|-|rent_test|arrille\nbed 102 2|fighters guild|-|-\n";
+static int cell_kind=1;static long cell_x=5,cell_y=5;static const char *cell_region="Quiet Region",*cell_id="";
+int AW_HudPlayerCell(long *x,long *y,char *id,int size,const char **region){
+    *x=cell_x;*y=cell_y;*region=cell_kind==1?cell_region:NULL;snprintf(id,size,"%s",cell_id);return cell_kind;}
+static int hostiles,level_ups,player_rank=-1;static float fatigue=10,effect_seconds;
+int AW_CombatHostiles(void){return hostiles;}
+float AW_CombatPlayerFatigue(float *maximum){if(maximum)*maximum=200;return fatigue;}
+void AW_MovePlayerInputs(aw_move_inputs_t *in){memset(in,0,sizeof(*in));in->strength=50;in->carried=0;}
+int AW_StandingRank(const char *faction){(void)faction;return player_rank;}
+int AW_LevelupRested(void){level_ups++;return 1;}
+void AW_MwscriptEffectsAdvance(float seconds){effect_seconds+=seconds;}
+aw_character_t aw_character;aw_birth_t aw_births[16];int aw_birth_count;
 int COM_FOpenFile(char *path,FILE **file){
     *file=NULL;
+    if(!strcmp(path,"levelup/rest.txt")){
+        if(!rest_data)return -1;
+        *file=tmpfile();assert(*file);fputs(rest_file,*file);rewind(*file);return (int)strlen(rest_file);
+    }
     if(strcmp(path,"view/settings.txt") || !settings_text)return -1;
     *file=tmpfile();assert(*file);fputs("AWVS1\nfVanityDelay 30\nsNotifyMessage2 Test: enemies near.\n",*file);rewind(*file);
     return 60;
@@ -259,6 +287,45 @@ static void daynight_hold(void){
     arg="true";daynight();assert(!AW_DayNightFrozen());
     cycle->value=1;host_frametime=1;argc=1;
 }
+/* REST-WAIT-59: T opens Rest in the wilderness and Wait in a no-sleep cell; the refusals with the game's lines; the
+ * restoration by mode; Until Healed; the level-up only after a full rest; beds: owned refused, rented and a guild bed
+ * at rank allowed, Rest even in a no-sleep cell. */
+static void rest_and_wait(void){
+    int clock;
+    AW_StateReset();assert(AW_ClockEnsure());rest_data=1;
+    aw_character.valid=1;aw_character.attributes[5]=50;aw_character.attributes[1]=40;
+    aw_character.maximum[0]=100;aw_character.maximum[1]=80;aw_character.current[1]=20;
+    player.v.health=40;player.v.flags=FL_ONGROUND;player.v.movetype=MOVETYPE_WALK;player.v.waterlevel=0;
+    /* the refusals: water, air, enemies (both lines together) */
+    player.v.waterlevel=1;subtitle[0]=0;open_wait();assert(key_dest==key_game && !strcmp(subtitle,"Test: solid ground."));
+    player.v.waterlevel=0;player.v.flags=0;hostiles=1;subtitle[0]=0;open_wait();
+    assert(key_dest==key_game && !strcmp(subtitle,"Test: solid ground. Test: enemies."));
+    player.v.flags=FL_ONGROUND;hostiles=0;
+    /* the wilderness: Rest, 8 hours: health 0.1 x 50 x 8, magicka 0.15 x 40 x 8, fatigue full; the level-up after it */
+    clock=AW_StateGet(&aw_state,AW_GLOBAL,"amiwind:clock:ms");
+    open_wait();assert(key_dest==key_menu && AW_RestSleeping() && AW_WaitDraw());
+    {int i;for(i=0;i<7;i++)AW_WaitKey(K_RIGHTARROW);}AW_WaitKey(K_ENTER);
+    assert(key_dest==key_game && player.v.health==80 && aw_character.current[1]==68 && aw_character.current[2]==200);
+    assert(level_ups==1 && effect_seconds==8*3600/30.0f && !AW_RestSleeping());
+    assert(AW_StateGet(&aw_state,AW_GLOBAL,"amiwind:clock:ms")==(clock+8*3600000)%86400000);
+    /* Until Healed: health 80 of 100 at 5 an hour = 4 hours; magicka 68 of 80 at 6 = 2: four hours */
+    open_wait();AW_WaitKey('h');assert(player.v.health==100 && aw_character.current[1]==80 && level_ups==2);
+    /* a no-sleep town cell: Wait; fatigue only, no level-up */
+    cell_x=-2;cell_y=-9;player.v.health=50;aw_character.current[2]=10;
+    open_wait();assert(key_dest==key_menu && !AW_RestSleeping());AW_WaitKey(K_ENTER);
+    assert(player.v.health==50 && aw_character.current[2]==200 && level_ups==2);
+    /* the same in a no-sleep interior by its cell ID */
+    cell_kind=2;cell_id="Seyda Neen, Census and Excise Office";open_wait();assert(!AW_RestSleeping());AW_WaitKey(K_ESCAPE);
+    /* beds: an owned bed refuses with its line and opens nothing; rented (its global set) and a guild bed at the asked
+     * rank give Rest even here; a bed lifts the air rule but not water */
+    subtitle[0]=0;assert(!AW_RestOpen(100) && key_dest==key_game && !strcmp(subtitle,"Test: not your bed."));
+    assert(!AW_RestOpen(101));AW_StateSet(&aw_state,AW_GLOBAL,"rent_test",1);
+    assert(AW_RestOpen(101) && AW_RestSleeping());AW_WaitKey(K_ESCAPE);
+    player_rank=1;assert(!AW_RestOpen(102));player_rank=2;assert(AW_RestOpen(102) && AW_RestSleeping());AW_WaitKey(K_ESCAPE);
+    player.v.flags=0;assert(AW_RestOpen(999) && AW_RestSleeping());AW_WaitKey(K_ESCAPE);
+    player.v.waterlevel=1;assert(!AW_RestOpen(999));player.v.waterlevel=0;player.v.flags=FL_ONGROUND;
+    cell_kind=1;cell_x=cell_y=5;rest_data=0;aw_character.valid=0;
+}
 int main(void){
     aw_state_t saved;int i;char exact[5];
     const char *bad[]={"","1","630","00000","2400","2360","0060","-100","+100","12.0","NaN","12:30","0630x"," 630","0630 ","0x10","tomorrow"};
@@ -375,6 +442,7 @@ int main(void){
     restricted=1;lightgallery();assert(AW_DayGalleryClock(77)==77 && !AW_WaitKey(K_UPARROW));restricted=0;
     argc=2;arg="off";lightgallery();argc=1;
     cycle->value=1;host_frametime=1;
+    rest_and_wait();
     tour_camera();night_tour_camera();daynight_hold();
     AW_StateReset();for(i=0;i<31;i++){char name[32];sprintf(name,"full%ld",(long)i);AW_StateSet(&aw_state,AW_GLOBAL,name,i);}
     saved=aw_state;assert(!AW_ClockEnsure() && !memcmp(&saved,&aw_state,sizeof(saved)));

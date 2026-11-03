@@ -5,7 +5,8 @@ A decision made for the project reads "project decision" / "decided for the proj
 acts (reports, plays, decides, publishes, approves) is "the maintainer". Technical ownership stays:
 the owner chunk / frame / core / record of a placement, cell and town ownership, storage owners,
 the schema field owner_accepted, status values such as owner-accepted-known-findings, the reporter
-value "owner" in bugs.json and bug IDs.
+value "owner" in bugs.json and bug IDs; and in-game ownership: the NPC or faction an item, bed, container or room
+belongs to, and what that owner says or does in the game.
 
 Not checked: frozen history (docs/journals/, the bug archive, released notes and whitespace baselines in
 docs/releases/, the records and superseded documents in docs/history/), the generated register pages
@@ -27,10 +28,15 @@ SKIP = re.compile(r'^(docs/journals/|docs/bugs/archive/|engine/|src/|docs/releas
 TEXT = {'.md', '.json', '.py', '.sh', '.js', '.html', '.txt', '.c', '.h', '.yml', '.ps1', '.cmd'}
 # Words after "the owner" that make it technical (ownership of chunks, frames, cells, records ...).
 TECHNICAL = ('chunk', 'chunks', 'frame', 'frames', 'core', 'cores', 'record', 'records', 'field', 'region',
-             'regions', 'cell', 'cells', 'of', 'apron', 'aprons', 'backlink', 'backlinks')
+             'regions', 'cell', 'cells', 'of', 'apron', 'aprons', 'backlink', 'backlinks',
+             # in-game ownership (2026-11-02, the maintainer: "owner can be used to describe things IN THE GAME"):
+             # the NPC or faction an item, bed, container or room belongs to, and what that NPC says or does
+             'line', 'lines', 'npc', 'NPC', 'faction', 'item', 'items', 'bed', 'beds', 'container', 'containers',
+             'room', 'rooms', 'house', 'shop', 'id', 'rank', 'present', 'sees', 'saw', 'catches', 'caught',
+             'disposition', 'reaction', 'reacts', 'gets', 'field')
 NOT_AFTER = r"(?<![-'\"\w])"
 PERSON = re.compile(
-    r"\b[Tt]he owner(?:'s)?\b(?! (?:%s)\b)" % '|'.join(TECHNICAL)
+    r"\b[Tt]he owner(?:'s)?(?!')\b(?! (?:%s)\b)" % '|'.join(TECHNICAL)
     + r"|" + NOT_AFTER + r"[Oo]wner (?:decisions?|acceptance|reports?|reported|playtests?|playtesting|order"
     r"|rules?|requirements?|screenshots?|evidence|confirms|confirmed|confirmation|requests?|requested|approval"
     r"|approved|feedback|review|direction|priority|choice|follow-up|instruction)\b"
@@ -81,6 +87,9 @@ class MaintainerWordingTest(unittest.TestCase):
         self.assertTrue(hits("the owner's playtest"))
         self.assertTrue(hits('an owner-approved reason'))
         self.assertFalse(hits('the owner chunk of a placement; cell ownership; owner_accepted'))
+        # in-game ownership stays
+        self.assertFalse(hits("The owner's line sCaughtStealingMessage needs the owner present."))
+        self.assertFalse(hits('the owner NPC of the bed; the owner faction and rank'))
         self.assertFalse(hits('see `the owner` in code and [x](#owner-decision-1)'))
         self.assertFalse(hits("status 'owner-accepted-known-findings', flag --owner-accepted"))
 

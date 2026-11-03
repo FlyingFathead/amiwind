@@ -328,3 +328,335 @@ int AW_PartsAssemble (const char *text, long size, const char *race, int female,
     out->beast = beast;
     return n > 0;
 }
+
+int AW_PartsNpcFind (const char *text, long size, const char *id, aw_parts_npc_t *out)
+{
+    const char *p, *end, *line_end, *at;
+    word_t k, w, sex, head, hair;
+    if (!text || size < 6 || !id || !out || memcmp (text, "AWNP1", 5) || (text[5] != '\n' && text[5] != '\r'))
+        return 0;
+    end = text + size;
+    for (p = text ; p < end ; p = line_end + 1)
+    {
+        line_end = memchr (p, '\n', (size_t)(end - p));
+        if (!line_end)
+            line_end = end;
+        at = p;
+        {
+            const char *e = line_end > p && line_end[-1] == '\r' ? line_end - 1 : line_end;
+            if (!next_word (&at, e, &k) || k.n != 1 || k.p[0] != 'N' || !next_word (&at, e, &w) || !same_id (w, id))
+                continue;
+            memset (out, 0, sizeof(*out));
+            if (!next_word (&at, e, &w) || w.n >= AW_PARTS_ID || !next_word (&at, e, &sex) || sex.n != 1 ||
+                (sex.p[0] != '0' && sex.p[0] != '1') || !next_word (&at, e, &head) || head.n >= AW_PARTS_ID ||
+                !next_word (&at, e, &hair) || hair.n >= AW_PARTS_ID)
+                return 0;
+            copy_word (w, out->race, AW_PARTS_ID);
+            out->female = sex.p[0] == '1';
+            if (!(head.n == 1 && head.p[0] == '-'))
+                copy_word (head, out->head, AW_PARTS_ID);
+            if (!(hair.n == 1 && hair.p[0] == '-'))
+                copy_word (hair, out->hair, AW_PARTS_ID);
+            while (next_word (&at, e, &w))
+            {
+                if (w.n >= AW_PARTS_ID || out->count >= AW_PARTS_ITEMS)
+                    return 0;
+                copy_word (w, out->items[out->count++], AW_PARTS_ID);
+            }
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/* The residents' recipe tables per place (BUILD-NPC-RECIPES-PER-CELL-59; tools/npc_recipes.py cell_key) */
+static char *put_int (char *o, char *end, int v)
+{
+    char digits[12];
+    int n = 0;
+    unsigned u = v < 0 ? 0u - (unsigned)v : (unsigned)v;
+    if (v < 0 && o < end)
+        *o++ = '-';
+    do
+        digits[n++] = (char)('0' + u % 10);
+    while ((u /= 10) && n < 11);
+    while (n && o < end)
+        *o++ = digits[--n];
+    return o;
+}
+
+void AW_NpcTableCellKey (int cx, int cy, char *out, int size)
+{
+    char *o = out, *end = out + size - 1;
+    if (size <= 0)
+        return;
+    if (o < end)
+        *o++ = 'c';
+    o = put_int (o, end, cx);
+    if (o < end)
+        *o++ = '_';
+    o = put_int (o, end, cy);
+    *o = 0;
+}
+
+static int table_at (const aw_npc_tables_t *t, const char *key)
+{
+    int i;
+    for (i=0 ; i<t->count ; i++)
+        if (!strcmp (t->t[i].key, key))
+            return i;
+    return -1;
+}
+
+int AW_NpcTablesHas (const aw_npc_tables_t *t, const char *key)
+{
+    return t && key && table_at (t, key) >= 0;
+}
+
+static unsigned u16 (const unsigned char *p) {return (unsigned)p[0] << 8 | p[1];}
+static unsigned long u32 (const unsigned char *p) {return (unsigned long)u16 (p) << 16 | u16 (p + 2);}
+
+unsigned long AW_NpcIdHash (const char *id)
+{
+    unsigned long h = 0x811C9DC5UL;
+    for ( ; id && *id ; id++)
+        h = ((h ^ (unsigned long)(unsigned char)lower ((unsigned char)*id)) * 0x01000193UL) & 0xFFFFFFFFUL;
+    return h;
+}
+
+long AW_NpcPackIndexBytes (const unsigned char *head)
+{
+    return head && !memcmp (head, "AWNP", 4) ? 8 + 12L * (long)u16 (head + 4) : -1;
+}
+
+static int s16 (const unsigned char *p) {int v = (int)u16 (p); return v >= 0x8000 ? v - 0x10000 : v;}
+
+int AW_NpcPackFind (const unsigned char *index, long size, int cx, int cy, unsigned long *at, unsigned long *bytes)
+{
+    long lo, hi;
+    if (!index || size < 8 || AW_NpcPackIndexBytes (index) != size)
+        return 0;
+    for (lo = 0, hi = (long)u16 (index + 4) - 1 ; lo <= hi ; )
+    {
+        long mid = (lo + hi) / 2;
+        const unsigned char *e = index + 8 + 12 * mid;
+        int x = s16 (e), y = s16 (e + 2);
+        if (x == cx && y == cy)
+        {
+            *at = u32 (e + 4);
+            *bytes = u32 (e + 8);
+            return 1;
+        }
+        if (x < cx || (x == cx && y < cy))
+            lo = mid + 1;
+        else
+            hi = mid - 1;
+    }
+    return 0;
+}
+
+int AW_NpcDirCount (const unsigned char *data, long size)
+{
+    long places, count, names, i;
+    if (!data || size < 12 || memcmp (data, "AWND", 4))
+        return 0;
+    places = (long)u16 (data + 4);
+    count = (long)u32 (data + 8);
+    names = 12 + 6 * count + 2 * places;
+    if (count > 0xFFFF || names > size || (places && data[size - 1]))
+        return 0;
+    for (i=0 ; i<places ; i++)
+        if (names + (long)u16 (data + 12 + 6 * count + 2 * i) >= size)
+            return 0;
+    return (int)count;
+}
+
+int AW_NpcDirFind (const unsigned char *data, long size, const char *id, char *key, int keysize)
+{
+    long lo, hi, count = AW_NpcDirCount (data, size), places;
+    unsigned long h;
+    if (!count || !id || !key || keysize < 1)
+        return 0;
+    places = (long)u16 (data + 4);
+    h = AW_NpcIdHash (id);
+    for (lo = 0, hi = count - 1 ; lo <= hi ; )
+    {
+        long mid = (lo + hi) / 2;
+        const unsigned char *e = data + 12 + 6 * mid;
+        if (u32 (e) == h)
+        {
+            unsigned place = u16 (e + 4);
+            const unsigned char *offsets = data + 12 + 6 * count;
+            if ((long)place >= places)
+                return 0;
+            strncpy (key, (const char *)offsets + 2 * places + u16 (offsets + 2 * place), (size_t)keysize - 1);
+            key[keysize - 1] = 0;
+            return 1;
+        }
+        if (u32 (e) < h)
+            lo = mid + 1;
+        else
+            hi = mid - 1;
+    }
+    return 0;
+}
+
+static int read_int (const char **p, int *out)
+{
+    int sign = 1, n = 0, digits = 0;
+    if (**p == '-')
+    {
+        sign = -1;
+        (*p)++;
+    }
+    while (**p >= '0' && **p <= '9' && digits < 9)
+    {
+        n = n * 10 + (*(*p)++ - '0');
+        digits++;
+    }
+    *out = sign * n;
+    return digits > 0;
+}
+
+int AW_NpcCellOfKey (const char *key, int *cx, int *cy)
+{
+    const char *p = key;
+    if (!p || *p++ != 'c' || !read_int (&p, cx) || *p++ != '_' || !read_int (&p, cy) || *p)
+        return 0;
+    return 1;
+}
+
+/* AWNB version 2 (npc_recipes.table_bytes): 12-byte header, the records, a u16 offset per name, the names */
+int AW_NpcTableCount (const unsigned char *data, long size)
+{
+    long count, names, blob, i;
+    if (!data || size < 12 || memcmp (data, "AWNB", 4) || data[4] != 2 || data[5] != AW_NPC_RECORD)
+        return -1;
+    count = (long)u16 (data + 6);
+    names = (long)u16 (data + 8);
+    blob = 12 + count * AW_NPC_RECORD + 2 * names;
+    if (blob > size || (names && data[size - 1]))
+        return -1;
+    for (i=0 ; i<names ; i++)
+        if (blob + (long)u16 (data + 12 + count * AW_NPC_RECORD + 2 * i) >= size)
+            return -1;
+    return (int)count;
+}
+
+/* name INDEX of a checked table into OUT; 0 when out of range */
+static int table_name (const unsigned char *data, unsigned index, char *out)
+{
+    long count = (long)u16 (data + 6), names = (long)u16 (data + 8), at = 12 + count * AW_NPC_RECORD;
+    if ((long)index >= names)
+        return 0;
+    strncpy (out, (const char *)data + at + 2 * names + u16 (data + at + 2 * index), AW_PARTS_ID - 1);
+    out[AW_PARTS_ID - 1] = 0;
+    return 1;
+}
+
+int AW_NpcTableFind (const unsigned char *data, long size, const char *id, aw_parts_npc_t *out)
+{
+    long lo, hi, count = AW_NpcTableCount (data, size);
+    unsigned long h;
+    if (count <= 0 || !id || !out)
+        return 0;
+    h = AW_NpcIdHash (id);
+    for (lo = 0, hi = count - 1 ; lo <= hi ; )
+    {
+        long mid = (lo + hi) / 2;
+        const unsigned char *r = data + 12 + mid * AW_NPC_RECORD;
+        unsigned long rh = u32 (r);
+        if (rh == h)
+        {
+            int i, n = r[5];
+            unsigned head = u16 (r + 6), hair = u16 (r + 8);
+            memset (out, 0, sizeof(*out));
+            if (n > AW_PARTS_ITEMS || !table_name (data, r[4] >> 1, out->race) ||
+                (head != 0xFFFF && !table_name (data, head, out->head)) ||
+                (hair != 0xFFFF && !table_name (data, hair, out->hair)))
+                return 0;
+            out->female = r[4] & 1;
+            for (i=0 ; i<n ; i++)
+                if (!table_name (data, u16 (r + 10 + 2 * i), out->items[out->count++]))
+                    return 0;
+            return 1;
+        }
+        if (rh < h)
+            lo = mid + 1;
+        else
+            hi = mid - 1;
+    }
+    return 0;
+}
+
+int AW_NpcTablesAdd (aw_npc_tables_t *t, const char *key, unsigned char *data, long bytes)
+{
+    size_t n;
+    if (!t || !key || !data || (n = strlen (key)) >= AW_PARTS_ID || table_at (t, key) >= 0 ||
+        AW_NpcTableCount (data, bytes) < 0)
+        return 0;
+    if (t->count >= AW_NPC_TABLES)
+        return -1;
+    memcpy (t->t[t->count].key, key, n + 1);
+    t->t[t->count].data = data;
+    t->t[t->count].bytes = bytes;
+    t->count++;
+    t->bytes += bytes;
+    return 1;
+}
+
+static unsigned char *drop_at (aw_npc_tables_t *t, int i, long *bytes)
+{
+    unsigned char *text = t->t[i].data;
+    if (bytes)
+        *bytes = t->t[i].bytes;
+    t->bytes -= t->t[i].bytes;
+    t->t[i] = t->t[--t->count];
+    memset (&t->t[t->count], 0, sizeof(t->t[t->count]));
+    return text;
+}
+
+unsigned char *AW_NpcTablesDrop (aw_npc_tables_t *t, const char *key, long *bytes)
+{
+    int i = t && key ? table_at (t, key) : -1;
+    return i < 0 ? NULL : drop_at (t, i, bytes);
+}
+
+unsigned char *AW_NpcTablesPop (aw_npc_tables_t *t, long *bytes)
+{
+    return t && t->count ? drop_at (t, t->count - 1, bytes) : NULL;
+}
+
+int AW_NpcTablesFind (const aw_npc_tables_t *t, const char *id, aw_parts_npc_t *out)
+{
+    int i;
+    for (i=0 ; t && i<t->count ; i++)
+        if (AW_NpcTableFind (t->t[i].data, t->t[i].bytes, id, out))
+            return 1;
+    return 0;
+}
+
+/* tools/player_inventory_pose.py GROUPS: unarmed, then the original's melee weapon types 0..8 */
+static const char *const inventory_groups[10] = {
+    "inventoryhandtohand", "inventoryshortbladeonehand", "inventoryweapononehand", "inventoryweapontwohand",
+    "inventorybluntonehand", "inventoryblunttwohand", "inventoryweapontwowide", "inventoryweapontwowide",
+    "inventorybluntonehand", "inventoryblunttwohand"};
+
+int AW_PartsInventoryGroups (int type, const char *out[2], int *show_left)
+{
+    int two;
+    const char *fallback;
+    if (type < 0 || type > 8)
+        type = -1;
+    two = type == 2 || type == 4 || type == 5 || type == 6 || type == 8;
+    if (show_left)
+        *show_left = !two;
+    out[0] = inventory_groups[type + 1];
+    out[1] = NULL;
+    if (type < 0)
+        return 1;
+    fallback = two ? "inventoryweapontwohand" : "inventoryweapononehand";
+    if (strcmp (fallback, out[0]))
+        out[1] = fallback;
+    return out[1] ? 2 : 1;
+}

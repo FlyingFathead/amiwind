@@ -8,6 +8,7 @@
 typedef struct {
     char name[48],race[48],clas[48],birth[48];
     int level,classed;                  /* classed: major/minor from the class */
+    int level_progress,level_total;     /* LEVEL-UP-58: raises toward the next level, of iLevelupTotal (0 = no bar) */
     float current[3],maximum[3];        /* health, magicka, fatigue */
     short attributes[8],base[8];        /* current (base + modifiers - damage) and base */
     short skills[27];

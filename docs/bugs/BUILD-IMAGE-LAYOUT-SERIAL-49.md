@@ -2,10 +2,11 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 2 times; something has to be done
+## PERSISTING: reported 3 times; something has to be done
 
 - Reported with v0.0.51-dev3 at 2026-10-25 09:25 +0200: dev3: layout plan and partitions 1m23s at 1.53 of 24 cores, partitions 1m18s at 1.57; image under half its cores 5 times
 - Reported with v0.0.57-dev1 at 2026-10-30 11:55 +0200: v0.0.57-dev2 full build: the image layout write (_write_layout_task) ran on 2 usable cores and took 120 s with the same 2 units (was 64 s); the perf guard failed on it
+- Reported with v0.0.59-dev6 at 2026-11-03 12:44 +0000: v0.0.59-dev6 full build (2026_11_03_v0.0.59-dev6_full-v0.0.59-dev6_7973537): the perf guard failed the image's parallel layout write, 104 s for the same 2 units against 56 s before (+88 %), on 1.52 cores; two gates and emulator sessions ran on the host beside it. Perf only, the delivery went on.
 
 <!-- END GENERATED PERSISTING -->
 

@@ -23,6 +23,7 @@
 #include "aw_combat.h"
 #include "aw_items.h"
 #include "aw_character.h"
+#include "aw_levelup.h"
 #include "aw_anim.h"
 #include "aw_move.h"
 #include "aw_hand_models.h"
@@ -561,6 +562,9 @@ static void begin_encounter(void) {
 }
 /* Make an NPC hostile to the player. fighter: its sheet; layout: frame
  * groups (fighters.txt) or NULL for the model's own frames. */
+/* Set by AW_CombatTestEngage(t,1): the slot is taken only to hold a corpse (a killed actor's saved death applied on
+ * a scene load): no encounter starts, no weapon is drawn, no battle cry and no "attacks" line (COMBAT-DEAD-ACTOR-RELOAD-59). */
+static int engage_dead;
 int AW_CombatEngage(edict_t *e,const aw_fighter_t *fighter,const char *layout) {
     slot_t *s=slot_of(e);int i;
     if(!combat_on.value || !e || e->free || !fighter || !AW_CombatSettingsLoad())return 0;
@@ -574,7 +578,7 @@ int AW_CombatEngage(edict_t *e,const aw_fighter_t *fighter,const char *layout) {
             release(&slots[i]);break;
         }
         if(i==SLOTS){Con_Printf("Combat: %ld hostile NPCs already.\n",(long)SLOTS);return 0;}s=&slots[i];}
-    if(!AW_CombatHostiles())begin_encounter();
+    if(!engage_dead && !AW_CombatHostiles())begin_encounter();
     AW_ItemsHide(s->item);      /* a re-engaged NPC: its items again from the start */
     memset(s,0,sizeof(*s));s->e=e;s->f=*fighter;s->f.aware=1;
     s->think=e->v.think;s->nextthink=e->v.nextthink;e->v.nextthink=0;    /* its QuakeC idle stops */
@@ -594,6 +598,7 @@ int AW_CombatEngage(edict_t *e,const aw_fighter_t *fighter,const char *layout) {
         retry.npc[s-slots].e=e;VectorCopy(e->v.origin,retry.npc[s-slots].origin);VectorCopy(e->v.angles,retry.npc[s-slots].angles);
         retry.npc[s-slots].f=s->f;retry.npc[s-slots].health=e->v.health;
     }
+    if(engage_dead)return 1;    /* a corpse: the caller marks it dead at once */
     AW_ItemsShow(e,s->item);    /* a resident draws its weapon and shield (NPC-WEAPON-MESH-33) */
     if(readout.value)Con_Printf("Combat: %s (level %ld) attacks; seed %lu\n",s->f.name,(long)s->f.level,seed_used);
     voice(e,AW_VOICE_START);
@@ -710,11 +715,16 @@ static void npc_strike(slot_t *s,edict_t *p) {
     if(out.outcome==AW_HIT_BLOCKED){
         totals.npc_misses++;totals.player_blocks++;if(!mapped)shield_sound(&you);p->v.punchangle[0]=-4;p->v.punchangle[2]=3;
         block_shown_until=(float)sv.time+block_seconds*(1-block_hit);
+        AW_LevelupUse(AW_SK_BLOCK,0,1);       /* LEVEL-UP-58: Block_Success (OpenMW combat.cpp blockMeleeAttack) */
     }
     else if(out.outcome==AW_HIT_MISS){totals.npc_misses++;if(!mapped)sound(SND_SWISH);player_react_miss(p,&out);}
     else{
         totals.npc_hits++;
         if(out.outcome==AW_HIT_HEALTH){totals.taken_health+=out.damage;flash(out.damage);if(!mapped)sound(SND_HEALTH);
+            /* LEVEL-UP-58: Armor_HitByOpponent for the piece the blow lands on, Unarmored for an empty slot (OpenMW
+             * files/data-mw/scripts/omw/combat/local.lua applyArmor); the slot by the roll the hit sounds used */
+            {int c=AW_HIT_CLASS(&you,AW_CombatArmorHitSlot((int)((sound_state>>8)%100)));
+             AW_LevelupUse(c==1?AW_SK_LIGHT:c==2?AW_SK_MEDIUM:c==3?AW_SK_HEAVY:AW_SK_UNARMORED,0,1);}
             /* the player says a Hit line too (OpenMW npc.cpp onHit: the player is an NPC there; iVoiceHitOdds; his race and
              * sex's lines from the voice table, aw_glut.c player row; COMBAT-VOICES-SILENT-33) */
             if(!you.dead)voice(p,AW_VOICE_HIT);}
@@ -839,6 +849,8 @@ static void player_strike(edict_t *p) {
     else{
         totals.player_hits++;
         if(out.outcome==AW_HIT_HEALTH)totals.dealt_health+=out.damage;else totals.dealt_fatigue+=out.damage;
+        /* LEVEL-UP-58: Weapon_SuccessfulHit for the weapon's skill, Hand-to-hand for fists (OpenMW combat local.lua) */
+        AW_LevelupUse(you.weapon?you.weapon_skill:AW_SK_H2H,0,1);
         if(!mapped)sound(out.critical?SND_CRITICAL:out.outcome==AW_HIT_HEALTH?SND_HEALTH:SND_PUNCH);
     }
     print_swing("You",s->f.name,attack,&out);
@@ -1293,7 +1305,8 @@ int AW_CombatTestEngage(edict_t *t,int dead) {
         v=GetEdictFieldValue(t,"aw_source_id");
         if(!v || !v->string || !*(pr_strings+v->string))return 0;
         strncpy(id,pr_strings+v->string,sizeof(id)-1);id[sizeof(id)-1]=0;
-        if(!AW_CombatActorLoad(id,&sheet) || !AW_CombatEngage(t,&sheet,NULL))return 0;
+        {int ok;engage_dead=dead?1:0;ok=AW_CombatActorLoad(id,&sheet) && AW_CombatEngage(t,&sheet,NULL);engage_dead=0;
+         if(!ok)return 0;}
         s=slot_of(t);if(!s)return 0;
     }
     if(dead){s->f.dead=1;s->f.health=0;set_state(s,S_DEAD,G_DEATH);}

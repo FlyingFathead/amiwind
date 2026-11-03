@@ -1,10 +1,11 @@
 # Changelog
 
-_Last updated with AmiWind v0.0.58 (1 November 2026)._
+_Last updated with AmiWind v0.0.59 (3 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.59: Assembling The Bits And Pieces, Once Again, 3 November 2026](#v0059-assembling-the-bits-and-pieces-once-again-3-november-2026)
 - [v0.0.58: Time To Talk, 1 November 2026](#v0058-time-to-talk-1-november-2026)
 - [v0.0.57: Remembering The Emperor, 31 October 2026](#v0057-remembering-the-emperor-31-october-2026)
 - [v0.0.56: Some Velvet Morning, 29 October 2026](#v0056-some-velvet-morning-29-october-2026)
@@ -166,6 +167,27 @@ _Last updated with AmiWind v0.0.58 (1 November 2026)._
 - [CHIM source candidate - 14 October 2026, v0.0.40-dev1](#chim-source-candidate---14-october-2026-v0040-dev1)
 
 <!-- contents end -->
+
+## v0.0.59: Assembling The Bits And Pieces, Once Again, 3 November 2026
+
+- World items: every item has its own world model (880 models in one shared table, checked for every carriable item by
+  the builder), a model table of 512 entries per map, the items of the game placed from the table and taken, and an
+  index of every item you can pick up.
+- The world remembers: one change list keeps taken, dropped and moved items, disabled and locked objects, the stolen
+  mark, open doors, container contents and faction ranks across rooms and saved games; respawn by the original rules;
+  saves made with other game data load.
+- The player: the body and first-person arms assembled from parts and kept in memory (the Seyda Neen arrival frame from
+  12 to 15 seconds down to about 1 second); `dbg give weapons`; a HUD picture for every weapon.
+- The container strip, the original journal view without the old caps, and resting and waiting with the original's
+  rules and the level-up after a full rest.
+- Dialogue text macros as compact codes with bound key names, 34 named sound events, and the original mouse cursor.
+- Fixes: conversations open at once again, topic links keep their words, placed items stay taken, save marks and save
+  size, the HUD weapon box, the coordinate conversion on the streamed towns, a dead actor that started combat on load,
+  the Arrille's Tradehouse long frame, the container take stall and the disk images padded to whole IDE cylinders.
+- Builds and the Toolkit (0.1.20): fewer rebuilds, the CHIM world pack in two passes on the worker pool, frame wait
+  counters and emulator sessions on the A1200 IDE controller.
+- The sixth development snapshot with its version number; the rest moved to v0.0.60
+  ([release notes](releases/notes/RELEASE-v0.0.59.md)).
 
 ## v0.0.58: Time To Talk, 1 November 2026
 
@@ -467,8 +489,8 @@ _Last updated with AmiWind v0.0.58 (1 November 2026)._
   ([CHIM-STAIR-STEPS-SOLID-43](bugs/CHIM-STAIR-STEPS-SOLID-43.md)); two tree meshes no longer keep 14 cells off CHIM.
 - Red Mountain's summit no longer meets a solid sky ceiling, editor markers are no longer drawn or solid, and
   interior plants and trees are sprites by default.
-- The build checks a pooled stage against the memory it needs before it starts, the image step's frame maps run on
-  all cores, and the playtest is smaller.
+- The build checks a pooled stage against the memory it needs before it starts, the image step's frame maps run in
+  parallel, and the playtest is smaller.
 - Details: [the v0.0.43 release notes](releases/notes/RELEASE-v0.0.43.md).
 
 ## v0.0.42: Things Are Starting To Look Pretty Khuul, 17 October 2026

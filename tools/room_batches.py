@@ -487,7 +487,17 @@ def install(stage_dir, id1, jobs=None):
     record = json.loads((stage_dir / RECORD).read_text(encoding='utf-8'))
     if record.get('format') != STAGE_FORMAT:
         raise ValueError('Not a room batches output: %s' % stage_dir)
-    conflicts = []
+    from npc_recipes import MERGEABLE  # files each stage writes for its own part: merged, not a collision
+    conflicts, merged = [], {}
+
+    def other_bytes(rel):
+        if rel not in MERGEABLE:
+            conflicts.append('%s: staged in the image with other bytes' % rel)
+            return
+        try:
+            merged[rel] = MERGEABLE[rel](id1 / rel, stage_dir / 'id1' / rel, 'chim-room-batches')
+        except ValueError as error:
+            conflicts.append(str(error))
     threads = install_threads(jobs)
     if threads > 1:
         # BUILD-IMAGE-UNDERUSED-32: 13,141 files (1.7 GB) hashed twice and copied one by one, silently, 5 to 14 s
@@ -502,27 +512,29 @@ def install(stage_dir, id1, jobs=None):
             if source_sha != sha:
                 conflicts.append('%s: changed since the stage wrote it' % rel)
             elif target_sha is not None and target_sha != sha:
-                conflicts.append('%s: staged in the image with other bytes' % rel)
+                other_bytes(rel)
     else:
         for rel, sha in record['files'].items():
             source, target = stage_dir / 'id1' / rel, id1 / rel
             if hashlib.sha256(source.read_bytes()).hexdigest() != sha:
                 conflicts.append('%s: changed since the stage wrote it' % rel)
             elif target.is_file() and hashlib.sha256(target.read_bytes()).hexdigest() != sha:
-                conflicts.append('%s: staged in the image with other bytes' % rel)
+                other_bytes(rel)
     if conflicts:
         raise ValueError('Room batches collide with the image: %s' % '; '.join(conflicts[:8]))
     for folder in sorted({(id1 / rel).parent for rel in record['files']}):
         folder.mkdir(parents=True, exist_ok=True)
+    plain = [rel for rel in record['files'] if rel not in merged]
     if threads > 1:
         from concurrent.futures import ThreadPoolExecutor
         with ThreadPoolExecutor(max_workers=threads) as pool:
-            for _ in pool.map(lambda rel: shutil.copyfile(stage_dir / 'id1' / rel, id1 / rel), list(record['files']),
-                              chunksize=64):
+            for _ in pool.map(lambda rel: shutil.copyfile(stage_dir / 'id1' / rel, id1 / rel), plain, chunksize=64):
                 pass
     else:
-        for rel in record['files']:
+        for rel in plain:
             shutil.copyfile(stage_dir / 'id1' / rel, id1 / rel)
+    for rel, data in sorted(merged.items()):
+        (id1 / rel).write_bytes(data)
     return {'rooms': {r['room'].casefold(): r['map'] for r in record['rooms']}, 'files': len(record['files']),
             'record': record}
 

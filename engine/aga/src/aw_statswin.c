@@ -42,6 +42,8 @@ const char *AW_StatsAttributeName(int i){return i>=0 && i<8?attribute_names[i]:"
 const char *AW_StatsSkillName(int i){return i>=0 && i<27?skill_names[i]:"";}
 
 static int skill_top;
+/* aw_levelup.c sets it when the levelling data loads: iLevelupTotal, the level progress bar's end (0 = no bar). */
+int aw_stats_level_total;
 static aw_magic_list_t *magic;   /* only while the Magic window is open */
 
 /* the name cut to the field (no strncpy: -O2 warns on the cut, -Wstringop-truncation) */
@@ -52,6 +54,7 @@ int AW_StatsSheet(aw_stats_sheet_t *s){
     copy(s->name,sizeof(s->name),aw_story.name);
     if(!c->valid)return 0;
     s->level=c->level>0?c->level:1;
+    s->level_progress=c->level_progress;s->level_total=aw_stats_level_total;
     if(c->race>=0 && c->race<aw_race_count)copy(s->race,sizeof(s->race),aw_races[c->race].name);
     if(c->birth>=0 && c->birth<aw_birth_count)copy(s->birth,sizeof(s->birth),aw_births[c->birth].name);
     if(c->clas>=0 && c->clas<aw_class_count){
@@ -128,6 +131,13 @@ void AW_StatsDrawSheet(const aw_stats_sheet_t *s,int top){
     bar(40,"Fatigue",s->current[2],s->maximum[2],AW_UIColor(40,160,56),gold);
     AW_UIFill(8,50,122,1,muted);
     sprintf(line,"%ld",(long)s->level);pair(8,54,130,"Level",line,gold,gold);
+    /* the level progress under the level (the original's Level bar: raises of major and minor skills toward the
+     * next level, LEVEL-UP-58) */
+    if(s->level_total>0){
+        int filled=122*(s->level_progress<s->level_total?s->level_progress:s->level_total)/s->level_total;
+        AW_UIFill(8,60,122,1,AW_UIColor(48,39,22));
+        if(filled>0)AW_UIFill(8,60,filled,1,AW_UIColor(200,40,32));
+    }
     pair(8,62,130,"Race",s->race[0]?s->race:"-",gold,gold);
     pair(8,70,130,"Class",s->clas[0]?s->clas:"-",gold,gold);
     AW_UIFill(8,80,122,1,muted);

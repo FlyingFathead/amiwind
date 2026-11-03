@@ -29,6 +29,9 @@ float AW_HandDuration(int clip,float fallback){(void)fallback;return clip==3?.9f
 int AW_ItemsShow(edict_t *a,edict_t *o[AW_ITEMS_KINDS]){(void)a;o[0]=o[1]=NULL;items_shown++;return 0;}
 void AW_ItemsUpdate(edict_t *a,edict_t *i[AW_ITEMS_KINDS]){(void)a;(void)i;}
 void AW_ItemsHide(edict_t *i[AW_ITEMS_KINDS]){i[0]=i[1]=NULL;items_hidden++;}
+/* aw_levelup.c (its own fixture aga_levelup_rules_test.c): the skill uses the fights report, counted by skill. */
+static int skill_uses[27];
+int AW_LevelupUse(int skill,int use,float scale){assert(skill>=0 && skill<27 && use==0 && scale==1);skill_uses[skill]++;return 0;}
 static char strings[256];static int string_at=1;
 static edict_t edicts[16];static client_t client;static dprograms_t program;static model_t model;
 static eval_t fields[16][8];
@@ -343,6 +346,8 @@ int main(void){
         run("-aw_alt");run("aw_combat_cmd block hold");
         AW_CombatClear();aw_combat_player_preset=NULL;p->v.health=60;p->v.angles[1]=0;
         printf("blocking ok: held %lu, not held %lu, automatic %lu of 40 blows\n",held_blocks,free_blocks,auto_blocks);
+        /* LEVEL-UP-58: every block the player made is one Block use */
+        assert(skill_uses[AW_SK_BLOCK]==(int)(held_blocks+auto_blocks));
     }
 
     /* Actual equipment updates preserve live vital/status state and condition. */
@@ -374,10 +379,30 @@ int main(void){
         aw_combat_equipment_store=NULL;aw_combat_equipment=NULL;
         AW_CombatClear();
     }
+    /* COMBAT-DEAD-ACTOR-RELOAD-59: a killed actor's saved death applied on a scene load (aw_actors.c ApplyLoaded,
+     * "chim actors kill") takes a combat slot only to hold the corpse: no "attacks" line, no encounter, no weapon
+     * drawn, no battle cry, never counted as a hostile. */
+    {int was_printed,was_shown,was_start;float h=-1;
+     AW_CombatClear();run("aw_combat_cmd readout on");
+     was_printed=printed;was_shown=items_shown;was_start=voices[AW_VOICE_START];
+     assert(AW_CombatTestEngage(resident,1));
+     assert(printed==was_printed && items_shown==was_shown && voices[AW_VOICE_START]==was_start);
+     assert(AW_CombatSlotState(resident,&h)==2 && h==0 && AW_CombatHostiles()==0 && !AW_PlayerInCombat());
+     AW_CombatClear();
+     /* a living engage still announces itself */
+     assert(AW_CombatTestEngage(resident,0));
+     assert(printed==was_printed+1 && items_shown==was_shown+1 && voices[AW_VOICE_START]==was_start+1);
+     assert(AW_CombatSlotState(resident,NULL)==1 && AW_CombatHostiles()==1);
+     AW_CombatClear();}
     /* commands and cost */
     run("aw_combat_cmd");run("aw_combat_cmd readout off");run("aw_combat_cmd calm");run("aw_combat_cmd off");
     assert(!AW_CombatEngage(npc,&f,NULL));
     run("aw_combat_cmd on");
+    /* LEVEL-UP-58: the player's landed blows report their skill, the blows the player took the armour or Unarmored */
+    {int armour=skill_uses[AW_SK_LIGHT]+skill_uses[AW_SK_MEDIUM]+skill_uses[AW_SK_HEAVY]+skill_uses[AW_SK_UNARMORED];
+     assert(skill_uses[AW_SK_H2H]>0 && armour>0);
+     printf("skill uses ok: hand-to-hand %ld, block %ld, armour or unarmored %ld\n",(long)skill_uses[AW_SK_H2H],
+            (long)skill_uses[AW_SK_BLOCK],(long)armour);}
     printf("combat ok: %ld steps, %ld sounds\n",(long)steps,(long)sounds);
     AW_CombatClear();assert(items_hidden>=items_shown);   /* every release hides them */
     return 0;

@@ -39,9 +39,17 @@ import re
 #   cvar_default: chim/chim_world.c's cvar defaults, chim_statics.c's CHIM_MAX_STATICS) counts by its facts too, so a
 #   diagnostic print in chim_world.c re-keys no CHIM world; a declaration whose string literal is a name the stage
 #   reaches (a cvar's {"name", "value"}) defines that name.
+# 3 (BUILD-ENGINE-SOURCE-KEY-BROAD-36, reopened 2026-11-03): the frame timing header (TIMING_HEADERS) counts only by
+#   what can carry a layout. Its prototypes, extern counters, function-like timing macros and slot enums were kept
+#   because a prototype shares its name with the host-test stub macro (the "macro used as a declaration" rule), the
+#   chunk code names a slot and quakedef.h's disk wait wrappers call the macros: three timing edits of v0.0.59
+#   re-keyed the CHIM world and its interiors. A struct, union, typedef or object-like macro there still counts, and a
+#   timing item still counts when such a layout item names it.
 # A record made by an earlier version is compared through its own source tree (translate).
-VERSION = 2
-PREFIXES = {1: 'cfacts1:', 2: 'cfacts2:'}
+VERSION = 3
+PREFIXES = {1: 'cfacts1:', 2: 'cfacts2:', 3: 'cfacts3:'}
+# Engine headers that only time frames (spike slots, wait counters, their macros): version 3 reads them by layout
+TIMING_HEADERS = frozenset({'engine/aga/src/aw_spike.h'})
 PREFIX = PREFIXES[VERSION]
 C_SUFFIXES = ('.c', '.h', '.inc')
 HEADER = '.h'
@@ -214,7 +222,8 @@ def parse_header(text, version=1):
                         uses.update(IDENTIFIER.findall(directive))
                 items.append({'stack': snapshot(), 'text': norm,
                               'defines': frozenset([name.group(0)]) if name else frozenset(),
-                              'uses': frozenset(uses), 'always': not name, 'call': None, 'paste': '##' in body})
+                              'uses': frozenset(uses), 'always': not name, 'call': None, 'paste': '##' in body,
+                              'function_macro': bool(name) and body.startswith('(')})
             elif item is None and keyword not in ('include', 'include_next', 'import', ''):
                 items.append({'stack': snapshot(), 'text': norm, 'defines': frozenset(),
                               'uses': frozenset(IDENTIFIER.findall(rest)), 'always': True, 'call': None,
@@ -251,13 +260,39 @@ def parse_header(text, version=1):
     return items
 
 
+def _shapes(item):
+    """True when ITEM can carry a size or a value into what it declares: not a function (body or prototype) and not a
+    function-like macro (version 3)."""
+    if item.get('body') or item.get('function_macro'):
+        return False
+    return not (item['call'] and not item['text'].startswith('typedef'))
+
+
+def _timing_only(item):
+    """True for an item of a TIMING_HEADERS file that only times frames (version 3): a function, a prototype, an
+    extern variable, a function-like macro, an #undef (the disk wait wrappers replace fopen, fread and fseek) or an
+    enum of slot numbers. A struct, union, typedef or object-like macro is never timing-only: it can carry a
+    layout."""
+    text = item['text']
+    if text.startswith('typedef') or any(re.search(r'\b%s\s+\w+\s*\{' % tag, text) for tag in ('struct', 'union')):
+        return False
+    if text.startswith('#'):
+        return bool(item.get('function_macro')) or text.startswith('#undef')
+    return not _shapes(item) or text.startswith('extern') or text.startswith('enum {')
+
+
 def kept_items(headers, roots, version=1, definitions_only=()):
     """({path: [kept item, ...]}, uncertain) of HEADERS {path: text} for the names ROOTS can reach (module doc).
     DEFINITIONS_ONLY: files nothing compiles, read only for single definitions (a .c file named only in define()
-    or cvar_default calls): their function bodies are never kept (version 2)."""
+    or cvar_default calls): their function bodies are never kept (version 2).
+    Version 3: a timing-only item of a TIMING_HEADERS file (_timing_only) is kept only when an item that can carry a
+    layout (_shapes: a struct, typedef, variable or object-like macro outside the timing items) names it; the names
+    a function body, a prototype, a function-like macro or the reached code itself use do not keep it."""
     parsed = {path: parse_header(text, version) for path, text in headers.items()}
     parsed = {path: [item for item in items if not (path in definitions_only and item.get('body'))]
               for path, items in parsed.items()}
+    timing = {(path, index) for path, items in parsed.items() if version >= 3 and path in TIMING_HEADERS
+              for index, item in enumerate(items) if _timing_only(item)}
     macros = {name for items in parsed.values() for item in items if item['text'].startswith('#define')
               for name in item['defines']}
     by_name = {}
@@ -265,21 +300,28 @@ def kept_items(headers, roots, version=1, definitions_only=()):
         for index, item in enumerate(items):
             for name in item['defines']:
                 by_name.setdefault(name, []).append((path, index))
-    reached, kept, pending = set(roots), set(), list(roots)
+    # (name, reached from a layout item): a timing-only item is kept only on the second
+    reached, kept = {(name, False) for name in roots}, set()
+    pending = list(reached)
 
     def keep(ref):
         kept.add(ref)
-        for name in parsed[ref[0]][ref[1]]['uses']:
-            if name not in reached:
-                reached.add(name)
-                pending.append(name)
+        item = parsed[ref[0]][ref[1]]
+        shaped = ref not in timing and _shapes(item)
+        for name in item['uses']:
+            if (name, shaped) not in reached:
+                reached.add((name, shaped))
+                pending.append((name, shaped))
     for path, items in parsed.items():
         for index, item in enumerate(items):
+            if (path, index) in timing and not item['always']:
+                continue
             if item['always'] or item['call'] in macros:
                 keep((path, index))
     while pending:
-        for ref in by_name.get(pending.pop(), ()):
-            if ref not in kept:
+        name, shaped = pending.pop()
+        for ref in by_name.get(name, ()):
+            if ref not in kept and (shaped or ref not in timing):
                 keep(ref)
     out = {path: [item for index, item in enumerate(items) if (path, index) in kept] for path, items in parsed.items()}
     uncertain = any(item['paste'] for items in out.values() for item in items)

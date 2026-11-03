@@ -1,0 +1,53 @@
+# Census and Excise Office silver plate (MWSCRIPT-TRAY-SMOKE-58; docs/CENSUS_TRAY_SMOKE.md).
+# A full image, FS-UAE at 32 MB Fast, started with --map seyda. A character after the census (dbg aw hors), then the
+# office: take the crab meat off the plate (E: Take), steal the plate (E: Steal, reference 119580, owned by
+# "a shady smuggler"), turn to the open floor and drop it, quicksave and quickload, look at it again.
+# Expected console lines: "stolen misc_imp_silverware_plate_01 from a shady smuggler: 1" after the take, after the
+# drop and after the load; "drops 1" after the drop and after the load; the plate on the floor in t3 and t4.
+wait 8
+cmd dbg all on
+cmd dbg headlamp off
+cmd dbg god on
+cmd dbg aw hors
+wait 12
+cmd dbg scene census
+wait 15
+state map
+cmd dbg noclip
+cmd aw_view 145 200 74 270 39
+cmd dbg noclip
+wait 4
+state local
+shot t1-aim-crabmeat
+key e
+wait 3
+shot t2-aim-plate-steal
+key e
+wait 3
+shot t2b-plate-taken
+cmd aw_mwscript_status call getpccrimelevel
+cmd aw_placed ledger
+cmd aw_mwscript_status
+wait 2
+cmd dbg noclip
+cmd aw_view 145 200 74 90 35
+cmd dbg noclip
+wait 3
+cmd aw_inventory drop misc_imp_silverware_plate_01
+wait 3
+shot t3-dropped
+cmd aw_placed ledger
+wait 2
+cmd aw_quicksave
+wait 4
+cmd aw_quickload
+key Return
+key Return
+wait 15
+state map
+cmd dbg noclip
+cmd aw_view 145 200 74 90 35
+cmd dbg noclip
+wait 4
+cmd aw_placed ledger
+shot t4-after-load

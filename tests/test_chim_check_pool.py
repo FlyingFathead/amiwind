@@ -82,7 +82,8 @@ class CheckPoolTests(unittest.TestCase):
         self.assertEqual(sha([{k: v for k, v in f.items() if k != 'trees'} for f in sworld['visibility']]),
                          sha([{k: v for k, v in f.items() if k != 'trees'} for f in pworld['visibility']]))
         # one progress line per frame (fixlist B2): [done/total frames] CHIM validation: <frame file>: N failures
-        lines = [x for x in err.splitlines() if 'CHIM validation:' in x]
+        # (the timed phase lines, '[+N.Ns] CHIM validation: <part>: ...', are left out here)
+        lines = [x for x in err.splitlines() if 'CHIM validation:' in x and ' frames] CHIM validation:' in x]
         self.assertEqual(len(lines), 2)
         self.assertRegex(lines[0], r'^\[1/2 frames\] CHIM validation: frames/[^:]+/frame\.ccf: 0 failures$')
         self.assertTrue(lines[1].startswith('[2/2 frames] CHIM validation: '))
@@ -121,6 +122,30 @@ class CheckPoolTests(unittest.TestCase):
         self.assertTrue(any('story-hidden' in f and 'area west' in f for f in fails_serial))
         with self.assertRaises(ValueError):
             validate(self.out, source, cross_checks='other')
+
+    def test_pvs_rows_decoded_on_the_workers_keep_their_failures_in_place(self):
+        # the PVS rows are decoded with the frame's cross-checks (on the workers since BUILD-CHIM-STAGE-SERIAL-TAIL-36,
+        # v0.0.59); a broken row's failure goes back into the frame's chunk failures at the chunk's place
+        import chim.validate as V
+        real, bad = V.decompress_row, []
+
+        def broken(raw, n):
+            if not bad:
+                bad.append(raw)
+            if raw is bad[0]:
+                raise ValueError('test row')
+            return real(raw, n)
+        with patch.object(V, 'decompress_row', broken), contextlib.redirect_stderr(io.StringIO()):
+            fails, _ = validate(self.out, self.source, jobs=1, cross_checks='serial')
+        rows = [f for f in fails if 'PVS row: test row' in f]
+        self.assertTrue(rows)
+        self.assertTrue(all('area west' in f for f in rows), rows)
+
+    def test_cross_checks_come_back_in_frame_order(self):
+        import chim.validate as V
+        self.assertEqual(list(V._in_input_order([(2, 'c'), (0, 'a'), (1, 'b'), (3, 'd')])), ['a', 'b', 'c', 'd'])
+        with self.assertRaises(RuntimeError):
+            list(V._in_input_order([(1, 'b')]))
 
     def test_variant_audit_in_runs_is_the_same_report(self):
         fails = Failures()

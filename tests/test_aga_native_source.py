@@ -30,6 +30,75 @@ def tree_project_version():
     return module
 
 
+def area_fixture(id1):
+    """AREA-TABLES-59: a synthetic id1 (focus.awf AWF3 with owners and contents, inventory/items.awi, the icon pack)
+    with three rooms, its areas.awa from tools/prepare_area_tables.py, and expect.txt: the answers it was made with.
+    Each room's items are its own (so an item of another room needs a narrow load)."""
+    import struct
+    sys.path.insert(0, str(ROOT / 'tools'))
+    try:
+        from prepare_focus import owner_list, contents_list, record_id, clean, NAME
+        import prepare_area_tables
+    finally:
+        sys.path.pop(0)
+    owners_of = {0: ('arrille', 0), 1: ('fighters_guild', 1)}
+    rooms, owners, containers, items, expect, icons = {}, {}, {}, {}, [], {}
+    for r, room in enumerate((10, 11, 12)):
+        rows = []
+        for c in range(2):
+            ref = 1000 + 10 * r + c
+            entries = [('r%d_%s' % (room, x), 1 + c + k) for k, x in enumerate('ab'[:c + 1])]
+            owner = owners_of.get(c) if not (room == 12 and c == 1) else None
+            rows.append((ord('C'), int(bool(owner)), 1 | (4 if owner else 0), 10 * c, ref, ('Chest %d' % c), b''))
+            containers[ref] = (entries, 1 if c else 0)
+            if owner:
+                owners[ref] = owner
+            expect.append('C %d %d %s %d %d %s' % (room, ref, owner[0] if owner else '-', owner[1] if owner else 0,
+                                                 len(entries), ' '.join('%s %d' % e for e in entries)))
+            for ident, _ in entries:
+                items[ident] = 'Item %s' % ident
+        pref = 2000 + r
+        pid = 'r%d_p' % room
+        items[pid] = 'Placed %s' % pid
+        rows.append((ord('I'), 0, 1, 0, pref, 'Placed', pid))
+        expect.append('P %d %d %s' % (room, pref, pid))
+        rooms[room] = rows
+        icons['item:r%d_a' % room] = (4, 3, 40 + r)
+    index, body = [], []
+    for room in sorted(rooms):
+        index.append(struct.pack('<III', room, len(body), len(rooms[room])))
+        for kind, owned, action, lock, ref, name, ident in rooms[room]:
+            raw = clean(name)
+            body.append(struct.pack('<BBBBIiiifi', kind, owned, action, lock, ref, 8 * ref % 97, 0, 16, 1.0, 5) +
+                        raw + b'\0' * (NAME - len(raw)) + record_id(ident if isinstance(ident, str) else ''))
+    focus = (b'AWF3' + struct.pack('<I', len(index)) + b''.join(index) + b''.join(body) + owner_list(owners) +
+             contents_list({ref: (entries, flags) for ref, (entries, flags) in containers.items()}))
+    rows = []
+    for ident in sorted(items):
+        row = bytearray(512)
+        row[0:len(ident)] = ident.encode(); row[64:64 + len(items[ident])] = items[ident].encode()
+        struct.pack_into('<IiIfII', row, 160, 7, 0, 3, 0.5, 0, 0)
+        rows.append(bytes(row))
+        expect.append('I %s %s' % (ident, items[ident]))
+    pack, table = bytearray(b'AWP1' + struct.pack('<I', len(icons))), []
+    for key in sorted(icons):
+        w, h, first = icons[key]
+        pic = b'AWI1' + struct.pack('<HH', w, h) + bytes([first] + [1] * (w * h - 1))
+        row = bytearray(160); row[0:len(key)] = key.encode()
+        struct.pack_into('<II', row, 120, len(pack), len(pic))
+        table.append(bytes(row)); pack += pic
+        expect.append('K %s %d %d %d' % (key[5:], w, h, first))
+    (id1 / 'inventory').mkdir(parents=True); (id1 / 'gfx').mkdir()
+    (id1 / 'focus.awf').write_bytes(focus)
+    (id1 / 'inventory/items.awi').write_bytes(b'AWI2' + struct.pack('<I', len(rows)) + b''.join(rows))
+    (id1 / 'gfx/icons.awl').write_bytes(b'AWL2' + struct.pack('<I', len(table)) + b''.join(table))
+    (id1 / 'gfx/icons.awp').write_bytes(bytes(pack))
+    payload, report = prepare_area_tables.build(id1)
+    (id1 / 'areas.awa').write_bytes(payload)
+    (id1 / 'expect.txt').write_text('\n'.join(expect) + '\n', encoding='ascii')
+    return report
+
+
 # Engine files that build map paths through aw_mappath.c (AW_MapPath).
 MAP_PATH_USERS = ('aw_region.c', 'aw_section.c', 'aw_scene.c', 'aw_gallery.c', 'aw_arena.c', 'aw_wait.c',
                   'sv_main.c', 'chim_world.c')
@@ -123,11 +192,11 @@ class NativeSourceTests(unittest.TestCase):
 
     def test_first_save_description_loads_character_catalogue(self):
         self.compile_run('aga_save_frontmenu_test.c', [Path(SOURCE)/'src'/n for n in
-            ('aw_save.c', 'aw_save_codec.c', 'aw_ledger.c')])
+            ('aw_save.c', 'aw_save_codec.c', 'aw_ledger.c', 'aw_jhist.c')])
 
     def test_autosave_preserves_safe_checkpoint_through_lava_and_arrival(self):
         self.compile_run('aga_autosave_safety_test.c', [Path(SOURCE)/'src'/n for n in
-            ('aw_save.c', 'aw_save_codec.c', 'aw_ledger.c', 'mathlib.c')],
+            ('aw_save.c', 'aw_save_codec.c', 'aw_ledger.c', 'aw_jhist.c', 'mathlib.c')],
             cflags=['-fsanitize=undefined', '-fno-sanitize-recover=all'])
 
     def test_harvest_original_loot_transaction_capacity_and_save_persistence(self):
@@ -323,6 +392,34 @@ class NativeSourceTests(unittest.TestCase):
             ('aw_inventory.c','aw_state.c','aw_ledger.c','aw_ledger_drops.c','mathlib.c')],
             cflags=['-fsanitize=address,undefined','-fno-sanitize-recover=all'])
 
+    def test_container_strip_prompt_locks_take_and_put(self):
+        # CONTAINER-WINDOW-59: the real focus table (AWF3, owners and contents), prompt, lock, E, take and put through
+        # the container deltas (owned: stolen), and the strip's pure rules
+        self.compile_run('aga_container_strip_test.c', [Path(SOURCE)/'src'/n for n in
+            ('aw_inventory.c','aw_cstrip_rules.c','aw_state.c','aw_ledger.c','aw_ledger_drops.c','mathlib.c')],
+            cflags=['-fsanitize=address,undefined','-fno-sanitize-recover=all'])
+
+    def test_container_strip_open_both_ways_take_reads_once(self):
+        # CONTAINER-STRIP-TAKE-STALL-59: the real strip opened by E and by the console (aw_placed container REF open):
+        # the same open, takes, put, Take All and Esc; the container's data read once while open; the whole-screen
+        # copy only after a change (CONTAINER-STRIP-REDRAW-COST-59)
+        self.compile_run('aga_container_strip_open_test.c', [Path(SOURCE)/'src'/n for n in
+            ('aw_inventory.c','aw_cstrip.c','aw_cstrip_rules.c','aw_state.c','aw_ledger.c','aw_ledger_drops.c','mathlib.c')],
+            cflags=['-fsanitize=address,undefined','-fno-sanitize-recover=all'])
+
+    def test_area_tables_answer_as_the_files_load_unload_and_narrow(self):
+        # AREA-TABLES-59: the per-area tables built by tools/prepare_area_tables.py over a synthetic focus.awf, item
+        # table and icon pack give every container's contents and owner, the item names, the placed items' records and
+        # the strip's pictures exactly as the island-wide files do, with no file opened and no fallback in a loaded
+        # room; a room left is kept and taken back without a read; the trim empties the cache; a container or item
+        # elsewhere is narrow-loaded through the directory
+        with tempfile.TemporaryDirectory() as tmp:
+            id1 = Path(tmp) / 'id1'
+            area_fixture(id1)
+            self.compile_run('aga_area_tables_test.c', [Path(SOURCE)/'src'/n for n in
+                ('aw_inventory.c','aw_state.c','aw_ledger.c','aw_ledger_drops.c','mathlib.c')],
+                arguments=[str(id1)], cflags=['-fsanitize=address,undefined','-fno-sanitize-recover=all'])
+
     def test_inventory_real_drop_placement_capacity_and_no_loss(self):
         # the old fixed table (aw_ledger_on 0) and the world change list (CELL-CHANGES-59), both through the real drop
         self.compile_run('aga_inventory_placement_test.c', [Path(SOURCE)/'src'/n for n in
@@ -339,7 +436,7 @@ class NativeSourceTests(unittest.TestCase):
 
     def test_inventory_fullscreen_events_real_equip_atomic_drop_and_exit(self):
         self.compile_run('aga_inventory_ui_test.c', [Path(SOURCE)/'src'/n for n in
-            ('aw_worldui.c','aw_textdef.c','aw_inventory.c','aw_harvest.c','aw_state.c','aw_save_codec.c','mathlib.c','common.c')],
+            ('aw_worldui.c','aw_questbook.c','aw_jhist.c','aw_ledger.c','aw_textdef.c','aw_inventory.c','aw_harvest.c','aw_state.c','aw_save_codec.c','mathlib.c','common.c')],
             defines=['AW_INVENTORY_RULES_ONLY','AW_TEXTDEF_HOST_TEST'],
             cflags=['-Wl,--wrap=COM_FOpenFile','-Werror=implicit-function-declaration','-fsanitize=undefined,float-cast-overflow','-fno-sanitize-recover=all'])
 
@@ -350,7 +447,7 @@ class NativeSourceTests(unittest.TestCase):
                     '-fsanitize=address,undefined','-fno-sanitize-recover=all'])
 
     def test_world_map_journal_disk_bounds_navigation_and_modal_exit(self):
-        self.compile_run('aga_worldui_test.c', [Path(SOURCE)/'src'/n for n in ('aw_worldui.c','aw_textdef.c','aw_inventory.c','aw_state.c','aw_save_codec.c','mathlib.c')],
+        self.compile_run('aga_worldui_test.c', [Path(SOURCE)/'src'/n for n in ('aw_worldui.c','aw_questbook.c','aw_jhist.c','aw_ledger.c','aw_textdef.c','aw_inventory.c','aw_state.c','aw_save_codec.c','mathlib.c')],
             defines=['AW_INVENTORY_RULES_ONLY','AW_TEXTDEF_HOST_TEST'], cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])
 
     def test_mouse_event_order_accumulation_modal_reset_and_signed_deltas(self):
@@ -360,7 +457,7 @@ class NativeSourceTests(unittest.TestCase):
                                    ('gnu99', ('signed_game', 'filter', 'bounds'))):
             with self.subTest(standard=standard):
                 self.compile_run('aga_mouse_event_test.c', [Path(SOURCE)/'src'/n for n in
-                    ('in_amiga.c', 'cl_input.c', 'aw_worldui.c', 'aw_textdef.c', 'aw_inventory.c', 'aw_state.c', 'aw_save_codec.c', 'mathlib.c')],
+                    ('in_amiga.c', 'cl_input.c', 'aw_worldui.c', 'aw_questbook.c', 'aw_jhist.c', 'aw_ledger.c', 'aw_textdef.c', 'aw_inventory.c', 'aw_state.c', 'aw_save_codec.c', 'mathlib.c')],
                     defines=['AW_INVENTORY_RULES_ONLY', 'AW_TEXTDEF_HOST_TEST'], cflags=['-fsanitize=undefined,float-cast-overflow', '-fno-sanitize-recover=all'],
                     standard=standard, argument_sets=[(case,) for case in selected])
 
@@ -381,13 +478,25 @@ class NativeSourceTests(unittest.TestCase):
                                + branches[0].strip() + '}\n')
             self.compile_run('aga_map_focus_test.c',
                 [*[Path(SOURCE)/'src'/n for n in
-                   ('in_amiga.c', 'cl_input.c', 'keys.c', 'aw_worldui.c', 'aw_textdef.c', 'aw_inventory.c', 'aw_state.c', 'mathlib.c')], adapter],
+                   ('in_amiga.c', 'cl_input.c', 'keys.c', 'aw_worldui.c', 'aw_questbook.c', 'aw_jhist.c', 'aw_ledger.c', 'aw_textdef.c', 'aw_inventory.c', 'aw_state.c', 'mathlib.c')], adapter],
                 defines=['AW_INVENTORY_RULES_ONLY', 'AW_TEXTDEF_HOST_TEST'], cflags=['-fsanitize=undefined,float-cast-overflow', '-fno-sanitize-recover=all'],
                 argument_sets=[(case,) for case in cases])
 
     def test_journal_history_dates_duplicates_and_capacity_transaction(self):
         self.compile_run('aga_journal_state_test.c', [Path(SOURCE)/'src/aw_state.c'],
             cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])
+
+    def test_journal_book_lists_every_kept_quest_by_name(self):
+        # JOURNAL-BOOK-32-QUESTS-59: the book's quests from the kept stages on the world change list, no 32 limit
+        self.compile_run('aga_questbook_test.c', [Path(SOURCE)/'src'/n for n in ('aw_questbook.c','aw_ledger.c')],
+            cflags=['-fsanitize=address,undefined','-fno-sanitize-recover=all'])
+
+    def test_dated_journal_history_on_the_change_list_and_in_saves(self):
+        # JOURNAL-ORIGINAL-VIEW-59: the dated history past 32 quests and 256 entries, its save feature 128 both ways,
+        # an older save's 32-slot history taken over
+        self.compile_run('aga_jhist_test.c', [Path(SOURCE)/'src'/n for n in
+            ('aw_jhist.c','aw_ledger.c','aw_save_codec.c','aw_state.c','mathlib.c')],
+            cflags=['-fsanitize=address,undefined','-fno-sanitize-recover=all'])
 
     def test_dialogue_speaker_functions_and_disposition_terms(self):
         # DIALOGUE-COMPLETE-58: SameSex, SameRace, ShouldAttack through the shared evaluator; disease, drawn weapon, Charm
@@ -502,7 +611,7 @@ class NativeSourceTests(unittest.TestCase):
 
     def test_wait_cancel_bounds_calendar_and_debug_time(self):
         self.compile_run('aga_wait_test.c', [Path(SOURCE)/'src'/n for n in
-            ('aw_wait.c','aw_clock.c','aw_state.c','view.c','r_sky.c','mathlib.c')],
+            ('aw_wait.c','aw_rest_rules.c','aw_clock.c','aw_state.c','view.c','r_sky.c','mathlib.c')],
             cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])
 
     def test_scenery_cannot_displace_late_npcs_from_visible_list(self):
@@ -776,6 +885,10 @@ class NativeSourceTests(unittest.TestCase):
             sources = [*sources, tree/"src/aw_miniwind.c"]
         if any(p.name == "world.c" for p in sources):
             sources = [*sources, tree/"src/aw_scenery.c"]
+        # the file buffer setting common.c and aw_inventory.c share (TRADEHOUSE-LONG-FRAME-59)
+        if any(p.name in ("common.c", "aw_inventory.c") for p in sources) and \
+                not any(p.name == "aw_fopenbuf.c" for p in sources):
+            sources = [*sources, tree/"src/aw_fopenbuf.c"]
         if any(p.name in ("aw_scene.c", "aw_scenery.c") for p in sources):
             sources = [*sources, tree/"src/aw_harvest.c", tree/"src/aw_harvest_runtime.c"]
             if not any(p.name == "aw_state.c" for p in sources):

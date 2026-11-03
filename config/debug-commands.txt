@@ -67,6 +67,7 @@ PLAYTESTING|halloween|aw_halloween|[dagoth / skeletons / bench [skeletons] / fps
 PLAYTESTING|halloweenbench|aw_bench|same as bench halloween
 PLAYTESTING|halloweentest|aw_halloweentest|[same words as halloween] the Halloween scene with the FPS counter on (bottom left)
 PLAYTESTING|inventory grant|aw_inventory|<quoted source item ID> <1..999> explicit diagnostic grant of actual catalogue items (not saved defaults)
+PLAYTESTING|levelup|aw_levelup|[use SKILL [N [TYPE]] / raise SKILL [N] / check / rest [HOURS] / bed REF] levelling: no argument = level, progress, multipliers, each skill's progress; use = N skill uses (TYPE 0..3); raise = N raises; check = the level-up box when due; rest = HOURS (default 8), then the box when due (saved)
 PLAYTESTING|lightgallery|aw_lightgallery|[off] lighting switches at this spot in a strip below the view: night mode, tint, lamps, glow, headlamp, horizon veil, time preview; arrows change, Esc done
 PLAYTESTING|modelgallery|aw_charplane|[number/name/ID]
 PLAYTESTING|nightgallery|aw_nightgallery|[here/off] (23:00 wide view, Masser, Secunda, stars; Esc returns)
@@ -78,6 +79,7 @@ PLAYTESTING|set playerrace|aw_quickchar_set|[ID / NAME / list] zero-based race l
 PLAYTESTING|set race|aw_quickchar_set|[ID / NAME / list] alias for set playerrace; no value lists loaded race IDs and names
 PLAYTESTING|shroompicker|aw_shroompicker|[1..10/list] (default 1; preserves inventory and picked state)
 PLAYTESTING|shroomtracker|aw_shroomtracker|(picked mushrooms in this save; excludes empty plants)
+PLAYTESTING|skill progress|aw_levelup|same as levelup
 PLAYTESTING|torchgallery|aw_torchtest|[npc ID/name] same as torchtest: one NPC in the dark room, V toggles your torch
 PLAYTESTING|torchtest|aw_torchtest|[npc ID/name; empty/center/help/exit] dark room, current hands, V toggles torch
 PLAYTESTING|tpscene|aw_tpscene|[list/headselection] (fresh debug scene; resets unsaved progress)

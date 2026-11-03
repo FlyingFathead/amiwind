@@ -1,6 +1,6 @@
 # AmiWind console commands
 
-_Generated from `config/debug-commands.txt` with AmiWind v0.0.59-dev5._
+_Generated from `config/debug-commands.txt` with AmiWind v0.0.59._
 
 Open the console with F10 or the backquote key and type
 a command, for example `dbg headlamp on`. This page is generated from
@@ -78,6 +78,7 @@ Type: "dbg help" for help.
 | `dbg give weapons` | `dbg inventory grant` | [stats] a kit of the game's own weapons, one of every type (blades, blunt, staff, spear, axes, bow, crossbow, thrown, arrows, bolts) and a light and a heavy shield, given at once and saved like any grant, with each one's stats from its record; stats: the table only (docs/INVENTORY.md) |
 | `dbg halloween` | - | [dagoth / skeletons / bench [skeletons] / fps on/off / camera wide/director / stop / status] Halloween scene (docs/HALLOWEEN.md, an image with the cast): skeletons, Desele's dancers, Dagoth Ur dance on the beat; dagoth (default) or skeletons alone; bench: the standard benchmark, one result line |
 | `dbg halloweentest` | - | [same words as halloween] the Halloween scene with the FPS counter on (bottom left) |
+| `dbg levelup` | `dbg skill progress` | [use SKILL [N [TYPE]] / raise SKILL [N] / check / rest [HOURS] / bed REF] levelling: no argument = level, progress, multipliers, each skill's progress; use = N skill uses (TYPE 0..3); raise = N raises; check = the level-up box when due; rest = HOURS (default 8), then the box when due (saved) |
 | `dbg lightgallery` | - | [off] lighting switches at this spot in a strip below the view: night mode, tint, lamps, glow, headlamp, horizon veil, time preview; arrows change, Esc done |
 | `dbg nightgallery` | - | [here/off] (23:00 wide view, Masser, Secunda, stars; Esc returns) |
 | `dbg set playerrace` | `dbg set race` | [ID / NAME / list] zero-based race list; switch appearance in place; retain gender/class/name/equipment/level/stats; choose valid head and hair |

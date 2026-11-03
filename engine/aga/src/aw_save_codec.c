@@ -12,7 +12,11 @@ void (*aw_save_objects_import)(const aw_changes_t *changes);
 int (*aw_save_actors_export)(unsigned char *out,int capacity);
 void (*aw_save_actors_import)(const unsigned char *data,int bytes);
 int (*aw_save_ledger_rows)(const struct aw_ledger_s *ledger);
+void (*aw_save_script_export)(struct aw_ledger_s *ledger);
+void (*aw_save_script_import)(const struct aw_ledger_s *ledger);
 int (*aw_save_ledger_encode)(const struct aw_ledger_s *ledger,unsigned char *out,int capacity);
+int (*aw_save_journal_encode)(const struct aw_jhist_s *h,unsigned char *out,int capacity);
+int (*aw_save_journal_decode)(const unsigned char *data,int size,struct aw_jhist_s *into);
 int (*aw_save_ledger_decode)(const unsigned char *data,int size,struct aw_ledger_s *into);
 /* AWS4 feature bit 16: the actor record's block, u32 length then its bytes (checked by aw_actorstate.c's import);
  * read straight into the caller's buffer (its contents count only when the decode succeeds) */
@@ -234,6 +238,23 @@ static void magic_fields(aw_state_t *s){
         }else if(writing && m->charge[i]!=0){error=1;return;}
     }
 }
+/* AWS4 feature bit 64 (LEVEL-UP-58): the player's levelling (aw_levelup.h): each skill's progress, the level
+ * progress, the raises per attribute and per specialization. Written only when any of it is set; older saves load
+ * with all of it 0, older readers refuse the bit instead of losing it. */
+static int levelling_used(const aw_character_t *c){
+    int i;if(c->level_progress)return 1;
+    for(i=0;i<27;i++)if(c->progress[i]!=0)return 1;
+    for(i=0;i<8;i++)if(c->raises[i])return 1;
+    for(i=0;i<3;i++)if(c->special[i])return 1;
+    return 0;
+}
+static void levelling_fields(aw_character_t *c){
+    int i,n;
+    for(i=0;i<27;i++)floating(&c->progress[i],0,1);
+    n=c->level_progress;integer(&n,0,10000);c->level_progress=(short)n;
+    for(i=0;i<8;i++){n=c->raises[i];integer(&n,0,10000);c->raises[i]=(short)n;}
+    for(i=0;i<3;i++){n=c->special[i];integer(&n,0,10000);c->special[i]=(short)n;}
+}
 /* AWS4 feature bit 8: the world-state change list (aw_save.h). Entries strictly ascending by key, each checked
  * field by field; 36 bytes each on disk. The sorted copy and the decoder's scratch live here, off the stack. */
 static aw_changes_t change_scratch;
@@ -301,11 +322,13 @@ int AW_SaveEncodeChanges(unsigned char *out,int capacity,const aw_save_t *state,
     aw_save_t copy=*state;uint32_t size=0,crc;int listed=changes && changes->count>0;
     int actors=changes && changes->actors && changes->actor_bytes>0;
     int ledgered=changes && changes->ledger && aw_save_ledger_rows && aw_save_ledger_rows(changes->ledger)>0;
+    int dated=changes && changes->journal && aw_save_journal_encode && aw_save_journal_encode(changes->journal,NULL,0)>0;
     if(capacity<12 || capacity>AW_SAVE_MAX_BYTES)return 0;
     writing=out;reading=NULL;at=12;end=capacity;error=0;
     memset(out,0,capacity);fields(&copy);if(!error)journal_fields(&copy.state);
     {uint32_t features=(copy.state.harvest.slots?1U:0U)|(inventory_used(&copy.state.inventory)?2U:0U)|
-        (magic_used(&copy.state.magic)?4U:0U)|(listed?8U:0U)|(actors?16U:0U)|(ledgered?32U:0U);word(&features);}
+        (magic_used(&copy.state.magic)?4U:0U)|(listed?8U:0U)|(actors?16U:0U)|(ledgered?32U:0U)|
+        (levelling_used(&copy.character)?64U:0U)|(dated?128U:0U);word(&features);}
     if(!error && copy.state.harvest.slots)harvest_fields(&copy.state.harvest);
     if(!copy.state.harvest.slots){
         int i;for(i=0;i<32;i++)if(copy.state.harvest.catalogue[i])error=1;
@@ -316,6 +339,7 @@ int AW_SaveEncodeChanges(unsigned char *out,int capacity,const aw_save_t *state,
        ((copy.equipment&AW_EQUIPMENT_TORCH) && !(copy.equipment&AW_EQUIPMENT_DRAWN)))error=1;
     if(!error && inventory_used(&copy.state.inventory))inventory_fields(&copy.state);
     if(!error && magic_used(&copy.state.magic))magic_fields(&copy.state);
+    if(!error && levelling_used(&copy.character))levelling_fields(&copy.character);
     if(!error && listed){
         if(changes->count>AW_SAVE_CHANGES)return 0;
         change_scratch.count=changes->count;
@@ -327,6 +351,13 @@ int AW_SaveEncodeChanges(unsigned char *out,int capacity,const aw_save_t *state,
         uint32_t n=(uint32_t)changes->actor_bytes;
         if(n>AW_SAVE_ACTOR_BYTES || changes->actor_bytes>changes->actor_capacity)return 0;
         word(&n);bytes(changes->actors,(int)n);
+    }
+    /* feature 128 (JOURNAL-ORIGINAL-VIEW-59): u32 length, then the dated journal history's own form (aw_jhist.c) */
+    if(!error && dated){
+        int need=aw_save_journal_encode(changes->journal,NULL,0);uint32_t n=(uint32_t)need;
+        word(&n);
+        if(error || at>end-need || aw_save_journal_encode(changes->journal,out+at,need)!=need)return 0;
+        at+=need;
     }
     /* feature 32: u32 length, then the world change list's own form (aw_ledger.c), checked row by row */
     if(!error && ledgered){
@@ -347,7 +378,7 @@ int AW_SaveDecode(const unsigned char *data,int size,aw_save_t *out)
 }
 int AW_SaveDecodeChanges(const unsigned char *data,int size,aw_save_t *out,aw_changes_t *changes)
 {
-    aw_save_t candidate;uint32_t length=0,crc=0,features=0;
+    aw_save_t candidate;uint32_t length=0,crc=0,features=0,dated_n=0;const unsigned char *dated=NULL;
     if(size<12 || size>AW_SAVE_MAX_BYTES || (memcmp(data,"AWS1",4) && memcmp(data,"AWS2",4) && memcmp(data,"AWS3",4) && memcmp(data,"AWS4",4)))return 0;
     writing=NULL;reading=data;at=4;end=size;error=0;word(&length);word(&crc);
     if(length!=(uint32_t)size || crc!=crc32(data+12,size-12))return 0;
@@ -355,7 +386,7 @@ int AW_SaveDecodeChanges(const unsigned char *data,int size,aw_save_t *out,aw_ch
     /* Older saves have quest indices but no chronological evidence. Do not
      * fabricate earlier entries or dates when decoding them. */
     if(!error && data[3]!='1')journal_fields(&candidate.state);
-    if(!error && data[3]=='4'){word(&features);if(features>63)error=1;}
+    if(!error && data[3]=='4'){word(&features);if(features>255)error=1;}
     if(!error && (data[3]=='3' || (data[3]=='4' && (features&1))))harvest_fields(&candidate.state.harvest);
     if(!error && data[3]=='4'){
         word(&candidate.equipment);
@@ -364,6 +395,7 @@ int AW_SaveDecodeChanges(const unsigned char *data,int size,aw_save_t *out,aw_ch
     }
     if(!error && data[3]=='4' && (features&2))inventory_fields(&candidate.state);
     if(!error && data[3]=='4' && (features&4))magic_fields(&candidate.state);
+    if(!error && data[3]=='4' && (features&64))levelling_fields(&candidate.character);
     change_scratch.count=0;
     if(!error && data[3]=='4' && (features&8))changes_fields(&change_scratch);
     actor_scratch_bytes=0;
@@ -375,6 +407,13 @@ int AW_SaveDecodeChanges(const unsigned char *data,int size,aw_save_t *out,aw_ch
                 memcpy(changes->actors,reading+at,n);actor_scratch_bytes=(int)n;}
             at+=(int)n;
         }
+    }
+    /* feature 128: checked here, read into the caller's history only when the whole save is good (below) */
+    if(!error && data[3]=='4' && (features&128)){
+        word(&dated_n);
+        if(error || dated_n<8 || at>end-(int)dated_n || !aw_save_journal_decode ||
+           !aw_save_journal_decode(reading+at,(int)dated_n,NULL))error=1;
+        else{dated=reading+at;at+=(int)dated_n;}
     }
     /* feature 32 (CELL-CHANGES-59): the world change list, read into the caller's list only when the whole save is
      * good (it is the last section: nothing after it can still refuse); without a list it is checked, not kept */
@@ -388,6 +427,11 @@ int AW_SaveDecodeChanges(const unsigned char *data,int size,aw_save_t *out,aw_ch
         }
     }
     if(error || at!=size)return 0;
+    /* the dated journal history (feature 128; none: emptied, an older save's is taken over on load) */
+    if(changes && changes->journal){
+        if(dated){if(!aw_save_journal_decode(dated,(int)dated_n,changes->journal))return 0;}
+        else if(aw_save_journal_decode)aw_save_journal_decode(NULL,0,changes->journal);
+    }
     *out=candidate;
     if(changes){changes->count=change_scratch.count;
         memcpy(changes->entry,change_scratch.entry,sizeof(aw_change_t)*change_scratch.count);

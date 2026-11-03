@@ -916,6 +916,34 @@ def is_skeletal(model):
 # (SKEL-VERTEX-LIMIT-52: today's full-detail head takes a model to about 3,000 vertices).
 RESIDENT_HEAD_DETAIL = 'budget'
 _tables = {}
+TABLE_UNIT = 'skeletal-table'
+TABLE_UNIT_FILE = 'table.awsk'
+
+
+def cached_table(choice, build):
+    """(table bytes, build report) of one shared table: from the unit cache when the game data (the build's input
+    lock) and the code this module reaches are unchanged, else build() and stored (RESIDENT-BAKE-VIVEC-COST-59).
+    A table takes about 18 s of CPU, and every worker process of a stage that bakes skeletal actors built it again
+    (and the beast table too when a beast came its way): the town stages' resident bake paid it once per worker,
+    which made Vivec's 39 residents about 26 s of CPU each against about 4 s for the bake itself. CHOICE names the
+    table (skeleton, appended skeleton, prefix, the own-animation prefixes). Without the cache or an input lock,
+    build() as before."""
+    from pass_cache import UnitCache, game_data_digest, json_exact
+    try:
+        cache = UnitCache.open(TABLE_UNIT, {}, __file__)
+        identity = game_data_digest() if cache is not None else None
+    except (OSError, ValueError, TypeError):
+        cache, identity = None, None
+    if cache is None or identity is None:
+        return build()
+    inputs = {'entry': {'name': choice['skeleton']}, 'choice': choice, 'game_data': identity}
+    found = cache.load_unit(inputs)
+    if found is not None and TABLE_UNIT_FILE in found[1] and isinstance(found[0].get('report'), dict):
+        return found[1][TABLE_UNIT_FILE], found[0]['report']
+    data, report = build()
+    if json_exact(report):
+        cache.store_files(inputs, {'report': report}, {TABLE_UNIT_FILE: data})
+    return data, report
 
 
 def own_sources(skeleton_of):
@@ -941,8 +969,11 @@ def game_table(data_key, appearance, skeleton_of):
         appended, prefix = APPENDED.get(name, (None, None))
         if over is not None and appended != over:
             raise ValueError('Animation table %s: %s is not the skeleton its table appends' % (path, over))
-        data, report = stick_table(skeleton_of(name), over=skeleton_of(appended) if appended else None,
-                                   append=prefix, more=own_sources(skeleton_of) if appended else ())
+        more = own_sources(skeleton_of) if appended else ()
+        data, report = cached_table(
+            {'skeleton': name, 'over': appended, 'append': prefix, 'more': [p for _, p in more]},
+            lambda: stick_table(skeleton_of(name), over=skeleton_of(appended) if appended else None,
+                                append=prefix, more=more))
         if report['missing']:
             raise ValueError('Animation table %s: groups without start or stop keys: %s'
                              % (table_file(path), report['missing']))

@@ -24,7 +24,7 @@ class PureChimDiskTests(unittest.TestCase):
                  '-Wno-format-truncation', '-Wno-stringop-truncation',
                  '-fsanitize=address,undefined', '-fno-sanitize-recover=all', '-I' + str(src),
                  str(ROOT / 'tests/aga_chim_save_test.c'),
-                 *(str(src / n) for n in ('aw_character.c', 'aw_state.c', 'aw_save_codec.c', 'aw_ledger.c', 'aw_region.c',
+                 *(str(src / n) for n in ('aw_character.c', 'aw_state.c', 'aw_save_codec.c', 'aw_ledger.c', 'aw_jhist.c', 'aw_region.c',
                                           'aw_format.c', 'aw_world.c', 'aw_mappath.c')),
                  '-lm', '-o', str(binary)], capture_output=True, text=True)
             self.assertEqual(build.returncode, 0, build.stdout + build.stderr)

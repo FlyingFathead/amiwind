@@ -25,6 +25,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "aw_state.h"
 #include "aw_items.h"
 #include "aw_ambient.h"
+#include "aw_spike.h"
 #include "chim/chim.h"
 
 /*
@@ -1640,21 +1641,26 @@ void SV_Physics (void)
 {
 	int		i;
 	edict_t	*ent;
+	double	ents_t0, ent_t0 = 0;	/* spike timing (aw_spike.h; TRADEHOUSE-LONG-FRAME-59) */
 
 // let the progs know that a new frame has started
 	pr_global_struct->self = EDICT_TO_PROG(sv.edicts);
 	pr_global_struct->other = EDICT_TO_PROG(sv.edicts);
 	pr_global_struct->time = sv.time;
-	PR_ExecuteProgram (pr_global_struct->StartFrame);
+	AW_SPIKE_STAGE (AW_SP_PSTART, PR_ExecuteProgram (pr_global_struct->StartFrame));
 
 //SV_CheckAllEnts ();
 
 //
 // treat each object in turn
 //
+	AW_SPIKE_BEGIN (ents_t0);
 	ent = sv.edicts;
 	for (i=0 ; i<sv.num_edicts ; i++, ent = NEXT_EDICT(ent))
 	{
+		if (aw_spike_on && ent_t0 > 0)
+			AW_SpikeEnt (i - 1, Sys_FloatTime () - ent_t0);
+		AW_SPIKE_BEGIN (ent_t0);
 		if (ent->free)
 			continue;
 
@@ -1694,22 +1700,25 @@ void SV_Physics (void)
 		else
 			Sys_Error ("SV_Physics: bad movetype %i", (int)ent->v.movetype);
 	}
+	if (aw_spike_on && ent_t0 > 0)
+		AW_SpikeEnt (i - 1, Sys_FloatTime () - ent_t0);
+	AW_SPIKE_END (AW_SP_ENTS, ents_t0, 0);
 
 	/* The debug companion's think (aw_companion.c), on Quake's cadence. */
-	AW_CompanionPhysics ();
+	AW_SPIKE_STAGE (AW_SP_COMPANION, AW_CompanionPhysics ());
 	/* Hostile NPCs and the player's punch (aw_combat.c), after the companion. */
-	AW_CombatPhysics ();
+	AW_SPIKE_STAGE (AW_SP_COMBAT, AW_CombatPhysics ());
 	/* The residents' Wander packages (aw_ambient.c), after combat: an actor combat holds is left alone. */
-	AW_AmbientPhysics ();
+	AW_SPIKE_STAGE (AW_SP_AMBIENT, AW_AmbientPhysics ());
 	/* A room has no CHIM window tick: the change list's room entries are applied here (aw_actors.c, v0.0.57) */
-	AW_ActorsRoomTick ();
+	AW_SPIKE_STAGE (AW_SP_ROOM, AW_ActorsRoomTick ());
 	/* Carried lights of skeletal actors: a guard's torch follows its hand (aw_items.c). */
-	AW_ItemsCarriedUpdate ();
+	AW_SPIKE_STAGE (AW_SP_ITEMS, AW_ItemsCarriedUpdate ());
 	/* Enchanted items recharge with unpaused time (OpenMW Engine::frame rechargeItems). */
 	if (svs.maxclients == 1 && aw_magic_frame)
-		aw_magic_frame ((float)host_frametime);
+		AW_SPIKE_STAGE (AW_SP_MAGIC, aw_magic_frame ((float)host_frametime));
 	/* Lava damage (aw_lava.c), after combat: the player's health as combat left it. */
-	AW_LavaPhysics ();
+	AW_SPIKE_STAGE (AW_SP_LAVA, AW_LavaPhysics ());
 
 	if (pr_global_struct->force_retouch)
 		pr_global_struct->force_retouch--;

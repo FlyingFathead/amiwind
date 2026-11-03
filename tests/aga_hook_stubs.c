@@ -11,6 +11,7 @@
 #include "aw_quickchar.h"
 #include "aw_testbox.h"
 #include "aw_weather.h"
+#include "aw_skel.h"
 #define WEAK __attribute__((weak))
 WEAK int AW_QuickCharActive(void){return 0;}
 /* The game clock (aw_clock.c): the travel services move it by a ride's hours (aw_scene.c travel_ride). */
@@ -117,6 +118,18 @@ WEAK void AW_ViewInventoryClear(void){}
 WEAK int AW_ViewInventoryBody(model_t **model,int *frame){(void)model;(void)frame;return 0;}
 WEAK int AW_ViewInventoryHeld(model_t **model,int *frame){(void)model;(void)frame;return 0;}
 WEAK int AW_ViewInventoryEquipment(model_t *models[2],float origins[2][3],float angles[2][3]){(void)models;(void)origins;(void)angles;return 0;}
+/* INVENTORY-PREVIEW-BAKED-BODY-59: the assembled body's further parts (aw_view.c), and the posing of a skeletal part
+ * (aw_skel.c) for fixtures that link aw_head.c without them: no assembled body, no skeletal part posed. */
+/* JOURNAL-BOOK-32-QUESTS-59: the scripts' export to the world change list (aw_save_codec.c holds the pointer; set by
+ * aw_mwhost.c) for fixtures that link the book without the save codec */
+struct aw_ledger_s;
+WEAK void (*aw_save_script_export)(struct aw_ledger_s *ledger);
+WEAK int AW_ViewInventoryParts(model_t **models,int max,float scale[3]){(void)models;(void)max;(void)scale;return -1;}
+WEAK void AW_SkelPose(const aw_skel_table_t *t,float frame,float world[][3][4]){(void)t;(void)frame;(void)world;}
+WEAK int AW_SkelBlockHead(const unsigned char *b,long size,int nv,aw_skel_block_t *out){(void)b;(void)size;(void)nv;(void)out;return 0;}
+WEAK void AW_SkelPoseVerts(const unsigned char *verts,const unsigned char *normals,int normal_stride,int n,
+    float rest_scale,const float world[][3][4],const float origin[3],const float scale[3],unsigned char *out){
+    (void)verts;(void)normals;(void)normal_stride;(void)n;(void)rest_scale;(void)world;(void)origin;(void)scale;(void)out;}
 WEAK int AW_InventoryPreviewDraw(model_t *model,int frame,int x,int y,int w,int h,float angle){(void)model;(void)frame;(void)x;(void)y;(void)w;(void)h;(void)angle;return 0;}
 WEAK void AW_CombatEquipmentStore(void){}
 WEAK void AW_CombatEquipmentChanged(void){}

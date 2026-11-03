@@ -955,8 +955,13 @@ void GetSoundtime(void)
 #endif
 }
 
+/* LOAD-STALL-SESSIONS-59: host.c points it at the remote state heartbeat (aw_remote.c), so long
+ * work inside one frame keeps the test session's state file current. NULL in native tests. */
+void (*S_ExtraUpdateHook)(void);
 void S_ExtraUpdate (void)
 {
+	if (S_ExtraUpdateHook)
+		S_ExtraUpdateHook ();
 
 #ifdef _WIN32
 	IN_Accumulate ();

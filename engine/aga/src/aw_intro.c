@@ -292,8 +292,11 @@ void AW_NameDraw(int x,int y,const char *name) {
     caret_height=AW_UIFontSize();if(!caret_height)caret_height=8;
     AW_UIFill(x+1+AW_UIWidth(name),y,1,caret_height,AW_UIColor(223,199,144));
 }
+/* CONTAINER-WINDOW-59: the container strip's keys and drawing (aw_cstrip.c sets them; NULL: no strip) */
+int (*aw_cstrip_key)(int key);
+void (*aw_cstrip_draw)(void);
 int AW_IntroKey(int key) {
-    if(AW_ReaderKey(key) || AW_CharacterKey(key) || AW_QuickCharKey(key))return 1;
+    if(AW_ReaderKey(key) || (aw_cstrip_key && aw_cstrip_key(key)) || AW_CharacterKey(key) || AW_QuickCharKey(key))return 1;
     if(!active || !prompt || key_dest!=key_game)return 0;
     if(key==K_ESCAPE)return 0;
     if(prompt==1){
@@ -304,7 +307,8 @@ int AW_IntroKey(int key) {
 void AW_IntroDraw(void) {
     int y;extern int scr_copyeverything;
     if(key_dest==key_game && (character_modal() || AW_ReaderActive() || prompt))scr_copyeverything=1;
-    AW_CharacterDraw();AW_QuickCharDraw();AW_ReaderDraw();if(!prompt || key_dest!=key_game)return;
+    AW_CharacterDraw();AW_QuickCharDraw();AW_ReaderDraw();if(aw_cstrip_draw)aw_cstrip_draw();
+    if(!prompt || key_dest!=key_game)return;
     y=r_refdef.vrect.y+r_refdef.vrect.height;AW_UIBox(0,y,vid.width,vid.height-y);
     if(prompt==1){AW_UIText(10,y+4,"Name (Enter to accept)",-1);AW_NameDraw(10,y+22,player_name);}
     else AW_UICenteredLines(0,y,vid.width,vid.height-y,"WASD: move. E: activate.\nEnter to follow the guard.");

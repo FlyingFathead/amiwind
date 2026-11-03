@@ -1,6 +1,6 @@
 # AmiWind FAQ
 
-_Last updated with AmiWind v0.0.51 (25 October 2026)._
+_Last updated with AmiWind v0.0.59-dev6 (3 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -413,7 +413,8 @@ PiStorm, Vampire and 68060 hardware, see [Comparisons](COMPARISONS.md).
 
 ## Can a MiSTer run AmiWind?
 
-Not at present. MiSTer rebuilds classic machines in an FPGA rather than emulating them in software, and its
+Not with the standard Amiga core, but possibly with BigMig (see the update below). MiSTer rebuilds classic machines
+in an FPGA rather than emulating them in software, and its
 Amiga core, [Minimig-AGA](https://github.com/MiSTer-devel/Minimig-AGA_MiSTer), has the AGA chipset AmiWind
 draws to. Its CPU is the limit: the core offers a 68000, 68010, 68EC020 or 68030, and its documentation states
 that there is no FPU (read 18 October 2026).
@@ -427,6 +428,15 @@ world cache, but the CPU and FPU come first.
 Machines with a 68040 or 68060 accelerator, or a [PiStorm](REAL_HARDWARE.md#pistorm) (which presents a 68040
 with an FPU), are the ones to try. If a later version of the core gains a 68040-class CPU with an FPU, this
 answer changes.
+
+**Update, 3 November 2026: BigMig.** [BigMig](https://github.com/raparici/BigMig-Emu68A9) is a separate MiSTer core
+that keeps Minimig's FPGA chipset, AGA included, and runs the 68k processor on the DE10-Nano's second ARM core
+through a port of Emu68. It offers 68EC020, 68040 and 68060+ processor modes, with floating-point support. Its
+20261019 release reports about 840 MIPS in SysInfo at a 1.2 GHz host clock, an overclock, and faster
+floating-point code in its translator ([news report](https://theoasisbbs.com/bigmig-20261019-improves-jit-and-3d-performance-on-mister/),
+read 3 November 2026; figures from the developer's own tests). On paper that meets what AmiWind needs: the AGA
+chipset, a 68040-class processor with an FPU, and well above 68060 speed. AmiWind has not been tried on it yet.
+It also needs 32 MB of Fast RAM, so check what the core provides; reports from anyone who runs it are welcome.
 
 ## Can a Vampire (Apollo 68080) run AmiWind?
 

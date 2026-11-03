@@ -31,6 +31,15 @@ int R_SkyExterior(void){return 1;}
 int AW_GuardTorchNight(void){return 1;}
 int aw_efrags_bad=3;   /* r_efrag.c: the efrag safety net's count (CHIM-FRAME-EDGE-EFRAG-CRASH-36) */
 static int held;int AW_DayNightFrozen(void){return held;}
+/* the windows' own state (aw_worldui.c, aw_wait.c, aw_dialwin.c, ...): LOAD-STALL-SESSIONS-59 */
+static const char *the_window="";static int dialogue;
+int AW_WorldUIActive(void){return *the_window!=0;}
+const char *AW_WorldUIName(void){return the_window;}
+const char *AW_WaitWindowName(void){return "";}
+int AW_DialWindowActive(void){return dialogue;}
+int AW_LevelupBoxActive(void){return 0;}int AW_MsgBoxActive(void){return 0;}int AW_ListBoxActive(void){return 0;}
+int AW_QuickCharActive(void){return 0;}int AW_CharacterActive(void){return 0;}int AW_SaveMenuActive(void){return 0;}
+int AW_ReaderActive(void){return 0;}
 static int exists(const char *p){FILE *f=fopen(p,"rb");if(f)fclose(f);return f!=NULL;}
 int main(void){
     char dir[256],cmd[300],state[300],text[2048];FILE *f;size_t n;
@@ -54,6 +63,26 @@ int main(void){
     held=1;realtime=2.2;AW_RemotePoll();
     f=fopen(state,"r");n=fread(text,1,sizeof text-1,f);fclose(f);text[n]=0;assert(strstr(text,"daynight off\n"));
     assert(strstr(AW_RemoteConsoleLog(),"console.log"));
+    /* LOAD-STALL-SESSIONS-59: a window names itself; long work inside one frame (realtime standing)
+     * still rewrites the file with ticks advancing; the format keeps "end" last. */
+    assert(strstr(text,"ticks 5\n"));   /* five host frames polled so far (the first with aw_remote off) */
+    the_window="inventory";key_dest=key_menu;
+    AW_RemoteBusy(100.0);
+    f=fopen(state,"r");n=fread(text,1,sizeof text-1,f);fclose(f);text[n]=0;
+    assert(strstr(text,"screen inventory\n") && strstr(text,"realtime 2.20\n") && strstr(text,"ticks 6\n"));
+    assert(!strcmp(text+n-4,"end\n"));
+    AW_RemoteBusy(100.2);   /* within the period: ticks only */
+    f=fopen(state,"r");n=fread(text,1,sizeof text-1,f);fclose(f);text[n]=0;assert(strstr(text,"ticks 6\n"));
+    the_window="";AW_RemoteBusy(100.6);   /* no window: key_dest names the screen as before */
+    f=fopen(state,"r");n=fread(text,1,sizeof text-1,f);fclose(f);text[n]=0;
+    assert(strstr(text,"screen menu\n") && strstr(text,"ticks 8\n"));
+    key_dest=key_console;the_window="journal";AW_RemoteBusy(101.2);   /* the console is on top of a window */
+    f=fopen(state,"r");n=fread(text,1,sizeof text-1,f);fclose(f);text[n]=0;assert(strstr(text,"screen console\n"));
+    key_dest=key_menu;the_window="window";dialogue=1;AW_RemoteBusy(101.8);   /* the dialogue window is a panel */
+    f=fopen(state,"r");n=fread(text,1,sizeof text-1,f);fclose(f);text[n]=0;assert(strstr(text,"screen dialogue\n"));
+    dialogue=0;AW_RemoteBusy(102.4);   /* another panel (stats, the container strip): a generic window */
+    f=fopen(state,"r");n=fread(text,1,sizeof text-1,f);fclose(f);text[n]=0;assert(strstr(text,"screen window\n"));
+    the_window="";key_dest=key_game;
 #ifdef AW_FRAME_MAP
     aw_world_chim_source=frame_source;sv.active=1;strcpy(sv.name,"seyda");
     r_refdef.vieworg[0]=10;r_refdef.vieworg[1]=20;r_refdef.vieworg[2]=30;

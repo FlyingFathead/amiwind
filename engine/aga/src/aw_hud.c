@@ -185,6 +185,17 @@ static void place_cheats(char *a,char *b,char *extra,int size,int limit) {
     cheat_text(0,text,sizeof text);
     if(!place_extra(extra,size,text,limit)){cheat_text(1,text,sizeof text);place_extra(extra,size,text,limit);}
 }
+/* REST-WAIT-59 (aw_wait.c): the player's original cell: 1 an exterior grid cell (X, Y and its region's name, NULL when
+ * unknown), 2 an interior (its cell ID into ID), 0 unknown. */
+int AW_HudPlayerCell(long *x,long *y,char *id,int size,const char **region) {
+    vec3_t global;
+    *region=NULL;if(size>0)id[0]=0;
+    if(!sv.active || svs.maxclients!=1 || !svs.clients || !svs.clients[0].edict)return 0;
+    if(exterior_cell(svs.clients[0].edict->v.origin,x,y,global)){*region=AW_RegionNameAt(global);return 1;}
+    cell_load();
+    if(!cell_number || size<1)return 0;
+    strncpy(id,cell_id,size-1);id[size-1]=0;return 2;
+}
 static void debug_cell(void) {
     long x,y;vec3_t global;vec_t *p;
     if(cls.state!=ca_connected){Con_Printf("Cell: no scene loaded.\n");return;}

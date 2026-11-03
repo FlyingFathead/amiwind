@@ -1,0 +1,56 @@
+# The container strip (CONTAINER-WINDOW-59; docs/INVENTORY.md "The container strip").
+# A seyda MiniWind or a full image, FS-UAE at 32 MB Fast, started with --map seyda. A character after the census
+# (dbg aw hors), then Arrille's Tradehouse at its arrival. The strip is opened by reference with the console
+# (aw_placed container REF open: the same path as E on the aimed container, locks and all), so no placement of the
+# player is needed: the basket 331661 (Arrille's stock, owned); E twice takes two (stolen), Tab and E put one back
+# (the first carried kind), Esc closes; the locked small chest 331519 (lock 50) refuses with "Locked"; quicksave,
+# quickload, the basket's strip again.
+# Expected console lines: "Container 331661, Basket (owned): ..." before and after; the ledger's container deltas and
+# the stolen pair after the take, still there after the load.
+wait 8
+cmd dbg all on
+cmd dbg headlamp off
+cmd dbg god on
+cmd dbg aw hors
+wait 60
+cmd dbg scene tradehouse
+wait 60
+state map
+cmd aw_placed container 331661
+cmd aw_placed container 331661 open
+wait 3
+shot c2-strip-open
+key e
+wait 2
+shot c3-taken
+key e
+wait 2
+key Tab
+wait 1
+shot c4-inventory-side
+key e
+wait 2
+shot c5-put
+key Escape
+wait 1
+cmd aw_placed container 331661
+cmd aw_placed ledger
+wait 2
+shot c6-closed
+cmd aw_placed container 331519 open
+wait 1
+shot c8-locked
+cmd aw_quicksave
+wait 4
+cmd aw_quickload
+key Return
+key Return
+wait 60
+state map
+cmd aw_placed container 331661
+cmd aw_placed ledger
+cmd aw_placed container 331661 open
+wait 3
+shot c9-after-load-strip
+key Escape
+wait 1

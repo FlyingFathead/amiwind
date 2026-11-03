@@ -209,6 +209,7 @@ int AW_AmbientTravelPlan(const aw_ambient_pkg_t *p,int fx,int fy,int fz,int tx,i
 #include "aw_mwvm.h"
 #include "aw_combat.h"
 #include "aw_dial.h"
+#include "aw_spike.h"
 
 #define SLOTS 128
 #define ACTOR_RANGE 1792.0f       /* OpenMW's actors processing range 7168 x 0.25 */
@@ -685,7 +686,7 @@ static void think(slot_t *s,float dt) {
                     if(s->travel==2){s->state=S_OFF;return;}
                     if(!near_allowed(s)){rejoin(s);}
                     return;}
-    aggro(s);                                   /* a finished package does not end the engage check (OpenMW) */
+    AW_SPIKE_STAGE(AW_SP_AMBAGGRO,aggro(s));    /* a finished package does not end the engage check (OpenMW) */
     if(AW_CombatSlotState(e,NULL)){s->fighting=1;s->mover=0;return;}
     if(s->travel==3 || s->travel==4){follow_think(s,dt);return;}
     if(s->state==S_OFF)return;
@@ -712,7 +713,7 @@ static void think(slot_t *s,float dt) {
         react(s);
     }
     switch(s->state){
-    case S_CHOOSE:choose(s);break;
+    case S_CHOOSE:AW_SPIKE_STAGE(AW_SP_AMBCHOOSE,choose(s));break;
     case S_IDLE:
         e->v.frame=(float)(s->skel_first+(int)(s->t*s->skel_rate));
         if((int)(s->t*s->skel_rate)>=s->skel_count){e->v.frame=(float)s->skel_first;set_field(e,"aw_moving",0);s->state=S_CHOOSE;}
@@ -721,7 +722,7 @@ static void think(slot_t *s,float dt) {
             if(s->pkg.distance && !s->pkg.manual && !near_allowed(s)){set_field(e,"aw_moving",0);rejoin(s);}
         }
         break;
-    case S_WALK:walk(s,dt);break;
+    case S_WALK:AW_SPIKE_STAGE(AW_SP_AMBWALK,walk(s,dt));break;
     }
 }
 void AW_AmbientPhysics(void) {
@@ -729,7 +730,7 @@ void AW_AmbientPhysics(void) {
     if(!ambient_on || !(p=player()))return;
     if(slots_world!=sv.worldmodel)reset_all();
     if(!load())return;
-    if(sv.time>=scan_at){scan_at=(float)sv.time+1.0f;scan(p);if(npend)apply_saved_packages(p);}
+    if(sv.time>=scan_at){scan_at=(float)sv.time+1.0f;AW_SPIKE_STAGE(AW_SP_AMBSCAN,{scan(p);if(npend)apply_saved_packages(p);});}
     interval=think_interval;
     t0=Sys_FloatTime();
     for(i=0;i<SLOTS;i++){
@@ -745,7 +746,8 @@ void AW_AmbientPhysics(void) {
         if(!AW_CombatSlotState(s->e,NULL) && !s->fighting &&
            (AW_CompanionEdict(s->e) || s->e->v.nextthink<=0 || field(s->e,"aw_story_hidden",0)))continue;
         if(dt>.5f)dt=.5f;
-        st.thinks++;think(s,dt);
+        {double a0;AW_SPIKE_BEGIN(a0);st.thinks++;think(s,dt);
+         if(aw_spike_on && a0>0)AW_SpikeEnt(s->num,Sys_FloatTime()-a0);}   /* the slowest actor named on the spike line */
     }
     t0=Sys_FloatTime()-t0;st.seconds+=t0;if(t0>st.worst)st.worst=t0;
 }

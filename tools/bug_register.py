@@ -84,7 +84,15 @@ ARCHIVES = ((ARCHIVE_DIR / 'bugs-to-v0.0.31.json', 31),
             # limit (996,775 bytes, gate 5010); up to v0.0.56 moved only 3 bugs (BUGS.md unchanged), so the rotation
             # moves on to v0.0.57, the last release, shipped the same day: 20 of its bugs are fixed or closed
             # (TRACKER-REGISTER-SIZE-36)
-            (ARCHIVE_DIR / 'bugs-v0.0.55-v0.0.57.json', 57))
+            (ARCHIVE_DIR / 'bugs-v0.0.55-v0.0.57.json', 57),
+            # 2026-11-02: the v0.0.59-dev5 findings and the CELL-CHANGES-59 slice 4 merge took bugs.json to 95.2 % of
+            # its 1 MiB limit (997,806 bytes, gate 5738); the rotation moves on to v0.0.58, the last release
+            # (TRACKER-REGISTER-SIZE-36)
+            (ARCHIVE_DIR / 'bugs-v0.0.58.json', 58),
+            # 2026-11-03: the night's v0.0.59 findings and reports took bugs.json to 95.1 % of its 1 MiB limit
+            # (997,410 bytes, gate 6400); nothing older is left to move, so the rotation moves on to v0.0.59, the
+            # current line: its 17 fixed or closed bugs, about 22 KB (TRACKER-REGISTER-SIZE-36)
+            (ARCHIVE_DIR / 'bugs-v0.0.59.json', 59))
 ARCHIVE_UP_TO = ARCHIVES[-1][1]   # fixed or closed bugs first found in v0.0.40 or earlier rotate into an archive
 # Archive files of earlier layouts: still read when present, emptied into ARCHIVES and removed by render.
 RETIRED_ARCHIVES = (ARCHIVE_DIR / 'bugs-v0.0.29-v0.0.33.json',)
@@ -682,7 +690,8 @@ def validate_waiting(b, where):
                                   and len(waiting) > len(WAITING_PREFIX) and _line_ok(waiting, 120)):
         errors.append('%s: waiting_on must be one line "%s<system>" of at most 120 characters' % (where, WAITING_PREFIX))
     if 'deferred' in b and not (isinstance(deferred, str) and DEFERRED_RE.match(deferred) and _line_ok(deferred, 200)):
-        errors.append('%s: deferred must be one line "YYYY-MM-DD: reason" (the maintainer\'s deferral)' % where)
+        errors.append('%s: deferred must be one line "YYYY-MM-DD: reason" of at most 200 characters (the maintainer\'s '
+                      'deferral; this one has %d)' % (where, len(deferred) if isinstance(deferred, str) else 0))
     if (waiting or deferred) and b.get('state') != 'open':
         errors.append('%s: waiting_on and deferred belong to open bugs; clear them when it is fixed or closed' % where)
     return errors

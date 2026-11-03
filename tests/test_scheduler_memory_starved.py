@@ -152,7 +152,13 @@ class PlanBeside(unittest.TestCase):
                         {'stages': {'chim': [self.measured()], 'scene': [self.SCENE]}, 'stair': None, 'runs': []})
         beside = rp.plan(self.WITH, {'chim', 'scene'}, 12, self.got(32),
                          {'stages': {'chim': [self.measured(container=27000.0)], 'scene': [self.SCENE]},
-                          'stair': None, 'runs': []})
+                          'stair': None, 'runs': []}, alone=False)
+        # with runs-alone on (the default, BUILD-CHIM-POOL-MEMORY-THROTTLE-59) the same stage runs alone instead
+        on = rp.plan(self.WITH, {'chim', 'scene'}, 12, self.got(32),
+                     {'stages': {'chim': [self.measured(container=27000.0)], 'scene': [self.SCENE]},
+                      'stair': None, 'runs': []})
+        self.assertEqual(on['alone'], ['chim'])
+        self.assertEqual(on['stages'][0]['workers'], alone['stages'][0]['workers'])
         a, b = alone['stages'][0], beside['stages'][0]
         self.assertEqual(a['beside_mib'], 0.0)
         self.assertEqual(b['beside_mib'], 6800.0)

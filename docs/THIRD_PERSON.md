@@ -1,6 +1,6 @@
 # Third person, vanity camera and the death scene
 
-_Last updated with AmiWind v0.0.59-dev4 (2 November 2026)._
+_Last updated with AmiWind v0.0.59-dev6 (3 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -180,6 +180,40 @@ death and the hand-to-hand ready sections).
 The baked body stays selectable (`aw_player_body_parts 0`, saved, or `dbg camera parts off`), and it is still the
 body while a torch is carried or while swimming (their own baked poses). Not yet on the assembled body: the
 draw/lower and punch arm layers of the baked body, armed stances per weapon class and the torch pose.
+
+**The body is kept in memory** (`aw_player_cache 1`, the default, in the game's default settings). Its parts
+load over several frames, at most 40 ms of loading in one frame, and then stay in memory: the model cache never
+evicts them to make room. A change of what is worn loads only the changed part. The first-person arms' parts are
+kept the same way. `aw_player_cache 0` gives the previous way (every part in the frame that first needs the body,
+the parts free to be evicted) for a comparison on the same image. The console says what each assembly cost:
+"Assembled player body: 21 parts, N file lookups, T ms over F frames (K KB kept)".
+
+Measured on 3 November 2026 (v0.0.59-dev6 image, FS-UAE, JIT, 68040, 32 MB Fast RAM, Seyda Neen):
+
+| | Previous way (dev5, dev6 engines) | Kept body |
+|---|---|---|
+| First frame after arriving | 12.2 to 15.3 s (the parts, the script file's journal names, the actor rows) | about 1.0 s |
+| Body assembly | all 21 parts inside that frame | 1.6 s of loading spread over 21 frames |
+| Reload of the parts later in play | one frame of 4.2 to 5.6 s | none |
+| Wearing a cuirass | (not measured) | 1 part loaded, 50 ms over 2 frames |
+| Memory kept | none | 281 KB (body and arms) |
+
+### The inventory picture
+
+Since v0.0.59 the character picture in the inventory window draws the same assembled body: the parts of what the
+player wears (the same recipe and the same worn items as the third-person view, assembled again only when one of
+them changes), posed at the start of the original's inventory pose for the weapon in the right hand (the
+`inventory...` groups of the shared table: hand to hand, short blade, one- and two-handed, blunt, two-handed wide),
+with the weapon and shield on the table's item bones. Equipping or taking off an item in the window redraws the
+picture once; every other frame copies the kept picture, as before. A two-handed weapon hides the shield, as in the
+original (OpenMW `characterpreview.cpp` `InventoryPreview::update` picks the pose; the rule is the one the baked
+poses used).
+
+The picture follows the body's switch: with `aw_player_body_parts 0` (or `dbg camera parts off`) it draws the
+previous picture, the race's baked inventory companion (`progs/body/*_i.mdl`) in its own starting outfit. A carried
+torch keeps its torch body in the picture in both. The baked companions therefore stay in the image: they are the
+picture with the baked body, and whenever the parts cannot be assembled (an image without `view/parts.txt`, or a
+table without the inventory groups).
 
 ## First-person arms
 

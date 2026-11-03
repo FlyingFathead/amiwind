@@ -159,6 +159,12 @@ int main(void){
      for(i=0;i<5;i++)assert(find(AW_StatsSkillName(minor[i]))->y==78+i*8);
     }
     assert(find("Misc Skills")->y==118);
+    /* LEVEL-UP-58: the level progress under the level: none without the levelling data, half of iLevelupTotal */
+    assert(frame[60*320+8]==AW_UIColor(0,0,0));
+    {extern int aw_stats_level_total;aw_stats_level_total=10;c->level_progress=5;draw();
+     assert(frame[60*320+8]==AW_UIColor(200,40,32) && frame[60*320+68]==AW_UIColor(200,40,32));
+     assert(frame[60*320+69]==AW_UIColor(48,39,22));
+     aw_stats_level_total=0;c->level_progress=0;draw();}
     if(path)write_ppm(path);
     /* Every skill exactly once over the scroll; misc rows in skill record order. */
     memset(seen,0,sizeof(seen));major_rows=0;

@@ -9,6 +9,17 @@
 #include "aw_maps.h"
 #include "aw_tryalloc.h"	/* the 256 KB save buffers: malloc would trap on a full machine (SDK-MALLOC-TRAPS-52) */
 #include "aw_ledger.h"
+#include "aw_jhist.h"	/* the dated journal history, feature 128 (JOURNAL-ORIGINAL-VIEW-59) */
+/* CELL-CHANGES-59 slice 7: 1 while a save of other game data is loaded (aw_mwhost.c leaves out what names another
+ * build's table rows: the known-topic bits by row); the hooks (aw_mwhost.c binds them; NULL: a save of other game
+ * data is refused as before, nothing is migrated) */
+int aw_save_migrating;
+int (*aw_save_other_ok)(void);
+void (*aw_save_ident_refresh)(struct aw_ledger_s *ledger);
+long (*aw_save_migrate)(struct aw_ledger_s *ledger,void *dropped);
+int (*aw_save_drop_actor_records)(void);
+void (*aw_save_notice)(const char *line);
+static int pending_other;
 #ifdef AMIGA
 #include <proto/dos.h>
 #else
@@ -23,6 +34,7 @@ static aw_save_t world,pending;
 static aw_changes_t save_changes,pending_changes;
 /* a loaded save's world change list (feature 32, CELL-CHANGES-59), handed to the session's list at the load */
 static aw_ledger_t pending_ledger;
+static aw_jhist_t pending_jhist;
 /* the actor record's block (feature 16), one buffer for a save and one for a loaded save */
 static unsigned char save_actor_block[AW_SAVE_ACTOR_BYTES],pending_actor_block[AW_SAVE_ACTOR_BYTES];
 static int loading,scheduled,content_ready;
@@ -80,6 +92,13 @@ static byte *read_whole(FILE *f,int *size)
     if(ferror(f) || *size<12){free(raw);return NULL;}
     return raw;
 }
+/* CELL-CHANGES-59 slice 7: a save of other game data or another build's tables (its content fingerprint is not this
+ * build's) loads, migrated (AW_SaveSpawn), when this build has the reference identity table to check it against
+ * (aw_inventory.c AW_PlacedRefs); without the table it is refused as before. */
+static int other_content_ok(const aw_save_t *state)
+{
+    return content() && (!memcmp(state->content,content_id,32) || (aw_save_other_ok && aw_save_other_ok()));
+}
 static int read_file_changes(uint32_t profile,int slot,int generation,aw_save_t *state,aw_changes_t *changes)
 {
     char filename[384];byte *raw;FILE *f;int n=0,ok;
@@ -87,8 +106,7 @@ static int read_file_changes(uint32_t profile,int slot,int generation,aw_save_t 
     f=fopen(filename,"rb");if(!f)return 0;
     raw=read_whole(f,&n);ok=raw!=NULL;
     fclose(f);if(!raw)return 0;
-    ok=ok && AW_SaveDecodeChanges(raw,n,state,changes) && state->profile==profile &&
-        content() && !memcmp(state->content,content_id,32);
+    ok=ok && AW_SaveDecodeChanges(raw,n,state,changes) && state->profile==profile && other_content_ok(state);
     free(raw);return ok;
 }
 static int newest(uint32_t profile,int slot,aw_save_t *state)
@@ -104,6 +122,27 @@ static uint32_t actor_id(edict_t *e)
     if(v && v->_float>0)return (uint32_t)v->_float;
     v=GetEdictFieldValue(e,"aw_intro_role");
     return v && v->_float>0?0x800000U+(uint32_t)v->_float:0;
+}
+/* CELL-CHANGES-59 slice 7: the loaded list of a save of other game data, migrated; and what the load says. */
+static void migrate_loaded(void)
+{
+    aw_ledger_dropped_t d;long n;
+    memset(&d,0,sizeof(d));
+    n=aw_save_migrate?aw_save_migrate(&aw_ledger,&d):-1;
+    aw_ledger_events.migrations++;aw_ledger_events.migrated=d;aw_ledger_events.migrated_all=n>0?(unsigned long)n:0;
+}
+static void migrate_report(void)
+{
+    const aw_ledger_events_t *v=&aw_ledger_events;char line[160];
+    Con_Printf("This save was made with other game data or another build: %lu changes of things this game no longer has, "
+               "or that are now other things, were left out (objects %lu, containers %lu, ranks %lu, dispositions %lu, "
+               "script locals %lu, actors %lu, levelled rolls %lu, drops %lu, stolen marks %lu; content files missing %lu); "
+               "%lu actor records and dead counts of the other actor table were left out.\n",v->migrated_all,
+               v->migrated.objects,v->migrated.containers,v->migrated.ranks,v->migrated.dispositions,v->migrated.locals,
+               v->migrated.actors,v->migrated.picks,v->migrated.drops,v->migrated.stolen,v->migrated.files,v->records);
+    snprintf(line,sizeof(line),"Save of other game data: %lu changes left out (things no longer in the game).",
+             v->migrated_all+v->records);
+    if(aw_save_notice)aw_save_notice(line);
 }
 int (*aw_companion_home)(edict_t *,vec3_t,vec3_t);   /* aw_companion.c */
 int (*aw_save_entry_refuse)(const char *scene,const float *position);   /* aw_scene.c, bound in aw_debug.c */
@@ -163,7 +202,23 @@ void AW_SaveSpawn(void)
          * save's object entries and dropped items join it (aw_mwhost.c, aw_inventory.c) */
         AW_LedgerMove(&aw_ledger,&pending_ledger);
         if(aw_save_objects_import)aw_save_objects_import(&pending_changes);
+        /* slice 7: a save of other game data: every change of a reference this game no longer has, or that now names
+         * another record, is dropped and counted (aw_ledger.h AW_LedgerMigrate), before anything reads the list */
+        aw_save_migrating=pending_other;
+        if(pending_other)migrate_loaded();
         if(aw_save_actors_import)aw_save_actors_import(pending_changes.actors,pending_changes.actor_bytes);
+        /* slice 4: the scripts' globals, quest stages and known topics as saved (an older save: the data's start,
+         * its 32-slot journal folded in), after the actor block's topic bits */
+        if(aw_save_script_import)aw_save_script_import(&aw_ledger);
+        /* the dated journal history as saved; an older save's 32-slot history taken over (JOURNAL-ORIGINAL-VIEW-59) */
+        AW_JHistMove(&aw_jhist,&pending_jhist);
+        if(!aw_jhist.count)AW_JHistTakeOver(&aw_jhist,&aw_state);
+        if(pending_other){
+            /* the actor records and dead counts name another build's actor table rows: they go, counted */
+            aw_ledger_events.records=aw_save_drop_actor_records?(unsigned long)aw_save_drop_actor_records():0;
+            migrate_report();
+        }
+        aw_save_migrating=pending_other=0;
         AW_BarrierLoad();AW_OpeningSpawn();
     }
     for(i=1;i<sv.num_edicts;i++){
@@ -193,7 +248,7 @@ void AW_SaveSpawn(void)
     }else AW_SaveSchedule();
 }
 /* A new game: no saved state, and the world as in the game data (the world change list emptied, CELL-CHANGES-59). */
-void AW_SaveReset(void){memset(&world,0,sizeof(world));loading=scheduled=0;last_auto=realtime;AW_LedgerClear(&aw_ledger);}
+void AW_SaveReset(void){memset(&world,0,sizeof(world));loading=scheduled=0;last_auto=realtime;AW_LedgerClear(&aw_ledger);AW_JHistClear(&aw_jhist);}
 int AW_SaveAllowed(void)
 {
     return sv.active && svs.maxclients==1 && aw_story.stage==AW_STAGE_RELEASED && aw_character.valid &&
@@ -263,15 +318,22 @@ int AW_SaveWrite(int slot)
     /* Keep larger serialized storage off the fixed Amiga task stack. The world change list (CELL-CHANGES-59) adds
      * its own bytes to the buffer: a save is never refused because the list is long. */
     capacity=AW_SAVE_BYTES;
+    /* slice 4: the scripts' globals, quest stages and known topics join the list as they are now (aw_mwhost.c) */
+    if(aw_save_script_export)aw_save_script_export(&aw_ledger);
+    /* slice 7: the record hash of every reference the list names and the content files, so a later build of other
+     * game data can tell what still names the same thing (only when there is a list to save) */
+    if(AW_LedgerRows(&aw_ledger)>0 && aw_save_ident_refresh)aw_save_ident_refresh(&aw_ledger);
     if(AW_LedgerRows(&aw_ledger)>0){      /* its rows, or its stolen pairs alone (slice 2) */
         int need=AW_LedgerEncode(&aw_ledger,NULL,0);
         if(need<=0 || need>AW_SAVE_MAX_BYTES-AW_SAVE_BYTES-8){
             Con_Printf("Save world change list invalid (%d rows); previous saves retained.\n",aw_ledger.count);return 0;}
         capacity+=need+8;
     }
+    if(aw_jhist.count)capacity+=AW_JHistEncode(&aw_jhist,NULL,0)+8;   /* the dated journal history (feature 128) */
     raw=(byte *)AW_TryMalloc((unsigned long)capacity);
-    if(!raw){Con_Printf("Save skipped: not enough free memory for its buffer; previous saves retained.\n");return 0;}
-    save_changes.count=0;save_changes.ledger=&aw_ledger;
+    if(!raw){AW_LedgerRecordsSet(&aw_ledger,NULL,0);
+        Con_Printf("Save skipped: not enough free memory for its buffer; previous saves retained.\n");return 0;}
+    save_changes.count=0;save_changes.ledger=&aw_ledger;save_changes.journal=&aw_jhist;
     if((aw_save_changes_export && aw_save_changes_export(&save_changes)<0) ||
        (aw_save_objects_export && aw_save_objects_export(&save_changes)<0)){
         free(raw);Con_Printf("Save change list incomplete; previous saves retained.\n");return 0;
@@ -280,7 +342,9 @@ int AW_SaveWrite(int slot)
     if(aw_save_actors_export && (save_changes.actor_bytes=aw_save_actors_export(save_actor_block,AW_SAVE_ACTOR_BYTES))<0){
         free(raw);Con_Printf("Save actor records too large; previous saves retained.\n");return 0;
     }
-    n=AW_SaveEncodeChanges(raw,capacity,&world,&save_changes);if(!n){free(raw);Con_Printf("Save state validation failed; previous saves retained.\n");return 0;}
+    n=AW_SaveEncodeChanges(raw,capacity,&world,&save_changes);
+    AW_LedgerRecordsSet(&aw_ledger,NULL,0);   /* slice 6: the actor records' copy is only for this write */
+    if(!n){free(raw);Con_Printf("Save state validation failed; previous saves retained.\n");return 0;}
     side=newest(world.profile,slot,&check);side=side==0?1:0;
     if(!path(filename,sizeof(filename),world.profile,slot,side)){free(raw);return 0;}
     f=fopen(filename,"wb");if(!f){free(raw);return 0;}
@@ -305,6 +369,7 @@ int AW_SaveRead(uint32_t profile,int slot)
     pending_changes.actors=pending_actor_block;pending_changes.actor_capacity=AW_SAVE_ACTOR_BYTES;
     pending_changes.actor_bytes=0;
     AW_LedgerClear(&pending_ledger);pending_changes.ledger=&pending_ledger;
+    AW_JHistClear(&pending_jhist);pending_changes.journal=&pending_jhist;
     if(!AW_CharacterLoad() || !content() || (generation=newest(profile,slot,&candidate))<0 ||
        !read_file_changes(profile,slot,generation,&candidate,&pending_changes)){
         Con_Printf("No valid compatible save generation; current game retained.\n");return 0;
@@ -320,6 +385,7 @@ int AW_SaveRead(uint32_t profile,int slot)
     if(aw_save_entry_refuse && aw_save_entry_refuse(candidate.scene,candidate.position))return 2;
     if(!AW_RegionSelect(candidate.scene,candidate.position,0))return 0;
     pending=candidate;loading=1;scheduled=0;
+    pending_other=memcmp(candidate.content,content_id,32)!=0;    /* slice 7: migrated at the spawn */
     IN_AWClearButtons();key_dest=key_game;
     /* Restore before later console commands can replace the pending scene. */
     snprintf(map,sizeof(map),"map %s\n",candidate.scene);Cbuf_InsertText(map);return 1;
@@ -367,7 +433,8 @@ int AW_SaveDescription(uint32_t profile,int slot,char *out,int capacity)
     if(capacity<1)return 0;
     /* Load stable character IDs before AWS1/2/3/4 decoding resolves save IDs. */
     if(!AW_CharacterLoad() || newest(profile,slot,&info)<0){out[0]=0;return 0;}
-    snprintf(out,capacity,"%s / %s / L%ld",info.story.name,info.scene,(long)info.character.level);return 1;
+    snprintf(out,capacity,"%s / %s / L%ld%s",info.story.name,info.scene,(long)info.character.level,
+             memcmp(info.content,content_id,32)?" / other game data":"");return 1;
 }
 /* The best state of a slot's two generations: no file, a file that does not decode (damaged, or a format this build
  * cannot read), a save of other game data or another build's content, or a loadable save. */
@@ -380,7 +447,7 @@ int AW_SaveSlotState(uint32_t profile,int slot)
         if(!path(filename,sizeof(filename),profile,slot,generation) || !(f=fopen(filename,"rb")))continue;
         raw=read_whole(f,&n);fclose(f);
         if(!raw || !AW_SaveDecodeChanges(raw,n,info,NULL) || info->profile!=profile)state=AW_SLOT_UNREADABLE;
-        else state=content() && !memcmp(info->content,content_id,32)?AW_SLOT_OK:AW_SLOT_OTHER_DATA;
+        else state=other_content_ok(info)?AW_SLOT_OK:AW_SLOT_OTHER_DATA;   /* slice 7: migrated when it can be */
         free(raw);
         if(state>best)best=state;
     }
@@ -443,4 +510,5 @@ void AW_SaveInit(void)
 {
     Cvar_RegisterVariable(&autosaves);Cmd_AddCommand("aw_quicksave",quicksave);Cmd_AddCommand("aw_quickload",quickload);
     aw_save_ledger_rows=AW_LedgerRows;aw_save_ledger_encode=AW_LedgerEncode;aw_save_ledger_decode=AW_LedgerDecode;
+    aw_save_journal_encode=AW_JHistEncode;aw_save_journal_decode=AW_JHistDecode;
 }

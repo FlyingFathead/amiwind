@@ -15,7 +15,9 @@ from PIL import Image
 from mwad.audit import records, subrecords, string
 from mwad.paths import ensure_external, child_ci
 sys.path.insert(0,str(Path(__file__).resolve().parent))
-import text_defines   # tools/text_defines.py (not under mwad: an older mwad may already be loaded in tests)
+# tools/text_defines.py is imported in journal_assets, its only reader (not under mwad: an older mwad may already be
+# loaded in tests). Not at import: the CHIM world and rooms stages reach this module's validate() alone, and a stage key
+# counts what a stage reaches, so a text define change re-keys only the stages that write text (BUILD-STAGE-KEY-TEXT-DEFINES-59).
 from build_scratch import scratch_dir
 
 WORLD_UI_FILES = ('map.awm', 'journal.awj', 'entries.dat', 'quests.awq', 'region-names.awn', 'region-weather.aww',
@@ -368,8 +370,16 @@ def fixed(value,size):
     return raw.ljust(size,b'\0')
 
 
+# The journal index (JOURNAL-BOOK-32-QUESTS-59): AWJ2 rows are AWJ1's (id 64, stage i32, text offset u32, text length
+# u32) and a u32 of the INFO's quest status flags, so the book can tell a finished quest (OpenMW 0.51
+# mwdialogue/quest.cpp addEntry: QSTF finishes the quest, QSTR restarts it; QSTN names it). The engine reads both forms.
+JOURNAL_ROW=80
+JOURNAL_FINISHED,JOURNAL_RESTART,JOURNAL_NAME=1,2,4
+
+
 def journal_assets(raw):
-    kind=None;quest=None;entries={}
+    import text_defines   # the engine's define codes (BOOK-TEXT-MACROS-58); here, not at import (see the imports)
+    kind=None;quest=None;entries={};flags_of={}
     for tag,flags,payload in records(raw):
         if tag not in ('DIAL','INFO'):continue
         f=dict(subrecords(payload))
@@ -385,9 +395,12 @@ def journal_assets(raw):
             key=(quest,stage)
             if key in entries:raise ValueError('Ambiguous journal stage: '+str(key))
             entries[key]=body
-    index=bytearray(b'AWJ1'+struct.pack('<I',len(entries)));blob=bytearray()
+            flags_of[key]=((JOURNAL_FINISHED if 'QSTF' in f else 0)|(JOURNAL_RESTART if 'QSTR' in f else 0)|
+                           (JOURNAL_NAME if 'QSTN' in f else 0))
+    index=bytearray(b'AWJ2'+struct.pack('<I',len(entries)));blob=bytearray()
     for (quest,stage),body in sorted(entries.items()):
-        index.extend(fixed(quest,64)+struct.pack('<iII',stage,len(blob),len(body)));blob.extend(body)
+        index.extend(fixed(quest,64)+struct.pack('<iIII',stage,len(blob),len(body),flags_of[(quest,stage)]))
+        blob.extend(body)
     return bytes(index),bytes(blob),len({key[0] for key in entries})
 
 
@@ -612,7 +625,7 @@ def prepare(data_files,survey,scene,world_map=None,lava_pools=None):
         (dest/name).write_bytes(raw)
     receipt={'format':'AmiWind world UI 1','master_sha256':report['master_sha256'],
              'palette_sha256':hashlib.sha256(palette).hexdigest(),'journal_quests':quests,
-             'journal_entries':(len(index)-8)//76,'journal_text_bytes':len(blob),'map_bytes':len(worldmap),
+             'journal_entries':(len(index)-8)//JOURNAL_ROW,'journal_text_bytes':len(blob),'map_bytes':len(worldmap),
              'region_weather':dict(weather_info,hours=hours),
              'smoke':{'rows':smoke_report['rows'],'by_kind':smoke_report['by_kind']},
              'files':{name:hashlib.sha256((dest/name).read_bytes()).hexdigest() for name in WORLD_UI_FILES+OPTIONAL_WORLD_UI_FILES

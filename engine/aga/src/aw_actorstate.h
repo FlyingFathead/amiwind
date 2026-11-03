@@ -3,8 +3,9 @@
  *
  * The base of every actor is a row of the actor table the builder writes into id1/mwscript.awm (tools/mwscript/
  * actors.py: ACTB, AINV, AITM, ASPT, ASPL, OACT); the rows stay on disk and are read through the host's read
- * function when an actor is first needed. What play changes lives in a live record per placed reference (a fixed
- * pool, no allocation after AW_ActorStateOpen), saved with the game (AW_ActorStateExport/Import) and found again by
+ * function when an actor is first needed. What play changes lives in a live record per placed reference (a pool of
+ * blocks that grows only while every record in it is changed, below), saved with the game (the dead counts in the
+ * actor block, the changed records in the world change list: AW_ActorStateExportCounts/Records) and found again by
  * the reference. Combat, behaviour and the scripts all read and write the same record through these calls; the scripts'
  * semantics are OpenMW's (apps/openmw/mwscript/statsextensions.cpp, aiextensions.cpp, containerextensions.cpp),
  * written independently.
@@ -15,9 +16,14 @@
 #include <stdint.h>
 
 #define AW_ACTOR_NONE 0xFFFF
-#define AW_ACTOR_POOL 128          /* live records (268 bytes each on the host build) */
-#define AW_ACTOR_ITEMS 12          /* inventory changes kept per actor (item, count change) */
-#define AW_ACTOR_SPELLS 8          /* spell changes kept per actor (spell, added or removed) */
+/* ACTOR-STATE-POOL-LIMITS-54 (CELL-CHANGES-59 slice 6): the live records come in blocks of AW_ACTOR_POOL; an unchanged
+ * record gives its place to a new one, a changed one is never dropped: when every record is changed a new block is
+ * taken, up to AW_ACTOR_POOL_MAX records (the game's actor table has 3,437 bases; it places 2,673 NPCs). The change
+ * lists of one actor grow on demand up to AW_ACTOR_ITEMS / AW_ACTOR_SPELLS (were 12 and 8). */
+#define AW_ACTOR_POOL 128          /* live records per block */
+#define AW_ACTOR_POOL_MAX 8192     /* live records at most */
+#define AW_ACTOR_ITEMS 255         /* inventory changes kept per actor (item, count change) */
+#define AW_ACTOR_SPELLS 255        /* spell changes kept per actor (spell, added or removed) */
 #define AW_ACTOR_PLAYER_REF 0xFFFFFFFFu   /* the player's own record (its sheet: aw_character, by the host) */
 
 /* Stats (the STAT of the calls below and of the scripts' ACTOR opcode). */
@@ -88,9 +94,9 @@ typedef struct {
     unsigned char ai[4];                 /* hello, fight, flee, alarm */
     short disposition;
     unsigned char kind,record_flags;
-    unsigned char nitems,nspells;
-    struct {uint16_t item;int16_t change;} items[AW_ACTOR_ITEMS];
-    struct {uint16_t spell;int16_t change;} spells[AW_ACTOR_SPELLS];  /* change: +1 added, -1 removed */
+    unsigned char nitems,nspells,items_capacity,spells_capacity;
+    struct aw_actor_item_s {uint16_t item;int16_t change;} *items;      /* grown on demand (NULL: none) */
+    struct aw_actor_spell_s {uint16_t spell;int16_t change;} *spells;   /* change: +1 added, -1 removed */
 } aw_actor_t;
 
 /* The host: READ the bytes at OFFSET of id1/mwscript.awm (0 on success). */
@@ -111,6 +117,7 @@ int AW_ActorStateReady(void);
 int AW_ActorCount(void);
 /* The ACTB row of an actor id (folded; binary search on disk), AW_ACTOR_NONE if none. */
 int AW_ActorFind(const char *id);
+void AW_ActorFindForget(void);   /* the kept finds go (ARRIVAL-LONG-FRAME-DEV6-59; the table closes) */
 /* The ACTB row the scripts' object OBJECT names (the resident OACT table), AW_ACTOR_NONE if none. */
 int AW_ActorOfObject(int object,const uint16_t *oact,int count);
 int AW_ActorBase(int row,aw_actor_base_t *out);
@@ -211,6 +218,19 @@ int AW_SoldImport(const unsigned char *p,int bytes);
  * (0 nothing to save, -1 too small); Import returns 1, or 0 for a bad block (the pool is left empty). */
 int AW_ActorStateExport(unsigned char *out,int capacity);
 int AW_ActorStateImport(const unsigned char *data,int bytes);
+/* Slice 6 (the save's world change list, aw_ledger.h RECORDS): the dead counts alone as an AWAS1 block (records 0), and
+ * the changed records alone as "AWAR": u8 version (1) u8 0 u16 0 u32 records, then each record as in AWAS1. Export
+ * returns the bytes (OUT NULL: the bytes needed; 0 nothing; -1 too small). ImportRecords adds the records to the pool
+ * after an Import (a reference already there is replaced); 1 good (also for 0 bytes), 0 a bad block (nothing added). */
+int AW_ActorStateExportCounts(unsigned char *out,int capacity);
+int AW_ActorStateExportRecords(unsigned char *out,int capacity);
+int AW_ActorStateImportRecords(const unsigned char *data,int bytes);
+/* CELL-CHANGES-59 slice 7: a respawned actor's live record goes (1 when there was one); after a load of another build's
+ * save, every changed record and dead count goes (how many). */
+int AW_ActorForget(uint32_t reference);
+int AW_ActorStateDropAll(void);
+/* Live records now and changed ones (for the status line and the tests). */
+int AW_ActorStateLive(int *changed);
 const aw_actorstate_stats_t *AW_ActorStateStats(void);
 /* Bytes held while open (the pool, the dead counts, the directory). */
 unsigned long AW_ActorStateResident(void);

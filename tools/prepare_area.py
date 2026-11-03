@@ -706,6 +706,44 @@ def _guard_torch(key,data,assets,appearance,palette):
     return guards['items'][shade]
 
 
+def table_warmers(tasks):
+    """One task per shared animation table the skeletal bakes of TASKS read (skeletal_actor.table_choice), in first-use
+    order; [] for baked actors (--npc-anim-type 1) or when the unit cache is off (a table built in one worker would
+    not reach the others)."""
+    import npc_anim
+    import skeletal_actor
+    from pass_cache import folder as cache_folder
+    if not tasks or npc_anim.anim_type()!=2 or cache_folder() is None:
+        return []
+    out={}
+    for task in tasks:
+        appearance=task[2]
+        if appearance.get('initially_dead',False):
+            continue
+        try:
+            choice=skeletal_actor.table_choice(appearance)[:2]
+        except (KeyError,ValueError):
+            continue            # the bake itself names the problem
+        out.setdefault(choice,task)
+    return list(out.values())
+
+
+def warm_resident_table(task):
+    """Build (or read) the shared animation table of TASK's resident in this worker: skeletal_actor.game_table with the
+    bake's own asset and skeleton caches, so the table lands in the unit cache once for every worker."""
+    import skeletal_actor
+    data,appearance=task[0],task[2]
+    key=str(Path(data).resolve())
+    if key not in _resident_assets:_resident_assets[key]=Assets(data,BSA(child_ci(data,'Morrowind.bsa')))
+    assets=_resident_assets[key]
+    def rig_of(path):
+        rig=(key,path)
+        if rig not in _resident_rigs:_resident_rigs[rig]=Skeleton(assets,path)
+        return _resident_rigs[rig]
+    skeletal_actor.game_table(key,appearance,rig_of)
+    return True
+
+
 def _skeletal_resident(task, profile_name, profile, key, assets):
     """build_resident's --npc-anim-type 2 bake (skeletal_actor.skeletal_resident): the model, its layout on the
     table's frames (no mover), its carried items' skeletal tag (AWTS1, SKEL-ITEM-TAGS-52), sounds and voice as the
@@ -967,6 +1005,14 @@ def populate(data,scene,rooms,reports,ffmpeg='ffmpeg',jobs=None,
         else:pending.append((task,cache,inputs,folder))
     if tasks:print('Residents: %d looked up in the unit cache %s (%d found) in %.1f s on %d threads'%(
         len(tasks),RESIDENT_UNIT,len(tasks)-len(pending),time.perf_counter()-started,threads),flush=True)
+    # the shared animation tables the bakes left need, each built once (side by side) into the unit cache first, so the
+    # workers read them instead of each building them again (RESIDENT-BAKE-VIVEC-COST-59)
+    warm=table_warmers([p[0] for p in pending])
+    if warm:
+        started=time.perf_counter()
+        list(ordered_map(warm_resident_table,warm,max(1,min(resolve_jobs(jobs),len(warm)))))
+        print('Residents: %d shared animation table(s) ready for %d bakes in %.1f s'%(
+            len(warm),len(pending),time.perf_counter()-started),flush=True)
     # the bakes left, on the shared pool as before (only the misses)
     for (task,cache,inputs,folder),baked in zip(pending,ordered_map(build_resident,[p[0] for p in pending],max(1,min(resolve_jobs(jobs),len(pending) or 1))) if pending else ()):
         identifier,record=publish_resident(folder,*baked)
@@ -989,6 +1035,18 @@ def populate(data,scene,rooms,reports,ffmpeg='ffmpeg',jobs=None,
     if fallbacks:
         print('Residents with a smaller animation level (alias byte budget): %d: %s'%(len(fallbacks),
               ', '.join('%s (%s)'%(f['id'],f['level']) for f in fallbacks)),flush=True)
+    # Seyda Neen's skeletal residents also get their recipe, for the engine to draw them from the player's parts
+    # library (tools/npc_recipes.py, NPC-PARTS-RUNTIME-59, the first stage: this town); the fused models stay (the
+    # server model and the fallback)
+    import npc_anim as resident_anim
+    # one small table per place (BUILD-NPC-RECIPES-PER-CELL-59): an exterior resident in its cell's table (grid
+    # numbers of its position), a room's in the room's (its map name), loaded and freed with the place in the engine
+    if resident_anim.anim_type()==2 and models:
+        import npc_recipes
+        exterior_ids={id(r) for r in exterior}
+        placements=[(npc_recipes.cell_key(*npc_recipes.cell_of(r['position'])) if id(r) in exterior_ids else slug,r['id'])
+                    for slug,r in cast]
+        npc_recipes.write_tables(scene/'id1',[r['appearance'] for r in models.values()],placements)
     # Near/far models (tools/npc_lod.py): near files and the pairing manifest (NPC records only).
     lod_report=npc_lod.publish(scene/'id1',models,kinds)
     creature_ids=sorted({r['id'].casefold() for _,r in creatures})

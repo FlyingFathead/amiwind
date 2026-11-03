@@ -2,12 +2,13 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 4 times; something has to be done
+## PERSISTING: reported 5 times; something has to be done
 
 - Reported with v0.0.55-dev1 at 2026-10-28 (time not recorded): The v0.0.55-dev1 full build (2026_10_28_v0.0.55-dev1_full-dev1_81de78f), its perf guard the only failure: chim-town-balmora build_resident 87 s (was 39 s, +121 percent), chim-town-vivec_city 97 s (was 62 s, +56 percent), the same units; perf only, the build shipped.
 - Reported with v0.0.57-dev1 at 2026-10-30 06:13 +0200: v0.0.57-dev1 full build: build_resident with the same units 191 percent slower in chim-town-balmora (114 s, was 39 s) and 111 percent in chim-town-vivec_city (132 s, was 62 s); perf guard failed on these two, the host was busy with four workers gates and MiniWinds
 - Reported with v0.0.57-dev1 at 2026-10-30 11:55 +0200: v0.0.57-dev2 full build (2026_10_30_v0.0.57-dev1_full-dev2_2a4027c): build_resident with the same units 121 s in chim-town-balmora (was 52 s) and 137 s in chim-town-vivec_city (was 62 s); perf guard failed on these again, host shared with five workers
 - Reported with v0.0.57-dev3 at 2026-10-30 16:16 +0200: PERSISTING: dev3 full run 2026_10_30_v0.0.57-dev3_full-v0.0.57-dev3-snapshot-for-the-forge_8297a0b, perf guard FAIL chim-town-balmora build_resident 124 s, was 52 s with the same 15 units (+138 %); only failing section, delivered as perf-only
+- Reported with v0.0.59-dev5 at 2026-11-02 (time not recorded): Same cause as PERF-GUARD-RESIDENT-BUSY-HOST-57: the shared animation table built again in every worker process (about 18 s of CPU each); hair is not the cost.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -35,7 +36,7 @@ _Last updated with AmiWind v0.0.57-dev1 (30 October 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 4 times; something has to be done](#persisting-reported-4-times-something-has-to-be-done)
+- [PERSISTING: reported 5 times; something has to be done](#persisting-reported-5-times-something-has-to-be-done)
 - [Status: 30 October 2026](#status-30-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -99,7 +100,9 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-CACHE-TRACE-PYTHONPATH-33](BUILD-CACHE-TRACE-PYTHONPATH-33.md): The stage read trace refused reuse of a reused run when another checkout was on PYTHONPATH
 - [BUILD-CHIM-CONVERTER-CHANGE-FULL-REBUILD-46](BUILD-CHIM-CONVERTER-CHANGE-FULL-REBUILD-46.md): A change in the shared collision converter rebuilds every CHIM frame and everything after it, even where the output is identical
 - [BUILD-CHIM-FRAME-SWAP-LATE-36](BUILD-CHIM-FRAME-SWAP-LATE-36.md): The image step builds 335 legacy maps of cells already on CHIM, then removes them before packing
+- BUILD-CHIM-KEY-SKY-OVERLAY-TABLE-59 (no report page): The CHIM world stage and its ocean units are keyed by the whole sky palette overlay module, so a new image file extension rebuilds the CHIM world
 - [BUILD-CHIM-MAIN-MEMORY-46](BUILD-CHIM-MAIN-MEMORY-46.md): The CHIM stage main process holds so much memory that the memory guard starves its own workers
+- BUILD-CHIM-POOL-MEMORY-THROTTLE-59 (no report page): A CHIM stage rebuild runs its area pool on 8 of 24 workers because the stage's parent and the stages beside it hold most of the build's memory
 - [BUILD-CHIM-REGION-FRAMES-TAIL-43](BUILD-CHIM-REGION-FRAMES-TAIL-43.md): The CHIM region-frame step runs its last frames on one worker while the other cores sit idle
 - [BUILD-CHIM-SERIAL-SECTIONS-44](BUILD-CHIM-SERIAL-SECTIONS-44.md): The CHIM stage runs several sections on one core while units wait: visibility rows starve their workers
 - [BUILD-CHIM-SOURCE-REPEAT-41](BUILD-CHIM-SOURCE-REPEAT-41.md): The CHIM stage parsed the whole master and read the same models again for every area: 723 source stages took 24,500 CPU seconds

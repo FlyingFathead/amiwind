@@ -175,6 +175,21 @@ NEUTRAL_EDITS = {
     # CHIM world and its interiors, because the heap audit read client.h whole for four efrag #define lines
     'a new input button in client.h': (SRC + 'client.h', lambda text: re.sub(
         r'(extern\s+kbutton_t\s+in_speed\s*;)', r'\1\nextern kbutton_t in_aw_key_test;', text, count=1)),
+    # BUILD-ENGINE-SOURCE-KEY-BROAD-36 (reopened 2026-11-03): the frame timing edits of v0.0.59 re-keyed the CHIM
+    # world and its interiors (dev6): a new spike slot, new wait counters and a changed timing macro in aw_spike.h
+    'aw_spike.h: a new spike slot': (SRC + 'aw_spike.h', lambda text: text.replace(
+        '\tAW_SP_SLOTS', '\tAW_SP_KEYTEST,\n\tAW_SP_SLOTS', 1)),
+    'aw_spike.h: a new wait counter and its macros': (SRC + 'aw_spike.h', lambda text: text.replace(
+        'AW_WAIT_VBL, AW_WAITS}', 'AW_WAIT_VBL, AW_WAIT_KEYTEST, AW_WAITS}', 1).replace(
+        'extern int aw_disk_depth;', 'extern int aw_disk_depth;\nextern long aw_keytest_count;\n'
+        'void AW_SpikeKeyTest (int n);\n#define AW_KEYTEST(n)\t(aw_keytest_count += (n))', 1)),
+    'aw_spike.h: the disk wait macro changed': (SRC + 'aw_spike.h', lambda text: text.replace(
+        '#define AW_DISK_BEGIN(t0)\t((t0) = aw_disk_depth++ ? 0 : Sys_FloatTime ())',
+        '#define AW_DISK_BEGIN(t0)\t((t0) = aw_disk_depth++ > 0 ? 0 : Sys_FloatTime ())', 1)),
+    'aw_spike.h: a disk wait wrapper changed (quakedef.h maps fread to it)': (SRC + 'aw_spike.h', lambda text: text.replace(
+        'got=(fread)(p,size,n,f);', 'got=(fread)(p,size,n,f); aw_wait_time[AW_WAIT_DISK] += 0;', 1)),
+    'aw_spike.h: the fopen wrapper macro changed': (SRC + 'aw_spike.h', lambda text: text.replace(
+        '#define fopen(p,m) AW_DiskFopen((p),(m))', '#define fopen(p,m) AW_DiskFopen(p,m)', 1)),
 }
 # edits of what the world build reads: each must re-key the CHIM world
 READ_EDITS = {
@@ -466,6 +481,64 @@ class EngineFactsTranslationTests(unittest.TestCase):
         changed = build_cache.explain(record, engine_facts.translate(record, self.components(self.new, True),
                                                                       self.run, 'chim'))
         self.assertIn('engine/aga/src/quakedef.h', changed[0])    # compared as before: the whole files differ
+
+
+TIMING = 'engine/aga/src/aw_spike.h'
+TIMING_TEXT = '''#ifndef AW_SPIKE_H
+#define AW_SPIKE_H
+enum { AW_SP_A, AW_SP_B, AW_SP_SLOTS };
+#ifdef AMIGA
+void AW_SpikeAdd (int slot, double seconds, long bytes);
+extern int aw_disk_depth;
+#define AW_DISK_BEGIN(t0) ((t0) = aw_disk_depth++)
+#else
+#define AW_SpikeAdd(s, t, b) ((void)0)
+#endif
+#define AW_SPIKE_ROWS 8
+#endif
+'''
+WRAPPER = 'static inline int W_Open(void) { double t0; AW_DISK_BEGIN(t0); return 0; }\n#define fopen W_Open\n'
+
+
+class TimingHeaderTests(unittest.TestCase):
+    """BUILD-ENGINE-SOURCE-KEY-BROAD-36 (reopened 2026-11-03): the timing header counts only by its layout facts."""
+
+    def kept(self, other, roots, version=engine_facts.VERSION, timing=TIMING_TEXT):
+        out, uncertain = engine_facts.kept_items({TIMING: timing, 'engine/aga/src/q.h': other}, roots, version)
+        self.assertFalse(uncertain)
+        return [item['text'] for item in out[TIMING]]
+
+    def test_timing_items_named_by_code_or_bodies_leave_the_key(self):
+        self.assertEqual(self.kept(WRAPPER, {'fopen', 'AW_SP_B', 'AW_SpikeAdd'}), [])
+
+    def test_version_2_kept_them(self):
+        self.assertTrue(self.kept(WRAPPER, {'fopen', 'AW_SP_B', 'AW_SpikeAdd'}, version=2))
+
+    def test_a_layout_item_naming_a_timing_slot_keeps_it(self):
+        texts = self.kept('typedef struct { double t[AW_SP_SLOTS]; } w_t;\n', {'w_t'})
+        self.assertTrue(any('AW_SP_SLOTS' in text for text in texts), texts)
+        layout = {'q.h': 'typedef struct { double t[AW_SP_SLOTS]; } w_t;\n'}
+        values = [engine_facts.value(engine_facts.kept_items(dict(layout, **{TIMING: text}), {'w_t'},
+                                                             engine_facts.VERSION)[0][TIMING])
+                  for text in (TIMING_TEXT, TIMING_TEXT.replace('AW_SP_B,', 'AW_SP_B, AW_SP_C,'))]
+        self.assertNotEqual(values[0], values[1])
+
+    def test_no_chim_unit_kind_keys_an_engine_file(self):
+        # the second level: the CHIM pool's per-unit keys (chim/units.py code keys) reach no engine C file, so an
+        # engine edit can only reach the CHIM world through the stage key above (the area work under it follows it)
+        sys.path.insert(0, str(ROOT / 'src'))
+        from chim import units
+        for kind in units.CODE_ENTRIES:
+            files = units.unit_code_key(kind)['files']
+            self.assertEqual([f for f in files if str(f).startswith('engine/')], [], kind)
+            self.assertEqual([f for f in units.TOOLS.get(kind, ()) if f.startswith('engine/')], [], kind)
+
+    def test_a_struct_or_object_macro_in_the_timing_header_still_counts(self):
+        layout = TIMING_TEXT.replace('#define AW_SPIKE_ROWS 8', '#define AW_SPIKE_ROWS 8\nstruct aw_row { int r[AW_SPIKE_ROWS]; };')
+        texts = self.kept('', {'aw_row'}, timing=layout)
+        self.assertTrue(any(text.startswith('struct aw_row') for text in texts), texts)
+        self.assertTrue(any('AW_SPIKE_ROWS 8' in text for text in texts), texts)
+        self.assertTrue(any('AW_SPIKE_ROWS' in text for text in self.kept('', {'AW_SPIKE_ROWS'})))
 
 
 if __name__ == '__main__':

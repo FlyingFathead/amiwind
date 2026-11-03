@@ -814,6 +814,7 @@ int SCR_ModalMessage (char *text)
     {
         key_count = -1;		// wait for a key down and up
         Sys_SendKeyEvents ();
+        if (S_ExtraUpdateHook) S_ExtraUpdateHook ();	// the remote state file (LOAD-STALL-SESSIONS-59)
     } while (key_lastpress != 'y' && key_lastpress != 'n' && key_lastpress != K_ESCAPE);
 
     scr_fullupdate = 0;

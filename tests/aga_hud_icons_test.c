@@ -22,6 +22,11 @@ static const int sizes[][3]={{20,4,11},{20,20,12},{18,18,23},{18,2,13},{18,2,14}
 #define ROWS 14
 static int sneaking;
 int AW_MoveSneaking(void){return sneaking;}
+/* AREA-TABLES-59: no area tables in this test (aw_inventory.c is not linked): every picture comes from the table */
+int AW_AreaIcon(const char *key,int *w,int *h,unsigned char *pixels,int maxw,int maxh){
+    (void)key;(void)w;(void)h;(void)pixels;(void)maxw;(void)maxh;return 0;}
+void AW_AreaIconFallback(const char *key){(void)key;}
+int (*aw_area_picture_read)(const char *key,int *w,int *h,unsigned char *pixels,int maxw,int maxh);
 static FILE *memory(const byte *p,int n,FILE **out){FILE *f=tmpfile();assert(f);assert(fwrite(p,1,n,f)==(size_t)n);fseek(f,0,SEEK_SET);*out=f;return f;}
 /* pack_mode 1: the AWL2 table into one pack (gfx/icons.awp), as the builder writes it. */
 static int pack_mode;

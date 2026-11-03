@@ -111,6 +111,8 @@ def build(args):
     subprocess.run(command, check=True)
     check_image(part, normalize=True)
     subprocess.run(rdb + [str(image), 'create', 'chs=257,1,64', '+', 'init', '+', 'addimg', str(part), 'name=DH0', 'bootable=1', 'pri=0'], check=True)
+    from world_volumes import pad_to_ide_cylinders
+    pad_to_ide_cylinders(image)       # whole IDE cylinders, as every drive of the game image (IMAGE-IDE-CYLINDER-TAIL-59)
     check_image(image, partition='DH0')
     disk_layout = [gate_dry_run_image(image, boot, payload)]
     check = out / 'readback.tmp'

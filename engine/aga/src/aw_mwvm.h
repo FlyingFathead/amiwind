@@ -12,8 +12,11 @@
 
 #define AW_MWVM_INSTANCES 256      /* placed objects attached to the loaded map, plus running global scripts */
 #define AW_MWVM_CELLS 4096         /* local values of the attached objects and the global scripts */
-#define AW_MWVM_PARKED 512         /* objects whose values are kept while their map is not loaded */
-#define AW_MWVM_PARK_CELLS 4096
+/* objects whose values are kept while their map is not loaded, and their values: the game places 2,115 references
+ * whose script has locals, 7,388 values in all (counted in v0.0.59-dev5's compiled scripts; CELL-CHANGES-59 slice 5
+ * raised these from 512 and 4,096 so a whole game's objects keep theirs: 37 KB more in the interpreter's one block) */
+#define AW_MWVM_PARKED 2304
+#define AW_MWVM_PARK_CELLS 8192
 #define AW_MWVM_STACK 32
 #define AW_MWVM_STRINGS 8192       /* NOTYET names logged once each */
 #define AW_MWVM_SELF (-2)
@@ -154,7 +157,31 @@ const aw_mwvm_stats_t *AW_MwvmStats(void);
 int32_t AW_MwvmGlobalInt(int global);
 float AW_MwvmGlobalFloat(int global);
 int AW_MwvmGlobalCount(void);
+/* A global's 32 bits now, its start in the game data, and setting them (a loaded save, CELL-CHANGES-59 slice 4). */
+uint32_t AW_MwvmGlobalBits(int global);
+uint32_t AW_MwvmGlobalStart(int global);
+void AW_MwvmGlobalSetBits(int global,uint32_t bits);
 /* A global's name (a string index, -1 for a bad number) and its TYPE (0 short, 1 long, 2 float) when TYPE is set. */
 int AW_MwvmGlobalName(int global,int *type);
 aw_mwcell_t AW_MwvmLocal(int instance,int slot);
+/* The scripts' own state for a save (CELL-CHANGES-59 slice 5; OpenMW 0.51 keeps a reference's locals with the reference
+ * and a global script with its running state and locals). EACH calls FN for every object's locals (attached to the
+ * loaded map, then the parked ones not attached; GLOBAL 0, REFERENCE its reference) and every global script that has an
+ * instance (GLOBAL 1, REFERENCE 0, RUNNING 1/0); CELLS its COUNT values. RESET puts them back at a new game's start:
+ * no parked values, the attached objects' and the global scripts' values 0, only the start scripts running. SET puts one
+ * value (BITS) into REFERENCE's locals of SCRIPT (attached, else parked: made when needed); GLOBALSET a global script's
+ * running state (its instance made when needed), GLOBALLOCAL one of its values. 1 done, 0 refused (a bad script or
+ * slot, an object attached with another script, the instance table or the parking store full). */
+void AW_MwvmLocalsEach(void (*fn)(void *user,uint32_t reference,int script,int global,int running,
+                                  const aw_mwcell_t *cells,int count),void *user);
+void AW_MwvmLocalsReset(void);
+int AW_MwvmLocalSet(uint32_t reference,int script,int slot,uint32_t bits);
+int AW_MwvmGlobalScriptSet(int script,int running);
+int AW_MwvmGlobalScriptLocal(int script,int slot,uint32_t bits);
+/* 1: SCRIPT starts with a new game (the file's STRT list); its local count; 1 when running now */
+int AW_MwvmStartsAtLoad(int script);
+int AW_MwvmLocalCount(int script);
+int AW_MwvmScriptRunning(int script);
+/* REFERENCE's local SLOT now (attached, else parked): 1 found, *SCRIPT its script, *OUT the value */
+int AW_MwvmLocalGet(uint32_t reference,int slot,int *script,aw_mwcell_t *out);
 #endif

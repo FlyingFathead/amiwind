@@ -1,6 +1,6 @@
 # Implementation ideas and research queue
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.59-dev6 (3 November 2026)._
 
 Proposals recorded 27 September 2026, after checkpoint-014. These are not
 implemented features. Verified mappings, causes and accepted fixes belong in
@@ -22,6 +22,34 @@ implemented features. Verified mappings, causes and accepted fixes belong in
 5. Separate mutable world/inventory state from disposable render data before
    interior transitions and container interaction. Round trips must not reset
    looted containers or duplicate items. See [CONTAINERS.md](CONTAINERS.md).
+
+## Speed: techniques under consideration (3 November 2026)
+
+Ideas for a faster frame on the 68040 and the 68060, and for a smaller memory and disk footprint. None of them may
+change how the game looks: each is checked with stills at fixed cameras against the current path. Each one is A/B
+testable: a console and config switch (on/off, 1/0), and an entry in the graphics options once it is built, so the
+old and new paths can be compared in the same session. Each is measured first and kept only if the measurement shows
+a gain; one that does not help is taken out again.
+
+1. **Early off-screen rejection of objects and actors.** A cheap bounding-sphere test against the view before an
+   object's model is set up, so objects behind or beside the camera cost almost nothing. In towns nearly every object
+   is handed to the drawing setup today; the first step is to measure where the existing checks drop them, and whether
+   one sphere around a whole chunk or block of objects rejects them together. Planned switches: an on/off setting for
+   the test, and a debug view that draws each object's sphere, to see what is rejected.
+2. **Doorway culling in interiors.** Each doorway of a room's sections gets an on-screen rectangle; sections seen
+   only through a doorway outside the view, or behind another doorway's rectangle, are skipped with everything placed
+   in them. Biggest in large interiors such as the Vivec cantons and the guild halls. Needs doorway data from the
+   builder in the CHIM room format.
+3. **Integer maths for actor models (doubtful, measure first).** Transforming actor models with fixed-point arithmetic
+   and small lookup tables (reciprocals, sine and cosine) instead of the floating-point unit. On a real 68040 the
+   floating-point multiply is fast and a 32-bit integer multiply is not, so this may not gain anything there; where it
+   can help is in avoiding floating-point instructions the 68040 has to emulate in software. Heavy actor models cost
+   mostly through their number of vertices and triangles, so fewer of them for distant actors is likely the bigger
+   win. Profiled on the 68040 preset and the Raspberry Pi 4 before any code; the current path stays selectable and the
+   two are compared pixel for pixel.
+4. **Compressed music and voice (4-bit ADPCM).** About half the size of today's 8-bit audio on disk and in memory,
+   decoded while playing. Lower priority: the format is lossy, so it is only an option if a blind listening comparison
+   on WinUAE cannot tell it from today's audio, and only if audio is what strains the 32 MB budget or load times.
 
 ## Combat: make dice-roll outcomes visible
 

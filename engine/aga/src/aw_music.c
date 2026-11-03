@@ -360,6 +360,14 @@ void AW_MusicDeath(void) {
     if(open_track(death_id,"death")){title_playing=0;paused=0;fade=128;}
     else advance("death-fallback");
 }
+/* The level-up box opened (aw_levelup.c): the special triumph track once (OpenMW LevelupDialog::onOpen streams
+ * MWSound::triumphMusic), then the current group's shuffle at its end. Looked up at start, as the death track. */
+static int triumph_id=-1;
+int AW_MusicTriumph(void) {
+    if(!available || held || triumph_id<0)return 0;
+    if(open_track(triumph_id,"triumph")){title_playing=0;paused=0;fade=128;return 1;}
+    advance("triumph-fallback");return 0;
+}
 /* StreamMusic from a compiled script (aw_mwhost.c): that track once, as the death track plays, then the
  * current group's shuffle at its end. TRACK: the soundtrack's own number (music/trackNN.mws). */
 int AW_MusicScriptTrack(int track) {
@@ -496,7 +504,7 @@ int CDAudio_Init(void) {
     title_track=-1;title_playing=0;
     if(Q_fscanf(f,"%d",&id)==1 && id>=0 && id<=98)title_track=id;
     fclose(f);available=1;paused=0;mode=0;loading=-1;
-    {int group;death_id=manual_lookup("mw_death",&group);}
+    {int group;death_id=manual_lookup("mw_death",&group);triumph_id=manual_lookup("mw_triumph",&group);}
     rng^=(unsigned int)(Sys_FloatTime()*1000000.0);
     AW_LogHeader(AW_LOG_MUSIC_EVENTS,"time_ms,event,mode,track,file,played_frames,total_frames\n");events=1;
     Cmd_AddCommand("aw_music_play",music_play);

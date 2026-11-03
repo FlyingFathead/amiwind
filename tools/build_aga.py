@@ -1842,13 +1842,13 @@ def stage_actor_logic_config(id1):
     if not raw.endswith(b'\n'):
         raw += b'\n'
     path.write_bytes(raw + ACTOR_LOGIC_LINES)
-    return {'on': True, 'config': 'id1/default-game.cfg', 'lines': ['aw_mwscript 1', 'chim actors ambient on']}
+    return {'on': True, 'config': 'id1/default-game.cfg', 'lines': ['aw_mwscript 1', 'chim actors ambient on', 'aw_player_cache 1']}
 
 
 ACTOR_LOGIC_LINES = (b'// Compiled game logic (default on since v0.0.57): the game\'s compiled scripts and the actors\'\n'
                      b'// Wander packages. "dbg mwscript off" and "chim actors ambient off" in the console switch them off.\n'
                      b'aw_mwscript 1\n'
-                     b'chim actors ambient on\n')
+                     b'chim actors ambient on\naw_player_cache 1\n')
 
 
 CHIM_CROSSING_LINES = (b'// Cell crossings (builder option --chim-crossing 0|1, default 1 since v0.0.47): type 1, the\n'
@@ -2945,6 +2945,7 @@ def finalize_image(args):
     if getattr(args,'focus',None):
         (out/'focus-staging.json').write_text(json.dumps(install_focus(args.focus,boot/'id1'),indent=2)+'\n',
                                               encoding='utf-8',newline='\n')
+        from prepare_area_tables import stage;stage(boot/'id1',args.focus,out)   # AREA-TABLES-59
     if getattr(args,'books',None):
         (out/'books-staging.json').write_text(json.dumps(install_books(args.books,boot/'id1'),indent=2)+'\n',
                                               encoding='utf-8',newline='\n')

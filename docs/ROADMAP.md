@@ -1,11 +1,11 @@
 # Roadmap and implementation options
 
-_Last updated with AmiWind v0.0.59-dev4 (2 November 2026)._
+_Last updated with AmiWind v0.0.59 (3 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
-- [v0.0.59: in development, dev4 published 2 November 2026; v0.0.60 next](#v0059-in-development-dev4-published-2-november-2026-v0060-next)
+- [v0.0.59: released 3 November 2026; v0.0.60 next](#v0059-released-3-november-2026-v0060-next)
 - [v0.0.58: released 1 November 2026](#v0058-released-1-november-2026)
 - [v0.0.57: released 31 October 2026; v0.0.58 next](#v0057-released-31-october-2026-v0058-next)
   - [The v0.0.58 list, item by item](#the-v0058-list-item-by-item)
@@ -108,66 +108,123 @@ _Last updated with AmiWind v0.0.59-dev4 (2 November 2026)._
 
 15 October 2026: exact-source validation completed 4,231 tests: 4,225 passed, three Windows-only skips and three tracked Census expected failures. The 71 focused tests and original-data readback across nine frame positions passed, consistently hiding 33 of 158 original references at stronghold state 6 while preserving unknown scripts. All 243 player resources are reusable after exact producer, input and file verification. Complete combined-world conversion, native comparison, packaging and shipment remain pending; coverage counts are unchanged.
 
-## v0.0.59: in development, dev4 published 2 November 2026; v0.0.60 next
+## v0.0.59: released 3 November 2026; v0.0.60 next
 
-The development line is at v0.0.59-dev4. The state below is the project's tracker for v0.0.59; the release notes of
-each snapshot are [dev1](releases/notes/RELEASE-v0.0.59-dev1.md), [dev2](releases/notes/RELEASE-v0.0.59-dev2.md),
-[dev3](releases/notes/RELEASE-v0.0.59-dev3.md) and [dev4](releases/notes/RELEASE-v0.0.59-dev4.md). Each snapshot
-carries everything of the ones before it.
+v0.0.59, "Assembling The Bits And Pieces, Once Again", shipped as its sixth development snapshot with its final
+version number ([release notes](releases/notes/RELEASE-v0.0.59.md)): every item with its own world model and the
+game's items in their places, the world change list across rooms and saved games with respawn, the player's body and
+hands from parts kept in memory, the container strip, the original journal view, and resting and waiting as in the
+original. The release notes of each snapshot are [dev1](releases/notes/RELEASE-v0.0.59-dev1.md),
+[dev2](releases/notes/RELEASE-v0.0.59-dev2.md), [dev3](releases/notes/RELEASE-v0.0.59-dev3.md),
+[dev4](releases/notes/RELEASE-v0.0.59-dev4.md), [dev5](releases/notes/RELEASE-v0.0.59-dev5.md) and
+[dev6](releases/notes/RELEASE-v0.0.59-dev6.md). Only fixes known to work went into the final; every item that is not
+finished moves to v0.0.60, listed below.
 
-**Done on the dev line (dev1 to dev4):**
+**Done in v0.0.59 (dev1 to dev6):**
 
 - **A world model for every item,** 880 distinct models in one shared table, with a builder check of every carriable
-  item, and a model table of 512 entries per map (it held 256). Shipped in dev1 to dev4.
+  item, and a model table of 512 entries per map (it held 256). Every kind of item can be carried and dropped. Shipped
+  in dev1 to dev6.
 - **Items in their places.** The items the game data places in the world are drawn from the shared table in rooms and
   outdoors and can be aimed at and taken. Shipped in dev4.
-- **The world change list, first part.** One list for the whole world keeps what the player changes (items taken,
-  dropped or moved, objects a script disables or locks, the stolen mark) across rooms, outdoor areas and saved games.
-  Dropping works on the streamed towns. Shipped in dev4.
+- **The world change list.** One list for the whole world keeps what the player changes (items taken, dropped or
+  moved, objects a script disables or locks, the stolen mark) across rooms, outdoor areas and saved games. Since dev5
+  it also keeps open doors, locks, the contents of containers and the faction ranks of NPCs; since dev6 it covers
+  respawn (containers refill and the actors the original brings back return) and saved games made with other game
+  data, where what no longer exists is left out.
+- **The player's body and hands from parts.** The third-person body is assembled from parts by what is worn on the
+  shared skeleton (2,156 part models in the shared table), armour over clothing, the drawn weapon in the right hand and
+  the shield on the left arm; the first-person arms are assembled the same way. The baked body stays selectable.
+  Shipped in dev5. The inventory picture and the journal's book are made from the same parts (dev5 and dev6).
+- **The player's body kept in memory (dev6).** The parts of the body are looked up once and kept, instead of being
+  looked up again on every arrival, so the first frame in Seyda Neen takes about a second. It lasted 12 to 15 seconds
+  before, most of it spent in file calls (see the frame wait counters below).
+- **Frame wait counters (dev6).** The frame timing lines show how long each frame waited on the disk, on the copy to
+  the screen and on the buffer swap, so a long frame says whether the game was working or waiting
+  ([frame waits](performance/FRAME-WAITS.md)). First readings: of a 12.75 second arrival frame, 9.9 seconds were inside
+  file calls; the walking residents spend 95 % of their time in reads and seeks.
+- **A kit of every weapon type for testing:** a debug command gives one weapon of every type and the shields and
+  prints each one's stats from the game's records. The HUD weapon box shows a picture for every weapon. Shipped in
+  dev5.
+- **Named sound events** for the combat and creature sounds, each played from its mapped sound, with a coverage line in
+  the build report. Shipped in dev5.
+- **One shared conversion between map units and the original's coordinates,** so scripts, lamps, weather and the
+  camera find the right place on every map, the streamed towns included. Shipped in dev5.
 - **Text macros as compact codes in dialogue,** with the bound key shown for action words; the first conversation
-  opens at once again (the v0.0.58 stall); topic words show whole and as links. Shipped in dev2 to dev4.
-- **Fewer rebuilds:** an engine-only change or a development label change no longer rebuilds the CHIM world, its
-  rooms or the progress pages. Shipped in dev1 to dev4.
+  opens at once again (the v0.0.58 stall); topic words show whole and as links. Shipped in dev2 to dev6; the talk
+  window opens faster in dev6.
 - **Morrowind's own mouse cursor** from your game data in every window, with the previous cursor as the fallback and a
   choice in the Options menu. Shipped in dev4.
+- **The journal as in the original game:** it opens at the newest dated entries, two pages at a time, with the quest
+  list one key away and no cap on the history. Shipped in dev6.
+- **The container strip:** E on a container (baskets, crates, barrels, chests) opens a strip at the bottom of the
+  screen listing its items to take or put back, with owned containers and locks marked. Shipped in dev6.
+- **Resting and waiting as in the original,** the first slice of levelling: resting heals and leads to the level-up
+  box, waiting only passes the time, and neither works with enemies near ([Resting](RESTING.md)). Shipped in dev6.
+- **Fewer rebuilds:** an engine-only change or a development label change no longer rebuilds the CHIM world, its
+  rooms or the progress pages, and a change of a text define no longer re-keys the stages that write no text. Shipped
+  in dev1 to dev6.
+- **An index of the items you can pick up,** from the game's records: [cell, kind and owner](ITEMS_INDEX.md), made by
+  the builder as its own stage. Shipped in dev6.
 
-**In the line, not yet in a published snapshot:**
+**Not finished at the release, moved to v0.0.60:**
 
-- **The player's body.** The third-person body is assembled from parts by what is worn (2,156 part models in the
-  shared table), armour over clothing, the drawn weapon in the right hand and the shield on the left arm; the baked
-  body stays selectable. The first-person hands show the equipped melee weapon in the original's three stances.
-  Left: first-person gloves and bracers from the parts, the stances per weapon class with the draw and punch layers,
-  and the torch pose on the parts.
-- **One shared conversion between map units and the original's coordinates,** so scripts, lamps, weather and the
-  camera find the right place on every map, the streamed towns included.
+- The checks on the release image: dropping every kind of item indoors and outdoors and picking it up again across a
+  save, the container strip, the journal view, the time of day and an action key in a text, the mouse cursor in the
+  windows.
+- The world change list's remaining parts: script locals and running global scripts, the journal, engine facts and
+  globals, the actor pool limits, and migration when the content changes.
+- Levelling: the skill rises with use and the level-up box with the attribute picks.
+- The conversation, complete, with a tracker page listing each part, its state and its proof, and the rank changes an
+  NPC script can make; the voice and sound mapping with its tracker page.
+- The builder's resident bake of the Vivec town costs about three and a half times the CPU it used to; the cause is
+  being found and fixed.
+- A scripted check of the silver tray in the Census and Excise Office, and the two release checks on the notes' claims
+  about builds from scratch and core use.
 
-**In progress:**
+**Known problems in v0.0.59:** the first frame in Seyda Neen still takes about a second, and the walking residents
+search their data file while they walk, costing 200 to 800 ms on some frames (v0.0.60, below); containers whose
+contents are levelled lists open empty, and bodies of the dead cannot be looted yet (both v0.0.60, below); the trip
+from Seyda Neen to Balmora sometimes stalls on the loading screen in the emulator.
 
-- The checks on the dev4 image: dropping every kind of item indoors and outdoors and picking it up again across a
-  save, the time of day and an action key in a text, the mouse cursor in the windows.
-- The world change list's next parts: doors, locks and the stolen and owner ledger; container contents; the journal,
-  engine facts and globals; script locals and running global scripts; the actor pool limits; respawn and migration
-  when the content changes.
-- The debug command that gives a kit of every weapon type with each weapon's stats, for testing.
-- Keying the CHIM stages by what they read, so that a change to a text macro no longer rebuilds the CHIM world and the
-  rooms.
-
-**Left:**
+**Also moved to v0.0.60:**
 
 - **Voices and sounds in place:** every character voice line and creature sound mapped into the world and heard in
   game, with a tracker page for each kind and its proof. v0.0.59 maps every voice and sound moment with its engine
   hook, the combat ones included; v0.0.60 plays the combat ones in play.
-- **The conversation, complete,** with a tracker page listing each part, its state and its proof; the remaining
-  checks on the v0.0.58 dialogue, and the rank changes an NPC script can make.
-- **Levelling as in the original,** with the level-up box.
-- An index of every item you can pick up (cell, position, item and owner), a scripted check of the silver tray in the
-  Census and Excise Office, and the two release checks on the notes' claims about builds from scratch and core use.
-- A separate patch for v0.0.58 with the conversation fix waits for the maintainer's decision; the fix is in dev3 and
-  dev4.
+- **Levelling as in the original,** completed with the level-up box.
+- The actor-library build stage using all the cores it is allowed, and a from-scratch build of the release line
+  recorded as proof that the shipped image can be reproduced.
+- The conversation fix of v0.0.58 ships with this release; no separate v0.0.58 patch was made.
 
-**Moved to v0.0.60,** with the combat work: weapons and shields of every type in first and third person with a debug
-weapon menu, the first-person hands per weapon type, the cliff racer's strikes at the right size, player casting, the
-spell-effect system and the crime system.
+**v0.0.60 next,** with the combat work:
+
+- **The walking residents' data per area.** The tables the walking residents read are kept in memory per area,
+  loaded with the area, instead of being searched in files while you walk; measured with the frame wait counters on
+  the same Seyda Neen script as the first reading, then the rest of the arrival frame brought under half a second.
+  The residents drawn from parts get their appearance from small tables per cell and per interior in the same way.
+- **A measured performance history.** Each method is measured once when it works, and the result is kept per build
+  in [docs/performance](performance/), with the build, the setting, the test script, the emulator preset and the Fast
+  RAM, so later comparisons start from the last recorded line instead of measuring again. The history of earlier
+  methods is filled in from this version's results.
+- The player's gear in all stances: the stances per weapon class with the draw and punch layers, first-person gloves
+  and bracers from the parts, and the torch pose on the parts; v0.0.59 ships without them.
+- Weapons and shields of every type in first and third person, with a debug weapon menu and gear menu and a tester
+  mode, all kept in the save.
+- First-person hands with the weapon in them for every weapon type (4 of 103 animation groups exist today).
+- Cliff racers that attack the player land their strikes and are drawn at the right size; then fish in the water and
+  the kill-and-return behaviour.
+- Player casting: ready a spell, pay its magicka, roll to succeed and deliver Self, Touch or Target effects, with the
+  casting animation and HUD.
+- A spell-effect system: effects applied over their duration to actors and kept in saves, with the script calls that
+  wait for it.
+- The original crime system: theft, pickpocketing, attacks, killing and trespass seen by witnesses raise a bounty, and
+  guards arrest, fine or jail.
+- Characters in the world drawn from the same body and clothing parts as the player, so they can change what they
+  wear, and the image needs far less space for them.
+- **Containers whose contents come from levelled item lists show their items,** rolled by the original rules and kept
+  across saves.
+- **Bodies of dead NPCs and creatures can be looted** through the container strip, kept across saves.
 
 ## v0.0.58: released 1 November 2026
 
@@ -554,6 +611,10 @@ Ideas of the maintainer for when they fit, not scheduled:
   ([EXTRAS-MENU-54](BUGS.md)).
 - **Two players in the arena,** further out: Quake's own network code over a null modem cable or an Amiga TCP/IP
   stack.
+- **The chip bus and DMA per frame,** measured next to the frame times, to see where each frame's time goes against
+  the limits of real Amiga hardware. First the engine's own counters, which work on every machine (the
+  [frame wait counters](performance/FRAME-WAITS.md) are that first part); then, for deep dives, an emulator's DMA
+  view on one profile of the Seyda Neen arrival and a walk. Not scheduled.
 
 ## v0.0.54: Hair, Movement, Magic And More, 28 October 2026
 
@@ -783,6 +844,16 @@ when the game runs. The Quake model format the engine draws stores every vertex 
 record with its own look is baked into its own model of 64 full frames of about 1,500 vertices, roughly 400 to 700 KB,
 for about 1,769 records ([ROOM-RESIDENT-MODELS-SIZE-48](bugs/ROOM-RESIDENT-MODELS-SIZE-48.md)). That is fast to draw
 on a 68040 and very large on disk, and on an Amiga every megabyte on disk is also loading time.
+
+How a resident drawn from parts finds its appearance (planned for v0.0.60): each exterior cell and each interior has its own
+small table of the residents placed there, in a compact binary form, loaded together with the cell (and the
+neighbouring cells loaded ahead of the player) or when the player enters the interior, and dropped when the area is
+left. A lookup searches only the tables of the areas loaded at that moment, never a list for the whole island.
+
+The same rule applies to everything the game looks up while you play. In v0.0.59, containers (their contents, owner
+and lock) move into such per-area tables, so opening a container or taking from it reads nothing from disk. In
+v0.0.60, doors, activators, creatures and each resident's possible dialogue follow, so opening a conversation reads
+nothing from disk either.
 
 Inside those 1,468 MB (4,225 complete models): 992 MB of animation frames and 587 MB of skin textures, one skin stored
 inside every model. Two design faults double it: each character has a standing model and a separate "mover" model

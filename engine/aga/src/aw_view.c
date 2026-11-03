@@ -179,9 +179,26 @@ static void parts_release(void) {
 }
 /* 0 = no assembled body now (the baked one draws); 1 = the parts are those of what is worn; 2 = assembled again now
  * (the race, sex, head, hair or a worn item changed). */
+/* ARRIVAL-LONG-FRAME-DEV6-59: an assembly loads its part models over several frames, PARTS_FRAME_BUDGET seconds of
+ * loading per frame at most (at least one part), never all of them inside one frame (about 28 parts took 12-15 s of
+ * the first frame after arriving); -1 while it is under way (no body drawn yet; the previous one stays until the new
+ * one is complete when one was assembled before) */
+#define PARTS_FRAME_BUDGET .04
+/* aw_player_cache 1 (the default, id1/default-game.cfg): this way; 0 = the previous way for an A/B on the same image
+ * (every part in the frame that needs the body, the parts left to the cache's LRU) */
+static cvar_t player_cache_cvar={"aw_player_cache","1"};
+static void part_pin(model_t *m,int on){if(m)Cache_Pin(&m->cache,on && player_cache_cvar.value);}
+static aw_parts_body_t pend;
+static model_t *pend_models[AW_PARTS_MAX];
+static char pend_sig[sizeof(parts_sig)];
+static int pend_on,pend_next,pend_count,pend_frames;
+static unsigned long pend_loads;
+static double pend_t;
+extern unsigned long aw_file_finds;   /* aw_spike.c: files looked up by name (a part read from disk: 3 lookups) */
+static int parts_in_use(const model_t *m){int i;for(i=0;i<AW_PARTS_MAX;i++)if(part_models[i]==m)return 1;return 0;}
 static int parts_ready(const char *race,int female) {
     const char *items[AW_PARTS_ITEMS],*head=NULL,*hair=NULL;char sig[sizeof(parts_sig)];
-    aw_parts_body_t next;int n=0,s,i,ok,mark;byte *text;double t0;
+    aw_parts_body_t next;int n=0,s,i,ok,mark;byte *text;double t0,start;
     if(!parts_cvar.value || parts_failed)return 0;
     if(aw_character.valid){
         if(aw_character.head>=0 && aw_character.head<aw_part_count)head=aw_parts[aw_character.head].id;
@@ -195,30 +212,61 @@ static int parts_ready(const char *race,int female) {
     snprintf(sig,sizeof(sig),"%s|%d|%s|%s",race,female,head?head:"",hair?hair:"");
     for(i=0;i<n;i++){size_t used=strlen(sig);snprintf(sig+used,sizeof(sig)-used,"|%s",items[i]);}
     if(body_parts && parts.count && parts_table && !strcmp(sig,parts_sig))return 1;
-    t0=Sys_FloatTime();
-    mark=Hunk_LowMark();text=COM_LoadHunkFile("view/parts.txt");
-    ok=text && AW_PartsAssemble((const char *)text,com_filesize,race,female,head,hair,items,n,&next);
-    Hunk_FreeToLowMark(mark);
-    if(!ok){
-        parts_failed=1;
-        Con_Printf("Assembled player body unavailable (%s, %s): the baked body draws.\n",
-            text?"no recipe for this race and sex":"no view/parts.txt in this image",race);
-        return 0;
-    }
-    if(!(parts_table=AW_SkelTableFor(next.table))){parts_failed=1;Con_Printf("Assembled player body: no table %s.\n",next.table);return 0;}
-    parts_release();
-    parts=next;
-    for(i=0,s=0;i<next.count;i++){
-        model_t *m=Mod_ForName(next.model[i],false);
-        aliashdr_t *h=m && m->type==mod_alias?(aliashdr_t *)Mod_Extradata(m):NULL;
-        if(!h || !h->aw_skel || (const void *)h->aw_skel_table!=(const void *)parts_table){
-            Con_Printf("Assembled player body: part %s (slot %d) not drawn: %s.\n",next.model[i],next.slot[i],
-                !m?"not in this image":!h?"not a model":"not on the body's table");
-            continue;
+    start=Sys_FloatTime();
+    if(!pend_on || strcmp(sig,pend_sig)){
+        /* a new assembly: the recipe read once (one file), its parts loaded over the next frames */
+        mark=Hunk_LowMark();text=COM_LoadHunkFile("view/parts.txt");
+        ok=text && AW_PartsAssemble((const char *)text,com_filesize,race,female,head,hair,items,n,&next);
+        Hunk_FreeToLowMark(mark);
+        if(!ok){
+            parts_failed=1;pend_on=0;
+            Con_Printf("Assembled player body unavailable (%s, %s): the baked body draws.\n",
+                text?"no recipe for this race and sex":"no view/parts.txt in this image",race);
+            return 0;
         }
-        part_models[s]=m;strcpy(parts.model[s],next.model[i]);parts.slot[s]=next.slot[i];s++;
+        if(!AW_SkelTableFor(next.table)){parts_failed=1;pend_on=0;Con_Printf("Assembled player body: no table %s.\n",next.table);return 0;}
+        /* an assembly left unfinished: its parts no longer kept (those the body in use draws stay pinned) */
+        for(i=0;i<pend_count;i++)if(pend_models[i] && !parts_in_use(pend_models[i]))part_pin(pend_models[i],0);
+        pend=next;strcpy(pend_sig,sig);pend_on=1;pend_next=pend_count=pend_frames=0;pend_t=0;
+        pend_loads=aw_file_finds;
+        memset(pend_models,0,sizeof(pend_models));
     }
-    parts.count=s;
+    {
+        const aw_skel_table_t *table=AW_SkelTableFor(pend.table);
+        while(pend_next<pend.count){
+            model_t *m=Mod_ForName(pend.model[pend_next],false);
+            aliashdr_t *h=m && m->type==mod_alias?(aliashdr_t *)Mod_Extradata(m):NULL;
+            if(!h || !h->aw_skel || (const void *)h->aw_skel_table!=(const void *)table)
+                Con_Printf("Assembled player body: part %s (slot %d) not drawn: %s.\n",pend.model[pend_next],pend.slot[pend_next],
+                    !m?"not in this image":!h?"not a model":"not on the body's table");
+            else{
+                part_pin(m,1);     /* kept from now on: no lack of room evicts it */
+                pend_models[pend_count]=m;
+                if(pend_count!=pend_next){strcpy(pend.model[pend_count],pend.model[pend_next]);pend.slot[pend_count]=pend.slot[pend_next];}
+                pend_count++;
+            }
+            pend_next++;
+            if(pend_next<pend.count && player_cache_cvar.value && Sys_FloatTime()-start>=PARTS_FRAME_BUDGET){
+                pend_t+=Sys_FloatTime()-start;pend_frames++;
+                return body_parts && parts.count && parts_table?1:-1;   /* the rest in the next frames */
+            }
+        }
+        pend_t+=Sys_FloatTime()-start;
+        t0=Sys_FloatTime()-pend_t;      /* parts_ms below: the loading time in all, over its frames */
+        pend_on=0;pend_frames++;
+        /* the parts of the body in use that the new one does not keep: back to the cache's LRU */
+        for(i=0;i<AW_PARTS_MAX;i++)if(part_models[i]){
+            int k,kept=0;
+            for(k=0;k<pend_count;k++)if(pend_models[k]==part_models[i])kept=1;
+            if(!kept)part_pin(part_models[i],0);
+        }
+        parts_table=table;
+        parts_release();
+        parts=pend;parts.count=s=pend_count;
+        memcpy(part_models,pend_models,sizeof(part_models));
+        Con_Printf("Assembled player body: %d parts, %lu file lookups, %.0f ms over %d frames (%lu KB kept).\n",
+            s,aw_file_finds-pend_loads,pend_t*1000,pend_frames,aw_cache_pinned_bytes/1024);
+    }
     mark=Hunk_LowMark();text=COM_LoadHunkFile(parts.anm);
     ok=s>0 && text && AW_AnimParse(&parts_anim,(const char *)text,parts_table->frames);
     Hunk_FreeToLowMark(mark);
@@ -263,6 +311,9 @@ static int hand_parts_ready(const char *race,int female) {
     mark=Hunk_LowMark();text=COM_LoadHunkFile("view/parts_1st.txt");
     ok=text && AW_PartsAssemble((const char *)text,com_filesize,race,female,NULL,NULL,items,n,&next);
     Hunk_FreeToLowMark(mark);
+    /* ARRIVAL-LONG-FRAME-DEV6-59: the arms' parts are kept (pinned) while worn; the old set back to the LRU (a part
+     * the new set keeps is pinned again below, still in memory: no disk read) */
+    for(i=0;i<AW_PARTS_MAX;i++)if(hpart_models[i] && !parts_in_use(hpart_models[i]))part_pin(hpart_models[i],0);
     hparts.count=0;memset(hpart_models,0,sizeof(hpart_models));
     if(!ok){
         hparts_failed=1;
@@ -288,11 +339,13 @@ static int hand_parts_ready(const char *race,int female) {
                 !m?"not in this image":!h?"not a model":"not on the first-person table");
             continue;
         }
+        part_pin(m,1);
         hpart_models[s]=m;strcpy(hparts.model[s],next.model[i]);hparts.slot[s]=next.slot[i];s++;
     }
     hparts.count=s;
     if(!s){hparts_failed=1;Con_Printf("First-person arms from parts: no part loaded: the baked arms draw.\n");return 0;}
     strcpy(hparts_sig,sig);hparts_built++;hparts_ms=(Sys_FloatTime()-t0)*1000;
+    Con_Printf("First-person arms from parts: %d parts in %.0f ms (%lu KB kept).\n",s,hparts_ms,aw_cache_pinned_bytes/1024);
     return 2;
 }
 /* aw_hand_models.c (aw_hand_parts_apply): the view model becomes the first part at the hands' FRAME (0..27) of
@@ -335,7 +388,8 @@ static int body_ready(void) {
     carried=AW_TorchEquipped() && player && player->v.waterlevel<2 && death.stage==AW_DEATH_NONE && !torch_failed;
     /* the assembled body (the default): on land without a torch; a carried torch and swimming keep their baked
      * companions (their own poses), the previous method for both */
-    if(!carried && !swimming && (i=parts_ready(race,female))!=0){
+    if(!carried && !swimming && (i=parts_ready(race,female))<0)return 0;   /* parts still loading (ARRIVAL-LONG-FRAME-DEV6-59) */
+    if(!carried && !swimming && i!=0){
         if(!body_parts || changed){
             if(body_model && body_model->type==mod_alias && body_model->cache.data && !body_parts)Cache_Free(&body_model->cache);
             if(held_model && held_model->type==mod_alias && held_model->cache.data)Cache_Free(&held_model->cache);
@@ -453,9 +507,60 @@ int AW_ViewEquipmentReady(void){
     if(body_parts)return parts_table && parts.weapon_bone>=0 && parts.weapon_bone<parts_table->bones;
     return AW_ItemsAliasTag(body_model,-1,0,NULL);
 }
+/* ---- the inventory picture of the assembled body (INVENTORY-PREVIEW-BAKED-BODY-59) ----
+ * The picture draws what the third-person view draws: the same parts (the recipe assembled for the race, sex, head,
+ * hair and what is worn: parts_ready, again only when one of them changes) on the same table, posed at the start of
+ * the original's inventory group for the weapon in the right hand (AW_PartsInventoryGroups), the weapon and shield on
+ * the table's item bones. The picture follows the body's switch (no setting of its own: the resident registry's
+ * budget): aw_player_body_parts 0 draws the race's baked inventory companion (the _i.mdl beside each baked body, its
+ * own starting outfit), the previous method; the carried torch keeps its torch body in both. */
+static int inventory_parts_frame=-1,inventory_parts_said;
+/* the table frame of the group's start key (its first frame when it has no such key), -1 when the table has neither
+ * group */
+static int parts_inventory_frame(int type,int *left){
+    const char *g[2];int n=AW_PartsInventoryGroups(type,g,left),i,group,frame;aw_skel_group_t at;
+    for(i=0;i<n;i++){
+        if((group=AW_SkelGroup(parts_table,g[i]))<0)continue;
+        frame=AW_SkelKeyFrame(parts_table,group,"start");
+        if(frame<0){AW_SkelGroupAt(parts_table,group,&at);frame=(int)at.first;}
+        if(frame>=0 && frame<parts_table->frames)return frame;
+    }
+    return -1;
+}
+/* aw_head.c: the picture's further parts (the first is AW_ViewInventoryBody's model) and the race's scale (x y by
+ * weight, z by height, as the third-person view scales them after posing); -1 when the picture is not the assembled
+ * body. */
+int AW_ViewInventoryParts(model_t **models,int max,float scale[3]){
+    int i,n=0;
+    if(inventory_parts_frame<0 || !body_parts || !parts_table)return -1;
+    for(i=1;i<parts.count && n<max;i++)if(part_models[i])models[n++]=part_models[i];
+    scale[0]=scale[1]=parts.weight;scale[2]=parts.height;
+    return n;
+}
+/* the weapon and the shield on the item bones of the table posed at the picture's frame (as parts_draws) */
+static int parts_inventory_items(int frame,model_t *models[2],float origins[2][3],float angles[2][3]){
+    static float world[AW_SKEL_MAX_BONES][3][4];
+    int kind,n=0,bone,posed=0;aw_inventory_item_t item;float tag[6],scale[3];
+    scale[0]=scale[1]=parts.weight*.25f;scale[2]=parts.height*.25f;
+    for(kind=0;kind<2;kind++){
+        bone=kind?parts.shield_bone:parts.weapon_bone;
+        if(bone<0 || bone>=parts_table->bones || (kind && !inventory_left))continue;
+        if(!AW_InventoryEquippedItem(kind?AW_SLOT_LEFT:AW_SLOT_RIGHT,&item) || !item.model[0] ||
+           (kind && (item.category!=AW_INV_ARMOUR || item.subtype!=8)))continue;
+        models[n]=Mod_ForName(item.model,false);
+        if(!models[n] || models[n]->type!=mod_alias || !Cache_Check(&models[n]->cache))continue;
+        if(!posed){AW_SkelPose(parts_table,(float)frame,world);posed=1;}
+        AW_SkelBoneTag((const float (*)[4])world[bone],scale,tag);
+        memcpy(origins[n],tag,3*sizeof(float));memcpy(angles[n],tag+3,3*sizeof(float));n++;
+    }
+    return n;
+}
 int AW_ViewInventoryEquipment(model_t *models[2],float origins[2][3],float angles[2][3]){
     int kind,n=0,frame;model_t *actual;aw_inventory_item_t item;float tag[6];
-    if(!AW_ViewInventoryBody(&actual,&frame) || !AW_ItemsAliasTag(actual,-1,0,NULL))return 0;
+    if(!AW_ViewInventoryBody(&actual,&frame))return 0;
+    if(inventory_parts_frame>=0 && body_parts && parts_table && actual==part_models[0])
+        return parts_inventory_items(frame,models,origins,angles);
+    if(!AW_ItemsAliasTag(actual,-1,0,NULL))return 0;
     for(kind=0;kind<2;kind++){
         int slot=kind?AW_SLOT_LEFT:AW_SLOT_RIGHT;
         if(kind && !inventory_left)continue;
@@ -498,6 +603,7 @@ static int inventory_need(const char *path){
 int AW_ViewInventoryBody(model_t **model,int *frame){
     aw_inventory_item_t item;char path[64];int type=-1;
     extern int hunk_size,hunk_low_used,hunk_high_used;
+    inventory_parts_frame=-1;
     if(!model || !frame || !body_ready() || body_index<0)return 0;
     inventory_left=1;
     /* Torch preview retains its existing companion until its dedicated
@@ -512,6 +618,14 @@ int AW_ViewInventoryBody(model_t **model,int *frame){
         type=item.subtype;
     }
     inventory_left=type!=2 && type!=4 && type!=5 && type!=6 && type!=8;
+    if(body_parts && parts_table && part_models[0]){
+        int f=parts_inventory_frame(type,&inventory_left);
+        if(f>=0){inventory_parts_frame=f;*model=part_models[0];*frame=f;return 1;}
+        if(!inventory_parts_said){
+            inventory_parts_said=1;
+            Con_Printf("Inventory picture: the table %s has no inventory pose; the baked companion draws.\n",parts.table);
+        }
+    }
     strcpy(path,bodies[body_index].path);strcpy(path+strlen(path)-4,"_i.mdl");
     if(strcmp(path,inventory_body_path)){
         AW_ViewInventoryClear();strcpy(inventory_body_path,path);
@@ -1212,7 +1326,10 @@ static void command(void) {
         if(!AW_CombatHurtPlayer(100000,"dbg camera die"))Con_Printf("Not in a game, or already dead.\n");
         return;
     }
+    /* residents drawn from parts (aw_npc_parts.c, NPC-PARTS-RUNTIME-59): npcs = the counters, npcs on/off */
+    if(!Q_strcasecmp(a,"npcs") && Cmd_Argc()==2){AW_NpcPartsStatus();return;}
     if(Cmd_Argc()==3 && (on=AW_CompanionToggleWord(Cmd_Argv(2)))>=0){
+        if(!Q_strcasecmp(a,"npcs")){AW_NpcPartsSet(on);AW_NpcPartsStatus();return;}
         if(!Q_strcasecmp(a,"vanity")){Cvar_SetValue(vanity_cvar.name,(float)on);return;}
         if(!Q_strcasecmp(a,"death")){Cvar_SetValue(death_cvar.name,(float)on);return;}
         if(!Q_strcasecmp(a,"retry")){Cvar_SetValue(retry_cvar.name,(float)on);return;}
@@ -1230,12 +1347,12 @@ static void command(void) {
             return;
         }
     }
-    Con_Printf("Usage: dbg camera [first | third | toggle | distance N | vanity on/off/now | death on/off | retry on/off | body on/off | parts on/off | hands on/off | die]\n");
+    Con_Printf("Usage: dbg camera [first | third | toggle | distance N | vanity on/off/now | death on/off | retry on/off | body on/off | parts on/off | hands on/off | npcs [on/off] | die]\n");
 }
 void AW_ViewInit(void) {
     Cvar_RegisterVariable(&view_cvar);Cvar_RegisterVariable(&distance_cvar);Cvar_RegisterVariable(&vanity_cvar);
     Cvar_RegisterVariable(&death_cvar);Cvar_RegisterVariable(&retry_cvar);Cvar_RegisterVariable(&body_cvar);
-    Cvar_RegisterVariable(&parts_cvar);Cvar_RegisterVariable(&hand_parts_cvar);
+    Cvar_RegisterVariable(&parts_cvar);Cvar_RegisterVariable(&hand_parts_cvar);Cvar_RegisterVariable(&player_cache_cvar);
     aw_hand_parts_apply=hand_parts_apply;aw_view_hand_part=hand_part;
     Cvar_RegisterVariable(&fullview_cvar);Cvar_RegisterVariable(&aw_inventory_preview_reserve);Cvar_RegisterVariable(&aw_inventory_preview_live);
     AW_ViewRulesDefault(&rules);AW_ViewReset(&view,&rules);

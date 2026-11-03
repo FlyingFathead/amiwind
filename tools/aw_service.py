@@ -423,6 +423,11 @@ def build_commands(config, request, facts, run_name):
     commands['perf-guard'] = docker_run(build, f'{prefix}-perf-guard-{run_name}',
                                         [build['python'], 'tools/perf_guard.py', 'show', run_dir, '--json'],
                                         [volume_ro], workdir=source, env=env)
+    # IMAGE-IDE-CYLINDER-TAIL-59: every drive file of the built image is whole IDE cylinders (the same check the
+    # builder runs on the drives it writes, tools/ide_cylinders.py); a build without an image passes with that said
+    commands['ide-cylinders'] = docker_run(build, f'{prefix}-ide-cylinders-{run_name}',
+                                           [build['python'], 'tools/ide_cylinders.py', 'check', run_dir + '/image',
+                                            '--json'], [volume_ro], workdir=source, env=env)
     ingest = build.get('ingest')
     if ingest:
         fill = {'run_dir': run_dir, 'run_name': run_name, 'purpose': request['purpose'], 'mount': mount}
@@ -1088,8 +1093,8 @@ def submit_build(config, request, dry_run, runner):
         options = request.get('options') or {}
     commands = build_commands(config, request, facts, run_name)
     shown = [show(commands['source'][0]) + ' | ' + show(commands['source'][1])]
-    shown += [show(commands[key]) for key in ('inputs', 'check', 'build', 'summary', 'perf-guard', 'stair-records',
-                                              'ingest')
+    shown += [show(commands[key]) for key in ('inputs', 'check', 'build', 'summary', 'perf-guard', 'ide-cylinders',
+                                              'stair-records', 'ingest')
               if commands.get(key)]
     print(f'aw submit: {run_name}: build of {facts["commit"]} ({facts["version"]}) for {request["requester"]}',
           flush=True)
@@ -1177,6 +1182,8 @@ def submit_build(config, request, dry_run, runner):
     guard = None
     if steps['build']['ok'] and commands.get('perf-guard'):
         guard, steps['perf-guard'] = perf_guard_result(runner, commands['perf-guard'], code)
+    if steps['build']['ok'] and commands.get('ide-cylinders'):
+        steps['ide-cylinders'] = ide_cylinders_result(runner, commands['ide-cylinders'])
     numbers = {'stages': summary.get('stages'), 'reused_stages': summary.get('reused'),
                'rebuilt_stages': summary.get('rebuilt'), 'not_started': summary.get('not_started')}
     result = 'passed' if steps['build']['ok'] else 'failed'   # the build's outputs (stair records follow them)
@@ -1215,7 +1222,8 @@ def submit_build(config, request, dry_run, runner):
                         numbers=numbers, timings=timings,
                         failed_stage=summary.get('failed_stage') or (
                             'perf-guard' if steps.get('perf-guard', {}).get('ok') is False else
-                            'size-guard' if steps.get('size-guard', {}).get('ok') is False else None),
+                            'size-guard' if steps.get('size-guard', {}).get('ok') is False else
+                            'ide-cylinders' if steps.get('ide-cylinders', {}).get('ok') is False else None),
                         logs=[str(log_path)], artifacts=[commands['run_dir']], inputs=inputs, recipe=recipe_info,
                         **({'stair_walk': stair} if stair else {}), **({'perf_guard': guard} if guard else {}),
                         **({'over_budget': summary['over_budget']} if summary.get('over_budget') else {}),
@@ -1251,6 +1259,25 @@ def perf_guard_result(runner, command, build_code):
     if verdict == 'missing':
         ok, detail = False, 'the build wrote no perf guard verdict (perf-guard.json missing)'
     return summary, {'exit': code, 'ok': ok, 'detail': detail[:600]}
+
+
+def ide_cylinders_result(runner, command):
+    """The step of the IDE cylinder check (tools/ide_cylinders.py, IMAGE-IDE-CYLINDER-TAIL-59): a built image whose
+    drive file is not whole IDE cylinders fails the result; an unreadable verdict fails it too (a builder older than
+    the check has no tools/ide_cylinders.py and passes with that said)."""
+    code, out, err = runner.capture(command, timeout=300)
+    text = (err or out or '').strip()
+    try:
+        summary = json.loads((out.strip().splitlines() or ['{}'])[-1])
+    except ValueError:
+        summary = None
+    if not isinstance(summary, dict) or 'verdict' not in summary:
+        if 'ide_cylinders.py' in text and ('No such file' in text or "can't open file" in text):
+            return {'exit': code, 'ok': True, 'detail': 'this builder has no IDE cylinder check (tools/ide_cylinders.py)'}
+        return {'exit': code, 'ok': False, 'detail': 'IDE cylinder verdict unreadable: '
+                + (text.splitlines() or [''])[-1][:200]}
+    return {'exit': code, 'ok': summary['verdict'] in ('passed', 'no-drives') and code == 0,
+            'detail': ('IDE cylinders ' + str(summary['verdict']) + ': ' + str(summary.get('detail', '')))[:600]}
 
 
 def finish_build(config, request, run_name, lease, started, t0, facts, steps, notes, shown, reuse_info, problems,

@@ -10,6 +10,10 @@
 #include "aw_state.h"
 #include "aw_sky.h"
 #include "aw_mappath.h"
+#include "aw_rest.h"
+#include "aw_levelup.h"
+#include "aw_move.h"
+#include "aw_pcstanding.h"
 static int modal,hours=1,help_page;
 static const struct {const char *command,*action;} help_bindings[]={
     {"+forward","Move forward"},{"+back","Move back"},
@@ -308,9 +312,189 @@ static int allowed(void) {
         ((int)p->v.flags&FL_ONGROUND) && p->v.waterlevel<2 && !sv.paused;
 }
 static void close_modal(void){modal=0;key_dest=return_dest;IN_AWClearButtons();}
+/* The open window for the remote state file (LOAD-STALL-SESSIONS-59): "" when none. */
+const char *AW_WaitWindowName(void){return modal==1?"wait":modal==2?"help":modal==3?"rest":"";}
 static void open_modal(int kind){return_dest=key_dest;modal=kind;key_dest=key_menu;IN_AWClearButtons();}
+
+/* ---- Resting and waiting (REST-WAIT-59, docs/RESTING.md; rules in aw_rest_rules.c) ----
+ * The T window opens in REST mode where sleeping is allowed (no "no sleep" flag on the cell, or a bed the player may use)
+ * and in WAIT mode elsewhere; it refuses on water, in the air (a bed lifts that) and with enemies near, with the game's
+ * lines. levelup/rest.txt (tools/prepare_levelup.py) is read from disk when the window opens, never in play. Modal 3. */
+void (*aw_rest_bed_refused)(unsigned long reference,const char *owner);
+void (*aw_rest_spawn)(const char *sleep_list);
+int AW_CombatHostiles(void);float AW_CombatPlayerFatigue(float *maximum);   /* aw_combat.c */
+static aw_rest_settings_t rest_settings;
+static int rest_sleeping,rest_bed,rest_until,rest_data;
+static char rest_list[64],rest_line[5][160];   /* the window's lines, read once when it opens */
+/* levelup/rest.txt read in ONE pass when the window opens (a 32 KB text: never twice, never in play): the settings, the
+ * window's lines, whether the player's cell forbids sleeping, the region's sleep list, the bed's ownership and the
+ * birthsign's stunted mark. */
+static const char *const rest_keys[]={"sNotifyMessage1","sNotifyMessage2","sNotifyMessage64","sRestIllegal","sRestMenu3",
+    "sRestMenu2","sRest","sWait","sUntilHealed","sSleepInterrupt"};
+#define REST_KEYS ((int)(sizeof(rest_keys)/sizeof(rest_keys[0])))
+static struct {
+    int kind;long x,y;const char *id,*region,*sign;unsigned long bed;    /* what to look for */
+    char text[REST_KEYS][120];int nosleep,stunted,bed_hit,bed_rank;          /* what was found */
+    char faction[64],global[64],owner[64];
+} rest_read;
+static void rest_line_in(char *line)
+{
+    char name[48],list[64],*field[4],*bar;float v;long x,y;unsigned long ref;int i,n;
+    if(!strncmp(line,"set ",4)){if(Q_sscanf(line,"set %47s %f",name,&v)==2)AW_RestSettingSet(&rest_settings,name,v);return;}
+    if(!strncmp(line,"text ",5)){
+        for(i=0;i<REST_KEYS;i++){n=(int)strlen(rest_keys[i]);
+            if(!strncmp(line+5,rest_keys[i],n) && line[5+n]==' '){snprintf(rest_read.text[i],sizeof(rest_read.text[i]),"%s",line+6+n);return;}}
+        return;
+    }
+    if(rest_read.kind==1 && !strncmp(line,"nosleep ",8)){
+        if(Q_sscanf(line,"nosleep %ld %ld",&x,&y)==2 && x==rest_read.x && y==rest_read.y){rest_read.nosleep=1;}
+        return;
+    }
+    if(rest_read.kind==2 && !strncmp(line,"nosleepi ",9)){
+        if(!Q_strcasecmp(line+9,(char *)rest_read.id)){rest_read.nosleep=1;}
+        return;
+    }
+    if(rest_read.region && !strncmp(line,"sleepregion ",12) && Q_sscanf(line+12,"%63s",list)==1){
+        n=(int)strlen(list);
+        if(line[12+n]==' ' && !Q_strcasecmp(line+13+n,(char *)rest_read.region))snprintf(rest_list,sizeof(rest_list),"%s",list);
+        return;
+    }
+    if(rest_read.sign && *rest_read.sign && !strncmp(line,"stunted ",8)){
+        if(!Q_strcasecmp(line+8,(char *)rest_read.sign)){rest_read.stunted=1;}
+        return;
+    }
+    /* "bed REF RANK|FACTION|GLOBAL|OWNER" (the ids may hold spaces) */
+    if(rest_read.bed && !strncmp(line,"bed ",4) && Q_sscanf(line,"bed %lu %d",&ref,&n)==2 && ref==rest_read.bed){
+        if(!(field[0]=strchr(line+4,' ')))return;
+        for(i=1;i<4;i++){if(!(bar=strchr(field[i-1],'|')))return;*bar=0;field[i]=bar+1;}
+        snprintf(rest_read.faction,sizeof(rest_read.faction),"%s",field[1]);
+        snprintf(rest_read.global,sizeof(rest_read.global),"%s",field[2]);
+        snprintf(rest_read.owner,sizeof(rest_read.owner),"%s",field[3]);rest_read.bed_rank=n;rest_read.bed_hit=1;
+    }
+}
+static int rest_load(void)
+{
+    FILE *f=NULL;char line[200];int ok=0;
+    memset(&rest_settings,0,sizeof(rest_settings));rest_list[0]=0;
+    if(COM_FOpenFile("levelup/rest.txt",&f)<0 || !f)return 0;
+    if(fgets(line,sizeof(line),f) && !strncmp(line,"AWRS1",5)){
+        ok=1;
+        while(fgets(line,sizeof(line),f)){line[strcspn(line,"\r\n")]=0;rest_line_in(line);}
+    }
+    fclose(f);return ok;
+}
+static void rest_text(const char *key,const char *fallback,char *out,int size)
+{
+    int i;
+    for(i=0;i<REST_KEYS;i++)if(!strcmp(key,rest_keys[i]) && rest_read.text[i][0]){snprintf(out,size,"%s",rest_read.text[i]);return;}
+    snprintf(out,size,"%s",fallback);
+}
+static float modified(int i){int v=aw_character.attributes[i]+aw_character.modifiers[i]-aw_character.damage[i];return (float)(v<0?0:v);}
+static void rest_body(aw_rest_body_t *b)
+{
+    edict_t *p=svs.clients[0].edict;aw_move_inputs_t in;
+    memset(b,0,sizeof(*b));
+    b->health=p->v.health;b->health_max=aw_character.maximum[0];
+    b->magicka=aw_character.current[1];b->magicka_max=aw_character.maximum[1];
+    b->fatigue=AW_CombatPlayerFatigue(&b->fatigue_max);
+    b->endurance=modified(5);b->intelligence=modified(1);
+    AW_MovePlayerInputs(&in);b->strength=in.strength;b->carried=in.carried;
+    b->stunted=rest_read.stunted;
+}
+static void rest_store(const aw_rest_body_t *b)
+{
+    svs.clients[0].edict->v.health=b->health;aw_character.current[0]=b->health;
+    aw_character.current[1]=b->magicka;aw_character.current[2]=b->fatigue;
+}
+int AW_RestSleeping(void){return modal==3 && rest_sleeping;}
+/* T or a bed: the refusals, then the window in rest or wait mode. BED_REFERENCE: the bed used (0 for T). */
+int AW_RestOpen(unsigned long bed_reference)
+{
+    edict_t *p;int refusal,y,m,d,h,n;long cx,cy;static char id[64];char line[200];const char *region;aw_rest_body_t b;
+    if(modal || gallery_active)return 0;
+    if(!sv.active || svs.maxclients!=1 || !svs.clients || !(p=svs.clients[0].edict) || cls.state!=ca_connected ||
+       AW_StoryRestricted() || AW_CharacterActive() || AW_ReaderActive() || p->v.health<=0)return 0;   /* rest not unlocked */
+    if(!AW_ClockEnsure()){Con_Printf("Clock state unavailable.\n");return 0;}
+    if(daynight_hold){AW_UISubtitle("","Time is held at 12:00 (dbg daynight on).",4);return 0;}
+    memset(&rest_read,0,sizeof(rest_read));
+    rest_read.kind=AW_HudPlayerCell(&cx,&cy,id,sizeof(id),&region);rest_read.x=cx;rest_read.y=cy;rest_read.id=id;
+    rest_read.region=rest_read.kind==1?region:NULL;rest_read.bed=bed_reference;
+    rest_read.sign=aw_character.birth>=0 && aw_character.birth<aw_birth_count?aw_births[aw_character.birth].id:"";
+    rest_data=rest_load();
+    refusal=AW_RestRefusal(p->v.waterlevel>=1,((int)p->v.flags&FL_ONGROUND)!=0,p->v.movetype!=MOVETYPE_WALK,
+        AW_PlayerInCombat() || AW_CombatHostiles()>0,bed_reference!=0);
+    if(refusal){
+        line[0]=0;
+        if(refusal&(AW_REST_WATER|AW_REST_AIR))rest_text("sNotifyMessage1","You can only rest on solid ground.",line,sizeof(line));
+        if(refusal&AW_REST_ENEMIES){
+            char more[120];rest_text("sNotifyMessage2","You can't rest here enemies are nearby.",more,sizeof(more));
+            if(line[0])strncat(line," ",sizeof(line)-strlen(line)-1);
+            strncat(line,more,sizeof(line)-strlen(line)-1);
+        }
+        AW_UISubtitle("",line,5);return 0;
+    }
+    rest_bed=bed_reference!=0;
+    if(rest_bed){
+        if(rest_read.bed_hit){
+            int global=strcmp(rest_read.global,"-")?AW_StateGet(&aw_state,AW_GLOBAL,rest_read.global):0;
+            int rank=strcmp(rest_read.faction,"-")?AW_StandingRank(rest_read.faction):-1;
+            if(!AW_RestBedAllowed(rest_read.owner,rest_read.faction,rest_read.bed_rank,global>0,rank)){
+                rest_text("sNotifyMessage64","You can't sleep in someone else's bed!",line,sizeof(line));
+                AW_UISubtitle("",line,5);
+                if(aw_rest_bed_refused)aw_rest_bed_refused(bed_reference,strcmp(rest_read.owner,"-")?rest_read.owner:rest_read.faction);
+                return 0;
+            }
+        }
+    }
+    /* sleeping: a bed, or a cell without the no-sleep flag; the sleep list counts only outdoors and when sleeping */
+    rest_sleeping=rest_bed || !rest_read.nosleep;
+    if(!rest_sleeping || rest_read.kind!=1)rest_list[0]=0;
+    rest_body(&b);
+    rest_until=rest_sleeping?AW_RestUntilHealed(&rest_settings,&b):0;
+    AW_ClockDate(&y,&m,&d,&h,&n);
+    snprintf(rest_line[0],sizeof(rest_line[0]),"%02ld:%02ld  %02ld/%02ld/%ld",(long)h,(long)n,(long)d,(long)m,(long)y);
+    if(rest_sleeping)rest_text("sRestMenu3","Rest",rest_line[1],sizeof(rest_line[1]));
+    else rest_text("sRestIllegal","Resting here is illegal. You'll need to find a bed.",rest_line[1],sizeof(rest_line[1]));
+    rest_text("sRestMenu2","Hours",rest_line[2],sizeof(rest_line[2]));
+    rest_text(rest_sleeping?"sRest":"sWait",rest_sleeping?"Rest":"Wait",rest_line[3],sizeof(rest_line[3]));
+    rest_text("sUntilHealed","Until Healed",rest_line[4],sizeof(rest_line[4]));
+    if(key_dest==key_console)Con_ToggleConsole_f();
+    hours=1;open_modal(3);return 1;
+}
+/* HOURS in rest or wait mode: the clock, recharge and spell effects hour by hour, the stats by the rules, the wilderness
+ * interruption, then the level-up when a full rest ends with it due. */
+static void rest_run(int wanted)
+{
+    int done=0,stop=0,interrupted=0,y,m,d,h,n;aw_rest_body_t b;char line[160],verb[16];
+    if(rest_sleeping && rest_list[0] && rest_data)stop=AW_RestInterruptAt(&rest_settings,wanted,rand()%wanted);
+    while(done<(stop?stop:wanted)){
+        if(!AW_ClockAdvance(3600000))break;
+        if(timescale.value>0){
+            if(aw_magic_frame)aw_magic_frame(3600.0f/timescale.value);
+            AW_MwscriptEffectsAdvance(3600.0f/timescale.value);
+        }
+        done++;
+    }
+    clock_fraction=0;
+    rest_body(&b);AW_RestRestore(&rest_settings,&b,(float)done,rest_sleeping);rest_store(&b);
+    interrupted=stop && done==stop;
+    close_modal();
+    if(interrupted){
+        rest_text("sSleepInterrupt","Your rest has been interrupted.",line,sizeof(line));AW_UISubtitle("",line,5);
+        if(aw_rest_spawn)aw_rest_spawn(rest_list);
+        return;
+    }
+    AW_ClockDate(&y,&m,&d,&h,&n);
+    rest_text(rest_sleeping?"sRest":"sWait",rest_sleeping?"Rest":"Wait",verb,sizeof(verb));
+    snprintf(line,sizeof(line),"%s: %ld h. %02ld:%02ld, %02ld/%02ld/%ld",verb,(long)done,(long)h,(long)n,(long)d,(long)m,(long)y);
+    AW_UISubtitle("",line,5);
+    /* only a full rest opens a due level-up (OpenMW WaitDialog::onWaitingFinished) */
+    if(rest_sleeping && done==wanted)AW_LevelupRested();
+}
 static void wait_open(void) {
     if(modal || gallery_active || key_dest!=key_game)return;
+    /* the rest and wait rules when the image has their data (REST-WAIT-59); else the earlier wait-only window below */
+    {FILE *f=NULL;int have=COM_FOpenFile("levelup/rest.txt",&f)>=0 && f;if(f)fclose(f);if(have){AW_RestOpen(0);return;}}
     if(AW_PlayerInCombat()){enemies_notice();return;}   /* WAIT-DURING-COMBAT-36: no waiting in a fight */
     if(!allowed()){AW_UISubtitle("","Wait after registration, on dry ground, when no one is speaking.",5);return;}
     if(!AW_ClockEnsure()){Con_Printf("Clock state unavailable.\n");return;}
@@ -454,6 +638,13 @@ int AW_WaitKey(int key) {
     }
     if(key_dest!=key_menu){modal=0;return 0;}
     if(key==K_ESCAPE || (modal==2 && (key==K_ENTER || key==K_F1))){close_modal();return 1;}
+    if(modal==3){   /* rest or wait: 1 to 24 hours, Until Healed in rest mode */
+        if(key==K_LEFTARROW || key==K_DOWNARROW || key=='a' || key=='s'){if(hours>1)hours--;}
+        if(key==K_RIGHTARROW || key==K_UPARROW || key=='d' || key=='w'){if(hours<24)hours++;}
+        if((key=='h' || key=='H') && rest_until>0){rest_run(rest_until);return 1;}
+        if(key==K_ENTER)rest_run(hours);
+        return 1;
+    }
     if(modal==2){
         help_layout_t layout;help_layout(&layout);
         if(key==K_LEFTARROW || key==K_RIGHTARROW || key==K_PGDN || key==K_PGUP || key==K_TAB)help_page=(help_page+(key==K_LEFTARROW || key==K_PGUP?-1:1)+layout.pages)%layout.pages;
@@ -477,6 +668,17 @@ int AW_WaitKey(int key) {
 int AW_WaitDraw(void) {
     int y,m,d,h,n;char line[96];
     if(!modal || key_dest!=key_menu)return 0;
+    if(modal==3){
+        AW_UIBox(18,24,284,152);AW_UISmallBegin();
+        AW_UITextBox(26,32,268,20,rest_line[1],-1);
+        AW_UITextBox(26,57,268,20,rest_line[0],-1);
+        snprintf(line,sizeof(line),"%ld %.40s",(long)hours,rest_line[2]);AW_UITextBox(26,85,268,22,line,-1);
+        AW_UITextBox(26,116,268,20,"Arrows / A D: 1 to 24 hours",-1);
+        if(rest_until>0)snprintf(line,sizeof(line),"Enter: %.15s  H: %.31s  Esc",rest_line[3],rest_line[4]);
+        else snprintf(line,sizeof(line),"Enter: %.15s   Esc: cancel",rest_line[3]);
+        AW_UITextBox(26,143,268,20,line,-1);
+        AW_UISmallEnd();scr_copyeverything=1;return 1;
+    }
     if(modal==1){
         AW_UIBox(18,24,284,152);AW_UISmallBegin();
         AW_ClockDate(&y,&m,&d,&h,&n);

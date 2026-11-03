@@ -1,6 +1,6 @@
 # World map and progression journal
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.59-dev5 (2 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -10,6 +10,7 @@ _Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 - [Map file formats: v1 and v2 (lava pools)](#map-file-formats-v1-and-v2-lava-pools)
 - [Region name and debug teleport](#region-name-and-debug-teleport)
 - [J: earned journal entries in two facing pages](#j-earned-journal-entries-in-two-facing-pages)
+  - [Quests (since v0.0.59)](#quests-since-v0059)
 - [Persistence and validation](#persistence-and-validation)
 - [v0.0.27-rc4 selector regression and rc5 source correction](#v0027-rc4-selector-regression-and-rc5-source-correction)
 - [v0.0.29 focus cancellation candidate](#v0029-focus-cancellation-candidate)
@@ -145,21 +146,30 @@ progression or a promise that every map pixel is a reachable destination.
 
 ## J: earned journal entries in two facing pages
 
-J, or `aw_journal`, opens the most recently earned entry in a two-page book.
-Left/right, Page Up/Down, wheel and the bottom page links turn pages, continuing
-to the previous/next earned entry at each entry boundary. Home/End selects the
-first/last entry. Long entries continue onto additional spreads.
+J, or `aw_journal`, opens the journal as the original game does (JOURNAL-ORIGINAL-VIEW-59, since v0.0.59): two
+facing pages of every earned entry, oldest to newest, each day under its date heading, opened at the newest
+spread. The heading has the original's form, for example **16 Last Seed (Day 1)**: the day of the month, the
+month's name and the days passed counted from 1. The month names and the word "Day" are the game data's own
+settings (`sMonthMorningstar` to `sMonthEveningstar`, `sDay`); day 0 of the game clock is 16 Last Seed. Entries
+of one day follow under one heading, a blank line apart; a heading never ends a page without its first line.
 
-Headings are centred on the left leaf, never across the spine. Long titles wrap
-fully and move that page's body text down; the right leaf keeps its normal text
-area. Quest-index titles wrap too. Startup restores J and M when an older saved
-configuration leaves them unassigned, while retaining custom bindings.
+The button row has the original's buttons: **Prev**, **Topics**, **Quests**, **Close** and **Next**. Left/right,
+Page Up/Down, Space and the wheel turn a spread; Home/End go to the first/last spread. **Topics** (or T) opens the
+alphabetical topic index; a topic's page shows what was heard about it, with links to other topics. **Back** (or
+Tab/T) returns to the dated journal. J/Escape closes. The mouse stays in the panel. F10 closes the panel and opens
+the console. Startup restores J and M when an older saved configuration leaves them unassigned, while retaining
+custom bindings.
 
-Tab or the **Quests** link opens the quest index. Select with arrows, wheel,
-Page Up/Down, the draggable scrollbar or mouse, then Enter/click to filter entries for that quest. Clicking
-the quest heading also follows that quest link. Backspace returns to all entries;
-J/Escape closes. The mouse stays in the panel. F10 closes the panel and opens
-the console. Gallery help/controls retain their separate context.
+**Quests** (or Q, or Tab) opens the view by subject: the quest index below. It plays the role of the later
+expansion's Quests button and is an extra beside the original layout. Select with arrows, wheel, Page Up/Down, the
+draggable scrollbar or mouse, then Enter/click to read that quest's entries one at a time (headings centred on the
+left leaf, long titles wrapped, the date in the same form as above). Clicking the quest heading follows that
+quest; **All entries** reads every entry this way. Tab returns to the index, Q or Backspace to the dated journal.
+
+The dated journal is built when the book opens: each entry's text is read once, laid out with the book's font into
+lines and pages, and freed when the book closes. It has no page or entry limit of its own. The dated history it
+reads is the one described below; kept quest stages without a date (a quest past the history's 32 quests, or a
+save's stages without their dates) come first, without a heading.
 
 The supplied master contains 632 journal DIAL records, of which 629 have text:
 **2,489 journal INFO entries**. They are typed binary DIAL/INFO records, not XML.
@@ -174,14 +184,38 @@ text. The reader uses **28,188 bytes** while open and frees it on close. It neve
 reads all source quest text into the runtime heap. `%PCName`, `%PCRace` and
 `%PCClass` expand for the current character within checked text bounds.
 
-`AW_JournalAdd` records a new earned stage with its date/time. Repeated grants
-cannot duplicate it. `AW_StateSet` may change an index without writing fictional
-history. Capacity failure leaves the quest index and history unchanged; reward
-transactions must propagate that failure. Current bounds are **32 quest IDs and
-256 dated entries**, suitable for the present opening slice, not a claim that a
-complete Morrowind playthrough fits. Expanding quest capacity and general script
-execution are later milestones. The reader links quests; a complete dialogue
-knowledge/topic-link system is still pending.
+A script's or a conversation's `Journal` records a new earned stage with its date and time. Repeated grants
+cannot duplicate it; `SetJournalIndex` changes a stage without writing history. Since v0.0.59 the dated history is
+kept on the world change list with no quest or entry limit (JOURNAL-ORIGINAL-VIEW-59, AW-STATE-32-SLOTS-48): one
+16-byte entry per earned stage (the quest's name hash, the stage, the day and the time of day), in the order earned,
+saved only when it has an entry (save feature 128, `AWH1`, 16 bytes an entry). An older save's history (at most
+256 entries of 32 quests) is taken over when it loads. The 32-slot copy is still written for older readers.
+`dbg mwscript call journal QUEST N` records a stage as a script's `Journal` does; `dbg mwscript call setjournalindex
+QUEST N` sets it without an entry.
+
+### Quests (since v0.0.59)
+
+Every quest's stage is kept on the world change list by its quest id (the change list's quest table, saved with
+the game), with no 32-quest limit. When the book opens it reads the stages the scripts hold at that moment and
+lists every started quest from them (JOURNAL-BOOK-32-QUESTS-59):
+
+- The quest index lists quest **names**, each name once even when several quest ids share it, sorted by name. A
+  quest without a name is not listed; its entries still read under **All entries**. This is the rule OpenMW 0.51
+  follows (`journalviewmodel.cpp`, `journalwindow.cpp`).
+- By default the index shows the active quests. **Show all** (or the A key) adds the finished ones, drawn in the
+  page ink instead of the link colour; **Show active** returns. A quest is finished when the journal entry of its
+  kept stage finishes it (the entry's quest status in the game data; `world/journal.awj` carries it since the
+  `AWJ2` form, which adds four bytes of status flags to each row; an `AWJ1` file still reads, with no quest
+  finished).
+- The entries: the dated entries first, in the order they were earned, then for every started quest whose kept stage
+  has no dated entry (a quest past the dated history's 32 quests, or stages from a save without their dates) the
+  entry of that stage, without a date, in quest order. Filtering by a name reads that name's entries.
+
+The quest list lives only while the book is open: the catalogue rows of the started quests, one row per entry and
+one per name (with 100 quests started, about 21 KB beside the reader), freed when the book closes. Opening the
+book reads `world/quests.awq` once and, per started quest, one index lookup for its finished flag. `dbg mwscript call
+journal QUEST N` sets a quest's stage for a test. The reader links quests; topics have their own pages (T from
+the journal or the quest index).
 
 ## Persistence and validation
 

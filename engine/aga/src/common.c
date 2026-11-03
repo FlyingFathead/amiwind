@@ -20,6 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // common.c -- misc functions used in client and server
 
 #include "quakedef.h"
+#include "aw_spike.h"
 
 #define NUM_SAFE_ARGVS  7
 
@@ -1553,6 +1554,10 @@ bad:
 	return 0;
 }
 static int com_find_quiet;   /* set while probing an optional file: a miss is not reported */
+/* the stdio buffer of a file COM_FOpenFile opens from a directory (0: 16 KiB); a caller that only binary-searches the
+ * file sets a small one around its open (TRADEHOUSE-LONG-FRAME-59: each search step refilled the whole buffer).
+ * Defined in aw_fopenbuf.c. */
+extern int com_fopen_buffer;
 static void COM_InitFileAliases (void)
 {
 	char *text;
@@ -1594,9 +1599,23 @@ AmiWind: a name no search path has is tried once more as its stored copy (file a
 int COM_FindFile (char *filename, int *handle, FILE **file)
 {
 	char *stored;
-	int found = COM_FindFileIn (filename, handle, file);
+	double disk_t0;
+	int found;
+	AW_DISK_BEGIN (disk_t0);	/* FRAME-WAIT-COUNTERS-59: the lookups' Locks and opens are disk wait */
+	found = COM_FindFileIn (filename, handle, file);
 	if (found < 0 && (stored = COM_FileAliasTarget (filename)) != NULL)
 		found = COM_FindFileIn (stored, handle, file);
+	AW_DISK_END (disk_t0);
+	AW_SpikeFile (filename, found >= 0);	/* ARRIVAL-LONG-FRAME-DEV6-59: file work per frame */
+#ifdef AMIGA
+	/* ARRIVAL-LONG-FRAME-DEV6-59: a long run of file lookups inside one frame keeps the remote state's heartbeat
+	 * (ticks) going, at most twice a second (aw_remote.c AW_RemoteBusy), so a test session tells it from a stall */
+	{
+		extern void (*S_ExtraUpdateHook)(void);
+		if (S_ExtraUpdateHook)
+			S_ExtraUpdateHook ();
+	}
+#endif
 	if (found < 0 && !com_find_quiet) {
 		Sys_Printf ("FindFile: can't find %s\n", filename);
 		fflush(stdout);
@@ -1677,6 +1696,23 @@ static int COM_FindFileIn (char *filename, int *handle, FILE **file)
 				continue;
 #endif
 
+			/* ARRIVAL-LONG-FRAME-DEV6-59: a FILE asked for without a cache folder is opened once: the open is the
+			 * existence check, the length from the open file (it was a test open, an open for the length and this
+			 * open: three AmigaDOS opens per file, about 70 ms in the emulator) */
+#ifdef AMIGA
+			if (file && !com_cachedir[0])
+			{
+				extern int filelength (FILE *f);	/* sys_file_amiga.c */
+				*file = fopen (netpath, "rb");
+				if (!*file)
+					continue;
+				/* SEYDA-READ-SLOW-31, as below; before any read. A caller that reads small rows at random places
+				 * (a binary search on disk) asks for a small buffer: com_fopen_buffer (every refill reads it whole) */
+				setvbuf (*file, NULL, _IOFBF, com_fopen_buffer > 0 ? com_fopen_buffer : 16384);
+				com_filesize = filelength (*file);
+				return com_filesize;
+			}
+#endif
 			findtime = Sys_FileTime (netpath);
 			if (findtime == -1)
 				continue;
@@ -1715,7 +1751,7 @@ static int COM_FindFileIn (char *filename, int *handle, FILE **file)
 				 * AmigaDOS call per KiB. 16 KiB halves map read time
 				 * (SEYDA-READ-SLOW-31); larger buffers gained nothing overall. */
 				if (*file)
-					setvbuf (*file, NULL, _IOFBF, 16384);
+					setvbuf (*file, NULL, _IOFBF, com_fopen_buffer > 0 ? com_fopen_buffer : 16384);
 			}
 			return com_filesize;
 		}

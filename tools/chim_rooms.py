@@ -124,19 +124,29 @@ def install(rooms_dir, id1):
     the record."""
     rooms_dir, id1 = Path(rooms_dir), Path(id1)
     record = output_record(rooms_dir)
-    conflicts, copied = [], []
+    from npc_recipes import MERGEABLE  # files each stage writes for its own part: merged, not a collision
+    conflicts, copied, merged = [], [], {}
     for rel, sha in record['files'].items():
         source, target = rooms_dir / 'id1' / rel, id1 / rel
         if hashlib.sha256(source.read_bytes()).hexdigest() != sha:
             conflicts.append('%s: changed since the stage wrote it' % rel)
         elif target.is_file() and hashlib.sha256(target.read_bytes()).hexdigest() != sha:
-            conflicts.append('%s: staged in the image with other bytes' % rel)
+            if rel in MERGEABLE:
+                try:
+                    merged[rel] = MERGEABLE[rel](target, source, 'chim-rooms-' + record['town'])
+                except ValueError as error:
+                    conflicts.append(str(error))
+            else:
+                conflicts.append('%s: staged in the image with other bytes' % rel)
     if conflicts:
         raise ValueError('CHIM rooms of %s collide with the image: %s' % (record['town'], '; '.join(conflicts[:8])))
     for rel in record['files']:
         target = id1 / rel
         target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(rooms_dir / 'id1' / rel, target)
+        if rel in merged:
+            target.write_bytes(merged[rel])
+        else:
+            shutil.copyfile(rooms_dir / 'id1' / rel, target)
         copied.append(rel)
     return {'town': record['town'], 'rooms': [r['map'] for r in record['rooms']], 'files': len(copied),
             'door_bank': record['door_file']}

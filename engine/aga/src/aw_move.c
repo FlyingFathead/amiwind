@@ -18,6 +18,7 @@
 #include "quakedef.h"
 #include "aw_move.h"
 #include "aw_character.h"
+#include "aw_levelup.h"
 #include "aw_combat.h"
 #include "aw_inventory.h"
 
@@ -168,6 +169,10 @@ static void after(float seconds) {
     AW_MovePlayerInputs(&in);in.swimming=last_swimming;in.running=last_running;in.sneaking=last_sneaking;
     loss=AW_MoveMaxSpeed(&settings,&in)>0?AW_MoveFatigueRate(&settings,&in)*last_factor*seconds:0;
     if(jumped)loss+=AW_MoveJumpFatigue(&settings,&in);
+    /* LEVEL-UP-58: Acrobatics_Jump at the jump, Athletics per second of running on the ground (not sneaking) or of
+     * swimming (OpenMW character.cpp) */
+    if(jumped)AW_LevelupUse(AW_LU_ACROBATICS,AW_USE_JUMP,1);
+    if(last_factor>0)AW_LevelupMoveSeconds(in.running && ground_now && !in.sneaking,in.swimming,seconds);
     last_factor=0;
     if(loss>0)AW_CombatPlayerFatigueLoss(loss);
 }

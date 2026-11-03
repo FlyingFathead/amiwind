@@ -222,11 +222,19 @@ def require_disk_layout(drive, drive_bytes, receipts, partitions=()):
         if size >= FILE_SIZE_LIMIT:
             problems.append('%s %s file %s is %d bytes (limit below %d, 1 GiB)' % (drive, r['partition'], path, size,
                                                                                 FILE_SIZE_LIMIT))
+    # format: the readback found exactly the partitions the layout wrote (RDB, partition names; the filesystem and
+    # every file are read back by verify_combined before this gate)
+    if partitions:
+        wanted, found = sorted(p['partition'] for p in partitions), sorted(r['partition'] for r in receipts)
+        if wanted != found:
+            problems.append('%s: the partition table holds %s, the layout wrote %s' % (drive, found, wanted))
+    # IDE cylinders: the drive is whole cylinders and every partition ends inside them
+    problems += ide_cylinder_problems(drive, drive_bytes, receipts)
     if problems:
         raise ValueError('Disk layout gate (Amiga limits): ' + '; '.join(problems))
     return dict(file=drive, bytes=drive_bytes, partitions=rows, ok=True,
                 limits=dict(partition_start=PARTITION_START_LIMIT, partition=PARTITION_SIZE_LIMIT,
-                            file=FILE_SIZE_LIMIT, drive=DRIVE_SIZE_LIMIT))
+                            file=FILE_SIZE_LIMIT, drive=DRIVE_SIZE_LIMIT, ide_cylinder_sectors=IDE_CYLINDER_SECTORS))
 
 
 def planned_partition(partition, files, volume=None, **extra):
@@ -240,7 +248,8 @@ def planned_partition(partition, files, volume=None, **extra):
 def require_partition_plans(planned):
     """Each planned world partition on its own, before its writer copies a byte (the drive grouping
     is not known yet): the partition below 2 GiB, every file below FILE_SIZE_LIMIT (the same gate)."""
-    return [require_disk_layout('%s (planned)' % (p.get('volume') or p['partition']), p['bytes'] + RDB_BYTES,
+    return [require_disk_layout('%s (planned)' % (p.get('volume') or p['partition']),
+                                ide_cylinder_bytes(p['bytes'] + RDB_BYTES),
                                 [dict(partition=p['partition'], offset_bytes=RDB_BYTES, bytes=p['bytes'])], [p])
             for p in planned]
 
@@ -262,8 +271,12 @@ def plan_drives(boot, worlds, name=lambda index: 'drive-%02d.hdf' % index, group
         drive_bytes = mib * MIB + RDB_BYTES
         receipts = [dict(partition=m['partition'], offset_bytes=start, bytes=m['bytes'])
                     for m, start in zip(members, partition_starts(RDB_BYTES, members))]
-        layout = require_disk_layout('%s (planned)' % name(index), drive_bytes, receipts, members)
-        plans.append(dict(file=name(index), members=members, mib=mib, bytes=drive_bytes, layout=layout))
+        # KHUUL-HOP-STALL-59: the drive is written padded to whole IDE cylinders (assemble_drives), so the 4 GiB
+        # limit and the IDE rule are judged on the padded size, before any partition is written.
+        ide_bytes = ide_cylinder_bytes(drive_bytes)
+        layout = require_disk_layout('%s (planned)' % name(index), ide_bytes, receipts, members)
+        plans.append(dict(file=name(index), members=members, mib=mib, bytes=drive_bytes, ide_bytes=ide_bytes,
+                          layout=layout))
     return plans
 
 
@@ -281,6 +294,53 @@ def write_boot_partition(xdftool, part, boot, mib, volume='AMIWIND'):
     return check_image(part, normalize=True)
 
 
+# KHUUL-HOP-STALL-59: on the emulated A1200 IDE port (and a real IDE drive given a raw image) the drive's size is
+# read as whole cylinders of 16 heads x 63 sectors. A drive file of 6,266,944 sectors showed only 6217 cylinders
+# (6,266,736 sectors), so the last 144 sectors of the world partition (Khuul's files) gave Kickstart's "has a read
+# error" requester and the game waited on it for ever. Every drive is padded with zeros to whole IDE cylinders.
+IDE_CYLINDER_SECTORS = 16 * 63
+
+
+def ide_cylinder_bytes(size):
+    """SIZE rounded up to a whole number of IDE cylinders (16 heads x 63 sectors of 512 bytes)."""
+    unit = IDE_CYLINDER_SECTORS * 512
+    return (size + unit - 1) // unit * unit
+
+
+def pad_to_ide_cylinders(drive):
+    """Pad DRIVE with zeros to whole IDE cylinders (KHUUL-HOP-STALL-59); returns the bytes added."""
+    drive = Path(drive)
+    size = drive.stat().st_size
+    padded = ide_cylinder_bytes(size)
+    if padded != size:
+        with drive.open('r+b') as stream:
+            stream.truncate(padded)
+    return padded - size
+
+
+def ide_cylinder_problems(drive, drive_bytes, receipts):
+    """The IDE cylinder rules of the image layout gate (KHUUL-HOP-STALL-59): the drive is whole IDE cylinders and
+    every partition ends inside them. Returns the violations as text (empty = passes)."""
+    unit = IDE_CYLINDER_SECTORS * 512
+    problems = []
+    if drive_bytes % unit:
+        problems.append('drive %s is %d bytes, not whole IDE cylinders of %d sectors: an IDE port reads its last '
+                        'blocks as missing' % (drive, drive_bytes, IDE_CYLINDER_SECTORS))
+    for r in receipts:
+        if r['offset_bytes'] + r['bytes'] > drive_bytes // unit * unit:
+            problems.append('%s %s ends at %d, past the last whole IDE cylinder (%d)'
+                            % (drive, r['partition'], r['offset_bytes'] + r['bytes'], drive_bytes // unit * unit))
+    return problems
+
+
+def require_ide_cylinders(drive, drive_bytes, receipts):
+    """The IDE cylinder rules alone (the image layout gate, require_disk_layout, runs them with every other rule;
+    this is for a finished drive file: tools/ide_cylinders.py, the master builder, the release guard)."""
+    problems = ide_cylinder_problems(drive, drive_bytes, receipts)
+    if problems:
+        raise ValueError('IDE cylinder gate (KHUUL-HOP-STALL-59): ' + '; '.join(problems))
+
+
 def assemble_drives(rdbtool, plans, out, boot_part, boot_files, jobs=1, images=None, run=None):
     """Write every planned drive with rdbtool from partitions already written (BOOT_PART for DH0 with
     its hashed BOOT_FILES; out/<file> for a world partition, IMAGES by partition name when the plan
@@ -293,7 +353,7 @@ def assemble_drives(rdbtool, plans, out, boot_part, boot_files, jobs=1, images=N
     layout, drive_receipts, disk_layout = [], [], []
     for plan in plans:
         drive = out / plan['file']
-        if plan['mib'] * MIB + RDB_BYTES >= DRIVE_SIZE_LIMIT:
+        if ide_cylinder_bytes(plan['mib'] * MIB + RDB_BYTES) >= DRIVE_SIZE_LIMIT:
             raise ValueError('Legacy hardfile must remain below 4 GiB')
         command = [rdbtool, drive, 'create', 'chs=%d,1,64' % (plan['mib'] * 32 + 1), '+', 'init']
         partitions = []
@@ -311,13 +371,15 @@ def assemble_drives(rdbtool, plans, out, boot_part, boot_files, jobs=1, images=N
                                  % (member['partition'], source.stat().st_size, member['bytes']))
             partitions.append(written)
         run(command)
+        pad_to_ide_cylinders(drive)
         checked = verify_combined(drive, partitions, jobs=jobs)
         for receipt in checked:
             receipt['hdf_file'] = drive.name
         # Kickstart 3.1 does not mount a partition starting at or beyond 2 GiB of its drive.
         require_mountable(checked)
-        # Every drive passes the disk-layout gate as written too: partition start and size below 2 GiB,
-        # files well under 2 GiB, the drive below 4 GiB (BUILD-WORLD-PARTITION-MOUNT-33).
+        # Every drive passes the image layout gate as written too, ONE check with every rule: partition start and
+        # size below 2 GiB, files well under 2 GiB, the drive below 4 GiB (BUILD-WORLD-PARTITION-MOUNT-33), the
+        # partition table as planned and the drive whole IDE cylinders (IMAGE-IDE-CYLINDER-TAIL-59).
         disk_layout.append(require_disk_layout(drive.name, drive.stat().st_size, checked, partitions))
         layout.extend(checked)
         drive_receipts.append(dict(file=drive.name, bytes=drive.stat().st_size, sha256=digest(drive),

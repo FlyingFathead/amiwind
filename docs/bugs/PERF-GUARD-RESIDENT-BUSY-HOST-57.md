@@ -2,12 +2,14 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 4 times; something has to be done
+## PERSISTING: reported 6 times; something has to be done
 
 - Reported with v0.0.57 at 2026-10-31 03:46 +0200: v0.0.57 release image run 2026_10_31_v0.0.57_full-v0.0.57-release_7ff625e: every stage passed, the perf guard failed the same two: chim-town-balmora build_resident 86 s, was 52 s (+65 %); chim-town-vivec_city 98 s, was 62 s (+57 %), same units. Worker gates shared the host. Perf only, delivered; the monitor lists the run as failed for this.
 - Reported with v0.0.58-dev1 at 2026-10-31 16:50 +0200: v0.0.58-dev1 build 2026_10_31_v0.0.58-dev1_full-v0.0.58-dev1_3d610fa: every stage passed, the perf guard failed the same two: chim-town-balmora build_resident 101 s, was 52 s (+93 %); chim-town-vivec_city 118 s, was 62 s (+89 %), same units; worker gates (5046, 5088 and more) shared the host. Third sighting: delivered (perf only).
 - Reported with v0.0.59-dev1 at 2026-11-01 (time not recorded): Seen again on the v0.0.59-dev1 full build: the same two resident sections failed the performance check (chim-town-balmora wall time 107 s against 52 s with the same 15 units; chim-town-vivec_city CPU per unit 35.3 s against 7.1 s with the same 39 units) while worker gates ran on the host. The stages passed and the image was delivered (a performance-only failure).
 - Reported with v0.0.58-dev3 at 2026-11-01 04:34 +0200: Seen again in the v0.0.58 test image build of 6679573 (2026-11-01): the perf guard failed chim-town-vivec_city parallel map build_resident at 32.9 s CPU per unit against a 7.1 s baseline with the same 39 units, while a gate ran beside the build (busy host). The stages passed and the image is valid; perf only, not blocking.
+- Reported with v0.0.59-dev5 at 2026-11-02 (time not recorded): PERSISTING on a quiet host: v0.0.59-dev5 (f08583e0) chim-town-vivec_city build_resident 26.3 s CPU per unit against the baseline 7.1 s (+268 %, the same 39 units); dev4 26.6 s, so dev4 to dev5 unchanged. Failing in every full build since v0.0.58-dev1.
+- Reported with v0.0.59-dev5 at 2026-11-02 (time not recorded): Cause found (quiet host): since skeletal actors became the default, every worker process builds the shared animation table again, about 18 s of CPU per table (the beast table too); a Vivec resident bake itself is 3 to 6 s. Fix on branch v0.0.59-vivecbake: the table goes through the unit cache and the stage builds each table once before the bakes. Same cause as BUILD-RESIDENT-BAKE-SLOWER-52.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -34,7 +36,7 @@
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 4 times; something has to be done](#persisting-reported-4-times-something-has-to-be-done)
+- [PERSISTING: reported 6 times; something has to be done](#persisting-reported-6-times-something-has-to-be-done)
 - [Symptom](#symptom)
 - [Where](#where)
 - [How it happened](#how-it-happened)
@@ -121,7 +123,9 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-CACHE-TRACE-PYTHONPATH-33](BUILD-CACHE-TRACE-PYTHONPATH-33.md): The stage read trace refused reuse of a reused run when another checkout was on PYTHONPATH
 - [BUILD-CHIM-CONVERTER-CHANGE-FULL-REBUILD-46](BUILD-CHIM-CONVERTER-CHANGE-FULL-REBUILD-46.md): A change in the shared collision converter rebuilds every CHIM frame and everything after it, even where the output is identical
 - [BUILD-CHIM-FRAME-SWAP-LATE-36](BUILD-CHIM-FRAME-SWAP-LATE-36.md): The image step builds 335 legacy maps of cells already on CHIM, then removes them before packing
+- BUILD-CHIM-KEY-SKY-OVERLAY-TABLE-59 (no report page): The CHIM world stage and its ocean units are keyed by the whole sky palette overlay module, so a new image file extension rebuilds the CHIM world
 - [BUILD-CHIM-MAIN-MEMORY-46](BUILD-CHIM-MAIN-MEMORY-46.md): The CHIM stage main process holds so much memory that the memory guard starves its own workers
+- BUILD-CHIM-POOL-MEMORY-THROTTLE-59 (no report page): A CHIM stage rebuild runs its area pool on 8 of 24 workers because the stage's parent and the stages beside it hold most of the build's memory
 - [BUILD-CHIM-REGION-FRAMES-TAIL-43](BUILD-CHIM-REGION-FRAMES-TAIL-43.md): The CHIM region-frame step runs its last frames on one worker while the other cores sit idle
 - [BUILD-CHIM-SERIAL-SECTIONS-44](BUILD-CHIM-SERIAL-SECTIONS-44.md): The CHIM stage runs several sections on one core while units wait: visibility rows starve their workers
 - [BUILD-CHIM-SOURCE-REPEAT-41](BUILD-CHIM-SOURCE-REPEAT-41.md): The CHIM stage parsed the whole master and read the same models again for every area: 723 source stages took 24,500 CPU seconds

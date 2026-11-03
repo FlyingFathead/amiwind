@@ -13,6 +13,9 @@
 #include "aw_statswin.h"
 #include "aw_tryalloc.h"
 #include "aw_textdef.h"
+#include "aw_questbook.h"
+#include "aw_jhist.h"
+#include "aw_save.h"
 #include <stdint.h>
 /* AWM1: header, areas, pixels. AWM2 adds the LAVA section (docs/WORLD_MAP_AND_JOURNAL.md "Map file formats"). */
 #define LAVA_POOLS_MAX 2048
@@ -87,16 +90,26 @@ static char teleport_region[64];
 #define BOOK_HITS 96          /* the link pieces drawn on one spread */
 static char opened_scene[64];
 static struct {char id[16],title[32];float x,y,scale;} areas[8];
+/* The quest pages (JOURNAL-BOOK-32-QUESTS-59, aw_questbook.h): every started quest, from the stages kept on the world
+ * change list, built when the book opens and freed when it closes (the catalogue rows of the started quests only).
+ * filter: a name's row in qb (-1 all entries); entry: a row of qb.entry; selection and index_*: rows of shown. */
 typedef struct {
-    char raw[8192],text[16384],titles[AW_STATE_VALUES][96];unsigned short pages[BOOK_PAGES];
+    char raw[8192],text[16384];unsigned short pages[BOOK_PAGES];
     int count,spread,entry,filter,index_mode,index_top,selection,title_rows,index_end;
-    int index_x[AW_STATE_VALUES],index_y[AW_STATE_VALUES],index_rows[AW_STATE_VALUES];
+    aw_questbook_t qb;aw_qb_quest_t *quests;int nquests;
+    int *shown,nshown,all;              /* the names listed (rows of qb.group); all: "Show all" (finished ones too) */
+    int *index_x,*index_y,*index_rows;  /* per row of shown */
     /* the topic pages (OpenMW's journal Topics): the topics heard, by name; the one being read */
     int topics,topic_top,topic_sel,topic_open;short topic_id[BOOK_TOPICS];char topic_name[BOOK_TOPICS][40];
     /* the page's links (OpenMW JournalWindow): the topic of the n-th link mark in text, and where the drawn ones are */
     int links,hits;unsigned short link_topic[BOOK_LINKS];
     struct {short x,y,w;short link;} hit[BOOK_HITS];
+    /* the dated journal (JOURNAL-ORIGINAL-VIEW-59): the first view, every entry under its day; shown while entry is
+     * BOOK_DATED, spread = its left page */
+    aw_journalview_t jv;
 } book_t;
+#define BOOK_DATED (-3)
+#define BOOK_DATED_LINES 11   /* rows of a dated page, from y 12 to the button row */
 static book_t *book;
 extern int scr_copyeverything;
 
@@ -119,7 +132,13 @@ static void cursor(void){
 static void (*panel_draw)(void);
 static int (*panel_key)(int key,int mouse_x,int mouse_y);
 static void (*panel_closed)(void);
+static void book_free(void){
+    if(book){AW_QuestBookFree(&book->qb);AW_JournalViewFree(&book->jv);free(book->quests);free(book->shown);free(book->index_x);free(book->index_y);free(book->index_rows);}
+    free(book);book=NULL;
+}
+int aw_worldui_panel_holds_escape;   /* set by the panel's opener after AW_WorldUIOpenPanel; cleared on every close */
 static void close_panel(void){
+    aw_worldui_panel_holds_escape=0;
     if(modal==4 && panel_closed)panel_closed();
     panel_draw=NULL;panel_key=NULL;panel_closed=NULL;
     if(inventory && inventory->preview_frames)
@@ -127,12 +146,18 @@ static void close_panel(void){
             AW_ViewInventoryLive()?"live":"still",inventory->preview_renders,(int)(inventory->preview_render_seconds*1000),
             inventory->preview_frames,(int)(inventory->preview_seconds*1e6/inventory->preview_frames),INV_PREVIEW_W*INV_PREVIEW_H);
     free(inventory);inventory=NULL;AW_InventoryPreviewClear();
-    free(map_data);map_data=map_pixels=NULL;lava_pools=lava_points=NULL;lava_count=0;free(book);book=NULL;
+    free(map_data);map_data=map_pixels=NULL;lava_pools=lava_points=NULL;lava_count=0;
+    book_free();
     if(modal && key_dest==key_menu)key_dest=key_game;
     modal=drag=marker_click=teleport_mode=teleport_selected=0;teleport_message=marker_message=NULL;IN_AWClearButtons();
 }
 int AW_WorldUIActive(void){return modal!=0;}
-/* A button released outside the window must not leave a modal drag held. */
+/* The open window for the remote state file (LOAD-STALL-SESSIONS-59): a panel of another file
+ * (stats, the container strip, ...) is a generic "window". */
+const char *AW_WorldUIName(void){
+    static const char *const names[]={"","map","journal","inventory","window"};
+    return modal>=0 && modal<=4?names[modal]:"window";
+}/* A button released outside the window must not leave a modal drag held. */
 void AW_WorldUICancelDrag(void){drag=marker_click=0;}
 static int allowed(void){
     return !modal && key_dest==key_game && sv.active && svs.maxclients==1 && svs.clients &&
@@ -625,23 +650,32 @@ static void confirm_teleport(void){
 }
 /* Sorted fixed records permit bounded disk lookups. Offset includes a possible
  * pak member start; no assumption that COM_FOpenFile starts at byte zero. */
-static int entry_text(const char *id,int stage,char *out,int capacity){
-    FILE *f=NULL;byte header[8],row[76];int size,count,lo,hi,mid,cmp,found=0;uint32_t offset=0,length=0;long base;
+/* The index row of (ID, STAGE): 1 and its text's place and its quest status flags (AWJ2: 1 finished, 2 restart,
+ * 4 name; AWJ1 rows have none). JOURNAL-BOOK-32-QUESTS-59. */
+static int journal_row(const char *id,int stage,uint32_t *offset,uint32_t *length,uint32_t *flags){
+    FILE *f=NULL;byte header[8],row[80];int size,count,lo,hi,mid,cmp,found=0,width;long base;
     size=COM_FOpenFile("world/journal.awj",&f);if(!f)return 0;
     base=ftell(f);
-    if(size<8 || fread(header,1,8,f)!=8 || memcmp(header,"AWJ1",4))goto end_index;
-    count=(int)u32(header+4);if(count<0 || count>10000 || size!=8+count*76)goto end_index;
+    if(size<8 || fread(header,1,8,f)!=8)goto end_index;
+    if(!memcmp(header,"AWJ2",4))width=80;else if(!memcmp(header,"AWJ1",4))width=76;else goto end_index;
+    count=(int)u32(header+4);if(count<0 || count>10000 || size!=8+count*width)goto end_index;
     lo=0;hi=count;
     while(lo<hi){
         mid=lo+(hi-lo)/2;
-        if(fseek(f,base+8+(long)mid*76,SEEK_SET) || fread(row,1,76,f)!=76 || !memchr(row,0,64))break;
+        if(fseek(f,base+8+(long)mid*width,SEEK_SET) || fread(row,1,width,f)!=(size_t)width || !memchr(row,0,64))break;
         cmp=strcmp(id,(char *)row);
         if(!cmp){int value=(int32_t)u32(row+64);cmp=stage<value?-1:stage>value?1:0;}
-        if(!cmp){offset=u32(row+68);length=u32(row+72);found=1;break;}
+        if(!cmp){*offset=u32(row+68);*length=u32(row+72);*flags=width==80?u32(row+76):0;found=1;break;}
         if(cmp<0)hi=mid;else lo=mid+1;
     }
  end_index:
-    fclose(f);f=NULL;if(!found || length<1 || length>(uint32_t)capacity)return 0;
+    fclose(f);
+    return found;
+}
+static int entry_text(const char *id,int stage,char *out,int capacity){
+    FILE *f=NULL;int size,found;uint32_t offset=0,length=0,flags;long base;
+    found=journal_row(id,stage,&offset,&length,&flags);
+    if(!found || length<1 || length>(uint32_t)capacity)return 0;
     size=COM_FOpenFile("world/entries.dat",&f);if(!f)return 0;base=ftell(f);
     found=size>0 && offset<=(uint32_t)size && length<=(uint32_t)size-offset &&
         !fseek(f,base+offset,SEEK_SET) && fread(out,1,length,f)==length;
@@ -656,8 +690,22 @@ static int expand_entry(void){
     n=AW_TextDefines(book->text,(int)sizeof(book->text),book->raw,&v);
     return n<(int)sizeof(book->text)-1;
 }
-static int eligible(int i){return i>=0 && i<aw_state.journal_count && (book->filter<0 || aw_state.journal[i].quest==book->filter);}
-static int next_entry(int i,int step){for(i+=step;i>=0 && i<aw_state.journal_count;i+=step)if(eligible(i))return i;return -1;}
+static int eligible(int i){return i>=0 && i<book->qb.entries && (book->filter<0 || book->qb.entry[i].group==book->filter);}
+static int next_entry(int i,int step){for(i+=step;i>=0 && i<book->qb.entries;i+=step)if(eligible(i))return i;return -1;}
+/* An entry's quest id: its catalogue row's, else the dated entry's own (a quest the catalogue lacks). */
+static const char *entry_id(int i){
+    const aw_qb_entry_t *e=&book->qb.entry[i];
+    return e->quest>=0?book->quests[e->quest].id:"";
+}
+/* An entry's heading: its quest's name, else its id with spaces (as the book did before names were read) */
+static const char *entry_title(int i){
+    static char derived[AW_QB_TITLE];const aw_qb_entry_t *e=&book->qb.entry[i];int j;
+    if(e->quest>=0 && book->quests[e->quest].title[0])return book->quests[e->quest].title;
+    snprintf(derived,sizeof(derived),"%s",entry_id(i));
+    for(j=0;derived[j];j++)if(derived[j]=='_')derived[j]=' ';
+    return derived;
+}
+static const char *shown_title(int row){return book->quests[book->qb.group[book->shown[row]].quest].title;}
 /* Centre only already-wrapped lines: AW_UITextBox does not clip. */
 static int title_rows(const char *p){
     char line[160];int rows=0;
@@ -667,8 +715,8 @@ static int title_rows(const char *p){
 static int page_lines(int page){return BOOK_LINES-((page&1)?0:book->title_rows-1);}
 static void index_layout(void){
     int i,col=0,row=0,lines;
-    for(i=book->index_top;i<aw_state.count[AW_JOURNAL];i++){
-        lines=title_rows(book->titles[i]);
+    for(i=book->index_top;i<book->nshown;i++){
+        lines=title_rows(shown_title(i));
         if(row+lines>BOOK_LINES){col++;row=0;}
         if(col>=2)break;
         book->index_x[i]=14+col*156;book->index_y[i]=40+row*14;book->index_rows[i]=lines;
@@ -677,18 +725,17 @@ static void index_layout(void){
     book->index_end=i;
 }
 static void load_entry(int index){
-    int i;const char *p,*before;char line[160];aw_journal_entry_t *entry;
+    int i;const char *p,*before;char line[160];
     book->entry=index;book->spread=0;book->count=0;
     if(index<0){strcpy(book->text,"No dated journal entries have been recorded yet. Entries appear here as you earn them during play.");}
     else {
-        entry=&aw_state.journal[index];
-        if(!entry_text(aw_state.values[AW_JOURNAL][entry->quest].id,entry->stage,book->raw,sizeof(book->raw)))
+        if(!entry_text(entry_id(index),book->qb.entry[index].stage,book->raw,sizeof(book->raw)))
             strcpy(book->text,"This earned entry has no matching text in the installed journal catalogue. Its quest stage and date remain saved.");
         else if(!expand_entry())strcpy(book->text,"This entry exceeds the reader's text capacity. Its saved history remains intact.");
     }
     AW_UIBookBegin();book->title_rows=1;
     if(index>=0){
-        book->title_rows=title_rows(book->titles[aw_state.journal[index].quest]);
+        book->title_rows=title_rows(entry_title(index));
     }
     p=book->text;
     while(*p && book->count<BOOK_PAGES){
@@ -777,29 +824,108 @@ static void load_topic(int k){
     AW_UIBookEnd();
     if(!book->count){book->count=1;book->pages[0]=0;}
 }
-static void quest_titles(void){
-    FILE *f=NULL;byte header[8],row[160];int i,j,count,size;
-    for(i=0;i<aw_state.count[AW_JOURNAL];i++){
-        strcpy(book->titles[i],aw_state.values[AW_JOURNAL][i].id);
-        for(j=0;book->titles[i][j];j++)if(book->titles[i][j]=='_')book->titles[i][j]=' ';
-    }
-    if(!aw_state.count[AW_JOURNAL])return;
-    size=COM_FOpenFile("world/quests.awq",&f);if(!f)return;
-    if(size<8 || fread(header,1,8,f)!=8 || memcmp(header,"AWQ1",4)){fclose(f);return;}
-    count=(int)u32(header+4);
-    if(count<0 || count>10000 || size!=8+count*160){fclose(f);return;}
-    for(i=0;i<count;i++){
+/* ---- the quest pages (JOURNAL-BOOK-32-QUESTS-59, aw_questbook.h) ----
+ * Built when the book opens: the world change list is brought up to the scripts' live stages first (the same export
+ * a save runs, aw_save.h aw_save_script_export), then world/quests.awq is read once and only the rows of started
+ * quests are kept (a stage on the list, or a dated entry), with their names. A quest finished at its kept stage is
+ * read from the journal index's flags (AWJ2). Freed with the book. */
+static int dated_quest(const char *id){return AW_JHistHasQuest(&aw_jhist,AW_LedgerNameHash(id));}
+static int quest_finished(const char *id,int32_t stage,void *ctx){
+    uint32_t offset,length,flags=0;(void)ctx;
+    return journal_row(id,stage,&offset,&length,&flags) && (flags&1);
+}
+static int book_quests(void){
+    FILE *f=NULL;byte header[8],row[160];int i,j,count=0,size,kept=0,ok;aw_qb_dated_t *dated=NULL;
+    if(aw_save_script_export)aw_save_script_export(&aw_ledger);
+    size=COM_FOpenFile("world/quests.awq",&f);
+    if(f && (size<8 || fread(header,1,8,f)!=8 || memcmp(header,"AWQ1",4) ||
+             (count=(int)u32(header+4))<0 || count>AW_QB_QUESTS || size!=8+count*160))count=0;
+    book->quests=(aw_qb_quest_t *)AW_TryMalloc((unsigned long)(count+aw_jhist.count+1)*sizeof(aw_qb_quest_t));
+    dated=(aw_qb_dated_t *)AW_TryMalloc((unsigned long)(aw_jhist.count+1)*sizeof(aw_qb_dated_t));
+    if(!book->quests || !dated){if(f)fclose(f);free(dated);return 0;}
+    for(i=0;f && i<count;i++){
         if(fread(row,1,160,f)!=160 || !memchr(row,0,64) || !memchr(row+64,0,96))break;
-        for(j=0;j<aw_state.count[AW_JOURNAL];j++)if(!strcmp((char *)row,aw_state.values[AW_JOURNAL][j].id))
-            memcpy(book->titles[j],row+64,96);
+        if(!AW_QuestBookStage(&aw_ledger,(char *)row) && !dated_quest((char *)row))continue;
+        memcpy(book->quests[kept].id,row,64);memcpy(book->quests[kept].title,row+64,96);kept++;
     }
-    fclose(f);
+    if(f)fclose(f);
+    /* the dated history (aw_jhist.h) by its quests' name hashes: the catalogue's id, else (no world/quests.awq, an
+     * older image) the id the 32-slot table holds, named as before */
+    {uint32_t *hash=(uint32_t *)AW_TryMalloc((unsigned long)(kept+1)*sizeof(uint32_t));int catalogued=kept;
+    if(!hash){free(dated);return 0;}
+    for(i=0;i<catalogued;i++)hash[i]=AW_LedgerNameHash(book->quests[i].id);
+    for(j=0;j<aw_jhist.count;j++){
+        const aw_jhist_entry_t *h=&aw_jhist.entry[j];int q;
+        dated[j].id=NULL;
+        for(i=0;i<catalogued && !dated[j].id;i++)if(hash[i]==h->quest)dated[j].id=book->quests[i].id;
+        for(q=0;q<aw_state.count[AW_JOURNAL] && !dated[j].id;q++)
+            if(AW_LedgerNameHash(aw_state.values[AW_JOURNAL][q].id)==h->quest)dated[j].id=aw_state.values[AW_JOURNAL][q].id;
+        dated[j].stage=h->stage;dated[j].days=h->days;dated[j].milliseconds=h->milliseconds;
+        if(!dated[j].id || (dated[j].id>=book->quests[0].id && dated[j].id<book->quests[catalogued].id))continue;
+        for(i=catalogued;i<kept && Q_strcasecmp(book->quests[i].id,(char *)dated[j].id);i++);
+        if(i<kept){dated[j].id=book->quests[i].id;continue;}
+        snprintf(book->quests[kept].id,sizeof(book->quests[kept].id),"%s",dated[j].id);
+        strcpy(book->quests[kept].title,book->quests[kept].id);
+        for(i=0;book->quests[kept].title[i];i++)if(book->quests[kept].title[i]=='_')book->quests[kept].title[i]=' ';
+        kept++;
+    }
+    free(hash);}
+    book->nquests=kept;
+    ok=AW_QuestBookBuild(&book->qb,book->quests,kept,&aw_ledger,dated,aw_jhist.count,quest_finished,NULL);
+    free(dated);
+    return ok;
+}
+/* the names listed: the active ones, or all of them ("Show all", OpenMW's journal window) */
+static void book_shown(void){
+    book->nshown=AW_QuestBookShown(&book->qb,book->all,book->shown,book->qb.groups);
+    book->index_top=book->selection=0;
+}
+/* The dated journal (JOURNAL-ORIGINAL-VIEW-59): every entry's text read once here, the kept stages without a date
+ * first (an older save's, no heading), then the dated ones as earned, each day under its heading; laid out with the
+ * book's font. 0 out of memory. */
+static int book_dated(void){
+    int pass,i,ok=1;const char *t;
+    for(pass=0;pass<2 && ok;pass++)
+        for(i=0;i<book->qb.entries && ok;i++){
+            const aw_qb_entry_t *e=&book->qb.entry[i];
+            if((e->dated==AW_QB_UNDATED)!=(pass==0))continue;
+            if(!entry_text(entry_id(i),e->stage,book->raw,sizeof(book->raw)))
+                t="This earned entry has no matching text in the installed journal catalogue. Its quest stage and date remain saved.";
+            else if(!expand_entry())t="This entry exceeds the reader's text capacity. Its saved history remains intact.";
+            else t=book->text;
+            ok=AW_JournalViewAdd(&book->jv,e->dated==AW_QB_UNDATED?-1:e->days,t);
+        }
+    AW_UIBookBegin();
+    if(ok)ok=AW_JournalViewLayout(&book->jv,AW_UILine,BOOK_WIDTH,BOOK_DATED_LINES);
+    AW_UIBookEnd();
+    return ok;
+}
+/* back to the dated journal at its newest spread */
+static void show_dated(void){
+    book->index_mode=0;book->filter=-1;book->entry=BOOK_DATED;book->hits=0;
+    book->spread=AW_JournalViewNewest(&book->jv);
 }
 static void open_journal(void){
+    int n;
     if(!allowed())return;
     book=(book_t *)AW_TryCalloc(1,sizeof(*book));if(!book){Con_Printf("Journal reader: not enough memory.\n");return;}
-    quest_titles();book->filter=-1;load_entry(aw_state.journal_count-1);opened(2);
-    Con_Printf("Journal: %ld earned entries; reader %ld bytes.\n",(long)aw_state.journal_count,(long)sizeof(*book));
+    n=0;
+    if(book_quests()){
+        n=book->qb.groups?book->qb.groups:1;
+        book->shown=(int *)AW_TryMalloc((unsigned long)n*sizeof(int));
+        book->index_x=(int *)AW_TryMalloc((unsigned long)n*sizeof(int));
+        book->index_y=(int *)AW_TryMalloc((unsigned long)n*sizeof(int));
+        book->index_rows=(int *)AW_TryMalloc((unsigned long)n*sizeof(int));
+    }
+    if(!n || !book->shown || !book->index_x || !book->index_y || !book->index_rows || !book_dated()){
+        Con_Printf("Journal reader: not enough memory.\n");
+        book_free();return;
+    }
+    book_shown();show_dated();opened(2);
+    Con_Printf("Journal: %ld entries (%ld dated), %ld quests started, %ld names listed; %ld pages; reader %ld bytes.\n",
+        (long)book->qb.entries,(long)aw_jhist.count,(long)book->qb.started,(long)book->nshown,(long)book->jv.pages,
+        (long)(sizeof(*book)+book->jv.cap+(unsigned long)book->jv.line_cap*sizeof(aw_jv_line_t)+(unsigned long)book->nquests*sizeof(aw_qb_quest_t)+
+               (unsigned long)book->qb.entries*sizeof(aw_qb_entry_t)+(unsigned long)n*(4*sizeof(int)+sizeof(aw_qb_group_t))));
 }
 static void inventory_command(void){
     if(Cmd_Argc()==1)AW_InventoryOpen();else AW_InventoryGrantCommand();
@@ -824,7 +950,7 @@ void AW_WorldUIMouse(int dx,int dy){
         if(top>=0)inventory_scroll(top);
     }
     if(modal==2 && book->index_mode && drag){
-        top=AW_UIScrollHit(306,minmax(mouse_y,40,165),304,40,126,aw_state.count[AW_JOURNAL],(book->index_end-book->index_top),book->index_top);
+        top=AW_UIScrollHit(306,minmax(mouse_y,40,165),304,40,126,book->nshown,(book->index_end-book->index_top),book->index_top);
         if(top>=0){book->index_top=top;book->selection=top;AW_UIBookBegin();index_layout();AW_UIBookEnd();}
     }
 }
@@ -847,6 +973,8 @@ int AW_WorldUIKey(int key,int down){
         return 1;
     }
     if(key==K_F10 || key=='`'){close_panel();return 0;}
+    /* a panel that must be finished (the level-up box, LEVEL-UP-58: the original's box has no cancel) takes Esc itself */
+    if(key==K_ESCAPE && modal==4 && aw_worldui_panel_holds_escape){if(!panel_key(key,mouse_x,mouse_y))close_panel();return 1;}
     if(key==K_ESCAPE || (modal==1 && (key=='m' || key=='M')) || (modal==2 && (key=='j' || key=='J')) || (modal==3 && (key=='i' || key=='I'))){close_panel();return 1;}
     if(modal==3){inventory_key(key);return 1;}
     if(modal==4){if(!panel_key(key,mouse_x,mouse_y))close_panel();return 1;}
@@ -892,7 +1020,8 @@ int AW_WorldUIKey(int key,int down){
             }
         }
     }else if(book->index_mode==2){
-        if(key==K_TAB){book->index_mode=0;load_entry(aw_state.journal_count-1);return 1;}
+        if(key==K_TAB || key=='t' || key=='T' || (key==K_MOUSE1 && mouse_y>=174 && mouse_x<60)){show_dated();return 1;}
+        if(key=='q' || key=='Q'){book->index_mode=1;book->selection=book->index_top=0;return 1;}
         if(key==K_UPARROW || key==K_MWHEELUP)book->topic_sel--;
         if(key==K_DOWNARROW || key==K_MWHEELDOWN)book->topic_sel++;
         if(key==K_PGUP)book->topic_sel-=22;
@@ -907,9 +1036,15 @@ int AW_WorldUIKey(int key,int down){
         if(key==K_ENTER && book->topics){book->index_mode=0;load_topic(book->topic_sel);}
         return 1;
     }else if(book->index_mode){
-        n=aw_state.count[AW_JOURNAL];
+        n=book->nshown;
         AW_UIBookBegin();index_layout();AW_UIBookEnd();
-        if(key==K_TAB){book->index_mode=2;topic_list();book->topic_sel=book->topic_top=0;return 1;}
+        /* the view by subject: Back (Tab, Q) returns to the dated journal, T the topics */
+        if(key==K_TAB || key=='q' || key=='Q' || (key==K_MOUSE1 && mouse_y>=174 && mouse_x<60)){show_dated();return 1;}
+        if(key=='t' || key=='T'){book->index_mode=2;topic_list();book->topic_sel=book->topic_top=0;return 1;}
+        /* "Show all" / "Show active" (OpenMW's journal window: the finished quests listed too, or not) */
+        if(key=='a' || key=='A' || (key==K_MOUSE1 && mouse_y>=176 && mouse_x>=84 && mouse_x<160)){
+            book->all=!book->all;book_shown();AW_UIBookBegin();index_layout();AW_UIBookEnd();return 1;
+        }
         if(key==K_UPARROW || key==K_MWHEELUP)book->selection--;
         if(key==K_DOWNARROW || key==K_MWHEELDOWN)book->selection++;
         if(key==K_PGUP)book->selection-=(book->index_end-book->index_top);
@@ -925,18 +1060,36 @@ int AW_WorldUIKey(int key,int down){
                 if(mouse_x>=book->index_x[n] && mouse_x<book->index_x[n]+BOOK_WIDTH &&
                    mouse_y>=book->index_y[n] && mouse_y<book->index_y[n]+book->index_rows[n]*14)break;
             if(n==book->index_end)return 1;
-            book->selection=n;n=aw_state.count[AW_JOURNAL];key=K_ENTER;
+            book->selection=n;n=book->nshown;key=K_ENTER;
         }
         book->selection=minmax(book->selection,0,n?n-1:0);
         if(book->selection<book->index_top)book->index_top=book->selection;
         AW_UIBookBegin();index_layout();
         while(book->selection>=book->index_end && book->index_top<book->selection){book->index_top++;index_layout();}
         AW_UIBookEnd();
-        if(key==K_ENTER && n){book->filter=book->selection;book->index_mode=0;load_entry(next_entry(aw_state.journal_count,-1));}
-        if(key==K_MOUSE1 && mouse_y>=176){book->index_mode=0;book->filter=-1;load_entry(aw_state.journal_count-1);}
+        if(key==K_ENTER && n){book->filter=book->shown[book->selection];book->index_mode=0;load_entry(next_entry(book->qb.entries,-1));}
+        if(key==K_MOUSE1 && mouse_y>=174 && mouse_x>=170){book->index_mode=0;book->filter=-1;load_entry(book->qb.entries-1);}
+    }else if(book->entry==BOOK_DATED){
+        /* the original journal: Prev / Topics / Quests (the view by subject) / Close / Next */
+        if(key==K_MOUSE1 && mouse_y>=174 && mouse_y<190){
+            if(mouse_x>=14 && mouse_x<50)key=K_LEFTARROW;
+            else if(mouse_x>=60 && mouse_x<100)key='t';
+            else if(mouse_x>=104 && mouse_x<146)key='q';
+            else if(mouse_x>=196 && mouse_x<232){close_panel();return 1;}
+            else if(mouse_x>=270 && mouse_x<302)key=K_RIGHTARROW;
+        }
+        if(key=='q' || key=='Q' || key==K_TAB){book->index_mode=1;book->selection=book->index_top=0;return 1;}
+        if(key=='t' || key=='T'){book->index_mode=2;topic_list();book->topic_sel=book->topic_top=0;return 1;}
+        if((key==K_LEFTARROW || key==K_PGUP || key==K_MWHEELUP) && book->spread>=2)book->spread-=2;
+        if((key==K_RIGHTARROW || key==K_PGDN || key==K_MWHEELDOWN || key==K_SPACE) && book->spread+2<book->jv.pages)book->spread+=2;
+        if(key==K_HOME)book->spread=0;
+        if(key==K_END)book->spread=AW_JournalViewNewest(&book->jv);
     }else{
-        if(key==K_TAB){book->index_mode=1;book->selection=book->index_top=0;return 1;}
-        if(key==K_BACKSPACE){book->filter=-1;load_entry(aw_state.journal_count-1);return 1;}
+        if(key==K_TAB){
+            if(book->entry==-2){book->index_mode=2;return 1;}   /* a topic page: back to the topics */
+            book->index_mode=1;book->selection=book->index_top=0;return 1;
+        }
+        if(key==K_BACKSPACE || key=='q' || key=='Q'){show_dated();return 1;}
         if(key==K_MOUSE1 && book->entry==-2){   /* a link on a topic page opens that topic's page */
             int h,row;
             for(h=0;h<book->hits;h++)
@@ -946,8 +1099,9 @@ int AW_WorldUIKey(int key,int down){
                 }
         }
         if(key==K_MOUSE1){
-            if(mouse_y>=26 && mouse_y<26+book->title_rows*14 && mouse_x>=14 && mouse_x<146 && book->entry>=0){
-                book->filter=aw_state.journal[book->entry].quest;load_entry(next_entry(aw_state.journal_count,-1));return 1;
+            if(mouse_y>=26 && mouse_y<26+book->title_rows*14 && mouse_x>=14 && mouse_x<146 && book->entry>=0 &&
+               book->qb.entry[book->entry].group>=0){
+                book->filter=book->qb.entry[book->entry].group;load_entry(next_entry(book->qb.entries,-1));return 1;
             }
             if(mouse_y>=174 && mouse_y<188){
                 if(mouse_x>=14 && mouse_x<90)key=K_LEFTARROW;
@@ -958,7 +1112,7 @@ int AW_WorldUIKey(int key,int down){
         if(key==K_LEFTARROW || key==K_PGUP || key==K_MWHEELUP)flip(-1);
         if(key==K_RIGHTARROW || key==K_PGDN || key==K_MWHEELDOWN || key==K_SPACE)flip(1);
         if(key==K_HOME)load_entry(next_entry(-1,1));
-        if(key==K_END)load_entry(next_entry(aw_state.journal_count,-1));
+        if(key==K_END)load_entry(next_entry(book->qb.entries,-1));
     }
     return 1;
 }
@@ -1149,14 +1303,30 @@ static void map_draw(void){
     }
 }
 static void journal_draw(void){
-    static const int month_days[12]={31,28,31,30,31,30,31,31,30,31,30,31};
-    int i,j,x,y,entry=book->entry,page,ink=AW_UIColor(38,29,20),gold=AW_UIColor(103,65,27),d,m,year;
-    char line[160];const char *p;aw_journal_entry_t *e;
+    int i,j,x,y,entry=book->entry,page,ink=AW_UIColor(38,29,20),gold=AW_UIColor(103,65,27);
+    char line[160];const char *p;const aw_qb_entry_t *e;
     AW_UIFill(0,0,320,200,AW_UIColor(29,23,17));
     AW_UIFill(5,5,153,190,AW_UIColor(223,207,166));AW_UIFill(162,5,153,190,AW_UIColor(232,217,180));
     AW_UIFill(158,5,4,190,AW_UIColor(92,70,43));
     AW_UIBookBegin();
-    if(book->index_mode==2){
+    if(!book->index_mode && entry==BOOK_DATED){
+        /* the original journal: two facing pages of dated entries, the day headings in the heading colour */
+        const aw_journalview_t *v=&book->jv;int first,last,row;
+        for(j=0;j<2;j++){
+            page=book->spread+j;if(page>=v->pages)continue;
+            first=v->page[page];last=page+1<v->pages?v->page[page+1]:v->lines;
+            for(i=first,row=0;i<last && row<BOOK_DATED_LINES;i++,row++){
+                int n=v->line[i].len<(int)sizeof(line)-1?v->line[i].len:(int)sizeof(line)-1;
+                if(v->line[i].blank || !n)continue;
+                memcpy(line,v->text+v->line[i].start,(size_t)n);line[n]=0;
+                AW_UIText(14+j*156,12+row*14,line,v->line[i].heading?gold:ink);
+            }
+        }
+        if(!v->lines)AW_UITextBox(14,26,BOOK_WIDTH,14,"No entries yet.",ink);
+        if(book->spread>0)AW_UIText(14,176,"Prev",gold);
+        AW_UIText(60,176,"Topics",gold);AW_UIText(104,176,"Quests",gold);AW_UIText(196,176,"Close",gold);
+        if(book->spread+2<v->pages)AW_UIText(270,176,"Next",gold);
+    }else if(book->index_mode==2){
         AW_UITextBox(14,12,BOOK_WIDTH,14,"Topics",ink);
         for(j=0;j<22 && book->topic_top+j<book->topics;j++){
             i=book->topic_top+j;x=j<11?14:170;y=40+(j%11)*12;
@@ -1164,31 +1334,32 @@ static void journal_draw(void){
             AW_UITextBox(x,y,BOOK_WIDTH,12,book->topic_name[i],gold);
         }
         if(!book->topics)AW_UITextBox(14,42,BOOK_WIDTH,14,"No topics yet.",ink);
-        AW_UITextBox(14,176,BOOK_WIDTH,12,"Tab: return",ink);
+        AW_UIText(14,176,"Back",gold);
     }else if(book->index_mode){
         AW_UITextBox(14,12,BOOK_WIDTH,14,"Quests",ink);
-        AW_UITextBox(170,12,BOOK_WIDTH,14,"Journal",ink);
+        AW_UITextBox(170,12,BOOK_WIDTH,14,"By subject",ink);
         index_layout();
         for(j=book->index_top;j<book->index_end;j++){
             x=book->index_x[j];y=book->index_y[j];
             if(j==book->selection)AW_UIFill(x-4,y,140,book->index_rows[j]*14,AW_UIColor(203,186,145));
-            p=book->titles[j];
+            p=shown_title(j);
             for(i=0;i<book->index_rows[j];i++){
                 p=AW_UILine(p,BOOK_WIDTH,line,sizeof(line));
-                AW_UITextBox(x,y+i*14,BOOK_WIDTH,14,line,gold);
+                AW_UITextBox(x,y+i*14,BOOK_WIDTH,14,line,book->qb.group[book->shown[j]].finished?ink:gold);
             }
         }
-        AW_UIScrollbar(304,40,126,aw_state.count[AW_JOURNAL],(book->index_end-book->index_top),book->index_top);
-        if(!aw_state.count[AW_JOURNAL])AW_UITextBox(14,42,BOOK_WIDTH,14,"No quests yet.",ink);
-        AW_UITextBox(14,176,BOOK_WIDTH,12,"Tab: return",ink);
+        AW_UIScrollbar(304,40,126,book->nshown,(book->index_end-book->index_top),book->index_top);
+        if(!book->nshown)AW_UITextBox(14,42,BOOK_WIDTH,14,book->qb.groups?"No active quests.":"No quests yet.",ink);
+        AW_UIText(14,176,"Back",gold);
+        AW_UIText(84,176,book->all?"Show active":"Show all",gold);
         AW_UITextBox(170,176,BOOK_WIDTH,12,"All entries",gold);
     }else{
         if(entry>=0){
-            e=&aw_state.journal[entry];d=e->days+227;year=427+d/365;d%=365;m=0;
-            while(d>=month_days[m])d-=month_days[m++];
-            sprintf(line,"%02ld/%02ld/%ld",(long)d+1,(long)m+1,(long)year);AW_UIText(14,10,line,ink);
+            e=&book->qb.entry[entry];
+            /* a kept stage without a date shows none; the date in the original's form (AW_JournalDate) */
+            if(e->dated>=0 && AW_JournalDate(e->days,line,sizeof(line)))AW_UIText(14,10,line,ink);
             AW_UITextBox(170,10,132,14,"Journal",ink);
-            p=book->titles[e->quest];
+            p=entry_title(entry);
             for(i=0;i<book->title_rows;i++){
                 p=AW_UILine(p,BOOK_WIDTH,line,sizeof(line));
                 AW_UITextBox(14,26+i*14,BOOK_WIDTH,14,line,gold);
@@ -1213,7 +1384,11 @@ static void journal_draw(void){
         AW_UITextBox(102,174,44,14,"Quests",gold);
     }
     AW_UIBookEnd();
-    sprintf(line,"%ld/%ld  Tab quests Backspace all J close",(long)(entry+1),(long)aw_state.journal_count);
+    if(!book->index_mode && entry==BOOK_DATED)
+        sprintf(line,"Page %ld/%ld  Q quests T topics J close",(long)(book->jv.pages?book->spread+1:0),(long)book->jv.pages);
+    else if(book->index_mode==2)strcpy(line,"T/Tab journal  Q quests  J close");
+    else if(book->index_mode)strcpy(line,"Q/Tab journal  T topics  J close");
+    else sprintf(line,"%ld/%ld  Tab list Q journal J close",(long)(entry+1),(long)book->qb.entries);
     AW_UIFill(5,188,310,12,AW_UIColor(29,23,17));
     text(8,190,line,314);
 }

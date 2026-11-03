@@ -139,6 +139,60 @@ int main (void)
         const char *crlf = "AWPP1\r\nT h t 1 2\r\nA h 0 a\r\nR x 0 h 1.0 1.0\r\nS x 0 3 aaaaaaaaaaaa\r\n";
         assert (AW_PartsAssemble (crlf, (long)strlen (crlf), "x", 0, NULL, NULL, none, 0, &b) && has (&b, 3, "aaaaaaaaaaaa"));
     }
+    /* the inventory picture's pose (INVENTORY-PREVIEW-BAKED-BODY-59): the group per right-hand weapon type and its
+     * fallback, the shield hidden for a two-handed weapon (tools/player_inventory_pose.py GROUPS, TWO_HANDED) */
+    {
+        const char *g[2];
+        int left = -1;
+        assert (AW_PartsInventoryGroups (-1, g, &left) == 1 && !strcmp (g[0], "inventoryhandtohand") && !g[1] && left);
+        assert (AW_PartsInventoryGroups (42, g, &left) == 1 && !strcmp (g[0], "inventoryhandtohand"));
+        assert (AW_PartsInventoryGroups (0, g, &left) == 2 && !strcmp (g[0], "inventoryshortbladeonehand") &&
+                !strcmp (g[1], "inventoryweapononehand") && left);
+        assert (AW_PartsInventoryGroups (1, g, &left) == 1 && !strcmp (g[0], "inventoryweapononehand") && left);
+        assert (AW_PartsInventoryGroups (2, g, &left) == 1 && !strcmp (g[0], "inventoryweapontwohand") && !left);
+        assert (AW_PartsInventoryGroups (5, g, &left) == 2 && !strcmp (g[0], "inventoryweapontwowide") &&
+                !strcmp (g[1], "inventoryweapontwohand") && !left);
+        assert (AW_PartsInventoryGroups (7, g, &left) == 2 && !strcmp (g[0], "inventorybluntonehand") && left);
+        assert (AW_PartsInventoryGroups (8, g, NULL) == 2 && !strcmp (g[0], "inventoryblunttwohand"));
+    }
+    /* a resident's own recipe (NPC-PARTS-RUNTIME-59, tools/npc_parts.py): its line by id, case-insensitive, a space
+     * as '|'; its words fed to the body recipe give the same parts as the player's rule */
+    {
+        static const char npcs[] =
+            "AWNP1\n"
+            "N fargoth dark|elf 0 b_n_dark|elf_m_head_02 - common_shirt_01 iron_helmet\n"
+            "N arrille high|elf 0 - - \r\n"
+            "N too|many x 0 - - a b c d e f g h i j k l m n o p q\n"
+            "N bad x 2 - -\n";
+        aw_parts_npc_t r;
+        const char *items[AW_PARTS_ITEMS];
+        int i;
+        long m = (long)strlen (npcs);
+        assert (AW_PartsNpcFind (npcs, m, "Fargoth", &r));
+        assert (!strcmp (r.race, "dark|elf") && !r.female && !strcmp (r.head, "b_n_dark|elf_m_head_02") && !r.hair[0]);
+        assert (r.count == 2 && !strcmp (r.items[0], "common_shirt_01") && !strcmp (r.items[1], "iron_helmet"));
+        for (i=0 ; i<r.count ; i++)
+            items[i] = r.items[i];
+        assert (AW_PartsAssemble (recipe, n, r.race, r.female, r.head, r.hair, items, r.count, &b));
+        assert (has (&b, 0, "777777777777") && has (&b, 1, NULL) && has (&b, 3, "111111111111"));
+        assert (AW_PartsNpcFind (npcs, m, "arrille", &r) && !strcmp (r.race, "high|elf") && r.count == 0);
+        assert (!AW_PartsNpcFind (npcs, m, "too many", &r));        /* over AW_PARTS_ITEMS: refused */
+        assert (!AW_PartsNpcFind (npcs, m, "bad", &r));             /* sex not 0 or 1 */
+        assert (!AW_PartsNpcFind (npcs, m, "nobody", &r));
+        assert (!AW_PartsNpcFind ("AWPP1\nN fargoth x 0 - -\n", 22, "fargoth", &r));   /* not AWNP1 */
+    }
+    /* the recipes per place (BUILD-NPC-RECIPES-PER-CELL-59): tests/aga_npc_tables_test.c with the builder's tables */
+    {
+        char key[AW_PARTS_ID];
+        AW_NpcTableCellKey (-2, -9, key, sizeof(key));
+        assert (!strcmp (key, "c-2_-9"));
+        AW_NpcTableCellKey (12, 0, key, sizeof(key));
+        assert (!strcmp (key, "c12_0"));
+        AW_NpcTableCellKey (-2147483647 - 1, 5, key, 8);   /* cut to the room it has, NUL-terminated */
+        assert (strlen (key) == 7);
+        assert (AW_NpcIdHash ("Seyda Guard") == AW_NpcIdHash ("seyda|guard"));
+        assert (AW_NpcIdHash ("") == 0x811C9DC5UL);
+    }
     puts ("aga_player_parts_test ok");
     return 0;
 }

@@ -17,13 +17,48 @@ typedef struct {uint32_t offset,rows,bytes;} section_t;
 typedef struct {
     aw_actorstate_io_t io;
     section_t actb,ainv,aitm,aspt,aspl,aspc,aspe,aeff,amge,strs;
-    aw_actor_t pool[AW_ACTOR_POOL];
+    aw_actor_t *block[AW_ACTOR_POOL_MAX/AW_ACTOR_POOL];   /* the live records, blocks never move */
+    int blocks;
     aw_actor_t player;
     uint16_t *dead;            /* per ACTB row */
-    int nactors,cursor,player_row;
+    int nactors,cursor,player_row,last;
     aw_actorstate_stats_t stats;
 } state_t;
 static state_t *st;
+#define AW_ACTOR_RECORD_BYTES 200     /* one live record (196 on the Amiga) */
+#define AW_ACTOR_POOL_GROWN 8064      /* AW_ACTOR_POOL_MAX less the first block */
+#define AW_ACTOR_CHANGE_BYTES 4       /* one item or spell change */
+#define AW_ACTOR_CHANGES_ALL 16384    /* item and spell changes of all actors together at most */
+typedef char aw_actor_record_fits[(sizeof(aw_actor_t)<=AW_ACTOR_RECORD_BYTES || sizeof(void *)>4)?1:-1];
+typedef char aw_actor_grown_ok[(AW_ACTOR_POOL_GROWN==AW_ACTOR_POOL_MAX-AW_ACTOR_POOL)?1:-1];
+AW_RESIDENT_GROWS("actor records past the first block (ACTOR-STATE-POOL-LIMITS-54)",AW_ACTOR_POOL_GROWN,AW_ACTOR_RECORD_BYTES);
+AW_RESIDENT_GROWS("actor item and spell changes (ACTOR-STATE-POOL-LIMITS-54)",AW_ACTOR_CHANGES_ALL,AW_ACTOR_CHANGE_BYTES);
+static int change_entries;           /* item and spell change capacity of all records together */
+#define RECORDS() (st->blocks*AW_ACTOR_POOL)
+#define KEPT_RECORD(a) (((a)->flags&(AWL_USED|AWL_CHANGED))==(AWL_USED|AWL_CHANGED))
+#define REC(i) (&st->block[(i)/AW_ACTOR_POOL][(i)%AW_ACTOR_POOL])
+static void release(aw_actor_t *a){
+    change_entries-=a->items_capacity+a->spells_capacity;
+    if(a->items)free(a->items);
+    if(a->spells)free(a->spells);
+    a->items=NULL;a->spells=NULL;a->nitems=a->nspells=a->items_capacity=a->spells_capacity=0;
+}
+static void pool_empty(void){
+    int i;
+    for(i=0;i<RECORDS();i++)release(REC(i));
+    for(i=0;i<st->blocks;i++)memset(st->block[i],0,sizeof(aw_actor_t)*AW_ACTOR_POOL);
+    release(&st->player);memset(&st->player,0,sizeof(st->player));
+    st->cursor=st->last=0;
+}
+/* one more block (0: at AW_ACTOR_POOL_MAX or no memory) */
+static int grow(void){
+    aw_actor_t *b;
+    if(st->blocks>=AW_ACTOR_POOL_MAX/AW_ACTOR_POOL)return 0;
+    if(!(b=(aw_actor_t *)AW_TryMalloc(sizeof(aw_actor_t)*AW_ACTOR_POOL)))return 0;
+    memset(b,0,sizeof(aw_actor_t)*AW_ACTOR_POOL);
+    st->block[st->blocks++]=b;
+    return 1;
+}
 
 #define U16(p) ((unsigned)(((p)[0]<<8)|(p)[1]))
 static uint32_t u32(const unsigned char *p){return ((uint32_t)p[0]<<24)|((uint32_t)p[1]<<16)|((uint32_t)p[2]<<8)|p[3];}
@@ -62,7 +97,11 @@ static int string_of(int index,char *out,int capacity){return string_at(index,ou
 }
 
 void AW_ActorStateClose(void){
+    int i;
     if(!st)return;
+    pool_empty();
+    for(i=0;i<st->blocks;i++)free(st->block[i]);
+    AW_ActorFindForget();
     if(st->dead)free(st->dead);
     free(st);st=NULL;
 }
@@ -83,14 +122,29 @@ int AW_ActorStateOpen(const unsigned char *head,uint32_t head_bytes,const aw_act
     find_section(head,head_bytes,"AMGE",&st->amge);    /* absent before v0.0.58: no effects to make or enchant with */     /* absent in a table before v0.0.58: no spells for sale */
     find_section(head,head_bytes,"STRS",&st->strs);
     st->nactors=(int)actb.rows;
-    if(!(st->dead=(uint16_t *)AW_TryMalloc(sizeof(uint16_t)*(unsigned long)st->nactors))){AW_ActorStateClose();return 0;}
+    if(!(st->dead=(uint16_t *)AW_TryMalloc(sizeof(uint16_t)*(unsigned long)st->nactors)) || !grow()){
+        AW_ActorStateClose();return 0;}
     memset(st->dead,0,sizeof(uint16_t)*(unsigned long)st->nactors);
     st->player_row=AW_ActorFind("player");
     return 1;
 }
 const aw_actorstate_stats_t *AW_ActorStateStats(void){static aw_actorstate_stats_t none;return st?&st->stats:&none;}
 unsigned long AW_ActorStateResident(void){
-    return st?(unsigned long)sizeof(state_t)+sizeof(uint16_t)*(unsigned long)st->nactors:0;
+    unsigned long n;int i;
+    if(!st)return 0;
+    n=(unsigned long)sizeof(state_t)+sizeof(uint16_t)*(unsigned long)st->nactors+
+      (unsigned long)RECORDS()*sizeof(aw_actor_t);
+    for(i=0;i<RECORDS();i++)n+=4UL*(REC(i)->items_capacity+REC(i)->spells_capacity);
+    return n;
+}
+int AW_ActorStateLive(int *changed){
+    int i,n=0,c=0;
+    if(st)for(i=0;i<RECORDS();i++){
+        if(REC(i)->flags&AWL_USED)n++;
+        if((REC(i)->flags&(AWL_USED|AWL_CHANGED))==(AWL_USED|AWL_CHANGED))c++;
+    }
+    if(changed)*changed=c;
+    return n;
 }
 
 /* --- the table on disk --- */
@@ -118,12 +172,19 @@ int AW_ActorItem(int item,aw_item_t *o){
     memcpy(o->damage,r+8,6);o->flags=(unsigned short)U16(r+14);o->weight=f32(r+16);o->speed=f32(r+20);o->reach=f32(r+24);
     return 1;
 }
+/* ARRIVAL-LONG-FRAME-DEV6-59: the ids found lately and their rows (a binary search on disk is about 12 probes of
+ * three small reads each; the arrival's residents asked theirs again and again): FIND_MEMO answers, round robin,
+ * cleared with the table (st) */
+#define FIND_MEMO 64
+static struct {char id[40];int row;const void *table;} find_memo[FIND_MEMO];static int find_memo_next;
+void AW_ActorFindForget(void){memset(find_memo,0,sizeof(find_memo));find_memo_next=0;}
 int AW_ActorFind(const char *id){
     char want[64],have[64];int low=0,high,i;
     if(!st || !id)return AW_ACTOR_NONE;
     for(i=0;i<63 && id[i];i++)want[i]=fold(id[i]);
     want[i]=0;
     st->stats.finds++;
+    for(i=0;i<FIND_MEMO;i++)if(find_memo[i].table==(const void *)st && !strcmp(find_memo[i].id,want))return find_memo[i].row;
     high=st->nactors-1;
     while(low<=high){
         int mid=(low+high)/2,cmp;unsigned char b[2];
@@ -131,10 +192,15 @@ int AW_ActorFind(const char *id){
         /* the builder sorts by the folded id's bytes (cp1252): an unsigned compare */
         {const unsigned char *x=(const unsigned char *)have,*y=(const unsigned char *)want;
          while(*x && *x==*y){x++;y++;}cmp=*x<*y?-1:*x>*y;}
-        if(!cmp)return mid;
+        if(!cmp){low=mid;break;}
         if(cmp<0)low=mid+1;else high=mid-1;
     }
-    return AW_ACTOR_NONE;
+    i=low<=high?low:AW_ACTOR_NONE;
+    if(strlen(want)<sizeof(find_memo[0].id)){   /* found or not, the answer is kept */
+        int k=find_memo_next;find_memo_next=(find_memo_next+1)%FIND_MEMO;
+        strcpy(find_memo[k].id,want);find_memo[k].row=i;find_memo[k].table=(const void *)st;
+    }
+    return i;
 }
 int AW_ActorOfObject(int object,const uint16_t *oact,int count){
     return oact && object>=0 && object<count?(int)oact[object]:AW_ACTOR_NONE;
@@ -143,7 +209,7 @@ int AW_ActorOfObject(int object,const uint16_t *oact,int count){
 /* --- live records --- */
 static void from_base(aw_actor_t *a,uint32_t reference,int row){
     aw_actor_base_t b;int i;
-    memset(a,0,sizeof(*a));
+    release(a);memset(a,0,sizeof(*a));
     a->reference=reference;a->base=(uint16_t)row;a->flags=AWL_USED;
     if(!AW_ActorBase(row,&b))return;
     a->level=b.level;a->kind=b.kind;a->record_flags=b.flags;
@@ -156,7 +222,7 @@ aw_actor_t *AW_ActorPlayer(void){
     if(!st)return NULL;
     if(!(st->player.flags&AWL_USED)){
         if(st->player_row!=AW_ACTOR_NONE)from_base(&st->player,AW_ACTOR_PLAYER_REF,st->player_row);
-        else{memset(&st->player,0,sizeof(st->player));st->player.base=AW_ACTOR_NONE;}
+        else{release(&st->player);memset(&st->player,0,sizeof(st->player));st->player.base=AW_ACTOR_NONE;}
         st->player.reference=AW_ACTOR_PLAYER_REF;st->player.flags|=AWL_USED;
     }
     return &st->player;
@@ -165,24 +231,62 @@ aw_actor_t *AW_ActorGet(uint32_t reference,int row,int create){
     int i,free_slot=-1;
     if(!st)return NULL;
     if(reference==AW_ACTOR_PLAYER_REF)return AW_ActorPlayer();
-    for(i=0;i<AW_ACTOR_POOL;i++){
-        aw_actor_t *a=&st->pool[i];
+    if(st->last<RECORDS()){   /* the scripts ask for the same actor many times in a row */
+        aw_actor_t *a=REC(st->last);
+        if((a->flags&AWL_USED) && a->reference==reference && (row==AW_ACTOR_NONE || a->base==row))return a;
+    }
+    for(i=0;i<RECORDS();i++){
+        aw_actor_t *a=REC(i);
         if(!(a->flags&AWL_USED)){if(free_slot<0)free_slot=i;continue;}
-        if(a->reference==reference && (row==AW_ACTOR_NONE || a->base==row))return a;
+        if(a->reference==reference && (row==AW_ACTOR_NONE || a->base==row)){st->last=i;return a;}
     }
     if(!create || row<0 || row>=st->nactors)return NULL;
     if(free_slot<0){
-        /* full: drop an unchanged record (it comes back from its base when needed again) */
-        for(i=0;i<AW_ACTOR_POOL;i++){
-            int k=(st->cursor+i)%AW_ACTOR_POOL;
-            if(!(st->pool[k].flags&AWL_CHANGED)){free_slot=k;st->stats.evicted++;break;}
+        /* full: drop an unchanged record (it comes back from its base when needed again); when every record is
+         * changed, a new block (ACTOR-STATE-POOL-LIMITS-54: a changed record is never lost) */
+        for(i=0;i<RECORDS();i++){
+            int k=(st->cursor+i)%RECORDS();
+            if(!(REC(k)->flags&AWL_CHANGED)){free_slot=k;st->stats.evicted++;break;}
         }
-        if(free_slot<0){st->stats.full++;return NULL;}
-        st->cursor=(free_slot+1)%AW_ACTOR_POOL;
+        if(free_slot<0){
+            if(!grow()){st->stats.full++;return NULL;}
+            free_slot=RECORDS()-AW_ACTOR_POOL;
+        }
+        st->cursor=(free_slot+1)%RECORDS();
     }
-    from_base(&st->pool[free_slot],reference,row);
-    st->stats.created++;
-    return &st->pool[free_slot];
+    from_base(REC(free_slot),reference,row);
+    st->stats.created++;st->last=free_slot;
+    return REC(free_slot);
+}
+/* a free record for an import (a new block when needed); NULL at AW_ACTOR_POOL_MAX */
+static aw_actor_t *import_slot(uint32_t reference){
+    int i;
+    for(i=0;i<RECORDS();i++)if((REC(i)->flags&AWL_USED) && REC(i)->reference==reference){release(REC(i));return REC(i);}
+    for(i=0;i<RECORDS();i++)if(!(REC(i)->flags&AWL_USED))return REC(i);
+    return grow()?REC(RECORDS()-AW_ACTOR_POOL):NULL;
+}
+/* CELL-CHANGES-59 slice 7: the live record of REFERENCE goes (a respawned actor starts from its base again); 1 when
+ * there was one. Dead counts stay (OpenMW 0.51 keeps GetDeadCount over respawns). */
+int AW_ActorForget(uint32_t reference){
+    int i,n=0;
+    if(!st || reference==AW_ACTOR_PLAYER_REF)return 0;
+    for(i=0;i<RECORDS();i++){
+        aw_actor_t *a=REC(i);
+        if((a->flags&AWL_USED) && a->reference==reference){release(a);memset(a,0,sizeof(*a));n=1;}
+    }
+    st->last=0;
+    return n;
+}
+/* A save of another build's actor table is loaded: every changed record and every dead count goes (their rows name
+ * that table's bases, items and spells); the counts gone. */
+int AW_ActorStateDropAll(void){
+    int i,n=0;
+    if(!st)return 0;
+    for(i=0;i<RECORDS();i++)if(KEPT_RECORD(REC(i)))n++;
+    for(i=0;i<st->nactors;i++)if(st->dead[i])n++;
+    pool_empty();
+    memset(st->dead,0,sizeof(uint16_t)*(unsigned long)st->nactors);
+    return n;
 }
 static void changed(aw_actor_t *a){
     if(!(a->flags&AWL_CHANGED))st->stats.changed++;
@@ -321,11 +425,27 @@ int AW_ActorItemCount(const aw_actor_t *a,int item){
     for(i=0;i<a->nitems;i++)if(a->items[i].item==item)n+=a->items[i].change;
     return n<0?0:n;
 }
+/* room for one more change in the list (*LIST, *N used of *CAPACITY entries of 4 bytes); 0 at AW_ACTOR_ITEMS (255) or
+ * AW_ACTOR_CHANGES_ALL, or no memory */
+static int change_room(void **list,unsigned char n,unsigned char *capacity){
+    int want;void *grown;
+    if(n<*capacity)return 1;
+    if(*capacity>=AW_ACTOR_ITEMS)return 0;
+    want=*capacity?*capacity*2:2;
+    if(want>AW_ACTOR_ITEMS)want=AW_ACTOR_ITEMS;
+    if(change_entries+want-*capacity>AW_ACTOR_CHANGES_ALL)return 0;
+    if(!(grown=AW_TryRealloc(*list,(unsigned long)want*AW_ACTOR_CHANGE_BYTES)))return 0;
+    change_entries+=want-*capacity;
+    *list=grown;*capacity=(unsigned char)want;
+    return 1;
+}
 static int item_change(aw_actor_t *a,int item,int change){
     int i;
     for(i=0;i<a->nitems;i++)if(a->items[i].item==item)break;
     if(i==a->nitems){
-        if(a->nitems==AW_ACTOR_ITEMS)return 0;
+        void *list=a->items;
+        if(!change_room(&list,a->nitems,&a->items_capacity))return 0;
+        a->items=(struct aw_actor_item_s *)list;
         a->items[i].item=(uint16_t)item;a->items[i].change=0;a->nitems++;
     }
     a->items[i].change=(int16_t)clampf((float)a->items[i].change+change,-32768,32767);
@@ -386,7 +506,11 @@ static int spell_change(aw_actor_t *a,int spell,int has){
     base=base_spell(a,spell);
     for(i=0;i<a->nspells;i++)if(a->spells[i].spell==spell)break;
     if(base==has){if(i<a->nspells){a->spells[i]=a->spells[--a->nspells];changed(a);}return 1;}
-    if(i==a->nspells){if(a->nspells==AW_ACTOR_SPELLS)return 0;a->spells[i].spell=(uint16_t)spell;a->nspells++;}
+    if(i==a->nspells){
+        void *list=a->spells;
+        if(!change_room(&list,a->nspells,&a->spells_capacity))return 0;
+        a->spells=(struct aw_actor_spell_s *)list;
+        a->spells[i].spell=(uint16_t)spell;a->nspells++;}
     a->spells[i].change=(int16_t)(has?1:-1);
     changed(a);
     return 1;
@@ -462,59 +586,114 @@ int AW_ActorSpells(const aw_actor_t *a,int *out,int max){
 static unsigned char *put16(unsigned char *p,unsigned v){p[0]=(unsigned char)(v>>8);p[1]=(unsigned char)v;return p+2;}
 static unsigned char *put32(unsigned char *p,uint32_t v){p[0]=(unsigned char)(v>>24);p[1]=(unsigned char)(v>>16);p[2]=(unsigned char)(v>>8);p[3]=(unsigned char)v;return p+4;}
 static unsigned char *putf(unsigned char *p,float f){uint32_t u;memcpy(&u,&f,4);return put32(p,u);}
-int AW_ActorStateExport(unsigned char *out,int capacity){
-    int i,j,records=0,counts=0,need=10;unsigned char *p;
+#define KEPT(a) (((a)->flags&(AWL_USED|AWL_CHANGED))==(AWL_USED|AWL_CHANGED))
+static unsigned char *put_record(unsigned char *p,const aw_actor_t *a){
+    int j;
+    p=put32(p,a->reference);p=put16(p,a->base);p=put16(p,a->flags&(AWL_CHANGED|AWL_DEAD|AWL_DIED|AWL_COMBAT));
+    p=put16(p,(unsigned)(uint16_t)a->level);
+    for(j=0;j<8;j++){p=put16(p,(unsigned)(uint16_t)a->attr_base[j]);p=put16(p,(unsigned)(uint16_t)a->attr_mod[j]);}
+    for(j=0;j<27;j++){p=put16(p,(unsigned)(uint16_t)a->skill_base[j]);p=put16(p,(unsigned)(uint16_t)a->skill_mod[j]);}
+    for(j=0;j<3;j++){p=putf(p,a->dyn_base[j]);p=putf(p,a->dyn_cur[j]);}
+    for(j=0;j<4;j++)*p++=a->ai[j];
+    p=put16(p,(unsigned)(uint16_t)a->disposition);*p++=a->nitems;*p++=a->nspells;
+    for(j=0;j<a->nitems;j++){p=put16(p,a->items[j].item);p=put16(p,(unsigned)(uint16_t)a->items[j].change);}
+    for(j=0;j<a->nspells;j++){p=put16(p,a->spells[j].spell);p=put16(p,(unsigned)(uint16_t)a->spells[j].change);}
+    return p;
+}
+/* the changed records' count and bytes */
+static int records_need(int *records){
+    int i,n=0,need=0;
+    for(i=0;i<RECORDS();i++)if(KEPT(REC(i))){n++;need+=RECORD_FIXED+4*(REC(i)->nitems+REC(i)->nspells);}
+    *records=n;
+    return need;
+}
+static int export_block(unsigned char *out,int capacity,int with_records){
+    int i,records=0,counts=0,need=10;unsigned char *p;
     if(!st)return 0;
-    for(i=0;i<AW_ACTOR_POOL;i++)if((st->pool[i].flags&(AWL_USED|AWL_CHANGED))==(AWL_USED|AWL_CHANGED)){
-        records++;need+=RECORD_FIXED+4*(st->pool[i].nitems+st->pool[i].nspells);}
+    if(with_records)need+=records_need(&records);
+    if(records>0xFFFF)return -1;                   /* AWAS1 counts in 16 bits: the records go as AWAR */
     for(i=0;i<st->nactors;i++)if(st->dead[i]){counts++;need+=4;}
     if(!records && !counts)return 0;
     if(need>capacity)return -1;
     p=out;memcpy(p,"AWAS",4);p+=4;*p++=1;*p++=0;p=put16(p,(unsigned)records);p=put16(p,(unsigned)counts);
-    for(i=0;i<AW_ACTOR_POOL;i++){
-        const aw_actor_t *a=&st->pool[i];
-        if((a->flags&(AWL_USED|AWL_CHANGED))!=(AWL_USED|AWL_CHANGED))continue;
-        p=put32(p,a->reference);p=put16(p,a->base);p=put16(p,a->flags&(AWL_CHANGED|AWL_DEAD|AWL_DIED|AWL_COMBAT));
-        p=put16(p,(unsigned)(uint16_t)a->level);
-        for(j=0;j<8;j++){p=put16(p,(unsigned)(uint16_t)a->attr_base[j]);p=put16(p,(unsigned)(uint16_t)a->attr_mod[j]);}
-        for(j=0;j<27;j++){p=put16(p,(unsigned)(uint16_t)a->skill_base[j]);p=put16(p,(unsigned)(uint16_t)a->skill_mod[j]);}
-        for(j=0;j<3;j++){p=putf(p,a->dyn_base[j]);p=putf(p,a->dyn_cur[j]);}
-        for(j=0;j<4;j++)*p++=a->ai[j];
-        p=put16(p,(unsigned)(uint16_t)a->disposition);*p++=a->nitems;*p++=a->nspells;
-        for(j=0;j<a->nitems;j++){p=put16(p,a->items[j].item);p=put16(p,(unsigned)(uint16_t)a->items[j].change);}
-        for(j=0;j<a->nspells;j++){p=put16(p,a->spells[j].spell);p=put16(p,(unsigned)(uint16_t)a->spells[j].change);}
-    }
+    if(with_records)for(i=0;i<RECORDS();i++)if(KEPT(REC(i)))p=put_record(p,REC(i));
     for(i=0;i<st->nactors;i++)if(st->dead[i]){p=put16(p,(unsigned)i);p=put16(p,st->dead[i]);}
     return (int)(p-out);
 }
-int AW_ActorStateImport(const unsigned char *data,int bytes){
-    const unsigned char *p=data,*end=data+bytes;int i,j,records,counts;
+int AW_ActorStateExport(unsigned char *out,int capacity){return export_block(out,capacity,1);}
+int AW_ActorStateExportCounts(unsigned char *out,int capacity){return export_block(out,capacity,0);}
+int AW_ActorStateExportRecords(unsigned char *out,int capacity){
+    int i,records,need;unsigned char *p;
     if(!st)return 0;
-    memset(st->pool,0,sizeof(st->pool));memset(&st->player,0,sizeof(st->player));
+    need=12+records_need(&records);
+    if(!records)return 0;
+    if(!out)return need;
+    if(need>capacity)return -1;
+    p=out;memcpy(p,"AWAR",4);p+=4;*p++=1;*p++=0;p=put16(p,0);p=put32(p,(uint32_t)records);
+    for(i=0;i<RECORDS();i++)if(KEPT(REC(i)))p=put_record(p,REC(i));
+    return (int)(p-out);
+}
+/* one record from P (END the block's end) into A (released, zero); the bytes read, 0 bad */
+static int get_record(const unsigned char *p,const unsigned char *end,aw_actor_t *a){
+    const unsigned char *start=p;int j;unsigned char ni,ns;
+    if(end-p<RECORD_FIXED)return 0;
+    a->reference=u32(p);a->base=(uint16_t)U16(p+4);a->flags=(uint16_t)(U16(p+6)|AWL_USED|AWL_CHANGED);p+=8;
+    if(a->base>=st->nactors || a->reference==AW_ACTOR_PLAYER_REF)return 0;
+    a->level=(short)U16(p);p+=2;
+    for(j=0;j<8;j++){a->attr_base[j]=(short)U16(p);a->attr_mod[j]=(short)U16(p+2);p+=4;}
+    for(j=0;j<27;j++){a->skill_base[j]=(short)U16(p);a->skill_mod[j]=(short)U16(p+2);p+=4;}
+    for(j=0;j<3;j++){a->dyn_base[j]=f32(p);a->dyn_cur[j]=f32(p+4);p+=8;
+        if(!(a->dyn_base[j]>-1e7f && a->dyn_base[j]<1e7f) || !(a->dyn_cur[j]>-1e7f && a->dyn_cur[j]<1e7f))return 0;}
+    for(j=0;j<4;j++)a->ai[j]=*p++;
+    a->disposition=(short)U16(p);ni=p[2];ns=p[3];p+=4;
+    if(end-p<4*(ni+ns))return 0;
+    for(j=0;j<ni;j++){
+        int item=(int)U16(p),change=(int16_t)U16(p+2);p+=4;
+        if(item>=(int)st->aitm.rows || !change || !item_change(a,item,change))return 0;
+    }
+    for(j=0;j<ns;j++){
+        int spell=(int)U16(p),change=(int16_t)U16(p+2);void *list=a->spells;
+        p+=4;
+        if(spell>=(int)st->aspt.rows || (change!=1 && change!=-1) ||
+           !change_room(&list,a->nspells,&a->spells_capacity))return 0;
+        a->spells=(struct aw_actor_spell_s *)list;
+        a->spells[a->nspells].spell=(uint16_t)spell;a->spells[a->nspells].change=(int16_t)change;a->nspells++;
+    }
+    a->flags=(uint16_t)(a->flags|AWL_USED|AWL_CHANGED);   /* item_change marked it changed too */
+    {aw_actor_base_t b;if(AW_ActorBase(a->base,&b)){a->kind=b.kind;a->record_flags=b.flags;}}
+    return (int)(p-start);
+}
+static int import_records(const unsigned char *p,const unsigned char *end,int records){
+    int i,n;
+    if(records>AW_ACTOR_POOL_MAX)return 0;
+    for(i=0;i<records;i++){
+        aw_actor_t *a=import_slot(end-p>=4?u32(p):0);
+        if(!a)return 0;
+        memset(a,0,sizeof(*a));
+        if(!(n=get_record(p,end,a))){release(a);memset(a,0,sizeof(*a));return 0;}
+        p+=n;
+    }
+    return 1;
+}
+static const unsigned char *skip_records(const unsigned char *p,const unsigned char *end,int records){
+    int i;
+    for(i=0;i<records;i++){
+        if(end-p<RECORD_FIXED)return NULL;
+        {int extra=4*(p[RECORD_FIXED-2]+p[RECORD_FIXED-1]);if(end-p<RECORD_FIXED+extra)return NULL;p+=RECORD_FIXED+extra;}
+    }
+    return p;
+}
+int AW_ActorStateImport(const unsigned char *data,int bytes){
+    const unsigned char *p=data,*end=data+bytes,*q;int i,records,counts;
+    if(!st)return 0;
+    pool_empty();
     memset(st->dead,0,sizeof(uint16_t)*(unsigned long)st->nactors);
     if(!data || !bytes)return 1;                  /* a save without actor changes */
     if(bytes<10 || memcmp(p,"AWAS",4) || p[4]!=1)return 0;
     records=(int)U16(p+6);counts=(int)U16(p+8);p+=10;
-    if(records>AW_ACTOR_POOL)return 0;
-    for(i=0;i<records;i++){
-        aw_actor_t *a=&st->pool[i];
-        if(end-p<RECORD_FIXED)goto bad;
-        a->reference=u32(p);a->base=(uint16_t)U16(p+4);a->flags=(uint16_t)(U16(p+6)|AWL_USED|AWL_CHANGED);p+=8;
-        if(a->base>=st->nactors || a->reference==AW_ACTOR_PLAYER_REF)goto bad;
-        a->level=(short)U16(p);p+=2;
-        for(j=0;j<8;j++){a->attr_base[j]=(short)U16(p);a->attr_mod[j]=(short)U16(p+2);p+=4;}
-        for(j=0;j<27;j++){a->skill_base[j]=(short)U16(p);a->skill_mod[j]=(short)U16(p+2);p+=4;}
-        for(j=0;j<3;j++){a->dyn_base[j]=f32(p);a->dyn_cur[j]=f32(p+4);p+=8;
-            if(!(a->dyn_base[j]>-1e7f && a->dyn_base[j]<1e7f) || !(a->dyn_cur[j]>-1e7f && a->dyn_cur[j]<1e7f))goto bad;}
-        for(j=0;j<4;j++)a->ai[j]=*p++;
-        a->disposition=(short)U16(p);a->nitems=p[2];a->nspells=p[3];p+=4;
-        if(a->nitems>AW_ACTOR_ITEMS || a->nspells>AW_ACTOR_SPELLS || end-p<4*(a->nitems+a->nspells))goto bad;
-        for(j=0;j<a->nitems;j++){a->items[j].item=(uint16_t)U16(p);a->items[j].change=(int16_t)U16(p+2);p+=4;
-            if(a->items[j].item>=st->aitm.rows)goto bad;}
-        for(j=0;j<a->nspells;j++){a->spells[j].spell=(uint16_t)U16(p);a->spells[j].change=(int16_t)U16(p+2);p+=4;
-            if(a->spells[j].spell>=st->aspt.rows || (a->spells[j].change!=1 && a->spells[j].change!=-1))goto bad;}
-        {aw_actor_base_t b;if(AW_ActorBase(a->base,&b)){a->kind=b.kind;a->record_flags=b.flags;}}
-    }
+    /* an older save's records (at most 128 then) are taken into the pool as they are: migrated */
+    if(!(q=skip_records(p,end,records)) || !import_records(p,q,records))goto bad;
+    p=q;
     for(i=0;i<counts;i++){
         int row;
         if(end-p<4)goto bad;
@@ -524,8 +703,26 @@ int AW_ActorStateImport(const unsigned char *data,int bytes){
     if(p!=end)goto bad;
     return 1;
 bad:
-    memset(st->pool,0,sizeof(st->pool));memset(st->dead,0,sizeof(uint16_t)*(unsigned long)st->nactors);
+    pool_empty();memset(st->dead,0,sizeof(uint16_t)*(unsigned long)st->nactors);
     return 0;
+}
+int AW_ActorStateImportRecords(const unsigned char *data,int bytes){
+    const unsigned char *p=data,*end=data+bytes,*q;int i,records;
+    if(!st)return 0;
+    if(!data || !bytes)return 1;
+    if(bytes<12 || memcmp(p,"AWAR",4) || p[4]!=1 || p[5] || U16(p+6))return 0;
+    records=(int)u32(p+8);p+=12;
+    if(records<1 || records>AW_ACTOR_POOL_MAX || !(q=skip_records(p,end,records)) || q!=end)return 0;
+    {   /* every record checked first, so a bad block adds nothing */
+        aw_actor_t check;const unsigned char *r=p;int n;
+        for(i=0;i<records;i++){
+            memset(&check,0,sizeof(check));
+            n=get_record(r,q,&check);release(&check);
+            if(!n)return 0;
+            r+=n;
+        }
+    }
+    return import_records(p,q,records);
 }
 /* The items A holds now (its base list and the changes, gold not counted: it is the record's gold), with counts and
  * whether equipped; up to MAX; the count of distinct items. For a merchant's stock (the dialogue's Barter). */

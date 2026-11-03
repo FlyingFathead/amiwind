@@ -206,8 +206,38 @@ class FocusTableTests(unittest.TestCase):
         self.assertEqual(tail[36:68].rstrip(b'\0'), b'test_cup')
         self.assertEqual(struct.unpack_from('<i', tail, 68)[0], 2)
         inventory = (SRC / 'aw_inventory.c').read_text(encoding='utf-8')
-        self.assertIn('"AWC1"', body(inventory, 'static int container_base('))
+        # CONTAINER-STRIP-TAKE-STALL-59: the file reader is container_base_read (container_base serves a held container)
+        self.assertIn('"AWC1"', body(inventory, 'static int container_base_read('))
         self.assertIn("row[0]!='C'", inventory)
+
+    def test_container_opens_or_is_harvested_and_carries_its_lock(self):
+        """CONTAINER-WINDOW-59: a container's row action 1 opens it (+4 owned); an organic one (CONT FLAG bit 0,
+        flora) has none and flag 4 on its contents; the row's byte 3 is the placement's lock level (FLTV, 0..100)."""
+        import prepare_focus as focus
+        master = self.MASTER + b''.join([
+            rec('CONT', sub('NAME', z('basket_a')), sub('FNAM', z('Basket')), sub('FLAG', struct.pack('<I', 8))),
+            rec('CONT', sub('NAME', z('flora_a')), sub('FNAM', z('Wickwheat')), sub('FLAG', struct.pack('<I', 1 | 2))),
+            rec('CELL', sub('NAME', z('Store')), sub('DATA', struct.pack('<Iii', 1, 0, 0)),
+                ref(50, 'basket_a', (1, 1, 1)), ref(51, 'basket_a', (1, 1, 1), sub('ANAM', z('clerk')),
+                                                     sub('FLTV', struct.pack('<i', 50))),
+                ref(52, 'flora_a', (1, 1, 1)), ref(53, 'basket_a', (1, 1, 1), sub('FLTV', struct.pack('<i', 400))))])
+        objects = focus.objects_of(master)
+        self.assertEqual(objects['basket_a'][4], focus.ACT_TAKE)
+        self.assertEqual((objects['flora_a'][4], objects['flora_a'][6] & focus.CFLAG_ORGANIC), (focus.ACT_NONE, 4))
+        rows = {r[2]: r for r in focus.placements(master, objects, {'store': 9})[9]}
+        self.assertEqual([(rows[k][10], rows[k][13]) for k in (50, 51, 52, 53)],
+                         [(1, 0), (1 | focus.ACT_OWNED, 50), (0, 0), (1, 100)])
+        tail = focus.contents_list({52: rows[52][12]})
+        self.assertEqual(struct.unpack_from('<IIHBB', tail, 8)[3], 4)
+        inventory = (SRC / 'aw_inventory.c').read_text(encoding='utf-8')
+        self.assertIn("r->lock=(unsigned char)(row[0]=='C' && row[3]<=100?row[3]:0);", inventory)
+        self.assertIn("return container_open(&focus_rows[best]);", body(inventory, 'static int placed_use(void)'))
+        self.assertIn('AW_CStripInit();', (SRC / 'aw_placed.c').read_text(encoding='utf-8'))
+        strip = (SRC / 'aw_cstrip.c').read_text(encoding='utf-8')
+        self.assertIn('AW_TryMalloc(sizeof(strip_t))', strip)        # allocated on open only
+        self.assertIn('free(strip)', strip)                          # and freed on close
+        self.assertIn('AW_ContainerTake(strip->reference', strip)     # the deltas, never a copy
+        self.assertIn('AW_ContainerPut(strip->reference', strip)
 
     def test_row_layout(self):
         import prepare_focus as focus

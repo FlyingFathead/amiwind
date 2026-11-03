@@ -4,7 +4,7 @@
 
 # AmiWind
 
-_Last updated with AmiWind v0.0.59-dev5 (2 November 2026)._
+_Last updated with AmiWind v0.0.59 (3 November 2026)._
 
 An unofficial, experimental RPG engine and enthusiast project bringing Morrowind
 to the Commodore Amiga, featuring CHIM: an AmiQuake-based engine and an asset
@@ -25,18 +25,16 @@ Like community projects such as
 
 More in the [gallery](docs/GALLERY.md).
 
-## Where AmiWind stands (1 November 2026)
+## Where AmiWind stands (3 November 2026)
 
-The newest release is **v0.0.58: Time To Talk**: most of the original's dialogue window works (links in the text,
-persuasion, the services such as barter, training, travel, repair, spellmaking and enchanting, choices, journal topic
-pages), character creation at the Census and Excise Office follows the original's pages (class list, questions or a
-class of your own, birthsign, review sheet), aiming at an item or door shows a box, placed items can be taken
-("E: Take", a red "E: Steal" when owned), books and letters are read in place, Left Ctrl sneaks, and creatures and
-fights have their own sounds, running on CHIM Engine v0.2.2
-([release notes](docs/releases/notes/RELEASE-v0.0.58.md)). The one before it, **v0.0.57: Remembering The Emperor**,
-dedicated to the memory of Sir Patrick Stewart, the voice of Emperor Uriel Septim VII, brought the first
-conversations, walking and running with the feet on the ground, torches for the guards and 957 of the game's 1,207
-scripts running whole ([release notes](docs/releases/notes/RELEASE-v0.0.57.md)). The project's own builds have had every exterior cell of Vvardenfell on CHIM since v0.0.43 (a build from the
+The newest release is **v0.0.59: Assembling The Bits And Pieces, Once Again**: every item has its own world model and
+the items of the game stand in their places to be taken, the world keeps what you change (taken and dropped items,
+doors, locks, container contents) across rooms and saved games, with respawn by the original's rules, the player's
+body and hands are assembled from parts, E on a container opens a strip with its items, J opens the journal as in the
+original, and resting and waiting follow the original's rules, running on CHIM Engine v0.2.2 and needing 32 MB of
+Fast RAM ([release notes](docs/releases/notes/RELEASE-v0.0.59.md)). The one before it, **v0.0.58: Time To Talk**,
+brought most of the original's dialogue window, character creation at the Census and Excise Office, the aim box,
+books read in place and sneaking ([release notes](docs/releases/notes/RELEASE-v0.0.58.md)). The project's own builds have had every exterior cell of Vvardenfell on CHIM since v0.0.43 (a build from the
 repository does so only from v0.0.47, when the cell list became part of the repository and the default): 1,409
 cells, counting the 61 in the town frames (1,348 are one-cell region frames; 1,292 land cells, 98 sea-floor cells
 and 19 open-sea cells), with no classic region maps left outdoors. What these numbers count:
@@ -45,21 +43,24 @@ and 19 open-sea cells), with no classic region maps left outdoors. What these nu
 prison and the census office) is built as a CHIM room, with the people the game places in them. Solstheim is not
 converted.
 
-The development line is at **v0.0.59-dev5** (2 November 2026): the player's third-person body and first-person
-arms are assembled from parts, `dbg give weapons` gives a kit of every weapon type, the HUD weapon box shows every
-weapon, 34 named sound events can be triggered from the console, the world change list also keeps open doors, locks,
-the stolen mark, container contents and NPC faction ranks across maps and saved games, and one shared conversion
-between map and game coordinates serves the engine on every map; with the placed items, the original mouse cursor,
-the 512 model table and the dialogue fixes of the earlier snapshots, for testing in game
-([dev5 notes](docs/releases/notes/RELEASE-v0.0.59-dev5.md), [dev4 notes](docs/releases/notes/RELEASE-v0.0.59-dev4.md)).
+What comes next is in the [roadmap](docs/ROADMAP.md): v0.0.60 takes what v0.0.59 did not finish and the combat work:
+the walking residents' data kept in memory per area (the arrival frame under half a second), what the player wears
+and wields in every stance, weapons of every type in both views, player casting and the spell-effect system, the
+crime system, the cliff racer's strikes, levelling with the level-up box, the rest of the world change list,
+containers with levelled contents and looting the dead. Items that are in no version's list yet stay in the backlog
+until they are scheduled.
 
-What comes next is in the [roadmap](docs/ROADMAP.md): the rest of v0.0.59 is what the player wears and wields on the
-body (the third-person body assembled from parts is in the development line since dev4), the world change list
-extended to doors, containers, the journal and script state, the debug command that gives a kit of weapons, levelling
-with the original's level-up box, the voice and sound coverage and the checks of the conversation. Weapons of every
-type in both views, the first-person hands per weapon, the cliff racer's strikes, player casting, the spell-effect
-system and the crime system moved to v0.0.60. Items that are in no version's list yet stay in the backlog until they
-are scheduled.
+### What v0.0.59 changed
+
+World items: 880 item models in one shared table, a model table of 512 entries per map, the game's own items placed
+from it and taken, and [an index of the items you can pick up](docs/ITEMS_INDEX.md). The world change list keeps what
+you change across rooms and saves, with respawn and saves that survive a change of game data. The player's body and
+arms are built from parts and kept in memory, so arriving in Seyda Neen takes about a second instead of 12 to 15.
+Containers open in a strip with Take All, the journal is the original's dated view, resting and waiting follow the
+original, conversations open at once again, and the mouse cursor is the original's. Builds rebuild less, and the
+disk images are padded to whole IDE cylinders. Known limits: containers with levelled contents open empty, bodies
+cannot be looted yet, the residents' walking steps can cost up to 800 ms on some frames, and casting waits for
+v0.0.60. Full list: [v0.0.59 release notes](docs/releases/notes/RELEASE-v0.0.59.md).
 
 ### What v0.0.58 changed
 

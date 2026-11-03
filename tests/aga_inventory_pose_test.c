@@ -16,6 +16,12 @@ void Q_strncpy(char *d,char *s,int n){strncpy(d,s,(size_t)n);}
 int AW_PartsAssemble(const char *t,long n,const char *r,int f,const char *h,const char *k,const char *const *i,int c,
                      aw_parts_body_t *o){(void)t;(void)n;(void)r;(void)f;(void)h;(void)k;(void)i;(void)c;(void)o;assert(0);return 0;}
 const aw_skel_table_t *AW_SkelTableFor(const char *name){(void)name;assert(0);return NULL;}
+/* the assembled body's inventory picture (INVENTORY-PREVIEW-BAKED-BODY-59): not reached with the parts off */
+int AW_PartsInventoryGroups(int t,const char *o[2],int *l){(void)t;(void)o;(void)l;assert(0);return 0;}
+int AW_SkelGroup(const aw_skel_table_t *t,const char *n){(void)t;(void)n;assert(0);return -1;}
+int AW_SkelKeyFrame(const aw_skel_table_t *t,int g,const char *n){(void)t;(void)g;(void)n;assert(0);return -1;}
+void AW_SkelGroupAt(const aw_skel_table_t *t,int i,aw_skel_group_t *o){(void)t;(void)i;(void)o;assert(0);}
+void AW_SkelBoneTag(const float b[3][4],const float s[3],float t[6]){(void)b;(void)s;(void)t;assert(0);}
 void *Mod_Extradata(model_t *m){(void)m;assert(0);return NULL;}
 int Hunk_LowMark(void){return 0;}
 void Hunk_FreeToLowMark(int n){(void)n;}
@@ -29,6 +35,10 @@ int Q_strcasecmp(char *a,char *b){return strcasecmp(a,b);}
 void Con_Printf(char *format,...){(void)format;}
 void *Cache_Check(cache_user_t *c){return c->data;}
 void Cache_Free(cache_user_t *c){assert(c->data);c->data=NULL;frees++;}
+/* ARRIVAL-LONG-FRAME-DEV6-59: the cached player body pins its parts (zone.c) and counts file lookups (aw_spike.c) */
+static int pins;
+void Cache_Pin(cache_user_t *c,int on){(void)c;pins+=on?1:-1;}
+unsigned long aw_cache_pinned_bytes,aw_file_finds;
 model_t *Mod_ForName(char *path,qboolean crash){
     model_t *m;(void)crash;
     if(strstr(path,"_i.mdl")){

@@ -462,6 +462,7 @@ void AW_ConsoleBackground(int lines);
 int AW_DebugTranslate(int argc,char **argv,char *out,int capacity);
 
 int AW_Interior(void);
+int AW_HudPlayerCell(long *x,long *y,char *id,int size,const char **region);   /* aw_hud.c: 1 exterior, 2 interior */
 int AW_SceneUse(void);
 /* Activation (v0.0.51): a script's Activate on a load door of this map; the scripts' take-over of a door's use. */
 int AW_SceneActivate(unsigned reference);
@@ -533,6 +534,12 @@ void AW_HandSpritesDraw(void);
 void AW_GuardTorchInit(void);
 void AW_GuardTorchLoadAssets(const byte *torch);
 void AW_GuardTorchUpdate(void);
+void AW_NpcPartsSet(int on);     /* aw_npc_parts.c: residents drawn from parts (NPC-PARTS-RUNTIME-59); dbg camera npcs */
+void AW_NpcPartsStatus(void);
+void AW_NpcPartsReset(void);
+void AW_NpcPartsUpdate(void);
+void AW_NpcPartsCell(int cx,int cy,int in);   /* aw_actors.c: a cell's recipe table in (1) or out (0) with its actors */
+void AW_NpcPartsRoom(const char *map);        /* aw_actors.c: a room's recipe table on entering it */
 void AW_GuardTorchDraw(void);
 void AW_StaticFlamesDraw(void);
 /* One placed static flame (aw_flame entity); shape: size, rise, spread (0 = legacy). */
@@ -750,6 +757,7 @@ void AW_LavaEmbersDraw(void);
 int AW_LavaPoolCount(void);
 void AW_MusicCombat(int on);
 void AW_MusicDeath(void);
+int AW_MusicTriumph(void);   /* the level-up music once (aw_levelup.c) */
 extern int (*aw_combat_enemy_bar)(float *fraction,float *alpha);
 extern int (*aw_combat_guard_marker)(void);
 extern void (*aw_combat_scene)(void);
@@ -789,6 +797,13 @@ int AW_ReaderActive(void);
 int AW_ReaderKey(int key);
 void AW_ReaderDraw(void);
 void AW_ReaderMouse(int dx,int dy);
+/* CONTAINER-WINDOW-59: the container strip (aw_cstrip.c, aw_cstrip.h) reaches the input, the drawing and the scene's
+ * prompt through these hooks (NULL until AW_CStripInit, as in the native tests that link those files alone). */
+void AW_CStripInit(void);
+extern int (*aw_cstrip_mouse)(int dx,int dy);      /* in_amiga.c */
+extern int (*aw_cstrip_key)(int key);              /* aw_intro.c */
+extern void (*aw_cstrip_draw)(void);               /* aw_intro.c */
+extern int (*aw_cstrip_open_now)(void);            /* aw_scene.c */
 int AW_ReaderResult(void);
 void AW_BirthArt(int index,int x,int y);
 int AW_IntroSpeak(int role,const char *stem);
@@ -830,6 +845,7 @@ int AW_ViewInventoryEquipment(model_t *models[2],float origins[2][3],float angle
 extern int (*aw_hand_block_item)(char id[64],char model[64]);
 extern int (*aw_hand_weapon_item)(int *weapon,char model[64]);
 int AW_ViewInventoryBody(model_t **model,int *frame);
+int AW_ViewInventoryParts(model_t **models,int max,float scale[3]);   /* the assembled body's further parts, -1 none */
 int AW_ViewInventoryHeld(model_t **model,int *frame);   /* the carried torch with the torch pose */
 int AW_InventoryPreviewDraw(model_t *model,int frame,int x,int y,int width,int height,float angle);
 void AW_InventoryPreviewClear(void);
@@ -838,6 +854,8 @@ void AW_ViewInventoryClear(void);
 int AW_InventoryActive(void);
 void AW_WorldUIInit(void);
 int AW_WorldUIActive(void);
+const char *AW_WorldUIName(void);     /* the open window for the remote state file (LOAD-STALL-SESSIONS-59) */
+const char *AW_WaitWindowName(void);  /* aw_wait.c: "wait", "help", "rest" or "" */
 void AW_WorldUICancelDrag(void);
 int AW_WorldUIKey(int key,int down);
 void AW_WorldUIMouse(int dx,int dy);
@@ -857,3 +875,13 @@ static inline int AW_PlayerDead(void)
     return sv.active && svs.maxclients==1 && svs.clients && svs.clients[0].edict &&
         svs.clients[0].edict->v.health<=0;
 }
+
+/* FRAME-WAIT-COUNTERS-59: every fopen, fread and fseek of the engine counts into the frame's disk wait
+ * (aw_spike.h AW_DISK_BEGIN: nested calls count once). AmigaDOS calls made directly (Lock, Open, Read) are timed
+ * where they matter (COM_FindFile). The wrappers (AW_DiskFopen, AW_DiskFread, AW_DiskFseek) and the fopen, fread
+ * and fseek macros live in aw_spike.h (its AW_DISKWAIT_WRAPPED part), the frame timing header, so a timing edit
+ * stays out of the CHIM world's stage keys (BUILD-ENGINE-SOURCE-KEY-BROAD-36). */
+#if defined(AMIGA) && !defined(AW_DISKWAIT_NO_WRAP) && !defined(AW_DISKWAIT_WRAPPED)
+#define AW_DISKWAIT_WRAPPED
+#include "aw_spike.h"
+#endif

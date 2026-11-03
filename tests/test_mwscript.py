@@ -250,6 +250,23 @@ End''',
 short r
 set r to GetPCRank "Mages Guild"
 End''',
+    # CELL-CHANGES-59 slice 5: a global script that starts another one and stops itself (never placed: the harness
+    # starts it as a start script); the other one counts its own runs
+    'Starter': '''Begin Starter
+short phase
+set phase to phase + 1
+if ( phase == 1 )
+    StartScript GlobalCounter
+endif
+if ( phase >= 3 )
+    StopScript Starter
+endif
+End''',
+    'GlobalCounter': '''Begin GlobalCounter
+short ticks
+set ticks to ticks + 1
+set Counter to Counter
+End''',
 }
 
 
@@ -569,6 +586,7 @@ HARNESS = r'''
 #include <string.h>
 #include "aw_mwvm.h"
 #include "aw_mwcode.h"
+#include "aw_ledger.h"
 static int tick;static int journal[64];
 static void h_sound(int i,int t,int s,int how,float v,float p){printf("%d sound %d %d %d %d %.2f\n",tick,i,t,s,how,v);}
 static int h_playing(int i,int t,int s){return 0;}
@@ -631,6 +649,73 @@ static const aw_mwvm_host_t host={h_sound,h_playing,h_say,h_saydone,h_music,h_di
     h_actor,h_item,h_spell,h_combat,h_dead,h_wander,h_call,h_cell,h_pos,h_move,h_ai};
 static unsigned char buf[1<<20];static long nbuf;
 static int read_mem(void *u,uint32_t off,void *out,uint32_t n){(void)u;if((long)off+(long)n>nbuf)return 0;memcpy(out,buf+off,n);return 1;}
+/* CELL-CHANGES-59 slice 5: the scripts' state through the world change list as the engine's host keeps it
+ * (aw_mwhost.c locals_export / locals_import): a script's name hash here is the hash of "s<row>" */
+static uint32_t name_hash(int script){char s[16];sprintf(s,"s%d",script);return AW_LedgerNameHash(s);}
+static void put(void *user,uint32_t ref,int script,int global,int running,const aw_mwcell_t *cells,int count){
+    aw_ledger_t *l=(aw_ledger_t *)user;int i;uint32_t h=name_hash(script);
+    if(global && running!=AW_MwvmStartsAtLoad(script) && !AW_LedgerScriptSet(l,h,script,running))printf("refused script\n");
+    for(i=0;i<count;i++)if(cells[i].i && !AW_LedgerLocalSet(l,global,global?h:ref,h,script,i,cells[i].i))printf("refused local\n");
+}
+static void import(const aw_ledger_t *l){
+    int i,dropped=0;
+    AW_MwvmLocalsReset();
+    for(i=0;i<l->script_count;i++)
+        if(name_hash(l->script[i].hint)!=l->script[i].script || !AW_MwvmGlobalScriptSet(l->script[i].hint,l->script[i].running))dropped++;
+    for(i=0;i<l->local_count;i++){
+        const aw_ledger_local_t *x=&l->local[i];
+        if(name_hash(x->hint)!=x->script || !(x->global?AW_MwvmGlobalScriptLocal(x->hint,x->slot,(uint32_t)x->value):
+                                             AW_MwvmLocalSet(x->key,x->hint,x->slot,(uint32_t)x->value)))dropped++;
+    }
+    printf("import dropped %d\n",dropped);
+}
+static void attach_all(void){
+    uint32_t off,rows,bytes,r;int i;
+    AW_MwvmSection("BIND",&off,&rows,&bytes);
+    for(r=0;r<rows;r++){
+        unsigned char *p=buf+off+24*r;float o[3];
+        for(i=0;i<3;i++)o[i]=(float)(int32_t)(((uint32_t)p[12+4*i]<<24)|((uint32_t)p[13+4*i]<<16)|((uint32_t)p[14+4*i]<<8)|p[15+4*i])*0.25f;
+        AW_MwvmAttach(((uint32_t)p[0]<<24)|(p[1]<<16)|(p[2]<<8)|p[3],(p[4]<<8)|p[5],(p[6]<<8)|p[7],-1,o);
+    }
+}
+/* what the test reads: references 102 (TimerChime: timer, count) and 103 (Quiet: done), the global scripts */
+static void show(const char *when,int starter,int counter){
+    int s;aw_mwcell_t v,c;
+    printf("%s",when);
+    if(AW_MwvmLocalGet(103,0,&s,&v))printf(" done %d",(int)v.i);else printf(" done -");
+    if(AW_MwvmLocalGet(102,0,&s,&v) && AW_MwvmLocalGet(102,1,&s,&c))printf(" timer %.2f count %d",v.f,(int)c.i);
+    else printf(" timer - count -");
+    printf(" starter %d counter %d",AW_MwvmScriptRunning(starter),AW_MwvmScriptRunning(counter));
+    for(s=0;s<AW_MwvmInstanceCount();s++){aw_mwvm_instance_t *in=AW_MwvmInstance(s);
+        if(in && (in->flags&AWI_GLOBAL) && (int)in->script==counter)printf(" ticks %d",(int)AW_MwvmLocal(s,0).i);}
+    printf("\n");
+}
+static int locals_test(float dt,int starter,int counter){
+    static aw_ledger_t saved,read_back;static unsigned char bytes[1<<18];int n,i;float player[3]={0,0,0};
+    AW_MwvmStartScript(starter);     /* as a start script: it starts COUNTER with StartScript, then stops itself */    for(tick=1;tick<=6;tick++)AW_MwvmTick(dt,player);
+    show("before",starter,counter);
+    AW_MwvmBeginMap();               /* a map with none of these objects: their values are parked */
+    for(i=0;i<2;i++,tick++)AW_MwvmTick(dt,player);
+    show("away",starter,counter);
+    AW_MwvmBeginMap();attach_all();  /* back: the values come back from the parking store */
+    show("back",starter,counter);
+    AW_MwvmLocalsEach(put,&saved);   /* the save */
+    n=AW_LedgerEncode(&saved,bytes,sizeof(bytes));
+    printf("saved %d locals %d scripts %d bytes %.4s\n",saved.local_count,saved.script_count,n,(const char *)bytes);
+    if(n<=0 || !AW_LedgerDecode(bytes,n,&read_back))return 1;
+    { int s;aw_mwcell_t v;           /* changed after the save */
+      if(AW_MwvmLocalGet(103,0,&s,&v))AW_MwvmLocalSet(103,s,0,99u);
+      AW_MwvmGlobalScriptSet(counter,0);AW_MwvmGlobalScriptSet(starter,1);
+      for(i=0;i<3;i++,tick++)AW_MwvmTick(dt,player); }
+    show("changed",starter,counter);
+    AW_MwvmBeginMap();import(&read_back);attach_all();   /* the load: the saved values, then the map */
+    show("loaded",starter,counter);
+    for(i=0;i<2;i++,tick++)AW_MwvmTick(dt,player);
+    show("running",starter,counter);
+    AW_MwvmLocalsReset();show("reset",starter,counter);   /* a new game: the start */
+    AW_LedgerClear(&saved);AW_LedgerClear(&read_back);
+    return 0;
+}
 int main(int argc,char **argv){
     FILE *f=fopen(argv[1],"rb");long n=fread(buf,1,sizeof(buf),f);uint32_t off,rows,bytes,r;
     int ticks=atoi(argv[2]),i;float player[3]={0,0,0},dt=(float)atof(argv[3]);
@@ -647,6 +732,7 @@ int main(int argc,char **argv){
         printf("attach %u %d\n",(unsigned)((p[0]<<24)|(p[1]<<16)|(p[2]<<8)|p[3]),
                AW_MwvmAttach(((uint32_t)p[0]<<24)|(p[1]<<16)|(p[2]<<8)|p[3],(p[4]<<8)|p[5],(p[6]<<8)|p[7],-1,o));
     }
+    if(getenv("LOCALS"))return locals_test(dt,atoi(getenv("LOCALS")),atoi(getenv("COUNTER")));
     if(getenv("DIALOGUE")){   /* a result text run on reference 103 (the Quiet object) through its DRSC row */
         const char *text=getenv("DIALOGUE");int speaker=-1,row_speaker,broken,script,k;
         for(k=0;k<AW_MwvmInstanceCount();k++){aw_mwvm_instance_t *in=AW_MwvmInstance(k);
@@ -690,7 +776,8 @@ class InterpreterTests(unittest.TestCase):
         src = ROOT / 'engine/aga/src'
         built = subprocess.run(['cc', '-std=gnu89', '-Wall', '-Werror', '-Wno-unused-parameter', '-Wshadow',
                                 '-fsanitize=undefined,address', '-fno-sanitize-recover=all', '-I' + str(src),
-                                str(cls.tmp / 'h.c'), str(src / 'aw_mwvm.c'), '-o', str(cls.tmp / 'h')],
+                                str(cls.tmp / 'h.c'), str(src / 'aw_mwvm.c'), str(src / 'aw_ledger.c'),
+                                '-o', str(cls.tmp / 'h')],
                                capture_output=True, text=True)
         assert built.returncode == 0, built.stdout + built.stderr
 
@@ -763,6 +850,42 @@ class InterpreterTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             awms.check_limits(awms.ENGINE_MAX_SCRIPTS + 1, 0)
         awms.check_limits(awms.ENGINE_MAX_SCRIPTS, awms.ENGINE_MAX_GLOBALS)
+
+    def test_locals_and_global_scripts_kept_across_a_cell_change_and_a_load(self):
+        # CELL-CHANGES-59 slice 5 (OpenMW 0.51: a reference's locals are part of its saved state; a global script is
+        # saved with its running state and its locals): through the world change list's saved form and back
+        starter, counter = self.index('scripts', 'starter'), self.index('scripts', 'globalcounter')
+        out = self.run_vm(0, env={'LOCALS': str(starter), 'COUNTER': str(counter)})
+        rows = {l.split()[0]: l.split()[1:] for l in out if l.split()[:1] and l.split()[0] in
+                ('before', 'away', 'back', 'changed', 'loaded', 'running', 'reset')}
+
+        def field(when, name):
+            r = rows[when]
+            return r[r.index(name) + 1]
+        # StartScript ran from the started script; it stopped itself with StopScript
+        self.assertEqual((field('before', 'starter'), field('before', 'counter')), ('0', '1'), out)
+        ticks = int(field('before', 'ticks'))
+        self.assertGreaterEqual(ticks, 5)
+        self.assertEqual(field('before', 'done'), '1')            # Quiet set its own local on its first run
+        # a cell change: the objects' values parked (kept, not running), the global script runs on, the values come back
+        self.assertEqual(rows['away'][:6], rows['before'][:6])
+        self.assertEqual(int(field('away', 'ticks')), ticks + 2)
+        self.assertEqual(rows['back'][:6], rows['before'][:6])
+        # the save carries the values (the fifth form) and the running script; after the load they are the saved ones
+        saved = next(l for l in out if l.startswith('saved')).split()
+        self.assertEqual(saved[-1], 'AWL5')
+        self.assertGreaterEqual(int(saved[1]), 4)                 # done, timer, count, phase, ticks (non-zero ones)
+        self.assertEqual(saved[3], '1')                           # one global script whose running state differs
+        self.assertEqual(field('changed', 'done'), '99')
+        self.assertEqual((field('changed', 'counter'), field('changed', 'starter')), ('0', '0'))
+        self.assertEqual(rows['loaded'][:6], rows['back'][:6])
+        self.assertEqual((field('loaded', 'starter'), field('loaded', 'counter'), field('loaded', 'ticks')),
+                         ('0', '1', str(ticks + 2)))
+        self.assertIn('import dropped 0', out)
+        self.assertEqual(int(field('running', 'ticks')), ticks + 4)  # still running after the load
+        # a new game: every value at 0, no global script running but the start scripts (none here)
+        self.assertEqual((field('reset', 'done'), field('reset', 'counter'), field('reset', 'ticks')), ('0', '0', '0'))
+        self.assertFalse([l for l in out if l.startswith('refused')], out)
 
     def test_handwritten_scripts_do_not_attach(self):
         out = self.run_vm(1)

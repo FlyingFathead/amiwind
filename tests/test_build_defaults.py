@@ -71,6 +71,8 @@ SHIPPED_STAGES = {
     'focus': 'focus.awf (the focus table)',
     # v0.0.58 (BOOK-READER-58): the readable books' texts for the book reader
     'books': 'books.awb (the book texts)',
+    # v0.0.59 (ITEMS-INDEX-57): every placed item the player can pick up; a build output, not an image input
+    'items-index': 'items-index.json (the items index, docs/ITEMS_INDEX.md)',
     # v0.0.58 (CHARGEN-CENSUS-57): the class questions from the install's Morrowind.ini
     'chargen': 'character/questions.awq (the class questions)',
     # v0.0.58 (ITEM-WORLD-MODELS-58): every item's world model, one per mesh, keyed by the mesh path

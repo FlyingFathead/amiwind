@@ -51,7 +51,8 @@ DEFAULT_WORKER_MIB = 512        # estimated, no data yet
 DEFAULT_PARENT_MIB = 256
 CHAIN_RUNS = 6                  # runs read along the reuse chain for measurements
 HISTORY_ROWS = 5                # newest history measurements per stage
-ADVISORY_MIN_GAIN = 0.02        # an advisory only when the build would be at least 2 % faster
+HEAVY_MIB = 1024                # a stage whose full-speed peak is this or more never runs beside one that runs alone
+ADVISORY_MIN_GAIN = 0.02       # an advisory only when the build would be at least 2 % faster
 GOVERNOR_SECONDS = 30.0         # how often a running pool re-reads the container's memory and CPU quota
 GOVERNOR_ENV = 'AMIWIND_GOVERNOR_SECONDS'
 UNIT_MIB_ENV = 'AMIWIND_STAGE_UNIT_MIB'          # a stage's memory per worker unit (set by the scheduler from the plan)
@@ -500,10 +501,17 @@ def _waits_for(steps):
     return found
 
 
-def plan(steps, running, jobs, got, gathered, reuse_from=None, stair_walk=None):
+def plan(steps, running, jobs, got, gathered, reuse_from=None, stair_walk=None, alone=True):
     """The resource plan document (schema resource-plan-1) of STEPS [(name, command)] of which RUNNING (names) will
     actually run, at --jobs JOBS, against GOT (limits()); the build's scope is GATHERED's (gather(scope=)), STAIR_WALK
-    its stair walk scope ('off', 'flights', 'all'; None: GATHERED's, else not known and the stair model counts)."""
+    its stair walk scope ('off', 'flights', 'all'; None: GATHERED's, else not known and the stair model counts).
+
+    ALONE (BUILD-CHIM-POOL-MEMORY-THROTTLE-59): a pool stage that memory would throttle only because of the memory the
+    stages beside it hold, and that fits more workers with nothing beside it, RUNS ALONE: the row says so ('alone',
+    reason "runs alone: ..."), its workers are planned without the memory beside it, and the scheduler
+    (build_parallel.execute_parallel, metadata 'resource_plan_alone' / 'resource_plan_heavy') starts no other
+    memory-heavy stage (doc 'memory_heavy', a peak of HEAVY_MIB or more) beside it: the others wait, then run at full
+    width after it. False: the earlier plan (every stage planned against the memory beside it), for A/B estimates."""
     scope = gathered.get('scope')
     stair_walk = stair_walk or gathered.get('stair_walk')
     memory_mib = got['memory_bytes'] / MIB if got.get('memory_bytes') else None
@@ -538,6 +546,16 @@ def plan(steps, running, jobs, got, gathered, reuse_from=None, stair_walk=None):
             fixed = model['parent_mib'] + beside
             by_memory = int((room - fixed) // model['worker_mib']) if room > fixed else 0
         status, reasons = 'OK', []
+        runs_alone = False
+        if alone and room is not None and model['worker_mib'] > 0 and planned > 1 and beside > 0 \
+                and by_memory < planned:
+            by_alone = int((room - model['parent_mib']) // model['worker_mib']) if room > model['parent_mib'] else 0
+            if min(by_alone, planned) > max(1, by_memory):
+                runs_alone = True
+                reasons.append('runs alone: beside the %.0f MiB other stages held memory holds %d worker%s, with no '
+                               'memory-heavy stage beside it %d; the others wait until it is done'
+                               % (beside, max(1, by_memory), '' if by_memory == 1 else 's', min(by_alone, planned)))
+                by_memory, beside = by_alone, 0.0
         if room is not None and model['unit_mib'] > room:
             status = 'WILL NOT FIT'
             reasons.append('one unit (%s) needs about %.0f MiB, the build plans with %.0f MiB (%.0f %% of %.1f GiB)'
@@ -566,6 +584,8 @@ def plan(steps, running, jobs, got, gathered, reuse_from=None, stair_walk=None):
                'beside_mib': round(beside, 1), 'lease_gb_full_speed': lease_gb}
         if status != 'OK':
             reasons.append('a lease of %d GB runs it at its %d planned workers' % (lease_gb, planned))
+        if runs_alone:
+            row['alone'] = True
         if model.get('stair'):
             row['stair'] = model['stair']
         if model['runs']:
@@ -586,10 +606,38 @@ def plan(steps, running, jobs, got, gathered, reuse_from=None, stair_walk=None):
            'refusals': refusals, 'advisory': advisory(rows, got, threads, jobs, models)}
     if scope in SCOPES:
         doc['scope'] = scope
+    alone_rows = [r['stage'] for r in rows if r.get('alone')]
+    if alone_rows:
+        doc['alone'] = alone_rows
+        # the stages that may not run beside one that runs alone (each alone stage is one of them)
+        doc['memory_heavy'] = sorted({r['stage'] for r in rows if r['full_speed_mib'] >= HEAVY_MIB} | set(alone_rows))
     if stair_walk:
         doc['stair_walk'] = str(stair_walk)
     doc['verdict'] = 'refused' if refusals else 'throttled' if any(r['status'] != 'OK' for r in rows) else 'ok'
     return doc
+
+
+def alone_hold(ready, active, alone, heavy):
+    """(the READY stages held back now, the READY stages in start order) for stages the plan runs alone
+    (BUILD-CHIM-POOL-MEMORY-THROTTLE-59). ALONE: the stages that run alone; HEAVY: the memory-heavy stages (every alone
+    stage is one). While an alone stage runs, or is ready and waits for the memory-heavy stages still running to end,
+    no other memory-heavy stage starts; an alone stage starts only with no other memory-heavy stage running; alone
+    stages start first. Light stages are never held. Without ALONE nothing is held and the order is kept."""
+    alone, heavy = set(alone or ()), set(heavy or ()) | set(alone or ())
+    if not alone:
+        return set(), list(ready)
+    held = set()
+    running_alone = [n for n in active if n in alone]
+    running_heavy = [n for n in active if n in heavy]
+    waiting_alone = [n for n in ready if n in alone]
+    for name in ready:
+        if name in alone:
+            if running_heavy or name != waiting_alone[0]:
+                held.add(name)
+        elif name in heavy and (running_alone or waiting_alone):
+            held.add(name)
+    order = [n for n in ready if n in alone] + [n for n in ready if n not in alone]
+    return held, order
 
 
 def _workers_at(row, model, room_mib, threads):
@@ -894,6 +942,9 @@ SCHEMA_DOCUMENT = json.loads(r"""
       "type": "integer",
       "minimum": 0
      },
+     "alone": {
+      "type": "boolean"
+     },
      "measured_in": {
       "type": "array",
       "items": {
@@ -1038,6 +1089,18 @@ SCHEMA_DOCUMENT = json.loads(r"""
   "stair_walk": {
    "type": "string",
    "minLength": 1
+  },
+  "alone": {
+   "type": "array",
+   "items": {
+    "type": "string"
+   }
+  },
+  "memory_heavy": {
+   "type": "array",
+   "items": {
+    "type": "string"
+   }
   },
   "flagged_over_estimate": {
    "type": "array",

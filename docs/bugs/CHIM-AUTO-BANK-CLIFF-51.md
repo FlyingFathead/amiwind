@@ -1,5 +1,15 @@
 # CHIM-AUTO-BANK-CLIFF-51: 32 MB of Fast RAM got no automatic CHIM cache bank
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 3 times; something has to be done
+
+- Reported with v0.0.59-dev5 at 2026-11-03 05:17 +0200: Gate boot smoke at 32 MB Fast failed on CHIM zone full 174 and 99 times (gates 6201, 6202) while the same engine passed with none in gates 6200 and 6203: the zone budget at 32 MB sits close enough to its limit that it fails only some of the time. The smoke message names CHIM-ZONE-BUDGET-33, an ID the register does not hold.
+- Reported with v0.0.59-dev5 at 2026-11-03 05:52 +0200: Third intermittent gate-smoke failure on CHIM zone full at 32 MB (gate 6222, 71 times, on the chimtail branch right after merging 2c6c590c); the unchanged rerun passed. Three of about twenty gates tonight.
+- Reported with v0.0.59-dev5 at 2026-11-03 07:01 +0200: Correction: the gate-smoke CHIM zone full failures reported here earlier today (gates 6201, 6202, 6222) were not this bug. The smoke typed aw_remote 1 while the start-up logo was up, and its M turned the CHIM cache off for that start: SMOKE-M-KEY-SKIPS-CHIM-CACHE-57, reopened and fixed in the smoke harness.
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |

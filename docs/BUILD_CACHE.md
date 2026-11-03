@@ -1,6 +1,6 @@
 # Build cache: resuming and reusing work safely
 
-_Last updated with AmiWind v0.0.56-dev1 (29 October 2026)._
+_Last updated with AmiWind v0.0.59-dev6 (3 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -174,7 +174,12 @@ header of engine-only declarations re-keys no CHIM world stage, while a limit, a
 reads still does. A `.c` file read only for single definitions (its `#define` lines through `define()`, its cvar
 defaults through `cvar_default`: `chim/chim_world.c`, `chim/chim_statics.c`) counts by those definitions alone, never
 by its function bodies, so a status print added to `chim_world.c` re-keys no CHIM world either
-(BUILD-STAGE-KEY-ENGINE-C-WHOLE-54; the reading's version 2, key values `cfacts2:`). Anything the reading cannot explain (an engine folder named whole, a token-pasting macro in the
+(BUILD-STAGE-KEY-ENGINE-C-WHOLE-54; the reading's version 2, key values `cfacts2:`). The frame timing header
+`aw_spike.h` (engine_facts `TIMING_HEADERS`; it also holds the disk wait wrappers quakedef.h maps fopen, fread and
+fseek to) counts only by what can carry a layout: its functions, prototypes, extern counters, function-like timing
+macros, `#undef` lines and slot enums stay out of the key unless a struct, typedef, variable or object-like macro
+names them, so a timing edit re-keys no CHIM world stage (BUILD-ENGINE-SOURCE-KEY-BROAD-36; version 3, `cfacts3:`).
+The CHIM pool's per-unit code keys (`tools/chim/units.py`) reach no engine file. Anything the reading cannot explain (an engine folder named whole, a token-pasting macro in the
 facts) keeps the stage's engine files whole. A reuse source keyed with whole engine files is compared by its C facts
 when its own source tree (the checkout its stage ran from) gives exactly its recorded sources; otherwise as before.
 Until 27 October 2026 the actor record's and the magic effects' header edits planned a full CHIM world rebuild for

@@ -64,6 +64,7 @@ class ActorsNativeTests(unittest.TestCase):
                '-include', str(ROOT / 'tests/aga_test_files.h'), '-I' + str(tmp), '-I' + str(SRC),
                str(ROOT / 'tests/aga_actors_test.c'), str(SRC / 'aw_actors.c'), str(SRC / 'chim/chim_actor_table.c'),
                str(SRC / 'chim/chim_format.c'), str(SRC / 'mathlib.c'), str(SRC / 'aw_format.c'),
+               str(SRC / 'aw_ledger.c'),   # CELL-CHANGES-59 slice 6: the actors' rows are on the world change list
                str(ROOT / 'tests/aga_hook_stubs.c'), '-lm', '-o', str(cls.exe)]
         result = subprocess.run(cmd, capture_output=True, text=True)
         assert result.returncode == 0, result.stderr

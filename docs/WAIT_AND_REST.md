@@ -1,9 +1,9 @@
 # Waiting and resting: the original's rules
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.59-dev5 (2 November 2026)._
 
-Status: study, 10 October 2026. Not implemented yet; planned for a later version (see [ROADMAP.md](ROADMAP.md)).
-Today **T** only moves the clock forward ([DIALOGUE_AND_WAIT.md](DIALOGUE_AND_WAIT.md)).
+Status: study, 10 October 2026, kept as the first notes. Implemented in v0.0.59: [RESTING.md](RESTING.md) describes
+what the game does now and supersedes this page where they differ.
 
 Every rule below comes from the original's own data (the three master files: game settings, cell flags, region
 records, scripts) or from OpenMW 0.51's source, which reproduces the original's engine. Nothing is invented. Where
