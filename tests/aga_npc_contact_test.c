@@ -10,6 +10,14 @@ eval_t *GetEdictFieldValue(edict_t *e,char *name){if(!strcmp(name,"aw_ground_mod
 void SV_LinkEdict(edict_t *e,qboolean touch){}
 int AW_RegionGroundCoverage(const float *point){return 1;}
 int Chim_Active(void){return chim_on;}
+/* CORPSE-INVENTORY-NOT-OPENABLE-59: a resident model with two frames, standing (8 wide, 40 high) and lying (60 long,
+ * 8 high); the whole-model bounds enclose both. Cache_Check gives it while resident (never loads). */
+static struct {aliashdr_t h;maliasframedesc_t lying;mdl_t m;} alias;static int resident;
+void *Cache_Check(cache_user_t *c){(void)c;return resident?&alias:NULL;}
+static void frame_box(maliasframedesc_t *f,int x0,int y0,int z0,int x1,int y1,int z1){
+    f->bboxmin.v[0]=(byte)(x0+128);f->bboxmin.v[1]=(byte)(y0+128);f->bboxmin.v[2]=(byte)z0;
+    f->bboxmax.v[0]=(byte)(x1+128);f->bboxmax.v[1]=(byte)(y1+128);f->bboxmax.v[2]=(byte)z1;
+}
 trace_t SV_Move(vec3_t a,vec3_t mins,vec3_t maxs,vec3_t b,int type,edict_t *skip){
     trace_t t;memset(&t,0,sizeof(t));t.fraction=1;VectorCopy(b,t.endpos);
     if(blocked){t.startsolid=t.allsolid=true;t.fraction=0;return t;}
@@ -37,6 +45,20 @@ int main(void){
     {int before=aw_fpucount[AW_FPU_NPCTEST];e->v.origin[0]=500;assert(!AW_NPCTarget(p,angles));
      assert(aw_fpucount[AW_FPU_NPCTEST]==before);e->v.origin[0]=20;assert(AW_NPCTarget(p,angles)==e);
      assert(aw_fpucount[AW_FPU_NPCTEST]==before+1);}
+    /* the drawn frame's box, not the whole model's (CORPSE-INVENTORY-NOT-OPENABLE-59) */
+    {int k;
+     alias.h.model=(int)((byte *)&alias.m-(byte *)&alias);alias.m.numframes=2;
+     for(k=0;k<3;k++){alias.m.scale[k]=1;alias.m.scale_origin[k]=k<2?-128:0;}
+     frame_box(&alias.h.frames[0],-4,-4,0,4,4,40);frame_box(&alias.lying,-30,-30,0,30,30,8);
+     model.mins[0]=model.mins[1]=-30;model.maxs[0]=model.maxs[1]=30;model.maxs[2]=40;
+     e->v.origin[1]=12;resident=0;assert(AW_NPCTarget(p,angles)==e);   /* evicted: the whole model's bounds */
+     resident=1;e->v.frame=0;assert(!AW_NPCTarget(p,angles));            /* standing beside the line: missed */
+     e->v.origin[1]=0;assert(AW_NPCTarget(p,angles)==e);                  /* standing on it: hit */
+     e->v.frame=1;assert(!AW_NPCTarget(p,angles));                        /* lying below the eye: missed */
+     {vec3_t down={30,0,0};assert(AW_NPCTarget(p,down)==e);}             /* looking down at the body: hit */
+     e->v.frame=7;e->v.origin[1]=12;assert(!AW_NPCTarget(p,angles));      /* a frame out of range: frame 0 */
+     e->v.frame=0;e->v.origin[1]=0;resident=0;
+     model.mins[0]=model.mins[1]=-4;model.maxs[0]=model.maxs[1]=4;}
     floor_z=126;e->v.origin[2]=144;
     assert(AW_NPCFloor(e));assert(fabs(e->v.origin[2]-126.25f)<.001);
     assert(AW_NPCFloor(e));assert(fabs(e->v.origin[2]-126.25f)<.001); /* no drift */

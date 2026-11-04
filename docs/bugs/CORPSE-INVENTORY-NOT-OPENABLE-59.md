@@ -9,7 +9,7 @@
 | Where | engine actor inventory data; aw_inventory.c container open |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.59-dev5 (last seen) |
+| Persists in | fixed in v0.0.60-dev3 |
 | Severity | medium: Looting the dead is a core part of the game; the carried items are not in the data the engine reads |
 | Family | Game logic (QuakeC) and saves (`game-logic`) |
 | Playtest version | 2026_11_03_v0.0.59-dev5_miniwind-seyda-containers10_420cb1a |

@@ -99,6 +99,47 @@ def area_fixture(id1):
     return report
 
 
+def levelled_fixture(id1):
+    """CONTAINER-LEVELLED-CONTENTS-60 / CORPSE-LOOT-60: a synthetic id1 with one room (10): container 1000 (an item of
+    its own and three levelled entries), container 1001 (two levelled entries, one a list inside a list) and an actor
+    1002 with an inventory (an item and a levelled entry); focus.awf with its AWL1 lists, items.awi, areas.awa from
+    tools/prepare_area_tables.py. The answers are in tests/aga_levelled_contents_test.c. Returns the build report."""
+    import struct
+    sys.path.insert(0, str(ROOT / 'tools'))
+    try:
+        from prepare_focus import contents_list, record_id, clean, NAME, levelled_section, owner_list
+        import prepare_area_tables
+    finally:
+        sys.path.pop(0)
+    lists = {'l_low_high': (0, 0, [('lev_low', 1), ('lev_high', 5)]),
+             'l_each': (1, 0, [('gem', 1)]),
+             'l_nested': (2, 0, [('l_each', 1)]),
+             'l_none': (0, 100, [('gem', 1)])}
+    containers = {1000: ([('base_item', 2), ('l_low_high', 1), ('l_each', 3), ('l_none', 5)], 0),
+                  1001: ([('l_low_high', 2), ('l_nested', 1)], 0),
+                  1002: ([('npc_shirt', 1), ('l_each', 2)], 8)}
+    rows = [(ord('C'), 1000, 'Sack'), (ord('C'), 1001, 'Basket'), (ord('A'), 1002, 'Arrille')]
+    body = []
+    for kind, ref, name in rows:
+        raw = clean(name)
+        body.append(struct.pack('<BBBBIiiifi', kind, 0, 1 if kind == ord('C') else 3, 0, ref, 0, 0, 16, 0.0, 0) +
+                    raw + b'\0' * (NAME - len(raw)) + record_id(''))
+    focus = (b'AWF3' + struct.pack('<I', 1) + struct.pack('<III', 10, 0, len(body)) + b''.join(body) +
+             owner_list({}) + contents_list(containers) + levelled_section(lists))
+    items = []
+    for ident in sorted(('base_item', 'lev_low', 'lev_high', 'gem', 'npc_shirt')):
+        row = bytearray(512)
+        row[0:len(ident)] = ident.encode(); row[64:64 + len(ident)] = ident.title().encode()
+        struct.pack_into('<IiIfII', row, 160, 7, 0, 3, 0.5, 0, 0)
+        items.append(bytes(row))
+    (id1 / 'inventory').mkdir(parents=True)
+    (id1 / 'focus.awf').write_bytes(focus)
+    (id1 / 'inventory/items.awi').write_bytes(b'AWI2' + struct.pack('<I', len(items)) + b''.join(items))
+    payload, report = prepare_area_tables.build(id1)
+    (id1 / 'areas.awa').write_bytes(payload)
+    return report
+
+
 # Engine files that build map paths through aw_mappath.c (AW_MapPath).
 MAP_PATH_USERS = ('aw_region.c', 'aw_section.c', 'aw_scene.c', 'aw_gallery.c', 'aw_arena.c', 'aw_wait.c',
                   'sv_main.c', 'chim_world.c')
@@ -418,6 +459,19 @@ class NativeSourceTests(unittest.TestCase):
             area_fixture(id1)
             self.compile_run('aga_area_tables_test.c', [Path(SOURCE)/'src'/n for n in
                 ('aw_inventory.c','aw_state.c','aw_ledger.c','aw_ledger_drops.c','mathlib.c')],
+                arguments=[str(id1)], cflags=['-fsanitize=address,undefined','-fno-sanitize-recover=all'])
+
+    def test_levelled_contents_roll_once_and_actor_inventories(self):
+        # CONTAINER-LEVELLED-CONTENTS-60 / CORPSE-LOOT-60: levelled entries rolled on the first open by the game's rule
+        # and kept on the world change list; a body's inventory through the same strip data, never theft
+        with tempfile.TemporaryDirectory() as tmp:
+            id1 = Path(tmp) / 'id1'
+            report = levelled_fixture(id1)
+            self.assertEqual((report['levelled_item_lists'], report['areas_with_levelled'], report['actor_inventories'],
+                              report['item_chunks'], report['item_chunk_items']), (4, 1, 1, 1, 3))
+            self.compile_run('aga_levelled_contents_test.c', [Path(SOURCE)/'src'/n for n in
+                ('aw_inventory.c','aw_state.c','aw_ledger.c','aw_ledger_drops.c','mathlib.c',
+                 'chim/chim_actor_table.c','chim/chim_format.c')],
                 arguments=[str(id1)], cflags=['-fsanitize=address,undefined','-fno-sanitize-recover=all'])
 
     def test_inventory_real_drop_placement_capacity_and_no_loss(self):

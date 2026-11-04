@@ -56,6 +56,28 @@ FOLDERS = {'gallery': 'npc-gallery', 'sound': 'sound', 'music': 'music', 'intro'
 CHIM_MAP_SUFFIXES = (FRAME_EXT, '.far')   # CHIM frame maps (tools/map_files.py) and their far terrain
 VIDEO_SUFFIXES = ('.awv',)
 DEV_VERSION = re.compile(r'-dev[0-9]+$')
+# The release names its payload growth in the release commit (BUILD-SIZE-GUARD-LATE-48): {"version": "X.Y.Z",
+# "reason": TEXT}; used when the build is given no --size-growth-reason and its version's release part matches.
+GROWTH_FILE = ROOT / 'tools' / 'size-growth.json'
+FINAL_HINT = ('Size guard: a final or rc of this content will STOP here (exit 4): name the growth before the final '
+              'build, in tools/size-growth.json ("version", "reason") in the release commit or with '
+              '--size-growth-reason TEXT')
+
+
+def release_part(version):
+    """'0.0.60' of '0.0.60-dev3', '0.0.60-rc1' or '0.0.60' (a leading v dropped)."""
+    return str(version or '').lstrip('v').split('-')[0]
+
+
+def committed_growth_reason(version, path=GROWTH_FILE):
+    """The growth reason tools/size-growth.json names for VERSION's release, or None."""
+    try:
+        record = json.loads(Path(path).read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(record, dict) or not record.get('reason') or not version:
+        return None
+    return str(record['reason']) if release_part(record.get('version')) == release_part(version) else None
 
 
 def group_of(path):
@@ -285,6 +307,8 @@ def table_lines(ledger):
     guard = ledger.get('guard')
     if guard:
         lines.append(guard_line(guard))
+        if guard.get('final_needs_reason'):
+            lines.append(FINAL_HINT)
     return lines
 
 
@@ -389,6 +413,9 @@ def build_ledger(run, version, baselines=(), mode='auto', margin_gib=DEFAULT_MAR
             ledger['checks'].append('%s record %s not read: %s' % (role, path, exc))
     ledger['comparisons'] = comparisons
     ledger['guard'] = judge(comparisons, guard_mode(mode, version), reason, margin)
+    if ledger['guard']['verdict'] == 'warned' and DEV_VERSION.search(version or ''):
+        # a dev build only warns, but the final of the same content stops (the v0.0.59 final on progs +0.12 GiB)
+        ledger['guard']['final_needs_reason'] = True
     return ledger
 
 
@@ -418,6 +445,10 @@ def step(run, version, baselines=(), mode='auto', margin_gib=DEFAULT_MARGIN_GIB,
     log('Size ledger: started (1 worker: reads the image receipt and the payload file lists)')
     started = time.monotonic()
     effective = guard_mode(mode, version)
+    if not reason:
+        reason = committed_growth_reason(version)
+        if reason:
+            log('Size guard: growth reason from tools/size-growth.json: %s' % reason)
     try:
         ledger = build_ledger(run, version, baselines, mode, margin_gib, reason, release_baseline)
     except Exception as exc:  # noqa: BLE001 - reported, and judged like a failed guard in fail mode
@@ -431,6 +462,9 @@ def step(run, version, baselines=(), mode='auto', margin_gib=DEFAULT_MARGIN_GIB,
         return 'failed' if effective == 'fail' else 'warned'
     path = write(run, ledger)
     log('Size ledger: written %s (took %.1f s)' % (path, time.monotonic() - started))
+    if ledger['guard'].get('final_needs_reason'):
+        log(guard_line(ledger['guard']))
+        log(FINAL_HINT)
     return ledger['guard']['verdict']
 
 

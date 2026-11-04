@@ -436,7 +436,10 @@ def add_serial_stages_group(p):
     p.add_argument('--size-growth-margin', type=float, default=0.05, metavar='GIB',
                    help='Growth per payload folder the size guard allows without a reason (GiB, default 0.05)')
     p.add_argument('--size-growth-reason', metavar='TEXT',
-                   help='Names why the payload grew (recorded in size-ledger.json and the build summary)')
+                   help='Names why the payload grew (recorded in size-ledger.json and the build summary); without '
+                        'it the reason committed in tools/size-growth.json for this release is used, so a release '
+                        'names its growth in the release commit, before its final build. A -devN build that grows '
+                        'prints that a final will need it (BUILD-SIZE-GUARD-LATE-48)')
     p.add_argument('--no-profile', action='store_true',
                    help='DEBUGGING ONLY: run stages without the build profiler and output manifests '
                         '(build-profile.json); outputs are the same, and a later --reuse-from cannot use such a run. '

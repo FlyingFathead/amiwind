@@ -816,7 +816,9 @@ def reopen(b, version, at, by=None, note=None):
     if b.get('severity') in SEVERITIES:
         raised = SEVERITIES[max(SEVERITIES.index(b['severity']) - 1, 0)]
         if raised != b['severity']:
-            b['severity_reason'] = 'Regressed in %s (was %s): %s' % (version, b['severity'], b.get('severity_reason'))
+            r = 'Regressed in %s (was %s): %s' % (version, b['severity'], b.get('severity_reason'))
+            # the field's limit is 160 characters (check above): a long earlier reason is cut, never refused
+            b['severity_reason'] = r if len(r) <= 160 else r[:157].rstrip() + '...'
             b['severity'] = raised
     if has_facts(b):
         b['persists_in'] = [version]

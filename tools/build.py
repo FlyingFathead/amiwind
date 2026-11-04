@@ -2704,6 +2704,17 @@ def reuse_plan_environment(old_run, flags=None):
 
 
 def main(argv=None):
+    try:
+        return _main(argv)
+    finally:
+        # the reuse preflight is shared by the two asks of one --check / --plan run only, never past it
+        cache = sys.modules.get('build_cache')
+        if cache is not None and getattr(cache, 'PREFLIGHT_ONCE', False):
+            cache.PREFLIGHT_ONCE = False
+            cache._PREFLIGHT_DONE.clear()
+
+
+def _main(argv=None):
     # Also cover direct Python invocations and subsequent environment re-exec.
     os.environ['PYTHONUNBUFFERED'] = '1'
     for stream in (sys.stdout, sys.stderr):
@@ -3085,6 +3096,11 @@ def main(argv=None):
         os.environ['AMIWIND_RUN_NAME'] = args.name
         os.environ['AMIWIND_RUN_COMMIT'] = str(commit)
         os.environ['AMIWIND_RUN_VERSION'] = VERSION
+        if args.check or args.plan:
+            # the entry check and the resource plan ask for the same reuse preflight: the second gets a copy
+            # (BUILD-REUSE-CHECK-ONE-CORE-59; about 2.4 min of the check on the v0.0.59 release run)
+            import build_cache
+            build_cache.PREFLIGHT_ONCE = True
         if getattr(args, 'developer_mode', False):
             # Developer mode (tools/entry_check.py): version, source, integration head, pool, run name, reuse.
             args.developer_mode_record = entry_check.check(

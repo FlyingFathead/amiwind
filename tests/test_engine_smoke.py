@@ -38,12 +38,39 @@ class DefaultFastRamTests(unittest.TestCase):
         # (CHIM cache off for that start); Escape ends the logo before the first console line
         # PERSISTING in v0.0.59: on a busy host the logo began after that Escape; the boot loop now only presses Escape
         # (the play copy's autoexec turns the remote on) and types the command only after 90 s
-        lines = engine_smoke.PROBE.splitlines()
-        i = next(k for k, l in enumerate(lines) if 'con "aw_remote 1"' in l)
-        self.assertIn('$((90*K))', lines[i])
-        self.assertIn('key Escape', lines[i - 1])
+        # REGRESSION v0.0.60 (gate 6418): the logo came after 90 s on a loaded host; nothing is typed before ready now
+        a = engine_smoke.PROBE.index('# BOOT-WAIT-BEGIN')
+        boot = engine_smoke.PROBE[a:engine_smoke.PROBE.index('# BOOT-WAIT-END')]
+        boot = '\n'.join(l for l in boot.splitlines() if not l.lstrip().startswith('#'))
+        self.assertNotIn('con ', boot)
+        self.assertNotIn('rc ', boot)
+        self.assertNotIn('key ', boot)    # gate 6810: an early Escape held the AmigaDOS preflight
         with open(engine_smoke.__file__, encoding='utf-8') as f:
             self.assertIn("printf 'aw_remote 1", f.read())    # the autoexec the boot loop relies on
+
+    @unittest.skipUnless(shutil.which('bash'), 'bash needed')
+    def test_late_logo_gets_no_typed_key_before_ready(self):
+        # Simulated loaded host: the logo shows at 100 s and 200 s of the wait (past the old 90 s fallback) and the
+        # remote answers at 240 s. Every input the loop sends is logged; nothing may reach the screen before ready.
+        a = engine_smoke.PROBE.index('# BOOT-WAIT-BEGIN')
+        boot = engine_smoke.PROBE[a:engine_smoke.PROBE.index('# BOOT-WAIT-END')]
+        with tempfile.TemporaryDirectory() as d:
+            script = '''set -e
+R=%s; K=1; T=0; mkdir -p $R/awctl
+alive(){ return 0; }
+finish(){ echo "FINISH $1" >> $R/sent; exit 0; }
+sleep(){ T=$((T+$1)); [ $T -ge 240 ] && echo up > $R/awctl/state.txt; return 0; }
+key(){ echo "key $1 at $T" >> $R/sent; }
+con(){ echo "con $1 at $T" >> $R/sent; }
+rc(){ echo "rc $1 at $T" >> $R/sent; }
+%s
+[ -s $R/awctl/state.txt ] && echo "READY at $T" >> $R/sent
+''' % (d, boot)
+            subprocess.run(['bash', '-c', script], check=True, timeout=30)
+            sent = (Path(d) / 'sent').read_text().splitlines()
+        self.assertEqual(len(sent), 1, sent)
+        self.assertTrue(int(sent[0].split()[-1]) >= 240, sent)
+        self.assertTrue(sent[0].startswith('READY at '), sent)
 
     def test_zone_full_names_a_skipped_cache(self):
         self.assertIn('SMOKE-M-KEY-SKIPS-CHIM-CACHE-57', engine_smoke.PROBE)

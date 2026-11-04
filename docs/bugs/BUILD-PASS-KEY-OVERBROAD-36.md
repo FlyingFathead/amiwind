@@ -157,6 +157,7 @@ Family: Build reuse keys and output attribution (`build-cache-reuse`). A unit is
 - BUILD-KEY-UNIT-RESTORED-CODE-52 (no report page): A stage whose last real run restored its units from a cache was reused after the code those units come from changed: chim-room-batches kept actor models of the old animation tables
 - BUILD-MINIWIND-REUSE-STALE-57 (no report page): The MiniWind build launcher reused the v0.0.53 final run instead of the newest passed run
 - BUILD-MWSCRIPT-KEY-UNDERDECLARED-48 (no report page): The mwscript stage's reuse record is refused: the stage reads tools/mwscript/measure.py, which its fingerprint leaves out
+- BUILD-MWSCRIPT-STAGE-REUSED-COMPILER-CHANGED-59 (no report page): The mwscript stage was reused after its compiler changed, so v0.0.59 ships compiled scripts of an older compiler
 - [BUILD-NPC-BAKE-CACHE-KEY-40](BUILD-NPC-BAKE-CACHE-KEY-40.md): New NPC shell fallback dependencies are absent from the model cache key
 - [BUILD-OUTPUTS-NOT-REPRODUCIBLE-33](BUILD-OUTPUTS-NOT-REPRODUCIBLE-33.md): A stage that runs again never matches its old outputs (tool logs, timings, run paths), so every stage after it is rebuilt
 - [BUILD-PASS-KEY-RULE-NO-CARRYOVER-36](BUILD-PASS-KEY-RULE-NO-CARRYOVER-36.md): A pass key rule change carried no entries written by older trees: dev4 recomputed 2,372 optimizer maps and the exterior sky maps with code and outputs identical to dev3

@@ -109,7 +109,7 @@ class FormatTests(unittest.TestCase):
         self.assertEqual(record['status'], 'complete')
         self.assertEqual(record['labels'], [])
         self.assertEqual(sum(row['bytes'] for row in record['groups'].values()), record['payload_bytes'])
-        self.assertEqual(size_ledger.gib(record['payload_bytes']), '2.57')  # v0.0.58 release record (9 MB more than v0.0.57's 2.56)
+        self.assertEqual(size_ledger.gib(record['payload_bytes']), '2.71')  # v0.0.59 release record (v0.0.58's 2.57 + the item world models and body parts)
         # NPC Gallery v2.0 (v0.0.54) bakes nothing of its own: the gallery shows the world's own characters
         self.assertEqual(size_ledger.gib(record['groups']['npc-gallery']['bytes']), '0.00')
 
@@ -291,6 +291,46 @@ class GuardTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             ledger = self.grown(folder, '0.0.42-dev1', 'auto')
         self.assertEqual(ledger['guard']['verdict'], 'warned')
+
+    def test_a_dev_build_that_grew_says_a_final_will_need_the_reason(self):
+        # BUILD-SIZE-GUARD-LATE-48: the v0.0.59 final stopped on growth its dev builds had only warned about
+        with tempfile.TemporaryDirectory() as folder:
+            ledger = self.grown(folder, '0.0.42-dev1', 'auto')
+        self.assertTrue(ledger['guard']['final_needs_reason'])
+        lines = size_ledger.table_lines(dict(ledger, labels=[], status='complete', comparisons=[]))
+        self.assertIn(size_ledger.FINAL_HINT, lines)
+        self.assertIn('tools/size-growth.json', size_ledger.FINAL_HINT)
+        with tempfile.TemporaryDirectory() as folder:
+            self.assertNotIn('final_needs_reason', self.grown(folder, '0.0.42', 'auto')['guard'])
+        with tempfile.TemporaryDirectory() as folder:
+            self.assertNotIn('final_needs_reason', self.grown(folder, '0.0.42-dev1', 'auto', reason='x')['guard'])
+
+    def test_the_committed_growth_reason_of_the_release(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / 'size-growth.json'
+            path.write_text(json.dumps({'version': '0.0.60', 'reason': 'item world models'}))
+            self.assertEqual(size_ledger.committed_growth_reason('0.0.60', path), 'item world models')
+            self.assertEqual(size_ledger.committed_growth_reason('0.0.60-rc1', path), 'item world models')
+            self.assertIsNone(size_ledger.committed_growth_reason('0.0.61', path))
+            path.write_text(json.dumps({'version': '0.0.60', 'reason': None}))
+            self.assertIsNone(size_ledger.committed_growth_reason('0.0.60', path))
+        committed = json.loads(size_ledger.GROWTH_FILE.read_text(encoding='utf-8'))
+        self.assertEqual(committed['schema'], 'amiwind-size-growth-v1')
+        self.assertIn('reason', committed)
+
+    def test_step_uses_the_committed_reason(self):
+        with tempfile.TemporaryDirectory() as folder:
+            base_dir = Path(folder) / 'base'
+            base_dir.mkdir()
+            base = base_dir / 'record.json'
+            base.write_text(json.dumps(size_ledger.collect(make_run(base_dir, BOOT))))
+            run = make_run(Path(folder) / 'now', dict(BOOT, **{'id1/maps/big.bsp': GIB // 10}))
+            out = io.StringIO()
+            with patch.object(size_ledger, 'committed_growth_reason', return_value='named in the release'), \
+                    contextlib.redirect_stdout(out):
+                verdict = size_ledger.step(run, '0.0.42', [base], 'fail', release_baseline=None)
+            self.assertEqual(verdict, 'named')
+            self.assertIn('tools/size-growth.json', out.getvalue())
 
     def test_rc_is_judged_like_a_release(self):
         self.assertEqual(size_ledger.guard_mode('auto', '0.0.42-rc1'), 'fail')

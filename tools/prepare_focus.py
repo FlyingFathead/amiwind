@@ -94,9 +94,11 @@ def record_id(ident):
     return raw + b'\0' * (IDENT - len(raw))
 
 
-def container_items(fields, items):
-    """A CONT record's NPCO list: [(folded id, count)] of the entries ITEMS (the item records) knows, restocking
-    counts made positive; and the flags (1: an entry restocks, 2: a levelled list was left out)."""
+def container_items(fields, items, levelled=()):
+    """A CONT, NPC_ or CREA record's NPCO list: [(folded id, count)] of the entries ITEMS (the item records) or
+    LEVELLED (the levelled item lists, CONTAINER-LEVELLED-CONTENTS-60: kept by their list id, rolled by the engine on
+    the first open) knows, restocking counts made positive; and the flags (1: an entry restocks, 2: an entry naming
+    neither was left out)."""
     out, flags = [], 0
     for key, value in fields:
         if key != 'NPCO' or len(value) < 36:
@@ -105,7 +107,7 @@ def container_items(fields, items):
         ident = value[4:36].split(b'\0', 1)[0].decode('ascii', 'replace').casefold()
         if count < 0:
             flags |= 1; count = -count
-        if ident not in items:
+        if ident not in items and ident not in levelled:
             flags |= 2 if ident else 0
             continue
         if count and len(ident.encode('ascii', 'replace')) <= IDENT:
@@ -113,11 +115,43 @@ def container_items(fields, items):
     return out, flags
 
 
-def objects_of(raw):
+def item_lists(raw):
+    """CONTAINER-LEVELLED-CONTENTS-60: {list id (folded): (flags, chance none, [(entry id folded, level)])} of every
+    live LEVI record, entries in the record's order (INAM, INTV pairs). Flags as the data has them (OpenMW 0.51
+    esm3/loadlevlist.hpp ItemLevList: 1 Each, a new roll for every one of the count; 2 AllLevels, every entry at or
+    below the player's level, not only the highest)."""
+    out = {}
+    for tag, flags, payload in records(raw):
+        if tag != 'LEVI' or flags & 0x20:
+            continue
+        fields = list(subrecords(payload))
+        if any(k == 'DELE' for k, _ in fields):
+            continue
+        ident = string(first(fields, 'NAME'), 'NAME', errors='replace').casefold()
+        data, chance = first(fields, 'DATA'), first(fields, 'NNAM')
+        entries, pending = [], None
+        for key, value in fields:
+            if key == 'INAM':
+                pending = string(value, 'INAM', errors='replace').casefold()
+            elif key == 'INTV' and pending is not None and len(value) >= 2:
+                entries.append((pending, struct.unpack_from('<H', value)[0])); pending = None
+        if ident:
+            out[ident] = (struct.unpack_from('<I', data)[0] if len(data) >= 4 else 0,
+                          min(chance[0], 100) if chance else 0, entries)
+    return out
+
+
+ACTOR_INVENTORY = 8     # the contents list's flag (bit 3, CORPSE-LOOT-60): an actor's inventory (a body opens it)
+
+
+def objects_of(raw, levelled=None):
     """Folded record id -> (kind, name, weight, value, action[, contents, flags]) of every placeable item, actor,
-    door and container (kind 'C': its contents and their flags, container_items)."""
+    door and container (kind 'C': its contents and their flags, container_items; kind 'A' with an NPCO list: its
+    inventory, flag ACTOR_INVENTORY, CORPSE-LOOT-60). LEVELLED: item_lists (their ids are kept in the contents)."""
     out = {}
     conts = []
+    levelled = levelled or {}
+    actors = []
     for tag, flags, payload in records(raw):
         if tag not in ITEM_DATA and tag not in ACTORS and tag not in ('DOOR', 'CONT'):
             continue
@@ -149,9 +183,15 @@ def objects_of(raw):
             out[ident] = ('I', name, float(weight), int(value), action)
         elif name:
             out[ident] = ('A' if tag in ACTORS else 'D', name, 0.0, 0, ACT_TALK if tag in ACTORS else ACT_NONE)
+            if tag in ACTORS:
+                actors.append((ident, fields))
     items = {k for k, v in out.items() if v[0] == 'I'}
+    for ident, fields in actors:
+        contents, cflags = container_items(fields, items, levelled)
+        if contents:
+            out[ident] = out[ident][:5] + (contents, (cflags & 3) | ACTOR_INVENTORY)
     for ident, name, fields, organic in conts:
-        contents, cflags = container_items(fields, items)
+        contents, cflags = container_items(fields, items, levelled)
         # CONTAINER-WINDOW-59: a container opens (ACT_TAKE: E opens its strip); an organic one (flora) is harvested,
         # never opened (action none, flag 4)
         out[ident] = ('C', name, 0.0, 0, ACT_NONE if organic else ACT_TAKE, contents,
@@ -172,7 +212,7 @@ def contents_list(containers):
     index, body = [], []
     for reference in sorted(containers):
         contents, flags = containers[reference]
-        index.append(struct.pack('<IIHBB', reference, len(body), len(contents), flags & 7, 0))
+        index.append(struct.pack('<IIHBB', reference, len(body), len(contents), flags & 15, 0))
         for ident, count in contents:
             body.append(record_id(ident) + struct.pack('<i', count))
     return (b'AWC1' + struct.pack('<I', len(index)) + b''.join(index) + struct.pack('<I', len(body)) + b''.join(body))
@@ -258,6 +298,26 @@ def reference_table(raw, digest=None, name=MASTER):
     return (b'AWI1' + files + struct.pack('<iffIII', months, respawn_delay, clear_delay, len(keys), REFS_STEP,
                                           len(blocks)) +
             b''.join(struct.pack('<I', k) for k in blocks) + body), len(keys), (months, respawn_delay, clear_delay)
+
+
+def levelled_section(lists):
+    """CONTAINER-LEVELLED-CONTENTS-60: the AWL1 section after AWI1, for the per-area tables only (the engine never
+    reads it; tools/prepare_area_tables.py writes each area's lists): "AWL1" u32 lists, lists x { char id[32],
+    u8 flags, u8 chance none, u16 entries, entries x { char id[32], u16 level } }, ascending id; an id that does not
+    fit 32 printable bytes is left out."""
+    out = [b'AWL1', b'']
+    n = 0
+    for ident in sorted(lists):
+        flags, chance, entries = lists[ident]
+        raw = record_id(ident)
+        if not raw.strip(b'\0'):
+            continue
+        kept = [(record_id(e), lv) for e, lv in entries if record_id(e).strip(b'\0')]
+        out.append(raw + struct.pack('<BBH', flags & 0xFF, chance, len(kept)) +
+                   b''.join(e + struct.pack('<H', lv) for e, lv in kept))
+        n += 1
+    out[1] = struct.pack('<I', n)
+    return b''.join(out)
 
 
 def action_code(kind_action, owned):
@@ -381,7 +441,8 @@ def placements(raw, objects, numbers, extras=None):
             rows.append((kind, owned, stable_ref(MASTER, ref['number']), x, y, z, weight, value, name,
                          ident if kind in ('I', 'C') else '',
                          action_code(action, owned), owner_of(ref) if owned else None,
-                         record[5:7] if kind == 'C' else None, lock_level(ref) if kind == 'C' else 0))
+                         record[5:7] if kind in ('C', 'A') and len(record) > 5 else None,
+                         lock_level(ref) if kind == 'C' else 0))
     return rooms
 
 
@@ -392,7 +453,8 @@ def build(data_files):
     table, hashes = load_table(data)
     numbers = {row['cell'].casefold(): row['number'] for row in table if row['master'] == 'Morrowind.esm'}
     extras = {}
-    rooms = placements(raw, objects_of(raw), numbers, extras)
+    levelled = item_lists(raw)
+    rooms = placements(raw, objects_of(raw, levelled), numbers, extras)
     index, body, held, owners, containers = [], [], {}, {}, {}
     for number in sorted(rooms):
         rows = sorted(rooms[number], key=lambda r: r[2])
@@ -410,10 +472,11 @@ def build(data_files):
                 owners[reference] = owner
     identities, references, respawn = reference_table(raw, hashes.get('Morrowind.esm'))
     payload = (b'AWF3' + struct.pack('<I', len(index)) + b''.join(index) + b''.join(body) + owner_list(owners) +
-               contents_list(containers) + identities)
+               contents_list(containers) + identities + levelled_section(levelled))
     assert all(len(r) == ROW for r in body)
     report = {'format': 'AWF3', 'rooms': len(index), 'rows': len(body), 'owners': len(owners),
-              'containers': len(containers), 'references': references,
+              'containers': len(containers), 'references': references, 'levelled_item_lists': len(levelled),
+              'actor_inventories': sum(1 for c in containers.values() if c[1] & ACTOR_INVENTORY),
               'respawn': dict(zip(RESPAWN_GMSTS, respawn)), 'bytes': len(payload),
               'sha256': hashlib.sha256(payload).hexdigest(), 'master_sha256': hashes.get('Morrowind.esm'),
               'held_rows': held}

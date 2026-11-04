@@ -406,7 +406,8 @@ class RespawnAndMigrationTests(unittest.TestCase):
 
     def test_the_table_is_after_the_contents_list(self):
         source = (ROOT / 'tools/prepare_focus.py').read_text(encoding='utf-8')
-        self.assertIn('contents_list(containers) + identities)', source)
+        # CONTAINER-LEVELLED-CONTENTS-60: the builder-only levelled lists follow the identity table
+        self.assertIn('contents_list(containers) + identities + levelled_section(levelled))', source)
         inventory = code('aw_inventory.c')
         refs = body(inventory, 'aw_refs_t *AW_PlacedRefs(void){')
         self.assertLess(refs.index('"AWC1"'), refs.index('AW_RefsOpen(&refs,refs_read,NULL,at-base,end-base)'))

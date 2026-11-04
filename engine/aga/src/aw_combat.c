@@ -858,6 +858,9 @@ static void player_strike(edict_t *p) {
     if(s->f.dead){
         set_state(s,S_DEAD,G_DEATH);s->e->v.solid=SOLID_NOT;SV_LinkEdict(s->e,false);sound(SND_FALL);
         if(s->rolled){s->e->v.angles[2]=90;s->e->v.origin[2]+=2;}           /* stand-in: lie down */
+        /* the death onto the change list at once (CORPSE-LOOT-60): a room captures its actors only every half
+         * minute, so a body killed just before the player left came back alive and its search was lost */
+        if(aw_combat_actor_died)aw_combat_actor_died(s->e);
         if(readout.value)Con_Printf("Combat: %s is dead\n",s->f.name);
         voice(s->e,AW_VOICE_DEATH);
         if(!AW_CombatHostiles())ended(1);
@@ -1309,7 +1312,12 @@ int AW_CombatTestEngage(edict_t *t,int dead) {
          if(!ok)return 0;}
         s=slot_of(t);if(!s)return 0;
     }
-    if(dead){s->f.dead=1;s->f.health=0;set_state(s,S_DEAD,G_DEATH);}
+    /* a corpse as the fight leaves one (combat_hit: not solid; the aim test finds it by its model's bounds) */
+    if(dead){s->f.dead=1;s->f.health=0;set_state(s,S_DEAD,G_DEATH);s->e->v.solid=SOLID_NOT;
+        if(s->rolled && s->e->v.angles[2]!=90){s->e->v.angles[2]=90;s->e->v.origin[2]+=2;}   /* stand-in: lie down */
+        SV_LinkEdict(s->e,false);
+        if(aw_combat_actor_died)aw_combat_actor_died(s->e);   /* on the change list at once, as a fight's death */
+    }
     return 1;
 }
 /* aw_actors.c: a resumed fight keeps the health the save or the change list held. */

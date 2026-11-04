@@ -164,6 +164,7 @@ static void placed_command(void){
     if(!strcmp(a,"ledger")){ledger_command();return;}
     if(!strcmp(a,"pass")){pass_command();return;}
     if(!strcmp(a,"container")){AW_ContainerCommand();return;}   /* CELL-CHANGES-59 slice 3 */
+    if(!strcmp(a,"body")){AW_CorpseCommand();return;}           /* CORPSE-LOOT-60 */
     if(!strcmp(a,"areas")){AW_AreaStatus();return;}             /* AREA-TABLES-59 */
     if(!strcmp(a,"look") || !strcmp(a,"go"))look_command(!strcmp(a,"go"));
     else if(!strcmp(a,"on") || !strcmp(a,"off")){placed_on=!strcmp(a,"on");Con_Printf("Placed items %s from the next map.\n",a);}
@@ -173,6 +174,7 @@ void AW_PlacedInit(void){
     Cmd_AddCommand("aw_placed",placed_command);
     aw_placed_begin=placed_begin;aw_placed_admit=placed_admit;aw_object_drawn=placed_drawn;aw_placed_link=AW_PlacedLink;
     AW_CStripInit();     /* CONTAINER-WINDOW-59: E on a container opens its strip */
+    AW_CorpseInit();     /* CORPSE-LOOT-60: E on a body too; CONTAINER-LEVELLED-CONTENTS-60: the levelled rolls */
 }
 void AW_PlacedLink(void){
     int i,outdoor;vec3_t shift;

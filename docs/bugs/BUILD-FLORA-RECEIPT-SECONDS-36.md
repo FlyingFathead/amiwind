@@ -20,6 +20,22 @@
 
 _Last updated with AmiWind v0.0.41 (16 October 2026)._
 
+<!-- contents start -->
+## Contents
+
+- [Status: 10 October 2026](#status-10-october-2026)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
+
 ## Status: 10 October 2026
 
 Repaired in source (v0.0.36 development, not yet in a build). One of the causes of
@@ -94,6 +110,7 @@ Family: Build reuse keys and output attribution (`build-cache-reuse`). A unit is
 - BUILD-KEY-UNIT-RESTORED-CODE-52 (no report page): A stage whose last real run restored its units from a cache was reused after the code those units come from changed: chim-room-batches kept actor models of the old animation tables
 - BUILD-MINIWIND-REUSE-STALE-57 (no report page): The MiniWind build launcher reused the v0.0.53 final run instead of the newest passed run
 - BUILD-MWSCRIPT-KEY-UNDERDECLARED-48 (no report page): The mwscript stage's reuse record is refused: the stage reads tools/mwscript/measure.py, which its fingerprint leaves out
+- BUILD-MWSCRIPT-STAGE-REUSED-COMPILER-CHANGED-59 (no report page): The mwscript stage was reused after its compiler changed, so v0.0.59 ships compiled scripts of an older compiler
 - [BUILD-NPC-BAKE-CACHE-KEY-40](BUILD-NPC-BAKE-CACHE-KEY-40.md): New NPC shell fallback dependencies are absent from the model cache key
 - [BUILD-OUTPUTS-NOT-REPRODUCIBLE-33](BUILD-OUTPUTS-NOT-REPRODUCIBLE-33.md): A stage that runs again never matches its old outputs (tool logs, timings, run paths), so every stage after it is rebuilt
 - [BUILD-PASS-KEY-OVERBROAD-36](BUILD-PASS-KEY-OVERBROAD-36.md): Image-pass and unit cache keys changed with code no pass runs: a new function in a shared module and edits to the cache's own key code rekeyed every character head preview twice (Vivec stage A try2 and try3: 275 of 275 recomputed)

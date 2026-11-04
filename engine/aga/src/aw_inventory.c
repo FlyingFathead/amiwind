@@ -1296,6 +1296,8 @@ typedef struct {
     unsigned long key;byte *blob;long bytes;
     int rows,owners,owned,conts,contents,items;
     const byte *row,*owner,*own,*cont,*content,*itemoff,*pic;
+    const byte *lev;      /* CONTAINER-LEVELLED-CONTENTS-60: the levelled lists (CHIM actor table list layout), or NULL */
+    const byte *pool;int pool_ids;   /* and the ids their entries name (u8 length, the id) */
 } area_t;
 /* slots 0..AREA_MAX-1: the place's areas; the last AREA_NARROW: the cache (KEEP WHAT YOU CAN AFFORD): the areas the
  * player left lately and those narrow-loaded for one answer outside the place (a carried item from elsewhere, a
@@ -1388,7 +1390,29 @@ static int area_read_at(unsigned long n,area_t *a){
         for(s=0;s<6;s++){p+=1+*p;if(p>a->blob+a->bytes){area_free(a);return 0;}}
         end=p-a->blob;}
      if(end+(long)a->items*8>a->bytes){area_free(a);return 0;}
-     a->pic=a->blob+end;}
+     a->pic=a->blob+end;
+     /* CONTAINER-LEVELLED-CONTENTS-60: the levelled lists after the pictures, named by the record's last 8 bytes
+      * (u32 their offset, "AWL1"; tools/prepare_area_tables.py); a record without them has none */
+     if(a->bytes>=end+(long)a->items*8+16 && !memcmp(b+a->bytes-4,"AWL1",4)){
+        unsigned long o=focus_u32(b+a->bytes-8),stop=(unsigned long)(a->bytes-8),lists,lb,total=0;
+        const byte *s=b+o+4;
+        if(o>=(unsigned long)(end+(long)a->items*8) && o+8<=stop && !memcmp(b+o,"AWL1",4)){
+            /* the lists' bytes: the heads, then the entries up to the last head's (tools/prepare_area_tables.py
+             * levelled_block), then the id pool "AWN1" u16 ids, ids x {u8 length, id} */
+            lists=(unsigned long)s[0]<<24|(unsigned long)s[1]<<16|(unsigned long)s[2]<<8|s[3];
+            if(lists && lists<0x8000 && o+8+lists*8<=stop){
+                const byte *h=s+4+(lists-1)*8;
+                total=((unsigned long)h[0]<<24|(unsigned long)h[1]<<16|(unsigned long)h[2]<<8|h[3])+(unsigned long)(h[4]<<8|h[5]);
+            }
+            lb=4+lists*8+total*4;
+            if(lists && total<0x100000 && o+4+lb+6<=stop && !memcmp(s+lb,"AWN1",4) && aw_levelled_valid &&
+               aw_levelled_valid(s,lb,0x8000u)){
+                const byte *p=s+lb+6;int k,ids=s[lb+4]|(s[lb+5]<<8);
+                for(k=0;k<ids && p<b+stop;k++)p+=1+*p;
+                if(k==ids && p<=b+stop){a->lev=s;a->pool=s+lb+6;a->pool_ids=ids;}
+            }
+        }
+     }}
     return 1;
 }
 /* a cache slot for an area of NEED bytes: the least recently used ones freed until the cache's bytes allow it */
@@ -1685,9 +1709,57 @@ static int area_placed_id(unsigned reference,char *id){
     }
     return -1;
 }
+/* CONTAINER-LEVELLED-CONTENTS-60: a container's (or a body's) levelled entries are rolled once, on its first open,
+ * by the game's rule (OpenMW 0.51 mwmechanics/levelledlist.cpp getLevelledItem and mwworld/containerstore.cpp
+ * addInitialItem: the player's level now; chance none; the highest level at or below it, or every level when the
+ * list says so; a list inside a list rolled again; "Each" a roll per one of the count, else one roll for the whole
+ * count; our own code, the same pick as the levelled creatures, ChimActors_LevelledPick). What it gave goes onto the
+ * world change list as put-in items, with the mark LEVELLED_MARK, so it stays across maps and saves; a respawn refill
+ * (AW_LedgerContentDrop) drops both and the next open rolls again, as OpenMW's restock does. */
+#define LEVELLED_MARK "*levelled"
+#define LEVELLED_LIST_BYTES 8         /* chim_actor_table.h CHIM_ACTOR_LIST_BYTES */
+unsigned aw_levelled_seed;            /* 0: from the clock at the first roll (tests set it) */
+unsigned long aw_levelled_rolls,aw_levelled_items;
+/* the CHIM actor table's list code (aw_corpse.c AW_CorpseInit sets them; NULL in the tools' tests: no list is read,
+ * levelled entries give nothing) */
+int (*aw_levelled_valid)(const unsigned char *s,unsigned long bytes,unsigned items);
+int (*aw_levelled_pick)(const unsigned char *s,unsigned index,int level,unsigned *state);
+int (*aw_levelled_level)(void);       /* the player's level now (NULL or below 1: 1) */
+static void levelled_roll(const area_t *a,unsigned reference,int list,int count,int *rolled){
+    unsigned state;int level=aw_levelled_level?aw_levelled_level():1,each,times,i;
+    const byte *l;char id[sizeof(((aw_container_item_t *)0)->id)];
+    if(level<1)level=1;
+    if(!aw_ledger_on || !a->lev || !aw_levelled_pick || count<1)return;
+    if(!*rolled){
+        if(AW_LedgerContentDelta(&aw_ledger,reference,LEVELLED_MARK)>0){*rolled=-1;return;}
+        AW_LedgerContentAdd(&aw_ledger,reference,LEVELLED_MARK,1);*rolled=1;
+    }
+    if(*rolled<0)return;
+    if(!aw_levelled_seed)aw_levelled_seed=(unsigned)(Sys_FloatTime()*1000.0)|1u;
+    /* the roll state (as ChimActors_RollSeed): the reference and list mixed with the session's seed */
+    state=(unsigned)((((unsigned long)reference^(unsigned long)list<<20^aw_levelled_seed++)*2654435761UL)&0xFFFFFFFFUL);
+    if(!state)state=0x9E3779B9u;
+    l=a->lev+4+(unsigned long)list*LEVELLED_LIST_BYTES;
+    each=(l[7]&2)!=0;times=each?count:1;
+    if(times>256)times=256;
+    for(i=0;i<times;i++){
+        int got=aw_levelled_pick(a->lev,(unsigned)list,level,&state);
+        aw_levelled_rolls++;
+        if(got<0)continue;
+        if(got&0x4000){       /* an id of the pool (its record through the item directory when the strip names it) */
+            const byte *p=a->pool;int k=got&0x3FFF,j;
+            if(k>=a->pool_ids)continue;
+            while(k--)p+=1+*p;
+            if(!*p || *p>=(int)sizeof(id))continue;
+            for(j=0;j<*p;j++){int c=p[1+j];id[j]=(char)(c>='A' && c<='Z'?c+32:c);}
+            id[j]=0;
+        }else if(!area_item_id(a,got,id,sizeof(id)))continue;
+        if(AW_LedgerContentAdd(&aw_ledger,reference,id,each?1:count))aw_levelled_items+=each?1:(unsigned long)count;
+    }
+}
 /* a loaded area's container contents (as container_base_read): -2 when no loaded area has REFERENCE */
 static int area_contents(unsigned reference,aw_container_item_t *out,int max,int *flags,int *lock){
-    const area_t *a;const byte *c=area_container(reference,&a);int first,n,i,k;
+    const area_t *a;const byte *c=area_container(reference,&a);int first,n,i,k,rolled=0;
     if(!c)return -2;
     first=c[4]|(c[5]<<8);n=c[6]|(c[7]<<8);
     if(flags)*flags=c[8]&7;
@@ -1695,6 +1767,12 @@ static int area_contents(unsigned reference,aw_container_item_t *out,int max,int
     if(first+n>a->contents)return -1;
     for(i=k=0;i<n && k<max;i++){
         const byte *e=a->content+(first+i)*8;
+        if(e[2]&1){        /* a levelled list's entry: rolled on the first open, its items on the change list */
+            if(a->lev && (unsigned long)(e[0]|(e[1]<<8))<((unsigned long)a->lev[0]<<24|(unsigned long)a->lev[1]<<16|
+                                                         (unsigned long)a->lev[2]<<8|a->lev[3]))
+                levelled_roll(a,reference,e[0]|(e[1]<<8),(int)(int32_t)focus_u32(e+4),&rolled);
+            continue;
+        }
         if(!area_item_id(a,e[0]|(e[1]<<8),out[k].id,sizeof(out[k].id)))continue;
         out[k].count=(int)(int32_t)focus_u32(e+4);k++;
     }
@@ -1879,7 +1957,7 @@ int AW_ContainerContents(unsigned reference,aw_container_item_t *out,int max,int
     m=AW_LedgerContentOf(&aw_ledger,reference,&first);
     for(i=first;i<first+m && k<max;i++){
         int j;const aw_ledger_content_t *c=&aw_ledger.content[i];
-        if(c->count<=0)continue;
+        if(c->count<=0 || c->item[0]=='*')continue;     /* LEVELLED_MARK: the rolled mark, no item */
         for(j=0;j<n;j++)if(same_id_ci(out[j].id,c->item))break;
         if(j<n)continue;            /* a data entry: counted above */
         Q_strcpy_bounded(out[k].id,c->item,sizeof(out[k].id));out[k].count=c->count;k++;
@@ -2146,7 +2224,7 @@ static int refs_lookup(void *context,uint32_t key,uint32_t *record){
 }
 static int item_known(void *context,const char *id){
     aw_inventory_item_t item;(void)context;
-    return id && id[0] && AW_InventoryRead(id,&item);
+    return id && id[0] && (id[0]=='*' || AW_InventoryRead(id,&item));   /* '*': LEVELLED_MARK */
 }
 /* A save is written: the record hash of every reference the list names, and the content files (aw_save.c). */
 void AW_PlacedIdentRefresh(aw_ledger_t *l){
@@ -2320,6 +2398,16 @@ int AW_PlacedRefresh(void){
     if(sv.active && svs.maxclients==1 && svs.clients && svs.clients[0].edict)focus_refresh(svs.clients[0].edict);
     return focus_outdoor;
 }
+/* AMBIENT-WALK-PER-AREA-60: the place's area keys (the room, or the 3 x 3 exterior cells), for the other per-area
+ * tables (aw_ambient.c); the generation moves with every place read */
+static unsigned long place_keys[AREA_MAX],place_gen;static int place_n;static model_t *place_world;
+int AW_AreaPlaceKeys(unsigned long *keys,int max,unsigned long *generation){
+    int i;
+    if(place_world!=sv.worldmodel || !place_world)return -1;     /* this map's place not read yet */
+    for(i=0;i<place_n && i<max;i++)keys[i]=place_keys[i];
+    *generation=place_gen;
+    return i;
+}
 static void focus_load(void){
     FILE *f=NULL;long base,room=0;int i,j,dx,dy,ok=1;
     unsigned long rooms;edict_t *e;eval_t *v;vec3_t game,local;
@@ -2329,6 +2417,9 @@ static void focus_load(void){
     if(svs.clients && svs.clients[0].edict && focus_to_source(svs.clients[0].edict->v.origin,game)){
         focus_outdoor=1;focus_gx=(int)floor(game[0]/FOCUS_CELL);focus_gy=(int)floor(game[1]/FOCUS_CELL);
     }else if(!(room=focus_room()))return;
+    place_n=0;place_gen++;place_world=sv.worldmodel;
+    if(!focus_outdoor)place_keys[place_n++]=(unsigned long)room;
+    else for(dx=-1;dx<=1;dx++)for(dy=-1;dy<=1;dy++)place_keys[place_n++]=focus_exterior_key(focus_gx+dx,focus_gy+dy);
     if(!focus_rows && !(focus_rows=(focus_row_t *)AW_TryMalloc(FOCUS_ROWS*sizeof(focus_row_t))))return;
     if(area_ready()){
         /* AREA-TABLES-59: the place's area tables (the room, or the 3 x 3 exterior cells) loaded with it: one seek and

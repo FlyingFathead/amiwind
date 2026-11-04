@@ -248,6 +248,96 @@ class AmbientNativeTests(unittest.TestCase):
                 cflags=['-fsanitize=undefined', '-fno-sanitize-recover=all'],
                 arguments=[str(table), str(Path(tmp) / 'expect.tsv')])
 
+    def test_c_reader_reads_the_per_area_tables(self):
+        """AMBIENT-WALK-PER-AREA-60: every table of npc-ambient.awa (the shared levelled packages and each area's) is a
+        whole AWAM1 table the engine's reader opens and answers from, as aw_ambient.c amb_open does."""
+        import test_aga_native_source as native
+        import prepare_area_tables as P
+        raw, _ = A.build_master(master())
+        refs = sorted({r['ref'] for r in A.read_table(raw)[1] if r['ref']})
+        keys_of = {x: 7 if k % 2 == 0 else 0x80000001 for k, x in enumerate(refs)}
+        payload, _ = P.build_ambient(keys_of, raw)
+        n, shared_at, shared_bytes = struct.unpack_from('<III', payload, 4)
+        tables = [payload[shared_at:shared_at + shared_bytes]]
+        for i in range(n):
+            _, at, size = struct.unpack_from('<III', payload, 16 + 12 * i)
+            tables.append(payload[at:at + size])
+        with tempfile.TemporaryDirectory(prefix='ambient-areas-native-') as tmp:
+            for k, t in enumerate(tables):
+                head, rows, points, hops, profiles = A.read_table(t)
+                lines = []
+                for i, r in enumerate(rows):
+                    lines.append('row\t%d\t%d\t%d\t%d\t%d\t%d' % (r['ref'], r['hash'], i, r['points'], r['destinations'],
+                                                                 r['profile']))
+                    for j in range(r['points']):
+                        p = points[r['first_point'] + j]
+                        lines.append('point\t%d\t%d\t%d\t%d\t%d\t%d' % (i, j, p[0], p[1], p[2], p[3]))
+                    w = r['destinations']
+                    for a in range(r['points']):
+                        for b in range(w):
+                            h = hops[r['first_hop'] + a * w + b]
+                            lines.append('hop\t%d\t%d\t%d\t%d' % (i, a, b, -1 if h == 255 else h))
+                for j, prof in enumerate(profiles):
+                    lines.append('profile\t%d\t%s' % (j, '\t'.join(map(str, prof))))
+                (Path(tmp) / ('t%d.lut' % k)).write_bytes(t)
+                (Path(tmp) / ('e%d.tsv' % k)).write_text('\n'.join(lines) + '\n', encoding='utf-8')
+                native.NativeSourceTests().compile_run(
+                    'aga_ambient_test.c', [SRC / 'aw_ambient.c'], defines=['AW_AMBIENT_HOST_TEST'],
+                    cflags=['-fsanitize=undefined', '-fno-sanitize-recover=all'],
+                    arguments=[str(Path(tmp) / ('t%d.lut' % k)), str(Path(tmp) / ('e%d.tsv' % k)), 'area'])
+
+
+class AmbientAreasTests(unittest.TestCase):
+    """AMBIENT-WALK-PER-AREA-60: tools/prepare_area_tables.py build_ambient splits npc-ambient.lut per area."""
+
+    def test_split_keeps_every_package_byte(self):
+        import prepare_area_tables as P
+        raw, _ = A.build_master(master())
+        mult, rows, profiles = P.read_awam(raw)
+        refs = sorted({f[0] for f, _, _ in rows if f[0]})
+        self.assertGreaterEqual(len(refs), 2)
+        keys_of = {refs[0]: 7, 999999: 11}
+        keys_of.update({x: 9 for x in refs[1:]})
+        payload, report = P.build_ambient(keys_of, raw)
+        self.assertEqual(payload[:4], b'AWM1')
+        n, shared_at, shared_bytes = struct.unpack_from('<III', payload, 4)
+        self.assertEqual(n, 2)                                  # the room with no package gets no table
+        keys = [struct.unpack_from('<I', payload, 16 + 12 * i)[0] for i in range(n)]
+        self.assertEqual(keys, [7, 9])
+        smult, srows, _ = P.read_awam(payload[shared_at:shared_at + shared_bytes])
+        self.assertEqual(smult, mult)
+        self.assertEqual(sorted(f[1] for f, _, _ in srows), sorted(f[1] for f, _, _ in rows if f[0] == 0))
+        seen = []
+        for i in range(n):
+            _, at, size = struct.unpack_from('<III', payload, 16 + 12 * i)
+            m2, arows, aprof = P.read_awam(payload[at:at + size])
+            for f, pts, hop in arows:
+                orig = next(o for o in rows if o[0][0] == f[0] and o[0][1] == f[1])
+                self.assertEqual(f[:8], orig[0][:8])
+                self.assertEqual((pts, hop), (orig[1], orig[2]))
+                self.assertEqual(aprof[f[10]], profiles[orig[0][10]])
+                seen.append((f[0], f[1]))
+        self.assertEqual(sorted(seen), sorted((f[0], f[1]) for f, _, _ in rows if f[0]))
+        self.assertEqual(report['refs_not_in_any_area'], 0)
+
+    def test_places_name_every_placement(self):
+        import prepare_area_tables as P
+        from prepare_focus import exterior_key
+        raw, report = A.build_master(master())
+        self.assertEqual({int(r) for r in report['places']}, {r['ref'] for r in A.read_table(raw)[1] if r['ref']})
+        self.assertEqual(P.area_keys({'5': ['e', -2, -9], '6': ['i', 'x room'], '8': ['i', 'no number']},
+                                     {'x room': 42}), {5: exterior_key(-2, -9), 6: 42})
+
+    def test_wired_behind_the_cvar(self):
+        c = re.sub(r'/\*.*?\*/', '', (SRC / 'aw_ambient.c').read_text(encoding='utf-8'), flags=re.S)
+        self.assertIn('{"aw_ambient_areas","1"}', c)
+        self.assertIn('AW_AreaPlaceKeys(keys,AMB_AREAS,&gen)', c)
+        self.assertIn('if(!m && !load())return;', c)            # aw_ambient_areas 0: the island-wide file as before
+        b = (ROOT / 'tools/build_aga.py').read_text(encoding='utf-8')
+        self.assertIn("aw_ambient_areas 1\\n", b)
+        self.assertIn('ambient_table_step(', b)
+        self.assertIn('stage_ambient(id1,', (ROOT / 'tools/ambient_lut.py').read_text(encoding='utf-8'))
+
 
 class AmbientSourceContractTests(unittest.TestCase):
     def code(self, name):
@@ -257,7 +347,9 @@ class AmbientSourceContractTests(unittest.TestCase):
         c = self.code('aw_ambient.c')
         self.assertIn('static int ambient_on=1;', c)        # on by default since v0.0.57, no cvar or command of its own
         self.assertIn('chim actors ambient on', (ROOT / 'tools/build_aga.py').read_text(encoding='utf-8'))
-        self.assertNotRegex(c, r'Cvar_RegisterVariable|Cmd_AddCommand')
+        self.assertNotRegex(c, r'Cmd_AddCommand')
+        # its one cvar: the per-area tables' A/B switch (AMBIENT-WALK-PER-AREA-60)
+        self.assertEqual(re.findall(r'Cvar_RegisterVariable\s*\(([^)]*)\)', c), ['&ambient_areas_cvar'])
         self.assertIn('aw_ambient_cmd ();', self.code('aw_actors.c'))
         self.assertIn('aw_ambient_cmd=AW_AmbientCommand;', c)
         self.assertIn('AW_CombatSlotState', c)              # combat owns a fighting actor
@@ -270,8 +362,8 @@ class AmbientSourceContractTests(unittest.TestCase):
     def test_levelled_index_and_aggro_wired(self):
         c = self.code('aw_ambient.c')
         # levelled creatures: own id first, then the reference's routes with the creature's package
-        self.assertIn('find(ref,AW_AMBIENT_LEVELLED_HASH,r)', c)
-        self.assertIn('find(AW_AMBIENT_LEVELLED_REF,hash,&pkg)', c)
+        self.assertIn('find_in(ref,AW_AMBIENT_LEVELLED_HASH,r,&found_t)', c)
+        self.assertIn('find_in(AW_AMBIENT_LEVELLED_REF,hash,&pkg,&found_prof)', c)
         # the rows stay on disk: one key per block resident, a block read per lookup, absent actors remembered
         self.assertIn('resident_size=blocks*8+', c)
         self.assertNotIn('AW_AmbientOpen(&table', c)

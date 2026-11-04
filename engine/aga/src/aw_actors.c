@@ -276,6 +276,10 @@ static int Respawned (change_t *c)
 		return 0;
 	if (aw_actors_forget)
 		aw_actors_forget (c->key);
+	/* CORPSE-LOOT-60: what was taken from or put into the body goes too (it comes back with its data's inventory,
+	 * its levelled entries rolled again on the next open) */
+	if (aw_ledger_on)
+		AW_LedgerContentDrop (&aw_ledger, c->key);
 	AW_LedgerActorReset (c);
 	aw_ledger_events.actors++;
 	Con_Printf ("Respawn: actor %lu is back as the game data has it.\n", (unsigned long)c->key);
@@ -1036,6 +1040,11 @@ void AW_ActorsRoomTick (void)
 	}
 	if (!room)
 		return;
+	/* CORPSE-LOOT-60: not in the map's settle frames: the player's scene set-up (aw_combat.c AW_CombatSceneSpawn) comes
+	 * after them and empties the combat slots, so a body laid down there stood up again with nothing to search; until
+	 * then nothing is captured either (the map's own placement would overwrite where a body lies) */
+	if (apply_pending && (svs.maxclients < 1 || !svs.clients || !svs.clients[0].active || !svs.clients[0].spawned))
+		return;
 	if (apply_pending)
 		ApplyLoaded ();
 	/* keep the room's actors captured as they stand: the room's map goes away without a leave of its own */
@@ -1631,7 +1640,12 @@ static void ApplyLoaded (void)
 			SV_LinkEdict (e, false);
 		}
 		if (c->dead)
-			AW_CombatTestEngage (e, 1);
+		{
+			int held = AW_CombatTestEngage (e, 1);
+			/* one line per body on the map's first tick (a body that could not be laid down is a finding, CORPSE-LOOT-60) */
+			Con_Printf ("actors: %s (ref %.0f) dead again: %s\n", e->v.netname ? pr_strings + e->v.netname : "?",
+					RefOf (e), held ? "lying" : "no combat slot, not laid down");
+		}
 		else if (c->fight && AW_CombatTestEngage (e, 0))
 			AW_CombatSetHealth (e, c->health);
 		applied++;

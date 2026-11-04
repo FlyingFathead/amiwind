@@ -190,7 +190,8 @@ loaded(){ s=0; while [ $s -lt $((150*K)) ]; do alive || finish "FAIL emulator ex
   [ "$(st server)" = "$1" ] && return 0; sleep 1; s=$((s+1)); done; stall "$1 did not load (server $(st server))"; }
 t0=$(date +%s)
 sleep $((9*K))
-n=0; while [ ! -s $R/awctl/state.txt ] && [ $n -lt $((200*K)) ]; do
+# BOOT-WAIT-BEGIN
+n=0; while [ ! -s $R/awctl/state.txt ] && [ $n -lt $((${BOOT_WAIT:-300}*K)) ]; do
   # Escape first: the start-up logo takes every key, and its memory notice reads M as "not now" (the CHIM cache off
   # for this start): the m of "aw_remote" typed onto the logo failed gate smokes with the zone full
   # (SMOKE-M-KEY-SKIPS-CHIM-CACHE-57). Escape ends the logo before anything is typed.
@@ -198,10 +199,19 @@ n=0; while [ ! -s $R/awctl/state.txt ] && [ $n -lt $((200*K)) ]; do
   # and the typed m still skipped the cache (gates 5916, 6201, 6202, 6222, 6262: "remote up after 21-22 s"). The play
   # copy's id1/autoexec.cfg already turns the remote on, so the smoke now only presses Escape while it waits, and types
   # "aw_remote 1" only as a late fallback, after 90 s, when any logo is long gone.
-  alive || finish "FAIL emulator exited during boot"; key Escape; sleep 2
-  if [ $n -ge $((90*K)) ]; then con "aw_remote 1"; sleep 2; key Escape; fi
-  sleep $((2*K)); n=$((n+2+2*K)); done
-[ -s $R/awctl/state.txt ] || finish "FAIL no remote control after boot"
+  # REGRESSION 2026-11-04 (gate 6418, a from-scratch build on all cores): the logo came after 90 s and the late
+  # fallback's m skipped the cache again. No timing is safe, so the smoke types NOTHING before the game's own remote
+  # answers: the play copy's id1/autoexec.cfg turns the remote on, and the remote's state file is the ready signal.
+  # No key at all while waiting: gate 6810 showed that an Escape sent before the game runs lands in the AmigaDOS
+  # window's start-up preflight ("Starting in 2 s...") as typed input and holds it there, so the game never starts.
+  # BOOT_WAIT (300 s) bounds the wait; no remote by then fails as "no remote control", never by typing onto the screen.
+  alive || finish "FAIL emulator exited during boot"
+  sleep $((2*K)); n=$((n+2*K)); done
+# BOOT-WAIT-END
+# The game runs now (its remote answers): Escape ends a start-up logo that is still up or comes later; Escape never
+# answers the logo's memory notice (only M does), so it is safe at any time after this point.
+[ -s $R/awctl/state.txt ] && for i in 1 2 3; do key Escape; sleep $((2*K)); done
+[ -s $R/awctl/state.txt ] || finish "FAIL no remote control after boot ($(( $(date +%s) - t0 )) s; the play copy's autoexec turns it on, nothing is typed before it answers)"
 log "boot: remote up after $(( $(date +%s) - t0 )) s"; shot menu
 if [ "${START:-map}" = enter ] || [ "${START:-map}" = auto ]; then  # a MiniWind image starts its own scene; Enter through its quick character pages
   [ "${START:-map}" = auto ] || key Return; loaded "$MAP1"; i=0  # until the view renders (local origin not 0 0 0), at most 20 pages

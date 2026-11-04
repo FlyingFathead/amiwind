@@ -479,6 +479,7 @@ def build_master(master, report_areas=True):
             first_kinds[kind or 'none'] = first_kinds.get(kind or 'none', 0) + 1
             counts['no_package' if kind is None else 'wander_first' if kind == 'wander' else 'other_first'] += 1
     per_row_cell = []
+    places = {}     # AMBIENT-WALK-PER-AREA-60: reference number -> its cell (tools/prepare_area_tables.py splits by it)
     for cell, ref, ident, a in placed_wanderers(actors, cells):
         w = a['packages'][0][1]
         interior = bool(cell['flags'] & 1)
@@ -510,6 +511,7 @@ def build_master(master, report_areas=True):
         while len(hops) % 4:
             hops.append(0)
         per_row_cell.append((cell, len(pts) * POINT + len(hop) + (-len(hop)) % 4 + ROW))
+        places[str(ref['number'])] = place_of(cell)
     # Levelled creature references (LEVELLED_HASH rows) and the packages of the creatures they can give (LEVELLED_REF
     # rows). OpenMW 0.51 spawns the creature a list picks as an ordinary reference of that creature
     # (mwclass/creaturelevlist.cpp: ManualRef of the picked id), whose package sequence is filled from its own record's
@@ -550,6 +552,7 @@ def build_master(master, report_areas=True):
             while len(hops) % 4:
                 hops.append(0)
             per_row_cell.append((cell, len(pts) * POINT + len(hop) + (-len(hop)) % 4 + ROW))
+            places[str(ref['number'])] = place_of(cell)
     for cid, a in sorted(used.items()):
         w = a['packages'][0][1]
         prof = tuple(idle_profile(w['idle'], multiplier))
@@ -586,10 +589,15 @@ def build_master(master, report_areas=True):
               'rows': len(rows), 'points': len(points), 'hop_bytes': len(hops), 'profiles': len(profiles),
               'idle_multiplier': multiplier / 65535.0, 'first_package': first_kinds, 'counts': counts,
               'scripted_actors': len(scripted), 'grids': len(grids), 'levelled': lev,
-              'seconds': round(time.time() - t0, 2)}
+              'seconds': round(time.time() - t0, 2), 'places': places}
     if report_areas:
         report['areas'] = area_bytes(per_row_cell)
     return bytes(out), report
+
+
+def place_of(cell):
+    """A placement's cell: ['i', interior name folded] or ['e', grid x, grid y]."""
+    return ['i', cell['name'].casefold()] if cell['flags'] & 1 else ['e', cell['x'], cell['y']]
 
 
 def area_bytes(per_row_cell):
@@ -667,10 +675,17 @@ def image_step(data, id1, out=None, jobs=1):
     target.write_bytes(raw)
     if out is not None:
         Path(out).mkdir(parents=True, exist_ok=True)
-        (Path(out) / 'npc-ambient-table.json').write_text(json.dumps(report, indent=1, sort_keys=True) + '\n',
-                                                          encoding='utf-8', newline='\n')
+        # the placements' cells stay out of the printed report (one line per actor); build_aga.py hands them to
+        # prepare_area_tables.stage_ambient
+        (Path(out) / 'npc-ambient-table.json').write_text(
+            json.dumps({k: v for k, v in report.items() if k != 'places'}, indent=1, sort_keys=True) + '\n',
+            encoding='utf-8', newline='\n')
     print('Ambient table: %s %s, %d bytes, %d actors (took %.1f s, 1 core)' % (
         'reused' if report['reused'] else 'built', NAME, len(raw), report['rows'], time.time() - t0), flush=True)
+    # AMBIENT-WALK-PER-AREA-60: the same packages split per area (id1/npc-ambient.awa), loaded with the area and
+    # searched in memory by the engine (aw_ambient_areas 1, build_aga.py's default-game.cfg; 0 = this file as before)
+    from prepare_area_tables import stage_ambient
+    stage_ambient(id1, out if out is not None else Path(id1).parent, data, report.get('places'))
     return report
 
 

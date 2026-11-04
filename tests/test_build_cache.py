@@ -2063,6 +2063,122 @@ class NarrowedReuseTests(unittest.TestCase):
         self.assertIn('trace form 1', record['why'][0])
 
 
+TABLED = '''HOST = {'raiserank', 'showmap'}
+EFFECTS = {'showmap'}
+
+
+def lookup(name):
+    return name in HOST
+'''
+TABLE_USER = '''from tabled import EFFECTS
+import tabled
+
+
+def effect(name):
+    return name in EFFECTS
+
+
+def known(name):
+    return tabled.lookup(name)
+'''
+WHOLE_STAGE = '''import hashlib
+from pathlib import Path
+import sys
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / 'tools'))
+from tabled import lookup  # noqa: E402
+
+
+def identity():
+    h = hashlib.sha256()
+    for path in sorted((ROOT / 'tools' / 'compiler').glob('*.py')):
+        h.update(path.read_bytes())
+    return h.hexdigest()
+
+
+if __name__ == '__main__':
+    print(identity(), lookup('raiserank'))
+'''
+
+
+class TableAndWholeReadTests(unittest.TestCase):
+    """BUILD-MWSCRIPT-STAGE-REUSED-COMPILER-CHANGED-59: the mwscript stage was reused from 1 November to the v0.0.59
+    release although its compiler changed (functions.HOST gained RaiseRank, ShowRestMenu, ...): its record of what it
+    used held only the functions that ran, and a literal table is a unit of its own that no call names. A table the
+    recorded code names is in the record; a stage whose code reads .py files whole (compiler_identity) is narrowed
+    only by a record that has them whole."""
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.repository = Path(self.temp.name) / 'repo'
+        make_repository(self.repository)
+        (self.repository / 'tools' / 'tabled.py').write_text(TABLED)
+        (self.repository / 'tools' / 'table_user.py').write_text(TABLE_USER)
+        (self.repository / 'tools' / 'compiler').mkdir()
+        (self.repository / 'tools' / 'compiler' / 'functions.py').write_text(TABLED)
+        (self.repository / 'tools' / 'whole_stage.py').write_text(WHOLE_STAGE)
+
+    def tearDown(self):
+        self.temp.cleanup()
+
+    def index(self):
+        return build_cache.SourceIndex(self.repository, top_format=build_cache.STAGE_TOP_FORMAT)
+
+    def edit(self, relative, old, new):
+        path = self.repository / relative
+        text = path.read_text()
+        self.assertIn(old, text)
+        path.write_text(text.replace(old, new))
+
+    def test_a_table_the_code_names_is_recorded(self):
+        record = build_cache.used_record(['#v2', '@tools/tabled.py\t<module>', '@tools/tabled.py\tlookup'], self.index())
+        self.assertTrue(record['complete'], record.get('why'))
+        self.assertIn('HOST', record['units']['tools/tabled.py'])
+        self.assertNotIn('EFFECTS', record['units']['tools/tabled.py'])       # no recorded code names it
+
+    def test_a_table_imported_from_another_module_is_recorded(self):
+        record = build_cache.used_record(['#v2', '@tools/table_user.py\t<module>', '@tools/table_user.py\teffect',
+                                          '@tools/tabled.py\t<module>'], self.index())
+        self.assertIn('EFFECTS', record['units']['tools/tabled.py'])
+        record = build_cache.used_record(['#v2', '@tools/table_user.py\t<module>', '@tools/table_user.py\tknown',
+                                          '@tools/tabled.py\t<module>', '@tools/tabled.py\tlookup'], self.index())
+        self.assertIn('HOST', record['units']['tools/tabled.py'])
+
+    def test_a_table_edit_in_code_that_ran_changes_the_record(self):
+        lines = ['#v2', '@tools/whole_stage.py\t<module>', '@tools/whole_stage.py\tidentity',
+                 '@tools/tabled.py\t<module>', '@tools/tabled.py\tlookup']
+        record = build_cache.used_record(lines, self.index())
+        with patch.object(build_cache, 'ran_manifest', return_value={'used': record}):
+            self.assertEqual(build_cache.narrowed_unchanged(Path('old'), 'stage', self.index()), (True, None))
+            self.edit('tools/tabled.py', "'raiserank', ", "'raiserank', 'lowerrank', ")
+            same, why = build_cache.narrowed_unchanged(Path('old'), 'stage', self.index())
+        self.assertFalse(same)
+        self.assertIn('tools/tabled.py', why)
+
+    def test_code_read_whole_needs_a_record_that_has_it_whole(self):
+        script = self.repository / 'tools' / 'whole_stage.py'
+        import stage_record
+        self.assertEqual(stage_record.whole_code_reads(self.index(), script), {'tools/compiler/functions.py'})
+        ran = ['#v2', '@tools/whole_stage.py\t<module>', '@tools/whole_stage.py\tidentity',
+               '@tools/tabled.py\t<module>', '@tools/tabled.py\tlookup', 'tools/compiler/functions.py']
+        # the file was imported somewhere and read whole: as an import only, the record does not narrow the key
+        old = build_cache.used_record(ran + ['@tools/compiler/functions.py\t<module>'], self.index())
+        with patch.object(build_cache, 'ran_manifest', return_value={'used': old}):
+            same, why = build_cache.narrowed_unchanged(Path('old'), 'stage', self.index(), script)
+        self.assertFalse(same)
+        self.assertIn('tools/compiler/functions.py', why)
+        # with the stage's '=' line (prepare_mwscript.note_compiler_read) it does, until that file changes
+        new = build_cache.used_record(ran + ['@tools/compiler/functions.py\t<module>', '=tools/compiler/functions.py'],
+                                      self.index())
+        with patch.object(build_cache, 'ran_manifest', return_value={'used': new}):
+            self.assertEqual(build_cache.narrowed_unchanged(Path('old'), 'stage', self.index(), script), (True, None))
+            self.edit('tools/compiler/functions.py', "'showmap'}\nEFFECTS", "'showmap', 'getpcsleep'}\nEFFECTS")
+            same, why = build_cache.narrowed_unchanged(Path('old'), 'stage', self.index(), script)
+        self.assertFalse(same)
+        self.assertIn('tools/compiler/functions.py', why)
+
+
 class KeyWalkListingTests(unittest.TestCase):
     """BUILD-REUSE-KEY-WALK-LISTED-51: the CHIM world stages' records listed almost every folder of the checkout (the
     SourceIndex walk behind an in-stage cache key), so a new bug page refused their narrowed reuse. A listing whose

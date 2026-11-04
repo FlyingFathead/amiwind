@@ -6,7 +6,7 @@ Inputs: the masters (Morrowind, Tribunal, Bloodmoon), the media stage's catalogu
 converted file each sound and voice became) and the soundtrack (music/soundtrack.json: each track's number),
 and config/mwscript.json. Sounds, voices and music are referred to by index into the media catalogue's files
 (sound/pool/a<hash>.wav, music/trackNN.mws): no audio is copied. One unit, keyed by the SHA-256 of all of
-those and of the compiler's source: an unchanged key reuses the file from the pool (tools/file_cache.py).
+those and of the compiler's source (tools/mwscript/ident.py): an unchanged key reuses the file from the pool (tools/file_cache.py).
 
   prepare_mwscript.py --data-files DIR --media RUN/media --music RUN/music --out RUN/mwscript
                       [--cache POOL --cache-report FILE]
@@ -42,17 +42,10 @@ def sha(path):
     return h.hexdigest()
 
 
-def compiler_identity():
-    """SHA-256 over the compiler's source files (tools/mwscript/*.py, this stage, and tools/prepare_combat.py, whose
-    autocalculation and equipment rules the actor table uses: tools/mwscript/actors.py; tools/room_batches.py and
-    tools/town_interiors.py, whose door arrival rule the player's PositionCell uses: tools/mwscript/rooms.py)."""
-    h = hashlib.sha256()
-    for path in sorted((ROOT / 'tools' / 'mwscript').glob('*.py')) + [Path(__file__).resolve(),
-                                                                        ROOT / 'tools' / 'prepare_combat.py',
-                                                                        ROOT / 'tools' / 'room_batches.py',
-                                                                        ROOT / 'tools' / 'town_interiors.py']:
-        h.update(path.name.encode() + b'\0' + path.read_bytes())
-    return h.hexdigest()
+# The compiler's identity (its files hashed whole), the '=' trace lines that key them whole in the stage's record, and
+# the image step's check: tools/mwscript/ident.py (BUILD-MWSCRIPT-STAGE-REUSED-COMPILER-CHANGED-59)
+from mwscript.ident import compiler_files, compiler_identity, check as check_compiler  # noqa: E402,F401
+from mwscript.ident import note_read as note_compiler_read  # noqa: E402
 
 
 def unit_inputs(data_files, media, music, config, rooms=None):
@@ -127,7 +120,8 @@ def main(argv=None):
     print('[mwscript] start: one unit (the whole program), 1 worker: the compiler reads every script once; '
           'serial by design (member access needs every script), measured in seconds', flush=True)
     inputs = unit_inputs(args.data_files, args.media, args.music, args.config)
-    key = hashlib.sha256(json.dumps(inputs, sort_keys=True).encode()).hexdigest()
+    note_compiler_read()
+    key =hashlib.sha256(json.dumps(inputs, sort_keys=True).encode()).hexdigest()
     target = args.out / 'id1' / NAME
     result = 'off'
     cache = None

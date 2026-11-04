@@ -342,7 +342,7 @@ edict_t *AW_NPCTarget(edict_t *p,vec3_t angles) {return AW_NPCTargetReach(p,angl
 /* The same test with a longer reach (dbg pickcompanion: 384 units). */
 edict_t *AW_NPCTargetReach(edict_t *p,vec3_t angles,float reach) {
     edict_t *e,*best=NULL;model_t *m;int i,j,index;float limit,lo,hi,a,b,o,d,t;
-    vec3_t eye,end,forward,right,up,delta,local,ray;trace_t tr;
+    vec3_t eye,end,forward,right,up,delta,local,ray,fmins,fmaxs;trace_t tr;
     AW_FPUCOUNT(AW_FPU_NPCTARGET);
     if(!p || p->v.movetype!=MOVETYPE_WALK)return NULL;
     AW_FPUCOUNT(AW_FPU_NPCSCAN);
@@ -372,15 +372,26 @@ edict_t *AW_NPCTargetReach(edict_t *p,vec3_t angles,float reach) {
         for(o=0,j=0;j<3;j++)o+=fabs(m->mins[j])>fabs(m->maxs[j])?fabs(m->mins[j]):fabs(m->maxs[j]);
         if(DotProduct(delta,delta)>(limit+o)*(limit+o))continue;
         AW_FPUCOUNT(AW_FPU_NPCTEST);
+        /* The drawn frame's box (CORPSE-INVENTORY-NOT-OPENABLE-59), as aw_inspect.c model_hit: the whole model's
+         * bounds enclose every frame, the lying death pose too, so a standing resident's box reached about a body's
+         * length around him and held the crosshair over a body beside him, and a body's box stood a man's height
+         * over it. Cache_Check never loads: an evicted model keeps the whole-model bounds. */
+        {aliashdr_t *h=(aliashdr_t *)Cache_Check(&m->cache);mdl_t *md;maliasframedesc_t *fd;int f;
+         VectorCopy(m->mins,fmins);VectorCopy(m->maxs,fmaxs);
+         if(h && (md=(mdl_t *)((byte *)h+h->model))->numframes>0){
+            f=(int)e->v.frame;if(f<0 || f>=md->numframes)f=0;fd=&h->frames[f];
+            for(j=0;j<3;j++){fmins[j]=fd->bboxmin.v[j]*md->scale[j]+md->scale_origin[j];
+                             fmaxs[j]=fd->bboxmax.v[j]*md->scale[j]+md->scale_origin[j];}
+         }}
         AngleVectors(e->v.angles,local,right,up);
         ray[0]=DotProduct(forward,local);ray[1]=-DotProduct(forward,right);ray[2]=DotProduct(forward,up);
         end[0]=DotProduct(delta,local);end[1]=-DotProduct(delta,right);end[2]=DotProduct(delta,up);
         lo=0;hi=limit;
         for(j=0;j<3;j++){
             o=end[j];d=ray[j];
-            if(fabs(d)<0.00001f){if(o<m->mins[j] || o>m->maxs[j])break;}
+            if(fabs(d)<0.00001f){if(o<fmins[j] || o>fmaxs[j])break;}
             else{
-                a=(m->mins[j]-o)/d;b=(m->maxs[j]-o)/d;
+                a=(fmins[j]-o)/d;b=(fmaxs[j]-o)/d;
                 if(a>b){t=a;a=b;b=t;}if(a>lo)lo=a;if(b<hi)hi=b;
                 if(lo>hi)break;
             }
@@ -775,11 +786,19 @@ void (*aw_scene_census_exit)(void);
 /* Object state (v0.0.51, aw_mwhost.c sets it; NULL without the scripts): 1 when a script that reads OnActivate
  * takes the use of the object REFERENCE (the original's rule); the door then waits for the script's Activate. */
 int (*aw_scene_intercept)(unsigned reference);
+/* CORPSE-LOOT-60: aw_corpse.c sets them (aw_inventory.h) */
+int (*aw_corpse_prompt)(char *line,int size,const char **name);
+int (*aw_corpse_use)(void);
 static int use_link(int i);
 int AW_SceneUse(void) {
     int i;
     if(AW_PlayerDead())return 1;   /* dead: nothing is used (the key is spent) */
-    i=0;if(pending || door_ready)return 1;if(!travel_by_talk() && travel_use())return 1;if(!npc_hint() && (AW_InventoryUse() || AW_HarvestUse()))return 1;i=aimed_door();
+    i=0;
+    if(pending || door_ready)return 1;
+    if(aw_corpse_use && aw_corpse_use())return 1;    /* CORPSE-LOOT-60: a dead actor's body opens its inventory */
+    if(!travel_by_talk() && travel_use())return 1;
+    if(!npc_hint() && (AW_InventoryUse() || AW_HarvestUse()))return 1;
+    i=aimed_door();
     if(i<0)return aw_hinged_use?aw_hinged_use():0;   /* an ordinary hinged door (aw_hinged_door.c), else nothing here */
     if(aw_scene_intercept && aw_scene_intercept(links[i].reference))return 1;
     return use_link(i);
@@ -842,7 +861,8 @@ void AW_SceneDraw(void) {
             AW_PlacedFocus(&focus_name,weight,value,sizeof(weight),&owned)))
             AW_UIFocusBox(focus_name,weight,value,owned);
     }
-    if(driver){name=pr_strings+driver->v.netname;action="E: Talk";npc=1;}
+    if(!driver && aw_corpse_prompt && aw_corpse_prompt(take,sizeof(take),&name)){action=take;npc=1;}   /* CORPSE-LOOT-60 */
+    else if(driver){name=pr_strings+driver->v.netname;action="E: Talk";npc=1;}
     /* STEAL-PROMPT-58: an aimed takeable item (its name is in the focus box): "E: Take", or "E: Steal" in red */
     else if(!npc_hint() && AW_ItemPrompt(take,sizeof(take),&steal)){name="";action=take;npc=1;}
     else if(!npc_hint() && (name=AW_HarvestHint())!=NULL){action="E: Pick";npc=1;}

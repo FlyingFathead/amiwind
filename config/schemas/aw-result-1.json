@@ -63,6 +63,7 @@
     "perf_guard": {"type": "object", "description": "The perf guard's verdict on a build (tools/perf_guard.py show --json): verdict, failed, waived, busy, sections, failing, waivers"},
     "outcome": {"enum": ["passed-perf-guard-failed"], "description": "Only on a build whose stages all passed and whose only failed step is the perf guard: status stays failed, the Toolkit monitor shows this as its own amber state"},
     "over_budget": {"type": "array", "items": {"type": "object"}, "description": "Every CHIM frame over its memory budget in the run's heap reports (chim*/chim-heap.json), worst first: report, frame, needs, budget, over (bytes)"},
+    "size_guard": {"type": "object", "description": "The size guard's verdict of the run (size-ledger.json guard): verdict, mode, reason, grown, final_needs_reason (a -devN build that grew past the margin: a final of it needs a named reason, BUILD-SIZE-GUARD-LATE-48)"},
     "failed_stage": {"type": ["string", "null"]},
     "inputs": {"type": "array", "items": {"type": "object", "required": ["path"],
                                            "properties": {"path": {"type": "string"},

@@ -88,7 +88,81 @@ def read_focus(raw):
             word, _ = struct.unpack_from('<II', raw, p + 8 * i)
             if word >> 24:
                 refs[word & 0xFFFFFF] = word >> 24
-    return rooms, owners, containers, refs
+        at = p + 8 * rows
+    return rooms, owners, containers, refs, read_levelled(raw, at)
+
+
+def read_levelled(raw, at):
+    """focus.awf's AWL1 section (prepare_focus.levelled_section; CONTAINER-LEVELLED-CONTENTS-60) at AT ->
+    {list id: (flags, chance none, [(entry id, level)])}; {} when the file has none."""
+    out = {}
+    if raw[at:at + 4] != b'AWL1':
+        return out
+    n = u32(raw, at + 4); p = at + 8
+    for _ in range(n):
+        ident = raw[p:p + IDENT].split(b'\0', 1)[0].decode('ascii')
+        flags, chance, k = struct.unpack_from('<BBH', raw, p + IDENT); p += IDENT + 4
+        entries = []
+        for _ in range(k):
+            entries.append((raw[p:p + IDENT].split(b'\0', 1)[0].decode('ascii'),
+                            struct.unpack_from('<H', raw, p + IDENT)[0])); p += IDENT + 2
+        out[ident] = (flags, chance, entries)
+    return out
+
+
+LEV_EACH, LEV_ALL_LEVELS = 1, 2          # LEVI DATA flags (OpenMW 0.51 esm3 ItemLevList Each, AllLevels)
+LEV_NESTED, LEV_NOTHING = 0x8000, 0xFFFF
+CONT_ACTOR = 32                          # an actor's inventory (focus.awf AWC1 bit 3, CORPSE-LOOT-60)
+CONTENT_LEVELLED = 1                     # a content row's flags (its u16 after the index): the index is a list's
+
+
+def list_closure(levelled, roots):
+    """The levelled lists ROOTS reach (themselves and every list inside them), sorted."""
+    seen, todo = set(), [r for r in roots if r in levelled]
+    while todo:
+        lid = todo.pop()
+        if lid in seen:
+            continue
+        seen.add(lid)
+        todo.extend(e for e, _ in levelled[lid][2] if e in levelled and e not in seen)
+    return sorted(seen)
+
+
+LEV_POOL = 0x4000          # an entry's target: LEV_POOL | the index of an id in the area's id pool
+
+
+def levelled_block(lists, levelled, index, items):
+    """An area's levelled lists in the CHIM actor table's list layout (big-endian, engine ChimActors_LevelledPick, so
+    the engine rolls an item list with the same code and rule as a creature list): u32 lists, lists x { u32 first
+    entry, u16 entries, u8 chance none, u8 flags (bit 0 all levels, bit 1 each) }, entries x { u16 level, u16 target:
+    the area's item index, LEV_POOL | an id of the pool below, LEV_NESTED | a list index, or LEV_NOTHING for an id the
+    game has no item of }; then the id pool: "AWN1" u16 ids, ids x { u8 length, the folded id }. An item a list can
+    give is named by its id only (BUDGET: its record and picture are not copied into every area whose containers name
+    the list; the strip reads them through the item directory, NARROW-LOAD, when a roll gives it). Returns the bytes
+    and the pool's ids."""
+    at = {lid: i for i, lid in enumerate(lists)}
+    heads, entries, pool, pool_at = [], [], [], {}
+    for lid in lists:
+        flags, chance, rows = levelled[lid]
+        heads.append(struct.pack('>IHBB', len(entries), len(rows), chance,
+                                 (1 if flags & LEV_ALL_LEVELS else 0) | (2 if flags & LEV_EACH else 0)))
+        for ident, level in rows:
+            if ident in at:
+                target = LEV_NESTED | at[ident]
+            elif ident in index:
+                target = index[ident]
+            elif ident in items:
+                if ident not in pool_at:
+                    pool_at[ident] = len(pool); pool.append(ident)
+                target = LEV_POOL | pool_at[ident]
+            else:
+                target = LEV_NOTHING
+            entries.append(struct.pack('>HH', min(level, 0xFFFF), target))
+    if len(pool) >= LEV_POOL:
+        raise ValueError('an area names over %d levelled item ids' % LEV_POOL)
+    names = b''.join(bytes([len(i.encode('ascii'))]) + i.encode('ascii') for i in pool)
+    return (struct.pack('>I', len(lists)) + b''.join(heads) + b''.join(entries) + b'AWN1' +
+            struct.pack('<H', len(pool)) + names), pool
 
 
 def read_items(raw):
@@ -142,10 +216,11 @@ def expand_item(packed):
     return bytes(row)
 
 
-def area(rows, owners, containers, refs, extras, items, icons):
-    """One area's AWB1 record and its counts."""
+def area(rows, owners, containers, refs, extras, items, icons, levelled=None, extra_items=()):
+    """One area's AWB1 record and its counts (EXTRA_ITEMS: item records it holds besides its own, item_chunks)."""
+    levelled = levelled or {}
     refs_here = [u32(r, 4) for r in rows]
-    used = set()
+    used = {k for k in extra_items if k in items}
     for r in rows:
         if r[0] == ord('I'):
             ident = r[64:96].split(b'\0', 1)[0].decode('ascii').lower()
@@ -154,6 +229,10 @@ def area(rows, owners, containers, refs, extras, items, icons):
     conts = sorted(ref for ref in refs_here if ref in containers)
     for ref in conts:
         used.update(i.lower() for i, _ in containers[ref][1] if i.lower() in items)
+    # CONTAINER-LEVELLED-CONTENTS-60: the lists the area's containers and actors name and every list inside them; the
+    # items they can give are named by id (levelled_block), their records stay where the item directory finds them
+    lists = list_closure(levelled, {i.lower() for ref in conts for i, _ in containers[ref][1]})
+    list_at = {lid: i for i, lid in enumerate(lists)}
     for ref in refs_here:
         key = extras.get(str(ref), (0, ''))[1]
         if key and key in items:
@@ -171,14 +250,15 @@ def area(rows, owners, containers, refs, extras, items, icons):
     lock_of = {u32(r, 4): r[3] for r in rows if r[0] == ord('C')}
     for ref in conts:
         flags, entries = containers[ref]
-        flags &= 7
+        flags = (flags & 7) | (CONT_ACTOR if flags & 8 else 0)
         if extras.get(str(ref), (0, ''))[0]:
             flags |= CONT_TRAPPED
         if refs.get(ref, 0) & 1:
             flags |= CONT_RESPAWN
-        kept = [(index[i.lower()], n) for i, n in entries if i.lower() in index]
+        kept = [(index[i.lower()], 0, n) if i.lower() in index else (list_at[i.lower()], CONTENT_LEVELLED, n)
+                for i, n in entries if i.lower() in index or i.lower() in list_at]
         cont_rows.append(struct.pack('<IHHBBH', ref, len(content_rows), len(kept), flags, min(lock_of.get(ref, 0), 100), 0))
-        content_rows.extend(struct.pack('<HHi', k, 0, n) for k, n in kept)
+        content_rows.extend(struct.pack('<HHi', k, f, n) for k, f, n in kept)
     head = b'AWB1' + struct.pack('<HHHHHH', len(rows), len(owner_ids), len(owned), len(cont_rows), len(content_rows),
                                  len(order))
     body = (head + b''.join(rows) + b''.join(i.encode('ascii').ljust(OWNER, b'\0') for i in owner_ids) +
@@ -195,9 +275,35 @@ def area(rows, owners, containers, refs, extras, items, icons):
         table.append(struct.pack('<II', at if pic else 0, len(pic)))
         pictures.append(pic); at += len(pic)
     record = body + b''.join(table) + b''.join(pictures)
+    lev_bytes, pool = 0, []
+    if lists:
+        # the levelled section after the pictures, found from the record's last 8 bytes: u32 its offset, "AWL1"
+        block, pool = levelled_block(lists, levelled, index, items)
+        block = b'AWL1' + block
+        lev_bytes = len(block) + 8
+        record += block + struct.pack('<I', len(record)) + b'AWL1'     # the offset is the record's length before it
     return record, {'rows': len(rows), 'containers': len(cont_rows), 'items': len(order),
                     'pictures': sum(1 for p in pictures if p), 'bytes': len(record), 'item_ids': order,
-                    'container_refs': conts}
+                    'container_refs': conts, 'levelled_lists': len(lists), 'levelled_bytes': lev_bytes,
+                    'levelled_ids': pool,
+                    'actor_inventories': sum(1 for ref in conts if containers[ref][0] & 8)}
+
+
+CHUNK_KEY = 0x7FFF0000     # the item chunks' keys (no room number reaches them; exterior keys have the top bit)
+CHUNK_ITEMS = 16           # item records per chunk (with their pictures: about 20 KiB at most)
+
+
+def item_chunks(ids, items, icons):
+    """CONTAINER-LEVELLED-CONTENTS-60: item records no area holds that a levelled list can give, as small area
+    records of their own (no rows, no containers: items and pictures only, CHUNK_ITEMS each), so the item directory
+    answers them with one narrow load, never the island-wide items.awi: [(key, record, stats)]."""
+    out = []
+    ids = [k for k in items if k in ids]              # items.awi order (ascending)
+    for n in range(0, len(ids), CHUNK_ITEMS):
+        part = ids[n:n + CHUNK_ITEMS]
+        record, s = area([], {}, {}, {}, {}, items, icons, extra_items=part)
+        out.append((CHUNK_KEY + n // CHUNK_ITEMS, record, s))
+    return out
 
 
 def name_hash(ident):
@@ -212,7 +318,7 @@ def name_hash(ident):
 
 def build(id1, extras_path=None):
     id1 = Path(id1)
-    rooms, owners, containers, refs = read_focus((id1 / 'focus.awf').read_bytes())
+    rooms, owners, containers, refs, levelled = read_focus((id1 / 'focus.awf').read_bytes())
     items = read_items((id1 / 'inventory' / 'items.awi').read_bytes())
     icons = {}
     if (id1 / 'gfx' / 'icons.awl').is_file() and (id1 / 'gfx' / 'icons.awp').is_file():
@@ -221,10 +327,18 @@ def build(id1, extras_path=None):
     keys = sorted(rooms)
     records, stats = [], []
     for done, key in enumerate(keys, 1):
-        record, s = area(rooms[key], owners, containers, refs, extras, items, icons)
+        record, s = area(rooms[key], owners, containers, refs, extras, items, icons, levelled)
         records.append(record); s['key'] = key; stats.append(s)
         if done % 500 == 0 or done == len(keys):
             print('[areas] %d / %d areas' % (done, len(keys)), flush=True)
+    # CONTAINER-LEVELLED-CONTENTS-60: the items a list can give that no area holds, in chunks the directory names
+    held = {k for s in stats for k in s['item_ids']}
+    wanted = {k for s in stats for k in s['levelled_ids']} - held
+    chunks = item_chunks(wanted, items, icons)
+    for key, record, s in chunks:
+        s['key'] = key; keys.append(key); records.append(record); stats.append(s)
+    order = sorted(range(len(keys)), key=lambda i: keys[i])
+    keys = [keys[i] for i in order]; records = [records[i] for i in order]; stats = [stats[i] for i in order]
     # the directory (NARROW-LOAD, ALSO FOR GLOBAL LOOKUPS): an item by its name hash -> the smallest area that holds
     # its record (one narrow load answers a carried item from elsewhere); a container by its reference -> its area
     item_area, cont_area = {}, {}
@@ -260,7 +374,14 @@ def build(id1, extras_path=None):
               'area_bytes_p90': sizes[int(len(sizes) * .9)] if sizes else 0,
               'area_bytes_largest': largest.get('bytes', 0), 'largest_key': largest.get('key'),
               'item_vocabulary': vocabulary, 'item_pictures': len(icons),
-              'item_picture_bytes': sum(len(p) for p in icons.values())}
+              'item_picture_bytes': sum(len(p) for p in icons.values()),
+              'levelled_item_lists': len(levelled),
+              'areas_with_levelled': sum(1 for s in stats if s['levelled_lists']),
+              'levelled_bytes': sum(s['levelled_bytes'] for s in stats),
+              'levelled_bytes_largest': max((s['levelled_bytes'] for s in stats), default=0),
+              'item_chunks': len(chunks), 'item_chunk_items': len(wanted),
+              'item_chunk_bytes': sum(len(r) for _, r, _ in chunks),
+              'actor_inventories': sum(s['actor_inventories'] for s in stats)}
     return payload, report
 
 
@@ -284,6 +405,137 @@ def stage(id1, focus_stage, out):
     print('=== areas: per-area lookup tables ===', flush=True)
     report = install(id1, Path(focus_stage) / 'focus-extras.json')
     (Path(out) / 'areas-staging.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8', newline='\n')
+    return report
+
+
+# ---------------------------------------------------------------- AMBIENT-WALK-PER-AREA-60: the Wander packages per area
+#
+# id1/npc-ambient.awa, little-endian like areas.awa:
+#   "AWM1" u32 areas, u32 shared offset, u32 shared bytes,
+#   areas x { u32 key, u32 offset, u32 bytes }   ascending key (focus.awf's keys; only areas with a package)
+#   shared: one AWAM1 table (tools/ambient_lut.py layout, big-endian inside) of the levelled creatures' package rows
+#           (reference 0), kept in memory by the engine (the picked creature can come from any list)
+#   per area: one AWAM1 table of the rows whose reference is placed in that area (its cell, from ambient_lut's
+#           report; a room by its number from tools/cell_numbers.py, as focus.awf's keys), with their
+#           points, hops and idle profiles renumbered; the engine reads it with one seek and one read when the area
+#           loads and searches it in memory (aw_ambient.c, cvar aw_ambient_areas).
+AWAM_HEADER, AWAM_ROW, AWAM_POINT, AWAM_PROFILE = 32, 28, 8, 16
+
+
+def read_awam(raw):
+    """npc-ambient.lut AWAM1 -> (multiplier, [(row fields, points bytes, hops bytes)], [profile bytes])."""
+    if raw[:4] != b'AWAM' or struct.unpack_from('>HH', raw, 4) != (1, AWAM_ROW):
+        raise ValueError('npc-ambient.lut is not AWAM1')
+    rows, points, hops, profiles = struct.unpack_from('>IIII', raw, 8)
+    multiplier = struct.unpack_from('>H', raw, 24)[0]
+    points_at = AWAM_HEADER + rows * AWAM_ROW
+    hops_at = points_at + points * AWAM_POINT
+    prof_at = hops_at + hops
+    if prof_at + profiles * AWAM_PROFILE != len(raw):
+        raise ValueError('npc-ambient.lut size mismatch')
+    out = []
+    for i in range(rows):
+        f = list(struct.unpack_from('>IIHHBBBBIIHH', raw, AWAM_HEADER + i * AWAM_ROW))
+        n, d = f[6], f[7]
+        pts = raw[points_at + f[8] * AWAM_POINT: points_at + (f[8] + n) * AWAM_POINT]
+        hop = raw[hops_at + f[9]: hops_at + f[9] + n * d]
+        out.append((f, pts, hop))
+    profs = [raw[prof_at + i * AWAM_PROFILE: prof_at + (i + 1) * AWAM_PROFILE] for i in range(profiles)]
+    return multiplier, out, profs
+
+
+def write_awam(multiplier, rows, profiles):
+    """An AWAM1 table of ROWS (as read_awam gives them, in their sorted order) with its own points, hops and the
+    idle profiles they use, renumbered."""
+    used = sorted({f[10] for f, _, _ in rows})
+    remap = {p: i for i, p in enumerate(used)}
+    row_bytes, pts_bytes, hop_bytes = [], [], []
+    npts = nhop = 0
+    for f, pts, hop in rows:
+        g = list(f)
+        g[8], g[9], g[10], g[11] = npts, nhop, remap[f[10]], 0
+        row_bytes.append(struct.pack('>IIHHBBBBIIHH', *g))
+        pts_bytes.append(pts); npts += len(pts) // AWAM_POINT
+        padded = hop + b'\0' * (-len(hop) % 4)
+        hop_bytes.append(padded); nhop += len(padded)
+    head = b'AWAM' + struct.pack('>HHIIIIHHI', 1, AWAM_ROW, len(rows), npts, nhop, len(used), multiplier, 0, 0)
+    return head + b''.join(row_bytes) + b''.join(pts_bytes) + b''.join(hop_bytes) + b''.join(profiles[p] for p in used)
+
+
+def area_keys(places, numbers):
+    """{reference: area key} from ambient_lut's placements' cells (PLACES: {str ref: ['i', name] | ['e', x, y]}) and
+    the room numbers (NUMBERS: {folded interior name: number}); a room without a number has no area (the engine's
+    island-wide fallback answers there, counted)."""
+    from prepare_focus import exterior_key
+    out = {}
+    for ref, place in places.items():
+        if place[0] == 'e':
+            out[int(ref)] = exterior_key(place[1], place[2])
+        elif place[1] in numbers:
+            out[int(ref)] = numbers[place[1]]
+    return out
+
+
+def build_ambient(keys_of, lut):
+    """npc-ambient.awa from each placement's area key (KEYS_OF: {reference: key}) and npc-ambient.lut's bytes; the
+    report."""
+    multiplier, rows, profiles = read_awam(lut)
+    shared = write_awam(multiplier, [r for r in rows if r[0][0] == 0], profiles)
+    by_ref = {}
+    for r in rows:
+        if r[0][0]:
+            by_ref.setdefault(r[0][0], []).append(r)
+    by_key = {}
+    for ref in sorted(by_ref):
+        if ref in keys_of:
+            by_key.setdefault(keys_of[ref], []).append(ref)
+    tables, placed = [], set()
+    for key in sorted(by_key):
+        refs = by_key[key]
+        mine = [r for ref in refs for r in by_ref[ref]]       # ascending ref, by_ref keeps the file's hash order
+        tables.append((key, write_awam(multiplier, mine, profiles), len(mine)))
+        placed.update(refs)
+    at = 16 + 12 * len(tables)
+    shared_at = at; at += len(shared)
+    index = []
+    for key, t, _ in tables:
+        index.append(struct.pack('<III', key, at, len(t))); at += len(t)
+    payload = (b'AWM1' + struct.pack('<III', len(tables), shared_at, len(shared)) + b''.join(index) + shared +
+               b''.join(t for _, t, _ in tables))
+    sizes = sorted(len(t) for _, t, _ in tables)
+    largest = max(tables, key=lambda t: len(t[1])) if tables else (None, b'', 0)
+    report = {'format': 'AWM1', 'areas': len(tables), 'bytes': len(payload), 'index_bytes': 16 + 12 * len(tables),
+              'shared_rows': sum(1 for r in rows if r[0][0] == 0), 'shared_bytes': len(shared),
+              'rows': len(rows), 'rows_placed': sum(len(by_ref[r]) for r in placed),
+              'refs_not_in_any_area': len(set(by_ref) - placed),
+              'area_bytes_median': sizes[len(sizes) // 2] if sizes else 0,
+              'area_bytes_p90': sizes[int(len(sizes) * .9)] if sizes else 0,
+              'area_bytes_largest': len(largest[1]), 'largest_key': largest[0],
+              'sha256': hashlib.sha256(payload).hexdigest()}
+    return payload, report
+
+
+def stage_ambient(id1, out, data_files, places):
+    """build_aga.py's step after the ambient table: id1/npc-ambient.awa from id1/npc-ambient.lut and the placements'
+    cells (PLACES, the ambient table step's report), the room numbers from DATA_FILES (tools/cell_numbers.py, as
+    focus.awf's keys); its report in OUT/ambient-areas-staging.json."""
+    id1 = Path(id1)
+    if not (id1 / 'npc-ambient.lut').is_file() or not places:
+        return None
+    print('=== areas: the Wander packages per area ===', flush=True)
+    import prepare_focus  # noqa: F401  (puts src/ on the path for mwad)
+    from cell_numbers import load_table
+    from mwad.paths import resolve_data_files
+    table, _ = load_table(resolve_data_files(Path(data_files)))
+    numbers = {row['cell'].casefold(): row['number'] for row in table if row['master'] == 'Morrowind.esm'}
+    payload, report = build_ambient(area_keys(places, numbers), (id1 / 'npc-ambient.lut').read_bytes())
+    (id1 / 'npc-ambient.awa').write_bytes(payload)
+    report['file'] = 'id1/npc-ambient.awa'
+    print('[areas] ambient: %d areas, %d bytes (median area %d, largest %d), shared %d bytes, %d actors in no area' % (
+        report['areas'], report['bytes'], report['area_bytes_median'], report['area_bytes_largest'],
+        report['shared_bytes'], report['refs_not_in_any_area']), flush=True)
+    (Path(out) / 'ambient-areas-staging.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8',
+                                                          newline='\n')
     return report
 
 

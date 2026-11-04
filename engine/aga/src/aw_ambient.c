@@ -210,6 +210,7 @@ int AW_AmbientTravelPlan(const aw_ambient_pkg_t *p,int fx,int fy,int fz,int tx,i
 #include "aw_combat.h"
 #include "aw_dial.h"
 #include "aw_spike.h"
+int AW_AreaPlaceKeys(unsigned long *keys,int max,unsigned long *generation);   /* aw_inventory.c */
 
 #define SLOTS 128
 #define ACTOR_RANGE 1792.0f       /* OpenMW's actors processing range 7168 x 0.25 */
@@ -349,6 +350,127 @@ static int find(unsigned long ref,unsigned long hash,aw_ambient_row_t *r) {
     AW_AmbientRow(&view,i,r);
     return 1;
 }
+/* ---- AMBIENT-WALK-PER-AREA-60: the packages per area (id1/npc-ambient.awa, tools/prepare_area_tables.py
+ * build_ambient). Its index (12 bytes an area) and the levelled creatures' package rows (one small AWAM1 table) stay
+ * in memory; an area's own AWAM1 table (its placed actors' rows, points, hops, idle profiles) is read with one seek and
+ * one read when the place changes (the room, or the 3 x 3 exterior cells, as the container tables:
+ * AW_AreaPlaceKeys) and searched in memory; a package's routes are copied from it, no file read in play.
+ * aw_ambient_areas 1 (the default, id1/default-game.cfg); 0 = the island-wide npc-ambient.lut searched by seek and read
+ * as before (the A/B). Without a place (a compiled room without a number) the island-wide file answers, counted. */
+static cvar_t ambient_areas_cvar={"aw_ambient_areas","1"};
+#define AMB_AREAS 9
+typedef struct {unsigned long key;unsigned char *blob;long bytes;aw_ambient_table_t t;} amb_area_t;
+static amb_area_t amb[AMB_AREAS];static int amb_count;
+static FILE *amb_file;static long amb_base,amb_length;
+static unsigned char *amb_index,*amb_shared;static unsigned long amb_keys;static aw_ambient_table_t amb_shared_t;
+static int amb_tried;             /* 0 not tried, 1 ready, -1 no pack */
+static unsigned long amb_gen;static int amb_synced;static int amb_mode;static float world_at;
+static struct {unsigned long loads,bytes,hits,misses,fallbacks,deferred;double seconds,last;long last_bytes;int last_n;} ast;
+static unsigned long le32(const unsigned char *p) {return (unsigned long)p[0]|(unsigned long)p[1]<<8|(unsigned long)p[2]<<16|(unsigned long)p[3]<<24;}
+/* BLOB (BYTES, a whole AWAM1 table) opened into *t: every row checked, offsets relative to BLOB */
+static int amb_open(aw_ambient_table_t *t,const unsigned char *blob,long bytes) {
+    long rows_size,prof;aw_ambient_table_t h;
+    if(bytes<AW_AMBIENT_HEADER || (rows_size=AW_AmbientRowsSize(blob,bytes))<0 || !AW_AmbientHeader(&h,blob,bytes))return 0;
+    prof=h.profiles*AW_AMBIENT_PROFILE;
+    return AW_AmbientOpen(t,blob,rows_size,blob+bytes-prof,bytes);
+}
+static int amb_ready(void) {
+    unsigned char head[16];long length;unsigned long shared_at,shared_bytes;
+    if(amb_tried)return amb_tried>0;
+    amb_tried=-1;
+    length=COM_FOpenFile("npc-ambient.awa",&amb_file);
+    if(!amb_file)return 0;
+    amb_base=ftell(amb_file);amb_length=length;
+    if(length<16 || fread(head,1,16,amb_file)!=16 || memcmp(head,"AWM1",4) || (amb_keys=le32(head+4))>65535 ||
+       16+amb_keys*12>(unsigned long)length)goto bad;
+    shared_at=le32(head+8);shared_bytes=le32(head+12);
+    if(shared_at+shared_bytes>(unsigned long)length || shared_bytes>256*1024ul)goto bad;
+    if(!(amb_index=(unsigned char *)AW_TryMalloc((unsigned long)(amb_keys*12+1))) ||
+       !(amb_shared=(unsigned char *)AW_TryMalloc(shared_bytes+1)) ||
+       fread(amb_index,1,amb_keys*12,amb_file)!=amb_keys*12 ||
+       fseek(amb_file,amb_base+(long)shared_at,SEEK_SET) || fread(amb_shared,1,shared_bytes,amb_file)!=shared_bytes ||
+       !amb_open(&amb_shared_t,amb_shared,(long)shared_bytes))goto bad;
+    Con_DPrintf("Ambient areas: %lu areas; in memory the index %lu bytes and %ld levelled packages (%lu bytes)\n",
+                amb_keys,amb_keys*12,amb_shared_t.rows,shared_bytes);
+    amb_tried=1;
+    return 1;
+ bad:
+    if(amb_index)free(amb_index);
+    if(amb_shared)free(amb_shared);
+    amb_index=amb_shared=NULL;memset(&amb_shared_t,0,sizeof(amb_shared_t));
+    fclose(amb_file);amb_file=NULL;
+    Con_Printf("Ambient areas: npc-ambient.awa is not a pack this engine reads; the island-wide table answers.\n");
+    return 0;
+}
+static void amb_free(amb_area_t *a) {if(a->blob)free(a->blob);memset(a,0,sizeof(*a));}
+/* the area KEY's table read (0: the pack has none for it: no package placed there, or it does not read) */
+static int amb_read(unsigned long key,amb_area_t *a) {
+    long lo=0,hi=(long)amb_keys-1;
+    memset(a,0,sizeof(*a));
+    while(lo<=hi){
+        long mid=(lo+hi)/2;const unsigned char *b=amb_index+mid*12;unsigned long k=le32(b);
+        if(k==key){
+            unsigned long offset=le32(b+4),bytes=le32(b+8);
+            if(bytes<AW_AMBIENT_HEADER || offset+bytes>(unsigned long)amb_length || bytes>1024*1024ul)return 0;
+            if(!(a->blob=(unsigned char *)AW_TryMalloc(bytes)))return 0;
+            if(fseek(amb_file,amb_base+(long)offset,SEEK_SET) || fread(a->blob,1,bytes,amb_file)!=bytes ||
+               !amb_open(&a->t,a->blob,(long)bytes)){amb_free(a);return 0;}
+            a->key=key;a->bytes=(long)bytes;
+            return 1;
+        }
+        if(k<key)lo=mid+1;else hi=mid-1;
+    }
+    return 0;
+}
+/* the place's tables loaded (those already in memory kept); 1 in step with the place, 0 the place is not known */
+static int amb_sync(void) {
+    unsigned long keys[AMB_AREAS],gen;int n,i,j,count=0;amb_area_t next[AMB_AREAS];double t0;long bytes=0;
+    if((n=AW_AreaPlaceKeys(keys,AMB_AREAS,&gen))<0)return 0;
+    if(amb_synced && gen==amb_gen)return 1;
+    t0=Sys_FloatTime();
+    for(i=0;i<n;i++){
+        for(j=0;j<amb_count;j++)if(amb[j].blob && amb[j].key==keys[i])break;
+        if(j<amb_count){next[count++]=amb[j];memset(&amb[j],0,sizeof(amb[j]));continue;}
+        if(amb_read(keys[i],&next[count])){bytes+=next[count].bytes;count++;ast.loads++;}
+    }
+    for(j=0;j<amb_count;j++)amb_free(&amb[j]);
+    memcpy(amb,next,(size_t)count*sizeof(amb_area_t));amb_count=count;
+    amb_gen=gen;amb_synced=1;
+    memset(none_ref,0,sizeof(none_ref));     /* "not in the tables" was said of the place before */
+    ast.last=Sys_FloatTime()-t0;ast.seconds+=ast.last;ast.bytes+=(unsigned long)bytes;ast.last_bytes=bytes;ast.last_n=count;
+    return 1;
+}
+/* the row of (REF, HASH) from the loaded areas (reference 0: the levelled packages); its table */
+static int amb_find(unsigned long ref,unsigned long hash,aw_ambient_row_t *r,const aw_ambient_table_t **t) {
+    int i;long k;
+    if(ref==AW_AMBIENT_LEVELLED_REF){
+        if((k=AW_AmbientFind(&amb_shared_t,ref,hash))<0)return 0;
+        AW_AmbientRow(&amb_shared_t,k,r);*t=&amb_shared_t;return 1;
+    }
+    for(i=0;i<amb_count;i++)if((k=AW_AmbientFind(&amb[i].t,ref,hash))>=0){AW_AmbientRow(&amb[i].t,k,r);*t=&amb[i].t;return 1;}
+    return 0;
+}
+/* which tables answer now: 1 the areas, 0 the island-wide file, -1 wait (the new map's place is read in a frame) */
+static int mode_now(void) {
+    if(!ambient_areas_cvar.value || !amb_ready())return 0;
+    if(amb_sync())return 1;
+    if(sv.time-world_at<3.0f){ast.deferred++;return -1;}
+    return 0;
+}
+/* ready for a lookup (a script's package: never waits, the file answers then) */
+static int ready_now(void) {
+    int m=mode_now();
+    amb_mode=m>0;
+    if(!amb_mode && ambient_areas_cvar.value && amb_tried>0)ast.fallbacks++;
+    return amb_mode || load();
+}
+/* the table a found row's points and hops are in (NULL: the island-wide file) and the one its idle profile is in */
+static const aw_ambient_table_t *found_t,*found_prof;
+static int find_in(unsigned long ref,unsigned long hash,aw_ambient_row_t *r,const aw_ambient_table_t **t) {
+    if(amb_mode){int k=amb_find(ref,hash,r,t);if(k)ast.hits++;return k;}
+    *t=NULL;return find(ref,hash,r);
+}
+
 /* The package of actor E: its placement's row, or for a levelled creature its reference's routes with the picked
  * creature's package (OpenMW 0.51: the picked creature runs its own record's packages, mwclass/creature.cpp). */
 static int find_actor(edict_t *e,aw_ambient_row_t *r);
@@ -370,6 +492,7 @@ static void reset_all(void) {
     int i;
     for(i=0;i<SLOTS;i++)if(slots[i].e)release(&slots[i],0);
     memset(slot_of,0,sizeof(slot_of));memset(none_ref,0,sizeof(none_ref));slots_world=sv.worldmodel;rng=1;scan_at=0;
+    world_at=(float)sv.time;amb_synced=0;
 }
 /* SV_SpawnServer: every slot's edict is stale, also on a reload of the same map, which the world check cannot see
  * (HORS-AFTER-HALLOWEEN-CRASH-58): the next tick resets every slot without touching its old edict. */
@@ -390,8 +513,11 @@ static void minutes_now(int *m) {int y,mo,d,h,mi;AW_ClockDate(&y,&mo,&d,&h,&mi);
 /* A package for E from its row (or none: a script's package for an actor outside the table). */
 static int find_actor(edict_t *e,aw_ambient_row_t *r) {
     unsigned long ref=(unsigned long)field(e,"aw_ref",0),hash=AW_AmbientHash(source_id(e));aw_ambient_row_t pkg;
-    if(find(ref,hash,r))return 1;
-    if(!find(ref,AW_AMBIENT_LEVELLED_HASH,r) || !find(AW_AMBIENT_LEVELLED_REF,hash,&pkg))return 0;
+    if(find_in(ref,hash,r,&found_t)){found_prof=found_t;return 1;}
+    if(!find_in(ref,AW_AMBIENT_LEVELLED_HASH,r,&found_t) || !find_in(AW_AMBIENT_LEVELLED_REF,hash,&pkg,&found_prof)){
+        if(amb_mode)ast.misses++;
+        return 0;
+    }
     AW_AmbientLevelled(r,&pkg);st.levelled++;
     return 1;
 }
@@ -400,13 +526,17 @@ static slot_t *start(edict_t *e,const aw_ambient_row_t *row) {
     if(!s || n<0 || n>=MAX_EDICTS)return NULL;
     memset(s,0,sizeof(*s));
     if(row){
-        r=*row;AW_AmbientBlobAt(&table,&r,&pa,&pb,&ha,&hb);
+        /* the row's table: a loaded area's (in memory) or the island-wide file's (found_t NULL) */
+        const aw_ambient_table_t *pt=found_t?found_t:&table;
+        r=*row;AW_AmbientBlobAt(pt,&r,&pa,&pb,&ha,&hb);
         if(!(s->mem=(unsigned char *)AW_TryMalloc((unsigned long)(pb+hb))))return NULL;
-        if(fseek(file,file_base+pa,SEEK_SET) || (long)fread(s->mem,1,(size_t)pb,file)!=pb ||
+        if(found_t){memcpy(s->mem,found_t->rows_data-AW_AMBIENT_HEADER+pa,(size_t)pb);
+                    memcpy(s->mem+pb,found_t->rows_data-AW_AMBIENT_HEADER+ha,(size_t)hb);}
+        else if(fseek(file,file_base+pa,SEEK_SET) || (long)fread(s->mem,1,(size_t)pb,file)!=pb ||
            fseek(file,file_base+ha,SEEK_SET) || (long)fread(s->mem+pb,1,(size_t)hb,file)!=hb){free(s->mem);s->mem=NULL;return NULL;}
         st.blob_bytes+=(unsigned long)(pb+hb);
         s->pkg.blob=s->mem;s->pkg.points=r.points;s->pkg.destinations=r.destinations;s->pkg.record_distance=r.distance;
-        AW_AmbientProfile(&table,r.profile,s->cdf);
+        AW_AmbientProfile(found_prof?found_prof:&table,r.profile,s->cdf);
         s->flags=r.flags;s->repeat=(unsigned char)((r.flags&AW_AMBIENT_REPEAT)!=0);s->remain=r.duration;
         /* flyers wander on the routes or near the start (v0.0.57, fly() below); swimmers ignore the path grid
          * (OpenMW aiwander.cpp: "pathgrids don't usually include water, so swimmers ignore them") and swim to random
@@ -726,11 +856,16 @@ static void think(slot_t *s,float dt) {
     }
 }
 void AW_AmbientPhysics(void) {
-    edict_t *p;int i;float interval;double t0;
+    edict_t *p;int i,m;float interval;double t0;
     if(!ambient_on || !(p=player()))return;
     if(slots_world!=sv.worldmodel)reset_all();
-    if(!load())return;
-    if(sv.time>=scan_at){scan_at=(float)sv.time+1.0f;AW_SPIKE_STAGE(AW_SP_AMBSCAN,{scan(p);if(npend)apply_saved_packages(p);});}
+    m=mode_now();
+    amb_mode=m>0;
+    if(!m && !load())return;                     /* the island-wide file (aw_ambient_areas 0, or no place) */
+    /* m < 0: the new place's tables come next frame; no scan (no file search) meanwhile */
+    if(m>=0 && sv.time>=scan_at){
+        if(!m && ambient_areas_cvar.value && amb_tried>0)ast.fallbacks++;
+        scan_at=(float)sv.time+1.0f;AW_SPIKE_STAGE(AW_SP_AMBSCAN,{scan(p);if(npend)apply_saved_packages(p);});}
     interval=think_interval;
     t0=Sys_FloatTime();
     for(i=0;i<SLOTS;i++){
@@ -820,7 +955,7 @@ static void follow_think(slot_t *s,float dt) {
 int AW_AmbientFollow(edict_t *e,edict_t *target,float hours,const float *final) {
     slot_t *s;aw_ambient_row_t r;
     if(!e || e->free || !is_actor(e) || !target || target->free || target==e)return 0;
-    if(!(s=slot_for(e)) && !(s=start(e,load() && find_actor(e,&r)?&r:NULL)))return 0;
+    if(!(s=slot_for(e)) && !(s=start(e,ready_now() && find_actor(e,&r)?&r:NULL)))return 0;
     if(!s->can_walk)return 0;
     if(s->state==S_WALK)stop_walk(s);
     s->travel=3;s->follow_num=(short)NUM_FOR_EDICT(target);s->follow_hours=hours>0?hours:0;minutes_now(&s->follow_minutes);
@@ -835,7 +970,7 @@ int AW_AmbientTravel(edict_t *e,const float to[3]) {
     if(!e || e->free || !is_actor(e) || !to)return 0;
     if(!AW_AmbientTravelInRange((int)(to[0]-e->v.origin[0]),(int)(to[1]-e->v.origin[1]),(int)(to[2]-e->v.origin[2])))
         return 0;                               /* aitravel.cpp: beyond the maximum range the package does not run */
-    if(!(s=slot_for(e)) && !(s=start(e,load() && find_actor(e,&r)?&r:NULL)))return 0;
+    if(!(s=slot_for(e)) && !(s=start(e,ready_now() && find_actor(e,&r)?&r:NULL)))return 0;
     if(!s->can_walk)return 0;
     if(s->state==S_WALK)stop_walk(s);
     VectorCopy(to,s->travel_to);s->travel=1;s->remain=0;s->repeat=0;s->stuck=0;
@@ -908,7 +1043,7 @@ static void apply_saved_packages(edict_t *p) {
         if(!e){i++;continue;}                  /* its actor is not in this map (yet): it waits */
         if(k->travel==1)ok=AW_AmbientTravel(e,k->to);
         else if(k->travel==2){slot_t *s=slot_for(e);aw_ambient_row_t r;
-            if(!s)s=start(e,load() && find_actor(e,&r)?&r:NULL);
+            if(!s)s=start(e,ready_now() && find_actor(e,&r)?&r:NULL);
             if(s){stop_walk(s);s->travel=2;s->state=S_OFF;ok=1;}}
         else{t=k->follow_ref<0?p:edict_by_ref(k->follow_ref);
             ok=t && AW_AmbientFollow(e,t,k->hours,k->final?k->to:NULL);}
@@ -924,11 +1059,11 @@ int AW_AmbientWander(edict_t *e,int distance,int duration,int hour,const unsigne
     if(distance<0)distance=0;
     if(distance>65535)distance=65535;
     if(!(s=slot_for(e))){
-        if(!(s=start(e,load() && find_actor(e,&r)?&r:NULL)))return 0;
+        if(!(s=start(e,ready_now() && find_actor(e,&r)?&r:NULL)))return 0;
     }
     if(s->state==S_WALK)stop_walk(s);
     (void)hour;                                 /* stored by OpenMW, read nowhere */
-    AW_AmbientIdleProfile(idle,loaded>0?table.multiplier:49151u,s->cdf);
+    AW_AmbientIdleProfile(idle,amb_tried>0?amb_shared_t.multiplier:loaded>0?table.multiplier:49151u,s->cdf);
     s->repeat=(unsigned char)(repeat!=0);s->remain=(float)(duration>0?duration:0);s->bad=0;
     if(s->pkg.blob)AW_AmbientAllow(&s->pkg,(unsigned)distance);
     else{s->pkg.distance=(unsigned short)distance;s->pkg.manual=(unsigned char)(distance>0);}
@@ -955,7 +1090,7 @@ int AW_AmbientAiPackage(edict_t *e,int *done) {
     {
         aw_ambient_row_t r;int n=NUM_FOR_EDICT(e);float ref=field(e,"aw_ref",0);
         if(n>=0 && n<MAX_EDICTS && ref>0 && none_ref[n]==ref)return -1;   /* known absent: no disk read */
-        if(load() && find_actor(e,&r))return 0;
+        if(ready_now() && find_actor(e,&r))return 0;
         if(n>=0 && n<MAX_EDICTS && ref>0)none_ref[n]=ref;
     }
     return -1;
@@ -982,6 +1117,13 @@ static void status(void) {
     Con_Printf("  %lu flying or swimming steps (straight, off the ground; %lu swim spots out of water skipped, last contents %d)\n",st.flights,st.dry,last_dry);
     Con_Printf("  %lu levelled creatures on their reference's routes; aggro %s: %lu checks, %lu fights started, %lu waited (4 fighting)\n",
                st.levelled,aggro_on?"on":"off",st.aggro_checks,st.aggro_engaged,st.aggro_full);
+    {long held=0;int k;for(k=0;k<amb_count;k++)held+=amb[k].bytes;
+     Con_Printf("  per area (aw_ambient_areas %d): %s; %d areas in memory (%ld bytes, levelled packages %ld rows); %lu loads, "
+                "%lu bytes, %d ms in all, last %d areas %ld bytes %d ms; %lu rows found in memory, %lu actors in none; "
+                "%lu scans on the island-wide file, %lu waits for the place\n",(int)ambient_areas_cvar.value,
+                amb_tried>0?"npc-ambient.awa":amb_tried<0?"no npc-ambient.awa":"not read",amb_count,held,amb_shared_t.rows,
+                ast.loads,ast.bytes,(int)(ast.seconds*1000),ast.last_n,ast.last_bytes,(int)(ast.last*1000),ast.hits,ast.misses,
+                ast.fallbacks,ast.deferred);}
     Con_Printf("  cost: %.3f ms per think, worst frame %.3f ms\n",st.thinks?st.seconds*1000.0/st.thinks:0.0,st.worst*1000.0);
 }
 /* "chim actors ambient [on|off|think S|list|reset]" (aw_actors.c forwards it; arguments from the fourth word) */
@@ -1033,6 +1175,7 @@ void AW_AmbientCommand(void) {
 extern void (*aw_ambient_cmd)(void);   /* aw_actors.c: "chim actors ambient" */
 void AW_AmbientInit(void) {
     aw_ambient_cmd=AW_AmbientCommand;
+    Cvar_RegisterVariable(&ambient_areas_cvar);      /* AMBIENT-WALK-PER-AREA-60 */
     /* the actor record's two hooks (aw_mwhost.c): the scripts' AIWander sets this package; the walk speed is the
      * record's Speed attribute (-1 without one: the stand-in 50) */
     aw_mwscript_wander=AW_AmbientWander;

@@ -254,7 +254,7 @@ def install_mwscript(stage, id1):
     source = stage/'id1'/'mwscript.awm'
     if hashlib.sha256(source.read_bytes()).hexdigest() != receipt.get('sha256'):
         raise ValueError(f'Compiled scripts differ from their stage receipt: {source}')
-    from mwscript import awms
+    from mwscript import awms, ident
     awms.read(source.read_bytes())
     target = Path(id1)/'mwscript.awm'
     if target.exists():
@@ -264,7 +264,7 @@ def install_mwscript(stage, id1):
     except OSError:
         shutil.copyfile(source, target);how = 'copied'
     return {'file': 'id1/mwscript.awm', 'sha256': receipt['sha256'], 'bytes': target.stat().st_size, 'how': how,
-            'unit_key': receipt.get('unit_key'), 'cache': receipt.get('cache')}
+            'unit_key': receipt.get('unit_key'), 'cache': receipt.get('cache'), **ident.check(stage)}
 
 
 def install_chargen(stage, id1):
@@ -1848,7 +1848,7 @@ def stage_actor_logic_config(id1):
 ACTOR_LOGIC_LINES = (b'// Compiled game logic (default on since v0.0.57): the game\'s compiled scripts and the actors\'\n'
                      b'// Wander packages. "dbg mwscript off" and "chim actors ambient off" in the console switch them off.\n'
                      b'aw_mwscript 1\n'
-                     b'chim actors ambient on\naw_player_cache 1\n')
+                     b'chim actors ambient on\naw_player_cache 1\naw_ambient_areas 1\n')
 
 
 CHIM_CROSSING_LINES = (b'// Cell crossings (builder option --chim-crossing 0|1, default 1 since v0.0.47): type 1, the\n'

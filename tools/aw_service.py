@@ -165,6 +165,14 @@ else:
                 over.append({"report": str(report.relative_to(run)), "frame": f.get("frame"), "needs": f["peak_bytes"],
                              "budget": f["budget_bytes"], "over": f["peak_bytes"] - f["budget_bytes"]})
     out["over_budget"] = sorted(over, key=lambda o: -o["over"])
+    # the size guard's verdict (tools/size_ledger.py): a dev build's growth that a final will need to name is kept in
+    # the result, where the release preflight reads it (BUILD-SIZE-GUARD-LATE-48)
+    try:
+        guard = json.loads((run / "size-ledger.json").read_text()).get("guard") or {}
+    except (OSError, ValueError, AttributeError):
+        guard = {}
+    if guard:
+        out["size_guard"] = {k: guard.get(k) for k in ("verdict", "mode", "reason", "grown", "final_needs_reason")}
     try:
         out["recipe"] = json.loads((run / "build-recipe.json").read_text())
     except (OSError, ValueError):
@@ -1227,6 +1235,7 @@ def submit_build(config, request, dry_run, runner):
                         logs=[str(log_path)], artifacts=[commands['run_dir']], inputs=inputs, recipe=recipe_info,
                         **({'stair_walk': stair} if stair else {}), **({'perf_guard': guard} if guard else {}),
                         **({'over_budget': summary['over_budget']} if summary.get('over_budget') else {}),
+                        **({'size_guard': summary['size_guard']} if summary.get('size_guard') else {}),
                         **({'cores': cores_info} if cores_info else {}))
 
 

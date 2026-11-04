@@ -116,7 +116,7 @@ POOL_TOKEN = '{WORKSPACE}/cache/asset-pool-v1'
 POOL_CONTENT = 'not hashed (content-addressed storage pool)'
 # Worker counts (outputs do not depend on them), bookkeeping, and interpreter locations
 # (the Python version and packages are fingerprinted themselves).
-IGNORED_ENV = {'AMIWIND_BUILD_JOBS', 'AMIWIND_INPUTS_LOCK', 'AMIWIND_PROFILE_SECTIONS', 'AMIWIND_COST_HISTORY', 'AMIWIND_PASS_CACHE',
+IGNORED_ENV = {'AMIWIND_BUILD_JOBS', 'AMIWIND_FINGERPRINT_JOBS','AMIWIND_INPUTS_LOCK', 'AMIWIND_PROFILE_SECTIONS', 'AMIWIND_COST_HISTORY', 'AMIWIND_PASS_CACHE',
                'AMIWIND_BUILD_PROFILE', 'AMIWIND_PROFILE_INTERVAL', 'AMIWIND_BUILD_JOBS_FILE',
                'AMIWIND_BUILD_BUDGET', 'AMIWIND_ACTIVE_ENV', 'AMIWIND_PYTHON', 'AMIWIND_STAGE_TRACE',
                'AMIWIND_REBUILD_UNITS', 'AMIWIND_CACHE_FALLBACK', 'AMIWIND_SOURCE_COMMIT', 'AMIWIND_STORAGE_POOL',
@@ -932,6 +932,7 @@ class SourceIndex:
         self._keyed.clear()
         self._json_values.clear()
         self._companion = None
+        self.__dict__.pop('_prefetched', None)
 
     def reached_units(self, script):
         """{python file: reached units} of a stage script (scopes 'units' and 'symbols'), or None."""
@@ -1358,6 +1359,11 @@ class SourceIndex:
         each reached function (unit_digest), so an edit to a function the stage never
         reaches keeps the fingerprint; data files and the other scopes: whole files.
         """
+        done = self.__dict__.get('_prefetched', {}).get(('selection', str(Path(script).resolve()),
+                                                          top_format or self.top_format))
+        if done is not None:
+            # computed by prefetch_selections in a worker process (BUILD-REUSE-CHECK-ONE-CORE-59)
+            return dict(done[0]), done[1]
         python, data, uncertain = self.closure(script)
         files = self.files
         if uncertain:
@@ -1384,6 +1390,9 @@ class SourceIndex:
         """{older top format: selection} of SCRIPT, for reuse sources fingerprinted in an older form (comparable).
         Form 3 reaches other units (classes of their own, keyed scripts, globbed Python files), so forms 1 and 2
         come from a companion index of form 2, which reaches what the stage keys reached before."""
+        done = self.__dict__.get('_prefetched', {}).get(('previous', str(Path(script).resolve()), self.top_format))
+        if done is not None:
+            return {form: dict(value) for form, value in done.items()}
         if self.top_format < 3:
             return {form: self.selection(script, form)[0] for form in TOP_FORMATS if form < self.top_format}
         companion = self.companion()
@@ -2143,7 +2152,8 @@ def module_symbols(tree, text=None, refined=False, split=False):
             for key, value in facts['bindings'].items():
                 fallback.setdefault(key, value)  # `global X; import x as X` inside a function
     return {'units': units, 'bindings': dict(units['<top>']['bindings']), 'fallback': fallback, 'broken': False,
-            'texts': unit_texts(tree, text, lazy, classes) if text is not None else {}, 'classes': class_info}
+            'texts': unit_texts(tree, text, lazy, classes) if text is not None else {}, 'classes': class_info,
+            'tables': sorted(set(tables.values()))}
 
 
 def unit_texts(tree, text, lazy, classes=None):
@@ -2472,6 +2482,13 @@ def stage_components(name, command, run, metadata, index, dependencies, fingerpr
 def fingerprint_steps(steps, run, metadata, index=None, dependencies=None):
     """({stage: fingerprint}, {stage: components}, {stage: [problems]}) for every stage."""
     index = index or SourceIndex(top_format=STAGE_TOP_FORMAT)
+    if os.environ.get('AMIWIND_FINGERPRINT_JOBS'):
+        # opt-in worker processes for the source selections (tools/fingerprint_prefetch.py); log on stderr, never
+        # mixed into a command's JSON on stdout
+        from fingerprint_prefetch import prefetch_selections
+        prefetch_selections(index, [s for s in (stage_script([str(p) for p in c]) for _, c in steps)
+                                    if s is not None and s.is_file()],
+                            log=lambda line: print(line, file=sys.stderr, flush=True))
     if dependencies is None:
         try:
             from build_parallel import plan_skipped, stage_dependencies
@@ -3268,7 +3285,12 @@ def used_record(lines, index, run_inside=None, reused=False):
                 if name != head:                       # a method this module no longer has: all of them
                     wanted.update(classes[head]['methods'])
             # a class, a decorated function, a comprehension or lambda at module level: part of '<top>'
-        hashes = index.unit_hashes(path, wanted)
+        units[path] = wanted
+    from stage_record import recorded_tables      # the tables that code names (-59)
+    for path, extra in recorded_tables(index, units).items():
+        units.setdefault(path, {'<top>'}).update(extra)
+    for path in sorted(units):
+        hashes = index.unit_hashes(path, units[path])
         if hashes is None or any(v is None for v in hashes.values()):
             record.update(complete=False, why=['cannot hash the units of %s' % path])
             return record
@@ -3294,9 +3316,9 @@ def used_record(lines, index, run_inside=None, reused=False):
     return record
 
 
-def narrowed_unchanged(old_run, name, index):
+def narrowed_unchanged(old_run, name, index, script=None):
     """(True, None) when the stage's record in OLD_RUN (where it last really ran) names only code, files and
-    listings that are unchanged in INDEX's checkout; else (False, why)."""
+    listings that are unchanged in INDEX's checkout; else (False, why). SCRIPT: the stage's (stage_record.py)."""
     if not narrowing_enabled():
         return False, 'narrowing off'
     record = (ran_manifest(old_run, name) or {}).get('used')
@@ -3304,6 +3326,10 @@ def narrowed_unchanged(old_run, name, index):
         return False, 'no record of what it used'
     if not record.get('complete'):
         return False, 'record incomplete: ' + '; '.join(record.get('why') or ['unknown'])
+    from stage_record import whole_read_missing
+    why = whole_read_missing(record, index, script)
+    if why:
+        return False, why
     top_format = record.get('top_format')
     for path, hashes in (record.get('units') or {}).items():
         # scheduling units key no stage, also in records written before SCHEDULING_UNITS existed
@@ -3796,7 +3822,7 @@ def plan_reuse(steps, fingerprints, dependencies, components, problems, old_run,
         if (not own_same and index is not None and name in old_details and name not in NON_REUSABLE
                 and name not in forced and old_status.get(name) == 'passed'
                 and only_sources_changed(old_details[name], components[name])):
-            same, _ = narrowed_unchanged(old_run, name, index)
+            same, _ = narrowed_unchanged(old_run, name, index, stage_script(dict(steps)[name]))
             if same:
                 own_same = True
                 if narrowed is not None:
@@ -4029,12 +4055,31 @@ def run_preflight(steps, reasons, components, old_run, index, reused=()):
 def predict_preflight(old_run, scope=DEFAULT_SCOPE, root=ROOT):
     """`build.py --reuse-plan OLD_RUN`: the preflight of OLD_RUN's own stages against this checkout (no build)."""
     old_run = Path(old_run)
+    # the check asks twice in one process (developer mode's entry check and the resource plan): the same checkout
+    # and run give the same answer, so the second is a copy of the first (BUILD-REUSE-CHECK-ONE-CORE-59)
+    # only while build.py --check / --plan holds the answer for one process (PREFLIGHT_ONCE), keyed also by the
+    # AMIWIND_* environment the stages are keyed in; the files cannot change between the two asks there
+    key = (str(old_run.resolve()), scope, str(Path(root).resolve()),
+           tuple(sorted((k, v) for k, v in os.environ.items() if k.startswith('AMIWIND_') and k not in IGNORED_ENV)))
+    if not PREFLIGHT_ONCE:
+        key = None
+    if key in _PREFLIGHT_DONE:
+        import copy
+        return copy.deepcopy(_PREFLIGHT_DONE[key])
     steps, state = old_run_steps(old_run, root)
     index = SourceIndex(root, scope=scope, top_format=STAGE_TOP_FORMAT)
     reasons, components = predict(old_run, scope, root, index=index, details=True)
     reasons = {name: reason for name, reason in reasons.items() if reason is not None}
     reused = [name for name, _ in steps if name not in reasons]
-    return run_preflight(steps, reasons, components, old_run, index, reused)
+    result = run_preflight(steps, reasons, components, old_run, index, reused)
+    if key is not None:
+        import copy
+        _PREFLIGHT_DONE[key] = copy.deepcopy(result)
+    return result
+
+
+_PREFLIGHT_DONE = {}
+PREFLIGHT_ONCE = False   # set by build.py for a --check or --plan run
 
 
 def advisory_stages(steps, dependencies):
@@ -4550,7 +4595,7 @@ def predict(old_run, scope=DEFAULT_SCOPE, root=ROOT, dependencies=None, index=No
             if all(part.startswith('dependency ') for part in changed):
                 result[name] = None
             elif (name in old_details and only_sources_changed(old_details[name], components[name])
-                  and narrowed_unchanged(old_run, name, index)[0]):
+                  and narrowed_unchanged(old_run, name, index, stage_script(dict(steps)[name]))[0]):
                 result[name] = None   # narrowed reuse: what it used is unchanged (B7)
             else:
                 result[name] = 'changed: ' + ', '.join(changed)

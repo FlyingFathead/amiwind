@@ -4,7 +4,7 @@
 
 # AmiWind
 
-_Last updated with AmiWind v0.0.59 (3 November 2026)._
+_Last updated with AmiWind v0.0.60-dev3 (4 November 2026)._
 
 An unofficial, experimental RPG engine and enthusiast project bringing Morrowind
 to the Commodore Amiga, featuring CHIM: an AmiQuake-based engine and an asset
@@ -42,6 +42,13 @@ and 19 open-sea cells), with no classic region maps left outdoors. What these nu
 [CHIM Progress Tracker](docs/chim/PROGRESS_TRACKER.md). Since v0.0.48 every interior of the base game but two (the
 prison and the census office) is built as a CHIM room, with the people the game places in them. Solstheim is not
 converted.
+
+The development line is at **v0.0.60-dev3** (4 November 2026): the third snapshot of v0.0.60, in development. Since
+dev2, dead residents and creatures can be searched (E: Search on the body); the body lies where it died and stays after
+leaving and coming back, and a taken item stays taken. It also carries the builder fix that rebuilds the compiled
+scripts whenever their compiler changes and containers with levelled contents that show their items; the walking
+residents' per-area tables are in it, not yet measured
+([dev3 notes](docs/releases/notes/RELEASE-v0.0.60-dev3.md), [dev2 notes](docs/releases/notes/RELEASE-v0.0.60-dev2.md), [dev1 notes](docs/releases/notes/RELEASE-v0.0.60-dev1.md)).
 
 What comes next is in the [roadmap](docs/ROADMAP.md): v0.0.60 takes what v0.0.59 did not finish and the combat work:
 the walking residents' data kept in memory per area (the arrival frame under half a second), what the player wears

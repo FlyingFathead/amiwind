@@ -9,7 +9,7 @@
 | Where | tools/prepare_focus.py container rows; engine container contents |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.59-dev5 (last seen) |
+| Persists in | fixed in v0.0.60-dev2 |
 | Severity | medium: Many sacks, baskets and chests show nothing, e.g. most of the ones in Arrille's Tradehouse |
 | Family | Game logic (QuakeC) and saves (`game-logic`) |
 | Playtest version | 2026_11_03_v0.0.59-dev5_miniwind-seyda-containers10_420cb1a |

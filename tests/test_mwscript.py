@@ -1194,6 +1194,44 @@ class BuilderStageTests(unittest.TestCase):
             self.assertEqual((s.dir / 'out-miss/id1/mwscript.awm').read_bytes(),
                              (s.dir / 'out-hit/id1/mwscript.awm').read_bytes())
 
+    def test_the_image_refuses_scripts_of_another_compiler(self):
+        """BUILD-MWSCRIPT-STAGE-REUSED-COMPILER-CHANGED-59: v0.0.59 shipped bytecode of an older compiler (a reused
+        stage); the image step compares the receipt's compiler with this source's when it installs the file."""
+        import build_aga
+        import prepare_mwscript
+        with SyntheticData() as s:
+            media = s.dir / 'media'; media.mkdir()
+            (media / 'media-coverage.json').write_text(json.dumps(catalogue()))
+            out = s.dir / 'out'
+            self.assertEqual(prepare_mwscript.main(['--data-files', str(s.dir), '--media', str(media),
+                                                    '--out', str(out)]), 0)
+            checked = prepare_mwscript.check_compiler(out)
+            self.assertEqual(checked['compiler'], prepare_mwscript.compiler_identity())
+            id1 = s.dir / 'image-id1'; id1.mkdir()
+            self.assertEqual(build_aga.install_mwscript(out, id1)['source_compiler'], checked['compiler'])
+            receipt = json.loads((out / 'mwscript-receipt.json').read_text())
+            receipt['inputs']['compiler'] = '9d6be54a' + '0' * 56
+            (out / 'mwscript-receipt.json').write_text(json.dumps(receipt))
+            with self.assertRaisesRegex(ValueError, 'another compiler'):
+                prepare_mwscript.check_compiler(out)
+            with self.assertRaisesRegex(ValueError, 'another compiler'):
+                build_aga.install_mwscript(out, id1)
+
+    def test_the_stage_keys_its_compiler_whole_in_its_trace(self):
+        """The '=' lines the stage writes into its trace name every compiler file (note_compiler_read)."""
+        import prepare_mwscript
+        with tempfile.TemporaryDirectory() as temp:
+            trace = Path(temp) / 'trace.txt'
+            from unittest import mock
+            with mock.patch.dict(os.environ, {'AMIWIND_STAGE_TRACE': str(trace)}):
+                prepare_mwscript.note_compiler_read()
+            lines = set(trace.read_text().splitlines())
+        self.assertIn('=tools/mwscript/functions.py', lines)
+        self.assertIn('=tools/mwscript/ident.py', lines)
+        self.assertIn('=tools/prepare_mwscript.py', lines)
+        self.assertIn('=tools/prepare_combat.py', lines)
+        self.assertEqual(len(lines), len(prepare_mwscript.compiler_files()))
+
 
 if __name__ == '__main__':
     unittest.main()

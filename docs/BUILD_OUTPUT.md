@@ -1,6 +1,6 @@
 # Build completion output
 
-_Last updated with AmiWind v0.0.48 (24 October 2026)._
+_Last updated with AmiWind v0.0.59 (4 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -166,6 +166,13 @@ The size guard: a folder that grew by more than `--size-growth-margin`
 build ends with exit code 4 (the stages passed; their outputs stay valid and
 reusable), while a `-devN` build prints a warning. `--size-guard fail|warn|off`
 overrides that choice (`off` is for debugging only).
+
+A `-devN` build that grows past the margin also prints that a final or rc of
+the same content will stop there. The release names the growth in its release
+commit, before the final build: `tools/size-growth.json` holds `version` (the
+release, X.Y.Z) and `reason`, and the size guard uses that reason when the
+build is given no `--size-growth-reason`. The release preflight checks that a
+release whose dev builds grew names it (BUILD-SIZE-GUARD-LATE-48).
 
 The table is printed in the completion footer, written to `size-ledger.json`
 in the run folder and copied into `build-summary.json` (`size_ledger`). It can

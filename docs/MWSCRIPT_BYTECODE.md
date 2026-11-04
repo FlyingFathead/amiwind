@@ -1,6 +1,6 @@
 # MWScript compiled by the builder
 
-_Last updated with AmiWind v0.0.57 (31 October 2026)._
+_Last updated with AmiWind v0.0.60 (4 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -698,6 +698,13 @@ SHA-256 of the masters, the media catalogue, the soundtrack, `config/mwscript.js
 reused from the shared pool when unchanged. Writes `mwscript/id1/mwscript.awm`, `mwscript-report.json` (counts,
 sizes, every unmapped sound with its reason) and `mwscript-receipt.json`. The image step checks the file against the
 receipt's SHA-256, reads it back, and links it into the payload. The legacy builder's plan is unchanged.
+
+The stage keys the compiler's files whole: it names them in its read trace, so a reused build takes the stage's
+earlier output only while every one of them is unchanged, tables such as the host function list included
+(`tools/mwscript/ident.py`). When it installs the file, the image step compares the receipt's compiler hash with
+this source's and stops on a difference
+(BUILD-MWSCRIPT-STAGE-REUSED-COMPILER-CHANGED-59: v0.0.59 was built with compiled scripts of an older compiler, so the
+1,225 placed beds and two RaiseRank scripts had no compiled behaviour).
 
 ## Next
 

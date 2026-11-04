@@ -97,6 +97,7 @@ void SZ_Clear(sizebuf_t *buf){buf->cursize=0;}
 void MSG_WriteByte(sizebuf_t *buf,int value){}
 void MSG_WriteString(sizebuf_t *buf,char *value){}
 void Cache_Report(void){}
+void *Cache_Check(cache_user_t *c){(void)c;return NULL;}   /* the actor aim's frame box: whole-model bounds here */
 void SCR_EndLoadingPlaque(void){signon_finished++;}
 void Con_DPrintf(char *fmt,...){}
 char *va(char *fmt,...){return "";}

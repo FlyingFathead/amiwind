@@ -1,0 +1,6 @@
+{
+ "schema": "amiwind-size-growth-v1",
+ "note": "The release names its payload growth here in the release commit, before its final build (docs/BUILD_OUTPUT.md \"Size ledger\"): version = the release (X.Y.Z), reason = why a payload folder grew past the margin against the previous release. Used by the size guard when a build is given no --size-growth-reason.",
+ "version": null,
+ "reason": null
+}

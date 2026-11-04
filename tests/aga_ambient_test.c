@@ -26,7 +26,9 @@ static void pkg_of(long row,aw_ambient_pkg_t *p) {
 }
 int main(int argc,char **argv) {
     long size,rows;char line[1024];FILE *x;int checks=0;
-    assert(argc==3);
+    /* a third argument (AMBIENT-WALK-PER-AREA-60): a per-area table, its rows only (the decisions below need the
+     * synthetic room's wanderer, which only one table holds) */
+    assert(argc==3 || argc==4);
     data=slurp(argv[1],&size);
     rows=AW_AmbientRowsSize(data,size);
     assert(rows>=AW_AMBIENT_HEADER);
@@ -86,7 +88,7 @@ int main(int argc,char **argv) {
         checks++;
     }
     fclose(x);
-    {   /* decisions on the synthetic room: the wanderer (reference 7) has four grid destinations at 900, three at
+    if(argc==3){   /* decisions on the synthetic room: the wanderer (reference 7) has four grid destinations at 900, three at
          * the record's 700 is still four (offset 148 x 4 = 592 < 700); at 100 one point, so its start joins; at 0
          * nothing (stands) */
         long row=-1,i;aw_ambient_pkg_t pk;int seen[AW_AMBIENT_MAX_DEST],k,goal;

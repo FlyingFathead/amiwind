@@ -1,11 +1,11 @@
 # Roadmap and implementation options
 
-_Last updated with AmiWind v0.0.59 (3 November 2026)._
+_Last updated with AmiWind v0.0.60-dev3 (4 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
-- [v0.0.59: released 3 November 2026; v0.0.60 next](#v0059-released-3-november-2026-v0060-next)
+- [v0.0.59: released 3 November 2026; v0.0.60 in development](#v0059-released-3-november-2026-v0060-in-development)
 - [v0.0.58: released 1 November 2026](#v0058-released-1-november-2026)
 - [v0.0.57: released 31 October 2026; v0.0.58 next](#v0057-released-31-october-2026-v0058-next)
   - [The v0.0.58 list, item by item](#the-v0058-list-item-by-item)
@@ -108,7 +108,7 @@ _Last updated with AmiWind v0.0.59 (3 November 2026)._
 
 15 October 2026: exact-source validation completed 4,231 tests: 4,225 passed, three Windows-only skips and three tracked Census expected failures. The 71 focused tests and original-data readback across nine frame positions passed, consistently hiding 33 of 158 original references at stronghold state 6 while preserving unknown scripts. All 243 player resources are reusable after exact producer, input and file verification. Complete combined-world conversion, native comparison, packaging and shipment remain pending; coverage counts are unchanged.
 
-## v0.0.59: released 3 November 2026; v0.0.60 next
+## v0.0.59: released 3 November 2026; v0.0.60 in development
 
 v0.0.59, "Assembling The Bits And Pieces, Once Again", shipped as its sixth development snapshot with its final
 version number ([release notes](releases/notes/RELEASE-v0.0.59.md)): every item with its own world model and the
@@ -197,7 +197,11 @@ from Seyda Neen to Balmora sometimes stalls on the loading screen in the emulato
   recorded as proof that the shipped image can be reproduced.
 - The conversation fix of v0.0.58 ships with this release; no separate v0.0.58 patch was made.
 
-**v0.0.60 next,** with the combat work:
+**v0.0.60, in development,** with the combat work. The first snapshot, v0.0.60-dev1, opened the line on 4 November
+2026 ([notes](releases/notes/RELEASE-v0.0.60-dev1.md)); the second, v0.0.60-dev2, adds containers with levelled
+contents and the builder's check of the script compiler ([notes](releases/notes/RELEASE-v0.0.60-dev2.md)); the third,
+v0.0.60-dev3, adds searching the bodies of the dead ([notes](releases/notes/RELEASE-v0.0.60-dev3.md)). The walking
+residents' tables are in all three but not yet measured, and the other items below are not finished in any of them:
 
 - **The walking residents' data per area.** The tables the walking residents read are kept in memory per area,
   loaded with the area, instead of being searched in files while you walk; measured with the frame wait counters on
@@ -224,7 +228,8 @@ from Seyda Neen to Balmora sometimes stalls on the loading screen in the emulato
   wear, and the image needs far less space for them.
 - **Containers whose contents come from levelled item lists show their items,** rolled by the original rules and kept
   across saves.
-- **Bodies of dead NPCs and creatures can be looted** through the container strip, kept across saves.
+- **Bodies of dead NPCs and creatures can be searched** through the container strip, kept across saves; done in
+  v0.0.60-dev3, checked in game.
 
 ## v0.0.58: released 1 November 2026
 

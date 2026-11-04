@@ -159,6 +159,21 @@ float AW_ActivateDistance(void);
 int AW_PlacedFocus(const char **name,char *weight_line,char *value_line,int line_size,int *owned);
 /* STEAL-PROMPT-58: "E: Take" or "E: Steal" (*steal 1) for the aimed takeable item; 0 for none. */
 int AW_ItemPrompt(char *line,int size,int *steal);
+/* CORPSE-LOOT-60 (aw_corpse.c): a dead actor in reach under the crosshair: "E: Search" in LINE and its name; E opens
+ * its inventory in the container strip (1 when used). Hooks, set by AW_CorpseInit (NULL in the tools' tests). */
+extern int (*aw_corpse_prompt)(char *line,int size,const char **name);
+extern int (*aw_corpse_use)(void);
+void AW_CorpseInit(void);
+/* aw_placed body: the nearest dead actor in this place: the view turned onto it from where the player stands, then
+ * opened as E would (the prompt's aim test first); for in-game checks */
+void AW_CorpseCommand(void);
+/* CONTAINER-LEVELLED-CONTENTS-60: the list code the levelled entries are rolled with (AW_CorpseInit sets the CHIM
+ * actor table's), the player's level for it, the session seed (0: from the clock), the rolls and items given. */
+extern int (*aw_levelled_valid)(const unsigned char *s,unsigned long bytes,unsigned items);
+extern int (*aw_levelled_pick)(const unsigned char *s,unsigned index,int level,unsigned *state);
+extern int (*aw_levelled_level)(void);
+extern unsigned aw_levelled_seed;
+extern unsigned long aw_levelled_rolls,aw_levelled_items;
 /* The book reader's entry (NULL until it exists): opens the readable book placed as REFERENCE; 1 when it opened. */
 extern int (*aw_book_reader)(unsigned reference);
 /* BOOK-READER-58: the placed book's record id (FOCUS id, 33 bytes) and ownership; 1 when it is in the focus table. */
@@ -208,6 +223,9 @@ void AW_AreaStats(unsigned long out[6]);
 /* the memory policy's call: cached area tables (areas left, narrow loads) freed, least recently used first, until
  * WANTED bytes are free; the bytes freed (the world change list is never touched) */
 long AW_AreaCacheTrim(long wanted);
+/* AMBIENT-WALK-PER-AREA-60: the place's area keys (at most MAX) into KEYS and its generation (moves with every place
+ * read); -1 while this map's place has not been read yet */
+int AW_AreaPlaceKeys(unsigned long *keys,int max,unsigned long *generation);
 int AW_ContainerChange(unsigned reference,const char *id,int count,int owner_mark);
 void AW_ContainerCommand(void);
 /* CONTAINER-WINDOW-59: COUNT of ID out of container REFERENCE into the inventory (OWNED: stolen from its owner) or
