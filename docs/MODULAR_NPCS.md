@@ -1,6 +1,6 @@
 # Modular NPCs: every body part stored once, assembled per actor
 
-_Last updated with AmiWind v0.0.59-dev6 (3 November 2026)._
+_Last updated with AmiWind v0.0.60-dev3 (4 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -27,6 +27,7 @@ _Last updated with AmiWind v0.0.59-dev6 (3 November 2026)._
 - [Runtime method B: attached parts as follower entities](#runtime-method-b-attached-parts-as-follower-entities)
 - [Stage: residents from parts (v0.0.59)](#stage-residents-from-parts-v0059)
   - [Residents from parts: when their data is loaded](#residents-from-parts-when-their-data-is-loaded)
+  - [Residents from parts on the shared per-area pack (v0.0.60)](#residents-from-parts-on-the-shared-per-area-pack-v0060)
 - [Comparison](#comparison)
 - [Visibility and frame cost](#visibility-and-frame-cost)
 - [Recommendation and staged plan](#recommendation-and-staged-plan)
@@ -791,6 +792,23 @@ resident drawn outside the places loaded now, for example one a script moved, re
 small cache, never all of them. The same small cache keeps the tables of places just left (up to 16 tables and
 64 KB for now, the oldest let go first), so walking back into a cell or a room reads nothing again. This replaces the one recipe file for the whole image
 (BUILD-NPC-RECIPES-PER-CELL-59).
+
+### Residents from parts on the shared per-area pack (v0.0.60)
+
+The image step also writes the same tables into `id1/npc-parts.awa`, on the same per-area layout as the container
+tables (`id1/areas.awa`) and the walking residents' tables (`id1/npc-ambient.awa`): one pack, an index of
+`{area key, offset, size}` in key order, and the same area keys (a room's number, an exterior cell's grid key), so one
+place key names a place's data in every pack. A small resident directory (8 bytes a resident) follows the index. The
+tables themselves are unchanged.
+
+The engine keeps the pack open, holds its index (12 bytes an area) and its directory, and reads a place's tables with
+one seek and one read each when the place changes (the room, or the 3 x 3 cells around the player, as the container
+and walking tables do) or when a cell's residents arrive with the streamer. Entering a room no longer opens a file of
+its own. A resident whose table is not loaded yet keeps its fused model and is looked up in the directory at the next
+place change or arrival, never in the middle of play; `dbg camera npcs` counts these lookups.
+
+`aw_npc_tables_areas 1` (the default, set in the build's `default-game.cfg`) uses the pack; `aw_npc_tables_areas 0`
+uses the earlier files, which stay in the image for the comparison (NPC-RECIPES-PER-AREA-59).
 
 ## Comparison
 

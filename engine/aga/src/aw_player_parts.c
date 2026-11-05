@@ -636,6 +636,114 @@ int AW_NpcTablesFind (const aw_npc_tables_t *t, const char *id, aw_parts_npc_t *
     return 0;
 }
 
+/* NPC-RECIPES-PER-AREA-59: the shared per-area pack (little-endian) */
+static unsigned long le32 (const unsigned char *p)
+{
+    return (unsigned long)p[0] | (unsigned long)p[1] << 8 | (unsigned long)p[2] << 16 | (unsigned long)p[3] << 24;
+}
+
+unsigned long AW_NpcAreaCellKey (int cx, int cy)
+{
+    return 0x80000000UL | ((unsigned long)((cx + 2048) & 0xFFF) << 12) | (unsigned long)((cy + 2048) & 0xFFF);
+}
+
+void AW_NpcAreaKeyName (unsigned long key, char *out, int size)
+{
+    static const char hex[] = "0123456789abcdef";
+    int i;
+    if (size < 10)
+    {
+        if (size > 0)
+            out[0] = 0;
+        return;
+    }
+    out[0] = 'a';
+    for (i=0 ; i<8 ; i++)
+        out[1 + i] = hex[(key >> (28 - 4 * i)) & 15];
+    out[9] = 0;
+}
+
+int AW_NpcAreaKeyOf (const char *name, unsigned long *key)
+{
+    unsigned long k = 0;
+    int i;
+    if (!name || name[0] != 'a')
+        return 0;
+    for (i=1 ; i<=8 ; i++)
+    {
+        int c = (unsigned char)name[i], d = c >= '0' && c <= '9' ? c - '0' : c >= 'a' && c <= 'f' ? c - 'a' + 10 : -1;
+        if (d < 0)
+            return 0;
+        k = k << 4 | (unsigned long)d;
+    }
+    if (name[9])
+        return 0;
+    *key = k & 0xFFFFFFFFUL;
+    return 1;
+}
+
+int AW_NpcAreaHead (const unsigned char *head, unsigned long length, unsigned long *areas, unsigned long *dir_at,
+                    unsigned long *dir_n)
+{
+    unsigned long a, at, n;
+    if (!head || length < AW_NPC_AREA_HEAD || memcmp (head, "AWR1", 4))
+        return 0;
+    a = le32 (head + 4);
+    at = le32 (head + 8);
+    n = le32 (head + 12);
+    if (a > 65535 || n > 1048576 || at != AW_NPC_AREA_HEAD + 12 * a || at + 8 * n > length)
+        return 0;
+    *areas = a;
+    *dir_at = at;
+    *dir_n = n;
+    return 1;
+}
+
+int AW_NpcAreaFind (const unsigned char *index, unsigned long areas, unsigned long key, unsigned long *at,
+                    unsigned long *bytes, unsigned long *n)
+{
+    long lo = 0, hi = (long)areas - 1;
+    while (index && lo <= hi)
+    {
+        long mid = (lo + hi) / 2;
+        unsigned long k = le32 (index + 12 * mid);
+        if (k == key)
+        {
+            *at = le32 (index + 12 * mid + 4);
+            *bytes = le32 (index + 12 * mid + 8);
+            if (n)
+                *n = (unsigned long)mid;
+            return 1;
+        }
+        if (k < key)
+            lo = mid + 1;
+        else
+            hi = mid - 1;
+    }
+    return 0;
+}
+
+long AW_NpcAreaDirFind (const unsigned char *dir, unsigned long n, const char *id)
+{
+    long lo = 0, hi = (long)n - 1;
+    unsigned long h;
+    if (!dir || !id)
+        return -1;
+    h = AW_NpcIdHash (id);
+    while (lo <= hi)
+    {
+        long mid = (lo + hi) / 2;
+        unsigned long k = le32 (dir + 8 * mid);
+        if (k == h)
+            return (long)(dir[8 * mid + 4] | dir[8 * mid + 5] << 8);
+        if (k < h)
+            lo = mid + 1;
+        else
+            hi = mid - 1;
+    }
+    return -1;
+}
+
 /* tools/player_inventory_pose.py GROUPS: unarmed, then the original's melee weapon types 0..8 */
 static const char *const inventory_groups[10] = {
     "inventoryhandtohand", "inventoryshortbladeonehand", "inventoryweapononehand", "inventoryweapontwohand",

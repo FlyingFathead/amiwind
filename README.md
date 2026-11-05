@@ -4,7 +4,7 @@
 
 # AmiWind
 
-_Last updated with AmiWind v0.0.60-dev3 (4 November 2026)._
+_Last updated with AmiWind v0.0.60 (4 November 2026)._
 
 An unofficial, experimental RPG engine and enthusiast project bringing Morrowind
 to the Commodore Amiga, featuring CHIM: an AmiQuake-based engine and an asset
@@ -25,16 +25,16 @@ Like community projects such as
 
 More in the [gallery](docs/GALLERY.md).
 
-## Where AmiWind stands (3 November 2026)
+## Where AmiWind stands (4 November 2026)
 
-The newest release is **v0.0.59: Assembling The Bits And Pieces, Once Again**: every item has its own world model and
-the items of the game stand in their places to be taken, the world keeps what you change (taken and dropped items,
-doors, locks, container contents) across rooms and saved games, with respawn by the original's rules, the player's
-body and hands are assembled from parts, E on a container opens a strip with its items, J opens the journal as in the
-original, and resting and waiting follow the original's rules, running on CHIM Engine v0.2.2 and needing 32 MB of
-Fast RAM ([release notes](docs/releases/notes/RELEASE-v0.0.59.md)). The one before it, **v0.0.58: Time To Talk**,
-brought most of the original's dialogue window, character creation at the Census and Excise Office, the aim box,
-books read in place and sneaking ([release notes](docs/releases/notes/RELEASE-v0.0.58.md)). The project's own builds have had every exterior cell of Vvardenfell on CHIM since v0.0.43 (a build from the
+The newest release is **v0.0.60: Work With What You've Got**: beds and the two rank raises work again, containers
+with levelled contents show their items, the bodies of the dead can be searched, the walking residents and the
+residents built from parts read small per-area tables instead of searching files, and a tracker lists the 48 systems
+of the base game (10 done, 29 partial, 9 missing), running on CHIM Engine v0.2.2 and needing 32 MB of Fast RAM
+([release notes](docs/releases/notes/RELEASE-v0.0.60.md)). The one before it, **v0.0.59: Assembling The Bits And
+Pieces, Once Again**, gave every item its own world model, a world that keeps what you change across rooms and saved
+games, the player's body and hands assembled from parts, the container strip, the original's journal view, and resting
+and waiting by the original's rules ([release notes](docs/releases/notes/RELEASE-v0.0.59.md)). The project's own builds have had every exterior cell of Vvardenfell on CHIM since v0.0.43 (a build from the
 repository does so only from v0.0.47, when the cell list became part of the repository and the default): 1,409
 cells, counting the 61 in the town frames (1,348 are one-cell region frames; 1,292 land cells, 98 sea-floor cells
 and 19 open-sea cells), with no classic region maps left outdoors. What these numbers count:
@@ -43,19 +43,25 @@ and 19 open-sea cells), with no classic region maps left outdoors. What these nu
 prison and the census office) is built as a CHIM room, with the people the game places in them. Solstheim is not
 converted.
 
-The development line is at **v0.0.60-dev3** (4 November 2026): the third snapshot of v0.0.60, in development. Since
-dev2, dead residents and creatures can be searched (E: Search on the body); the body lies where it died and stays after
-leaving and coming back, and a taken item stays taken. It also carries the builder fix that rebuilds the compiled
-scripts whenever their compiler changes and containers with levelled contents that show their items; the walking
-residents' per-area tables are in it, not yet measured
-([dev3 notes](docs/releases/notes/RELEASE-v0.0.60-dev3.md), [dev2 notes](docs/releases/notes/RELEASE-v0.0.60-dev2.md), [dev1 notes](docs/releases/notes/RELEASE-v0.0.60-dev1.md)).
+What comes next is in the [roadmap](docs/ROADMAP.md): v0.0.61 holds the combat work (weapons of every type in both
+views, the first-person hands per weapon, the cliff racer's strikes, player casting and the spell-effect system, the
+crime system), the larger data and dialogue items (per-area tables for containers, doors, items and creatures,
+each resident's dialogue prepared in advance, the conversation system complete, characters drawn from the same parts
+as the player), levelling with the level-up box, the rest of the world change list, and the in-game checks carried
+over from v0.0.59 and v0.0.60. Items that are in no version's list yet stay in the backlog until they are scheduled.
 
-What comes next is in the [roadmap](docs/ROADMAP.md): v0.0.60 takes what v0.0.59 did not finish and the combat work:
-the walking residents' data kept in memory per area (the arrival frame under half a second), what the player wears
-and wields in every stance, weapons of every type in both views, player casting and the spell-effect system, the
-crime system, the cliff racer's strikes, levelling with the level-up box, the rest of the world change list,
-containers with levelled contents and looting the dead. Items that are in no version's list yet stay in the backlog
-until they are scheduled.
+### What v0.0.60 changed
+
+The scripts stage is rebuilt whenever the script compiler changes, so placed beds open the rest window and the two
+rank raises happen again (v0.0.59 shipped scripts of an older compiler). Containers whose contents are levelled lists
+roll their items by the original's rules and keep them across saves, and a dead actor under the crosshair reads "E:
+Search" and opens what it carried in the container strip. The walking residents and the residents built from parts take
+their data from small tables per area, kept in memory. [The game feature tracker](docs/GAME_FEATURES.md) lists 48
+systems of the base game; `dbg kill` kills the actor picked with a red crosshair, and the game shows its own message
+when an essential character dies (both checked by tests, not yet in game). The builder warns early about size growth and
+output names, and the reuse check is faster. Known limits: the first frame in Seyda Neen takes about a second, the
+residents' walking steps can cost 200 to 800 ms on some frames (the new tables are not yet measured in game), and
+casting waits for v0.0.61. Full list: [v0.0.60 release notes](docs/releases/notes/RELEASE-v0.0.60.md).
 
 ### What v0.0.59 changed
 
@@ -254,7 +260,7 @@ WinUAE: [Building and playing](docs/BUILDING_AND_PLAYING.md), the [Linux build g
 - Project: [FAQ](docs/FAQ.md) · [Gallery](docs/GALLERY.md) · [Project state](docs/PROJECT_STATE.md) ·
   [Roadmap](docs/ROADMAP.md) · [Changelog](docs/CHANGELOG.md) · [Open bug reports](docs/BUGS.md)
 - How it works: [Architecture](docs/ARCHITECTURE.md) · [Actor placement](docs/ACTOR_PLACEMENT.md) · [CHIM](docs/chim/README.md) ·
-  [CHIM progress tracker](docs/chim/PROGRESS_TRACKER.md) · [CHIM progress map (colours)](docs/chim/CHIM_PROGRESS_MAP.md) · [Asset coverage](docs/ASSET_COVERAGE.md)
+  [CHIM progress tracker](docs/chim/PROGRESS_TRACKER.md) · [CHIM progress map (colours)](docs/chim/CHIM_PROGRESS_MAP.md) · [Asset coverage](docs/ASSET_COVERAGE.md) · [Game features](docs/GAME_FEATURES.md)
 - Building: [Building and playing](docs/BUILDING_AND_PLAYING.md) · [Build dependencies](docs/BUILD_DEPENDENCIES.md) ·
   [Release workflow](docs/RELEASE_WORKFLOW.md) · [Hosted CI jobs](docs/CI.md)
 - Development: [Repository layout](docs/REPOSITORY_LAYOUT.md) · [Project rules](docs/PROJECT_RULES.md) (including the

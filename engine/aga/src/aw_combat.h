@@ -201,6 +201,8 @@ int AW_CombatActorFleeing(struct edict_s *e);
  * longest think in milliseconds, the fighters now in slots. */
 void AW_CombatCost(float *per_second,float *ms_mean,float *ms_max,int *fighters);
 int AW_CombatActorLoad(const char *id,aw_fighter_t *out);
+/* ESSENTIAL-DEATH-60: 1 when the actor record of ID is known (ESSENTIAL set from its essential flag) */
+int AW_CombatEssentialRecord(const char *id,int *essential);
 void AW_CombatPlayerSheet(aw_fighter_t *out);
 extern void (*aw_combat_equipment)(aw_fighter_t *sheet);
 extern void (*aw_combat_equipment_store)(const aw_fighter_t *sheet);

@@ -93,6 +93,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [AW-LEASE-NO-GROW-36](AW-LEASE-NO-GROW-36.md): A running build's core lease did not grow back when gates ended, and its worker pools never grow
 - AW-QUEUE-DEAD-TICKET-54 (no report page): A requester killed while queued leaves its queue ticket at the head of the strict FIFO: every build machine-wide waited
 - [BUILD-ACTOR-LIBRARY-UNDERUSED-54](BUILD-ACTOR-LIBRARY-UNDERUSED-54.md): The actor-library stage ran at 2.69 of 8 allowed cores with 130 units queued and 7 running
+- [BUILD-AGA-AT-TEXT-LIMIT-60](BUILD-AGA-AT-TEXT-LIMIT-60.md): tools/build_aga.py is 7 bytes under the release text size limit: the next change to it fails the gate unless a stage is split out
 - [BUILD-BODY-BAKE-SLOWER-44](BUILD-BODY-BAKE-SLOWER-44.md): The image step's player body bake ran 42 % slower than its baseline with the same 40 bodies
 - [BUILD-CACHE-ABSOLUTE-PATHS-33](BUILD-CACHE-ABSOLUTE-PATHS-33.md): Stage fingerprints contain absolute paths, so a moved workspace or checkout reuses nothing
 - [BUILD-CACHE-CHIM-UNITS-33](BUILD-CACHE-CHIM-UNITS-33.md): The chim stage's fingerprint changes whenever the CHIM unit cache gains units, so the stage is never reused

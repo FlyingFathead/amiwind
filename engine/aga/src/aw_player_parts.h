@@ -97,4 +97,25 @@ unsigned char *AW_NpcTablesPop(aw_npc_tables_t *t, long *bytes);
 /* ID's recipe from the tables held now (the first that has it): 1 = OUT holds it. */
 int AW_NpcTablesFind(const aw_npc_tables_t *t, const char *id, aw_parts_npc_t *out);
 
+/* NPC-RECIPES-PER-AREA-59: the same tables on the shared per-area layout, id1/npc-parts.awa (tools/prepare_area_tables.py
+ * build_recipes; little-endian like areas.awa and npc-ambient.awa): "AWR1" u32 areas, u32 directory offset, u32
+ * directory entries; the index, areas x {u32 key, u32 offset, u32 bytes} ascending key (focus.awf's keys: a room's
+ * number, an exterior cell's 0x80000000 | (x + 2048) << 12 | (y + 2048)); the directory, entries x {u32 id hash
+ * (AW_NpcIdHash), u16 area index, u16 0} ascending hash; the AWNB tables. Pure. */
+#define AW_NPC_AREA_HEAD 16
+/* The area key of exterior cell CX CY (prepare_focus.exterior_key, aw_inventory.c focus_exterior_key). */
+unsigned long AW_NpcAreaCellKey(int cx, int cy);
+/* A table key for an area key ("a" and 8 hex digits) and back (1 = KEY is one). */
+void AW_NpcAreaKeyName(unsigned long key, char *out, int size);
+int AW_NpcAreaKeyOf(const char *name, unsigned long *key);
+/* HEAD (AW_NPC_AREA_HEAD bytes of a file of LENGTH): 1 and *AREAS, *DIR_AT, *DIR_N when it is an AWR1 pack whose index
+ * and directory fit. */
+int AW_NpcAreaHead(const unsigned char *head, unsigned long length, unsigned long *areas, unsigned long *dir_at,
+                   unsigned long *dir_n);
+/* Area KEY in INDEX (AREAS entries): 1 and *AT, *BYTES (the pack's offset and size), else 0; *N its index (may be NULL). */
+int AW_NpcAreaFind(const unsigned char *index, unsigned long areas, unsigned long key, unsigned long *at,
+                   unsigned long *bytes, unsigned long *n);
+/* The area index the directory DIR (N entries) names for resident ID, -1 none. */
+long AW_NpcAreaDirFind(const unsigned char *dir, unsigned long n, const char *id);
+
 #endif

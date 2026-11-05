@@ -1,8 +1,10 @@
 # World progress tracker
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.60-dev3 (4 November 2026)._
 
 **Status: first version in the image build (v0.0.31 development).**
+
+> Superseded: this page is the first version, written for the v0.0.31 image build. The state of the conversion is kept by the [game features tracker](../GAME_FEATURES.md) and the [cell tracker](../chim/CELL_TRACKER.md); see [Trackers](README.md).
 
 One view of the whole conversion: Vvardenfell's exterior cell grid with
 switchable layers: the World Map of the [AmiWind Toolkit](../AMIWIND_TOOLKIT.md)

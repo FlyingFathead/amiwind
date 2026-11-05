@@ -306,6 +306,23 @@ def item_chunks(ids, items, icons):
     return out
 
 
+def pack_index(entries, at):
+    """THE SHARED PER-AREA LAYOUT (the project's rule of small binary tables per area; areas.awa, npc-ambient.awa and
+    npc-parts.awa all use it): the index of a pack, ENTRIES [(area key, record bytes)] in ascending key, each
+    { u32 key, u32 offset from the file's start, u32 bytes } little-endian, the records stored from AT on in the same
+    order. The key is focus.awf's: a room's number, or an exterior cell's 0x80000000 | (gx + 2048) << 12 | (gy + 2048)
+    (prepare_focus.exterior_key), so one place key names an area in every pack. Returns (index bytes, the offset
+    after the last record)."""
+    out = []
+    last = None
+    for key, record in entries:
+        if last is not None and key <= last:
+            raise ValueError('area pack keys not ascending: %d after %d' % (key, last))
+        last = key
+        out.append(struct.pack('<III', key, at, len(record))); at += len(record)
+    return b''.join(out), at
+
+
 def name_hash(ident):
     """FNV-1a over the id with A-Z folded; 0 becomes 1 (prepare_focus.name_hash, engine AW_LedgerNameHash)."""
     h = 2166136261
@@ -356,11 +373,9 @@ def build(id1, extras_path=None):
     cont_at = at; at += 8 * len(cont_dir)
     heads = [cont_dir[i][0] for i in range(0, len(cont_dir), DIR_BLOCK)]
     at += 4 * len(heads)
-    index = []
-    for key, record in zip(keys, records):
-        index.append(struct.pack('<III', key, at, len(record))); at += len(record)
+    index, at = pack_index(zip(keys, records), at)
     payload = (b'AWA1' + struct.pack('<IIIII', len(keys), item_at, len(item_dir), cont_at, len(cont_dir)) +
-               b''.join(index) + b''.join(struct.pack('<IHH', h, n, 0) for h, n in item_dir) +
+               index + b''.join(struct.pack('<IHH', h, n, 0) for h, n in item_dir) +
                b''.join(struct.pack('<IHH', r, n, 0) for r, n in cont_dir) +
                b''.join(struct.pack('<I', h) for h in heads) + b''.join(records))
     sizes = sorted(s['bytes'] for s in stats)
@@ -497,10 +512,8 @@ def build_ambient(keys_of, lut):
         placed.update(refs)
     at = 16 + 12 * len(tables)
     shared_at = at; at += len(shared)
-    index = []
-    for key, t, _ in tables:
-        index.append(struct.pack('<III', key, at, len(t))); at += len(t)
-    payload = (b'AWM1' + struct.pack('<III', len(tables), shared_at, len(shared)) + b''.join(index) + shared +
+    index, at = pack_index(((key, t) for key, t, _ in tables), at)
+    payload = (b'AWM1' + struct.pack('<III', len(tables), shared_at, len(shared)) + index + shared +
                b''.join(t for _, t, _ in tables))
     sizes = sorted(len(t) for _, t, _ in tables)
     largest = max(tables, key=lambda t: len(t[1])) if tables else (None, b'', 0)
@@ -536,6 +549,115 @@ def stage_ambient(id1, out, data_files, places):
         report['shared_bytes'], report['refs_not_in_any_area']), flush=True)
     (Path(out) / 'ambient-areas-staging.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8',
                                                           newline='\n')
+    # NPC-RECIPES-PER-AREA-59: the residents' recipe tables on the same layout (here: this step has the data files the
+    # room numbers come from, and build_aga.py sits at its release size limit, BUILD-AGA-AT-TEXT-LIMIT-60)
+    stage_recipes(id1, out, data_files)
+    return report
+
+
+# ---------------------------------------------------------------- NPC-RECIPES-PER-AREA-59: the residents' recipes per area
+#
+# id1/npc-parts.awa: the residents' recipe tables (tools/npc_recipes.py AWNB, unchanged inside) on the shared per-area
+# layout, written at image assembly from the stages' own files (view/npc_parts/cells.awnp, view/npc_parts/<map>.awnb),
+# which stay in the image as the previous method (engine cvar aw_npc_tables_areas 0). Little-endian like areas.awa:
+#   "AWR1" u32 areas, u32 directory offset, u32 directory entries,
+#   areas x { u32 key, u32 offset, u32 bytes }   pack_index: ascending key (focus.awf's keys: an exterior cell by its
+#           grid, a room by the number its map carries in "_aw_cell_int", the very key the engine's place has)
+#   the resident directory, entries x { u32 id hash (npc_recipes.id_hash, as the AWNB records), u16 area index, u16 0 }
+#           ascending hash (NARROW-LOAD: a resident outside the loaded areas costs one seek and one read; the first
+#           area by key keeps a resident placed in two)
+#   the AWNB tables, one per area
+# The engine (aw_npc_parts.c) holds the index and the directory, and reads an area's table with one seek and one read
+# when the place changes (AW_AreaPlaceKeys: the room, or the 3 x 3 exterior cells) or a cell's residents arrive.
+def room_number(id1, name, planned=None):
+    """The room number of map NAME: the "_aw_cell_int" its world entity carries (the key engine aw_inventory.c
+    focus_room reads), else PLANNED[NAME], the number tools/cell_numbers.py stamps there later in the image step
+    (planned_numbers); None when neither names one."""
+    from map_files import head_bytes, map_file, worldspawn
+    value = worldspawn(head_bytes(map_file(Path(id1) / 'maps', name))).get('_aw_cell_int', '')
+    if value.isdigit():
+        return int(value)
+    return (planned or {}).get(name)
+
+
+def planned_numbers(names, data_files):
+    """{map name: room number} as tools/cell_numbers.py stamp_staged_cells will stamp the maps NAMES (the same map
+    cells and the same numbering of the masters in DATA_FILES)."""
+    import prepare_focus  # noqa: F401  (puts src/ on the path for mwad, as stage_ambient)
+    from cell_numbers import interior_map_cells, load_table
+    from mwad.paths import resolve_data_files
+    table, _ = load_table(resolve_data_files(Path(data_files)))
+    numbers = {row['cell'].casefold(): row['number'] for row in table}
+    return {name: numbers[cell.casefold()] for name, cell in interior_map_cells(names).items()
+            if cell.casefold() in numbers}
+
+
+def table_hashes(table):
+    """The id hashes of an AWNB table's residents (npc_recipes.table_bytes: u16 residents at 6, records from 12)."""
+    if table[:4] != b'AWNB':
+        raise ValueError('not an AWNB table')
+    count, size = struct.unpack_from('>H', table, 6)[0], table[5]
+    return [struct.unpack_from('>I', table, 12 + i * size)[0] for i in range(count)]
+
+
+def build_recipes(tables):
+    """npc-parts.awa from TABLES {area key: AWNB bytes}; the report."""
+    keys = sorted(tables)
+    directory = {}
+    for n, key in enumerate(keys):
+        for h in table_hashes(tables[key]):
+            directory.setdefault(h, n)
+    entries = sorted(directory.items())
+    at = 16 + 12 * len(keys)
+    dir_at = at
+    at += 8 * len(entries)
+    index, _ = pack_index(((k, tables[k]) for k in keys), at)
+    payload = (b'AWR1' + struct.pack('<III', len(keys), dir_at, len(entries)) + index +
+               b''.join(struct.pack('<IHH', h, n, 0) for h, n in entries) + b''.join(tables[k] for k in keys))
+    sizes = sorted(len(t) for t in tables.values())
+    report = {'format': 'AWR1', 'areas': len(keys), 'bytes': len(payload), 'index_bytes': 16 + 12 * len(keys),
+              'residents': len(entries), 'directory_bytes': 8 * len(entries),
+              'area_bytes_median': sizes[len(sizes) // 2] if sizes else 0,
+              'area_bytes_largest': sizes[-1] if sizes else 0,
+              'sha256': hashlib.sha256(payload).hexdigest()}
+    return payload, report
+
+
+def stage_recipes(id1, out, data_files=None):
+    """The image step's write of id1/npc-parts.awa from the stages' recipe tables (none: no file), run from the
+    Wander tables' step (stage_ambient, which has the data files for the room numbers: the image step stamps them
+    into the maps only later); a room with no number keeps only its old file (listed). Its report in
+    OUT/npc-parts-staging.json."""
+    from prepare_focus import exterior_key
+    import npc_recipes
+    id1 = Path(id1)
+    folder = id1 / npc_recipes.TABLE_DIR
+    if not folder.is_dir():
+        return None
+    print('=== areas: the residents\' recipes per area ===', flush=True)
+    tables, left = {}, []
+    pack = folder / 'cells.awnp'
+    if pack.is_file():
+        for (x, y), data in sorted(npc_recipes.pack_tables(pack.read_bytes()).items()):
+            tables[exterior_key(x, y)] = data
+    rooms = sorted(folder.glob('*.awnb'))
+    planned = planned_numbers([p.stem for p in rooms], data_files) if rooms and data_files else {}
+    for path in rooms:
+        number = room_number(id1, path.stem, planned)
+        if number is None or number in tables:
+            left.append(path.stem)
+            continue
+        tables[number] = path.read_bytes()
+    if not tables:
+        return None
+    payload, report = build_recipes(tables)
+    (id1 / 'npc-parts.awa').write_bytes(payload)
+    report.update(file='id1/npc-parts.awa', places_left=left)
+    print('[areas] recipes: %d areas, %d residents, %d bytes (index %d, directory %d); rooms without a number: %s' % (
+        report['areas'], report['residents'], report['bytes'], report['index_bytes'], report['directory_bytes'],
+        ', '.join(left) or 'none'), flush=True)
+    (Path(out) / 'npc-parts-staging.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8',
+                                                      newline='\n')
     return report
 
 

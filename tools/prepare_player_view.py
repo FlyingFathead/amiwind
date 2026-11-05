@@ -50,6 +50,7 @@ SETTINGS_FORMAT = 'AWVS1'
 BODIES_FORMAT = 'AWPB1'
 NUMBERS = ('fVanityDelay',)
 STRINGS = ('sLoadLastSaveMsg', 'sYes', 'sNo', 'sNotifyMessage2')   # sNotifyMessage2: no rest/wait, enemies nearby
+OPTIONAL_STRINGS = ('sKilledEssential',)   # the message box when an essential character dies (ESSENTIAL-DEATH-60)
 PLAYER_RECORD = 'player'
 BODY_PROFILE = 'move'
 # Plus the shield block (COMBAT-BLOCKING-36): base_anim 'shield: block start..stop', played while the player
@@ -148,6 +149,18 @@ def settings_text(kinds):
             raise ValueError('sLoadLastSaveMsg must hold exactly one %s')
         value = value.replace('\n', '\\n')
         if len(value) > 150 or not value.isascii():
+            raise ValueError('Game setting text too long or not ASCII: ' + name)
+        lines.append(f'{name} {value}')
+    for name in OPTIONAL_STRINGS:
+        # a game setting a master may lack: written only when present (the engine shows nothing without it)
+        try:
+            value = _gmst(kinds, name)
+        except ValueError:
+            continue
+        if not isinstance(value, str) or not value or '\\' in value or any(ord(c) < 32 and c != '\n' for c in value):
+            raise ValueError('Unsupported text in game setting ' + name)
+        value = value.replace('\n', '\\n')
+        if len(value) > 250 or not value.isascii():
             raise ValueError('Game setting text too long or not ASCII: ' + name)
         lines.append(f'{name} {value}')
     return '\n'.join(lines) + '\n'

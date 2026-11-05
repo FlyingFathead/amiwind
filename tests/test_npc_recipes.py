@@ -73,6 +73,82 @@ class Recipe(unittest.TestCase):
         self.assertEqual(npc_recipes.RECORD, 42)             # a few dozen bytes a resident
 
 
+def write_area_pack(tmp, numbers):
+    """The image step's npc-parts.awa (prepare_area_tables.stage_recipes) from the tables in TMP, each room's map given
+    its NUMBERS in "_aw_cell_int" as a built room map carries it; {old place key: area key} of every place packed."""
+    import prepare_area_tables
+    from prepare_focus import exterior_key
+    maps = Path(tmp) / 'maps'
+    maps.mkdir(exist_ok=True)
+    for name, number in numbers.items():           # a BSP29 head and its entity lump, as a room map is written
+        lump = b'{\n"classname" "worldspawn"\n"_aw_cell_int" "%d"\n}\n\0' % number
+        (maps / (name + '.chim')).write_bytes((29).to_bytes(4, 'little') + (12).to_bytes(4, 'little') +
+                                              len(lump).to_bytes(4, 'little') + lump)
+    report = prepare_area_tables.stage_recipes(tmp, tmp)
+    assert report and not report['places_left'], report
+    out = {}
+    folder = Path(tmp) / npc_recipes.TABLE_DIR
+    for (x, y) in npc_recipes.pack_tables((folder / 'cells.awnp').read_bytes()):
+        out[npc_recipes.cell_key(x, y)] = exterior_key(x, y)
+    for path in folder.glob('*.awnb'):
+        out[path.stem] = numbers[path.stem]
+    return out
+
+
+class AreaPack(unittest.TestCase):
+    """NPC-RECIPES-PER-AREA-59: the recipe tables on the shared per-area layout (prepare_area_tables.pack_index, as
+    areas.awa and npc-ambient.awa)."""
+    def test_pack_layout_keys_and_directory(self):
+        import struct
+        import prepare_area_tables
+        from prepare_focus import exterior_key
+        with tempfile.TemporaryDirectory() as tmp:
+            npc_recipes.write_tables(tmp, PerPlace.CAST, PerPlace.PLACED, log=lambda *a, **k: None)
+            areas = write_area_pack(tmp, {'arrilles_tradehouse': 762})
+            raw = (Path(tmp) / 'npc-parts.awa').read_bytes()
+            report = (Path(tmp) / 'npc-parts-staging.json').read_text(encoding='utf-8')
+            old = {k: (Path(tmp) / npc_recipes.table_path(k)).read_bytes() for k in areas if not k.startswith('c')}
+            old.update({npc_recipes.cell_key(*xy): t for xy, t in npc_recipes.pack_tables(
+                (Path(tmp) / npc_recipes.PACK_PATH).read_bytes()).items()})
+        self.assertIn('"format": "AWR1"', report)
+        self.assertEqual(areas, {'arrilles_tradehouse': 762, 'c-1_-9': exterior_key(-1, -9),
+                                 'c-2_-9': exterior_key(-2, -9)})
+        n, dir_at, dir_n = struct.unpack_from('<III', raw, 4)
+        self.assertEqual((raw[:4], n, dir_at), (b'AWR1', 3, 16 + 12 * 3))
+        index = [struct.unpack_from('<III', raw, 16 + 12 * i) for i in range(n)]
+        self.assertEqual([k for k, _, _ in index], sorted(areas.values()))
+        by_key = {v: k for k, v in areas.items()}
+        for key, at, size in index:                       # each area's table is the place's own, byte for byte
+            self.assertEqual(raw[at:at + size], old[by_key[key]])
+        directory = [struct.unpack_from('<IHH', raw, dir_at + 8 * i) for i in range(dir_n)]
+        self.assertEqual([h for h, _, _ in directory], sorted(h for h, _, _ in directory))
+        self.assertEqual(dir_n, 4)                         # Fargoth, Seyda Guard, Arrille, Hrisskar
+        for h, a, _ in directory:
+            self.assertIn(h, prepare_area_tables.table_hashes(old[by_key[index[a][0]]]))
+
+    def test_rooms_without_a_number_stay_on_their_old_file(self):
+        import prepare_area_tables
+        with tempfile.TemporaryDirectory() as tmp:
+            npc_recipes.write_tables(tmp, PerPlace.CAST, PerPlace.PLACED, log=lambda *a, **k: None)
+            report = prepare_area_tables.stage_recipes(tmp, tmp)
+        self.assertEqual(report['places_left'], ['arrilles_tradehouse'])
+        self.assertEqual(report['areas'], 2)
+
+    def test_one_index_writer_for_every_area_pack(self):
+        import prepare_area_tables
+        source = (ROOT / 'tools/prepare_area_tables.py').read_text(encoding='utf-8')
+        self.assertEqual(source.count("struct.pack('<III', key, at, len("), 1)    # pack_index only
+        self.assertEqual(source.count('pack_index('), 4)                         # its def and three packs
+        self.assertRaises(ValueError, prepare_area_tables.pack_index, [(2, b'x'), (1, b'y')], 0)
+        self.assertIn('stage(boot/\'id1\',args.focus,out)', (ROOT / 'tools/build_aga.py').read_text(encoding='utf-8'))
+        self.assertIn('    stage_recipes(id1, out, data_files)\n', source)    # the image step's Wander tables' step
+        # a room map not stamped yet takes the number cell_numbers will stamp (the image step stamps later)
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertEqual(prepare_area_tables.room_number(tmp, 'tradehouse', {'tradehouse': 762}), 762)
+            self.assertIsNone(prepare_area_tables.room_number(tmp, 'tradehouse'))
+        self.assertIn(b'aw_npc_tables_areas 1\\n', (ROOT / 'tools/build_aga.py').read_bytes())
+
+
 class PerPlace(unittest.TestCase):
     """BUILD-NPC-RECIPES-PER-CELL-59: one table per exterior cell and per room, each resident's line the very line
     of the one island-wide table it replaces."""
@@ -125,6 +201,10 @@ class PerPlace(unittest.TestCase):
                    for key, text in texts.items()}
             (folder / 'places.txt').write_text(''.join('\t'.join([k] + v) + '\n' for k, v in sorted(ids.items())),
                                                encoding='ascii', newline='\n')
+            # NPC-RECIPES-PER-AREA-59: the same tables on the shared per-area pack, a room keyed by its map's number
+            areas = write_area_pack(tmp, {'census_and_excise_office': 762, 'arrilles_tradehouse': 12})
+            (folder / 'areas.txt').write_text(''.join('%s\t%d\n' % kv for kv in sorted(areas.items())),
+                                              encoding='ascii', newline='\n')
             native.NativeSourceTests.compile_run(self, 'aga_npc_tables_test.c', [SRC / 'aw_player_parts.c'],
                                                  arguments=[str(folder)],
                                                  cflags=['-fsanitize=address,undefined', '-fno-sanitize-recover=all'])
@@ -146,7 +226,13 @@ class EngineWiring(unittest.TestCase):
     def test_off_by_default_fused_model_kept_and_wired(self):
         source = (SRC / 'aw_npc_parts.c').read_text(encoding='latin-1')
         self.assertIn('static int npc_parts_on=0;', source)
-        self.assertNotIn('Cvar_RegisterVariable', source)                      # the resident registry budget
+        # one console variable only, the A/B switch of the area pack (resident registry budget, 2026-11-04)
+        self.assertEqual(source.count('Cvar_RegisterVariable'), 1)
+        self.assertIn('{"aw_npc_tables_areas","1"}', source)
+        self.assertIn('AW_NpcPartsInit();', (SRC / 'aw_debug.c').read_text(encoding='latin-1'))
+        # the area method reads nothing in play: a miss waits for the next place change or arrival
+        self.assertIn('pending_add(needs[i])', source)
+        self.assertIn('method_check();areas_sync(0);', source)
         self.assertIn('AW_NpcPartsSet(on)', (SRC / 'aw_view.c').read_text(encoding='latin-1'))
         self.assertIn('AW_NpcTablesFind(&tables,', source)                    # only the tables held now
         self.assertIn('h->aw_skel_table!=(const void *)e->table', source)       # only the parts' own table

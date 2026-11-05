@@ -1,8 +1,10 @@
 # Entity tracker
 
-_Last updated with AmiWind v0.0.32-dev1 (8 October 2026)._
+_Last updated with AmiWind v0.0.60-dev3 (4 November 2026)._
 
 **Status: first version in the image build (v0.0.31 development).**
+
+> Superseded: this page is the first version, written for the v0.0.31 image build. The state of the conversion is kept by the [game features tracker](../GAME_FEATURES.md) and the [cell tracker](../chim/CELL_TRACKER.md); see [Trackers](README.md).
 
 Keeps track of which kinds of things are placed in AmiWind, so nothing is left
 behind unnoticed as more of the world is converted.

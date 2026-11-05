@@ -146,7 +146,7 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - [GATE-PRIVACY-SCAN-33](GATE-PRIVACY-SCAN-33.md): The source preflight does not scan file contents for tool or model names and private path prefixes
 - [GATE-SHARED-SOURCE-32](GATE-SHARED-SOURCE-32.md): The local gate always tested the main checkout, in one shared folder
 - GATE-SMOKE-IMAGE-REMOVED-54 (no report page): Every gate failed its smoke part: the image it boots lived in an old build run that the automatic Docker cleanup retired
-- GATE-SMOKE-NO-REMOTE-CONTROL-60 (no report page): Gate boot smokes sometimes fail with no remote control after boot
+- [GATE-SMOKE-NO-REMOTE-CONTROL-60](GATE-SMOKE-NO-REMOTE-CONTROL-60.md): Gate boot smokes sometimes fail with no remote control after boot
 - [GATE-SOURCE-RACE-33](GATE-SOURCE-RACE-33.md): The local gate copies the working tree after its clean check, so edits during the copy reach the tested source
 - GATE-STAGES-DIRTY-WORKTREE-54 (no report page): A gate copies the worktree as it is when it starts, not the commit it was launched for
 - [GATE-SUITE-WRITABLE-32](GATE-SUITE-WRITABLE-32.md): The test suite needs a writable source copy and an executable /tmp; the documented command does not say so

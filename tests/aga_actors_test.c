@@ -304,6 +304,7 @@ int AW_CombatSlotState (edict_t *e, float *health)
 int AW_CombatTestEngage (edict_t *e, int dead) {return 0;}
 int AW_CombatSetHealth (edict_t *e, float health) {return 0;}
 void AW_CombatForget (edict_t *e) {}
+void AW_CompanionKillMode (void) {}
 int ChimChunks_OriginCell (int *cx, int *cy) {*cx = *cy = 0; return 1;}
 /* the residents' recipe tables (aw_npc_parts.c, BUILD-NPC-RECIPES-PER-CELL-59): in with a join, out with a leave */
 static int parts_cells_in, parts_cells_out, parts_rooms;

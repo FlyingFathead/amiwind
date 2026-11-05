@@ -115,6 +115,13 @@ static int route_format(route_t *r,int argc,char **argv,int j,char *out,int capa
         if(argc-j>1 || used+20>capacity)return 0;
         strcpy(out+used," actors creatures");used+=17;
     }
+    /* dbg kill [REF] (DBG-KILL-60): "chim actors killpick" (the red crosshair pick) or "chim actors kill REF"; no
+     * resident command of its own */
+    if(!strcmp(r->command,"chim") && !strcmp(r->words,"kill")){
+        if(argc-j>1 || used+20>capacity)return 0;
+        if(argc==j){strcpy(out+used," actors killpick\n");return 1;}
+        strcpy(out+used," actors kill");used+=12;
+    }
     /* dbg mwscript alone: what the compiled scripts do and what was loaded (DBG-MWSCRIPT-SILENT-56); dbg mwscript
      * status keeps the counts only */
     if(!strcmp(r->command,"aw_mwscript_status") && !strcmp(r->words,"mwscript") && argc==j){

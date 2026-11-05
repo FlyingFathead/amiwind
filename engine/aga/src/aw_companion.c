@@ -24,6 +24,7 @@
 #include "aw_links.h"
 #include "aw_npcpath.h"
 #include "aw_anim.h"
+#include "aw_actors.h"   /* AW_CombatSlotState, AW_CombatTestEngage (dbg kill) */
 
 #define DISTANCE_MIN 48         /* dbg companion distance: follow distance clamp */
 #define DISTANCE_MAX 512
@@ -66,7 +67,7 @@ static struct {
     double started, think_seconds, think_max;
 } stats;
 
-static struct {unsigned char on, click, red, drawn; int frame; edict_t *target;} pick;
+static struct {unsigned char on, click, red, drawn, kill; int frame; edict_t *target;} pick;   /* kill: dbg kill's pick (DBG-KILL-60) */
 static cvar_t think_interval={"aw_companion_think","0.1"};
 /* How close the follower keeps (feet to feet, game units). 96: out of the
  * player's way in a doorway, still in view. Not saved. */
@@ -419,12 +420,22 @@ static edict_t *pick_target(void) {
     if(pick.frame!=host_framecount){
         pick.frame=host_framecount;pick.target=AW_NPCTargetReach(p,cl.viewangles,PICK_REACH);
         if(pick.target && pick.target==c.e)pick.target=NULL;
+        if(pick.kill && pick.target && AW_CombatSlotState(pick.target,NULL)==2)pick.target=NULL;   /* a body is not killed twice */
     }
     return pick.target;
 }
+/* A click in pick mode: dbg companion pick makes the actor follow, dbg kill (DBG-KILL-60) kills it through the same call
+ * as "chim actors kill" (AW_CombatTestEngage dead: it lies down, is not solid, its death is on the change list at once). */
+static void pick_act(edict_t *e) {
+    if(!pick.kill){pick_npc(e);return;}
+    if(AW_CombatTestEngage(e,1)){
+        eval_t *r=GetEdictFieldValue(e,"aw_ref");
+        Con_Printf("dbg kill: %s (ref %.0f) is dead\n",e->v.netname?pr_strings+e->v.netname:"?",r?r->_float:0.0f);
+    }else Con_Printf("dbg kill: %s has no combat sheet and cannot be killed\n",e->v.netname?pr_strings+e->v.netname:"?");
+}
 /* view.c: 0 = not picking (normal crosshair rule), 1 = picking, no target
  * (white crosshair, even if the crosshair is off), 2 = red: click picks. */
-static void pick_escape(void) {if(pick.on && key_dest==key_menu){pick.on=0;Con_Printf("Pick mode off.\n");}}
+static void pick_escape(void) {if(pick.on && key_dest==key_menu){pick.on=0;pick.kill=0;Con_Printf("Pick mode off.\n");}}
 int AW_CompanionCrosshair(int x,int y) {
     static int red=-1;int i;long best=0x7fffffff,d,r,g,b;
     pick_escape();
@@ -444,7 +455,7 @@ int AW_CompanionButtons(int bits) {
     if(!pick.on){held=bits&1;return bits;}
     if((bits&1) && !held){
         t=pick_target();
-        if(t)pick_npc(t);else Con_Printf("Pick: no NPC under the crosshair.\n");
+        if(t)pick_act(t);else Con_Printf("Pick: no NPC under the crosshair.\n");
     }
     held=bits&1;return bits&~1;
 }
@@ -455,8 +466,9 @@ int AW_CompanionPickAim(void) {
     edict_t *t;
     pick_escape();
     if(!pick.on)return 0;
+    if(pick.kill){pick.on=0;pick.kill=0;Con_Printf("Pick mode off.\n");return 1;}   /* dbg kill: the right button leaves */
     t=pick_target();
-    if(t)pick_npc(t);else Con_Printf("Pick: no NPC under the crosshair.\n");
+    if(t)pick_act(t);else Con_Printf("Pick: no NPC under the crosshair.\n");
     return 1;
 }
 
@@ -504,9 +516,17 @@ static void stop(void) {
 }
 static void toggle_pick(void) {
     if(!player() || cls.state!=ca_connected){Con_Printf("AmiWind: start the local scene first.\n");return;}
-    pick.on=!pick.on;pick.frame=-1;pick.target=NULL;
+    pick.on=!pick.on;pick.kill=0;pick.frame=-1;pick.target=NULL;
     Con_Printf(pick.on?"Pick mode: aim at an NPC (red crosshair) and attack or right-click to pick; dbg companion pick or Escape leaves.\n":
         "Pick mode off.\n");
+}
+/* dbg kill toggles the kill pick ("chim actors killpick", aw_console.c routes it; no command of its own: the resident
+ * registry budget); dbg kill REF is "chim actors kill REF". */
+void AW_CompanionKillMode(void) {
+    if(!player() || cls.state!=ca_connected){Con_Printf("AmiWind: start the local scene first.\n");return;}
+    if(pick.on && pick.kill){pick.on=0;pick.kill=0;Con_Printf("Pick mode off.\n");return;}
+    pick.on=1;pick.kill=1;pick.frame=-1;pick.target=NULL;
+    Con_Printf("Kill mode: aim at an NPC or creature (red crosshair) and attack to kill it; dbg kill, a right click or Escape leaves.\n");
 }
 static void distance(void) {
     float v;

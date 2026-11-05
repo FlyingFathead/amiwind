@@ -78,6 +78,68 @@ int main (int argc, char **argv)
         assert (!AW_NpcCellOfKey ("census_and_excise_office", &cx, &cy) && !AW_NpcCellOfKey ("c1_", &cx, &cy));
         free (dir);
     }
+    {   /* NPC-RECIPES-PER-AREA-59: the area pack (DIR/../../npc-parts.awa; DIR/areas.txt "<place key>\t<area key>"):
+         * each place's table under its area key is the very table of the earlier files, and the pack's directory names
+         * for every resident an area whose table holds it */
+        long asize, lsize;
+        unsigned char *pack = slurp (argv[1], "../../npc-parts.awa", &asize);
+        char *alist = (char *)slurp (argv[1], "areas.txt", &lsize), *s3 = NULL, *l;
+        unsigned long areas, dir_at, dir_n, at, size, n, key, back;
+        char name[AW_PARTS_ID];
+        int found = 0;
+        assert (AW_NpcAreaHead (pack, (unsigned long)asize, &areas, &dir_at, &dir_n) && areas > 0 && dir_n > 0);
+        assert (!AW_NpcAreaHead (pack, AW_NPC_AREA_HEAD - 1, &areas, &dir_at, &dir_n));
+        assert (AW_NpcAreaCellKey (-2, -9) == (0x80000000UL | (2046UL << 12) | 2039UL));
+        AW_NpcAreaKeyName (0x80ffe7f7UL, name, sizeof(name));
+        assert (!strcmp (name, "a80ffe7f7") && AW_NpcAreaKeyOf (name, &back) && back == 0x80ffe7f7UL);
+        assert (!AW_NpcAreaKeyOf ("c-2_-9", &back) && !AW_NpcAreaKeyOf ("a80ffe7f", &back));
+        for (l = strtok_r (alist, "\n", &s3) ; l ; l = strtok_r (NULL, "\n", &s3))
+        {
+            char *tab = strchr (l, '\t');
+            long osize;
+            unsigned char *old;
+            int cx, cy;
+            char tail, oname[AW_PARTS_ID + 8];
+            assert (tab);
+            *tab = 0;
+            key = strtoul (tab + 1, NULL, 10);
+            assert (AW_NpcAreaFind (pack + AW_NPC_AREA_HEAD, areas, key, &at, &size, &n) && at + size <= (unsigned long)asize);
+            if (sscanf (l, "c%d_%d%c", &cx, &cy, &tail) == 2)
+            {
+                long whole;
+                unsigned long oat, osz;
+                unsigned char *cells = slurp (argv[1], "cells.awnp", &whole);
+                assert (key == AW_NpcAreaCellKey (cx, cy));
+                assert (AW_NpcPackFind (cells, AW_NpcPackIndexBytes (cells), cx, cy, &oat, &osz));
+                assert (osz == size && !memcmp (cells + oat, pack + at, size));
+                free (cells);
+            }
+            else
+            {
+                snprintf (oname, sizeof(oname), "%s.awnb", l);
+                old = slurp (argv[1], oname, &osize);
+                assert ((unsigned long)osize == size && !memcmp (old, pack + at, size));
+                free (old);
+            }
+            found++;
+        }
+        assert ((unsigned long)found == areas);
+        assert (!AW_NpcAreaFind (pack + AW_NPC_AREA_HEAD, areas, 0x7fffffffUL, &at, &size, &n));
+        for (p=0 ; p<nplaces ; p++)
+            for (i=0 ; i<nids[p] ; i++)
+            {
+                long a = AW_NpcAreaDirFind (pack + dir_at, dir_n, ids[p][i]);
+                const unsigned char *e;
+                assert (a >= 0 && (unsigned long)a < areas);
+                e = pack + AW_NPC_AREA_HEAD + 12 * a;
+                at = e[4] | e[5] << 8 | e[6] << 16 | (unsigned long)e[7] << 24;
+                size = e[8] | e[9] << 8 | e[10] << 16 | (unsigned long)e[11] << 24;
+                assert (AW_NpcTableFind (pack + at, (long)size, ids[p][i], &b));
+            }
+        assert (AW_NpcAreaDirFind (pack + dir_at, dir_n, "nobody at all") < 0);
+        free (pack);
+        free (alist);
+    }
     memset (&t, 0, sizeof(t));
     for (round=0 ; round<3 ; round++)               /* in and out again: no stale entry, nothing kept */
     {

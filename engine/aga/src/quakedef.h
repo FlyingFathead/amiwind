@@ -540,6 +540,7 @@ void AW_NpcPartsReset(void);
 void AW_NpcPartsUpdate(void);
 void AW_NpcPartsCell(int cx,int cy,int in);   /* aw_actors.c: a cell's recipe table in (1) or out (0) with its actors */
 void AW_NpcPartsRoom(const char *map);        /* aw_actors.c: a room's recipe table on entering it */
+void AW_NpcPartsInit(void);                   /* aw_debug.c: aw_npc_tables_areas (NPC-RECIPES-PER-AREA-59) */
 void AW_GuardTorchDraw(void);
 void AW_StaticFlamesDraw(void);
 /* One placed static flame (aw_flame entity); shape: size, rise, spread (0 = legacy). */
@@ -736,6 +737,7 @@ int AW_CompanionButtons(int bits);
 extern int (*aw_combat_buttons)(int bits);
 int AW_CompanionPickMode(void);
 int AW_CompanionPickAim(void);
+void AW_CompanionKillMode(void);   /* dbg kill: the red-crosshair kill pick on or off (DBG-KILL-60) */
 /* Hooks set by AW_CompanionInit, defined beside their callers (NULL in
  * fixtures that compile those files alone): view.c, cl_input.c,
  * aw_scene.c, aw_save.c. */

@@ -1,18 +1,18 @@
 # CHIM Engine tracker
 
-_Generated from `docs/bugs/bugs.json` with AmiWind v0.0.60-dev3._
+_Generated from `docs/bugs/bugs.json` with AmiWind v0.0.60._
 
 <!-- Generated whole by tools/bug_register.py render from docs/bugs/bugs.json and docs/BUG_JOURNAL.md; do not edit by hand. -->
 
 Every bug of the CHIM engine: its streaming and memory, world format, builder, stairs and collision on CHIM worlds, rendering and performance. Generated together with the [bug register](../BUGS.md) from [`bugs.json`](bugs.json); a test fails when this page is stale or a CHIM bug is missing. Which bugs appear here and how to add one: [CHIM bugs](README.md#chim-bugs). Design: [world streamer](../WORLD_STREAMER.md).
 
-CHIM version: 0.2.2. 362 CHIM bugs: 180 open, 165 fixed, 17 closed.
+CHIM version: 0.2.2. 363 CHIM bugs: 181 open, 165 fixed, 17 closed.
 
 | Part | Open | Fixed | Closed |
 | --- | --- | --- | --- |
 | [Engine streaming and memory](#engine-streaming-and-memory) | 26 | 27 | 2 |
 | [World format](#world-format) | 3 | 4 | 0 |
-| [Builder](#builder) | 100 | 110 | 11 |
+| [Builder](#builder) | 101 | 110 | 11 |
 | [Stairs and collision on CHIM worlds](#stairs-and-collision-on-chim-worlds) | 19 | 10 | 2 |
 | [Rendering and visibility](#rendering-and-visibility) | 15 | 3 | 1 |
 | [Performance](#performance) | 17 | 11 | 1 |
@@ -163,6 +163,7 @@ Newest first: the last 10 [journal](../BUG_JOURNAL.md) entries that name a CHIM 
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | [ACTOR-SPAWN-DROPTOFLOOR-49](ACTOR-SPAWN-DROPTOFLOOR-49.md) | The resident spawn grounding as Quake's droptofloor, one rule with the build's room bake | open | low | 23 October 2026, in v0.0.48-dev2 | - | 2026_10_23_v0.0.48-dev2_dev2-try11_b8c6b6e9: CHIM 0.2.1, format 0.12, engine b8c6b6e, source b8c6b6e, world b8c6b6e | Open, planned for v0.0.49 (23 October 2026): the engine keeps a baked resident exactly at spawn (AW_NPCFloor) and snaps any other 8 over to 32 under; make that fallback the build bake's own rule, and add runtime grounding for moving actors (levitation, flying, jumps, swimming, knockback, scripted SetPos). |
 | [BUILD-ACTOR-LIBRARY-UNDERUSED-54](BUILD-ACTOR-LIBRARY-UNDERUSED-54.md) | The actor-library stage ran at 2.69 of 8 allowed cores with 130 units queued and 7 running | open | high | 27 October 2026, in v0.0.54-dev1 | - | 2026_10_27_v0.0.54-dev1_miniwind-seyda-ambient_55625e2f: CHIM 0.2.2, format 0.13, engine 55625e2, source 55625e2, world 55625e2 | Fix in source (v0.0.58-voices): the NPC pool follows the live share minus the creature workers still running, never over the allowance, all of it once they finish; tests. Next full build to confirm. |
+| [BUILD-AGA-AT-TEXT-LIMIT-60](BUILD-AGA-AT-TEXT-LIMIT-60.md) | tools/build_aga.py is 7 bytes under the release text size limit: the next change to it fails the gate unless a stage is split out | open | medium | 4 November 2026, in v0.0.60-dev3 | - | v0.0.60-dev-source-dbee2384: CHIM 0.2.2, engine dbee238, source dbee238, world dbee238, format not recorded | 4 November 2026: open. 262,137 of 262,144 bytes. Next: move one of its stages into its own module. |
 | [BUILD-CHIM-CONVERTER-CHANGE-FULL-REBUILD-46](BUILD-CHIM-CONVERTER-CHANGE-FULL-REBUILD-46.md) | A change in the shared collision converter rebuilds every CHIM frame and everything after it, even where the output is identical | open | high | 20 October 2026, in v0.0.46-dev1 | - | 2026_10_20_v0.0.46-dev1_dev1-try2_e86b1704: CHIM 0.2.1, format 0.5, engine e86b170, source e86b170, world e86b170 | Repaired on the v0.0.46 development line (20 October 2026), waits for a build: CHIM unit keys hold the code each worker can reach (tools/code_key.py), and variants and the collision surface gate are keyed on the SHA-256 of the prepared mesh (early cutoff). Persisting repeat of BUILD-CACHE-NO-CUTOFF-33 and BUILD-ENGINE-SOURCE-KEY-BROAD-36. |
 | [BUILD-CHIM-KEY-VERSION-48](BUILD-CHIM-KEY-VERSION-48.md) | The CHIM world and cell-progress stages key on VERSION, so a version-only bump (rc to final) rebuilds the whole CHIM world | open | high | 23 October 2026, in v0.0.48-rc1 | - | 2026_10_23_v0.0.48-rc1_rc1_18a24ead: CHIM 0.2.2, format 0.12, engine 18a24ea, source 18a24ea, world 18a24ea | Repaired on v0.0.49-dev, not in a release yet: the version file keys a stage only when its reach names it other than through build_cache.VERSION_HIDDEN_UNITS (project_version.run_version for provenance and refusals, the zone gate compile); project_version reads it lazily (no import-time read). chim_build.py and every CHIM stage no longer key it; the tracker data keeps it (it shows the version). Gate test tests/test_stage_version_key.py. (full text: the register) |
 | [BUILD-CHIM-MAIN-MEMORY-46](BUILD-CHIM-MAIN-MEMORY-46.md) | The CHIM stage main process holds so much memory that the memory guard starves its own workers | open | medium | 20 October 2026, in v0.0.46-dev1 | - | 2026_10_20_v0.0.46-dev1_dev1_f5a1404a: CHIM 0.2.1, format 0.5, engine f5a1404, source f5a1404, world f5a1404 | Open: measured in the v0.0.46-dev1 build; also seen in the v0.0.45 build (about 17 GB main process plus idle workers). Cause not measured yet. |

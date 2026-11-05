@@ -67,6 +67,7 @@ PLAYTESTING|halloween|aw_halloween|[dagoth / skeletons / bench [skeletons] / fps
 PLAYTESTING|halloweenbench|aw_bench|same as bench halloween
 PLAYTESTING|halloweentest|aw_halloweentest|[same words as halloween] the Halloween scene with the FPS counter on (bottom left)
 PLAYTESTING|inventory grant|aw_inventory|<quoted source item ID> <1..999> explicit diagnostic grant of actual catalogue items (not saved defaults)
+PLAYTESTING|kill|chim|[REF] test kill: no argument = pick mode, a red crosshair over a living NPC or creature, attack kills it (the body lies down, can be searched), dbg kill, a right click or Escape leaves; REF = the same as chim actors kill REF (that actor, by reference). One console line per kill. Essential characters show the game's essential-death message
 PLAYTESTING|levelup|aw_levelup|[use SKILL [N [TYPE]] / raise SKILL [N] / check / rest [HOURS] / bed REF] levelling: no argument = level, progress, multipliers, each skill's progress; use = N skill uses (TYPE 0..3); raise = N raises; check = the level-up box when due; rest = HOURS (default 8), then the box when due (saved)
 PLAYTESTING|lightgallery|aw_lightgallery|[off] lighting switches at this spot in a strip below the view: night mode, tint, lamps, glow, headlamp, horizon veil, time preview; arrows change, Esc done
 PLAYTESTING|modelgallery|aw_charplane|[number/name/ID]

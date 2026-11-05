@@ -1,10 +1,11 @@
 # Changelog
 
-_Last updated with AmiWind v0.0.59 (3 November 2026)._
+_Last updated with AmiWind v0.0.60 (4 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.60: Work With What You've Got, 4 November 2026](#v0060-work-with-what-youve-got-4-november-2026)
 - [v0.0.59: Assembling The Bits And Pieces, Once Again, 3 November 2026](#v0059-assembling-the-bits-and-pieces-once-again-3-november-2026)
 - [v0.0.58: Time To Talk, 1 November 2026](#v0058-time-to-talk-1-november-2026)
 - [v0.0.57: Remembering The Emperor, 31 October 2026](#v0057-remembering-the-emperor-31-october-2026)
@@ -167,6 +168,22 @@ _Last updated with AmiWind v0.0.59 (3 November 2026)._
 - [CHIM source candidate - 14 October 2026, v0.0.40-dev1](#chim-source-candidate---14-october-2026-v0040-dev1)
 
 <!-- contents end -->
+
+## v0.0.60: Work With What You've Got, 4 November 2026
+
+- Beds and the two rank raises work again: the compiled scripts are rebuilt whenever the script compiler changes, and
+  the image step refuses scripts made by another compiler.
+- Containers whose contents are levelled lists show their items, rolled by the original's rules and kept across saves.
+- The bodies of dead NPCs and creatures can be searched ("E: Search") through the container strip; what is taken stays
+  taken.
+- The walking residents and the residents built from parts read small per-area tables kept in memory instead of
+  searching files while you walk (not yet measured in game).
+- A tracker of the base game's systems ([game features](GAME_FEATURES.md): 48 systems, 10 done, 29 partial, 9
+  missing), `dbg kill` for testing, and the game's own message when an essential character dies (checked by tests, not
+  yet in game).
+- Builder and release tooling: earlier warnings for size growth and output names, a faster reuse check, safe disk
+  image copies, and a boot check that waits for the game
+  ([release notes](releases/notes/RELEASE-v0.0.60.md)).
 
 ## v0.0.59: Assembling The Bits And Pieces, Once Again, 3 November 2026
 

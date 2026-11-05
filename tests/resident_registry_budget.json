@@ -7,9 +7,9 @@
    "hunk_bytes": 9280
   },
   "cvars": {
-   "count": 357,
-   "static_bytes": 8568,
-   "zone_bytes": 11648
+   "count": 358,
+   "static_bytes": 8592,
+   "zone_bytes": 11680
   },
   "tables": {
    "count": 0,
@@ -85,7 +85,8 @@
   "2026-11-02: the dated journal history on the world change list (JOURNAL-ORIGINAL-VIEW-59, decided by the maintainer: no 32-quest limit), at most 8,192 entries of 16 bytes, only what was earned",
   "2026-11-03: CELL-CHANGES-59 slice 7 (respawn and content-change migration; the continuity ask of 2 November 2026): four growing allocations and one wider row, nothing until first use: the places' container refill times (OpenMW 0.51 CellStore::respawn keeps one per cell), at most 8,192 x 12 bytes = 98,304 worst (the game: about 1,400 exterior cells and 1,000 rooms); the record hash of every reference the change list names (a save of other game data is checked against them), at most 65,536 x 8 bytes = 524,288 worst (a late game names a few thousand); the build's reference identity table's block index, at most 16,384 x 4 bytes = 65,536 worst (Morrowind.esm: 1,235 blocks, about 5 KB) and one block of rows, 8,192 bytes; the actor row gains its time of death (48 to 52 bytes, 8,192 rows: +32,768 worst). aw_placed pass HOURS is a subcommand of the existing aw_placed command (no command, no cvar). Raised on the worker branch v0.0.59-cellchanges7; the maintainer approves it at merge.",
   "2026-11-03: aw_player_cache, the A/B switch of the cached player body the maintainer asked for (ARRIVAL-LONG-FRAME-DEV6-59)",
-  "2026-11-04: +1 console variable aw_ambient_areas (AMBIENT-WALK-PER-AREA-60), the A/B switch every new loading method gets by the maintainer's A/B/C rule of 2026-11-03 (per-area Wander tables vs the island-wide file); 24 structure bytes and 32 zone bytes, no new command."
+  "2026-11-04: +1 console variable aw_ambient_areas (AMBIENT-WALK-PER-AREA-60), the A/B switch every new loading method gets by the maintainer's A/B/C rule of 2026-11-03 (per-area Wander tables vs the island-wide file); 24 structure bytes and 32 zone bytes, no new command.",
+  "2026-11-04: +1 console variable aw_npc_tables_areas (NPC-RECIPES-PER-AREA-59), the A/B switch of the residents' recipe tables on the shared per-area pack (npc-parts.awa) vs the earlier files, by the same A/B/C rule; its budget sheet was approved the same day; 24 structure bytes and 32 zone bytes, no new command."
  ],
  "entries": {
   "commands": [
@@ -514,6 +515,7 @@
    "aw_npc_lod_max",
    "aw_npc_lod_reserve_kib",
    "aw_npc_movers",
+   "aw_npc_tables_areas",
    "aw_npc_voice_lut",
    "aw_npc_voice_pick",
    "aw_npc_voices",

@@ -226,6 +226,36 @@ static int creature_sheet(const char *id,aw_fighter_t *out) {
     if(row==AW_ACTOR_NONE || !AW_ActorBase(row,&b))return 0;
     return AW_CombatCreatureSheet(&b,id,out);
 }
+/* ESSENTIAL-DEATH-60: an actor whose record carries the essential flag (AWR_ESSENTIAL) dies, in a fight or by dbg kill:
+ * the game's own message (GMST sKilledEssential, view/settings.txt by tools/prepare_player_view.py; OpenMW 0.51 shows the
+ * same GMST in a message box when an essential actor dies). The player goes on; loading a save is the player's choice.
+ * Nothing is shown when the image has no such text (a console line says so). */
+extern void AW_MsgBoxShow(const char *text,const char *const *buttons,int count);
+int AW_CombatEssentialRecord(const char *id,int *essential) {
+    int row;aw_actor_base_t b;char want[32];
+    *essential=0;
+    if(!id || !id[0] || !AW_MwscriptActors())return 0;
+    lower(id,want,sizeof(want));
+    row=AW_ActorFind(want);
+    if(row==AW_ACTOR_NONE || row<0 || !AW_ActorBase(row,&b))return 0;
+    *essential=(b.flags&AWR_ESSENTIAL)?1:0;return 1;
+}
+static void essential_death(edict_t *e) {
+    eval_t *v;int essential;FILE *f=NULL;char line[320],*s,*bs;const char *key="sKilledEssential ";size_t n=strlen(key);
+    if(!(v=GetEdictFieldValue(e,"aw_source_id")) || !v->string || !AW_CombatEssentialRecord(pr_strings+v->string,&essential) || !essential)return;
+    Con_Printf("Essential: %s has died.\n",e->v.netname?pr_strings+e->v.netname:"?");
+    if(COM_FOpenFile("view/settings.txt",&f)>=0 && f){
+        while(fgets(line,sizeof(line),f)){
+            line[strcspn(line,"\r\n")]=0;
+            if(strncmp(line,key,n) || !line[n])continue;
+            fclose(f);s=line+n;
+            while((bs=strstr(s,"\\n"))!=NULL){bs[0]=' ';memmove(bs+1,bs+2,strlen(bs+2)+1);}   /* the file writes a newline as \n */
+            AW_MsgBoxShow(s,NULL,0);return;
+        }
+        fclose(f);
+    }
+    Con_Printf("Essential: this image has no death message (view/settings.txt sKilledEssential).\n");
+}
 int AW_CombatActorLoad(const char *id,aw_fighter_t *out) {
     FILE *f=NULL;char line[512],want[32],*tab;long data,offset[27];int total,i,b,cmp;
     lower(id,want,sizeof(want));
@@ -861,6 +891,7 @@ static void player_strike(edict_t *p) {
         /* the death onto the change list at once (CORPSE-LOOT-60): a room captures its actors only every half
          * minute, so a body killed just before the player left came back alive and its search was lost */
         if(aw_combat_actor_died)aw_combat_actor_died(s->e);
+        essential_death(s->e);
         if(readout.value)Con_Printf("Combat: %s is dead\n",s->f.name);
         voice(s->e,AW_VOICE_DEATH);
         if(!AW_CombatHostiles())ended(1);
@@ -1317,6 +1348,7 @@ int AW_CombatTestEngage(edict_t *t,int dead) {
         if(s->rolled && s->e->v.angles[2]!=90){s->e->v.angles[2]=90;s->e->v.origin[2]+=2;}   /* stand-in: lie down */
         SV_LinkEdict(s->e,false);
         if(aw_combat_actor_died)aw_combat_actor_died(s->e);   /* on the change list at once, as a fight's death */
+        essential_death(s->e);
     }
     return 1;
 }

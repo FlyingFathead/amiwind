@@ -1,6 +1,6 @@
 # AmiWind console commands
 
-_Generated from `config/debug-commands.txt` with AmiWind v0.0.60-dev3._
+_Generated from `config/debug-commands.txt` with AmiWind v0.0.60._
 
 Open the console with F10 or the backquote key and type
 a command, for example `dbg headlamp on`. This page is generated from
@@ -72,7 +72,7 @@ Type: "dbg help" for help.
 | `dbg combattest` | - | [opponent] same as arenapit; combattest gallery (or floor): the empty floor test, current hands, then idle/draw/lower/punch/center/help/exit |
 | `dbg companion` | - | [pick/choose/test/off/distance N/mimic speed on/off] NPC follower test (not saved): no argument = status and counters; pick = attack the NPC under the red crosshair; test = spawn one beside you; off = it goes home / is removed; distance 48..512 (default 96); mimic speed (default on) |
 | `dbg companiontest` | - | [on/off] same as companion test / companion off; no argument: status |
-| `dbg creatures` | - | [on/off, true/false or 1/0; no argument: status] the outdoor creatures (default on; not saved): off removes the wild creatures alive (their state kept) and spawns none, to compare frame rate, memory and behaviour; on brings them back as their cells join again |
+| `dbg creatures` | `dbg kill` | [on/off, true/false or 1/0; no argument: status] the outdoor creatures (default on; not saved): off removes the wild creatures alive (their state kept) and spawns none, to compare frame rate, memory and behaviour; on brings them back as their cells join again |
 | `dbg daycycle gallery` | - | [here/off] (eight-stage camera tour; here keeps this view; Esc returns) |
 | `dbg demowind` | - | [on / off / next / prev / effect 1-2 / dist 0-7 / status] DemoWind (docs/DEMOWIND.md): the effects test kit, fullscreen, no world; each effect with its ms a frame and bytes on screen; Left/Right effect, Up/Down distance to Red Mountain, Esc off |
 | `dbg give weapons` | `dbg inventory grant` | [stats] a kit of the game's own weapons, one of every type (blades, blunt, staff, spear, axes, bow, crossbow, thrown, arrows, bolts) and a light and a heavy shield, given at once and saved like any grant, with each one's stats from its record; stats: the table only (docs/INVENTORY.md) |

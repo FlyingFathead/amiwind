@@ -79,6 +79,7 @@ static void every_entry_translates(void){
        !strcmp(bar1+1,"give weapons")?" give weapons":
        !strcmp(bar1+1,"door roulette")?" roulette":!strcmp(bar1+1,"doorlocks")?" locks":
        !strcmp(bar1+1,"creatures")?" actors creatures":!strcmp(bar1+1,"mwscript")?" about":
+       !strcmp(bar1+1,"kill")?" actors killpick":
        (!strcmp(bar1+1,"set race") || !strcmp(bar1+1,"set playerrace"))?" playerrace":"");
   if(AW_DebugTranslate(argc,argv,output,sizeof(output))!=1 || strcmp(output,expect)){
    printf("catalogue entry does not reach its handler: dbg %s -> %s (got %s)\n",bar1+1,handler,output);assert(0);
@@ -104,6 +105,12 @@ int main(int count,char **values){
  }
  {
   char *tracker[]={"dbg","shroomtracker","reset"};
+  { /* DBG-KILL-60: dbg kill = the red crosshair pick, dbg kill REF = chim actors kill REF */
+    char *pick[]={"dbg","kill"},*ref[]={"dbg","kill","331662"},*two[]={"dbg","kill","1","2"};
+    assert(AW_DebugTranslate(2,pick,output,sizeof(output))==1 && !strcmp(output,"chim actors killpick\n"));
+    assert(AW_DebugTranslate(3,ref,output,sizeof(output))==1 && !strcmp(output,"chim actors kill 331662\n"));
+    assert(AW_DebugTranslate(4,two,output,sizeof(output))==0);
+  }
   assert(AW_DebugTranslate(2,tracker,output,sizeof(output))==1 && !strcmp(output,"aw_shroomtracker\n"));
   { /* DBG-TOGGLE-WORDS-31: toggle words reach settings as 1/0; commands keep their words. */
     char *fog[3]={"dbg","fog","on"},*fill[4]={"dbg","skyline","fill","Off"},*guard[3]={"dbg","guardtorch","on"};

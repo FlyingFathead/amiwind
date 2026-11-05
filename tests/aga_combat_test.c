@@ -90,9 +90,14 @@ int COM_FOpenFile(char *name,FILE **file){
 /* The actor record (aw_actorstate.c, aw_mwhost.c): one creature, "daedroth" (COMBAT-DAEDROTH-NO-HIT-51). */
 static int actor_tables=1;
 int AW_MwscriptActors(void){return actor_tables;}
-int AW_ActorFind(const char *id){return !strcmp(id,"daedroth")?7:AW_ACTOR_NONE;}
+int AW_ActorFind(const char *id){return !strcmp(id,"daedroth")?7:!strcmp(id,"a guard")?9:AW_ACTOR_NONE;}
+/* ESSENTIAL-DEATH-60: the resident "a guard" has a record whose flags this test sets; the message box is counted */
+static int guard_flags,boxes;static char box_text[320];
+void AW_MsgBoxShow(const char *text,const char *const *buttons,int count){assert(!buttons && count==0);boxes++;strcpy(box_text,text);}
 int AW_ActorBase(int row,aw_actor_base_t *out){
-    int i;if(row!=7)return 0;
+    int i;
+    if(row==9){memset(out,0,sizeof(*out));out->flags=(unsigned char)guard_flags;return 1;}
+    if(row!=7)return 0;
     memset(out,0,sizeof(*out));out->kind=1;out->level=16;out->health=180;out->fatigue=400;out->magicka=50;
     for(i=0;i<8;i++)out->attributes[i]=60;
     for(i=0;i<27;i++)out->skills[i]=70;              /* the combat value in every combat skill (getSkill) */
@@ -394,6 +399,21 @@ int main(void){
      assert(printed==was_printed+1 && items_shown==was_shown+1 && voices[AW_VOICE_START]==was_start+1);
      assert(AW_CombatSlotState(resident,NULL)==1 && AW_CombatHostiles()==1);
      AW_CombatClear();}
+    /* ESSENTIAL-DEATH-60: a death shows the game's own sKilledEssential text (view/settings.txt) only for a record with
+     * the essential flag (AWR_ESSENTIAL 2); the record flags come from the actor table, the words from the file */
+    {int shown_before;char sub[96];
+     sprintf(sub,"%s/view",dir);mkdir(sub,0700);
+     write_file("view/settings.txt","AWVS1\nfVanityDelay 30\nsKilledEssential Test essential words\\none line.\n");
+     AW_CombatClear();guard_flags=0;shown_before=boxes;
+     assert(AW_CombatTestEngage(resident,1));
+     assert(boxes==shown_before);                                   /* an ordinary record: no box */
+     AW_CombatClear();guard_flags=2;                                /* essential */
+     assert(AW_CombatTestEngage(resident,1));
+     assert(boxes==shown_before+1 && !strcmp(box_text,"Test essential words one line."));
+     {int essential=0;assert(AW_CombatEssentialRecord("a guard",&essential) && essential);
+      guard_flags=0;assert(AW_CombatEssentialRecord("a guard",&essential) && !essential);
+      assert(!AW_CombatEssentialRecord("nobody",&essential) && !essential);}
+     guard_flags=0;AW_CombatClear();}
     /* commands and cost */
     run("aw_combat_cmd");run("aw_combat_cmd readout off");run("aw_combat_cmd calm");run("aw_combat_cmd off");
     assert(!AW_CombatEngage(npc,&f,NULL));

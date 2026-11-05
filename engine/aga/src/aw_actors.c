@@ -1375,6 +1375,11 @@ static void Command (void)
 		}
 		return;
 	}
+	if (Cmd_Argc () == 3 && !strcmp (a, "killpick"))
+	{
+		AW_CompanionKillMode ();	/* dbg kill: the red crosshair pick (aw_companion.c) */
+		return;
+	}
 	if (Cmd_Argc () == 4 && !strcmp (a, "kill"))
 	{
 		float want = (float)Q_atof (Cmd_Argv (3));

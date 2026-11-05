@@ -1,11 +1,12 @@
 # Roadmap and implementation options
 
-_Last updated with AmiWind v0.0.60-dev3 (4 November 2026)._
+_Last updated with AmiWind v0.0.60 (4 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
-- [v0.0.59: released 3 November 2026; v0.0.60 in development](#v0059-released-3-november-2026-v0060-in-development)
+- [v0.0.60: released 4 November 2026; v0.0.61 next](#v0060-released-4-november-2026-v0061-next)
+- [v0.0.59: released 3 November 2026](#v0059-released-3-november-2026)
 - [v0.0.58: released 1 November 2026](#v0058-released-1-november-2026)
 - [v0.0.57: released 31 October 2026; v0.0.58 next](#v0057-released-31-october-2026-v0058-next)
   - [The v0.0.58 list, item by item](#the-v0058-list-item-by-item)
@@ -108,7 +109,106 @@ _Last updated with AmiWind v0.0.60-dev3 (4 November 2026)._
 
 15 October 2026: exact-source validation completed 4,231 tests: 4,225 passed, three Windows-only skips and three tracked Census expected failures. The 71 focused tests and original-data readback across nine frame positions passed, consistently hiding 33 of 158 original references at stronghold state 6 while preserving unknown scripts. All 243 player resources are reusable after exact producer, input and file verification. Complete combined-world conversion, native comparison, packaging and shipment remain pending; coverage counts are unchanged.
 
-## v0.0.59: released 3 November 2026; v0.0.60 in development
+## v0.0.60: released 4 November 2026; v0.0.61 next
+
+v0.0.60, "Work With What You've Got", shipped as its fourth development snapshot with its final version number
+([release notes](releases/notes/RELEASE-v0.0.60.md)). It is a smaller release: the fixes of its snapshots, looting, the
+per-area tables for the residents, and a tracker of the base game. The release notes of each snapshot are
+[dev1](releases/notes/RELEASE-v0.0.60-dev1.md), [dev2](releases/notes/RELEASE-v0.0.60-dev2.md),
+[dev3](releases/notes/RELEASE-v0.0.60-dev3.md) and [dev4](releases/notes/RELEASE-v0.0.60-dev4.md).
+
+**Done in v0.0.60 (dev1 to dev4):**
+
+- **Containers whose contents come from levelled item lists show their items,** rolled by the original rules and kept
+  across saves (dev2, checked in game).
+- **Bodies of dead NPCs and creatures can be looted** through the container strip, kept across saves (dev3, checked in
+  game).
+- **Compiled game scripts are rebuilt whenever the script compiler changes;** the image step refuses compiled scripts
+  made by another compiler, so beds and the two rank raises work again (dev2).
+- **Residents drawn from parts get their appearance from small tables per cell and per interior,** loaded with the
+  area, instead of one table for the whole island (dev4; the old files stay behind a switch).
+- **One tracker for the whole base game:** every system with its state, its reference and its proof, and the share of
+  the game done ([game features](GAME_FEATURES.md): 48 systems, 10 done, 29 partial, 9 missing) (dev4).
+
+**Shipped, with its check still to do:**
+
+- **The walking residents' data per area.** The walking residents read their data from small tables kept in memory per
+  area instead of searching files while you walk (dev1 to dev4; the frame times are not yet measured).
+- **`dbg kill`,** a test command that kills the person or creature picked with a red crosshair, and the game's message
+  when an essential character dies (dev4; checked by tests, in-game check pending).
+- Release-build tooling: earlier warnings for size growth and output names, a faster reuse check, and safe disk image
+  copies (dev1 and dev2).
+
+**Known problems in v0.0.60:** the first frame in Seyda Neen still takes about a second and the walking residents'
+steps can cost 200 to 800 ms on some frames; the trip from Seyda Neen to Balmora sometimes stalls on the loading screen
+in the emulator; some rooms still load in after you arrive; the resident bake of the Vivec town costs about three and
+a half times the CPU it used to.
+
+**v0.0.61 is next.** It holds the combat block, the larger data and dialogue items, the v0.0.59 items whose in-game
+checks are still pending, and the builder and release tooling work:
+
+- Combat and magic:
+  - Weapons and shields of every type in first and third person, a debug weapon menu and gear menu, and a tester mode
+    giving every weapon, all kept in the save.
+  - First-person hands with the weapon in them for every weapon type; 4 of 103 animation groups exist today.
+  - Cliff racers that attack the player land their strikes and are drawn at the right size; then fish in the water and
+    the kill-and-return behaviour.
+  - Player casting: ready a spell, pay its magicka, roll to succeed and deliver Self, Touch or Target effects, with
+    the casting animation and HUD.
+  - A spell-effect system: effects applied over their duration to actors and kept in saves, with the script calls that
+    wait for it.
+  - The original crime system: theft, pickpocketing, attacks, killing and trespass seen by witnesses raise a bounty,
+    and guards arrest, fine or jail.
+  - The in-game check of `dbg kill`, a test command that kills the person or creature picked with a red crosshair.
+- Data and dialogue:
+  - Characters in the world drawn from the same body and clothing parts as the player, so they can change what they
+    wear, and the image needs far less space for them.
+  - Containers, doors, items, activators and creatures take their data from small tables per cell and per interior,
+    loaded with the area, so nothing is searched on disk during play.
+  - Each resident's possible dialogue prepared in advance and loaded with the area, so opening a conversation reads
+    nothing from disk.
+  - Dialogue texts use the same compact macro table as books and the journal; action keys show the bound key.
+  - The conversation system complete against the original and OpenMW 0.51, with a tracker page listing each part, its
+    state and its proof, and a release check that refuses unfinished rows.
+  - New approach being tried: all game data in small chunks per cell and interior, loaded with the area, kept in
+    memory as far as memory allows.
+  - Measuring the walking residents' per-area tables in game.
+- Checks and work carried over from v0.0.59:
+  - Containers such as baskets, crates, barrels and chests open, and a strip at the bottom of the screen lists their
+    items to take or put back.
+  - Resting and waiting work as in the original game: resting heals and lets you level up, waiting only passes the
+    time, and neither works with enemies near.
+  - What you change in the world stays: items taken or moved, NPC disposition, topics learned, journal and script
+    state, across cells and saves.
+  - Scripts, lamps, weather and the camera find the right place in the game world on every map, the streamed towns
+    included.
+  - Every item placed in the original game appears in its place, drawn from one shared model table, and can be aimed at
+    and taken.
+  - What the player wears and wields shows in first person and on the third-person body, changing as the equipment
+    changes.
+  - An index of every item you can pick up, from the game's records.
+  - A test that every kind of item can be dropped from the inventory indoors and outdoors, lands in front of the
+    player, can be picked up again and stays where it was dropped across a save.
+  - A scripted check of the game's own scripts: taking the silver tray in the Census and Excise Office behaves as in
+    the original.
+  - Levelling as in the original: skills rise with use, and resting brings the level-up box with its picture and text,
+    where three markers pick the attributes to raise, each with its multiplier.
+  - Every character voice line and every creature sound mapped into the world and heard in game, with combat sounds on
+    by default and a tracker page showing each kind and its proof.
+- Builder and release tooling:
+  - Release-build tooling: earlier warnings for size growth and output names, a faster reuse check, and safe disk image
+    copies.
+  - Each method is measured once when it works and the result is kept in [docs/performance](performance/) per build,
+    so later comparisons reuse it instead of measuring again.
+  - When a build stage needs most of the memory for its worker pool, the builder runs it on its own first so it can use
+    every core; the builder may use more of the build machine's memory, so more of its stages run on every core.
+  - The release check also verifies two kinds of claim in the release notes: the mention of a build from scratch, and
+    any claim of full core use against the build measurements.
+  - The resident bake of the Vivec town in the builder costs about three and a half times the CPU it used to; the
+    cause is being found and fixed.
+  - Test sessions in the emulator sometimes stopped while loading Seyda Neen; the cause is being found and fixed.
+
+## v0.0.59: released 3 November 2026
 
 v0.0.59, "Assembling The Bits And Pieces, Once Again", shipped as its sixth development snapshot with its final
 version number ([release notes](releases/notes/RELEASE-v0.0.59.md)): every item with its own world model and the
@@ -191,45 +291,11 @@ from Seyda Neen to Balmora sometimes stalls on the loading screen in the emulato
 
 - **Voices and sounds in place:** every character voice line and creature sound mapped into the world and heard in
   game, with a tracker page for each kind and its proof. v0.0.59 maps every voice and sound moment with its engine
-  hook, the combat ones included; v0.0.60 plays the combat ones in play.
+  hook, the combat ones included; the combat ones are played in play with the combat work (v0.0.61).
 - **Levelling as in the original,** completed with the level-up box.
 - The actor-library build stage using all the cores it is allowed, and a from-scratch build of the release line
   recorded as proof that the shipped image can be reproduced.
 - The conversation fix of v0.0.58 ships with this release; no separate v0.0.58 patch was made.
-
-**v0.0.60, in development,** with the combat work. The first snapshot, v0.0.60-dev1, opened the line on 4 November
-2026 ([notes](releases/notes/RELEASE-v0.0.60-dev1.md)); the second, v0.0.60-dev2, adds containers with levelled
-contents and the builder's check of the script compiler ([notes](releases/notes/RELEASE-v0.0.60-dev2.md)); the third,
-v0.0.60-dev3, adds searching the bodies of the dead ([notes](releases/notes/RELEASE-v0.0.60-dev3.md)). The walking
-residents' tables are in all three but not yet measured, and the other items below are not finished in any of them:
-
-- **The walking residents' data per area.** The tables the walking residents read are kept in memory per area,
-  loaded with the area, instead of being searched in files while you walk; measured with the frame wait counters on
-  the same Seyda Neen script as the first reading, then the rest of the arrival frame brought under half a second.
-  The residents drawn from parts get their appearance from small tables per cell and per interior in the same way.
-- **A measured performance history.** Each method is measured once when it works, and the result is kept per build
-  in [docs/performance](performance/), with the build, the setting, the test script, the emulator preset and the Fast
-  RAM, so later comparisons start from the last recorded line instead of measuring again. The history of earlier
-  methods is filled in from this version's results.
-- The player's gear in all stances: the stances per weapon class with the draw and punch layers, first-person gloves
-  and bracers from the parts, and the torch pose on the parts; v0.0.59 ships without them.
-- Weapons and shields of every type in first and third person, with a debug weapon menu and gear menu and a tester
-  mode, all kept in the save.
-- First-person hands with the weapon in them for every weapon type (4 of 103 animation groups exist today).
-- Cliff racers that attack the player land their strikes and are drawn at the right size; then fish in the water and
-  the kill-and-return behaviour.
-- Player casting: ready a spell, pay its magicka, roll to succeed and deliver Self, Touch or Target effects, with the
-  casting animation and HUD.
-- A spell-effect system: effects applied over their duration to actors and kept in saves, with the script calls that
-  wait for it.
-- The original crime system: theft, pickpocketing, attacks, killing and trespass seen by witnesses raise a bounty, and
-  guards arrest, fine or jail.
-- Characters in the world drawn from the same body and clothing parts as the player, so they can change what they
-  wear, and the image needs far less space for them.
-- **Containers whose contents come from levelled item lists show their items,** rolled by the original rules and kept
-  across saves.
-- **Bodies of dead NPCs and creatures can be searched** through the container strip, kept across saves; done in
-  v0.0.60-dev3, checked in game.
 
 ## v0.0.58: released 1 November 2026
 
@@ -850,14 +916,16 @@ record with its own look is baked into its own model of 64 full frames of about 
 for about 1,769 records ([ROOM-RESIDENT-MODELS-SIZE-48](bugs/ROOM-RESIDENT-MODELS-SIZE-48.md)). That is fast to draw
 on a 68040 and very large on disk, and on an Amiga every megabyte on disk is also loading time.
 
-How a resident drawn from parts finds its appearance (planned for v0.0.60): each exterior cell and each interior has its own
+How a resident drawn from parts finds its appearance (v0.0.60): each exterior cell and each interior has its own
 small table of the residents placed there, in a compact binary form, loaded together with the cell (and the
 neighbouring cells loaded ahead of the player) or when the player enters the interior, and dropped when the area is
-left. A lookup searches only the tables of the areas loaded at that moment, never a list for the whole island.
+left. A lookup searches only the tables of the areas loaded at that moment, never a list for the whole island. From
+v0.0.60 these tables sit in one pack with the same layout and the same area keys as the container tables and the
+walking residents' tables.
 
 The same rule applies to everything the game looks up while you play. In v0.0.59, containers (their contents, owner
-and lock) move into such per-area tables, so opening a container or taking from it reads nothing from disk. In
-v0.0.60, doors, activators, creatures and each resident's possible dialogue follow, so opening a conversation reads
+and lock) moved into such per-area tables, so opening a container or taking from it reads nothing from disk. In
+v0.0.61, doors, activators, creatures and each resident's possible dialogue follow, so opening a conversation reads
 nothing from disk either.
 
 Inside those 1,468 MB (4,225 complete models): 992 MB of animation frames and 587 MB of skin textures, one skin stored

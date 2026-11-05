@@ -38,6 +38,10 @@ trace_t SV_Move(vec3_t a,vec3_t mi,vec3_t ma,vec3_t b,int type,edict_t *e){
 }
 qboolean AW_ActorStep(edict_t *e,vec3_t move,double dt){(void)dt;e->v.origin[0]+=move[0];e->v.origin[1]+=move[1];aw_sv_move_calls+=step_cost;steps++;return true;}
 edict_t *AW_NPCTargetReach(edict_t *p,vec3_t angles,float reach){(void)p;(void)angles;assert(reach>=300);return target;}
+/* DBG-KILL-60: aw_combat.c's calls, counted */
+static int kills,dead_slot;static edict_t *killed;
+int AW_CombatSlotState(edict_t *e,float *health){(void)e;(void)health;return dead_slot?2:0;}
+int AW_CombatTestEngage(edict_t *t,int dead){assert(dead==1);killed=t;kills++;return 1;}
 void Draw_Fill(int x,int y,int w,int h,int c){(void)x;(void)y;(void)w;(void)h;fills++;fill_colour=c;}
 double Sys_FloatTime(void){return clock_now+=.0001;}
 /* aw_anim.c engine glue: models here have no layout file (previous frames). */
@@ -117,6 +121,18 @@ int main(void){
     run("aw_companion mimic speed maybe");assert(AW_CompanionMimic());
     run("aw_companion mimic speed");assert(AW_CompanionMimic());
 
+    /* DBG-KILL-60: dbg kill = the same red crosshair, the attack kills through AW_CombatTestEngage(e,1), the right button
+     * and the second command leave, a body is no target, and the companion is not touched */
+    {int before;
+     AW_CompanionKillMode();assert(AW_CompanionPickMode());
+     target=npc;host_framecount++;assert(AW_CompanionCrosshair(0,0)==2);
+     assert(AW_CompanionButtons(1)==0 && kills==1 && killed==npc && !AW_CompanionEdict(npc));
+     assert(strstr(console,"dbg kill: "));
+     AW_CompanionButtons(0);
+     dead_slot=1;host_framecount++;before=fills;assert(AW_CompanionCrosshair(0,0)==1 && fills==before);dead_slot=0;
+     assert(AW_CompanionPickAim()==1 && !AW_CompanionPickMode() && kills==1);
+     AW_CompanionKillMode();assert(AW_CompanionPickMode());AW_CompanionKillMode();assert(!AW_CompanionPickMode());
+     target=NULL;fills=0;}
     /* pick mode: off -> no effect on the crosshair or the attack */
     assert(!AW_CompanionPickMode() && AW_CompanionCrosshair(0,0)==0 && AW_CompanionButtons(3)==3);
     assert(AW_CompanionPickAim()==0);          /* the right button (+aw_alt) leaves it to the next context */
