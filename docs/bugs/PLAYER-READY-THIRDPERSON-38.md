@@ -168,6 +168,7 @@ Family: First-person hands and torch (`torch-hands`). First-person hands, punche
 - [DEBUG-GALLERY-TIMING-29](DEBUG-GALLERY-TIMING-29.md): Hands unavailable in the combat and torch test rooms
 - FIRST-PERSON-BLOCK-ITEM-TABLE-59 (no report page): The first-person shield block refuses a shield whose model comes from the shared item model table
 - FIRST-PERSON-WEAPON-SETS-MISSING-54 (no report page): First-person hands have only 4 of the 103 original animation groups: no weapon stance or attack, spellcast, hit, swim or storm
+- FP-WEAPON-SWAY-60 (no report page): The weapon in first-person view moves more while walking than in the original
 - HAND-IDLE-BLINK-29 (no report page): Fists disappear once per idle breathing cycle
 - HAND-PUNCH-COVERAGE-29 (no report page): Near-plane opening at maximum punch extension
 - HAND-PUNCH-TRANSITION-29 (no report page): Hands briefly disappear when changing into the punch animation

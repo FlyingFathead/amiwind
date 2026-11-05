@@ -43,16 +43,21 @@ DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.27-rc2-{name}.png" for na
 DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.28-rc1-{name}.png" for name in ("sunrise", "sunset", "night"))
 DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.31-toolkit-{name}.png" for name in ("header", "world"))
 DOCUMENTATION_CLIPS = {"docs/images/amiwind-v0.0.23-dev2-port.gif"}
-TEXT_LIMIT = 262144
+# Hand-written pages: hard limit 1 MiB (raised from 256 KiB by the maintainer on 2026-11-05: no real explanation needs
+# more, so nothing is cut to fit, and a runaway page cannot sneak in). Generated and growing files: 16 MiB.
+# Writing stays concise and precise: long raw evidence (logs, dumps, run tables) goes into linked files, not into the page.
+TEXT_LIMIT = 1048576
+LARGE_TEXT_LIMIT = 16777216
 # The bug register grows with every bug: its JSON source and the generated table (docs/bugs/README.md).
 # The CHIM inclusion ledger (tools/chim_inclusion.py) grows with every packaged build, like the register.
-LARGE_TEXT = {"docs/bugs/bugs.json": 1048576, "docs/BUGS.md": 1048576, "docs/chim/cell-progress-reference.json": 1048576,
-              "amiwind-toolkit/chim-inclusion.json": 1048576, "amiwind-toolkit/chim-inclusion.js": 1048576}
+LARGE_TEXT = {"docs/bugs/bugs.json": LARGE_TEXT_LIMIT, "docs/BUGS.md": LARGE_TEXT_LIMIT,
+              "docs/chim/cell-progress-reference.json": LARGE_TEXT_LIMIT,
+              "amiwind-toolkit/chim-inclusion.json": LARGE_TEXT_LIMIT, "amiwind-toolkit/chim-inclusion.js": LARGE_TEXT_LIMIT}
 # Whitespace baselines (docs/releases/patches/PATCH-v<version>.json; at the docs/ root until v0.0.54) list every
 # file of the published base release and grow with the repository (RELEASE-PATCH-SIZE-33).
 # The known-good stair records (tools/stair_records.py, one entry per CHIM frame) grow with the CHIM world.
-LARGE_TEXT_PATTERNS = ((re.compile(r"docs/releases/patches/PATCH-v[0-9][0-9A-Za-z.-]*[.]json"), 1048576),
-                       (re.compile(r"config/stair-records/[0-9A-Za-z._-]+[.]json"), 1048576))
+LARGE_TEXT_PATTERNS = ((re.compile(r"docs/releases/patches/PATCH-v[0-9][0-9A-Za-z.-]*[.]json"), LARGE_TEXT_LIMIT),
+                       (re.compile(r"config/stair-records/[0-9A-Za-z._-]+[.]json"), LARGE_TEXT_LIMIT))
 
 
 def text_limit(name):

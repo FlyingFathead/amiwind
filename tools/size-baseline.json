@@ -4,11 +4,11 @@
   "npc_gallery": true,
   "partial_area": null
  },
- "drive_bytes": 3209084928,
+ "drive_bytes": 3224567808,
  "drives": [
   {
-   "bytes": 3209084928,
-   "file": "AmiWind-v0.0.59.hdf"
+   "bytes": 3224567808,
+   "file": "AmiWind-v0.0.60.hdf"
   }
  ],
  "groups": {
@@ -33,8 +33,8 @@
    "files": 1
   },
   "other": {
-   "bytes": 415042463,
-   "files": 4068
+   "bytes": 430679511,
+   "files": 4070
   },
   "progs": {
    "bytes": 330423083,
@@ -51,9 +51,9 @@
  },
  "labels": [],
  "note": "",
- "payload_bytes": 2914507580,
- "run": "2026_11_03_v0.0.59_full-v0.0.59-release-try2_feaee79",
+ "payload_bytes": 2930144628,
+ "run": "2026_11_04_v0.0.60_full-v0.0.60-release_1fed45d",
  "schema": "amiwind-size-ledger-v1",
  "status": "complete",
- "version": "0.0.59"
+ "version": "0.0.60"
 }

@@ -1,6 +1,6 @@
 # Roadmap and implementation options
 
-_Last updated with AmiWind v0.0.60 (4 November 2026)._
+_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -206,7 +206,15 @@ checks are still pending, and the builder and release tooling work:
     any claim of full core use against the build measurements.
   - The resident bake of the Vivec town in the builder costs about three and a half times the CPU it used to; the
     cause is being found and fixed.
-  - Test sessions in the emulator sometimes stopped while loading Seyda Neen; the cause is being found and fixed.
+  - Test sessions in the emulator sometimes stopped while loading Seyda Neen; the cause is being found and fixed. The
+    suspected causes (a lost disk-completion signal inside the emulator, the remote-console folder) and the plan to test
+    them are on the [bug page](bugs/CHIM-SEYDA-BALMORA-LOAD-HANG-43.md); the same route is also run on the Raspberry
+    Pi 4B.
+  - A [gameplay recorder](GAME_RECORDER.md) for testing: armed from the console, Ctrl+R records a session with a red
+    dot on screen and says where the recording was saved. A recording holds a save of the character and the world at the
+    start and the player's inputs (about 1 MB per hour, written when recording stops), so another game replays it
+    exactly, with checkpoints that show where a replay differs. Recordings also serve as frame-rate benchmarks over
+    marked segments, and become gameplay tests in the boot smoke and the delivery checks.
 
 ## v0.0.59: released 3 November 2026
 

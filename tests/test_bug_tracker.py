@@ -370,7 +370,8 @@ class BugTrackerTest(unittest.TestCase):
         # 9 October 2026): warn at 75 % of each file's limit, before the release preflight fails.
         sys.path.insert(0, str(ROOT / 'tools'))
         import release
-        self.assertEqual(release.TEXT_LIMIT, 262144)
+        self.assertEqual(release.TEXT_LIMIT, 1048576)       # raised from 256 KiB on 2026-11-05
+        self.assertEqual(release.LARGE_TEXT_LIMIT, 16777216)
         files = [REGISTER, JOURNAL, *sorted(p for p in (DOCS / 'bugs').iterdir() if p.is_file()),
                  *sorted((DOCS / 'bugs' / 'archive').glob('*.json'))]
         files += sorted((DOCS / 'releases' / 'patches').glob('PATCH-v*.json'))  # whitespace baselines (RELEASE-PATCH-SIZE-33)
@@ -520,13 +521,16 @@ class BugTrackerTest(unittest.TestCase):
         # base release; the v0.0.33-dev1 baseline (1,811 files) passed 256 KiB.
         sys.path.insert(0, str(ROOT / 'tools'))
         import release
-        self.assertEqual(release.text_limit('docs/releases/patches/PATCH-v0.0.33-dev1.json'), 1048576)
-        self.assertEqual(release.text_limit('docs/releases/patches/PATCH-v0.0.32.json'), 1048576)
+        self.assertEqual(release.text_limit('docs/releases/patches/PATCH-v0.0.33-dev1.json'), 16777216)
+        self.assertEqual(release.text_limit('docs/releases/patches/PATCH-v0.0.32.json'), 16777216)
         # since v0.0.55 a baseline at the docs/ root is not a baseline (the layout test refuses it there)
         self.assertEqual(release.text_limit('docs/PATCH-v0.0.33-dev1.json'), release.TEXT_LIMIT)
-        self.assertEqual(release.text_limit('docs/bugs/bugs.json'), 1048576)
+        self.assertEqual(release.text_limit('docs/bugs/bugs.json'), 16777216)
         # the CHIM inclusion ledger grows with every packaged build (287 KB on 16 October 2026)
-        self.assertEqual(release.text_limit('amiwind-toolkit/chim-inclusion.js'), 1048576)
+        self.assertEqual(release.text_limit('amiwind-toolkit/chim-inclusion.js'), 16777216)
+        # a 1.5 MiB hand-written page is over its limit; a 2 MiB bugs.json is within its own
+        self.assertGreater(int(1.5 * 1048576), release.text_limit('docs/bugs/SOME-BUG-60.md'))
+        self.assertLessEqual(2 * 1048576, release.text_limit('docs/bugs/bugs.json'))
         self.assertEqual(release.text_limit('docs/PATCH-NOTES.md'), release.TEXT_LIMIT)
         self.assertEqual(release.text_limit('tools/PATCH-v0.0.33.json'), release.TEXT_LIMIT)
         self.assertEqual(release.text_limit('README.md'), release.TEXT_LIMIT)

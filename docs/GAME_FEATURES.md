@@ -1,6 +1,6 @@
 # Game features
 
-_Last updated with AmiWind v0.0.60 (4 November 2026)._
+_Last updated with AmiWind v0.0.61-dev1 (4 November 2026)._
 
 <!-- Generated whole by tools/game_features.py render from docs/game-features.json; do not edit by hand. -->
 

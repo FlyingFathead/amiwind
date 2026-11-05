@@ -2,7 +2,7 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 30 times; something has to be done
+## PERSISTING: reported 31 times; something has to be done
 
 - Reported with v0.0.46 at 2026-10-20 20:09 +0300: Listed under Known in this build in the v0.0.46 release notes (still open at the release).
 - Reported with v0.0.53-dev2 at 2026-10-26 (time not recorded): 19:14 UTC door sample: the Yassu Mine room load (ri9f4c8ccd45) stopped after its BSP while a gate ran its emulator; the next try loaded in 7.6 s
@@ -34,6 +34,7 @@
 - Reported with v0.0.59-dev6 at 2026-11-03 12:50 +0200: The v0.0.59-dev6 test session stops in Seyda Neen were not this disk stall: the processor was busy in one 13 to 15 s frame (the player's assembled body loaded at arrival), ARRIVAL-LONG-FRAME-DEV6-59. The smoke now names such a frame a long frame (busy) and keeps this name for an idle processor with a file request held.
 - Reported with v0.0.59-dev6 at 2026-11-03 15:44 +0000: v0.0.59-dev6 image 95a5bdb (FS-UAE, JIT, 32 MB Fast): the delivery hops stop on the hop from Ald'ruhn to Khuul 3 times of 3, twice on a quiet host; the load stops right after vf0271's bsp, the game waits on SIGF_DOS with the request held by DW0, still so after 90 s. The same hop passed in the v0.0.57-dev5, v0.0.58-dev5 and v0.0.59-dev5 deliveries.
 - Reported with v0.0.59-dev6 at 2026-11-03 18:36 +0200: Not this stall: the dev6 Khuul hop stop (3 of 3 on IDE) was Kickstart's read error requester on AW_WORLD0 block 2480045. On the IDE port the drive is read as whole 16x63 cylinders and the drive ended 144 sectors short; the dev5 image fails the same on IDE, both pass on the hard-file device. Fixed in the image step (drives padded to whole IDE cylinders, ad3c345e, gate 6660); hops and Khuul repro pass on a padded dev6 copy.
+- Reported with v0.0.60 at 2026-11-05 05:49 +0200: Candidate cause under investigation, not confirmed: FS-UAE 3.1.66 updates a shared interrupt-request word without atomic operations, so a finished hard-file request can lose its signal under host load. Checks next: source, a capture at a stall, an atomic emulator build A/B, the Pi 4B. See SMOKE-STALL-LABEL-INFERRED-60.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -57,18 +58,19 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.59-dev6 (3 November 2026)._
+_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 30 times; something has to be done](#persisting-reported-30-times-something-has-to-be-done)
+- [PERSISTING: reported 31 times; something has to be done](#persisting-reported-31-times-something-has-to-be-done)
 - [Symptom](#symptom)
 - [Where](#where)
 - [How it happened](#how-it-happened)
 - [Why it was not caught](#why-it-was-not-caught)
 - [Reproduction](#reproduction)
 - [Repair](#repair)
+- [Hypotheses and the test plan](#hypotheses-and-the-test-plan)
 - [Verification](#verification)
 - [Prevention](#prevention)
 - [Bugs in the same category](#bugs-in-the-same-category)
@@ -189,6 +191,60 @@ Decision (the maintainer, 3 November 2026): the shipped FS-UAE and WinUAE preset
 the hard-file device for now. The Pi 4 image (Amiberry), the project's measuring machine, is the next test: the
 presets move to the IDE port only if a stall shows up there or in play, since IDE makes every load about 30 %
 slower.
+
+## Hypotheses and the test plan
+
+5 November 2026. The cause is not found. What is known, what is suspected, and how each suspicion will be tested.
+
+**Known**
+- The stall is strongly associated with host load, but it is not shown to require it: one apparent stall on an idle
+  host (3 November, 1 of 3 sessions) may need reclassifying.
+- In the stalls that were examined, the game waits idle on a reply from DH0 (the processor in exec's idle loop, the game
+  waiting on SIGF_DOS).
+- It was seen once with the JIT off, so it is not tied to the JIT.
+- Hard-file device 3 stalls in 12 sessions against emulated IDE 0 in 16 (the table above); the IDE runs were also
+  about 30 % slower, so that comparison changed both the completion path and the timing.
+- The test sessions have used IDE since 3 November, and no stall has been seen in the deliveries since.
+
+**H1 (candidate, unconfirmed): a lost completion signal in the emulator.** FS-UAE 3.1.66 appears to update one shared
+interrupt-request word with plain read-modify-write operations, from the hard-file worker thread (which sets the bit
+that announces a finished request) and from the emulation thread (which clears the bits of other devices). If the two
+interleave, the announcement can be overwritten and the reply stays queued with nobody told. Upstream changes make
+these updates atomic: FS-UAE 4eefeebd0947bb7b08fae3b9b4f1735376897aaf with the helpers in
+11eca645d849bb558bfdea25bedd0fabde56196a, and WinUAE 0cc79925fa5f3092f4a103066e140cbf9980b9f2 and
+7da6a52378d074a4b030aca951172cf183286045. The files concerned appear identical in FS-UAE 3.1.66 and 3.2.35. Whether
+the absence of these changes causes our stalls is not established. The point is to be checked against the source of
+the package the test containers use.
+
+**H2: the remote-console folder may take part.** The older freeze HANG-IDLE-DUSK-35 needed heavy traffic on the
+remote-console folder (AWCTL, a directory drive). An upstream report describes repeated file operations on directory
+drives leaving a guest task stuck, prevented by `deterministic = 1`. That setting serialises directory drives only; the
+hard-file worker is not affected. A result with it therefore tests AWCTL's part, not H1, and its slowdown could also
+hide a race. H1 and H2 can both be true.
+
+**H3 (verified): the smoke's stall label is inferred.** The smoke labels a stall "emulator disk stall" from a scan of
+the game's stack, without checking the pending device request. The label means the guest waits on DOS and the cause
+below the engine is unresolved; it does not show a lost device completion. Some of the sightings counted here were
+later reclassified (long frames, a read error on IDE), so only the confirmed captures count towards this mechanism.
+Tracked as SMOKE-STALL-LABEL-INFERRED-60.
+
+**The test plan** (cheap first, all in the test containers)
+1. Read the FS-UAE 3.1.66 source: the interrupt-request word, every writer, and the four upstream changes. Confirm or
+   reject the mechanism of H1 in the source.
+2. Capture a sustained stall with all emulator threads stopped: the request the guest waits for, the queue of
+   replies to deliver, the interrupt-request word, and the state of each host thread. Setting the missing bit again and
+   seeing the load continue at once shows that the signal was stranded.
+3. A/B with a build in which every access to that word is atomic, against the original, in alternating runs with the
+   same image, script and background load (running both together disturbs both). It counts only if the original
+   reproduces the captured failure repeatedly and the patched build survives the same exposure.
+4. `deterministic = 1` in a copy of the session preset, checked in the start-up log: this tests H2.
+5. The same route on the Raspberry Pi 4B (Amiberry, a quiet machine). A stall only on the busy build machine is host
+   load; a stall on the Pi as well is a bug in the game or the disk image.
+
+**For players.** The shipped presets are unchanged and keep the hard-file device until this is verified. If H1 holds,
+the decision is to provide or name a corrected emulator build, document the affected emulator versions, and decide
+whether an IDE profile stays useful for those who run unpatched builds. Results on the Pi (Amiberry) are kept apart,
+since it is a different emulator.
 
 ## Verification
 

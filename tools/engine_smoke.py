@@ -210,8 +210,12 @@ n=0; while [ ! -s $R/awctl/state.txt ] && [ $n -lt $((${BOOT_WAIT:-300}*K)) ]; d
 # BOOT-WAIT-END
 # The game runs now (its remote answers): Escape ends a start-up logo that is still up or comes later; Escape never
 # answers the logo's memory notice (only M does), so it is safe at any time after this point.
-[ -s $R/awctl/state.txt ] && for i in 1 2 3; do key Escape; sleep $((2*K)); done
-[ -s $R/awctl/state.txt ] || finish "FAIL no remote control after boot ($(( $(date +%s) - t0 )) s; the play copy's autoexec turns it on, nothing is typed before it answers)"
+# remote_up: the game rewrites state.txt in place, so one look can catch it empty mid-write; a gate smoke failed
+# "no remote control after boot" 15 s in, twice in a row, with the remote already up (GATE-SMOKE-NO-REMOTE-CONTROL-60,
+# 2026-11-05). Look up to 10 times, 0.5 s apart, as st() does, before calling the remote absent.
+remote_up(){ i=0; while [ $i -lt 10 ]; do [ -s $R/awctl/state.txt ] && return 0; sleep 0.5; i=$((i+1)); done; return 1; }
+remote_up && for i in 1 2 3; do key Escape; sleep $((2*K)); done
+remote_up || finish "FAIL no remote control after boot ($(( $(date +%s) - t0 )) s; the play copy's autoexec turns it on, nothing is typed before it answers)"
 log "boot: remote up after $(( $(date +%s) - t0 )) s"; shot menu
 if [ "${START:-map}" = enter ] || [ "${START:-map}" = auto ]; then  # a MiniWind image starts its own scene; Enter through its quick character pages
   [ "${START:-map}" = auto ] || key Return; loaded "$MAP1"; i=0  # until the view renders (local origin not 0 0 0), at most 20 pages

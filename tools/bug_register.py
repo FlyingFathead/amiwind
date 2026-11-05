@@ -348,7 +348,7 @@ def validate_facts(b, ids, families, where):
                                 and VERSION_RE.match(g('found_in'))):
         errors.append('%s: found_in must be a version like v0.0.32-dev3, or unknown' % where)
     if 'where' in b and not _line_ok(g('where'), 100):
-        errors.append('%s: where must be one line of at most 100 characters without |' % where)
+        errors.append('%s: where must be one line of at most 100 characters without | (it is a table cell: the long text goes into the status or a report note or the bug\'s report page, never into another entry)' % where)
     if 'reproduction' in b and g('reproduction') not in REPRODUCTION:
         errors.append('%s: reproduction must be one of %s' % (where, REPRODUCTION))
     if 'duplicate_of' in b:
@@ -621,7 +621,7 @@ def validate(bugs, families=None):
                 errors.append('%s: reports must be a non-empty list' % where)
             else:
                 for r in reports:
-                    if not isinstance(r, dict) or set(r) - {'version', 'at', 'note'} or not {'version', 'at'} <= set(r)                             or not REPORT_VERSION_RE.match(str(r.get('version')))                             or not REPORT_AT_RE.match(str(r.get('at')))                             or ('note' in r and not _line_ok(r['note'], 500)):
+                    if not isinstance(r, dict) or set(r) - {'version', 'at', 'note'} or not {'version', 'at'} <= set(r)                             or not REPORT_VERSION_RE.match(str(r.get('version')))                             or not REPORT_AT_RE.match(str(r.get('at')))                             or ('note' in r and not _line_ok(r['note'], 200000)):
                         errors.append('%s: each report needs version (vX.Y.Z[-devN]) and at (YYYY-MM-DD HH:MM +ZZZZ, '
                                       'or a date alone), optional one-line note' % where)
                         break
@@ -790,7 +790,7 @@ def validate_regressions(b, where):
                 or not REPORT_VERSION_RE.match(str(r.get('version'))) or not REPORT_AT_RE.match(str(r.get('at'))) \
                 or r.get('was') not in ('fixed', 'closed') \
                 or not (r.get('fixed_in') is None or VERSION_RE.match(str(r.get('fixed_in')))) \
-                or any(k in r and not _line_ok(r[k], 500) for k in ('by', 'note')):
+                or any(k in r and not _line_ok(r[k], 200000) for k in ('by', 'note')):
             return ['%s: each regression needs version, at, was (fixed or closed) and fixed_in (or null), optional '
                     'one-line by and note' % where]
     ats = [str(r['at']) for r in regs]

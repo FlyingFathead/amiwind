@@ -300,7 +300,7 @@ class ReleaseBaselineTests(unittest.TestCase):
     def test_release_baseline_is_public_safe(self):
         import json
         raw = (ROOT / 'config/entity-baseline.json').read_bytes()
-        self.assertLess(len(raw), 262144)  # the release source limit for text files
+        self.assertLess(len(raw), 1048576)  # the release source limit for text files
         base = json.loads(raw)
         self.assertEqual((base['format'], base['release']), ('AW-ENTITY-BASELINE1', 'v0.0.31'))
         self.assertNotIn('placed_refs', base)
