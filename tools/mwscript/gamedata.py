@@ -20,7 +20,7 @@ SCRIPTED = ('ACTI', 'ALCH', 'APPA', 'ARMO', 'BOOK', 'CLOT', 'CONT', 'CREA', 'DOO
             'NPC_', 'PROB', 'REPA', 'WEAP', 'STAT')
 # Records kept whole for the actor table (actors.py): the actors, what their stats come from, what they carry.
 RECORD_TAGS = ('NPC_', 'CREA', 'RACE', 'CLAS', 'SKIL', 'WEAP', 'ARMO', 'CLOT', 'LEVI', 'SPEL', 'FACT', 'GMST',
-               'ALCH', 'APPA', 'BOOK', 'INGR', 'LIGH', 'LOCK', 'MISC', 'PROB', 'REPA', 'MGEF')
+               'ALCH', 'APPA', 'BOOK', 'INGR', 'LIGH', 'LOCK', 'MISC', 'PROB', 'REPA', 'MGEF', 'ENCH')
 
 
 def _text(data):

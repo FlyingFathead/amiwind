@@ -2,7 +2,7 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 6 times; something has to be done
+## PERSISTING: reported 7 times; something has to be done
 
 - Reported with v0.0.57 at 2026-10-31 03:46 +0200: v0.0.57 release image run 2026_10_31_v0.0.57_full-v0.0.57-release_7ff625e: every stage passed, the perf guard failed the same two: chim-town-balmora build_resident 86 s, was 52 s (+65 %); chim-town-vivec_city 98 s, was 62 s (+57 %), same units. Worker gates shared the host. Perf only, delivered; the monitor lists the run as failed for this.
 - Reported with v0.0.58-dev1 at 2026-10-31 16:50 +0200: v0.0.58-dev1 build 2026_10_31_v0.0.58-dev1_full-v0.0.58-dev1_3d610fa: every stage passed, the perf guard failed the same two: chim-town-balmora build_resident 101 s, was 52 s (+93 %); chim-town-vivec_city 118 s, was 62 s (+89 %), same units; worker gates (5046, 5088 and more) shared the host. Third sighting: delivered (perf only).
@@ -10,6 +10,7 @@
 - Reported with v0.0.58-dev3 at 2026-11-01 04:34 +0200: Seen again in the v0.0.58 test image build of 6679573 (2026-11-01): the perf guard failed chim-town-vivec_city parallel map build_resident at 32.9 s CPU per unit against a 7.1 s baseline with the same 39 units, while a gate ran beside the build (loaded machine). The stages passed and the image is valid; perf only, not blocking.
 - Reported with v0.0.59-dev5 at 2026-11-02 (time not recorded): PERSISTING on a quiet machine: v0.0.59-dev5 (f08583e0) chim-town-vivec_city build_resident 26.3 s CPU per unit against the baseline 7.1 s (+268 %, the same 39 units); dev4 26.6 s, so dev4 to dev5 unchanged. Failing in every full build since v0.0.58-dev1.
 - Reported with v0.0.59-dev5 at 2026-11-02 (time not recorded): Cause found (quiet machine): since skeletal actors became the default, every worker process builds the shared animation table again, about 18 s of CPU per table (the beast table too); a Vivec resident bake itself is 3 to 6 s. Fix on branch v0.0.59-vivecbake: the table goes through the unit cache and the stage builds each table once before the bakes. Same cause as BUILD-RESIDENT-BAKE-SLOWER-52.
+- Reported with v0.0.61-dev2 at 2026-11-06 (time not recorded): Seen again in the v0.0.61-dev2 full build: chim-town-vivec_city, parallel map build_resident, 11.9 s of CPU per unit against 7.1 s (+66 %) with the same 39 units, at 7.34 cores against the baseline 5.90; the only perf guard failure of the build, the stage output passed.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -36,7 +37,7 @@
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 6 times; something has to be done](#persisting-reported-6-times-something-has-to-be-done)
+- [PERSISTING: reported 7 times; something has to be done](#persisting-reported-7-times-something-has-to-be-done)
 - [Symptom](#symptom)
 - [Where](#where)
 - [How it happened](#how-it-happened)

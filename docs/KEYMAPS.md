@@ -1,6 +1,6 @@
 # Keyboard and command reference
 
-_Last updated with AmiWind v0.0.59-dev3 (2 November 2026)._
+_Last updated with AmiWind v0.0.61-dev3 (2026-11-06)._
 
 <!-- contents start -->
 ## Contents
@@ -57,7 +57,7 @@ Prefs     Show crosshairs, Crosshair colour, Crosshair shape, Mouse cursor,
           NPC (name place), Objects (name place), Autosave history
 Audio     Master, Music, Effects, Dialogue (sliders)
 Controls  Mouse sensitivity (slider), Invert Y axis, the gameplay actions,
-          Combat style, Dice rolls, Blocking, Reset to defaults
+          Combat style, Dice rolls, Blocking, Weapon sway, Reset to defaults
 Video     Fog distance, Reset distance, Far detail, Photo mode, Area loading,
           Load method, Read-ahead buffer, Extra RAM
 ```
@@ -95,8 +95,12 @@ there; bind them with the console.
 
 The inventory is bound to I by default (`aw_inventory`), the Stats window to P
 (`aw_stats`) and the Magic window to O (`aw_magicmenu`); older saved key files get
-P and O when those keys are free. Greyed rows are planned
-actions (quick keys, magic) with their intended
+P and O when those keys are free. Since v0.0.61 R readies and lowers the magic (the attack button then casts the
+selected spell, [MAGIC_EFFECTS.md](MAGIC_EFFECTS.md)), and after `dbg recorder` Ctrl+R starts and stops a recording
+([GAME_RECORDER.md](GAME_RECORDER.md)). In the dialogue window Up and Down move the highlighted topic or answer, Enter
+picks it and Tab switches to the conversation text, where Up and Down scroll it. Weapon sway has two styles, the
+AmiWind groove and a stiff one with still hands. Greyed rows are planned
+actions (quick keys) with their intended
 keys. They become selectable when the action exists. The action table
 and the steps for adding one are documented in `engine/aga/src/aw_menu.c`.
 

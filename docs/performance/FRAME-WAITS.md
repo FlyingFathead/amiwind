@@ -1,6 +1,16 @@
 # Frame waits: disk, screen copy and buffer swap
 
-_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
+_Last updated with AmiWind v0.0.61 (6 November 2026)._
+
+<!-- contents start -->
+## Contents
+
+- [The fields](#the-fields)
+- [Where they appear](#where-they-appear)
+- [Reading them](#reading-them)
+- [Recorded measurements](#recorded-measurements)
+
+<!-- contents end -->
 
 A slow frame is either the processor working or the game waiting. The Amiga chipset has no counter a program can
 read that says how long it waited for the disk or the display, so the engine times its own waits, every frame, and
@@ -101,3 +111,103 @@ spike frames of a part); the remaining long frames while walking are the harvest
 in spike frames), not their walking. The arrival's longest frame depends more on the order in the session than on
 the setting (the later arrival of each session is shorter). The counter "scans on the island-wide file" counts only
 the fallbacks with the setting on, so it reads 0 with the setting off too.
+
+### AmiWind v0.0.61-dev2 (source afa644d4), 6 November 2026
+
+- Setup: FS-UAE 3.1.66, A1200 AGA, 68040 with FPU, JIT, 32 MB Fast RAM, audio on, hard disks on the IDE controller;
+  the delivered v0.0.61-dev2 image (run 2026_11_06_v0.0.61-dev2_full-v0.0.61-dev2_afa644d) with its own engine
+  (SHA-256 6f2aa1d72af05959cc8cba739b604206954264d2ec9d1c9da14d365ca1c6df57), and the delivered v0.0.61-dev1 image
+  (run 2026_11_05_v0.0.61-dev1_full-v0.0.61-dev1_374d59b, engine e06a3897925238e4f043c772e944a8185a8c9dff97cf6393f39327b301e2f76b),
+  one session after the other with the same script. The build machine was lightly loaded for both sessions (4 to 15 %
+  processor use); the dev1 line of 5 November above was taken under heavy load, so only the same-day dev1 session below
+  is compared.
+- Session script SHA-256: B 1c352d2ce342f589c0548a973b6b33196794a7228e2b212b1a6922d80d588c01 (the same script as in the
+  dev1 section; `aw_ambient_areas 1` first, then 0). Only the `aw_ambient_areas 1` rows (the default) are compared in the
+  table; the `aw_ambient_areas 0` rows follow.
+- Previous recorded line: v0.0.61-dev1 (source 374d59b) above, and the dev1 session of the same day.
+
+| Part | dev1: frames, total, disk | dev2: frames, total, disk | Total | Disk |
+| --- | ---: | ---: | ---: | ---: |
+| Arrival (60 s) | 3,442 frames, 60,458 ms, disk 9,180.8 ms | 3,651 frames, 60,436 ms, disk 6,317.3 ms | 0 % | -31 % |
+| Standing (10 s) | 552 frames, 10,201 ms, disk 1,143.3 ms | 673 frames, 10,673 ms, disk 584.9 ms | +5 % | -49 % |
+| Walk (19 s) | 1,193 frames, 20,209 ms, disk 3,590.4 ms | 1,157 frames, 19,615 ms, disk 2,432.1 ms | -3 % | -32 % |
+
+With `aw_ambient_areas 0` (second half of the session): arrival disk 7,378.9 ms (dev1) against 6,471.5 ms (dev2), -12 %;
+standing 2,073.2 against 483.7 ms, -77 %; walk 3,304.4 against 2,739.9 ms, -17 %; the totals are within 1 %.
+
+| Residents' think (`chim actors ambient`) | dev1 | dev2 |
+| --- | ---: | ---: |
+| Cost per think, areas 1 / areas 0 | 0.673 / 0.658 ms | 0.205 / 0.168 ms |
+| Worst think frame, areas 1 / areas 0 | 184.7 / 95.5 ms | 179.8 / 269.5 ms |
+
+The totals of the parts are the length of the wait steps in the script, so they stay near the same value; the
+frames and the disk time carry the difference. No part is more than 10 % slower in disk time, so there is no regression.
+The worst single think frame of dev2 with the setting off (269.5 ms against 95.5 ms) is one frame and the
+setting is not the default.
+
+#### The standard benchmark (`aw bench halloween`)
+
+| Build | Machine | Run 1 | Run 2 |
+| --- | --- | --- | --- |
+| v0.0.61-dev1 | FS-UAE, 32 MB Fast, 68040, JIT | avg 29.4 fps, min 0.9, 1 % low 1.9, 20.4 s | avg 28.3 fps, min 1.4, 1 % low 2.1, 21.2 s |
+| v0.0.61-dev2 | FS-UAE, 32 MB Fast, 68040, JIT | avg 31.0 fps, min 1.2, 1 % low 2.3, 19.3 s | avg 33.4 fps, min 1.5, 1 % low 3.4, 18.0 s |
+| v0.0.61-dev2 | Pi 4B, Amiberry, 128 MB Fast | avg 5.1 fps, 600 frames, 118.0 s (from the console still; the live scene was running, residents on) | none |
+
+dev2 is 8 to 15 % faster than dev1 on the emulator (mean 32.2 against 28.9 fps). No dev1 line exists for the Pi, so
+the Pi line is the first of this build; the Pi's frame-line numbers in the live Seyda Neen scene (`chim spikes 300`,
+second arrival after the map was loaded, windows longer than the script's because the console was typed in by hand):
+arrival 4,732 frames in 106,374 ms with disk 2,089.7 ms and the longest frame 740 ms; standing 225 frames in 25,418 ms
+with disk 42.0 ms and the longest frame 145 ms; residents' think 0.356 ms, worst 109.1 ms.
+
+#### Walking residents' stuck searches (AMBIENT-UNSTUCK-FLOOD-61), 6 November 2026
+
+- Setup: FS-UAE 3.1.66, A1200 AGA, 68040 with FPU, JIT, 32 MB Fast RAM; the delivered v0.0.61-dev2 image (run
+  2026_11_06_v0.0.61-dev2_full-v0.0.61-dev2_afa644d), first with its own engine, then with the engine of branch
+  v0.0.61-unstuck (built from the worktree before the setting moved from a console variable to the console switch,
+  the same behaviour; SHA-256
+  a8215c9e4bab04687f44b7aa54f4d0df9d5c18ae3ee3633017bcd4a25a6cd8b9), developer messages on, the Seyda Neen start.
+- What is counted: the searches for a clear spot that the residents' steps run (`chim actors ambient`, new in this
+  engine), and the "Unstuck." lines (one per search) for the image's own engine. A search costs 12 to 30 position
+  tests (each a box trace against the world and the bodies).
+- Previous recorded line: none for this counter; the residents' think cost above (v0.0.61-dev2) is the line it sits beside.
+
+From the arrival at the Seyda Neen start (`dbg tp seydaneen` reloads the map), about 85 s, the old way: 24 searches
+with the image's engine (one resident, Indrele Rathryon, 20 of them) and 26 with the branch engine at
+`chim actors ambient settle off` (an Imperial Guard 21, at the same steep face). In a run where no resident ended up inside the
+face, 3 searches; eight further arrivals gave 1 to 4 searches each with either setting, none of them repeated: the case
+depends on where the random routes end.
+
+On purpose (session script SHA-256 8427c6edb6a0a56ca794e84a343fc6a061acfec63e935b1d3dd0878447e7134e): the two residents
+put at the spots where they had started inside solid (`chim actors ambient put`) and walked on into the face, three
+times each at three spots, 3 to 4 s per try:
+
+| Setting | Searches per try | Settled | Position tests, all nine tries |
+| --- | ---: | ---: | ---: |
+| `chim actors ambient settle off` (old) | 1 to 26, mostly 10 (106 in nine tries) | none | 1,758 |
+| `chim actors ambient settle on` (default) | 1, plus the settle's own search | 9 of 9 | 336 (-81 %) |
+
+The residents' think cost per think moves with the town around them (0.09 to 1.4 ms in these short windows) and shows
+no clear difference beyond the searches' own share. In Balmora, Vivec and Suran (45 s after each arrival, the default
+setting) the residents' steps ran 2, 0 and 2 searches, none repeated.
+
+### The Raspberry Pi 4B, the standard benchmark (6 November 2026)
+
+The project's Pi 4B boot stick runs nothing but Amiberry and the game, so its line is the cleanest comparison between
+builds; it is also the machine closest to a PiStorm ([REAL_HARDWARE.md](../REAL_HARDWARE.md)). Setup: Amiberry on the
+Pi 4B at 2.0 GHz (not throttled), 68040 with FPU, JIT with a 16 MB cache and the FPU JIT on, CPU speed at maximum,
+128 MB Fast RAM, PAL. Steps: `map seyda`, `dbg camera vanity off`, `chim actors ambient off`, then
+`aw bench halloween` in Seyda Neen, the console closed with the backquote key before the 600 frames start. The scene is
+a worst case on purpose: Seyda Neen is the heaviest place in the game so far, with about ten animated characters on
+screen and Dagoth Ur, the most detailed model.
+
+| Build | Setting | Average | Min | 1 % low | 600 frames in |
+| --- | --- | ---: | ---: | ---: | ---: |
+| v0.0.61-dev3 (the v0.0.61 game) | `cpu_threaded=false` | 5.4 fps | 1.0 | 2.0 | 110.3 s |
+
+A 962 ms frame with 477 ms of disk wait was printed while the scene set up; the result line cannot yet show whether
+any of the 600 frames waited on the disk, so the minimum and the 1 % low are rough until the benchmark reports drawing
+and disk time apart (planned for v0.0.62).
+
+Earlier Pi lines are not comparable and are not listed: the runs of v0.0.59 to v0.0.61-dev2 taken the same evening
+closed the console with the Escape key, which opens the main menu, so they measured with the menu over the scene.
+They will be taken again with the corrected steps.

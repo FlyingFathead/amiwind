@@ -9,6 +9,9 @@
 #ifndef AMIWIND_SPRITE_HANDS
 #define AMIWIND_SPRITE_HANDS 0
 #endif
+/* a carried light's catalogue byte 511 (aw_inventory.h AW_LIGHT_FLAGS_SET, AW_LIGHT_FLICKER) */
+#define AW_HELD_FLAGS_SET 0x80
+#define AW_HELD_FLICKER 1
 static cvar_t torch_radius={"aw_torch_radius","192",true};
 static cvar_t torch_flame_style={"aw_torch_flame_style","2",true};
 cvar_t aw_torch_strength={"aw_torch_strength","0.7",true,false,.7f};
@@ -146,13 +149,21 @@ static int hand_state(edict_t *p)
     v=GetEdictFieldValue(p,"aw_hand_state");
     return v && (v->_float==1 || v->_float==2)?(int)v->_float:0;
 }
-int AW_TorchEquipped(void)
+static int held_own(void);
+/* the carried light is lit (V or the equip) with the hands raised */
+static int light_lit(void)
 {
     edict_t *p=torch_player();eval_t *v;
-    if(!p || !torch_assets || hand_state(p)!=2)return 0;
+    if(!p || hand_state(p)!=2)return 0;
     v=GetEdictFieldValue(p,"aw_torch");
     return v && v->_float==1;
 }
+/* the torch: lit, and the left hand holds no light of its own (HELD-LIGHT-OWN-MODEL-61) */
+int AW_TorchEquipped(void)
+{
+    return torch_assets && light_lit() && !held_own();
+}
+static int held_lit(void){return light_lit() && held_own();}
 static void extinguish(void)
 {
     int i;
@@ -181,6 +192,7 @@ void AW_TorchInit(void){
     Cmd_AddCommand("aw_torch_strength_set",strength_command);
     Cvar_RegisterVariable(&aw_headlamp);Cmd_AddCommand("aw_headlamp_set",headlamp_command);
     Cmd_AddCommand("aw_torch",toggle);AW_GuardTorchInit();AW_LampInit();
+    aw_held_light_now=AW_HeldLight;     /* the flame drawer's view of the held light (HELD-LIGHT-OWN-MODEL-61) */
 }
 float AW_LightFlicker(unsigned seed)
 {
@@ -197,6 +209,100 @@ float AW_LightFlicker(unsigned seed)
 static int phase(void)
 {
     return (int)floor(fmod(AW_TorchAnimationTime(),1.0)*8);
+}
+/* ---- HELD-LIGHT-OWN-MODEL-61: a held light that is not the torch (aw_torch.h) ---- */
+/* A decimal "-12.3456" (held_lights.text's %.4f); no library float parsing (it pulls in FPU-emulated code). */
+static int held_number(const char **pp,const char *end,float *out)
+{
+    const char *s=*pp;float v=0,scale=1;int neg=0,digits=0;
+    while(s<end && *s==' ')s++;
+    if(s<end && *s=='-'){neg=1;s++;}
+    while(s<end && *s>='0' && *s<='9'){v=v*10+(float)(*s-'0');s++;digits++;}
+    if(s<end && *s=='.'){s++;while(s<end && *s>='0' && *s<='9'){scale*=.1f;v+=(float)(*s-'0')*scale;s++;digits++;}}
+    if(!digits || v>100000.f)return 0;
+    *out=neg?-v:v;*pp=s;return 1;
+}
+static int held_line(const char **pp,const char *end,const char *word,float *values,int n)
+{
+    const char *p=*pp;int k,len=(int)strlen(word);
+    if(end-p<len || memcmp(p,word,len))return 0;
+    p+=len;
+    for(k=0;k<n;k++)if(!held_number(&p,end,&values[k]) || !isfinite(values[k]))return 0;
+    while(p<end && (*p==' ' || *p=='\r'))p++;
+    if(p<end && *p!='\n')return 0;
+    *pp=p<end?p+1:p;return 1;
+}
+int AW_HeldLightParse(const char *text,int size,const char *model,aw_held_light_t *out)
+{
+    const char *p=text,*end;int k;
+    if(!text || !out || !model || size<6 || strlen(model)>=sizeof(out->model))return 0;
+    end=text+size;memset(out,0,sizeof(*out));
+    if(memcmp(p,"AWHL1",5) || (p[5]!='\n' && p[5]!='\r'))return 0;
+    p+=5;while(p<end && (*p=='\r' || *p=='\n'))p++;
+    if(!held_line(&p,end,"offset ",out->offset,6))return 0;
+    for(k=0;k<3;k++)if(out->offset[k]< -64 || out->offset[k]>64)return 0;
+    while(p<end && out->flames<AW_HELD_FLAMES+1){
+        float *f;
+        if(*p=='\n' || *p=='\r'){p++;continue;}
+        if(out->flames==AW_HELD_FLAMES)return 0;
+        f=out->flame[out->flames];
+        if(!held_line(&p,end,"flame ",f,7))return 0;
+        for(k=0;k<3;k++)if(f[k]< -128 || f[k]>128)return 0;
+        if(!(f[3]>0 && f[3]<=16) || f[4]<0 || f[4]>=64 || f[5]<0 || f[5]>=128 || f[6]<0 || f[6]>=64)return 0;
+        out->flames++;
+    }
+    strcpy(out->model,model);
+    return 1;
+}
+float AW_HeldLightRadius(float torch_light,int item_radius,int torch_record)
+{
+    float r;
+    if(!(torch_light>0) || !isfinite(torch_light))return 1;
+    if(torch_record<=0 || item_radius<=0)return torch_light;
+    r=torch_light*(float)item_radius/(float)torch_record;
+    if(r>torch_light)r=torch_light;
+    return r<1?1:r;
+}
+int (*aw_held_light_item)(char id[64],char model[64],int *radius,int *flags,int *torch_radius);
+int (*aw_view_held_light)(vec3_t out);
+int (*aw_hand_held_light)(float origin[3],float angles[3]);
+static aw_held_light_t held;
+static char held_id[64];
+static int held_ok,held_radius,held_torch_radius;
+/* The light in the left hand: its file read once when the item there changes (an equip, a load); 1 = it is a light
+ * with its own held file (not the torch). */
+static int held_own(void)
+{
+    char id[64],model[64];int radius=0,flags=0,torch_record=0;
+    if(!aw_held_light_item || !aw_held_light_item(id,model,&radius,&flags,&torch_record)){held_id[0]=0;held_ok=0;return 0;}
+    if(strcmp(id,held_id)){
+        FILE *f=NULL;char path[64],text[1024];int size,n=(int)strlen(model);
+        strncpy(held_id,id,63);held_id[63]=0;held_ok=0;
+        if(n>4 && n<(int)sizeof(path) && !strcmp(model+n-4,".mdl")){
+            memcpy(path,model,n-4);strcpy(path+n-4,".hld");
+            size=COM_FOpenFile(path,&f);
+            if(f){
+                if(size>0 && size<(int)sizeof(text) && fread(text,1,size,f)==(size_t)size)
+                    held_ok=AW_HeldLightParse(text,size,model,&held);
+                fclose(f);
+                if(!held_ok)Con_Printf("Held light %s: invalid %s; the torch is shown.\n",id,path);
+            }
+        }
+        held.flicker=!(flags&AW_HELD_FLAGS_SET) || (flags&AW_HELD_FLICKER);
+        held_radius=radius;held_torch_radius=torch_record;
+        /* one line per new item in the hand (the in-game checks read it) */
+        if(held_ok)Con_Printf("Held light %s: %s, %d flame%s, radius %d against the torch's %d: light %.0f (torch %.0f), %s.\n",
+            id,model,held.flames,held.flames==1?"":"s",radius,torch_record,
+            AW_HeldLightRadius(AW_TorchLightRadius(),radius,torch_record),AW_TorchLightRadius(),
+            held.flicker?"flickering":"steady");
+    }
+    return held_ok;
+}
+const aw_held_light_t *AW_HeldLight(void)
+{
+    if(!held_lit())return NULL;
+    held.radius=AW_HeldLightRadius(AW_TorchLightRadius(),held_radius,held_torch_radius);
+    return &held;
 }
 /* Equipping the inventory light lights the carried torch and unequipping puts it out, as a
  * torch in the left hand; V still toggles it. The game rules put the torch out whenever the
@@ -217,13 +323,13 @@ void AW_TorchUpdate(void)
 {
     static const float radius[8]={144,147,142,146,143,148,144,141};
     dlight_t *light;
-    int torch;
+    int torch;const aw_held_light_t *own;
     AW_GuardTorchUpdate();
     AW_NpcPartsUpdate();     /* residents drawn from parts (aw_npc_parts.c) */
     AW_LampUpdate();
     item_torch();
-    torch=AW_TorchEquipped();
-    if(!torch && !aw_headlamp.value){extinguish();return;}
+    torch=AW_TorchEquipped();own=torch?NULL:AW_HeldLight();
+    if(!torch && !own && !aw_headlamp.value){extinguish();return;}
     light=CL_AllocDlight(AW_TORCH_LIGHT);
     /* Eye position stays inside the player's clear view volume. Offsetting a
      * point light toward a drawn hand could put it through a nearby wall.
@@ -231,7 +337,14 @@ void AW_TorchUpdate(void)
     VectorCopy(r_refdef.vieworg,light->origin);
     if(torch && aw_view_torch_light){vec3_t emitter;
         if(aw_view_torch_light(emitter))VectorCopy(emitter,light->origin);}
-    light->radius=AW_TorchLightRadius()+(torch?radius[phase()]-144:0);light->minlight=16;
+    if(own){
+        /* a held candle, candlestick or lantern: its record's reach against the torch's, the torch's flicker only
+         * where its record flickers (HELD-LIGHT-OWN-MODEL-61); in third person from its flame */
+        vec3_t emitter;
+        if(aw_view_held_light && aw_view_held_light(emitter))VectorCopy(emitter,light->origin);
+        light->radius=own->radius*(own->flicker?radius[phase()]/144.f:1);
+    }else light->radius=AW_TorchLightRadius()+(torch?radius[phase()]-144:0);
+    light->minlight=16;
     light->die=cl.time+.1;light->decay=0;
 }
 int AW_TorchFrame(void)
@@ -351,4 +464,21 @@ void AW_TorchDraw(void)
 #if !AMIWIND_SPRITE_HANDS
     draw_sparks(world,animation_time);
 #endif
+}
+/* The first-person held light's flames (HELD-LIGHT-OWN-MODEL-61): each of its flame points carried through the place
+ * its item model is drawn at this frame (aw_hand_models.c), drawn as the placed copy's flames are, over the view. */
+void AW_HeldLightDraw(void)
+{
+    const aw_held_light_t *own;float origin[3],angles[3],shape[4];vec3_t forward,right,up,at;int i,j;
+    if(!vid.buffer || !r_drawviewmodel.value || chase_active.value || r_fov_greater_than_90 ||
+       (cl.items&IT_INVISIBILITY) || !(own=AW_HeldLight()) || !own->flames || !aw_hand_held_light ||
+       !aw_hand_held_light(origin,angles))return;
+    angles[PITCH]=-angles[PITCH];         /* alias angles: the renderer negates the pitch */
+    AngleVectors(angles,forward,right,up);
+    for(i=0;i<own->flames;i++){
+        const float *f=own->flame[i];
+        for(j=0;j<3;j++)at[j]=origin[j]+f[0]*forward[j]-f[1]*right[j]+f[2]*up[j];
+        shape[0]=f[3];shape[1]=f[4];shape[2]=f[5];shape[3]=f[6];
+        AW_HeldFlameDraw(at,shape,1);
+    }
 }

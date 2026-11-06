@@ -12,4 +12,6 @@ int AW_PlacedModels(void);
 extern int (*aw_object_drawn)(unsigned reference);
 /* aw_scenery.c: set by AW_PlacedInit to AW_PlacedLink; AW_SceneryLink calls it every client frame. */
 extern void (*aw_placed_link)(void);
+/* `aw_placed crime ...` (STEAL-WITNESSED-NO-CRIME-61): set by aw_crime.c AW_CrimeInit; NULL: no crime layer */
+extern void (*aw_placed_crime)(void);
 #endif

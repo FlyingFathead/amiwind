@@ -155,6 +155,9 @@ static int move_group(const aw_anim_t *a,float speed,int swimming,int idle,int w
     return g;
 }
 
+int AW_AnimSwims(const aw_anim_t *a) {
+    return a && a->g[AW_ANIM_SWIM].present && a->g[AW_ANIM_SWIMIDLE].present;
+}
 int AW_AnimMoveGroup(const aw_anim_t *a,float speed,int swimming,float *rate) {
     return move_group(a,speed,swimming,AW_ANIM_IDLE,AW_ANIM_WALK,AW_ANIM_RUN,rate);
 }

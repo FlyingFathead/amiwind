@@ -105,6 +105,34 @@ int main(void){
  assert(fabs(r_refdef.vieworg[2]-cl.viewheight-1.0/32)<.0001);
  aw_noclipwobble.value=1;assert(fabs(V_CalcBob()-bob)<.0001);
  aw_noclipwobble.value=0;noclip_anglehack=false;assert(fabs(V_CalcBob()-bob)<.0001);
+ /* FP-FOREARMS-BELOW-VIEW-61: the original's first-person view (OpenMW 0.51: "first person field of view" 60,
+  * vertical; the first-person neck turns the arms by 0.75 of the pitch). The AmiWind view, fov 90 over a view 2.107
+  * times as wide as high: the world's half height is tan 0.4746, the model's tan 30 degrees. */
+ {
+  float half=112,yscale=112/.4746f,k=V_FirstPersonScale(.57735f,half,yscale);
+  assert(aw_fp_view.archive && aw_fp_view.value==1);              /* saved, the original's view by default */
+  assert(fabs(k-.4746f/.57735f)<.001f && k<1);                    /* drawn smaller: more of the arms in view */
+  assert(fabs(half/(yscale*k)-.57735f)<.001f);
+  assert(fabs(V_FirstPersonScale(.4746f,half,yscale)-1)<.001f);   /* the same field: the world's projection */
+  assert(V_FirstPersonScale(1.2f,half,yscale)<k);
+  assert(V_FirstPersonScale(0,half,yscale)==1 && V_FirstPersonScale(NAN,half,yscale)==1);
+  assert(V_FirstPersonScale(.57735f,0,yscale)==1 && V_FirstPersonScale(.57735f,half,-1)==1);
+  assert(V_FirstPersonScale(.57735f,half,INFINITY)==1);
+  assert(fabs(V_FirstPersonPitch(45,V_FP_NECK)-33.75f)<.001f && fabs(V_FirstPersonPitch(-40,V_FP_NECK)+30)<.001f);
+  assert(V_FirstPersonPitch(45,1)==45 && V_FirstPersonPitch(45,0)==0 && V_FirstPersonPitch(0,V_FP_NECK)==0);
+  assert(fabs(V_FirstPersonPitch(45,NAN)-33.75f)<.001f && fabs(V_FirstPersonPitch(45,2)-33.75f)<.001f);
+  /* the whole view: looking 45 down the arms are pitched 33.75 (11.25 up into the view), 45 with aw_fp_view 0; the
+   * eye's own angles and place do not change */
+  for(i=0;i<3;i++){
+   float want[3]={-40*.75f,0,45*.75f};
+   setup(.15,0,pitches[i],0);torch_equipped=0;aw_fp_view.value=1;V_CalcRefdef();
+   assert(fabs(-cl.viewent.angles[PITCH]-want[i])<.01f);
+   VectorCopy(r_refdef.viewangles,world_angles);VectorCopy(r_refdef.vieworg,world_camera);
+   aw_fp_view.value=0;V_CalcRefdef();assert(fabs(-cl.viewent.angles[PITCH]-pitches[i])<.01f);
+   for(n=0;n<3;n++)assert(r_refdef.viewangles[n]==world_angles[n] && r_refdef.vieworg[n]==world_camera[n]);
+  }
+  aw_fp_view.value=1;
+ }
  puts("torch view depth stable through stride; legacy rollback, camera, anchors and unarmed placement passed");
  return 0;
 }

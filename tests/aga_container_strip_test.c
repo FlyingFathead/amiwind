@@ -110,6 +110,27 @@ static void rules(void){
     l.selected[0]=9;AW_CStripClamp(&l);l.count[0]=3;AW_CStripClamp(&l);
     assert(l.selected[0]==2 && l.first[0]==0);
     l.count[0]=0;AW_CStripClamp(&l);assert(!AW_CStripSelected(&l) && l.selected[0]==0);
+    {   /* LOOT-WINDOW-LAYOUT-60: on 320 x 200 (the view down to 168) and 640 x 400, both console fonts: every row inside
+         * the screen and its frame, the rows in order with room between them, the key help never cut off */
+        static const int screens[][3]={{320,200,168},{320,200,124},{320,200,200},{640,400,336},{376,240,200}};
+        static const int fonts[][2]={{8,8},{4,6}};
+        int s,f;aw_cstrip_layout_t o;
+        for(s=0;s<5;s++)for(f=0;f<2;f++){
+            AW_CStripLayout(screens[s][0],screens[s][1],screens[s][2],fonts[f][0],fonts[f][1],&o);
+            assert(o.top>=0 && o.top<=screens[s][2] && o.bottom==screens[s][1]);
+            assert(o.title_y>=o.top+AW_CSTRIP_FRAME+AW_CSTRIP_GAP);                    /* room above the buttons */
+            assert(o.cells_y>=o.title_y+AW_CSTRIP_TITLE+AW_CSTRIP_GAP);                /* and below them */
+            assert(o.name_y>=o.cells_y+AW_CSTRIP_CELL+AW_CSTRIP_GAP);
+            assert(o.props_y>=o.name_y+fonts[f][1] && o.keys_y>=o.props_y+fonts[f][1]);
+            assert(o.keys_y+fonts[f][1]+AW_CSTRIP_GAP<=o.bottom-AW_CSTRIP_FRAME);       /* the key help fits */
+            assert(o.columns>=1 && o.left+o.columns*AW_CSTRIP_CELL<=screens[s][0]-AW_CSTRIP_FRAME);
+            /* the longest key help line fits on one line */
+            assert(o.text_columns>=(int)strlen("E: Steal  Q: stack  T: all  Tab: put"));
+        }
+        /* a strip from the view's bottom when that leaves room, higher when not */
+        AW_CStripLayout(320,200,60,8,8,&o);assert(o.top==60);
+        AW_CStripLayout(320,200,168,8,8,&o);assert(o.top<168 && o.top==200-(o.keys_y-o.top)-o.line_h-AW_CSTRIP_GAP-AW_CSTRIP_FRAME);
+    }
 }
 int main(void){
     const char *name,*why;char weight[48],value[48],prompt[48];int owned,steal;
@@ -141,6 +162,14 @@ int main(void){
     /* take and put through the container deltas: owned, the take is stolen from arrille */
     tables(1,1,0);level();
     assert(AW_ContainerCount(CHEST,"misc_quill")==3);
+    {   /* LOOT-WINDOW-ITEM-PROPERTIES-60: the selected entry's kind, weight and value (the short words when narrow) */
+        char line[96];
+        assert(AW_InventoryPropertiesLine("misc_quill",60,line,sizeof(line)) && !strncmp(line,"Misc  Weight ",13) &&
+               strstr(line,"  Value "));
+        assert(AW_InventoryPropertiesLine("misc_quill",20,line,sizeof(line)) && !strncmp(line,"Misc  Wt ",9) &&
+               (int)strlen(line)<=20);
+        assert(!AW_InventoryPropertiesLine("no_such_item",60,line,sizeof(line)) && !line[0]);
+    }
     assert(AW_ContainerTake(CHEST,"misc_quill",2,1,&why)==2);
     assert(AW_ContainerCount(CHEST,"misc_quill")==1 && AW_StateGet(&aw_state,AW_ITEM,"misc_quill")==2);
     assert(AW_LedgerStolenCount(&aw_ledger,"misc_quill","arrille",0)==2);

@@ -236,19 +236,22 @@ def generate_native(version_file, out, heap_mb=None):
     # The boot check's short form "AmiWind vX / CHIM vY" (project decision, 2026-10-08).
     title = f'AmiWind v{value} / CHIM v{chim}' if chim else f'AmiWind v{value}'
     out = Path(out); out.mkdir(parents=True, exist_ok=True)
-    (out/'amiwind_version.h').write_text('/* Generated from VERSION; do not edit. */\n'
+    # Every header is written only when it changed (BUILD-VERSION-HEADER-RACE-61): the heap header's make rule runs
+    # this on every make, beside the compiles, and a rewrite of an unchanged header could be read half written
+    # ("chim_version.h is shorter than expected"), which fails the warning-free engine build.
+    _write_if_changed(out/'amiwind_version.h', '/* Generated from VERSION; do not edit. */\n'
         '#ifndef AMIWIND_VERSION_H\n#define AMIWIND_VERSION_H\n'
         f'#define AMIWIND_VERSION "{value}"\n'
         # The console's first version line (maintainer, 11 October 2026): the boot check's title.
         f'#define AMIWIND_TITLE "{title}"\n#endif\n')
     if chim:
         # CHIM's own version for the engine (engine/aga/src/chim/chim.h includes it).
-        (out/'chim_version.h').write_text('/* Generated from CHIM_VERSION; do not edit. */\n'
+        _write_if_changed(out/'chim_version.h', '/* Generated from CHIM_VERSION; do not edit. */\n'
             '#ifndef CHIM_VERSION_H\n#define CHIM_VERSION_H\n'
             f'#define CHIM_VERSION "{chim}"\n#endif\n')
     header = f'{title} hardware preflight'
     rule = '-' * len(header)  # every divider is exactly as long as the header line (generated, never hard-coded)
-    (out/'amiwind_version.i').write_text('; Generated from VERSION and CHIM_VERSION; do not edit.\n'
+    _write_if_changed(out/'amiwind_version.i', '; Generated from VERSION and CHIM_VERSION; do not edit.\n'
         f'banner: dc.b "{rule}",10\n'
         f'        dc.b "{header}",10\n'
         f'        dc.b "{rule}",10,0\n'

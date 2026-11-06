@@ -38,6 +38,8 @@
 #include "aw_jhist.h"
 #include "aw_maps.h"
 #include "aw_rest.h"
+#include "aw_crime.h"
+#include "aw_levelup.h"
 #include <ctype.h>
 
 #define FILE_NAME "mwscript.awm"
@@ -886,17 +888,58 @@ static int instance_row[AW_MWVM_INSTANCES];static uint32_t instance_row_ref[AW_M
 /* ACTOR-STATS-ALL-61: the player's spells from character creation (OpenMW 0.51 mechanicsmanagerimp.cpp: the chosen
  * race's powers and abilities, the birthsign's spells; the class gives none of its own). Applied when the race or the
  * birthsign is (re)chosen: what the previous choice gave goes, and the abilities and powers of the default player
- * record (the game's "player" NPC) go the first time; spells bought or added by scripts stay. The starting spells
- * OpenMW autocalculates from the skills (autocalcspell.cpp autoCalcPlayerSpells) are not given yet. */
-static int applied_race=-2,applied_birth=-2,applied_n;static int applied[AWS_SPELLS];
+ * record (the game's "player" NPC) go the first time; spells bought or added by scripts stay. Since v0.0.61 also the
+ * starting spells OpenMW autocalculates from the class's skills (autocalcspell.cpp autoCalcPlayerSpells, start_spells
+ * below), chosen again when the class is. */
+static int applied_race=-2,applied_birth=-2,applied_class=-2,applied_n;static int applied[AWS_SPELLS];
+/* PLAYER-START-SPELLS-NOT-KNOWN-61: the starting spells of the class and the skills (OpenMW 0.51 mechanicsmanagerimp.cpp
+ * buildPlayer: autoCalcPlayerSpells over the new character's base skills and attributes, aw_cast_rules.c). Computed
+ * from the character as creation builds it (race, sex, class, birthsign at level 1), so a later skill gain or a load
+ * never changes the set. RACE: the race's spells (never given twice). Into OUT, how many. */
+#define START_SPELLS 32
+static int start_spells(const int *race,int nrace,int *out,int max){
+    aw_start_spell_t *s;aw_start_settings_t set;aw_character_t c=aw_character;
+    int rows[START_SPELLS],count,i,k,type,n;float skills[27],attributes[8];char name[8];
+    if(!(count=AW_ActorStartSpells(&set,rows,START_SPELLS)) || !AW_CharacterRebuild(&c))return 0;
+    /* about 0.5 KB a spell, only while they are chosen (the masters flag 12) */
+    if(!(s=(aw_start_spell_t *)AW_TryMalloc(sizeof(aw_start_spell_t)*(unsigned long)count)))return 0;
+    for(i=0;i<8;i++)attributes[i]=c.attributes[i];
+    for(i=0;i<27;i++)skills[i]=c.skills[i];
+    for(i=0;i<count;i++){
+        memset(&s[i],0,sizeof(s[i]));s[i].row=rows[i];
+        AW_ActorSpellInfo(rows[i],&type,name,sizeof(name),&s[i].cost);
+        s[i].flags=AW_ActorSpellFlags(rows[i]);
+        s[i].n=AW_ActorSpellEffects(rows[i],s[i].e,AW_MADE_EFFECTS);
+        for(k=0;k<s[i].n;k++)if(!AW_ActorMagicEffect(s[i].e[k].effect,&s[i].m[k]))memset(&s[i].m[k],0,sizeof(s[i].m[k]));
+    }
+    n=AW_CastStartSpells(s,count,&set,skills,attributes,race,nrace,out,max);
+    free(s);
+    return n;
+}
+static int start_chosen[START_SPELLS],start_chosen_n=-1;
+static aw_actor_t *player_record(void);
+void AW_MwscriptStartSpellsReport(void){
+    int i,type,cost;char name[32];
+    player_record();   /* a race, class or birthsign changed since: chosen again now */
+    if(start_chosen_n<0){Con_Printf("Starting spells: no character made in this session.\n");return;}
+    Con_Printf("Starting spells from the class and the skills: %d\n",start_chosen_n);
+    for(i=0;i<start_chosen_n;i++){
+        AW_ActorSpellInfo(start_chosen[i],&type,name,sizeof(name),&cost);
+        Con_Printf(" %d %s (cost %d)\n",start_chosen[i],name,cost);
+    }
+}
 static void creation_spells(aw_actor_t *a){
-    int want[AWS_SPELLS],n=0,i,j,held[128],h,type,cost;long tb;const unsigned char *t;char name[8];
-    if(!aw_character.valid || (aw_character.race==applied_race && aw_character.birth==applied_birth))return;
+    int want[AWS_SPELLS],n=0,i,j,held[128],h,type,cost,nrace;long tb;const unsigned char *t;char name[8];
+    if(!aw_character.valid || (aw_character.race==applied_race && aw_character.birth==applied_birth &&
+                               aw_character.clas==applied_class))return;
     if(!(t=AW_AreaStatsShared(&tb)))return;
     if(aw_character.race>=0 && aw_character.race<aw_race_count)
         n+=AW_StatRaceSpells(t,tb,AW_StatIdHash(aw_races[aw_character.race].id),want+n,AWS_SPELLS-n);
+    nrace=n;
     if(aw_character.birth>=0 && aw_character.birth<aw_birth_count)
         n+=AW_StatBirthSpells(t,tb,AW_StatIdHash(aw_births[aw_character.birth].id),want+n,AWS_SPELLS-n);
+    {int k=start_spells(want,nrace,want+n,AWS_SPELLS-n<START_SPELLS?AWS_SPELLS-n:START_SPELLS);
+     memcpy(start_chosen,want+n,sizeof(int)*(size_t)k);start_chosen_n=k;n+=k;}
     if(applied_race==-2){
         h=AW_ActorSpells(a,held,128);
         for(i=0;i<h;i++){
@@ -907,7 +950,8 @@ static void creation_spells(aw_actor_t *a){
     }else for(i=0;i<applied_n;i++){for(j=0;j<n && want[j]!=applied[i];j++);if(j==n)AW_ActorRemoveSpell(a,applied[i]);}
     for(i=0;i<n;i++)if(!AW_ActorHasSpell(a,want[i]))AW_ActorAddSpell(a,want[i]);
     memcpy(applied,want,sizeof(int)*(size_t)n);applied_n=n;applied_race=aw_character.race;applied_birth=aw_character.birth;
-    Con_DPrintf("Player spells: %d from the race and the birthsign\n",n);
+    applied_class=aw_character.clas;
+    Con_DPrintf("Player spells: %d from the race, the birthsign, the class and the skills (%d starting spells)\n",n,start_chosen_n);
 }
 static aw_actor_t *player_record(void){
     aw_actor_t *a=AW_ActorPlayer();int i;
@@ -968,6 +1012,12 @@ static aw_actor_t *record_of_edict(edict_t *e){
     uint32_t ref=ref_of_edict(e);int row;
     if(!ref || !AW_MwscriptActors() || (row=row_of_edict(e))==AW_ACTOR_NONE)return NULL;
     return disposition_restore(AW_ActorGet(ref,row,1));
+}
+/* WEAPON-STRIKE-ENCHANT-NOT-CAST-61 (aw_cast.c): an actor edict's record and its actor table row */
+aw_actor_t *AW_MwscriptActorOf(edict_t *e,int *row){
+    aw_actor_t *a=record_of_edict(e);
+    if(row)*row=a?a->base:AW_ACTOR_NONE;
+    return a;
 }
 /* the effects of RANGE among a spell's N effects (E, their records M) land on TARGET: the player when NULL or
  * sv_player, else the actor whose edict it is (OpenMW spellcasting.cpp inflict): each magnitude rolled once, the
@@ -1131,6 +1181,30 @@ static void folded_item_id(int item,char *out,int capacity){
     if(!AW_ActorItem(item,&it) || !read_string(it.id,out,capacity))return;
     for(i=0;out[i];i++)if(out[i]>='A' && out[i]<='Z')out[i]=(char)(out[i]+32);
 }
+/* DIALOGUE-ITEM-NOTICE-MISSING-61 (OpenMW 0.51 containerextensions.cpp OpAddItem / OpRemoveItem): an item a script
+ * adds to or removes from the player is told in the conversation while the dialogue window is open (the message box
+ * in ShowInDialogueMode_Only: nowhere else), with the game's own lines sNotifyMessage60 (one added), 61 (COUNT added),
+ * 62 (one removed), 63 (COUNT removed), the item's name filled in; the game text is read only when one is shown. */
+static void item_notice(const char *id,int32_t count,int added){
+    static const char *const keys[4]={"sNotifyMessage60","sNotifyMessage61","sNotifyMessage62","sNotifyMessage63"};
+    static const char *const fallback[4]={"%s has been added to your inventory.","%d %s has been added to your inventory.",
+                                          "%s has been removed from your inventory.","%d %s has been removed from your inventory."};
+    char form[160],line[256],number[16];aw_inventory_item_t it;const char *name;int k=(added?0:2)+(count>1),i,o=0;
+    if(count<1 || !AW_DialWindowActive())return;
+    name=AW_InventoryRead(id,&it) && it.name[0]?it.name:id;
+    if(!AW_LevelupGameText(keys[k],form,sizeof(form)) || !form[0])Q_strcpy_bounded(form,fallback[k],sizeof(form));
+    Q_snprintf(number,sizeof(number),"%ld",(long)count);
+    for(i=0;form[i] && o<(int)sizeof(line)-1;i++){
+        const char *put=NULL;
+        if(form[i]=='%' && form[i+1]=='s'){put=name;i++;}
+        else if(form[i]=='%' && form[i+1]=='d'){put=number;i++;}
+        else if(form[i]=='%' && form[i+1]=='%'){i++;}
+        if(!put){line[o++]=form[i];continue;}
+        while(*put && o<(int)sizeof(line)-1)line[o++]=*put++;
+    }
+    line[o]=0;
+    AW_DialWindowMessage(line);
+}
 static int32_t host_item(int instance,int target,int verb,int item,int32_t count){
     edict_t *e;aw_actor_t *a=actor_of(instance,target,&e);aw_item_t it;
     actor_calls++;
@@ -1158,8 +1232,11 @@ static int32_t host_item(int instance,int target,int verb,int item,int32_t count
         if(!id[0])return 0;
         have=AW_StateGet(&aw_state,AW_ITEM,id);
         if(count<0)count=(int32_t)(uint16_t)count;
-        if(verb==1 && count)AW_StateSet(&aw_state,AW_ITEM,id,have+count);
-        else if(verb==2 && count)AW_StateSet(&aw_state,AW_ITEM,id,have>count?have-count:0);
+        if(verb==1 && count){AW_StateSet(&aw_state,AW_ITEM,id,have+count);item_notice(id,count,1);}
+        else if(verb==2 && count){
+            AW_StateSet(&aw_state,AW_ITEM,id,have>count?have-count:0);
+            if(have>0)item_notice(id,have>count?count:have,0);   /* only what was removed (numRemoved > 0) */
+        }
         return AW_StateGet(&aw_state,AW_ITEM,id);
     }
     if(verb==1)return AW_ActorAddItem(a,item,count);
@@ -1829,6 +1906,21 @@ int AW_MwscriptPersons(const char *record,unsigned long reference,aw_dial_person
     npc->level=AW_ActorStat(a,AWA_LEVEL);npc->reputation=(float)b.reputation;npc->fatigue=AW_ActorRatio(a,AWA_FATIGUE);
     *fight=(int)AW_ActorStat(a,AWA_FIGHT);*flee=(int)AW_ActorStat(a,AWA_FLEE);
     return 1;
+}
+/* DIALOGUE-RING-DISPOSITION-CHECK-60: the speaker's own (base) disposition now, from its actor record with the
+ * scripts' changes in it (a result's ModDisposition / SetDisposition), else the world change list's, else FALLBACK;
+ * and that value set (OpenMW DialogueManager writes it at every persuasion: NpcStats::setBaseDisposition). */
+int AW_MwscriptSpeakerDisposition(const char *record,unsigned long reference,int fallback){
+    int row;aw_actor_t *a;
+    if(!AW_MwscriptActors() || !record || (row=AW_ActorFind(record))<0)return fallback;
+    if(reference && (a=AW_ActorGet((uint32_t)reference,row,0))!=NULL)return (int)AW_ActorStat(disposition_restore(a),AWA_DISPOSITION);
+    return disposition_kept(reference,fallback);
+}
+void AW_MwscriptSetSpeakerDisposition(const char *record,unsigned long reference,int disposition){
+    aw_actor_t *a=speaker_actor(record,reference);
+    if(!a)return;
+    AW_ActorSetStat(a,AWA_DISPOSITION,(float)disposition);disposition_keep(a);
+    AW_MwvmStateChanged();
 }
 /* The speaker's own disposition, Fight and Flee set (the actor record, saved with the game). */
 void AW_MwscriptSetSpeaker(const char *record,unsigned long reference,int disposition,int fight,int flee){
@@ -2611,9 +2703,11 @@ static void actors_import(const unsigned char *data,int bytes){
                 /* the active spell effects after it (v0.0.57; a save without them: none active), then the actors'
                  * travel and follow packages (AWPK; a save without them: none) */
                 if(rest+6<=tail && !memcmp(p+rest,"AWEF",4)){
-                    unsigned long fx=6+10UL*p[rest+5];
-                    if(rest+fx>tail || !AW_EffectsImport(p+rest,(int)fx))Con_Printf("Saved spell effects unreadable: none active.\n");
-                    else rest+=fx;
+                    /* SAVE-EFFECTS-BLOCK-SIZE-61: 10 bytes an effect in a version 1 block (v0.0.57), 16 in version 2
+                     * (v0.0.61); read as 10, every save with an effect active lost its effects and the blocks after */
+                    int fx=AW_EffectsBlockBytes(p+rest,tail-rest);
+                    if(fx<0 || !AW_EffectsImport(p+rest,fx))Con_Printf("Saved spell effects unreadable: none active.\n");
+                    else rest+=(unsigned long)fx;
                 }
                 if(rest+6<=tail && !memcmp(p+rest,"AWSL",4)){   /* things sold to merchants (v0.0.58) */
                     int k=AW_SoldImport(p+rest,(int)(tail-rest));
@@ -2660,6 +2754,9 @@ static uint32_t actors_ref_flags(uint32_t key,aw_ledger_respawn_t *rule){
     if(r && rule)*rule=r->respawn;
     return AW_PlacedRefFlags(key);
 }
+static int crime_witness(edict_t *e,aw_crime_witness_t *w);
+static int crime_attack(edict_t *e,int fight);
+static void crime_thief(aw_crime_thief_t *t);
 void AW_MwscriptInit(void){
     Cvar_RegisterVariable(&mwscript);
     stats_hooks();
@@ -2682,6 +2779,9 @@ void AW_MwscriptInit(void){
     aw_combat_effect_magnitude=effect_magnitude_of;   /* RESIST-NORMAL-WEAPONS-61: the blow's resistance (v0.0.61-weapons) */
 #endif
     Cmd_AddCommand("aw_mwscript_status",status);
+    /* STEAL-WITNESSED-NO-CRIME-61: the crime rules read the witnesses and the player here */
+    aw_crime_witness=crime_witness;aw_crime_attack=crime_attack;aw_crime_thief=crime_thief;
+    AW_CrimeInit();
 }
 /* the speaker of a conversation attacks when its Fight rating with the conversation's disposition reaches 100 */
 int AW_MwscriptSpeakerAggro(edict_t *e,int disposition){
@@ -2693,6 +2793,65 @@ int AW_MwscriptSpeakerAggro(edict_t *e,int disposition){
     to_fighter(a,&sheet);
     if((got=AW_CombatAggro(e,&sheet,NULL,disposition,NULL,NULL))>0){a->flags|=AWL_COMBAT;combat_starts++;}
     return got;
+}
+/* STEAL-WITNESSED-NO-CRIME-61 (aw_crime.h): what the crime rules read of NPC E and of the player, and a witness's
+ * attack; from the actor records in memory (the area's stat blocks), the effects and the player's sheet */
+static float fatigue_term_of(float current,float maximum){
+    float normalised=maximum<1?1:current/maximum;
+    if(normalised<0)normalised=0;
+    if(!AW_CombatSettingsLoad())return 1;
+    return aw_combat_settings.fFatigueBase-aw_combat_settings.fFatigueMult*(1-normalised);   /* getFatigueTerm */
+}
+static int crime_witness(edict_t *e,aw_crime_witness_t *w){
+    eval_t *v,*r;aw_actor_t *a;aw_actor_base_t b;char clas[32];const aw_fighter_t *f;
+    memset(w,0,sizeof(*w));
+    if(!e || e==sv_player || !(v=GetEdictFieldValue(e,"aw_source_id")) || !v->string)return 0;
+    r=GetEdictFieldValue(e,"aw_ref");
+    /* the live record by its reference alone (the area load made it from the area's stat block): no search of the
+     * actor table on disk; s12: the first theft's seven searches and class reads took 650 ms. The search only for a
+     * record not made yet. */
+    a=r && r->_float>0?AW_ActorGet((uint32_t)r->_float,AW_ACTOR_NONE,0):NULL;
+    if(!a)a=speaker_actor(pr_strings+v->string,r?(unsigned long)r->_float:0);
+    if(!a || a->kind!=0)return 0;   /* NPCs only */
+    f=AW_CombatFighter(e);
+    w->can_report=!(a->flags&AWL_DEAD) && e->v.health>=0 && !(f && (f->dead || f->knocked));   /* canReportCrime */
+    w->alarm=(int)AW_ActorStat(a,AWA_ALARM);w->fight=(int)AW_ActorStat(a,AWA_FIGHT);
+    /* isClass(actor, "guard") matters only to a witness with Alarm 100 (an alarmed guard): read only for those */
+    w->guard=w->alarm>=100 && AW_ActorBase(a->base,&b) && b.clas!=AW_ACTOR_NONE && read_string(b.clas,clas,sizeof(clas)) &&
+             !Q_strcasecmp(clas,"guard");
+    w->observer.sneak=AW_ActorStat(a,AWA_SKILL+19);w->observer.agility=AW_ActorStat(a,AWA_ATTRIBUTE+3);
+    w->observer.luck=AW_ActorStat(a,AWA_ATTRIBUTE+7);
+    w->observer.blind=a->reference?AW_EffectsMagnitude(a->reference,47,AW_EFFECT_NO_ARG):0;   /* Blind */
+    w->observer.fatigue_term=fatigue_term_of(a->dyn_cur[2],a->dyn_base[2]);
+    return 1;
+}
+static int crime_attack(edict_t *e,int fight){
+    eval_t *v,*r;aw_actor_t *a;aw_fighter_t sheet;
+    if(!e || e==sv_player || !sv_player || sv_player->v.health<=0 || !(v=GetEdictFieldValue(e,"aw_source_id")) || !v->string)return 0;
+    r=GetEdictFieldValue(e,"aw_ref");
+    a=r && r->_float>0?AW_ActorGet((uint32_t)r->_float,AW_ACTOR_NONE,0):NULL;   /* as crime_witness */
+    if(!a)a=speaker_actor(pr_strings+v->string,r?(unsigned long)r->_float:0);
+    if(!a || (a->flags&AWL_DEAD))return 0;
+    AW_ActorSetStat(a,AWA_FIGHT,(float)(fight>100?100:fight));   /* the Fight kept: it fights on after a Calm (OpenMW) */
+    if(AW_CombatFighter(e))return 1;                              /* already fighting */
+    /* every fight slot taken (aw_combat.c SLOTS 4): no sheet read from disk for a fight that cannot start (s4: two of
+     * the six reads of combat/actors.txt at a theft were for such witnesses) */
+    if(AW_CombatHostiles()>=4)return 0;
+    if(!AW_CombatActorLoad(pr_strings+v->string,&sheet))return 0;
+    to_fighter(a,&sheet);sheet.fight=(unsigned char)(fight>100?100:fight);sheet.aware=1;
+    if(!AW_CombatEngage(e,&sheet,NULL))return 0;
+    a->flags|=AWL_COMBAT;combat_starts++;
+    return 1;
+}
+static void crime_thief(aw_crime_thief_t *t){
+    aw_actor_t *p=player_record();aw_inventory_item_t boots;float maximum=0,fatigue=AW_CombatPlayerFatigue(&maximum);
+    t->sneaking=AW_MoveSneaking();
+    if(p){t->sneak=AW_ActorStat(p,AWA_SKILL+19);t->agility=AW_ActorStat(p,AWA_ATTRIBUTE+3);t->luck=AW_ActorStat(p,AWA_ATTRIBUTE+7);}
+    t->boot_weight=sv_player && ((int)sv_player->v.flags&FL_ONGROUND) && AW_InventoryEquippedItem(AW_SLOT_BOOTS,&boots)?
+                   boots.weight:0;
+    t->fatigue_term=fatigue_term_of(fatigue,maximum);
+    t->chameleon=AW_EffectsMagnitude(AW_ACTOR_PLAYER_REF,40,AW_EFFECT_NO_ARG);       /* Chameleon */
+    t->invisibility=AW_EffectsMagnitude(AW_ACTOR_PLAYER_REF,39,AW_EFFECT_NO_ARG);    /* Invisibility */
 }
 int AW_MwscriptActorRow(const char *record){
     int row;

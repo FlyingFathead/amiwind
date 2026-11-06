@@ -138,6 +138,7 @@ Family: Menus, HUD, map screen and text (`ui-text`). Menus, HUD, map screen, fon
 - DIALOGUE-BACKDROP-HUD-60 (no report page): The status bars stay visible behind the dialogue screen
 - DIALOGUE-CHOICE-LINE-UNMARKED-60 (no report page): An answer picked from a dialogue choice is printed like the NPC's text, not as the player's line
 - [DIALOGUE-CLOSE-FRAME-FREEZE-59](DIALOGUE-CLOSE-FRAME-FREEZE-59.md): The talk window takes seconds to open
+- [DIALOGUE-ITEM-NOTICE-MISSING-61](DIALOGUE-ITEM-NOTICE-MISSING-61.md): An item a dialogue answer gives or takes shows no notice while talking
 - DIALOGUE-LINK-MARK-AS-DEFINE-58 (no report page): Dialogue links lose their first two letters to a number, and the link itself, since the text defines table
 - DIALOGUE-MSGBOX-BEHIND-60 (no report page): Message boxes raised during a conversation open behind the dialogue window
 - DIALOGUE-OPEN-STALL-58 (no report page): Opening a conversation hangs the game for many seconds
@@ -154,6 +155,8 @@ Family: Menus, HUD, map screen and text (`ui-text`). Menus, HUD, map screen, fon
 - [HUD-NOTIFY-OVERLAP-31](HUD-NOTIFY-OVERLAP-31.md): Console messages print over the location title
 - [HUD-STATS-29](HUD-STATS-29.md): Health uses fixed 100; other bars hardcoded full
 - HUD-WEAPON-BOX-EMPTY-59 (no report page): HUD weapon box stays empty after equipping a weapon from the console
+- INVENTORY-BURDEN-TEXT-UNREADABLE-61 (no report page): The carried and maximum weight on the inventory burden bar cannot be read
+- INVENTORY-NO-ARMOR-RATING-61 (no report page): The inventory window shows no armour rating under the character picture
 - INVENTORY-PREVIEW-STALE-61 (no report page): The inventory character preview does not change when equipment is put on or taken off in the window
 - LEVEL-UP-MISSING-57 (no report page): Requested: levelling as in the original: skills rise with use, the level-up box with its text and sound, attributes raised, the new values used by every check
 - LOOT-WINDOW-ITEM-PROPERTIES-60 (no report page): Loot window does not show the selected item's type, weight and value

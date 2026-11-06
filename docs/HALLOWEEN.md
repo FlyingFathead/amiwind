@@ -1,6 +1,18 @@
 # The Halloween scene
 
-_Last updated with AmiWind v0.0.54-dev1 (27 October 2026)._
+_Last updated with AmiWind v0.0.61 (6 November 2026)._
+
+<!-- contents start -->
+## Contents
+
+- [Building it](#building-it)
+- [In the game](#in-the-game)
+- [The choreography](#the-choreography)
+- [The camera](#the-camera)
+- [The benchmark](#the-benchmark)
+- [Known limits](#known-limits)
+
+<!-- contents end -->
 
 For Halloween 2026 the animation stage gets a beat: the game's own skeletons, the dancers of Desele's House of
 Earthly Delights in Suran and Dagoth Ur himself dance on a roof in Balmora, filmed by a small camera director. It is
@@ -132,6 +144,11 @@ counter on, and 600 frames with the scene clock stepping a tenth of a second eac
 every camera shot), so every run on every machine draws exactly the same frames, as Quake's timedemo plays a fixed
 recording. At the end the console shows one line to copy: the average, minimum and 1 % low frame rates, the frame
 count, the seconds, the Fast RAM, the CPU and the build. How to send it: [REAL_HARDWARE.md](REAL_HARDWARE.md).
+
+The benchmark is deliberately a heavy scene, meant to push a machine to its limits: a full town around the roof, the
+whole dancing cast with skinned, animated models, and a moving camera that keeps changing shot. Its frame rate is
+therefore well below what the same machine gives in ordinary play, and it is meant for comparing builds and
+machines with each other, not as the frame rate to expect while playing.
 The residents of Balmora around the roof keep their own idle timing, so the picture away from the stage can differ
 a little between runs.
 

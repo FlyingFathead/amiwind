@@ -1,10 +1,11 @@
 # Current project state
 
-_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
+_Last updated with AmiWind v0.0.61-dev3 (2026-11-06)._
 
 <!-- contents start -->
 ## Contents
 
+- [6 November 2026: v0.0.61-dev3 - development snapshot](#6-november-2026-v0061-dev3---development-snapshot)
 - [25 October 2026: v0.0.51 - Let There Be More Inner Light](#25-october-2026-v0051---let-there-be-more-inner-light)
 - [21 October 2026: v0.0.47-dev1 - development snapshot](#21-october-2026-v0047-dev1---development-snapshot)
 - [19 October 2026: v0.0.45 - CHIM Streaming Improved, Guard Torches Are Back](#19-october-2026-v0045---chim-streaming-improved-guard-torches-are-back)
@@ -30,9 +31,32 @@ _Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 
 <!-- contents end -->
 
+## 6 November 2026: v0.0.61-dev3 - development snapshot
+
+The newest release is [v0.0.60: Work With What You've Got](releases/notes/RELEASE-v0.0.60.md), running on CHIM Engine
+v0.2.2 and needing 32 MB of Fast RAM. The development line is
+[v0.0.61-dev3](releases/notes/RELEASE-v0.0.61-dev3.md), the third snapshot of v0.0.61, "Keep Your Lantern Lit" (not a
+release). The sections below this one describe the project as it stood in October 2026 and are kept as history; the
+changelog and the release notes have every version in between.
+
+Where the game stands: all of Vvardenfell's outdoors (1,409 exterior cells) and 1,132 of the 1,134 interiors are CHIM
+maps, with the people and creatures the game places in them; the player is built from parts (body and first-person
+arms) and shows what is worn and wielded; the conversation system runs (topics, choices, disposition, persuasion and the
+services); containers and the bodies of the dead open in a strip; the world keeps what the player changes across rooms
+and saved games; and the player casts spells, with a spell-effect system, enchanted items that cast, class starting
+spells, witnessed theft, weapons and shields of every type in both views, carriable and held lights, an inventory with
+no limit on the number of kinds, and an in-game recorder for testing. The tracker of the base game's systems
+([game features](GAME_FEATURES.md)) counts what is done, partial and missing.
+
+What is not in: quests beyond what the scripts run, guards who arrest, pickpocketing, trespass, alchemy, making
+your own enchantments, the shot of bows and thrown weapons, Tribunal and Bloodmoon, and real-hardware
+speed (the first figures from testers are in [AmiWind on real hardware](REAL_HARDWARE.md)). What comes next is in the
+[roadmap](ROADMAP.md); the known problems are in the [bug register](BUGS.md) and under "Known in this build" in each
+snapshot's notes.
+
 ## 25 October 2026: v0.0.51 - Let There Be More Inner Light
 
-The newest release is [v0.0.51: Let There Be More Inner Light](releases/notes/RELEASE-v0.0.51.md), running on CHIM Engine v0.2.2.
+The newest release (as of this section, 25 October) is [v0.0.51: Let There Be More Inner Light](releases/notes/RELEASE-v0.0.51.md), running on CHIM Engine v0.2.2.
 Akulakhan's Chamber, the game's final room, loads on 32 MB. Every interior is baked with its cell's sunlight, the
 light the original gives a room from one fixed direction, which the bake had always left out; the interior
 brightness default is back to 1.0 ([interior lighting](INTERIOR_LIGHTING.md)). The music keeps playing through the

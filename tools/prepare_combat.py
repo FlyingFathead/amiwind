@@ -54,6 +54,11 @@ MOVE_SETTINGS = ('fMinWalkSpeed', 'fMaxWalkSpeed', 'fEncumberedMoveEffect', 'fBa
 # playground"): written as "ai NAME VALUE" lines, which the melee settings' loader skips.
 AI_SETTINGS = ('iFightDistanceBase', 'fFightDistanceMultiplier', 'fFightDispMult',
                'fAIFleeHealthMult', 'fAIFleeFleeMult', 'fAIMeleeWeaponMult', 'fAIMeleeArmorMult')
+# The crime rules (engine/aga/src/aw_crime.h aw_crime_settings_t, the same order; STEAL-WITNESSED-NO-CRIME-61):
+# written as "crime NAME VALUE" lines, which the melee settings' loader skips.
+CRIME_SETTINGS = ('fAlarmRadius', 'fCrimeStealing', 'fDispStealing', 'fFightStealing',
+                  'fSneakSkillMult', 'fSneakBootMult', 'fSneakDistanceBase', 'fSneakDistanceMultiplier',
+                  'fSneakNoViewMult', 'fSneakViewMult', 'iCrimeThreshold')
 # Settings only the builder needs (armour classes, magicka).
 BUILD_SETTINGS = ('iBaseArmorSkill', 'fLightMaxMod', 'fMedMaxMod', 'iHelmWeight', 'iCuirassWeight',
                   'iPauldronWeight', 'iGreavesWeight', 'iBootsWeight', 'iGauntletWeight', 'iShieldWeight',
@@ -143,7 +148,8 @@ def gmst_text(kinds, name):
 
 
 # The texts the combat layer shows (RESIST-NORMAL-WEAPONS-61: a weapon with no effect on a target that resists it)
-TEXT_SETTINGS = ('sMagicTargetResistsWeapons',)
+# and the crime rules (STEAL-WITNESSED-NO-CRIME-61: the bounty rose)
+TEXT_SETTINGS = ('sMagicTargetResistsWeapons', 'sCrimeMessage')
 
 
 def movement_lines(kinds, settings):
@@ -664,7 +670,8 @@ def prepare(data_files, id1, jobs=None, fighters=None):
     data = resolve_data_files(Path(data_files))
     id1 = Path(id1)
     kinds = load(child_ci(data, 'Morrowind.esm'))
-    settings = {name: gmst(kinds, name) for name in SETTINGS + BUILD_SETTINGS + MOVE_SETTINGS + AI_SETTINGS}
+    settings = {name: gmst(kinds, name) for name in SETTINGS + BUILD_SETTINGS + MOVE_SETTINGS + AI_SETTINGS +
+                CRIME_SETTINGS}
     (id1 / 'combat').mkdir(parents=True, exist_ok=True)
     (id1 / 'sound/combat').mkdir(parents=True, exist_ok=True)
     from npc_geometry import Assets
@@ -673,6 +680,7 @@ def prepare(data_files, id1, jobs=None, fighters=None):
     lines += [f'{name} {settings[name]:.6g}' for name in SETTINGS]
     lines += movement_lines(kinds, settings)
     lines += [f'ai {name} {settings[name]:.6g}' for name in AI_SETTINGS]
+    lines += [f'crime {name} {settings[name]:.6g}' for name in CRIME_SETTINGS]
     sounds = {}
     for key, record in SOUNDS:
         fields = kinds['SOUN'].get(record.casefold())
@@ -720,7 +728,7 @@ def prepare(data_files, id1, jobs=None, fighters=None):
             lines.append('text %s %s' % (name, setting))
     (id1 / 'combat/settings.txt').write_text('\n'.join(lines) + '\n', encoding='ascii', newline='\n')
     count, size, skipped = write_actors(kinds, settings, id1 / 'combat/actors.txt')
-    report = {'settings': {k: settings[k] for k in SETTINGS + AI_SETTINGS}, 'sounds': sounds, 'clips': clips,
+    report = {'settings': {k: settings[k] for k in SETTINGS + AI_SETTINGS + CRIME_SETTINGS}, 'sounds': sounds, 'clips': clips,
               'sound_generators': {'creatures': generator_text.count('\n') - 1, 'sounds': converted,
                                    'bytes': generator_bytes, 'missing': missing},
               'actors': {'count': count, 'bytes': size, 'skipped_non_ascii_or_long_ids': skipped}}

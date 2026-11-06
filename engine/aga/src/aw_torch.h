@@ -52,4 +52,45 @@ void AW_TorchReleaseLegacyCache(void);
 /* Optional player-body emitter; NULL in first-person-only builds/fixtures. */
 extern int (*aw_view_torch_emitter)(vec3_t out);
 extern int (*aw_view_torch_light)(vec3_t out);
+
+/* HELD-LIGHT-OWN-MODEL-61: a held carried light that is not the torch (a candle, candlestick or lantern) is drawn as
+ * itself: its own item model on the left hand's shield bone and the flames its placed copy has, in both views, and
+ * its dynamic light (the torch's key) reaches the torch's radius scaled by its record's radius against the torch's,
+ * never past the torch, flickering only where the record says. The builder writes beside the light's item model a
+ * small file (progs/items/m<hex>.hld, tools/held_lights.py), read once when the light is equipped: the model's place
+ * on the bone (origin and Quake angles, the carried-light turn) and up to AW_HELD_FLAMES flame emitters (point,
+ * size, particle, rise, spread: a placed aw_flame row's numbers, in the item model's units). No file (the torch's
+ * mesh, an older image): the torch, as before. */
+#define AW_HELD_FLAMES 4
+typedef struct {
+    char model[64];
+    float offset[6];
+    int flames;
+    float flame[AW_HELD_FLAMES][7];
+    float radius;          /* the dynamic light's reach now */
+    int flicker;           /* the record flickers or pulses (an older catalogue: 1, as the torch) */
+} aw_held_light_t;
+/* Pure: the .hld text (SIZE bytes) into OUT with MODEL; 1 valid, 0 refused (OUT then unusable). */
+int AW_HeldLightParse(const char *text,int size,const char *model,aw_held_light_t *out);
+/* Pure: the held light's reach: TORCH_LIGHT x ITEM_RADIUS / TORCH_RADIUS, never past TORCH_LIGHT, at least 1; the
+ * torch's own light when the torch's radius is unknown (0 or less). */
+float AW_HeldLightRadius(float torch_light,int item_radius,int torch_record);
+/* The held light now when one is held lit (hands raised, V or the equip) and it is not the torch; NULL otherwise. */
+const aw_held_light_t *AW_HeldLight(void);
+/* aw_debug_torch.c: the light in the left hand (1) with its catalogue id, item model, radius and catalogue byte 511
+ * flags, and the torch record's radius (0 unknown); 0 when the left hand holds no light. NULL in fixtures. */
+extern int (*aw_held_light_item)(char id[64],char model[64],int *radius,int *flags,int *torch_radius);
+/* aw_view.c, third person: the held light's flames in the world (OUT, its count) and its light's place (1 found and
+ * in the clear). NULL or 0 in first person. The flames' hook and AW_HeldLight's for the flame drawer live in
+ * aw_guard_torch.c (aw_torch.c sets aw_held_light_now), so the flame drawer links without the torch. */
+extern int (*aw_view_held_flames)(vec3_t out[AW_HELD_FLAMES]);
+extern const aw_held_light_t *(*aw_held_light_now)(void);
+extern int (*aw_view_held_light)(vec3_t out);
+/* aw_hand_models.c, first person: the held light's item model place this frame (origin, alias angles); 0 none. */
+extern int (*aw_hand_held_light)(float origin[3],float angles[3]);
+/* aw_guard_torch.c: one held flame (a placed flame's shape: SIZE, PARTICLE, RISE, SPREAD in map units) at ORIGIN;
+ * VIEW 1 = in the first-person view (drawn over the view model, no depth test, as the torch's flame). */
+void AW_HeldFlameDraw(const vec3_t origin,const float shape[4],int view);
+/* The first-person held light's flames (view.c, beside AW_TorchDraw). */
+void AW_HeldLightDraw(void);
 #endif

@@ -68,6 +68,11 @@ fixed16_t Invert24To16(fixed16_t val);
 int GreatestCommonDivisor (int i1, int i2);
 
 void AngleVectors (vec3_t angles, vec3_t forward, vec3_t right, vec3_t up);
+/* PLACED-PIT-AXE-NO-FOCUS-61: where the ray from EYE along the unit vector DIR enters an alias model's box (MINS..MAXS
+ * in model units, widened by MARGIN world units) placed at ORIGIN, turned by ANGLES as r_alias.c turns it and scaled
+ * by SCALE: the distance along the ray (0 when EYE is inside), -1 when it misses. */
+float AW_RayAliasBox (const float origin[3], const float angles[3], float scale, const float mins[3],
+		const float maxs[3], float margin, const float eye[3], const float dir[3]);
 void Q_SinCosDeg (float degrees, float *s, float *c);
 void Q_SinCosRad (float radians, float *s, float *c);
 float Q_SinRad (float radians);

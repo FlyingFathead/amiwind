@@ -116,4 +116,8 @@ Family: Distance drawing (horizon, fog, sky, far edges) (`distance-drawing`). Fa
 - [TREE-VIEW-FLOAT-38](TREE-VIEW-FLOAT-38.md): Sprite tree appears detached from terrain from particular viewing directions
 - [WATER-UNDERWATER-SKY-44](WATER-UNDERWATER-SKY-44.md): Under water the distance shows the sky's clouds instead of blue water
 
+Related bugs in other categories:
+
+- BC-TREE-FLOATING-60 (no report page): A Bitter Coast tree near cell -2,-8 floats above the ground
+
 <!-- END GENERATED CATEGORY -->

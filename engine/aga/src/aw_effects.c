@@ -5,11 +5,14 @@
 
 #define FL_STAT 1        /* acts on a stat (AW_EffectKind >= 0) */
 #define FL_PER_SECOND 2
+#define FL_CONSTANT 4    /* a worn item's or an ability's: lasts until taken off (AW_EffectsRemoveSource) */
+#define SAVED_CONSTANT 1e7f   /* the seconds left a constant effect is saved with (its source says it is one) */
 typedef struct {uint32_t owner;unsigned char used,effect,arg,flags;uint16_t source;float magnitude,left;} effect_t;
 static effect_t fx[AW_EFFECTS_MAX];
 static unsigned long refused;
+static unsigned long generation=1;   /* moves with every reset and load: the worn items' effects are set again */
 
-void AW_EffectsReset(void){memset(fx,0,sizeof(fx));}
+void AW_EffectsReset(void){memset(fx,0,sizeof(fx));generation++;}
 int AW_EffectsCount(void){int i,n=0;for(i=0;i<AW_EFFECTS_MAX;i++)n+=fx[i].used;return n;}
 int AW_EffectsCountOn(uint32_t owner){int i,n=0;for(i=0;i<AW_EFFECTS_MAX;i++)n+=fx[i].used && fx[i].owner==owner;return n;}
 unsigned long AW_EffectsRefused(void){return refused;}
@@ -119,6 +122,18 @@ int AW_EffectsForget(uint32_t owner){
     for(i=0;i<AW_EFFECTS_MAX;i++)if(fx[i].used && fx[i].owner==owner){fx[i].used=0;n++;}
     return n;
 }
+int AW_EffectsRemoveSource(aw_actor_t *a,int source){
+    int i,n=0;
+    if(!a)return 0;
+    for(i=0;i<AW_EFFECTS_MAX;i++){
+        effect_t *e=&fx[i];
+        if(!e->used || e->owner!=a->reference || e->source!=(uint16_t)source)continue;
+        if(!(e->flags&FL_PER_SECOND) && (e->flags&FL_STAT))act_entry(a,e,e->magnitude,-1);   /* undone, as at its end */
+        e->used=0;n++;
+    }
+    return n;
+}
+unsigned long AW_EffectsGeneration(void){return generation;}
 int AW_EffectsAt(int i,aw_effect_info_t *out){
     int k;
     for(k=0;k<AW_EFFECTS_MAX;k++){
@@ -142,6 +157,17 @@ int AW_EffectsLand(aw_actor_t *a,int effect,int arg,float m,float seconds,int so
     if(!a || effect<0 || effect>=AW_EFFECT_COUNT || !(m>=0) || m>1e6f)return 0;
     kind=AW_EffectKind(effect,&group);per_second=AW_EffectPerSecond(effect);
     if(kind>=0 && AW_EffectStat(group,arg)<0)return 0;   /* an attribute or skill effect without its attribute or skill */
+    if(seconds==AW_EFFECT_CONSTANT){                /* a worn item's: until its source is taken off */
+        if(source<AW_EFFECT_SOURCE_CONSTANT || source>=AW_EFFECT_NO_SOURCE)return 0;
+        if((i=free_slot(a->reference))<0){refused++;return 0;}
+        e=&fx[i];memset(e,0,sizeof(*e));
+        e->used=1;e->owner=a->reference;e->effect=(unsigned char)effect;
+        e->arg=(unsigned char)(arg>=0 && arg<255?arg:AW_EFFECT_NO_ARG);
+        e->flags=(unsigned char)((kind>=0?FL_STAT:0)|(per_second?FL_PER_SECOND:0)|FL_CONSTANT);
+        e->source=(uint16_t)source;e->magnitude=m;e->left=SAVED_CONSTANT;
+        if(!per_second)act_entry(a,e,m,1);
+        return 1;
+    }
     if(!(seconds>0)){                               /* once: a per-second effect acts its whole magnitude */
         if(per_second && kind>=0 && m>0)act(a,kind,AW_EffectStat(group,arg),m,1);
         return 1;
@@ -171,6 +197,10 @@ int AW_EffectsTick(aw_actor_t *a,float dt){
     for(i=0;i<AW_EFFECTS_MAX;i++){
         effect_t *e=&fx[i];float step;
         if(!e->used || e->owner!=a->reference)continue;
+        if(e->flags&FL_CONSTANT){   /* never ends on the clock; a per-second one acts each second it is worn */
+            if((e->flags&FL_PER_SECOND) && (e->flags&FL_STAT)){act_entry(a,e,e->magnitude*dt,1);changed=1;}
+            continue;
+        }
         step=dt<e->left?dt:e->left;
         if(e->flags&FL_PER_SECOND){if(e->flags&FL_STAT){act_entry(a,e,e->magnitude*step,1);changed=1;}}
         e->left-=dt;
@@ -209,8 +239,15 @@ static int import_one(int i,uint32_t owner,int effect,int arg,int source,float m
     if(kind>=0 && AW_EffectStat(group,arg)<0)return 0;
     fx[i].used=1;fx[i].owner=owner;fx[i].effect=(unsigned char)effect;fx[i].arg=(unsigned char)arg;
     fx[i].source=(uint16_t)source;fx[i].magnitude=m;fx[i].left=left;
-    fx[i].flags=(unsigned char)((kind>=0?FL_STAT:0)|(AW_EffectPerSecond(effect)?FL_PER_SECOND:0));
+    fx[i].flags=(unsigned char)((kind>=0?FL_STAT:0)|(AW_EffectPerSecond(effect)?FL_PER_SECOND:0)|
+                                (source>=AW_EFFECT_SOURCE_CONSTANT && source<AW_EFFECT_NO_SOURCE && left==SAVED_CONSTANT?FL_CONSTANT:0));
     return 1;
+}
+int AW_EffectsBlockBytes(const unsigned char *data,unsigned long available){
+    unsigned long n;
+    if(available<6 || memcmp(data,"AWEF",4) || (data[4]!=1 && data[4]!=2))return -1;
+    n=6+(data[4]==1?10UL:16UL)*data[5];
+    return n>available?-1:(int)n;
 }
 int AW_EffectsImport(const unsigned char *data,int bytes){
     static const int base[4]={17,22,74,79};int i,n,size;

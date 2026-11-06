@@ -295,7 +295,9 @@ class LedgerWiringTests(unittest.TestCase):
         inventory = code('aw_inventory.c')
         take = body(inventory, 'static int take_row(focus_row_t *row)')
         self.assertIn('AW_LedgerStolenAdd(&aw_ledger,item.id,owner,faction,1)', take)
-        self.assertIn('row->owned && aw_ledger_on', take)
+        # STEAL-WITNESSED-NO-CRIME-61: the owned take is the stolen pair and the crime (one owner lookup for both)
+        self.assertIn('stolen=row->owned && container_owner(row->reference,owner,&faction);', take)
+        self.assertIn('if(stolen && aw_ledger_on)AW_LedgerStolenAdd', take)
         # a save is written when the list has rows or stolen pairs alone
         self.assertIn('if(AW_LedgerRows(&aw_ledger)>0)', code('aw_save.c'))
 
@@ -422,7 +424,8 @@ class RespawnAndMigrationTests(unittest.TestCase):
 
     def test_save_keeps_identity_and_a_save_of_other_data_is_migrated(self):
         save = code('aw_save.c')
-        write = body(save, 'int AW_SaveWrite(int slot)')
+        # the save's encoding (AW_SaveWrite's and the recorder's, GAME-RECORDER-61)
+        write = body(save, 'static byte *encode_world(const char *label,int bump,int *size)')
         self.assertLess(write.index('aw_save_ident_refresh(&aw_ledger)'), write.index('AW_LedgerEncode(&aw_ledger,NULL,0)'))
         spawn = body(save, 'void AW_SaveSpawn(void)')
         # migrated before anything reads the list; the other actor table's records and dead counts go

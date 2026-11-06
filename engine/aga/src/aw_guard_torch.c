@@ -377,6 +377,13 @@ static void hearth_lut_build(void)
     }
     hearth_lut_ready=1;
 }
+/* 1 while a first-person held light's flame is drawn (AW_HeldFlameDraw): over the view model, as the torch's own
+ * first-person flame (aw_torch.c AW_TorchDraw), no depth test and nothing written to the depth buffer */
+static int flame_view;
+/* HELD-LIGHT-OWN-MODEL-61 (aw_torch.h): the third-person held light's flames (aw_view.c) and the held light now
+ * (aw_torch.c AW_HeldLight); NULL in fixtures without them */
+int (*aw_view_held_flames)(vec3_t out[AW_HELD_FLAMES]);
+const aw_held_light_t *(*aw_held_light_now)(void);
 static void flame_particle(const vec3_t origin,int k,float scale,int core,int max_pixels,float rise,float opacity,int solid)
 {
     static const int threshold[16]={0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5};
@@ -397,9 +404,10 @@ static void flame_particle(const vec3_t origin,int k,float scale,int core,int ma
             py<r_refdef.vrect.y || px>=r_refdef.vrect.x+r_refdef.vrect.width ||
             py>=r_refdef.vrect.y+r_refdef.vrect.height)continue;
         j=((yy*16/n)*16+xx*16/n)*2;alpha=(int)(flame_pixels[j+1]*(1-age*.6f)*opacity);
-        if(alpha>(solid?solid:threshold[(py&3)*4+(px&3)]*16+7) && d_pzbuffer[py*d_zwidth+px]<=z){
+        if(alpha>(solid?solid:threshold[(py&3)*4+(px&3)]*16+7) && (flame_view || d_pzbuffer[py*d_zwidth+px]<=z)){
             byte c=AW_TorchFlameColor(flame_pixels[j],j,age,core);
-            vid.buffer[py*vid.rowbytes+px]=flame_lut?flame_lut[c]:c;d_pzbuffer[py*d_zwidth+px]=z;
+            vid.buffer[py*vid.rowbytes+px]=flame_lut?flame_lut[c]:c;
+            if(!flame_view)d_pzbuffer[py*d_zwidth+px]=z;
         }
     }
 }
@@ -415,6 +423,16 @@ void AW_GuardTorchDraw(void)
     if(aw_view_torch_emitter && aw_view_torch_emitter(player_flame)){
         for(k=0;k<3;k++)flame_particle(player_flame,k,1,core,16,1,1,0);
         if((rand()&1023)<(int)(host_frametime*6*1024))AW_EmberSpawn(player_flame,.8f,18);
+    }
+    /* a held candle, candlestick or lantern in third person: the flames its placed copy has (HELD-LIGHT-OWN-MODEL-61) */
+    {
+        vec3_t at[AW_HELD_FLAMES];const aw_held_light_t *own=aw_view_held_flames && aw_held_light_now?aw_held_light_now():NULL;
+        int n=own?aw_view_held_flames(at):0;
+        for(i=0;i<n && i<own->flames;i++){
+            float shape[4];
+            shape[0]=own->flame[i][3];shape[1]=own->flame[i][4];shape[2]=own->flame[i][5];shape[3]=own->flame[i][6];
+            AW_HeldFlameDraw(at[i],shape,0);
+        }
     }
     for(i=0;i<visible_count;i++){
         if(!guards[i].active)continue;
@@ -453,6 +471,22 @@ const float aw_static_flame_offsets[STATIC_FLAME_PARTS][2]={
     {0.559622347f,0.729913831f},
     {-0.698827982f,-0.123603635f},
     {0.421530217f,-0.268152744f}};
+/* HELD-LIGHT-OWN-MODEL-61: a held light's flame drawn as AW_StaticFlamesDraw draws a placed one of the same shape
+ * (SIZE, PARTICLE, RISE, SPREAD: the aw_flame row's aw_flame_size and aw_flame_shape) */
+void AW_HeldFlameDraw(const vec3_t origin,const float shape[4],int view)
+{
+    int k,core;vec3_t at;float scale=shape[0];
+    if(!flame_pixels || !vid.buffer || (!view && (!d_pzbuffer || d_zwidth<vid.width)))return;
+    core=AW_TorchFlameCoreColor();flame_view=view!=0;
+    if(shape[1]>0){
+        for(k=0;k<STATIC_FLAME_PARTS;k++){
+            VectorCopy(origin,at);
+            at[0]+=shape[3]*aw_static_flame_offsets[k][0];at[1]+=shape[3]*aw_static_flame_offsets[k][1];
+            flame_particle(at,k,(shape[1]>scale*1.5f?shape[1]:scale*1.5f)/1.5f,core,64,shape[2]/2.7f,2,96);
+        }
+    }else for(k=0;k<3;k++)flame_particle(origin,k,scale,core,48,scale<2.5f?scale:2.5f,2,96);
+    flame_view=0;
+}
 static aw_static_flame_t static_flames[STATIC_FLAME_MAX];
 static int static_flame_count;
 static model_t *static_flame_world;
@@ -582,6 +616,8 @@ static int flame_depth_limit(void)
     int i,limit=32767;vec3_t delta,player;const aw_static_flame_t *f;
     if(!flame_pixels)return limit;
     if(aw_view_torch_emitter && aw_view_torch_emitter(player))limit=flame_limit(player,4.2f,limit);
+    {vec3_t at[AW_HELD_FLAMES];int n=aw_view_held_flames && aw_held_light_now && aw_held_light_now()?aw_view_held_flames(at):0;
+     for(i=0;i<n;i++)limit=flame_limit(at[i],4.2f,limit);}
     for(i=0;i<visible_count;i++)if(guards[i].active)limit=flame_limit(guards[i].flame,4.2f,limit);
     if(aw_static_flames.value && cl.worldmodel && (r_campfires || !R_SkyExterior())){
         /* Not read yet for this map (AW_StaticFlamesDraw reads it): unknown

@@ -414,6 +414,18 @@ void AW_NoclipDebugVelocity(vec3_t view,usercmd_t *cmd,float maximum,
 int AW_DebugOverlaysEnabled(void);
 void AW_FpsCorner(void);	/* aw_hud.c: the FPS counter, bottom-left corner of the screen */
 void AW_FpsDraw(void);		/* aw_hud.c: dbg fps, every view (HUD-FPS-NEEDS-DBG-HUD-56) */
+/* The gameplay recorder (aw_recorder.c, GAME-RECORDER-61, docs/GAME_RECORDER.md): dbg recorder arms it, Ctrl+R records
+ * from a save taken at the start, dbg recorder play FILE replays. Off: one test per hook and frame. */
+void AW_RecorderInit(void);
+int AW_RecorderActive(void);		/* recording or playing back (starting included) */
+void AW_RecorderFrame(void);		/* host.c, after Host_FilterTime: the frame's length (kept or replayed) */
+void AW_RecorderInput(void);		/* host.c, after the input and the remote poll: a replay's keys and lines */
+int AW_RecorderKey(int key,int down);	/* keys.c Key_Event first: 1 = taken (Ctrl+R, a replay's live keys) */
+void AW_RecorderLine(const char *text);	/* aw_remote.c: a remote command file's text, kept with its frame */
+void AW_RecorderMove(usercmd_t *cmd);	/* cl_main.c CL_SendCmd after IN_Move: the move and view kept or replayed */
+const char *AW_RecorderSuffix(void);	/* " (RECORDING)", " (PLAYBACK)" or "" */
+int AW_RecorderLineShown(void);		/* the pixels the recorder's lines take at the top of the screen (0 none) */
+void AW_RecorderDraw(void);		/* screen.c: the version line with the recorder's state, at the top */
 /* Photo mode (aw_photo.c): dbg photomode / dbg killhud, dbg crosshair. */
 void AW_PhotoInit(void);
 int AW_PhotoModeActive(void);
@@ -555,6 +567,8 @@ extern int (*aw_lamp_gone)(unsigned int reference);
 int ChimChunks_GonePid(unsigned pid,int gone);
 int AW_AreaEffectPids(unsigned reference,unsigned *pids,int most);
 void AW_AreaEffectsApply(void);
+/* the hash the 'F' links name a frame map by: its file stem ("maps/vivec_city-chim.chim" -> "vivec_city-chim") */
+unsigned long AW_AreaMapHash(const char *path);
 int AW_StaticFlamesPick(const aw_static_flame_t *flames,int count,int nearest,int *chosen);
 /* aw_mwhost.c sets it (AW_ObjectDisabled): 1 when the flame's placement was taken or disabled, so its flame is not
  * drawn (aw_guard_torch.c). NULL: every flame burns. */
@@ -567,6 +581,7 @@ int AW_TorchFlameCoreColor(void);
 byte AW_TorchFlameColor(byte original,int texel,float age,int core);
 void AW_TorchUpdate(void);
 void AW_TorchDraw(void);
+void AW_HeldLightDraw(void);   /* aw_torch.h: a held light's first-person flames (HELD-LIGHT-OWN-MODEL-61) */
 void AW_TorchLoadAssets(void);
 void AW_TorchViewModel(void);
 int AW_TorchFrame(void);
@@ -583,6 +598,8 @@ int AW_ModalWorldFrozen(void);
 extern int (*aw_death_prompt_active)(void); /* aw_view: finished death animation, choice still open */
 int AW_ModalWorldHidden(void);
 extern int (*aw_menu_fullscreen)(void);   /* aw_menu.c: the full-screen Options panel is open */
+extern int (*aw_ui_dialogue_backdrop)(void);   /* aw_dialwin.c: the dialogue window is open (black backdrop, no HUD) */
+extern int aw_ui_over_window;   /* screen.c: the messages are drawn over a window (aw_ui.c AW_UIDraw) */
 int AW_ModalBlackBackground(void);
 int AW_UIMode(void);
 void AW_SceneCancelTransition(void);
@@ -722,6 +739,7 @@ int AW_NavLoad(const char *);
 int AW_NavStart(edict_t *,vec3_t);
 int AW_NavStep(double,int);
 qboolean AW_ActorStep(edict_t *,vec3_t,double);
+qboolean AW_ActorSettle(edict_t *);   /* aw_walk.c: one stuck search after a failed step, its clear spot kept */
 /* Character animation kit (aw_anim.c, aw_anim.h). */
 void AW_AnimInit(void);
 void AW_AnimKitInit(void);

@@ -59,6 +59,14 @@ static void player_ready(void) {
     assert(AW_AnimPlayerMoveGroup(&a,0,0,0,&rate)==AW_ANIM_IDLE);
     assert(AW_AnimPlayerMoveGroup(&a,20,1,1,&rate)==AW_ANIM_SWIM && rate==1);
     assert(AW_AnimMoveGroup(&a,55,0,&rate)==AW_ANIM_WALK); /* NPC selector unchanged */
+    /* SWIM-BAKED-CLOTHES-60: a body swims on its own layout only with both swim groups (swim without swimidle: no) */
+    assert(!AW_AnimSwims(&a) && !AW_AnimSwims(NULL));
+    {
+        aw_anim_t w;
+        assert(AW_AnimParse(&w,"idle:0:8:0.3 walk:8:4:0.1:30 swim:16:4:0.1:20 swimidle:20:4:0.2",24));
+        assert(AW_AnimSwims(&w));
+        assert(AW_AnimPlayerMoveGroup(&w,0,1,0,&rate)==AW_ANIM_SWIMIDLE && AW_AnimPlayerMoveGroup(&w,20,1,0,&rate)==AW_ANIM_SWIM);
+    }
     memset(&p,0,sizeof(p));p.group=AW_ANIM_IDLE;p.phase=6;p.index=6;
     assert(AW_AnimPlayerAdvance(&a,&p,AW_ANIM_READY,0,1)==31);
     assert(p.phase==3); /* 6/8 normal idle becomes 3/4 ready, not frame zero */

@@ -12,7 +12,18 @@
  * The look (hand glow, cast, bolt, hit) is aw_magic.c's when aw_magic_fx is on.
  *
  * Cost: nothing resident but this file's state (about 0.3 KB); a spell's effects are read from the actor table
- * once when it is selected (one read of its AEFF rows and their AMGE rows); a bolt is one SV_Move a frame. */
+ * once when it is selected (one read of its AEFF rows and their AMGE rows); a bolt is one SV_Move a frame.
+ *
+ * Magic items (v0.0.61; OpenMW 0.51 spellcasting.cpp CastSpell::cast(item), combat.cpp applyOnStrikeEnchantment,
+ * activespells.cpp the equipment's constant effects; docs/MAGIC_EFFECTS.md "Magic items"): the enchantment of an item
+ * is read from the actor table's AENC row by the catalogue's enchantment id (or a made item's own effects), the last
+ * one kept. Cast When Strikes: a weapon blow that hits or is blocked casts it on the victim (the player's weapon and
+ * an NPC's), the charge paid by the Enchant skill; Cast When Used and Cast Once: with an item selected (aw_magic
+ * select ID) and magic ready, the cast button uses it (no success roll; a scroll is used up), Self on the user, Touch
+ * on the actor in reach, Target as a bolt; Constant Effect: a worn item's effects are active while it is worn (the
+ * slot is checked each frame by comparing its id, the item read once when it changes). The charge of the player's
+ * items is saved (AW_ITEM_CHARGE); an NPC weapon's spent charge is kept for the session only (16 weapons). */
+#include <stdlib.h>
 #include <string.h>
 #include "quakedef.h"
 #include "aw_cast.h"
@@ -24,6 +35,7 @@
 #include "aw_ledger.h"
 #include "aw_move.h"
 #include "aw_statswin.h"
+#include "aw_inventory.h"
 
 static int cast_on=1;              /* dbg cast casting on|off */
 #define SCALE .25f                 /* original units -> map units (tools/prepare_quake.py SCALE) */
@@ -37,9 +49,10 @@ static int ready,held,light_set,sel_kind=-1,sel_index=-1;
 static float last_burden,last_feather;
 /* the selected spell, read once */
 static struct {
-    int valid,type,cost,n,school;char name[32];
+    int valid,type,cost,n,school,always;char name[32];
     aw_spell_effect_t e[AW_MADE_EFFECTS];aw_mgef_t m[AW_MADE_EFFECTS];
 } spell;
+static char item_seen[64];         /* the magic item selection last seen (a new one deselects the spell) */
 static float lock_until;
 /* a bolt in flight: TARGET the actor aimed at when it left (edict number, 0 none; the fight's own aim test, as NPCs
  * are not solid to a plain trace), its distance, and how far the bolt has flown */
@@ -61,6 +74,7 @@ static int load_spell(void){
     if(sel_kind==0){
         if(!AW_ActorSpellInfo(sel_index,&spell.type,spell.name,sizeof(spell.name),&spell.cost))return 0;
         spell.n=AW_ActorSpellEffects(sel_index,spell.e,AW_MADE_EFFECTS);
+        spell.always=(AW_ActorSpellFlags(sel_index)&AW_SPELL_ALWAYS)!=0;   /* SPDT "always succeeds" */
     }else{
         const aw_made_spell_t *s=AW_MadeSpellAt(sel_index);
         if(!s)return 0;
@@ -78,6 +92,8 @@ static int load_spell(void){
 void AW_CastSelect(int kind,int index){
     sel_kind=index<0?-1:kind;sel_index=index;
     if(index>=0 && !load_spell()){Con_Printf("Magic: spell %d has no effects in this build.\n",index);sel_index=-1;}
+    /* a spell or a magic item is selected, never both (OpenMW InventoryStore: selecting a spell clears the item) */
+    if(sel_index>=0){AW_MagicClear(&aw_state);item_seen[0]=0;}
 }
 static int power_ready(int row){
     int i;float now=AW_LedgerGameHours();
@@ -99,34 +115,36 @@ float AW_CastChanceNow(void){
                            spell.cost,mult,&school);
     spell.school=school;
     f=AW_CombatPlayerFatigue(&fmax);
-    return AW_CastChance(base,spell.type,sel_kind==0?power_ready(sel_index):1,0,
+    return AW_CastChance(base,spell.type,sel_kind==0?power_ready(sel_index):1,spell.always,
                          AW_EffectsMagnitude(AW_ACTOR_PLAYER_REF,AW_EFFECT_SILENCE,AW_EFFECT_NO_ARG),
                          AW_EffectsMagnitude(AW_ACTOR_PLAYER_REF,AW_EFFECT_SOUND,AW_EFFECT_NO_ARG),
                          AW_CastFatigueTerm(1.25f,0.5f,f,fmax),AW_ActorStat(p,AWA_MAGICKA),spell.cost,0);
 }
 static void say(const char *text){AW_MsgBoxShow(text,NULL,0);}
-static int first_mgef(int range){int i;for(i=0;i<spell.n;i++)if(spell.e[i].range==range)return spell.e[i].effect;return -1;}
+static int first_of(const aw_spell_effect_t *e,int n,int range){int i;for(i=0;i<n;i++)if(e[i].range==range)return e[i].effect;return -1;}
+static int first_mgef(int range){return first_of(spell.e,spell.n,range);}
 static void eye(vec3_t at,vec3_t fwd){
     vec3_t right,up;
     VectorCopy(sv_player->v.origin,at);at[2]+=sv_player->v.view_ofs[2];
     AngleVectors(sv_player->v.v_angle,fwd,right,up);
 }
-static void touch(void){
+static void touch_effects(const aw_spell_effect_t *e,const aw_mgef_t *m,int n,int source){
     float reach=aw_combat_settings.fCombatDistance*SCALE+16;
     edict_t *t=AW_NPCTargetReach(sv_player,sv_player->v.v_angle,reach);
     if(!t){Con_DPrintf("Touch: no actor within %.0f units in front\n",reach);return;}
-    if(AW_MwscriptLand(t,spell.e,spell.m,spell.n,AW_RANGE_TOUCH,sel_kind==0?sel_index:-1)>0)landed++;
+    if(AW_MwscriptLand(t,e,m,n,AW_RANGE_TOUCH,source)>0)landed++;
 }
-static void launch(void){
+static void touch(void){touch_effects(spell.e,spell.m,spell.n,sel_kind==0?sel_index:-1);}
+static void launch_effects(const aw_spell_effect_t *e,const aw_mgef_t *m,int n,int source){
     int i;vec3_t fwd;
     for(i=0;i<BOLTS && bolts[i].used;i++);
     if(i==BOLTS)i=0;   /* the oldest place: at most BOLTS in flight */
     memset(&bolts[i],0,sizeof(bolts[i]));
     eye(bolts[i].at,fwd);
     VectorScale(fwd,BOLT_SPEED_DEFAULT*SCALE,bolts[i].vel);
-    bolts[i].used=1;bolts[i].until=(float)sv.time+BOLT_SECONDS;bolts[i].source=sel_kind==0?sel_index:-1;
-    bolts[i].n=spell.n;
-    {int k;for(k=0;k<spell.n;k++){bolts[i].e[k]=spell.e[k];bolts[i].flags[k]=spell.m[k].flags;}}
+    bolts[i].used=1;bolts[i].until=(float)sv.time+BOLT_SECONDS;bolts[i].source=source;
+    bolts[i].n=n>AW_MADE_EFFECTS?AW_MADE_EFFECTS:n;
+    {int k;for(k=0;k<bolts[i].n;k++){bolts[i].e[k]=e[k];bolts[i].flags[k]=m[k].flags;}}
     {   /* the actor in the line of the cast, within the bolt's whole flight */
         edict_t *t=AW_NPCTargetReach(sv_player,sv_player->v.v_angle,BOLT_SPEED_DEFAULT*SCALE*BOLT_SECONDS);
         if(t && t!=sv_player && GetEdictFieldValue(t,"aw_ref")){
@@ -136,6 +154,7 @@ static void launch(void){
         }
     }
 }
+static void launch(void){launch_effects(spell.e,spell.m,spell.n,sel_kind==0?sel_index:-1);}
 /* the bolt's own Target effects land on T (their records' flags are all the landing reads) */
 static void bolt_land(const bolt_t *b,edict_t *t,int source){
     aw_mgef_t m[AW_MADE_EFFECTS];int k;
@@ -186,6 +205,148 @@ static void bolts_frame(float dt){
         b->used=0;
     }
 }
+/* ---- magic items (v0.0.61) ---- */
+typedef struct {int n,type;float cost,charge;aw_spell_effect_t e[AW_MADE_EFFECTS];aw_mgef_t m[AW_MADE_EFFECTS];} item_magic_t;
+static struct {char id[64];int ok;item_magic_t v;} magic_kept[2];   /* the last two enchantments read, by id */
+static int magic_kept_next;
+static unsigned long item_uses,item_refused,item_strikes,npc_strikes,worn_landed,worn_refused;
+#define ENCHANT_SKILL 9            /* the Enchant skill */
+#define ENCHANT_USE_ITEM 1         /* its uses: Enchant_UseMagicItem, Enchant_CastOnStrike (SKIL SKDT) */
+#define ENCHANT_USE_STRIKE 3
+#define MADE_PREFIX_LEN ((int)sizeof(AW_MADE_ITEM_PREFIX)-1)
+/* IT's enchantment: the game's (its AENC row by the catalogue's enchantment id) or a made item's own (aw_made_N) */
+static int item_magic(const aw_inventory_item_t *it,item_magic_t *out){
+    int i,k;
+    if(!it || !it->enchantment[0] || it->enchant_kind==AW_ENCH_NONE)return 0;
+    for(k=0;k<2;k++)if(magic_kept[k].id[0] && !strcmp(magic_kept[k].id,it->enchantment)){*out=magic_kept[k].v;return magic_kept[k].ok;}
+    memset(out,0,sizeof(*out));
+    if(!strncmp(it->enchantment,AW_MADE_ITEM_PREFIX,MADE_PREFIX_LEN)){
+        const aw_made_item_t *mi=AW_MadeItemAt(atoi(it->enchantment+MADE_PREFIX_LEN));
+        if(!mi)return 0;   /* not kept: the made item may come with a load */
+        out->type=mi->cast_type;out->n=mi->effects>AW_MADE_EFFECTS?AW_MADE_EFFECTS:mi->effects;
+        for(i=0;i<out->n;i++)out->e[i]=mi->effect[i];
+        out->cost=AW_DialwinMadeItemCost(out->e,out->n,out->type==3);if(out->cost<0)out->cost=0;
+        out->charge=mi->charge_max;
+    }else{
+        aw_enchant_t en;int row=AW_ActorEnchantFind(it->enchantment);
+        if(row==AW_ACTOR_NONE || !AW_ActorEnchant(row,&en)){
+            if(AW_ActorEnchantCount())Con_DPrintf("Magic item %s: no enchantment %s in this build.\n",it->id,it->enchantment);
+            return 0;
+        }
+        out->type=en.type;out->n=en.n;out->cost=en.cost;out->charge=en.charge;
+        for(i=0;i<en.n;i++)out->e[i]=en.effect[i];
+    }
+    for(i=0;i<out->n;i++)if(!AW_ActorMagicEffect(out->e[i].effect,&out->m[i]))memset(&out->m[i],0,sizeof(out->m[i]));
+    k=magic_kept_next;magic_kept_next=(magic_kept_next+1)%2;
+    Q_strncpy(magic_kept[k].id,(char *)it->enchantment,sizeof(magic_kept[k].id)-1);magic_kept[k].id[sizeof(magic_kept[k].id)-1]=0;
+    magic_kept[k].v=*out;magic_kept[k].ok=out->n>0;
+    return out->n>0;
+}
+/* OpenMW CastSpell::cast(item) for the player's IT (ENCHANTMENT MG): the charge of a When Used or When Strikes item
+ * by the Enchant skill (refused with the failure sound when too little; god mode free), the skill's use, a Cast Once
+ * item used up; then Self on the player, Touch on TARGET, and Target on TARGET (a strike) or as a bolt (a use, BOLT).
+ * 1 when it was cast. */
+static int item_cast(const aw_inventory_item_t *it,const item_magic_t *mg,edict_t *target,int bolt){
+    aw_actor_t *p=AW_MwscriptPlayerRecord();int god=((int)sv_player->v.flags&FL_GODMODE)!=0,ranges;
+    if(!p)return 0;
+    if(!god && (mg->type==AW_ENCH_STRIKES-1 || mg->type==AW_ENCH_USED-1)){
+        int cost=AW_CastItemCost(mg->cost,AW_ActorStat(p,AWA_SKILL+ENCHANT_SKILL));
+        float now=AW_MagicCharge(&aw_state,it),left=AW_CastItemCharge(now,cost);
+        if(left<0){
+            item_refused++;say("Item does not have enough charge.");   /* sMagicInsufficientCharge */
+            AW_MagicCastLook(mg->e[0].effect,mg->e[0].range,1,0);
+            Con_DPrintf("Magic item %s: charge %.1f, a use takes %d\n",it->name,now,cost);
+            return 0;
+        }
+        AW_MagicSetCharge(&aw_state,it,left);
+        Con_DPrintf("Magic item %s: charge %.1f -> %.1f of %.0f (cost %d)\n",it->name,now,left,it->charge_max,cost);
+    }
+    if(mg->type==AW_ENCH_USED-1)AW_LevelupUse(ENCHANT_SKILL,ENCHANT_USE_ITEM,1);
+    else if(mg->type==AW_ENCH_STRIKES-1)AW_LevelupUse(ENCHANT_SKILL,ENCHANT_USE_STRIKE,1);
+    else if(mg->type==AW_ENCH_ONCE-1 && !god)AW_ItemAdd(&aw_state,it->id,-1);   /* a scroll is gone */
+    ranges=AW_CastRanges(mg->e,mg->n);
+    if(ranges&(1<<AW_RANGE_SELF)){
+        if(AW_MwscriptLand(NULL,mg->e,mg->m,mg->n,AW_RANGE_SELF,AW_EFFECT_SOURCE_ITEM)>0)landed++;
+        if(bolt)AW_MagicCastLook(first_of(mg->e,mg->n,AW_RANGE_SELF),AW_RANGE_SELF,0,0);
+    }
+    if(ranges&(1<<AW_RANGE_TOUCH)){
+        if(target){if(AW_MwscriptLand(target,mg->e,mg->m,mg->n,AW_RANGE_TOUCH,AW_EFFECT_SOURCE_ITEM)>0)landed++;}
+        else if(bolt)touch_effects(mg->e,mg->m,mg->n,AW_EFFECT_SOURCE_ITEM);
+        if(bolt)AW_MagicCastLook(first_of(mg->e,mg->n,AW_RANGE_TOUCH),AW_RANGE_TOUCH,0,0);
+    }
+    if(ranges&(1<<AW_RANGE_TARGET)){
+        if(bolt){launch_effects(mg->e,mg->m,mg->n,AW_EFFECT_SOURCE_ITEM);AW_MagicCastLook(first_of(mg->e,mg->n,AW_RANGE_TARGET),AW_RANGE_TARGET,0,0);}
+        else if(target && AW_MwscriptLand(target,mg->e,mg->m,mg->n,AW_RANGE_TARGET,AW_EFFECT_SOURCE_ITEM)>0)landed++;
+    }
+    return 1;
+}
+/* Cast When Used / Cast Once: the selected item, with magic ready (the cast button) or dbg cast now */
+static void use_item(const aw_inventory_item_t *it){
+    item_magic_t mg;
+    if(it->enchant_kind!=AW_ENCH_USED && it->enchant_kind!=AW_ENCH_ONCE)return;
+    if(!item_magic(it,&mg)){say("This item has no effect in this build.");return;}
+    lock_until=(float)sv.time+CAST_SECONDS;
+    if(item_cast(it,&mg,NULL,1)){item_uses++;Con_DPrintf("Used %s (%s)\n",it->name,it->enchant_kind==AW_ENCH_ONCE?"cast once":"when used");}
+}
+/* WEAPON-STRIKE-ENCHANT-NOT-CAST-61 (aw_combat.h aw_combat_strike_enchant): a blow of ATTACKER reached VICTIM */
+#define NPC_CHARGES 16
+static struct {uint32_t ref;int item;float charge;} npc_charge[NPC_CHARGES];static int npc_charge_next;
+static void strike_enchant(edict_t *attacker,edict_t *victim){
+    if(!cast_on || !sv.active || !sv_player || !attacker || !victim)return;
+    if(attacker==sv_player){
+        aw_inventory_item_t it;item_magic_t mg;
+        if(!AW_InventoryEquippedItem(AW_SLOT_RIGHT,&it) || it.enchant_kind!=AW_ENCH_STRIKES || !item_magic(&it,&mg) ||
+           mg.type!=AW_ENCH_STRIKES-1)return;
+        if(item_cast(&it,&mg,victim,0))item_strikes++;
+        return;
+    }
+    {   /* an NPC's or a creature's weapon (its actor table row's held weapon): its charge kept for the session */
+        aw_actor_t *a;int row,item=-1,ench,k,god=((int)sv_player->v.flags&FL_GODMODE)!=0,cost;aw_enchant_t en;item_magic_t mg;
+        if(!(a=AW_MwscriptActorOf(attacker,&row)) || row==AW_ACTOR_NONE)return;
+        if((ench=AW_ActorWeaponEnchant(row,&item))==AW_ACTOR_NONE || !AW_ActorEnchant(ench,&en) || en.type!=AW_ENCH_STRIKES-1)return;
+        memset(&mg,0,sizeof(mg));mg.n=en.n;
+        for(k=0;k<en.n;k++){mg.e[k]=en.effect[k];if(!AW_ActorMagicEffect(en.effect[k].effect,&mg.m[k]))memset(&mg.m[k],0,sizeof(mg.m[k]));}
+        cost=AW_CastItemCost(en.cost,AW_ActorStat(a,AWA_SKILL+ENCHANT_SKILL));
+        for(k=0;k<NPC_CHARGES && !(npc_charge[k].ref==a->reference && npc_charge[k].item==item);k++);
+        if(k==NPC_CHARGES){k=npc_charge_next;npc_charge_next=(npc_charge_next+1)%NPC_CHARGES;
+                           npc_charge[k].ref=a->reference;npc_charge[k].item=item;npc_charge[k].charge=en.charge;}
+        if(AW_CastItemCharge(npc_charge[k].charge,cost)<0){Con_DPrintf("Strike: the weapon's charge is spent\n");return;}
+        npc_charge[k].charge-=(float)cost;
+        npc_strikes++;
+        /* OpenMW CastSpell::cast(item): Self on the attacker, Touch and Target on the victim (god mode: the player
+         * takes no harm from it, as from the blow) */
+        AW_MwscriptLand(attacker,mg.e,mg.m,mg.n,AW_RANGE_SELF,AW_EFFECT_SOURCE_ITEM);
+        if(victim==sv_player && god)return;
+        AW_MwscriptLand(victim,mg.e,mg.m,mg.n,AW_RANGE_TOUCH,AW_EFFECT_SOURCE_ITEM);
+        AW_MwscriptLand(victim,mg.e,mg.m,mg.n,AW_RANGE_TARGET,AW_EFFECT_SOURCE_ITEM);
+    }
+}
+/* Constant Effect: each equipment slot's worn item; a changed slot's effects go (undone) and the new item's land, each
+ * magnitude rolled once (OpenMW ActiveSpells::update, Flag_Equipment). After a load or a reset every slot again. */
+static char worn_id[AW_INVENTORY_SLOTS][64];static unsigned long worn_generation;
+static void worn_frame(void){
+    int s,k;aw_actor_t *p=NULL;int all=AW_EffectsGeneration()!=worn_generation;
+    for(s=0;s<AW_INVENTORY_SLOTS;s++){
+        const char *id=aw_state.inventory.equipped[s];aw_inventory_item_t it;item_magic_t mg;
+        if(id[0] && AW_StateGet(&aw_state,AW_ITEM,id)<1)id="";
+        if(!all && !strcmp(worn_id[s],id))continue;
+        if(!p && !(p=AW_MwscriptPlayerRecord()))return;
+        AW_EffectsRemoveSource(p,AW_EFFECT_SOURCE_CONSTANT+s);
+        Q_strncpy(worn_id[s],(char *)id,sizeof(worn_id[s])-1);worn_id[s][sizeof(worn_id[s])-1]=0;
+        if(!id[0] || !AW_InventoryRead(id,&it) || it.enchant_kind!=AW_ENCH_CONSTANT || !item_magic(&it,&mg) ||
+           mg.type!=AW_ENCH_CONSTANT-1)continue;
+        for(k=0;k<mg.n;k++){
+            float mag=mg.m[k].flags&AW_MGEF_NO_MAGNITUDE?1:AW_CastMagnitude(mg.e[k].magnitude_min,mg.e[k].magnitude_max,
+                                                                              (float)(rand()&32767)/32768.0f);
+            int arg=mg.e[k].attribute>=0?mg.e[k].attribute:mg.e[k].skill>=0?mg.e[k].skill:AW_EFFECT_NO_ARG;
+            if(AW_EffectsLand(p,mg.e[k].effect,arg,mag,AW_EFFECT_CONSTANT,AW_EFFECT_SOURCE_CONSTANT+s))worn_landed++;
+            else worn_refused++;
+        }
+        Con_DPrintf("Worn %s: %d constant effects\n",it.name,mg.n);
+    }
+    worn_generation=AW_EffectsGeneration();
+    if(p)AW_MwscriptPlayerStore(p);
+}
 static void cast_now(void){
     float chance;int roll,ranges,god;aw_actor_t *p;
     if(!cast_on || !sv.active || !sv_player || sv_player->v.health<=0)return;
@@ -193,7 +354,11 @@ static void cast_now(void){
      * in game 6 November 2026: after a teleport across maps no cast went off for minutes) */
     if(lock_until>(float)sv.time+CAST_SECONDS)lock_until=0;
     if(sv.time<lock_until)return;
-    if(sel_index<0 || !spell.valid){say("You have no spell selected.");return;}
+    if(sel_index<0 || !spell.valid){
+        aw_inventory_item_t it;
+        if(AW_MagicSelectedItem(&it)){use_item(&it);return;}   /* Cast When Used / Cast Once (v0.0.61) */
+        say("You have no spell selected.");return;
+    }
     if(!(p=AW_MwscriptPlayerRecord())){Con_Printf("Casting: no player record in this build.\n");return;}
     lock_until=(float)sv.time+CAST_SECONDS;
     /* god mode (Quake's, dbg god on): no magicka paid and the cast always succeeds (OpenMW startSpellCast and
@@ -261,8 +426,15 @@ static int window_status(char *out,int size){
 void AW_CastFrame(void){
     edict_t *p=sv_player;
     aw_magic_castables=window_castables;aw_magic_select=window_select;aw_magic_status=window_status;
+    aw_combat_strike_enchant=strike_enchant;
     if(!sv.active || !p || p->free)return;
     bolts_frame((float)host_frametime);
+    /* a magic item newly selected (aw_magic select ID) deselects the spell */
+    if(strcmp(item_seen,aw_state.magic.selected)){
+        Q_strncpy(item_seen,aw_state.magic.selected,sizeof(item_seen)-1);item_seen[sizeof(item_seen)-1]=0;
+        if(item_seen[0] && sel_index>=0){sel_kind=-1;sel_index=-1;memset(&spell,0,sizeof(spell));}
+    }
+    if(cast_on)worn_frame();
     /* Light on the player: Quake's own entity light (EF_DIMLIGHT, the client's dynamic light) while the effect lasts
      * (OpenMW: a light attached to the actor while its Light magnitude is above 0); only the bit set here is cleared */
     if(AW_EffectsMagnitude(AW_ACTOR_PLAYER_REF,AW_EFFECT_LIGHT,AW_EFFECT_NO_ARG)>0){
@@ -293,7 +465,7 @@ static void ready_command(void){
     ready=!ready;
     /* the hands come up as for a fight, and go down with the magic */
     if((goal=GetEdictFieldValue(sv_player,"aw_hand_goal"))!=NULL)goal->_float=ready?1:0;
-    if(ready && sel_index<0)say("You have no spell selected.");
+    if(ready && sel_index<0 && !aw_state.magic.selected[0])say("You have no spell selected.");
     Con_DPrintf("Magic %s.\n",ready?"ready":"lowered");
 }
 /* the words after "spell": Cmd_Argv(A) is the first */
@@ -307,6 +479,28 @@ static void spell_command(int A){
         for(i=0;i<AW_MadeSpellCount();i++)Con_Printf(" m%d %s (made)%s\n",i,AW_MadeSpellAt(i)->name,sel_kind==1 && sel_index==i?" *":"");
         if(spell.valid)Con_Printf("Selected: %s, cost %d, chance %.0f %%; %lu cast, %lu failed, %lu refused, %lu landed\n",
                                   spell.name,spell.cost,AW_CastChanceNow(),casts,fails,refused,landed);
+        {aw_inventory_item_t it;
+         if(AW_MagicSelectedItem(&it))Con_Printf("Selected item: %s, charge %.1f of %.0f\n",it.name,AW_MagicCharge(&aw_state,&it),it.charge_max);
+         if(AW_InventoryEquippedItem(AW_SLOT_RIGHT,&it) && it.enchant_kind!=AW_ENCH_NONE)
+             Con_Printf("Weapon: %s, charge %.1f of %.0f\n",it.name,AW_MagicCharge(&aw_state,&it),it.charge_max);}
+        Con_Printf("Magic items: %lu used, %lu refused, %lu of your strikes cast, %lu NPC strikes cast; worn: %lu effects on, %lu refused\n",
+                   item_uses,item_refused,item_strikes,npc_strikes,worn_landed,worn_refused);
+        {   /* the player's active effects now: effect number, its attribute or skill, magnitude, seconds left (worn:
+             * the slot of the item it comes with) */
+            aw_effect_info_t e;int k;aw_actor_t *r=AW_MwscriptPlayerRecord();
+            for(k=0;AW_EffectsAt(k,&e);k++){
+                if(e.owner!=AW_ACTOR_PLAYER_REF)continue;
+                if(e.source>=AW_EFFECT_SOURCE_CONSTANT)Con_Printf(" effect %d arg %d magnitude %.0f worn (slot %d)\n",e.effect,e.arg,e.magnitude,
+                                                                  e.source-AW_EFFECT_SOURCE_CONSTANT);
+                else Con_Printf(" effect %d arg %d magnitude %.0f %.0f s left%s\n",e.effect,e.arg,e.magnitude,e.left,
+                                e.source>=AW_EFFECT_SOURCE_ITEM?" (an item's)":"");
+            }
+            if(r)Con_Printf("Attributes %.0f %.0f %.0f %.0f %.0f %.0f %.0f %.0f; health %.0f/%.0f magicka %.0f/%.0f\n",
+                            AW_ActorStat(r,AWA_ATTRIBUTE),AW_ActorStat(r,AWA_ATTRIBUTE+1),AW_ActorStat(r,AWA_ATTRIBUTE+2),
+                            AW_ActorStat(r,AWA_ATTRIBUTE+3),AW_ActorStat(r,AWA_ATTRIBUTE+4),AW_ActorStat(r,AWA_ATTRIBUTE+5),
+                            AW_ActorStat(r,AWA_ATTRIBUTE+6),AW_ActorStat(r,AWA_ATTRIBUTE+7),r->dyn_cur[0],r->dyn_base[0],
+                            r->dyn_cur[1],r->dyn_base[1]);
+        }
         return;
     }
     if(!Q_strcasecmp(ARG(0),"none")){AW_CastSelect(0,-1);return;}
@@ -333,6 +527,16 @@ int AW_CastCommand(void){
     if(!Q_strcasecmp((char *)w,"ready")){ready_command();return 1;}
     if(!Q_strcasecmp((char *)w,"spell")){spell_command(2);return 1;}
     if(!Q_strcasecmp((char *)w,"now")){cast_now();return 1;}
+    if(!Q_strcasecmp((char *)w,"start")){AW_MwscriptStartSpellsReport();return 1;}   /* the starting spells chosen */
+    if(!Q_strcasecmp((char *)w,"strike")){   /* for tests: the held weapon's blow lands on the actor in reach */
+        edict_t *t;
+        if(!sv.active || !sv_player){Con_Printf("Strike: no game.\n");return 1;}
+        t=AW_NPCTargetReach(sv_player,sv_player->v.v_angle,aw_combat_settings.fCombatDistance*SCALE+16);
+        if(!t){Con_Printf("Strike: no actor in reach.\n");return 1;}
+        strike_enchant(sv_player,t);
+        Con_Printf("Strike on %s: %lu of your strikes cast.\n",t->v.netname?pr_strings+t->v.netname:"an actor",item_strikes);
+        return 1;
+    }
     if(!Q_strcasecmp((char *)w,"casting")){
         if(Cmd_Argc()>=3)cast_on=Q_strcasecmp(Cmd_Argv(2),"off") && strcmp(Cmd_Argv(2),"0");
         if(!cast_on){ready=0;held=0;}

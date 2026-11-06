@@ -93,6 +93,10 @@ static const model_t *cell_model;
 static char cell_map[64];
 static long cell_number;
 static char cell_id[64];
+/* REST-CENSUS-NO-CELL-ID-61: a value longer than the token (a room's light grid rows, _aw_lightgrid0.., about 980
+ * bytes) is read to its end and kept cut, so the keys after it are still found; the reading used to stop there, and
+ * the compiled rooms (the Census and Excise Office, the prison ship), whose cell keys come after the light grid,
+ * had no cell: the rest window offered Rest where the game data says no sleeping. */
 static char *cell_token(char *data,char *token,int capacity) {
     int n=0;
     if(!data)return NULL;
@@ -101,7 +105,7 @@ static char *cell_token(char *data,char *token,int capacity) {
     if(*data=='{' || *data=='}'){token[0]=*data++;token[1]=0;return data;}
     if(*data!='"')return NULL;
     data++;
-    while(*data && *data!='"'){if(n>=capacity-1)return NULL;token[n++]=*data++;}
+    while(*data && *data!='"'){if(n<capacity-1)token[n++]=*data;data++;}
     if(*data!='"')return NULL;
     token[n]=0;return data+1;
 }
@@ -315,18 +319,22 @@ void AW_FpsDraw(void) {
 void Sbar_Draw(void) {
     char title[128];const char *region;int limit,width=hud_type.value==1?8:4,slots,lift;
     if(key_dest==key_console)return;
-    AW_UIHud();
-    compass();
-    AW_NpcLodDrawLabels();
+    /* DIALOGUE-BACKDROP-HUD-60: the dialogue screen stands on plain black: no status bars, compass or names behind it
+     * (the debug lines below stay for checks) */
+    if(!(aw_ui_dialogue_backdrop && aw_ui_dialogue_backdrop())){
+        AW_UIHud();
+        compass();
+        AW_NpcLodDrawLabels();
+    }
     /* Its strip replaces the bottom HUD. Photo mode hides it like everything
      * else over the view; Ctrl+H (dbg hud) brings it back with the debug HUD.
      * Its keys keep working while hidden (AW_WaitKey). */
     if((!AW_PhotoModeActive() || AW_DebugOverlaysEnabled()) && AW_LightGalleryDraw())return;
     if(!AW_DebugOverlaysEnabled())return;
     if(current_region(&region))
-        snprintf(title,sizeof(title),"AmiWind v" AMIWIND_VERSION " Vvardenfell / %s",region?region:"Region unavailable");
+        snprintf(title,sizeof(title),"AmiWind v" AMIWIND_VERSION "%s Vvardenfell / %s",AW_RecorderSuffix(),region?region:"Region unavailable");
     else
-        snprintf(title,sizeof(title),"AmiWind v" AMIWIND_VERSION " / %s",cl.levelname[0]?cl.levelname:"Location unavailable");
+        snprintf(title,sizeof(title),"AmiWind v" AMIWIND_VERSION "%s / %s",AW_RecorderSuffix(),cl.levelname[0]?cl.levelname:"Location unavailable");
     limit=(vid.width-16)/width;if(limit<0)limit=0;if(limit>127)limit=127;
     if((int)strlen(title)>limit){title[limit]=0;if(limit>=3)memcpy(title+limit-3,"...",3);}
     /* HUD-NOTIFY-OVERLAP-31: the title sits under the view (never over it or over
@@ -334,7 +342,7 @@ void Sbar_Draw(void) {
     lift=AW_InspectHudLift();
     slots=strip_slots(lift);
     if(slots){strip_text(8,vid.height-HUD_LINE_BOTTOM-lift,title,width);scr_copyeverything=1;}
-    else strip_text(8,8,title,width);
+    else strip_text(8,8+AW_RecorderLineShown(),title,width);   /* below the recorder's line (GAME-RECORDER-61) */
     inspect_lines(lift);
     if(AW_DebugCoordsEnabled() && cls.state==ca_connected && cl.viewentity>0 && cl.viewentity<MAX_EDICTS) {
         char line[80],second[80],extra[80],clock[16];vec_t *p=cl_entities[cl.viewentity].origin;vec3_t global;

@@ -21,7 +21,10 @@ OPAQUE={'.cfg','.dat','.json','.lip','.rc','.tsv','.txt','.wav','.awc','.awj','.
         '.cwi','.ccs','.crm',
         # residents' recipe tables (tools/npc_recipes.py, BUILD-NPC-RECIPES-PER-CELL-59): a place's table, the cells'
         # pack and the resident directory; id hashes, indices and names, no pixels
-        '.awnb','.awnp','.awnd'}
+        '.awnb','.awnp','.awnd',
+        # a carried light's held place and flame points beside its item model (tools/held_lights.py,
+        # HELD-LIGHT-OWN-MODEL-61): plain ASCII numbers, no pixels
+        '.hld'}
 # Every extension spans() parses as indexed pixels or metadata (besides OPAQUE and the named files below).
 # .awk: a shared actor skin (tools/payload_share.py): indexed pixels only; a model that points to one carries no
 # pixels of its own (skin type AWSK, IMAGE-ACTOR-SKIN-REPEATS-46).

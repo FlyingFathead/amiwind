@@ -1,6 +1,6 @@
 # Carried torch
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.61-dev3 (2026-11-06)._
 
 <!-- contents start -->
 ## Contents
@@ -39,6 +39,11 @@ _Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 - [Final-release gates added after dev4 playtesting](#final-release-gates-added-after-dev4-playtesting)
 
 <!-- contents end -->
+
+This page is the record of the carried torch from v0.0.29 to v0.0.42; its acceptance notes are kept as written. Since
+v0.0.61 a held candle, candlestick or lantern is drawn and lit as itself in the same hand, with the torch unchanged, and a
+lit light that is taken takes its flame with it: see [Light sources](LIGHT_SOURCES.md), "Lights that can be taken and
+held", and [Inventory](INVENTORY.md), "World models".
 
 ## Appearance acceptance: 2026-10-06T20:06:10+03:00
 

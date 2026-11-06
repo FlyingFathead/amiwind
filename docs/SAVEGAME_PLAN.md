@@ -1,6 +1,6 @@
 # Save/load milestone: compact state and a manageable save list
 
-_Last updated with AmiWind v0.0.59-dev5 (3 November 2026)._
+_Last updated with AmiWind v0.0.61-dev3 (2026-11-06)._
 
 <!-- contents start -->
 ## Contents
@@ -12,6 +12,7 @@ _Last updated with AmiWind v0.0.59-dev5 (3 November 2026)._
 - [Planned: importing original and OpenMW saves](#planned-importing-original-and-openmw-saves)
 - [Actors in rooms and their packages (v0.0.57)](#actors-in-rooms-and-their-packages-v0057)
 - [The world change list (v0.0.59)](#the-world-change-list-v0059)
+- [Magic, items and effects in saved games (v0.0.61)](#magic-items-and-effects-in-saved-games-v0061)
 - [References inspected](#references-inspected)
 
 <!-- contents end -->
@@ -320,6 +321,19 @@ actor table is off by default), so the levelled case is checked by the native te
 Not yet: corpses are not cleared away after fCorpseClearDelay (a body stays until it respawns or a script removes
 it), and the actor block's other parts (spell effects, soul gems, packages) are taken over as saved. The save import
 above builds on this list.
+
+## Magic, items and effects in saved games (v0.0.61)
+
+- **Active spell effects** are kept in a block of their own (older saves still load). Every effect applied to an actor
+  by reference is kept with its time left; the player's constant-effect items are set again from what is worn after a
+  load. In v0.0.61-dev2 the block was read at the wrong size, so a save made with an effect active lost the effects,
+  and the made spells, enchanted items, soul gems and the other blocks stored after them, when it was loaded; it is read
+  at its real size since v0.0.61-dev3 (`SAVE-EFFECTS-BLOCK-SIZE-61`).
+- **Items.** The item table has no fixed number of kinds: it grows in blocks of 32 rows. A save with more than 32 kinds
+  sets a feature bit (512) that older versions refuse rather than lose items; saves of the earlier 128-kind table
+  (feature bit 256) still load. The player's items keep their condition and charge, and recharge over time; an NPC
+  weapon's charge is kept for the session only.
+- **Starting spells** are chosen once, when the character is made, and kept with the character.
 
 ## References inspected
 

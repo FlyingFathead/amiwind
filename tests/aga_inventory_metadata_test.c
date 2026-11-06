@@ -67,6 +67,11 @@ int main(void){
         u32(row+504,0);assert(!AW_InventoryRead("fixture_sword",&out));
         u32(row+504,(unsigned)-2);assert(!AW_InventoryRead("fixture_sword",&out));u32(row+504,(unsigned)AW_LIGHT_INFINITE);
         row[511]=1;assert(!AW_InventoryRead("fixture_sword",&out));row[511]=0;
+        /* byte 511 (HELD-LIGHT-OWN-MODEL-61): 0 (older catalogue) or 0x80 | flicker 1 | fire 2; anything else refused */
+        assert(AW_InventoryRead("fixture_sword",&out) && out.light_flags==0);
+        row[511]=AW_LIGHT_FLAGS_SET|AW_LIGHT_FIRE;
+        assert(AW_InventoryRead("fixture_sword",&out) && out.light_flags==(AW_LIGHT_FLAGS_SET|AW_LIGHT_FIRE));
+        row[511]=AW_LIGHT_FLAGS_SET|4;assert(!AW_InventoryRead("fixture_sword",&out));row[511]=0;
         u32(row+164,0);assert(!AW_InventoryRead("fixture_sword",&out));u32(row+164,256);
         u32(row+160,AW_INV_WEAPON);assert(!AW_InventoryRead("fixture_sword",&out));u32(row+160,AW_INV_MISC);
         u32(row+180,AW_INV_EQUIP|AW_INV_EQUIP_SUPPORTED);assert(!AW_InventoryRead("fixture_sword",&out)); /* tail without the flag */

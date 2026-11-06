@@ -44,6 +44,13 @@ int AW_HandItemPath(const char *path);
 extern int (*aw_hand_weapon_item)(int *weapon,char model[64]);
 /* After the hands are drawn: 1 with cl.viewent set to the equipped weapon on its tag for this frame. */
 int AW_HandWeaponItemApply(void);
+/* HELD-LIGHT-OWN-MODEL-61: the arms from parts' light stance (the first-person table's eighth group, 'light': the bare
+ * hands with the left arm on the original's torch group; tools/prepare_player_fp_parts.py LIGHT_STANCE), and after the
+ * arms are drawn, 1 with cl.viewent set to the held light's own model on their shield bone for this frame. */
+#define AW_HAND_LIGHT_STANCE 7
+#define AW_HAND_LIGHT_FORWARD 4.0f   /* the torch arms' view offset (tools/prepare_torch.py VIEW_OFFSET) */
+int AW_HandLightItemApply(void);
+extern int (*aw_hand_parts_shield_tag)(float tag[6]);
 /* The first-person hand clips (FIRST-PERSON-HANDS-IN-C-54): the builder writes them to gfx/hand-anims.txt in the image
  * (tools/hand_metadata.py hand_table; read by aw_hands.c), never into a map's worldspawn or the QuakeC, so a change to the hands rebuilds
  * the image only. Text: "AWHA1", then "clip NAME FIRST COUNT DURATION" for idle, draw, lower and punch (frames of the

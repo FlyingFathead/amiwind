@@ -1,6 +1,6 @@
 # Resting and waiting
 
-_Last updated with AmiWind v0.0.59-dev5 (2 November 2026)._
+_Last updated with AmiWind v0.0.61-dev3 (2026-11-06)._
 
 Since v0.0.59 the T key and the game's beds work as in the original game. The rules are the original's, written
 independently; the OpenMW engine (0.51) is the reference used to check them. Every number and every line on screen
@@ -43,6 +43,10 @@ uneven, but not in water or with enemies near.
   solid ground. A bed lifts the air rule, not the water rule.
 - With enemies near: the game's line that you cannot rest with enemies nearby. Both lines can show together.
 - Before your character is registered at the Census Office: nothing opens.
+- In a cell where sleeping is illegal, among them the Census and Excise Office itself (since v0.0.61-dev3): the
+  game's line, and the window offers Wait only.
+
+Not yet seen in game on a numbered build: Until Healed after damage and the interruption of a rest in the wilderness.
 
 ## What the hours do
 

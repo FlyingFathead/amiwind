@@ -209,7 +209,7 @@ static int CaptureInto (chim_statics_t *L, char **data)
 	char *p = *data, key[64], classname[32], model[MAX_QPATH];
 	vec3_t origin, angles, box[2];
 	float scale = 1;
-	int frame = 0, skin = 0, chunk = -1, has_box = 0, has_origin = 0, tagged = 0, row;
+	int frame = 0, skin = 0, chunk = -1, has_box = 0, has_origin = 0, tagged = 0, row, push = 0;
 	chim_static_t *s;
 
 	if (!L->capacity)
@@ -255,6 +255,8 @@ static int CaptureInto (chim_statics_t *L, char **data)
 			skin = Q_atoi (com_token);
 		else if (!strcmp (key, "aw_scale"))
 			scale = (float)Q_atof (com_token);
+		else if (!strcmp (key, "aw_depth_push"))
+			push = Q_atoi (com_token) == 1;		/* BC-TREE-FLOATING-60: a card whose base stands in a wall */
 		else if (!strcmp (key, "_chim_chunk"))
 		{
 			chunk = Q_atoi (com_token);
@@ -300,7 +302,7 @@ static int CaptureInto (chim_statics_t *L, char **data)
 	s->chunk = (short)chunk;
 	s->frame = (unsigned char)frame;
 	s->skin = (unsigned char)skin;
-	s->flora = !strcmp (classname, "aw_flora");
+	s->flora = !strcmp (classname, "aw_flora") ? (push ? 2 : 1) : 0;	/* render.h aw_flora */
 	L->sorted = 0;
 	*data = p;
 	return 1;

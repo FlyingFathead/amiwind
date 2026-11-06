@@ -2,6 +2,7 @@
 #include "quakedef.h"
 #include "aw_character.h"
 #include "aw_hand_models.h"
+#include "aw_torch.h"
 #include <assert.h>
 #include <stdarg.h>
 client_state_t cl;aw_character_t aw_character;aw_race_t aw_races[16];int aw_race_count;
@@ -15,6 +16,10 @@ void AW_TorchUseHandAssets(int enabled){metadata_active=enabled && metadata_vali
 void AW_TorchReleaseLegacyCache(void){torch_releases++;}
 int AW_TorchFrame(void){return metadata_active?6:2;}
 int AW_TorchEquipped(void){return torch;}
+/* the held light's half in aw_torch.c and the renderer's frame (HELD-LIGHT-OWN-MODEL-61): no held light here */
+int r_framecount;
+int (*aw_hand_held_light)(float origin[3],float angles[3]);
+const aw_held_light_t *AW_HeldLight(void){return NULL;}
 void Con_Printf(char *fmt,...){warnings++;}
 /* The first-person weapon table loads only with an equipped weapon (none here): never reached. */
 int Hunk_LowMark(void){assert(0);return 0;}

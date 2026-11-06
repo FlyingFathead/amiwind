@@ -1249,6 +1249,41 @@ int main(void){
 '''
 
 
+# v0.0.61 (PLAYER-CASTING-59): a worn item's Constant Effect: Fortify Strength (79) applied at once and held whatever
+# the clock does, a Restore Health (75) acting each second it is worn, both through a save; taken off (its source
+# removed) the fortify is undone; a constant effect needs an item source; the generation moves with a load.
+EFFECT_CONSTANT_HARNESS = r'''
+#include <stdio.h>
+#include <string.h>
+#include "aw_effects.h"
+int main(void){
+    static aw_actor_t p;unsigned char block[1100];int n,ok,i;unsigned long g0,g1;
+    memset(&p,0,sizeof(p));p.reference=AW_ACTOR_PLAYER_REF;p.dyn_base[0]=100;p.dyn_cur[0]=50;
+    AW_EffectsReset();g0=AW_EffectsGeneration();
+    ok=AW_EffectsLand(&p,79,0,10,AW_EFFECT_CONSTANT,AW_EFFECT_SOURCE_CONSTANT+1);
+    ok+=AW_EffectsLand(&p,75,AW_EFFECT_NO_ARG,2,AW_EFFECT_CONSTANT,AW_EFFECT_SOURCE_CONSTANT+1);
+    ok+=AW_EffectsLand(&p,79,0,10,AW_EFFECT_CONSTANT,7);                       /* refused: a spell's source */
+    ok+=AW_EffectsLand(&p,41,AW_EFFECT_NO_ARG,5,3,AW_EFFECT_SOURCE_ITEM);      /* a used item's Light, 3 s */
+    printf("landed %d str %d health %.1f count %d\n",ok,p.attr_mod[0],p.dyn_cur[0],AW_EffectsCount());
+    for(i=0;i<5;i++)AW_EffectsTick(&p,1.0f);
+    printf("after5 str %d health %.1f count %d light %.1f\n",p.attr_mod[0],p.dyn_cur[0],AW_EffectsCount(),
+           AW_EffectsMagnitude(AW_ACTOR_PLAYER_REF,41,AW_EFFECT_NO_ARG));
+    n=AW_EffectsExport(block,sizeof(block));
+    /* SAVE-EFFECTS-BLOCK-SIZE-61: the reader's size of the block, by its version; a cut one refused */
+    {int whole=AW_EffectsBlockBytes(block,(unsigned long)n+40),cut=AW_EffectsBlockBytes(block,(unsigned long)n-1),v1;
+     block[4]=1;v1=AW_EffectsBlockBytes(block,1000);block[4]=2;
+     printf("block %d cut %d v1 %d\n",whole,cut,v1);}
+    ok=AW_EffectsImport(block,n);g1=AW_EffectsGeneration();
+    printf("saved %d %d count %d moved %d\n",n,ok,AW_EffectsCount(),g1!=g0);
+    AW_EffectsTick(&p,1e8f);
+    printf("long str %d count %d\n",p.attr_mod[0],AW_EffectsCount());
+    n=AW_EffectsRemoveSource(&p,AW_EFFECT_SOURCE_CONSTANT+1);
+    printf("off %d str %d count %d none %d\n",n,p.attr_mod[0],AW_EffectsCount(),AW_EffectsRemoveSource(&p,AW_EFFECT_SOURCE_CONSTANT+1));
+    return 0;
+}
+'''
+
+
 CAST_RULES_HARNESS = r'''
 #include <stdio.h>
 #include <string.h>
@@ -1280,6 +1315,70 @@ int main(void){
     return 0;
 }
 '''
+
+
+ITEM_RULES_HARNESS = r'''
+#include <stdio.h>
+#include <string.h>
+#include "aw_cast.h"
+static void spell(aw_start_spell_t *s,int row,int cost,int flags,int effect,int range,int school,float base,int lo,int hi,
+                  int duration,unsigned mflags){
+    memset(s,0,sizeof(*s));s->row=row;s->cost=cost;s->flags=flags;s->n=1;
+    s->e[0].effect=(short)effect;s->e[0].range=(unsigned char)range;s->e[0].skill=5;s->e[0].attribute=-1;
+    s->e[0].magnitude_min=(unsigned short)lo;s->e[0].magnitude_max=(unsigned short)hi;s->e[0].duration=(unsigned short)duration;
+    s->m[0].school=school;s->m[0].base_cost=base;s->m[0].flags=mflags;
+}
+int main(void){
+    aw_start_spell_t s[5];aw_start_settings_t set;float sk[27],at[8];int out[8],n,i,race[1]={12};
+    printf("cost %d %d %d %d\n",AW_CastItemCost(40,10),AW_CastItemCost(40,60),AW_CastItemCost(40,110),AW_CastItemCost(5,5));
+    printf("charge %.1f %.1f %.1f\n",AW_CastItemCharge(30,20),AW_CastItemCharge(20,20),AW_CastItemCharge(19.5f,20));
+    for(i=0;i<27;i++)sk[i]=30;
+    for(i=0;i<8;i++)at[i]=40;
+    spell(&s[0],10,5,2,14,AW_RANGE_TARGET,2,5,2,4,1,0);      /* fire on target, destruction */
+    spell(&s[1],11,8,2,41,AW_RANGE_SELF,0,1,5,5,10,0);       /* light on self, alteration */
+    spell(&s[2],12,3,6,14,AW_RANGE_TOUCH,2,5,1,1,1,0);       /* always succeeds; the race's own */
+    spell(&s[3],13,2,2,83,AW_RANGE_SELF,0,1,5,5,10,1);       /* names skill 5 (30 < 70): refused */
+    spell(&s[4],14,9,2,41,AW_RANGE_SELF,0,1,5,5,10,0);
+    set.magicka_mult=1;set.chance=50;set.max=100;set.skill_min=70;set.cost_mult=0.5f;
+    printf("chance %.2f %.2f %.2f\n",AW_CastStartChance(&s[0],sk,at,0.5f),AW_CastStartChance(&s[1],sk,at,0.5f),
+           AW_CastStartChance(&s[2],sk,at,0.5f));
+    n=AW_CastStartSpells(s,5,&set,sk,at,race,1,out,8);printf("all %d",n);for(i=0;i<n;i++)printf(" %d",out[i]);printf("\n");
+    set.max=2;n=AW_CastStartSpells(s,5,&set,sk,at,race,1,out,8);printf("max2 %d",n);for(i=0;i<n;i++)printf(" %d",out[i]);printf("\n");
+    at[1]=6;set.max=100;n=AW_CastStartSpells(s,5,&set,sk,at,NULL,0,out,8);printf("int6 %d",n);for(i=0;i<n;i++)printf(" %d",out[i]);printf("\n");
+    at[1]=40;sk[10]=5;n=AW_CastStartSpells(s,5,&set,sk,at,NULL,0,out,8);printf("weak %d",n);for(i=0;i<n;i++)printf(" %d",out[i]);printf("\n");
+    return 0;
+}
+'''
+
+
+@unittest.skipIf(os.name == 'nt', 'native fixtures run in the Linux Docker gate')
+@unittest.skipUnless(shutil.which('cc'), 'a Linux C compiler is required')
+class ItemAndStartSpellRuleTests(unittest.TestCase):
+    """v0.0.61 (PLAYER-CASTING-59, PLAYER-START-SPELLS-NOT-KNOWN-61): a magic item's charge per use by the Enchant
+    skill (OpenMW 0.51 spellutil.cpp getEffectiveEnchantmentCastCost) and the starting spells of a new character
+    (autocalcspell.cpp autoCalcPlayerSpells), natively."""
+
+    def test_item_cost_and_starting_spells(self):
+        tmp = Path(tempfile.mkdtemp(prefix='aw-items-'))
+        try:
+            (tmp / 'h.c').write_text(ITEM_RULES_HARNESS, encoding='utf-8')
+            src = ROOT / 'engine/aga/src'
+            built = subprocess.run(['cc', '-std=gnu89', '-Wall', '-Werror', '-Wshadow', '-fsanitize=undefined,address',
+                                    '-fno-sanitize-recover=all', '-I' + str(src), str(tmp / 'h.c'),
+                                    str(src / 'aw_cast_rules.c'), str(src / 'aw_effects.c'), '-lm', '-o', str(tmp / 'h')],
+                                   capture_output=True, text=True)
+            self.assertEqual(built.returncode, 0, built.stdout + built.stderr)
+            out = subprocess.run([str(tmp / 'h')], capture_output=True, text=True, check=True).stdout.splitlines()
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+        # cost 40 at Enchant 10, 60 (half off), 110 (none left: at least 1), 5 at Enchant 5 (5.25: a little more);
+        # a charge of 20 pays a 20 use, 19.5 does not
+        # the fire bolt: 2 x 30 - 5 + 0.2 x 40 + 0.1 x 40 = 67; the light 64; always succeeds 100
+        # all: the race's own and the one naming a skill under 70 left out; past 2 the cheapest (fire, 5) gives way to
+        # the next one dearer than it; with Intelligence 6 only the spells of cost 6 or less (fire 5; the always one 3
+        # now that no race excludes it); Destruction 5: the fire bolt's chance is 17, under 50
+        self.assertEqual(out, ['cost 40 20 1 5', 'charge 10.0 0.0 -1.0', 'chance 67.00 64.00 100.00',
+                               'all 3 10 11 14', 'max2 2 11 14', 'int6 2 10 12', 'weak 3 11 12 14'])
 
 
 @unittest.skipIf(os.name == 'nt', 'native fixtures run in the Linux Docker gate')
@@ -1349,6 +1448,27 @@ class EffectTests(unittest.TestCase):
         # 25 + 15 while both last; the 3-second one ends; the weakness holds 5 s; neither touches health
         # a creature has no skills: Fortify Skill on it changes nothing, nor undoes anything at its end
         self.assertEqual(out, ['now 40.0 20.0 0.0', 'after4 25.0 20.0 health 60.0', 'creature 0 10', 'creature after 0 0'])
+
+    def test_constant_effects_of_worn_items(self):
+        tmp = Path(tempfile.mkdtemp(prefix='aw-effects4-'))
+        try:
+            (tmp / 'h.c').write_text(EFFECT_CONSTANT_HARNESS, encoding='utf-8')
+            src = ROOT / 'engine/aga/src'
+            built = subprocess.run(['cc', '-std=gnu89', '-Wall', '-Werror', '-Wshadow', '-fsanitize=undefined,address',
+                                    '-fno-sanitize-recover=all', '-I' + str(src), str(tmp / 'h.c'),
+                                    str(src / 'aw_effects.c'), '-o', str(tmp / 'h')], capture_output=True, text=True)
+            self.assertEqual(built.returncode, 0, built.stdout + built.stderr)
+            out = subprocess.run([str(tmp / 'h')], capture_output=True, text=True, check=True).stdout.splitlines()
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+        # three land (the spell-sourced constant refused); Restore Health 2 a second while worn (50 -> 60 in 5 s), the
+        # Light of a used item ends at 3 s; the save keeps the constants (6 + 2 x 16) and the load moves the
+        # generation; no clock ends them; taken off, the fortify is undone
+        # SAVE-EFFECTS-BLOCK-SIZE-61: the block's size by its version (2 x 16 here; the same count read as version 1
+        # would be 2 x 10), a cut block refused
+        self.assertEqual(out, ['landed 3 str 10 health 50.0 count 3', 'after5 str 10 health 60.0 count 2 light 0.0',
+                               'block 38 cut -1 v1 26', 'saved 38 1 count 2 moved 1', 'long str 10 count 2',
+                               'off 2 str 0 count 0 none 0'])
 
     def test_any_effect_on_any_actor(self):
         tmp = Path(tempfile.mkdtemp(prefix='aw-effects2-'))

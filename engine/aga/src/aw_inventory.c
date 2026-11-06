@@ -369,6 +369,12 @@ int AW_GearBoxLabel(const aw_inventory_item_t *it,char *out,int size){
 #ifndef AW_INVENTORY_RULES_ONLY
 #include "aw_ledger.h"
 #include "aw_maps.h"
+/* STEAL-WITNESSED-NO-CRIME-61: COUNT of item ID (VALUE each) taken from OWNER (a faction when FACTION) is a theft:
+ * the crime rules decide it (aw_crime.c sets the hook; NULL: no crime layer, the pure fixtures) */
+void (*aw_inventory_theft)(const char *owner,int faction,const char *id,int count,int value);
+static void theft(const char *owner,int faction,const char *id,int count,int value){
+    if(aw_inventory_theft)aw_inventory_theft(owner,faction,id,count,value);
+}
 #define INV_ROW 512
 extern int com_fopen_buffer;   /* aw_fopenbuf.c: the buffer of the next COM_FOpenFile (0: 16 KiB) */
 static edict_t *drop_entity[AW_INVENTORY_DROPS];
@@ -440,7 +446,10 @@ static int inv_parse_row(const byte *row,aw_inventory_item_t *out){
                 /* A carried light: burn time (AW_LIGHT_INFINITE or 1..), colour, radius in subtype. */
                 value.light_time=(int)(int32_t)inv_u32(row+504);value.light_radius=value.subtype;
                 memcpy(value.light_colour,row+508,3);
-                if(row[511] || value.category!=AW_INV_MISC || value.light_radius<1 || value.light_radius>65535 ||
+                /* byte 511 (HELD-LIGHT-OWN-MODEL-61): 0 an older catalogue, else AW_LIGHT_FLAGS_SET | flicker | fire */
+                value.light_flags=row[511];
+                if((row[511] && (!(row[511]&AW_LIGHT_FLAGS_SET) || (row[511]&~(AW_LIGHT_FLAGS_SET|AW_LIGHT_FLICKER|AW_LIGHT_FIRE)))) ||
+                   value.category!=AW_INV_MISC || value.light_radius<1 || value.light_radius>65535 ||
                    (value.light_time!=AW_LIGHT_INFINITE && (value.light_time<1 || value.light_time>1000000)))return 0;
             }else{int n;value.enchant_capacity=row[504]|(row[505]<<8);   /* the record's enchantment points */
                   /* byte 506: a weapon's magical (1) and silver (2) flags (RESIST-NORMAL-WEAPONS-61) */
@@ -1340,6 +1349,40 @@ static void weight_text(float weight,char *out,int size){
     while(n>0 && out[n-1]=='0')out[--n]=0;
     if(n>0 && out[n-1]=='.')out[--n]=0;
 }
+/* LOOT-WINDOW-ITEM-PROPERTIES-60: the container strip's properties line for item ID, as the original's item tooltip
+ * reads it (the kind, weight, value and, for gear, its condition), within COLUMNS characters: the full words when they
+ * fit, else the short ones. One catalogue read per newly selected item, never per frame. 0 when the item is unknown. */
+int AW_InventoryPropertiesLine(const char *id,int columns,char *out,int size){
+    static char cached_id[64];static aw_inventory_item_t item;static int cached_ok;
+    static const char *const kinds[]={"Item","Weapon","Armor","Clothing","Potion","Ingredient","Book","Misc"};
+    char weight[24],type[32],condition[24];const char *kind;int pass;
+    if(!out || size<2)return 0;
+    out[0]=0;
+    if(!id || !*id)return 0;
+    if(strcmp(cached_id,id)){Q_strcpy_bounded(cached_id,id,sizeof(cached_id));cached_ok=AW_InventoryRead(cached_id,&item);}
+    if(!cached_ok)return 0;
+    kind=item.category>=0 && item.category<8?kinds[item.category]:"Item";
+    if(item.flags&AW_INV_LIGHT)kind="Light";
+    if(AW_GearBoxKind(&item)!=AW_GEARBOX_NONE){
+        if(item.category==AW_INV_WEAPON)kind=gear_weapons[item.subtype];
+        else if(item.category==AW_INV_CLOTHING)kind=gear_clothes[item.subtype];
+        else kind=gear_armour[item.subtype];
+    }
+    Q_strcpy_bounded(type,kind,sizeof(type));
+    if(item.category==AW_INV_ARMOUR && item.shield_class>=0 && item.shield_class<3){
+        strcat(type," ");strcat(type,gear_classes[item.shield_class]);
+    }
+    weight_text(item.weight,weight,sizeof(weight));
+    for(pass=0;pass<2;pass++){
+        condition[0]=0;
+        if((item.category==AW_INV_WEAPON || item.category==AW_INV_ARMOUR) && item.health>0)
+            Q_snprintf(condition,sizeof(condition),pass?"  Cnd %d":"  Condition %d",(int)item.health);
+        Q_snprintf(out,size,pass?"%s  Wt %s  Val %d%s":"%s  Weight %s  Value %d%s",type,weight,item.value,condition);
+        if(columns<=0 || (int)strlen(out)<=columns)break;
+    }
+    if(columns>0 && columns<size && (int)strlen(out)>columns)out[columns]=0;
+    return 1;
+}
 static int inv_target(void){
     int i,best=-1;float distance=AW_ActivateDistance(),along,side;edict_t *p;vec3_t f,r,u,eye,delta;trace_t tr;
     if(!sv.active || svs.maxclients!=1 || !svs.clients || !(p=svs.clients[0].edict))return -1;
@@ -1780,8 +1823,21 @@ int AW_AreaEffectPids(unsigned reference,unsigned *pids,int most){
 }
 /* After the place's areas are read: their effect links applied once (a few rows an area; 'P' one look at the world
  * change list each): the gone placements out of the CHIM world, the frame map's flames and the lamp rows named. */
+/* TAKEN-LIGHT-OUTDOOR-EFFECTS-UNLINKED-61: the 'F' links name the frame map FILE the flames are in (its stem, as
+ * tools/effect_links.py hashes it: "vivec_city-chim"), and that file is the world model; the server's name is the
+ * town's ("vivec_city", aw_region.c loads its CHIM frame map), so hashing sv.name matched no link in any town and
+ * every outdoor carriable light kept its flame when taken. "maps/NAME.chim" -> the hash of NAME. */
+unsigned long AW_AreaMapHash(const char *path){
+    char stem[MAX_QPATH];const char *s,*slash;int n;
+    if(!path || !path[0])return 0;
+    for(slash=s=path;*s;s++)if(*s=='/' || *s=='\\')slash=s+1;
+    for(n=0;slash[n] && slash[n]!='.' && n<(int)sizeof(stem)-1;n++)stem[n]=slash[n];
+    stem[n]=0;
+    return n?area_name_hash(stem):0;
+}
 void AW_AreaEffectsApply(void){
-    int i,k;unsigned long map=sv.name[0]?area_name_hash(sv.name):0;
+    int i,k;unsigned long map=sv.worldmodel && sv.worldmodel->name[0]?AW_AreaMapHash(sv.worldmodel->name):
+                              sv.name[0]?area_name_hash(sv.name):0;
     for(i=0;i<area_count;i++){
         const area_t *a=&areas[i];
         if(!a->blob || !a->links)continue;
@@ -2388,6 +2444,10 @@ int AW_ContainerTake(unsigned reference,const char *id,int count,int owned,const
     if(moved<count)AW_ItemAdd(&aw_state,item.id,moved-count);
     if(!moved){if(why)*why="kept";return 0;}
     aw_state.inventory.initialized=1;AW_CombatEquipmentChanged();
+    if(owned){   /* STEAL-WITNESSED-NO-CRIME-61: taken from an owned container: the owner's, a crime when seen */
+        char owner[AW_LEDGER_STOLEN_ID+1];int faction;
+        if(container_owner(reference,owner,&faction))theft(owner,faction,item.id,moved,item.value);
+    }
     TAKE_MARK(5);
 #ifdef AMIGA
     if(t[5]-t[0]>=.1)Con_Printf("Slow take: %ld ms (item %ld, count %ld, add %ld, change %ld, equipment %ld)\n",
@@ -2711,6 +2771,7 @@ int AW_PlacedLocal(int at,int32_t where,const float *game,float *local){
 #define PLACED_FILE "progs/items/placed.awp"
 int (*aw_placed_begin)(void);
 int (*aw_placed_admit)(unsigned reference,const char *stem,const float local[3],const float angles[3],float scale);
+float (*aw_placed_ray)(int drawn,const float *eye,const float *dir);
 /* What the last read of the list saw (aw_placed status): keys read, rows, rows without an item row in the focus table,
  * rows the map draws itself, rows outside this map, rows offered. */
 static int placed_seen[6];
@@ -2897,9 +2958,14 @@ static void focus_refresh(const edict_t *p){
     if(focus_outdoor && focus_to_source(p->v.origin,game) &&
        ((int)floor(game[0]/FOCUS_CELL)!=focus_gx || (int)floor(game[1]/FOCUS_CELL)!=focus_gy))focus_load();
 }
-/* The placed row aimed at within reach, -1 none. */
+/* The placed row aimed at within reach, -1 none.
+ * PLACED-PIT-AXE-NO-FOCUS-61: a row the placed list draws is aimed at where the view ray meets its model (aw_placed.c,
+ * the model's box turned and scaled as drawn), at the distance of that point, as the original and OpenMW 0.51 test
+ * the activation ray against the object itself; the near-the-origin test (4 map units off the crosshair line) only
+ * reached a long item such as an axe near its origin. Rows the map draws itself keep that test, and so does a drawn
+ * row the ray misses (a small item, aimed just beside it). */
 static int placed_target(void){
-    int i,best=-1;float reach=AW_ActivateDistance(),nearest,along,side,length,shift[3];edict_t *p;vec3_t f,r,u,eye,delta,at;
+    int i,best=-1;float reach=AW_ActivateDistance(),nearest,along,side,length,shift[3],hit;edict_t *p;vec3_t f,r,u,eye,delta,at;
     trace_t tr;
     if(!sv.active || svs.maxclients!=1 || !svs.clients || !(p=svs.clients[0].edict))return -1;
     focus_refresh(p);
@@ -2910,7 +2976,17 @@ static int placed_target(void){
     for(i=0;i<focus_count;i++){
         focus_row_t *row=&focus_rows[i];
         if(row->edict || AW_ObjectDisabled(row->reference))continue;
-        VectorAdd(row->at,shift,at);VectorSubtract(at,eye,delta);along=DotProduct(delta,f);length=DotProduct(delta,delta);
+        VectorAdd(row->at,shift,at);VectorSubtract(at,eye,delta);length=DotProduct(delta,delta);
+        /* the ray asked only of drawn rows whose origin is within the reach and 64 units (the longest item) */
+        if(row->kind=='I' && row->drawn>0 && aw_placed_ray && length<=(reach+64)*(reach+64) &&
+           (hit=aw_placed_ray(row->drawn,eye,f))>=0){
+            if(hit>nearest)continue;
+            VectorMA(eye,hit,f,at);
+            tr=SV_Move(eye,vec3_origin,vec3_origin,at,MOVE_NOMONSTERS,p);
+            if(tr.fraction<1 && (1-tr.fraction)*hit>6)continue;        /* something in front of the item */
+            nearest=hit;best=i;continue;
+        }
+        VectorAdd(row->at,shift,at);along=DotProduct(delta,f);
         if(along<=0 || along>nearest || length>reach*reach)continue;
         side=length-along*along;
         if(side>(row->kind=='I'?16.0f:36.0f))continue;     /* close to the crosshair line (map units squared) */
@@ -2919,6 +2995,31 @@ static int placed_target(void){
         nearest=along;best=i;
     }
     return best;
+}
+/* aw_placed aim (PLACED-PIT-AXE-NO-FOCUS-61, a check command): every focus row within twice the reach of the eye and
+ * what placed_target makes of it: the distance along the view, off the crosshair line, and the line of sight. */
+void AW_PlacedAimReport(void){
+    int i,shown=0,best;float reach=AW_ActivateDistance(),along,side,length,shift[3];edict_t *p;vec3_t f,r,u,eye,delta,at;
+    trace_t tr;
+    if(!sv.active || svs.maxclients!=1 || !svs.clients || !(p=svs.clients[0].edict)){Con_Printf("aw_placed aim: no game.\n");return;}
+    best=placed_target();
+    VectorCopy(p->v.origin,eye);eye[2]+=p->v.view_ofs[2];AngleVectors(p->v.v_angle,f,r,u);
+    if(focus_outdoor)shift[0]=shift[1]=shift[2]=0;else AW_MwscriptRoomShift(shift);
+    Con_Printf("aw_placed aim: reach %.0f, %d rows (%s), eye %.0f %.0f %.0f, aimed row %d\n",reach,focus_count,
+               focus_outdoor?"outdoors":"room",eye[0],eye[1],eye[2],best);
+    for(i=0;i<focus_count && shown<12;i++){
+        focus_row_t *row=&focus_rows[i];
+        VectorAdd(row->at,shift,at);VectorSubtract(at,eye,delta);along=DotProduct(delta,f);length=DotProduct(delta,delta);
+        if(length>4*reach*reach)continue;
+        side=length-along*along;
+        tr=SV_Move(eye,vec3_origin,vec3_origin,at,MOVE_NOMONSTERS,p);
+        Con_Printf("  %d %c %u %s: at %.0f %.0f %.0f, edict %d drawn %d disabled %d, dist %.1f along %.1f off %.1f, "
+                   "sight %.2f (%.1f short), ray %.1f\n",i,row->kind,row->reference,row->name,at[0],at[1],at[2],row->edict,
+                   row->drawn,AW_ObjectDisabled(row->reference),(float)sqrt(length),along,(float)sqrt(side>0?side:0),
+                   tr.fraction,(1-tr.fraction)*(float)sqrt(length),
+                   row->drawn>0 && aw_placed_ray?aw_placed_ray(row->drawn,eye,f):-2.0f);
+        shown++;
+    }
 }
 int AW_PlacedFocus(const char **name,char *weight_line,char *value_line,int line_size,int *owned){
     static char label_weight[32],label_value[32];static int labels;
@@ -3049,13 +3150,15 @@ static int take_row(focus_row_t *row){
     if(!AW_ItemAdd(&aw_state,item.id,1)){AW_InventoryRefused(row->name,item.id,1);return 1;}
     if(!AW_ObjectTake(row->reference,row->owned)){AW_ItemAdd(&aw_state,item.id,-1);return 0;}
     /* CELL-CHANGES-59 slice 2: an owned item is stolen from its owner (the reference's owner, else its faction): the
-     * pair (item, owner) on the world change list, kept wherever the item goes; the crime itself is CRIME-59 */
-    if(row->owned && aw_ledger_on){
-        char owner[AW_LEDGER_STOLEN_ID+1];int faction;
-        if(container_owner(row->reference,owner,&faction))AW_LedgerStolenAdd(&aw_ledger,item.id,owner,faction,1);
+     * pair (item, owner) on the world change list, kept wherever the item goes; STEAL-WITNESSED-NO-CRIME-61: the
+     * crime when a witness sees it (aw_crime.c) */
+    {
+        char owner[AW_LEDGER_STOLEN_ID+1];int faction,stolen=row->owned && container_owner(row->reference,owner,&faction);
+        if(stolen && aw_ledger_on)AW_LedgerStolenAdd(&aw_ledger,item.id,owner,faction,1);
+        aw_state.inventory.initialized=1;
+        AW_UIPickupNotice(row->name,3);AW_CombatEquipmentChanged();
+        if(stolen)theft(owner,faction,item.id,1,item.value);
     }
-    aw_state.inventory.initialized=1;
-    AW_UIPickupNotice(row->name,3);AW_CombatEquipmentChanged();
     return 1;
 }
 int AW_InventoryUse(void){

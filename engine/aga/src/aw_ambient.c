@@ -241,6 +241,7 @@ typedef struct {
     short follow_num;           /* AIFollow: the followed edict's number */
     float follow_hours,follow_check;int follow_minutes;unsigned char follow_moving,follow_final;
     aw_dial_npc_cache_t disp;   /* an NPC's disposition facts for the aggro (DIALOGUE-FIGHT-DISPOSITION-57) */
+    unsigned short unsticks;    /* AMBIENT-UNSTUCK-FLOOD-61: stuck searches its steps ran since the counters' reset */
 } slot_t;
 static int aggro_on;static void aggro_facts(slot_t *s);   /* below (aggro on sight) */
 static void travel_end(slot_t *s);
@@ -274,7 +275,17 @@ static model_t *slots_world;
 static unsigned long rng=1;
 static float scan_at;
 static struct {unsigned long thinks,steps,traces,walks,idles,bad_idles,registered,unknown,no_walk,blob_bytes,manual,stuck,
-               levelled,aggro_checks,aggro_engaged,aggro_full,flights,dry,travels,travels_done,follows,follows_done;double seconds,worst;} st;
+               levelled,aggro_checks,aggro_engaged,aggro_full,flights,dry,travels,travels_done,follows,follows_done,
+               unsticks,unstick_tests,settles,settled;double seconds,worst,elapsed;} st;
+/* sv_phys.c SV_CheckStuck: every search for a clear spot (a box that starts in solid), its position tests, and the
+ * searches that found none (AMBIENT-UNSTUCK-FLOOD-61) */
+extern unsigned long aw_stuck_searches,aw_stuck_tests,aw_stuck_failed;
+static unsigned long stuck_base,stuck_tests_base,stuck_failed_base;
+/* "chim actors ambient settle on|off" (default on, id1/default-game.cfg; AMBIENT-UNSTUCK-FLOOD-61; no cvar of its own:
+ * the resident registry budget): a walker whose step started in solid and failed is moved once onto the clear spot the
+ * stuck search finds, so its next steps start clear; off = the old way (the failed step puts it back inside, and every
+ * following step searches again: up to 10 searches a walk). Not saved. */
+static int settle_on=1;
 static const char path[]="npc-ambient.lut";
 static aw_move_settings_t move_defaults;
 
@@ -476,12 +487,13 @@ static int find_in(unsigned long ref,unsigned long hash,aw_ambient_row_t *r,cons
 static int find_actor(edict_t *e,aw_ambient_row_t *r);
 
 /* ---- slots ---- */
+static void give_back_mover(slot_t *s);
 static void release(slot_t *s,int give_back) {
     edict_t *e=s->e;
     /* only an edict of the running world is touched: after a map change the old pointers are stale (the crash on a
      * teleport, NUM_FOR_EDICT: bad pointer, ACTOR-AMBIENT-STALE-EDICT-57); the slot keeps its edict number */
     if(give_back && e && slots_world==sv.worldmodel && !e->free){
-        if(s->mover)AW_AnimMover(e,0);
+        give_back_mover(s);
         set_field(e,"aw_moving",0);
     }
     if(s->mem)free(s->mem);
@@ -598,8 +610,17 @@ static int play_idle(slot_t *s,int idle) {
     set_field(s->e,"aw_moving",1);s->e->v.frame=(float)s->skel_first;
     return 1;
 }
+/* CREATURE-COMBAT-FRAMES-MISSING-61: the walker's mover is taken off only while no fight holds the actor. An actor
+ * that starts a fight on sight while it walks keeps the mover it wears: combat laid its groups out on the mover's
+ * frames (aw_combat.c AW_CombatEngage) and takes it off itself when the fight ends. Taking it off here left the
+ * ancestor ghost fighting with the mover's run and attack frames (16-29) on its 16-frame standing model. */
+static void give_back_mover(slot_t *s) {
+    if(!s->mover)return;
+    if(!AW_CombatFighter(s->e))AW_AnimMover(s->e,0);
+    s->mover=0;
+}
 static void stop_walk(slot_t *s) {
-    if(s->mover){AW_AnimMover(s->e,0);s->mover=0;}
+    give_back_mover(s);
     set_field(s->e,"aw_moving",0);s->at=-1;s->manual_walk=0;s->stuck=0;
 }
 static float walk_speed(slot_t *s) {
@@ -617,7 +638,9 @@ static void walk_frames(slot_t *s,float speed,float dt) {
 }
 static void begin_walk(slot_t *s) {
     const aw_anim_t *a=AW_AnimOf(s->e);
-    if(a && a->mover[0] && !s->mover){AW_AnimMover(s->e,1);s->mover=1;}
+    /* by what is worn, not the slot's own mark: a fight that ended took the mover off (aw_combat.c release) */
+    if(a && a->mover[0] && !AW_AnimMoving(s->e) && AW_AnimMover(s->e,1))s->mover=1;
+    else if(!AW_AnimMoving(s->e))s->mover=0;
     set_field(s->e,"aw_moving",1);memset(&s->play,0,sizeof(s->play));s->stuck=0;s->state=S_WALK;st.walks++;
 }
 
@@ -734,6 +757,19 @@ static void log_failed_step(slot_t *s,const vec3_t move) {
                aw_actor_step_reached[1],aw_actor_step_reached[2],aw_actor_step_floor[0],aw_actor_step_floor[1],
                aw_actor_step_floor[2],aw_actor_step_floor[3],(int)aw_actor_step_floor[4]);
 }
+/* With the steplog on (AMBIENT-UNSTUCK-FLOOD-61): a walker whose standing box already starts in solid before its step
+ * (the step's stuck search follows): who, where, and what the box is in, the world alone or a body or brush entity. */
+static void log_start_solid(slot_t *s) {
+    edict_t *e=s->e;trace_t all,world;
+    all=SV_Move(e->v.origin,e->v.mins,e->v.maxs,e->v.origin,MOVE_NORMAL,e);
+    if(!all.startsolid)return;
+    world=SV_Move(e->v.origin,e->v.mins,e->v.maxs,e->v.origin,MOVE_NOMONSTERS,e);
+    Con_Printf("Ambient start in solid: %s at %.2f %.2f %.2f in %s%s%s%s\n",source_id(e),e->v.origin[0],e->v.origin[1],
+               e->v.origin[2],world.startsolid?"the world":"a body",
+               !world.startsolid && all.ent && all.ent!=sv.edicts && all.ent->v.classname?" ":"",
+               !world.startsolid && all.ent && all.ent!=sv.edicts && all.ent->v.classname?pr_strings+all.ent->v.classname:"",
+               !world.startsolid && all.ent && all.ent!=sv.edicts?(is_actor(all.ent)?" (an actor)":all.ent==player()?" (the player)":""):"");
+}
 /* Water for a swimmer: the map's liquid contents, or outdoors anything below the sea level (z 0: the exterior water
  * height, OpenMW's cell water level). A CHIM world's sea is a drawn surface with a thin water volume (seen in game,
  * 31 October 2026: slaughterfish at z -150 read CONTENTS_EMPTY), so the contents alone strand every fish. */
@@ -759,7 +795,8 @@ static int fly(slot_t *s,const float target[3],float step) {
     return tr.fraction>=1;
 }
 static void walk(slot_t *s,float dt) {
-    float target[2],dx,dy,len,speed=walk_speed(s),step;vec3_t move,from;int xyz[3],heading;unsigned long before;
+    float target[2],dx,dy,len,speed=walk_speed(s),step;vec3_t move,from;int xyz[3],heading,stepped;
+    unsigned long before,searches,tests;
     int flyer=(s->flags&(AW_AMBIENT_FLYER|AW_AMBIENT_SWIMMER))!=0;float tz=s->home[2];   /* swimmers move the same way, in water */
     if(s->manual_walk){target[0]=s->manual_goal[0];target[1]=s->manual_goal[1];}
     else{AW_AmbientPoint(&s->pkg,s->at,xyz,NULL);target[0]=s->home[0]+xyz[0];target[1]=s->home[1]+xyz[1];tz=s->home[2]+xyz[2];}
@@ -793,7 +830,21 @@ static void walk(slot_t *s,float dt) {
     heading=AW_PathHeading((int)dx,(int)dy);
     s->e->v.angles[1]=heading*360.0f/AW_PATH_FAN-90;s->e->v.angles[0]=s->e->v.angles[2]=0;
     before=aw_sv_move_calls;VectorCopy(s->e->v.origin,from);
-    if(AW_ActorStep(s->e,move,host_frametime>0?host_frametime:dt)){   /* the velocity is moved over one frame */
+    if(steplog)log_start_solid(s);
+    searches=aw_stuck_searches;tests=aw_stuck_tests;
+    stepped=AW_ActorStep(s->e,move,host_frametime>0?host_frametime:dt);   /* the velocity is moved over one frame */
+    if(aw_stuck_searches!=searches){
+        s->unsticks+=(unsigned short)(aw_stuck_searches-searches);st.unsticks+=aw_stuck_searches-searches;
+        st.unstick_tests+=aw_stuck_tests-tests;
+        /* the step started in solid and failed: AW_ActorStep put the walker back inside. Settle it once on the clear
+         * spot the search finds (a unit aside or a few up at most: SV_CheckStuck), so the next step starts clear. */
+        if(!stepped && settle_on){
+            tests=aw_stuck_tests;
+            if(AW_ActorSettle(s->e))st.settled++;   /* a clear spot found: the walker stands there now */
+            st.settles++;st.unstick_tests+=aw_stuck_tests-tests;
+        }
+    }
+    if(stepped){
         /* WALK-CYCLES-57: the walk plays by the distance the step covered (a step cut by a wall or the waypoint plays
          * that much of the cycle), so the feet do not slide; the phase is AW_AnimAdvance's speed over the own speed */
         float gone=(float)sqrt((s->e->v.origin[0]-from[0])*(s->e->v.origin[0]-from[0])+(s->e->v.origin[1]-from[1])*(s->e->v.origin[1]-from[1]));
@@ -858,6 +909,7 @@ static void think(slot_t *s,float dt) {
 void AW_AmbientPhysics(void) {
     edict_t *p;int i,m;float interval;double t0;
     if(!ambient_on || !(p=player()))return;
+    st.elapsed+=host_frametime;                   /* the per-second counters (status) */
     if(slots_world!=sv.worldmodel)reset_all();
     m=mode_now();
     amb_mode=m>0;
@@ -1124,6 +1176,11 @@ static void status(void) {
                 amb_tried>0?"npc-ambient.awa":amb_tried<0?"no npc-ambient.awa":"not read",amb_count,held,amb_shared_t.rows,
                 ast.loads,ast.bytes,(int)(ast.seconds*1000),ast.last_n,ast.last_bytes,(int)(ast.last*1000),ast.hits,ast.misses,
                 ast.fallbacks,ast.deferred);}
+    {double secs=st.elapsed>0?st.elapsed:1;   /* game time the residents ran since the reset (map loads included) */
+     Con_Printf("  stuck searches (start in solid, AMBIENT-UNSTUCK-FLOOD-61) over %.0f s: residents' steps %lu (%.2f/s), "
+                "settled %lu of %lu (settle %s), %lu position tests; every body %lu (%lu tests, %lu found no "
+                "clear spot)\n",secs,st.unsticks,st.unsticks/secs,st.settled,st.settles,settle_on?"on":"off",
+                st.unstick_tests,aw_stuck_searches-stuck_base,aw_stuck_tests-stuck_tests_base,aw_stuck_failed-stuck_failed_base);}
     Con_Printf("  cost: %.3f ms per think, worst frame %.3f ms\n",st.thinks?st.seconds*1000.0/st.thinks:0.0,st.worst*1000.0);
 }
 /* "chim actors ambient [on|off|think S|list|reset]" (aw_actors.c forwards it; arguments from the fourth word) */
@@ -1156,17 +1213,46 @@ void AW_AmbientCommand(void) {
         Con_Printf("Ambient: aggro on sight %s (default on, not saved): creatures with a Fight that reaches 100 at "
                    "their distance attack the player they see (OpenMW's fight-distance rule)\n",aggro_on?"ON":"OFF");
     }
-    else if(!strcmp(a,"reset")){memset(&st,0,sizeof(st));Con_Printf("Ambient: counters reset\n");}
+    else if(!strcmp(a,"settle") && Cmd_Argc()>4){
+        settle_on=!strcmp(Cmd_Argv(4),"on");
+        Con_Printf("Ambient: settle %s (default on, not saved): %s\n",settle_on?"ON":"OFF",settle_on?
+                   "a walker whose failed step started inside solid stands once on the clear spot the stuck search finds":
+                   "the old way: a failed step puts the walker back inside, and its next steps search again");
+    }
+    else if(!strcmp(a,"put") && Cmd_Argc()>7){
+        /* "chim actors ambient put SLOT X Y Z [GX GY]" (AMBIENT-UNSTUCK-FLOOD-61, for the collision owner): the
+         * slot's actor ("list" numbers them) stands at X Y Z (map units, as "list" prints them), with GX GY it walks
+         * straight there (a manual walk, ten failed steps end it); without, it chooses again. Not saved. */
+        int i=Q_atoi(Cmd_Argv(4));slot_t *s=i>=0 && i<SLOTS?&slots[i]:NULL;
+        if(!s || !s->e)Con_Printf("Ambient: no actor in slot %d\n",i);
+        else{
+            s->e->v.origin[0]=(float)Q_atof(Cmd_Argv(5));s->e->v.origin[1]=(float)Q_atof(Cmd_Argv(6));
+            s->e->v.origin[2]=(float)Q_atof(Cmd_Argv(7));VectorCopy(s->e->v.origin,s->e->v.oldorigin);
+            SV_LinkEdict(s->e,false);stop_walk(s);s->state=S_CHOOSE;
+            if(Cmd_Argc()>9){
+                s->manual_goal[0]=(float)Q_atof(Cmd_Argv(8));s->manual_goal[1]=(float)Q_atof(Cmd_Argv(9));
+                s->manual_walk=1;begin_walk(s);
+            }
+            Con_Printf("Ambient: %s put at %.2f %.2f %.2f%s (%s)\n",source_id(s->e),s->e->v.origin[0],s->e->v.origin[1],
+                       s->e->v.origin[2],s->manual_walk?", walking straight to the goal":"",
+                       SV_TestEntityPosition(s->e)?"inside solid":"clear");
+        }
+    }
+    else if(!strcmp(a,"reset")){
+        int i;memset(&st,0,sizeof(st));stuck_base=aw_stuck_searches;stuck_tests_base=aw_stuck_tests;stuck_failed_base=aw_stuck_failed;
+        for(i=0;i<SLOTS;i++)slots[i].unsticks=0;
+        Con_Printf("Ambient: counters reset\n");
+    }
     else if(!strcmp(a,"list")){
         int i;
         for(i=0;i<SLOTS;i++)if(slots[i].e){
             slot_t *s=&slots[i];
-            Con_Printf("%3d %-24s ref %ld state %d dist %u dests %u/%u cur %u goal %u at %d%s%s%s at %.0f %.0f %.0f flags %u ground %.0f scale %.3f model %s%s\n",
+            Con_Printf("%3d %-24s ref %ld state %d dist %u dests %u/%u cur %u goal %u at %d%s%s%s at %.0f %.0f %.0f flags %u ground %.0f scale %.3f unsticks %u model %s%s\n",
                        i,source_id(s->e),(long)s->ref,s->state,s->pkg.distance,s->pkg.count,s->pkg.destinations,s->pkg.cur,
                        s->goal,s->at,s->pkg.manual?" manual":"",s->can_walk?"":" no-walk",
                        s->travel==1?" TRAVEL":s->travel==2?" TRAVEL-DONE":s->travel>=3?" FOLLOW":"",
                        s->e->v.origin[0],s->e->v.origin[1],
-                       s->e->v.origin[2],s->flags,field(s->e,"aw_ground_mode",-1),field(s->e,"aw_scale",1),
+                       s->e->v.origin[2],s->flags,field(s->e,"aw_ground_mode",-1),field(s->e,"aw_scale",1),s->unsticks,
                        s->e->v.model?pr_strings+s->e->v.model:"-",AW_CombatSlotState(s->e,NULL)?" fighting":"");
         }
     }

@@ -1,11 +1,11 @@
 # Changelog
 
-_Last updated with AmiWind v0.0.61-dev2 (2026-11-06)._
+_Last updated with AmiWind v0.0.61 (6 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
-- [v0.0.61 (in progress), 6 November 2026](#v0061-in-progress-6-november-2026)
+- [v0.0.61: Keep Your Lantern Lit, 6 November 2026](#v0061-keep-your-lantern-lit-6-november-2026)
 - [v0.0.60: Work With What You've Got, 4 November 2026](#v0060-work-with-what-youve-got-4-november-2026)
 - [v0.0.59: Assembling The Bits And Pieces, Once Again, 3 November 2026](#v0059-assembling-the-bits-and-pieces-once-again-3-november-2026)
 - [v0.0.58: Time To Talk, 1 November 2026](#v0058-time-to-talk-1-november-2026)
@@ -170,7 +170,25 @@ _Last updated with AmiWind v0.0.61-dev2 (2026-11-06)._
 
 <!-- contents end -->
 
-## v0.0.61 (in progress), 6 November 2026
+## v0.0.61: Keep Your Lantern Lit, 6 November 2026
+
+v0.0.61 is the third development snapshot with its final version number and the release documents; its
+[release notes](releases/notes/RELEASE-v0.0.61.md) cover the whole version by area. The in-game check of that snapshot
+and the rest of the list move to v0.0.62.
+
+How much faster (figures and setups in [docs/performance](performance/FRAME-WAITS.md)):
+
+- The standard benchmark on the Raspberry Pi 4B boot stick, the clearest line: 5.4 fps (minimum 1.0, 1 % low 2.0) in
+  Seyda Neen, the heaviest place, with about ten characters and Dagoth Ur on screen. In FS-UAE it
+  read 28.9 fps (dev1), 32.2 (dev2) and 39.6 (dev3), but those runs were not taken under the same conditions and the
+  Pi 4B does not show the same rise, so they are not claimed as a gain.
+- Seyda Neen waits 31 % less for the disk on arrival, 49 % less standing and 32 % less walking (dev1 to dev2). With
+  about 400 kinds of item carried the inventory (7 to 13 s before) and a place load (19 to 59 s before) are much
+  faster, and a body with 415 kinds opens in 82 ms (10.3 s); the residents' stuck-movement retry costs 81 % fewer
+  position tests.
+- Not faster: the first frame in Seyda Neen and the Vivec resident bake in the builder.
+
+The snapshots, in order:
 
 In v0.0.61-dev1 (the first snapshot, no game changes; [release notes](releases/notes/RELEASE-v0.0.61-dev1.md)):
 
@@ -203,6 +221,26 @@ In v0.0.61-dev2 (the second snapshot, the first with game changes;
   tested as in the original, creatures from levelled lists in tombs and caves, and the Balmora canal bank at the
   original ground height (+10 triangles in that frame only).
 - Several parts are not yet seen in game and are checked on this image (see the release notes).
+
+In v0.0.61-dev3 (the third snapshot; [release notes](releases/notes/RELEASE-v0.0.61-dev3.md)):
+
+- Enchanted items: Cast When Strikes, Cast When Used and Constant Effect items work, enchanted weapons and shields can be
+  equipped, and a new character gets the class starting spells. A save with an active spell effect no longer loses the
+  effects and the blocks stored after them on load (a dev2 problem).
+- Held candles, candlesticks and lanterns are drawn and lit as themselves, by their own record radius; the flames of
+  carriable lights in the towns are tied to them, so a taken lantern leaves no flame.
+- Witnessed theft: the crime report, the bounty, the witnesses' lines and attacks, checked only at the take.
+- Dialogue: item notices in the conversation, notices on top of every window, picked answers as the player's line,
+  Up, Down, Tab and Enter keys, and a loot window with room, wrapped names and the item's properties.
+- The container strip opens in 82 ms instead of 10.3 s with 415 kinds carried; fighting creatures keep their frames;
+  Seyda Neen residents no longer fall into the stuck-movement retry.
+- Inventory: worn clothes show at once in the preview, the pit axe can be taken, the Census Office is a no-rest cell,
+  the burden bar numbers are legible, and the armour rating is shown.
+- First-person arms in their own 60 degree view so the forearms and sleeves show; swimming keeps the worn clothes;
+  tree trunks reach the ground on slopes.
+- The in-game recorder, slice 1: `dbg recorder`, Ctrl+R, replay with checkpoints, (RECORDING) and (PLAYBACK) on the
+  version line.
+- Known: dropped lights get no flame back; Shield does not soften blows; an ended Fortify counts as damage.
 
 ## v0.0.60: Work With What You've Got, 4 November 2026
 

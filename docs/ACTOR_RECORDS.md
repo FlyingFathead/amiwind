@@ -1,6 +1,6 @@
 # What every being can have: the actor records
 
-_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
+_Last updated with AmiWind v0.0.61-dev3 (2026-11-06)._
 
 <!-- contents start -->
 ## Contents
@@ -391,8 +391,9 @@ common disease, blight, normal weapons, magicka, paralysis and poison). If there
 a percentage, so a total of 100 is immunity and a negative total (a weakness) makes the damage larger. For an effect
 with no resisting effect of its own (many buffs), the resistance is 0. When a spell lands, the game also rolls a chance
 based on Willpower plus a tenth of Luck, scaled by the fatigue term, against the spell's ease of casting; an effect that
-has no magnitude is either resisted whole or not at all. AmiWind does not yet apply any of these: the actor table keeps
-the spell list, so the totals can be computed once the magic work lands.
+has no magnitude is either resisted whole or not at all. AmiWind applies only the Resist and Weakness to Normal Weapons
+totals so far (the combat code reads them, v0.0.61); the other resistances are not applied yet: the actor table keeps
+the spell list and the active effects are in place, so the totals can be computed as the magic work continues.
 
 ### What a missing value reads as
 
@@ -430,7 +431,7 @@ OpenMW save file keeps the value.
 | Disposition changes during a conversation (persuasion, bribes) | | N | yes (folded into the base) | Kept for the conversation by the dialogue layer; not on the record |
 | Crime disposition modifier | whole number | N | yes | Not yet |
 | Reputation | whole number | P N | yes | Player: the standing block, saved. People: the table's value, not changed |
-| Bounty (crime level), current crime id, paid crime id | whole numbers | P | yes | Bounty in the standing block, saved. Witnesses and crime reports: not yet |
+| Bounty (crime level), current crime id, paid crime id | whole numbers | P | yes | Bounty in the standing block, saved. A theft seen by a witness is reported and raises it (v0.0.61-dev3); the other crimes: not yet |
 | Faction ranks, expelled marks and faction reputation | per faction | P N | yes | Player: the standing block, saved. People: the table's faction and rank only |
 | Werewolf state, werewolf kills, the saved attribute and skill values to restore | flag, number, lists | P N | yes | Not yet |
 | Used items (ids of what has been eaten or drunk, for learning ingredient effects) | list of ids | P | yes | Not yet |
@@ -443,14 +444,14 @@ OpenMW save file keeps the value.
 | Movement flags, fall height | | P N C | yes | The player's movement layer only |
 | Last object that hit it, last object that tried to hit it | ids | P N C | yes | Not yet |
 | Spell list: known spells, the selected spell, powers used and when, permanent effects | lists | P N C | yes | Known spells: the table's list plus play's changes, saved. The rest: not yet |
-| Active spells (each with source, caster, item, flags and per-effect magnitude, duration and time left) | list | P N C | yes | Partly, for the player: a pool of 16 active effects (Fortify, Drain, Damage and Restore of an attribute, skill, health, magicka or fatigue, with the time left), saved. Sources, casters and the other beings: not yet |
+| Active spells (each with source, caster, item, flags and per-effect magnitude, duration and time left) | list | P N C | yes | A pool of 64 entries (32 of them for the player) for any of the 143 effects applied to an actor by reference, with the time left, saved in a block of their own; the effects of non-player actors run while they are loaded (v0.0.61). Sources, casters and the effects of actors that are not loaded: not yet |
 | Magic effects total (base and modifier per effect, the source of resistances and Fortify values) | map | P N C | yes | Not yet (resistances and weaknesses wait for it; see [GAME_FORMULAS.md](GAME_FORMULAS.md)) |
 | Corprus spells (worsenings and the next worsening time) | list | P N C | yes | Not yet |
 | Summoned creatures and the summon graveyard | maps | P N C | yes | Not yet |
 | The package sequence: wander, travel, escort, follow, activate, combat and pursue with their live state and remaining time | list | N C | yes | Ambient wander and travel tables, and the one fight the combat layer has; no live sequence per being; not saved |
 | Behaviour settings: hello, fight, flee, alarm (base and modifier) | whole numbers | N C | yes | Base only, per actor. Saved |
 | Trade time (when a merchant restocks) and gold pool | time, number | N C | yes | Gold per actor; sold items kept per merchant and saved; the restock timer: not yet |
-| Inventory: items, counts, condition, charge; equipment slots; selected enchanted item; permanent magic effect values | lists | P N C | yes | The table's entries plus play's changes, saved; worn marks per entry; condition and charge per being: not yet. The player's items are the engine's own table |
+| Inventory: items, counts, condition, charge; equipment slots; selected enchanted item; permanent magic effect values | lists | P N C | yes | The table's entries plus play's changes, saved; worn marks per entry; the player's items keep condition and charge in saved games (v0.0.61); condition and charge of other beings' items: an NPC weapon's charge is kept for the session only. The player's items are the engine's own table |
 | Local script variables (short, long, float) | name and value per object | any scripted object | yes | Held by the script host; saved since v0.0.59 |
 | Position, enabled state, count and the reference's own values (owner, lock, charge) | | any object | yes | The world change list, partly |
 | Animation state | | any object | yes | Not saved |

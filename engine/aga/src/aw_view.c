@@ -279,6 +279,10 @@ static int parts_ready(const char *race,int female) {
     strcpy(parts_sig,sig);parts_built++;parts_ms=(Sys_FloatTime()-t0)*1000;
     return 2;
 }
+/* aw_worldui.c (INVENTORY-PREVIEW-STALE-61): 1 while a changed outfit's parts are still loading, so the inventory
+ * picture waits for them instead of keeping the previous outfit */
+extern int (*aw_inventory_preview_pending)(void);
+static int parts_pending(void){return pend_on && parts_cvar.value && !parts_failed;}
 /* ---- the first-person arms from parts (PLAYER-GEAR-VISUAL-59, docs/THIRD_PERSON.md "First-person arms") ----
  * The same recipe reader on view/parts_1st.txt (tools/prepare_player_fp_parts.py): the race's arm skin and the arm
  * parts of what is worn (gloves, gauntlets, bracers, sleeves; a robe's own first-person sleeves), each one shared
@@ -290,7 +294,9 @@ static int parts_ready(const char *race,int female) {
  * and the shield guard keep their baked arms in both. */
 static cvar_t hand_parts_cvar={"aw_hand_parts","1",true};
 #define HAND_PART_FRAMES 28     /* aw_hand_models.c: the hands' frame contract */
-#define HAND_PART_STANCES 7     /* bare hands, then AW_HandStance's six (an older table: the first four) */
+/* bare hands, then AW_HandStance's six (an older table: the first four), then the held light (v0.0.61,
+ * HELD-LIGHT-OWN-MODEL-61: aw_hand_models.h AW_HAND_LIGHT_STANCE; an older table has no such frames) */
+#define HAND_PART_STANCES 8
 #define HAND_PART_MELEE 4       /* the stances every table has */
 static aw_parts_body_t hparts;
 static model_t *hpart_models[AW_PARTS_MAX];
@@ -369,6 +375,19 @@ static struct model_s *hand_part(int i) {
     if(!hparts_shown || cl.viewent.model!=hpart_models[0] || cl.viewent.frame!=hparts_frame)return NULL;
     return i>0 && i<hparts.count?hpart_models[i]:NULL;
 }
+/* aw_hand_models.c (aw_hand_parts_shield_tag, HELD-LIGHT-OWN-MODEL-61): the arms' shield bone at this frame's table
+ * frame as a tag in the view model's space (the table's root carries the view: tools/prepare_player_fp_parts.py) */
+static int hand_parts_shield_tag(float tag[6]) {
+    static float world[AW_SKEL_MAX_BONES][3][4];static const aw_skel_table_t *posed;static int posed_frame=-1;
+    float scale[3],w=hparts.weight>0?hparts.weight:1,h=hparts.height>0?hparts.height:1;
+    if(!hparts_shown || !hparts_table || hparts.shield_bone<0 || hparts.shield_bone>=hparts_table->bones)return 0;
+    if(posed!=hparts_table || posed_frame!=hparts_frame){
+        AW_SkelPose(hparts_table,(float)hparts_frame,world);posed=hparts_table;posed_frame=hparts_frame;
+    }
+    scale[0]=scale[1]=w*.25f;scale[2]=h*.25f;
+    AW_SkelBoneTag((const float (*)[4])world[hparts.shield_bone],scale,tag);
+    return 1;
+}
 static int body_find(const char *race,int female) {
     int i;
     for(i=0;i<body_count;i++)if(bodies[i].female==female && !Q_strcasecmp(bodies[i].race,(char *)race))return i;
@@ -390,10 +409,12 @@ static int body_ready(void) {
     if(changed)torch_failed=water_failed=0;
     swimming=player && player->v.health>0 && player->v.waterlevel>=2 && death.stage==AW_DEATH_NONE && !water_failed;
     carried=AW_TorchEquipped() && player && player->v.waterlevel<2 && death.stage==AW_DEATH_NONE && !torch_failed;
-    /* the assembled body (the default): on land without a torch; a carried torch and swimming keep their baked
-     * companions (their own poses), the previous method for both */
-    if(!carried && !swimming && (i=parts_ready(race,female))<0)return 0;   /* parts still loading (ARRIVAL-LONG-FRAME-DEV6-59) */
-    if(!carried && !swimming && i!=0){
+    /* the assembled body (the default): without a torch, on land and in water (SWIM-BAKED-CLOTHES-60: the image's
+     * layout has the table's swim groups, so the swimmer wears what is worn); a carried torch keeps its baked
+     * companion (its own pose), and so does swimming in an image whose layout has no swim groups (the previous
+     * method) */
+    if(!carried && (i=parts_ready(race,female))<0)return 0;   /* parts still loading (ARRIVAL-LONG-FRAME-DEV6-59) */
+    if(!carried && i!=0 && (!swimming || AW_AnimSwims(&parts_anim))){
         if(!body_parts || changed){
             if(body_model && body_model->type==mod_alias && body_model->cache.data && !body_parts)Cache_Free(&body_model->cache);
             if(held_model && held_model->type==mod_alias && held_model->cache.data)Cache_Free(&held_model->cache);
@@ -853,9 +874,46 @@ static const aw_inventory_item_t *parts_hand_item(int kind) {
     }
     return parts_hand[kind].have?&parts_hand[kind].item:NULL;
 }
+/* HELD-LIGHT-OWN-MODEL-61: a held candle, candlestick or lantern on the assembled body: the left arm on the table's
+ * "torch" group (as a skeletal guard holds his torch, aw_items.c AW_ItemsTorchLayer: the group's frames in turn with
+ * the body's), the light's own item model on the shield bone at its carried-light place, its flames from it. */
+static int parts_light_layer(int frame,float *layer_frame,int *root) {
+    /* the arm's root and the group's frames looked up once per table (asked for every part drawn) */
+    static const aw_skel_table_t *seen;static int arm=-1,first,span;
+    if(!parts_table)return 0;
+    if(seen!=parts_table){
+        aw_skel_group_t g;int i;
+        seen=parts_table;span=0;
+        arm=AW_SkelLeftArmRoot(parts_table,parts.shield_bone,parts.weapon_bone);
+        if(arm>=0 && (i=AW_SkelGroup(parts_table,"torch"))>=0){
+            AW_SkelGroupAt(parts_table,i,&g);first=(int)g.first;span=(int)(g.last-g.first)+1;
+        }
+    }
+    if(arm<0 || span<1)return 0;
+    *root=arm;
+    *layer_frame=(float)(first+(unsigned)(frame<0?0:frame)%(unsigned)span);
+    return 1;
+}
+/* aw_items.c aw_items_player_layer: the renderer poses the body's parts so while the light is held in third person */
+static int player_light_layer(const model_t *m,const void *skel_table,int frame,float *layer_frame,int *root) {
+    extern int r_framecount;
+    static int asked=-1,held;      /* the held light asked once a frame, not once per drawn part */
+    if(!body_parts || !parts_table || skel_table!=(const void *)parts_table || !m || !chase_active.value ||
+       !parts_in_use(m))return 0;
+    if(asked!=r_framecount){asked=r_framecount;held=AW_HeldLight()!=NULL;}
+    return held && parts_light_layer(frame,layer_frame,root);
+}
+static model_t *held_light_model;            /* the held light's model drawn this frame (NULL none) */
+static float held_light_place[6];            /* its origin and alias angles */
+/* the host frame (realtime) it was placed in: the body's items are placed when the client relinks its entities, before
+ * the frame's render, so the render's own counter is one ahead of it by then */
+static double held_light_time=-1;
 static void parts_draws(edict_t *p) {
     static float world[AW_SKEL_MAX_BONES][3][4];static const aw_skel_table_t *posed;static int posed_frame=-1;
-    eval_t *goal;int i,kind,drawn,bone;float tag[6],scale[3];const aw_inventory_item_t *right,*item;
+    static float posed_layer=-1;
+    eval_t *goal;int i,kind,drawn,bone,root=-1,layered=0;float tag[6],scale[3],layer=-1;
+    const aw_inventory_item_t *right,*item;const aw_held_light_t *light;
+    held_light_model=NULL;
     for(i=1;i<parts.count && held_draw_count<AW_PARTS_MAX;i++){
         part_ents[i]=body;part_ents[i].model=part_models[i];
         held_draws[held_draw_count++]=&part_ents[i];
@@ -865,24 +923,70 @@ static void parts_draws(edict_t *p) {
     drawn=goal && goal->_float==1;
     right=parts_hand_item(0);
     scale[0]=scale[1]=parts.weight*.25f;scale[2]=parts.height*.25f;
+    light=AW_HeldLight();
+    if(light)layered=parts_light_layer(body.frame,&layer,&root);
     for(kind=0;kind<2;kind++){
         model_t *model;entity_t *out=&inventory_held[kind];
         bone=kind?parts.shield_bone:parts.weapon_bone;
         if(bone<0 || bone>=parts_table->bones)continue;
-        if(!kind){if(!drawn || !right)continue;item=right;}
-        else if(!(item=parts_hand_item(1)) || item->category!=AW_INV_ARMOUR || item->subtype!=8 ||
-                (drawn && right && AW_TWO_HANDED(right->weapon)))continue;
-        if(!item->model[0])continue;
-        model=Mod_ForName((char *)item->model,false);
-        if(!model || model->type!=mod_alias || !Cache_Check(&model->cache))continue;
-        if(posed!=parts_table || posed_frame!=body.frame){
-            AW_SkelPose(parts_table,(float)body.frame,world);posed=parts_table;posed_frame=body.frame;
+        if(kind && light){
+            model=Mod_ForName((char *)light->model,false);
+            if(!model || model->type!=mod_alias || !Cache_Check(&model->cache))continue;
+        }else{
+            if(!kind){if(!drawn || !right)continue;item=right;}
+            else if(!(item=parts_hand_item(1)) || item->category!=AW_INV_ARMOUR || item->subtype!=8 ||
+                    (drawn && right && AW_TWO_HANDED(right->weapon)))continue;
+            if(!item->model[0])continue;
+            model=Mod_ForName((char *)item->model,false);
+            if(!model || model->type!=mod_alias || !Cache_Check(&model->cache))continue;
+        }
+        if(posed!=parts_table || posed_frame!=body.frame || posed_layer!=(layered?layer:-1)){
+            if(layered)AW_SkelPoseLayer(parts_table,(float)body.frame,layer,root,world);
+            else AW_SkelPose(parts_table,(float)body.frame,world);
+            posed=parts_table;posed_frame=body.frame;posed_layer=layered?layer:-1;
         }
         AW_SkelBoneTag((const float (*)[4])world[bone],scale,tag);
         *out=body;out->model=model;out->frame=0;out->effects&=~AW_EF_ALIAS_SCALE;out->aw_alias_zscale=0;out->aw_sprite_scale=1;
         AW_ItemsPose(tag,body.origin,body.angles[YAW],out->origin,out->angles);
+        if(kind && light){
+            float origin[3],angles[3];
+            VectorCopy(out->origin,origin);VectorCopy(out->angles,angles);
+            AW_BlockCompose(origin,angles,light->offset,out->origin,out->angles);
+            held_light_model=model;
+            memcpy(held_light_place,out->origin,3*sizeof(float));memcpy(held_light_place+3,out->angles,3*sizeof(float));
+            held_light_time=realtime;
+        }
         held_draws[held_draw_count++]=out;
     }
+}
+/* aw_torch.h aw_view_held_flames / aw_view_held_light: the third-person held light's flames and light place */
+/* placed in this host frame (the flames), or in the previous one too (SLACK: the light, set before this frame's relink) */
+static int held_light_placed(int slack) {
+    return held_light_model && held_light_time>=0 && (held_light_time==realtime || (slack && realtime-held_light_time<.25));
+}
+static int view_held_flames(vec3_t out[AW_HELD_FLAMES]) {
+    const aw_held_light_t *light=AW_HeldLight();vec3_t forward,right,up,angles;int i,j;
+    if(!light || !owned || !chase_active.value || !held_light_placed(0))return 0;
+    memcpy(angles,held_light_place+3,3*sizeof(float));angles[PITCH]=-angles[PITCH];
+    AngleVectors(angles,forward,right,up);
+    for(i=0;i<light->flames && i<AW_HELD_FLAMES;i++)
+        for(j=0;j<3;j++)out[i][j]=held_light_place[j]+light->flame[i][0]*forward[j]-light->flame[i][1]*right[j]+
+                                  light->flame[i][2]*up[j];
+    return i;
+}
+static int view_held_light(vec3_t out) {
+    const aw_held_light_t *light;vec3_t forward,right,up,angles;edict_t *p=local_player();trace_t t;int j;
+    if(!p || !(light=AW_HeldLight()) || !owned || !chase_active.value || !held_light_placed(1))return 0;
+    /* from its first flame; a light without one (the paper lantern) from its model's place */
+    memcpy(out,held_light_place,3*sizeof(float));
+    if(light->flames){
+        memcpy(angles,held_light_place+3,3*sizeof(float));angles[PITCH]=-angles[PITCH];
+        AngleVectors(angles,forward,right,up);
+        for(j=0;j<3;j++)out[j]+=light->flame[0][0]*forward[j]-light->flame[0][1]*right[j]+light->flame[0][2]*up[j];
+    }
+    if(SV_PointContents(out)!=CONTENTS_EMPTY)return 0;
+    t=SV_Move(p->v.origin,vec3_origin,vec3_origin,out,MOVE_NOMONSTERS,p);
+    return !t.startsolid && !t.allsolid && t.fraction==1;
 }
 static entity_t *view_held(entity_t *draw) {
     edict_t *p=local_player();eval_t *goal;int kind;float tag[6];aw_inventory_item_t item,right;
@@ -1378,6 +1482,24 @@ static void command(void) {
             Con_Printf("\n");
         }else Con_Printf("First-person arms: the baked arms (%s)\n",!hand_parts_cvar.value?"aw_hand_parts 0":
             hparts_failed?"parts unavailable in this image":"parts not drawn yet");
+        /* FP-FOREARMS-BELOW-VIEW-61: the first-person model's own view (view.c) */
+        if(aw_fp_view.value)Con_Printf("First-person view: the original's (aw_fp_view 1): its own field %.0f degrees "
+            "high, the arms turn %.2f of the pitch; view pitch %.1f, arms pitch %.1f\n",V_FP_FOV,V_FP_NECK,
+            cl.viewangles[PITCH],-cl.viewent.angles[PITCH]);
+        else Con_Printf("First-person view: the world's projection, the arms follow the whole pitch (aw_fp_view 0)\n");
+        /* HELD-LIGHT-OWN-MODEL-61: the held light's state, for the in-game checks */
+        {
+            const aw_held_light_t *l=AW_HeldLight();vec3_t at;int lroot;float lframe;
+            if(!l)Con_Printf("Held light: none lit (chase %d, owned %d)\n",(int)chase_active.value,owned);
+            else{
+                int lit=view_held_light(at);
+                Con_Printf("Held light: %s, reach %.0f, %s, %d flames; third person placed %.2f s ago at %.1f %.1f %.1f "
+                    "(player %.1f %.1f %.1f), light from it %d; layer %d\n",l->model,l->radius,l->flicker?"flickering":"steady",
+                    l->flames,held_light_time>=0?realtime-held_light_time:-1.0,held_light_place[0],held_light_place[1],
+                    held_light_place[2],body.origin[0],body.origin[1],body.origin[2],lit,
+                    parts_table?parts_light_layer(body.frame,&lframe,&lroot):-1);
+            }
+        }
         if(body_model){
             edict_t *p=local_player();
             Con_Printf("Body animation: frame %d/%d, group %d, layers %d, kit %d, water %d, torch %d\n",
@@ -1441,6 +1563,14 @@ static void command(void) {
             Con_Printf("Weapon stances in third person %s (aw_player_stances %d, saved).\n",on?"on":"off: the fixed layout",on);
             return;
         }
+        /* FP-FOREARMS-BELOW-VIEW-61: the original's first-person view (on, the default) or the world's projection with
+         * the arms following the whole pitch (off, the previous method) */
+        if(!Q_strcasecmp(a,"fpview")){
+            Cvar_SetValue(aw_fp_view.name,(float)on);
+            Con_Printf("First-person view: %s (aw_fp_view %d, saved).\n",on?"the original's: its own field of view, "
+                "the arms lag the pitch":"the world's projection, the arms follow the whole pitch",on);
+            return;
+        }
         /* the first-person arms from parts (on, the default) or the baked arms (off, the previous method) */
         if(!Q_strcasecmp(a,"hands")){
             Cvar_SetValue(hand_parts_cvar.name,(float)on);hparts_failed=0;hparts_sig[0]=0;hparts.count=0;
@@ -1448,14 +1578,14 @@ static void command(void) {
             return;
         }
     }
-    Con_Printf("Usage: dbg camera [first | third | toggle | distance N | vanity on/off/now | death on/off | retry on/off | body on/off | parts on/off | stances on/off | hands on/off | sway 1/2/bench | npcs [on/off] | die]\n");
+    Con_Printf("Usage: dbg camera [first | third | toggle | distance N | vanity on/off/now | death on/off | retry on/off | body on/off | parts on/off | stances on/off | hands on/off | fpview on/off | sway 1/2/bench | npcs [on/off] | die]\n");
 }
 void AW_ViewInit(void) {
     Cvar_RegisterVariable(&view_cvar);Cvar_RegisterVariable(&distance_cvar);Cvar_RegisterVariable(&vanity_cvar);
     Cvar_RegisterVariable(&death_cvar);Cvar_RegisterVariable(&retry_cvar);Cvar_RegisterVariable(&body_cvar);
     Cvar_RegisterVariable(&parts_cvar);Cvar_RegisterVariable(&hand_parts_cvar);Cvar_RegisterVariable(&player_cache_cvar);
     Cvar_RegisterVariable(&stances_cvar);
-    aw_hand_parts_apply=hand_parts_apply;aw_view_hand_part=hand_part;
+    aw_hand_parts_apply=hand_parts_apply;aw_view_hand_part=hand_part;aw_inventory_preview_pending=parts_pending;
     Cvar_RegisterVariable(&fullview_cvar);Cvar_RegisterVariable(&aw_inventory_preview_reserve);Cvar_RegisterVariable(&aw_inventory_preview_live);
     AW_ViewRulesDefault(&rules);AW_ViewReset(&view,&rules);
     Cmd_AddCommand("+aw_pov",pov_press);Cmd_AddCommand("-aw_pov",pov_release);
@@ -1465,6 +1595,10 @@ void AW_ViewInit(void) {
     aw_death_prompt_active=death_prompt_active;
     aw_view_frame=AW_ViewFrame;aw_view_camera=AW_ViewCamera;aw_view_body=AW_ViewBody;aw_view_hide_hands=AW_ViewThirdPerson;
     aw_view_held=view_held;aw_view_torch_emitter=view_torch_emitter;aw_view_torch_light=view_torch_light;
+    /* HELD-LIGHT-OWN-MODEL-61: the held light's place, flames and arm pose in both views */
+    aw_view_held_flames=view_held_flames;aw_view_held_light=view_held_light;aw_hand_parts_shield_tag=hand_parts_shield_tag;
+    aw_items_player_layer=player_light_layer;
+    if(!R_AliasTorchLayer)R_AliasTorchLayer=AW_ItemsTorchLayer;
     aw_view_input=AW_ViewInput;aw_view_key=AW_ViewKey;aw_view_draw=AW_ViewDraw;aw_view_fullscreen=AW_ViewVanityFullscreen;
     aw_view_orbiting=AW_ViewOrbiting;
     combat_scene=aw_combat_scene;aw_combat_scene=scene_spawn;   /* after AW_CombatInit (aw_debug.c) */

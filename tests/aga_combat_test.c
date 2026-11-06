@@ -157,6 +157,9 @@ static void test_equipment_apply(aw_fighter_t *sheet) {
     /* A bad adapter must not let equipment refresh reset active combat. */
     sheet->health=999;sheet->fatigue=999;sheet->knocked=0;sheet->dead=0;
 }
+/* INVENTORY-NO-ARMOR-RATING-61: an active Shield of 10 on the player */
+static int shield_asked=-1;
+static float test_shield(struct edict_s *actor,int effect){(void)actor;shield_asked=effect;return effect==3?10:0;}
 int main(void){
     edict_t *p=&edicts[1],*npc=&edicts[2],*resident=&edicts[3];aw_fighter_t f;const aw_fighter_t *sheet;
     float fraction,alpha;int i,before;
@@ -222,6 +225,15 @@ int main(void){
     }
     AW_CombatPlayerSheet(&f);
     assert(f.health==60 && f.fatigue_max==200 && f.skills[AW_SK_H2H]==30 && !f.weapon && f.armor>5.84f && f.armor<5.86f);
+    /* INVENTORY-NO-ARMOR-RATING-61: the inventory window's rating (OpenMW npc.cpp getArmorRating): the sheet's, plus
+     * the magnitude of an active Shield effect (effect 3) */
+    {
+        extern float (*aw_worldui_armor_rating)(void);float r=AW_CombatPlayerArmorRating();
+        assert(r>5.84f && r<5.86f && aw_worldui_armor_rating==AW_CombatPlayerArmorRating);
+        aw_combat_effect_magnitude=test_shield;r=AW_CombatPlayerArmorRating();
+        assert(r>15.84f && r<15.86f && shield_asked==3);
+        aw_combat_effect_magnitude=NULL;
+    }
 
     /* engage from 300 units: it runs in, then swings */
     assert(AW_CombatActorLoad("mevil molor",&f));
@@ -426,6 +438,18 @@ int main(void){
      aw_combat_scene();client.active=client.spawned=1;p->v.health=60;   /* the scene set-up, the health back */
      tick(3);assert(music_death==deaths && !AW_CombatDeathMusicPlayed());
      AW_CombatClear();}
+    /* CREATURE-COMBAT-FRAMES-MISSING-61: a fighter laid out on the model it wore at the engage (the walker's 38-frame
+     * mover) and then put back on a smaller model (its 16-frame standing one) plays only frames that model has */
+    {static model_t standing;int seen=0,top=-1;
+     AW_CombatClear();p->v.health=60;p->v.button0=0;
+     npc->v.solid=SOLID_BBOX;npc->v.origin[0]=p->v.origin[0]-200;npc->v.origin[1]=p->v.origin[1];
+     assert(AW_CombatActorLoad("mevil molor",&f));
+     assert(AW_CombatEngage(npc,&f,"idle:0:4:0.6667 run:4:6:0.1556 attack:10:8:0.1500:0.667 hit:18:3:0.3333 knock:21:4:0.6667 death:25:6:0.3333"));
+     tick(2);
+     standing.numframes=16;sv.models[2]=&standing;npc->v.modelindex=2;   /* the mover taken off under the fight */
+     for(i=0;i<400;i++){tick(1);seen++;if(npc->v.frame>top)top=(int)npc->v.frame;assert(npc->v.frame>=0 && npc->v.frame<16);}
+     assert(seen==400 && top>=0);
+     npc->v.modelindex=1;sv.models[2]=NULL;AW_CombatClear();}
     /* commands and cost */
     run("aw_combat_cmd");run("aw_combat_cmd readout off");run("aw_combat_cmd calm");run("aw_combat_cmd off");
     assert(!AW_CombatEngage(npc,&f,NULL));

@@ -583,7 +583,7 @@ void Con_DrawNotify (void)
 	float	time;
 	extern char chat_buffer[];
 
-	v = 0;
+	v = AW_RecorderLineShown ();	// below the recorder's version line (GAME-RECORDER-61)
 	for (i= con_current-NUM_CON_TIMES+1 ; i<=con_current ; i++)
 	{
 		if (i < 0)

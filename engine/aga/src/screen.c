@@ -870,6 +870,7 @@ void SCR_UpdateScreen (void)
     static float	oldlcd_x;
     vrect_t		vrect;
     int			vanity;
+    int			over_window = 0;	/* a world window is open: the messages go over it */
 
     if (scr_skipupdate || block_drawing)
         return;
@@ -1039,16 +1040,23 @@ void SCR_UpdateScreen (void)
             Sbar_Draw ();
         if (!AW_PhotoModeActive() && !vanity)
             AW_SceneDraw();
-        /* In photo mode the message box shows only photo mode's own notice. With the HUD hidden
-         * (Ctrl+Alt+H) messages, dialogue and menus stay: only the HUD goes. */
-        if ((!AW_PhotoModeActive() && (!vanity || aw_hud_hidden)) || AW_PhotoNoticeShowing())
-            AW_UIDraw();
         AW_IntroDraw();
         AW_HalloweenDraw();		/* dbg halloween: its FPS counter and greeting box, photo mode or not */
         if (aw_view_draw)
             aw_view_draw ();
-        if (aw_msgbox_draw)
-            aw_msgbox_draw ();
+        /* DIALOGUE-MSGBOX-BEHIND-60: the messages (a notice such as an item added, a script's message box) are the
+         * top layer, as in the original: over the container strip (drawn by AW_IntroDraw) here, and over the world
+         * windows (the dialogue window, the inventory, the map: drawn by M_Draw) after them, below. */
+        over_window = AW_WorldUIActive ();
+        aw_ui_over_window = over_window || (aw_cstrip_open_now && aw_cstrip_open_now ());
+        if (!over_window) {
+            /* In photo mode the message box shows only photo mode's own notice. With the HUD hidden
+             * (Ctrl+Alt+H) messages, dialogue and menus stay: only the HUD goes. */
+            if ((!AW_PhotoModeActive() && (!vanity || aw_hud_hidden)) || AW_PhotoNoticeShowing())
+                AW_UIDraw();
+            if (aw_msgbox_draw)
+                aw_msgbox_draw ();
+        }
         /* Test-room and gallery instruction text is not part of a photo
          * (PHOTO-GALLERY-TEXT-33); the light gallery strip stays, it is a tool. */
         if (!AW_PhotoModeActive() && !vanity)
@@ -1056,8 +1064,17 @@ void SCR_UpdateScreen (void)
         if (!vanity)
             AW_UIOuterFrame();
         AW_FpsDraw();			/* dbg fps: the bottom-left corner of the screen, the vanity orbit too */
+        AW_RecorderDraw();		/* the version line with (RECORDING) / (PLAYBACK) at the top (GAME-RECORDER-61) */
         SCR_DrawConsole ();
         M_Draw ();
+        if (over_window && key_dest != key_console) {   /* the messages over the world window (above) */
+            /* not hidden by the idle camera's full view: the window is open over it (its HUD is not drawn anyway) */
+            if (!AW_PhotoModeActive() || AW_PhotoNoticeShowing())
+                AW_UIDraw ();
+            if (aw_msgbox_draw)
+                aw_msgbox_draw ();
+        }
+        aw_ui_over_window = 0;
     }
 
     D_DisableBackBufferAccess ();	// for adapters that can't stay mapped in

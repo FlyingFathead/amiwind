@@ -81,7 +81,12 @@ void AW_UIBookEnd(void){}
 int AW_UIWidth(const char *s){return (int)strlen(s)*6;}
 void AW_UIText(int x,int y,const char *s,int c){strcat(drawn,s);}
 void AW_SmallStringColor(int x,int y,int width,const char *s,int c){
-    assert(x>=128 && x+width<=316 && y>=20 && y+5<=194);
+    /* the list panel, or the burden bar's band above the picture with its one-pixel shadow
+     * (INVENTORY-BURDEN-TEXT-UNREADABLE-61: bar 8..122 x 21..30), or the armour rating's band under the picture
+     * (INVENTORY-NO-ARMOR-RATING-61: 7..123 x 182..195, inside the picture's box) */
+    assert((x>=128 && x+width<=316 && y>=20 && y+5<=194) ||
+           (x>=8 && x+width<=123 && y>=21 && y+5<=31) ||
+           (x>=7 && x+width<=124 && y>=182 && y+5<=195));
     assert((int)strlen(s)*4<=width);
     strcat(drawn,s);
 }

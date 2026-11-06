@@ -28,6 +28,7 @@
 #include "aw_move.h"
 #include "aw_hand_models.h"
 #include "aw_ambient.h"
+#include "aw_effects.h"
 
 #define SLOTS 4                /* hostile NPCs at a time */
 #define SCALE .25f              /* original units -> game units (tools/prepare_quake.py SCALE) */
@@ -340,6 +341,17 @@ void AW_CombatPlayerSheet(aw_fighter_t *o) {
     o->armor=settings_ok?AW_CombatUnarmoredRating(&aw_combat_settings,o):0;
     if(aw_combat_equipment)aw_combat_equipment(o);
 }
+/* INVENTORY-NO-ARMOR-RATING-61: the player's armour rating as the inventory window shows it under the picture (OpenMW
+ * 0.51 mwgui/inventorywindow.cpp updateArmorRating: the whole number of mwclass/npc.cpp getArmorRating): the worn pieces
+ * by slot share, each by its class's skill and its condition, an empty slot by the unarmored skill (the combat sheet,
+ * aw_inventory.c inv_combat), plus the magnitude of an active Shield effect. -1 without the game's settings. */
+float AW_CombatPlayerArmorRating(void) {
+    aw_fighter_t f;edict_t *p=sv.active && svs.clients?svs.clients[0].edict:NULL;float shield;
+    if(!settings_ok && !AW_CombatSettingsLoad())return -1;
+    AW_CombatPlayerSheet(&f);
+    shield=p && aw_combat_effect_magnitude?aw_combat_effect_magnitude(p,AW_EFFECT_SHIELD):0;
+    return f.armor+(shield>0?shield:0);
+}
 /* Inventory transactions store condition before changing slots. Refresh only
  * equipment fields: equipping must never heal or clear an active knockdown. */
 void AW_CombatEquipmentStore(void) {
@@ -509,6 +521,15 @@ static void animate(slot_t *s) {
         else{s->base[G_DEATH]=0;s->count[G_DEATH]=1;}
     }
     if(s->state==S_DEAD && s->rolled){s->e->v.frame=s->base[G_IDLE];return;}
+    {   /* CREATURE-COMBAT-FRAMES-MISSING-61: the groups were laid out on the model worn at the engage; when another
+         * part put a different model on the actor since (a walker's mover taken off), the groups are laid out again
+         * on the model it wears now, never a frame past its last */
+        int mi=(int)s->e->v.modelindex,n=mi>0 && mi<MAX_MODELS && sv.models[mi]?sv.models[mi]->numframes:0;
+        if(n>0 && s->base[g]+s->count[g]>n){
+            if(readout.value)Con_Printf("Combat: %s changed model (%d frames): its groups laid out again\n",s->f.name,n);
+            layout_default(s);
+        }
+    }
     if(g==G_RUN && s->run_x>0){
         /* WALK-CYCLES-57: the run's phase by the distance covered over the group's own speed (OpenMW
          * CharacterController: the movement animation's speed scaled to the actor's speed), so the feet do not slide
@@ -796,6 +817,8 @@ static void npc_strike(slot_t *s,edict_t *p) {
         voice(p,AW_VOICE_DEATH);    /* Hit, always, when death comes (OpenMW Actors::killDeadActors) */
         sound(SND_FALL);ended(0);
     }
+    /* WEAPON-STRIKE-ENCHANT-NOT-CAST-61: the NPC's weapon's Cast When Strikes on the player (a hit or a block) */
+    else if(aw_combat_strike_enchant && s->f.weapon && out.outcome!=AW_HIT_MISS)aw_combat_strike_enchant(s->e,p);
 }
 /* Damage from the world, not from a fighter (lava, aw_lava.c, docs/LAVA.md): the
  * player's live health as combat keeps it; a death ends like a death in combat. */
@@ -871,6 +894,7 @@ int (*aw_combat_player_ranged)(void);
  * creature's abilities reach the effect list. */
 float (*aw_combat_effect_magnitude)(struct edict_s *actor,int effect);
 int (*aw_combat_player_weapon_normal)(void);
+void (*aw_combat_strike_enchant)(struct edict_s *attacker,struct edict_s *victim);
 static float resist_test=-1;
 const char *AW_CombatResistText(void){return resist_text;}
 /* Resist less Weakness to Normal Weapons in percent, clamped to the sheet's short; TEST: the target of the player's
@@ -968,6 +992,10 @@ static void player_strike(edict_t *p) {
     }else if(s->f.knocked && s->state!=S_KNOCK){set_state(s,S_KNOCK,G_KNOCK);sound(SND_FALL);}
     else if(out.outcome>=AW_HIT_FATIGUE && !out.no_effect && s->state!=S_KNOCK)set_state(s,S_HIT,G_HIT);   /* hit recovery: every damaging hit */
     if(!s->f.dead && out.outcome>=AW_HIT_FATIGUE && !out.no_effect)voice(s->e,AW_VOICE_HIT);
+    /* WEAPON-STRIKE-ENCHANT-NOT-CAST-61: a weapon's Cast When Strikes on a blow that hit or was blocked, the killing
+     * blow too (OpenMW npc.cpp hit: the enchantment is cast before the blow's damage; its charge is spent, its effects
+     * find a corpse and do nothing) */
+    if(aw_combat_strike_enchant && you.weapon && out.outcome!=AW_HIT_MISS)aw_combat_strike_enchant(p,t);
 }
 /* The player's swing now (0 chop, 1 slash, 2 thrust): the same choice player_strike makes, by the movement at the
  * swing's start or the best attack; the third-person body plays its keys (aw_view.c, WEAPONS-57). */
@@ -1414,6 +1442,7 @@ void AW_CombatInit(void) {
     Cmd_AddCommand("aw_combat_cmd",command);   /* not "aw_combat": the cvar of that name would shadow it (CONSOLE-COMMAND-SHADOWED-BY-CVAR-36) */
     Cmd_AddCommand("+aw_alt",alt_down);Cmd_AddCommand("-aw_alt",alt_up);
     aw_combat_enemy_bar=AW_CombatEnemyBar;aw_combat_scene=AW_CombatSceneSpawn;
+    {extern float (*aw_worldui_armor_rating)(void);aw_worldui_armor_rating=AW_CombatPlayerArmorRating;}
 }
 
 #include "aw_actors.h"

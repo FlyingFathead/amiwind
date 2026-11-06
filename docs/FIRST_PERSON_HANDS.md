@@ -1,6 +1,6 @@
 # First-person geometry and sprite experiment
 
-_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
+_Last updated with AmiWind v0.0.61-dev3 (2026-11-06)._
 
 <!-- contents start -->
 ## Contents
@@ -20,6 +20,7 @@ _Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 - [The equipped weapon in first person (v0.0.59)](#the-equipped-weapon-in-first-person-v0059)
 - [Weapon sway: AmiWind groove or Morrowind stiff (v0.0.61)](#weapon-sway-amiwind-groove-or-morrowind-stiff-v0061)
 - [Bows, crossbows and thrown weapons (v0.0.61)](#bows-crossbows-and-thrown-weapons-v0061)
+- [The view's own field of view, sleeves and held lights (v0.0.61-dev3)](#the-views-own-field-of-view-sleeves-and-held-lights-v0061-dev3)
 
 <!-- contents end -->
 
@@ -378,7 +379,7 @@ placement for every stance and frame.
 When the player has a melee weapon equipped in the right hand, the engine shows
 that stance's arms instead of the bare hands and draws the weapon's own model
 (the one shared model of its mesh) on the Weapon Bone: one extra model, only
-while armed. Bows, crossbows and thrown weapons keep the bare hands for now. The
+while armed. Bows, crossbows and thrown weapons have their own stances since v0.0.61 (below). The
 arms and the weapon model are loaded only while that weapon is equipped; if a
 file is missing the bare hands stay, with one console line. The first-person
 shield block also accepts the shared item models.
@@ -421,3 +422,15 @@ the four melee stances only, and there a ranged weapon keeps the bare hands.
 The cost is measured with `dbg rcount`: the line's `hd` field is the time of the
 first-person view model per frame (hands, torch, shield or weapon), compared at a
 fixed pose with the bare hands and the same view armed.
+
+The seven stances (bare hands, one-handed, two-handed close and wide, bow, crossbow and thrown) were checked in game on
+the v0.0.61-dev2 image. A still in the middle of a swing with the view of the next section is not yet seen.
+
+## The view's own field of view, sleeves and held lights (v0.0.61-dev3)
+
+Since v0.0.61-dev3 the arms, the drawn weapon and the held light are drawn with a 60 degree field of view of their own
+and turn with three quarters of the view's pitch, as in the original (`aw_fp_view`, default on, saved; `dbg camera fpview
+on|off`; details and the build in [THIRD_PERSON.md](THIRD_PERSON.md), "The first-person view"). With the fists raised and
+the view looking down the forearms show, and a worn shirt's or robe's sleeves cover them. A held candle, candlestick or
+lantern is drawn as itself in the left hand with the torch's first-person pose; a lantern hangs below the hand, so only
+its handle shows ([INVENTORY.md](INVENTORY.md), "World models").

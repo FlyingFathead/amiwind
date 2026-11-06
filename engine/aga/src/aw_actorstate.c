@@ -10,14 +10,17 @@
 
 #define ACTB_BYTES 96
 #define AINV_BYTES 6
-#define AITM_BYTES 28
+#define AITM_BYTES 32        /* v0.0.61: + u16 enchantment; a table before it has 28-byte rows (AITM_SIZE) */
+#define AITM_OLD_BYTES 28
 #define ASPT_BYTES 4
+#define AENC_BYTES 16
+#define APCS_HEAD 16
 #define GOLD_ITEM 0          /* AITM row 0 is the gold item (tools/mwscript/actors.py) */
 
 typedef struct {uint32_t offset,rows,bytes;} section_t;
 typedef struct {
     aw_actorstate_io_t io;
-    section_t actb,ainv,aitm,aspt,aspl,aspc,aspe,aeff,amge,strs;
+    section_t actb,ainv,aitm,aspt,aspl,aspc,aspe,aeff,amge,strs,aenc,apcs;
     aw_actor_t *block[AW_ACTOR_POOL_MAX/AW_ACTOR_POOL];   /* the live records, blocks never move */
     int blocks;
     aw_actor_t player;
@@ -122,6 +125,9 @@ int AW_ActorStateOpen(const unsigned char *head,uint32_t head_bytes,const aw_act
     find_section(head,head_bytes,"ASPE",&st->aspe);find_section(head,head_bytes,"AEFF",&st->aeff);
     find_section(head,head_bytes,"AMGE",&st->amge);    /* absent before v0.0.58: no effects to make or enchant with */     /* absent in a table before v0.0.58: no spells for sale */
     find_section(head,head_bytes,"STRS",&st->strs);
+    /* v0.0.61 (PLAYER-CASTING-59): the enchantments and the starting spells; absent in older tables */
+    if(find_section(head,head_bytes,"AENC",&st->aenc) && st->aenc.bytes!=st->aenc.rows*AENC_BYTES)memset(&st->aenc,0,sizeof(st->aenc));
+    if(find_section(head,head_bytes,"APCS",&st->apcs) && st->apcs.bytes!=APCS_HEAD+2*st->apcs.rows)memset(&st->apcs,0,sizeof(st->apcs));
     st->nactors=(int)actb.rows;
     if(!(st->dead=(uint16_t *)AW_TryMalloc(sizeof(uint16_t)*(unsigned long)st->nactors)) || !grow()){
         AW_ActorStateClose();return 0;}
@@ -166,11 +172,16 @@ int AW_ActorBase(int row,aw_actor_base_t *o){
     o->soul=(unsigned short)U16(r+94);
     return 1;
 }
+/* the AITM row size: 32 bytes since v0.0.61, 28 in a table before it */
+static uint32_t aitm_size(void){return st->aitm.rows && st->aitm.bytes==st->aitm.rows*AITM_OLD_BYTES?AITM_OLD_BYTES:AITM_BYTES;}
 int AW_ActorItem(int item,aw_item_t *o){
-    unsigned char r[AITM_BYTES];
-    if(!st || item<0 || (uint32_t)item>=st->aitm.rows || !fetch(st->aitm.offset+(uint32_t)item*AITM_BYTES,r,AITM_BYTES))return 0;
+    unsigned char r[AITM_BYTES];uint32_t size;
+    if(!st || item<0 || (uint32_t)item>=st->aitm.rows)return 0;
+    size=aitm_size();
+    if(!fetch(st->aitm.offset+(uint32_t)item*size,r,size))return 0;
     o->id=(uint16_t)U16(r);o->kind=r[2];o->type=r[3];o->health=(unsigned short)U16(r+4);o->rating=(unsigned short)U16(r+6);
     memcpy(o->damage,r+8,6);o->flags=(unsigned short)U16(r+14);o->weight=f32(r+16);o->speed=f32(r+20);o->reach=f32(r+24);
+    o->enchant=(uint16_t)(size>=AITM_BYTES?U16(r+28):AW_ACTOR_NONE);
     return 1;
 }
 /* ARRIVAL-LONG-FRAME-DEV6-59: the ids found lately and their rows (a binary search on disk is about 12 probes of
@@ -178,7 +189,8 @@ int AW_ActorItem(int item,aw_item_t *o){
  * cleared with the table (st) */
 #define FIND_MEMO 64
 static struct {char id[40];int row;const void *table;} find_memo[FIND_MEMO];static int find_memo_next;
-void AW_ActorFindForget(void){memset(find_memo,0,sizeof(find_memo));find_memo_next=0;}
+static void ench_forget(void);
+void AW_ActorFindForget(void){memset(find_memo,0,sizeof(find_memo));find_memo_next=0;ench_forget();}
 int AW_ActorFind(const char *id){
     char want[64],have[64];int low=0,high,i;
     if(!st || !id)return AW_ACTOR_NONE;
@@ -527,6 +539,15 @@ int AW_ActorWeaponType(int row){
     if(!fetch(st->ainv.offset+(uint32_t)(b.inv_first+b.weapon)*AINV_BYTES,e,AINV_BYTES))return -1;
     if(!AW_ActorItem((int)U16(e),&it) || it.kind!=AWK_WEAPON)return -1;
     return it.type;
+}
+int AW_ActorWeaponEnchant(int row,int *item){
+    aw_actor_base_t b;unsigned char e[AINV_BYTES];aw_item_t it;
+    if(item)*item=-1;
+    if(!st || !AW_ActorBase(row,&b) || b.weapon==0xFF || b.weapon>=b.inv_count)return AW_ACTOR_NONE;
+    if(!fetch(st->ainv.offset+(uint32_t)(b.inv_first+b.weapon)*AINV_BYTES,e,AINV_BYTES))return AW_ACTOR_NONE;
+    if(!AW_ActorItem((int)U16(e),&it) || it.kind!=AWK_WEAPON)return AW_ACTOR_NONE;
+    if(item)*item=(int)U16(e);
+    return it.enchant;
 }
 
 /* --- spells --- */
@@ -886,15 +907,70 @@ int AW_ActorMagicEffect(int index,aw_mgef_t *out){
     if(U16(e+10)!=0xFFFF)string_at((int)U16(e+10),out->name,sizeof(out->name),0);
     return 1;
 }
-int AW_ActorSpellEffects(int spell,aw_spell_effect_t *out,int max){
-    unsigned char e[14],r[4];int i,n;uint32_t first;
-    if(!st || spell<0 || (uint32_t)spell>=st->aspe.rows || !fetch(st->aspe.offset+4u*(uint32_t)spell,r,4))return 0;
-    first=U16(r);n=r[2]<max?r[2]:max;
+/* N effects of the AEFF list from FIRST into OUT (MAX at most); how many were read */
+static int effects_at(uint32_t first,int n,aw_spell_effect_t *out,int max){
+    unsigned char e[14];int i;
+    if(n>max)n=max;
     for(i=0;i<n;i++){
         if(first+(uint32_t)i>=st->aeff.rows || !fetch(st->aeff.offset+14u*(first+(uint32_t)i),e,14))return i;
         out[i].effect=(int16_t)U16(e);out[i].skill=(signed char)e[2];out[i].attribute=(signed char)e[3];out[i].range=e[4];
         out[i].area=U16(e+6);out[i].duration=U16(e+8);out[i].magnitude_min=U16(e+10);out[i].magnitude_max=U16(e+12);
     }
+    return n;
+}
+int AW_ActorSpellEffects(int spell,aw_spell_effect_t *out,int max){
+    unsigned char r[4];
+    if(!st || spell<0 || (uint32_t)spell>=st->aspe.rows || !fetch(st->aspe.offset+4u*(uint32_t)spell,r,4))return 0;
+    return effects_at(U16(r),r[2],out,max);
+}
+int AW_ActorSpellFlags(int spell){
+    unsigned char e[ASPT_BYTES];
+    if(!st || spell<0 || (uint32_t)spell>=st->aspt.rows || !fetch(st->aspt.offset+(uint32_t)spell*ASPT_BYTES,e,ASPT_BYTES))return 0;
+    return e[3];
+}
+/* --- enchantments (AENC, v0.0.61; PLAYER-CASTING-59): read when an item is used, strikes or is worn --- */
+int AW_ActorEnchantCount(void){return st?(int)st->aenc.rows:0;}
+int AW_ActorEnchant(int row,aw_enchant_t *out){
+    unsigned char r[AENC_BYTES];
+    if(!st || row<0 || (uint32_t)row>=st->aenc.rows || !fetch(st->aenc.offset+(uint32_t)row*AENC_BYTES,r,AENC_BYTES))return 0;
+    out->type=r[2];out->flags=r[3];out->cost=f32(r+4);out->charge=f32(r+8);
+    out->n=effects_at(U16(r+12),r[14],out->effect,AW_MADE_EFFECTS);
+    return 1;
+}
+/* the folded id's row: a binary search on disk (about 10 probes for the masters' 795), the last answers kept */
+#define ENCH_MEMO 16
+static struct {char id[40];int row;const void *table;} ench_memo[ENCH_MEMO];static int ench_memo_next;
+static void ench_forget(void){memset(ench_memo,0,sizeof(ench_memo));ench_memo_next=0;}
+int AW_ActorEnchantFind(const char *id){
+    char want[64],have[64];int low=0,high,i;
+    if(!st || !id || !*id || !st->aenc.rows)return AW_ACTOR_NONE;
+    for(i=0;i<63 && id[i];i++)want[i]=fold(id[i]);
+    want[i]=0;
+    for(i=0;i<ENCH_MEMO;i++)if(ench_memo[i].table==(const void *)st && !strcmp(ench_memo[i].id,want))return ench_memo[i].row;
+    high=(int)st->aenc.rows-1;
+    while(low<=high){
+        int mid=(low+high)/2,cmp;unsigned char b[2];
+        if(!fetch(st->aenc.offset+(uint32_t)mid*AENC_BYTES,b,2) || !string_of((int)U16(b),have,sizeof(have)))return AW_ACTOR_NONE;
+        {const unsigned char *x=(const unsigned char *)have,*y=(const unsigned char *)want;
+         while(*x && *x==*y){x++;y++;}cmp=*x<*y?-1:*x>*y;}
+        if(!cmp){low=mid;break;}
+        if(cmp<0)low=mid+1;else high=mid-1;
+    }
+    i=low<=high?low:AW_ACTOR_NONE;
+    if(strlen(want)<sizeof(ench_memo[0].id)){
+        int k=ench_memo_next;ench_memo_next=(ench_memo_next+1)%ENCH_MEMO;
+        strcpy(ench_memo[k].id,want);ench_memo[k].row=i;ench_memo[k].table=(const void *)st;
+    }
+    return i;
+}
+/* the starting spells (APCS): the rule's settings and the ASPT rows, in the masters' order; how many */
+int AW_ActorStartSpells(aw_start_settings_t *set,int *rows,int max){
+    unsigned char h[APCS_HEAD],b[2];int i,n;
+    if(!st || !st->apcs.bytes || !fetch(st->apcs.offset,h,APCS_HEAD))return 0;
+    if(set){set->magicka_mult=f32(h);set->chance=f32(h+4);set->max=(int)U16(h+8);set->skill_min=(int)U16(h+10);
+            set->cost_mult=f32(h+12);}
+    n=(int)st->apcs.rows<max?(int)st->apcs.rows:max;
+    for(i=0;i<n;i++){if(!fetch(st->apcs.offset+APCS_HEAD+2u*(uint32_t)i,b,2))return i;rows[i]=(int)U16(b);}
     return n;
 }
 /* --- things the player made: spells (Spellmaking) and enchanted items (Enchanting) ---

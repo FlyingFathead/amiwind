@@ -331,6 +331,9 @@ void AW_MwscriptDispositionFacts(const char *record,unsigned long reference,int 
 int AW_MwscriptPersons(const char *record,unsigned long reference,aw_dial_person_t *player,aw_dial_person_t *npc,
                        int *fight,int *flee);
 void AW_MwscriptSetSpeaker(const char *record,unsigned long reference,int disposition,int fight,int flee);
+/* the speaker's own disposition now (the scripts' changes in it; FALLBACK without a record), and set to a value */
+int AW_MwscriptSpeakerDisposition(const char *record,unsigned long reference,int fallback);
+void AW_MwscriptSetSpeakerDisposition(const char *record,unsigned long reference,int disposition);
 int AW_MwscriptPlayerGold(int delta);
 /* training: the speaker's 27 skills, the player's skill (raised by one when RAISE) and attribute (aw_mwhost.c) */
 int AW_MwscriptNpcSkills(const char *record,unsigned long reference,float *out);
@@ -388,6 +391,9 @@ void AW_MwscriptDispositionNow(int actor_row,unsigned long reference,int base,aw
 /* the NPC's row in the actor file (a binary search on disk: once, with the cache), -1 none */
 int AW_MwscriptActorRow(const char *record);
 int AW_DialWindowActive(void);
+/* DIALOGUE-ITEM-NOTICE-MISSING-61: a message box raised while the conversation is open goes into it (OpenMW
+ * DialogueWindow::addMessageBox: its own paragraph, in the notify colour); nothing when no conversation is open */
+void AW_DialWindowMessage(const char *text);
 /* the compiled scripts' file string reads that went to disk (aw_mwhost.c read_string; cached names do not count) */
 unsigned long AW_MwscriptStringReads(void);
 /* RankRequirement from the loaded table (AW_DialRankRequirement; 0 without the table) */

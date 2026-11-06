@@ -81,6 +81,7 @@ typedef struct {
 typedef struct {
     uint16_t id;unsigned char kind,type;unsigned short health,rating;unsigned char damage[6];unsigned short flags;
     float weight,speed,reach;
+    uint16_t enchant;                    /* its enchantment's AENC row (AW_ActorEnchant), AW_ACTOR_NONE none (v0.0.61) */
 } aw_item_t;
 
 /* The live record. Attributes and skills: modified = base + mod (mod: fortify minus damage, OpenMW's modStat). */
@@ -157,6 +158,9 @@ int AW_ActorEquipped(const aw_actor_t *a,int entry);              /* 1: base ent
 /* The type of the weapon the record of ROW holds (its weapon entry: the WPDT type, OpenMW's weapon type 0..13), -1
  * none (the animation's stance, aw_animkit.c). */
 int AW_ActorWeaponType(int row);
+/* The AENC row of the enchantment on the weapon the record of ROW holds (AW_ACTOR_NONE: none, or no weapon); *ITEM its
+ * AITM row (-1 none). v0.0.61, an NPC's Cast When Strikes weapon. */
+int AW_ActorWeaponEnchant(int row,int *item);
 /* Spells: the base list plus the changes; SPELL an ASPT row. */
 int AW_ActorHasSpell(const aw_actor_t *a,int spell);
 /* Any spell of an ASPT type (2 blight, 3 disease) in the base list and the changes (GetBlightDisease,
@@ -182,8 +186,26 @@ typedef struct {uint32_t flags;float base_cost;int school;char name[32];} aw_mge
 typedef struct {int16_t effect;signed char skill,attribute;unsigned char range;unsigned short area,duration,magnitude_min,magnitude_max;} aw_spell_effect_t;
 int AW_ActorMagicEffect(int index,aw_mgef_t *out);
 int AW_ActorSpellEffects(int spell,aw_spell_effect_t *out,int max);
+/* A spell's SPDT flags (ASPT byte 3, v0.0.61): AW_SPELL_AUTOCALC, AW_SPELL_PC_START, AW_SPELL_ALWAYS; 0 in older
+ * tables. */
+#define AW_SPELL_AUTOCALC 1
+#define AW_SPELL_PC_START 2
+#define AW_SPELL_ALWAYS 4
+int AW_ActorSpellFlags(int spell);
 /* Things the player made (bounded, saved: AWMD, AWEN): spells and enchanted items, up to 8 effects each. */
 #define AW_MADE_EFFECTS 8
+/* The game's enchantments (AENC, v0.0.61; tools/mwscript/actors.py): TYPE 0 cast once, 1 when strikes, 2 when used,
+ * 3 constant effect; FLAGS 1 autocalc; COST the cast cost before the caster's Enchant skill; CHARGE the full charge;
+ * the effects (the masters have at most 8). Find: the row of an enchantment id (folded; a binary search on disk, the
+ * last 16 answers kept), AW_ACTOR_NONE none. */
+typedef struct {int type,flags,n;float cost,charge;aw_spell_effect_t effect[AW_MADE_EFFECTS];} aw_enchant_t;
+int AW_ActorEnchantCount(void);
+int AW_ActorEnchantFind(const char *id);
+int AW_ActorEnchant(int row,aw_enchant_t *out);
+/* The starting spells of a new character (APCS, v0.0.61): the rule's game settings and the ASPT rows of the spells
+ * flagged as starting spells, in the masters' record order; how many (0: an older table). */
+typedef struct {float magicka_mult,chance,cost_mult;int max,skill_min;} aw_start_settings_t;
+int AW_ActorStartSpells(aw_start_settings_t *set,int *rows,int max);
 #define AW_MADE_ITEM_PREFIX "aw_made_"   /* the inventory id of made item N: aw_made_N */
 #define AW_MADE_SPELL_BYTES 152
 #define AW_MADE_ITEM_BYTES 200

@@ -10,11 +10,11 @@
 #include "aw_icons.h"
 #include "aw_tryalloc.h"
 #include "aw_cstrip.h"
-#define STRIP_H 76           /* the strip's height at the least (320 x 200: from y 124) */
-#define STRIP_CELL 36        /* a cell: the 32 x 32 picture, its frame and a gap */
-#define STRIP_COLUMNS 16     /* cells in view at most (a 640-wide screen) */
-#define STRIP_TITLE 14
-#define STRIP_BUTTON_W 56
+/* LOOT-WINDOW-LAYOUT-60: the rows and their room (aw_cstrip_rules.c AW_CStripLayout, native-tested) */
+#define STRIP_CELL AW_CSTRIP_CELL
+#define STRIP_COLUMNS AW_CSTRIP_COLUMNS
+#define STRIP_TITLE AW_CSTRIP_TITLE
+#define STRIP_BUTTON_W AW_CSTRIP_BUTTON_W
 typedef struct {
     aw_cstrip_list_t list;
     aw_icon_t icon[STRIP_COLUMNS];
@@ -31,6 +31,7 @@ static int strip_dirty;
 static int strip_pictures_pending;   /* AREA-TABLES-59: the next drawn frame's picture loads are measured */
 extern int scr_copyeverything;
 int AW_CStripActive(void){return strip!=NULL;}
+const aw_cstrip_list_t *AW_CStripList(void){return strip?&strip->list:NULL;}
 static int strip_open(unsigned reference,const char *name,int owned);
 /* aw_placed.c AW_PlacedInit: E on containers opens the strip; the input, drawing and prompt reach it (hooks only, no
  * command, no variable, nothing allocated) */
@@ -50,6 +51,64 @@ static const aw_cstrip_entry_t *strip_known(const aw_cstrip_list_t *old,const ch
     if(!old)return NULL;
     for(s=0;s<2;s++)for(i=0;i<old->count[s];i++)if(!Q_strcasecmp((char *)old->row[s][i].id,(char *)id))return &old->row[s][i];
     return NULL;
+}
+/* CONTAINER-STRIP-OPEN-MANY-KINDS-61: the inventory side, every carried kind in the item table's order. Names come
+ * from the old list first: both lists are in that order, so a cursor finds them in one walk (a full search only when
+ * the cursor misses: 415 kinds x 415 string compares per take otherwise). The kinds still unnamed are read the way the
+ * inventory window reads them (aw_inventory.c AW_InventoryCarried): above STRIP_SEARCHES of them one pass over
+ * items.awi in file order, else one search each. One binary search per kind held the open of a body 10.3 s with 415
+ * kinds on FS-UAE (about 25 ms each). A kind the catalogue has no row for is left out, as before. */
+#define STRIP_SEARCHES 8
+typedef struct {aw_cstrip_entry_t *row;const int *at;unsigned char *named;int named_now;} strip_pass_t;
+static void strip_pass_row(void *ctx,int state_row,const aw_inventory_item_t *it,int file_row){
+    strip_pass_t *p=(strip_pass_t *)ctx;int k=p->at[state_row];aw_cstrip_entry_t *e;(void)file_row;
+    if(k<0 || p->named[k] || !it)return;
+    e=&p->row[k];
+    Q_strcpy_bounded(e->id,it->id,sizeof(e->id));Q_strcpy_bounded(e->name,it->name,sizeof(e->name));
+    p->named[k]=1;p->named_now++;
+}
+static void strip_fill_inventory(aw_cstrip_list_t *l,const aw_cstrip_list_t *old,int kinds){
+    aw_cstrip_entry_t *row=l->row[AW_CSTRIP_INVENTORY];const aw_cstrip_entry_t *known;aw_inventory_item_t item;
+    int *at=NULL;unsigned char *named=NULL;int i,k,n=0,missing=0,cursor=0,oldn=old?old->count[AW_CSTRIP_INVENTORY]:0;
+    l->count[AW_CSTRIP_INVENTORY]=0;
+    if(kinds<1)return;
+    at=(int *)AW_TryMalloc(sizeof(int)*kinds);named=(unsigned char *)AW_TryCalloc((unsigned long)kinds,1);
+    if(!at || !named){free(at);free(named);return;}
+    for(i=0;i<kinds;i++){
+        aw_cstrip_entry_t *e;const char *id;
+        at[i]=-1;
+        if(AW_ITEM_ROW(&aw_state,i)->value<=0)continue;
+        id=AW_ITEM_ID(&aw_state,i);e=&row[n];
+        e->count=AW_ITEM_ROW(&aw_state,i)->value;
+        Q_strcpy_bounded(e->id,id,sizeof(e->id));e->name[0]=0;
+        known=NULL;
+        if(cursor<oldn && !Q_strcasecmp((char *)old->row[AW_CSTRIP_INVENTORY][cursor].id,(char *)id))
+            known=&old->row[AW_CSTRIP_INVENTORY][cursor++];
+        else if(oldn || (old && old->count[AW_CSTRIP_CONTAINER])){
+            known=strip_known(old,id);
+            /* found further on the old inventory side (a kind before it is gone): the cursor follows it */
+            if(known && known>=old->row[AW_CSTRIP_INVENTORY] && known<old->row[AW_CSTRIP_INVENTORY]+oldn)
+                cursor=(int)(known-old->row[AW_CSTRIP_INVENTORY])+1;
+        }
+        if(known){Q_strcpy_bounded(e->id,known->id,sizeof(e->id));Q_strcpy_bounded(e->name,known->name,sizeof(e->name));named[n]=1;}
+        else missing++;
+        at[i]=n++;
+    }
+    if(missing>STRIP_SEARCHES){
+        strip_pass_t p;p.row=row;p.at=at;p.named=named;p.named_now=0;
+        AW_InventoryCarried(strip_pass_row,&p);   /* every carried kind; the named ones are skipped */
+    }else if(missing){
+        for(i=0;i<kinds;i++){
+            if(at[i]<0 || named[at[i]])continue;
+            if(AW_InventoryRead(row[at[i]].id,&item)){
+                Q_strcpy_bounded(row[at[i]].id,item.id,sizeof(row[at[i]].id));
+                Q_strcpy_bounded(row[at[i]].name,item.name,sizeof(row[at[i]].name));named[at[i]]=1;
+            }
+        }
+    }
+    for(i=k=0;i<n;i++)if(named[i]){if(k!=i)row[k]=row[i];k++;}   /* the kinds without a catalogue row left out */
+    l->count[AW_CSTRIP_INVENTORY]=k;
+    free(at);free(named);
 }
 /* the two sides from the container's contents now (data + deltas) and the player's items; names already known are
  * kept, so a take or a put reads only the contents again, never every item's catalogue row */
@@ -74,19 +133,7 @@ static void strip_fill(void){
         e->count=items[i].count;k++;
     }
     l->count[AW_CSTRIP_CONTAINER]=k;
-    for(i=k=0;i<kinds && k<kinds;i++){
-        aw_value_t vrow;const aw_value_t *v=&vrow;aw_cstrip_entry_t *e=&l->row[AW_CSTRIP_INVENTORY][k];
-        vrow.value=AW_ITEM_ROW(&aw_state,i)->value;
-        if(v->value<=0)continue;
-        strcpy(vrow.id,AW_ITEM_ID(&aw_state,i));
-        if((known=strip_known(old,v->id))!=NULL){
-            Q_strcpy_bounded(e->id,known->id,sizeof(e->id));Q_strcpy_bounded(e->name,known->name,sizeof(e->name));
-        }else if(AW_InventoryRead(v->id,&item)){
-            Q_strcpy_bounded(e->id,item.id,sizeof(e->id));Q_strcpy_bounded(e->name,item.name,sizeof(e->name));
-        }else continue;
-        e->count=v->value;k++;
-    }
-    l->count[AW_CSTRIP_INVENTORY]=k;
+    strip_fill_inventory(l,old,kinds);
     AW_InventoryBatchEnd();
     free(oldl.row[0]);free(oldl.row[1]);
     AW_CStripClamp(l);
@@ -115,14 +162,19 @@ static int strip_open(unsigned reference,const char *name,int owned){
     IN_AWClearButtons();
     return 1;
 }
-static void layout(int *top,int *left,int *columns){
-    int y=r_refdef.vrect.y+r_refdef.vrect.height;
-    if(y>(int)vid.height-STRIP_H)y=(int)vid.height-STRIP_H;
-    if(y<0)y=0;
-    *top=y;*left=12;
-    *columns=((int)vid.width-24)/STRIP_CELL;
-    if(*columns>STRIP_COLUMNS)*columns=STRIP_COLUMNS;
-    if(*columns<1)*columns=1;
+static void layout(aw_cstrip_layout_t *o){
+    AW_CStripLayout((int)vid.width,(int)vid.height,r_refdef.vrect.y+r_refdef.vrect.height,AW_ConsoleCharWidth(),
+                    AW_ConsoleCharHeight(),o);
+}
+/* LOOT-WINDOW-LAYOUT-60: a line in the console font (the key help, the name and the properties), clipped at RIGHT;
+ * RED (a palette index) for an owned container's entries, -1 the console's own colour */
+static void ctext(int x,int y,const char *s,int right,int red){
+    int w=AW_ConsoleCharWidth();
+    if(w<1)w=8;
+    for(;s && *s && x+w<=right;s++,x+=w){
+        if(red>=0)AW_ConsoleCharacterRed(x,y,(unsigned char)*s,red);
+        else AW_ConsoleCharacter(x,y,(unsigned char)*s);
+    }
 }
 /* HOW: 0 one, 1 the stack, 2 everything in the container */
 static void strip_act(int how){
@@ -178,14 +230,14 @@ int AW_CStripMouse(int dx,int dy){
 }
 /* the title row's targets: the two side names, Take All, Close */
 static int click(void){
-    int top,left,columns,i,right=(int)vid.width-6;aw_cstrip_list_t *l=&strip->list;
-    layout(&top,&left,&columns);
-    if(mouse_y>=top+2 && mouse_y<top+2+STRIP_TITLE){
+    int i,right=(int)vid.width-AW_CSTRIP_FRAME-4;aw_cstrip_list_t *l=&strip->list;aw_cstrip_layout_t o;
+    layout(&o);
+    if(mouse_y>=o.title_y && mouse_y<o.title_y+STRIP_TITLE){
         if(mouse_x>=right-STRIP_BUTTON_W)return K_ESCAPE;
         if(mouse_x>=right-2*STRIP_BUTTON_W-4)return 't';
-        return mouse_x<left+120?'1':'2';
+        return mouse_x<o.left+120?'1':'2';
     }
-    i=AW_CStripCell(l,mouse_x,mouse_y,left,top+STRIP_TITLE+4,STRIP_CELL,STRIP_CELL);
+    i=AW_CStripCell(l,mouse_x,mouse_y,o.left,o.cells_y,STRIP_CELL,STRIP_CELL);
     if(i<0)return 0;
     if(i==l->selected[l->side])return 'e';
     l->selected[l->side]=i;AW_CStripClamp(l);
@@ -215,25 +267,29 @@ int AW_CStripKey(int key){
 }
 void AW_CStripDraw(void){
     static int white=-1,red,grey,dark,gold;
-    int top,left,columns,c,y,right=(int)vid.width-6;aw_cstrip_list_t *l;const aw_cstrip_entry_t *e;char line[96];
+    int left,columns,c,y,right=(int)vid.width-AW_CSTRIP_FRAME-4;aw_cstrip_list_t *l;const aw_cstrip_entry_t *e;char line[96];
+    aw_cstrip_layout_t o;
     if(!strip)return;
     if(!sv.active || cls.state!=ca_connected || key_dest!=key_game){strip_close();return;}
     if(white<0){white=AW_UIColor(255,255,255);red=AW_UIColor(220,40,40);grey=AW_UIColor(150,140,120);
                 dark=AW_UIColor(24,20,16);gold=AW_UIColor(223,199,144);}
     l=&strip->list;
-    layout(&top,&left,&columns);
+    layout(&o);left=o.left;columns=o.columns;
     if(l->columns!=columns){l->columns=columns;AW_CStripClamp(l);}
-    AW_UIBox(0,top,(int)vid.width,(int)vid.height-top);
+    AW_UIBox(0,o.top,(int)vid.width,o.bottom-o.top);
     AW_UISmallBegin();
-    /* the title row: the container (red when owned: taking is theft), the inventory side, Take All, Close */
-    AW_UIText(left,top+4,strip->title,l->side==AW_CSTRIP_CONTAINER?(strip->owned?red:gold):grey);
-    AW_UIText(left+124,top+4,"Inventory",l->side==AW_CSTRIP_INVENTORY?gold:grey);
-    AW_UIBox(right-2*STRIP_BUTTON_W-4,top+2,STRIP_BUTTON_W,STRIP_TITLE);
-    AW_UITextBox(right-2*STRIP_BUTTON_W-4,top+2,STRIP_BUTTON_W,STRIP_TITLE,"Take All",strip->owned?red:white);
-    AW_UIBox(right-STRIP_BUTTON_W,top+2,STRIP_BUTTON_W,STRIP_TITLE);
-    AW_UITextBox(right-STRIP_BUTTON_W,top+2,STRIP_BUTTON_W,STRIP_TITLE,"Close",white);
+    /* the title row: the container (red when owned: taking is theft), the inventory side, Take All, Close; the
+     * buttons with room above and below (LOOT-WINDOW-LAYOUT-60) */
+    AW_UITextBox(left,o.title_y,AW_UIWidth(strip->title),STRIP_TITLE,strip->title,
+                 l->side==AW_CSTRIP_CONTAINER?(strip->owned?red:gold):grey);
+    AW_UITextBox(left+124,o.title_y,AW_UIWidth("Inventory"),STRIP_TITLE,"Inventory",l->side==AW_CSTRIP_INVENTORY?gold:grey);
+    AW_UIBox(right-2*STRIP_BUTTON_W-4,o.title_y,STRIP_BUTTON_W,STRIP_TITLE);
+    AW_UITextBox(right-2*STRIP_BUTTON_W-4,o.title_y,STRIP_BUTTON_W,STRIP_TITLE,"Take All",strip->owned?red:white);
+    AW_UIBox(right-STRIP_BUTTON_W,o.title_y,STRIP_BUTTON_W,STRIP_TITLE);
+    AW_UITextBox(right-STRIP_BUTTON_W,o.title_y,STRIP_BUTTON_W,STRIP_TITLE,"Close",white);
+    AW_UISmallEnd();
     /* the cells: picture, count, the selected one framed */
-    y=top+STRIP_TITLE+4;
+    y=o.cells_y;
     {double t0=Sys_FloatTime();int loaded=0;
      for(c=0;c<columns;c++){
         int i=l->first[l->side]+c;char key[48];
@@ -246,8 +302,9 @@ void AW_CStripDraw(void){
      if(strip_pictures_pending && loaded)
         Con_DPrintf("Container strip: %d pictures in %d ms.\n",loaded,(int)((Sys_FloatTime()-t0)*1000));
      strip_pictures_pending=0;}
-    if(l->first[l->side]>0)AW_UIText(2,y+12,"<",white);
-    if(l->first[l->side]+columns<l->count[l->side])AW_UIText((int)vid.width-9,y+12,">",white);
+    if(l->first[l->side]>0)ctext(left-o.char_w-2,y+(STRIP_CELL-o.char_h)/2,"<",left,-1);
+    if(l->first[l->side]+columns<l->count[l->side])
+        ctext(left+columns*STRIP_CELL,y+(STRIP_CELL-o.char_h)/2,">",(int)vid.width-AW_CSTRIP_FRAME,-1);
     for(c=0;c<columns;c++){
         int i=l->first[l->side]+c,x=left+c*STRIP_CELL;char key[48];
         AW_UIFill(x,y,STRIP_CELL-2,STRIP_CELL-2,dark);
@@ -256,19 +313,36 @@ void AW_CStripDraw(void){
         if(i==l->selected[l->side]){AW_UIFill(x-1,y-1,STRIP_CELL,1,gold);AW_UIFill(x-1,y+STRIP_CELL-2,STRIP_CELL,1,gold);
                                     AW_UIFill(x-1,y-1,1,STRIP_CELL,gold);AW_UIFill(x+STRIP_CELL-2,y-1,1,STRIP_CELL,gold);}
         Q_snprintf(key,sizeof(key),"item:%s",e->id);
-        if(AW_IconLoad(&strip->icon[c],key))AW_IconDraw(&strip->icon[c],x+1,y+1);
-        else{Q_strcpy_bounded(line,e->name,5);AW_UIText(x+2,y+4,line,grey);}
-        if(e->count>1){Q_snprintf(line,sizeof(line),"%d",e->count);AW_UIText(x+STRIP_CELL-3-AW_UIWidth(line),y+STRIP_CELL-12,line,white);}
+        /* the picture centred in its cell (LOOT-WINDOW-LAYOUT-60); without one, the name in the console font, wrapped
+         * over the cell's lines (never cut to a few letters) */
+        if(AW_IconLoad(&strip->icon[c],key)){
+            int iw=strip->icon[c].w>0 && strip->icon[c].w<=STRIP_CELL-2?strip->icon[c].w:32;
+            int ih=strip->icon[c].h>0 && strip->icon[c].h<=STRIP_CELL-2?strip->icon[c].h:32;
+            AW_IconDraw(&strip->icon[c],x+(STRIP_CELL-2-iw)/2,y+(STRIP_CELL-2-ih)/2);
+        }else{
+            int cols=(STRIP_CELL-4)/o.char_w,rows=(STRIP_CELL-4)/o.char_h,r;const char *p=e->name;
+            for(r=0;r<rows && p && *p;r++){
+                int n,cut;
+                while(*p==' ')p++;
+                n=(int)strlen(p);cut=n>cols?cols:n;
+                if(n>cols){int b=cut;while(b>0 && p[b]!=' ')b--;if(b>0)cut=b;}
+                Q_strcpy_bounded(line,p,cut+1<(int)sizeof(line)?cut+1:(int)sizeof(line));
+                ctext(x+2,y+2+r*o.char_h,line,x+STRIP_CELL-2,-1);
+                p+=cut;
+            }
+        }
+        if(e->count>1){Q_snprintf(line,sizeof(line),"%d",e->count);AW_UISmallBegin();
+                       AW_UIText(x+STRIP_CELL-3-AW_UIWidth(line),y+STRIP_CELL-12,line,white);AW_UISmallEnd();}
     }
-    /* the selected entry and the keys */
-    y+=STRIP_CELL+2;
+    /* the selected entry, its properties (LOOT-WINDOW-ITEM-PROPERTIES-60: as the original's item tooltip) and the keys,
+     * in the console font */
     if((e=AW_CStripSelected(l))!=NULL){
         Q_snprintf(line,sizeof(line),"%s%s",e->name,e->count>1?va(" (%d)",e->count):"");
-        AW_UIText(left,y,line,l->side==AW_CSTRIP_CONTAINER && strip->owned?red:white);
-    }else AW_UIText(left,y,l->side==AW_CSTRIP_CONTAINER?"Empty.":"You carry nothing to put in.",grey);
-    AW_UIText(left,y+11,l->side==AW_CSTRIP_CONTAINER?(strip->owned?"E: Steal  Q: stack  Tab: put":"E: Take  Q: stack  Tab: put"):
-                                                     "E: Put  Q: stack  Tab: back",grey);
-    AW_UISmallEnd();
+        ctext(left,o.name_y,line,right,l->side==AW_CSTRIP_CONTAINER && strip->owned?red:-1);
+        if(AW_InventoryPropertiesLine(e->id,o.text_columns,line,sizeof(line)))ctext(left,o.props_y,line,right,-1);
+    }else ctext(left,o.name_y,l->side==AW_CSTRIP_CONTAINER?"Empty.":"You carry nothing to put in.",right,-1);
+    ctext(left,o.keys_y,l->side==AW_CSTRIP_CONTAINER?(strip->owned?"E: Steal  Q: stack  T: all  Tab: put":
+                                                     "E: Take  Q: stack  T: all  Tab: put"):"E: Put  Q: stack  Tab: back",right,-1);
     if(!AW_UICursor(mouse_x,mouse_y)){AW_UIFill(mouse_x,mouse_y,2,6,white);AW_UIFill(mouse_x,mouse_y,6,2,white);}
     if(strip_dirty>0){scr_copyeverything=1;strip_dirty--;}
 }

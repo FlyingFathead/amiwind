@@ -1,11 +1,12 @@
 # Roadmap and implementation options
 
-_Last updated with AmiWind v0.0.61-dev2 (2026-11-06)._
+_Last updated with AmiWind v0.0.61 (6 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
-- [v0.0.60: released 4 November 2026; v0.0.61 next](#v0060-released-4-november-2026-v0061-next)
+- [v0.0.61: released 6 November 2026; v0.0.62 next](#v0061-released-6-november-2026-v0062-next)
+- [v0.0.60: released 4 November 2026](#v0060-released-4-november-2026)
 - [v0.0.59: released 3 November 2026](#v0059-released-3-november-2026)
 - [v0.0.58: released 1 November 2026](#v0058-released-1-november-2026)
 - [v0.0.57: released 31 October 2026; v0.0.58 next](#v0057-released-31-october-2026-v0058-next)
@@ -109,7 +110,68 @@ _Last updated with AmiWind v0.0.61-dev2 (2026-11-06)._
 
 15 October 2026: exact-source validation completed 4,231 tests: 4,225 passed, three Windows-only skips and three tracked Census expected failures. The 71 focused tests and original-data readback across nine frame positions passed, consistently hiding 33 of 158 original references at stronghold state 6 while preserving unknown scripts. All 243 player resources are reusable after exact producer, input and file verification. Complete combined-world conversion, native comparison, packaging and shipment remain pending; coverage counts are unchanged.
 
-## v0.0.60: released 4 November 2026; v0.0.61 next
+## v0.0.61: released 6 November 2026; v0.0.62 next
+
+v0.0.61, "Keep Your Lantern Lit", shipped as its third development snapshot with its final version number
+([release notes](releases/notes/RELEASE-v0.0.61.md); snapshots [dev1](releases/notes/RELEASE-v0.0.61-dev1.md),
+[dev2](releases/notes/RELEASE-v0.0.61-dev2.md) and [dev3](releases/notes/RELEASE-v0.0.61-dev3.md)). It was cut there on
+purpose so that one update does not carry too much: the rest of the list moves, openly, to v0.0.62.
+
+**Done in v0.0.61:**
+
+- **Casting and the spell-effect system:** ready a spell, pay its magicka, roll to succeed, deliver Self, Touch and
+  Target effects; 143 effects applied over time to any actor and kept in saves (dev2, dev3).
+- **Enchanted items and the class starting spells:** Cast When Strikes, Cast When Used and Constant Effect items work
+  for the player (dev3).
+- **Weapons and shields of every type** in their stances, first-person bow, crossbow and thrown stances, two styles of
+  weapon sway, creatures that resist normal weapons, god mode, and cliff racers that land their strikes (dev2).
+- **Every person and creature carries the full stats of its record,** in one place (dev2).
+- **The inventory has no fixed number of kinds;** carry weight and burden limit it, and it opens fast with hundreds of
+  kinds (dev2, dev3).
+- **Carriable lights take their flame and light with them,** and held candles, candlesticks and lanterns are drawn and
+  lit as themselves (dev2, dev3).
+- **Theft seen by a witness is reported** with the bounty, the witnesses' lines and attacks (dev3).
+- **Dialogue and loot windows:** item notices, messages on top, picked answers as the player's line, keys, and a loot
+  window with room, wrapped names and the item's properties (dev3).
+- **First-person arms in their own view,** the armour rating, swimming in the worn clothes, trees that reach the ground
+  on slopes, and a faster game: 28.9, 32.2 and 39.6 fps in the standard emulator benchmark over the three snapshots (dev3).
+- **The in-game recorder, slice 1:** record, replay and checkpoints (dev3).
+
+**Shipped, with its in-game check still to do:** the pieces listed under "Not yet seen in game" in the release notes
+(held lights against the original, the first-person bow and crossbow stances, a weapon that casts on strike used by a
+non-player character, the shore wall pose, a swimmer in a worn robe, resting after damage).
+
+**Known problems in v0.0.61:** a dropped light gets no flame; a Shield effect does not soften blows; an ended Fortify
+effect counts as damage; a theft seen by several witnesses holds one frame for about 0.6 s; the baked light of a room
+stays when a light in it is taken; Seyda Neen's carriable lanterns are missing from the open world; the first frame in
+Seyda Neen takes about a second; the resident bake of the Vivec town costs about three and a half times the CPU it used
+to; the trip from Seyda Neen to Balmora sometimes stalls on the loading screen in the emulator; some rooms still load in
+after you arrive.
+
+**v0.0.62 is next.** It holds what moved from v0.0.61:
+
+- The in-game check of the third snapshot and the fixes it brings.
+- The original crime system: theft, pickpocketing, attacks, killing and trespass seen by witnesses raise a bounty, and
+  guards arrest, fine or jail.
+- Alchemy as in the original: combine ingredients with your apparatus to make potions, and eat ingredients for their
+  first effect.
+- Enchanting as in the original: put a trapped soul into an item to give it a spell effect, by yourself or at an
+  enchanter.
+- Spellmaking as in the original: make your own spells at a spellmaker from the effects you know.
+- Containers, doors, items, activators and creatures take their data from small tables per cell and per interior,
+  loaded with the area, so nothing is searched on disk during play.
+- New approach being tried: all game data in small chunks per cell and interior, loaded with the area, kept in memory
+  as far as memory allows.
+- Items lying outdoors can be picked up and stay taken, as in the original.
+- The build reports the size of every lookup table the game reads while playing and refuses tables that grow past
+  their limits, so loading stays quick on the Amiga.
+- A carriable light that is dropped or put down again burns and lights the place where it lies.
+- Characters other than the player get the effects of the Constant Effect items they wear.
+
+The longer list that stood for v0.0.61 before this cut, with the status of each item at the time, follows under
+v0.0.60.
+
+## v0.0.60: released 4 November 2026
 
 v0.0.60, "Work With What You've Got", shipped as its fourth development snapshot with its final version number
 ([release notes](releases/notes/RELEASE-v0.0.60.md)). It is a smaller release: the fixes of its snapshots, looting, the
@@ -144,8 +206,9 @@ steps can cost 200 to 800 ms on some frames; the trip from Seyda Neen to Balmora
 in the emulator; some rooms still load in after you arrive; the resident bake of the Vivec town costs about three and
 a half times the CPU it used to.
 
-**v0.0.61 is next.** It holds the combat block, the larger data and dialogue items, the v0.0.59 items whose in-game
-checks are still pending, and the builder and release tooling work:
+**The v0.0.61 list as planned after v0.0.60** (what shipped is in the v0.0.61 section above; the items still open
+moved to v0.0.62): the combat block, the larger data and dialogue items, the v0.0.59 items whose in-game checks were
+still pending, and the builder and release tooling work:
 
 - Combat and magic:
   - Weapons and shields of every type in first and third person, a debug weapon menu and gear menu, and a tester mode
@@ -157,11 +220,12 @@ checks are still pending, and the builder and release tooling work:
     the kill-and-return behaviour. In progress: the strikes land in the open world (v0.0.61-dev2); the drawn size, the
     fish and the pack test are next.
   - Player casting: ready a spell, pay its magicka, roll to succeed and deliver Self, Touch or Target effects, with
-    the casting animation and HUD. In progress: casting works and is in v0.0.61-dev2; the casting gesture, the
-    starting spells of race, birth sign and class, and items that cast are next.
+    the casting animation and HUD. In progress: casting works and is in v0.0.61-dev2; the starting spells of race,
+    birth sign and class and items that cast (Cast When Strikes, Cast When Used, Constant Effect) are in
+    v0.0.61-dev3; the casting gesture and the Constant Effect items of non-player characters are next.
   - A spell-effect system: effects applied over their duration to actors and kept in saves, with the script calls that
-    wait for it. In progress: in v0.0.61-dev2; resistances from abilities, reflection and the movement effects are
-    next.
+    wait for it. In progress: in v0.0.61-dev2; the active effects now survive a load (v0.0.61-dev3); resistances from
+    abilities, reflection and the movement effects are next.
   - Ghosts and other creatures that resist ordinary weapons take no harm from them, as in the original; silver and
     magical weapons still work. In progress: in v0.0.61-dev2, checked on that image.
   - Every person and creature, and the player, carries the full stats of its record, kept in one place that every
@@ -169,7 +233,8 @@ checks are still pending, and the builder and release tooling work:
     and combat sheets move onto it next.
   - Alchemy, enchanting and spellmaking work as in the original (next; spellmaking's service exists since v0.0.58).
   - The original crime system: theft, pickpocketing, attacks, killing and trespass seen by witnesses raise a bounty,
-    and guards arrest, fine or jail.
+    and guards arrest, fine or jail. In progress: a theft seen by a witness is reported with the bounty, the witnesses'
+    lines and attacks (v0.0.61-dev3); guards who arrest, pickpocketing, trespass, assault and murder are next.
   - The in-game check of `dbg kill`, a test command that kills the person or creature picked with a red crosshair.
 - Data and dialogue:
   - Characters in the world drawn from the same body and clothing parts as the player, so they can change what they
@@ -211,8 +276,21 @@ checks are still pending, and the builder and release tooling work:
   - After character creation the inventory opens and the character is dressed at the same moments as in the original,
     also after leaving the Census and Excise Office.
   - Picking up a lit candle or lamp takes its flame and its light with it (TAKEN-LIGHT-FLAME-STAYS-60). In progress:
-    in v0.0.61-dev2, checked on that image; the baked light of a room stays when a light in it is taken, and Seyda
-    Neen's carriable lanterns are missing from the open world.
+    in v0.0.61-dev2; the flames of the town lights are tied to them in v0.0.61-dev3, checked on that image; the baked
+    light of a room stays when a light in it is taken, and Seyda Neen's carriable lanterns are missing from the open
+    world. Next: a dropped light burns and lights the place where it lies.
+  - A held candle, candlestick or lantern is drawn as itself and lights by its own record radius, as the original.
+    In progress: in v0.0.61-dev3; the lantern's place in the hand, its light colour and its burn time are next.
+  - Dialogue and loot windows: item notices, messages on top of the window, picked answers shown as the player's line,
+    the arrow, Tab and Enter keys, and a loot window with room, wrapped names and the item's properties. In progress: in
+    v0.0.61-dev3, checked on that image.
+  - Opening a container or a body while carrying hundreds of kinds of item no longer holds the game for seconds; a
+    creature that starts a fight while walking its route fights with its own frames; walking residents no longer fall
+    into the stuck-movement retry. In progress: in v0.0.61-dev3, checked on that image.
+  - Clothes show at once in the inventory preview, the pit axe can be taken, the Census Office is a no-rest cell, the
+    burden bar numbers are legible, the armour rating is shown, the first-person arms and sleeves show in their own
+    view, swimming keeps the worn clothes and tree trunks reach the ground on slopes. In progress: in v0.0.61-dev3,
+    checked on that image.
   - The inventory works as in the original: no limit on the number of kinds of item, only carry weight, with the burden
     shown and movement stopped when over it. In progress: in v0.0.61-dev2, checked on that image.
   - A blank sheet of paper is taken instead of read; traders refuse service only under the original's conditions;
@@ -239,11 +317,13 @@ checks are still pending, and the builder and release tooling work:
     suspected causes (a lost disk-completion signal inside the emulator, the remote-console folder) and the plan to test
     them are on the [bug page](bugs/CHIM-SEYDA-BALMORA-LOAD-HANG-43.md); the same route is also run on the Raspberry
     Pi 4B.
-  - A [gameplay recorder](GAME_RECORDER.md) for testing: armed from the console, Ctrl+R records a session with a red
-    dot on screen and says where the recording was saved. A recording holds a save of the character and the world at the
-    start and the player's inputs (about 1 MB per hour, written when recording stops), so another game replays it
-    exactly, with checkpoints that show where a replay differs. Recordings also serve as frame-rate benchmarks over
-    marked segments, and become gameplay tests in the boot smoke and the delivery checks.
+  - A [gameplay recorder](GAME_RECORDER.md) for testing: armed from the console, Ctrl+R records a session (the version line
+    at the top reads RECORDING) and says where the recording was saved. A recording holds a save of the character and
+    the world at the start and the player's inputs (15 bytes a frame, written when recording stops), so another game
+    replays it exactly (PLAYBACK), with checkpoints every 5 seconds that show where a replay differs. In progress:
+    slice 1 is in v0.0.61-dev3; the pointer in windows, segment marks, frame times per segment and the smoke suite made
+    from recordings are next. Recordings also serve as frame-rate benchmarks over marked segments, and become gameplay
+    tests in the boot smoke and the delivery checks.
 
 ## v0.0.59: released 3 November 2026
 

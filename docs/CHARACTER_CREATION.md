@@ -1,6 +1,6 @@
 # Next milestone: dock and Census Office character creation
 
-_Last updated with AmiWind v0.0.59-dev5 (3 November 2026)._
+_Last updated with AmiWind v0.0.61-dev3 (2026-11-06)._
 
 <!-- contents start -->
 ## Contents
@@ -21,6 +21,7 @@ _Last updated with AmiWind v0.0.59-dev5 (3 November 2026)._
 - [dev4 confirmation and review navigation](#dev4-confirmation-and-review-navigation)
 - [dev5 playtest follow-up](#dev5-playtest-follow-up)
 - [Character UI V2: completion controls and remaining artwork](#character-ui-v2-completion-controls-and-remaining-artwork)
+- [What a new character starts with (v0.0.61)](#what-a-new-character-starts-with-v0061)
 - [Levelling](#levelling)
 
 <!-- contents end -->
@@ -367,6 +368,20 @@ Missing components requested on 5 October 2026:
 The maintainer confirmed appearance/head rotation and class selection work in the
 preceding target build. That observation does not verify the new V2 controls,
 class artwork or custom-class functionality.
+
+## What a new character starts with (v0.0.61)
+
+- **Clothes and inventory.** After character creation the inventory opens and the character is dressed at the same
+  moments as in the original, also after leaving the Census and Excise Office (`CHARGEN-INVENTORY-LOCKED-60`,
+  `CHARGEN-NO-STARTING-CLOTHES-60`).
+- **Spells.** A new character knows the powers and abilities of its race, the spells of its birth sign and, since
+  v0.0.61-dev3, the starting spells the original works out from its class and skills: a Breton mage under the Mage sign
+  has 10 spells, a warrior none. The class spells are chosen from the character as character creation builds it, and
+  never later; the list is 12 rows in the game data and about 6 KB only while a character is chosen
+  ([PLAYER-START-SPELLS-NOT-KNOWN-61](bugs/PLAYER-START-SPELLS-NOT-KNOWN-61.md); the rule in
+  [MAGIC_EFFECTS.md](MAGIC_EFFECTS.md), "Starting spells").
+- **The Magic window** (O) stays closed during the opening, as the original keeps it, until the courtyard ring; it is
+  not yet seen in game after that point.
 
 ## Levelling
 

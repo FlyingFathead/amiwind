@@ -41,6 +41,22 @@ float AW_CastMagnitude(int lo,int hi,float r);
 float AW_CastDuration(const aw_spell_effect_t *e,const aw_mgef_t *m);
 /* The ranges among the N effects, a bit per AW_RANGE_*. */
 int AW_CastRanges(const aw_spell_effect_t *e,int n);
+/* Magic items (v0.0.61; OpenMW spellutil.cpp getEffectiveEnchantmentCastCost, spellcasting.cpp CastSpell::cast): the
+ * charge one use of a Cast When Used or Cast When Strikes item takes, by the caster's Enchant skill (COST - COST / 100
+ * x (skill - 10), at least 1); the charge left after it, -1 when CHARGE is too little (the use is refused). An item's
+ * use never rolls for success. */
+int AW_CastItemCost(float cast_cost,float enchant_skill);
+float AW_CastItemCharge(float charge,int cost);
+/* The starting spells of a new character (OpenMW 0.51 autocalcspell.cpp autoCalcPlayerSpells): over the spells
+ * flagged as starting spells, in the masters' order (S, COUNT: each one's ASPT ROW, price COST, SPDT FLAGS and
+ * effects), with the character's base SKILLS and ATTRIBUTES: not one of the RACE's spells, the magicka (fPCbaseMagicka
+ * Mult x Intelligence) at least the cost, the chance (AW_CastStartChance) at least fAutoPCSpellChance, every skill or
+ * attribute an effect names at least iAutoSpellAttSkillMin; at most iAutoPCSpellMax, past it the cheapest gives way.
+ * The chosen ASPT rows into OUT; how many. */
+typedef struct {int row,cost,flags,n;aw_spell_effect_t e[AW_MADE_EFFECTS];aw_mgef_t m[AW_MADE_EFFECTS];} aw_start_spell_t;
+float AW_CastStartChance(const aw_start_spell_t *s,const float skills[27],const float attributes[8],float cost_mult);
+int AW_CastStartSpells(const aw_start_spell_t *s,int count,const aw_start_settings_t *set,const float skills[27],
+                       const float attributes[8],const int *race,int nrace,int *out,int max);
 
 /* ---- engine glue (aw_cast.c; the landing in aw_mwhost.c) ---- */
 struct edict_s;
@@ -49,10 +65,15 @@ int AW_MwscriptLand(struct edict_s *target,const aw_spell_effect_t *e,const aw_m
 /* The player's record (its stats from the character sheet when there is one) and its changes stored back. */
 aw_actor_t *AW_MwscriptPlayerRecord(void);
 void AW_MwscriptPlayerStore(aw_actor_t *a);
+/* An actor edict's record (made from its base when it has none yet; NULL for objects without one) and its ACTB row. */
+aw_actor_t *AW_MwscriptActorOf(struct edict_s *e,int *row);
+/* dbg cast start: the starting spells the class and the skills gave the character made in this session */
+void AW_MwscriptStartSpellsReport(void);
 /* aw_dialwin.c: the game's fEffectCostMult (0 when the build has no dialogue table) and a made spell's magicka cost by
  * the Spellmaking rule (-1 without the table) */
 float AW_DialwinEffectCostMult(void);
 int AW_DialwinMadeSpellCost(const aw_spell_effect_t *e,int count);
+float AW_DialwinMadeItemCost(const aw_spell_effect_t *e,int count,int constant);
 /* aw_magic.c: the look and sounds of a cast of effect MGEF on RANGE (FAIL: the failure's sound only); 0 when the
  * look is off (aw_magic_fx 0) or the effect has none */
 int AW_MagicCastLook(int mgef,int range,int fail,float area);

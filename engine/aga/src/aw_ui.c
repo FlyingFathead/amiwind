@@ -100,6 +100,13 @@ int AW_ModalBlackBackground(void) {return modal_black.value!=0;}
 int (*aw_menu_fullscreen)(void);
 /* aw_listbox.c sets it at its first box: 0 no box, 1 a box over the view to render, 2 over its kept copy. */
 int (*aw_listbox_over_world)(void);
+/* DIALOGUE-BACKDROP-HUD-60: aw_dialwin.c sets it (NULL in fixtures): 1 while the dialogue window is open. The dialogue
+ * screen is drawn over plain black whatever aw_modal_black says (no view render under it), and the status bars and
+ * compass are not drawn behind it (aw_hud.c Sbar_Draw). */
+int (*aw_ui_dialogue_backdrop)(void);
+/* DIALOGUE-MSGBOX-BEHIND-60: screen.c sets it while a world window or the container strip is open and the messages
+ * are drawn over it: the notice box then leaves the strip under the view as it is (no black fill beside the box). */
+int aw_ui_over_window;
 int AW_ModalWorldHidden(void) {
     /* Blackout is independent of simulation pause. An opaque background can
      * skip world drawing without a saved framebuffer; with black disabled,
@@ -107,6 +114,8 @@ int AW_ModalWorldHidden(void) {
      * The full-screen Options panel hides the world whatever the policy: it is
      * not drawn behind it at all. */
     if(aw_menu_fullscreen && aw_menu_fullscreen() && !cl.intermission && !death_prompt())return 1;
+    if(aw_ui_dialogue_backdrop && aw_ui_dialogue_backdrop() && modal_world_ready() && !cl.intermission && !death_prompt())
+        return 1;
     /* The console-font list box (aw_listbox.c: dbg tp, later dbg weapon / dbg gear) sits ON TOP of the game, as
      * the console does: the view keeps drawing behind it whatever aw_modal_black says (TP-PICKER-57). */
     if(aw_listbox_over_world && !AW_InventoryActive()){
@@ -852,6 +861,9 @@ void AW_UIDraw(void) {
     /* Photo mode's full-screen view has no strip below it: its notice box
      * rises over the bottom of the view, with room for three rows. */
     if(AW_PhotoModeActive() && h<72)h=72;
+    /* DIALOGUE-MSGBOX-BEHIND-60: over a window the view may be the full screen (the idle camera's full view under the
+     * dialogue window): the notice box rises over the bottom of the screen the same way */
+    if(aw_ui_over_window && h<72)h=72;
     if(h<24)return;
     legacy=AW_UIDialogueMethod()==1;centered=!legacy && dialogue_layout.value!=1;
     show_name=speaker[0] && (!subtitle_voice || AW_UIVoiceNames());
@@ -906,7 +918,7 @@ void AW_UIDraw(void) {
     }
     /* The old full-width panel covered bars and action hints. Clear their
      * strip before a compact box too, so partial labels cannot leak beside it. */
-    if(centered)AW_UIFill(0,r_refdef.vrect.y+r_refdef.vrect.height,vid.width,vid.height,black);
+    if(centered && !aw_ui_over_window)AW_UIFill(0,r_refdef.vrect.y+r_refdef.vrect.height,vid.width,vid.height,black);
     y=vid.height-(int)(h*panel_position);AW_UIBox(boxx,y,boxwidth,h);
     row=y+(legacy?6:4);
     if(show_name){

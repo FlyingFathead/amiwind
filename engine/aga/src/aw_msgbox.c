@@ -30,11 +30,14 @@ void AW_MsgBoxShow(const char *raw,const char *const *buttons,int count) {
     Con_DPrintf("MessageBox: %s (%d buttons)\n",text,count);
 }
 int AW_MsgBoxActive(void) {return ready && box.open;}
+/* DIALOGUE-MSGBOX-BEHIND-60: a box raised by a dialogue answer's result script (or under any world window) is shown
+ * over that window and takes its keys first (OpenMW: message boxes are the top layer); elsewhere only in play */
+static int box_here(void) {return key_dest==key_game || (key_dest==key_menu && AW_WorldUIActive());}
 int AW_MsgBoxPressed(void) {return ready?AW_MsgBoxTake(&box):-1;}
 void AW_MsgBoxClear(void) {if(ready)AW_MsgBoxReset(&box);}
 int AW_MsgBoxGameKey(int key) {
     int k=0;
-    if(!AW_MsgBoxActive() || key_dest!=key_game)return 0;
+    if(!AW_MsgBoxActive() || !box_here())return 0;
     if(key==K_LEFTARROW || key==K_UPARROW || key=='a' || key=='A' || key=='w' || key=='W')k=AW_MSGKEY_PREVIOUS;
     else if(key==K_RIGHTARROW || key==K_DOWNARROW || key==K_TAB || key=='d' || key=='D' || key=='s' || key=='S')
         k=AW_MSGKEY_NEXT;
@@ -48,7 +51,7 @@ int AW_MsgBoxGameKey(int key) {
 void AW_MsgBoxDraw(void) {
     char line[160];const char *rest;int i,lines=0,w,x,y,h,lh,rows,bw,gold,grey;
     extern int scr_copyeverything;
-    if(!AW_MsgBoxActive() || key_dest!=key_game)return;
+    if(!AW_MsgBoxActive() || !box_here())return;
     scr_copyeverything=1;
     gold=AW_UIColor(223,199,144);grey=AW_UIColor(150,130,100);
     w=vid.width-16<300?vid.width-16:300;lh=AW_UIHeight();if(lh<8)lh=8;

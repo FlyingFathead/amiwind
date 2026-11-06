@@ -64,8 +64,16 @@ int main(void){
     {
         entity_t card={0};float k;
         card.model=&sprite;assert(R_SpriteDepthScale(&card,500,400)==1);
-        card.aw_flora=1;k=R_SpriteDepthScale(&card,500,400);
+        /* BC-TREE-FLOATING-60: by default only a card the builder marked (aw_flora 2) is pushed; an unmarked card
+         * keeps its plane's depth, so the ground of a slope behind it no longer covers its trunk */
+        assert(aw_flora_push_mode==AW_FLORA_PUSH_MARKED);
+        card.aw_flora=1;assert(R_SpriteDepthScale(&card,500,400)==1);
+        card.aw_flora=2;k=R_SpriteDepthScale(&card,500,400);
         assert(fabs(k-500.0/550.0)<1e-5);assert(k/500<1/490.0f);
+        /* every flora card (the v0.0.58 method); none */
+        aw_flora_push_mode=AW_FLORA_PUSH_EVERY;card.aw_flora=1;assert(fabs(R_SpriteDepthScale(&card,500,400)-500.0/550.0)<1e-5);
+        aw_flora_push_mode=AW_FLORA_PUSH_NONE;card.aw_flora=2;assert(R_SpriteDepthScale(&card,500,400)==1);
+        aw_flora_push_mode=AW_FLORA_PUSH_MARKED;
         assert(R_SpriteDepthScale(&card,0,400)==1 && R_SpriteDepthScale(&card,500,0)==1 && R_SpriteDepthScale(NULL,500,400)==1);
         assert(R_SpriteDepthScale(&card,500,NAN)==1 && R_SpriteDepthScale(&card,500,INFINITY)==1);
     }

@@ -19,6 +19,9 @@
 typedef char placed_entry_fits[(sizeof(entity_t)+sizeof(unsigned)+3*sizeof(float)<=PLACED_ENTRY)?1:-1];
 AW_RESIDENT_GROWS("placed items (WORLD-OBJECT-PLACEMENT-59)",PLACED_MAX,PLACED_ENTRY);
 static int placed_on=1;                   /* aw_placed on|off */
+/* aw_placed crime [watch OWNER | take REFERENCE] (aw_crime.c sets it; no console command of its own: the resident
+ * registry budget) */
+void (*aw_placed_crime)(void);
 static entity_t *ents;
 static unsigned *refs;
 static float (*base)[3];
@@ -77,6 +80,20 @@ static int placed_admit(unsigned reference,const char *stem,const float local[3]
     VectorCopy(local,base[count]);VectorCopy(local,e->origin);
     refs[count]=reference;
     return ++count;
+}
+/* PLACED-PIT-AXE-NO-FOCUS-61 (aw_inventory.c placed_target, the aim): where the view ray from EYE along the unit vector
+ * DIR enters the model of drawn row DRAWN (placed_admit's number): its vertex box (an alias model's mins and maxs, the
+ * quantisation box of its frames), turned as r_alias.c turns the entity (pitch negated, model y along -right), scaled
+ * by the placement's scale and widened by PLACED_AIM_MARGIN map units; the distance along the ray (0 when the eye is
+ * inside), -1 when it misses (mathlib.c AW_RayAliasBox: a slab test, no allocation, a few dozen multiplies a row). */
+#define PLACED_AIM_MARGIN 1.0f
+static float placed_ray(int drawn,const float *eye,const float *dir){
+    entity_t *e;
+    if(drawn<1 || drawn>count || level_world!=sv.worldmodel)return -1;
+    e=&ents[drawn-1];
+    if(!e->model || e->model->type!=mod_alias)return -1;
+    return AW_RayAliasBox(e->origin,e->angles,(e->effects&AW_EF_ALIAS_SCALE)?e->aw_sprite_scale:1,
+                          e->model->mins,e->model->maxs,PLACED_AIM_MARGIN,eye,dir);
 }
 /* aw_mwhost.c AW_ObjectTake: REFERENCE is drawn here (taking it hides it through the object state). */
 static int placed_drawn(unsigned reference){
@@ -166,6 +183,8 @@ static void placed_command(void){
     if(!strcmp(a,"container")){AW_ContainerCommand();return;}   /* CELL-CHANGES-59 slice 3 */
     if(!strcmp(a,"body")){AW_CorpseCommand();return;}           /* CORPSE-LOOT-60 */
     if(!strcmp(a,"areas")){AW_AreaStatus();return;}             /* AREA-TABLES-59 */
+    if(!strcmp(a,"crime")){if(aw_placed_crime)aw_placed_crime();else Con_Printf("No crime layer.\n");return;}   /* STEAL-WITNESSED-NO-CRIME-61 */
+    if(!strcmp(a,"aim")){AW_PlacedAimReport();return;}          /* PLACED-PIT-AXE-NO-FOCUS-61 */
     if(!strcmp(a,"look") || !strcmp(a,"go"))look_command(!strcmp(a,"go"));
     else if(!strcmp(a,"on") || !strcmp(a,"off")){placed_on=!strcmp(a,"on");Con_Printf("Placed items %s from the next map.\n",a);}
     else status_command();
@@ -173,6 +192,7 @@ static void placed_command(void){
 void AW_PlacedInit(void){
     Cmd_AddCommand("aw_placed",placed_command);
     aw_placed_begin=placed_begin;aw_placed_admit=placed_admit;aw_object_drawn=placed_drawn;aw_placed_link=AW_PlacedLink;
+    aw_placed_ray=placed_ray;
     AW_CStripInit();     /* CONTAINER-WINDOW-59: E on a container opens its strip */
     AW_CorpseInit();     /* CORPSE-LOOT-60: E on a body too; CONTAINER-LEVELLED-CONTENTS-60: the levelled rolls */
 }

@@ -82,9 +82,11 @@ typedef struct entity_s
     /* World format 0.13: the colour that light leans toward (0 none, 1-7: the
      * r_sky.c tint tables, r_tint_colormap); 0 for every other entity. */
     int aw_tint;
-    /* 1: a static flora card (aw_flora). Its depth is pushed back by about a
-     * trunk's width so the trunk base no longer draws over a wall standing
-     * just behind the card's centre (SEYDA-WALL-SHAPE-31). */
+    /* 1: a static flora card (aw_flora); 2: a flora card the builder marked
+     * ("aw_depth_push" "1": its trunk base stands in a wall or building box).
+     * The base of a marked card tests depth about a trunk's width behind its
+     * plane so it no longer draws over that wall (SEYDA-WALL-SHAPE-31); an
+     * unmarked card keeps its plane's depth (aw_flora_push, BC-TREE-FLOATING-60). */
     int aw_flora;
     /* With AW_EF_ALIAS_SCALE on an alias: the height scale when above 0 (x and y take aw_sprite_scale): the
      * assembled player body's parts at the race's weight and height (aw_player_parts.h); 0 = uniform, as before. */
@@ -100,6 +102,13 @@ float R_AliasAxisScale(const entity_t *ent, int axis);
  * never sinks behind a building it stands in front of. */
 #define AW_FLORA_DEPTH_PUSH_FRAC 0.125f
 #define AW_FLORA_BASE_SHARE 0.25f
+/* Which flora cards get the base push (r_sprite.c aw_flora_push_mode, BC-TREE-FLOATING-60): only the cards the
+ * builder marked (aw_flora 2; the default and the only one in a build); every card is the v0.0.58 method (on a slope
+ * the ground behind a trunk then covers the trunk's lower part, so trees seem to float), none for tests. Not a cvar:
+ * the resident registry budget (tests/resident_registry_budget.json); the like-for-like check runs the v0.0.61-dev1
+ * engine against this one on the same image. */
+enum {AW_FLORA_PUSH_NONE, AW_FLORA_PUSH_EVERY, AW_FLORA_PUSH_MARKED};
+extern int aw_flora_push_mode;
 /* Factor applied to a sprite's 1/z for the depth test only (1 = unchanged):
  * dist / (dist + push) for a flora card of world width WIDTH whose plane lies
  * DIST in front of the eye; texture mapping keeps the real plane. */

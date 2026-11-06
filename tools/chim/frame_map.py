@@ -385,6 +385,91 @@ def model_radius(raw):
     raise ValueError('Not a sprite or alias model')
 
 
+# ---------------------------------------------------------------- flora cards whose trunk base stands in a wall
+
+# The engine's flora card base push (render.h AW_FLORA_DEPTH_PUSH_FRAC, AW_FLORA_BASE_SHARE): the bottom quarter of a
+# card's rows tests depth an eighth of its width behind the card. For every card it hid the lower trunk behind the
+# ground of a slope behind it, so trees seemed to float (BC-TREE-FLOATING-60); it is kept only for the cards whose
+# base stands in a wall or a building (the shape it was made for, SEYDA-WALL-SHAPE-31), marked "aw_depth_push" "1".
+FLORA_PUSH_FRAC = 0.125
+FLORA_BASE_SHARE = 0.25
+FLORA_PUSH_KEY = 'aw_depth_push'
+
+
+def sprite_card(raw):
+    """(width, height, top) of a single-frame sprite (IDSP): the frame's pixels and its origin's top row."""
+    if raw[:4] != b'IDSP':
+        raise ValueError('Not a sprite')
+    _left, top, width, height = struct.unpack_from('<4i', raw, 40)
+    return width, height, top
+
+
+def flora_wall_model(name):
+    """True for a placed model a flora card's base can stand in: anything but flora and collision-only models."""
+    path = name.replace('\\', '/').casefold()
+    stem = path.rsplit('/', 1)[-1]
+    return not (path.startswith('f/') or stem.startswith('flora') or '#collision_only' in path)
+
+
+def flora_push_refs(rows, chunks, models, cards):
+    """({aw_ref}, {aw_ref: model name}) of the aw_flora ROWS (frame-local origins) whose card base (the rows the engine
+    pushes: the bottom quarter, an eighth of the card's width around the trunk) meets the box of a wall or building the
+    frame's CHUNKS own (MODELS: the frame's model entries by id, chim.validate.load_frame). CARDS: {sprite path:
+    sprite_card(...)}. Boxes are the placements' drawn boxes (frame-local)."""
+    walls = []
+    for c in chunks:
+        for r in c.get('owned', ()):
+            if isinstance(models, dict):
+                m = models.get(r['model'])
+            else:                                   # the world's model list (chim.validate.load_world)
+                m = models[r['model']] if 0 <= r['model'] < len(models) else None
+            if m is not None and flora_wall_model(m['name']):
+                walls.append((r['box'], m['name']))
+    out, why = set(), {}
+    if not walls:
+        return out, why
+    for row in rows:
+        if row.get('classname') != 'aw_flora' or row.get('model') not in cards or 'aw_ref' not in row:
+            continue
+        width, height, top = cards[row['model']]
+        scale = float(row.get('aw_scale', 1))
+        x, y, z = (float(v) for v in row['origin'].split())
+        reach = width * scale * FLORA_PUSH_FRAC
+        bottom = z - (height - top) * scale
+        band = (bottom, bottom + height * scale * FLORA_BASE_SHARE)
+        for (lo, hi), name in walls:
+            if (lo[0] - reach <= x <= hi[0] + reach and lo[1] - reach <= y <= hi[1] + reach
+                    and lo[2] <= band[1] and hi[2] >= band[0]):
+                out.add(row['aw_ref'])
+                why[row['aw_ref']] = name
+                break
+    return out, why
+
+
+def mark_flora_push(rows, refs):
+    """Set FLORA_PUSH_KEY on the aw_flora ROWS whose aw_ref is in REFS (in place); the count marked."""
+    n = 0
+    for row in rows:
+        if row.get('classname') == 'aw_flora' and row.get('aw_ref') in refs:
+            row[FLORA_PUSH_KEY] = '1'
+            n += 1
+    return n
+
+
+def flag_flora_push(id1, rows, world, index):
+    """Mark the aw_flora ROWS of a frame map whose card base stands in a wall or building of the frame (WORLD's frame
+    row INDEX: frame_world / frame_alone), their sprites read from ID1. Returns {'cards', 'marked'}."""
+    if not any(r.get('classname') == 'aw_flora' for r in rows):
+        return {'cards': 0, 'marked': 0}             # no card: nothing to read (a frame map with no flora)
+    _, _, chunks = world['frames'][index]
+    cards = {}
+    for row in rows:
+        if row.get('classname') == 'aw_flora' and row.get('model') and row['model'] not in cards:
+            cards[row['model']] = sprite_card((Path(id1) / row['model']).read_bytes())
+    refs, _ = flora_push_refs(rows, chunks, world['models'], cards)
+    return {'cards': sum(1 for r in rows if r.get('classname') == 'aw_flora'), 'marked': mark_flora_push(rows, refs)}
+
+
 def frame_grid(world_dir, cell):
     """(chunks, low (x, y), grain, nx, ny) of the frame at cell."""
     from chim import reach  # noqa: F401 (reads world formats 0.8 and 0.9)
@@ -820,6 +905,7 @@ def build(id1, town, world_dir, entity_rows=None, world=None, activated_rows=Non
     if report['refused']:
         raise ValueError('CHIM frame map for %s: %s' % (town, '; '.join(report['refused'][:6])))
     report['flames'] = add_flames(rows, world, world_dir, town_cell)
+    report['flora_push'] = flag_flora_push(id1, rows, world, index)     # BC-TREE-FLOATING-60
     cell, lo, hi = frame_bounds(world_dir, town_cell)
     rows[0][FRAME_KEY] = '%d %d' % cell
     streamed, streamed_bytes = 0, 0
@@ -1100,6 +1186,11 @@ def region_task(id1, frame, world_dir, world=None, directory=None, rows=None, ha
             if any(r.get('classname') != 'aw_flora' or r.get('model') not in assets for r in sprite_rows):
                 raise ValueError('Unbound recipe sprite entity')
             task['sprite_rows'], task['sprite_assets'] = sprite_rows, assets
+            if world is not None:
+                # BC-TREE-FLOATING-60: the cards whose base stands in a wall or building keep the base depth push
+                cards = {p: sprite_card((id1 / p).read_bytes()) for p in assets}
+                refs, _ = flora_push_refs(sprite_rows, chunks, world['models'], cards)
+                task['flora_push'] = sorted(refs)
     # The frame's static flames (CHIM-EXTERIOR-FLAMES-MISSING-48): rows made here from the world held in this
     # process, so the worker and the pass-cache key see them
     from chim.flames import world_frame_rows
@@ -1230,7 +1321,9 @@ def region_inputs(task, legacy):
                              **({'sprite_rows': task['sprite_rows'], 'sprite_assets': task['sprite_assets']}
                                 if task.get('sprite_rows') else {}),
                              # a frame without flames keeps its key
-                             **({'flame_rows': task['flame_rows']} if task.get('flame_rows') else {})})
+                             **({'flame_rows': task['flame_rows']} if task.get('flame_rows') else {}),
+                             # the cards that keep the base push (BC-TREE-FLOATING-60); none: the key stays
+                             **({'flora_push': task['flora_push']} if task.get('flora_push') else {})})
     models = {}
     for e in entities(legacy):
         model = e.get('model', '')
@@ -1378,6 +1471,7 @@ def _region_map(task, legacy):
     if report['refused']:
         raise ValueError('CHIM region frame map %s (%s): %s' % (name, frame['id'], '; '.join(report['refused'][:6])))
     rows = [world_row, start or {'classname': 'info_player_start', 'origin': '0 0 0'}] + rows
+    mark_flora_push(rows, set(task.get('flora_push', ())))          # region_task, BC-TREE-FLOATING-60
     rows += [dict(r) for r in task.get('flame_rows', [])]           # the frame's static flames (region_task)
     if task.get('flame_rows'):
         report['flames'] = task['flames']
@@ -1422,6 +1516,7 @@ def _region_map_game_data(task):
     rows = [dict(task['worldspawn']),
             {'angle': '90', 'classname': 'info_player_start', 'origin': '%g %g %g' % (0, 0, task['start_z'])}]
     rows.extend(dict(r) for r in task.get('sprite_rows', []))
+    mark_flora_push(rows, set(task.get('flora_push', ())))         # region_task, BC-TREE-FLOATING-60
     rows.extend(dict(r) for r in task.get('flame_rows', []))       # the frame's static flames (region_task)
     problems, _ = static_check(rows)
     if problems:
@@ -2064,6 +2159,7 @@ def build_docks(id1, world_dir, town='seyda', name=DOCKS, world=None, entity_row
     if report['refused']:
         raise ValueError('CHIM frame map for %s: %s' % (name, '; '.join(report['refused'][:6])))
     report['flames'] = add_flames(rows, world, world_dir, cell)
+    report['flora_push'] = flag_flora_push(id1, rows, world, index)     # BC-TREE-FLOATING-60
     cell, lo, hi = frame_bounds(world_dir, cell)
     rows[0][FRAME_KEY] = '%d %d' % cell
     streamed, streamed_bytes = 0, 0

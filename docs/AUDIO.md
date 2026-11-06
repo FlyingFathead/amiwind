@@ -1,10 +1,11 @@
 # Streamed music and speech
 
-_Last updated with AmiWind v0.0.59-dev4 (2 November 2026)._
+_Last updated with AmiWind v0.0.61-dev3 (2026-11-06)._
 
 <!-- contents start -->
 ## Contents
 
+- [Tomb ambience and the death music (v0.0.61)](#tomb-ambience-and-the-death-music-v0061)
 - [Sound events and the coverage line: 2 November 2026](#sound-events-and-the-coverage-line-2-november-2026)
 - [The mixer's limits: 31 October 2026](#the-mixers-limits-31-october-2026)
 - [Every NPC's voice lines: 23 October 2026](#every-npcs-voice-lines-23-october-2026)
@@ -27,6 +28,19 @@ _Last updated with AmiWind v0.0.59-dev4 (2 November 2026)._
 - [RC1 Audio options candidate](#rc1-audio-options-candidate)
 
 <!-- contents end -->
+
+## Tomb ambience and the death music (v0.0.61)
+
+- Inside ancestral tombs the tomb ambience plays instead of the exploration music, and battle music still starts when
+  an enemy attacks (after the fight the ambience alone returns). This is a deliberate difference from the original,
+  which keeps the exploration music on (`TOMB-MUSIC-OVER-AMBIENT-60`; [COMBAT.md](COMBAT.md), "Battle music").
+- The death music plays only when the player dies, never as exploration or battle music and never when an area
+  changes: the player's health was read before it was restored on arrival, which started the track on some crossings
+  (`MUSIC-DEATH-TRACK-RANDOM-60`).
+- The spell sounds of a cast (the school's cast, bolt, hit, area and failure sounds) play with the look of the spell
+  when `dbg magicfx` is on ([MAGIC_EFFECTS.md](MAGIC_EFFECTS.md)). The tomb ambience with battle music on a ghost
+  attack and the absence of the death music on area crossings were still listed as not yet seen in game in the
+  [v0.0.61-dev2 notes](releases/notes/RELEASE-v0.0.61-dev2.md).
 
 ## Sound events and the coverage line: 2 November 2026
 

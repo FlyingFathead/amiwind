@@ -71,6 +71,7 @@ static void run_commands(void)
     text[n]=0;
     if(n && text[n-1]!='\n'){text[n++]='\n';text[n]=0;}
     command_files++;
+    AW_RecorderLine(text);   /* a recording keeps it with its frame (GAME-RECORDER-61) */
     Cbuf_AddText(text);
 }
 /* Fixed-point text for state.txt, same format as %.<decimals>f. printf's

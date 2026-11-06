@@ -114,6 +114,27 @@ class Outdoors(unittest.TestCase):
             self.assertEqual([r[2] for r in rows[L.area_key(lights()[LANTERN])]], [7001, 7002])   # both pieces
             self.assertEqual(L.check(im.id1, lights(), world, links=rows)['exterior placements'], 2)
 
+    def test_a_flame_link_must_name_a_frame_map_of_the_image(self):
+        # TAKEN-LIGHT-OUTDOOR-EFFECTS-UNLINKED-61: the engine applies a flame link only on the frame map file it names
+        # (its stem's hash); one keyed by the town's server name ("vivec_city" for vivec_city-chim) is never applied
+        from prepare_area_tables import name_hash
+        world = {'frames': [], 'models': []}
+        frame = [{'classname': 'worldspawn', '_chim_frame': '0 -13'}]
+        key = L.area_key(lights()[LANTERN])
+        good = {key: [(L.KIND_FLAME, 0, name_hash('vivec_city-chim'), LANTERN)]}
+        bad = {key: [(L.KIND_FLAME, 0, name_hash('vivec_city'), LANTERN)]}
+        with Image({'vivec_city-chim.chim': frame}) as im:
+            saved = L.frame_maps
+            L.frame_maps = lambda id1: [('vivec_city-chim', frame)]
+            try:
+                L.check(im.id1, lights(), world, links=good)
+                with self.assertRaises(ValueError) as e:
+                    L.check(im.id1, lights(), world, links=bad)
+            finally:
+                L.frame_maps = saved
+        self.assertIn('names map hash %#x, which is no frame map of the image' % name_hash('vivec_city'),
+                      str(e.exception))
+
 
 class Sections(unittest.TestCase):
     def pack(self, records):
@@ -153,6 +174,13 @@ class EngineReaders(unittest.TestCase):
         self.assertLess(inv.index('!memcmp(b+len-4,"AWE1",4)'), inv.index('!memcmp(b+len-4,"AWS1",4)'))
         self.assertLess(inv.index('!memcmp(b+len-4,"AWS1",4)'), inv.index('!memcmp(b+a->logical-4,"AWL1",4)'))
         self.assertIn('AW_AreaEffectsApply();      /* TAKEN-LIGHT-FLAME-61', inv)
+        # TAKEN-LIGHT-OUTDOOR-EFFECTS-UNLINKED-61: the 'F' links are matched against the loaded frame map file (the
+        # world model's stem, the same hash as name_hash; tests/aga_container_strip_open_test.c holds the numbers),
+        # never the town's server name, which matched no link in any town
+        self.assertIn('AW_AreaMapHash(sv.worldmodel->name)', inv)
+        from prepare_area_tables import name_hash
+        self.assertEqual(name_hash('vivec_city-chim'), 0x60c9ec7e)
+        self.assertNotEqual(name_hash('vivec_city-chim'), name_hash('vivec_city'))
         self.assertNotIn('effect-links.awe', inv + self.code('aw_lamps.c'))   # no world-wide file at run time
 
     def test_a_taken_exterior_light_leaves_the_chim_world_and_its_effects_go(self):

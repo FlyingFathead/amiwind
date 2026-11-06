@@ -407,12 +407,20 @@ def check(id1, lights, world=None, limit=20, links=None):
             if (KIND_PLACE, 0, pid, ref) not in have:
                 misses.append('CHIM placement %d of reference %d (%s) has no effect link in its cell, so it cannot be '
                               'taken' % (pid, ref, lights[ref]['id']))
-        for stem, rows in frame_maps(id1):
+        maps = frame_maps(id1)
+        for stem, rows in maps:
             for ordinal, ref in frame_flame_links(rows, world, lights):
                 counts['exterior frame map flames'] += 1
                 if (KIND_FLAME, ordinal, name_hash(stem), ref) not in have:
                     misses.append('%s.chim: flame row %d of reference %d (%s) has no effect link in its cell'
                                   % (stem, ordinal, ref, lights[ref]['id']))
+        # TAKEN-LIGHT-OUTDOOR-EFFECTS-UNLINKED-61: a flame link is matched by the engine against the loaded frame map
+        # file's stem (aw_inventory.c AW_AreaMapHash); a link naming no frame map of the image is never applied
+        stems = {name_hash(stem) for stem, _ in maps}
+        for k, aux, key, ref in sorted(have):
+            if k == KIND_FLAME and key not in stems:
+                misses.append('flame link %d of reference %d names map hash %#x, which is no frame map of the image'
+                              % (aux, ref, key))
     if (id1 / LAMPS).is_file():
         for row, ref in lamp_links(lamp_rows((id1 / LAMPS).read_bytes()), lights):
             counts['lamp rows'] += 1

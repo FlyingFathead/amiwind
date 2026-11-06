@@ -261,9 +261,11 @@ int AW_ItemsShow(edict_t *actor,edict_t *out[AW_ITEMS_KINDS]) {
 /* A skeletal model's item rows at one table frame (SKEL-ITEM-TAGS-52): the table posed at the frame and each item
  * bone made into a tag row. The last pose is kept (an armed actor's items follow it every server frame while its
  * table frame changes about 8 times a second). 0 when the model has no table. */
+int (*aw_items_player_layer)(const model_t *m,const void *skel_table,int frame,float *layer_frame,int *root);
 int AW_ItemsTorchLayer(const model_t *m,const void *skel_table,int frame,float *layer_frame,int *root) {
     const aw_skel_table_t *tab=(const aw_skel_table_t *)skel_table;
     aw_skel_group_t g;int t,i,span;
+    if(m && tab && aw_items_player_layer && aw_items_player_layer(m,skel_table,frame,layer_frame,root))return 1;
     if(!m || !tab || !AW_GuardTorchWanted())return 0;
     for(t=0;t<used && table[t].model!=m;t++);
     if(t==used || !carries_light(t))return 0;

@@ -122,10 +122,17 @@ class RoomFastRam(unittest.TestCase):
         # before anything is left or queued (the behaviour: tests/aga_scene_test.c, tests/aga_chim_save_test.c).
         src = ROOT / 'engine/aga/src'
         save = (src / 'aw_save.c').read_text(encoding='utf-8')
-        read = save[save.index('int AW_SaveRead('):save.index('void AW_SaveSchedule(')]
+        # every load from a save (a slot, and the gameplay recorder's save in memory, GAME-RECORDER-61) ends in
+        # load_decoded, which asks the check before the map is queued
+        decoded = save[save.index('static int load_decoded('):save.index('unsigned char *AW_SaveEncodeNow(')]
         # (the refused save gives its item table back first: INVENTORY-ORIGINAL-LIMITS-61)
-        self.assertLess(read.index('aw_save_entry_refuse(candidate.scene,candidate.position)){AW_SaveRelease(&candidate);return 2;}'),
-                        read.index('Cbuf_InsertText(map)'))
+        self.assertLess(decoded.index('aw_save_entry_refuse(candidate->scene,candidate->position)){AW_SaveRelease(candidate);return 2;}'),
+                        decoded.index('Cbuf_InsertText(map)'))
+        read = save[save.index('int AW_SaveRead('):save.index('void AW_SaveSchedule(')]
+        self.assertIn('return load_decoded(&candidate);', read)
+        self.assertNotIn('Cbuf_InsertText', read)
+        loaded = save[save.index('int AW_SaveLoadBytes('):save.index('int AW_SaveLoadPending(')]
+        self.assertIn('return load_decoded(&candidate);', loaded)
         self.assertIn('aw_save_entry_refuse=AW_SceneSaveEntryRefuse;', (src / 'aw_debug.c').read_text(encoding='utf-8'))
         host = (src / 'host_cmd.c').read_text(encoding='latin-1')
         for start, end, before in (('void Host_Map_f (void)', 'Host_Changelevel_f', 'CL_Disconnect ();'),

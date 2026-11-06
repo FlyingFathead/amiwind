@@ -6,6 +6,7 @@
 #include "r_local.h"
 #include "aw_hand_state.h"
 #include "aw_hand_models.h"
+#include "aw_torch.h"
 #include <assert.h>
 #include <stddef.h>
 #include <stdarg.h>
@@ -68,6 +69,9 @@ void AW_GuardTorchUpdate(void){}
 void AW_NpcPartsReset(void){}
 void AW_NpcPartsUpdate(void){}
 void AW_LampInit(void){}void AW_LampUpdate(void){}
+/* aw_guard_torch.c's half of the held light (HELD-LIGHT-OWN-MODEL-61) */
+void AW_HeldFlameDraw(const vec3_t origin,const float shape[4],int view){(void)origin;(void)shape;(void)view;}
+const aw_held_light_t *(*aw_held_light_now)(void);
 void Cmd_AddCommand(char *name,void (*fn)(void)){
     if(!strcmp(name,"aw_torch_radius_set"))set_radius=fn;
     else if(!strcmp(name,"aw_torch_flame_set"))set_flame=fn;

@@ -9,6 +9,7 @@
 #include "aw_harvest_proxy.h"
 #include "aw_tryalloc.h"
 static aw_harvest_t harvest;
+void (*aw_harvest_theft)(const char *owner,const char *id,int count);
 static edict_t **plants;
 static unsigned char *available;
 static cvar_t harvest_mode={"aw_harvest_mode","1",true};
@@ -198,6 +199,10 @@ int AW_HarvestUse(void)
                 if(k<j)continue;
                 amount=AW_StateGet(&aw_state,AW_ITEM,AW_HarvestText(&harvest,harvest.node[j].id))-before[j];
                 if(amount<=0)continue;
+                /* STEAL-WITNESSED-NO-CRIME-61 (OpenMW 0.51 actionharvest.cpp: itemTaken for each item taken): an owned
+                 * plant's ingredients are a theft, a crime when a witness sees it (aw_crime.c) */
+                if(harvest.plant[i].owner && aw_harvest_theft)
+                    aw_harvest_theft(AW_HarvestOwner(&harvest,i),AW_HarvestText(&harvest,harvest.node[j].id),(int)amount);
                 label=AW_HarvestText(&harvest,harvest.node[j].label);if(!label[0])label="items"; /* AWH1 compatibility. */
                 /* ENGINE-HARVEST-MESSAGE-BOUND-35: bounded line and message. */
                 snprintf(line,sizeof(line),"Picked up %ld %s.",(long)amount,label);

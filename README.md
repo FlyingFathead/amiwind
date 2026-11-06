@@ -4,7 +4,7 @@
 
 # AmiWind
 
-_Last updated with AmiWind v0.0.61-dev2 (6 November 2026)._
+_Last updated with AmiWind v0.0.61 (6 November 2026)._
 
 An unofficial, experimental RPG engine and enthusiast project bringing Morrowind
 to the Commodore Amiga, featuring CHIM: an AmiQuake-based engine and an asset
@@ -25,13 +25,18 @@ Like community projects such as
 
 More in the [gallery](docs/GALLERY.md).
 
-## Where AmiWind stands (4 November 2026)
+## Where AmiWind stands (6 November 2026)
 
-The newest release is **v0.0.60: Work With What You've Got**: beds and the two rank raises work again, containers
-with levelled contents show their items, the bodies of the dead can be searched, the walking residents and the
-residents built from parts read small per-area tables instead of searching files, and a tracker lists the 48 systems
-of the base game (10 done, 29 partial, 9 missing), running on CHIM Engine v0.2.2 and needing 32 MB of Fast RAM
-([release notes](docs/releases/notes/RELEASE-v0.0.60.md)). The one before it, **v0.0.59: Assembling The Bits And
+The newest release is **v0.0.61: Keep Your Lantern Lit**, the combat, magic and light release: casting with a
+spell-effect system, weapons and shields of every type in their stances, enchanted items that cast, one set of stats for
+every person and creature, an inventory limited only by carry weight, carriable lights that take their flame with them
+and held candles and lanterns that light as themselves, theft that witnesses report, a fuller dialogue and loot window,
+the first slice of an in-game recorder for testing, and a faster game (the standard benchmark runs 37 % more frames a
+second in the emulator than in the first snapshot of the version), running on CHIM Engine v0.2.2 and needing 32 MB of
+Fast RAM ([release notes](docs/releases/notes/RELEASE-v0.0.61.md)). The one before it, **v0.0.60: Work With What
+You've Got**, made beds and the two rank raises work again, levelled container contents show their items, the bodies of
+the dead can be searched, and the residents read small per-area tables
+([release notes](docs/releases/notes/RELEASE-v0.0.60.md)). Before that, **v0.0.59: Assembling The Bits And
 Pieces, Once Again**, gave every item its own world model, a world that keeps what you change across rooms and saved
 games, the player's body and hands assembled from parts, the container strip, the original's journal view, and resting
 and waiting by the original's rules ([release notes](docs/releases/notes/RELEASE-v0.0.59.md)). The project's own builds have had every exterior cell of Vvardenfell on CHIM since v0.0.43 (a build from the
@@ -43,19 +48,28 @@ and 19 open-sea cells), with no classic region maps left outdoors. What these nu
 prison and the census office) is built as a CHIM room, with the people the game places in them. Solstheim is not
 converted.
 
-The development line is at **v0.0.61-dev2** (6 November 2026): the second snapshot of v0.0.61 and the first with game
-changes. It adds casting (Self, Touch and Target) with a spell-effect system, weapons and shields of every type in their
-stance with two first-person sway styles, the full stats of every being from its record, an inventory without a fixed
-number of kinds with carry weight and burden, and carriable lights that take their flame and light with them
-([dev2 notes](docs/releases/notes/RELEASE-v0.0.61-dev2.md); the first snapshot:
-[dev1 notes](docs/releases/notes/RELEASE-v0.0.61-dev1.md)).
+The development line is at **v0.0.62**, which has just opened. v0.0.61 shipped as its third snapshot with the final
+version number ([dev3 notes](docs/releases/notes/RELEASE-v0.0.61-dev3.md); earlier snapshots:
+[dev2 notes](docs/releases/notes/RELEASE-v0.0.61-dev2.md), [dev1 notes](docs/releases/notes/RELEASE-v0.0.61-dev1.md)).
 
-What comes next is in the [roadmap](docs/ROADMAP.md): v0.0.61 holds the combat work (weapons of every type in both
-views, the first-person hands per weapon, the cliff racer's strikes, player casting and the spell-effect system, the
-crime system), the larger data and dialogue items (per-area tables for containers, doors, items and creatures,
-each resident's dialogue prepared in advance, the conversation system complete, characters drawn from the same parts
-as the player), levelling with the level-up box, the rest of the world change list, and the in-game checks carried
-over from v0.0.59 and v0.0.60. Items that are in no version's list yet stay in the backlog until they are scheduled.
+What comes next is in the [roadmap](docs/ROADMAP.md): v0.0.62 holds the in-game check of the v0.0.61 pieces not yet
+seen in play, the full crime system (guards who arrest, pickpocketing, trespass, assault, murder), alchemy, enchanting
+and spellmaking, per-area data tables for containers, doors, items, activators and creatures, a build check on the size
+of every lookup table, outdoor items that can be picked up, dropped lights with their flame, and the Constant Effect
+items of non-player characters. Items that are in no version's list yet stay in the backlog until they are scheduled.
+
+### What v0.0.61 changed
+
+Player casting with a spell-effect system of 143 effects kept in saves; weapons and shields of every type in their
+stances, first-person bow, crossbow and thrown stances, two styles of weapon sway and creatures that resist normal
+weapons; enchanted items that cast (Cast When Strikes, Cast When Used, Constant Effect) and the class starting spells;
+every person and creature carrying the full stats of its record; an inventory with no fixed number of kinds, only carry
+weight; carriable lights that take their flame with them, held candles, candlesticks and lanterns drawn and lit as
+themselves; witnessed theft with a bounty; dialogue notices, keys and a fuller loot window; first-person arms in their
+own view, the armour rating and swimming in the worn clothes; and the first slice of an in-game recorder. Where it is faster:
+Seyda Neen waits 31 to 49 % less for the disk, and containers, the inventory and place loads much faster with hundreds of kinds carried.
+Known limits: a dropped light gets no flame, a Shield effect does not soften blows yet, and the full crime system,
+alchemy, enchanting and spellmaking are v0.0.62. Full list: [v0.0.61 release notes](docs/releases/notes/RELEASE-v0.0.61.md).
 
 ### What v0.0.60 changed
 
@@ -206,16 +220,21 @@ front page used to carry are kept in [earlier README sections](docs/README_ARCHI
   table; the build fails if one does not ([door graph](docs/chim/DOOR_GRAPH.md)). Since v0.0.53 the build also runs
   the engine's own door code over all 1,102 exterior entrances, also after a walk across a frame border, and its
   count of usable entrances may only go up.
-- **Play:** create your character through the opening sequence; the inventory, the journal and the map; saving and
-  loading, with what you pick up staying picked after a save and a load; basic hand-to-hand combat (damage, armour,
-  block, knockdown, knockout, fatigue, death); a torch in hand to explore Vvardenfell at night and underground;
-  mushrooms to pick indoors and out; the original movement speeds; weather by region, and music streamed from disk;
-  travel by silt strider, boat, gondola and guild guide.
-- **Not yet:** quests, dialogue, most services, schedules, weapon and magic combat and most other game logic are
-  unfinished, and items and containers in rooms are not live objects yet; the jail markers are in the door table for
-  the jail system to come. Characters do not wander by their records yet, nobody attacks on sight yet, and Dagoth Ur
-  does not fight or speak yet; the Unmarked Shipwreck's upper trapdoor still keeps the use key out of reach
-  ([v0.0.55 release notes](docs/releases/notes/RELEASE-v0.0.55.md#known-in-this-build)).
+- **Play:** create your character through the opening sequence; the inventory (no limit on the kinds of item, only
+  carry weight, with the armour rating and a preview that follows what you wear), the journal and the map; saving and
+  loading, with what you change in the world staying changed; melee combat with the original's rules (damage, armour,
+  block, knockdown, knockout, fatigue, death) and weapons and shields of every type in first and third person;
+  casting spells, with the original's chance, cost and effects, and enchanted items that cast; talking to people
+  (topics, choices, disposition, persuasion and the services); containers and the bodies of the dead opened in a strip;
+  taking things in view of a witness is reported as a crime; a torch, a candle, a candlestick or a lantern in the hand
+  to explore Vvardenfell at night and underground; mushrooms to pick indoors and out; the original movement speeds;
+  weather by region, and music streamed from disk; travel by silt strider, boat, gondola and guild guide.
+- **Not yet:** most quests and other game logic that depends on scripts the game does not run yet (957 of the 1,207
+  scripts run whole), guards who arrest and jail, pickpocketing, trespass, alchemy, making your own enchantments, the
+  shot of a bow or a thrown weapon, schedules by the time of day and most of the scripted AI packages, and Dagoth Ur's
+  fight and voice. The jail markers are in the door table for the jail system to come. The Unmarked Shipwreck's upper
+  trapdoor still keeps the use key out of reach ([v0.0.55 release notes](docs/releases/notes/RELEASE-v0.0.55.md#known-in-this-build)).
+  [The game feature tracker](docs/GAME_FEATURES.md) lists every system of the base game with its state.
 - The reference target is an A1200 with AGA, a 68040 with FPU, 2 MiB Chip and 32 MiB Fast RAM (the safe minimum;
   16 MiB starts with a warning); development and
   every performance figure so far come from emulators and are relative. The first real-hardware figures, from testers
@@ -257,8 +276,9 @@ test image of one spot see [MiniWind: the test ground](docs/MINIWIND.md), the
 Everything else about building, the build speed options, the FPU support library and running the image in FS-UAE or
 WinUAE: [Building and playing](docs/BUILDING_AND_PLAYING.md), the [Linux build guide](docs/LINUX_BUILD.md) and the
 [FS-UAE launcher](docs/FS-UAE-LAUNCHER.md). The newest emulator presets are
-[`AmiWind-v0.0.52-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.52-FS-UAE.fs-uae) and
-[`AmiWind-v0.0.52-WinUAE.uae`](resources/emulators/AmiWind-v0.0.52-WinUAE.uae).
+[`AmiWind-v0.0.61-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.61-FS-UAE.fs-uae) and
+[`AmiWind-v0.0.61-WinUAE.uae`](resources/emulators/AmiWind-v0.0.61-WinUAE.uae); both start with 32 MB of
+Fast RAM.
 
 ## Where to read more
 

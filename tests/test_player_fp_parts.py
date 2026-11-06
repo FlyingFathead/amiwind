@@ -49,6 +49,7 @@ class FakeSkeleton:
             self.parents['bip01 %s finger0' % side] = 'bip01 %s hand' % side
             self.parents[item_bone] = 'bip01 %s hand' % side
         self.keys = {}
+        self.events = {'torch: start': 50.0, 'torch: stop': 52.0}
 
     def local(self, name, t):
         np = self.np
@@ -107,9 +108,11 @@ class Table(unittest.TestCase):
         finally:
             fp.stance_times = saved
         table = sa.read_table(data)
-        self.assertEqual(table['frames'], fp.FRAMES * len(fp.STANCES))
-        self.assertEqual([table['groups'][s] for s in fp.STANCES],
-                         [(i * fp.FRAMES, i * fp.FRAMES + fp.FRAMES - 1) for i in range(len(fp.STANCES))])
+        # the weapon stances, then the held light's (HELD-LIGHT-OWN-MODEL-61, the engine's stance 7)
+        self.assertEqual(table['frames'], fp.FRAMES * (len(fp.STANCES) + 1))
+        self.assertEqual([table['groups'][s] for s in fp.STANCES + (fp.LIGHT_STANCE,)],
+                         [(i * fp.FRAMES, i * fp.FRAMES + fp.FRAMES - 1) for i in range(len(fp.STANCES) + 1)])
+        self.assertEqual(len(fp.STANCES), 7)
         self.assertTrue(np.allclose(view0, fp.view_matrix(sk.pose(stances[0][1][0])('camera')[3, :3])))
         for i, (_, ts) in enumerate(stances):
             view = fp.view_matrix(sk.pose(ts[0])('camera')[3, :3])
@@ -119,6 +122,36 @@ class Table(unittest.TestCase):
                     want = np.asarray(sk.pose(ts[k])(name)) @ view
                     got = world[bones.index(name)]
                     self.assertTrue(np.allclose(got, want, atol=2e-2), (name, i, k, got, want))
+        # the light stance: the bare hands' frames, the left arm (clavicle down, the shield bone with it) on the
+        # torch group's eight phases in turn, in the bare hands' view
+        hands = stances[0][1]
+        view = fp.view_matrix(sk.pose(hands[0])('camera')[3, :3])
+        torch = fp.light_times(sk)
+        self.assertEqual(torch[0], 50.0)
+        self.assertEqual(torch[8], 50.0)
+        self.assertAlmostEqual(torch[3], 50.75)
+        base = len(fp.STANCES) * fp.FRAMES
+        for k in (0, 5, fp.FRAMES - 1):
+            world = sa.table_world(table, base + k)
+            for name in ('bip01 r hand', 'weapon bone'):
+                want = np.asarray(sk.pose(hands[k])(name)) @ view
+                self.assertTrue(np.allclose(world[bones.index(name)], want, atol=2e-2), (name, k))
+            # the left arm's local joints at the torch time, under the neck at the hands' time
+            for name in ('bip01 l forearm', 'shield bone'):
+                local = {n: sk.local(n, torch[k] if fp.left_arm(sk.parents, [n]) else hands[k]) for n in sk.parents}
+                m, n = np.eye(4), name
+                while n is not None:
+                    m = m @ local[n]
+                    n = sk.parents[n]
+                want = m @ view
+                self.assertTrue(np.allclose(world[bones.index(name)], want, atol=2e-2), (name, k))
+
+    def test_light_stance_needs_the_torch_group(self):
+        import prepare_player_fp_parts as fp
+        sk = FakeSkeleton()
+        sk.events = {}
+        with self.assertRaises(ValueError):
+            fp.light_times(sk)
 
 
 class Items(unittest.TestCase):

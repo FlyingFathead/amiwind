@@ -1,10 +1,11 @@
 # World tree sprites and the Balmora comparison zone
 
-_Last updated with AmiWind v0.0.56 (30 October 2026)._
+_Last updated with AmiWind v0.0.61-dev3 (2026-11-06)._
 
 <!-- contents start -->
 ## Contents
 
+- [Floating trunks and the base depth push (6 November 2026)](#floating-trunks-and-the-base-depth-push-6-november-2026)
 - [Open sprite-root regression - 4 October 2026](#open-sprite-root-regression---4-october-2026)
 - [Study: cheap trees with some depth (29 October 2026)](#study-cheap-trees-with-some-depth-29-october-2026)
 - [Balmora mesh exclusion](#balmora-mesh-exclusion)
@@ -16,6 +17,25 @@ _Last updated with AmiWind v0.0.56 (30 October 2026)._
 - [Reserves fail fast (11 October 2026)](#reserves-fail-fast-11-october-2026)
 
 <!-- contents end -->
+
+## Floating trunks and the base depth push (6 November 2026)
+
+Since v0.0.58 the bottom quarter of every tree card's rows was depth-tested an eighth of the card's width behind the
+card, so that one trunk base by the Seyda Neen shore wall no longer drew over the wall
+([SEYDA-WALL-SHAPE-31](bugs/SEYDA-WALL-SHAPE-31.md)). The card is flat, so the ground just behind a trunk lies inside
+that distance almost everywhere on a slope: it covered the pushed rows, and the trunk ended in a flat horizontal cut
+above the ground (BC-TREE-FLOATING-60 in the [bug register](BUGS.md)). The baked cards themselves reach the ground:
+each holds its model from the lowest to the highest vertex, so the trunk of a Bitter Coast tree goes well into the
+terrain under it.
+
+Now the push is kept only where it was meant to work: the builder marks a card (`"aw_depth_push" "1"`) when its pushed
+rows (the bottom quarter, an eighth of its width around the trunk) meet the box of a wall, building or rock of the
+frame; trees and other flora never count (`tools/chim/frame_map.py` `flora_push_refs`, for the town, special and
+region frame maps alike). On the v0.0.61-dev1 build that is 124 of the 885 cards (14 %), the Seyda Neen shore wall's
+among them; the other 761 keep their plane's depth. The engine pushes only the marked cards; the earlier method
+(every card) stays in the engine source for tests, and the like-for-like comparison runs the v0.0.61-dev1 engine
+against the new one on the same image and poses. No triangles are added. This is in v0.0.61-dev3; the shore wall pose in
+Seyda Neen after the change has not yet been seen in game.
 
 ## Open sprite-root regression - 4 October 2026
 

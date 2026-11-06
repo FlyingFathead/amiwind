@@ -23,7 +23,8 @@
                             i16 cell y i32 x y z (game units)
   STRT  2 bytes a start script: u16 script
   STRS  u32 offset per string, then the NUL-ended strings (cp1252)
-  OACT, ACTB, AINV, AITM, ASPT, ASPL, ASPC, ASPE, AEFF, AMGE: the actor table (actors.py; docs/ACTOR_STATE.md)
+  OACT, ACTB, AINV, AITM, ASPT, ASPL, ASPC, ASPE, AEFF, AMGE, AENC, APCS: the actor table (actors.py;
+        docs/ACTOR_STATE.md)
   PCEL  the cells each GetPCCell name matches (resident; pccell_section below)
   PMOV  20 bytes a move of the player (PositionCell; resident; written in write() below)
   TOPC  2 bytes a dialogue topic (DIAL type 0), sorted by folded id: u16 name (on disk; AddTopic hands the row)
@@ -40,10 +41,10 @@ MAGIC = b'AWMS'
 VERSION = 1
 TYPES = {'s': 0, 'l': 1, 'f': 2}
 ORDER = ('CONF', 'GLOB', 'JRNL', 'SNDS', 'VOIC', 'MUSI', 'OBJS', 'SCRP', 'STRT', 'OACT', 'PCEL', 'PMOV', 'SPFX', 'CODE', 'BIND', 'STRS',
-         'ACTB', 'AINV', 'AITM', 'ASPT', 'ASPL', 'TOPC', 'ASPC', 'ASPE', 'AEFF', 'AMGE', 'DRSC')
+         'ACTB', 'AINV', 'AITM', 'ASPT', 'ASPL', 'TOPC', 'ASPC', 'ASPE', 'AEFF', 'AMGE', 'DRSC', 'AENC', 'APCS')
 # The actor sections (actors.py, docs/ACTOR_STATE.md): OACT is resident (a script's target -> its actor row); the
 # others stay on disk and are read a row at a time by the engine's actor state (aw_actorstate.c).
-ACTOR_SECTIONS = ('OACT', 'ACTB', 'AINV', 'AITM', 'ASPT', 'ASPL', 'ASPC', 'ASPE', 'AEFF', 'AMGE')
+ACTOR_SECTIONS = ('OACT', 'ACTB', 'AINV', 'AITM', 'ASPT', 'ASPL', 'ASPC', 'ASPE', 'AEFF', 'AMGE', 'AENC', 'APCS')
 DEFAULT_CONF = {'range_units': 12288, 'ops_per_frame': 4000, 'ops_per_run': 2000}
 RESIDENT = ORDER[:ORDER.index('BIND')]
 # The engine's limits (the interpreter's MAX_SCRIPTS and MAX_GLOBALS; tests/test_mwscript.py keeps them equal): a file over them is refused there and every

@@ -57,7 +57,13 @@ typedef struct {
     /* a weapon's WPDT flags (catalogue byte 506, RESIST-NORMAL-WEAPONS-61): 1 magical, 2 silver; 0 in older catalogues */
     int weapon_flags;
     unsigned char light_colour[3];
+    /* AW_INV_LIGHT rows, catalogue byte 511 (v0.0.61, HELD-LIGHT-OWN-MODEL-61): 0 in older catalogues, else
+     * AW_LIGHT_FLAGS_SET with AW_LIGHT_FLICKER (the record flickers or pulses) and AW_LIGHT_FIRE (a flame) */
+    int light_flags;
 } aw_inventory_item_t;
+#define AW_LIGHT_FLAGS_SET 0x80
+#define AW_LIGHT_FLICKER 1
+#define AW_LIGHT_FIRE 2
 enum {AW_ENCH_NONE,AW_ENCH_ONCE,AW_ENCH_STRIKES,AW_ENCH_USED,AW_ENCH_CONSTANT};
 /* Selected magic item and enchantment charge (aw_magic_state_t). Pure rules:
  * select only an owned Cast Once / Cast When Used item (OpenMW SpellModel);
@@ -171,6 +177,9 @@ extern int (*aw_inventory_read_row)(int file_row,aw_inventory_item_t *out);
 void AW_InventoryBatchBegin(void);
 void AW_InventoryBatchEnd(void);
 int AW_InventoryEquippedItem(int slot,aw_inventory_item_t *out);
+/* STEAL-WITNESSED-NO-CRIME-61: COUNT of ID (VALUE each) taken from OWNER (a faction when FACTION): an owned placed
+ * item or an owned container's content; set by aw_crime.c (NULL: no crime layer) */
+extern void (*aw_inventory_theft)(const char *owner,int faction,const char *id,int count,int value);
 int AW_InventoryCanEquip(const aw_inventory_item_t *item);
 void AW_InventoryInit(void);
 void AW_InventoryGrantCommand(void);
@@ -182,6 +191,9 @@ const char *AW_InventoryHint(void);
 /* The focus box (FOCUS-BOX-58): the aimed ground item within the activation distance, its name and the box's
  * "Weight: x" and "Value: y" lines; owned 1 when taking it would be theft. 0 when no item is aimed at. */
 int AW_InventoryFocus(const char **name,char *weight_line,char *value_line,int line_size,int *owned);
+/* LOOT-WINDOW-ITEM-PROPERTIES-60: "Long blade  Weight 4  Value 1  Condition 300" for item ID within COLUMNS characters
+ * (the short words when the full ones do not fit); one catalogue read per new ID. 0 when the item is unknown. */
+int AW_InventoryPropertiesLine(const char *id,int columns,char *out,int size);
 float AW_ActivateDistance(void);
 /* The same for things placed in the loaded room (id1/focus.awf): items with weight and value, actors and doors with
  * their name only (empty lines). */
@@ -209,11 +221,16 @@ extern int (*aw_book_reader)(unsigned reference);
 int AW_PlacedBook(unsigned reference,char *id,int *owned);
 /* BOOK-READER-58: take the placed item REFERENCE as E on it would (owned: stolen); 1 when taken or refused. */
 int AW_PlacedTake(unsigned reference);
+/* aw_placed aim (PLACED-PIT-AXE-NO-FOCUS-61): the focus rows near the eye and what the aim test makes of each. */
+void AW_PlacedAimReport(void);
 /* WORLD-OBJECT-PLACEMENT-59: the placed item list (progs/items/placed.awp) is read with the focus rows; each row the
  * map does not draw itself is offered to aw_placed_admit (aw_placed.c: returns its drawn index + 1, 0 when it is not
  * drawn); aw_placed_begin forgets the drawn set and returns 0 when nothing is to be drawn. NULL: nothing is. */
 extern int (*aw_placed_begin)(void);
 extern int (*aw_placed_admit)(unsigned reference,const char *stem,const float local[3],const float angles[3],float scale);
+/* PLACED-PIT-AXE-NO-FOCUS-61 (aw_placed.c): where the view ray from EYE along the unit vector DIR meets the model of
+ * the drawn placed row DRAWN (its admit number), as a distance along the ray; -1 when it misses. NULL: not asked. */
+extern float (*aw_placed_ray)(int drawn,const float *eye,const float *dir);
 /* Once per client frame (aw_placed.c): read the focus table again when the map or exterior cell changed; 1 outdoors. */
 int AW_PlacedRefresh(void);
 /* What the last read of the placed list saw: keys read (negative outdoors), rows, rows with no item row in the focus

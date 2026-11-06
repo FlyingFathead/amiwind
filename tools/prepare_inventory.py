@@ -129,7 +129,8 @@ def source_items(data):
             result[DEBUG_TORCH_ID]=dict(id=DEBUG_TORCH_ID,name=DEBUG_TORCH_NAME,category=KINDS[kind],kind=kind,
                 subtype=radius,weight=weight,value=value,source_model=text(fields,'MODL'),
                 source_icon=text(fields,'ITEX'),script='',raw=raw,enchantment='',parts=False,
-                light=dict(source=identifier,time=LIGHT_INFINITE,source_time=time,radius=radius,colour=list(raw[16:19])))
+                light=dict(source=identifier,time=LIGHT_INFINITE,source_time=time,radius=radius,colour=list(raw[16:19]),
+                           flags=struct.unpack_from('<I',raw,20)[0]))
         if kind=='LIGH':
             if len(raw)!=24:continue
             # A carried light (LHDT flag 2, "can carry"): weight, value, burn time, radius, colour, as the torch
@@ -137,7 +138,7 @@ def source_items(data):
             weight,value,time,radius=struct.unpack_from('<fiii',raw)
             if not struct.unpack_from('<I',raw,20)[0]&2:continue
             light=dict(source=identifier,time=LIGHT_INFINITE if time<1 else min(time,1000000),source_time=time,
-                       radius=max(1,min(65535,radius)),colour=list(raw[16:19]))
+                       radius=max(1,min(65535,radius)),colour=list(raw[16:19]),flags=struct.unpack_from('<I',raw,20)[0])
             if not (math.isfinite(weight) and weight>=0 and value>=0):raise ValueError('Invalid item weight/value '+identifier)
             result[identifier]=dict(id=identifier,name=name,category=KINDS[kind],kind=kind,subtype=light['radius'],
                 weight=weight,value=value,source_model=text(fields,'MODL'),source_icon=text(fields,'ITEX'),
@@ -201,6 +202,22 @@ def prepare(data_files,id1,selected=(),palette=None,models=True,jobs=None,model_
         nif=nif_reader()
         assets=Assets(data,BSA(child_ci(data,'Morrowind.bsa')))
     rows=[];inventory_icons={};row_flags={}
+    from held_lights import catalogue_flags,held_light,sidecar_path,text as held_text
+    # HELD-LIGHT-OWN-MODEL-61: beside each carried light's item model (not the torch's mesh: the torch keeps its own
+    # hand, flame and light) its placing on the shield bone and its flames, one small file per model
+    torch_mesh=mesh_key(items[DEBUG_TORCH_SOURCE]['source_model']) if DEBUG_TORCH_SOURCE in items else ''
+    report['held_lights']={'files':0,'flames':0,'without_flame':0,'torch_mesh_skipped':0,'failed':{}}
+    held_written=set()
+    def held_inert(item):
+        # EQUIP-SHARDAXE-REFUSED-61: a weapon or shield whose enchantment does nothing while it is merely held is
+        # equipped as any other: none, Cast When Strikes (ENDT type 1) or Cast When Used (type 2). Only a worn item's
+        # Constant Effect enchantment becomes an active effect (OpenMW mwmechanics/activespells.cpp); those stay
+        # refused until constant effects are applied. 193 weapons (the iron shardaxe among them) were refused.
+        # PLAYER-CASTING-59 (v0.0.61): a Constant Effect one (type 3) as well, its effects active while it is worn
+        # (aw_cast.c worn_frame); only an enchantment the masters do not have stays refused.
+        if not item['enchantment']:return True
+        enchant=enchantments.get(item['enchantment'])
+        return bool(enchant) and enchant[0] in (1,2,3)
     for identifier,item in sorted(items.items()):
         model=icon='';slots=flags=0
         inert=not item['script'] or script_inert_after_registration(scripts.get(item['script'],''))
@@ -211,12 +228,13 @@ def prepare(data_files,id1,selected=(),palette=None,models=True,jobs=None,model_
             # First implemented equipment: accessories with no visible body-part
             # replacement and no constant/cast-on-equip effect. CastWhenUsed is
             # never applied merely by wearing the item.
+            # v0.0.61 (PLAYER-CASTING-59): a Constant Effect enchantment too, active while worn (aw_cast.c).
             enchant=enchantments.get(item['enchantment']) if item['enchantment'] else None
-            if item['subtype'] in (8,9) and not item['parts'] and inert and (not item['enchantment'] or (enchant and enchant[0]==2)):flags|=4
+            if item['subtype'] in (8,9) and not item['parts'] and inert and (not item['enchantment'] or (enchant and enchant[0] in (2,3))):flags|=4
             # Clothing with body parts (shirts, pants, shoes, robes, skirts, gloves): the player's assembled body
             # shows them (PLAYER-GEAR-VISUAL-59, tools/prepare_player_parts.py), so they are worn by the same rule
             # (nothing else happens when worn).
-            elif item['parts'] and inert and (not item['enchantment'] or (enchant and enchant[0]==2)):flags|=4
+            elif item['parts'] and inert and (not item['enchantment'] or (enchant and enchant[0] in (2,3))):flags|=4
         combat=[0,26,*([0]*6),0.,0.,0.,0.,0,0]
         if item['kind']=='WEAP' and item['subtype'] in HELD_WEAPONS:
             from prepare_combat import WEAPON_SKILL
@@ -236,8 +254,10 @@ def prepare(data_files,id1,selected=(),palette=None,models=True,jobs=None,model_
             combat=[0,26,*([0]*6),0.,0.,float(health),float(base),cls,int(settings['ibasearmorskill'])]
             slots=1<<ARMOUR_SLOTS[item['subtype']];flags|=1
             # Worn pieces count in combat (rating, hit sound) without a body picture yet (PLAYER-BODY-ALL-ANIMS):
-            # equippable when the item does nothing else when worn (no script after registration, no enchantment).
-            if item['subtype']!=8 and inert and not item['enchantment'] and health>0:flags|=4
+            # equippable when the item does nothing else when worn (no script after registration); since v0.0.61 with
+            # a Cast When Used or a Constant Effect enchantment too (PLAYER-CASTING-59, aw_cast.c).
+            enchant=enchantments.get(item['enchantment']) if item['enchantment'] else None
+            if item['subtype']!=8 and inert and (not item['enchantment'] or (enchant and enchant[0] in (2,3))) and health>0:flags|=4
         if item.get('light'):
             # Equipped like a torch: the left hand (its own slot rules; never a weapon or shield).
             slots=1<<SLOT_LEFT;flags|=1|4|FLAG_LIGHT
@@ -249,8 +269,22 @@ def prepare(data_files,id1,selected=(),palette=None,models=True,jobs=None,model_
             model=model_table.get(mesh_key(item['source_model']),'')
             if model:
                 if inert:flags|=2
-                if inert and not item['enchantment'] and (item['kind']=='WEAP' and item['subtype'] in HELD_WEAPONS or item['kind']=='ARMO' and item['subtype']==8):flags|=4
+                if inert and held_inert(item) and (item['kind']=='WEAP' and item['subtype'] in HELD_WEAPONS or item['kind']=='ARMO' and item['subtype']==8):flags|=4
             else:report['held'].setdefault(identifier,{})['model']='not in the item model table'
+            if model and item.get('light') and assets is not None and model not in held_written:
+                if mesh_key(item['source_model'])==torch_mesh:report['held_lights']['torch_mesh_skipped']+=1
+                else:
+                    try:
+                        from mwad.audit import normpath
+                        key=normpath('meshes/'+item['source_model'])
+                        held=held_light(assets.read(key),nif,key)
+                        out=id1/sidecar_path(model);out.parent.mkdir(parents=True,exist_ok=True)
+                        out.write_text(held_text(held),encoding='ascii',newline='\n')
+                        held_written.add(model);report['held_lights']['files']+=1
+                        report['held_lights']['flames']+=len(held['flames'])
+                        report['held_lights']['without_flame']+=not held['flames']
+                    except (ValueError,KeyError,OSError) as error:
+                        report['held_lights']['failed'][identifier]=str(error)[:200]
         if models and identifier in selected:
             stem=hashlib.sha256(identifier.encode()).hexdigest()[:16]
             if model_table is None and item['source_model']:
@@ -260,7 +294,7 @@ def prepare(data_files,id1,selected=(),palette=None,models=True,jobs=None,model_
                     model='progs/inv/i'+stem+'.mdl';out=id1/model;out.parent.mkdir(parents=True,exist_ok=True);out.write_bytes(raw)
                     report['models'][identifier]={'path':model,'sha256':hashlib.sha256(raw).hexdigest(),'bytes':len(raw)}
                     if inert:flags|=2
-                    if inert and not item['enchantment'] and (item['kind']=='WEAP' and item['subtype'] in HELD_WEAPONS or item['kind']=='ARMO' and item['subtype']==8):flags|=4
+                    if inert and held_inert(item) and (item['kind']=='WEAP' and item['subtype'] in HELD_WEAPONS or item['kind']=='ARMO' and item['subtype']==8):flags|=4
                 except (ValueError,KeyError,OSError) as error:report['held'].setdefault(identifier,{})['model']=str(error)
             if item['source_icon']:
                 try:
@@ -298,7 +332,9 @@ def prepare(data_files,id1,selected=(),palette=None,models=True,jobs=None,model_
         # byte 506 of a weapon (v0.0.61, RESIST-NORMAL-WEAPONS-61): its WPDT flags, 1 magical and 2 silver (OpenMW
         # combat.cpp isNormalWeapon: a creature that resists normal weapons is hurt only by these or enchanted ones)
         flags_506=struct.unpack_from('<i',item['raw'],28)[0]&3 if item['kind']=='WEAP' and len(item['raw'])>=32 else 0
-        tail=struct.pack('<i3Bx',light['time'],*light['colour']) if light else \
+        # byte 511 of a carried light (v0.0.61, HELD-LIGHT-OWN-MODEL-61): 0x80 | 1 it flickers or pulses | 2 a fire
+        # (held_lights.catalogue_flags; 0 in older catalogues)
+        tail=struct.pack('<i3BB',light['time'],*light['colour'],catalogue_flags(light.get('flags',0))) if light else \
             struct.pack('<HB5x',item.get('capacity',0),flags_506)
         row+=struct.pack('<ii6iffffii',*combat)+struct.pack('<B3xf',kind,charge)+tail
         assert len(row)==ROW;rows.append(row)

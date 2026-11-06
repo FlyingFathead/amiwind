@@ -231,6 +231,9 @@ extern void (*aw_combat_sheet_stats)(const char *id,aw_fighter_t *out);
 /* ESSENTIAL-DEATH-60: 1 when the actor record of ID is known (ESSENTIAL set from its essential flag) */
 int AW_CombatEssentialRecord(const char *id,int *essential);
 void AW_CombatPlayerSheet(aw_fighter_t *out);
+/* INVENTORY-NO-ARMOR-RATING-61: the player's armour rating as the inventory window shows it (the sheet's, with an
+ * active Shield effect's magnitude; OpenMW npc.cpp getArmorRating); -1 without the game's settings */
+float AW_CombatPlayerArmorRating(void);
 extern void (*aw_combat_equipment)(aw_fighter_t *sheet);
 extern void (*aw_combat_equipment_store)(const aw_fighter_t *sheet);
 void AW_CombatEquipmentStore(void);
@@ -289,6 +292,11 @@ extern int (*aw_combat_player_ranged)(void);
 extern float (*aw_combat_effect_magnitude)(struct edict_s *actor,int effect);
 /* The player's right-hand weapon is ordinary (aw_inventory.c: its catalogue flags and enchantment); NULL: ordinary. */
 extern int (*aw_combat_player_weapon_normal)(void);
+/* WEAPON-STRIKE-ENCHANT-NOT-CAST-61 (aw_cast.c sets it; NULL: none): a weapon blow of ATTACKER reached VICTIM (it hit,
+ * or was blocked; OpenMW npc.cpp hit: applyOnStrikeEnchantment on every successful hit, before the block): a Cast When
+ * Strikes enchantment on the weapon is cast on the victim with its charge. Called after the blow is applied (a victim
+ * the blow killed: the charge is spent, the effects find a corpse). */
+extern void (*aw_combat_strike_enchant)(struct edict_s *attacker,struct edict_s *victim);
 /* The text the player is shown when an ordinary weapon has no effect (combat/settings.txt "text
  * sMagicTargetResistsWeapons ..."); "" when the image has none. */
 const char *AW_CombatResistText(void);

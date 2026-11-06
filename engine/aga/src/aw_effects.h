@@ -26,6 +26,14 @@
 #define AW_EFFECT_COUNT 143        /* the game's magic effect numbers 0..142 */
 #define AW_EFFECT_NO_ARG 0xFF
 #define AW_EFFECT_NO_SOURCE 0xFFFF
+/* v0.0.61 (PLAYER-CASTING-59): a constant effect (a worn item's Constant Effect enchantment, OpenMW activespells.cpp
+ * Flag_Equipment) lands with SECONDS AW_EFFECT_CONSTANT and a SOURCE from AW_EFFECT_SOURCE_CONSTANT up (the item's
+ * equipment slot added); it never ends on the clock (a per-second one acts each second) and goes with
+ * AW_EffectsRemoveSource, undone as at an end. Saved like the others, with 1e7 seconds left. Sources below
+ * AW_EFFECT_SOURCE_ITEM are spells (ASPT rows); from AW_EFFECT_SOURCE_ITEM up, the effects of a used or striking item. */
+#define AW_EFFECT_CONSTANT (-1.0f)
+#define AW_EFFECT_SOURCE_ITEM 0xF000
+#define AW_EFFECT_SOURCE_CONSTANT 0xF800
 enum {AW_FX_DRAIN=0,AW_FX_DAMAGE=1,AW_FX_RESTORE=2,AW_FX_FORTIFY=3};
 /* Some effect numbers the engine reads (OpenMW's MGEF indexes). */
 enum {AW_EFFECT_WATER_BREATHING=0,AW_EFFECT_SWIFT_SWIM=1,AW_EFFECT_WATER_WALKING=2,AW_EFFECT_SHIELD=3,
@@ -66,6 +74,10 @@ float AW_EffectsMagnitude(uint32_t owner,int effect,int arg);
 int AW_EffectsOwners(uint32_t *out,int max);
 /* OWNER's effects go without being undone (it died or left the game); how many. */
 int AW_EffectsForget(uint32_t owner);
+/* A's effects of SOURCE go, each undone as at its end (an item taken off); how many. */
+int AW_EffectsRemoveSource(aw_actor_t *a,int source);
+/* Moves with every reset and every load of a saved game (the worn items' effects are checked again then). */
+unsigned long AW_EffectsGeneration(void);
 /* The I-th active effect (0..AW_EffectsCount()-1), for the HUD and the status line; 1 when there is one. */
 typedef struct {uint32_t owner;int effect,arg,source;float magnitude,left;} aw_effect_info_t;
 int AW_EffectsAt(int i,aw_effect_info_t *out);
@@ -76,4 +88,8 @@ unsigned long AW_EffectsRefused(void);
  * as they stood, so an import only restores the list; nothing is applied again. */
 int AW_EffectsExport(unsigned char *out,int capacity);
 int AW_EffectsImport(const unsigned char *data,int bytes);
+/* The bytes of the AWEF block at DATA (of AVAILABLE bytes), by its version: 10 an effect in version 1, 16 in 2; -1 not
+ * one or cut (SAVE-EFFECTS-BLOCK-SIZE-61: the save reader took 10 for every block, so a v0.0.61 save with an effect
+ * active lost its effects and every block after them). */
+int AW_EffectsBlockBytes(const unsigned char *data,unsigned long available);
 #endif

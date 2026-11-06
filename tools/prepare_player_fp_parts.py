@@ -19,7 +19,9 @@ forearms and upper arms under them; a robe without one leaves the arms as they a
   id1/progs/humanoid_1st.awsk   the first-person table: the arms of base_anim.1st.nif (every finger joint: the hand
                                 is seen close), 28 frames per stance in the baked hands' frame contract (prepare_hands
                                 stance_clips: idle 8, draw 6, lower 4, punch 10) for the four stances in the engine's
-                                order (bare hands, one-handed, two-handed close, two-handed wide). The root carries the
+                                order (bare hands, one-handed, two-handed close, two-handed wide; then bow, crossbow,
+                                thrown and, last, the held light: the bare hands with the left arm on the original's
+                                torch group, which a candle, candlestick or lantern takes). The root carries the
                                 view: each stance's frames are taken from its first frame's Camera and turned to the
                                 view axes, as prepare_hands bakes the arms, so a posed part is in view space and the
                                 Weapon Bone tags of gfx/hand-weapons.aww place the weapon on it unchanged.
@@ -49,6 +51,8 @@ SLEEVES = (11, 12, 13, 14)
 CHEST = 3
 # the table's groups in the engine's stance order (aw_hand_models.c AW_HandStance + 1; 0 the bare hands)
 STANCES = ('hh', '1h', '2c', '2w', 'bow', 'xb', '1t')     # the ranged three since v0.0.61 (FIRST-PERSON-WEAPONS-56)
+# after them the held light (HELD-LIGHT-OWN-MODEL-61): the engine's stance 7 (aw_view.c HAND_PART_LIGHT)
+LIGHT_STANCE = 'light'
 FRAMES = 28
 # triangles per part by slot: the baked bare arms of a man keep about 700 of the source's (authored topology)
 FP_CAP = {3: 160, 6: 320, 7: 320, 8: 48, 9: 48, 11: 120, 12: 120, 13: 80, 14: 80}
@@ -96,9 +100,33 @@ def camera_at(skeleton, t):
     return np.asarray(skeleton.pose(float(t))('camera'), float)[3, :3]
 
 
+def light_times(skeleton, count=FRAMES):
+    """The left arm's sample times of the light stance (HELD-LIGHT-OWN-MODEL-61): the original's first-person torch
+    group (base_anim.1st.nif 'torch: start'..'torch: stop', the hold prepare_torch bakes in 8 phases), its 8 phases in
+    turn over the stance's 28 frames."""
+    start, stop = skeleton.events.get('torch: start'), skeleton.events.get('torch: stop')
+    if start is None or stop is None or not stop > start:
+        raise ValueError('The first-person skeleton has no torch group')
+    return [float(start + (i % 8) / 8.0 * (stop - start)) for i in range(count)]
+
+
+def left_arm(parents, bones):
+    """The indices of the table's bones from the left clavicle down (the arm the carried light takes)."""
+    out = set()
+    for i, name in enumerate(bones):
+        n = name
+        while n is not None and n != 'bip01 l clavicle':
+            n = parents.get(n)
+        if n is not None:
+            out.add(i)
+    return sorted(out)
+
+
 def fp_table(skeleton):
     """(table bytes, bone names, the bare hands' view matrix, the table's sample times): the first-person table of
-    the skeleton (npc_geometry.Skeleton of base_anim.1st.nif)."""
+    the skeleton (npc_geometry.Skeleton of base_anim.1st.nif). After the weapon stances the light stance
+    (LIGHT_STANCE, HELD-LIGHT-OWN-MODEL-61): the bare hands' 28 frames with the left arm on the torch group, as the
+    original layers a carried light over the hands."""
     import numpy as np
     import skeletal_actor as sa
     keep = fp_bones(skeleton)
@@ -113,6 +141,15 @@ def fp_table(skeleton):
         views.extend([view_matrix(camera_at(skeleton, t[0]))] * FRAMES)
         times.extend(t)
     rot, pos = sa.sample_table(kept, bones, times)
+    hands = stance_times(skeleton)[0][1]
+    groups[LIGHT_STANCE] = (len(times), len(times) + FRAMES - 1)
+    views.extend([view_matrix(camera_at(skeleton, hands[0]))] * FRAMES)
+    times.extend(hands)
+    lrot, lpos = sa.sample_table(kept, bones, hands)
+    trot, tpos = sa.sample_table(kept, bones, light_times(skeleton))
+    arm = left_arm(kept.parents, bones)
+    lrot[:, arm], lpos[:, arm] = trot[:, arm], tpos[:, arm]
+    rot, pos = np.concatenate((rot, lrot)), np.concatenate((pos, lpos))
     for f, view in enumerate(views):
         for b, parent in enumerate(parents):
             if parent < 0:
@@ -280,8 +317,11 @@ def _safe_bake(task):
 
 def unit_inputs(task):
     data, palette, part, cap = task
+    # a part's skin block names the table's frame count (aw_skel_load.c refuses a part whose count differs), so the
+    # table's frames are part of the key: the light stance (v0.0.61) made every part again once
     return {'entry': {'name': 'first-person part %d %s' % (part['slot'], part['id'])}, 'skeleton': FP_SKELETON,
-            'part': part, 'cap': cap, 'palette_sha256': hashlib.sha256(palette).hexdigest()}
+            'part': part, 'cap': cap, 'palette_sha256': hashlib.sha256(palette).hexdigest(),
+            'table_frames': FRAMES * (len(STANCES) + 1)}
 
 
 def _unit_cache():

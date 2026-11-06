@@ -90,6 +90,7 @@ Family: Distance drawing (horizon, fog, sky, far edges) (`distance-drawing`). Fa
 
 Related bugs in other categories:
 
+- BC-TREE-FLOATING-60 (no report page): A Bitter Coast tree near cell -2,-8 floats above the ground
 - [CHIM-BC-TREE-PYRAMID-BOX-47](CHIM-BC-TREE-PYRAMID-BOX-47.md): Bitter Coast trees (flora_bc_tree family) look like a pyramid trunk with a flat box floating above it
 
 <!-- END GENERATED CATEGORY -->

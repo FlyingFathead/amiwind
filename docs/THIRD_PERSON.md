@@ -1,6 +1,6 @@
 # Third person, vanity camera and the death scene
 
-_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
+_Last updated with AmiWind v0.0.61-dev3 (2026-11-06)._
 
 <!-- contents start -->
 ## Contents
@@ -14,6 +14,7 @@ _Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
   - [The drawn weapon's stance (v0.0.61)](#the-drawn-weapons-stance-v0061)
   - [The inventory picture](#the-inventory-picture)
 - [First-person arms](#first-person-arms)
+  - [The first-person view](#the-first-person-view)
 - [Console](#console)
 - [Build switches](#build-switches)
 
@@ -178,10 +179,18 @@ In the game (`engine/aga/src/aw_player_parts.c`, `aw_view.c`): the recipe is rea
 hair or a worn item changes, and not kept in memory; the parts load as ordinary models (about 0.3 MB for a full
 outfit). Every part draws at the body's frame of the shared table; the bones are posed once per frame for all of
 them, the vertices per part. The body plays the same groups as the baked one (idle, walk, run, jump, the block,
-death and the hand-to-hand ready sections).
+death, the hand-to-hand ready sections and, since v0.0.61, swimming: the original's `idleswim` and
+`swimwalkforward` from the same shared table), so a swimming player wears what is worn, not the baked swimmer's
+starting clothes.
+
+A changed outfit loads its parts over several frames; since v0.0.61-dev3 the inventory picture waits for them (at most
+5 seconds) and is drawn once, so a cuirass, a robe or trousers put on or taken off show in the window and on the body
+at once. A held candle, candlestick or lantern is drawn on the left hand with its own model and flames, and the left
+arm takes the light's pose ([INVENTORY.md](INVENTORY.md), "World models"); the light is not in the inventory picture.
 
 The baked body stays selectable (`aw_player_body_parts 0`, saved, or `dbg camera parts off`), and it is still the
-body while a torch is carried or while swimming (their own baked poses). Not yet on the assembled body: the
+body while a torch is carried (its own baked pose), and while swimming in an image whose layout has no swim groups.
+Not yet on the assembled body: the
 draw/lower and punch arm layers of the bare hands and the torch pose.
 
 ### The drawn weapon's stance (v0.0.61)
@@ -251,6 +260,27 @@ the original does (the rule OpenMW follows in `npcanimation.cpp`). A robe shows 
 `.1st` chest record) and covers the arms under them; a robe without one leaves the arms as they are. Changing gloves
 or gauntlets in the inventory changes the hands at once. The drawn weapon is held in the same stances as before.
 
+### The first-person view
+
+Since v0.0.61 the arms, the drawn weapon, the torch, a held light and their flames are drawn as the original draws
+its first-person model (OpenMW 0.51 `npcanimation.cpp`), `aw_fp_view 1` (the default, saved):
+
+- with their own field of view, 60 degrees high (OpenMW's "first person field of view"; `OverrideFieldOfViewCallback`),
+  whatever the world's: the world's fov 90 across a view 2.1 times as wide as high is only about 51 degrees high, and
+  drawn with it the arms were larger and only the hands reached into the bottom edge. Only the projection's scale
+  changes (one tangent a frame); the centre, the clipping and the depth stay the world's;
+- turned by 0.75 of the view's pitch (OpenMW's first-person neck, `runAnimation`; the skeleton's Camera rides Bip01
+  Head on Bip01 Neck, so seen from the eye the arms turn a quarter of the pitch the other way): looking down they rise
+  into the view with the forearms and the sleeves, looking up they sink. The eye and the aim do not change.
+
+`aw_fp_view 0` (or `dbg camera fpview off`) keeps the previous method: the world's projection and the arms following
+the whole pitch. Reference frames of OpenMW 0.51 at the same poses (first person, shirt and robe, fists and a dagger,
+level and 45 degrees down) were taken for the comparison. With the fists raised and the view looking down the forearms
+show, and a worn shirt's or robe's sleeves cover them. A lantern hangs below the hand, so in first person only its
+handle shows. Not yet seen in game: the glass lantern in first person, a still in the middle of a swing, and the frame
+times of this view on the Raspberry Pi 4B. Register: FP-FOREARMS-BELOW-VIEW-61 ([BUGS.md](BUGS.md)).
+Tests: `tests/aga_viewmodel_bob_test.c`.
+
 How it is built (`tools/prepare_player_fp_parts.py`, in the image step after the player view):
 
 - The first-person skeleton (`meshes/base_anim.1st.nif`) becomes a small animation table of its two arms, every finger
@@ -294,6 +324,7 @@ while a torch is carried and while the shield is raised to guard (their own bake
 | `dbg camera body on/off` | Draw the body; off means first person only (`aw_player_body`). |
 | `dbg camera parts on/off` | The body assembled from what is worn (on, the default) or the baked body (off); `aw_player_body_parts`, saved. `dbg camera` lists the assembled body's parts, its scale and the last assembly's time. |
 | `dbg camera stances on/off` | The drawn weapon's stance on the assembled body (on, the default) or the body's own poses (off); `aw_player_stances`, saved. |
+| `dbg camera fpview on/off` | The original's first-person view (on, the default: the arms, weapon and held light with their own 60-degree field of view, lagging the pitch) or the world's projection with the arms following the whole pitch (off, the previous method); `aw_fp_view`, saved. `dbg camera` shows it with the view's and the arms' pitch. |
 | `dbg camera hands on/off` | The first-person arms assembled from what is worn (on, the default) or the baked arms (off); `aw_hand_parts`, saved. `dbg camera` lists the arms' parts, their frame and the last assembly's time. |
 | `dbg camera die` | Test the death scene: the player dies as from world damage (like lava). |
 

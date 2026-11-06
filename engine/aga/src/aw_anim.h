@@ -89,6 +89,8 @@ int AW_AnimMoveGroup(const aw_anim_t *a,float speed,int swimming,float *rate);
 /* The player's bare-hand ready stance. Missing variants and swimming retain
  * normal locomotion; NPC selection and first-person hand state are unchanged. */
 int AW_AnimPlayerMoveGroup(const aw_anim_t *a,float speed,int swimming,int ready,float *rate);
+/* 1 when the layout has both swim groups (swim, swimidle): the body it animates can swim (SWIM-BAKED-CLOTHES-60). */
+int AW_AnimSwims(const aw_anim_t *a);
 /* Advance by dt seconds at rate; returns the frame. *crossed gets a bit per
  * group frame index entered (loop groups wrap; one-shot groups hold the last). */
 int AW_AnimAdvance(const aw_anim_t *a,aw_anim_play_t *p,int group,float dt,float rate,unsigned long *crossed);

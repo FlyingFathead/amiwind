@@ -60,6 +60,10 @@ int AW_ItemsLightEmitter(const struct model_s *item,float out[3]);
 int AW_ItemsTorchLayer(const struct model_s *m,const void *skel_table,int frame,float *layer_frame,int *root);
 /* r_alias.c's hook to it (set with the level's item tables; NULL: no torch pose, as in the renderer's native tests) */
 extern int (*R_AliasTorchLayer)(const struct model_s *m,const void *skel_table,int frame,float *layer_frame,int *root);
+/* aw_view.c (HELD-LIGHT-OWN-MODEL-61): the player's assembled body holding a candle, candlestick or lantern takes the
+ * same left-arm layer; asked first by AW_ItemsTorchLayer (NULL: none) */
+extern int (*aw_items_player_layer)(const struct model_s *m,const void *skel_table,int frame,float *layer_frame,
+                                    int *root);
 /* An actor (of an item table: its arm bones are known) facing into an ash or blight storm while idle, walking,
  * running, turning or sneaking shields its eyes: 1 with its right arm's root and the table frame of the "idlestorm"
  * group (ACTOR-STORM-POSE-51; aw_weather.h). yaw: the drawn entity's. The torso part of the original pose is left

@@ -83,6 +83,7 @@ void AW_FpuCountInit(void){}
 double Sys_FloatTime(void){return realtime;}
 #endif
 
+static int talking;static int dialogue_open(void){return talking;}
 static void policy(void){
     int f,b;
     AW_UIInit();assert(freeze && freeze->archive && freeze->value==1);
@@ -119,6 +120,13 @@ static void policy(void){
     assert(AW_ModalWorldFrozen() && !AW_ModalWorldHidden());
     cls.signon=3;assert(!AW_ModalWorldFrozen());cls.signon=SIGNONS;
     death_prompt=0;assert(!AW_ModalWorldFrozen());freeze->value=1;
+    /* DIALOGUE-BACKDROP-HUD-60: the dialogue window stands on plain black whatever aw_modal_black says; without it
+     * (or with the hook unset, as in builds without the window) the policy is as before */
+    key_dest=key_menu;black->value=0;assert(!AW_ModalWorldHidden());
+    aw_ui_dialogue_backdrop=dialogue_open;assert(!AW_ModalWorldHidden());
+    talking=1;assert(AW_ModalWorldHidden());
+    sv.active=false;assert(!AW_ModalWorldHidden());sv.active=true;   /* only over a game being played */
+    talking=0;assert(!AW_ModalWorldHidden());aw_ui_dialogue_backdrop=NULL;black->value=1;key_dest=key_game;
 }
 void AW_RemotePoll(void){}
 int main(void){

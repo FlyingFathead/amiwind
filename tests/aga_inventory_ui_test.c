@@ -122,11 +122,21 @@ void AW_CombatEquipmentStore(void){store_calls++;}
 void AW_CombatEquipmentChanged(void){changed_calls++;}
 int AW_ViewInventoryBody(model_t **model,int *frame){static model_t body;*model=&body;*frame=7;return 1;}
 int AW_InventoryPreviewDraw(model_t *model,int frame,int x,int y,int width,int height,float angle){
-    (void)model;(void)angle;assert(frame==7 && x<128 && y==32 && width==116 && height==158);assert(angle>3.14f && angle<3.15f);preview_calls++;return 1;
+    (void)model;(void)angle;assert(frame==7 && x<128 && y==32 && width==116 && height==150);assert(angle>3.14f && angle<3.15f);preview_calls++;return 1;
 }
+/* INVENTORY-PREVIEW-STALE-61: the assembled body still loading a changed outfit's parts (aw_view.c parts_pending),
+ * and the clock the picture's wait is measured by */
+static int parts_loading;static double test_clock=100;
+static int test_parts_pending(void){return parts_loading;}
+extern int (*aw_inventory_preview_pending)(void);
+double Sys_FloatTime(void){return test_clock;}
 /* ENCUMBRANCE-INCOMPLETE-61: the player's burden as aw_move.c gives it (12.2 of 300) */
 static float test_burden(float *capacity){*capacity=300;return 12.2f;}
 extern float (*aw_worldui_encumbrance)(float *capacity);
+/* INVENTORY-NO-ARMOR-RATING-61: the player's armour rating as aw_combat.c gives it, and how often it is asked */
+static float test_armor_value=17.8f;static int armor_calls;
+static float test_armor(void){armor_calls++;return test_armor_value;}
+extern float (*aw_worldui_armor_rating)(void);
 int main(void){
     static client_t client;static edict_t actor;aw_state_t before;int calls;
     assert(!map_journal_regressions());
@@ -160,7 +170,34 @@ int main(void){
     assert(preview_calls==1);
     AW_WorldUIKey('e',1);assert(AW_InventoryEquipped(&aw_state,fixture_item.id)==1);assert(store_calls && changed_calls);
     draw();draw();assert(preview_calls==2);   /* the equipment changed: one new picture */
+    /* INVENTORY-PREVIEW-STALE-61: while the new outfit's parts load, the picture waits (the kept one shown) and is
+     * rendered once they are all in, never of the previous outfit; a load that never ends waits 5 s at most */
+    aw_inventory_preview_pending=test_parts_pending;
+    AW_WorldUIKey('e',1);parts_loading=1;draw();draw();draw();assert(preview_calls==2);
+    parts_loading=0;draw();draw();assert(preview_calls==3);
+    AW_WorldUIKey('e',1);assert(AW_InventoryEquipped(&aw_state,fixture_item.id)==1);
+    parts_loading=1;draw();test_clock+=4.9;draw();assert(preview_calls==3);
+    test_clock+=.2;draw();assert(preview_calls==4);draw();assert(preview_calls==4);
+    parts_loading=0;aw_inventory_preview_pending=NULL;
+    /* INVENTORY-NO-ARMOR-RATING-61: "Armor: N" under the picture (OpenMW inventorywindow.cpp updateArmorRating: the
+     * whole number), asked once and again only after an action, not every frame */
+    aw_worldui_armor_rating=test_armor;armor_calls=0;layout_capture=1;layout_count=0;draw();
+    assert(strstr(drawn,"Armor: 17") && armor_calls==1);
+    {const layout_text_t *a=NULL;int k,shadow=0;
+     for(k=0;k<layout_count;k++)if(strstr(layout_text[k].value,"Armor: 17")){
+         if(layout_text[k].y==186)a=&layout_text[k];else if(layout_text[k].y==187)shadow++;
+     }
+     assert(a && shadow==1);                                                              /* the burden bar's shadow */
+     assert(a->x>=7 && a->x+a->width<=123 && a->y+5<=195 && a->y>=32+150);               /* under the picture */
+     assert(abs((a->x+a->width/2)-(7+116/2))<=2);}                                       /* centred under it */
+    layout_capture=0;draw();draw();assert(armor_calls==1);
+    test_armor_value=25.6f;
     AW_WorldUIKey('e',1);assert(!AW_InventoryEquipped(&aw_state,fixture_item.id));
+    draw();assert(strstr(drawn,"Armor: 25") && armor_calls==2);
+    test_armor_value=-1;AW_WorldUIKey('e',1);draw();assert(!strstr(drawn,"Armor") && armor_calls==3);   /* unavailable */
+    draw();assert(armor_calls==3);
+    AW_WorldUIKey('e',1);assert(!AW_InventoryEquipped(&aw_state,fixture_item.id));
+    aw_worldui_armor_rating=NULL;test_armor_value=17.8f;
     /* Right click selects the actual row; Enter-equivalent action is real. */
     AW_WorldUIMouse(-1000,-1000);AW_WorldUIMouse(160,60);AW_WorldUIKey(K_MOUSE3,1);draw();assert(strstr(drawn,"Equip"));
     AW_WorldUIKey(K_MOUSE1,1);assert(AW_InventoryEquipped(&aw_state,fixture_item.id)==1);
@@ -233,7 +270,7 @@ int main(void){
         assert(label->width==137); /* no smaller font or wider hidden field */
         assert(layout_find("Tab category")->y==176);
         assert(layout_find("Up/Down select")->y==184);
-        assert(preview_calls); /* exact 116 x 158 preview bounds under the burden bar checked by its stub */
+        assert(preview_calls); /* exact 116 x 150 preview bounds under the burden bar checked by its stub */
         layout_point(160,135);AW_WorldUIKey(K_MOUSE1,1);layout_draw();
         label=layout_find("Actions unavailable");assert(label && label->y>=160 && label->y+5<=173);
         layout_point(160,55);AW_WorldUIKey(K_MOUSE1,1);
@@ -259,7 +296,7 @@ int main(void){
         x=label->x;y=label->y;layout_point(x+2,y+2);AW_WorldUIKey(K_MOUSE1,1);
         assert(!AW_InventoryActive() && key_dest==key_game);
         layout_capture=layout_mode=0;
-        printf("inventory bounds: rows54..149 details153..157 status160..172 controls176..188 context<=171 burden21..29 preview32..189; drawn action clicks equip/drop/close pass\n");
+        printf("inventory bounds: rows54..149 details153..157 status160..172 controls176..188 context<=171 burden21..29 preview32..181 armour186..191; drawn action clicks equip/drop/close pass\n");
         (void)at;
     }
     /* More than one page: arrows/rail/drag route through the shared helper;

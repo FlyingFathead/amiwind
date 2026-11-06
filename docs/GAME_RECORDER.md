@@ -1,67 +1,111 @@
 # Gameplay recorder
 
-_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
+_Last updated with AmiWind v0.0.61-dev3 (2026-11-06)._
 
-**Planned for v0.0.61.** Nothing on this page exists in the game yet; it is the design the work starts from.
+**In development for v0.0.61** (register: GAME-RECORDER-MISSING-61). The first slice below is in v0.0.61-dev3 and
+records and replays a session on the emulator; the hotkey for benchmark segments, the mouse in windows, replay on the Raspberry Pi 4B and the
+gameplay smoke set are still planned.
 
 A recorder for testing. It records what the player does in a session, keeps a save of the character and the world at
 the start, and plays the session back in another game instance, so a route played once can be repeated exactly: to
 reproduce a problem, to test the game's logic, and to measure frame times in the same places on every build.
 
-## How it works
+## How to use it
 
-- Planned: `dbg recorder` in the console arms the recorder. Nothing is recorded yet; the screen shows the key to press.
-- Ctrl+R starts and stops a recording. While recording, a red dot is on the screen. The key is live only after
-  `dbg recorder` (planned), so the normal play keys keep their meaning; Alt is avoided because the emulator presets use Left Alt
-  as their own modifier key.
-- When a recording stops, the screen shows where it was saved, for example `recordings/001.awr`.
-- Planned: `dbg recorder play FILE` loads the recording's save and plays the inputs back. While playing back, a play icon is on
-  the screen.
+- `dbg recorder` in the console arms the recorder. The version line at the top of the screen then reads
+  `AmiWind v<version> - Ctrl+R: record`. Nothing is recorded yet. `dbg recorder off` disarms it.
+- **Ctrl+R** starts a recording. The game takes a save of the character and the world as they are, loads that save at
+  once (a short load), and records from the first frame in play after it. While recording, the version line reads
+  `AmiWind v<version> (RECORDING)`. The key is live only after `dbg recorder`, so Ctrl and R keep their meaning in
+  normal play (Ctrl is sneak); Alt is avoided because the emulator presets use Left Alt as their own modifier key.
+- **Ctrl+R** again stops it. The file is written once, then, and the screen names it, for example
+  `Saved recordings/001.awr` (the next free number in the `recordings` folder of the game folder).
+- `dbg recorder play 001` (or `play 001.awr`) loads the recording's save and plays the session back. While it plays,
+  the version line reads `AmiWind v<version> (PLAYBACK)`, the keyboard is taken by the playback (Ctrl+R stops it), and
+  the console prints a line for every checkpoint. At the end one line sums it up:
+  `RECORDER RESULT match 7/7 checkpoints, ...` or `RECORDER RESULT diverged at checkpoint 3 (0:15, in <place>) ...`,
+  and the screen shows the same for 30 seconds.
+- `dbg recorder start`, `dbg recorder stop` and `dbg recorder status` do the same from the console (for scripted test
+  sessions).
 
 ## What a recording holds
 
-One file holds everything needed to repeat the session:
+One file (`.awr`) holds everything needed to repeat the session:
 
-- the starting save: the character and its attributes, the inventory, the list of changes made to the world, and the
-  random seed;
-- the player's inputs, frame by frame: movement, view angles, buttons and keys, and the console lines typed. Inputs
-  are keyed to the game's frame number, not to the clock, so a slow machine and a fast one replay the same session;
-- checkpoints every few seconds: the player's position, health, cell and a hash of the list of world changes.
+- the starting save: the character and its attributes, the inventory, the world change list, the journal, the time of
+  day, and the random seed the game's rolls start from;
+- every frame of the session, keyed to the game's frame number, never to the clock: the frame's length, the move
+  (forward, side, up) and the view angles the game sent, every key pressed or released (movement, E, attack, menus,
+  console typing) and the command lines of the remote test channel;
+- checkpoints every 5 seconds of game time: the frame, the player's position, health, the place and a hash of the world
+  change list.
 
-Only what the player does is recorded. The game works out everything else again during playback. This differs from the
-engine's demo recording, which stores what the server sent to the client: that is an exact replay to watch, not a
-re-run of the game's logic. The demo is recorded beside the input file, for watching.
+Only what the player does is recorded. The game works out everything else again during playback, which is what makes
+it a test of a build. This differs from the engine's demo recording (`record` / `playdemo`), which stores what the
+server sent to the client: an exact replay to watch, not a run of the game's logic again.
+
+## How a playback retraces the session
+
+The recording starts from a fresh load of its own save, and so does the playback: both begin in the same state, at
+the same first frame in play. The random generator is seeded at that frame with the recorded seed, and the game no
+longer draws a roll per wall-clock frame while the recorder runs. Each played frame uses the recorded length instead
+of the measured one, so a slow machine and a fast one run the same frames. The recorded keys go through the game's
+own key handling as if typed, and the recorded move and view replace the live ones. Autosaves are off while
+recording and playing back (a save changes the world change list's tables, and nothing is written during play).
+
+Matching checkpoints mean the route was retraced. The first mismatch is reported with its number, time and place: on
+the same build it is a hole in the determinism to fix; on a new build it is a finding (a bug, or a real change of
+behaviour).
 
 ## Budget
 
-- Per frame: under 16 bytes (movement 3 x 2, view angles 3 x 2, buttons and keys 1 to 2, frame length 1); the budget is
-  32 bytes with the frame number and the occasional console line.
-- At about 10 frames per second on a 68040: about 19 KB a minute and about 1.1 MB an hour. Checkpoints add about
-  30 bytes every 5 seconds, and the starting save is one ordinary save file.
-- Memory: the recording is held in a RAM buffer (about 1 MB holds an hour).
-- Disk: nothing is written during play. The file is written once, when recording stops.
-- Processor: one copy of 16 to 32 bytes per frame while recording; one test per frame when the recorder is off.
-- Drawing: only the red dot or the play icon.
+Measured or counted for this slice on FS-UAE at 32 MB of Fast RAM, 68040 with JIT:
 
-## Playback and divergence
+- **Off:** one test per hook and frame (the frame, the input, each key, the move, the drawing); about 1.2 KB of
+  static data; no allocation.
+- **Per frame while recording:** 3 bytes (flags and length), 12 bytes for the move and view, 2 bytes per key event,
+  and the length of a command line when there is one: 15 bytes in a frame without keys. At 10 frames a second, about
+  9 KB a minute and about 0.5 MB an hour.
+- **Memory:** the frames are kept in one buffer that starts at 32 KB and doubles up to 2 MB (about three hours at 10
+  frames a second; when it is full the recording stops and is saved); the checkpoints take 48 bytes every 5 seconds;
+  the starting save is held from the start to the stop (its size is that of an ordinary save). All of it is freed at
+  the stop.
+- **Processor:** a 15-byte copy per frame while recording; every 5 seconds a pass over the world change list for its
+  hash.
+- **Disk:** nothing during play. One write when recording stops, one read when a playback starts.
+- **Drawing:** the version line (and, for a few seconds, the saved file's name or the playback result) at the top of
+  the screen.
 
-Playback loads the starting save and feeds the recorded inputs to the game frame by frame, on the emulator or on the
-Raspberry Pi 4B. At each checkpoint it compares the position, health, cell and change-list hash with the recorded
-values and reports where a playback first differs. A divergence on a new build is itself a finding. A divergence before a
-benchmark segment makes that segment's numbers invalid.
+## Checked in game
+
+v0.0.61-dev2 recorder engine on the emulator, 32 MB of Fast RAM, 68040 with JIT: a recording that starts inside
+Arrille's Tradehouse in Seyda Neen, walks to the door, opens it with E (the load out to the street) and walks on:
+5,502 frames, 1 minute 20 seconds of game time, 82,667 bytes of frames (15.0 bytes a frame) and a 5,002-byte starting
+save. Its playback matched all 18 checkpoints to 0.0 units and ended on the same spot. A test recording on the
+dev3 engine, 3,797 frames (0:58 of game time), held 13 of 13 checkpoints in its replay. The engine's generated version
+header is rewritten only when it changes, which stops an engine build from failing on a header that is briefly shorter
+than expected ([BUILD-VERSION-HEADER-RACE-61](bugs/BUILD-VERSION-HEADER-RACE-61.md)).
+
+## Not yet covered
+
+- The mouse pointer in windows (inventory, dialogue) is not recorded yet: the view and the keys are, so a session
+  that uses windows by keyboard replays, one that clicks in them may not.
+- Segment marks, benchmark segments (planned: Ctrl+B) and frame times per segment in [docs/performance](performance/).
+- Replay on the Raspberry Pi 4B.
+- Anything that depends on loading speed or wall time rather than game frames (the streaming of the outdoor world,
+  some timers) can still make a playback differ; the checkpoints show where.
 
 ## Recordings as benchmarks
 
-A recording is also a frame-rate benchmark. Playback measures frame times over the whole replay and per marked segment.
-A key pressed while recording (planned: Ctrl+B) marks the start or the end of a segment, so the same places are measured
-on every build. The results are saved with the build and the commit, in the same way as the other measurements in
-[docs/performance](performance/): measured once, compared later.
+Planned. A recording is also a frame-rate benchmark: playback measures frame times over the whole replay and per
+marked segment, so the same places are measured on every build. The results are saved with the build and the commit,
+in the same way as the other measurements in [docs/performance](performance/): measured once, compared later.
 
 ## Gameplay smoke tests
 
-Planned for v0.0.61. Today's boot smoke moves between places with the `dbg tp` console command. A recording walks the
-real paths instead: doors opened with E, and the loads that follow. The planned starter set is a group of short
-recordings made by the maintainer on the Raspberry Pi 4B, each with named checkpoints:
+Planned. Today's boot smoke moves between places with the `dbg tp` console command. A recording walks the real paths
+instead: doors opened with E, and the loads that follow. The planned starter set is a group of short recordings made
+by the maintainer on the Raspberry Pi 4B, each with named checkpoints:
 
 1. Doors: the Seyda Neen street, into Arrille's Tradehouse, back out, then into the Census and Excise Office (exterior
    to interior and back, both ways).

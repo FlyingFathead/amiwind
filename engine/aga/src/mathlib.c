@@ -533,6 +533,57 @@ void AngleVectors (vec3_t angles, vec3_t forward, vec3_t right, vec3_t up)
 }
 #endif
 
+/* PLACED-PIT-AXE-NO-FOCUS-61 (mathlib.h): a slab test in the model's own frame. r_alias.c draws a model point (x,y,z)
+ * at origin + scale * (x*forward - y*right + z*up) with forward, right, up from the angles with the pitch negated. */
+float AW_RayAliasBox (const float origin[3], const float angles[3], float scale, const float mins[3],
+		const float maxs[3], float margin, const float eye[3], const float dir[3])
+{
+	vec3_t	turned, axis[3];
+	float	o[3], v[3], d[3], lo, hi, t0 = 0, t1 = 1e9f, a, b, t;
+	int		k;
+
+	if (!(scale > 0))
+		scale = 1;
+	turned[PITCH] = -angles[PITCH];
+	turned[YAW] = angles[YAW];
+	turned[ROLL] = angles[ROLL];
+	AngleVectors (turned, axis[0], axis[1], axis[2]);
+	for (k = 0; k < 3; k++)
+	{
+		axis[1][k] = -axis[1][k];
+		d[k] = eye[k] - origin[k];
+	}
+	for (k = 0; k < 3; k++)
+	{
+		o[k] = (d[0]*axis[k][0] + d[1]*axis[k][1] + d[2]*axis[k][2]) / scale;
+		v[k] = (dir[0]*axis[k][0] + dir[1]*axis[k][1] + dir[2]*axis[k][2]) / scale;
+	}
+	for (k = 0; k < 3; k++)
+	{
+		lo = mins[k] - margin / scale;
+		hi = maxs[k] + margin / scale;
+		if (v[k] > -1e-6f && v[k] < 1e-6f)
+		{
+			if (o[k] < lo || o[k] > hi)
+				return -1;
+			continue;
+		}
+		a = (lo - o[k]) / v[k];
+		b = (hi - o[k]) / v[k];
+		if (a > b)
+		{
+			t = a; a = b; b = t;
+		}
+		if (a > t0)
+			t0 = a;
+		if (b < t1)
+			t1 = b;
+		if (t0 > t1)
+			return -1;
+	}
+	return t0;
+}
+
 int VectorCompare (vec3_t v1, vec3_t v2)
 {
 	int		i;

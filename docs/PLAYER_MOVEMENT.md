@@ -1,6 +1,6 @@
 # Player scale, collision and camera motion
 
-_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
+_Last updated with AmiWind v0.0.61-dev3 (2026-11-06)._
 
 <!-- contents start -->
 ## Contents
@@ -88,7 +88,7 @@ Every factor of the OpenMW rules, and where it comes from in AmiWind:
 | Fatigue at or below 0 | knocked out | now, for a fight's damage | combat rules; movement never takes it below 0 |
 | Sneaking | x fSneakSpeedMultiplier, no running, fatigue | later | no sneak input yet |
 | Paralysis | speed 0 | later | magic effects (none yet) |
-| Feather / Burden | load | the call is in (v0.0.61, `AW_EncumbranceSetEffects`); the magnitudes come with the spell effects | magic effects |
+| Feather / Burden | load | in (v0.0.61, `AW_EncumbranceSetEffects`): the spell effects Burden and Feather feed the carry weight | magic effects |
 | Fortify / Drain / Damage Speed, Athletics, Strength, Acrobatics | the stats | later (the sheet's damage field already counts) | magic effects |
 | Swift Swim | swim x (1 + magnitude/100) | later | magic effects |
 | Levitate | fly speed from fMinFlySpeed / fMaxFlySpeed | later | magic effects |

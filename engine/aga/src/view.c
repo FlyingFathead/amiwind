@@ -62,6 +62,38 @@ cvar_t aw_torch_depth_bob = {"aw_torch_depth_bob","0", true};
  * stride sway, the idle clip held on its first frame) and only drawing, putting away and the attack move them. The
  * eye's own bob (cl_bob) is not part of it. Saved; Options > Controls > Weapon sway, dbg camera sway 1|2. */
 cvar_t aw_fp_sway = {"aw_fp_sway","1", true};
+/* FP-FOREARMS-BELOW-VIEW-61: the first-person model's own view, as the original and OpenMW 0.51 draw it. OpenMW draws
+ * the first-person arms, the weapon and the held light with their own vertical field of view (npcanimation.cpp
+ * OverrideFieldOfViewCallback; settings "first person field of view", 60), and its first-person neck turns them by
+ * 0.75 of the view's pitch (npcanimation.cpp runAnimation, mFirstPersonNeckController: the rotate factor 0.75, 1 only
+ * while aiming accurately), the camera riding the head on that neck (base_anim.1st.nif: Camera under Bip01 Head under
+ * Bip01 Neck), so seen from the eye the arms turn by a quarter of the pitch the other way: looking down they rise into
+ * the view with the forearms and sleeves, looking up they sink. Our view is 2.1 times as wide as high at fov 90 (a
+ * vertical field of about 51 degrees), so drawn with the world's projection the arms were larger and only the hands
+ * reached into the bottom edge.
+ * aw_fp_view 1 (the default, saved): the original's first-person view, the field V_FP_FOV and the neck's V_FP_NECK;
+ * 0: the previous method, the world's projection and the arms following the view's whole pitch. dbg camera fpview. */
+cvar_t aw_fp_view = {"aw_fp_view","1", true};
+/* The factor the world's projection scale is multiplied by for the first-person model: TAN_HALF the tangent of half
+ * its vertical field of view, HALF the view's half height in pixels, YSCALE the world's vertical scale (pixels per
+ * unit of y/z, r_main.c); the model's half height is then TAN_HALF in y/z. 1 (the world's) for a bad input. */
+float V_FirstPersonScale (float tan_half, float half, float yscale)
+{
+    float k;
+    if (!(tan_half > .01f && tan_half < 100) || !(half > 0 && half < 100000) || !(yscale > 0 && yscale < 1e7f))
+        return 1;
+    k = half / tan_half / yscale;
+    return k > .05f && k < 20 ? k : 1;
+}
+/* The first-person model's pitch for the view's PITCH: FACTOR of it (0..1; a bad factor is OpenMW's 0.75). */
+float V_FirstPersonPitch (float pitch, float factor)
+{
+    if (!(factor >= 0 && factor <= 1))
+        factor = V_FP_NECK;
+    if (!(pitch > -1000 && pitch < 1000))
+        return pitch;
+    return pitch * factor;
+}
 
 cvar_t	v_kicktime = {"v_kicktime", "0.5", false};
 cvar_t	v_kickroll = {"v_kickroll", "0.6", false};
@@ -960,7 +992,9 @@ void CalcGunAngle (void)
     oldpitch = pitch;
 
     cl.viewent.angles[YAW] = r_refdef.viewangles[YAW] + yaw;
-    cl.viewent.angles[PITCH] = - (r_refdef.viewangles[PITCH] + pitch);
+    /* FP-FOREARMS-BELOW-VIEW-61: the first-person neck turns the arms by aw_fp_neck of the view's pitch */
+    cl.viewent.angles[PITCH] = - (V_FirstPersonPitch (r_refdef.viewangles[PITCH],
+                                                      aw_fp_view.value == 0 ? 1 : V_FP_NECK) + pitch);
 
     cl.viewent.angles[ROLL] -= v_idlescale.value * Q_SinRad(cl.time*v_iroll_cycle.value) * v_iroll_level.value;
     cl.viewent.angles[PITCH] -= v_idlescale.value * Q_SinRad(cl.time*v_ipitch_cycle.value) * v_ipitch_level.value;
@@ -1349,7 +1383,11 @@ void V_RenderView (void)
     }
 
 #ifndef GLQUAKE
+    /* the flames over the held torch and light are projected as their models are (FP-FOREARMS-BELOW-VIEW-61) */
+    R_FirstPersonProjection (1);
     AW_TorchDraw ();
+    AW_HeldLightDraw ();    /* a held candle, candlestick or lantern: its own flames (HELD-LIGHT-OWN-MODEL-61) */
+    R_FirstPersonProjection (0);
     {
         /* dbg companion pick: 2 = drawn red over a pickable NPC, 1 = picking
          * (crosshair shown even when off), 0 = normal (aw_companion.c). */
@@ -1426,6 +1464,7 @@ void V_Init (void)
     Cvar_RegisterVariable (&cl_bobup);
     Cvar_RegisterVariable (&aw_torch_depth_bob);
     Cvar_RegisterVariable (&aw_fp_sway);
+    Cvar_RegisterVariable (&aw_fp_view);
     Cvar_RegisterVariable (&aw_noclipwobble);
 
     Cvar_RegisterVariable (&v_kicktime);

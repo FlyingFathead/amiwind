@@ -157,10 +157,17 @@ float R_AliasAxisScale(const entity_t *ent, int axis)
     return s;
 }
 
+int aw_flora_push_mode = AW_FLORA_PUSH_MARKED;
+
 float R_SpriteDepthScale(const entity_t *ent, float dist, float width)
 {
     float push;
     if (!ent || !ent->aw_flora || !(dist > 0) || !(width > 0))
+        return 1;
+    /* BC-TREE-FLOATING-60: the push for every card hid the lower trunk behind the ground of a slope behind it; only
+     * the cards the builder marked (their base in a wall's box) keep it */
+    if (aw_flora_push_mode == AW_FLORA_PUSH_NONE ||
+        (aw_flora_push_mode != AW_FLORA_PUSH_EVERY && ent->aw_flora != 2))
         return 1;
     push = width * AW_FLORA_DEPTH_PUSH_FRAC;
     return isfinite(push) ? dist / (dist + push) : 1;

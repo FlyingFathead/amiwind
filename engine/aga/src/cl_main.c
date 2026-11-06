@@ -713,6 +713,8 @@ void CL_SendCmd (void)
 
 	// allow mice or other external controllers to add to the move
 		IN_Move (&cmd);
+	// the recorder: this move and view kept, or the recorded ones replayed (GAME-RECORDER-61)
+		AW_RecorderMove (&cmd);
 
 	// send the unreliable message
 		CL_SendMove (&cmd);

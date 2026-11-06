@@ -215,3 +215,15 @@ qboolean AW_ActorStep(edict_t *p,vec3_t move,double dt)
     VectorCopy(origin,p->v.origin);VectorCopy(oldorigin,p->v.oldorigin);VectorCopy(velocity,p->v.velocity);
     p->v.flags=flags;p->v.groundentity=groundentity;SV_LinkEdict(p,false);return false;
 }
+/* AMBIENT-UNSTUCK-FLOOD-61: a failed step puts the actor back where it stood (above); when that box is inside solid
+ * (a box snapped onto ground that touches a steep face: Quake's plane precision), every following step runs the stuck
+ * search again (SV_CheckStuck in AW_WalkPlayer, up to 164 position tests). One search here, and its clear spot is
+ * kept (one unit aside or up to 17 up, as Quake moves the player). 1 when it moved the actor, 0 when the box was clear
+ * or no clear spot was found (it stays where it was). */
+qboolean AW_ActorSettle(edict_t *p)
+{
+    vec3_t at;
+    VectorCopy(p->v.origin,at);VectorCopy(p->v.origin,p->v.oldorigin);
+    SV_CheckStuck(p);
+    return at[0]!=p->v.origin[0] || at[1]!=p->v.origin[1] || at[2]!=p->v.origin[2];
+}

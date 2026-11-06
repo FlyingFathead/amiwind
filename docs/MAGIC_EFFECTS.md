@@ -1,6 +1,6 @@
 # Magic effects
 
-_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
+_Last updated with AmiWind v0.0.61-dev3 (2026-11-06)._
 
 <!-- contents start -->
 ## Contents
@@ -16,7 +16,8 @@ Morrowind draws its spells with a set of small effect meshes and textures of its
 a burst at the caster, a bolt per school in flight, a burst where it hits and an orb where an area spell lands.
 AmiWind shows them with Quake's own machinery, following the plan in the
 [roadmap](ROADMAP.md#near-term-magic-effects-as-sprites-and-bitmap-planes-25-october-2026). It is an experimental
-prototype, off by default.
+prototype, off by default. This page covers the look of spells (`dbg magicfx`) and, from v0.0.61, how the player casts
+them, what the effects do and how enchanted items work, which are on by default and do not need the look.
 
 ## What it shows
 
@@ -54,8 +55,8 @@ sounds; a potion plays the drinking sound (its effects' own sounds are still to 
 chosen effects use and writes the whole table, every effect's sound per phase, into the build report
 (`magic-effects.json`).
 
-Not yet: magicka, skills, cast chances and the effects on actors (they come with the game logic), the shields and
-auras on characters, the lightning rods of shock, the spell icons in a magic menu.
+The magicka, the cast chance and the effects on actors are in since v0.0.61 (see "Casting" below). Not yet in the look:
+the shields and auras on characters in every case, the lightning rods of shock and the spell icons in the magic menu.
 
 ### Shell shapes
 
@@ -136,16 +137,67 @@ The player casts the spells and powers he knows and the spells he made at a spel
 - **The effects** land through the active effects (each magnitude rolled once between its low and high, the
   duration on the game clock, kept in saved games; docs/MWSCRIPT_BYTECODE.md "Spell effects"). A harmful spell on an
   actor is an attack: it joins the fight, and its health falls with the damage until it dies as by a blow.
+- **The effect system**: any of the 143 effects can be applied to any actor by reference (a table of 64 entries, 32 of
+  them for the player), over time or once as the original does, with harmful effects told apart. The effects are kept
+  in saved games (a block of their own; saves of before it still load, and since v0.0.61-dev3 the block is read at
+  its real size, which dev2 got wrong and so lost the effects and the blocks stored after them on a load). The effects
+  of non-player actors run while they are loaded and their damage feeds the fight. Creatures ignore skill effects.
+  Light lights the player; Resist Normal Weapons and Weakness to Normal Weapons are read by the combat code; Burden
+  and Feather feed the carry weight (docs/INVENTORY.md).
 - **The look** is this page's (with `dbg magicfx 1` or `2`): the cast, the bolt and the hit of the spell's first
   effect of that range (an effect without its own look takes the first of its school). The look's bolt is drawn
   apart from the spell's own; the failure sound plays only with the look on.
 
 The Magic window (O) selects the spell too: Up and Down move, Enter or a click selects (docs/INVENTORY.md).
 
-Not yet: the casting gesture of the first-person hands and of the parts body, the always-succeeds flag of a few spells,
-resistances and reflection, Cast When Used and Constant Effect items, and most effects that need other systems to read
-their magnitude (Levitate, Shield, Feather and the like are kept and ticked, but nothing moves or protects by them
-yet). Light lights the player with Quake's own entity light while it lasts.
+A spell flagged as always succeeding in the game data always succeeds.
+
+Not yet: the casting gesture of the first-person hands and of the parts body, resistances from abilities, reflection,
+and the effects that need other systems to read their magnitude: Levitate and the other movement effects move nothing,
+and a Shield effect on the player does not soften the blows that land on it (the inventory window adds it to the armour
+rating; `COMBAT-SHIELD-EFFECT-NO-ARMOR-61`). When a Fortify Attribute effect on the player ends, the stat sheet keeps
+it as a raised modifier plus a drop counted as damage (`PLAYER-FORTIFY-END-AS-DAMAGE-61`). Light lights the player with
+Quake's own entity light while it lasts.
+
+### Magic items (v0.0.61)
+
+The game's enchanted items work by their enchantment's kind, by OpenMW 0.51's rules (its spell casting, combat and
+active spells code), written independently. The builder writes every enchantment of the masters into the actor table
+(its kind, its cast cost before the user's Enchant skill, its full charge and its effects; docs/ACTOR_STATE.md); the
+engine reads an item's enchantment by its id when the item is used, strikes or is put on, and keeps the last two.
+
+- **Cast When Strikes**: a weapon blow that hits, or is blocked, casts the weapon's enchantment: its Touch and Target
+  effects land on the one struck, its Self effects on the striker. Each strike takes charge: the enchantment's cost
+  less one percent for each point of the striker's Enchant skill over 10, at least 1. With too little charge left
+  nothing is cast and the player is told "Item does not have enough charge.". The player's strikes give Enchant its
+  use; an NPC's or a creature's weapon works the same way on the player (its spent charge is kept for the session; this
+path has not yet been seen in game, although 408 actors hold such a weapon). Weapons and shields with a Cast When
+Strikes or Cast When Used enchantment can be equipped (before dev3, 191 strike weapons, 59 use weapons and 20 use
+shields, the iron shardaxe among them, were refused); Constant Effect items are worn as before.
+- **Cast When Used** and **Cast Once** (scrolls): select the item (`aw_magic select ID` in the console), ready magic and press the
+  attack button (or `dbg cast now`): it is cast without a success roll, paying its charge as above (a Cast Once item
+  is used up instead); Self effects on the player, Touch on the actor in reach, Target as a bolt. A selected item and
+  a selected spell exclude each other, as in the original.
+- **Constant Effect**: a worn item's effects are active while it is worn and end when it comes off (each magnitude
+  rolled once when it is put on): a ring of Fortify Agility 30 takes Agility from 30 to 60 on and back to 30 off. They
+  are kept in saved games and set again from what is worn after a load. The worn Constant Effect items of non-player
+  characters are not applied yet, and the item table holds the base game's items only (Tribunal and Bloodmoon items
+  are not in it).
+- **Charge**: the player's items keep their charge in saved games and recharge over time
+  (`fMagicItemRechargePerSecond`); the HUD's magic box shows the selected item's charge. God mode spends none.
+
+`dbg cast spell list` also shows the selected item's charge and how many items were used, refused for lack of
+charge, how many strikes cast, and how many worn effects are active.
+
+### Starting spells (v0.0.61)
+
+A new character starts with the spells of the race and the birthsign and, as in the original, with the starting
+spells the class and skills give: among the game's spells flagged as starting spells (in the masters' order), each
+one the race does not give already, whose cost the character's magicka (Intelligence times fPCbaseMagickaMult) can
+pay, whose chance (twice the weakest school's skill, less the cost, plus a fifth of Willpower and a tenth of Luck) is
+at least fAutoPCSpellChance, and whose named attribute or skill is at least iAutoSpellAttSkillMin (OpenMW 0.51
+autocalcspell.cpp). They are chosen from the character as character creation builds it, so they change with the
+race, class and birthsign there and never later. `dbg cast start` lists them.
 
 | Command | What it does |
 |---|---|
@@ -153,7 +205,9 @@ yet). Light lights the player with Quake's own entity light while it lasts.
 | `dbg cast ready` (`R`) | ready or lower the magic |
 | `dbg cast spell list` / `N` / `mN` / `none` | the spells and the selection |
 | `dbg cast spell grant N` | for tests: give the player spell N (the actor table's spell row) and select it |
-| `dbg cast now` | cast the selected spell now (as the attack button with magic ready) |
+| `dbg cast now` | cast the selected spell, or use the selected magic item, now (as the attack button with magic ready) |
+| `dbg cast start` | the starting spells the class and the skills gave the character made in this session |
+| `dbg cast strike` | for tests: the held weapon's Cast When Strikes as if its blow landed on the actor in reach |
 
 These words live under the magic effects' own command (`aw_magicfx`), so casting adds no console command or setting
 to the engine's resident registries. Burden and Feather on the player go to the encumbrance once the inventory's

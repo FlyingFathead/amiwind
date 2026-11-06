@@ -2,8 +2,12 @@
 #include "quakedef.h"
 #include <assert.h>
 #include "aw_inspect.h"
-void AW_UIHud(void){}
-void AW_NpcLodDrawLabels(void){}
+static int hud_draws,label_draws;
+void AW_UIHud(void){hud_draws++;}
+void AW_NpcLodDrawLabels(void){label_draws++;}
+/* DIALOGUE-BACKDROP-HUD-60: aw_ui.c's hook, set by aw_dialwin.c while the dialogue window is open */
+int (*aw_ui_dialogue_backdrop)(void);
+static int talking;static int dialogue_open(void){return talking;}
 static int photo_mode;int AW_PhotoModeActive(void){return photo_mode;}
 static int fill_x=-1,fill_w=-1,hint_draws;
 /* aw_inspect.c / aw_ui.c (INSPECT-OVER-VIEWPORT-42). */
@@ -189,10 +193,15 @@ int main(void) {
   /* Interior: no exterior transform; number and full ID from worldspawn. */
   {
    static model_t room,other;
-   static char entities[]="{\n\"classname\" \"worldspawn\"\n\"message\" \"Census and Excise Office\"\n"
-    "\"_aw_cell_int\" \"763\"\n\"_aw_cell_id\" \"Seyda Neen, Census and Excise Office\"\n}\n"
-    "{\n\"classname\" \"info_player_start\"\n\"_aw_cell_int\" \"9\"\n}\n";
+   /* REST-CENSUS-NO-CELL-ID-61: the compiled room's light grid rows (about 980 bytes each) come before its cell keys,
+    * as in the shipped census.bsp; the keys after them are still read */
+   static char entities[4096],grid[990];
    static char plain[]="{\n\"classname\" \"worldspawn\"\n}\n";
+   memset(grid,'4',sizeof(grid)-1);grid[sizeof(grid)-1]=0;
+   snprintf(entities,sizeof(entities),"{\n\"classname\" \"worldspawn\"\n\"message\" \"Census and Excise Office\"\n"
+    "\"_aw_lightgrid0\" \"%s\"\n\"_aw_lightgrid1\" \"%s\"\n"
+    "\"_aw_cell_int\" \"763\"\n\"_aw_cell_id\" \"Seyda Neen, Census and Excise Office\"\n}\n"
+    "{\n\"classname\" \"info_player_start\"\n\"_aw_cell_int\" \"9\"\n}\n",grid,grid);
    strcpy(sv.name,"census");strcpy(room.name,"maps/census.bsp");room.entities=entities;cl.worldmodel=&room;
    Sbar_Draw();assert(!strcmp(local_line+strlen(local_line)-8," INT 763"));
    /* HUD-INTERIOR-CLOCK-CUT-54: the short interior text, so the clock fits */
@@ -315,5 +324,14 @@ int main(void) {
   aw_inspect_hint=NULL;aw_inspect_strip=NULL;inspect_hint=NULL;vid.width=376;
   player.v.origin[0]=497;player.v.origin[1]=-200;player.v.origin[2]=65;
  }
+ /* DIALOGUE-BACKDROP-HUD-60: while the dialogue window is open no status bars, compass or names are drawn behind it;
+  * without the hook (or with the window shut) they are, as before */
+ {int h=hud_draws,l=label_draws,c=compass_draws;
+  arg="on";compass_command();
+  Sbar_Draw();assert(hud_draws==h+1 && label_draws==l+1 && compass_draws==c+1);
+  aw_ui_dialogue_backdrop=dialogue_open;Sbar_Draw();assert(hud_draws==h+2 && compass_draws==c+2);
+  talking=1;Sbar_Draw();assert(hud_draws==h+2 && label_draws==l+2 && compass_draws==c+2);
+  talking=0;Sbar_Draw();assert(hud_draws==h+3 && compass_draws==c+3);
+  aw_ui_dialogue_backdrop=NULL;arg="off";compass_command();}
  return 0;
 }

@@ -112,7 +112,8 @@ def actor_items(data_files, id1=None):
         f = awms.read(awm.read_bytes())
         if f.get('AITM') is not None and 'AITM_rows' in f:
             strs = awms.strings(f)
-            table = {strs[struct.unpack_from('>H', f['AITM'], 28 * i)[0]].casefold() for i in range(f['AITM_rows'])}
+            size = len(f['AITM']) // f['AITM_rows'] if f['AITM_rows'] else 32   # 28 before v0.0.61, then 32
+            table = {strs[struct.unpack_from('>H', f['AITM'], size * i)[0]].casefold() for i in range(f['AITM_rows'])}
             return table, carried, 'image'
     from mwscript.compiler import compile_program
     program, _compiled = compile_program(data, handwritten=())

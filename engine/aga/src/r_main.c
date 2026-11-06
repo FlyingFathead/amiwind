@@ -669,6 +669,35 @@ void R_DrawEntitiesOnList (void)
 R_DrawViewModel
 =============
 */
+/* FP-FOREARMS-BELOW-VIEW-61: the first-person model (arms, weapon, torch, held light and their flames) drawn with its
+ * own vertical field of view (view.c V_FP_FOV, 60 as OpenMW 0.51; aw_fp_view 0 = the world's): only the projection's
+ * scales change, the centre, the clipping (in screen space, r_alias.c) and the depth stay the world's. ON 1 sets them,
+ * 0 puts the world's back; nested or unmatched calls do nothing. One tangent a frame. */
+void R_FirstPersonProjection (int on)
+{
+    static float saved[6];
+    static int active;
+    float k;
+    if (on && !active)
+    {
+        if (aw_fp_view.value == 0)
+            return;
+        k = V_FirstPersonScale (Q_TanRad ((float)(V_FP_FOV * M_PI / 360)),
+                                r_refdef.vrect.height * .5f, yscale);
+        if (k == 1)
+            return;
+        saved[0] = xscale; saved[1] = yscale; saved[2] = xscaleinv; saved[3] = yscaleinv;
+        saved[4] = aliasxscale; saved[5] = aliasyscale;
+        xscale *= k; yscale *= k; xscaleinv /= k; yscaleinv /= k; aliasxscale *= k; aliasyscale *= k;
+        active = 1;
+    }
+    else if (!on && active)
+    {
+        xscale = saved[0]; yscale = saved[1]; xscaleinv = saved[2]; yscaleinv = saved[3];
+        aliasxscale = saved[4]; aliasyscale = saved[5];
+        active = 0;
+    }
+}
 /* aw_view.c: third person hides the first-person hands, weapon and torch (as GLQuake's chase_active). */
 int (*aw_view_hide_hands)(void);
 /* aw_view.c: the further parts of the first-person arms drawn this frame (I from 1), NULL after the last (and in
@@ -782,6 +811,14 @@ void R_DrawViewModel (void)
     cl.viewent=saved_view;
     /* The equipped weapon on the stance arms' Weapon Bone tag (PLAYER-GEAR-VISUAL-59): one alias, only while armed. */
     if(AW_HandWeaponItemApply()){
+        currententity=&cl.viewent;
+        VectorCopy(currententity->origin,r_entorigin);
+        VectorSubtract(r_origin,r_entorigin,modelorg);
+        R_AliasDrawModel(&r_viewlighting);
+    }
+    cl.viewent=saved_view;
+    /* A held candle, candlestick or lantern on the arms' shield bone (HELD-LIGHT-OWN-MODEL-61): one alias. */
+    if(AW_HandLightItemApply()){
         currententity=&cl.viewent;
         VectorCopy(currententity->origin,r_entorigin);
         VectorSubtract(r_origin,r_entorigin,modelorg);
@@ -1213,7 +1250,7 @@ SetVisibilityByPassages ();
     AW_GuardTorchDraw(); /* Same world camera/depth, before hands and water warp. */
     AW_StaticFlamesDraw();
     AW_LavaEmbersDraw();
-    { double hands_t0; AW_RT_BEGIN(hands_t0); AW_Mark(4);R_DrawViewModel();AW_EndMark(4); AW_RT_END(RT_HANDS, hands_t0); }
+    { double hands_t0; AW_RT_BEGIN(hands_t0); AW_Mark(4);R_FirstPersonProjection(1);R_DrawViewModel();R_FirstPersonProjection(0);AW_EndMark(4); AW_RT_END(RT_HANDS, hands_t0); }
 	if (r_dowarp)
 		D_WarpScreen ();
 

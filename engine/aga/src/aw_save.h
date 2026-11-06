@@ -98,6 +98,11 @@ int AW_SaveSnapshot(aw_save_t *snapshot);
 void AW_SaveSnapshotRestore(const aw_save_t *snapshot);
 void AW_SaveSpawn(void);
 void AW_SaveSchedule(void);
+/* GAME-RECORDER-61 (aw_recorder.c): the game encoded now without a file (the caller frees it; the character's profile
+ * and sequence, 0 when none, in the two out values); a save loaded from such bytes; 1 while a load waits for its spawn */
+unsigned char *AW_SaveEncodeNow(int *size,uint32_t *profile,uint32_t *sequence);
+int AW_SaveLoadBytes(const unsigned char *raw,int size,uint32_t profile,uint32_t sequence);
+int AW_SaveLoadPending(void);
 int AW_SaveWrite(int slot);
 int AW_SaveRead(uint32_t profile,int slot);
 int AW_SaveProfiles(uint32_t *ids,char names[][32],int capacity);

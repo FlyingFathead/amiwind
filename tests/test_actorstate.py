@@ -66,8 +66,20 @@ def master_bytes():
                       sub('ENAM', struct.pack('<hbbiiiii', 14, -1, -1, 2, 0, 5, 10, 20))))
     out.append(record('SPEL', sub('NAME', 'race power'), sub('SPDT', struct.pack('<3i', 5, 0, 0))))
     out.append(record('SPEL', sub('NAME', 'other spell'), sub('SPDT', struct.pack('<3i', 1, 0, 0))))
+    # v0.0.61 (PLAYER-CASTING-59): three starting spells (SPDT flags 2; one always succeeds, flag 4; one too dear for
+    # any magicka) and two enchantments: a Cast When Strikes one on the sword, an autocalculated Cast When Used one
+    out.append(record('SPEL', sub('NAME', 'start fire'), sub('SPDT', struct.pack('<3i', 0, 5, 2)),
+                      sub('ENAM', struct.pack('<hbbiiiii', 14, -1, -1, 2, 0, 1, 2, 4))))
+    out.append(record('SPEL', sub('NAME', 'start always'), sub('SPDT', struct.pack('<3i', 0, 50, 6)),
+                      sub('ENAM', struct.pack('<hbbiiiii', 14, -1, -1, 1, 0, 1, 2, 4))))
+    out.append(record('SPEL', sub('NAME', 'start pricey'), sub('SPDT', struct.pack('<3i', 0, 500, 2)),
+                      sub('ENAM', struct.pack('<hbbiiiii', 14, -1, -1, 1, 0, 1, 2, 4))))
+    out.append(record('ENCH', sub('NAME', 'strike_en'), sub('ENDT', struct.pack('<4i', 1, 4, 100, 0)),
+                      sub('ENAM', struct.pack('<hbbiiiii', 14, -1, -1, 1, 0, 1, 3, 6))))
+    out.append(record('ENCH', sub('NAME', 'auto_en'), sub('ENDT', struct.pack('<4i', 2, 0, 0, 1)),
+                      sub('ENAM', struct.pack('<hbbiiiii', 14, -1, -1, 0, 0, 2, 2, 4))))
     wpdt = struct.pack('<fihhffh6Bi', 20.0, 100, 1, 500, 1.25, 1.5, 0, 2, 10, 3, 12, 4, 14, 0)
-    out.append(record('WEAP', sub('NAME', 'test_sword'), sub('WPDT', wpdt)))
+    out.append(record('WEAP', sub('NAME', 'test_sword'), sub('WPDT', wpdt), sub('ENAM', 'strike_en')))
     out.append(record('ARMO', sub('NAME', 'test_cuirass'), sub('AODT', struct.pack('<ifiiii', 1, 30.0, 50, 400, 0, 20))))
     out.append(record('MISC', sub('NAME', 'test_ring')))
     out.append(record('MISC', sub('NAME', 'Gold_001')))
@@ -197,9 +209,30 @@ class ActorTableTests(unittest.TestCase):
         flags = [s['flags'] for s in awms.scripts(self.f)]
         self.assertEqual(sum(1 for x in flags if x & SCRIPT_DIALOGUE), 2)
 
+    def test_enchantments_and_starting_spells(self):
+        # PLAYER-CASTING-59: AENC sorted by folded id; the record's cost and charge as authored, the autocalculated
+        # one by the game enchantment rule: 0.5 x (2 + 4) x 0.1 x 5 x 2 s = 3.0 x fEffectCostMult 0.5 = 1.5, its charge
+        # round(1.5) = 2 x iMagicItemChargeUse 5 = 10; AITM's sword names its row; ASPT carries the SPDT flags; APCS
+        # the settings (the masters' defaults here) and the starting spells in record order
+        rows = [struct.unpack_from('>HBBffHBB', self.f['AENC'], 16 * i) for i in range(self.f['AENC_rows'])]
+        self.assertEqual([self.names[r[0]] for r in rows], ['auto_en', 'strike_en'])
+        self.assertEqual([r[1:5] + (r[6],) for r in rows], [(2, 1, 1.5, 10.0, 1), (1, 0, 4.0, 100.0, 1)])
+        aeff = struct.unpack_from('>hbbBBHHHH', self.f['AEFF'], 14 * rows[1][5])
+        self.assertEqual(aeff, (14, -1, -1, 1, 0, 0, 1, 3, 6))
+        sword = self.t.item_index['test_sword']
+        self.assertEqual(struct.unpack_from('>H', self.f['AITM'], 32 * sword + 28)[0], 1)
+        self.assertEqual(struct.unpack_from('>H', self.f['AITM'], 32 * self.t.item_index['test_ring'] + 28)[0], 0xFFFF)
+        self.assertEqual(len(self.f['AITM']), 32 * self.f['AITM_rows'])
+        flags = {self.names[self.t.spells[i]['id']]: self.f['ASPT'][4 * i + 3] for i in range(len(self.t.spells))}
+        self.assertEqual((flags['start fire'], flags['start always'], flags['auto spell'], flags['test spell']), (2, 6, 1, 0))
+        head = struct.unpack_from('>ffHHf', self.f['APCS'])
+        self.assertEqual(head, (1.0, 50.0, 100, 70, 0.5))
+        start = [struct.unpack_from('>H', self.f['APCS'], 16 + 2 * i)[0] for i in range(self.f['APCS_rows'])]
+        self.assertEqual([self.names[self.t.spells[i]['id']] for i in start], ['start fire', 'start always', 'start pricey'])
+
     def test_file_reads_back(self):
         f = awms.read(self.raw)
-        for tag in ('OACT', 'ACTB', 'AINV', 'AITM', 'ASPT', 'ASPL', 'ASPC'):
+        for tag in ('OACT', 'ACTB', 'AINV', 'AITM', 'ASPT', 'ASPL', 'ASPC', 'AENC', 'APCS'):
             self.assertIn(tag, f)
         self.assertLess(f['resident'], [16 + 16 * i for i in range(1)][0] + len(self.raw))
 
@@ -345,6 +378,22 @@ int main(int argc,char **argv){
      /* one bad record among good ones (an item past the table) refuses the whole block */
      big[12+186+182]=0xFF;big[12+186+183]=0xFF;k=AW_ActorStateImportRecords(big,m);live=AW_ActorStateLive(&changed);
      P(" badrecord %d live %d empty %d\n",k,live,AW_ActorStateImportRecords(NULL,0));}
+    /* v0.0.61 (PLAYER-CASTING-59): an enchantment found by id (any case, again from the kept answers), its row, the
+     * sword's link, the NPC's held weapon's enchantment, the spells' flags and the starting spells */
+    {aw_enchant_t en;aw_item_t it;aw_start_settings_t set;int k,item,rows[8],m,
+         e1=AW_ActorEnchantFind("STRIKE_EN"),e2=AW_ActorEnchantFind("strike_en"),e3=AW_ActorEnchantFind("no_such");
+     k=AW_ActorEnchant(e1,&en);AW_ActorItem(sword,&it);
+     P("ench %d %d %d %d type %d flags %d cost %.1f charge %.1f n %d %d %d %u %u item %d",AW_ActorEnchantCount(),e1,e2,
+       e3==AW_ACTOR_NONE,en.type,en.flags,en.cost,en.charge,en.n,k,en.effect[0].range,en.effect[0].magnitude_min,
+       en.effect[0].magnitude_max,it.enchant);
+     k=AW_ActorWeaponEnchant(AW_ActorFind("fixed_npc"),&item);
+     P(" npc %d %d",k,item==sword);
+     P(" none %d",AW_ActorWeaponEnchant(AW_ActorFind("test_rat"),&item)==AW_ACTOR_NONE);
+     P(" flags %d %d",AW_ActorSpellFlags(spell),AW_ActorSpellFlags(auto_spell));
+     m=AW_ActorStartSpells(&set,rows,8);
+     P(" start %d %.1f %.1f %d %d %.1f",m,set.magicka_mult,set.chance,set.max,set.skill_min,set.cost_mult);
+     for(k=0;k<m;k++)P(" %d:%d",rows[k],AW_ActorSpellFlags(rows[k]));
+     P("\n");}
     AW_ActorStateClose();free(file);return 0;
 }
 '''
@@ -451,6 +500,15 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(self.out[34], 'changed 128 full 0')
         self.assertTrue(self.out[35].startswith('player 1 resident '))
         self.assertLess(int(self.out[35].split()[3]), 2 * 128 * 300 + 4000)
+
+    def test_enchantments_and_starting_spells_natively(self):
+        # PLAYER-CASTING-59: two enchantments; strike_en is row 1 by any case (the second ask from the kept answers),
+        # an unknown id none; type 1, cost 4, charge 100, its touch Fire Damage 3-6; the sword names it, so does the
+        # NPC holding it, the rat holds no weapon; flags of a plain and an autocalculated spell; three starting spells
+        t = self.prog.actors
+        start = ' '.join('%d:%d' % (t.spell_index[k], f) for k, f in (('start fire', 2), ('start always', 6), ('start pricey', 2)))
+        self.assertEqual(self.out[43], 'ench 2 1 1 1 type 1 flags 0 cost 4.0 charge 100.0 n 1 1 1 3 6 item 1 npc 1 1 none 1 '
+                                       'flags 0 1 start 3 1.0 50.0 100 70 0.5 ' + start)
 
     def test_pool_at_the_games_counts(self):
         # CELL-CHANGES-59 slice 6: 8,192 changed records (the game: 3,437 actor bases, 2,673 NPCs placed), each with an

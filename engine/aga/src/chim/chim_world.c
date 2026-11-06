@@ -1539,6 +1539,15 @@ static int Subcommand (void)
 {
 	char *argv[4];
 	int i, argc = Cmd_Argc () - 1;
+	/* "chim actors ..." reads its own arguments (aw_actors.c), more than four for "chim actors ambient put"
+	 * (AMBIENT-UNSTUCK-FLOOD-61) */
+	if (argc > 4 && !strcmp (Cmd_Argv (1), "actors"))
+	{
+		extern void (*chim_actors_cmd)(void);
+		if (chim_actors_cmd)
+			chim_actors_cmd ();
+		return 1;
+	}
 	if (argc < 1 || argc > 4)
 		return 0;
 	for (i=0 ; i<argc ; i++)

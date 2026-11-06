@@ -25,6 +25,8 @@ int AW_HandWeaponItemApply(void){
     assert(cl.viewent.model==&arm_model && cl.viewent.origin[0]==3);
     cl.viewent.model=&weapon_model;cl.viewent.frame=0;cl.viewent.origin[0]=21;cl.viewent.origin[1]=4;return 1;
 }
+/* The held light (HELD-LIGHT-OWN-MODEL-61) also composes from the restored arms entity; none held here. */
+int AW_HandLightItemApply(void){assert(cl.viewent.model==&arm_model);return 0;}
 int R_ActorLight(entity_t *e,int flags){assert(e==&cl.viewent);return 72;}
 float AW_TorchLightGain(int key,float radius,int mode){assert(0);return 1;}
 void R_AliasDrawModel(alight_t *lighting){

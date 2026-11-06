@@ -52,7 +52,10 @@ static const char *const marker_keys[3]={"amiwind:map:marker:x","amiwind:map:mar
  * EncumbranceBar above the Avatar) */
 #define INV_PREVIEW_Y 32
 #define INV_PREVIEW_W 116
-#define INV_PREVIEW_H 158
+/* the armour rating's line under the picture (INVENTORY-NO-ARMOR-RATING-61: OpenMW openmw_inventory_window.layout puts
+ * ArmorRating at the bottom of the Avatar box, under the AvatarImage) */
+#define INV_PREVIEW_H 150
+#define INV_ARMOR_Y 186
 #define INV_BURDEN_Y 21
 #define INV_BURDEN_H 9
 /* INVENTORY-ORIGINAL-LIMITS-61: the window lists every kind carried (no fixed limit) and keeps little per kind: a
@@ -74,7 +77,13 @@ typedef struct {
      * window opens and after each equipment change, then only copied. 0 = render next frame,
      * 1 = picture ready, -1 = unavailable. */
     int preview_state,preview_renders;
+    /* INVENTORY-PREVIEW-STALE-61: preview_have = the kept picture is valid (shown while a new outfit's parts load);
+     * preview_wait = when the wait for those parts began (while preview_waiting) */
+    int preview_have,preview_waiting;double preview_wait;
     unsigned preview_frames;double preview_seconds,preview_render_seconds;
+    /* INVENTORY-NO-ARMOR-RATING-61: the armour rating shown, worked out when the window opens and after each action
+     * (armor_state 0 = work it out at the next draw, 1 = armor holds it, -1 = unavailable) */
+    int armor_state,armor;
     byte preview[INV_PREVIEW_W*INV_PREVIEW_H];
 } inventory_panel_t;
 static inventory_panel_t *inventory;
@@ -309,6 +318,7 @@ static void inventory_action(int action){
     aw_inventory_item_t *item=inventory_selected();int ok=0;
     if(!item)return;
     inventory->preview_state=0;   /* equipment may change: one new still picture */
+    inventory->armor_state=0;     /* and the armour rating again */
     if(action==1 && inventory_equippable(item)){
         AW_CombatEquipmentStore();
         if(AW_InventoryEquipped(&aw_state,item->id))ok=AW_InventoryUnequip(&aw_state,item->id);
@@ -448,27 +458,44 @@ static void inventory_status(const char *value,int color){
  * CharacterPreview::redraw; InventoryPreview::update picks the pose) and redraws it only when the
  * equipment changes (mwgui/inventorywindow.cpp dirtyPreview). Here: one render into the window,
  * copied into a 116 x 168 picture, the pose model and depth buffer freed at once; every later
- * frame only copies the picture back. aw_inventory_preview_live 1: the old live, turnable preview. */
+ * frame only copies the picture back. aw_inventory_preview_live 1: the old live, turnable preview.
+ * INVENTORY-PREVIEW-STALE-61: a changed outfit's parts load over several frames (aw_view.c parts_ready,
+ * ARRIVAL-LONG-FRAME-DEV6-59) and the body keeps the previous outfit until they are all in; a picture rendered then
+ * showed the previous outfit and was kept. Now the picture waits for them (OpenMW redraws the preview once the new
+ * parts are attached, characterpreview.cpp rebuild + redraw), the kept picture shown meanwhile, at most
+ * INV_PREVIEW_WAIT seconds. aw_inventory_preview_pending (aw_view.c): 1 while such an assembly is under way. */
+int (*aw_inventory_preview_pending)(void);
+#define INV_PREVIEW_WAIT 5.0
+static void inventory_preview_copy(void){
+    int y;
+    for(y=0;y<INV_PREVIEW_H;y++)
+        memcpy(vid.buffer+(INV_PREVIEW_Y+y)*vid.rowbytes+INV_PREVIEW_X,inventory->preview+y*INV_PREVIEW_W,INV_PREVIEW_W);
+}
 static void inventory_preview(int muted){
-    model_t *model=NULL;int frame,y,ok;double t0=Sys_FloatTime(),t1;byte *row;
+    model_t *model=NULL;int frame,y,ok;double t0=Sys_FloatTime(),t1;
     if(AW_ViewInventoryLive()){
         if(!AW_ViewInventoryBody(&model,&frame) || !AW_InventoryPreviewDraw(model,frame,INV_PREVIEW_X,INV_PREVIEW_Y,
                                                                             INV_PREVIEW_W,INV_PREVIEW_H,inventory->angle))
             inventory_text(10,80,108,40,"Character preview unavailable",muted);
     }else{
         if(!inventory->preview_state){
-            ok=AW_ViewInventoryBody(&model,&frame) &&
-               AW_InventoryPreviewDraw(model,frame,INV_PREVIEW_X,INV_PREVIEW_Y,INV_PREVIEW_W,INV_PREVIEW_H,(float)M_PI);
+            ok=AW_ViewInventoryBody(&model,&frame);     /* also loads the next of a new outfit's parts */
+            if(aw_inventory_preview_pending && aw_inventory_preview_pending()){
+                if(!inventory->preview_waiting){inventory->preview_waiting=1;inventory->preview_wait=t0;}
+                if(t0-inventory->preview_wait<INV_PREVIEW_WAIT){
+                    if(inventory->preview_have)inventory_preview_copy();
+                    inventory->preview_seconds+=Sys_FloatTime()-t0;inventory->preview_frames++;
+                    return;
+                }
+            }
+            inventory->preview_waiting=0;
+            ok=ok &&AW_InventoryPreviewDraw(model,frame,INV_PREVIEW_X,INV_PREVIEW_Y,INV_PREVIEW_W,INV_PREVIEW_H,(float)M_PI);
             if(ok)for(y=0;y<INV_PREVIEW_H;y++)
                 memcpy(inventory->preview+y*INV_PREVIEW_W,vid.buffer+(INV_PREVIEW_Y+y)*vid.rowbytes+INV_PREVIEW_X,INV_PREVIEW_W);
             AW_InventoryPreviewClear();      /* pose model and depth buffer are not kept */
-            inventory->preview_state=ok?1:-1;inventory->preview_renders++;
+            inventory->preview_state=ok?1:-1;inventory->preview_have=ok;inventory->preview_renders++;
             t1=Sys_FloatTime();inventory->preview_render_seconds=t1-t0;t0=t1;
-        }else if(inventory->preview_state>0){
-            for(y=0;y<INV_PREVIEW_H;y++){
-                row=vid.buffer+(INV_PREVIEW_Y+y)*vid.rowbytes+INV_PREVIEW_X;memcpy(row,inventory->preview+y*INV_PREVIEW_W,INV_PREVIEW_W);
-            }
-        }
+        }else if(inventory->preview_state>0)inventory_preview_copy();
         if(inventory->preview_state<0)inventory_text(10,80,108,40,"Character preview unavailable",muted);
     }
     inventory->preview_seconds+=Sys_FloatTime()-t0;inventory->preview_frames++;
@@ -491,17 +518,43 @@ static void window_title(int x,int y,int w,const char *title,int color){
 }
 /* The burden bar (ENCUMBRANCE-INCOMPLETE-61): OpenMW mwgui/inventorywindow.cpp updateEncumbranceBar, every frame the
  * window is open: ceil(encumbrance) over the capacity, as "N/M" on the blue bar (MW_ChargeBar_Blue; here the original
- * bar art of the magicka bar, AW_UIBar colour 1). The encumbrance is the running total (aw_move.h), nothing summed. */
+ * bar art of the magicka bar, AW_UIBar colour 1). The encumbrance is the running total (aw_move.h), nothing summed.
+ * The numbers are the console-derived glyphs of the item list (4 px a character, 5 rows), centred, with a black
+ * shadow one pixel down and right: the ornate menu font over the blue fill could not be read at any fill
+ * (INVENTORY-BURDEN-TEXT-UNREADABLE-61). */
 float (*aw_worldui_encumbrance)(float *capacity);
 static void inventory_burden(void){
-    char line[32];float capacity=0,load;int shown,max;
+    char line[32];float capacity=0,load;int shown,max,w,x,y;
     if(!aw_worldui_encumbrance)return;
     load=aw_worldui_encumbrance(&capacity);
     shown=(int)load;if((float)shown<load)shown++;     /* std::ceil */
     max=(int)capacity;
     AW_UIBar(8,INV_BURDEN_Y,114,INV_BURDEN_H,1,max>0?(float)shown/(float)max:shown>0?1.0f:0.0f);
     sprintf(line,"%d/%d",shown,max);
-    AW_UISmallBegin();AW_UITextCentred(8,INV_BURDEN_Y,114,INV_BURDEN_H,line,AW_UIColor(223,199,144));AW_UISmallEnd();
+    w=(int)strlen(line)*4;if(w>114)w=114;
+    x=8+(114-w)/2;y=INV_BURDEN_Y+(INV_BURDEN_H-5)/2;
+    AW_SmallStringColor(x+1,y+1,w,line,AW_UIColor(0,0,0));
+    AW_SmallStringColor(x,y,w,line,AW_UIColor(255,255,255));
+}
+/* The armour rating under the picture (INVENTORY-NO-ARMOR-RATING-61): OpenMW mwgui/inventorywindow.cpp
+ * updateArmorRating, "#{sArmor}: N" (the game's sArmor, "Armor"), N the whole number of the player's rating
+ * (aw_combat.c AW_CombatPlayerArmorRating: the worn pieces, the skills, the unarmored skill, a Shield effect), worked
+ * out when the window opens and after each action, not every frame (it reads the worn pieces' records). In the burden
+ * bar's console-derived glyphs, centred under the picture, with the same shadow. */
+float (*aw_worldui_armor_rating)(void);
+static void inventory_armor(void){
+    char line[32];int w,x;float rating;
+    if(!aw_worldui_armor_rating)return;
+    if(!inventory->armor_state){
+        rating=aw_worldui_armor_rating();
+        inventory->armor_state=rating>=0 && rating<100000?1:-1;inventory->armor=inventory->armor_state>0?(int)rating:0;
+    }
+    if(inventory->armor_state<0)return;
+    sprintf(line,"Armor: %d",inventory->armor);
+    w=(int)strlen(line)*4;if(w>INV_PREVIEW_W)w=INV_PREVIEW_W;
+    x=INV_PREVIEW_X+(INV_PREVIEW_W-w)/2;
+    AW_SmallStringColor(x+1,INV_ARMOR_Y+1,w,line,AW_UIColor(0,0,0));
+    AW_SmallStringColor(x,INV_ARMOR_Y,w,line,AW_UIColor(255,255,255));
 }
 static void inventory_draw(void){
     int i,j,x,row,index,right=inventory_list_right();aw_inventory_item_t *item;char line[160];
@@ -513,6 +566,7 @@ static void inventory_draw(void){
     AW_UISmallEnd();
     inventory_preview(muted);
     inventory_burden();
+    inventory_armor();
     for(row=0;row<2;row++){
         x=130;
         for(i=row*4;i<row*4+4;i++){

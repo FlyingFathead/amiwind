@@ -1,8 +1,10 @@
 # Light sources: Morrowind lights mapped onto Quake's light machinery
 
-_Last updated with AmiWind v0.0.31 (8 October 2026)._
+_Last updated with AmiWind v0.0.61-dev3 (2026-11-06)._
 
-Status: 7 October 2026. Census and mapping done; converters not yet wired.
+Status: the census and the mapping were done on 7 October 2026 and the converters were wired in v0.0.31, when the
+original street lamps, lanterns, wall torches and fires began to light Balmora and Seyda Neen at night. The section
+at the end covers the lights that can be taken and held (v0.0.61).
 
 AmiWind runs on AmiQuake, so light sources are handled the way Quake handles
 them, not with a new engine feature:
@@ -101,3 +103,26 @@ Related: [LIGHT-FALLOFF-31](bugs/LIGHT-FALLOFF-31.md),
 [EMISSIVE-UNSHIPPED-31](bugs/EMISSIVE-UNSHIPPED-31.md),
 [NIGHT-RUST-31](bugs/NIGHT-RUST-31.md),
 [LANTERNS_AND_TORCH_LIGHTING.md](history/superseded/LANTERNS_AND_TORCH_LIGHTING.md).
+
+## Lights that can be taken and held (v0.0.61)
+
+- **Taking a lit candle or lamp takes its flame and its light with it,** outdoors and indoors, and it stays gone after a
+  save and a load. The builder writes each exterior cell's effect links (which flame and night lamp belong to which
+  placement) into the cell's own area record at image assembly; in the dev1 data that is 25 cells, 524 rows, a median of
+  112 bytes and at most 1,660 bytes. A build check covers the whole world and a test plants a miss on each path. In
+  the five town frame maps (Vivec 49, Seyda Neen 4, and two more town maps with 4 each) the flame links of 61 flame
+  rows of 53 carriable lights were looked up under the wrong map name, so a taken lantern left its flame floating; all
+  288 flame rows are found now, and the build check also refuses a flame link that names no frame map of the image
+  ([TAKEN-LIGHT-OUTDOOR-EFFECTS-UNLINKED-61](bugs/TAKEN-LIGHT-OUTDOOR-EFFECTS-UNLINKED-61.md)).
+- **Held lights are drawn and lit as themselves.** A candle, a candlestick (three candles) and a lantern held in the
+  hand show their own model and flames, in first person and on the third-person hand, and light by their own record:
+  the candle reaches half as far as the torch, the candlesticks and lanterns as far as the torch, as in the original.
+  The torch is unchanged ([INVENTORY.md](INVENTORY.md), "World models";
+  [HELD-LIGHT-ALWAYS-TORCH-61](bugs/HELD-LIGHT-ALWAYS-TORCH-61.md)).
+- **Limits in v0.0.61-dev3.** A light that is dropped or put down again gets no flame and gives no light where it lies
+  ([DROPPED-LIGHT-NO-EFFECTS-61](bugs/DROPPED-LIGHT-NO-EFFECTS-61.md)). The baked light of a room stays when a light in
+  it is taken (`TAKEN-LIGHT-BAKED-LIGHT-61`). Seyda Neen's carriable lanterns are
+  missing from the open world ([SEYDA-LANTERNS-MISSING-31](bugs/SEYDA-LANTERNS-MISSING-31.md)). A lantern hangs below the
+  hand, so in first person only its handle shows; the light's colour is one shade off the original; burn time is not
+  counted; the light is not in the inventory picture. The Ebonheart lantern after a save and load, and the candle in
+  Arrille's Tradehouse, are not yet seen taken on the dev3 image.

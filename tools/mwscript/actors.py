@@ -11,10 +11,19 @@ Built once from the game data by the mwscript stage, written as sections of id1/
           u16 first inventory entry, u16 entries  u16 first spell entry, u16 entries
           u8 weapon (its inventory entry, 0xFF none)  u8 creature type  u16 attack min/max x3 (creatures)  u16 soul
   AINV  6 bytes an inventory entry: u16 item (AITM row)  i16 count  u8 flags (INV_*)  u8 0
-  AITM  28 bytes an item, shared by every actor that carries it and every script that names it:
+  AITM  32 bytes an item, shared by every actor that carries it and every script that names it:
           u16 id  u8 kind (ITEM_*)  u8 type (weapon or armour type)  u16 condition  u16 armour rating
           u8 damage[6] (chop, slash, thrust: min, max)  u16 flags (1 two-handed)  f32 weight  f32 speed  f32 reach
-  ASPT  4 bytes a spell: u16 id  u8 type (0 spell, 1 ability, 2 blight, 3 disease, 4 curse, 5 power)  u8 0
+          u16 enchantment (AENC row, 0xFFFF none; v0.0.61, the engine also reads the 28-byte rows before it)  u16 0
+  ASPT  4 bytes a spell: u16 id  u8 type (0 spell, 1 ability, 2 blight, 3 disease, 4 curse, 5 power)
+          u8 the SPDT flags (1 autocalc, 2 a starting spell of the player, 4 always succeeds; 0 before v0.0.61)
+  AENC  16 bytes an enchantment (every ENCH record), sorted by its folded id (binary search by id; v0.0.61):
+          u16 id  u8 type (ENDT: 0 cast once, 1 when strikes, 2 when used, 3 constant)  u8 flags (1 autocalc)
+          f32 cast cost (before the caster's Enchant skill)  f32 charge (the item's full charge)
+          u16 first AEFF entry  u8 entries  u8 0
+  APCS  the starting spells of a new character (v0.0.61, OpenMW autocalcspell.cpp autoCalcPlayerSpells): a 16-byte
+        head f32 fPCbaseMagickaMult  f32 fAutoPCSpellChance  u16 iAutoPCSpellMax  u16 iAutoSpellAttSkillMin
+        f32 fEffectCostMult, then u16 an ASPT row per spell flagged as a starting spell, in the masters' record order
   ASPL  2 bytes a spell entry: u16 spell (ASPT row)
   ASPE  4 bytes per ASPT row: u16 first AEFF entry, u8 entries, u8 0; AEFF 14 bytes an effect: i16 effect, i8 skill,
         i8 attribute, u8 range, u8 0, u16 area, u16 duration, u16 magnitude min, u16 max (ENAM)
@@ -40,7 +49,9 @@ ACTOR_WALKS, ACTOR_SWIMS, ACTOR_FLIES, ACTOR_BIPEDAL = 16, 32, 64, 128
 INV_EQUIPPED, INV_LEVELLED, INV_RESTOCKS = 1, 2, 4
 ITEM_UNKNOWN, ITEM_WEAPON, ITEM_ARMOR, ITEM_CLOTHING, ITEM_OTHER, ITEM_LEVELLED = 0, 1, 2, 3, 4, 5
 OTHER_ITEMS = ('ALCH', 'APPA', 'BOOK', 'INGR', 'LIGH', 'LOCK', 'MISC', 'PROB', 'REPA')
-ACTB_BYTES, AINV_BYTES, AITM_BYTES, ASPT_BYTES = 96, 6, 28, 4
+ACTB_BYTES, AINV_BYTES, AITM_BYTES, ASPT_BYTES, AENC_BYTES = 96, 6, 32, 4, 16
+SPELL_PC_START = 2
+ENCH_TYPES = 4                  # ENDT 0 cast once, 1 when strikes, 2 when used, 3 constant effect
 NONE = 0xFFFF
 TWO_HANDED = {2, 4, 5, 6, 8}
 GOLD = 'Gold_001'
@@ -173,10 +184,71 @@ class ActorTables:
             raw = _first(f, 'FLTV') if name[0] == 'f' else _first(f, 'INTV')
             if len(raw) == 4:
                 self.settings[name] = struct.unpack('<f' if name[0] == 'f' else '<i', raw)[0]
+        self._enchantments()
         # AITM row 0 is the gold item: an actor's gold (its record's gold value) counts as it (OpenMW: gold_005,
         # gold_010, gold_025 and gold_100 are gold_001 for the scripts' item calls, containerextensions.cpp)
         self.item(GOLD)
         self._build()
+        # the starting spells of a new character (OpenMW autoCalcPlayerSpells walks the spell store in the masters'
+        # record order: the records dict keeps the first-seen order, as OpenMW's store does)
+        self.pc_start = []
+        for key, fields in self.records['SPEL'].items():
+            spdt = _first(fields, 'SPDT')
+            if len(spdt) >= 12 and struct.unpack_from('<i', spdt)[0] == 0 and \
+                    struct.unpack_from('<i', spdt, 8)[0] & SPELL_PC_START:
+                self.pc_start.append(self.spell(_text(_first(fields, 'NAME')) or key))
+        self.report['pc_start_spells'] = len(self.pc_start)
+
+    # --- enchantments (AENC, v0.0.61) ---
+    def _enchantments(self):
+        """Every ENCH record of the masters, sorted by folded id: type, autocalc flag, the cast cost and the full
+        charge by OpenMW 0.51's rules (spellutil.cpp getEffectiveEnchantmentCastCost before the caster's skill, and
+        getEnchantmentCharge; the one implementation is prepare_inventory's effect_cost / max_charge), its effects."""
+        import prepare_inventory
+        rec = self.records
+        mgef = {}
+        for index, fields in rec.get('MGEF', {}).items():
+            medt = _first(fields, 'MEDT')
+            if len(medt) >= 12:
+                _school, base, flags = struct.unpack_from('<ifi', medt)
+                mgef[index] = (base, flags)
+        settings = {}
+        for name in ('feffectcostmult', 'imagicitemchargeonce', 'imagicitemchargestrike', 'imagicitemchargeuse',
+                     'imagicitemchargeconst'):
+            f = rec['GMST'].get(name)
+            raw = (_first(f, 'FLTV') if name[0] == 'f' else _first(f, 'INTV')) if f else b''
+            settings[name] = struct.unpack('<f' if name[0] == 'f' else '<i', raw)[0] if len(raw) == 4 else \
+                {'feffectcostmult': 0.5, 'imagicitemchargeonce': 1, 'imagicitemchargestrike': 10,
+                 'imagicitemchargeuse': 5, 'imagicitemchargeconst': 10}[name]
+        self.enchants = []
+        self.enchant_index = {}
+        for key in sorted(rec.get('ENCH', {}), key=lambda k: k.encode('cp1252', 'replace')):
+            fields = rec['ENCH'][key]
+            endt = _first(fields, 'ENDT')
+            if len(endt) < 16:
+                continue
+            typ, cost, charge, flags = struct.unpack_from('<4i', endt)
+            if not 0 <= typ < ENCH_TYPES:
+                self.report.setdefault('enchantments_bad_type', []).append(key)
+                continue
+            raw = [struct.unpack_from('<hbbiiiii', d) for t, d in fields if t == 'ENAM' and len(d) >= 24]
+            try:
+                full = prepare_inventory.max_charge((typ, cost, charge, flags), raw, mgef, settings)
+                cast = sum(prepare_inventory.effect_cost(e, mgef, settings['feffectcostmult']) for e in raw) \
+                    if flags & 1 else float(cost)
+            except ValueError:
+                self.report.setdefault('enchantments_unknown_effect', []).append(key)
+                continue
+            self.enchant_index[key] = len(self.enchants)
+            # the id as the engine compares it: the folded key (the rows are sorted by it)
+            self.enchants.append({'id': self.string(key), 'type': typ, 'flags': flags & 1,
+                                  'cost': _f32(max(0.0, cast)), 'charge': _f32(max(0.0, full)),
+                                  'effects': spell_effects(fields)})
+        self.report['enchantments'] = len(self.enchants)
+
+    def enchant(self, ident):
+        """AENC row of an enchantment id, NONE when the masters have no such record."""
+        return self.enchant_index.get((ident or '').casefold(), NONE)
 
     # --- shared tables ---
     def item(self, ident):
@@ -185,8 +257,12 @@ class ActorTables:
         if key in self.item_index:
             return self.item_index[key]
         row = {'id': self.string(ident), 'kind': ITEM_UNKNOWN, 'type': 0, 'health': 0, 'rating': 0,
-               'damage': bytes(6), 'flags': 0, 'weight': 0.0, 'speed': 0.0, 'reach': 0.0}
+               'damage': bytes(6), 'flags': 0, 'weight': 0.0, 'speed': 0.0, 'reach': 0.0, 'enchant': NONE}
         r = self.records
+        for tag in ('WEAP', 'ARMO', 'CLOT', 'BOOK'):
+            if key in r[tag]:
+                row['enchant'] = self.enchant(_text(_first(r[tag][key], 'ENAM')))
+                break
         if key in r['WEAP']:
             w = _first(r['WEAP'][key], 'WPDT')
             if len(w) >= 28:
@@ -221,6 +297,7 @@ class ActorTables:
         name = _text(_first(f, 'FNAM')) if f else ''
         self.spells.append({'id': self.string(ident), 'type': struct.unpack_from('<i', spdt)[0] & 255
                             if len(spdt) >= 4 else 255, 'name': self.string(name) if name else NONE,
+                            'flags': struct.unpack_from('<i', spdt, 8)[0] & 255 if len(spdt) >= 12 else 0,
                             'cost': min(0xFFFF, max(0, spell_cost(self.records, f))) if f else 0,
                             'effects': spell_effects(f) if f else []})
         return self.spell_index[key]
@@ -380,9 +457,10 @@ class ActorTables:
                                 row['spell_first'], row['spell_count'], row['weapon_entry'], row['ctype'] & 255,
                                 *row['attack'], max(0, min(0xFFFF, row['soul'])))
         ainv = b''.join(struct.pack('>HhBB', i, c, f, 0) for i, c, f in self.inventory)
-        aitm = b''.join(struct.pack('>HBBHH6sHfff', r['id'], r['kind'], r['type'], r['health'], r['rating'],
-                                    r['damage'], r['flags'], r['weight'], r['speed'], r['reach']) for r in self.items)
-        aspt = b''.join(struct.pack('>HBB', r['id'], r['type'], 0) for r in self.spells)
+        aitm = b''.join(struct.pack('>HBBHH6sHfffHH', r['id'], r['kind'], r['type'], r['health'], r['rating'],
+                                    r['damage'], r['flags'], r['weight'], r['speed'], r['reach'], r['enchant'], 0)
+                        for r in self.items)
+        aspt = b''.join(struct.pack('>HBB', r['id'], r['type'], r['flags']) for r in self.spells)
         aspl = b''.join(struct.pack('>H', i) for i in self.spell_list)
         aspc = b''.join(struct.pack('>HH', r['name'], r['cost']) for r in self.spells)
         # ASPE / AEFF: each spell's effects; AMGE: the magic effects (Spellmaking, Enchanting, casting)
@@ -391,6 +469,26 @@ class ActorTables:
             aspe += struct.pack('>HBB', len(aeff) // AEFF_BYTES, min(255, len(r['effects'])), 0)
             for e in r['effects'][:255]:
                 aeff += struct.pack('>hbbBBHHHH', *e)
+        # AENC (v0.0.61): the enchantments, their effects in the same AEFF list after the spells'
+        aenc = bytearray()
+        for r in self.enchants:
+            aenc += struct.pack('>HBBffHBB', r['id'], r['type'], r['flags'], r['cost'], r['charge'],
+                                len(aeff) // AEFF_BYTES, min(255, len(r['effects'])), 0)
+            for e in r['effects'][:255]:
+                aeff += struct.pack('>hbbBBHHHH', *e)
+        if len(aeff) // AEFF_BYTES > 0xFFFF:
+            raise ValueError('spell and enchantment effects too many for 16-bit indexes')
+        # APCS (v0.0.61): the settings of the starting-spell rule, then the starting spells
+        g = self.records['GMST']
+
+        def setting(name, default):
+            f = g.get(name.casefold())
+            raw = (_first(f, 'FLTV') if name[0] == 'f' else _first(f, 'INTV')) if f else b''
+            return struct.unpack('<f' if name[0] == 'f' else '<i', raw)[0] if len(raw) == 4 else default
+        apcs = struct.pack('>ffHHf', setting('fPCbaseMagickaMult', 1.0), setting('fAutoPCSpellChance', 50.0),
+                           max(0, min(0xFFFF, setting('iAutoPCSpellMax', 100))),
+                           max(0, min(0xFFFF, setting('iAutoSpellAttSkillMin', 70))), setting('fEffectCostMult', 0.5))
+        apcs += b''.join(struct.pack('>H', i) for i in self.pc_start)
         mgef = self.records.get('MGEF', {})
         names = effect_names(self.records)
         missing = [i for i in range(MAGIC_EFFECTS) if i in mgef and not names[i]]
@@ -412,6 +510,7 @@ class ActorTables:
                 'AITM': (aitm, len(self.items)), 'ASPT': (aspt, len(self.spells)), 'ASPL': (aspl, len(self.spell_list)),
                 'ASPC': (aspc, len(self.spells)), 'ASPE': (bytes(aspe), len(self.spells)),
                 'AEFF': (bytes(aeff), len(aeff) // AEFF_BYTES), 'AMGE': (bytes(amge), MAGIC_EFFECTS),
+                'AENC': (bytes(aenc), len(self.enchants)), 'APCS': (apcs, len(self.pc_start)),
                 'OACT': (oact, len(objects))}
 
 

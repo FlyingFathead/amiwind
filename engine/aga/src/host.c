@@ -672,12 +672,15 @@ void _Host_Frame (float time)
     if (setjmp (host_abortserver) )
         return;			// something bad happened, or the server disconnected
 
-// keep the random time dependent
-    rand ();
+// keep the random time dependent (not while the recorder records or replays: the rolls must follow the game's
+// frames, not the wall clock; GAME-RECORDER-61)
+    if (!AW_RecorderActive ())
+        rand ();
 
 // decide the simulation time
     if (!Host_FilterTime (time))
         return;			// don't run too fast, or packets will flood out
+    AW_RecorderFrame ();		// the recorder: this frame's length kept, or the recorded one replayed
 
 // get new key events
     AW_SPIKE_STAGE (AW_SP_INPUT, Sys_SendKeyEvents ());
@@ -685,6 +688,7 @@ void _Host_Frame (float time)
 // allow mice or other external controllers to add commands
     AW_SPIKE_STAGE (AW_SP_INPUT, IN_Commands ());
     AW_SPIKE_STAGE (AW_SP_REMOTE, AW_RemotePoll ());	// headless test sessions: command file, state file
+    AW_RecorderInput ();		// a replay: the recorded keys and command lines of this frame
 
 // Do not run queued commands or world simulation during debug playback.
     if(AW_MovieDebugActive()) {

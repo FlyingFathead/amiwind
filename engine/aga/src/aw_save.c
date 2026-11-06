@@ -321,24 +321,24 @@ static int make_profile(void)
     if(f){fwrite(aw_story.name,1,strlen(aw_story.name),f);fclose(f);}
     return 1;
 }
-int AW_SaveWrite(int slot)
+/* The game as it is now, encoded (AW_SaveWrite's and the recorder's part, GAME-RECORDER-61): the bytes (the caller
+ * frees them) and their count in *SIZE; NULL when it cannot be (said why). BUMP: the next generation (a save file);
+ * 0 keeps the sequence (the recorder's starting save is no generation of the character's). */
+static byte *encode_world(const char *label,int bump,int *size)
 {
-    byte *raw;aw_save_t check;char filename[384],label[32];
-    FILE *f;int n,side,ok,i,capacity;edict_t *p;uint32_t equipment;
-    if(!AW_SaveAllowed() || slot<0 || slot>20 || !content() || !make_profile()){
-        Con_Printf("Save unavailable: complete registration and release first, and check the writable save folder.\n");return 0;
-    }
+    byte *raw;int n,capacity;edict_t *p;uint32_t equipment;
     p=svs.clients[0].edict;
     if(!AW_SavedEquipmentCapture(&equipment,p,sv.time)){
-        Con_Printf("Save equipment validation failed; previous saves retained.\n");return 0;
+        Con_Printf("Save equipment validation failed; previous saves retained.\n");return NULL;
     }
     AW_SaveCapture();world.equipment=equipment;
     world.story=aw_story;world.state=aw_state;world.character=aw_character;world.character.current[0]=p->v.health;
     VectorCopy(p->v.origin,world.position);VectorCopy(cl.viewangles,world.angles);world.angles[1]=anglemod(world.angles[1]);strcpy(world.scene,sv.name);
     memcpy(world.content,content_id,32);
-    if(world.sequence==0xffffffffU)return 0;
-    world.sequence++;
-    sprintf(label,slot>=5?"Autosave %ld":slot?"Manual %ld":"Quicksave",(long)(slot>=5?slot-4:slot));
+    if(bump){
+        if(world.sequence==0xffffffffU)return NULL;
+        world.sequence++;
+    }
     memset(world.label,0,sizeof(world.label));strcpy(world.label,label);
     /* Keep larger serialized storage off the fixed Amiga task stack. The world change list (CELL-CHANGES-59) adds
      * its own bytes to the buffer: a save is never refused because the list is long. */
@@ -351,27 +351,38 @@ int AW_SaveWrite(int slot)
     if(AW_LedgerRows(&aw_ledger)>0){      /* its rows, or its stolen pairs alone (slice 2) */
         int need=AW_LedgerEncode(&aw_ledger,NULL,0);
         if(need<=0 || need>AW_SAVE_MAX_BYTES-AW_SAVE_BYTES-8){
-            Con_Printf("Save world change list invalid (%d rows); previous saves retained.\n",aw_ledger.count);return 0;}
+            Con_Printf("Save world change list invalid (%d rows); previous saves retained.\n",aw_ledger.count);return NULL;}
         capacity+=need+8;
     }
     if(aw_jhist.count)capacity+=AW_JHistEncode(&aw_jhist,NULL,0)+8;   /* the dated journal history (feature 128) */
     raw=(byte *)AW_TryMalloc((unsigned long)capacity);
     if(!raw){AW_LedgerRecordsSet(&aw_ledger,NULL,0);
-        Con_Printf("Save skipped: not enough free memory for its buffer; previous saves retained.\n");return 0;}
+        Con_Printf("Save skipped: not enough free memory for its buffer; previous saves retained.\n");return NULL;}
     save_changes.count=0;save_changes.ledger=&aw_ledger;save_changes.journal=&aw_jhist;
     if((aw_save_changes_export && aw_save_changes_export(&save_changes)<0) ||
        (aw_save_objects_export && aw_save_objects_export(&save_changes)<0)){
-        free(raw);Con_Printf("Save change list incomplete; previous saves retained.\n");return 0;
+        free(raw);Con_Printf("Save change list incomplete; previous saves retained.\n");return NULL;
     }
     save_changes.actors=save_actor_block;save_changes.actor_capacity=AW_SAVE_ACTOR_BYTES;save_changes.actor_bytes=0;
     if(aw_save_actors_export && (save_changes.actor_bytes=aw_save_actors_export(save_actor_block,AW_SAVE_ACTOR_BYTES))<0){
-        free(raw);Con_Printf("Save actor records too large; previous saves retained.\n");return 0;
+        free(raw);Con_Printf("Save actor records too large; previous saves retained.\n");return NULL;
     }
     n=AW_SaveEncodeChanges(raw,capacity,&world,&save_changes);
     /* world shared the game's item table for the write only (aw_state.h OWNERSHIP) */
     memset(&world.state.items,0,sizeof(world.state.items));
     AW_LedgerRecordsSet(&aw_ledger,NULL,0);   /* slice 6: the actor records' copy is only for this write */
-    if(!n){free(raw);Con_Printf("Save state validation failed; previous saves retained.\n");return 0;}
+    if(!n){free(raw);Con_Printf("Save state validation failed; previous saves retained.\n");return NULL;}
+    *size=n;return raw;
+}
+int AW_SaveWrite(int slot)
+{
+    byte *raw;aw_save_t check;char filename[384],label[32];
+    FILE *f;int n,side,ok,i;
+    if(!AW_SaveAllowed() || slot<0 || slot>20 || !content() || !make_profile()){
+        Con_Printf("Save unavailable: complete registration and release first, and check the writable save folder.\n");return 0;
+    }
+    sprintf(label,slot>=5?"Autosave %ld":slot?"Manual %ld":"Quicksave",(long)(slot>=5?slot-4:slot));
+    if(!(raw=encode_world(label,1,&n)))return 0;
     side=newest_info(world.profile,slot,&check);side=side==0?1:0;
     if(!path(filename,sizeof(filename),world.profile,slot,side)){free(raw);return 0;}
     f=fopen(filename,"wb");if(!f){free(raw);return 0;}
@@ -392,13 +403,72 @@ int AW_SaveWrite(int slot)
     Con_Printf("Saved %s (%ld bytes, generation %lu).\n",label,(long)n,(unsigned long)world.sequence);
     return 1;
 }
-int AW_SaveRead(uint32_t profile,int slot)
+/* a load's decode targets: the actor block, the world change list and the journal history of the pending load */
+static void pending_targets(void)
 {
-    aw_save_t candidate,other;char map[40];int n,i,generation;
     pending_changes.actors=pending_actor_block;pending_changes.actor_capacity=AW_SAVE_ACTOR_BYTES;
     pending_changes.actor_bytes=0;
     AW_LedgerClear(&pending_ledger);pending_changes.ledger=&pending_ledger;
     AW_JHistClear(&pending_jhist);pending_changes.journal=&pending_jhist;
+}
+/* the end of a load (AW_SaveRead, AW_SaveLoadBytes): the decoded CANDIDATE (its item table owned; given back on a
+ * refusal) becomes the pending load and its scene's map is queued. 1 queued, 2 refused with the refusal screen up, 0
+ * refused. */
+static int load_decoded(aw_save_t *candidate)
+{
+    char map[40];
+    /* A save in a room or frame marked for more Fast RAM than this start has: nothing is left or loaded, the
+     * refusal screen is up and ENTER goes to the main menu (CHIM-32MB-SAVE-ENTRY-48). 2: refused, handled. */
+    if(aw_save_entry_refuse && aw_save_entry_refuse(candidate->scene,candidate->position)){AW_SaveRelease(candidate);return 2;}
+    if(!AW_RegionSelect(candidate->scene,candidate->position,0)){AW_SaveRelease(candidate);return 0;}
+    /* a load still pending (its spawn never came) gives its table back first */
+    if(pending.state.items.block!=aw_state.items.block)AW_SaveRelease(&pending);
+    pending=*candidate;loading=1;scheduled=0;
+    pending_other=memcmp(candidate->content,content_id,32)!=0;    /* slice 7: migrated at the spawn */
+    IN_AWClearButtons();key_dest=key_game;
+    /* Restore before later console commands can replace the pending scene. */
+    snprintf(map,sizeof(map),"map %s\n",candidate->scene);Cbuf_InsertText(map);return 1;
+}
+/* GAME-RECORDER-61: the recorder's starting save, encoded from the game as it is now (no file, no generation); the
+ * character's own profile and sequence in *PROFILE and *SEQUENCE (0 when it has none yet: the bytes then carry 1,
+ * which the codec needs, and the load puts the real values back). The caller frees the bytes. */
+unsigned char *AW_SaveEncodeNow(int *size,uint32_t *profile,uint32_t *sequence)
+{
+    byte *raw;uint32_t keep_profile=world.profile,keep_sequence=world.sequence;
+    if(!AW_SaveAllowed() || !content()){
+        Con_Printf("Recorder: the game cannot be saved here (registration and release first, alive, walking).\n");return NULL;
+    }
+    *profile=keep_profile;*sequence=keep_sequence;
+    if(!world.profile)world.profile=1;
+    if(!world.sequence)world.sequence=1;
+    raw=encode_world("Recording",0,size);
+    world.profile=keep_profile;world.sequence=keep_sequence;
+    return raw;
+}
+/* GAME-RECORDER-61: load a save from bytes in memory (the recorder's starting save), as a load from a slot does, with
+ * the character's PROFILE and SEQUENCE as they were when the bytes were taken. Returns as load_decoded. */
+int AW_SaveLoadBytes(const unsigned char *raw,int size,uint32_t profile,uint32_t sequence)
+{
+    static aw_save_t candidate;char map[40];
+    pending_targets();
+    if(!AW_CharacterLoad() || !content() || !AW_SaveDecodeChanges(raw,size,&candidate,&pending_changes)){
+        Con_Printf("Recorder: the recording's save does not decode; current game retained.\n");return 0;
+    }
+    if(!other_content_ok(&candidate)){
+        AW_SaveRelease(&candidate);Con_Printf("Recorder: the recording's save is of other game data; current game retained.\n");return 0;
+    }
+    if(AW_SceneMapSize(candidate.scene,map,sizeof(map))<124){
+        AW_SaveRelease(&candidate);Con_Printf("Recorder: the recording's scene is not in this build; current game retained.\n");return 0;
+    }
+    candidate.profile=profile;candidate.sequence=sequence;
+    return load_decoded(&candidate);
+}
+/* 1 while a load waits for its map's spawn */
+int AW_SaveLoadPending(void){return loading;}
+int AW_SaveRead(uint32_t profile,int slot)
+{
+    aw_save_t candidate,other;char map[40];int n,i,generation;
+    pending_targets();
     /* every decoded generation owns its item table (aw_state.h OWNERSHIP): all but the one loaded are given back */
     if(!AW_CharacterLoad() || !content() || (generation=newest(profile,slot,&candidate))<0){
         Con_Printf("No valid compatible save generation; current game retained.\n");return 0;
@@ -414,17 +484,7 @@ int AW_SaveRead(uint32_t profile,int slot)
      * every existing autosave of this character. */
     for(i=0;i<=20;i++)if(newest_info(profile,i,&other)>=0 && other.sequence>candidate.sequence)
         candidate.sequence=other.sequence;
-    /* A save in a room or frame marked for more Fast RAM than this start has: nothing is left or loaded, the
-     * refusal screen is up and ENTER goes to the main menu (CHIM-32MB-SAVE-ENTRY-48). 2: refused, handled. */
-    if(aw_save_entry_refuse && aw_save_entry_refuse(candidate.scene,candidate.position)){AW_SaveRelease(&candidate);return 2;}
-    if(!AW_RegionSelect(candidate.scene,candidate.position,0)){AW_SaveRelease(&candidate);return 0;}
-    /* a load still pending (its spawn never came) gives its table back first */
-    if(pending.state.items.block!=aw_state.items.block)AW_SaveRelease(&pending);
-    pending=candidate;loading=1;scheduled=0;
-    pending_other=memcmp(candidate.content,content_id,32)!=0;    /* slice 7: migrated at the spawn */
-    IN_AWClearButtons();key_dest=key_game;
-    /* Restore before later console commands can replace the pending scene. */
-    snprintf(map,sizeof(map),"map %s\n",candidate.scene);Cbuf_InsertText(map);return 1;
+    return load_decoded(&candidate);
 }
 void AW_SaveSchedule(void){if(aw_story.stage==AW_STAGE_RELEASED){scheduled=1;settle=realtime+3;}}
 int AW_PlayerInCombat(void);
@@ -445,7 +505,9 @@ static int autosave_safe(void)
 void AW_SaveTick(void)
 {
     int n,slot;aw_save_t info;uint32_t oldest=0xffffffffU;
-    if(!AW_AutosaveCount())return;
+    /* GAME-RECORDER-61: no autosave while the recorder records or plays back: a save changes the change list's
+     * tables (the scripts' export) and would happen in one run and not the other; and no disk write during play */
+    if(!AW_AutosaveCount() || AW_RecorderActive())return;
     if(!scheduled && realtime-last_auto<300)return;
     if(!autosave_safe()){
         /* Loading/menu time and time spent falling into danger do not count

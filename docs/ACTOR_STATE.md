@@ -1,6 +1,6 @@
 # The actor record
 
-_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
+_Last updated with AmiWind v0.0.61-dev3 (2026-11-06)._
 
 <!-- contents start -->
 ## Contents
@@ -69,12 +69,18 @@ after the script sections. Big-endian; the layout is in `tools/mwscript/actors.p
 | OACT | 2 | the actor each script object names (the scripts' targets) | in memory with the scripts |
 | ACTB | 96 | one actor: id, kind, flags, level, attributes, skills, behaviour ratings, disposition, reputation, rank, health, magicka, fatigue, race, class, faction, gold, its inventory and spell lists, its weapon, creature type, attacks, soul | on disk |
 | AINV | 6 | an inventory entry: item, count, flags (worn, from a levelled list, restocks) | on disk |
-| AITM | 28 | a shared item: id, kind, type, condition, armour rating, damage, flags, weight, speed, reach | on disk |
-| ASPT | 4 | a shared spell: id, type | on disk |
+| AITM | 32 | a shared item: id, kind, type, condition, armour rating, damage, flags, weight, speed, reach, its enchantment (v0.0.61; 28 bytes before, still read) | on disk |
+| ASPT | 4 | a shared spell: id, type, its flags (autocalculated, a starting spell, always succeeds; v0.0.61) | on disk |
 | ASPL | 2 | a spell entry | on disk |
 | ASPC | 4 | a spell's name and price cost (per ASPT row; the dialogue's Spells service) | on disk |
 | ASPE / AEFF | 4 / 14 | a spell's effects (per ASPT row: the first entry and count; each effect as the record has it) | on disk |
 | AMGE | 12 | a magic effect's flags, base cost and school (per effect index; Spellmaking and Enchanting) | on disk |
+| AENC | 16 | an enchantment (every one of the masters, sorted by id): kind, autocalculated, cast cost, full charge, its effects in AEFF (v0.0.61; docs/MAGIC_EFFECTS.md "Magic items") | on disk |
+| APCS | 16 + 2 | the starting-spell rule's game settings, then the spells flagged as starting spells, in the masters' order (v0.0.61) | on disk |
+
+The masters hold 795 enchantments (361 Cast When Used, 171 Cast When Strikes, 143 Cast Once, 120 Constant Effect;
+1,245 effects), so AENC is 12,720 bytes and its effects 17,430 bytes of AEFF; 12 spells are flagged as starting
+spells (measured 6 November 2026). 408 NPCs and creatures hold a Cast When Strikes weapon.
 
 Measured on the game data (27 October 2026): 3,437 actors (3,041 NPCs, 396 creatures), 20,596 inventory entries,
 1,691 items, 629 spells, 14,276 spell entries; with the items, spells and objects the scripts name (v0.0.54's

@@ -12,6 +12,7 @@
 #include "aw_testbox.h"
 #include "aw_weather.h"
 #include "aw_skel.h"
+#include "aw_torch.h"
 #define WEAK __attribute__((weak))
 WEAK int AW_QuickCharActive(void){return 0;}
 /* TAKEN-LIGHT-FLAME-61: the effect links' users (aw_guard_torch.c, aw_lamps.c, chim/chim_chunks.c) and their source
@@ -25,6 +26,8 @@ WEAK void AW_AreaEffectsApply(void){}
 WEAK int AW_ClockAdvance(int milliseconds){(void)milliseconds;return 0;}
 /* The owned-item crosshair cue (view.c defines it; aw_harvest_runtime.c sets it). */
 WEAK int (*aw_crosshair_owned)(void);
+/* The inventory window's armour rating (aw_worldui.c defines it; aw_combat.c sets it, INVENTORY-NO-ARMOR-RATING-61). */
+WEAK float (*aw_worldui_armor_rating)(void);
 /* The inventory picture: still by default (aw_view.c); fixtures time it with a frozen clock. */
 WEAK int AW_ViewInventoryLive(void){return 0;}
 WEAK double Sys_FloatTime(void){return 0;}
@@ -125,6 +128,10 @@ WEAK void AW_ViewInventoryClear(void){}
 WEAK int AW_ViewInventoryBody(model_t **model,int *frame){(void)model;(void)frame;return 0;}
 WEAK int AW_ViewInventoryHeld(model_t **model,int *frame){(void)model;(void)frame;return 0;}
 WEAK int AW_ViewInventoryEquipment(model_t *models[2],float origins[2][3],float angles[2][3]){(void)models;(void)origins;(void)angles;return 0;}
+/* INVENTORY-PREVIEW-STALE-61: aw_worldui.c's hook, set by aw_view.c, for fixtures with aw_view.c and no world UI */
+WEAK int (*aw_inventory_preview_pending)(void);
+/* PLACED-PIT-AXE-NO-FOCUS-61: aw_placed aim's report (aw_inventory.c), for fixtures with aw_placed.c alone */
+WEAK void AW_PlacedAimReport(void){}
 /* INVENTORY-PREVIEW-BAKED-BODY-59: the assembled body's further parts (aw_view.c), and the posing of a skeletal part
  * (aw_skel.c) for fixtures that link aw_head.c without them: no assembled body, no skeletal part posed. */
 /* JOURNAL-BOOK-32-QUESTS-59: the scripts' export to the world change list (aw_save_codec.c holds the pointer; set by
@@ -153,10 +160,33 @@ WEAK int Q_strcasecmp(char *a,char *b){return strcasecmp(a,b);}
 WEAK int AW_HandBlockApply(void){return 0;}
 WEAK int AW_HandBlockItemApply(void){return 0;}
 WEAK int AW_HandWeaponItemApply(void){return 0;}
+/* HELD-LIGHT-OWN-MODEL-61: a held light of its own (aw_torch.c, aw_hand_models.c, aw_guard_torch.c, aw_view.c);
+ * fixtures without them hold none. */
+WEAK int AW_HandLightItemApply(void){return 0;}
+WEAK void AW_HeldLightDraw(void){}
+WEAK const aw_held_light_t *AW_HeldLight(void){return NULL;}
+WEAK void AW_HeldFlameDraw(const vec3_t origin,const float shape[4],int view){(void)origin;(void)shape;(void)view;}
+WEAK const aw_held_light_t *(*aw_held_light_now)(void);
+WEAK int (*aw_view_held_flames)(vec3_t out[AW_HELD_FLAMES]);
+WEAK int (*aw_view_held_light)(vec3_t out);
+WEAK int (*aw_hand_held_light)(float origin[3],float angles[3]);
+WEAK int (*aw_hand_parts_shield_tag)(float tag[6]);
+WEAK int (*aw_held_light_item)(char id[64],char model[64],int *radius,int *flags,int *torch_radius);
 WEAK const char *AW_InventoryDropReason(void){return "Cannot place item here; kept.";}
 
 WEAK void AW_InventoryGrantCommand(void){}
 
+/* The gameplay recorder (aw_recorder.c, GAME-RECORDER-61): off in fixtures without it, so every hook passes through. */
+WEAK void AW_RecorderInit(void){}
+WEAK int AW_RecorderActive(void){return 0;}
+WEAK void AW_RecorderFrame(void){}
+WEAK void AW_RecorderInput(void){}
+WEAK int AW_RecorderKey(int key,int down){(void)key;(void)down;return 0;}
+WEAK void AW_RecorderLine(const char *text){(void)text;}
+WEAK void AW_RecorderMove(usercmd_t *cmd){(void)cmd;}
+WEAK const char *AW_RecorderSuffix(void){return "";}
+WEAK int AW_RecorderLineShown(void){return 0;}
+WEAK void AW_RecorderDraw(void){}
 /* dbg tp's settlements box (aw_tpplaces.c, TP-PICKER-57): no table in fixtures, so the scene picker opens as before. */
 WEAK int AW_TpPlacesOpen(void){return 0;}
 /* dbg weapon / dbg gear's box (aw_gearbox.c, WEAPONS-57): no box in fixtures. */

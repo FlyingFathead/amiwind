@@ -160,10 +160,17 @@ static hand_appearance_t appearances[MAX_HAND_APPEARANCES];
 static int appearance_count,selected=-2,pair_valid;
 static model_t *hand_model,*torch_model;
 
+/* HELD-LIGHT-OWN-MODEL-61: a held candle, candlestick or lantern in first person: the arms from parts at the light
+ * stance (the bare hands with the left arm on the torch group) and the light's own item model on their shield bone */
+static model_t *light_model,*light_base;
+static char light_path[64];
+static int light_bad,light_visible,light_said,light_pose_frame=-1;
+static float light_pose[6];
+static void light_reset(void){light_model=light_base=NULL;light_path[0]=0;light_bad=light_visible=0;light_pose_frame=-1;}
 void AW_HandModelsReset(void)
 {
     selected=-2;pair_valid=0;hand_model=torch_model=NULL;AW_TorchUseHandAssets(0);
-    block_reset();weapon_reset();
+    block_reset();weapon_reset();light_reset();
 }
 
 /* Optional first-person guard: the same alias renderer and depth as the hands,
@@ -393,11 +400,56 @@ int AW_HandWeaponItemApply(void) {
     cl.viewent.model=weapon_model;cl.viewent.frame=0;
     VectorCopy(origin,cl.viewent.origin);VectorCopy(angles,cl.viewent.angles);return 1;
 }
+/* aw_view.c: the arms from parts' shield bone this frame as a tag in the view model's space; 0 none */
+int (*aw_hand_parts_shield_tag)(float tag[6]);
+static model_t *held_light_model(const char *path)
+{
+    if(strcmp(path,light_path)){
+        Q_strncpy(light_path,(char *)path,63);light_path[63]=0;light_model=NULL;
+        light_bad=!AW_HandItemPath(path) || !probe_frames(path,1);
+        if(light_bad)Con_Printf("First-person held light: model %s unavailable; not drawn.\n",path);
+    }
+    if(light_bad)return NULL;
+    if(!light_model){
+        if(!Mod_CanFindName(light_path)){light_bad=1;Con_Printf("First-person held light: no model slot; not drawn.\n");return NULL;}
+        light_model=Mod_ForName(light_path,false);
+    }
+    if(!light_model || light_model->type!=mod_alias || light_model->numframes!=1 || strcmp(light_model->name,light_path)){
+        light_bad=1;light_model=NULL;Con_Printf("First-person held light: invalid model %s; not drawn.\n",light_path);return NULL;
+    }
+    return light_model;
+}
+int AW_HandLightItemApply(void) {
+    extern int r_framecount;
+    const aw_held_light_t *l;float tag[6],origin[3],angles[3];model_t *m;
+    if(!light_visible || !light_base || cl.viewent.model!=light_base || !(l=AW_HeldLight()) ||
+       !aw_hand_parts_shield_tag || !aw_hand_parts_shield_tag(tag) || !(m=held_light_model(l->model)))return 0;
+    /* the view model's place, then the shield bone, then the light's own carried-light place on it */
+    AW_BlockCompose(cl.viewent.origin,cl.viewent.angles,tag,origin,angles);
+    AW_BlockCompose(origin,angles,l->offset,light_pose,light_pose+3);
+    /* forward by the torch arms' own view offset (tools/prepare_torch.py VIEW_OFFSET, 4 units: the whole held torch is
+     * moved forward so it does not crowd the camera), so a candle or lantern sits where the torch's hand does */
+    {
+        vec3_t a,forward,right,up;int i;
+        VectorCopy(cl.viewent.angles,a);a[PITCH]=-a[PITCH];AngleVectors(a,forward,right,up);
+        for(i=0;i<3;i++)light_pose[i]+=AW_HAND_LIGHT_FORWARD*forward[i];
+    }
+    light_pose_frame=r_framecount;
+    cl.viewent.model=m;cl.viewent.frame=0;
+    memcpy(cl.viewent.origin,light_pose,3*sizeof(float));memcpy(cl.viewent.angles,light_pose+3,3*sizeof(float));return 1;
+}
+/* aw_torch.h aw_hand_held_light: the place the light was drawn at this frame (its flames follow it) */
+static int hand_held_light(float origin[3],float angles[3]) {
+    extern int r_framecount;
+    if(!light_visible || light_pose_frame!=r_framecount)return 0;
+    memcpy(origin,light_pose,3*sizeof(float));memcpy(angles,light_pose+3,3*sizeof(float));return 1;
+}
 int AW_HandModelsApply(void)
 {
 #if !AMIWIND_SPRITE_HANDS
     const char *race="nord",*path;int female=0,index=-1,i,equipped,frames;
     model_t **wanted,*base=cl.viewent.model;
+    aw_hand_held_light=hand_held_light;light_visible=0;
     weapon_visible=0;weapon_base=NULL;weapon_frame_base=0;
     AW_TorchUseHandAssets(0);
     if(!appearance_count || !base)return 0;
@@ -426,6 +478,21 @@ int AW_HandModelsApply(void)
     }
     if(!pair_valid || index<0)return 0;
     equipped=AW_TorchEquipped();frames=equipped?8:28;
+    light_visible=0;
+    if(!equipped && AW_HeldLight()){
+        /* a held light of its own (HELD-LIGHT-OWN-MODEL-61): the arms from parts at the light stance, the bare hands'
+         * frame (the right hand keeps its fist and punch); the light rides their shield bone (AW_HandLightItemApply) */
+        if(aw_hand_parts_apply && aw_hand_parts_apply(race,female,AW_HAND_LIGHT_STANCE,cl.viewent.frame)){
+            light_visible=1;light_base=cl.viewent.model;
+            AW_TorchUseHandAssets(1);release_owned(base,"progs/v_nord.mdl");AW_TorchReleaseLegacyCache();
+            return 1;
+        }
+        if(!light_said){
+            light_said=1;
+            Con_Printf("First-person held light: no light stance in the arms from parts (aw_hand_parts 0 or an older "
+                       "image); the bare hands are shown.\n");
+        }
+    }
     /* The arms from parts (PLAYER-GEAR-VISUAL-59, aw_view.c): what the hands wear, at the stance of the drawn weapon
      * (the weapon alone loads here: the parts pose the stance). Unavailable or aw_hand_parts 0: the baked arms below,
      * the previous method. The carried torch keeps its baked arms. */

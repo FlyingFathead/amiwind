@@ -46,6 +46,8 @@ static int fake_admit(unsigned reference,const char *stem,const float local[3],c
     admitted_ref=reference;memcpy(admitted_at,local,sizeof(admitted_at));admitted_scale=scale;strcpy(admitted_stem,stem);
     return ++admitted;
 }
+static float ray_hit;static int ray_drawn;
+static float fake_ray(int drawn,const float *eye,const float *dir){(void)eye;(void)dir;ray_drawn=drawn;return ray_hit;}
 static void placed_table(unsigned reference){
     byte *row=placed_file+8+16;float v[6]={80,0,116,0,90,0};int k;unsigned long bits;
     memset(placed_file,0,sizeof(placed_file));memcpy(placed_file,"AWP1",4);put32(placed_file+4,1);
@@ -103,6 +105,16 @@ static int reader_opened;
 static int fake_reader(unsigned reference){reader_opened=(int)reference;return 1;}
 int main(void){
     const char *name;char weight[48],value[48];int owned;
+    /* PLACED-PIT-AXE-NO-FOCUS-61: the ray against a placed model's box (mathlib.c AW_RayAliasBox): an axe 20 units long
+     * along its model x, turned 90 degrees (lying along world y), the margin 1; looked at from straight above */
+    {float origin[3]={100,0,0},angles[3]={0,90,0},mins[3]={0,-1,-1},maxs[3]={20,1,1},down[3]={0,0,-1};
+     float above[3]={100,10,10},beside[3]={100,-10,10},far_end[3]={100,30,10},side[3]={110,10,0},along[3]={-1,0,0};float t;
+     t=AW_RayAliasBox(origin,angles,1,mins,maxs,1,above,down);assert(t>7.99f && t<8.01f);        /* its middle: hit */
+     assert(AW_RayAliasBox(origin,angles,1,mins,maxs,1,beside,down)<0);                           /* behind its end */
+     assert(AW_RayAliasBox(origin,angles,1,mins,maxs,1,far_end,down)<0);                          /* past its tip */
+     t=AW_RayAliasBox(origin,angles,2,mins,maxs,1,far_end,down);assert(t>6.99f && t<7.01f);       /* scaled 2: hit */
+     t=AW_RayAliasBox(origin,angles,1,mins,maxs,1,side,along);assert(t>7.99f && t<8.01f);         /* from the side */
+     assert(AW_RayAliasBox(origin,angles,1,mins,maxs,1,origin,down)==0);}                         /* the eye inside */
     tables();
     /* the room draws the quill: the box, then E takes it once into the inventory */
     level(1);
@@ -156,6 +168,15 @@ int main(void){
     assert(admitted_at[0]==20 && admitted_at[1]==0 && admitted_at[2]==29 && admitted_scale==1.5f);
     assert(AW_InventoryUse() && taken==1 && take_reference==(int)QUILL);
     assert(!AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned));     /* taken: disabled, no box */
+    /* PLACED-PIT-AXE-NO-FOCUS-61: the aim meets a drawn item's own model (aw_placed.c placed_ray): the view turned 20
+     * degrees off its origin (6.8 units off the crosshair line, past the origin test's 4) finds it where the ray meets
+     * the model, at the distance of that point (beyond the reach: none); a miss falls back to the origin test */
+    aw_placed_ray=fake_ray;ray_hit=15;level(0);entities[1].v.v_angle[1]=20;
+    assert(AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned) && !strcmp(name,"Quill Pen") && ray_drawn==1);
+    ray_hit=-1;assert(!AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned));
+    ray_hit=60;assert(!AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned));
+    entities[1].v.v_angle[1]=0;ray_hit=-1;assert(AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned));
+    aw_placed_ray=NULL;
     /* a room that draws the item itself: nothing offered (no second copy) */
     level(1);assert(AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned) && admitted==0);
     /* the level's model room used up: the row is not drawn, so no box over an empty table */

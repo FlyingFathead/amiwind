@@ -59,3 +59,76 @@ int AW_CastRanges(const aw_spell_effect_t *e,int n){
     for(i=0;i<n;i++)if(e[i].range<=AW_RANGE_TARGET)bits|=1<<e[i].range;
     return bits;
 }
+
+/* ---- magic items (OpenMW 0.51 spellutil.cpp getEffectiveEnchantmentCastCost, spellcasting.cpp CastSpell::cast) ---- */
+int AW_CastItemCost(float cast_cost,float enchant_skill){
+    float r=cast_cost-(cast_cost/100.0f)*(enchant_skill-10.0f);   /* a point of Enchant over 10 takes 1 % off */
+    return r<1?1:(int)r;
+}
+float AW_CastItemCharge(float charge,int cost){return charge<(float)cost?-1.0f:charge-(float)cost;}
+
+/* ---- the starting spells (OpenMW 0.51 autocalcspell.cpp autoCalcPlayerSpells, attrSkillCheck, calcWeakestSchool,
+ * calcAutoCastChance; our own code) ---- */
+#define MGEF_TARGET_SKILL 0x1
+#define MGEF_TARGET_ATTRIBUTE 0x2
+#define MGEF_APPLIED_ONCE 0x1000
+static int start_skill_check(const aw_start_spell_t *s,const float skills[27],const float attributes[8],int minimum){
+    int i;
+    for(i=0;i<s->n;i++){
+        if((s->m[i].flags&MGEF_TARGET_SKILL) && (s->e[i].skill<0 || s->e[i].skill>=27 || skills[s->e[i].skill]<(float)minimum))return 0;
+        if((s->m[i].flags&MGEF_TARGET_ATTRIBUTE) &&
+           (s->e[i].attribute<0 || s->e[i].attribute>=8 || attributes[s->e[i].attribute]<(float)minimum))return 0;
+    }
+    return 1;
+}
+/* the skill term of the weakest school: 2 x the school's skill of the effect whose term minus its cost is lowest (the
+ * original's own cost formula here: magnitudes at least 1, 1 + duration, the area at least 1) */
+static float start_skill_term(const aw_start_spell_t *s,const float skills[27],float cost_mult){
+    float low=3.0e38f,term=0;int i;
+    for(i=0;i<s->n;i++){
+        int lo=1,hi=1,duration=0;float x,k;
+        if(!(s->m[i].flags&AW_MGEF_NO_MAGNITUDE)){lo=s->e[i].magnitude_min;hi=s->e[i].magnitude_max;}
+        if(!(s->m[i].flags&AW_MGEF_NO_DURATION))duration=s->e[i].duration;
+        if(!(s->m[i].flags&MGEF_APPLIED_ONCE) && duration<1)duration=1;
+        x=0.5f*(float)((lo>1?lo:1)+(hi>1?hi:1));
+        x*=0.1f*s->m[i].base_cost;
+        x*=(float)(1+duration);
+        x+=0.05f*(float)(s->e[i].area>1?s->e[i].area:1)*s->m[i].base_cost;
+        x*=cost_mult;
+        if(s->e[i].range==AW_RANGE_TARGET)x*=1.5f;
+        k=2.0f*skills[AW_CastSchoolSkill(s->m[i].school)];
+        if(k-x<low){low=k-x;term=k;}
+    }
+    return term;
+}
+float AW_CastStartChance(const aw_start_spell_t *s,const float skills[27],const float attributes[8],float cost_mult){
+    if(s->flags&4)return 100.0f;                    /* always succeeds */
+    return start_skill_term(s,skills,cost_mult)-(float)s->cost+0.2f*attributes[2]+0.1f*attributes[7];
+}
+int AW_CastStartSpells(const aw_start_spell_t *s,int count,const aw_start_settings_t *set,const float skills[27],
+                       const float attributes[8],const int *race,int nrace,int *out,int max){
+    int n=0,i,j,reached=0,weakest=-1,min_cost=0x7FFFFFFF;
+    float magicka=set->magicka_mult*attributes[1];  /* the base Intelligence */
+    for(i=0;i<count;i++){
+        int cost=s[i].cost;
+        if(reached && cost<=min_cost)continue;
+        for(j=0;j<nrace && race[j]!=s[i].row;j++);
+        if(j<nrace)continue;                        /* the race gives it already */
+        if(magicka<(float)cost)continue;
+        if(AW_CastStartChance(&s[i],skills,attributes,set->cost_mult)<set->chance)continue;
+        if(!start_skill_check(&s[i],skills,attributes,set->skill_min))continue;
+        if(n>=max)break;
+        out[n++]=i;
+        if(reached){
+            for(j=0;j<n && out[j]!=weakest;j++);
+            if(j<n){for(;j<n-1;j++)out[j]=out[j+1];n--;}
+            min_cost=0x7FFFFFFF;
+            for(j=0;j<n;j++)if(s[out[j]].cost<min_cost){min_cost=s[out[j]].cost;weakest=out[j];}
+        }else{
+            if(cost<min_cost){weakest=i;min_cost=cost;}
+            if(n==set->max)reached=1;
+        }
+    }
+    for(i=0;i<n;i++)out[i]=s[out[i]].row;
+    return n;
+}

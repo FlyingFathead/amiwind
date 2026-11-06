@@ -1,6 +1,6 @@
 # Inventory
 
-_Last updated with AmiWind v0.0.61-dev1 (6 November 2026)._
+_Last updated with AmiWind v0.0.61-dev3 (2026-11-06)._
 
 <!-- contents start -->
 ## Contents
@@ -9,6 +9,7 @@ _Last updated with AmiWind v0.0.61-dev1 (6 November 2026)._
   - [Weapon kit for testing (dbg give weapons)](#weapon-kit-for-testing-dbg-give-weapons)
   - [Every weapon, shield and piece of gear (dbg weapon, dbg gear)](#every-weapon-shield-and-piece-of-gear-dbg-weapon-dbg-gear)
 - [Carry weight](#carry-weight)
+- [Armour rating](#armour-rating)
 - [World models](#world-models)
 - [The container strip](#the-container-strip)
   - [Where container data comes from (AREA-TABLES-59)](#where-container-data-comes-from-area-tables-59)
@@ -54,12 +55,14 @@ O cycles name/value/weight sorting. Up/down and wheel select, Tab changes catego
 left/right rotates the body preview. Right-click opens only available actions.
 E or Enter equips/unequips the selected supported item; D drops one.
 
-The first supported equipment set is source-compatible rings/amulets without
-constant effects or unsupported scripts, plus converted melee weapons and
-shields. The original starter shirt, pants and shoes are initialized once from
-the original player record. Earned items remain earned: opening inventory does
-not grant gold, the healing ring, a sword or a shield. The healing ring is a
-CastWhenUsed item; wearing it never heals the player.
+The equipment set is rings and amulets (a Constant Effect ring or amulet acts while worn and ends when taken off, also
+across a save; see [MAGIC_EFFECTS.md](MAGIC_EFFECTS.md) "Magic items"), clothing, armour, and converted melee, ranged
+and thrown weapons and shields, among them those with a Cast When Strikes or Cast When Used enchantment (before
+v0.0.61-dev3, 191 strike weapons, 59 use weapons and 20 use shields, the iron shardaxe among them, were refused).
+Pieces with a script that still acts after registration are not equippable yet. The original starter shirt, pants and
+shoes are initialized once from the original player record. Earned items remain earned: opening inventory does not
+grant gold, the healing ring, a sword or a shield. The healing ring is a CastWhenUsed item; wearing it never heals the
+player.
 
 Equipment changes update persistent slots and live combat gear fields while
 preserving health, fatigue, knockdown and opponents. Actual source weapon damage,
@@ -71,13 +74,16 @@ are refused.
 
 Worn armour (v0.0.54): every armour piece goes into its own slot (helmet, cuirass, each pauldron, greaves, boots,
 each gauntlet or bracer, the shield in the left hand), as OpenMW 0.51 places it (`mwclass/armor.cpp`
-getEquipmentSlots). Pieces with a script that still acts after registration, or with an enchantment, are not
-equippable yet. The armour rating is the original weighting (`mwclass/npc.cpp` getArmorRating): cuirass 0.3;
+getEquipmentSlots). The armour rating is the original weighting (`mwclass/npc.cpp` getArmorRating): cuirass 0.3;
 shield, helmet, greaves, boots and each pauldron 0.1; each gauntlet 0.05; an empty slot counts the Unarmored skill.
 A piece rates its armour times the skill of its class (light, medium or heavy, by its weight) over iBaseArmorSkill,
 times its condition. Each worn piece also gives the hit sound of a blow landing on it ([COMBAT.md](COMBAT.md)
 "Sounds"). Since v0.0.59 the third-person body shows what is worn, assembled from parts by slot
-([THIRD_PERSON.md](THIRD_PERSON.md)); the first-person hands do not yet show gloves or bracers. A two-handed weapon
+([THIRD_PERSON.md](THIRD_PERSON.md)), and the character picture in the window follows a change at once: a changed
+outfit loads its parts over several frames, so the picture waits for them (at most 5 seconds) and is drawn once; a
+cuirass, a robe or trousers put on or taken off show in the window and on the third-person body. The first-person
+sleeves of a worn shirt or robe show (see [FIRST_PERSON_HANDS.md](FIRST_PERSON_HANDS.md)); gloves and bracers on the
+first-person hands are not yet seen in game. A two-handed weapon
 and a shield exclude each other: equipping one takes the other off and back to the pack (`actionequip.cpp`,
 `weapon.cpp` and `armor.cpp` canBeEquipped). Not yet: the rule that beast races cannot wear helmets that cover the
 head or boots (armor.cpp). The engine's call `AW_InventoryEquippedWeaponType()` gives the type of the weapon in the
@@ -95,8 +101,8 @@ Refused placement retains the item, quantity and condition. Aim at the dropped i
 and press E to pick it up. Full inventory or incompatible condition retains the
 world item. Save/load and scene re-entry restore the records: drops are rows of the world change list
 ([PERSISTENCE_AND_STREAMING.md](PERSISTENCE_AND_STREAMING.md)), which holds across rooms, outdoor areas and saves; the
-older table of 32 ground stacks stays selectable (`aw_placed ledger off`). Dropping every kind of item is not yet
-checked in game on the dev4 image.
+older table of 32 ground stacks stays selectable (`aw_placed ledger off`). A test drops every kind of item indoors and
+outdoors, picks it up again and checks that it stays where it was left across a save.
 
 For explicit testing, use dbg inventory grant "steel longsword" 1 and
 dbg inventory grant steel_shield 1 to grant actual catalogue items. These are
@@ -162,7 +168,7 @@ getCapacity, `mwworld/class.cpp` getNormalizedEncumbrance), with the game settin
 - the load is the carried items' weights times their counts, plus Burden, less Feather (Burden does not count in god
   mode), never below 0; the capacity is Strength (with its changes) times fEncumbranceStrMult (5);
 - the inventory window shows it as the original does: a blue bar above the character picture with "load/capacity",
-  the load rounded up;
+  the load rounded up (the numbers are legible and placed as in the original since v0.0.61-dev3);
 - the movement rules use it ([PLAYER_MOVEMENT.md](PLAYER_MOVEMENT.md)): walking, running, swimming and levitating
   slow by fEncumberedMoveEffect (0.3) times the load over the capacity, the jump by fJumpEncumbranceBase +
   fJumpEncumbranceMultiplier times what is left, the running and sneaking fatigue rises with the load; over the
@@ -174,6 +180,20 @@ The load is a running total kept by the item table: every count change adds or t
 is summed again exactly when a place loads (from the records the load reads anyway). Nothing is summed per frame.
 Burden and Feather come from the spell effects, which set them with `AW_EncumbranceSetEffects` (aw_move.h). Register:
 [ENCUMBRANCE-INCOMPLETE-61](bugs/ENCUMBRANCE-INCOMPLETE-61.md).
+
+## Armour rating
+
+Under the character picture the window shows "Armor: N", as the original does (OpenMW 0.51
+`mwgui/inventorywindow.cpp` updateArmorRating, the line under the picture in `openmw_inventory_window.layout`). N is the
+whole number of the player's armour rating (`mwclass/npc.cpp` getArmorRating): the cuirass counts 0.3, the shield,
+helmet, greaves, boots and each pauldron 0.1, each gauntlet or bracer 0.05; a worn piece rates its armour times its
+class's skill over iBaseArmorSkill (its own armour when it weighs nothing) times its condition, an empty slot the
+unarmored rating (fUnarmoredBase1 and fUnarmoredBase2 by the Unarmored skill); an active Shield effect adds its
+magnitude. It is the same rating the blows landing on the player are reduced by (the combat sheet, `aw_inventory.c`),
+worked out when the window opens and after each action in it, not every frame (it reads the worn pieces' records).
+The line uses the burden bar's small font with its shadow; the picture is 150 pixels high to leave room for it.
+Register: INVENTORY-NO-ARMOR-RATING-61 ([BUGS.md](BUGS.md)). Tests: `tests/aga_inventory_ui_test.c`,
+`tests/aga_combat_test.c`.
 
 ## World models
 
@@ -204,6 +224,18 @@ converted only ten models.
 The catalogue also holds apparatus, lockpicks, probes, repair tools (weight,
 value, and the apparatus type) and every light that can be carried (weight,
 value, burn time, radius and colour; equipped in the left hand like the torch).
+
+A held candle, candlestick or lantern is drawn as itself (HELD-LIGHT-OWN-MODEL-61): its own item model on the left
+hand, in first and third person, with the flames its placed copy has (a three-candle holder keeps its three; the
+paper lantern has none), and its light reaches the torch's distance scaled by its record's radius against the
+torch's 256, never further (a candle of radius 128 lights half as far; the lanterns and the three-candle holders,
+radius 256, as far as the torch). It flickers only when its record says so. In first person the arms from parts hold
+it in the original's torch pose (the first-person table's light stance); in third person the assembled body's left
+arm takes the same pose. The torch itself is drawn and lit as before. Beside the light's item model the image holds
+one small file (`progs/items/m<hex>.hld`, `tools/held_lights.py`: the place on the hand and the flame points), read
+once when the light is equipped; catalogue byte 511 holds the record's flicker and fire flags. Not yet: the light's
+colour (the dynamic light is one shade), its burn time counting down, the Bloodmoon and Tribunal lights (the
+catalogue reads Morrowind's records), and the light in the inventory picture.
 
 ## The container strip
 
@@ -249,8 +281,11 @@ frame for 100 ms or more says so in the console. While the strip is open the
 whole screen is copied out only for two frames after a change (a key, the mouse,
 a take or a put), otherwise only the view (CONTAINER-STRIP-REDRAW-COST-59). E and
 `aw_placed container REF open` open the strip the same way. Bodies of dead people
-and creatures are not containers in this pass: their carried items are not in the
-data the engine reads, so they cannot be opened yet. Tests:
+and creatures open in the same strip ("E: Search"; v0.0.60). With hundreds of kinds
+carried the strip still opens fast: its rows are named in one pass over the item table
+instead of one file search per kind, so with 415 kinds carried a body's strip opens in
+82 ms (it took 10.3 s before) and in 65 ms again after Take All
+([CONTAINER-STRIP-OPEN-MANY-KINDS-61](bugs/CONTAINER-STRIP-OPEN-MANY-KINDS-61.md)). Tests:
 `tests/aga_container_strip_test.c`, `tests/aga_container_strip_open_test.c` (the
 real strip opened both ways) and `tests/test_focus_box.py`; in game:
 `tests/sessions/container_strip_both_opens.txt`.
@@ -322,9 +357,9 @@ Selected full-body head/hair and arbitrary clothing/armour composition remain
 required work in the [equipment roadmap](CHARACTER_EQUIPMENT_ROADMAP.md).
 Unsupported worn clothing cannot be removed through this modal while its baked
 appearance would remain unchanged. Carried-light inventory ownership, arbitrary
-item resource conversion, two-handed animation/presentation, enchanted item use,
-constant effects, scripted equip/drop events, quantity dialogs and corpse looting
-remain incomplete (containers: see the container strip above). Missing models, tags or metadata disable the
+item resource conversion, scripted equip/drop events and quantity dialogs
+remain incomplete (containers and bodies: see the container strip above; enchanted items:
+[MAGIC_EFFECTS.md](MAGIC_EFFECTS.md)). Missing models, tags or metadata disable the
 corresponding action instead of substituting unrelated values or appearance.
 
 The converter writes a bounded, sorted AWI2 catalogue and selected original

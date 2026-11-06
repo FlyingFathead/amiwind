@@ -1,6 +1,6 @@
 # AmiWind FAQ
 
-_Last updated with AmiWind v0.0.59-dev6 (3 November 2026)._
+_Last updated with AmiWind v0.0.61-dev3 (2026-11-06)._
 
 <!-- contents start -->
 ## Contents
@@ -37,16 +37,16 @@ _Last updated with AmiWind v0.0.59-dev6 (3 November 2026)._
 
 *Harry Horsperg's perspective as the project's author.*
 
-**Latest release:** v0.0.51 - Let There Be More Inner Light (25 October 2026, CHIM Engine v0.2.2). Akulakhan's
-Chamber loads on 32 MB, every interior is lit with the light the original gives it from above, and the music plays on
-through the loads ([release notes](releases/notes/RELEASE-v0.0.51.md)). Since v0.0.48, 1,132 of the 1,134 base-game interiors are
-CHIM rooms with the actors standing in them; since v0.0.50 every door leads in and back out.
+**Latest release:** v0.0.60 - Work With What You've Got (4 November 2026, CHIM Engine v0.2.2, 32 MB of Fast RAM)
+([release notes](releases/notes/RELEASE-v0.0.60.md)). **In development:** v0.0.61, "Keep Your Lantern Lit", whose third
+snapshot, [v0.0.61-dev3](releases/notes/RELEASE-v0.0.61-dev3.md), adds casting and enchanted items, weapons of every
+type, held lights, witnessed theft and an in-game recorder for testing. Since v0.0.48, 1,132 of the 1,134 base-game
+interiors are CHIM rooms with the actors standing in them; since v0.0.50 every door leads in and back out.
 Since v0.0.43 every exterior cell of Vvardenfell is on the CHIM engine: 1,409 cells, 1,348 in one-cell region
 frames and 61 in the town frames of Balmora, Seyda Neen and Vivec
 ([what these numbers count](chim/CELL_TRACKER.md#what-we-count)).
-**Next:** v0.0.49, the build turnaround; then much smaller actor models ([modular NPCs](MODULAR_NPCS.md)); then
-the game's scripts and object state ([roadmap](ROADMAP.md)). See the
-[progress tracker](chim/PROGRESS_TRACKER.md), the [roadmap](ROADMAP.md) and the [bug tracker](BUGS.md).
+**Next:** see the [roadmap](ROADMAP.md), the [progress tracker](chim/PROGRESS_TRACKER.md), the
+[game feature tracker](GAME_FEATURES.md) and the [bug tracker](BUGS.md).
 
 ## What is possible on the Amiga?
 
@@ -226,8 +226,8 @@ configuration**:
 | Default game display | 320 × 200, 8-bit indexed colour |
 
 These settings are recorded in the
-[FS-UAE preset](../resources/emulators/AmiWind-v0.0.48-FS-UAE.fs-uae),
-[WinUAE preset](../resources/emulators/AmiWind-v0.0.48-WinUAE.uae) and
+[FS-UAE preset](../resources/emulators/AmiWind-v0.0.61-dev3-FS-UAE.fs-uae),
+[WinUAE preset](../resources/emulators/AmiWind-v0.0.61-dev3-WinUAE.uae) and
 [AGA build guide](AGA_BUILD.md). The Zorro III setting describes the emulator's
 memory configuration; it is not a specification for an ordinary A1200 expansion.
 
@@ -571,8 +571,8 @@ result are substantial parts of that work. The current scope is described below.
 
 ## How much of Morrowind is currently working?
 
-As of **25 October 2026**, the latest release is **v0.0.51: Let There Be More Inner Light** (CHIM Engine v0.2.2;
-[release notes](releases/notes/RELEASE-v0.0.51.md)). Since
+As of **6 November 2026**, the latest release is **v0.0.60: Work With What You've Got** (CHIM Engine v0.2.2;
+[release notes](releases/notes/RELEASE-v0.0.60.md)); the development snapshot is v0.0.61-dev3. Since
 v0.0.43 (**Let There Be CHIM: Vvardenfell's Outdoors, All of It**) every exterior cell of Vvardenfell runs on the CHIM
 engine (1,409 cells: 1,292 land cells, 98 sea-floor cells and 19 open-sea cells; [what these numbers count](chim/CELL_TRACKER.md#what-we-count)), from Seyda Neen, Balmora and the whole city of Vivec to Ald-ruhn, Maar Gan, Suran and Red
 Mountain; no classic region maps are left outdoors. Since v0.0.48, 1,132 of the 1,134 base-game interiors are CHIM
@@ -611,12 +611,19 @@ The documented playable scope now includes:
   weight with the clouds back in the sky and the first look of the original HUD and inventory (v0.0.42), and
   every exterior cell of Vvardenfell on CHIM (v0.0.43), and the Bitter Coast trees back inside the memory budget
   with the guards' night torches restored (v0.0.44).
+- Since then (v0.0.52 to v0.0.61-dev3): every humanoid on one shared skeleton and action table; the conversation
+  window with topics, choices, disposition, persuasion and the services; people and creatures that wander and fight by
+  their records; the player's body and hands built from what is worn; items with their own world models and the world
+  change list that keeps what you change; containers and the bodies of the dead opened in a strip; resting, waiting and
+  levelling; casting with a spell-effect system and enchanted items that cast; weapons and shields of every type;
+  carriable and held lights; a witnessed theft reported as a crime; an inventory limited only by carry weight; and an
+  in-game recorder for testing. Each snapshot's release notes list what was seen in game and what was not.
 
 World coverage and converted assets do not mean complete Morrowind gameplay.
-Full combat, quest simulation, services, schedules, conversations and the
-complete inventory system remain unfinished. Wider settlements, world actors
-and interiors also need further work. Tribunal and Bloodmoon world content are
-outside the current playable scope.
+Quest simulation (many of the game's scripts do not run yet), guards who arrest and jail, pickpocketing, alchemy,
+ranged shots, schedules and the rest of the complete inventory and magic systems remain unfinished
+([the game feature tracker](GAME_FEATURES.md) lists each system and its state). Wider settlements, world actors and
+interiors also need further work. Tribunal and Bloodmoon world content are outside the current playable scope.
 
 Speed on real hardware is the main open question. The first real-machine figure (an earlier
 build on an A4000 with a 68060 at 100 MHz) was about 0.2 frames per second, so frame cost is

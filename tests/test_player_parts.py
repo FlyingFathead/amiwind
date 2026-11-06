@@ -175,10 +175,28 @@ class EngineWiring(unittest.TestCase):
         self.assertNotIn('AW_InventoryEquippedItem', draws)
         # a weapon or shield is equipped under the assembled body too (it holds them on its table's bones)
         self.assertIn('if(body_parts)return parts_table && parts.weapon_bone>=0', view)
-        # clothing with body parts is worn now that the assembled body shows it
+        # clothing with body parts is worn now that the assembled body shows it (v0.0.61, PLAYER-CASTING-59: with a
+        # Cast When Used or a Constant Effect enchantment too)
         inventory = (ROOT / 'tools/prepare_inventory.py').read_text(encoding='utf-8')
-        self.assertIn("elif item['parts'] and inert and (not item['enchantment'] or (enchant and enchant[0]==2)):flags|=4",
+        self.assertIn("elif item['parts'] and inert and (not item['enchantment'] or (enchant and enchant[0] in (2,3))):flags|=4",
                       inventory)
+
+    def test_swimming_wears_the_assembled_body(self):
+        # SWIM-BAKED-CLOTHES-60: the player's layout carries the baked swimmer's swim groups, and the engine keeps the
+        # assembled body in water when its layout has them (the baked swimmer only without them, or with a torch)
+        import npc_anim
+        import prepare_player_parts as ppp
+        import prepare_player_view as ppv
+        self.assertEqual(set(ppp.SWIM_GROUPS), {'swim', 'swimidle'})
+        self.assertTrue(set(ppp.SWIM_GROUPS) <= {g[0] for g in ppv.BODY_SWIM})
+        self.assertTrue(set(ppp.SWIM_GROUPS) <= set(npc_anim.GROUPS))
+        layout = (ROOT / 'tools/prepare_player_parts.py').read_text(encoding='utf-8')
+        body = layout[layout.index('def player_layout('):]
+        self.assertIn('ppv.BODY_SWIM', body[:body.index('npc_anim.plan(')])
+        view = (SRC / 'aw_view.c').read_text(encoding='utf-8')
+        ready = view[view.index('static int body_ready('):view.index('static int held_ready(')]
+        self.assertIn('(!swimming || AW_AnimSwims(&parts_anim))', ready)
+        self.assertNotIn('!carried && !swimming && (i=parts_ready', ready)
 
     def test_inventory_picture_draws_the_assembled_parts(self):
         # INVENTORY-PREVIEW-BAKED-BODY-59: the inventory picture draws the parts the third-person view draws (the same

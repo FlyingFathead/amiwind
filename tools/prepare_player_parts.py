@@ -55,6 +55,7 @@ HELMET = 0
 # The player's groups (prepare_player_view's body: the 'move' profile, block, jump, land and the hand-to-hand ready
 # sections), so the assembled body plays what the baked one plays.
 PROFILE = 'move'
+SWIM_GROUPS = ('swimidle', 'swim')
 
 
 def part_dict(slot, body_id, mesh):
@@ -298,6 +299,10 @@ def player_layout(data, skeleton, female):
     table_bytes, report, table, _, rig, over = sa.game_table(str(data), appearance, of)
     path = sa.table_view(sa.table_choice(appearance)[2], list(table['groups']))
     profile = list(npc_anim.profiles()[PROFILE]) + [list(g) for g in ppv.BODY_EXTRA + ppv.BODY_READY]
+    # SWIM-BAKED-CLOTHES-60: the swim groups of the baked swimmer (prepare_player_view BODY_SWIM), so the assembled
+    # body swims in what is worn instead of the baked swimmer's starting clothes
+    have = {g[0] for g in profile}
+    profile += [list(g) for g in ppv.BODY_SWIM if g[0] in SWIM_GROUPS and g[0] not in have]
     _, groups = npc_anim.plan(rig, profile, over, 1.0, player_block_hit=True)
     kit = npc_anim.table_groups(table, groups, None, report['times'], prefix=sa.table_prefixes(path))
     return npc_anim.layout(kit), table['frames'], table_bytes, report['bone_names']

@@ -1,6 +1,6 @@
 # Combat and the Vivec Arena minigame
 
-_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
+_Last updated with AmiWind v0.0.61-dev3 (2026-11-06)._
 
 <!-- contents start -->
 ## Contents
@@ -10,6 +10,8 @@ _Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 - [How combat works](#how-combat-works)
 - [Blocking](#blocking)
 - [Ordinary weapons and creatures that resist them (v0.0.61)](#ordinary-weapons-and-creatures-that-resist-them-v0061)
+- [Weapons, stances and the debug menus (v0.0.61)](#weapons-stances-and-the-debug-menus-v0061)
+- [Spells, enchanted weapons and theft in a fight (v0.0.61)](#spells-enchanted-weapons-and-theft-in-a-fight-v0061)
 - [Two-handed weapons](#two-handed-weapons)
 - [Cost on a 68040](#cost-on-a-68040)
 - [Known limits](#known-limits)
@@ -352,8 +354,8 @@ until then the moments it needs (ranged weapons, casting) are proven through `db
 | knockdown, death | Body Fall Small, Medium or Large | 0 small, 1 medium (default), 2 large |
 | creatureattack, roar, moan, scream, land | the creature's sound generator (an attack plays its roar) | |
 
-The Intruder and Thief lines have their hooks, but no game event raises them yet: there is no witness or trespass
-detection. The data's one Alarm line has no NPC that can say it. Every build's report names what is not mapped
+The Thief line is raised by a witnessed theft (v0.0.61-dev3); the Intruder line has its hook, but no game event raises
+it yet, as there is no trespass detection. The data's one Alarm line has no NPC that can say it. Every build's report names what is not mapped
 (the voice coverage line: NPCs and creatures without a sound, creature moments, named sounds and sound records).
 
 The enemy's bar is yellow: the reserved UI palette bank (indices 225..253)
@@ -380,6 +382,40 @@ once per landed swing (never per frame, no file read). The weapon's flags are by
 (`inventory/items.awi`; 0 in older catalogues). `dbg combat resistnormal N` (test only, not saved) gives every target
 of the player's swings N % until `dbg combat resistnormal off`, and says whether the effect list is connected and the
 message text the image carries.
+
+## Weapons, stances and the debug menus (v0.0.61)
+
+- **Every weapon and shield type is drawn in its stance** on the player's assembled body (one-handed, two-handed close
+  and wide, the swings, the unequip), and the held weapon is attached to the hand as in the original. A blade is at
+  least one unit thick in the build, so its edge does not vanish when seen edge-on. The first-person view has the
+  matching stances, bow, crossbow and thrown included (196 frames in the first-person table;
+  [FIRST_PERSON_HANDS.md](FIRST_PERSON_HANDS.md)). Ranged weapons can be equipped and thrown weapons are equipped as
+  their stack; the shot itself waits for ranged combat.
+- **Two sway styles** for the first-person weapon: the AmiWind groove (default) and a stiff style with still hands, in
+  Options, Controls, Weapon sway, or `dbg camera sway 1|2|bench` (the last one measures the cost per frame).
+- **God mode** (`dbg god on`) takes no damage, knockdown, fatigue loss or wear, and every cast succeeds and is free.
+- **Debug menus.** `dbg weapon` lists every weapon (536 rows) and `dbg gear` every piece of gear (739 rows); each reads
+  in about 75 ms and holds about 133 KB only while open.
+- **The armour rating** is shown in the inventory window as "Armor: N" under the character picture, worked out from the
+  worn pieces, their condition and the skills by the rule above; a Shield effect is added to it there, but the blows
+  that land do not yet use that part (`COMBAT-SHIELD-EFFECT-NO-ARMOR-61`).
+- **Cliff racers** that attack the player land their strikes: on dry land beside a racer in the open world it attacked
+  on sight and hit 11 of 36 swings at its 31 percent chance. Its drawn size, the fish and the pack behaviour are not
+  yet seen in game.
+- **Creatures keep their fighting frames.** A creature that starts a fight while walking its route used to be handed
+  its standing model (16 frames) instead of the walking model (38); it now fights with its own run and attack poses.
+
+## Spells, enchanted weapons and theft in a fight (v0.0.61)
+
+- A harmful spell cast at an actor is an attack and starts the fight; its damage feeds the fight as a blow's does
+  ([MAGIC_EFFECTS.md](MAGIC_EFFECTS.md), "Casting").
+- A weapon with a Cast When Strikes enchantment casts on a landed blow, a hit or a block, and spends charge by the
+  striker's Enchant skill, also on a killing blow. Weapons and shields with such enchantments can be equipped.
+- Taking an owned item in view of its owner or another witness reports the crime ("Your crime has been reported!"),
+  adds a bounty and the witnesses speak their Thief line and attack. Witnesses are looked for only at the moment of the
+  take. Guards who pursue to arrest, pickpocketing, trespass, assault and murder are not in yet. Several witnesses
+  that start fights in the same frame hold that frame for about 0.6 s, because each fight start reads its sheet from
+  disk ([COMBAT-START-SHEET-READS-61](bugs/COMBAT-START-SHEET-READS-61.md)).
 
 ## Two-handed weapons
 
@@ -438,13 +474,12 @@ the four fighters (about 0.3 MB each).
   bone's position from a tag table beside the resident's model (<model>.tag,
   tools/npc_items.py, engine/aga/src/aw_items.c). The item keeps its own size
   (the original also stretches it with the actor's race width and height).
-- First-person weapon views are partial. Since v0.0.59 an equipped melee weapon is drawn in the hands in the
-  original's three stances (one-handed, two-handed close, two-handed wide; see
-  [FIRST_PERSON_HANDS.md](FIRST_PERSON_HANDS.md)); bows, crossbows and thrown weapons keep the bare hands. A weapon loadout
-  (`dbgmode arenapit loadout sword_shield`, config/arena_player.json) fights with the weapon's rules. The rest of the
-  weapon work (every weapon type in both views, the first-person hands per weapon, the draw and punch arm layers) is
-  planned for v0.0.60.
-- The world's NPCs do not yet start fights on their own (their disposition toward the player is not modelled);
+- First-person weapon views: since v0.0.59 an equipped melee weapon is drawn in the hands in the original's three
+  stances (one-handed, two-handed close, two-handed wide; see [FIRST_PERSON_HANDS.md](FIRST_PERSON_HANDS.md)), and
+  v0.0.61-dev2 adds the bow, crossbow and thrown stances (not yet seen in game as stills). The shot of a ranged weapon
+  waits for ranged combat. A weapon loadout (`dbgmode arenapit loadout sword_shield`, config/arena_player.json) fights
+  with the weapon's rules.
+- The world's NPCs do not yet start fights on their own, other than the witnesses of a theft (their disposition toward the player is not modelled);
   creatures that wander do since v0.0.57, at most four at once; in a larger pack the next one joins as soon as one
   falls (a fallen fighter's slot is reused and its death kept, COMBAT-PACK-SLOTS-57). Alarms are not in. Fleeing by the Flee rating is in, behind `dbg combat flee on` (off by default).
 - Sounds play at the listener, not from the fighter's position. Creatures do not yet play their own sound
@@ -455,5 +490,5 @@ the four fighters (about 0.3 MB each).
   Flee; its combat value in every combat skill; no armour; its own chop, slash and thrust attacks as health damage
   (minimum + (maximum - minimum) x swing, no Strength modifier, no condition); a bipedal creature punches hand to
   hand. Hit one in the world, or name its record ID in the arena (`dbgmode arenapit daedroth`, a stand-in model).
-  Not yet: weapons a creature carries (it fights with its own attacks), its own animation groups in a fight and its
-  sound generators from its animations.
+  Not yet: weapons a creature carries (it fights with its own attacks) and its sound generators from its animations.
+  A creature that starts a fight while walking its route now fights with its own run and attack frames (v0.0.61-dev3).

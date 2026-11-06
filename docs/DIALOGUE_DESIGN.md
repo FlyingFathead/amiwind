@@ -1,6 +1,6 @@
 # Dialogue: design (topics, conditions, choices, disposition, journal)
 
-_Last updated with AmiWind v0.0.58-dev3 (1 November 2026)._
+_Last updated with AmiWind v0.0.61-dev3 (2026-11-06)._
 
 <!-- contents start -->
 ## Contents
@@ -14,13 +14,15 @@ _Last updated with AmiWind v0.0.58-dev3 (1 November 2026)._
 
 <!-- contents end -->
 
-Status (DIALOGUE-57): steps 1 to 3 of the order of work below are built; result scripts, disposition and the
-journal book reading the table follow. See "Built so far" at the end. What ran before: the greetings and the voice lines (the NPC voice
-table, docs/NPC_VOICE_TABLE.md), the compiled game scripts with MessageBox and the journal calls
+Status (DIALOGUE-57, updated for v0.0.61-dev3): the table, the first-match reader, the window, result scripts, choices,
+disposition and persuasion (Admire, Intimidate, Taunt, Bribe) are built and run since v0.0.57 and v0.0.58; the
+services open from the conversation. The open parts, row by row with their proof, are in
+[DIALOGUE_FEATURES.md](DIALOGUE_FEATURES.md). This note is the design they were built from, so that the 32 MB Fast
+machine keeps only a small index in memory; the sections "Plan" and "Order of work" are kept as written, and "Built
+so far" at the end says what was done. Before the dialogue window the game ran the greetings and the voice lines (the
+NPC voice table, docs/NPC_VOICE_TABLE.md), the compiled game scripts with MessageBox and the journal calls
 (docs/MWSCRIPT_BYTECODE.md), the earned journal book (docs/WORLD_MAP_AND_JOURNAL.md), the Talk prompt and its rule
-(engine/aga/src/aw_talk.c). What does not run: topics, their conditions and result scripts, choices, disposition
-changes, persuasion, and most journal entries. This note plans them so that the 32 MB Fast machine keeps only a small
-index in memory.
+(engine/aga/src/aw_talk.c).
 
 ## The game's data, measured
 
@@ -193,8 +195,19 @@ player knows that this NPC answers (an answer or a refusal; OpenMW's getAvailabl
 you type, Up/Down, Enter and the mouse. On the left: the conversation, each chosen topic's name over its answer
 (PgUp/PgDn or the wheel scroll it). The topics an answer names become known. Goodbye (the button, Escape or F10)
 ends it. A new character knows the topics the census captain's answers add (their AddTopic calls, read from the
-data: nine on Morrowind.esm). Not yet: result scripts and choices (step 4), disposition changes and persuasion
-(step 5), saving the known topics, topics named in the greeting.
+data: nine on Morrowind.esm). When this step was written, result scripts, choices, disposition changes and
+persuasion were still to come; they are in since v0.0.57 and v0.0.58 (see the paragraphs below and
+[DIALOGUE_FEATURES.md](DIALOGUE_FEATURES.md)).
+
+**The window's keys and layers (v0.0.61).** Tab moves the keys between the topic list and the conversation; the pane
+that has them is framed. In the list, Up and Down move the highlighted topic or answer and Enter picks it; in the
+conversation, Up and Down scroll it, Left and Right choose a link and Enter asks it. The answer the player picks from
+a choice is shown as the player's line, in the same heading style as a picked topic. The window stands on a plain
+black screen with no status bars behind it, and the messages a conversation raises (an item or gold received, a
+journal update, a script's message box) are drawn over it. A result script's disposition change (for example the
+ring's reward) shows on the bar at once, as in OpenMW (Fargoth's ring: 40 to 90, +50 as the original data gives). An
+answer that gives or takes an item writes "... has been added to your inventory" or its removal line into the
+conversation, as the original does. Moving the mouse pointer with the arrow keys is not in.
 
 **Live state (v0.0.57 rc1).** The conditions read the game as it is, through the script host: journal indexes,
 dead counts, the player's items, globals, the speaker's script locals (the table names each local by its slot in

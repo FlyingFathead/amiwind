@@ -1,11 +1,19 @@
 # Bug journal
 
-_Last updated with AmiWind v0.0.61-dev1 (6 November 2026)._
+_Last updated with AmiWind v0.0.61-dev2 (6 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [STEAL-WITNESSED-NO-CRIME-60 in the works: theft seen by witnesses, 6 November 2026](#steal-witnessed-no-crime-60-in-the-works-theft-seen-by-witnesses-6-november-2026)
+- [Three causes from the v0.0.61-dev2 check; DROPPED-LIGHT-NO-EFFECTS-61 registered, 6 November 2026](#three-causes-from-the-v0061-dev2-check-dropped-light-no-effects-61-registered-6-november-2026)
+- [The v0.0.61-dev2 image checked in game; CONTAINER-STRIP-OPEN-MANY-KINDS-61 and CREATURE-COMBAT-FRAMES-MISSING-61 registered, 6 November 2026](#the-v0061-dev2-image-checked-in-game-container-strip-open-many-kinds-61-and-creature-combat-frames-missing-61-registered-6-november-2026)
+- [HELD-LIGHT-ALWAYS-TORCH-61: every carried light is held as the torch, 6 November 2026](#held-light-always-torch-61-every-carried-light-is-held-as-the-torch-6-november-2026)
+- [AMBIENT-UNSTUCK-FLOOD-61: a resident put back inside solid by her failed steps, 6 November 2026](#ambient-unstuck-flood-61-a-resident-put-back-inside-solid-by-her-failed-steps-6-november-2026)
+- [DIALOGUE-ITEM-NOTICE-MISSING-61: no notice for an item a dialogue answer gives or takes, 6 November 2026](#dialogue-item-notice-missing-61-no-notice-for-an-item-a-dialogue-answer-gives-or-takes-6-november-2026)
 - [BALMORA-GROUND-DENTS-51 reported again on v0.0.61-dev1; five ground vertices beside the canal wall, 6 November 2026](#balmora-ground-dents-51-reported-again-on-v0061-dev1-five-ground-vertices-beside-the-canal-wall-6-november-2026)
+- [BUILD-VERSION-HEADER-RACE-61: a generated version header read half written, 6 November 2026](#build-version-header-race-61-a-generated-version-header-read-half-written-6-november-2026)
+- [GAME-RECORDER-MISSING-61: a gameplay recorder, first slice, 6 November 2026](#game-recorder-missing-61-a-gameplay-recorder-first-slice-6-november-2026)
 - [GODMODE-COMBAT-DAMAGE-61: god mode does not stop a fight's blows, 6 November 2026](#godmode-combat-damage-61-god-mode-does-not-stop-a-fights-blows-6-november-2026)
 - [PLAYER-START-SPELLS-NOT-KNOWN-61: a new character's spells are not on its record, 5 November 2026](#player-start-spells-not-known-61-a-new-characters-spells-are-not-on-its-record-5-november-2026)
 - [Taken lights and their effects: an island-wide survey, 5 November 2026](#taken-lights-and-their-effects-an-island-wide-survey-5-november-2026)
@@ -131,6 +139,72 @@ _Last updated with AmiWind v0.0.61-dev1 (6 November 2026)._
 
 <!-- contents end -->
 
+## STEAL-WITNESSED-NO-CRIME-60 in the works: theft seen by witnesses, 6 November 2026
+
+STEAL-WITNESSED-NO-CRIME-60 (the register's entry): the theft rules of OpenMW 0.51 (commitCrime, reportCrime,
+awarenessCheck) are being added: witnesses within the alarm radius who see the player say their Thief line, a witness
+with Alarm 100 reports it (the bounty rises by the value taken, the crime message), and witnesses provoked enough
+attack. DIALOGUE-ITEM-NOTICE-MISSING-61 is repaired in the same work: the item's line goes into the conversation as a
+message paragraph. Both seen working in game the same day (Arrille's Tradehouse at 32 MB Fast: the brandy taken out
+of every resident's sight is no crime; taken in front of the counter it is reported, the bounty rises from 0 to 100
+and the residents attack; Elone's directions are named in the conversation). New:
+[COMBAT-START-SHEET-READS-61](bugs/COMBAT-START-SHEET-READS-61.md): the crime rules take 14 to 20 ms, but four
+residents starting their fight in the same frame hold it for about 0.64 s, each fight start reading its sheet from disk.
+
+## Three causes from the v0.0.61-dev2 check; DROPPED-LIGHT-NO-EFFECTS-61 registered, 6 November 2026
+
+The three findings of the v0.0.61-dev2 check were traced to their causes.
+[CONTAINER-STRIP-OPEN-MANY-KINDS-61](bugs/CONTAINER-STRIP-OPEN-MANY-KINDS-61.md): the container strip searched the item
+table once for every kind the player carries; it now names them in one pass over the table, as the inventory window
+does. [CREATURE-COMBAT-FRAMES-MISSING-61](bugs/CREATURE-COMBAT-FRAMES-MISSING-61.md): a creature that attacks on sight
+while it walks its route laid its fight out on its walking model, which the walk then took off; the walk now hands
+that model over to the fight. [TAKEN-LIGHT-OUTDOOR-EFFECTS-UNLINKED-61](bugs/TAKEN-LIGHT-OUTDOOR-EFFECTS-UNLINKED-61.md):
+the image tied every outdoor light's flame to its item, but in the five towns the engine looked the links up under the
+town's name instead of the name of the map file that holds the flames, so 61 flames of 53 lights stayed when the light
+was taken. New: [DROPPED-LIGHT-NO-EFFECTS-61](bugs/DROPPED-LIGHT-NO-EFFECTS-61.md), a dropped light shows no flame and
+gives no light where it lies.
+
+## The v0.0.61-dev2 image checked in game; CONTAINER-STRIP-OPEN-MANY-KINDS-61 and CREATURE-COMBAT-FRAMES-MISSING-61 registered, 6 November 2026
+
+The points the v0.0.61-dev2 release notes list as not yet seen in game were played on that image at 32 MB Fast in
+nine sessions. Seen working: the Census and Excise Office step after character creation (the papers, then the
+inventory opens, dressed), Arrille's disposition (40, as the formula gives for the test character) and Barter, the
+first-person stances of every weapon type, the blades drawn on the third-person body, both weapon sway styles (about
+1.3 microseconds a frame), the item table with 415 kinds (the window opens and the places load as fast as with 17
+kinds, a body's items taken), the blank paper offering Steal instead of Read, the tomb ambience with the battle music
+on the ghost's attack, god mode stopping the ghost's blows, the rest refusal in a fight, the outdoor lantern taken,
+and no death music on any of 41 area loads. Set fixed in v0.0.61-dev2: CHARGEN-INVENTORY-LOCKED-60,
+CHARGEN-NO-STARTING-CLOTHES-60, SERVICE-REFUSAL-UNCLOTHED-60, FP-WEAPON-SWAY-60, HELD-BLADE-EDGE-ON-61,
+CARRIED-RECORDS-SEARCH-PER-KIND-61, INVENTORY-OPEN-COST-MANY-KINDS-61, TAKEN-LIGHT-OUTDOORS-NOT-TAKEN-61,
+MUSIC-DEATH-TRACK-RANDOM-60, BLANK-PAPER-READ-60, COLLECT-CAPACITY-REJECTED-60 and TOMB-MUSIC-OVER-AMBIENT-60. Seen
+again: INVENTORY-PREVIEW-STALE-61 (its repair comes after this build) and TAKEN-LIGHT-OUTDOOR-EFFECTS-UNLINKED-61 (the
+taken lantern's flame stays in the air). New:
+[CONTAINER-STRIP-OPEN-MANY-KINDS-61](bugs/CONTAINER-STRIP-OPEN-MANY-KINDS-61.md), opening a body with 415 kinds carried
+held the game for 10.3 s, all of it in the strip's names, the one path the many-kinds repair did not reach; and
+[CREATURE-COMBAT-FRAMES-MISSING-61](bugs/CREATURE-COMBAT-FRAMES-MISSING-61.md), the ancestor ghost asks its model for
+frames it does not have once it fights. Not reached in these sessions: the ghost's resistance to ordinary weapons (the
+level 1 test character's dagger blows had no chance to hit), the indoor candle, the Magic window after the courtyard,
+Until Healed and the wilderness interruption.
+## HELD-LIGHT-ALWAYS-TORCH-61: every carried light is held as the torch, 6 November 2026
+
+[HELD-LIGHT-ALWAYS-TORCH-61](bugs/HELD-LIGHT-ALWAYS-TORCH-61.md): a candle, candlestick or lantern equipped from the
+inventory goes into the left hand as in the original, but the hand shows the torch model with the torch's flame and
+light radius, in both views. The records give each light its own radius (torch 256, the candle 128, the three-candle
+holders and the lanterns 256); the repair draws the held light's own model and flames and scales its light by its
+record against the torch's.
+
+## AMBIENT-UNSTUCK-FLOOD-61: a resident put back inside solid by her failed steps, 6 November 2026
+
+[AMBIENT-UNSTUCK-FLOOD-61](bugs/AMBIENT-UNSTUCK-FLOOD-61.md): the "Unstuck." lines of the v0.0.61-dev2 Pi bench in
+Seyda Neen come from Quake's stuck search, which every resident step runs. One resident did nearly all of them: at the
+foot of a steep face on her route her standing box tests as inside solid, her step into the face fails, and the failed
+step put her back inside, so each following step searched again (ten a walk). Repaired on the v0.0.61 line: a failed
+step that started inside solid settles the walker once on the clear spot the search finds (`chim actors ambient settle on`, the
+default), for every walking resident; the searches are counted per resident in `chim actors ambient`.
+## DIALOGUE-ITEM-NOTICE-MISSING-61: no notice for an item a dialogue answer gives or takes, 6 November 2026
+
+[DIALOGUE-ITEM-NOTICE-MISSING-61](bugs/DIALOGUE-ITEM-NOTICE-MISSING-61.md): handing Fargoth his ring in a scripted session removed it from the inventory without a word. The original shows the item added or removed while the conversation is open (the game's own sNotifyMessage60 to 63 texts). The messages are drawn over the dialogue window since v0.0.61, so only the notice itself is to be added.
+
 ## BALMORA-GROUND-DENTS-51 reported again on v0.0.61-dev1; five ground vertices beside the canal wall, 6 November 2026
 
 Reported again on 5 November 2026 at two spots beside Balmora's canal wall (cell -3,-2, local 523 -371 and 527 -231),
@@ -144,6 +218,20 @@ strip (320 units along the wall) every 8 units against the original surface with
 v0.0.61-dev1 terrain: both spots at the original height, the strip within 4 units everywhere; a first build with four
 vertices still showed a notch just south of the first spot, so the fifth and the longer strip were added. An earlier
 attempt that laid every bank tile of the island as exact 32-unit quads was not merged (+47 % ground triangles).
+
+## BUILD-VERSION-HEADER-RACE-61: a generated version header read half written, 6 November 2026
+
+[BUILD-VERSION-HEADER-RACE-61](bugs/BUILD-VERSION-HEADER-RACE-61.md): one of three engine builds stopped on the
+warning that `chim_version.h` was shorter than expected. The version generator runs on every make beside the compiles
+and rewrote the version headers even when unchanged. It now writes each only when its text changed.
+
+## GAME-RECORDER-MISSING-61: a gameplay recorder, first slice, 6 November 2026
+
+[GAME-RECORDER-MISSING-61](bugs/GAME-RECORDER-MISSING-61.md): the maintainer asked for a recorder that records a
+play session and plays it back in another game instance, to repeat a problem exactly and to test and measure real
+routes. The first slice records from a save taken at the start, keeps each frame's length, move, view, keys and
+remote command lines in memory with checkpoints every 5 seconds, writes the file once at the stop, and plays it back
+comparing the checkpoints ([the gameplay recorder](GAME_RECORDER.md)).
 
 ## GODMODE-COMBAT-DAMAGE-61: god mode does not stop a fight's blows, 6 November 2026
 

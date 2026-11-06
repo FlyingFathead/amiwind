@@ -1,6 +1,6 @@
 # Character animation
 
-_Last updated with AmiWind v0.0.58 (31 October 2026)._
+_Last updated with AmiWind v0.0.61-dev3 (2026-11-06)._
 
 <!-- contents start -->
 ## Contents
@@ -20,6 +20,7 @@ _Last updated with AmiWind v0.0.58 (31 October 2026)._
 - [Voices](#voices)
 - [Memory](#memory)
 - [Visibility](#visibility)
+- [Since this page was written](#since-this-page-was-written)
 - [Not done yet](#not-done-yet)
 - [Tests](#tests)
 
@@ -304,15 +305,28 @@ leaves it touches and culled whole by the PVS and frustum as before. Frame
 changes cost nothing in the visibility pass; the frame bounds grow with poses
 that reach further (death lying down).
 
+## Since this page was written
+
+The sections above describe the baked kit (v0.0.33 to v0.0.58). Later versions moved most of the former gaps:
+
+- Every humanoid, resident and player, moves by one shared skeleton and one shared action table
+  ([ANIMKIT.md](ANIMKIT.md), [MODULAR_NPCS.md](MODULAR_NPCS.md)), with the walk and run groups in every direction, the
+  weapon stances and the swim groups; residents walk their own paths by their records' packages (v0.0.57).
+- The player's third-person body plays the stance of the drawn weapon (one-handed, two-handed close and wide, the swings,
+  the draw and putting away) and swims in its own clothes, and the first-person arms have bow, crossbow and thrown
+  stances ([THIRD_PERSON.md](THIRD_PERSON.md), [FIRST_PERSON_HANDS.md](FIRST_PERSON_HANDS.md); v0.0.61).
+- A creature that starts a fight while walking its route keeps its walking model's frames and fights with its own run
+  and attack poses; before v0.0.61-dev3 it was handed its standing model (16 frames instead of 38) and asked for frames
+  it did not have ([CREATURE-COMBAT-FRAMES-MISSING-61](bugs/CREATURE-COMBAT-FRAMES-MISSING-61.md)).
+- The Thief voice line is said by the witnesses of a theft (v0.0.61-dev3, [COMBAT.md](COMBAT.md)).
+
 ## Not done yet
 
-- Back, left, right and sneak groups; turn in place; jump; random hit1 to hit5.
-- Thief and Intruder voices (crime is not simulated yet).
-- Weapon stances and weapon attacks (weapons are not drawn yet:
-  [NPC-WEAPON-MESH-33](bugs/NPC-WEAPON-MESH-33.md)); random hit1 to hit5 and death1 to death5.
-- Creatures (their own keyframes and sound generator records).
-- Women on their own skeleton ([NPC-FEMALE-SKELETON-33](bugs/NPC-FEMALE-SKELETON-33.md)).
-- Residents walking their own paths.
+- The casting gesture of the first-person hands and of the assembled body ([MAGIC_EFFECTS.md](MAGIC_EFFECTS.md)).
+- The punch transitions and the torch pose on the assembled body ([THIRD_PERSON.md](THIRD_PERSON.md)).
+- The Intruder voice (there is no trespass detection yet).
+- Women on their own skeleton in the baked kit ([NPC-FEMALE-SKELETON-33](bugs/NPC-FEMALE-SKELETON-33.md)).
+- Creatures' sound generators from their animations are written in source and not yet heard in a build.
 
 ## Tests
 

@@ -1,6 +1,6 @@
 # Every being's stats
 
-_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
+_Last updated with AmiWind v0.0.61-dev3 (2026-11-06)._
 
 Every NPC and creature in the game, and the player, carries the stats its original record gives it, even where no
 game system reads them yet. They are kept in one place and read through one set of calls, and each kind of being
@@ -20,6 +20,9 @@ facts, levelling and rest, and the live block split by kind.
 
 Measured on the game data (the three masters): 1,102 NPCs with their own stats, 1,939 auto-calculated NPCs and 396
 creatures.
+
+Known gaps in v0.0.61-dev3: the fallback for actors far from the player and the widened greeting value are still to
+come (`ACTOR-STATS-FAR-FALLBACK-61`, `ACTOR-HELLO-CLAMPED-61`).
 
 Resistances and weaknesses are not stats in the original. They come from the being's abilities and spells: a race's
 abilities (a Nord's resistance to frost), or a creature's own spell list (the ghosts' resistance to normal weapons).

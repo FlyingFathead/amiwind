@@ -1,6 +1,6 @@
 # Waiting and resting: the original's rules
 
-_Last updated with AmiWind v0.0.59-dev5 (2 November 2026)._
+_Last updated with AmiWind v0.0.61-dev3 (2026-11-06)._
 
 Status: study, 10 October 2026, kept as the first notes. Implemented in v0.0.59: [RESTING.md](RESTING.md) describes
 what the game does now and supersedes this page where they differ.
@@ -15,6 +15,7 @@ the two disagree with other descriptions of the original, the open question is l
 | --- | --- | --- |
 | T offers resting, unless the cell forbids sleeping or the player is a werewolf; then only waiting | cell flag "sleeping is illegal" | master files: cell flags; OpenMW `World::canRest` |
 | Cells that forbid sleeping | 736 of 1,328 interiors (every Seyda Neen and Balmora interior), 67 of 1,559 exterior cells (town grids: Seyda Neen 2, Balmora 4, Vivec 17, ...) | master files, all three merged |
+| The Census and Excise Office is such a cell: the rest window there gives the game's line and offers Wait (since v0.0.61-dev3, when the worldspawn reader that finds a room's cell keys stopped cutting values over 127 bytes; every compiled room with a light grid, the Census Office and the prison, was affected) | cell id 763 | `REST-CENSUS-NO-CELL-ID-61` |
 | Using a bed always offers resting | - | OpenMW `waitdialog.cpp` |
 | Neither waiting nor resting with the feet in water, in the air or levitating (a bed lifts the air rule only) | - | OpenMW `World::canRest` |
 | Neither with enemies near: an actor within 7,168 units that is fighting the player, or that is not a follower and passes the attack test | Fight + 20 - 0.005 x distance + 0.2 x (50 - disposition) >= 100 | OpenMW `getEnemiesNearby`, `isAggressive` |

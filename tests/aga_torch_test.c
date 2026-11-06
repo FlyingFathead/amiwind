@@ -46,6 +46,28 @@ void AW_NpcPartsReset(void){}
 void AW_NpcPartsUpdate(void){}
 void AW_LampInit(void){}void AW_LampUpdate(void){}
 void AW_GuardTorchDraw(void){}
+/* aw_guard_torch.c's half of the held light (HELD-LIGHT-OWN-MODEL-61) */
+static int held_flames_drawn;
+void AW_HeldFlameDraw(const vec3_t origin,const float shape[4],int view){(void)origin;(void)shape;(void)view;held_flames_drawn++;}
+const aw_held_light_t *(*aw_held_light_now)(void);
+/* the held light's file: the one candle-holder file the fixture serves (opens counted) */
+static const char held_file[]="AWHL1\noffset 0.0000 0.7493 -0.1207 -0.0000 0.0000 -90.0000\n"
+    "flame -4.6282 2.0771 5.2172 0.8000 0.6250 0.8750 0.0920\nflame -1.0872 -1.4289 5.4807 0.8000 0.6250 0.8750 0.0920\n"
+    "flame -2.8586 0.3232 6.4422 0.8000 0.6250 0.8750 0.0920\n";
+static int held_opens;
+int COM_FOpenFile(char *name,FILE **file){
+    FILE *f;
+    *file=NULL;
+    if(strcmp(name,"progs/items/mcandle09.hld"))return -1;
+    held_opens++;f=tmpfile();assert(f);fwrite(held_file,1,sizeof(held_file)-1,f);rewind(f);*file=f;
+    return (int)sizeof(held_file)-1;
+}
+static int held_equipped,held_radius_record=256,held_flags_record=0x80|1|2;
+static int held_item_stub(char id[64],char model[64],int *radius,int *flags,int *torch_radius){
+    if(!held_equipped)return 0;
+    strcpy(id,held_radius_record==128?"light_de_candle_03":"light_com_candle_09");strcpy(model,"progs/items/mcandle09.mdl");
+    *radius=held_radius_record;*flags=held_flags_record;*torch_radius=256;return 1;
+}
 vec3_t vpn,vup,vright;
 float aliasxcenter,aliasycenter,aliasxscale,aliasyscale;
 byte *COM_LoadHunkFile(char *path){
@@ -258,6 +280,42 @@ int main(void)
         assert(!memcmp(pixels,legacy_pixels,sizeof pixels));
         assert(radius_setting->value==144 && guard_loads==1);
     }
+    /* HELD-LIGHT-OWN-MODEL-61: the pure rules, then a held three-candle holder and a candle: the file read once per
+     * item, no torch drawn, the light at the torch's reach scaled by the record, flickering only where it says */
+    assert(AW_HeldLightRadius(192,128,256)==96 && AW_HeldLightRadius(192,256,256)==192);
+    assert(AW_HeldLightRadius(192,512,256)==192 && AW_HeldLightRadius(192,128,0)==192);
+    assert(AW_HeldLightRadius(192,0,256)==192 && AW_HeldLightRadius(144,1,256)==1 && AW_HeldLightRadius(NAN,1,1)==1);
+    {
+        aw_held_light_t h;static const char five[]="AWHL1\noffset 0 0 0 0 0 0\nflame 0 0 0 1 0 0 0\nflame 0 0 0 1 0 0 0\n"
+            "flame 0 0 0 1 0 0 0\nflame 0 0 0 1 0 0 0\nflame 0 0 0 1 0 0 0\n";
+        assert(AW_HeldLightParse(held_file,(int)sizeof(held_file)-1,"progs/items/x.mdl",&h) && h.flames==3);
+        assert(h.offset[5]==-90 && h.flame[2][2]>6.44f && h.flame[2][2]<6.45f && !strcmp(h.model,"progs/items/x.mdl"));
+        assert(AW_HeldLightParse("AWHL1\noffset 0 0 0 0 0 0\n",25,"m.mdl",&h) && h.flames==0);
+        assert(!AW_HeldLightParse("AWHL2\noffset 0 0 0 0 0 0\n",25,"m.mdl",&h));
+        assert(!AW_HeldLightParse("AWHL1\nflame 0 0 0 1 0 0 0\n",26,"m.mdl",&h));
+        assert(!AW_HeldLightParse("AWHL1\noffset 0 0 0 0 0 x\n",25,"m.mdl",&h));
+        assert(!AW_HeldLightParse("AWHL1\noffset 0 0 0 0 0 0\nflame 0 0 0 0 0 0 0\n",45,"m.mdl",&h));  /* size 0 */
+        assert(!AW_HeldLightParse(five,(int)sizeof(five)-1,"m.mdl",&h));   /* past AW_HELD_FLAMES */
+    }
+    cl.time=1;goal._float=1;state._float=2;torch._float=1;radius_setting->value=192;
+    assert(AW_TorchEquipped() && !AW_HeldLight());          /* no hook: the torch, as before */
+    aw_held_light_item=held_item_stub;held_equipped=1;
+    assert(!AW_TorchEquipped() && AW_HeldLight() && AW_HeldLight()->flames==3 && held_opens==1);
+    assert(aw_held_light_now==AW_HeldLight);
+    for(i=0;i<20;i++){
+        cl.time+=.05;AW_TorchUpdate();light=torchlight();
+        assert(light && light->radius>=192*141/144.f-.01f && light->radius<=192*148/144.f+.01f);
+    }
+    held_radius_record=128;held_flags_record=0x80|2;        /* a steady candle: half the torch's reach, no flicker */
+    AW_TorchUpdate();light=torchlight();assert(light && light->radius==96 && held_opens==2);
+    for(i=0;i<20;i++){cl.time+=.05;AW_TorchUpdate();assert(torchlight()->radius==96);}
+    assert(held_opens==2);                                   /* read once, not per frame */
+    cl.viewent.model=NULL;AW_TorchViewModel();assert(!cl.viewent.model);
+    memset(pixels,255,sizeof(pixels));AW_TorchDraw();for(i=0;i<sizeof(pixels);i++)assert(pixels[i]==255);
+    held_flames_drawn=0;AW_HeldLightDraw();assert(!held_flames_drawn);   /* no first-person place: no flames */
+    state._float=1;assert(!AW_HeldLight());state._float=2;  /* the hands lowered: out */
+    held_equipped=0;assert(AW_TorchEquipped() && !AW_HeldLight());
+    aw_held_light_item=NULL;
     memset(pixels,255,sizeof(pixels));chase_active.value=1;AW_TorchDraw();
     for(i=0;i<sizeof(pixels);i++)assert(pixels[i]==255);
     return 0;

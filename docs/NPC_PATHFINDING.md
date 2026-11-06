@@ -1,6 +1,6 @@
 # NPC pathfinding: how NPCs find their way
 
-_Last updated with AmiWind v0.0.57-dev1 (30 October 2026)._
+_Last updated with AmiWind v0.0.61-dev3 (2026-11-06)._
 
 <!-- contents start -->
 ## Contents
@@ -434,8 +434,23 @@ units, choose again. Decisions every 0.25 s (OpenMW's reaction time), steps ever
 step trace set per walking actor per think, nothing for idle or far actors. A greeting pauses the walk; combat
 owns a fighting actor and the package resumes after; ten failed steps in a row end a walk; an idle actor far from
 all its destinations walks back. `chim actors ambient` prints the counters and cost, `chim actors ambient list` the actors, `chim actors ambient steplog on` one line per failed step (where, which way,
-what the standing hull met) (no console command or
+what the standing hull met, and a walker that starts its step inside solid) (no console command or
 variable of its own: the resident registry budget).
+
+**A walker inside solid** (AMBIENT-UNSTUCK-FLOOD-61, v0.0.61): every step runs Quake's stuck search first (the
+player's walk, `sv_phys.c` `SV_CheckStuck`: up to 164 position tests, the developer message "Unstuck."). A walker
+snapped onto ground that touches a steep face can test as inside solid (Quake's plane precision); its step into the
+face then fails, and the failed step puts it back where it stood, so before v0.0.61 every following step of that walk
+searched again (ten searches a walk). Now a failed step that started inside solid settles the walker once on the
+clear spot the search finds (one unit aside or a few units up at most, `aw_walk.c` `AW_ActorSettle`), so its next
+steps start clear. `chim actors ambient settle on` is the default (written into `id1/default-game.cfg`); `chim actors ambient settle off`
+gives the old behaviour back for comparison. `chim actors ambient` prints the stuck searches of the residents' steps
+(and per second), how many were settled, their position tests, and the searches of every body since the counters'
+reset; `chim actors ambient list` prints each resident's own count. `chim actors ambient put SLOT X Y Z [GX GY]`
+puts the resident of a `list` slot at a point (map units) and, with a goal, walks it straight there, so a spot can be
+checked on purpose. In a forced test on the Seyda Neen residents, 106 searches and 1,758 position tests fell to 9 and
+336 (minus 81 percent); the cause was a resident's standing box at the foot of a steep face, and the face itself is
+unchanged. The measurements are in [docs/performance/FRAME-WAITS.md](performance/FRAME-WAITS.md).
 
 Not done yet (said so, not invented): doors in the way and occupied destinations (flyers and swimmers move since v0.0.57, below); the
 time of day is kept but unused (OpenMW reads it nowhere either); a package set by a script keeps the spawn position

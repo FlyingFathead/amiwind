@@ -1807,7 +1807,7 @@ ACTOR_LOGIC_LINES = (b'// Compiled game logic (default on since v0.0.57): the ga
                      b'// Wander packages. "dbg mwscript off" and "chim actors ambient off" in the console switch them off.\n'
                      b'aw_mwscript 1\n'
                      b'chim actors ambient on\naw_player_cache 1\naw_ambient_areas 1\naw_npc_tables_areas 1\n'
-                     b'aw_player_stances 1\naw_fp_sway 1\n')
+                     b'aw_player_stances 1\naw_fp_sway 1\naw_fp_view 1\nchim actors ambient settle on\n')
 
 
 CHIM_CROSSING_LINES = (b'// Cell crossings (builder option --chim-crossing 0|1, default 1 since v0.0.47): type 1, the\n'

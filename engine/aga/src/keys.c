@@ -883,6 +883,10 @@ void Key_Event (int key, qboolean down)
     char	*kb;
     char	cmd[1024];
 
+    /* The gameplay recorder sees every key first (GAME-RECORDER-61): Ctrl+R while armed, a recording keeps the
+     * event with its frame, a replay takes the live keys (its own come in through here as recorded). */
+    if (AW_RecorderKey (key, down))
+        return;
     /* A named chord uses the same editable binding and save path as keys.
      * Console typing and modal panels keep the literal M. */
     if(key=='m' && ((down && key_dest==key_game && keydown[K_ALT]) ||
@@ -919,6 +923,9 @@ void Key_Event (int key, qboolean down)
 
     if (AW_MovieKey(key,down)) return;
     if (AW_DemoWindKey(key,down)) return;	/* dbg demowind: effect and distance keys, Esc */
+    /* DIALOGUE-MSGBOX-BEHIND-60: a script's message box with buttons over a world window (a dialogue answer's
+     * result) takes its keys before the window does (aw_msgbox.c box_here: only over a world window) */
+    if (down && key_dest == key_menu && aw_msgbox_key && aw_msgbox_key (key)) return;
     if (AW_WorldUIKey(key,down)) return;
 
     /* Physical Amiga raw key 0 maps to grave (Finnish host: section key).

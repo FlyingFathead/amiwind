@@ -785,11 +785,15 @@ This is a big hack to try and fix the rare case of getting stuck in the world
 clipping hull.
 =============
 */
+/* AMBIENT-UNSTUCK-FLOOD-61: every search (a box that starts in solid) counted with the position tests it made, for
+ * the console's counters (aw_ambient.c "chim actors ambient": per resident and per second). */
+unsigned long aw_stuck_searches,aw_stuck_tests,aw_stuck_failed;
 void SV_CheckStuck (edict_t *ent)
 {
 	int		i, j;
 	int		z;
 	vec3_t	org;
+	unsigned long	tests = 2;
 
 	if (!SV_TestEntityPosition(ent))
 	{
@@ -797,10 +801,12 @@ void SV_CheckStuck (edict_t *ent)
 		return;
 	}
 
+	aw_stuck_searches++;
 	VectorCopy (ent->v.origin, org);
 	VectorCopy (ent->v.oldorigin, ent->v.origin);
 	if (!SV_TestEntityPosition(ent))
 	{
+		aw_stuck_tests += tests;
 		Con_DPrintf ("Unstuck.\n");
 		SV_LinkEdict (ent, true);
 		return;
@@ -813,14 +819,18 @@ void SV_CheckStuck (edict_t *ent)
 				ent->v.origin[0] = org[0] + i;
 				ent->v.origin[1] = org[1] + j;
 				ent->v.origin[2] = org[2] + z;
+				tests++;
 				if (!SV_TestEntityPosition(ent))
 				{
+					aw_stuck_tests += tests;
 					Con_DPrintf ("Unstuck.\n");
 					SV_LinkEdict (ent, true);
 					return;
 				}
 			}
 
+	aw_stuck_tests += tests;
+	aw_stuck_failed++;
 	VectorCopy (org, ent->v.origin);
 	Con_DPrintf ("player is stuck.\n");
 }

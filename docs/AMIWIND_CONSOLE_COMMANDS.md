@@ -1,6 +1,6 @@
 # AmiWind console commands
 
-_Generated from `config/debug-commands.txt` with AmiWind v0.0.61-dev2._
+_Generated from `config/debug-commands.txt` with AmiWind v0.0.61._
 
 Open the console with F10 or the backquote key and type
 a command, for example `dbg headlamp on`. This page is generated from
@@ -81,6 +81,7 @@ Type: "dbg help" for help.
 | `dbg levelup` | `dbg skill progress` | [use SKILL [N [TYPE]] / raise SKILL [N] / check / rest [HOURS] / bed REF] levelling: no argument = level, progress, multipliers, each skill's progress; use = N skill uses (TYPE 0..3); raise = N raises; check = the level-up box when due; rest = HOURS (default 8), then the box when due (saved) |
 | `dbg lightgallery` | - | [off] lighting switches at this spot in a strip below the view: night mode, tint, lamps, glow, headlamp, horizon veil, time preview; arrows change, Esc done |
 | `dbg nightgallery` | - | [here/off] (23:00 wide view, Masser, Secunda, stars; Esc returns) |
+| `dbg recorder` | - | [on/off / start / stop / play FILE / status] gameplay recorder (docs/GAME_RECORDER.md): no argument arms it; Ctrl+R records from a save taken at the start, (RECORDING) on the version line, and names the file at the stop; play 001 replays recordings/001.awr, (PLAYBACK), checkpoints compared, one RECORDER RESULT line |
 | `dbg set playerrace` | `dbg set race` | [ID / NAME / list] zero-based race list; switch appearance in place; retain gender/class/name/equipment/level/stats; choose valid head and hair |
 | `dbg shroompicker` | - | [1..10/list] (default 1; preserves inventory and picked state) |
 | `dbg shroomtracker` | - | (picked mushrooms in this save; excludes empty plants) |

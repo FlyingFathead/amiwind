@@ -1,6 +1,6 @@
 {
   "schema": "dialogue-features 1",
-  "updated": "2026-10-31",
+  "updated": "2026-11-06",
   "requirement": "v0.0.58 ships the dialogue feature-complete against the original and OpenMW 0.51 (decided for the project, 31 October 2026); a row that is not done blocks the release unless it carries the maintainer's written deferral.",
   "measured": {
     "source": "tools/dialogue_lut.py on Morrowind.esm (the report's coverage block), 31 October 2026; the 114 RankRequirement conditions moved to live on 1 November 2026 (FACTION-RANK-58)",
@@ -128,7 +128,7 @@
       "state": "partial",
       "what": "A result script's Choice lists buttons; the pick sets the Choice value and the topic is searched again.",
       "proof": "Choice is a host call (aw_mwhost.c AWF_CHOICE): the window lists its texts in place of the topics; the pick is shown, sets the Choice condition for one answer and asks the same topic again (aw_dialwin.c result_choice, ask). 1,103 of the game's result scripts call Choice.",
-      "missing": "No in-game still yet (build hold); no native test of a run through the window yet.",
+      "missing": "Since v0.0.61-dev3 the picked answer is shown as the player's line in the same heading style as a picked topic, and the disposition change of its result shows at once (Fargoth's ring: 40 to 90); no native test of a run through the window yet.",
       "bugs": []
     },
     {

@@ -156,6 +156,19 @@ class VersionHeaderSourceTests(unittest.TestCase):
         source = Path(__file__).read_text(encoding='utf-8')
         self.assertNotIn('from project_version ' + 'import generate_native', source)
 
+    def test_unchanged_headers_are_not_rewritten(self):
+        # BUILD-VERSION-HEADER-RACE-61: the heap header's make rule runs the generator on every make, beside the
+        # compiles; an unchanged header must keep its bytes and its time stamp, so no compile reads it half written
+        module = tree_project_version()
+        with tempfile.TemporaryDirectory() as tmp:
+            module.generate_native(ROOT / 'VERSION', Path(tmp))
+            files = sorted(Path(tmp).iterdir())
+            for path in files:
+                os.utime(path, ns=(1_000_000_000, 1_000_000_000))
+            module.generate_native(ROOT / 'VERSION', Path(tmp))
+            for path in files:
+                self.assertEqual(path.stat().st_mtime_ns, 1_000_000_000, path.name)
+
 class GuardTorchRenderContractTests(unittest.TestCase):
     def test_world_flames_share_camera_depth_and_precede_hands_and_water_warp(self):
         renderer=(Path(SOURCE)/'src/r_main.c').read_text()
@@ -1043,3 +1056,16 @@ class NativeSourceTests(unittest.TestCase):
         # ramps, lips and drops under aw_step_rules 0 (Quake, the default) and 1 (Morrowind's rules as OpenMW's).
         self.compile_run('aga_step_rules_test.c', [ROOT/'engine/aga/src/aw_walk.c', ROOT/'engine/aga/src/sv_phys.c',
                                                    Path(SOURCE)/'src/mathlib.c'])
+
+    def test_failed_step_inside_solid_settles_once(self):
+        # AMBIENT-UNSTUCK-FLOOD-61: a resident put back inside solid by a failed step searched for a clear spot at
+        # every step (ten a walk); aw_walk.c AW_ActorSettle runs the search once and keeps the spot (aw_ambient.c,
+        # "chim actors ambient settle on", the default written into id1/default-game.cfg).
+        self.compile_run('aga_unstuck_test.c', [ROOT/'engine/aga/src/aw_walk.c', ROOT/'engine/aga/src/sv_phys.c',
+                                                Path(SOURCE)/'src/mathlib.c'])
+        ambient = (ROOT/'engine/aga/src/aw_ambient.c').read_text(encoding='utf-8')
+        self.assertIn('static int settle_on=1;', ambient)
+        self.assertIn('if(!stepped && settle_on){', ambient)
+        self.assertIn('if(AW_ActorSettle(s->e))st.settled++;', ambient)
+        import build_aga
+        self.assertIn(b'chim actors ambient settle on\n', build_aga.ACTOR_LOGIC_LINES)
