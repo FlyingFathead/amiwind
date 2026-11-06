@@ -196,7 +196,48 @@ int main(void) {
     m.weapon=8;assert(AW_CombatCanBlock(&s,&m,0));                      /* one-handed axe */
     m.weapon=4;m.staggered=1;assert(!AW_CombatCanBlock(&s,&m,0));       /* hit recovery */
     m=mevil();
-    for(i=1;i<=10;i++)assert(AW_TWO_HANDED(i)==(i==3 || i==5 || i==6 || i==7 || i==9));
+    {   /* RESIST-NORMAL-WEAPONS-61: OpenMW 0.51 combat.cpp resistNormalWeapon / isNormalWeapon */
+        int no;aw_fighter_t at=mevil(),gh=mevil();aw_swing_t o;aw_combat_rng_t rr;float full;
+        assert(AW_CombatIsNormalWeapon(0,0) && !AW_CombatIsNormalWeapon(AW_WEAPON_SILVER,0) &&
+               !AW_CombatIsNormalWeapon(AW_WEAPON_MAGICAL,0) && !AW_CombatIsNormalWeapon(0,1));
+        assert(AW_CombatNormalWeaponFactor(1,0,&no)==1 && !no);
+        assert(AW_CombatNormalWeaponFactor(1,.5f,&no)==.5f && !no);
+        assert(AW_CombatNormalWeaponFactor(1,1,&no)==0 && no);
+        assert(AW_CombatNormalWeaponFactor(1,2.5f,&no)==0 && no);          /* min(1, ...) */
+        assert(AW_CombatNormalWeaponFactor(1,-.25f,&no)==1.25f && !no);    /* a weakness: stronger */
+        assert(AW_CombatNormalWeaponFactor(0,1,&no)==1 && !no);            /* silver, magical, enchanted: untouched */
+        /* a swing with dice off: the full blow, then the same blow on a ghost that resists fully and half */
+        aw_combat_dice=0;
+        at.weapon=2;at.damage[0][0]=at.damage[0][1]=20;at.weapon_health=at.weapon_health_max=100;at.weapon_normal=1;
+        gh.armor=0;gh.health=gh.health_max=1000;gh.aware=1;gh.resist_normal=0;
+        AW_CombatSeed(&rr,7);AW_CombatSwing(&s,&at,&gh,0,1,0,0,&rr,&o);full=o.damage;assert(full>0 && !o.no_effect);
+        gh.health=1000;gh.knocked=0;gh.resist_normal=100;at.weapon_health=100;          /* percent */
+        AW_CombatSwing(&s,&at,&gh,0,1,0,0,&rr,&o);assert(o.damage==0 && o.no_effect && gh.health==1000);
+        gh.resist_normal=50;gh.knocked=0;at.weapon_health=100;
+        AW_CombatSwing(&s,&at,&gh,0,1,0,0,&rr,&o);assert(!o.no_effect && o.damage>0 && o.damage<full);
+        at.weapon_normal=0;gh.resist_normal=100;gh.health=1000;gh.knocked=0;at.weapon_health=100;     /* a silver blade */
+        AW_CombatSwing(&s,&at,&gh,0,1,0,0,&rr,&o);assert(!o.no_effect && o.damage==full);
+        at.weapon=0;at.weapon_normal=0;gh.knocked=0;                                   /* fists: never resisted */
+        AW_CombatSwing(&s,&at,&gh,0,1,0,0,&rr,&o);assert(!o.no_effect);
+        aw_combat_dice=1;
+    }
+    {   /* GODMODE-COMBAT-DAMAGE-61: a god-mode player keeps health, fatigue and standing; its own swings are free */
+        aw_fighter_t at=mevil(),pl=mevil(),before;aw_swing_t o;aw_combat_rng_t rr;
+        aw_combat_dice=0;
+        at.weapon=2;at.damage[0][0]=at.damage[0][1]=200;at.weapon_health=at.weapon_health_max=100;
+        pl.armor=0;pl.health=pl.health_max=50;pl.aware=1;before=pl;
+        AW_CombatSeed(&rr,3);AW_CombatSwing(&s,&at,&pl,0,1,0,0,&rr,&o);
+        assert(o.damage>0 && pl.health<50);                                    /* the blow as resolved */
+        AW_CombatGodVictim(&pl,&before,&o);
+        assert(pl.health==50 && pl.fatigue==before.fatigue && !pl.knocked && !pl.dead && o.damage==0 && !o.knockdown);
+        before=at;AW_CombatSwing(&s,&at,&pl,0,1,0,0,&rr,&o);
+        assert(at.fatigue<before.fatigue && at.weapon_health<before.weapon_health);
+        AW_CombatGodAttacker(&at,&before,&o);
+        assert(at.fatigue==before.fatigue && at.weapon_health==before.weapon_health && at.weapon==2 && o.weapon_wear==0);
+        aw_combat_dice=1;
+    }
+    /* bow 10 and crossbow 11 are two-handed (weapontype.cpp), thrown 12 is not */
+    for(i=1;i<=12;i++)assert(AW_TWO_HANDED(i)==(i==3 || i==5 || i==6 || i==7 || i==9 || i==10 || i==11));
     /* the player's attack type by movement (forward/back beats sideways by 0.2) and best attack */
     assert(AW_CombatMovementAttack(1,0)==AW_ATTACK_THRUST && AW_CombatMovementAttack(-1,0)==AW_ATTACK_THRUST);
     assert(AW_CombatMovementAttack(0,1)==AW_ATTACK_SLASH && AW_CombatMovementAttack(0,-.5f)==AW_ATTACK_SLASH);

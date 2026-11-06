@@ -111,9 +111,18 @@ static int read_file_changes(uint32_t profile,int slot,int generation,aw_save_t 
 }
 static int newest(uint32_t profile,int slot,aw_save_t *state)
 {
-    aw_save_t other;int a=read_file(profile,slot,0,state),b=read_file(profile,slot,1,&other);
-    if(b && (!a || other.sequence>state->sequence)){*state=other;return 1;}
+    /* both generations' item tables are their own (aw_state.h OWNERSHIP): the one not kept is given back */
+    static aw_save_t other;int a=read_file(profile,slot,0,state),b=read_file(profile,slot,1,&other);
+    if(b && (!a || other.sequence>state->sequence)){if(a)AW_SaveRelease(state);*state=other;return 1;}
+    if(b)AW_SaveRelease(&other);
     return a?0:-1;
+}
+/* newest() for its facts only (sequence, label, scene): its item table given back at once */
+static int newest_info(uint32_t profile,int slot,aw_save_t *state)
+{
+    int r=newest(profile,slot,state);
+    if(r>=0)AW_SaveRelease(state);
+    return r;
 }
 static int scene_id(void){return AW_MapLogicalId(sv.name);}
 static uint32_t actor_id(edict_t *e)
@@ -179,13 +188,23 @@ int AW_SaveSnapshot(aw_save_t *snapshot)
     if(!AW_SavedEquipmentCapture(&equipment,p,sv.time))return 0;
     AW_SaveCapture();*snapshot=world;snapshot->equipment=equipment;
     snapshot->story=aw_story;snapshot->state=aw_state;snapshot->character=aw_character;
+    /* the snapshot's own copy of the item table (aw_state.h OWNERSHIP); the caller gives it back (AW_SaveRelease) */
+    if(!AW_ItemsClone(&snapshot->state.items,&aw_state.items))return 0;
     VectorCopy(p->v.origin,snapshot->position);VectorCopy(cl.viewangles,snapshot->angles);
     strcpy(snapshot->scene,sv.name);return 1;
 }
 void AW_SaveSnapshotRestore(const aw_save_t *snapshot)
 {
+    aw_items_t items;
     if(!snapshot)return;
+    /* the snapshot keeps its table (it may be restored again); the game takes a copy, or keeps its own when memory
+     * says no (said so) */
+    if(!AW_ItemsClone(&items,&snapshot->state.items)){
+        Con_Printf("Snapshot restore: not enough memory for the item table; the items stay as they are.\n");
+        items=aw_state.items;
+    }else AW_ItemsFree(&aw_state);
     world=*snapshot;aw_story=world.story;aw_state=world.state;aw_character=world.character;
+    aw_state.items=items;memset(&world.state.items,0,sizeof(world.state.items));
     loading=scheduled=0;last_auto=realtime;
 }
 void AW_SaveSpawn(void)
@@ -193,7 +212,13 @@ void AW_SaveSpawn(void)
     int i,j,k,scene=scene_id();edict_t *e;eval_t *v;uint32_t ref;aw_saved_actor_t *a;
     if(loading){
         if(strcmp(sv.name,pending.scene)){loading=0;Con_Printf("Saved scene could not be loaded.\n");return;}
+        /* the loaded save's item table becomes the game's (the old one given back; aw_state.h OWNERSHIP) */
+        if(pending.state.items.block!=aw_state.items.block)AW_ItemsFree(&aw_state);
         world=pending;aw_story=world.story;aw_character=world.character;aw_state=world.state;
+        memset(&pending.state.items,0,sizeof(pending.state.items));memset(&world.state.items,0,sizeof(world.state.items));
+        /* its rows weighed now, at the load (aw_inventory.c: one pass over the item file for many kinds;
+         * ENCUMBRANCE-INCOMPLETE-61): the place's area load may already have run for this map */
+        if(aw_save_items_loaded)aw_save_items_loaded();
         /* the change list: an old save's actor rows read as "moved + health" entries; aw_actors.c takes the
          * entries it can place (cells) before the window spawns its actors */
         if(!pending_changes.count)AW_SaveFoldActors(&world,&pending_changes);
@@ -343,15 +368,19 @@ int AW_SaveWrite(int slot)
         free(raw);Con_Printf("Save actor records too large; previous saves retained.\n");return 0;
     }
     n=AW_SaveEncodeChanges(raw,capacity,&world,&save_changes);
+    /* world shared the game's item table for the write only (aw_state.h OWNERSHIP) */
+    memset(&world.state.items,0,sizeof(world.state.items));
     AW_LedgerRecordsSet(&aw_ledger,NULL,0);   /* slice 6: the actor records' copy is only for this write */
     if(!n){free(raw);Con_Printf("Save state validation failed; previous saves retained.\n");return 0;}
-    side=newest(world.profile,slot,&check);side=side==0?1:0;
+    side=newest_info(world.profile,slot,&check);side=side==0?1:0;
     if(!path(filename,sizeof(filename),world.profile,slot,side)){free(raw);return 0;}
     f=fopen(filename,"wb");if(!f){free(raw);return 0;}
     ok=fwrite(raw,1,n,f)==(size_t)n;free(raw);
     if(fflush(f))ok=0;
     if(fclose(f))ok=0;
-    if(!ok || !read_file(world.profile,slot,side,&check) || check.sequence!=world.sequence){
+    if(ok && read_file(world.profile,slot,side,&check)){ok=check.sequence==world.sequence;AW_SaveRelease(&check);}
+    else ok=0;
+    if(!ok){
         Con_Printf("Save write/readback failed; previous generation retained.\n");return 0;
     }
     /* Retention reduction only follows a successful new autosave. Manual and
@@ -370,20 +399,27 @@ int AW_SaveRead(uint32_t profile,int slot)
     pending_changes.actor_bytes=0;
     AW_LedgerClear(&pending_ledger);pending_changes.ledger=&pending_ledger;
     AW_JHistClear(&pending_jhist);pending_changes.journal=&pending_jhist;
-    if(!AW_CharacterLoad() || !content() || (generation=newest(profile,slot,&candidate))<0 ||
-       !read_file_changes(profile,slot,generation,&candidate,&pending_changes)){
+    /* every decoded generation owns its item table (aw_state.h OWNERSHIP): all but the one loaded are given back */
+    if(!AW_CharacterLoad() || !content() || (generation=newest(profile,slot,&candidate))<0){
+        Con_Printf("No valid compatible save generation; current game retained.\n");return 0;
+    }
+    AW_SaveRelease(&candidate);
+    if(!read_file_changes(profile,slot,generation,&candidate,&pending_changes)){
         Con_Printf("No valid compatible save generation; current game retained.\n");return 0;
     }
     /* The scene's own map, or its CHIM frame map in a pure-CHIM image. */
     n=AW_SceneMapSize(candidate.scene,map,sizeof(map));
-    if(n<124){Con_Printf("Saved scene unavailable; current game retained.\n");return 0;}
+    if(n<124){AW_SaveRelease(&candidate);Con_Printf("Saved scene unavailable; current game retained.\n");return 0;}
     /* Loading an older manual save must still produce newer generations than
      * every existing autosave of this character. */
-    for(i=0;i<=20;i++)if(newest(profile,i,&other)>=0 && other.sequence>candidate.sequence)candidate.sequence=other.sequence;
+    for(i=0;i<=20;i++)if(newest_info(profile,i,&other)>=0 && other.sequence>candidate.sequence)
+        candidate.sequence=other.sequence;
     /* A save in a room or frame marked for more Fast RAM than this start has: nothing is left or loaded, the
      * refusal screen is up and ENTER goes to the main menu (CHIM-32MB-SAVE-ENTRY-48). 2: refused, handled. */
-    if(aw_save_entry_refuse && aw_save_entry_refuse(candidate.scene,candidate.position))return 2;
-    if(!AW_RegionSelect(candidate.scene,candidate.position,0))return 0;
+    if(aw_save_entry_refuse && aw_save_entry_refuse(candidate.scene,candidate.position)){AW_SaveRelease(&candidate);return 2;}
+    if(!AW_RegionSelect(candidate.scene,candidate.position,0)){AW_SaveRelease(&candidate);return 0;}
+    /* a load still pending (its spawn never came) gives its table back first */
+    if(pending.state.items.block!=aw_state.items.block)AW_SaveRelease(&pending);
     pending=candidate;loading=1;scheduled=0;
     pending_other=memcmp(candidate.content,content_id,32)!=0;    /* slice 7: migrated at the spawn */
     IN_AWClearButtons();key_dest=key_game;
@@ -421,7 +457,7 @@ void AW_SaveTick(void)
     if(!scheduled || realtime<settle || AW_SpeechRemaining()>0)return;
     slot=5;
     for(n=5;n<5+AW_AutosaveCount();n++){
-        if(!world.profile || newest(world.profile,n,&info)<0){slot=n;break;}
+        if(!world.profile || newest_info(world.profile,n,&info)<0){slot=n;break;}
         if(info.sequence<oldest){oldest=info.sequence;slot=n;}
     }
     scheduled=0;last_auto=realtime;
@@ -432,7 +468,7 @@ int AW_SaveDescription(uint32_t profile,int slot,char *out,int capacity)
     aw_save_t info;
     if(capacity<1)return 0;
     /* Load stable character IDs before AWS1/2/3/4 decoding resolves save IDs. */
-    if(!AW_CharacterLoad() || newest(profile,slot,&info)<0){out[0]=0;return 0;}
+    if(!AW_CharacterLoad() || newest_info(profile,slot,&info)<0){out[0]=0;return 0;}
     snprintf(out,capacity,"%s / %s / L%ld%s",info.story.name,info.scene,(long)info.character.level,
              memcmp(info.content,content_id,32)?" / other game data":"");return 1;
 }
@@ -446,8 +482,12 @@ int AW_SaveSlotState(uint32_t profile,int slot)
     for(generation=0;generation<2;generation++){
         if(!path(filename,sizeof(filename),profile,slot,generation) || !(f=fopen(filename,"rb")))continue;
         raw=read_whole(f,&n);fclose(f);
-        if(!raw || !AW_SaveDecodeChanges(raw,n,info,NULL) || info->profile!=profile)state=AW_SLOT_UNREADABLE;
-        else state=other_content_ok(info)?AW_SLOT_OK:AW_SLOT_OTHER_DATA;   /* slice 7: migrated when it can be */
+        if(!raw || !AW_SaveDecodeChanges(raw,n,info,NULL))state=AW_SLOT_UNREADABLE;
+        else{
+            AW_SaveRelease(info);   /* only its facts are read here */
+            if(info->profile!=profile)state=AW_SLOT_UNREADABLE;
+            else state=other_content_ok(info)?AW_SLOT_OK:AW_SLOT_OTHER_DATA;   /* slice 7: migrated when it can be */
+        }
         free(raw);
         if(state>best)best=state;
     }
@@ -498,14 +538,26 @@ int AW_SaveLatest(uint32_t profile,char *label,int capacity)
     aw_save_t info;int slot,best=-1;uint32_t sequence=0;
     if(capacity>0)label[0]=0;
     if(!profile || !AW_CharacterLoad())return -1;
-    for(slot=0;slot<=20;slot++)if(newest(profile,slot,&info)>=0 && (best<0 || info.sequence>sequence)){best=slot;sequence=info.sequence;}
+    for(slot=0;slot<=20;slot++)if(newest_info(profile,slot,&info)>=0 && (best<0 || info.sequence>sequence)){best=slot;sequence=info.sequence;}
     if(best>=0 && capacity>0)AW_SaveDescription(profile,best,label,capacity);
     return best;
 }
 static void quicksave(void){   /* without a profile no save is written: say so, as quickload does (QUICKSAVE-NO-PROFILE-SILENT-57) */
     if(!world.profile){Con_Printf("Choose a character in Load game first: no save without one.\n");return;}
     AW_SaveWrite(0);}
-static void quickload(void){if(world.profile)AW_SaveRead(world.profile,0);else Con_Printf("Choose a character in Load game first.\n");}
+/* aw_quickload [PROFILE [SLOT]]: the quicksave of this character; with a profile (its folder's hex number, p0000abcd
+ * or 0000abcd) that character's quicksave, or its SLOT (0 quicksave, 1-4 manual, 5-20 autosaves): test sessions load
+ * a save another engine wrote (INVENTORY-ORIGINAL-LIMITS-61: the older save formats in game) */
+static void quickload(void){
+    uint32_t profile=world.profile;int slot=0;const char *p;
+    if(Cmd_Argc()>=2){
+        p=Cmd_Argv(1);if(*p=='p' || *p=='P')p++;
+        profile=(uint32_t)strtoul(p,NULL,16);
+        if(Cmd_Argc()>=3)slot=Q_atoi(Cmd_Argv(2));
+        if(!profile || slot<0 || slot>20){Con_Printf("aw_quickload [PROFILE [SLOT]]: a profile folder's number, slot 0-20.\n");return;}
+    }
+    if(profile)AW_SaveRead(profile,slot);else Con_Printf("Choose a character in Load game first.\n");
+}
 void AW_SaveInit(void)
 {
     Cvar_RegisterVariable(&autosaves);Cmd_AddCommand("aw_quicksave",quicksave);Cmd_AddCommand("aw_quickload",quickload);

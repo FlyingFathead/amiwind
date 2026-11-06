@@ -59,9 +59,15 @@ int AW_HarvestPickedCount(const aw_state_t *);
 /* First encounter: persist roll/level, classify without granting items.
  * 1 available, 0 absent (empty or harvested), -1 unresolved data/state capacity. */
 int AW_HarvestPrepare(const aw_harvest_t *,int,aw_state_t *,int,uint32_t);
-/* 1 collected, 2 original empty result, 0 already harvested, -1 rejected.
+/* 1 collected, 2 original empty result, 0 already harvested, or below 0 refused, saying why
+ * (COLLECT-CAPACITY-REJECTED-60): AW_HARVEST_DATA the catalogue or its contents, AW_HARVEST_FULL no room for a new
+ * kind of item, AW_HARVEST_TOO_MANY an item's count would pass INT32_MAX, AW_HARVEST_STATE the plant's saved fact.
  * Loot seed/level persists even if inventory capacity rejects the transfer.
  * No item or harvested fact is committed until the complete transfer succeeds. */
+#define AW_HARVEST_DATA (-1)
+#define AW_HARVEST_FULL (-2)
+#define AW_HARVEST_TOO_MANY (-3)
+#define AW_HARVEST_STATE (-4)
 int AW_HarvestTake(const aw_harvest_t *,int,aw_state_t *,int,uint32_t);
 /* The owner's record id of PLANT ("" for an unowned one). */
 const char *AW_HarvestOwner(const aw_harvest_t *,int);

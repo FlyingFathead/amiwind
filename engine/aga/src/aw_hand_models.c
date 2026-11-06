@@ -109,6 +109,11 @@ int AW_HandStance(int weapon) {
     case 1:case 2:case 4:case 8:return 0;
     case 3:case 5:case 9:return 1;
     case 6:case 7:return 2;
+    /* FIRST-PERSON-WEAPONS-56: bow 9, crossbow 10, thrown 11 (bowandarrow, crossbow, throwweapon over idle1h and
+     * idlecrossbow, as the original's first-person file has them) */
+    case 10:return 3;
+    case 11:return 4;
+    case 12:return 5;
     }
     return -1;
 }
@@ -333,7 +338,8 @@ static void weapon_reset(void) {
 /* WITH_ARMS 1: the stance arms of the appearance and the weapon (the baked arms); 0: the weapon alone (the arms from
  * parts pose the stance themselves). 1 = the weapon is shown. */
 static int hand_weapon(int index,int with_arms) {
-    static const char *suffix[AW_HAND_STANCES]={"_1h.mdl","_2c.mdl","_2w.mdl"};
+    /* the ranged stances have no baked arms (the arms from parts pose them): their files are absent, the bare hands */
+    static const char *suffix[AW_HAND_STANCES]={"_1h.mdl","_2c.mdl","_2w.mdl","_bw.mdl","_xb.mdl","_1t.mdl"};
     char path[64]={0},arms[64];int weapon=0,stance,n,mark;byte *raw;
     weapon_visible=0;
     if(!aw_hand_weapon_item || !aw_hand_weapon_item(&weapon,path) || !memchr(path,0,sizeof(path)) ||

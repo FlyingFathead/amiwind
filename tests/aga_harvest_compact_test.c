@@ -31,7 +31,8 @@ void *__wrap_calloc(size_t count,size_t bytes)
 void __wrap_free(void *p)
 {
     int i;if(!p)return;
-    for(i=0;i<16;i++)if(allocation[i].pointer==p)break;assert(i<16);
+    for(i=0;i<16;i++)if(allocation[i].pointer==p)break;
+    if(i==16){__real_free(p);return;}   /* not the harvest's (calloc/realloc): the item table's own (malloc) */
     live_bytes-=allocation[i].bytes;allocation[i].pointer=NULL;allocation[i].bytes=0;__real_free(p);
 }
 void *__wrap_realloc(void *p,size_t bytes)
@@ -92,9 +93,9 @@ static void dense(int count)
         assert(h.plant[i].origin[2]==1.125f && h.plant[i].angles[0]==-15.5f && h.plant[i].angles[1]==(float)(i*1.25));
         assert(h.plant[i].angles[2]==21.5f && h.plant[i].scale==(float)(1.125+i*.001));
     }
-    memset(&state,0,sizeof(state));loads=0;
+    AW_ItemsFree(&state);memset(&state,0,sizeof(state));loads=0;
     assert(AW_HarvestProxySpawn(&h,&state,7,123)==count-1 && loads==8);
-    assert(!state.count[AW_ITEM] && AW_HarvestHidden(&h,count-1,&state));with_proxies=live_bytes;
+    assert(!AW_ItemCount(&state) && AW_HarvestHidden(&h,count-1,&state));with_proxies=live_bytes;
     assert(AW_HarvestProxyBytes()==(count-1)*sizeof(entity_t)+count*3U);
     cl_numvisedicts=1;cl_visedicts[0]=&unrelated;AW_HarvestProxyLink();assert(cl_numvisedicts==count);
     for(i=0;i<count-1;i++){

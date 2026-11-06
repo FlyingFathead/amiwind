@@ -28,10 +28,15 @@ static unsigned char raw[AW_SAVE_BYTES],copy[AW_SAVE_BYTES];
 static aw_save_t original,decoded,unchanged;
 static int bytes(const char *p){FILE *f=fopen(p,"rb");int n;assert(f);n=fread(raw,1,sizeof(raw),f);assert(fgetc(f)==EOF);fclose(f);return n;}
 static void hand(int goal,int state,int torch){memset(field_values,0,sizeof(field_values));field_values[0]._float=goal;field_values[1]._float=state;field_values[2]._float=torch;field_values[3]._float=sv.time-.2;field_values[4]._float=1;player.v.weaponframe=state?2:0;player.v.weaponmodel=state?1:0;}
-static void restore(const aw_save_t *s){pending=*s;loading=1;AW_SaveSpawn();assert(!loading);}
+/* a load hands the game its own item table (aw_state.h OWNERSHIP: the loader takes the pending save's table) */
+/* ENCUMBRANCE-INCOMPLETE-61: a load weighs the loaded rows itself (the place's area load may have run already) */
+static int weighed;static void weigh(void){weighed++;}
+static void restore(const aw_save_t *s){int was=weighed;pending=*s;assert(AW_ItemsClone(&pending.state.items,&s->state.items));
+ aw_save_items_loaded=weigh;loading=1;AW_SaveSpawn();assert(!loading && weighed==was+1);}
+static void live(const aw_state_t *s){aw_state=*s;assert(AW_ItemsClone(&aw_state.items,&s->items));}
 #ifndef OLD_CONTROL
 static void header(unsigned char *p,int size){uint32_t crc=0xffffffffU;int i,j;for(i=12;i<size;i++){crc^=p[i];for(j=0;j<8;j++)crc=(crc>>1)^((crc&1)?0xedb88320U:0);}crc^=0xffffffffU;for(i=0;i<4;i++){p[4+i]=(unsigned)size>>(i*8);p[8+i]=crc>>(i*8);}}
-static void bad(const unsigned char *p,int n){memset(&unchanged,0xa5,sizeof(unchanged));decoded=unchanged;assert(!AW_SaveDecode(p,n,&decoded));assert(!memcmp(&decoded,&unchanged,sizeof(decoded)));}
+static void bad(const unsigned char *p,int n){AW_SaveRelease(&decoded);memset(&unchanged,0xa5,sizeof(unchanged));decoded=unchanged;assert(!AW_SaveDecode(p,n,&decoded));assert(!memcmp(&decoded,&unchanged,sizeof(decoded)));memset(&decoded.state.items,0,sizeof(decoded.state.items));}
 static void intent(void){uint32_t flags;int i;static const int goal[]={0,1,1,1,0};static const int state[]={0,1,2,3,4};
  pr_strings=strings_a;sv.time=10;
  for(i=0;i<5;i++){hand(goal[i],state[i],0);flags=0xdeadbeef;assert(AW_SavedEquipmentCapture(&flags,&player,sv.time));assert(flags==(goal[i]?1U:0U));}
@@ -64,8 +69,8 @@ int main(int argc,char **argv){int n;char filename[512];assert(argc==2);
  original.state.harvest.slots=4;memset(original.state.harvest.catalogue,0x36,32);
  original.state.harvest.facts[0]=0x40100001U;
  strcpy(com_gamedir,argv[1]);pr_strings=strings_a;sv.active=1;sv.num_edicts=1;sv.time=10;strcpy(sv.name,"seyda");sv.model_precache[1]="progs/v_nord.mdl";svs.maxclients=1;svs.clients=&client;client.edict=&player;
- world=original;aw_story=original.story;aw_state=original.state;aw_character=original.character;player.v.health=aw_character.current[0];player.v.movetype=MOVETYPE_WALK;memcpy(content_id,original.content,32);content_ready=1;hand(1,2,1);
- assert(AW_SaveWrite(0));assert(path(filename,sizeof(filename),world.profile,0,0));n=bytes(filename);assert(AW_SaveDecode(raw,n,&decoded));
+ world=original;aw_story=original.story;live(&original.state);aw_character=original.character;player.v.health=aw_character.current[0];player.v.movetype=MOVETYPE_WALK;memcpy(content_id,original.content,32);content_ready=1;hand(1,2,1);
+ assert(AW_SaveWrite(0));assert(path(filename,sizeof(filename),world.profile,0,0));n=bytes(filename);AW_SaveRelease(&decoded);assert(AW_SaveDecode(raw,n,&decoded));
  /* Loading does not inherit currently hidden equipment: use only saved intent. */
  hand(0,0,0);pr_strings=strings_b;sv.time=32;restore(&decoded);
  assert(field_values[0]._float==1&&field_values[1]._float==2&&field_values[2]._float==1);
@@ -78,7 +83,7 @@ int main(int argc,char **argv){int n;char filename[512];assert(argc==2);
  {uint32_t sequence=world.sequence;pr_strings=strings_a;hand(1,2,1);player.v.weaponmodel=18;assert(!AW_SaveWrite(0)&&world.sequence==sequence);}
  intent();
  original.equipment=3;n=AW_SaveEncode(raw,sizeof(raw),&original);
- assert(n>0 && !memcmp(raw,"AWS4",4));assert(AW_SaveDecode(raw,n,&decoded));
+ assert(n>0 && !memcmp(raw,"AWS4",4));AW_SaveRelease(&decoded);assert(AW_SaveDecode(raw,n,&decoded));
  assert(decoded.state.harvest.facts[0]==original.state.harvest.facts[0]);
  memcpy(copy,raw,n);copy[n-4]=2;header(copy,n);bad(copy,n);
  memcpy(copy,raw,n);copy[n-4]=4;header(copy,n);bad(copy,n);
@@ -93,9 +98,9 @@ int main(int argc,char **argv){int n;char filename[512];assert(argc==2);
  strcpy(sv.name,"mi5b8154939f7ab");npc.v.health=1;npc_hello._float=0;
  loading=0;AW_SaveSpawn();assert(npc.v.health==43 && npc_hello._float==7);
  npc_hello._float=8;AW_SaveCapture();assert(world.actor_count==1 && world.actors[0].hello_count==8);
- aw_story=original.story;aw_character=original.character;aw_state=original.state;
+ aw_story=original.story;aw_character=original.character;AW_ItemsFree(&aw_state);live(&original.state);
  hand(1,2,1);assert(AW_SaveWrite(1));assert(path(filename,sizeof(filename),world.profile,1,0));
- n=bytes(filename);assert(AW_SaveDecode(raw,n,&decoded));
+ n=bytes(filename);AW_SaveRelease(&decoded);assert(AW_SaveDecode(raw,n,&decoded));
  assert(!strcmp(decoded.scene,"mi5b8154939f7ab") && decoded.actors[0].scene==8252);
  assert(decoded.equipment==3 && decoded.state.harvest.facts[0]==original.state.harvest.facts[0]);
  assert(AW_StateGet(&decoded.state,AW_ITEM,"ingredient_test")==1);

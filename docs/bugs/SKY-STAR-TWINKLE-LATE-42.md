@@ -157,6 +157,7 @@ Family: Lighting, lamps and night (`lighting-night`). Morrowind lights become Qu
 - RED-MOUNTAIN-MENACE-54 (no report page): Requested: the Red Mountain region, near and inside the Ghostfence, darker, redder and more menacing, from the game's own region and weather data
 - SKY-MIDNIGHT-29 (no report page): Dense clouds still hide the midnight sky
 - [SKY-REDMOUNTAIN-BLUE-44](SKY-REDMOUNTAIN-BLUE-44.md): Inside the Ghostfence at Red Mountain the sky and horizon are clear blue instead of the region's red ash weather
+- TAKEN-LIGHT-BAKED-LIGHT-61 (no report page): A taken candle or lamp leaves its own light baked into the room around it
 - [TERRAIN-LIGHT-UNIFORM-32](TERRAIN-LIGHT-UNIFORM-32.md): Open-world terrain lightmaps are nearly uniform
 - TORCH-LIGHT-29 (no report page): Torch flames look weak and provide little immediate light
 - TORCH-NPC-LIGHT-29 (no report page): Nearby NPCs do not visibly respond to torchlight

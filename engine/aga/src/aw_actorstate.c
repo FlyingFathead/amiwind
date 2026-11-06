@@ -5,6 +5,7 @@
  * containerextensions.cpp; apps/openmw/mwmechanics/stat.cpp), written independently. */
 #include <string.h>
 #include "aw_actorstate.h"
+#include "aw_stats.h"
 #include "aw_tryalloc.h"
 
 #define ACTB_BYTES 96
@@ -207,10 +208,45 @@ int AW_ActorOfObject(int object,const uint16_t *oact,int count){
 }
 
 /* --- live records --- */
+/* ACTOR-STATS-ALL-61: a record from its area's stat block (aw_stats.h): the record type's own values, the
+ * auto-calculated NPC's derived ones, a creature's skills by specialization; no read of the actor table */
+int (*aw_actor_stats_source)(uint32_t reference,struct aw_stat_block_s *out);
+static const aw_stat_block_t *pending_block;
+static int stats_on=1;
+static unsigned long made_from_area,made_from_table;
+int AW_ActorStatsSwitch(int on){int was=stats_on;if(on>=0)stats_on=on?1:0;return was;}
+void AW_ActorStatsCounts(unsigned long out[2]){out[0]=made_from_area;out[1]=made_from_table;}
+static void from_block(aw_actor_t *a,const aw_stat_block_t *s){
+    int i,f=s->flags;
+    a->level=s->level;
+    if(s->kind==AWS_KIND_CREATURE){
+        /* CREA FLAG: bipedal 1, respawn 2, swims 16, flies 32, walks 64, essential 128 (OpenMW esm3 loadcrea.hpp) */
+        a->kind=1;
+        a->record_flags=(unsigned char)(((f&128)?AWR_ESSENTIAL:0)|((f&2)?AWR_RESPAWN:0)|((f&64)?AWR_WALKS:0)|
+                                        ((f&16)?AWR_SWIMS:0)|((f&32)?AWR_FLIES:0)|((f&1)?AWR_BIPEDAL:0));
+    }else{
+        /* NPC_ FLAG: female 1, essential 2, respawn 4 (loadnpc.hpp) */
+        a->kind=0;
+        a->record_flags=(unsigned char)(((f&1)?AWR_FEMALE:0)|((f&2)?AWR_ESSENTIAL:0)|((f&4)?AWR_RESPAWN:0)|
+                                        (s->kind==AWS_KIND_AUTO?AWR_AUTOCALC:0));
+    }
+    for(i=0;i<8;i++)a->attr_base[i]=s->attributes[i];
+    for(i=0;i<27;i++)a->skill_base[i]=s->skills[i];
+    for(i=0;i<3;i++)a->dyn_base[i]=a->dyn_cur[i]=s->dynamic[i];
+    /* the live record keeps the behaviour values in bytes for now (ACTOR-HELLO-CLAMPED-61) */
+    a->ai[0]=(unsigned char)(s->hello>255?255:s->hello);a->ai[1]=s->fight;a->ai[2]=s->flee;a->ai[3]=s->alarm;
+    a->disposition=s->disposition;
+}
 static void from_base(aw_actor_t *a,uint32_t reference,int row){
-    aw_actor_base_t b;int i;
+    aw_actor_base_t b;int i;aw_stat_block_t got;
     release(a);memset(a,0,sizeof(*a));
     a->reference=reference;a->base=(uint16_t)row;a->flags=AWL_USED;
+    if(stats_on && reference!=AW_ACTOR_PLAYER_REF){
+        const aw_stat_block_t *s=pending_block;
+        if(!s && aw_actor_stats_source && aw_actor_stats_source(reference,&got))s=&got;
+        if(s && s->valid){from_block(a,s);made_from_area++;return;}
+    }
+    made_from_table++;
     if(!AW_ActorBase(row,&b))return;
     a->level=b.level;a->kind=b.kind;a->record_flags=b.flags;
     for(i=0;i<8;i++)a->attr_base[i]=(short)(b.attributes[i]>32767?32767:b.attributes[i]);
@@ -257,6 +293,15 @@ aw_actor_t *AW_ActorGet(uint32_t reference,int row,int create){
     from_base(REC(free_slot),reference,row);
     st->stats.created++;st->last=free_slot;
     return REC(free_slot);
+}
+aw_actor_t *AW_ActorFromStats(uint32_t reference,int row,const aw_stat_block_t *b){
+    aw_actor_t *a;
+    if(!st || !b || !b->valid || reference==AW_ACTOR_PLAYER_REF)return NULL;
+    if((a=AW_ActorGet(reference,row,0))!=NULL)return a;     /* kept as it is: play's changes stay */
+    pending_block=stats_on?b:NULL;
+    a=AW_ActorGet(reference,row,1);
+    pending_block=NULL;
+    return a;
 }
 /* a free record for an import (a new block when needed); NULL at AW_ACTOR_POOL_MAX */
 static aw_actor_t *import_slot(uint32_t reference){

@@ -1,6 +1,6 @@
 # Crossing baseline: the time a CHIM cell crossing costs
 
-_Last updated with AmiWind v0.0.45 (20 October 2026)._
+_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 
 The A side of every crossing comparison in the [v0.0.45 plan](../history/plans/PLAN-v0.0.45.md#1-cell-crossings) (step 1.1),
 for [CHIM-CROSSING-SLUGGISH-43](../bugs/CHIM-CROSSING-SLUGGISH-43.md): walking from one CHIM cell into the next
@@ -53,7 +53,7 @@ enters frames in quick succession (four crossings in about 11 seconds).
   - **Counts**: map file bytes and reads, the bytes and reads of the CHIM ring, surface-cache texels drawn in the
     three seconds after.
 - Emulator times are relative ([BENCH-JIT-PROFILE-32](../bugs/BENCH-JIT-PROFILE-32.md)): the bytes, reads and
-  texels are the main currency; times are compared only inside one series on a quiet host.
+  texels are the main currency; times are compared only inside one series on a quiet machine.
 
 Rerunning it: the session runs inside the FS-UAE container with the play copy, the Kickstart file and an output
 folder (`crossing_route.py session --hdf PLAY.hdf --kickstart KICK.rom --fast-mb 16 --out DIR`), then

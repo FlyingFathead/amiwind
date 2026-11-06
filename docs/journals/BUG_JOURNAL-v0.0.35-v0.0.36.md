@@ -39,7 +39,7 @@ FS-UAE config and a WinUAE config for each build.
 ## TEST-PARALLEL-SHARE-TIMING-36, 11 October 2026
 
 TEST-PARALLEL-SHARE-TIMING-36: integration gate 2032 failed the fair-share scheduler test while two full builds ran
-beside it. The test watched for the freed worker budget during a fixed 4 s, and the busy host outlasted it. The watcher
+beside it. The test watched for the freed worker budget during a fixed 4 s, and the loaded machine outlasted it. The watcher
 now waits until it sees the budget, for at most 20 s. Fixed in v0.0.36-dev5.
 
 ## BUILD-CHIM-STAIR-WALK-UNCACHED-36 fixed, 11 October 2026

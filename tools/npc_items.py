@@ -134,8 +134,49 @@ class _Rest:
         return lambda name: np.eye(4)
 
 
+# HELD-BLADE-EDGE-ON-61: a blade is a few tenths of a game unit thick (a steel claymore 0.47 across its 28.7 units), so
+# seen edge-on, as a held weapon is from behind in third person, its faces project to less than a pixel and the software
+# renderer draws no span of them: the blade vanishes and only the hilt shows. An item thinner than this along its
+# thinnest axis is drawn this thick (the vertices spread from the item's middle along that axis only; its length,
+# width, grip and texture unchanged). Weapons only. Game units (0.25 of the original's). 0 = the authored thickness (the
+# previous method), through the environment variable below; it is not part of the unit cache's key, so an A/B build
+# with it set runs its item stages without the cache.
+ITEM_MIN_THICKNESS = 1.0
+ITEM_MIN_THICKNESS_ENV = 'AMIWIND_ITEM_MIN_THICKNESS'
+
+
+def item_min_thickness():
+    import os
+    raw = os.environ.get(ITEM_MIN_THICKNESS_ENV, '').strip()
+    if not raw:
+        return ITEM_MIN_THICKNESS
+    value = float(raw)
+    if not 0 <= value <= 4:
+        raise ValueError('%s must be 0..4 game units, not %r' % (ITEM_MIN_THICKNESS_ENV, raw))
+    return value
+
+
+def thicken(frames, minimum):
+    """FRAMES (frames x vertices x 3, game units) with the thinnest axis of the whole item spread to at least MINIMUM
+    about its middle (HELD-BLADE-EDGE-ON-61); unchanged when the item is that thick already or MINIMUM is 0."""
+    frames = np.array(frames, float)
+    if minimum <= 0 or frames.size == 0:
+        return frames
+    lo, hi = frames.reshape(-1, 3).min(axis=0), frames.reshape(-1, 3).max(axis=0)
+    extent = hi - lo
+    axis = int(np.argmin(extent))
+    if extent[axis] >= minimum:
+        return frames
+    middle = (lo[axis] + hi[axis]) / 2
+    if extent[axis] <= 1e-6:
+        return frames            # a flat card has no side to spread: left as it is
+    frames[..., axis] = middle + (frames[..., axis] - middle) * (minimum / extent[axis])
+    return frames
+
+
 def item_model(assets, part, palette, N):
-    """One-frame alias model of a carried part (carried_parts row) in its own axes."""
+    """One-frame alias model of a carried part (carried_parts row) in its own axes, at least item_min_thickness() thick
+    along its thinnest axis."""
     from npc_geometry import animated_mdl, assemble, bake
     appearance = {'parts': [part], 'weight': 1.0, 'height': 1.0}
     shapes, materials, textures = assemble(assets, appearance, _Rest(N), np.zeros(1))
@@ -146,7 +187,18 @@ def item_model(assets, part, palette, N):
         except ValueError as error:
             if str(error) != 'Alias vertex budget exceeded' or budget == 96:
                 raise
+    # weapons only (the game's meshes/w/ folder): a plate or a coin keeps its own thin shape
+    if is_weapon_mesh(part.get('mesh', '')):
+        frames = thicken(frames, item_min_thickness())
     return animated_mdl(frames, faces, uv, skin, names=['item00'])
+
+
+def is_weapon_mesh(mesh):
+    """1 for a mesh of the game's weapons folder (w\\..., meshes/w/...)."""
+    m = str(mesh).replace('\\', '/').casefold()
+    if m.startswith('meshes/'):
+        m = m[7:]
+    return m.startswith('w/')
 
 
 def publish(id1, record):

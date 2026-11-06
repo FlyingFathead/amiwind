@@ -38,7 +38,8 @@ class MusicSwitchTests(unittest.TestCase):
             body = body[:body.index('\n}\n')]
             self.assertRegex(body, r'if\(muted\)return 0;', function)
         paint = text[text.index('void AW_MusicPaint('):]
-        self.assertIn('if(!available || paused || muted)return;', paint[:400])
+        # TOMB-MUSIC-OVER-AMBIENT-60: the painter also rests with the exploration music during a dungeon ambience
+        self.assertIn('if(!available || paused || muted || (resting() && !music))return;', paint[:400])
         apply = text[text.index('static void music_apply(void) {'):]
         apply = apply[:apply.index('\n}\n')]
         self.assertIn('close_music()', apply)   # pending read abandoned (aw_aread.c), never waited for

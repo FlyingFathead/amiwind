@@ -1,6 +1,6 @@
 # Current project state
 
-_Last updated with AmiWind v0.0.51 (25 October 2026)._
+_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -307,7 +307,7 @@ publication completed for v0.0.26; they remain pending for v0.0.27-rc2. See [rc1
 unnecessary recompilation between runs. The [toolkit roadmap](history/superseded/BUILD_TOOLKIT_ROADMAP.md)
 puts `vfXXXX` phase profiling, persistent reuse and duplicate BSP/collision work
 as an ongoing priority alongside host support; speculative QCC acceleration
-remains future work. The workstation
+remains future work. The build machine
 build completed world-terrain in 4232.5 seconds, then failed image assembly's
 world/journal receipt check. rc6 repairs that receipt and provides checked
 [image recovery](IMAGE_RECOVERY.md). The maintainer has since reported successful

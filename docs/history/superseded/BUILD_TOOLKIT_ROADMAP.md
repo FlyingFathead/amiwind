@@ -94,7 +94,7 @@ for checking source placements in the actual world.
 
 ## Top engineering priority: practical world build times
 
-The reported workstation run spends an impractical part of an evening compiling
+The reported build machine run spends an impractical part of an evening compiling
 world-terrain regions despite full CPU utilization. Reducing that elapsed time
 is now the top engineering priority. This is a reported usability problem, not
 a completed benchmark or a newly verified successful build.
@@ -192,7 +192,7 @@ it is not the proposed scheduling optimization or a claimed speedup.
 
 ## Checkpoint 1: measure phases and resource use
 
-**First target: world-terrain `vfXXXX` compilation.** The reported workstation
+**First target: world-terrain `vfXXXX` compilation.** The reported build machine
 run identifies this stage as the major observed wait with full CPU utilization.
 That observation sets profiling priority; it does not yet identify the costly
 internal phase. An uncached 2,526-region pass invokes `qbsp` up to 5,052 times,

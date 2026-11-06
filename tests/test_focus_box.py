@@ -132,19 +132,30 @@ class FocusTableTests(unittest.TestCase):
 
     def test_books_are_read_and_magic_scrolls_are_taken(self):
         """STEAL-PROMPT-58: a BOOK without an enchantment is read (2, +4 owned); one with an enchantment (a magic
-        scroll) is taken like any item (1) with the scroll bit (8)."""
+        scroll) is taken like any item (1) with the scroll bit (8). BLANK-PAPER-READ-60: a BOOK with no words (no
+        TEXT, as sc_paper plain, or only markup) is taken like any item (1), never read."""
         import prepare_focus as focus
         master = b''.join([
-            rec('BOOK', sub('NAME', z('bk_note')), sub('FNAM', z('A Note')), sub('BKDT', struct.pack('<fiiii', 1, 5, 1, -1, 0))),
+            rec('BOOK', sub('NAME', z('bk_note')), sub('FNAM', z('A Note')), sub('BKDT', struct.pack('<fiiii', 1, 5, 1, -1, 0)),
+                sub('TEXT', b'<DIV ALIGN="LEFT">Keep out.<BR>')),
             rec('BOOK', sub('NAME', z('sc_fire')), sub('FNAM', z('Scroll of Fire')),
                 sub('BKDT', struct.pack('<fiiii', .2, 80, 1, -1, 0)), sub('ENAM', z('fire_en'))),
+            rec('BOOK', sub('NAME', z('sc_paper plain')), sub('FNAM', z('paper')), sub('BKDT', struct.pack('<fiiii', 1, 3, 1, -1, 50))),
+            rec('BOOK', sub('NAME', z('bk_markup')), sub('FNAM', z('Empty Page')), sub('BKDT', struct.pack('<fiiii', 1, 3, 0, -1, 0)),
+                sub('TEXT', b'<DIV ALIGN="CENTER"><BR>\r\n&nbsp;<BR>\x00')),
             rec('CELL', sub('NAME', z('Library')), sub('DATA', struct.pack('<Iii', 1, 0, 0)),
                 ref(30, 'bk_note', (0, 0, 0)), ref(31, 'bk_note', (0, 0, 0), sub('ANAM', z('clerk'))),
-                ref(32, 'sc_fire', (0, 0, 0)), ref(33, 'sc_fire', (0, 0, 0), sub('ANAM', z('clerk'))))])
+                ref(32, 'sc_fire', (0, 0, 0)), ref(33, 'sc_fire', (0, 0, 0), sub('ANAM', z('clerk'))),
+                ref(34, 'sc_paper plain', (0, 0, 0)), ref(35, 'sc_paper plain', (0, 0, 0), sub('ANAM', z('clerk'))),
+                ref(36, 'bk_markup', (0, 0, 0)))])
         rows = {r[2]: r[10] for r in focus.placements(master, focus.objects_of(master), {'library': 3})[3]}
         self.assertEqual(rows, {30: focus.ACT_READ, 31: focus.ACT_READ | focus.ACT_OWNED,
                                 32: focus.ACT_TAKE | focus.ACT_MAGIC_SCROLL,
-                                33: focus.ACT_TAKE | focus.ACT_MAGIC_SCROLL | focus.ACT_OWNED})
+                                33: focus.ACT_TAKE | focus.ACT_MAGIC_SCROLL | focus.ACT_OWNED,
+                                34: focus.ACT_TAKE, 35: focus.ACT_TAKE | focus.ACT_OWNED, 36: focus.ACT_TAKE})
+        self.assertFalse(focus.book_has_words(b'') or focus.book_has_words(None))
+        self.assertTrue(focus.book_has_words(b'<BR>A<BR>'))
+        self.assertTrue(focus.book_has_words(b'<DIV><IMG SRC="bm_stonemap.tga" WIDTH="256"><BR>'))   # a picture page
 
     def test_owner_of_an_owned_item(self):
         """CELL-CHANGES-59 slice 2: whom an owned item is stolen from: the placement's owner (ANAM), else its owning

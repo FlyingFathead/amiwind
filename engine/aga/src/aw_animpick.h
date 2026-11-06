@@ -73,6 +73,15 @@ const char *AW_PickLongGroup(int weapon);
  * its own chance picks it. 0 = none (the plain idle). */
 int AW_PickWanderIdle(const unsigned char chances[8],int multiplier100,int roll_gate,const unsigned char rolls[8]);
 
+/* The player's assembled body in third person with a weapon (WEAPONS-57): the pick state from the first-person hand
+ * state machine (aw_hand_models.h: HAND 1 drawing, 2 drawn, 3 swinging, 4 putting away; GOAL 1 = wants it drawn), the
+ * drawn weapon's type (0..AW_PW_LAST; < 0 none), the legs' motion (AW_PM_*, RUN), the swing's attack (AW_PA_*) and
+ * whether the player is in the air. 1 and *out filled when the weapon's stance plays; 0 when the body keeps its own
+ * layout (nothing drawn, bare hands, swimming: SWIM). OpenMW 0.51 character.cpp updateWeaponState and
+ * refreshMovementAnims: drawing plays "equip", putting away "unequip", a swing the weapon's chop/slash/thrust, else the
+ * stance's idle, walk, run and jump groups (rules read there, written here). */
+int AW_PickPlayerState(int weapon,int hand,int goal,int move,int run,int attack,int air,int swim,aw_pick_state_t *out);
+
 /* The coverage catalogue: every group of the humanoid animation files (base_anim, base_animkna, base_anim_female
  * and an NPC's own file), how the game logic reaches it. tools/anim_coverage.py reads this table from the source. */
 typedef struct {const char *group;const char *hook;} aw_pick_catalogue_t;

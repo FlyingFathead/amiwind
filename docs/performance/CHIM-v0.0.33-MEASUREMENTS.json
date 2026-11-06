@@ -244,7 +244,7 @@
       "id": "frame-jit",
       "file": "amiwind-v0.0.33-chim-frame-jit.png",
       "title": "Frame time at the Balmora cameras, standard (JIT) preset",
-      "subtitle": "Median frame time at the five fixed benchmark cameras, legacy region maps and CHIM in one session (chim_towns 0, then 1). JIT timing is fast and noisy: the same legacy camera varied about 2x between busy-host sessions.",
+      "subtitle": "Median frame time at the five fixed benchmark cameras, legacy region maps and CHIM in one session (chim_towns 0, then 1). JIT timing is fast and noisy: the same legacy camera varied about 2x between loaded-machine sessions.",
       "series": [
         "legacy v0.0.32",
         "CHIM 0.1.0"
@@ -296,7 +296,7 @@
         }
       ],
       "footer": [
-        "8 October 2026, Balmora world format 0.4, busy host, no drift-control rerun in this session. A quiet-host session with a rerun is still to be measured."
+        "8 October 2026, Balmora world format 0.4, loaded machine, no drift-control rerun in this session. A quiet-machine session with a rerun is still to be measured."
       ]
     },
     {
@@ -823,7 +823,7 @@
                 null
               ],
               "notes": [
-                "24-thread build, mostly busy host",
+                "24-thread build, mostly loaded machine",
                 "comes with M4"
               ]
             }
@@ -831,7 +831,7 @@
         }
       ],
       "footer": [
-        "Legacy: the from-scratch v0.0.32 release build (8 October 2026). CHIM: the first pure-CHIM playtest build (MiniWind, 9 October 2026, host about 98 % busy with other jobs). A matched from-scratch pair on a quiet host is still to be run."
+        "Legacy: the from-scratch v0.0.32 release build (8 October 2026). CHIM: the first pure-CHIM playtest build (MiniWind, 9 October 2026, host about 98 % busy with other jobs). A matched from-scratch pair on a quiet machine is still to be run."
       ]
     },
     {

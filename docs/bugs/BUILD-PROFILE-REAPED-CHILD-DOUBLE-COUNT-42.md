@@ -22,7 +22,7 @@
 | Reproduction | sometimes |
 | Duplicate of | no |
 | Persists in | fixed in v0.0.42 |
-| Severity | low: No game, stage CPU or key effect; sampled per-stage thread peaks read high and the profiler test failed gates on loaded hosts |
+| Severity | low: No game, stage CPU or key effect; sampled per-stage thread peaks read high and the profiler test failed gates on loaded machines |
 | Family | Build speed (`build-speed`) |
 | Playtest version | line gate 2556 (ff6b77f) |
 | From commit | source and engine ff6b77f |
@@ -30,7 +30,7 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.45 (19 October 2026)._
+_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -76,7 +76,7 @@ children each process has already waited for. When a child ended between the wal
 ended and was not yet reaped by its parent, that sample saw less CPU than the one before (the dip).
 The sampler took the dip as its new baseline and reported 0 threads for that sample. When the
 parent then reaped the child, the child's whole CPU showed up in the parent's reaped-children
-total and was counted a second time. On a loaded host the gap between those reads is longer, so
+total and was counted a second time. On a loaded machine the gap between those reads is longer, so
 the dip happens more often.
 
 ## Why it was not caught
@@ -87,7 +87,7 @@ cause was not traced, so the problem PERSISTED: it came back as the larger overc
 
 ## Reproduction
 
-Sometimes: run the profiler tests on a heavily loaded host. Always:
+Sometimes: run the profiler tests on a heavily loaded machine. Always:
 `test_timeline_counts_a_reaped_child_once` replays the readings 0.0, 1.0, 0.2 (dip), 1.2, 1.5 s.
 The old sampler summed 2.3 s for a tree that used 1.5 s.
 
@@ -101,7 +101,7 @@ CPU). `tools/build_profile.py` is output-neutral and is in no stage key.
 ## Verification
 
 The new deterministic test passes. The old sampler fails it (2.3 s instead of 1.5 s). Gates 2661
-and 2558 passed with the full suite on loaded hosts.
+and 2558 passed with the full suite on loaded machines.
 
 ## Which recorded numbers are affected
 
@@ -210,6 +210,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-ORDERED-WINDOW-33](BUILD-ORDERED-WINDOW-33.md): The ordered worker pool idles behind one slow item, and hands long items out last
 - [BUILD-PARTITION-GROWTH-UNGATED-36](BUILD-PARTITION-GROWTH-UNGATED-36.md): Nothing gates the number of world partitions or the growth of the image
 - [BUILD-PASS-KEY-TOP-BROAD-43](BUILD-PASS-KEY-TOP-BROAD-43.md): A pass key counts a reached module's whole import-time code: a new constant in chim/models.py rekeyed all 1,295 region frame maps
+- BUILD-PERF-GUARD-BUSY-HOST-CORES-61 (no report page): The perf guard fails a build on a lower core share even when it has marked the run as a busy host
 - [BUILD-PIPELINE-UNDERUTILIZATION-36](BUILD-PIPELINE-UNDERUTILIZATION-36.md): Umbrella: several builder phases run on one core while the rest of the machine idles, and some do work the build no longer needs
 - BUILD-PLAN-BESIDE-STALE-48 (no report page): The resource plan held a reuse build at 1 of 24 room batch workers against memory that stages it no longer runs held in the measured run
 - BUILD-PLAN-HISTORY-ROW-CORRUPT-54 (no report page): The resource plan refuses every 16 GiB build: the mwscript stage is priced at 32,412 MiB from one corrupt history row, while its largest process measured 277 MiB
@@ -280,6 +281,6 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 
 Related bugs in other categories:
 
-- [TEST-PROFILE-TIMELINE-BOUND-33](TEST-PROFILE-TIMELINE-BOUND-33.md): A profiler test bounds the sampled CPU too tightly and fails on a busy host
+- [TEST-PROFILE-TIMELINE-BOUND-33](TEST-PROFILE-TIMELINE-BOUND-33.md): A profiler test bounds the sampled CPU too tightly and fails on a loaded machine
 
 <!-- END GENERATED CATEGORY -->

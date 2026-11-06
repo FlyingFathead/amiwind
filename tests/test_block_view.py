@@ -43,15 +43,21 @@ class BlockSourceContract(unittest.TestCase):
         self.assertEqual(len(raw), 8 + 3 * 28 * 24)
         self.assertEqual(struct.unpack_from('>6i', raw, 8 + (2 * 28 + 27) * 24),
                          (-5 * 65536, 98304, 131072, 0, 90 * 65536, -45 * 65536))
-        for bad in (np.zeros((3, 27, 6)), np.full((1, 28, 6), 129.), np.zeros((4, 28, 6))):
+        for bad in (np.zeros((3, 27, 6)), np.full((1, 28, 6), 129.), np.zeros((7, 28, 6))):
             with self.assertRaises(ValueError):
                 catalog.pack_weapon_tags(bad)
         self.assertEqual(catalog.stance_path('dark elf', True, '2w'), 'progs/hands/dark_elf_f_2w.mdl')
         self.assertEqual(catalog.WEAPON_STANCES, ('1h', '2c', '2w'))
+        # FIRST-PERSON-WEAPONS-56: six stances tagged (the ranged three without baked arms), as the engine reads them
+        self.assertEqual(catalog.WEAPON_TAG_STANCES, ('1h', '2c', '2w', 'bow', 'xb', '1t'))
+        self.assertEqual(catalog.pack_weapon_tags(np.zeros((6, 28, 6)))[5], 6)
+        with self.assertRaises(ValueError):
+            catalog.stance_path('nord', False, 'bow')
+        self.assertIn('#define AW_HAND_STANCES 6', (ROOT / 'engine/aga/src/aw_hand_models.h').read_text(encoding='utf-8'))
         with self.assertRaises(ValueError):
             catalog.stance_path('nord', False, 'hh')
         source = (ROOT / 'engine/aga/src/aw_hand_models.c').read_text(encoding='utf-8')
-        self.assertIn('"_1h.mdl","_2c.mdl","_2w.mdl"', source)
+        self.assertIn('"_1h.mdl","_2c.mdl","_2w.mdl","_bw.mdl","_xb.mdl","_1t.mdl"', source)
 
     def test_armed_stances_keep_the_hand_frame_contract(self):
         import prepare_hands as hands

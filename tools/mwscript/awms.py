@@ -8,7 +8,8 @@
   BIND and STRS stay on disk: the bindings are read at each map change, a string only when one is logged.
   GLOB  8 bytes a global:   u8 type (0 short, 1 long, 2 float) u8 0 u16 name u32 initial value (raw cell)
   JRNL  2 bytes a topic:    u16 name
-  SNDS  18 bytes a sound:   u8 pool name[8] u16 length (1/100 s) u8 volume u8 flags (1 mapped)
+  SNDS  18 bytes a sound:   u8 pool name[8] u16 length (1/100 s) u8 volume u8 flags (1 mapped, 2 a dungeon ambience:
+                            AMBIENCE_SOUNDS)
                             u16 near u16 far (hearing distances in game units, the SOUN record's min/max times the
                             game settings) u16 name
   VOIC  12 bytes a voice:   u8 pool name[8] u16 length (1/100 s) u16 path
@@ -49,6 +50,13 @@ RESIDENT = ORDER[:ORDER.index('BIND')]
 # script stays off (MWSCRIPT-REFUSED-SCRIPT-COUNT-58), so the builder refuses it here first.
 ENGINE_MAX_SCRIPTS = 16384
 ENGINE_MAX_GLOBALS = 512
+# SNDS flags. 2: a dungeon ambience (TOMB-MUSIC-OVER-AMBIENT-60, decided for the project 5 November 2026): while a
+# script loops one of these SOUN records (PlayLoopSound3D(VP) of the original's sound markers: sound_haunted and
+# sound_spirit_whisper in the ancestral tombs, sound_cave_drip and sound_cave_wind in the caves) the engine rests the
+# exploration music (aw_music.c AW_MusicAmbience); battle music still plays. Folded SOUN ids.
+SOUND_MAPPED = 1
+SOUND_AMBIENCE = 2
+AMBIENCE_SOUNDS = frozenset(('haunted', 'spirit ambient voices', 'cave drip', 'cave wind'))
 
 
 def check_limits(scripts, globals_):
@@ -117,10 +125,12 @@ def write(program, compiled, binds, conf=None):
         glob += struct.pack('>BBH', kind, 0, p.string(row['name'])) + value
     jrnl = b''.join(struct.pack('>H', p.string(r['name'])) for r in p.journal.rows)
     snds = bytearray()
-    for r in p.sounds.rows:
+    folded = {i: k for k, i in p.sounds.index.items()}
+    for i, r in enumerate(p.sounds.rows):
         lo, hi = p.data.sound_range({'min': r.get('min', 0), 'max': r.get('max', 0)})
+        flags = (SOUND_MAPPED if r.get('resolved') else 0) | (SOUND_AMBIENCE if ' '.join(folded.get(i, '').split()) in AMBIENCE_SOUNDS else 0)
         snds += _hash8(r) + struct.pack('>HBBHHH', _centis(r), r.get('volume', 255) & 255,
-                                        1 if r.get('resolved') else 0, min(lo, 0xFFFF), min(hi, 0xFFFF),
+                                        flags, min(lo, 0xFFFF), min(hi, 0xFFFF),
                                         r['name_string'])
     snds = bytes(snds)
     voic = b''.join(_hash8(r) + struct.pack('>HH', _centis(r), r['name_string']) for r in p.voices.rows)

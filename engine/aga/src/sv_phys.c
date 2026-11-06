@@ -26,6 +26,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "aw_items.h"
 #include "aw_ambient.h"
 #include "aw_spike.h"
+#include "aw_cast.h"
 #include "chim/chim.h"
 
 /*
@@ -1707,6 +1708,7 @@ void SV_Physics (void)
 	/* The debug companion's think (aw_companion.c), on Quake's cadence. */
 	AW_SPIKE_STAGE (AW_SP_COMPANION, AW_CompanionPhysics ());
 	/* Hostile NPCs and the player's punch (aw_combat.c), after the companion. */
+	AW_CastFrame ();   /* PLAYER-CASTING-59: magic ready takes the attack button before the fight sees it (aw_cast.c) */
 	AW_SPIKE_STAGE (AW_SP_COMBAT, AW_CombatPhysics ());
 	/* The residents' Wander packages (aw_ambient.c), after combat: an actor combat holds is left alone. */
 	AW_SPIKE_STAGE (AW_SP_AMBIENT, AW_AmbientPhysics ());

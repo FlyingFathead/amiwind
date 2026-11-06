@@ -19,7 +19,7 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.57-dev1 (30 October 2026)._
+_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -145,7 +145,7 @@ hidden faces of the shell and the props.
 
 Cache size done in v0.0.57 ([RENDER-SURFCACHE-THRASH-32](RENDER-SURFCACHE-THRASH-32.md)): at the heaviest heading
 the hold draws no surface block again per frame (413 before), and the frame went from 27.3 to 19.0 ms in the same
-session (v0.0.57-dev1 against dev2, FS-UAE JIT, 32 MB Fast, busy host both).
+session (v0.0.57-dev1 against dev2, FS-UAE JIT, 32 MB Fast, loaded machine both).
 
 Hidden faces, measured (30 October 2026, the v0.0.57-dev2 hold map): the existing closed-shell rule
 (`tools/cull_bsp_hidden.py`, exterior scenes) proves no face hidden here (it needs closed convex parts, and the

@@ -91,7 +91,7 @@ static void tables(void){
 }
 static void level(int draws){
     static model_t *next;
-    memset(&sv,0,sizeof(sv));memset(&svs,0,sizeof(svs));memset(entities,0,sizeof(entities));memset(&aw_state,0,sizeof(aw_state));
+    memset(&sv,0,sizeof(sv));memset(&svs,0,sizeof(svs));memset(entities,0,sizeof(entities));AW_StateReset();
     pr_strings=strings;sv.active=1;sv.num_edicts=2;strcpy(sv.name,"census");svs.maxclients=1;svs.clients=&client;
     client.edict=&entities[1];entities[1].v.movetype=MOVETYPE_WALK;entities[1].v.origin[2]=16;entities[1].v.view_ofs[2]=13;
     /* a new map each time: the focus table is read again */

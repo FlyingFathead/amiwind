@@ -1,6 +1,6 @@
 # Speed
 
-_Last updated with AmiWind v0.0.33 (9 October 2026)._
+_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 
 How the repository builder saves time: the worker count (`--jobs`, see
 [Parallel build](../../history/superseded/PARALLEL_BUILD.md)), stage reuse from one earlier run
@@ -85,7 +85,7 @@ only the fingerprint decides reuse.
 
 A CHIM Balmora build cut to the chim stage and the 13 stages it depends on
 (the scene chain, the world survey, the flora assets, the harvest table),
-v0.0.33-dev1, `--jobs 4`, on a busy host (other builds ran at the same time),
+v0.0.33-dev1, `--jobs 4`, on a loaded machine (other builds ran at the same time),
 `--prerendered-stages all`:
 
 | | Empty store (miss) | Same store, new workspace (hit) |

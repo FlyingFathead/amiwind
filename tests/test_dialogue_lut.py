@@ -253,6 +253,19 @@ def ref_greeting(t, npc, state):
     return -1
 
 
+def ref_refusal(t, npc, topic, state):
+    """SERVICE-REFUSAL-UNCLOTHED-60: the topic "Service Refusal" as a service is picked (OpenMW
+    DialogueManager::checkServiceRefused, Filter::testDisposition inverted): the first answer whose other tests hold
+    and whose disposition test fails (an INFO of disposition 0 has none: it always passes); no Info Refusal."""
+    for e in D.candidates(t, npc, topic):
+        _text, first, _s, _l, _n, n, _f = t['entries'][e]
+        conds = t['conds'][first:first + n]
+        if all(ref_holds(t, c, state) for c in conds if c[0] != G.OP_DISP) and \
+                not any(ref_holds(t, c, state) for c in conds if c[0] == G.OP_DISP):
+            return e
+    return -1
+
+
 def ref_answer(t, npc, topic, state):
     got, refused = ref_pick(t, npc, topic, state)
     if got < 0 and refused and t['info_refusal'] is not None and topic != t['info_refusal']:
@@ -561,6 +574,11 @@ class NativeDialogue(unittest.TestCase):
                             links, spans = link_fields(t, got)
                             lines.append('answer\t%s\t%d\t%d\t%d\t%d\t%d\t%s\t%s\t%s\t%s' % (
                                 ident, topic, disposition, choice, random, got, text, script, links, spans))
+                            refusal = ref_refusal(t, npc, topic, state)
+                            lines.append('refusal\t%s\t%d\t%d\t%d\t%d\t%d' % (
+                                ident, topic, disposition, choice, random, refusal))
+                            refusal_differs = refusal != ref_pick(t, npc, topic, state)[0]
+                            self.refusal_cases = getattr(self, 'refusal_cases', 0) + refusal_differs
             for disposition in (0, 39, 40, 69, 70, 100):
                 lines.append('greet\t%s\t%d\t%d' % (ident, disposition, ref_greeting(
                     t, npc, {'choice': -1, 'random': 50, 'disposition': disposition})))
@@ -569,6 +587,8 @@ class NativeDialogue(unittest.TestCase):
                     state = {'choice': -1, 'random': 50, 'disposition': disposition}
                     lines.append('list\t%s\t%d\t%s\t%s' % (ident, disposition, which,
                                                           ','.join(map(str, ref_list(t, npc, known, state))) or '-'))
+        # the inverted rule answers differently where an INFO has a disposition test (the fixture's disp= INFOs)
+        self.assertGreater(self.refusal_cases, 0)
         # the live state (aw_glut_live: the scripts' journal, locals, dead counts, items, the player's ranks)
         live = {'journal': {'a1_fargoth': 10}, 'local': {1: 1}, 'rank': {'mages guild': 0},
                 'item': {'gold_001': 100}, 'dead': {}, 'global': {}}

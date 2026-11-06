@@ -1,18 +1,22 @@
 # AmiWind release workflow
 
-_Last updated with AmiWind v0.0.54 (28 October 2026)._
+_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [Overview](#overview)
+- [Development snapshots, release candidates and finals](#development-snapshots-release-candidates-and-finals)
+- [The release commit](#the-release-commit)
+- [Checks before and after the build](#checks-before-and-after-the-build)
+- [Delivery and the maintainer's kit](#delivery-and-the-maintainers-kit)
+- [After the push](#after-the-push)
+- [The trackers](#the-trackers)
 - [Where release files go](#where-release-files-go)
 - [Mandatory change records](#mandatory-change-records)
-- [Historical rc1 handoff (published)](#historical-rc1-handoff-published)
-- [Historical v0.0.25 complete update package](#historical-v0025-complete-update-package)
 - [Release gate: the build tool must match the release](#release-gate-the-build-tool-must-match-the-release)
 - [Game version and engine version](#game-version-and-engine-version)
 - [Release gate](#release-gate)
-- [Release flow: test once, publish in resumable steps](#release-flow-test-once-publish-in-resumable-steps)
 - [Boot identity](#boot-identity)
 - [Amiga limitations](#amiga-limitations)
   - [FFS partition capacity and hardfile capacity are different](#ffs-partition-capacity-and-hardfile-capacity-are-different)
@@ -20,22 +24,141 @@ _Last updated with AmiWind v0.0.54 (28 October 2026)._
   - [Legacy filesystem names: 30 bytes per component](#legacy-filesystem-names-30-bytes-per-component)
   - [Traceable original-to-target mapping](#traceable-original-to-target-mapping)
   - [AmiQuake's limitations](#amiquakes-limitations)
-- [RC2 diagnostic snapshot boundary](#rc2-diagnostic-snapshot-boundary)
 - [Palette and skin-tone consistency](#palette-and-skin-tone-consistency)
-- [RC3 recovery candidate boundary](#rc3-recovery-candidate-boundary)
-- [v0.0.24 maintainer release decision - 1 October 2026](#v0024-maintainer-release-decision---1-october-2026)
 - [Source ZIP portability](#source-zip-portability)
 
 <!-- contents end -->
 
 Official project: https://github.com/FlyingFathead/amiwind/
 
-Published public-source base for the current v0.0.39 final preparation:
-**[v0.0.38 - Lava Is All You Need (And A Hint Of Tel Uvirith)](releases/notes/RELEASE-v0.0.38.md)**,
-13 October 2026, commit `d40fa70b4787da09b8a6d5006f46ef6fb7e56c6f`.
-The maintainer performs Git/GitHub publishing from Linux. Release archives and tags
-remain immutable; source/documentation corrections use follow-up commits.
-Public source publication and private image validation/delivery are separate.
+This page describes how a release is made today. The maintainer pushes, tags and publishes to GitHub from a Linux
+machine; the project builds, checks and verifies everything before that. The previous text of this page, written before
+every exterior ran on the CHIM engine, is kept as
+[history](history/superseded/RELEASE_WORKFLOW-v0.0.54.md).
+
+## Overview
+
+A release is a chain of checked steps. Each step validates its input before it starts and its output before the next
+step uses it, and a refusal at any step is final: it is fixed at its cause, never passed over.
+
+1. Work happens on branches, one gate per commit. A commit is built or merged only after its gate passed.
+2. Development snapshots (`devN`) are built from the development line, checked in the emulator and handed to the
+   playtest server. They are for testing and need the same 32 MB of Fast RAM the game requires.
+3. The release is one commit that carries the version bump, the documentation and the release presets.
+4. A release candidate or final image is built from that commit, checked, packaged and delivered.
+5. The maintainer's Linux kit is built from the same commit. He applies it, pushes, and the project watches the hosted
+   checks to the end.
+6. After the push the project's own line is connected to GitHub's main and the records are brought up to date.
+
+## Development snapshots, release candidates and finals
+
+- **Snapshots** are numbered `X.Y.Z-devN`. The version file, the emulator presets and the release notes of a snapshot
+  carry that name. A snapshot's notes say "in development" and list what is new, what is known and what is not yet
+  checked in game. A fix in a snapshot is not yet marked fixed in the register: that needs a numbered release build and
+  a verification, and a source-only fix does not count either.
+- **A release candidate** (`-rcN`) is a snapshot that is a candidate for the final; it is only built when something
+  needs a separate look before the final.
+- **The final** is usually the last snapshot built again with its release version number. A change of the version
+  number alone must rebuild only what shows the version (the engine and the image), never the converted world: caches
+  are keyed by content, so a snapshot, a candidate and a final of unchanged content reuse each other's results. The
+  from-scratch build of the release line, with nothing reused, is its own check and runs before a final.
+
+## The release commit
+
+One commit carries everything that must agree before the build:
+
+- **The version.** `VERSION` changes together with `resources/emulators/AmiWind-v<VERSION>-FS-UAE.fs-uae` and
+  `AmiWind-v<VERSION>-WinUAE.uae` and their entries in `tools/release-files.json`; older presets are kept. The
+  emulator-config, keyboard-port and launcher tests run against the new version before the commit is pinned
+  ([BUILD-VERSION-EMULATOR-PRESETS-38](bugs/BUILD-VERSION-EMULATOR-PRESETS-38.md)). The presets default to 32 MB of Fast
+  RAM.
+- **The records**, see [the change records](#mandatory-change-records): register, README, changelog, release notes,
+  roadmap, the generated indexes.
+- **The release notes** `docs/releases/notes/RELEASE-v<version>.md`, with the title word for word as the maintainer
+  gave it, a "Known in this build" section whose entries link register pages, and the whitespace baseline
+  `docs/releases/patches/PATCH-v<version>.json`.
+- **Measured inputs of the release image**, such as the disk footprint, and the Toolkit's own version and its
+  "Last updated" line whenever a Toolkit file changed.
+- **Limits**: a new setting that uses resident memory raises the resident budget in the same commit, and a deferral that
+  expired is renewed or lifted in the register.
+- **The CI time budget.** The release preflight projects each hosted job's run time from the last recorded runs and
+  raises the job's time limit in the release commit when the projection reaches 80 % of it, never after a push.
+
+## Checks before and after the build
+
+1. **The release preflight** takes minutes and lists every problem with its fix: the release guard, the persisting bugs,
+   the version records, the previous tag, the patch file, the notes' bug pages, the reuse plan of the build, the CI time
+   budget and a quiet machine.
+2. **The release guard** is run first and is the fast-failing gate around the rest. It checks the manifest schema, the
+   title (data, never code: no quotes, dollar signs, backticks, `@` or line breaks, tested with hostile titles), every
+   kit template with the real title, the version at the commit against the manifest and the working version, the
+   notes' format, the test list, privacy words in changed public files, the gate receipt of the same commit, the pinned
+   previous release and size baseline, the from-scratch ledger for a final, and that the delivered image run is known
+   to the progress tracker.
+3. **The gate** runs the full suite on the exact commit: source checks, tests, the engine build, the launcher parity
+   and a boot smoke whenever engine code is touched. A release gate runs without a queue and without early stop, and a
+   gate number is never reused. Every gate log is kept.
+4. **The build** is requested through the master builder ([aw](AW.md)), reusing the last good run of unchanged stages.
+   Its start-up plan is read in its first minute; an unexplained rebuild stops it. A build runs only from a gated commit
+   that contains the integration line.
+5. **The boot smoke.** Nothing is delivered without an emulator run of that exact image that boots, loads a map and
+   plays about ten seconds (the JIT preset, a fresh play copy, 32 MB of Fast RAM). Smaller sizes are recorded as below
+   the requirement and never block. The smoke runs the map change three times, so an intermittent load stall has three
+   chances to show.
+6. **The teleport hops.** The release smoke hops through Seyda Neen, Balmora, Vivec, the Arena Pit, Ald'ruhn and Khuul;
+   every hop must change the map and have its picture and frame time.
+7. **The readback and the package.** Every file of the image is read back from the disk image, then the playtest ZIP is
+   built and read back member by member against its manifest, with its SHA-256 checked.
+8. **The records of the world.** The CHIM progress tracker and cell tracker ingest the image run, and the CHIM
+   inclusion ledger is written for a release.
+
+## Delivery and the maintainer's kit
+
+- **Playtest delivery.** A verified snapshot goes to the private playtest server with the public source ZIP of the
+  exact commit, through one wrapper that validates its input first (version form, files and checksums, one playtest and
+  one source ZIP, the smoke passed, the guard passed for a candidate or final) and its output after. The server keeps the
+  current and one previous version; each push says which one drops out. A snapshot that was not smoke-tested is not
+  pushed.
+- **The Raspberry Pi stick.** The image of every delivered build and of every final is also copied onto the Raspberry
+  Pi 4B boot stick (Amiberry). It is the project's performance yardstick and a second smoke: the same image must reach
+  the main menu and load the game the smoke loads. A difference in behaviour between the two emulators is a finding;
+  slower boots and lower frame rates on the Pi are expected, and Pi numbers are only compared with earlier Pi numbers.
+- **The Linux kit.** The kit is one ZIP built from the exact release commit by the project's kit tool: the guard first,
+  the public-source ZIP, the suite record of the exact tree, the kit validation in a Linux container. The maintainer
+  extracts it, runs the one command in its README, reviews the diff and answers the yes or no prompts before the commit
+  and push. There is no second file beside the kit, and its scripts stop on local changes or a divergence from GitHub.
+  A kit for a snapshot (a pre-release patch) is made the same way from a snapshot's configuration.
+- **A docs review.** Right after the release commit, the release notes, README, changelog, roadmap and the kit README are
+  read against the register, the work list and the plan: false known issues, claims of features that moved, missing
+  features, numbers, links and the public-text rules. Findings are fixed in the release commit before the kit.
+
+## After the push
+
+1. The hosted checks of the pushed commit are watched to the end; a red job is reported with its name and failed step,
+   and a release is not done until the run on main passes. The tag run holds only the from-nothing bootstrap, not the
+   suite again. The job times are recorded for the next preflight.
+2. The trees are compared (the maintainer's commit and the project's have the same tree and different hashes), the main
+   checkout follows GitHub's main, and the project's line is merged with GitHub's main.
+3. **Connect the release fully, in one go:** the previous-release pin, the size baseline and the pinned payload size in
+   the size-ledger test, then a gate. The guard fails when the pin is not the newest published tag.
+4. The Pi stick is updated if it was not already, and its boot banner is checked.
+5. The whitespace baseline is refreshed from the tag.
+
+## The trackers
+
+The records change in the same step as the work, not later.
+
+- **The bug register** (`docs/bugs/bugs.json`, rendered into [BUGS.md](BUGS.md) and the report pages, with the
+  [journal](BUG_JOURNAL.md)) is always current: every finding is registered the same day; an issue seen again is
+  reported on its entry as persisting, never filed again; a fix is marked fixed only when it shipped in a numbered
+  release build and was verified, with the version it was fixed in. See [the register's readme](bugs/README.md).
+- **The roadmap** ([ROADMAP.md](ROADMAP.md)) lists the open work of each version and says what a release moved on.
+- **The changelog** ([CHANGELOG.md](CHANGELOG.md)) has an entry for each release, and an "in progress" entry for the
+  current one that is filled as work merges.
+- **The release notes** and the index pages ([releases](releases/README.md), the documentation index) are generated or
+  written per release.
+- **The measurements** of builds and in-game frame times are kept in [docs/performance](performance/) with the build and
+  settings that produced them; an unchanged path is not measured again.
 
 ## Where release files go
 
@@ -82,172 +205,43 @@ until its affected records agree with the code and actual verification.
    Rerun checks affected by changes; reuse unchanged valid evidence. Never
    turn an old image's successful check into acceptance of a new image.
 
-## Historical rc1 handoff (published)
-
-The following preserves the completed v0.0.26-rc1 handoff procedure. Its tag
-is immutable; final v0.0.26 subsequently completed its own snapshot, checksums,
-exact-commit CI and release artifacts. The commands below describe that historical
-handoff and must not be rerun to replace an existing release. Require Docker, Linux and Windows jobs to pass for
-the final pushed commit. Retain complete failed-step logs before stopping,
-and perform whitespace checks before commit and against the exact commit.
-
-The complete rc1 public-source ZIP contains every allowlisted source file and
-its generated package manifest. The separate private transfer kit contains the
-overlay/publishing helpers and checksums; do not upload that private kit.
-Overlay only after checking the exact cloned v0.0.25 base commit and preserving
-local work. Run Linux checks before publication. Push main from the publishing
-host and require a successful source-check workflow for that exact commit before
-creating the annotated v0.0.26-rc1 tag and a GitHub **prerelease**. Do not replace
-existing tags or mark this candidate as the latest stable release. Upload only
-the validated public-source ZIP and its checksum.
-
-## Historical v0.0.25 complete update package
-
-`AmiWind-v0.0.25-complete-update.zip` contains the complete public source ZIP,
-a source patch from rc10, updater, checksums and apply/recovery/publish scripts.
-The public source ZIP contains every maintained file under `amiwind/` plus a
-generated package manifest. No private playable, HDF, game payload or ROM is
-included. Only source ZIPs, updater and checksums are uploaded to GitHub.
-
-Finish the current build before applying to the rc10 checkout. APPLY.sh verifies
-the complete kit, updates changed files with an external backup and validates
-the result against the complete source package. Overlapping local edits stop
-before writes; unrelated edits remain preserved and require review before exact
-release validation. Existing rc10 cache entries remain compatible. Recovery uses
-the same workspace/cache and retains the original completed rc3 terrain/music.
-
-PUBLISH.sh stages the source allowlist, commits, pushes main and waits for a
-successful `source-check.yml` run whose `headSha` equals that exact commit. It
-then creates the annotated `v0.0.25` tag and a regular GitHub release (not a
-prerelease), downloads the uploaded assets and verifies their checksums and tag.
-Existing tags are never replaced. The maintainer runs the supplied Bash commands.
-
 ## Release gate: the build tool must match the release
 
-Applies from v0.0.32. v0.0.31 ships with one recorded exception: the shipped
-Seyda Neen maps cannot yet be regenerated by the repository builder
-([BUILD-SEYDA-REGEN-30](journals/BUG_JOURNAL-v0.0.31.md#build-seyda-regen-30-public-build-cannot-regenerate-seyda-neen-7-october-2026)).
-v0.0.32 keeps the same exception as a builder option: `--seyda-recorded DIR` (from v0.0.35 optional and
-NOT RECOMMENDED since v0.0.31: the default converts Seyda Neen from your data)
-(`tools/build.py`; passed on to the actor-contact and image steps), where `DIR/id1`
-holds the maintainer's recorded v0.0.31 Seyda Neen maps and region tables, checked
-against `config/seyda-recorded-v0.0.31.json` before any conversion
-(`tools/recorded_stage.py check DIR`). The recorded maps replace the Seyda region
-conversion and ship byte for byte: every later image pass is checked against the
-recorded bytes and the build stops on any difference. The one named difference
-(project decision) is `maps/seyda.bsp`, shipped as the fallback region (sn029) as
-the builder writes it, not v0.0.31's complete town
-([BUILD-SEYDA-REGEN-30](bugs/BUILD-SEYDA-REGEN-30.md)). v0.0.33 still required the
-recorded maps (its CHIM frame maps were checked against them). From v0.0.34 the
-option is optional for CHIM builds: without it Seyda Neen is converted from the
-maintainer's data (without the terrain visual cull, which cannot complete from scratch:
-BUILD-SEYDA-CULL-STABLE-32) and the frame maps are checked against that conversion,
-so the release payload compare needs no recorded input. A legacy build with Seyda
-Neen still needs it.
-
-See [Which Seyda Neen is in my build?](LINUX_BUILD.md#which-seyda-neen-is-in-my-build) for which Seyda Neen an image holds.
-
-No release candidate or final release until the repository's builder
-(`tools/build_aga.py`, `build.sh`, `build.cmd`, `build.ps1` and every converter
-they call) produces everything the release contains, from the builder's own
-Morrowind data, with no separate patch-up step. Every change that went into a
-development build (new world tables such as `id1/world/lamps.awl`,
-`night-windows.txt` and `fog-locations.txt`, map compiler settings, engine and
-data changes) is in the builder, tested and documented before the release
-notes are written. A clean build with the repository builder must reproduce
-the release payload's file list and contents, apart from documented build-time
-stamps; any other difference blocks the release.
+The repository's builder (`tools/build_aga.py`, `build.sh`, `build.cmd`, `build.ps1` and every converter they call)
+must produce everything the release contains, from the builder's own Morrowind data, with no separate patch-up step.
+Every change that went into a snapshot (world tables, map compiler settings, engine and data changes) is in the builder,
+tested and documented before the release notes are written, and the shipped build uses only machine settings
+(workspace, jobs, reuse, tools and data directories). A clean build with the repository builder must reproduce the
+release payload's file list and contents, apart from documented build-time stamps; any other difference blocks the
+release. The builder option `--seyda-recorded DIR`, which ships recorded Seyda Neen maps instead of converting them,
+is optional and NOT RECOMMENDED since v0.0.31: the default converts Seyda Neen from your data. See
+[Which Seyda Neen is in my build?](LINUX_BUILD.md#which-seyda-neen-is-in-my-build).
 
 ## Game version and engine version
 
-A change to `VERSION` also requires matching `resources/emulators/AmiWind-v<VERSION>-FS-UAE.fs-uae` and `AmiWind-v<VERSION>-WinUAE.uae` presets and their entries in `tools/release-files.json`. Preserve older presets. Run the emulator-config, FS-UAE keyboard-port and launcher tests against the new version before pinning source ([BUILD-VERSION-EMULATOR-PRESETS-38](bugs/BUILD-VERSION-EMULATOR-PRESETS-38.md)).
-
-From v0.0.33 the game and its engine carry separate version numbers. The
-streaming engine and its builder are the **CHIM engine**, with its own semantic
-version: the major number changes when the world format changes (the engine
-refuses a world built for another major version, with a clear message instead
-of a crash), the minor number for new engine features, the patch number for
-fixes. The CHIM builder has the same version as the engine it builds for.
-
-- v0.0.33 is planned as the first CHIM release: AmiWind v0.0.33, CHIM engine
-  0.1.0. CHIM 1.0.0 is the release in which the whole island runs on it.
-- Every release states both versions: "AmiWind vX / Running on CHIM Engine vY"
-  in the release notes and the README; the short form "AmiWind vX / CHIM vY" in
-  the boot checklist and the engine console; both numbers (and the world format
-  version) in every build receipt.
-- The engine and builder types are named, not numbered: "legacy" (the AmiQuake-based
-  region pipeline that runs every release before v0.0.33, and stays available) and
-  "CHIM" (from v0.0.33). There is no "builder v2" or "engine v2": CHIM has its own
-  version number, separate from AmiWind's VERSION, starting at CHIM Engine 0.1.0.
+The game and its engine carry separate version numbers. The streaming engine and its builder are the **CHIM engine**,
+with its own semantic version: the major number changes when the world format changes (the engine refuses a world
+built for another major version with a clear message instead of a crash), the minor number for new engine features, the
+patch number for fixes. The CHIM builder has the same version as the engine it builds for. Every release states both:
+"AmiWind vX / Running on CHIM Engine vY" in the release notes and the README, the short form in the boot checklist and
+the engine console, and both numbers with the world format version in every build receipt. CHIM 1.0.0 is the release in
+which the whole island runs on it.
 
 ## Release gate
 
-**ALWAYS CHECK FOR TRAILING WHITESPACE BEFORE POSTING AN AUTOMATED PUSH/PUBLISH
-SCRIPT.** Check all delivered files before posting or packaging. This check
-belongs to package preparation, before the maintainer downloads or applies anything.
-Passing tests and an archive allowlist do not replace it.
+**Check for trailing whitespace before any push or publish script is handed over.** `tools/release.py --check`,
+candidate creation and candidate validation reject trailing spaces and tabs, whitespace-only lines, space-before-tab
+indentation and blank lines at the end of new or modified text files. Only byte-identical inherited files under
+`engine/aga/` and `docs/aga/` are exempt, listed by hash in the whitespace baseline of the last published release; a new
+`VERSION` needs no extra file. After a release is published the list is refreshed from its tag
+(`python3 tools/release.py --whitespace-baseline v<VERSION>`); it can only shrink. Before delivery,
+`git diff --no-index --check` also runs on clean extracted source trees of the base and the candidate.
 
-`tools/release.py --check`, candidate creation and candidate validation all reject
-trailing spaces/tabs, whitespace-only lines, space-before-tab indentation and
-blank lines at EOF in new or modified text files. Only byte-identical inherited
-files under `engine/aga/` and `docs/aga/` are exempt; `docs/WHITESPACE-BASELINE.json`
-lists them by hash, taken from the last published release, so a new `VERSION` needs
-no extra file. A file we edit is checked in full, and project-authored files are
-never exempt. After a release is published, refresh the list from its tag with
-`python3 tools/release.py --whitespace-baseline v<VERSION>` (the tag must point to
-the release commit; the list can only shrink). This also
-covers files that are untracked or extracted without Git metadata. Before
-delivery, additionally run `git diff --no-index --check BASE_TREE CANDIDATE_TREE`
-on clean extracted source trees and retain the result. Keep the maintainer's
-`git diff --check` as a final check, not the first place defects are discovered.
-
-Candidates are written under `incoming/`, checked independently, then promoted
-into immutable `releases/`. Validate ZIP paths, source allowlist, content hashes,
-patch application, private image/ROM hashes, corresponding source and boot
-behavior. Never overwrite a released ZIP or relabel an old executable as a new
-build. Keep historical version strings in historical records accurate.
-
-Update README, project state, changelog and validation notes before packaging.
-Report the tests actually run and their limits. Public CI compiles without game
-files or ROMs. Full conversion, Windows/WSL and physical Amiga behavior require
-their own validation. The maintainer runs Git/GitHub commands; see FIRST_RELEASE.md
-for the historical first-release workflow. The source repository and source
-releases are public. Playable images, converted game files and supplied ROMs
-remain private and must never become GitHub release assets.
-
-## Release flow: test once, publish in resumable steps
-
-Every release follows the same short path from a green release gate
-to a published release. The aim is about 15 minutes for that path; each release
-records its step times so the figure is measured, not assumed.
-
-1. **One release gate on the final candidate.** The full gate (source checks,
-   suite, engine build, launcher parity) runs once on the exact release commit,
-   and the full test suite also runs once in a single interpreter, in discovery
-   order (`python -m unittest discover -s tests`). Leaks between tests only show
-   up in one interpreter and in order, so this run is never split into chunks
-   or parallel workers. Its result is recorded with the commit, the tree hash
-   and the test mode.
-2. **Focused package checks.** The release package carries that record. Package
-   validation and publication check that the committed tree equals the tested
-   tree and that the mode and result match; they do not run the full suite
-   again. Their own checks are short: file list and checksums, version, the
-   exact tree, `tools/release.py --check` and an asset-free dry-run build.
-3. **One hosted CI run per revision.** The pushed commit runs the CI workflow
-   once. The full suite runs in the source checks job; the Docker builder job
-   checks only what is specific to the container (image build, its tools,
-   source checks, a short set of builder tests and the dry-run build).
-   `tools/build_docker.py check --full-suite` still runs the full suite in the
-   image when wanted.
-4. **Publish from a separate checkout.** The release commit is applied and
-   checked in a separate scratch worktree. The publishing checkout's branch,
-   index, files and stash do not change until the release is published and its
-   downloaded assets are verified; only then is its branch fast-forwarded.
-   Cleanup removes only the scratch state it created and keeps every log.
-5. **Resume, never repeat.** If pushing, the CI wait, tagging or the release
-   upload fails, running the same command again continues from that step for
-   the same package and commit: no new scratch worktree, no repeated checks,
-   no retest. Existing tags and release files are verified, never replaced.
+Candidates are written to a staging area, checked independently, then promoted. ZIP paths, the source allowlist,
+content hashes, patch application, image hashes, corresponding source and boot behaviour are validated; a released ZIP
+is never overwritten and an old executable is never relabelled as a new build. Public CI compiles without game files or
+ROMs; full conversion and physical Amiga behaviour need their own validation. The source repository and source releases
+are public; playable images, converted game files and supplied ROMs stay private and are never release assets.
 
 ## Boot identity
 
@@ -428,18 +422,6 @@ Heap per map comes on top of all of these: see the map memory profile and
 the builder's heap budget. A future builder limits check is planned to report
 every one of these per map, as a warning or a failure.
 
-## RC2 diagnostic snapshot boundary
-
-The maintainer requested an interim v0.0.24-rc2 while the stricter contact audit and
-model-budget investigation remain open. Its separate snapshot receipt explicitly
-records a failed production placement gate (23 findings); no audit row is removed.
-`build_aga.py image` still stops on those findings. Do not promote this snapshot
-as a passed final build. Retain payload/readback hashes, source/binary receipt,
-full failed audit and native evidence in the private package. The ordinary source
-allowlist and whitespace checks still apply. Publish only public-source archives
-and their checksums, using the prerelease flag; never publish the playable HDF,
-ROM, model catalogue, converted assets or private inspection reports.
-
 ## Palette and skin-tone consistency
 
 Before packaging, run `ui_palette.sync_lookups(game, check=True)` against the
@@ -450,32 +432,6 @@ the private receipt. Use a pale-skinned resident as a native visual sentinel;
 check both nearby daylight and normal world lighting/fog. See the
 [ashen-face investigation](IMPLEMENTATION_JOURNAL.md#j027--pale-faces-mapped-back-to-sky-grey).
 This catches colour-table drift; it does not certify every face or texture seam.
-
-## RC3 recovery candidate boundary
-
-The maintainer requested RC3 before the final grounding work is complete. Retain the
-same diagnostic boundary as RC2: full source, matching private playable image,
-failed placement audit and independent HDF readback. A complete gallery does not
-turn the remaining 23 contact findings into a passed production gate. Source
-checks and targeted native tests still apply. Publish as a prerelease.
-
-## v0.0.24 maintainer release decision - 1 October 2026
-
-The maintainer explicitly requested the final v0.0.24 release after the RC4 delivery,
-under the title **v0.0.24 - Welcome to Balmora (and Vvardenfell!)**. The 23 strict
-contact findings remain known issues. Preserve their complete failed receipt;
-never label them passed, remove rows or broaden tolerances to match release status.
-The normal production image builder still stops on the audit. This milestone's
-private assembly reuses the hash-verified RC4 converted content and freshly
-builds the final-version runtime and preflight, then independently reads back
-and tests the finished image. This explicit release decision is not a standing
-permission to bypass future checks or hide new failures.
-
-Public presentation must distinguish whole-island mapping from playable scene
-coverage, and exclude Bloodmoon/Solstheim and Tribunal from that map's scope.
-Fresh native captures need exact `.gitignore` exceptions and source allowlist
-entries. The maintainer-run publisher verifies all expected public files are tracked
-before committing; it creates a normal release, without the prerelease flag.
 
 ## Source ZIP portability
 

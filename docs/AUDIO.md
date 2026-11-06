@@ -145,7 +145,7 @@ play are listed in [ENGINE-SYNC-IO-MAIN-LOOP-36](bugs/ENGINE-SYNC-IO-MAIN-LOOP-3
 [AUDIO-HOST-LOAD-33](bugs/AUDIO-HOST-LOAD-33.md): CHIM Preview 1 crackled and snapped throughout
 play on a PC whose CPU was saturated by build jobs, and was clean on an idle second PC. The emulator
 cannot feed the host sound system in time when every host thread is busy; the game's mixer is not
-involved. Audio is judged only on an unloaded host (like emulator timings), and playtest reports
+involved. Audio is judged only on an unloaded machine (like emulator timings), and playtest reports
 note the host load. In-game loading crackle stays under [AUDIO-LOAD-29](BUGS.md#music-and-sound-audio).
 
 ## Start-up and opening music: 7 October 2026

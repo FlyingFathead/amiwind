@@ -153,6 +153,27 @@ static void wear(const aw_combat_settings_t *s,aw_fighter_t *a,float damage,aw_s
     a->weapon_health-=x;out->weapon_wear=x;
     if(a->weapon_health<=0){a->weapon_health=0;a->weapon=0;a->weapon_skill=AW_SK_H2H;out->weapon_broke=1;}
 }
+/* GODMODE-COMBAT-DAMAGE-61 (OpenMW 0.51 npc.cpp hit/onHit, combat.cpp applyFatigueLoss and reduceWeaponCondition): a
+ * god-mode player takes no damage and is not knocked down by a blow, and the player's own swings cost no fatigue and
+ * wear no weapon. The swing was resolved on the sheets as usual; these put back what god mode keeps. */
+void AW_CombatGodVictim(aw_fighter_t *v,const aw_fighter_t *before,aw_swing_t *out) {
+    v->health=before->health;v->fatigue=before->fatigue;v->knocked=before->knocked;v->dead=before->dead;
+    if(out){out->damage=0;out->knockdown=0;}
+}
+void AW_CombatGodAttacker(aw_fighter_t *a,const aw_fighter_t *before,aw_swing_t *out) {
+    a->fatigue=before->fatigue;a->weapon_health=before->weapon_health;
+    a->weapon=before->weapon;a->weapon_skill=before->weapon_skill;
+    if(out){out->weapon_wear=0;out->weapon_broke=0;}
+}
+int AW_CombatIsNormalWeapon(int flags,int enchanted) {
+    return !(flags&(AW_WEAPON_MAGICAL|AW_WEAPON_SILVER)) && !enchanted;
+}
+float AW_CombatNormalWeaponFactor(int normal,float resist,int *no_effect) {
+    if(no_effect)*no_effect=0;
+    if(!normal || !(resist==resist))return 1;
+    if(resist>=1){if(no_effect)*no_effect=1;return 0;}
+    return 1-resist;                    /* a weakness (resist < 0) makes the blow stronger */
+}
 void AW_CombatSwing(const aw_combat_settings_t *s,aw_fighter_t *a,aw_fighter_t *v,int attack,float strength,
                     float angle,int still,aw_combat_rng_t *r,aw_swing_t *out) {
     float d,agility;int health;
@@ -164,6 +185,8 @@ void AW_CombatSwing(const aw_combat_settings_t *s,aw_fighter_t *a,aw_fighter_t *
     out->roll=aw_combat_dice?AW_CombatRoll100(r):-2;      /* dice off: every swing in reach hits */
     if(aw_combat_dice && out->roll>=out->chance){
         out->outcome=AW_HIT_MISS;wear(s,a,0,out);
+        /* OpenMW npc.cpp hit: a miss also passes resistNormalWeapon, so the full resistance is told on a miss too */
+        (void)AW_CombatNormalWeaponFactor(a->weapon && a->weapon_normal,v->resist_normal*.01f,&out->no_effect);
         out->miss_style=AW_CombatCanBlock(s,v,angle)?2:1;
         return;
     }
@@ -172,7 +195,11 @@ void AW_CombatSwing(const aw_combat_settings_t *s,aw_fighter_t *a,aw_fighter_t *
         int lo=a->damage[attack][0],hi=a->damage[attack][1];
         d=(lo+(hi-lo)*strength)*ratio(a->weapon_health,a->weapon_health_max)*
             (s->fDamageStrengthBase+a->attributes[AW_STR]*s->fDamageStrengthMult*.1f);
+        /* Npc::hit: resistNormalWeapon right after the weapon damage (RESIST-NORMAL-WEAPONS-61); the wear stays the
+         * full blow's, as OpenMW wears the weapon before that step */
         wear(s,a,d,out);
+        d*=AW_CombatNormalWeaponFactor(a->weapon_normal,v->resist_normal*.01f,&out->no_effect);
+        if(out->no_effect)d=0;
         health=1;
     }else if(a->creature==1){
         /* Creature::hit without a weapon: its own attack, min + (max - min) x strength, health damage */

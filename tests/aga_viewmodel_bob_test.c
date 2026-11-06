@@ -24,6 +24,7 @@ extern mdl_t *pmdl;
 static mdl_t synthetic_model;
 static int torch_equipped, bob_registered;
 int AW_TorchEquipped(void){return torch_equipped;}
+int aw_fp_stiff;   /* aw_hands.c's, set by view.c from aw_fp_sway (FP-WEAPON-SWAY-61) */
 void Chase_Update(void){assert(0);}
 char *Cmd_Argv(int n){return "0";}
 void Cmd_AddCommand(char *name,void(*fn)(void)){}

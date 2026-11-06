@@ -153,7 +153,7 @@ int main(int argc,char **argv){
     assert(nconts>=3 && nitems>=3 && nplaced>=1 && nicons>=1);
     for(i=0;i<nconts;i++){for(j=0;j<nrooms;j++)if(rooms[j]==conts[i].room)break;if(j==nrooms)rooms[nrooms++]=conts[i].room;}
     assert(nrooms>=3);
-    aw_ledger_on=1;AW_LedgerClear(&aw_ledger);memset(&aw_state,0,sizeof(aw_state));
+    aw_ledger_on=1;AW_LedgerClear(&aw_ledger);AW_StateReset();
     /* phase 1: no area loaded, every answer from the files */
     ask(-1);
     /* phase 2: each room entered, its answers from its table alone */

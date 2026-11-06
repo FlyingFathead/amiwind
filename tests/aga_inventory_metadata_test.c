@@ -34,7 +34,13 @@ int main(void){
     real(row+476,INFINITY);assert(!AW_InventoryRead("fixture_sword",&out));memcpy(row,pristine,512);
     u32(row+448,256);assert(!AW_InventoryRead("fixture_sword",&out));memcpy(row,pristine,512);
     u32(row+448,15);assert(!AW_InventoryRead("fixture_sword",&out));memcpy(row,pristine,512);
-    u32(row+440,10);assert(!AW_InventoryRead("fixture_sword",&out));memcpy(row,pristine,512);
+    /* FIRST-PERSON-WEAPONS-56: weapon 10..12 (bow, crossbow, thrown) are held weapons now; 13 is none */
+    u32(row+440,12);assert(AW_InventoryRead("fixture_sword",&out) && out.weapon==12);memcpy(row,pristine,512);
+    u32(row+440,13);assert(!AW_InventoryRead("fixture_sword",&out));memcpy(row,pristine,512);
+    /* RESIST-NORMAL-WEAPONS-61: byte 506 = the weapon's magical (1) and silver (2) flags; nothing else there */
+    assert(AW_InventoryRead("fixture_sword",&out) && out.weapon_flags==0);
+    row[506]=2;assert(AW_InventoryRead("fixture_sword",&out) && out.weapon_flags==2);memcpy(row,pristine,512);
+    row[506]=4;assert(!AW_InventoryRead("fixture_sword",&out));memcpy(row,pristine,512);
     u32(row+444,27);assert(!AW_InventoryRead("fixture_sword",&out));memcpy(row,pristine,512);
     u32(row+488,3);assert(!AW_InventoryRead("fixture_sword",&out));memcpy(row,pristine,512);
     strcpy((char *)row+184,"../escape.mdl");assert(!AW_InventoryRead("fixture_sword",&out));memcpy(row,pristine,512);

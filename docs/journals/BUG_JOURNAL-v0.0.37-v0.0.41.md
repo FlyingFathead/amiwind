@@ -1222,7 +1222,7 @@ CPU-seconds, same digests. The process method stays selectable (`AMIWIND_HASH_ME
 [BUILD-IMAGE-HEAP-AUDIT-UNDERUSED-36](../bugs/BUILD-IMAGE-HEAP-AUDIT-UNDERUSED-36.md): the world map heap
 audit walks static entities through the BSP with float32 arrays, computes the edge-cache prefix with
 span masks, reads the engine limits once per audit and deals maps round-robin into chunks; 2,377 dev5
-maps in about 12 s instead of about 40 s (busy host), byte-identical report. The earlier loops stay
+maps in about 12 s instead of about 40 s (loaded machine), byte-identical report. The earlier loops stay
 selectable (`AMIWIND_HEAP_AUDIT_METHOD=python`). Both perf guard waivers are removed.
 
 ## BUILD-IMAGE-STAIR-WALK-SERIAL-36, BUILD-IMAGE-FRAME-MAP-HEAP-SERIAL-36, BUILD-IMAGE-HASH-UNDERUSED-36 and BUILD-IMAGE-HEAP-AUDIT-UNDERUSED-36: the perf guard, 11 October 2026

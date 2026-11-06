@@ -593,7 +593,7 @@ void AW_GallerySpawn(edict_t *p) {
     if(returning || !AW_GalleryActive()){subject=NULL;turntable=0;}
     if(returning){
         if(strcmp(sv.name,back_map)){returning=0;strcpy(notice,"Return scene did not load; snapshot retained.");return;}
-        AW_SaveSnapshotRestore(back_state);free(back_state);back_state=NULL;
+        AW_SaveSnapshotRestore(back_state);AW_SaveRelease(back_state);free(back_state);back_state=NULL;
         if(voice){free(voice);voice=NULL;}
         if(torch_test)Cvar_SetValue("r_fullbright",back_fullbright);
         AW_ArenaEnd();arena=0;
@@ -608,7 +608,7 @@ void AW_GallerySpawn(edict_t *p) {
         if(torch_test)Cvar_SetValue("r_fullbright",back_fullbright);
         AW_ArenaEnd();arena=0;
         close_browser();editing=help=session=combat=torch_test=torch_actor=0;
-        if(back_state){free(back_state);back_state=NULL;}
+        if(back_state){AW_SaveRelease(back_state);free(back_state);back_state=NULL;}
         if(voice){free(voice);voice=NULL;}return;
     }
     if(!session)return;

@@ -1,15 +1,18 @@
 # Third person, vanity camera and the death scene
 
-_Last updated with AmiWind v0.0.59-dev6 (3 November 2026)._
+_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [Keys](#keys)
 - [The death scene](#the-death-scene)
+  - [While dead](#while-dead)
 - [Sources](#sources)
 - [The player's body](#the-players-body)
 - [The assembled body](#the-assembled-body)
+  - [The drawn weapon's stance (v0.0.61)](#the-drawn-weapons-stance-v0061)
+  - [The inventory picture](#the-inventory-picture)
 - [First-person arms](#first-person-arms)
 - [Console](#console)
 - [Build switches](#build-switches)
@@ -179,7 +182,30 @@ death and the hand-to-hand ready sections).
 
 The baked body stays selectable (`aw_player_body_parts 0`, saved, or `dbg camera parts off`), and it is still the
 body while a torch is carried or while swimming (their own baked poses). Not yet on the assembled body: the
-draw/lower and punch arm layers of the baked body, armed stances per weapon class and the torch pose.
+draw/lower and punch arm layers of the bare hands and the torch pose.
+
+### The drawn weapon's stance (v0.0.61)
+
+With a weapon drawn, the assembled body plays the original's groups for that kind of weapon from the shared table,
+the same groups and the same choice the residents use (OpenMW 0.51 `character.cpp` and `weapontype.cpp`):
+
+| What the player does | Group played |
+| --- | --- |
+| Draws the weapon | the weapon's group from `equip start` to `equip stop` |
+| Puts it away | `unequip start` to `unequip stop` |
+| Swings | the weapon's `chop`, `slash` or `thrust` from its start to its large follow-through (the same attack the strike uses: by the movement at the swing's start, or the best attack) |
+| Stands, walks, runs (forward, back, left, right) | the stance's own set: `idle1h`, `walkforward2c`, `runleft2w` ... |
+| Jumps | `jump1h`, `jump2c`, `jump2w` |
+
+The weapon groups by type: short blades, one-handed long blades, blunt weapons and axes play the one-handed set
+(`weapononehand`, `1h`); two-handed long blades, blunt weapons and axes the two-handed close set (`weapontwohand`,
+`2c`); staffs, warhammers and spears the two-handed wide set (`weapontwowide`, `2w`). The draw, the swing and the
+putting away follow the first-person hand clock, so both views and the strike's hit key stay together. A raised
+shield still plays the shield's block, and swimming, a carried torch and the bare hands keep the body's own poses.
+
+Nothing new is loaded for it: the groups are in the table the body already uses, and a group is looked up by name
+only when what the player does changes. `aw_player_stances 0` (saved, or `dbg camera stances off`) gives the previous
+way: the body's own poses with the weapon on the hand bone. `dbg camera` shows the group playing.
 
 **The body is kept in memory** (`aw_player_cache 1`, the default, in the game's default settings). Its parts
 load over several frames, at most 40 ms of loading in one frame, and then stay in memory: the model cache never
@@ -267,6 +293,7 @@ while a torch is carried and while the shield is raised to guard (their own bake
 | `dbg camera retry on/off` | "Retry fight" after a lost fight (`aw_death_retry`). |
 | `dbg camera body on/off` | Draw the body; off means first person only (`aw_player_body`). |
 | `dbg camera parts on/off` | The body assembled from what is worn (on, the default) or the baked body (off); `aw_player_body_parts`, saved. `dbg camera` lists the assembled body's parts, its scale and the last assembly's time. |
+| `dbg camera stances on/off` | The drawn weapon's stance on the assembled body (on, the default) or the body's own poses (off); `aw_player_stances`, saved. |
 | `dbg camera hands on/off` | The first-person arms assembled from what is worn (on, the default) or the baked arms (off); `aw_hand_parts`, saved. `dbg camera` lists the arms' parts, their frame and the last assembly's time. |
 | `dbg camera die` | Test the death scene: the player dies as from world damage (like lava). |
 

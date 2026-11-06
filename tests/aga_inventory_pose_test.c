@@ -76,7 +76,13 @@ int main(void){
         assert(n==1+left[i] && tag_frame==frame && origins[0][0]==frame*10);
         assert(body.frame==19 && body_play.phase==3.25f && loads==oldloads);
     }
-    right_type=9;assert(!AW_ViewInventoryBody(&m,&frame)); /* no fabricated ranged pose */
+    /* a bow, crossbow or thrown weapon: the one-handed pose (OpenMW characterpreview.cpp's fallback), no shield with a
+     * bow or crossbow (two-handed); nothing past thrown */
+    for(i=9;i<12;i++){
+        right_type=i;assert(AW_ViewInventoryBody(&m,&frame) && frame==2);
+        n=AW_ViewInventoryEquipment(equipment,origins,angles);assert(n==1+(i==11));
+    }
+    right_type=12;assert(!AW_ViewInventoryBody(&m,&frame));
     right_type=-1;AW_ViewInventoryClear();assert(!portrait.cache.data && world.cache.data);
     /* UI-INVENTORY-PREVIEW-GAP-41: admitted by the model's real need (3 x file + 256 KiB),
      * not a blanket 2 MiB: the Seyda Neen CHIM gap (2,056,656 bytes) shows the preview;

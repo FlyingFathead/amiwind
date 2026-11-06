@@ -1,6 +1,6 @@
 # CHIM world format
 
-_Last updated with AmiWind v0.0.54-dev1 (27 October 2026)._
+_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -821,6 +821,11 @@ each levelled reference as an `aw_levelled` entity: `aw_ref` the reference numbe
 order, origin and angle as the room's creatures. The engine takes such an entity while the map loads
 (`pr_edict.c` hands it to `aw_actors.c`), rolls it as an outdoor levelled reference (the player's level, the pick
 kept under the reference, so the room gives the same creature again, or nothing) and spawns the creature there.
+The room stages write those entities since v0.0.61 (`tools/room_levelled.py`, called by `tools/chim_room_batches.py`
+and `tools/chim_rooms.py` after the residents; `--room-levelled-creatures off` writes none, the room maps before):
+from v0.0.54 to v0.0.61-dev1 the engine took them but no room map carried one, so the tombs and caves had no
+creatures ([TOMB-NO-CREATURES-60](../BUGS.md)). The town stages' own rooms (Seyda Neen, Balmora) still list
+their few levelled references as left out.
 
 - **Records** (24 bytes, big-endian): u32 key (the reference number & 0xFFFFFF), u16 base, u16 flags, f32 origin
   x, y, z in the local units of the reference's own cell (the cell centre at 0, 0: the frame-local units of that

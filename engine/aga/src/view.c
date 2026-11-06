@@ -21,6 +21,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "quakedef.h"
 #include "r_local.h"
+#include "aw_hand_models.h"
 
 /* aw_view.c (docs/THIRD_PERSON.md): the player's view mode, once per frame before the view is
  * set up, and its camera in place of Chase_Update while it owns the chase camera. NULL in
@@ -55,6 +56,12 @@ cvar_t	cl_bobup = {"cl_bobup","0.5", false};
 /* Saved inspection preference; only explicit 1 restores noclip stride bob. */
 cvar_t aw_noclipwobble = {"aw_noclipwobble","0", true};
 cvar_t aw_torch_depth_bob = {"aw_torch_depth_bob","0", true};
+/* FP-WEAPON-SWAY-61 (the maintainer's decision, 5 November 2026): the first-person hands and weapon.
+ * 1 "AmiWind groove" (the default): the held weapon sways forward and back with the walking bob (Quake's view model
+ * depth bob) and the ready hands play their idle clip; 2 "Morrowind stiff": the hands stay still on the screen (no
+ * stride sway, the idle clip held on its first frame) and only drawing, putting away and the attack move them. The
+ * eye's own bob (cl_bob) is not part of it. Saved; Options > Controls > Weapon sway, dbg camera sway 1|2. */
+cvar_t aw_fp_sway = {"aw_fp_sway","1", true};
 
 cvar_t	v_kicktime = {"v_kicktime", "0.5", false};
 cvar_t	v_kickroll = {"v_kickroll", "0.6", false};
@@ -1003,6 +1010,40 @@ void V_AddIdle (void)
 }
 
 
+/* FP-WEAPON-SWAY-61: the per-frame cost of the sway's arithmetic on this machine: N rounds of what a frame runs for
+ * it (V_CalcBob: one square root and one sine; CalcGunAngle's three idle sines; V_AddIdle's three sines; the stride
+ * sway), timed with the system clock; the view state is put back after. Returns microseconds per round. The sines
+ * are Q_SinRad's table (mathlib.c), not the FPU's fsin, which the 68040 does not have. */
+double V_SwayBench (int n)
+{
+    vec3_t	saved_view, saved_angles, saved_origin;
+    double	t0, t1;
+    float	bob, sink = 0;
+    int		i;
+
+    if (n < 1)
+        n = 1;
+    VectorCopy (r_refdef.viewangles, saved_view);
+    VectorCopy (cl.viewent.angles, saved_angles);
+    VectorCopy (cl.viewent.origin, saved_origin);
+    t0 = Sys_FloatTime ();
+    for (i = 0; i < n; i++)
+    {
+        bob = V_CalcBob ();
+        CalcGunAngle ();
+        V_AddIdle ();
+        cl.viewent.origin[0] += bob*0.4;
+        sink += bob + cl.viewent.angles[ROLL];
+    }
+    t1 = Sys_FloatTime ();
+    VectorCopy (saved_view, r_refdef.viewangles);
+    VectorCopy (saved_angles, cl.viewent.angles);
+    VectorCopy (saved_origin, cl.viewent.origin);
+    if (sink == 12345.678f)
+        Con_Printf (" ");
+    return (t1 - t0) * 1e6 / n;
+}
+
 /*
 ==============
 V_CalcViewRoll
@@ -1158,6 +1199,11 @@ void V_CalcRefdef (void)
      * Retain eye/vertical bob and the shared model/emitter transform. Only
      * explicit legacy mode moves the equipped torch in view-local depth. */
     depth_bob = (!AW_TorchEquipped() || aw_torch_depth_bob.value == 1) ? bob : 0;
+    /* FP-WEAPON-SWAY-61: Morrowind stiff keeps the hands still on the screen: they follow the eye's height (the same
+     * bob as the eye, so no motion against it) without the forward stride sway of their own */
+    aw_fp_stiff = aw_fp_sway.value == 2;
+    if (aw_fp_stiff)
+        depth_bob = 0;
 
     for (i=0 ; i<3 ; i++)
     {
@@ -1379,6 +1425,7 @@ void V_Init (void)
     Cvar_RegisterVariable (&cl_bobcycle);
     Cvar_RegisterVariable (&cl_bobup);
     Cvar_RegisterVariable (&aw_torch_depth_bob);
+    Cvar_RegisterVariable (&aw_fp_sway);
     Cvar_RegisterVariable (&aw_noclipwobble);
 
     Cvar_RegisterVariable (&v_kicktime);

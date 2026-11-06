@@ -121,6 +121,7 @@ int AW_MwvmScriptFlags(int script);
 int AW_MwvmScriptName(int script);                       /* string index */
 /* 1 mapped; NEAR/FAR: hearing distances in game units */
 int AW_MwvmSound(int sound,unsigned char hash[8],int *centis,int *volume,int *near_units,int *far_units);
+int AW_MwvmSoundAmbience(int sound);                     /* 1: a mapped dungeon ambience (flags 1|2) */
 int AW_MwvmVoice(int voice,unsigned char hash[8],int *centis);                               /* 1 mapped */
 int AW_MwvmMusic(int music);                             /* track number, -1 none */
 uint32_t AW_MwvmObjectReference(int object);             /* 0: not placed once */

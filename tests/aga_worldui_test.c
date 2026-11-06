@@ -34,6 +34,9 @@ int AW_MapTeleport(const float *p){int i;for(i=0;i<3;i++)destination[i]=p[i];if(
 void Cmd_AddCommand(char *name,void (*fn)(void)){if(!strcmp(name,"aw_teleport_map"))teleport_command=fn;else if(!strcmp(name,"aw_worldmap"))map_command=fn;else if(!strcmp(name,"aw_journal"))journal_command=fn;}
 void IN_AWClearButtons(void){}
 int AW_StoryRestricted(void){return story_restricted;}
+/* CHARGEN-INVENTORY-LOCKED-60: the registration's inventory rule (aw_story.c); story_inventory = the papers activated */
+static int story_inventory;
+int AW_StoryInventoryAllowed(void){return !story_restricted || story_inventory;}
 int AW_ReaderActive(void){return 0;}
 int AW_CharacterActive(void){return 0;}
 int AW_GalleryActive(void){return 0;}
@@ -63,6 +66,14 @@ void AW_UIFill(int x,int y,int w,int h,int c){
     if(w==72 && h==15){button_x=x;button_y=y;}
     if(c==AW_UIColor(255,245,190) && w==1 && h==6)own_cursor++;   /* AmiWind's cursor, its light stroke */
 if(c==AW_UIColor(255,32,32))red_pixels++;assert(x>=0 && y>=0 && x+w<=320 && y+h<=200);if(w==9 && h==1){marker_x=x+4;marker_y=y;}}
+/* the inventory window's reads share one open of the item file (aw_inventory.c; nothing to open here) */
+void AW_InventoryBatchBegin(void){}
+void AW_InventoryBatchEnd(void){}
+/* the inventory's burden bar (ENCUMBRANCE-INCOMPLETE-61): where it is drawn and how full */
+static int bar_calls,bar_x,bar_y,bar_w,bar_h,bar_colour;static float bar_fraction;
+void AW_UIBar(int x,int y,int w,int h,int colour,float fraction){
+    bar_calls++;bar_x=x;bar_y=y;bar_w=w;bar_h=h;bar_colour=colour;bar_fraction=fraction;
+}
 void AW_UIScrollbar(int x,int y,int h,int total,int visible,int top){}
 int AW_UIScrollHit(int mx,int my,int x,int y,int h,int total,int visible,int top){return -1;}
 void AW_UIBookBegin(void){}

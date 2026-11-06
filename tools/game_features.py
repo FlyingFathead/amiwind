@@ -175,7 +175,9 @@ def render(doc):
                      f.get('missing') or '-', ', '.join(f['todo']) or '-', bugs]
             lines.append('| ' + ' | '.join(x.replace('|', '/').replace('\n', ' ') for x in cells) + ' |')
         lines.append('')
-    return '\n'.join(lines).rstrip('\n') + '\n'
+    # the contents list doc_toc.py gives every page past its length (150 lines), so the two tools agree on the page
+    import doc_toc
+    return doc_toc.render('\n'.join(lines).rstrip('\n') + '\n')
 
 
 def main(argv=None):

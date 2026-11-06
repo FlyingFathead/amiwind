@@ -10,12 +10,17 @@
 #include "chim/chim.h"
 extern int AW_SceneryCount(void);
 #endif
+#include <stdio.h>
 #include <string.h>
 #include <math.h>
 #include <limits.h>
 #include "aw_inventory.h"
 #include "aw_tryalloc.h"
 #include "aw_actorstate.h"
+/* the inventory window's records of every carried kind (AW_InventoryCarried, set by AW_InventoryInit; NULL in the
+ * rules-only fixtures: the window reads one record per kind) */
+int (*aw_inventory_carried)(void (*row)(void *ctx,int state_row,const aw_inventory_item_t *it,int file_row),void *ctx);
+int (*aw_inventory_read_row)(int file_row,aw_inventory_item_t *out);
 /* aw_world.h (its other prototypes need the full server headers, which the native tests replace) */
 int AW_WorldToSource(const char *,const float *,float *);
 int AW_SourceToWorld(const char *,const float *,float *);
@@ -23,9 +28,6 @@ int AW_SourceToWorld(const char *,const float *,float *);
  * open-world region table, so the region table alone said no there and its focus rows and placed items were never
  * read outdoors. Since CHIM-FRAME-SOURCE-CONVERSION-59 AW_WorldToSource / AW_SourceToWorld themselves ask the loaded
  * CHIM frame after the region table (aw_world.c), for every caller; this file's own frame hooks went into that. */
-#if AW_STATE_VALUES > 32
-#error Inventory condition bitset requires AW_STATE_VALUES <= 32
-#endif
 /* Catalogue binary search and UI sorting need ordering, while AmiQuake's
  * Q_strcasecmp deliberately returns -1 for every unequal pair. Catalogue IDs
  * are original case-folded IDs; compare ASCII letters without changing Quake. */
@@ -56,9 +58,12 @@ int AW_DebugTorchGrant(aw_state_t *s,int enabled){
     if(!s || !enabled || AW_StateGet(s,AW_GLOBAL,AW_DEBUG_TORCH_GRANTED))return 0;
     /* One transaction: the item and the "given" mark together, or nothing. The mark is a saved
      * global, so a reload or a second census exit never gives it again. */
+    /* the copy carries the global only: the item table is shared (aw_state.h OWNERSHIP), so the item comes last,
+     * after its room was made */
+    if(AW_ItemRefusal(s,AW_DEBUG_TORCH_ID,1)!=AW_ITEM_OK || !AW_ItemReserve(s,1))return 0;
     next=*s;
-    if(!AW_ItemAdd(&next,AW_DEBUG_TORCH_ID,1) || !AW_StateSet(&next,AW_GLOBAL,AW_DEBUG_TORCH_GRANTED,1))return 0;
-    *s=next;return 1;
+    if(!AW_StateSet(&next,AW_GLOBAL,AW_DEBUG_TORCH_GRANTED,1))return 0;
+    *s=next;AW_ItemAdd(s,AW_DEBUG_TORCH_ID,1);return 1;
 }
 /* An armour type's slot (OpenMW mwclass/armor.cpp getEquipmentSlots), -1 for an unknown type. */
 int AW_InventoryArmourSlot(int type){
@@ -142,10 +147,9 @@ int AW_InventoryUnequip(aw_state_t *s,const char *id){
     }
     return n;
 }
-static int inv_item_index(const aw_state_t *s,const char *id){
-    int i;for(i=0;i<s->count[AW_ITEM];i++)if(!strcmp(s->values[AW_ITEM][i].id,id))return i;
-    return -1;
-}
+#define inv_item_index AW_ItemIndex
+#define COND(s,i) (AW_ITEM_ROW(s,i)->condition)
+#define CHARGE(s,i) (AW_ITEM_ROW(s,i)->charge)
 int AW_InventoryDrop(aw_state_t *s,const aw_inventory_item_t *item,int32_t count,
                      const char *scene,const float position[3],float yaw){
     aw_dropped_item_t drop;int i,j,item_index;int32_t old;
@@ -154,7 +158,7 @@ int AW_InventoryDrop(aw_state_t *s,const aw_inventory_item_t *item,int32_t count
     old=AW_StateGet(s,AW_ITEM,item->id);if(count>old || s->inventory.next_serial==UINT32_MAX)return -1;
     /* Placed items carry condition but no charge yet: never refill a spent item by dropping it. */
     item_index=inv_item_index(s,item->id);
-    if(count==old && item_index>=0 && (s->magic.charge_known&(1U<<item_index)))return -1;
+    if(count==old && AW_ITEM_HAS(s,item_index,AW_ITEM_CHARGE))return -1;
     for(j=0;j<3;j++)if(!(position[j]>=-32767 && position[j]<=32767))return -1;
     if(!(yaw>=-360 && yaw<=360))return -1;
     for(i=0;i<AW_INVENTORY_DROPS && s->inventory.dropped[i].count;i++);
@@ -162,15 +166,15 @@ int AW_InventoryDrop(aw_state_t *s,const aw_inventory_item_t *item,int32_t count
     memset(&drop,0,sizeof(drop));strcpy(drop.id,item->id);strcpy(drop.scene,scene);
     drop.count=count;drop.serial=s->inventory.next_serial+1;drop.yaw=yaw;
     item_index=inv_item_index(s,item->id);
-    if(item_index>=0 && (s->inventory.condition_known&(1U<<item_index))){
-        drop.condition_known=1;drop.condition=s->inventory.condition[item_index];
+    if(AW_ITEM_HAS(s,item_index,AW_ITEM_CONDITION)){
+        drop.condition_known=1;drop.condition=COND(s,item_index);
     }
     memcpy(drop.position,position,sizeof(drop.position));
     /* AW_ItemAdd is the only fallible mutation. All placement/admission checks
      * precede it; inventory and world ownership commit together afterwards. */
     if(!AW_ItemAdd(s,item->id,-count))return -1;
     if(AW_InventoryEquipped(s,item->id)>old-count)AW_InventoryUnequip(s,item->id);
-    if(old==count && item_index>=0){s->inventory.condition_known&=~(1U<<item_index);s->inventory.condition[item_index]=0;}
+    if(old==count)AW_ItemUnmark(s,item_index,AW_ITEM_CONDITION);
     s->inventory.initialized=1;
     s->inventory.dropped[i]=drop;s->inventory.next_serial=drop.serial;return i;
 }
@@ -186,7 +190,7 @@ float AW_MagicCharge(const aw_state_t *s,const aw_inventory_item_t *item){
     int index;
     if(!s || !item || item->enchant_kind==AW_ENCH_NONE || !(item->charge_max>0))return 0;
     index=inv_item_index(s,item->id);
-    if(index>=0 && (s->magic.charge_known&(1U<<index)))return s->magic.charge[index];
+    if(AW_ITEM_HAS(s,index,AW_ITEM_CHARGE))return CHARGE(s,index);
     return item->charge_max;
 }
 int AW_MagicSetCharge(aw_state_t *s,const aw_inventory_item_t *item,float value){
@@ -194,8 +198,8 @@ int AW_MagicSetCharge(aw_state_t *s,const aw_inventory_item_t *item,float value)
     if(!s || !item || item->enchant_kind==AW_ENCH_NONE || !(item->charge_max>0) ||
        !(value>=0) || AW_StateGet(s,AW_ITEM,item->id)<1)return 0;
     index=inv_item_index(s,item->id);if(index<0)return 0;
-    if(value>=item->charge_max){s->magic.charge_known&=~(1U<<index);s->magic.charge[index]=0;}
-    else{s->magic.charge_known|=1U<<index;s->magic.charge[index]=value;}
+    if(value>=item->charge_max)AW_ItemUnmark(s,index,AW_ITEM_CHARGE);
+    else AW_ItemMark(s,index,AW_ITEM_CHARGE,value);
     return 1;
 }
 /* MWMechanics::rechargeItem: min(charge + rate * seconds, maximum); full stays full. */
@@ -204,8 +208,8 @@ int AW_MagicRecharge(aw_state_t *s,const aw_inventory_item_t *item,float seconds
     if(!s || !item || !(seconds>0) || !(rate>=0) ||
        (item->enchant_kind!=AW_ENCH_USED && item->enchant_kind!=AW_ENCH_STRIKES))return 0;
     index=inv_item_index(s,item->id);
-    if(index<0 || !(s->magic.charge_known&(1U<<index)))return 0;
-    return AW_MagicSetCharge(s,item,s->magic.charge[index]+rate*seconds);
+    if(!AW_ITEM_HAS(s,index,AW_ITEM_CHARGE))return 0;
+    return AW_MagicSetCharge(s,item,CHARGE(s,index)+rate*seconds);
 }
 int AW_InventoryPickup(aw_state_t *s,int index){
     aw_dropped_item_t *d;int item_index;int32_t old;float current,incoming;
@@ -213,12 +217,12 @@ int AW_InventoryPickup(aw_state_t *s,int index){
     d=&s->inventory.dropped[index];
     if(d->count<1 || !d->serial || !inv_id(d->id,64))return 0;
     item_index=inv_item_index(s,d->id);old=AW_StateGet(s,AW_ITEM,d->id);
-    current=item_index>=0 && (s->inventory.condition_known&(1U<<item_index))?s->inventory.condition[item_index]:1;
+    current=AW_ITEM_HAS(s,item_index,AW_ITEM_CONDITION)?COND(s,item_index):1;
     incoming=d->condition_known?d->condition:1;
     if(!(incoming>=0 && incoming<=1) || (old>0 && current!=incoming))return 0;
     if(!AW_ItemAdd(s,d->id,d->count))return 0;
     item_index=inv_item_index(s,d->id);
-    if(d->condition_known){s->inventory.condition_known|=1U<<item_index;s->inventory.condition[item_index]=incoming;}
+    if(d->condition_known)AW_ItemMark(s,item_index,AW_ITEM_CONDITION,incoming);
     s->inventory.initialized=1;memset(d,0,sizeof(*d));return 1;
 }
 /* dbg give weapons (DBG-GIVE-WEAPONS-59): the builder's weapon kit table (aw_inventory.h). Text the builder wrote,
@@ -269,11 +273,11 @@ int AW_WeaponKitNeeds(const aw_state_t *s,const aw_kit_row_t *rows,int n){
     }
     return need;
 }
-/* The whole kit or nothing: the room is checked first (AW_STATE_VALUES item kinds), then every row is added as
+/* The whole kit or nothing: the room is made first (AW_ItemReserve: rows for the new kinds), then every row is added as
  * dbg inventory grant adds one; saved like any grant (the AW_ITEM counts are the save's). */
 int AW_WeaponKitGrant(aw_state_t *s,const aw_kit_row_t *rows,int n){
     int i,need=AW_WeaponKitNeeds(s,rows,n);
-    if(need<0 || need>AW_STATE_VALUES-s->count[AW_ITEM])return 0;
+    if(need<0 || !AW_ItemReserve(s,need))return 0;
     for(i=0;i<n;i++)if(!AW_ItemAdd(s,rows[i].id,rows[i].count)){
         while(--i>=0)AW_ItemAdd(s,rows[i].id,-rows[i].count);   /* not reached after the room check */
         return 0;
@@ -315,6 +319,51 @@ int AW_WeaponKitLines(const aw_kit_row_t *row,int equippable,int width,char *out
     if(!kit_token(out,size,&used,&column,width,equippable?"equip":"carry",id))return -1;
     for(j=0;out[j];j++)if(out[j]=='\n')lines++;
     return lines;
+}
+
+/* dbg weapon / dbg gear (WEAPONS-57): which box a catalogue row belongs in, its order there and its line. Weapons by
+ * the original's type (WPDT, the row's subtype: 0 short blade .. 11 thrown, 12 arrow, 13 bolt), then the shields;
+ * armour by its piece (ARMO type 0..10, the shield aside) and weight class, clothing by its piece (CLOT 0..9). */
+static const char *const gear_weapons[14]={"Short blade","Long blade","Long blade 2H","Blunt","Blunt 2H","Staff",
+    "Spear","Axe","Axe 2H","Bow","Crossbow","Thrown","Arrow","Bolt"};
+static const char *const gear_armour[11]={"Helmet","Cuirass","Pauldron L","Pauldron R","Greaves","Boots",
+    "Gauntlet L","Gauntlet R","Shield","Bracer L","Bracer R"};
+static const char *const gear_clothes[10]={"Pants","Shoes","Shirt","Belt","Robe","Glove R","Glove L","Skirt","Ring",
+    "Amulet"};
+static const char *const gear_classes[3]={"light","medium","heavy"};
+int AW_GearBoxKind(const aw_inventory_item_t *it){
+    if(!it)return AW_GEARBOX_NONE;
+    if(it->category==AW_INV_WEAPON)return it->subtype>=0 && it->subtype<14?AW_GEARBOX_WEAPON:AW_GEARBOX_NONE;
+    if(it->category==AW_INV_ARMOUR){
+        if(it->subtype==8)return AW_GEARBOX_WEAPON;
+        return it->subtype>=0 && it->subtype<11?AW_GEARBOX_GEAR:AW_GEARBOX_NONE;
+    }
+    if(it->category==AW_INV_CLOTHING)return it->subtype>=0 && it->subtype<10?AW_GEARBOX_GEAR:AW_GEARBOX_NONE;
+    return AW_GEARBOX_NONE;
+}
+int AW_GearBoxOrder(const aw_inventory_item_t *it){
+    switch(AW_GearBoxKind(it)){
+    case AW_GEARBOX_WEAPON:return it->category==AW_INV_WEAPON?it->subtype:14+(it->shield_class>=0 && it->shield_class<3?it->shield_class:0);
+    case AW_GEARBOX_GEAR:
+        if(it->category==AW_INV_ARMOUR)return it->subtype*3+(it->shield_class>=0 && it->shield_class<3?it->shield_class:0);
+        return 40+it->subtype;
+    default:return -1;
+    }
+}
+int AW_GearBoxLabel(const aw_inventory_item_t *it,char *out,int size){
+    char type[32];const char *head;int n,ok;
+    if(!out || size<8 || AW_GearBoxKind(it)==AW_GEARBOX_NONE)return -1;
+    ok=(it->flags&(AW_INV_EQUIP|AW_INV_EQUIP_SUPPORTED))==(AW_INV_EQUIP|AW_INV_EQUIP_SUPPORTED);
+    if(it->category==AW_INV_WEAPON)head=gear_weapons[it->subtype];
+    else if(it->category==AW_INV_CLOTHING)head=gear_clothes[it->subtype];
+    else head=gear_armour[it->subtype];
+    strcpy(type,head);
+    if(it->category==AW_INV_ARMOUR && it->shield_class>=0 && it->shield_class<3){
+        strcat(type," ");strcat(type,gear_classes[it->shield_class]);
+    }
+    n=snprintf(out,(size_t)size,"%-17s %s%s",type,it->name[0]?it->name:it->id,ok?"":" (carry only)");
+    if(n<0)return -1;
+    return n<size?n:size-1;
 }
 
 #ifndef AW_INVENTORY_RULES_ONLY
@@ -394,12 +443,15 @@ static int inv_parse_row(const byte *row,aw_inventory_item_t *out){
                 if(row[511] || value.category!=AW_INV_MISC || value.light_radius<1 || value.light_radius>65535 ||
                    (value.light_time!=AW_LIGHT_INFINITE && (value.light_time<1 || value.light_time>1000000)))return 0;
             }else{int n;value.enchant_capacity=row[504]|(row[505]<<8);   /* the record's enchantment points */
-                  for(n=506;n<512;n++)if(row[n])return 0;}
+                  /* byte 506: a weapon's magical (1) and silver (2) flags (RESIST-NORMAL-WEAPONS-61) */
+                  value.weapon_flags=row[506];
+                  if(value.weapon_flags&~3 || (value.weapon_flags && value.category!=AW_INV_WEAPON))return 0;
+                  for(n=507;n<512;n++)if(row[n])return 0;}
             if(value.category<1 || value.category>7 || value.value<0 ||
                !(value.weight>=0 && value.weight<=1000000) ||
                (value.slots&~((1U<<AW_INVENTORY_SLOTS)-1)) ||
                (value.flags&~63U) ||
-               value.weapon<0 || value.weapon>9 ||
+               value.weapon<0 || value.weapon>12 ||
                value.weapon_skill<0 || value.weapon_skill>=27 ||
                !(value.reach>=0 && value.reach<=100) ||
                !(value.speed>=0 && value.speed<=100) ||
@@ -442,6 +494,8 @@ static void inv_cache_put(const aw_inventory_item_t *item){
 }
 static int area_item(const char *id,aw_inventory_item_t *out);
 static int inv_batch_open(void);
+#define WEIGHT_MEMO 8
+static struct {char id[64];float weight;} weight_memo[WEIGHT_MEMO];static int weight_next;
 static int area_loading;
 static unsigned long area_fallback[4];     /* disk searches in play: items.awi, focus.awf contents/owner, placed id, icons */
 int AW_InventoryRead(const char *id,aw_inventory_item_t *out){
@@ -486,12 +540,124 @@ int AW_InventoryRead(const char *id,aw_inventory_item_t *out){
             if(!inv_parse_row(row,&value))goto bad;
             if(f!=inv_batch_file)fclose(f);
             if(area_loading)inv_cache_put(&value);   /* the carried items read with an area load */
+            /* the weight of the last reads (ENCUMBRANCE-INCOMPLETE-61): a pickup reads the record, then the new row
+             * asks for its weight (inv_weight) without a second search */
+            Q_strcpy_bounded(weight_memo[weight_next].id,value.id,sizeof(weight_memo[0].id));
+            weight_memo[weight_next].weight=value.weight;weight_next=(weight_next+1)%WEIGHT_MEMO;
             *out=value;return 1;
         }
         CDAudio_Update();S_ExtraUpdate();
     }
  bad: if(f!=inv_batch_file)fclose(f);
     return 0;
+}
+/* dbg weapon / dbg gear (WEAPONS-57): the whole catalogue read once in file order, 32 rows a read (16 KiB, freed after);
+ * debug only, never in play. */
+#define SCAN_ROWS 32
+int AW_InventoryScan(void (*each)(void *ctx,const aw_inventory_item_t *it),void *ctx){
+    FILE *f=NULL;byte head[8],*rows;int size,n,i,k,got,read=0;aw_inventory_item_t value;
+    if(!each)return -1;
+    size=COM_FOpenFile("inventory/items.awi",&f);
+    if(!f)return -1;
+    if(size<8 || fread(head,1,8,f)!=8 || memcmp(head,"AWI2",4)){fclose(f);return -1;}
+    n=(int)inv_u32(head+4);
+    if(n<1 || n>65536 || size!=8+n*INV_ROW || !(rows=(byte *)AW_TryMalloc(SCAN_ROWS*INV_ROW))){fclose(f);return -1;}
+    for(i=0;i<n;i+=got){
+        got=n-i<SCAN_ROWS?n-i:SCAN_ROWS;
+        if(fread(rows,INV_ROW,(size_t)got,f)!=(size_t)got)break;
+        for(k=0;k<got;k++){
+            if(!memchr(rows+k*INV_ROW,0,64) || !inv_parse_row(rows+k*INV_ROW,&value))continue;
+            each(ctx,&value);read++;
+        }
+        CDAudio_Update();S_ExtraUpdate();
+    }
+    free(rows);fclose(f);
+    return read;
+}
+/* INVENTORY-ORIGINAL-LIMITS-61: the record of every carried kind (count above 0), each handed to ROW with its item
+ * row (NULL record when the catalogue has none). The records in memory first (the records cache, the loaded areas);
+ * the rest by one search each when there are few (at most CARRIED_SEARCHES), else in one pass over items.awi in file
+ * order (AW_InventoryScan: 16 KiB reads, no seeks), merged against the missing ids sorted the same way: at 400 kinds
+ * one pass instead of 400 binary searches (about 140 ms each on FS-UAE: a 55 s arrival in the v0.0.61 session).
+ * Records read from the file go into the records cache. */
+#define CARRIED_SEARCHES 8
+static int carried_cmp(const void *a,const void *b){
+    return AW_InventoryCompare(AW_ITEM_ID(&aw_state,*(const int *)a),AW_ITEM_ID(&aw_state,*(const int *)b));
+}
+/* a carried kind's record weighs its row (the total is summed again after, AW_ItemsWeigh) */
+static void carried_warm(void *ctx,int r,const aw_inventory_item_t *it,int file_row){
+    aw_item_row_t *row=AW_ITEM_ROW(&aw_state,r);(void)ctx;(void)file_row;
+    if(it){row->weight=it->weight;AW_ITEM_SET_FLAG(row,AW_ITEM_WEIGHED);}
+}
+/* the pass: the file in 32-row reads, each row's id compared with the next carried id (both in the file's order);
+ * only a matching row is parsed. Matched rows are handed over with their file row; DONE marks them. */
+#define CARRIED_CHUNK 32
+static int carried_pass(const int *order,int n,unsigned char *done,
+                        void (*row)(void *,int,const aw_inventory_item_t *,int),void *ctx,int cache){
+    FILE *f=NULL;byte head[8],*rows;int size,total,i,k,got,at=0,cmp,found=0;aw_inventory_item_t value;
+    size=COM_FOpenFile("inventory/items.awi",&f);if(!f)return -1;
+    if(size<8 || fread(head,1,8,f)!=8 || memcmp(head,"AWI2",4)){fclose(f);return -1;}
+    total=(int)inv_u32(head+4);
+    if(total<1 || total>65536 || size!=8+total*INV_ROW || !(rows=(byte *)AW_TryMalloc(CARRIED_CHUNK*INV_ROW))){fclose(f);return -1;}
+    for(i=0;i<total && at<n;i+=got){
+        got=total-i<CARRIED_CHUNK?total-i:CARRIED_CHUNK;
+        if(fread(rows,INV_ROW,(size_t)got,f)!=(size_t)got)break;
+        for(k=0;k<got && at<n;k++){
+            const char *rid=(const char *)rows+k*INV_ROW;
+            if(!memchr(rid,0,64))continue;
+            while(at<n && (cmp=AW_InventoryCompare(AW_ITEM_ID(&aw_state,order[at]),rid))<0)at++;
+            while(at<n && !AW_InventoryCompare(AW_ITEM_ID(&aw_state,order[at]),rid)){
+                if(!done[at] && inv_parse_row(rows+k*INV_ROW,&value)){
+                    if(cache)inv_cache_put(&value);
+                    row(ctx,order[at],&value,i+k);done[at]=1;found++;
+                }
+                at++;
+            }
+        }
+        CDAudio_Update();S_ExtraUpdate();
+    }
+    free(rows);fclose(f);return found;
+}
+/* a loaded save's rows weighed at once (aw_save.c AW_SaveSpawn; ENCUMBRANCE-INCOMPLETE-61) */
+static void inv_items_loaded(void){AW_InventoryCarried(carried_warm,NULL);AW_ItemsWeigh(&aw_state);}
+int AW_InventoryCarried(void (*row)(void *ctx,int state_row,const aw_inventory_item_t *it,int file_row),void *ctx){
+    int i,n=AW_ItemCount(&aw_state),m=0;int *order;unsigned char *done;aw_inventory_item_t item;
+    if(!row || n<1)return 0;
+    if(!(order=(int *)AW_TryMalloc(sizeof(int)*n)))return -1;
+    for(i=0;i<n;i++)if(AW_ITEM_ROW(&aw_state,i)->value>0)order[m++]=i;
+    /* many kinds: the one pass straight away (no per-kind look in the records cache: 400 kinds x 256 entries of string
+     * compares took 4.7 s on FS-UAE); few: the records in memory, else one search each */
+    if(m>CARRIED_SEARCHES && (done=(unsigned char *)AW_TryCalloc((unsigned long)m,1))!=NULL){
+        qsort(order,m,sizeof(int),carried_cmp);
+        carried_pass(order,m,done,row,ctx,m<=INV_CACHE);
+        for(i=0;i<m;i++)if(!done[i]){   /* not in the file: an enchanted item, or none */
+            char id[64];strcpy(id,AW_ITEM_ID(&aw_state,order[i]));
+            row(ctx,order[i],AW_InventoryRead(id,&item)?&item:NULL,-1);
+        }
+        free(done);free(order);return m;
+    }
+    AW_InventoryBatchBegin();
+    for(i=0;i<m;i++){
+        char id[64];strcpy(id,AW_ITEM_ID(&aw_state,order[i]));
+        row(ctx,order[i],AW_InventoryRead(id,&item)?&item:NULL,-1);
+    }
+    AW_InventoryBatchEnd();
+    free(order);return m;
+}
+/* one record by its row in items.awi (the file row AW_InventoryCarried handed over): one seek and one read, no search;
+ * inside AW_InventoryBatchBegin/End the file stays open */
+int AW_InventoryReadRow(int file_row,aw_inventory_item_t *out){
+    FILE *f=NULL;byte head[8],row[INV_ROW];int size,total,ok=0;long base;
+    if(file_row<0 || !out)return 0;
+    if(inv_batch_wanted)inv_batch_open();
+    if(inv_batch_file){f=inv_batch_file;size=inv_batch_size;base=inv_batch_base;}
+    else{com_fopen_buffer=INV_ROW;size=COM_FOpenFile("inventory/items.awi",&f);com_fopen_buffer=0;if(!f)return 0;base=ftell(f);}
+    if(!fseek(f,base,SEEK_SET) && size>=8 && fread(head,1,8,f)==8 && !memcmp(head,"AWI2",4) &&
+       (total=(int)inv_u32(head+4))>file_row && size==8+total*INV_ROW &&
+       !fseek(f,base+8+(long)file_row*INV_ROW,SEEK_SET) && fread(row,1,INV_ROW,f)==INV_ROW && memchr(row,0,64))
+        ok=inv_parse_row(row,out);
+    if(f!=inv_batch_file)fclose(f);
+    return ok;
 }
 /* TRADEHOUSE-LONG-FRAME-59: several item reads in a row (the strip's names) share one open of items.awi.
  * AREA-TABLES-59: the open happens only when a read needs the file (the area tables and the records in memory answer
@@ -509,31 +675,48 @@ void AW_InventoryBatchEnd(void){
     inv_batch_wanted=0;
     if(inv_batch_file){fclose(inv_batch_file);inv_batch_file=NULL;}
 }
+/* CHARGEN-NO-STARTING-CLOTHES-60: the player record's outfit (inventory/initial.awi: shirt, pants, shoes) is granted
+ * and worn once per game, at the first scene spawn (AW_InventorySpawn), as the original dresses the player from the
+ * start (OpenMW: the player's inventory is auto-equipped at a new game). Its own once-flag in the saved global table
+ * (no new save field): the old guard was inventory.initialized, which every take sets, so a take in the Census
+ * Office before the first inventory open skipped the outfit for good and the player stayed in underwear. A save from
+ * before this fix gets the outfit once, as far as it is missing (existing counts and worn items win). */
+#define INV_OUTFIT_KEY "amiwind:inventory:outfit"
 int AW_InventoryBootstrap(void){
-    FILE *f=NULL;byte head[8],row[72];int size,n,i,j,slot,amount;aw_state_t *next;
-    if(aw_state.inventory.initialized)return 1;
+    /* every row read and checked first, then the room made and the once-flag set, then the items given: nothing
+     * changes when a row is refused (the item table is not copied, aw_state.h OWNERSHIP) */
+    FILE *f=NULL;byte head[8],*rows;int size,n,i,j,slot,amount;
+    if(AW_StateGet(&aw_state,AW_GLOBAL,INV_OUTFIT_KEY)>0)return 1;
     size=COM_FOpenFile("inventory/initial.awi",&f);if(!f)return 0;
     if(size<8 || fread(head,1,8,f)!=8 || memcmp(head,"AWST",4)){fclose(f);return 0;}
     n=(int)inv_u32(head+4);
-    if(n<0 || n>AW_STATE_VALUES || size!=8+n*72){fclose(f);return 0;}
-    next=(aw_state_t *)AW_TryMalloc(sizeof(*next));if(!next){fclose(f);return 0;}*next=aw_state;
+    if(n<0 || n>AW_ITEM_KINDS_MAX || size!=8+n*72){fclose(f);return 0;}
+    rows=(byte *)AW_TryMalloc(n*72+1);if(!rows){fclose(f);return 0;}
+    if(n && fread(rows,1,n*72,f)!=(size_t)(n*72))goto failed;
     for(i=0;i<n;i++){
-        aw_inventory_item_t item;
-        if(fread(row,1,72,f)!=72 || !memchr(row,0,64))goto failed;
+        aw_inventory_item_t item;byte *row=rows+i*72;
+        if(!memchr(row,0,64))goto failed;
         amount=(int)inv_u32(row+64);slot=(int)(int32_t)inv_u32(row+68);
         if(amount<1 || amount>999 || slot< -1 || slot>=AW_INVENTORY_SLOTS ||
-           !AW_InventoryRead((char *)row,&item))goto failed;
-        j=AW_StateGet(next,AW_ITEM,item.id);
+           !AW_InventoryRead((char *)row,&item) || AW_ItemRefusal(&aw_state,item.id,amount)!=AW_ITEM_OK)goto failed;
+        memset(row,0,64);strcpy((char *)row,item.id);
+    }
+    if(!AW_ItemReserve(&aw_state,n) || !AW_StateSet(&aw_state,AW_GLOBAL,INV_OUTFIT_KEY,1))goto failed;
+    for(i=0;i<n;i++){
+        byte *row=rows+i*72;
+        amount=(int)inv_u32(row+64);slot=(int)(int32_t)inv_u32(row+68);
+        j=AW_StateGet(&aw_state,AW_ITEM,(char *)row);
         /* Builds before inventory retained the original NPC-player outfit in
          * the body bake but had no mutable clothing ownership. Reconstruct that
          * known initial possession once; never grant quest loot/gold or regrant
          * an item after its first persistent drop. Existing counts win. */
-        if(j<amount && !AW_ItemAdd(next,item.id,amount-j))goto failed;
-        if(slot>=0 && !next->inventory.equipped[slot][0])strcpy(next->inventory.equipped[slot],item.id);
+        if(j<amount)AW_ItemAdd(&aw_state,(char *)row,amount-j);   /* cannot refuse after the checks and the room */
+        if(slot>=0 && !aw_state.inventory.equipped[slot][0] && !AW_InventoryEquipped(&aw_state,(char *)row))
+            strcpy(aw_state.inventory.equipped[slot],(char *)row);
     }
-    fclose(f);next->inventory.initialized=1;aw_state=*next;free(next);AW_CombatEquipmentChanged();return 1;
+    fclose(f);free(rows);aw_state.inventory.initialized=1;AW_CombatEquipmentChanged();return 1;
  failed:
-    fclose(f);free(next);return 0;
+    fclose(f);free(rows);return 0;
 }
 int AW_InventoryEquippedItem(int slot,aw_inventory_item_t *out){
     static char ids[2][64];static aw_inventory_item_t values[2];int index;
@@ -560,9 +743,10 @@ int AW_InventoryEquippedWeaponType(void){
 int AW_InventoryCanEquip(const aw_inventory_item_t *item){
     if(!item || (item->flags&(AW_INV_EQUIP|AW_INV_EQUIP_SUPPORTED))!=(AW_INV_EQUIP|AW_INV_EQUIP_SUPPORTED))return 0;
     if(item->category==AW_INV_WEAPON || (item->category==AW_INV_ARMOUR && item->subtype==8)){
-        int index=inv_item_index(&aw_state,item->id);
-        if(AW_StateGet(&aw_state,AW_ITEM,item->id)!=1 || item->health<=0 ||
-           (index>=0 && (aw_state.inventory.condition_known&(1U<<index)) && aw_state.inventory.condition[index]<=0))return 0;
+        int index=inv_item_index(&aw_state,item->id),count=AW_StateGet(&aw_state,AW_ITEM,item->id);
+        /* one of it, except thrown weapons, which are held as their stack (OpenMW: the stack is the equipped item) */
+        if((count!=1 && !(item->category==AW_INV_WEAPON && item->weapon==12 && count>1)) || item->health<=0 ||
+           (index>=0 && AW_ITEM_HAS(&aw_state,index,AW_ITEM_CONDITION) && COND(&aw_state,index)<=0))return 0;
         return AW_ViewEquipmentReady();
     }
     return 1;
@@ -580,17 +764,28 @@ static int inv_weapon_item(int *weapon,char model[64]){
        !item.model[0])return 0;
     *weapon=item.weapon;strcpy(model,item.model);return 1;
 }
+/* the right hand holds a bow, crossbow or thrown weapon (aw_combat.c: no melee blow with it) */
+static int inv_ranged(void){
+    aw_inventory_item_t item;
+    return AW_InventoryEquippedItem(AW_SLOT_RIGHT,&item) && item.category==AW_INV_WEAPON && AW_INV_RANGED(item.weapon);
+}
+/* RESIST-NORMAL-WEAPONS-61: the right-hand weapon is ordinary (OpenMW isNormalWeapon: not silver, not magical, not
+ * enchanted, the default "enchanted weapons are magical") */
+static int inv_weapon_normal(void){
+    aw_inventory_item_t item;
+    if(!AW_InventoryEquippedItem(AW_SLOT_RIGHT,&item) || item.category!=AW_INV_WEAPON)return 1;
+    return !(item.weapon_flags&(AW_WEAPON_MAGICAL|AW_WEAPON_SILVER)) && !item.enchantment[0];   /* AW_CombatIsNormalWeapon */
+}
 static float inv_condition(const char *id){
     int index=inv_item_index(&aw_state,id);
-    return index>=0 && (aw_state.inventory.condition_known&(1U<<index))?aw_state.inventory.condition[index]:1;
+    return AW_ITEM_HAS(&aw_state,index,AW_ITEM_CONDITION)?COND(&aw_state,index):1;
 }
 float AW_InventoryCondition(const char *id){return inv_condition(id);}
 /* A carried thing's condition (0..1 of its record's health) set, the dialogue's Repair service; 0 when not carried */
 int AW_InventorySetCondition(const char *id,float condition){
     int index=inv_item_index(&aw_state,id);
     if(index<0)return 0;
-    aw_state.inventory.condition[index]=condition<0?0:condition>1?1:condition;
-    aw_state.inventory.condition_known|=1U<<index;
+    AW_ItemMark(&aw_state,index,AW_ITEM_CONDITION,condition<0?0:condition>1?1:condition);
     return 1;
 }
 /* The selected magic item, read once per selection change (no per-frame I/O). */
@@ -617,17 +812,22 @@ float AW_MagicRechargeRate(void){
     fclose(f);return recharge_rate;
 }
 /* Unpaused single-player time (SV_Physics) and waiting/resting: only items with
- * a recorded (below full) charge do any work; their catalogue rows are cached. */
+ * a recorded (below full) charge do any work; their catalogue rows are cached, MAGIC_CACHE of them (by item id,
+ * the oldest replaced): a handful of partly spent items is the usual case; more re-read the catalogue in turn. */
+#define MAGIC_CACHE 8
 void AW_MagicFrame(float seconds){
-    static char ids[AW_STATE_VALUES][64];static aw_inventory_item_t rows[AW_STATE_VALUES];static int ok[AW_STATE_VALUES];
-    int i;float rate;
-    if(!aw_state.magic.charge_known || !(seconds>0) || (rate=AW_MagicRechargeRate())<=0)return;
-    for(i=0;i<aw_state.count[AW_ITEM] && i<AW_STATE_VALUES;i++){
-        if(!(aw_state.magic.charge_known&(1U<<i)))continue;
-        if(strcmp(ids[i],aw_state.values[AW_ITEM][i].id)){
-            strcpy(ids[i],aw_state.values[AW_ITEM][i].id);ok[i]=AW_InventoryRead(ids[i],&rows[i]);
+    static char ids[MAGIC_CACHE][64];static aw_inventory_item_t rows[MAGIC_CACHE];static int ok[MAGIC_CACHE],next;
+    int i,c,any=0;float rate;
+    for(i=0;i<aw_state.items.count && !any;i++)any=AW_ITEM_HAS(&aw_state,i,AW_ITEM_CHARGE)!=0;
+    if(!any || !(seconds>0) || (rate=AW_MagicRechargeRate())<=0)return;
+    for(i=0;i<aw_state.items.count;i++){
+        if(!AW_ITEM_HAS(&aw_state,i,AW_ITEM_CHARGE))continue;
+        for(c=0;c<MAGIC_CACHE && strcmp(ids[c],AW_ITEM_ID(&aw_state,i));c++);
+        if(c==MAGIC_CACHE){
+            c=next;next=(next+1)%MAGIC_CACHE;
+            strcpy(ids[c],AW_ITEM_ID(&aw_state,i));ok[c]=AW_InventoryRead(ids[c],&rows[c]);
         }
-        if(ok[i])AW_MagicRecharge(&aw_state,&rows[i],seconds,rate);
+        if(ok[c])AW_MagicRecharge(&aw_state,&rows[c],seconds,rate);
     }
 }
 static void inv_store(const aw_fighter_t *sheet){
@@ -642,7 +842,7 @@ static void inv_store(const aw_fighter_t *sheet){
         maximum=kind?sheet->shield_health_max:sheet->weapon_health_max;
         if(!(maximum>0 && current>=0))continue;
         value=current/maximum;if(value>1)value=1;
-        aw_state.inventory.condition_known|=1U<<index;aw_state.inventory.condition[index]=value;
+        AW_ItemMark(&aw_state,index,AW_ITEM_CONDITION,value);
     }
 }
 static void inv_combat(aw_fighter_t *sheet){
@@ -717,8 +917,8 @@ static void weapon_kit(int give){
         if(!sv.active || svs.maxclients!=1){free(rows);Con_Printf("Weapon kit: start or load a game first.\n");return;}
         need=AW_WeaponKitNeeds(&aw_state,rows,n);
         if(!AW_WeaponKitGrant(&aw_state,rows,n)){
-            Con_Printf("Weapon kit refused: it needs %d more kinds of item, %d free of %d; nothing given.\n",
-                       need,AW_STATE_VALUES-aw_state.count[AW_ITEM],AW_STATE_VALUES);
+            Con_Printf("Weapon kit refused: not enough memory for %d more kinds of item (%d carried); nothing given.\n",
+                       need,AW_ItemCount(&aw_state));
             free(rows);return;
         }
         Con_Printf("DIAGNOSTIC weapon kit given: %d items (dbg give weapons stats shows this again).\n",n);
@@ -736,6 +936,13 @@ static void weapon_kit(int give){
 static char space_blocker[80];
 void AW_InventoryGrantCommand(void){
     aw_inventory_item_t item;int n;
+    /* dbg weapon / dbg gear (WEAPONS-57): the box of every weapon and shield, or of every armour and clothing piece */
+    if(cmd_source==src_command && Cmd_Argc()==3 && !Q_strcasecmp(Cmd_Argv(1),"box")){
+        int kind=!Q_strcasecmp(Cmd_Argv(2),"weapon")?AW_GEARBOX_WEAPON:!Q_strcasecmp(Cmd_Argv(2),"gear")?AW_GEARBOX_GEAR:0;
+        if(!kind){Con_Printf("dbg weapon | dbg gear\n");return;}
+        if(!sv.active || svs.maxclients!=1){Con_Printf("Start or load a game first.\n");return;}
+        AW_GearBoxOpen(kind);return;
+    }
     if(cmd_source==src_command && (Cmd_Argc()==3 || Cmd_Argc()==4) && !Q_strcasecmp(Cmd_Argv(1),"give") &&
        !Q_strcasecmp(Cmd_Argv(2),"weapons")){
         if(Cmd_Argc()==4 && Q_strcasecmp(Cmd_Argv(3),"stats")){Con_Printf("dbg give weapons [stats]\n");return;}
@@ -753,12 +960,27 @@ void AW_InventoryGrantCommand(void){
         }
         AW_CombatEquipmentChanged();Con_Printf("DIAGNOSTIC inventory equip: %s.\n",item.id);return;
     }
+    /* dbg inventory kinds (INVENTORY-ORIGINAL-LIMITS-61, ENCUMBRANCE-INCOMPLETE-61): the item table as it is (kinds
+     * carried, rows, blocks, the name pool, the bytes it holds) and the load against the capacity */
+    if(cmd_source==src_command && Cmd_Argc()==2 && !Q_strcasecmp(Cmd_Argv(1),"kinds")){
+        const aw_items_t *t=&aw_state.items;int i,carried=0;long bytes;
+        for(i=0;i<t->count;i++)if(AW_ITEM_ROW(&aw_state,i)->value>0)carried++;
+        bytes=(long)t->blocks*AW_ITEM_BLOCK*(long)sizeof(aw_item_row_t)+(long)t->names_size+(long)t->blocks*(long)sizeof(void *);
+        Con_Printf("DIAGNOSTIC item table: %d kinds carried, %d rows, %d blocks of %d, names %lu of %lu bytes, %ld bytes; "
+                   "load %.2f\n",carried,t->count,t->blocks,AW_ITEM_BLOCK,(unsigned long)t->names_used,
+                   (unsigned long)t->names_size,bytes,AW_ItemsBurden(&aw_state));
+        return;
+    }
     /* dbg inventory unequip "<id>" | worn (ARRIVAL-LONG-FRAME-DEV6-59, the gear swap check of the cached body): take
      * off a worn item as the inventory window does; "worn" lists the clothing and armour slots */
     if(cmd_source==src_command && sv.active && svs.maxclients==1 && Cmd_Argc()==2 && !Q_strcasecmp(Cmd_Argv(1),"worn")){
         int s;
         for(s=AW_SLOT_HELMET;s<=AW_SLOT_ROBE;s++)if(aw_state.inventory.equipped[s][0])
             Con_Printf("  worn slot %d: %s\n",s,aw_state.inventory.equipped[s]);
+        /* the hands too (WEAPONS-57: a two-handed weapon takes the shield off) */
+        Con_Printf("  right hand: %s\n  left hand: %s\n",aw_state.inventory.equipped[AW_SLOT_RIGHT][0]?
+            aw_state.inventory.equipped[AW_SLOT_RIGHT]:"-",aw_state.inventory.equipped[AW_SLOT_LEFT][0]?
+            aw_state.inventory.equipped[AW_SLOT_LEFT]:"-");
         return;
     }
     /* dbg inventory wear "<id>": one of it given (test only) and worn, as the window's E */
@@ -796,15 +1018,26 @@ void AW_InventoryGrantCommand(void){
     }
     if(cmd_source!=src_command || !sv.active || svs.maxclients!=1 || Cmd_Argc()!=4 || Q_strcasecmp(Cmd_Argv(1),"grant"))return;
     n=Q_atoi(Cmd_Argv(3));
-    if(n<1 || n>999 || !AW_InventoryRead(Cmd_Argv(2),&item) || !AW_ItemAdd(&aw_state,item.id,n)){
-        Con_Printf("Diagnostic inventory grant refused.\n");return;
+    if(n<1 || n>999 || !AW_InventoryRead(Cmd_Argv(2),&item)){Con_Printf("Diagnostic inventory grant refused: not a catalogue item, or a count outside 1 to 999.\n");return;}
+    if(!AW_ItemAdd(&aw_state,item.id,n)){
+        Con_Printf("Diagnostic inventory grant refused: %s.\n",AW_ItemRefusalText(&aw_state,AW_ItemRefusal(&aw_state,item.id,n)));return;
     }
     Con_Printf("DIAGNOSTIC inventory grant: %s +%d, now %ld.\n",item.id,n,(long)AW_StateGet(&aw_state,AW_ITEM,item.id));
 }
+/* ENCUMBRANCE-INCOMPLETE-61: a new kind's weight from its record (memory first: the records cache and the area
+ * tables; a pickup's record was just read) */
+static int inv_weight(const char *id,float *weight){
+    aw_inventory_item_t item;int i;
+    for(i=0;i<WEIGHT_MEMO;i++)if(weight_memo[i].id[0] && !AW_InventoryCompare(weight_memo[i].id,id)){*weight=weight_memo[i].weight;return 1;}
+    if(!AW_InventoryRead(id,&item))return 0;
+    *weight=item.weight;return 1;
+}
 void AW_InventoryInit(void){
     aw_combat_equipment=inv_combat;aw_combat_equipment_store=inv_store;aw_hand_block_item=inv_block_item;aw_hand_weapon_item=inv_weapon_item;
+    aw_combat_player_ranged=inv_ranged;aw_combat_player_weapon_normal=inv_weapon_normal;
     aw_inventory_hand_item=AW_InventoryEquippedItem;
-    aw_magic_frame=AW_MagicFrame;
+    aw_magic_frame=AW_MagicFrame;aw_item_weight=inv_weight;aw_inventory_carried=AW_InventoryCarried;aw_inventory_read_row=AW_InventoryReadRow;
+    aw_save_items_loaded=inv_items_loaded;
 }
 static void inv_level(void){
     if(inventory_world!=sv.worldmodel){
@@ -872,6 +1105,9 @@ void AW_InventorySpawn(void){
     inventory_world=sv.worldmodel;model_names_used=0;
     memset(drop_entity,0,sizeof(drop_entity));memset(drop_label,0,sizeof(drop_label));
     map_drop_count=0;
+    /* the starting outfit, worn from the first scene on (CHARGEN-NO-STARTING-CLOTHES-60); once per game, during the
+     * loading screen: one read of initial.awi and its three rows; later spawns cost one global lookup */
+    if(!AW_InventoryBootstrap())Con_Printf("Inventory: starting outfit unavailable (inventory/initial.awi).\n");
     if(aw_ledger_on){
         /* an older save's drops (keyed by map name) join the list once; then the list's drops of this map */
         if((i=AW_LedgerAdoptDrops(&aw_state,&aw_ledger))>0)Con_Printf("Inventory: %d dropped items of the save moved to the world change list.\n",i);
@@ -1298,7 +1534,15 @@ typedef struct {
     const byte *row,*owner,*own,*cont,*content,*itemoff,*pic;
     const byte *lev;      /* CONTAINER-LEVELLED-CONTENTS-60: the levelled lists (CHIM actor table list layout), or NULL */
     const byte *pool;int pool_ids;   /* and the ids their entries name (u8 length, the id) */
+    const byte *links;int link_rows;  /* TAKEN-LIGHT-FLAME-61: the effect links (AREA_LINK rows), or NULL */
+    const byte *stats;long stats_bytes;   /* ACTOR-STATS-ALL-61: the AWS1 section (aw_stats.h), or NULL */
+    long logical;         /* the record's bytes before the stats section (the levelled section's trailer ends there) */
 } area_t;
+/* TAKEN-LIGHT-FLAME-61: an area's effect links (tools/effect_links.py), the record's last section, named by its last
+ * 8 bytes (u32 its offset, "AWE1"): "AWE1" u16 rows u16 0, rows x 12 bytes { u8 kind, u8 0, u16 aux, u32 key, u32
+ * reference } ascending (kind, key, aux). Kinds: 'P' a CHIM exterior placement id (key) of the reference, 'F' a frame
+ * map's aw_flame row (key the map name's hash, aux the row's order), 'L' a row of world/lamps.awl (key). */
+#define AREA_LINK 12
 /* slots 0..AREA_MAX-1: the place's areas; the last AREA_NARROW: the cache (KEEP WHAT YOU CAN AFFORD): the areas the
  * player left lately and those narrow-loaded for one answer outside the place (a carried item from elsewhere, a
  * container a script names). Coming back to a cached area reads nothing; the least recently used one goes when the
@@ -1312,6 +1556,10 @@ static byte *area_index,*area_item_dir;static unsigned long area_keys,area_dir_i
 static byte *area_cont_heads;static unsigned long area_cont_blocks;
 static FILE *area_file;static long area_base,area_length;
 static int area_tried;
+/* ACTOR-STATS-ALL-61: the shared stats record (the race and class rows, the skill table, the exteriors' levelled
+ * creatures; a few KB), read once with the pack's index and kept */
+static area_t stats_shared;
+static int area_read(unsigned long key,area_t *a);
 static unsigned long area_loads,area_load_bytes,area_hits,area_narrow_loads;static double area_load_seconds,area_last_seconds;
 static unsigned long area_last_bytes;static int area_last_count;
 static int area_ready(void){
@@ -1340,6 +1588,8 @@ static int area_ready(void){
        fread(area_cont_heads,1,area_cont_blocks*4,area_file)!=area_cont_blocks*4)goto bad;
     Con_Printf("Area tables: %lu areas; in memory the index %lu bytes, the item directory %lu bytes, the container "
                "directory's heads %lu bytes\n",area_keys,area_keys*12,area_dir_items*8,area_cont_blocks*4);
+    if(area_read(AWS_SHARED_KEY,&stats_shared) && stats_shared.stats)
+        Con_Printf("Area tables: the shared stats record, %ld bytes kept\n",stats_shared.bytes);
     return 1;
  bad:
     if(area_index){free(area_index);area_index=NULL;}
@@ -1391,10 +1641,30 @@ static int area_read_at(unsigned long n,area_t *a){
         end=p-a->blob;}
      if(end+(long)a->items*8>a->bytes){area_free(a);return 0;}
      a->pic=a->blob+end;
+     {long len=a->bytes;
+     /* TAKEN-LIGHT-FLAME-61: the effect links last (written at image assembly, after the area stage); the sections
+      * before them end at their offset */
+     if(len>=end+(long)a->items*8+16 && !memcmp(b+len-4,"AWE1",4)){
+        unsigned long o=focus_u32(b+len-8),links;
+        if(o>=(unsigned long)(end+(long)a->items*8) && o+8<=(unsigned long)(len-8) && !memcmp(b+o,"AWE1",4) &&
+           o+8+(links=(unsigned long)(b[o+4]|(b[o+5]<<8)))*AREA_LINK==(unsigned long)(len-8)){
+            a->links=b+o+8;a->link_rows=(int)links;len=(long)o;
+        }
+     }
+     /* ACTOR-STATS-ALL-61: the stat entries of the actors placed here next, named by the remaining record's last 8
+      * bytes (u32 their offset, "AWS1"; tools/actor_stats.py); the sections before it end at that offset */
+      if(len>=end+(long)a->items*8+8+AWS_SLIM_HEAD && !memcmp(b+len-4,"AWS1",4)){
+         unsigned long o=focus_u32(b+len-8);
+         if(o>=(unsigned long)(end+(long)a->items*8) && o+AWS_SLIM_HEAD<=(unsigned long)(len-8) &&
+            (!memcmp(b+o,"AWS1",4) || !memcmp(b+o,"AWS2",4))){
+             a->stats=b+o;a->stats_bytes=(long)(len-8-(long)o);len=(long)o;
+         }
+      }
+      a->logical=len;}
      /* CONTAINER-LEVELLED-CONTENTS-60: the levelled lists after the pictures, named by the record's last 8 bytes
       * (u32 their offset, "AWL1"; tools/prepare_area_tables.py); a record without them has none */
-     if(a->bytes>=end+(long)a->items*8+16 && !memcmp(b+a->bytes-4,"AWL1",4)){
-        unsigned long o=focus_u32(b+a->bytes-8),stop=(unsigned long)(a->bytes-8),lists,lb,total=0;
+     if(a->logical>=end+(long)a->items*8+16 && !memcmp(b+a->logical-4,"AWL1",4)){
+        unsigned long o=focus_u32(b+a->logical-8),stop=(unsigned long)(a->logical-8),lists,lb,total=0;
         const byte *s=b+o+4;
         if(o>=(unsigned long)(end+(long)a->items*8) && o+8<=stop && !memcmp(b+o,"AWL1",4)){
             /* the lists' bytes: the heads, then the entries up to the last head's (tools/prepare_area_tables.py
@@ -1493,6 +1763,115 @@ static unsigned long area_name_hash(const char *s){
     unsigned long h=2166136261ul;
     for(;*s;s++){unsigned c=(unsigned char)*s;if(c>='A' && c<='Z')c+=32;h=((h^c)*16777619ul)&0xFFFFFFFFul;}
     return h?h:1;
+}
+/* TAKEN-LIGHT-FLAME-61: the CHIM exterior placement ids of REFERENCE in the loaded areas' effect links (every cut
+ * piece; the place's areas and the cache), at most MOST; their count. A take or a Disable outdoors hides them. */
+int AW_AreaEffectPids(unsigned reference,unsigned *pids,int most){
+    int i,k,n=0;
+    for(i=0;reference && i<AREA_SLOTS;i++){
+        const area_t *a=&areas[i];
+        if(!a->blob || !a->links)continue;
+        for(k=0;k<a->link_rows && n<most;k++){
+            const byte *r=a->links+k*AREA_LINK;
+            if(r[0]=='P' && focus_u32(r+8)==reference)pids[n++]=(unsigned)focus_u32(r+4);
+        }
+    }
+    return n;
+}
+/* After the place's areas are read: their effect links applied once (a few rows an area; 'P' one look at the world
+ * change list each): the gone placements out of the CHIM world, the frame map's flames and the lamp rows named. */
+void AW_AreaEffectsApply(void){
+    int i,k;unsigned long map=sv.name[0]?area_name_hash(sv.name):0;
+    for(i=0;i<area_count;i++){
+        const area_t *a=&areas[i];
+        if(!a->blob || !a->links)continue;
+        for(k=0;k<a->link_rows;k++){
+            const byte *r=a->links+k*AREA_LINK;unsigned key=(unsigned)focus_u32(r+4),ref=(unsigned)focus_u32(r+8);
+            if(r[0]=='P'){if(AW_ObjectDisabled(ref))ChimChunks_GonePid(key,1);}
+            else if(r[0]=='F'){if(key==map)AW_StaticFlameLink(sv.worldmodel,r[2]|(r[3]<<8),ref);}
+            else if(r[0]=='L')AW_LampLink(key,ref);
+        }
+    }
+}
+/* ACTOR-STATS-ALL-61: the stat block of a placed REFERENCE from the loaded areas: its actor row (the rows are in
+ * ascending reference) names its entry, decoded with no search of the section; an actor not placed in them (a script
+ * or a conversation naming someone, a levelled pick) by its id HASH in the sections (the place first, then the
+ * cache). 1 found; 0: not in the loaded areas (the caller keeps the actor table's row, counted). */
+static unsigned long stats_direct,stats_hashed,stats_missed;
+static double stats_fill_seconds,stats_drain_worst;static int stats_fill_made,stats_fill_blocks;
+/* the outdoor queue (rule of thumb 7): the placed actors of the cells just loaded, made a few a frame */
+#define STATS_QUEUE 512
+#define STATS_PER_FRAME 4
+static struct {unsigned long key;unsigned short row;} stats_queue[STATS_QUEUE];
+static int stats_q_n,stats_q_at,stats_q_frame=-1;static double stats_q_time;
+static const area_t *area_of_key(unsigned long key);
+/* the host's maker (aw_mwhost.c: decodes the entry, makes the live record; NULL in a build without the actor record):
+ * 1 made or there already, 0 not, -1 the area stats are off or the actor record is not open */
+int (*aw_area_actor_make)(unsigned reference,int actb_row,const unsigned char *section,long bytes,long offset,
+                          const unsigned char *shared,long shared_bytes);
+/* an actor row's entry offset and actor table row (tools/actor_stats.py mark_row; aw_stats.h AW_StatRowOffset) */
+static long row_entry(const byte *r){return r[0]=='A' && r[92]=='S' && !r[93]?(long)(r[94]<<8|r[95]):0;}
+static long row_actb(const byte *r){return r[0]=='A' && r[88]=='R' && !r[89]?(long)(r[90]<<8|r[91]):-1;}
+/* the live record of actor row J of area A from its block; 1 made (or there already) */
+static int stats_fill_row(const area_t *a,int j){
+    const byte *r=a->row+j*FOCUS_ROW2;long o=row_entry(r),ab=row_actb(r);
+    return o && ab>=0 && aw_area_actor_make && aw_area_actor_make((unsigned)focus_u32(r+4),(int)ab,a->stats,a->stats_bytes,o,
+                                                                   stats_shared.stats,stats_shared.stats_bytes)>0;
+}
+/* STATS_PER_FRAME queued actors made, once a frame; the worst frame's time kept */
+static void stats_drain(void){
+    double t0;int done=0;
+    /* once per server frame (sv.time moves each frame) */
+    if(stats_q_at>=stats_q_n || (stats_q_frame>=0 && stats_q_time==sv.time))return;
+    stats_q_frame=1;stats_q_time=sv.time;t0=Sys_FloatTime();
+    while(stats_q_at<stats_q_n && done<STATS_PER_FRAME){
+        const area_t *a=area_of_key(stats_queue[stats_q_at].key);
+        if(a && a->stats){stats_fill_made+=stats_fill_row(a,stats_queue[stats_q_at].row);done++;}
+        stats_q_at++;
+    }
+    if(Sys_FloatTime()-t0>stats_drain_worst)stats_drain_worst=Sys_FloatTime()-t0;
+}
+/* the last area load's actor records: made, placed actors with a block, the milliseconds of the load step (a room:
+ * all; outdoors: the queue) and of the worst staggered frame (dbg mwscript stats) */
+void AW_AreaActorFill(int *made,int *blocks,float *ms){*made=stats_fill_made;*blocks=stats_fill_blocks;*ms=(float)(stats_fill_seconds*1000.0);}
+float AW_AreaActorFillWorstFrame(void){return (float)(stats_drain_worst*1000.0);}
+/* the decoder (aw_stats.c), set by the host with the actor record (aw_mwhost.c): this file links without it */
+int (*aw_area_stat_decode_at)(const unsigned char *s,long bytes,long o,const unsigned char *sh,long shb,aw_stat_block_t *out);
+int (*aw_area_stat_decode)(const unsigned char *s,long bytes,uint32_t hash,const unsigned char *sh,long shb,aw_stat_block_t *out);
+#define AW_StatDecodeAt(s,n,o,sh,shb,b) (aw_area_stat_decode_at && aw_area_stat_decode_at(s,n,o,sh,shb,b))
+#define AW_StatDecode(s,n,h,sh,shb,b) (aw_area_stat_decode && aw_area_stat_decode(s,n,h,sh,shb,b))
+#define AW_StatRowOffset(r) row_entry(r)
+static long row_entry(const byte *r);
+int AW_AreaActorStats(unsigned reference,unsigned long hash,aw_stat_block_t *out){
+    int i;const unsigned char *sh=stats_shared.stats;long shb=stats_shared.stats_bytes;
+    for(i=0;reference && i<AREA_SLOTS;i++){
+        const area_t *a=&areas[i];int lo=0,hi;
+        if(!a->blob || !a->stats)continue;
+        hi=a->rows-1;
+        while(lo<=hi){
+            int mid=(lo+hi)/2;const byte *r=a->row+mid*FOCUS_ROW2;unsigned ref=(unsigned)focus_u32(r+4);
+            if(ref==reference){
+                long o=AW_StatRowOffset(r);
+                if(o && AW_StatDecodeAt(a->stats,a->stats_bytes,o,sh,shb,out)){out->id=(uint32_t)hash;stats_direct++;return 1;}
+                break;
+            }
+            if(ref<reference)lo=mid+1;else hi=mid-1;
+        }
+    }
+    for(i=0;hash && i<AREA_SLOTS;i++)
+        if(areas[i].blob && areas[i].stats && AW_StatDecode(areas[i].stats,areas[i].stats_bytes,(uint32_t)hash,sh,shb,out)){
+            stats_hashed++;return 1;}
+    /* the exteriors' levelled creatures are kept once, in the shared record */
+    if(hash && sh && AW_StatDecode(sh,shb,(uint32_t)hash,NULL,0,out)){stats_hashed++;return 1;}
+    stats_missed++;
+    return 0;
+}
+void AW_AreaActorStatsCounts(unsigned long out[3]){out[0]=stats_direct;out[1]=stats_hashed;out[2]=stats_missed;}
+static int area_ready(void);
+const unsigned char *AW_AreaStatsShared(long *bytes){
+    area_ready();
+    *bytes=stats_shared.stats?stats_shared.stats_bytes:0;
+    return stats_shared.stats;
 }
 static int area_item_find(const area_t *a,const char *id);
 /* the directory's area for item ID narrow-loaded: the area, NULL when the directory has none */
@@ -2437,12 +2816,38 @@ static void focus_load(void){
         }
         /* the carried items' records into memory now (the inventory, the strip's other side, the HUD): read at the
          * load, never in play */
-        for(j=0;j<aw_state.count[AW_ITEM];j++)
-            if(aw_state.values[AW_ITEM][j].value>0){aw_inventory_item_t item;AW_InventoryRead(aw_state.values[AW_ITEM][j].id,&item);
-                                                     pic_warm(aw_state.values[AW_ITEM][j].id);}
+        /* INVENTORY-ORIGINAL-LIMITS-61: in one go (AW_InventoryCarried: memory first, one pass over the file for many
+         * misses); each record weighs its row (ENCUMBRANCE-INCOMPLETE-61); the pictures of the first PIC_CACHE kinds */
+        AW_InventoryCarried(carried_warm,NULL);
+        for(j=k=0;j<aw_state.items.count && k<PIC_CACHE;j++)
+            if(AW_ITEM_ROW(&aw_state,j)->value>0){char id[64];strcpy(id,AW_ITEM_ID(&aw_state,j));pic_warm(id);k++;}
+        /* the carried weight summed again exactly from those weights */
+        AW_ItemsWeigh(&aw_state);
+        /* ACTOR-STATS-ALL-61: every placed actor's live record from its area's stat block. A room: all of them in this
+         * same loading step, before the room is shown. Outdoors (the engine_chim_design rule of thumb 7, staggered): the
+         * cells' actors are queued and made STATS_PER_FRAME a frame (stats_drain), so a crossing never makes them all
+         * in one frame; an actor that is asked for sooner gets its own block at once (aw_actor_stats_source). */
+        {double t1=Sys_FloatTime();int made=0,blocks=0;
+         stats_q_n=0;
+         if(aw_area_actor_make && aw_area_actor_make(0,-1,NULL,0,0,NULL,0)>=0)    /* on and the actor record open */
+             for(k=0;k<n;k++){
+                 const area_t *a=area_of_key(keys[k]);
+                 if(!a || !a->stats)continue;
+                 for(j=0;j<a->rows;j++){
+                     const byte *r=a->row+j*FOCUS_ROW2;
+                     if(!row_entry(r) || row_actb(r)<0)continue;
+                     blocks++;
+                     if(!focus_outdoor)made+=stats_fill_row(a,j);
+                     else if(stats_q_n<STATS_QUEUE){stats_queue[stats_q_n].key=keys[k];stats_queue[stats_q_n].row=(unsigned short)j;stats_q_n++;}
+                 }
+             }
+         stats_q_at=0;
+         stats_fill_seconds=Sys_FloatTime()-t1;stats_fill_made=made;stats_fill_blocks=blocks;}
         area_loading=0;
-        Con_Printf("Area tables: %d areas, %lu bytes read in %d ms (%d rows)\n",area_last_count,area_last_bytes,
-                   (int)(area_last_seconds*1000),focus_count);
+        AW_AreaEffectsApply();      /* TAKEN-LIGHT-FLAME-61: what a taken light takes with it, outdoors too */
+        Con_Printf("Area tables: %d areas, %lu bytes read in %d ms (%d rows); actor stats: %d of %d live records in "
+                   "%.2f ms\n",area_last_count,area_last_bytes,(int)(area_last_seconds*1000),focus_count,
+                   stats_fill_made,stats_fill_blocks,stats_fill_seconds*1000.0);
     }else{
         if(!(f=focus_open(&base,&rooms)))return;
         /* CELL-CHANGES-59 slice 7: each place read is a place loaded: its respawning containers refill when due */
@@ -2483,6 +2888,7 @@ static void focus_load(void){
 /* Read again on a new map, or outdoors when the player has walked into another cell. */
 static void focus_refresh(const edict_t *p){
     vec3_t game;
+    stats_drain();     /* ACTOR-STATS-ALL-61: a few of the cells' queued actor records a frame */
     if(focus_world!=sv.worldmodel){focus_load();return;}
     /* PLACED-ITEMS-OUTDOORS-FIRST-FRAME-59: read in the first frame after a map change, before the player stands at
      * the arrival, an outdoor map could look like a room without a number and was never read again: read it again
@@ -2629,10 +3035,18 @@ static int placed_use(void){
     if((row->action&3)==FOCUS_ACT_READ && aw_book_reader && aw_book_reader(row->reference))return 1;
     return take_row(row);
 }
+/* COLLECT-CAPACITY-REJECTED-60: a refused pickup says which limit refused it (AW_ItemRefusal); ID NULL when the
+ * caller does not know the item (then only a full table can be named) */
+void AW_InventoryRefused(const char *name,const char *id,int32_t count){
+    char text[128];int reason=id?AW_ItemRefusal(&aw_state,id,count):AW_ItemRoom(&aw_state)?AW_ITEM_OK:AW_ITEM_FULL;
+    Q_snprintf(text,sizeof(text),"Cannot collect: %s.",
+               reason==AW_ITEM_OK?"this item was refused":AW_ItemRefusalText(&aw_state,reason));
+    AW_UISubtitle(name,text,3);
+}
 static int take_row(focus_row_t *row){
     aw_inventory_item_t item;char id[FOCUS_ID+1];
     if(!placed_id(row->reference,id) || !AW_InventoryRead(id,&item))return 0;
-    if(!AW_ItemAdd(&aw_state,item.id,1)){AW_UISubtitle(row->name,"Cannot collect: inventory capacity.",3);return 1;}
+    if(!AW_ItemAdd(&aw_state,item.id,1)){AW_InventoryRefused(row->name,item.id,1);return 1;}
     if(!AW_ObjectTake(row->reference,row->owned)){AW_ItemAdd(&aw_state,item.id,-1);return 0;}
     /* CELL-CHANGES-59 slice 2: an owned item is stolen from its owner (the reference's owner, else its faction): the
      * pair (item, owner) on the world change list, kept wherever the item goes; the crime itself is CRIME-59 */
@@ -2650,13 +3064,14 @@ int AW_InventoryUse(void){
         /* CELL-CHANGES-59: a drop of the world change list comes back and its row goes */
         if((i=ledger_target())<0)return placed_use();
         if(!AW_LedgerPickup(&aw_state,&aw_ledger,map_drops[i].key)){
-            AW_UISubtitle(map_drops[i].label,"Cannot collect: inventory capacity.",3);return 1;}
+            AW_InventoryRefused(map_drops[i].label,NULL,1);return 1;}
         AW_UIPickupNotice(map_drops[i].label,3);AW_CombatEquipmentChanged();    /* the notice keeps its own copy */
         ED_Free(map_drops[i].e);map_drops[i]=map_drops[--map_drop_count];
         return 1;
     }
     i=inv_target();if(i<0)return placed_use();
-    if(!AW_InventoryPickup(&aw_state,i)){AW_UISubtitle(drop_label[i],"Cannot collect: inventory capacity.",3);return 1;}
+    if(!AW_InventoryPickup(&aw_state,i)){
+        AW_InventoryRefused(drop_label[i],aw_state.inventory.dropped[i].id,aw_state.inventory.dropped[i].count);return 1;}
     AW_UIPickupNotice(drop_label[i],3);AW_CombatEquipmentChanged();ED_Free(drop_entity[i]);drop_entity[i]=NULL;return 1;
 }
 #endif

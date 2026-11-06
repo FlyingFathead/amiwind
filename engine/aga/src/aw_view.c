@@ -34,6 +34,7 @@
 #include "aw_hand_models.h"
 #include "aw_player_parts.h"
 #include "aw_skel.h"
+#include "aw_animpick.h"
 
 extern cvar_t chase_active;
 /* The hooks (defined beside their callers, NULL in fixtures without this file). */
@@ -289,7 +290,8 @@ static int parts_ready(const char *race,int female) {
  * and the shield guard keep their baked arms in both. */
 static cvar_t hand_parts_cvar={"aw_hand_parts","1",true};
 #define HAND_PART_FRAMES 28     /* aw_hand_models.c: the hands' frame contract */
-#define HAND_PART_STANCES 4     /* bare hands, then AW_HandStance's three */
+#define HAND_PART_STANCES 7     /* bare hands, then AW_HandStance's six (an older table: the first four) */
+#define HAND_PART_MELEE 4       /* the stances every table has */
 static aw_parts_body_t hparts;
 static model_t *hpart_models[AW_PARTS_MAX];
 static const aw_skel_table_t *hparts_table;
@@ -321,7 +323,7 @@ static int hand_parts_ready(const char *race,int female) {
             text?"no recipe for this race and sex":"no view/parts_1st.txt in this image",race);
         return 0;
     }
-    if(!(hparts_table=AW_SkelTableFor(next.table)) || hparts_table->frames<HAND_PART_FRAMES*HAND_PART_STANCES){
+    if(!(hparts_table=AW_SkelTableFor(next.table)) || hparts_table->frames<HAND_PART_FRAMES*HAND_PART_MELEE){
         hparts_failed=1;Con_Printf("First-person arms from parts: no usable table %s: the baked arms draw.\n",next.table);
         return 0;
     }
@@ -349,10 +351,12 @@ static int hand_parts_ready(const char *race,int female) {
     return 2;
 }
 /* aw_hand_models.c (aw_hand_parts_apply): the view model becomes the first part at the hands' FRAME (0..27) of
- * STANCE (0 bare hands, 1 one-handed, 2 two-handed close, 3 two-handed wide). 1 = drawn from parts. */
+ * STANCE (0 bare hands, 1 one-handed, 2 two-handed close, 3 two-handed wide, 4 bow, 5 crossbow, 6 thrown; the last three
+ * only in a table that has them, FIRST-PERSON-WEAPONS-56). 1 = drawn from parts. */
 static int hand_parts_apply(const char *race,int female,int stance,int frame) {
     hparts_shown=0;
-    if(stance<0 || stance>=HAND_PART_STANCES || !hand_parts_ready(race,female))return 0;
+    if(stance<0 || stance>=HAND_PART_STANCES || !hand_parts_ready(race,female) ||
+       hparts_table->frames<(stance+1)*HAND_PART_FRAMES)return 0;
     if(frame<0)frame=0;
     if(frame>=HAND_PART_FRAMES)frame=HAND_PART_FRAMES-1;
     hparts_frame=stance*HAND_PART_FRAMES+frame;
@@ -614,12 +618,17 @@ int AW_ViewInventoryBody(model_t **model,int *frame){
         return 1;
     }
     if(AW_InventoryEquippedItem(AW_SLOT_RIGHT,&item)){
-        if(item.category!=AW_INV_WEAPON || item.subtype<0 || item.subtype>8)return 0;
+        if(item.category!=AW_INV_WEAPON || item.subtype<0 || item.subtype>11)return 0;
         type=item.subtype;
     }
-    inventory_left=type!=2 && type!=4 && type!=5 && type!=6 && type!=8;
+    /* a bow, crossbow or thrown weapon: the one-handed pose (OpenMW characterpreview.cpp: a ranged weapon's own group,
+     * else the one-handed fallback); a bow or crossbow hides the shield (two-handed) */
+    {int ranged=type>=9,left_shown=type!=2 && type!=4 && type!=5 && type!=6 && type!=8 && type!=9 && type!=10;
+    if(ranged)type=1;
+    inventory_left=left_shown;
     if(body_parts && parts_table && part_models[0]){
         int f=parts_inventory_frame(type,&inventory_left);
+        if(ranged)inventory_left=left_shown;
         if(f>=0){inventory_parts_frame=f;*model=part_models[0];*frame=f;return 1;}
         if(!inventory_parts_said){
             inventory_parts_said=1;
@@ -629,7 +638,8 @@ int AW_ViewInventoryBody(model_t **model,int *frame){
     strcpy(path,bodies[body_index].path);strcpy(path+strlen(path)-4,"_i.mdl");
     if(strcmp(path,inventory_body_path)){
         AW_ViewInventoryClear();strcpy(inventory_body_path,path);
-        inventory_left=type!=2 && type!=4 && type!=5 && type!=6 && type!=8;
+        inventory_left=left_shown;
+    }
     }
     if(inventory_failed)return 0;
     if(!inventory_model || !Cache_Check(&inventory_model->cache)){
@@ -723,6 +733,72 @@ static int body_hand_layer(edict_t *p,int frame) {
     if(fraction>1)fraction=1;
     return AW_ViewLayerFrame(&body_layers,state,frame,fraction);
 }
+/* ---- the weapon's stance on the assembled body (WEAPONS-57) ----
+ * With a weapon drawn the body plays the original's groups for that weapon from its shared table, as the NPCs do
+ * (aw_animkit.c): drawing "equip", putting away "unequip", a swing the weapon's chop/slash/thrust to its large follow,
+ * else the stance's idle, walk, run (forward, back, left, right) and jump (AW_AnimPick: OpenMW 0.51 character.cpp,
+ * weapontype.cpp). The draw, swing and put-away follow the first-person hand clock, so both views and the strike's hit
+ * key stay together. The table is the one the body already uses: no new data, a group looked up by name only when the
+ * state changes. aw_player_stances 0 (saved) = the previous way: the fixed layout (the bare-hand poses) with the weapon
+ * on the hand bone. */
+static cvar_t stances_cvar={"aw_player_stances","1",true};
+static struct {
+    aw_pick_state_t last;int picked,from,to,lfrom,loop;float t;const aw_skel_table_t *table;
+    char group[AW_PICK_NAME];const char *rule;unsigned long changes;
+} stance;
+static int stance_has(void *c,const char *name){return AW_SkelGroup((const aw_skel_table_t *)c,name)>=0;}
+static int stance_key(const aw_skel_table_t *t,int g,const char *key){
+    aw_skel_group_t gg;
+    AW_SkelGroupAt(t,g,&gg);
+    if(!strcmp(key,"start"))return (int)gg.first;
+    if(!strcmp(key,"stop"))return (int)gg.last;
+    return AW_SkelKeyFrame(t,g,key);
+}
+static float hand_fraction(edict_t *p,int clip){
+    eval_t *v=GetEdictFieldValue(p,"aw_hand_started");float d=AW_HandDuration(clip,0),f;
+    if(!v || !(d>0 && d<=60))return 1;
+    f=((float)sv.time-v->_float)/d;
+    return f<0?0:f>1?1:f;
+}
+/* The body's frame for the drawn weapon's stance, or -1 (nothing drawn, bare hands, swimming, a torch, no such group). */
+static int body_stance_frame(edict_t *p,int group,int air,float dt,float rate){
+    eval_t *v;aw_pick_state_t s;aw_pick_t o;int hand,goal,move=AW_PM_NONE,run=0,gi;
+    if(!stances_cvar.value || !body_parts || !parts_table || !p || p->v.health<=0)return -1;
+    if((v=GetEdictFieldValue(p,"aw_torch")) && v->_float==1)return -1;
+    hand=(v=GetEdictFieldValue(p,"aw_hand_state"))?(int)v->_float:0;
+    goal=(v=GetEdictFieldValue(p,"aw_hand_goal"))?(int)v->_float:0;
+    if(group==AW_ANIM_WALK || group==AW_ANIM_RUN || group==AW_ANIM_READYWALK || group==AW_ANIM_READYRUN){
+        /* the motion against the facing, as aw_animkit.c drive() reads an NPC's */
+        float yaw=cl.viewangles[YAW]*(float)M_PI/180,fx=Q_CosRad(yaw),fy=Q_SinRad(yaw);
+        float fwd=cl.velocity[0]*fx+cl.velocity[1]*fy,side=cl.velocity[0]*fy-cl.velocity[1]*fx;
+        run=group==AW_ANIM_RUN || group==AW_ANIM_READYRUN;
+        if(side*side>fwd*fwd)move=side>0?AW_PM_RIGHT:AW_PM_LEFT;else move=fwd>=0?AW_PM_FORWARD:AW_PM_BACK;
+    }
+    if(!AW_PickPlayerState(AW_InventoryEquippedWeaponType(),hand,goal,move,run,AW_CombatPlayerAttackType(),air,
+                           p->v.waterlevel>=2,&s)){stance.picked=0;return -1;}
+    if(!stance.picked || stance.table!=parts_table || memcmp(&s,&stance.last,sizeof(s))){
+        int from=-1,to=-1;
+        stance.last=s;stance.picked=1;stance.table=parts_table;
+        if(AW_AnimPick(&s,stance_has,(void *)parts_table,&o) && (gi=AW_SkelGroup(parts_table,o.group))>=0){
+            from=stance_key(parts_table,gi,o.start);to=stance_key(parts_table,gi,o.stop);
+            if(from<0 || to<from){aw_skel_group_t gg;AW_SkelGroupAt(parts_table,gi,&gg);from=(int)gg.first;to=(int)gg.last;}
+            stance.lfrom=o.loop_start[0]?stance_key(parts_table,gi,o.loop_start):-1;
+            if(from!=stance.from || strcmp(o.group,stance.group))stance.t=0;
+            memcpy(stance.group,o.group,sizeof(stance.group));stance.rule=o.rule;stance.loop=o.loop;stance.changes++;
+        }else stance.group[0]=0;
+        stance.from=from;stance.to=to;
+    }
+    if(stance.from<0 || stance.to>=parts_table->frames)return -1;
+    switch(s.event){
+    case AW_PE_EQUIP:return stance.from+(int)(hand_fraction(p,AW_HAND_DRAW)*(float)(stance.to-stance.from)+.5f);
+    case AW_PE_UNEQUIP:return stance.from+(int)(hand_fraction(p,AW_HAND_LOWER)*(float)(stance.to-stance.from)+.5f);
+    case AW_PE_ATTACK:return stance.from+(int)(hand_fraction(p,AW_HAND_PUNCH)*(float)(stance.to-stance.from)+.5f);
+    case AW_PE_JUMP:return stance.lfrom>=stance.from && stance.lfrom<=stance.to?stance.lfrom:stance.from;   /* held in the air */
+    default:
+        return AW_AnimKitSpanFrame((unsigned)stance.from,(unsigned)stance.to,parts_table->rate,&stance.t,
+                                   dt*(move!=AW_PM_NONE && rate>0?rate:1),1,NULL);
+    }
+}
 entity_t *AW_ViewBody(entity_t *ent) {
     float speed,rate=1,dt=(float)host_frametime;int group,block=-1,air,fists,layer;edict_t *p=local_player();
     held_visible=0;held_cursor=held_draw_count=0;
@@ -743,6 +819,7 @@ entity_t *AW_ViewBody(entity_t *ent) {
         p && !((int)p->v.flags&FL_ONGROUND),p && p->v.velocity[2]>0,fists,dt);
     if(air>=0)body.frame=air;
     if(death.stage==AW_DEATH_NONE && (layer=body_hand_layer(p,body.frame))>=0)body.frame=layer;
+    if(death.stage==AW_DEATH_NONE && (layer=body_stance_frame(p,group,air>=0,dt,rate))>=0)body.frame=layer;
     if(death.stage==AW_DEATH_NONE && (block=body_block_frame(dt))>=0)body.frame=block;
     /* the assembled body's frame is a frame of its table (every part draws it); the baked body's one of its own */
     if(body.frame<0 || body.frame>=(body_parts && parts_table?parts_table->frames:body_model->numframes))body.frame=0;
@@ -1306,6 +1383,9 @@ static void command(void) {
             Con_Printf("Body animation: frame %d/%d, group %d, layers %d, kit %d, water %d, torch %d\n",
                 body.frame,body_model->numframes,body_play.group,body_layers.count,
                 aw_anim_kit_enabled,body_water,body_torch);
+            Con_Printf("Weapon stance: %s (aw_player_stances %d), group %s (%s), frames %d..%d, %lu picks\n",
+                stance.picked && stance.group[0]?"playing":"not now",(int)stances_cvar.value,
+                stance.group[0]?stance.group:"-",stance.rule?stance.rule:"-",stance.from,stance.to,stance.changes);
             if(p)Con_Printf("Player state: waterlevel %.0f, movetype %.0f, velocity %.1f %.1f %.1f\n",
                 p->v.waterlevel,p->v.movetype,p->v.velocity[0],p->v.velocity[1],p->v.velocity[2]);
         }
@@ -1326,6 +1406,21 @@ static void command(void) {
         if(!AW_CombatHurtPlayer(100000,"dbg camera die"))Con_Printf("Not in a game, or already dead.\n");
         return;
     }
+    /* FP-WEAPON-SWAY-61: dbg camera sway [1|2|groove|stiff|bench] (view.c aw_fp_sway, saved) */
+    if(!Q_strcasecmp(a,"sway") && Cmd_Argc()<=3){
+        extern cvar_t aw_fp_sway;extern double V_SwayBench(int n);static char none[1];char *w=Cmd_Argc()==3?Cmd_Argv(2):none;
+        if(!Q_strcasecmp(w,"bench")){
+            double us=V_SwayBench(2000);
+            Con_Printf("Weapon sway arithmetic: %.2f us a frame (2000 rounds: bob, gun angle, idle; table sines).\n",us);
+            return;
+        }
+        if(!strcmp(w,"1") || !Q_strcasecmp(w,"groove"))Cvar_SetValue(aw_fp_sway.name,1);
+        else if(!strcmp(w,"2") || !Q_strcasecmp(w,"stiff"))Cvar_SetValue(aw_fp_sway.name,2);
+        else if(w[0]){Con_Printf("dbg camera sway [1 groove | 2 stiff | bench]\n");return;}
+        Con_Printf("Weapon sway: %s (aw_fp_sway %d, saved).\n",aw_fp_sway.value==2?"Morrowind stiff (still hands)":
+            "AmiWind groove (the hands sway with the stride)",aw_fp_sway.value==2?2:1);
+        return;
+    }
     /* residents drawn from parts (aw_npc_parts.c, NPC-PARTS-RUNTIME-59): npcs = the counters, npcs on/off */
     if(!Q_strcasecmp(a,"npcs") && Cmd_Argc()==2){AW_NpcPartsStatus();return;}
     if(Cmd_Argc()==3 && (on=AW_CompanionToggleWord(Cmd_Argv(2)))>=0){
@@ -1340,6 +1435,12 @@ static void command(void) {
             Con_Printf("Player body: %s (aw_player_body_parts %d, saved).\n",on?"assembled from what is worn":"the baked body",on);
             return;
         }
+        /* the drawn weapon's stance on the assembled body (on, the default) or the fixed layout (off, the previous way) */
+        if(!Q_strcasecmp(a,"stances")){
+            Cvar_SetValue(stances_cvar.name,(float)on);stance.picked=0;
+            Con_Printf("Weapon stances in third person %s (aw_player_stances %d, saved).\n",on?"on":"off: the fixed layout",on);
+            return;
+        }
         /* the first-person arms from parts (on, the default) or the baked arms (off, the previous method) */
         if(!Q_strcasecmp(a,"hands")){
             Cvar_SetValue(hand_parts_cvar.name,(float)on);hparts_failed=0;hparts_sig[0]=0;hparts.count=0;
@@ -1347,12 +1448,13 @@ static void command(void) {
             return;
         }
     }
-    Con_Printf("Usage: dbg camera [first | third | toggle | distance N | vanity on/off/now | death on/off | retry on/off | body on/off | parts on/off | hands on/off | npcs [on/off] | die]\n");
+    Con_Printf("Usage: dbg camera [first | third | toggle | distance N | vanity on/off/now | death on/off | retry on/off | body on/off | parts on/off | stances on/off | hands on/off | sway 1/2/bench | npcs [on/off] | die]\n");
 }
 void AW_ViewInit(void) {
     Cvar_RegisterVariable(&view_cvar);Cvar_RegisterVariable(&distance_cvar);Cvar_RegisterVariable(&vanity_cvar);
     Cvar_RegisterVariable(&death_cvar);Cvar_RegisterVariable(&retry_cvar);Cvar_RegisterVariable(&body_cvar);
     Cvar_RegisterVariable(&parts_cvar);Cvar_RegisterVariable(&hand_parts_cvar);Cvar_RegisterVariable(&player_cache_cvar);
+    Cvar_RegisterVariable(&stances_cvar);
     aw_hand_parts_apply=hand_parts_apply;aw_view_hand_part=hand_part;
     Cvar_RegisterVariable(&fullview_cvar);Cvar_RegisterVariable(&aw_inventory_preview_reserve);Cvar_RegisterVariable(&aw_inventory_preview_live);
     AW_ViewRulesDefault(&rules);AW_ViewReset(&view,&rules);

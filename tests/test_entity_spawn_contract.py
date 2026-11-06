@@ -150,6 +150,15 @@ class EntitySpawnContractTests(unittest.TestCase):
         self.assertEqual([e['classname'] for e in entities], ['aw_flame', 'aw_flame'])
         self.assertNotIn('aw_flame_shape', entities[0])
         self.assertIn('aw_flame_shape', entities[1])
+        self.assertTrue(all('aw_ref' not in e for e in entities))     # model-local emitters: no reference
+        # TAKEN-LIGHT-FLAME-STAYS-60: a placement's flames name it, so a taken candle's flame goes with it
+        prepare_mesh_bsp.NO_FLAMES = False
+        try:
+            referenced = parse_entities('\n'.join(prepare_mesh_bsp.flame_entities(ref, model, (0.0, 0.0), 119501)))
+        finally:
+            prepare_mesh_bsp.NO_FLAMES = saved
+        self.assertEqual([e.get('aw_ref') for e in referenced], ['119501', '119501'])
+        entities += referenced
         fields, spawn, engine_keys = qc_fields(), qc_spawn_functions(), engine_loader_keys()
         for entity in entities:
             self.assert_loads_silently(entity, fields, spawn, engine_keys)
@@ -161,7 +170,7 @@ class EntitySpawnContractTests(unittest.TestCase):
         reader = (SRC / 'aw_guard_torch.c').read_text(encoding='latin-1')
         reader = reader[reader.index('static void static_flames_load'):]
         reader = reader[:reader.index('\n}\n')]
-        for name in ('"aw_flame"', '"aw_flame_size"', '"aw_flame_shape"', '"origin"'):
+        for name in ('"aw_flame"', '"aw_flame_size"', '"aw_flame_shape"', '"origin"', '"aw_ref"'):
             self.assertIn(name, reader)
         self.assertIn('world->entities', reader, 'static flames must come from the map text, not live edicts')
 

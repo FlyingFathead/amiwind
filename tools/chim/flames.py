@@ -36,6 +36,7 @@ for p in (ROOT / 'tools', ROOT / 'src'):
 # engine/aga/src/aw_guard_torch.c: STATIC_FLAME_MAX flames read per map, the rest ignored (FLAMES-CAP-31)
 STATIC_FLAME_MAX = 128
 FLAME_CLASS = 'aw_flame'
+REF_KEY = 'aw_ref'      # the placement a room's flame burns on (TAKEN-LIGHT-FLAME-STAYS-60; engine static_flames_load)
 # Shape particle size from which the engine draws a flame with the hearth colour table and embers
 # (aw_guard_torch.c AW_StaticFlamesDraw: shape[0] >= 4)
 HEARTH_SIZE = 4.0
@@ -79,9 +80,11 @@ def record_angles(record):
     return tuple(record['angles']) if 'angles' in record else (0.0, record['yaw'], 0.0)
 
 
-def placed_flames(record, flames):
+def placed_flames(record, flames, refs=False):
     """Frame-local aw_flame rows of one placement record (its model's emitters, model_flames): world =
-    origin + model_matrix(angles) @ emitter, as the engine places the model (chim.placed.model_matrix)."""
+    origin + model_matrix(angles) @ emitter, as the engine places the model (chim.placed.model_matrix). REFS: each
+    row names the placement's source reference ("aw_ref", chim.cut.source_ref) so the engine drops the flame when
+    the item is taken (a room's candles, TAKEN-LIGHT-FLAME-STAYS-60); off for the exterior frames (no rows change)."""
     import numpy as np
     from chim.placed import model_matrix
     if not flames:
@@ -95,6 +98,9 @@ def placed_flames(record, flames):
                'aw_flame_size': f['size']}
         if f['shape'] is not None:
             row['aw_flame_shape'] = f['shape']
+        if refs and record.get('ref'):
+            from chim.cut import source_ref
+            row[REF_KEY] = str(source_ref(record['ref']))
         rows.append(row)
     return rows
 
@@ -169,7 +175,7 @@ def _fire_light(record, name, frame, lights):
     return None if found is None else '%.1f %.1f' % (found['radius'] * PL.SCALE, found['luma'])
 
 
-def frame_rows(chunks, models, cap=STATIC_FLAME_MAX, frame=None, lights=None):
+def frame_rows(chunks, models, cap=STATIC_FLAME_MAX, frame=None, lights=None, refs=False):
     """(rows, report): the aw_flame rows of every placement the frame's chunks own, largest flames first
     (hearths and campfires before candles), then by origin; at most CAP rows (the engine reads no more), every
     row past it counted in the report. chunks: the frame's chunks (frame_map.load / validate.load_frame:
@@ -177,7 +183,7 @@ def frame_rows(chunks, models, cap=STATIC_FLAME_MAX, frame=None, lights=None):
     bytes). A placement hidden by the opening story gets none (its fire would burn in the air); a mesh that is
     not fire (fire_mesh) gets none, counted; the same emitter reached twice (one origin rounded to 0.01) is
     written once. lights (fire_light_sources) and frame (its 'centre'): the first row of each fire placement whose
-    light record is found carries FIRE_LIGHT_KEY."""
+    light record is found carries FIRE_LIGHT_KEY. refs: every row carries REF_KEY (placed_flames; the rooms)."""
     from chim import format as F
     cache = getattr(models, 'flames', None)
     cache = {} if cache is None else cache
@@ -202,7 +208,7 @@ def frame_rows(chunks, models, cap=STATIC_FLAME_MAX, frame=None, lights=None):
             if lights is not None:
                 lit += light is not None
                 unmatched += light is None
-            for row in placed_flames(r, cache[mid]):
+            for row in placed_flames(r, cache[mid], refs):
                 if row['origin'] not in seen:
                     seen.add(row['origin'])
                     if light is not None:

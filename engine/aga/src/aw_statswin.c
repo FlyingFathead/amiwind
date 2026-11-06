@@ -10,10 +10,11 @@
  * aw_character (attributes, modifiers, damage, skills, current/maximum) every frame; nothing
  * is kept while the window is closed except the scroll position.
  *
- * Magic is a placeholder until the spell system: the original's Powers / Spells / Magic Items
- * headings, the character's race and birthsign spells by name (character/spells.aws, written
- * by tools/prepare_character.py from the SPEL records; read only while the window opens) and
- * "(Not yet implemented)" at the bottom. */
+ * Magic: the original's Powers / Spells / Magic Items headings. With casting (PLAYER-CASTING-59,
+ * aw_cast.c fills aw_magic_castables and its two neighbours) the spells and powers the player
+ * knows, a cursor and the selection of the spell to cast; without it the character's race and
+ * birthsign spells by name (character/spells.aws, written by tools/prepare_character.py from the
+ * SPEL records; read only while the window opens) and "(Not yet implemented)" at the bottom. */
 #include "quakedef.h"
 #include "aw_story.h"
 #include "aw_character.h"
@@ -205,10 +206,15 @@ static int spell_name(const char *id,char *name,int *power){
     }
     fclose(f);return found;
 }
+int (*aw_magic_castables)(aw_magic_list_t *out);
+void (*aw_magic_select)(int kind,int index);
+int (*aw_magic_status)(char *out,int size);
 int AW_MagicList(aw_magic_list_t *out){
     const aw_character_t *c=&aw_character;int i,k,power;char name[48];
-    out->count=0;
+    out->count=0;out->castable=0;out->selected=-1;
     if(!c->valid)return 0;
+    if(aw_magic_castables && aw_magic_castables(out)>0){out->castable=1;return out->count;}
+    out->count=0;out->selected=-1;
     for(k=0;k<2;k++){
         int count=k?(c->birth>=0 && c->birth<aw_birth_count?aw_births[c->birth].power_count:0):
                     (c->race>=0 && c->race<aw_race_count?aw_races[c->race].power_count:0);
@@ -220,31 +226,60 @@ int AW_MagicList(aw_magic_list_t *out){
     }
     return out->count;
 }
+/* the row each castable entry was drawn on this frame (for a click), -1 not drawn */
+static int magic_row_y[32];
 void AW_MagicDrawList(const aw_magic_list_t *list){
-    int gold=AW_UIColor(223,199,144),muted=AW_UIColor(150,135,104),y=24,section,i,any;
+    int gold=AW_UIColor(223,199,144),muted=AW_UIColor(150,135,104),bright=AW_UIColor(255,244,214),y=24,section,i,any;
     static const char *const headings[3]={"Powers","Spells","Magic Items"};
+    char footer[64];
     window_frame("Magic");
     AW_UIBox(4,18,312,160);
+    for(i=0;i<32;i++)magic_row_y[i]=-1;
     for(section=0;section<3;section++){
         /* Rows past the box bottom are not drawn (at most a handful of starting spells). */
         if(y<=170)small(10,y,200,headings[section],muted);
         y+=8;any=0;
         for(i=0;section<2 && i<list->count;i++){
             if(list->power[i]!=(section==0))continue;
-            if(y<=170)small(16,y,290,list->name[i],gold);
+            if(y<=170){
+                /* casting: the cursor's row bright, the selected spell marked */
+                int colour=list->castable && i==list->cursor?bright:gold;
+                if(list->castable && i==list->selected){
+                    char marked[52];marked[0]='*';marked[1]=' ';copy(marked+2,(int)sizeof(marked)-2,list->name[i]);
+                    small(16,y,290,marked,colour);
+                }
+                else small(16,y,290,list->name[i],colour);
+                magic_row_y[i]=y;
+            }
             y+=8;any=1;
         }
         if(!any){if(y<=170)small(16,y,100,"None",muted);y+=8;}
         y+=4;
     }
     AW_UISmallBegin();
-    AW_UITextCentred(4,180,312,14,"(Not yet implemented)",gold);
+    if(list->castable && aw_magic_status && aw_magic_status(footer,sizeof(footer)))AW_UITextCentred(4,180,312,14,footer,gold);
+    else if(list->castable)AW_UITextCentred(4,180,312,14,"Up/Down, Enter: select a spell",gold);
+    else AW_UITextCentred(4,180,312,14,"(Not yet implemented)",gold);
     AW_UISmallEnd();
 }
 static void magic_draw(void){if(magic)AW_MagicDrawList(magic);}
+static void magic_choose(int i){
+    if(!magic || !magic->castable || i<0 || i>=magic->count || !aw_magic_select)return;
+    aw_magic_select(magic->kind[i],magic->index[i]);
+    magic->selected=i;
+}
 static int magic_key(int key,int mouse_x,int mouse_y){
-    (void)mouse_x;(void)mouse_y;
-    return !own_key(key,"aw_magicmenu",'o');
+    int i;
+    if(own_key(key,"aw_magicmenu",'o'))return 0;
+    if(!magic || !magic->castable || magic->count<1)return 1;
+    if(key==K_UPARROW || key=='w' || key==K_MWHEELUP)magic->cursor=magic->cursor>0?magic->cursor-1:0;
+    if(key==K_DOWNARROW || key=='s' || key==K_MWHEELDOWN)magic->cursor=magic->cursor<magic->count-1?magic->cursor+1:magic->count-1;
+    if(key==K_ENTER)magic_choose(magic->cursor);
+    if(key==K_MOUSE1)for(i=0;i<magic->count;i++)
+        if(magic_row_y[i]>=0 && mouse_y>=magic_row_y[i]-1 && mouse_y<magic_row_y[i]+7 && mouse_x>=16 && mouse_x<306){
+            magic->cursor=i;magic_choose(i);break;
+        }
+    return 1;
 }
 static void magic_closed(void){free(magic);magic=NULL;}
 void AW_MagicMenuOpen(void){

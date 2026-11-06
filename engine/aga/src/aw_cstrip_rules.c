@@ -7,7 +7,7 @@ void AW_CStripClamp(aw_cstrip_list_t *list){
     for(s=0;s<2;s++){
         int n=list->count[s];
         if(n<0)n=list->count[s]=0;
-        if(n>AW_CSTRIP_ROWS)n=list->count[s]=AW_CSTRIP_ROWS;
+        if(n>list->cap[s])n=list->count[s]=list->cap[s];
         if(list->selected[s]>=n)list->selected[s]=n-1;
         if(list->selected[s]<0)list->selected[s]=0;
         if(list->first[s]>list->selected[s])list->first[s]=list->selected[s];

@@ -72,6 +72,16 @@ int AW_StoryPapersRead(void)
     return AW_StateSet(&aw_state,AW_GLOBAL,"amiwind:opening:papers_read",1);
 }
 
+int AW_StoryInventoryAllowed(void)
+{
+    /* CHARGEN-INVENTORY-LOCKED-60: the original enables the inventory when the papers are activated
+     * (CharGenStatsSheet OnActivate: EnableInventoryMenu; "You now have an Inventory Menu" on taking them), and
+     * CharGenDoorExit / CharGenDoorExitCaptain enable every menu again. The activation is the papers_read global
+     * AW_StoryPapersRead records; taking the papers (COURTYARD) or the hall guard's word (hall) imply it. */
+    return !AW_StoryRestricted() || aw_story.stage>=AW_STAGE_COURTYARD || aw_story.hall ||
+        (aw_story.stage>=AW_STAGE_PAPERS && AW_StateGet(&aw_state,AW_GLOBAL,"amiwind:opening:papers_read")>0);
+}
+
 int AW_StoryViewAllowed(void)
 {
     /* CharGen disables both view switching and vanity. CharGenClassNPC

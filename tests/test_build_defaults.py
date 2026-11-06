@@ -204,6 +204,9 @@ OPTIONS = {
     'actor_search': 'shipped default',
     # creatures in converted interiors: the listed ones (Vivec) by default; all = experimental, off = before v0.0.42
     'interior_creatures': 'shipped default',
+    # the rooms' levelled creatures (TOMB-NO-CREATURES-60): table = an aw_levelled entity per levelled reference of a
+    # converted room by default since v0.0.61; off = the room maps before
+    'room_levelled_creatures': 'shipped default',
     # actors the original's start script disables at a new game: original = off by default until the runtime
     # enable exists (NPC-STORY-DISABLED-AT-START-42); placed = as before
     'start_disabled': 'opt-in, not shipped',

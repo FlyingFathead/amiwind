@@ -123,7 +123,8 @@ class RoomFastRam(unittest.TestCase):
         src = ROOT / 'engine/aga/src'
         save = (src / 'aw_save.c').read_text(encoding='utf-8')
         read = save[save.index('int AW_SaveRead('):save.index('void AW_SaveSchedule(')]
-        self.assertLess(read.index('aw_save_entry_refuse(candidate.scene,candidate.position))return 2;'),
+        # (the refused save gives its item table back first: INVENTORY-ORIGINAL-LIMITS-61)
+        self.assertLess(read.index('aw_save_entry_refuse(candidate.scene,candidate.position)){AW_SaveRelease(&candidate);return 2;}'),
                         read.index('Cbuf_InsertText(map)'))
         self.assertIn('aw_save_entry_refuse=AW_SceneSaveEntryRefuse;', (src / 'aw_debug.c').read_text(encoding='utf-8'))
         host = (src / 'host_cmd.c').read_text(encoding='latin-1')

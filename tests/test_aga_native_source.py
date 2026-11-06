@@ -480,6 +480,37 @@ class NativeSourceTests(unittest.TestCase):
             ('aw_inventory.c','aw_state.c','aw_ledger.c','aw_ledger_drops.c','mathlib.c')],
             cflags=['-fsanitize=address,undefined,float-cast-overflow','-fno-sanitize-recover=all'])
 
+    def test_starting_outfit_worn_from_the_first_scene_once_per_game(self):
+        # CHARGEN-NO-STARTING-CLOTHES-60: the player record's outfit, as tools/prepare_inventory.py writes it from a
+        # synthetic master (shirt, pants, shoes on the NPC "player"), is carried and worn from the first scene spawn
+        # on, also after a take marked the inventory before its first open; once per game
+        import struct
+        from unittest.mock import patch
+        sys.path.insert(0, str(ROOT / 'tools'))
+        try:
+            import prepare_inventory
+        finally:
+            sys.path.pop(0)
+        def record(kind, fields):
+            data = b''.join(k.encode() + struct.pack('<I', len(v)) + v for k, v in fields)
+            return kind.encode() + struct.pack('<III', len(data), 0, 0) + data
+        raw = b''
+        for ident, name, kind in (('common_shirt_01', 'Common Shirt', 2), ('common_pants_01', 'Common Pants', 0),
+                                  ('common_shoes_01', 'Common Shoes', 1)):
+            raw += record('CLOT', [('NAME', ident.encode() + b'\0'), ('FNAM', name.encode() + b'\0'),
+                                   ('CTDT', struct.pack('<ifHH', kind, 1., 2, 0))])
+        raw += record('NPC_', [('NAME', b'player\0')] + [('NPCO', struct.pack('<i', 1) + i.encode().ljust(32, b'\0'))
+                       for i in ('common_shirt_01', 'common_shoes_01', 'common_pants_01')])
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp); (base / 'Morrowind.esm').write_bytes(raw)
+            with patch.object(prepare_inventory, 'resolve_data_files', return_value=base):
+                report = prepare_inventory.prepare(base, base / 'id1', palette=b'\0' * 768, models=False)
+            self.assertEqual(sorted(i['id'] for i in report['initial_items']),
+                             ['common_pants_01', 'common_shirt_01', 'common_shoes_01'])
+            self.compile_run('aga_starting_outfit_test.c', [Path(SOURCE)/'src'/n for n in
+                ('aw_inventory.c','aw_state.c','aw_ledger.c','aw_ledger_drops.c','mathlib.c')],
+                arguments=[str(base / 'id1')], cflags=['-fsanitize=address,undefined','-fno-sanitize-recover=all'])
+
     def test_inventory_actual_alias_preview_gear_depth_bounds_and_release(self):
         self.compile_run('aga_inventory_preview_test.c', [Path(SOURCE)/'src'/n for n in ('aw_head.c','mathlib.c')],
             cflags=['-fsanitize=undefined,float-cast-overflow','-fno-sanitize-recover=all'])
@@ -827,7 +858,7 @@ class NativeSourceTests(unittest.TestCase):
 
     def test_movement_live_sheet_superspeed_old_numbers_fatigue_and_command(self):
         self.compile_run("aga_move_test.c", [ROOT/"engine/aga/src"/n for n in
-                         ("aw_move.c", "aw_move_rules.c", "sv_user.c", "mathlib.c")],
+                         ("aw_move.c", "aw_move_rules.c", "sv_user.c", "mathlib.c", "aw_state.c")],
                          cflags=["-fsanitize=undefined", "-fno-sanitize-recover=all"])
 
     def test_menu_disabled_options_cancel_and_confirm(self):

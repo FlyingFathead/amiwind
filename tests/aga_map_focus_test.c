@@ -27,6 +27,7 @@ const char *AW_RegionNameAt(const float *p){region_calls++;return region_overrid
 int AW_MapTeleport(const float *p){int i;for(i=0;i<3;i++)destination[i]=p[i];if(!jump_available)return 0;jumps++;return 1;}
 void Cmd_AddCommand(char *name,void (*fn)(void)){if(!strcmp(name,"aw_teleport_map"))teleport_command=fn;else if(!strcmp(name,"aw_worldmap"))map_command=fn;else if(!strcmp(name,"aw_journal"))journal_command=fn;}
 int AW_StoryRestricted(void){return story_restricted;}
+int AW_StoryInventoryAllowed(void){return !story_restricted;}
 static int ui_kind;
 int AW_ReaderActive(void){return ui_kind==2;}
 int AW_CharacterActive(void){return ui_kind==3;}
@@ -45,6 +46,10 @@ void AW_ConsoleCharacter(int x,int y,int c){int n=strlen(drawn);assert(n<16383);
 }
 void AW_UIFill(int x,int y,int w,int h,int c){if(c==AW_UIColor(255,32,32))red_pixels++;assert(x>=0 && y>=0 && x+w<=320 && y+h<=200);if(w==9 && h==1){marker_x=x+4;marker_y=y;}}
 void AW_UIScrollbar(int x,int y,int h,int total,int visible,int top){}
+/* the inventory window's burden bar and its batched record reads (ENCUMBRANCE-INCOMPLETE-61) */
+void AW_UIBar(int x,int y,int w,int h,int colour,float fraction){}
+void AW_InventoryBatchBegin(void){}
+void AW_InventoryBatchEnd(void){}
 static int scroll_hits;
 int AW_UIScrollHit(int mx,int my,int x,int y,int h,int total,int visible,int top){scroll_hits++;return -1;}
 int AW_UICursor(int x,int y){(void)x;(void)y;return 0;}   /* aw_ui.c (CURSOR-MW-58): no Morrowind pointer here */

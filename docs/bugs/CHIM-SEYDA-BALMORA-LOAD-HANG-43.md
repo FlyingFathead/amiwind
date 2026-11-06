@@ -2,7 +2,7 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 31 times; something has to be done
+## PERSISTING: reported 32 times; something has to be done
 
 - Reported with v0.0.46 at 2026-10-20 20:09 +0300: Listed under Known in this build in the v0.0.46 release notes (still open at the release).
 - Reported with v0.0.53-dev2 at 2026-10-26 (time not recorded): 19:14 UTC door sample: the Yassu Mine room load (ri9f4c8ccd45) stopped after its BSP while a gate ran its emulator; the next try loaded in 7.6 s
@@ -19,22 +19,23 @@
 - Reported with v0.0.59-dev4 at 2026-11-02 12:44 +0200: FS-UAE sessions at 32 MB Fast on the seyda MiniWind (slice 1 image cc5b049 and the first-person arms image f983e6b alike) stopped on the emulator disk stall (game waits on SIGF_DOS, request held by DH0) in 6 of 9 runs between 11:57 and 12:44 +0200, with and without builds sharing the volume; the frame rate fell from about 6 to about 1 fps over the minute before each stall. Same scripts passed this morning.
 - Reported with v0.0.59-dev4 at 2026-11-02 14:06 +0000: Seen twice on the Seyda Neen MiniWind at 32 MB Fast (da6c335, CELL-CHANGES-59 slice 4 checks): the game stopped taking commands about a minute after a save in Seyda Neen (the request held by DH0); a shorter session got through.
 - Reported with v0.0.59-dev4 at 2026-11-02 14:49 +0200: Emulator disk stall during a first-person cost session in the Seyda Neen MiniWind (FS-UAE, 32 MB Fast, JIT); the same script ran through on the next try.
-- Reported with v0.0.59-dev5 at 2026-11-02 22:46 +0200: Seen in 5 of 9 short Seyda Neen MiniWind sessions in one evening on a busy host (4 with JIT, 1 before the map loaded with JIT off); the same scripts passed on a retry.
+- Reported with v0.0.59-dev5 at 2026-11-02 22:46 +0200: Seen in 5 of 9 short Seyda Neen MiniWind sessions in one evening on a loaded machine (4 with JIT, 1 before the map loaded with JIT off); the same scripts passed on a retry.
 - Reported with v0.0.59-dev5 at 2026-11-02 23:25 +0200: Seyda Neen MiniWind sessions, FS-UAE JIT 32 MB: disk stall on load (2 of 4 tries), host 32-56 % CPU.
 - Reported with v0.0.59-dev5 at 2026-11-03 (time not recorded): JIT A/B for CELL-CHANGES-59 slice 6 (2abc9fc0 vs 0128e0c0, 4 runs each, alternating): 3 of 4 passed on each side; one disk stall (with slice 6) and one start failure (without); heap readings identical. Not caused by slice 6.
 - Reported with v0.0.59-dev5 at 2026-11-03 (time not recorded): four strip sessions froze at the first take after a console-opened strip; IDE had completed its last command; one of four waited on DH0, three were in no file call; an aimed-open session on the same image did not freeze: follows the script path, not host load
 - Reported with v0.0.59-dev5 at 2026-11-03 00:19 +0200: Seen again on the v0.0.59-dev5 full image (FS-UAE, JIT, 32 MB Fast, 2026-11-02): five short verification sessions in a row stalled with the game waiting on DH0 (pc 00F81478), during a teleport to the Census Office, Seyda Neen or at the start in Balmora, while gate runs used the other cores. One more session did not reach play at all. No in-game check of that batch could complete.
 - Reported with v0.0.59-dev5 at 2026-11-03 01:50 +0200: A/B under the normal host load, same script: hard-file device 3 disk stalls in 12 sessions, emulated IDE port 0 in 16 (slower loads). The boot smoke now uses the IDE port; shipped presets unchanged.
-- Reported with v0.0.59-dev5 at 2026-11-03 02:18 +0200: One of three short Seyda Neen MiniWind sessions stalled on an idle host (disk request held by DH0); a retry passed.
+- Reported with v0.0.59-dev5 at 2026-11-03 02:18 +0200: One of three short Seyda Neen MiniWind sessions stalled on an idle machine (disk request held by DH0); a retry passed.
 - Reported with v0.0.59-dev5 at 2026-11-03 04:09 +0200: Gate boot smoke on a branch with the IDE disk controller (6c750516) and no engine change: the client stayed at signon 3 for the 30 s in-play wait before load 3 of 3; the unchanged rerun passed. The host was running several gates and emulator sessions. The gate log does not record the stall examination; the first sign that IDE alone may not end the stall under heavy host load.
 - Reported with v0.0.59-dev5 at 2026-11-03 04:39 +0200: Still seen with the IDE disks under host load: four container-strip sessions (strip11-14, Seyda Neen MiniWind 420cb1a and 3e51c30) froze 171-183 s into play, one sample showing the game waiting on SIGF_DOS with the request held by DH0, while three other workers ran gates and emulator sessions.
 - Reported with v0.0.59-dev5 at 2026-11-03 04:59 +0200: Correction to the earlier report of 2026-11-03: the container-strip sessions strip13 and strip14 stopped right after a take in the container strip (CONTAINER-STRIP-TAKE-STALL-59), and strip11 stopped with a conversation window open after E reached a person; none of them was this disk stall.
 - Reported with v0.0.59-dev5 at 2026-11-03 05:07 +0200: Seen again with the disks on IDE: the v0.0.59-dev5 full image run with the integration engine 5a41c209 (FS-UAE, JIT, 32 MB Fast) stalled while loading Seyda Neen, before play; pc 00F811BC/00F828A2, no file call pending. Three Seyda MiniWind sessions of the same engine ran.
-- Reported with v0.0.59-dev6 at 2026-11-03 11:28 +0200: Not this stall: the v0.0.59-dev6 smoke stop follows the dev6 engine. Idle host, 32 MB, IDE, Seyda Neen: dev5 image+engine passed 4/4; dev6 image+engine stopped 4/4 within 12 s of arrival; dev6 image with long-frame engine 9a782c55 stopped 4/4; dev6 image with dev5 engine passed 2/2; dev5 image with dev6 engine stopped 2/2. Examined as a DH0 wait, yet the game resumed when given 240 s: long file reads in one frame. Cause in engine changes f08583e..79735378.
+- Reported with v0.0.59-dev6 at 2026-11-03 11:28 +0200: Not this stall: the v0.0.59-dev6 smoke stop follows the dev6 engine. Idle machine, 32 MB, IDE, Seyda Neen: dev5 image+engine passed 4/4; dev6 image+engine stopped 4/4 within 12 s of arrival; dev6 image with long-frame engine 9a782c55 stopped 4/4; dev6 image with dev5 engine passed 2/2; dev5 image with dev6 engine stopped 2/2. Examined as a DH0 wait, yet the game resumed when given 240 s: long file reads in one frame. Cause in engine changes f08583e..79735378.
 - Reported with v0.0.59-dev6 at 2026-11-03 12:50 +0200: The v0.0.59-dev6 test session stops in Seyda Neen were not this disk stall: the processor was busy in one 13 to 15 s frame (the player's assembled body loaded at arrival), ARRIVAL-LONG-FRAME-DEV6-59. The smoke now names such a frame a long frame (busy) and keeps this name for an idle processor with a file request held.
-- Reported with v0.0.59-dev6 at 2026-11-03 15:44 +0000: v0.0.59-dev6 image 95a5bdb (FS-UAE, JIT, 32 MB Fast): the delivery hops stop on the hop from Ald'ruhn to Khuul 3 times of 3, twice on a quiet host; the load stops right after vf0271's bsp, the game waits on SIGF_DOS with the request held by DW0, still so after 90 s. The same hop passed in the v0.0.57-dev5, v0.0.58-dev5 and v0.0.59-dev5 deliveries.
+- Reported with v0.0.59-dev6 at 2026-11-03 15:44 +0000: v0.0.59-dev6 image 95a5bdb (FS-UAE, JIT, 32 MB Fast): the delivery hops stop on the hop from Ald'ruhn to Khuul 3 times of 3, twice on a quiet machine; the load stops right after vf0271's bsp, the game waits on SIGF_DOS with the request held by DW0, still so after 90 s. The same hop passed in the v0.0.57-dev5, v0.0.58-dev5 and v0.0.59-dev5 deliveries.
 - Reported with v0.0.59-dev6 at 2026-11-03 18:36 +0200: Not this stall: the dev6 Khuul hop stop (3 of 3 on IDE) was Kickstart's read error requester on AW_WORLD0 block 2480045. On the IDE port the drive is read as whole 16x63 cylinders and the drive ended 144 sectors short; the dev5 image fails the same on IDE, both pass on the hard-file device. Fixed in the image step (drives padded to whole IDE cylinders, ad3c345e, gate 6660); hops and Khuul repro pass on a padded dev6 copy.
 - Reported with v0.0.60 at 2026-11-05 05:49 +0200: Candidate cause under investigation, not confirmed: FS-UAE 3.1.66 updates a shared interrupt-request word without atomic operations, so a finished hard-file request can lose its signal under host load. Checks next: source, a capture at a stall, an atomic emulator build A/B, the Pi 4B. See SMOKE-STALL-LABEL-INFERRED-60.
+- Reported with v0.0.61-dev1 at 2026-11-05 23:16 +0200: Delivered image (run 2026_11_05_v0.0.61-dev1_full-v0.0.61-dev1_374d59b), FS-UAE 3.1.66 at 32 MB Fast, JIT, disks on IDE, a busy host: dbg scene seyda after a quickload in Arrilles Tradehouse stopped with the game clock frozen; the stall check found 5 of 5 program counter samples in exec idle, the game waiting on SIGF_DOS, no request holder found. 5 earlier sessions of the same image the same evening passed their Seyda Neen loads.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -63,7 +64,7 @@ _Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 31 times; something has to be done](#persisting-reported-31-times-something-has-to-be-done)
+- [PERSISTING: reported 32 times; something has to be done](#persisting-reported-32-times-something-has-to-be-done)
 - [Symptom](#symptom)
 - [Where](#where)
 - [How it happened](#how-it-happened)
@@ -122,7 +123,7 @@ hangs come with and without them (see Reproduction, 128 MiB).
 ## Why it was not caught
 
 The boot smoke made one map change per run and passes most of the time, so single green runs hid it; the earlier
-failure on the old image was taken for a flaky smoke and rerun. The hang needs a busy host: on a quiet host it did
+failure on the old image was taken for a flaky smoke and rerun. The hang needs a loaded machine: on a quiet machine it did
 not happen in 100 loads.
 
 ## Reproduction
@@ -206,7 +207,7 @@ slower.
   about 30 % slower, so that comparison changed both the completion path and the timing.
 - The test sessions have used IDE since 3 November, and no stall has been seen in the deliveries since.
 
-**H1 (candidate, unconfirmed): a lost completion signal in the emulator.** FS-UAE 3.1.66 appears to update one shared
+**A lost disk-done signal in the emulator (candidate, unconfirmed).** FS-UAE 3.1.66 appears to update one shared
 interrupt-request word with plain read-modify-write operations, from the hard-file worker thread (which sets the bit
 that announces a finished request) and from the emulation thread (which clears the bits of other devices). If the two
 interleave, the announcement can be overwritten and the reply stays queued with nobody told. Upstream changes make
@@ -216,13 +217,13 @@ these updates atomic: FS-UAE 4eefeebd0947bb7b08fae3b9b4f1735376897aaf with the h
 the absence of these changes causes our stalls is not established. The point is to be checked against the source of
 the package the test containers use.
 
-**H2: the remote-console folder may take part.** The older freeze HANG-IDLE-DUSK-35 needed heavy traffic on the
+**The remote-console folder may take part.** The older freeze HANG-IDLE-DUSK-35 needed heavy traffic on the
 remote-console folder (AWCTL, a directory drive). An upstream report describes repeated file operations on directory
 drives leaving a guest task stuck, prevented by `deterministic = 1`. That setting serialises directory drives only; the
-hard-file worker is not affected. A result with it therefore tests AWCTL's part, not H1, and its slowdown could also
-hide a race. H1 and H2 can both be true.
+hard-file worker is not affected. A result with it therefore tests AWCTL's part, not the lost disk-done signal, and its
+slowdown could also hide a race. Both can be true.
 
-**H3 (verified): the smoke's stall label is inferred.** The smoke labels a stall "emulator disk stall" from a scan of
+**The smoke's stall label is inferred (verified).** The smoke labels a stall "emulator disk stall" from a scan of
 the game's stack, without checking the pending device request. The label means the guest waits on DOS and the cause
 below the engine is unresolved; it does not show a lost device completion. Some of the sightings counted here were
 later reclassified (long frames, a read error on IDE), so only the confirmed captures count towards this mechanism.
@@ -230,18 +231,18 @@ Tracked as SMOKE-STALL-LABEL-INFERRED-60.
 
 **The test plan** (cheap first, all in the test containers)
 1. Read the FS-UAE 3.1.66 source: the interrupt-request word, every writer, and the four upstream changes. Confirm or
-   reject the mechanism of H1 in the source.
+   reject the mechanism of the lost disk-done signal in the source.
 2. Capture a sustained stall with all emulator threads stopped: the request the guest waits for, the queue of
    replies to deliver, the interrupt-request word, and the state of each host thread. Setting the missing bit again and
    seeing the load continue at once shows that the signal was stranded.
 3. A/B with a build in which every access to that word is atomic, against the original, in alternating runs with the
    same image, script and background load (running both together disturbs both). It counts only if the original
    reproduces the captured failure repeatedly and the patched build survives the same exposure.
-4. `deterministic = 1` in a copy of the session preset, checked in the start-up log: this tests H2.
+4. `deterministic = 1` in a copy of the session preset, checked in the start-up log: this tests the remote-console folder's part.
 5. The same route on the Raspberry Pi 4B (Amiberry, a quiet machine). A stall only on the busy build machine is host
    load; a stall on the Pi as well is a bug in the game or the disk image.
 
-**For players.** The shipped presets are unchanged and keep the hard-file device until this is verified. If H1 holds,
+**For players.** The shipped presets are unchanged and keep the hard-file device until this is verified. If the lost disk-done signal is confirmed,
 the decision is to provide or name a corrected emulator build, document the affected emulator versions, and decide
 whether an IDE profile stays useful for those who run unpatched builds. Results on the Pi (Amiberry) are kept apart,
 since it is a different emulator.
@@ -268,7 +269,7 @@ idle; game not in a file call" (the monitor check ran live and did not mistake a
 
 Fly-cam check, 18 October 2026: noclip flight Seyda Neen -> Vivec -> Balmora -> Khuul with the music on
 (about 300,000 units, 38 to 40 map and frame changes, about 290 s, under 3 times walking speed), at 16 MiB and at
-128 MiB Fast RAM on a quiet host: both completed, no stall. At 16 MiB, 267 "zone full" lines and 12 hunk-gap
+128 MiB Fast RAM on a quiet machine: both completed, no stall. At 16 MiB, 267 "zone full" lines and 12 hunk-gap
 warnings; at 128 MiB, no "zone full" and the same 12 warnings.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->

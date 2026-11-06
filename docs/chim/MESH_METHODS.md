@@ -1,6 +1,6 @@
 # CHIM mesh methods
 
-_Last updated with AmiWind v0.0.57-dev1 (30 October 2026)._
+_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -302,7 +302,7 @@ faces scaled by its measured cut); the next build's tracker replaces the estimat
 | Tel Aruhn (15,5) | 59,446 | 59,446 (not touched: Telvanni roots and menhirs) |
 
 Measured on the full images (v0.0.57-dev1 before, v0.0.57-dev2 after, Urshilaku Camp, the same pose, 32 MB
-Fast, JIT, quiet host): faces drawn at the two heavy headings 10,843 to 7,832 (-28 %) and 11,447 to 7,933
+Fast, JIT, quiet machine): faces drawn at the two heavy headings 10,843 to 7,832 (-28 %) and 11,447 to 7,933
 (-31 %); frame time there 30.8 to 15.6 ms and 20.3 to 16.2 ms (dev2 also has the larger surface cache,
 RENDER-SURFCACHE-THRASH-32, so the faces are the clean number for this change).
 

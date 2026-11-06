@@ -1,6 +1,16 @@
 # Magic effects
 
-_Last updated with AmiWind v0.0.54-dev1 (27 October 2026)._
+_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
+
+<!-- contents start -->
+## Contents
+
+- [What it shows](#what-it-shows)
+- [How it is made](#how-it-is-made)
+- [Console](#console)
+- [Casting (v0.0.61)](#casting-v0061)
+
+<!-- contents end -->
 
 Morrowind draws its spells with a set of small effect meshes and textures of its own: a glow on the casting hands,
 a burst at the caster, a bolt per school in flight, a burst where it hits and an orb where an area spell lands.
@@ -99,3 +109,52 @@ With the setting off (the default) nothing is loaded, spawned or drawn.
 | `dbg cast NAME repeat` | cast again as each cast ends (for measurements), until `dbg cast stop` |
 | `dbg cast list` | the effects in this image (fire, frost, shock, poison, drain, burden, levitate, shield, paralyze, light, dispel, heal, fortify, turnundead, summon) |
 | `dbg cast` | the setting, the table and the particles and sprites of the last frame |
+
+## Casting (v0.0.61)
+
+The player casts the spells and powers he knows and the spells he made at a spellmaker. The rules follow OpenMW
+0.51 (its spell utility, world and spell casting code), written independently.
+
+- **Ready magic** (`R`, `dbg cast ready`): the hands come up; with magic ready the attack button casts the selected
+  spell instead of striking, once per press.
+- **The selected spell**: `dbg cast spell list` shows the known spells and powers (with their number, cost and the
+  selection), `dbg cast spell N` selects spell N, `dbg cast spell mN` the made spell N, `dbg cast spell none` clears
+  it.
+- **The magicka** is paid when the cast starts; with too little the cast is refused ("You do not have enough
+  Magicka to cast the spell."). A power costs nothing and works once a day (game hours).
+- **The chance**: the effect with the lowest twice-the-school-skill minus its cost term gives the skill; the chance is
+  that skill minus the spell's cost, plus a fifth of Willpower and a tenth of Luck, less the Sound effect's magnitude,
+  times the fatigue term (1.25 minus 0.5 times the missing share of fatigue), from 0 to 100; Silence makes it 0. A
+  roll from 0 to 99 below the chance succeeds; a failure keeps the magicka spent and says "You failed casting the
+  spell.". A success gives the school's skill its use. In god mode (`dbg god on`) every cast succeeds and costs no
+  magicka, as in OpenMW.
+- **Delivery**: the Self effects land on the player; the Touch effects on the actor within a blow's reach in front;
+  the Target effects fly as a bolt (the masters' bolt speed) and land on the actor in the line of the cast when the
+  bolt reaches it (the fight's own aim test picks it at the cast; the world stops the bolt first if it is in the way)
+  and, with an area, on every actor within the area's radius where it lands. A bolt carries its own spell: a later
+  selection does not change it.
+- **The effects** land through the active effects (each magnitude rolled once between its low and high, the
+  duration on the game clock, kept in saved games; docs/MWSCRIPT_BYTECODE.md "Spell effects"). A harmful spell on an
+  actor is an attack: it joins the fight, and its health falls with the damage until it dies as by a blow.
+- **The look** is this page's (with `dbg magicfx 1` or `2`): the cast, the bolt and the hit of the spell's first
+  effect of that range (an effect without its own look takes the first of its school). The look's bolt is drawn
+  apart from the spell's own; the failure sound plays only with the look on.
+
+The Magic window (O) selects the spell too: Up and Down move, Enter or a click selects (docs/INVENTORY.md).
+
+Not yet: the casting gesture of the first-person hands and of the parts body, the always-succeeds flag of a few spells,
+resistances and reflection, Cast When Used and Constant Effect items, and most effects that need other systems to read
+their magnitude (Levitate, Shield, Feather and the like are kept and ticked, but nothing moves or protects by them
+yet). Light lights the player with Quake's own entity light while it lasts.
+
+| Command | What it does |
+|---|---|
+| `dbg cast casting off` / `on` | casting off / on (default; not saved) |
+| `dbg cast ready` (`R`) | ready or lower the magic |
+| `dbg cast spell list` / `N` / `mN` / `none` | the spells and the selection |
+| `dbg cast spell grant N` | for tests: give the player spell N (the actor table's spell row) and select it |
+| `dbg cast now` | cast the selected spell now (as the attack button with magic ready) |
+
+These words live under the magic effects' own command (`aw_magicfx`), so casting adds no console command or setting
+to the engine's resident registries. Burden and Feather on the player go to the encumbrance once the inventory's
+encumbrance call is in the build.

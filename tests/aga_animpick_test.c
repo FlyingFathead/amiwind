@@ -93,6 +93,26 @@ int main(void) {
     }
     s=st(AW_PW_NONE,AW_PE_HIT,0);assert(AW_AnimPick(&s,creature_has,NULL,&o) && !strcmp(o.group,"hit1"));
     s=st(AW_PW_NONE,AW_PE_DEATH,0);s.roll=3;assert(AW_AnimPick(&s,creature_has,NULL,&o) && !strcmp(o.group,"death1"));
+    /* WEAPONS-57: the player's body with a weapon (hand 1 drawing, 2 drawn, 3 swinging, 4 putting away) */
+    assert(!AW_PickPlayerState(-1,2,1,AW_PM_NONE,0,0,0,0,&s));                       /* bare hands: the body's own layout */
+    assert(!AW_PickPlayerState(1,0,0,AW_PM_NONE,0,0,0,0,&s));                        /* carried, not drawn */
+    assert(!AW_PickPlayerState(1,2,1,AW_PM_FORWARD,0,0,0,1,&s));                     /* swimming */
+    assert(!AW_PickPlayerState(1,2,0,AW_PM_NONE,0,0,0,0,&s));                        /* goal: put away, state not yet 4 */
+    assert(AW_PickPlayerState(1,2,1,AW_PM_NONE,0,0,0,0,&s) && !strcmp(pick(s,&o),"idle1h") && o.loop);
+    assert(AW_PickPlayerState(4,2,1,AW_PM_FORWARD,1,0,0,0,&s) && !strcmp(pick(s,&o),"runforward2c"));
+    assert(AW_PickPlayerState(6,2,1,AW_PM_BACK,0,0,0,0,&s) && !strcmp(pick(s,&o),"walkback2w"));
+    assert(AW_PickPlayerState(0,2,1,AW_PM_LEFT,0,0,0,0,&s) && !strcmp(pick(s,&o),"walkleft1h"));    /* short blade */
+    assert(AW_PickPlayerState(2,1,1,AW_PM_FORWARD,0,0,0,0,&s) && s.event==AW_PE_EQUIP &&
+           !strcmp(pick(s,&o),"weapontwohand") && !strcmp(o.start,"equip start") && !strcmp(o.stop,"equip stop"));
+    assert(AW_PickPlayerState(3,4,0,AW_PM_NONE,0,0,0,0,&s) && !strcmp(pick(s,&o),"weapononehand") && !strcmp(o.start,"unequip start"));   /* blunt: no group of its own */
+    assert(AW_PickPlayerState(7,3,1,AW_PM_NONE,0,AW_PA_SLASH,0,0,&s) && !strcmp(pick(s,&o),"weapononehand") &&
+           !strcmp(o.start,"slash start") && !strcmp(o.stop,"slash large follow stop"));                /* axe: 1h set */
+    assert(AW_PickPlayerState(6,3,1,AW_PM_NONE,0,AW_PA_THRUST,0,0,&s) && !strcmp(pick(s,&o),"weapontwowide") &&
+           !strcmp(o.start,"thrust start"));                                                             /* spear */
+    assert(AW_PickPlayerState(5,3,1,AW_PM_NONE,0,99,0,0,&s) && !strcmp(pick(s,&o),"weapontwowide") && !strcmp(o.start,"chop start"));                       /* bad attack: chop */
+    assert(AW_PickPlayerState(1,2,1,AW_PM_FORWARD,0,0,1,0,&s) && !strcmp(pick(s,&o),"jump1h") && !strcmp(o.loop_start,"loop start"));
+    assert(AW_PickPlayerState(10,2,1,AW_PM_NONE,0,0,0,0,&s) && !strcmp(pick(s,&o),"idlecrossbow"));
+    assert(AW_PickPlayerState(9,3,1,AW_PM_NONE,0,0,0,0,&s) && !strcmp(pick(s,&o),"bowandarrow") && !strcmp(o.start,"shoot start"));
     {   /* aiwander.cpp getRandomIdle: the dancers' chances; one roll per idle, the highest under its chance wins */
         static const unsigned char dancer[8]={20,20,20,10,0,0,0,80},r1[8]={50,50,50,50,50,50,50,60},r2[8]={15,90,90,90,90,90,90,90};
         assert(AW_PickWanderIdle(dancer,100,40,r1)==9);

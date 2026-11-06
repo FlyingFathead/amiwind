@@ -7,17 +7,17 @@
    "hunk_bytes": 9280
   },
   "cvars": {
-   "count": 358,
-   "static_bytes": 8592,
-   "zone_bytes": 11680
+   "count": 360,
+   "static_bytes": 8640,
+   "zone_bytes": 11744
   },
   "tables": {
    "count": 0,
    "bytes": 0
   },
   "growing": {
-   "count": 30,
-   "worst_bytes": 7652384
+   "count": 31,
+   "worst_bytes": 7820384
   }
  },
  "reasons": [
@@ -86,7 +86,10 @@
   "2026-11-03: CELL-CHANGES-59 slice 7 (respawn and content-change migration; the continuity ask of 2 November 2026): four growing allocations and one wider row, nothing until first use: the places' container refill times (OpenMW 0.51 CellStore::respawn keeps one per cell), at most 8,192 x 12 bytes = 98,304 worst (the game: about 1,400 exterior cells and 1,000 rooms); the record hash of every reference the change list names (a save of other game data is checked against them), at most 65,536 x 8 bytes = 524,288 worst (a late game names a few thousand); the build's reference identity table's block index, at most 16,384 x 4 bytes = 65,536 worst (Morrowind.esm: 1,235 blocks, about 5 KB) and one block of rows, 8,192 bytes; the actor row gains its time of death (48 to 52 bytes, 8,192 rows: +32,768 worst). aw_placed pass HOURS is a subcommand of the existing aw_placed command (no command, no cvar). Raised on the worker branch v0.0.59-cellchanges7; the maintainer approves it at merge.",
   "2026-11-03: aw_player_cache, the A/B switch of the cached player body the maintainer asked for (ARRIVAL-LONG-FRAME-DEV6-59)",
   "2026-11-04: +1 console variable aw_ambient_areas (AMBIENT-WALK-PER-AREA-60), the A/B switch every new loading method gets by the maintainer's A/B/C rule of 2026-11-03 (per-area Wander tables vs the island-wide file); 24 structure bytes and 32 zone bytes, no new command.",
-  "2026-11-04: +1 console variable aw_npc_tables_areas (NPC-RECIPES-PER-AREA-59), the A/B switch of the residents' recipe tables on the shared per-area pack (npc-parts.awa) vs the earlier files, by the same A/B/C rule; its budget sheet was approved the same day; 24 structure bytes and 32 zone bytes, no new command."
+  "2026-11-04: +1 console variable aw_npc_tables_areas (NPC-RECIPES-PER-AREA-59), the A/B switch of the residents' recipe tables on the shared per-area pack (npc-parts.awa) vs the earlier files, by the same A/B/C rule; its budget sheet was approved the same day; 24 structure bytes and 32 zone bytes, no new command.",
+  "2026-11-05: INVENTORY-ORIGINAL-LIMITS-61: no kind limit as in the original, the maintainer 2026-11-05 (only carry weight limits what is carried; the coordinator approved the raise 2026-11-06): the item table leaves the state table (its 128 rows for each of the globals, quests and items, 26 KB static with the stopgap, go back to 32 for the globals and quests) and grows with the kinds carried: 24-byte rows in blocks of 32 and the ids once in a name pool, worst case every item record of the game (2,930 in the v0.0.61-dev1 catalogue, plus up to 64 enchanted ones) x 56 bytes = 168,000 bytes; a session of 400 kinds takes 18,228 bytes (measured with the native compiler, 5 November 2026). No command, no cvar (dbg inventory kinds is a subcommand of the existing route). Raised on the worker branch v0.0.61-inventory; the maintainer approves it at merge.",
+  "2026-11-05: +1 console variable aw_player_stances (WEAPONS-57, weapons of every type in third person, the maintainer's request of 2026-10-30): the A/B switch of the drawn weapon's stance on the assembled body vs the fixed layout, by the A/B/C rule of 2026-11-03; 24 structure bytes and 32 zone bytes, no new command (dbg camera stances is a word of the existing aw_camera command).",
+  "2026-11-05: +1 console variable aw_fp_sway (FP-WEAPON-SWAY-61, decided by the maintainer the same evening: the first-person weapon sway as a saved choice, 1 AmiWind groove the default, 2 Morrowind stiff; Options > Controls and dbg camera sway); 24 structure bytes and 32 zone bytes, no new command."
  ],
  "entries": {
   "commands": [
@@ -460,6 +463,7 @@
    "aw_exteriorluma",
    "aw_fog",
    "aw_fog_location",
+   "aw_fp_sway",
    "aw_fpucount",
    "aw_gallery_defaults",
    "aw_ghostfence",
@@ -529,6 +533,7 @@
    "aw_player_footstep_stride",
    "aw_player_footstep_volume",
    "aw_player_footsteps",
+   "aw_player_stances",
    "aw_poly_budget_over_cap",
    "aw_quickchar_voice",
    "aw_rcount",
@@ -771,6 +776,7 @@
    "script locals (CELL-CHANGES-59)",
    "script name hashes met (CELL-CHANGES-59)",
    "stolen items by owner (CELL-CHANGES-59)",
+   "the item table: kinds carried (INVENTORY-ORIGINAL-LIMITS-61)",
    "world change list positions and drops (CELL-CHANGES-59)",
    "world change list rows (CELL-CHANGES-59)"
   ]

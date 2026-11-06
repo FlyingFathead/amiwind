@@ -112,16 +112,29 @@ static void fields(aw_save_t *s)
     integer(&q->ship_disabled,0,1);integer(&q->captain_hint,0,1);integer(&q->hall_open,0,1);
     floating(&q->dock_timer,0,100000);floating(&q->census_timer,0,100000);floating(&q->hall_timer,0,100000);
     if(!q->ship_disabled || q->captain!=-1 || !q->name[0])error=1;
-    for(i=0;i<3;i++){
+    for(i=0;i<2;i++){
         integer(&s->state.count[i],0,AW_STATE_VALUES);if(error)return;
         for(j=0;j<s->state.count[i];j++){
             aw_value_t *v=&s->state.values[i][j];
             string(v->id,64);if(error)return;
             number=writing?(uint32_t)v->value:0;word(&number);
             if(!writing)v->value=(int32_t)number;
-            if(!v->id[0] || (i==AW_ITEM && v->value<0))error=1;
+            if(!v->id[0])error=1;
             for(k=0;k<j;k++)if(!strcmp(v->id,s->state.values[i][k].id))error=1;
         }
+    }
+    /* the item rows (INVENTORY-ORIGINAL-LIMITS-61): the same bytes as before (a count, then a 64-byte id and a count
+     * per row, in table order); read into the decoded state's own table (aw_state.h OWNERSHIP) */
+    n=writing?s->state.items.count:0;integer(&n,0,AW_ITEM_KINDS_MAX);if(error)return;
+    for(j=0;j<n;j++){
+        char item[64];int32_t value=0;
+        memset(item,0,sizeof(item));
+        if(writing){strcpy(item,AW_ITEM_ID(&s->state,j));value=AW_ITEM_ROW(&s->state,j)->value;}
+        string(item,64);if(error)return;
+        number=writing?(uint32_t)value:0;word(&number);
+        if(writing)continue;
+        value=(int32_t)number;
+        if(!item[0] || value<0 || AW_ItemIndex(&s->state,item)>=0 || !AW_ItemAppend(&s->state,item,value)){error=1;return;}
     }
     if(AW_StateGet(&s->state,AW_GLOBAL,"CharGenState")!=-1)error=1;
     if(!error && (aw_parts[c->head].race!=c->race || aw_parts[c->hair].race!=c->race ||
@@ -176,11 +189,39 @@ static void harvest_fields(aw_harvest_state_t *h)
         previous=index;if(!writing)h->facts[index-1]=fact;
     }
 }
+/* AWS4 feature bit 256 (COLLECT-CAPACITY-REJECTED-60): more than 32 kinds of item. The item rows themselves need
+ * nothing new (a count, then the rows); the condition and charge marks, one word for 32 items before, are followed by
+ * AW_ITEM_WORDS-1 more words. Written only when the table holds more than 32 rows, so a save of up to 32 is
+ * byte for byte as before; older readers refuse the bit (and the count) instead of losing items. */
+/* INVENTORY-ORIGINAL-LIMITS-61, AWS4 feature bit 512: any number of kinds; the marks are ceil(kinds / 32) words. A
+ * feature 256 save (the 128-kind table of the v0.0.61 line) has 4 words and up to 128 kinds; neither bit: 1 word,
+ * up to 32 kinds (a save of up to 32 kinds is written byte for byte as before). */
+static int mark_words;
+static int items_marked(const aw_state_t *s,unsigned flag){
+    int i;for(i=0;i<s->items.count;i++)if(AW_ITEM_FLAGS(AW_ITEM_ROW(s,i))&flag)return 1;
+    return 0;
+}
+/* the mark words of FLAG, then the value of every marked row (condition 0..1 or charge 0..1000000) */
+static void item_marks(aw_state_t *s,unsigned flag){
+    int w,b,i;uint32_t bits;
+    for(w=0;w<mark_words && !error;w++){
+        bits=0;
+        if(writing)for(b=0;b<32;b++){i=w*32+b;if(i<s->items.count && (AW_ITEM_FLAGS(AW_ITEM_ROW(s,i))&flag))bits|=1U<<b;}
+        word(&bits);
+        for(b=0;b<32 && !error;b++)if(bits&(1U<<b)){
+            aw_item_row_t *r;i=w*32+b;
+            if(i>=s->items.count || (r=AW_ITEM_ROW(s,i))->value<1){error=1;return;}
+            if(!writing)AW_ITEM_SET_FLAG(r,flag);
+            if(flag==AW_ITEM_CONDITION)floating(&r->condition,0,1);else floating(&r->charge,0,1000000);
+        }
+    }
+}
 /* AWS4 feature bit 2 adds bounded equipment and dropped-world identities.
  * Older files remain byte-compatible; older readers reject this feature rather
  * than silently discarding owned items. No pointers or transient edicts persist. */
-static int inventory_used(const aw_inventory_state_t *v){
-    int i;if(v->next_serial || v->initialized || v->condition_known)return 1;
+static int inventory_used(const aw_state_t *s){
+    const aw_inventory_state_t *v=&s->inventory;
+    int i;if(v->next_serial || v->initialized || items_marked(s,AW_ITEM_CONDITION))return 1;
     for(i=0;i<AW_INVENTORY_SLOTS;i++)if(v->equipped[i][0])return 1;
     for(i=0;i<AW_INVENTORY_DROPS;i++)if(v->dropped[i].count)return 1;
     return 0;
@@ -190,13 +231,7 @@ static void inventory_fields(aw_state_t *s){
     int i,j,k,used=0,index=0,previous=-1,n;
     word(&v->next_serial);
     word(&v->initialized);if(v->initialized>1){error=1;return;}
-    word(&v->condition_known);
-    for(i=0;i<AW_STATE_VALUES;i++){
-        if(v->condition_known&(1U<<i)){
-            if(i>=s->count[AW_ITEM] || s->values[AW_ITEM][i].value<1){error=1;return;}
-            floating(&v->condition[i],0,1);
-        }else if(writing && v->condition[i]!=0){error=1;return;}
-    }
+    item_marks(s,AW_ITEM_CONDITION);if(error)return;
 
     for(i=0;i<AW_INVENTORY_SLOTS;i++){
         string(v->equipped[i],64);if(error)return;
@@ -225,18 +260,12 @@ static void inventory_fields(aw_state_t *s){
 }
 /* AWS4 feature bit 4: the selected magic item and current enchantment charges
  * (HUD-STATS-29). Older readers reject the bit instead of losing the charge. */
-static int magic_used(const aw_magic_state_t *m){return m->selected[0] || m->charge_known;}
+static int magic_used(const aw_state_t *s){return s->magic.selected[0] || items_marked(s,AW_ITEM_CHARGE);}
 static void magic_fields(aw_state_t *s){
-    aw_magic_state_t *m=&s->magic;int i;
+    aw_magic_state_t *m=&s->magic;
     string(m->selected,64);if(error)return;
     if(m->selected[0] && AW_StateGet(s,AW_ITEM,m->selected)<1){error=1;return;}
-    word(&m->charge_known);
-    for(i=0;i<AW_STATE_VALUES;i++){
-        if(m->charge_known&(1U<<i)){
-            if(i>=s->count[AW_ITEM] || s->values[AW_ITEM][i].value<1){error=1;return;}
-            floating(&m->charge[i],0,1000000);
-        }else if(writing && m->charge[i]!=0){error=1;return;}
-    }
+    item_marks(s,AW_ITEM_CHARGE);
 }
 /* AWS4 feature bit 64 (LEVEL-UP-58): the player's levelling (aw_levelup.h): each skill's progress, the level
  * progress, the raises per attribute and per specialization. Written only when any of it is set; older saves load
@@ -326,9 +355,10 @@ int AW_SaveEncodeChanges(unsigned char *out,int capacity,const aw_save_t *state,
     if(capacity<12 || capacity>AW_SAVE_MAX_BYTES)return 0;
     writing=out;reading=NULL;at=12;end=capacity;error=0;
     memset(out,0,capacity);fields(&copy);if(!error)journal_fields(&copy.state);
-    {uint32_t features=(copy.state.harvest.slots?1U:0U)|(inventory_used(&copy.state.inventory)?2U:0U)|
-        (magic_used(&copy.state.magic)?4U:0U)|(listed?8U:0U)|(actors?16U:0U)|(ledgered?32U:0U)|
-        (levelling_used(&copy.character)?64U:0U)|(dated?128U:0U);word(&features);}
+    mark_words=copy.state.items.count>32?(copy.state.items.count+31)/32:1;
+    {uint32_t features=(copy.state.harvest.slots?1U:0U)|(inventory_used(&copy.state)?2U:0U)|
+        (magic_used(&copy.state)?4U:0U)|(listed?8U:0U)|(actors?16U:0U)|(ledgered?32U:0U)|
+        (levelling_used(&copy.character)?64U:0U)|(dated?128U:0U)|(copy.state.items.count>32?512U:0U);word(&features);}
     if(!error && copy.state.harvest.slots)harvest_fields(&copy.state.harvest);
     if(!copy.state.harvest.slots){
         int i;for(i=0;i<32;i++)if(copy.state.harvest.catalogue[i])error=1;
@@ -337,8 +367,8 @@ int AW_SaveEncodeChanges(unsigned char *out,int capacity,const aw_save_t *state,
     word(&copy.equipment);
     if((copy.equipment&~AW_EQUIPMENT_MASK) ||
        ((copy.equipment&AW_EQUIPMENT_TORCH) && !(copy.equipment&AW_EQUIPMENT_DRAWN)))error=1;
-    if(!error && inventory_used(&copy.state.inventory))inventory_fields(&copy.state);
-    if(!error && magic_used(&copy.state.magic))magic_fields(&copy.state);
+    if(!error && inventory_used(&copy.state))inventory_fields(&copy.state);
+    if(!error && magic_used(&copy.state))magic_fields(&copy.state);
     if(!error && levelling_used(&copy.character))levelling_fields(&copy.character);
     if(!error && listed){
         if(changes->count>AW_SAVE_CHANGES)return 0;
@@ -376,9 +406,23 @@ int AW_SaveDecode(const unsigned char *data,int size,aw_save_t *out)
 {
     return AW_SaveDecodeChanges(data,size,out,NULL);
 }
+static int decode(const unsigned char *data,int size,aw_save_t *out,aw_changes_t *changes,aw_save_t *candidate);
+/* INVENTORY-ORIGINAL-LIMITS-61: the decoded save owns its item table (aw_state.h OWNERSHIP); a refused save gives its
+ * rows back here. The candidate lives off the Amiga task stack. */
 int AW_SaveDecodeChanges(const unsigned char *data,int size,aw_save_t *out,aw_changes_t *changes)
 {
-    aw_save_t candidate;uint32_t length=0,crc=0,features=0,dated_n=0;const unsigned char *dated=NULL;
+    static aw_save_t candidate;int ok;
+    memset(&candidate,0,sizeof(candidate));
+    ok=decode(data,size,out,changes,&candidate);
+    if(!ok)AW_ItemsFree(&candidate.state);
+    memset(&candidate,0,sizeof(candidate));
+    return ok;
+}
+void AW_SaveRelease(aw_save_t *save){if(save)AW_ItemsFree(&save->state);}
+static int decode(const unsigned char *data,int size,aw_save_t *out,aw_changes_t *changes,aw_save_t *candidate_p)
+{
+#define candidate (*candidate_p)
+    uint32_t length=0,crc=0,features=0,dated_n=0;const unsigned char *dated=NULL;
     if(size<12 || size>AW_SAVE_MAX_BYTES || (memcmp(data,"AWS1",4) && memcmp(data,"AWS2",4) && memcmp(data,"AWS3",4) && memcmp(data,"AWS4",4)))return 0;
     writing=NULL;reading=data;at=4;end=size;error=0;word(&length);word(&crc);
     if(length!=(uint32_t)size || crc!=crc32(data+12,size-12))return 0;
@@ -386,7 +430,13 @@ int AW_SaveDecodeChanges(const unsigned char *data,int size,aw_save_t *out,aw_ch
     /* Older saves have quest indices but no chronological evidence. Do not
      * fabricate earlier entries or dates when decoding them. */
     if(!error && data[3]!='1')journal_fields(&candidate.state);
-    if(!error && data[3]=='4'){word(&features);if(features>255)error=1;}
+    if(!error && data[3]=='4'){word(&features);if(features>1023)error=1;}
+    /* more than 32 kinds of item: feature 256 (4 mark words, up to 128 kinds; the v0.0.61 line's 128-kind table) or
+     * feature 512 (ceil(kinds / 32) words), never both; 32 or fewer: neither (none before AWS4) */
+    if((features&256) && (features&512))error=1;
+    if(!error && ((features&768)!=0)!=(candidate.state.items.count>32))error=1;
+    if(!error && (features&256) && candidate.state.items.count>128)error=1;
+    mark_words=(features&256)?4:(features&512)?(candidate.state.items.count+31)/32:1;
     if(!error && (data[3]=='3' || (data[3]=='4' && (features&1))))harvest_fields(&candidate.state.harvest);
     if(!error && data[3]=='4'){
         word(&candidate.equipment);
@@ -436,5 +486,7 @@ int AW_SaveDecodeChanges(const unsigned char *data,int size,aw_save_t *out,aw_ch
     if(changes){changes->count=change_scratch.count;
         memcpy(changes->entry,change_scratch.entry,sizeof(aw_change_t)*change_scratch.count);
         changes->actor_bytes=actor_scratch_bytes;}
+    memset(&candidate.state.items,0,sizeof(candidate.state.items));   /* OUT owns the table now */
     return 1;
+#undef candidate
 }

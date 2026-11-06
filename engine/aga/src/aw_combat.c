@@ -98,6 +98,9 @@ static cvar_t chase_speed={"aw_combat_speed","200"};
 static cvar_t miss_cvar={"aw_combat_miss","1",true};
 static cvar_t dice_cvar={"aw_combat_dice","1",true};
 static cvar_t best_cvar={"aw_combat_best_attack","0",true};
+static char resist_text[128];        /* sMagicTargetResistsWeapons (combat/settings.txt; RESIST-NORMAL-WEAPONS-61) */
+static short normal_resistance(edict_t *t,int test);
+static unsigned long god_blows;      /* blows god mode turned away (GODMODE-COMBAT-DAMAGE-61), shown by dbg combat */
 /* Blocking (Controls > Blocking; docs/COMBAT.md "Blocking"): aw_combat_block 1 = hold to block
  * (AmiWind extension, the default by owner decision 2026-10-11: the player blocks only while the
  * block button, the right mouse button, is held; each blow is still decided by the original
@@ -160,6 +163,10 @@ int AW_CombatSettingsLoad(void) {
             if(!strcmp(name,"block") && a>0 && a<10){block_seconds=a;if(b>=0 && b<1)block_hit=b;}
             continue;
          }}
+        /* "text sMagicTargetResistsWeapons TEXT": the game's own words for a weapon with no effect (RESIST-NORMAL-WEAPONS-61) */
+        if(!strncmp(line,"text sMagicTargetResistsWeapons ",32)){
+            strncpy(resist_text,line+32,sizeof(resist_text)-1);resist_text[sizeof(resist_text)-1]=0;continue;
+        }
         if(Q_sscanf(line,"sound %63s %63s",name,path)==2){
             for(i=0;i<AW_SND_COUNT;i++)if(!strcmp(name,sound_key[i]) && strlen(path)<sizeof(sound_path[i]) && !strstr(path,".."))strcpy(sound_path[i],path);
             continue;
@@ -256,7 +263,17 @@ static void essential_death(edict_t *e) {
     }
     Con_Printf("Essential: this image has no death message (view/settings.txt sKilledEssential).\n");
 }
+/* ACTOR-STATS-ALL-61: the stats of a fighter's sheet from the being's one stat block (the host, aw_mwhost.c: the loaded
+ * areas' block of record ID; NULL or none found: the sheet's own numbers, the previous method). Weapon, armour and the
+ * attacks stay the sheet's. */
+void (*aw_combat_sheet_stats)(const char *id,aw_fighter_t *out);
+static int actor_load(const char *id,aw_fighter_t *out);
 int AW_CombatActorLoad(const char *id,aw_fighter_t *out) {
+    int ok=actor_load(id,out);
+    if(ok && aw_combat_sheet_stats)aw_combat_sheet_stats(id,out);
+    return ok;
+}
+static int actor_load(const char *id,aw_fighter_t *out) {
     FILE *f=NULL;char line[512],want[32],*tab;long data,offset[27];int total,i,b,cmp;
     lower(id,want,sizeof(want));
     if(!want[0] || COM_FOpenFile("combat/actors.txt",&f)<0 || !f)return creature_sheet(want,out);
@@ -736,9 +753,16 @@ static void npc_strike(slot_t *s,edict_t *p) {
     }
     you.staggered=0;
     you.block_off=(unsigned char)(block_cvar.value && !AW_CombatGuarding());
+    /* RESIST-NORMAL-WEAPONS-61: the player's own resistance against an NPC's weapon (the NPC sheets carry no weapon
+     * flags yet: a weapon in an NPC's hand counts as ordinary) */
+    s->f.weapon_normal=(unsigned char)(s->f.weapon!=0);
+    you.resist_normal=s->f.weapon_normal?normal_resistance(p,0):0;
     /* fBlockStillBonus while not moving forward (combat.cpp: movement mPosition[1] <= 0) */
-    AW_CombatSwing(&aw_combat_settings,&s->f,&you,s->attack,s->strength,bearing(p,s->e,0),
+    {aw_fighter_t before=you;
+     AW_CombatSwing(&aw_combat_settings,&s->f,&you,s->attack,s->strength,bearing(p,s->e,0),
         svs.clients[0].cmd.forwardmove<=0,&rng,&out);
+     /* GODMODE-COMBAT-DAMAGE-61: dbg god on (Quake's FL_GODMODE): no damage, no knockdown (OpenMW npc.cpp) */
+     if((int)p->v.flags&FL_GODMODE){AW_CombatGodVictim(&you,&before,&out);god_blows++;}}
     you.block_off=0;
     totals.npc_swings++;cost.swings++;
     mapped=swing_sounds(&out,&you,0);
@@ -750,7 +774,8 @@ static void npc_strike(slot_t *s,edict_t *p) {
     else if(out.outcome==AW_HIT_MISS){totals.npc_misses++;if(!mapped)sound(SND_SWISH);player_react_miss(p,&out);}
     else{
         totals.npc_hits++;
-        if(out.outcome==AW_HIT_HEALTH){totals.taken_health+=out.damage;flash(out.damage);if(!mapped)sound(SND_HEALTH);
+        if(out.outcome==AW_HIT_HEALTH && out.damage<=0){if(!mapped)sound(SND_HEALTH);}   /* god mode: the blow lands, nothing more */
+        else if(out.outcome==AW_HIT_HEALTH){totals.taken_health+=out.damage;flash(out.damage);if(!mapped)sound(SND_HEALTH);
             /* LEVEL-UP-58: Armor_HitByOpponent for the piece the blow lands on, Unarmored for an empty slot (OpenMW
              * files/data-mw/scripts/omw/combat/local.lua applyArmor); the slot by the roll the hit sounds used */
             {int c=AW_HIT_CLASS(&you,AW_CombatArmorHitSlot((int)((sound_state>>8)%100)));
@@ -837,11 +862,42 @@ static void player_down_view(edict_t *p) {
     p->v.view_ofs[2]=base+(low-base)*f;
     if(!you.knocked && f<=0){p->v.view_ofs[2]=base;pv.view_saved=0;}
 }
+/* FIRST-PERSON-WEAPONS-56: 1 while the player's right hand holds a bow, a crossbow or a thrown weapon (aw_inventory.c sets
+ * it; NULL in fixtures): such a swing is the shot, which waits for ranged combat, never a melee blow with it. */
+int (*aw_combat_player_ranged)(void);
+/* RESIST-NORMAL-WEAPONS-61 (aw_combat.h): the effect list's magnitudes (v061-magic fills it), the player's weapon test
+ * (aw_inventory.c), and a test override:
+ * dbg combat resistnormal N gives every target N % until "off" (not saved), so the rule can be seen before a
+ * creature's abilities reach the effect list. */
+float (*aw_combat_effect_magnitude)(struct edict_s *actor,int effect);
+int (*aw_combat_player_weapon_normal)(void);
+static float resist_test=-1;
+const char *AW_CombatResistText(void){return resist_text;}
+/* Resist less Weakness to Normal Weapons in percent, clamped to the sheet's short; TEST: the target of the player's
+ * swing (the dbg override applies to those only) */
+static short normal_resistance(edict_t *t,int test){
+    float r=0,w=0;
+    if(test && resist_test>=0)return (short)resist_test;
+    if(!aw_combat_effect_magnitude)return 0;
+    r=aw_combat_effect_magnitude(t,AW_EFFECT_RESIST_NORMAL_WEAPONS)-aw_combat_effect_magnitude(t,AW_EFFECT_WEAKNESS_NORMAL_WEAPONS);
+    if(!(r==r))return 0;
+    w=r<-10000?-10000:r>10000?10000:r;
+    return (short)(w+(w<0?-.5f:.5f));
+}
+static void resist_notice(void){
+    if(readout.value)Con_Printf("Combat: your weapon has no effect on this target (it resists normal weapons)\n");
+    if(resist_text[0])AW_MsgBoxShow(resist_text,NULL,0);   /* OpenMW messageBox: the timed box, no buttons */
+}
 /* The player's punch reached its hit key: what is in reach takes it. */
 static void player_strike(edict_t *p) {
     edict_t *t;slot_t *s;aw_swing_t out;float reach=AW_CombatReach(&aw_combat_settings,&you)*SCALE,dz;
     char id[32];aw_fighter_t sheet;int attack,mapped;
     you.health=p->v.health;
+    if(aw_combat_player_ranged && aw_combat_player_ranged()){
+        static double said;
+        if(realtime-said>10){said=realtime;Con_Printf("The shot of a bow, crossbow or thrown weapon is not in this engine yet.\n");}
+        return;
+    }
     t=AW_NPCTargetReach(p,p->v.v_angle,reach+16);       /* from the eye: plus the player's own half width */
     if(t && !(s=slot_of(t))){
         /* Any resident: hitting it starts a fight (OpenMW actorAttacked). */
@@ -856,7 +912,8 @@ static void player_strike(edict_t *p) {
     s=t?slot_of(t):NULL;
     totals.player_swings++;
     if(!s || s->f.dead || gap_to(p,t,&dz)>reach){
-        you.fatigue-=aw_combat_settings.fFatigueAttackBase;totals.player_misses++;you_store(p);swing_sounds(NULL,NULL,1);
+        if(!((int)p->v.flags&FL_GODMODE))you.fatigue-=aw_combat_settings.fFatigueAttackBase;   /* god mode: attacks are free */
+        totals.player_misses++;you_store(p);swing_sounds(NULL,NULL,1);
         if(s && !s->f.dead){enemy=t;enemy_until=(float)sv.time+aw_combat_settings.fNPCHealthBarTime;}
         return;
     }
@@ -865,8 +922,16 @@ static void player_strike(edict_t *p) {
      * (character.cpp); the strength: how long the attack button was held. */
     attack=best_cvar.value?AW_CombatBestAttackPlayer(&you):AW_CombatMovementAttack(pv.move_fwd,pv.move_side);
     s->f.staggered=s->state==S_HIT;
-    AW_CombatSwing(&aw_combat_settings,&you,&s->f,attack,player_strength(),bearing(t,p,90),!s->f.moving,&rng,&out);
+    /* RESIST-NORMAL-WEAPONS-61: the target's resistance to ordinary weapons now (its active effects, abilities
+     * included) and whether the player's weapon is ordinary; asked only for an ordinary weapon */
+    you.weapon_normal=(unsigned char)(you.weapon && (!aw_combat_player_weapon_normal || aw_combat_player_weapon_normal()));
+    s->f.resist_normal=you.weapon_normal?normal_resistance(t,1):0;   /* percent */
+    {aw_fighter_t before=you;
+     AW_CombatSwing(&aw_combat_settings,&you,&s->f,attack,player_strength(),bearing(t,p,90),!s->f.moving,&rng,&out);
+     /* GODMODE-COMBAT-DAMAGE-61: no fatigue, no weapon wear in god mode (OpenMW combat.cpp) */
+     if((int)p->v.flags&FL_GODMODE)AW_CombatGodAttacker(&you,&before,&out);}
     s->f.aware=1;cost.swings++;
+    if(out.no_effect)resist_notice();
     mapped=swing_sounds(&out,&s->f,1);
     if(out.outcome==AW_HIT_BLOCKED){
         totals.player_misses++;totals.npc_blocks++;if(!mapped)shield_sound(&s->f);
@@ -875,6 +940,11 @@ static void player_strike(edict_t *p) {
         totals.player_misses++;
         if(miss_cvar.value){if(!mapped)sound(SND_SWISH);npc_react_miss(s,p,&out);}  /* AmiWind style */
         else if(!mapped)sound(SND_MISS);                                       /* original: the miss sound */
+    }
+    else if(out.no_effect){
+        /* the blow lands and does nothing: no hit sound, no skill use, no hit recovery (damage 0) */
+        totals.player_hits++;
+        if(!mapped)sound(SND_MISS);
     }
     else{
         totals.player_hits++;
@@ -896,8 +966,13 @@ static void player_strike(edict_t *p) {
         voice(s->e,AW_VOICE_DEATH);
         if(!AW_CombatHostiles())ended(1);
     }else if(s->f.knocked && s->state!=S_KNOCK){set_state(s,S_KNOCK,G_KNOCK);sound(SND_FALL);}
-    else if(out.outcome>=AW_HIT_FATIGUE && s->state!=S_KNOCK)set_state(s,S_HIT,G_HIT);   /* hit recovery: every damaging hit */
-    if(!s->f.dead && out.outcome>=AW_HIT_FATIGUE)voice(s->e,AW_VOICE_HIT);
+    else if(out.outcome>=AW_HIT_FATIGUE && !out.no_effect && s->state!=S_KNOCK)set_state(s,S_HIT,G_HIT);   /* hit recovery: every damaging hit */
+    if(!s->f.dead && out.outcome>=AW_HIT_FATIGUE && !out.no_effect)voice(s->e,AW_VOICE_HIT);
+}
+/* The player's swing now (0 chop, 1 slash, 2 thrust): the same choice player_strike makes, by the movement at the
+ * swing's start or the best attack; the third-person body plays its keys (aw_view.c, WEAPONS-57). */
+int AW_CombatPlayerAttackType(void) {
+    return best_cvar.value?AW_CombatBestAttackPlayer(&you):AW_CombatMovementAttack(pv.move_fwd,pv.move_side);
 }
 /* The punch (aw_hand_models.c AW_HandsTick state 3): strike once at the
  * hit key, aw_combat_punch_hit of the punch duration (the original
@@ -1111,6 +1186,11 @@ static void think(slot_t *s,edict_t *p,float dt) {
 void AW_CombatPhysics(void) {
     edict_t *p;int i,any=0;float dt=(float)host_frametime,interval;double t0;
     if(!combat_on.value || !(p=player()))return;
+    /* Only for a spawned player (MUSIC-DEATH-TRACK-RANDOM-60): a new map's settle frames (sv_main.c SV_SpawnServer runs
+     * SV_Physics twice) and the signon frames after "connect local" see the fresh client edict at health 0 before
+     * Host_Spawn_f gives it back (aw_scene.c), and the old map's slots before AW_CombatSceneSpawn empties them: that
+     * read as the player's death and played the death track on an area change. */
+    if(!svs.clients[0].active || !svs.clients[0].spawned)return;
     aw_combat_dice=dice_cvar.value!=0;
     for(i=0;i<SLOTS;i++){
         slot_t *s=&slots[i];
@@ -1237,6 +1317,7 @@ static void report(void) {
     if(you_valid)Con_Printf(" You: health %ld/%ld fatigue %ld/%ld\n",(long)you.health,(long)you.health_max,(long)you.fatigue,(long)you.fatigue_max);
     Con_Printf("thinks %lu (%.1f/s) swings %lu move traces %lu; ms/think avg %.3f max %.3f\n",cost.thinks,cost.thinks/span,
         cost.swings,cost.traces,cost.thinks?cost.seconds*1000/cost.thinks:0.0,cost.max*1000);
+    if(god_blows)Con_Printf("god mode turned away %lu blows (no damage, no knockdown)\n",god_blows);
     Con_Printf("bytes: per hostile NPC %ld, all slots %ld, player sheet %ld; no allocation\n",(long)sizeof(slot_t),
         (long)sizeof(slots),(long)sizeof(you));
 }
@@ -1284,6 +1365,18 @@ static void command(void) {
     char *a=Cmd_Argv(1);int on;
     if(Cmd_Argc()==1){report();return;}
     if(!Q_strcasecmp(a,"loadout") && Cmd_Argc()==3){loadout_command(Cmd_Argv(2));return;}
+    /* dbg combat resistnormal N|off (RESIST-NORMAL-WEAPONS-61, test only, not saved): every target resists normal
+     * weapons by N % (0..1000); off = the targets' own effects again */
+    if(!Q_strcasecmp(a,"resistnormal") && Cmd_Argc()<=3){
+        if(Cmd_Argc()==3)resist_test=!Q_strcasecmp(Cmd_Argv(2),"off")?-1:Q_atof(Cmd_Argv(2));
+        if(resist_test<0)resist_test=-1;
+        if(resist_test>1000)resist_test=1000;
+        if(resist_test>=0)Con_Printf("Resist normal weapons: every target %.0f %% (test only)",resist_test);
+        else Con_Printf("Resist normal weapons: the targets' own effects");
+        Con_Printf("; effect list %s; text %s\n",aw_combat_effect_magnitude?"connected":"not connected",
+                   resist_text[0]?resist_text:"(none in this image)");
+        return;
+    }
     if(!Q_strcasecmp(a,"seed") && Cmd_Argc()<=3){
         if(Cmd_Argc()==3)Cvar_SetValue(seed_cvar.name,Q_atof(Cmd_Argv(2)));
         Con_Printf("Combat seed %ld (0: a new seed per encounter); last used %lu\n",(long)seed_cvar.value,seed_used);return;
@@ -1349,6 +1442,34 @@ int AW_CombatTestEngage(edict_t *t,int dead) {
         SV_LinkEdict(s->e,false);
         if(aw_combat_actor_died)aw_combat_actor_died(s->e);   /* on the change list at once, as a fight's death */
         essential_death(s->e);
+    }
+    return 1;
+}
+/* PLAYER-CASTING-59 (aw_mwhost.c AW_MwscriptLand): a spell's effects changed an actor's health to HEALTH. A harmful
+ * spell is an attack: an actor not yet fighting joins the fight with the player (OpenMW spellcasting.cpp inflict,
+ * the player's harmful spell on a living actor shows its health bar and counts as an attack). At 0 it dies as by a
+ * blow. 1 when the actor has a fight slot. */
+int AW_CombatSpellHit(edict_t *e,float health,int harmful) {
+    slot_t *s;
+    if(!e || e->free)return 0;
+    s=slot_of(e);
+    if(!s){
+        eval_t *v=GetEdictFieldValue(e,"aw_source_id");aw_fighter_t sheet;
+        if(!harmful || !v || !v->string || !*(pr_strings+v->string))return 0;
+        if(!AW_CombatActorLoad(pr_strings+v->string,&sheet) || !AW_CombatEngage(e,&sheet,NULL) || !(s=slot_of(e)))return 0;
+    }
+    if(s->f.dead)return 1;
+    if(harmful){enemy=e;enemy_until=(float)sv.time+aw_combat_settings.fNPCHealthBarTime;}
+    s->f.health=health>0?health:0;
+    if(health<=0){
+        s->f.dead=1;
+        set_state(s,S_DEAD,G_DEATH);s->e->v.solid=SOLID_NOT;SV_LinkEdict(s->e,false);sound(SND_FALL);
+        if(s->rolled){s->e->v.angles[2]=90;s->e->v.origin[2]+=2;}           /* stand-in: lie down */
+        if(aw_combat_actor_died)aw_combat_actor_died(s->e);
+        essential_death(s->e);
+        if(readout.value)Con_Printf("Combat: %s is dead\n",s->f.name);
+        voice(s->e,AW_VOICE_DEATH);
+        if(!AW_CombatHostiles())ended(1);
     }
     return 1;
 }

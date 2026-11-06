@@ -1,6 +1,6 @@
 # Roadmap history: v0.0.29 and earlier
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -631,7 +631,7 @@ its optional inspection facility is disabled.
 ## Top engineering priority: world-terrain build time
 
 The reported full-world conversion takes an impractical part of an evening on
-the workstation. Prioritize making `vfXXXX` compilation and repeated builds
+the build machine. Prioritize making `vfXXXX` compilation and repeated builds
 practical alongside the current native Windows validation, before speculative compiler acceleration.
 The [build/compiler toolkit roadmap](history/superseded/BUILD_TOOLKIT_ROADMAP.md) defines the work:
 

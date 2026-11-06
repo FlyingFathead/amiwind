@@ -41,7 +41,7 @@ build reported 78 compiler-warning lines, retained without suppression.
 Validation results are recorded in [the rc6 receipt](../../validation/rc6-source.json).
 A successful native compile and asset-free test HDF are not a full game build.
 The earlier cloud full conversion stopped on disk exhaustion during world-terrain
-assembly. A reported rc3 workstation run completed terrain in 4232.5 seconds
+assembly. A reported rc3 build machine run completed terrain in 4232.5 seconds
 and then failed the world/journal receipt check; no final HDF passed.
 The receipt-only retry then encountered 23 pre-existing actor-contact findings.
 The new early actor check reproduced all 23 from the retained rc3 scene before

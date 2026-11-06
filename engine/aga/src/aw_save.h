@@ -86,6 +86,9 @@ typedef struct {
 } aw_save_t;
 int AW_SaveEncode(unsigned char *out,int capacity,const aw_save_t *state);
 int AW_SaveDecode(const unsigned char *data,int size,aw_save_t *out);
+/* INVENTORY-ORIGINAL-LIMITS-61: a decoded save owns its item table (aw_state.h OWNERSHIP): the rows given back. A save
+ * whose state became the game's (AW_SaveSpawn) or that was never decoded holds none. */
+void AW_SaveRelease(aw_save_t *save);
 void AW_SaveInit(void);
 void AW_SaveReset(void);
 int AW_SaveAllowed(void);

@@ -123,6 +123,11 @@ void AW_HandsTick(void) {
         if(state==4){hand_begin(p,0);hand_show(p,0);return;}
         hand_begin(p,2);clip=AW_HAND_IDLE;elapsed=0;
     }
+    /* FP-WEAPON-SWAY-61: Morrowind stiff (aw_fp_sway 2) holds the hands on the idle's first frame; only drawing,
+     * putting away and the attack move them */
+    if(clip==AW_HAND_IDLE && aw_fp_stiff)elapsed=0;
     p->v.weaponframe=(float)AW_HandClipFrame(&hand_table,clip,elapsed);
 }
 #endif
+/* view.c sets it from aw_fp_sway every frame (FP-WEAPON-SWAY-61) */
+int aw_fp_stiff;

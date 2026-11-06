@@ -85,6 +85,11 @@ def prepare(town, data_files, scene, chim_world, out, qbsp, vis, light, ffmpeg='
     # room_form shell (build.py, a build with CHIM rooms): no room compile (BUILD-SEYDA-BSP-CARRIER-48)
     rooms = convert_interiors(data, work_scene, settings, qbsp, vis, light, ffmpeg, jobs, vis_mode, timings,
                               only_cells=only_cells, room_form=room_form)
+    # the rooms' levelled creatures (tools/room_levelled.py, TOMB-NO-CREATURES-60): an aw_levelled entity per levelled
+    # reference, after the residents
+    import room_levelled
+    from mwad.paths import child_ci
+    levelled = room_levelled.write(work_scene / 'id1/maps', rooms['rooms'], child_ci(data, 'Morrowind.esm'))
     # The town's exterior door bank with its doors into the converted rooms (the CHIM world's own source stage).
     work = chim_world / 'work' / town
     if not (work / 'audit/placements.json').is_file():
@@ -101,6 +106,8 @@ def prepare(town, data_files, scene, chim_world, out, qbsp, vis, light, ffmpeg='
              for path in sorted((out / 'id1').rglob('*')) if path.is_file()}
     record = {'format': FORMAT, 'town': town, 'map': town_field(settings, 'map'), 'door_file': door_file,
               'rooms': rooms['receipt'], 'excluded': rooms['excluded'], 'files': files,
+              'levelled': {'mode': levelled['mode'], 'placed': levelled['placed'], 'maps': levelled['maps'],
+                           'left_out': levelled['left_out']},
               'source': 'game data; town_interiors.convert (interior-room units); door bank from the CHIM world '
                         'source stage ' + str(work.relative_to(chim_world))}
     write_json(out / RECORD, record)

@@ -208,6 +208,14 @@ int AW_HarvestUse(void)
             if(message[0])AW_UIPickupNotice(message,3);
         }
     }
-    else if(result<0)AW_UISubtitle(AW_HarvestText(&harvest,harvest.plant[i].label),"Cannot collect: inventory/state capacity or data rejected.",3);
+    else if(result<0){
+        /* COLLECT-CAPACITY-REJECTED-60: the message names the limit that refused (one message said all four) */
+        const char *why=result==AW_HARVEST_FULL?AW_ItemRefusalText(&aw_state,AW_ITEM_FULL):
+            result==AW_HARVEST_TOO_MANY?AW_ItemRefusalText(&aw_state,AW_ITEM_TOO_MANY):
+            result==AW_HARVEST_STATE?"this plant's saved state was refused":"this plant's data was refused";
+        snprintf(message,sizeof(message),"Cannot collect: %s.",why);
+        AW_UISubtitle(AW_HarvestText(&harvest,harvest.plant[i].label),message,3);
+        Con_Printf("Harvest refused (%d): %s\n",result,message);
+    }
     return 1;
 }

@@ -60,7 +60,7 @@ work; it needs a few hundred bytes of room in Balmora's tightest CHIM ring.
 last v0.0.33 fixes (barrel use, intro teleport, Seyda Neen repack and terrain floor). The release head is merged,
 and rc and final builds and the release gate now refuse a head without the release pinned in
 `tools/previous-release.json`. Gate findings: [TEST-PARALLEL-ORDER-LOAD-33](../bugs/TEST-PARALLEL-ORDER-LOAD-33.md)
-(a pool test fails on a fully loaded host; open),
+(a pool test fails on a fully loaded machine; open),
 [GATE-HOSTPARITY-TEMP-RACE-33](../bugs/GATE-HOSTPARITY-TEMP-RACE-33.md) (two gates shared one host-parity log) and
 [GATE-NUMPY-PATH-SCRATCH-33](../bugs/GATE-NUMPY-PATH-SCRATCH-33.md) (the gate's NumPy and Pillow folder was
 temporary); both gate findings are repaired in the gate tooling.
@@ -453,7 +453,7 @@ Owner playtest: the Amiga right mouse button arrives as MOUSE3 and was unbound, 
 Owner playtest findings for a later release: [ARENA-PIT-NO-INTERIOR-33](../bugs/ARENA-PIT-NO-INTERIOR-33.md) the Vivec Arena minigame fights on the test floor: the Arena Pit interior is not in v0.0.33 builds; [COMBAT-SETUP-DICE-BLOCK-33](../bugs/COMBAT-SETUP-DICE-BLOCK-33.md) the Arena setup offers no dice/style choice before a fight, and there is no block button; [COMBAT-VOICES-SILENT-33](../bugs/COMBAT-VOICES-SILENT-33.md) player pain grunts and hostile NPC taunts are not heard in fights; [MUSIC-DEATH-SILENT-33](../bugs/MUSIC-DEATH-SILENT-33.md) no death music when the player dies; [COMBAT-PLAYER-DEATH-FALL-33](../bugs/COMBAT-PLAYER-DEATH-FALL-33.md) the player does not collapse on death.
 
 ## TEST-CHIM-BIG-FRAME-TIMEOUT-33, 9 October 2026
-The Balmora-sized CHIM world fixture hit its 300 s subprocess limit in a gate on a busy host and passed on the same code one gate earlier: [TEST-CHIM-BIG-FRAME-TIMEOUT-33](../bugs/TEST-CHIM-BIG-FRAME-TIMEOUT-33.md).
+The Balmora-sized CHIM world fixture hit its 300 s subprocess limit in a gate on a loaded machine and passed on the same code one gate earlier: [TEST-CHIM-BIG-FRAME-TIMEOUT-33](../bugs/TEST-CHIM-BIG-FRAME-TIMEOUT-33.md).
 
 ## COMBAT-FIST-BLOCK-33, COMBAT-NO-CONDITION-33, COMBAT-PLAYER-ATTACK-TYPE-33, COMBAT-HIT-RECOVERY-33, 9 October 2026
 The combat mechanics study (weapons, shields, knockdown) found four places where the shipped rc1 combat
@@ -510,8 +510,7 @@ BUILD-SURVEY-NOT-REPRODUCIBLE-33 form the new family build-cache-reuse.
 BUILD-STAIR-WALK-SLOW-33: the stair walk took 1,751 s of the rc1c image step (14,645 CPU-s). The
 trace, the placement filter and the headroom tests now do the same arithmetic in the same order
 without the interpreter overhead and the all-triangles scans, and maps are handed out largest
-first: identical rows on 48 rc1c maps (15,506 rows), 737 against 201 CPU-s, side by side on a busy
-host (tests/test_walk_trace_speed.py).
+first: identical rows on 48 rc1c maps (15,506 rows), 737 against 201 CPU-s, side by side on a loaded machine (tests/test_walk_trace_speed.py).
 
 BUILD-SURVEY-NOT-REPRODUCIBLE-33: the survey's wall time moved to the log
 (tests/test_survey_reproducible.py); a byte-for-byte second run is pending.
@@ -557,7 +556,7 @@ now go through tools/build_scratch.py (the run's scratch folder); a static test 
 ## TEST-COST-ORDER-LOAD-33, 9 October 2026
 
 [TEST-COST-ORDER-LOAD-33](../bugs/TEST-COST-ORDER-LOAD-33.md): gate 672 failed the scheduler cost-order test on a
-fully loaded host; the merged head passes it 4 of 4 in isolation, so it is a load-dependent test, not a merge
+fully loaded machine; the merged head passes it 4 of 4 in isolation, so it is a load-dependent test, not a merge
 interaction. The CHIM Engine tracker link in docs/BUGS.md lost in the batch merge is restored.
 
 ## TRACKER-CHIM-LINK-MERGE-33, 9 October 2026
@@ -613,7 +612,7 @@ validated. Saves are still written when made.
 
 ## TEST-PROFILE-TIMELINE-SUM-33, 9 October 2026
 
-[TEST-PROFILE-TIMELINE-SUM-33](../bugs/TEST-PROFILE-TIMELINE-SUM-33.md): a full gate on a busy host
+[TEST-PROFILE-TIMELINE-SUM-33](../bugs/TEST-PROFILE-TIMELINE-SUM-33.md): a full gate on a loaded machine
 failed the build profile test's sampled-timeline check (2.48 s of timeline CPU against 2.01 s
 measured by the stage); the previous commit's gate passed it. Cause not investigated.
 
@@ -646,7 +645,7 @@ ordered pool idled behind one slow item (world terrain at 13.9 of 24 cores); fou
 worker now, and a longest-first cost model from item history. Stage-only runs for
 [BUILD-IDLE-STAGES-33](../bugs/BUILD-IDLE-STAGES-33.md), all byte-identical: balmora 716 -> 268 s,
 media 753 -> 258 s, balmora-interiors 904 -> 614 s, actor-contact 346 -> 194 s, bsp 125 -> 53 s
-(4 CPUs, busy host).
+(4 CPUs, loaded machine).
 
 ## BUILD-EXCLUDE-STAGE-CLOSURE-33: quick test builds, 9 October 2026
 
@@ -704,7 +703,7 @@ loads this tree's `tools/project_version.py` from its file.
 throughout CHIM Preview 1 played on a PC whose CPU was at 100 % with build jobs; the same build was
 clean on a second, idle PC. Cause: host CPU starvation of the emulator's audio, not game data and not
 the in-game loading crackle of [AUDIO-LOAD-29](../BUGS.md#music-and-sound-audio). Audio is judged only on
-an unloaded host; a controlled idle/loaded A/B on one PC is pending. Checked against the owner's
+an unloaded machine; a controlled idle/loaded A/B on one PC is pending. Checked against the owner's
 v0.0.32-dev3 Vivec reports: the floating resident is
 [VIVEC-ARENA-FLOATING-NPC-32](../bugs/VIVEC-ARENA-FLOATING-NPC-32.md), and the broken transition to the
 open world and its flora, and Vivec not being visible from the open world, are
@@ -1007,8 +1006,7 @@ profile stage test with the host at 100 % CPU ("2.06 not less than 1.936": wall 
 with CPU time). Fixed in source on v0.0.33-doc-toc (1d7b743), not shipped at the time of writing:
 the test compares the profiler with independent readings of the same stage; under load (2 CPUs,
 8 busy loops) the old test failed 5 of 5, the new one passes 10 of 10 and still fails a sampler
-that ignores child processes. Same family as TEST-PROFILE-SECTION-CPU-32 (timing tests on a busy
-host).
+that ignores child processes. Same family as TEST-PROFILE-SECTION-CPU-32 (timing tests on a loaded machine).
 
 ## Stair gate merged on v0.0.33-dev; BUILD-NAME-MOJIBAKE-32 closed as a duplicate, 8 October 2026
 
@@ -1080,12 +1078,12 @@ drawn in photo mode.
 as id's `info_null` does; the engine's static-flame table still reads the map text. New
 `tests/test_entity_spawn_contract.py` checks every converter classname and key against the game
 logic. [CENSUS-LOAD-SLOW-32](../bugs/CENSUS-LOAD-SLOW-32.md): cause confirmed in one FS-UAE container
-(busy host, relative numbers): dev3 Census 8.8-20.9 s with the remote console on, 0.13-0.16 s off;
+(loaded machine, relative numbers): dev3 Census 8.8-20.9 s with the remote console on, 0.13-0.16 s off;
 with the repaired game logic 0.20-0.41 s on, 0.12-0.22 s off.
 
 ## CENSUS-LOAD-SLOW-32 cause; REMOTE-CONSOLE-LOG-COST-32 and DEBUG-TP-SHIP-FREEZE-32, 8 October 2026
 
-[CENSUS-LOAD-SLOW-32](../bugs/CENSUS-LOAD-SLOW-32.md): cause confirmed in one FS-UAE container (busy host,
+[CENSUS-LOAD-SLOW-32](../bugs/CENSUS-LOAD-SLOW-32.md): cause confirmed in one FS-UAE container (loaded machine,
 relative numbers): dev3 Census 8.8-20.9 s with the remote console on, 0.13-0.16 s off; normal play is not
 affected. New: [REMOTE-CONSOLE-LOG-COST-32](../bugs/REMOTE-CONSOLE-LOG-COST-32.md) (each console line costs
 about 7-18 ms with the remote console on; test sessions only) and
@@ -1181,7 +1179,7 @@ flags are ignored, so banners, tapestries, rugs and similar props are solid).
 ## First FS-UAE session of Balmora under CHIM, 8 October 2026
 
 On the five benchmark cameras CHIM draws far fewer world faces and clip nodes than the legacy maps
-and roughly halves the frame time (JIT, busy host, relative), and doors work both ways
+and roughly halves the frame time (JIT, loaded machine, relative), and doors work both ways
 ([CHIM-VIEW-FACES-33](../bugs/CHIM-VIEW-FACES-33.md)). New:
 [CHIM-TEXTURE-SPECKS-33](../bugs/CHIM-TEXTURE-SPECKS-33.md) (bright single-texel specks in CHIM
 textures), [CHIM-ZONE-RING-THRASH-33](../bugs/CHIM-ZONE-RING-THRASH-33.md) (the ring does not fit
@@ -1204,7 +1202,7 @@ placement is involved. New: [VIVEC-ARENA-FRAME-EDGE-32](../bugs/VIVEC-ARENA-FRAM
 
 ## TEST-PROFILE-SECTION-CPU-32, 8 October 2026
 
-The full gate failed one build profile test on a loaded host: two 0.05 s section calls read
+The full gate failed one build profile test on a loaded machine: two 0.05 s section calls read
 0.08 s because `os.times()` counts whole clock ticks. The test now allows for the tick
 resolution. [Report](../bugs/TEST-PROFILE-SECTION-CPU-32.md).
 

@@ -20,7 +20,7 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
+_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -71,7 +71,7 @@ dsteps_03 3,854. Candidate owners: distance detail and model simplification for 
 the 160 placements over 16 leaves are in [CHIM-LEAF-SPAN-33](CHIM-LEAF-SPAN-33.md).
 
 First FS-UAE comparison, Balmora under CHIM against the legacy maps (8 October 2026; the five
-benchmark cameras; JIT profile on a busy host, so relative numbers only):
+benchmark cameras; JIT profile on a loaded machine, so relative numbers only):
 
 | Counter (per frame) | Legacy -> CHIM, range over the cameras |
 | --- | --- |

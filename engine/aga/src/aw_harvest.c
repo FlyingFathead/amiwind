@@ -303,51 +303,71 @@ static int contents(const aw_harvest_t *h,const aw_harvest_plant_t *p,int level,
     }
     return total;
 }
-int AW_HarvestPrepare(const aw_harvest_t *h,int plant,aw_state_t *state,int level,uint32_t entropy)
+/* COLLECT-CAPACITY-REJECTED-60: why a plant cannot be prepared or taken, AW_HARVEST_DATA (the catalogue or its
+ * contents) or AW_HARVEST_STATE (its saved pick fact: another catalogue's, or no room to keep it); the public
+ * AW_HarvestPrepare keeps answering -1 for both. */
+static int prepare(const aw_harvest_t *h,int plant,aw_state_t *state,int level,uint32_t entropy)
 {
     const aw_harvest_plant_t *p;uint32_t fact,seed;int total,amounts[AW_HARVEST_NODES];
-    if(plant<0 || plant>=h->plants || !AW_HarvestValidate(h) || level<1 || level>1000)return -1;
-    if(!compatible(h,state) || !migrate(h,plant,state))return -1;
+    if(plant<0 || plant>=h->plants || !AW_HarvestValidate(h) || level<1 || level>1000)return AW_HARVEST_DATA;
+    if(!compatible(h,state) || !migrate(h,plant,state))return AW_HARVEST_STATE;
     p=&h->plant[plant];fact=fact_get(h,plant,state);
     if(fact&(DONE|EMPTY))return 0;
     if(!fact){
         seed=entropy&SEED_MASK;if(!seed)seed=1;
         fact=((uint32_t)level<<20)|seed;
         /* Save the encounter roll before visibility or retryable insertion. */
-        if(!fact_set(h,plant,state,fact))return -1;
+        if(!fact_set(h,plant,state,fact))return AW_HARVEST_STATE;
     }
     level=(fact>>20)&1023U;seed=fact&SEED_MASK;
-    if(!seed || level<1 || level>1000)return -1;
-    total=contents(h,p,level,seed,amounts);if(total<0)return -1;
-    if(!total){if(!fact_set(h,plant,state,fact|EMPTY))return -1;return 0;}
+    if(!seed || level<1 || level>1000)return AW_HARVEST_STATE;
+    total=contents(h,p,level,seed,amounts);if(total<0)return AW_HARVEST_DATA;
+    if(!total){if(!fact_set(h,plant,state,fact|EMPTY))return AW_HARVEST_STATE;return 0;}
     return 1;
+}
+int AW_HarvestPrepare(const aw_harvest_t *h,int plant,aw_state_t *state,int level,uint32_t entropy)
+{
+    int result=prepare(h,plant,state,level,entropy);
+    return result<0?-1:result;
+}
+static void item_key(char key[64],const aw_harvest_t *h,int node)
+{
+    int k;strcpy(key,AW_HarvestText(h,h->node[node].id));
+    for(k=0;key[k];k++)if(key[k]>='A' && key[k]<='Z')key[k]+='a'-'A';
 }
 int AW_HarvestTake(const aw_harvest_t *h,int plant,aw_state_t *state,int level,uint32_t entropy)
 {
-    /* Transaction scratch contains only inventory (2 KiB), not the whole
-     * world harvest array. Validate every grant before committing any item. */
-    aw_value_t next[AW_STATE_VALUES];int count,j,k;char key[64];
-    const aw_harvest_plant_t *p;uint32_t fact;
-    int ready,i,amounts[AW_HARVEST_NODES];
+    /* Every grant is checked before anything changes (COLLECT-CAPACITY-REJECTED-60: no copy of the item table on the
+     * stack any more): rows for the new kinds made (AW_ItemReserve), each kind's total against INT32_MAX; then the pick fact,
+     * then the items, which cannot fail after those checks. */
+    const aw_harvest_plant_t *p;uint32_t fact;char key[64],other[64];
+    int ready,i,j,hidden,fresh=0,amounts[AW_HARVEST_NODES];int32_t total,old;
 
-    i=AW_HarvestHidden(h,plant,state);
-    ready=AW_HarvestPrepare(h,plant,state,level,entropy);
-    if(ready<0)return -1;
-    if(!ready)return i?0:2;
+    hidden=AW_HarvestHidden(h,plant,state);
+    ready=prepare(h,plant,state,level,entropy);
+    if(ready<0)return ready;
+    if(!ready)return hidden?0:2;
     p=&h->plant[plant];fact=fact_get(h,plant,state);
-    if(contents(h,p,(fact>>20)&1023U,fact&SEED_MASK,amounts)<=0)return -1;
-    count=state->count[AW_ITEM];if(count<0 || count>AW_STATE_VALUES)return -1;
-    memcpy(next,state->values[AW_ITEM],sizeof(next));
+    if(contents(h,p,(fact>>20)&1023U,fact&SEED_MASK,amounts)<=0)return AW_HARVEST_DATA;
     for(i=0;i<h->nodes;i++)if(amounts[i]){
-        strcpy(key,AW_HarvestText(h,h->node[i].id));
-        for(k=0;key[k];k++)if(key[k]>='A' && key[k]<='Z')key[k]+='a'-'A';
-        for(j=0;j<count;j++)if(!strcmp(next[j].id,key))break;
-        if(j==count){if(count==AW_STATE_VALUES)return -1;memset(&next[count],0,sizeof(next[count]));strcpy(next[count++].id,key);}
-        if(next[j].value<0 || next[j].value>INT32_MAX-amounts[i])return -1;
-        next[j].value+=amounts[i];
+        item_key(key,h,i);
+        for(j=0;j<i;j++)if(amounts[j]){item_key(other,h,j);if(!strcmp(key,other))break;}
+        if(j<i)continue;   /* the same item from another node: counted with its first */
+        total=0;
+        for(j=i;j<h->nodes;j++)if(amounts[j]){
+            item_key(other,h,j);
+            if(!strcmp(key,other)){if(total>INT32_MAX-amounts[j])return AW_HARVEST_TOO_MANY;total+=amounts[j];}
+        }
+        j=AW_ItemIndex(state,key);
+        old=j>=0?AW_ITEM_ROW(state,j)->value:0;
+        if(old<0 || old>INT32_MAX-total)return AW_HARVEST_TOO_MANY;
+        if(j<0)fresh++;
     }
-    if(!fact_set(h,plant,state,fact|DONE))return -1;
-    memcpy(state->values[AW_ITEM],next,sizeof(next));state->count[AW_ITEM]=count;return 1;
+    /* INVENTORY-ORIGINAL-LIMITS-61: no kind limit; FULL only when memory says no to the rows */
+    if(!AW_ItemReserve(state,fresh))return AW_HARVEST_FULL;
+    if(!fact_set(h,plant,state,fact|DONE))return AW_HARVEST_STATE;
+    for(i=0;i<h->nodes;i++)if(amounts[i]){item_key(key,h,i);AW_ItemAdd(state,key,amounts[i]);}
+    return 1;
 }
 const char *AW_HarvestOwner(const aw_harvest_t *h,int plant)
 {

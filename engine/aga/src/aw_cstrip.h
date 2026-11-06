@@ -7,12 +7,14 @@
  * the container deltas of the world change list (aw_inventory.h AW_ContainerTake / AW_ContainerPut), so they are kept
  * across maps and saves; a take from an owned container is stolen (the change list's stolen mark).
  * The pure rules (aw_cstrip_rules.c, native-tested): selection, scrolling, the mouse's cell and the sides. */
-#define AW_CSTRIP_ROWS 64          /* a side's entries: the container list (AW_CONTAINER_ITEMS) and the inventory */
+#define AW_CSTRIP_ROWS 64          /* the container side's entries (AW_CONTAINER_ITEMS) */
 #define AW_CSTRIP_NAME 40
 enum {AW_CSTRIP_CONTAINER,AW_CSTRIP_INVENTORY};
 typedef struct {char id[33];char name[AW_CSTRIP_NAME];int count;} aw_cstrip_entry_t;
+/* INVENTORY-ORIGINAL-LIMITS-61: each side's entries are an array of CAP (heap, sized when the strip fills: the
+ * container side AW_CSTRIP_ROWS, the inventory side every kind carried, no fixed limit) */
 typedef struct {
-    aw_cstrip_entry_t row[2][AW_CSTRIP_ROWS];
+    aw_cstrip_entry_t *row[2];int cap[2];
     int count[2],selected[2],first[2];
     int side,columns;              /* the side shown (CONTAINER / INVENTORY); cells in view */
 } aw_cstrip_list_t;

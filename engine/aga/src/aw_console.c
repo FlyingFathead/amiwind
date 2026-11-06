@@ -110,6 +110,11 @@ static int route_format(route_t *r,int argc,char **argv,int j,char *out,int capa
         if(argc-j>1 || (argc>j && Q_strcasecmp(argv[j],"stats")) || used+14>capacity)return 0;
         strcpy(out+used," give weapons");used+=13;
     }
+    /* dbg weapon / dbg gear (WEAPONS-57): the inventory command's list box, no resident command of its own */
+    if(!strcmp(r->command,"aw_inventory") && (!strcmp(r->words,"weapon") || !strcmp(r->words,"gear"))){
+        if(argc>j || used+12>capacity)return 0;
+        strcpy(out+used,!strcmp(r->words,"weapon")?" box weapon\n":" box gear\n");return 1;
+    }
     /* dbg creatures [on/off]: "chim actors creatures", no resident command or cvar of its own (aw_actors.c) */
     if(!strcmp(r->command,"chim") && !strcmp(r->words,"creatures")){
         if(argc-j>1 || used+20>capacity)return 0;
@@ -127,6 +132,11 @@ static int route_format(route_t *r,int argc,char **argv,int j,char *out,int capa
     if(!strcmp(r->command,"aw_mwscript_status") && !strcmp(r->words,"mwscript") && argc==j){
         if(used+8>capacity)return 0;
         strcpy(out+used," about\n");return 1;
+    }
+    /* dbg mwscript stats [ID|on|off] (ACTOR-STATS-ALL-61): a being's stats, no resident command of its own */
+    if(!strcmp(r->command,"aw_mwscript_status") && !strcmp(r->words,"mwscript stats")){
+        if(used+7>capacity)return 0;
+        strcpy(out+used," stats");used+=6;
     }
     /* dbg door roulette [SEED]: the teleport command's roulette, no resident command of its own */
     if(!strcmp(r->command,"aw_teleport") && !strcmp(r->words,"door roulette")){

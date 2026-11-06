@@ -48,13 +48,25 @@ static const char *const marker_keys[3]={"amiwind:map:marker:x","amiwind:map:mar
 #define INV_CLOSE_X 132
 #define INV_CLOSE_W 44
 #define INV_PREVIEW_X 7
-#define INV_PREVIEW_Y 22
+/* the picture starts under the burden bar (ENCUMBRANCE-INCOMPLETE-61: OpenMW openmw_inventory_window.layout puts the
+ * EncumbranceBar above the Avatar) */
+#define INV_PREVIEW_Y 32
 #define INV_PREVIEW_W 116
-#define INV_PREVIEW_H 168
+#define INV_PREVIEW_H 158
+#define INV_BURDEN_Y 21
+#define INV_BURDEN_H 9
+/* INVENTORY-ORIGINAL-LIMITS-61: the window lists every kind carried (no fixed limit) and keeps little per kind: a
+ * 40-byte sort key for each (its item row, value, weight, category and the first 23 letters of its name, read when the
+ * window opens or the list changes); the whole record (about 520 bytes) only for the rows in view and one page either
+ * side (INV_PAGE), read again when the view leaves them. */
+#define INV_PAGE (3*INV_VISIBLE)
+typedef struct {int state_row,value,file_row;float weight;unsigned char category,known;char name[24];} inv_key_t;
 typedef struct {
-    aw_inventory_item_t item[AW_STATE_VALUES];
-    unsigned char known[AW_STATE_VALUES];
-    int rows[AW_STATE_VALUES],count,selected,top,category,sort,context,context_x,context_y;
+    inv_key_t *keys;int nkeys;                 /* every kind carried (heap) */
+    int *rows;                                 /* list row -> key (the category's, sorted; heap) */
+    aw_inventory_item_t page[INV_PAGE];unsigned char page_known[INV_PAGE];int page_first;   /* -1: none read */
+    aw_inventory_item_t one;int one_row;       /* a row outside the page (the selection out of view) */
+    int count,selected,top,category,sort,context,context_x,context_y;
     int icon_row[INV_VISIBLE],icon_ok[INV_VISIBLE];
     byte icons[INV_VISIBLE][1024];
     char message[96];float angle;
@@ -69,6 +81,7 @@ static inventory_panel_t *inventory;
 int AW_InventoryActive(void){return modal==3;}
 static const char *const inventory_categories[]={"All","Weapons","Armour","Clothing","Potions","Ingredients","Books","Misc"};
 static void inventory_refresh(void);
+static void inventory_filter(void);
 static void inventory_key(int key);
 static void inventory_draw(void);
 static byte *map_data,*map_pixels;
@@ -145,6 +158,7 @@ static void close_panel(void){
         Con_Printf("Inventory preview (%s): %d renders, last %d ms; %u frames, %d us per frame; picture %d bytes kept, pose model freed after each render.\n",
             AW_ViewInventoryLive()?"live":"still",inventory->preview_renders,(int)(inventory->preview_render_seconds*1000),
             inventory->preview_frames,(int)(inventory->preview_seconds*1e6/inventory->preview_frames),INV_PREVIEW_W*INV_PREVIEW_H);
+    if(inventory){free(inventory->keys);free(inventory->rows);}
     free(inventory);inventory=NULL;AW_InventoryPreviewClear();
     free(map_data);map_data=map_pixels=NULL;lava_pools=lava_points=NULL;lava_count=0;
     book_free();
@@ -159,11 +173,12 @@ const char *AW_WorldUIName(void){
     return modal>=0 && modal<=4?names[modal]:"window";
 }/* A button released outside the window must not leave a modal drag held. */
 void AW_WorldUICancelDrag(void){drag=marker_click=0;}
-static int allowed(void){
+static int allowed_in_play(void){
     return !modal && key_dest==key_game && sv.active && svs.maxclients==1 && svs.clients &&
-        svs.clients[0].edict && cls.state==ca_connected && !AW_StoryRestricted() &&
+        svs.clients[0].edict && cls.state==ca_connected &&
         !AW_ReaderActive() && !AW_CharacterActive() && !AW_GalleryActive();
 }
+static int allowed(void){return allowed_in_play() && !AW_StoryRestricted();}
 static void opened(int kind){
     strncpy(opened_scene,sv.name,sizeof(opened_scene)-1);opened_scene[sizeof(opened_scene)-1]=0;
     modal=kind;key_dest=key_menu;IN_AWClearButtons();
@@ -174,7 +189,9 @@ int AW_WorldUIOpenPanel(void (*draw)(void),int (*key)(int key,int mouse_x,int mo
 }
 void AW_InventoryOpen(void){
     int i;
-    if(!allowed() || svs.clients[0].edict->v.health<=0)return;
+    /* the inventory opens during the registration from the papers on, as in the original (aw_story.c
+     * AW_StoryInventoryAllowed, CHARGEN-INVENTORY-LOCKED-60); the map and journal keep the released-game rule */
+    if(!allowed_in_play() || !AW_StoryInventoryAllowed() || svs.clients[0].edict->v.health<=0)return;
     inventory=(inventory_panel_t *)AW_TryCalloc(1,sizeof(*inventory));
     if(!inventory){Con_Printf("Inventory: not enough memory.\n");return;}
     for(i=0;i<INV_VISIBLE;i++)inventory->icon_row[i]=-1;
@@ -182,41 +199,103 @@ void AW_InventoryOpen(void){
     if(!AW_InventoryBootstrap())strcpy(inventory->message,"Initial item catalogue unavailable.");
     inventory_refresh();
 }
+/* a kind's record, or its id as the name (category Misc) when the catalogue has no row for it */
+static int inventory_read(int state_row,aw_inventory_item_t *out){
+    char id[64];
+    strcpy(id,AW_ITEM_ID(&aw_state,state_row));memset(out,0,sizeof(*out));
+    if(AW_InventoryRead(id,out))return 1;
+    memset(out,0,sizeof(*out));strcpy(out->id,id);Q_strcpy_bounded(out->name,id,sizeof(out->name));
+    out->category=AW_INV_MISC;return 0;
+}
+/* a key's record: by its row in the item file when the pass gave one (one read, no search), else by its id */
+static int inventory_read_key(const inv_key_t *k,aw_inventory_item_t *out){
+    if(k->file_row>=0 && aw_inventory_read_row && aw_inventory_read_row(k->file_row,out))return 1;
+    return inventory_read(k->state_row,out);
+}
+static int inventory_sort_mode;
+static int inventory_order(const void *a,const void *b){
+    const inv_key_t *x=&inventory->keys[*(const int *)a],*y=&inventory->keys[*(const int *)b];int cmp;
+    if(inventory_sort_mode==1)cmp=x->value<y->value?1:x->value>y->value?-1:0;
+    else if(inventory_sort_mode==2)cmp=x->weight<y->weight?1:x->weight>y->weight?-1:0;
+    else cmp=AW_InventoryCompare(x->name,y->name);
+    return cmp?cmp:x->state_row-y->state_row;   /* the same order every time */
+}
+/* one carried kind's sort key from its record (NULL: the id as the name, Misc) */
+static void inventory_key_row(void *ctx,int state_row,const aw_inventory_item_t *it,int file_row){
+    inv_key_t *k=&inventory->keys[inventory->nkeys++];aw_inventory_item_t item;(void)ctx;
+    k->file_row=file_row;
+    if(it){item=*it;k->known=1;}
+    else{memset(&item,0,sizeof(item));Q_strcpy_bounded(item.name,AW_ITEM_ID(&aw_state,state_row),sizeof(item.name));
+         item.category=AW_INV_MISC;k->known=0;}
+    k->state_row=state_row;k->value=item.value;k->weight=item.weight;
+    k->category=(unsigned char)item.category;Q_strcpy_bounded(k->name,item.name,sizeof(k->name));
+}
 static void inventory_refresh(void){
-    int i,j,n,order[AW_STATE_VALUES];
+    int i,kinds=AW_ItemCount(&aw_state);aw_inventory_item_t item;
     if(!inventory)return;
-    n=0;memset(inventory->known,0,sizeof(inventory->known));
-    for(i=0;i<aw_state.count[AW_ITEM] && i<AW_STATE_VALUES;i++){
-        aw_value_t *v=&aw_state.values[AW_ITEM][i];
-        if(v->value<=0)continue;
-        memset(&inventory->item[i],0,sizeof(inventory->item[i]));
-        inventory->known[i]=AW_InventoryRead(v->id,&inventory->item[i]);
-        if(!inventory->known[i]){
-            strcpy(inventory->item[i].id,v->id);strcpy(inventory->item[i].name,v->id);
-            inventory->item[i].category=AW_INV_MISC;
+    free(inventory->keys);free(inventory->rows);inventory->keys=NULL;inventory->rows=NULL;inventory->nkeys=0;
+    inventory->count=0;inventory->page_first=-1;inventory->one_row=-1;
+    if(kinds>0){
+        inventory->keys=(inv_key_t *)AW_TryMalloc(sizeof(inv_key_t)*kinds);
+        inventory->rows=(int *)AW_TryMalloc(sizeof(int)*kinds);
+        if(!inventory->keys || !inventory->rows){
+            free(inventory->keys);free(inventory->rows);inventory->keys=NULL;inventory->rows=NULL;
+            strcpy(inventory->message,"Inventory: not enough memory for the list.");kinds=0;
         }
-        if(!inventory->category || inventory->item[i].category==inventory->category)order[n++]=i;
     }
-    for(i=1;i<n;i++){
-        int value=order[i];j=i;
-        while(j>0){
-            int previous=order[j-1],cmp;
-            if(inventory->sort==1)cmp=inventory->item[previous].value<inventory->item[value].value?1:inventory->item[previous].value>inventory->item[value].value?-1:0;
-            else if(inventory->sort==2)cmp=inventory->item[previous].weight<inventory->item[value].weight?1:inventory->item[previous].weight>inventory->item[value].weight?-1:0;
-            else cmp=AW_InventoryCompare(inventory->item[previous].name,inventory->item[value].name);
-            if(cmp<=0)break;
-            order[j]=order[j-1];j--;
+    /* the engine: every kind's record at once (one pass over the item file for more than 8 kinds, keeping each
+     * kind's file row for the page reads; one search per kind opened the window with 400 kinds in 7 to 13 s); the
+     * fixtures: one read per kind */
+    if(kinds>0 && aw_inventory_carried && aw_inventory_carried(inventory_key_row,NULL)>=0){}
+    else{
+        inventory->nkeys=0;
+        AW_InventoryBatchBegin();   /* the reads below share one open of the item file */
+        for(i=0;i<kinds;i++){
+            if(AW_ITEM_ROW(&aw_state,i)->value<=0)continue;
+            inventory_key_row(NULL,i,inventory_read(i,&item)?&item:NULL,-1);
         }
-        order[j]=value;
+        AW_InventoryBatchEnd();
     }
+    inventory_filter();
+}
+/* the category's rows of the keys, sorted (Tab, the sort key and the category tabs: no record read again) */
+static void inventory_filter(void){
+    int i,n;
+    if(!inventory)return;
+    inventory->page_first=-1;inventory->one_row=-1;
+    for(i=n=0;i<inventory->nkeys;i++)
+        if(!inventory->category || inventory->keys[i].category==inventory->category)inventory->rows[n++]=i;
+    inventory_sort_mode=inventory->sort;
+    if(n>1)qsort(inventory->rows,n,sizeof(int),inventory_order);
     inventory->count=n;
-    for(i=0;i<n;i++)inventory->rows[i]=order[i];
     inventory->selected=minmax(inventory->selected,0,n?n-1:0);
     inventory->top=minmax(inventory->top,0,n>INV_VISIBLE?n-INV_VISIBLE:0);
     for(i=0;i<INV_VISIBLE;i++)inventory->icon_row[i]=-1;
 }
+/* the record of list row ROW: from the page (the rows in view and a page either side, read again when the view has
+ * left it), else read into the one spare */
+static aw_inventory_item_t *inventory_item(int row,int *known){
+    int i,first;
+    if(!inventory || row<0 || row>=inventory->count)return NULL;
+    first=inventory->top-INV_VISIBLE;if(first<0)first=0;
+    if(inventory->page_first<0 || inventory->top<inventory->page_first ||
+       inventory->top+INV_VISIBLE>inventory->page_first+INV_PAGE){   /* the view left the page */
+        AW_InventoryBatchBegin();
+        for(i=0;i<INV_PAGE && first+i<inventory->count;i++)
+            inventory->page_known[i]=(unsigned char)inventory_read_key(&inventory->keys[inventory->rows[first+i]],&inventory->page[i]);
+        AW_InventoryBatchEnd();
+        inventory->page_first=first;
+    }
+    if(row>=inventory->page_first && row<inventory->page_first+INV_PAGE){
+        if(known)*known=inventory->page_known[row-inventory->page_first];
+        return &inventory->page[row-inventory->page_first];
+    }
+    if(inventory->one_row!=row){inventory_read_key(&inventory->keys[inventory->rows[row]],&inventory->one);inventory->one_row=row;}
+    if(known)*known=inventory->keys[inventory->rows[row]].known;
+    return &inventory->one;
+}
 static aw_inventory_item_t *inventory_selected(void){
-    return inventory && inventory->count?&inventory->item[inventory->rows[inventory->selected]]:NULL;
+    return inventory && inventory->count?inventory_item(inventory->selected,NULL):NULL;
 }
 static int inventory_equippable(const aw_inventory_item_t *item){
     if(item && AW_InventoryEquipped(&aw_state,item->id) && (item->flags&AW_INV_EQUIP_SUPPORTED))return 1;
@@ -268,8 +347,8 @@ static void inventory_key(int key){
     if(key==K_PGDN)inventory->selected+=INV_VISIBLE;
     if(key==K_HOME)inventory->selected=0;
     if(key==K_END)inventory->selected=inventory->count-1;
-    if(key==K_TAB){inventory->category=(inventory->category+1)%8;inventory->selected=inventory->top=0;inventory_refresh();}
-    if(key=='o'){inventory->sort=(inventory->sort+1)%3;inventory_refresh();}
+    if(key==K_TAB){inventory->category=(inventory->category+1)%8;inventory->selected=inventory->top=0;inventory_filter();}
+    if(key=='o'){inventory->sort=(inventory->sort+1)%3;inventory_filter();}
     if(key==K_ENTER || key=='e'){inventory_action(1);return;}
     if(key=='d'){inventory_action(2);return;}
     if(key==K_MOUSE3 || key==K_MOUSE2){
@@ -304,7 +383,7 @@ static void inventory_key(int key){
             row=(mouse_y-20)/12;x=130;
             for(i=row*4;i<row*4+4;i++){
                 int width=i==0?28:i==1?48:i==2?48:i==3?60:i==4?44:i==5?66:i==6?40:30;
-                if(mouse_x>=x && mouse_x<x+width){inventory->category=i;inventory->selected=inventory->top=0;inventory_refresh();return;}x+=width;
+                if(mouse_x>=x && mouse_x<x+width){inventory->category=i;inventory->selected=inventory->top=0;inventory_filter();return;}x+=width;
             }
         }
         if(mouse_x>=128 && mouse_x<inventory_list_right() && mouse_y>=INV_LIST_Y && mouse_y<INV_LIST_Y+INV_VISIBLE*INV_ROW_H){
@@ -322,14 +401,15 @@ static void inventory_key(int key){
 }
 /* aw_icons.c: the original 16 x 16 inventory icon (UI-ICONS-INVENTORY-42); 0 = draw the old way. */
 int (*aw_inventory_row_icon)(int slot,const char *id,int equipped,int x,int y);
+/* INDEX: the list row */
 static void inventory_icon(int slot,int index,int x,int y){
-    FILE *f=NULL;int size,xx,yy;byte raw[1028];
-    if(aw_inventory_row_icon && aw_inventory_row_icon(slot,inventory->item[index].id,
-        AW_InventoryEquipped(&aw_state,inventory->item[index].id)>0,x,y))return;
+    FILE *f=NULL;int size,xx,yy;byte raw[1028];const aw_inventory_item_t *it=inventory_item(index,NULL);
+    if(!it)return;
+    if(aw_inventory_row_icon && aw_inventory_row_icon(slot,it->id,AW_InventoryEquipped(&aw_state,it->id)>0,x,y))return;
     if(inventory->icon_row[slot]!=index){
         inventory->icon_row[slot]=index;inventory->icon_ok[slot]=0;
-        if(inventory->item[index].icon[0]){
-            size=COM_FOpenFile(inventory->item[index].icon,&f);
+        if(it->icon[0]){
+            size=COM_FOpenFile((char *)it->icon,&f);
             if(f){if(size==1028 && fread(raw,1,sizeof(raw),f)==sizeof(raw) && !memcmp(raw,"AWIC",4)){
                 memcpy(inventory->icons[slot],raw+4,1024);inventory->icon_ok[slot]=1;
             }fclose(f);}
@@ -409,6 +489,20 @@ static const char *inventory_title(void){
 static void window_title(int x,int y,int w,const char *title,int color){
     if(!aw_title_bar || !aw_title_bar(x,y,w,title))AW_UITextCentred(x,y,w,12,title,color);
 }
+/* The burden bar (ENCUMBRANCE-INCOMPLETE-61): OpenMW mwgui/inventorywindow.cpp updateEncumbranceBar, every frame the
+ * window is open: ceil(encumbrance) over the capacity, as "N/M" on the blue bar (MW_ChargeBar_Blue; here the original
+ * bar art of the magicka bar, AW_UIBar colour 1). The encumbrance is the running total (aw_move.h), nothing summed. */
+float (*aw_worldui_encumbrance)(float *capacity);
+static void inventory_burden(void){
+    char line[32];float capacity=0,load;int shown,max;
+    if(!aw_worldui_encumbrance)return;
+    load=aw_worldui_encumbrance(&capacity);
+    shown=(int)load;if((float)shown<load)shown++;     /* std::ceil */
+    max=(int)capacity;
+    AW_UIBar(8,INV_BURDEN_Y,114,INV_BURDEN_H,1,max>0?(float)shown/(float)max:shown>0?1.0f:0.0f);
+    sprintf(line,"%d/%d",shown,max);
+    AW_UISmallBegin();AW_UITextCentred(8,INV_BURDEN_Y,114,INV_BURDEN_H,line,AW_UIColor(223,199,144));AW_UISmallEnd();
+}
 static void inventory_draw(void){
     int i,j,x,row,index,right=inventory_list_right();aw_inventory_item_t *item;char line[160];
     int gold=AW_UIColor(223,199,144),muted=AW_UIColor(150,135,104);
@@ -418,6 +512,7 @@ static void inventory_draw(void){
     window_title(6,6,308,inventory_title(),gold);
     AW_UISmallEnd();
     inventory_preview(muted);
+    inventory_burden();
     for(row=0;row<2;row++){
         x=130;
         for(i=row*4;i<row*4+4;i++){
@@ -430,19 +525,18 @@ static void inventory_draw(void){
     inventory_text(132,44,180,10,line,muted);
     if(!inventory->count)inventory_text(134,73,174,38,"No carried items in this category.",muted);
     for(i=0;i<INV_VISIBLE && (row=inventory->top+i)<inventory->count;i++){
-        index=inventory->rows[row];item=&inventory->item[index];
+        item=inventory_item(row,NULL);if(!item)break;
         if(row==inventory->selected)AW_UIFill(130,INV_LIST_Y+i*INV_ROW_H,right-130,INV_ROW_H,AW_UIColor(44,36,20));
-        inventory_icon(i,index,132,INV_LIST_Y+i*INV_ROW_H);
+        inventory_icon(i,row,132,INV_LIST_Y+i*INV_ROW_H);
         sprintf(line,"%s%s",AW_InventoryEquipped(&aw_state,item->id)?"* ":"",item->name);
         inventory_text(151,INV_LIST_Y+i*INV_ROW_H,right-24-151,11,line,gold);
         sprintf(line,"%ld",(long)AW_StateGet(&aw_state,AW_ITEM,item->id));inventory_text(right-22,INV_LIST_Y+i*INV_ROW_H,22,11,line,gold);
     }
     if(inventory->count>INV_VISIBLE)
         AW_UIScrollbar(INV_SCROLL_X,INV_LIST_Y,INV_SCROLL_H,inventory->count,INV_VISIBLE,inventory->top);
-    item=inventory_selected();
+    index=0;item=inventory->count?inventory_item(inventory->selected,&index):NULL;
     if(item){
-        index=inventory->rows[inventory->selected];
-        if(inventory->known[index])sprintf(line,"Weight %.2f  Value %ld",item->weight,(long)item->value);
+        if(index)sprintf(line,"Weight %.2f  Value %ld",item->weight,(long)item->value);
         else strcpy(line,"Item details unavailable");
         inventory_text(132,INV_DETAILS_Y,180,8,line,muted);
         inventory_status(inventory->message[0]?inventory->message:

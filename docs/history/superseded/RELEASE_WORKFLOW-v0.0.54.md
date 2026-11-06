@@ -1,0 +1,488 @@
+# AmiWind release workflow
+
+_Last updated with AmiWind v0.0.54 (28 October 2026)._
+
+<!-- contents start -->
+## Contents
+
+- [Where release files go](#where-release-files-go)
+- [Mandatory change records](#mandatory-change-records)
+- [Historical rc1 handoff (published)](#historical-rc1-handoff-published)
+- [Historical v0.0.25 complete update package](#historical-v0025-complete-update-package)
+- [Release gate: the build tool must match the release](#release-gate-the-build-tool-must-match-the-release)
+- [Game version and engine version](#game-version-and-engine-version)
+- [Release gate](#release-gate)
+- [Release flow: test once, publish in resumable steps](#release-flow-test-once-publish-in-resumable-steps)
+- [Boot identity](#boot-identity)
+- [Amiga limitations](#amiga-limitations)
+  - [FFS partition capacity and hardfile capacity are different](#ffs-partition-capacity-and-hardfile-capacity-are-different)
+  - [Preferred partition contents and performance](#preferred-partition-contents-and-performance)
+  - [Legacy filesystem names: 30 bytes per component](#legacy-filesystem-names-30-bytes-per-component)
+  - [Traceable original-to-target mapping](#traceable-original-to-target-mapping)
+  - [AmiQuake's limitations](#amiquakes-limitations)
+- [RC2 diagnostic snapshot boundary](#rc2-diagnostic-snapshot-boundary)
+- [Palette and skin-tone consistency](#palette-and-skin-tone-consistency)
+- [RC3 recovery candidate boundary](#rc3-recovery-candidate-boundary)
+- [v0.0.24 maintainer release decision - 1 October 2026](#v0024-maintainer-release-decision---1-october-2026)
+- [Source ZIP portability](#source-zip-portability)
+
+<!-- contents end -->
+
+> Superseded and kept as history (moved here in v0.0.55): replaced by [RELEASE_WORKFLOW.md](../../RELEASE_WORKFLOW.md).
+
+Official project: https://github.com/FlyingFathead/amiwind/
+
+Published public-source base for the current v0.0.39 final preparation:
+**[v0.0.38 - Lava Is All You Need (And A Hint Of Tel Uvirith)](../../releases/notes/RELEASE-v0.0.38.md)**,
+13 October 2026, commit `d40fa70b4787da09b8a6d5006f46ef6fb7e56c6f`.
+The maintainer performs Git/GitHub publishing from Linux. Release archives and tags
+remain immutable; source/documentation corrections use follow-up commits.
+Public source publication and private image validation/delivery are separate.
+
+## Where release files go
+
+Since v0.0.55 a release writes its notes to `docs/releases/notes/RELEASE-v<version>.md` (dev and rc notes beside
+them), its whitespace baseline to `docs/releases/patches/PATCH-v<version>.json`, adds its row to
+[releases](../../releases/README.md) and regenerates the [documentation index](../../README.md)
+(`python3 tools/docs_index.py write`). One-off records (checkpoint validations, local release candidates, feedback,
+investigations, per-version validations, plans, merges) go to `docs/history/<kind>/`, journals to `docs/journals/`.
+Nothing is written at the docs/ root except topic documents, and nothing in docs/ is deleted: a document that is
+replaced moves to `docs/history/superseded/` with a line naming its replacement. The gate refuses a per-version file
+at the docs/ root and any relative link that names no file (tests/test_docs_layout.py).
+
+## Mandatory change records
+
+Changelog, bug tracking and CHIM coverage maintenance are required parts of
+development, integration and release preparation. A change is incomplete
+until its affected records agree with the code and actual verification.
+
+1. Update [CHANGELOG.md](../../CHANGELOG.md) in the same change as a fix, feature,
+   regression or confirmed finding, under the current version and date. State
+   the player-visible result or build effect and link the issue ID. Keep
+   implemented changes separate from findings and unfinished work.
+2. Update [bugs.json](../../bugs/bugs.json), the issue report and [BUG_JOURNAL.md](../../BUG_JOURNAL.md)
+   together; render the generated register and related pages. The register
+   alone owns current status. Record regressions immediately. Source-only
+   work does not set shipped/fixed or maintainer-accepted status.
+3. Update the [CHIM cell tracker](../../chim/PROGRESS_TRACKER.md) whenever conversion,
+   audits, native checks or package inclusion change. Bind each state to its
+   source/build and receipt. Keep failed, excluded and held cells, original
+   reference types, deferred actors and unimplemented gameplay explicit.
+   Converted, audited, native-checked and packaged are separate states;
+   planned cells do not count as included cells.
+4. When coverage changes, regenerate the sanitized reference, cell-tracker
+   page and progress map together and update their captions/date/counts. Keep
+   the served tracker current from the same evidence. Do not expose private
+   receipts or source assets, edit historical releases or invent acceptance.
+5. Before freezing source or preparing a handoff, reconcile the changelog,
+   linked release notes, register, roadmap and coverage snapshot. Include
+   every new report/document in the public source allowlist. Check links,
+   generated sections, whitespace and the actual exported source, not only
+   the working directory. Missing or contradictory records block the handoff.
+6. At verification and delivery, update the affected records using exact
+   results and version IDs. Preserve historical entries and failed receipts.
+   Rerun checks affected by changes; reuse unchanged valid evidence. Never
+   turn an old image's successful check into acceptance of a new image.
+
+## Historical rc1 handoff (published)
+
+The following preserves the completed v0.0.26-rc1 handoff procedure. Its tag
+is immutable; final v0.0.26 subsequently completed its own snapshot, checksums,
+exact-commit CI and release artifacts. The commands below describe that historical
+handoff and must not be rerun to replace an existing release. Require Docker, Linux and Windows jobs to pass for
+the final pushed commit. Retain complete failed-step logs before stopping,
+and perform whitespace checks before commit and against the exact commit.
+
+The complete rc1 public-source ZIP contains every allowlisted source file and
+its generated package manifest. The separate private transfer kit contains the
+overlay/publishing helpers and checksums; do not upload that private kit.
+Overlay only after checking the exact cloned v0.0.25 base commit and preserving
+local work. Run Linux checks before publication. Push main from the publishing
+host and require a successful source-check workflow for that exact commit before
+creating the annotated v0.0.26-rc1 tag and a GitHub **prerelease**. Do not replace
+existing tags or mark this candidate as the latest stable release. Upload only
+the validated public-source ZIP and its checksum.
+
+## Historical v0.0.25 complete update package
+
+`AmiWind-v0.0.25-complete-update.zip` contains the complete public source ZIP,
+a source patch from rc10, updater, checksums and apply/recovery/publish scripts.
+The public source ZIP contains every maintained file under `amiwind/` plus a
+generated package manifest. No private playable, HDF, game payload or ROM is
+included. Only source ZIPs, updater and checksums are uploaded to GitHub.
+
+Finish the current build before applying to the rc10 checkout. APPLY.sh verifies
+the complete kit, updates changed files with an external backup and validates
+the result against the complete source package. Overlapping local edits stop
+before writes; unrelated edits remain preserved and require review before exact
+release validation. Existing rc10 cache entries remain compatible. Recovery uses
+the same workspace/cache and retains the original completed rc3 terrain/music.
+
+PUBLISH.sh stages the source allowlist, commits, pushes main and waits for a
+successful `source-check.yml` run whose `headSha` equals that exact commit. It
+then creates the annotated `v0.0.25` tag and a regular GitHub release (not a
+prerelease), downloads the uploaded assets and verifies their checksums and tag.
+Existing tags are never replaced. The maintainer runs the supplied Bash commands.
+
+## Release gate: the build tool must match the release
+
+Applies from v0.0.32. v0.0.31 ships with one recorded exception: the shipped
+Seyda Neen maps cannot yet be regenerated by the repository builder
+([BUILD-SEYDA-REGEN-30](../../journals/BUG_JOURNAL-v0.0.31.md#build-seyda-regen-30-public-build-cannot-regenerate-seyda-neen-7-october-2026)).
+v0.0.32 keeps the same exception as a builder option: `--seyda-recorded DIR` (from v0.0.35 optional and
+NOT RECOMMENDED since v0.0.31: the default converts Seyda Neen from your data)
+(`tools/build.py`; passed on to the actor-contact and image steps), where `DIR/id1`
+holds the maintainer's recorded v0.0.31 Seyda Neen maps and region tables, checked
+against `config/seyda-recorded-v0.0.31.json` before any conversion
+(`tools/recorded_stage.py check DIR`). The recorded maps replace the Seyda region
+conversion and ship byte for byte: every later image pass is checked against the
+recorded bytes and the build stops on any difference. The one named difference
+(project decision) is `maps/seyda.bsp`, shipped as the fallback region (sn029) as
+the builder writes it, not v0.0.31's complete town
+([BUILD-SEYDA-REGEN-30](../../bugs/BUILD-SEYDA-REGEN-30.md)). v0.0.33 still required the
+recorded maps (its CHIM frame maps were checked against them). From v0.0.34 the
+option is optional for CHIM builds: without it Seyda Neen is converted from the
+maintainer's data (without the terrain visual cull, which cannot complete from scratch:
+BUILD-SEYDA-CULL-STABLE-32) and the frame maps are checked against that conversion,
+so the release payload compare needs no recorded input. A legacy build with Seyda
+Neen still needs it.
+
+See [Which Seyda Neen is in my build?](../../LINUX_BUILD.md#which-seyda-neen-is-in-my-build) for which Seyda Neen an image holds.
+
+No release candidate or final release until the repository's builder
+(`tools/build_aga.py`, `build.sh`, `build.cmd`, `build.ps1` and every converter
+they call) produces everything the release contains, from the builder's own
+Morrowind data, with no separate patch-up step. Every change that went into a
+development build (new world tables such as `id1/world/lamps.awl`,
+`night-windows.txt` and `fog-locations.txt`, map compiler settings, engine and
+data changes) is in the builder, tested and documented before the release
+notes are written. A clean build with the repository builder must reproduce
+the release payload's file list and contents, apart from documented build-time
+stamps; any other difference blocks the release.
+
+## Game version and engine version
+
+A change to `VERSION` also requires matching `resources/emulators/AmiWind-v<VERSION>-FS-UAE.fs-uae` and `AmiWind-v<VERSION>-WinUAE.uae` presets and their entries in `tools/release-files.json`. Preserve older presets. Run the emulator-config, FS-UAE keyboard-port and launcher tests against the new version before pinning source ([BUILD-VERSION-EMULATOR-PRESETS-38](../../bugs/BUILD-VERSION-EMULATOR-PRESETS-38.md)).
+
+From v0.0.33 the game and its engine carry separate version numbers. The
+streaming engine and its builder are the **CHIM engine**, with its own semantic
+version: the major number changes when the world format changes (the engine
+refuses a world built for another major version, with a clear message instead
+of a crash), the minor number for new engine features, the patch number for
+fixes. The CHIM builder has the same version as the engine it builds for.
+
+- v0.0.33 is planned as the first CHIM release: AmiWind v0.0.33, CHIM engine
+  0.1.0. CHIM 1.0.0 is the release in which the whole island runs on it.
+- Every release states both versions: "AmiWind vX / Running on CHIM Engine vY"
+  in the release notes and the README; the short form "AmiWind vX / CHIM vY" in
+  the boot checklist and the engine console; both numbers (and the world format
+  version) in every build receipt.
+- The engine and builder types are named, not numbered: "legacy" (the AmiQuake-based
+  region pipeline that runs every release before v0.0.33, and stays available) and
+  "CHIM" (from v0.0.33). There is no "builder v2" or "engine v2": CHIM has its own
+  version number, separate from AmiWind's VERSION, starting at CHIM Engine 0.1.0.
+
+## Release gate
+
+**ALWAYS CHECK FOR TRAILING WHITESPACE BEFORE POSTING AN AUTOMATED PUSH/PUBLISH
+SCRIPT.** Check all delivered files before posting or packaging. This check
+belongs to package preparation, before the maintainer downloads or applies anything.
+Passing tests and an archive allowlist do not replace it.
+
+`tools/release.py --check`, candidate creation and candidate validation all reject
+trailing spaces/tabs, whitespace-only lines, space-before-tab indentation and
+blank lines at EOF in new or modified text files. Only byte-identical inherited
+files under `engine/aga/` and `docs/aga/` are exempt; `docs/WHITESPACE-BASELINE.json`
+lists them by hash, taken from the last published release, so a new `VERSION` needs
+no extra file. A file we edit is checked in full, and project-authored files are
+never exempt. After a release is published, refresh the list from its tag with
+`python3 tools/release.py --whitespace-baseline v<VERSION>` (the tag must point to
+the release commit; the list can only shrink). This also
+covers files that are untracked or extracted without Git metadata. Before
+delivery, additionally run `git diff --no-index --check BASE_TREE CANDIDATE_TREE`
+on clean extracted source trees and retain the result. Keep the maintainer's
+`git diff --check` as a final check, not the first place defects are discovered.
+
+Candidates are written under `incoming/`, checked independently, then promoted
+into immutable `releases/`. Validate ZIP paths, source allowlist, content hashes,
+patch application, private image/ROM hashes, corresponding source and boot
+behavior. Never overwrite a released ZIP or relabel an old executable as a new
+build. Keep historical version strings in historical records accurate.
+
+Update README, project state, changelog and validation notes before packaging.
+Report the tests actually run and their limits. Public CI compiles without game
+files or ROMs. Full conversion, Windows/WSL and physical Amiga behavior require
+their own validation. The maintainer runs Git/GitHub commands; see FIRST_RELEASE.md
+for the historical first-release workflow. The source repository and source
+releases are public. Playable images, converted game files and supplied ROMs
+remain private and must never become GitHub release assets.
+
+## Release flow: test once, publish in resumable steps
+
+Every release follows the same short path from a green release gate
+to a published release. The aim is about 15 minutes for that path; each release
+records its step times so the figure is measured, not assumed.
+
+1. **One release gate on the final candidate.** The full gate (source checks,
+   suite, engine build, launcher parity) runs once on the exact release commit,
+   and the full test suite also runs once in a single interpreter, in discovery
+   order (`python -m unittest discover -s tests`). Leaks between tests only show
+   up in one interpreter and in order, so this run is never split into chunks
+   or parallel workers. Its result is recorded with the commit, the tree hash
+   and the test mode.
+2. **Focused package checks.** The release package carries that record. Package
+   validation and publication check that the committed tree equals the tested
+   tree and that the mode and result match; they do not run the full suite
+   again. Their own checks are short: file list and checksums, version, the
+   exact tree, `tools/release.py --check` and an asset-free dry-run build.
+3. **One hosted CI run per revision.** The pushed commit runs the CI workflow
+   once. The full suite runs in the source checks job; the Docker builder job
+   checks only what is specific to the container (image build, its tools,
+   source checks, a short set of builder tests and the dry-run build).
+   `tools/build_docker.py check --full-suite` still runs the full suite in the
+   image when wanted.
+4. **Publish from a separate checkout.** The release commit is applied and
+   checked in a separate scratch worktree. The publishing checkout's branch,
+   index, files and stash do not change until the release is published and its
+   downloaded assets are verified; only then is its branch fast-forwarded.
+   Cleanup removes only the scratch state it created and keeps every log.
+5. **Resume, never repeat.** If pushing, the CI wait, tagging or the release
+   upload fails, running the same command again continues from that step for
+   the same package and commit: no new scratch worktree, no repeated checks,
+   no retest. Existing tags and release files are verified, never replaced.
+
+## Boot identity
+
+NPC placement is a release gate: follow [NPC_GROUND_CONTACT.md](../../NPC_GROUND_CONTACT.md)
+on fresh scene loads, sub-cell/door re-entry and save restoration. Keep original
+reference IDs in the report, investigate non-grounded residents and document
+intentional airborne/scripted exceptions. A floor correction is not proof that
+the final packaged runtime passes the audit.
+
+Transition experiments follow the numbered-method protocol in
+[PERSISTENCE_AND_STREAMING.md](../../PERSISTENCE_AND_STREAMING.md): preserve current
+method 1, measure loading phases and heap separately, and compare any new method
+2 before making it a default. Do not replace the existing loader during research.
+
+
+Normal preflight and dry-run screens display their shared AmiWind version. The
+preflight also repeats the version in its pass/fail footer so screenshots always
+identify the runtime under test. Guest-visible hardware is reported by
+`AmiWindCheck`; FS-UAE-only settings are validated by the portable host launcher.
+The boot identity also includes:
+
+```text
+By FlyingFathead
+https://github.com/FlyingFathead/amiwind/
+Special thanks to: ChaosWhisperer
+```
+
+Public source excludes original/converted game data, reusable extracted fonts,
+ROMs and private images. The explicitly allowlisted maintainer-approved README screenshots are a
+documentation exception. README/gameplay images must show AmiWind itself;
+OpenMW screenshots are private reference material and must never enter public
+source or documentation assets. Preserve component licence notices and keep complete
+development recovery sets separate from playable packages.
+
+Public documentation and release assets use generic example paths. Keep maintainer
+usernames, machine names and local directory layouts in private handoff material.
+
+## Amiga limitations
+
+### FFS partition capacity and hardfile capacity are different
+
+For the current Kickstart 3.1 / DOS1 FFS compatibility profile, plan partitions
+**below 2 GiB** and keep the complete device's addressed range **below 4 GiB**.
+One RDB `.hdf` can contain several such partitions; a 2 GiB partition bound is
+not a 2 GiB limit on the complete multi-partition hardfile. Verify the actual
+ROM, filesystem and device path, including native reads at the highest used
+offsets. These planning bounds do not certify arbitrary physical controllers.
+
+The older `build_aga.py` **1 GiB boot-partition cap was a project build setting**,
+not the FFS format limit. Do not describe it as an Amiga filesystem restriction.
+Keep that smaller boot partition only when its payload fits; use the available
+partition capacity deliberately when building the combined terrain image.
+
+Measure the converted runtime payload before deciding its disk layout. Original
+Morrowind installation size is not the converted-image size: overlapping BSPs
+duplicate terrain, collision and visibility tables, and converted audio/textures
+have different storage costs. Record payload bytes, partition sizes, free-space
+allowance and highest used device offset in the build receipt. Check avoidable
+duplication before expanding storage. Distinguish decimal GB from binary GiB
+(2 GiB = 2,147,483,648 bytes). See [storage profiles](../../STORAGE.md).
+
+### Preferred partition contents and performance
+
+If capacity eventually requires two larger partitions, prefer **partition 1 for
+the main Morrowind game**, including frequently visited interiors and shared
+resources, plus boot files, configuration and saves. Prefer **partition 2 for
+future Bloodmoon/Tribunal content, videos and less frequently used assets**.
+Move selected base-game interiors only if needed; shops, guilds and quest hubs
+are not inherently rare. Keep expansion assets together for play within that
+expansion, and retain one copy of shared resources.
+
+This is the maintainer's future placement preference. The present v0.0.25-rc1 image
+uses two 1,664 MiB partitions with base-game terrain balanced between them; no
+expansion conversions are included. Its measured payload exceeds one 2 GiB
+partition, so further reductions or selective overflow are necessary before all
+main-game content can occupy partition 1. Two exactly 2 GiB partitions plus RDB
+space would exceed 4 GiB; keep both partitions and the complete image below their
+respective planning bounds.
+
+Two partitions do not cause operating-system swapping on the plain KS 3.1
+baseline, and partition 2 in the same HDF has no inherent speed advantage.
+Extra filesystem buffers/handler state consume RAM, and filesystem work costs
+CPU time. Our current fallback search also checks primary paths before opening
+second-volume files. Once open, reads use that file handle. A future direct
+asset-to-volume index can avoid those failed lookups; it is not implemented.
+Scene reloads may pause on either partition. Measure load time, RAM, frame stalls
+and audio refill behavior before claiming a performance gain or no overhead.
+See [content placement and costs](../../STORAGE.md#preferred-future-content-placement).
+
+### Legacy filesystem names: 30 bytes per component
+
+The RC1 HDF build rejected `scene-doors-bmhlaalucouncil.txt`: 31 ASCII
+characters/bytes exceed the selected legacy Amiga OFS/FFS limit of **30 bytes
+for each filename or directory component, including the extension**. A name
+that works in the host workspace can therefore fail during Amiga packaging.
+This is a constraint of our legacy target format; do not assume that newer
+Amiga filesystems or a host-directory emulator mount behave identically.
+
+Use stable abbreviations, shorthands, numbering or bounded identifiers when
+needed. Reserve room for prefixes, suffixes and extensions. Do not silently
+truncate: different originals can then collide. Keep target names ASCII where
+possible, case-insensitively unique, and independent of display labels.
+
+The door converter now emits `doors-bmhlaalucouncil.txt` (25 bytes). Runtime
+loading prefers `doors-<map>.txt` and retains the older-name fallback. The
+payload preflight `tools/amiga_fs.py:check_payload_names` runs before HDF
+packing and rejects overlength components, unsupported characters and
+case-insensitive path collisions. Validate the complete staged payload, not
+only the examples that originally failed.
+
+### Traceable original-to-target mapping
+
+Every shortening must retain a reverse lookup. `config/seyda_area.json` and
+`config/balmora_interiors.json` keep original cell names beside stable runtime
+map IDs. `tools/prepare_doors.py` additionally generates private
+`asset-name-map.json`: source master SHA-256, original cell, runtime map ID,
+BSP path, current/previous door-bank filename, and each original door's record
+ID, placed reference number, cell/grid, mesh path and destination. RC1 has
+60 scene entries and 185 placed door records. Keep exact source spellings;
+never replace them with the shortened target name.
+
+| Original Morrowind cell | Runtime map | Generated door bank |
+| --- | --- | --- |
+| Balmora, Hlaalu Council Manor | `bmhlaalucouncil` | `doors-bmhlaalucouncil.txt` |
+| Balmora, Caius Cosades' House | `bmcaius` | `doors-bmcaius.txt` |
+| Balmora, Guild of Mages | `bmmages` | `doors-bmmages.txt` |
+
+That JSON covers scene/BSP and door-bank naming. Other asset families retain
+source-to-output receipts: `balmora-interiors.json` links NPC record IDs,
+appearance part meshes and authored greeting paths to hashed MDL/WAV names;
+`door-audio.json` links source samples and hashes to short WAV names. Original
+placed geometry and transforms remain in `interior-reference.json`, while
+room conversion reports identify selected meshes. These are complementary
+records, not a claim that a single JSON covers every texture and sound in the
+game. Keep the reports with private conversion evidence and include new asset
+families as they are introduced. A one-to-many conversion must list every
+output; reused outputs must preserve every relevant source identity.
+
+For recurrence: trace the rejected path to its converter; choose a stable
+short name; update producer and consumer together; emit the mapping; run the
+payload preflight; rebuild the HDF; read files back and boot the packed image.
+Do not fix only a local staging copy or rely solely on a host-directory boot.
+
+### AmiQuake's limitations
+
+AmiWind's engine is AmiQuake, so every converted map also lives inside Quake's
+own limits. Numbers below are read from `engine/aga/src` (`bspfile.h`,
+`client.h`, `progs.h`, `quakedef.h`, `model.c`, `common.c`) and the converter
+(`tools/prepare_mesh_bsp.py`). Several are AmiWind extensions of the BSP29
+format: indices stock Quake reads as signed 16-bit numbers are read unsigned.
+
+| Limit | Value | Where it bites | Notes |
+| --- | ---: | --- | --- |
+| Map format | BSP29 only | every map | `BSPVERSION 29`; BSP2 is not supported. |
+| Texture mappings (texinfo) per map | 65,535 | dense Vivec cantons | AmiWind reads the 16-bit face field unsigned (VIVEC-TEXINFO-31); the converter shares identical mappings. ericw vis v0.18.1 crashes and ericw light leaves faces unlit above 32,767, so run them only on maps below it (ERICW-TEXINFO-SIGNED-31). |
+| Faces per map | 65,535 | big towns and interiors | `MAX_MAP_FACES`. |
+| Faces listed in leaves (marksurfaces) | 65,535 | moving building faces into the world | 16-bit leaf lists, read unsigned with bounds checks (MODEL-MARKSURF-SIGNED-31). |
+| Planes referenced by faces | 65,535 | large converted scenes | AmiWind reads face plane indices unsigned. |
+| Surface extents | 256 texels per face | grid-exact mesh faces | The engine computes texture coordinates in double precision after every operation (as ericw light); the converter splits faces with a 1/16-texel guard, sizes lightmaps from the stored values and checks extents under double, single and extended rounding (`tools/surface_grid.py`). |
+| BSP nodes | 32,767 | dense maps | negative values mean leaf contents. |
+| Collision clipnodes | 65,520 | caves, shrines, mines | AmiWind extension (stock: 32,767). |
+| Vertices / edges / surface edges | 65,535 / 256,000 / 512,000 | large meshes | `MAX_MAP_VERTS`, `MAX_MAP_EDGES`, `MAX_MAP_SURFEDGES`. |
+| Leaves | 8,192 | vis splits | `MAX_MAP_LEAFS` (tool limit). |
+| Inline models per map | 256 (AmiWind budget 220) | rooms with many objects | `MAX_MODELS` is sent as a byte; AmiWind keeps headroom. |
+| Entities on the server | 600 | crowded scenes | `MAX_EDICTS`. |
+| Leaves an entity is linked to | 16 | brush models of buildings | `MAX_ENT_LEAFS`; an entity in more leaves is treated as visible everywhere. See [Town visibility](../../performance/TOWN-VISIBILITY.md). |
+| Static entities | 512 | dressed scenes | `MAX_STATIC_ENTITIES`. |
+| Animated flames | 128 per map | fire-heavy interiors | `STATIC_FLAME_MAX`. |
+| Dynamic lights at once | 32 | torches, guard torches, night lamps | `MAX_DLIGHTS`. |
+| Light styles | 64 | switchable and flickering lights | `MAX_LIGHTSTYLES`. |
+| Lightmaps per face | 4 styles | overlapping animated lights | `MAXLIGHTMAPS`. |
+| Particles | 2,048 | fire, embers | `MAX_PARTICLES`. |
+| Surface extent | 256 texels | large flat faces | Checked at load; the 68040's wide floating-point intermediates can round a face that sits exactly on the 16-texel grid one block larger than a 32-bit check predicts. |
+| Coordinates | about +/-4,096 units | town and region size | sent as 16-bit numbers in 1/8 units; why towns are split into frames and sub-cells. |
+| Sounds / models per level | 256 each | | sent over the network as bytes. |
+
+Heap per map comes on top of all of these: see the map memory profile and
+the builder's heap budget. A future builder limits check is planned to report
+every one of these per map, as a warning or a failure.
+
+## RC2 diagnostic snapshot boundary
+
+The maintainer requested an interim v0.0.24-rc2 while the stricter contact audit and
+model-budget investigation remain open. Its separate snapshot receipt explicitly
+records a failed production placement gate (23 findings); no audit row is removed.
+`build_aga.py image` still stops on those findings. Do not promote this snapshot
+as a passed final build. Retain payload/readback hashes, source/binary receipt,
+full failed audit and native evidence in the private package. The ordinary source
+allowlist and whitespace checks still apply. Publish only public-source archives
+and their checksums, using the prerelease flag; never publish the playable HDF,
+ROM, model catalogue, converted assets or private inspection reports.
+
+## Palette and skin-tone consistency
+
+Before packaging, run `ui_palette.sync_lookups(game, check=True)` against the
+final game directory. The production image builder enforces this check. Palette
+reservation must update the dependent lighting and fog columns, including when
+reopening a previously converted payload. Retain the resulting table hashes in
+the private receipt. Use a pale-skinned resident as a native visual sentinel;
+check both nearby daylight and normal world lighting/fog. See the
+[ashen-face investigation](../../IMPLEMENTATION_JOURNAL.md#j027--pale-faces-mapped-back-to-sky-grey).
+This catches colour-table drift; it does not certify every face or texture seam.
+
+## RC3 recovery candidate boundary
+
+The maintainer requested RC3 before the final grounding work is complete. Retain the
+same diagnostic boundary as RC2: full source, matching private playable image,
+failed placement audit and independent HDF readback. A complete gallery does not
+turn the remaining 23 contact findings into a passed production gate. Source
+checks and targeted native tests still apply. Publish as a prerelease.
+
+## v0.0.24 maintainer release decision - 1 October 2026
+
+The maintainer explicitly requested the final v0.0.24 release after the RC4 delivery,
+under the title **v0.0.24 - Welcome to Balmora (and Vvardenfell!)**. The 23 strict
+contact findings remain known issues. Preserve their complete failed receipt;
+never label them passed, remove rows or broaden tolerances to match release status.
+The normal production image builder still stops on the audit. This milestone's
+private assembly reuses the hash-verified RC4 converted content and freshly
+builds the final-version runtime and preflight, then independently reads back
+and tests the finished image. This explicit release decision is not a standing
+permission to bypass future checks or hide new failures.
+
+Public presentation must distinguish whole-island mapping from playable scene
+coverage, and exclude Bloodmoon/Solstheim and Tribunal from that map's scope.
+Fresh native captures need exact `.gitignore` exceptions and source allowlist
+entries. The maintainer-run publisher verifies all expected public files are tracked
+before committing; it creates a normal release, without the prerelease flag.
+
+## Source ZIP portability
+
+When rebundling an audited source tree, preserve file bytes and each
+entry's Unix executable modes. Validate paths before extraction: reject
+absolute paths, parent traversal, symlinks, case collisions, Windows
+device names, alternate-stream colons and trailing dots or spaces.
+Hash checks do not establish executable-mode or pathname portability.

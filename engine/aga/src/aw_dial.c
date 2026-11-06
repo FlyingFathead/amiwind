@@ -652,7 +652,7 @@ int AW_DialFind(const aw_dial_conv_t *c,int topic) {
     return -1;
 }
 
-int AW_DialPick(const aw_dial_conv_t *c,int topic,const aw_glut_state_t *s,int *refused) {
+static int pick(const aw_dial_conv_t *c,int topic,const aw_glut_state_t *s,int *refused,int invert) {
     int k=AW_DialFind(c,topic),i;
     if(refused)*refused=0;
     if(k<0)return -1;
@@ -662,13 +662,24 @@ int AW_DialPick(const aw_dial_conv_t *c,int topic,const aw_glut_state_t *s,int *
          * the player to Info Refusal) */
         for(n=0;n<a->conditions && other;n++){
             const unsigned char *r=a->cond+8*n;
-            if(r[0]==AW_GLUT_OP_DISP)disposition=AW_GlutCond(&c->cond,r,s);
+            /* INVERT (Service Refusal): the disposition test turned round, the speaker refuses below the value; an
+             * INFO of disposition 0 has no record and always passes (OpenMW Filter::testDisposition) */
+            if(r[0]==AW_GLUT_OP_DISP)disposition=invert?!AW_GlutCond(&c->cond,r,s):AW_GlutCond(&c->cond,r,s);
             else other=AW_GlutCond(&c->cond,r,s);
         }
         if(other && disposition)return i;
         if(other && refused)*refused=1;
     }
     return -1;
+}
+int AW_DialPick(const aw_dial_conv_t *c,int topic,const aw_glut_state_t *s,int *refused) {
+    return pick(c,topic,s,refused,0);
+}
+/* SERVICE-REFUSAL-UNCLOTHED-60: the topic "Service Refusal" when a service is picked (OpenMW
+ * DialogueManager::checkServiceRefused: Filter::list with the disposition inverted, no Info Refusal): its catch-all
+ * last INFO (disposition 20, no condition) refuses only a speaker whose disposition is below 20. */
+int AW_DialPickRefusal(const aw_dial_conv_t *c,int topic,const aw_glut_state_t *s) {
+    return pick(c,topic,s,NULL,1);
 }
 
 int AW_DialTopicList(const aw_dial_conv_t *c,const unsigned char *known,const aw_glut_state_t *s,int *out,int max) {

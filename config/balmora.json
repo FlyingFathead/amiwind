@@ -152,6 +152,22 @@
       "reason": "Maintainer view XYZ 2663 -1107 211, yaw 14 pitch 27: isolated default tile surrounded by WG_dirtroad_01"
     }
   ],
+  "terrain_fixups": {
+    "bug": "BALMORA-GROUND-DENTS-51",
+    "reason": "Two V-shaped dents in the ground beside the canal wall (cell -3,-2): the coarse bank triangles there reach from the bank top to the canal bed, so the ground sags under the original between their samples. Five ground vertices at the original height on the long edges beside the wall; the strip between the canal wall and the street is checked against the original surface.",
+    "vertices": [
+      [480, -256, 42.0],
+      [480, -320, 42.0],
+      [488, -288, 42.0],
+      [480, -160, 38.0],
+      [488, -416, 42.0]
+    ],
+    "check": {
+      "box": [[480, -480], [512, -160]],
+      "grid": 8,
+      "tolerance": 4.0
+    }
+  },
   "arrival_actor": "selvil sareloth",
   "entity_budget": 1000,
   "model_budget": 220,

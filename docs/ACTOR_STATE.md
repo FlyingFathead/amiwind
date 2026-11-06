@@ -1,6 +1,6 @@
 # The actor record
 
-_Last updated with AmiWind v0.0.58-dev1 (31 October 2026)._
+_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -23,7 +23,8 @@ read and change the same record, as OpenMW's script extensions do; play's change
 maintainer asked for it on 25 October 2026 ("the mwscript hook for each character's baselevel abilities, weapons,
 stats, inventory"), with the starting stats of every character and of the player. What the values usually are, how
 they are assigned and changed, the NPCs' sounds and movements and the item coverage are in
-[NPC_DEFAULTS.md](NPC_DEFAULTS.md).
+[NPC_DEFAULTS.md](NPC_DEFAULTS.md). Since v0.0.61 every being's stats, kept per record type and read with its area,
+are described in [ACTOR_STATS.md](ACTOR_STATS.md).
 
 Status: **in progress** (v0.0.54). The table is built in every build; the record, its calls and the compiled
 scripts' actor functions are in the engine ([MWSCRIPT_BYTECODE.md](MWSCRIPT_BYTECODE.md), experimental with the

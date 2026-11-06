@@ -48,7 +48,7 @@ FP_SLOTS = (6, 7, 8, 9, 11, 12, 13, 14)
 SLEEVES = (11, 12, 13, 14)
 CHEST = 3
 # the table's groups in the engine's stance order (aw_hand_models.c AW_HandStance + 1; 0 the bare hands)
-STANCES = ('hh', '1h', '2c', '2w')
+STANCES = ('hh', '1h', '2c', '2w', 'bow', 'xb', '1t')     # the ranged three since v0.0.61 (FIRST-PERSON-WEAPONS-56)
 FRAMES = 28
 # triangles per part by slot: the baked bare arms of a man keep about 700 of the source's (authored topology)
 FP_CAP = {3: 160, 6: 320, 7: 320, 8: 48, 9: 48, 11: 120, 12: 120, 13: 80, 14: 80}

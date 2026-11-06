@@ -773,6 +773,7 @@ void AW_ControlsMigrate(void)
     /* The Stats (P) and Magic (O) windows, v0.0.48 (aw_statswin.c). */
     if(!keybindings['p'] || !*keybindings['p'])Key_SetBinding('p',"aw_stats");
     if(!keybindings['o'] || !*keybindings['o'])Key_SetBinding('o',"aw_magicmenu");
+    if(!keybindings['r'] || !*keybindings['r'])Key_SetBinding('r',"aw_magicfx ready");   /* PLAYER-CASTING-59 */
     if(!keybindings[K_UPARROW] || !*keybindings[K_UPARROW])Key_SetBinding(K_UPARROW,"+forward");
     if(!keybindings[K_DOWNARROW] || !*keybindings[K_DOWNARROW])Key_SetBinding(K_DOWNARROW,"+back");
     /* The Amiga right button is K_MOUSE3: the context action (aw_combat.c +aw_alt). */

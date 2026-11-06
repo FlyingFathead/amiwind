@@ -8,6 +8,12 @@
 static aw_state_t state,prior;
 static aw_inventory_item_t ring,other,third;
 /* the engine's hand lookup (AW_InventoryEquippedItem), here: what the test says the hands hold */
+/* ENCUMBRANCE-INCOMPLETE-61: the weights the engine reads from the records, here by name */
+static int fixture_weight(const char *id,float *weight){
+    if(!strcmp(id,"heavy")){*weight=10;return 1;}
+    if(!strncmp(id,"light",5)){*weight=.5f;return 1;}
+    return 0;
+}
 static aw_state_t *test_hands;static const aw_inventory_item_t *test_right,*test_left;
 static int test_hand(int slot,aw_inventory_item_t *out){
     const aw_inventory_item_t *held=slot==AW_SLOT_RIGHT?test_right:slot==AW_SLOT_LEFT?test_left:NULL;
@@ -43,8 +49,33 @@ int main(void){
     for(i=0;i<AW_INVENTORY_DROPS;i++)if(!state.inventory.dropped[i].count)state.inventory.dropped[i]=state.inventory.dropped[drop];
     prior=state;assert(AW_InventoryDrop(&state,&other,1,"seyda",pos,0)<0);assert(!memcmp(&state,&prior,sizeof(state)));
     memset(&state,0,sizeof(state));strcpy(state.inventory.dropped[0].id,"unknown_item");state.inventory.dropped[0].count=1;state.inventory.dropped[0].serial=1;
-    for(i=0;i<AW_STATE_VALUES;i++){char name[32];sprintf(name,"item%d",i);assert(AW_ItemAdd(&state,name,1));}
-    prior=state;assert(!AW_InventoryPickup(&state,0));assert(!memcmp(&state,&prior,sizeof(state)));
+    /* INVENTORY-ORIGINAL-LIMITS-61: no kind limit: with 400 kinds carried a new kind is taken; a row whose count fell
+     * to 0 takes the next new kind in its place, its condition mark gone with the last one */
+    for(i=0;i<400;i++){char name[32];sprintf(name,"item%d",i);assert(AW_ItemAdd(&state,name,1));}
+    assert(AW_ItemCount(&state)==400 && AW_StateGet(&state,AW_ITEM,"item399")==1 && AW_StateGet(&state,AW_ITEM,"ITEM250")==1);
+    assert(AW_ItemRefusal(&state,"unknown_item",1)==AW_ITEM_OK && AW_ItemRoom(&state)>0);
+    assert(AW_ItemAdd(&state,"item3",INT32_MAX-1) && AW_ItemRefusal(&state,"item3",1)==AW_ITEM_TOO_MANY);
+    AW_ItemMark(&state,100,AW_ITEM_CONDITION,.5f);assert(AW_ITEM_HAS(&state,100,AW_ITEM_CONDITION));
+    assert(AW_ItemAdd(&state,"item100",-1) && !AW_ITEM_HAS(&state,100,AW_ITEM_CONDITION));
+    assert(!strcmp(AW_ItemRefusalText(&state,AW_ITEM_FULL),"not enough memory for another kind of item (399 kinds carried)"));
+    assert(AW_InventoryPickup(&state,0) && !strcmp(AW_ITEM_ID(&state,100),"unknown_item"));
+    assert(AW_ItemCount(&state)==400 && AW_StateGet(&state,AW_ITEM,"unknown_item")==1 && !AW_StateGet(&state,AW_ITEM,"item100"));
+    assert(AW_ItemAdd(&state,"kind400",1) && AW_ItemCount(&state)==401 && AW_ItemIndex(&state,"kind400")==400);
+    assert(AW_ItemAdd(&state,"never_held",0) && AW_ItemCount(&state)==401);   /* none of it: no row */
+    /* the running weight (ENCUMBRANCE-INCOMPLETE-61): no record weight in these fixtures, so the hook gives it */
+    {
+        aw_state_t w;int k;
+        memset(&w,0,sizeof(w));aw_item_weight=fixture_weight;
+        assert(AW_ItemAdd(&w,"heavy",3) && AW_ItemsBurden(&w)==30);           /* 3 x 10 */
+        assert(AW_ItemAdd(&w,"light",4) && fabsf(AW_ItemsBurden(&w)-32)<1e-4f); /* + 4 x 0.5 */
+        assert(AW_ItemAdd(&w,"heavy",-1) && fabsf(AW_ItemsBurden(&w)-22)<1e-4f);
+        assert(AW_ItemAdd(&w,"heavy",-2) && fabsf(AW_ItemsBurden(&w)-2)<1e-4f);
+        assert(AW_ItemAdd(&w,"unweighed",5) && fabsf(AW_ItemsBurden(&w)-2)<1e-4f);  /* no record: 0 */
+        for(k=0;k<400;k++){char name[32];sprintf(name,"light%d",k);assert(AW_ItemAdd(&w,name,2));}
+        assert(fabsf(AW_ItemsBurden(&w)-402)<1e-2f);                         /* 2 + 400 x 2 x 0.5 */
+        AW_ItemsWeigh(&w);assert(fabsf(AW_ItemsBurden(&w)-402)<1e-3f);     /* summed again: the same */
+        aw_item_weight=NULL;AW_ItemsFree(&w);assert(!AW_ItemCount(&w) && AW_ItemsBurden(&w)==0);
+    }
     /* Magic items (HUD-STATS-29): select only an owned Cast Once / When Used item;
      * charge full unless recorded; recharge capped; a spent stack is never dropped
      * (drops do not carry charge yet); losing the item clears the selection. */
@@ -58,11 +89,12 @@ int main(void){
         assert(AW_ItemAdd(&state,used.id,1) && AW_ItemAdd(&state,strikes.id,1) && AW_ItemAdd(&state,plain.id,1));
         assert(!AW_MagicSelect(&state,&plain) && !AW_MagicSelect(&state,&strikes));
         assert(AW_MagicSelect(&state,&used) && !strcmp(state.magic.selected,"magic_ring"));
-        assert(AW_MagicCharge(&state,&used)==20 && !state.magic.charge_known);
+        assert(AW_MagicCharge(&state,&used)==20 && !AW_ITEM_HAS(&state,AW_ItemIndex(&state,used.id),AW_ITEM_CHARGE));
         assert(AW_MagicSetCharge(&state,&used,7) && AW_MagicCharge(&state,&used)==7);
         assert(!AW_MagicSetCharge(&state,&plain,1) && !AW_MagicSetCharge(&state,&used,NAN));
         assert(AW_MagicRecharge(&state,&used,20,.05f) && fabsf(AW_MagicCharge(&state,&used)-8)<1e-4f);
-        assert(AW_MagicRecharge(&state,&used,1000,.05f) && AW_MagicCharge(&state,&used)==20 && !state.magic.charge_known);
+        assert(AW_MagicRecharge(&state,&used,1000,.05f) && AW_MagicCharge(&state,&used)==20 &&
+               !AW_ITEM_HAS(&state,AW_ItemIndex(&state,used.id),AW_ITEM_CHARGE));
         assert(!AW_MagicRecharge(&state,&used,10,.05f));                /* full stays full */
         assert(AW_MagicSetCharge(&state,&strikes,1) && AW_MagicRecharge(&state,&strikes,20,.05f));
         assert(AW_MagicSetCharge(&state,&used,3));
@@ -84,8 +116,9 @@ int main(void){
         assert(AW_ItemAdd(&state,AW_DEBUG_TORCH_ID,-1));assert(!AW_DebugTorchGrant(&state,1));          /* dropped or sold: not again */
         assert(AW_StateGet(&state,AW_ITEM,AW_DEBUG_TORCH_ID)==0);
         memset(&state,0,sizeof(state));
-        for(i=0;i<AW_STATE_VALUES;i++){char name[32];sprintf(name,"item%d",i);assert(AW_ItemAdd(&state,name,1));}
-        prior=state;assert(!AW_DebugTorchGrant(&state,1));assert(!memcmp(&state,&prior,sizeof(state)));  /* full: nothing, no mark */
+        for(i=0;i<400;i++){char name[32];sprintf(name,"item%d",i);assert(AW_ItemAdd(&state,name,1));}
+        assert(AW_DebugTorchGrant(&state,1) && AW_StateGet(&state,AW_ITEM,AW_DEBUG_TORCH_ID)==1);  /* 400 kinds: no limit */
+        assert(AW_StateGet(&state,AW_GLOBAL,AW_DEBUG_TORCH_GRANTED)==1 && AW_ItemCount(&state)==401);
         memset(&torch,0,sizeof(torch));strcpy(torch.id,AW_DEBUG_TORCH_ID);torch.flags=AW_INV_LIGHT;
         torch.light_time=AW_LIGHT_INFINITE;lamp=torch;lamp.light_time=210;
         assert(AW_LightBurn(&torch,AW_LIGHT_INFINITE,3600)==AW_LIGHT_INFINITE);

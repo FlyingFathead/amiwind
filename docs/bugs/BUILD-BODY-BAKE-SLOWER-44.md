@@ -28,7 +28,7 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.47-dev1 (21 October 2026)._
+_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -108,7 +108,7 @@ Done (source, branch v0.0.47-build-cores): the sampling takes `inverse[triids]` 
 and the texel weights (the same for every face) are made once per bake instead of once per face. Byte-identical:
 SHA-256 of frames, faces, UV and skin of the first three bakes of two real bodies (breton male, imperial female) are
 the same before and after; time per bake 8.7 s to 4.6 s, 5.7 s to 3.1 s, 4.6 s to 2.4 s (breton male) and 14.5 s to
-5.2 s and 12.7 s to 5.6 s (imperial female) at 2 cores on a busy host. Rekeyed: every stage that reaches
+5.2 s and 12.7 s to 5.6 s (imperial female) at 2 cores on a loaded machine. Rekeyed: every stage that reaches
 `tools/npc_geometry.py` (npcs, hands, hand-catalog, character, the image step's bodies and the NPC gallery); their
 outputs are unchanged, so the dependants stop at the identical outputs.
 
@@ -205,6 +205,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-ORDERED-WINDOW-33](BUILD-ORDERED-WINDOW-33.md): The ordered worker pool idles behind one slow item, and hands long items out last
 - [BUILD-PARTITION-GROWTH-UNGATED-36](BUILD-PARTITION-GROWTH-UNGATED-36.md): Nothing gates the number of world partitions or the growth of the image
 - [BUILD-PASS-KEY-TOP-BROAD-43](BUILD-PASS-KEY-TOP-BROAD-43.md): A pass key counts a reached module's whole import-time code: a new constant in chim/models.py rekeyed all 1,295 region frame maps
+- BUILD-PERF-GUARD-BUSY-HOST-CORES-61 (no report page): The perf guard fails a build on a lower core share even when it has marked the run as a busy host
 - [BUILD-PIPELINE-UNDERUTILIZATION-36](BUILD-PIPELINE-UNDERUTILIZATION-36.md): Umbrella: several builder phases run on one core while the rest of the machine idles, and some do work the build no longer needs
 - BUILD-PLAN-BESIDE-STALE-48 (no report page): The resource plan held a reuse build at 1 of 24 room batch workers against memory that stages it no longer runs held in the measured run
 - BUILD-PLAN-HISTORY-ROW-CORRUPT-54 (no report page): The resource plan refuses every 16 GiB build: the mwscript stage is priced at 32,412 MiB from one corrupt history row, while its largest process measured 277 MiB

@@ -52,8 +52,8 @@ int main(void)
     assert(!cl_numvisedicts && !AW_HarvestHint());
     setup();empty=1;AW_HarvestBegin();AW_HarvestSpawn();cl_numvisedicts=0;AW_HarvestLink();
     assert(!cl_numvisedicts && !AW_HarvestHint() && !AW_HarvestUse() && !sounds && !subtitle);
-    setup();for(i=0;i<AW_STATE_VALUES;i++){sprintf(id,"capacity%d",i);assert(AW_ItemAdd(&aw_state,id,1));}
-    assert(AW_HarvestUse() && AW_HarvestHint() && !sounds);aw_state.count[AW_ITEM]=0;
+    /* INVENTORY-ORIGINAL-LIMITS-61: 400 kinds carried is no limit: the plant is collected */
+    setup();for(i=0;i<400;i++){sprintf(id,"capacity%d",i);assert(AW_ItemAdd(&aw_state,id,1));}
     assert(AW_HarvestUse() && !AW_HarvestHint() && sounds==1);
     setup();model_missing=1;AW_HarvestBegin();AW_HarvestSpawn();cl_numvisedicts=0;AW_HarvestLink();
     assert(!cl_numvisedicts && !AW_HarvestHint() && !AW_HarvestUse() && !AW_StateGet(&aw_state,AW_ITEM,"synthetic_ingredient"));

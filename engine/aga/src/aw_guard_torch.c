@@ -456,18 +456,38 @@ const float aw_static_flame_offsets[STATIC_FLAME_PARTS][2]={
 static aw_static_flame_t static_flames[STATIC_FLAME_MAX];
 static int static_flame_count;
 static model_t *static_flame_world;
+/* TAKEN-LIGHT-FLAME-STAYS-60: a taken or disabled placement's flames go with it (aw_mwhost.c sets this to
+ * AW_ObjectDisabled; the world change list keeps the state across saves and room re-entry, so a load hides them too). */
+int (*aw_static_flame_gone)(unsigned int reference);
+/* TAKEN-LIGHT-FLAME-61: an exterior frame map's flames name no placement (the CHIM frames are not re-keyed); the
+ * area records' effect links do (aw_inventory.c AW_AreaEffectsApply): the reference of the map's aw_flame row ORDINAL
+ * (its order among the map's aw_flame entities). Kept for the map they came with, whether the flames are read yet
+ * or not. */
+static unsigned flame_link[STATIC_FLAME_MAX];static model_t *flame_link_world;
+void AW_StaticFlameLink(model_t *world,int ordinal,unsigned reference)
+{
+    int i;
+    if(!world || ordinal<0 || ordinal>=STATIC_FLAME_MAX)return;
+    if(flame_link_world!=world){memset(flame_link,0,sizeof(flame_link));flame_link_world=world;}
+    flame_link[ordinal]=reference;
+    if(static_flame_world==world)
+        for(i=0;i<static_flame_count;i++)if(static_flames[i].ordinal==ordinal && !static_flames[i].named)
+            static_flames[i].reference=reference;
+}
 static void static_flames_load(model_t *world)
 {
-    char *data,key[64];int flame;vec3_t origin;float scale,shape[3];
+    char *data,key[64];int flame,ordinal=0;vec3_t origin;float scale,shape[3];unsigned long reference;
     static_flame_count=0;static_flame_world=world;
+    if(flame_link_world!=world){memset(flame_link,0,sizeof(flame_link));flame_link_world=world;}
     if(!world || !world->entities)return;
     data=world->entities;
     while((data=COM_Parse(data))!=NULL && com_token[0]=='{'){
-        flame=0;origin[0]=origin[1]=origin[2]=0;scale=1;shape[0]=shape[1]=shape[2]=0;
+        flame=0;origin[0]=origin[1]=origin[2]=0;scale=1;shape[0]=shape[1]=shape[2]=0;reference=0;
         while((data=COM_Parse(data))!=NULL && com_token[0]!='}'){
             strncpy(key,com_token,sizeof(key)-1);key[sizeof(key)-1]=0;
             if(!(data=COM_Parse(data)))break;
             if(!strcmp(key,"classname"))flame=!strcmp(com_token,"aw_flame");
+            else if(!strcmp(key,"aw_ref")){double r=Q_strtod(com_token,NULL);reference=r>0 && r<=16777215.0?(unsigned long)r:0;}
             else if(!strcmp(key,"origin"))Q_sscanf(com_token,"%f %f %f",&origin[0],&origin[1],&origin[2]);
             else if(!strcmp(key,"aw_flame_size"))scale=(float)Q_strtod(com_token,NULL);
             else if(!strcmp(key,"aw_flame_shape") &&
@@ -478,8 +498,12 @@ static void static_flames_load(model_t *world)
             static_flames[static_flame_count].shape[0]=isfinite(shape[0]) && shape[0]>0 && shape[0]<64?shape[0]:0;
             static_flames[static_flame_count].shape[1]=isfinite(shape[1]) && shape[1]>=0 && shape[1]<128?shape[1]:0;
             static_flames[static_flame_count].shape[2]=isfinite(shape[2]) && shape[2]>=0 && shape[2]<64?shape[2]:0;
+            static_flames[static_flame_count].named=reference!=0;
+            static_flames[static_flame_count].ordinal=ordinal;
+            static_flames[static_flame_count].reference=reference?(unsigned)reference:ordinal<STATIC_FLAME_MAX?flame_link[ordinal]:0;
             static_flames[static_flame_count++].scale=scale;
         }
+        if(flame)ordinal++;
         if(!data)break;
     }
 }
@@ -520,6 +544,8 @@ int AW_StaticFlamesPick(const aw_static_flame_t *flames,int count,int nearest,in
     for(i=0;i<count;i++){
         VectorSubtract(flames[i].origin,r_refdef.vieworg,delta);d=DotProduct(delta,delta);
         if(d>STATIC_FLAME_RANGE)continue;
+        /* the placement it burns on was taken: no flame (one sorted-list lookup, flames in range only) */
+        if(flames[i].reference && aw_static_flame_gone && aw_static_flame_gone(flames[i].reference))continue;
         if(nearest)k=d;
         else {
             if(!flame_on_screen(&flames[i],delta))continue;

@@ -30,7 +30,7 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
+_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -164,7 +164,7 @@ reach records; every input it reads does: each walk lump of a chunk and of a pla
 tile, a placement's reference, origin, yaw and box, another model placed; the walker key is the frame worker without
 the known-findings table; units skip empty cores, largest first, rows in core order; the stored rows equal the
 per-core walk byte for byte; a warm run walks nothing and writes the same report). Measured on the coast2 build's
-330 frames (read-only, cache on a tmpfs, 24 workers, BUSY host: the coast2 and ocean builds and three gates ran at
+330 frames (read-only, cache on a tmpfs, 24 workers, loaded machine: the coast2 and ocean builds and three gates ran at
 about 23 cores):
 
 | Run | Frames | Walked | Reused | Sample | Units | Time | Cores |

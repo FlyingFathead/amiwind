@@ -216,9 +216,18 @@ def expand_item(packed):
     return bytes(row)
 
 
-def area(rows, owners, containers, refs, extras, items, icons, levelled=None, extra_items=()):
+def area(rows, owners, containers, refs, extras, items, icons, levelled=None, extra_items=(), stats=None):
     """One area's AWB1 record and its counts (EXTRA_ITEMS: item records it holds besides its own, item_chunks)."""
     levelled = levelled or {}
+    stats_block, stats_report = b'', {'entries': 0, 'ref_offsets': {}}
+    if stats is not None:
+        # ACTOR-STATS-ALL-61: the stat entries of the actors placed here (tools/actor_stats.py section); each actor row
+        # gets its entry's offset (actor_stats.mark_row: the direct lookup from the row the engine reads)
+        stats_block, stats_report = stats([u32(r, 4) for r in rows if r[0] == ord('A')])
+        import actor_stats
+        rows = [actor_stats.mark_row(r, stats_report['ref_offsets'].get(u32(r, 4), 0),
+                                     stats_report.get('ref_actb', {}).get(u32(r, 4))) if r[0] == ord('A') else r
+                for r in rows]
     refs_here = [u32(r, 4) for r in rows]
     used = {k for k in extra_items if k in items}
     for r in rows:
@@ -282,7 +291,13 @@ def area(rows, owners, containers, refs, extras, items, icons, levelled=None, ex
         block = b'AWL1' + block
         lev_bytes = len(block) + 8
         record += block + struct.pack('<I', len(record)) + b'AWL1'     # the offset is the record's length before it
-    return record, {'rows': len(rows), 'containers': len(cont_rows), 'items': len(order),
+    stats_bytes = 0
+    if stats_block:
+        # the stats section last, named by the record's last 8 bytes (u32 its offset, "AWS1"); the levelled section's
+        # own 8 bytes end just before it
+        stats_bytes = len(stats_block) + 8
+        record += stats_block + struct.pack('<I', len(record)) + b'AWS1'
+    return record, {'stats_entries': stats_report['entries'], 'stats_bytes': stats_bytes,'rows': len(rows), 'containers': len(cont_rows), 'items': len(order),
                     'pictures': sum(1 for p in pictures if p), 'bytes': len(record), 'item_ids': order,
                     'container_refs': conts, 'levelled_lists': len(lists), 'levelled_bytes': lev_bytes,
                     'levelled_ids': pool,
@@ -290,6 +305,8 @@ def area(rows, owners, containers, refs, extras, items, icons, levelled=None, ex
 
 
 CHUNK_KEY = 0x7FFF0000     # the item chunks' keys (no room number reaches them; exterior keys have the top bit)
+STATS_KEY = 0x7FFE0000     # the shared stats record (ACTOR-STATS-ALL-61)
+EXTERIOR = 0x80000000      # exterior cells' keys have the top bit (prepare_focus.exterior_key)
 CHUNK_ITEMS = 16           # item records per chunk (with their pictures: about 20 KiB at most)
 
 
@@ -333,8 +350,72 @@ def name_hash(ident):
     return h or 1
 
 
-def build(id1, extras_path=None):
+def reference_hashes(raw):
+    """focus.awf's reference identity table (AWI1) -> {reference & 0xFFFFFF: record id hash} ({} without one)."""
+    n = u32(raw, 4)
+    index = [struct.unpack_from('<III', raw, 8 + 12 * i) for i in range(n)]
+    at = 8 + 12 * n + sum(r for _, _, r in index) * ROW
+    if raw[at:at + 4] != b'AWO1':
+        return {}
+    pool_at = at + 8 + 8 * u32(raw, at + 4)
+    at = pool_at + 4 + u32(raw, pool_at)
+    if raw[at:at + 4] != b'AWC1':
+        return {}
+    items_at = at + 8 + 12 * u32(raw, at + 4)
+    at = items_at + 4 + 36 * u32(raw, items_at)
+    if raw[at:at + 4] != b'AWI1':
+        return {}
+    p = at + 4
+    files = raw[p]; p += 1
+    for _ in range(files):
+        p += 2 + raw[p + 1] + 12
+    p += 12
+    count, _step, blocks = struct.unpack_from('<III', raw, p); p += 12 + 4 * blocks
+    out = {}
+    for i in range(count):
+        word, h = struct.unpack_from('<II', raw, p + 8 * i)
+        out[word & 0xFFFFFF] = h
+    return out
+
+
+def stats_maker(id1, stats_path):
+    """ACTOR-STATS-ALL-61: a function (actor references of an area) -> its AWS1 section, from the focus stage's
+    actor-stats.awt (STATS_PATH) and the image's id1/mwscript.awm (the spells' ASPT rows); None without the file."""
+    import actor_stats
+    if not stats_path or not Path(stats_path).is_file():
+        return None
+    vocabulary = actor_stats.read_vocabulary(Path(stats_path).read_bytes())
+    awm = Path(id1) / 'mwscript.awm'
+    spell_row = actor_stats.spell_rows(awm.read_bytes()) if awm.is_file() else {}
+    actb_row = actor_stats.actor_rows(awm.read_bytes()) if awm.is_file() else {}
+    hashes = reference_hashes((Path(id1) / 'focus.awf').read_bytes())
+
+    tables = actor_stats.shared_tables(vocabulary)
+    # DRY: the creatures the exteriors' levelled lists can give are kept once, in the shared record, with every race
+    # and class row; a room keeps its own lists' creatures (a room loads with one read, no second one)
+    outdoor = actor_stats.expand([h for k, v in vocabulary['levelled_areas'].items() if k >= EXTERIOR for h in v],
+                                 vocabulary)
+    shared_block, shared_report = actor_stats.shared_section(outdoor, vocabulary, spell_row, tables)
+    shared_report.pop('offsets', None)
+
+    def make(references, key=None):
+        placed = [hashes[r & 0xFFFFFF] for r in references if (r & 0xFFFFFF) in hashes]
+        # a room's levelled creature references have no actor row: their lists' creatures come in by the area key
+        wanted = placed + (vocabulary['levelled_areas'].get(key, []) if key is not None and key < EXTERIOR else [])
+        block, report = actor_stats.section(wanted, vocabulary, spell_row, shared=tables)
+        offsets = report.pop('offsets', {})
+        report['ref_offsets'] = {r: offsets[hashes[r & 0xFFFFFF]] for r in references
+                                 if hashes.get(r & 0xFFFFFF) in offsets}
+        report['ref_actb'] = {r: actb_row[hashes[r & 0xFFFFFF]] for r in report['ref_offsets']
+                              if hashes[r & 0xFFFFFF] in actb_row}
+        return block, report
+    make.shared = (shared_block, shared_report)
+    return make
+
+
+def build(id1, extras_path=None, stats_path=None):
     id1 = Path(id1)
+    stat_section = stats_maker(id1, stats_path)
     rooms, owners, containers, refs, levelled = read_focus((id1 / 'focus.awf').read_bytes())
     items = read_items((id1 / 'inventory' / 'items.awi').read_bytes())
     icons = {}
@@ -344,7 +425,8 @@ def build(id1, extras_path=None):
     keys = sorted(rooms)
     records, stats = [], []
     for done, key in enumerate(keys, 1):
-        record, s = area(rooms[key], owners, containers, refs, extras, items, icons, levelled)
+        record, s = area(rooms[key], owners, containers, refs, extras, items, icons, levelled,
+                         stats=(lambda found, k=key: stat_section(found, k)) if stat_section else None)
         records.append(record); s['key'] = key; stats.append(s)
         if done % 500 == 0 or done == len(keys):
             print('[areas] %d / %d areas' % (done, len(keys)), flush=True)
@@ -354,6 +436,12 @@ def build(id1, extras_path=None):
     chunks = item_chunks(wanted, items, icons)
     for key, record, s in chunks:
         s['key'] = key; keys.append(key); records.append(record); stats.append(s)
+    if stat_section is not None:
+        # ACTOR-STATS-ALL-61: the shared stats record (no rows: the race and class rows, the skill table, the
+        # exteriors' levelled creatures), read once by the engine with the pack's index and kept
+        block, srep = stat_section.shared
+        record, s = area([], {}, {}, {}, {}, items, icons, stats=lambda _found: (block, dict(srep, ref_offsets={})))
+        s['key'] = STATS_KEY; keys.append(STATS_KEY); records.append(record); stats.append(s)
     order = sorted(range(len(keys)), key=lambda i: keys[i])
     keys = [keys[i] for i in order]; records = [records[i] for i in order]; stats = [stats[i] for i in order]
     # the directory (NARROW-LOAD, ALSO FOR GLOBAL LOOKUPS): an item by its name hash -> the smallest area that holds
@@ -396,13 +484,17 @@ def build(id1, extras_path=None):
               'levelled_bytes_largest': max((s['levelled_bytes'] for s in stats), default=0),
               'item_chunks': len(chunks), 'item_chunk_items': len(wanted),
               'item_chunk_bytes': sum(len(r) for _, r, _ in chunks),
-              'actor_inventories': sum(s['actor_inventories'] for s in stats)}
+              'actor_inventories': sum(s['actor_inventories'] for s in stats),
+              'stats_areas': sum(1 for s in stats if s['stats_entries']),
+              'stats_entries': sum(s['stats_entries'] for s in stats),
+              'stats_bytes': sum(s['stats_bytes'] for s in stats),
+              'stats_bytes_largest': max((s['stats_bytes'] for s in stats), default=0)}
     return payload, report
 
 
-def install(id1, extras_path=None):
+def install(id1, extras_path=None, stats_path=None):
     """Write id1/areas.awa from the staged files; the staging report."""
-    payload, report = build(id1, extras_path)
+    payload, report = build(id1, extras_path, stats_path)
     (Path(id1) / 'areas.awa').write_bytes(payload)
     report['file'] = 'id1/areas.awa'
     print('[areas] %d areas, %d bytes (median area %d, largest %d), index %d bytes' % (
@@ -418,7 +510,7 @@ def stage(id1, focus_stage, out):
     if not (id1 / 'inventory' / 'items.awi').is_file() or not (id1 / 'focus.awf').is_file():
         return None
     print('=== areas: per-area lookup tables ===', flush=True)
-    report = install(id1, Path(focus_stage) / 'focus-extras.json')
+    report = install(id1, Path(focus_stage) / 'focus-extras.json', Path(focus_stage) / 'actor-stats.awt')
     (Path(out) / 'areas-staging.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8', newline='\n')
     return report
 

@@ -543,9 +543,22 @@ void AW_NpcPartsRoom(const char *map);        /* aw_actors.c: a room's recipe ta
 void AW_NpcPartsInit(void);                   /* aw_debug.c: aw_npc_tables_areas (NPC-RECIPES-PER-AREA-59) */
 void AW_GuardTorchDraw(void);
 void AW_StaticFlamesDraw(void);
-/* One placed static flame (aw_flame entity); shape: size, rise, spread (0 = legacy). */
-typedef struct {vec3_t origin;float scale,shape[3];} aw_static_flame_t;
+/* One placed static flame (aw_flame entity); shape: size, rise, spread (0 = legacy); reference: the placement it
+ * burns on ("aw_ref", 0 none: an older map or a fixed fire), TAKEN-LIGHT-FLAME-STAYS-60. */
+typedef struct {vec3_t origin;float scale,shape[3];unsigned reference;int ordinal,named;} aw_static_flame_t;
+/* TAKEN-LIGHT-FLAME-61: the area records' effect links (aw_inventory.c AW_AreaEffectsApply, tools/effect_links.py):
+ * the reference of a frame map's aw_flame row ORDINAL (aw_guard_torch.c), of a night lamp row (aw_lamps.c), and the
+ * CHIM exterior placements of a reference hidden (GONE 1) or back (0) (chim/chim_chunks.c; 0 when the list is full). */
+void AW_StaticFlameLink(model_t *world,int ordinal,unsigned reference);
+void AW_LampLink(unsigned row,unsigned reference);
+extern int (*aw_lamp_gone)(unsigned int reference);
+int ChimChunks_GonePid(unsigned pid,int gone);
+int AW_AreaEffectPids(unsigned reference,unsigned *pids,int most);
+void AW_AreaEffectsApply(void);
 int AW_StaticFlamesPick(const aw_static_flame_t *flames,int count,int nearest,int *chosen);
+/* aw_mwhost.c sets it (AW_ObjectDisabled): 1 when the flame's placement was taken or disabled, so its flame is not
+ * drawn (aw_guard_torch.c). NULL: every flame burns. */
+extern int (*aw_static_flame_gone)(unsigned int reference);
 void AW_EmberSpawn(const vec3_t org,float spread,float rise);
 entity_t *AW_GuardTorchEntity(entity_t *entity);
 void AW_TorchInit(void);
@@ -758,6 +771,9 @@ int AW_LavaContentsShift(int eye_contents,int rgb[3],int *percent);
 void AW_LavaEmbersDraw(void);
 int AW_LavaPoolCount(void);
 void AW_MusicCombat(int on);
+/* TOMB-MUSIC-OVER-AMBIENT-60: a dungeon ambience loops on this map (aw_mwhost.c): the exploration group rests; the
+ * battle group, the death and level-up tracks still play. Called every script tick; acts only on a change. */
+void AW_MusicAmbience(int on);
 void AW_MusicDeath(void);
 int AW_MusicTriumph(void);   /* the level-up music once (aw_levelup.c) */
 extern int (*aw_combat_enemy_bar)(float *fraction,float *alpha);

@@ -162,7 +162,7 @@ The conversation's remaining parts and the bigger items move, openly, to v0.0.59
   (NPC-VOICE-INTRUDER-THIEF-NO-EVENT-58, open in the [register](../../BUGS.md)).
 - The prison ship's hold draws slower than the Arena Pit, and Seyda Neen is heavy on the Raspberry Pi 4B
   ([PRISON-SHIP-RENDER-COST-56](../../bugs/PRISON-SHIP-RENDER-COST-56.md)).
-- A build's performance check can fail on busy hosts when other builds run beside it
+- A build's performance check can fail on loaded machines when other builds run beside it
   ([PERF-GUARD-RESIDENT-BUSY-HOST-57](../../bugs/PERF-GUARD-RESIDENT-BUSY-HOST-57.md); the fix is in, to be confirmed
   on the next loaded full build).
 - A rare fault in sprite data was seen on arrival at Gnisis; the sprite is left out of the frame instead of ending the
@@ -170,7 +170,7 @@ The conversation's remaining parts and the bigger items move, openly, to v0.0.59
   ([SPRITE-BAD-TYPE-THREADED-56](../../bugs/SPRITE-BAD-TYPE-THREADED-56.md)).
 - A few places are slow right after arriving ([SWEEP-SLOW-ARRIVALS-57](../../bugs/SWEEP-SLOW-ARRIVALS-57.md)), and
   the Manor District of Ald'ruhn ([INTERIOR-FAR-BLANK-MANOR-56](../../bugs/INTERIOR-FAR-BLANK-MANOR-56.md)).
-- On FS-UAE with a busy host, a load now and then waits forever on the emulated hard disk; restarting the emulator gets
+- On FS-UAE with a loaded machine, a load now and then waits forever on the emulated hard disk; restarting the emulator gets
   past it ([CHIM-SEYDA-BALMORA-LOAD-HANG-43](../../bugs/CHIM-SEYDA-BALMORA-LOAD-HANG-43.md)).
 - Some rooms still load in after you arrive ([CHIM-ROOM-POPIN-51](../../bugs/CHIM-ROOM-POPIN-51.md)).
 - Dialogue texts and the time of day still fill their macros from the written name at run time, and action-key macros

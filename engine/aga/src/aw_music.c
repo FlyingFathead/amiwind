@@ -52,6 +52,16 @@ static int muted;
 /* The custom OST player's hold (AW_MusicCustomHold, below): no playlist track at all while it has the music; only
  * the custom track, never followed by the playlist (at its end, silence). */
 static int scene_hold;
+/* TOMB-MUSIC-OVER-AMBIENT-60 (decided for the project, 5 November 2026; the original and OpenMW 0.51 keep the explore
+ * playlist on everywhere, files/data-mw/scripts/omw/music/music.lua): while a dungeon ambience loops (a tomb's or a
+ * cave's sound marker, aw_mwhost.c) the exploration group rests: no explore track opens and the one playing stops; the
+ * battle group still starts on a fight, the death, level-up and script tracks still play, and after any of them the
+ * ambience alone is heard. */
+static int ambience_rest;
+static int resting(void) {return ambience_rest && mode==0 && !title_playing;}
+static void close_music(void);
+static void log_event(const char *why);
+static int in_explore_group(int id) {int i;for(i=0;i<counts[0];i++)if(groups[0][i]==id)return 1;return 0;}
 static unsigned long be32(byte *p) { return ((unsigned long)p[0]<<24)|((unsigned long)p[1]<<16)|((unsigned long)p[2]<<8)|p[3]; }
 static int random_bounded(int n) { rng=rng*1664525U+1013904223U;return (rng>>16)%n; }
 static void log_event(const char *why) {
@@ -119,6 +129,7 @@ static int advance(const char *reason) {
     int id,tries;
     if(muted)return 0;   /* off is not a failure: the music stays available */
     if(scene_hold)return 0;   /* the custom OST player has the music: no playlist track, at its end silence */
+    if(resting()){close_music();log_event("ambience-rest");return 0;}   /* the ambience alone (not a failure) */
     if(title_playing){if(open_track(title_track,reason))return 1;available=0;return 0;}
     for(tries=0;tries<counts[mode];tries++) {
         if(cursor[mode]+1<length[mode])id=history[mode][++cursor[mode]];
@@ -151,7 +162,7 @@ static void music_stalled(void) {
          * comes. The next track opens on a free reader, or the music stays
          * off until an abandoned read returns (CDAudio_Update). */
         abandons++;log_event("read-abandoned");close_music();
-        if(!advance("stall")){stall_off=1;available=0;log_event("stall-off");}
+        if(!advance("stall") && !resting()){stall_off=1;available=0;log_event("stall-off");}
     }
 }
 /* Take a finished read, store it, and send the next one. Never waits.
@@ -168,7 +179,7 @@ static int music_pump(void) {
             if(!take_header(data,n)) {
                 errors++;log_event("bad-header");close_music();
                 /* Bounded: a playlist of bad streams turns the music off. */
-                if(++bad_headers>counts[mode]+1 || !advance("bad-header"))available=0;
+                if(++bad_headers>counts[mode]+1 || (!advance("bad-header") && !resting()))available=0;
                 return 1;
             }
         } else {
@@ -203,7 +214,7 @@ void CDAudio_Update(void) {
     if(!AW_AReadService() && stall_off) {
         stall_off=0;available=1;log_event("stall-recovered");
         /* advance() reopens the title track on the title screen. */
-        if(!held && !muted && !advance("stall-recovered"))available=0;
+        if(!held && !muted && !advance("stall-recovered") && !resting())available=0;
     }
     if(title_due>=0 && realtime>=title_due)AW_MusicTitle();
     if(available && !paused)music_pump();
@@ -216,7 +227,7 @@ void AW_MusicLoadPump(void) {
 }
 void AW_MusicPaint(portable_samplepair_t *dst,int n) {
     int i,take,l,r,next,gain=(int)(bgmvolume.value*256);
-    if(!available || paused || muted)return;
+    if(!available || paused || muted || (resting() && !music))return;   /* the ambience alone: no silent-span count */
     while(n>0) {
         if(at>=valid[active]) {
             valid[active]=0;at=0;
@@ -350,6 +361,16 @@ void AW_MusicCombat(int on) {
     if(!available || held || title_playing || counts[want]<1 || (mode==want && music))return;
     mode=want;combat_switches++;fade=128;paused=0;
     advance(want?"combat":"combat-end");
+}
+/* TOMB-MUSIC-OVER-AMBIENT-60: the script host's word each tick (1 while a dungeon ambience loops). On: an explore track
+ * playing stops (a battle, death, level-up or script track plays on to its end). Off: the explore group comes back. */
+void AW_MusicAmbience(int on) {
+    on=on!=0;
+    if(on==ambience_rest)return;
+    ambience_rest=on;log_event(on?"ambience-on":"ambience-off");
+    if(!available || held || title_playing || scene_hold || muted)return;
+    if(on){if(mode==0 && music && in_explore_group(current))close_music();return;}
+    if(mode==0 && !music){fade=128;paused=0;advance("ambience-off");}
 }
 /* The player died: the special death track once (music.lua playerDied),
  * then the current group's shuffle at its end. */

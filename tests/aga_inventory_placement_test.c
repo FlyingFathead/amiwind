@@ -53,7 +53,7 @@ static void plane(int i,int axis,float distance){
 }
 static void reset(int geometry){
     int i;
-    memset(&sv,0,sizeof(sv));memset(&svs,0,sizeof(svs));memset(&aw_state,0,sizeof(aw_state));
+    memset(&sv,0,sizeof(sv));memset(&svs,0,sizeof(svs));AW_StateReset();
     memset(entities,0,sizeof(entities));memset(&world,0,sizeof(world));memset(&item_model,0,sizeof(item_model));
     memset(planes,0,sizeof(planes));memset(nodes,0,sizeof(nodes));memset(&item,0,sizeof(item));
     allocations=links=notices=trace_calls=path_blocked=wet=streamed=scenery=restricted=0;pr_strings=strings;

@@ -1,10 +1,22 @@
 # Bug journal
 
-_Last updated with AmiWind v0.0.48-dev2 (23 October 2026)._
+_Last updated with AmiWind v0.0.61-dev1 (6 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [BALMORA-GROUND-DENTS-51 reported again on v0.0.61-dev1; five ground vertices beside the canal wall, 6 November 2026](#balmora-ground-dents-51-reported-again-on-v0061-dev1-five-ground-vertices-beside-the-canal-wall-6-november-2026)
+- [GODMODE-COMBAT-DAMAGE-61: god mode does not stop a fight's blows, 6 November 2026](#godmode-combat-damage-61-god-mode-does-not-stop-a-fights-blows-6-november-2026)
+- [PLAYER-START-SPELLS-NOT-KNOWN-61: a new character's spells are not on its record, 5 November 2026](#player-start-spells-not-known-61-a-new-characters-spells-are-not-on-its-record-5-november-2026)
+- [Taken lights and their effects: an island-wide survey, 5 November 2026](#taken-lights-and-their-effects-an-island-wide-survey-5-november-2026)
+- [CARRIED-RECORDS-SEARCH-PER-KIND-61, INVENTORY-OPEN-COST-MANY-KINDS-61 and LOADED-ITEMS-NOT-WEIGHED-61 registered, 6 November 2026](#carried-records-search-per-kind-61-inventory-open-cost-many-kinds-61-and-loaded-items-not-weighed-61-registered-6-november-2026)
+- [ENCUMBRANCE-INCOMPLETE-61: carry weight is only half there, 5 November 2026](#encumbrance-incomplete-61-carry-weight-is-only-half-there-5-november-2026)
+- [ACTOR-STATS-SCATTERED-61, ACTOR-HELLO-CLAMPED-61 and ACTOR-STATS-FAR-FALLBACK-61 registered, 5 November 2026](#actor-stats-scattered-61-actor-hello-clamped-61-and-actor-stats-far-fallback-61-registered-5-november-2026)
+- [TOMB-NO-CREATURES-60: the rooms' levelled creatures written by the room stages, 5 November 2026](#tomb-no-creatures-60-the-rooms-levelled-creatures-written-by-the-room-stages-5-november-2026)
+- [SMOKE-STALL-LABEL-INFERRED-60 seen again in v0.0.61-dev1: the smoke's stall label is a guess, 5 November 2026](#smoke-stall-label-inferred-60-seen-again-in-v0061-dev1-the-smokes-stall-label-is-a-guess-5-november-2026)
+- [FP-WEAPON-SWAY-60: the first-person sway kept as a setting with two styles, 5 November 2026](#fp-weapon-sway-60-the-first-person-sway-kept-as-a-setting-with-two-styles-5-november-2026)
+- [COLLECT-CAPACITY-REJECTED-60: the item table held 32 kinds, 5 November 2026](#collect-capacity-rejected-60-the-item-table-held-32-kinds-5-november-2026)
+- [TOMB-NO-CREATURES-60: cause found, the rooms' creatures stop at the room stage, 5 November 2026](#tomb-no-creatures-60-cause-found-the-rooms-creatures-stop-at-the-room-stage-5-november-2026)
 - [CHIM-32MB-SAVE-ENTRY-48 fixed; BUILD-ACTOR-MODEL-UNSUPPORTED-48 closed, ACTOR-MODEL-ERROR-UNNAMED-48 registered, 23 October 2026](#chim-32mb-save-entry-48-fixed-build-actor-model-unsupported-48-closed-actor-model-error-unnamed-48-registered-23-october-2026)
 - [PLAYER-MOVEMENT-STATS-PARITY-39 persisting, repaired in source; PLAYER-JUMP-ORIGINAL-RULES-48 registered, 23 October 2026](#player-movement-stats-parity-39-persisting-repaired-in-source-player-jump-original-rules-48-registered-23-october-2026)
 - [INTERIOR-PLACED-ITEMS-47: design of record, the shell baked and everything takeable as objects, 21 October 2026](#interior-placed-items-47-design-of-record-the-shell-baked-and-everything-takeable-as-objects-21-october-2026)
@@ -118,6 +130,111 @@ _Last updated with AmiWind v0.0.48-dev2 (23 October 2026)._
 - [INTERIOR-SPAWN-UNDERWATER-41, 17 October 2026](#interior-spawn-underwater-41-17-october-2026)
 
 <!-- contents end -->
+
+## BALMORA-GROUND-DENTS-51 reported again on v0.0.61-dev1; five ground vertices beside the canal wall, 6 November 2026
+
+Reported again on 5 November 2026 at two spots beside Balmora's canal wall (cell -3,-2, local 523 -371 and 527 -231),
+further along the bank than the spots of the first report. The cause: the coarse bank tiles there have triangles
+reaching from the bank top (height 42) to the canal bed 64 to 128 units west, so the ground sags under the original
+between the samples, by up to 19 units in the strip between the canal model and the street; the v0.0.52 fix added
+samples only where land and water change sides. The fix, on a branch: five hand-listed ground vertices at the original
+height (`config/balmora.json` `terrain_fixups`, docs/TOWN_IMPORT.md), each splitting only the two triangles whose
+shared edge it lies on (10 ground triangles more in the Balmora frame, nothing elsewhere), and a build check of that
+strip (320 units along the wall) every 8 units against the original surface within 4 units. Measured on the
+v0.0.61-dev1 terrain: both spots at the original height, the strip within 4 units everywhere; a first build with four
+vertices still showed a notch just south of the first spot, so the fifth and the longer strip were added. An earlier
+attempt that laid every bank tile of the island as exact 32-unit quads was not merged (+47 % ground triangles).
+
+## GODMODE-COMBAT-DAMAGE-61: god mode does not stop a fight's blows, 6 November 2026
+
+[GODMODE-COMBAT-DAMAGE-61](bugs/GODMODE-COMBAT-DAMAGE-61.md): in a scripted session on the Seyda Neen map with
+`dbg god on`, a guard's blows took the player's health until the player died. God mode is Quake's own; the combat
+layer takes the damage on its own fighter sheet and does not ask it. Planned: no damage on the player in god mode.
+
+## PLAYER-START-SPELLS-NOT-KNOWN-61: a new character's spells are not on its record, 5 November 2026
+
+[PLAYER-START-SPELLS-NOT-KNOWN-61](bugs/PLAYER-START-SPELLS-NOT-KNOWN-61.md): found while building player casting.
+Character creation never puts the race, birthsign and class spells and abilities on the player record; the Magic
+window shows the race and birthsign spells by name from the character data only. So casting has nothing to cast for
+a new character and the constant abilities do not apply. Planned: the being stat block's ability and spell list,
+filled at creation, then applied by the active effects.
+## Taken lights and their effects: an island-wide survey, 5 November 2026
+
+A survey of every carriable light that gives light in the three masters (130 light records with the carry flag and
+a radius or a flame emitter, 114 of them with a flame in the mesh), per builder path, against the delivered
+v0.0.61-dev1 image. Rooms: 1,963 placements in 594 converted rooms (484 in 197 whole rooms, 1,479 in batch rooms);
+their flames name their placement since the fix of TAKEN-LIGHT-FLAME-STAYS-60. Outdoors: 130 placements in 25
+exterior cells of Vvardenfell, all of them in the night lamp table and 114 with a flame; none of these effects names
+its placement (TAKEN-LIGHT-OUTDOOR-EFFECTS-UNLINKED-61), and the lights themselves cannot be taken outdoors, because a
+placement of the CHIM world cannot be hidden by reference (TAKEN-LIGHT-OUTDOORS-NOT-TAKEN-61). The light every one of
+them casts is baked when its room or frame is built and stays after a take (TAKEN-LIGHT-BAKED-LIGHT-61). Side finding:
+a looping script sound goes on after a script disables its object (SCRIPT-LOOP-SOUND-DISABLED-OBJECT-61). Not in the
+image yet: 304 room placements of Tribunal and Bloodmoon and 11 outdoors on Solstheim; the build check covers them
+when they come.
+
+## CARRIED-RECORDS-SEARCH-PER-KIND-61, INVENTORY-OPEN-COST-MANY-KINDS-61 and LOADED-ITEMS-NOT-WEIGHED-61 registered, 6 November 2026
+
+The in-game check of the item table without a kind limit (INVENTORY-ORIGINAL-LIMITS-61, 32 MB Fast, 400 kinds carried) found three costs, all repaired on the v0.0.61 line: [CARRIED-RECORDS-SEARCH-PER-KIND-61](bugs/CARRIED-RECORDS-SEARCH-PER-KIND-61.md), place loads of 19 to 59 s from one catalogue search per carried kind, now one pass over the item file; [INVENTORY-OPEN-COST-MANY-KINDS-61](bugs/INVENTORY-OPEN-COST-MANY-KINDS-61.md), an inventory that took 5 to 13 s to open and read the file again on every Tab, now one pass, page rows read by their file row and Tab re-filtering only; [LOADED-ITEMS-NOT-WEIGHED-61](bugs/LOADED-ITEMS-NOT-WEIGHED-61.md), a load of 0 after loading another character's save, now weighed at the load.
+
+## ENCUMBRANCE-INCOMPLETE-61: carry weight is only half there, 5 November 2026
+
+[ENCUMBRANCE-INCOMPLETE-61](bugs/ENCUMBRANCE-INCOMPLETE-61.md): in the original the only limit on what the player
+carries is its weight (Strength times 5, changed by Burden and Feather), shown as a bar in the inventory, with the
+game's own message when the player is over it and tries to move. AmiWind caps the number of kinds of item instead (32
+in v0.0.61-dev1, 128 on the v0.0.61 line), shows no burden, gives no message (the movement rules do stop the player),
+and has no way for Burden and Feather to change the load. Registered on review of the stopgap for
+COLLECT-CAPACITY-REJECTED-60; the game features table gets a row for carry weight.
+
+## ACTOR-STATS-SCATTERED-61, ACTOR-HELLO-CLAMPED-61 and ACTOR-STATS-FAR-FALLBACK-61 registered, 5 November 2026
+
+[ACTOR-STATS-SCATTERED-61](bugs/ACTOR-STATS-SCATTERED-61.md): the 8 attributes and 27 skills are kept in five
+separate copies (the actor record, the character sheet, the combat sheets, the stats window, the dialogue facts),
+each for some beings and some stats. Repair started: each area's table now carries the stats of the beings placed
+there, exactly as each record type holds them, and the engine reads them by the original's rules; checked on all
+3,437 NPC and creature records. ACTOR-HELLO-CLAMPED-61: the Hello value is cut to 255 although the record keeps 16
+bits. ACTOR-STATS-FAR-FALLBACK-61: a being named from outside the loaded areas still reads the island-wide actor
+table.
+## TOMB-NO-CREATURES-60: the rooms' levelled creatures written by the room stages, 5 November 2026
+
+TOMB-NO-CREATURES-60: fixed in source on the v0.0.61 line (not in a numbered build yet). The room stages write an
+`aw_levelled` entity for every levelled creature reference of a converted room (`tools/room_levelled.py`;
+`--room-levelled-creatures off` keeps the room maps as before). On a MiniWind with Samarys Ancestral Tomb at 32 MB
+Fast, a level 1 character finds an ancestor ghost and a skeleton there (the other three lists give nothing below
+level 3, as in the game data), and the ghost attacks on sight. The rooms' placed creatures (478 references held back
+by `--interior-creatures listed`) are the next step.
+
+## SMOKE-STALL-LABEL-INFERRED-60 seen again in v0.0.61-dev1: the smoke's stall label is a guess, 5 November 2026
+
+[SMOKE-STALL-LABEL-INFERRED-60](bugs/SMOKE-STALL-LABEL-INFERRED-60.md): the boot smoke names a stop an "emulator disk
+stall" when the processor sits in the system's idle loop, the game waits on DOS and a word on the game's stack equals
+another process's message-list address. That is a scan of the stack, not a check of the pending device request, so the
+label shows a wait on the disk handler and does not show a lost completion in the emulator. The first snapshot of
+v0.0.61 carries the same smoke. Registered in v0.0.60, reported again with v0.0.61-dev1, with a report page; the
+hypotheses of the load stall are on the [bug page of the Seyda Neen to Balmora stall](bugs/CHIM-SEYDA-BALMORA-LOAD-HANG-43.md).
+
+## FP-WEAPON-SWAY-60: the first-person sway kept as a setting with two styles, 5 November 2026
+
+[FP-WEAPON-SWAY-60](bugs/FP-WEAPON-SWAY-60.md): the held weapon swings more while walking than in the original. After playing it the maintainer kept the sway as its own style: a setting with style 1, AmiWind groove (the default), and style 2, Morrowind stiff (hands still until an attack), chosen in the Options menu, the debug menu and the console.
+
+## COLLECT-CAPACITY-REJECTED-60: the item table held 32 kinds, 5 November 2026
+
+[COLLECT-CAPACITY-REJECTED-60](bugs/COLLECT-CAPACITY-REJECTED-60.md): after the debug weapon set and one looted body
+nothing more could be picked up. The item table held 32 kinds of item and a kind at 0 kept its row; the weapon set
+alone takes 16. Checked on the v0.0.61-dev1 image: after 18 kinds the weapon set was refused with 14 free of 32.
+Repaired on the v0.0.61 line: 128 kinds, a row at 0 reused when the table is full, and every refused pickup names
+the limit that refused it.
+
+## TOMB-NO-CREATURES-60: cause found, the rooms' creatures stop at the room stage, 5 November 2026
+
+TOMB-NO-CREATURES-60: Samarys Ancestral Tomb has no creature in v0.0.61-dev1. Its five creature references are
+all levelled lists (in_tomb_all_lev-2, +0 and +2); the room stage lists every one of them as left out ("the pick is
+not resolved at build time") and the room map carries no entity for them, so the engine has nothing to roll. The
+engine side of a room's levelled creature (an `aw_levelled` entity rolled from the actor table's lists,
+CREATURE-ROOM-LEVELLED-54, v0.0.54) is in the game; the room stage that writes those entities was never added.
+Island-wide in that build: 1,196 levelled references and 478 placed creatures of the built rooms are left out (the
+placed ones by the default `--interior-creatures listed`, which names four creatures); 84 tombs (408 references) and
+63 caves (419 references) place none or one. Same family as
+[INTERIOR-CREATURES-MISSING-41](bugs/INTERIOR-CREATURES-MISSING-41.md). Fix in progress in the shared resident stage.
 
 ## CHIM-32MB-SAVE-ENTRY-48 fixed; BUILD-ACTOR-MODEL-UNSUPPORTED-48 closed, ACTOR-MODEL-ERROR-UNNAMED-48 registered, 23 October 2026
 
@@ -836,7 +953,7 @@ on v0.0.43-imgpar: the world read once and handed on, ground traces on a column 
 maps and door rows on the pool, the region cache keyed by both row methods (the old key named the legacy one only).
 Checked on scratch copies of the dev2 run's own inputs: all 1,300 frame maps the repaired code makes are byte for byte
 the run's (SHA-256), and so are the 20,266 other id1 files they touch; the world read, entity tracker placements,
-frame maps and heap gate took 75.6 + 1.8 + 52.3 + 36.8 s (12 workers, a busy host, pass cache off), against
+frame maps and heap gate took 75.6 + 1.8 + 52.3 + 36.8 s (12 workers, a loaded machine, pass cache off), against
 192.5 s for the placements alone with the code before. Persisting reports added to BUILD-IMAGE-CHIM-MAPS-SERIAL-36
 and BUILD-IMAGE-FRAME-MAP-HEAP-SERIAL-36.
 [BUILD-PASS-KEY-TOP-BROAD-43](bugs/BUILD-PASS-KEY-TOP-BROAD-43.md): why the region cache had 0 hits: for the frame
@@ -860,7 +977,7 @@ from a measured table they are 29 and 37 deep and all 14 cells pass.
 [CHIM-STAIR-STEPS-SOLID-43](bugs/CHIM-STAIR-STEPS-SOLID-43.md): Ald-ruhn and Maar Gan (Redoran steps), Suran (Hlaalu
 steps) and cell 0,8 (a rope bridge) fail the stair walk; 39 cells wait on them. Open.
 
-[CHIM-SEYDA-BALMORA-LOAD-HANG-43](bugs/CHIM-SEYDA-BALMORA-LOAD-HANG-43.md): 18 October 2026, v0.0.43-dev1: reproduced with a repeat loop under host load (5 hangs; none in 100 loads on a quiet host, at 16 and at 128 MiB Fast RAM alike). The debugger shows a deadlock below the engine: the processor idle, the game waiting on a file request taken by the boot partition's file system (DH0) that never answers, the same class as SEYDA-LOAD-HANG-30. The boot smoke now runs its map change three times and, when a load stalls, examines it with the emulator's monitor: this stall is reported as an emulator disk stall and retried once on a fresh play copy. Still open (under observation): which layer loses the request; real hardware is not believed affected, unproven.
+[CHIM-SEYDA-BALMORA-LOAD-HANG-43](bugs/CHIM-SEYDA-BALMORA-LOAD-HANG-43.md): 18 October 2026, v0.0.43-dev1: reproduced with a repeat loop under host load (5 hangs; none in 100 loads on a quiet machine, at 16 and at 128 MiB Fast RAM alike). The debugger shows a deadlock below the engine: the processor idle, the game waiting on a file request taken by the boot partition's file system (DH0) that never answers, the same class as SEYDA-LOAD-HANG-30. The boot smoke now runs its map change three times and, when a load stalls, examines it with the emulator's monitor: this stall is reported as an emulator disk stall and retried once on a fresh play copy. Still open (under observation): which layer loses the request; real hardware is not believed affected, unproven.
 
 [CHIM-CELL-FEATURE-LIST-INCOMPLETE-38](bugs/CHIM-CELL-FEATURE-LIST-INCOMPLETE-38.md) — 15 October 2026, v0.0.41-dev1: full-build preparation rejected five explicitly selected ocean routing cells absent from the original CELL/LAND inventory, before legacy compilation. The source checklist now records additional ocean routing cells separately and allows their absence only before routing rows are appended. Final classification/stage verification still requires every row and CHIM routing flags; undeclared or unselected missing cells are rejected. All 98 targeted checks across five modules pass, including three new ocean checklist regressions. Exact production conversion, native ocean behavior, image/package and delivery checks remain pending; coverage states are unchanged.
 
@@ -1032,7 +1149,7 @@ game boots and runs.
 
 [BUILD-PROFILE-REAPED-CHILD-DOUBLE-COUNT-42](bugs/BUILD-PROFILE-REAPED-CHILD-DOUBLE-COUNT-42.md): the build
 profiler's sampled timeline counted a child process twice when the child ended between two readings of the
-stage's process tree (gates 2519, 2610, 2651 and 2556 failed the timeline bound on loaded hosts). The sampler's
+stage's process tree (gates 2519, 2610, 2651 and 2556 failed the timeline bound on loaded machines). The sampler's
 baseline no longer goes down, so the CPU is counted once. Stage CPU, average build-machine threads used and the
 perf guard baselines were never affected; sampled per-stage peaks in earlier build profiles may read high.
 PERSISTING since TEST-PROFILE-TIMELINE-BOUND-33 (v0.0.33-dev), which widened the bound instead.

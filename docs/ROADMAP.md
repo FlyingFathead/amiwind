@@ -1,6 +1,6 @@
 # Roadmap and implementation options
 
-_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
+_Last updated with AmiWind v0.0.61-dev2 (2026-11-06)._
 
 <!-- contents start -->
 ## Contents
@@ -72,7 +72,7 @@ _Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 - [v0.0.32 - Last Stop on the Old Line: Window-Shopping in Vivec (released)](#v0032---last-stop-on-the-old-line-window-shopping-in-vivec-released)
   - [Decided: a world streamer with no duplicated assets - the whole game on one hard file](#decided-a-world-streamer-with-no-duplicated-assets---the-whole-game-on-one-hard-file)
   - [Near future: fires and lava across the world](#near-future-fires-and-lava-across-the-world)
-- [Planned: heap size matched to the host machine, 7 October 2026](#planned-heap-size-matched-to-the-host-machine-7-october-2026)
+- [Planned: heap size matched to the machine it runs on, 7 October 2026](#planned-heap-size-matched-to-the-machine-it-runs-on-7-october-2026)
   - [The cache plan: extra RAM spent on not doing work twice (16 October 2026)](#the-cache-plan-extra-ram-spent-on-not-doing-work-twice-16-october-2026)
 - [Other ideas and wildcards](#other-ideas-and-wildcards)
   - [Sky fading into the horizon](#sky-fading-into-the-horizon)
@@ -149,14 +149,25 @@ checks are still pending, and the builder and release tooling work:
 
 - Combat and magic:
   - Weapons and shields of every type in first and third person, a debug weapon menu and gear menu, and a tester mode
-    giving every weapon, all kept in the save.
-  - First-person hands with the weapon in them for every weapon type; 4 of 103 animation groups exist today.
+    giving every weapon, all kept in the save. In progress: in v0.0.61-dev2; the first-person ranged stances and
+    thicker blades are checked on that image.
+  - First-person hands with the weapon in them for every weapon type; 4 of 103 animation groups exist today. In
+    progress: bow, crossbow and thrown stances are in v0.0.61-dev2.
   - Cliff racers that attack the player land their strikes and are drawn at the right size; then fish in the water and
-    the kill-and-return behaviour.
+    the kill-and-return behaviour. In progress: the strikes land in the open world (v0.0.61-dev2); the drawn size, the
+    fish and the pack test are next.
   - Player casting: ready a spell, pay its magicka, roll to succeed and deliver Self, Touch or Target effects, with
-    the casting animation and HUD.
+    the casting animation and HUD. In progress: casting works and is in v0.0.61-dev2; the casting gesture, the
+    starting spells of race, birth sign and class, and items that cast are next.
   - A spell-effect system: effects applied over their duration to actors and kept in saves, with the script calls that
-    wait for it.
+    wait for it. In progress: in v0.0.61-dev2; resistances from abilities, reflection and the movement effects are
+    next.
+  - Ghosts and other creatures that resist ordinary weapons take no harm from them, as in the original; silver and
+    magical weapons still work. In progress: in v0.0.61-dev2, checked on that image.
+  - Every person and creature, and the player, carries the full stats of its record, kept in one place that every
+    game system reads ([actor stats](ACTOR_STATS.md)). In progress: in v0.0.61-dev2; the stat window, levelling, rest
+    and combat sheets move onto it next.
+  - Alchemy, enchanting and spellmaking work as in the original (next; spellmaking's service exists since v0.0.58).
   - The original crime system: theft, pickpocketing, attacks, killing and trespass seen by witnesses raise a bounty,
     and guards arrest, fine or jail.
   - The in-game check of `dbg kill`, a test command that kills the person or creature picked with a red crosshair.
@@ -186,7 +197,8 @@ checks are still pending, and the builder and release tooling work:
     and taken.
   - What the player wears and wields shows in first person and on the third-person body, changing as the equipment
     changes.
-  - An index of every item you can pick up, from the game's records.
+  - An index of every item you can pick up, from the game's records: cell, position, item and owner (work item
+    ITEMS-INDEX-57).
   - A test that every kind of item can be dropped from the inventory indoors and outdoors, lands in front of the
     player, can be picked up again and stays where it was dropped across a save.
   - A scripted check of the game's own scripts: taking the silver tray in the Census and Excise Office behaves as in
@@ -195,6 +207,23 @@ checks are still pending, and the builder and release tooling work:
     where three markers pick the attributes to raise, each with its multiplier.
   - Every character voice line and every creature sound mapped into the world and heard in game, with combat sounds on
     by default and a tracker page showing each kind and its proof.
+- Found while playing v0.0.61-dev1, being fixed:
+  - After character creation the inventory opens and the character is dressed at the same moments as in the original,
+    also after leaving the Census and Excise Office.
+  - Picking up a lit candle or lamp takes its flame and its light with it (TAKEN-LIGHT-FLAME-STAYS-60). In progress:
+    in v0.0.61-dev2, checked on that image; the baked light of a room stays when a light in it is taken, and Seyda
+    Neen's carriable lanterns are missing from the open world.
+  - The inventory works as in the original: no limit on the number of kinds of item, only carry weight, with the burden
+    shown and movement stopped when over it. In progress: in v0.0.61-dev2, checked on that image.
+  - A blank sheet of paper is taken instead of read; traders refuse service only under the original's conditions;
+    tombs and caves have the creatures of their levelled lists. In progress: in v0.0.61-dev2, checked on that image.
+  - The ground along the Balmora canal no longer dips below the original terrain, without adding to the number of
+    triangles the game draws (a few ground points added; in progress).
+  - Inside ancestral tombs the tomb ambience plays instead of the exploration music; battle music still starts when an
+    enemy attacks.
+  - The death music plays only when the player dies, never as exploration or battle music.
+  - The first-person weapon sway is kept, with a switch to turn it off for still hands: a debug command, a saved
+    setting and an Options menu row (also useful if the sway costs too much on slower machines).
 - Builder and release tooling:
   - Release-build tooling: earlier warnings for size growth and output names, a faster reuse check, and safe disk image
     copies.
@@ -2598,7 +2627,7 @@ After that: lighting follow-ups, a battle-arena test room, then inventory,
 character statistics, a map that reveals as you travel, and the heap option
 below.
 
-## Planned: heap size matched to the host machine, 7 October 2026
+## Planned: heap size matched to the machine it runs on, 7 October 2026
 
 The game heap is a fixed 11 MiB. On the reference configuration a fully loaded
 Seyda Neen sub-cell leaves only about 2.6 MB of it for cached models, so each

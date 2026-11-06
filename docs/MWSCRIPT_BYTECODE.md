@@ -1,6 +1,6 @@
 # MWScript compiled by the builder
 
-_Last updated with AmiWind v0.0.60 (4 November 2026)._
+_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -630,6 +630,18 @@ and Fire, Frost and Shock Damage and Poison, which hurt health like Damage Healt
 the full magnitude lands): 830 before, 834 after. Still waiting: the effects of other kinds (Shield, Water
 Breathing, Swift Swim, Levitate and the like; 13 scripts wait only for a Cast of them), Casts on other actors, effects on other actors, the effect table of every spell and
 enchantment.
+
+**Any effect on any actor (v0.0.61).** The active list now holds any of the game's 143 magic effects, by its
+effect number and its attribute or skill, on any actor record by its reference (the player and the NPCs and
+creatures a spell lands on): 64 entries of 20 bytes (1,280 bytes resident), at most 32 of them on the player. The
+effects that act while they last (the elements, poison, sun damage, Damage and Restore, Absorb Health, Magicka and
+Fatigue, the disintegrations, the cures) act each second, their magnitude a second; every other effect is applied
+once and undone when it ends (Fortify, Drain, Absorb Attribute and Skill), or only adds its magnitude to the actor's
+effect magnitudes, which the engine's systems read (Light, Levitate, Shield, Feather and the like). Which effects act
+each second follows OpenMW 0.51 (components/esm3/loadmgef.cpp, the effects without the applied-once flag). Effects
+on an actor whose record is not loaded do not tick, as OpenMW updates only the actors in the active cells. Saved
+games carry the list as a version 2 block (16 bytes an effect, with the actor and the spell); v0.0.57's version 1
+blocks still load. Not yet: resistances and weaknesses, reflection, the caster's half of Absorb.
 
 The design, as it was written first (the rest of it is still to build). What the shrines' blessings, the traps, `Cast`, `GetEffect` and the effect Get/Set/Mod calls
 wait for. The rules are OpenMW 0.51's (apps/openmw/mwmechanics/activespells.cpp for the active list and its ticking,

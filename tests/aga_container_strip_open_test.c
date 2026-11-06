@@ -126,7 +126,7 @@ static void console_open(void){
 /* One run: open (E or the console), take 2 quills, put 1 back, Take All, Esc. Returns the ledger's stolen quills. */
 static void run(int by_console){
     unsigned long reads;int frames;
-    AW_LedgerClear(&aw_ledger);memset(&aw_state,0,sizeof(aw_state));tables();level();
+    AW_LedgerClear(&aw_ledger);AW_StateReset();tables();level();
     vid.width=320;vid.height=200;r_refdef.vrect.width=320;r_refdef.vrect.height=200;
     assert(!AW_CStripActive());
     if(by_console)console_open();else assert(AW_InventoryUse());

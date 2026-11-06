@@ -19,6 +19,8 @@ static int highlight_y,highlight_w,scroll_top,scroll_total;
 static int own_cursor;   /* the menu's own (AmiWind) cursor strokes drawn: AW_UICursor below said no */
 /* Controls > Combat style / Dice rolls / Blocking (aw_combat.c's saved options). */
 static float combat_miss=1,combat_dice=1,combat_block=1;
+/* Controls > Weapon sway (aw_fp_sway, FP-WEAPON-SWAY-61: 1 AmiWind groove, the default; 2 Morrowind stiff). */
+static float fp_sway=1;
 /* Video > Far detail (aw_cull, aw_fog.c; the engine default 4 = Strong). */
 static float far_detail=4;static int far_sets;
 /* Video > Extra RAM (aw_autoram, chim_world.c; default 1 = automatic). */
@@ -33,6 +35,7 @@ float Cvar_VariableValue(char *name){
     if(!strcmp(name,"aw_combat_miss"))return combat_miss;
     if(!strcmp(name,"aw_combat_dice"))return combat_dice;
     if(!strcmp(name,"aw_combat_block"))return combat_block;
+    if(!strcmp(name,"aw_fp_sway"))return fp_sway;
     if(!strcmp(name,"m_pitch"))return pitch_value;
     if(!strcmp(name,"aw_player_footsteps"))return player_steps;
     assert(0);return 0;
@@ -41,6 +44,7 @@ void Cvar_SetValue(char *name,float value){cvar_t *rows[]={&volume,&bgmvolume,&e
     if(!strcmp(name,"aw_cull")){assert(value==1 || value==3 || value==4 || value==6);far_detail=value;far_sets++;return;}
     if(!strcmp(name,"m_pitch")){pitch_value=value;return;}
     if(!strcmp(name,"aw_player_footsteps")){assert(value==0 || value==1);player_steps=value;return;}
+    if(!strcmp(name,"aw_fp_sway")){assert(value==1 || value==2);fp_sway=value;return;}
     assert(value>=0 && value<=1);
     if(!strcmp(name,"aw_combat_miss")){combat_miss=value;return;}
     if(!strcmp(name,"aw_autoram")){autoram=value;return;}
@@ -200,8 +204,10 @@ static void check_controls(void){
  M_Keydown(K_ENTER);M_Keydown('W');assert(!strcmp(keybindings['w'],"+forward") && !strcmp(keybindings['k'],"+forward"));
  M_Keydown(K_DEL);assert(!*keybindings['w'] && !*keybindings['k']);
  for(i=0;i<40;i++)M_Keydown(K_DOWNARROW);
- up(1);assert(highlight_y==150 && scroll_total==31 && scroll_top==24); /* Reset to defaults is the last row (Stats, Magic and Sneak rows included) */
+ up(1);assert(highlight_y==150 && scroll_total==32 && scroll_top==25); /* Reset to defaults is the last row (Stats, Magic and Sneak rows included) */
  M_Keydown(K_ENTER);assert(!strcmp(queued,"exec keymaps-default.cfg\n"));changes--;
+ /* Weapon sway above it (FP-WEAPON-SWAY-61): Enter and the arrows switch AmiWind groove / Morrowind stiff */
+ M_Keydown(K_UPARROW);M_Keydown(K_ENTER);assert(fp_sway==2);M_Draw();M_Keydown(K_RIGHTARROW);assert(fp_sway==1);
  /* Blocking, Dice rolls, Combat style above it: Enter and the arrows switch the three options */
  M_Keydown(K_UPARROW);M_Keydown(K_ENTER);assert(combat_block==0 && combat_dice==1 && combat_miss==1);
  M_Keydown(K_RIGHTARROW);assert(combat_block==1);

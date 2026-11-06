@@ -29,7 +29,8 @@ SETTINGS = ('fMajorSkillBonus', 'fMinorSkillBonus', 'fMiscSkillBonus', 'fSpecial
             'iLevelupMinorMultAttribute', 'iLevelupMiscMultAttriubte', 'iLevelupSpecialization') + tuple(
             'iLevelUp%02dMult' % n for n in range(1, 11))
 # The game's lines the engine shows (aw_levelup.c game_text).
-TEXTS = ('sNotifyMessage39', 'sLevelUpMsg', 'sLevelUpMenu1', 'sLevelUpMenu2', 'sNotifyMessage36')
+# sNotifyMessage59: the over-encumbered line (aw_move.c, ENCUMBRANCE-INCOMPLETE-61).
+TEXTS = ('sNotifyMessage39', 'sLevelUpMsg', 'sLevelUpMenu1', 'sLevelUpMenu2', 'sNotifyMessage36', 'sNotifyMessage59')
 # The level-up pictures by name (aw_levelup_rules.c AW_LevelupClassImage; OpenMW getLevelupClassImage).
 PICTURES = ('acrobat', "agent", 'archer', 'assassin', 'barbarian', 'bard', 'battlemage', 'crusader', 'healer',
             'knight', 'mage', 'monk', 'pilgrim', 'rogue', 'scout', 'sorcerer', 'spellsword', 'thief', 'warrior',

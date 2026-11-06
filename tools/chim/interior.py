@@ -676,7 +676,9 @@ def room_map(room_bsp, name, record, bounds, liquids=None, store=None, types=Non
         # room record's placements give them, from the store models' emitters (chim.flames,
         # CHIM-EXTERIOR-FLAMES-MISSING-48). A room converted whole keeps its own map's flames unchanged.
         from chim.flames import frame_rows, store_models
-        flames, flame_report = frame_rows([{'owned': read_room_record(record)['placements']}], store_models(store))
+        # each flame names its placement (aw_ref): a taken candle's flame goes with it (TAKEN-LIGHT-FLAME-STAYS-60)
+        flames, flame_report = frame_rows([{'owned': read_room_record(record)['placements']}], store_models(store),
+                                          refs=True)
         rows += flames
     world = rows[0]
     if shell and 'aw_hull' not in world:

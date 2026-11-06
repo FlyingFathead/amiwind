@@ -50,9 +50,12 @@ def interior_dressing():
     return () if _SKIP_DRESSING[0] else INTERIOR_DRESSING
 
 
-def flame_entities(ref, model, centre):
+def flame_entities(ref, model, centre, reference=None):
     """aw_flame entities for a placement's particle flames (prepare_scenery
-    model_flames); same transform as the placed geometry."""
+    model_flames); same transform as the placed geometry. REFERENCE: the
+    placement's reference number, written as "aw_ref" so the engine drops the
+    flame when the item is taken (TAKEN-LIGHT-FLAME-STAYS-60); None leaves it out
+    (model-local emitters, chim.models)."""
     if NO_FLAMES or not model.get('flames'):
         return []
     rotation = reference_rotation(ref)
@@ -63,6 +66,8 @@ def flame_entities(ref, model, centre):
         p = origin + rotation @ np.array([x, y, z], dtype=float) * SCALE * ref['scale']
         text = '{\n"classname" "aw_flame"\n"origin" "%.2f %.2f %.2f"\n"aw_flame_size" "%.2f"\n' % (
             p[0], p[1], p[2], size * ref['scale'])
+        if reference is not None:
+            text += '"aw_ref" "%d"\n' % int(reference)
         if len(flame) >= 7:
             # Emitter shape in map units: particle size, rise and cone spread.
             k = SCALE * ref['scale']
@@ -734,7 +739,7 @@ def _append_meshes(src, out, scenery, palette, archive, centre, lighting, jobs,
         original=visual_models[key];header=bytearray(lumps[14][original*64:(original+1)*64])
         struct.pack_into('<4i',header,36,nroot,croot,croot,croot)
         instance_models[variant]=len(lumps[14])//64;lumps[14]+=header
-       entities.append(placement_entity(instance_models[variant],origin,yaw,ref['number']));entities.extend(flame_entities(ref,m,centre));continue
+       entities.append(placement_entity(instance_models[variant],origin,yaw,ref['number']));entities.extend(flame_entities(ref,m,centre,ref['number']));continue
       surfaces,worldparts,lo,hi=next_placement();part_cache[key]=worldparts
       if terrain is not None and terrain.prisms:
        surfaces,cull_counts=cull_surfaces(surfaces,terrain,placement_groups[key])
@@ -827,7 +832,7 @@ def _append_meshes(src, out, scenery, palette, archive, centre, lighting, jobs,
       nroot,croot=collision_models[collision_key]
       modelnum=len(lumps[14])//64;nf=len(lumps[7])//20-firstface
       lumps[14]+=struct.pack('<9f7i',*lo,*hi,0,0,0,nroot,croot,croot,croot,0,firstface,nf)
-      visual_models[key]=modelnum;instance_models[variant]=modelnum;entities.append(placement_entity(modelnum,origin,yaw,ref['number']));entities.extend(flame_entities(ref,m,centre))
+      visual_models[key]=modelnum;instance_models[variant]=modelnum;entities.append(placement_entity(modelnum,origin,yaw,ref['number']));entities.extend(flame_entities(ref,m,centre,ref['number']))
       report.append({'model':name,'faces':nf,'collision_parts':len(components),'scale':ref['scale'],'visual_lod':{k:v for k,v in lod.items() if not k.startswith('_')},'texture_size':texsize});print(len(report),name,nf,len(lumps[9])//8,len(lumps[5])//24,flush=True)
       if len(lumps[5])//24>32767 or len(lumps[9])//8>=65520:raise ValueError('Node budget exceeded')
     if rebakes:

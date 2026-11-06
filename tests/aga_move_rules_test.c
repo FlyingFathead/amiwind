@@ -112,5 +112,38 @@ int main(void) {
     /* A loss stops at 0; an already negative fatigue (knocked out) keeps falling. */
     assert(AW_MoveFatigueAfter(10,1)==9 && AW_MoveFatigueAfter(3,5)==0 && AW_MoveFatigueAfter(-2,1)==-3);
     assert(AW_MoveFatigueAfter(4,0)==4);
+
+    /* ENCUMBRANCE-INCOMPLETE-61: every term at a load, by hand from OpenMW 0.51 (actor.cpp getEncumbrance, npc.cpp
+     * getCapacity / getWalkSpeed / getRunSpeed / getMaxSpeed / getJump, actor.hpp getSwimSpeedImpl, character.cpp
+     * fatigue, physicssystem.cpp handleJump) with the settings as Morrowind.esm has them (checked 5 November 2026:
+     * the 30 values of AW_MoveSettingsDefault equal the master's GMSTs). Strength 60: capacity 300. */
+    in.running=0;in.godmode=0;in.sneaking=0;in.swimming=0;in.levitate=0;in.levitation_enabled=0;
+    in.speed=50;in.athletics=35;in.acrobatics=15;in.strength=60;in.fatigue=in.fatigue_max=200;
+    /* exactly at the limit (normalized 1): still moving, at 1 - 0.3 of the speed */
+    in.carried=300;assert(near(AW_MoveEncumbrance(&s,&in),1));
+    assert(near(AW_MoveWalkSpeed(&s,&in),105));                  /* 150 x (1 - 0.3 x 1) */
+    assert(near(AW_MoveRunSpeed(&s,&in),220.5f));                /* 105 x (0.35 x 1 + 1.75) */
+    assert(near(AW_MoveMaxSpeed(&s,&in),105));
+    in.swimming=1;assert(near(AW_MoveMaxSpeed(&s,&in),56.175f)); /* 105 x (0.5 + 0.35 x 0.1) */
+    in.swimming=0;
+    /* the jump's load term 0.5 + 1 x (1 - 1) = 0.5: (128 + 1) x 0.5 x 1.25 + 8.96 x 69.99125, / 3 */
+    assert(fabs(AW_MoveJumpVelocity(&s,&in)-(129*.5f*1.25f+627.1216f)/3)<.01f);
+    in.running=1;assert(near(AW_MoveFatigueRate(&s,&in),7));     /* fFatigueRunBase 5 + 1 x fFatigueRunMult 2 */
+    in.sneaking=1;assert(near(AW_MoveFatigueRate(&s,&in),3));    /* 1.5 + 1 x 1.5 */
+    in.sneaking=0;assert(near(AW_MoveJumpFatigue(&s,&in),5));    /* 5 + min(1, n) x fFatigueJumpMult 0 */
+    in.running=0;
+    /* Burden adds, Feather takes away (not below 0): 200 + 100 = 300 still moves; - 50 Feather = 250 */
+    in.carried=200;in.burden=100;assert(near(AW_MoveEncumbrance(&s,&in),1) && AW_MoveMaxSpeed(&s,&in)>0);
+    in.feather=50;assert(near(AW_MoveEncumbrance(&s,&in),250/300.0f));
+    assert(near(AW_MoveWalkSpeed(&s,&in),150*(1-.3f*250/300.0f)));
+    in.feather=500;assert(AW_MoveEncumbrance(&s,&in)==0);       /* floored at 0 */
+    in.feather=0;in.burden=0;
+    /* over the limit by a hundredth: no movement, no jump, no running cost; the jump cost stays 5 */
+    in.carried=300.01f;assert(AW_MoveMaxSpeed(&s,&in)==0 && AW_MoveJumpVelocity(&s,&in)==0);
+    in.running=1;assert(AW_MoveFatigueRate(&s,&in)==0 && near(AW_MoveJumpFatigue(&s,&in),5));
+    in.running=0;
+    /* levitation with half the load: (5 + 0.01 x (50 + 10) x 295) x (1 - 0.3 x 0.5) */
+    in.carried=150;in.levitate=10;in.levitation_enabled=1;assert(near(AW_MoveMaxSpeed(&s,&in),182*.85f));
+    in.levitate=0;in.levitation_enabled=0;in.carried=0;
     return 0;
 }

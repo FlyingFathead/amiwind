@@ -177,7 +177,7 @@ int main(void){
 
     pr_strings=strings;progs=&program;program.entityfields=sizeof(entvars_t)/4;
     sv.active=1;sv.edicts=edicts;sv.num_edicts=4;sv.models[1]=&model;model.numframes=31;sv.time=1;
-    svs.maxclients=1;svs.clients=&client;client.edict=p;cls.state=ca_connected;key_dest=key_game;
+    svs.maxclients=1;svs.clients=&client;client.edict=p;client.active=client.spawned=1;cls.state=ca_connected;key_dest=key_game;
     fields[0][2]._float=.9f;                                         /* worldspawn aw_hand_punch */
     p->v.origin[0]=300;p->v.origin[2]=16.625f;p->v.mins[2]=-16.625f;p->v.maxs[0]=7.32f;p->v.health=60;
     aw_character.valid=1;for(i=0;i<8;i++)aw_character.attributes[i]=50;for(i=0;i<27;i++)aw_character.skills[i]=30;
@@ -414,6 +414,18 @@ int main(void){
       guard_flags=0;assert(AW_CombatEssentialRecord("a guard",&essential) && !essential);
       assert(!AW_CombatEssentialRecord("nobody",&essential) && !essential);}
      guard_flags=0;AW_CombatClear();}
+    /* MUSIC-DEATH-TRACK-RANDOM-60: an area change mid-fight. The new map's settle frames and the signon frames see the
+     * fresh client edict at health 0 and the old map's slots: no death, no death track; play goes on once spawned. */
+    {int deaths=music_death;
+     AW_CombatClear();p->v.health=60;p->v.button0=0;
+     assert(AW_CombatActorLoad("mevil molor",&f) && AW_CombatEngage(npc,&f,NULL));
+     tick(2);assert(AW_PlayerInCombat());
+     client.spawned=0;p->v.health=0;                             /* settle frames / before Host_Spawn_f */
+     tick(3);assert(music_death==deaths && !AW_CombatDeathMusicPlayed() && results[0]==2);
+     client.active=0;tick(2);assert(music_death==deaths);       /* before "connect local" */
+     aw_combat_scene();client.active=client.spawned=1;p->v.health=60;   /* the scene set-up, the health back */
+     tick(3);assert(music_death==deaths && !AW_CombatDeathMusicPlayed());
+     AW_CombatClear();}
     /* commands and cost */
     run("aw_combat_cmd");run("aw_combat_cmd readout off");run("aw_combat_cmd calm");run("aw_combat_cmd off");
     assert(!AW_CombatEngage(npc,&f,NULL));

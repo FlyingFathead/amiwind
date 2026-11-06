@@ -1,6 +1,6 @@
 # Installed Morrowind game inputs
 
-_Last updated with AmiWind v0.0.25-rc3 (1 October 2026)._
+_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 
 Point `--data-files` at the installed game's `Data Files` directory or its
 installation root. The builder locates the named `Morrowind.esm` and
@@ -8,7 +8,7 @@ installation root. The builder locates the named `Morrowind.esm` and
 
 For example, a GOG installation may use `C:\GOG Games\Morrowind\` as its
 installation root. That is an example, not a required drive or location.
-The paths below are relative to that root; no workstation or account-specific
+The paths below are relative to that root; no build machine or account-specific
 path is required.
 
 | Relative path | Contents and current build use |

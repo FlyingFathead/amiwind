@@ -1,4 +1,4 @@
-# AUDIO-HOST-LOAD-33: Music and sound crackle when the emulator shares a fully loaded host CPU
+# AUDIO-HOST-LOAD-33: Music and sound crackle when the emulator shares a fully loaded CPU
 
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
@@ -19,7 +19,7 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 
 ## Status: 9 October 2026
 
@@ -51,7 +51,7 @@ is the first to suffer when the host is saturated.
 
 This differs from [AUDIO-LOAD-29](AUDIO-LOAD-29.md) and [WIN-05](../journals/BUG_JOURNAL-v0.0.29.md#win-05-intermittent-winuae-background-music-snapping---investigation-open):
 those crackles happen inside the emulated machine (the game's mixer starves during blocking disk
-loads) and are heard on an idle host; this one is continuous and disappears on an idle host.
+loads) and are heard on an idle machine; this one is continuous and disappears on an idle machine.
 
 ## Why it was not caught
 
@@ -67,7 +67,7 @@ Not yet run as a controlled pair; the evidence so far is the maintainer's two PC
 ## Repair
 
 None in the game. Play on a PC that is not running builds, or throttle the builds (lower their CPU
-limits) while playing on the build PC.
+limits) while playing on the build machine.
 
 ## Verification
 
@@ -76,8 +76,8 @@ Pending: the controlled idle/loaded A/B on one PC, judged by ear, with host CPU 
 ## Prevention
 
 Audio playtest reports note the host load. Audio judgements (this family) are made only on an
-unloaded host, like emulator timings ([BENCH-JIT-PROFILE-32](BENCH-JIT-PROFILE-32.md)). When playing
-on the build PC, build jobs are limited so that free threads remain for the desktop and emulator.
+unloaded machine, like emulator timings ([BENCH-JIT-PROFILE-32](BENCH-JIT-PROFILE-32.md)). When playing
+on the build machine, build jobs are limited so that free threads remain for the desktop and emulator.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 

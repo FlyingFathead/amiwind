@@ -423,6 +423,22 @@ class LexerParserTests(unittest.TestCase):
 
 
 class CompilerTests(unittest.TestCase):
+    def test_dungeon_ambience_sounds_are_flagged(self):
+        """TOMB-MUSIC-OVER-AMBIENT-60: a sound marker's loop of a dungeon ambience (here Cave Wind) carries SNDS flag 2
+        beside the mapped flag; other sounds (Chime, Drip) do not. The engine rests the exploration music on it."""
+        prog, compiled, binds, data = program()
+        raw, _ = awms.write(prog, compiled, binds)
+        sections = struct.unpack_from('>H', raw, 6)[0]
+        table = {raw[16 + 16 * i:20 + 16 * i]: struct.unpack_from('>III', raw, 20 + 16 * i) for i in range(sections)}
+        offset, rows, size = table[b'SNDS']
+        self.assertEqual(size, 18 * rows)
+        flags = {name: raw[offset + 18 * i + 11] for name, i in prog.sounds.index.items()}
+        self.assertEqual(flags['cave wind'] & awms.SOUND_AMBIENCE, awms.SOUND_AMBIENCE)
+        self.assertFalse(flags['chime'] & awms.SOUND_AMBIENCE or flags['drip'] & awms.SOUND_AMBIENCE)
+        self.assertEqual(awms.AMBIENCE_SOUNDS, {'haunted', 'spirit ambient voices', 'cave drip', 'cave wind'})
+        vm = (ROOT / 'engine/aga/src/aw_mwvm.c').read_text(encoding='utf-8')
+        self.assertIn('(vm.snds[18*k+11]&3)==3', vm)   # mapped and an ambience
+
     def test_program_compiles_and_round_trips(self):
         prog, compiled, binds, data = program()
         names = {c.name: c for c in compiled}
@@ -1121,7 +1137,14 @@ EFFECT_HARNESS = r'''
 #include "aw_effects.h"
 int main(void){
     static aw_actor_t a;static unsigned char block[512];int i,n,ok;
-    memset(&a,0,sizeof(a));a.dyn_base[0]=a.dyn_cur[0]=50;a.dyn_base[1]=a.dyn_cur[1]=40;a.attr_base[0]=40;
+#ifdef AW_ACTOR_SKILL_PARTS
+    static aw_actor_skills_t skills;
+#endif
+    memset(&a,0,sizeof(a));a.reference=AW_ACTOR_PLAYER_REF;a.dyn_base[0]=a.dyn_cur[0]=50;
+#ifdef AW_ACTOR_SKILL_PARTS
+    AW_ActorAttachSkills(&a,&skills);
+#endif
+    a.dyn_base[1]=a.dyn_cur[1]=40;a.attr_base[0]=40;
     AW_EffectsReset();
     AW_EffectsAdd(&a,AW_FX_FORTIFY,AWA_ATTRIBUTE+0,10,5);
     AW_EffectsAdd(&a,AW_FX_DAMAGE,AWA_HEALTH,2,3);
@@ -1137,13 +1160,155 @@ int main(void){
     printf("restore %.1f\n",a.dyn_cur[0]);
     for(i=0;i<5;i++)AW_EffectsTick(&a,1.0f);
     printf("end %.1f %.1f %d\n",a.dyn_cur[0],a.dyn_base[0],AW_EffectsCount());
-    for(i=0;i<20;i++)AW_EffectsAdd(&a,AW_FX_FORTIFY,AWA_SKILL+3,1,60);
+    for(i=0;i<40;i++)AW_EffectsAdd(&a,AW_FX_FORTIFY,AWA_SKILL+3,1,60);
     printf("full %d %lu\n",AW_EffectsCount(),AW_EffectsRefused());
     ok=AW_EffectsImport(block,n-1);
     printf("bad %d %d\n",ok,AW_EffectsCount());
     return 0;
 }
 '''
+
+# v0.0.61 (SPELL-EFFECTS-57): any effect number on any actor by its reference, the effects that only add their
+# magnitude (Light, Levitate), the per-second elements, the NPCs' share of the pool, forgetting, the v2 save and a
+# v0.0.57 (version 1) block still loading.
+EFFECT_ACTORS_HARNESS = r'''
+#include <stdio.h>
+#include <string.h>
+#include "aw_effects.h"
+int main(void){
+    static aw_actor_t p,npc,other;static unsigned char block[2048];int i,n,ok,group;uint32_t owners[8];
+    static const unsigned char v1[16]={'A','W','E','F',1,1,3,0,0x41,0x20,0,0,0x40,0xa0,0,0};   /* Fortify Strength 10, 5 s */
+    memset(&p,0,sizeof(p));memset(&npc,0,sizeof(npc));memset(&other,0,sizeof(other));
+    p.reference=AW_ACTOR_PLAYER_REF;p.dyn_base[0]=p.dyn_cur[0]=50;
+    npc.reference=0x1234;npc.dyn_base[0]=npc.dyn_cur[0]=40;npc.attr_base[2]=50;
+    other.reference=0x99;other.dyn_base[0]=other.dyn_cur[0]=30;
+    AW_EffectsReset();
+    {int k1=AW_EffectKind(14,&group),g1=group,k2=AW_EffectKind(41,&group),k3=AW_EffectKind(89,&group),g3=group;
+     printf("kinds %d %d %d %d %d\n",k1,g1,k2,k3,g3);}
+    printf("persec %d %d %d %d\n",AW_EffectPerSecond(14),AW_EffectPerSecond(41),AW_EffectPerSecond(79),AW_EffectPerSecond(75));
+    printf("harmful %d %d %d %d %d %d\n",AW_EffectHarmful(14),AW_EffectHarmful(86),AW_EffectHarmful(41),AW_EffectHarmful(75),
+           AW_EffectHarmful(7),AW_EffectHarmful(8));
+    ok=AW_EffectsLand(&p,AW_EFFECT_LIGHT,AW_EFFECT_NO_ARG,20,30,7);
+    ok+=AW_EffectsLand(&p,AW_EFFECT_LEVITATE,AW_EFFECT_NO_ARG,10,15,8);
+    ok+=AW_EffectsLand(&npc,AW_EFFECT_FIRE_DAMAGE,AW_EFFECT_NO_ARG,5,4,9);
+    ok+=AW_EffectsLand(&npc,AW_EFFECT_FROST_DAMAGE,AW_EFFECT_NO_ARG,12,0,9);       /* no duration: at once */
+    ok+=AW_EffectsLand(&npc,17,2,10,6,9);                                          /* Drain Intelligence (attribute 2) */
+    ok+=AW_EffectsLand(&npc,17,AW_EFFECT_NO_ARG,10,6,9);                           /* refused: no attribute */
+    ok+=AW_EffectsLand(&other,AW_EFFECT_SHIELD,AW_EFFECT_NO_ARG,15,10,3);
+    printf("landed %d count %d %d %d %d\n",ok,AW_EffectsCount(),AW_EffectsCountOn(AW_ACTOR_PLAYER_REF),AW_EffectsCountOn(0x1234),
+           AW_EffectsCountOn(0x99));
+    printf("npc %.1f %d light %.1f lev %.1f has %d %d %d\n",npc.dyn_cur[0],npc.attr_mod[2],
+           AW_EffectsMagnitude(AW_ACTOR_PLAYER_REF,AW_EFFECT_LIGHT,AW_EFFECT_NO_ARG),
+           AW_EffectsMagnitude(AW_ACTOR_PLAYER_REF,AW_EFFECT_LEVITATE,AW_EFFECT_NO_ARG),
+           AW_EffectsHas(AW_EFFECT_LIGHT),AW_EffectsHasOn(0x1234,AW_EFFECT_FIRE_DAMAGE),AW_EffectsHas(AW_EFFECT_FIRE_DAMAGE));
+    n=AW_EffectsOwners(owners,8);
+    printf("owners %d %x %x\n",n,(unsigned)owners[0],(unsigned)owners[1]);
+    for(i=0;i<5;i++){AW_EffectsTick(&npc,1.0f);AW_EffectsTick(&p,1.0f);}           /* "other" is not loaded: it does not tick */
+    printf("after5 npc %.1f %d count %d other %d\n",npc.dyn_cur[0],npc.attr_mod[2],AW_EffectsCount(),AW_EffectsCountOn(0x99));
+    n=AW_EffectsExport(block,sizeof(block));ok=AW_EffectsImport(block,n);
+    printf("saved %d %d %d %.1f\n",n,ok,AW_EffectsCount(),AW_EffectsMagnitude(0x99,AW_EFFECT_SHIELD,AW_EFFECT_NO_ARG));
+    n=AW_EffectsForget(0x99);printf("forget %d %d\n",n,AW_EffectsCount());
+    for(i=0;i<40;i++)AW_EffectsLand(&npc,AW_EFFECT_SHIELD,AW_EFFECT_NO_ARG,1,60,3);
+    printf("npcfull %d %d %lu\n",AW_EffectsCount(),AW_EffectsCountOn(0x1234),AW_EffectsRefused());
+    ok=AW_EffectsImport(v1,sizeof(v1));
+    {aw_effect_info_t e;int got=AW_EffectsAt(0,&e);
+     printf("v1 %d %d %d %d %x %.1f %.1f\n",ok,AW_EffectsCount(),got,e.effect,(unsigned)e.owner,e.magnitude,e.left);}
+    return 0;
+}
+'''
+
+
+# RESIST-NORMAL-WEAPONS-61: the combat layer reads Resist Normal Weapons (98) and Weakness to Normal Weapons (36) as
+# the summed magnitude on the actor now (aw_mwhost.c effect_magnitude_of); two sources add, one ending takes its part.
+EFFECT_RESIST_HARNESS = r'''
+#include <stdio.h>
+#include <string.h>
+#include "aw_effects.h"
+int main(void){
+    static aw_actor_t npc;int i;
+    memset(&npc,0,sizeof(npc));npc.reference=0x42;npc.dyn_base[0]=npc.dyn_cur[0]=60;
+    AW_EffectsReset();
+    AW_EffectsLand(&npc,98,AW_EFFECT_NO_ARG,25,10,1);
+    AW_EffectsLand(&npc,98,AW_EFFECT_NO_ARG,15,3,2);
+    AW_EffectsLand(&npc,36,AW_EFFECT_NO_ARG,20,5,3);
+    printf("now %.1f %.1f %.1f\n",AW_EffectsMagnitude(0x42,98,AW_EFFECT_NO_ARG),AW_EffectsMagnitude(0x42,36,AW_EFFECT_NO_ARG),
+           AW_EffectsMagnitude(0x43,98,AW_EFFECT_NO_ARG));
+    for(i=0;i<4;i++)AW_EffectsTick(&npc,1.0f);
+    printf("after4 %.1f %.1f health %.1f\n",AW_EffectsMagnitude(0x42,98,AW_EFFECT_NO_ARG),
+           AW_EffectsMagnitude(0x42,36,AW_EFFECT_NO_ARG),npc.dyn_cur[0]);
+    {   /* a creature: Fortify Skill (83, Long Blade 5) changes nothing, Fortify Attribute (79, Strength) does */
+        static aw_actor_t c;
+        memset(&c,0,sizeof(c));c.reference=0x77;c.kind=1;
+        AW_EffectsLand(&c,83,5,10,5,4);AW_EffectsLand(&c,79,0,10,5,4);
+        printf("creature %d %d\n",c.skill_mod[5],c.attr_mod[0]);
+        for(i=0;i<6;i++)AW_EffectsTick(&c,1.0f);
+        printf("creature after %d %d\n",c.skill_mod[5],c.attr_mod[0]);
+    }
+    return 0;
+}
+'''
+
+
+CAST_RULES_HARNESS = r'''
+#include <stdio.h>
+#include <string.h>
+#include "aw_cast.h"
+int main(void){
+    aw_spell_effect_t e[2];aw_mgef_t m[2];float skill[27];int school,i;float base,ft;
+    memset(e,0,sizeof(e));memset(m,0,sizeof(m));
+    for(i=0;i<27;i++)skill[i]=5;
+    skill[10]=30;skill[11]=20;                         /* Destruction 30, Alteration 20 */
+    e[0].effect=14;e[0].range=AW_RANGE_TOUCH;e[0].duration=1;e[0].magnitude_min=2;e[0].magnitude_max=8;
+    m[0].base_cost=5;m[0].school=2;                    /* Fire Damage, destruction */
+    e[1].effect=41;e[1].range=AW_RANGE_SELF;e[1].duration=20;e[1].magnitude_min=10;e[1].magnitude_max=10;
+    m[1].base_cost=1;m[1].school=0;                    /* Light, alteration */
+    base=AW_CastBaseChance(e,m,2,skill,50,40,12,0.5f,&school);
+    ft=AW_CastFatigueTerm(1.25f,0.5f,50,100);
+    printf("base %.2f school %d ft %.2f\n",base,school,ft);
+    printf("chance %.2f %.2f %.2f %.2f %.2f %.2f\n",AW_CastChance(base,0,0,0,0,5,ft,100,12,1),
+           AW_CastChance(base,0,0,0,0,5,ft,10,12,1),AW_CastChance(base,0,0,1,0,0,ft,100,12,1),
+           AW_CastChance(base,5,1,0,0,0,ft,0,12,1),AW_CastChance(base,5,0,0,0,0,ft,0,12,1),
+           AW_CastChance(base,0,0,0,3,0,ft,100,12,1));
+    printf("cap %.2f %.2f ft0 %.2f\n",AW_CastChance(500,0,0,0,0,0,1,100,1,1),AW_CastChance(-20,0,0,0,0,0,1,100,1,1),
+           AW_CastFatigueTerm(1.25f,0.5f,0,0));
+    printf("mag %.0f %.0f %.0f %.0f\n",AW_CastMagnitude(2,8,0),AW_CastMagnitude(2,8,0.999f),AW_CastMagnitude(2,8,0.5f),
+           AW_CastMagnitude(5,3,0.7f));
+    printf("schools %d %d ranges %d dur %.0f\n",AW_CastSchoolSkill(2),AW_CastSchoolSkill(5),AW_CastRanges(e,2),
+           AW_CastDuration(&e[0],&m[0]));
+    m[0].flags=AW_MGEF_NO_DURATION;
+    printf("nodur %.0f\n",AW_CastDuration(&e[0],&m[0]));
+    return 0;
+}
+'''
+
+
+@unittest.skipIf(os.name == 'nt', 'native fixtures run in the Linux Docker gate')
+@unittest.skipUnless(shutil.which('cc'), 'a Linux C compiler is required')
+class CastRuleTests(unittest.TestCase):
+    """v0.0.61 (PLAYER-CASTING-59): the casting chance by OpenMW 0.51's rules (spellutil.cpp), natively."""
+
+    def test_chance_fatigue_magnitude(self):
+        tmp = Path(tempfile.mkdtemp(prefix='aw-cast-'))
+        try:
+            (tmp / 'h.c').write_text(CAST_RULES_HARNESS, encoding='utf-8')
+            src = ROOT / 'engine/aga/src'
+            built = subprocess.run(['cc', '-std=gnu89', '-Wall', '-Werror', '-Wshadow', '-fsanitize=undefined,address',
+                                    '-fno-sanitize-recover=all', '-I' + str(src), str(tmp / 'h.c'),
+                                    str(src / 'aw_cast_rules.c'), str(src / 'aw_effects.c'), '-lm', '-o', str(tmp / 'h')],
+                                   capture_output=True, text=True)
+            self.assertEqual(built.returncode, 0, built.stdout + built.stderr)
+            out = subprocess.run([str(tmp / 'h')], capture_output=True, text=True, check=True).stdout.splitlines()
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+        # Fire Damage on touch: term 1 x 0.5 x 5 x 0.5 = 1.25 against 2 x 30; Light on self: 20 x 0.1 x 10 x 0.5 = 10
+        # against 2 x 20 = 40, the lower: skill 40 (alteration); 40 - 12 + 0.2 x 50 + 0.1 x 40 = 42; fatigue at half
+        # 1.25 - 0.5 x 0.5 = 1.0; Sound 5 takes 5; too little magicka, a used power or Silence give 0
+        self.assertEqual(out, ['base 42.00 school 0 ft 1.00',
+                               'chance 37.00 0.00 100.00 100.00 0.00 0.00',
+                               'cap 100.00 0.00 ft0 1.25',
+                               'mag 2 8 5 5',
+                               'schools 10 15 ranges 3 dur 1',
+                               'nodur 1'])
 
 
 @unittest.skipIf(os.name == 'nt', 'native fixtures run in the Linux Docker gate')
@@ -1165,8 +1330,51 @@ class EffectTests(unittest.TestCase):
             shutil.rmtree(tmp, ignore_errors=True)
         # Fortify Strength +10 and Fortify Health +20 at once, Drain Magicka -15; Damage Health 2 a second for 3 s;
         # after 6 s the Fortify Strength and the Drain have ended and are undone, the Fortify Health still holds
-        self.assertEqual(out, ['start 10 70.0 70.0 25.0 40.0', 'has 1 1 1 0', 'after6 0 64.0 70.0 40.0 1', 'saved 16 1 1',
-                               'restore 70.0', 'end 50.0 50.0 0', 'full 16 4', 'bad 0 0'])
+        # v0.0.61: the save block is version 2 (16 bytes an effect); the player holds up to 32 of the 64 entries
+        self.assertEqual(out, ['start 10 70.0 70.0 25.0 40.0', 'has 1 1 1 0', 'after6 0 64.0 70.0 40.0 1', 'saved 22 1 1',
+                               'restore 70.0', 'end 50.0 50.0 0', 'full 32 8', 'bad 0 0'])
+
+    def test_weapon_resistance_magnitudes(self):
+        tmp = Path(tempfile.mkdtemp(prefix='aw-effects3-'))
+        try:
+            (tmp / 'h.c').write_text(EFFECT_RESIST_HARNESS, encoding='utf-8')
+            src = ROOT / 'engine/aga/src'
+            built = subprocess.run(['cc', '-std=gnu89', '-Wall', '-Werror', '-Wshadow', '-fsanitize=undefined,address',
+                                    '-fno-sanitize-recover=all', '-I' + str(src), str(tmp / 'h.c'),
+                                    str(src / 'aw_effects.c'), '-o', str(tmp / 'h')], capture_output=True, text=True)
+            self.assertEqual(built.returncode, 0, built.stdout + built.stderr)
+            out = subprocess.run([str(tmp / 'h')], capture_output=True, text=True, check=True).stdout.splitlines()
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+        # 25 + 15 while both last; the 3-second one ends; the weakness holds 5 s; neither touches health
+        # a creature has no skills: Fortify Skill on it changes nothing, nor undoes anything at its end
+        self.assertEqual(out, ['now 40.0 20.0 0.0', 'after4 25.0 20.0 health 60.0', 'creature 0 10', 'creature after 0 0'])
+
+    def test_any_effect_on_any_actor(self):
+        tmp = Path(tempfile.mkdtemp(prefix='aw-effects2-'))
+        try:
+            (tmp / 'h.c').write_text(EFFECT_ACTORS_HARNESS, encoding='utf-8')
+            src = ROOT / 'engine/aga/src'
+            built = subprocess.run(['cc', '-std=gnu89', '-Wall', '-Werror', '-Wshadow', '-fsanitize=undefined,address',
+                                    '-fno-sanitize-recover=all', '-I' + str(src), str(tmp / 'h.c'),
+                                    str(src / 'aw_effects.c'), '-o', str(tmp / 'h')], capture_output=True, text=True)
+            self.assertEqual(built.returncode, 0, built.stdout + built.stderr)
+            out = subprocess.run([str(tmp / 'h')], capture_output=True, text=True, check=True).stdout.splitlines()
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+        # Fire Damage 5 a second for 4 s and Frost Damage 12 at once on the NPC (40 -> 28, then -20 over 4 s);
+        # Drain Intelligence 10 for 6 s holds past 5 s; Light and Levitate add their magnitudes on the player and end
+        # at 30 and 15 s; the Shield on an actor whose record is not loaded does not tick and survives the save
+        # harmful: Fire Damage, Absorb Health, Burden yes; Light, Restore Health, Feather no
+        self.assertEqual(out, ['kinds 1 1 -1 0 4', 'persec 1 0 0 1', 'harmful 1 1 0 0 1 0',
+                               'landed 6 count 5 2 2 1',
+                               'npc 28.0 -10 light 20.0 lev 10.0 has 1 1 0',
+                               'owners 2 1234 99',
+                               'after5 npc 8.0 -10 count 4 other 1',
+                               'saved 70 1 4 15.0',
+                               'forget 1 3',
+                               'npcfull 34 32 9',
+                               'v1 1 1 1 79 ffffffff 10.0 5.0'])
 
 
 class BuilderStageTests(unittest.TestCase):

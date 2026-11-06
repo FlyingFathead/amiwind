@@ -39,7 +39,7 @@ void AW_CStripInit(void){
     aw_cstrip_mouse=AW_CStripMouse;aw_cstrip_key=AW_CStripKey;aw_cstrip_draw=AW_CStripDraw;aw_cstrip_open_now=AW_CStripActive;
 }
 static void strip_close(void){
-    if(strip){free(strip);strip=NULL;}
+    if(strip){free(strip->list.row[0]);free(strip->list.row[1]);free(strip);strip=NULL;}
     AW_ContainerRelease();      /* CONTAINER-STRIP-TAKE-STALL-59 */
     strip_dirty=STRIP_DIRTY_FRAMES;   /* the frames after it closed show the view without it */
     IN_AWClearButtons();
@@ -54,10 +54,13 @@ static const aw_cstrip_entry_t *strip_known(const aw_cstrip_list_t *old,const ch
 /* the two sides from the container's contents now (data + deltas) and the player's items; names already known are
  * kept, so a take or a put reads only the contents again, never every item's catalogue row */
 static void strip_fill(void){
-    aw_container_item_t items[AW_CONTAINER_ITEMS];aw_inventory_item_t item;aw_cstrip_list_t *l=&strip->list,*old;
-    const aw_cstrip_entry_t *known;int n,i,k;
-    old=(aw_cstrip_list_t *)AW_TryMalloc(sizeof(*old));
-    if(old)memcpy(old,l,sizeof(*old));
+    aw_container_item_t items[AW_CONTAINER_ITEMS];aw_inventory_item_t item;aw_cstrip_list_t *l=&strip->list,oldl,*old=&oldl;
+    const aw_cstrip_entry_t *known;int n,i,k,kinds=AW_ItemCount(&aw_state);aw_cstrip_entry_t *side[2];
+    /* new arrays for both sides (the inventory side as long as the kinds carried); the old ones lend their names */
+    side[0]=(aw_cstrip_entry_t *)AW_TryMalloc(sizeof(aw_cstrip_entry_t)*AW_CSTRIP_ROWS);
+    side[1]=(aw_cstrip_entry_t *)AW_TryMalloc(sizeof(aw_cstrip_entry_t)*(kinds>0?kinds:1));
+    if(!side[0] || !side[1]){free(side[0]);free(side[1]);return;}   /* the lists stay as they were */
+    oldl=*l;l->row[0]=side[0];l->row[1]=side[1];l->cap[0]=AW_CSTRIP_ROWS;l->cap[1]=kinds;
     AW_InventoryBatchBegin();   /* the names below share one open of the item file (TRADEHOUSE-LONG-FRAME-59) */
     n=AW_ContainerContents(strip->reference,items,AW_CONTAINER_ITEMS,NULL);
     for(i=k=0;i<n && k<AW_CSTRIP_ROWS;i++){
@@ -71,9 +74,11 @@ static void strip_fill(void){
         e->count=items[i].count;k++;
     }
     l->count[AW_CSTRIP_CONTAINER]=k;
-    for(i=k=0;i<aw_state.count[AW_ITEM] && k<AW_CSTRIP_ROWS;i++){
-        const aw_value_t *v=&aw_state.values[AW_ITEM][i];aw_cstrip_entry_t *e=&l->row[AW_CSTRIP_INVENTORY][k];
+    for(i=k=0;i<kinds && k<kinds;i++){
+        aw_value_t vrow;const aw_value_t *v=&vrow;aw_cstrip_entry_t *e=&l->row[AW_CSTRIP_INVENTORY][k];
+        vrow.value=AW_ITEM_ROW(&aw_state,i)->value;
         if(v->value<=0)continue;
+        strcpy(vrow.id,AW_ITEM_ID(&aw_state,i));
         if((known=strip_known(old,v->id))!=NULL){
             Q_strcpy_bounded(e->id,known->id,sizeof(e->id));Q_strcpy_bounded(e->name,known->name,sizeof(e->name));
         }else if(AW_InventoryRead(v->id,&item)){
@@ -83,7 +88,7 @@ static void strip_fill(void){
     }
     l->count[AW_CSTRIP_INVENTORY]=k;
     AW_InventoryBatchEnd();
-    if(old)free(old);
+    free(oldl.row[0]);free(oldl.row[1]);
     AW_CStripClamp(l);
 }
 /* the hook E reaches (aw_inventory.c container_open): an unlocked container that opens */
@@ -122,17 +127,18 @@ static void layout(int *top,int *left,int *columns){
 /* HOW: 0 one, 1 the stack, 2 everything in the container */
 static void strip_act(int how){
     aw_cstrip_list_t *l=&strip->list;const aw_cstrip_entry_t *e=AW_CStripSelected(l);const char *why="";
-    char line[96];int moved=0,i;
+    char line[96];int moved=0,i,refused=-1;
     strip_dirty=STRIP_DIRTY_FRAMES;
     if(how==2){
         if(l->side!=AW_CSTRIP_CONTAINER)return;
         for(i=0;i<l->count[AW_CSTRIP_CONTAINER];i++){
             const aw_cstrip_entry_t *t=&l->row[AW_CSTRIP_CONTAINER][i];
             int n=AW_ContainerTake(strip->reference,t->id,t->count,strip->owned,&why);
-            if(!n && !strcmp(why,"capacity"))break;
+            if(!n && !strcmp(why,"capacity")){refused=i;break;}
             moved+=n;
         }
-        if(!strcmp(why,"capacity"))AW_UISubtitle(strip->title,"Cannot collect: inventory capacity.",3);
+        if(refused>=0)AW_InventoryRefused(strip->title,l->row[AW_CSTRIP_CONTAINER][refused].id,
+                                          l->row[AW_CSTRIP_CONTAINER][refused].count);
         if(moved){
             Q_snprintf(line,sizeof(line),"%s: %d taken%s",strip->title,moved,strip->owned?" (stolen)":"");
             AW_UIPickupNotice(line,3);
@@ -143,7 +149,7 @@ static void strip_act(int how){
     if(l->side==AW_CSTRIP_CONTAINER){
         moved=AW_ContainerTake(strip->reference,e->id,how?e->count:1,strip->owned,&why);
         if(moved){Q_snprintf(line,sizeof(line),"%s%s%s",e->name,moved>1?va(" x %d",moved):"",strip->owned?" (stolen)":"");AW_UIPickupNotice(line,3);}
-        else if(!strcmp(why,"capacity"))AW_UISubtitle(strip->title,"Cannot collect: inventory capacity.",3);
+        else if(!strcmp(why,"capacity"))AW_InventoryRefused(strip->title,e->id,how?e->count:1);
     }else{
         moved=AW_ContainerPut(strip->reference,e->id,how?e->count:1,&why);
         if(!moved)AW_UISubtitle(strip->title,"Cannot put it here.",3);

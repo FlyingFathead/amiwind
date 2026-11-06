@@ -1482,6 +1482,134 @@ def door_detail_tiles(references, settings, height, heights, low, high, step):
     return tiles
 
 
+FIXUP_HEIGHT_TOLERANCE = 0.5    # a listed fix-up vertex height must be the original LAND height there (else refused)
+FIXUP_CHECK_GRID = 8.0          # the default spacing of the fix-up box check
+FIXUP_CHECK_TOLERANCE = 4.0     # the default: the checked box lies within this of the original surface
+
+
+def terrain_fixups(settings, low, high):
+    """The town config's hand-listed ground fix-ups ('terrain_fixups', docs/TOWN_IMPORT.md), checked, or None:
+    {'bug': ID, 'vertices': [(x, y, z)], 'check': {'box': ((x0, y0), (x1, y1)), 'grid': g, 'tolerance': t} or None}.
+    Every point lies inside the frame's ground box [LOW, HIGH) (frame-local units); each height is the original
+    LAND height at its point (apply_terrain_fixups refuses one that is not)."""
+    rows = settings.get('terrain_fixups')
+    if rows is None:
+        return None
+
+    def number(v):
+        return isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v)
+
+    def inside(p):
+        return low[0] <= p[0] < high[0] and low[1] <= p[1] < high[1]
+
+    if not isinstance(rows, dict) or not isinstance(rows.get('bug'), str) or not rows['bug'].strip():
+        raise ValueError('terrain_fixups must be an object naming its bug')
+    vertices = rows.get('vertices')
+    if not isinstance(vertices, list) or not vertices:
+        raise ValueError('terrain_fixups.vertices must be a list of [x, y, height]')
+    seen, out = set(), []
+    for row in vertices:
+        if not isinstance(row, list) or len(row) != 3 or not all(number(v) for v in row) or not inside(row):
+            raise ValueError('A terrain fix-up vertex must be [x, y, height] inside the frame ground: %s' % (row,))
+        if (row[0], row[1]) in seen:
+            raise ValueError('Duplicate terrain fix-up vertex: %s' % (row,))
+        seen.add((row[0], row[1]))
+        out.append(tuple(float(v) for v in row))
+    check = rows.get('check')
+    if check is not None:
+        box = check.get('box') if isinstance(check, dict) else None
+        if (not isinstance(box, list) or len(box) != 2
+                or any(not isinstance(p, list) or len(p) != 2 or not all(number(v) for v in p) for p in box)
+                or not (inside(box[0]) and inside(box[1])) or not (box[0][0] < box[1][0] and box[0][1] < box[1][1])):
+            raise ValueError('terrain_fixups.check.box must be [[x0, y0], [x1, y1]] inside the frame ground')
+        grid, tol = check.get('grid', FIXUP_CHECK_GRID), check.get('tolerance', FIXUP_CHECK_TOLERANCE)
+        if not number(grid) or grid <= 0 or not number(tol) or tol < 0:
+            raise ValueError('terrain_fixups.check needs a positive grid and a tolerance of 0 or more')
+        check = {'box': ((float(box[0][0]), float(box[0][1])), (float(box[1][0]), float(box[1][1]))),
+                 'grid': float(grid), 'tolerance': float(tol)}
+    return {'bug': rows['bug'], 'vertices': out, 'check': check}
+
+
+def insert_ground_vertex(ground, point):
+    """GROUND (chim.ground.TriangleGround) with a vertex at POINT (x, y, z): every triangle holding the point in
+    plan (inside it, or on an edge: both triangles of the edge) is split around it, every other triangle stays;
+    (new ground, number of triangles split). The ground stays closed: a vertex on an edge splits both sides alike."""
+    from chim.ground import TriangleGround, _bary
+    x, y, z = point
+    tris, split = [], 0
+    for key in sorted(ground.tiles):
+        for tri, m in ground.tiles[key]:
+            if min(_bary(tri, x, y)) < -1e-8:
+                tris.append((tri, m))
+                continue
+            split += 1
+            for k in range(3):
+                a, b = tri[k], tri[(k + 1) % 3]
+                if (b[0] - a[0]) * (y - a[1]) - (b[1] - a[1]) * (x - a[0]) > 1e-8:
+                    tris.append(([a, b, (float(x), float(y), float(z))], m))
+    out = TriangleGround(tris, ground.step, ground.low, ground.size)
+    out.refined = set(getattr(ground, 'refined', ()))
+    return out, split
+
+
+def original_surface(height, x, y, grid_origin=(0., 0.)):
+    """The original LAND surface at (x, y), frame-local, as the game draws its 32-unit quads: the four samples around
+    the point (height(x, y): the sample height) with the game's parity diagonals (even global parity 0-2, odd 1-3,
+    as terrain_triangles lays a full-detail tile); GRID_ORIGIN translates frame-local points to the global grid."""
+    gx, gy = x + grid_origin[0], y + grid_origin[1]
+    ix, iy = math.floor(gx / 32), math.floor(gy / 32)
+    fx, fy = gx / 32 - ix, gy / 32 - iy
+    bx, by = ix * 32 - grid_origin[0], iy * 32 - grid_origin[1]
+    a, b, c, d = (height(bx, by), height(bx + 32, by), height(bx + 32, by + 32), height(bx, by + 32))
+    if (ix + iy) % 2 == 0:
+        return a + (b - a) * fx + (c - b) * fy if fx >= fy else a + (c - d) * fx + (d - a) * fy
+    return (a + (b - a) * fx + (d - a) * fy) if fx + fy <= 1 else (c + (d - c) * (1 - fx) + (b - c) * (1 - fy))
+
+
+def ground_check_failures(ground, height, check, grid_origin=(0., 0.)):
+    """The points of CHECK's box (every CHECK grid units from its low corner, both ends in) where GROUND
+    (TriangleGround) lies further than CHECK's tolerance from the original surface (original_surface over HEIGHT):
+    ['(x, y): ground G, original H'], empty when the box passes."""
+    (x0, y0), (x1, y1) = check['box']
+    g, tol = check['grid'], check['tolerance']
+    failures = []
+    for j in range(int(math.floor((y1 - y0) / g + 1e-9)) + 1):
+        for i in range(int(math.floor((x1 - x0) / g + 1e-9)) + 1):
+            x, y = x0 + i * g, y0 + j * g
+            z, h = ground.height(x, y), original_surface(height, x, y, grid_origin)
+            if abs(z - h) > tol + 1e-6:
+                failures.append('(%g, %g): ground %.2f, original %.2f' % (x, y, z, h))
+    return failures
+
+
+def apply_terrain_fixups(ground, fixups, height, grid_origin=(0., 0.)):
+    """GROUND with FIXUPS' vertices (terrain_fixups) inserted at the original height (height(x, y), frame-local; a
+    listed height further than FIXUP_HEIGHT_TOLERANCE from it is refused: the list drifted from the data), then the
+    box check (ground_check_failures; a failure refuses the frame): (new ground, record for the source section)."""
+    added = 0
+    for x, y, z in fixups['vertices']:
+        original = height(x, y)
+        if abs(original - z) > FIXUP_HEIGHT_TOLERANCE:
+            raise ValueError('Terrain fix-up vertex (%g, %g) lists height %g but the original LAND there is %.2f (%s)'
+                             % (x, y, z, original, fixups['bug']))
+        before = sum(len(rows) for rows in ground.tiles.values())
+        ground, split = insert_ground_vertex(ground, (x, y, original))
+        if not split:
+            raise ValueError('Terrain fix-up vertex (%g, %g) lies in no ground triangle (%s)' % (x, y, fixups['bug']))
+        added += sum(len(rows) for rows in ground.tiles.values()) - before
+    report = 'no box check'
+    if fixups['check']:
+        failures = ground_check_failures(ground, height, fixups['check'], grid_origin)
+        if failures:
+            raise ValueError('%s: the frame ground misses the original surface by more than %g at %d points of the '
+                             'checked box: %s' % (fixups['bug'], fixups['check']['tolerance'], len(failures),
+                                                  '; '.join(failures[:5])))
+        (x0, y0), (x1, y1) = fixups['check']['box']
+        report = ('box check passed: (%g, %g)-(%g, %g) every %g units within %g of the original surface'
+                  % (x0, y0, x1, y1, fixups['check']['grid'], fixups['check']['tolerance']))
+    return ground, {'vertices': len(fixups['vertices']), 'triangles_added': added, 'check': report}
+
+
 def resident_detail_tiles(work, settings, height, low, high, step, references=None):
     """{(x, y)}: low corners of the frame's terrain tiles that keep the original LAND samples because a
     resident of this town stands on the ground there (CHIM-VIVEC-FRAME-WIDE-41).
@@ -1921,6 +2049,21 @@ def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings
                       if mode == 'on' or pools or detail else None)
         if tri_ground is not None and not tri_ground.refined:
             tri_ground = None          # no shoreline tile: the plain grid is the same ground (frame unchanged)
+        # Hand-listed ground vertices at the original height (the town config's terrain_fixups,
+        # BALMORA-GROUND-DENTS-51): a long coarse triangle of the bank beside Balmora's canal wall sags under the
+        # original ground between its samples; each listed vertex splits only the triangles it lies in (two more
+        # per vertex), and the listed box is checked against the original surface afterwards (a miss refuses the frame).
+        fixups = terrain_fixups(settings, low, high)
+        if fixups:
+            if tri_ground is None:
+                tri_ground = shoreline_ground(lambda x, y: terrain_at(grids, settings, x, y), materials, low, high,
+                                              step, frame_liquids(pools, centre), shoreline=mode == 'on',
+                                              grid_origin=tuple(v*SCALE for v in centre), detail=detail)
+            tri_ground, fixup_record = apply_terrain_fixups(
+                tri_ground, fixups, lambda x, y: terrain_at(grids, settings, x, y)[0], tuple(v*SCALE for v in centre))
+            print('[chim] %s: %d ground vertices at the original height (%s), %d triangles more; %s'
+                  % (town, fixup_record['vertices'], fixups['bug'], fixup_record['triangles_added'],
+                     fixup_record['check']), flush=True)
         height_at = None
         if terrain_refs_on(settings_override):
             # terrain references: heights one tile past the ground too (the ring of an edge chunk's hull)
@@ -1964,6 +2107,8 @@ def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings
                    'terrain_refined_tiles': len(tri_ground.refined)} if tri_ground is not None else {}),
                # lava pools carved into the chunks as Quake liquid (docs/LAVA.md), by source cell
                'lava': lava_section(pools), 'terrain_liquids': frame_liquids(pools, centre), 'lava_depth': 8.0}
+    if fixups:
+        section['terrain_fixups'] = dict(fixup_record, bug=fixups['bug'])
     if ocean_source is not None:
         section['ocean_runtime'] = ocean_source
     if support.report['used']:

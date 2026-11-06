@@ -354,7 +354,7 @@ int main(int argc,char **argv)
     {aw_inventory_item_t item;uint32_t keys[40];int32_t before;
      memset(&item,0,sizeof(item));strcpy(item.id,"misc_com_bottle_01");strcpy(item.model,"progs/items/x.mdl");
      item.flags=AW_INV_DROP;
-     memset(&inv,0,sizeof(inv));AW_LedgerClear(&list);
+     AW_ItemsFree(&inv);memset(&inv,0,sizeof(inv));AW_LedgerClear(&list);
      assert(AW_ItemAdd(&inv,item.id,45));
      for(i=0;i<40;i++){
          float at[3];at[0]=(float)i*16;at[1]=-74000;at[2]=120;
@@ -376,12 +376,12 @@ int main(int argc,char **argv)
      /* condition: the last one, worn, dropped and taken back */
      {aw_inventory_item_t blade=item;float at[3]={5,5,5};uint32_t k;int idx;
       strcpy(blade.id,"iron dagger");assert(AW_ItemAdd(&inv,blade.id,1));
-      for(idx=0;strcmp(inv.values[AW_ITEM][idx].id,"iron dagger");idx++);
-      inv.inventory.condition_known|=1U<<idx;inv.inventory.condition[idx]=0.5f;
+      idx=AW_ItemIndex(&inv,"iron dagger");assert(idx>=0);
+      AW_ItemMark(&inv,idx,AW_ITEM_CONDITION,0.5f);
       k=AW_LedgerDrop(&inv,&list,&blade,1,AW_AT_ROOM,203,at,10);assert(k);
       r=&list.row[AW_LedgerFind(&list,k)];
-      assert((r->fields&AW_LEDGER_CONDITION) && r->extra->condition==0.5f && !(inv.inventory.condition_known&(1U<<idx)));
-      assert(AW_LedgerPickup(&inv,&list,k) && (inv.inventory.condition_known&(1U<<idx)) && inv.inventory.condition[idx]==0.5f);}
+      assert((r->fields&AW_LEDGER_CONDITION) && r->extra->condition==0.5f && !AW_ITEM_HAS(&inv,idx,AW_ITEM_CONDITION));
+      assert(AW_LedgerPickup(&inv,&list,k) && AW_ITEM_HAS(&inv,idx,AW_ITEM_CONDITION) && AW_ITEM_ROW(&inv,idx)->condition==0.5f);}
      /* an older save's drops (keyed by the map's name) */
      memset(&inv.inventory.dropped,0,sizeof(inv.inventory.dropped));
      strcpy(inv.inventory.dropped[0].id,"gold_001");strcpy(inv.inventory.dropped[0].scene,"seyda");
@@ -435,7 +435,7 @@ int main(int argc,char **argv)
      n=save_trip(&s);assert(!got.count && got.stolen_count==4 && AW_LedgerStolenCount(&got,"misc_quill","fargoth",0)==3);
      /* the mark goes with the item: dropped (a row of the list), saved, picked up, the pairs never change */
      memset(&q,0,sizeof(q));strcpy(q.id,"misc_quill");strcpy(q.model,"progs/items/x.mdl");q.flags=AW_INV_DROP;
-     memset(&inv,0,sizeof(inv));assert(AW_ItemAdd(&inv,q.id,3));
+     AW_ItemsFree(&inv);memset(&inv,0,sizeof(inv));assert(AW_ItemAdd(&inv,q.id,3));
      key=AW_LedgerDrop(&inv,&s,&q,1,AW_AT_CELL,cell(-2,-9),at,0);assert(key && s.count==1);
      save_trip(&s);assert(got.count==1 && AW_LedgerStolenCount(&got,"misc_quill","fargoth",0)==3);
      assert(AW_LedgerPickup(&inv,&s,key) && !s.count && AW_LedgerStolenCount(&s,"misc_quill",NULL,0)==5);

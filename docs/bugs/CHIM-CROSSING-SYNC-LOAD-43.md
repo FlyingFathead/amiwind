@@ -19,7 +19,7 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.45 (19 October 2026)._
+_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -120,7 +120,7 @@ that survive a map change (the 16 MiB machine) nothing of this runs.
 
 ## Verification
 
-18 October 2026, FS-UAE (68040 JIT, two sessions in parallel, busy host: compare within the table, not with other
+18 October 2026, FS-UAE (68040 JIT, two sessions in parallel, loaded machine: compare within the table, not with other
 days), the dev2 image as built (A) against the dev2 data with this engine, prefetch off (B) and on (C); the same
 scripted runs: the open-world route (Seyda Neen, heading 30 degrees, 180 s), a square around the corner of cells 2,-7,
 3,-7, 2,-6 and 3,-6 (four laps of 12 s), one heavy crossing (cell 10,0, 5.1 MB of frame files, into 11,0, 4.9 MB) and one

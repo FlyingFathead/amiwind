@@ -31,13 +31,19 @@ static void save_roundtrip(void)
     strcpy(aw_parts[0].id,"head");strcpy(aw_parts[1].id,"hair");aw_parts[1].kind=1;
     assert(AW_StateSet(&state,AW_GLOBAL,"chargenstate",-1));saved.state=state;
     n=AW_SaveEncode(bytes,sizeof(bytes),&saved);assert(n>0);assert(AW_SaveDecode(bytes,n,&loaded));
-    memset(&state,0,sizeof(state));state=loaded.state;assert(!memcmp(&state,&saved.state,sizeof(state)));
+    /* the decoded save owns its item table (aw_state.h OWNERSHIP): the rows compared one by one, the rest bytewise */
+    {aw_state_t a=loaded.state,b=saved.state;int k;
+     assert(a.items.count==b.items.count);
+     for(k=0;k<a.items.count;k++)assert(!strcmp(AW_ITEM_ID(&a,k),AW_ITEM_ID(&b,k)) && AW_ITEM_ROW(&a,k)->value==AW_ITEM_ROW(&b,k)->value);
+     memset(&a.items,0,sizeof(a.items));memset(&b.items,0,sizeof(b.items));assert(!memcmp(&a,&b,sizeof(a)));}
+    /* the decoded facts become the state, its rows (just compared equal) stay the state's own table */
+    {aw_items_t keep=state.items;state=loaded.state;AW_ItemsFree(&state);state.items=keep;}
 }
 int main(int argc,char **argv)
 {
     int i,found=0,a,b,result;char id[64];FILE *f;
     fixture();assert(AW_HarvestPrepare(&h,0,&state,1,123)==1);
-    assert(!state.count[AW_ITEM] && !AW_HarvestHidden(&h,0,&state));
+    assert(!AW_ItemCount(&state) && !AW_HarvestHidden(&h,0,&state));
     before=state;assert(AW_HarvestPrepare(&h,0,&state,999,999)==1 && !memcmp(&state,&before,sizeof(state)));
     assert(AW_HarvestTake(&h,0,&state,999,999)==1); /* encounter level/roll retained */
     assert(AW_StateGet(&state,AW_ITEM,"ingredient_a")==2);assert(AW_HarvestHidden(&h,0,&state));
@@ -49,11 +55,11 @@ int main(int argc,char **argv)
     HSTR(h.plant[0].key)[5]='b';assert(!AW_HarvestHidden(&h,0,&state));
     fixture();assert(AW_HarvestTake(&h,0,&state,2,123)==1);assert(AW_StateGet(&state,AW_ITEM,"ingredient_b")==2);
     fixture();h.node[0].chance=100;assert(AW_HarvestTake(&h,0,&state,2,123)==2);
-    assert(!state.count[AW_ITEM] && AW_HarvestHidden(&h,0,&state));
+    assert(!AW_ItemCount(&state) && AW_HarvestHidden(&h,0,&state));
     assert(AW_StateGet(&state,AW_GLOBAL,HSTR(h.plant[0].key))<0); /* EMPTY is bit31, not level bits20..29. */
     save_roundtrip();assert(AW_HarvestHidden(&h,0,&state));before=state;
     assert(AW_HarvestPrepare(&h,0,&state,999,777)==0 && !memcmp(&state,&before,sizeof(state)));
-    assert(AW_HarvestTake(&h,0,&state,999,777)==0 && !state.count[AW_ITEM]);
+    assert(AW_HarvestTake(&h,0,&state,999,777)==0 && !AW_ItemCount(&state));
     assert(AW_HarvestPickedCount(&state)==0);
     assert(AW_StateSet(&state,AW_GLOBAL,"ordinary",0x40100001));
     assert(AW_StateSet(&state,AW_GLOBAL,"aw:h:invalid",0x40100001));
@@ -67,19 +73,23 @@ int main(int argc,char **argv)
     assert(found);fixture();h.node[0].flags=2;assert(AW_HarvestTake(&h,0,&state,2,(uint32_t)i)==1);
     assert(AW_StateGet(&state,AW_ITEM,"ingredient_a")==2 || AW_StateGet(&state,AW_ITEM,"ingredient_b")==2);
     /* Capacity/overflow failures leave the plant visible and inventory intact. */
-    fixture();for(i=0;i<AW_STATE_VALUES;i++){sprintf(id,"slot%d",i);assert(AW_ItemAdd(&state,id,1));}
-    assert(AW_HarvestTake(&h,0,&state,1,12)==-1);assert(!AW_HarvestHidden(&h,0,&state));
-    before=state;save_roundtrip();assert(AW_HarvestTake(&h,0,&state,2,999)==-1);
-    assert(AW_StateGet(&state,AW_GLOBAL,HSTR(h.plant[0].key))==AW_StateGet(&before,AW_GLOBAL,HSTR(h.plant[0].key)));
-    state.count[AW_ITEM]=0;assert(AW_HarvestTake(&h,0,&state,2,999)==1);
+    /* COLLECT-CAPACITY-REJECTED-60 / INVENTORY-ORIGINAL-LIMITS-61: no kind limit: 400 kinds carried, the plant is
+     * still collected (the 128-kind table refused it); a row whose count fell to 0 takes the new kind in its place */
+    fixture();for(i=0;i<400;i++){sprintf(id,"slot%d",i);assert(AW_ItemAdd(&state,id,1));}
+    assert(AW_ItemCount(&state)==400 && AW_ItemAdd(&state,"slot7",-1));
+    assert(AW_HarvestTake(&h,0,&state,1,12)==1 && AW_ItemCount(&state)==400);   /* the level-1 roll: ingredient_a x 2 */
+    assert(AW_ItemIndex(&state,"ingredient_a")==7 && AW_StateGet(&state,AW_ITEM,"ingredient_a")==2);
+    save_roundtrip();assert(AW_StateGet(&state,AW_ITEM,"slot399")==1 && AW_ItemIndex(&state,"ingredient_a")==7);
+    fixture();for(i=0;i<400;i++){sprintf(id,"slot%d",i);assert(AW_ItemAdd(&state,id,1));}
+    assert(AW_HarvestTake(&h,0,&state,1,12)==1 && AW_ItemCount(&state)==401);
     assert(AW_StateGet(&state,AW_ITEM,"ingredient_a")==2 && !AW_StateGet(&state,AW_ITEM,"ingredient_b"));
-    fixture();assert(AW_ItemAdd(&state,"ingredient_a",INT32_MAX));assert(AW_HarvestTake(&h,0,&state,1,2)==-1);
+    fixture();assert(AW_ItemAdd(&state,"ingredient_a",INT32_MAX));assert(AW_HarvestTake(&h,0,&state,1,2)==AW_HARVEST_TOO_MANY);
     assert(AW_StateGet(&state,AW_ITEM,"ingredient_a")==INT32_MAX && !AW_HarvestHidden(&h,0,&state));
     fixture();for(i=0;i<AW_STATE_VALUES;i++){sprintf(id,"global%d",i);assert(AW_StateSet(&state,AW_GLOBAL,id,1));}
-    before=state;assert(AW_HarvestTake(&h,0,&state,1,2)==-1 && !memcmp(&state,&before,sizeof(state)));
+    before=state;assert(AW_HarvestTake(&h,0,&state,1,2)==AW_HARVEST_STATE && !memcmp(&state,&before,sizeof(state)));
     /* A late second-item failure must not commit the first item. */
     fixture();h.edge[2].node=1;h.plant[0].count=2;h.edges=4;h.edge[3].node=2;h.edge[3].count=1;
-    assert(AW_ItemAdd(&state,"ingredient_b",INT32_MAX));assert(AW_HarvestTake(&h,0,&state,1,2)==-1);
+    assert(AW_ItemAdd(&state,"ingredient_b",INT32_MAX));assert(AW_HarvestTake(&h,0,&state,1,2)==AW_HARVEST_TOO_MANY);
     assert(!AW_StateGet(&state,AW_ITEM,"ingredient_a") && !AW_HarvestHidden(&h,0,&state));
     /* Nested leveled recursion and invalid graphs are exercised directly. */
     fixture();h.nodes=4;h.node[3]=h.node[0];strcpy(HSTR(h.node[3].id),"nested");h.edge[2].node=3;

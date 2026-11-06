@@ -23,6 +23,7 @@
  */
 #include "quakedef.h"
 #include "aw_dial.h"
+#include "aw_cast.h"
 #include "aw_travel.h"
 #include "aw_clock.h"
 #include "aw_inventory.h"
@@ -643,16 +644,18 @@ static int greet(void){
     topics_sync();                   /* the result's AddTopic */
     return 1;
 }
-static void answer_of(int topic,const char *heading){
-    int k=AW_DialFind(&conv,topic),answer;
+/* ANSWER of TOPIC shown under HEADING (NULL: the topic's name), its result run; JOURNAL: a Topic answer also goes on
+ * the journal's topic page (a service refusal does not: OpenMW checkServiceRefused) */
+static void answer_with(int topic,int answer,const char *heading,int journal){
+    int k=AW_DialFind(&conv,topic);
     char name[NAME_CHARS];
-    if(k<0 || (answer=AW_DialAnswer(&conv,topic,&state))<0){if(heading)append(heading,1);return;}
+    if(k<0 || answer<0){if(heading)append(heading,1);return;}
     Q_snprintf(name,sizeof(name),"%s",heading?heading:names+NAME_CHARS*k);
     append(name,1);
     show_answer(answer);
     {   /* the journal's topic page (OpenMW Journal::addTopic): a Topic answer, not the Info Refusal one */
         int refused=0;
-        if(AW_DialTopicKind(&table,topic)==AW_DIAL_KIND_TOPIC && AW_DialPick(&conv,topic,&state,&refused)==answer){
+        if(journal && AW_DialTopicKind(&table,topic)==AW_DIAL_KIND_TOPIC && AW_DialPick(&conv,topic,&state,&refused)==answer){
             int got=AW_DialHeardAdd((int)conv.answer[answer].entry,topic,speaker?pr_strings+speaker->v.netname:"");
             if(got==2)Con_DPrintf("Journal: the topic pages are full (12000 entries); the oldest entry of a topic with a newer one gave way\n");
             else if(!got)Con_DPrintf("Journal: no memory for a topic page entry\n");
@@ -662,6 +665,9 @@ static void answer_of(int topic,const char *heading){
     conv.cond.choice=-1;             /* a choice holds for the one answer it picks */
     topics_sync();                   /* the result's AddTopic */
     refresh();
+}
+static void answer_of(int topic,const char *heading){
+    answer_with(topic,AW_DialFind(&conv,topic)<0?-1:AW_DialAnswer(&conv,topic,&state),heading,1);
 }
 static void ask_topic(int topic){answer_of(topic,NULL);}
 /* Training (OpenMW TrainingWindow): the speaker's three best skills, each at iTrainingMod x the player's base
@@ -1000,9 +1006,10 @@ static void train(int k){
 /* Service Refusal (OpenMW DialogueManager::checkServiceRefused): before a service opens, the speaker's "Service
  * Refusal" answer under this conversation's conditions; one that holds is said and the service stays shut */
 static int service_refused(void){
-    int topic=named_topic("service refusal");
-    if(topic<0 || AW_DialPick(&conv,topic,&state,NULL)<0)return 0;
-    answer_of(topic,"Service Refusal");return 1;
+    int topic=named_topic("service refusal"),answer;
+    /* SERVICE-REFUSAL-UNCLOTHED-60: the inverted disposition test; the info it picked is the one shown */
+    if(topic<0 || (answer=AW_DialPickRefusal(&conv,topic,&state))<0)return 0;
+    answer_with(topic,answer,"Service Refusal",0);return 1;
 }
 /* a row of the list: a topic, or the persuasion page's entries */
 static void ask(int r){
@@ -1338,4 +1345,17 @@ void AW_DialWindowInit(void){   /* the journal book's topic pages read through t
     aw_journal_heard_count=AW_DialHeardCount;aw_journal_heard_at=AW_DialHeardAt;
     aw_journal_topic_name=AW_DialWindowTopicName;aw_journal_entry_text=journal_entry_filled;
     aw_journal_entry_marked=journal_entry_marked;aw_journal_updated=journal_updated;
+}
+/* PLAYER-CASTING-59 (aw_cast.c): the game's fEffectCostMult from this table (0 when the build has none), and a
+ * made spell's magicka cost by the Spellmaking rule it was bought with (-1 without the table) */
+float AW_DialwinEffectCostMult(void){return load()?AW_DialSetting(&table,AW_DIAL_SET_EFFECT_COST_MULT):0;}
+int AW_DialwinMadeSpellCost(const aw_spell_effect_t *e,int count){
+    aw_dial_effect_t d[AW_MADE_EFFECTS];aw_mgef_t m;char name[32];int i;
+    if(!load() || count<0 || count>AW_MADE_EFFECTS)return -1;
+    for(i=0;i<count;i++){
+        sm_effect_info(e[i].effect,&m,name,sizeof(name));
+        d[i].base_cost=m.base_cost;d[i].flags=(int)m.flags;d[i].magnitude_min=e[i].magnitude_min;
+        d[i].magnitude_max=e[i].magnitude_max;d[i].duration=e[i].duration;d[i].area=e[i].area;d[i].range=e[i].range;
+    }
+    return AW_DialSpellmakingCost(&table,d,count);
 }

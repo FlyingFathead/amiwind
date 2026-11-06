@@ -1,6 +1,6 @@
 # Town import
 
-_Last updated with AmiWind v0.0.43-dev2 (18 October 2026)._
+_Last updated with AmiWind v0.0.61-dev1 (6 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -53,6 +53,7 @@ to hard-wire for Balmora.
 | `reference_margin` | Optional frame filter (for frames not equal to the audited cells): keep residents and markers whose origin is inside the bounds plus this margin, and every visible placement whose whole-object bounds reach into them (measured in a scratch export of the audited cells) |
 | `core_size`, `overlap`, `hysteresis`, `draw_distance` | Sub-cell layout; the overlap must cover `sqrt(2) * draw + hysteresis + 32` |
 | `terrain_step`, `terrain_material_repairs` | Terrain quads and checked tile repairs |
+| `terrain_fixups` | Optional: `{"bug": ID, "vertices": [[x, y, height], ...], "check": {"box": [[x0, y0], [x1, y1]], "grid": 8, "tolerance": 4}}`, frame-local units. Hand-listed ground vertices the CHIM frame's ground gets at the original height, for a coarse tile whose triangles sag under the original surface between their samples (Balmora's canal bank, BALMORA-GROUND-DENTS-51 in the [register](BUGS.md)): each vertex splits only the triangles it lies in (two triangles more per vertex, the ground stays closed); a listed height that is not the original LAND height there is refused. The optional box is then checked every `grid` units against the original surface (the game's 32-unit quads), and the build refuses the frame if a point misses by more than `tolerance` |
 | `entity_budget`, `model_budget`, `collision_margin` | Per-region limits (Balmora: 1000, 220 inline models, 224) |
 | `region_core_overrides` | Measured core splits, by region name |
 | `town.id` | Registry id (`config/towns.json`) |

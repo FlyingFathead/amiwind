@@ -196,6 +196,21 @@ int AW_AnimPick(const aw_pick_state_t *s,aw_pick_has_t h,void *c,aw_pick_t *o) {
     return has(h,c,o->group);
 }
 
+int AW_PickPlayerState(int weapon,int hand,int goal,int move,int run,int attack,int air,int swim,aw_pick_state_t *out) {
+    memset(out,0,sizeof(*out));out->weapon=AW_PW_NONE;
+    if(!real(weapon) || swim)return 0;
+    out->weapon=(signed char)weapon;
+    if(hand==1)out->event=AW_PE_EQUIP;
+    else if(hand==4)out->event=AW_PE_UNEQUIP;
+    else if(goal!=1 || (hand!=2 && hand!=3))return 0;      /* put away (or never drawn): no stance */
+    else if(hand==3){
+        out->event=AW_PE_ATTACK;out->attack=(unsigned char)(attack>=AW_PA_CHOP && attack<=AW_PA_THRUST?attack:AW_PA_CHOP);
+        out->follow=AW_PF_LARGE;
+    }else if(air)out->event=AW_PE_JUMP;
+    else{out->move=(unsigned char)(move>=AW_PM_NONE && move<AW_PM_COUNT?move:AW_PM_NONE);out->run=(unsigned char)(run!=0);}
+    return 1;
+}
+
 int AW_PickWanderIdle(const unsigned char chances[8],int multiplier100,int roll_gate,const unsigned char rolls[8]) {
     int i,best=0,pick=0;
     if(roll_gate>multiplier100)return 0;

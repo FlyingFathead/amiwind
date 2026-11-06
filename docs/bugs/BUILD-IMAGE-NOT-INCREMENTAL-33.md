@@ -27,7 +27,7 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.45 (19 October 2026)._
+_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -127,8 +127,7 @@ incremental drive packing.
 and warm, a warm run never prepares a map again, a damaged entry is ignored; hidden-surface maps,
 proofs and receipt identical off/cold/warm; stair-walk report bytes identical off/cold/warm and a
 warm check never re-checks a map; source or option changes miss; release versions turn the cache
-off. Real maps (the 109 parseable maps of the v0.0.33-dev1 MiniWind image, 65 exteriors; busy
-host, 4 then 1 CPUs): cull 48.2 s off, 52.0 s cold, 6.6 s warm; optimizer 388.4 s off, 519 s cold
+off. Real maps (the 109 parseable maps of the v0.0.33-dev1 MiniWind image, 65 exteriors; loaded machine, 4 then 1 CPUs): cull 48.2 s off, 52.0 s cold, 6.6 s warm; optimizer 388.4 s off, 519 s cold
 (1 CPU), 5.7 s warm; maps, receipts and proofs byte-identical in all three; cache 23.7 MB. A
 whole-image comparison (drive image of a warm run against a cold run) is pending.
 
@@ -217,6 +216,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-ORDERED-WINDOW-33](BUILD-ORDERED-WINDOW-33.md): The ordered worker pool idles behind one slow item, and hands long items out last
 - [BUILD-PARTITION-GROWTH-UNGATED-36](BUILD-PARTITION-GROWTH-UNGATED-36.md): Nothing gates the number of world partitions or the growth of the image
 - [BUILD-PASS-KEY-TOP-BROAD-43](BUILD-PASS-KEY-TOP-BROAD-43.md): A pass key counts a reached module's whole import-time code: a new constant in chim/models.py rekeyed all 1,295 region frame maps
+- BUILD-PERF-GUARD-BUSY-HOST-CORES-61 (no report page): The perf guard fails a build on a lower core share even when it has marked the run as a busy host
 - [BUILD-PIPELINE-UNDERUTILIZATION-36](BUILD-PIPELINE-UNDERUTILIZATION-36.md): Umbrella: several builder phases run on one core while the rest of the machine idles, and some do work the build no longer needs
 - BUILD-PLAN-BESIDE-STALE-48 (no report page): The resource plan held a reuse build at 1 of 24 room batch workers against memory that stages it no longer runs held in the measured run
 - BUILD-PLAN-HISTORY-ROW-CORRUPT-54 (no report page): The resource plan refuses every 16 GiB build: the mwscript stage is priced at 32,412 MiB from one corrupt history row, while its largest process measured 277 MiB

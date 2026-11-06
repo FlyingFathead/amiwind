@@ -1,6 +1,6 @@
 # First-person geometry and sprite experiment
 
-_Last updated with AmiWind v0.0.59-dev1 (1 November 2026)._
+_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -18,6 +18,8 @@ _Last updated with AmiWind v0.0.59-dev1 (1 November 2026)._
 - [Detailed-model depth arithmetic candidate](#detailed-model-depth-arithmetic-candidate)
 - [Investigation: first-person hands rendered as sprites](#investigation-first-person-hands-rendered-as-sprites)
 - [The equipped weapon in first person (v0.0.59)](#the-equipped-weapon-in-first-person-v0059)
+- [Weapon sway: AmiWind groove or Morrowind stiff (v0.0.61)](#weapon-sway-amiwind-groove-or-morrowind-stiff-v0061)
+- [Bows, crossbows and thrown weapons (v0.0.61)](#bows-crossbows-and-thrown-weapons-v0061)
 
 <!-- contents end -->
 
@@ -380,6 +382,41 @@ while armed. Bows, crossbows and thrown weapons keep the bare hands for now. The
 arms and the weapon model are loaded only while that weapon is equipped; if a
 file is missing the bare hands stay, with one console line. The first-person
 shield block also accepts the shared item models.
+
+## Weapon sway: AmiWind groove or Morrowind stiff (v0.0.61)
+
+How the held hands and weapon move in first person is a saved choice, `aw_fp_sway`, in Options > Controls >
+Weapon sway, on the console as `dbg camera sway 1` / `dbg camera sway 2`:
+
+| Value | Name | What it does |
+| --- | --- | --- |
+| 1 (the default) | AmiWind groove | The hands sway forward and back with the stride (Quake's view model bob) and the ready hands play their idle clip. |
+| 2 | Morrowind stiff | The hands stay still on the screen: no stride sway, the idle clip held on its first frame; only drawing, putting away and the attack move them. |
+
+The eye's own walking bob (`cl_bob`) is a separate setting and is not changed by either. The sway's arithmetic is
+small: one square root and seven sines a frame, and the sines come from the engine's table (`Q_SinRad`), not from
+the FPU's `fsin`, which the 68040 does not have in hardware. `dbg camera sway bench` times it on the machine it runs
+on (2,000 rounds, microseconds a frame).
+
+## Bows, crossbows and thrown weapons (v0.0.61)
+
+The first-person table (`progs/humanoid_1st.awsk`) and the Weapon Bone table
+(`gfx/hand-weapons.aww`) now also hold the three ranged stances of the original's
+first-person file, in the same 28-frame contract: a bow plays `bowandarrow` over
+`idle1h`, a crossbow `crossbow` over `idlecrossbow`, a thrown weapon `throwweapon`
+over `idle1h` (the original's choice, as OpenMW 0.51 `weapontype.cpp` writes it);
+drawing is the group's `equip`, putting away its `unequip`, and the swing's ten
+frames are its `shoot start` to `shoot follow stop`. Bows, crossbows and thrown
+weapons can now be equipped in the right hand and drawn, in both views. Their
+shot is not in this engine yet: the attack plays the shot's motion and strikes
+nobody (one console line says so). Arrows and bolts stay carried until the
+ammunition slot exists. A bow or a crossbow takes the shield off the left arm, as
+two-handed weapons do.
+
+These stances come with the arms from parts (the default). They have no baked
+arms: with `aw_hand_parts 0` a ranged weapon keeps the bare hands. The table grows
+by 84 frames (196 in all), nothing else is added; an image built before this has
+the four melee stances only, and there a ranged weapon keeps the bare hands.
 
 The cost is measured with `dbg rcount`: the line's `hd` field is the time of the
 first-person view model per frame (hands, torch, shield or weapon), compared at a

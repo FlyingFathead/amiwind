@@ -2074,7 +2074,7 @@ function showChimCell(x, y) {
     '<h3>Provenance</h3><p>' + (pv ? 'build ' + escapeHtml(pv.build) + ' (' + escapeHtml(pv.label || '') + ') · source commit ' + escapeHtml(pv.source_commit || 'not recorded') + ' · CHIM ' + escapeHtml(pv.chim_version || '?') +
       ' · world format ' + escapeHtml(pv.world_format || '?') + ' · built ' + escapeHtml(fullStamp(pv.built_at)) : 'not in a CHIM build') +
     (c.last_build ? '<br>last build: ' + Math.round(c.last_build.elapsed_s / 60 * 10) / 10 + ' min elapsed' + (c.last_build.chim_stage_s ? ', CHIM stage ' + Math.round(c.last_build.chim_stage_s) + ' s' : '') +
-      (c.last_build.host_busy ? ' (busy host)' : '') : '') + '</p>' +
+      (c.last_build.host_busy ? ' (loaded machine)' : '') : '') + '</p>' +
     chimInteriorsBlock(c) +
     '<h3>Linked bugs (' + (c.bugs || []).length + ', ' + chimOpenBugs(c).length + ' open)</h3>' + (bugs ? '<div style="max-height:260px;overflow:auto"><table class="mt"><thead><tr><th class="l">ID</th><th class="l">State</th><th class="l">Severity</th><th class="l">Title</th></tr></thead><tbody>' + bugs + '</tbody></table></div>' : '<p>none linked</p>') +
     '<p><button id="chimoverview">Back to the overview</button></p>';

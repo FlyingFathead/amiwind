@@ -46,7 +46,7 @@ owner is whom it is stolen from (the reference's owner ANAM, else its owning fac
 mwmechanics/mechanicsmanagerimp.cpp itemTaken), kept by the engine's world change list as (item, owner).
 A new stage of its own: no other stage's input or cache key changes.
 """
-import argparse, hashlib, json, math, struct, sys
+import argparse, hashlib, json, math, re, struct, sys
 from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'src'))
@@ -75,6 +75,18 @@ GRID_BIAS = 2048        # exterior keys: grid offset into 12 bits
 ACT_NONE, ACT_TAKE, ACT_READ, ACT_TALK = 0, 1, 2, 3      # bits 0-1
 ACT_OWNED = 4                                            # bit 2: taking it is theft
 ACT_MAGIC_SCROLL = 8                                     # bit 3: a BOOK with an enchantment (taken, never read)
+
+
+def book_has_words(text):
+    """True when a BOOK's TEXT holds something to read once its markup (<...>, &nbsp;) and blanks are gone, or a
+    picture (<IMG ...>: the Bloodmoon stone map) (BLANK-PAPER-READ-60: a text-less paper is taken, not read)."""
+    if not text:
+        return False
+    if re.search(rb'<\s*img\b', text, flags=re.I):
+        return True
+    plain = re.sub(rb'<[^>]*>', b' ', text.replace(b'\x00', b''))
+    plain = re.sub(rb'&nbsp;?', b' ', plain, flags=re.I)
+    return bool(plain.strip())
 CONT_ORGANIC = 1        # CONT FLAG bit 0: organic (flora: harvested, never opened)
 CFLAG_ORGANIC = 4       # the contents list's flag for it (bit 2)
 
@@ -176,10 +188,16 @@ def objects_of(raw, levelled=None):
                 continue      # a fixed light is not an item
             if not math.isfinite(weight) or weight < 0 or value < 0 or not name:
                 continue
-            # STEAL-PROMPT-58: a BOOK without an enchantment is read; one with (a magic scroll) is taken like an item
+            # STEAL-PROMPT-58: a BOOK without an enchantment is read; one with (a magic scroll) is taken like an item.
+            # BLANK-PAPER-READ-60: one with no words to read (no TEXT, or only markup: sc_paper plain, the paper under
+            # the quill in the Census and Excise Office) is taken like an item too. Decided for the project, 5 November
+            # 2026; the original and OpenMW 0.51 (mwclass/book.cpp Book::activate) open an empty page first.
             action = ACT_TAKE
             if tag == 'BOOK':
-                action = ACT_TAKE | ACT_MAGIC_SCROLL if first(fields, 'ENAM') else ACT_READ
+                if first(fields, 'ENAM'):
+                    action = ACT_TAKE | ACT_MAGIC_SCROLL
+                elif book_has_words(first(fields, 'TEXT')):
+                    action = ACT_READ
             out[ident] = ('I', name, float(weight), int(value), action)
         elif name:
             out[ident] = ('A' if tag in ACTORS else 'D', name, 0.0, 0, ACT_TALK if tag in ACTORS else ACT_NONE)
@@ -497,6 +515,18 @@ def main():
     extras = report.pop('extras')
     (a.out / 'focus-extras.json').write_text(json.dumps(extras, indent=0) + '\n', encoding='utf-8', newline='\n')
     (a.out / 'focus-receipt.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8', newline='\n')
+    # ACTOR-STATS-ALL-61: every NPC and creature record's stat subrecords of the masters, for the areas' stat
+    # sections the image step writes (tools/prepare_area_tables.py stats_section)
+    import actor_stats
+    recs, gmst = actor_stats.master_records(a.data_files)
+    from cell_numbers import load_table
+    data = resolve_data_files(Path(a.data_files))
+    numbers = {row['cell'].casefold(): row['number'] for row in load_table(data)[0] if row['master'] == MASTER}
+    vocabulary = actor_stats.write_vocabulary(recs, gmst, actor_stats.levelled_by_area(
+        child_ci(data, MASTER).read_bytes(), numbers))
+    (a.out / actor_stats.FILE_NAME).write_bytes(vocabulary)
+    print('[focus] actor stats: %d NPC and %d creature records, %d bytes' % (len(recs['NPC_']), len(recs['CREA']),
+                                                                             len(vocabulary)), flush=True)
     print('[focus] %d rooms, %d placed things, %d owned things with their owner, %d containers with contents, '
           '%d references in the identity table, %d bytes'
           % (report['rooms'], report['rows'], report['owners'], report['containers'], report['references'],

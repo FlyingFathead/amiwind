@@ -112,7 +112,7 @@ by scripts, more weapons and the rest of the v0.0.57 list move to v0.0.58 as the
   ([SWEEP-SLOW-ARRIVALS-57](../../bugs/SWEEP-SLOW-ARRIVALS-57.md)), and the Manor District of Ald'ruhn
   ([INTERIOR-FAR-BLANK-MANOR-56](../../bugs/INTERIOR-FAR-BLANK-MANOR-56.md)).
 - Whether a creature's attack plays its own attack animation is not yet confirmed in game; the strikes themselves land.
-- On FS-UAE with a busy host, a load now and then waits forever on the emulated hard disk: nothing in the game runs,
+- On FS-UAE with a loaded machine, a load now and then waits forever on the emulated hard disk: nothing in the game runs,
   the emulator's disk handler never answers; restarting the emulator gets past it
   ([CHIM-SEYDA-BALMORA-LOAD-HANG-43](../../bugs/CHIM-SEYDA-BALMORA-LOAD-HANG-43.md)).
 - Some rooms still load in after you arrive ([CHIM-ROOM-POPIN-51](../../bugs/CHIM-ROOM-POPIN-51.md)).

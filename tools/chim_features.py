@@ -272,7 +272,8 @@ def status_title(status, version):
 def figure_label(g):
     parts = [BASES[g['basis']]]
     if g.get('host'):
-        parts.append('%s host' % g['host'])
+        parts.append({'quiet': 'quiet machine', 'busy': 'loaded machine', 'mixed': 'mixed machine load'}.get(
+            g['host'], '%s machine' % g['host']))
     parts.append(human_date(g['date']))
     return ', '.join(parts)
 

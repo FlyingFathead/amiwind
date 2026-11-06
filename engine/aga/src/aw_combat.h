@@ -76,14 +76,20 @@ typedef struct {
     unsigned char creature;             /* 0 an NPC or the player; 1 a creature striking with its own attacks
                                            (damage = its record's chop/slash/thrust); 2 a bipedal creature (hand to
                                            hand, its combat skill); AW_CombatCreatureSheet */
+    /* RESIST-NORMAL-WEAPONS-61 (OpenMW 0.51 combat.cpp resistNormalWeapon, isNormalWeapon), in the padding before
+     * hit_classes: as an attacker, 1 when the weapon in its hand is ordinary (not silver, magical or enchanted); as a
+     * victim, its Resist Normal Weapons less its Weakness to Normal Weapons in percent (set before each swing at it) */
+    unsigned char weapon_normal;
+    short resist_normal;
     unsigned int hit_classes;           /* the armour a blow can land on, 2 bits per AW_CombatArmorHitSlot slot: 0 none,
                                            1 light, 2 medium, 3 heavy (its hit sound; sheet field 12); AW_HIT_CLASS */
     float weapon_health,weapon_health_max,shield_health,shield_health_max;  /* condition; max 0 = unknown (full) */
 } aw_fighter_t;
 #define AW_HIT_CLASS(f,slot) ((int)(((f)->hit_classes>>(2*(slot)))&3u))
 /* Two-handed weapon types (and hand to hand, which OpenMW's weapon table also marks
- * two-handed): no shield block. weapon = 1 + original type. */
-#define AW_TWO_HANDED(w) ((w)==0 || (w)==3 || (w)==5 || (w)==6 || (w)==7 || (w)==9)
+ * two-handed): no shield block. weapon = 1 + original type; bows (10) and crossbows (11) are two-handed too
+ * (OpenMW weapontype.cpp), thrown weapons (12) are not. */
+#define AW_TWO_HANDED(w) ((w)==0 || (w)==3 || (w)==5 || (w)==6 || (w)==7 || (w)==9 || (w)==10 || (w)==11)
 
 /* Deterministic rolls: one xorshift32 per encounter (seeded). */
 typedef struct {unsigned long state;} aw_combat_rng_t;
@@ -97,7 +103,25 @@ typedef struct {
     int miss_style;                     /* a miss: 1 dodge, 2 block-like (AmiWind extension presentation) */
     int weapon_broke,shield_broke;
     float strength,damage,raw,weapon_wear;
+    int no_effect;                      /* RESIST-NORMAL-WEAPONS-61: an ordinary weapon on a full resistance (the
+                                           game setting sMagicTargetResistsWeapons is shown to the player) */
 } aw_swing_t;
+/* RESIST-NORMAL-WEAPONS-61: the damage factor of an ordinary weapon (NORMAL) on a victim with Resist minus Weakness
+ * to Normal Weapons RESIST (a fraction): 1 - min(1, RESIST), and *NO_EFFECT 1 at a full resistance (OpenMW 0.51
+ * combat.cpp resistNormalWeapon); 1 for a weapon that is not ordinary. Pure. */
+float AW_CombatNormalWeaponFactor(int normal,float resist,int *no_effect);
+/* OpenMW isNormalWeapon: WPDT FLAGS (1 magical, 2 silver) and the enchantment (an enchanted weapon is magical: the
+ * setting "enchanted weapons are magical", true by default). Pure. */
+int AW_CombatIsNormalWeapon(int flags,int enchanted);
+/* GODMODE-COMBAT-DAMAGE-61 (OpenMW 0.51 npc.cpp, combat.cpp): after a resolved swing, a god-mode player as the VICTIM
+ * gets back its health, fatigue, standing and life (BEFORE: the sheet before the swing; the swing's damage and knockdown
+ * zeroed), and as the ATTACKER its fatigue and its weapon's condition (no wear, no break). Pure. */
+void AW_CombatGodVictim(aw_fighter_t *v,const aw_fighter_t *before,aw_swing_t *out);
+void AW_CombatGodAttacker(aw_fighter_t *a,const aw_fighter_t *before,aw_swing_t *out);
+#define AW_WEAPON_MAGICAL 1
+#define AW_WEAPON_SILVER 2
+#define AW_EFFECT_WEAKNESS_NORMAL_WEAPONS 36
+#define AW_EFFECT_RESIST_NORMAL_WEAPONS 98
 /* aw_combat_dice: 1 (default) the original rolls; 0 (AmiWind extension) no dice:
  * every swing in reach hits, nothing is blocked, knockdown by the damage threshold
  * alone, NPC swing strength the mean. docs/COMBAT.md. */
@@ -201,6 +225,9 @@ int AW_CombatActorFleeing(struct edict_s *e);
  * longest think in milliseconds, the fighters now in slots. */
 void AW_CombatCost(float *per_second,float *ms_mean,float *ms_max,int *fighters);
 int AW_CombatActorLoad(const char *id,aw_fighter_t *out);
+/* ACTOR-STATS-ALL-61: set by the host: a loaded sheet's level, attributes, skills, health, magicka, fatigue, Fight and
+ * Flee from the being's stat block (docs/ACTOR_STATS.md); NULL: the sheet's own */
+extern void (*aw_combat_sheet_stats)(const char *id,aw_fighter_t *out);
 /* ESSENTIAL-DEATH-60: 1 when the actor record of ID is known (ESSENTIAL set from its essential flag) */
 int AW_CombatEssentialRecord(const char *id,int *essential);
 void AW_CombatPlayerSheet(aw_fighter_t *out);
@@ -244,9 +271,27 @@ extern void (*aw_combat_actor_released)(struct edict_s *e);
  * than slots), so the owner records the death before the slot forgets it (aw_actors.c: the change list). */
 extern void (*aw_combat_actor_died)(struct edict_s *e);
 const aw_fighter_t *AW_CombatFighter(struct edict_s *e);
+/* PLAYER-CASTING-59: a spell set an actor's health to HEALTH; HARMFUL 1 makes it an attack (the actor joins the fight
+ * with the player); at 0 it dies as by a blow. 1 when the actor has a fight slot. */
+int AW_CombatSpellHit(struct edict_s *e,float health,int harmful);
 /* An engaged NPC's current swing: 0 chop, 1 slash, 2 thrust; -1 when it is not fighting (aw_animkit.c picks the
  * attack's keys by it, ANIM-GROUPS-NOT-HOOKED-54). */
 int AW_CombatAttackType(struct edict_s *e);
+/* The player's swing (0 chop, 1 slash, 2 thrust) as player_strike chooses it: for the third-person body's attack keys. */
+int AW_CombatPlayerAttackType(void);
+/* 1 while the player holds a ranged weapon (aw_inventory.c): its swing strikes nobody until ranged combat exists. */
+extern int (*aw_combat_player_ranged)(void);
+/* RESIST-NORMAL-WEAPONS-61: the summed magnitude of magic effect EFFECT (the ESM index: 98 Resist Normal Weapons, 36
+ * Weakness to Normal Weapons) active on ACTOR now, abilities included; 0 none. Filled by the script host's effect list
+ * (v061-magic, aw_mwhost.c effect_magnitude_of); NULL = no effects known (every resistance 0). Asked once per landed
+ * swing with an ordinary weapon, never per frame. */
+#define AW_COMBAT_EFFECT_MAGNITUDE 1
+extern float (*aw_combat_effect_magnitude)(struct edict_s *actor,int effect);
+/* The player's right-hand weapon is ordinary (aw_inventory.c: its catalogue flags and enchantment); NULL: ordinary. */
+extern int (*aw_combat_player_weapon_normal)(void);
+/* The text the player is shown when an ordinary weapon has no effect (combat/settings.txt "text
+ * sMagicTargetResistsWeapons ..."); "" when the image has none. */
+const char *AW_CombatResistText(void);
 void AW_CombatClear(void);
 const aw_combat_stats_t *AW_CombatStats(void);
 const aw_fighter_t *AW_CombatPlayer(void);

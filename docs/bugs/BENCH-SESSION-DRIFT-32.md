@@ -15,7 +15,7 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.36 (11 October 2026)._
+_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 
 ## Status: 8 October 2026
 
@@ -58,12 +58,12 @@ Not yet: only same-session runs with a drift-control rerun (A, variants, A again
 
 ## Verification
 
-Pending: repeat on a quiet host to separate host load from emulator drift.
+Pending: repeat on a quiet machine to separate host load from emulator drift.
 
 ## Prevention
 
 Timing runs record the concurrent host load (other containers and their CPU use) and are repeated
-on a quiet host before any conclusion is drawn; every sweep includes a drift-control rerun.
+on a quiet machine before any conclusion is drawn; every sweep includes a drift-control rerun.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 

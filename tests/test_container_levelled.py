@@ -146,8 +146,10 @@ class EngineSourceTests(unittest.TestCase):
         combat = (self.SRC / 'aw_combat.c').read_text(encoding='utf-8')
         self.assertIn('set_state(s,S_DEAD,G_DEATH);s->e->v.solid=SOLID_NOT;', combat)
         # a death goes onto the change list at once (a room captures its actors only every half minute), from a fight
-        # and from chim actors kill alike
-        self.assertEqual(combat.count('if(aw_combat_actor_died)aw_combat_actor_died(s->e);'), 2)
+        # and from chim actors kill alike, and (v0.0.61, PLAYER-CASTING-59) from a spell's damage (AW_CombatSpellHit)
+        self.assertEqual(combat.count('if(aw_combat_actor_died)aw_combat_actor_died(s->e);'), 3)
+        hit = combat[combat.index('int AW_CombatSpellHit('):combat.index('int AW_CombatSetHealth(')]
+        self.assertIn('set_state(s,S_DEAD,G_DEATH);s->e->v.solid=SOLID_NOT;', hit)
         self.assertIn('found=AW_NPCTarget(p,p->v.v_angle)==best;', corpse)
 
 

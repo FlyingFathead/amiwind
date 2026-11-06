@@ -1581,49 +1581,7 @@ def legacy_maps_summary(id1, removed_legacy):
             'payload_by_kind': dict(sorted(kinds.items())), 'line': line}
 
 
-def chim_far_sidecar(chim_world, id1, record):
-    """Copy the far terrain layer of a frame map's frame (CHIM output far/<cx>_<cy>.far) to
-    id1/maps/<frame map>.far after checking it; None when the world has none (built without it)."""
-    from chim.far import decode, file_name, sidecar_name
-    if not record.get('frame') or not record.get('map'):
-        return None
-    source = Path(chim_world)/'far'/file_name(record['frame'])
-    if not source.is_file():
-        return None
-    data = source.read_bytes()
-    head = decode(data)[0]
-    if list(head['cell']) != list(record['frame']):
-        raise ValueError('Far terrain %s names frame %s, not %s' % (source.name, head['cell'], record['frame']))
-    target = Path(id1)/sidecar_name(record['map'])
-    if target.exists():
-        raise ValueError('Far terrain already present: '+target.name)
-    target.write_bytes(data)
-    return {'file': sidecar_name(record['map']), 'bytes': len(data), 'sha256': hashlib.sha256(data).hexdigest(),
-            'size': list(head['size']), 'step': head['step']}
-
-
-def chim_cut_sidecar(chim_world, id1, record):
-    """Copy the whole-structure cut groups of a frame map's frame (CHIM output cuts/<cx>_<cy>.cut) to
-    id1/maps/<frame map>.cut after checking it; None when the world has none (built before them, or a frame
-    without structures: every placement then keeps its own cut)."""
-    from chim.cuts import decode, file_name, sidecar_name
-    if not record.get('frame') or not record.get('map'):
-        return None
-    source = Path(chim_world)/'cuts'/file_name(record['frame'])
-    if not source.is_file():
-        return None
-    data = source.read_bytes()
-    head = decode(data)[0]
-    if list(head['cell']) != list(record['frame']):
-        raise ValueError('Cut groups %s name frame %s, not %s' % (source.name, head['cell'], record['frame']))
-    if not head['structures']:
-        return None
-    target = Path(id1)/sidecar_name(record['map'])
-    if target.exists():
-        raise ValueError('Cut groups already present: '+target.name)
-    target.write_bytes(data)
-    return {'file': sidecar_name(record['map']), 'bytes': len(data), 'sha256': hashlib.sha256(data).hexdigest(),
-            'structures': head['structures'], 'members': head['members']}
+from chim.sidecars import chim_far_sidecar, chim_cut_sidecar  # noqa: E402 (BUILD-AGA-AT-TEXT-LIMIT-60: moved there)
 
 
 def add_chim_volume(chim_world, id1, out, index, xdftool, mib=None, frames=None, packed=None):
@@ -1848,7 +1806,8 @@ def stage_actor_logic_config(id1):
 ACTOR_LOGIC_LINES = (b'// Compiled game logic (default on since v0.0.57): the game\'s compiled scripts and the actors\'\n'
                      b'// Wander packages. "dbg mwscript off" and "chim actors ambient off" in the console switch them off.\n'
                      b'aw_mwscript 1\n'
-                     b'chim actors ambient on\naw_player_cache 1\naw_ambient_areas 1\naw_npc_tables_areas 1\n')
+                     b'chim actors ambient on\naw_player_cache 1\naw_ambient_areas 1\naw_npc_tables_areas 1\n'
+                     b'aw_player_stances 1\naw_fp_sway 1\n')
 
 
 CHIM_CROSSING_LINES = (b'// Cell crossings (builder option --chim-crossing 0|1, default 1 since v0.0.47): type 1, the\n'
@@ -3235,6 +3194,10 @@ def finalize_image(args):
                         record['bytes'] = (boot/'id1'/record['map']).stat().st_size
             print('[chim] CHIM frame maps marked 32 MB by the image heap gate (the CHIM stage\'s estimate passed them): '
                   '%d: %s' % (len(late), ', '.join(sorted(late))), flush=True)
+        # TAKEN-LIGHT-FLAME-61: a carriable light's CHIM placements, frame map flames and night lamp rows tied to it in
+        # its cell's own record of areas.awa (tools/effect_links.py), checked over the whole world
+        from effect_links import stage as stage_effect_links
+        stage_effect_links(boot/'id1', args.data_files, chim_world_data, out)
         # the CHIM world read once for the image step is not needed after its last reader (the heap gate)
         chim_world_held.clear()
         chim_world_data = None
@@ -3267,6 +3230,8 @@ def finalize_image(args):
     print('Engine map limits passed: %d maps; tightest: %s.' % (engine_map_limits['maps'], ', '.join(
         '%s %s %d/%d' % (key, row['top'][0]['map'], row['top'][0]['value'], row['limit'])
         for key, row in engine_map_limits['worst'].items() if row['top'])), flush=True)
+    # TAKEN-LIGHT-FLAME-61: every room flame of a carriable light names it, every lamp row of one outdoors is linked
+    from effect_links import check_image;check_image(boot/'id1', args.data_files, out)
     # Every flight of stairs in every map can be walked up and down by the
     # standing box (COLLISION-STAIR-SLOPE-32); on with follow_original_stair_rules.
     # The recorded Seyda Neen stage (BUILD-SEYDA-REGEN-30) is reported, not gated.

@@ -7,9 +7,9 @@
 - Reported with v0.0.57 at 2026-10-31 03:46 +0200: v0.0.57 release image run 2026_10_31_v0.0.57_full-v0.0.57-release_7ff625e: every stage passed, the perf guard failed the same two: chim-town-balmora build_resident 86 s, was 52 s (+65 %); chim-town-vivec_city 98 s, was 62 s (+57 %), same units. Worker gates shared the host. Perf only, delivered; the monitor lists the run as failed for this.
 - Reported with v0.0.58-dev1 at 2026-10-31 16:50 +0200: v0.0.58-dev1 build 2026_10_31_v0.0.58-dev1_full-v0.0.58-dev1_3d610fa: every stage passed, the perf guard failed the same two: chim-town-balmora build_resident 101 s, was 52 s (+93 %); chim-town-vivec_city 118 s, was 62 s (+89 %), same units; worker gates (5046, 5088 and more) shared the host. Third sighting: delivered (perf only).
 - Reported with v0.0.59-dev1 at 2026-11-01 (time not recorded): Seen again on the v0.0.59-dev1 full build: the same two resident sections failed the performance check (chim-town-balmora wall time 107 s against 52 s with the same 15 units; chim-town-vivec_city CPU per unit 35.3 s against 7.1 s with the same 39 units) while worker gates ran on the host. The stages passed and the image was delivered (a performance-only failure).
-- Reported with v0.0.58-dev3 at 2026-11-01 04:34 +0200: Seen again in the v0.0.58 test image build of 6679573 (2026-11-01): the perf guard failed chim-town-vivec_city parallel map build_resident at 32.9 s CPU per unit against a 7.1 s baseline with the same 39 units, while a gate ran beside the build (busy host). The stages passed and the image is valid; perf only, not blocking.
-- Reported with v0.0.59-dev5 at 2026-11-02 (time not recorded): PERSISTING on a quiet host: v0.0.59-dev5 (f08583e0) chim-town-vivec_city build_resident 26.3 s CPU per unit against the baseline 7.1 s (+268 %, the same 39 units); dev4 26.6 s, so dev4 to dev5 unchanged. Failing in every full build since v0.0.58-dev1.
-- Reported with v0.0.59-dev5 at 2026-11-02 (time not recorded): Cause found (quiet host): since skeletal actors became the default, every worker process builds the shared animation table again, about 18 s of CPU per table (the beast table too); a Vivec resident bake itself is 3 to 6 s. Fix on branch v0.0.59-vivecbake: the table goes through the unit cache and the stage builds each table once before the bakes. Same cause as BUILD-RESIDENT-BAKE-SLOWER-52.
+- Reported with v0.0.58-dev3 at 2026-11-01 04:34 +0200: Seen again in the v0.0.58 test image build of 6679573 (2026-11-01): the perf guard failed chim-town-vivec_city parallel map build_resident at 32.9 s CPU per unit against a 7.1 s baseline with the same 39 units, while a gate ran beside the build (loaded machine). The stages passed and the image is valid; perf only, not blocking.
+- Reported with v0.0.59-dev5 at 2026-11-02 (time not recorded): PERSISTING on a quiet machine: v0.0.59-dev5 (f08583e0) chim-town-vivec_city build_resident 26.3 s CPU per unit against the baseline 7.1 s (+268 %, the same 39 units); dev4 26.6 s, so dev4 to dev5 unchanged. Failing in every full build since v0.0.58-dev1.
+- Reported with v0.0.59-dev5 at 2026-11-02 (time not recorded): Cause found (quiet machine): since skeletal actors became the default, every worker process builds the shared animation table again, about 18 s of CPU per table (the beast table too); a Vivec resident bake itself is 3 to 6 s. Fix on branch v0.0.59-vivecbake: the table goes through the unit cache and the stage builds each table once before the bakes. Same cause as BUILD-RESIDENT-BAKE-SLOWER-52.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -19,7 +19,7 @@
 | --- | --- |
 | Reported by | build |
 | First noticed | 31 October 2026, in v0.0.57-dev5 |
-| Where | perf guard (build_resident rows of the chim-town stages) on a busy host |
+| Where | perf guard (build_resident rows of the chim-town stages) on a loaded machine |
 | Reproduction | sometimes |
 | Duplicate of | no |
 | Persists in | v0.0.57 (last seen) |
@@ -75,7 +75,7 @@ The CPU time did not grow. In the release image build the two sections spent 488
 beside the build's own other stages and the gates running on the same machine, against a baseline taken when they had
 more cores. The guard compares wall time, so fewer cores reads as slower code.
 
-A first fix (the same day) counts a stage as being on a busy host when the whole host was at least 90 % busy while it
+A first fix (the same day) counts a stage as being on a loaded machine when the whole host was at least 90 % busy while it
 ran. That covered the dev5 build (92.9 %), but not the release build: the host was 84.5 % and 55.1 % busy during the
 two sections, under the line, while the sections themselves were short of cores.
 
@@ -183,6 +183,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-ORDERED-WINDOW-33](BUILD-ORDERED-WINDOW-33.md): The ordered worker pool idles behind one slow item, and hands long items out last
 - [BUILD-PARTITION-GROWTH-UNGATED-36](BUILD-PARTITION-GROWTH-UNGATED-36.md): Nothing gates the number of world partitions or the growth of the image
 - [BUILD-PASS-KEY-TOP-BROAD-43](BUILD-PASS-KEY-TOP-BROAD-43.md): A pass key counts a reached module's whole import-time code: a new constant in chim/models.py rekeyed all 1,295 region frame maps
+- BUILD-PERF-GUARD-BUSY-HOST-CORES-61 (no report page): The perf guard fails a build on a lower core share even when it has marked the run as a busy host
 - [BUILD-PIPELINE-UNDERUTILIZATION-36](BUILD-PIPELINE-UNDERUTILIZATION-36.md): Umbrella: several builder phases run on one core while the rest of the machine idles, and some do work the build no longer needs
 - BUILD-PLAN-BESIDE-STALE-48 (no report page): The resource plan held a reuse build at 1 of 24 room batch workers against memory that stages it no longer runs held in the measured run
 - BUILD-PLAN-HISTORY-ROW-CORRUPT-54 (no report page): The resource plan refuses every 16 GiB build: the mwscript stage is priced at 32,412 MiB from one corrupt history row, while its largest process measured 277 MiB

@@ -20,6 +20,12 @@ CLOTHING_SLOTS={0:9,1:7,2:8,3:15,4:11,5:6,6:5,7:10,8:12,9:14}
 # greaves, boots, left and right gauntlet, shield (the left hand), left and right bracer (the gauntlet slots).
 ARMOUR_SLOTS={0:0,1:1,2:3,3:4,4:2,5:7,6:5,7:6,8:17,9:5,10:6}
 ROW=512
+# The weapons the player can hold in the right hand: the melee types 0..8 and, since v0.0.61 (FIRST-PERSON-WEAPONS-56),
+# bow 9, crossbow 10 and thrown 11 (held, drawn and shown in both views; their shot waits for ranged combat, the engine
+# strikes nothing with them). Arrows and bolts (12, 13) stay carried until the ammunition slot exists. A ranged
+# weapon's combat skill is Marksman (the ESM skill index 23), its damage row the record's own (chop = its damage).
+HELD_WEAPONS=(0,1,2,3,4,5,6,7,8,9,10,11)
+MARKSMAN=23
 # The debug torch (test only; the maintainer's preview-stage request, 17 October 2026): one
 # catalogue row made from the original torch (LIGH "torch": model, icon, weight, value, light
 # radius and colour) whose burn time is LIGHT_INFINITE, the value OpenMW 0.51
@@ -212,10 +218,10 @@ def prepare(data_files,id1,selected=(),palette=None,models=True,jobs=None,model_
             # (nothing else happens when worn).
             elif item['parts'] and inert and (not item['enchantment'] or (enchant and enchant[0]==2)):flags|=4
         combat=[0,26,*([0]*6),0.,0.,0.,0.,0,0]
-        if item['kind']=='WEAP' and item['subtype'] in (0,1,2,3,4,5,6,7,8):
+        if item['kind']=='WEAP' and item['subtype'] in HELD_WEAPONS:
             from prepare_combat import WEAPON_SKILL
             raw=item['raw'];health=struct.unpack_from('<h',raw,10)[0]
-            combat=[1+item['subtype'],WEAPON_SKILL[item['subtype']],*raw[22:28],
+            combat=[1+item['subtype'],WEAPON_SKILL.get(item['subtype'],MARKSMAN),*raw[22:28],
                     struct.unpack_from('<f',raw,16)[0],struct.unpack_from('<f',raw,12)[0],float(health),0.,0,0]
             slots=1<<16;flags|=1
         elif item['kind']=='ARMO' and item['subtype'] in ARMOUR_SLOTS:
@@ -243,7 +249,7 @@ def prepare(data_files,id1,selected=(),palette=None,models=True,jobs=None,model_
             model=model_table.get(mesh_key(item['source_model']),'')
             if model:
                 if inert:flags|=2
-                if inert and not item['enchantment'] and (item['kind']=='WEAP' and item['subtype'] in (0,1,2,3,4,5,6,7,8) or item['kind']=='ARMO' and item['subtype']==8):flags|=4
+                if inert and not item['enchantment'] and (item['kind']=='WEAP' and item['subtype'] in HELD_WEAPONS or item['kind']=='ARMO' and item['subtype']==8):flags|=4
             else:report['held'].setdefault(identifier,{})['model']='not in the item model table'
         if models and identifier in selected:
             stem=hashlib.sha256(identifier.encode()).hexdigest()[:16]
@@ -254,7 +260,7 @@ def prepare(data_files,id1,selected=(),palette=None,models=True,jobs=None,model_
                     model='progs/inv/i'+stem+'.mdl';out=id1/model;out.parent.mkdir(parents=True,exist_ok=True);out.write_bytes(raw)
                     report['models'][identifier]={'path':model,'sha256':hashlib.sha256(raw).hexdigest(),'bytes':len(raw)}
                     if inert:flags|=2
-                    if inert and not item['enchantment'] and (item['kind']=='WEAP' and item['subtype'] in (0,1,2,3,4,5,6,7,8) or item['kind']=='ARMO' and item['subtype']==8):flags|=4
+                    if inert and not item['enchantment'] and (item['kind']=='WEAP' and item['subtype'] in HELD_WEAPONS or item['kind']=='ARMO' and item['subtype']==8):flags|=4
                 except (ValueError,KeyError,OSError) as error:report['held'].setdefault(identifier,{})['model']=str(error)
             if item['source_icon']:
                 try:
@@ -289,7 +295,11 @@ def prepare(data_files,id1,selected=(),palette=None,models=True,jobs=None,model_
         if not (math.isfinite(charge) and 0<=charge<=1000000):raise ValueError('Invalid enchantment charge '+identifier)
         light=item.get('light')
         # bytes 504..511: a carried light's burn time and colour; else the enchantment points (u16 at 504, v0.0.58)
-        tail=struct.pack('<i3Bx',light['time'],*light['colour']) if light else struct.pack('<H6x',item.get('capacity',0))
+        # byte 506 of a weapon (v0.0.61, RESIST-NORMAL-WEAPONS-61): its WPDT flags, 1 magical and 2 silver (OpenMW
+        # combat.cpp isNormalWeapon: a creature that resists normal weapons is hurt only by these or enchanted ones)
+        flags_506=struct.unpack_from('<i',item['raw'],28)[0]&3 if item['kind']=='WEAP' and len(item['raw'])>=32 else 0
+        tail=struct.pack('<i3Bx',light['time'],*light['colour']) if light else \
+            struct.pack('<HB5x',item.get('capacity',0),flags_506)
         row+=struct.pack('<ii6iffffii',*combat)+struct.pack('<B3xf',kind,charge)+tail
         assert len(row)==ROW;rows.append(row)
     out=id1/'inventory/items.awi';out.parent.mkdir(parents=True,exist_ok=True)

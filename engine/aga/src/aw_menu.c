@@ -203,19 +203,27 @@ static const control_t controls[]={
 #define CONTROL_STYLE (CONTROL_FIRST+CONTROL_ACTIONS)
 #define CONTROL_DICE (CONTROL_STYLE+1)
 #define CONTROL_BLOCK (CONTROL_STYLE+2)
-#define CONTROL_RESET (CONTROL_STYLE+3)
+/* Weapon sway (FP-WEAPON-SWAY-61, the maintainer's decision of 5 November 2026): AmiWind groove (aw_fp_sway 1, the
+ * default: the held weapon bobs and lags behind the turn) / Morrowind stiff (2: the hands stay still, only the attack
+ * moves them) */
+#define CONTROL_SWAY (CONTROL_STYLE+3)
+#define CONTROL_RESET (CONTROL_STYLE+4)
 #define CONTROL_ROWS (CONTROL_RESET+1)
 #define CONTROL_ACTION(row) ((row)>=CONTROL_FIRST && (row)<CONTROL_STYLE)
-#define CONTROL_COMBAT(row) ((row)==CONTROL_STYLE || (row)==CONTROL_DICE || (row)==CONTROL_BLOCK)
+#define CONTROL_COMBAT(row) ((row)==CONTROL_STYLE || (row)==CONTROL_DICE || (row)==CONTROL_BLOCK || (row)==CONTROL_SWAY)
 static void combat_toggle(int row){
     if(row==CONTROL_STYLE)Cvar_SetValue("aw_combat_miss",Cvar_VariableValue("aw_combat_miss")?0:1);
     else if(row==CONTROL_DICE)Cvar_SetValue("aw_combat_dice",Cvar_VariableValue("aw_combat_dice")?0:1);
     else if(row==CONTROL_BLOCK)Cvar_SetValue("aw_combat_block",Cvar_VariableValue("aw_combat_block")?0:1);
+    else if(row==CONTROL_SWAY)Cvar_SetValue("aw_fp_sway",Cvar_VariableValue("aw_fp_sway")==2?1:2);
 }
 static void combat_line(int row,char *line){
     if(row==CONTROL_STYLE){
         strcpy(line,Cvar_VariableValue("aw_combat_miss")?"Combat style: AmiWind":"Combat style: Original Morrowind");
         if(AW_UIWidth(line)>LIST_W-4)strcpy(line,Cvar_VariableValue("aw_combat_miss")?"Combat: AmiWind":"Combat: Original Morrowind");
+    }else if(row==CONTROL_SWAY){
+        strcpy(line,Cvar_VariableValue("aw_fp_sway")==2?"Weapon sway: Morrowind stiff":"Weapon sway: AmiWind groove");
+        if(AW_UIWidth(line)>LIST_W-4)strcpy(line,Cvar_VariableValue("aw_fp_sway")==2?"Sway: Morrowind stiff":"Sway: AmiWind groove");
     }else if(row==CONTROL_BLOCK)strcpy(line,Cvar_VariableValue("aw_combat_block")?"Blocking: Hold to block":"Blocking: Automatic");
     else strcpy(line,Cvar_VariableValue("aw_combat_dice")?"Dice rolls: On":"Dice rolls: Off");
 }

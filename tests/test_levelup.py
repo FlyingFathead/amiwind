@@ -133,7 +133,9 @@ class LevelupSourceContractTests(unittest.TestCase):
         codec = code('aw_save_codec.c')
         self.assertIn('(levelling_used(&copy.character)?64U:0U)', codec)
         self.assertIn("if(!error && data[3]=='4' && (features&64))levelling_fields(&candidate.character);", codec)
-        self.assertIn('if(features>255)error=1;', codec)   # bit 128: the dated journal history (JOURNAL-ORIGINAL-VIEW-59)
+        # bit 128: the dated journal history (JOURNAL-ORIGINAL-VIEW-59), 256: up to 128 kinds of item, 512: any number
+        # of kinds (INVENTORY-ORIGINAL-LIMITS-61)
+        self.assertIn('if(features>1023)error=1;', codec)
 
     def test_engine_wiring_build_route_and_budget(self):
         make = (ROOT / 'engine/aga/Makefile').read_text(encoding='utf-8')

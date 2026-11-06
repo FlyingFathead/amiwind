@@ -127,6 +127,18 @@ int AW_ActorItem(int item,aw_item_t *out);
 aw_actor_t *AW_ActorGet(uint32_t reference,int row,int create);
 /* The player's record (base: the "player" row); the host fills it from its character sheet (AW_ActorPlayerSet). */
 aw_actor_t *AW_ActorPlayer(void);
+/* ACTOR-STATS-ALL-61 (aw_stats.h, docs/ACTOR_STATS.md): the live record of a placed REFERENCE whose base is ROW, made
+ * from its area's stat block B when it has none yet (the area load fills every placed actor's record this way, before
+ * play; a record that exists is returned as it is). A record made from the base row without a block asks
+ * aw_actor_stats_source (the host: the loaded areas' block of a placed reference; NULL or 0: the actor table's row,
+ * the previous method, counted). AW_ActorStatsSwitch(-1) reads, 0 / 1 sets the area stats on (1, the default) or off
+ * (the actor table's rows only); the value before. */
+struct aw_stat_block_s;
+aw_actor_t *AW_ActorFromStats(uint32_t reference,int row,const struct aw_stat_block_s *b);
+extern int (*aw_actor_stats_source)(uint32_t reference,struct aw_stat_block_s *out);
+int AW_ActorStatsSwitch(int on);
+/* records made from area blocks, from the actor table's rows */
+void AW_ActorStatsCounts(unsigned long out[2]);
 
 /* Stats with OpenMW's semantics (docs/ACTOR_STATE.md "The calls"). */
 float AW_ActorStat(const aw_actor_t *a,int stat);                 /* GET: modified value, current dynamic */

@@ -14,6 +14,13 @@
 #include "aw_skel.h"
 #define WEAK __attribute__((weak))
 WEAK int AW_QuickCharActive(void){return 0;}
+/* TAKEN-LIGHT-FLAME-61: the effect links' users (aw_guard_torch.c, aw_lamps.c, chim/chim_chunks.c) and their source
+ * (aw_inventory.c): a fixture without them has no exterior placement to hide and no link to apply. */
+WEAK void AW_StaticFlameLink(model_t *world,int ordinal,unsigned reference){(void)world;(void)ordinal;(void)reference;}
+WEAK void AW_LampLink(unsigned row,unsigned reference){(void)row;(void)reference;}
+WEAK int ChimChunks_GonePid(unsigned pid,int gone){(void)pid;(void)gone;return 0;}
+WEAK int AW_AreaEffectPids(unsigned reference,unsigned *pids,int most){(void)reference;(void)pids;(void)most;return 0;}
+WEAK void AW_AreaEffectsApply(void){}
 /* The game clock (aw_clock.c): the travel services move it by a ride's hours (aw_scene.c travel_ride). */
 WEAK int AW_ClockAdvance(int milliseconds){(void)milliseconds;return 0;}
 /* The owned-item crosshair cue (view.c defines it; aw_harvest_runtime.c sets it). */
@@ -152,3 +159,5 @@ WEAK void AW_InventoryGrantCommand(void){}
 
 /* dbg tp's settlements box (aw_tpplaces.c, TP-PICKER-57): no table in fixtures, so the scene picker opens as before. */
 WEAK int AW_TpPlacesOpen(void){return 0;}
+/* dbg weapon / dbg gear's box (aw_gearbox.c, WEAPONS-57): no box in fixtures. */
+WEAK int AW_GearBoxOpen(int kind){(void)kind;return 0;}

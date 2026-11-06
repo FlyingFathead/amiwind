@@ -148,6 +148,7 @@ Family: Mesh converter geometry (`converter-geometry`). Converted faces must be 
 - GEO-01 (no report page): Giant mushroom cap gaps after material-wise mesh reduction
 - GEO-03 (no report page): Canonical clipping stored reversed-winding fragments
 - [GHOSTFENCE-NO-ANIMATION-46](GHOSTFENCE-NO-ANIMATION-46.md): The Ghostfence's shimmering curtain does not move: its texture scroll is dropped by the converter
+- HELD-BLADE-EDGE-ON-61 (no report page): A held weapon seen edge-on from behind in third person shows only its hilt: the thin blade draws no pixels
 - INLAND-SHORE-29 (no report page): v0.0.29-dev1: Angular/jagged inland shoreline
 - [LIGHTMAP-GRID-31](LIGHTMAP-GRID-31.md): Some baked lightmaps sit one sample row or column off
 - [LIGHTMAP-TAIL-31](LIGHTMAP-TAIL-31.md): Interior lightmap: the last face points past the end of the lighting lump

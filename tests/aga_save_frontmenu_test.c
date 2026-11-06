@@ -19,6 +19,12 @@ int aw_race_count,aw_class_count,aw_birth_count,aw_part_count;
 static int catalogue_loads;
 
 int32_t AW_StateGet(const aw_state_t *s,int kind,const char *id){(void)s;(void)kind;(void)id;return -1;}
+/* the item table (aw_state.c is not linked here; these fixtures carry no items) */
+int AW_ItemIndex(const aw_state_t *s,const char *id){(void)s;(void)id;return -1;}
+int AW_ItemAppend(aw_state_t *s,const char *id,int32_t value){(void)s;(void)id;(void)value;return 0;}
+void AW_ItemsFree(aw_state_t *s){memset(&s->items,0,sizeof(s->items));}
+int AW_ItemsClone(aw_items_t *out,const aw_items_t *in){(void)in;memset(out,0,sizeof(*out));return 1;}
+void (*aw_save_items_loaded)(void);
 int AW_CharacterLoad(void)
 {
     catalogue_loads++;

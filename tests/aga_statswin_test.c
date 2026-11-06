@@ -114,6 +114,19 @@ static void spells_file(void){
     }
     fclose(f);
 }
+/* PLAYER-CASTING-59: casting's hooks (aw_cast.c in the game) as fakes */
+static int chosen_kind=-1,chosen_index=-1;
+static int fake_castables(aw_magic_list_t *out){
+    strcpy(out->name[0],"Ancestor Guardian");out->power[0]=1;out->kind[0]=0;out->index[0]=2;
+    strcpy(out->name[1],"Fire Bite");out->power[1]=0;out->kind[1]=0;out->index[1]=324;
+    strcpy(out->name[2],"My Spell");out->power[2]=0;out->kind[2]=1;out->index[2]=0;
+    out->count=3;out->selected=-1;return 3;
+}
+static void fake_select(int kind,int index){chosen_kind=kind;chosen_index=index;}
+static int fake_status(char *out,int size){
+    if(chosen_index<0)return 0;
+    snprintf(out,(size_t)size,"%s: cost 6, chance 16 %%",chosen_kind?"My Spell":"Fire Bite");return 1;
+}
 int main(void){
     static const char *const attributes[8]={"Strength","Intelligence","Willpower","Agility","Speed","Endurance","Personality","Luck"};
     char line[32],*path=getenv("AW_STATS_PPM");int i,j,seen[27],major_rows;
@@ -210,8 +223,22 @@ int main(void){
     remove("spells.aws");magic_command();draw();
     for(i=j=0;i<text_count;i++)if(!strcmp(texts[i].value,"None"))j++;
     assert(j==3);panel_closed();
+    /* With casting: the spells the player knows, a cursor (Up/Down), Enter or a click selects, the footer names it. */
+    aw_magic_castables=fake_castables;aw_magic_select=fake_select;aw_magic_status=fake_status;
+    magic_command();assert(opens==4);draw();
+    assert(find("Ancestor Guardian") && find("Fire Bite") && find("My Spell") && !find("Fay's Light"));
+    assert(find("Powers")->y<find("Ancestor Guardian")->y && find("Spells")->y<find("Fire Bite")->y);
+    assert(find("Up/Down, Enter: select a spell") && !find("(Not yet implemented)"));
+    assert(panel_key(K_UPARROW,0,0) && panel_key(K_DOWNARROW,0,0) && panel_key(K_ENTER,0,0));
+    assert(chosen_kind==0 && chosen_index==324);
+    draw();assert(find("* Fire Bite") && find("Fire Bite: cost 6, chance 16 %"));
+    {int y=find("My Spell")->y;assert(panel_key(K_MOUSE1,20,y+1));}
+    assert(chosen_kind==1 && chosen_index==0);
+    draw();assert(find("* My Spell") && find("Fire Bite") && find("My Spell: cost 6, chance 16 %"));
+    assert(!panel_key('o',0,0));panel_closed();
+    aw_magic_castables=NULL;aw_magic_select=NULL;aw_magic_status=NULL;
     /* No character: neither window opens. */
-    c->valid=0;stats_command();magic_command();assert(opens==3);
+    c->valid=0;stats_command();magic_command();assert(opens==4);
     puts("Stats and Magic windows: content rows, grouping, scroll, keys, live update ok");
     return 0;
 }

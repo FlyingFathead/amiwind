@@ -33,8 +33,8 @@ static struct {char id[64];float male,female;} races[RACES];
 static int race_count;
 static float last_factor;       /* the last move's input 0..1 (fatigue cost scale) */
 static int last_swimming,last_running,last_sneaking,prev_ground;
-static unsigned long carried_key;
-static float carried_weight;
+static float effect_burden,effect_feather;   /* AW_EncumbranceSetEffects */
+static double over_shown;                     /* when the over-encumbered line was last raised */
 
 extern void (*aw_move_ground)(float *forwardmove,float *sidemove);
 extern int (*aw_move_water)(float forwardmove,float sidemove,float upmove,float *wishspeed);
@@ -80,22 +80,27 @@ static void load_settings(void) {
     if(settings_state==2)Con_Printf("Movement settings: %ld of %ld in this image; the original's values are used.\n",
                                     (long)count,(long)AW_MOVE_SETTING_COUNT);
 }
-/* The carried weight: the owned items' catalogue weights x counts, read again
- * only when the owned items change (a key over ids and counts). */
-static float carried(void) {
-    unsigned long key=5381;int i,n=aw_state.count[AW_ITEM];const char *s;float total=0;
-    aw_inventory_item_t item;
-    for(i=0;i<n;i++){
-        for(s=aw_state.values[AW_ITEM][i].id;*s;s++)key=key*33+(unsigned char)*s;
-        key=key*33+(unsigned long)aw_state.values[AW_ITEM][i].value;
-    }
-    key=key*33+(unsigned long)n;
-    if(key==carried_key)return carried_weight;
-    for(i=0;i<n;i++)
-        if(aw_state.values[AW_ITEM][i].value>0 && AW_InventoryRead(aw_state.values[AW_ITEM][i].id,&item))
-            total+=item.weight*aw_state.values[AW_ITEM][i].value;
-    carried_key=key;carried_weight=total;
-    return total;
+/* The carried weight: the item table's running total (aw_state.h, ENCUMBRANCE-INCOMPLETE-61): the records' weights
+ * x counts, changed when items come and go, never summed here. */
+static float carried(void) {return AW_ItemsBurden(&aw_state);}
+void AW_EncumbranceSetEffects(float burden,float feather) {
+    effect_burden=burden>0?burden:0;effect_feather=feather>0?feather:0;
+}
+float AW_PlayerEncumbrance(float *capacity) {
+    aw_move_inputs_t in;float weight;
+    AW_MovePlayerInputs(&in);
+    if(capacity)*capacity=AW_MoveCapacity(&settings,&in);
+    weight=in.carried-in.feather+(in.godmode?0:in.burden);
+    return weight>0?weight:0;
+}
+/* The player tried to move or jump while over the limit (OpenMW mwgui/windowmanagerimp.cpp: getEncumbrance >
+ * getCapacity): the game's own line, sNotifyMessage59, kept up while he keeps trying (raised again every 2 s). */
+static void over_encumbered(const aw_move_inputs_t *in,int trying) {
+    static char line[96];float capacity=AW_MoveCapacity(&settings,in);
+    float weight=in->carried-in->feather+(in->godmode?0:in->burden);
+    if(!trying || !(weight>capacity) || in->dead || realtime-over_shown<2)return;
+    if(!line[0] && !AW_LevelupGameText("sNotifyMessage59",line,sizeof(line)))strcpy(line,"You are over-encumbered.");
+    AW_UISubtitle("",line,3);over_shown=realtime;
 }
 static float attribute(int i) {
     return (float)(aw_character.attributes[i]+aw_character.modifiers[i]-aw_character.damage[i]);
@@ -122,7 +127,8 @@ void AW_MovePlayerInputs(aw_move_inputs_t *in) {
     in->dead=p && p->v.health<=0;
     in->godmode=p && ((int)p->v.flags&FL_GODMODE);
     in->fatigue=AW_CombatPlayerFatigue(&in->fatigue_max);
-    /* paralysis, Feather/Burden, Levitate, Swift Swim, Jump, Slowfall,
+    in->burden=effect_burden;in->feather=effect_feather;   /* AW_EncumbranceSetEffects */
+    /* paralysis, Levitate, Swift Swim, Jump, Slowfall,
      * Water Walking: no input or magic effect in the engine yet (0 = no effect). */
 }
 /* The command's input as a fraction of full input on each axis (Shift scales
@@ -137,6 +143,7 @@ static void ground(float *forwardmove,float *sidemove) {
     y=axis(*forwardmove,(*forwardmove>=0?cl_forwardspeed.value:cl_backspeed.value)*run);
     x=axis(*sidemove,cl_sidespeed.value*run);
     len=sqrt(x*x+y*y);
+    over_encumbered(&in,len>0 || (sv_player && sv_player->v.button2));
     if(len<=0){*forwardmove=*sidemove=0;return;}
     last_factor=len>1?1:len;last_swimming=0;last_running=in.running;last_sneaking=in.sneaking;
     speed=AW_MoveCurrentSpeed(&settings,&in,last_factor,AW_MoveStrafing(y,x))*AW_MOVE_UNIT_SCALE;
@@ -152,6 +159,7 @@ static int water(float forwardmove,float sidemove,float upmove,float *wishspeed)
     x=axis(sidemove,cl_sidespeed.value*run);
     z=axis(upmove,cl_upspeed.value*run);
     len=sqrt(x*x+y*y+z*z);
+    over_encumbered(&in,len>0);
     last_factor=len>1?1:len;last_swimming=1;last_running=in.running;last_sneaking=0;
     *wishspeed=AW_MoveCurrentSpeed(&settings,&in,last_factor,AW_MoveStrafing(y,x))*AW_MOVE_UNIT_SCALE;
     return 1;
@@ -201,7 +209,9 @@ static void superspeed_command(void) {
      Con_Printf(" (Speed %ld, Athletics %ld, load %ld of %ld)\n",(long)in.speed,(long)in.athletics,
                 (long)(in.carried+.5f),(long)(AW_MoveCapacity(&settings,&in)+.5f));}
 }
+extern float (*aw_worldui_encumbrance)(float *capacity);   /* aw_worldui.c: the inventory window's burden bar */
 void AW_MoveInit(void) {
+    aw_worldui_encumbrance=AW_PlayerEncumbrance;
     Cvar_RegisterVariable(&superspeed);
     Cmd_AddCommand("superspeed",superspeed_command);
     aw_move_ground=ground;aw_move_water=water;aw_move_after=after;aw_view_sneak=view_sneak;

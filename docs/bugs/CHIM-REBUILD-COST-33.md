@@ -20,7 +20,7 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
+_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -96,7 +96,7 @@ vis rows, ground traces, placement and static efrags, edict leaves); on a Balmor
 669 chunks where the full rebuild copies 66,081. At one chunk a frame, the nearest chunk without ground
 stays 456 units away (collision margin 224), with no urgent join and no repack after the first layout.
 
-9 October 2026, FS-UAE with the JIT, busy host (relative numbers), Balmora's CHIM frame map, the same walk
+9 October 2026, FS-UAE with the JIT, loaded machine (relative numbers), Balmora's CHIM frame map, the same walk
 per variant (1,536 units east and back, noclip), one session with a drift-control rerun:
 
 | Variant | Updates | us per update median / max | KB copied per update (max) | Chunk copies | Nearest chunk without ground |
@@ -114,7 +114,7 @@ session are not quoted: with `chim_debug 1` each update wrote a console line thr
 
 8 October 2026, FS-UAE (emulator numbers are relative until a hardware number exists): one
 frame-world rebuild per chunk crossing costs 0.7-3.5 ms under JIT, but 95-184 ms for 30-40 chunks
-in a cycle-exact run (JIT off, CPU multiplier 7, busy host). On a 68040 that is a visible hitch at
+in a cycle-exact run (JIT off, CPU multiplier 7, loaded machine). On a 68040 that is a visible hitch at
 every crossing. Suggested direction: an incremental frame-world pool that touches only the chunks
 that changed. Pending: a hardware number.
 

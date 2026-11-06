@@ -35,7 +35,12 @@ class Hands(unittest.TestCase):
             times,clips=sample_clips(events,stance)
             self.assertEqual(len(times),28);self.assertEqual([c['first'] for c in clips.values()],[0,8,14,18])
         with self.assertRaises(ValueError):sample_clips({},'1h')          # groups missing
-        with self.assertRaises(ValueError):stance_clips('bow')
+        with self.assertRaises(ValueError):stance_clips('spell')
+        # FIRST-PERSON-WEAPONS-56: the ranged stances shoot instead of chopping, over their own idles
+        self.assertEqual(stance_clips('bow')[0][1],'idle1h: start')
+        self.assertEqual(stance_clips('bow')[3][1:3],('bowandarrow: shoot start','bowandarrow: shoot follow stop'))
+        self.assertEqual(stance_clips('xb')[0][1],'idlecrossbow: start')
+        self.assertEqual(stance_clips('1t')[1][1:3],('throwweapon: equip start','throwweapon: equip stop'))
 
     def test_view_tags_place_items_like_the_hand_vertices(self):
         # An item vertex placed by the view tag (item model in its own axes, 0.25 scale) lands where

@@ -17,6 +17,17 @@ static unsigned crc(const unsigned char *p,int n)
     unsigned x=~0U;int j;while(n--){x^=*p++;for(j=0;j<8;j++)x=(x>>1)^((x&1)?0xedb88320U:0);}return ~x;
 }
 static void put(unsigned char *p,unsigned x){p[0]=x;p[1]=x>>8;p[2]=x>>16;p[3]=x>>24;}
+/* INVENTORY-ORIGINAL-LIMITS-61: a decoded save owns its item table (aw_state.h OWNERSHIP): the rows compared one by
+ * one (id and count), everything else byte for byte */
+static int same_state(const aw_state_t *x,const aw_state_t *y)
+{
+    aw_state_t a=*x,b=*y;int i;
+    if(a.items.count!=b.items.count)return 0;
+    for(i=0;i<a.items.count;i++)
+        if(strcmp(AW_ITEM_ID(&a,i),AW_ITEM_ID(&b,i)) || AW_ITEM_ROW(&a,i)->value!=AW_ITEM_ROW(&b,i)->value)return 0;
+    memset(&a.items,0,sizeof(a.items));memset(&b.items,0,sizeof(b.items));
+    return !memcmp(&a,&b,sizeof(a));
+}
 static void encoding(void)
 {
     static aw_save_t source,decoded,sentinel;static unsigned char raw[AW_SAVE_BYTES],copy[AW_SAVE_BYTES];
@@ -24,6 +35,7 @@ static void encoding(void)
     strcpy(source.scene,"seyda");strcpy(source.story.name,"Synthetic");
     source.story.stage=AW_STAGE_RELEASED;source.story.ship_disabled=1;source.story.captain=-1;
     source.character.level=1;source.character.hair=1;source.state=state;
+    assert(AW_ItemsClone(&source.state.items,&state.items));   /* its own rows: the items below are the save's only */
     source.actor_count=AW_SAVE_ACTORS;
     for(i=0;i<AW_SAVE_ACTORS;i++){source.actors[i].reference=i+1;source.actors[i].scene=0;}
     assert(AW_StateSet(&source.state,AW_JOURNAL,"quest",256));
@@ -34,14 +46,14 @@ static void encoding(void)
     source.state.journal_count=AW_JOURNAL_ENTRIES;
     for(i=0;i<AW_JOURNAL_ENTRIES;i++){source.state.journal[i].quest=0;source.state.journal[i].stage=i+1;}
     n=AW_SaveEncode(raw,sizeof(raw),&source);assert(n>32768 && n<AW_SAVE_BYTES && !memcmp(raw,"AWS4",4));
-    assert(AW_SaveDecode(raw,n,&decoded));assert(!memcmp(&source.state,&decoded.state,sizeof(state)));
+    assert(AW_SaveDecode(raw,n,&decoded));assert(same_state(&source.state,&decoded.state));AW_SaveRelease(&decoded);
     /* Remove only the two AWS4 words to retain a genuine old-layout
      * sparse save reader check; this fixture contains all 4096 facts. */
     at=n-4-(40+AW_HARVEST_SLOTS*8)-4;
     memcpy(copy,raw,at);memcpy(copy+at,raw+at+4,n-at-8);
     memcpy(copy,"AWS3",4);put(copy+4,n-8);put(copy+8,crc(copy+12,n-20));
     assert(AW_SaveDecode(copy,n-8,&decoded) && !decoded.equipment);
-    assert(!memcmp(&source.state,&decoded.state,sizeof(state)));
+    assert(same_state(&source.state,&decoded.state));AW_SaveRelease(&decoded);
     printf("maximum-state save bytes=%d, state bytes=%lu, saved-state bytes=%lu\n",n,(unsigned long)sizeof(state),(unsigned long)sizeof(source));
     memset(&sentinel,0x5a,sizeof(sentinel));decoded=sentinel;
     for(i=0;i<16;i++){assert(!AW_SaveDecode(raw,n-i-1,&decoded));assert(!memcmp(&decoded,&sentinel,sizeof(decoded)));}
@@ -56,7 +68,9 @@ static void encoding(void)
     source.state.harvest.slots=AW_HARVEST_SLOTS-1;assert(!AW_SaveEncode(copy,sizeof(copy),&source));
     source.state.harvest.slots=AW_HARVEST_SLOTS;source.state.harvest.facts[0]=0x40100000U;
     assert(!AW_SaveEncode(copy,sizeof(copy),&source));
+    AW_ItemsFree(&source.state);
     source.state=state;memset(source.state.harvest.catalogue,0,32);assert(!AW_SaveEncode(copy,sizeof(copy),&source));
+    memset(&source.state.items,0,sizeof(source.state.items));   /* it shared the game state's rows for the encode */
 }
 int main(int argc,char **argv)
 {
@@ -78,7 +92,7 @@ int main(int argc,char **argv)
     indexed();h.node[0].chance=100;assert(AW_HarvestPrepare(&h,0,&state,1,9)==0);
     fact=state.harvest.facts[0];assert(fact&0x80000000U);save_roundtrip();
     h.node[0].chance=0;assert(AW_HarvestPrepare(&h,0,&state,99,33)==0 && state.harvest.facts[0]==fact);
-    assert(AW_HarvestPickedCount(&state)==0 && !state.count[AW_ITEM]);
+    assert(AW_HarvestPickedCount(&state)==0 && !AW_ItemCount(&state));
     /* Exact-key legacy migration preserves the chosen roll, not just a boolean. */
     fixture();assert(AW_HarvestTake(&h,0,&state,1,17)==1);save_roundtrip();
     h.slots=AW_HARVEST_SLOTS;memset(h.catalogue,0x36,32);h.plant[0].slot=99;
@@ -87,7 +101,7 @@ int main(int argc,char **argv)
     assert(AW_HarvestPickedCount(&state)==1);save_roundtrip();
     indexed();h.edge[2].node=1;h.plant[0].count=2;h.edges=4;h.edge[3].node=2;h.edge[3].count=1;
     assert(AW_ItemAdd(&state,"ingredient_b",INT32_MAX));
-    assert(AW_HarvestTake(&h,0,&state,1,7)==-1 && !AW_StateGet(&state,AW_ITEM,"ingredient_a"));
+    assert(AW_HarvestTake(&h,0,&state,1,7)==AW_HARVEST_TOO_MANY && !AW_StateGet(&state,AW_ITEM,"ingredient_a"));
     assert(!AW_HarvestHidden(&h,0,&state));
     puts("4096 placement states, AWS4 maximum save and AWS3 compatibility, exact-key migration and atomic rejection passed");return 0;
 }

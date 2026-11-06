@@ -75,6 +75,6 @@ Family: Emulator measurement method (`benchmark-method`). Emulator numbers are r
 
 Related bugs in other categories:
 
-- [AUDIO-HOST-LOAD-33](AUDIO-HOST-LOAD-33.md): Music and sound crackle when the emulator shares a fully loaded host CPU
+- [AUDIO-HOST-LOAD-33](AUDIO-HOST-LOAD-33.md): Music and sound crackle when the emulator shares a fully loaded CPU
 
 <!-- END GENERATED CATEGORY -->

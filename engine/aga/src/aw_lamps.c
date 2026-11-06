@@ -36,7 +36,9 @@
 /* Seconds a lamp takes to grow to full radius when chosen, and to shrink
  * away when dropped (on the spare lamp keys); nothing snaps on or off. */
 #define LAMP_FADE .4f
-typedef struct {float origin[3],radius,lit_since,off_since;int cool,lit,fading,fire,flicker;} lamp_t;
+/* row: the lamp's row in the table; ref: the placement of the carriable light it stands at (the area's effect links,
+ * AW_LampLink; 0 a fixed lamp): a taken or disabled one gives no light (TAKEN-LIGHT-FLAME-61) */
+typedef struct {float origin[3],radius,lit_since,off_since;int cool,lit,fading,fire,flicker;unsigned row,ref;} lamp_t;
 /* The lamp table's class codes (tools/light_sources.py LAMP_CLASSES): lamp 1, torch 2, fire 3, candle 4. */
 #define LAMP_CLASS_TORCH 2
 #define LAMP_CLASS_FIRE 3
@@ -70,6 +72,26 @@ static int last_found,last_index[AW_LAMP_LIGHT_COUNT];static float last_distance
 static uint32_t u32(const byte *p){return (uint32_t)p[0]|((uint32_t)p[1]<<8)|((uint32_t)p[2]<<16)|((uint32_t)p[3]<<24);}
 static int s16(const byte *p){return (int)(int16_t)(uint16_t)(p[0]|(p[1]<<8));}
 static float f32(const byte *p){uint32_t n=u32(p);float f;memcpy(&f,&n,4);return f;}
+/* TAKEN-LIGHT-FLAME-61: the lamp rows that stand at a carriable light, from the effect links of the loaded areas
+ * (areas.awa, aw_inventory.c AW_AreaEffectsApply; no file of their own): row of world/lamps.awl -> its placement's
+ * reference. LAMP_CACHE rows at most (the 3 x 3 cells' lamps), the oldest replaced; 8 bytes a row, 2 KB. */
+static struct {unsigned row,ref;} lamp_links[LAMP_CACHE];static int lamp_link_count,lamp_link_next;
+/* aw_mwhost.c sets it (AW_ObjectDisabled): 1 when the lamp's carriable light was taken or disabled. NULL: every lamp. */
+int (*aw_lamp_gone)(unsigned int reference);
+static unsigned lamp_link_of(unsigned row){
+    int i;for(i=0;i<lamp_link_count;i++)if(lamp_links[i].row==row)return lamp_links[i].ref;
+    return 0;
+}
+void AW_LampLink(unsigned row,unsigned ref){
+    int i;
+    for(i=0;i<lamp_link_count;i++)if(lamp_links[i].row==row)break;
+    if(i==lamp_link_count){
+        if(lamp_link_count<LAMP_CACHE)i=lamp_link_count++;
+        else{i=lamp_link_next;lamp_link_next=(lamp_link_next+1)%LAMP_CACHE;}
+    }
+    lamp_links[i].row=row;lamp_links[i].ref=ref;
+    for(i=0;i<lamp_count;i++)if(lamps[i].row==row)lamps[i].ref=ref;    /* the cached lamps of the cells read already */
+}
 /* Read every row of one cell into the cache; the table is sorted by cell. */
 static void load_cell(FILE *f,long base,unsigned count,int cx,int cy)
 {
@@ -87,7 +109,7 @@ static void load_cell(FILE *f,long base,unsigned count,int cx,int cy)
         if(lamp_count>=LAMP_CACHE){lamp_dropped++;continue;} /* counted, shown by dbg lamps */
         for(k=0;k<3;k++)l->origin[k]=f32(row+4+k*4);
         l->radius=(float)(row[16]|(row[17]<<8));l->cool=row[19]==2;l->lit=l->fading=0;l->lit_since=l->off_since=0;
-        l->fire=row[18]==LAMP_CLASS_FIRE;l->flicker=LAMP_FLICKERS(row[18]);
+        l->fire=row[18]==LAMP_CLASS_FIRE;l->flicker=LAMP_FLICKERS(row[18]);l->row=(unsigned)lo;l->ref=lamp_link_of((unsigned)lo);
         if(isfinite(l->origin[0]) && isfinite(l->origin[1]) && isfinite(l->origin[2]) && l->radius>0)lamp_count++;
     }
 }
@@ -200,6 +222,8 @@ void AW_LampUpdate(void)
         d=(dx*dx+dy*dy+dz*dz)*(1.0f/16);
         if(!(d<LAMP_RANGE*LAMP_RANGE))continue;
         if(lamps[i].fire && !r_campfires)continue;      /* dbg campfires off */
+        /* a carriable light taken or disabled: its light goes with it (one sorted-list lookup, lamps in range only) */
+        if(lamps[i].ref && aw_lamp_gone && aw_lamp_gone(lamps[i].ref))continue;
         /* Local and source axes are the same (scale and offset only). */
         if(dx*vpn[0]+dy*vpn[1]+dz*vpn[2]<0)d*=LAMP_BEHIND*LAMP_BEHIND;
         if(lamps[i].lit)d*=LAMP_KEEP;

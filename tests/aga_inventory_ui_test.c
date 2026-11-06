@@ -122,8 +122,11 @@ void AW_CombatEquipmentStore(void){store_calls++;}
 void AW_CombatEquipmentChanged(void){changed_calls++;}
 int AW_ViewInventoryBody(model_t **model,int *frame){static model_t body;*model=&body;*frame=7;return 1;}
 int AW_InventoryPreviewDraw(model_t *model,int frame,int x,int y,int width,int height,float angle){
-    (void)model;(void)angle;assert(frame==7 && x<128 && y==22 && width==116 && height==168);assert(angle>3.14f && angle<3.15f);preview_calls++;return 1;
+    (void)model;(void)angle;assert(frame==7 && x<128 && y==32 && width==116 && height==158);assert(angle>3.14f && angle<3.15f);preview_calls++;return 1;
 }
+/* ENCUMBRANCE-INCOMPLETE-61: the player's burden as aw_move.c gives it (12.2 of 300) */
+static float test_burden(float *capacity){*capacity=300;return 12.2f;}
+extern float (*aw_worldui_encumbrance)(float *capacity);
 int main(void){
     static client_t client;static edict_t actor;aw_state_t before;int calls;
     assert(!map_journal_regressions());
@@ -133,8 +136,20 @@ int main(void){
     strcpy(fixture_item.model,"progs/inv/fixture.mdl");fixture_item.category=AW_INV_CLOTHING;
     fixture_item.slots=(1U<<AW_SLOT_LRING)|(1U<<AW_SLOT_RRING);fixture_item.flags=7;
     assert(AW_ItemAdd(&aw_state,fixture_item.id,2));
+    /* CHARGEN-INVENTORY-LOCKED-60: during the registration the inventory key opens the window once the papers are
+     * activated (story_inventory), the map and journal stay closed until the registration ends */
+    story_restricted=1;AW_InventoryOpen();assert(!AW_InventoryActive() && key_dest==key_game);
+    story_inventory=1;map_command();assert(!AW_WorldUIActive());journal_command();assert(!AW_WorldUIActive());
+    AW_InventoryOpen();assert(AW_InventoryActive() && key_dest==key_menu);
+    AW_WorldUIKey('i',1);assert(!AW_InventoryActive() && key_dest==key_game);
+    story_restricted=story_inventory=0;preview_calls=0;
     AW_InventoryOpen();assert(AW_InventoryActive() && key_dest==key_menu);draw();assert(preview_calls==1);
     assert(strstr(drawn,"Fixture Ring") && strstr(drawn,"Sort: Name"));
+    /* the burden bar above the picture (OpenMW inventorywindow.cpp: ceil(encumbrance) / capacity on the blue bar) */
+    assert(!bar_calls);aw_worldui_encumbrance=test_burden;draw();
+    assert(bar_calls==1 && bar_colour==1 && bar_x==8 && bar_y==21 && bar_w==114 && bar_h==9 && bar_y+bar_h<=32);
+    assert(bar_fraction>13/300.0f-1e-4f && bar_fraction<13/300.0f+1e-4f && strstr(drawn,"13/300"));
+    aw_worldui_encumbrance=NULL;
     /* UI-INVENTORY-PREVIEW-STILL-42: a still picture: one render, then the same pose and the
      * front angle frame after frame (the stub asserts the angle); turning keys do nothing. */
     {int i;for(i=0;i<8;i++)draw();}
@@ -218,7 +233,7 @@ int main(void){
         assert(label->width==137); /* no smaller font or wider hidden field */
         assert(layout_find("Tab category")->y==176);
         assert(layout_find("Up/Down select")->y==184);
-        assert(preview_calls); /* exact168px preview bounds checked by its stub */
+        assert(preview_calls); /* exact 116 x 158 preview bounds under the burden bar checked by its stub */
         layout_point(160,135);AW_WorldUIKey(K_MOUSE1,1);layout_draw();
         label=layout_find("Actions unavailable");assert(label && label->y>=160 && label->y+5<=173);
         layout_point(160,55);AW_WorldUIKey(K_MOUSE1,1);
@@ -244,7 +259,7 @@ int main(void){
         x=label->x;y=label->y;layout_point(x+2,y+2);AW_WorldUIKey(K_MOUSE1,1);
         assert(!AW_InventoryActive() && key_dest==key_game);
         layout_capture=layout_mode=0;
-        printf("inventory bounds: rows54..149 details153..157 status160..172 controls176..188 context<=171 preview22..189; drawn action clicks equip/drop/close pass\n");
+        printf("inventory bounds: rows54..149 details153..157 status160..172 controls176..188 context<=171 burden21..29 preview32..189; drawn action clicks equip/drop/close pass\n");
         (void)at;
     }
     /* More than one page: arrows/rail/drag route through the shared helper;

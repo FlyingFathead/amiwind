@@ -20,6 +20,10 @@ RECORD_SIZE=196
 # hands, and one Weapon Bone tag table for all appearances (engine/aga/src/aw_hand_models.h, gfx/hand-weapons.aww).
 # The order is the engine's stance index (0 one-handed, 1 two-handed close, 2 two-handed wide).
 WEAPON_STANCES=('1h','2c','2w')
+# FIRST-PERSON-WEAPONS-56 (v0.0.61): the Weapon Bone table also holds the ranged stances (engine stance 3 bow, 4 crossbow,
+# 5 thrown). They have no baked arms: the arms from parts (tools/prepare_player_fp_parts.py) pose them; with the baked
+# arms (aw_hand_parts 0) those weapons keep the bare hands. An older catalogue with the three melee stances still installs.
+WEAPON_TAG_STANCES=WEAPON_STANCES+('bow','xb','1t')
 WEAPON_FRAMES=28
 WEAPON_METADATA='gfx/hand-weapons.aww'
 
@@ -41,16 +45,16 @@ def stance_weapon_tags(skeleton,stance):
 
 def weapon_view_tags(source):
     """One Weapon Bone table for every appearance (the skeleton, base_anim.1st.nif, is shared, as for the block
-    view): per stance of WEAPON_STANCES, 28 frames of six values."""
+    view): per stance of WEAPON_TAG_STANCES, 28 frames of six values."""
     from npc_geometry import Skeleton
     skeleton=Skeleton(source.assets,'meshes/base_anim.1st.nif')
-    return [stance_weapon_tags(skeleton,stance) for stance in WEAPON_STANCES]
+    return [stance_weapon_tags(skeleton,stance) for stance in WEAPON_TAG_STANCES]
 
 def pack_weapon_tags(tags):
     """AWW1: magic, 0, stance count, 0, frames (28), then per stance and frame six big-endian 16.16 values."""
     import numpy as np
     tags=np.asarray(tags,float)
-    if (tags.ndim!=3 or not 1<=tags.shape[0]<=len(WEAPON_STANCES) or tags.shape[1:]!=(WEAPON_FRAMES,6)
+    if (tags.ndim!=3 or not 1<=tags.shape[0]<=len(WEAPON_TAG_STANCES) or tags.shape[1:]!=(WEAPON_FRAMES,6)
             or not np.isfinite(tags).all() or np.max(abs(tags[:,:,:3]))>128 or np.max(abs(tags[:,:,3:]))>720):
         raise ValueError('First-person weapon tags outside runtime bounds')
     raw=bytearray(b'AWW1'+bytes((0,tags.shape[0],0,WEAPON_FRAMES)))
@@ -172,7 +176,7 @@ def prepare(data_files,palette_path,out,budget=320,topology='reduced',normal_mod
     weapon_tags=weapon_view_tags(source)
     weapon_meta=pack_weapon_tags(weapon_tags);(out/WEAPON_METADATA).write_bytes(weapon_meta)
     weapon_view={'metadata':WEAPON_METADATA,'metadata_sha256':hashlib.sha256(weapon_meta).hexdigest(),
-                 'stances':list(WEAPON_STANCES),'frames':WEAPON_FRAMES,'tags':[[list(map(float,row)) for row in t] for t in weapon_tags]}
+                 'stances':list(WEAPON_TAG_STANCES),'frames':WEAPON_FRAMES,'tags':[[list(map(float,row)) for row in t] for t in weapon_tags]}
     # The normal 3D hand stage also owns its matching first-person block arms.
     # Use these exact final palette bytes, rather than the earlier scene palette.
     from prepare_block_view import prepare as prepare_block_view
@@ -246,7 +250,8 @@ def install(catalog,id1):
     # The armed arms and their Weapon Bone table (PLAYER-GEAR-VISUAL-59): all of them or none (an older catalogue).
     weapon=report.get('weapon_view')
     if weapon is not None:
-        if not isinstance(weapon,dict) or weapon.get('metadata')!=WEAPON_METADATA or list(weapon.get('stances',[]))!=list(WEAPON_STANCES):
+        if not isinstance(weapon,dict) or weapon.get('metadata')!=WEAPON_METADATA or \
+                list(weapon.get('stances',[])) not in (list(WEAPON_TAG_STANCES),list(WEAPON_STANCES)):
             raise ValueError('Invalid first-person weapon assets in the hand catalogue')
         for entry in report['entries']:
             stances=entry.get('stances') or {}

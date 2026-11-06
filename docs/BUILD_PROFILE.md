@@ -1,6 +1,6 @@
 # Build profile and stage reuse
 
-_Last updated with AmiWind v0.0.59 (3 November 2026)._
+_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -188,9 +188,9 @@ ranked with the critical path first and then by the wall time they could save
 | `underused-phase` | A phase or outermost section ran more than 30 s on fewer than half of the workers its stage held (`build_profile.underused`; also `[underused]` lines in the build summary and `stages[].underused` live in `build-progress.json`) | Run its independent items on the shared worker pool, cache its result by the SHA-256 of its inputs, or give the workers back ([BUILD-UNDERUSE-GATE-36](bugs/BUILD-UNDERUSE-GATE-36.md)) |
 
 With several runs each row says in how many of them the item appeared, so a
-one-off (a busy host, a cold disk cache) stands apart from a stage that is
+one-off (a loaded machine, a cold disk cache) stands apart from a stage that is
 always slow. Items measured while other work loaded the machine say so: measure
-them again on a quiet host before acting. Every speed-up must keep the outputs
+them again on a quiet machine before acting. Every speed-up must keep the outputs
 byte for byte (check it against `--jobs 1`).
 
 ## Perf guard
@@ -1536,7 +1536,7 @@ the measure):
 | CPU seconds, whole conversion | 15,855 | 8,626 | -46 % |
 | CPU seconds, source stages | 6,555 | 2,088 | -68 % |
 | CPU seconds, ground samples | 1,023 | 72 | |
-| wall (busy host) | 4,364 s | 2,750 s | |
+| wall (loaded machine) | 4,364 s | 2,750 s | |
 | files of the world (8,318) | | | all byte-identical |
 
 ## Payload preflight

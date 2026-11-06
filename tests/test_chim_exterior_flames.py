@@ -72,6 +72,21 @@ class FlameRowsTests(unittest.TestCase):
         want = np.array([1, 2, 3]) + model_matrix(angles) @ np.array([2.0, 0.0, 4.0])
         self.assertEqual(row['origin'], '%.2f %.2f %.2f' % tuple(want))
 
+    def test_a_rooms_flames_name_their_placement(self):
+        """TAKEN-LIGHT-FLAME-STAYS-60: with refs (the rooms, chim.interior) every row carries the placement's source
+        reference (a cut piece's too), so the engine drops a taken candle's flame; the exterior frames' rows (refs
+        off, the default) stay as they were."""
+        from chim.cut import source_ref
+        models = {0: model_image(flame_text((0, 0, 0, 0.8, None), (2, 0, 0, 0.8, None)))}
+        piece = dict(record(0, (10, 0, 0)), ref=(3 << 24) | 119501)
+        rows, _ = FL.frame_rows([{'owned': [piece, dict(record(0, (40, 0, 0)), ref=119502)]}], models, refs=True)
+        self.assertEqual(sorted(r[FL.REF_KEY] for r in rows), ['119501', '119501', '119502', '119502'])
+        self.assertEqual(source_ref(piece['ref']), 119501)
+        plain, _ = FL.frame_rows([{'owned': [piece]}], models)
+        self.assertTrue(plain and all(FL.REF_KEY not in r for r in plain))
+        source = (ROOT / 'tools' / 'chim' / 'interior.py').read_text(encoding='utf-8')
+        self.assertIn('store_models(store),\n                                          refs=True)', source)
+
     def test_story_hidden_and_not_fire_meshes_get_none(self):
         models = {0: model_image(flame_text((0, 0, 0, 8, None))),
                   1: model_image(flame_text((0, 0, 0, 2, None)), name='f/active_blight_large'),

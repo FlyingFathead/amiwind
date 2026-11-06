@@ -106,7 +106,7 @@ static void setup(void)
     memset(&aw_character,0,sizeof(aw_character));aw_character.level=1;aw_character.hair=1;aw_character.valid=1;
     aw_character.current[0]=aw_character.maximum[0]=50;
     /* The state the section-save test writes (aga_section_save_test.c). */
-    memset(&aw_state,0,sizeof(aw_state));
+    AW_StateReset();
     assert(AW_StateSet(&aw_state,AW_GLOBAL,"chargenstate",-1));
     assert(AW_ItemAdd(&aw_state,"ingredient_test",1));
     aw_state.harvest.slots=4;memset(aw_state.harvest.catalogue,0x36,32);aw_state.harvest.facts[0]=0x40100001U;

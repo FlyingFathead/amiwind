@@ -85,7 +85,7 @@ static void expect(unsigned ref,int n,...){
 int main(int argc,char **argv){
     unsigned long rolls;
     assert(argc==2);folder=argv[1];
-    aw_ledger_on=1;AW_LedgerClear(&aw_ledger);memset(&aw_state,0,sizeof(aw_state));
+    aw_ledger_on=1;AW_LedgerClear(&aw_ledger);AW_StateReset();
     aw_levelled_valid=lists_valid;aw_levelled_pick=ChimActors_LevelledPick;aw_levelled_level=player_level;aw_levelled_seed=7;
     enter(10);
     /* level 1: the list's level-1 entry; "Each" x 3 one gem each; chance none 100: nothing; the data's own item kept */

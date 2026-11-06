@@ -16,6 +16,9 @@ static void candle(float x,float y,float z){aw_static_flame_t *f=&flames[count++
 static void view(float x,float y,float z,float pitch,float yaw){vec3_t a;a[0]=pitch;a[1]=yaw;a[2]=0;
     r_refdef.vieworg[0]=x;r_refdef.vieworg[1]=y;r_refdef.vieworg[2]=z;AngleVectors(a,vpn,vright,vup);}
 static int has(const int *chosen,int n,int index){int i;for(i=0;i<n;i++)if(chosen[i]==index)return 1;return 0;}
+/* TAKEN-LIGHT-FLAME-STAYS-60: the world change list's answer for a flame's placement (aw_mwhost.c AW_ObjectDisabled) */
+static unsigned taken_ref;static int gone_asked;
+static int gone(unsigned reference){gone_asked++;return reference==taken_ref;}
 static int front(int index){vec3_t d;VectorSubtract(flames[index].origin,r_refdef.vieworg,d);return DotProduct(d,vpn)>0;}
 int main(void)
 {
@@ -49,6 +52,17 @@ int main(void)
     for(j=0;j<n;j++)assert(flames[chosen[j]].origin[0]<100+2*16); /* the nearest of equal size */
     /* Beyond the range, nothing. */
     view(-2000,0,60,0,0);assert(AW_StaticFlamesPick(flames,count,0,chosen)==0 && AW_StaticFlamesPick(flames,count,1,chosen)==0);
-    puts("static flames: on-screen, size-ranked budget keeps the hearth; nearest-first rule kept and selectable");
+    /* TAKEN-LIGHT-FLAME-STAYS-60: a taken candlestick's flames (its "aw_ref") are not drawn; the others are, and a
+     * flame without a reference (a fixed fire, an older map) never asks */
+    count=0;for(i=0;i<4;i++){candle(40+i,(i&1)*4,60);flames[count-1].reference=i<2?119501:119502;}
+    candle(44,8,60);                                                  /* no reference */
+    view(0,0,60,0,0);aw_static_flame_gone=gone;
+    taken_ref=0;n=AW_StaticFlamesPick(flames,count,0,chosen);assert(n==5);
+    taken_ref=119501;gone_asked=0;n=AW_StaticFlamesPick(flames,count,0,chosen);
+    assert(n==3 && !has(chosen,n,0) && !has(chosen,n,1) && has(chosen,n,2) && has(chosen,n,3) && has(chosen,n,4));
+    assert(gone_asked==4);
+    n=AW_StaticFlamesPick(flames,count,1,chosen);assert(n==3 && !has(chosen,n,0) && !has(chosen,n,1));
+    aw_static_flame_gone=NULL;assert(AW_StaticFlamesPick(flames,count,0,chosen)==5);
+    puts("static flames: on-screen, size-ranked budget keeps the hearth; nearest-first rule kept and selectable; taken placements' flames out");
     return 0;
 }

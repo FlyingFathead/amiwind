@@ -1,6 +1,6 @@
 # CHIM feature tracker
 
-_Generated from `docs/chim/features.json` with AmiWind v0.0.61-dev1._
+_Generated from `docs/chim/features.json` with AmiWind v0.0.61-dev2._
 
 <!-- Generated whole by tools/chim_features.py render from docs/chim/features.json; do not edit by hand. -->
 
@@ -15,19 +15,19 @@ The headline measured gains. Each links to its feature, which says what was comp
 - **Every asset stored once:** Balmora exterior: 162.1 MB of legacy region maps to 21.3 MB of CHIM world (7.62 times smaller). *builder output, 9 October 2026.* [Details](#every-asset-stored-once)
 - **Every asset stored once:** Seyda Neen with the intro docks and the courtyard: 190.4 MB to 7.83 MB (24.3 times smaller). *builder output, 9 October 2026.* [Details](#every-asset-stored-once)
 - **Streaming with no region stop:** Bytes read on the Balmora door walk: 73.5 MB to 40.7 MB. *builder output, 8 October 2026.* [Details](#streaming-with-no-region-stop)
-- **Crossings without a level change (type 1):** Not like for like: the type 1 prototype creates no entities in joined frames, so its worst frame after a light-area crossing (42 ms at 128 MB, 66 ms at 16 MB, against type 0's 83 and 373 ms) does not show how much faster a complete crossing would be. *emulator, relative, quiet host, 20 October 2026.* [Details](#crossings-without-a-level-change-type-1)
-- **Incremental frame world:** At most 16 KB copied per update instead of 405 KB; 85 chunk copies instead of 4,504. *emulator, relative, busy host, 9 October 2026.* [Details](#incremental-frame-world)
+- **Crossings without a level change (type 1):** Not like for like: the type 1 prototype creates no entities in joined frames, so its worst frame after a light-area crossing (42 ms at 128 MB, 66 ms at 16 MB, against type 0's 83 and 373 ms) does not show how much faster a complete crossing would be. *emulator, relative, quiet machine, 20 October 2026.* [Details](#crossings-without-a-level-change-type-1)
+- **Incremental frame world:** At most 16 KB copied per update instead of 405 KB; 85 chunk copies instead of 4,504. *emulator, relative, loaded machine, 9 October 2026.* [Details](#incremental-frame-world)
 - **Chunk pinning: no holes in the town:** Steps with a chunk missing its ground inside the collision margin on the maintainer's Balmora route: 860 to 0. *host simulation, 9 October 2026.* [Details](#chunk-pinning-no-holes-in-the-town)
-- **No disk writes during play:** Time spent "not validated" during play: 3.7 % to 0 %; write bursts during play: 6 in 410 s to 0 in 1,355 s. *emulator, relative, busy host, 9 October 2026.* [Details](#no-disk-writes-during-play)
+- **No disk writes during play:** Time spent "not validated" during play: 3.7 % to 0 %; write bursts during play: 6 in 410 s to 0 in 1,355 s. *emulator, relative, loaded machine, 9 October 2026.* [Details](#no-disk-writes-during-play)
 - **Quake's visibility culling kept effective:** Brush models sent to the renderer: 512-654 to 46-114; BSP nodes walked per clipped face: 27-52 to 8.6-9.9. *exact counts, 8 October 2026.* [Details](#quakes-visibility-culling-kept-effective)
-- **Faster frames in town:** Slow preset (cycle-exact 68040 at about 50 MHz): median frame 2.0-4.1 s to 1.1-1.6 s, 1.6-2.6 times faster. *emulator, relative, busy host, 9 October 2026.* [Details](#faster-frames-in-town)
-- **Far terrain: the distant view:** Far layer in the low Hunk: 13.2 KB for Balmora; drawing it costs 30.6-43.7 ms per frame on the slow preset at the bridge and east-bank poses. *emulator, relative, busy host, 9 October 2026.* [Details](#far-terrain-the-distant-view)
-- **Build cache and prerendered store:** Image step on MiniWind maps, warm: BSP optimizer 388 s to 5.7 s, hidden-surface cull 48 s to 6.6 s, byte-identical outputs. *builder output, busy host, 9 October 2026.* [Details](#build-cache-and-prerendered-store)
-- **Statics and flora sprites streamed with their chunks:** Seyda Neen: largest free Hunk gap after the first load 1,099,200 B to more than 2,097,200 B. *emulator, relative, busy host, 9 October 2026.* [Details](#statics-and-flora-sprites-streamed-with-their-chunks)
+- **Faster frames in town:** Slow preset (cycle-exact 68040 at about 50 MHz): median frame 2.0-4.1 s to 1.1-1.6 s, 1.6-2.6 times faster. *emulator, relative, loaded machine, 9 October 2026.* [Details](#faster-frames-in-town)
+- **Far terrain: the distant view:** Far layer in the low Hunk: 13.2 KB for Balmora; drawing it costs 30.6-43.7 ms per frame on the slow preset at the bridge and east-bank poses. *emulator, relative, loaded machine, 9 October 2026.* [Details](#far-terrain-the-distant-view)
+- **Build cache and prerendered store:** Image step on MiniWind maps, warm: BSP optimizer 388 s to 5.7 s, hidden-surface cull 48 s to 6.6 s, byte-identical outputs. *builder output, loaded machine, 9 October 2026.* [Details](#build-cache-and-prerendered-store)
+- **Statics and flora sprites streamed with their chunks:** Seyda Neen: largest free Hunk gap after the first load 1,099,200 B to more than 2,097,200 B. *emulator, relative, loaded machine, 9 October 2026.* [Details](#statics-and-flora-sprites-streamed-with-their-chunks)
 - **Ground stored once:** Seven CHIM region cells (coast and sea floor): 9.0 MB of frames to 1.9 MB with references and the compiled terrain hull, 0.91 times the 2.1 MB of open-world maps they replace. *builder output, 10 October 2026.* [Details](#ground-stored-once)
 - **Fewer faces per mesh (planar merge, meshoptimizer for large shells):** Every mesh of the v0.0.36-dev3 world's CHIM areas: 101,153 to 99,052 faces with planar merge; the arrival ship 4,046 to 3,690 faces with closed seams (torn seam 2.2 % to 0) and about a seventh of the shape error. *exact counts, 11 October 2026.* [Details](#fewer-faces-per-mesh-planar-merge-meshoptimizer-for-large-shells)
-- **Extra Fast RAM as CHIM cache, automatic:** 128 MiB against 16 MiB Fast RAM, two sessions each: failed zone loads 625-655 (Seyda Neen) and 288-312 (Ebonheart plaza) to 0, evictions on a 58 s flight 487-550 to 0; frame time unchanged within drift. *emulator, relative, quiet host, 17 October 2026.* [Details](#extra-fast-ram-as-chim-cache-automatic)
-- **Cells ahead read into spare Fast RAM:** Open-world cell crossings: median 452 ms to 209-223 ms, worst 724 ms to 477-498 ms; seconds with a frame of 300 ms or more 11 to 2-3 of 178; a four-cell corner 426 ms to 146-239 ms; one heavy crossing (cells 10,0 to 11,0) 598 ms to 245 ms. *emulator, relative, busy host, 18 October 2026.* [Details](#cells-ahead-read-into-spare-fast-ram)
+- **Extra Fast RAM as CHIM cache, automatic:** 128 MiB against 16 MiB Fast RAM, two sessions each: failed zone loads 625-655 (Seyda Neen) and 288-312 (Ebonheart plaza) to 0, evictions on a 58 s flight 487-550 to 0; frame time unchanged within drift. *emulator, relative, quiet machine, 17 October 2026.* [Details](#extra-fast-ram-as-chim-cache-automatic)
+- **Cells ahead read into spare Fast RAM:** Open-world cell crossings: median 452 ms to 209-223 ms, worst 724 ms to 477-498 ms; seconds with a frame of 300 ms or more 11 to 2-3 of 178; a four-cell corner 426 ms to 146-239 ms; one heavy crossing (cells 10,0 to 11,0) 598 ms to 245 ms. *emulator, relative, loaded machine, 18 October 2026.* [Details](#cells-ahead-read-into-spare-fast-ram)
 
 Several features also have a cost, listed under their caveats: CHIM leaves less of the Hunk free at the load peak, spends more time outside the 3D view and draws slightly more spans. Each shipped feature names the CHIM version it came with; the features marked "in this release" are in the development line of CHIM 0.2.2, not yet published.
 
@@ -290,14 +290,14 @@ The land is cut into chunks of 256 units. A ring of chunks around the player is 
 **Measured gain:**
 
 - Bytes read on the Balmora door walk: 73.5 MB to 40.7 MB. Compared: the same walk through all 70 load doors (16,007 units): 18 legacy region map loads against 83 chunk crossings, from the builder's walk report, world format 0.2. *builder output, 8 October 2026.*
-- Median read time per area change: 94 ms to 21 ms; longest read stall 112 ms to 71 ms. Compared: file reads of that walk replayed in FS-UAE (cycle-approximate 68040), busy host, one session with a drift-control rerun. *emulator, relative, busy host, 8 October 2026.*
+- Median read time per area change: 94 ms to 21 ms; longest read stall 112 ms to 71 ms. Compared: file reads of that walk replayed in FS-UAE (cycle-approximate 68040), loaded machine, one session with a drift-control rerun. *emulator, relative, loaded machine, 8 October 2026.*
 
 **Visibility:** Chunks are linked into the frame world's leaves; the visibility rows of the chunk the camera is in decide which leaves are visited. Streaming never changes how the PVS culls what is already resident.
 
 **Caveats:**
 
 - The total read time over the walk is the same, 1.64 s legacy against 1.65 s CHIM: CHIM spreads it thinner, it does not remove it.
-- To be repeated with the release world (format 0.5) on a quiet host.
+- To be repeated with the release world (format 0.5) on a quiet machine.
 
 **Read more:** [CHIM engine: loading](ENGINE.md#loading); [Draft v0.0.33 release notes, loading](../releases/notes/RELEASE-v0.0.33.md#loading-smaller-steps-no-region-stop); [Measurements behind the release charts](../performance/CHIM-v0.0.33-MEASUREMENTS.json).
 
@@ -311,7 +311,7 @@ The region frames around the player run as one window in one frame world, so wal
 
 **Measured gain:**
 
-- Not like for like: the type 1 prototype creates no entities in joined frames, so its worst frame after a light-area crossing (42 ms at 128 MB, 66 ms at 16 MB, against type 0's 83 and 373 ms) does not show how much faster a complete crossing would be. Compared: the crossing route's legs ai-c1, ai-l1 and ai-e1 (18 crossings per session) on the v0.0.45 release image with the same engine, chim crossing 0 against 1, FS-UAE JIT 68040, a type 0 session repeated as drift control; type 1 skips the entity work type 0 does, so the two do not do equal work. *emulator, relative, quiet host, 20 October 2026.*
+- Not like for like: the type 1 prototype creates no entities in joined frames, so its worst frame after a light-area crossing (42 ms at 128 MB, 66 ms at 16 MB, against type 0's 83 and 373 ms) does not show how much faster a complete crossing would be. Compared: the crossing route's legs ai-c1, ai-l1 and ai-e1 (18 crossings per session) on the v0.0.45 release image with the same engine, chim crossing 0 against 1, FS-UAE JIT 68040, a type 0 session repeated as drift control; type 1 skips the entity work type 0 does, so the two do not do equal work. *emulator, relative, quiet machine, 20 October 2026.*
 
 **Visibility:** Each chunk keeps its own frame's visibility row; a chunk of another frame outside that row's area is treated as visible, so distance and the view frustum decide there.
 
@@ -334,8 +334,8 @@ When a chunk joins or leaves the ring, only the leaves it touches are relinked, 
 
 **Measured gain:**
 
-- At most 16 KB copied per update instead of 405 KB; 85 chunk copies instead of 4,504. Compared: the same walk (1,536 units east and back) on Balmora's frame map, full rebuild against the incremental method with its defaults. *emulator, relative, busy host, 9 October 2026.*
-- Median update time 0.42 ms against 0.9 ms (1.7 ms in the drift-control rerun). Compared: the same session, FS-UAE with the JIT. *emulator, relative, busy host, 9 October 2026.*
+- At most 16 KB copied per update instead of 405 KB; 85 chunk copies instead of 4,504. Compared: the same walk (1,536 units east and back) on Balmora's frame map, full rebuild against the incremental method with its defaults. *emulator, relative, loaded machine, 9 October 2026.*
+- Median update time 0.42 ms against 0.9 ms (1.7 ms in the drift-control rerun). Compared: the same session, FS-UAE with the JIT. *emulator, relative, loaded machine, 9 October 2026.*
 
 **Visibility:** On the five benchmark cameras both methods give identical renderer counters (entities sent, BSP nodes per clipped face), so visibility culling is unchanged.
 
@@ -400,7 +400,7 @@ The frame map tags its static models and flora sprites with their chunk; the eng
 
 **Measured gain:**
 
-- Seyda Neen: largest free Hunk gap after the first load 1,099,200 B to more than 2,097,200 B. Compared: the same Seyda Neen position with the frame map's statics resident against streamed with their chunks (FS-UAE A/B). *emulator, relative, busy host, 9 October 2026.*
+- Seyda Neen: largest free Hunk gap after the first load 1,099,200 B to more than 2,097,200 B. Compared: the same Seyda Neen position with the frame map's statics resident against streamed with their chunks (FS-UAE A/B). *emulator, relative, loaded machine, 9 October 2026.*
 
 **Visibility:** Not a drawing change: the sprites stay ordinary static entities, only their loading moves with the chunks.
 
@@ -420,7 +420,7 @@ At start-up the free Fast RAM beyond a margin (2 MiB plus an eighth of all Fast 
 
 **Measured gain:**
 
-- 128 MiB against 16 MiB Fast RAM, two sessions each: failed zone loads 625-655 (Seyda Neen) and 288-312 (Ebonheart plaza) to 0, evictions on a 58 s flight 487-550 to 0; frame time unchanged within drift. Compared: the same engine and v0.0.42-dev1 image in FS-UAE (68040 JIT), same poses and flight, 16 MiB and 128 MiB Zorro III. *emulator, relative, quiet host, 17 October 2026.*
+- 128 MiB against 16 MiB Fast RAM, two sessions each: failed zone loads 625-655 (Seyda Neen) and 288-312 (Ebonheart plaza) to 0, evictions on a 58 s flight 487-550 to 0; frame time unchanged within drift. Compared: the same engine and v0.0.42-dev1 image in FS-UAE (68040 JIT), same poses and flight, 16 MiB and 128 MiB Zorro III. *emulator, relative, quiet machine, 17 October 2026.*
 
 Counts are exact; times are emulator-relative. First-time ground still reads in the frame (non-blocking reads are separate work).
 
@@ -441,9 +441,9 @@ Outdoors a cell border is a map change. With extra Fast RAM the files of the cel
 
 **Measured gain:**
 
-- Open-world cell crossings: median 452 ms to 209-223 ms, worst 724 ms to 477-498 ms; seconds with a frame of 300 ms or more 11 to 2-3 of 178; a four-cell corner 426 ms to 146-239 ms; one heavy crossing (cells 10,0 to 11,0) 598 ms to 245 ms. Compared: the v0.0.43-dev2 image in FS-UAE (68040 JIT, 128 MiB): as built against this engine with the prefetch on, the same scripted route (Seyda Neen heading 30 degrees for 180 s, 12-13 crossings), corner square and crossings; "Scene ready" per map load. *emulator, relative, busy host, 18 October 2026.*
+- Open-world cell crossings: median 452 ms to 209-223 ms, worst 724 ms to 477-498 ms; seconds with a frame of 300 ms or more 11 to 2-3 of 178; a four-cell corner 426 ms to 146-239 ms; one heavy crossing (cells 10,0 to 11,0) 598 ms to 245 ms. Compared: the v0.0.43-dev2 image in FS-UAE (68040 JIT, 128 MiB): as built against this engine with the prefetch on, the same scripted route (Seyda Neen heading 30 degrees for 180 s, 12-13 crossings), corner square and crossings; "Scene ready" per map load. *emulator, relative, loaded machine, 18 October 2026.*
 
-Emulator-relative times, two FS-UAE sessions in parallel on a busy host; the counts (reads served from RAM, read-ahead bytes) are exact. The legacy maps still in the route (dev2) are not helped.
+Emulator-relative times, two FS-UAE sessions in parallel on a loaded machine; the counts (reads served from RAM, read-ahead bytes) are exact. The legacy maps still in the route (dev2) are not helped.
 
 **Visibility:** No change: the same bytes are read, from RAM instead of the disk; the same chunks and placements.
 
@@ -503,8 +503,8 @@ The shallow per-chunk trees and the far smaller number of models sent to the ren
 
 **Measured gain:**
 
-- Slow preset (cycle-exact 68040 at about 50 MHz): median frame 2.0-4.1 s to 1.1-1.6 s, 1.6-2.6 times faster. Compared: the five Balmora cameras, legacy v0.0.32 disks against CHIM with the preview engine (0d8bf4f, world format 0.4); a legacy rerun in the same session agrees within 0.3-5 %. *emulator, relative, busy host, 9 October 2026.*
-- Standard (JIT) preset: median frame 40-87 ms to 15-20 ms, 2.6-4.4 times faster. Compared: the same cameras, one session, world format 0.4. *emulator, relative, busy host, 8 October 2026.*
+- Slow preset (cycle-exact 68040 at about 50 MHz): median frame 2.0-4.1 s to 1.1-1.6 s, 1.6-2.6 times faster. Compared: the five Balmora cameras, legacy v0.0.32 disks against CHIM with the preview engine (0d8bf4f, world format 0.4); a legacy rerun in the same session agrees within 0.3-5 %. *emulator, relative, loaded machine, 9 October 2026.*
+- Standard (JIT) preset: median frame 40-87 ms to 15-20 ms, 2.6-4.4 times faster. Compared: the same cameras, one session, world format 0.4. *emulator, relative, loaded machine, 8 October 2026.*
 
 **Visibility:** The gain comes from the counters of the previous entry: fewer brush models sent and shallower trees, with the same potentially visible set.
 
@@ -512,7 +512,7 @@ The shallow per-chunk trees and the far smaller number of models sent to the ren
 
 - Emulator numbers are relative until a frame has been measured on a real accelerated Amiga.
 - CHIM spends 17-28 % more time outside the 3D view (streaming and the frame world), measured at two of the cameras.
-- The JIT figures have no drift-control rerun and vary about 2 times between busy-host sessions; a quiet-host session is still to be measured.
+- The JIT figures have no drift-control rerun and vary about 2 times between loaded-machine sessions; a quiet-machine session is still to be measured.
 
 **Read more:** [Draft v0.0.33 release notes, frame time](../releases/notes/RELEASE-v0.0.33.md#frame-time-and-renderer-counters); [Measurements behind the release charts](../performance/CHIM-v0.0.33-MEASUREMENTS.json); [CHIM ideas: the slow-accelerator reality](IDEAS.md#the-slow-accelerator-reality).
 
@@ -526,7 +526,7 @@ A resident low-detail layer of the land for the frame and beyond its edge (maps/
 
 **Measured gain:**
 
-- Far layer in the low Hunk: 13.2 KB for Balmora; drawing it costs 30.6-43.7 ms per frame on the slow preset at the bridge and east-bank poses. Compared: the far layer on and off at the maintainer's bridge pose and the east-bank pose (docs/chim/FAR_TERRAIN.md, Cost). *emulator, relative, busy host, 9 October 2026.*
+- Far layer in the low Hunk: 13.2 KB for Balmora; drawing it costs 30.6-43.7 ms per frame on the slow preset at the bridge and east-bank poses. Compared: the far layer on and off at the maintainer's bridge pose and the east-bank pose (docs/chim/FAR_TERRAIN.md, Cost). *emulator, relative, loaded machine, 9 October 2026.*
 
 **Visibility:** The far layer is drawn beyond the ring the way the approved horizon draws land at the fog plane, from the same height samples as the chunk terrain; it is checked with the renderer counters against the v0.0.32 horizon before it counts.
 
@@ -703,7 +703,7 @@ Diagnostic logs stay in memory during play and are written on request or when th
 
 **Measured gain:**
 
-- Time spent "not validated" during play: 3.7 % to 0 %; write bursts during play: 6 in 410 s to 0 in 1,355 s. Compared: previous engine against logs in memory, slow setting (cycle-exact 68040, CPU multiplier 14), three sessions of 510, 311 and 534 s. *emulator, relative, busy host, 9 October 2026.*
+- Time spent "not validated" during play: 3.7 % to 0 %; write bursts during play: 6 in 410 s to 0 in 1,355 s. Compared: previous engine against logs in memory, slow setting (cycle-exact 68040, CPU multiplier 14), three sessions of 510, 311 and 534 s. *emulator, relative, loaded machine, 9 October 2026.*
 
 **Visibility:** Not applicable.
 
@@ -819,13 +819,13 @@ tools/build.py --builder chim builds the CHIM world from your own Morrowind data
 
 **Measured gain:**
 
-- Balmora exterior stage: 5.2 minutes wall and 5.1 CPU minutes on CHIM against 8.5 minutes wall and 24.1 CPU minutes for the 64 legacy region maps. Compared: two different builds: CHIM on a 6-thread build with the host about 98 % busy, legacy on a 24-thread build on a quiet host. *builder output, mixed host, 9 October 2026.*
+- Balmora exterior stage: 5.2 minutes wall and 5.1 CPU minutes on CHIM against 8.5 minutes wall and 24.1 CPU minutes for the 64 legacy region maps. Compared: two different builds: CHIM on a 6-thread build with the host about 98 % busy, legacy on a 24-thread build on a quiet machine. *builder output, mixed machine load, 9 October 2026.*
 
 **Visibility:** The builder links every placement to its leaves and writes the visibility rows; a build that makes the counters worse fails its gate.
 
 **Caveats:**
 
-- Different builds and host loads, so wall times are not a matched pair; a matched from-scratch pair on a quiet host is still to be run.
+- Different builds and host loads, so wall times are not a matched pair; a matched from-scratch pair on a quiet machine is still to be run.
 
 **Read more:** [Builder types](build_guide/BUILDER_TYPES.md); [CHIM build statistics](STATS.md); [Draft v0.0.33 release notes, build time](../releases/notes/RELEASE-v0.0.33.md#build-time).
 
@@ -859,7 +859,7 @@ Stage fingerprints let a development build reuse the finished stages of an earli
 
 **Measured gain:**
 
-- Image step on MiniWind maps, warm: BSP optimizer 388 s to 5.7 s, hidden-surface cull 48 s to 6.6 s, byte-identical outputs. Compared: the same MiniWind maps with and without the per-map pass cache (BUILD-IMAGE-NOT-INCREMENTAL-33). *builder output, busy host, 9 October 2026.*
+- Image step on MiniWind maps, warm: BSP optimizer 388 s to 5.7 s, hidden-surface cull 48 s to 6.6 s, byte-identical outputs. Compared: the same MiniWind maps with and without the per-map pass cache (BUILD-IMAGE-NOT-INCREMENTAL-33). *builder output, loaded machine, 9 October 2026.*
 
 **Visibility:** Not applicable.
 

@@ -362,12 +362,15 @@ static void SlotRelease (int s);
 
 /* The frame file (chunk directory, sector table) of frame (cx, cy); each
  * chunk record lives in one of the frame's sector files. */
+static int		gone_count;		/* the gone placements (below, TAKEN-LIGHT-FLAME-61) */
+
 int ChimChunks_Begin (int cx, int cy)
 {
 	chim_header_t h;
 	int n, cells, bits, size, row, sectors;
 	static const float zero[2] = {0, 0};
 
+	gone_count = 0;		/* a new map: its areas name its gone placements again as they load */
 	memset (&chim_frame, 0, sizeof(chim_frame));
 	memset (&counts, 0, sizeof(counts));
 	link_world = NULL;
@@ -502,6 +505,64 @@ int (*chim_story_hidden)(void);
 static int Hidden (const chim_place_t *p)
 {
 	return (p->flags & CHIM_RECORD_STORY_HIDDEN) && chim_story_hidden && chim_story_hidden ();
+}
+
+/* TAKEN-LIGHT-FLAME-61 (the general hide by reference of an exterior placement;
+ * carriable lights are its first users): the placement ids whose reference was
+ * taken or disabled (aw_mwhost.c, from the area records' effect links,
+ * aw_inventory.c) are not drawn and not solid. The list holds the map's gone
+ * placements that the loaded areas name (a few: each a taken light's pieces);
+ * a new map starts it empty and the areas fill it again as they load. */
+#define CHIM_GONE_PIDS	64
+static unsigned	gone_pid[CHIM_GONE_PIDS];
+static int		gone_count;
+
+static int Gone (unsigned pid)
+{
+	int i;
+	for (i=0 ; i<gone_count ; i++)
+		if (gone_pid[i] == pid)
+			return 1;
+	return 0;
+}
+
+static void Unlink (chim_place_t *p);
+static void Reconcile (void);
+
+/* PID's placement leaves (GONE 1: every copy unlinked now, owner and reach) or
+ * comes back (0: linked again by the next reconcile, done here). 1 done, 0 the
+ * list is full. */
+int ChimChunks_GonePid (unsigned pid, int gone)
+{
+	int i, j;
+	for (i=0 ; i<gone_count && gone_pid[i] != pid ; i++)
+		;
+	if (!gone)
+	{
+		if (i < gone_count)
+		{
+			gone_pid[i] = gone_pid[--gone_count];
+			Reconcile ();
+		}
+		return 1;
+	}
+	if (i == gone_count)
+	{
+		if (gone_count >= CHIM_GONE_PIDS)
+			return 0;
+		gone_pid[gone_count++] = pid;
+	}
+	for (i=0 ; i<chim_frame.count ; i++)
+	{
+		chim_entry_t *e = &chim_frame.entries[i];
+		chim_chunk_t *c = e->chunk.data;
+		if (e->state != CHIM_STATE_ACTIVE || !c)
+			continue;
+		for (j=0 ; j<c->records ; j++)
+			if (c->places[j].pid == pid && c->places[j].linked)
+				Unlink (&c->places[j]);
+	}
+	return 1;
 }
 
 /* Hinged doors (aw_hinged_door.c): a door turns about its origin, so its
@@ -685,7 +746,7 @@ static void Reconcile (void)
 		for (j=0 ; j<c->records ; j++)
 		{
 			chim_place_t *p = &c->places[j];
-			if (p->linked || Drawn (p->pid) || Hidden (p) || !p->ent.model ||
+			if (p->linked || Drawn (p->pid) || Hidden (p) || (gone_count && Gone (p->pid)) || !p->ent.model ||
 				!CoreKeeps (&chim_frame.entries[i], p->ent.origin))
 				continue;
 			if (j >= c->owned && OwnerDraws (p))

@@ -84,6 +84,12 @@ static void Cvar_SetValue(char *name,float value){cvar_t *v;for(v=test_cvars;v;v
             events = (p / "music-events.csv").read_text().splitlines()
             self.assertEqual(sum(",music-off," in line for line in events), 1)
             self.assertEqual(sum(",music-on," in line for line in events), 1)
+            # TOMB-MUSIC-OVER-AMBIENT-60: the exploration group rests while a dungeon ambience loops
+            subprocess.run([str(exe), str(p), "ambience"], cwd=p, check=True, timeout=10)
+            events = (p / "music-events.csv").read_text().splitlines()
+            self.assertGreaterEqual(sum(",ambience-on," in line for line in events), 2)
+            self.assertTrue(any(",ambience-rest," in line for line in events))
+            self.assertTrue(any(",ambience-off," in line for line in events))
             subprocess.run([str(exe), str(p), "normal"], cwd=p, check=True, timeout=10)
             events = (p / "music-events.csv").read_text().splitlines()
             completed = [line.split(",") for line in events[1:] if ",complete," in line]

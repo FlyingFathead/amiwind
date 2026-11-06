@@ -28,7 +28,7 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.57-dev2 (30 October 2026)._
+_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 
 ## Status: 30 October 2026
 
@@ -48,7 +48,7 @@ The image step's layout plan and partition writes (the parallel map `_write_layo
 ## Repair
 
 Split the partition writes into independent units (per partition, per large file group) so they run on all cores, and
-keep the layout plan itself cheap; measure on a quiet host against the baseline.
+keep the layout plan itself cheap; measure on a quiet machine against the baseline.
 
 ## Verification
 

@@ -47,8 +47,7 @@ tests or by the build; what is not yet checked in game is listed at the end of t
 - **The builder and the release tooling.** A build that grows past the size margin says early that a final will stop
   there and records it ([BUILD-SIZE-GUARD-LATE-48](../../bugs/BUILD-SIZE-GUARD-LATE-48.md)); the delivery checks its
   output names at the start, before the boot check; the reuse check runs its preflight once instead of twice (143
-  seconds instead of 286 on a busy host, same result); padded disk images are copied onto the J: drive in a way the
-  drive accepts; and the check that boots the finished image in the emulator sends no key until the game's own remote
+  seconds instead of 286 on a loaded machine, same result); padded disk images are copied in a way every file system accepts; and the check that boots the finished image in the emulator sends no key until the game's own remote
   state file appears, so a key typed during the start-up memory notice can no longer turn the CHIM cache off and fail
   the check.
 

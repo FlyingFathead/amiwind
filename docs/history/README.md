@@ -1,6 +1,6 @@
 # AmiWind history
 
-_Generated from `docs/history/MOVES.json` with AmiWind v0.0.61-dev1._
+_Generated from `docs/history/MOVES.json` with AmiWind v0.0.61-dev2._
 
 Records of earlier work, kept as history and never deleted: each file sits in the folder of its kind. Nothing here describes the current state; the [documentation index](../README.md) does. [MOVES.json](MOVES.json) maps every file that left the docs/ root in v0.0.55 to its new place (release notes and baselines: [releases](../releases/README.md); journals: [journals](../journals/)).
 
@@ -138,6 +138,7 @@ Topic documents replaced by newer ones (each names its replacement).
 | [PIPELINE.md](superseded/PIPELINE.md) | Intended host-to-Amiga build pipeline | `docs/PIPELINE.md` |
 | [PLAYTEST_STATUS.md](superseded/PLAYTEST_STATUS.md) | Playtest status by development version | `docs/PLAYTEST_STATUS.md` |
 | [PROFILING.md](superseded/PROFILING.md) | Profiling by runtime | `docs/PROFILING.md` |
+| [RELEASE_WORKFLOW-v0.0.54.md](superseded/RELEASE_WORKFLOW-v0.0.54.md) | AmiWind release workflow | `docs/history/superseded/RELEASE_WORKFLOW-v0.0.54.md` |
 | [RUNTIME.md](superseded/RUNTIME.md) | Runtime component status | `docs/RUNTIME.md` |
 | [SETUP.md](superseded/SETUP.md) | Setup with an existing Morrowind installation | `docs/SETUP.md` |
 | [SEYDA_NEEN_INTERIORS.md](superseded/SEYDA_NEEN_INTERIORS.md) | Seyda Neen interiors — v0.0.23-dev2 | `docs/SEYDA_NEEN_INTERIORS.md` |

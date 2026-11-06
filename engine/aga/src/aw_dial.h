@@ -222,6 +222,9 @@ int AW_DialFind(const aw_dial_conv_t *c,int topic);
  * none holds but one failed only on its disposition test, *refused = 1 (the answer then comes from Info Refusal).
  * The index into c->answer, or -1. */
 int AW_DialPick(const aw_dial_conv_t *c,int topic,const aw_glut_state_t *s,int *refused);
+/* The same for the topic "Service Refusal" (OpenMW checkServiceRefused): the disposition test inverted, the speaker
+ * refuses only below an INFO's value (SERVICE-REFUSAL-UNCLOTHED-60); no Info Refusal. */
+int AW_DialPickRefusal(const aw_dial_conv_t *c,int topic,const aw_glut_state_t *s);
 /* The topic's answer with the refusal rule applied (Info Refusal's answer when only disposition failed), -1 none. */
 int AW_DialAnswer(const aw_dial_conv_t *c,int topic,const aw_glut_state_t *s);
 /* File offsets of an answer's text and result script, -1 when it has none. */

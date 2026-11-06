@@ -1,6 +1,6 @@
 # CHIM far terrain: the distant view
 
-_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
+_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -219,7 +219,7 @@ the standard profile, fewer pixels than measured here):
 
 So the default depth costs 3 to 5 % of a slow-preset frame there; the whole layer
 13 to 24 %, which is one reason the default stops at the legacy depth.
-Standard-profile (JIT) timings on the busy host are not comparable and are not
+Standard-profile (JIT) timings on the loaded machine are not comparable and are not
 quoted.
 
 ## Settings

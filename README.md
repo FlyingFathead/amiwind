@@ -4,7 +4,7 @@
 
 # AmiWind
 
-_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
+_Last updated with AmiWind v0.0.61-dev2 (6 November 2026)._
 
 An unofficial, experimental RPG engine and enthusiast project bringing Morrowind
 to the Commodore Amiga, featuring CHIM: an AmiQuake-based engine and an asset
@@ -43,11 +43,12 @@ and 19 open-sea cells), with no classic region maps left outdoors. What these nu
 prison and the census office) is built as a CHIM room, with the people the game places in them. Solstheim is not
 converted.
 
-The development line is at **v0.0.61-dev1** (5 November 2026): the first snapshot of v0.0.61, in development. It adds
-no game changes yet. It publishes the plan for a [gameplay recorder](docs/GAME_RECORDER.md) (record a session, replay it
-exactly, use recordings as tests and frame-rate benchmarks) and the suspected causes of the emulator's disk stall and
-the plan to test them ([bug page](docs/bugs/CHIM-SEYDA-BALMORA-LOAD-HANG-43.md))
-([dev1 notes](docs/releases/notes/RELEASE-v0.0.61-dev1.md)).
+The development line is at **v0.0.61-dev2** (6 November 2026): the second snapshot of v0.0.61 and the first with game
+changes. It adds casting (Self, Touch and Target) with a spell-effect system, weapons and shields of every type in their
+stance with two first-person sway styles, the full stats of every being from its record, an inventory without a fixed
+number of kinds with carry weight and burden, and carriable lights that take their flame and light with them
+([dev2 notes](docs/releases/notes/RELEASE-v0.0.61-dev2.md); the first snapshot:
+[dev1 notes](docs/releases/notes/RELEASE-v0.0.61-dev1.md)).
 
 What comes next is in the [roadmap](docs/ROADMAP.md): v0.0.61 holds the combat work (weapons of every type in both
 views, the first-person hands per weapon, the cliff racer's strikes, player casting and the spell-effect system, the

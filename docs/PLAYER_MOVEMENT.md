@@ -1,6 +1,6 @@
 # Player scale, collision and camera motion
 
-_Last updated with AmiWind v0.0.48-dev2 (23 October 2026)._
+_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -73,7 +73,8 @@ Every factor of the OpenMW rules, and where it comes from in AmiWind:
 | Speed attribute | walk speed | now | character sheet (base + race/birthsign modifiers - damage) |
 | Athletics skill | run and swim speed | now | character sheet |
 | Strength | carrying capacity | now | character sheet |
-| Carried weight | load | now | owned items x catalogue weight (re-read when the items change) |
+| Carried weight | load | now | owned items x catalogue weight, a running total kept by the item table (v0.0.61; [INVENTORY.md](INVENTORY.md#carry-weight)) |
+| Over the limit | no movement or jump, "You are over-encumbered." | now (the message since v0.0.61) | sNotifyMessage59, raised while the player tries to move |
 | Race weight | movement scale | now | race record, male/female (builder) |
 | Running | run speed, fatigue | now | Shift held |
 | Swimming | swim speed, fatigue | now | the water movement path |
@@ -87,7 +88,7 @@ Every factor of the OpenMW rules, and where it comes from in AmiWind:
 | Fatigue at or below 0 | knocked out | now, for a fight's damage | combat rules; movement never takes it below 0 |
 | Sneaking | x fSneakSpeedMultiplier, no running, fatigue | later | no sneak input yet |
 | Paralysis | speed 0 | later | magic effects (none yet) |
-| Feather / Burden | load | later | magic effects |
+| Feather / Burden | load | the call is in (v0.0.61, `AW_EncumbranceSetEffects`); the magnitudes come with the spell effects | magic effects |
 | Fortify / Drain / Damage Speed, Athletics, Strength, Acrobatics | the stats | later (the sheet's damage field already counts) | magic effects |
 | Swift Swim | swim x (1 + magnitude/100) | later | magic effects |
 | Levitate | fly speed from fMinFlySpeed / fMaxFlySpeed | later | magic effects |

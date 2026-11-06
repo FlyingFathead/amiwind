@@ -214,6 +214,8 @@ int AW_MwvmSound(int k,unsigned char hash[8],int *centis,int *volume,int *near_u
     r=vm.snds+18*k;memcpy(hash,r,8);*centis=(int)U16(r+8);*volume=r[10];
     *near_units=(int)U16(r+12);*far_units=(int)U16(r+14);return r[11]&1;
 }
+/* TOMB-MUSIC-OVER-AMBIENT-60: the sound is a dungeon ambience (flag 2, tools/mwscript/awms.py AMBIENCE_SOUNDS) */
+int AW_MwvmSoundAmbience(int k){return ON && k>=0 && k<vm.nsnds && (vm.snds[18*k+11]&3)==3;}
 int AW_MwvmVoice(int k,unsigned char hash[8],int *centis){
     const unsigned char *r;if(!ON || k<0 || k>=vm.nvoic)return 0;
     r=vm.voic+12*k;memcpy(hash,r,8);*centis=(int)U16(r+8);

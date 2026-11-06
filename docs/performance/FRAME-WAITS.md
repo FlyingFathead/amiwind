@@ -1,6 +1,6 @@
 # Frame waits: disk, screen copy and buffer swap
 
-_Last updated with AmiWind v0.0.59-dev6 (3 November 2026)._
+_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 
 A slow frame is either the processor working or the game waiting. The Amiga chipset has no counter a program can
 read that says how long it waited for the disk or the display, so the engine times its own waits, every frame, and
@@ -63,3 +63,41 @@ the next 209 frames (the walk) 19,957 ms, of which disk 16,549.1 ms, c2p 14.9 ms
 What it shows: the arrival's long frames are mostly file waits, not processor work, and the residents' walking step
 (the `ambwalk` stage) spends almost all of its 300 to 800 ms per spike frame inside file calls, with few new files
 looked up: it reads from files that are already open. The screen copy and the buffer swap are negligible here.
+
+### AmiWind v0.0.61-dev1 (source 374d59b), 5 November 2026: residents' tables per area, on and off
+
+- Setup: FS-UAE 3.1.66, A1200 AGA, 68040 with FPU, JIT, 32 MB Fast RAM, audio on, hard disks on the IDE controller;
+  the delivered v0.0.61-dev1 image (run 2026_11_05_v0.0.61-dev1_full-v0.0.61-dev1_374d59b) with its own engine
+  (SHA-256 e06a3897925238e4f043c772e944a8185a8c9dff97cf6393f39327b301e2f76b). The host was busy with other builds
+  and checks (76 to 100 % CPU), the same for both variants of a session.
+- What is compared: `aw_ambient_areas 1` (the default since v0.0.60: each area's walking-resident table read once
+  when the place changes and searched in memory) against `aw_ambient_areas 0` (the island-wide table searched by
+  seek and read). Both variants do the same work: the same arrival (`dbg scene seyda`, 60 s), 10 s standing, the
+  same walk (8 s forward, 3 s left, 8 s forward), `chim spikes 300`, a `chim spikes report` after each part. Both
+  variants are second or later arrivals in their session; session A ran 0 then 1, session B ran 1 then 0.
+- Session scripts SHA-256: A 96177910dfd9a2573b4ff88c756e72ba047f45b409804e8b904fabce1a77fefd, B
+  1c352d2ce342f589c0548a973b6b33196794a7228e2b212b1a6922d80d588c01.
+- Previous recorded line: v0.0.59-dev (commit 4d2b2269) above, before the tables per area.
+
+| Part | Session | areas 0: frames, total, disk | areas 1: frames, total, disk |
+| --- | --- | ---: | ---: |
+| Arrival (60 s) | A | 2,077 frames, 61,006 ms, disk 13,888.6 ms | 2,830 frames, 60,779 ms, disk 10,976.7 ms |
+| Arrival (60 s) | B | 2,599 frames, 61,265 ms, disk 9,145.3 ms | 3,073 frames, 61,093 ms, disk 8,501.8 ms |
+| Standing (10 s) | A | 316 frames, 10,389 ms, disk 2,064.0 ms | 673 frames, 10,651 ms, disk 1,069.3 ms |
+| Standing (10 s) | B | 438 frames, 10,882 ms, disk 1,946.8 ms | 471 frames, 10,230 ms, disk 1,075.7 ms |
+| Walk (19 s) | A | 1,017 frames, 20,256 ms, disk 4,334.2 ms | 988 frames, 19,751 ms, disk 4,074.5 ms |
+| Walk (19 s) | B | 832 frames, 20,471 ms, disk 4,919.7 ms | 1,137 frames, 20,151 ms, disk 3,731.1 ms |
+
+| Residents' think (`chim actors ambient`) | areas 0 | areas 1 |
+| --- | ---: | ---: |
+| Cost per think, session A / B | 0.737 / 0.490 ms | 0.517 / 0.475 ms |
+| Worst think frame, session A / B | 411.7 / 181.7 ms | 314.9 / 259.9 ms |
+
+What it shows: standing in Seyda Neen, the frames wait about half as long for the disk with the tables per area
+(1,069 and 1,076 ms in 10 s against 1,947 and 2,064 ms), and the walk waits 6 to 24 % less. The 300 to 800 ms
+`ambwalk` spike frames of the earlier line are gone with both settings (the walking step is now 10 to 41 ms over all
+spike frames of a part); the remaining long frames while walking are the harvest plants of the next cells being read
+(482 to 823 ms), and the residents' longest frames are their choice of the next package (`ambchoose`, 111 to 401 ms
+in spike frames), not their walking. The arrival's longest frame depends more on the order in the session than on
+the setting (the later arrival of each session is shorter). The counter "scans on the island-wide file" counts only
+the fallbacks with the setting on, so it reads 0 with the setting off too.

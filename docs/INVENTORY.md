@@ -1,12 +1,14 @@
 # Inventory
 
-_Last updated with AmiWind v0.0.59-dev6 (3 November 2026)._
+_Last updated with AmiWind v0.0.61-dev1 (6 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [Items and actions](#items-and-actions)
   - [Weapon kit for testing (dbg give weapons)](#weapon-kit-for-testing-dbg-give-weapons)
+  - [Every weapon, shield and piece of gear (dbg weapon, dbg gear)](#every-weapon-shield-and-piece-of-gear-dbg-weapon-dbg-gear)
+- [Carry weight](#carry-weight)
 - [World models](#world-models)
 - [The container strip](#the-container-strip)
   - [Where container data comes from (AREA-TABLES-59)](#where-container-data-comes-from-area-tables-59)
@@ -30,8 +32,16 @@ on the left and carried items on the right.
 
 ## Items and actions
 
-The existing state capacity is 32 distinct carried IDs and 32 persistent ground
-stacks. A loaded level admits up to 64 distinct new item models for dropped items
+As in the original, there is no limit on the number of kinds of item the player carries; the only limit is the
+weight (see [Carry weight](#carry-weight)). Since v0.0.61 the item table grows as kinds come: 24-byte rows in blocks
+of 32 from the game's memory, each id kept once in a name pool (about 42 bytes per kind on average; 400 kinds take
+about 17 KB). v0.0.61-dev1 held 32 kinds, which a short session filled
+([COLLECT-CAPACITY-REJECTED-60](bugs/COLLECT-CAPACITY-REJECTED-60.md)); the v0.0.61 line held 128 for a while. A new
+kind takes a row whose count fell to 0 before a new row. A refused pickup names why: "not enough memory for another
+kind of item", "too many of this item", or, for a plant, its saved state or its data. Saves are written as before for
+up to 32 kinds; past 32 they set a feature bit (512, the condition and charge marks one word per 32 kinds) that older
+versions refuse rather than lose items; the saves of the 128-kind table (feature bit 256) still load. There are 32
+persistent ground stacks. A loaded level admits up to 64 distinct new item models for dropped items
 (`AW_INVENTORY_MODELS`). Every map is built with room for 16 of them in its model
 table (`AW_INVENTORY_MODELS_GUARANTEED`, counted by the map limits check); past
 those a drop takes only slots the map leaves free, keeps one slot for the arena
@@ -106,9 +116,10 @@ its record: chop, slash and thrust damage (for bows, crossbows, thrown weapons a
 ammunition, their damage), speed, reach, weight, value, health, enchantment points,
 and armour for the shields. `dbg give weapons stats` prints the table again without
 giving anything. Each row ends with `equip "ID"` (equippable now, with
-`aw_inventory equip "ID"` or the inventory window) or `carry "ID"` (bows, crossbows,
-thrown weapons and ammunition are carried only until ranged combat exists). The
-lines wrap to the console's width.
+`aw_inventory equip "ID"` or the inventory window) or `carry "ID"` (arrows and bolts
+are carried only until the ammunition slot exists). Since v0.0.61 bows, crossbows and
+thrown weapons are equipped and drawn in both views; their shot waits for ranged
+combat (the attack strikes nobody). The lines wrap to the console's width.
 
 The items are chosen when the image is built, by a rule, not by a list
 (`tools/prepare_weapon_kit.py`): per type, the plain items (no enchantment, no
@@ -120,9 +131,49 @@ chitin short bow, steel crossbow with steel bolts, the chitin shield and the ste
 shield. The choice is written to `inventory/weapon-kit.txt` (about 1 KB) and named
 in the build receipt (`inventory-data.json` "weapon_kit"); the engine reads it only
 when the command runs. The kit is given whole or not at all: it needs up to 16
-kinds of item of the inventory's 32, and a full inventory refuses it with the
-numbers. The items are an ordinary grant, saved and loaded like any other.
+new kinds of item, which the inventory always takes unless memory says no (then the
+console says so). The items are an ordinary grant, saved and loaded like any other.
 Tests: `tests/test_weapon_kit.py` and `tests/aga_weapon_kit_test.c`.
+
+### Every weapon, shield and piece of gear (dbg weapon, dbg gear)
+
+`dbg weapon` opens the console-font list box (the one `dbg tp` uses) with every weapon and shield of the game,
+sorted by type: short blades, long blades, long blades two-handed, blunt, blunt two-handed, staffs, spears, axes,
+axes two-handed, bows, crossbows, thrown weapons, arrows, bolts, then the light, medium and heavy shields. `dbg gear`
+does the same for armour (by piece and weight class: helmet, cuirass, pauldrons, greaves, boots, gauntlets,
+bracers) and clothing (pants, shoes, shirt, belt, robe, gloves, skirt, ring, amulet). Typing searches the lines,
+letters and digits only ("longblade2h", "glass", "heavy boots"); Up/Down, Page Up/Down, Enter and the mouse choose.
+
+Choosing a row gives one of it when the player has none (a test grant, saved and loaded like any other) and equips
+or wears it by the inventory window's own rules (a two-handed weapon takes the shield off, a weapon only when its
+hand is free to change). A row marked "carry only" is given but not equipped: what this engine does not equip yet
+(arrows and bolts until the ammunition slot exists, and enchanted pieces). There is no limit on the kinds of item;
+a grant is refused only when memory says no, and the console says so.
+
+The rows come from the item catalogue (`inventory/items.awi`), read once when the box opens (a debug command, never in
+play) and freed when it closes: nothing is kept while it is shut. The console says how many rows it read, the bytes
+the box held and how long the read took. Tests: `tests/aga_weapon_kit_test.c` (which box, the order, the line).
+
+## Carry weight
+
+The original's encumbrance, by the OpenMW 0.51 rules (`mwclass/actor.cpp` getEncumbrance, `mwclass/npc.cpp`
+getCapacity, `mwworld/class.cpp` getNormalizedEncumbrance), with the game settings from the user's own master file:
+
+- the load is the carried items' weights times their counts, plus Burden, less Feather (Burden does not count in god
+  mode), never below 0; the capacity is Strength (with its changes) times fEncumbranceStrMult (5);
+- the inventory window shows it as the original does: a blue bar above the character picture with "load/capacity",
+  the load rounded up;
+- the movement rules use it ([PLAYER_MOVEMENT.md](PLAYER_MOVEMENT.md)): walking, running, swimming and levitating
+  slow by fEncumberedMoveEffect (0.3) times the load over the capacity, the jump by fJumpEncumbranceBase +
+  fJumpEncumbranceMultiplier times what is left, the running and sneaking fatigue rises with the load; over the
+  capacity the player cannot move or jump, and trying shows the game's own line, "You are over-encumbered.", again
+  every 2 seconds while he keeps trying;
+- the original shows no burden on the HUD, so AmiWind does not either.
+
+The load is a running total kept by the item table: every count change adds or takes away its weight, and the total
+is summed again exactly when a place loads (from the records the load reads anyway). Nothing is summed per frame.
+Burden and Feather come from the spell effects, which set them with `AW_EncumbranceSetEffects` (aw_move.h). Register:
+[ENCUMBRANCE-INCOMPLETE-61](bugs/ENCUMBRANCE-INCOMPLETE-61.md).
 
 ## World models
 
@@ -538,9 +589,13 @@ stats window for structure (`mwgui/statswindow.cpp` and its layout). Two differe
 sits under the attributes instead of under the skills, and factions, reputation and bounty are not shown,
 because the engine has no faction state yet.
 
-The Magic window is a placeholder until spells exist. It shows the original's headings, Powers, Spells
-and Magic Items, lists the character's race and birthsign spells by their names from the game data
-(`character/spells.aws`, written by the image builder; powers under Powers, spells under Spells,
-abilities left out), shows "None" under an empty heading, and says "(Not yet implemented)" at the bottom.
-Its title is "Magic"; the original titles it with the selected spell. Starting spells the original picks
-from the class and skills are not listed yet.
+The Magic window shows the original's headings, Powers, Spells and Magic Items. With casting in the build
+(v0.0.61, [Magic effects: Casting](MAGIC_EFFECTS.md#casting-v0061)) it lists the spells and powers the player
+knows and the spells he made: Up and Down (or W and S) move the cursor, Enter or a click selects the spell to cast,
+the selected one is marked with a star, and the bottom line names it with its magicka cost and chance. Without
+casting it lists the character's race and birthsign spells by their names from the game data
+(`character/spells.aws`, written by the image builder; powers under Powers, spells under Spells, abilities left
+out) and says "(Not yet implemented)" at the bottom. An empty heading shows "None". Its title is "Magic"; the
+original titles it with the selected spell. The race, birthsign and class spells are not yet on the player's record
+([PLAYER-START-SPELLS-NOT-KNOWN-61](bugs/PLAYER-START-SPELLS-NOT-KNOWN-61.md)), so a new character lists only what
+it bought or made.

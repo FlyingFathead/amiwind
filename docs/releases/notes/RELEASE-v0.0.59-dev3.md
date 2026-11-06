@@ -42,7 +42,7 @@ its contents reach the public with this one: [dev2 notes](RELEASE-v0.0.59-dev2.m
 - Items placed in the world by the game data are not yet placed from the new table (the next step); dropped items
   use it.
 - The player's own gear is not yet shown on the hands or the body (a later snapshot).
-- A build's performance check can fail on busy hosts when other builds run beside it
+- A build's performance check can fail on loaded machines when other builds run beside it
   ([PERF-GUARD-RESIDENT-BUSY-HOST-57](../../bugs/PERF-GUARD-RESIDENT-BUSY-HOST-57.md)).
 - Some rooms still load in after you arrive ([CHIM-ROOM-POPIN-51](../../bugs/CHIM-ROOM-POPIN-51.md)).
 

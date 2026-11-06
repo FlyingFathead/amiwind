@@ -68,7 +68,7 @@ Family: Music and sound (`audio`). The mixer must stay fed through loads and sce
 - [AUDIO-DMA-CLOCK-DRIFT-35](AUDIO-DMA-CLOCK-DRIFT-35.md): The mixer estimates the audio DMA position from the EClock, not from the hardware, so the two can drift apart over a long session
 - AUDIO-EFFECTS-DEFAULT-29 (no report page): Effects volume should default to 75%
 - AUDIO-ENTER-29 (no report page): Sub-second soundtrack cut on Enter to follow the guard
-- [AUDIO-HOST-LOAD-33](AUDIO-HOST-LOAD-33.md): Music and sound crackle when the emulator shares a fully loaded host CPU
+- [AUDIO-HOST-LOAD-33](AUDIO-HOST-LOAD-33.md): Music and sound crackle when the emulator shares a fully loaded CPU
 - [AUDIO-LOAD-29](AUDIO-LOAD-29.md): OST crackles under heavy loading
 - AUDIO-LOCAL-SOUND-CUTS-58 (no report page): One blow's combat sounds cut each other: every local sound replaces the player's other sounds, so only the last of swish, armour struck and Health Damage is heard
 - [AUDIO-LOGO-31](AUDIO-LOGO-31.md): Music crackles while the startup logo plays (WinUAE)

@@ -1,10 +1,11 @@
 # Changelog
 
-_Last updated with AmiWind v0.0.60 (4 November 2026)._
+_Last updated with AmiWind v0.0.61-dev2 (2026-11-06)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.61 (in progress), 6 November 2026](#v0061-in-progress-6-november-2026)
 - [v0.0.60: Work With What You've Got, 4 November 2026](#v0060-work-with-what-youve-got-4-november-2026)
 - [v0.0.59: Assembling The Bits And Pieces, Once Again, 3 November 2026](#v0059-assembling-the-bits-and-pieces-once-again-3-november-2026)
 - [v0.0.58: Time To Talk, 1 November 2026](#v0058-time-to-talk-1-november-2026)
@@ -168,6 +169,40 @@ _Last updated with AmiWind v0.0.60 (4 November 2026)._
 - [CHIM source candidate - 14 October 2026, v0.0.40-dev1](#chim-source-candidate---14-october-2026-v0040-dev1)
 
 <!-- contents end -->
+
+## v0.0.61 (in progress), 6 November 2026
+
+In v0.0.61-dev1 (the first snapshot, no game changes; [release notes](releases/notes/RELEASE-v0.0.61-dev1.md)):
+
+- A plan for a gameplay recorder for testing ([GAME_RECORDER](GAME_RECORDER.md)): a session recorded as a save plus the
+  player's inputs, replayed exactly, with checkpoints that show where a replay differs. Nothing of it is in the game
+  yet.
+- The emulator disk stall while loading Seyda Neen: what is known, three suspected causes (a lost disk-completion
+  signal inside the emulator, the remote-console folder, and the boot smoke's own stall label, which is inferred and not
+  checked) and the plan to test each, on the
+  [bug page](bugs/CHIM-SEYDA-BALMORA-LOAD-HANG-43.md). The shipped presets are unchanged.
+
+In v0.0.61-dev2 (the second snapshot, the first with game changes;
+[release notes](releases/notes/RELEASE-v0.0.61-dev2.md)):
+
+- Magic: ready a spell and cast it (Self, Touch and Target), with the magicka paid, the chance to succeed by the
+  original's rules and the Magic window to choose; a spell-effect system of 143 effects applied over time to any actor
+  and kept in saves.
+- Weapons and shields of every type in their stance on the third-person body, a debug weapon menu and gear menu, the
+  two-handed rule, bow, crossbow and thrown stances in first person, two styles of first-person weapon sway, creatures
+  that resist normal weapons, and god mode without damage or wear.
+- Every person and creature, and the player, carries the full stats of its record, kept in one place and read through
+  one set of calls; two reference pages for the game data
+  ([ACTOR_RECORDS](ACTOR_RECORDS.md), [GAME_FORMULAS](GAME_FORMULAS.md)).
+- Inventory: no fixed number of kinds of item, only carry weight, with the burden shown and movement stopped over the
+  limit; the carried items read in one pass at each place load.
+- Picking up a lit candle or lamp takes its flame and its light with it; baked room light stays and Seyda Neen's
+  carriable lanterns are not yet in the open world.
+- Fixes: a blank sheet of paper is taken instead of read, tomb ambience instead of exploration music in tombs, no death
+  music on area changes, the character dressed and the inventory opening after character creation, trader refusal
+  tested as in the original, creatures from levelled lists in tombs and caves, and the Balmora canal bank at the
+  original ground height (+10 triangles in that frame only).
+- Several parts are not yet seen in game and are checked on this image (see the release notes).
 
 ## v0.0.60: Work With What You've Got, 4 November 2026
 

@@ -1,13 +1,13 @@
 # Builder profile: where a full build spends its time
 
-_Last updated with AmiWind v0.0.46-dev1 (20 October 2026)._
+_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [Contents](#contents-1)
 - [Builder fixes and time savings, v0.0.33 and beyond](#builder-fixes-and-time-savings-v0033-and-beyond)
-- [Ranked table: v0.0.33-rc1c (busy host)](#ranked-table-v0033-rc1c-busy-host)
+- [Ranked table: v0.0.33-rc1c (loaded machine)](#ranked-table-v0033-rc1c-loaded-machine)
 - [The image step, section by section](#the-image-step-section-by-section)
 - [Cost of a failure](#cost-of-a-failure)
 - [Top items and what was done](#top-items-and-what-was-done)
@@ -19,10 +19,9 @@ _Last updated with AmiWind v0.0.46-dev1 (20 October 2026)._
 
 Measured 9 October 2026 from the build profiles (`build-profile.json`, section timers, one-second
 core samples) of the v0.0.33-rc1 builds, and from side-by-side runs of single passes. Every number
-says what host load it was taken under: all full builds of that day ran on a **busy host** (other
+says what host load it was taken under: all full builds of that day ran on a **loaded machine** (other
 builds and gates used 25 to 60 % of the 24 threads), so core counts and wall times are lower and
-longer than on a quiet host. Processor-seconds (CPU-s) are the steadier currency; wall times on a busy
-host are compared only with wall times of the same session.
+longer than on a quiet machine. Processor-seconds (CPU-s) are the steadier currency; wall times on a loaded machine are compared only with wall times of the same session.
 
 How to read the columns:
 
@@ -40,7 +39,7 @@ builds with its `compare` mode ([BUILD_PROFILE.md](../BUILD_PROFILE.md)).
 
 ## Contents
 
-- [Ranked table: v0.0.33-rc1c (busy host)](#ranked-table-v0033-rc1c-busy-host)
+- [Ranked table: v0.0.33-rc1c (loaded machine)](#ranked-table-v0033-rc1c-loaded-machine)
 - [The image step, section by section](#the-image-step-section-by-section)
 - [Cost of a failure](#cost-of-a-failure)
 - [Top items and what was done](#top-items-and-what-was-done)
@@ -67,7 +66,7 @@ an estimate, the value and its kind change in the JSON and the chart is drawn ag
 | MiniWind media on a new volume | 20 min (measured) | 14 s (estimated) | BUILD-CACHE-PER-WORKSPACE-33 | hudcell-mw1: 4,862 of 4,875 sounds converted; rc1c with a warm pool: 14 s |
 | Expected loss to failures per full build | 87 min (estimated) | 5 min (estimated) | preflight, resume, faster image step | 6 of 9 image attempts failed, mean 3,339 s to the error (ledger) |
 
-## Ranked table: v0.0.33-rc1c (busy host)
+## Ranked table: v0.0.33-rc1c (loaded machine)
 
 v0.0.33-rc1c: `--jobs 22`, `--reuse-from` the previous rc1 build, 4,527 s until the image step
 stopped (critical path 4,503 s). Before the cache-reuse repair (BUILD-REUSE-SCRATCH-UNDECLARED-33)
@@ -92,7 +91,7 @@ stages before the image step are expected to be reused, which is the largest sin
 | - | world-survey | no | 57 | 149 | 2.6 / 10 | 422 | yes (not reproducible: BUILD-SURVEY-NOT-REPRODUCIBLE-33) | off the path |
 | - | engine | no | 10 | 32 | 3.1 / 4 | 7 | always (SDK not in its key: BUILD-ENGINE-KEY-SDK-33) | off the path |
 
-The previous build of the same day (v0.0.33-rc1b, busy host) shows the same order, with world-terrain
+The previous build of the same day (v0.0.33-rc1b, loaded machine) shows the same order, with world-terrain
 at 1,015 s / 12,385 CPU-s because its per-map cache was cold. A from-scratch reference build of that
 day spent 2,772 s in the NPC gallery and 1,315 s in world-terrain (no section timers recorded).
 
@@ -102,7 +101,7 @@ reading, opening-references, world-ui, media with a warm pool, music, harvest) a
 
 ## The image step, section by section
 
-v0.0.33-rc1c, 22 workers, busy host (58 % of the host used by other work while it ran):
+v0.0.33-rc1c, 22 workers, loaded machine (58 % of the host used by other work while it ran):
 
 | Section | Wall s | CPU-s | Cores | Note |
 | --- | ---: | ---: | ---: | --- |
@@ -148,7 +147,7 @@ shortens every image attempt, failed or not.
 | # | Item | Measured | Status |
 | ---: | --- | --- | --- |
 | 1 | Per-file caches per workspace: a reused build on a new volume converts everything again (BUILD-CACHE-PER-WORKSPACE-33, MINIWIND-NOT-MINUTES-33) | MiniWind media 1,195 s, 4,862 of 4,875 sounds converted, against 14 s and 7,164 reused in the reuse source's workspace | repaired in source: read-only fallback to the `--reuse-from` workspace's caches |
-| 2 | Stair walk (BUILD-STAIR-WALK-SLOW-33) | 1,751 s / 14,645 CPU-s in rc1c | repaired in source: identical rows on 48 maps, 737 to 201 CPU-s (busy host, both runs side by side) |
+| 2 | Stair walk (BUILD-STAIR-WALK-SLOW-33) | 1,751 s / 14,645 CPU-s in rc1c | repaired in source: identical rows on 48 maps, 737 to 201 CPU-s (loaded machine, both runs side by side) |
 | 3 | Stages run again despite `--reuse-from` (BUILD-REUSE-SCRATCH-UNDECLARED-33) | 33 of 34 stages in rc1c, about 1,400 s before the image step | repaired in the integration line |
 | 4 | Late image failures (cost of a failure above) | 6 of 9 image attempts, mean 3,339 s to detect | payload preflight in the integration line; resume in progress |
 | 5 | BSP optimizer verification oracles | 685 s / 7,511 CPU-s | measured, not changed (see below) |
@@ -175,7 +174,7 @@ before, 201 CPU-s after. Largest maps: one large interior 278 to 91 CPU-s, the h
 map 126 to 24 CPU-s.
 
 Expected in a full image step: about 4,000 CPU-s instead of 14,645, so about 3 minutes on 22 free
-workers instead of 29 minutes on a busy host.
+workers instead of 29 minutes on a loaded machine.
 
 Store-once result pool (a result per stair flight, keyed by the collision and visible geometry
 around it in the flight's own frame, shared by every placement of the same building): measured on
@@ -203,7 +202,7 @@ read the whole map's tree and are keyed per map instead.
 - BSP optimizer: 95 % of a map's time is the two independent verification oracles (each decodes
   every face of both maps it compares); memoizing the shared map's faces made it slower and used
   2.8 times the memory (more objects kept alive for the garbage collector), so it was not kept.
-- Sky palette pass of the image step: reading and hashing about 11,000 files; on a busy host with 4
+- Sky palette pass of the image step: reading and hashing about 11,000 files; on a loaded machine with 4
   workers it went from 31 to 48 s serial to 26 to 37 s, within the noise of the host, so it was not
   kept.
 

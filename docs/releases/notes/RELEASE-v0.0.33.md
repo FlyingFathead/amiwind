@@ -140,7 +140,7 @@ On the same Balmora walk through all 70 load doors, CHIM reads **40.7 MB** inste
 change drops from 94 ms to 21 ms and the longest stall from 112 ms to 71 ms. The total
 read time over the walk is the same (1.64 s against 1.65 s): CHIM spreads it thinner,
 it does not remove it.
-This walk was replayed with an earlier CHIM world (format 0.4) on a busy host; the
+This walk was replayed with an earlier CHIM world (format 0.4) on a loaded machine; the
 release world (format 0.5) has not been replayed yet.
 
 ![Read time per area change, longest stall, total read time and bytes read on the Balmora door walk](../../images/amiwind-v0.0.33-chim-loading.png)
@@ -159,7 +159,7 @@ On the slow cycle-exact x14 preset (a 49.7 MHz 68040 without the JIT), measured 
 CHIM preview engine (0d8bf4f) and a legacy rerun as the drift control, it falls from 2.0-4.1 s to 1.1-1.6 s per frame: most
 of the gain is in drawing the placed models (2.5-3.8x less). CHIM spends 17-28 % more
 time outside the 3D view (streaming and the frame world), and the chart shows that too.
-The JIT figures come from one busy-host session without a drift-control rerun; they
+The JIT figures come from one loaded-machine session without a drift-control rerun; they
 vary about two times between busy sessions, so read them as a direction, not a number.
 
 ![Median frame time at the five Balmora cameras on the standard JIT preset](../../images/amiwind-v0.0.33-chim-frame-jit.png)
@@ -289,7 +289,7 @@ Disks, emulators and hardware:
 - [BENCH-JIT-PROFILE-32](../../bugs/BENCH-JIT-PROFILE-32.md): frame-rate and load-time figures are emulator measurements, relative until a hardware number exists
 - [BOOT-VOLUME-NOT-VALIDATED-33](../../bugs/BOOT-VOLUME-NOT-VALIDATED-33.md): after an emulator session was closed mid-write, AmigaOS validates the volume at the next boot
 - [BOOT-68060-FPU-FAIL-32](../../bugs/BOOT-68060-FPU-FAIL-32.md): on a 68060 with Kickstart 3.1 and no 68060.library the boot check stops at the FPU line
-- [AUDIO-HOST-LOAD-33](../../bugs/AUDIO-HOST-LOAD-33.md): music and sound crackle when the emulator shares a fully loaded host CPU
+- [AUDIO-HOST-LOAD-33](../../bugs/AUDIO-HOST-LOAD-33.md): music and sound crackle when the emulator shares a fully loaded CPU
 
 ## What's next
 

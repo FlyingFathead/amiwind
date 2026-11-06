@@ -91,7 +91,8 @@ int main(int argc,char **argv){
         static unsigned char w[8+3*28*24];static aw_hand_weapons_t h;int s;
         assert(AW_HandStance(0)==-1 && AW_HandStance(1)==0 && AW_HandStance(2)==0 && AW_HandStance(4)==0 && AW_HandStance(8)==0);
         assert(AW_HandStance(3)==1 && AW_HandStance(5)==1 && AW_HandStance(9)==1 && AW_HandStance(6)==2 && AW_HandStance(7)==2);
-        for(s=10;s<16;s++)assert(AW_HandStance(s)==-1);
+        assert(AW_HandStance(10)==3 && AW_HandStance(11)==4 && AW_HandStance(12)==5);   /* bow, crossbow, thrown */
+        for(s=13;s<16;s++)assert(AW_HandStance(s)==-1);
         memset(w,0,sizeof(w));memcpy(w,"AWW1",4);w[5]=3;w[7]=28;
         put32(w+8+(2*28+27)*24,(unsigned long)(-5*65536L));put32(w+8+(2*28+27)*24+20,90*65536UL);
         assert(AW_HandWeaponsDecode(&h,w,sizeof(w)) && h.stances==3);

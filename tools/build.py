@@ -100,6 +100,8 @@ def parser():
     add_accept_entity_loss_group(p)  # --accept-entity-loss .. --npc-root-rule
     import creature_residents
     creature_residents.add_option(p)
+    import room_levelled
+    room_levelled.add_option(p)
     import start_disabled
     start_disabled.add_option(p)
     import seyda_entities
@@ -2106,6 +2108,7 @@ def provenance(args, tools):
         "npc_root_rule": getattr(args, "npc_root_rule", "legacy"),
         "actor_search": getattr(args, "actor_search", "wide"),
         "interior_creatures": getattr(args, "interior_creatures", "listed"),
+        "room_levelled_creatures": getattr(args, "room_levelled_creatures", "table"),
         "start_disabled": getattr(args, "start_disabled", None) or "placed",
         "tool_sha256": {name: sha256(path) for name, path in tools.items()},
         "input_sha256": {} if args.dry_run else input_hashes(args),
@@ -2518,6 +2521,16 @@ def export_option_environment(args, announce=True):
     os.environ['AMIWIND_INTERIOR_CREATURES'] = getattr(args, 'interior_creatures', 'listed')
     if os.environ['AMIWIND_INTERIOR_CREATURES'] == 'all' and announce:
         print('Interior creatures: all (experimental: every classified creature; docs/BUILDER.md)', flush=True)
+    # The rooms' levelled creatures (tools/room_levelled.py reads AMIWIND_ROOM_LEVELLED; part of the room stages'
+    # keys; TOMB-NO-CREATURES-60). Default table: the variable is removed, so a default build's environment is as
+    # before; off writes no aw_levelled entity (the room maps before v0.0.61).
+    if getattr(args, 'room_levelled_creatures', 'table') == 'table':
+        os.environ.pop('AMIWIND_ROOM_LEVELLED', None)
+    else:
+        os.environ['AMIWIND_ROOM_LEVELLED'] = args.room_levelled_creatures
+        if announce:
+            print('Room levelled creatures: %s (no aw_levelled entity in the room maps; TOMB-NO-CREATURES-60)'
+                  % args.room_levelled_creatures, flush=True)
     # Actors the original's start scripts disable at a new game (tools/start_disabled.py reads
     # AMIWIND_START_DISABLED; part of the resident stages' keys; NPC-STORY-DISABLED-AT-START-42).
     # Default placed: the variable is removed, so a default build's environment is as before.

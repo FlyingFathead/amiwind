@@ -54,6 +54,8 @@ typedef struct {
     int light_time,light_radius;
     /* the record's enchantment points (bytes 504..505 of a row that is not a light): what Enchanting can put on it */
     int enchant_capacity;
+    /* a weapon's WPDT flags (catalogue byte 506, RESIST-NORMAL-WEAPONS-61): 1 magical, 2 silver; 0 in older catalogues */
+    int weapon_flags;
     unsigned char light_colour[3];
 } aw_inventory_item_t;
 enum {AW_ENCH_NONE,AW_ENCH_ONCE,AW_ENCH_STRIKES,AW_ENCH_USED,AW_ENCH_CONSTANT};
@@ -84,7 +86,11 @@ float AW_MagicRechargeRate(void);
 /* Equipment rules (pure; aw_inventory.c): an armour type's slot (-1 unknown); the slot a new item clears (a two-handed
  * weapon and a shield exclude each other; -1 none); an equipment slot's armour hit slot (aw_combat.h order; -1 none).
  * Weapon = 1 + the original type, two-handed: 2 long blade, 4 blunt, 5 staff, 6 spear, 8 axe (OpenMW weapontype.hpp). */
-#define AW_INV_TWO_HANDED(weapon) ((weapon)==3 || (weapon)==5 || (weapon)==6 || (weapon)==7 || (weapon)==9)
+#define AW_INV_TWO_HANDED(weapon) ((weapon)==3 || (weapon)==5 || (weapon)==6 || (weapon)==7 || (weapon)==9 || \
+                                   (weapon)==10 || (weapon)==11)
+/* Ranged weapons (FIRST-PERSON-WEAPONS-56): weapon = 1 + the type, bow 10, crossbow 11, thrown 12. Held, drawn and shown
+ * in both views; their shot waits for ranged combat (no melee strike with them). */
+#define AW_INV_RANGED(weapon) ((weapon)>=10 && (weapon)<=12)
 int AW_InventoryArmourSlot(int type);
 int AW_InventoryEquipConflict(const aw_inventory_item_t *item,const aw_inventory_item_t *right,const aw_inventory_item_t *left);
 int AW_InventoryHitSlot(int slot);
@@ -116,6 +122,18 @@ int AW_WeaponKitParse(const char *text,int length,aw_kit_row_t *rows,int max);
 int AW_WeaponKitNeeds(const aw_state_t *,const aw_kit_row_t *rows,int n);
 int AW_WeaponKitGrant(aw_state_t *,const aw_kit_row_t *rows,int n);
 int AW_WeaponKitLines(const aw_kit_row_t *row,int equippable,int width,char *out,int size);
+/* dbg weapon / dbg gear (WEAPONS-57, aw_gearbox.c): the console-font list box over the item catalogue, read when it
+ * opens and freed when it closes. Pure rules: the box a row belongs in (weapons and shields; armour and clothing), its
+ * order (by type, then the name) and its line ("Long blade 2H     Steel Claymore", "(carry only)" when this engine
+ * does not equip it yet); -1 for a row of neither box. */
+enum {AW_GEARBOX_NONE,AW_GEARBOX_WEAPON,AW_GEARBOX_GEAR};
+int AW_GearBoxKind(const aw_inventory_item_t *it);
+int AW_GearBoxOrder(const aw_inventory_item_t *it);
+int AW_GearBoxLabel(const aw_inventory_item_t *it,char *out,int size);
+/* Every catalogue row in file order through EACH (CTX); the rows read, -1 when the catalogue cannot be read. */
+int AW_InventoryScan(void (*each)(void *ctx,const aw_inventory_item_t *it),void *ctx);
+/* dbg weapon / dbg gear: open the box (KIND AW_GEARBOX_*); 0 when it cannot open now. */
+int AW_GearBoxOpen(int kind);
 int AW_InventoryEquipped(const aw_state_t *,const char *id);
 int AW_InventoryEquipSlot(aw_state_t *,const aw_inventory_item_t *,int slot);
 int AW_InventoryEquip(aw_state_t *,const aw_inventory_item_t *);
@@ -123,6 +141,8 @@ int AW_InventoryUnequip(aw_state_t *,const char *id);
 int AW_InventoryDrop(aw_state_t *,const aw_inventory_item_t *,int32_t count,
                      const char *scene,const float position[3],float yaw);
 int AW_InventoryPickup(aw_state_t *,int drop);
+/* the subtitle of a refused pickup, naming the limit that refused it (COLLECT-CAPACITY-REJECTED-60) */
+void AW_InventoryRefused(const char *name,const char *id,int32_t count);
 /* CELL-CHANGES-59 (aw_ledger_drops.c): the same rules on the world change list (aw_ledger.h). A drop: COUNT leaves
  * the inventory and a row (key bit 30 + the next serial, DROPPED) lies at AT / WHERE, POSITION (the place's units,
  * aw_ledger.h), YAW; the row's key, 0 when refused (nothing changed). A pickup: the row's items come back and the row
@@ -138,6 +158,15 @@ int AW_LedgerAdoptDrops(aw_state_t *,struct aw_ledger_s *);
 /* Ordered ASCII case-insensitive comparison; unlike Quake equality helpers. */
 int AW_InventoryCompare(const char *,const char *);
 int AW_InventoryRead(const char *,aw_inventory_item_t *);
+/* INVENTORY-ORIGINAL-LIMITS-61: every carried kind's record (count above 0) to ROW with its item row and its row in
+ * the item file (NULL record when none; file row -1 when it did not come from the pass): for more than 8 kinds one
+ * pass over the item file (ids compared before a row is parsed), else the records in memory or one search each; the
+ * number handed over, -1 when memory says no. ReadRow: one record by its file row (no search). The hooks: the same for
+ * the inventory window (NULL in the window's native fixtures: one read per kind). */
+int AW_InventoryCarried(void (*row)(void *ctx,int state_row,const aw_inventory_item_t *it,int file_row),void *ctx);
+int AW_InventoryReadRow(int file_row,aw_inventory_item_t *out);
+extern int (*aw_inventory_carried)(void (*row)(void *ctx,int state_row,const aw_inventory_item_t *it,int file_row),void *ctx);
+extern int (*aw_inventory_read_row)(int file_row,aw_inventory_item_t *out);
 /* several reads in a row share one open of the item file (TRADEHOUSE-LONG-FRAME-59): Begin, the reads, End */
 void AW_InventoryBatchBegin(void);
 void AW_InventoryBatchEnd(void);
@@ -220,6 +249,15 @@ void AW_AreaStatus(void);
 unsigned long AW_AreaFallbacks(void);
 /* loads, areas kept on leaving, taken back from the cache, narrow loads, bytes read, areas of the place now */
 void AW_AreaStats(unsigned long out[6]);
+/* ACTOR-STATS-ALL-61 (aw_stats.h): a being's stat block from the loaded areas, by its placed REFERENCE's row (direct)
+ * or by its id HASH; 1 found. The counts: direct, by hash, not found. */
+#include "aw_stats.h"
+int AW_AreaActorStats(unsigned reference,unsigned long hash,aw_stat_block_t *out);
+void AW_AreaActorStatsCounts(unsigned long out[3]);
+void AW_AreaActorFill(int *made,int *blocks,float *ms);
+float AW_AreaActorFillWorstFrame(void);
+/* the shared stats record's section (the race, class and birthsign rows), NULL none */
+const unsigned char *AW_AreaStatsShared(long *bytes);
 /* the memory policy's call: cached area tables (areas left, narrow loads) freed, least recently used first, until
  * WANTED bytes are free; the bytes freed (the world change list is never touched) */
 long AW_AreaCacheTrim(long wanted);

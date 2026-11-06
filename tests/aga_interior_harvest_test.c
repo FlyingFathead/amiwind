@@ -45,7 +45,7 @@ int main(void)
     assert(picked(0) && picked(1) && AW_HarvestPickedCount(&state)==2);
     /* A room catalogue bound to another index (another digest) fails closed: no pick, no state change. */
     before=state;load(1);h.catalogue[0]^=1;
-    assert(AW_HarvestPrepare(&h,0,&state,1,7)==-1 && AW_HarvestTake(&h,0,&state,1,7)==-1);
+    assert(AW_HarvestPrepare(&h,0,&state,1,7)==-1 && AW_HarvestTake(&h,0,&state,1,7)==AW_HARVEST_STATE);
     assert(!memcmp(&state,&before,sizeof(state)));
     puts("interior and world catalogues share one pick state: pick, leave, return, save, order, foreign index passed");
     return 0;

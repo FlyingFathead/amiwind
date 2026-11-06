@@ -17,17 +17,24 @@ from build_jobs import add_jobs
 # engine picks them by weapon class (hand to hand; one-handed; two-handed close: long blade,
 # blunt; two-handed wide: spear, axe, staff). Each stance fills the same frame contract.
 STANCES={'hh':('idlehh','handtohand'),'1h':('idle1h','weapononehand'),
-         '2c':('idle2c','weapontwohand'),'2w':('idle2w','weapontwowide')}
+         '2c':('idle2c','weapontwohand'),'2w':('idle2w','weapontwowide'),
+         # FIRST-PERSON-WEAPONS-56 (v0.0.61): the ranged weapons, over the idles the original's first-person file
+         # gives them (OpenMW 0.51 weapontype.cpp: bow and thrown take the 1h idle, the crossbow its own); their
+         # attack is the shot, "shoot start" to "shoot follow stop", in the swing's 10 frames
+         'bow':('idle1h','bowandarrow'),'xb':('idlecrossbow','crossbow'),'1t':('idle1h','throwweapon')}
+RANGED=('bow','xb','1t')
 
 def stance_clips(stance='hh'):
     """The fixed frame contract (idle 8, draw 6, lower 4, punch 10 = 28 frames) for one stance;
     the runtime state logic is the same for every stance."""
     if stance not in STANCES:raise ValueError('Unknown first-person stance '+str(stance))
     idle,group=STANCES[stance]
+    attack=(group+': shoot start',group+': shoot follow stop') if stance in RANGED else \
+        (group+': chop start',group+': chop large follow stop')
     return (('idle',idle+': start',idle+': stop',8,False),
             ('draw',group+': equip start',group+': equip stop',6,True),
             ('lower',group+': unequip start',group+': unequip stop',4,True),
-            ('punch',group+': chop start',group+': chop large follow stop',10,True))
+            ('punch',*attack,10,True))
 
 # Fixed frame contract shared with independent runtime state logic.
 CLIPS=stance_clips('hh')

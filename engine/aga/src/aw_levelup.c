@@ -74,6 +74,7 @@ static const aw_class_t *player_class(void)
 }
 /* "Your %s skill increased to %d." with the skill and its new value (the game's own line, its two fields filled in
  * order; an AmiWind line when the image has none). */
+int AW_LevelupGameText(const char *key,char *out,int size){return game_text(key,out,size);}
 static void raised_message(int sk,int due)
 {
     char form[160],line[320],rest[160];int i=0,o=0,fields=0;

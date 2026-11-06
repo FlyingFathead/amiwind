@@ -1,6 +1,6 @@
 # Cell crossings: how the engine moves from one CHIM frame to the next
 
-_Last updated with AmiWind v0.0.58-dev4 (1 November 2026)._
+_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -48,7 +48,7 @@ network or a null-modem cable) concerns the indoor Arena, an ordinary level, and
 ## What a crossing costs today
 
 Measured 20 October 2026 on the v0.0.44 and v0.0.45 release images in an Amiga emulator (FS-UAE, JIT, 68040), on
-a quiet host, over the scripted [crossing route](../performance/CROSSING_BASELINE.md) (relative numbers; real
+a quiet machine, over the scripted [crossing route](../performance/CROSSING_BASELINE.md) (relative numbers; real
 hardware differs). Median (and worst) time from the crossing until the player stands in the next frame ("ready"),
 36 straight crossings and 24 corner-loop crossings per image and memory size:
 
@@ -249,7 +249,7 @@ that starts on a region frame then runs a window instead of one frame:
 
 Measured on the crossing route ([Crossing baseline](../performance/CROSSING_BASELINE.md)) on the v0.0.45 release
 image, with the same engine (branch commit ce322285) for both methods and only the setting changed. FS-UAE JIT,
-68040, quiet host. Legs ai-c1, ai-l1 and ai-e1, which lie in the four cells 2,-7 / 3,-7 / 2,-6 / 3,-6, each flown
+68040, quiet machine. Legs ai-c1, ai-l1 and ai-e1, which lie in the four cells 2,-7 / 3,-7 / 2,-6 / 3,-6, each flown
 three times: 18 crossings per session. A type 0 session at 128 MB was run again at the end as the drift control
 (ready 151 against 146 ms, worst frame 83 against 83 ms). Median (worst), milliseconds. Type 1 creates no entities
 in joined frames: not comparable.

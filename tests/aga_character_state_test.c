@@ -160,6 +160,17 @@ int main(void)
     AW_CharacterMouse(0,128);AW_CharacterKey(K_MOUSE1);AW_CharacterKey(K_ENTER);
     assert(AW_CharacterDone()==1);
     AW_StoryReset(1);assert(AW_StoryRestricted());assert(!AW_StoryTransition(AW_STAGE_OFFICE));
+    /* CHARGEN-INVENTORY-LOCKED-60: the inventory opens from the papers' activation on (CharGenStatsSheet:
+     * EnableInventoryMenu), still inside the registration; never before the papers are laid out */
+    assert(!AW_StoryInventoryAllowed());aw_story.stage=AW_STAGE_REVIEW;
+    assert(!AW_StoryPapersRead() && !AW_StoryInventoryAllowed());
+    aw_story.stage=AW_STAGE_PAPERS;assert(!AW_StoryInventoryAllowed());
+    assert(AW_StoryPapersRead() && AW_StoryInventoryAllowed() && AW_StoryRestricted());
+    AW_StoryReset(1);assert(!AW_StoryInventoryAllowed());
+    aw_story.stage=AW_STAGE_COURTYARD;assert(AW_StoryInventoryAllowed());   /* papers taken */
+    AW_StoryReset(1);aw_story.stage=AW_STAGE_PAPERS;aw_story.hall=1;assert(AW_StoryInventoryAllowed());
+    AW_StoryReset(1);assert(AW_StateSet(&aw_state,AW_GLOBAL,"CharGenState",-1) && AW_StoryInventoryAllowed());
+    AW_StoryReset(1);
     assert(AW_CourtyardRingAvailable() && AW_CourtyardTakeRing());
     assert(AW_Ring()==1 && !AW_CourtyardTakeRing());
     assert(AW_ItemAdd(&aw_state,"ring_keley",-1));

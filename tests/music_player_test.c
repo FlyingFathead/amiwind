@@ -72,6 +72,35 @@ static int switch_case(void) {
     assert(!muted && music && available && heard>0 && opens==opened_before+1);
     CDAudio_Shutdown();return 0;
 }
+/* TOMB-MUSIC-OVER-AMBIENT-60: while a dungeon ambience loops the exploration group rests (silence, nothing opens, no
+ * silent span counted); a fight still plays the battle group and the ambience alone is back after it; a track that is
+ * not an exploration track (a script's StreamMusic) plays to its end; off brings the exploration group back. */
+static int ambience_case(void) {
+    int j,heard;unsigned long opened,silent_spans,ends;
+    for(j=0;j<10;j++)game_frame();
+    assert(music && mode==0 && in_explore_group(current));
+    AW_MusicAmbience(1);assert(ambience_rest && !music);
+    opened=opens;silent_spans=underruns;ends=completions;
+    for(j=0;j<60;j++)assert(!game_frame());
+    music_next();AW_MusicAmbience(1);
+    for(j=0;j<20;j++)assert(!game_frame());
+    assert(opens==opened && underruns==silent_spans && completions==ends && available);
+    AW_MusicCombat(1);assert(music && mode==1);                  /* a hostile engages: battle music */
+    for(j=0,heard=0;j<20;j++)heard+=game_frame();
+    assert(heard>0);
+    AW_MusicCombat(0);assert(!music && mode==0);                 /* the fight is over: the ambience alone */
+    for(j=0;j<20;j++)assert(!game_frame());
+    AW_MusicCombat(1);AW_MusicAmbience(0);AW_MusicAmbience(1);assert(music && mode==1);   /* battle unchanged */
+    AW_MusicCombat(0);assert(!music);
+    assert(AW_MusicScriptTrack(83) && music && current==83);     /* a script's track: not an explore track */
+    AW_MusicAmbience(0);AW_MusicAmbience(1);assert(music && current==83);
+    for(j=0;j<20;j++)game_frame();
+    assert(!music && available);                                  /* at its end, the ambience alone */
+    AW_MusicAmbience(0);assert(!ambience_rest && music && mode==0 && in_explore_group(current));
+    for(j=0,heard=0;j<20;j++)heard+=game_frame();
+    assert(heard>0 && available && errors==0);
+    CDAudio_Shutdown();return 0;
+}
 int main(int argc,char **argv) {
     portable_samplepair_t sample;
     unsigned long position=0, old_total=0, offset;
@@ -86,6 +115,7 @@ int main(int argc,char **argv) {
     if(!strcmp(argv[2],"stall-late"))return stall_case("late");
     if(!strcmp(argv[2],"stall-never"))return stall_case("never");
     if(!strcmp(argv[2],"switch"))return switch_case();
+    if(!strcmp(argv[2],"ambience"))return ambience_case();
     if(!strcmp(argv[2],"buffered")) {
         unsigned long initial_reads;
         assert(MUSIC_BLOCKS==4 && sizeof(blocks)==65536);

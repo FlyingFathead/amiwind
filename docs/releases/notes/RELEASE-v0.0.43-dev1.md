@@ -30,7 +30,7 @@ The first v0.0.43 snapshot: the build system fixes found while building v0.0.42,
 
 - [CHIM-SEYDA-BALMORA-LOAD-HANG-43](../../bugs/CHIM-SEYDA-BALMORA-LOAD-HANG-43.md): travelling from Seyda Neen to Balmora can
   stop on the Loading screen in the emulator while the host computer is writing heavily to its disk (the emulator's
-  hard disk loses a request); restart the emulator if it happens. Not seen on a quiet host.
+  hard disk loses a request); restart the emulator if it happens. Not seen on a quiet machine.
 - [MESH-EBONHEART-DRAGON-PEDESTAL-42](../../bugs/MESH-EBONHEART-DRAGON-PEDESTAL-42.md): the dragon statue in Ebonheart's
   plaza still floats without its pedestal.
 - [UI-INVENTORY-FONT-TABS-42](../../bugs/UI-INVENTORY-FONT-TABS-42.md) and

@@ -98,6 +98,9 @@ int AW_LevelupUse(int skill,int use,float scale);
 int AW_LevelupRaise(int skill,int source);
 /* Seconds of running or swimming on foot (Athletics; OpenMW character.cpp: one use per whole second). */
 void AW_LevelupMoveSeconds(int running,int swimming,float seconds);
+/* One of the game's own lines from levelup/settings.txt ("text KEY ..."; tools/prepare_levelup.py TEXTS), read from
+ * disk on each call (callers keep it); 0 when the image does not have it. */
+int AW_LevelupGameText(const char *key,char *out,int size);
 /* A rest ended normally: the box opens when the level-up is due. Returns 1 when it opened. */
 int AW_LevelupRested(void);
 int AW_LevelupBoxActive(void);

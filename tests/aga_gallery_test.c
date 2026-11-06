@@ -52,6 +52,7 @@ void Cbuf_InsertText(char *s){strcpy(queued,s);}
 void Con_Printf(char *s,...){va_list ap;va_start(ap,s);vsnprintf(printed,sizeof(printed),s,ap);va_end(ap);}
 int AW_SaveSnapshot(aw_save_t *out){captures++;out->character=character;return 1;}
 void AW_SaveSnapshotRestore(const aw_save_t *out){restores++;character=out->character;}
+void AW_SaveRelease(aw_save_t *save){if(save)AW_ItemsFree(&save->state);}   /* the snapshot's item table */
 int Q_strcasecmp(char *a,char *b){return strcasecmp(a,b);}
 void AW_UIFill(int x,int y,int w,int h,int color){}
 int AW_UIColor(int r,int g,int b){return 0;}

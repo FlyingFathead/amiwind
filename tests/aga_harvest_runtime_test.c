@@ -81,8 +81,14 @@ int main(void){
     assert(!AW_HarvestHint() && !AW_HarvestUse() && sounds==1 && sound_checks==1);
     /* Crossings reload the catalogue and a fresh brush, retaining game facts. */
     AW_HarvestBegin();edicts[2].v.modelindex=1;AW_HarvestSpawn();assert(edicts[2].v.modelindex==0 && linked==2 && sounds==1);
-    reset();for(i=0;i<AW_STATE_VALUES;i++){sprintf(id,"item%d",i);assert(AW_ItemAdd(&aw_state,id,1));}
-    AW_HarvestSpawn();assert(AW_HarvestUse());assert(edicts[2].v.modelindex==1 && !linked && !sounds && !sound_checks);
+    /* INVENTORY-ORIGINAL-LIMITS-61: no kind limit (the 128-kind table refused here): 400 kinds carried, collected */
+    reset();for(i=0;i<400;i++){sprintf(id,"item%d",i);assert(AW_ItemAdd(&aw_state,id,1));}
+    AW_HarvestSpawn();assert(AW_HarvestUse() && AW_StateGet(&aw_state,AW_ITEM,"synthetic_ingredient")==2 && sounds==1);
+    /* the refusal text when memory says no names it */
+    assert(!strncmp(AW_ItemRefusalText(&aw_state,AW_ITEM_FULL),"not enough memory for another kind of item (401",47));
+    /* the session of the report: 32 kinds carried (the weapon kit, the opening's items, a looted body) is no limit */
+    reset();for(i=0;i<32;i++){sprintf(id,"item%d",i);assert(AW_ItemAdd(&aw_state,id,1));}
+    AW_HarvestSpawn();assert(AW_HarvestUse() && AW_StateGet(&aw_state,AW_ITEM,"synthetic_ingredient")==2);
     reset();empty=1;AW_HarvestBegin();AW_HarvestSpawn();assert(!AW_HarvestHint() && !AW_HarvestUse());
     assert(!edicts[2].v.modelindex && !sounds && !subtitle && !sound_checks && !AW_StateGet(&aw_state,AW_ITEM,"synthetic_ingredient"));
     tracker();assert(tracker_count==0);
@@ -95,6 +101,7 @@ int main(void){
     reset();mode->value=0;AW_HarvestSpawn();assert(!AW_HarvestHint() && !AW_HarvestUse());
     reset();for(i=0;i<AW_STATE_VALUES;i++){sprintf(id,"global%d",i);assert(AW_StateSet(&aw_state,AW_GLOBAL,id,1));}
     AW_HarvestSpawn();assert(edicts[2].v.modelindex==1 && !AW_HarvestHint() && !AW_HarvestUse() && !sounds);
+    /* globals full: availability unresolved at spawn, nothing offered (the message is the console's) */
     reset();edicts[3]=edicts[2];sv.num_edicts=4;AW_HarvestSpawn(); /* unmatched original ref remains untouched */
     assert(AW_HarvestUse());assert(edicts[3].v.modelindex==1);
     reset();corrupt=1;AW_HarvestBegin();assert(!AW_HarvestProtect(&edicts[2]));AW_HarvestSpawn();assert(!AW_HarvestUse());

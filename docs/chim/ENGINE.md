@@ -1,6 +1,6 @@
 # CHIM engine: shared models, chunk placements and the ring loader
 
-_Last updated with AmiWind v0.0.58-dev4 (1 November 2026)._
+_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -179,7 +179,8 @@ the chunks wait ungrafted.
 ## Memory
 
 The plain-language guide with the measured figures per map, the rules and how to read the numbers:
-[build_guide/MEMORY.md](build_guide/MEMORY.md).
+[build_guide/MEMORY.md](build_guide/MEMORY.md). The rules for run-time lookup tables (small, per area, shared once,
+staggered outdoors): [data layout rules](DATA_LAYOUT_RULES.md).
 
 Three roles, allocated separately (the [memory placement
 requirement](../WORLD_STREAMER.md#memory-placement-requirement)):

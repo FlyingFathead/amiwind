@@ -87,8 +87,9 @@ static int fake_open(unsigned reference,const char *name,int owned){
     assert(!strcmp(name,"Basket"));opened=reference;opened_owned=owned;return 1;}
 static int fake_lock(unsigned reference,int original){assert(reference==CHEST);return script_lock>=0?script_lock:original;}
 static void rules(void){
-    static aw_cstrip_list_t l;int i;
+    static aw_cstrip_list_t l;static aw_cstrip_entry_t sides[2][AW_CSTRIP_ROWS];int i;
     memset(&l,0,sizeof(l));l.columns=4;
+    l.row[0]=sides[0];l.row[1]=sides[1];l.cap[0]=l.cap[1]=AW_CSTRIP_ROWS;
     for(i=0;i<10;i++){Q_snprintf(l.row[0][i].id,sizeof(l.row[0][i].id),"item%d",i);l.row[0][i].count=i+1;}
     l.count[0]=10;l.count[1]=0;AW_CStripClamp(&l);
     assert(l.side==AW_CSTRIP_CONTAINER && l.selected[0]==0 && l.first[0]==0);
@@ -113,7 +114,7 @@ static void rules(void){
 int main(void){
     const char *name,*why;char weight[48],value[48],prompt[48];int owned,steal;
     rules();
-    aw_ledger_on=1;AW_LedgerClear(&aw_ledger);memset(&aw_state,0,sizeof(aw_state));
+    aw_ledger_on=1;AW_LedgerClear(&aw_ledger);AW_StateReset();
     /* unowned, unlocked: "E: Open" in white; the box names it without a lock line; E opens the strip */
     tables(0,1,0);level();
     assert(AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned) && !strcmp(name,"Basket") && !owned && !weight[0]);
@@ -154,7 +155,7 @@ int main(void){
     /* the change is the world change list's: kept across a new map (read again) */
     level();assert(AW_ContainerCount(CHEST,"misc_quill")==1);
     /* an unowned take marks nothing stolen */
-    AW_LedgerClear(&aw_ledger);memset(&aw_state,0,sizeof(aw_state));tables(0,1,0);level();
+    AW_LedgerClear(&aw_ledger);AW_StateReset();tables(0,1,0);level();
     assert(AW_ContainerTake(CHEST,"misc_quill",3,0,&why)==3 && !aw_ledger.stolen_count);
     assert(AW_ContainerCount(CHEST,"misc_quill")==0);
     /* the last one put away is no longer worn: an equipped item put in is unequipped */

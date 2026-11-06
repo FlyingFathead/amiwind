@@ -1,6 +1,6 @@
 # CHIM ideas and held-back work
 
-_Last updated with AmiWind v0.0.54-dev1 (28 October 2026)._
+_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -514,7 +514,7 @@ Where a slow frame goes, part by part, and how the speed work adds up and is
 calibrated on real machines: [where a slow frame goes](../performance/SLOW-FRAME-BREAKDOWN.md).
 
 **Status: measured; the breakdown is in progress.** Measured in FS-UAE on
-Balmora on CHIM (relative numbers, busy host): the normal JIT preset runs
+Balmora on CHIM (relative numbers, loaded machine): the normal JIT preset runs
 20-25 frames per second, but an A1200 with a 68040 at about 50 MHz (the slow
 accelerator preset, cycle-exact) runs **about 0.8-0.9 frames per second**,
 about a second for every frame in town; a chunk crossing adds up to about

@@ -139,6 +139,16 @@ int main(int argc,char **argv) {
             /* a buffer too small for the conversation is refused, never overrun */
             {static unsigned char small[64];aw_dial_conv_t c2;
              if(conv.answers>0)assert(!AW_DialConverse(&c2,&d,npc,&speaker,read_mem,&file,small,sizeof(small)));}
+        }else if(!strcmp(f[0],"refusal")){
+            /* SERVICE-REFUSAL-UNCLOTHED-60: the inverted disposition test of a service refusal */
+            aw_glut_state_t s;int got,npc=AW_GlutFind(&g,f[1]),entry;
+            assert(n==7 && npc==opened);
+            memset(&s,0,sizeof(s));
+            s.random100=atoi(f[5]);s.speaker_health_percent=s.player_health_percent=s.player_health=100;
+            conv.cond.disposition=atoi(f[3]);conv.cond.choice=atoi(f[4]);
+            got=AW_DialPickRefusal(&conv,atoi(f[2]),&s);
+            entry=got<0?-1:(int)conv.answer[got].entry;
+            if(entry!=atoi(f[6])){fprintf(stderr,"refusal %s topic %s disp %s choice %s r %s: %d, want %s\n",f[1],f[2],f[3],f[4],f[5],entry,f[6]);return 1;}
         }else if(!strcmp(f[0],"answer")){
             aw_glut_state_t s;int got,npc=AW_GlutFind(&g,f[1]),entry;char text[2048],script[2048],links[512];
             unsigned short l[64];int nl,k;aw_dial_span_t sp[64];char spans[1024];

@@ -30,7 +30,7 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.48 (23 October 2026)._
+_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -100,7 +100,7 @@ One image pass on the dev1 inputs (16-CPU container, `--jobs 16`) still spends:
 
 Update (8 October 2026, 517d548, not shipped at the time of writing): the hidden-surface cull's imbalance came from
 the parent process rewriting a 4 MB progress receipt after every map, which starved the workers;
-it now writes at most every 2 s, and the cull went from 186.5 s to 83.1 s (busy host). Drive
+it now writes at most every 2 s, and the cull went from 186.5 s to 83.1 s (loaded machine). Drive
 readback is now parallel (in slices). Still open: guard torch conversion stays serial (60 s)
 because its receipt records assets in first-read order, so per-entry asset recording is needed
 before it can run in parallel; shared sky, night lighting and the Balmora rebuilds are not yet
@@ -108,7 +108,7 @@ re-measured.
 
 ## Remaining serial work (profile of 8 October 2026, after the image-step parallel work)
 
-Measured on a busy host (21-30 % of the machine used by other work), `--jobs 16`, 16-CPU container.
+Measured on a loaded machine (21-30 % of the machine used by other work), `--jobs 16`, 16-CPU container.
 bake_ground, the Balmora repair, the cull hash checks, sky and gallery staging now use the pool
 (bake_ground 102.3 s at 2.2 cores -> 24.8 s at 12.0 cores; repair 85.5 s at 1.9 cores -> 23-32 s at
 about 5.7 cores; outputs byte for byte identical). Still serial:
@@ -247,6 +247,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-ORDERED-WINDOW-33](BUILD-ORDERED-WINDOW-33.md): The ordered worker pool idles behind one slow item, and hands long items out last
 - [BUILD-PARTITION-GROWTH-UNGATED-36](BUILD-PARTITION-GROWTH-UNGATED-36.md): Nothing gates the number of world partitions or the growth of the image
 - [BUILD-PASS-KEY-TOP-BROAD-43](BUILD-PASS-KEY-TOP-BROAD-43.md): A pass key counts a reached module's whole import-time code: a new constant in chim/models.py rekeyed all 1,295 region frame maps
+- BUILD-PERF-GUARD-BUSY-HOST-CORES-61 (no report page): The perf guard fails a build on a lower core share even when it has marked the run as a busy host
 - [BUILD-PIPELINE-UNDERUTILIZATION-36](BUILD-PIPELINE-UNDERUTILIZATION-36.md): Umbrella: several builder phases run on one core while the rest of the machine idles, and some do work the build no longer needs
 - BUILD-PLAN-BESIDE-STALE-48 (no report page): The resource plan held a reuse build at 1 of 24 room batch workers against memory that stages it no longer runs held in the measured run
 - BUILD-PLAN-HISTORY-ROW-CORRUPT-54 (no report page): The resource plan refuses every 16 GiB build: the mwscript stage is priced at 32,412 MiB from one corrupt history row, while its largest process measured 277 MiB

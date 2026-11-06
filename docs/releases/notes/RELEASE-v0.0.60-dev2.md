@@ -25,7 +25,7 @@ four lines below. They are listed here so that this page is complete against v0.
 - **Release tooling.** A build that grows past the size margin now says early that a final will stop there and records
   it ([BUILD-SIZE-GUARD-LATE-48](../../bugs/BUILD-SIZE-GUARD-LATE-48.md)); the delivery checks its output names at the
   start, before the boot check; the reuse check runs its preflight once instead of twice (143 s instead of 286 s on a
-  busy host, same result); padded disk images are copied onto the J: drive in a way the drive accepts.
+  loaded machine, same result); padded disk images are copied in a way every file system accepts.
 - **Compiled scripts of the correct compiler.** v0.0.59 shipped compiled scripts made by an older compiler than the
   one in its source (7,339 bindings instead of 8,566), so beds gave no rest window and two rank raises did nothing. The
   dev1 build was made with the scripts rebuilt.

@@ -67,8 +67,9 @@ class DbgKillTests(unittest.TestCase):
         self.assertIn('"sKilledEssential "', combat)         # the key; the words are the game's, never typed here
         self.assertIn('view/settings.txt', fn)
         self.assertIn('AW_MsgBoxShow', fn)
-        # both deaths (a fight and the test kill) call it
-        self.assertEqual(text.count('essential_death(s->e);'), 2)
+        # every death (a fight, the test kill and, v0.0.61 PLAYER-CASTING-59, a spell's damage) calls it
+        self.assertEqual(text.count('essential_death(s->e);'), 3)
+        self.assertIn('essential_death(s->e);', body(text, 'int AW_CombatSpellHit'))
         self.assertNotIn('thread of prophecy', combat)
 
     def test_builder_exports_the_message_when_the_master_has_it(self):

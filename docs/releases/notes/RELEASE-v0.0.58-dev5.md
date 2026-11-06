@@ -35,7 +35,7 @@ checked in game yet (see the last section).
   (CENSUS-BACK-TABLE-NOT-DRAWN-58, open in the [register](../../BUGS.md)).
 - The aim box measures the reach to an item's origin, not to its nearer surface as the original does
   (FOCUS-REACH-ITEM-ORIGIN-58, open in the [register](../../BUGS.md)).
-- A build's performance check can fail on busy hosts when other builds run beside it
+- A build's performance check can fail on loaded machines when other builds run beside it
   ([PERF-GUARD-RESIDENT-BUSY-HOST-57](../../bugs/PERF-GUARD-RESIDENT-BUSY-HOST-57.md)).
 - The netch bull's reduced model loses a stretch of one leg
   (CREATURE-NETCH-BULL-LEG-REDUCED-58, open in the [register](../../BUGS.md)).

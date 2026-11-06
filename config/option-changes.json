@@ -1105,6 +1105,15 @@
       "to": null,
       "source": "tools/gallery_v2.py (NPC-GALLERY-V2)",
       "note": "NPC Gallery v2.0 by default (null = v2): no npc-gallery stage, the image step lists the actors the build made (gallery/actors.txt) and the gallery spawns them from their own rows; baked = the previous gallery (the npc-gallery stage). A MiniWind leaves the gallery out unless the option is given"
+    },
+    {
+      "version": "0.0.61-dev2",
+      "option": "room_levelled_creatures",
+      "flag": "--room-levelled-creatures",
+      "change": "added",
+      "to": "table",
+      "source": "tools/room_levelled.py (TOMB-NO-CREATURES-60)",
+      "note": "The room stages write an aw_levelled entity for every levelled creature reference of a converted room, rolled by the engine from the actor table at the player's level; off = no entity, the room maps before"
     }
   ],
   "current": {
@@ -1259,6 +1268,7 @@
       "resource_plan_json": null,
       "resource_threads": null,
       "room_batches": "all",
+      "room_levelled_creatures": "table",
       "scale_snap": null,
       "scenery_reduce": null,
       "scenery_reduce_texels": null,

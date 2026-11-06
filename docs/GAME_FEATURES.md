@@ -1,12 +1,21 @@
 # Game features
 
-_Last updated with AmiWind v0.0.61-dev1 (4 November 2026)._
+_Last updated with AmiWind v0.0.61-dev2 (5 November 2026)._
+
+<!-- contents start -->
+## Contents
+
+- [Measured: MWScript](#measured-mwscript)
+- [Sub-trackers](#sub-trackers)
+- [The systems](#the-systems)
+
+<!-- contents end -->
 
 <!-- Generated whole by tools/game_features.py render from docs/game-features.json; do not edit by hand. -->
 
 One row per system of the base game: what state AmiWind has it in, which reference decides how it should behave, where the proof is, and which work items and register entries carry the rest. The states are taken from the work lists and the bug register; a row is marked done only when it names a proof.
 
-**10 of 48 systems done**, 29 partial, 9 missing.
+**10 of 49 systems done**, 31 partial, 8 missing.
 
 | Area | Done | Partial | Missing | Systems |
 | --- | ---: | ---: | ---: | ---: |
@@ -14,12 +23,12 @@ One row per system of the base game: what state AmiWind has it in, which referen
 | Actors and behaviour | 0 | 6 | 0 | 6 |
 | The player | 2 | 5 | 0 | 7 |
 | Combat, death and the law | 1 | 1 | 2 | 4 |
-| Magic | 0 | 1 | 4 | 5 |
-| Items, containers and trade | 0 | 3 | 1 | 4 |
+| Magic | 0 | 2 | 3 | 5 |
+| Items, containers and trade | 0 | 4 | 1 | 5 |
 | Dialogue, voices, journal and factions | 0 | 4 | 0 | 4 |
 | MWScript | 1 | 2 | 0 | 3 |
 | Sound, music and the interface | 2 | 3 | 0 | 5 |
-| **All** | **10** | **29** | **9** | **48** |
+| **All** | **10** | **31** | **8** | **49** |
 
 A row counts the system, not its size: a done row can be small and a missing one large. The references are OpenMW 0.51 for behaviour (read for the rules, nothing copied) and the pages of the UESP mirror for the original's numbers.
 
@@ -88,7 +97,7 @@ Each has its own source file and its own check.
 | Character creation | done | The Census Office questions, race, face, hair, class and birthsign, with the install's class questions. | OpenMW 0.51 character generation; UESP Morrowind:Character Creation | tests/test_chargen_questions.py, tests/aga_quickchar_test.c, tests/aga_chargen_class_review_test.c. | - | - | - |
 | The player's body and gear | partial | The player's hands and body in first and third person. | OpenMW 0.51 first and third person; the original's body parts | tests/test_player_parts.py, tests/aga_player_parts_test.c, tests/aga_saved_equipment_test.c. | Worn gear does not yet show on the hands and the body. | PLAYER-GEAR-VISUAL-59, FIRST-PERSON-WEAPONS-56 | - |
 | Player movement | done | Walking, running, jumping, swimming, steps and collision on the original's movement rules. | OpenMW 0.51 player movement; UESP Morrowind:Movement | tests/aga_move_rules_test.c, tests/aga_step_rules_test.c, docs/PLAYER_MOVEMENT.md. | - | - | - |
-| Attributes and skills | partial | The stat sheet with attributes, skills, health, magicka and fatigue, and the race and class numbers. | OpenMW 0.51 stats; UESP Morrowind:Skills, Morrowind:Attributes | tests/aga_statswin_test.c, tests/test_race_stats.py. | Skills do not yet rise with use. | LEVEL-UP-58 | - |
+| Attributes and skills | partial | The stat sheet with attributes, skills, health, magicka and fatigue, and the race and class numbers. | OpenMW 0.51 stats; UESP Morrowind:Skills, Morrowind:Attributes | tests/aga_statswin_test.c, tests/test_race_stats.py, docs/ACTOR_RECORDS.md (the index of every value a being can hold), docs/GAME_FORMULAS.md (every calculation and its status). | Skills do not yet rise with use. | LEVEL-UP-58 | - |
 | Levelling | partial | The level-up rules and the attribute multipliers. | OpenMW 0.51 levelling; UESP Morrowind:Level | tests/aga_levelup_rules_test.c, tests/test_levelup.py (the rules); the level-up box is not in. | The level-up box after rest and skill advancement by use. | LEVEL-UP-58 | - |
 | Rest and wait | partial | The rest rules and the wait dialog. | OpenMW 0.51 rest and wait; UESP Morrowind:Resting | tests/aga_rest_rules_test.c, tests/aga_wait_test.c, docs/RESTING.md. | Resting heals and levels up and waiting only passes time, both refused near enemies: the in-game behaviour is not yet proven end to end. | REST-WAIT-59 | - |
 | Saved games | partial | Saves keep the character, the position, equipment, the journal, topics and the changes made to actors and objects. | OpenMW 0.51 saved games | tests/aga_save_changes_test.c, tests/aga_inventory_save_test.c, tests/test_save_changes.py. | Moved or taken objects, doors and locks, script variables and the calendar are not all kept; no default save titles; no import of the original's saves. | SAVEGAME-COMPLETE-57, SAVE-NAMES-57, CELL-CHANGES-59, SAVE-IMPORT-57 | - |
@@ -106,8 +115,8 @@ Each has its own source file and its own check.
 
 | System | State | What | Reference | Proof | Missing | Work items | Register |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Spell effects | partial | Magic effects applied to actors over their duration, the active effects display, and the effect rules. | OpenMW 0.51 magic effects; UESP Morrowind:Magic Effects | tests/aga_magic_rules_test.c, tests/test_magic_effects.py, docs/MAGIC_EFFECTS.md, docs/HUD_ACTIVE_EFFECTS.md. | Effects over time on actors and the script calls that wait for them. | SPELL-EFFECTS-57 | - |
-| Player casting | missing | Ready a spell, pay the magicka, roll to succeed, deliver Self, Touch and Target effects. | OpenMW 0.51 spell casting; UESP Morrowind:Magic | - | - | PLAYER-CASTING-59 | - |
+| Spell effects | partial | Magic effects applied to actors over their duration, the active effects display, and the effect rules. | OpenMW 0.51 magic effects; UESP Morrowind:Magic Effects | tests/aga_magic_rules_test.c, tests/test_magic_effects.py, docs/MAGIC_EFFECTS.md, docs/HUD_ACTIVE_EFFECTS.md. | Resistances and reflection, the caster's half of Absorb, and most effects that other systems must read (Levitate, Shield, Feather and the like). | SPELL-EFFECTS-57 | - |
+| Player casting | partial | Ready a spell, pay the magicka, roll to succeed, deliver Self, Touch and Target effects. | OpenMW 0.51 spell casting; UESP Morrowind:Magic | tests/test_mwscript.py CastRuleTests and EffectTests, docs/MAGIC_EFFECTS.md (Casting). | The hands' casting gesture, the starting spells on the player's record, Cast When Used and Constant Effect items. | PLAYER-CASTING-59 | - |
 | Spellmaking | missing | Making spells at a spellmaker. | OpenMW 0.51 spellmaking; UESP Morrowind:Spellmaking | - | - | - | - |
 | Alchemy | missing | Making potions from apparatus and ingredients. | OpenMW 0.51 alchemy; UESP Morrowind:Alchemy | - | - | - | - |
 | Enchanting | missing | Enchanting items with soul gems. | OpenMW 0.51 enchanting; UESP Morrowind:Enchant | - | - | - | - |
@@ -117,6 +126,7 @@ Each has its own source file and its own check.
 | System | State | What | Reference | Proof | Missing | Work items | Register |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Inventory | partial | The inventory window with the item list, the preview and the equip rules; drop and pick up. | OpenMW 0.51 inventory; UESP Morrowind:Inventory | tests/aga_inventory_test.c, tests/aga_inventory_ui_test.c, tests/aga_focus_pickup_test.c, docs/INVENTORY.md. | A test that every kind of item can be dropped, picked up again and kept across a save. | DROP-ALL-TEST-58 | - |
+| Carry weight | partial | The weight carried against Strength times fEncumbranceStrMult: slower with more load, no movement over the limit with the game's line, the burden bar in the inventory; no limit on the number of kinds of item. | OpenMW 0.51 encumbrance (mwclass/actor.cpp, mwclass/npc.cpp, mwgui/inventorywindow.cpp, mwgui/windowmanagerimp.cpp); UESP Morrowind:Strength | tests/aga_move_rules_test.c, tests/aga_move_test.c, tests/aga_inventory_test.c, tests/aga_inventory_save_test.c, docs/INVENTORY.md. | Burden and Feather magnitudes from the spell effects (the call is in), and the in-game check on a numbered build. | INVENTORY-ORIGINAL-LIMITS-61 | [ENCUMBRANCE-INCOMPLETE-61](bugs/ENCUMBRANCE-INCOMPLETE-61.md) |
 | Containers | partial | Baskets, crates, barrels and chests open into a strip of their items to take or put back, with levelled contents rolled by the original's rules. | OpenMW 0.51 containers; UESP Morrowind:Containers | tests/aga_container_strip_test.c, tests/aga_levelled_contents_test.c, docs/CONTAINERS.md. | The container window's in-game check and the per-area tables for container data. | CONTAINER-WINDOW-59, AREA-TABLES-60 | - |
 | Barter | missing | Buying and selling with prices from disposition and Mercantile, both inventories, offer and haggle. | OpenMW 0.51 trading; UESP Morrowind:Mercantile | - | - | BARTER-FULL-58 | - |
 | Training | partial | Paid training in the dialogue window. | OpenMW 0.51 training service; UESP Morrowind:Training | tests/aga_dial_test.c (the services row of docs/DIALOGUE_FEATURES.md). | A trained skill does not yet count toward the level. | LEVEL-UP-58 | - |

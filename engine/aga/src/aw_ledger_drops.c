@@ -12,10 +12,7 @@
 #include "aw_inventory.h"
 #include "aw_ledger.h"
 #include "aw_maps.h"
-static int drop_item_index(const aw_state_t *s,const char *id){
-    int i;for(i=0;i<s->count[AW_ITEM];i++)if(!strcmp(s->values[AW_ITEM][i].id,id))return i;
-    return -1;
-}
+#define drop_item_index AW_ItemIndex
 static int drop_id_ok(const char *id){
     int i;
     if(!id || !id[0])return 0;
@@ -31,7 +28,7 @@ uint32_t AW_LedgerDrop(aw_state_t *s,aw_ledger_t *l,const aw_inventory_item_t *i
     if(count>old || s->inventory.next_serial>=AW_LEDGER_ID)return 0;
     /* placed items carry condition but no charge yet: never refill a spent item by dropping it */
     index=drop_item_index(s,item->id);
-    if(count==old && index>=0 && (s->magic.charge_known&(1U<<index)))return 0;
+    if(count==old && AW_ITEM_HAS(s,index,AW_ITEM_CHARGE))return 0;
     for(j=0;j<3;j++)if(!(position[j]>=-1000000 && position[j]<=1000000))return 0;
     if(!(yaw>=-360 && yaw<=360))return 0;
     key=AW_LEDGER_PLAYER|(s->inventory.next_serial+1);
@@ -40,13 +37,13 @@ uint32_t AW_LedgerDrop(aw_state_t *s,aw_ledger_t *l,const aw_inventory_item_t *i
     r->fields=AW_LEDGER_DROPPED;AW_LedgerSetPlace(l,r,at,where);
     memcpy(x->position,position,sizeof(x->position));x->yaw=yaw;x->count=count;
     memset(x->item,0,sizeof(x->item));strcpy(x->item,item->id);
-    if(index>=0 && (s->inventory.condition_known&(1U<<index))){
-        r->fields|=AW_LEDGER_CONDITION;x->condition=s->inventory.condition[index];
+    if(AW_ITEM_HAS(s,index,AW_ITEM_CONDITION)){
+        r->fields|=AW_LEDGER_CONDITION;x->condition=AW_ITEM_ROW(s,index)->condition;
     }
     /* AW_ItemAdd is the only fallible change of the inventory: the row goes again when it says no */
     if(!AW_ItemAdd(s,item->id,-count)){r->fields=0;AW_LedgerTidy(l,key);return 0;}
     if(AW_InventoryEquipped(s,item->id)>old-count)AW_InventoryUnequip(s,item->id);
-    if(old==count && index>=0){s->inventory.condition_known&=~(1U<<index);s->inventory.condition[index]=0;}
+    if(old==count)AW_ItemUnmark(s,index,AW_ITEM_CONDITION);
     s->inventory.initialized=1;s->inventory.next_serial++;
     return key;
 }
@@ -56,14 +53,12 @@ int AW_LedgerPickup(aw_state_t *s,aw_ledger_t *l,uint32_t key){
     r=&l->row[i];x=r->extra;
     if(!(r->fields&AW_LEDGER_DROPPED) || !x || x->count<1 || !drop_id_ok(x->item))return 0;
     index=drop_item_index(s,x->item);old=AW_StateGet(s,AW_ITEM,x->item);
-    current=index>=0 && (s->inventory.condition_known&(1U<<index))?s->inventory.condition[index]:1;
+    current=AW_ITEM_HAS(s,index,AW_ITEM_CONDITION)?AW_ITEM_ROW(s,index)->condition:1;
     incoming=(r->fields&AW_LEDGER_CONDITION)?x->condition:1;
     if(!(incoming>=0 && incoming<=1) || (old>0 && current!=incoming))return 0;
     if(!AW_ItemAdd(s,x->item,x->count))return 0;
     index=drop_item_index(s,x->item);
-    if((r->fields&AW_LEDGER_CONDITION) && index>=0){
-        s->inventory.condition_known|=1U<<index;s->inventory.condition[index]=incoming;
-    }
+    if(r->fields&AW_LEDGER_CONDITION)AW_ItemMark(s,index,AW_ITEM_CONDITION,incoming);
     s->inventory.initialized=1;
     r->fields=0;AW_LedgerTidy(l,key);
     return 1;

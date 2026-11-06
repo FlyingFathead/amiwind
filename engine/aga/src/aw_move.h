@@ -102,4 +102,11 @@ int AW_MoveSuperspeed(void);
 int AW_MoveSneaking(void);
 /* The player's inputs as the rules see them this frame (live character sheet). */
 void AW_MovePlayerInputs(aw_move_inputs_t *in);
+/* ENCUMBRANCE-INCOMPLETE-61 (INVENTORY-ORIGINAL-LIMITS-61): the magnitudes of the Burden and Feather effects on the
+ * player now (0 = none), set by the spell effects whenever they change (v061-magic, SPELL-EFFECTS-57); kept until set
+ * again, not saved (the effects themselves are). AW_PlayerEncumbrance: OpenMW Actor::getEncumbrance (carried + Burden,
+ * Burden not in godmode, - Feather, never below 0), with the capacity (Strength x fEncumbranceStrMult) in *CAPACITY. */
+#define AW_ENCUMBRANCE_EFFECTS 1
+void AW_EncumbranceSetEffects(float burden,float feather);
+float AW_PlayerEncumbrance(float *capacity);
 #endif

@@ -10,7 +10,7 @@
 | Reproduction | sometimes |
 | Duplicate of | no |
 | Persists in | v0.0.48-dev2 (last seen) |
-| Severity | medium: about 100 s of the image step on 3 of 24 cores in a busy-host build; perf-guard FIX-NOW class |
+| Severity | medium: about 100 s of the image step on 3 of 24 cores in a loaded-machine build; perf-guard FIX-NOW class |
 | Family | Build speed (`build-speed`) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |
 | Playtest version | 2026_10_21_v0.0.47-dev2_dev2-try3_c20bc0d8 |
@@ -19,7 +19,7 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.47-dev2 (21 October 2026)._
+_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -84,7 +84,7 @@ about nine tenths of its time. Two candidates, both outside the unit's own compu
 
 1. File reads. Each worker reads the sector files its frames refer to into a private cache, so the same neighbour
    sector files are read by many workers (and again after the cache clears at 256 entries), after the parent has read
-   the same bytes once. On a busy host with the file cache shared with a running image step this is I/O wait, which
+   the same bytes once. On a loaded machine with the file cache shared with a running image step this is I/O wait, which
    the core count shows as idle. The dev1 world was written minutes before it was read; the dev2 world is a smaller,
    reused one (1.1 GB against 1.4 GB), so a cold file cache is possible.
 2. The parent. About 1.5 GB of results go through the pool's one result thread and are unpickled on the parent's core,
@@ -103,7 +103,7 @@ was no baseline row to compare against, and the phase's log line still says "ser
 
 ## Reproduction
 
-Run a full or reuse build whose image step reads a stored CHIM world that is not in the file cache, on a busy host;
+Run a full or reuse build whose image step reads a stored CHIM world that is not in the file cache, on a loaded machine;
 the perf guard lists `parallel map: _read_frames_task`. One group alone, read-only:
 `chim.validate._read_frames_task((root, rows, lean))` on any stored world.
 
@@ -209,6 +209,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-ORDERED-WINDOW-33](BUILD-ORDERED-WINDOW-33.md): The ordered worker pool idles behind one slow item, and hands long items out last
 - [BUILD-PARTITION-GROWTH-UNGATED-36](BUILD-PARTITION-GROWTH-UNGATED-36.md): Nothing gates the number of world partitions or the growth of the image
 - [BUILD-PASS-KEY-TOP-BROAD-43](BUILD-PASS-KEY-TOP-BROAD-43.md): A pass key counts a reached module's whole import-time code: a new constant in chim/models.py rekeyed all 1,295 region frame maps
+- BUILD-PERF-GUARD-BUSY-HOST-CORES-61 (no report page): The perf guard fails a build on a lower core share even when it has marked the run as a busy host
 - [BUILD-PIPELINE-UNDERUTILIZATION-36](BUILD-PIPELINE-UNDERUTILIZATION-36.md): Umbrella: several builder phases run on one core while the rest of the machine idles, and some do work the build no longer needs
 - BUILD-PLAN-BESIDE-STALE-48 (no report page): The resource plan held a reuse build at 1 of 24 room batch workers against memory that stages it no longer runs held in the measured run
 - BUILD-PLAN-HISTORY-ROW-CORRUPT-54 (no report page): The resource plan refuses every 16 GiB build: the mwscript stage is priced at 32,412 MiB from one corrupt history row, while its largest process measured 277 MiB

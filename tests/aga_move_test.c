@@ -30,7 +30,13 @@ server_static_t svs;
 aw_character_t aw_character;
 aw_race_t aw_races[16];
 int aw_race_count;
-aw_state_t aw_state;
+/* ENCUMBRANCE-INCOMPLETE-61: the over-encumbered line (sNotifyMessage59; the image's text is not in this fixture, so the
+ * engine's own copy of the game's line), the clock it is raised by, the inventory window's hook */
+static char subtitle[128];static int subtitles;
+void AW_UISubtitle(const char *name,const char *text,double seconds){(void)name;(void)seconds;strcpy(subtitle,text);subtitles++;}
+int AW_LevelupGameText(const char *key,char *out,int size){(void)key;(void)out;(void)size;return 0;}
+double realtime;
+float (*aw_worldui_encumbrance)(float *capacity);
 trace_t SV_Move(vec3_t start,vec3_t mins,vec3_t maxs,vec3_t end,int type,edict_t *passedict)
 {trace_t t;memset(&t,0,sizeof t);t.fraction=1;(void)start;(void)mins;(void)maxs;(void)end;(void)type;(void)passedict;return t;}
 int Q_strcasecmp(char *a,char *b){return strcasecmp(a,b);}
@@ -59,11 +65,10 @@ int COM_FOpenFile(char *name,FILE **file){
     if(strcmp(name,"combat/settings.txt") || !n)return -1;
     f=tmpfile();fwrite(settings_text,1,n,f);rewind(f);*file=f;return n;
 }
-/* The catalogue: one owned item, a cuirass of 30. */
-int AW_InventoryRead(const char *id,aw_inventory_item_t *out){
-    memset(out,0,sizeof *out);
+/* The catalogue: one owned item, a cuirass of 30 (the item table's weight hook, aw_state.h) */
+static int test_weight(const char *id,float *weight){
     if(strcmp(id,"cuirass"))return 0;
-    out->weight=30;return 1;
+    *weight=30;return 1;
 }
 /* The player's fatigue as the combat module holds it. */
 static float fatigue=200;static int knocked;
@@ -147,11 +152,27 @@ int main(void){
     aw_character.female=1;assert(near(ground(120,0,0),37.5f));          /* Nord female weight 1 */
     aw_character.female=0;
     /* Load: the cuirass, 30 of 300 (5 x Strength 60): walk x (1 - 0.3 x 0.1). */
-    strcpy(aw_state.values[AW_ITEM][0].id,"cuirass");aw_state.values[AW_ITEM][0].value=1;aw_state.count[AW_ITEM]=1;
-    assert(near(ground(120,0,0),46.875f*.97f));
-    aw_state.values[AW_ITEM][0].value=11;                                  /* 330 > 300: cannot move */
-    assert(ground(120,0,0)==0);
-    aw_state.count[AW_ITEM]=0;assert(near(ground(120,0,0),46.875f));
+    aw_item_weight=test_weight;
+    assert(AW_ItemAdd(&aw_state,"cuirass",1) && AW_ItemsBurden(&aw_state)==30);
+    assert(near(ground(120,0,0),46.875f*.97f) && !subtitles);
+    assert(AW_ItemAdd(&aw_state,"cuirass",10));                           /* 330 > 300: cannot move */
+    realtime=10;assert(ground(120,0,0)==0);
+    /* the game's line when he tries to move over the limit (OpenMW windowmanagerimp.cpp), kept up while he tries */
+    assert(subtitles==1 && !strcmp(subtitle,"You are over-encumbered."));
+    realtime=11;ground(120,0,0);assert(subtitles==1);                     /* still shown: not raised again yet */
+    realtime=12.5;ground(0,0,0);assert(subtitles==1);                     /* not trying: nothing */
+    realtime=13;ground(120,0,0);assert(subtitles==2);
+    {float capacity;assert(AW_PlayerEncumbrance(&capacity)==330 && capacity==300);}
+    assert(aw_worldui_encumbrance==AW_PlayerEncumbrance);
+    /* Burden and Feather (the spell effects' call, v061-magic): Feather 40 takes 330 to 290, moving again */
+    AW_EncumbranceSetEffects(0,40);assert(near(ground(120,0,0),46.875f*(1-.3f*290/300.0f)));
+    AW_EncumbranceSetEffects(100,0);assert(AW_ItemAdd(&aw_state,"cuirass",-10));   /* 30 + 100 Burden */
+    assert(near(ground(120,0,0),46.875f*(1-.3f*130/300.0f)));
+    player.v.flags=(float)((int)player.v.flags|FL_GODMODE);assert(near(ground(120,0,0),46.875f*.97f));   /* Burden ignored */
+    player.v.flags=(float)((int)player.v.flags&~FL_GODMODE);
+    AW_EncumbranceSetEffects(0,0);
+    assert(AW_ItemAdd(&aw_state,"cuirass",-1) && AW_ItemsBurden(&aw_state)==0);
+    assert(near(ground(120,0,0),46.875f));
     knocked=1;assert(ground(120,0,0)==0);knocked=0;
 
     /* Fatigue: one second of running costs 5, walking nothing; a jump 5; never below 0. */

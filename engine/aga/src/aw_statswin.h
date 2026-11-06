@@ -19,8 +19,15 @@ int AW_StatsSheet(aw_stats_sheet_t *out);
 /* The skill list rows: header (-1 major, -2 minor, -3 misc) or a skill index. */
 int AW_StatsRows(const aw_stats_sheet_t *s,int *rows);
 void AW_StatsDrawSheet(const aw_stats_sheet_t *s,int top);
-/* The Magic placeholder: names under Powers / Spells, Magic Items empty. */
-typedef struct {int count;char name[32][48];unsigned char power[32];} aw_magic_list_t;
+/* The Magic window: names under Powers / Spells, Magic Items empty. Without casting (the hooks below NULL) the
+ * race's and birthsign's spells by name; with casting (PLAYER-CASTING-59, aw_cast.c fills the hooks) the spells and
+ * powers the player knows: Up/Down (or W/S) move the cursor, Enter or a click selects the spell to cast, and the
+ * footer names the selection with its cost and chance. KIND/INDEX: the spell as aw_cast.c selects it. */
+typedef struct {int count;char name[32][48];unsigned char power[32];
+                int castable,cursor,selected,kind[32],index[32];} aw_magic_list_t;
+extern int (*aw_magic_castables)(aw_magic_list_t *out);   /* fills OUT (castable, selected); the count */
+extern void (*aw_magic_select)(int kind,int index);
+extern int (*aw_magic_status)(char *out,int size);         /* the footer text; 0 none */
 int AW_MagicList(aw_magic_list_t *out);
 void AW_MagicDrawList(const aw_magic_list_t *list);
 /* Opens a full-screen panel on the inventory's modal (aw_worldui.c); 0 when it cannot open. */

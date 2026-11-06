@@ -127,6 +127,25 @@ def gmst(kinds, name):
     return float(struct.unpack('<i', first(fields, 'INTV'))[0])
 
 
+def gmst_text(kinds, name):
+    """A text game setting (STRV) as one plain ASCII line, or '' when the data has none or it is not plain ASCII
+    (the engine then says it on the console only)."""
+    fields = kinds['GMST'].get(name.casefold())
+    if fields is None:
+        return ''
+    try:
+        raw = first(fields, 'STRV')
+    except (KeyError, IndexError, ValueError):
+        return ''
+    words = raw.split(b'\0', 1)[0].decode('latin-1').replace('\r', ' ').replace('\n', ' ').strip()
+    # the engine reads combat/settings.txt in lines of up to 127 characters ("text NAME " is 32 of them)
+    return words if words.isascii() and words.isprintable() and len(words) <= 90 else ''
+
+
+# The texts the combat layer shows (RESIST-NORMAL-WEAPONS-61: a weapon with no effect on a target that resists it)
+TEXT_SETTINGS = ('sMagicTargetResistsWeapons',)
+
+
 def movement_lines(kinds, settings):
     """The movement rules' settings and each race's male/female weight (RADT: heights, weights, flags at the
     end), which scales an NPC's horizontal movement (OpenMW character.cpp, normalise race speed off)."""
@@ -695,6 +714,10 @@ def prepare(data_files, id1, jobs=None, fighters=None):
             hit = (events[extra] - events[start]) / length if extra and extra in events else 0
             lines.append(f'anim {key} {length:.4f} {hit:.4f}')
             clips[key] = round(length, 4)
+    for name in TEXT_SETTINGS:
+        setting = gmst_text(kinds, name)
+        if setting:
+            lines.append('text %s %s' % (name, setting))
     (id1 / 'combat/settings.txt').write_text('\n'.join(lines) + '\n', encoding='ascii', newline='\n')
     count, size, skipped = write_actors(kinds, settings, id1 / 'combat/actors.txt')
     report = {'settings': {k: settings[k] for k in SETTINGS + AI_SETTINGS}, 'sounds': sounds, 'clips': clips,

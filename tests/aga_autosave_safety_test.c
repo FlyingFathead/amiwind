@@ -23,6 +23,10 @@ void AW_UISubtitle(const char *a,const char *b,double t){fprintf(stderr,"%s\n",b
 void Con_Printf(char *s,...){va_list args;va_start(args,s);vfprintf(stderr,s,args);va_end(args);}
 void Cvar_RegisterVariable(cvar_t *c){c->value=atof(c->string);}
 void Cmd_AddCommand(char *s,void(*f)(void)){}
+/* aw_quickload's optional profile and slot (no console arguments here) */
+int Cmd_Argc(void){return 1;}
+char *Cmd_Argv(int i){(void)i;return "";}
+int Q_atoi(char *s){return atoi(s);}
 eval_t *GetEdictFieldValue(edict_t *e,char *name){static eval_t hidden;return &hidden;}
 edict_t *EDICT_NUM(int n){assert(0);return NULL;}
 int AW_SceneMapSize(const char *name,char *map,int capacity){assert(0);return 0;}

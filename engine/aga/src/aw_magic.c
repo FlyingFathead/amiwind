@@ -22,6 +22,8 @@
 #include "aw_magic.h"
 #include "aw_animkit.h"
 #include "aw_tryalloc.h"
+#include "aw_actorstate.h"
+#include "aw_cast.h"
 #include <math.h>
 
 extern particle_t *active_particles,*free_particles;
@@ -611,6 +613,7 @@ static void command(void) {
     int i,fx,mode=MODE_TARGET,repeat=0,slot=-1,caster=0,shape=-1;float area=0,dur=-1;char *a;
     if(cmd_source!=src_command)return;
     if(Cmd_Argc()<2){status();return;}
+    if(AW_CastCommand())return;   /* PLAYER-CASTING-59: ready, spell, now, casting (aw_cast.c) */
     a=Cmd_Argv(1);
     if(!Q_strcasecmp(a,"stop")){clear_casts();Con_Printf("Magic effects: casts stopped.\n");return;}
     if(!Q_strcasecmp(a,"orb")){
@@ -673,6 +676,26 @@ static void command(void) {
                    AW_MagicSchoolName(table->fx[fx].school),repeat?", repeating":"");
     }else Con_Printf("You cast %s (%s)%s%s\n",table->fx[fx].name,AW_MagicSchoolName(table->fx[fx].school),
                      mode==MODE_FAIL?": the spell fails":"",repeat?", repeating":"");
+}
+/* PLAYER-CASTING-59 (aw_cast.c): the look of the player's real cast of effect MGEF on RANGE (0 self, 1 touch, 2
+ * target; FAIL: the failure's sound only), as dbg cast plays it; an effect the table has no look for takes the first
+ * of its school's. The bolt seen here is the look only: the spell's own bolt is aw_cast.c's. 0 when nothing plays. */
+int AW_MagicCastLook(int mgef,int range,int fail,float area) {
+    int i,fx=-1,slot=-1;aw_mgef_t m;
+    if(!aw_magic_fx.value || mgef<0 || !sv.active || svs.maxclients!=1 || !sv_player || !load_table())return 0;
+    for(i=0;i<table->effects;i++)if(table->fx[i].mgef==mgef){fx=i;break;}
+    if(fx<0 && AW_ActorMagicEffect(mgef,&m))for(i=0;i<table->effects;i++)if(table->fx[i].school==m.school){fx=i;break;}
+    if(fx<0)return 0;
+    for(i=0;i<CASTS;i++)if(!casts[i].used){slot=i;break;}
+    if(slot<0)return 0;
+    memset(&casts[slot],0,sizeof(cast_t));
+    casts[slot].used=1;casts[slot].fx=fx;casts[slot].area=area;casts[slot].start=cl.time;casts[slot].shape=-1;
+    casts[slot].mode=fail?MODE_FAIL:range==0?MODE_SELF:range==1?MODE_TOUCH:MODE_TARGET;
+    casts[slot].duration=(table->fx[fx].flags&AW_MAGIC_CONTINUOUS_VFX)?HOLD_DEFAULT:0;
+    if(!aim(&casts[slot])){casts[slot].used=0;return 0;}
+    animate(&casts[slot]);
+    if(last_world!=cl.worldmodel){last_world=cl.worldmodel;last_time=cl.time;}
+    return 1;
 }
 void AW_MagicInit(void) {
     Cvar_RegisterVariable(&aw_magic_fx);

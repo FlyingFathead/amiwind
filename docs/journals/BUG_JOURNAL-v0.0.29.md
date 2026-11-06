@@ -1957,7 +1957,7 @@ appearance and Amiga performance remain playtest tasks.
 
 ## AW25-09: image rejects world/journal receipt after terrain — v0.0.25-rc3
 
-The reported workstation run completed world-terrain in 4232.5 seconds, then
+The reported build machine run completed world-terrain in 4232.5 seconds, then
 image assembly failed with `Incomplete world/journal conversion receipt`.
 The world-UI writer swept `regions.awr` into a receipt whose validator correctly
 requires exactly four UI-owned files. rc6 enumerates only those four files;
