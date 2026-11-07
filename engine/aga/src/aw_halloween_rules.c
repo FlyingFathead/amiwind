@@ -9,6 +9,7 @@
  * spellcasting on the strong beats with an idle or a pose between.
  */
 #include <math.h>
+#include <stdio.h>
 #include <string.h>
 #include "aw_halloween.h"
 /* mathlib.c's FPU-safe forms: libm's sin, cos and atan2 reach instructions a 68040 does not implement */
@@ -300,25 +301,62 @@ void AW_HalloweenAim(const float eye[3],const float look[3],float angles[3]) {
 }
 
 /* ---- the benchmark's figures ---- */
-void AW_HalloweenBenchFigures(const float *times,int n,aw_hw_bench_t *out) {
-    double sum=0,worst=0,slow=0;int i,j,k,count;
-    memset(out,0,sizeof(*out));
-    if(n<=0)return;
-    for(i=0;i<n;i++){sum+=times[i];if(times[i]>worst)worst=times[i];}
-    out->frames=n;out->seconds=(float)sum;
-    out->average=sum>0?(float)(n/sum):0;
-    out->minimum=worst>0?(float)(1/worst):0;
-    /* the slowest 1 % (at least one frame, at most 64): picked one by one, the caller's array left as it is */
-    count=n/100;if(count<1)count=1;if(count>64)count=64;
-    {int taken[64];
-     for(k=0;k<count;k++){
+/* frame J counts: every frame (CLEAN 0), or only one with no disk wait (CLEAN 1) */
+static int counted(const float *disk,int clean,int j) {return !clean || !disk || !(disk[j]>0);}
+/* The slowest COUNT counted frames (at most 64), picked one by one, the caller's arrays left as they are: their
+ * indices into TAKEN, how many found returned. */
+static int slowest(const float *times,const float *disk,int clean,int n,int count,int *taken) {
+    int j,k,m;
+    for(k=0;k<count;k++){
         int at=-1;
         for(j=0;j<n;j++){
-            int used=0,m;
+            int used=0;
+            if(!counted(disk,clean,j))continue;
             for(m=0;m<k;m++)if(taken[m]==j)used=1;
             if(!used && (at<0 || times[j]>times[at]))at=j;
         }
-        taken[k]=at;slow+=times[at];
-     }}
+        if(at<0)break;
+        taken[k]=at;
+    }
+    return k;
+}
+static void figures(const float *times,const float *disk,int clean,int n,aw_hw_bench_t *out) {
+    double sum=0,worst=0,slow=0;int i,k,count,frames=0,taken[64];
+    memset(out,0,sizeof(*out));
+    if(n<=0)return;
+    for(i=0;i<n;i++)if(counted(disk,clean,i)){frames++;sum+=times[i];if(times[i]>worst)worst=times[i];}
+    if(!frames)return;
+    out->frames=frames;out->seconds=(float)sum;
+    out->average=sum>0?(float)(frames/sum):0;
+    out->minimum=worst>0?(float)(1/worst):0;
+    /* the slowest 1 % (at least one frame, at most 64) */
+    count=frames/100;if(count<1)count=1;if(count>64)count=64;
+    count=slowest(times,disk,clean,n,count,taken);
+    for(k=0;k<count;k++)slow+=times[taken[k]];
     out->low1=slow>0?(float)(count/slow):0;
+}
+void AW_HalloweenBenchFigures(const float *times,int n,aw_hw_bench_t *out) {figures(times,NULL,0,n,out);}
+void AW_HalloweenBenchSplit(const float *times,const float *disk,int n,aw_hw_bench_split_t *out) {
+    int i,k,taken[AW_HW_BENCH_SLOWEST];double wait=0;
+    memset(out,0,sizeof(*out));
+    if(n<=0)return;
+    figures(times,disk,0,n,&out->all);
+    figures(times,disk,1,n,&out->drawing);
+    for(i=0;disk && i<n;i++){
+        if(!(disk[i]>0))continue;
+        out->disk_frames++;wait+=disk[i];
+        if(!out->worst_disk_frame || disk[i]>out->worst_disk){out->worst_disk=disk[i];out->worst_disk_frame=i+1;}
+    }
+    out->disk_seconds=(float)wait;
+    k=slowest(times,disk,0,n,AW_HW_BENCH_SLOWEST,taken);
+    for(i=0;i<k;i++)out->slowest[i]=taken[i]+1;
+}
+void AW_HalloweenBenchName(const char *build,int run,char *out) {
+    char cut[AW_HW_BENCH_BUILD_CHARS+1];int i;
+    for(i=0;build && build[i] && i<AW_HW_BENCH_BUILD_CHARS;i++)
+        cut[i]=build[i]==' ' || build[i]=='/' || build[i]==':' || build[i]=='"'?'_':build[i];
+    cut[i]=0;
+    if(run<1)run=1;
+    if(run>999)run=999;
+    sprintf(out,"halloween-%s-%03d.txt",cut,run);
 }

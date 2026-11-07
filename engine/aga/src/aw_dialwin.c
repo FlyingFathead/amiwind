@@ -1350,6 +1350,65 @@ void AW_DialWindowTalk(const char *want){
     Con_Printf("Talk: %s (%.0f units)\n",pr_strings+best->v.netname,best_d);
     if(!AW_DialWindowOpen(best,text,count && count->_float>1))Con_Printf("Talk: no dialogue window for this NPC.\n");
 }
+/* dbg mwscript result TOPIC NPC [N] (MWSCRIPT-PLAYER-CONTROL-62's test aid, aw_dial.h): the conversation is read as
+ * AW_DialWindowOpen reads it (the speaker's row, its disposition, every candidate of its topics into the buffer) but
+ * nothing is shown, no greeting is said and no topic becomes known; the chosen answer's result script runs through
+ * AW_MwscriptRunResult, as run_result runs it; then everything is given back. Choice and ClearInfoActor in the result
+ * do nothing here (no conversation is open). The cost: one conversation read (as a Talk), at a console command only. */
+int AW_DialWindowRunResult(const char *topic_name,const char *npc,int nth){
+    edict_t *e=NULL;aw_glut_cond_t cond;int i,k,topic=-1,answer=-1,first=0,count=0,n,ran=0;
+    char name[NAME_CHARS];static char script[RESULT_TEXT];long at;
+    if(active){Con_Printf("dbg mwscript result: close the dialogue window first.\n");return 0;}
+    if(!sv.active || svs.maxclients<1 || !svs.clients[0].edict){Con_Printf("Not in a game.\n");return 0;}
+    for(i=1;i<sv.num_edicts && !e;i++){
+        edict_t *x=EDICT_NUM(i);eval_t *v;
+        if(x->free || AW_GlutNpcOf(x)<0 || !(v=GetEdictFieldValue(x,"aw_source_id")) || !v->string)continue;
+        if(!Q_strcasecmp(pr_strings+v->string,(char *)npc))e=x;
+    }
+    if(!e){Con_Printf("dbg mwscript result: no NPC %s with dialogue is loaded here.\n",npc);return 0;}
+    if(!load() || (row=AW_GlutSpeaker(e,0,&cond,&state))<0 || row>=table.npcs){
+        Con_Printf("dbg mwscript result: no dialogue table row for %s.\n",npc);return 0;}
+    {   eval_t *id=GetEdictFieldValue(e,"aw_source_id"),*ref=GetEdictFieldValue(e,"aw_ref");
+        AW_MwscriptDispositionFacts(id && id->string?pr_strings+id->string:NULL,ref?(uint32_t)ref->_float:0,
+                                    cond.disposition,cond.faction,&facts);
+        cond.disposition=disposition=AW_DialDisposition(&table,&facts,1);
+        Q_snprintf(speaker_record,sizeof(speaker_record),"%s",id && id->string?pr_strings+id->string:"");
+        speaker_reference=ref?(unsigned long)ref->_float:0;
+    }
+    if(COM_FOpenFile((char *)path,&file)<0 || !file){file=NULL;Con_Printf("dbg mwscript result: no dialogue table.\n");return 0;}
+    file_start=ftell(file);
+    if(read_cache)AW_DialCacheInit(read_cache,read_disk,NULL,file_size);
+    if(!(buffer=(unsigned char *)AW_TryMalloc(AW_DIAL_BUFFER)) ||
+       !AW_DialConverse(&conv,&table,row,&cond,read_file,NULL,buffer,AW_DIAL_BUFFER)){
+        Con_Printf("dbg mwscript result: the conversation could not be read.\n");release();return 0;}
+    for(k=0;k<conv.topics && topic<0;k++){
+        int length;at=AW_DialTopicName(&table,conv.topic[k].topic,&length);
+        if(length>NAME_CHARS-1)length=NAME_CHARS-1;
+        if(at<0 || !read_file(NULL,at,name,length))continue;
+        name[length]=0;
+        if(!Q_strcasecmp(name,(char *)topic_name)){topic=conv.topic[k].topic;first=conv.topic[k].first;count=conv.topic[k].count;}
+    }
+    if(topic<0)Con_Printf("dbg mwscript result: %s has no topic %s.\n",npc,topic_name);
+    else if(nth>0 && nth>count)Con_Printf("dbg mwscript result: %s has %d answers on %s.\n",npc,count,topic_name);
+    else{
+        answer=nth>0?first+nth-1:AW_DialAnswer(&conv,topic,&state);
+        if(answer<0)Con_Printf("dbg mwscript result: %s gives no answer on %s now (N picks one: 1 to %d).\n",npc,topic_name,count);
+        else if((at=AW_DialScriptAt(&conv,answer))<0)
+            Con_Printf("dbg mwscript result: %s's answer %d on %s has no result script.\n",npc,answer-first+1,topic_name);
+        else{
+            read_string(at,script,sizeof(script));
+            if((n=(int)strlen(script))>0){
+                choice_count=0;choice_topic=topic;
+                i=AW_MwscriptRunResult(speaker_record,speaker_reference,script,n);
+                ran=i>0;
+                Con_Printf("dbg mwscript result: %s, %s, answer %d of %d: %s\n%s\n",npc,topic_name,answer-first+1,count,
+                           i>0?"ran":i<0?"did not compile":"no compiled script",script);
+            }
+        }
+    }
+    release();
+    return ran;
+}
 static int journal_entry_filled(int entry,char *out,int capacity){   /* the entry with its %-values filled */
     char said[1024];
     if(!AW_DialWindowEntryText(entry,said,sizeof(said)))return 0;

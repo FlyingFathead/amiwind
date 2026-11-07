@@ -19,6 +19,7 @@ void (*aw_save_ident_refresh)(struct aw_ledger_s *ledger);
 long (*aw_save_migrate)(struct aw_ledger_s *ledger,void *dropped);
 int (*aw_save_drop_actor_records)(void);
 void (*aw_save_notice)(const char *line);
+void (*aw_save_new_game)(void);
 static int pending_other;
 #ifdef AMIGA
 #include <proto/dos.h>
@@ -273,7 +274,8 @@ void AW_SaveSpawn(void)
     }else AW_SaveSchedule();
 }
 /* A new game: no saved state, and the world as in the game data (the world change list emptied, CELL-CHANGES-59). */
-void AW_SaveReset(void){memset(&world,0,sizeof(world));loading=scheduled=0;last_auto=realtime;AW_LedgerClear(&aw_ledger);AW_JHistClear(&aw_jhist);}
+void AW_SaveReset(void){memset(&world,0,sizeof(world));loading=scheduled=0;last_auto=realtime;AW_LedgerClear(&aw_ledger);AW_JHistClear(&aw_jhist);
+    if(aw_save_new_game)aw_save_new_game();}
 int AW_SaveAllowed(void)
 {
     return sv.active && svs.maxclients==1 && aw_story.stage==AW_STAGE_RELEASED && aw_character.valid &&

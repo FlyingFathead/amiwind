@@ -1,6 +1,6 @@
 # The Halloween scene
 
-_Last updated with AmiWind v0.0.61 (6 November 2026)._
+_Last updated with AmiWind v0.0.62-dev1 (6 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -144,6 +144,41 @@ counter on, and 600 frames with the scene clock stepping a tenth of a second eac
 every camera shot), so every run on every machine draws exactly the same frames, as Quake's timedemo plays a fixed
 recording. At the end the console shows one line to copy: the average, minimum and 1 % low frame rates, the frame
 count, the seconds, the Fast RAM, the CPU and the build. How to send it: [REAL_HARDWARE.md](REAL_HARDWARE.md).
+
+### The result file and the figures measured apart
+
+From v0.0.62 the benchmark also saves its result in a file on the game disk: `bench/halloween-<build>-<nnn>.txt` in
+the game folder (`id1`), for example `bench/halloween-0.0.62-dev1-001.txt`, the first free number from 001 on, so no
+run overwrites another. It is written once, after the last frame; nothing is written while the 600 frames run. The
+console names the file on its last line.
+
+Each frame's time is taken from the Amiga's own timer, and with it the time that frame spent waiting on the disk
+(file lookups, opens, seeks and reads, the same counters as the frame wait lines of
+[FRAME-WAITS.md](performance/FRAME-WAITS.md)). The result keeps the two apart, because a frame that waits on the
+disk says something about the disk, not about how fast the machine draws:
+
+- **every frame**: the first console line, as before (average, minimum, 1 % low over all 600 frames);
+- **drawing**: the same three figures over the frames that waited on nothing from the disk; this is the headline
+  frame rate;
+- **disk**: how many frames waited, their wait in all, the worst wait and its frame, and how many files were looked
+  up and read during the run. A run should show none: the scene is loaded before its first frame.
+
+```
+HALLOWEEN BENCH dagoth: avg 4.9 fps, min 0.4, 1% low 0.6, 600 frames, 121.2 s, Fast RAM 32 MB, CPU 68040, AmiWind v0.0.62-dev1 ...
+HALLOWEEN BENCH drawing: avg 5.0 fps, min 0.8, 1% low 1.1 over 598 frames with no disk wait
+HALLOWEEN BENCH disk: 2 frames waited, 812.3 ms in all, worst 500.4 ms (frame 12), 14 files looked up, 30 reads
+HALLOWEEN BENCH file: bench/halloween-0.0.62-dev1-001.txt
+```
+
+(the numbers above show the layout only). The file holds the same lines as plain text, the screen size, `viewsize`,
+`fov` and fog settings, the five slowest frames with their disk waits, and then every frame's time and disk wait in
+milliseconds, about 12 KB. Copy it off the game disk like any other file; `tools/bench_result.py` reads one or more
+of them, checks the figures against the frame times and prints one JSON row each (add `--commit`, `--machine "..."`
+and `--append FILE` to collect the rows; a file already collected is not added twice):
+
+```
+python3 tools/bench_result.py halloween-0.0.62-dev1-001.txt --machine "A1200, 68040 at 40 MHz"
+```
 
 The benchmark is deliberately a heavy scene, meant to push a machine to its limits: a full town around the roof, the
 whole dancing cast with skinned, animated models, and a moving camera that keeps changing shot. Its frame rate is

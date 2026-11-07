@@ -29,6 +29,8 @@ from mwscript.gamedata import GameData, MASTERS  # noqa: E402
 from mwscript.compiler import compile_program, bindings  # noqa: E402
 from mwscript.media import MediaMap  # noqa: E402
 from mwscript import awms  # noqa: E402
+from mwscript import newgame  # noqa: E402
+from mwscript import events  # noqa: E402
 
 CONFIG = ROOT / 'config' / 'mwscript.json'
 NAME = 'mwscript.awm'
@@ -72,6 +74,14 @@ def build(data_files, media, music, out, config=CONFIG):
     program, compiled = compile_program(data, mapper, handwritten=config_data['handwritten']['patterns'])
     moves = {'rows': len(program.moves), 'rooms_known': len(program.rooms or {})}
     binds = bindings(program, compiled)
+    # the build check (NPC-STORY-DISABLED-AT-START-42): a new game starts Main's run-once scripts and each of their
+    # disables reaches its placed reference; a failure stops the stage here
+    new_game = newgame.check(program, compiled)
+    # SCRIPTED-EVENT-FALLING-MAGE-61: the actors standing on an object some script disables (the HELD section), and
+    # the census of distance-triggered world events for the script tracker
+    held = events.check(data)
+    program.held = held['rows']
+    census = events.census(data)
     conf = {'range_units': int(config_data['activation']['range_units']),
             'ops_per_frame': int(config_data['budget']['ops_per_frame']),
             'ops_per_run': int(config_data['budget']['ops_per_run'])}
@@ -94,6 +104,13 @@ def build(data_files, media, music, out, config=CONFIG):
               'not_compiled': [c.name for c in compiled if c.error],
               'bindings': len(binds), 'globals': len(program.globals), 'journal_topics': len(program.journal),
               'player_moves': moves,
+              'new_game': {'scripts': new_game['scripts'], 'counts': new_game['counts'],
+                           'actors': sorted(d['id'] for d in new_game['disabled'] if d['type'] in newgame.ACTOR_TYPES)},
+              'held_actors': {'rows': [dict(r, cell=str(r['cell']), position=[round(v, 1) for v in r['position']])
+                                       for r in held['rows']],
+                              'near_not_held': len(held['near'])},
+              'distance_events': {'scripts': len({r['script'] for r in census}), 'placements': len(census),
+                                  'rows': [dict(r, cell=str(r['cell'])) for r in census]},
               'actors': dict(program.actors.report, items=len(program.actors.items),
                              spells=len(program.actors.spells), inventory_entries=len(program.actors.inventory),
                              spell_entries=len(program.actors.spell_list)),
@@ -152,6 +169,22 @@ def main(argv=None):
               report['scripts'], len(report['not_compiled']), report['bytes'], report['sha256'][:12],
               report['bindings'], m['sounds']['mapped'], m['sounds']['names'], m['voices']['mapped'],
               m['voices']['names'], m['music']['mapped'], m['music']['names'], result), flush=True)
+    ng = report.get('new_game')
+    if ng:
+        c = ng['counts']
+        print('[mwscript] new game: %d scripts start once (%s); they disable %d references (%d actors), %d placed '
+              'once and bound, %d placed more than once, %d not placed in the world' % (
+                  c['scripts'], ', '.join(s['name'] for s in ng['scripts']), c['disabled'], c['actors'],
+                  c['resolved'], c['placed_more_than_once'], c['not_placed']), flush=True)
+    held = report.get('held_actors')
+    if held:
+        print('[mwscript] held actors: %d stand on an object a script disables (%s); %d others near such an object '
+              'are not on it' % (len(held['rows']), ', '.join('%s on %s' % (r['actor_id'], r['support_id'])
+                                                             for r in held['rows'][:6]), held['near_not_held']), flush=True)
+    ev = report.get('distance_events')
+    if ev:
+        print('[mwscript] distance-triggered world events: %d scripts, %d placements' % (ev['scripts'],
+                                                                                        ev['placements']), flush=True)
     for kind in ('sounds', 'voices', 'music'):
         for row in m[kind]['unmapped']:
             print('[mwscript] [warning: unmapped %s] %s: %s' % (kind[:-1] if kind != 'music' else kind,

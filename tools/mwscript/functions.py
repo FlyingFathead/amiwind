@@ -363,8 +363,9 @@ RUN = {'playsound', 'playsoundvp', 'playsound3d', 'playsound3dvp', 'playloopsoun
        # the world and cell lookups (v0.0.54): the player's cell against a build-time table of the cells a name
        # matches (GETPCCELL), an object's position (GETPOS), the diseases among an actor's spells (SPELL verbs 3, 4)
        'getpccell', 'getpos', 'getcommondisease', 'getblightdisease',
-       # what OpenMW does nothing for (miscextensions.cpp OpDontSaveObject) or answers with a constant (OpXBox: 0)
-       'dontsaveobject', 'xbox',
+       # what OpenMW does nothing for (miscextensions.cpp OpDontSaveObject, OpFall: the falling mage's script calls it,
+       # the fall itself is the physics after his platform is disabled) or answers with a constant (OpXBox: 0)
+       'dontsaveobject', 'fall', 'xbox',
        # the ambient tables' AI package (v0.0.54, aw_ambient.h AW_AmbientAiPackage): the current one and its end
        'getcurrentaipackage', 'getaipackagedone'}
 
@@ -440,9 +441,63 @@ HOST = {'getpccrimelevel', 'setpccrimelevel', 'modpccrimelevel',
         # v0.0.59: ShowRestMenu on a bed (the rest window with the bed, its ownership checked) and GetPCSleep (the
         # window open in rest mode): aw_wait.c AW_RestOpen, AW_RestSleeping (REST-WAIT-59; OpenMW guiextensions.cpp
         # OpShowRestMenu, statsextensions.cpp OpGetPCSleep)
-        'showrestmenu', 'getpcsleep'}
-HOST_EFFECTS = {'showrestmenu', 'raiserank', 'lowerrank', 'showmap', 'clearinfoactor', 'choice', 'goodbye', 'modfactionreaction', 'setfactionreaction', 'forcegreeting', 'rotate', 'aitravel', 'aifollow', 'position','playgroup', 'loopgroup', 'addtopic', 'cast','setpccrimelevel', 'modpccrimelevel', 'setreputation', 'modreputation', 'pcraiserank',
-                'pclowerrank', 'pcjoinfaction', 'pcexpell', 'pcclearexpelled', 'setpcfacrep', 'modpcfacrep'}
+        'showrestmenu', 'getpcsleep',
+        # v0.0.62: PositionCell of anything but the player (the player's own keeps its PMOV row): an actor moved to a
+        # place in a named cell, kept on the world change list by its reference, spawned there when that room loads
+        # (aw_mwhost.c AWF_POSITIONCELL, aw_actors.c; OpenMW transformationextensions.cpp OpPositionCell,
+        # MWSCRIPT-POSITIONCELL-ACTORS-62)
+        'positioncell',
+        # v0.0.62: AIFollowCell (a follower that crosses doors with the player and is done in the named room) and
+        # AIEscort / AIEscortCell (the actor leads the target to a point while it keeps up), on the ambient tables
+        # (aw_ambient.c AW_AmbientPackage; OpenMW aiextensions.cpp OpAiFollowCell, OpAiEscort, OpAiEscortCell,
+        # aifollow.cpp, aiescort.cpp, actionteleport.cpp getFollowers; MWSCRIPT-POSITIONCELL-ACTORS-62)
+        'aifollowcell', 'aiescort', 'aiescortcell',
+        # v0.0.62: the placing family (OpenMW transformationextensions.cpp OpPlaceAt, OpPlaceItem, OpPlaceItemCell): a
+        # new NPC or creature of a record the world already has a converted model for, or a carried item, made at the
+        # player, at a reference, at a position or in a named cell, kept on the world change list (aw_mwhost.c
+        # AWF_PLACE*, codegen.Program.place_rows; MWSCRIPT-PLACE-OBJECTS-62); any other object stays "not yet"
+        'placeatpc', 'placeatme', 'placeitem', 'placeitemcell',
+        # v0.0.62: the small functions (MWSCRIPT-SMALL-FUNCTIONS-62; aw_mwhost.c): an object's angles read and set,
+        # moved along its own or the world's axes, set on one axis, put back where it started, an actor turned to a
+        # point (OpenMW transformationextensions.cpp OpGetAngle, OpSetAngle, OpMove, OpMoveWorld, OpSetPos,
+        # OpSetAtStart; aiextensions.cpp OpFace); detection and the line of sight (aiextensions.cpp OpGetDetected,
+        # OpGetLineOfSight; actors.cpp isActorDetected; mechanicsmanagerimp.cpp awarenessCheck, the crime rules'
+        # check, aw_crime.c); the player's cell an interior (cellextensions.cpp OpGetInterior), the weather
+        # (skyextensions.cpp OpGetCurrentWeather), a knockdown's first frame (statsextensions.cpp OpOnKnockout) and
+        # the player woken from a rest (miscextensions.cpp OpWakeUpPC); turned about the world's axes
+        # (OpRotateWorld), the player sneaking (controlextensions.cpp OpGetPcSneaking), a weapon out
+        # (miscextensions.cpp OpGetWeaponDrawn) and SetDelete as the object state's Disable / Enable (OpSetDelete)
+        'getangle', 'setangle', 'move', 'moveworld', 'setpos', 'setatstart', 'face', 'rotateworld',
+        'getdetected', 'getlos', 'getlineofsight', 'getinterior', 'getcurrentweather', 'onknockout', 'wakeuppc',
+        'getpcsneaking', 'getweapondrawn', 'setdelete',
+        # v0.0.62 (MWSCRIPT-GAP-FUNCTIONS-62): the screen faded to black and back (OpenMW miscextensions.cpp OpFadeIn,
+        # OpFadeOut, OpFadeTo, mwgui/screenfader.cpp: from the fade of the moment, over the seconds given; FadeTo's
+        # number is a percent), Quake's palette shift (view.c V_ScreenFade); the sneak stance forced and cleared
+        # (controlextensions.cpp OpSetMovementFlag, OpClearMovementFlag, OpGetForceSneak; creaturestats.cpp getStance:
+        # the forced flag makes the actor sneak): the player sneaks (aw_move.c), an NPC is taken as sneaking by the
+        # detection (aw_mwhost.c); the resistances read, set and changed (statsextensions.cpp OpGetMagicEffect,
+        # OpSetMagicEffect, OpModMagicEffect: the effect's magnitude less its weakness, the elemental shields counted;
+        # Set and Mod move a base modifier the actor keeps, aw_effects.c AW_EffectsBaseModify)
+        'fadein', 'fadeout', 'fadeto', 'forcesneak', 'clearforcesneak', 'getforcesneak',
+        # v0.0.62: the player's filled soul gems by their soul (miscextensions.cpp OpHasSoulGem, OpRemoveSoulGem;
+        # aw_mwhost.c soul_gems)
+        'hassoulgem', 'removesoulgem'}
+RESISTS = ('resistfire', 'resistfrost', 'resistshock', 'resistmagicka', 'resistdisease', 'resistblight',
+           'resistcorprus', 'resistpoison', 'resistnormalweapons', 'resistparalysis')
+HOST |= {verb + r for r in RESISTS for verb in ('get', 'set', 'mod')}
+# v0.0.62: the player's control switches, Disable/Enable and the Get...Disabled readers of the seven input switches,
+# and Disable/EnableTeleporting and -Levitation (aw_story.h AW_Control*, saved; OpenMW controlextensions.cpp
+# OpSetControl / OpGetDisabled, mwinput/controlswitch.cpp, miscextensions.cpp OpEnableTeleporting / OpEnableLevitation;
+# MWSCRIPT-PLAYER-CONTROL-62)
+CONTROL_SWITCHES = CONTROLS + ('teleporting', 'levitation')
+CONTROL_SETS = {verb + c for c in CONTROL_SWITCHES for verb in ('enable', 'disable')}
+HOST |= CONTROL_SETS | {'get' + c + 'disabled' for c in CONTROLS}
+HOST_EFFECTS = set(CONTROL_SETS) | {'placeatpc', 'placeatme', 'placeitem', 'placeitemcell', 'setangle', 'move', 'moveworld', 'setpos', 'setatstart', 'face', 'wakeuppc',
+                                    'rotateworld', 'setdelete', 'fadein', 'fadeout', 'fadeto', 'forcesneak',
+                                    'clearforcesneak', 'removesoulgem',
+                                    'aifollowcell', 'aiescort', 'aiescortcell', 'positioncell','showrestmenu', 'raiserank', 'lowerrank', 'showmap', 'clearinfoactor', 'choice', 'goodbye', 'modfactionreaction', 'setfactionreaction', 'forcegreeting', 'rotate', 'aitravel', 'aifollow', 'position','playgroup', 'loopgroup', 'addtopic', 'cast','setpccrimelevel', 'modpccrimelevel', 'setreputation', 'modreputation', 'pcraiserank',
+                'pclowerrank', 'pcjoinfaction', 'pcexpell', 'pcclearexpelled', 'setpcfacrep', 'modpcfacrep'} | \
+    {verb + r for r in RESISTS for verb in ('set', 'mod')}
 
 # Groups the measurement reports as "the engine does not have it yet" (the brief's list), and the rest.
 MISSING_GROUPS = ('ai', 'inventory', 'combat', 'spells', 'position')

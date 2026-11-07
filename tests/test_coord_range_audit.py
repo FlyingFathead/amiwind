@@ -47,7 +47,8 @@ class CoordRangeAuditTests(unittest.TestCase):
 
     def test_engine_position_bounds_follow_the_coordinate_bound(self):
         world = (ROOT / 'engine/aga/src/aw_world.c').read_text(encoding='utf-8')
-        self.assertEqual(world.count('AW_COORD_BOUND'), 6)   # valid_town (2), region cover (2), two arrival checks
+        # valid_town (2), region cover (2), two arrival checks, the loaded map's arrival x/y (2, DEBUG-TP-MINIWIND-36)
+        self.assertEqual(world.count('AW_COORD_BOUND'), 8)
         self.assertNotRegex(world, r'[^0-9]4000[^0-9]')
         spawn = (ROOT / 'engine/aga/src/aw_spawn.c').read_text(encoding='utf-8')
         # map placement x/y (2) and below-point z (1); the search band and AW_MapPlace's start height follow the bound

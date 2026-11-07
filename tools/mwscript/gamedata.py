@@ -7,6 +7,7 @@ earlier one, as in the game. Placed references are read from Morrowind.esm (Vvar
 the add-ons' references are counted, not bound (their reference numbers need the add-on's load-order index).
 """
 import hashlib
+import re
 import struct
 from pathlib import Path
 import sys
@@ -15,9 +16,73 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'src'))
 from mwad.esm import records, subrecords, string  # noqa: E402
 
 MASTERS = ('Morrowind.esm', 'Tribunal.esm', 'Bloodmoon.esm')
+# The global script the game always runs (OpenMW 0.51 apps/openmw/mwscript/globalscripts.cpp GlobalScripts::addStartup
+# adds "main" before the masters' start scripts). A new game sets CharGenState to 1 (OpenMW mwworld/worldimp.cpp
+# startNewGame); Main's block under that test starts the new game's run-once scripts (Startup, whose ->Disable lines
+# take the Dreamers, the falling mage and the quest characters out of the world, and VampireCheck).
+MAIN_SCRIPT = 'main'
+_TARGET = r'(?:"([^"]+)"|([^\s"]+))'
+_START = re.compile(r'^startscript[\s,]+' + _TARGET + r'$', re.I)
+_DISABLE = re.compile(r'^' + _TARGET + r'\s*->\s*disable$', re.I)
+_NEW_GAME_TEST = re.compile(r'^if\s*\(?\s*chargenstate\s*==\s*1\s*\)?$', re.I)
+
+
+def _statements(text):
+    """The script's statements: comments cut, blanks dropped, spaces folded."""
+    out = []
+    for line in (text or '').splitlines():
+        line = re.sub(r'\s+', ' ', line.split(';', 1)[0]).strip()
+        if line:
+            out.append(line)
+    return out
+
+
+def _target(match):
+    return (match.group(1) or match.group(2)).strip()
+
+
+def new_game_scripts(text):
+    """The folded names Main starts inside its `if ( CharGenState == 1 )` block (any depth inside it), in order:
+    the scripts a new game starts once. [] when Main has no such block."""
+    names, depth, inside = [], 0, None
+    for line in _statements(text):
+        low = line.casefold()
+        if re.match(r'^if\b', low):
+            depth += 1
+            if inside is None and _NEW_GAME_TEST.match(line):
+                inside = depth
+            continue
+        if re.match(r'^endif\b', low):
+            if inside is not None and depth == inside:
+                inside = None
+            depth = max(0, depth - 1)
+            continue
+        match = _START.match(line)
+        if inside is not None and match and _target(match).casefold() not in names:
+            names.append(_target(match).casefold())
+    return names
+
+
+def unconditional_disables(text):
+    """The folded ids of a script's `ID->Disable` lines outside every if block, in order (what a run-once script such
+    as Startup always disables)."""
+    out, depth = [], 0
+    for line in _statements(text):
+        low = line.casefold()
+        if re.match(r'^if\b', low):
+            depth += 1
+        elif re.match(r'^endif\b', low):
+            depth = max(0, depth - 1)
+        elif depth == 0:
+            match = _DISABLE.match(line)
+            if match and _target(match).casefold() not in out:
+                out.append(_target(match).casefold())
+    return out
 # Record types that may name a script (SCRI) and be placed in a cell.
 SCRIPTED = ('ACTI', 'ALCH', 'APPA', 'ARMO', 'BOOK', 'CLOT', 'CONT', 'CREA', 'DOOR', 'INGR', 'LIGH', 'LOCK', 'MISC',
             'NPC_', 'PROB', 'REPA', 'WEAP', 'STAT')
+# The placements events.py reads: the actors and the objects an actor can stand on.
+PLACEMENT_TYPES = ('NPC_', 'CREA', 'ACTI', 'STAT', 'CONT', 'DOOR')
 # Records kept whole for the actor table (actors.py): the actors, what their stats come from, what they carry.
 RECORD_TAGS = ('NPC_', 'CREA', 'RACE', 'CLAS', 'SKIL', 'WEAP', 'ARMO', 'CLOT', 'LEVI', 'SPEL', 'FACT', 'GMST',
                'ALCH', 'APPA', 'BOOK', 'INGR', 'LIGH', 'LOCK', 'MISC', 'PROB', 'REPA', 'MGEF', 'ENCH')
@@ -48,10 +113,17 @@ class GameData:
         self.globals = {}          # folded name -> (type letter, initial value, spelling)
         self.sounds = {}           # folded SOUN id -> {'id', 'file', 'volume', 'min', 'max', 'master'}
         self.start_scripts = []    # folded script ids (SSCR), in order
+        self.new_game = []         # folded script ids Main starts when a new game begins (new_game_scripts)
         self.bases = {}            # folded record id -> (type, folded script id)
         self.references = []       # Morrowind.esm placed refs whose base has a script
         self.reference_counts = {m: 0 for m in MASTERS}     # placed scripted references per master
         self.object_refs = {}      # folded base id -> [reference numbers] (Morrowind.esm, every placed ref)
+        # the cell each placed actor (an NPC_ or CREA reference of Morrowind.esm) stands in: reference number -> the
+        # folded interior cell id, or None outdoors (PositionCell's visitors, codegen.Program.visitor)
+        self.actor_cells = {}
+        # Morrowind.esm placed actors and the objects they can stand on (events.py, SCRIPTED-EVENT-FALLING-MAGE-61):
+        # reference number -> (base type, folded id, cell, x, y, z in game units)
+        self.placements = {}
         self.cells = []            # interior cell names (folded) in first-seen order
         self.master_sha256 = {}
         self.gmst = {}             # folded float game settings
@@ -94,6 +166,8 @@ class GameData:
         from cell_numbers import number_cells
         # the stable interior numbers the builder stamps into each room map (_aw_cell_int, tools/cell_numbers.py)
         self.interior_numbers = {r['cell'].casefold(): r['number'] for r in number_cells(self.interior_ids)}
+        main = self.scripts.get(MAIN_SCRIPT)
+        self.new_game = new_game_scripts(main.text) if main else []
         return self
 
     def _master(self, master, raw):
@@ -219,6 +293,12 @@ class GameData:
             base = self.bases.get(r['id'].casefold())
             if master == 'Morrowind.esm':
                 self.object_refs.setdefault(r['id'].casefold(), []).append(r['number'])
+                if base and base[0] in ('NPC_', 'CREA'):
+                    self.actor_cells[r['number']] = cell_name.casefold() if interior else None
+                if base and base[0] in PLACEMENT_TYPES:
+                    x, y, z = r.get('position', [0.0, 0.0, 0.0])
+                    self.placements[r['number']] = (base[0], r['id'].casefold(),
+                                                    cell_name.casefold() if interior else (gx, gy), x, y, z)
             if not base or not base[1]:
                 continue
             self.reference_counts[master] += 1

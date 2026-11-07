@@ -98,7 +98,8 @@ static void act_entry(aw_actor_t *a,const effect_t *e,float m,int sign){
 
 int AW_EffectsHasOn(uint32_t owner,int number){
     int i;
-    for(i=0;i<AW_EFFECTS_MAX;i++)if(fx[i].used && fx[i].owner==owner && fx[i].effect==number)return 1;
+    for(i=0;i<AW_EFFECTS_MAX;i++)   /* the active spells' (OpenMW OpGetEffect), not a script's base modifier */
+        if(fx[i].used && fx[i].owner==owner && fx[i].effect==number && fx[i].source!=AW_EFFECT_SOURCE_SCRIPT)return 1;
     return 0;
 }
 int AW_EffectsHas(int number){return AW_EffectsHasOn(AW_ACTOR_PLAYER_REF,number);}
@@ -182,6 +183,23 @@ int AW_EffectsLand(aw_actor_t *a,int effect,int arg,float m,float seconds,int so
     if(!per_second)act_entry(a,e,m,1);
     return 1;
 }
+int AW_EffectsBaseModify(uint32_t owner,int effect,float delta){
+    int i,group;effect_t *e=NULL;
+    if(effect<0 || effect>=AW_EFFECT_COUNT || AW_EffectKind(effect,&group)>=0 || !(delta>-1e6f && delta<1e6f))return 0;
+    for(i=0;i<AW_EFFECTS_MAX && !e;i++)
+        if(fx[i].used && fx[i].owner==owner && fx[i].effect==effect && fx[i].source==AW_EFFECT_SOURCE_SCRIPT)e=&fx[i];
+    if(!e){
+        if(delta==0)return 1;
+        if((i=free_slot(owner))<0){refused++;return 0;}
+        e=&fx[i];memset(e,0,sizeof(*e));
+        e->used=1;e->owner=owner;e->effect=(unsigned char)effect;e->arg=AW_EFFECT_NO_ARG;
+        e->flags=(unsigned char)((AW_EffectPerSecond(effect)?FL_PER_SECOND:0)|FL_CONSTANT);
+        e->source=AW_EFFECT_SOURCE_SCRIPT;e->left=SAVED_CONSTANT;
+    }
+    e->magnitude+=delta;
+    if(e->magnitude>-0.5f && e->magnitude<0.5f)e->used=0;   /* back to none: the entry goes */
+    return 1;
+}
 int AW_EffectsAdd(aw_actor_t *a,int kind,int stat,float m,float seconds){
     static const int base[4]={17,22,74,79};int group,arg;
     if(kind<AW_FX_DRAIN || kind>AW_FX_FORTIFY || !(m>0))return 0;
@@ -234,8 +252,10 @@ int AW_EffectsExport(unsigned char *out,int capacity){
 }
 static int import_one(int i,uint32_t owner,int effect,int arg,int source,float m,float left){
     int group,kind;
-    if(effect>=AW_EFFECT_COUNT || !(m>=0 && m<1e6f) || !(left>0 && left<=1e7f))return 0;
+    if(effect>=AW_EFFECT_COUNT || !((m>=0 || (source==AW_EFFECT_SOURCE_SCRIPT && m>-1e6f)) && m<1e6f) ||
+       !(left>0 && left<=1e7f))return 0;
     kind=AW_EffectKind(effect,&group);
+    if(source==AW_EFFECT_SOURCE_SCRIPT && kind>=0)return 0;
     if(kind>=0 && AW_EffectStat(group,arg)<0)return 0;
     fx[i].used=1;fx[i].owner=owner;fx[i].effect=(unsigned char)effect;fx[i].arg=(unsigned char)arg;
     fx[i].source=(uint16_t)source;fx[i].magnitude=m;fx[i].left=left;

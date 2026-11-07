@@ -192,6 +192,13 @@ int AW_ActorSpellEffects(int spell,aw_spell_effect_t *out,int max);
 #define AW_SPELL_PC_START 2
 #define AW_SPELL_ALWAYS 4
 int AW_ActorSpellFlags(int spell);
+/* RESIST-NORMAL-WEAPONS-61 (v0.0.62): the summed magnitude of EFFECT (0..142, every argument) among the spells of A's
+ * list that act always: every type but a castable spell (0) and a power (5), i.e. abilities, blights, diseases and
+ * curses (rule from OpenMW 0.51 apps/openmw/mwmechanics/activespells.cpp update: such spells of the actor's list are
+ * kept active with no end). OpenMW rolls each such effect's magnitude once; here the middle of its range, the same
+ * number for every ability of the game data (minimum = maximum in all of them). Reads the actor's list and those
+ * spells' effects from disk: the caller keeps the answer. 0 none. */
+float AW_ActorPassiveMagnitude(const aw_actor_t *a,int effect);
 /* Things the player made (bounded, saved: AWMD, AWEN): spells and enchanted items, up to 8 effects each. */
 #define AW_MADE_EFFECTS 8
 /* The game's enchantments (AENC, v0.0.61; tools/mwscript/actors.py): TYPE 0 cast once, 1 when strikes, 2 when used,
@@ -207,6 +214,10 @@ int AW_ActorEnchant(int row,aw_enchant_t *out);
 typedef struct {float magicka_mult,chance,cost_mult;int max,skill_min;} aw_start_settings_t;
 int AW_ActorStartSpells(aw_start_settings_t *set,int *rows,int max);
 #define AW_MADE_ITEM_PREFIX "aw_made_"   /* the inventory id of made item N: aw_made_N */
+/* ALCHEMY-61: a made potion is a made item whose cast type is AW_MADE_POTION: BASE the potion of the masters whose
+ * bottle it borrows (model, picture), NAME its name, CHARGE its weight, CHARGE_MAX its value, the effects its own
+ * (range Self, magnitude min = max); kept and saved with the enchanted items (AWEN, no new block) */
+#define AW_MADE_POTION 4
 #define AW_MADE_SPELL_BYTES 152
 #define AW_MADE_ITEM_BYTES 200
 typedef struct {char name[32];int effects;aw_spell_effect_t effect[AW_MADE_EFFECTS];} aw_made_spell_t;

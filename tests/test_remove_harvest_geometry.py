@@ -23,6 +23,12 @@ class RemoverTests(unittest.TestCase):
         es=entities(lumps(out)[0]);self.assertNotIn('42',[e.get('aw_ref') for e in es])
         self.assertEqual(es[-1],dict(classname='func_wall',aw_ref='43',model='*1',origin='7 8 9',angles='0 12 0',custom='survive exactly'))
 
+    def test_a_baked_trunk_fungus_is_removed_like_a_mushroom(self):
+        # FLORA-FAUNA-COVERAGE-62: every harvest kind, the bracket fungi on the tree trunks too
+        raw,ref=fixture();ref['kind']='tree_fungus'
+        out,report=remove_geometry(raw,[ref],[0,0,0])
+        self.assertNotIn('42',[e.get('aw_ref') for e in entities(lumps(out)[0])])
+
     def test_missing_duplicate_ambiguous_and_non_mushroom_targets_rejected(self):
         raw,ref=fixture()
         for field,value in [('number',43),('kind','tree'),('type','STAT'),('source_key',None)]:

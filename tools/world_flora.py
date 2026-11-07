@@ -14,7 +14,20 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 from mwad.audit import cell_data, normpath, records, string, subrecords
 
-CATEGORIES = ('tree', 'grass', 'reeds', 'fern', 'bush', 'flora_log', 'stateful_flora', 'small_mushroom')
+CATEGORIES = ('tree', 'grass', 'reeds', 'fern', 'bush', 'flora_log', 'stateful_flora', 'small_mushroom', 'tree_fungus')
+
+
+def harvest_only_kind(model):
+    """A harvest kind that is no scenery category of flora_kind: the bracket fungi that grow from the sides of the
+    Bitter Coast trees (flora_bc_shelffungus_NN: Bungler's Bane and Hypha Facia), 'tree_fungus'; else None.
+
+    Kept apart from flora_kind so that the collision, sprite and tracker decisions made from flora_kind for these
+    models (none until now) stay as they are; only inventory(..., ('tree_fungus',)) selects them."""
+    stem = normpath(model).rsplit('/', 1)[-1]
+    if stem.startswith('flora_bc_shelffungus_') and stem.removeprefix('flora_bc_shelffungus_').removesuffix('.nif').isdigit() \
+            and stem.endswith('.nif'):
+        return 'tree_fungus'
+    return None
 
 
 def flora_kind(model):
@@ -56,7 +69,7 @@ def inventory(master, categories=('tree',)):
             if 'NAME' not in fields or 'DELE' in fields:
                 continue
             model = string(fields.get('MODL', b''))
-            kind = flora_kind(model)
+            kind = flora_kind(model) or harvest_only_kind(model)
             if kind not in categories and kind not in ('ivy', 'lilypad'):
                 continue
             obj = {'type': tag, 'model': normpath(model), 'kind': kind,

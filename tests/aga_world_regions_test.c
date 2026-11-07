@@ -3,7 +3,7 @@
 #include "aw_maps.h"
 #include "aw_world.h"
 #include <assert.h>
-static int opens,missing_map,broken_names,old_names;
+static int opens,missing_map,broken_names,old_names,no_directory;
 void Con_Printf(char *fmt,...){}
 static void word(FILE *f,unsigned n){int i;for(i=0;i<4;i++)fputc((n>>(8*i))&255,f);}
 static void number(FILE *f,float value){unsigned n;memcpy(&n,&value,4);word(f,n);}
@@ -12,6 +12,7 @@ int COM_FOpenFile(char *name,FILE **out){
     float rows[2][11]={{1024,0,512,-1024,-1024,1024,1024,-1920,-1920,1920,1920},
                        {3072,0,768,-1024,-1024,1024,1024,-1920,-1920,1920,1920}};
     opens++;assert(f);*out=f;
+    if(!strcmp(name,"world/regions.awr") && no_directory){fclose(f);*out=NULL;return -1;}   /* a MiniWind disk */
     if(!strcmp(name,"world/regions.awr")){
         fputs("AWR2",f);word(f,2);
         for(i=0;i<2;i++)for(k=0;k<7;k++)number(f,towns[i][k]);
@@ -96,9 +97,33 @@ static void frame_maps(void){
     aw_world_chim_source=NULL;aw_world_chim_local=NULL;aw_world_chim_contains=NULL;
     puts("frame maps: region rows unchanged, the loaded frame both ways, rooms stay rooms");
 }
-int main(void){
+/* DEBUG-TP-MINIWIND-36: a MiniWind disk (no open-world region table) with its town's CHIM frame loaded: the region
+ * table answers nothing, a point inside the loaded map resolves to that map at its local X Y, one outside it, another
+ * map's name or a name too long for a map does not. */
+static int loaded_map_without_directory(void){
+    float source[3]={-8000+400,12000-200,0},arrival[3]={1,1,1};char target[16]={0};
+    no_directory=1;frame_name="seyda";
+    aw_world_chim_source=frame_source;aw_world_chim_local=frame_local;aw_world_chim_contains=frame_contains;
+    assert(!AW_WorldHasDirectory() && !AW_WorldMapTarget(source,target,arrival));
+    assert(AW_WorldLoadedTarget("seyda",source,target,arrival) && !strcmp(target,"seyda") &&
+           arrival[0]==100 && arrival[1]==-50 && arrival[2]==0);
+    source[0]=-8000+3600;assert(!AW_WorldLoadedTarget("seyda",source,target,arrival));   /* outside the frame */
+    source[0]=-8000+400;assert(!AW_WorldLoadedTarget("balmora",source,target,arrival));  /* not the loaded frame */
+    assert(!AW_WorldLoadedTarget("a_map_name_too_long",source,target,arrival) && !AW_WorldLoadedTarget(NULL,source,target,arrival));
+    source[1]=NAN;assert(!AW_WorldLoadedTarget("seyda",source,target,arrival));
+    source[1]=12000-200;missing_map=1;assert(!AW_WorldLoadedTarget("seyda",source,target,arrival));missing_map=0;
+    puts("no region table: dbg tp resolves inside the loaded map only");
+    return 0;
+}
+int main(int argc,char **argv){
     float a[3]={240,0,40},b[3],c[3],source[3];char target[16];int before;
+    if(argc>1 && !strcmp(argv[1],"no-directory"))return loaded_map_without_directory();
     frame_maps();
+    /* with the region table on the disk the loaded map is never asked: the table answers (or refuses) as before */
+    source[0]=-8000+400;source[1]=12000-200;source[2]=0;frame_name="seyda";
+    aw_world_chim_source=frame_source;aw_world_chim_local=frame_local;aw_world_chim_contains=frame_contains;
+    assert(AW_WorldHasDirectory() && !AW_WorldLoadedTarget("seyda",source,target,b));
+    aw_world_chim_source=NULL;aw_world_chim_local=NULL;aw_world_chim_contains=NULL;frame_name="seyda_chim";
     assert(AW_MapId("vf0000")==AW_MAP_COUNT);
     /* Outdoor save IDs stay fixed when interior sections are appended. */
     assert(AW_MapId("vf8191")==8251 && AW_INTERIOR_MAP_BASE==8252);

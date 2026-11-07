@@ -1,6 +1,6 @@
 # Roadmap and implementation options
 
-_Last updated with AmiWind v0.0.61 (6 November 2026)._
+_Last updated with AmiWind v0.0.62-dev1 (7 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -167,6 +167,13 @@ after you arrive.
   their limits, so loading stays quick on the Amiga.
 - A carriable light that is dropped or put down again burns and lights the place where it lies.
 - Characters other than the player get the effects of the Constant Effect items they wear.
+
+**In v0.0.62-dev1** ([release notes](releases/notes/RELEASE-v0.0.62-dev1.md), 7 November 2026): alchemy; the creatures
+placed in rooms (228 creature records built, 527 of 904 room placements); the new-game scripts and the falling mage with
+falls, fall damage and Slowfall; PositionCell, AIFollowCell, AIEscort and the Place functions; pickable tree fungi; the
+creature and flora census; the MWScript tracker at 479 of 1,207 scripts running; the in-game check of v0.0.61 and its
+fixes. Still to do from the list above: the crime system, enchanting, spellmaking, the per-area tables, outdoor items,
+dropped lights and the Constant Effect items of other characters.
 
 The longer list that stood for v0.0.61 before this cut, with the status of each item at the time, follows under
 v0.0.60.

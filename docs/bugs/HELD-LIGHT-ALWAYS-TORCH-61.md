@@ -9,7 +9,7 @@
 | Where | engine held light (torch and hand models) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.61-dev2 (last seen) |
+| Persists in | fixed in v0.0.61 |
 | Severity | medium: every held light other than a torch looks and lights wrong; nothing breaks |
 | Family | First-person hands and torch (`torch-hands`) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |

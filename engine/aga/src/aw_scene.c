@@ -311,9 +311,13 @@ int AW_NPCFloorRetry(void) {
 /* Resolve the authored feet point against linked world/architectural brushes.
  * Balmora's ground conversion leaves source feet up to 18 units above paving.
  * Bound correction to 32 units so a missing floor cannot move actors a storey. */
+/* aw_fall.c (SCRIPTED-EVENT-FALLING-MAGE-61): 1 while E is an actor held on an object a script will remove (the
+ * builder's HELD rows): it stays where the game data placed it, never on the ground under it. NULL: none. */
+int (*aw_fall_held)(edict_t *e);
 int AW_NPCFloor(edict_t *e) {
     vec3_t start,end;trace_t tr;eval_t *mode,*valid,*baked;int k;
     mode=GetEdictFieldValue(e,"aw_ground_mode");if(mode && mode->_float)return 0;
+    if(aw_fall_held && aw_fall_held(e))return 0;
     if(!AW_RegionGroundCoverage(e->v.origin))return 0;
     /* The host fitted the actual rendered soles. A second origin-only snap
      * would destroy that result. Preserve only the exact baked initial position;
@@ -486,6 +490,8 @@ static void read_links_for(const char *map) {
     }
     fclose(f);
 }
+void (*aw_scene_followers)(edict_t *player,int leave);   /* aw_mwhost.c (v0.0.62): the followers through a door */
+static int no_followers;
 static void load_scene(aw_scene_link_t *link,int immediate) {
     edict_t *p=svs.clients[0].edict;char command[32];
     if(pending || !map_valid(link->target))return;
@@ -501,6 +507,9 @@ static void load_scene(aw_scene_link_t *link,int immediate) {
     shroompicker_view=0;travel_rows_for=NULL;   /* edicts are reused by the next map: look the provider up again */
     next=*link;pending=1;started=Sys_FloatTime();AW_StreamTransitionBegin();
     AW_SaveCapture();
+    /* the player's followers go along (v0.0.62; OpenMW ActionTeleport teleports them with the player at a door, a
+     * travel and here a region map's load too); not on a coordinate teleport (dbg tp, Position) */
+    if(aw_scene_followers && !no_followers)aw_scene_followers(p,1);
     health=p->v.health;
     if(!AW_HandSnapshotCapture(&hand_snapshot,p,sv.time))
         Con_Printf("Hand transition state unavailable; destination rules will initialize hands.\n");
@@ -520,13 +529,17 @@ static void load_scene(aw_scene_link_t *link,int immediate) {
  * ring there loaded before the ground is searched (aw_chim_spawn). With a
  * height (dbg tp X Y Z) the player lands on the first surface at or below it,
  * else on the highest one; a blocked target falls back to the scene spawn. */
-int AW_MapTeleportAt(const float *source_position,int use_height) {
+/* LOADED_MAP (DEBUG-TP-MINIWIND-36): dbg tp only; on a disk without the open-world table (a MiniWind) a point inside
+ * the loaded map resolves to that map (AW_WorldLoadedTarget). Scripts (Position) and the other callers keep the
+ * table's answer alone. */
+static int map_teleport(const float *source_position,int use_height,int loaded_map) {
     aw_scene_link_t r;edict_t *p;float local[3];
     if(pending || !sv.active || svs.maxclients!=1 || !svs.clients ||
        !(p=svs.clients[0].edict) || cls.state!=ca_connected || p->v.health<=0 ||
        AW_StoryRestricted())return 0;
     memset(&r,0,sizeof(r));
-    if(!AW_WorldMapTarget(source_position,r.target,r.arrival))return 0;
+    if(!AW_WorldMapTarget(source_position,r.target,r.arrival) &&
+       !(loaded_map && AW_WorldLoadedTarget(sv.name,source_position,r.target,r.arrival)))return 0;
     if(use_height){
         /* The target map's own units: the shared conversion answers for a region map, or for the CHIM frame map only
          * while it is the loaded one (a frame map not yet loaded has no frame to ask: its height then comes from the
@@ -536,10 +549,11 @@ int AW_MapTeleportAt(const float *source_position,int use_height) {
     }
     r.yaw=p->v.v_angle[1];region_crossing=0;door_ready=0;door_close=0;
     crossing_movetype=p->v.movetype;
-    load_scene(&r,1);
+    no_followers=1;load_scene(&r,1);no_followers=0;
     if(!pending)return 0;
     map_jump=use_height?2:1;return 1;
 }
+int AW_MapTeleportAt(const float *source_position,int use_height) {return map_teleport(source_position,use_height,0);}
 int AW_MapTeleport(const float *source_position) {return AW_MapTeleportAt(source_position,0);}
 /* The view of a shot, as aw_aim sets it (dbg cam recall, aw_cam.c). */
 static void shot_view(edict_t *p,float yaw,float pitch) {
@@ -1146,7 +1160,9 @@ void AW_SceneSpawn(edict_t *p) {
         Con_Printf("Scene ready: %s, %ld ms, %ld hunk bytes, arrival %s\n",sv.name,
             (long)((Sys_FloatTime()-started)*1000),(long)(Hunk_LowMark()+Hunk_HighMark()),placed?"checked":"blocked");
         AW_MusicSceneEvent("scene-enter");pending=0;AW_StreamTransitionReady();
+        if(aw_scene_followers)aw_scene_followers(p,0);    /* the followers that came along arrive beside the player */
     } else {
+        if(aw_scene_followers)aw_scene_followers(p,-1);   /* another map loaded (a load, a restart): none come along */
         pending=shroompicker_view=0;memset(&hand_snapshot,0,sizeof(hand_snapshot));AW_TorchResetAnimation();
         if(AW_Interior() || AW_TownFlag(sv.name,AW_TOWN_GROUND_PLACE) || AW_TerrainId(sv.name)>=0)AW_InteriorPlace(p,p->v.origin);
         else AW_PlacePlayer(p,p->v.origin);
@@ -1457,14 +1473,27 @@ int AW_SceneMapMarker(float *source) {
     source[2]=0;return 1;
 }
 static void roulette_command(int first);
+/* DEBUG-TP-MINIWIND-36: after a refused coordinate teleport, which maps this disk holds (the town list of dbg tp) and,
+ * on a disk without the open world (a MiniWind), that the loaded map takes points inside it, with where you stand. */
+static void disk_maps_note(void) {
+    char names[256];float here[3];int open=AW_WorldHasDirectory();
+    AW_TeleportDestinations(names,sizeof(names));
+    Con_Printf("This disk holds %s%s%s.\n",open?"the open world":"no open world",names[0]?"; towns: ":"",names);
+    if(!open && sv.active && svs.clients && svs.clients[0].edict &&
+       AW_WorldToSource(sv.name,svs.clients[0].edict->v.origin,here))
+        Con_Printf("dbg tp X Y takes points inside the loaded map %s (you stand at %ld %ld).\n",
+            sv.name,(long)here[0],(long)here[1]);
+}
 static void teleport_command(void) {
     vec3_t source;
     if(Cmd_Argc()>=2 && !strcmp(Cmd_Argv(1),"roulette")){roulette_command(2);return;}   /* dbg door roulette [SEED] */
     if(Cmd_Argc()==2 && (!strcmp(Cmd_Argv(1),"mark") || !strcmp(Cmd_Argv(1),"marker"))) {
         if(!AW_SceneMapMarker(source)){Con_Printf("no map marker set\n");return;}
-        if(!AW_MapTeleportAt(source,0))
+        if(!map_teleport(source,0,1)){
             Con_Printf("Map marker teleport unavailable (no map on this disk holds %ld %ld); player state unchanged.\n",
                 (long)source[0],(long)source[1]);
+            disk_maps_note();
+        }
         else Con_Printf("Teleport to the map marker: %ld %ld.\n",(long)source[0],(long)source[1]);
         return;
     }
@@ -1483,8 +1512,10 @@ static void teleport_command(void) {
             Con_Printf("Usage: dbg tp X Y [Z] (original Morrowind global coordinates)\n");return;
         }
         if(Cmd_Argc()==3)source[2]=0;
-        if(!AW_MapTeleportAt(source,Cmd_Argc()==4))
+        if(!map_teleport(source,Cmd_Argc()==4,1)){
             Con_Printf("Coordinate teleport unavailable (no map on this disk holds that point); player state unchanged.\n");
+            disk_maps_note();
+        }
         return;
     }
     if(Cmd_Argc()>4) {

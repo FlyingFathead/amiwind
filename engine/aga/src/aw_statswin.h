@@ -32,6 +32,7 @@ int AW_MagicList(aw_magic_list_t *out);
 void AW_MagicDrawList(const aw_magic_list_t *list);
 /* Opens a full-screen panel on the inventory's modal (aw_worldui.c); 0 when it cannot open. */
 int AW_WorldUIOpenPanel(void (*draw)(void),int (*key)(int key,int mouse_x,int mouse_y),void (*closed)(void));
+void AW_WorldUIClose(void);   /* the open window closed, as Esc does (ALCHEMY-61: aw_inventory alchemy close) */
 void AW_StatsOpen(void);
 void AW_MagicMenuOpen(void);
 void AW_StatsWindowInit(void);

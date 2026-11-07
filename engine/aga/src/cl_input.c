@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // rights reserved.
 
 #include "quakedef.h"
+#include "aw_story.h"
 
 /*
 ===============================================================================
@@ -132,6 +133,8 @@ void IN_UpUp(void) {KeyUp(&in_up);}
 void IN_AWUseDown(void) {
     if (key_dest != key_game) return;
     if (AW_IntroUse()) return;
+    /* a script's DisablePlayerControls: no activation (OpenMW ActionManager::activate) */
+    if (!AW_ControlAllowed(AW_CONTROL_PLAYER)) return;
     if (AW_OpeningUse()) return;
     if (!(in_up.state & 1) && AW_SceneUse()) return;
     if (!(in_up.state & 1)) in_impulse = 201;

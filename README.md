@@ -4,7 +4,7 @@
 
 # AmiWind
 
-_Last updated with AmiWind v0.0.61 (6 November 2026)._
+_Last updated with AmiWind v0.0.62-dev1 (7 November 2026)._
 
 An unofficial, experimental RPG engine and enthusiast project bringing Morrowind
 to the Commodore Amiga, featuring CHIM: an AmiQuake-based engine and an asset
@@ -48,9 +48,13 @@ and 19 open-sea cells), with no classic region maps left outdoors. What these nu
 prison and the census office) is built as a CHIM room, with the people the game places in them. Solstheim is not
 converted.
 
-The development line is at **v0.0.62**, which has just opened. v0.0.61 shipped as its third snapshot with the final
-version number ([dev3 notes](docs/releases/notes/RELEASE-v0.0.61-dev3.md); earlier snapshots:
-[dev2 notes](docs/releases/notes/RELEASE-v0.0.61-dev2.md), [dev1 notes](docs/releases/notes/RELEASE-v0.0.61-dev1.md)).
+The development line is at **v0.0.62-dev1** (7 November 2026): the first snapshot of v0.0.62, in development. It adds
+alchemy as in the original, the creatures placed in tombs, caves and other rooms, the scripts of a new game (the
+Dreamers held back, the falling mage near Seyda Neen), falls with fall damage and Slowfall, characters and objects
+that scripts move, follow and place, pickable tree fungi, and a generated [tracker of the game's scripts](docs/MWSCRIPT_FEATURES.md)
+(479 of 1,207 running) ([dev1 notes](docs/releases/notes/RELEASE-v0.0.62-dev1.md)). It needs 32 MB of Fast RAM.
+v0.0.61 shipped as its third snapshot with the final version number
+([release notes](docs/releases/notes/RELEASE-v0.0.61.md)).
 
 What comes next is in the [roadmap](docs/ROADMAP.md): v0.0.62 holds the in-game check of the v0.0.61 pieces not yet
 seen in play, the full crime system (guards who arrest, pickpocketing, trespass, assault, murder), alchemy, enchanting

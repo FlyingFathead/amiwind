@@ -93,6 +93,39 @@ class GameRecorderSource(unittest.TestCase):
         # the console's notify lines start below it
         self.assertIn('AW_RecorderLineShown', body(source('console.c'), 'Con_DrawNotify'))
 
+    def test_ctrl_r_taken_in_every_key_destination(self):
+        # GAME-RECORDER-HOTKEY-DIALOGUE-61: Ctrl+R while armed or running is the recorder's in a window too (it typed into
+        # the dialogue's Find field and the recording carried on); a recording starts only in play
+        key = body(source('aw_recorder.c'), 'AW_RecorderKey')
+        taken = re.search(r"if\s*\(\s*down\s*&&\s*\(\s*key\s*==\s*'r'\s*\|\|\s*key\s*==\s*'R'\s*\)\s*&&\s*real_ctrl\s*\)", key)
+        self.assertTrue(taken, 'Ctrl+R must not depend on key_dest')
+        branch = key[taken.end():key.find('return 1;', taken.end())]
+        self.assertRegex(branch, r'if\s*\(\s*key_dest\s*==\s*key_game\s*\)\s*record_start\s*\(\s*\)')
+        self.assertIn('record_stop("Ctrl+R")', branch)
+        self.assertIn('play_end()', branch)
+        self.assertLess(key.find('if(!armed && mode==IDLE)return 0;'), taken.start())   # never taken while not armed
+        # its line is drawn over the windows, so the state and the saved file show with the dialogue open
+        update = body(source('screen.c'), 'SCR_UpdateScreen')
+        self.assertLess(update.find('M_Draw ()'), update.find('AW_RecorderDraw()'))
+
+    def test_every_random_stream_follows_the_recording(self):
+        # GAME-RECORDER-FIGHT-SEED-61: a fight recorded replayed 1 of 8 checkpoints (its seed came from the replaying
+        # game's own count of fights); every stream the game logic draws from is set from the recording's seed
+        rec = source('aw_recorder.c')
+        streams = body(rec, 'seed_streams')
+        for call in ('AW_CombatRecorderSeed(', 'AW_MwvmSeed(', 'aw_levelled_seed='):
+            self.assertIn(call, streams)
+        frame = body(rec, 'AW_RecorderFrame')
+        order(frame, 'seed_streams()', 'mode==RECORDING', 'frame_seed(frames)', 'read_frame()', 'frame_seed(frames)', 'frames++')
+        self.assertNotRegex(frame, r'\bsrand\s*\(\s*seed\s*\)')
+        self.assertRegex(body(rec, 'frame_seed'), r'srand\s*\(')
+        self.assertIn('AW_CombatRecorderSeed(0)', body(rec, 'release'))
+        combat = source('aw_combat.c')
+        begin = body(combat, 'begin_encounter')
+        self.assertLess(begin.find('recorder_seed'), begin.find('encounters+1'))
+        self.assertIn('AW_CombatSeed(&rng', body(combat, 'AW_CombatRecorderSeed'))
+        self.assertRegex(body(source('aw_mwvm.c'), 'AW_MwvmSeed'), r'vm\.rng\s*=')
+
     def test_catalogue_route_and_makefile(self):
         catalogue = (ROOT / 'config' / 'debug-commands.txt').read_text(encoding='utf-8')
         self.assertRegex(catalogue, r'(?m)^PLAYTESTING\|recorder\|aw_recorder\|')

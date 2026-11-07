@@ -30,6 +30,16 @@ enum {AW_SLOT_HELMET,AW_SLOT_CUIRASS,AW_SLOT_GREAVES,AW_SLOT_LPAULDRON,
 #define AW_INV_CONSTANT_EFFECT 16U
 /* A carried light (catalogue bytes 504..510: burn time, colour; subtype = radius). */
 #define AW_INV_LIGHT 32U
+/* ALCHEMY-61 (docs/ALCHEMY.md): an ingredient, potion or apparatus row; catalogue bytes 440..495 hold its alchemy block
+ * (tools/prepare_alchemy.py) in place of the weapon and armour numbers: u8 kind (AW_ALCHEMY_*), u8 count, u16 0,
+ * f32 the apparatus quality, then 8 x (u8 effect, u8 argument, u16 duration, u16 magnitude), little-endian. */
+#define AW_INV_ALCHEMY 64U
+#define AW_INV_ALCHEMY_EFFECTS 8
+#define AW_ALCHEMY_NO_EFFECT 0xFF
+enum {AW_ALCHEMY_NOT=0,AW_ALCHEMY_INGREDIENT=1,AW_ALCHEMY_POTION=2,AW_ALCHEMY_APPARATUS=3};
+/* one effect of an ingredient or a potion: the effect number (AW_ALCHEMY_NO_EFFECT: an empty ingredient slot), the
+ * attribute or skill it names (0xFF none), a potion's duration and magnitude (0 for an ingredient's) */
+typedef struct {unsigned char effect,arg;unsigned short duration,magnitude;} aw_alchemy_effect_t;
 /* The debug torch (test only), the maintainer's preview-stage request (17 October 2026): the
  * original torch (LIGH "torch") as one catalogue row that never burns out; given once when the
  * player leaves the census office while aw_debug_torch is 1 (the builder's game config, on until
@@ -60,6 +70,12 @@ typedef struct {
     /* AW_INV_LIGHT rows, catalogue byte 511 (v0.0.61, HELD-LIGHT-OWN-MODEL-61): 0 in older catalogues, else
      * AW_LIGHT_FLAGS_SET with AW_LIGHT_FLICKER (the record flickers or pulses) and AW_LIGHT_FIRE (a flame) */
     int light_flags;
+    /* AW_INV_ALCHEMY rows (ALCHEMY-61): the kind (AW_ALCHEMY_*), the effects (an ingredient's 4 slots, a potion's
+     * list) and an apparatus' quality (its type is SUBTYPE: 0 mortar and pestle, 1 alembic, 2 calcinator, 3 retort);
+     * a made potion (aw_made_N, Alchemy) has up to 8 effects */
+    unsigned char alchemy_kind,alchemy_count;
+    aw_alchemy_effect_t alchemy[AW_INV_ALCHEMY_EFFECTS];
+    float apparatus_quality;
 } aw_inventory_item_t;
 #define AW_LIGHT_FLAGS_SET 0x80
 #define AW_LIGHT_FLICKER 1
@@ -159,6 +175,13 @@ uint32_t AW_LedgerDrop(aw_state_t *,struct aw_ledger_s *,const aw_inventory_item
                        int at,int32_t where,const float position[3],float yaw);
 int AW_LedgerPickup(aw_state_t *,struct aw_ledger_s *,uint32_t key);
 int AW_LedgerAdoptDrops(aw_state_t *,struct aw_ledger_s *);
+/* v0.0.62 (MWSCRIPT-PLACE-OBJECTS-62): an item a script placed: a drop row of ID (COUNT, at AT / WHERE, POSITION, YAW)
+ * with the next serial and nothing taken from the inventory; its key, 0 when refused. */
+uint32_t AW_LedgerPlaceItem(aw_state_t *,struct aw_ledger_s *,const char *id,int32_t count,
+                            int at,int32_t where,const float position[3],float yaw);
+/* The same from the engine (aw_inventory.c): ID must be a carried item of the catalogue with a model; the row is shown
+ * at once when its place is on this map. 1 placed, 0 refused (no world change list, an unknown item, no room). */
+int AW_InventoryPlace(const char *id,int at,int32_t where,const float game[3],float yaw);
 /* Declarations remain visible to pure-rule/UI fixtures; the implementation
  * switch changes linked code, never the callable ABI. */
 /* Ordered ASCII case-insensitive comparison; unlike Quake equality helpers. */
@@ -188,6 +211,22 @@ int AW_InventoryBootstrap(void);
 int AW_InventoryDropHere(const aw_inventory_item_t *,int32_t count);
 int AW_InventoryUse(void);
 const char *AW_InventoryHint(void);
+/* ALCHEMY-61 (aw_alchemy.c sets them; NULL in the fixtures: nothing to use): a carried potion is drunk, an ingredient
+ * eaten, an apparatus opens the alchemy window, from the inventory window's use or "aw_inventory use ID"; the result
+ * 1 done, 2 the alchemy window opens once the inventory window has closed (aw_worldui_alchemy_open), 0 not usable now.
+ * aw_inventory_command: the inventory command's alchemy words first (1 handled). */
+extern int (*aw_inventory_use)(const aw_inventory_item_t *it);
+extern int (*aw_inventory_command)(void);
+/* the same two for the inventory window (aw_worldui.c defines them, so its fixtures link without aw_inventory.c) */
+extern int (*aw_worldui_use)(const aw_inventory_item_t *it);
+extern void (*aw_worldui_alchemy_open)(void);
+/* MADE-ITEM-NO-PICTURE-62: the id whose picture the inventory row shows (a made item's base item; aw_alchemy.c) */
+extern const char *(*aw_worldui_icon_id)(const char *id);
+/* a row that can be used: a potion, an ingredient or an apparatus */
+#define AW_INV_USABLE_KIND(it) (((it)->flags&AW_INV_ALCHEMY) && (it)->alchemy_kind>=AW_ALCHEMY_INGREDIENT && \
+                                (it)->alchemy_kind<=AW_ALCHEMY_APPARATUS)
+/* the carried row's use: 1 when IT is a usable kind and aw_inventory_use is set */
+int AW_InventoryUsable(const aw_inventory_item_t *it);
 /* The focus box (FOCUS-BOX-58): the aimed ground item within the activation distance, its name and the box's
  * "Weight: x" and "Value: y" lines; owned 1 when taking it would be theft. 0 when no item is aimed at. */
 int AW_InventoryFocus(const char **name,char *weight_line,char *value_line,int line_size,int *owned);

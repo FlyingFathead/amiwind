@@ -9,7 +9,7 @@
 | Where | resident placement: Startup script disables and journal re-enables not applied |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.42-dev1 (last seen) |
+| Persists in | v0.0.42-dev1, v0.0.61 (last seen) |
 | Severity | medium: Sixth House servants appear long before the main quest sends them |
 | Family | Actors and NPCs (`actors-npc`) |
 | Playtest version | 2026_10_17_v0.0.42-dev1_full-dev1-proof_5e043ad |
@@ -109,8 +109,34 @@ layer. Objects the start script disables (scaffolding, notes, keys, a bucket) ar
 terrain detail tiles of a CHIM town (`tools/chim/build.py`) still count a held resident's spot (only keeps the
 original ground samples there).
 
+### The runtime route (v0.0.62)
+
+Reported again with v0.0.61 (7 November 2026): Dreamers stood on the roads from the start of a new game. By then the
+runtime pieces existed: the compiled scripts carry out `Disable` and `Enable` on any placed reference, the object
+state keeps them in saved games, the CHIM world spawns no disabled actor, and a room hides a disabled actor's entity.
+What was missing was the start: the engine never ran the global script Main, so Startup never ran.
+
+- The builder reads the scripts Main starts under `if ( CharGenState == 1 )` (`tools/mwscript/gamedata.py`
+  `new_game_scripts`) and writes them as the NEWG section of `id1/mwscript.awm`: Startup and VampireCheck run, the
+  character creation script stays with the engine's hand-written opening.
+- The engine starts each once when a new game begins, by any opening (`aw_save.c` `AW_SaveReset`, the scripts on
+  their next tick: `aw_mwhost.c`, `aw_mwvm.c` `AW_MwvmNewGame`). Startup then disables its 102 references through
+  the object state; each Dreamer's own script keeps running while it is disabled and enables it at the main quest's
+  stage, as in the original.
+- The build check (`tools/mwscript/newgame.py`, in the mwscript stage) stops the build when a new game would start
+  nothing, or when a reference placed once that those scripts disable is not bound to its reference number. On the
+  game data: 102 disabled references, 78 actors, 101 placed once and bound, 1 placed twice (a plate).
+- The builder option `--start-disabled` (above) stays as it was: `placed` is still right, because the game now holds
+  the actors back itself and can bring them back.
+
+Not yet seen in game: a new game in a build with this change, then the road north of Seyda Neen (the Dreamer at
+cell -2,-8 and the falling mage at -3,-8). A save made before v0.0.62 keeps the world it had.
+
 ## Verification
 
+- Unit tests `tests/test_mwscript_new_game.py` (v0.0.62, synthetic master): the reader of Main's new-game block and
+  of the unconditional disables, the NEWG section, the build check passing and refusing, `Fall` compiled to nothing,
+  and natively the interpreter: a new game runs Startup's disables once, without a new game nothing is disabled.
 - Unit tests `tests/test_start_disabled.py` (synthetic script text and a synthetic master, no game data): the
   `->Disable` reader (quoted, bare, comments, conditional lines), the scripts Main starts, the journal template in
   both forms and its refusals, the enable callers, the table, the filter in both modes, the builder option and the
@@ -175,10 +201,12 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 - [CREATURE-COMBAT-FRAMES-MISSING-61](CREATURE-COMBAT-FRAMES-MISSING-61.md): In a fight the ancestor ghost asks its model for frames it does not have: "No such frame" fills the console
 - CREATURE-COMBAT-WEAPON-54 (no report page): A creature's carried weapon is not drawn in combat
 - [CREATURE-DAGOTH-UR-ABSENT-52](CREATURE-DAGOTH-UR-ABSENT-52.md): Dagoth Ur and the Heart of Lorkhan are not in their rooms: the room creature list never named them, so Akulakhan s Chamber has neither
+- [CREATURE-EXPANSION-62](CREATURE-EXPANSION-62.md): The creatures of Tribunal and Bloodmoon are not in the game: 136 creature records, their 491 placements and 1,126 levelled creature points
 - CREATURE-NETCH-BULL-LEG-REDUCED-58 (no report page): The netch bull's reduced model loses a long stretch of one leg (up to 20 units from the source surface)
 - CREATURE-RACER-DRAWN-TINY-57 (no report page): The cliff racer is drawn many times too small: a dark speck the size of a bird while its hit box is a full cliff racer
 - CREATURE-RACER-MESH-SPIKE-58 (no report page): The cliff racer's model is drawn broken: the wings do not join the body, the parts sit apart, and a long spike runs far below
 - CREATURE-SCALE-KEYS-54 (no report page): The Heart of Lorkhan beats by a scale key, and the skeletal animation table format holds no scale
+- [CREATURE-SUMMONED-62](CREATURE-SUMMONED-62.md): The 16 creatures that summoning spells call up are not built: a summoning has no creature to show
 - DANCER-OWN-ANIM-IGNORED-53 (no report page): The Suran dancers only idle: an NPC's own animation file (anim_dancingGirl.nif) was ignored by the skeletal actors
 - DIALOGUE-FIGHT-DISPOSITION-57 (no report page): Requested: disposition drives combat as in the original: a low-disposition NPC turns hostile (effective Fight from disposition), Taunt can start a fight
 - DIALOGUE-TEXT-LINKS-57 (no report page): Requested: topic names inside an answer are plain text; the original draws them as blue links that ask about the topic
@@ -214,6 +242,7 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 - PLAYER-BODY-THIRD-PERSON-GEAR-59 (no report page): Third-person view: the assembled player body shows no worn clothes or armour, and the shield is not drawn
 - PLAYER-SPELL-CAP-58 (no report page): The player can hold only 8 spell changes, so a ninth bought spell is refused
 - [RESIDENT-ANIM-BYTE-BUDGET-48](RESIDENT-ANIM-BYTE-BUDGET-48.md): A room resident whose animation kit model is over the alias byte budget at every rung stopped the whole room stage (ienas nadus)
+- [ROOM-LEVELLED-INTRO-ROOMS-62](ROOM-LEVELLED-INTRO-ROOMS-62.md): Addamasartus and Tharys Ancestral Tomb have no levelled creatures: the intro scene converts their rooms without the levelled creature points
 - [ROOM-RESIDENTS-NO-FIT-48](ROOM-RESIDENTS-NO-FIT-48.md): 19 batch room residents have no spot their room's collision supports: slopes, a rope bridge's hull, no floor in reach
 - SKEL-ANIM-STAGE-52 (no report page): Requested: a MiniWind animation stage where NPCs of Seyda Neen and Balmora run every action from the shared table, nothing baked
 - SKEL-BUDGET-SHAPES-52 (no report page): A skeletal resident with many head shapes fits no budget of the ladder: the Vivec town stage stopped on Too many separate shapes for budget
@@ -230,5 +259,7 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 Related bugs in other categories:
 
 - [NPC-DREAMER-GREETING-DEFAULT-42](NPC-DREAMER-GREETING-DEFAULT-42.md): Dreamers (Sixth House sleepers) give a default greeting instead of their own Sixth House greeting
+- SCRIPT-ENABLED-ACTOR-NOT-DRAWN-62 (no report page): An actor a script enables in a loaded area is not drawn: the falling mage near Seyda Neen falls and dies unseen, his body searchable but invisible
+- [SCRIPTED-EVENT-FALLING-MAGE-61](SCRIPTED-EVENT-FALLING-MAGE-61.md): The falling mage north of Seyda Neen does not fall: he is in the world from the start and his scripted fall does not run
 
 <!-- END GENERATED CATEGORY -->

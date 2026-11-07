@@ -2109,6 +2109,7 @@ def provenance(args, tools):
         "actor_search": getattr(args, "actor_search", "wide"),
         "interior_creatures": getattr(args, "interior_creatures", "listed"),
         "room_levelled_creatures": getattr(args, "room_levelled_creatures", "table"),
+        "room_placed_creatures": getattr(args, "room_placed_creatures", "table"),
         "start_disabled": getattr(args, "start_disabled", None) or "placed",
         "tool_sha256": {name: sha256(path) for name, path in tools.items()},
         "input_sha256": {} if args.dry_run else input_hashes(args),
@@ -2531,6 +2532,17 @@ def export_option_environment(args, announce=True):
         if announce:
             print('Room levelled creatures: %s (no aw_levelled entity in the room maps; TOMB-NO-CREATURES-60)'
                   % args.room_levelled_creatures, flush=True)
+    # The creatures placed in rooms (tools/room_levelled.py and chim.actors.room_placed_creatures read
+    # AMIWIND_ROOM_PLACED; part of the room stages', the actor library's and the image step's keys;
+    # TOMB-NO-CREATURES-61). Default table: the variable is removed; off: no placed list in the actor table, no model
+    # in the actor library and no entity in the room maps (the rooms before v0.0.62).
+    if getattr(args, 'room_placed_creatures', 'table') == 'table':
+        os.environ.pop('AMIWIND_ROOM_PLACED', None)
+    else:
+        os.environ['AMIWIND_ROOM_PLACED'] = args.room_placed_creatures
+        if announce:
+            print('Room placed creatures: %s (only the listed room creatures; TOMB-NO-CREATURES-61)'
+                  % args.room_placed_creatures, flush=True)
     # Actors the original's start scripts disable at a new game (tools/start_disabled.py reads
     # AMIWIND_START_DISABLED; part of the resident stages' keys; NPC-STORY-DISABLED-AT-START-42).
     # Default placed: the variable is removed, so a default build's environment is as before.

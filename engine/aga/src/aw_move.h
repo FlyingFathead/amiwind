@@ -31,8 +31,10 @@ typedef struct {
     float fFatigueRunBase,fFatigueRunMult,fFatigueSwimWalkBase,fFatigueSwimWalkMult;
     float fFatigueSwimRunBase,fFatigueSwimRunMult,fFatigueSneakBase,fFatigueSneakMult;
     float fFatigueJumpBase,fFatigueJumpMult,fFatigueBase,fFatigueMult;
+    /* fall damage (v0.0.62, SCRIPTED-EVENT-FALLING-MAGE-61; OpenMW 0.51 mwmechanics/character.cpp getFallDamage) */
+    float fFallDamageDistanceMin,fFallDistanceBase,fFallDistanceMult,fFallAcroBase,fFallAcroMult;
 } aw_move_settings_t;
-#define AW_MOVE_SETTING_COUNT 30
+#define AW_MOVE_SETTING_COUNT 35
 
 /* Everything the speed depends on, gathered in one place so later effects plug
  * in without rewriting the rules. Stats are the MODIFIED values (base +
@@ -89,8 +91,49 @@ float AW_MoveJumpFatigue(const aw_move_settings_t *s,const aw_move_inputs_t *in)
 /* OpenMW DynamicStat::setCurrent: a loss never takes fatigue below 0 unless it already is. */
 float AW_MoveFatigueAfter(float fatigue,float loss);
 
+/* Falls (v0.0.62, SCRIPTED-EVENT-FALLING-MAGE-61), for the player and every actor. Rules from OpenMW 0.51, written
+ * independently:
+ * - mwphysics/physicssystem.cpp: Slowfall's factor is 1 - magnitude x 0.005, clamped to 0..1;
+ * - mwphysics/movementsolver.cpp: each physics step (OpenMW's 1/60 s) the vertical speed loses gravity x step and,
+ *   while falling, is multiplied by that factor;
+ * - mwphysics/mtphysics.cpp: the fall height grows by every drop while in the air, and starts again at 0 on the
+ *   ground, under water, while flying or while any Slowfall is on (so a Slowfall landing never hurts);
+ * - mwmechanics/character.cpp getFallDamage and the landing: below fFallDamageDistanceMin nothing; above it the
+ *   height less the minimum less 1.5 x Acrobatics and the Jump magnitude (never below 0), times fFallDistanceMult plus
+ *   fFallDistanceBase, times fFallAcroBase + fFallAcroMult x (100 - Acrobatics); the health lost is that times
+ *   (1 - 0.25 x the fatigue term), and the actor is knocked down when the damage is more than Acrobatics x the
+ *   fatigue term. No damage landing in water, none in god mode. */
+#define AW_MOVE_GRAVITY 627.1152f        /* 8.96 m/s^2 x 69.99125 units a metre (components/misc/constants.hpp) */
+#define AW_MOVE_PHYSICS_STEP (1.0f/60.0f)
+float AW_MoveSlowFallFactor(float magnitude);
+/* one physics step of STEP seconds: the new vertical speed (original units/s, up positive) */
+float AW_MoveFallStep(float vz,float step,float gravity,float slowfall);
+float AW_MoveFallDamage(const aw_move_settings_t *s,float height,float acrobatics,float jump);
+float AW_MoveFallHealthLoss(float damage,float fatigue_term);
+int AW_MoveFallKnockdown(float damage,float acrobatics,float fatigue_term);
+/* aw_move.c: the same with the image's settings (the player's and the actors' falls); *KNOCKDOWN may be NULL */
+float AW_MoveFallLoss(float height,float acrobatics,float jump,float fatigue,float fatigue_max,int *knockdown);
+/* aw_fall.c: the actors held on an object a script removes, and their falls (the HELD rows of the compiled scripts) */
+void AW_FallInit(void);
+void AW_FallTick(float dt);
+void AW_FallStatus(void);
+
 /* Original units -> AmiWind units (tools/prepare_quake.py SCALE, the converter's world scale). */
 #define AW_MOVE_UNIT_SCALE 0.25f
+
+/* A script's angles and moves of an object (MWSCRIPT-SMALL-FUNCTIONS-62; OpenMW 0.51 transformationextensions.cpp
+ * OpGetAngle, OpSetAngle, OpMove, worldimp.cpp rotateObject; written independently). The converter places an object
+ * turned by the original's z rotation R (radians) at Quake yaw -R in degrees (tools/import_town.py, prepare_area.py),
+ * so the original's z angle is minus the yaw; x is Quake's pitch and y its roll, as Rotate turns them. OpenMW keeps an
+ * actor's z (and y) angle within -180..180 once it turns (rotateObject normalizeAngle) and its x within -90..90; an
+ * object keeps the angle it was given. AXIS 'x', 'y' or 'z' ('u', 'v', 'w' the same axes); anything else reads 0 and
+ * sets nothing (-1). Pure. */
+float AW_MoveScriptAngle(const float quake[3],int axis,int actor);
+/* the Quake angle index (0 pitch, 1 yaw, 2 roll) SetAngle writes, and the Quake degrees in *OUT; -1 an unknown axis */
+int AW_MoveScriptAngleSet(int axis,float degrees,int actor,float *out);
+/* Move AXIS by AMOUNT (AmiWind units): along the object's own axes (OpenMW: its attitude x the axis), the original's
+ * x being Quake's forward, y its left and z its up, from AngleVectors' FORWARD, RIGHT and UP; 0 for an unknown axis */
+int AW_MoveScriptLocal(const float forward[3],const float right[3],const float up[3],int axis,float amount,float out[3]);
 
 /* aw_move.c: the engine side. AW_MoveInit registers aw_superspeed and the
  * superspeed command and sets sv_user.c's hooks: the ground/air move and the
@@ -100,6 +143,8 @@ void AW_MoveInit(void);
 int AW_MoveSuperspeed(void);
 /* SNEAK-58: 1 while the player sneaks (the sneak key held, on foot, not swimming, not in noclip). */
 int AW_MoveSneaking(void);
+/* MWSCRIPT-GAP-FUNCTIONS-62: 1 while a script's ForceSneak holds the player in the sneak stance (aw_mwhost.c). */
+extern int aw_move_force_sneak;
 /* The player's inputs as the rules see them this frame (live character sheet). */
 void AW_MovePlayerInputs(aw_move_inputs_t *in);
 /* ENCUMBRANCE-INCOMPLETE-61 (INVENTORY-ORIGINAL-LIMITS-61): the magnitudes of the Burden and Feather effects on the

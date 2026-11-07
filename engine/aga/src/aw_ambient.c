@@ -195,6 +195,31 @@ int AW_AmbientTravelPlan(const aw_ambient_pkg_t *p,int fx,int fy,int fz,int tx,i
     *goal=best;
     return AW_AmbientNearest(p,fx,fy,fz);
 }
+/* AIFollowCell and AIEscort (v0.0.62; rules from OpenMW 0.51 aifollow.cpp and aiescort.cpp execute, our own code; the
+ * distances in engine units, original units x 0.25). The follow: done near the final point only in the place the
+ * package names. The escort: it waits outside its place; while the target is within the keep-up distance (450 at the
+ * start, then the actor's half extent + 450 while near) it walks on, and it waits once the target falls behind (the
+ * half extent + 250 then, so the two do not flip); arrived within 64 (the travel's tolerance), it is done. */
+#define ESCORT_START 112.5f     /* aiescort.hpp mMaxDist 450 */
+#define ESCORT_NEAR 112.5f      /* maxHalfExtent + 450 */
+#define ESCORT_FAR 62.5f        /* maxHalfExtent + 250 */
+#define ESCORT_ARRIVE 16.0f     /* 64: the travel's arrival tolerance */
+static int in_place(long place,long room) {return place>0?room==place:place<0?room==0:1;}
+int AW_AmbientFollowDone(long place,long room,float dist2,float fd) {
+    if(place<0 || (place>0 && room!=place))return 0;
+    return dist2<fd*fd;
+}
+int AW_AmbientEscortStep(long place,long room,float target2,float dest2,float hull,float *max) {
+    if(!in_place(place,room))return AW_ESCORT_WAIT;
+    if(*max<=0)*max=ESCORT_START;
+    if(target2<=*max**max){
+        if(dest2<=ESCORT_ARRIVE*ESCORT_ARRIVE)return AW_ESCORT_DONE;
+        *max=hull+ESCORT_NEAR;
+        return AW_ESCORT_WALK;
+    }
+    *max=hull+ESCORT_FAR;
+    return AW_ESCORT_WAIT;
+}
 
 #ifndef AW_AMBIENT_HOST_TEST
 /* ------------------------------------------------------------------ the engine part */
@@ -236,20 +261,24 @@ typedef struct {
     int skel_first,skel_count;float skel_rate;
     float manual_goal[2];
     unsigned char travel;       /* AITravel (v0.0.57): 1 walking to travel_to, 2 arrived (the package is done);
-                                   AIFollow: 3 following follow_num, 4 following and active (seen once in range) */
+                                   AIFollow: 3 following follow_num, 4 following and active (seen once in range);
+                                   AIEscort (v0.0.62): 5 leading follow_num to travel_to */
     float travel_to[3];
-    short follow_num;           /* AIFollow: the followed edict's number */
+    short follow_num;           /* AIFollow: the followed edict's number; AIEscort: the escorted one's */
     float follow_hours,follow_check;int follow_minutes;unsigned char follow_moving,follow_final;
+    long follow_place;          /* v0.0.62: the place an AIFollowCell / AIEscortCell names (AW_AmbientPackage) */
+    float escort_max;           /* AIEscort: the keep-up distance (AW_AmbientEscortStep) */
     aw_dial_npc_cache_t disp;   /* an NPC's disposition facts for the aggro (DIALOGUE-FIGHT-DISPOSITION-57) */
     unsigned short unsticks;    /* AMBIENT-UNSTUCK-FLOOD-61: stuck searches its steps ran since the counters' reset */
 } slot_t;
 static int aggro_on;static void aggro_facts(slot_t *s);   /* below (aggro on sight) */
 static void travel_end(slot_t *s);
 static void follow_think(slot_t *s,float dt);
+static void escort_think(slot_t *s,float dt);
 /* Saved AI packages (v0.0.57, SAVEGAME-COMPLETE-57): a loaded game's travel and follow packages, waiting until their
  * actor is in the map (applied at the once-a-second scan). */
 #define SAVED_PACKAGES 64
-typedef struct {float ref,follow_ref,hours,to[3];unsigned char travel,final;} saved_pkg_t;
+typedef struct {float ref,follow_ref,hours,to[3];unsigned char travel,final;long place;} saved_pkg_t;
 static saved_pkg_t pend[SAVED_PACKAGES];static int npend;
 static void apply_saved_packages(edict_t *p);
 
@@ -276,7 +305,7 @@ static unsigned long rng=1;
 static float scan_at;
 static struct {unsigned long thinks,steps,traces,walks,idles,bad_idles,registered,unknown,no_walk,blob_bytes,manual,stuck,
                levelled,aggro_checks,aggro_engaged,aggro_full,flights,dry,travels,travels_done,follows,follows_done,
-               unsticks,unstick_tests,settles,settled;double seconds,worst,elapsed;} st;
+               unsticks,unstick_tests,settles,settled,escorts,crossed;double seconds,worst,elapsed;} st;
 /* sv_phys.c SV_CheckStuck: every search for a clear spot (a box that starts in solid), its position tests, and the
  * searches that found none (AMBIENT-UNSTUCK-FLOOD-61) */
 extern unsigned long aw_stuck_searches,aw_stuck_tests,aw_stuck_failed;
@@ -870,6 +899,7 @@ static void think(slot_t *s,float dt) {
     AW_SPIKE_STAGE(AW_SP_AMBAGGRO,aggro(s));    /* a finished package does not end the engage check (OpenMW) */
     if(AW_CombatSlotState(e,NULL)){s->fighting=1;s->mover=0;return;}
     if(s->travel==3 || s->travel==4){follow_think(s,dt);return;}
+    if(s->travel==5){escort_think(s,dt);return;}
     if(s->state==S_OFF)return;
     /* a greeting pauses the package (aiwander.cpp: the greeting interrupts wandering) */
     if(field(e,"aw_face_until",0)>sv.time){
@@ -961,8 +991,10 @@ static void travel_end(slot_t *s) {
  * the hulls); the package becomes active only once the target is within that distance + 384 original units and in
  * sight (checked every 0.5 s); then the actor walks straight toward the target when it is farther than the distance
  * (30 original units of hysteresis between moving and stopping) and stands facing it when near. A duration (game
- * hours) ends it, and so does reaching the final point when one is given. Followers do not cross doors here and are
- * never warped (OpenMW warps only at teleport doors within 800 units, out of view: not yet). */
+ * hours) ends it, and so does reaching the final point when one is given (AIFollowCell, v0.0.62: only in the room it
+ * names; a cell that is no room: never, as OpenMW). Since v0.0.62 the player's followers within 800 original units go
+ * through a door, a travel or a region map's load with the player (AW_AmbientFollowersOf; OpenMW actionteleport.cpp
+ * getFollowers); within one map they are never warped. */
 static void follow_done(slot_t *s) {
     stop_walk(s);s->travel=2;s->state=S_OFF;st.follows_done++;AW_MwvmStateChanged();
 }
@@ -990,7 +1022,7 @@ static void follow_think(slot_t *s,float dt) {
     }
     if(s->follow_final){
         float fx=s->travel_to[0]-e->v.origin[0],fy=s->travel_to[1]-e->v.origin[1],fz=s->travel_to[2]-e->v.origin[2];
-        if(fx*fx+fy*fy+fz*fz<fd*fd){follow_done(s);return;}
+        if(AW_AmbientFollowDone(s->follow_place,s->follow_place?AW_ActorsRoom():0,fx*fx+fy*fy+fz*fz,fd)){follow_done(s);return;}
     }
     th=s->follow_moving?fd-7.5f:fd+7.5f;
     if(dist2<=th*th){
@@ -1014,8 +1046,90 @@ int AW_AmbientFollow(edict_t *e,edict_t *target,float hours,const float *final) 
     s->follow_check=0;s->follow_moving=0;s->remain=0;s->repeat=0;s->state=S_CHOOSE;
     s->follow_final=(unsigned char)(final && (final[0]!=0 || final[1]!=0 || final[2]!=0));
     if(s->follow_final)VectorCopy(final,s->travel_to);
+    s->follow_place=0;s->escort_max=0;
     st.follows++;AW_MwvmStateChanged();
     return 1;
+}
+/* ---- AIEscort / AIEscortCell (v0.0.62; rules from OpenMW 0.51 aiescort.cpp, written independently; the decision is
+ * AW_AmbientEscortStep above) ----
+ * The actor walks straight to the destination (as a travel's last leg) while the escorted target keeps up, stands
+ * when it falls behind, and pauses outside the place an AIEscortCell names (OpenMW: the player brings it back through
+ * a door; an escort itself never goes through one). A duration (game hours) ends it too. */
+static void escort_think(slot_t *s,float dt) {
+    edict_t *t=s->follow_num>0 && s->follow_num<sv.num_edicts?EDICT_NUM(s->follow_num):NULL,*e=s->e;
+    vec3_t d;float dx,dy,hull;int step;
+    if(s->follow_hours>0){
+        int m;minutes_now(&m);
+        if(m!=s->follow_minutes){int delta=m-s->follow_minutes;if(delta<0)delta+=1440;s->follow_hours-=delta/60.0f;s->follow_minutes=m;}
+        if(s->follow_hours<=0){follow_done(s);return;}
+    }
+    if(!t || t->free){if(s->state==S_WALK)stop_walk(s);s->state=S_CHOOSE;return;}   /* the target is not here: it waits */
+    VectorSubtract(t->v.origin,e->v.origin,d);
+    dx=s->travel_to[0]-e->v.origin[0];dy=s->travel_to[1]-e->v.origin[1];
+    hull=e->v.maxs[0]>e->v.maxs[1]?e->v.maxs[0]:e->v.maxs[1];
+    step=AW_AmbientEscortStep(s->follow_place,s->follow_place?AW_ActorsRoom():0,DotProduct(d,d),dx*dx+dy*dy,hull,
+                              &s->escort_max);
+    if(step==AW_ESCORT_DONE){follow_done(s);return;}
+    if(step==AW_ESCORT_WAIT){
+        if(s->state==S_WALK)stop_walk(s);
+        s->state=S_CHOOSE;
+        return;
+    }
+    s->manual_goal[0]=s->travel_to[0];s->manual_goal[1]=s->travel_to[1];s->manual_walk=1;
+    if(s->state!=S_WALK)begin_walk(s);
+    walk(s,dt);
+}
+int AW_AmbientPackage(edict_t *e,edict_t *target,int kind,float hours,const float *point,long place) {
+    slot_t *s;
+    if(kind==3){
+        /* AIFollowCell: a follow whose final point counts only in its place (a cell that is no room: never) */
+        if(!AW_AmbientFollow(e,target,hours,place<0?NULL:point) || !(s=slot_for(e)))return 0;
+        if(place>0 && point){VectorCopy(point,s->travel_to);s->follow_final=1;}
+        s->follow_place=place;
+        return 1;
+    }
+    if(kind!=2 || !point)return 0;
+    {
+        aw_ambient_row_t r;
+        if(!e || e->free || !is_actor(e) || !target || target->free || target==e)return 0;
+        if(!(s=slot_for(e)) && !(s=start(e,ready_now() && find_actor(e,&r)?&r:NULL)))return 0;
+    }
+    if(!s->can_walk)return 0;
+    if(s->state==S_WALK)stop_walk(s);
+    s->travel=5;s->follow_num=(short)NUM_FOR_EDICT(target);s->follow_hours=hours>0?hours:0;minutes_now(&s->follow_minutes);
+    VectorCopy(point,s->travel_to);s->follow_final=1;s->follow_place=place;s->escort_max=0;
+    s->follow_moving=0;s->remain=0;s->repeat=0;s->state=S_CHOOSE;
+    st.escorts++;AW_MwvmStateChanged();
+    return 1;
+}
+/* A slot's package as a saved one (the save, and a follower going through a door) */
+static void keep_package(slot_t *s,saved_pkg_t *k) {
+    edict_t *t;
+    memset(k,0,sizeof(*k));k->ref=s->ref;k->travel=s->travel;k->hours=s->follow_hours;k->place=s->follow_place;
+    if(s->travel>=3){
+        t=s->follow_num>0 && s->follow_num<sv.num_edicts?EDICT_NUM(s->follow_num):NULL;
+        k->follow_ref=!t || t->free?0:t==player()?-1:field(t,"aw_ref",0);
+        k->final=s->follow_final;
+    }else k->final=1;
+    VectorCopy(s->travel_to,k->to);
+}
+int AW_AmbientFollowersOf(edict_t *p,edict_t **out,int max) {
+    int i,j,n=0;
+    if(!p || !out || max<=0 || slots_world!=sv.worldmodel)return 0;
+    for(i=0;i<SLOTS && n<max;i++){
+        slot_t *s=&slots[i];vec3_t d;saved_pkg_t k;
+        if(!s->e || s->e->free || (s->travel!=3 && s->travel!=4) || s->follow_num!=NUM_FOR_EDICT(p))continue;
+        if(AW_CombatSlotState(s->e,NULL))continue;           /* OpenMW: a fighting follower's combat stops instead */
+        VectorSubtract(s->e->v.origin,p->v.origin,d);
+        if(DotProduct(d,d)>200.0f*200.0f)continue;            /* getFollowers: within 800 units */
+        keep_package(s,&k);
+        if(!k.ref)continue;
+        for(j=0;j<npend && pend[j].ref!=k.ref;j++);
+        if(j==npend){if(npend>=SAVED_PACKAGES)continue;npend++;}
+        pend[j]=k;
+        out[n++]=s->e;st.crossed++;
+    }
+    return n;
 }
 int AW_AmbientTravel(edict_t *e,const float to[3]) {
     slot_t *s;aw_ambient_row_t r;int goal=-1,from;
@@ -1040,8 +1154,12 @@ int AW_AmbientTravel(edict_t *e,const float to[3]) {
  * components/esm3/aisequence.cpp, here only travel and follow) ----
  * "AWPK" u8 1 u8 count, then per package: f32 the actor's reference, u8 state (1 travelling, 2 done, 3/4 following),
  * u8 a final point given, f32 x y z (the travel's target or the follow's final point, map coordinates), f32 the
- * followed actor's reference (-1 the player), f32 hours of following left. 26 bytes a package. */
-#define SAVED_PKG_BYTES 26
+ * followed actor's reference (-1 the player), f32 hours of following left. 26 bytes a package.
+ * Version 2 (v0.0.62): u8 state 5 an escort too (the escorted actor's reference where the followed one's is), and after
+ * the hours an i32 the place an AIFollowCell or AIEscortCell names (0 none, -1 a cell that is no room, else the room's
+ * stable number): 30 bytes a package. A version 1 block still loads (no place). */
+#define SAVED_PKG_BYTES 30
+#define SAVED_PKG_BYTES_V1 26
 static unsigned char *putf32(unsigned char *p,float f){unsigned int v;memcpy(&v,&f,4);p[0]=(unsigned char)(v>>24);p[1]=(unsigned char)(v>>16);p[2]=(unsigned char)(v>>8);p[3]=(unsigned char)v;return p+4;}
 static float getf32(const unsigned char *p){unsigned int v=((unsigned int)p[0]<<24)|((unsigned int)p[1]<<16)|((unsigned int)p[2]<<8)|p[3];float f;memcpy(&f,&v,4);return f;}
 int AW_AmbientPackagesExport(unsigned char *out,int capacity) {
@@ -1050,35 +1168,38 @@ int AW_AmbientPackagesExport(unsigned char *out,int capacity) {
     for(i=0;i<SLOTS+npend;i++){
         saved_pkg_t k;
         if(i<SLOTS){
-            slot_t *s=&slots[i];edict_t *t;
+            slot_t *s=&slots[i];
             if(!s->e || !s->travel)continue;
-            memset(&k,0,sizeof(k));k.ref=s->ref;k.travel=s->travel;k.hours=s->follow_hours;
-            if(s->travel>=3){
-                t=s->follow_num>0 && s->follow_num<sv.num_edicts?EDICT_NUM(s->follow_num):NULL;
-                k.follow_ref=!t || t->free?0:t==player()?-1:field(t,"aw_ref",0);
-                k.final=s->follow_final;
-            }else k.final=1;
-            VectorCopy(s->travel_to,k.to);
-        }else k=pend[i-SLOTS];          /* not applied yet: kept for the next save */
+            keep_package(s,&k);
+        }else{
+            /* not applied yet: kept for the next save (a follower that went through a door is both until it arrives) */
+            int j;k=pend[i-SLOTS];
+            for(j=0;j<SLOTS && !(slots[j].e && slots[j].travel && slots[j].ref==k.ref);j++);
+            if(j<SLOTS)continue;
+        }
         if(!k.ref || (k.travel>=3 && !k.follow_ref))continue;
         if(p+SAVED_PKG_BYTES>out+capacity || n==255)return -1;
         p=putf32(p,k.ref);*p++=k.travel;*p++=k.final;p=putf32(p,k.to[0]);p=putf32(p,k.to[1]);p=putf32(p,k.to[2]);
-        p=putf32(p,k.follow_ref);p=putf32(p,k.hours);n++;
+        p=putf32(p,k.follow_ref);p=putf32(p,k.hours);
+        {unsigned long v=(unsigned long)k.place;p[0]=(unsigned char)(v>>24);p[1]=(unsigned char)(v>>16);
+         p[2]=(unsigned char)(v>>8);p[3]=(unsigned char)v;p+=4;}
+        n++;
     }
-    memcpy(out,"AWPK",4);out[4]=1;out[5]=(unsigned char)n;
+    memcpy(out,"AWPK",4);out[4]=2;out[5]=(unsigned char)n;
     return 6+SAVED_PKG_BYTES*n;
 }
 int AW_AmbientPackagesImport(const unsigned char *data,int bytes) {
-    int i,n;
+    int i,n,size;
     npend=0;
-    if(bytes<6 || memcmp(data,"AWPK",4) || data[4]!=1)return 0;
-    n=data[5];
-    if(bytes!=6+SAVED_PKG_BYTES*n || n>SAVED_PACKAGES)return 0;
+    if(bytes<6 || memcmp(data,"AWPK",4) || (data[4]!=1 && data[4]!=2))return 0;
+    n=data[5];size=data[4]==2?SAVED_PKG_BYTES:SAVED_PKG_BYTES_V1;
+    if(bytes!=6+size*n || n>SAVED_PACKAGES)return 0;
     for(i=0;i<n;i++){
-        const unsigned char *p=data+6+SAVED_PKG_BYTES*i;saved_pkg_t *k=&pend[npend];
+        const unsigned char *p=data+6+size*i;saved_pkg_t *k=&pend[npend];
         k->ref=getf32(p);k->travel=p[4];k->final=p[5];k->to[0]=getf32(p+6);k->to[1]=getf32(p+10);k->to[2]=getf32(p+14);
         k->follow_ref=getf32(p+18);k->hours=getf32(p+22);
-        if(!(k->ref>0) || k->travel<1 || k->travel>4)continue;
+        k->place=size==SAVED_PKG_BYTES?(long)(int32_t)(((uint32_t)p[26]<<24)|((uint32_t)p[27]<<16)|((uint32_t)p[28]<<8)|p[29]):0;
+        if(!(k->ref>0) || k->travel<1 || k->travel>5)continue;
         npend++;
     }
     return 1;
@@ -1098,7 +1219,10 @@ static void apply_saved_packages(edict_t *p) {
             if(!s)s=start(e,ready_now() && find_actor(e,&r)?&r:NULL);
             if(s){stop_walk(s);s->travel=2;s->state=S_OFF;ok=1;}}
         else{t=k->follow_ref<0?p:edict_by_ref(k->follow_ref);
-            ok=t && AW_AmbientFollow(e,t,k->hours,k->final?k->to:NULL);}
+            if(!t){i++;continue;}              /* the followed or escorted actor is not here (yet): it waits too */
+            if(k->travel==5)ok=AW_AmbientPackage(e,t,2,k->hours,k->to,k->place);
+            else if(k->place)ok=AW_AmbientPackage(e,t,3,k->hours,k->final?k->to:NULL,k->place);
+            else ok=AW_AmbientFollow(e,t,k->hours,k->final?k->to:NULL);}
         (void)ok;
         pend[i]=pend[--npend];                 /* applied (or not possible here): done */
     }
@@ -1134,6 +1258,7 @@ int AW_AmbientAiPackage(edict_t *e,int *done) {
     if(done)*done=0;
     if(!e || e->free || !is_actor(e))return -1;
     if((s=slot_for(e))!=NULL){
+        if(s->travel==5){return 2;}                          /* AIEscort: OpenMW's package 2 (v0.0.62) */
         if(s->travel>=3){return 3;}                          /* AIFollow: OpenMW's package 3, done when it ends */
         if(s->travel){if(done)*done=s->travel==2;return 1;}   /* AITravel: OpenMW's package 1 */
         if(done){*done=s->state==S_OFF;}
@@ -1181,6 +1306,9 @@ static void status(void) {
                 "settled %lu of %lu (settle %s), %lu position tests; every body %lu (%lu tests, %lu found no "
                 "clear spot)\n",secs,st.unsticks,st.unsticks/secs,st.settled,st.settles,settle_on?"on":"off",
                 st.unstick_tests,aw_stuck_searches-stuck_base,aw_stuck_tests-stuck_tests_base,aw_stuck_failed-stuck_failed_base);}
+    Con_Printf("  script packages: travels %lu (%lu done), follows %lu, escorts %lu (%lu follows and escorts done); "
+               "followers through a door with the player %lu\n",st.travels,st.travels_done,st.follows,st.escorts,
+               st.follows_done,st.crossed);
     Con_Printf("  cost: %.3f ms per think, worst frame %.3f ms\n",st.thinks?st.seconds*1000.0/st.thinks:0.0,st.worst*1000.0);
 }
 /* "chim actors ambient [on|off|think S|list|reset]" (aw_actors.c forwards it; arguments from the fourth word) */
@@ -1250,7 +1378,7 @@ void AW_AmbientCommand(void) {
             Con_Printf("%3d %-24s ref %ld state %d dist %u dests %u/%u cur %u goal %u at %d%s%s%s at %.0f %.0f %.0f flags %u ground %.0f scale %.3f unsticks %u model %s%s\n",
                        i,source_id(s->e),(long)s->ref,s->state,s->pkg.distance,s->pkg.count,s->pkg.destinations,s->pkg.cur,
                        s->goal,s->at,s->pkg.manual?" manual":"",s->can_walk?"":" no-walk",
-                       s->travel==1?" TRAVEL":s->travel==2?" TRAVEL-DONE":s->travel>=3?" FOLLOW":"",
+                       s->travel==1?" TRAVEL":s->travel==2?" TRAVEL-DONE":s->travel==5?" ESCORT":s->travel>=3?" FOLLOW":"",
                        s->e->v.origin[0],s->e->v.origin[1],
                        s->e->v.origin[2],s->flags,field(s->e,"aw_ground_mode",-1),field(s->e,"aw_scale",1),s->unsticks,
                        s->e->v.model?pr_strings+s->e->v.model:"-",AW_CombatSlotState(s->e,NULL)?" fighting":"");
@@ -1267,6 +1395,8 @@ void AW_AmbientInit(void) {
     aw_mwscript_wander=AW_AmbientWander;
     aw_mwscript_travel=AW_AmbientTravel;
     aw_mwscript_follow=AW_AmbientFollow;
+    aw_mwscript_package=AW_AmbientPackage;           /* AIFollowCell, AIEscort, AIEscortCell (v0.0.62) */
+    aw_mwscript_followers=AW_AmbientFollowersOf;     /* the followers through a door (v0.0.62) */
     aw_mwscript_packages_export=AW_AmbientPackagesExport;
     aw_mwscript_packages_import=AW_AmbientPackagesImport;
     aw_ambient_speed_attribute=AW_MwscriptSpeedAttribute;

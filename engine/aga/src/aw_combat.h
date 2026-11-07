@@ -94,6 +94,8 @@ typedef struct {
 /* Deterministic rolls: one xorshift32 per encounter (seeded). */
 typedef struct {unsigned long state;} aw_combat_rng_t;
 void AW_CombatSeed(aw_combat_rng_t *r,unsigned long seed);
+/* the gameplay recorder's seed for the fights (aw_recorder.c frame 0; 0 when it stops): GAME-RECORDER-FIGHT-SEED-61 */
+void AW_CombatRecorderSeed(unsigned long seed);
 int AW_CombatRoll100(aw_combat_rng_t *r);           /* 0..99, as roll0to99 */
 float AW_CombatRoll01(aw_combat_rng_t *r);          /* 0..1 inclusive, as rollClosedProbability */
 

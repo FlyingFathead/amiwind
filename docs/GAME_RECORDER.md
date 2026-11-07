@@ -1,6 +1,6 @@
 # Gameplay recorder
 
-_Last updated with AmiWind v0.0.61-dev3 (2026-11-06)._
+_Last updated with AmiWind v0.0.62-dev1 (2026-11-07)._
 
 **In development for v0.0.61** (register: GAME-RECORDER-MISSING-61). The first slice below is in v0.0.61-dev3 and
 records and replays a session on the emulator; the hotkey for benchmark segments, the mouse in windows, replay on the Raspberry Pi 4B and the
@@ -18,8 +18,12 @@ reproduce a problem, to test the game's logic, and to measure frame times in the
   once (a short load), and records from the first frame in play after it. While recording, the version line reads
   `AmiWind v<version> (RECORDING)`. The key is live only after `dbg recorder`, so Ctrl and R keep their meaning in
   normal play (Ctrl is sneak); Alt is avoided because the emulator presets use Left Alt as their own modifier key.
-- **Ctrl+R** again stops it. The file is written once, then, and the screen names it, for example
-  `Saved recordings/001.awr` (the next free number in the `recordings` folder of the game folder).
+- **Ctrl+R** again stops it, also with a window open (the dialogue, the inventory, the menu or the console): while the
+  recorder is armed or running, Ctrl+R belongs to it everywhere and never reaches the window, so it is not typed into
+  the dialogue's search field (register: GAME-RECORDER-HOTKEY-DIALOGUE-61). A
+  recording starts only in play: with a window open, Ctrl+R says to close it first. The file is written once, at the
+  stop, and the screen names it, for example `Saved recordings/001.awr` (the next free number in the `recordings`
+  folder of the game folder).
 - `dbg recorder play 001` (or `play 001.awr`) loads the recording's save and plays the session back. While it plays,
   the version line reads `AmiWind v<version> (PLAYBACK)`, the keyboard is taken by the playback (Ctrl+R stops it), and
   the console prints a line for every checkpoint. At the end one line sums it up:
@@ -47,8 +51,19 @@ server sent to the client: an exact replay to watch, not a run of the game's log
 ## How a playback retraces the session
 
 The recording starts from a fresh load of its own save, and so does the playback: both begin in the same state, at
-the same first frame in play. The random generator is seeded at that frame with the recorded seed, and the game no
-longer draws a roll per wall-clock frame while the recorder runs. Each played frame uses the recorded length instead
+the same first frame in play. Every random stream the game's logic draws from follows the recorded seed
+(register: GAME-RECORDER-FIGHT-SEED-61):
+
+- at that first frame the fights' dice, the script language's Random and the levelled container rolls are set from
+  it. A fight that was on when the recording started (or began again in the load of the starting save) rolls the same
+  dice in the recording and in its playback, and a fight that begins later takes its seed from the recording's own
+  count of fights, not from how many fights the replaying game has seen;
+- the general generator (monster moves, spells, persuasion, rests, harvest rolls, effects) is set again at the start
+  of every frame from the seed and the frame's number, so a roll drawn on one frame in one run and not in the other
+  cannot shift the rolls of the frames after it;
+- the game no longer draws a roll per wall-clock frame while the recorder runs.
+
+Each played frame uses the recorded length instead
 of the measured one, so a slow machine and a fast one run the same frames. The recorded keys go through the game's
 own key handling as if typed, and the recorded move and view replace the live ones. Autosaves are off while
 recording and playing back (a save changes the world change list's tables, and nothing is written during play).
@@ -70,11 +85,11 @@ Measured or counted for this slice on FS-UAE at 32 MB of Fast RAM, 68040 with JI
   frames a second; when it is full the recording stops and is saved); the checkpoints take 48 bytes every 5 seconds;
   the starting save is held from the start to the stop (its size is that of an ordinary save). All of it is freed at
   the stop.
-- **Processor:** a 15-byte copy per frame while recording; every 5 seconds a pass over the world change list for its
-  hash.
+- **Processor:** a 15-byte copy and one reseed of the general generator (a few multiplies) per frame while recording
+  or playing back; every 5 seconds a pass over the world change list for its hash.
 - **Disk:** nothing during play. One write when recording stops, one read when a playback starts.
 - **Drawing:** the version line (and, for a few seconds, the saved file's name or the playback result) at the top of
-  the screen.
+  the screen; a message wider than the screen goes on a second line instead of running past the edge.
 
 ## Checked in game
 

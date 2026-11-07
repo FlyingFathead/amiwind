@@ -31,4 +31,21 @@ int AW_StoryInventoryAllowed(void);
 int AW_StoryViewAllowed(void);
 int AW_StoryDoor(unsigned reference);
 void AW_ExpandPlayerName(char *out, unsigned capacity, const char *text);
+/* The player's control switches the scripts set (MWSCRIPT-PLAYER-CONTROL-62; rules from OpenMW 0.51
+ * mwinput/controlswitch.cpp, mwscript/controlextensions.cpp and miscextensions.cpp OpEnableTeleporting, mwworld World
+ * enableTeleporting / enableLevitation): Disable/EnablePlayerControls, -Fighting, -Jumping, -Looking, -Magic,
+ * -ViewSwitch, -VanityMode, -Teleporting, -Levitation and the Get...Disabled readers. Every switch starts on in a new
+ * game; the disabled ones are one bit mask in the saved named facts ("amiwind:controls", no new save field: an older
+ * save reads 0, everything on). They are separate from the opening's own rule (the AW_Story* permissions above): a
+ * control is usable only when both allow it. */
+enum aw_control {
+    AW_CONTROL_PLAYER=1, AW_CONTROL_FIGHTING=2, AW_CONTROL_JUMPING=4, AW_CONTROL_LOOKING=8, AW_CONTROL_MAGIC=16,
+    AW_CONTROL_VIEWSWITCH=32, AW_CONTROL_VANITY=64, AW_CONTROL_TELEPORTING=128, AW_CONTROL_LEVITATION=256,
+    AW_CONTROL_ALL=511
+};
+#define AW_CONTROL_FACT "amiwind:controls"
+int AW_ControlsDisabled(void);              /* the mask of switches a script turned off */
+int AW_ControlAllowed(int controls);        /* 1 when none of CONTROLS is off */
+int AW_ControlSet(int controls,int enable); /* 1 when kept (0: the named facts are full; nothing changed) */
+const char *AW_ControlName(int control);    /* "playercontrols" ... for one bit, "" else */
 #endif

@@ -1336,6 +1336,9 @@ void AW_ViewFrame(void) {
     }else if(playing()){
         int turned=cl.viewangles[YAW]!=last_angles[YAW] || cl.viewangles[PITCH]!=last_angles[PITCH];
         mode_before=view.mode;
+        /* a script's DisablePlayerViewSwitch (MWSCRIPT-PLAYER-CONTROL-62): the view stays as it is, the key does
+         * nothing (OpenMW camera.lua updatePOV reads the ViewMode switch) */
+        if(!AW_ControlAllowed(AW_CONTROL_VIEWSWITCH))pov_down=pov_tapped=0;
         if(pov_tapped && !pov_down)AW_ViewPOVTap(&view,&rules);
         else AW_ViewPOV(&view,&rules,pov_down,dt);
         if(view.mode!=AW_VIEW_FIRST && !body_ready()){
@@ -1355,7 +1358,9 @@ void AW_ViewFrame(void) {
         }
         input=input_seen || pov_down || pov_tapped || turned || cl.velocity[0] || cl.velocity[1] || cl.velocity[2];
         mode_before=view.mode;
-        AW_ViewIdle(&view,&rules,input,AW_ViewVanityAllowed(vanity_cvar.value || vanity_forced,body_ready(),AW_ArenaActive()),dt);
+        /* DisableVanityMode: no idle orbit, and a running one ends (camera.lua updateVanity) */
+        AW_ViewIdle(&view,&rules,input,AW_ViewVanityAllowed(vanity_cvar.value || vanity_forced,body_ready(),AW_ArenaActive()) &&
+                    AW_ControlAllowed(AW_CONTROL_VANITY),dt);
         if(view.mode!=AW_VIEW_VANITY)vanity_forced=0;
         if(mode_before==AW_VIEW_VANITY && view.mode!=AW_VIEW_VANITY)view.orbit_yaw=view.orbit_pitch=0;
         else if(mode_before!=AW_VIEW_VANITY && view.mode==AW_VIEW_VANITY)VectorCopy(cl.viewangles,anchor);
@@ -1393,6 +1398,7 @@ void AW_ViewSceneSpawn(void) {
 static void vanity_start(void) {
     if(!ready)load_settings();
     if(!AW_StoryViewAllowed()){Con_Printf("Vanity camera: character registration is not complete.\n");return;}
+    if(!AW_ControlAllowed(AW_CONTROL_VANITY)){Con_Printf("Vanity camera: a script has switched it off.\n");return;}
     if(!body_ready()){Con_Printf("No player body in this image (--player-body on builds it): no vanity camera.\n");return;}
     if(death.stage!=AW_DEATH_NONE || !local_player()){Con_Printf("Vanity camera: not now.\n");return;}
     view.idle=rules.vanity_delay+1;VectorCopy(cl.viewangles,anchor);

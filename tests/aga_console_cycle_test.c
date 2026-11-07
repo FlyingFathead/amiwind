@@ -26,6 +26,7 @@ static const char *draw(double time){
 }
 int AW_RemoteLogging(void){return 0;}
 const char *AW_RemoteConsoleLog(void){return "";}
+void AW_RemoteLog(const char *msg){(void)msg;}
 int main(void){
     cls.state=ca_connected;
     Con_CycleConsole_f();assert(key_dest==key_console && !con_fullscreen);

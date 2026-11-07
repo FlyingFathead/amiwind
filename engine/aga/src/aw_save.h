@@ -167,4 +167,7 @@ extern void (*aw_save_ident_refresh)(struct aw_ledger_s *ledger);
 extern long (*aw_save_migrate)(struct aw_ledger_s *ledger,void *dropped);
 extern int (*aw_save_drop_actor_records)(void);
 extern void (*aw_save_notice)(const char *line);   /* the on-screen line of a migrated load */
+/* a new game's state begins (AW_SaveReset): the scripts start the original's run-once new-game scripts
+ * (aw_mwhost.c AW_MwscriptNewGame, NPC-STORY-DISABLED-AT-START-42) */
+extern void (*aw_save_new_game)(void);
 #endif

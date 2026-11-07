@@ -64,8 +64,12 @@ def cell_exterior(x, y, refs, name='', region=None):
     return record('CELL', *parts)
 
 
-def cell_interior(name):
-    return record('CELL', sub('NAME', name), sub('DATA', struct.pack('<Iii', 1, 0, 0)))
+def cell_interior(name, refs=()):
+    parts = [sub('NAME', name), sub('DATA', struct.pack('<Iii', 1, 0, 0))]
+    for number, ident, pos in refs:
+        parts += [sub('FRMR', struct.pack('<I', number)), sub('NAME', ident),
+                  sub('DATA', struct.pack('<6f', pos[0], pos[1], pos[2], 0, 0, 0))]
+    return record('CELL', *parts)
 
 
 SCRIPTS = {
@@ -107,8 +111,8 @@ if ( OnActivate == 1 )
     Activate
     PlaySound "Chime"
 endif
-FadeTo 100 5
-FadeTo 100 5
+COE 100 5
+COE 100 5
 End''',
     # the actor record (v0.0.54): stats, items, spells, combat, wander and the dead count reach the host
     'ActorUser': '''Begin ActorUser
@@ -137,7 +141,7 @@ End''',
     'Inert': '''Begin Inert
 float t
 set t to t + GetSecondsPassed
-RotateWorld Z 30
+SetScale 0.5
 End''',
     'Looper': '''Begin Looper
 short n
@@ -250,6 +254,56 @@ End''',
 short r
 set r to GetPCRank "Mages Guild"
 End''',
+    # v0.0.62 (MWSCRIPT-SMALL-FUNCTIONS-62): the small functions through the host's call(); never placed, compiled only
+    'SmallUser': '''Begin SmallUser
+float a
+short r
+set a to ( "chime_obj"->GetAngle Z )
+SetAngle, X, a
+"chime_obj"->Move y 10
+MoveWorld z -70
+SetPos z 100.5
+SetAtStart
+Face 10 20 30
+if ( GetDetected Player == 1 )
+    set r to 1
+elseif ( GetLOS "chime_obj" == 1 )
+    set r to 2
+elseif ( GetInterior )
+    set r to 3
+elseif ( GetCurrentWeather >= 5 )
+    set r to 4
+elseif ( OnKnockout == 1 )
+    WakeUpPC
+endif
+RotateWorld z 90
+if ( player->GetWeaponDrawn == 1 )
+    if ( GetPCSneaking )
+        SetDelete 1
+    endif
+endif
+End''',
+    'SmallReader': '''Begin SmallReader
+short r
+set r to GetInterior
+End''',
+    # v0.0.62 (MWSCRIPT-GAP-FUNCTIONS-62): the fades, the forced sneak and the resistances; never placed
+    'GapUser': '''Begin GapUser
+short r
+FadeOut 2
+FadeIn 1.5
+FadeTo 50 3
+"chime_obj"->ForceSneak
+set r to ( "chime_obj"->GetForceSneak )
+ClearForceSneak
+ModResistFire 100
+SetResistFrost 40
+set r to GetResistShock
+set r to ( "chime_obj"->GetResistParalysis )
+if ( ( player->HasSoulGem "skink" ) > 0 )
+    player->RemoveSoulGem "skink" 2
+endif
+End''',
     # CELL-CHANGES-59 slice 5: a global script that starts another one and stops itself (never placed: the harness
     # starts it as a start script); the other one counts its own runs
     'Starter': '''Begin Starter
@@ -274,7 +328,8 @@ End''',
 RESULT_TEXT = 'set done to 7' + chr(13) + chr(10) + 'Choice ' + chr(34) + 'A' + chr(34) + ' 3'
 
 
-def master_bytes(scripts=SCRIPTS):
+def master_bytes(scripts=SCRIPTS, records=(), room_refs=()):
+    """RECORDS: more records before the cells; ROOM_REFS: references placed in Test Room."""
     out = [record('TES3', sub('HEDR', b'\0' * 300))]
     out += [glob('QuestFlag', 's', 0), glob('Counter', 'l', 0), glob('Fraction', 'f', 1.5), glob('Where', 'l', 0),
             glob('PosX', 'f', 0)]
@@ -298,6 +353,7 @@ def master_bytes(scripts=SCRIPTS):
             acti('notyet_obj', 'NotYetUser'), acti('loop_obj', 'Looper'), acti('cg_obj', 'chargenTest'),
             acti('inert_obj', 'Inert'), acti('gate_obj', 'GateScript'), acti('actor_obj', 'ActorUser'),
             acti('cell_obj', 'CellUser'), acti('drip_obj', 'MarkerZero')]
+    out += list(records)
     out.append(cell_exterior(0, 0, [(101, 'marker_wind', (100, 200, 0)), (102, 'chime_obj', (400, 0, 0)),
                                     (103, 'quiet_obj', (0, 0, 0)), (104, 'notyet_obj', (8, 8, 0)),
                                     (105, 'loop_obj', (16, 16, 0)), (106, 'cg_obj', (0, 0, 0)),
@@ -305,7 +361,7 @@ def master_bytes(scripts=SCRIPTS):
                                     (109, 'actor_obj', (0, 0, 0)), (110, 'cell_obj', (0, 0, 0)),
                                     (111, 'drip_obj', (0, 0, 0))]))
     out += [cell_exterior(-2, -9, [], 'Seyda Neen', 'bitter coast region'),
-            cell_exterior(-3, -9, [], '', 'bitter coast region'), cell_interior('Test Room'),
+            cell_exterior(-3, -9, [], '', 'bitter coast region'), cell_interior('Test Room', room_refs),
             cell_interior('Another Room')]
     return b''.join(out)
 
@@ -521,13 +577,15 @@ class CompilerTests(unittest.TestCase):
         names = {c.name: c for c in compiled}
         calls = [a for _, n, a in awms.decode(names['NotYetUser'].code) if n == 'NOTYET']
         self.assertEqual(len(calls), 2)
-        self.assertEqual(calls[0][0], FUNCTION_NUMBERS['fadeto'])
-        self.assertEqual(prog.strings.rows[calls[0][1]], 'fadeto')
+        self.assertEqual(calls[0][0], FUNCTION_NUMBERS['coe'])     # v0.0.62: FadeTo is carried out now
+        self.assertEqual(prog.strings.rows[calls[0][1]], 'coe')
         self.assertEqual(calls[0][2] & 0x1F, 2)                    # two numbers: 100 5
         cell = names['CellUser']
-        # PositionCell: the player's moves are worked out here; a room no list names and another object stay not yet
+        # PositionCell: the player's moves are worked out here; the player's into a room no list names stays not yet;
+        # another object's goes to the host (v0.0.62): the same NOTYET form, not counted as not yet
         self.assertEqual([prog.strings.rows[a[1]] for _, n, a in awms.decode(cell.code) if n == 'NOTYET'],
                          ['positioncell', 'positioncell'])
+        self.assertEqual(cell.notyet, ['positioncell'])
         moves = [a[0] for _, n, a in awms.decode(cell.code) if n == 'PLAYERMOVE']
         self.assertEqual(len(moves), 2)
         room, outdoors = (prog.moves.rows[m] for m in moves)
@@ -544,6 +602,190 @@ class CompilerTests(unittest.TestCase):
         f = awms.read(awms.write(prog, compiled, binds)[0])
         self.assertEqual(f['PCEL_rows'], 3)
         self.assertIn('PCEL', awms.RESIDENT)
+
+    def test_position_cell_of_an_actor(self):
+        # v0.0.62 (MWSCRIPT-POSITIONCELL-ACTORS-62; OpenMW transformationextensions.cpp OpPositionCell): anything but
+        # the player goes to the host with x, y, z in the destination's units (a room: its map's own, a recentred
+        # room's offset first), Quake's yaw from the rotation in minutes of arc, the kind and the room's number; a
+        # cell the game has not is no code (OpenMW does nothing); each actor a move may bring into a room is a VISI
+        # row with its home room's map (the self form: the script's bearers)
+        from mwscript.functions import FUNCTION_NUMBERS
+        scripts = dict(SCRIPTS, MoverScript='''Begin MoverScript
+"mover_npc"->PositionCell 4100 8000 -200 5400 "Test Room"
+"mover_npc"->PositionCell 0 0 0 0 "No Such Place"
+"mover_npc"->PositionCell 100 200 300 0 "Seyda Neen"
+End''', SelfMover='''Begin SelfMover
+PositionCell 8 8 8 60 "Another Room"
+End''')
+        extra = (record('NPC_', sub('NAME', 'mover_npc')), record('NPC_', sub('NAME', 'self_npc'), sub('SCRI', 'SelfMover')))
+        tmp = Path(tempfile.mkdtemp(prefix='aw-mwscript-pc-'))
+        try:
+            (tmp / 'Morrowind.esm').write_bytes(master_bytes(scripts, extra, [(201, 'mover_npc', (0, 0, 0)),
+                                                                              (202, 'self_npc', (0, 0, 0))]))
+            data = GameData().load(tmp)
+            prog, compiled = compile_program(data, MediaMap(data, catalogue(), SOUNDTRACK), rooms=ROOMS)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+        names = {c.name: c for c in compiled}
+        mover = names['MoverScript']
+        self.assertEqual(mover.notyet, [])
+        self.assertFalse(mover.flags & SCRIPT_NOTYET)
+        self.assertTrue(any('No Such Place' in w for w in mover.warnings))
+        ops = [(n, a) for _, n, a in awms.decode(mover.code)]
+        calls = [k for k, (n, a) in enumerate(ops) if n == 'NOTYET']
+        self.assertEqual(len(calls), 2)
+        for k in calls:
+            self.assertEqual(ops[k][1][0], FUNCTION_NUMBERS['positioncell'])
+            self.assertEqual(ops[k][1][2] & 0x1F, 6)               # x, y, z, yaw, kind, number
+            self.assertEqual(ops[k][1][3], 1)                      # the cell's name
+        room = data.interior_numbers['test room']
+
+        def pushed(k):
+            out = []
+            for n, a in ops[k - 6:k]:
+                out.append(a[0])
+            return out
+        first = pushed(calls[0])
+        self.assertEqual(first[:4], [1000.0, 2000.0, -50.0, 270.0])   # (x - 100) / 4, y / 4, z / 4; -90 degrees
+        self.assertEqual(first[4:], [2, room])
+        self.assertEqual(pushed(calls[1]), [100.0, 200.0, 300.0, 0.0, 1, 0])   # outdoors: the original's units
+        self.assertEqual(ops[calls[0] - 7][0], 'REF')
+        other = data.interior_numbers['another room']
+        self.assertEqual(prog.visitors, {(room, 201): prog.strings.index['ri0123456789'],
+                                         (other, 202): prog.strings.index['ri0123456789']})
+        f = awms.read(awms.write(prog, compiled, bindings(prog))[0])
+        self.assertEqual(f['VISI_rows'], 2)
+        self.assertEqual(struct.unpack_from('>IIHH', f['VISI'], 0)[:2], tuple(sorted([(room, 201), (other, 202)])[0]))
+        self.assertIn('VISI', awms.RESIDENT)
+        self.assertEqual(names['SelfMover'].notyet, [])
+
+    def test_the_placing_family(self):
+        # v0.0.62 (MWSCRIPT-PLACE-OBJECTS-62; OpenMW transformationextensions.cpp OpPlaceAt, OpPlaceItem,
+        # OpPlaceItemCell): an NPC or creature with a placed reference, or a carried item, goes to the host with its
+        # PLAC row as the last number; a creature placed nowhere and an activator stay not yet; PlaceItemCell works
+        # its cell out here (a room: the room map's units for an actor); the PLAC rows are every id a Place call
+        # names, sorted, with the template (a room's reference first) and the record's script
+        from mwscript.functions import FUNCTION_NUMBERS
+        from mwscript.codegen import PLACE_KINDS
+        scripts = dict(SCRIPTS, PlacerScript='''Begin PlacerScript
+PlaceAtPC "summon_npc" 1 128 1
+PlaceAtPC "lone_rat", 1, 256, 0
+"cell_obj"->PlaceAtMe "summon_npc" 2 64 3
+PlaceItem "shiny_coin" 100 200 300 90
+PlaceItem "magic_glow" 1 2 3 0
+PlaceItemCell "summon_npc" "Test Room" 4100 8000 -200 90
+PlaceItemCell "summon_npc" "No Such Place" 0 0 0 0
+End''', SummonedScript='''Begin SummonedScript
+short done
+set done to 1
+End''')
+        extra = (record('NPC_', sub('NAME', 'summon_npc'), sub('SCRI', 'SummonedScript')),
+                 record('CREA', sub('NAME', 'lone_rat')), record('MISC', sub('NAME', 'shiny_coin')),
+                 acti('magic_glow', ''))
+        tmp = Path(tempfile.mkdtemp(prefix='aw-mwscript-place-'))
+        try:
+            (tmp / 'Morrowind.esm').write_bytes(master_bytes(scripts, extra, [(301, 'summon_npc', (0, 0, 0))]))
+            data = GameData().load(tmp)
+            prog, compiled = compile_program(data, MediaMap(data, catalogue(), SOUNDTRACK), rooms=ROOMS)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+        names = {c.name: c for c in compiled}
+        placer = names['PlacerScript']
+        self.assertEqual(sorted(placer.notyet), ['placeatpc', 'placeitem'])     # the rat placed nowhere, the activator
+        self.assertTrue(any('No Such Place' in w for w in placer.warnings))
+        rows = prog.place_rows()
+        self.assertEqual([r['key'] for r in rows], ['lone_rat', 'magic_glow', 'shiny_coin', 'summon_npc'])
+        npc = rows[3]
+        self.assertEqual((npc['kind'], npc['template'], npc['carried']), (PLACE_KINDS['actor'], 301, True))
+        self.assertEqual(npc['home'], prog.strings.index['ri0123456789'])
+        self.assertEqual(npc['script'], prog.scripts.index['summonedscript'])
+        self.assertEqual((rows[0]['carried'], rows[1]['kind'], rows[2]['kind']), (False, PLACE_KINDS['other'],
+                                                                                 PLACE_KINDS['item']))
+        ops = [(n, a) for _, n, a in awms.decode(placer.code)]
+        calls = [(k, a) for k, (n, a) in enumerate(ops) if n == 'NOTYET' and
+                 a[0] in (FUNCTION_NUMBERS['placeatpc'], FUNCTION_NUMBERS['placeatme'], FUNCTION_NUMBERS['placeitem'],
+                          FUNCTION_NUMBERS['placeitemcell'])]
+
+        def pushed(k, count):
+            # the constants pushed before op K (conversions between them skipped)
+            out = []
+            while len(out) < count:
+                k -= 1
+                if ops[k][0].startswith('PUSH'):
+                    out.insert(0, ops[k][1][0])
+            return out
+
+        def before(k):
+            # the nearest REF or NOTYET before op K
+            while ops[k - 1][0] not in ('REF', 'NOTYET'):
+                k -= 1
+            return ops[k - 1][0]
+        by_fn = {}
+        for k, a in calls:
+            by_fn.setdefault(a[0], []).append((k, a))
+        at_pc = by_fn[FUNCTION_NUMBERS['placeatpc']]
+        self.assertEqual(at_pc[0][1][2] & 0x1F, 4)                 # count, distance, direction, row
+        self.assertEqual(pushed(at_pc[0][0], 4), [1, 128.0, 1, 3])
+        self.assertEqual(at_pc[1][1][2] & 0x1F, 3)                 # the rat: not yet, its own numbers only
+        at_me = by_fn[FUNCTION_NUMBERS['placeatme']][0]
+        self.assertEqual(pushed(at_me[0], 4), [2, 64.0, 3, 3])
+        self.assertEqual(before(at_me[0]), 'REF')
+        item = [c for c in by_fn[FUNCTION_NUMBERS['placeitem']] if c[1][2] & 0x1F == 5]
+        self.assertEqual(pushed(item[0][0], 5), [100.0, 200.0, 300.0, 90.0, 2])
+        cell = by_fn[FUNCTION_NUMBERS['placeitemcell']][0]
+        self.assertEqual(cell[1][2] & 0x1F, 7)
+        room = data.interior_numbers['test room']
+        self.assertEqual(pushed(cell[0], 7), [1000.0, 2000.0, -50.0, 270.0, 2, room, 3])
+        f = awms.read(awms.write(prog, compiled, bindings(prog))[0])
+        self.assertEqual(f['PLAC_rows'], 4)
+        self.assertEqual(struct.unpack_from('>HHIHBB', f['PLAC'], 36),
+                         (npc['id'], npc['home'], 301, npc['script'], 0, 1))
+        self.assertIn('PLAC', awms.RESIDENT)
+        # the placed record's own script is compiled (it runs on the placed actor's instance)
+        self.assertIn('SummonedScript', names)
+
+    def test_ai_follow_cell_and_escort(self):
+        # v0.0.62 (MWSCRIPT-POSITIONCELL-ACTORS-62; OpenMW aiextensions.cpp OpAiFollowCell, OpAiEscort, OpAiEscortCell):
+        # the host gets duration, x, y, z (a room: its map's own units, as PositionCell's), the kind and the room's
+        # number, the target and the cell; the reset argument is not passed; an AIEscortCell into a cell the game has
+        # not is no code; a follower of the player is a VISI row of any room (0xFFFFFFFF) with its home room's map
+        from mwscript.functions import FUNCTION_NUMBERS
+        from mwscript.codegen import VISI_ANY
+        scripts = dict(SCRIPTS, EscortScript='''Begin EscortScript
+"guide_npc"->AIFollowCell Player "Test Room" 0 4100 8000 -200 0
+"guide_npc"->AIEscortCell Player "Seyda Neen" 2 100 200 300
+"guide_npc"->AIEscortCell Player "No Such Place" 0 1 2 3
+"guide_npc"->AIEscort Player 0 10 20 30 0
+AIFollowCell, Player, "Nowhere At All", 0, 1, 2, 3, 0
+End''')
+        extra = (record('NPC_', sub('NAME', 'guide_npc'), sub('SCRI', 'EscortScript')),)
+        tmp = Path(tempfile.mkdtemp(prefix='aw-mwscript-ai-'))
+        try:
+            (tmp / 'Morrowind.esm').write_bytes(master_bytes(scripts, extra, [(301, 'guide_npc', (0, 0, 0))]))
+            data = GameData().load(tmp)
+            prog, compiled = compile_program(data, MediaMap(data, catalogue(), SOUNDTRACK), rooms=ROOMS)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+        c = {x.name: x for x in compiled}['EscortScript']
+        self.assertEqual(c.notyet, [])
+        self.assertTrue(any('No Such Place' in w for w in c.warnings))
+        ops = [(n, a) for _, n, a in awms.decode(c.code)]
+        calls = [k for k, (n, a) in enumerate(ops) if n == 'NOTYET']
+        self.assertEqual([ops[k][1][0] for k in calls], [FUNCTION_NUMBERS['aifollowcell'], FUNCTION_NUMBERS['aiescortcell'],
+                                                         FUNCTION_NUMBERS['aiescort'], FUNCTION_NUMBERS['aifollowcell']])
+        room = data.interior_numbers['test room']
+
+        def pushed(k, n):
+            return [a[0] for _, a in ops[k - n:k]]
+        self.assertEqual(ops[calls[0]][1][2] & 0x1F, 6)
+        self.assertEqual(ops[calls[0]][1][3], 2)                      # the target and the cell
+        self.assertEqual(pushed(calls[0], 6), [0.0, 1000.0, 2000.0, -50.0, 2, room])
+        self.assertEqual(pushed(calls[1], 6), [2.0, 100.0, 200.0, 300.0, 1, 0])   # outdoors: the original's units
+        self.assertEqual(ops[calls[2]][1][2] & 0x1F, 5)               # AIEscort: duration x y z and the reset
+        self.assertEqual(pushed(calls[3], 6), [0.0, 1.0, 2.0, 3.0, 1, 0])   # a cell the game has not: never done
+        self.assertEqual(prog.visitors, {(VISI_ANY, 301): prog.strings.index['ri0123456789']})
+        f = awms.read(awms.write(prog, compiled, bindings(prog))[0])
+        self.assertEqual(struct.unpack_from('>IIHH', f['VISI'], 0)[:2], (VISI_ANY, 301))
 
     def test_the_players_standing_goes_through_the_host_call(self):
         # v0.0.57 (functions.HOST): crime level, faction rank, faction reputation and GetRace keep the import route's
@@ -594,6 +836,56 @@ class CompilerTests(unittest.TestCase):
         header = (ROOT / 'engine/aga/src/aw_mwcode.h').read_text(encoding='utf-8')
         found = {m.group(1).lower(): int(m.group(2)) for m in re.finditer(r'#define AWF_(\w+) (\d+)', header)}
         self.assertEqual(found, {n: FUNCTION_NUMBERS[n] for n in HOST})
+
+    def test_fades_forced_sneak_and_resistances_go_through_the_host_call(self):
+        # v0.0.62 (MWSCRIPT-GAP-FUNCTIONS-62): carried out by the host (not "not yet"), in order, with their numbers;
+        # the resistances' reads make the script VOLATILE (an effect lands or ends without the state generation)
+        from mwscript.functions import FUNCTION_NUMBERS
+        prog, compiled, _, _ = program()
+        user = {c.name: c for c in compiled}['GapUser']
+        self.assertEqual(user.notyet, [])
+        self.assertFalse(user.flags & SCRIPT_NOTYET)
+        self.assertTrue(user.flags & SCRIPT_VOLATILE)
+        self.assertFalse(user.flags & SCRIPT_INERT)
+        calls = [a for _, n, a in awms.decode(user.code) if n == 'NOTYET']
+        self.assertEqual([a[0] for a in calls], [FUNCTION_NUMBERS[n] for n in (
+            'fadeout', 'fadein', 'fadeto', 'forcesneak', 'getforcesneak', 'clearforcesneak', 'modresistfire',
+            'setresistfrost', 'getresistshock', 'getresistparalysis', 'hassoulgem', 'removesoulgem')])
+
+    def test_the_small_functions_go_through_the_host_call(self):
+        # v0.0.62 (MWSCRIPT-SMALL-FUNCTIONS-62): angles, moves, SetAtStart, Face, detection, the line of sight, the
+        # interior, the weather, a knockdown and WakeUpPC keep the import route's form and are carried out (the script
+        # is not "not yet"); the reads that change without the state generation make it VOLATILE, GetInterior does not
+        # (the player's cell moves it); the changes keep it attached (not INERT)
+        from mwscript.functions import FUNCTION_NUMBERS
+        prog, compiled, _, _ = program()
+        names = {c.name: c for c in compiled}
+        user = names['SmallUser']
+        self.assertEqual(user.notyet, [])
+        self.assertFalse(user.flags & SCRIPT_NOTYET)
+        self.assertTrue(user.flags & SCRIPT_VOLATILE)
+        self.assertFalse(user.flags & SCRIPT_INERT)
+        reader = names['SmallReader']
+        self.assertFalse(reader.flags & (SCRIPT_VOLATILE | SCRIPT_NOTYET))
+        self.assertTrue(reader.flags & SCRIPT_INERT)              # a read alone is seen nowhere
+        ops = [(n, a) for _, n, a in awms.decode(user.code)]
+        calls = [(k, a) for k, (n, a) in enumerate(ops) if n == 'NOTYET']
+        self.assertEqual([a[0] for _, a in calls], [FUNCTION_NUMBERS[n] for n in (
+            'getangle', 'setangle', 'move', 'moveworld', 'setpos', 'setatstart', 'face', 'getdetected', 'getlos',
+            'getinterior', 'getcurrentweather', 'onknockout', 'wakeuppc', 'rotateworld', 'getweapondrawn',
+            'getpcsneaking', 'setdelete')])
+        k = calls[14][0]
+        self.assertEqual(ops[k - 1], ('REF', [0xFFFF]))          # player->GetWeaponDrawn: the player as the target
+        chime = prog.objects.index['chime_obj']
+        k, angle = calls[0]
+        self.assertEqual(ops[k - 1], ('REF', [chime]))            # "chime_obj"->GetAngle: the object as the target
+        self.assertEqual(angle[2], 0x80 | 0x40)                   # a value, a fraction, no numbers
+        self.assertEqual([prog.strings.rows[s] for s in angle[4:]], ['Z'])
+        self.assertEqual(calls[1][1][2] & 0x1F, 1)                # SetAngle: one number, after its axis
+        self.assertIn(('REF', [chime]), ops[calls[1][0] + 1:calls[2][0]])   # "chime_obj"->Move: the object
+        self.assertEqual(calls[6][1][2] & 0x1F, 2)                # Face X Y (the ignored third number dropped)
+        self.assertEqual(calls[7][1][2], 0x80)                    # GetDetected: a whole number
+        self.assertEqual([prog.strings.rows[s] for s in calls[7][1][4:]], ['Player'])
 
 
 HARNESS = r'''
@@ -748,7 +1040,36 @@ int main(int argc,char **argv){
         printf("attach %u %d\n",(unsigned)((p[0]<<24)|(p[1]<<16)|(p[2]<<8)|p[3]),
                AW_MwvmAttach(((uint32_t)p[0]<<24)|(p[1]<<16)|(p[2]<<8)|p[3],(p[4]<<8)|p[5],(p[6]<<8)|p[7],-1,o));
     }
+    if(getenv("NEWGAME"))printf("newgame %d\n",AW_MwvmNewGame());   /* NPC-STORY-DISABLED-AT-START-42 */
+    if(getenv("HELD")){   /* SCRIPTED-EVENT-FALLING-MAGE-61: the HELD rows and the lookup by actor */
+        uint32_t a,s;float at[3];int k;
+        for(k=0;AW_MwvmHeld(k,&a,&s,at);k++)printf("held %u %u %.1f %.1f %.1f find %d\n",(unsigned)a,(unsigned)s,
+                                                   at[0],at[1],at[2],AW_MwvmHeldFind(a));
+        printf("held rows %d find-none %d\n",AW_MwvmHeldCount(),AW_MwvmHeldFind(1));
+        return 0;
+    }
     if(getenv("LOCALS"))return locals_test(dt,atoi(getenv("LOCALS")),atoi(getenv("COUNTER")));
+    if(getenv("DETACH")){   /* v0.0.62: reference 103 leaves the map (PositionCell), its values parked, then back */
+        int s,k,attached=0,first,again;aw_mwcell_t v;
+        for(tick=1;tick<=2;tick++)AW_MwvmTick(dt,player);
+        first=AW_MwvmDetach(103);again=AW_MwvmDetach(103);
+        printf("detach %d again %d\n",first,again);
+        for(k=0;k<AW_MwvmInstanceCount();k++){aw_mwvm_instance_t *in=AW_MwvmInstance(k);
+            if(in && (in->flags&AWI_USED) && in->reference==103)attached++;}
+        printf("attached %d parked %d\n",attached,AW_MwvmLocalGet(103,0,&s,&v)?(int)v.i:-1);
+        k=AW_MwvmAttach(103,s,0,-1,player);
+        printf("back %d done %d\n",k>=0,k>=0?(int)AW_MwvmLocal(k,0).i:-1);
+        return 0;
+    }
+    if(getenv("BLOCK")){    /* v0.0.62: an entity block by its reference in a map's entity text */
+        static const char text[]="{\n\"classname\" \"worldspawn\"\n\"message\" \"a } in a value\"\n}\n"
+            "{\n\"classname\" \"aw_npc\"\n\"aw_ref\"  \"12\"\n\"netname\" \"Twelve\"\n}\n"
+            "{\n\"classname\" \"aw_npc\"\n\"netname\" \"aw_ref\"\n\"aw_ref\" \"123\"\n}\n";
+        static const uint32_t refs[]={12,123,1,0};unsigned long length=0;
+        for(i=0;i<4;i++){const char *b=AW_MwvmEntityBlock(text,sizeof(text)-1,refs[i],&length);
+            printf("block %u %ld %.*s|\n",(unsigned)refs[i],b?(long)(b-text):-1L,b?(int)length:0,b?b:"");}
+        return 0;
+    }
     if(getenv("DIALOGUE")){   /* a result text run on reference 103 (the Quiet object) through its DRSC row */
         const char *text=getenv("DIALOGUE");int speaker=-1,row_speaker,broken,script,k;
         for(k=0;k<AW_MwvmInstanceCount();k++){aw_mwvm_instance_t *in=AW_MwvmInstance(k);
@@ -903,6 +1224,25 @@ class InterpreterTests(unittest.TestCase):
         self.assertEqual((field('reset', 'done'), field('reset', 'counter'), field('reset', 'ticks')), ('0', '0', '0'))
         self.assertFalse([l for l in out if l.startswith('refused')], out)
 
+    def test_an_object_that_left_the_map_keeps_its_values(self):
+        # v0.0.62 (PositionCell to another place): the instance is parked as a map change parks it, runs no more,
+        # and has its values again when attached where it arrives
+        out = self.run_vm(0, env={'DETACH': '1'})
+        self.assertIn('detach 1 again 0', out)
+        self.assertIn('attached 0 parked 1', out)                 # Quiet's done (1 after its first run), kept
+        self.assertIn('back 1 done 1', out)
+
+    def test_an_entity_block_by_its_reference(self):
+        # v0.0.62: the actor's entity in a map's entity text by its "aw_ref" key: a quoted brace or a value that reads
+        # "aw_ref" is no match; a reference no entity has is none
+        text = '\n'.join(self.run_vm(0, env={'BLOCK': '1'}))
+        found = dict(re.findall(r'block (\d+) (-?\d+) ', text))
+        self.assertEqual((found['1'], found['0']), ('-1', '-1'))
+        self.assertNotEqual(found['12'], '-1')
+        self.assertIn('"aw_ref"  "12"\n"netname" "Twelve"\n}|', text)
+        self.assertIn('"netname" "aw_ref"\n"aw_ref" "123"\n}|', text)
+        self.assertLess(int(found['12']), int(found['123']))
+
     def test_handwritten_scripts_do_not_attach(self):
         out = self.run_vm(1)
         self.assertIn('attach 106 -1', out)
@@ -913,8 +1253,9 @@ class InterpreterTests(unittest.TestCase):
         stats = next(l for l in out if l.startswith('stats')).split()
         self.assertGreater(int(stats[4]), 0)                       # quiet skips happened
         notyet = [l for l in out if l.split()[1:2] == ['notyet']]
-        # FadeTo and PositionCell (of another object, into a room no list names), once each (OnActivate and
-        # Activate run since v0.0.51; never used here, OnActivate reads 0; AIWander runs since v0.0.54)
+        # COE and PositionCell (the player's into a room no list names; the stub host carries out no call, so the
+        # other object's goes the same way), once each (OnActivate and Activate run since v0.0.51; never used here,
+        # OnActivate reads 0; AIWander runs since v0.0.54)
         self.assertEqual(len(notyet), 2, notyet)
         self.assertTrue(all(int(l.split()[0]) <= 2 for l in notyet), notyet)   # on its first run (budget order)
         self.assertGreaterEqual(int(stats[10]), 1)                 # the endless loop was stopped
@@ -1054,15 +1395,15 @@ class ImportRouteTests(unittest.TestCase):
 
     def test_not_yet_calls_are_counted_and_handed_to_the_host(self):
         from mwscript.functions import FUNCTION_NUMBERS
-        travel = FUNCTION_NUMBERS['fadeto']
+        travel = FUNCTION_NUMBERS['coe']
         out = self.run_vm(4)
         calls = [l.split()[1:] for l in out if l.split()[1:3] == ['call', str(travel)]]
         self.assertTrue(calls, out)
         self.assertEqual(calls[0], ['call', str(travel), '2', '100', '5', 'strings', '0'])
         counted = {int(l.split()[1]): l.split() for l in out if l.startswith('function')}
         self.assertEqual(int(counted[travel][2]), len(calls))
-        self.assertEqual(int(counted[travel][3]), self.prog.strings.index['fadeto'])
-        travel_line = str(self.prog.strings.index['fadeto'])
+        self.assertEqual(int(counted[travel][3]), self.prog.strings.index['coe'])
+        travel_line = str(self.prog.strings.index['coe'])
         self.assertEqual(len([l for l in out if l.split()[1:3] == ['notyet', travel_line]]), 1)    # logged once
         # carried out by number (the host answers): no log, the host count instead
         out = self.run_vm(4, env={'CALLS': str(travel)})
@@ -1244,6 +1585,34 @@ int main(void){
         for(i=0;i<6;i++)AW_EffectsTick(&c,1.0f);
         printf("creature after %d %d\n",c.skill_mod[5],c.attr_mod[0]);
     }
+    return 0;
+}
+'''
+
+
+# v0.0.62 (MWSCRIPT-GAP-FUNCTIONS-62): a script's base modifier (ModResistFire / SetResistFire): it adds to the
+# magnitude, may go below 0, is not an active spell (GetEffect), survives the clock and the save, and goes at 0;
+# a stat effect (Fortify Strength, 79) refused
+EFFECT_BASE_HARNESS = r'''
+#include <stdio.h>
+#include <string.h>
+#include "aw_effects.h"
+int main(void){
+    static aw_actor_t npc;static unsigned char block[2048];int n,i;
+    memset(&npc,0,sizeof(npc));npc.reference=0x42;
+    AW_EffectsReset();
+    AW_EffectsLand(&npc,90,AW_EFFECT_NO_ARG,25,5,1);
+    printf("mod %d %d %d\n",AW_EffectsBaseModify(0x42,90,100),AW_EffectsBaseModify(0x42,28,-30),
+           AW_EffectsBaseModify(0x42,79,5));
+    printf("now %.1f %.1f has %d %d\n",AW_EffectsMagnitude(0x42,90,AW_EFFECT_NO_ARG),
+           AW_EffectsMagnitude(0x42,28,AW_EFFECT_NO_ARG),AW_EffectsHasOn(0x42,90),AW_EffectsHasOn(0x42,28));
+    for(i=0;i<6;i++)AW_EffectsTick(&npc,1.0f);
+    printf("after6 %.1f count %d\n",AW_EffectsMagnitude(0x42,90,AW_EFFECT_NO_ARG),AW_EffectsCountOn(0x42));
+    n=AW_EffectsExport(block,sizeof(block));
+    printf("saved %d %d %.1f %.1f\n",n,AW_EffectsImport(block,n),AW_EffectsMagnitude(0x42,90,AW_EFFECT_NO_ARG),
+           AW_EffectsMagnitude(0x42,28,AW_EFFECT_NO_ARG));
+    AW_EffectsBaseModify(0x42,90,-100);
+    printf("back %.1f count %d\n",AW_EffectsMagnitude(0x42,90,AW_EFFECT_NO_ARG),AW_EffectsCountOn(0x42));
     return 0;
 }
 '''
@@ -1448,6 +1817,23 @@ class EffectTests(unittest.TestCase):
         # 25 + 15 while both last; the 3-second one ends; the weakness holds 5 s; neither touches health
         # a creature has no skills: Fortify Skill on it changes nothing, nor undoes anything at its end
         self.assertEqual(out, ['now 40.0 20.0 0.0', 'after4 25.0 20.0 health 60.0', 'creature 0 10', 'creature after 0 0'])
+
+    def test_a_scripts_base_modifier(self):
+        tmp = Path(tempfile.mkdtemp(prefix='aw-effects5-'))
+        try:
+            (tmp / 'h.c').write_text(EFFECT_BASE_HARNESS, encoding='utf-8')
+            src = ROOT / 'engine/aga/src'
+            built = subprocess.run(['cc', '-std=gnu89', '-Wall', '-Werror', '-Wshadow', '-fsanitize=undefined,address',
+                                    '-fno-sanitize-recover=all', '-I' + str(src), str(tmp / 'h.c'),
+                                    str(src / 'aw_effects.c'), '-o', str(tmp / 'h')], capture_output=True, text=True)
+            self.assertEqual(built.returncode, 0, built.stdout + built.stderr)
+            out = subprocess.run([str(tmp / 'h')], capture_output=True, text=True, check=True).stdout.splitlines()
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+        # Resist Fire 25 for 5 s from a spell plus the script's 100; Weakness to Fire's base at -30; Fortify Strength
+        # refused; the spell's ends, the base holds (two entries, saved as 6 + 2 x 16); back to 0, it goes
+        self.assertEqual(out, ['mod 1 1 0', 'now 125.0 -30.0 has 1 0', 'after6 100.0 count 2', 'saved 38 1 100.0 -30.0',
+                               'back 0.0 count 1'])
 
     def test_constant_effects_of_worn_items(self):
         tmp = Path(tempfile.mkdtemp(prefix='aw-effects4-'))

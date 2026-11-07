@@ -1,10 +1,12 @@
 # Bug journal
 
-_Last updated with AmiWind v0.0.61-dev2 (6 November 2026)._
+_Last updated with AmiWind v0.0.62-dev1 (7 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [The falling mage is drawn after his Enable; SCRIPTED-EVENT-PAST-DRAW-DISTANCE-62 registered, 7 November 2026](#the-falling-mage-is-drawn-after-his-enable-scripted-event-past-draw-distance-62-registered-7-november-2026)
+- [Register and work list synchronised: three entries fixed, the rest linked to open work, 7 November 2026](#register-and-work-list-synchronised-three-entries-fixed-the-rest-linked-to-open-work-7-november-2026)
 - [STEAL-WITNESSED-NO-CRIME-60 in the works: theft seen by witnesses, 6 November 2026](#steal-witnessed-no-crime-60-in-the-works-theft-seen-by-witnesses-6-november-2026)
 - [Three causes from the v0.0.61-dev2 check; DROPPED-LIGHT-NO-EFFECTS-61 registered, 6 November 2026](#three-causes-from-the-v0061-dev2-check-dropped-light-no-effects-61-registered-6-november-2026)
 - [The v0.0.61-dev2 image checked in game; CONTAINER-STRIP-OPEN-MANY-KINDS-61 and CREATURE-COMBAT-FRAMES-MISSING-61 registered, 6 November 2026](#the-v0061-dev2-image-checked-in-game-container-strip-open-many-kinds-61-and-creature-combat-frames-missing-61-registered-6-november-2026)
@@ -138,6 +140,25 @@ _Last updated with AmiWind v0.0.61-dev2 (6 November 2026)._
 - [INTERIOR-SPAWN-UNDERWATER-41, 17 October 2026](#interior-spawn-underwater-41-17-october-2026)
 
 <!-- contents end -->
+
+## The falling mage is drawn after his Enable; SCRIPTED-EVENT-PAST-DRAW-DISTANCE-62 registered, 7 November 2026
+
+SCRIPT-ENABLED-ACTOR-NOT-DRAWN-62 is closed: it was no fault of the Enable. In five sessions on the same Seyda Neen
+MiniWind the mage had his model on the server and on the client after his journal's script enabled him, and he was
+drawn standing on his platform from about 200 units, and his body where it landed. The first check had looked from
+past the draw distance. Two things came out of it. The sweep (`dbg sweep`) counted every actor hidden on purpose (the
+ones the new game's Startup script disables, the opening's ship guards) as "actor without a model": it now counts them
+apart and fails a disabled actor that is still drawn (SWEEP-SEYDA-EIGHT-FAIL-59 reported again; its door failures are
+the MiniWind's scope). And the event itself plays out past the default draw distance: the trigger is 500 map units
+from his journal, he stands 617 above the ground, the default draw distance is 300, so from the road the player sees
+the landing and the body, not the fall: [SCRIPTED-EVENT-PAST-DRAW-DISTANCE-62](BUGS.md). The scripts' `Say` calls are
+now counted in `aw_mwscript_status` (started, not started, the last one's actor): both of the event's screams start.
+Three of the ten sessions stopped with the game clock frozen right after a frame of several seconds of console output
+or file reads: [SESSION-STALL-AFTER-LONG-FRAME-62](BUGS.md).
+
+## Register and work list synchronised: three entries fixed, the rest linked to open work, 7 November 2026
+
+An audit of the register against the work list found entries that disagreed with it. Fixed after the check, each shipped in a numbered build and seen in game: ACTOR-AMBIENT-WALK-COST-59 and DBG-TP-SAME-MAP-54 (v0.0.61-dev1), INVENTORY-BURDEN-TEXT-UNREADABLE-61 (v0.0.61-dev3). Kept open and linked to the work that still holds them: ARRIVAL-LONG-FRAME-DEV6-59 (first frame still above half a second), CHARGEN-TUTORIAL-ITEM-MESSAGES-59 (the chargen scripts are not run yet), DROP-STACK-ONE-ROW-PER-UNIT-59 (a stack drops one piece per press), the voice entries (NPC-VOICE-NONASCII-IDS-48, NPC-VOICE-BARKS-33, COMBAT-VOICES-SILENT-33, AUDIO-MAGIC-STOPS-SPEECH-54, NPC-DREAMER-GREETING-DEFAULT-42, NPC-GREETING-PICK-33, AUDIO-MISSING-SOURCES-32, CREATURE-ANIM-SOUND-54, PUNCH-AUDIO-COVERAGE-29: the sound events play in game, a natural fight or a spontaneous line is not checked), SEYDA-LOAD-HANG-30 and CHIM-SEYDA-BALMORA-LOAD-HANG-43 (the load stall), and INVENTORY-NO-ARMOR-RATING-61 (fixed in source, not in a build yet).
 
 ## STEAL-WITNESSED-NO-CRIME-60 in the works: theft seen by witnesses, 6 November 2026
 

@@ -503,6 +503,16 @@ extern int (*aw_mwscript_combat_end)(struct edict_s *e);
 extern int (*aw_mwscript_wander)(struct edict_s *e,int distance,int duration,int hour,const unsigned char idle[8],int repeat);
 extern int (*aw_mwscript_travel)(struct edict_s *e,const float to[3]);
 extern int (*aw_mwscript_follow)(struct edict_s *e,struct edict_s *target,float hours,const float *final);
+/* AIFollowCell (KIND 3) and AIEscort / AIEscortCell (KIND 2) on the ambient tables (aw_ambient.c AW_AmbientPackage,
+ * v0.0.62): POINT the final point or the destination in the map's units; PLACE the room's stable number it holds in, 0
+ * none named (the map the call came in), -1 a cell that is no room (follow: never done by position; escort: outdoors) */
+extern int (*aw_mwscript_package)(struct edict_s *e,struct edict_s *target,int kind,float hours,const float *point,long place);
+/* The player's followers going through a door with the player (aw_ambient.c AW_AmbientFollowersOf): up to MAX
+ * edicts into OUT, each one's package kept to be applied where it arrives; the count */
+extern int (*aw_mwscript_followers)(struct edict_s *player,struct edict_s **out,int max);
+/* aw_scene.c: a door, travel or region crossing is about to load the next map (LEAVE 1) / the player was placed there
+ * (LEAVE 0); aw_mwhost.c carries the followers through (v0.0.62) */
+extern void (*aw_scene_followers)(struct edict_s *player,int leave);
 extern int (*aw_mwscript_packages_export)(unsigned char *out,int capacity);   /* aw_ambient.c: saved travel/follow */
 extern int (*aw_mwscript_packages_import)(const unsigned char *data,int bytes);   /* the ambient tables' AITravel (aw_mwhost.c) */
 extern int (*aw_mwscript_ai_package)(struct edict_s *e,int *done);   /* the ambient tables' AI package (aw_mwhost.c) */

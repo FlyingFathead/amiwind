@@ -1,6 +1,6 @@
 # AmiWind console commands
 
-_Generated from `config/debug-commands.txt` with AmiWind v0.0.61._
+_Generated from `config/debug-commands.txt` with AmiWind v0.0.62-dev1._
 
 Open the console with F10 or the backquote key and type
 a command, for example `dbg headlamp on`. This page is generated from
@@ -25,7 +25,7 @@ Type: "dbg help" for help.
 | `dbg footsteps` | - | [on/off, true/false or 1/0; no argument = status] your own footsteps (default off, saved; also Options > Audio): by your boots (bare, light, medium, heavy), in water and swimming; NPC and creature footsteps stay on (aw_npc_footsteps) |
 | `dbg music` | - | [on/off, true/false or 1/0; no argument = status of the switch and the stream] background music (default on; not saved): off closes the stream at once and opens none until on again |
 | `dbg music custom` | - | [play / stop; no argument: status] the custom OST player (an image built with --custom-ost FILE): play your own track alone, the playlist and its auto-advance waiting; stop gives the playlist back; without a custom track: silence, never the OST |
-| `dbg mwscript` | `dbg mwscript stats`, `dbg mwscript status` | [on/off, true/false or 1/0; no argument: what it does] (default on, saved) the game's compiled scripts (docs/MWSCRIPT_BYTECODE.md): sounds, NPC lines, music cues, journal, globals, object state, AIWander; not-yet functions logged once. Answers with the file (id1/mwscript.awm: format, scripts, bytes kept) and the counts |
+| `dbg mwscript` | `dbg mwscript result`, `dbg mwscript stats`, `dbg mwscript status` | [on/off, true/false or 1/0; no argument: what it does] (default on, saved) the game's compiled scripts (docs/MWSCRIPT_BYTECODE.md): sounds, NPC lines, music cues, journal, globals, object state, AIWander; not-yet functions logged once. Answers with the file (id1/mwscript.awm: format, scripts, bytes kept) and the counts |
 | `dbg ost play` | - | 00..98 / original music filename stem (spaces as underscores) |
 | `dbg sound` | - | [MOMENT [N] / list] a sound event on the actor aimed at, else you:hello idle intruder thief hit attack flee alarm taunt pain swish miss armorhit block damage critical punch punch2 bowdraw bowshoot crossbowdraw crossbowshoot throw projectilehit cast spellhit spellfail knockdown death creatureattack roar moan scream land; N: class, school, size |
 
@@ -36,6 +36,9 @@ Type: "dbg help" for help.
 | `dbg atmos` | - | 0..3 (saved, default 2): 1 rain, snow and storm ash outdoors (off until measured), 2 chimney, fire and steam smoke; 3 both |
 | `dbg cam` | - | [mark NAME / recall NAME / list / orbit [photo] [speed DEG] [ref N / mark NAME] / orbit off] (docs/CAMERA_MARKS.md) mark saves place, view, time, headlamp, fog; recall: a public mark (bm1..bm5, sn1..sn5, vivec-palace) or yours, as dbg tp; orbit circles the crosshair target, player detached: +/- speed, 0 holds, wheel distance, right click or Esc ends |
 | `dbg camera` | `dbg pov`, `dbg thirdperson` | [first / third / toggle / distance 7.5..200 / vanity on/off/now / death on/off / retry on/off / body on/off / stances on/off / sway 1/2/bench / die] player view: no argument = status; Tab first/third person (held: orbit), wheel zooms; vanity = idle orbit; death = death camera; retry = Retry fight; die = test death (docs/THIRD_PERSON.md) |
+| `dbg camera fpview` | - | [on/off] the first-person view of the original (default on, saved): its own field of view and the arms lag the pitch; off is the world's projection with the arms following the whole pitch |
+| `dbg camera hands` | - | [on/off] the first-person arms assembled from what is worn (default on, saved); off shows the baked arms |
+| `dbg camera parts` | - | [on/off] the third-person player body assembled from what is worn (default on, saved); off shows the baked body |
 | `dbg campfires` | - | [on/off, true/false or 1/0] fires outdoors (default on; not saved): on = campfires, braziers, fire pits, torches and flame lamps burn and light the objects around them (and, at night, the ground near the nearest); off = no flame and no fire light outdoors, at once (interiors keep their fires) |
 | `dbg crosshair` | `dbg crosshairs` | [on/off or 1/0; no argument toggles / colour NAME / shape NAME / style] show the crosshair (saved; default on; also Options > Prefs); colours Warm white (default), Yellow, Green, Blue; shapes Cross (default), Open cross, Small cross, Dot (saved); a number or a name's start is enough, no name lists them; style prints all three |
 | `dbg cull` | - | far detail (saved; also Options > Video > Far detail): 1 Full (everything to the fog), 3 Light, 4 Strong (default; saves from before v0.0.42 keep Full), 6 Strong + small faces (distant models drop out sooner: faster); also 0 none, 2 fog-exact (same picture as 1), 5 small faces only, 7 debug view; on = 1, off = 0; +8 fog rule, +16 cut groups (see those) |
@@ -64,8 +67,14 @@ Type: "dbg help" for help.
 | `dbg arena` | `dbg arenapit`, `dbg arenatest`, `dbg battlearena`, `dbg playground` | [opponent / list / next / prev / here/pit/floor / seed N / rematch / setup / exit] Vivec Arena combat minigame (also dbgmode arenapit, testarena): title, fight, result, then Enter rematch / S same seed / N, B next, previous / P pick / Esc leave; opponent = Arena fighter, gallery # or NPC record ID; Ctrl+X returns (not saved) |
 | `dbg aw charplane` | `dbg gallery`, `dbg modelgallery`, `dbg npcgallery` | [number/name/ID; next/previous/body/exit] |
 | `dbg aw hors` | - | 0 (new Hors, Nord / Barbarian / Steed, after Census; in play or from the main menu) |
-| `dbg bench` | `dbg halloweenbench` | [halloween [skeletons]] the standard benchmark (docs/REAL_HARDWARE.md; also aw halloweenbench, dbg halloween bench): 600 fixed frames of the Halloween scene, FPS small at the bottom left, then one result line on the console to copy |
+| `dbg bench` | `dbg halloweenbench` | [halloween [skeletons]] the standard benchmark (docs/REAL_HARDWARE.md; also aw halloweenbench, dbg halloween bench): 600 fixed frames of the Halloween scene, FPS small at the bottom left, then the result (drawing and disk measured apart) on the console and in bench/halloween-BUILD-NNN.txt |
 | `dbg cast` | - | [NAME [target / touch / self / fail] [npc] [area FEET] [dur S] [shape egg/sphere] [repeat] / list / stop / orb 0-3 / shell egg/sphere; no argument: status and costs] a spell's look and sound (docs/MAGIC_EFFECTS.md; needs dbg magicfx 1/2): cast animation, orb, cast, bolt, hit, area; npc: the actor in front casts at you; no magicka |
+| `dbg cast casting` | - | [on/off; no argument: status] the player's casting switch (default on): off lowers the magic and the attack button is the fight again |
+| `dbg cast now` | - | cast the selected spell once, as the attack button does with magic ready (docs/MAGIC_EFFECTS.md) |
+| `dbg cast ready` | - | raise or lower the magic (the R key): the hands come up as for a fight and the attack button casts the selected spell; a message says when no spell is selected |
+| `dbg cast spell` | - | [list / none / N / mN / grant N] your spells: no argument or list shows the known spells, the selected one, the counts of casts, magic items used and your active effects; N or mN selects a spell or a made spell; none clears it; grant N gives you spell row N and selects it (for tests) |
+| `dbg cast start` | - | the starting spells chosen for the character: what the start gave and why (report) |
+| `dbg cast strike` | - | for tests: the held enchanted weapon's blow lands on the actor in reach and its enchantment casts; prints the count of strikes cast |
 | `dbg characterchange` | `dbg quickchar` | [race class birthsign review / all] reopen the pier race, gender, head and hair menu over the current scene; confirm to apply (after registration) |
 | `dbg choosecompanion` | `dbg pickcompanion` | same as companion pick |
 | `dbg combat` | - | [on/off / seed N / readout on/off / music on/off / dice on/off / style amiwind/original / block hold/auto / flee on/off / bestattack on/off / loadout NAME/off / resistnormal N/off / calm] melee combat: no argument = status, costs; readout = a line per swing; flee on = also by Flee rating (defaults on, readout on, music on, block hold, flee off) |
@@ -206,4 +215,4 @@ Type: "dbg help" for help.
 | `dbg sealevel` | - | on/off |
 | `dbg show fps` | - | [on/off] |
 | `dbg showram` | - | on/off |
-| `dbg sweep` | - | [actors/plants/doors/lights/statics] each entity class of the loaded area: what the image ships (map entities, door bank, harvest catalogue) against what is live; names each failure (actor without model or animation, harvestable but not pickable, door without a link); last line SWEEP RESULT ok/FAIL (read only) |
+| `dbg sweep` | - | [actors/plants/doors/lights/statics] each entity class of the loaded area: what the image ships (map entities, door bank, harvest catalogue) against what is live; names each failure (actor without model or animation, disabled but drawn, harvestable but not pickable, door without a link; hidden ones counted); last line SWEEP RESULT ok/FAIL (read only) |

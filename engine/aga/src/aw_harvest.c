@@ -80,8 +80,12 @@ int AW_HarvestModelIndex(const aw_harvest_t *h,int plant)
     const char *s;int n;
     if(h->representation!=4 || plant<0 || plant>=h->plants)return -1;
     s=AW_HarvestText(h,h->plant[plant].model);
-    if(s[0]!='@' || s[1]<'0' || s[1]>'7' || s[2])return -1;
-    n=s[1]-'0';return n<h->models?n:-1;
+    /* '@0'..'@9', '@10'..'@15' (no leading zero) */
+    if(s[0]!='@' || s[1]<'0' || s[1]>'9')return -1;
+    if(!s[2])n=s[1]-'0';
+    else if(s[1]!='0' && s[2]>='0' && s[2]<='9' && !s[3])n=(s[1]-'0')*10+(s[2]-'0');
+    else return -1;
+    return n<h->models?n:-1;
 }
 static int walk(const aw_harvest_t *h,int node,unsigned char *active,int depth)
 {
@@ -99,6 +103,14 @@ int AW_HarvestValidate(const aw_harvest_t *h)
     for(k=0;k<32;k++)nonzero|=h->catalogue[k];
     if((h->slots!=0)!=(nonzero!=0))return 0;
     if(h->representation!=0 && h->representation!=4)return 0;
+    /* earlier index generations: only on a slotted catalogue, slots rising and below this index's, digests nonzero and
+     * unlike this one's */
+    if(h->bases<0 || h->bases>AW_HARVEST_BASES || (h->bases && !h->slots))return 0;
+    for(i=0;i<h->bases;i++){
+        if(h->base_slots[i]<1 || h->base_slots[i]>=h->slots || (i && h->base_slots[i]<=h->base_slots[i-1]))return 0;
+        for(nonzero=0,k=0;k<32;k++)nonzero|=h->base_catalogue[i][k];
+        if(!nonzero || !memcmp(h->base_catalogue[i],h->catalogue,32))return 0;
+    }
     if(h->models<0 || h->models>AW_HARVEST_MODELS || (!h->representation && h->models) ||
        (h->representation==4 && (!h->slots || !h->models)))return 0;
     if(h->models>h->model_capacity || h->nodes>h->node_capacity || h->edges>h->edge_capacity ||
@@ -144,9 +156,11 @@ int AW_HarvestValidate(const aw_harvest_t *h)
 }
 int AW_HarvestLoad(FILE *f,int bytes,aw_harvest_t *h)
 {
-    int i,k,c,nodes,edges,plants,models=0,slots=0,representation=0;
+    int i,k,c,nodes,edges,plants,models=0,slots=0,representation=0,bases=0,first_path=0,base_slots[AW_HARVEST_BASES];
     long start=ftell(f);char magic[8],digest[65],token[64],label[64],row[128];unsigned char catalogue[32];
+    unsigned char base_catalogue[AW_HARVEST_BASES][32];
     AW_HarvestRelease(h);memset(catalogue,0,sizeof(catalogue));
+    memset(base_slots,0,sizeof(base_slots));memset(base_catalogue,0,sizeof(base_catalogue));
     if(start<0 || bytes<0 || bytes>65536)goto bad;
     if(Q_fscanf(f,"%7s %d %d %d",magic,&nodes,&edges,&plants)!=4 || (strcmp(magic,"AWH1") && strcmp(magic,"AWH2") && strcmp(magic,"AWH3") && strcmp(magic,"AWH4")))goto bad;
     if(!strcmp(magic,"AWH3") || !strcmp(magic,"AWH4")){
@@ -155,13 +169,23 @@ int AW_HarvestLoad(FILE *f,int bytes,aw_harvest_t *h)
     if(!strcmp(magic,"AWH4")){
         representation=4;
         if(Q_fscanf(f," %d",&models)!=1 || models<1 || models>AW_HARVEST_MODELS)goto bad;
+        /* optional on the header line: 'bases K' and K pairs of slots and digest (earlier index generations,
+         * FLORA-FAUNA-COVERAGE-62); otherwise this token is the first model's path */
+        if(Q_fscanf(f," %63s",token)!=1)goto bad;
+        if(!strcmp(token,"bases")){
+            if(Q_fscanf(f," %d",&bases)!=1 || bases<1 || bases>AW_HARVEST_BASES)goto bad;
+            for(i=0;i<bases;i++)
+                if(Q_fscanf(f," %d %64s",&base_slots[i],digest)!=2 || !digest_read(digest,base_catalogue[i]))goto bad;
+        }else first_path=1;
     }
     if(!AW_HarvestReserve(h,models,nodes,edges,plants))goto bad;
     h->slots=slots;h->representation=representation;memcpy(h->catalogue,catalogue,32);
+    h->bases=bases;memcpy(h->base_slots,base_slots,sizeof(base_slots));memcpy(h->base_catalogue,base_catalogue,sizeof(base_catalogue));
     if(representation==4){
         for(i=0;i<h->models;i++){
             aw_harvest_model_t *m=&h->model[i];
-            if(Q_fscanf(f," %63s %64s",token,digest)!=2 || !digest_read(digest,m->digest))goto bad;
+            if(i==0 && first_path){if(Q_fscanf(f," %64s",digest)!=1 || !digest_read(digest,m->digest))goto bad;}
+            else if(Q_fscanf(f," %63s %64s",token,digest)!=2 || !digest_read(digest,m->digest))goto bad;
             m->path=AW_HarvestIntern(h,token);if(m->path==AW_HARVEST_BAD_TEXT)goto bad;
             for(k=0;k<3;k++)if(Q_fscanf(f," %f",&m->mins[k])!=1)goto bad;
             for(k=0;k<3;k++)if(Q_fscanf(f," %f",&m->maxs[k])!=1)goto bad;
@@ -228,11 +252,20 @@ static int resolve(const aw_harvest_t *h,int index,int level,uint32_t *seed,int 
 /* AWH3 map copies share a catalogue and slot. Mixing incompatible index
  * spaces fails closed; changing a build's catalogue also changes save-content.
  * Legacy saves migrate only exact full placement keys, never FRMR guesses. */
+/* A save made with an earlier generation of the index (h->base_*: its slots are the first slots of this one, unchanged)
+ * is compatible too; fact_set takes it over to this index the first time it writes (FLORA-FAUNA-COVERAGE-62). */
+static int earlier(const aw_harvest_t *h,const aw_state_t *s)
+{
+    int i;
+    for(i=0;i<h->bases;i++)if(s->harvest.slots==(uint32_t)h->base_slots[i] &&
+        !memcmp(s->harvest.catalogue,h->base_catalogue[i],32))return 1;
+    return 0;
+}
 static int compatible(const aw_harvest_t *h,const aw_state_t *s)
 {
     if(!h->slots)return !s->harvest.slots;
     return !s->harvest.slots || (s->harvest.slots==(uint32_t)h->slots &&
-        !memcmp(s->harvest.catalogue,h->catalogue,32));
+        !memcmp(s->harvest.catalogue,h->catalogue,32)) || earlier(h,s);
 }
 static uint32_t fact_get(const aw_harvest_t *h,int plant,const aw_state_t *s)
 {
@@ -244,7 +277,9 @@ static int fact_set(const aw_harvest_t *h,int plant,aw_state_t *s,uint32_t fact)
 {
     if(!h->slots)return AW_StateSet(s,AW_GLOBAL,AW_HarvestText(h,h->plant[plant].key),(int32_t)fact);
     if(!compatible(h,s))return 0;
-    if(!s->harvest.slots){s->harvest.slots=h->slots;memcpy(s->harvest.catalogue,h->catalogue,32);}
+    /* a fresh state, or one of an earlier index generation (its facts beyond its own slots are zero: the save codec
+     * refuses anything else), now speaks this index */
+    if(!s->harvest.slots || earlier(h,s)){s->harvest.slots=h->slots;memcpy(s->harvest.catalogue,h->catalogue,32);}
     s->harvest.facts[h->plant[plant].slot-1]=fact;return 1;
 }
 static int migrate(const aw_harvest_t *h,int plant,aw_state_t *s)

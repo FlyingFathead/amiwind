@@ -79,7 +79,7 @@ static void every_entry_translates(void){
        !strcmp(bar1+1,"give weapons")?" give weapons":
        !strcmp(bar1+1,"door roulette")?" roulette":!strcmp(bar1+1,"doorlocks")?" locks":
        !strcmp(bar1+1,"creatures")?" actors creatures":!strcmp(bar1+1,"mwscript")?" about":
-       !strcmp(bar1+1,"mwscript stats")?" stats":
+       !strcmp(bar1+1,"mwscript stats")?" stats":!strcmp(bar1+1,"mwscript result")?" result":
        !strcmp(bar1+1,"kill")?" actors killpick":
        !strcmp(bar1+1,"weapon")?" box weapon":!strcmp(bar1+1,"gear")?" box gear":
        (!strcmp(bar1+1,"set race") || !strcmp(bar1+1,"set playerrace"))?" playerrace":"");
@@ -144,6 +144,27 @@ int main(int count,char **values){
     mw[2]="off";assert(AW_DebugTranslate(3,mw,output,sizeof(output))==1 && !strcmp(output,"aw_mwscript_status off\n"));
     assert(AW_DebugTranslate(2,mw,output,sizeof(output))==1 && !strcmp(output,"aw_mwscript_status about\n"));
     mw[2]="status";assert(AW_DebugTranslate(3,mw,output,sizeof(output))==1 && !strcmp(output,"aw_mwscript_status\n"));
+  }
+  { /* dbg mwscript result TOPIC NPC [N] (MWSCRIPT-PLAYER-CONTROL-62): quoted topics and ids keep their spaces and
+     * apostrophes; a fourth word and a command separator are refused */
+    char *res[6]={"dbg","mwscript","result","little advice","fargoth","2"};
+    assert(AW_DebugTranslate(6,res,output,sizeof(output))==1 &&
+           !strcmp(output,"aw_mwscript_status result \"little advice\" fargoth 2\n"));
+    assert(AW_DebugTranslate(5,res,output,sizeof(output))==1 &&
+           !strcmp(output,"aw_mwscript_status result \"little advice\" fargoth\n"));
+    res[3]="Dagoth's";assert(AW_DebugTranslate(5,res,output,sizeof(output))==1 &&
+           !strcmp(output,"aw_mwscript_status result \"Dagoth's\" fargoth\n"));
+    res[4]="fargoth;quit";assert(!AW_DebugTranslate(5,res,output,sizeof(output)));
+    res[4]="fargoth\"";assert(!AW_DebugTranslate(5,res,output,sizeof(output)));
+  }
+  { /* a quoted record ID with a space reaches every command route as one quoted argument (dbg npcs talk "agronian
+     * guy" was refused as an unknown debug command); separators and quotes stay refused; a setting takes no spaces */
+    char *talk[4]={"dbg","npcs","talk","agronian guy"},*fog[3]={"dbg","fog","on off"};
+    assert(AW_DebugTranslate(4,talk,output,sizeof(output))==1 && !strcmp(output,"aw_npcs talk \"agronian guy\"\n"));
+    talk[3]="agronian";assert(AW_DebugTranslate(4,talk,output,sizeof(output))==1 && !strcmp(output,"aw_npcs talk agronian\n"));
+    talk[3]="agronian guy;quit";assert(!AW_DebugTranslate(4,talk,output,sizeof(output)));
+    talk[3]="agronian \"guy";assert(!AW_DebugTranslate(4,talk,output,sizeof(output)));
+    assert(!AW_DebugTranslate(3,fog,output,sizeof(output)));
   }
   { /* dbg music on|off (ENGINE-MUSIC-NO-OFF-SWITCH-36): the stream status handler takes the switch words. */
     char *music[3]={"dbg","music","off"};

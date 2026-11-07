@@ -120,6 +120,25 @@ void AW_HalloweenAim(const float eye[3],const float look[3],float angles[3]);
  * fps, the 1 % low (fps of the mean of the slowest 1 % of frames, at least one), the seconds. */
 typedef struct {float average,minimum,low1,seconds;int frames;} aw_hw_bench_t;
 void AW_HalloweenBenchFigures(const float *times,int n,aw_hw_bench_t *out);
+/* BENCH-RESULT-FILE-62: the figures measured apart. TIMES and DISK are the N frames' times and the disk wait inside
+ * each (seconds; DISK may be NULL: no disk wait known). ALL = every frame (AW_HalloweenBenchFigures); DRAWING = the
+ * same figures over the frames that waited on nothing from the disk (DISK 0), the headline frame rate; the disk side
+ * apart: how many frames waited, their wait in all and the worst one (its frame, 1-based); SLOWEST = the slowest
+ * frames, slowest first (1-based frame numbers, 0 when there are fewer frames). */
+#define AW_HW_BENCH_SLOWEST		5
+typedef struct {
+    aw_hw_bench_t all,drawing;
+    int disk_frames,worst_disk_frame,slowest[AW_HW_BENCH_SLOWEST];
+    float disk_seconds,worst_disk;
+} aw_hw_bench_split_t;
+void AW_HalloweenBenchSplit(const float *times,const float *disk,int n,aw_hw_bench_split_t *out);
+/* The result file's folder on the game disk and its name for build BUILD and run number RUN (1..999):
+ * "halloween-<build>-<nnn>.txt", the build cut to AW_HW_BENCH_BUILD_CHARS so the name fits an Amiga file name (30
+ * characters). OUT holds AW_HW_BENCH_NAME bytes. */
+#define AW_HW_BENCH_FOLDER		"bench"
+#define AW_HW_BENCH_BUILD_CHARS	12
+#define AW_HW_BENCH_NAME		32
+void AW_HalloweenBenchName(const char *build,int run,char *out);
 
 void AW_HalloweenInit(void);
 void AW_HalloweenTick(void);

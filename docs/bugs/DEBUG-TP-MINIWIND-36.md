@@ -1,5 +1,14 @@
 # DEBUG-TP-MINIWIND-36: dbg tp X Y does nothing in a MiniWind build: the coordinate teleport needs the open-world region table, which a MiniWind image leaves out
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 2 times; something has to be done
+
+- Reported with v0.0.57-dev1 at 2026-10-30 07:07 +0200: Balmora exterior MiniWind 2a3284a: every dbg tp X Y unavailable, also beside the player; the new settlement list (dbg tp, TP-PICKER-57) therefore takes you nowhere on a MiniWind; full dev1 image works
+- Reported with v0.0.62-dev1 at 2026-11-07 06:16 +0200: Seyda Neen CHIM MiniWind b3bf27ea: dbg tp X Y refused (no map on this disk holds that point); scripted checks moved with noclip + aw_view
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -18,7 +27,13 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.42-dev2 (17 October 2026)._
+_Last updated with AmiWind v0.0.62-dev1 (7 November 2026)._
+
+## Status: 7 November 2026
+
+Open until a numbered build carries the fix. Seen again in the Seyda Neen MiniWind of v0.0.62-dev1. A fix is on its
+way into v0.0.62 (see Repair); it counts as fixed once `dbg tp X Y` is seen landing inside a MiniWind of a numbered
+build.
 
 ## Status: 11 October 2026
 
@@ -56,13 +71,17 @@ Always, in any MiniWind image: `dbg tp <x> <y>` with a point inside the sandbox'
 
 ## Repair
 
-To do: resolve the towns without the open-world table (the town rows from the town table the image already
-ships), and read `regions.awr` only for the open-world part; or write a town-only `regions.awr` into MiniWind
-images. A test that a MiniWind image resolves a coordinate inside its town.
+v0.0.62: on a disk without the open-world region table, `dbg tp X Y [Z]` (and `dbg tp marker`) resolves a point
+inside the map that is loaded, through the same conversion the debug HUD uses for its global coordinates (the
+loaded CHIM frame), and loads the player there as any coordinate teleport does (`aw_world.c`
+`AW_WorldLoadedTarget`, `aw_scene.c` `teleport_command`). A disk with the table answers as before; scripts
+(Position) keep the table's answer alone. A refused coordinate teleport now also prints which maps the disk holds
+and, on a MiniWind, where the player stands in original coordinates. Test: `tests/aga_world_regions_test.c` with
+no region table (inside the loaded map, outside it, another map, a name too long for a map).
 
 ## Verification
 
-To do: `dbg tp` inside the sandbox's town in a MiniWind build lands there; a full build is unchanged.
+To do: `dbg tp` inside the sandbox's town in a MiniWind of a numbered build lands there; a full build is unchanged.
 
 ## Prevention
 
@@ -81,6 +100,7 @@ Family: Debug commands and remote control (`debug-commands`). dbg commands, tele
 - DBG-DOOR-GO-AIM-CHIM-59 (no report page): aw_hinged_door go does not bring the door under the crosshair in a CHIM room
 - [DBG-ENTITY-INSPECT-39](DBG-ENTITY-INSPECT-39.md): Requested click-to-pin raw entity and reference inspection
 - DBG-PLACED-LOOK-VIEW-NOT-TURNED-61 (no report page): The test commands aw_placed look and aw_view set the view angles but the view does not turn
+- DBG-QUOTED-ID-REFUSED-62 (no report page): A debug command with a quoted record ID holding a space is refused as an unknown debug command (dbg npcs talk "agronian guy")
 - [DBG-TOGGLE-WORDS-31](DBG-TOGGLE-WORDS-31.md): dbg on/off words turned settings off
 - DBG-TP-SAME-MAP-54 (no report page): dbg tp X Y finds no map for a point on a MiniWind CHIM frame
 - DEBUG-ALIASES-29 (no report page): Discoverable video-player aliases and disk-backed help
@@ -93,6 +113,8 @@ Family: Debug commands and remote control (`debug-commands`). dbg commands, tele
 - DEBUG-VIEW-PITCH-DRIFT-54 (no report page): aw_view alone lets the pitch drift, and the greeting camera takes the view during scripted sessions
 - DEV2-REGION-LOAD-CRASH-57 (no report page): v0.0.57-dev1 dev2 image crashes with NUM_FOR_EDICT: bad pointer when a teleport loads another region (dev1 did not)
 - [ENGINE-UNLINK-STUB-35](ENGINE-UNLINK-STUB-35.md): unlink was a stub that deleted nothing, so -condebug appended to the previous console log
+- GAME-RECORDER-FIGHT-SEED-61 (no report page): A recording made while an NPC fights the player does not replay the same: the fight takes a seed of its own on the replay's load
+- GAME-RECORDER-HOTKEY-DIALOGUE-61 (no report page): While a recording runs, Ctrl+R does not stop it when the dialogue window is open: the key goes into the dialogue search field
 - [GAME-RECORDER-MISSING-61](GAME-RECORDER-MISSING-61.md): Requested: a gameplay recorder that records a play session and plays it back in another game instance
 - HORS-FROM-MENU-58 (no report page): dbg aw hors cannot be started from the main menu
 - [HUD-GLOBAL-NO-REGIONS-33](HUD-GLOBAL-NO-REGIONS-33.md): The debug HUD said "GLOBAL XYZ: unavailable" on a CHIM town on a disk without the world directory (MiniWind)

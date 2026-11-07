@@ -168,6 +168,36 @@ static int crime(const char *owner,int faction,int value,int dry){
 }
 int AW_CrimeTheft(const char *owner,int faction,int value){return crime(owner,faction,value,0);}
 
+/* MWSCRIPT-SMALL-FUNCTIONS-62: GetLOS and GetDetected (aw_crime.h). Budget: one world trace per ask, plus the awareness
+ * target's arithmetic; the scripts that ask run every frame (a handful of guards and slave owners near the player) */
+static void eye(edict_t *e,vec3_t out){
+    VectorCopy(e->v.origin,out);
+    out[2]+=e->v.view_ofs[2]!=0?e->v.view_ofs[2]:e->v.maxs[2]*.9f;
+}
+int AW_CrimeSight(edict_t *from,edict_t *to){
+    vec3_t a,b;trace_t tr;edict_t *p=player();
+    if(!from || !to || from==to || from->free || to->free)return 0;
+    if((from!=p && !from->v.modelindex) || (to!=p && !to->v.modelindex))return 0;   /* disabled: hidden, no model */
+    eye(from,a);eye(to,b);
+    tr=SV_Move(a,vec3_origin,vec3_origin,b,MOVE_NOMONSTERS,from);
+    return tr.fraction>=1 && !tr.startsolid && !tr.allsolid;
+}
+#define ROLLS 16
+static aw_crime_roll_t rolls[ROLLS];static int rolls_ready;
+int AW_CrimeDetects(edict_t *observer,const aw_crime_observer_t *o,edict_t *actor,const aw_crime_thief_t *t){
+    aw_crime_observer_t seen;vec3_t d;float aim;int key,roll,i;
+    if(!AW_CrimeSight(observer,actor))return 0;
+    if(!load())return 1;            /* no settings in the image: seen is noticed (logged once by load) */
+    if(!rolls_ready){for(i=0;i<ROLLS;i++){rolls[i].key=0;rolls[i].roll=-1;rolls[i].at=0;}rolls_ready=1;}
+    seen=*o;
+    VectorSubtract(actor->v.origin,observer->v.origin,d);
+    seen.behind=behind(observer,d);
+    aim=AW_CrimeAwarenessTarget(&settings,t,&seen,(float)Length(d)/SCALE);
+    key=NUM_FOR_EDICT(observer);
+    if((roll=AW_CrimeRollFind(rolls,ROLLS,key,sv.time))<0){roll=roll100();AW_CrimeRollKeep(rolls,ROLLS,key,roll,sv.time);}
+    return (float)roll>=aim;
+}
+
 /* aw_placed crime: the settings and the last theft (its witnesses: distance, line of sight, the awareness roll, Alarm, Fight) */
 static void status(void){
     int i;

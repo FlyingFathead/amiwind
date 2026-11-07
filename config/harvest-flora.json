@@ -1,0 +1,21 @@
+{
+  "format": 1,
+  "about": "Every organic container record of the game's masters (the plants, fungi, egg sacks, shells and ore that the original lets the player harvest) and what this build does with it. tools/harvest_flora_census.py reads it on every build (the harvest step): a group is harvestable (its kind is a harvest kind of tools/prepare_harvest.py and every placement of it must be harvestable or listed with its reason), pending (not harvestable yet, with the register entry that tracks it) or not_flora (an ordinary container with the organic flag, tracked elsewhere). An organic container record that no group names stops the build, so a kind the build does not know is never left out silently.",
+  "groups": [
+    {"name": "Small mushrooms", "kind": "small_mushroom", "status": "harvestable"},
+    {"name": "Bracket fungi on the tree trunks", "kind": "tree_fungus", "status": "harvestable"},
+    {"name": "Other plants", "status": "pending", "register": "HARVEST-ORGANIC-PLANTS-47",
+     "ids": ["flora_*", "contain_trama_shrub_*", "tramaroot_*"]},
+    {"name": "Kwama egg sacks, kollops and spore pods", "status": "pending", "register": "HARVEST-ORGANIC-PLANTS-47",
+     "ids": ["egg_kwama*", "kollop_*", "cavern_spore*"]},
+    {"name": "Ore and gem rocks", "status": "pending", "register": "HARVEST-ORE-ROCKS-62",
+     "ids": ["rock_*"]},
+    {"name": "Supply chests and barrels", "status": "not_flora", "register": "INTERIOR-PLACED-ITEMS-47",
+     "ids": ["barrel_*", "com_chest_*"]}
+  ],
+  "masters": [
+    {"name": "Morrowind.esm", "status": "read"},
+    {"name": "Tribunal.esm", "status": "pending", "register": "HARVEST-EXPANSION-FLORA-62"},
+    {"name": "Bloodmoon.esm", "status": "pending", "register": "HARVEST-EXPANSION-FLORA-62"}
+  ]
+}

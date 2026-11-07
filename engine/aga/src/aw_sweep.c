@@ -20,6 +20,7 @@
 #include "aw_region.h"
 #include "aw_maps.h"
 #include "aw_town.h"
+#include "aw_story.h"
 
 #define SWEEP_NAMES 6      /* failures named per class (the count is always whole) */
 enum {S_ACTOR,S_CORPSE,S_FLAME,S_STATIC,S_STREAMED,S_CLASSES};
@@ -65,8 +66,20 @@ static const char *name_of(edict_t *e){
     if(v && v->string && pr_strings[v->string])return pr_strings+v->string;
     return e->v.netname?pr_strings+e->v.netname:"?";
 }
+/* SCRIPT-ENABLED-ACTOR-NOT-DRAWN-62: why an actor is hidden on purpose (its model taken off, its model name kept):
+ * 1 a script disabled its reference (the world change list; Startup's story characters, the falling mage before his
+ * journal enables him), 2 the opening hides it (the ship's guards once the player is ashore, aw_opening.c); 0 none */
+static int hidden_reason(edict_t *e){
+    eval_t *v=GetEdictFieldValue(e,"aw_ref");
+    if(v && v->_float>=1 && AW_ObjectDisabled((unsigned int)v->_float))return 1;
+    if(!strcmp(sv.name,"seyda") && aw_story.ship_disabled){
+        eval_t *h=GetEdictFieldValue(e,"aw_story_hidden");
+        if((h && h->_float) || e==AW_IntroRole(4) || e==AW_IntroRole(5))return 2;
+    }
+    return 0;
+}
 static void actors(const int *map){
-    int i,live[2]={0,0},no_model=0,no_anim=0,shown=0,k;edict_t *e;model_t *m;char note[128];
+    int i,live[2]={0,0},no_model=0,no_anim=0,disabled=0,story=0,shown=0,k,why;edict_t *e;model_t *m;char note[128];
     for(i=1;i<sv.num_edicts;i++){
         e=EDICT_NUM(i);
         if(e->free || !e->v.classname)continue;
@@ -75,13 +88,20 @@ static void actors(const int *map){
         else continue;
         live[k]++;
         m=(e->v.modelindex>0 && e->v.modelindex<MAX_MODELS)?sv.models[(int)e->v.modelindex]:NULL;
+        why=hidden_reason(e);
+        /* a script's Disable hides the actor until its Enable: drawn while disabled is a failure, hidden is not; an
+         * actor enabled again (no reason now) without its model is "without a model" below (it is never drawn) */
+        if(why==1 && m){sprintf(note,"%.60s (%s)",name_of(e),k?"corpse":"actor");fail("disabled by a script but drawn",note,&shown);}
+        if(!m && why && e->v.model && pr_strings[e->v.model]){if(why==1)disabled++;else story++;continue;}
         if(!m){no_model++;sprintf(note,"%.60s (%s)",name_of(e),k?"corpse":"actor");fail("actor without a model",note,&shown);continue;}
         if(!k && !AW_AnimOf(e)->from_layout && !skeletal(m)){
             no_anim++;sprintf(note,"%.60s (%.40s)",name_of(e),m->name);fail("actor without animation",note,&shown);
         }
     }
-    Con_Printf(" actors: map %ld, live %ld; corpses: map %ld, live %ld; %ld without a model, %ld without animation\n",
-               (long)map[S_ACTOR],(long)live[0],(long)map[S_CORPSE],(long)live[1],(long)no_model,(long)no_anim);
+    Con_Printf(" actors: map %ld, live %ld; corpses: map %ld, live %ld; %ld without a model, %ld without animation; "
+               "hidden on purpose: %ld disabled by a script, %ld by the opening\n",
+               (long)map[S_ACTOR],(long)live[0],(long)map[S_CORPSE],(long)live[1],(long)no_model,(long)no_anim,
+               (long)disabled,(long)story);
     /* the map's own actors are spawned at its load; fewer live ones than it lists are missing (a CHIM window's joins
      * can only add) */
     if(live[0]+live[1]<map[S_ACTOR]+map[S_CORPSE]){

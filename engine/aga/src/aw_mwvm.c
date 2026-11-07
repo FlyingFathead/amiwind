@@ -29,8 +29,8 @@ typedef struct {uint32_t reference;uint16_t script,count,at;} parked_t;
  * at load (AW_MwvmLoad), kept for the session; a game that never switches them on spends nothing. */
 typedef struct {
     const unsigned char *base;unsigned long bytes;const aw_mwvm_host_t *host;
-    const unsigned char *glob,*jrnl,*snds,*voic,*musi,*objs,*scrp,*strt,*code,*oact,*pcel,*pmov;
-    int nglob,njrnl,nsnds,nvoic,nmusi,nobjs,nscrp,nstrt,noact,npcel,npmov;unsigned long ncode;
+    const unsigned char *glob,*jrnl,*snds,*voic,*musi,*objs,*scrp,*strt,*code,*oact,*pcel,*pmov,*newg,*held;
+    int nglob,njrnl,nsnds,nvoic,nmusi,nobjs,nscrp,nstrt,noact,npcel,npmov,nnewg,nheld;unsigned long ncode;
     uint32_t fcalls[AWM_FUNCTIONS];uint16_t fname[AWM_FUNCTIONS];   /* the import route's counters; name+1 */
     uint32_t nactb,naitm,naspt;       /* the actor table's rows (on disk: only their counts, for the load check) */
     uint32_t range;int ops_frame,ops_run;
@@ -159,6 +159,8 @@ static int check_code(const unsigned char *code,unsigned long n,int nlocals){
 }
 void AW_MwvmReset(void){if(vmp)memset(vmp,0,sizeof(*vmp));}
 int AW_MwvmLoaded(void){return vmp && vm.loaded;}
+/* GAME-RECORDER-FIGHT-SEED-61: Random's generator set from the gameplay recorder's seed at its frame 0 */
+void AW_MwvmSeed(unsigned long seed){if(vmp)vm.rng=seed?(uint32_t)seed:0x2545F491u;}
 int AW_MwvmLoad(const unsigned char *data,unsigned long bytes,const aw_mwvm_host_t *host){
     const unsigned char *conf;int rows,i;unsigned long len;
     if(!vmp && !(vmp=(vm_t *)AW_TryMalloc(sizeof(vm_t))))return 0;   /* once, at load; never while running */
@@ -190,6 +192,12 @@ int AW_MwvmLoad(const unsigned char *data,unsigned long bytes,const aw_mwvm_host
     /* the player's moves (v0.0.54; a file without them: no PLAYERMOVE passes the load check) */
     vm.pmov=section("PMOV",&vm.npmov,&len);
     if(!vm.pmov || vm.npmov<0 || 20ul*(unsigned long)vm.npmov>len)vm.npmov=0;
+    /* the scripts a new game starts once (v0.0.62, NPC-STORY-DISABLED-AT-START-42; a file without them: none) */
+    vm.newg=section("NEWG",&vm.nnewg,&len);
+    if(!vm.newg || vm.nnewg<0 || 2ul*(unsigned long)vm.nnewg>len)vm.nnewg=0;
+    /* the actors held on an object a script removes (v0.0.62, SCRIPTED-EVENT-FALLING-MAGE-61; older file: none) */
+    vm.held=section("HELD",&vm.nheld,&len);
+    if(!vm.held || vm.nheld<0 || 20ul*(unsigned long)vm.nheld>len)vm.nheld=0;
     vm.range=u32(conf);vm.ops_frame=(int)U16(conf+4);vm.ops_run=(int)U16(conf+6);
     if(vm.ops_frame<1)vm.ops_frame=1;
     if(vm.ops_run<1)vm.ops_run=1;
@@ -317,6 +325,49 @@ int AW_MwvmAttach(uint32_t reference,int script,int bind_flags,int entity,const 
     else memset(&vm.cells[in->locals],0,n*sizeof(aw_mwcell_t));
     return k;
 }
+/* An attached object left the loaded map (PositionCell to another place, v0.0.62): its values are parked as a map
+ * change parks them, and it no longer runs here; attached again where it arrives. 1 when one was attached. */
+int AW_MwvmDetach(uint32_t reference){
+    int k;
+    if(!ON || !reference)return 0;
+    for(k=0;k<vm.ninst;k++){
+        aw_mwvm_instance_t *in=&vm.inst[k];parked_t *p;
+        if(!(in->flags&AWI_USED) || (in->flags&AWI_GLOBAL) || in->reference!=reference)continue;
+        if((p=park_slot(in->reference,in->script))!=NULL)
+            memcpy(&vm.park[p->at],&vm.cells[in->locals],p->count*sizeof(aw_mwcell_t));
+        in->flags=0;in->entity=-1;
+        return 1;
+    }
+    return 0;
+}
+/* The entity block of reference REF in a map's entity text (its "aw_ref" key): a pointer at its '{' and *LENGTH the
+ * bytes up to and with its '}', or NULL. Pure text: the host's PositionCell reads it from the loaded map or from the
+ * actor's home room map (v0.0.62). */
+const char *AW_MwvmEntityBlock(const char *text,unsigned long length,uint32_t ref,unsigned long *block){
+    char want[24];unsigned long i,n,open=0,start=0;int depth=0,inside=0,quoted=0,strings=0,key_ref=0;
+    if(!text || !ref)return NULL;
+    {char digits[24];uint32_t v=ref;int d=0;
+     while(v){digits[d++]=(char)('0'+v%10);v/=10;}
+     for(n=0;d>0;)want[n++]=digits[--d];}
+    for(i=0;i<length && text[i];i++){
+        if(text[i]=='"'){
+            if(!quoted){quoted=1;start=i+1;continue;}
+            quoted=0;
+            /* a string ended: an even one is a key, an odd one its value; the key "aw_ref", its value the number */
+            if(depth && !(strings&1))key_ref=i-start==6 && !memcmp(text+start,"aw_ref",6);
+            else if(depth && key_ref && i-start==n && !memcmp(text+start,want,n))inside=1;
+            if(depth)strings++;
+            continue;
+        }
+        if(quoted)continue;
+        if(text[i]=='{' && !depth){open=i;depth=1;inside=0;strings=0;continue;}
+        if(text[i]=='}' && depth){
+            depth=0;
+            if(inside){*block=i-open+1;return text+open;}
+        }
+    }
+    return NULL;
+}
 void AW_MwvmSetOrigin(int k,const float o[3]){
     if(ON && k>=0 && k<vm.ninst){vm.inst[k].origin[0]=o[0];vm.inst[k].origin[1]=o[1];vm.inst[k].origin[2]=o[2];}
 }
@@ -341,6 +392,37 @@ void AW_MwvmStartScript(int script){
     if(!ON || script<0 || script>=vm.nscrp || !vm.runnable[script])return;
     k=global_instance(script,1);
     if(k>=0)vm.inst[k].flags|=AWI_RUNNING;
+}
+/* a new game begins (any opening): the scripts Main starts under CharGenState == 1 in the original (Startup and
+ * VampireCheck), each once; a script that cannot run (hand-written, broken, out of range) is left out by StartScript */
+int AW_MwvmNewGame(void){
+    int i,started=0,s;
+    if(!ON)return 0;
+    for(i=0;i<vm.nnewg;i++){
+        s=(int)U16(vm.newg+2*i);
+        if(s>=0 && s<vm.nscrp && vm.runnable[s]){AW_MwvmStartScript(s);started++;}
+    }
+    if(started)vm.generation++;
+    return started;
+}
+/* the HELD rows (aw_mwvm.h): sorted by actor, so a lookup is a binary search */
+int AW_MwvmHeldCount(void){return vmp && vm.loaded?vm.nheld:0;}
+int AW_MwvmHeld(int i,uint32_t *actor,uint32_t *support,float position[3]){
+    const unsigned char *r;
+    if(!vmp || !vm.loaded || i<0 || i>=vm.nheld)return 0;
+    r=vm.held+20*i;
+    if(actor)*actor=u32(r);
+    if(support)*support=u32(r+4);
+    if(position){position[0]=f32(r+8);position[1]=f32(r+12);position[2]=f32(r+16);}
+    return 1;
+}
+int AW_MwvmHeldFind(uint32_t actor){
+    int low=0,high=AW_MwvmHeldCount()-1;
+    while(low<=high){
+        int mid=(low+high)/2;uint32_t a=u32(vm.held+20*mid);
+        if(a<actor)low=mid+1;else if(a>actor)high=mid-1;else return mid;
+    }
+    return -1;
 }
 /* --- the scripts' own state for a save (CELL-CHANGES-59 slice 5, aw_mwvm.h) --- */
 static int attached_instance(uint32_t ref){

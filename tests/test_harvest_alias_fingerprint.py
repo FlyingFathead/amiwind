@@ -100,6 +100,22 @@ class SharedHarvestFingerprintTests(unittest.TestCase):
                 other.write_text(bad)
                 with self.assertRaises(ValueError):build_aga.harvest_fingerprint_entries(root)
 
+    def test_earlier_index_generations_on_the_header_line(self):
+        # FLORA-FAUNA-COVERAGE-62: 'bases K' and K pairs after the model count; malformed ones are refused
+        with tempfile.TemporaryDirectory() as temp:
+            base=Path(temp);args,bsp=sample(base/'input')
+            output=base/'converted';convert_plan(**args,output=output)
+            root=base/'id1';root.mkdir();legacy.HarvestFingerprintTests().seed(root)
+            raw=(output/'harvest-town.txt').read_bytes().decode()
+            shutil.copytree(output/'progs',root/'progs')
+            (root/'maps/sncourt.bsp').write_bytes(bsp)
+            first,rest=raw.split('\n',1);path=root/'harvest-sncourt.txt'
+            path.write_text(first+' bases 1 1 '+'e'*64+'\n'+rest)
+            self.assertEqual(len(build_aga.harvest_fingerprint_entries(root)),2)
+            for bad in (' bases 2 1 '+'e'*64,' bases 1 1',' bases 5 1 '+'e'*64,' bases 1 1 '+'E'*64):
+                path.write_text(first+bad+'\n'+rest)
+                with self.assertRaises(ValueError):build_aga.harvest_fingerprint_entries(root)
+
 
 if __name__=='__main__':
     unittest.main()

@@ -3,8 +3,10 @@
 installs its models and gives the actor table their base texts; CHIM-EXTERIOR-ACTORS-MISSING-46).
 
 Models for the exterior actors the town residents do not cover:
-- every creature the exterior can show (its creature references and every creature its levelled lists can give):
-  one standing and one mover model per creature mesh (tools/creature_library.py, method kf); an authored-dead
+- every creature the exterior can show (its creature references and every creature its levelled lists can give)
+  and every creature the rooms can show (their levelled lists and their placed creatures, TOMB-NO-CREATURES-61):
+  one standing and one mover model per creature mesh (tools/creature_library.py, method kf; a mesh only the rooms
+  reach: one skeletal model on its own table, room_only_meshes); an authored-dead
   creature placed outdoors: one corpse model per mesh, its own death pose (ACTOR-LIBRARY-LEFT-OUT-48);
 - every exterior NPC record with a reference the CHIM towns of this run do not place (a record only the towns place
   has its model from the town stages): one standing model per appearance (tools/npc_library.py).
@@ -59,8 +61,12 @@ def plan(master, residents=(), town_refs=None):
     refs = A.exterior_actors(master)
     lists, creatures = A.levelled_lists(master), A.creature_ids(master)
     # the rooms' levelled lists too (chim.actors.table_list_order): the table rolls a room's 'aw_levelled' entity
-    # from the same lists, so every creature they can give needs its model here (CREATURE-ROOM-LEVELLED-54)
-    used = A.table_list_order(lists, refs, A.room_levelled_roots(master))
+    # from the same lists, so every creature they can give needs its model here (CREATURE-ROOM-LEVELLED-54); and the
+    # creatures placed in rooms, each on a list of one (TOMB-NO-CREATURES-61)
+    rooms = A.room_references(master)
+    placed = A.room_placed_creatures(master, references=rooms)
+    used = A.table_list_order(lists, refs, rooms['LEVC'], placed)
+    lists = A.with_placed(lists, placed)
     want = {b.casefold() for _, b, t, *_ in refs if t == 'CREA'}
     for lid in used:
         want |= {e for e, _ in lists[lid][2] if e in creatures}
@@ -89,8 +95,8 @@ def plan(master, residents=(), town_refs=None):
 
 
 def room_only_meshes(master, meshes):
-    """The meshes of MESHES (plan's) that only the rooms' levelled lists reach (no exterior reference or exterior
-    list gives them): they are baked with the skeletal method (one rest frame on the creature's own table, about a
+    """The meshes of MESHES (plan's) that only the rooms reach (their levelled lists or their placed creatures; no
+    exterior reference or exterior list gives them): they are baked with the skeletal method (one rest frame on the creature's own table, about a
     third of a kf model's bytes), sized for the 32 MB rooms."""
     from chim import actors as A
     import creature_library as L

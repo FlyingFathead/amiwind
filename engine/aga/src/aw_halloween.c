@@ -33,7 +33,10 @@
  * Overlays keep to the corners: the FPS counter, small, at the bottom left (off in the show, on in halloweentest
  * and the benchmark; dbg halloween fps on/off). aw bench halloween (also aw halloweenbench, dbg halloween bench): no
  * greeting, no music change, the scene clock stepping a fixed time a frame for a fixed number of frames (every run
- * draws the same frames), then one result line on the console.
+ * draws the same frames), then the result on the console and in one file on the game disk (BENCH-RESULT-FILE-62:
+ * bench/halloween-<build>-<nnn>.txt, written once after the last frame): every frame's time with the disk wait inside
+ * it, and the figures measured apart, the drawing frame rate over the frames that waited on nothing from the disk and
+ * the disk side on its own.
  */
 #include "quakedef.h"
 #include "amiwind_version.h"
@@ -41,10 +44,14 @@
 #include "aw_skel.h"
 #include "aw_links.h"
 #include "aw_clock.h"
+#include <stdarg.h>
 #ifdef AMIGA
 #include <proto/exec.h>
+#include <proto/dos.h>
 #include <exec/execbase.h>
 #include <exec/memory.h>
+#else
+#include <sys/stat.h>
 #endif
 
 typedef struct {edict_t *e;int role,mirror,group,frame;const aw_skel_table_t *table;} hw_actor_t;
@@ -56,8 +63,10 @@ static struct {
     aw_hw_cast_t cast;
     hw_actor_t actor[AW_HALLOWEEN_MAX];
     struct {int step,steps,lead;double start;float span;const aw_hw_step_t *line;} role[AW_HW_ROLES];
+    double disk_last;unsigned long finds0,reads0;
 } hw;
-static float bench_times[AW_HALLOWEEN_BENCH_FRAMES];
+/* the bench's frames: each one's time and the disk wait inside it (BENCH-RESULT-FILE-62), seconds */
+static float bench_times[AW_HALLOWEEN_BENCH_FRAMES],bench_disk[AW_HALLOWEEN_BENCH_FRAMES];
 static char model_names[AW_HALLOWEEN_MAX_ROWS][AW_HALLOWEEN_PATH],actor_names[AW_HALLOWEEN_MAX_ROWS][32];
 static int model_names_used;
 static model_t *names_world;
@@ -406,16 +415,100 @@ static void start(int version,int bench,int fps) {
                left?", some left out (no free spot on that floor)":"",grounded==hw.count?"":" (CHECK FAILED)");
 }
 
+/* ---- the benchmark's result: the console lines and one file (BENCH-RESULT-FILE-62) ---- */
+/* the disk wait since the start, the frame in progress included (aw_spike.h); 0 off the Amiga */
+static double disk_now(void) {
+#ifdef AMIGA
+    return aw_disk_total+aw_wait_time[AW_WAIT_DISK];
+#else
+    return 0;
+#endif
+}
+static void counters_now(unsigned long *finds,unsigned long *reads) {
+#ifdef AMIGA
+    *finds=aw_file_finds;*reads=aw_file_reads;
+#else
+    *finds=*reads=0;
+#endif
+}
+static void make_folder(const char *folder) {
+#ifdef AMIGA
+    BPTR lock=CreateDir((char *)folder);
+    if(lock)UnLock(lock);
+#else
+    mkdir(folder,0777);
+#endif
+}
+/* "<game folder>/bench" ("<volume>:bench" for a game folder that is a volume root) */
+static int bench_folder(char *out,int size) {
+    size_t n=strlen(com_gamedir);
+    return snprintf(out,size,"%s%s" AW_HW_BENCH_FOLDER,com_gamedir,n && com_gamedir[n-1]==':'?"":"/")<size;
+}
+static int put_line(FILE *f,const char *format,...) {
+    char line[256];va_list a;
+    va_start(a,format);vsnprintf(line,sizeof(line),format,a);va_end(a);
+    return fputs(line,f)>=0;
+}
+/* One write after the run, nothing during it: the summary, the split figures, the settings and every frame with
+ * its disk wait (about 12 KB) into bench/halloween-<build>-<nnn>.txt, the first free number. 1 and NAME filled. */
+static int bench_write(const char *summary,const aw_hw_bench_split_t *s,unsigned long fast,int cpu,unsigned long finds,
+                       unsigned long reads,char *name) {
+    char folder[MAX_OSPATH],path[MAX_OSPATH+AW_HW_BENCH_NAME+2];FILE *f;int run,i,ok;
+    if(!bench_folder(folder,sizeof(folder)))return 0;
+    make_folder(folder);
+    for(run=1;run<1000;run++){
+        AW_HalloweenBenchName(AMIWIND_VERSION,run,name);
+        snprintf(path,sizeof(path),"%s/%s",folder,name);
+        if(!(f=fopen(path,"rb")))break;
+        fclose(f);
+    }
+    if(run==1000 || !(f=fopen(path,"w")))return 0;
+    ok=put_line(f,"AWBENCH1 halloween\n") &&
+       put_line(f,"scene %s\n",hw.version==AW_HW_WITH_LEAD?"dagoth":"skeletons") &&
+       put_line(f,"build %s\n",AMIWIND_VERSION) &&
+       put_line(f,"title %s\n",AMIWIND_TITLE) &&
+       put_line(f,"cpu 680%02d\n",cpu) &&
+       put_line(f,"fast_ram_mb %lu\n",fast) &&
+       put_line(f,"settings screen %dx%d viewsize %.0f fov %.0f fog %.0f\n",(int)vid.width,(int)vid.height,
+                Cvar_VariableValue("viewsize"),Cvar_VariableValue("fov"),Cvar_VariableValue("aw_fog")) &&
+       put_line(f,"step_s %.3f\n",(double)AW_HALLOWEEN_BENCH_STEP) &&
+       put_line(f,"summary %s\n",summary) &&
+       put_line(f,"all frames %d seconds %.3f avg %.2f min %.2f low1 %.2f\n",s->all.frames,s->all.seconds,
+                s->all.average,s->all.minimum,s->all.low1) &&
+       put_line(f,"drawing frames %d seconds %.3f avg %.2f min %.2f low1 %.2f\n",s->drawing.frames,s->drawing.seconds,
+                s->drawing.average,s->drawing.minimum,s->drawing.low1) &&
+       put_line(f,"disk frames %d ms %.2f worst_ms %.2f worst_frame %d lookups %lu reads %lu\n",s->disk_frames,
+                s->disk_seconds*1000.0,s->worst_disk*1000.0,s->worst_disk_frame,finds,reads);
+    for(i=0;ok && i<AW_HW_BENCH_SLOWEST && s->slowest[i];i++)
+        ok=put_line(f,"slowest %d %.2f %.2f\n",s->slowest[i],bench_times[s->slowest[i]-1]*1000.0,
+                    bench_disk[s->slowest[i]-1]*1000.0);
+    ok=ok && put_line(f,"times frame ms disk_ms\n");
+    for(i=0;ok && i<s->all.frames;i++)ok=put_line(f,"%d %.2f %.2f\n",i+1,bench_times[i]*1000.0,bench_disk[i]*1000.0);
+    ok=ok && put_line(f,"end\n");
+    if(fclose(f))ok=0;
+    return ok;
+}
 static void bench_result(void) {
-    aw_hw_bench_t b;unsigned long fast=0;int cpu=0;
-    AW_HalloweenBenchFigures(bench_times,hw.frames,&b);
+    aw_hw_bench_split_t s;unsigned long fast=0,finds,reads;int cpu=0;char summary[200],name[AW_HW_BENCH_NAME];
+    AW_HalloweenBenchSplit(bench_times,bench_disk,hw.frames,&s);
+    counters_now(&finds,&reads);finds-=hw.finds0;reads-=hw.reads0;
 #ifdef AMIGA
     fast=(unsigned long)AvailMem(MEMF_FAST|MEMF_TOTAL)/(1024UL*1024UL);
     {unsigned attn=SysBase->AttnFlags;cpu=attn&(1u<<7)?60:attn&(1u<<3)?40:attn&(1u<<2)?30:attn&(1u<<1)?20:0;}
 #endif
-    Con_Printf("HALLOWEEN BENCH %s: avg %.1f fps, min %.1f, 1%% low %.1f, %d frames, %.1f s, Fast RAM %lu MB, CPU 680%02d, %s\n",
-               hw.version==AW_HW_WITH_LEAD?"dagoth":"skeletons",b.average,b.minimum,b.low1,b.frames,b.seconds,fast,cpu,
-               AMIWIND_TITLE);
+    snprintf(summary,sizeof(summary),"HALLOWEEN BENCH %s: avg %.1f fps, min %.1f, 1%% low %.1f, %d frames, %.1f s, Fast RAM %lu MB, CPU 680%02d, %s",
+             hw.version==AW_HW_WITH_LEAD?"dagoth":"skeletons",s.all.average,s.all.minimum,s.all.low1,s.all.frames,
+             s.all.seconds,fast,cpu,AMIWIND_TITLE);
+    Con_Printf("%s\n",summary);
+    /* measured apart: the drawing over the frames that waited on nothing from the disk, then the disk side */
+    Con_Printf("HALLOWEEN BENCH drawing: avg %.1f fps, min %.1f, 1%% low %.1f over %d frames with no disk wait\n",
+               s.drawing.average,s.drawing.minimum,s.drawing.low1,s.drawing.frames);
+    if(s.disk_frames)
+        Con_Printf("HALLOWEEN BENCH disk: %d frames waited, %.1f ms in all, worst %.1f ms (frame %d), %lu files looked up, %lu reads\n",
+                   s.disk_frames,s.disk_seconds*1000.0,s.worst_disk*1000.0,s.worst_disk_frame,finds,reads);
+    else Con_Printf("HALLOWEEN BENCH disk: no frame waited on the disk (%lu files looked up, %lu reads)\n",finds,reads);
+    if(bench_write(summary,&s,fast,cpu,finds,reads,name))Con_Printf("HALLOWEEN BENCH file: " AW_HW_BENCH_FOLDER "/%s\n",name);
+    else Con_Printf("HALLOWEEN BENCH file: not written (the bench folder is full or not writable)\n");
 }
 
 void AW_HalloweenTick(void) {
@@ -424,8 +517,12 @@ void AW_HalloweenTick(void) {
     if(!sv.active || hw.world!=sv.worldmodel){hw.on=hw.count=0;restore_settings();return;}   /* a new map: its edicts are gone */
     dt=realtime-hw.last;hw.last=realtime;
     if(hw.bench){
-        /* the frame just drawn (the first one is the scene's own start); then the fixed step */
-        if(hw.frames>0)bench_times[hw.frames-1]=(float)dt;
+        /* the frame just drawn (the first one is the scene's own start) with the disk wait inside it; then the fixed
+         * step */
+        double disk=disk_now();
+        if(hw.frames>0){bench_times[hw.frames-1]=(float)dt;bench_disk[hw.frames-1]=(float)(disk-hw.disk_last);}
+        else counters_now(&hw.finds0,&hw.reads0);
+        hw.disk_last=disk;
         if(hw.frames>=AW_HALLOWEEN_BENCH_FRAMES){bench_result();stop(1);return;}
         hw.now=(float)hw.frames*AW_HALLOWEEN_BENCH_STEP;hw.frames++;
     }else{

@@ -17,7 +17,10 @@ from .opcodes import CODE, CMP_I, CMP_F, ARITH_I, ARITH_F, NONE, QUERIES, WHOLE_
 # The squeeze switch: False builds the program without the compare-and-branch opcodes (the A/B reference run; the
 # builder always squeezes).
 SQUEEZE = True
-from .functions import lookup, ACTOR_CALLS, HOST, HOST_EFFECT_NUMBERS
+from .functions import lookup, ACTOR_CALLS, HOST, HOST_EFFECT_NUMBERS, RESISTS
+
+# A VISI row's room for an actor that may stand in any room: a follower of the player (AIFollow, AIFollowCell; v0.0.62)
+VISI_ANY = 0xFFFFFFFF
 
 # The magic effects in the game's numbering (the MGEF index; OpenMW components/esm3/loadmgef.cpp lists them in this
 # order): GetEffect names one as "sEffect<Name>" (v0.0.57)
@@ -39,6 +42,15 @@ CURE_EFFECTS = {69: 3, 70: 2, 72: 0}
 HEALTH_DAMAGE_EFFECTS = (14, 15, 16, 27)
 # Cast carried out (v0.0.57): the cures on the player (aw_mwhost.c AWF_CAST)
 CURES = ('cure common disease', 'cure blight disease', 'cure poison')
+# The placing family (v0.0.62, MWSCRIPT-PLACE-OBJECTS-62): the calls (their object id is always the first argument),
+# the kinds of a PLAC row, the record types the inventory carries, and the most rows a placed actor's key can name
+# (aw_mwhost.c placed_key: 0xF00000 | row << 12 | serial)
+import re as _re
+PLACE_CALL = _re.compile(r'(?i)\bplace(atpc|atme|itemcell|item)\b[\s,]+("[^"]+"|[^\s,"]+)')
+PLACE_FUNCTIONS = ('placeatpc', 'placeatme', 'placeitem', 'placeitemcell')
+PLACE_KINDS = {'actor': 0, 'item': 1, 'other': 2}
+PLACE_ITEM_TAGS = ('WEAP', 'ARMO', 'CLOT', 'ALCH', 'APPA', 'BOOK', 'INGR', 'LIGH', 'LOCK', 'MISC', 'PROB', 'REPA')
+PLACE_ROWS_MAX = 256
 SCRIPT_VOLATILE = 1     # reads time, distance, chance, sound state or an engine query
 SCRIPT_NOTYET = 2        # holds at least one NOTYET call
 SCRIPT_START = 4         # a start script (runs from the beginning of the game)
@@ -143,7 +155,11 @@ class Program:
         self.scripts = Table()
         self.pccells = Table()    # GetPCCell names: the cells each one matches (the PCEL section)
         self.moves = Table()      # the player's PositionCell moves, worked out at build time (the PMOV section)
-        self.rooms = None         # {interior cell: room map and recentring} (rooms.room_table; compiler.py sets it)
+        # the actors a PositionCell may bring into a room (the VISI section): (room number, reference) -> the home
+        # room map's name (a string index, NONE: outdoors or a room this build lacks)
+        self.visitors = {}
+        self._place_rows = None   # the objects the scripts' Place calls name (the PLAC section): place_rows()
+        self.rooms = None        # {interior cell: room map and recentring} (rooms.room_table; compiler.py sets it)
         self.unresolved = []      # (script, kind, name, reason)
         for name, (kind, value, spelling) in data.globals.items():
             self.globals.get(name, {'name': spelling, 'type': kind, 'value': value})
@@ -187,7 +203,7 @@ class Program:
             ident = '_dlg_%d' % n
             body = 'Begin %s\n%s\n%s\nEnd %s\n' % (ident, declared[script], text, ident)
             s = Script(ident, 'dialogue', body, len(text), 0, (0, 0, 0, 0, 0), [])
-            self.scripts.get(ident, {'name': ident, 'script': s, 'dialogue': True})
+            self.scripts.get(ident, {'name': ident, 'script': s, 'dialogue': True, 'speaker': speaker})
             raw = text.encode('cp1252', 'replace')
             self.results.append({'hash': fnv1a(raw), 'length': len(raw), 'speaker_script': script, 'script': ident,
                                  'text': raw})
@@ -348,6 +364,119 @@ class Program:
         else:
             row = {'kind': PLAYERMOVE_KINDS['outdoors'], 'map': NONE, 'at': (x, y, z), 'yaw': rot}
         return self.moves.get((row['kind'], row['map'], row['at'], row['yaw']), row)
+
+    def actor_move(self, args):
+        """(kind, room number, x, y, z, yaw) of a PositionCell of anything but the player, 'unknown' for a cell the
+        game has not (OpenMW does nothing then), or None when it stays "not yet" (a number not constant, no cell).
+        Rules from OpenMW apps/openmw/mwscript/transformationextensions.cpp OpPositionCell: an interior cell by its
+        name, else an exterior cell by its name (the reference goes to the exterior cell at x, y); the rotation of
+        anything but the player is in minutes of arc (60 a degree). Into a room: x, y, z in that room map's own units
+        (a quarter scale, a recentred room's offset first; tools/prepare_npcs.py places a resident so), the room's
+        stable number; outdoors: the original's units. YAW is Quake's (an NPC's angles: minus the original's z)."""
+        from .opcodes import PLAYERMOVE_KINDS
+        numbers = [fold(a) for a in args if a[0] != 'str'][:4]
+        cells = [a[1] for a in args if a[0] == 'str']
+        if len(numbers) < 4 or not all(_const(n) for n in numbers) or not cells:
+            return None
+        x, y, z, rot = (float(n[1]) for n in numbers)
+        yaw = round((-rot / 60.0) % 360.0, 5) % 360.0
+        key = cells[0].casefold()
+        if key in self.data.interior_numbers:
+            room = (self.rooms or {}).get(key) or {}
+            offset = room.get('offset') or (0.0, 0.0, 0.0)
+            at = tuple(round((v - offset[k]) * 0.25, 5) for k, v in enumerate((x, y, z)))
+            return (PLAYERMOVE_KINDS['room'], self.data.interior_numbers[key]) + at + (yaw,)
+        if key in self.exterior_names():
+            return (PLAYERMOVE_KINDS['outdoors'], 0, x, y, z, yaw)
+        return 'unknown'
+
+    def exterior_names(self):
+        """The folded names of the exterior cells that have one (OpenMW's findCell finds an exterior by its name)."""
+        if getattr(self, '_exterior_names', None) is None:
+            self._exterior_names = {cell.casefold() for cell, _ in self.data.exteriors.values() if cell}
+        return self._exterior_names
+
+    def visitor(self, room_number, ref, ident):
+        """Note the actors a PositionCell into room ROOM_NUMBER may bring there (the VISI rows): REF's placed
+        references (Morrowind.esm, the world the image has), or with no reference the script's own bearers (the
+        records that carry script IDENT; a dialogue result: its speaker). Each with its home room's map, from which
+        the engine reads the actor's entity when it arrives while its home is not loaded."""
+        d = self.data
+        cells = getattr(d, 'actor_cells', {})
+        if ref is not None:
+            ids = [ref.casefold()]
+        else:
+            row = self.scripts.rows[self.scripts.index[ident.casefold()]] if ident.casefold() in self.scripts.index \
+                else {}
+            if row.get('dialogue'):
+                ids = [row['speaker']] if row.get('speaker') else []
+            else:
+                ids = sorted(k for k, (_tag, script) in d.bases.items() if script == ident.casefold())
+        for name in ids:
+            for number in d.object_refs.get(name, []):
+                if number not in cells:
+                    continue                  # not an actor
+                home = cells[number]
+                room = (self.rooms or {}).get(home) if home else None
+                key = (room_number, number & 0xFFFFFF)
+                if key not in self.visitors:
+                    self.visitors[key] = self.string(room['map']) if room else NONE
+
+    def place_rows(self):
+        """The PLAC rows (v0.0.62, MWSCRIPT-PLACE-OBJECTS-62): every object id a PlaceAtPC, PlaceAtMe, PlaceItem or
+        PlaceItemCell call of the game names (the scripts and the dialogue results, read once from the text), sorted by
+        folded id, so a row's number depends on the game data alone: the engine keys a placed actor by it (aw_mwhost.c
+        placed_key). Each row: the id, its kind (PLACE_KINDS: an NPC or creature, a carried item, anything else), for
+        an actor a template (a reference of that record placed in Morrowind.esm, a room's first when one has it, with
+        that room's map name) and the record's own script, and whether the engine can make it (an actor needs a placed
+        reference of its record, whose converted model the build has; an item the inventory catalogue's row)."""
+        if self._place_rows is None:
+            ids = set()
+            texts = [s.text for s in self.data.scripts.values()] + [t for (_speaker, t) in self.data.results]
+            for text in texts:
+                for line in (text or '').splitlines():
+                    for m in PLACE_CALL.finditer(line.split(';', 1)[0]):
+                        ids.add(m.group(2).strip('"').casefold())
+            self._place_rows = []
+            self._place_index = {}
+            for ident in sorted(ids):
+                self._place_add(ident)
+        return self._place_rows
+
+    def _place_add(self, ident):
+        d = self.data
+        recs = getattr(d, 'records', {})
+        if ident in recs.get('NPC_', {}) or ident in recs.get('CREA', {}):
+            kind = 'actor'
+        elif any(ident in recs.get(tag, {}) for tag in PLACE_ITEM_TAGS):
+            kind = 'item'
+        else:
+            kind = 'other'
+        template, home = 0, NONE
+        refs = sorted(d.object_refs.get(ident, []))
+        if kind == 'actor' and refs:
+            in_rooms = [(n, (self.rooms or {}).get(d.actor_cells.get(n))) for n in refs if d.actor_cells.get(n)]
+            in_rooms = [(n, room) for n, room in in_rooms if room]
+            if in_rooms:
+                template, home = in_rooms[0][0] & 0xFFFFFF, self.string(in_rooms[0][1]['map'])
+            else:
+                template = refs[0] & 0xFFFFFF
+        base = d.bases.get(ident)
+        script = self.scripts.index.get(base[1], NONE) if base and base[1] else NONE
+        row = {'key': ident, 'id': self.string(ident), 'kind': PLACE_KINDS[kind], 'template': template,
+               'home': home, 'script': script, 'carried': kind == 'item' or (kind == 'actor' and bool(refs))}
+        self._place_index[ident] = len(self._place_rows)
+        self._place_rows.append(row)
+        return self._place_index[ident]
+
+    def placed(self, ident):
+        """The PLAC row number of object IDENT when the engine can make it, else None ("not yet")."""
+        rows = self.place_rows()
+        key = ident.casefold()
+        k = self._place_index.get(key)
+        if k is None:
+            k = self._place_add(key)      # a call the text scan missed: after the sorted rows, still deterministic
+        return k if rows[k]['carried'] and k < PLACE_ROWS_MAX else None
 
     def item(self, name):
         """AITM row of an item id a script names (the gold coins are one item)."""
@@ -558,19 +687,22 @@ class ScriptCompiler:
             self.e.op('QUERY', QUERIES['ITEM_COUNT'], self.p.string(args[0][1].casefold()), pushes=1)
             self.flags |= SCRIPT_VOLATILE
             return 'i'
-        if fn.name == 'positioncell' and ref is not None and ref.casefold() == 'player':
-            move = self.p.player_move(args)
-            if move is not None:
-                self.e.op('PLAYERMOVE', move)
-                return None
+        if fn.name == 'positioncell':
+            return self.position_cell(fn, ref, args)
+        if fn.name in PLACE_FUNCTIONS:
+            return self.place(fn, ref, args)
+        if fn.name in ('aifollowcell', 'aiescortcell'):
+            return self.ai_cell(fn, ref, args)
+        if fn.name == 'aifollow':
+            self.follower(ref, args)
         if fn.name in HOST:
             return self.hostcall(fn, ref, args)
         if not fn.run:
             return self.notyet(fn, ref, args, value)
         n = fn.name
         s = lambda i: args[i][1] if i < len(args) and args[i][0] == 'str' else ''   # noqa: E731
-        # OpenMW: DontSaveObject does nothing, Xbox reads 0 (miscextensions.cpp): no code, a constant
-        if n == 'dontsaveobject':
+        # OpenMW: DontSaveObject and Fall do nothing, Xbox reads 0 (miscextensions.cpp): no code, a constant
+        if n in ('dontsaveobject', 'fall'):
             return None
         if n == 'xbox':
             return self.push_const(('int', 0))
@@ -774,8 +906,11 @@ class ScriptCompiler:
                 if ref is not None:
                     self.e.op('REF', self.p.object(ref))
                 return self.notyet(fn, None, [('str', spell), ('str', who), ('int', row)], None, carried=True)
-        if fn.name in ('gettarget', 'getstandingpc'):
-            # a fight starts without the state generation moving: the script asks every frame
+        if fn.name in ('gettarget', 'getstandingpc', 'getangle', 'getdetected', 'getlos', 'getlineofsight',
+                       'onknockout', 'getcurrentweather', 'getpcsneaking', 'getweapondrawn', 'hassoulgem') or \
+                (fn.name.startswith('getresist') and fn.name[3:] in RESISTS):
+            # a fight starts without the state generation moving: the script asks every frame; so do the angles, the
+            # detection, the line of sight, a knockdown and the weather (v0.0.62), as GetPos does
             self.flags |= SCRIPT_VOLATILE
         if fn.name == 'geteffect':
             # v0.0.57: the effect's number (0 none known) as the call's number; the engine reads the active effects
@@ -801,6 +936,128 @@ class ScriptCompiler:
         if ref is not None:
             self.e.op('REF', self.p.object(ref))
         return self.notyet(fn, None, args, None, carried=True)
+
+    def position_cell(self, fn, ref, args):
+        """PositionCell (OpenMW transformationextensions.cpp OpPositionCell). The player: a PMOV row (PLAYERMOVE), or
+        "not yet" when it cannot be worked out here (a number not constant, a room this build lacks). Anything else:
+        the host's call (v0.0.62, MWSCRIPT-POSITIONCELL-ACTORS-62) with the numbers x, y, z, yaw, kind, room number
+        (actor_move) and the cell's name; the room's possible visitors noted (VISI). A cell the game has not: no
+        code, as OpenMW does nothing for anything but the player."""
+        from .opcodes import PLAYERMOVE_KINDS
+        if ref is not None and ref.casefold() == 'player':
+            move = self.p.player_move(args)
+            if move is None:
+                return self.notyet(fn, ref, args, None)
+            self.e.op('PLAYERMOVE', move)
+            return None
+        move = self.p.actor_move(args)
+        if move is None:
+            return self.notyet(fn, ref, args, None)
+        cell = [a[1] for a in args if a[0] == 'str'][0]
+        if move == 'unknown':
+            self.warnings.append('PositionCell into %r, a cell the game has not: nothing (OpenMW)' % cell)
+            return None
+        kind, number, x, y, z, yaw = move
+        if kind == PLAYERMOVE_KINDS['room']:
+            self.p.visitor(number, ref, self.ident)
+        if ref is not None:
+            self.e.op('REF', self.p.object(ref))
+        return self.notyet(fn, None, [('float', x), ('float', y), ('float', z), ('float', yaw), ('str', cell),
+                                      ('int', kind), ('int', number)], None, carried=True)
+
+    def place(self, fn, ref, args):
+        """PlaceAtPC, PlaceAtMe, PlaceItem, PlaceItemCell (v0.0.62, MWSCRIPT-PLACE-OBJECTS-62; OpenMW
+        transformationextensions.cpp OpPlaceAt, OpPlaceItem, OpPlaceItemCell). An object the engine can make
+        (Program.placed) goes to the host with its PLAC row as the last number: PlaceAtPC and PlaceAtMe with count,
+        distance (game units) and direction (0 front, 1 back, 2 left, 3 right), PlaceAtMe on REF's object or the
+        script's own; PlaceItem with x, y, z (game units, the player's cell) and the rotation in degrees; PlaceItemCell
+        with the cell worked out here as PositionCell's (x, y, z in a room map's own units for an actor, game units for
+        an item; Quake's yaw; the kind and the room's number). Anything else stays "not yet"; a PlaceItemCell into a
+        cell the game has not is no code (OpenMW reports it and does nothing)."""
+        from .opcodes import PLAYERMOVE_KINDS
+        strs = [a[1] for a in args if a[0] == 'str']
+        nums = [a for a in args if a[0] != 'str']
+        if not strs:
+            return self.notyet(fn, ref, args, None)
+        row = self.p.placed(strs[0])
+        if row is None:
+            return self.notyet(fn, ref, args, None)
+        ident = ('str', strs[0])
+        n = fn.name
+        if n in ('placeatpc', 'placeatme'):
+            nums = (nums + [('int', 1), ('float', 0.0), ('int', 0)][len(nums):])[:3]
+            if n == 'placeatme' and ref is not None:
+                self.e.op('REF', self.p.object(ref))
+            return self.notyet(fn, None, [ident] + nums + [('int', row)], None, carried=True)
+        if n == 'placeitem':
+            nums = (nums + [('float', 0.0)] * 4)[:4]
+            return self.notyet(fn, None, [ident] + nums + [('int', row)], None, carried=True)
+        # placeitemcell: the cell at build time
+        if len(strs) < 2 or len(nums) < 4 or not all(_const(fold(a)) for a in nums[:4]):
+            return self.notyet(fn, ref, args, None)
+        cell = strs[1]
+        x, y, z, rot = (float(fold(a)[1]) for a in nums[:4])
+        yaw = round((-rot) % 360.0, 5) % 360.0
+        actor = self.p.place_rows()[row]['kind'] == PLACE_KINDS['actor']
+        key = cell.casefold()
+        if key in self.p.data.interior_numbers:
+            number = self.p.data.interior_numbers[key]
+            at = (x, y, z)
+            if actor:
+                room = (self.p.rooms or {}).get(key) or {}
+                offset = room.get('offset') or (0.0, 0.0, 0.0)
+                at = tuple(round((v - offset[k]) * 0.25, 5) for k, v in enumerate((x, y, z)))
+            kind = PLAYERMOVE_KINDS['room']
+        elif key in self.p.exterior_names():
+            number, at, kind = 0, (x, y, z), PLAYERMOVE_KINDS['outdoors']
+        else:
+            self.warnings.append('PlaceItemCell into %r, a cell the game has not: nothing (OpenMW)' % cell)
+            return None
+        return self.notyet(fn, None, [ident, ('str', cell)] + [('float', v) for v in at] +
+                           [('float', yaw), ('int', kind), ('int', number), ('int', row)], None, carried=True)
+
+    def follower(self, ref, args):
+        """An AIFollow / AIFollowCell whose target is the player: the follower crosses doors with the player (OpenMW
+        actionteleport.cpp getFollowers), so it may stand in any room; a VISI row with the room VISI_ANY (the actor,
+        its home room's map) lets a room it was left in, or a saved game, spawn it there again."""
+        target = next((a[1] for a in args if a[0] == 'str'), '')
+        if target.casefold() == 'player':
+            self.p.visitor(VISI_ANY, ref, self.ident)
+
+    def ai_cell(self, fn, ref, args):
+        """AIFollowCell / AIEscortCell (v0.0.62, MWSCRIPT-POSITIONCELL-ACTORS-62; rules from OpenMW 0.51
+        aiextensions.cpp OpAiFollowCell / OpAiEscortCell, aifollow.cpp, aiescort.cpp). The destination is worked out
+        here once, as PositionCell's (actor_move): an interior cell by its name (its stable number, the point in that
+        room map's own units), else the outdoors or a cell the game has not (the number 0: OpenMW's follow is then
+        never done by its position, an escort walks outdoors only). An AIEscortCell into a cell the game has not
+        compiles to nothing, as OpenMW starts no package then. The host gets the numbers duration, x, y, z, kind, the
+        room's number and the strings target, cell; the reset argument is not passed (its value does not matter,
+        OpenMW). Numbers that are not constants stay "not yet"."""
+        from .opcodes import PLAYERMOVE_KINDS
+        strs = [a[1] for a in args if a[0] == 'str']
+        numbers = [fold(a) for a in args if a[0] != 'str'][:4]
+        if len(strs) < 2 or len(numbers) < 4 or not all(_const(n) for n in numbers):
+            return self.notyet(fn, ref, args, None)
+        target, cell = strs[0], strs[1]
+        duration, x, y, z = (float(n[1]) for n in numbers)
+        move = self.p.actor_move([('float', x), ('float', y), ('float', z), ('float', 0.0), ('str', cell)])
+        if move == 'unknown' or move is None:
+            if fn.name == 'aiescortcell':
+                self.warnings.append('AIEscortCell into %r, a cell the game has not: nothing (OpenMW)' % cell)
+                return None
+            kind, number, at = PLAYERMOVE_KINDS['outdoors'], 0, (x, y, z)
+        else:
+            kind, number = move[0], move[1]
+            at = move[2:5] if kind == PLAYERMOVE_KINDS['room'] else (x, y, z)
+            if kind != PLAYERMOVE_KINDS['room']:
+                number = 0
+        if fn.name == 'aifollowcell':
+            self.follower(ref, args)
+        if ref is not None:
+            self.e.op('REF', self.p.object(ref))
+        return self.notyet(fn, None, [('str', target), ('str', cell), ('float', duration), ('float', at[0]),
+                                      ('float', at[1]), ('float', at[2]), ('int', kind), ('int', number)], None,
+                           carried=True)
 
     def notyet(self, fn, ref, args, value, carried=False):
         """NOTYET: the numeric arguments pushed, the strings as indexes; logged once by the engine."""

@@ -84,6 +84,10 @@ typedef struct {
     /* INVENTORY-NO-ARMOR-RATING-61: the armour rating shown, worked out when the window opens and after each action
      * (armor_state 0 = work it out at the next draw, 1 = armor holds it, -1 = unavailable) */
     int armor_state,armor;
+    /* INVENTORY-OPEN-WINDOW-NO-REFRESH-61: what the window last showed of the worn set and the carried kinds; a change
+     * made outside the window (the console, a script, a trade, a pick-up) redraws it at the next frame */
+    char seen_worn[AW_INVENTORY_SLOTS][64];
+    uint32_t seen_kinds,seen_kinds_sum;
     byte preview[INV_PREVIEW_W*INV_PREVIEW_H];
 } inventory_panel_t;
 static inventory_panel_t *inventory;
@@ -175,6 +179,8 @@ static void close_panel(void){
     modal=drag=marker_click=teleport_mode=teleport_selected=0;teleport_message=marker_message=NULL;IN_AWClearButtons();
 }
 int AW_WorldUIActive(void){return modal!=0;}
+/* ALCHEMY-61: the open window closed from a command (aw_inventory alchemy close), as Esc closes it */
+void AW_WorldUIClose(void){if(modal)close_panel();}
 /* The open window for the remote state file (LOAD-STALL-SESSIONS-59): a panel of another file
  * (stats, the container strip, ...) is a generic "window". */
 const char *AW_WorldUIName(void){
@@ -200,7 +206,8 @@ void AW_InventoryOpen(void){
     int i;
     /* the inventory opens during the registration from the papers on, as in the original (aw_story.c
      * AW_StoryInventoryAllowed, CHARGEN-INVENTORY-LOCKED-60); the map and journal keep the released-game rule */
-    if(!allowed_in_play() || !AW_StoryInventoryAllowed() || svs.clients[0].edict->v.health<=0)return;
+    if(!allowed_in_play() || !AW_StoryInventoryAllowed() || !AW_ControlAllowed(AW_CONTROL_PLAYER) ||
+       svs.clients[0].edict->v.health<=0)return;
     inventory=(inventory_panel_t *)AW_TryCalloc(1,sizeof(*inventory));
     if(!inventory){Con_Printf("Inventory: not enough memory.\n");return;}
     for(i=0;i<INV_VISIBLE;i++)inventory->icon_row[i]=-1;
@@ -239,6 +246,30 @@ static void inventory_key_row(void *ctx,int state_row,const aw_inventory_item_t 
     k->state_row=state_row;k->value=item.value;k->weight=item.weight;
     k->category=(unsigned char)item.category;Q_strcpy_bounded(k->name,item.name,sizeof(k->name));
 }
+/* INVENTORY-OPEN-WINDOW-NO-REFRESH-61: the carried kinds in two numbers (how many rows have a count, and the sum of
+ * their id hashes): one pass over the item rows, no record read */
+static void inventory_kinds(uint32_t *kinds,uint32_t *sum){
+    int i,n=AW_ItemCount(&aw_state);const aw_item_row_t *r;
+    *kinds=0;*sum=0;
+    for(i=0;i<n;i++){r=AW_ITEM_ROW(&aw_state,i);if(r->value>0){(*kinds)++;*sum+=r->hash*2654435761U+1U;}}
+}
+static void inventory_seen(void){
+    memcpy(inventory->seen_worn,aw_state.inventory.equipped,sizeof(inventory->seen_worn));
+    inventory_kinds(&inventory->seen_kinds,&inventory->seen_kinds_sum);
+}
+/* every frame the window is open: a worn set changed elsewhere renders the picture and the armour rating again (the
+ * list's marks are read at each draw), a carried kind gained or lost elsewhere reads the list again. OpenMW redraws
+ * its preview and list on any change of the container store (mwgui/inventorywindow.cpp updateItemView and
+ * dirtyPreview, called by the InventoryStore listener); the original's window follows the same. */
+static void inventory_watch(void){
+    uint32_t kinds,sum;
+    if(memcmp(inventory->seen_worn,aw_state.inventory.equipped,sizeof(inventory->seen_worn))){
+        memcpy(inventory->seen_worn,aw_state.inventory.equipped,sizeof(inventory->seen_worn));
+        inventory->preview_state=0;inventory->armor_state=0;
+    }
+    inventory_kinds(&kinds,&sum);
+    if(kinds!=inventory->seen_kinds || sum!=inventory->seen_kinds_sum)inventory_refresh();
+}
 static void inventory_refresh(void){
     int i,kinds=AW_ItemCount(&aw_state);aw_inventory_item_t item;
     if(!inventory)return;
@@ -266,6 +297,7 @@ static void inventory_refresh(void){
         AW_InventoryBatchEnd();
     }
     inventory_filter();
+    inventory_seen();
 }
 /* the category's rows of the keys, sorted (Tab, the sort key and the category tabs: no record read again) */
 static void inventory_filter(void){
@@ -310,6 +342,11 @@ static int inventory_equippable(const aw_inventory_item_t *item){
     if(item && AW_InventoryEquipped(&aw_state,item->id) && (item->flags&AW_INV_EQUIP_SUPPORTED))return 1;
     return AW_InventoryCanEquip(item);
 }
+/* ALCHEMY-61 (aw_inventory.h; aw_alchemy.c sets them, NULL in the fixtures): a potion drunk, an ingredient eaten, an
+ * apparatus opening the alchemy window */
+int (*aw_worldui_use)(const aw_inventory_item_t *it);
+void (*aw_worldui_alchemy_open)(void);
+static int inventory_usable(const aw_inventory_item_t *item){return item && aw_worldui_use && AW_INV_USABLE_KIND(item);}
 static int inventory_droppable(const aw_inventory_item_t *item){
     return item && (item->flags&AW_INV_DROP) &&
         (!AW_InventoryEquipped(&aw_state,item->id) || inventory_equippable(item));
@@ -325,6 +362,13 @@ static void inventory_action(int action){
         else ok=AW_InventoryEquip(&aw_state,item);
         if(ok)AW_CombatEquipmentChanged();
         strcpy(inventory->message,ok?"Equipment updated.":"Cannot equip this item.");
+    }else if(action==3 && inventory_usable(item)){
+        /* ALCHEMY-61: a potion drunk, an ingredient eaten (aw_alchemy.c), an apparatus opens the alchemy window once
+         * this window has closed (OpenMW mwclass/apparatus.cpp use: ActionAlchemy) */
+        ok=aw_worldui_use(item);
+        if(ok==2){close_panel();if(aw_worldui_alchemy_open)aw_worldui_alchemy_open();return;}
+        if(!ok)strcpy(inventory->message,"Cannot use this item now.");
+        else inventory->message[0]=0;
     }else if(action==2 && inventory_droppable(item)){
         /* First stage drops one real item; repeated actions preserve stack count.
          * No deletion occurs when the world placement/model/entity is refused. */
@@ -359,19 +403,26 @@ static void inventory_key(int key){
     if(key==K_END)inventory->selected=inventory->count-1;
     if(key==K_TAB){inventory->category=(inventory->category+1)%8;inventory->selected=inventory->top=0;inventory_filter();}
     if(key=='o'){inventory->sort=(inventory->sort+1)%3;inventory_filter();}
-    if(key==K_ENTER || key=='e'){inventory_action(1);return;}
+    if(key==K_ENTER || key=='e'){inventory_action(inventory_usable(item)?3:1);return;}
     if(key=='d'){inventory_action(2);return;}
     if(key==K_MOUSE3 || key==K_MOUSE2){
         if(mouse_x<128 || mouse_x>=inventory_list_right() || mouse_y<INV_LIST_Y || mouse_y>=INV_LIST_Y+INV_VISIBLE*INV_ROW_H)return;
         row=inventory->top+(mouse_y-INV_LIST_Y)/INV_ROW_H;if(row>=inventory->count)return;
         inventory->selected=row;
         inventory->context=inventory->count!=0;
-        inventory->context_x=minmax(mouse_x,128,206);inventory->context_y=minmax(mouse_y,50,INV_CONTROLS_Y-2*16-4);
+        /* room for its entries above the footer: two as before, three with Drink/Eat/Use (ALCHEMY-61) */
+        item=inventory_item(row,NULL);
+        inventory->context_x=minmax(mouse_x,128,206);
+        inventory->context_y=minmax(mouse_y,50,INV_CONTROLS_Y-(inventory_usable(item)?3:2)*16-4);
         return;
     }
     if(key==K_MOUSE1){
         if(inventory->context){
             x=inventory->context_x;y=inventory->context_y;row=0;
+            if(inventory_usable(item)){
+                if(mouse_x>=x && mouse_x<x+110 && mouse_y>=y+row*16 && mouse_y<y+(row+1)*16){inventory_action(3);return;}
+                row++;
+            }
             if(inventory_equippable(item)){
                 if(mouse_x>=x && mouse_x<x+110 && mouse_y>=y+row*16 && mouse_y<y+(row+1)*16){inventory_action(1);return;}
                 row++;
@@ -411,11 +462,15 @@ static void inventory_key(int key){
 }
 /* aw_icons.c: the original 16 x 16 inventory icon (UI-ICONS-INVENTORY-42); 0 = draw the old way. */
 int (*aw_inventory_row_icon)(int slot,const char *id,int equipped,int x,int y);
+/* the id whose picture a row shows (aw_alchemy.c: a made item's base; NULL in the fixtures: the row's own) */
+const char *(*aw_worldui_icon_id)(const char *id);
 /* INDEX: the list row */
 static void inventory_icon(int slot,int index,int x,int y){
     FILE *f=NULL;int size,xx,yy;byte raw[1028];const aw_inventory_item_t *it=inventory_item(index,NULL);
     if(!it)return;
-    if(aw_inventory_row_icon && aw_inventory_row_icon(slot,it->id,AW_InventoryEquipped(&aw_state,it->id)>0,x,y))return;
+    /* MADE-ITEM-NO-PICTURE-62: a made item (aw_made_N: a made potion, an enchanted item) shows its base item's picture */
+    if(aw_inventory_row_icon && aw_inventory_row_icon(slot,aw_worldui_icon_id?aw_worldui_icon_id(it->id):it->id,
+                                                      AW_InventoryEquipped(&aw_state,it->id)>0,x,y))return;
     if(inventory->icon_row[slot]!=index){
         inventory->icon_row[slot]=index;inventory->icon_ok[slot]=0;
         if(it->icon[0]){
@@ -559,6 +614,8 @@ static void inventory_armor(void){
 static void inventory_draw(void){
     int i,j,x,row,index,right=inventory_list_right();aw_inventory_item_t *item;char line[160];
     int gold=AW_UIColor(223,199,144),muted=AW_UIColor(150,135,104);
+    inventory_watch();
+    right=inventory_list_right();   /* the list may have changed its length */
     AW_UIFill(0,0,320,200,AW_UIColor(0,0,0));AW_UIBox(2,2,316,196);
     AW_UIBox(4,18,122,178);AW_UIBox(128,18,188,178);
     AW_UISmallBegin();
@@ -594,15 +651,23 @@ static void inventory_draw(void){
         else strcpy(line,"Item details unavailable");
         inventory_text(132,INV_DETAILS_Y,180,8,line,muted);
         inventory_status(inventory->message[0]?inventory->message:
+            inventory_usable(item)?(item->alchemy_kind==AW_ALCHEMY_POTION?"E/Enter drink  D drop  RMB actions":
+                                      item->alchemy_kind==AW_ALCHEMY_INGREDIENT?"E/Enter eat  D drop  RMB actions":
+                                      "E/Enter use  D drop  RMB actions"):
             inventory_equippable(item)?"E/Enter equip  D drop  RMB actions":
             inventory_droppable(item)?"D drop  RMB actions":"Actions unavailable for this item",muted);
     }
     if(inventory->context && item){
         x=inventory->context_x;j=inventory->context_y;row=0;
+        if(inventory_usable(item))row++;
         if(inventory_equippable(item))row++;
         if(inventory_droppable(item))row++;
         if(row){
             AW_UIFill(x,j,110,row*16,AW_UIColor(10,9,7));AW_UIBox(x,j,110,row*16);row=0;
+            if(inventory_usable(item)){
+                inventory_text(x+4,j+row*16+2,102,13,item->alchemy_kind==AW_ALCHEMY_POTION?"Drink":
+                               item->alchemy_kind==AW_ALCHEMY_INGREDIENT?"Eat":"Use",gold);row++;
+            }
             if(inventory_equippable(item)){inventory_text(x+4,j+row*16+2,102,13,AW_InventoryEquipped(&aw_state,item->id)?"Unequip":"Equip",gold);row++;}
             if(inventory_droppable(item))inventory_text(x+4,j+row*16+2,102,13,"Drop one",gold);
         }else inventory->context=0;
@@ -709,7 +774,8 @@ static void open_map(void){
 }
 /* M follows the current HUD preference; explicit teleport remains independent. */
 static void open_normal_map(void){
-    if(!allowed())return;
+    /* a script's DisablePlayerControls keeps the player's own windows shut (OpenMW playercontrols.lua uiAllowed) */
+    if(!allowed() || !AW_ControlAllowed(AW_CONTROL_PLAYER))return;
     Cvar_SetValue(aw_map_mode.name,AW_DebugOverlaysEnabled() && map_debug_enabled()?0:1);
     open_map();
 }
@@ -1055,7 +1121,7 @@ static void show_dated(void){
 }
 static void open_journal(void){
     int n;
-    if(!allowed())return;
+    if(!allowed() || !AW_ControlAllowed(AW_CONTROL_PLAYER))return;
     book=(book_t *)AW_TryCalloc(1,sizeof(*book));if(!book){Con_Printf("Journal reader: not enough memory.\n");return;}
     n=0;
     if(book_quests()){

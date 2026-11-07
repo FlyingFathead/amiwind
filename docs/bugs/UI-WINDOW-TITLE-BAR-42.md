@@ -127,10 +127,12 @@ Family: Menus, HUD, map screen and text (`ui-text`). Menus, HUD, map screen, fon
 - HUD-WEAPON-BOX-EMPTY-59 (no report page): HUD weapon box stays empty after equipping a weapon from the console
 - INVENTORY-BURDEN-TEXT-UNREADABLE-61 (no report page): The carried and maximum weight on the inventory burden bar cannot be read
 - INVENTORY-NO-ARMOR-RATING-61 (no report page): The inventory window shows no armour rating under the character picture
+- INVENTORY-OPEN-WINDOW-NO-REFRESH-61 (no report page): An item given and worn through the console while the inventory window is open does not show in that window until it is opened again
 - INVENTORY-PREVIEW-STALE-61 (no report page): The inventory character preview does not change when equipment is put on or taken off in the window
 - LEVEL-UP-MISSING-57 (no report page): Requested: levelling as in the original: skills rise with use, the level-up box with its text and sound, attributes raised, the new values used by every check
 - LOOT-WINDOW-ITEM-PROPERTIES-60 (no report page): Loot window does not show the selected item's type, weight and value
 - LOOT-WINDOW-LAYOUT-60 (no report page): Loot window: key help cut off, item names clipped, buttons crammed against the frame
+- [MADE-ITEM-NO-PICTURE-62](MADE-ITEM-NO-PICTURE-62.md): A made potion or a made enchanted item shows an empty picture in the inventory list
 - MAP-FOCUS-DRAG-29 (no report page): Map or journal keeps dragging after window focus returns
 - MAP-MARKER-29 (no report page): Requested: click to place a user map marker
 - MAP-REG-01 (no report page): In-Game map mode hid settlement markers (regression)

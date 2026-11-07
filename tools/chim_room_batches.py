@@ -532,17 +532,19 @@ def prepare(batches, data_files, scene, out, held_by=(), ffmpeg='ffmpeg', jobs=N
                  shared['models']['bytes_removed'] / 1048576, shared['voices']['shared'],
                  shared['voices']['residents'], shared['voices']['files_removed'],
                  shared['voices']['bytes_removed'] / 1048576, len(changed)))
-    # the rooms' levelled creatures: an aw_levelled entity per levelled reference, rolled by the engine from the actor
-    # table (tools/room_levelled.py, TOMB-NO-CREATURES-60); after the residents and their shared files
+    # the rooms' levelled and placed creatures: an aw_levelled entity per levelled reference, rolled by the engine
+    # from the actor table, and per placed creature reference, spawned from its table base (tools/room_levelled.py,
+    # TOMB-NO-CREATURES-60 and -61); after the residents and their shared files
     levelled = None
     if converted:
         import room_levelled
         from mwad.paths import child_ci
         levelled = room_levelled.write(work / 'id1/maps', converted, child_ci(Path(data), 'Morrowind.esm'))
-        if residents and levelled['placed']:
+        if residents and levelled['maps']:
             residents['left_out'] = room_levelled.drop_placed(
                 residents['left_out'], levelled['maps'], converted,
-                room_levelled.list_index(child_ci(Path(data), 'Morrowind.esm')))
+                room_levelled.list_index(child_ci(Path(data), 'Morrowind.esm')),
+                levelled['mode'] == 'table', levelled['placed_mode'] == 'table')
             residents['levelled'] = {k: v for k, v in levelled.items() if k != 'maps'}
             (work / 'room-batches-residents.json').write_text(json.dumps(residents, indent=2) + '\n', encoding='utf-8',
                                                               newline='\n')
@@ -568,6 +570,8 @@ def prepare(batches, data_files, scene, out, held_by=(), ffmpeg='ffmpeg', jobs=N
                             'left_out': len((residents or {}).get('left_out', [])),
                             'levelled': {'mode': (levelled or {}).get('mode', 'none'),
                                          'placed': (levelled or {}).get('placed', 0),
+                                         'placed_mode': (levelled or {}).get('placed_mode', 'none'),
+                                         'creatures': (levelled or {}).get('creatures', 0),
                                          'left_out': len((levelled or {}).get('left_out', []))},
                             'anim_fallback': fallback,
                             'shared_files': {k: v for k, v in shared.items() if k != 'paths'}},

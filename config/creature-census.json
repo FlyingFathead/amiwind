@@ -1,0 +1,21 @@
+{
+  "format": 1,
+  "about": "Every creature record of the game's masters and what this build does with it. tools/creature_census.py reads it on every build (the image step, after the NPC gallery catalogue): a creature record is built when the image places it (the maps and the actor table); one that is not built takes the first group below whose fact holds for it (expansion: defined by a master the image does not read; summon: named by a game setting sMagic...ID, the creature a summoning effect calls up; interior: placed in rooms only; unused: no placement, used levelled list, script, dialogue result or summoning setting names it), and a placement of a built creature in a room that the room stage does not place is counted under the interior group. A group is missing (with the register entry that tracks it) or skipped (on purpose, with its reason). A record that is not built and that no group names, and a levelled creature point of the base master that is not placed in a cell no levelled_points group names stop a full build, so a creature is never left out silently. The facts no_model (no MODL or a mesh the data lacks), left_out (the actor library refused the mesh) and script (placed by a script only) have no group today: a record with them stops the build until it is registered and a group is added.",
+  "groups": [
+    {"name": "Tribunal and Bloodmoon creatures", "when": "expansion", "status": "missing", "register": "CREATURE-EXPANSION-62"},
+    {"name": "Summoned creatures", "when": "summon", "status": "missing", "register": "CREATURE-SUMMONED-62"},
+    {"name": "Creatures placed in rooms", "when": "interior", "status": "missing", "register": "INTERIOR-CREATURES-MISSING-41"},
+    {"name": "Not used by the game data", "when": "unused", "status": "skipped",
+     "reason": "No placement, used levelled list, script, dialogue result or summoning setting of the masters names these records (unused variants: dead bodies with no placement, quest creatures the game never places, duplicates of placed ones); there is nothing to show."}
+  ],
+  "levelled_points": [
+    {"name": "Levelled creatures in the intro scene's rooms", "register": "ROOM-LEVELLED-INTRO-ROOMS-62",
+     "cells": ["Addamasartus", "Tharys Ancestral Tomb"],
+     "reason": "The intro scene stage converts these rooms with the older room path, which lists a levelled creature reference as left out; only the room stages write the rooms' levelled creature points (tools/room_levelled.py)."}
+  ],
+  "masters": [
+    {"name": "Morrowind.esm", "status": "read"},
+    {"name": "Tribunal.esm", "status": "pending", "register": "CREATURE-EXPANSION-62"},
+    {"name": "Bloodmoon.esm", "status": "pending", "register": "CREATURE-EXPANSION-62"}
+  ]
+}

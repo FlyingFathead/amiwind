@@ -9,7 +9,7 @@
 | Where | remote debugging console (aw_remote 1), engine/aga/src/console.c and aw_remote.c |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.32-dev3, v0.0.32 (last seen) |
+| Persists in | fixed in v0.0.62-dev1 |
 | Severity | low: Test tooling. |
 | Family | Debug commands and remote control (`debug-commands`) |
 | Playtest version | v0.0.32-dev3 |
@@ -18,13 +18,15 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
+_Last updated with AmiWind v0.0.62-dev1 (7 November 2026)._
 
 ## Status: 8 October 2026
 
 Open; cause known, not repaired. Tagged performance. Test sessions only: the remote console
 (`aw_remote 1`) is off by default and not saved. Found while measuring
 [CENSUS-LOAD-SLOW-32](CENSUS-LOAD-SLOW-32.md).
+
+7 November 2026: repaired in v0.0.62-dev1 (see Repair).
 
 ## Symptom
 
@@ -60,13 +62,22 @@ console. Any command with long output (for example `edicts`) shows the same cost
 
 ## Repair
 
-Not yet. Options: keep the log file open while the remote console is on and close it on
-`aw_remote 0`, map change or quit; or buffer console output and append it once per remote poll
-(twice a second). Quake's `-condebug` path stays as it is.
+7 November 2026 (v0.0.62-dev1): the second option. With the remote console on, `Con_Printf` hands
+its text to `AW_RemoteLog` (`aw_remote.c`), which collects it in an 8 KiB buffer; the buffer is
+appended to `console.log` in one open, seek, write and close at the remote poll (twice a second),
+on the long-work heartbeat, when it is full, and at exit (a fatal exit writes it right after its
+heap note, so the session tool still finds that note). A print larger than the buffer is appended
+on its own. Quake's `-condebug` path stays as it is.
+
+The cost mattered beyond load times: an `edict` listing is about 300 prints (each field name is
+padded one space at a time), a frame of 3 to 7 seconds of folder traffic, and test sessions stopped
+right after such frames (SESSION-STALL-AFTER-LONG-FRAME-62).
 
 ## Verification
 
-Pending: the same load with the remote console on and off within a few percent of each other.
+Unit check (`tests/aga_remote_test.c`): 302 prints make no file call until the poll, which writes
+them in order in one append; the heartbeat, a full buffer, a print larger than the buffer and the
+exit flush each append in order. In game: the session check of SESSION-STALL-AFTER-LONG-FRAME-62.
 
 ## Prevention
 
@@ -86,6 +97,7 @@ Family: Debug commands and remote control (`debug-commands`). dbg commands, tele
 - DBG-DOOR-GO-AIM-CHIM-59 (no report page): aw_hinged_door go does not bring the door under the crosshair in a CHIM room
 - [DBG-ENTITY-INSPECT-39](DBG-ENTITY-INSPECT-39.md): Requested click-to-pin raw entity and reference inspection
 - DBG-PLACED-LOOK-VIEW-NOT-TURNED-61 (no report page): The test commands aw_placed look and aw_view set the view angles but the view does not turn
+- DBG-QUOTED-ID-REFUSED-62 (no report page): A debug command with a quoted record ID holding a space is refused as an unknown debug command (dbg npcs talk "agronian guy")
 - [DBG-TOGGLE-WORDS-31](DBG-TOGGLE-WORDS-31.md): dbg on/off words turned settings off
 - DBG-TP-SAME-MAP-54 (no report page): dbg tp X Y finds no map for a point on a MiniWind CHIM frame
 - DEBUG-ALIASES-29 (no report page): Discoverable video-player aliases and disk-backed help
@@ -99,6 +111,8 @@ Family: Debug commands and remote control (`debug-commands`). dbg commands, tele
 - DEBUG-VIEW-PITCH-DRIFT-54 (no report page): aw_view alone lets the pitch drift, and the greeting camera takes the view during scripted sessions
 - DEV2-REGION-LOAD-CRASH-57 (no report page): v0.0.57-dev1 dev2 image crashes with NUM_FOR_EDICT: bad pointer when a teleport loads another region (dev1 did not)
 - [ENGINE-UNLINK-STUB-35](ENGINE-UNLINK-STUB-35.md): unlink was a stub that deleted nothing, so -condebug appended to the previous console log
+- GAME-RECORDER-FIGHT-SEED-61 (no report page): A recording made while an NPC fights the player does not replay the same: the fight takes a seed of its own on the replay's load
+- GAME-RECORDER-HOTKEY-DIALOGUE-61 (no report page): While a recording runs, Ctrl+R does not stop it when the dialogue window is open: the key goes into the dialogue search field
 - [GAME-RECORDER-MISSING-61](GAME-RECORDER-MISSING-61.md): Requested: a gameplay recorder that records a play session and plays it back in another game instance
 - HORS-FROM-MENU-58 (no report page): dbg aw hors cannot be started from the main menu
 - [HUD-GLOBAL-NO-REGIONS-33](HUD-GLOBAL-NO-REGIONS-33.md): The debug HUD said "GLOBAL XYZ: unavailable" on a CHIM town on a disk without the world directory (MiniWind)
@@ -121,5 +135,6 @@ Family: Debug commands and remote control (`debug-commands`). dbg commands, tele
 Related bugs in other categories:
 
 - [CENSUS-LOAD-SLOW-32](CENSUS-LOAD-SLOW-32.md): The Census and Excise Office takes 8-10 s to load in FS-UAE; other scenes 0.2-1.5 s
+- [SESSION-STALL-AFTER-LONG-FRAME-62](SESSION-STALL-AFTER-LONG-FRAME-62.md): The game stops with its clock frozen right after a frame of several seconds spent on console output or file reads, in three of ten scripted Seyda Neen sessions
 
 <!-- END GENERATED CATEGORY -->

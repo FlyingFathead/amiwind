@@ -125,41 +125,81 @@ def source_records(master, reference_metadata=None):
     return objects, reference_fields
 
 
-def placement_index(census):
-    """Stable across map subsets; reserve known interior identities as well.
+# The harvestable plant kinds (world_flora inventory kinds), one GENERATION of the global placement index each, in the
+# order they joined it. A new kind is APPENDED as a new generation, never sorted in among the earlier keys: the slots of
+# the earlier generations stay where they were, so a save made with an earlier index keeps every pick fact, and the
+# catalogue names the earlier index digests as its bases (aw_harvest.c compatible(): such a save is taken over in place).
+# FLORA-FAUNA-COVERAGE-62: the bracket fungi that grow from the sides of the Bitter Coast trees joined as generation 2.
+INDEX_GENERATIONS = (('small_mushroom',), ('tree_fungus',))
+HARVEST_KINDS = tuple(kind for generation in INDEX_GENERATIONS for kind in generation)
+INDEX_SLOTS = 4096          # engine/aga/src/aw_state.h AW_HARVEST_SLOTS
+INDEX_BASES = 4             # engine/aga/src/aw_harvest.h AW_HARVEST_BASES
 
-    This indexes the supported numeric mushroom taxonomy, not all GOTY flora.
-    Unsupported placements remain indexed but are never silently activated.
-    """
-    keys = []
+
+def index_generations(census, generations=None):
+    """[(slots so far, digest)] of each generation of the global placement index, oldest first, and {key: slot}.
+
+    Generation 1 keeps the first index's exact form ('AmiWind harvest index 1', its sorted keys), so its digest is the
+    one every earlier build and save carries. Each later generation sorts only its own keys after the earlier ones and
+    chains the earlier digest: 'AmiWind harvest index 2', 'base <slots> <digest>', its keys."""
+    generations = INDEX_GENERATIONS if generations is None else generations
+    wanted = {kind for generation in generations for kind in generation}
+    by_kind = {}
     for group in ('references', 'interior_references', 'deferred_references'):
         for ref in census[group]:
-            if ref['kind'] != 'small_mushroom':
+            if ref['kind'] not in wanted:
                 continue
             if group == 'interior_references':
                 identity = (census['master_sha256'], 'interior', ref['cell'], ref['number'])
             else:
                 identity = source_key(ref, census['master_sha256'])
-            keys.append(identity_key(identity))
-    if len(keys) != len(set(keys)) or not 1 <= len(keys) <= 4096:
-        raise ValueError('Global harvest placement index is duplicate, empty or exceeds 4096')
-    keys.sort()
-    digest = hashlib.sha256(('AmiWind harvest index 1\n' + '\n'.join(keys) + '\n').encode('ascii')).hexdigest()
-    return {key: i + 1 for i, key in enumerate(keys)}, digest
+            by_kind.setdefault(ref['kind'], []).append(identity_key(identity))
+    indices, chain = {}, []
+    for number, generation in enumerate(generations):
+        keys = sorted(key for kind in generation for key in by_kind.get(kind, ()))
+        if not keys:
+            if number == 0:
+                raise ValueError('Global harvest placement index is empty (no %s placement)' % ', '.join(generation))
+            continue        # a master without this kind: the index is the earlier one, unchanged
+        if len(keys) != len(set(keys)) or set(keys) & set(indices):
+            raise ValueError('Global harvest placement index is duplicate')
+        if number == 0:
+            text = 'AmiWind harvest index 1\n' + '\n'.join(keys) + '\n'
+        else:
+            text = 'AmiWind harvest index 2\nbase %d %s\n' % chain[-1] + '\n'.join(keys) + '\n'
+        indices.update((key, len(indices) + 1) for key in keys)
+        chain.append((len(indices), hashlib.sha256(text.encode('ascii')).hexdigest()))
+    if not chain or not 1 <= len(indices) <= INDEX_SLOTS or len(chain) - 1 > INDEX_BASES:
+        raise ValueError('Global harvest placement index is empty, exceeds %d or has over %d earlier generations'
+                         % (INDEX_SLOTS, INDEX_BASES))
+    return chain, indices
 
 
-def source_context(master, *, max_plants=24, intern_root_spans=False):
-    """Parse original identity and contents once for a bounded map batch."""
-    full = inventory(master, ('small_mushroom',))
-    indices, catalogue = placement_index(full)
+def placement_index(census, generations=None):
+    """Stable across map subsets; reserve known interior identities as well.
+
+    This indexes the supported harvest kinds (INDEX_GENERATIONS), not all GOTY flora: {key: slot}, the digest of the
+    whole index (its last generation). Unsupported placements remain indexed but are never silently activated.
+    """
+    chain, indices = index_generations(census, generations)
+    return indices, chain[-1][1]
+
+
+def source_context(master, *, max_plants=24, intern_root_spans=False, generations=None):
+    """Parse original identity and contents once for a bounded map batch. generations: INDEX_GENERATIONS by default;
+    (('small_mushroom',),) is the earlier mushroom-only index (its catalogues carry no bases)."""
+    generations = INDEX_GENERATIONS if generations is None else generations
+    kinds = tuple(kind for generation in generations for kind in generation)
+    full = inventory(master, kinds)
+    chain, indices = index_generations(full, generations)
     if type(max_plants) is not int or not 1 <= max_plants <= 256 or type(intern_root_spans) is not bool:
         raise ValueError('Explicit runtime plant admission must be 1..256')
     original = {identity_key(placement_source_key(r, full['master_sha256'])): r
                 for group in ('references', 'interior_references', 'deferred_references') for r in full[group]
-                if r['kind'] == 'small_mushroom'}
+                if r['kind'] in kinds}
     reference_metadata = {}
     objects, placement_fields = source_records(master, reference_metadata)
-    return dict(full=full, indices=indices, catalogue=catalogue,
+    return dict(full=full, indices=indices, catalogue=chain[-1][1], bases=chain[:-1], kinds=kinds,
                 original=original, objects=objects, placement_fields=placement_fields,
                 max_plants=max_plants, intern_root_spans=intern_root_spans, reference_metadata=reference_metadata)
 
@@ -277,8 +317,9 @@ def prepare_graph(context, references, binding):
                 raise ValueError('Only original ingredients and LEVI contents are supported')
         nodes[index] = result; active.remove(name); return index
 
+    kinds = context.get('kinds', ('small_mushroom',))
     for ref in references:
-        if ref.get('kind') != 'small_mushroom':
+        if ref.get('kind') not in kinds:
             continue
         key = identity_key(ref['source_key'])
         if key in used_keys or key not in original:
@@ -288,7 +329,7 @@ def prepare_graph(context, references, binding):
             if ref.get(field) != value:
                 raise ValueError('Source placement metadata mismatch: ' + field)
         if ref['type'] != 'CONT' or ref.get('script') or not ref['container_state']['flags'] & 1:
-            raise ValueError('Only unscripted organic container mushrooms are supported')
+            raise ValueError('Only unscripted organic container plants are supported')
         metadata = placement_metadata(context, ref)
         if metadata['admission'] not in ADMITTED:
             raise ValueError('Source placement requires ownership/theft or nondefault charge/gold handling: ' + metadata['admission'])

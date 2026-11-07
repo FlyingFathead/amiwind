@@ -57,7 +57,8 @@ typedef struct
 #define	CSHIFT_DAMAGE	1
 #define	CSHIFT_BONUS	2
 #define	CSHIFT_POWERUP	3
-#define	NUM_CSHIFTS		4
+#define	CSHIFT_FADE		4	/* a script's FadeOut / FadeIn / FadeTo (view.c V_ScreenFade) */
+#define	NUM_CSHIFTS		5
 
 #define	NAME_LENGTH	64
 

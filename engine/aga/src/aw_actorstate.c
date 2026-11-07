@@ -928,6 +928,19 @@ int AW_ActorSpellFlags(int spell){
     if(!st || spell<0 || (uint32_t)spell>=st->aspt.rows || !fetch(st->aspt.offset+(uint32_t)spell*ASPT_BYTES,e,ASPT_BYTES))return 0;
     return e[3];
 }
+/* RESIST-NORMAL-WEAPONS-61 (v0.0.62, aw_actorstate.h): the always-active spells' magnitudes of EFFECT */
+float AW_ActorPassiveMagnitude(const aw_actor_t *a,int effect){
+    int held[64],n,i,k,m,type;aw_spell_effect_t e[AW_MADE_EFFECTS];float sum=0;
+    if(!st || !a || effect<0)return 0;
+    n=AW_ActorSpells(a,held,64);
+    for(i=0;i<n;i++){
+        type=spell_type(held[i]);
+        if(type<0 || type==0 || type==5)continue;          /* a castable spell or a power: only when cast */
+        m=AW_ActorSpellEffects(held[i],e,AW_MADE_EFFECTS);
+        for(k=0;k<m;k++)if(e[k].effect==effect)sum+=.5f*((float)e[k].magnitude_min+(float)e[k].magnitude_max);
+    }
+    return sum;
+}
 /* --- enchantments (AENC, v0.0.61; PLAYER-CASTING-59): read when an item is used, strikes or is worn --- */
 int AW_ActorEnchantCount(void){return st?(int)st->aenc.rows:0;}
 int AW_ActorEnchant(int row,aw_enchant_t *out){

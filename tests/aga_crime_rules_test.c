@@ -59,6 +59,21 @@ int main(void)
     assert(near(term,(50+50.5f*.2f+10)*.4f) && 40+term<100);
     /* never negative: a far witness of a worthless theft with a negative distance bias */
     assert(AW_CrimeTheftFight(&s,0,30,100,100000,.2f,20,.005f)==0);
+    /* GetDetected's kept roll (MWSCRIPT-SMALL-FUNCTIONS-62; creaturestats.cpp getAwarenessRoll / updateAwareness): an
+     * observer's roll holds for 5 seconds, then it rolls again; other observers have their own; a clock that went
+     * back (a new map) finds none; a full table gives the oldest slot */
+    {
+        aw_crime_roll_t rolls[3];
+        for(i=0;i<3;i++){rolls[i].key=0;rolls[i].roll=-1;rolls[i].at=0;}
+        assert(AW_CrimeRollFind(rolls,3,7,1)==-1);
+        AW_CrimeRollKeep(rolls,3,7,42,1);AW_CrimeRollKeep(rolls,3,9,5,2);
+        assert(AW_CrimeRollFind(rolls,3,7,5.9)==42 && AW_CrimeRollFind(rolls,3,9,5.9)==5);
+        assert(AW_CrimeRollFind(rolls,3,7,6)==-1 && AW_CrimeRollFind(rolls,3,7,.5)==-1);
+        AW_CrimeRollKeep(rolls,3,7,80,6);assert(AW_CrimeRollFind(rolls,3,7,6.5)==80);   /* rolled again, same slot */
+        AW_CrimeRollKeep(rolls,3,11,1,6.6);AW_CrimeRollKeep(rolls,3,12,2,6.7);         /* full: 9's slot (oldest) */
+        assert(AW_CrimeRollFind(rolls,3,12,6.8)==2 && AW_CrimeRollFind(rolls,3,9,6.8)==-1 &&
+               AW_CrimeRollFind(rolls,3,7,6.8)==80 && AW_CrimeRollFind(rolls,3,11,6.8)==1);
+    }
     printf("crime rules ok\n");
     return 0;
 }

@@ -398,8 +398,9 @@ static void queue_and_budget (void)
 	puts ("queue and budget passed");
 }
 
-/* Object state (v0.0.51): a script's Disable keeps an actor of the window from spawning; after Enable it comes
- * with its cell's next join (aw_mwhost.c sets aw_actor_disabled in the engine). */
+/* Object state (v0.0.51): a script's Disable keeps an actor of the window from spawning; since v0.0.62 the Enable
+ * spawns it on the next tick, its cell still in the window (SCRIPTED-EVENT-FALLING-MAGE-61), and a later join of the
+ * same cell does not spawn it twice (aw_mwhost.c sets aw_actor_disabled and calls aw_actor_enabled in the engine). */
 static unsigned disabled_ref;
 static int disabled_stub (unsigned reference)
 {
@@ -415,10 +416,30 @@ static void disabled_actor (void)
 	chim_actors_join (0, 0, "frame", none);
 	chim_actors_tick ();
 	assert (actors_alive () == 2 && index_of ("spawn progs/a_mid.mdl") < 0);
-	disabled_ref = 0;			/* Enable */
-	chim_actors_join (0, 0, "frame", none);
+	chim_actors_tick ();
+	assert (actors_alive () == 2);			/* kept, not spawned, while disabled */
+	aw_actor_enabled (999);				/* another reference's Enable: nothing */
+	chim_actors_tick ();
+	assert (actors_alive () == 2);
+	disabled_ref = 0;			/* Enable: on the next tick, no join needed */
+	assert (aw_actor_enabled != NULL);
+	aw_actor_enabled (502);
 	chim_actors_tick ();
 	assert (actors_alive () == 3 && index_of ("spawn progs/a_mid.mdl") >= 0);
+	chim_actors_join (0, 0, "frame", none);	/* the cell joining again: alive, not spawned twice */
+	chim_actors_tick ();
+	assert (actors_alive () == 3);
+	/* disabled again and its cell left and joined: kept again; the Enable after the leave of its cell does nothing */
+	reset_level ();
+	disabled_ref = 502;
+	chim_actors_join (0, 0, "frame", none);
+	chim_actors_tick ();
+	assert (actors_alive () == 2);
+	chim_actors_leave (0, 0);
+	disabled_ref = 0;
+	aw_actor_enabled (502);
+	chim_actors_tick ();
+	assert (index_of ("spawn progs/a_mid.mdl") < 0);
 	aw_actor_disabled = NULL;
 	command ("budget", "1");
 	puts ("disabled actor passed");
@@ -739,6 +760,21 @@ static void room_levelled (void)
 	puts ("room levelled passed");
 }
 
+/* COMBAT-PLAYGROUND-CREATURE-HUMANOID-61: a creature record ID's world model from its table base (any case); a
+ * creature with no model in this build, an unknown id and a buffer too small for the path give none */
+static void base_model (void)
+{
+	char model[64];
+	assert (AW_ActorsBaseModel ("CRAB", model, sizeof(model)) && !strcmp (model, "progs/c_crab.mdl"));
+	assert (AW_ActorsBaseModel ("crab", model, sizeof(model)) && !strcmp (model, "progs/c_crab.mdl"));
+	assert (!AW_ActorsBaseModel ("racer", model, sizeof(model)) && !model[0]);
+	assert (!AW_ActorsBaseModel ("nobody", model, sizeof(model)) && !model[0]);
+	assert (!AW_ActorsBaseModel ("crab", model, 8) && !model[0]);
+	assert (!AW_ActorsBaseModel ("", model, sizeof(model)));
+	printf ("base model %s\n", AW_ActorsBaseModel ("Crab", model, sizeof(model)) ? model : "none");
+	puts ("base model passed");
+}
+
 int main (int argc, char **argv)
 {
 	static client_t client;
@@ -778,6 +814,8 @@ int main (int argc, char **argv)
 		roll ((unsigned)atoi (argv[4]));
 	else if (!strcmp (argv[1], "room"))
 		room_levelled ();
+	else if (!strcmp (argv[1], "basemodel"))
+		base_model ();
 	else
 		return 2;
 	return 0;

@@ -23,6 +23,7 @@ DATA = ROOT / 'docs' / 'game-features.json'
 OUT = ROOT / 'docs' / 'GAME_FEATURES.md'
 BUGS = ROOT / 'docs' / 'bugs' / 'bugs.json'
 DIALOGUE = ROOT / 'docs' / 'dialogue-features.json'
+MWSCRIPT = ROOT / 'docs' / 'mwscript-features.json'
 SCHEMA = 'game-features 1'
 STATES = ('done', 'partial', 'missing')
 AREAS = [('world', 'World and interiors'), ('actors', 'Actors and behaviour'), ('player', 'The player'),
@@ -156,6 +157,11 @@ def render(doc):
         n = sum(d.values())
         lines.append('| [Dialogue features](DIALOGUE_FEATURES.md) | %d of %d done, %d partial, %d missing |'
                      % (d['done'], n, d['partial'], d['missing']))
+    if MWSCRIPT.is_file():
+        s = json.loads(MWSCRIPT.read_text(encoding='utf-8'))['scripts']
+        lines.append('| [MWScript features](MWSCRIPT_FEATURES.md) | %d of %d scripts run, %d use a function the '
+                     'interpreter lacks |' % (sum(1 for r in s if r['state'] == 'runs'), len(s),
+                                              sum(1 for r in s if r['state'] == 'missing-function')))
     lines += ['| [Voices and sounds](VOICE_FEATURES.md) | per kind of line, with its proof |',
               '| [CHIM features](chim/FEATURES.md) | engine features with measured gains |',
               '| [World, cell by cell](chim/CELL_TRACKER.md) | every cell converted and audited |',

@@ -1,6 +1,6 @@
 # Combat and the Vivec Arena minigame
 
-_Last updated with AmiWind v0.0.61-dev3 (2026-11-06)._
+_Last updated with AmiWind v0.0.61 (7 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -51,7 +51,7 @@ Choosing an opponent:
 | `dbgmode arenapit list` | the Arena fighters, the gallery and how to pick |
 | `dbgmode arenapit ultis salam` | a fighter by name or record ID |
 | `dbgmode arenapit #12` or `12` | NPC number 12 of the NPC gallery |
-| `dbgmode arenapit fargoth` | any NPC record (a stand-in model) |
+| `dbgmode arenapit fargoth` | any NPC or creature record (the model the world draws it with, else a stand-in) |
 | `dbgmode arenapit next` / `prev` | step through the fighters, then the gallery |
 
 The Arena fighters (config/arena_fighters.json: Mevil Molor, Ultis Salam,
@@ -377,8 +377,17 @@ original (OpenMW 0.51 `combat.cpp` `resistNormalWeapon` and `isNormalWeapon`):
 - The same rule applies to the player when an NPC strikes with a weapon (an NPC's weapon counts as ordinary: the NPC
   sheets carry no weapon flags yet).
 
-The resistance comes from the target's active effects, abilities included: the script host's effect list answers it
-once per landed swing (never per frame, no file read). The weapon's flags are byte 506 of its row in the item catalogue
+The resistance comes from the target's active effects (cast spells, worn items: the script host's effect list) and,
+since v0.0.62, from the spells of its own list that act always: abilities, blights, diseases and curses (OpenMW 0.51
+`activespells.cpp`: every spell of an actor's list that is neither a castable spell nor a power stays active). In the
+game data that is the "immune to normal weapons" ability (100 %) of 68 creatures and one NPC (ancestor ghosts, the
+atronachs, daedroths, dremora, golden saints, hungers, ogrims, scamps, bonelords and more), the vampires' 50 % and a
+few named abilities (Almalexia's shield 30 %, the Hircine aspects and the frost giant 100 %). Before v0.0.62 only the
+`dbg combat resistnormal` test value reached the rule, so a real ghost still took full damage. Cost: once per landed
+swing; the list part reads the target's spells from the game's actor table on disk the first time and is then kept
+(eight answers by actor, effect and list size, refreshed when a script changes the list or a game loads), so a fight
+reads nothing after its first blow; `dbg mwscript stats ID` shows an actor's value and how many answers were read and
+kept. The weapon's flags are byte 506 of its row in the item catalogue
 (`inventory/items.awi`; 0 in older catalogues). `dbg combat resistnormal N` (test only, not saved) gives every target
 of the player's swings N % until `dbg combat resistnormal off`, and says whether the effect list is connected and the
 message text the image carries.
@@ -489,6 +498,10 @@ the four fighters (about 0.3 MB each).
   rules (`mwclass/creature.cpp` hit, getSkill, getArmorRating): its level, attributes, health, fatigue, Fight and
   Flee; its combat value in every combat skill; no armour; its own chop, slash and thrust attacks as health damage
   (minimum + (maximum - minimum) x swing, no Strength modifier, no condition); a bipedal creature punches hand to
-  hand. Hit one in the world, or name its record ID in the arena (`dbgmode arenapit daedroth`, a stand-in model).
+  hand. Hit one in the world, or name its record ID in the arena (`dbgmode arenapit daedroth`). Since v0.0.62 the arena
+  draws a creature named by its record ID with the model the outdoor world draws it with (its base in the actor table,
+  `maps/chim-actors.cca`: the creature's own standing model with its mover for the run and attack frames), so the
+  `group` and `aggro` modes show a cliff racer as a cliff racer; a record with no model in the build still gets a
+  stand-in.
   Not yet: weapons a creature carries (it fights with its own attacks) and its sound generators from its animations.
   A creature that starts a fight while walking its route now fights with its own run and attack frames (v0.0.61-dev3).

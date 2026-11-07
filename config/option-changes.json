@@ -1114,6 +1114,15 @@
       "to": "table",
       "source": "tools/room_levelled.py (TOMB-NO-CREATURES-60)",
       "note": "The room stages write an aw_levelled entity for every levelled creature reference of a converted room, rolled by the engine from the actor table at the player's level; off = no entity, the room maps before"
+    },
+    {
+      "version": "0.0.62-dev1",
+      "option": "room_placed_creatures",
+      "flag": "--room-placed-creatures",
+      "change": "added",
+      "to": "table",
+      "source": "tools/room_levelled.py, tools/chim/actors.py room_placed_creatures (TOMB-NO-CREATURES-61)",
+      "note": "Every creature placed in a converted room gets a list of one in the actor table, a model in the actor library and an aw_levelled entity in its room map, spawned by the engine from its table base as the outdoor creatures are; off = none of these, the rooms before (only the creatures config/interior_creatures.json lists)"
     }
   ],
   "current": {
@@ -1269,6 +1278,7 @@
       "resource_threads": null,
       "room_batches": "all",
       "room_levelled_creatures": "table",
+      "room_placed_creatures": "table",
       "scale_snap": null,
       "scenery_reduce": null,
       "scenery_reduce_texels": null,

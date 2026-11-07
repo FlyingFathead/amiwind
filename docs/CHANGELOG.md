@@ -1,10 +1,11 @@
 # Changelog
 
-_Last updated with AmiWind v0.0.61 (6 November 2026)._
+_Last updated with AmiWind v0.0.62-dev1 (7 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.62-dev1: first snapshot of v0.0.62, 7 November 2026](#v0062-dev1-first-snapshot-of-v0062-7-november-2026)
 - [v0.0.61: Keep Your Lantern Lit, 6 November 2026](#v0061-keep-your-lantern-lit-6-november-2026)
 - [v0.0.60: Work With What You've Got, 4 November 2026](#v0060-work-with-what-youve-got-4-november-2026)
 - [v0.0.59: Assembling The Bits And Pieces, Once Again, 3 November 2026](#v0059-assembling-the-bits-and-pieces-once-again-3-november-2026)
@@ -169,6 +170,28 @@ _Last updated with AmiWind v0.0.61 (6 November 2026)._
 - [CHIM source candidate - 14 October 2026, v0.0.40-dev1](#chim-source-candidate---14-october-2026-v0040-dev1)
 
 <!-- contents end -->
+
+## v0.0.62-dev1: first snapshot of v0.0.62, 7 November 2026
+
+The first development snapshot of v0.0.62 ([release notes](releases/notes/RELEASE-v0.0.62-dev1.md)). It needs 32 MB of
+Fast RAM.
+
+- Alchemy as in the original: drink potions, eat ingredients, and make potions in the alchemy window with the
+  apparatus carried ([ALCHEMY](ALCHEMY.md)).
+- The creatures placed in tombs, caves and other rooms are built and placed: 228 creature records built (100 before) and
+  527 of 904 room placements (4 before), with a creature census on every build ([CREATURES](CREATURES.md)).
+- The scripts of a new game run: 102 story references, the Dreamers among them, wait for their scripts, and the falling
+  mage near Seyda Neen is held on his platform, falls, takes fall damage and dies, and his body can be searched. Falls
+  with fall damage and Slowfall work for the player and for actors.
+- Scripts can move characters and creatures (PositionCell), make companions follow or escort (AIFollowCell, AIEscort),
+  place actors and items (PlaceAtPC, PlaceAtMe, PlaceItem, PlaceItemCell), switch the player's controls, fade the
+  screen, force sneaking and change resistances. The generated [MWScript tracker](MWSCRIPT_FEATURES.md) shows 479 of
+  1,207 scripts running.
+- Creatures that resist normal weapons use the abilities of their own record; the bracket fungi on the Bitter Coast
+  trees can be picked.
+- Ctrl+R works in every window, and recordings of fights replay exactly; the inventory window refreshes when items
+  change outside it; the benchmark writes its result file; the test tools start a small test image in its own map; long debug listings no
+  longer stall a frame for seconds (remote console prints are written twice a second).
 
 ## v0.0.61: Keep Your Lantern Lit, 6 November 2026
 

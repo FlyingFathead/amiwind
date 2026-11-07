@@ -12,6 +12,7 @@ void S_LocalSound(char *s){}
 void Q_memset(void *p,int v,int n){memset(p,v,n);}
 int AW_RemoteLogging(void){return 0;}
 const char *AW_RemoteConsoleLog(void){return "";}
+void AW_RemoteLog(const char *msg){(void)msg;}
 int main(void){
  static char buffer[16384];int old;char *last;
  con_text=buffer;con_linewidth=-1;vid.width=320;con_vislines=100;

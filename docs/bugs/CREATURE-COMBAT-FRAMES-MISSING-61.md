@@ -9,7 +9,7 @@
 | Where | Engine: creature animation in a fight, the ancestor ghost model (progs/c_a7b84d8bf8c0.mdl) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.61-dev2 (last seen) |
+| Persists in | fixed in v0.0.61 |
 | Severity | medium: a console line every frame of the fight on the slow machine, and the poses asked for are not the model's |
 | Family | Actors and NPCs (`actors-npc`) |
 | Playtest version | v0.0.61-dev2 |
@@ -20,12 +20,12 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.61-dev2 (6 November 2026)._
+_Last updated with AmiWind v0.0.61 (7 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
-- [Status: 6 November 2026](#status-6-november-2026)
+- [Status: 7 November 2026](#status-7-november-2026)
 - [Symptom](#symptom)
 - [How it happened](#how-it-happened)
 - [Why it was not caught](#why-it-was-not-caught)
@@ -35,10 +35,10 @@ _Last updated with AmiWind v0.0.61-dev2 (6 November 2026)._
 
 <!-- contents end -->
 
-## Status: 6 November 2026
+## Status: 7 November 2026
 
-Open (tracker CREATURE-FIGHT-MOVER-61). Seen in the in-game check of the v0.0.61-dev2 image. Repaired on the
-v0.0.61 line and checked in game with that repair; not yet in a numbered build.
+Fixed in v0.0.61. Seen in the in-game check of the v0.0.61-dev2 image, repaired on the v0.0.61 line, checked in game
+with that repair, and carried by the v0.0.61 release.
 
 ## Symptom
 
@@ -121,10 +121,12 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 - CREATURE-COMBAT-ANIM-GROUPS-54 (no report page): A creature does not use its own animation groups in a fight
 - CREATURE-COMBAT-WEAPON-54 (no report page): A creature's carried weapon is not drawn in combat
 - [CREATURE-DAGOTH-UR-ABSENT-52](CREATURE-DAGOTH-UR-ABSENT-52.md): Dagoth Ur and the Heart of Lorkhan are not in their rooms: the room creature list never named them, so Akulakhan s Chamber has neither
+- [CREATURE-EXPANSION-62](CREATURE-EXPANSION-62.md): The creatures of Tribunal and Bloodmoon are not in the game: 136 creature records, their 491 placements and 1,126 levelled creature points
 - CREATURE-NETCH-BULL-LEG-REDUCED-58 (no report page): The netch bull's reduced model loses a long stretch of one leg (up to 20 units from the source surface)
 - CREATURE-RACER-DRAWN-TINY-57 (no report page): The cliff racer is drawn many times too small: a dark speck the size of a bird while its hit box is a full cliff racer
 - CREATURE-RACER-MESH-SPIKE-58 (no report page): The cliff racer's model is drawn broken: the wings do not join the body, the parts sit apart, and a long spike runs far below
 - CREATURE-SCALE-KEYS-54 (no report page): The Heart of Lorkhan beats by a scale key, and the skeletal animation table format holds no scale
+- [CREATURE-SUMMONED-62](CREATURE-SUMMONED-62.md): The 16 creatures that summoning spells call up are not built: a summoning has no creature to show
 - DANCER-OWN-ANIM-IGNORED-53 (no report page): The Suran dancers only idle: an NPC's own animation file (anim_dancingGirl.nif) was ignored by the skeletal actors
 - DIALOGUE-FIGHT-DISPOSITION-57 (no report page): Requested: disposition drives combat as in the original: a low-disposition NPC turns hostile (effective Fight from disposition), Taunt can start a fight
 - DIALOGUE-TEXT-LINKS-57 (no report page): Requested: topic names inside an answer are plain text; the original draws them as blue links that ask about the topic
@@ -161,6 +163,7 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 - PLAYER-BODY-THIRD-PERSON-GEAR-59 (no report page): Third-person view: the assembled player body shows no worn clothes or armour, and the shield is not drawn
 - PLAYER-SPELL-CAP-58 (no report page): The player can hold only 8 spell changes, so a ninth bought spell is refused
 - [RESIDENT-ANIM-BYTE-BUDGET-48](RESIDENT-ANIM-BYTE-BUDGET-48.md): A room resident whose animation kit model is over the alias byte budget at every rung stopped the whole room stage (ienas nadus)
+- [ROOM-LEVELLED-INTRO-ROOMS-62](ROOM-LEVELLED-INTRO-ROOMS-62.md): Addamasartus and Tharys Ancestral Tomb have no levelled creatures: the intro scene converts their rooms without the levelled creature points
 - [ROOM-RESIDENTS-NO-FIT-48](ROOM-RESIDENTS-NO-FIT-48.md): 19 batch room residents have no spot their room's collision supports: slopes, a rope bridge's hull, no floor in reach
 - SKEL-ANIM-STAGE-52 (no report page): Requested: a MiniWind animation stage where NPCs of Seyda Neen and Balmora run every action from the shared table, nothing baked
 - SKEL-BUDGET-SHAPES-52 (no report page): A skeletal resident with many head shapes fits no budget of the ladder: the Vivec town stage stopped on Too many separate shapes for budget

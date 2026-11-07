@@ -173,7 +173,12 @@ def catalogue(context, refs, origin, model_indices, registry):
         return entity, pose, angles
 
     nodes, edges, plants, provenance = prepare_graph(context, refs, binding)
-    lines = [f"AWH4 {len(nodes)} {len(edges)} {len(plants)} {len(context['indices'])} {context['catalogue']} {len(registry)}"]
+    # The earlier generations of the global index (prepare_harvest.index_generations) ride on the header line after the
+    # model count: 'bases K' and K pairs of slots and digest, oldest first; none: the earlier header, byte for byte.
+    bases = context.get('bases') or ()
+    tail = (' bases %d ' % len(bases) + ' '.join('%d %s' % base for base in bases)) if bases else ''
+    lines = [f"AWH4 {len(nodes)} {len(edges)} {len(plants)} {len(context['indices'])} {context['catalogue']} {len(registry)}"
+             + tail]
     lines.extend(registry)
     lines += ['{kind} {flags} {chance} {first} {count} {id}'.format(**n) + '\t' + n.get('label', '-') for n in nodes]
     lines += [' '.join(map(str, edge)) for edge in edges]

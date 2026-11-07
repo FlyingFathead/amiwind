@@ -263,3 +263,20 @@ int AW_WorldMapTarget(const float *world,char *target,float *arrival){
     arrival[2]=0;
     return target_map(target);
 }
+/* Whether this disk holds the open-world region table (a MiniWind holds one town and none). */
+int AW_WorldHasDirectory(void){return load_directory();}
+/* DEBUG-TP-MINIWIND-36: on a disk without the open-world region table (a MiniWind: one town, no open world) an
+ * original-game point inside the map that is LOADED (the server's map) resolves to that map, through the shared
+ * conversion (its loaded CHIM frame). 0 on a disk with the table (AW_WorldMapTarget answers there), for a point
+ * outside the loaded map, or with no frame to ask. TARGET gets LOADED (at most 15 characters), ARRIVAL its local
+ * X Y and 0, as AW_WorldMapTarget. */
+int AW_WorldLoadedTarget(const char *loaded,const float *world,char *target,float *arrival){
+    float point[3],local[3];
+    if(!loaded || !*loaded || strlen(loaded)>15 || !isfinite(world[0]) || !isfinite(world[1]) ||
+       fabs(world[0])>2000000 || fabs(world[1])>2000000 || load_directory())return 0;
+    point[0]=world[0];point[1]=world[1];point[2]=0;
+    if(!AW_SourceToWorld(loaded,point,local) || !AW_WorldContains(loaded,local) ||
+       !(fabs(local[0])<AW_COORD_BOUND && fabs(local[1])<AW_COORD_BOUND))return 0;
+    strcpy(target,loaded);arrival[0]=local[0];arrival[1]=local[1];arrival[2]=0;
+    return target_map(target);
+}

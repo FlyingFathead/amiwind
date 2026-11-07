@@ -82,7 +82,29 @@ void AW_LevelupMoveSeconds(int running,int swimming,float seconds){
     if(swimming)swim_reported+=seconds;else if(running)run_reported+=seconds;
 }
 
+/* SCRIPTED-EVENT-FALLING-MAGE-61: the player's active effects (Slowfall, Jump, Levitate) and the world damage a landing
+ * deals (aw_effects.c and aw_combat.c in the engine) */
+#include "aw_effects.h"
+static float slowfall_magnitude,jump_magnitude;static float hurt_total;static int hurts;
+float AW_EffectsMagnitude(uint32_t owner,int effect,int arg){
+    (void)arg;assert(owner==AW_ACTOR_PLAYER_REF);
+    return effect==AW_EFFECT_SLOWFALL?slowfall_magnitude:effect==AW_EFFECT_JUMP?jump_magnitude:0;
+}
+int AW_EffectsCount(void){return slowfall_magnitude>0 || jump_magnitude>0;}
+int AW_CombatHurtPlayer(float damage,const char *cause){assert(!strcmp(cause,"a fall"));hurt_total+=damage;hurts++;return 0;}
+
 static int near(float a,float b){return fabs(a-b)<=.002f*(fabs(b)>1?fabs(b):1);}
+/* A fall of the player from Z0 to Z1 (engine units) in steps of 30 units a 1/20 s frame, then the landing frame. */
+static edict_t player;
+static void fall(float z0,float z1,int water_at_landing,int god){
+    int flags=god?FL_GODMODE:0;
+    player.v.origin[2]=z0;player.v.flags=flags;player.v.velocity[2]=-600;player.v.waterlevel=0;
+    aw_move_after(.05f);
+    while(player.v.origin[2]-30>=z1){player.v.origin[2]-=30;aw_move_after(.05f);}
+    player.v.origin[2]=z1;player.v.flags=FL_ONGROUND|flags;player.v.velocity[2]=0;player.v.waterlevel=water_at_landing;
+    aw_move_after(.05f);
+    player.v.waterlevel=0;player.v.flags=FL_ONGROUND;
+}
 /* The wished ground speed for this command (SV_AirMove, airborne so only the wish is read). */
 static float ground(float forward,float side,int shift){
     VectorCopy(vec3_origin,velocity);
@@ -100,7 +122,7 @@ static float swim(float forward,int shift){
 }
 
 int main(void){
-    edict_t player;client_t client;aw_move_settings_t originals;int i,n;
+    client_t client;aw_move_settings_t originals;int i,n;
     memset(&player,0,sizeof player);memset(&cmd,0,sizeof cmd);memset(&client,0,sizeof client);
     sv_player=&player;velocity=player.v.velocity;angles=player.v.angles;origin=player.v.origin;
     client.edict=&player;svs.clients=&client;svs.maxclients=1;sv.active=true;
@@ -200,6 +222,31 @@ int main(void){
     player.v.waterlevel=2;assert(!AW_MoveSneaking());player.v.waterlevel=0;
     player.v.movetype=MOVETYPE_NOCLIP;assert(!AW_MoveSneaking());player.v.movetype=MOVETYPE_WALK;
     in_sneak.state=0;assert(!AW_MoveSneaking() && near(ground(120,0,0),46.875f));
+    fatigue=200;
+
+    /* Falls (SCRIPTED-EVENT-FALLING-MAGE-61; OpenMW 0.51 character.cpp, mtphysics.cpp, physicssystem.cpp): Acrobatics
+     * 15, full fatigue (term 1.25). 600 engine units = 2,400 original: (2400 - 400 - 22.5) x 0.07 x 1.1 = 152.2675,
+     * the health lost x (1 - 0.25 x 1.25). */
+    ground(0,0,0);hurts=0;hurt_total=0;
+    fall(1000,400,0,0);assert(hurts==1 && near(hurt_total,152.2675f*.6875f));
+    fall(1000,950,0,0);assert(hurts==1);                        /* 200 units: under fFallDamageDistanceMin 400 */
+    fall(1000,400,1,0);assert(hurts==1);                        /* into water: nothing */
+    fall(1000,400,0,1);assert(hurts==1);                        /* god mode: nothing */
+    slowfall_magnitude=10;fall(1000,400,0,0);assert(hurts==1);  /* any Slowfall: the height never grows */
+    /* Slowfall slows the fall: the factor (1 - 10 x 0.005) once each 1/60 s of falling */
+    player.v.origin[2]=410;player.v.flags=0;player.v.velocity[2]=-100;aw_move_after(1/60.0f);
+    assert(near(player.v.velocity[2],-95));
+    player.v.velocity[2]=-100;aw_move_after(.05f);assert(near(player.v.velocity[2],-100*.95f*.95f*.95f));
+    player.v.velocity[2]=50;aw_move_after(.05f);assert(near(player.v.velocity[2],50));    /* rising: kept */
+    slowfall_magnitude=0;player.v.flags=FL_ONGROUND;player.v.velocity[2]=0;aw_move_after(.05f);
+    /* a Jump magnitude of 20 takes 20 units off the height */
+    hurt_total=0;fall(1000,400,0,0);fall(1000,400,0,0);assert(hurts==3 && near(hurt_total,2*152.2675f*.6875f));
+    jump_magnitude=20;hurt_total=0;fall(1000,400,0,0);
+    assert(hurts==4 && near(hurt_total,(2400-400-22.5f-20)*.07f*1.1f*.6875f));
+    jump_magnitude=0;
+    /* a teleport or a new map: no fall from where the player was */
+    player.v.origin[2]=5000;player.v.flags=0;aw_move_after(.05f);player.v.origin[2]=0;aw_move_after(.05f);
+    player.v.flags=FL_ONGROUND;aw_move_after(.05f);assert(hurts==4);
     fatigue=200;
 
     /* Superspeed: exactly the old numbers and no fatigue cost; the words; off restores the rules. */

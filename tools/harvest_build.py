@@ -5,7 +5,8 @@
 Two halves, no private plan input:
 
 - ``prepare`` (builder step ``harvest``): read the player's own master and
-  archive, convert every exterior small-mushroom model once into a shared
+  archive, convert every harvestable plant model (the small mushrooms and the
+  bracket fungi on the tree trunks, prepare_harvest.HARVEST_KINDS) once into a shared
   one-frame MDL against the palette the image step ends with, and record every
   original placement (identity, pose, bounds, model). Nothing map-specific.
 - ``install`` (image step, on the final maps): derive the plan from the region
@@ -40,6 +41,7 @@ SOURCE_FORMAT = 'AmiWind harvest source 1'
 STAGING_FORMAT = 'AmiWind harvest staging 1'
 PLAN_FORMAT = 'AmiWind external harvest plan 1'
 SOURCE_RECEIPT = 'harvest-source.json'
+FLORA_CENSUS = 'flora-census.json'          # tools/harvest_flora_census.py, written by prepare (private)
 MAX_PLANTS = 256
 TEXTURE_SIZE = 32
 NAME = re.compile(r'[a-z0-9_]{1,24}')
@@ -68,18 +70,20 @@ def runtime_limits(source=None):
 
 
 def exterior_references(context):
-    """Every exterior original small-mushroom placement, in master order."""
+    """Every exterior original placement of a harvest kind (prepare_harvest.HARVEST_KINDS: the small mushrooms and the
+    bracket fungi on the Bitter Coast tree trunks), in master order."""
     from prepare_harvest import placement_source_key
     master_sha256 = context['full']['master_sha256']
+    kinds = context.get('kinds', ('small_mushroom',))
     refs = [dict(r, source_key=placement_source_key(r, master_sha256))
-            for r in context['full']['references'] if r['kind'] == 'small_mushroom']
+            for r in context['full']['references'] if r['kind'] in kinds]
     if not refs:
-        raise ValueError('The master has no exterior small-mushroom placements')
+        raise ValueError('The master has no exterior harvestable plant placements')
     return refs
 
 
 def interior_references(context):
-    """Interior original small-mushroom placements (HARVEST-INTERIOR-PICK-47), in master order.
+    """Interior original placements of a harvest kind (HARVEST-INTERIOR-PICK-47), in master order.
 
     The same placements the global index already reserves slots for (prepare_harvest.placement_index: exterior and
     interior identities, one digest), so interior catalogues share the world's pick state: a pick in a room and a
@@ -91,8 +95,9 @@ def interior_references(context):
     from prepare_harvest_alias import alias_angles
     master_sha256 = context['full']['master_sha256']
     admitted, refused = [], []
+    kinds = context.get('kinds', ('small_mushroom',))
     for r in context['full']['interior_references']:
-        if r['kind'] != 'small_mushroom':
+        if r['kind'] not in kinds:
             continue
         ref = dict(r, source_key=placement_source_key(r, master_sha256))
         try:
@@ -151,6 +156,23 @@ def prepare(data_files, scene_palette, out, *, jobs=None, interiors=True):
     prepare_graph(dict(context, max_plants=len(refs)), refs,
                   lambda r: ({'model': '@0', 'representation': 'external_alias', 'scale': r['scale']},
                              [v * .25 for v in r['position']], alias_angles(r)))
+    # The world-wide flora check (FLORA-FAUNA-COVERAGE-62): every organic container record of the masters is known
+    # (harvestable, or pending with its register entry), and every placement of a harvest kind is placed here or
+    # listed with its reason; anything else stops the build before a model is converted.
+    from harvest_flora_census import census, check as census_check, load_config, read_masters, summary
+    flora_config = load_config()
+    listed = {r['number']: r['reason'] for r in refused}
+    if not interiors:
+        listed.update((r['number'], 'interiors off: left baked (harvest step --interiors off)')
+                      for r in context['full']['interior_references'] if r['kind'] in context['kinds'])
+    flora = census(read_masters(data, flora_config), flora_config,
+                   harvest=dict(numbers={r['number'] for r in refs}, refused=listed))
+    for line in summary(flora):
+        print(line, flush=True)
+    problems = census_check(flora)
+    if problems:
+        raise ValueError('Harvest flora census failed (FLORA-FAUNA-COVERAGE-62): %d problem(s): %s'
+                         % (len(problems), '; '.join(problems[:8])))
     palette = runtime_palette(data, scene_palette)
     if len(palette) != 768:
         raise ValueError('Expected a 768-byte RGB palette')
@@ -179,7 +201,10 @@ def prepare(data_files, scene_palette, out, *, jobs=None, interiors=True):
         models.append(dict(path=name, **pin(raw), source=model['source'], source_sha256=model['source_sha256'],
                            packet_model=number, registry=registry_line(name, raw), conversion=report))
     (out / 'palette.lmp').write_bytes(palette)
+    (out / FLORA_CENSUS).write_text(json.dumps(flora, indent=1) + '\n', encoding='utf-8', newline='\n')
     receipt = dict(format=SOURCE_FORMAT,
+                   flora_census=dict(path=FLORA_CENSUS, sha256=digest((out / FLORA_CENSUS).read_bytes()),
+                                     **flora['totals']),
                    settings=dict(max_plants=MAX_PLANTS, intern_root_spans=True, compact_models=True,
                                  texture_size=TEXTURE_SIZE, interiors=bool(interiors)),
                    master=pin(master), scene_palette_sha256=digest(Path(scene_palette).read_bytes()),
@@ -187,7 +212,8 @@ def prepare(data_files, scene_palette, out, *, jobs=None, interiors=True):
                    global_slots=len(context['indices']), global_catalogue_sha256=context['catalogue'],
                    placements=len(checked), interior_placements=len(inside), interior_refused=refused,
                    models=models,
-                   scope='Every exterior original small-mushroom placement' +
+                   kinds=list(context['kinds']), index_bases=[list(base) for base in context['bases']],
+                   scope='Every exterior original placement of the harvest kinds (' + ', '.join(context['kinds']) + ')' +
                          (' and every representable interior one' if interiors else '') +
                          '; maps, catalogues, geometry gate and heap admission are decided by the image step on '
                          'its final maps')

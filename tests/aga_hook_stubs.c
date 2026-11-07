@@ -189,5 +189,8 @@ WEAK int AW_RecorderLineShown(void){return 0;}
 WEAK void AW_RecorderDraw(void){}
 /* dbg tp's settlements box (aw_tpplaces.c, TP-PICKER-57): no table in fixtures, so the scene picker opens as before. */
 WEAK int AW_TpPlacesOpen(void){return 0;}
+/* The scripts' control switches (aw_story.c, MWSCRIPT-PLAYER-CONTROL-62): every switch on in fixtures without it. */
+WEAK int AW_ControlAllowed(int controls){(void)controls;return 1;}
+WEAK int AW_ControlsDisabled(void){return 0;}
 /* dbg weapon / dbg gear's box (aw_gearbox.c, WEAPONS-57): no box in fixtures. */
 WEAK int AW_GearBoxOpen(int kind){(void)kind;return 0;}

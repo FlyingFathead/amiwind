@@ -41,6 +41,11 @@ for a list inside a list). A creature base has text when a creature model librar
 (tools/creature_library.py, LIBRARY {creature id: base text}); without one, a levelled reference resolves to a
 creature the engine counts as "without a model".
 
+The creatures placed directly in rooms (v0.0.62, TOMB-NO-CREATURES-61) use the same section: after the real lists,
+each creature a room places (room_placed_creatures) has a list of one entry (placed_lists: that creature at level 1,
+no chance of nothing), so the room map's 'aw_levelled' entity of the reference (tools/room_levelled.py) spawns it
+with the engine's levelled path, without a change to the engine or the format.
+
 What it does not do: only actors whose model a build made (the resident stage: today the town residents; with a
 creature library, the creatures it baked) have base text; every other NPC is in the table without a model, and the
 engine counts it as not spawnable. Nothing here is reached by a default build.
@@ -308,6 +313,13 @@ def room_levelled_roots(master):
     """The levelled creature list ids (lower case) placed in the master's interior cells: the rooms' wild creatures
     (1,270 references of 58 lists in Morrowind.esm). The actor table carries their lists too, so a room's
     'aw_levelled' entity is rolled by the engine as an exterior one is (aw_actors.c)."""
+    return room_references(master)['LEVC']
+
+
+def room_references(master):
+    """{'LEVC': [list ids], 'CREA': [creature ids]} (lower case, sorted) of the non-deleted levelled creature and
+    creature references of the master's interior cells: one pass over the master for room_levelled_roots and
+    room_placed_creatures (master_tables needs both)."""
     from mwad.audit import cell_data, records, string, subrecords
     tags, rooms = {}, []
     for tag, flags, payload in records(master):
@@ -317,23 +329,65 @@ def room_levelled_roots(master):
             cell = cell_data(list(subrecords(payload)))
             if cell['flags'] & 1:
                 rooms.append(cell)
-        elif tag == 'LEVC':
+        elif tag in ('LEVC', 'CREA'):
             fields = dict(subrecords(payload))
             if 'NAME' in fields and 'DELE' not in fields:
                 tags[string(fields['NAME']).casefold()] = tag
-    return sorted({r['id'].casefold() for c in rooms for r in c['refs']
-                   if not r.get('deleted') and r.get('id', '').casefold() in tags})
+    out = {'LEVC': set(), 'CREA': set()}
+    for c in rooms:
+        for r in c['refs']:
+            ident = r.get('id', '').casefold()
+            if not r.get('deleted') and ident in tags:
+                out[tags[ident]].add(ident)
+    return {k: sorted(v) for k, v in out.items()}
 
 
-def table_list_order(lists, refs, room_roots=()):
+PLACED = 'placed'               # the key of a placed room creature's one-entry list: (PLACED, creature id)
+PLACED_ENV = 'AMIWIND_ROOM_PLACED'      # tools/room_levelled.py --room-placed-creatures (off: no placed lists)
+
+
+def room_placed_creatures(master, exclude=None, references=None):
+    """The creature ids (lower case, sorted) placed directly in the master's interior cells (the rooms' tombs, caves
+    and strongholds: 530 references of 178 records in Morrowind.esm), without EXCLUDE (default: the creatures the
+    resident stage bakes itself, config/interior_creatures.json: Vivec, Dagoth Ur and the Heart). The actor table
+    gives each one a list of its own (placed_lists), so a room's 'aw_levelled' entity spawns it as the table spawns a
+    levelled pick (TOMB-NO-CREATURES-61). Empty with --room-placed-creatures off (AMIWIND_ROOM_PLACED=off: the rooms
+    before v0.0.62). REFERENCES: room_references(master), when worked out already."""
+    import os
+    if os.environ.get(PLACED_ENV, '').strip() == 'off':
+        return []
+    if exclude is None:
+        from creature_residents import listed
+        exclude = set(listed())
+    exclude = {e.casefold() for e in exclude}
+    return [i for i in (references or room_references(master))['CREA'] if i not in exclude]
+
+
+def placed_lists(placed):
+    """{(PLACED, id): list} of PLACED creature ids: a list of one entry (the creature at level 1, every level counted,
+    no chance of nothing), so the engine's levelled roll always gives that creature, keeps it under the reference
+    (the change list's pick) and respawns it only as the game respawns a placed creature (its record's Respawn flag;
+    a levelled reference's rule does not apply: the reference identity table names it a creature's)."""
+    return {(PLACED, i): (ALL_LEVELS, 0, [(i, 1)]) for i in placed}
+
+
+def with_placed(lists, placed=()):
+    """LISTS with the placed lists of PLACED added (the lists build_table and the actor library read)."""
+    out = dict(lists)
+    out.update(placed_lists(placed))
+    return out
+
+
+def table_list_order(lists, refs, room_roots=(), placed=()):
     """The table's levelled lists in order: every list the exterior references and the rooms' ROOM_ROOTS reach
-    (used_lists, sorted). One function for the table and the room stage, so an 'aw_levelled' entity's list index is
-    the table's."""
+    (used_lists, sorted), then a list of one per creature placed in a room (PLACED: room_placed_creatures; keys
+    (PLACED, id), sorted), after the real lists, so their indices and the bases they give stay as before. One
+    function for the table and the room stage, so an 'aw_levelled' entity's list index is the table's."""
     roots = {b.casefold() for _, b, t, *_ in refs if t == 'LEVC'} | {r.casefold() for r in room_roots}
-    return used_lists(lists, roots)
+    return used_lists(lists, roots) + [(PLACED, i) for i in sorted({p.casefold() for p in placed})]
 
 
-def build_table(refs, built=None, lists=None, creatures=None, library=None, scales=None, room_roots=()):
+def build_table(refs, built=None, lists=None, creatures=None, library=None, scales=None, room_roots=(), placed=()):
     """(table bytes, report) from exterior_actors' rows and built_actors' rows (keyed by reference number).
 
     Without LISTS: version 1, as before. With LISTS (levelled_lists of the master) and CREATURES (creature_ids):
@@ -345,13 +399,18 @@ def build_table(refs, built=None, lists=None, creatures=None, library=None, scal
     index and f32 scale, by record index); a scaled creature reference takes its library text at that scale (key
     'id@S', scale_key) when the library has it, and a scaled levelled reference a copy of its list whose creatures
     take their texts at that scale (the original scales the creature a list gives by the list reference's scale:
-    OpenMW mwclass/creaturelevlist.cpp)."""
+    OpenMW mwclass/creaturelevlist.cpp).
+    PLACED (room_placed_creatures; version 2 only): the creatures placed in rooms, each a list of one after the real
+    lists (placed_lists), so a room's 'aw_levelled' entity spawns it; its creature base takes its library text."""
     built = built or {}
     library = {k.casefold(): v for k, v in (library or {}).items()}
     v2 = lists is not None
     creatures = set(creatures or ())
     scaled = {n: round(float(sc), 4) for n, sc in (scales or {}).items() if v2 and abs(sc - 1.0) > 1e-5}
-    order = table_list_order(lists, refs, room_roots) if v2 else []
+    placed = sorted({p.casefold() for p in placed} & creatures) if v2 else []
+    order = table_list_order(lists, refs, room_roots, placed) if v2 else []
+    if v2:
+        lists = with_placed(lists, placed)
     list_index = {lid: i for i, lid in enumerate(order)}
     # a scale the library has baked models for (keys 'id@S'): those references name the baked models (and say so
     # in their flags); without them the engine draws the model at the record's scale (AWU_SCALE)
@@ -474,7 +533,8 @@ def build_table(refs, built=None, lists=None, creatures=None, library=None, scal
         report['levelled'] = {'lists': len(table_lists), 'entries': sum(len(e) for _, _, e in table_lists),
                               'list_bytes': len(lists_raw), 'creature_bases': len(targets),
                               'creature_bases_with_model': sum(1 for t in targets if bases[t][1]),
-                              'entries_naming_nothing': len(missing), 'scaled_list_copies': len(copies)}
+                              'entries_naming_nothing': len(missing), 'scaled_list_copies': len(copies),
+                              'placed_lists': len(placed)}
         report['scaled_records'] = sum(1 for r in records if r[6] != 1.0)
     return bytes(out), report
 
@@ -564,12 +624,13 @@ def frame_centres(chim_root):
 
 
 def master_tables(master_path):
-    """What the table takes from the master alone: (exterior actors, levelled lists, creature ids, exterior scales).
-    About 5 s on one core; the image step works it out beside its finalize checks and hands it to write_table
-    (BUILD-IMAGE-FINALIZE-UNDERUSED-48)."""
+    """What the table takes from the master alone: (exterior actors, levelled lists, creature ids, exterior scales,
+    the rooms' levelled list roots, the creatures placed in rooms). About 5 s on one core; the image step works it
+    out beside its finalize checks and hands it to write_table (BUILD-IMAGE-FINALIZE-UNDERUSED-48)."""
     master = Path(master_path).read_bytes()
+    rooms = room_references(master)
     return (exterior_actors(master), levelled_lists(master), creature_ids(master), exterior_scales(master),
-            room_levelled_roots(master))
+            rooms['LEVC'], room_placed_creatures(master, references=rooms))
 
 
 def write_table(path, master_path, maps, chim_root=None, library=None, tables=None):
@@ -580,12 +641,14 @@ def write_table(path, master_path, maps, chim_root=None, library=None, tables=No
     report."""
     refs, levelled, creatures, scales, *rest = master_tables(master_path) if tables is None else tables
     room_roots = rest[0] if rest else ()
+    placed = rest[1] if len(rest) > 1 else ()
     built = built_actors(maps, frame_centres(chim_root) if chim_root else {})
     if library is not None and not isinstance(library, dict):
         from creature_library import base_texts
         library = base_texts(library)
-    data, report = build_table(refs, built, levelled, creatures, library, scales, room_roots)
+    data, report = build_table(refs, built, levelled, creatures, library, scales, room_roots, placed)
     report['room_list_roots'] = len(room_roots)
+    report['room_placed_creatures'] = len(placed)
     Path(path).write_bytes(data)
     return report
 

@@ -1,6 +1,6 @@
 # Game features
 
-_Last updated with AmiWind v0.0.61 (6 November 2026)._
+_Last updated with AmiWind v0.0.62-dev1 (7 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -15,7 +15,7 @@ _Last updated with AmiWind v0.0.61 (6 November 2026)._
 
 One row per system of the base game: what state AmiWind has it in, which reference decides how it should behave, where the proof is, and which work items and register entries carry the rest. The states are taken from the work lists and the bug register; a row is marked done only when it names a proof.
 
-**10 of 49 systems done**, 32 partial, 7 missing.
+**10 of 49 systems done**, 33 partial, 6 missing.
 
 | Area | Done | Partial | Missing | Systems |
 | --- | ---: | ---: | ---: | ---: |
@@ -23,30 +23,30 @@ One row per system of the base game: what state AmiWind has it in, which referen
 | Actors and behaviour | 0 | 6 | 0 | 6 |
 | The player | 2 | 5 | 0 | 7 |
 | Combat, death and the law | 1 | 2 | 1 | 4 |
-| Magic | 0 | 2 | 3 | 5 |
+| Magic | 0 | 3 | 2 | 5 |
 | Items, containers and trade | 0 | 4 | 1 | 5 |
 | Dialogue, voices, journal and factions | 0 | 4 | 0 | 4 |
 | MWScript | 1 | 2 | 0 | 3 |
 | Sound, music and the interface | 2 | 3 | 0 | 5 |
-| **All** | **10** | **32** | **7** | **49** |
+| **All** | **10** | **33** | **6** | **49** |
 
 A row counts the system, not its size: a done row can be small and a missing one large. The references are OpenMW 0.51 for behaviour (read for the rules, nothing copied) and the pages of the UESP mirror for the original's numbers.
 
 ## Measured: MWScript
 
-tools/mwscript/functions.py (the compiler's own table, counted in the builder container on 4 November 2026) and the builder's script measurement (docs/MWSCRIPT_BYTECODE.md).
+tools/mwscript/functions.py (the compiler's own table, counted in the builder container on 7 November 2026) and the builder's script measurement (docs/MWSCRIPT_BYTECODE.md).
 
 | | Count |
 | --- | ---: |
 | Functions and instructions in the compiler's table | 504 |
-| Carried out by the interpreter and the host | 229 (45.4 %) |
+| Carried out by the interpreter and the host | 319 (63.3 %) |
 | Distinct functions the game's scripts use (23 October 2026, over the three masters) | 251 |
 | Of those, carried out | used: pending |
 | Scripts in the three masters | 1,207 |
 | Scripts that compile | 1,207 |
 | Scripts that run whole (30 October 2026) | 957 (79.3 %) |
 
-used_and_carried_out is pending: the builder's script report does not record the used functions per build, so the overlap of the 251 used with the 229 carried out needs one run of python3 -m mwscript.measure on the game data in the builder container (MWSCRIPT-MORE-57).
+used_and_carried_out is pending: the builder's script report does not record the used functions per build, so the overlap of the 251 used with the 319 carried out needs one run of python3 -m mwscript.measure on the game data in the builder container (MWSCRIPT-MORE-57).
 
 ## Sub-trackers
 
@@ -55,6 +55,7 @@ Each has its own source file and its own check.
 | Tracker | Headline |
 | --- | --- |
 | [Dialogue features](DIALOGUE_FEATURES.md) | 5 of 29 done, 19 partial, 5 missing |
+| [MWScript features](MWSCRIPT_FEATURES.md) | 479 of 1207 scripts run, 130 use a function the interpreter lacks |
 | [Voices and sounds](VOICE_FEATURES.md) | per kind of line, with its proof |
 | [CHIM features](chim/FEATURES.md) | engine features with measured gains |
 | [World, cell by cell](chim/CELL_TRACKER.md) | every cell converted and audited |
@@ -86,9 +87,9 @@ Each has its own source file and its own check.
 | Residents in the world | partial | Characters stand where the original places them, with the right face, hair and gear, in the exteriors and rooms that are built. | OpenMW 0.51 actor placement; UESP Morrowind:NPCs | tests/aga_ambient_test.c, tests/test_npc_recipes.py, tests/test_chim_actor_table.py. | Bodies are still baked into the image rather than built from parts at run time; the recipe tables are being cut per area. | NPC-RECIPES-PER-AREA-59, NPC-PARTS-RUNTIME-59 | - |
 | Wander, idle and travel | partial | Residents walk and idle on their records' packages, and the scripts can send them travelling. | OpenMW 0.51 behaviour packages (wander, travel); UESP Morrowind:NPCs | tests/aga_ambient_test.c, tests/aga_npcpath_test.c, tests/test_ambient_lut.py. | Schedules by time of day, escort and the other packages are not carried out; compiled wander packages are built but off by default. | ACTORS-ALIVE-56, ACTORS-ON-57, AMBIENT-WALK-PER-AREA-60 | - |
 | Creatures | partial | Creatures on their own models with idle, wander and attack on sight. | OpenMW 0.51 creature stats and behaviour | tests/test_creature_tables.py, tests/aga_chim_actor_table_test.c. | The cliff racer's strikes land in the open world (v0.0.61-dev2), but its drawn size, the fish and the pack behaviour are not yet seen in game; Dagoth Ur's fight and voice are not in. A creature that starts a fight keeps its own run and attack frames (v0.0.61-dev3). | RACER-STRIKES-58, ACTORS-ALIVE-56 | - |
-| Followers and companions | partial | A follower keeps with the player inside a cell. | OpenMW 0.51 AIFollow and AIFollowCell | tests/aga_companion_test.c, tests/test_companion_native.py. | Followers do not cross doors with the player. | FOLLOW-CELL-58 | - |
+| Followers and companions | partial | A follower keeps with the player inside a cell and, since v0.0.62, goes through doors, travel and region loads with the player; an escort leads the player to its destination (AIFollowCell, AIEscort, AIEscortCell). | OpenMW 0.51 AIFollow, AIFollowCell and AIEscort | tests/aga_companion_test.c, tests/test_companion_native.py, tests/aga_ambient_test.c, tests/test_mwscript.py. | Going through doors is not yet seen in game; a follower whose home is outdoors comes back after a saved game is loaded only once its home area is loaded. | FOLLOW-CELL-58, MWSCRIPT-POSITIONCELL-ACTORS-62 | [MWSCRIPT-POSITIONCELL-OUTDOOR-62](bugs/MWSCRIPT-POSITIONCELL-OUTDOOR-62.md) |
 | Animation | partial | Standing, walking, running, fighting and scripted animation groups on skeletal actors. | OpenMW 0.51 animation groups; the original's keyframe files | tests/aga_animkit_test.c, tests/test_animkit.py, tests/test_anim_coverage.py. | Not every character plays its full set of sequences; walk and run cycles are being made cheaper. | ANIM-ALL-CHARACTERS-57, WALK-CYCLES-57 | [ANIMKIT-COVERAGE-35](bugs/ANIMKIT-COVERAGE-35.md) |
-| Spawning by script | partial | Characters, creatures and items placed by scripts through one shared spawn. | OpenMW 0.51 PlaceAtMe, PlaceAtPC, PlaceItem | tests/aga_spawn_test.c, tests/test_entity_spawn_contract.py. | Spawned references are not yet proven across a save and reload. | SPAWNER-57, SPAWN-PROOF-58 | - |
+| Spawning by script | partial | Characters, creatures and items placed by scripts through one shared spawn. Since v0.0.62 the scripts' PlaceAtPC, PlaceAtMe, PlaceItem and PlaceItemCell make an NPC or creature whose record the world places somewhere (spawned from that reference's entity, kept on the world change list) and any carried item (a drop row). | OpenMW 0.51 PlaceAtMe, PlaceAtPC, PlaceItem, PlaceItemCell | tests/aga_spawn_test.c, tests/test_entity_spawn_contract.py, tests/test_mwscript.py (the placing family); docs/MWSCRIPT_BYTECODE.md (placing objects). | Spawned references are not yet proven across a save and reload in game. Records no reference places (no converted model) and activators, containers and levelled lists are not placed yet. | SPAWNER-57, SPAWN-PROOF-58, MWSCRIPT-PLACE-OBJECTS-62 | [MWSCRIPT-PLACE-NO-MODEL-62](bugs/MWSCRIPT-PLACE-NO-MODEL-62.md), [MWSCRIPT-PLACE-OTHER-KINDS-62](bugs/MWSCRIPT-PLACE-OTHER-KINDS-62.md) |
 
 ### The player
 
@@ -118,7 +119,7 @@ Each has its own source file and its own check.
 | Spell effects | partial | Magic effects applied to actors over their duration, the active effects display, and the effect rules. | OpenMW 0.51 magic effects; UESP Morrowind:Magic Effects | tests/aga_magic_rules_test.c, tests/test_magic_effects.py, docs/MAGIC_EFFECTS.md, docs/HUD_ACTIVE_EFFECTS.md. | Resistances from abilities, reflection, the movement effects, the caster's half of Absorb, and some effects that other systems must read (Shield does not yet soften blows); an ended Fortify Attribute leaves a drop counted as damage. | SPELL-EFFECTS-57 | - |
 | Player casting | partial | Ready a spell, pay the magicka, roll to succeed, deliver Self, Touch and Target effects; the starting spells of race, birth sign and class; enchanted items that cast (Cast When Strikes, Cast When Used, Constant Effect, scrolls). | OpenMW 0.51 spell casting; UESP Morrowind:Magic | tests/test_mwscript.py CastRuleTests and EffectTests, docs/MAGIC_EFFECTS.md (Casting, Enchanted items); the four kinds of enchanted item seen in game on the v0.0.61-dev2 image with the dev3 engine. | The hands' casting gesture; the worn Constant Effect items of non-player characters; an enchanted blow of a non-player character on the player is not yet seen in game, and its charge is kept for the session only; Tribunal and Bloodmoon items are not in the item table. | PLAYER-CASTING-59 | - |
 | Spellmaking | missing | Making spells at a spellmaker. | OpenMW 0.51 spellmaking; UESP Morrowind:Spellmaking | - | - | - | - |
-| Alchemy | missing | Making potions from apparatus and ingredients. | OpenMW 0.51 alchemy; UESP Morrowind:Alchemy | - | - | - | - |
+| Alchemy | partial | Making potions from apparatus and ingredients in the alchemy window (apparatus quality, the effects the Alchemy skill reveals, strength and duration from skill, Intelligence, Luck and apparatus, success roll, skill gain); drinking potions; eating an ingredient for its first effect. | OpenMW 0.51 alchemy; UESP Morrowind:Alchemy | tests/test_alchemy.py, tests/aga_alchemy_rules_test.c, tests/aga_alchemy_catalogue_test.c, docs/ALCHEMY.md. | Several potions at once and a typed potion name; ingredient and apparatus pictures in the window; non-player characters do not drink potions. | ALCHEMY-61 | - |
 | Enchanting | missing | Enchanting items with soul gems at an enchanter. Items that are already enchanted cast; see Player casting. | OpenMW 0.51 enchanting; UESP Morrowind:Enchant | - | - | - | - |
 
 ### Items, containers and trade
@@ -145,7 +146,7 @@ Each has its own source file and its own check.
 | System | State | What | Reference | Proof | Missing | Work items | Register |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | MWScript compiler | done | All 1,207 scripts of the three masters compile to the compact bytecode, with the original's quirks kept. | OpenMW 0.51 script compiler (behaviour only); UESP Morrowind:Scripting | tests/test_mwscript.py; docs/MWSCRIPT_BYTECODE.md (1,207 of 1,207 compiled, none refused). | - | - | - |
-| MWScript functions | partial | The compiler knows 504 functions and instructions; the interpreter and the host carry out 229 of them, the rest compile to the not-yet call. The game's scripts use 251 distinct functions. | OpenMW 0.51 script extensions (behaviour); UESP Morrowind:Script Functions | tools/mwscript/functions.py (the table and its RUN and HOST sets); tests/test_mwscript.py. | 275 table functions are not carried out. How many of the 251 used ones are among them is pending a measurement run. | MWSCRIPT-MORE-57, ACTORS-ON-57 | - |
+| MWScript functions | partial | The compiler knows 504 functions and instructions; the interpreter and the host carry out 281 of them (since v0.0.62 the player's control switches too: Disable/EnablePlayerControls and their family, kept in saved games; the small functions: GetAngle, SetAngle, Move, MoveWorld, RotateWorld, SetPos, SetAtStart, Face, GetDetected, GetLOS, GetInterior, GetCurrentWeather, GetPCSneaking, GetWeaponDrawn, OnKnockout, SetDelete, WakeUpPC; and the placing family: PlaceAtPC, PlaceAtMe, PlaceItem, PlaceItemCell), the rest compile to the not-yet call. The game's scripts use 251 distinct functions. | OpenMW 0.51 script extensions (behaviour); UESP Morrowind:Script Functions | tools/mwscript/functions.py (the table and its RUN and HOST sets); tests/test_mwscript.py; tests/aga_controls_test.c; tests/aga_move_rules_test.c; tests/aga_crime_rules_test.c. | 223 table functions are not carried out. How many of the 251 used ones are among them is pending a measurement run. | MWSCRIPT-MORE-57, ACTORS-ON-57, MWSCRIPT-PLAYER-CONTROL-62, MWSCRIPT-SMALL-FUNCTIONS-62, MWSCRIPT-PLACE-OBJECTS-62 | - |
 | Scripts that run whole | partial | 957 of the 1,207 scripts run whole today: every function they call is carried out. | the original scripts run under OpenMW 0.51 | docs/MWSCRIPT_BYTECODE.md (measured 30 October 2026); tests/test_mwscript.py. | 250 scripts call at least one function that is not carried out. The census tray smoke test is not run. | MWSCRIPT-MORE-57, MWSCRIPT-TRAY-SMOKE-58, ACTORS-ON-57 | - |
 
 ### Sound, music and the interface

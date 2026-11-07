@@ -109,7 +109,7 @@ class FormatTests(unittest.TestCase):
         self.assertEqual(record['status'], 'complete')
         self.assertEqual(record['labels'], [])
         self.assertEqual(sum(row['bytes'] for row in record['groups'].values()), record['payload_bytes'])
-        self.assertEqual(size_ledger.gib(record['payload_bytes']), '2.73')  # v0.0.60 release record (v0.0.59's 2.71 + the per-area packs)
+        self.assertEqual(size_ledger.gib(record['payload_bytes']), '2.73')  # v0.0.61 release record (same 2.73 as v0.0.60's)
         # NPC Gallery v2.0 (v0.0.54) bakes nothing of its own: the gallery shows the world's own characters
         self.assertEqual(size_ledger.gib(record['groups']['npc-gallery']['bytes']), '0.00')
 

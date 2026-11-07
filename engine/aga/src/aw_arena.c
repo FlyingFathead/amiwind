@@ -27,6 +27,7 @@
 #include "aw_mappath.h"
 #include "aw_animkit.h"
 #include "aw_anim.h"
+#include "aw_actors.h"
 
 #define MAP_PIT "vai000"
 #define MAP_FLOOR "charplane"
@@ -169,12 +170,17 @@ static int choose(const char *spec) {
     }
     if(spec[0]=='#')spec++;
     if(choose_gallery(0,spec))return 1;
-    /* Any NPC record: stats from its sheet, a stand-in model. */
+    /* Any NPC or creature record: stats from its sheet; the model the world draws it with (its actor table base:
+     * a creature's own baked model, COMBAT-PLAYGROUND-CREATURE-HUMANOID-61), else a stand-in. */
     {
-        aw_fighter_t sheet;char lowered[32];int i;
+        aw_fighter_t sheet;char lowered[32],own[64];int i;
         for(i=0;i<31 && spec[i];i++)lowered[i]=(spec[i]>='A' && spec[i]<='Z')?spec[i]+32:spec[i];
         lowered[i]=0;
-        if(AW_CombatActorLoad(lowered,&sheet))return take(sheet.id,sheet.name,"","",SOURCE_STANDIN,-1);
+        if(AW_CombatActorLoad(lowered,&sheet)){
+            if(!AW_ActorsBaseModel(lowered,own,sizeof(own)))own[0]=0;
+            else Con_Printf("Combat playground: %s drawn with its own model %s\n",lowered,own);
+            return take(sheet.id,sheet.name,own,"",SOURCE_STANDIN,-1);
+        }
     }
     Con_Printf("No fighter, gallery NPC or NPC record matches \"%s\" (dbgmode arenapit list).\n",spec);
     return 0;
@@ -188,7 +194,8 @@ static void list(void) {
     if(!f)Con_Printf(" (no baked fighters in this build)\n");
     if(g)Con_Printf(" + %ld humanoid NPCs of the gallery (one pose): dbg gallery browse, then their # or ID\n",(long)g);
     else Con_Printf(" (no NPC gallery in this build)\n");
-    Con_Printf(" + any NPC record ID (stand-in model). next / prev step through fighters, then the gallery.\n");
+    Con_Printf(" + any NPC or creature record ID (the model the world draws it with, else a stand-in). next / prev step\n"
+               "   through fighters, then the gallery.\n");
     if(foe.id[0])Con_Printf("Current: %s (%s)\n",foe.name,foe.id);
 }
 static void modes(void) {
@@ -204,8 +211,8 @@ static void modes(void) {
 static void creatures(void) {
     Con_Printf("Creature fights: a creature's sheet comes from the actor record (docs/ACTOR_STATE.md): its level,\n"
                "attributes, combat skill, health and its own attacks. Fight one here by its record ID (dbgmode arenapit\n"
-               "daedroth: a stand-in model) or by hitting it in the world. Not yet: creatures' carried weapons, their\n"
-               "own animation groups in a fight, their sound generators from their animations.\n");
+               "daedroth: the model the world draws it with, a stand-in when it has none) or by hitting it in the\n"
+               "world. Not yet: creatures' carried weapons, their sound generators from their animations.\n");
 }
 
 /* A creature's sound generators (combat/sndg.txt "AWSG1 N", then sorted rows "id<tab>g0<tab>...<tab>g7", each
@@ -339,7 +346,9 @@ void AW_ArenaEntities(void) {
             SetMinMaxSize(e,low,high,false);
         }
         {eval_t *v=GetEdictFieldValue(e,"aw_source_id");if(v)v->string=ED_NewString(o->id)-pr_strings;}
-        if(mode!=MODE_DUEL)AW_AnimPrep(e);     /* its <model>.anm: the anim mode's groups of a baked model */
+        /* its <model>.anm: the anim mode's groups of a baked model; a record drawn with its world model (a creature's
+         * standing model naming its mover) in every mode, so its fight has its own run and attack frames */
+        if(mode!=MODE_DUEL || (o->source==SOURCE_STANDIN && o->model[0] && index!=standin))AW_AnimPrep(e);
         opponents[k]=e;
     }
 }

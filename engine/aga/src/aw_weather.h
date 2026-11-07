@@ -147,6 +147,10 @@ int AW_WeatherMountainLevel(void);
 int AW_WeatherStorm(float dir[2]);
 /* What falls at the player this frame (AW_PRECIP_*, strength 0..AW_WEATHER_STEPS); AW_PRECIP_NONE indoors. */
 int AW_WeatherFalling(int *strength);
+/* GetCurrentWeather (OpenMW 0.51 skyextensions.cpp OpGetCurrentWeather, weather.cpp: the weather in effect, the one
+ * being left while a transition runs; kept indoors): its number in aw_weather_names' order, the original's (0 clear
+ * .. 9 blizzard). MWSCRIPT-SMALL-FUNCTIONS-62. */
+int AW_WeatherCurrent(void);
 /* aw_atmos.c: the falling weather and the mesh smoke (WEATHER-RAIN, MESH-PARTICLE-EMITTERS); the update runs each
  * client frame after CL_UpdateTEnts (cl_main.c), the init with the weather's (r_sky.c). */
 void AW_AtmosInit(void);

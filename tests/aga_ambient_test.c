@@ -122,6 +122,28 @@ int main(int argc,char **argv) {
     }
     assert(AW_AmbientWithin(0,0,0,0) && AW_AmbientWithin(25,0,0,100) && !AW_AmbientWithin(26,0,0,100));
     assert(!AW_AmbientWithin(20000,0,0,65535));
+    {   /* AIFollowCell (v0.0.62, OpenMW aifollow.cpp): no place named: near the point anywhere; a room: only there;
+         * a cell that is no room: never by its position */
+        assert(AW_AmbientFollowDone(0,0,99,10) && !AW_AmbientFollowDone(0,0,100,10));
+        assert(AW_AmbientFollowDone(7,7,1,10) && !AW_AmbientFollowDone(7,8,1,10) && !AW_AmbientFollowDone(7,0,1,10));
+        assert(!AW_AmbientFollowDone(-1,0,0,10) && !AW_AmbientFollowDone(-1,5,0,10));
+    }
+    {   /* AIEscort (v0.0.62, OpenMW aiescort.cpp): 450 to start, then the half extent + 450 while near, + 250 once the
+         * target fell behind; done within 64 of the destination; outside its place it waits */
+        float max=0;
+        assert(AW_AmbientEscortStep(0,0,100.0f*100.0f,500.0f*500.0f,16,&max)==AW_ESCORT_WALK && max==16+112.5f);
+        assert(AW_AmbientEscortStep(0,0,120.0f*120.0f,500.0f*500.0f,16,&max)==AW_ESCORT_WALK);   /* 128.5 now */
+        assert(AW_AmbientEscortStep(0,0,130.0f*130.0f,500.0f*500.0f,16,&max)==AW_ESCORT_WAIT && max==16+62.5f);
+        assert(AW_AmbientEscortStep(0,0,100.0f*100.0f,500.0f*500.0f,16,&max)==AW_ESCORT_WAIT);   /* 78.5: still behind */
+        assert(AW_AmbientEscortStep(0,0,70.0f*70.0f,500.0f*500.0f,16,&max)==AW_ESCORT_WALK);
+        assert(AW_AmbientEscortStep(0,0,70.0f*70.0f,15.0f*15.0f,16,&max)==AW_ESCORT_DONE);
+        max=0;
+        assert(AW_AmbientEscortStep(9,3,0,0,16,&max)==AW_ESCORT_WAIT && max==0);   /* another room: waits */
+        assert(AW_AmbientEscortStep(9,9,0,0,16,&max)==AW_ESCORT_DONE);
+        assert(AW_AmbientEscortStep(-1,9,0,0,16,&max)==AW_ESCORT_WAIT);           /* outdoors only */
+        assert(AW_AmbientEscortStep(-1,0,0,0,16,&max)==AW_ESCORT_DONE);
+        checks+=14;
+    }
     printf("aga_ambient_test: %d checks passed\n",checks);
     free(data);
     return 0;

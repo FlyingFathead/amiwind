@@ -92,6 +92,32 @@ int AW_StoryViewAllowed(void)
         (aw_story.stage==AW_STAGE_PAPERS && aw_story.census==-1);
 }
 
+/* The scripts' control switches (aw_story.h, MWSCRIPT-PLAYER-CONTROL-62): one saved named fact, read where the input
+ * asks (a short search of the 32 global rows, as CharGenState's above). AW_StoryReset's AW_StateReset clears it, so a
+ * new game starts with every switch on, as OpenMW's InputManager::clear and World::startNewGame. */
+int AW_ControlsDisabled(void)
+{
+    return (int)AW_StateGet(&aw_state,AW_GLOBAL,AW_CONTROL_FACT)&AW_CONTROL_ALL;
+}
+int AW_ControlAllowed(int controls)
+{
+    return !(AW_ControlsDisabled()&controls);
+}
+int AW_ControlSet(int controls,int enable)
+{
+    int now=AW_ControlsDisabled(),next=enable?now&~controls:now|(controls&AW_CONTROL_ALL);
+    if(next==now)return 1;               /* no row is taken for a switch that does not change */
+    return AW_StateSet(&aw_state,AW_GLOBAL,AW_CONTROL_FACT,next);
+}
+const char *AW_ControlName(int control)
+{
+    static const char *const names[]={"playercontrols","playerfighting","playerjumping","playerlooking","playermagic",
+                                      "playerviewswitch","vanitymode","teleporting","levitation"};
+    int i;
+    for(i=0;i<9;i++)if(control==1<<i)return names[i];
+    return "";
+}
+
 void AW_ExpandPlayerName(char *out,unsigned capacity,const char *text)
 {
     unsigned n=0;

@@ -18,6 +18,10 @@ class SharedHarvestNativeTests(unittest.TestCase):
     def test_same_original_facts_across_brush_alias_save_and_return(self):
         self.compile('aga_harvest_mixed_test.c', ['aw_harvest.c', 'aw_state.c', 'aw_save_codec.c'])
 
+    def test_index_generations_keep_earlier_saves_and_sixteen_models(self):
+        # FLORA-FAUNA-COVERAGE-62: the trunk fungi join the index as a new generation
+        self.compile('aga_harvest_generations_test.c', ['aw_harvest.c', 'aw_state.c', 'aw_save_codec.c'])
+
     def test_shared_proxy_lifetime_capacity_failure_and_no_reroll(self):
         self.compile('aga_harvest_proxy_test.c', ['aw_harvest_proxy.c', 'aw_harvest.c', 'aw_state.c'])
 

@@ -23,6 +23,7 @@ char *ID = "$VER: AmiWind " AMIWIND_VERSION "\r\n";
 
 #include "quakedef.h"
 #include "aw_log.h"
+#include "aw_remote.h"
 extern cvar_t aw_logs_live;
 
 
@@ -411,6 +412,9 @@ void Sys_Error (char *error, ...)
 
     /* Capture allocator state before shutdown releases caches and heap. */
     AW_HeapAuditPhase(NULL,"fatal-exit");
+    /* a test session's console copy (collected in memory, SESSION-STALL-AFTER-LONG-FRAME-62) gets the
+     * fatal-exit note now, before any shutdown step that could fail again */
+    AW_RemoteLogFlush();
     /* DOS calls avoid the allocating stdio path during heap exhaustion.
      * Resolve the file itself so the displayed path matches this launch's cwd. */
     strcpy(errorPath,"ERROR.TXT (in the launch directory)");

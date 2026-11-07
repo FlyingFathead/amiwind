@@ -17,7 +17,8 @@ static float units(const aw_move_settings_t *s,const aw_move_inputs_t *in) {
 int main(void) {
     aw_move_settings_t s;aw_move_inputs_t in;
     AW_MoveSettingsDefault(&s);
-    assert(AW_MoveSettingIndex("fminwalkspeed")==0 && AW_MoveSettingIndex("fFatigueMult")==AW_MOVE_SETTING_COUNT-1);
+    assert(AW_MoveSettingIndex("fminwalkspeed")==0 && AW_MoveSettingIndex("fFatigueMult")==29 &&
+           AW_MoveSettingIndex("fFallAcroMult")==AW_MOVE_SETTING_COUNT-1);
     assert(AW_MoveSettingIndex("fCombatDistance")<0 && !AW_MoveSettingSet(&s,"nonsense",1));
     assert(s.fMinWalkSpeed==100 && s.fMaxWalkSpeed==200 && s.fBaseRunMultiplier==1.75f && s.fAthleticsRunBonus==1);
     assert(AW_MOVE_UNIT_SCALE==.25f);
@@ -145,5 +146,69 @@ int main(void) {
     /* levitation with half the load: (5 + 0.01 x (50 + 10) x 295) x (1 - 0.3 x 0.5) */
     in.carried=150;in.levitate=10;in.levitation_enabled=1;assert(near(AW_MoveMaxSpeed(&s,&in),182*.85f));
     in.levitate=0;in.levitation_enabled=0;in.carried=0;
+
+    /* Falls (SCRIPTED-EVENT-FALLING-MAGE-61), by hand from OpenMW 0.51 character.cpp getFallDamage with Morrowind.esm's
+     * fFallDamageDistanceMin 400, fFallDistanceBase 0, fFallDistanceMult 0.07, fFallAcroBase 0.25, fFallAcroMult 0.01
+     * (read from the master on 7 November 2026). */
+    assert(s.fFallDamageDistanceMin==400 && s.fFallDistanceBase==0 && near(s.fFallDistanceMult,.07f) &&
+           s.fFallAcroBase==.25f && near(s.fFallAcroMult,.01f));
+    assert(AW_MoveFallDamage(&s,399.9f,0,0)==0);                     /* below the minimum: nothing */
+    assert(AW_MoveFallDamage(&s,400,0,0)==0);                        /* at it: (0 + 0.07 x 0) x 1.25 */
+    assert(near(AW_MoveFallDamage(&s,1400,0,0),87.5f));              /* 0.07 x 1000 x (0.25 + 0.01 x 100) */
+    /* Acrobatics 15: (1400 - 400 - 22.5) x 0.07 x (0.25 + 0.85) = 75.2675 */
+    assert(near(AW_MoveFallDamage(&s,1400,15,0),75.2675f));
+    /* a Jump magnitude of 20 takes 20 more units off: (977.5 - 20) x 0.07 x 1.1 */
+    assert(near(AW_MoveFallDamage(&s,1400,15,20),73.7275f));
+    assert(AW_MoveFallDamage(&s,500,100,0)==0);                       /* Acrobatics 100 absorbs 150 units: 0 left */
+    /* The falling mage: about 2,464 units from his platform to the ground, Acrobatics 15 (a level 6 enchanter, read
+     * from his record by the actor table in game): (2464 - 400 - 22.5) x 0.07 x 1.1 = 157.195; at full fatigue
+     * (term 1.25) the health lost is 157.195 x (1 - 0.3125) = 108.07, far over his 5 */
+    assert(near(AW_MoveFallDamage(&s,2464,15,0),157.1955f));
+    assert(near(AW_MoveFallHealthLoss(157.1955f,1.25f),108.0719f));
+    assert(AW_MoveFallHealthLoss(0,1.25f)==0);
+    /* knocked down when the damage passes Acrobatics x the fatigue term */
+    assert(AW_MoveFallKnockdown(20,15,1.25f) && !AW_MoveFallKnockdown(18,15,1.25f) && !AW_MoveFallKnockdown(0,0,1));
+    /* Slowfall (physicssystem.cpp): 1 - magnitude x 0.005, clamped */
+    assert(AW_MoveSlowFallFactor(0)==1 && near(AW_MoveSlowFallFactor(10),.95f) && near(AW_MoveSlowFallFactor(100),.5f));
+    assert(AW_MoveSlowFallFactor(300)==0 && AW_MoveSlowFallFactor(-5)==1);
+    /* a step (movementsolver.cpp): gravity x step off the vertical speed, then the factor while falling */
+    assert(near(AW_MoveFallStep(0,AW_MOVE_PHYSICS_STEP,AW_MOVE_GRAVITY,1),-AW_MOVE_GRAVITY/60));
+    assert(near(AW_MoveFallStep(0,AW_MOVE_PHYSICS_STEP,AW_MOVE_GRAVITY,.5f),-AW_MOVE_GRAVITY/120));
+    assert(near(AW_MoveFallStep(100,AW_MOVE_PHYSICS_STEP,AW_MOVE_GRAVITY,.5f),100-AW_MOVE_GRAVITY/60));   /* rising: kept */
+    {   /* with Slowfall 10 the speed settles where v = 0.95 (v - g/60): -0.95 x 10.452 / 0.05 = -198.6 units/s */
+        float v=0;int i;
+        for(i=0;i<600;i++)v=AW_MoveFallStep(v,AW_MOVE_PHYSICS_STEP,AW_MOVE_GRAVITY,AW_MoveSlowFallFactor(10));
+        assert(fabs(v+.95f*AW_MOVE_GRAVITY/60/.05f)<.5f);
+    }
+
+    /* A script's angles (MWSCRIPT-SMALL-FUNCTIONS-62; OpenMW 0.51 OpGetAngle / OpSetAngle / rotateObject): an object
+     * placed with the original's z rotation 4.5 radians stands at Quake yaw -257.83, so GetAngle Z reads 257.83 back
+     * as placed; an actor's reads within -180..180 (-102.17), its x within -90..90; y is the roll */
+    {
+        float q[3]={10,-257.8310f,-30},out;
+        assert(near(AW_MoveScriptAngle(q,'z',0),257.831f) && near(AW_MoveScriptAngle(q,'Z',1),-102.169f));
+        assert(near(AW_MoveScriptAngle(q,'x',0),10) && near(AW_MoveScriptAngle(q,'y',1),-30));
+        q[0]=200;assert(near(AW_MoveScriptAngle(q,'x',0),200) && near(AW_MoveScriptAngle(q,'x',1),-90));
+        q[0]=100;assert(near(AW_MoveScriptAngle(q,'x',1),90));
+        q[1]=-720.5f;assert(near(AW_MoveScriptAngle(q,'w',1),.5f));    /* w is z; whole turns off */
+        assert(AW_MoveScriptAngle(q,'q',0)==0);
+        /* SetAngle: z 90 is Quake yaw -90 (the doors' "SetAngle Z 90"); 270 on an actor turns to -90, so yaw 90 */
+        assert(AW_MoveScriptAngleSet('z',90,0,&out)==1 && near(out,-90));
+        assert(AW_MoveScriptAngleSet('Z',270,1,&out)==1 && near(out,90));
+        assert(AW_MoveScriptAngleSet('x',45,0,&out)==0 && near(out,45));
+        assert(AW_MoveScriptAngleSet('x',135,1,&out)==0 && near(out,90));
+        assert(AW_MoveScriptAngleSet('v',-20,0,&out)==2 && near(out,-20));
+        assert(AW_MoveScriptAngleSet('a',1,0,&out)==-1);
+        /* GetAngle reads back what SetAngle wrote */
+        q[0]=q[1]=q[2]=0;AW_MoveScriptAngleSet('z',123.5f,0,&q[1]);assert(near(AW_MoveScriptAngle(q,'z',0),123.5f));
+    }
+    /* Move along the object's own axes: x forward, y left (minus right), z up */
+    {
+        float f[3]={0,1,0},r[3]={1,0,0},u[3]={0,0,1},d[3];
+        assert(AW_MoveScriptLocal(f,r,u,'x',5,d) && d[0]==0 && d[1]==5 && d[2]==0);
+        assert(AW_MoveScriptLocal(f,r,u,'Y',5,d) && d[0]==-5 && d[1]==0);
+        assert(AW_MoveScriptLocal(f,r,u,'z',-2,d) && d[2]==-2 && d[0]==0);
+        assert(!AW_MoveScriptLocal(f,r,u,'w',5,d) && d[0]==0 && d[1]==0 && d[2]==0);
+    }
     return 0;
 }

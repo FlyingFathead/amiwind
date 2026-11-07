@@ -87,7 +87,11 @@ def new_stamp(version=None):
 # Routes that share a handler but are commands of their own: the translator (aw_console.c route_format) turns
 # them into a different value of that handler (switch bits of aw_cull; the teleport command's roulette), so they are
 # no aliases of it.
-OWN_ROUTES = {('aw_cull', 'fog rule'), ('aw_cull', 'cut groups'), ('aw_teleport', 'door roulette')}
+OWN_ROUTES = {('aw_cull', 'fog rule'), ('aw_cull', 'cut groups'), ('aw_teleport', 'door roulette'),
+              # the casting words of aw_magicfx and the player-body words of aw_camera: each is a command of its own
+              ('aw_magicfx', 'cast casting'), ('aw_magicfx', 'cast now'), ('aw_magicfx', 'cast ready'),
+              ('aw_magicfx', 'cast spell'), ('aw_magicfx', 'cast start'), ('aw_magicfx', 'cast strike'),
+              ('aw_camera', 'camera fpview'), ('aw_camera', 'camera hands'), ('aw_camera', 'camera parts')}
 
 
 def render(text, stamp=None):

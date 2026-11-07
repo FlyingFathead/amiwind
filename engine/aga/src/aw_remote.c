@@ -13,6 +13,8 @@
  * output also goes to <aw_remote_dir>console.log (Quake's -condebug log).
  * Nothing here runs while aw_remote is 0.
  */
+#include <unistd.h>
+#include <fcntl.h>
 #include "quakedef.h"
 #include "aw_world.h"
 #include "aw_clock.h"
@@ -59,6 +61,41 @@ const char *AW_RemoteConsoleLog(void)
     static char path[MAX_OSPATH];
     remote_path(path,sizeof path,"console.log");
     return path;
+}
+/* SESSION-STALL-AFTER-LONG-FRAME-62: the console copy was one open, seek, write and close on the
+ * remote folder per Con_Printf, and Quake prints piecewise (one "edict" listing is about 300
+ * prints, each field name padded one space at a time): a 3-7 s frame of remote-folder file calls,
+ * and 3 of 10 test sessions stopped right after one. The prints now collect here (8 KiB, a
+ * fraction of a frame's text) and go out in ONE append: at the poll (twice a second), on the
+ * long-work heartbeat, when the buffer is full, and at exit (Sys_Error flushes right after its
+ * fatal-exit heap note). A print larger than the buffer is appended on its own. */
+#define REMOTE_LOG_MAX 8192
+static char log_buf[REMOTE_LOG_MAX];
+static int log_len,log_exit_hook;
+static void log_append(const char *data,int len)
+{
+    int fd=open(AW_RemoteConsoleLog(),O_WRONLY|O_CREAT|O_APPEND,0666);
+    if(fd<0)return;
+    /* the Amiga C library does not honour O_APPEND (REMOTE-CONSOLE-APPEND-31) */
+    lseek(fd,0,SEEK_END);
+    if(write(fd,data,len)!=len){}   /* a short write loses log text only; nothing to retry here */
+    close(fd);
+}
+void AW_RemoteLogFlush(void)
+{
+    int n=log_len;
+    if(n<=0)return;
+    log_len=0;
+    log_append(log_buf,n);
+}
+void AW_RemoteLog(const char *msg)
+{
+    int n=msg?(int)strlen(msg):0;
+    if(n<=0)return;
+    if(!log_exit_hook){log_exit_hook=1;atexit(AW_RemoteLogFlush);}
+    if(log_len+n>REMOTE_LOG_MAX)AW_RemoteLogFlush();
+    if(n>REMOTE_LOG_MAX){log_append(msg,n);return;}
+    memcpy(log_buf+log_len,msg,n);log_len+=n;
 }
 /* Run a waiting command file: its text goes to the command buffer as typed. */
 static void run_commands(void)
@@ -115,8 +152,10 @@ static void write_state(void)
 void AW_RemotePoll(void)
 {
     ticks++;
-    if(aw_remote.value<=0 || realtime<next_poll)return;
+    if(aw_remote.value<=0){AW_RemoteLogFlush();return;}   /* switched off: what was collected still goes out */
+    if(realtime<next_poll)return;
     next_poll=realtime+REMOTE_PERIOD;
+    AW_RemoteLogFlush();
     run_commands();
     write_state();
 }
@@ -128,6 +167,7 @@ void AW_RemoteBusy(double now)
     ticks++;
     if(aw_remote.value<=0 || now<next_busy)return;
     next_busy=now+REMOTE_PERIOD;
+    AW_RemoteLogFlush();
     write_state();
 }
 void AW_RemoteInit(void)

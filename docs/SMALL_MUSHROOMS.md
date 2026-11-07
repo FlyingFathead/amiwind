@@ -1,6 +1,6 @@
 # Optional small mushrooms
 
-_Last updated with AmiWind v0.0.57 (31 October 2026)._
+_Last updated with AmiWind v0.0.61 (7 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -9,6 +9,8 @@ _Last updated with AmiWind v0.0.57 (31 October 2026)._
 - [Crosshair prompt and pickup notification](#crosshair-prompt-and-pickup-notification)
 - [Dev4 pickup confirmation and repeatable release checkpoint](#dev4-pickup-confirmation-and-repeatable-release-checkpoint)
 - [Every CHIM town has its catalogues (v0.0.57)](#every-chim-town-has-its-catalogues-v0057)
+- [Bracket fungi on the tree trunks (v0.0.62)](#bracket-fungi-on-the-tree-trunks-v0062)
+- [Every harvestable plant of the game: the flora census (v0.0.62)](#every-harvestable-plant-of-the-game-the-flora-census-v0062)
 
 <!-- contents end -->
 
@@ -232,3 +234,63 @@ map (`aw_region.c` AW_RegionAt, `aw_harvest_runtime.c` AW_HarvestFollow). The CH
 those plants out before, for the image to place). New catalogues change the save-content fingerprint, as any
 catalogue change does. A partial-area test build whose image has no region table of a town (an interior-scope
 MiniWind of one of its rooms) lists that town's plants as its limit.
+
+## Bracket fungi on the tree trunks (v0.0.62)
+
+The shelf-shaped fungi that grow from the sides of the Bitter Coast trees, Bungler's Bane and Hypha Facia, are
+picked exactly like the small mushrooms on the ground: aim at one, the same `(E: Pick)` prompt, the same picking
+sound and message, and the fungus is gone after picking, through cell changes and save and load. Indoors and in every
+CHIM area alike: the CHIM world and the CHIM rooms leave them out and the image places them as harvest entities from
+the same catalogues ([HARVEST-TREE-FUNGUS-62](bugs/HARVEST-TREE-FUNGUS-62.md)).
+
+They are a harvest kind of their own (`tree_fungus`, the four `flora_bc_shelffungus_NN` meshes), kept apart from the
+scenery kinds so that nothing else about how these meshes are drawn or collide changes. 813 placements of the base
+master: 724 outdoors (Bitter Coast 667, West Gash 46, Ascadian Isles 11) and 89 indoors.
+
+**Earlier saves keep their picks.** The saved pick state is a table of placement facts keyed by one global placement
+index. The fungi join that index as a second generation, after every mushroom: the 2,083 mushroom slots and the
+digest of the earlier index stay exactly as they were, and the fungi take slots 2,084 to 2,896 (of 4,096). Every
+catalogue names the earlier index on its header line (`bases 1 2083 <digest>` after the model count). A save made with
+the earlier index is accepted as it is and taken over to the new one the first time a plant's pick state is written;
+its picked mushrooms stay picked. A save of any other index is still refused, as before. Up to four earlier
+generations can be named, so later kinds can join the same way.
+
+**Up to 16 shared models per catalogue** (was 8): a Bitter Coast map can hold the eight small-mushroom meshes and the
+four fungus meshes together (up to 12 in one map). A plant row names its model as `@0` to `@15`.
+
+**What it costs** (counted on the base master and the v0.0.61 build's maps; the in-game numbers come from the
+MiniWind check):
+
+- Disk: four fungus models of 3,960 bytes each (48 triangles, a 68 by 33 skin). A catalogue row is about 170 bytes;
+  the largest map catalogue grows from 98 to 174 plants, under the 256-plant and 64 KiB catalogue bounds.
+- RAM: the models a map uses (at most 4 more alias models of about 4 KB each), one proxy entity per unpicked plant (up
+  to about 80 more in the densest Bitter Coast map) and the catalogue rows; 148 bytes more per loaded catalogue for the
+  earlier-generation table and 32 bytes of proxy model pointers. The saved fact table is unchanged (4,096 facts).
+- CPU: the catalogue is read once when its map loads; picking is the same ray and the same transaction as for a
+  mushroom. Drawing: up to 48 triangles per visible fungus, as an alias model; before, the same fungi were drawn as
+  CHIM placements of the same mesh.
+
+## Every harvestable plant of the game: the flora census (v0.0.62)
+
+The harvest step counts every organic container of the masters (the plants, fungi, egg sacks, shells and ore that
+the original lets the player harvest) on every build (`tools/harvest_flora_census.py`) and checks it against
+`config/harvest-flora.json`: each record is harvestable, or pending with the register entry that tracks it, or an
+ordinary container that carries the organic flag. A record that no group names stops the build, and so does a
+placement of a harvestable kind that the harvest step neither places nor lists with its reason (owned plants with a
+charge or gold value stay scenery and are listed). `python3 tools/harvest_flora_census.py --data-files DIR` prints the
+census for an audit.
+
+All three masters, 7 November 2026:
+
+| Group | Status | Placements | Outdoors by region (largest first) | Indoors |
+| --- | --- | ---: | --- | ---: |
+| Small mushrooms | harvestable | 2,128 | Bitter Coast 853, West Gash 65, Ascadian Isles 16 | 1,194 |
+| Bracket fungi on the tree trunks | harvestable | 817 | Bitter Coast 667, West Gash 46, Ascadian Isles 11 | 93 |
+| Other plants | pending ([HARVEST-ORGANIC-PLANTS-47](bugs/HARVEST-ORGANIC-PLANTS-47.md)) | 17,620 | Grazelands 5,227, Azura's Coast 4,089, West Gash 2,569, Ashlands 1,511, Ascadian Isles 1,376, Molag Mar 599, Sheogorad 519, Bitter Coast 387, and Solstheim | 915 |
+| Kwama egg sacks, kollops and spore pods | pending ([HARVEST-ORGANIC-PLANTS-47](bugs/HARVEST-ORGANIC-PLANTS-47.md)) | 4,883 | Azura's Coast 1,401, Sheogorad 1,229, Ascadian Isles 196, West Gash 168, Bitter Coast 136 | 1,709 |
+| Ore and gem rocks | pending ([HARVEST-ORE-ROCKS-62](bugs/HARVEST-ORE-ROCKS-62.md)) | 234 | none | 234 |
+| Supply chests and barrels | ordinary containers | 13 | 1 | 12 |
+
+Of the harvestable groups, 2,896 placements are in the base master and all of them are indexed: 2,881 harvestable
+and 15 left as scenery with their reason. The 49 that the expansion masters place, and every plant of the expansions,
+wait for their areas ([HARVEST-EXPANSION-FLORA-62](bugs/HARVEST-EXPANSION-FLORA-62.md)).

@@ -114,6 +114,7 @@ int AW_MwvmFunctionName(int function);
  * Returns 1, or 0 with nothing loaded (bad magic, version, sizes). The buffer must outlive the interpreter. */
 int AW_MwvmLoad(const unsigned char *data,unsigned long bytes,const aw_mwvm_host_t *host);
 void AW_MwvmReset(void);
+void AW_MwvmSeed(unsigned long seed);   /* Random's generator (the gameplay recorder's frame 0; 0 = the load's value) */
 int AW_MwvmLoaded(void);
 /* Table access for the host. */
 int AW_MwvmScriptCount(void);
@@ -141,6 +142,11 @@ int AW_MwvmSection(const char tag[4],uint32_t *offset,uint32_t *rows,uint32_t *b
 void AW_MwvmBeginMap(void);
 int AW_MwvmAttach(uint32_t reference,int script,int bind_flags,int entity,const float origin[3]);
 void AW_MwvmSetOrigin(int instance,const float origin[3]);
+/* An attached object left the loaded map (PositionCell elsewhere): its values parked, it runs no more here (1 found). */
+int AW_MwvmDetach(uint32_t reference);
+/* The entity block of reference REF (its "aw_ref" key) in a map's entity TEXT of LENGTH bytes: its '{', *BLOCK the
+ * bytes up to and with its '}'; NULL when none. */
+const char *AW_MwvmEntityBlock(const char *text,unsigned long length,uint32_t ref,unsigned long *block);
 aw_mwvm_instance_t *AW_MwvmInstance(int instance);
 int AW_MwvmInstanceCount(void);
 /* Start scripts and StartScript. */
@@ -181,6 +187,15 @@ int AW_MwvmGlobalScriptSet(int script,int running);
 int AW_MwvmGlobalScriptLocal(int script,int slot,uint32_t bits);
 /* 1: SCRIPT starts with a new game (the file's STRT list); its local count; 1 when running now */
 int AW_MwvmStartsAtLoad(int script);
+/* a new game begins: start each script of the NEWG section once (Main's CharGenState block in the original:
+ * Startup's disables, VampireCheck); returns how many started (NPC-STORY-DISABLED-AT-START-42, v0.0.62) */
+int AW_MwvmNewGame(void);
+/* the HELD section (v0.0.62, SCRIPTED-EVENT-FALLING-MAGE-61): the actors standing on an object some script disables,
+ * each with that object and its placed position (game units); a file without it holds none. AW_MwvmHeld: 1 when row
+ * I exists; AW_MwvmHeldFind: the row of ACTOR's reference, -1 none (rows sorted by actor) */
+int AW_MwvmHeldCount(void);
+int AW_MwvmHeld(int i,uint32_t *actor,uint32_t *support,float position[3]);
+int AW_MwvmHeldFind(uint32_t actor);
 int AW_MwvmLocalCount(int script);
 int AW_MwvmScriptRunning(int script);
 /* REFERENCE's local SLOT now (attached, else parked): 1 found, *SCRIPT its script, *OUT the value */

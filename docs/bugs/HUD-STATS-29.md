@@ -2,13 +2,14 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 5 times; something has to be done
+## PERSISTING: reported 6 times; something has to be done
 
 - Reported with v0.0.40-dev1 at 2026-10-14 (time not recorded): Original HUD reference requires actual weapon/fists and selected spell/enchantment boxes with applicable condition/charge indicators; no off-hand guess.
 - Reported with v0.0.40-dev1 at 2026-10-14 (time not recorded): Opening HUD timing queried. Source audit finds missing staged channel checks; actual weapon model is a separate gate. Native reproduction and repair pending.
 - Reported with v0.0.40-dev2 at 2026-10-14 (time not recorded): Dev2 source restores staged HUD channels and paper-pickup fighting. Seven focused checks pass; full suite, target and native pending. Map/menu gates and inventory pose remain separate.
 - Reported with v0.0.40-dev2 at 2026-10-14 (time not recorded): Original and candidate show paper pickup enabling fists before the hall guard; reading alone does not. Scoped HUD observations retained; failed exit gate and full-route checks remain separate.
 - Reported with v0.0.42-dev1 at 2026-10-17 01:58 +0300: owner: the weapon and magic boxes at the bottom of the HUD are still placeholders (fist, dash) and look bad
+- Reported with v0.0.61 at 2026-11-07 03:39 +0200: Release image: in a game started from the map menu the player's sheet reads health 100 of a maximum of 55 (aw_magicfx spell list and the combat report "You: health 100/55"), in three sessions.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -33,7 +34,7 @@ _Last updated with AmiWind v0.0.42 (17 October 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 5 times; something has to be done](#persisting-reported-5-times-something-has-to-be-done)
+- [PERSISTING: reported 6 times; something has to be done](#persisting-reported-6-times-something-has-to-be-done)
 - [Symptom](#symptom)
 - [Where](#where)
 - [How it happened](#how-it-happened)
@@ -372,10 +373,12 @@ Family: Menus, HUD, map screen and text (`ui-text`). Menus, HUD, map screen, fon
 - HUD-WEAPON-BOX-EMPTY-59 (no report page): HUD weapon box stays empty after equipping a weapon from the console
 - INVENTORY-BURDEN-TEXT-UNREADABLE-61 (no report page): The carried and maximum weight on the inventory burden bar cannot be read
 - INVENTORY-NO-ARMOR-RATING-61 (no report page): The inventory window shows no armour rating under the character picture
+- INVENTORY-OPEN-WINDOW-NO-REFRESH-61 (no report page): An item given and worn through the console while the inventory window is open does not show in that window until it is opened again
 - INVENTORY-PREVIEW-STALE-61 (no report page): The inventory character preview does not change when equipment is put on or taken off in the window
 - LEVEL-UP-MISSING-57 (no report page): Requested: levelling as in the original: skills rise with use, the level-up box with its text and sound, attributes raised, the new values used by every check
 - LOOT-WINDOW-ITEM-PROPERTIES-60 (no report page): Loot window does not show the selected item's type, weight and value
 - LOOT-WINDOW-LAYOUT-60 (no report page): Loot window: key help cut off, item names clipped, buttons crammed against the frame
+- [MADE-ITEM-NO-PICTURE-62](MADE-ITEM-NO-PICTURE-62.md): A made potion or a made enchanted item shows an empty picture in the inventory list
 - MAP-FOCUS-DRAG-29 (no report page): Map or journal keeps dragging after window focus returns
 - MAP-MARKER-29 (no report page): Requested: click to place a user map marker
 - MAP-REG-01 (no report page): In-Game map mode hid settlement markers (regression)

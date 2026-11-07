@@ -70,12 +70,14 @@ static int		aw_actors_trace;		/* aw_actors trace 1: one line per tick that spawn
 static struct
 {
 	unsigned long	joins, leaves, spawned, skipped_dead, skipped_alive, released, kept, rehomed, frees_by_tick, spawn_ticks;
-	unsigned long	skipped_disabled;
+	unsigned long	skipped_disabled, skipped_away, away, visitors;
 	double			join_time, leave_time, spawn_time, spawn_worst;
 } st;
 
 /* Object state (aw_mwhost.c sets it; NULL without the scripts): 1 when a script disabled the placement REFERENCE. */
 int (*aw_actor_disabled)(unsigned reference);
+/* SCRIPTED-EVENT-FALLING-MAGE-61: a script's Enable of REFERENCE (aw_mwhost.c calls it; set here at init) */
+void (*aw_actor_enabled)(unsigned reference);
 extern void (*chim_actors_join)(int cx, int cy, const char *map, const float *offset);
 extern void (*chim_actors_leave)(int cx, int cy);
 extern void (*chim_actors_tick)(void);
@@ -368,10 +370,22 @@ typedef struct
 	short	table;			/* 1: from the actor table, REC holds the placement */
 	chim_actor_record_t	rec;
 	float	scale;			/* the table's instance scale (1: none) */
+	short	visitor;		/* 1: an actor of another place a PositionCell brought here (its row places it) */
+	float	ref;			/* its reference (aw_ref), once read (kept: disabled) */
 } pending_t;
+static edict_t	*spawned_last;	/* SpawnOne's edict when it spawned one */
 
 static pending_t	pending[MAX_PENDING];
 static int			npending;
+/* SCRIPTED-EVENT-FALLING-MAGE-61 (a): the actors of joined cells that were not spawned because a script had disabled
+ * them, kept with their entity text (a few hundred bytes each) while their cell is in the window, so a script's Enable
+ * spawns the actor at once (the next tick), not at its cell's next join; dropped with their cell, a full list keeps the
+ * old way (the next join). */
+#define MAX_KEPT		16
+static pending_t	waitq[MAX_KEPT];
+static int			nwaitq;
+static unsigned long	kept_full, kept_enabled;
+#define SPAWN_DISABLED	(-1)
 static int			budget_n = 1;		/* chim actors budget N: spawns per tick (0: all at once) */
 /* chim actors warm 1 (default 0, experimental): a queued actor's first-time loads (its model file, then its voice)
  * each take a tick of their own before the tick that spawns it, so no single tick pays a model load, a voice load
@@ -447,6 +461,70 @@ static void PendingDrop (int i)
 	pending[i] = pending[--npending];
 }
 
+static void IslandOffset (float *d);
+
+/* A queued actor a script had disabled: kept (its text moves with it) in island coordinates, so a recentre of the
+ * session between now and the Enable does not move it; 1 kept, 0 the list is full (the caller frees it). */
+static int KeepDisabled (pending_t *q)
+{
+	float d[3];
+	int i;
+	for (i=0 ; i<nwaitq ; i++)
+		if (waitq[i].ref == q->ref)
+		{
+			free (waitq[i].text);		/* the same reference joined again: the newer copy */
+			waitq[i] = waitq[--nwaitq];
+			break;
+		}
+	if (nwaitq == MAX_KEPT)
+	{
+		kept_full++;
+		return 0;
+	}
+	IslandOffset (d);
+	waitq[nwaitq] = *q;
+	waitq[nwaitq].offset[0] += d[0];
+	waitq[nwaitq].offset[1] += d[1];
+	waitq[nwaitq].origin[0] += d[0];
+	waitq[nwaitq].origin[1] += d[1];
+	nwaitq++;
+	return 1;
+}
+
+static void KeptDrop (int i)
+{
+	free (waitq[i].text);
+	waitq[i] = waitq[--nwaitq];
+}
+
+/* A script's Enable (aw_mwhost.c): a kept actor of a cell still in the window goes back to the queue, the nearest
+ * first as every queued one (it spawns on the next tick). Nothing for an actor not kept here (not loaded, a room's,
+ * or hidden as an edict: aw_mwhost.c shows that one again). */
+static void Enabled (unsigned reference)
+{
+	float d[3];
+	int i;
+	for (i=0 ; i<nwaitq ; i++)
+		if (waitq[i].ref == (float)reference)
+		{
+			if (npending == MAX_PENDING)
+				return;		/* the queue is full: it stays kept for the next Enable or its cell's next join */
+			IslandOffset (d);
+			pending[npending] = waitq[i];
+			pending[npending].offset[0] -= d[0];
+			pending[npending].offset[1] -= d[1];
+			pending[npending].origin[0] -= d[0];
+			pending[npending].origin[1] -= d[1];
+			pending[npending].warmed = 0;
+			npending++;
+			waitq[i] = waitq[--nwaitq];		/* the text went with it */
+			kept_enabled++;
+			if (aw_actors_trace)
+				Con_Printf ("actors: reference %lu enabled: spawns on the next tick\n", (unsigned long)reference);
+			return;
+		}
+}
+
 static int SpawnOne (pending_t *q)
 {
 	edict_t *ent;
@@ -499,19 +577,50 @@ static int SpawnOne (pending_t *q)
 		st.skipped_dead++;
 		return 0;
 	}
-	/* a script's Disable (aw_mwhost.c object state, v0.0.51): not spawned while disabled; after Enable it comes with
-	 * its cell's next join */
+	/* a script's Disable (aw_mwhost.c object state, v0.0.51): not spawned while disabled; kept by the caller (KeepDisabled)
+	 * so a later Enable spawns it at once (SCRIPTED-EVENT-FALLING-MAGE-61), else with its cell's next join */
 	if (aw_actor_disabled && ref > 0 && aw_actor_disabled ((unsigned)ref))
 	{
 		ED_Free (ent);
 		st.skipped_disabled++;
-		return 0;
+		q->ref = ref;
+		return SPAWN_DISABLED;
 	}
 	if (AliveWithRef (ref, ent))
 	{
 		ED_Free (ent);
 		st.skipped_alive++;
 		return 0;
+	}
+	/* PositionCell (v0.0.62): an actor its row puts in a room other than this place is there, not here */
+	if (c && c->moved && !c->follow && c->room && c->room != RoomNumber ())
+	{
+		ED_Free (ent);
+		st.skipped_away++;
+		return 0;
+	}
+	if (q->visitor)
+	{
+		/* an actor of another place: its home's baked ground point means nothing here; the row places it */
+		eval_t *v;
+		float d[3];
+		if (!c || !c->moved)
+		{
+			ED_Free (ent);
+			return 0;
+		}
+		/* the row's place in this session's units: a room keeps its own, outdoors the island position less the
+		 * session's origin (v0.0.62: a placed actor outdoors; the spawn function sees where it really stands) */
+		IslandOffset (d);
+		if (c->room)
+			d[0] = d[1] = d[2] = 0;
+		if ((v = GetEdictFieldValue (ent, "aw_ground_valid")) != NULL)
+			v->_float = 0;
+		if ((v = GetEdictFieldValue (ent, "aw_ground_baked")) != NULL)
+			VectorSubtract (c->origin, d, v->vector);
+		VectorSubtract (c->origin, d, ent->v.origin);
+		ent->v.angles[0] = ent->v.angles[2] = 0;
+		ent->v.angles[1] = c->angles[1];
 	}
 	ent->v.origin[0] += q->offset[0];
 	ent->v.origin[1] += q->offset[1];
@@ -539,6 +648,8 @@ static int SpawnOne (pending_t *q)
 	{
 		float d[3];
 		IslandOffset (d);
+		if (c->room)
+			d[0] = d[1] = d[2] = 0;		/* a room keeps its own coordinates */
 		VectorSubtract (c->origin, d, ent->v.origin);
 		VectorCopy (c->angles, ent->v.angles);
 		SV_LinkEdict (ent, false);
@@ -547,6 +658,7 @@ static int SpawnOne (pending_t *q)
 			AW_CombatSetHealth (ent, c->health);
 	}
 	st.spawned++;
+	spawned_last = ent;
 	return 1;
 }
 
@@ -731,6 +843,7 @@ static void TableJoin (int cx, int cy, const float *offset)
 		q->warmed = 0;
 		q->rec = r;
 		q->scale = table.scales ? ChimActors_Scale (table.scales, cell.first + k) : 1.0f;
+		q->visitor = 0;
 		VectorCopy (r.origin, q->origin);
 		q->offset[0] = offset[0];
 		q->offset[1] = offset[1];
@@ -815,9 +928,86 @@ static void LevelledEntity (edict_t *ent)
 	VectorCopy (ent->v.origin, q.rec.origin);
 	q.rec.yaw = ent->v.angles[1];
 	q.rec.flags = 0;
-	if (SpawnOne (&q))
+	if (SpawnOne (&q) > 0)
 		table.spawnable++;
 	free (q.text);
+}
+
+/* COMBAT-PLAYGROUND-CREATURE-HUMANOID-61 (aw_arena.c): the model the world draws a creature or NPC record ID with,
+ * from its base in the actor table (the first base of that id, by tools/chim/actors.py fnv of the lower-cased id, that
+ * names a model); 1 found, 0 none (no table, no such base, no model). The table is the one outdoor spawning keeps
+ * (cells and bases resident; loaded here if this session has not yet); one base text is read from the file. */
+int AW_ActorsBaseModel (const char *id, char *model, int size)
+{
+	chim_actor_base_t b;
+	unsigned h = 2166136261u, i;
+	const char *s;
+	char *text;
+	long at;
+	int bytes, found = 0;
+	FILE *f;
+	model[0] = 0;
+	if (!id || !*id || !TableLoad ())
+		return 0;
+	for (s = id; *s; s++)
+		h = (h ^ (unsigned char)(*s >= 'A' && *s <= 'Z' ? *s + 32 : *s)) * 16777619u;
+	for (i = 0; i < table.head.bases && !found; i++)
+	{
+		if (!ChimActors_Base (table.bases + i*CHIM_ACTOR_BASE_BYTES, &table.head, &b) || b.hash != h || !b.bytes ||
+			(b.kind != CHIM_ACTOR_KIND_CREATURE && b.kind != CHIM_ACTOR_KIND_NPC))
+			continue;
+		if (!(f = TableOpen (&at, &bytes)))
+			return 0;
+		if ((text = AW_TryMalloc (b.bytes + 1)) != NULL && !fseek (f, at + (long)table.head.text_at + (long)b.at, SEEK_SET) &&
+			fread (text, 1, b.bytes, f) == b.bytes)
+		{
+			text[b.bytes] = 0;
+			TextValue (text, "model", model, size);
+			found = model[0] != 0;
+		}
+		free (text);
+		fclose (f);
+	}
+	return found;
+}
+
+/* The frames joined this session, newest last (v0.0.62, AW_ActorsFrameMap): a cell's frame map name, 32 at most */
+#define JOINED 32
+static struct {short cx, cy; char map[MAX_QPATH];} joined[JOINED];
+static int njoined;
+static void Joined (int cx, int cy, const char *map)
+{
+	int i;
+	for (i=0 ; i<njoined ; i++)
+		if (joined[i].cx == cx && joined[i].cy == cy)
+			break;
+	if (i == njoined)
+	{
+		if (njoined < JOINED)
+			njoined++;
+		else
+			memmove (joined, joined + 1, sizeof(joined[0]) * (JOINED - 1)), i = JOINED - 1;
+	}
+	joined[i].cx = (short)cx;
+	joined[i].cy = (short)cy;
+	Q_strncpy (joined[i].map, (char *)map, sizeof(joined[i].map) - 1);
+	joined[i].map[sizeof(joined[i].map) - 1] = 0;
+}
+int AW_ActorsFrameMap (edict_t *e, char *map, int size)
+{
+	eval_t *v;
+	int cx, cy, held, i;
+	if (!e || e->free || size < 2 || !(v = GetEdictFieldValue (e, "aw_ground_baked")) ||
+		!ChimChunks_WindowCell (v->vector, &cx, &cy, &held))
+		return 0;
+	for (i=njoined-1 ; i>=0 ; i--)
+		if (joined[i].cx == cx && joined[i].cy == cy)
+		{
+			Q_strncpy (map, joined[i].map, size - 1);
+			map[size - 1] = 0;
+			return 1;
+		}
+	return 0;
 }
 
 static void Join (int cx, int cy, const char *map, const float *offset)
@@ -841,6 +1031,7 @@ static void Join (int cx, int cy, const char *map, const float *offset)
 	bytes = COM_FOpenFile (path, &f);
 	if (!f)
 		return;
+	Joined (cx, cy, map);
 	at = ftell (f);
 	if (fread (head, 1, sizeof(head), f) != sizeof(head))
 	{
@@ -900,6 +1091,7 @@ static void Join (int cx, int cy, const char *map, const float *offset)
 			q->warmed = 0;
 			q->table = 0;
 			q->scale = 1.0f;
+			q->visitor = 0;
 			npending++;
 			queued++;
 		}
@@ -947,8 +1139,17 @@ static void SpawnQueued (void)
 		}
 		if (warm_on && limit > 0 && WarmStep (&pending[best]))
 			break;		/* this tick loaded; the spawn comes on a later one */
-		spawned += SpawnOne (&pending[best]);
-		PendingDrop (best);
+		{
+			int r = SpawnOne (&pending[best]);
+			if (r == SPAWN_DISABLED && KeepDisabled (&pending[best]))
+				pending[best] = pending[--npending];		/* its text moved to the kept list */
+			else
+			{
+				if (r > 0)
+					spawned += r;
+				PendingDrop (best);
+			}
+		}
 	}
 	/* a tick that only loaded (warm) added nothing to the precache lists: no client list pass */
 	tl = Sys_FloatTime ();
@@ -985,6 +1186,9 @@ static void Leave (int cx, int cy)
 			PendingDrop (i);
 			dropped++;
 		}
+	for (i=nwaitq-1 ; i>=0 ; i--)
+		if (waitq[i].cx == cx && waitq[i].cy == cy)
+			KeptDrop (i);		/* its next join reads it again (and keeps it again while disabled) */
 	for (i=1 ; i<sv.num_edicts ; i++)
 	{
 		int own, hx, hy, hheld;
@@ -1046,7 +1250,12 @@ void AW_ActorsRoomTick (void)
 	if (apply_pending && (svs.maxclients < 1 || !svs.clients || !svs.clients[0].active || !svs.clients[0].spawned))
 		return;
 	if (apply_pending)
+	{
+		/* the actors a PositionCell brought into this room come first (v0.0.62), so the rows place them too */
+		if (aw_actors_visitors)
+			aw_actors_visitors (room);
 		ApplyLoaded ();
+	}
 	/* keep the room's actors captured as they stand: the room's map goes away without a leave of its own */
 	for (i=1 ; i<sv.num_edicts ; i++)
 	{
@@ -1075,6 +1284,8 @@ static void Tick (void)
 		if (strncmp (tick_map, sv.name, sizeof(tick_map) - 1))
 		{
 			Q_strncpy (tick_map, sv.name, sizeof(tick_map) - 1);
+			while (nwaitq)
+				KeptDrop (nwaitq - 1);	/* another map: its cells join again */
 			MarkHome ();
 			{
 				/* the home frame's own residents came with the map (no join): its cell's recipe table now */
@@ -1478,12 +1689,16 @@ static void Command (void)
 	}
 	Con_Printf ("chim actors: %ld actors alive, %ld edicts; joins %lu (%.1f ms reading); spawned %lu in %lu ticks "
 		"(%.1f ms, worst tick %.1f ms, budget %ld per tick, %ld waiting; dead skipped %lu, alive skipped %lu, disabled "
-		"skipped %lu); leaves %lu (released %lu, kept %lu, by tick %lu, %.1f ms); change list %ld\n",
+		"skipped %lu, elsewhere skipped %lu); leaves %lu (released %lu, kept %lu, by tick %lu, %.1f ms); change list %ld; "
+		"PositionCell: %lu left for another place, %lu arrived\n",
 		(long)n, (long)sv.num_edicts, st.joins, st.join_time*1000, st.spawned, st.spawn_ticks, st.spawn_time*1000,
-		st.spawn_worst*1000, (long)budget_n, (long)npending, st.skipped_dead, st.skipped_alive, st.skipped_disabled, st.leaves,
-		st.released, st.kept, st.frees_by_tick, st.leave_time*1000, (long)nchanges);
+		st.spawn_worst*1000, (long)budget_n, (long)npending, st.skipped_dead, st.skipped_alive, st.skipped_disabled,
+		st.skipped_away, st.leaves, st.released, st.kept, st.frees_by_tick, st.leave_time*1000, (long)nchanges, st.away,
+		st.visitors);
 	Con_Printf ("chim actors: warm %d; warmed %lu models (%.1f ms), %lu voices (%.1f ms), %lu client sounds (%.1f ms), worst warm tick %.1f ms\n",
 		warm_on, wst.models, wst.model_time*1000, wst.voices, wst.voice_time*1000, wst.sounds, wst.sound_time*1000, wst.worst*1000);
+	Con_Printf ("chim actors: %ld disabled actors kept for a script's Enable (of %d; %lu not kept: list full), %lu enabled "
+		"and spawned at once\n", (long)nwaitq, MAX_KEPT, kept_full, kept_enabled);
 }
 
 /* The change list in a save (aw_save.c, AWS4 feature 8; aw_save.h): every change entry plus the actors alive in
@@ -1630,8 +1845,17 @@ static void ApplyLoaded (void)
 			continue;
 		if (Respawned (c))
 			continue;		/* slice 7: the map spawned it as the game data has it */
+		if (c->moved && !c->follow && c->room != RoomNumber ())
+		{
+			/* its row puts it in another place (a PositionCell, v0.0.62; OpenMW moves the reference there): it is
+			 * there, not here */
+			AW_CombatForget (e);
+			ED_Free (e);
+			st.away++;
+			continue;
+		}
 		if (c->moved && c->room != RoomNumber ())
-			;			/* captured in another room (or outdoors): its position belongs there */
+			;			/* a companion captured in another room (or outdoors): its position belongs there */
 		else if (c->moved && c->room)
 		{
 			VectorCopy (c->origin, e->v.origin);	/* room-local */
@@ -1658,6 +1882,281 @@ static void ApplyLoaded (void)
 	Con_Printf ("actors: the save's changes applied to %d of the scene's actors\n", applied);
 }
 
+/* PositionCell of an actor (v0.0.62, MWSCRIPT-POSITIONCELL-ACTORS-62; the rules of OpenMW 0.51
+ * apps/openmw/mwscript/transformationextensions.cpp OpPositionCell, our own code): the actor's row of the world change
+ * list says where it is now, so its home leaves it out (ApplyLoaded, SpawnOne) and the room it went to spawns it
+ * (aw_mwhost.c reads its entity, AW_ActorsSpawnVisitor); a save keeps the row as every moved actor's. */
+void (*aw_actors_visitors)(long room);
+int AW_ActorsMoveTo (unsigned reference, long room, const float origin[3], float yaw)
+{
+	change_t *c = Change ((float)reference, 1);
+	if (!c || room < 0 || room > 0xFFFFFF)
+		return 0;
+	c->moved = 1;
+	c->fight = 0;			/* OpenMW: a teleported actor's combat with the player does not carry over */
+	c->room = (int32_t)room;
+	VectorCopy (origin, c->origin);
+	c->angles[0] = c->angles[2] = 0;
+	c->angles[1] = anglemod (yaw);
+	c->hours = GameHours ();
+	if (!(c->hours >= 0 && c->hours <= 10000000))
+		c->hours = 0;
+	return 1;
+}
+
+void AW_ActorsCapture (edict_t *e)
+{
+	change_t *c;
+	if (e && !e->free && IsActor (e) && (c = Change (RefOf (e), 1)) != NULL)
+		Capture (e, c);
+}
+
+void AW_ActorsRemove (edict_t *e)
+{
+	if (!e || e->free)
+		return;
+	AW_CombatForget (e);
+	ED_Free (e);
+	st.away++;
+}
+
+long AW_ActorsRoom (void)
+{
+	return RoomNumber ();
+}
+
+/* A follower that came through a door with the player (v0.0.62): its row puts it here, at ORIGIN (this map's units)
+ * facing YAW, as the place loaded now is a room (its number) or the outdoors (the island's units). */
+int AW_ActorsArriveHere (unsigned reference, const float origin[3], float yaw)
+{
+	float d[3], at[3];
+	long room = RoomNumber ();
+	IslandOffset (d);
+	if (room)
+		d[0] = d[1] = d[2] = 0;
+	VectorAdd (origin, d, at);
+	return AW_ActorsMoveTo (reference, room, at, yaw);
+}
+
+int AW_ActorsMovedPlace (unsigned reference, long *room)
+{
+	change_t *c = Change ((float)reference, 0);
+	if (!c || !c->moved || c->follow)
+		return 0;
+	*room = c->room;
+	return 1;
+}
+
+edict_t *AW_ActorsSpawnVisitor (const char *text, unsigned long length)
+{
+	pending_t q;
+	int ok;
+	if (!sv.active || !text || length < 2 || text[0] != '{' || text[length-1] != '}')
+		return NULL;
+	memset (&q, 0, sizeof(q));
+	if (!(q.text = AW_TryMalloc (length + 1)))
+		return NULL;
+	memcpy (q.text, text + 1, length - 1);		/* after its '{', up to and with its '}' */
+	q.text[length-1] = 0;
+	q.scale = 1.0f;
+	q.visitor = 1;
+	spawned_last = NULL;
+	ok = SpawnOne (&q);
+	free (q.text);
+	if (!ok || !spawned_last)
+		return NULL;
+	ClientLists (1);
+	st.visitors++;
+	return spawned_last;
+}
+
+/* --- actors a script placed (v0.0.62, MWSCRIPT-PLACE-OBJECTS-62; the rules of OpenMW 0.51
+ * apps/openmw/mwscript/transformationextensions.cpp OpPlaceAt, OpPlaceItem, OpPlaceItemCell and
+ * mwworld/worldimp.cpp safePlaceObject, our own code). A placed NPC or creature is a new reference: its key is in the
+ * script-placed block (AW_ACTORS_PLACED: the content file index 15 no game file has; aw_mwhost.c chooses the rest),
+ * and its row of the world change list (moved, its place and position) is all that keeps it: a save keeps the row as
+ * every moved actor's, and AW_ActorsPlacedTick spawns it wherever the row says it is, as long as no edict of that
+ * reference lives (leaving the area releases it as any actor of the window; a room's map change takes it with the
+ * map). Dead stays dead (no respawn rule names a placed reference). */
+static unsigned long	placed_spawns, placed_refused;
+
+int AW_ActorsPlaceRow (unsigned reference, const float local[3], float yaw)
+{
+	change_t *c;
+	float d[3];
+	if (reference < AW_ACTORS_PLACED || reference > (AW_ACTORS_PLACED | 0xFFFFF) || !(c = Change ((float)reference, 1)))
+		return 0;
+	AW_LedgerActorReset (c);
+	c->moved = 1;
+	c->room = (int32_t)RoomNumber ();
+	IslandOffset (d);
+	if (c->room)
+		d[0] = d[1] = d[2] = 0;		/* a room keeps its own coordinates */
+	VectorAdd (local, d, c->origin);
+	c->angles[1] = anglemod (yaw);
+	c->hours = GameHours ();
+	if (!(c->hours >= 0 && c->hours <= 10000000))
+		c->hours = 0;
+	return 1;
+}
+
+void AW_ActorsPlacedForget (unsigned reference)
+{
+	change_t *c = Change ((float)reference, 0);
+	if (c && reference >= AW_ACTORS_PLACED)
+		AW_LedgerActorReset (c);	/* no field left: not saved, the key free again */
+}
+
+int AW_ActorsPlacedFree (unsigned reference)
+{
+	change_t *c = Change ((float)reference, 0);
+	return (!c || (!c->moved && !c->dead)) && !AliveWithRef ((float)reference, NULL);
+}
+
+/* The entity text of record ID in the actor table (a base with a model, an NPC or a creature), as "{" .. "}" (a copy
+ * the caller frees; *LENGTH its bytes), or NULL: no table, no such base. One base read from the file. */
+char *AW_ActorsBaseText (const char *id, unsigned long *length)
+{
+	chim_actor_base_t b;
+	unsigned h = 2166136261u, i;
+	const char *s;
+	char *text = NULL;
+	long at;
+	int bytes;
+	FILE *f;
+	if (!id || !*id || !TableLoad ())
+		return NULL;
+	for (s = id; *s; s++)
+		h = (h ^ (unsigned char)(*s >= 'A' && *s <= 'Z' ? *s + 32 : *s)) * 16777619u;
+	for (i = 0; i < table.head.bases; i++)
+	{
+		if (!ChimActors_Base (table.bases + i*CHIM_ACTOR_BASE_BYTES, &table.head, &b) || b.hash != h || !b.bytes ||
+			(b.kind != CHIM_ACTOR_KIND_CREATURE && b.kind != CHIM_ACTOR_KIND_NPC))
+			continue;
+		if (!(f = TableOpen (&at, &bytes)))
+			return NULL;
+		if ((text = AW_TryMalloc (b.bytes + 3)) != NULL && !fseek (f, at + (long)table.head.text_at + (long)b.at, SEEK_SET) &&
+			fread (text + 1, 1, b.bytes, f) == b.bytes)
+		{
+			text[0] = '{';
+			text[b.bytes+1] = '}';
+			text[b.bytes+2] = 0;
+			*length = b.bytes + 2;
+		}
+		else
+		{
+			free (text);
+			text = NULL;
+		}
+		fclose (f);
+		return text;
+	}
+	return NULL;
+}
+
+/* Once a second: every placed actor's row whose place is here (this room; outdoors a cell the window holds, or near
+ * the player without a window), not dead and with no live edict, is spawned by SPAWN (aw_mwhost.c: its template); a
+ * reference SPAWN refused is not tried again on this map. Cost: a binary search in the change list and the placed
+ * rows (a handful in a game); nothing more while none is due. */
+#define PLACED_FAILED	16
+#define PLACED_NEAR		(2*2048.0f)		/* without a window: two exterior cells (map units) of the player */
+void AW_ActorsPlacedTick (int (*spawn)(unsigned reference))
+{
+	static double next;
+	static void *map;
+	static unsigned failed[PLACED_FAILED];
+	static int nfailed;
+	int lo = 0, hi = nchanges, i, k, cx, cy, held;
+	long room;
+	float d[3];
+	vec3_t p;
+	edict_t *pl = Player ();
+	if (!spawn || !sv.active || !pl)
+		return;
+	if (map != (void *)sv.worldmodel)
+	{
+		map = (void *)sv.worldmodel;
+		nfailed = 0;
+		next = 0;
+	}
+	if (Sys_FloatTime () < next)
+		return;
+	next = Sys_FloatTime () + 1.0;
+	while (lo < hi)
+	{
+		int mid = (lo + hi) / 2;
+		if (changes[mid].key < AW_ACTORS_PLACED)
+			lo = mid + 1;
+		else
+			hi = mid;
+	}
+	room = RoomNumber ();
+	IslandOffset (d);
+	for (i = lo ; i < nchanges && changes[i].key <= (AW_ACTORS_PLACED | 0xFFFFF) ; i++)
+	{
+		change_t *c = &changes[i];
+		unsigned key = c->key;
+		if (!c->moved || c->dead || c->room != room)
+			continue;
+		if (!room)
+		{
+			VectorSubtract (c->origin, d, p);
+			if (ChimChunks_WindowCell (p, &cx, &cy, &held))
+			{
+				if (!held)
+					continue;
+			}
+			else
+			{
+				float dx = p[0] - pl->v.origin[0], dy = p[1] - pl->v.origin[1];
+				if (dx*dx + dy*dy > PLACED_NEAR*PLACED_NEAR)
+					continue;
+			}
+		}
+		if (AliveWithRef ((float)key, NULL))
+			continue;
+		for (k = 0 ; k < nfailed && failed[k] != key ; k++)
+			;
+		if (k < nfailed)
+			continue;
+		if (spawn (key))
+			placed_spawns++;
+		else
+		{
+			placed_refused++;
+			if (nfailed < PLACED_FAILED)
+				failed[nfailed++] = key;
+		}
+		/* the spawn may have made rows (its levelled pick, its record): find this one again */
+		for (k = 0 ; k < nchanges && changes[k].key != key ; k++)
+			;
+		i = k;
+	}
+}
+
+void AW_ActorsPlacedStatus (void)
+{
+	int lo = 0, hi = nchanges, i, rows = 0, dead = 0, alive = 0;
+	while (lo < hi)
+	{
+		int mid = (lo + hi) / 2;
+		if (changes[mid].key < AW_ACTORS_PLACED)
+			lo = mid + 1;
+		else
+			hi = mid;
+	}
+	for (i = lo ; i < nchanges && changes[i].key <= (AW_ACTORS_PLACED | 0xFFFFF) ; i++)
+	{
+		if (!changes[i].moved && !changes[i].dead)
+			continue;
+		rows++;
+		dead += changes[i].dead;
+		alive += AliveWithRef ((float)changes[i].key, NULL);
+	}
+	Con_Printf ("placed actors: %d kept (%d dead, %d here now); spawned again %lu, refused %lu\n", rows, dead, alive,
+		placed_spawns, placed_refused);
+}
+
 /* A fallen fighter whose combat slot goes to a new fighter (aw_combat.c, COMBAT-PACK-SLOTS-57): its death into the
  * change list now, as Capture would record it when it leaves, so it does not come back alive. */
 extern void (*aw_combat_actor_died)(struct edict_s *e);
@@ -1682,4 +2181,5 @@ void AW_ActorsInit (void)
 	chim_actors_tick = Tick;
 	chim_actors_cmd = Command;		/* "chim actors ...": no command or cvar of its own (the resident registry budget) */
 	aw_levelled_entity = LevelledEntity;	/* a room map's levelled creatures (pr_edict.c ED_LoadFromFile) */
+	aw_actor_enabled = Enabled;		/* a script's Enable spawns a kept actor at once (SCRIPTED-EVENT-FALLING-MAGE-61) */
 }

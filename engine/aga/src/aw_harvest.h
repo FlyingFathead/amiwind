@@ -6,7 +6,12 @@
 #define AW_HARVEST_NODES 64
 #define AW_HARVEST_EDGES 256
 #define AW_HARVEST_PLANTS 256
-#define AW_HARVEST_MODELS 8
+/* Shared models per catalogue: 8 small-mushroom meshes and 4 tree-trunk fungus meshes can meet in one Bitter Coast
+ * map (FLORA-FAUNA-COVERAGE-62: up to 12), so 16; a model is '@0'..'@15' in a plant row. */
+#define AW_HARVEST_MODELS 16
+/* Earlier generations of the global placement index a catalogue names (AWH4 header 'bases K', oldest first): a save
+ * made with one of them is taken over in place, its pick facts kept (the earlier slots never move). */
+#define AW_HARVEST_BASES 4
 #define AW_HARVEST_TEXT_BYTES 65535U
 #define AW_HARVEST_BAD_TEXT 65535U
 /* Offsets are into one map-owned, NUL-separated dictionary. Original keys are
@@ -26,6 +31,7 @@ typedef struct {
 typedef struct {
     int nodes,edges,plants;
     int slots;unsigned char catalogue[32]; /* zero slots: legacy AWH1/AWH2 */
+    int bases,base_slots[AW_HARVEST_BASES];unsigned char base_catalogue[AW_HARVEST_BASES][32];
     int representation,models; /* 4: shared alias catalogue; 0: legacy brush. */
     aw_harvest_model_t *model;
     aw_harvest_node_t *node;

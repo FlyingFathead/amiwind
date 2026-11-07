@@ -47,6 +47,25 @@ uint32_t AW_LedgerDrop(aw_state_t *s,aw_ledger_t *l,const aw_inventory_item_t *i
     s->inventory.initialized=1;s->inventory.next_serial++;
     return key;
 }
+/* v0.0.62 (MWSCRIPT-PLACE-OBJECTS-62): an item a script placed (PlaceAtPC, PlaceAtMe, PlaceItem, PlaceItemCell; OpenMW
+ * 0.51 transformationextensions.cpp makes a new reference of the record): a drop row as the player's (the next serial,
+ * the item's id, COUNT, the place and position), without taking anything from the inventory; picked up as any drop. */
+uint32_t AW_LedgerPlaceItem(aw_state_t *s,aw_ledger_t *l,const char *id,int32_t count,
+                            int at,int32_t where,const float position[3],float yaw){
+    aw_ledger_row_t *r;aw_ledger_extra_t *x;uint32_t key;int j;
+    if(!s || !l || !position || !drop_id_ok(id) || count<1 || at<AW_AT_CELL || at>AW_AT_SCENE ||
+       s->inventory.next_serial>=AW_LEDGER_ID)return 0;
+    for(j=0;j<3;j++)if(!(position[j]>=-1000000 && position[j]<=1000000))return 0;
+    if(!(yaw>=-360 && yaw<=360))return 0;
+    key=AW_LEDGER_PLAYER|(s->inventory.next_serial+1);
+    if(AW_LedgerFind(l,key)>=0 || !(r=AW_LedgerPut(l,key)))return 0;
+    if(!(x=AW_LedgerExtra(l,r))){AW_LedgerTidy(l,key);return 0;}
+    r->fields=AW_LEDGER_DROPPED;AW_LedgerSetPlace(l,r,at,where);
+    memcpy(x->position,position,sizeof(x->position));x->yaw=yaw;x->count=count;
+    memset(x->item,0,sizeof(x->item));strcpy(x->item,id);
+    s->inventory.next_serial++;
+    return key;
+}
 int AW_LedgerPickup(aw_state_t *s,aw_ledger_t *l,uint32_t key){
     int i,index;aw_ledger_row_t *r;aw_ledger_extra_t *x;int32_t old;float current,incoming;
     if(!s || !l || (i=AW_LedgerFind(l,key))<0)return 0;

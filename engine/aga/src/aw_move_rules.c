@@ -14,11 +14,12 @@ static const char *names[AW_MOVE_SETTING_COUNT]={
     "fJumpRunMultiplier","fJumpMoveBase","fJumpMoveMult",
     "fFatigueRunBase","fFatigueRunMult","fFatigueSwimWalkBase","fFatigueSwimWalkMult",
     "fFatigueSwimRunBase","fFatigueSwimRunMult","fFatigueSneakBase","fFatigueSneakMult",
-    "fFatigueJumpBase","fFatigueJumpMult","fFatigueBase","fFatigueMult"};
+    "fFatigueJumpBase","fFatigueJumpMult","fFatigueBase","fFatigueMult",
+    "fFallDamageDistanceMin","fFallDistanceBase","fFallDistanceMult","fFallAcroBase","fFallAcroMult"};
 /* Morrowind.esm values of the same settings, in the same order. */
 static const float originals[AW_MOVE_SETTING_COUNT]={
     100,200,.3f,1.75f,1, .5f,.1f,.75f,5, 5,300, 128,4,.5f,1, 1,.5f,.5f,
-    5,2,2.5f,0, 7,0,1.5f,1.5f, 5,0,1.25f,.5f};
+    5,2,2.5f,0, 7,0,1.5f,1.5f, 5,0,1.25f,.5f, 400,0,.07f,.25f,.01f};
 
 const char *AW_MoveSettingName(int index) {
     return index>=0 && index<AW_MOVE_SETTING_COUNT?names[index]:0;
@@ -158,4 +159,70 @@ float AW_MoveFatigueAfter(float fatigue,float loss) {
     if(loss<=0)return fatigue;
     if(after<0 && fatigue>=0)after=0;
     return after;
+}
+/* Falls (aw_move.h): physicssystem.cpp, movementsolver.cpp, character.cpp getFallDamage. */
+float AW_MoveSlowFallFactor(float magnitude) {
+    float x=magnitude*.005f;
+    if(!(x>0))x=0;
+    if(x>1)x=1;
+    return 1-x;
+}
+float AW_MoveFallStep(float vz,float step,float gravity,float slowfall) {
+    vz-=step*gravity;
+    if(vz<0)vz*=slowfall;
+    return vz;
+}
+float AW_MoveFallDamage(const aw_move_settings_t *s,float height,float acrobatics,float jump) {
+    float x,a;
+    if(!(height>=s->fFallDamageDistanceMin))return 0;
+    x=height-s->fFallDamageDistanceMin-(1.5f*acrobatics+jump);
+    if(x<0)x=0;
+    a=s->fFallAcroBase+s->fFallAcroMult*(100-acrobatics);
+    return (s->fFallDistanceBase+s->fFallDistanceMult*x)*a;
+}
+float AW_MoveFallHealthLoss(float damage,float fatigue_term) {
+    return damage>0?damage*(1-.25f*fatigue_term):0;
+}
+int AW_MoveFallKnockdown(float damage,float acrobatics,float fatigue_term) {
+    return damage>0 && damage>acrobatics*fatigue_term;
+}
+
+/* MWSCRIPT-SMALL-FUNCTIONS-62: a script's angles and moves (aw_move.h). No fmod or floor (the 68040 lacks the
+ * instructions they reach): a whole number of turns taken off by a truncating cast. */
+static float wrap180(float a) {
+    a-=360.0f*(float)(int)(a/360.0f);
+    if(a>180)a-=360;
+    else if(a<-180)a+=360;
+    return a;
+}
+static int axis_of(int axis) {
+    switch(axis){case 'x':case 'X':case 'u':case 'U':return 0;case 'y':case 'Y':case 'v':case 'V':return 1;
+                 case 'z':case 'Z':case 'w':case 'W':return 2;}
+    return -1;
+}
+float AW_MoveScriptAngle(const float quake[3],int axis,int actor) {
+    float a;
+    switch(axis_of(axis)){
+    case 0:a=quake[0];
+        if(actor){a=wrap180(a);if(a>90)a=90;else if(a<-90)a=-90;}
+        return a;
+    case 1:a=quake[2];return actor?wrap180(a):a;
+    case 2:a=-quake[1];return actor?wrap180(a):a;
+    }
+    return 0;
+}
+int AW_MoveScriptAngleSet(int axis,float degrees,int actor,float *out) {
+    switch(axis_of(axis)){
+    case 0:if(actor){degrees=wrap180(degrees);if(degrees>90)degrees=90;else if(degrees<-90)degrees=-90;}
+        *out=degrees;return 0;
+    case 1:*out=actor?wrap180(degrees):degrees;return 2;
+    case 2:*out=-(actor?wrap180(degrees):degrees);return 1;
+    }
+    return -1;
+}
+int AW_MoveScriptLocal(const float forward[3],const float right[3],const float up[3],int axis,float amount,float out[3]) {
+    int i,k=axis_of(axis);
+    if(k<0 || axis=='u' || axis=='U' || axis=='v' || axis=='V' || axis=='w' || axis=='W'){out[0]=out[1]=out[2]=0;return 0;}
+    for(i=0;i<3;i++)out[i]=amount*(k==0?forward[i]:k==1?-right[i]:up[i]);
+    return 1;
 }

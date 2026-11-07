@@ -1,6 +1,6 @@
 # Save/load milestone: compact state and a manageable save list
 
-_Last updated with AmiWind v0.0.61-dev3 (2026-11-06)._
+_Last updated with AmiWind v0.0.62-dev1 (2026-11-07)._
 
 <!-- contents start -->
 ## Contents
@@ -167,7 +167,8 @@ room is entered again (rooms have no CHIM window tick, so `AW_ActorsRoomTick` do
 follow packages started by the scripts (AITravel, AIFollow) are saved as their own block (AWPK, 26 bytes a package:
 the actor, the state, the target point, the followed actor, the hours left) and started again when the actor is in
 the map; OpenMW keeps the whole package sequence in the actor's state (components/esm3/aisequence.cpp), here only those
-two. Kept by `tests/aga_save_changes_test.c` (a room entry round trip and its refusals).
+two. Since v0.0.62 the block is version 2 (30 bytes a package, the place an AIFollowCell or AIEscortCell names added)
+and holds the escorts too; a version 1 block still loads. Kept by `tests/aga_save_changes_test.c` (a room entry round trip and its refusals).
 
 ## The world change list (v0.0.59)
 

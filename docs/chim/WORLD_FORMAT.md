@@ -1,6 +1,6 @@
 # CHIM world format
 
-_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
+_Last updated with AmiWind v0.0.62-dev1 (7 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -826,6 +826,19 @@ and `tools/chim_rooms.py` after the residents; `--room-levelled-creatures off` w
 from v0.0.54 to v0.0.61-dev1 the engine took them but no room map carried one, so the tombs and caves had no
 creatures ([TOMB-NO-CREATURES-60](../BUGS.md)). The town stages' own rooms (Seyda Neen, Balmora) still list
 their few levelled references as left out.
+
+The creatures placed in rooms (from v0.0.62): every creature record a room places directly (Morrowind.esm: 530
+references of 178 records in 222 rooms; `tools/chim/actors.py` `room_placed_creatures`) has a list of one in the
+table, after the real lists, so the real lists' indices and the bases they give stay as before: one entry, that
+creature at level 1, every level counted, no chance of nothing. The actor library makes the creature's model (a mesh
+only the rooms reach with the skeletal method; an authored-dead creature its mesh's corpse), its base carries that
+model, and the room map carries the reference as an `aw_levelled` entity with `sounds` its list's index and
+`aw_source_id` the creature. The engine spawns it as it spawns a room's levelled pick, with no change to the engine
+or the format; the pick kept under the reference is always that creature, and it comes back after its death only when
+its record is flagged Respawn, as the game has it (the reference identity table names it a creature's, not a
+levelled list's). The creatures the resident stage bakes itself (`config/interior_creatures.json`: Vivec, Dagoth Ur
+and the Heart of Lorkhan) have no such list. `--room-placed-creatures off` leaves out the lists, the models and the
+entities (the rooms before).
 
 - **Records** (24 bytes, big-endian): u32 key (the reference number & 0xFFFFFF), u16 base, u16 flags, f32 origin
   x, y, z in the local units of the reference's own cell (the cell centre at 0, 0: the frame-local units of that

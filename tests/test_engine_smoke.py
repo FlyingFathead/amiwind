@@ -304,6 +304,42 @@ class EngineSmokeTests(unittest.TestCase):
         self.assertEqual(text.count('|| finish "FAIL game stalled during $2 (realtime $r1 -> $r2)"; }'), 1)
 
     @unittest.skipUnless(shutil.which('sh'), 'a POSIX shell is required')
+    def test_a_frame_without_heartbeat_gets_a_grace_before_the_stall(self):
+        """SESSION-STALL-AFTER-LONG-FRAME-62: the state file is written between frames and on the heartbeat only, so a
+        frame of several seconds without a heartbeat left realtime and ticks standing over a 1 s wait, and the session
+        was called stalled while the game was still working. Both standing now get STALL_GRACE seconds; a frame that
+        ends inside it is logged and the wait passes; a game that never moves again is still a stall."""
+        text = engine_smoke.PROBE
+        self.assertIn('STALL_GRACE:-30', text)
+        start = text.index('play(){')
+        end = text.index('(realtime $r1 -> $r2)"; }', start) + len('(realtime $r1 -> $r2)"; }')
+        body = text[start:end]
+
+        def run(moves_at, what, grace=''):
+            # sleep() is one second; from the sleep numbered moves_at on, realtime and/or the ticks move
+            stubs = ('K=1\nN=0\n%s'
+                     'st(){ case "$1" in realtime) [ %d -ge 0 ] && [ $N -ge %d ] && [ %s = 1 ] && echo 76.00 || echo 69.21;; '
+                     'ticks) [ %d -ge 0 ] && [ $N -ge %d ] && echo $((14441+N)) || echo 14441;; screen) echo game;; esac; }\n'
+                     'alive(){ return 0; }\nsleep(){ N=$((N+1)); }\nlog(){ echo "log $*"; }\n'
+                     'finish(){ echo "$1 after $N s"; exit 0; }\n') % (
+                         grace, moves_at, moves_at, 1 if what == 'clock' else 0, moves_at, moves_at)
+            done = subprocess.run(['sh', '-c', stubs + body + '\nplay 1 "a script"\necho "ok after $N s"\n'],
+                                  capture_output=True, text=True, timeout=60)
+            return done.stdout.strip().splitlines()
+        # the frame ends 8 s in (as the 6.8 s script-file frame of the talk session): logged, passes
+        lines = run(8, 'clock')
+        self.assertEqual(lines[-1], 'ok after 8 s', lines)
+        self.assertEqual(lines[-2], 'log long frame during a script: realtime 69.21 and ticks 14441 stood for 1 s and '
+                                    '7 s more, then went on (realtime 76.00, ticks 14449)')
+        # nothing moves again: the stall verdict, after the grace (STALL_GRACE, 30 s by default)
+        self.assertEqual(run(-1, 'clock')[-1], 'FAIL game stalled during a script (realtime 69.21 -> 69.21) after 31 s')
+        self.assertEqual(run(-1, 'clock', grace='STALL_GRACE=5\n')[-1],
+                         'FAIL game stalled during a script (realtime 69.21 -> 69.21) after 6 s')
+        # only the ticks move after a while (a heartbeat inside the frame): the long-frame (busy) rules take over
+        self.assertTrue(run(4, 'ticks')[-1].startswith('FAIL long frame (busy) during a script: realtime stood at 69.21'),
+                        run(4, 'ticks'))
+
+    @unittest.skipUnless(shutil.which('sh'), 'a POSIX shell is required')
     def test_zone_full_fails_a_pass_from_32_mb(self):
         """CHIM-ZONE-BUDGET-33 (v0.0.51): a CHIM chunk waiting for room in the zone fails the smoke from 32 MB of Fast
         RAM; at 16 MB the retries are the known cost; --allow-zone-full only counts them."""
@@ -382,6 +418,42 @@ class ScriptedSessionTests(unittest.TestCase):
                      'finish(){ echo "finish $1"; exit 0; }\nt0=0\n' % Path(tmp).as_posix())
             done = subprocess.run(['sh', '-c', stubs + block], capture_output=True, text=True, timeout=30, input='')
         self.assertEqual(done.stdout.splitlines()[:4], ['rec cycle', 'play 1', 'recstop', 'shot b'], done.stderr)
+
+    @unittest.skipUnless(shutil.which('sh'), 'a POSIX shell is required')
+    def test_a_quoted_id_with_a_space_reaches_the_command_file_unchanged(self):
+        """TEST-HARNESS-MINIWIND-62: cmd dbg npcs talk "agronian guy" goes into the game's command file as written,
+        quotes kept (the engine's debug translator keeps it one argument)."""
+        text = engine_smoke.PROBE
+        start = text.index('if [ -s $R/script.txt ]; then')
+        block = text[start:text.index('\nfi\n', start) + 4]
+        rc = text[text.index('rc(){ '):text.index('log "cmd $1"; }') + len('log "cmd $1"; }')]
+        line = 'cmd dbg npcs talk "agronian guy"'
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, 'awctl').mkdir()
+            Path(tmp, 'script.txt').write_text(line + '\n', encoding='utf-8', newline='\n')
+            stubs = ('R=%s\nK=1\nlog(){ :; }\nstall(){ echo "stall $1"; exit 0; }\nplay(){ :; }\nalive(){ return 0; }\n'
+                     'st(){ case "$1" in screen) echo game;; signon) echo 4;; *) echo 1;; esac; }\n'
+                     'finish(){ echo "finish $1"; exit 0; }\nt0=0\n' % Path(tmp).as_posix())
+            done = subprocess.run(['sh', '-c', stubs + rc + '\n' + block], capture_output=True, text=True, timeout=30,
+                                  input='')
+            written = Path(tmp, 'awctl', 'cmd.txt').read_text(encoding='utf-8')
+        self.assertEqual(written, line[len('cmd '):] + '\n', done.stdout + done.stderr)
+
+    @unittest.skipUnless(shutil.which('sh'), 'a POSIX shell is required')
+    def test_start_map_any_takes_the_map_the_image_starts_on(self):
+        """TEST-HARNESS-MINIWIND-62: MAP1 any with START enter waits for whichever map the image loads (a MiniWind's
+        one map), not a named one it does not hold."""
+        text = engine_smoke.PROBE
+        start = text.index('if [ "${START:-map}" = enter ]')
+        block = text[start:text.index('\nelse rc "map $MAP1"', start)] + '\nfi\n'
+        stubs = ('K=1\nSTART=enter\nMAP1=any\nkey(){ :; }\nsleep(){ :; }\nalive(){ return 0; }\nlog(){ echo "log $*"; }\n'
+                 'loaded(){ echo "loaded $1"; }\nstall(){ echo "stall $1"; exit 0; }\nfinish(){ echo "finish $1"; exit 0; }\n'
+                 'st(){ case "$1" in server) echo seyda;; map) echo maps/seyda-chim.chim;; local) echo "1 2 3";; esac; }\n')
+        done = subprocess.run(['sh', '-c', stubs + block], capture_output=True, text=True, timeout=30)
+        lines = done.stdout.splitlines()
+        self.assertIn('log start map from the game: seyda', lines, done.stdout + done.stderr)
+        self.assertIn('loaded seyda', lines)
+        self.assertFalse([l for l in lines if l.startswith(('stall', 'finish'))], done.stdout)
 
     @unittest.skipUnless(shutil.which('sh'), 'a POSIX shell is required')
     def test_script_rejects_disconnected_game_after_host_error(self):

@@ -615,8 +615,24 @@ int AW_CombatHostiles(void) {
     for(i=0;i<SLOTS;i++)if(slots[i].e && !slots[i].e->free && !slots[i].f.dead)n++;
     return n;
 }
+/* GAME-RECORDER-FIGHT-SEED-61: while the gameplay recorder records or plays back, the fights draw their seeds from the
+ * recording's seed and the recording's own count of fights (recorder_fights), never from this game instance's count
+ * (encounters, which differs between the game that recorded and the one that replays) or the clock. At the
+ * recording's frame 0 the running generator is set from it too: a fight already on, or begun again by the starting
+ * save's load, rolls the same dice in the recording and its replay. 0 = the recorder is off. */
+static unsigned long recorder_seed,recorder_fights;
+static unsigned long recorder_fight_seed(void) {
+    unsigned long s=((recorder_seed^(recorder_fights*2654435761UL))*2246822519UL)&0xffffffUL;
+    return s?s:1;
+}
+void AW_CombatRecorderSeed(unsigned long seed) {
+    recorder_seed=seed&0xffffffffUL;recorder_fights=0;
+    if(!seed)return;
+    seed_used=recorder_fight_seed();AW_CombatSeed(&rng,seed_used);totals.seed=seed_used;
+}
 static void begin_encounter(void) {
     unsigned long seed=(unsigned long)seed_cvar.value;
+    if(recorder_seed){recorder_fights++;seed=recorder_fight_seed();}
     /* 24 bits: exact in the float cvar, so a printed seed replays (aw_combat_seed). */
     if(!seed){seed=(0x41c64e6dUL^((encounters+1)*2654435761UL))&0xffffffUL;if(!seed)seed=1;}
     AW_CombatSeed(&rng,seed);seed_used=seed;encounters++;

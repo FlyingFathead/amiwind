@@ -54,6 +54,11 @@ static int target_weather(int days,int milliseconds,const float *source,int *reg
     if(forced>=0)return forced;
     return AW_WeatherOfRegion(&table,*region,days,milliseconds);
 }
+/* GetCurrentWeather (MWSCRIPT-SMALL-FUNCTIONS-62): the weather in effect */
+int AW_WeatherCurrent(void)
+{
+    return state.current<0 || state.current>=AW_WEATHERS?0:state.current;
+}
 /* The storm at the player this frame (ACTOR-STORM-POSE-51): set by AW_WeatherFrame. */
 static int storm;
 static float storm_dir[2];

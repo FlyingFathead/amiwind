@@ -198,6 +198,25 @@ int main(void){
     draw();assert(armor_calls==3);
     AW_WorldUIKey('e',1);assert(!AW_InventoryEquipped(&aw_state,fixture_item.id));
     aw_worldui_armor_rating=NULL;test_armor_value=17.8f;
+    /* INVENTORY-OPEN-WINDOW-NO-REFRESH-61: worn, taken off or given from outside the window while it is open (the
+     * console, a script): the picture, the armour rating, the row mark and the list follow at the next frame, without
+     * reopening (OpenMW inventorywindow.cpp updateItemView + dirtyPreview on every store change); frames with no
+     * change render nothing again */
+    draw();calls=preview_calls;draw();draw();assert(preview_calls==calls && !strstr(drawn,"* Fixture Ring"));
+    aw_worldui_armor_rating=test_armor;armor_calls=0;draw();assert(armor_calls==1);
+    assert(AW_InventoryEquip(&aw_state,&fixture_item));
+    draw();assert(preview_calls==calls+1 && armor_calls==2 && strstr(drawn,"* Fixture Ring"));
+    draw();draw();assert(preview_calls==calls+1 && armor_calls==2);
+    assert(AW_InventoryUnequip(&aw_state,fixture_item.id));
+    draw();assert(preview_calls==calls+2 && armor_calls==3 && !strstr(drawn,"* Fixture Ring"));
+    aw_worldui_armor_rating=NULL;
+    assert(!strstr(drawn,"fixture_robe"));
+    assert(AW_ItemAdd(&aw_state,"fixture_robe",1));draw();assert(strstr(drawn,"fixture_robe"));
+    assert(preview_calls==calls+2);                          /* a new kind alone: the list, not the picture */
+    assert(AW_ItemAdd(&aw_state,"fixture_robe",-1));draw();assert(!strstr(drawn,"fixture_robe"));
+    /* the window's own Equip renders once, not again for the change it made itself */
+    AW_WorldUIKey('e',1);draw();draw();assert(preview_calls==calls+3);
+    AW_WorldUIKey('e',1);draw();assert(preview_calls==calls+4 && !AW_InventoryEquipped(&aw_state,fixture_item.id));
     /* Right click selects the actual row; Enter-equivalent action is real. */
     AW_WorldUIMouse(-1000,-1000);AW_WorldUIMouse(160,60);AW_WorldUIKey(K_MOUSE3,1);draw();assert(strstr(drawn,"Equip"));
     AW_WorldUIKey(K_MOUSE1,1);assert(AW_InventoryEquipped(&aw_state,fixture_item.id)==1);

@@ -50,3 +50,21 @@ float AW_CrimeTheftFight(const aw_crime_settings_t *s,int value,int fight,int al
     if((float)fight+term>100)term=(float)(100-fight);
     return term<0?0:term;
 }
+
+/* creaturestats.cpp getAwarenessRoll / updateAwareness: the roll stays until 5 seconds have passed */
+static int roll_live(const aw_crime_roll_t *r,double now){
+    return r->roll>=0 && now>=r->at && now-r->at<AW_CRIME_ROLL_SECONDS;
+}
+int AW_CrimeRollFind(const aw_crime_roll_t *table,int count,int key,double now){
+    int i;
+    for(i=0;i<count;i++)if(table[i].key==key && roll_live(&table[i],now))return table[i].roll;
+    return -1;
+}
+void AW_CrimeRollKeep(aw_crime_roll_t *table,int count,int key,int roll,double now){
+    int i,slot=0;
+    for(i=0;i<count;i++){
+        if(table[i].key==key || !roll_live(&table[i],now)){slot=i;break;}
+        if(table[i].at<table[slot].at)slot=i;
+    }
+    table[slot].key=key;table[slot].roll=roll;table[slot].at=now;
+}

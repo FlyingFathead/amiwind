@@ -57,7 +57,7 @@ def read_catalogue(text):
     head = lines[0].split()
     if not head or head[0] != 'AWH4':
         raise ValueError('not an AWH4 catalogue')
-    count = int(head[-1])
+    count = int(head[6])     # the model count; 'bases K ...' (earlier index generations) may follow it
     boxes = []
     for line in lines[1:1 + count]:
         p = line.split()

@@ -138,6 +138,12 @@ static int route_format(route_t *r,int argc,char **argv,int j,char *out,int capa
         if(used+7>capacity)return 0;
         strcpy(out+used," stats");used+=6;
     }
+    /* dbg mwscript result TOPIC NPC [N] (MWSCRIPT-PLAYER-CONTROL-62): a result script without the dialogue window,
+     * no resident command of its own; topics and ids may hold spaces (quoted) and apostrophes */
+    if(!strcmp(r->command,"aw_mwscript_status") && !strcmp(r->words,"mwscript result")){
+        if(argc-j>3 || used+8>capacity)return 0;   /* alone or short: the handler prints its usage */
+        strcpy(out+used," result");used+=7;
+    }
     /* dbg door roulette [SEED]: the teleport command's roulette, no resident command of its own */
     if(!strcmp(r->command,"aw_teleport") && !strcmp(r->words,"door roulette")){
         if(used+10>capacity)return 0;
@@ -154,9 +160,11 @@ static int route_format(route_t *r,int argc,char **argv,int j,char *out,int capa
         strcpy(out+used," playerrace");used+=11;
     }
     setting=Cvar_FindVar(r->command)!=NULL;
-    spaced=!strcmp(r->command,"aw_inventory") ||
-        (!strcmp(r->command,"aw_quickchar_set") &&
-         (!strcmp(r->words,"set race") || !strcmp(r->words,"set playerrace")));
+    /* A quoted word with a space or an apostrophe (a record ID such as "agronian guy", a topic, a race) reaches every
+     * command route quoted again, as one argument; a setting takes one plain value. Up to v0.0.62-dev1 only the
+     * inventory, race and result routes took them, and dbg npcs talk "agronian guy" was refused as an unknown
+     * debug command (TEST-HARNESS-MINIWIND-62). The characters stay checked: no separator, quote or new command. */
+    spaced=!setting;
     for(;j<argc;j++){
         token=argv[j];
         /* A route straight onto a setting gets 1/0 for the toggle words the
@@ -166,12 +174,12 @@ static int route_format(route_t *r,int argc,char **argv,int j,char *out,int capa
             else if(!Q_strcasecmp(token,"off") || !Q_strcasecmp(token,"false") || !Q_strcasecmp(token,"no"))token="0";
         }
         n=(int)strlen(token);
-        quoted=spaced && strchr(token,' ')!=NULL;
+        quoted=spaced && (strchr(token,' ')!=NULL || strchr(token,'\'')!=NULL);   /* Quake's parser splits at ' */
         if(!n || used+n+(quoted?5:3)>capacity)return 0;
         for(k=0;k<n;k++)if(!((token[k]>='a'&&token[k]<='z') ||
             (token[k]>='A'&&token[k]<='Z') || (token[k]>='0'&&token[k]<='9') ||
             token[k]=='-' || token[k]=='+' || token[k]=='.' || token[k]=='_' ||
-            (spaced && token[k]==' ')))return 0;
+            (spaced && (token[k]==' ' || token[k]=='\''))))return 0;
         out[used++]=' ';if(quoted)out[used++]='"';
         memcpy(out+used,token,n);used+=n;if(quoted)out[used++]='"';
     }

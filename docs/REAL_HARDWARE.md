@@ -1,6 +1,6 @@
 # Running AmiWind on real Amiga hardware
 
-_Last updated with AmiWind v0.0.59-dev6 (3 November 2026)._
+_Last updated with AmiWind v0.0.62-dev1 (6 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -163,7 +163,12 @@ HALLOWEEN BENCH dagoth: avg 12.3 fps, min 7.9, 1% low 8.4, 600 frames, 48.8 s, F
 ```
 
 The average is the frames over their time, the minimum is the slowest frame, the 1 % low is the slowest 1 % of the
-frames taken together. Send the line with the machine (accelerator, its clock) and the screen mode. A standard demo that every image ships, run by
+frames taken together. From v0.0.62 two more lines follow it, the same figures measured apart: `drawing` over the
+frames that waited on nothing from the disk (the frame rate to compare), and `disk` with the frames that did wait,
+their wait in all and the worst one; the last line names the result file the run saved on the game disk,
+`bench/halloween-<build>-<nnn>.txt` in the game folder (`id1`), with every frame's time and disk wait
+([the result file](HALLOWEEN.md#the-result-file-and-the-figures-measured-apart)). Send that file, or the lines, with
+the machine (accelerator, its clock) and the screen mode. A standard demo that every image ships, run by
 one command, is planned for v0.0.49 ([roadmap](ROADMAP.md#one-standard-timedemo-for-real-amigas-v0049)). `dbg rcount`
 (what each frame draws) and `dbg logs live on` (writes frame stalls, cell load times and a walk profile to log
 files) give the numbers that matter most ([console commands](AMIWIND_CONSOLE_COMMANDS.md)).
@@ -573,5 +578,6 @@ machine) as the bridge to the shop and blog MIPS figures. How to run DoomAttack 
 ## What to send back
 
 A useful report describes the machine (model, CPU and its revision, clock, FPU, Chip and Fast RAM, Kickstart, disk
-or card) and includes the `awbench` results. From the game, it helps to have where you were, the `dbg rcount`
+or card) and includes the `awbench` results and the `aw bench halloween` result file (`bench/` in the game folder).
+From the game, it helps to have where you were, the `dbg rcount`
 lines, the log files of `dbg logs live` and a screenshot. Reports go to the project's issue tracker on GitHub.

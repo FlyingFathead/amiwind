@@ -9,6 +9,9 @@ int AW_SourceToWorld(const char *,const float *,float *);
 int AW_RegionWorldToSource(const char *,const float *,float *);
 int AW_RegionSourceToWorld(const char *,const float *,float *);
 int AW_WorldMapTarget(const float *,char *,float *);
+/* DEBUG-TP-MINIWIND-36: a disk without the open-world table (a MiniWind) and a point inside the loaded map */
+int AW_WorldHasDirectory(void);
+int AW_WorldLoadedTarget(const char *,const float *,char *,float *);
 int AW_CellMap(int,int,char *,int);
 const char *AW_SceneName(void);
 const char *AW_SceneWalkModel(void);

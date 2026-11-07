@@ -34,6 +34,9 @@
 #define AW_EFFECT_CONSTANT (-1.0f)
 #define AW_EFFECT_SOURCE_ITEM 0xF000
 #define AW_EFFECT_SOURCE_CONSTANT 0xF800
+/* v0.0.62 (MWSCRIPT-GAP-FUNCTIONS-62): a script's base modifier of an effect (OpenMW MagicEffects::modifyBase, by
+ * SetResistFire and the like): a constant entry of this source, its magnitude may be below 0, saved as the others */
+#define AW_EFFECT_SOURCE_SCRIPT 0xFFFE
 enum {AW_FX_DRAIN=0,AW_FX_DAMAGE=1,AW_FX_RESTORE=2,AW_FX_FORTIFY=3};
 /* Some effect numbers the engine reads (OpenMW's MGEF indexes). */
 enum {AW_EFFECT_WATER_BREATHING=0,AW_EFFECT_SWIFT_SWIM=1,AW_EFFECT_WATER_WALKING=2,AW_EFFECT_SHIELD=3,
@@ -70,6 +73,10 @@ int AW_EffectsHas(int number);
 int AW_EffectsHasOn(uint32_t owner,int number);
 /* The summed magnitude of EFFECT on OWNER (ARG AW_EFFECT_NO_ARG: every argument). */
 float AW_EffectsMagnitude(uint32_t owner,int effect,int arg);
+/* OWNER's base modifier of EFFECT (no argument) moved by DELTA (OpenMW MagicEffects::modifyBase): one entry of
+ * AW_EFFECT_SOURCE_SCRIPT, gone when it comes back to 0; it only adds to the magnitude (the resistances and the
+ * effects without a stat). 1 kept, 0 refused (a stat effect, a full pool). */
+int AW_EffectsBaseModify(uint32_t owner,int effect,float delta);
 /* The other actors that carry effects (not the player), up to MAX; their count. */
 int AW_EffectsOwners(uint32_t *out,int max);
 /* OWNER's effects go without being undone (it died or left the game); how many. */

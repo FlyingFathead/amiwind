@@ -53,13 +53,20 @@ int COM_FOpenFile(char *name,FILE **file){
             "cliff racer\tcrfoot\tcrfoot\t-\t-\tcrmoan\tcrroar\tcrscream\tfall\n"
             "daedroth\tfootl\tfootr\tswiml\tswimr\tdmoan\tdroar1,droar2\tdscream\tfall\n";
         *file=fmemopen((void *)sndg,strlen(sndg),"r");return (int)strlen(sndg);}
-    if(!strncmp(name,"arena/f",7) || !strncmp(name,"gallery/",8))return 5000;
+    if(!strncmp(name,"arena/f",7) || !strncmp(name,"gallery/",8) || !strncmp(name,"progs/c_",8))return 5000;
     return -1;
+}
+/* COMBAT-PLAYGROUND-CREATURE-HUMANOID-61: the actor table's model of a record (aw_actors.c); the cliff racer has one */
+int AW_ActorsBaseModel(const char *id,char *model,int size){
+    model[0]=0;
+    if(strcmp(id,"cliff racer") || size<18)return 0;
+    strcpy(model,"progs/c_racer.mdl");return 1;
 }
 int AW_CombatSettingsLoad(void){return 1;}
 int AW_CombatActorLoad(const char *id,aw_fighter_t *out){
     memset(out,0,sizeof(*out));
-    if(strcmp(id,"mevil molor") && strcmp(id,"ultis salam") && strcmp(id,"fargoth") && strcmp(id,"caius cosades"))return 0;
+    if(strcmp(id,"mevil molor") && strcmp(id,"ultis salam") && strcmp(id,"fargoth") && strcmp(id,"caius cosades") &&
+       strcmp(id,"cliff racer"))return 0;
     strcpy(out->id,id);strcpy(out->name,!strcmp(id,"fargoth")?"Fargoth":"Someone");out->level=9;out->health=out->health_max=94;
     out->fight=(unsigned char)(!strcmp(id,"fargoth")?90:30);return 1;
 }
@@ -241,6 +248,15 @@ int main(void){
     /* here: the captured spot, the opponent ahead */
     spawn_scene("balmora");AW_ArenaSpawn(p);foe=&edicts[5];
     assert(p->v.origin[0]==500 && foe->v.origin[0]>600);
+    AW_ArenaEnd();
+    /* a creature record: drawn with the model its actor table base names, not the stand-in
+     * (COMBAT-PLAYGROUND-CREATURE-HUMANOID-61) */
+    printed[0]=0;run("aw_arenapit cliff racer");
+    assert(strstr(printed,"cliff racer drawn with its own model progs/c_racer.mdl"));
+    {int was=preps;   /* its layout (standing model naming the mover) is prepared even in the duel */
+     spawn_scene("vai000");foe=&edicts[5];
+     assert(foe->v.modelindex!=3 && !strcmp(pr_strings+foe->v.model,"progs/c_racer.mdl") && preps==was+1);
+     preps=was;}
     AW_ArenaEnd();
 
     /* the setup hook runs before the title card */

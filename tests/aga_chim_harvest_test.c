@@ -54,7 +54,7 @@ int COM_FOpenFile(char *name,FILE **out){
 }
 int main(void){
     vec3_t p={50,50,0};
-    typedef char limits[AW_HARVEST_NODES==64 && AW_HARVEST_EDGES==256 && AW_HARVEST_MODELS==8 ? 1 : -1];
+    typedef char limits[AW_HARVEST_NODES==64 && AW_HARVEST_EDGES==256 && AW_HARVEST_MODELS==16 ? 1 : -1];
     (void)sizeof(limits);
     AW_HarvestInit();AW_StateReset();
     sv.edicts=edicts;sv.num_edicts=4;sv.active=true;sv.worldmodel=&world;sv.models[1]=&model;model.type=mod_brush;

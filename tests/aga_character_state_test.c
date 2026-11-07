@@ -170,6 +170,23 @@ int main(void)
     aw_story.stage=AW_STAGE_COURTYARD;assert(AW_StoryInventoryAllowed());   /* papers taken */
     AW_StoryReset(1);aw_story.stage=AW_STAGE_PAPERS;aw_story.hall=1;assert(AW_StoryInventoryAllowed());
     AW_StoryReset(1);assert(AW_StateSet(&aw_state,AW_GLOBAL,"CharGenState",-1) && AW_StoryInventoryAllowed());
+    /* MWSCRIPT-PLAYER-CONTROL-62: the scripts' switches start on, change only their own bits, take no row while
+     * unchanged, sit beside the opening's own rule (both must allow) and go with a new game */
+    AW_StoryReset(1);
+    {   int before=aw_state.count[AW_GLOBAL];
+        assert(!AW_ControlsDisabled() && AW_ControlAllowed(AW_CONTROL_ALL));
+        assert(AW_ControlSet(AW_CONTROL_PLAYER,1) && aw_state.count[AW_GLOBAL]==before);   /* on already: no row */
+        assert(AW_ControlSet(AW_CONTROL_PLAYER|AW_CONTROL_JUMPING,0) && AW_ControlsDisabled()==5);
+        assert(!AW_ControlAllowed(AW_CONTROL_PLAYER) && !AW_ControlAllowed(AW_CONTROL_JUMPING|AW_CONTROL_MAGIC));
+        assert(AW_ControlAllowed(AW_CONTROL_MAGIC|AW_CONTROL_LOOKING));
+        assert(AW_ControlSet(AW_CONTROL_PLAYER,1) && AW_ControlsDisabled()==AW_CONTROL_JUMPING);
+        assert(AW_ControlSet(AW_CONTROL_TELEPORTING|AW_CONTROL_LEVITATION,0) && AW_ControlsDisabled()==4+128+256);
+        assert(AW_StateGet(&aw_state,AW_GLOBAL,AW_CONTROL_FACT)==388);
+        assert(!strcmp(AW_ControlName(AW_CONTROL_VANITY),"vanitymode") && !strcmp(AW_ControlName(3),""));
+        /* the opening's own rule is untouched by the switches: CharGenState still restricts */
+        assert(AW_StoryRestricted() && !AW_StoryFighting());
+        AW_StoryReset(1);assert(!AW_ControlsDisabled());   /* a new game: every switch on (OpenMW InputManager::clear) */
+    }
     AW_StoryReset(1);
     assert(AW_CourtyardRingAvailable() && AW_CourtyardTakeRing());
     assert(AW_Ring()==1 && !AW_CourtyardTakeRing());
@@ -192,6 +209,7 @@ int main(void)
     source.character=c;source.story=aw_story;source.story.stage=AW_STAGE_RELEASED;
     source.story.hall=1;source.story.ship_disabled=1;source.story.captain=-1;
     assert(AW_StateSet(&aw_state,AW_GLOBAL,"CharGenState",-1));assert(AW_ClockEnsure() && AW_ClockAdvance(86400000));
+    assert(AW_ControlSet(AW_CONTROL_PLAYER|AW_CONTROL_LEVITATION,0));   /* kept through the save (below) */
     assert(AW_ClockSetTime(23,59) && AW_ClockAdvance(12345));source.state=aw_state;
     strcpy(source.scene,"seyda");strcpy(source.label,"Manual 1");source.position[0]=12.25;
     n=AW_SaveEncode(raw,sizeof(raw),&source);assert(n>500 && n<2000);
@@ -202,6 +220,8 @@ int main(void)
     assert(AW_ClockEnsure() && AW_StateGet(&aw_state,AW_GLOBAL,"amiwind:clock:ms")==86352345);
     assert(AW_ClockAdvance(47655) && AW_StateGet(&aw_state,AW_GLOBAL,"amiwind:clock:days")==2 && AW_StateGet(&aw_state,AW_GLOBAL,"amiwind:clock:ms")==0);
     assert(decoded.story.hall==1 && AW_StateGet(&decoded.state,AW_GLOBAL,"amiwind:ref:172851:ring_taken")==1);
+    assert(AW_StateGet(&decoded.state,AW_GLOBAL,AW_CONTROL_FACT)==AW_CONTROL_PLAYER+AW_CONTROL_LEVITATION);
+    assert(!AW_ControlAllowed(AW_CONTROL_PLAYER) && AW_ControlAllowed(AW_CONTROL_MAGIC));   /* aw_state is the loaded one */
     assert(AW_StateGet(&decoded.state,AW_JOURNAL,"a1_1_findspymaster")==5);
     assert(!AW_StateGet(&decoded.state,AW_ITEM,"bk_a1_1_caiuspackage")); /* Released saves may lack a former quest item. */
     for(i=12;i<n;i++){raw[i]^=1;assert(!AW_SaveDecode(raw,n,&decoded));raw[i]^=1;}

@@ -181,5 +181,46 @@ int main(void) {
      assert(b.low1>2.66f && b.low1<2.67f);                 /* two slowest: (0.5 + 0.25) / 2 */
      assert(b.seconds>10.64f && b.seconds<10.66f && b.average>18.7f && b.average<18.85f);   /* 198 x 0.05 + 0.75 */
      AW_HalloweenBenchFigures(times,0,&b);assert(!b.frames && !b.average);}
+    /* BENCH-RESULT-FILE-62: the figures measured apart, from a fixed list of frame and disk times: 600 frames of
+     * 0.2 s (5 fps) drawn, five slow drawn frames (0.4, 0.5, 0.6, 0.8, 1.0 s), and three frames that waited on the disk
+     * (2.5 s with 2.3 s of it disk, 0.7 s with 0.5 s disk, 0.25 s with 0.01 s disk) */
+    {static float times[600],disk[600];aw_hw_bench_split_t s;aw_hw_bench_t b;char name[AW_HW_BENCH_NAME];
+     for(i=0;i<600;i++){times[i]=.2f;disk[i]=0;}
+     times[100]=.4f;times[200]=.5f;times[300]=.6f;times[400]=.8f;times[500]=1.0f;
+     times[11]=2.5f;disk[11]=2.3f;times[50]=.7f;disk[50]=.5f;times[599]=.25f;disk[599]=.01f;
+     AW_HalloweenBenchSplit(times,disk,600,&s);
+     /* every frame: the old figures, unchanged */
+     AW_HalloweenBenchFigures(times,600,&b);
+     assert(s.all.frames==600 && s.all.average==b.average && s.all.minimum==b.minimum && s.all.low1==b.low1);
+     /* 592 x 0.2 + 3.3 (slow drawn) + 3.45 (disk frames) = 125.15 s */
+     assert(s.all.seconds>125.14f && s.all.seconds<125.16f);
+     assert(s.all.average>4.793f && s.all.average<4.796f);            /* 600 / 125.15 */
+     assert(s.all.minimum>.399f && s.all.minimum<.401f);               /* the 2.5 s disk frame */
+     assert(s.all.low1>.9835f && s.all.low1<.9837f);                   /* 6 slowest: 2.5+1.0+0.8+0.7+0.6+0.5 = 6.1 s */
+     /* the drawing: the 597 frames with no disk wait */
+     assert(s.drawing.frames==597);
+     assert(s.drawing.seconds>121.69f && s.drawing.seconds<121.71f);   /* 592 x 0.2 + 3.3 */
+     assert(s.drawing.average>4.9054f && s.drawing.average<4.9058f);   /* 597 / 121.7 */
+     assert(s.drawing.minimum>.999f && s.drawing.minimum<1.001f);      /* the 1.0 s frame */
+     assert(s.drawing.low1>1.5150f && s.drawing.low1<1.5153f);        /* 5 slowest drawn: 1.0+0.8+0.6+0.5+0.4 = 3.3 s */
+     /* the disk side: three frames, 2.81 s of waits, the worst frame 12 */
+     assert(s.disk_frames==3 && s.worst_disk_frame==12);
+     assert(s.disk_seconds>2.809f && s.disk_seconds<2.811f && s.worst_disk>2.299f && s.worst_disk<2.301f);
+     /* the five slowest frames, 1-based, slowest first */
+     assert(s.slowest[0]==12 && s.slowest[1]==501 && s.slowest[2]==401 && s.slowest[3]==51 && s.slowest[4]==301);
+     /* no disk times known (NULL): every frame counts as drawing, no disk side */
+     AW_HalloweenBenchSplit(times,NULL,600,&s);
+     assert(s.drawing.frames==600 && s.drawing.average==s.all.average && !s.disk_frames && !s.worst_disk_frame);
+     /* fewer frames than the slowest list: the rest 0; every frame waited: no drawing figures */
+     AW_HalloweenBenchSplit(times+11,disk+11,1,&s);
+     assert(s.slowest[0]==1 && !s.slowest[1] && s.all.frames==1 && !s.drawing.frames && !s.drawing.average);
+     assert(s.disk_frames==1 && s.worst_disk_frame==1);
+     AW_HalloweenBenchSplit(times,disk,0,&s);assert(!s.all.frames && !s.disk_frames && !s.slowest[0]);
+     /* the result file's name: fits an Amiga file name, the build cut, its odd characters replaced */
+     AW_HalloweenBenchName("0.0.62-dev1",1,name);assert(!strcmp(name,"halloween-0.0.62-dev1-001.txt"));
+     assert(strlen(name)<=30);
+     AW_HalloweenBenchName("0.0.62-dev1 extra long",42,name);assert(!strcmp(name,"halloween-0.0.62-dev1_-042.txt"));
+     assert(strlen(name)<=30);
+     AW_HalloweenBenchName("a/b:c",1000,name);assert(!strcmp(name,"halloween-a_b_c-999.txt"));}
     return 0;
 }

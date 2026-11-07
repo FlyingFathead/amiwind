@@ -108,11 +108,15 @@ def verify_survivors(source_raw,target_raw,retained_models,removed_indices):
         model_bounds_origins_visibility_leaf_counts='identical')
 
 
+# prepare_harvest.HARVEST_KINDS, kept here without importing it (tests/test_tree_fungus_harvest.py checks they agree)
+HARVEST_KINDS=('small_mushroom','tree_fungus')
+
+
 def remove_geometry(raw,refs,origin):
     data=lumps(raw);r=rows(data);records=strict_entities(data[0]);wanted={};keys=set()
     require(len(origin)==3 and all(math.isfinite(v) for v in origin),'Invalid map origin')
     for ref in refs:
-        require(ref.get('type')=='CONT' and ref.get('kind')=='small_mushroom','Target is not an original mushroom container')
+        require(ref.get('type')=='CONT' and ref.get('kind') in HARVEST_KINDS,'Target is not an original harvestable plant container')
         # an exterior key names its cell [x, y]; an interior one its cell name (HARVEST-INTERIOR-PICK-47)
         key=ref.get('source_key');require(isinstance(key,(list,tuple)) and len(key)==4 and key[3]==ref['number'] and
                                       ((key[1]=='exterior' and isinstance(key[2],(list,tuple))) or

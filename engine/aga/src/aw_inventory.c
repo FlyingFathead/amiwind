@@ -418,6 +418,10 @@ static int inv_field(char *out,const byte *raw,int n){
 }
 /* the made items' store (aw_actorstate.c AW_MadeItemAt), set by the script host when it starts; none in the tools' tests */
 const aw_made_item_t *(*aw_inventory_made_item)(int index);
+/* ALCHEMY-61 (aw_inventory.h): set by aw_alchemy.c; NULL in the fixtures */
+int (*aw_inventory_use)(const aw_inventory_item_t *it);
+int (*aw_inventory_command)(void);
+int AW_InventoryUsable(const aw_inventory_item_t *it){return it && aw_inventory_use && AW_INV_USABLE_KIND(it);}
 static FILE *inv_batch_file;static int inv_batch_size;static long inv_batch_base,inv_batch_wanted;   /* AW_InventoryBatchBegin */
 /* One items.awi row (512 bytes) into OUT; 0 when it is not a row this engine reads. Shared by the file's search and the
  * area tables' item records (AREA-TABLES-59, area_item). */
@@ -438,6 +442,28 @@ static int inv_parse_row(const byte *row,aw_inventory_item_t *out){
             bits=(uint32_t)inv_u32(row+480);memcpy(&value.health,&bits,4);
             bits=(uint32_t)inv_u32(row+484);memcpy(&value.armor,&bits,4);
             value.shield_class=(int)inv_u32(row+488);value.armor_skill_base=(int)inv_u32(row+492);
+            if(value.flags&AW_INV_ALCHEMY){
+                /* ALCHEMY-61: the alchemy block in place of the weapon and armour numbers (aw_inventory.h) */
+                int n,used;
+                value.weapon=0;value.weapon_skill=26;memset(value.damage,0,sizeof(value.damage));
+                value.reach=value.speed=value.health=value.armor=0;value.shield_class=value.armor_skill_base=0;
+                value.alchemy_kind=row[440];value.alchemy_count=row[441];
+                bits=(uint32_t)inv_u32(row+444);memcpy(&value.apparatus_quality,&bits,4);
+                if(row[442] || row[443] || value.alchemy_count>AW_INV_ALCHEMY_EFFECTS ||
+                   (value.alchemy_kind==AW_ALCHEMY_INGREDIENT && (value.category!=AW_INV_INGREDIENT || value.alchemy_count!=4)) ||
+                   (value.alchemy_kind==AW_ALCHEMY_POTION && value.category!=AW_INV_POTION) ||
+                   (value.alchemy_kind==AW_ALCHEMY_APPARATUS && (value.category!=AW_INV_MISC || value.subtype<0 ||
+                    value.subtype>3 || value.alchemy_count || !(value.apparatus_quality>0 && value.apparatus_quality<=100))) ||
+                   value.alchemy_kind<AW_ALCHEMY_INGREDIENT || value.alchemy_kind>AW_ALCHEMY_APPARATUS ||
+                   (value.alchemy_kind!=AW_ALCHEMY_APPARATUS && value.apparatus_quality!=0))return 0;
+                for(n=0;n<AW_INV_ALCHEMY_EFFECTS;n++){
+                    const byte *e=row+448+n*6;aw_alchemy_effect_t *x=&value.alchemy[n];
+                    used=n<value.alchemy_count;
+                    x->effect=e[0];x->arg=e[1];x->duration=(unsigned short)(e[2]|(e[3]<<8));x->magnitude=(unsigned short)(e[4]|(e[5]<<8));
+                    if(!used && (e[0] || e[1] || e[2] || e[3] || e[4] || e[5]))return 0;
+                    if(used && (x->effect>142 && !(x->effect==AW_ALCHEMY_NO_EFFECT && value.alchemy_kind==AW_ALCHEMY_INGREDIENT)))return 0;
+                }
+            }
             value.enchant_kind=row[496];bits=(uint32_t)inv_u32(row+500);memcpy(&value.charge_max,&bits,4);
             if(value.enchant_kind>AW_ENCH_CONSTANT || row[497] || row[498] || row[499] ||
                !(value.charge_max>=0 && value.charge_max<=1000000) ||
@@ -459,7 +485,7 @@ static int inv_parse_row(const byte *row,aw_inventory_item_t *out){
             if(value.category<1 || value.category>7 || value.value<0 ||
                !(value.weight>=0 && value.weight<=1000000) ||
                (value.slots&~((1U<<AW_INVENTORY_SLOTS)-1)) ||
-               (value.flags&~63U) ||
+               (value.flags&~127U) ||
                value.weapon<0 || value.weapon>12 ||
                value.weapon_skill<0 || value.weapon_skill>=27 ||
                !(value.reach>=0 && value.reach<=100) ||
@@ -523,6 +549,23 @@ int AW_InventoryRead(const char *id,aw_inventory_item_t *out){
         const aw_made_item_t *m=aw_inventory_made_item?aw_inventory_made_item(atoi(id+sizeof(AW_MADE_ITEM_PREFIX)-1)):NULL;
         if(!m || !strncmp(m->base,AW_MADE_ITEM_PREFIX,sizeof(AW_MADE_ITEM_PREFIX)-1) || !AW_InventoryRead(m->base,out))return 0;
         Q_snprintf(out->id,sizeof(out->id),"%s",id);Q_snprintf(out->name,sizeof(out->name),"%s",m->name);
+        if(m->cast_type==AW_MADE_POTION){
+            /* ALCHEMY-61: a made potion: the bottle of its base potion, its own name, weight, value and effects */
+            int k;
+            if(out->category!=AW_INV_POTION || out->alchemy_kind!=AW_ALCHEMY_POTION || m->effects<1 ||
+               m->effects>AW_INV_ALCHEMY_EFFECTS || !(m->charge>=0 && m->charge<=1000000) ||
+               !(m->charge_max>=0 && m->charge_max<=1000000))return 0;
+            out->weight=m->charge;out->value=(int)m->charge_max;out->script[0]=0;out->flags&=~AW_INV_SCRIPTED;
+            out->alchemy_count=(unsigned char)m->effects;memset(out->alchemy,0,sizeof(out->alchemy));
+            for(k=0;k<m->effects;k++){
+                const aw_spell_effect_t *e=&m->effect[k];
+                if(e->effect<0 || e->effect>142)return 0;
+                out->alchemy[k].effect=(unsigned char)e->effect;
+                out->alchemy[k].arg=(unsigned char)(e->skill>=0?e->skill:e->attribute>=0?e->attribute:0xFF);
+                out->alchemy[k].duration=e->duration;out->alchemy[k].magnitude=e->magnitude_max;
+            }
+            return 1;
+        }
         Q_snprintf(out->enchantment,sizeof(out->enchantment),"%s",id);
         out->enchant_kind=m->cast_type+1;out->charge_max=m->charge_max;out->enchant_capacity=0;
         return 1;
@@ -945,6 +988,8 @@ static void weapon_kit(int give){
 static char space_blocker[80];
 void AW_InventoryGrantCommand(void){
     aw_inventory_item_t item;int n;
+    /* ALCHEMY-61: aw_inventory use "ID" and aw_inventory alchemy ... (aw_alchemy.c), no resident command of their own */
+    if(aw_inventory_command && aw_inventory_command())return;
     /* dbg weapon / dbg gear (WEAPONS-57): the box of every weapon and shield, or of every armour and clothing piece */
     if(cmd_source==src_command && Cmd_Argc()==3 && !Q_strcasecmp(Cmd_Argv(1),"box")){
         int kind=!Q_strcasecmp(Cmd_Argv(2),"weapon")?AW_GEARBOX_WEAPON:!Q_strcasecmp(Cmd_Argv(2),"gear")?AW_GEARBOX_GEAR:0;
@@ -1106,6 +1151,16 @@ static void ledger_spawn(void){
         }
         e=ED_Alloc();map_drop_add(r->key,e,item.name);ledger_drop_entity(e,model,local,x->yaw);
     }
+}
+/* MWSCRIPT-PLACE-OBJECTS-62: a script placed item ID (aw_mwhost.c): a drop row of the list, shown at once when its place
+ * is on this map (the same spawn the list's drops take at a map load) */
+int AW_InventoryPlace(const char *id,int at,int32_t where,const float game[3],float yaw){
+    aw_inventory_item_t item;
+    if(!aw_ledger_on || !sv.active || svs.maxclients!=1 || !AW_InventoryRead(id,&item) || !(item.flags&AW_INV_DROP) ||
+       !item.model[0])return 0;
+    if(!AW_LedgerPlaceItem(&aw_state,&aw_ledger,item.id,1,at,where,game,yaw))return 0;
+    ledger_spawn();
+    return 1;
 }
 void AW_InventorySpawn(void){
     int i,model;aw_inventory_item_t item;

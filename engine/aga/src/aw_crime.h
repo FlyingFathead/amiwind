@@ -61,6 +61,13 @@ float AW_CrimeTheftFight(const aw_crime_settings_t *s,int value,int fight,int al
                          float fight_disp_mult,float distance_base,float distance_mult);
 /* reportCrime: the crime is reported when a witness in the radius has Alarm 100 or more. Pure. */
 #define AW_CRIME_REPORTS(alarm) ((alarm)>=100)
+/* The awareness roll an observer keeps (OpenMW 0.51 creaturestats.cpp getAwarenessRoll and updateAwareness: rolled
+ * 0..99 when asked, kept until 5 seconds have passed), in a small table by the observer's KEY; NOW in seconds (a NOW
+ * before the stored time, a new map's clock, is no match). Pure. */
+#define AW_CRIME_ROLL_SECONDS 5.0
+typedef struct {int key,roll;double at;} aw_crime_roll_t;
+int AW_CrimeRollFind(const aw_crime_roll_t *table,int count,int key,double now);   /* the kept roll, -1 none */
+void AW_CrimeRollKeep(aw_crime_roll_t *table,int count,int key,int roll,double now);   /* an expired or the oldest slot */
 
 /* aw_crime.c, the engine side. */
 struct edict_s;
@@ -78,4 +85,10 @@ int AW_CrimeTheft(const char *owner,int faction,int value);
 int AW_CrimeTakenValue(const char *id,int count,int value);
 /* Counters and the last crime for `dbg crime` (the console). */
 void AW_CrimeInit(void);
+/* MWSCRIPT-SMALL-FUNCTIONS-62, GetLOS and GetDetected (OpenMW 0.51 World::getLOS; actors.cpp isActorDetected;
+ * mechanicsmanagerimp.cpp awarenessCheck): FROM sees TO eye to eye through the world (actors do not block; a hidden,
+ * disabled one is never seen nor sees); OBSERVER notices ACTOR when it sees it and its kept roll is at least the
+ * awareness target (the settings of the crime rules; without them every seen actor is noticed). */
+int AW_CrimeSight(struct edict_s *from,struct edict_s *to);
+int AW_CrimeDetects(struct edict_s *observer,const aw_crime_observer_t *o,struct edict_s *actor,const aw_crime_thief_t *t);
 #endif

@@ -22,11 +22,18 @@
                             i16 cell x (or u16 the interior's stable number, the room map's _aw_cell_int)
                             i16 cell y i32 x y z (game units)
   STRT  2 bytes a start script: u16 script
+  NEWG  2 bytes a script a new game starts once (Main's CharGenState block: Startup, VampireCheck; v0.0.62,
+        NPC-STORY-DISABLED-AT-START-42): u16 script; resident, optional (an older file: none)
+  HELD  20 bytes an actor standing on an object a script disables (events.py; v0.0.62, SCRIPTED-EVENT-FALLING-MAGE-61),
+        sorted by actor: u32 the actor's reference u32 the object's reference f32 x y z (the actor's placed position,
+        game units); resident, optional (an older file: none)
   STRS  u32 offset per string, then the NUL-ended strings (cp1252)
   OACT, ACTB, AINV, AITM, ASPT, ASPL, ASPC, ASPE, AEFF, AMGE, AENC, APCS: the actor table (actors.py;
         docs/ACTOR_STATE.md)
   PCEL  the cells each GetPCCell name matches (resident; pccell_section below)
   PMOV  20 bytes a move of the player (PositionCell; resident; written in write() below)
+  VISI  12 bytes an actor a PositionCell may bring into a room (resident; written in write() below)
+  PLAC  12 bytes an object a Place call names (PlaceAtPC, PlaceAtMe, PlaceItem, PlaceItemCell; resident; write() below)
   TOPC  2 bytes a dialogue topic (DIAL type 0), sorted by folded id: u16 name (on disk; AddTopic hands the row)
   DRSC  12 bytes a dialogue result script, sorted: u32 FNV-1a of its text, u16 length, u16 speaker script, u16 its
         compiled script (_dlg_N), u16 flags (1 did not compile); on disk
@@ -40,7 +47,7 @@ from .opcodes import NAME, LAYOUT
 MAGIC = b'AWMS'
 VERSION = 1
 TYPES = {'s': 0, 'l': 1, 'f': 2}
-ORDER = ('CONF', 'GLOB', 'JRNL', 'SNDS', 'VOIC', 'MUSI', 'OBJS', 'SCRP', 'STRT', 'OACT', 'PCEL', 'PMOV', 'SPFX', 'CODE', 'BIND', 'STRS',
+ORDER = ('CONF', 'GLOB', 'JRNL', 'SNDS', 'VOIC', 'MUSI', 'OBJS', 'SCRP', 'STRT', 'NEWG', 'HELD', 'OACT', 'PCEL', 'PMOV', 'SPFX', 'VISI', 'PLAC', 'CODE', 'BIND', 'STRS',
          'ACTB', 'AINV', 'AITM', 'ASPT', 'ASPL', 'TOPC', 'ASPC', 'ASPE', 'AEFF', 'AMGE', 'DRSC', 'AENC', 'APCS')
 # The actor sections (actors.py, docs/ACTOR_STATE.md): OACT is resident (a script's target -> its actor row); the
 # others stay on disk and are read a row at a time by the engine's actor state (aw_actorstate.c).
@@ -149,6 +156,11 @@ def write(program, compiled, binds, conf=None):
             cell = struct.pack('>Hh', b['cell'], 0)
         bind += struct.pack('>IHH', b['reference'], b['script'], b['flags']) + cell + struct.pack('>iii', *b['position'])
     strt = b''.join(struct.pack('>H', p.scripts.index[s]) for s in p.data.start_scripts if s in p.scripts.index)
+    newg = b''.join(struct.pack('>H', p.scripts.index[s]) for s in getattr(p.data, 'new_game', [])
+                    if s in p.scripts.index)
+    held_rows = getattr(p, 'held', None) or []
+    held = b''.join(struct.pack('>IIfff', r['actor'], r['support'], *r['position'])
+                    for r in sorted(held_rows, key=lambda r: r['actor']))
     pcel = pccell_section(getattr(p, 'pccells', None))
     # PMOV, 20 bytes a move of the player (PositionCell, v0.0.54): u8 kind (1 outdoors, 2 into a room) u8 0 u16 the
     # room map's name (string index, 0xFFFF outdoors) f32 x y z (outdoors the original's units; a room its map's own
@@ -166,6 +178,19 @@ def write(program, compiled, binds, conf=None):
             body += struct.pack('>BBHHH', *e)
         first += len(r['effects'])
     spfx = (bytes(head + body), len(spfx_rows) if spfx_rows is not None else 0)
+    # VISI (v0.0.62, MWSCRIPT-POSITIONCELL-ACTORS-62): 12 bytes an actor a PositionCell may bring into a room, sorted
+    # by (room, reference): u32 the room's stable number, u32 the actor's reference, u16 its home room map's name
+    # (string index; 0xFFFF outdoors or a room this build lacks), u16 0; resident
+    visitors = getattr(p, 'visitors', None) or {}
+    visi = (b''.join(struct.pack('>IIHH', room, ref, home, 0) for (room, ref), home in sorted(visitors.items())),
+            len(visitors))
+    # PLAC (v0.0.62, MWSCRIPT-PLACE-OBJECTS-62): 12 bytes an object the scripts' Place calls name, in the order of
+    # codegen.Program.place_rows (sorted by folded id): u16 id, u16 the template's home room map (0xFFFF none), u32 the
+    # template reference (0 none), u16 the record's script (0xFFFF none), u8 kind (0 an actor, 1 an item, 2 other),
+    # u8 flags (1 the engine can make it); resident
+    places = p.place_rows() if hasattr(p, 'place_rows') else []
+    plac = (b''.join(struct.pack('>HHIHBB', r['id'], r['home'], r['template'], r['script'], r['kind'],
+                                 1 if r['carried'] else 0) for r in places), len(places))
     # TOPC, 2 bytes a dialogue topic (v0.0.57): u16 name, sorted by folded id (AddTopic hands the row number); on disk
     rows = getattr(p, 'topic_rows', None)
     topics = sorted(rows(), key=rows().get) if rows else []
@@ -192,8 +217,8 @@ def write(program, compiled, binds, conf=None):
                 'SNDS': (snds, len(p.sounds)), 'VOIC': (voic, len(p.voices)), 'MUSI': (musi, len(p.music)),
                 'OBJS': (objs, len(p.objects)), 'SCRP': (bytes(scrp), len(compiled)),
                 'CODE': (bytes(code), len(compiled)), 'BIND': (bytes(bind), len(binds)),
-                'STRT': (strt, len(strt) // 2), 'PCEL': pcel, 'PMOV': pmov, 'TOPC': topc, 'SPFX': spfx,
-                'DRSC': drsc}
+                'STRT': (strt, len(strt) // 2), 'NEWG': (newg, len(newg) // 2), 'HELD': (held, len(held_rows)), 'PCEL': pcel, 'PMOV': pmov, 'TOPC': topc, 'SPFX': spfx,
+                'VISI': visi, 'PLAC': plac, 'DRSC': drsc}
     actors = getattr(p, 'actors', None)
     if actors is not None:
         sections.update(actors.sections(p.objects.rows))

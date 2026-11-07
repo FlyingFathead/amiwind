@@ -407,6 +407,9 @@ static void rest_store(const aw_rest_body_t *b)
     aw_character.current[1]=b->magicka;aw_character.current[2]=b->fatigue;
 }
 int AW_RestSleeping(void){return modal==3 && rest_sleeping;}
+/* WakeUpPC (MWSCRIPT-SMALL-FUNCTIONS-62; OpenMW 0.51 miscextensions.cpp OpWakeUpPC, waitdialog.cpp wakeUp: the sleep
+ * stops): the window open in rest mode closes, as GetPCSleep reads it; a wait is not a sleep and stays */
+int AW_RestWake(void){if(!AW_RestSleeping())return 0;close_modal();return 1;}
 /* T or a bed: the refusals, then the window in rest or wait mode. BED_REFERENCE: the bed used (0 for T). */
 int AW_RestOpen(unsigned long bed_reference)
 {
@@ -493,6 +496,9 @@ static void rest_run(int wanted)
 }
 static void wait_open(void) {
     if(modal || gallery_active || key_dest!=key_game)return;
+    /* a script's DisablePlayerControls: the T key does nothing (OpenMW ActionManager::rest); a bed's ShowRestMenu
+     * from a script is not this key and still opens */
+    if(!AW_ControlAllowed(AW_CONTROL_PLAYER))return;
     /* the rest and wait rules when the image has their data (REST-WAIT-59); else the earlier wait-only window below */
     {FILE *f=NULL;int have=COM_FOpenFile("levelup/rest.txt",&f)>=0 && f;if(f)fclose(f);if(have){AW_RestOpen(0);return;}}
     if(AW_PlayerInCombat()){enemies_notice();return;}   /* WAIT-DURING-COMBAT-36: no waiting in a fight */

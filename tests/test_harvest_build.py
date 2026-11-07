@@ -474,7 +474,8 @@ class HarvestBuild(HarvestCase):
     def test_runtime_bounds_match_the_builder(self):
         limits = harvest_build.runtime_limits()
         self.assertEqual(limits['plants'], harvest_build.MAX_PLANTS)
-        self.assertEqual(limits['models'], 8)
+        # 8 small-mushroom and 4 trunk-fungus meshes can meet in one Bitter Coast map (FLORA-FAUNA-COVERAGE-62)
+        self.assertEqual(limits['models'], 16)
 
 
 # HARVEST-INTERIOR-PICK-47: one interior with a representable mushroom (201) and an owned one (202, left baked).

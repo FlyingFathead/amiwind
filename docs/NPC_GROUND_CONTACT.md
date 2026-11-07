@@ -1,6 +1,6 @@
 # Initial NPC placement and ground-contact workflow
 
-_Last updated with AmiWind v0.0.48-rc1 (23 October 2026)._
+_Last updated with AmiWind v0.0.62-dev1 (7 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -202,6 +202,11 @@ scale and **not** moved to the floor, so the height the animation gives the body
 kept. Vivec: the `idle2` loop (his AI_W idle chances give Idle2 60; his model has no `idle` group), the posed
 body from 13.9 to 33.1 Quake units above his reference point. A placed creature is an idle `aw_npc` like the
 placed NPCs: no greeting, dialogue or combat yet (nothing is invented).
+
+From v0.0.62 every other creature a room places is not a resident: the room stages write it as an `aw_levelled`
+entity that the engine spawns from the creature's base in the actor table, with the outdoor creature's model, stats,
+sounds and behaviour (`--room-placed-creatures`, default `table`; [the actor table](chim/WORLD_FORMAT.md)). The
+resident stage keeps only the listed creatures above.
 
 The support state is the policy's class, never a rule for one ID in code. `levitating` (aw_ground_mode 1)
 means the authored animation holds the body above the actor's reference point: the host contact fit and the

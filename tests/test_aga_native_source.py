@@ -418,6 +418,18 @@ class NativeSourceTests(unittest.TestCase):
         self.compile_run('aga_world_regions_test.c', [Path(SOURCE)/'src/aw_world.c'],
             cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])
 
+    def test_coordinate_teleport_inside_the_loaded_map_without_the_region_table(self):
+        # DEBUG-TP-MINIWIND-36: a MiniWind disk ships no open-world region table; dbg tp X Y resolves a point inside
+        # the loaded map (its CHIM frame) and only that, and a refusal names the maps the disk holds
+        self.compile_run('aga_world_regions_test.c', [Path(SOURCE)/'src/aw_world.c'],
+            cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'], arguments=['no-directory'])
+        scene = (ROOT/'engine/aga/src/aw_scene.c').read_text(encoding='utf-8')
+        command = re.search(r'static void teleport_command\(void\) \{(.*?)\n\}', scene, re.S).group(1)
+        self.assertEqual(command.count('map_teleport(source,'), 2)
+        self.assertEqual(command.count('disk_maps_note();'), 2)
+        self.assertIn('loaded_map && AW_WorldLoadedTarget(sv.name,source_position,r.target,r.arrival)', scene)
+        self.assertIn('return map_teleport(source_position,use_height,0);', scene)
+
     def test_alias_near_quad_clips_every_screen_edge(self):
         self.compile_run('aga_alias_clip_test.c', [Path(SOURCE)/'src'/n for n in
             ('r_aclip.c','r_alias.c','aw_skel.c')],

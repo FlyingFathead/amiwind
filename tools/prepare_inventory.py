@@ -36,6 +36,7 @@ DEBUG_TORCH_NAME='Debug torch (test only)'
 DEBUG_TORCH_SOURCE='torch'
 LIGHT_INFINITE=-1
 FLAG_LIGHT=32
+FLAG_ALCHEMY=64   # ALCHEMY-61: bytes 440..495 hold the alchemy block (tools/prepare_alchemy.py)
 SLOT_LEFT=17
 
 def safe_text(value,size):
@@ -152,11 +153,14 @@ def source_items(data):
             else:weight,value=struct.unpack_from('<fi',raw)
         if weight is None:continue          # a record whose data this does not decode
         if not math.isfinite(weight) or weight<0 or value<0:raise ValueError('Invalid item weight/value '+identifier)
+        # ALCHEMY-61: an ingredient's four effects, a potion's effects, an apparatus' quality (tools/prepare_alchemy.py
+        # block_for), written into the row's bytes 440..495 with catalogue flag 64
+        from prepare_alchemy import block_for
         result[identifier]=dict(id=identifier,name=name,category=KINDS[kind],kind=kind,
             subtype=subtype,weight=weight,value=value,source_model=text(fields,'MODL'),
             source_icon=text(fields,'TEXT' if kind=='ALCH' else 'ITEX'),script=text(fields,'SCRI').casefold(),
             raw=raw,enchantment=text(fields,'ENAM').casefold() if kind in ('CLOT','ARMO','WEAP','BOOK') else '',parts=any(k=='INDX' for k,_ in fields),
-            capacity=enchant_capacity(kind,raw))
+            capacity=enchant_capacity(kind,raw),alchemy=block_for(kind,fields))
     for identifier,enchant in enchantments.items():
         if not 0<=enchant[0]<=3:continue
         try:charges[identifier]=max_charge(enchant,effects[identifier],mgef,settings)
@@ -317,6 +321,7 @@ def prepare(data_files,id1,selected=(),palette=None,models=True,jobs=None,model_
         # Every catalogue item can be owned (pickup, reward, grant): its inventory icon (UI-ICONS-INVENTORY-42).
         if item['source_icon']:inventory_icons[identifier]={'source_icon':item['source_icon'],
             'enchanted':bool(item['enchantment']),'equippable':bool(flags&1)}
+        if item.get('alchemy'):flags|=FLAG_ALCHEMY
         row_flags[identifier]=flags
         row=safe_text(identifier,64)+safe_text(item['name'],96)+struct.pack('<iiifII',item['category'],item['subtype'],item['value'],item['weight'],slots,flags)
         row+=safe_text(model,64)+safe_text(icon,64)+safe_text(item['enchantment'],64)+safe_text(item['script'],64)
@@ -336,7 +341,12 @@ def prepare(data_files,id1,selected=(),palette=None,models=True,jobs=None,model_
         # (held_lights.catalogue_flags; 0 in older catalogues)
         tail=struct.pack('<i3BB',light['time'],*light['colour'],catalogue_flags(light.get('flags',0))) if light else \
             struct.pack('<HB5x',item.get('capacity',0),flags_506)
-        row+=struct.pack('<ii6iffffii',*combat)+struct.pack('<B3xf',kind,charge)+tail
+        # ALCHEMY-61: an ingredient, potion or apparatus row carries the alchemy block where the weapon and armour
+        # numbers sit (it has none), flag 64 (tools/prepare_alchemy.py)
+        if item.get('alchemy'):
+            if any(combat[2:]) or combat[0] or combat[1]!=26:raise ValueError('Alchemy row with combat numbers '+identifier)
+            row+=item['alchemy']+struct.pack('<B3xf',kind,charge)+tail
+        else:row+=struct.pack('<ii6iffffii',*combat)+struct.pack('<B3xf',kind,charge)+tail
         assert len(row)==ROW;rows.append(row)
     out=id1/'inventory/items.awi';out.parent.mkdir(parents=True,exist_ok=True)
     out.write_bytes(b'AWI2'+struct.pack('<I',len(rows))+b''.join(rows))
@@ -352,6 +362,9 @@ def prepare(data_files,id1,selected=(),palette=None,models=True,jobs=None,model_
     report['debug_torch']=({'id':DEBUG_TORCH_ID,'name':DEBUG_TORCH_NAME,**items[DEBUG_TORCH_ID]['light']}
                            if DEBUG_TORCH_ID in items else None)
     report['catalogue_sha256']=hashlib.sha256(out.read_bytes()).hexdigest()
+    # ALCHEMY-61: the alchemy settings, lines, sounds and bottle looks (alchemy/settings.txt), in the same step
+    from prepare_alchemy import prepare as prepare_alchemy
+    report['alchemy']=prepare_alchemy(data,id1,items)
     # dbg give weapons (DBG-GIVE-WEAPONS-59): one plain item of every weapon type and two shields, chosen from the
     # records by a rule (tools/prepare_weapon_kit.py), every one a row of the catalogue just written.
     from prepare_weapon_kit import write_kit

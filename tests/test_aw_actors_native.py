@@ -132,6 +132,13 @@ class ActorsNativeTests(unittest.TestCase):
         self.assertTrue(rows)
         self.assertTrue(any(r[4] != 'none' for r in rows))
 
+    def test_record_id_gives_its_world_model(self):
+        # COMBAT-PLAYGROUND-CREATURE-HUMANOID-61: the combat playground draws a creature record with the model its
+        # actor table base names (the mudcrab's), none for one without a model in this build
+        out = self.run_check('basemodel')
+        self.assertIn('base model progs/c_crab.mdl', out)
+        self.assertIn('base model passed', out)
+
     def test_levelled_roll_is_deterministic_and_kept(self):
         def picks(seed):
             out = [l.split() for l in self.run_check('roll', seed).splitlines() if l.startswith('pick pass ')]

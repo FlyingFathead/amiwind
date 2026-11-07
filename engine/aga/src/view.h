@@ -41,3 +41,7 @@ float V_FirstPersonPitch (float pitch, float factor);
 /* r_main.c: 1 = the first-person model's projection from here on, 0 = the world's back */
 void R_FirstPersonProjection (int on);
 void V_UpdatePalette (void);
+/* A script's FadeOut / FadeIn / FadeTo: the screen's black to TARGET (0 none .. 1 black) over SECONDS (view.c). */
+void V_ScreenFade (float target, float seconds);
+float V_ScreenFadeLevel (void);
+float V_ScreenFadeTarget (void);

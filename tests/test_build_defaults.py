@@ -207,6 +207,9 @@ OPTIONS = {
     # the rooms' levelled creatures (TOMB-NO-CREATURES-60): table = an aw_levelled entity per levelled reference of a
     # converted room by default since v0.0.61; off = the room maps before
     'room_levelled_creatures': 'shipped default',
+    # the creatures placed in rooms (TOMB-NO-CREATURES-61): table = a list of one in the actor table, a library model
+    # and an aw_levelled entity per placed creature reference of a converted room by default since v0.0.62; off = before
+    'room_placed_creatures': 'shipped default',
     # actors the original's start script disables at a new game: original = off by default until the runtime
     # enable exists (NPC-STORY-DISABLED-AT-START-42); placed = as before
     'start_disabled': 'opt-in, not shipped',

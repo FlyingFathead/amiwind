@@ -119,6 +119,18 @@ int AW_AmbientTravelInRange (int dx, int dy, int dz);
 int AW_AmbientTravelPlan (const aw_ambient_pkg_t *p, int fx, int fy, int fz, int tx, int ty, int tz, int *goal);
 /* The local point nearest an offset from the start (an actor put off its route, after a fight), or -1. */
 int AW_AmbientNearest (const aw_ambient_pkg_t *p, int x, int y, int z);
+/* AIFollowCell (v0.0.62; OpenMW 0.51 aifollow.cpp execute): 1 when a follow whose final point lies DIST2 (squared engine
+ * units) from the actor is done by its position at follow distance FD. PLACE 0: no cell named, done near the point
+ * anywhere (AmiWind's AIFollow before v0.0.62, kept); > 0: only in that room (ROOM the loaded room's stable number, 0
+ * outdoors); -1: never (OpenMW: a cell named that is no interior). */
+int AW_AmbientFollowDone (long place, long room, float dist2, float fd);
+/* AIEscort / AIEscortCell (v0.0.62; OpenMW 0.51 aiescort.cpp execute), one decision: AW_ESCORT_WAIT the actor stands
+ * (the target too far, or not in the package's place), AW_ESCORT_WALK it walks on to the destination, AW_ESCORT_DONE
+ * it arrived. TARGET2 / DEST2: squared distances (engine units) to the escorted target and to the destination; HULL the
+ * actor's largest half extent; PLACE and ROOM as AW_AmbientFollowDone (-1: outdoors only); *MAX the keep-up distance,
+ * kept between calls (0 at the start: 450 original units, then the half extent + 450 while near, + 250 once too far). */
+enum {AW_ESCORT_WAIT, AW_ESCORT_WALK, AW_ESCORT_DONE};
+int AW_AmbientEscortStep (long place, long room, float target2, float dest2, float hull, float *max);
 
 #ifndef AW_AMBIENT_HOST_TEST
 struct edict_s;
@@ -144,6 +156,13 @@ int AW_AmbientTravel (struct edict_s *e, const float to[3]);
 /* AIFollow (v0.0.57; OpenMW aifollow.cpp): E follows TARGET for HOURS of game time (0: until another package),
  * ending at FINAL (this map's coordinates; NULL or 0 0 0: none). 0 when E is no actor here or cannot walk. */
 int AW_AmbientFollow (struct edict_s *e, struct edict_s *target, float hours, const float *final);
+/* AIFollowCell (KIND 3) and AIEscort / AIEscortCell (KIND 2) (v0.0.62, MWSCRIPT-POSITIONCELL-ACTORS-62): E follows or
+ * leads TARGET for HOURS (0: no limit) to POINT (the map's units; for PLACE > 0 that room map's own) in PLACE (the room's
+ * stable number; 0 none named; -1 a cell that is no room). 0 when E is no actor here or cannot walk. */
+int AW_AmbientPackage (struct edict_s *e, struct edict_s *target, int kind, float hours, const float *point, long place);
+/* The player's followers within OpenMW's 800 units (actionteleport.cpp getFollowers), not fighting: up to MAX into
+ * OUT, and each one's package kept (as a saved one) to be applied when the follower is in the next map; the count. */
+int AW_AmbientFollowersOf (struct edict_s *player, struct edict_s **out, int max);
 /* Saved games (v0.0.57, SAVEGAME-COMPLETE-57): the actors' travel and follow packages as an "AWPK" block (bytes, -1
  * too small); a loaded block's packages wait until their actors are in the map (1, or 0 for a bad block). */
 int AW_AmbientPackagesExport (unsigned char *out, int capacity);
@@ -152,8 +171,8 @@ int AW_AmbientPackagesImport (const unsigned char *data, int bytes);
  * the walk speed then uses the attribute 50 (an AmiWind stand-in, said in docs/NPC_PATHFINDING.md). */
 extern int (*aw_ambient_speed_attribute)(struct edict_s *e);
 /* GetCurrentAIPackage / GetAIPackageDone for the interpreter (v054-mwscript sets its aw_mwscript_ai_package hook to
- * this): OpenMW's package number (-1 none, 0 Wander; Travel, Escort, Follow, Activate are not run yet and read as
- * none), *done 1 once a non-repeating Wander has run its duration. */
+ * this): OpenMW's package number (-1 none, 0 Wander, 1 Travel, 2 Escort, 3 Follow; Activate is not run yet and reads
+ * as none), *done 1 once a non-repeating Wander has run its duration or a travel, escort or follow ended. */
 int AW_AmbientAiPackage (struct edict_s *e, int *done);
 /* The row flags (AW_AMBIENT_FLYER, AW_AMBIENT_SWIMMER, ...) of the package E runs, 0 without one (no disk read). */
 int AW_AmbientFlags (struct edict_s *e);

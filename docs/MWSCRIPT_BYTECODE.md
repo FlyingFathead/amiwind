@@ -1,6 +1,6 @@
 # MWScript compiled by the builder
 
-_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
+_Last updated with AmiWind v0.0.62-dev1 (7 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -20,6 +20,7 @@ _Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
   - [The original's sound markers](#the-originals-sound-markers)
 - [The interpreter](#the-interpreter)
   - [Which objects run scripts](#which-objects-run-scripts)
+  - [Held actors and falls](#held-actors-and-falls)
   - [What runs today, what is "not yet"](#what-runs-today-what-is-not-yet)
   - [The import route: every call kept](#the-import-route-every-call-kept)
 - [Spell effects: the design (SPELL-EFFECTS-57)](#spell-effects-the-design-spell-effects-57)
@@ -139,6 +140,8 @@ nothing happens twice.
 | `media.py` | script sounds, voices and music to the media catalogue's converted files |
 | `opcodes.py` | the opcode table (the engine's copy: `engine/aga/src/aw_mwcode.h`) |
 | `measure.py` | the measurement above |
+| `newgame.py` | the scripts a new game starts once and their build check (v0.0.62) |
+| `events.py` | the actors held on an object a script disables, and the census of distance-triggered world events (v0.0.62) |
 
 ### The quirks it keeps
 
@@ -257,8 +260,12 @@ on disk.
 | OBJS | 12 | reference (if placed once), id, script, placed count, kind | 1,992 |
 | SCRP | 16 | name, locals, stack, flags, code offset and length | 19,312 |
 | STRT | 2 | start scripts | 8 |
+| NEWG | 2 | the scripts a new game starts once (v0.0.62): Main's new-game block, [below](#which-objects-run-scripts) | 6 |
+| HELD | 20 | an actor standing on an object a script disables (v0.0.62): the actor's and the object's references, the actor's placed position, [below](#held-actors-and-falls) | 20 (1 row) |
 | PCEL | | the cells each `GetPCCell` name matches (v0.0.54): per name the rooms by stable number and the outdoor cells by grid, made at build time | 1,692 |
 | PMOV | 20 | the player's PositionCell moves (v0.0.54): kind (outdoors, into a room), the room map's name, x y z, yaw | 420 |
+| VISI | 12 | the actors a PositionCell may bring into a room (v0.0.62), sorted: the room's stable number, the actor's reference, its home room map's name (none: outdoors or a room the build lacks) | 12 a row |
+| PLAC | 12 | every object a Place call names (v0.0.62), sorted by id: the id, a template reference of the same record and its home room map's name, the record's script, the kind (NPC or creature, carried item, other) and whether the engine can make it, [below](#what-runs-today-what-is-not-yet) | 492 (41 rows) |
 | CODE | | the bytecode | 132,376 |
 | BIND | 24 | placed scripted objects, by reference: script, flags, cell (grid or the room's stable number), position | 117,768 (4,907 rows) |
 | STRS | | strings (names for the log, messages, ids of not-yet calls) | 145,333 |
@@ -416,6 +423,94 @@ kept. Not attached: the hand-written list, inert scripts, and more than 256 edic
 object's values are kept while its map is not loaded (512 objects, 4,096 values). Room placements are not
 checked in game yet ([MWSCRIPT-INTERIOR-PLACEMENTS-48](BUGS.md)).
 
+Global scripts: the game data's start script records (Tribunal's and Bloodmoon's) start when the file loads and again
+at every load of a save. The original also always runs its global script Main (OpenMW 0.51 globalscripts.cpp adds it
+before the start script records), and a new game sets CharGenState to 1 (OpenMW worldimp.cpp), so Main's block under
+that test starts the new game's run-once scripts: Startup and VampireCheck (and the character creation script, which
+the engine carries by hand). Startup's `->Disable` lines take 102 references out of the world until a quest brings
+them back: the twelve Dreamers on the roads and in the towns, the Dreamer Prophet, the falling mage north of Seyda
+Neen, quest characters, creatures and a few objects. Until v0.0.62 nothing started Main, so all of them stood in the
+world from the first minute ([NPC-STORY-DISABLED-AT-START-42](bugs/NPC-STORY-DISABLED-AT-START-42.md)). Since
+v0.0.62 the builder reads the scripts Main starts in that block and writes them as the NEWG section (2 bytes a
+script, resident); the engine starts each once when a new game begins, by any opening (the ship, a quick start, a
+test scene), and then Startup disables them through the object state, which saved games keep. A disabled reference's
+own script keeps running, as in OpenMW (World::disable keeps the local script), so a Dreamer's script enables it when
+the main quest reaches its stage. The build check (`tools/mwscript/newgame.py`, run by the stage) refuses a file whose
+new game would start nothing, or one where a reference placed once that these scripts disable is not bound to its
+reference number; the stage report lists the counts (`new_game` in `mwscript-report.json`). Measured on the game data,
+7 November 2026: 3 scripts in the block (2 run, the character creation script is carried by hand), 102 disabled
+references, 78 of them actors, 101 placed once and every one bound, 1 placed twice (a plate, left as it is).
+`aw_mwscript_status` counts the new games and the scripts started. A save made before v0.0.62 keeps the world it had.
+
+### Held actors and falls
+
+v0.0.62, SCRIPTED-EVENT-FALLING-MAGE-61. The falling mage north of Seyda Neen is not scripted to fall. He stands on
+an invisible platform high above the road; his journal's script enables him when the player comes within 2,000 units,
+disables the platform two seconds later, and plays two screams through the player (`"player"->Say`, two seconds and
+four more after). The game's physics does the rest: with the platform gone he falls, and the fall damage on landing
+kills him (OpenMW 0.51: the platform's collision leaves with `Disable`, mwphysics/movementsolver.cpp drops the actor,
+mwmechanics/character.cpp charges the landing). AmiWind has no collision for an invisible marker box, so the same
+thing is built as a general mechanism, by a rule on the data, not by name:
+
+- **The builder** (`tools/mwscript/events.py`, run by the mwscript stage) finds every NPC or creature that stands on
+  a placed activator, static, container or door that some script disables (an `ID->Disable` in any script or dialogue
+  result, or the object's own script calling `Disable`) and that is placed once: its feet at most 32 game units
+  sideways from the object and up to 128 above it. Each pair is a HELD row: the actor's reference, the object's and
+  the actor's placed position. Measured on the game data, 7 November 2026: 1 row, the mage on his platform (his feet
+  50 units above it, 15 sideways); 7 other actors stand near such an object but beside or below it (the stage report
+  lists them with the reason).
+- **The engine** (`engine/aga/src/aw_fall.c`) holds a HELD actor at its placed position while its object is there: the
+  floor snap at spawn (`aw_scene.c AW_NPCFloor`) leaves it, and a ground point baked by a frame or the actor table is
+  replaced by the row's position. Once a script disables the object (or the player takes it), the actor falls: OpenMW's
+  gravity (8.96 m/s squared, 627 game units/s squared) in steps of 1/60 s, every drop counted as the fall height, until
+  its hull meets the ground or water. The fall starts only when something collidable is under it (the streamed ground
+  may not be ready yet). The landing costs the fall damage of the next section, taken from the actor record's health
+  with the game's Health Damage sound; at 0 it dies as by a blow, so `OnDeath` reads 1 (the journal's script stops) and
+  the body lies where it landed and can be searched. `aw_mwscript_status` shows the rows, the actors tracked and their
+  state (held, waiting for ground, falling, landed), the falls and the last fall's height and loss.
+
+**Fall damage** (the player and every actor; `aw_move_rules.c`, rules from OpenMW 0.51 written independently): below
+the game setting fFallDamageDistanceMin (400) nothing; above it the height less 400, less 1.5 times Acrobatics and the
+Jump magnitude (not below 0), times fFallDistanceMult (0.07) plus fFallDistanceBase (0), times fFallAcroBase (0.25)
+plus fFallAcroMult (0.01) times (100 minus Acrobatics). The health lost is that times 1 minus a quarter of the fatigue
+term. Nothing landing in water, nothing in god mode. The fall height grows only while the actor is in the air and
+starts again on the ground, under water, while levitating and while any Slowfall is on, so a Slowfall landing never
+hurts (OpenMW mtphysics.cpp). The five settings are read from the game data with the movement settings
+(`combat/settings.txt`). For the mage: about 2,460 units, Acrobatics around 15: 157 damage, 108 health at full fatigue,
+where he has 5.
+
+**Slowfall** (OpenMW physicssystem.cpp and movementsolver.cpp): the factor 1 minus the magnitude times 0.005 (0 to 1)
+multiplies the falling speed once each 1/60 s, so a Slowfall settles at a slow, steady descent. On an actor (a Slowfall
+spell cast on the mage before the platform goes) and on the player alike. The player still falls with the engine's own
+gravity, several times the original's ([PHYSICS-GRAVITY-SCALE-36](bugs/PHYSICS-GRAVITY-SCALE-36.md)); the fall height,
+and so the damage, does not depend on the speed.
+
+Not yet: a hard landing's knockdown (the damage over Acrobatics times the fatigue term; the combat layer's knockdown
+starts only in a fight) and an NPC's landing sound (DefaultLand); [FALL-LANDING-KNOCKDOWN-62](BUGS.md).
+
+**Seen in game** (7 November 2026, Seyda Neen MiniWinds at 32 MB Fast): held until the trigger, enabled by his journal's
+script (his hidden edict shown again with its model and solidity, his disabled row cleared and the platform's added),
+drawn standing on the platform and in the air on the last part of his fall, the fall of 2,468 units, 117.9 health
+lost, dead, the body drawn where it landed and searchable with the original loot. Both screams start (`Say: 2
+started, 0 not started`, on the player). His only greeting ("Greeting 0") has the result `Goodbye`, and
+`dbg mwscript result "Greeting 0" "agronian guy"` runs it to the Goodbye. What the player does not
+see is the draw distance: the trigger is 500 map units from his journal and he stands 617 above the ground, past the
+default draw distance of 300, so from the road the fall is out of sight until near its end
+([SCRIPTED-EVENT-PAST-DRAW-DISTANCE-62](BUGS.md)). `aw_mwscript_status` counts the scripts' `Say` calls (started, not
+started for want of an actor, a voice row or a sample, the last one's actor and length): the two screams of the event.
+`dbg sweep` counts the actors a script disabled (and those the opening hides) apart, not as "without a model", and
+fails a disabled actor that is still drawn.
+
+**The census of distance-triggered events.** The stage report (`distance_events` in `mwscript-report.json`) lists
+every script that tests the player's distance and then changes the world (enables, disables, attacks, places, moves,
+makes an actor fall), with the object each is placed on. Game data, 7 November 2026: 90 scripts, 92 rows; 25 scripts
+placed in Vvardenfell, 65 without a placement there (placed in the add-ons' worlds, which the image does not hold yet,
+or on records the game spawns while it runs). What they do: disable 59, enable 44, attack 33, greet 32, place 14,
+speak 13, walk 13, follow 9, move 7, play a sound 7, fall 1.
+Among them: the slave hunters at Khuul, four fighters who attack in exterior cell 11, 20, Dagoth Ur's chamber and Azura's end, the
+Moon and Star's cavern, Hannat Zainsubani, Ragash gra-Shuzgub, the white guar, and in the add-ons the Raven Rock colony, the
+werewolf and hunter events and Almalexia's and Sotha Sil's ends.
+
 ### What runs today, what is "not yet"
 
 Runs: variables, `if`/`elseif`/`else`, `while`, `set`, arithmetic and comparisons, globals, another object's
@@ -431,7 +526,9 @@ object or the one named before `->`. A disabled object with an entity is hidden 
 after a map change (its new entity is hidden again); `Lock` without a number takes the level the object had last
 (100 when it never had one). Both are kept in saved games, by the object's reference, in the same change list as the
 actors' state (an object's entry carries "disabled" and "lock set, level"). An actor the CHIM world spawns as its
-cell joins is not spawned while disabled; after `Enable` it comes with its cell's next join. Not yet: CHIM scenery
+cell joins is not spawned while disabled; since v0.0.62 its entity text is kept while its cell stays in the window (16
+at most, a few hundred bytes each), and an `Enable` spawns it on the next tick, as the original shows an enabled
+actor at once; before, it came only with its cell's next join (SCRIPTED-EVENT-FALLING-MAGE-61). Not yet: CHIM scenery
 without an entity keeps showing when disabled (its collision is part of the CHIM chunk, so hiding it alone would
 leave an invisible wall). Doors that turn in place
 (hinged doors) follow a script's lock: the opening's own locks come first, then the script's, then the game data's;
@@ -480,8 +577,9 @@ and the engine moves the state generation when the player's cell changes, so the
 frame. `GetPos` reads the position of the script's object or the one named before `->` in game units (OpenMW's
 transformationextensions.cpp). `GetCommonDisease` and `GetBlightDisease` look for a spell of that type in the
 actor's spell list and its changes (OpenMW's hasCommonDisease and hasBlightDisease); the player catches no disease
-from creatures yet, so on the player they read 1 only after a script gave one. `DontSaveObject` compiles to nothing
-and `Xbox` to 0, as OpenMW has them. 6 functions moved from "not yet" to running: scripts that run whole 635 before,
+from creatures yet, so on the player they read 1 only after a script gave one. `DontSaveObject` and `Fall` compile
+to nothing and `Xbox` to 0, as OpenMW has them (`Fall` since v0.0.62: the falling mage's script calls it, and his fall
+is the physics after his invisible platform is disabled). 6 functions moved from "not yet" to running: scripts that run whole 635 before,
 697 after (of 1,207; GetPCCell alone was the last missing call of 25 of them).
 
 `PositionCell` of the player (v0.0.54; rule from OpenMW's transformationextensions.cpp OpPositionCell): the builder
@@ -495,6 +593,154 @@ the disk (a batch room the build did not convert), a pending load or the story's
 (21 moves, 19 of them into rooms); 74 stay "not yet": moving an NPC or a creature into another cell waits for the
 object state's table of moved actors (roadmap step 4), and a few of the player's go into rooms no repo list names yet
 (Tribunal and Bloodmoon). Scripts that run whole: 715 of 1,207.
+
+`PositionCell` of anything but the player (v0.0.62, MWSCRIPT-POSITIONCELL-ACTORS-62; rules from OpenMW's
+transformationextensions.cpp OpPositionCell, our own code). The builder works the destination out once: an interior
+cell by its name (its stable number, and x, y, z in that room map's own units: a recentred room's offset first, then a
+quarter scale, as the builder places a resident), else an exterior cell by its name (the original's units); the
+rotation of anything but the player is in minutes of arc (60 a degree), turned into Quake's yaw; a cell the game does
+not have compiles to nothing, as OpenMW does nothing then. The call goes to the engine through the import route (x, y,
+z, yaw, the kind, the room's number, the cell's name; no new opcode). Each actor such a move may bring into a room is a
+row of the VISI section (the room, the actor's reference, its home room's map), 12 bytes a row, resident. In the
+engine (aw_mwhost.c `position_cell`, aw_actors.c):
+
+- into the place loaded now, the actor loaded: it is put there and turned; its row of the world change list keeps
+  where it stands (CELL-CHANGES-59), so it stays there after leaving and coming back and after a save and a load;
+- into another place: the actor's row says where it is now (the room's number and its position there, or outdoors
+  its island position); a loaded actor leaves this map at the end of the frame, not while a conversation or a menu is
+  open (its own script's values parked as a map change parks them), and its entity is kept for the session;
+- its home leaves it out from then on: a room or a town map frees it when its actors take their rows, a joining CHIM
+  frame does not spawn it;
+- a room spawns its arrivals when it loads: for each VISI row of the room whose actor's row puts it there, its
+  entity from this session's copy, else from its home room's map (one file open, the map's header and its entity
+  lump in one read each), spawned as a joining frame's actor is, its own script attached again;
+- into the room loaded now, the actor not loaded: it arrives at once the same way.
+
+Not carried yet, counted in `aw_mwscript_status` ("PositionCell: ..."): an actor that arrives outdoors while its home
+frame is not in the window stands there once its home frame joins (no outdoor arrival table yet); an object that is no
+actor moved to another place; the player's own PositionCell into a room the build lacks (still "not yet": the
+Tribunal and Bloodmoon rooms). Measured 7 November 2026 with the feature tracker (MWSCRIPT_FEATURES.md): scripts that
+run whole 409 before, 433 after (of 1,207); 26 of the 30 scripts PositionCell alone held moved (24 run, 2 are placed
+only in an add-on world); the 4 left are the player's into rooms the build lacks; every dialogue result that calls it
+(14) now runs, 7,366 of 7,411 results whole.
+
+Cost (the budget sheet): resident, the VISI rows (12 bytes each; the game's moves give a few dozen) and at most 8
+kept entity blocks of 16 KB at most each, made only when an actor leaves a loaded map; per call a few comparisons and
+one row of the change list (a binary search), no disk; leaving a map, one search of the map's entity text (in
+memory); an arrival whose home is not loaded, one file open and two reads (the map header's 12 bytes, then the home
+room's entity lump), behind the room's loading screen, then the spawn every joining actor costs. Measured on the
+v0.0.61 build's room maps (7 November 2026) for seven home rooms the game's moves name: entity lumps 721 to 9,169
+bytes (under 5 ms at 2 MB/s, plus the open), an actor's block 483 to 775 bytes (median 616). Nothing per frame while
+no move happens.
+
+`AIFollowCell`, `AIEscort` and `AIEscortCell` (v0.0.62, MWSCRIPT-POSITIONCELL-ACTORS-62; rules from OpenMW's
+aiextensions.cpp OpAiFollowCell, OpAiEscort and OpAiEscortCell, aifollow.cpp, aiescort.cpp and actionteleport.cpp,
+our own code). The builder works the cell out once, as PositionCell's: an interior cell's stable number and the point
+in that room map's own units; the outdoors and a cell the game does not have get the number 0. An AIEscortCell into
+a cell the game does not have compiles to nothing (OpenMW starts no package then); the reset argument is not passed
+(OpenMW ignores its value). The call goes to the engine through the import route (duration, x, y, z, the kind, the
+room's number; the target and the cell). On the ambient tables (aw_ambient.c `AW_AmbientPackage`):
+
+- the follow (GetCurrentAIPackage 3) is AIFollow's, done when the actor is within the follow distance of the point in
+  the room the call names; with a cell that is no room it is never done by its position, as OpenMW has it; a duration
+  in game hours ends it too;
+- the escort (GetCurrentAIPackage 2) walks straight to the destination while the escorted actor keeps up (450
+  original units at the start, then the actor's half extent + 450 while near) and stands once it falls behind (the
+  half extent + 250 then); outside the place an AIEscortCell names it waits; done within 64 units of the destination;
+- the player's followers go along through a door, a travel or a region map's load (OpenMW's getFollowers: those
+  within 800 original units, not fighting): the package is kept, the follower's entity block is kept for the session
+  (from the loaded map, or for an outdoor actor from the CHIM frame map it was joined from: one open and two reads,
+  behind the loading screen), and once the player stands in the new place the follower is spawned beside the player
+  there, its row of the world change list saying so, its own script attached again. A coordinate teleport takes no
+  follower along. Escorts never go through a door (OpenMW: the player brings them back);
+- every AIFollow and AIFollowCell of the player compiles a VISI row of any room (room 0xFFFFFFFF) for the follower,
+  so a room it was left in, or a saved game made there, spawns it there again;
+- the packages are kept in saved games (the AWPK block, version 2: 30 bytes a package, the place added; a version 1
+  block still loads).
+
+Counted in `aw_mwscript_status` and `chim actors ambient`. Not carried yet: a follower whose home is outdoors, after a
+saved game is loaded in a room, comes back only once its home frame loads (its entity is read from its home room's map
+for an indoor home; MWSCRIPT-POSITIONCELL-OUTDOOR-62). Measured 7 November 2026 with the feature tracker: scripts that
+run whole 434 before, 435 after (of 1,207; two of the escort scripts are placed only in an add-on world); every
+dialogue result that calls AIFollowCell (19) runs, 7,385 of 7,411 results whole. Cost: per call one slot change and a
+few comparisons; per think of an escort or a follower one distance test and the walk step; at a door, per follower a
+search of the loaded map's entity text in memory or one frame map read; resident, at most 8 kept entity blocks (shared
+with PositionCell) and 32 joined frame names (2 KB). The game's masters compile to 228 VISI rows (2,736 bytes,
+resident): 28 of PositionCell's rooms and 200 followers of any room; a room's load reads them once (a binary search of
+the change list for each follower row).
+
+The player's control switches (v0.0.62, MWSCRIPT-PLAYER-CONTROL-62; rules from OpenMW 0.51 controlextensions.cpp,
+mwinput/controlswitch.cpp, the input scripts playercontrols.lua and camera.lua, miscextensions.cpp OpEnableTeleporting
+and OpEnableLevitation; our own code): `DisablePlayerControls` and `EnablePlayerControls`, the same pair for
+`PlayerFighting`, `PlayerJumping`, `PlayerLooking`, `PlayerMagic`, `PlayerViewSwitch` and `VanityMode`, the seven
+`Get...Disabled` readers, and `Disable`/`EnableTeleporting` and `Disable`/`EnableLevitation`. They go through the import
+route (no new opcode, no change of the file's format). What each one stops while it is off:
+
+| Switch | Off means |
+| --- | --- |
+| PlayerControls | no walking, jumping, attacking or readying, no use key, and the inventory, map, journal and wait windows do not open from their keys |
+| PlayerFighting | no attack and the hands are not readied |
+| PlayerJumping | no jump |
+| PlayerLooking | the mouse and the turn keys do not turn the player; switching it off faces the player to rotation 0, as OpenMW does |
+| PlayerMagic | kept and read; the player cannot ready a spell yet, so nothing else changes |
+| PlayerViewSwitch | the first and third person key does nothing; the view stays as it is |
+| VanityMode | no idle orbit; a running one ends |
+| Teleporting, Levitation | kept and saved for the effects that will read them (Mark, Recall and the Interventions; Levitate) |
+
+A switch a script turns off is independent of the opening's own rule (`aw_story.c`): a control works only when both allow
+it, so the registration on the ship and in the census office behaves as before, and the opening's scripts stay on the
+hand-written list. The disabled switches are one bit mask in the saved named facts, so a saved game keeps them, an
+older save loads with every switch on, and a new game starts with every switch on (OpenMW InputManager::clear,
+World::startNewGame). A script that calls the same switch every frame changes nothing and wakes no other script.
+`aw_mwscript_status` names the switches that are off; `dbg mwscript call disableplayercontrols` (any of the 25 names)
+carries one out by the script's route. Measured 7 November 2026 with the feature tracker: scripts that run whole 435
+before, 437 after (of 1,207); the 15 scripts that call DisablePlayerControls no longer have it among their gaps. Cost:
+per call one search of the 32 global rows and, on a change, one row written; in play, a few such searches a frame for
+the input (the same search the opening's CharGenState test already makes); nothing resident but the one row.
+
+The small functions (v0.0.62, MWSCRIPT-SMALL-FUNCTIONS-62; rules from OpenMW 0.51, our own code): the functions
+that alone kept the most scripts from running whole, cheapest first, ranked on the feature tracker. All go through the
+import route (no new opcode, no change of the file's format):
+
+| Function | What it does here | OpenMW 0.51 |
+| --- | --- | --- |
+| `GetAngle`, `SetAngle` | an object's rotation in degrees on x, y or z (u, v, w the same axes); z is minus Quake's yaw, as the converter places objects; an actor's angle within -180 to 180 (x within -90 to 90); SetAngle on the player turns the view | transformationextensions.cpp OpGetAngle, OpSetAngle; worldimp.cpp rotateObject |
+| `Move`, `MoveWorld` | units a second along the object's own axes (x forward, y left, z up) or the world's; the player standing on it goes along | OpMove, OpMoveWorld, moveStandingActors |
+| `RotateWorld` | degrees a second about the world's z (x and y as Quake's pitch and roll, for an object standing upright); an actor only about z | OpRotateWorld |
+| `SetPos` | the position on one axis, the original's units | OpSetPos |
+| `SetAtStart` | back where the map put it: a script's first change of an object's place or angles keeps that start, until the next map | OpSetAtStart |
+| `Face` | an actor (not the player) turns to the point at once (the original turns it at its turning speed) | aiextensions.cpp OpFace |
+| `GetDetected` | an NPC sees the actor (a line of sight through the world, actors not in the way) and its awareness roll, kept 5 seconds, reaches the crime rules' target (a player who does not sneak is always noticed); any other observer: any NPC within 7,168 units that does | aiextensions.cpp OpGetDetected; actors.cpp isActorDetected; mechanicsmanagerimp.cpp awarenessCheck; creaturestats.cpp getAwarenessRoll |
+| `GetLOS`, `GetLineOfSight` | both actors, enabled, eye to eye through the world | OpGetLineOfSight, World::getLOS |
+| `GetInterior` | 1 while the player is in a room map | cellextensions.cpp OpGetInterior |
+| `GetCurrentWeather` | the weather in effect (0 clear to 9 blizzard, the one being left while a change runs) | skyextensions.cpp OpGetCurrentWeather |
+| `GetPCSneaking` | the player sneaks | controlextensions.cpp OpGetPcSneaking |
+| `GetWeaponDrawn` | the player's hands readied without a torch; an actor while it fights | miscextensions.cpp OpGetWeaponDrawn |
+| `OnKnockout` | 1 in the frame a script first sees the actor knocked down (a blow's or fatigue's) | statsextensions.cpp OpOnKnockout; actors.cpp |
+| `SetDelete` | 1 takes the object out as Disable does, 0 brings it back (kept in saved games); OpenMW also stops the script of a deleted object, here it keeps running as a disabled object's does | miscextensions.cpp OpSetDelete |
+| `WakeUpPC` | the rest window open for sleeping closes (a wait stays) | miscextensions.cpp OpWakeUpPC; waitdialog.cpp wakeUp |
+
+Angles and moves act on an object with an entity; CHIM scenery without one cannot turn or move yet (counted in
+`aw_mwscript_status`, as Rotate's). The reads that change without the state generation moving (the angles, detection,
+the line of sight, a knockdown, the weather, sneaking, a weapon out) make their script VOLATILE, as GetPos does;
+GetInterior does not (the player's cell moves it). Measured 7 November 2026 with the feature tracker: scripts that run
+whole 437 before, 468 after (of 1,207); 277 of 504 functions carried out (259 before). GetDetected alone held 9 attached
+scripts (the slave owners, guards and the prison guards), SetAtStart 4, SetAngle 3. Cost (the budget sheet): resident,
+32 starting places (36 bytes each) and 16 knockdown and 16 awareness rows (16 bytes each), 1,664 bytes; per call a few comparisons
+and at most one entity link; GetDetected and GetLOS one world trace each (their scripts ask every frame: a handful of
+NPCs near the player); no disk, nothing per frame while no script asks.
+
+Not carried in this batch, with the reason: `Cast` of other spells (the spell effects on other actors, SPELL-EFFECTS-57),
+`PlaceAtPC`, `PlaceItem`, `PlaceAtMe`, `Drop` (the object spawner, above), `BecomeWerewolf`, `IsWerewolf`,
+`UndoWerewolf` (werewolves), `OnMurder` (the murder crime: the crime rules know thefts only, CRIME-59), `PlayBink` (the
+videos are not in the image), `HurtStandingActor` (the engine's own lava rule hurts the player already; the script form
+would hurt twice), `GotoJail` and `PayFine` (jail), `Resurrect`, `HitOnMe` (the last weapon to hit an actor is not kept
+yet), `HasSoulGem` (souls in soul gems are not kept yet).
+
+A test aid for result scripts: `dbg mwscript result TOPIC NPC [N]` runs the result script of the answer the loaded NPC
+gives on TOPIC now (or its N-th answer on the topic, from 1, whatever its conditions say) the way the dialogue window
+runs it, without opening the window, and prints the script and whether it ran. An in-game check of a PositionCell,
+AIFollowCell or control switch answer needs no conversation then. Its cost is one conversation read, at the command only.
 
 `GetCurrentAIPackage` and `GetAIPackageDone` (v0.0.54; rules from OpenMW's aiextensions.cpp): the actor's package as
 the ambient tables run it (`AW_AmbientAiPackage`, through the engine's `aw_mwscript_ai_package`), with OpenMW's
@@ -559,25 +805,54 @@ ambient tables' routes (docs/NPC_PATHFINDING.md "Travel packages, from the scrip
 and `GetAIPackageDone` 1 once it arrived. Scripts that run whole: 919 before, 930 after. `AIFollow` (OpenMW
 aifollow.cpp) on the same module (docs/NPC_PATHFINDING.md); `GetStandingPC` (OpenMW World::getPlayerStandingOn)
 reads 1 while the player stands on an object that has an entity (CHIM scenery without one reads 0 yet). Scripts that
-run whole: 930 before, 950 after. `GetDetected` waits for the sneak and detection rules. `Position` (OpenMW
+run whole: 930 before, 950 after. `GetDetected` runs since v0.0.62 (the small functions, above). `Position` (OpenMW
 transformationextensions.cpp OpPosition): the player goes to the outdoor point by the coordinate teleport (as the
 original, the player always lands outdoors); any other object with an entity moves within the map it is in; the
-rotation is not applied yet. Scripts that run whole: 950 before, 957 after. `PlaceAtPC` waits: it makes a new
-object, which the engine cannot spawn from a script yet.
+rotation is not applied yet. Scripts that run whole: 950 before, 957 after.
 
-**The object spawner (proposed, measured 30 October 2026).** `PlaceAtPC`, `PlaceAtMe`, `PlaceItem` and
-`PlaceItemCell` would let 15 more scripts run whole; the scripts name 38 different objects (in their calls: NPCs 23
-times, activators 27, creatures 8, clothing 7, the rest unscripted creatures and items). The engine has no table from
-an object's id to a converted model today: every model on the disk belongs to a placed reference. The plan, by
-OpenMW 0.51's rules (transformationextensions.cpp OpPlaceAt / OpPlaceItem: COUNT copies, at DISTANCE in the
-DIRECTION 0 front, 1 back, 2 left, 3 right of the player or the object, on the ground; PlaceItem at X Y Z with a
-rotation): (1) the builder collects the ids the scripts' Place calls name and converts each once into a spawn pack
-(static models for activators and items, the actor pipeline's skeletal model and record for NPCs and creatures), with
-a table id to model on disk and only its index resident; (2) the engine spawns an entity from that table with the
-existing entity code (the static and actor spawn paths the CHIM window uses), at OpenMW's position; (3) every spawned
-reference goes into the saved game as a new kind of change (id, cell, position, rotation, its actor record when it is
-an actor): that is a part SAVEGAME-COMPLETE-57 must add (the change list today only holds placed references). First
-slice: activators and items (static models), then creatures, then NPCs.
+**Placing objects** (v0.0.62, MWSCRIPT-PLACE-OBJECTS-62; rules from OpenMW 0.51 transformationextensions.cpp
+OpPlaceAt, OpPlaceItem, OpPlaceItemCell and worldimp.cpp safePlaceObject, our own code). `PlaceAtPC` and `PlaceAtMe`
+make COUNT copies at DISTANCE game units in the DIRECTION 0 front, 1 back, 2 left, 3 right of the player or the
+reference, facing as it faces; an NPC or creature takes the next direction (in OpenMW's order) while the way from the
+spot back to the reference is blocked (OpenMW's ray from 30 units up to the reference 20 units up), and stands on the
+ground under the spot. `PlaceItem` places at X Y Z of the player's cell with a rotation in degrees; `PlaceItemCell` in
+a named cell, which the builder works out as PositionCell's (a cell the game has not compiles to nothing: OpenMW
+reports it and does nothing).
+
+- **The builder** reads every object id a Place call of the game names (the scripts and the dialogue results) and
+  writes the PLAC section, sorted by id (12 bytes a row, resident): its kind, for an NPC or creature a template (a
+  reference of the same record placed in Morrowind.esm, a room's first, with that room's map name) and the record's
+  own script. A call goes to the engine through the import route with the row's number as its last number (no new
+  opcode). It is carried out for an NPC or creature that has a placed reference in Vvardenfell (the build has its
+  converted model) and for a carried item; any other stays "not yet" (below).
+- **An NPC or creature** is a new reference: its key is in a block no game file uses (content file index 15: `F00000`
+  plus the PLAC row times 4,096 plus a serial). Its entity is the template's (the loaded map's text, this session's
+  copy, else the template's home room map: one open and two reads), else the actor table's base of the record, with
+  the new reference; it is spawned as a joining frame's actor is and its own script is attached. Its row of the world
+  change list (place and position, then health and death as every actor's) keeps it: leaving the area releases it as
+  any outdoor actor, a room's map change takes it with the map, and once a second the engine spawns every placed actor
+  whose row puts it here (this room; outdoors a cell the window holds) and that does not live. A save keeps the row; a
+  dead one stays dead. A load of a save made with other game data drops these rows with the other changes it cannot
+  place.
+- **A carried item** is a drop row of the world change list (the next drop serial, the item's id, the place and
+  position), shown at once when its place is loaded and taken as any drop (CELL-CHANGES-59).
+
+Not carried yet, kept as "not yet" and counted in the feature tracker: an NPC or creature whose record no reference
+in Vvardenfell places (Ranes Ienith, Rerlas Mon's rats, the Dark Brotherhood attackers of Tribunal and most of
+Bloodmoon's: no converted model, [MWSCRIPT-PLACE-NO-MODEL-62](BUGS.md)), and activators, containers and levelled
+creature lists (Solstheim's and Mournhold's effects and spriggans, [MWSCRIPT-PLACE-OTHER-KINDS-62](BUGS.md)). Game
+data, 7 November 2026: 41 objects named (21 NPCs, 9 creatures, 4 items, 7 others), 11 of them made by the engine.
+Measured with the feature tracker (MWSCRIPT_FEATURES.md, 7 November 2026, against the integration line with
+AIFollowCell, AIEscort, the player's control switches and the small functions): scripts that run whole 468 before,
+472 after (of 1,207); scripts with a function missing 149 before, 139 after (6 more are whole but placed only in an
+add-on world); dialogue results whole 7,385 before, 7,386 after.
+
+Cost (the budget sheet): resident, the PLAC rows (492 bytes for the game) and a change list row per placed actor (48
+bytes); per call a few traces (the ray back to the reference, the ground), one template read when the template is not
+in the loaded map (one open and two reads of its room map's header and entity lump, 1 to 9 KB), then the spawn every
+joining actor costs (its model's first load when it is not cached); once a second a binary search in the change list
+and a look at the placed rows; nothing per frame. `aw_mwscript_status` counts the calls made, refused and kept for
+another place, the spawns and the placed actors kept.
 
 A test route in the console: `aw_mwscript_status call FUNCTION [number] [faction]` carries out one of the
 standing calls or `addtopic ROW` on the player through the same host route a script takes, and answers with the
@@ -734,12 +1009,11 @@ this source's and stops on a difference
 4. The greeting conditions on the same interpreter (`MessageBox` runs since v0.0.51).
 5. The next blockers by the scripts they stop (measured 30 October 2026, "Not yet" above): ForceGreeting (64
    scripts wait only for it: it needs the dialogue window of DIALOGUE-57, which opens on the actor and lists the
-   known topics this page's AddTopic keeps), Cast (spells on actors), then PositionCell of other actors (25
-   scripts). That one waits for the object state's moved-actors table (SAVEGAME-COMPLETE-57): a row per actor a
-   script moved (its reference, the new cell by grid or stable room number, position and rotation), kept in saved
-   games; the CHIM window and the room loader spawn a moved actor where its row says and not at its placement, and
-   an actor moved out of the loaded map is removed from it; the builder can work the destination out as it does for
-   the player (PMOV), so the engine reads numbers only. Then the scripts' own values in saved games.
+   known topics this page's AddTopic keeps), Cast (spells on actors). PositionCell of other actors runs since
+   v0.0.62 (above), and so do AIFollowCell, AIEscort and AIEscortCell with the followers going through doors; next
+   for them: the outdoor arrivals (an actor moved to an exterior cell stands there while its home frame is not in the
+   window) and the in-game check of both.
+   Then the scripts' own values in saved games.
 
 ## Credits
 

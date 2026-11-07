@@ -40,6 +40,10 @@
 #include "aw_rest.h"
 #include "aw_crime.h"
 #include "aw_levelup.h"
+#include "aw_mappath.h"
+#include "aw_npcpath.h"   /* aw_path_fan: the followers' arrival spots (v0.0.62) */
+#include "aw_story.h"     /* the player's control switches (v0.0.62, MWSCRIPT-PLAYER-CONTROL-62) */
+#include "aw_weather.h"   /* GetCurrentWeather (v0.0.62, MWSCRIPT-SMALL-FUNCTIONS-62) */
 #include <ctype.h>
 
 #define FILE_NAME "mwscript.awm"
@@ -283,12 +287,16 @@ static int host_sound_playing(int instance,int target,int sound){
  * apps/openmw/mwdialogue/dialoguemanagerimp.cpp DialogueManager::say instead, which also refuses an actor that is
  * already speaking, an NPC under water and a knocked-down actor: the greeting and combat tables carry that rule
  * (docs/NPC_VOICE_TABLE.md), not a script's Say. */
+/* SCRIPTED-EVENTS-FALLING-MAGE-62: the session's Say calls, started and not (no actor in the world, no voice row, no
+ * sample in the pool), and the entity and length of the last one started (aw_mwscript_status) */
+static unsigned long says_started,says_missed;static int say_last_entity;static float say_last_seconds;
 static void host_say(int instance,int target,int voice,int text){
     unsigned char hash[8];int centis,entity,i,slot=0;vec3_t at;sfx_t *s;
     (void)text;
     entity=locate(instance,target,at);
-    if(entity<=0 || !AW_MwvmVoice(voice,hash,&centis) || !(s=pool_sound(hash)))return;
+    if(entity<=0 || !AW_MwvmVoice(voice,hash,&centis) || !(s=pool_sound(hash))){says_missed++;return;}
     S_StartSound(entity,CHAN_SCRIPT_VOICE,s,at,1.0f,1.0f);
+    says_started++;say_last_entity=entity;say_last_seconds=centis/100.0f;
     for(i=0;i<SAYS;i++){if(says[i].entity==entity){slot=i;break;}if(says[i].until<says[slot].until)slot=i;}
     says[slot].entity=entity;says[slot].until=(float)realtime+centis/100.0f;
 }
@@ -461,6 +469,13 @@ static int ledger_data_lock(uint32_t ref){
     int level=AW_HingedDoorOriginalLock(ref);
     return level<=0?0:level>100?100:level;
 }
+/* SCRIPTED-EVENT-FALLING-MAGE-61 (a): an actor a script enables in an area that is loaded already (the CHIM window
+ * held it back while disabled) spawns at once, not at its cell's next join (aw_actors.c sets it; NULL: none). The
+ * edict an earlier Disable hid on this map is shown again by ledger_show / object_show as before. */
+extern void (*aw_actor_enabled)(unsigned reference);
+void AW_FallTick(float dt);void AW_FallStatus(void);void AW_FallInit(void);
+static unsigned long actors_enabled;
+static void enabled(uint32_t ref){if(aw_actor_enabled){aw_actor_enabled(ref);actors_enabled++;}}
 static int32_t ledger_object(uint32_t ref,int op,int32_t value){
     aw_ledger_row_t *r=ledger_row(ref);
     switch(op){
@@ -468,6 +483,7 @@ static int32_t ledger_object(uint32_t ref,int op,int32_t value){
         if(r && (r->fields&AW_LEDGER_DISABLED)){
             r->fields&=~AW_LEDGER_DISABLED;
             if(!(r->fields&AW_LEDGER_TAKEN))ledger_show(ref);   /* a taken item stays taken */
+            if(!(r->fields&AW_LEDGER_TAKEN))enabled(ref);       /* an actor of a loaded area spawns at once */
             AW_LedgerTidy(&aw_ledger,ref);
         }
         return 0;
@@ -649,7 +665,7 @@ static int32_t object_op(uint32_t ref,int op,int32_t value){
     if(aw_ledger_on && op!=AWM_ACTIVATE && op!=AWM_GETLOCKED)return ledger_object(ref,op,value);
     switch(op){
     case AWM_ENABLE:
-        if((o=object_find(ref,0))!=NULL && o->disabled){o->disabled=0;object_show(o);}
+        if((o=object_find(ref,0))!=NULL && o->disabled){o->disabled=0;object_show(o);enabled(ref);}
         return 0;
     case AWM_DISABLE:
         if((o=object_find(ref,1))!=NULL && !o->disabled){o->disabled=1;object_hide(o);}
@@ -1056,14 +1072,36 @@ int AW_MwscriptLand(edict_t *target,const aw_spell_effect_t *e,const aw_mgef_t *
     return k;
 }
 #ifdef AW_COMBAT_EFFECT_MAGNITUDE
-/* RESIST-NORMAL-WEAPONS-61 (aw_combat.h aw_combat_effect_magnitude): the summed magnitude of EFFECT active on the
- * actor of edict E now (the player's or an NPC's by its reference); once per landed blow, no file read */
+/* RESIST-NORMAL-WEAPONS-61 (aw_combat.h aw_combat_effect_magnitude): the summed magnitude of EFFECT on the actor of
+ * edict E now (the player's or an NPC's or creature's by its reference): its active effects (cast spells, worn items)
+ * plus, since v0.0.62, the always-active spells of its list (AW_ActorPassiveMagnitude: the "immune to normal weapons"
+ * ability of 68 creatures and 1 NPC of the masters, the vampires' 50 %, Almalexia's shield). The list part reads the
+ * actor's spells from disk, so it is kept: PASSIVE_MEMO answers by reference, effect, list size and record, refreshed
+ * when the list changes or a game loads; once per landed blow, no file read when kept. */
+#define PASSIVE_MEMO 8
+static struct {uint32_t ref;int effect,nspells;uint16_t base;unsigned long generation;float value;} passive_memo[PASSIVE_MEMO];
+static int passive_next;
+static unsigned long passive_reads,passive_kept;
+static float passive_of(const aw_actor_t *a,uint32_t ref,int effect){
+    int i;unsigned long g=AW_EffectsGeneration();
+    if(!a)return 0;
+    for(i=0;i<PASSIVE_MEMO;i++)
+        if(passive_memo[i].ref==ref && passive_memo[i].effect==effect && passive_memo[i].nspells==a->nspells &&
+           passive_memo[i].base==a->base && passive_memo[i].generation==g){passive_kept++;return passive_memo[i].value;}
+    i=passive_next;passive_next=(passive_next+1)%PASSIVE_MEMO;
+    passive_memo[i].ref=ref;passive_memo[i].effect=effect;passive_memo[i].nspells=a->nspells;passive_memo[i].base=a->base;
+    passive_memo[i].generation=g;passive_memo[i].value=AW_ActorPassiveMagnitude(a,effect);
+    passive_reads++;
+    return passive_memo[i].value;
+}
 static float effect_magnitude_of(edict_t *e,int effect){
     uint32_t ref;
     if(!e)return 0;
-    if(e==sv_player)return AW_EffectsMagnitude(AW_ACTOR_PLAYER_REF,effect,AW_EFFECT_NO_ARG);
+    if(e==sv_player)
+        return AW_EffectsMagnitude(AW_ACTOR_PLAYER_REF,effect,AW_EFFECT_NO_ARG)+passive_of(player_record(),AW_ACTOR_PLAYER_REF,effect);
     ref=ref_of_edict(e);
-    return ref?AW_EffectsMagnitude(ref,effect,AW_EFFECT_NO_ARG):0;
+    if(!ref)return 0;
+    return AW_EffectsMagnitude(ref,effect,AW_EFFECT_NO_ARG)+passive_of(record_of_edict(e),ref,effect);
 }
 #endif
 /* the NPCs' and creatures' effects on the game clock: only those whose record is in the pool and whose edict is in
@@ -1522,9 +1560,850 @@ int AW_MwscriptNpcRank(edict_t *e){
 /* the dialogue window's Choice and Goodbye (aw_dialwin.c sets it while a result script runs): TEXTS NULL = Goodbye */
 void (*aw_dial_result_choice)(const char **texts,int ntexts,const aw_mwcell_t *numbers,int count);
 void (*aw_dial_result_clear)(void);
+
+/* --- PositionCell of anything but the player (v0.0.62, MWSCRIPT-POSITIONCELL-ACTORS-62; the rules of OpenMW 0.51
+ * apps/openmw/mwscript/transformationextensions.cpp OpPositionCell, our own code). The compiler hands x, y, z, yaw,
+ * the kind (AWM_MOVE_OUTDOORS: the original's units; AWM_MOVE_ROOM: the room map's own units) and the room's stable
+ * number. Into the place loaded now: the actor is put there (or, not loaded here, spawned there from its entity). Into
+ * another place: its row of the world change list says where it is now (aw_actors.c AW_ActorsMoveTo); a loaded actor
+ * leaves this map at the end of the frame (its script parked, its edict freed; after a conversation closes), and its
+ * entity block is kept for this session. A room spawns its arrivals when it loads (room_visitors: the VISI rows, the
+ * entity read from the actor's home room map, one open and two reads). Not carried yet: an actor arriving outdoors
+ * while its home frame is not in the window (it stands there once its home frame joins), and an object that is no
+ * actor moved across places (counted). */
+static unsigned long poscells,poscells_refused,poscells_away,visitors_spawned,visitors_no_text;
+static int compare_refs(const void *a,const void *b);
+#define CARRIED 8
+static struct {uint32_t ref;char *text;unsigned long length;} carried_text[CARRIED];static int carried_next;
+#define LEAVING 16
+static struct {uint32_t ref;int entity;} leaving[LEAVING];static int leaving_count;
+static void edict_refs_refresh(void){
+    int i;edict_t *e;eval_t *v;
+    edict_ref_count=0;
+    for(i=1;i<sv.num_edicts && edict_ref_count<EDICT_REFS;i++){
+        e=EDICT_NUM(i);if(e->free)continue;
+        v=GetEdictFieldValue(e,"aw_ref");if(!v || v->_float<=0)continue;
+        edict_refs[edict_ref_count].ref=(uint32_t)v->_float;edict_refs[edict_ref_count++].entity=i;
+    }
+    qsort(edict_refs,edict_ref_count,sizeof(edict_refs[0]),compare_refs);
+}
+/* an actor's entity block kept when it leaves a map this session (its home's text, or a joined frame's) */
+static void carry_copy(uint32_t ref,const char *block,unsigned long length){
+    int i,slot=-1;char *copy;
+    if(!block || length<2 || length>16384)return;
+    for(i=0;i<CARRIED;i++)if(carried_text[i].text && carried_text[i].ref==ref)slot=i;
+    if(slot<0){slot=carried_next;carried_next=(carried_next+1)%CARRIED;}
+    if(!(copy=(char *)AW_TryMalloc(length+1)))return;
+    memcpy(copy,block,length);copy[length]=0;
+    free(carried_text[slot].text);carried_text[slot].text=copy;carried_text[slot].ref=ref;carried_text[slot].length=length;
+}
+/* from the loaded map's entity text (a room's, a town map's) */
+static void carry_text(uint32_t ref){
+    const char *text=sv.worldmodel?sv.worldmodel->entities:NULL,*block;unsigned long length=0;
+    if(text && (block=AW_MwvmEntityBlock(text,(unsigned long)strlen(text),ref,&length))!=NULL)carry_copy(ref,block,length);
+}
+static const char *carried_of(uint32_t ref,unsigned long *length){
+    int i;for(i=0;i<CARRIED;i++)if(carried_text[i].text && carried_text[i].ref==ref){*length=carried_text[i].length;return carried_text[i].text;}
+    return NULL;
+}
+/* REF's entity block from its home room map MAP (a copy, freed by the caller; NULL none): the map's header, then its
+ * entity lump in one read (BSP29 and CHIM room maps alike: lump 0) */
+static char *home_text(const char *map,uint32_t ref,unsigned long *length){
+    char path[AW_MAP_PATH_SIZE];unsigned char head[12];FILE *f=NULL;int bytes;long at,k,n;char *lump,*copy=NULL;
+    const char *block;
+    AW_MapPath(map,path,sizeof(path));
+    if((bytes=COM_FOpenFile(path,&f))<=0 || !f){if(f)fclose(f);return NULL;}
+    at=ftell(f);
+    if(fread(head,1,sizeof(head),f)!=sizeof(head)){fclose(f);return NULL;}
+    k=(long)(head[4]|(head[5]<<8)|(head[6]<<16)|((unsigned long)head[7]<<24));
+    n=(long)(head[8]|(head[9]<<8)|(head[10]<<16)|((unsigned long)head[11]<<24));
+    if(k<0 || n<=0 || n>4L*1024L*1024L || k+n>bytes || !(lump=(char *)AW_TryMalloc((size_t)n+1))){fclose(f);return NULL;}
+    if(fseek(f,at+k,SEEK_SET) || fread(lump,1,(size_t)n,f)!=(size_t)n)n=0;
+    fclose(f);lump[n]=0;
+    if((block=AW_MwvmEntityBlock(lump,(unsigned long)n,ref,length))!=NULL && (copy=(char *)AW_TryMalloc(*length+1))!=NULL){
+        memcpy(copy,block,*length);copy[*length]=0;}
+    free(lump);
+    return copy;
+}
+/* an arrived actor's own script, as attach_map binds this map's (the BIND rows are sorted by reference: a binary
+ * search on disk, a few small reads) */
+static void attach_visitor(uint32_t ref,int entity,const edict_t *e){
+    FILE *f=NULL;uint32_t offset,rows,bytes;long base,low=0,high;unsigned char row[24];
+    if(!AW_MwvmSection("BIND",&offset,&rows,&bytes) || !rows || COM_FOpenFile(FILE_NAME,&f)<=0 || !f){if(f)fclose(f);return;}
+    base=ftell(f);high=(long)rows-1;
+    while(low<=high){
+        long mid=(low+high)/2;uint32_t r;
+        if(fseek(f,base+(long)offset+24L*mid,SEEK_SET) || fread(row,1,24,f)!=24)break;
+        r=((uint32_t)row[0]<<24)|((uint32_t)row[1]<<16)|((uint32_t)row[2]<<8)|row[3];
+        if(r<ref)low=mid+1;else if(r>ref)high=mid-1;
+        else{
+            int k=AW_MwvmAttach(ref,(row[4]<<8)|row[5],((row[6]<<8)|row[7])|(map_room?AWB_INTERIOR:0),entity,e->v.origin);
+            if(k>=0)attach_edicts++;else attach_refused++;
+            break;
+        }
+    }
+    fclose(f);
+}
+/* REF arrives here (its row says so): its entity from this session's copy, else from its home room map HOME (a string
+ * index, AWM_NONE: none known); spawned, indexed and its script attached. NULL when it cannot be. */
+static edict_t *visitor_arrives(uint32_t ref,int home){
+    unsigned long length=0;const char *text=carried_of(ref,&length);char *read=NULL,map[64];edict_t *e;
+    if(!text && home!=AWM_NONE && read_string(home,map,sizeof(map)))text=read=home_text(map,ref,&length);
+    if(!text){visitors_no_text++;Con_DPrintf("PositionCell: actor %lu arrives with no entity to spawn.\n",(unsigned long)ref);
+        return NULL;}
+    e=AW_ActorsSpawnVisitor(text,length);
+    free(read);
+    if(!e)return NULL;
+    edict_refs_refresh();
+    attach_visitor(ref,NUM_FOR_EDICT(e),e);
+    visitors_spawned++;
+    return e;
+}
+/* aw_actors.c, when a room's actors take their rows: the VISI rows of ROOM (resident, sorted by room) */
+static void room_visitors(long room){
+    uint32_t off,rows,bytes,i;long moved;
+    if(!resident || !room || !AW_MwvmSection("VISI",&off,&rows,&bytes) || off+bytes>resident_bytes || 12ul*rows>bytes)return;
+    for(i=0;i<rows;i++){
+        const unsigned char *r=resident+off+12*i;uint32_t where=rd_be32(r),ref=rd_be32(r+4);
+        /* 0xFFFFFFFF: a follower of the player, in whatever room its row puts it (v0.0.62) */
+        if(where!=0xFFFFFFFFu && (long)where!=room)continue;
+        if(AW_ActorsMovedPlace(ref,&moved) && moved==room)visitor_arrives(ref,(r[8]<<8)|r[9]);
+    }
+}
+/* the VISI row of (ROOM, REF): its home map, AWM_NONE none */
+static int visitor_home(long room,uint32_t ref){
+    uint32_t off,rows,bytes,i;
+    if(!resident || !AW_MwvmSection("VISI",&off,&rows,&bytes) || off+bytes>resident_bytes || 12ul*rows>bytes)return AWM_NONE;
+    for(i=0;i<rows;i++){
+        const unsigned char *r=resident+off+12*i;
+        if((long)rd_be32(r)==room && rd_be32(r+4)==ref)return (r[8]<<8)|r[9];
+    }
+    return AWM_NONE;
+}
+/* the actors that left this map this frame go at its end (a script that moved itself goes on to its end first), and
+ * not while a conversation or a menu is open */
+static void leave_now(void){
+    int i,left=0;
+    if(!leaving_count || host_menu_mode())return;
+    for(i=0;i<leaving_count;i++){
+        edict_t *e=edict_of(leaving[i].entity);eval_t *v;
+        AW_MwvmDetach(leaving[i].ref);
+        if(!e || e->free || !(v=GetEdictFieldValue(e,"aw_ref")) || (uint32_t)v->_float!=leaving[i].ref)continue;
+        AW_ActorsRemove(e);left++;
+    }
+    leaving_count=0;
+    if(left)edict_refs_refresh();
+}
+static int is_actor(const edict_t *e){
+    const char *c;
+    if(!e || e->free || !e->v.classname)return 0;
+    c=pr_strings+e->v.classname;
+    return !strcmp(c,"aw_npc") || !strcmp(c,"aw_creature");
+}
+static int position_cell(int instance,int target,const aw_mwcell_t *numbers,int count){
+    vec3_t at,local;int n,kind,i,here;long where;edict_t *e;uint32_t ref;float pos[3],yaw,island[3];
+    if(count<6)return 0;                       /* not the compiler's carried form: stays "not yet" */
+    for(i=0;i<3;i++)pos[i]=numbers[i].f;
+    yaw=numbers[3].f;kind=numbers[4].i;where=numbers[5].i;
+    if(target==AW_MWVM_PLAYER){                /* the compiler keeps the player's own as PLAYERMOVE */
+        if(kind==AWM_MOVE_OUTDOORS && AW_MapTeleportAt(pos,1))poscells++;else poscells_refused++;
+        return 1;
+    }
+    n=locate(instance,target,at);e=n>0?edict_of(n):NULL;
+    if(e && (e->free || e==sv_player))e=NULL;
+    ref=target_reference(instance,target);
+    if(kind==AWM_MOVE_ROOM){here=map_room && where==map_room;for(i=0;i<3;i++)local[i]=pos[i];}
+    else here=!map_room && AW_SourceToWorld(sv.name,pos,local);
+    if(e && !is_actor(e)){
+        /* an object that is no actor: moved within this place as Position does; across places not yet */
+        if(!here){poscells_refused++;return 1;}
+        VectorCopy(local,e->v.origin);e->v.angles[1]=yaw;SV_LinkEdict(e,false);poscells++;return 1;
+    }
+    if(here && e){
+        VectorCopy(local,e->v.origin);e->v.angles[0]=e->v.angles[2]=0;e->v.angles[1]=yaw;
+        e->v.velocity[0]=e->v.velocity[1]=e->v.velocity[2]=0;SV_LinkEdict(e,false);
+        /* its row: where it stands now (outdoors the actor module's own island conversion) */
+        if(ref && map_room)AW_ActorsMoveTo(ref,map_room,local,yaw);
+        else if(ref)AW_ActorsCapture(e);
+        poscells++;return 1;
+    }
+    if(!ref){poscells_refused++;return 1;}     /* no reference: nothing to keep it by */
+    for(i=0;i<3;i++)island[i]=pos[i]*0.25f;    /* outdoors: the island's units (game units / 4) */
+    if(!AW_ActorsMoveTo(ref,kind==AWM_MOVE_ROOM?where:0,kind==AWM_MOVE_ROOM?pos:island,yaw)){poscells_refused++;return 1;}
+    AW_MwvmStateChanged();
+    if(here){
+        /* not loaded here: it arrives now (a room: its entity from its home map) */
+        if(kind!=AWM_MOVE_ROOM || !visitor_arrives(ref,visitor_home(where,ref)))poscells_refused++;
+        else poscells++;
+        return 1;
+    }
+    if(e && leaving_count<LEAVING){
+        carry_text(ref);
+        leaving[leaving_count].ref=ref;leaving[leaving_count].entity=NUM_FOR_EDICT(e);leaving_count++;
+    }
+    poscells_away++;
+    return 1;
+}
+
+/* --- the placing family (v0.0.62, MWSCRIPT-PLACE-OBJECTS-62; the rules of OpenMW 0.51
+ * apps/openmw/mwscript/transformationextensions.cpp OpPlaceAt, OpPlaceItem, OpPlaceItemCell and mwworld/worldimp.cpp
+ * safePlaceObject, our own code). The compiler hands the object's PLAC row (the id, its kind, a template reference of
+ * the same record and that reference's home room map, the record's script) as the last number. PlaceAtPC / PlaceAtMe:
+ * COUNT copies at DISTANCE game units in DIRECTION (0 front, 1 back, 2 left, 3 right) of the player or the reference,
+ * facing as it faces; an actor takes the next direction when the way back to the reference is blocked (OpenMW: a ray
+ * from the spot 30 units up to the reference 20 units up), and stands on the ground under the spot. PlaceItem: x, y,
+ * z in the player's cell (game units), the rotation in degrees. PlaceItemCell: the place worked out by the compiler.
+ * An NPC or creature is a new reference (aw_actors.h AW_ACTORS_PLACED + its row << 12 + a serial) spawned from its
+ * template's entity (the loaded map's text, this session's copy, the home room map's, else the actor table's base of
+ * the record), its own script attached; its row of the world change list keeps it (AW_ActorsPlacedTick spawns it again
+ * where the row says). A carried item is a drop row of the list (AW_InventoryPlace), taken as any drop. */
+#define PLACE_ACTOR 0
+#define PLACE_ITEM 1
+#define PLACE_COPIES 16          /* the most copies one call makes (the game's calls ask for 1) */
+typedef struct {int id,home,script,kind,carried;uint32_t template_ref;} place_row_t;
+static unsigned long places,places_refused,places_away,placed_spawned,placed_no_text;
+static int place_row(int row,place_row_t *out){
+    uint32_t off,rows,bytes;const unsigned char *r;
+    if(!resident || row<0 || !AW_MwvmSection("PLAC",&off,&rows,&bytes) || off+bytes>resident_bytes || 12ul*rows>bytes ||
+       (uint32_t)row>=rows)return 0;
+    r=resident+off+12*row;
+    out->id=(r[0]<<8)|r[1];out->home=(r[2]<<8)|r[3];out->template_ref=rd_be32(r+4);out->script=(r[8]<<8)|r[9];
+    out->kind=r[10];out->carried=r[11]&1;
+    return out->carried;
+}
+/* a free key for a new placement of PLAC row ROW: 0 when the row's 4,095 are used */
+static uint32_t placed_key(int row){
+    uint32_t n,key;
+    if(row<0 || row>255)return 0;
+    for(n=1;n<=0xFFF;n++){key=AW_ACTORS_PLACED|((uint32_t)row<<12)|n;if(AW_ActorsPlacedFree(key))return key;}
+    return 0;
+}
+/* the entity text a placed actor of row R spawns from, with its own reference KEY ("{" .. "}", to free; NULL none) */
+static char *placed_text(const place_row_t *r,uint32_t key,unsigned long *length){
+    unsigned long n=0;const char *text=NULL,*block;char *own=NULL,*out,id[64],map[64],tail[40];int t;
+    if(r->template_ref){
+        const char *ents=sv.worldmodel?sv.worldmodel->entities:NULL;
+        if(ents && (block=AW_MwvmEntityBlock(ents,(unsigned long)strlen(ents),r->template_ref,&n))!=NULL)text=block;
+        else if((block=carried_of(r->template_ref,&n))!=NULL)text=block;
+        else if(r->home!=AWM_NONE && read_string(r->home,map,sizeof(map)))text=own=home_text(map,r->template_ref,&n);
+    }
+    if(!text && read_string(r->id,id,sizeof(id)))text=own=AW_ActorsBaseText(id,&n);
+    if(!text || n<2 || text[n-1]!='}' || n>16384){free(own);return NULL;}
+    /* the template's own "aw_ref" stays in the text; a later key wins in ED_ParseEdict */
+    t=sprintf(tail,"\n\"aw_ref\" \"%lu\"\n}",(unsigned long)key);
+    if((out=(char *)AW_TryMalloc(n+(unsigned long)t+1))!=NULL){
+        memcpy(out,text,n-1);memcpy(out+n-1,tail,(size_t)t+1);*length=n-1+(unsigned long)t;
+    }
+    free(own);
+    return out;
+}
+/* the placed actor KEY spawned where its row puts it (here), its script attached; 1 spawned. AW_ActorsPlacedTick's
+ * spawner too (a return to its place, a load). */
+static int placed_spawn(unsigned key){
+    place_row_t r;unsigned long n=0;char *text;edict_t *e;
+    if(key<AW_ACTORS_PLACED || !place_row((int)((key>>12)&0xFF),&r) || r.kind!=PLACE_ACTOR)return 0;
+    if(!(text=placed_text(&r,key,&n))){placed_no_text++;return 0;}
+    e=AW_ActorsSpawnVisitor(text,n);
+    free(text);
+    if(!e)return 0;
+    edict_refs_refresh();
+    if(r.script!=AWM_NONE){
+        int k;
+        AW_MwvmDetach(key);       /* spawned again (a return, a load): its values parked, then on the new edict */
+        k=AW_MwvmAttach(key,r.script,map_room?AWB_INTERIOR:0,NUM_FOR_EDICT(e),e->v.origin);
+        if(k>=0)attach_edicts++;else attach_refused++;
+    }
+    placed_spawned++;
+    return 1;
+}
+/* LOCAL dropped onto the ground under it (a short trace down; unchanged over nothing) */
+static void place_ground(vec3_t local){
+    vec3_t start,end;trace_t tr;
+    VectorCopy(local,start);start[2]+=8;VectorCopy(local,end);end[2]-=256;
+    tr=SV_Move(start,vec3_origin,vec3_origin,end,MOVE_NOMONSTERS,sv_player);
+    if(!tr.startsolid && !tr.allsolid && tr.fraction<1)local[2]=tr.endpos[2];
+}
+/* OpenMW safePlaceObject: the spot DISTANCE (map units) in DIRECTION of BASE (the reference's feet) facing YAW; an actor
+ * falls back to the next direction while the way from the spot to the reference is blocked */
+static void place_spot(const vec3_t base,float yaw,float distance,int direction,int actor,vec3_t out){
+    static const int order[4][4]={{0,3,2,1},{1,0,3,2},{2,1,0,3},{3,2,1,0}};
+    vec3_t angles,forward,right,up,back;int i,k,d;trace_t tr;
+    angles[0]=angles[2]=0;angles[1]=yaw;AngleVectors(angles,forward,right,up);
+    if(direction<0 || direction>3)direction=0;
+    for(i=0;i<4;i++){
+        d=order[direction][i];
+        for(k=0;k<3;k++){
+            float v=d==0?forward[k]:d==1?-forward[k]:d==2?-right[k]:right[k];
+            out[k]=base[k]+v*distance;
+        }
+        if(!actor)break;
+        out[2]+=30*0.25f;                       /* 30 game units up for slopes, snapped down below */
+        VectorCopy(base,back);back[2]+=20*0.25f;
+        tr=SV_Move(out,vec3_origin,vec3_origin,back,MOVE_NOMONSTERS,sv_player);
+        if(!(tr.fraction<1) && !tr.startsolid)break;   /* every way blocked: the last one stays, as OpenMW */
+    }
+    if(actor)place_ground(out);
+}
+/* one copy of row R (number ROW) at LOCAL on this map facing YAW: 1 made */
+static int place_here(int row,const place_row_t *r,const vec3_t local,float yaw){
+    if(r->kind==PLACE_ITEM){
+        int at;int32_t where;float game[3];char id[64];
+        if(!read_string(r->id,id,sizeof(id)) || !AW_PlacedWhere(local,&at,&where,game))return 0;
+        return AW_InventoryPlace(id,at,where,game,yaw);
+    }
+    {uint32_t key=placed_key(row);
+     if(!key || !AW_ActorsPlaceRow(key,local,yaw))return 0;
+     if(!placed_spawn(key)){AW_ActorsPlacedForget(key);return 0;}
+     return 1;}
+}
+static int place_call(int instance,int target,int function,const aw_mwcell_t *numbers,int count){
+    place_row_t r;vec3_t base,local;float yaw=0;int i,row,copies=1,made=0;
+    if(function==AWF_PLACEATPC || function==AWF_PLACEATME){
+        edict_t *e=NULL;int n;
+        if(count<4)return 0;                   /* not the compiler's carried form: stays "not yet" */
+        row=numbers[3].i;copies=numbers[0].i;
+        if(!place_row(row,&r)){places_refused++;return 1;}
+        if(copies<1)return 1;                  /* OpenMW: none (a negative count is its script error) */
+        if(copies>PLACE_COPIES)copies=PLACE_COPIES;
+        if(function==AWF_PLACEATPC){
+            if(!sv_player){places_refused++;return 1;}
+            e=sv_player;VectorCopy(e->v.origin,base);base[2]+=e->v.mins[2];yaw=e->v.v_angle[1];
+        }else{
+            if((n=locate(instance,target,base))<0){places_refused++;return 1;}
+            if(n>0 && (e=edict_of(n))!=NULL && !e->free){
+                if(e->v.solid!=SOLID_BSP)base[2]+=e->v.mins[2];
+                yaw=e==sv_player?e->v.v_angle[1]:e->v.angles[1];
+            }
+        }
+        place_spot(base,yaw,numbers[1].f*0.25f,numbers[2].i,r.kind==PLACE_ACTOR,local);
+        for(i=0;i<copies;i++)made+=place_here(row,&r,local,yaw);
+    }else if(function==AWF_PLACEITEM){
+        float game[3];
+        if(count<5)return 0;
+        row=numbers[4].i;
+        if(!place_row(row,&r)){places_refused++;return 1;}
+        for(i=0;i<3;i++)game[i]=numbers[i].f;
+        yaw=-numbers[3].f;                     /* the original's degrees clockwise; Quake's yaw turns the other way */
+        if(!AW_SourceToWorld(sv.name,game,local))for(i=0;i<3;i++)local[i]=game[i]/4.0f+room_shift[i];
+        if(r.kind==PLACE_ACTOR)place_ground(local);
+        made=place_here(row,&r,local,yaw);
+    }else{                                     /* AWF_PLACEITEMCELL */
+        float pos[3];int kind,here;long where;
+        if(count<7)return 0;
+        row=numbers[6].i;
+        if(!place_row(row,&r)){places_refused++;return 1;}
+        for(i=0;i<3;i++)pos[i]=numbers[i].f;
+        yaw=numbers[3].f;kind=numbers[4].i;where=numbers[5].i;
+        if(kind==AWM_MOVE_ROOM){
+            here=map_room && where==map_room;
+            /* an actor: the room map's units; an item: room-local game units */
+            for(i=0;i<3;i++)local[i]=r.kind==PLACE_ACTOR?pos[i]:pos[i]/4.0f+room_shift[i];
+        }else here=!map_room && AW_SourceToWorld(sv.name,pos,local);
+        if(here){
+            if(r.kind==PLACE_ACTOR)place_ground(local);
+            made=place_here(row,&r,local,yaw);
+        }else if(r.kind==PLACE_ITEM){
+            /* the row lies in that place until it loads (a room: its number; outdoors: the exterior cell) */
+            char id[64];int32_t w=kind==AWM_MOVE_ROOM?(int32_t)where:
+                (int32_t)(((uint32_t)(int16_t)floor(pos[0]/8192.0f)<<16)|((uint32_t)(int)floor(pos[1]/8192.0f)&0xffffU));
+            made=read_string(r.id,id,sizeof(id)) && aw_ledger_on &&
+                 AW_LedgerPlaceItem(&aw_state,&aw_ledger,id,1,kind==AWM_MOVE_ROOM?AW_AT_ROOM:AW_AT_CELL,w,pos,yaw)!=0;
+            if(made)places_away++;
+        }else{
+            /* an actor's row puts it there (a room: its map units; outdoors the island's: game units / 4) */
+            uint32_t key=placed_key(row);float island[3];
+            for(i=0;i<3;i++)island[i]=pos[i]*0.25f;
+            made=key && AW_ActorsMoveTo(key,kind==AWM_MOVE_ROOM?where:0,kind==AWM_MOVE_ROOM?pos:island,yaw);
+            if(made)places_away++;
+        }
+        copies=1;
+    }
+    places+=(unsigned long)made;places_refused+=(unsigned long)(copies-made);
+    if(made)AW_MwvmStateChanged();
+    return 1;
+}
+/* --- AIFollowCell, AIEscort, AIEscortCell and the followers through a door (v0.0.62, MWSCRIPT-POSITIONCELL-ACTORS-62;
+ * the rules of OpenMW 0.51 aiextensions.cpp OpAiFollowCell / OpAiEscort / OpAiEscortCell, aifollow.cpp, aiescort.cpp
+ * and actionteleport.cpp getFollowers, our own code). The packages run on the ambient tables (aw_ambient.c
+ * AW_AmbientPackage). When a door, a travel or a region map's load takes the player away, each follower of the player
+ * within 800 original units goes along: its package is kept to be applied where it arrives, its entity block kept for
+ * the session (from the loaded map's entities, or for an outdoor actor from the CHIM frame map it was joined from), and
+ * once the player stands in the new place it is spawned beside the player there, its row of the world change list
+ * saying so (aw_actors.c AW_ActorsArriveHere), its own script attached again. A follower's VISI row of any room
+ * (compiled for every AIFollow / AIFollowCell of the player) spawns it again in a room it was left in or saved in. */
+static unsigned long escorts,escorts_refused,cell_follows,cell_follows_refused,crossed,crossed_lost;
+#define CROSSING 8
+static uint32_t crossing[CROSSING];static int crossing_count;
+int (*aw_mwscript_package)(struct edict_s *e,struct edict_s *target,int kind,float hours,const float *point,long place);
+int (*aw_mwscript_followers)(struct edict_s *player,struct edict_s **out,int max);
+/* an actor of this map by its id (the player: "player"), as AIFollow names its target */
+static edict_t *named_actor(const char *who){
+    int i;
+    if(!who)return NULL;
+    if(!Q_strcasecmp((char *)who,"player"))return sv_player;
+    for(i=1;i<sv.num_edicts;i++){
+        edict_t *x=EDICT_NUM(i);eval_t *v;
+        if(x->free || !(v=GetEdictFieldValue(x,"aw_source_id")) || !v->string)continue;
+        if(!Q_strcasecmp(pr_strings+v->string,(char *)who))return x;
+    }
+    return NULL;
+}
+static int ai_package(int instance,int target,int function,const aw_mwcell_t *numbers,int count,
+                      const unsigned char *strings,int nstrings){
+    vec3_t at,point;edict_t *e,*t;int n=locate(instance,target,at),i,cell=function!=AWF_AIESCORT;
+    int follow=function==AWF_AIFOLLOWCELL;long place=0;
+    unsigned long *ok=follow?&cell_follows:&escorts,*refused=follow?&cell_follows_refused:&escorts_refused;
+    e=n>0?edict_of(n):NULL;
+    if(count<(cell?6:4) || !e || e->free || e==sv_player || !is_actor(e) || !aw_mwscript_package ||
+       !(t=named_actor(call_string(strings,nstrings,0)))){(*refused)++;return 1;}
+    if(cell){
+        /* the compiler's carried form: duration, x y z (a room: its map's own units), kind, the room's number */
+        place=numbers[4].i==AWM_MOVE_ROOM && numbers[5].i>0?(long)numbers[5].i:-1;
+        for(i=0;i<3;i++)point[i]=numbers[1+i].f;
+        if(place<0 && !follow){
+            /* AIEscortCell outdoors: the original's units, converted for the map it is in */
+            float game[3];for(i=0;i<3;i++)game[i]=point[i];
+            if(!AW_SourceToWorld(sv.name,game,point))for(i=0;i<3;i++)point[i]=game[i]/4.0f+room_shift[i];
+        }
+    }else{
+        /* AIEscort TARGET DURATION X Y Z: the original's units, converted for the map it is in (as AIFollow's) */
+        float game[3];for(i=0;i<3;i++)game[i]=numbers[1+i].f;
+        if(!AW_SourceToWorld(sv.name,game,point))for(i=0;i<3;i++)point[i]=game[i]/4.0f+room_shift[i];
+    }
+    if(aw_mwscript_package(e,t,follow?3:2,numbers[0].f,point,place))(*ok)++;else (*refused)++;
+    return 1;
+}
+/* aw_scene.c: LEAVE 1 the next map loads (the followers' entities and packages kept), 0 the player stands there (they
+ * arrive), -1 another map loaded (none come) */
+static void followers(edict_t *p,int leave){
+    int i,n;
+    if(leave<0){crossing_count=0;return;}
+    if(leave>0){
+        edict_t *list[CROSSING];
+        crossing_count=0;
+        if(!p || !aw_mwscript_followers || !sv.worldmodel)return;
+        n=aw_mwscript_followers(p,list,CROSSING);
+        for(i=0;i<n;i++){
+            eval_t *v=GetEdictFieldValue(list[i],"aw_ref");uint32_t ref=v && v->_float>0?(uint32_t)v->_float:0;
+            unsigned long length;char map[64];
+            if(!ref)continue;
+            carry_text(ref);
+            if(!carried_of(ref,&length) && AW_ActorsFrameMap(list[i],map,sizeof(map))){
+                /* an outdoor actor: its entity from the frame map it was joined from */
+                char *text=home_text(map,ref,&length);
+                if(text){carry_copy(ref,text,length);free(text);}
+            }
+            if(carried_of(ref,&length))crossing[crossing_count++]=ref;else crossed_lost++;
+        }
+        return;
+    }
+    for(i=0;i<crossing_count;i++){
+        uint32_t ref=crossing[i];unsigned long length=0;const char *text=carried_of(ref,&length);edict_t *e;vec3_t spot;
+        float yaw=p->v.angles[1];int h;
+        if(!text){crossed_lost++;continue;}
+        /* behind the player, side by side when several (OpenMW puts them on the player's own spot); the heading table,
+         * no sin or cos (the 68040 lacks them in hardware) */
+        h=((int)((yaw+180.0f)*AW_PATH_FAN/360.0f+0.5f)+(i*2-(crossing_count-1))*2)%AW_PATH_FAN;if(h<0)h+=AW_PATH_FAN;
+        spot[0]=p->v.origin[0]+aw_path_fan[h][0]*40.0f/AW_PATH_FAN_RADIUS;
+        spot[1]=p->v.origin[1]+aw_path_fan[h][1]*40.0f/AW_PATH_FAN_RADIUS;spot[2]=p->v.origin[2];
+        if(!AW_ActorsArriveHere(ref,spot,yaw)){crossed_lost++;continue;}
+        AW_MwvmStateChanged();
+        if(!(e=AW_ActorsSpawnVisitor(text,length))){crossed_lost++;continue;}
+        if(SV_TestEntityPosition(e)){VectorCopy(p->v.origin,e->v.origin);SV_LinkEdict(e,false);}   /* no room: the player's spot */
+        edict_refs_refresh();
+        attach_visitor(ref,NUM_FOR_EDICT(e),e);
+        crossed++;
+    }
+    crossing_count=0;
+}
+/* The player's control switches (v0.0.62, MWSCRIPT-PLAYER-CONTROL-62; OpenMW 0.51 controlextensions.cpp OpSetControl
+ * and OpGetDisabled, miscextensions.cpp OpEnableTeleporting and OpEnableLevitation): the function's switch bit, set
+ * on, off, or read; 0 for any other function. A reference before the call (player->DisablePlayerControls) changes
+ * nothing: the switches are the player's. Kept in saved games (aw_story.c, the "amiwind:controls" named fact). */
+static unsigned long control_calls,control_refused;
+static int control_function(int function,int *verb){
+    static const struct {short fn;short verb;short bit;} rows[]={
+        {AWF_DISABLEPLAYERCONTROLS,0,AW_CONTROL_PLAYER},{AWF_ENABLEPLAYERCONTROLS,1,AW_CONTROL_PLAYER},
+        {AWF_GETPLAYERCONTROLSDISABLED,2,AW_CONTROL_PLAYER},
+        {AWF_DISABLEPLAYERFIGHTING,0,AW_CONTROL_FIGHTING},{AWF_ENABLEPLAYERFIGHTING,1,AW_CONTROL_FIGHTING},
+        {AWF_GETPLAYERFIGHTINGDISABLED,2,AW_CONTROL_FIGHTING},
+        {AWF_DISABLEPLAYERJUMPING,0,AW_CONTROL_JUMPING},{AWF_ENABLEPLAYERJUMPING,1,AW_CONTROL_JUMPING},
+        {AWF_GETPLAYERJUMPINGDISABLED,2,AW_CONTROL_JUMPING},
+        {AWF_DISABLEPLAYERLOOKING,0,AW_CONTROL_LOOKING},{AWF_ENABLEPLAYERLOOKING,1,AW_CONTROL_LOOKING},
+        {AWF_GETPLAYERLOOKINGDISABLED,2,AW_CONTROL_LOOKING},
+        {AWF_DISABLEPLAYERMAGIC,0,AW_CONTROL_MAGIC},{AWF_ENABLEPLAYERMAGIC,1,AW_CONTROL_MAGIC},
+        {AWF_GETPLAYERMAGICDISABLED,2,AW_CONTROL_MAGIC},
+        {AWF_DISABLEPLAYERVIEWSWITCH,0,AW_CONTROL_VIEWSWITCH},{AWF_ENABLEPLAYERVIEWSWITCH,1,AW_CONTROL_VIEWSWITCH},
+        {AWF_GETPLAYERVIEWSWITCHDISABLED,2,AW_CONTROL_VIEWSWITCH},
+        {AWF_DISABLEVANITYMODE,0,AW_CONTROL_VANITY},{AWF_ENABLEVANITYMODE,1,AW_CONTROL_VANITY},
+        {AWF_GETVANITYMODEDISABLED,2,AW_CONTROL_VANITY},
+        {AWF_DISABLETELEPORTING,0,AW_CONTROL_TELEPORTING},{AWF_ENABLETELEPORTING,1,AW_CONTROL_TELEPORTING},
+        {AWF_DISABLELEVITATION,0,AW_CONTROL_LEVITATION},{AWF_ENABLELEVITATION,1,AW_CONTROL_LEVITATION}};
+    int i;
+    for(i=0;i<(int)(sizeof(rows)/sizeof(rows[0]));i++)if(rows[i].fn==function){*verb=rows[i].verb;return rows[i].bit;}
+    return 0;
+}
+/* --- the small functions (v0.0.62, MWSCRIPT-SMALL-FUNCTIONS-62; the rules of OpenMW 0.51 named at each, our own code).
+ * Angles and moves act on an object with an entity (an NPC, a creature, a door or an object the map keeps as an edict);
+ * CHIM scenery without one cannot turn or move yet (counted, as Rotate). Cost: per call a few comparisons and at most
+ * one link of the entity; GetDetected and GetLOS one world trace each; nothing resident but the tables below (32
+ * starting places of 36 bytes, 16 knockdowns of 16; aw_crime.c 16 awareness rolls of 16: 1,664 bytes). */
+static unsigned long transforms,transforms_missed,detections,detections_yes,sightings,knockouts,wakeups;
+static void crime_thief(aw_crime_thief_t *t);
+static int crime_witness(edict_t *e,aw_crime_witness_t *w);
+static float fatigue_term_of(float current,float maximum);
+static int disposition_weapon_drawn(void);
+/* the object a transform call names: its entity, or NULL (counted as missed) */
+static edict_t *transform_target(int instance,int target){
+    vec3_t at;int n=locate(instance,target,at);edict_t *e=n>0?edict_of(n):NULL;
+    if(!e || e->free){transforms_missed++;return NULL;}
+    return e;
+}
+/* SetAtStart (OpenMW transformationextensions.cpp OpSetAtStart: the reference back at its placed position and
+ * rotation): a script's first change of an object's place or angles keeps where the map put it, until the next map */
+#define STARTS 32
+static struct {uint32_t ref;int entity,map;vec3_t origin,angles;} starts[STARTS];static int start_next;
+static int start_find(edict_t *e){
+    int i,n=NUM_FOR_EDICT(e);
+    for(i=0;i<STARTS;i++)if(starts[i].map==attached_map && starts[i].entity==n && starts[i].ref)return i;
+    return -1;
+}
+static void start_keep(edict_t *e){
+    eval_t *v;int i;
+    if(e==sv_player || start_find(e)>=0 || !(v=GetEdictFieldValue(e,"aw_ref")) || v->_float<=0)return;
+    i=start_next;start_next=(start_next+1)%STARTS;
+    starts[i].ref=(uint32_t)v->_float;starts[i].entity=NUM_FOR_EDICT(e);starts[i].map=attached_map;
+    VectorCopy(e->v.origin,starts[i].origin);VectorCopy(e->v.angles,starts[i].angles);
+}
+/* the player standing on E goes with it (OpenMW moveStandingActors: elevators) */
+static void move_by(edict_t *e,const vec3_t diff){
+    start_keep(e);
+    if(sv_player && e!=sv_player && ((int)sv_player->v.flags&FL_ONGROUND) && PROG_TO_EDICT(sv_player->v.groundentity)==e){
+        VectorAdd(sv_player->v.origin,diff,sv_player->v.origin);SV_LinkEdict(sv_player,false);
+    }
+    VectorAdd(e->v.origin,diff,e->v.origin);SV_LinkEdict(e,false);transforms++;
+}
+static int actor_like(const edict_t *e){return e==sv_player || is_actor(e);}
+/* ForceSneak / ClearForceSneak / GetForceSneak (v0.0.62, MWSCRIPT-GAP-FUNCTIONS-62; OpenMW controlextensions.cpp
+ * OpSetMovementFlag, OpClearMovementFlag, OpGetForceSneak; creaturestats.cpp getStance: the forced flag makes the
+ * actor sneak): the player's flag is aw_move.c's (the stance itself), an NPC's a reference in this short list, read by
+ * the detection as the NPC sneaking. Not kept in saved games yet (OpenMW keeps the movement flags): a load clears them. */
+#define FORCED 32
+static uint32_t forced_sneak[FORCED];
+static unsigned long forced_calls,forced_refused;
+static void forced_reset(void){memset(forced_sneak,0,sizeof(forced_sneak));aw_move_force_sneak=0;}
+static int forced_find(uint32_t ref){int i;for(i=0;ref && i<FORCED;i++)if(forced_sneak[i]==ref)return i;return -1;}
+/* Saved games (v0.0.62): "AWFS" u8 1 u8 the player forced u8 count, count x u32 NPC reference, f32 the screen's black
+ * the fade goes to (big-endian); 11 + 4 x count bytes. OpenMW keeps the movement flags with the actors; the fade is
+ * kept too, so a game saved dark loads dark until its script's FadeIn. */
+static int forced_export(unsigned char *out,int capacity){
+    int i,n=0,k;unsigned char *p;unsigned int v;float f=V_ScreenFadeTarget();
+    for(i=0;i<FORCED;i++)n+=forced_sneak[i]!=0;
+    if(11+4*n>capacity)return -1;
+    memcpy(out,"AWFS",4);out[4]=1;out[5]=(unsigned char)(aw_move_force_sneak!=0);out[6]=(unsigned char)n;p=out+7;
+    for(i=0;i<FORCED;i++)if(forced_sneak[i])
+        for(k=3;k>=0;k--)*p++=(unsigned char)(forced_sneak[i]>>(8*k));
+    memcpy(&v,&f,4);
+    for(k=3;k>=0;k--)*p++=(unsigned char)(v>>(8*k));
+    return 11+4*n;
+}
+static int forced_import(const unsigned char *p,int bytes){
+    int i,n,k;unsigned int v=0;float f;
+    if(bytes<11 || memcmp(p,"AWFS",4) || p[4]!=1 || (n=p[6])>FORCED || bytes<11+4*n)return -1;
+    forced_reset();aw_move_force_sneak=p[5]!=0;
+    for(i=0;i<n;i++){
+        uint32_t r=0;for(k=0;k<4;k++)r=(r<<8)|p[7+4*i+k];
+        forced_sneak[i]=r;
+    }
+    for(k=0;k<4;k++)v=(v<<8)|p[7+4*n+k];
+    memcpy(&f,&v,4);
+    if(f>=0 && f<=1)V_ScreenFade(f,0);
+    return 11+4*n;
+}
+/* GetDetected's two sides: ACTOR as the one noticed (the player's sheet, else an actor that does not sneak: OpenMW sets
+ * the sneak stance of an NPC only by ForceSneak, not carried; its Chameleon and Invisibility), an NPC as the observer */
+static void detect_thief(edict_t *a,aw_crime_thief_t *t){
+    eval_t *r;uint32_t ref;aw_actor_t *x;
+    memset(t,0,sizeof(*t));t->fatigue_term=1;
+    if(a==sv_player){crime_thief(t);return;}
+    r=GetEdictFieldValue(a,"aw_ref");ref=r && r->_float>0?(uint32_t)r->_float:0;
+    if(!ref)return;
+    t->sneaking=forced_find(ref)>=0;   /* a ForceSneak on the NPC (v0.0.62) */
+    if((x=AW_ActorGet(ref,AW_ACTOR_NONE,0))!=NULL){
+        t->fatigue_term=fatigue_term_of(x->dyn_cur[2],x->dyn_base[2]);
+        if(x->reference)ref=x->reference;   /* the key the effects keep (as crime_witness reads Blind) */
+    }
+    t->chameleon=AW_EffectsMagnitude(ref,40,AW_EFFECT_NO_ARG);
+    t->invisibility=AW_EffectsMagnitude(ref,39,AW_EFFECT_NO_ARG);
+}
+static int detect_observer(edict_t *o,aw_crime_witness_t *w){
+    const aw_fighter_t *f;
+    if(!o || o==sv_player || !crime_witness(o,w))return 0;    /* an NPC only */
+    f=AW_CombatFighter(o);
+    return w->can_report || (f && f->knocked && !f->dead);   /* awarenessCheck: alive (a knocked-down one still looks) */
+}
+/* OpenMW actors.cpp isActorDetected: an NPC observer, its own check; any other (a creature, no object): whether any NPC
+ * within the actors' processing range (7168 original units) sees and notices ACTOR (creatures are not asked here) */
+static int detected(edict_t *observer,edict_t *actor){
+    aw_crime_thief_t t;aw_crime_witness_t w;int i;
+    if(!actor || actor->free || !actor_like(actor))return 0;
+    detect_thief(actor,&t);
+    if(detect_observer(observer,&w))return AW_CrimeDetects(observer,&w.observer,actor,&t);
+    for(i=1;i<sv.num_edicts;i++){
+        edict_t *x=EDICT_NUM(i);vec3_t d;
+        if(x==actor || x->free || strcmp(pr_strings+x->v.classname,"aw_npc"))continue;
+        VectorSubtract(x->v.origin,actor->v.origin,d);
+        if(Length(d)>7168*AW_MOVE_UNIT_SCALE || !detect_observer(x,&w))continue;
+        if(AW_CrimeDetects(x,&w.observer,actor,&t))return 1;
+    }
+    return 0;
+}
+/* OnKnockout (OpenMW statsextensions.cpp OpOnKnockout, actors.cpp: the knocked-down flag holds for exactly one frame
+ * when the knockdown starts): 1 in the frame a script first sees the actor's knockdown (a hit's or fatigue's) */
+#define KNOCKS 16
+static struct {int entity,map,knocked,frame;} knocks[KNOCKS];
+static int knocked_now(edict_t *e){
+    const aw_fighter_t *f=e?AW_CombatFighter(e):NULL;int i,n,slot=-1,down=f && f->knocked && !f->dead;
+    if(!e)return 0;
+    n=NUM_FOR_EDICT(e);
+    for(i=0;i<KNOCKS;i++){
+        if(knocks[i].entity==n && knocks[i].map==attached_map){slot=i;break;}
+        if(slot<0 && (!knocks[i].knocked || knocks[i].map!=attached_map))slot=i;
+    }
+    if(!down){if(slot>=0 && knocks[slot].entity==n)knocks[slot].knocked=0;return 0;}
+    if(slot<0)return 0;
+    if(knocks[slot].entity!=n || knocks[slot].map!=attached_map || !knocks[slot].knocked){
+        knocks[slot].entity=n;knocks[slot].map=attached_map;knocks[slot].knocked=1;knocks[slot].frame=host_framecount;
+        knockouts++;
+    }
+    return knocks[slot].frame==host_framecount;
+}
+/* a point of the original's world (x y z) in this map's units, as Position converts it */
+static void map_point(const float game[3],vec3_t local){
+    int i;
+    if(!AW_SourceToWorld(sv.name,(float *)game,local))for(i=0;i<3;i++)local[i]=game[i]/4.0f+room_shift[i];
+}
+static int small_call(int instance,int target,int function,const aw_mwcell_t *numbers,int count,
+                      const unsigned char *strings,int nstrings,aw_mwcell_t *result){
+    const char *axis=call_string(strings,nstrings,0);edict_t *e;
+    switch(function){
+    case AWF_GETANGLE:
+        /* GetAngle AXIS (OpenMW OpGetAngle): the reference's rotation on the axis in degrees (aw_move_rules.c) */
+        result->f=0;
+        if(!axis || !(e=transform_target(instance,target)))return AW_MWVM_CALL_READ;
+        result->f=AW_MoveScriptAngle(e==sv_player?sv_player->v.v_angle:e->v.angles,(unsigned char)axis[0],actor_like(e));
+        return AW_MWVM_CALL_READ;
+    case AWF_SETANGLE:{
+        /* SetAngle AXIS DEGREES (OpenMW OpSetAngle, rotateObject): the reference turned to it; the player's view too */
+        float q;int k;
+        if(!axis || count<1 || !(e=transform_target(instance,target)))return 1;
+        if((k=AW_MoveScriptAngleSet((unsigned char)axis[0],numbers[0].f,actor_like(e),&q))<0){transforms_missed++;return 1;}
+        start_keep(e);
+        if(e==sv_player){sv_player->v.v_angle[k]=q;VectorCopy(sv_player->v.v_angle,sv_player->v.angles);sv_player->v.fixangle=1;}
+        else{e->v.angles[k]=q;SV_LinkEdict(e,false);}
+        transforms++;return 1;}
+    case AWF_MOVE:case AWF_MOVEWORLD:{
+        /* Move / MoveWorld AXIS UNITS-A-SECOND (OpenMW OpMove: along the object's own axes; OpMoveWorld: the world's;
+         * times the frame's duration; the actors standing on it go along) */
+        vec3_t diff,f,r,u;float step=count>=1?numbers[0].f*(float)host_frametime*AW_MOVE_UNIT_SCALE:0;
+        if(!axis || !(e=transform_target(instance,target)))return 1;
+        if(function==AWF_MOVE){
+            AngleVectors(e->v.angles,f,r,u);
+            if(!AW_MoveScriptLocal(f,r,u,(unsigned char)axis[0],step,diff)){transforms_missed++;return 1;}
+        }else{
+            int k=tolower((unsigned char)axis[0])-'x';
+            if(k<0 || k>2){transforms_missed++;return 1;}
+            diff[0]=diff[1]=diff[2]=0;diff[k]=step;
+        }
+        move_by(e,diff);return 1;}
+    case AWF_SETPOS:{
+        /* SetPos AXIS VALUE (OpenMW OpSetPos): the reference's position on the axis, the original's units */
+        float game[3];vec3_t local;int k;
+        if(!axis || count<1 || !(e=transform_target(instance,target)))return 1;
+        k=tolower((unsigned char)axis[0])-'x';
+        if(k<0 || k>2){transforms_missed++;return 1;}
+        start_keep(e);
+        to_game_units(e->v.origin,game);game[k]=numbers[0].f;map_point(game,local);
+        VectorSubtract(local,e->v.origin,local);local[(k+1)%3]=local[(k+2)%3]=0;   /* only that axis moves */
+        VectorAdd(e->v.origin,local,e->v.origin);SV_LinkEdict(e,false);transforms++;
+        return 1;}
+    case AWF_SETATSTART:{
+        int i;
+        if(!(e=transform_target(instance,target)))return 1;
+        if((i=start_find(e))>=0){
+            VectorCopy(starts[i].origin,e->v.origin);VectorCopy(starts[i].angles,e->v.angles);SV_LinkEdict(e,false);
+        }   /* never moved by a script on this map: it stands where it started */
+        transforms++;return 1;}
+    case AWF_FACE:{
+        /* Face X Y (OpenMW aiextensions.cpp OpFace, aiface.cpp: an actor, not the player, turns to face the point; the
+         * original turns it at its turning speed, here at once); Q_atan2: no atan the 68040 lacks */
+        float game[3];vec3_t local;
+        if(count<2 || !(e=transform_target(instance,target)))return 1;
+        if(e==sv_player || !is_actor(e)){transforms_missed++;return 1;}
+        to_game_units(e->v.origin,game);game[0]=numbers[0].f;game[1]=numbers[1].f;map_point(game,local);
+        if(local[0]!=e->v.origin[0] || local[1]!=e->v.origin[1])
+            e->v.angles[1]=(float)(Q_atan2(local[1]-e->v.origin[1],local[0]-e->v.origin[0])*180/M_PI);
+        transforms++;return 1;}
+    case AWF_GETDETECTED:{
+        /* GetDetected ACTOR (OpenMW aiextensions.cpp OpGetDetected): see detected() above */
+        vec3_t at;int n=locate(instance,target,at);
+        result->i=detected(n>0?edict_of(n):NULL,named_actor(axis));
+        detections++;if(result->i)detections_yes++;
+        return AW_MWVM_CALL_READ;}
+    case AWF_GETLOS:case AWF_GETLINEOFSIGHT:{
+        /* GetLOS ACTOR (OpenMW OpGetLineOfSight, World::getLOS): both actors, enabled, eye to eye through the world */
+        vec3_t at;int n=locate(instance,target,at);edict_t *t=named_actor(axis);
+        e=n>0?edict_of(n):NULL;
+        result->i=e && t && actor_like(e) && actor_like(t) && AW_CrimeSight(e,t);
+        sightings++;return AW_MWVM_CALL_READ;}
+    case AWF_GETINTERIOR:
+        /* GetInterior (OpenMW cellextensions.cpp OpGetInterior): 1 while the player is in an interior (a room map) */
+        result->i=map_room!=0;return AW_MWVM_CALL_READ;
+    case AWF_GETCURRENTWEATHER:
+        result->i=AW_WeatherCurrent();return AW_MWVM_CALL_READ;
+    case AWF_ONKNOCKOUT:{
+        vec3_t at;int n=locate(instance,target,at);e=n>0?edict_of(n):NULL;
+        result->i=e && e!=sv_player && knocked_now(e);return AW_MWVM_CALL_READ;}
+    case AWF_WAKEUPPC:
+        if(AW_RestWake()){wakeups++;AW_MwvmStateChanged();}
+        return 1;
+    case AWF_ROTATEWORLD:{
+        /* RotateWorld AXIS DEGREES-A-SECOND (OpenMW OpRotateWorld: about the world's axis, times the frame's duration;
+         * an actor only about z). About z that is Rotate's turn; about x and y it is taken as Quake's pitch and roll,
+         * exact for an object standing upright (the game's one use turns a door about z) */
+        float step=count>=1?numbers[0].f*(float)host_frametime:0;int k;
+        if(!axis || !(e=transform_target(instance,target)))return 1;
+        k=tolower((unsigned char)axis[0]);
+        if(k!='z' && ((k!='x' && k!='y') || actor_like(e))){transforms_missed++;return 1;}
+        start_keep(e);
+        if(k=='z')e->v.angles[1]-=step;else if(k=='x')e->v.angles[0]+=step;else e->v.angles[2]+=step;
+        SV_LinkEdict(e,false);transforms++;return 1;}
+    case AWF_GETPCSNEAKING:
+        /* GetPCSneaking (OpenMW controlextensions.cpp OpGetPcSneaking, isSneaking): the player sneaks (aw_move.c) */
+        result->i=AW_MoveSneaking();return AW_MWVM_CALL_READ;
+    case AWF_GETWEAPONDRAWN:{
+        /* GetWeaponDrawn (OpenMW miscextensions.cpp OpGetWeaponDrawn: the draw state is the weapon and it shows): the
+         * player's readied hands without a torch (the disposition's rule); an actor while it fights (the combat layer
+         * readies its weapon for the fight) */
+        vec3_t at;int n=locate(instance,target,at);const aw_fighter_t *f;
+        e=n>0?edict_of(n):NULL;
+        if(e==sv_player || target==AW_MWVM_PLAYER)result->i=disposition_weapon_drawn();
+        else result->i=e && (f=AW_CombatFighter(e))!=NULL && !f->dead;
+        return AW_MWVM_CALL_READ;}
+    case AWF_SETDELETE:
+        /* SetDelete 1 / 0 (OpenMW miscextensions.cpp OpSetDelete: the reference deleted from the world, or back): here
+         * the object state's Disable and Enable, kept in saved games; any other number does nothing (OpenMW: an
+         * error) */
+        if(count<1 || (numbers[0].i!=0 && numbers[0].i!=1))return 1;
+        host_object(instance,target,numbers[0].i?AWM_DISABLE:AWM_ENABLE,0);AW_MwvmStateChanged();transforms++;
+        return 1;
+    }
+    return 0;
+}
+/* GetResist* / SetResist* / ModResist* (v0.0.62, MWSCRIPT-GAP-FUNCTIONS-62; OpenMW 0.51 statsextensions.cpp
+ * OpGetMagicEffect, OpSetMagicEffect, OpModMagicEffect): the value is the resistance's magnitude less its weakness's,
+ * the elemental shield added for fire, frost and shock; Set moves the actor's base modifier by the difference to the
+ * new value, Mod by the number (aw_effects.c AW_EffectsBaseModify, kept in saved games with the effects) */
+static const struct {int get,set,mod,effect,weakness,shield;} resists[]={
+    {AWF_GETRESISTFIRE,AWF_SETRESISTFIRE,AWF_MODRESISTFIRE,90,28,4},
+    {AWF_GETRESISTFROST,AWF_SETRESISTFROST,AWF_MODRESISTFROST,91,29,6},
+    {AWF_GETRESISTSHOCK,AWF_SETRESISTSHOCK,AWF_MODRESISTSHOCK,92,30,5},
+    {AWF_GETRESISTMAGICKA,AWF_SETRESISTMAGICKA,AWF_MODRESISTMAGICKA,93,31,-1},
+    {AWF_GETRESISTDISEASE,AWF_SETRESISTDISEASE,AWF_MODRESISTDISEASE,94,32,-1},
+    {AWF_GETRESISTBLIGHT,AWF_SETRESISTBLIGHT,AWF_MODRESISTBLIGHT,95,33,-1},
+    {AWF_GETRESISTCORPRUS,AWF_SETRESISTCORPRUS,AWF_MODRESISTCORPRUS,96,34,-1},
+    {AWF_GETRESISTPOISON,AWF_SETRESISTPOISON,AWF_MODRESISTPOISON,97,35,-1},
+    {AWF_GETRESISTNORMALWEAPONS,AWF_SETRESISTNORMALWEAPONS,AWF_MODRESISTNORMALWEAPONS,98,36,-1},
+    {AWF_GETRESISTPARALYSIS,AWF_SETRESISTPARALYSIS,AWF_MODRESISTPARALYSIS,99,-1,-1}};
+static unsigned long resist_calls,resist_refused,fades;
+static float resist_value(uint32_t owner,int k){
+    float v=AW_EffectsMagnitude(owner,resists[k].effect,AW_EFFECT_NO_ARG);
+    if(resists[k].weakness>=0)v-=AW_EffectsMagnitude(owner,resists[k].weakness,AW_EFFECT_NO_ARG);
+    if(resists[k].shield>=0)v+=AW_EffectsMagnitude(owner,resists[k].shield,AW_EFFECT_NO_ARG);
+    return v;
+}
+/* HasSoulGem / RemoveSoulGem CREATURE [COUNT] (v0.0.62; OpenMW 0.51 miscextensions.cpp OpHasSoulGem, OpRemoveSoulGem):
+ * the player's filled soul gems whose soul is that creature (aw_actorstate.c AW_Gem*: the soul as its ACTB row); Remove
+ * takes COUNT of them (1 when not given), each gem item leaving the inventory with its soul, as OpenMW removes the
+ * item (Azura's Star too). Another actor carries no filled gems here: 0, nothing. */
+static unsigned long gem_calls;
+static int soul_gems(int function,int target,const char *creature,int count){
+    int row,i,n=0;char gem[40];int soul;
+    if(target!=AW_MWVM_PLAYER || !creature || !AW_MwscriptActors() || (row=AW_ActorFind(creature))<0)return 0;
+    gem_calls++;
+    for(i=AW_GemCount()-1;i>=0;i--){
+        if(!AW_GemAt(i,gem,sizeof(gem),&soul) || soul!=row)continue;
+        if(function==AWF_HASSOULGEM){n++;continue;}
+        if(n>=count)break;
+        AW_GemRemove(i);AW_ItemAdd(&aw_state,gem,-1);n++;
+    }
+    if(function==AWF_REMOVESOULGEM && n)AW_MwvmStateChanged();
+    return n;
+}
+static int gap_call(int instance,int target,int function,const aw_mwcell_t *numbers,int count,
+                    const unsigned char *strings,int nstrings,aw_mwcell_t *result){
+    int k;
+    if(function==AWF_HASSOULGEM){result->i=soul_gems(function,target,call_string(strings,nstrings,0),0);
+                                 return AW_MWVM_CALL_READ;}
+    if(function==AWF_REMOVESOULGEM){
+        soul_gems(function,target,call_string(strings,nstrings,0),count>=1 && numbers[0].i>0?numbers[0].i:1);return 1;}
+    for(k=0;k<(int)(sizeof(resists)/sizeof(resists[0]));k++){
+        edict_t *e;aw_actor_t *a;uint32_t owner;
+        if(function!=resists[k].get && function!=resists[k].set && function!=resists[k].mod)continue;
+        result->i=0;
+        if(target==AW_MWVM_PLAYER)owner=AW_ACTOR_PLAYER_REF;
+        else if((a=actor_of(instance,target,&e))!=NULL)owner=a->reference;
+        else{resist_refused++;return function==resists[k].get?AW_MWVM_CALL_READ:1;}
+        if(function==resists[k].get){result->i=(int)resist_value(owner,k);resist_calls++;return AW_MWVM_CALL_READ;}
+        if(count<1)return 1;
+        if(!AW_EffectsBaseModify(owner,resists[k].effect,(float)(function==resists[k].mod?numbers[0].i:
+                                                                  numbers[0].i-(int)resist_value(owner,k)))){
+            resist_refused++;Con_DPrintf("MWScript: a resistance change not kept (effects full)\n");return 1;}
+        resist_calls++;AW_MwvmStateChanged();return 1;
+    }
+    switch(function){
+    case AWF_FADEIN:case AWF_FADEOUT:
+        /* FadeIn / FadeOut SECONDS (OpenMW OpFadeIn, OpFadeOut): to none / to black from the fade of the moment */
+        V_ScreenFade(function==AWF_FADEOUT?1.0f:0.0f,count>=1?numbers[0].f:0);fades++;return 1;
+    case AWF_FADETO:
+        /* FadeTo PERCENT SECONDS (OpenMW OpFadeTo: the percent of black, the whole number of it) */
+        if(count<2)return 1;
+        V_ScreenFade((float)(int)numbers[0].f/100.0f,numbers[1].f);fades++;return 1;
+    case AWF_FORCESNEAK:case AWF_CLEARFORCESNEAK:case AWF_GETFORCESNEAK:{
+        vec3_t at;int n,i,set=function==AWF_FORCESNEAK;uint32_t ref;
+        if(target==AW_MWVM_PLAYER){
+            if(function==AWF_GETFORCESNEAK){result->i=aw_move_force_sneak!=0;return AW_MWVM_CALL_READ;}
+            if(aw_move_force_sneak!=set){aw_move_force_sneak=set;AW_MwvmStateChanged();}
+            forced_calls++;return 1;
+        }
+        n=locate(instance,target,at);
+        ref=n>0?ref_of_edict(edict_of(n)):0;
+        if(!ref)ref=target_reference(instance,target);
+        i=forced_find(ref);
+        if(function==AWF_GETFORCESNEAK){result->i=i>=0;return AW_MWVM_CALL_READ;}
+        if(!ref){forced_refused++;return 1;}
+        if(set && i<0){
+            for(i=0;i<FORCED && forced_sneak[i];i++);
+            if(i==FORCED){forced_refused++;Con_DPrintf("MWScript: a ForceSneak not kept (32 at most)\n");return 1;}
+            forced_sneak[i]=ref;AW_MwvmStateChanged();
+        }else if(!set && i>=0){forced_sneak[i]=0;AW_MwvmStateChanged();}
+        forced_calls++;return 1;}
+    }
+    return 0;
+}
 static int host_call(int instance,int target,int function,const aw_mwcell_t *numbers,int count,
                      const unsigned char *strings,int nstrings,aw_mwcell_t *result){
-    char own[64];const char *faction;int value=count>0?numbers[0].i:0;
+    char own[64];const char *faction;int value=count>0?numbers[0].i:0,verb,bit;
+    if((bit=control_function(function,&verb))!=0){
+        int before=AW_ControlsDisabled();
+        if(verb==2){result->i=!AW_ControlAllowed(bit);return AW_MWVM_CALL_READ;}
+        if(!AW_ControlSet(bit,verb==1)){control_refused++;Con_DPrintf("MWScript: a control switch not kept (named facts full)\n");return 0;}
+        control_calls++;
+        if(AW_ControlsDisabled()!=before)AW_MwvmStateChanged();   /* a script that repeats the call each frame wakes no one */
+        return 1;
+    }
+    if((bit=small_call(instance,target,function,numbers,count,strings,nstrings,result))!=0)return bit;   /* v0.0.62 */
+    if((bit=gap_call(instance,target,function,numbers,count,strings,nstrings,result))!=0)return bit;   /* MWSCRIPT-GAP-FUNCTIONS-62 */
     switch(function){
     case AWF_GETPCCRIMELEVEL:result->f=(float)AW_StandingCrime();standing_calls++;return AW_MWVM_CALL_READ;
     case AWF_SETPCCRIMELEVEL:case AWF_MODPCCRIMELEVEL:
@@ -1668,6 +2547,15 @@ static int host_call(int instance,int target,int function,const aw_mwcell_t *num
         if(!AW_SourceToWorld(sv.name,game,local))for(i=0;i<3;i++)local[i]=game[i]/4.0f+room_shift[i];
         VectorCopy(local,e->v.origin);SV_LinkEdict(e,false);positions++;
         return 1;}
+    case AWF_POSITIONCELL:
+        /* PositionCell of anything but the player (v0.0.62; see position_cell above) */
+        return position_cell(instance,target,numbers,count);
+    case AWF_PLACEATPC:case AWF_PLACEATME:case AWF_PLACEITEM:case AWF_PLACEITEMCELL:
+        /* the placing family (v0.0.62, MWSCRIPT-PLACE-OBJECTS-62; see place_call above) */
+        return place_call(instance,target,function,numbers,count);
+    case AWF_AIFOLLOWCELL:case AWF_AIESCORT:case AWF_AIESCORTCELL:
+        /* v0.0.62: see ai_package above */
+        return ai_package(instance,target,function,numbers,count,strings,nstrings);
     case AWF_GETSTANDINGPC:{
         /* GetStandingPC (OpenMW miscextensions.cpp OpGetStandingPc, World::getPlayerStandingOn): 1 while the player
          * stands on the object. Here an object with an entity (Quake's ground entity); CHIM scenery without one is
@@ -1949,6 +2837,9 @@ int AW_MwscriptActorFaction(const char *record,char *out,int capacity){
 static const aw_glut_live_t live={live_journal,live_dead,live_item,live_rank,live_global,live_function,live_local};
 
 /* --- loading and the map's objects --- */
+/* a new game (aw_save.c AW_SaveReset, every opening and quick start): its run-once scripts start on the next tick */
+static int new_game_pending,new_game_started;static unsigned long new_games;
+static void new_game_hook(void){new_game_pending=1;new_game_started=0;}
 static int load(void){
     FILE *f=NULL;int length,i,n;unsigned char head[16];uint32_t wanted;char name[64];long base;
     if(resident || load_failed)return resident!=NULL;
@@ -2046,6 +2937,7 @@ static void attach_objects(void){
         edict_refs[edict_ref_count].ref=(uint32_t)v->_float;edict_refs[edict_ref_count++].entity=i;
     }
     qsort(edict_refs,edict_ref_count,sizeof(edict_refs[0]),compare_refs);
+    leaving_count=0;             /* a map change took this map's actors with it (PositionCell, v0.0.62) */
     /* the object state: what a script disabled or the player took stays hidden on this map too */
     if(aw_ledger_on){ledger_attach();return;}      /* CELL-CHANGES-59: this map's rows of the world change list */
     for(i=0;i<object_count;i++)if(objects[i].disabled){objects[i].entity=-1;object_hide(&objects[i]);}
@@ -2133,6 +3025,14 @@ void AW_MwscriptTick(float dt){
     {   /* ARRIVAL-LONG-FRAME-DEV6-59: the parts of a first tick that take long are named */
         double t0=Sys_FloatTime(),t1,t2;int was=resident!=NULL;
         if(!load())return;
+        if(new_game_pending){
+            /* NPC-STORY-DISABLED-AT-START-42: a new game began (AW_SaveReset). The scripts start from the game data
+             * (a file loaded this tick already did; one kept from an earlier game is reset from the cleared list),
+             * then the original's run-once new-game scripts start: Startup disables its story characters */
+            new_game_pending=0;
+            if(was)script_import(&aw_ledger);
+            new_game_started=AW_MwvmNewGame();new_games++;
+        }
         t1=Sys_FloatTime();
         if(script_model!=map_model){script_model=map_model;attach_map();}
         t2=Sys_FloatTime();
@@ -2176,6 +3076,10 @@ void AW_MwscriptTick(float dt){
     {double t0=Sys_FloatTime();
      AW_MwvmTick(dt,player);
      if(Sys_FloatTime()-t0>.3)Con_Printf("MWScript tick: %.0f ms (scripts run this frame).\n",(Sys_FloatTime()-t0)*1000);}
+    leave_now();   /* PositionCell: the actors moved to another place leave this map now */
+    AW_ActorsPlacedTick(placed_spawn);   /* the actors scripts placed here come back (once a second; MWSCRIPT-PLACE-OBJECTS-62) */
+    /* SCRIPTED-EVENT-FALLING-MAGE-61: actors held on an object a script removes fall once it is gone (aw_fall.c) */
+    AW_FallTick(dt);
 }
 static void status_counts(void){
     const aw_mwvm_stats_t *s=AW_MwvmStats();int k,n=AW_MwvmInstanceCount(),attached=0,global=0,active=0,looping=0;
@@ -2189,6 +3093,13 @@ static void status_counts(void){
                attach_places,attach_rooms,attach_refused,global,active,looping);
     Con_Printf("frames %lu runs %lu quiet-skips %lu far %lu deferred %lu ops %lu (max %lu a frame) aborted %lu not-yet calls %lu\n",
                s->frames,s->runs,s->skipped_quiet,s->skipped_far,s->deferred,s->ops,s->max_ops_frame,s->aborted,s->notyet_calls);
+    Con_Printf("new games %lu: %d run-once scripts started%s\n",new_games,new_game_started,
+               new_game_pending?" (one pending)":"");
+    Con_Printf("actors enabled in a loaded area: %lu (an edict of this map shown again, or a kept actor spawned at once)\n",
+               actors_enabled);
+    Con_Printf("Say: %lu started, %lu not started (no actor, voice or sample); last on entity %d, %.1f s\n",
+               says_started,says_missed,say_last_entity,say_last_seconds);
+    AW_FallStatus();
     {/* the import route: the not-yet functions this session called most (by function number) */
      int top[8],ntop=0,f,i,j;char name[32];
      for(f=0;f<AWM_FUNCTIONS;f++){
@@ -2225,6 +3136,29 @@ static void status_counts(void){
                AW_StandingCrime(),AW_StandingReputation(),standing_calls,standing_misses,
                AW_StandingFull()?"; faction table full":"",anim_plays,anim_misses,topics_added,topic_rows,topic_bytes,cures,
                effects_cast,AW_EffectsCount(),AW_EffectsRefused(),greetings,greetings_missed,rotations,rotations_missed,travels,travels_refused,follows,follows_refused,positions,positions_refused);
+    Con_Printf("PositionCell: %lu moved here, %lu to another place, %lu not possible; arrivals spawned %lu (%lu with no "
+               "entity to spawn); %d leaving\n",poscells,poscells_away,poscells_refused,visitors_spawned,visitors_no_text,
+               leaving_count);
+    Con_Printf("Place calls: %lu made (%lu kept for another place), %lu not possible; placed actors spawned %lu (%lu with "
+               "no entity to spawn)\n",places,places_away,places_refused,placed_spawned,placed_no_text);
+    AW_ActorsPlacedStatus();
+    Con_Printf("AIFollowCell %lu (%lu not possible), AIEscort and AIEscortCell %lu (%lu not possible); followers through "
+               "a door with the player %lu (%lu could not come: no entity, no row or no spawn)\n",cell_follows,
+               cell_follows_refused,escorts,escorts_refused,crossed,crossed_lost);
+    Con_Printf("Angles, moves, SetAtStart and SetDelete %lu (%lu with no entity or axis); GetDetected %lu (%lu detected), GetLOS "
+               "%lu; knockdowns read %lu; WakeUpPC %lu\n",transforms,transforms_missed,detections,detections_yes,
+               sightings,knockouts,wakeups);
+    Con_Printf("Fades %lu (black now %.2f); ForceSneak and ClearForceSneak %lu (%lu not kept), the player forced %d; "
+               "resistances read or changed %lu (%lu with no actor or no room); soul gem calls %lu\n",fades,
+               (double)V_ScreenFadeLevel(),forced_calls,forced_refused,aw_move_force_sneak,resist_calls,resist_refused,
+               gem_calls);
+    {   /* MWSCRIPT-PLAYER-CONTROL-62: the switches a script turned off now, by name */
+        char off[160];int b;off[0]=0;
+        for(b=1;b<=AW_CONTROL_LEVITATION;b<<=1)if(!AW_ControlAllowed(b)){
+            if(off[0])strncat(off,", ",sizeof(off)-strlen(off)-1);
+            strncat(off,AW_ControlName(b),sizeof(off)-strlen(off)-1);}
+        Con_Printf("Control switches: %lu calls (%lu not kept); off now: %s\n",control_calls,control_refused,off[0]?off:"none");
+    }
 }
 /* "aw_mwscript_status [on|off|about]" (dbg mwscript [on|off], dbg mwscript status; DBG-MWSCRIPT-SILENT-56): the
  * switch answers in the console what it does, whether id1/mwscript.awm was loaded (scripts, bytes, its format) and
@@ -2296,12 +3230,34 @@ static void stats_readout(void){
                "actor table %lu; combat sheets from the stats %lu; last area load: %d of %d records, load step %.2f ms, "
                "worst staggered frame %.2f ms\n",AW_ActorStatsSwitch(-1)?"on":"off",c[0],c[1],c[2],m[0],m[1],
                combat_sheets_from_stats,made,blocks,ms,AW_AreaActorFillWorstFrame());
+#ifdef AW_COMBAT_EFFECT_MAGNITUDE
+    if(ref && AW_MwscriptActors()){
+        aw_actor_t *a=AW_ActorGet(ref,AW_ACTOR_NONE,0);
+        Con_Printf("  resistance to normal weapons from its abilities: %.0f (weakness %.0f); ability lookups read %lu, "
+                   "kept %lu\n",a?AW_ActorPassiveMagnitude(a,AW_EFFECT_RESIST_NORMAL_WEAPONS):0.0f,
+                   a?AW_ActorPassiveMagnitude(a,AW_EFFECT_WEAKNESS_NORMAL_WEAPONS):0.0f,passive_reads,passive_kept);
+    }
+#endif
 }
 static void status(void){
     char *a=Cmd_Argc()>1?Cmd_Argv(1):"";int k,on=-1;
     if(!Q_strcasecmp(a,"on") || !Q_strcasecmp(a,"true") || !Q_strcasecmp(a,"yes") || !strcmp(a,"1"))on=1;
     else if(!Q_strcasecmp(a,"off") || !Q_strcasecmp(a,"false") || !Q_strcasecmp(a,"no") || !strcmp(a,"0"))on=0;
     if(!Q_strcasecmp(a,"stats")){stats_readout();return;}
+    if(!Q_strcasecmp(a,"result")){
+        /* "aw_mwscript_status result TOPIC NPC [N]" (dbg mwscript result; MWSCRIPT-PLAYER-CONTROL-62's test aid): the
+         * result script of NPC's answer on TOPIC runs as the dialogue window runs it, without the window: the answer
+         * the NPC would give now, or its N-th answer on the topic (from 1, in the table's order) whatever its
+         * conditions say. TOPIC and NPC in quotes when they hold spaces. */
+        int nth=Cmd_Argc()>4?atoi(Cmd_Argv(4)):0;
+        if(Cmd_Argc()<4 || Cmd_Argc()>5 || nth<0){
+            Con_Printf("dbg mwscript result TOPIC NPC [N]: the result script of NPC's answer on TOPIC (N: its N-th answer)\n");
+            return;
+        }
+        if(!load()){Con_Printf("dbg mwscript result: the scripts are not loaded\n");return;}
+        AW_DialWindowRunResult(Cmd_Argv(2),Cmd_Argv(3),nth);
+        return;
+    }
     if(!Q_strcasecmp(a,"call")){
         /* "aw_mwscript_status call FUNCTION [number] [faction]" (dbg mwscript call): one of the player's standing or
          * AddTopic calls through the same host route a script takes, on the player (a test and evidence route) */
@@ -2430,6 +3386,51 @@ static void status(void){
              Con_Printf("dbg mwscript call %s: %s (row %d, %d locals, start script %s): %s, local 0 = %d\n",f,name,s,
                         AW_MwvmLocalCount(s),AW_MwvmStartsAtLoad(s)?"yes":"no",AW_MwvmScriptRunning(s)?"running":"not running",local);}
             return;
+        }
+        if(!Q_strcasecmp(f,"placeatpc")){
+            /* MWSCRIPT-PLACE-OBJECTS-62: "call placeatpc ID [COUNT DISTANCE DIRECTION]" (ID: the record id of a PLAC row,
+             * in quotes when it has a space), as a script's PlaceAtPC through the same host route */
+            uint32_t off,rows,bytes,row;char id[64];aw_mwcell_t c[4];int found=-1;
+            if(!load() || Cmd_Argc()<4 || !AW_MwvmSection("PLAC",&off,&rows,&bytes)){
+                Con_Printf("dbg mwscript call placeatpc ID [COUNT DISTANCE DIRECTION]: the file must be loaded\n");return;}
+            for(row=0;row<rows && found<0;row++){
+                if(resident && off+12*row+12<=resident_bytes){
+                    const unsigned char *p=resident+off+12*row;
+                    if(read_string((p[0]<<8)|p[1],id,sizeof(id)) && same_id(id,Cmd_Argv(3)))found=(int)row;
+                }
+            }
+            if(found<0){Con_Printf("dbg mwscript call placeatpc: %s is not named by any Place call of the game\n",Cmd_Argv(3));return;}
+            c[0].i=Cmd_Argc()>4?atoi(Cmd_Argv(4)):1;c[1].f=Cmd_Argc()>5?(float)Q_atof(Cmd_Argv(5)):128.0f;
+            c[2].i=Cmd_Argc()>6?atoi(Cmd_Argv(6)):0;c[3].i=found;
+            {unsigned long before=places,spawned=placed_spawned;
+             place_call(-1,AW_MWVM_PLAYER,AWF_PLACEATPC,c,4);
+             Con_Printf("dbg mwscript call placeatpc: %s (row %d): %lu made, %lu actors spawned (%s)\n",Cmd_Argv(3),found,
+                        places-before,placed_spawned-spawned,places>before?"placed":"not possible: see aw_mwscript_status");}
+            return;
+        }
+        {   /* "call disableplayercontrols" / "call enableplayermagic" / "call getplayerjumpingdisabled" ... (the control
+             * switches, MWSCRIPT-PLAYER-CONTROL-62): by the same host route a script's call takes */
+            static const short fns[3][9]={
+                {AWF_DISABLEPLAYERCONTROLS,AWF_DISABLEPLAYERFIGHTING,AWF_DISABLEPLAYERJUMPING,AWF_DISABLEPLAYERLOOKING,
+                 AWF_DISABLEPLAYERMAGIC,AWF_DISABLEPLAYERVIEWSWITCH,AWF_DISABLEVANITYMODE,AWF_DISABLETELEPORTING,
+                 AWF_DISABLELEVITATION},
+                {AWF_ENABLEPLAYERCONTROLS,AWF_ENABLEPLAYERFIGHTING,AWF_ENABLEPLAYERJUMPING,AWF_ENABLEPLAYERLOOKING,
+                 AWF_ENABLEPLAYERMAGIC,AWF_ENABLEPLAYERVIEWSWITCH,AWF_ENABLEVANITYMODE,AWF_ENABLETELEPORTING,
+                 AWF_ENABLELEVITATION},
+                {AWF_GETPLAYERCONTROLSDISABLED,AWF_GETPLAYERFIGHTINGDISABLED,AWF_GETPLAYERJUMPINGDISABLED,
+                 AWF_GETPLAYERLOOKINGDISABLED,AWF_GETPLAYERMAGICDISABLED,AWF_GETPLAYERVIEWSWITCHDISABLED,
+                 AWF_GETVANITYMODEDISABLED,-1,-1}};
+            static const char *const pre[3]={"disable","enable","get"};
+            int v,b;char name[48];
+            for(v=0;v<3;v++)for(b=0;b<9;b++){
+                if(fns[v][b]<0)continue;
+                Q_snprintf(name,sizeof(name),"%s%s%s",pre[v],AW_ControlName(1<<b),v==2?"disabled":"");
+                if(Q_strcasecmp(f,name))continue;
+                r.i=0;done=host_call(-1,AW_MWVM_PLAYER,fns[v][b],NULL,0,NULL,0,&r);
+                Con_Printf("dbg mwscript call %s: %s%s; switches off now: mask %d\n",name,done?"done":"not kept",
+                           v==2?(r.i?", reads 1 (off)":", reads 0 (on)"):"",AW_ControlsDisabled());
+                return;
+            }
         }
         if(!Q_strcasecmp(f,"forcegreeting")){   /* the actor under the crosshair greets, as a script's ForceGreeting */
             edict_t *e=sv_player?AW_NPCTarget(sv_player,sv_player->v.v_angle):NULL;
@@ -2672,6 +3673,9 @@ static int actors_export(unsigned char *out,int capacity){
      t+=k;
      k=AW_DialHeardExport(out+n+s+t,capacity-n-s-t-8);       /* the journal's topic pages (AWTP) */
      if(k<0)return -1;
+     t+=k;
+     k=forced_export(out+n+s+t,capacity-n-s-t-8);            /* the forced sneak and the fade (AWFS, v0.0.62) */
+     if(k<0)return -1;
      t+=k;}
     if(aw_mwscript_packages_export){   /* the actors' travel and follow packages (aw_ambient.c, SAVEGAME-COMPLETE-57) */
         int k=aw_mwscript_packages_export(out+n+s+t,capacity-n-s-t-8);
@@ -2682,6 +3686,7 @@ static int actors_export(unsigned char *out,int capacity){
 }
 static void actors_import(const unsigned char *data,int bytes){
     int actors=bytes;
+    forced_reset();V_ScreenFade(0,0);   /* MWSCRIPT-GAP-FUNCTIONS-62: an older save has no AWFS block: none, unfaded */
     AW_StandingReset();AW_EffectsReset();AW_SoldReset();AW_MadeReset();AW_GemsReset();AW_DialReactionsReset();AW_RevealedReset();AW_DialHeardReset();
     if(aw_mwscript_packages_import)aw_mwscript_packages_import(NULL,0);   /* none until the save's block says */
     if(topic_bytes)memset(known_topics,0,topic_bytes);
@@ -2733,6 +3738,10 @@ static void actors_import(const unsigned char *data,int bytes){
                     int k=AW_DialHeardImport(p+rest,(int)(tail-rest));
                     if(k<0)Con_Printf("Saved journal topic pages unreadable: none kept.\n");else rest+=(unsigned long)k;
                 }
+                if(rest+11<=tail && !memcmp(p+rest,"AWFS",4)){   /* the forced sneak and the fade (v0.0.62) */
+                    int k=forced_import(p+rest,(int)(tail-rest));
+                    if(k<0)Con_Printf("Saved forced sneak and fade unreadable: none kept.\n");else rest+=(unsigned long)k;
+                }
                 if(rest+6<=tail && !memcmp(p+rest,"AWPK",4) && aw_mwscript_packages_import &&
                    !aw_mwscript_packages_import(p+rest,(int)(tail-rest)))Con_Printf("Saved actor packages unreadable: none kept.\n");
             }
@@ -2763,6 +3772,8 @@ void AW_MwscriptInit(void){
     aw_actors_ref_flags=actors_ref_flags;aw_actors_forget=AW_ActorForget;aw_save_notice=save_notice;
     aw_save_other_ok=save_other_ok;aw_save_ident_refresh=save_ident_refresh;aw_save_migrate=save_migrate;
     aw_save_drop_actor_records=save_drop_actor_records;
+    aw_save_new_game=new_game_hook;   /* the original's run-once new-game scripts (NPC-STORY-DISABLED-AT-START-42) */
+    AW_FallInit();                    /* held and falling actors (SCRIPTED-EVENT-FALLING-MAGE-61) */
     AW_StandingReset();AW_EffectsReset();
     aw_save_actors_export=actors_export;aw_save_actors_import=actors_import;   /* the actor record (feature 16) */
     aw_save_objects_export=objects_export;aw_save_objects_import=objects_import;
@@ -2772,6 +3783,8 @@ void AW_MwscriptInit(void){
     aw_object_lock=AW_ObjectLock;aw_door_open=door_open;   /* CELL-CHANGES-59 slice 2: the key's unlock, door poses */
     aw_scene_intercept=aw_hinged_intercept=object_intercept;   /* OnActivate takes a door's use */
     aw_actor_disabled=AW_ObjectDisabled;   /* the CHIM window spawns no disabled actor */
+    aw_actors_visitors=room_visitors;      /* PositionCell: a room spawns the actors moved into it (v0.0.62) */
+    aw_scene_followers=followers;          /* the player's followers through a door (v0.0.62) */
     aw_static_flame_gone=AW_ObjectDisabled;   /* a taken candle's flame goes with it (TAKEN-LIGHT-FLAME-STAYS-60) */
     aw_lamp_gone=AW_ObjectDisabled;           /* and outdoors its night lamp light (TAKEN-LIGHT-FLAME-61) */
     aw_inventory_made_item=AW_MadeItemAt;   /* enchanted items (aw_made_N) read through the inventory */

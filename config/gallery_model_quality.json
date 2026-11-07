@@ -35,6 +35,24 @@
       "minimum_faces": {},
       "pose_event": "idle: start",
       "preserve_airborne": true
+    },
+    "r/kwama queen.nif": {
+      "id": "room-creature-cap-v1",
+      "reason": "A creature only rooms place (TOMB-NO-CREATURES-61): 384 triangles keep its share of the smallest room that holds it under the +2 % triangle cap (the Sarimisun-Assa Egg Mine queen's lair: 21,303 faces).",
+      "budget": 384,
+      "minimum_faces": {}
+    },
+    "r/ashvampire.nif": {
+      "id": "room-creature-cap-v1",
+      "reason": "A creature only rooms place (TOMB-NO-CREATURES-61): 384 triangles keep its share of the smallest room that holds it under the +2 % triangle cap (Kagrenac's Library in Tureynulal: 20,706 faces).",
+      "budget": 384,
+      "minimum_faces": {}
+    },
+    "r/byagram.nif": {
+      "id": "room-creature-cap-v1",
+      "reason": "A creature only rooms place (TOMB-NO-CREATURES-61): 384 triangles, as the other two meshes only rooms place, well under the +2 % triangle cap of its room (the Corprusarium Bowels: 53,531 faces).",
+      "budget": 384,
+      "minimum_faces": {}
     }
   }
 }

@@ -83,6 +83,11 @@ void AW_SpikeFileRead (long bytes);
 enum {AW_WAIT_DISK, AW_WAIT_C2P, AW_WAIT_VBL, AW_WAITS};
 extern double aw_wait_time[AW_WAITS];
 extern int aw_disk_depth;
+/* BENCH-RESULT-FILE-62: running totals since the start (one add per frame, one per file call): the disk wait of
+ * every finished frame (the frame in progress is still in aw_wait_time[AW_WAIT_DISK]), the files looked up by name
+ * and the file reads; a caller takes the difference between two moments (aw_halloween.c: per benchmark frame). */
+extern double aw_disk_total;
+extern unsigned long aw_file_finds, aw_file_reads;
 #define AW_DISK_BEGIN(t0)	((t0) = aw_disk_depth++ ? 0 : Sys_FloatTime ())
 #define AW_DISK_END(t0)		do { if (--aw_disk_depth <= 0) { aw_disk_depth = 0; aw_wait_time[AW_WAIT_DISK] += Sys_FloatTime () - (t0); } } while (0)
 #define AW_WAIT_BEGIN(t0)	((t0) = Sys_FloatTime ())

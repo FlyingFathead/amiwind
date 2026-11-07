@@ -49,7 +49,9 @@ MOVE_SETTINGS = ('fMinWalkSpeed', 'fMaxWalkSpeed', 'fEncumberedMoveEffect', 'fBa
                  'fJumpRunMultiplier', 'fJumpMoveBase', 'fJumpMoveMult',
                  'fFatigueRunBase', 'fFatigueRunMult', 'fFatigueSwimWalkBase', 'fFatigueSwimWalkMult',
                  'fFatigueSwimRunBase', 'fFatigueSwimRunMult', 'fFatigueSneakBase', 'fFatigueSneakMult',
-                 'fFatigueJumpBase', 'fFatigueJumpMult', 'fFatigueBase', 'fFatigueMult')
+                 'fFatigueJumpBase', 'fFatigueJumpMult', 'fFatigueBase', 'fFatigueMult',
+                 # fall damage (v0.0.62, SCRIPTED-EVENT-FALLING-MAGE-61; aw_move.h AW_MoveFallDamage)
+                 'fFallDamageDistanceMin', 'fFallDistanceBase', 'fFallDistanceMult', 'fFallAcroBase', 'fFallAcroMult')
 # The aggro and flee ratings (engine/aga/src/aw_combat.h aw_combat_ai_t, the same order; docs/COMBAT.md "Combat
 # playground"): written as "ai NAME VALUE" lines, which the melee settings' loader skips.
 AI_SETTINGS = ('iFightDistanceBase', 'fFightDistanceMultiplier', 'fFightDispMult',

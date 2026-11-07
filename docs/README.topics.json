@@ -116,6 +116,8 @@
       "docs": [
         "GAME_FEATURES.md",
         "game-features.json",
+        "MWSCRIPT_FEATURES.md",
+        "mwscript-features.json",
         "ACTOR_PLACEMENT.md",
         "ITEMS_INDEX.md",
         "ORIGINAL_MAP_DATA.md",
@@ -171,11 +173,13 @@
         "COMBAT.md",
         "RESTING.md",
         "MAGIC_EFFECTS.md",
+        "ALCHEMY.md",
         "INVENTORY.md",
         "HUNTER_STUDY.md",
         "FACE_VALIDATION.md",
         "MESH_TIPS_AND_TRICKS.md",
         "ACTOR_RECORDS.md",
+        "CREATURES.md",
         "GAME_FORMULAS.md"
       ]
     },

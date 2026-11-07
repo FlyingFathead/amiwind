@@ -1,6 +1,6 @@
 # Player scale, collision and camera motion
 
-_Last updated with AmiWind v0.0.61-dev3 (2026-11-06)._
+_Last updated with AmiWind v0.0.62-dev1 (2026-11-07)._
 
 <!-- contents start -->
 ## Contents
@@ -94,7 +94,9 @@ Every factor of the OpenMW rules, and where it comes from in AmiWind:
 | Levitate | fly speed from fMinFlySpeed / fMaxFlySpeed | later | magic effects |
 | Jump effect, Acrobatics, load, fatigue | jump height (getJump) | later (rule written and tested, not applied) | needs the gravity scale first ([PHYSICS-GRAVITY-SCALE-36](bugs/PHYSICS-GRAVITY-SCALE-36.md)) |
 | Acrobatics | in-air control (fJumpMoveBase / fJumpMoveMult) | later | Quake air control is kept |
-| Slowfall, Water Walking | fall and water surface | later | magic effects |
+| Slowfall | the falling speed, no fall height | v0.0.62 | the factor 1 - magnitude x 0.005 once each 1/60 s of falling; the engine's gravity stays Quake's |
+| Acrobatics, Jump, fatigue | fall damage on landing (fFallDamageDistanceMin, fFallDistanceBase/Mult, fFallAcroBase/Mult) | v0.0.62 | [MWSCRIPT_BYTECODE.md "Held actors and falls"](MWSCRIPT_BYTECODE.md#held-actors-and-falls); no knockdown yet |
+| Water Walking | water surface | later | magic effects |
 | Werewolf | run x fWereWolfRunMult | later | no werewolf form |
 
 The rules are pure functions in `engine/aga/src/aw_move_rules.c` (tested against hand-worked OpenMW

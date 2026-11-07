@@ -1004,10 +1004,15 @@ def harvest_fingerprint_entries(id1, *, plant_capacity=None, removed=()):
         except UnicodeDecodeError:
             raise ValueError('Harvest catalogue is not ASCII: '+path.name) from None
         lines=text.splitlines()
-        header=re.fullmatch(r'AWH([1234]) ([0-9]+) ([0-9]+) ([0-9]+)(?: ([0-9]+) ([0-9a-f]{64}))?(?: ([0-9]+))?',lines[0]) if lines else None
+        # an AWH4 header may end in 'bases K' and K pairs of slots and digest: the earlier generations of the global
+        # index (prepare_harvest.index_generations, FLORA-FAUNA-COVERAGE-62)
+        header=re.fullmatch(r'AWH([1234]) ([0-9]+) ([0-9]+) ([0-9]+)(?: ([0-9]+) ([0-9a-f]{64}))?(?: ([0-9]+))?'
+                            r'(?: bases ([1-4])((?: [0-9]+ [0-9a-f]{64})+))?',lines[0]) if lines else None
         if not header or any(ord(c)<32 and c not in '\r\n\t' for c in text):
             raise ValueError('Invalid harvest catalogue envelope: '+path.name)
-        version,nodes,edges,plants,slots,identity,models=header.groups()
+        version,nodes,edges,plants,slots,identity,models,base_count,bases=header.groups()
+        if base_count is not None and (version!='4' or len(bases.split())!=2*int(base_count)):
+            raise ValueError('Invalid harvest catalogue envelope: '+path.name)
         indexed=version in ('3','4')
         if indexed != (slots is not None):
             raise ValueError('Invalid harvest catalogue envelope: '+path.name)
@@ -1016,7 +1021,7 @@ def harvest_fingerprint_entries(id1, *, plant_capacity=None, removed=()):
         if external != (models is not None):
             raise ValueError('Invalid external harvest catalogue envelope: '+path.name)
         models=int(models) if external else 0
-        if (external and not 1<=models<=8) or any(n>limit for n,limit in zip(counts,(64,256,plant_capacity))) or len(lines)!=1+sum(counts)+models:
+        if (external and not 1<=models<=16) or any(n>limit for n,limit in zip(counts,(64,256,plant_capacity))) or len(lines)!=1+sum(counts)+models:
             raise ValueError('Invalid harvest catalogue counts: '+path.name)
         if catalogue_kind is not None and catalogue_kind!=indexed:
             raise ValueError('Mixed legacy and indexed harvest catalogues: '+path.name)
@@ -3216,6 +3221,11 @@ def finalize_image(args):
         # NPC Gallery v2.0: every actor the finished maps and the actor table hold, one catalogue row each (seconds)
         from gallery_v2 import catalogue_step
         gallery_report=catalogue_step(boot/'id1',child_ci(args.data_files,'Morrowind.esm'),out,gallery_report,jobs=jobs)
+    # FAUNA-COVERAGE-62: every creature record of the masters is built, or not built for a reason that
+    # config/creature-census.json names (tools/creature_census.py); an unnamed one stops a full build (seconds)
+    from creature_census import stage as creature_census_stage, partial_reason as creature_census_partial
+    creature_census_stage(boot/'id1', args.data_files, out, library=installed_actor_library(args),
+                          partial=creature_census_partial(args), jobs=jobs)
     # Original NPC heads take world, combat and guard models past 2,000 vertices:
     # each gets its byte-matching model-budgets.txt line (NPC-HEAD-DECIMATION-33).
     from audit_gallery_budgets import world_allowances

@@ -708,6 +708,32 @@ void V_CalcPowerupCshift (void)
         cl.cshifts[CSHIFT_POWERUP].percent = 0;
 }
 
+/* MWSCRIPT-GAP-FUNCTIONS-62: FadeIn / FadeOut / FadeTo (OpenMW 0.51 miscextensions.cpp OpFadeIn, OpFadeOut, OpFadeTo;
+ * mwgui/screenfader.cpp: from the fade of the moment to the new one over the given seconds, at once with none). The
+ * screen's black, 0 none .. 1 black, as the last palette shift (CSHIFT_FADE): no pixel work, the palette alone. Kept
+ * outside cl, so a map change between a FadeOut and its FadeIn keeps the screen dark. */
+static float fade_from, fade_to, fade_now, fade_seconds, fade_elapsed;
+void V_ScreenFade (float target, float seconds)
+{
+    if (target < 0) target = 0;
+    if (target > 1) target = 1;
+    fade_from = fade_now; fade_to = target; fade_elapsed = 0;
+    fade_seconds = seconds > 0 ? seconds : 0;
+}
+float V_ScreenFadeLevel (void) {return fade_now;}
+float V_ScreenFadeTarget (void) {return fade_to;}
+static void V_ScreenFadeUpdate (void)
+{
+    if (fade_now != fade_to)
+    {
+        fade_elapsed += host_frametime;
+        fade_now = fade_seconds > 0 && fade_elapsed < fade_seconds ?
+                   fade_from + (fade_to - fade_from) * fade_elapsed / fade_seconds : fade_to;
+    }
+    cl.cshifts[CSHIFT_FADE].destcolor[0] = cl.cshifts[CSHIFT_FADE].destcolor[1] = cl.cshifts[CSHIFT_FADE].destcolor[2] = 0;
+    cl.cshifts[CSHIFT_FADE].percent = (int)(fade_now * 256);
+}
+
 /*
 =============
 V_CalcBlend
@@ -770,6 +796,7 @@ void V_UpdatePalette (void)
     qboolean force;
 
     V_CalcPowerupCshift ();
+    V_ScreenFadeUpdate ();
 
     new = false;
 
@@ -862,6 +889,7 @@ void V_UpdatePalette (void)
      * until the destination is ready. Force a fresh world palette on release. */
     if(AW_LoadingFrozen()){frozen_palette=true;return;}
     V_CalcPowerupCshift ();
+    V_ScreenFadeUpdate ();
 
     new = false;
 

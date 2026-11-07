@@ -21,6 +21,7 @@
 #include "aw_levelup.h"
 #include "aw_combat.h"
 #include "aw_inventory.h"
+#include "aw_effects.h"
 
 #define SKILL_ATHLETICS 8       /* original skill order (aw_character.c skills[]) */
 #define SKILL_ACROBATICS 20
@@ -43,10 +44,13 @@ extern void (*aw_move_after)(float seconds);
 int AW_MoveSuperspeed(void) {return superspeed.value!=0;}
 /* SNEAK-58: the sneak key held (+aw_sneak, Left Ctrl) by a player on foot in the game: not swimming (the original
  * and OpenMW 0.51 stand up in water), not in noclip (there the key is fast flight), not knocked down or dead. */
+/* MWSCRIPT-GAP-FUNCTIONS-62: a script's ForceSneak on the player (OpenMW creaturestats.cpp getStance: the forced flag
+ * or the key); ClearForceSneak clears it (aw_mwhost.c) */
+int aw_move_force_sneak;
 int AW_MoveSneaking(void) {
     edict_t *p=sv.active && svs.clients?svs.clients[0].edict:NULL;
     /* menus clear the held key (cl_input.c IN_AWClearButtons) */
-    return p && (in_sneak.state&1) && p->v.movetype==MOVETYPE_WALK && p->v.waterlevel<2 &&
+    return p && ((in_sneak.state&1) || aw_move_force_sneak) && p->v.movetype==MOVETYPE_WALK && p->v.waterlevel<2 &&
            p->v.health>0 && !AW_CombatPlayerKnocked();
 }
 
@@ -164,6 +168,59 @@ static int water(float forwardmove,float sidemove,float upmove,float *wishspeed)
     *wishspeed=AW_MoveCurrentSpeed(&settings,&in,last_factor,AW_MoveStrafing(y,x))*AW_MOVE_UNIT_SCALE;
     return 1;
 }
+/* Falls (aw_move.h, SCRIPTED-EVENT-FALLING-MAGE-61): the health a landing from HEIGHT original units costs, with the
+ * image's game settings. */
+float AW_MoveFallLoss(float height,float acrobatics,float jump,float fatigue,float fatigue_max,int *knockdown) {
+    aw_move_inputs_t in;float damage,term;
+    load_settings();
+    memset(&in,0,sizeof(in));in.fatigue=fatigue;in.fatigue_max=fatigue_max;
+    term=AW_MoveFatigueTerm(&settings,&in);
+    damage=AW_MoveFallDamage(&settings,height,acrobatics,jump);
+    if(knockdown)*knockdown=AW_MoveFallKnockdown(damage,acrobatics,term);
+    return AW_MoveFallHealthLoss(damage,term);
+}
+/* The player's fall (OpenMW 0.51 mtphysics.cpp and character.cpp, aw_move.h): the drop while in the air adds to the
+ * fall height, which starts again on the ground, in water, while levitating and while any Slowfall is on; the landing
+ * costs the health of AW_MoveFallLoss (not in god mode, not in water). Slowfall slows the fall as OpenMW's physics
+ * step does (the factor once each 1/60 s of falling; the engine's own gravity stays Quake's, PHYSICS-GRAVITY-SCALE-36).
+ * Knockdown on a hard landing: not yet for the player (no knockdown entry outside a fight). */
+static float fall_height,fall_z;static int fall_air;
+static unsigned long falls_hurt;static float fall_last;
+static void player_fall(edict_t *p,float seconds,int ground_now) {
+    float slow,z=p->v.origin[2];
+    int water=p->v.waterlevel>=1,levitate;
+    static void *fall_map;
+    /* a new map, a teleport or a door: no fall from where the player was (sv_maxvelocity 2000 units/s at most) */
+    if(fall_map!=(void *)sv.worldmodel || fabs(z-fall_z)>64+2000*seconds){fall_map=(void *)sv.worldmodel;
+        fall_height=0;fall_air=0;fall_z=z;return;}
+    if(p->v.movetype!=MOVETYPE_WALK || p->v.health<=0){fall_height=0;fall_air=0;fall_z=z;return;}
+    /* the effects are looked up only while any is active (a frame without: no look at the effect list) */
+    slow=AW_EffectsCount()?AW_MoveSlowFallFactor(AW_EffectsMagnitude(AW_ACTOR_PLAYER_REF,AW_EFFECT_SLOWFALL,AW_EFFECT_NO_ARG)):1;
+    levitate=AW_EffectsCount() && AW_EffectsMagnitude(AW_ACTOR_PLAYER_REF,AW_EFFECT_LEVITATE,AW_EFFECT_NO_ARG)>0;
+    if(!ground_now){
+        if(slow<1 && p->v.velocity[2]<0){
+            int steps=(int)(seconds*60+.5f);
+            if(steps<1)steps=1;
+            if(steps>15)steps=15;
+            while(steps-->0)p->v.velocity[2]*=slow;
+        }
+        if(slow<1 || p->v.waterlevel>=2 || levitate)fall_height=0;
+        else if(z<fall_z)fall_height+=(fall_z-z)/AW_MOVE_UNIT_SCALE;
+        fall_air=1;
+    }else{
+        if(fall_air && slow>=1 && !water && z<fall_z)fall_height+=(fall_z-z)/AW_MOVE_UNIT_SCALE;
+        if(fall_air && fall_height>0 && !water && !((int)p->v.flags&FL_GODMODE)){
+            aw_move_inputs_t in;float loss;
+            AW_MovePlayerInputs(&in);
+            loss=AW_MoveFallLoss(fall_height,in.acrobatics,
+                                 AW_EffectsMagnitude(AW_ACTOR_PLAYER_REF,AW_EFFECT_JUMP,AW_EFFECT_NO_ARG),
+                                 in.fatigue,in.fatigue_max,NULL);
+            if(loss>0){falls_hurt++;fall_last=loss;AW_CombatHurtPlayer(loss,"a fall");}
+        }
+        fall_height=0;fall_air=0;
+    }
+    fall_z=z;
+}
 /* After the move: running, swimming and sneaking cost fatigue per second of
  * input (character.cpp), a jump costs its own (physicssystem.cpp). The jump is
  * seen as leaving the ground upwards with the jump button held. */
@@ -171,6 +228,7 @@ static void after(float seconds) {
     edict_t *p=sv_player;aw_move_inputs_t in;float loss;int ground_now,jumped;
     if(!p)return;
     ground_now=((int)p->v.flags&FL_ONGROUND)!=0;
+    player_fall(p,seconds,ground_now);
     jumped=prev_ground && !ground_now && p->v.velocity[2]>0 && p->v.button2;
     prev_ground=ground_now;
     if(AW_MoveSuperspeed() || (last_factor<=0 && !jumped)){last_factor=0;return;}

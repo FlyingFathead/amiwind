@@ -20,7 +20,18 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.47 (21 October 2026)._
+_Last updated with AmiWind v0.0.61 (7 November 2026)._
+
+## Status: 7 November 2026
+
+Persisting in v0.0.61. The bracket fungi on the Bitter Coast tree trunks became a harvest kind of their own
+([HARVEST-TREE-FUNGUS-62](HARVEST-TREE-FUNGUS-62.md)), joining the saved index as a second generation so that earlier
+saves keep their picks; the same way is open for every other kind below. The census asked for under Prevention now
+runs on every build (`tools/harvest_flora_census.py`, `config/harvest-flora.json`): in all three masters, 17,620
+placements of other plants and 4,883 of egg sacks, kollops and spore pods are still scenery under this entry. The ore
+rocks are tracked as [HARVEST-ORE-ROCKS-62](HARVEST-ORE-ROCKS-62.md), the expansion masters' plants as
+[HARVEST-EXPANSION-FLORA-62](HARVEST-EXPANSION-FLORA-62.md). The saved index has 1,200 free facts of 4,096: the
+whole list (about 25,000 placements) needs a larger pick state first.
 
 ## Status: 21 October 2026
 
@@ -93,13 +104,16 @@ Family: Harvestable plants (`harvest`). Harvest catalogues are built by the buil
 - [ENTITY-TRACKER-HARVEST-32](ENTITY-TRACKER-HARVEST-32.md): The entity tracker did not count plants placed by harvest catalogues
 - [HARVEST-BITTERCOAST-29](HARVEST-BITTERCOAST-29.md): Only one of three nearby Bitter Coast mushrooms reportedly usable
 - [HARVEST-CHIM-REGION-LOSS-41](HARVEST-CHIM-REGION-LOSS-41.md): Harvestable plants lost on CHIM region cells: six cells place fewer or different plants than the baseline
+- [HARVEST-EXPANSION-FLORA-62](HARVEST-EXPANSION-FLORA-62.md): The plants placed by the Tribunal and Bloodmoon masters are not harvestable
 - [HARVEST-EXTRA-TOWNS-32](HARVEST-EXTRA-TOWNS-32.md): Opt-in towns get no harvestable mushrooms
 - [HARVEST-GEOMETRY-GATE-32](HARVEST-GEOMETRY-GATE-32.md): The harvest geometry gate was never re-run on the shipped Seyda Neen maps
 - [HARVEST-INTERIOR-PICK-47](HARVEST-INTERIOR-PICK-47.md): Mushrooms inside interiors cannot be picked
+- [HARVEST-ORE-ROCKS-62](HARVEST-ORE-ROCKS-62.md): The ore and gem rocks in the mines cannot be mined
 - [HARVEST-PILOT-SHIPPING-32](HARVEST-PILOT-SHIPPING-32.md): 24 Seyda Neen maps still ship the six-plant pilot harvest catalogue
 - [HARVEST-PLANTS-IN-COLLISION-33](HARVEST-PLANTS-IN-COLLISION-33.md): 51 placed harvest plants have their centre inside converted collision (terrain or a tree's convex root piece)
 - [HARVEST-SEYDA-STALE-32](HARVEST-SEYDA-STALE-32.md): v0.0.31 ships Seyda Neen harvest catalogues made for older map versions
 - [HARVEST-SEYDA-TREE-SPRITE-BLOCKS-PICK-47](HARVEST-SEYDA-TREE-SPRITE-BLOCKS-PICK-47.md): Some mushrooms in the Seyda Neen region cannot be picked: a tree sprite blocks the pick
+- [HARVEST-TREE-FUNGUS-62](HARVEST-TREE-FUNGUS-62.md): The bracket fungi growing from the tree trunks cannot be picked
 - HARVEST-WORLD-29 (no report page): Original mushroom placement, picking and persistent state worldwide
 
 Related bugs in other categories:

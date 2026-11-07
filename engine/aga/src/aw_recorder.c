@@ -31,6 +31,9 @@
 #include "aw_ledger.h"
 #include "aw_world.h"
 #include "aw_tryalloc.h"
+#include "aw_combat.h"
+#include "aw_mwvm.h"
+#include "aw_inventory.h"
 #include <ctype.h>
 #ifdef AMIGA
 #include <proto/dos.h>
@@ -133,11 +136,32 @@ static int ready(void)
     return sv.active && cls.state==ca_connected && cls.signon==SIGNONS && svs.clients && svs.clients[0].edict &&
         !AW_SaveLoadPending() && key_dest==key_game && !AW_LoadingScreen();
 }
+/* GAME-RECORDER-FIGHT-SEED-61: every random stream the game logic draws from follows the recording's seed. At frame 0
+ * each stream is set from it (a fight that was on when the recording started, or that began again in the starting
+ * save's load, re-seeded in the same way for the recording and its replay; a fight that begins later draws its seed
+ * from the recording's own count of fights, never from how many fights this game instance has seen); and the C
+ * library's generator (QuakeC random, monster moves, spells, persuasion, rests, harvest rolls) is set again at the
+ * start of EVERY frame from the seed and the frame number, so a roll drawn on one frame and not on the other (a
+ * wall-clock pacing, an effect) cannot shift the rolls of the frames after it. */
+static uint32_t stream_seed(uint32_t salt)
+{
+    uint32_t h=seed^(salt*2654435761U);
+    h^=h>>16;h*=0x7feb352dU;h^=h>>15;h*=0x846ca68bU;h^=h>>16;
+    return h?h:1;
+}
+static void seed_streams(void)
+{
+    AW_CombatRecorderSeed(stream_seed(0xC0DE0001U));     /* the fight's dice (aw_combat.c) */
+    AW_MwvmSeed(stream_seed(0xC0DE0002U));               /* MWScript Random (aw_mwvm.c) */
+    aw_levelled_seed=stream_seed(0xC0DE0003U)|1U;        /* the levelled container rolls (aw_inventory.c) */
+}
+static void frame_seed(unsigned long n){srand((unsigned)stream_seed((uint32_t)n));}
 static void release(void)
 {
     if(!file)free(stream);      /* a playback's frames lie inside its file buffer */
     free(file);free(checks);free(save);
     stream=file=save=NULL;checks=NULL;used=capacity=cursor=stream_bytes=0;check_count=check_capacity=0;save_bytes=0;
+    if(mode==RECORDING || mode==PLAYING)AW_CombatRecorderSeed(0);   /* the fights' own seeds again */
     cur.open=0;mode=IDLE;
 }
 static void minutes(double t,long *m,long *s){long n=(long)t;*m=n/60;*s=n%60;}
@@ -375,7 +399,7 @@ void AW_RecorderFrame(void)
     if(mode==REC_START || mode==PLAY_START){
         if(!ready())return;
         /* frame 0: the same buttons, keys and random rolls for the recording and its replay */
-        IN_AWClearButtons();Key_ClearStates();srand(seed);
+        IN_AWClearButtons();Key_ClearStates();seed_streams();
         frames=0;game_time=0;next_check=0;cur.open=0;
         mode=mode==REC_START?RECORDING:PLAYING;
         Con_Printf("Recorder: %s from frame 0 in %s.\n",mode==RECORDING?"recording":"playing back",AW_SceneName());
@@ -390,12 +414,14 @@ void AW_RecorderFrame(void)
         dt=(unsigned)(host_frametime*FRAME_UNIT+0.5);if(dt<1)dt=1;if(dt>65535)dt=65535;
         host_frametime=dt/FRAME_UNIT;game_time+=host_frametime;
         memset(&cur,0,sizeof(cur));cur.open=1;cur.dt=dt;
+        frame_seed(frames);       /* this frame's rolls: from the seed and its number */
         return;
     }
     while(check_next<check_count && checks[check_next].frame<frames)check_next++;
     if(check_next<check_count && checks[check_next].frame==frames)compare(check_next++);
     if(frames>=frame_count){play_end();return;}
     if(!read_frame()){Con_Printf("Recorder: frame %lu of the recording is damaged.\n",frames);play_end();return;}
+    frame_seed(frames);           /* the same rolls as the recorded frame */
     host_frametime=cur.dt/FRAME_UNIT;game_time+=host_frametime;frames++;
 }
 void AW_RecorderInput(void)
@@ -407,14 +433,21 @@ void AW_RecorderInput(void)
     injecting=0;
     if(cur.line)Cbuf_AddText(line);
 }
+/* GAME-RECORDER-HOTKEY-DIALOGUE-61: while armed or running, Ctrl+R is the recorder's in every key destination (play,
+ * a window such as the dialogue with its Find field, the menu, the console): it never reaches the window under it.
+ * A recording starts only in play (its starting save loads at once, which a window open over the game would not
+ * survive); in a window Ctrl+R says so and is still taken. Stopping works everywhere. */
 int AW_RecorderKey(int key,int down)
 {
     if(injecting)return 0;
     if(key==K_CTRL)real_ctrl=down;
     if(!armed && mode==IDLE)return 0;
-    if(down && (key=='r' || key=='R') && real_ctrl && (key_dest==key_game || mode==PLAYING)){
+    if(down && (key=='r' || key=='R') && real_ctrl){
         taken_r=1;
-        if(mode==IDLE)record_start();
+        if(mode==IDLE){
+            if(key_dest==key_game)record_start();
+            else{Con_Printf("Recorder: close the window (or the console) first; Ctrl+R records from play.\n");say("Ctrl+R: close the window first",5);}
+        }
         else if(mode==REC_START || mode==RECORDING)record_stop("Ctrl+R");
         else{Con_Printf("Recorder: playback stopped with Ctrl+R.\n");play_end();}
         return 1;
@@ -454,26 +487,46 @@ void AW_RecorderMove(usercmd_t *cmd)
     cmd->forwardmove=cur.move[0];cmd->sidemove=cur.move[1];cmd->upmove=cur.move[2];
     for(i=0;i<3;i++)cl.viewangles[i]=angle_value(cur.angle[i],i==YAW);
 }
-/* the version line while armed or running (10 pixels), and the saved file or the result for a few seconds (10 more) */
+/* the characters one line holds on this screen (8 pixels each, 4 of margin either side) */
+static int line_chars(void){int n=((int)vid.width-8)/8;return n<1?1:n>95?95:n;}
+/* the message's lines: a message wider than the screen goes on two (GAME-RECORDER-FIGHT-SEED-61 side finding: the
+ * divergence line ran past the right edge and its end was drawn over its own start, one row lower) */
+static int message_lines(void)
+{
+    if(!(realtime<message_until && message[0]))return 0;
+    return (int)strlen(message)>line_chars()?2:1;
+}
+/* the version line while armed or running (10 pixels), and the saved file or the result for a few seconds (10 or 20 more) */
 int AW_RecorderLineShown(void)
 {
     if(key_dest==key_console)return 0;
-    return (mode!=IDLE || armed?10:0)+(realtime<message_until && message[0]?10:0);
+    return (mode!=IDLE || armed?10:0)+10*message_lines();
+}
+/* one line of at most line_chars() characters, never past the screen's right edge */
+static void draw_line(int y,const char *s)
+{
+    char text[96];int n=line_chars(),w;
+    strncpy(text,s,sizeof(text)-1);text[sizeof(text)-1]=0;
+    if((int)strlen(text)>n)text[n]=0;
+    w=(int)strlen(text)*8+8;if(w>(int)vid.width)w=vid.width;
+    Draw_Fill(0,y,w,10,255);Draw_String(4,y+1,text);
 }
 void AW_RecorderDraw(void)
 {
-    char text[96];int y=0,w;
+    char text[96];int y=0,n,lines,cut;
     if(!vid.buffer || !AW_RecorderLineShown())return;
     if(mode!=IDLE)snprintf(text,sizeof(text),"AmiWind v" AMIWIND_VERSION "%s",AW_RecorderSuffix());
     else if(armed)snprintf(text,sizeof(text),"AmiWind v" AMIWIND_VERSION " - Ctrl+R: record");
     else text[0]=0;
-    if(text[0]){
-        w=(int)strlen(text)*8+8;if(w>(int)vid.width)w=vid.width;
-        Draw_Fill(0,0,w,10,255);Draw_String(4,1,text);y=10;
-    }
-    if(realtime<message_until && message[0]){
-        w=(int)strlen(message)*8+8;if(w>(int)vid.width)w=vid.width;
-        Draw_Fill(0,y,w,10,255);Draw_String(4,y+1,message);
+    if(text[0]){draw_line(0,text);y=10;}
+    if((lines=message_lines())==1)draw_line(y,message);
+    else if(lines==2){
+        /* the break at the last space that fits */
+        n=line_chars();
+        for(cut=n;cut>0 && message[cut]!=' ';cut--);
+        if(cut<=0)cut=n;
+        memcpy(text,message,cut);text[cut]=0;draw_line(y,text);
+        draw_line(y+10,message+cut+(message[cut]==' '));
     }
     scr_copyeverything=1;
 }

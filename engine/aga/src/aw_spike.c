@@ -73,6 +73,8 @@ static int WaitText (char *out, int size, const double *t)
 }
 
 unsigned long aw_file_finds;	/* every file looked up by name since the start (aw_view.c: what an assembly read) */
+unsigned long aw_file_reads;	/* every file read since the start (BENCH-RESULT-FILE-62) */
+double aw_disk_total;			/* the disk wait of every finished frame since the start (BENCH-RESULT-FILE-62) */
 void AW_SpikeFile (const char *name, int found)
 {
 	int i;
@@ -104,6 +106,7 @@ void AW_SpikeFile (const char *name, int found)
 
 void AW_SpikeFileRead (long bytes)
 {
+	aw_file_reads++;
 	fw.reads++;
 	if (bytes > 0)
 		fw.bytes += (unsigned long)bytes;
@@ -160,6 +163,7 @@ void AW_SpikeFrame (void)
 		wait_frames++;
 		wait_frames_time += dt;
 	}
+	aw_disk_total += aw_wait_time[AW_WAIT_DISK];
 	memset (aw_wait_time, 0, sizeof(aw_wait_time));
 	aw_disk_depth = 0;		/* never inside a file call here; a Sys_Error longjmp out of one is forgotten */
 	/* ARRIVAL-LONG-FRAME-DEV6-59: the frame's file work, always */

@@ -325,6 +325,10 @@ int AW_DialWindowOpen(struct edict_s *e,const char *greeting,int talked);
 void AW_DialWindowReadCache(int on);   /* dbg npcs talkcache on|off: the conversation's block cache (default on) */
 /* dbg npcs talk [ID]: Talk with the nearest NPC that can be talked to (or record ID), the player turned to it. */
 void AW_DialWindowTalk(const char *id);
+/* dbg mwscript result TOPIC NPC [N] (MWSCRIPT-PLAYER-CONTROL-62's test aid): the result script of the answer NPC (a
+ * loaded actor's record id) gives on TOPIC now (N 0), or of its N-th answer on it (from 1, conditions not tested), run
+ * as the window runs it but without opening the window. 1 when a result ran. */
+int AW_DialWindowRunResult(const char *topic,const char *npc,int nth);
 /* aw_mwhost.c: a speaker's disposition facts from the actor record, the character and the player's standing */
 void AW_MwscriptDispositionFacts(const char *record,unsigned long reference,int base,const char *faction,
                                  aw_dial_facts_t *f);

@@ -42,6 +42,29 @@ class Rules(unittest.TestCase):
         for name in ('aw_halloween_rules.c', 'aw_halloween.c'):
             self.assertNotRegex((SRC / name).read_text(encoding='utf-8'), r'[^_A-Za-z](sin|cos|tan|atan2|pow|exp)\(')
 
+    def test_bench_result_file_written_once_after_the_run(self):
+        # BENCH-RESULT-FILE-62: the result goes into bench/halloween-<build>-<nnn>.txt once, after the 600th frame;
+        # during the run each frame stores its time and its disk wait only, nothing is written
+        engine = (SRC / 'aw_halloween.c').read_text(encoding='utf-8')
+        tick = engine[engine.index('void AW_HalloweenTick(void) {'):]
+        tick = tick[:tick.index('\n}\n')]
+        self.assertIn('bench_disk[hw.frames-1]=(float)(disk-hw.disk_last);', tick)
+        self.assertIn('if(hw.frames>=AW_HALLOWEEN_BENCH_FRAMES){bench_result();stop(1);return;}', tick)
+        for call in ('fopen', 'fputs', 'put_line', 'bench_write'):
+            self.assertNotIn(call, tick)
+        result = engine[engine.index('static void bench_result(void) {'):]
+        result = result[:result.index('\n}\n')]
+        self.assertEqual(result.count('bench_write('), 1)
+        self.assertIn('AW_HalloweenBenchSplit(bench_times,bench_disk,hw.frames,&s);', result)
+        # the disk wait comes from the frame wait counters (aw_spike.c), a running total
+        spike = (SRC / 'aw_spike.c').read_text(encoding='utf-8')
+        self.assertIn('aw_disk_total += aw_wait_time[AW_WAIT_DISK];', spike)
+        self.assertIn('return aw_disk_total+aw_wait_time[AW_WAIT_DISK];', engine)
+        # the console shows the same split and the file's name
+        for line in ('HALLOWEEN BENCH drawing: avg %.1f fps', 'HALLOWEEN BENCH disk: %d frames waited',
+                     'HALLOWEEN BENCH file: '):
+            self.assertIn(line, result)
+
     def test_default_beat_is_the_same_number_in_the_builder_and_the_engine(self):
         header = (SRC / 'aw_halloween.h').read_text(encoding='utf-8')
         self.assertIn('#define AW_HALLOWEEN_BPM10\t\t%d' % round(hc.DEFAULT_BPM * 10), header)

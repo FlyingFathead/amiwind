@@ -424,7 +424,7 @@ void Con_Printf (char *fmt, ...)
 	if (con_debuglog)
 		Con_DebugLog(va("%s/qconsole.log",com_gamedir), "%s", msg);
 	else if (AW_RemoteLogging ())
-		Con_DebugLog((char *)AW_RemoteConsoleLog (), "%s", msg);
+		AW_RemoteLog (msg);	// collected, one append twice a second (SESSION-STALL-AFTER-LONG-FRAME-62)
 
 	if (!con_initialized)
 		return;

@@ -2,7 +2,7 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 32 times; something has to be done
+## PERSISTING: reported 34 times; something has to be done
 
 - Reported with v0.0.46 at 2026-10-20 20:09 +0300: Listed under Known in this build in the v0.0.46 release notes (still open at the release).
 - Reported with v0.0.53-dev2 at 2026-10-26 (time not recorded): 19:14 UTC door sample: the Yassu Mine room load (ri9f4c8ccd45) stopped after its BSP while a gate ran its emulator; the next try loaded in 7.6 s
@@ -36,6 +36,8 @@
 - Reported with v0.0.59-dev6 at 2026-11-03 18:36 +0200: Not this stall: the dev6 Khuul hop stop (3 of 3 on IDE) was Kickstart's read error requester on AW_WORLD0 block 2480045. On the IDE port the drive is read as whole 16x63 cylinders and the drive ended 144 sectors short; the dev5 image fails the same on IDE, both pass on the hard-file device. Fixed in the image step (drives padded to whole IDE cylinders, ad3c345e, gate 6660); hops and Khuul repro pass on a padded dev6 copy.
 - Reported with v0.0.60 at 2026-11-05 05:49 +0200: Candidate cause under investigation, not confirmed: FS-UAE 3.1.66 updates a shared interrupt-request word without atomic operations, so a finished hard-file request can lose its signal under host load. Checks next: source, a capture at a stall, an atomic emulator build A/B, the Pi 4B. See SMOKE-STALL-LABEL-INFERRED-60.
 - Reported with v0.0.61-dev1 at 2026-11-05 23:16 +0200: Delivered image (run 2026_11_05_v0.0.61-dev1_full-v0.0.61-dev1_374d59b), FS-UAE 3.1.66 at 32 MB Fast, JIT, disks on IDE, a busy host: dbg scene seyda after a quickload in Arrilles Tradehouse stopped with the game clock frozen; the stall check found 5 of 5 program counter samples in exec idle, the game waiting on SIGF_DOS, no request holder found. 5 earlier sessions of the same image the same evening passed their Seyda Neen loads.
+- Reported with v0.0.61 at 2026-11-07 03:39 +0200: Release image: a coordinate teleport from Seyda Neen to Ebonheart about 60 s after arrival stopped the game: the clock stood still, the processor idle and the game waiting on a file request no handler held. The emulator was not under load at the time. The same teleport worked in the session before and in the rerun.
+- Reported with v0.0.61 at 2026-11-07 05:21 +0200: The v0.0.61 release image on the emulator (32 MB Fast, JIT, busy host): the second load of Seyda Neen at the start of a scripted session stopped at the second sign-on step and stayed on the Loading screen; the same script prefix loaded normally in the session before.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -64,7 +66,7 @@ _Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 32 times; something has to be done](#persisting-reported-32-times-something-has-to-be-done)
+- [PERSISTING: reported 34 times; something has to be done](#persisting-reported-34-times-something-has-to-be-done)
 - [Symptom](#symptom)
 - [Where](#where)
 - [How it happened](#how-it-happened)
@@ -402,6 +404,7 @@ Related bugs in other categories:
 - [CONTAINER-STRIP-TAKE-STALL-59](CONTAINER-STRIP-TAKE-STALL-59.md): A take or put in the container strip can hold the game for seconds
 - [HANG-IDLE-DUSK-35](HANG-IDLE-DUSK-35.md): The game freezes with the music looping after the player is left idle for a few minutes outdoors, seen around sundown
 - IMAGE-IDE-CYLINDER-TAIL-59 (no report page): On the emulated A1200 IDE port the last 144 sectors of the world partition AW_WORLD0 were unreadable, so loading Khuul stopped the game
+- [SESSION-STALL-AFTER-LONG-FRAME-62](SESSION-STALL-AFTER-LONG-FRAME-62.md): The game stops with its clock frozen right after a frame of several seconds spent on console output or file reads, in three of ten scripted Seyda Neen sessions
 - [SEYDA-LOAD-HANG-30](SEYDA-LOAD-HANG-30.md): Rare freeze during a Seyda Neen region load
 - [SMOKE-DELIVERY-OLD-COPY-58](SMOKE-DELIVERY-OLD-COPY-58.md): The playtest delivery ran an old copy of the boot smoke: the v0.0.58 release smoke failed four times on a working image
 

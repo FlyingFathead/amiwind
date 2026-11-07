@@ -44,7 +44,8 @@ PROBE = r'''#!/bin/sh
 # MAP1 (first map, default seyda), REPEAT (how many times the TP map change runs, default 3), AFTER (after it loads: a console command, or key:NAME, e.g. key:Return for a MiniWind), TP (second load as "dbg tp X Y", default Balmora), PLAY (seconds of play, 10).
 # TP "same X Y": a one-area image; teleport inside MAP1 and stay in it (no second map). TP "view X Y Z": noclip and
 # aw_view to a local point of MAP1; the client's view origin must arrive there (wide network coordinates).
-# START enter: press Enter on a MiniWind startup screen and through its quick character pages instead of "map MAP1".
+# START enter: press Enter on a MiniWind startup screen and through its quick character pages instead of "map MAP1";
+# with MAP1 any the map the image starts on is taken, whichever it is.
 # Steps, each judged: boot to the remote-control console; load MAP1 with the music on and play; the music stream
 # reads (aw_music_status reads=); dbg music off (no more reads, the game goes on); a second load (TP) with the music
 # off; dbg music on (reads again). Any emulator exit, stall or missing step fails. Last line: "smoke RESULT ...".
@@ -161,6 +162,16 @@ finish(){ [ -e $R/finished ] && exit 0; : > $R/finished; case "$1" in PASS*) b=$
 play(){ r1=$(st realtime); t1=$(st ticks); s=0
   while [ $s -lt $(($1*K)) ]; do alive || finish "FAIL emulator exited during $2 (map $(st map))"; sleep 1; s=$((s+1)); done
   r2=$(st realtime); t2=$(st ticks); w=$(st screen)
+  # SESSION-STALL-AFTER-LONG-FRAME-62: neither realtime nor ticks moved over the wait. The game writes its state file
+  # between frames and on the long-work heartbeat only, so one frame of several seconds without a heartbeat (file
+  # reads for a script command, a long console print) reads the same as a dead game over a short wait: a session was
+  # called stalled 1 s into such a frame. STALL_GRACE seconds (30) for either to move before any verdict; when one
+  # does, the frame is logged and the checks below judge the new reading.
+  if [ "$t1" = "$t2" ] && { [ -z "$r2" ] || [ "$r1" = "$r2" ]; }; then r3=; t3=; g=0
+    while [ $g -lt $((${STALL_GRACE:-30}*K)) ]; do alive || finish "FAIL emulator exited during $2 (map $(st map))"
+      sleep 1; g=$((g+1)); r3=$(st realtime); t3=$(st ticks)
+      [ -n "$r3" ] && { [ "$r3" != "$r1" ] || [ "$t3" != "$t1" ]; } && break; done
+    [ -n "$r3" ] && { [ "$r3" != "$r1" ] || [ "$t3" != "$t1" ]; } && { log "long frame during $2: realtime $r1 and ticks $t1 stood for $1 s and $g s more, then went on (realtime $r3, ticks $t3)"; r2=$r3; t2=$t3; w=$(st screen); }; fi
   [ -n "$r2" ] && [ "$r1" = "$r2" ] && [ -n "$t2" ] && [ "$t1" != "$t2" ] && [ -n "$w" ] && [ "$w" != game ] &&
     { log "window $w during $2: realtime $r1 -> $r2, ticks $t1 -> $t2 (the engine runs)"; return 0; }
   # ARRIVAL-LONG-FRAME-DEV6-59: realtime standing on the game screen while the ticks move is long work inside one
@@ -218,7 +229,13 @@ remote_up && for i in 1 2 3; do key Escape; sleep $((2*K)); done
 remote_up || finish "FAIL no remote control after boot ($(( $(date +%s) - t0 )) s; the play copy's autoexec turns it on, nothing is typed before it answers)"
 log "boot: remote up after $(( $(date +%s) - t0 )) s"; shot menu
 if [ "${START:-map}" = enter ] || [ "${START:-map}" = auto ]; then  # a MiniWind image starts its own scene; Enter through its quick character pages
-  [ "${START:-map}" = auto ] || key Return; loaded "$MAP1"; i=0  # until the view renders (local origin not 0 0 0), at most 20 pages
+  [ "${START:-map}" = auto ] || key Return
+  # MAP1 any: the map the image starts on, whichever it is (a MiniWind holds one; TEST-HARNESS-MINIWIND-62: a session
+  # that named another map waited for it and stopped on the character name page)
+  if [ "$MAP1" = any ]; then s=0; v=; while [ $s -lt $((150*K)) ]; do alive || finish "FAIL emulator exited loading the image's start map"
+      v=$(st server); [ -n "$v" ] && [ "$v" != none ] && break; sleep 1; s=$((s+1)); done
+    [ -n "$v" ] && [ "$v" != none ] || stall "the image's start map did not load (server $(st server))"; MAP1=$v; log "start map from the game: $MAP1"; fi
+  loaded "$MAP1"; i=0  # until the view renders (local origin not 0 0 0), at most 20 pages
   while [ "${START:-map}" != auto ] && [ $i -lt 20 ] && { [ "$(st map)" = none ] || [ "$(st local)" = "0 0 0" ]; }; do sleep $((2*K)); key Return; i=$((i+1)); done
   sleep $((2*K)); [ "$(st map)" != none ] && [ "$(st local)" != "0 0 0" ] || finish "FAIL $MAP1 runs but the game never started (client map $(st map))"
   log "in game after $i Enter presses: local $(st local)"
@@ -458,7 +475,8 @@ def main(argv=None):
     ap.add_argument('--fast-mb', type=int, default=DEFAULT_FAST_MB, choices=(16, 32, 64, 128, 256, 512, 1024),
                     help='Zorro III Fast RAM in MiB (default 32: the game needs 32 MB of Fast RAM since 27 October '
                     '2026, the maintainer\'s order; 16 only to look at the old baseline; 128 = what a playtest starts with)')
-    ap.add_argument('--map', default='seyda')
+    ap.add_argument('--map', default='seyda', help='the first map; with --start enter, "any" takes the map the image '
+                    'starts on (a MiniWind holds one)')
     ap.add_argument('--tp', default='-21800 -12300',
                     help='second load as dbg tp X Y (default Balmora); "same X Y" for a one-area image: teleport inside --map; '
                          '"view X Y Z": noclip + aw_view to a local point of --map, checked on the client; map:NAME: a second map the image holds')

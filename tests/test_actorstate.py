@@ -66,6 +66,18 @@ def master_bytes():
                       sub('ENAM', struct.pack('<hbbiiiii', 14, -1, -1, 2, 0, 5, 10, 20))))
     out.append(record('SPEL', sub('NAME', 'race power'), sub('SPDT', struct.pack('<3i', 5, 0, 0))))
     out.append(record('SPEL', sub('NAME', 'other spell'), sub('SPDT', struct.pack('<3i', 1, 0, 0))))
+    # RESIST-NORMAL-WEAPONS-61 (v0.0.62): always-active spells carry Resist (98) and Weakness (36) to Normal Weapons:
+    # an ability 100 (the game's "immune to normal weapons"), a disease 20-40 (the middle, 30, counts), and a castable
+    # spell and a power with 98 that must not count until cast
+    out.append(record('SPEL', sub('NAME', 'rat immunity'), sub('SPDT', struct.pack('<3i', 1, 0, 0)),
+                      sub('ENAM', struct.pack('<hbbiiiii', 98, -1, -1, 0, 0, 0, 100, 100))))
+    out.append(record('SPEL', sub('NAME', 'rat pox'), sub('SPDT', struct.pack('<3i', 3, 0, 0)),
+                      sub('ENAM', struct.pack('<hbbiiiii', 36, -1, -1, 0, 0, 0, 20, 40)),
+                      sub('ENAM', struct.pack('<hbbiiiii', 98, -1, -1, 0, 0, 0, 5, 5))))
+    out.append(record('SPEL', sub('NAME', 'rat shield spell'), sub('SPDT', struct.pack('<3i', 0, 5, 0)),
+                      sub('ENAM', struct.pack('<hbbiiiii', 98, -1, -1, 0, 0, 10, 50, 50))))
+    out.append(record('SPEL', sub('NAME', 'rat power'), sub('SPDT', struct.pack('<3i', 5, 0, 0)),
+                      sub('ENAM', struct.pack('<hbbiiiii', 98, -1, -1, 0, 0, 10, 50, 50))))
     # v0.0.61 (PLAYER-CASTING-59): three starting spells (SPDT flags 2; one always succeeds, flag 4; one too dear for
     # any magicka) and two enchantments: a Cast When Strikes one on the sword, an autocalculated Cast When Used one
     out.append(record('SPEL', sub('NAME', 'start fire'), sub('SPDT', struct.pack('<3i', 0, 5, 2)),
@@ -101,7 +113,8 @@ def master_bytes():
     out.append(record('INFO', sub('INAM', '2'), sub('NAME', 'Bye.'), sub('BNAM', 'Goodbye')))
     crea = struct.pack('<24i', 0, 4, *([20] * 8), 30, 0, 60, 10, 40, 5, 15, 1, 3, 2, 4, 0, 0, 0)
     out.append(record('CREA', sub('NAME', 'test_rat'), sub('NPDT', crea), sub('FLAG', struct.pack('<I', 0x48)),
-                      aidt(0, 100, 0, 0), npcs('other spell')))
+                      aidt(0, 100, 0, 0), npcs('other spell'), npcs('rat immunity'), npcs('rat pox'),
+                      npcs('rat shield spell'), npcs('rat power')))
     return b''.join(out)
 
 
@@ -394,6 +407,15 @@ int main(int argc,char **argv){
      P(" start %d %.1f %.1f %d %d %.1f",m,set.magicka_mult,set.chance,set.max,set.skill_min,set.cost_mult);
      for(k=0;k<m;k++)P(" %d:%d",rows[k],AW_ActorSpellFlags(rows[k]));
      P("\n");}
+    /* RESIST-NORMAL-WEAPONS-61 (v0.0.62): the always-active spells' magnitudes: the rat's ability 100 + its disease's
+     * 5 = 105 resist, the disease's weakness 30 (the middle of 20-40), its castable spell and power not counted; the
+     * immunity removed by a script leaves 5; the NPC with no such spell 0 */
+    {aw_actor_t *x;int rat=AW_ActorFind("test_rat"),immunity=atoi(argv[7]);
+     AW_ActorStateImport(NULL,0);x=AW_ActorGet(31337,rat,1);
+     P("passive %.0f %.0f %.0f",AW_ActorPassiveMagnitude(x,98),AW_ActorPassiveMagnitude(x,36),AW_ActorPassiveMagnitude(x,14));
+     AW_ActorRemoveSpell(x,immunity);
+     P(" removed %.0f npc %.0f none %.0f\n",AW_ActorPassiveMagnitude(x,98),
+       AW_ActorPassiveMagnitude(AW_ActorGet(31338,row,1),98),AW_ActorPassiveMagnitude(NULL,98));}
     AW_ActorStateClose();free(file);return 0;
 }
 '''
@@ -416,7 +438,7 @@ class EngineTests(unittest.TestCase):
         assert built.returncode == 0, built.stdout + built.stderr
         t = cls.prog.actors
         args = [str(t.item_index['test_sword']), str(t.item_index['test_ring']), str(t.spell_index['test spell']),
-                str(t.spell_index['other spell']), str(t.spell_index['auto spell'])]
+                str(t.spell_index['other spell']), str(t.spell_index['auto spell']), str(t.spell_index['rat immunity'])]
         r = subprocess.run([str(cls.tmp / 'h'), str(cls.tmp / 'a.awm'), *args], capture_output=True, text=True)
         assert r.returncode == 0, r.stdout + r.stderr
         cls.out = r.stdout.splitlines()
@@ -509,6 +531,12 @@ class EngineTests(unittest.TestCase):
         start = ' '.join('%d:%d' % (t.spell_index[k], f) for k, f in (('start fire', 2), ('start always', 6), ('start pricey', 2)))
         self.assertEqual(self.out[43], 'ench 2 1 1 1 type 1 flags 0 cost 4.0 charge 100.0 n 1 1 1 3 6 item 1 npc 1 1 none 1 '
                                        'flags 0 1 start 3 1.0 50.0 100 70 0.5 ' + start)
+
+    def test_always_active_spells_magnitudes(self):
+        # RESIST-NORMAL-WEAPONS-61 (v0.0.62, OpenMW 0.51 activespells.cpp): abilities, blights, diseases and curses of
+        # the actor's list act always (the ability's 100 + the disease's 5; the disease's weakness 30, the middle of
+        # 20-40); a castable spell and a power only when cast; a removed ability no longer counts; no record, nothing
+        self.assertEqual(self.out[44], 'passive 105 30 0 removed 5 npc 0 none 0')
 
     def test_pool_at_the_games_counts(self):
         # CELL-CHANGES-59 slice 6: 8,192 changed records (the game: 3,437 actor bases, 2,673 NPCs placed), each with an

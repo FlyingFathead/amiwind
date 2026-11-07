@@ -93,6 +93,33 @@ int main(void){
     sv.active=0;aw_world_chim_source=NULL;
     puts("remote console on a CHIM frame map: the GLOBAL line through the shared conversion");
 #endif
+    /* SESSION-STALL-AFTER-LONG-FRAME-62: the console copy collects in memory and reaches console.log in one
+     * append at the poll, on the heartbeat, when the buffer is full and at exit: never one file call per print */
+    {
+        char logp[300];static char big[9000];int i;long size;double t0=realtime;
+        snprintf(logp,sizeof logp,"%sconsole.log",dir);remove(logp);
+        for(i=0;i<300;i++)AW_RemoteLog(i%2?" ":"x");   /* an edict listing's padding, one space a print */
+        AW_RemoteLog("end of listing\n");AW_RemoteLog("");AW_RemoteLog(NULL);
+        assert(!exists(logp));                           /* 302 prints, no file call yet */
+        realtime=t0+.2;AW_RemotePoll();assert(!exists(logp));   /* within the period: still collected */
+        realtime=t0+.6;AW_RemotePoll();
+        f=fopen(logp,"r");n=fread(text,1,sizeof text-1,f);fclose(f);text[n]=0;
+        assert(n==315 && text[0]=='x' && text[1]==' ' && !strcmp(text+300,"end of listing\n"));
+        AW_RemoteLog("busy line\n");AW_RemoteBusy(103.0);   /* the long-work heartbeat sends it too, appended */
+        f=fopen(logp,"r");n=fread(text,1,sizeof text-1,f);fclose(f);text[n]=0;
+        assert(n==325 && !strcmp(text+300,"end of listing\nbusy line\n"));
+        memset(big,'a',8000);big[8000]=0;AW_RemoteLog(big);
+        f=fopen(logp,"rb");fseek(f,0,SEEK_END);size=ftell(f);fclose(f);assert(size==325);   /* fits: kept */
+        memset(big,'b',500);big[500]=0;AW_RemoteLog(big);   /* does not fit: the 8000 go first */
+        f=fopen(logp,"rb");fseek(f,0,SEEK_END);size=ftell(f);fclose(f);assert(size==8325);
+        memset(big,'c',8999);big[8999]=0;AW_RemoteLog(big);  /* larger than the buffer: the 500, then itself */
+        f=fopen(logp,"rb");fseek(f,0,SEEK_END);size=ftell(f);fseek(f,8325,SEEK_SET);
+        assert(size==17824 && fgetc(f)=='b');fseek(f,8825,SEEK_SET);assert(fgetc(f)=='c');fclose(f);
+        AW_RemoteLog("last\n");AW_RemoteLogFlush();AW_RemoteLogFlush();   /* exit's flush; a second one is nothing */
+        f=fopen(logp,"rb");fseek(f,0,SEEK_END);size=ftell(f);fclose(f);assert(size==17829);
+        remove(logp);
+        puts("remote console log: collected, one append a poll, heartbeat, full buffer and exit");
+    }
     remove(state);snprintf(text,sizeof text,"rmdir %s",dir);assert(!system(text));
     puts("remote console: off by default, command file once, state file, period");
     return 0;

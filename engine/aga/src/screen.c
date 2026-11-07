@@ -1064,9 +1064,12 @@ void SCR_UpdateScreen (void)
         if (!vanity)
             AW_UIOuterFrame();
         AW_FpsDraw();			/* dbg fps: the bottom-left corner of the screen, the vanity orbit too */
-        AW_RecorderDraw();		/* the version line with (RECORDING) / (PLAYBACK) at the top (GAME-RECORDER-61) */
         SCR_DrawConsole ();
         M_Draw ();
+        /* the version line with (RECORDING) / (PLAYBACK) at the top (GAME-RECORDER-61), over the windows (the
+         * dialogue, the inventory, the menu), so its state and the saved file's name show while one is open
+         * (GAME-RECORDER-HOTKEY-DIALOGUE-61); not over the console (AW_RecorderLineShown) */
+        AW_RecorderDraw();
         if (over_window && key_dest != key_console) {   /* the messages over the world window (above) */
             /* not hidden by the idle camera's full view: the window is open over it (its HUD is not drawn anyway) */
             if (!AW_PhotoModeActive() || AW_PhotoNoticeShowing())

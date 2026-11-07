@@ -25,8 +25,12 @@ static char saved[2048], output[4096];
 static void AW_HeapAuditPhase(void *unused, const char *name) {
     (void)unused; assert(!strcmp(name,"fatal-exit")); assert(phase==0); phase=1;
 }
+/* SESSION-STALL-AFTER-LONG-FRAME-62: a test session's collected console copy goes out right after the heap note,
+ * before the crash report and any shutdown step */
+static int remote_flushed;
+static void AW_RemoteLogFlush(void) {assert(phase==1 && !remote_flushed);remote_flushed=1;}
 static BPTR Open(const char *name, int access) {
-    assert(phase==1); assert(!strcmp(name,"ERROR.TXT"));
+    assert(phase==1 && remote_flushed==1); assert(!strcmp(name,"ERROR.TXT"));
     if(access==MODE_NEWFILE) return mode==1 ? 0 : 1;
     assert(access==MODE_OLDFILE); cursor=0; return mode==4 ? 0 : 2;
 }
@@ -79,7 +83,7 @@ int main(void) {
     char cause[200]; int i;
     for(i=0;i<150;i++)cause[i]=(char)('a'+i%26);cause[150]=0;
     for(mode=0;mode<10;mode++) {
-        phase=exit_status=close_count=read_count=guard_removed=0; log_flushes=log_closes=0; output[0]=0;
+        phase=exit_status=close_count=read_count=guard_removed=remote_flushed=0; log_flushes=log_closes=0; output[0]=0;
         aw_heap_allocation=&phase; aw_heap_allocation_size=16;
         quakeparms.membase=aw_heap_allocation;
         if(!setjmp(terminated)) Sys_Error("fixture error: %s",cause);
