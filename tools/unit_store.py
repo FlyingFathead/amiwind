@@ -26,7 +26,25 @@ LEGACY_SOURCES = {
     # they run) has the bake-reach digest below.
     ('player-view', '1eeb4b9a9b78f2df602772279ca9a9d280b94bc7f116ca6c518dbbea6a2a78ae'):
         ('9d09ca9cba358b6505d72a56ef908b7913d7002a2703693fe106326711a70d75',),
+    # tools/prepare_area.py and tools/chim_room_batches.py at fe90f8ed (the v0.0.62 release build, whose residents and
+    # rooms the v0.0.62 release runs reused): the resident and room unit caches keyed every unit on the whole file, so
+    # the v0.0.63 edits elsewhere in prepare_area.py re-keyed all of them (UNIT-KEY-WHOLE-FILE-63). Bake reaches:
+    # resident-bake = build_resident + publish_resident, interior-room = build_room (prepare_area.py),
+    # interior-room-chim = build_shell (chim_room_batches.py).
+    ('resident-bake', '4318d4be491911a8a2867bb8873f23a052a1616df08f4151d7344705a13ec576'):
+        ('9e0e915fef811882a5c341a96549762b7fb07ea768a876fa0f0c9411ce8d1786',),
+    ('interior-room', '4a4ff8d268a2b8030c1bd8b294aa61c888f734bf66edbbb91e040b370a2c45a2'):
+        ('9e0e915fef811882a5c341a96549762b7fb07ea768a876fa0f0c9411ce8d1786',),
+    ('interior-room-chim', '02b87fd3252e52456b3e2688fcc2ce3172853ef735ae43d159ef43f1a9983d49'):
+        ('115d5e69098e1c5ffd0cf15e11c4431f326b8767ea01d5f650b0885fa1604b0a',),
 }
+
+# AMIWIND_* settings that say where a stage does its work, never what a unit is made of: left out of a unit key
+# (as pass_cache.environment leaves out the run's scratch folder). AMIWIND_RESIDENT_WORK (prepare_area
+# resident_work_folder) picks the folder the residents are baked in.
+WORK_PLACE_SETTINGS = ('AMIWIND_RESIDENT_WORK',)
+# (The list of unit caches still keyed on whole files lives in tests/test_unit_store.py, not here: file names written
+# in this module would count as files its users' code reads, and so as part of their keys.)
 
 
 def legacy_sources(name, sources):
@@ -34,15 +52,19 @@ def legacy_sources(name, sources):
     return tuple(LEGACY_SOURCES.get((name, sources), ()))
 
 
-def bake_keyed_cache(name, options, sources, previous, files, covered=()):
+def bake_keyed_cache(name, options, sources, previous, files, covered=(), neutral=()):
     """The unit cache NAME keyed on SOURCES (the digest of what its workers run), or None when the cache is off.
-    OPTIONS as UnitCache.open makes them: the caller's options with the AMIWIND_* settings that FILES read; PREVIOUS:
-    older key forms (pass_cache.previous_digests) with the LEGACY_SOURCES keys added."""
+    OPTIONS as UnitCache.open makes them: the caller's options with the AMIWIND_* settings that FILES read, less the
+    NEUTRAL ones (WORK_PLACE_SETTINGS); PREVIOUS: older key forms (pass_cache.previous_digests) with the
+    LEGACY_SOURCES keys added."""
     import pass_cache
     root = pass_cache.folder()
     if root is None:
         return None
-    return pass_cache.UnitCache(name, dict(options, environment=pass_cache.environment(*files)), sources, root,
+    environment = pass_cache.environment(*files)
+    for setting in neutral:
+        environment.pop(setting, None)
+    return pass_cache.UnitCache(name, dict(options, environment=environment), sources, root,
                                 previous=tuple(previous) + legacy_sources(name, sources), covered=covered)
 
 
@@ -62,6 +84,23 @@ def timed(work):
     except Exception as error:   # collected: run_each names every failed unit after keeping the rest
         result = Failed('%s: %s' % (type(error).__name__, error))
     return index, round(time.monotonic() - began, 3), result
+
+
+def timed_raising(call, work):
+    """Pool worker: WORK (index, task) -> (index, seconds, call(task)); an error is raised as call raised it (the CHIM
+    units: chim.units.run_units stores every unit that came back before it, then the map ends with that error)."""
+    index, task = work
+    began = time.monotonic()
+    value = call(task)
+    return index, round(time.monotonic() - began, 3), value
+
+
+def completed_units(call, items, jobs):
+    """(index, seconds, call(task)) for ITEMS [(index, task)] as each comes back from the worker pool
+    (build_parallel.completed_map); the first error ends the map, after every unit handed back before it."""
+    from functools import partial
+    from build_parallel import completed_map
+    return completed_map(partial(timed_raising, call), items, jobs)
 
 
 def progress_line(label, done, total, name, seconds, failed=False):

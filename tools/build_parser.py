@@ -212,6 +212,12 @@ def add_media_catalogue_group(p):
                         'its mover model) is stored once in progs/skins/ and the models point to it '
                         '(tools/payload_share.py, IMAGE-ACTOR-SKIN-REPEATS-46, docs/PAYLOAD_SHARING.md; about 65 MB '
                         'less on the v0.0.46 payload); off keeps a skin in every model (the method before)')
+    p.add_argument('--shared-shapes', choices=('on', 'off'), default='on',
+                   help='on (the default since v0.0.63): the texture coordinates and triangles that several actor '
+                        'models repeat (progs/*.mdl) are stored once in progs/shapes/ and the models point to them; '
+                        'the engine rebuilds each model before decoding it, byte for byte '
+                        '(tools/payload_share.py, IMAGE-BIGGER-THAN-ORIGINAL-62, docs/PAYLOAD_SHARING.md; about '
+                        '78 MB less on the v0.0.62 payload); off keeps both blocks in every model (the method before)')
     p.add_argument('--night-lamp-lightmaps', choices=('on', 'off'), default='off',
                    help='EXPERIMENTAL (off by default): legacy Balmora cores get baked night-lamp lightmaps on '
                         'lightstyle 32 (prototype, tools/lamp_lightmaps.py; docs/EXPERIMENTAL_FLAGS.md); off keeps '

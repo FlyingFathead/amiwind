@@ -1812,7 +1812,10 @@ ACTOR_LOGIC_LINES = (b'// Compiled game logic (default on since v0.0.57): the ga
                      b'// Wander packages. "dbg mwscript off" and "chim actors ambient off" in the console switch them off.\n'
                      b'aw_mwscript 1\n'
                      b'chim actors ambient on\naw_player_cache 1\naw_ambient_areas 1\naw_npc_tables_areas 1\n'
-                     b'aw_player_stances 1\naw_fp_sway 1\naw_fp_view 1\nchim actors ambient settle on\n')
+                     b'aw_player_stances 1\naw_fp_sway 1\naw_fp_view 1\nchim actors ambient settle on\n'
+                     b'// Walking creatures without a baked ground point drop onto what is under them (OpenMW\'s\n'
+                     b'// placement rule, CREATURE-FLOATING-62); off = the 32-unit snap of every actor.\n'
+                     b'chim actors ambient drop on\n')
 
 
 CHIM_CROSSING_LINES = (b'// Cell crossings (builder option --chim-crossing 0|1, default 1 since v0.0.47): type 1, the\n'
@@ -3394,12 +3397,13 @@ def finalize_image(args):
                                                for kind, row in legacy_summary['payload_by_kind'].items()), flush=True)
     if legacy_summary['shipped']:
         raise ValueError('Legacy maps of CHIM cells in the payload: ' + ', '.join(legacy_summary['shipped'][:8]))
-    # Repeated content stored once (tools/payload_share.py; both EXPERIMENTAL, off by default): the last payload pass,
+    # Repeated content stored once (tools/payload_share.py; build.py turns each on by default): the last payload pass,
     # after every check above that reads the payload by name or size (heap, budgets, legacy maps). The layout plan of
     # the payload preflight allows for the bytes it removes from DH0 (layout_plan.require_follows shrink).
     from payload_share import share_payload
     payload_sharing = share_payload(boot/'id1', file_aliases=getattr(args, 'file_aliases', False),
-                                    shared_skins=getattr(args, 'shared_skins', False), jobs=jobs,
+                                    shared_skins=getattr(args, 'shared_skins', False),
+                                    shared_shapes=getattr(args, 'shared_shapes', False), jobs=jobs,
                                     log=lambda line: print(line, flush=True))
     suffix = '' if actor_acceptance['production_gate_passed'] and budget_decision['production_memory_gate_passed'] else '-private-test'
     if suffix:
@@ -3708,6 +3712,9 @@ def main():
     i.add_argument('--shared-skins',action='store_true',
                    help='build.py --shared-skins on (its default since v0.0.47): store a skin several actor models repeat once in '
                         'progs/skins/ (tools/payload_share.py, IMAGE-ACTOR-SKIN-REPEATS-46)')
+    i.add_argument('--shared-shapes',action='store_true',
+                   help='build.py --shared-shapes on (its default since v0.0.63): store the texture coordinates and triangles '
+                        'several actor models repeat once in progs/shapes/ (tools/payload_share.py, IMAGE-BIGGER-THAN-ORIGINAL-62)')
     i.add_argument('--media-catalogue',action='store_true',
                    help='DEBUGGING ONLY (build.py --media-catalogue on): also put the media catalogue (the media coverage '
                         'report, about 64 MB) on the boot disk as id1/media/catalogue.json. Nothing in the game reads it; '

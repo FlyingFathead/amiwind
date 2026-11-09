@@ -56,6 +56,12 @@ static hd_door_t placed[HD_PLACED];static int placed_count,moving,overflow;
 typedef struct {unsigned ref;unsigned char lock,flags;unsigned short key;} hd_lock_t;   /* key: pool offset + 1, 0 none */
 static hd_lock_t locks[HD_LOCKS];static int lock_count,key_pool_used;static char key_pool[HD_KEY_POOL];
 static char key_used[48];   /* GMST sKeyUsed */
+/* WORLD-BUTTONS-62: the M rows, references ascending; pid: its CHIM placement once loaded (0 none); shift: how far
+ * the scripts moved it (map units); since: travel since its efrags were last relinked. 128 x 24 = 3,072 bytes. */
+#define HD_MOVERS 128
+typedef struct {unsigned ref,pid;vec3_t shift;float since;} hd_mover_t;
+static hd_mover_t movers[HD_MOVERS];static int mover_count,mover_pending;
+static void movers_pending(void);
 /* dbg doorlocks on|off (the coordinator, 2026-10-27: on by default, a debug switch until lockpicks and the Open
  * spell exist; no cvar: the resident registry is full). Not saved. */
 static int door_locks=1;
@@ -121,9 +127,14 @@ static void load(void){
         }else if(line[0]=='U' && line[1]==' '){
             n=(int)strcspn(line+2,"\r\n");if(n>(int)sizeof(key_used)-1)n=sizeof(key_used)-1;
             memcpy(key_used,line+2,n);key_used[n]=0;
+        }else if(line[0]=='M' && line[1]==' '){
+            /* a scripted mover (WORLD-BUTTONS-62): left out when out of order or there is no room */
+            if(mover_count>=HD_MOVERS || Q_sscanf(line+2,"%u %c",&ref,&extra)!=1 ||
+               (mover_count && ref<=movers[mover_count-1].ref))continue;
+            memset(&movers[mover_count],0,sizeof(movers[0]));movers[mover_count++].ref=ref;
         }else{bad=1;break;}
     }
-    if(bad){row_count=base_count=sound_count=lock_count=key_pool_used=0;locked_sound=-1;key_used[0]=0;}
+    if(bad){row_count=base_count=sound_count=lock_count=key_pool_used=mover_count=0;locked_sound=-1;key_used[0]=0;}
     fclose(f);
 }
 int AW_HingedDoorRow(unsigned reference){
@@ -259,6 +270,7 @@ static int overlaps(hd_door_t *d){
 static int is_player(int n){return n>0 && svs.clients && svs.clients[0].edict && EDICT_NUM(n)==svs.clients[0].edict;}
 void AW_HingedDoorTick(double seconds){
     int i,who;hd_door_t *d;float next,old;
+    if(mover_pending)movers_pending();   /* WORLD-BUTTONS-62: a moved mover loaded again goes where it was left */
     if(!moving || !sv.active)return;
     if(seconds>.1)seconds=.1;
     if(seconds<=0)return;
@@ -360,7 +372,76 @@ static hd_door_t *add(unsigned reference,int row,const float *origin,float radiu
     d->ref=reference;d->row=row;VectorCopy(origin,d->origin);d->radius=radius;d->closed=yaw;
     return d;
 }
-void AW_HingedDoorMapBegin(void){load();placed_count=moving=overflow=0;}
+void AW_HingedDoorMapBegin(void){
+    int i;
+    load();placed_count=moving=overflow=0;
+    for(i=0;i<mover_count;i++){movers[i].pid=0;movers[i].since=0;}   /* placed again as the new map's chunks load */
+}
+/* ---- Scripted movers (WORLD-BUTTONS-62). The Ghostgate's switches (scripts GG_OpenGate1/2) raise their
+ * portcullis with "ex_gg_portcullis_01"->MoveWorld z 70 for three seconds and put it back with SetAtStart; in the
+ * CHIM world the portcullis is a placement without an entity, so the script's move had nothing to move. The rule
+ * (OpenMW 0.51 transformationextensions.cpp OpMoveWorld, OpSetAtStart): the reference itself moves, its drawing and
+ * collision with it, and SetAtStart puts it back at its placed position. Cost: a binary search of at most 128 rows
+ * per placement loaded (only while the table has rows), and per moving frame one pass over the loaded chunks'
+ * records of that pid; its efrags are relinked every AW_MOVER_RELINK units of travel and at the end. */
+static int mover_find(unsigned reference){
+    int low=0,high,mid;
+    load();high=mover_count-1;
+    while(low<=high){
+        mid=(low+high)/2;
+        if(movers[mid].ref==reference)return mid;
+        if(movers[mid].ref<reference)low=mid+1;else high=mid-1;
+    }
+    return -1;
+}
+int AW_MoverCount(void){load();return mover_count;}
+int AW_MoverMoved(void){
+    int i,n=0;
+    for(i=0;i<mover_count;i++)if(movers[i].shift[0] || movers[i].shift[1] || movers[i].shift[2])n++;
+    return n;
+}
+/* The frames' door hook for a mover (through AW_HingedDoorPlacement): 1, the placement keeps its pid; one that has
+ * moved is put where the scripts left it on the next tick (the record is still being read now). */
+int AW_MoverPlacement(unsigned pid,unsigned reference){
+    int i;
+    if(!mover_count && loaded)return 0;
+    if((i=mover_find(reference))<0)return 0;
+    movers[i].pid=pid;
+    if(movers[i].shift[0] || movers[i].shift[1] || movers[i].shift[2]){movers[i].since=-1;mover_pending=1;}
+    return 1;
+}
+static void mover_place(hd_mover_t *m,const float *d,int relink){
+    if(m->pid && aw_chim_place_shift)aw_chim_place_shift(m->pid,d,relink);
+}
+static void movers_pending(void){
+    int i;
+    mover_pending=0;
+    for(i=0;i<mover_count;i++)if(movers[i].since<0){movers[i].since=0;mover_place(&movers[i],movers[i].shift,1);}
+}
+int AW_MoverShift(unsigned reference,const float *d){
+    int i,relink;hd_mover_t *m;
+    if((i=mover_find(reference))<0)return 0;
+    m=&movers[i];
+    VectorAdd(m->shift,d,m->shift);
+    if(m->since<0)return 1;   /* loaded, not yet placed: the pending pass puts it at the whole shift */
+    m->since+=(float)sqrt(d[0]*d[0]+d[1]*d[1]+d[2]*d[2]);
+    relink=m->since>=AW_MOVER_RELINK;if(relink)m->since=0;
+    mover_place(m,d,relink);
+    return 1;
+}
+int AW_MoverAtStart(unsigned reference){
+    int i;hd_mover_t *m;vec3_t back;
+    if((i=mover_find(reference))<0)return 0;
+    m=&movers[i];
+    VectorScale(m->shift,-1,back);m->shift[0]=m->shift[1]=m->shift[2]=0;
+    if(m->since>=0 && (back[0] || back[1] || back[2]))mover_place(m,back,1);   /* a pending one is still at its start */
+    m->since=0;
+    return 1;
+}
+void AW_MoverReset(void){
+    int i;
+    for(i=0;i<mover_count;i++)AW_MoverAtStart(movers[i].ref);
+}
 int AW_HingedDoorProtect(edict_t *e){
     eval_t *v=GetEdictFieldValue(e,"aw_ref");
     return v && v->_float>0 && door_row((unsigned)v->_float)>=0;
@@ -412,7 +493,7 @@ void AW_HingedDoorSpawn(void){
 }
 int AW_HingedDoorPlacement(unsigned pid,unsigned reference,const float *origin,float radius,float *yaw){
     int i,row;hd_door_t *d;
-    if((row=door_row(reference))<0)return 0;
+    if((row=door_row(reference))<0)return AW_MoverPlacement(pid,reference);   /* WORLD-BUTTONS-62 */
     for(i=0;i<placed_count;i++){
         d=&placed[i];
         if(!d->edict && d->pid==pid){*yaw=d->closed-d->amount;return 1;}

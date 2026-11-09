@@ -20,7 +20,7 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.62 (8 November 2026)._
+_Last updated with AmiWind v0.0.62 (9 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -39,7 +39,10 @@ _Last updated with AmiWind v0.0.62 (8 November 2026)._
 
 ## Status: 8 November 2026
 
-Fixed in source on the v0.0.63 line; to be confirmed by the next full build.
+Fixed in source on the v0.0.63 line for the player view, the player parts and the first-person parts; to be
+confirmed by the next full build. Still open: the CHIM units (`tools/chim/units.py` `run_units`) store their units
+only after their whole map; changing that map changes the keys of the chim and chim-interiors stages once (the unit
+keys stay equal), so that change waits for a decision.
 
 ## Symptom
 
@@ -73,6 +76,12 @@ finished.
   whole files, so a change to how units are scheduled or stored keeps every stored unit.
 - Backwards compatible: while the bake code is unchanged, a unit missing under the new key is looked up under the
   whole-file key the v0.0.62 release build stored it with, and stored under the new key (`unit_store.LEGACY_SOURCES`).
+- The player parts (`tools/prepare_player_parts.py`) and the first-person parts (`tools/prepare_player_fp_parts.py`)
+  stored each part in input order, so a part done early waited for every part before it; both now run through
+  `unit_store.run_each` and store each part as it comes back, with one `[done/total]` line per part. Their unit keys
+  and every stage key are unchanged (the reuse plan against the v0.0.62 release build still reuses 45 of 47 stages).
+  `tests/test_units_kept_on_failure.py` now also finds a store after a loop over a pool map (the CHIM units' form)
+  and a store in input order.
 
 ## Verification
 
@@ -131,7 +140,9 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-ENV-FINGERPRINT-GLOBAL-33](BUILD-ENV-FINGERPRINT-GLOBAL-33.md): The stair rule setting invalidates the reuse cache of every build stage, including stages that never read it
 - BUILD-ETA-CHIM-STALE-48 (no report page): The build ETA said the CHIM world had about 4 minutes left for over 20 minutes while 40 % of its frames remained
 - [BUILD-ETA-CLOCK-UTC-ONLY-46](BUILD-ETA-CLOCK-UTC-ONLY-46.md): The build ETA printed its finish time on the container clock (UTC) only: 12:53 read as three hours ago on a +03:00 host
+- BUILD-ETA-FRAME-SCALING-63 (no report page): The build progress scales one-frame test builds up to the whole island: a 34-hour chim estimate
 - [BUILD-EXCLUDE-STAGE-CLOSURE-33](BUILD-EXCLUDE-STAGE-CLOSURE-33.md): The quick test build table entered every conversion stage's fingerprint through the stage scheduler
+- BUILD-FIGHTER-BAKE-SLOWER-62 (no report page): The image step's arena fighter bake took 130 s in the v0.0.62 release build against 44 s before (+198 %) with the same 4 units
 - [BUILD-FLORA-FALLBACK-RETRY-35](BUILD-FLORA-FALLBACK-RETRY-35.md): The routed-hull fallback of a flora overlay could not retry: the failed try's candidate folder was looked up from the wrong place
 - [BUILD-HAND-CATALOG-SERIAL-32](BUILD-HAND-CATALOG-SERIAL-32.md): The hand-catalog stage bakes every race and sex one after another
 - [BUILD-HEAP-GATE-AFTER-STAIRS-46](BUILD-HEAP-GATE-AFTER-STAIRS-46.md): The 12-second CHIM heap gate runs after the two-hour stair walk, so an over-budget frame fails the build late
@@ -228,6 +239,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - GATE-IMAGE-REMOVED-52 (no report page): A cleanup removed the image the gate s Linux host-parity step runs: the in-use check looked at containers only
 - GATE-PRIVACY-NOT-IN-PREGATE-52 (no report page): The privacy word check runs only in the full gate: the quick pre-gate checks passed text the gate then refused
 - [HARVEST-CHIM-COVERAGE-ONE-AREA-48](HARVEST-CHIM-COVERAGE-ONE-AREA-48.md): The image step harvest coverage check failed on every CHIM world of one area (every MiniWind sandbox of one town)
+- IMAGE-BIGGER-THAN-ORIGINAL-62 (no report page): The game image (3,022 MB in v0.0.62) is bigger than the original game data it is made from (1.93 GB)
 - [MINIWIND-NO-INTERIOR-SCOPE-42](MINIWIND-NO-INTERIOR-SCOPE-42.md): A MiniWind of one room built the whole town: no scope converted only the start room
 - [MINIWIND-NOT-MINUTES-33](MINIWIND-NOT-MINUTES-33.md): A reused MiniWind build took about two hours instead of minutes
 - [MINIWIND-SCENE-CHAIN-WEIGHT-42](MINIWIND-SCENE-CHAIN-WEIGHT-42.md): Every MiniWind bakes all playable races and the opening rooms, and walks its whole frame stairs
@@ -240,5 +252,6 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [ROOM-BAKE-FOOTPRINT-SLOW-48](ROOM-BAKE-FOOTPRINT-SLOW-48.md): The room actor bake's footprint rule with the collision-box test is more than 100 times slower
 - [ROOM-BATCH-CORES-49](ROOM-BATCH-CORES-49.md): The room batches stage ran on about two of its eight cores for minutes before its first room, and kept few of its finished rooms when stopped
 - ROOM-RESIDENTS-KEY-SERIAL-49 (no report page): The room residents step opens its unit cache once per resident: 233 s on one core before any cached resident is restored
+- UNIT-KEY-WHOLE-FILE-63 (no report page): The resident and room unit caches keyed every unit on the whole of their tool files, so an unrelated edit to tools/prepare_area.py re-keyed all 1,769 residents and every room, and the v0.0.63-dev1 build baked them all again
 
 <!-- END GENERATED CATEGORY -->

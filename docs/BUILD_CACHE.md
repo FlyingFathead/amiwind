@@ -1,6 +1,6 @@
 # Build cache: resuming and reusing work safely
 
-_Last updated with AmiWind v0.0.59-dev6 (3 November 2026)._
+_Last updated with AmiWind v0.0.62 (9 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -184,6 +184,15 @@ facts) keeps the stage's engine files whole. A reuse source keyed with whole eng
 when its own source tree (the checkout its stage ran from) gives exactly its recorded sources; otherwise as before.
 Until 27 October 2026 the actor record's and the magic effects' header edits planned a full CHIM world rebuild for
 v0.0.54 builds.
+
+`engine/aga/src/model.c` counts as its loader policy (`tools/engine_loader_policy.py`, `policy1:`,
+BUILD-CHIM-HEAP-KEY-LOADER-63) when only the heap audits name it (engine_facts `POLICY_MODULES`): the sprite, BSP slice,
+alias stream and packed-edge policies they extract, each policy's refusal text when it does not recognise the loader,
+and the digest of the brush and edge-cache loaders (every `#define` and declaration of the file counts too). The
+packed-edge pin (`tools/edge_cache_heap.py`) compares that digest instead of the whole file (`AMIWIND_EDGE_PIN=whole`
+keeps the whole-file pin selectable). An alias or sprite reader edit, or a console message, re-keys no CHIM world
+stage; a loader limit or a brush loader edit does (tests/test_engine_loader_policy.py). Until 9 November 2026 every
+model.c edit re-keyed the CHIM world and its interiors.
 
 The image-pass and unit caches (`tools/pass_cache.py`) use form 2 as well. Their keys
 also leave out `tools/pass_cache.py` itself: that is the cache's own key and storage

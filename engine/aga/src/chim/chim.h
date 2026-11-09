@@ -36,6 +36,10 @@ extern int (*aw_world_chim_contains)(const char *name, const float *local);
  * chim_world.c, set by Chim_Init) */
 extern int (*aw_chim_door_yaw)(unsigned pid, float yaw);
 extern int (*aw_chim_door_clip)(unsigned pid, vec3_t start, vec3_t mins, vec3_t maxs, vec3_t end, trace_t *trace);
+/* aw_hinged_door.c: move every copy of a scripted mover placement by d
+ * (WORLD-BUTTONS-62; chim_room.c ChimMovers_Shift, set by Chim_Init) */
+extern int (*aw_chim_place_shift)(unsigned pid, const float *d, int relink);
+int ChimMovers_Shift (unsigned pid, const float *d, int relink);
 
 void Chim_Init (void);
 int Chim_Active (void);

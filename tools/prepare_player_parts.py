@@ -480,24 +480,24 @@ def prepare(data, id1, palette, jobs=None, log=print):
             todo.append(t)
     reused = len(results)
     if todo:
-        from build_costs import costed_map
+        import unit_store
         from build_jobs import resolve_jobs
         workers = max(1, min(resolve_jobs(jobs), len(todo)))
         names = [unit_inputs(t)['entry']['name'] for t in todo]
+
+        def keep(index, result):
+            # each part into the unit cache the moment it is back (UNIT-STORED-AT-MAP-END-62)
+            if isinstance(result, str):
+                failed.append(result)
+                return
+            path, raw, report = result
+            results[path] = (raw, report)
+            if cache is not None:
+                cache.store_files(unit_inputs(todo[index]), {'report': report}, {'0': raw})
         with stage_pool(jobs, 'player parts'):
-            made = costed_map('player-parts', _safe_bake, todo, names, workers, fallback=lambda name: 1.0)
-            done = 0
-            for t, result in zip(todo, made):
-                done += 1
-                if done % 100 == 0 or done == len(todo):
-                    log('player parts: %d / %d baked' % (done, len(todo)), flush=True)
-                if isinstance(result, str):
-                    failed.append(result)
-                    continue
-                path, raw, report = result
-                results[path] = (raw, report)
-                if cache is not None:
-                    cache.store_files(unit_inputs(t), {'report': report}, {'0': raw})
+            failed.extend(unit_store.run_each('player-parts', _safe_bake, list(enumerate(todo)), names, workers, keep,
+                                              fallback=lambda name: 1.0, label='Player parts', already=reused,
+                                              log=log))
     log('=== PHASE 2/3: player parts: layouts and tables ===', flush=True)
     models = {}
     for path, t in unique.items():

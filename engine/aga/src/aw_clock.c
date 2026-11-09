@@ -34,6 +34,8 @@ int AW_ClockSetHour(double hour) {
     if(!(hour>=0 && hour<24) || !AW_ClockEnsure())return 0;
     return AW_StateSet(&aw_state,AW_GLOBAL,ms,(int)(hour*3600000));
 }
+/* days since the start (0 = 16 Last Seed 3E 427): the shared date layout's DAYS (aw_questbook.h AW_DateText) */
+int AW_ClockDays(void){return AW_ClockEnsure()?AW_StateGet(&aw_state,AW_GLOBAL,days):0;}
 void AW_ClockDate(int *year,int *month,int *day,int *hour,int *minute) {
     int d=227,t=32400000,m=0;
     if(AW_ClockEnsure()){d+=AW_StateGet(&aw_state,AW_GLOBAL,days);t=AW_StateGet(&aw_state,AW_GLOBAL,ms);}

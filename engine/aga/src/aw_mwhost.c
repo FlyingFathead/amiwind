@@ -1050,6 +1050,8 @@ static void creation_spells(aw_actor_t *a){
     applied_class=aw_character.clas;
     Con_DPrintf("Player spells: %d from the race, the birthsign, the class and the skills (%d starting spells)\n",n,start_chosen_n);
 }
+static unsigned long god_health_held;   /* GODMODE-LAVA-DEATH-62: script or spell health losses god mode kept back */
+unsigned long AW_MwscriptGodHealthHeld(void){return god_health_held;}
 static aw_actor_t *player_record(void){
     aw_actor_t *a=AW_ActorPlayer();int i;
     if(!a || !aw_character.valid)return a;
@@ -1075,7 +1077,14 @@ static void player_store(const aw_actor_t *a){
     for(i=0;i<27;i++)aw_character.skills[i]=(short)(a->skill_base[i]+a->skill_mod[i]);
     for(i=0;i<3;i++){aw_character.maximum[i]=a->dyn_base[i];aw_character.current[i]=a->dyn_cur[i];}
     aw_character.level=a->level;
-    if(sv_player)sv_player->v.health=a->dyn_cur[0];
+    /* GODMODE-LAVA-DEATH-62: every script and spell change of the player's health comes back here (SetHealth,
+     * ModCurrentHealth, Damage Health, poison, the elements, a drain of the maximum): in god mode it never falls below
+     * the edict's live health (a heal still lands) */
+    if(sv_player){
+        float h=AW_CombatGodHealth(((int)sv_player->v.flags&FL_GODMODE)!=0,sv_player->v.health,a->dyn_cur[0],a->dyn_base[0]);
+        if(h!=a->dyn_cur[0]){god_health_held++;aw_character.current[0]=h;}
+        sv_player->v.health=h;
+    }
 }
 /* PLAYER-CASTING-59 (aw_cast.c): the player's record with the sheet's stats when there is a sheet (else the record's
  * own, as a game started straight on a map has), and its changes back to the sheet and the edict */
@@ -2324,10 +2333,23 @@ static int crime_witness(edict_t *e,aw_crime_witness_t *w);
 static float fatigue_term_of(float current,float maximum);
 static int disposition_weapon_drawn(void);
 /* the object a transform call names: its entity, or NULL (counted as missed) */
-static edict_t *transform_target(int instance,int target){
+static edict_t *transform_entity(int instance,int target){
     vec3_t at;int n=locate(instance,target,at);edict_t *e=n>0?edict_of(n):NULL;
-    if(!e || e->free){transforms_missed++;return NULL;}
+    return !e || e->free?NULL:e;
+}
+static edict_t *transform_target(int instance,int target){
+    edict_t *e=transform_entity(instance,target);
+    if(!e)transforms_missed++;
     return e;
+}
+/* WORLD-BUTTONS-62: the reference a transform call names (the call's own object, or the named one), 0 for the
+ * player or none; a CHIM placement without an entity moves through the movers table (aw_hinged_door.c) */
+static unsigned long mover_moves;
+static uint32_t transform_reference(int instance,int target){
+    aw_mwvm_instance_t *in;
+    if(target==AW_MWVM_PLAYER)return 0;
+    if(target==AW_MWVM_SELF){in=AW_MwvmInstance(instance);return in?in->reference:0;}
+    return AW_MwvmObjectReference(target);
 }
 /* SetAtStart (OpenMW transformationextensions.cpp OpSetAtStart: the reference back at its placed position and
  * rotation): a script's first change of an object's place or angles keeps where the map put it, until the next map */
@@ -2361,8 +2383,81 @@ static int actor_like(const edict_t *e){return e==sv_player || is_actor(e);}
 #define FORCED 32
 static uint32_t forced_sneak[FORCED];
 static unsigned long forced_calls,forced_refused;
-static void forced_reset(void){memset(forced_sneak,0,sizeof(forced_sneak));aw_move_force_sneak=0;}
+static unsigned long moon_calls,equipped_calls,equipped_missed;   /* v0.0.63, MWSCRIPT-GAPS-63 */
+/* ForceRun / ClearForceRun / GetForceRun (v0.0.63, MWSCRIPT-GAPS-63; OpenMW controlextensions.cpp OpSetMovementFlag,
+ * OpClearMovementFlag, OpGetForceRun): the player's flag is aw_move.c's (the player runs), an NPC's a reference in the
+ * same kind of short list, read by the ambient tables' walk as the NPC running (AW_MwscriptForcedRun); kept in saved
+ * games (the AWRN block) */
+static uint32_t forced_run[FORCED];
+/* GetAttacked (v0.0.63, MWSCRIPT-GAPS-63; OpenMW statsextensions.cpp OpGetAttacked, CreatureStats::getAttacked, set by
+ * actorAttacked): the actors the player attacked (aw_combat.c aw_combat_attacked), a short list by reference; an entry
+ * holds while the actor's fight goes on and goes when it ends (the combat layer fights the player only, so no other
+ * actor attacks one). Not saved: a load ends every fight. */
+#define ATTACKED 16
+static uint32_t attacked[ATTACKED];static int attacked_next;
+/* The werewolf set (v0.0.63, MWSCRIPT-GAPS-63; OpenMW 0.51 statsextensions.cpp OpSetWerewolf, OpIsWerewolf,
+ * OpSetWerewolfAcrobatics, OpGetWerewolfKills; mechanicsmanagerimp.cpp setWerewolf, applyWerewolfAcrobatics;
+ * player.cpp setWerewolfStats / restoreStats): the player's form with his own attributes and skills kept while the
+ * werewolf's (the game settings fWerewolf*, handed by the compiler) stand, every item taken off; the NPCs a script
+ * turned (a short list by reference); the werewolf kills. Kept in saved games (the AWWF block). The beast's body is
+ * not drawn yet: the player keeps his own model (said in docs/MWSCRIPT_BYTECODE.md). */
+#define WERE_NPCS 16
+static aw_were_t were;static uint32_t were_npc[WERE_NPCS];
+static unsigned long were_calls;
+static void forced_reset(void){
+    memset(&were,0,sizeof(were));memset(were_npc,0,sizeof(were_npc));aw_move_werewolf=0;
+    memset(attacked,0,sizeof(attacked));attacked_next=0;
+    memset(forced_sneak,0,sizeof(forced_sneak));aw_move_force_sneak=0;
+    memset(forced_run,0,sizeof(forced_run));aw_move_force_run=0;
+}
 static int forced_find(uint32_t ref){int i;for(i=0;ref && i<FORCED;i++)if(forced_sneak[i]==ref)return i;return -1;}
+static int forced_run_find(uint32_t ref){int i;for(i=0;ref && i<FORCED;i++)if(forced_run[i]==ref)return i;return -1;}
+static int forced_run_export(unsigned char *out,int capacity){   /* aw_forced_rules.c */
+    uint32_t refs[FORCED];int i,n=0;
+    for(i=0;i<FORCED;i++)if(forced_run[i])refs[n++]=forced_run[i];
+    return AW_ForcedRunPack(out,capacity,aw_move_force_run,refs,n);
+}
+static int forced_run_import(const unsigned char *p,int bytes){
+    int player,n,k;
+    memset(forced_run,0,sizeof(forced_run));aw_move_force_run=0;
+    if((k=AW_ForcedRunUnpack(p,bytes,&player,forced_run,FORCED,&n))<0){memset(forced_run,0,sizeof(forced_run));return -1;}
+    aw_move_force_run=player;
+    return k;
+}
+/* the ambient tables' walk (aw_ambient.c walk_speed): 1 when a script forced E to run */
+int AW_MwscriptForcedRun(struct edict_s *e){return forced_run_find(ref_of_edict(e))>=0;}
+static void were_kill_hook(edict_t *e){
+    /* OpenMW actors.cpp: the player kills an NPC while he is a werewolf: one more werewolf kill */
+    if(were.player && e && !strcmp(pr_strings+e->v.classname,"aw_npc") && were.kills<0xFFFF){were.kills++;AW_MwvmStateChanged();}
+}
+static int were_export(unsigned char *out,int capacity){
+    uint32_t refs[WERE_NPCS];int i,n=0;
+    for(i=0;i<WERE_NPCS;i++)if(were_npc[i])refs[n++]=were_npc[i];
+    return AW_WerePack(out,capacity,&were,refs,n);
+}
+static int were_import(const unsigned char *p,int bytes){
+    int n,k;
+    memset(&were,0,sizeof(were));memset(were_npc,0,sizeof(were_npc));
+    if((k=AW_WereUnpack(p,bytes,&were,were_npc,WERE_NPCS,&n))<0){memset(&were,0,sizeof(were));memset(were_npc,0,sizeof(were_npc));return -1;}
+    aw_move_werewolf=were.player;
+    return k;
+}
+static int were_npc_find(uint32_t ref){int i;for(i=0;ref && i<WERE_NPCS;i++)if(were_npc[i]==ref)return i;return -1;}
+static void attacked_hook(edict_t *e){
+    uint32_t ref=ref_of_edict(e);int i;
+    if(!ref)return;
+    for(i=0;i<ATTACKED;i++)if(attacked[i]==ref)return;
+    attacked[attacked_next]=ref;attacked_next=(attacked_next+1)%ATTACKED;
+}
+static int attacked_now(edict_t *e){
+    uint32_t ref=ref_of_edict(e);int i;const aw_fighter_t *f;
+    for(i=0;ref && i<ATTACKED;i++)if(attacked[i]==ref){
+        if((f=AW_CombatFighter(e))!=NULL && !f->dead)return 1;
+        if(!f){attacked[i]=0;return 0;}   /* the fight ended: the flag goes */
+        return 1;                         /* dead: still the one that was attacked */
+    }
+    return 0;
+}
 /* Saved games (v0.0.62): "AWFS" u8 1 u8 the player forced u8 count, count x u32 NPC reference, f32 the screen's black
  * the fade goes to (big-endian); 11 + 4 x count bytes. OpenMW keeps the movement flags with the actors; the fade is
  * kept too, so a game saved dark loads dark until its script's FadeIn. */
@@ -2464,7 +2559,18 @@ static int small_call(int instance,int target,int function,const aw_mwcell_t *nu
         /* Move / MoveWorld AXIS UNITS-A-SECOND (OpenMW OpMove: along the object's own axes; OpMoveWorld: the world's;
          * times the frame's duration; the actors standing on it go along) */
         vec3_t diff,f,r,u;float step=count>=1?numbers[0].f*(float)host_frametime*AW_MOVE_UNIT_SCALE:0;
-        if(!axis || !(e=transform_target(instance,target)))return 1;
+        if(!axis)return 1;
+        if(!(e=transform_entity(instance,target))){
+            /* no entity: a scripted mover the CHIM world draws as a placement (the Ghostgate portcullises) moves
+             * along the world's axes; Move along its own axes needs its angles: not yet (counted as missed) */
+            int k=tolower((unsigned char)axis[0])-'x';
+            diff[0]=diff[1]=diff[2]=0;
+            if(function==AWF_MOVEWORLD && k>=0 && k<=2){
+                diff[k]=step;
+                if(AW_MoverShift(transform_reference(instance,target),diff)){mover_moves++;transforms++;return 1;}
+            }
+            transforms_missed++;return 1;
+        }
         if(function==AWF_MOVE){
             AngleVectors(e->v.angles,f,r,u);
             if(!AW_MoveScriptLocal(f,r,u,(unsigned char)axis[0],step,diff)){transforms_missed++;return 1;}
@@ -2487,7 +2593,12 @@ static int small_call(int instance,int target,int function,const aw_mwcell_t *nu
         return 1;}
     case AWF_SETATSTART:{
         int i;
-        if(!(e=transform_target(instance,target)))return 1;
+        if(!(e=transform_entity(instance,target))){
+            /* a scripted mover placement back where the game data put it (WORLD-BUTTONS-62) */
+            if(AW_MoverAtStart(transform_reference(instance,target))){mover_moves++;transforms++;}
+            else transforms_missed++;
+            return 1;
+        }
         if((i=start_find(e))>=0){
             VectorCopy(starts[i].origin,e->v.origin);VectorCopy(starts[i].angles,e->v.angles);SV_LinkEdict(e,false);
         }   /* never moved by a script on this map: it stands where it started */
@@ -2585,7 +2696,10 @@ static const struct {int get,set,mod,effect,weakness,shield;} resists[]={
     {AWF_GETRESISTCORPRUS,AWF_SETRESISTCORPRUS,AWF_MODRESISTCORPRUS,96,34,-1},
     {AWF_GETRESISTPOISON,AWF_SETRESISTPOISON,AWF_MODRESISTPOISON,97,35,-1},
     {AWF_GETRESISTNORMALWEAPONS,AWF_SETRESISTNORMALWEAPONS,AWF_MODRESISTNORMALWEAPONS,98,36,-1},
-    {AWF_GETRESISTPARALYSIS,AWF_SETRESISTPARALYSIS,AWF_MODRESISTPARALYSIS,99,-1,-1}};
+    {AWF_GETRESISTPARALYSIS,AWF_SETRESISTPARALYSIS,AWF_MODRESISTPARALYSIS,99,-1,-1},
+    /* v0.0.63 (UNDERWATER-BREATH-62): Get/Set/ModWaterBreathing, the same calls on Water Breathing; the read also
+     * counts the always-active spells of the actor's list (the Argonians' ability), as OpenMW's magic effects do */
+    {AWF_GETWATERBREATHING,AWF_SETWATERBREATHING,AWF_MODWATERBREATHING,AW_EFFECT_WATER_BREATHING,-1,-1}};
 static unsigned long resist_calls,resist_refused,fades;
 static float resist_value(uint32_t owner,int k){
     float v=AW_EffectsMagnitude(owner,resists[k].effect,AW_EFFECT_NO_ARG);
@@ -2802,13 +2916,19 @@ static int gap_call(int instance,int target,int function,const aw_mwcell_t *numb
     if(function==AWF_REMOVESOULGEM){
         soul_gems(function,target,call_string(strings,nstrings,0),count>=1 && numbers[0].i>0?numbers[0].i:1);return 1;}
     for(k=0;k<(int)(sizeof(resists)/sizeof(resists[0]));k++){
-        edict_t *e;aw_actor_t *a;uint32_t owner;
+        edict_t *e;aw_actor_t *a=NULL;uint32_t owner;
         if(function!=resists[k].get && function!=resists[k].set && function!=resists[k].mod)continue;
         result->i=0;
         if(target==AW_MWVM_PLAYER)owner=AW_ACTOR_PLAYER_REF;
         else if((a=actor_of(instance,target,&e))!=NULL)owner=a->reference;
         else{resist_refused++;return function==resists[k].get?AW_MWVM_CALL_READ:1;}
-        if(function==resists[k].get){result->i=(int)resist_value(owner,k);resist_calls++;return AW_MWVM_CALL_READ;}
+        if(function==resists[k].get){
+            float v=resist_value(owner,k);
+#ifdef AW_COMBAT_EFFECT_MAGNITUDE
+            if(resists[k].effect==AW_EFFECT_WATER_BREATHING)
+                v+=passive_of(target==AW_MWVM_PLAYER?player_record():a,owner,resists[k].effect);
+#endif
+            result->i=(int)v;resist_calls++;return AW_MWVM_CALL_READ;}
         if(count<1)return 1;
         if(!AW_EffectsBaseModify(owner,resists[k].effect,(float)(function==resists[k].mod?numbers[0].i:
                                                                   numbers[0].i-(int)resist_value(owner,k)))){
@@ -2842,8 +2962,77 @@ static int gap_call(int instance,int target,int function,const aw_mwcell_t *numb
             forced_sneak[i]=ref;AW_MwvmStateChanged();
         }else if(!set && i>=0){forced_sneak[i]=0;AW_MwvmStateChanged();}
         forced_calls++;return 1;}
+    case AWF_FORCERUN:case AWF_CLEARFORCERUN:case AWF_GETFORCERUN:{
+        /* v0.0.63 (MWSCRIPT-GAPS-63): as the sneak above, the run flag (OpenMW OpSetMovementFlag Flag_ForceRun) */
+        vec3_t at;int n,i,set=function==AWF_FORCERUN;uint32_t ref;
+        if(target==AW_MWVM_PLAYER){
+            if(function==AWF_GETFORCERUN){result->i=aw_move_force_run!=0;return AW_MWVM_CALL_READ;}
+            if(aw_move_force_run!=set){aw_move_force_run=set;AW_MwvmStateChanged();}
+            forced_calls++;return 1;
+        }
+        n=locate(instance,target,at);
+        ref=n>0?ref_of_edict(edict_of(n)):0;
+        if(!ref)ref=target_reference(instance,target);
+        i=forced_run_find(ref);
+        if(function==AWF_GETFORCERUN){result->i=i>=0;return AW_MWVM_CALL_READ;}
+        if(!ref){forced_refused++;return 1;}
+        if(set && i<0){
+            for(i=0;i<FORCED && forced_run[i];i++);
+            if(i==FORCED){forced_refused++;Con_DPrintf("MWScript: a ForceRun not kept (32 at most)\n");return 1;}
+            forced_run[i]=ref;AW_MwvmStateChanged();
+        }else if(!set && i>=0){forced_run[i]=0;AW_MwvmStateChanged();}
+        forced_calls++;return 1;}
+    case AWF_TURNMOONRED:case AWF_TURNMOONWHITE:
+        /* v0.0.63 (MWSCRIPT-GAPS-63; OpenMW skyextensions.cpp OpTurnMoonRed / OpTurnMoonWhite, sky.cpp setMoonColour):
+         * Secunda in the script colour or white, kept in the saved named facts (aw_story.c) */
+        if(AW_MoonRed()!=(function==AWF_TURNMOONRED)){
+            if(!AW_MoonRedSet(function==AWF_TURNMOONRED)){Con_DPrintf("MWScript: the moon colour not kept (named facts full)\n");return 1;}
+            AW_MwvmStateChanged();
+        }
+        moon_calls++;return 1;
+    case AWF_HASITEMEQUIPPED:{
+        /* v0.0.63 (MWSCRIPT-GAPS-63; OpenMW containerextensions.cpp OpHasItemEquipped: 1 when any equipment slot holds
+         * the item, compared without case): the player's slots (aw_inventory.c); an NPC's worn or held entries of its
+         * record's list, by the item's AITM row the compiler hands (aw_actorstate.c AW_ActorWearsItem) */
+        const char *id=call_string(strings,nstrings,0);int slot;
+        result->i=0;
+        if(!id)return AW_MWVM_CALL_READ;
+        if(target!=AW_MWVM_PLAYER){
+            edict_t *e;aw_actor_t *a=actor_of(instance,target,&e);
+            if(!a || count<1){equipped_missed++;return AW_MWVM_CALL_READ;}
+            result->i=AW_ActorWearsItem(a,numbers[0].i);equipped_calls++;return AW_MWVM_CALL_READ;
+        }
+        for(slot=0;slot<AW_INVENTORY_SLOTS;slot++)if(aw_state.inventory.equipped[slot][0] &&
+                                            !Q_strcasecmp(aw_state.inventory.equipped[slot],(char *)id)){result->i=1;break;}
+        equipped_calls++;return AW_MWVM_CALL_READ;}
     }
     return 0;
+}
+/* SPELL-EFFECTS-57: the compiler's SPFX row ROW (every effect a Fortify, Drain, Damage or Restore of a stat, a cure,
+ * or a passive effect by its number) lands on the player, each magnitude rolled once; 0 when the row is not there.
+ * Cast and ExplodeSpell share it (v0.0.63). */
+static unsigned long explodes,explodes_missed;   /* v0.0.63, MWSCRIPT-GAPS-63 */
+static int land_spfx(int row){
+    uint32_t off,rows,bytes;int e;aw_actor_t *p=player_record();
+    if(!p || !AW_MwvmSection("SPFX",&off,&rows,&bytes) || row<0 || (uint32_t)row>=rows ||
+       off+bytes>resident_bytes)return 0;
+    {const unsigned char *h=resident+off+4*row;int first=(h[0]<<8)|h[1],nfx=h[2];
+     for(e=0;e<nfx;e++){
+         const unsigned char *x=resident+off+4*rows+8*(first+e);int lo=(x[4]<<8)|x[5],hi=(x[6]<<8)|x[7];
+         float m=(float)(hi>lo?lo+rand()%(hi-lo+1):lo);
+         if(x[0]==4){   /* a cure: the spells of that type go (0: Cure Poison, no poison state yet) */
+             if(x[1])AW_ActorRemoveSpellType(p,x[1]);
+             cures++;continue;
+         }
+         if(x[0]==5){   /* MWSCRIPT-UNPLACED-ATTACH-62: an effect with no attribute or skill, by its number
+                         * (Shield, a resistance, Levitate, Fortify Attack: the shrines' blessings) */
+             if(AW_EffectsLand(p,x[1],AW_EFFECT_NO_ARG,m,(float)((x[2]<<8)|x[3]),AW_EFFECT_NO_SOURCE))effects_cast++;
+             continue;
+         }
+         if(AW_EffectsAdd(p,x[0],x[1],m,(float)((x[2]<<8)|x[3])))effects_cast++;
+     }}
+    player_store(p);AW_MwvmStateChanged();
+    return 1;
 }
 static int host_call(int instance,int target,int function,const aw_mwcell_t *numbers,int count,
                      const unsigned char *strings,int nstrings,aw_mwcell_t *result){
@@ -3073,6 +3262,95 @@ static int host_call(int instance,int target,int function,const aw_mwcell_t *num
          * a build without it says so once and the script goes on. Esc skips it whatever SKIP says. */
         if(AW_MovieScript(call_string(strings,nstrings,0)))binks++;else binks_missed++;
         return 1;
+    case AWF_BECOMEWEREWOLF:case AWF_UNDOWEREWOLF:case AWF_ISWEREWOLF:{
+        int set=function==AWF_BECOMEWEREWOLF,i;
+        if(target!=AW_MWVM_PLAYER){
+            vec3_t at;int n=locate(instance,target,at);uint32_t ref=n>0?ref_of_edict(edict_of(n)):0;
+            if(!ref)ref=target_reference(instance,target);
+            i=were_npc_find(ref);
+            if(function==AWF_ISWEREWOLF){result->i=i>=0;return AW_MWVM_CALL_READ;}
+            if(!ref)return 1;
+            if(set && i<0){
+                for(i=0;i<WERE_NPCS && were_npc[i];i++);
+                if(i==WERE_NPCS){Con_DPrintf("MWScript: a werewolf NPC not kept (16 at most)\n");return 1;}
+                were_npc[i]=ref;AW_MwvmStateChanged();
+            }else if(!set && i>=0){were_npc[i]=0;AW_MwvmStateChanged();}
+            were_calls++;return 1;
+        }
+        if(function==AWF_ISWEREWOLF){result->i=were.player;return AW_MWVM_CALL_READ;}
+        if(were.player==set)return 1;
+        {aw_actor_t *p=player_record();
+         if(set){
+             /* player.cpp setWerewolfStats: his own kept, the werewolf's from the game settings (Acrobatics apart:
+              * SetWerewolfAcrobatics); inventorystore.cpp unequipAll */
+             if(p){
+                 for(i=0;i<8;i++)were.attr[i]=p->attr_base[i];
+                 for(i=0;i<27;i++)were.skill[i]=p->skill_base[i];
+                 were.kept=1;
+                 for(i=0;i<8+27;i++){
+                     int v=count>i/4?(int)(((uint32_t)numbers[i/4].i>>(8*(3-i%4)))&255):255;
+                     if(v==255 || i==8+20)continue;   /* no setting; Acrobatics stays */
+                     if(i<8)p->attr_base[i]=(short)v;else p->skill_base[i-8]=(short)v;
+                 }
+                 player_store(p);
+             }
+             for(i=0;i<AW_INVENTORY_SLOTS;i++)if(aw_state.inventory.equipped[i][0]){
+                 char id[64];Q_strncpy(id,aw_state.inventory.equipped[i],sizeof(id)-1);id[sizeof(id)-1]=0;
+                 AW_InventoryUnequip(&aw_state,id);
+             }
+         }else if(p && were.kept){   /* player.cpp restoreStats */
+             for(i=0;i<8;i++)p->attr_base[i]=were.attr[i];
+             for(i=0;i<27;i++)p->skill_base[i]=were.skill[i];
+             were.kept=0;player_store(p);
+         }}
+        were.player=set;aw_move_werewolf=set;were_calls++;AW_MwvmStateChanged();return 1;}
+    case AWF_SETWEREWOLFACROBATICS:{
+        /* mechanicsmanagerimp.cpp applyWerewolfAcrobatics: Acrobatics to fWerewolfAcrobatics (the compiler's number) */
+        aw_actor_t *p=target==AW_MWVM_PLAYER?player_record():NULL;
+        if(!p || count<1)return 1;
+        p->skill_base[20]=(short)numbers[0].i;player_store(p);were_calls++;AW_MwvmStateChanged();return 1;}
+    case AWF_GETWEREWOLFKILLS:
+        /* OpenMW OpGetWerewolfKills: the player's count, whoever asks */
+        result->i=were.kills;return AW_MWVM_CALL_READ;
+    case AWF_SETSCALE:case AWF_MODSCALE:case AWF_GETSCALE:{
+        /* SetScale / ModScale / GetScale (v0.0.63, MWSCRIPT-GAPS-63; OpenMW transformationextensions.cpp OpSetScale,
+         * OpModScale, OpGetScale, World::scaleObject): the object's drawn size, the edict's aw_scale (the client draws
+         * it, AWU_SCALE); an object without an entity is not scaled (counted). Not kept past the map: a room or area
+         * load builds its objects at the game data's size again */
+        vec3_t at;int n=locate(instance,target,at);edict_t *e=n>0?edict_of(n):NULL;eval_t *v=e?GetEdictFieldValue(e,"aw_scale"):NULL;
+        float now=v && v->_float>0?v->_float:1;
+        if(function==AWF_GETSCALE){result->f=now;return AW_MWVM_CALL_READ;}
+        if(!v || count<1){transforms_missed++;return 1;}
+        now=function==AWF_SETSCALE?numbers[0].f:now+numbers[0].f;
+        if(!(now>0))now=0.01f;
+        if(v->_float!=now){v->_float=now;SV_LinkEdict(e,false);AW_MwvmStateChanged();}   /* GetScale wakes with it */
+        transforms++;return 1;}
+    case AWF_GETPCTRAVELING:
+        /* OpenMW miscextensions.cpp OpGetPcTraveling, World::isPlayerTraveling: 1 only inside the travel's own
+         * teleport step, which no script frame sees here (a travel is one step): 0 */
+        result->i=0;return AW_MWVM_CALL_READ;
+    case AWF_GETSPELLEFFECTS:{
+        /* GetSpellEffects SPELL (v0.0.63, MWSCRIPT-GAPS-63; OpenMW miscextensions.cpp OpGetSpellEffects,
+         * ActiveSpells::isSpellActive): 1 while an effect of the spell (the compiler's ASPT row) is active on the actor */
+        aw_effect_info_t fx;edict_t *e;aw_actor_t *a;uint32_t owner;int k;
+        result->i=0;
+        if(count<1)return AW_MWVM_CALL_READ;
+        if(target==AW_MWVM_PLAYER)owner=AW_ACTOR_PLAYER_REF;
+        else if((a=actor_of(instance,target,&e))!=NULL)owner=a->reference;
+        else return AW_MWVM_CALL_READ;
+        for(k=0;k<AW_EffectsCount() && AW_EffectsAt(k,&fx);k++)
+            if(fx.owner==owner && fx.source==numbers[0].i){result->i=1;break;}
+        return AW_MWVM_CALL_READ;}
+    case AWF_GETATTACKED:{
+        vec3_t at;int n=locate(instance,target,at);edict_t *e=n>0?edict_of(n):NULL;
+        result->i=e && e!=sv_player && attacked_now(e);return AW_MWVM_CALL_READ;}
+    case AWF_EXPLODESPELL:{
+        /* ExplodeSpell SPELL (v0.0.63, MWSCRIPT-GAPS-63; OpenMW miscextensions.cpp OpExplodeSpell): the compiler hands
+         * the spell's ASPT row; the object casts it on itself, its effects' areas reach the actors around it (aw_cast.c
+         * AW_CastExplode) */
+        vec3_t at;int n=locate(instance,target,at);
+        if(count<1 || n<0 || AW_CastExplode(at,numbers[0].i)<0){explodes_missed++;return 1;}
+        explodes++;return 1;}
     case AWF_CAST:{
         /* Cast SPELL TARGET (OpenMW apps/openmw/mwscript/miscextensions.cpp OpCast; the cures' effects from
          * mwmechanics/spelleffects.cpp CureCommonDisease / CureBlightDisease / CurePoison): v0.0.57 carries out the
@@ -3084,25 +3362,7 @@ static int host_call(int instance,int target,int function,const aw_mwcell_t *num
         if(count>=1){
             /* SPELL-EFFECTS-57, the first slice: the compiler handed the spell's SPFX row (every effect a Fortify,
              * Drain, Damage or Restore of a stat); each lands on the player with its magnitude rolled once */
-            uint32_t off,rows,bytes;int row=numbers[0].i,e;aw_actor_t *p=player_record();
-            if(!p || !AW_MwvmSection("SPFX",&off,&rows,&bytes) || row<0 || (uint32_t)row>=rows ||
-               off+bytes>resident_bytes)return 0;
-            {const unsigned char *h=resident+off+4*row;int first=(h[0]<<8)|h[1],nfx=h[2];
-             for(e=0;e<nfx;e++){
-                 const unsigned char *x=resident+off+4*rows+8*(first+e);int lo=(x[4]<<8)|x[5],hi=(x[6]<<8)|x[7];
-                 float m=(float)(hi>lo?lo+rand()%(hi-lo+1):lo);
-                 if(x[0]==4){   /* a cure: the spells of that type go (0: Cure Poison, no poison state yet) */
-                     if(x[1])AW_ActorRemoveSpellType(p,x[1]);
-                     cures++;continue;
-                 }
-                 if(x[0]==5){   /* MWSCRIPT-UNPLACED-ATTACH-62: an effect with no attribute or skill, by its number
-                                 * (Shield, a resistance, Levitate, Fortify Attack: the shrines' blessings) */
-                     if(AW_EffectsLand(p,x[1],AW_EFFECT_NO_ARG,m,(float)((x[2]<<8)|x[3]),AW_EFFECT_NO_SOURCE))effects_cast++;
-                     continue;
-                 }
-                 if(AW_EffectsAdd(p,x[0],x[1],m,(float)((x[2]<<8)|x[3])))effects_cast++;
-             }}
-            player_store(p);AW_MwvmStateChanged();
+            if(!land_spfx(numbers[0].i))return 0;
             n=locate(instance,target,at);caster=n>0?edict_of(n):NULL;
             if(caster && caster!=sv_player)AW_AnimPickCast(caster,AW_PR_TOUCH);
             return 1;
@@ -3760,6 +4020,8 @@ static void status_counts(void){
     Con_Printf("Angles, moves, SetAtStart and SetDelete %lu (%lu with no entity or axis); GetDetected %lu (%lu detected), GetLOS "
                "%lu; knockdowns read %lu; WakeUpPC %lu\n",transforms,transforms_missed,detections,detections_yes,
                sightings,knockouts,wakeups);
+    Con_Printf("Scripted movers (placements without an entity, WORLD-BUTTONS-62): %d in the table, %d away from their "
+               "start, %lu moves and returns\n",AW_MoverCount(),AW_MoverMoved(),mover_moves);
     Con_Printf("Fades %lu (black now %.2f); ForceSneak and ClearForceSneak %lu (%lu not kept), the player forced %d; "
                "resistances read or changed %lu (%lu with no actor or no room); soul gem calls %lu; the player hurt standing "
                "on an object %lu frames; Drop %lu; Resurrect %lu (%lu not possible); OnPCEquip set %lu, PCSkipEquip took %lu, "
@@ -4309,6 +4571,12 @@ static int actors_export(unsigned char *out,int capacity){
      t+=k;
      k=AW_CrimeActorsExport(out+n+s+t,capacity-n-s-t-8);     /* the NPCs' crime marks and pursuers (AWCR, v0.0.62) */
      if(k<0)return -1;
+     t+=k;
+     k=forced_run_export(out+n+s+t,capacity-n-s-t-8);        /* the forced run (AWRN, v0.0.63) */
+     if(k<0)return -1;
+     t+=k;
+     k=were_export(out+n+s+t,capacity-n-s-t-8);              /* the werewolf state (AWWF, v0.0.63) */
+     if(k<0)return -1;
      t+=k;}
     if(aw_mwscript_packages_export){   /* the actors' travel and follow packages (aw_ambient.c, SAVEGAME-COMPLETE-57) */
         int k=aw_mwscript_packages_export(out+n+s+t,capacity-n-s-t-8);
@@ -4320,6 +4588,7 @@ static int actors_export(unsigned char *out,int capacity){
 static void actors_import(const unsigned char *data,int bytes){
     int actors=bytes;
     forced_reset();V_ScreenFade(0,0);   /* MWSCRIPT-GAP-FUNCTIONS-62: an older save has no AWFS block: none, unfaded */
+    AW_MoverReset();                    /* WORLD-BUTTONS-62: every scripted mover back at its start (not saved yet) */
     AW_CombatLastHitReset();            /* MWSCRIPT-INVENTORY-HITONME-62: no blow of the last game is remembered */
     AW_WeatherScriptClear();            /* MWSCRIPT-COMPLETE-LANDMARK: no region's weather changed by a script */
     carried_reset();                     /* the carried items' scripts run again from their next equipping */
@@ -4387,6 +4656,14 @@ static void actors_import(const unsigned char *data,int bytes){
                 if(rest+6<=tail && !memcmp(p+rest,"AWCR",4)){   /* the NPCs' crime marks and pursuers (v0.0.62) */
                     int k=AW_CrimeActorsImport(p+rest,(int)(tail-rest));
                     if(k<0)Con_Printf("Saved crime marks unreadable: none kept.\n");else rest+=(unsigned long)k;
+                }
+                if(rest+7<=tail && !memcmp(p+rest,"AWRN",4)){   /* the forced run (v0.0.63) */
+                    int k=forced_run_import(p+rest,(int)(tail-rest));
+                    if(k<0)Con_Printf("Saved forced run unreadable: none kept.\n");else rest+=(unsigned long)k;
+                }
+                if(rest+79<=tail && !memcmp(p+rest,"AWWF",4)){   /* the werewolf state (v0.0.63) */
+                    int k=were_import(p+rest,(int)(tail-rest));
+                    if(k<0)Con_Printf("Saved werewolf state unreadable: none kept.\n");else rest+=(unsigned long)k;
                 }
                 if(rest+6<=tail && !memcmp(p+rest,"AWPK",4) && aw_mwscript_packages_import &&
                    !aw_mwscript_packages_import(p+rest,(int)(tail-rest)))Con_Printf("Saved actor packages unreadable: none kept.\n");
@@ -4491,6 +4768,8 @@ void AW_MwscriptInit(void){
     /* StopCombat and the crime's calm end an actor's fight (MWSCRIPT-STOPCOMBAT-UNWIRED-62: the hook was never set,
      * so StopCombat and a paid fine left the fight going) */
     if(!aw_mwscript_combat_end)aw_mwscript_combat_end=AW_CombatActorEnd;
+    aw_combat_attacked=attacked_hook;   /* GetAttacked (MWSCRIPT-GAPS-63) */
+    aw_combat_player_kill=were_kill_hook;   /* GetWerewolfKills (MWSCRIPT-GAPS-63) */
     aw_combat_weapon_hit=weapon_hit;   /* HitOnMe: the last weapon per victim (MWSCRIPT-INVENTORY-HITONME-62) */
     aw_ambient_fight_now=ambient_fight_now;   /* DIALOGUE-AGGRO-62: a bystander's raised Fight counts */
     AW_CrimeInit();

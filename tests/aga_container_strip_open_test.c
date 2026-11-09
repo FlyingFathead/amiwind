@@ -222,9 +222,36 @@ static void many_kinds(void){
     assert(aw_cstrip_key(K_ESCAPE) && !AW_CStripActive());
     many_items=0;AW_LedgerClear(&aw_ledger);
 }
+/* ROOM-OBJECTS-MISSING-62: an ash urn (urn_ash00, 7.1 map units half-height about its reference point) whose point is
+ * 7 units under the crosshair line: the reference point test alone refuses it; aimed at its top half, the view ray
+ * meets its placement box (the room's drawn box, chim_room.c ChimRoom_RayRef) and E opens it. */
+static const float urn_mins[3]={13,-7,14.9f},urn_maxs[3]={27,7,29.1f};
+static float fake_room_ray(unsigned reference,const float *eye,const float *dir){
+    float lo=0,hi=1e30f,a,b,t;int j;
+    if(reference!=CHEST)return -1;
+    for(j=0;j<3;j++){
+        if(dir[j]>-1e-5f && dir[j]<1e-5f){if(eye[j]<urn_mins[j] || eye[j]>urn_maxs[j])return -1;continue;}
+        a=(urn_mins[j]-eye[j])/dir[j];b=(urn_maxs[j]-eye[j])/dir[j];if(a>b){t=a;a=b;b=t;}
+        if(a>lo)lo=a;if(b<hi)hi=b;if(lo>hi)return -1;
+    }
+    return lo;
+}
+static void urn_aim(void){
+    byte *row=focus_file+8+12;
+    AW_LedgerClear(&aw_ledger);AW_StateReset();tables();
+    put32(row+16,88);           /* the urn's point at map z 22, the eye at 29 */
+    vid.width=320;vid.height=200;r_refdef.vrect.width=320;r_refdef.vrect.height=200;
+    level();aw_room_ray=NULL;
+    assert(!AW_InventoryUse() && !AW_CStripActive());     /* the point test alone: 7 units off the line, refused */
+    level();aw_room_ray=fake_room_ray;
+    assert(AW_InventoryUse() && AW_CStripActive());       /* the box: its top half is under the crosshair */
+    assert(aw_cstrip_key(K_ESCAPE) && !AW_CStripActive());
+    aw_room_ray=NULL;AW_LedgerClear(&aw_ledger);
+}
 int main(void){
     aw_ledger_on=1;
     AW_CStripInit();
+    urn_aim();
     run(0);     /* E on the aimed basket */
     run(1);     /* aw_placed container 500 open */
     many_kinds();

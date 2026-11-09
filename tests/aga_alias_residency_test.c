@@ -28,7 +28,10 @@ void Q_strncpy(char *d,char *s,int n){strncpy(d,s,n);}
 void Q_strcpy(char *d,char *s){strcpy(d,s);}
 void Con_Printf(char *fmt,...){(void)fmt;}
 void Cmd_AddCommand(char *name,xcommand_t fn){(void)name;(void)fn;}
-void Sys_Error(char *fmt,...){assert(expect_error);longjmp(failure,1);}
+void Sys_Error(char *fmt,...){
+    if(!expect_error){va_list a;va_start(a,fmt);vfprintf(stderr,fmt,a);va_end(a);fputc('\n',stderr);}  /* the reason */
+    assert(expect_error);longjmp(failure,1);
+}
 static int make_alias(int mode){
     /* mode 0: small; 1: grouped; 2: over the 512 KiB staging limit (536 KB); 3: over the stream limit (797 KB) */
     mdl_t *m=(mdl_t *)raw;byte *p;int i,j,grouped=mode==1,skinbytes,nf=mode==3?80:8;dtriangle_t *tri;daliasframe_t *f;

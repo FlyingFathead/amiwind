@@ -58,6 +58,9 @@ DEFAULTS = ROOT / 'config' / 'build-stage-durations.json'
 INTERVAL_ENV = 'AMIWIND_PROGRESS_INTERVAL'
 DEFAULT_INTERVAL = 10.0
 HISTORY_RUNS = 10          # newest earlier runs read for expected durations
+# ... and for a stage with a work measure, older runs too, up to this many, so a full build's own stage is found
+# behind a row of small test builds (BUILD-ETA-FRAME-SCALING-63)
+HISTORY_SCAN = 60
 FALLBACK_SECONDS = 60.0    # weight of a stage without any history when nothing is known
 REUSED_SECONDS = 5.0       # a stage copied by --reuse-from
 RUNNING_CAP = 0.95         # a running stage never counts as finished
@@ -157,8 +160,9 @@ def scaled_seconds(wall, cpu, jobs, budget_then, budget_now):
     return serial_time * ((1 - share) + share / new_workers)
 
 
-def history_samples(run, limit=HISTORY_RUNS):
-    """({stage: [{wall, cpu, jobs, budget, run}]}, [run names]) from earlier runs next to RUN."""
+def history_samples(run, limit=HISTORY_RUNS, scan=HISTORY_SCAN):
+    """({stage: [{wall, cpu, jobs, budget, run}]}, [run names]) from earlier runs next to RUN: the newest LIMIT runs,
+    and for the stages with a work measure (WORK_MEASURES) the newest SCAN runs."""
     run = Path(run)
     try:
         here = run.resolve()
@@ -168,7 +172,7 @@ def history_samples(run, limit=HISTORY_RUNS):
         return {}, []
     folders.sort(key=lambda folder: ((folder / PROFILE_NAME).stat().st_mtime, folder.name), reverse=True)
     samples, used = {}, []
-    for folder in folders[:limit]:
+    for position, folder in enumerate(folders[:max(limit, scan)]):
         try:
             profile = json.loads((folder / PROFILE_NAME).read_text(encoding='utf-8'))
         except (OSError, ValueError):
@@ -179,6 +183,8 @@ def history_samples(run, limit=HISTORY_RUNS):
         counted = run_units(folder)
         for row in profile.get('stages', []):
             if row.get('status') != 'passed' or row.get('reused') or not row.get('wall'):
+                continue
+            if position >= limit and row.get('name') not in WORK_MEASURES:
                 continue
             sample = {'wall': row['wall'], 'cpu': row.get('cpu'), 'jobs': row.get('jobs_max') or row.get('jobs'),
                       'budget': budget, 'run': folder.name}
@@ -254,6 +260,20 @@ def expected_durations(names, budget, samples=None, defaults=(None, {}), reused=
                                 'basis': f'{NO_COMPARABLE}: {amount} {unit} here, '
                                          f'{len(rows or ())} earlier run(s) of unknown size'}
                 continue
+            # Runs of about this size first; else only runs at least this size, scaled down: a stage's time is never
+            # scaled up past the largest size seen (BUILD-ETA-FRAME-SCALING-63: one-frame test builds scaled by 1,351
+            # frames gave the v0.0.62 final's chim stage 34 hours; it took about 48 minutes). Without either, the
+            # stage says so and its estimate comes from its own counter (units left x the rate measured here).
+            comparable = [r for r in sized if 1 / COMPARABLE_RATIO <= amount / r['work'] <= COMPARABLE_RATIO]
+            larger = [r for r in sized if r['work'] >= amount]
+            if not (comparable or larger):
+                most = max(r['work'] for r in sized)
+                result[name] = {'seconds': None, 'cores': None, 'source': NO_COMPARABLE, 'samples': 0,
+                                'work': amount, 'work_unit': unit,
+                                'basis': f'{NO_COMPARABLE}: {amount} {unit} here, at most {most:g} in {len(sized)} '
+                                         f'earlier run(s), never scaled up; the stage counter gives the rate'}
+                continue
+            sized = comparable or larger
             seconds = statistics.median(scaled_seconds(r['wall'], r.get('cpu'), r.get('jobs'), r.get('budget'), budget)
                                         * amount / r['work'] for r in sized)
             then = statistics.median(r['work'] for r in sized)
@@ -291,9 +311,52 @@ def expected_durations(names, budget, samples=None, defaults=(None, {}), reused=
 COUNTER_LINE = re.compile(r'^(?:\[\+[^\]]*\]\s*)?\[(\d+)/(\d+)(?: ([^\]|]*?))?\s*(?:\|[^\]]*)?\]\s*([^:\n]+)')
 
 
+# The unit stores' form (tools/unit_store.py progress_line): "LABEL [done/total] NAME [FAILED ]41m12s", and the start
+# line "LABEL [done/total] cached, N to make"
+UNIT_LINE = re.compile(r'^(?:\[\+[^\]]*\]\s*)?([A-Za-z][^\[\]\n]*?) \[(\d+)/(\d+)\] (.+?)(?: (FAILED))?(?: (\d+)m(\d+)s| (\d+)s)?$')
+
+
+def unit_line(line):
+    """{label, done, total, unit_name, seconds, failed, cached} of a unit store progress line, or None."""
+    match = UNIT_LINE.match(line.strip())
+    if not match or int(match.group(3)) <= 0:
+        return None
+    seconds = (int(match.group(6)) * 60 + int(match.group(7)) if match.group(6) else
+               int(match.group(8)) if match.group(8) else None)
+    rest = match.group(4).strip()
+    return {'label': match.group(1).strip(), 'done': int(match.group(2)), 'total': int(match.group(3)),
+            'unit_name': rest, 'seconds': seconds, 'failed': bool(match.group(5)),
+            'cached': rest.startswith('cached,')}
+
+
+POOL_STALE_SECONDS = 30.0
+
+
+def pool_maps(allowance_file, now=None, stale_seconds=POOL_STALE_SECONDS):
+    """[{label, done, total, running, slowest: [name, seconds] or None}] of a running stage's pool maps, from its pool
+    status file (tools/pool_status.py, RUN/jobs/NN-stage.pool); total None while a map's input has no known end. []
+    when there is no file or it is stale. For the Monitor: each running map's [done/total] and its slowest unit."""
+    import pool_status
+    try:
+        record = json.loads(pool_status.status_path(allowance_file).read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        return []
+    now = time.time() if now is None else now
+    if now - float(record.get('updated') or 0) > stale_seconds:
+        return []
+    out = []
+    for row in (record.get('maps') or {}).values():
+        done, running, queued = int(row.get('done') or 0), int(row.get('running') or 0), row.get('queued')
+        out.append({'label': row.get('label'), 'done': done, 'running': running,
+                    'total': None if queued is None else done + running + int(queued), 'slowest': row.get('slowest')})
+    return out
+
+
 def log_counter(path, limit=LOG_TAIL_BYTES):
     """{name, done, total, unit} of the last counted progress line ("[done/total unit] name: ...",
-    tools/progress_line.py) in the end of a stage log, or None."""
+    tools/progress_line.py, or a unit store's "LABEL [done/total] NAME 41m12s", tools/unit_store.py) in the end of a
+    stage log, or None. A unit store line also gives 'slowest' ({name, seconds}: the slowest unit of that label seen
+    in the tail) for the monitor."""
     try:
         with open(path, 'rb') as stream:
             stream.seek(0, os.SEEK_END)
@@ -302,11 +365,23 @@ def log_counter(path, limit=LOG_TAIL_BYTES):
             text = stream.read().decode('utf-8', errors='replace')
     except OSError:
         return None
-    for line in reversed(text.splitlines()):
+    lines = text.splitlines()
+    for position in range(len(lines) - 1, -1, -1):
+        line = lines[position]
         match = COUNTER_LINE.match(line.strip())
         if match and int(match.group(2)) > 0:
             return {'name': match.group(4).strip(), 'done': int(match.group(1)), 'total': int(match.group(2)),
                     'unit': (match.group(3) or '').strip() or None}
+        found = unit_line(line)
+        if found:
+            slowest = None
+            for earlier in lines[:position + 1]:
+                row = unit_line(earlier)
+                if row and row['label'] == found['label'] and not row['cached'] and row['seconds'] is not None \
+                        and (slowest is None or row['seconds'] > slowest['seconds']):
+                    slowest = {'name': row['unit_name'], 'seconds': row['seconds']}
+            return {'name': found['label'], 'done': found['done'], 'total': found['total'], 'unit': None,
+                    'slowest': slowest}
     return None
 
 
@@ -553,6 +628,9 @@ class Tracker:
     def _live(self, name, stage, row, elapsed, entry):
         """The running stage's estimate corrected from its work done (row['live']), or None."""
         now = time.time()
+        pools = pool_maps(self.run / 'jobs' / f"{stage['number']:02}-{name}", now)
+        if pools:
+            row['pools'] = pools
         current = row.get('phase') or {}
         if current.get('total'):
             counter = {'source': 'phase timer', 'name': current.get('name'), 'done': int(current.get('done') or 0),

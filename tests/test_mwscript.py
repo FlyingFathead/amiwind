@@ -141,7 +141,7 @@ End''',
     'Inert': '''Begin Inert
 float t
 set t to t + GetSecondsPassed
-SetScale 0.5
+SetWaterLevel 0.5
 End''',
     'Looper': '''Begin Looper
 short n
@@ -313,6 +313,43 @@ HurtStandingActor 20
 if ( ( "chime_obj"->GetHealth ) < 1 )
     "chime_obj"->Resurrect
 endif
+End''',
+    # v0.0.63 (MWSCRIPT-GAPS-63): the moon's colour, an item the player has equipped, the forced run; never placed
+    'GapUser63': '''Begin GapUser63
+short r
+TurnMoonRed
+if ( player->HasItemEquipped "steel longbow_carnius" == 1 )
+    TurnMoonWhite
+endif
+"chime_obj"->ForceRun
+set r to ( "chime_obj"->GetForceRun )
+player->ClearForceRun
+End''',
+    # v0.0.63 (MWSCRIPT-GAPS-63, batch 2): a trap's explosion, an attacked actor, a spell's effects, an NPC's gear
+    'GapUser63b': '''Begin GapUser63b
+short r
+if ( GetAttacked == 1 )
+    ExplodeSpell "proj_trap_spell"
+endif
+set r to ( player->GetSpellEffects "proj_trap_spell" )
+set r to ( "chime_obj"->HasItemEquipped "iron dagger" )
+End''',
+    # v0.0.63 (MWSCRIPT-GAPS-63, batch 3): the werewolf set, the travel read and the scale
+    'GapUser63c': '''Begin GapUser63c
+short r
+float s
+if ( GetPCTraveling == 0 )
+    if ( Player->IsWerewolf == 0 )
+        Player->BecomeWerewolf
+        Player->SetWerewolfAcrobatics
+    endif
+endif
+if ( GetWerewolfKills > 0 )
+    Player->UndoWerewolf
+endif
+SetScale 1.5
+ModScale 0.25
+set s to GetScale
 End''',
     # CELL-CHANGES-59 slice 5: a global script that starts another one and stops itself (never placed: the harness
     # starts it as a start script); the other one counts its own runs
@@ -1072,6 +1109,83 @@ End''')
         self.assertEqual([a[0] for a in calls], [FUNCTION_NUMBERS[n] for n in (
             'fadeout', 'fadein', 'fadeto', 'forcesneak', 'getforcesneak', 'clearforcesneak', 'modresistfire',
             'setresistfrost', 'getresistshock', 'getresistparalysis', 'hassoulgem', 'removesoulgem', 'hurtstandingactor', 'resurrect')])
+
+    def test_moon_equipped_and_forced_run_go_through_the_host_call(self):
+        # v0.0.63 (MWSCRIPT-GAPS-63): TurnMoonRed / TurnMoonWhite, HasItemEquipped and the forced run are carried out
+        # by the host (not "not yet"), in order; HasItemEquipped's read makes the script VOLATILE (equipping does not
+        # move the state generation); the engine has a case for each and keeps the run in the AWRN save block
+        from mwscript.functions import FUNCTION_NUMBERS
+        prog, compiled, _, _ = program()
+        user = {c.name: c for c in compiled}['GapUser63']
+        self.assertEqual(user.notyet, [])
+        self.assertFalse(user.flags & SCRIPT_NOTYET)
+        self.assertTrue(user.flags & SCRIPT_VOLATILE)
+        self.assertFalse(user.flags & SCRIPT_INERT)
+        ops = [(n, a) for _, n, a in awms.decode(user.code)]
+        calls = [(k, a) for k, (n, a) in enumerate(ops) if n == 'NOTYET']
+        self.assertEqual([a[0] for _, a in calls], [FUNCTION_NUMBERS[n] for n in (
+            'turnmoonred', 'hasitemequipped', 'turnmoonwhite', 'forcerun', 'getforcerun', 'clearforcerun')])
+        self.assertIn(('REF', [0xFFFF]), ops[calls[0][0] + 1:calls[1][0]])   # player->HasItemEquipped (then its row)
+        self.assertEqual([prog.strings.rows[s] for s in calls[1][1][4:]], ['steel longbow_carnius'])
+        self.assertEqual(ops[calls[5][0] - 1], ('REF', [0xFFFF]))   # player->ClearForceRun
+        host = (ROOT / 'engine/aga/src/aw_mwhost.c').read_text(encoding='utf-8')
+        for case in ('AWF_TURNMOONRED', 'AWF_HASITEMEQUIPPED', 'AWF_FORCERUN', '"AWRN"'):
+            self.assertIn(case, host)
+        self.assertIn('sky_moon_red', (ROOT / 'engine/aga/src/r_sky.c').read_text(encoding='utf-8'))
+        self.assertIn('aw_ambient_forced_run', (ROOT / 'engine/aga/src/aw_ambient.c').read_text(encoding='utf-8'))
+
+    def test_explode_attacked_and_spell_effects_go_through_the_host_call(self):
+        # v0.0.63 (MWSCRIPT-GAPS-63, batch 2): ExplodeSpell and GetSpellEffects hand the spell's ASPT row, HasItemEquipped
+        # the item's AITM row (an NPC's worn list) after its id; GetAttacked reads the combat layer's list
+        from mwscript.functions import FUNCTION_NUMBERS
+        prog, compiled, _, _ = program()
+        user = {c.name: c for c in compiled}['GapUser63b']
+        self.assertEqual(user.notyet, [])
+        self.assertFalse(user.flags & SCRIPT_NOTYET)
+        self.assertTrue(user.flags & SCRIPT_VOLATILE)
+        self.assertFalse(user.flags & SCRIPT_INERT)
+        ops = [(n, a) for _, n, a in awms.decode(user.code)]
+        calls = [(k, a) for k, (n, a) in enumerate(ops) if n == 'NOTYET']
+        self.assertEqual([a[0] for _, a in calls], [FUNCTION_NUMBERS[n] for n in (
+            'getattacked', 'explodespell', 'getspelleffects', 'hasitemequipped')])
+        row = prog.spell('proj_trap_spell')
+        self.assertEqual(calls[1][1][2] & 0x1F, 1)                  # ExplodeSpell: one number, the row
+        self.assertEqual(calls[2][1][2] & 0x1F, 1)
+        self.assertIn(row, [a[0] for n, a in ops[:calls[1][0]] if n.startswith('PUSH')])
+        self.assertIn(('REF', [0xFFFF]), ops[calls[1][0] + 1:calls[2][0]])   # player->GetSpellEffects
+        self.assertEqual([prog.strings.rows[s] for s in calls[3][1][4:]], ['iron dagger'])
+        host = (ROOT / 'engine/aga/src/aw_mwhost.c').read_text(encoding='utf-8')
+        for case in ('AWF_EXPLODESPELL', 'AWF_GETATTACKED', 'AWF_GETSPELLEFFECTS', 'AW_ActorWearsItem'):
+            self.assertIn(case, host)
+        self.assertIn('int AW_CastExplode(', (ROOT / 'engine/aga/src/aw_cast.c').read_text(encoding='utf-8'))
+        self.assertIn('aw_combat_attacked(t)', (ROOT / 'engine/aga/src/aw_combat.c').read_text(encoding='utf-8'))
+
+    def test_werewolf_set_and_scale_go_through_the_host_call(self):
+        # v0.0.63 (MWSCRIPT-GAPS-63, batch 3): BecomeWerewolf hands the werewolf's 35 stats four to a number (9
+        # numbers, 255 where the data has no setting), SetWerewolfAcrobatics its one value; the rest by number
+        from mwscript.functions import FUNCTION_NUMBERS
+        from mwscript.codegen import Program
+        prog, compiled, _, _ = program()
+        user = {c.name: c for c in compiled}['GapUser63c']
+        self.assertEqual(user.notyet, [])
+        self.assertFalse(user.flags & SCRIPT_NOTYET)
+        self.assertFalse(user.flags & SCRIPT_INERT)
+        calls = [a for _, n, a in awms.decode(user.code) if n == 'NOTYET']
+        self.assertEqual([a[0] for a in calls], [FUNCTION_NUMBERS[n] for n in (
+            'getpctraveling', 'iswerewolf', 'becomewerewolf', 'setwerewolfacrobatics', 'getwerewolfkills',
+            'undowerewolf', 'setscale', 'modscale', 'getscale')])
+        self.assertEqual(calls[2][2] & 0x1F, 9)
+        self.assertEqual(calls[3][2] & 0x1F, 1)
+        self.assertEqual(calls[8][2] & 0xC0, 0xC0)                 # GetScale: a value, a fraction
+        # the packing: four bytes to a number, high byte first, signed
+        prog.data.records.setdefault('GMST', {})['fwerewolfstrength'] = [('FLTV', struct.pack('<f', 150.0))]
+        words = Program.werewolf_settings(prog, True)
+        self.assertEqual(len(words), 9)
+        self.assertEqual((words[0] >> 24) & 255, 150)
+        self.assertEqual(words[0] & 0xFFFFFF, 0xFFFFFF)
+        host = (ROOT / 'engine/aga/src/aw_mwhost.c').read_text(encoding='utf-8')
+        for case in ('AWF_BECOMEWEREWOLF', 'AWF_SETWEREWOLFACROBATICS', 'AWF_GETWEREWOLFKILLS', 'AWF_SETSCALE', '"AWWF"'):
+            self.assertIn(case, host)
 
     def test_the_small_functions_go_through_the_host_call(self):
         # v0.0.62 (MWSCRIPT-SMALL-FUNCTIONS-62): angles, moves, SetAtStart, Face, detection, the line of sight, the
@@ -2039,6 +2153,22 @@ int main(void){
      printf("refused %d %d %d\n",cut,many,tag);}
     n=AW_ForcedPack(b,sizeof(b),0,in,0,2.0f);
     printf("badfade %d %d\n",n,AW_ForcedUnpack(b,n,&player,out,4,&count,&fade));
+    /* v0.0.63 (MWSCRIPT-GAPS-63): the AWRN block of the forced run */
+    n=AW_ForcedRunPack(b,sizeof(b),1,in,2);
+    printf("run %d %c%c%c%c %d %d %d small %d\n",n,b[0],b[1],b[2],b[3],b[4],b[5],b[6],AW_ForcedRunPack(b,14,1,in,2));
+    {int k=AW_ForcedRunUnpack(b,n,&player,out,4,&count);
+     printf("rununpack %d %d %d %08x %08x\n",k,player,count,(unsigned)out[0],(unsigned)out[1]);
+     printf("runrefused %d %d\n",AW_ForcedRunUnpack(b,n-1,&player,out,4,&count),AW_ForcedRunUnpack(b,n,&player,out,1,&count));}
+    /* v0.0.63 (MWSCRIPT-GAPS-63): the AWWF block of the werewolf state */
+    {unsigned char wb[128];aw_were_t w,r;int i,k;
+     w.player=1;w.kept=1;w.kills=300;
+     for(i=0;i<8;i++)w.attr[i]=(short)(40+i);
+     for(i=0;i<27;i++)w.skill[i]=(short)(5+i);
+     w.skill[3]=-2;
+     n=AW_WerePack(wb,sizeof(wb),&w,in,2);
+     k=AW_WereUnpack(wb,n,&r,out,4,&count);
+     printf("were %d %d %d %d %d %d %d %d %08x small %d cut %d\n",n,k,r.player,r.kept,r.kills,r.attr[7],r.skill[26],
+            r.skill[3],(unsigned)out[1],AW_WerePack(wb,82,&w,in,2),AW_WereUnpack(wb,n-1,&r,out,4,&count));}
     return 0;
 }
 '''
@@ -2258,7 +2388,11 @@ class EffectTests(unittest.TestCase):
             shutil.rmtree(tmp, ignore_errors=True)
         # 11 + 2 x 4 bytes, round trip; a cut block, too many references, a wrong tag and a fade past 1 refused
         self.assertEqual(out, ['pack 19 AWFS 1 1 2 small -1', 'unpack 19 1 2 01020304 a0b0c0d0 0.50',
-                               'refused -1 -1 -1', 'badfade 11 -1'])
+                               'refused -1 -1 -1', 'badfade 11 -1',
+                               # v0.0.63: the forced run, 7 + 2 x 4 bytes, round trip; cut and too many refused
+                               'run 15 AWRN 1 1 2 small -1', 'rununpack 15 1 2 01020304 a0b0c0d0', 'runrefused -1 -1',
+                               # the werewolf state, 79 + 2 x 4 bytes, round trip (a negative skill kept); small, cut
+                               'were 87 87 1 1 300 47 31 -2 a0b0c0d0 small -1 cut -1'])
 
     def test_summoning_effects_and_one_effect_ended(self):
         tmp = Path(tempfile.mkdtemp(prefix='aw-effects5-'))

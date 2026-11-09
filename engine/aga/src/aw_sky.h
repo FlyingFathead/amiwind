@@ -58,6 +58,8 @@ const float *R_DayNightSunDirection(void);
 int R_NightMoonOrbit(int moon,int milliseconds,int days,float direction[3],int *phase);
 /* Masser=0, Secunda=1; NULL when hidden or no valid owned atlas. */
 const float *R_DayNightMoonDirection(int moon);
+/* 1 while a script's TurnMoonRed holds Secunda in the script colour (aw_story.c, saved; MWSCRIPT-GAPS-63). */
+int AW_MoonRed(void);
 /* Procedural legacy colors follow the versioned private asset palette remap. */
 unsigned char R_SkyLegacyColour(unsigned char index);
 /* Validated shared cloud roles use a broader texture projection. */

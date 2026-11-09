@@ -293,7 +293,22 @@ function renderProgress(p) {
           skipped: ['⊘', '#8a98a8', 'skipped']}[s.status] || ['○', '#8a98a8', 'pending']);
     const icon = el('span', 'mark', mark); icon.style.color = colour; icon.style.textAlign = 'center';
     icon.title = s.name + ': ' + says + (s.expected_basis && !reused ? ' (expected from ' + s.expected_basis + ')' : '');
-    row.append(icon, name, track, el('span', 'muted', fmtS(s.elapsed_seconds)));
+    // [done/total] of a running stage's counter (build-progress.json stage row 'counter', from its log), with the
+    // slowest unit so far when the unit store's lines give it
+    // and each running pool map (stage row 'pools', from RUN/jobs/NN-stage.pool) with its slowest running unit
+    const live = s.status === 'running';
+    const c = live && s.counter && s.counter.total ? s.counter : null;
+    const pools = live ? (s.pools || []) : [];
+    const firstPool = !c && pools.length ? pools[0] : null;
+    const shown = c || (firstPool && firstPool.total ? firstPool : null);
+    const took = el('span', 'muted', (shown ? '[' + shown.done + '/' + shown.total + '] ' : '') + fmtS(s.elapsed_seconds));
+    const lines = [];
+    if (c) lines.push((c.name || '') + ': ' + c.done + ' of ' + c.total + ' ' + (c.unit || 'units') +
+      (c.slowest ? ' · slowest done ' + c.slowest.name + ' ' + fmtS(c.slowest.seconds) : ''));
+    for (const m of pools) lines.push((m.label || 'pool') + ': [' + m.done + '/' + (m.total == null ? '?' : m.total) + '] ' +
+      m.running + ' running' + (m.slowest ? ' · slowest ' + m.slowest[0] + ' ' + fmtS(m.slowest[1]) : ''));
+    if (lines.length) took.title = lines.join('\n');
+    row.append(icon, name, track, took);
     box.append(row);
   }
   if ($('follow').checked && running.length) {

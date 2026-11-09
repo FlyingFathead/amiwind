@@ -290,8 +290,9 @@ class Cores(unittest.TestCase):
                 self.assertEqual(single, shared)
                 self.assertEqual(len(set(shared)), len(entries))
                 calls = []
-                real = pass_cache.UnitCache.open
-                with patch.object(pass_cache.UnitCache, 'open', lambda *a: calls.append(a) or real(*a)), \
+                import unit_store       # the cache is keyed on build_shell's reach (UNIT-KEY-WHOLE-FILE-63)
+                real = unit_store.bake_keyed_cache
+                with patch.object(unit_store, 'bake_keyed_cache', lambda *a, **k: calls.append(a) or real(*a, **k)), \
                         patch.object(S, 'build_shell', lambda task, jobs=1: (_ for _ in ()).throw(ValueError('x'))):
                     S.convert('data', tmp / 'scene', entries, 't', 1,
                               refresh=lambda todo: {e['map']: {'refs': [0]} for e in todo})

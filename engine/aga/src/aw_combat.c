@@ -95,12 +95,16 @@ static cvar_t chase_speed={"aw_combat_speed","200"};
  * aw_combat_miss 1 = AmiWind style (AmiWind extension: a failed roll shows the
  * defender's dodge or block), 0 = Original Morrowind (the swish/miss sound);
  * aw_combat_dice 1 = the original rolls, 0 = no dice (AmiWind extension);
- * aw_combat_best_attack 1 = "always use best attack", 0 = by movement. */
+ * aw_combat_best_attack 1 = "always use best attack", 0 = by movement. Options > Prefs "Always use best attack"
+ * (aw_menu.c, the original's Preferences tab); ON by default, an AmiWind default (the original's is off), by decision of
+ * the maintainer, 7 November 2026 (BEST-ATTACK-OPTION-62); a saved configuration from before it is switched on once
+ * (AW_CombatDefaultsMigrate). */
 static cvar_t miss_cvar={"aw_combat_miss","1",true};
 static cvar_t dice_cvar={"aw_combat_dice","1",true};
-static cvar_t best_cvar={"aw_combat_best_attack","0",true};
+static cvar_t best_cvar={"aw_combat_best_attack","1",true};
 static char resist_text[128];        /* sMagicTargetResistsWeapons (combat/settings.txt; RESIST-NORMAL-WEAPONS-61) */
 static short normal_resistance(edict_t *t,int test);
+static void hit_effects(edict_t *e,aw_fighter_t *f);
 static unsigned long god_blows;      /* blows god mode turned away (GODMODE-COMBAT-DAMAGE-61), shown by dbg combat */
 /* Blocking (Controls > Blocking; docs/COMBAT.md "Blocking"): aw_combat_block 0 = Original Morrowind
  * (automatic: a shield blocks by skill, no button; UESP Block, OpenMW has no block input), the default
@@ -116,9 +120,10 @@ static cvar_t block_cvar={"aw_combat_block","0",true};
  * sounds (one per outcome), 1 (default since v0.0.58, COMBAT-SOUNDS-RULE-OFF-58) = every swing its swing sound, the armour hit sound of the piece struck, the miss sound
  * for the player's misses only, the two punch sounds. The combat playground's modes switch it on for their session.
  * Both switches are AW_CombatRule's (dbg combat flee|sounds on/off), not console variables. */
-static int rules[AW_RULE_COUNT]={0,1};              /* flee off (A/B), sounds on (shipped features default on) */
+static int rules[AW_RULE_COUNT]={0,1,1};            /* flee off (A/B), sounds on, contact on (shipped features default on) */
 #define flee_on rules[AW_RULE_FLEE]
 #define sounds_on rules[AW_RULE_SOUNDS]
+#define contact_on rules[AW_RULE_CONTACT]
 int AW_CombatRule(int rule,int on) {
     int was;
     if(rule<0 || rule>=AW_RULE_COUNT)return 0;
@@ -329,7 +334,10 @@ void AW_CombatPlayerSheet(aw_fighter_t *o) {
         return;
     }
     memset(o,0,sizeof(*o));strcpy(o->id,"player");strcpy(o->name,"You");o->aware=1;
-    for(i=0;i<8;i++){int v=aw_character.valid?aw_character.attributes[i]:50;o->attributes[i]=(unsigned char)(v<0?0:v>255?255:v);}
+    /* HIT-CHANCE-CHECK-62: the modified attributes (base + fortify - damage), as OpenMW's getModified in every combat
+     * formula; the base alone left a Fortify Agility or Luck out of the hit chance */
+    for(i=0;i<8;i++){int v=aw_character.valid?aw_character.attributes[i]+aw_character.modifiers[i]-aw_character.damage[i]:50;
+                     o->attributes[i]=(unsigned char)(v<0?0:v>255?255:v);}
     for(i=0;i<27;i++){int v=aw_character.valid?aw_character.skills[i]:30;o->skills[i]=(unsigned char)(v<0?0:v>255?255:v);}
     o->level=(short)(aw_character.valid?aw_character.level:1);
     o->health_max=aw_character.valid && aw_character.maximum[0]>0?aw_character.maximum[0]:100;
@@ -794,6 +802,7 @@ static void npc_strike(slot_t *s,edict_t *p) {
      * flags yet: a weapon in an NPC's hand counts as ordinary) */
     s->f.weapon_normal=(unsigned char)(s->f.weapon!=0);
     you.resist_normal=s->f.weapon_normal?normal_resistance(p,0):0;
+    hit_effects(s->e,&s->f);hit_effects(p,&you);                     /* HIT-CHANCE-CHECK-62 */
     /* fBlockStillBonus while not moving forward (combat.cpp: movement mPosition[1] <= 0) */
     {aw_fighter_t before=you;
      AW_CombatSwing(&aw_combat_settings,&s->f,&you,s->attack,s->strength,bearing(p,s->e,0),
@@ -839,10 +848,16 @@ static void npc_strike(slot_t *s,edict_t *p) {
     if(aw_combat_weapon_hit && s->f.weapon && out.outcome!=AW_HIT_MISS)aw_combat_weapon_hit(s->e,p);
 }
 /* Damage from the world, not from a fighter (lava, aw_lava.c, docs/LAVA.md): the
- * player's live health as combat keeps it; a death ends like a death in combat. */
+ * player's live health as combat keeps it; a death ends like a death in combat.
+ * GODMODE-LAVA-DEATH-62: every world damage (the lava volume, a lava script's HurtStandingActor, a fall, drowning,
+ * dbg camera die) comes through here, so god mode (Quake's FL_GODMODE) is checked here once: no health is lost
+ * (OpenMW 0.51: god mode keeps the player's health in every damage path). The held-back damage is counted. */
+static unsigned long world_god_held;static float world_god_damage;
+unsigned long AW_CombatWorldGodHeld(float *damage) {if(damage)*damage=world_god_damage;return world_god_held;}
 int AW_CombatHurtPlayer(float damage,const char *cause) {
     edict_t *p=player();float h;
     if(!p || !(damage>0) || p->v.health<=0)return 0;
+    if(AW_CombatGodWorldDamage((int)p->v.flags&FL_GODMODE,damage,&world_god_damage)){world_god_held++;return 0;}
     h=p->v.health-damage;if(h<0)h=0;
     p->v.health=h;
     if(you_valid)you.health=h;
@@ -941,6 +956,8 @@ int AW_CombatLastHitTake(unsigned long victim,unsigned long weapon){
 void AW_CombatLastHitReset(void){memset(last_hit,0,sizeof(last_hit));last_hit_next=0;}
 int AW_CombatLastHitCount(void){int k,n=0;for(k=0;k<AW_COMBAT_LAST_HITS;k++)n+=last_hit[k].victim!=0;return n;}
 void (*aw_combat_assault)(struct edict_s *victim);
+void (*aw_combat_attacked)(struct edict_s *victim);
+void (*aw_combat_player_kill)(struct edict_s *victim);
 void (*aw_combat_killed)(struct edict_s *victim);
 static float resist_test=-1;
 const char *AW_CombatResistText(void){return resist_text;}
@@ -954,6 +971,51 @@ static short normal_resistance(edict_t *t,int test){
     if(!(r==r))return 0;
     w=r<-10000?-10000:r>10000?10000:r;
     return (short)(w+(w<0?-.5f:.5f));
+}
+/* HIT-CHANCE-CHECK-62: the effects the hit chance counts, on fighter F of actor E, before a swing (OpenMW 0.51 combat.cpp
+ * getHitChance, creaturestats.cpp getEvasion): about ten effect sums a swing, never per frame */
+static short effect_rounded(edict_t *e,int effect){
+    float m=aw_combat_effect_magnitude(e,effect);
+    if(!(m==m))return 0;
+    if(m>10000)m=10000;
+    if(m<-10000)m=-10000;
+    return (short)(m+(m<0?-.5f:.5f));
+}
+static void hit_effects(edict_t *e,aw_fighter_t *f){
+    short sanctuary;
+    f->attack_mod=0;f->sanctuary=f->unseen=0;
+    if(!e || !aw_combat_effect_magnitude)return;
+    f->attack_mod=(short)(effect_rounded(e,AW_EFFECT_FORTIFY_ATTACK)-effect_rounded(e,AW_EFFECT_BLIND));
+    sanctuary=effect_rounded(e,AW_EFFECT_SANCTUARY);
+    f->sanctuary=(unsigned char)(sanctuary<0?0:sanctuary>100?100:sanctuary);   /* getEvasion: at most 100 */
+    f->unseen=AW_CombatUnseen(&aw_combat_settings,aw_combat_effect_magnitude(e,AW_EFFECT_CHAMELEON),
+                              aw_combat_effect_magnitude(e,AW_EFFECT_INVISIBILITY));
+}
+/* ENEMY-HEALTH-BAR-62 / HIT-CHANCE-CHECK-62: the player's hit contact when the crosshair's ray met nobody (OpenMW 0.51
+ * combat.cpp getHitContact: the player strikes the nearest actor in the cone in front, not only the one under the
+ * crosshair). Only the fighters (the slots) are asked: a resident not fighting is still struck by aiming at it. A
+ * flyer's feet may be higher by the same allowance its own strike has. Line of sight as World::getLOS. */
+static edict_t *contact_target(edict_t *p,float reach){
+    int i;edict_t *e,*best=NULL;float best_gap=0,gap,dz,eye,to[3],forward[3],right[3],up[3];vec3_t from,at;trace_t tr;
+    AngleVectors(p->v.v_angle,forward,right,up);
+    eye=p->v.view_ofs[2]>1?p->v.view_ofs[2]-p->v.mins[2]:22-p->v.mins[2];   /* eye over the feet; 22: Quake's eye */
+    for(i=0;i<SLOTS;i++){
+        e=slots[i].e;
+        if(!e || e->free || slots[i].f.dead || slots[i].state==S_DEAD)continue;
+        gap=gap_to(p,e,&dz);
+        to[0]=e->v.origin[0]-p->v.origin[0];to[1]=e->v.origin[1]-p->v.origin[1];
+        to[2]=(e->v.origin[2]+e->v.mins[2])-(p->v.origin[2]+p->v.mins[2]);
+        if(!AW_CombatContact(&aw_combat_settings,to,eye,e->v.maxs[2]-e->v.mins[2],gap,dz,reach,
+                             (AW_AmbientFlags(e)&AW_AMBIENT_FLYER)?64:0,forward))continue;
+        if(best && gap>=best_gap)continue;
+        VectorAdd(p->v.origin,p->v.view_ofs,from);
+        VectorCopy(e->v.origin,at);at[2]+=(e->v.mins[2]+e->v.maxs[2])*.5f;
+        tr=SV_Move(from,vec3_origin,vec3_origin,at,MOVE_NOMONSTERS,p);
+        if(tr.fraction<1 || tr.startsolid || tr.allsolid)continue;
+        best=e;best_gap=gap;
+    }
+    if(best)totals.player_contacts++;
+    return best;
 }
 static void resist_notice(void){
     if(readout.value)Con_Printf("Combat: your weapon has no effect on this target (it resists normal weapons)\n");
@@ -970,6 +1032,7 @@ static void player_strike(edict_t *p) {
         return;
     }
     t=AW_NPCTargetReach(p,p->v.v_angle,reach+16);       /* from the eye: plus the player's own half width */
+    if(!t && contact_on)t=contact_target(p,reach);      /* the original's hit cone over the fighters (AW_RULE_CONTACT) */
     if(t && !(s=slot_of(t))){
         /* Any resident: hitting it starts a fight (OpenMW actorAttacked). */
         eval_t *v=GetEdictFieldValue(t,"aw_source_id");
@@ -979,6 +1042,7 @@ static void player_strike(edict_t *p) {
             /* CRIME-59: the assault (OpenMW actorAttacked: canCommitCrimeAgainst, commitCrime OT_Assault) before its
              * fight starts; a witness or the victim itself may start fighting there (the crime's reactions) */
             if(aw_combat_assault)aw_combat_assault(t);
+            if(aw_combat_attacked)aw_combat_attacked(t);   /* GetAttacked (MWSCRIPT-GAPS-63) */
             if((s=slot_of(t))!=NULL)s->f.aware=0;   /* the crime started its fight: the blow is still unaware's */
             else if(!AW_CombatActorLoad(id,&sheet)){if(readout.value)Con_Printf("Combat: no combat sheet for %s\n",id);t=NULL;}
             else{sheet.aware=0;if(!AW_CombatEngage(t,&sheet,NULL))t=NULL;else if((s=slot_of(t)))s->f.aware=0;}
@@ -1001,6 +1065,7 @@ static void player_strike(edict_t *p) {
      * included) and whether the player's weapon is ordinary; asked only for an ordinary weapon */
     you.weapon_normal=(unsigned char)(you.weapon && (!aw_combat_player_weapon_normal || aw_combat_player_weapon_normal()));
     s->f.resist_normal=you.weapon_normal?normal_resistance(t,1):0;   /* percent */
+    hit_effects(p,&you);hit_effects(t,&s->f);                        /* HIT-CHANCE-CHECK-62 */
     {aw_fighter_t before=you;
      AW_CombatSwing(&aw_combat_settings,&you,&s->f,attack,player_strength(),bearing(t,p,90),!s->f.moving,&rng,&out);
      /* GODMODE-COMBAT-DAMAGE-61: no fatigue, no weapon wear in god mode (OpenMW combat.cpp) */
@@ -1052,6 +1117,7 @@ static void player_strike(edict_t *p) {
      * successful blows only, the killing one too; HitOnMe reads it) */
     if(aw_combat_weapon_hit && you.weapon && out.outcome!=AW_HIT_MISS)aw_combat_weapon_hit(p,t);
     if(killed && aw_combat_killed)aw_combat_killed(killed);   /* CRIME-59: OpenMW actorKilled */
+    if(killed && aw_combat_player_kill)aw_combat_player_kill(killed);   /* GetWerewolfKills (MWSCRIPT-GAPS-63) */
 }
 /* The player's swing now (0 chop, 1 slash, 2 thrust): the same choice player_strike makes, by the movement at the
  * swing's start or the best attack; the third-person body plays its keys (aw_view.c, WEAPONS-57). */
@@ -1395,6 +1461,8 @@ static void report(void) {
     Con_Printf("Flee by rating: %s; aggro and flee settings %s; flees %ld\n",flee_on?"on":"off",
         ai_ok?"loaded":"missing (rebuild the image)",(long)totals.npc_flees);
     Con_Printf("Sounds: %s\n",sounds_on?"as OpenMW (dbg combat sounds on)":"one per outcome (dbg combat sounds off)");
+    Con_Printf("Best attack: %s; hit contact: %s (swings found by the cone %ld)\n",best_cvar.value?"on":"off",
+        contact_on?"cone when the crosshair misses":"crosshair only",(long)totals.player_contacts);
     for(i=0;i<SLOTS;i++)if(slots[i].e)Con_Printf(" %s: health %ld/%ld fatigue %ld/%ld %s\n",slots[i].f.name,
         (long)slots[i].f.health,(long)slots[i].f.health_max,(long)slots[i].f.fatigue,(long)slots[i].f.fatigue_max,
         slots[i].f.dead?"dead":slots[i].f.knocked?"down":"fighting");
@@ -1483,10 +1551,13 @@ static void command(void) {
         Con_Printf("Flee by the Flee rating %s.\n",on?"on (OpenMW makeFleeDecision)":"off (only an unreachable player makes a fighter flee)");return;}
     if(Cmd_Argc()==3 && !Q_strcasecmp(a,"sounds") && (on=AW_CompanionToggleWord(Cmd_Argv(2)))>=0){AW_CombatRule(AW_RULE_SOUNDS,on);
         Con_Printf("Combat sounds: %s.\n",on?"as OpenMW plays them (swing, armour hit, miss for your swings, two punches)":"one sound per outcome (the earlier set)");return;}
-    if(Cmd_Argc()==3 && !Q_strcasecmp(a,"bestattack") && (on=AW_CompanionToggleWord(Cmd_Argv(2)))>=0){Cvar_SetValue(best_cvar.name,(float)on);return;}
+    if(Cmd_Argc()==3 && !Q_strcasecmp(a,"bestattack") && (on=AW_CompanionToggleWord(Cmd_Argv(2)))>=0){Cvar_SetValue(best_cvar.name,(float)on);
+        Con_Printf("Always use best attack: %s (Options > Prefs shows the same setting).\n",on?"on (the weapon's strongest attack)":"off (the attack follows your movement)");return;}
+    if(Cmd_Argc()==3 && !Q_strcasecmp(a,"contact") && (on=AW_CompanionToggleWord(Cmd_Argv(2)))>=0){AW_CombatRule(AW_RULE_CONTACT,on);
+        Con_Printf("Hit contact: %s.\n",on?"the original's hit cone when the crosshair misses (OpenMW getHitContact)":"the crosshair's ray only (the earlier rule)");return;}
     if(!Q_strcasecmp(a,"calm") && Cmd_Argc()==2){AW_CombatClear();if(battle){battle=0;AW_MusicCombat(0);}Con_Printf("Combat: everyone calms down.\n");return;}
     if((on=AW_CompanionToggleWord(a))>=0 && Cmd_Argc()==2){Cvar_SetValue(combat_on.name,(float)on);if(!on)AW_CombatClear();return;}
-    Con_Printf("Usage: dbg combat [on/off | seed N | readout on/off | music on/off | dice on/off | style amiwind/original | block hold/auto | flee on/off | sounds on/off | bestattack on/off | loadout NAME/off | calm]\n");
+    Con_Printf("Usage: dbg combat [on/off | seed N | readout on/off | music on/off | dice on/off | style amiwind/original | block hold/auto | flee on/off | sounds on/off | bestattack on/off | contact on/off | loadout NAME/off | calm]\n");
 }
 void AW_CombatInit(void) {
     Cvar_RegisterVariable(&combat_on);Cvar_RegisterVariable(&readout);Cvar_RegisterVariable(&music);
@@ -1499,6 +1570,13 @@ void AW_CombatInit(void) {
     Cmd_AddCommand("+aw_alt",alt_down);Cmd_AddCommand("-aw_alt",alt_up);
     aw_combat_enemy_bar=AW_CombatEnemyBar;aw_combat_scene=AW_CombatSceneSpawn;
     {extern float (*aw_worldui_armor_rating)(void);aw_worldui_armor_rating=AW_CombatPlayerArmorRating;}
+    {extern void (*aw_defaults_migrate)(int level);aw_defaults_migrate=AW_CombatDefaultsMigrate;}
+}
+/* BEST-ATTACK-OPTION-62: run once for a saved configuration of defaults level LEVEL (aw_fog.c horizon_migrate, after
+ * config.cfg): before level 2 the configuration holds "Always use best attack" at the old default 0, which no menu
+ * offered, so it takes the new default 1; a choice made after that stays. */
+void AW_CombatDefaultsMigrate(int level) {
+    if(level<2)Cvar_SetValue(best_cvar.name,1);
 }
 
 #include "aw_actors.h"
@@ -1542,6 +1620,7 @@ int AW_CombatSpellHit(edict_t *e,float health,int harmful) {
         eval_t *v=GetEdictFieldValue(e,"aw_source_id");aw_fighter_t sheet;
         if(!harmful || !v || !v->string || !*(pr_strings+v->string))return 0;
         if(aw_combat_assault)aw_combat_assault(e);   /* CRIME-59: the player's harmful spell is an attack too */
+        if(aw_combat_attacked)aw_combat_attacked(e);  /* GetAttacked (MWSCRIPT-GAPS-63) */
         if(!(s=slot_of(e)) && (!AW_CombatActorLoad(pr_strings+v->string,&sheet) || !AW_CombatEngage(e,&sheet,NULL) ||
                                !(s=slot_of(e))))return 0;
     }
@@ -1557,6 +1636,7 @@ int AW_CombatSpellHit(edict_t *e,float health,int harmful) {
         if(readout.value)Con_Printf("Combat: %s is dead\n",s->f.name);
         voice(s->e,AW_VOICE_DEATH);
         if(harmful && aw_combat_killed)aw_combat_killed(s->e);   /* CRIME-59: the player's spell killed it */
+        if(harmful && aw_combat_player_kill)aw_combat_player_kill(s->e);   /* GetWerewolfKills (MWSCRIPT-GAPS-63) */
         if(!AW_CombatHostiles())ended(1);
     }
     return 1;

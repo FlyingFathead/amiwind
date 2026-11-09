@@ -17,7 +17,7 @@ from .opcodes import CODE, CMP_I, CMP_F, ARITH_I, ARITH_F, NONE, QUERIES, WHOLE_
 # The squeeze switch: False builds the program without the compare-and-branch opcodes (the A/B reference run; the
 # builder always squeezes).
 SQUEEZE = True
-from .functions import lookup, ACTOR_CALLS, HOST, HOST_EFFECT_NUMBERS, RESISTS
+from .functions import lookup, ACTOR_CALLS, HOST, HOST_EFFECT_NUMBERS, MAGIC_EFFECT_CALLS
 
 # A VISI row's room for an actor that may stand in any room: a follower of the player (AIFollow, AIFollowCell; v0.0.62)
 VISI_ANY = 0xFFFFFFFF
@@ -302,6 +302,35 @@ class Program:
             raise CompileError('GetPCCell %r: a cell outside the table\'s ranges' % name)
         wild = d.default_cell_name.casefold().startswith(key)
         return self.pccells.get(key, {'name': name, 'rooms': rooms, 'outside': outside, 'wilderness': wild})
+
+    def werewolf_settings(self, stats):
+        """The werewolf's game settings (GMST fWerewolf*; the masters spell two of them fWerewolfIntellegence and
+        fWerewolfMerchantile): STATS: the 8 attributes and 27 skills, a byte each (255: no setting), packed four to a
+        whole number, high byte first, as signed 32-bit numbers; else [fWerewolfAcrobatics] (80 when the data has
+        none, the masters' value)."""
+        from .functions import ATTRIBUTES, SKILLS
+        gmst = getattr(self.data, 'records', {}).get('GMST', {})
+
+        def value(name):
+            for tag, data in gmst.get('fwerewolf' + name, []):
+                if tag == 'FLTV' and len(data) >= 4:
+                    return struct.unpack_from('<f', data)[0]
+            return None
+        spelled = {'intelligence': 'intellegence', 'mercantile': 'merchantile'}
+        if not stats:
+            v = value('acrobatics')
+            return [int(round(v)) if v is not None else 80]
+        out = []
+        for name in ATTRIBUTES + SKILLS:
+            v = value(spelled.get(name, name))
+            out.append(255 if v is None else max(0, min(254, int(round(v)))))
+        while len(out) % 4:
+            out.append(255)
+        words = []
+        for i in range(0, len(out), 4):
+            w = (out[i] << 24) | (out[i + 1] << 16) | (out[i + 2] << 8) | out[i + 3]
+            words.append(w - (1 << 32) if w >= 1 << 31 else w)
+        return words
 
     def spell_effects(self, spell):
         """The SPFX row of a spell whose every effect is in the first slice of the spell effects (v0.0.57,
@@ -957,10 +986,35 @@ class ScriptCompiler:
                 if ref is not None:
                     self.e.op('REF', self.p.object(ref))
                 return self.notyet(fn, None, [('str', spell), ('str', who), ('int', row)], None, carried=True)
+        if fn.name in ('hasitemequipped', 'getspelleffects') and args and args[0][0] == 'str':
+            # v0.0.63 (MWSCRIPT-GAPS-63): the item's AITM row (an NPC's worn list) / the spell's ASPT row (the active
+            # effects' source) as the call's number, the id kept as its string; both reads ask every frame (VOLATILE)
+            self.flags |= SCRIPT_VOLATILE
+            row = self.p.item(args[0][1]) if fn.name == 'hasitemequipped' else self.p.spell(args[0][1])
+            if ref is not None:
+                self.e.op('REF', self.p.object(ref))
+            return self.notyet(fn, None, [args[0], ('int', row)], None, carried=True)
+        if fn.name in ('becomewerewolf', 'setwerewolfacrobatics'):
+            # v0.0.63 (MWSCRIPT-GAPS-63): the werewolf's game settings as the call's numbers (OpenMW player.cpp
+            # setWerewolfStats, mechanicsmanagerimp.cpp applyWerewolfAcrobatics): BecomeWerewolf four per number, the
+            # eight attributes then the 27 skills, 255 where the data has none; SetWerewolfAcrobatics the one value
+            numbers = [('int', v) for v in self.p.werewolf_settings(fn.name == 'becomewerewolf')]
+            if ref is not None:
+                self.e.op('REF', self.p.object(ref))
+            return self.notyet(fn, None, numbers, None, carried=True)
+        if fn.name == 'explodespell':
+            # v0.0.63 (MWSCRIPT-GAPS-63): the spell's ASPT row as the call's number; the engine reads its effects and
+            # areas from the actor table (aw_cast.c AW_CastExplode)
+            spell = args[0][1] if args and args[0][0] == 'str' else ''
+            if not spell:
+                return self.notyet(fn, ref, args, None)
+            if ref is not None:
+                self.e.op('REF', self.p.object(ref))
+            return self.notyet(fn, None, [('int', self.p.spell(spell))], None, carried=True)
         if fn.name in ('gettarget', 'getstandingpc', 'getangle', 'getdetected', 'getlos', 'getlineofsight',
                        'onknockout', 'getcurrentweather', 'getpcsneaking', 'getweapondrawn', 'getpcinjail',
                        'hassoulgem', 'hitonme') or \
-                (fn.name.startswith('getresist') and fn.name[3:] in RESISTS):
+                (fn.name.startswith('get') and fn.name[3:] in MAGIC_EFFECT_CALLS):
             # a fight starts without the state generation moving: the script asks every frame; so do the angles, the
             # detection, the line of sight, a knockdown and the weather (v0.0.62), as GetPos does
             self.flags |= SCRIPT_VOLATILE

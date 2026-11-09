@@ -313,7 +313,7 @@ OPTIONS = {
     # The media catalogue on the boot disk (IMAGE-MEDIA-CATALOGUE-ON-DISK-46): DEBUGGING ONLY, off by default
     'media_catalogue': 'mode',
     # Repeated content stored once (tools/payload_share.py): on by default since v0.0.47; off stores every copy
-    'file_aliases': 'shipped default', 'shared_skins': 'shipped default',
+    'file_aliases': 'shipped default', 'shared_skins': 'shipped default', 'shared_shapes': 'shipped default',
     # Modular NPCs (docs/MODULAR_NPCS.md): EXPERIMENTAL, whole by default
     'npc_models': 'mode', 'npc_parts_face_cap': 'tooling', 'npc_parts_policy': 'tooling', 'parts_cache': 'tooling', 'storage_pool_dir': 'tooling', 'stair_walk': 'check',
     # The free space a build needs (tools/disk_need.py, BUILD-DISK-NEED-UNKNOWN-52): machine settings
@@ -382,6 +382,10 @@ class DefaultBuildShipsTheRelease(unittest.TestCase):
         off = dict(steps('--file-aliases', 'off', '--shared-skins', 'off'))['image']
         self.assertNotIn('--file-aliases', off)
         self.assertNotIn('--shared-skins', off)
+        # IMAGE-BIGGER-THAN-ORIGINAL-62: shared actor shapes, on by default since v0.0.63; off keeps both blocks
+        self.assertIn('--shared-shapes', image)
+        self.assertNotIn('--shared-shapes', dict(steps('--shared-shapes', 'off'))['image'])
+        self.assertNotEqual(steps('--shared-shapes', 'off'), steps())
 
     def test_default_build_has_the_v047_dev2_switches(self):
         # Decided for the project, 2026-10-21: v0.0.47 ships v0.0.47-dev2's content. That build was made with

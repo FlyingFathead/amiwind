@@ -1,6 +1,6 @@
 # Combat and the Vivec Arena minigame
 
-_Last updated with AmiWind v0.0.62-dev1 (7 November 2026)._
+_Last updated with AmiWind v0.0.62 (8 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -152,11 +152,25 @@ reference used to check them, and the numbers are the game settings read from
 your own master file when the image is built.
 
 - Hit chance: (weapon skill + Agility/5 + Luck/10) x fatigue term of the
-  attacker, minus the defender's evasion (Agility/5 + Luck/10) x its fatigue
-  term; no evasion while knocked down, unaware or below zero fatigue. A roll
-  of 0..99 below it hits. Fatigue term = fFatigueBase - fFatigueMult x (1 -
-  fatigue/maximum). Reference: OpenMW `combat.cpp` getHitChance,
-  `creaturestats.cpp` getFatigueTerm and getEvasion.
+  attacker, plus Fortify Attack, minus Blind, minus the defender's evasion
+  ((Agility/5 + Luck/10) x its fatigue term + Sanctuary, at most 100) and its
+  Chameleon and Invisibility (each fCombatInvisoMult x the magnitude, at most
+  100); no evasion while knocked down or unaware, no defence at all below zero
+  fatigue. Attributes and skills are the current ones (a Fortify Agility or
+  Luck counts). A roll of 0..99 below it hits. Fatigue term = fFatigueBase -
+  fFatigueMult x (1 - fatigue/maximum). `dbg combat readout on` prints the
+  chance and the roll of every swing. Reference: OpenMW `combat.cpp`
+  getHitChance, `creaturestats.cpp` getFatigueTerm and getEvasion (the effects
+  since v0.0.63).
+- Reaching the target: the swing strikes the actor under the crosshair, or,
+  when the crosshair is on nobody, the nearest fighter in front of you within
+  the weapon's reach and the original's hit cone (fCombatAngleXY to the side,
+  fCombatAngleZ up and down, about 42 degrees each), in sight. A flyer such as
+  a cliff racer can be struck this way while it hovers beside the crosshair.
+  A swing that reaches nobody is not a miss of the dice: it only costs fatigue.
+  Console: `dbg combat contact on/off` (on by default; off = the crosshair
+  alone, the earlier rule); `dbg combat` counts the swings the cone found.
+  Reference: OpenMW `combat.cpp` getHitContact and isInMeleeReach.
 - Weapons: short and long blades, blunt weapons, axes and spears, one- and
   two-handed, each with its own skill. Damage: minimum + (maximum - minimum)
   x swing strength for the attack type (chop, slash, thrust), times the
@@ -167,8 +181,13 @@ your own master file when the image is built.
   adjustWeaponDamage and reduceWeaponCondition.
 - Attack type: your movement when the swing starts picks it (forward or back:
   thrust; sideways: slash; standing or diagonal: chop), or the weapon's best
-  attack (highest minimum + maximum) with `aw_combat_best_attack 1`, the
-  original "always use best attack" option. NPCs pick an attack weighted by
+  attack (highest minimum + maximum), the original "Always use best attack"
+  option, in Options > Prefs (`aw_combat_best_attack`, `dbg combat bestattack
+  on/off`; one saved setting, the menu and the console show the same value).
+  It is on by default in AmiWind (decided for the project, 7 November 2026);
+  the original's default is off. A configuration saved before v0.0.63 is
+  switched on once. Best attack changes the damage of a blow, not its chance
+  to hit. With fists the attack type does not change the damage. NPCs pick an attack weighted by
   its average damage. Swing strength: yours is how long you hold the attack
   button until the strike (the punch plays at once, so the hold stands in for
   the original draw-back); an NPC's is random. Reference: `character.cpp`
@@ -301,7 +320,9 @@ size, just above it, appears for fNPCHealthBarTime seconds (3) after each of
 your attacks that reaches the enemy, hit or miss, and fades over the last
 fNPCHealthBarFade seconds (0.5) (OpenMW `hud.cpp` setEnemy /
 updateEnemyHealthBar, `openmw_hud.layout` EnemyHealth). On the 8-bit screen
-the fade is a stipple.
+the fade is a stipple. It is the same for NPCs and creatures; since v0.0.63 a
+swing that finds its target by the hit cone (above) shows it too, so a cliff
+racer beside the crosshair gets its bar from the first swing that reaches it.
 
 Sounds: the original sound records, read from your master file and converted to 11 kHz. Which sound plays for what
 follows OpenMW 0.51; the rule is the switch `dbg combat sounds on/off` (on by default since v0.0.58; off plays one

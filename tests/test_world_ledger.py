@@ -120,6 +120,22 @@ class ActorStateWiringTests(unittest.TestCase):
         self.assertIn('c->died = GameHours ()', body(actors, 'static void Capture (edict_t *e, change_t *c)'))
         self.assertIn('c->died = GameHours ()', body(actors, 'static void Died (edict_t *e)'))
 
+    def test_fight_stays_behind_a_load_door(self):
+        # ROOM-CREATURES-NO-AGGRO-62, the original's rule: a hostile actor never follows the player through a load
+        # door; it stays hostile and fights again when the player comes back. Only followers and escorts go through.
+        actors = code('aw_actors.c')
+        room = body(actors, 'void AW_ActorsRoomTick (void)')
+        # a fighter in a room is captured every tick (the room's map goes without a leave), as outdoors
+        self.assertIn('(((int)sv.time * 2 + i) % 64 && AW_CombatSlotState (e, NULL) == 0)', room)
+        self.assertIn('if (IsActor (e) && AW_CombatSlotState (e, NULL) != 0)', body(actors, 'static void Tick (void)'))
+        self.assertIn('c->fight = state == 1;', body(actors, 'static void Capture (edict_t *e, change_t *c)'))
+        # coming back: the row's fight is taken up again with the health it had
+        self.assertIn('else if (c->fight && AW_CombatTestEngage (e, 0))', body(actors, 'static void ApplyLoaded (void)\n{'))
+        # never through the door: the followers handed to the door are AIFollow ones, a fighting one is left
+        followers = body(code('aw_ambient.c'), 'int AW_AmbientFollowersOf(edict_t *p,edict_t **out,int max) {')
+        self.assertIn('(s->travel!=3 && s->travel!=4)', followers)
+        self.assertIn('if(AW_CombatSlotState(s->e,NULL))continue;', followers)
+
 
 class ScriptLocalsWiringTests(unittest.TestCase):
     """CELL-CHANGES-59 slice 5: every object's script locals and the running global scripts reach the one world change
@@ -259,6 +275,12 @@ class LedgerWiringTests(unittest.TestCase):
         drop = body(inventory, 'int AW_InventoryDropHere(const aw_inventory_item_t *item,int32_t count)')
         self.assertIn('AW_LedgerDrop(&aw_state,&aw_ledger,item,count,at,where,game,yaw)', drop)
         self.assertIn('inv_trace_support(position,mins,maxs,p)', drop)
+        # DROP-ROOM-BRUSH-ENTITY-59 (v0.0.63): an uneven room floor never refuses the drop: only the centre needs
+        # ground, and a failed spot ahead falls back to the floor under the player (OpenMW dropObjectOnGround)
+        self.assertIn('!inv_feet_drop(p,mins,maxs,position)', drop)
+        support = body(inventory, 'static int inv_trace_support(')
+        self.assertNotIn('corner', support)
+        self.assertIn('SV_Move(start,vec3_origin,vec3_origin,end,MOVE_NORMAL,p)', body(inventory, 'static int inv_feet_drop('))
         self.assertIn('(chim && !aw_ledger_on)', drop)
         self.assertIn('AW_LedgerPickup(&aw_state,&aw_ledger,map_drops[i].key)', body(inventory, 'int AW_InventoryUse(void)'))
         spawn = body(inventory, 'void AW_InventorySpawn(void)')

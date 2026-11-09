@@ -520,6 +520,7 @@ extern int (*aw_mwscript_ai_package)(struct edict_s *e,int *done);   /* the ambi
  * record: the ambient aggression reads it instead of the record's (aw_mwhost.c sets it; NULL: the record's) */
 extern int (*aw_ambient_fight_now)(struct edict_s *e);
 int AW_MwscriptSpeedAttribute(struct edict_s *e);
+int AW_MwscriptForcedRun(struct edict_s *e);   /* a script's ForceRun on the actor (v0.0.63, MWSCRIPT-GAPS-63) */
 /* Object state the scripts set (aw_mwhost.c): 1 when Disable hid the placement REFERENCE; its lock level, or
  * ORIGINAL when no script set one (0 unlocked .. 100). */
 int AW_ObjectDisabled(unsigned int reference);
@@ -839,6 +840,9 @@ int AW_CombatHurtPlayer(float damage,const char *cause);
 /* Lava damage and the in-lava view tint (aw_lava.c, aw_lava.h, docs/LAVA.md). */
 void AW_LavaInit(void);
 void AW_LavaPhysics(void);
+/* Breath and drowning under water (aw_breath.c, aw_breath.h, UNDERWATER-BREATH-62). */
+void AW_BreathInit(void);
+void AW_BreathPhysics(void);
 int AW_LavaContentsShift(int eye_contents,int rgb[3],int *percent);
 void AW_LavaEmbersDraw(void);
 int AW_LavaPoolCount(void);

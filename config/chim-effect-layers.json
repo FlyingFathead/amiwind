@@ -1,0 +1,12 @@
+{
+ "format": "AmiWind CHIM effect layers 1",
+ "note": "Placed models that are animated, translucent effect layers in the original (their shapes faded in and moved by the model's own controllers) and that CHIM would draw as solid, still geometry. Their placements are left out of the CHIM world (tools/chim/build.py effect_layer_references, recorded per frame in the parity record as effect_layers_removed) until an effect replaces them. Keys: the model path as the record names it, lower case, forward slashes.",
+ "models": {
+  "f/active_blight_large.nif": {
+   "record": "blight cloud",
+   "bug": "CHIM-DAGOTH-UR-RUIN-CYLINDER-44",
+   "todo": "BLIGHT-CLOUD-HIDE-62",
+   "reason": "The blight-storm whirlwind around Dagoth Ur (cell 2,8): about a dozen nested cylinders textured Tx_Dagoth_cloud02 with material alpha 0.0 to 0.4, faded in and turned by the model's animation, no collision. Drawn solid and still it is a large brown wall. The original's EndGame script disables it after the Heart is destroyed. Step 2: a turbulence effect (warped translucent shells) in its place."
+  }
+ }
+}

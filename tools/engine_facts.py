@@ -66,6 +66,12 @@ DEFINE_TABLE_SUFFIX = 'DEFINES'
 RECEIPT_UNITS = frozenset({('tools/check_world_map_heap.py', 'compile_target_sizes')})
 RECEIPT_WRITERS = frozenset({('tools/check_world_map_heap.py', 'audit_world_maps')})
 RECEIPT_CALL = 'digest'
+# Engine files the heap audits read only for their loader policy (BUILD-CHIM-HEAP-KEY-LOADER-63): named only in these
+# modules (and not for a receipt the reach writes), such a file counts as its policy (tools/engine_loader_policy.py
+# key_value), never whole. Named anywhere else, it counts as before.
+POLICY_FILES = frozenset({'engine/aga/src/model.c'})
+POLICY_MODULES = frozenset({'tools/check_world_map_heap.py', 'tools/alias_stream_heap.py', 'tools/edge_cache_heap.py',
+                            'tools/sprite_heap.py', 'tools/engine_loader_policy.py'})
 UPPER_NAME = re.compile(r'[A-Z][A-Z0-9_]*')
 IDENTIFIER = re.compile(r'[A-Za-z_][A-Za-z0-9_]*')
 INCLUDE_LINE = re.compile(r'^[ \t]*#[ \t]*include[ \t]*"([^"\n]+)"', re.M)
@@ -470,10 +476,15 @@ def narrow(index, script, selected, folders, readers):
             if len(node.value) > 400:
                 continue
             for path in _named(node.value, engine, by_base):
-                contexts.setdefault(path, set()).add(_context(node, parents, units, relative, define_readers))
+                found = _context(node, parents, units, relative, define_readers)
+                if path in POLICY_FILES and relative in POLICY_MODULES and found == 'text':
+                    found = 'policy'
+                contexts.setdefault(path, set()).add(found)
     kinds = {}
     for path, found in contexts.items():
-        if 'text' in found or ('receipt' in found and writers):
+        if found & {'policy'} and not ('text' in found or ('receipt' in found and writers)):
+            kinds[path] = 'policy'
+        elif 'text' in found or ('receipt' in found and writers):
             kinds[path] = 'text'
         elif 'define' in found:
             kinds[path] = 'define'
@@ -481,7 +492,8 @@ def narrow(index, script, selected, folders, readers):
             kinds[path] = 'doc'
         else:
             kinds[path] = 'receipt'
-    closure = index.include_closure(sorted({path for path, kind in kinds.items() if kind != 'receipt'} | probes))
+    closure = index.include_closure(sorted({path for path, kind in kinds.items() if kind not in ('receipt', 'policy')}
+                                           | probes))
     # what the folder rule put in the key: every named file and the closure of them all (receipts included)
     named_closure = index.include_closure(sorted(set(kinds) | probes))
     whole, facts, out = set(), set(), dict(selected)
@@ -490,7 +502,10 @@ def narrow(index, script, selected, folders, readers):
         kind = kinds.get(path)
         if path not in out:
             out[path] = index.files[path]
-        if kind == 'text':
+        if kind == 'policy' and path not in closure:
+            import engine_loader_policy
+            out[path] = engine_loader_policy.key_value(index.root)
+        elif kind == 'text':
             whole.add(path)
         elif kind not in ('define', 'doc') and path not in closure:
             if path not in named_closure:

@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-only
-"""Payload sharing (tools/payload_share.py): file aliases (IMAGE-DUPLICATE-FILES-46) and shared actor skins
-(IMAGE-ACTOR-SKIN-REPEATS-46). The builder's forms rebuild every original byte; the engine's readers (common.c
-COM_FindFile, model.c / model_alias_stream.inc) read exactly what the builder writes; both stay off by default.
-Synthetic data only."""
+"""Payload sharing (tools/payload_share.py): file aliases (IMAGE-DUPLICATE-FILES-46), shared actor skins
+(IMAGE-ACTOR-SKIN-REPEATS-46) and shared actor shapes (IMAGE-BIGGER-THAN-ORIGINAL-62). The builder's forms rebuild
+every original byte; the engine's readers (common.c COM_FindFile, model.c / model_alias_stream.inc) read exactly
+what the builder writes; the payload pass does nothing unless asked (build.py asks for all three by default).
+Synthetic data, plus real models listed in AMIWIND_SHAPE_MODELS for the native shape test."""
 import os
 from pathlib import Path
 import shutil
@@ -75,6 +76,99 @@ class SharedSkins(unittest.TestCase):
             self.assertEqual(sorted((p.name, p.read_bytes()) for p in id1.rglob('*') if p.is_file()), before)
 
 
+def shaped(blocks_value, frames=b'frames', verts=3, tris=2, width=8, height=4, skin_value=1):
+    """A small single-skin alias model with VERTS ST entries and TRIS triangles of BLOCKS_VALUE bytes."""
+    header = bytearray(model(skin_value, b'', width, height))
+    struct.pack_into('<2i', header, 60, verts, tris)
+    return bytes(header) + bytes([blocks_value]) * (verts * 12 + tris * 16) + frames
+
+
+class SharedShapes(unittest.TestCase):
+    def test_stored_form_rebuilds_the_model(self):
+        raw = shaped(5)
+        at, st, tri = share.shape_of(raw)
+        self.assertEqual((at, st, tri), (84 + 4 + 32, 36, 32))
+        digest = share.sha256(raw[at:at + st + tri])
+        stored = share.shared_shape_model(raw, digest)
+        self.assertTrue(share.is_shape_shared(stored))
+        self.assertEqual(len(raw) - len(stored), st + tri - share.SHAPE_REF)
+        self.assertEqual(share.expand_shared_shape(stored, lambda name: raw[at:at + st + tri]), raw)
+        self.assertIsNone(share.shape_of(stored))            # never shared twice
+        with self.assertRaises(ValueError):
+            share.expand_shared_shape(stored, lambda name: raw[at:at + st + tri - 1])
+
+    def test_shape_after_a_shared_skin(self):
+        raw = shaped(6)
+        at, pixels = share.skin_of(raw)
+        skin_digest = share.sha256(raw[at:at + pixels])
+        skinned = share.shared_model(raw, skin_digest)
+        sat, st, tri = share.shape_of(skinned)
+        self.assertEqual(sat, 84 + share.SKIN_REF)
+        blocks = skinned[sat:sat + st + tri]
+        stored = share.shared_shape_model(skinned, share.sha256(blocks))
+        self.assertTrue(share.is_shared(stored) and share.is_shape_shared(stored))
+        rebuilt = share.expand_shared_skin(share.expand_shared_shape(stored, lambda name: blocks),
+                                           lambda name: raw[at:at + pixels])
+        self.assertEqual(rebuilt, raw)
+
+    def test_only_repeated_shapes_of_top_level_progs_models_are_shared(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            id1 = Path(tmp) / 'id1'
+            (id1 / 'progs/sub').mkdir(parents=True)
+            (id1 / 'items').mkdir()
+            originals = {'progs/a_one.mdl': shaped(1, b'stand', skin_value=1),
+                         'progs/n_two.mdl': shaped(1, b'other frames', skin_value=2),
+                         'progs/c_three.mdl': shaped(2), 'progs/sub/a_four.mdl': shaped(1),
+                         'items/a_five.mdl': shaped(1), 'progs/npc_lod_x.mdl': shaped(1)}
+            for rel, raw in originals.items():
+                (id1 / rel).write_bytes(raw)
+            (id1 / share.NPC_LOD_MANIFEST).write_text('progs/npc_lod_x.mdl 1 2 3\n', encoding='ascii')
+            groups = share.plan_shapes(id1, jobs=2)
+            self.assertEqual(list(groups.values()), [['progs/a_one.mdl', 'progs/n_two.mdl']])
+            record = share.apply_shapes(id1, groups)
+            self.assertEqual((record['shapes'], record['models'], record['files_added']), (1, 2, 1))
+            digest = next(iter(groups))
+            self.assertEqual((id1 / share.shape_name(digest)).read_bytes(), bytes([1]) * 68)
+            for rel, raw in originals.items():
+                stored = (id1 / rel).read_bytes()
+                rebuilt = share.expand_shared_shape(stored, lambda name: (id1 / name).read_bytes()) \
+                    if share.is_shape_shared(stored) else stored
+                self.assertEqual(rebuilt, raw, rel)
+            self.assertEqual(record['bytes_saved'], 68 - 2 * share.SHAPE_REF)
+            self.assertEqual(share.identity(id1)['shapes'], 0)      # nothing left to share
+
+    def test_identity_over_a_payload(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            id1 = Path(tmp)
+            (id1 / 'progs').mkdir()
+            for name, value in (('a_x.mdl', 3), ('a_y.mdl', 3), ('n_z.mdl', 3), ('a_w.mdl', 4)):
+                (id1 / 'progs' / name).write_bytes(shaped(value, bytes(100)))
+            result = share.identity(id1, jobs=1)
+            self.assertEqual((result['shapes'], result['models'], result['byte_identical']), (1, 3, 3))
+            self.assertEqual(result['bytes_saved'], 2 * 68 - 3 * share.SHAPE_REF)
+            self.assertEqual(share.main(['identity', str(id1)]), 0)
+
+    def test_payload_pass_order_and_record(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            id1 = Path(tmp)
+            (id1 / 'progs').mkdir()
+            for name in ('a_x.mdl', 'a_y.mdl'):
+                (id1 / 'progs' / name).write_bytes(shaped(3, bytes(5000)))
+            originals = {p.name: p.read_bytes() for p in (id1 / 'progs').iterdir()}
+            record = share.share_payload(id1, shared_skins=True, shared_shapes=True, file_aliases=True,
+                                         log=lambda line: None)
+            self.assertEqual(record['skins']['models'], 2)
+            self.assertEqual(record['shapes']['models'], 2)
+            # both stored forms are byte-identical then: one is an alias of the other
+            self.assertEqual(record['aliases']['files_removed'], 1)
+            table = share.read_alias_table((id1 / share.ALIAS_FILE).read_bytes())
+            for name, raw in originals.items():
+                path = id1 / 'progs' / name
+                stored = (path if path.is_file() else id1 / table[('progs/' + name).casefold()]).read_bytes()
+                read = lambda rel: (id1 / rel).read_bytes()
+                self.assertEqual(share.expand_shared_skin(share.expand_shared_shape(stored, read), read), raw)
+
+
 class FileAliases(unittest.TestCase):
     def payload(self, root):
         id1 = Path(root)
@@ -141,17 +235,33 @@ class EngineReaders(unittest.TestCase):
             [SRC / name for name in ('model.c', 'aw_skel.c', 'aw_skel_load.c', 'mathlib.c')],
             cflags=['-fsanitize=address,undefined', '-fno-sanitize-recover=all', '-Wl,--wrap=malloc'])
 
+    def test_shared_shape_models_decode_like_inline_blocks(self):
+        # AMIWIND_SHAPE_MODELS: a file listing real converted actor models (one path a line, read only) that are
+        # decoded too, as the identity run over a release image does.
+        import test_aga_native_source as native
+        listed = os.environ.get('AMIWIND_SHAPE_MODELS')
+        models = Path(listed).read_text(encoding='utf-8').split() if listed else []
+        native.NativeSourceTests().compile_run('aga_shared_shape_test.c',
+            [SRC / name for name in ('model.c', 'aw_skel.c', 'aw_skel_load.c', 'mathlib.c')],
+            cflags=['-fsanitize=address,undefined', '-fno-sanitize-recover=all', '-Wl,--wrap=malloc'],
+            arguments=models)
+
 
 class Wiring(unittest.TestCase):
     def test_builder_options_default_on(self):
         # on by default since v0.0.47 (decided for the project, 2026-10-21); off stays selectable
         import build
         args = build.parser().parse_args([])
-        self.assertEqual((args.file_aliases, args.shared_skins), ('on', 'on'))
-        args = build.parser().parse_args(['--file-aliases', 'off', '--shared-skins', 'off'])
-        self.assertEqual((args.file_aliases, args.shared_skins), ('off', 'off'))
+        self.assertEqual((args.file_aliases, args.shared_skins, args.shared_shapes), ('on', 'on', 'on'))
+        args = build.parser().parse_args(['--file-aliases', 'off', '--shared-skins', 'off', '--shared-shapes', 'off'])
+        self.assertEqual((args.file_aliases, args.shared_skins, args.shared_shapes), ('off', 'off', 'off'))
         image = (ROOT / 'tools/build_aga.py').read_text(encoding='utf-8')
         self.assertIn("share_payload(boot/'id1'", image)
+        self.assertIn("shared_shapes=getattr(args, 'shared_shapes', False)", image)
+        model = (SRC / 'model.c').read_text(encoding='utf-8')
+        self.assertIn('progs/shapes/', model)
+        self.assertEqual(share.SHAPE_DIR, 'progs/shapes')
+        self.assertNotIn('off by default until', (ROOT / 'tools/payload_share.py').read_text(encoding='utf-8'))
         common = (SRC / 'common.c').read_text(encoding='utf-8')
         self.assertIn('#define COM_ALIAS_FILE "file-aliases.txt"', common)
         self.assertEqual(share.ALIAS_FILE, 'file-aliases.txt')

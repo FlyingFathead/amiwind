@@ -9,13 +9,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
 import build_cache  # noqa: E402
 
-# chim-room-batches read these to key its resident bakes (UnitCache.open(..., __file__) of tools/prepare_area.py);
-# the v0.0.48-dev2 try 5 and try 7 records were refused for them (BUILD-ROOM-BATCHES-KEY-UNDERDECLARED-48)
-ROOM_BATCH_READS = ('config/surface-flattening.json', 'config/terrain-visual-cull.json', 'config/visual-offsets.json',
-                    'tools/chim/seyda.py', 'tools/collision_bsp.py', 'tools/compact_bsp.py', 'tools/exterior_plan.py',
-                    'tools/map_files.py', 'tools/planar_merge.py', 'tools/prepare_world_scenery.py', 'tools/routed_hull.py',
-                    'tools/surface_flatten.py', 'tools/terrain_visual_cull.py', 'tools/visual_offsets.py',
-                    'tools/visual_primitives.py', 'tools/world_payload.py', 'tools/world_scenery.py')
+# chim-room-batches reads what its unit keys hash (BUILD-ROOM-BATCHES-KEY-UNDERDECLARED-48: the v0.0.48-dev2 try 5 and
+# try 7 records were refused for files its resident key read outside its own key)
 
 
 class StageKeyReachTests(unittest.TestCase):
@@ -40,8 +35,17 @@ class StageKeyReachTests(unittest.TestCase):
             self.assertIn(path.relative_to(ROOT).as_posix(), covered)
 
     def test_room_batch_key_covers_its_resident_bake_key(self):
+        # since UNIT-KEY-WHOLE-FILE-63 the resident, room and room-batch unit keys read only what their bake functions
+        # reach (pass_cache.source_digest of (module, function), form 2); the stage key must still cover all of it
         covered = self.covered('chim_room_batches.py')
-        self.assertEqual([path for path in ROOM_BATCH_READS if path not in covered], [])
+        keyed = build_cache.SourceIndex(ROOT)
+        reads = set()
+        for module, function in (('prepare_area.py', 'build_resident'), ('prepare_area.py', 'publish_resident'),
+                                 ('chim_room_batches.py', 'build_shell')):
+            python, data, uncertain, _ = keyed.entry_units(ROOT / 'tools' / module, function)
+            self.assertFalse(uncertain, function)
+            reads |= set(python) | set(data)
+        self.assertEqual(sorted(path for path in reads if path not in covered), [])
 
     def test_the_ground_bake_method_keys_no_chim_stage(self):
         # BUILD-STAGE-KEY-WHOLE-CLASS-48: commit 62827968 edited actor_grounding._Fitter._scene (the ground bake of

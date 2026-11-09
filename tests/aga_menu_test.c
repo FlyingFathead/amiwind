@@ -29,7 +29,10 @@ static float autoram=1;
 static float pitch_value=.022f;
 /* Audio > Your footsteps (aw_player_footsteps, default off). */
 static float player_steps;
+/* Prefs > Always use best attack (aw_combat_best_attack, BEST-ATTACK-OPTION-62: on by default, an AmiWind default). */
+static float best_attack=1;
 float Cvar_VariableValue(char *name){
+    if(!strcmp(name,"aw_combat_best_attack"))return best_attack;
     if(!strcmp(name,"aw_cull"))return far_detail;
     if(!strcmp(name,"aw_autoram"))return autoram;
     if(!strcmp(name,"aw_combat_miss"))return combat_miss;
@@ -50,6 +53,7 @@ void Cvar_SetValue(char *name,float value){cvar_t *rows[]={&volume,&bgmvolume,&e
     if(!strcmp(name,"aw_autoram")){autoram=value;return;}
     if(!strcmp(name,"aw_combat_dice")){combat_dice=value;return;}
     if(!strcmp(name,"aw_combat_block")){combat_block=value;return;}
+    if(!strcmp(name,"aw_combat_best_attack")){best_attack=value;return;}
     for(i=0;i<4;i++)if(!strcmp(rows[i]->name,name)){rows[i]->value=value;audio_sets++;return;}assert(0);}
 void AW_UISmallBegin(void){}void AW_UISmallEnd(void){}
 int AW_UIFrameEnabled(void){return gold_frame;}
@@ -71,7 +75,8 @@ void AW_UIFill(int x,int y,int w,int h,int c){if(c==62){highlight_y=y;highlight_
 void AW_UIScrollbar(int x,int y,int h,int total,int visible,int top){assert(x>=0 && x+10<=320 && y+h<=200);assert(top>=0 && top+visible<=total);scroll_top=top;scroll_total=total;}
 int AW_UIScrollHit(int mx,int my,int x,int y,int h,int total,int visible,int top){return -1;}
 /* What the Options page drew: labels by their start, every tab and box. */
-static char crosshair_label[64],photo_label[64],far_label[64],colour_label[64],shape_label[64],invert_label[64],cursor_label[64];
+static char crosshair_label[64],photo_label[64],far_label[64],colour_label[64],shape_label[64],invert_label[64],cursor_label[64],
+            best_label[64];
 /* The mouse cursor (aw_ui.c, CURSOR-MW-58): aw_cursor_type 2 = Morrowind's pointer (drawn when the image has it), 1 = AmiWind's. */
 static int cursor_kind=2,cursor_calls,cursor_art=1;
 int AW_UICursorType(void){return cursor_kind;}
@@ -85,6 +90,7 @@ void AW_UITextBox(int x,int y,int w,int h,const char *s,int c){assert(y>=0 && y+
  if(!strncmp(s,"Crosshair colour",16))strcpy(colour_label,s);
  if(!strncmp(s,"Crosshair shape",15))strcpy(shape_label,s);
  if(!strncmp(s,"Mouse cursor",12))strcpy(cursor_label,s);
+ if(!strncmp(s,"Always use best attack",22)){strcpy(best_label,s);assert(AW_UIWidth(s)<=w-4);}
  if(!strncmp(s,"Invert Y axis",13))strcpy(invert_label,s);
  if(x==252)strcpy(sens_value,s); /* the value beside the sensitivity rail */
  if(x==10 && y==176)strcpy(help,s);
@@ -168,7 +174,12 @@ static void check_prefs(void){
  down(1);M_Keydown(K_RIGHTARROW);assert(AW_SceneUIOption(2,0)==2);
  /* Name labels (INFO-BOX-TEXT-CUT-62): AmiWind by default, Enter or an arrow switches to Morrowind and back */
  down(1);assert(AW_SceneUIOption(3,0)==1);M_Keydown(K_ENTER);assert(AW_SceneUIOption(3,0)==0);M_Keydown(K_RIGHTARROW);assert(AW_SceneUIOption(3,0)==1);
- down(1);assert(scroll_total==14 && scroll_top==7 && highlight_y==150); /* Autosave history, the last row (14 rows: topic colours and name labels both) */
+ /* Always use best attack (BEST-ATTACK-OPTION-62): on by default; Enter or an arrow switches the one saved value */
+ down(1);assert(!strcmp(best_label,"Always use best attack: On") && best_attack==1);
+ M_Keydown(K_ENTER);M_Draw();assert(best_attack==0 && !strcmp(best_label,"Always use best attack: Off"));
+ M_Keydown(K_RIGHTARROW);M_Draw();assert(best_attack==1 && !strcmp(best_label,"Always use best attack: On"));
+ best_attack=0;M_Draw();assert(!strcmp(best_label,"Always use best attack: Off"));best_attack=1;   /* a console change shows at once */
+ down(1);assert(scroll_total==15 && scroll_top==8 && highlight_y==150); /* Autosave history, the last row (15 rows: topic colours, name labels, best attack) */
  /* Past the last row: Back, which holds; Up returns to the last row, Up past the first to the tabs. */
  down(3);assert(highlight_y==179 && highlight_w==74 && !strcmp(help,"Enter: back to the menu"));
  up(1);assert(highlight_y==150 && highlight_w==280);

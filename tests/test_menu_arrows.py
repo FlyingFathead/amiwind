@@ -32,6 +32,20 @@ class MenuArrowsGuardTests(unittest.TestCase):
         self.assertIn('(video_window->Flags&WFLG_WINDOWACTIVE)', events)
 
 
+class ConsoleHistoryArrowsTests(unittest.TestCase):
+    """CONSOLE-HISTORY-ARROWS-32 (regressed in v0.0.61): the same stuck Amiga qualifier made Intuition's keyboard
+    mouse take the console's Up and Down too. The raw Up/Down codes are stripped, the key map turns them into the
+    console's arrow keys, and the console recalls its history from them (Ctrl+P / Ctrl+N stay as extra keys)."""
+
+    def test_up_and_down_reach_the_console_history(self):
+        self.assertTrue(strips(0x4C) and strips(0x4D))
+        keys = (ROOT / 'engine/aga/src/keys.c').read_text(encoding='utf-8')
+        self.assertIn("'-', 0, K_UPARROW, K_DOWNARROW, K_RIGHTARROW, K_LEFTARROW", keys)
+        self.assertIn('consolekeys[K_UPARROW] = true;', keys)
+        self.assertIn("else if(key=='p')key=K_UPARROW;", keys)
+        self.assertIn('case K_UPARROW:', keys)
+
+
 class ListNavigationRuleTests(unittest.TestCase):
     @unittest.skipIf(__import__('os').name == 'nt', 'native fixtures run on Linux, including the Docker gate')
     def test_the_shared_rule(self):

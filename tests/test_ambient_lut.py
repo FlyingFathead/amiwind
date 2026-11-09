@@ -384,6 +384,23 @@ class AmbientSourceContractTests(unittest.TestCase):
         self.assertIn('tr=SV_Move(e->v.origin,e->v.mins,e->v.maxs,end,MOVE_NORMAL,e);', c)
         self.assertRegex(c, r'if\(fly\(s,t3,speed\*dt\)\)')
 
+    def test_actor_without_package_still_engages(self):
+        # ROOM-CREATURES-NO-AGGRO-62: OpenMW runs the engage check for every actor in range; an actor without a Wander
+        # row gets a standing slot for it (kept only when its Fight can reach 100), never a package of its own
+        c = self.code('aw_ambient.c')
+        scan = c[c.index('static void scan(edict_t *p)'):c.index('static const aw_skel_table_t *table_of(')]
+        self.assertIn('slot_t *s=aggro_on?start(e,NULL):NULL;', scan)
+        self.assertIn('if(s && s->fight>0){s->state=S_OFF;s->standing=1;', scan)
+        self.assertIn('if(s){release(s,0);st.registered--;}', scan)
+        think = c[c.index('static void think(slot_t *s,float dt)'):c.index('void AW_AmbientPhysics(void)')]
+        self.assertLess(think.index('aggro(s)'), think.index('s->standing)return;'))   # the check before the stop
+        self.assertIn('if(s->standing)return -1;', c)                       # GetCurrentAIPackage: none
+        self.assertIn('else s->flags=record_flags(e);', c)                 # a creature's disposition bias, flyers
+        self.assertIn('if((b.flags&AWR_SWIMS) && !(b.flags&AWR_WALKS))f|=AW_AMBIENT_SWIMMER;', c)
+        # CREATURE-FLOATING-62: the record answer for aw_scene.c's drop comes from here (aw_scene.c links alone)
+        self.assertIn('aw_actor_walks=walks_on_ground;', c)
+        self.assertIn('return b.kind==1 && !(b.flags&(AWR_FLIES|AWR_SWIMS));', c)
+
     def test_no_stale_edict_after_a_map_change(self):
         # ACTOR-AMBIENT-STALE-EDICT-57: a teleport to another map crashed with "NUM_FOR_EDICT: bad pointer" when a
         # script asked for an actor's package while the slots still held the old map's edicts

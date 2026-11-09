@@ -22,7 +22,8 @@ static void settings(void) {
         {"iBlockMinChance",10},{"iBlockMaxChance",50},{"fSwingBlockBase",1},{"fSwingBlockMult",1},{"fBlockStillBonus",1.25f},
         {"fFatigueBlockBase",4},{"fFatigueBlockMult",0},{"fWeaponFatigueBlockMult",1},
         {"fCombatBlockLeftAngle",-90},{"fCombatBlockRightAngle",30},{"fCombatDelayNPC",.1f},
-        {"fNPCHealthBarTime",3},{"fNPCHealthBarFade",.5f},{"fWeaponDamageMult",.1f}};
+        {"fNPCHealthBarTime",3},{"fNPCHealthBarFade",.5f},{"fWeaponDamageMult",.1f},
+        {"fCombatAngleXY",60},{"fCombatAngleZ",60},{"fCombatInvisoMult",.2f}};
     int i;
     assert(sizeof(aw_combat_settings_t)==AW_COMBAT_SETTING_COUNT*sizeof(float));
     assert(sizeof(rows)/sizeof(*rows)==AW_COMBAT_SETTING_COUNT);
@@ -92,6 +93,34 @@ int main(void) {
     y.fatigue=-1;assert(AW_CombatHitChance(&s,&m,&y)==61);y.fatigue=200;  /* evasion needs fatigue >= 0 */
     /* the player's punch: (30 + 10 + 4) * 1.25 - (63/5 + 4) * 1.25 = 55 - 20.75 -> 34 */
     assert(AW_CombatHitChance(&s,&y,&m)==34);
+    /* HIT-CHANCE-CHECK-62, the effects OpenMW 0.51 getHitChance counts: Fortify Attack 10 less Blind 3 on the attacker:
+     * 60.75 + 7 - 17.5 = 50.25 -> 50 */
+    m.attack_mod=7;assert(AW_CombatHitChance(&s,&m,&y)==50);m.attack_mod=0;
+    /* Sanctuary 20 on the victim is evasion: 60.75 - (17.5 + 20) -> 23; at most 100: 60.75 - 117.5 -> -57; none while down */
+    y.sanctuary=20;assert(AW_CombatHitChance(&s,&m,&y)==23);
+    y.sanctuary=150;assert(AW_CombatHitChance(&s,&m,&y)==-57);
+    y.knocked=1;assert(AW_CombatHitChance(&s,&m,&y)==61);y.knocked=0;y.sanctuary=0;
+    /* Chameleon 50 x fCombatInvisoMult 0.2 = 10; Invisibility 1000 x 0.2 capped at 100 */
+    assert(AW_CombatUnseen(&s,50,0)==10 && AW_CombatUnseen(&s,50,1000)==110 && AW_CombatUnseen(&s,-5,0)==0);
+    y.unseen=AW_CombatUnseen(&s,50,0);
+    assert(AW_CombatHitChance(&s,&m,&y)==33);                         /* 60.75 - 27.5 -> 33 */
+    y.knocked=1;assert(AW_CombatHitChance(&s,&m,&y)==51);y.knocked=0;  /* down: no evasion, the unseen part stays */
+    y.fatigue=-1;assert(AW_CombatHitChance(&s,&m,&y)==61);y.fatigue=200;y.unseen=0;   /* below 0 fatigue: no defence */
+    /* the hit contact (OpenMW getHitContact, isInMeleeReach; angles 60 = sine 0.667): in front within reach */
+    {float fw[3]={1,0,0},up[3]={.6f,0,.8f},down[3]={.5f,0,-.866f},to[3];
+     to[0]=30;to[1]=0;to[2]=0;assert(AW_CombatContact(&s,to,39,33,15,0,32,0,fw));
+     assert(AW_CombatContact(&s,to,39,33,15,0,32,0,down));            /* looking down at it: its body is in the cone */
+     assert(!AW_CombatContact(&s,to,39,33,40,0,32,0,fw));             /* out of reach */
+     assert(!AW_CombatContact(&s,to,39,33,15,40,32,0,fw));            /* feet 40 above: out of reach */
+     to[0]=-30;assert(!AW_CombatContact(&s,to,39,33,15,0,32,0,fw));   /* behind */
+     to[0]=20;to[1]=25;assert(!AW_CombatContact(&s,to,39,33,15,0,32,0,fw));   /* sine 0.78 to the side */
+     to[0]=25;to[1]=15;assert(AW_CombatContact(&s,to,39,33,15,0,32,0,fw));    /* sine 0.51 */
+     /* a flyer whose feet are 60 above (the flyer's 64 allowance): struck when looked up at, not when looking level */
+     to[0]=20;to[1]=0;to[2]=60;
+     assert(!AW_CombatContact(&s,to,39,20,10,60,32,0,up));            /* no allowance: out of reach */
+     assert(!AW_CombatContact(&s,to,39,20,10,60,32,64,fw));
+     assert(AW_CombatContact(&s,to,39,20,10,60,32,64,up));
+     to[0]=0;to[2]=0;assert(AW_CombatContact(&s,to,39,33,0,0,32,0,fw));}   /* right over the feet */
 
     /* reach in original units */
     assert(near(AW_CombatReach(&s,&m),128) && near(AW_CombatReach(&s,&y),128));
@@ -236,6 +265,21 @@ int main(void) {
         assert(at.fatigue==before.fatigue && at.weapon_health==before.weapon_health && at.weapon==2 && o.weapon_wear==0);
         aw_combat_dice=1;
     }
+    {   /* GODMODE-LAVA-DEATH-62: world damage (lava, falls, drowning) is held back in god mode and counted; a script's
+         * or a spell's loss of health never takes a god-mode player below what he had, a heal still lands */
+        float held=0;
+        assert(!AW_CombatGodWorldDamage(0,20,&held) && held==0);
+        assert(AW_CombatGodWorldDamage(1,20,&held) && held==20);
+        assert(AW_CombatGodWorldDamage(1,3.5f,&held) && held==23.5f);
+        assert(!AW_CombatGodWorldDamage(1,0,&held) && held==23.5f);
+        assert(AW_CombatGodWorldDamage(1,1,NULL));
+        assert(AW_CombatGodHealth(0,50,0,100)==0);              /* SetHealth 0 without god mode: dead */
+        assert(AW_CombatGodHealth(1,50,0,100)==50);             /* with it: kept */
+        assert(AW_CombatGodHealth(1,50,-30,100)==50);
+        assert(AW_CombatGodHealth(1,50,80,100)==80);            /* a heal lands */
+        assert(AW_CombatGodHealth(1,50,40,40)==40);             /* the maximum drained to 40: capped there */
+        assert(AW_CombatGodHealth(1,50,0,0.5f)==1);             /* never below 1 */
+    }
     /* bow 10 and crossbow 11 are two-handed (weapontype.cpp), thrown 12 is not */
     for(i=1;i<=12;i++)assert(AW_TWO_HANDED(i)==(i==3 || i==5 || i==6 || i==7 || i==9 || i==10 || i==11));
     /* the player's attack type by movement (forward/back beats sideways by 0.2) and best attack */
@@ -370,7 +414,7 @@ int main(void) {
     }
 
     /* a fighter sheet stays small (bytes per actor) */
-    assert(sizeof(aw_fighter_t)<=180);
+    assert(sizeof(aw_fighter_t)<=184);   /* +4 since v0.0.63: the hit chance's effect terms (HIT-CHANCE-CHECK-62) */
     printf("combat rules ok: fighter %lu bytes, settings %lu bytes\n",(unsigned long)sizeof(aw_fighter_t),(unsigned long)sizeof(s));
     return 0;
 }

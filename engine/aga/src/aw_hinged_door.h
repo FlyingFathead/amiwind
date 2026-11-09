@@ -81,4 +81,20 @@ int AW_HingedDoorActivate(unsigned reference);
 int AW_HingedDoorPlacement(unsigned pid,unsigned reference,const float *origin,float radius,float *yaw);
 void AW_HingedDoorRecentre(const float *d);
 
+/* Scripted movers (WORLD-BUTTONS-62): the table's M rows, the references a script moves (Move, MoveWorld, SetPos,
+ * SetAtStart) that the CHIM world draws as placements without an entity, the Ghostgate portcullises first.
+ *   AW_MoverPlacement  the frames' door hook asks (AW_HingedDoorPlacement): 1 for a mover, which keeps its pid and,
+ *                      when moved already, is put where the scripts left it on the next tick
+ *   AW_MoverShift      the scripts move it by D (map units): 1 when it is a mover (its placement moves when loaded)
+ *   AW_MoverAtStart    back where the game data placed it (SetAtStart): 1 when it is a mover
+ *   AW_MoverReset      every mover back at its start (New Game, a loaded game)
+ *   AW_MoverCount      rows in the table; AW_MoverMoved: movers away from their start now */
+int AW_MoverPlacement(unsigned pid,unsigned reference);
+int AW_MoverShift(unsigned reference,const float *d);
+int AW_MoverAtStart(unsigned reference);
+void AW_MoverReset(void);
+int AW_MoverCount(void);
+int AW_MoverMoved(void);
+#define AW_MOVER_RELINK 32.f   /* map units of travel between two relinks of a moving placement's efrags */
+
 #endif

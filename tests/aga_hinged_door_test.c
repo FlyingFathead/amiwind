@@ -39,6 +39,7 @@ static unsigned script_ref;static int script_level;
 static int script_lock(unsigned reference,int original){return reference==script_ref?script_level:original;}
 int (*aw_chim_door_yaw)(unsigned pid,float yaw);
 int (*aw_chim_door_clip)(unsigned pid,vec3_t start,vec3_t mins,vec3_t maxs,vec3_t end,trace_t *trace);
+int (*aw_chim_place_shift)(unsigned pid,const float *d,int relink);
 
 static const char *table;
 static int opens,started,stopped,last_entity,last_channel;static float last_volume,last_attenuation;
@@ -523,8 +524,48 @@ static void kept_mode(void){
     printf("kept ok\n");
 }
 
+/* WORLD-BUTTONS-62: the M rows. The Ghostgate's switch script raises its portcullis (a CHIM placement without an
+ * entity) with MoveWorld z 70 for three seconds (210 game units, 52.5 map units) and puts it back with SetAtStart. */
+static unsigned shifted_pid;static float shifted[3];static int shifts,relinks;
+static int chim_shift(unsigned pid,const float *d,int relink){
+    int k;shifted_pid=pid;for(k=0;k<3;k++)shifted[k]+=d[k];shifts++;relinks+=relink;return 1;
+}
+static void movers_mode(void){
+    float d[3]={0,0,0},yaw=0;int i;
+    table="AWHD1\nW doors/d0123456789abcdef.wav 0.5 1.2\nB 0 0 Door\nD 100 0 0 0\n"
+          "M 5000\nM 4000\nM 6000\nM 6000 x\n";   /* out of order and a trailing word: left out */
+    aw_chim_place_shift=chim_shift;
+    assert(AW_HingedDoorRow(100)==0 && AW_MoverCount()==2);
+    AW_HingedDoorMapBegin();
+    /* moved before its placement loads: the move is kept, nothing drawn moves */
+    d[2]=1;assert(AW_MoverShift(5000,d) && shifts==0 && AW_MoverMoved()==1);
+    /* the placement loads (the frames' door hook answers for it, its yaw untouched) and goes where the scripts left
+     * it on the next tick, relinked; a move before that tick waits for it too */
+    assert(AW_HingedDoorPlacement(77,5000,d,10,&yaw) && yaw==0 && !AW_HingedDoorPlacement(78,4001,d,10,&yaw));
+    d[2]=.5f;assert(AW_MoverShift(5000,d) && shifts==0);
+    AW_HingedDoorTick(.02);assert(shifts==1 && relinks==1 && fabs(shifted[2]-1.5f)<.01f);
+    AW_HingedDoorTick(.02);assert(shifts==1);
+    shifts=relinks=0;shifted[2]=0;
+    /* three seconds at 70 game units a second in 30 frames: 52.5 map units, relinked every 32 */
+    d[2]=70*0.1f*0.25f;
+    for(i=0;i<30;i++)assert(AW_MoverShift(5000,d));
+    assert(shifted_pid==77 && fabs(shifted[2]-52.5f)<.01f && shifts==30 && relinks==1);
+    /* not a mover: the call is not taken */
+    assert(!AW_MoverShift(4001,d) && !AW_MoverAtStart(4001));
+    /* SetAtStart: back by everything it moved (1.5 before and 52.5 now), relinked */
+    assert(AW_MoverAtStart(5000) && fabs(shifted[2]+1.5f)<.01f && relinks==2 && AW_MoverMoved()==0);
+    /* New Game: every mover back at its start */
+    d[2]=5;assert(AW_MoverShift(6000,d) && !AW_MoverShift(4000,d) && AW_MoverMoved()==1);
+    AW_MoverReset();assert(AW_MoverMoved()==0);
+    /* a new map forgets the placements: a move then moves no drawn copy */
+    AW_HingedDoorMapBegin();shifts=0;assert(AW_MoverShift(5000,d) && shifts==0);
+    aw_chim_place_shift=NULL;
+    printf("movers ok\n");
+}
+
 int main(int argc,char **argv){
     assert(argc==2);
+    if(!strcmp(argv[1],"movers")){movers_mode();return 0;}
     if(!strcmp(argv[1],"locks")){locks_mode();return 0;}
     if(!strcmp(argv[1],"kept")){kept_mode();return 0;}
     if(!strcmp(argv[1],"table"))table_mode();

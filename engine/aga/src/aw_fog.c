@@ -55,12 +55,18 @@ int AW_SkyHazeNow(void) {
 }
 /* Once per saved configuration, after config.cfg (quake.rc), as aw_gallery_migrate:
  * a save from before the land-outline default (v0.0.31, dev builds) still holds
- * aw_skyline_fill 1. Later explicit choices stay effective. */
+ * aw_skyline_fill 1. Later explicit choices stay effective.
+ * aw_horizon_defaults is the saved configuration's defaults level: 1 the land outline (v0.0.31), 2 (v0.0.63,
+ * BEST-ATTACK-OPTION-62) "Always use best attack" on (aw_defaults_migrate, aw_combat.c). Each level runs once. */
+#define DEFAULTS_LEVEL 2
 static cvar_t aw_horizon_defaults={"aw_horizon_defaults","0",true};
+void (*aw_defaults_migrate)(int level);
 static void horizon_migrate(void) {
-    if(aw_horizon_defaults.value>=1)return;
-    Cvar_SetValue("aw_skyline_fill",0);
-    Cvar_SetValue("aw_horizon_defaults",1);
+    int level=(int)aw_horizon_defaults.value;
+    if(level>=DEFAULTS_LEVEL)return;
+    if(level<1)Cvar_SetValue("aw_skyline_fill",0);
+    if(aw_defaults_migrate)aw_defaults_migrate(level);
+    Cvar_SetValue("aw_horizon_defaults",DEFAULTS_LEVEL);
 }
 #define SKYLINE_LEVEL 12
 #define SKYLINE_MAX 1600

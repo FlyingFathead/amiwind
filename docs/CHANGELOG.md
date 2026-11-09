@@ -5,6 +5,7 @@ _Last updated with AmiWind v0.0.62 (8 November 2026)._
 <!-- contents start -->
 ## Contents
 
+- [v0.0.63-dev1: first snapshot of v0.0.63, 9 November 2026](#v0063-dev1-first-snapshot-of-v0063-9-november-2026)
 - [v0.0.62: Stick To The Script, 8 November 2026](#v0062-stick-to-the-script-8-november-2026)
 - [v0.0.62-dev2: second snapshot of v0.0.62, 7 November 2026 (not delivered; its work ships in v0.0.62)](#v0062-dev2-second-snapshot-of-v0062-7-november-2026-not-delivered-its-work-ships-in-v0062)
 - [v0.0.62-dev1: first snapshot of v0.0.62, 7 November 2026](#v0062-dev1-first-snapshot-of-v0062-7-november-2026)
@@ -172,6 +173,34 @@ _Last updated with AmiWind v0.0.62 (8 November 2026)._
 - [CHIM source candidate - 14 October 2026, v0.0.40-dev1](#chim-source-candidate---14-october-2026-v0040-dev1)
 
 <!-- contents end -->
+
+## v0.0.63-dev1: first snapshot of v0.0.63, 9 November 2026
+
+The first development snapshot of v0.0.63 ([release notes](releases/notes/RELEASE-v0.0.63-dev1.md)). It needs 32 MB of
+Fast RAM. Its changes are checked by tests, not yet in play.
+
+- The builder keeps every finished world unit, player body part and first-person part the moment it comes back, with
+  one `[done/total]` line per unit, so a build that stops part way reuses everything finished before the stop. The
+  world stages are keyed only on the engine loader policies they read, each stage keeps to its own outputs, and the
+  progress estimates come from builds of a comparable size; the build monitor shows `[done/total]` per running stage.
+- Actor models built on the same body store their repeated texture coordinates and triangles once in the image: 78.4
+  MB less on the v0.0.62 payload, with the models rebuilt byte for byte when loaded (`--shared-shapes off` keeps the
+  earlier method).
+- More of the game's scripts run: 599 of 1,207 (588 in v0.0.62), with TurnMoonRed and TurnMoonWhite,
+  HasItemEquipped, the forced run, ExplodeSpell, GetAttacked, GetSpellEffects, the werewolf functions, GetPCTraveling,
+  SetScale and the Water Breathing functions. The [MWScript tracker](MWSCRIPT_FEATURES.md) counts the scripts that do
+  not run by their reason.
+- Breath and drowning under water, with Water Breathing from race abilities, potions, spells and worn items; god mode
+  holds back every kind of damage, lava included.
+- Walking creatures stand on the ground instead of floating; hostile creatures attack on sight also without a wander
+  package, and a fight left through a load door resumes on return.
+- Combat: Always use best attack in Options > Prefs, on by default; the chance to hit counts Fortify Attack, Blind,
+  Sanctuary, Chameleon and Invisibility; a blow reaches the nearest fighter in the original's hit cone.
+- Scripts move the world objects they name, so the Ghostgate portcullises rise; dates read as in the original
+  (18 Last Seed, Day 3), and `dbg date` prints the lore form.
+- Containers in rooms can be opened again: they are aimed at by their box instead of a single point.
+- Items can be dropped on uneven tomb and cave floors; the blight cloud at Dagoth Ur no longer shows as a solid
+  shape.
 
 ## v0.0.62: Stick To The Script, 8 November 2026
 

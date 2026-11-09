@@ -1562,7 +1562,9 @@ static void command(void) {
     if(!Q_strcasecmp(a,"vanity") && Cmd_Argc()==3 && !Q_strcasecmp(Cmd_Argv(2),"now")){vanity_start();return;}
     if(!Q_strcasecmp(a,"die") && Cmd_Argc()==2){
         /* test the death scene: world damage through the combat layer (as lava, aw_lava.c) */
-        if(!AW_CombatHurtPlayer(100000,"dbg camera die"))Con_Printf("Not in a game, or already dead.\n");
+        /* GODMODE-LAVA-DEATH-62: god mode keeps the player alive here too */
+        if(sv_player && ((int)sv_player->v.flags&FL_GODMODE))Con_Printf("God mode is on: no death (dbg god off first).\n");
+        else if(!AW_CombatHurtPlayer(100000,"dbg camera die"))Con_Printf("Not in a game, or already dead.\n");
         return;
     }
     /* FP-WEAPON-SWAY-61: dbg camera sway [1|2|groove|stiff|bench] (view.c aw_fp_sway, saved) */

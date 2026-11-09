@@ -1,6 +1,6 @@
 # Lava
 
-_Last updated with AmiWind v0.0.62-dev1 (7 November 2026)._
+_Last updated with AmiWind v0.0.62 (8 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -144,6 +144,10 @@ Since v0.0.62 the game's own lava script runs: its HurtStandingActor hurts the p
 has an entity, with the script's own number. While it does, the lava volume's damage holds back, so the player is
 hurt once. The volume's damage covers only the lava where the script cannot see the player standing on its object
 (the lava drawn as world scenery, which has no entity).
+
+In god mode (`dbg god`) neither hurts: until v0.0.62 the lava volume's damage skipped the god mode check and a
+player could die in a lava pool with god mode on. From v0.0.63 every world damage goes through one check that god
+mode holds back (GODMODE-LAVA-DEATH-62, [PLAYER_MOVEMENT.md "Breath and drowning"](PLAYER_MOVEMENT.md#breath-and-drowning)).
 
 The blood red is darker and more saturated than the damage flash (190, 20, 20) and far from the planned blight
 weather tint (a dusty brown red at low strength, [ROADMAP.md](ROADMAP.md#weather-ash-storms-and-blight-winds)), so

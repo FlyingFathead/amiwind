@@ -113,6 +113,15 @@ int AW_ControlSet(int controls,int enable)
     if(next==now)return 1;               /* no row is taken for a switch that does not change */
     return AW_StateSet(&aw_state,AW_GLOBAL,AW_CONTROL_FACT,next);
 }
+int AW_MoonRed(void)
+{
+    return AW_StateGet(&aw_state,AW_GLOBAL,AW_MOON_FACT)!=0;
+}
+int AW_MoonRedSet(int red)
+{
+    if(AW_MoonRed()==(red!=0))return 1;
+    return AW_StateSet(&aw_state,AW_GLOBAL,AW_MOON_FACT,red!=0);
+}
 int AW_StoryMenus(void)
 {
     return (int)AW_StateGet(&aw_state,AW_GLOBAL,AW_MENU_FACT)&AW_MENU_ALL;

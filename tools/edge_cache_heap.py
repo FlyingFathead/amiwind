@@ -66,19 +66,43 @@ import struct
 # Re-pinned 2026-11-01 for ENGINE-MODEL-TABLE-58 (model.c, model.h): MAX_MODELS 512; mod_known keeps 256 static slots
 # (model_slot_capacity below) and pages the rest only when a map needs them; edge-cache code and brush loaders are
 # byte-identical.
+# Narrowed 2026-11-09 (BUILD-CHIM-HEAP-KEY-LOADER-63): model.c is pinned by its brush and edge-cache loaders only
+# (tools/engine_loader_policy.py brush_edge_digest; its limits, tables and static buffers count too), so an alias or
+# sprite reader edit no longer refuses this policy. The whole-file pin of 2026-11-01 was
+# dc882f24752a953f769370a23957cb300eb5bd7ac7c699ef048e0eb77084a1be; MODEL_C_PIN='whole' (environment
+# AMIWIND_EDGE_PIN=whole) keeps that method selectable with the whole-file hash below.
+# Re-pinned 2026-11-09 for the shared actor shapes (IMAGE-BIGGER-THAN-ORIGINAL-62, BUILD-EDGE-PIN-SHARED-SHAPES-63):
+# the digest gains only the two defines AW_SHAPE_SHARED and AW_SHAPE_SHARED_REF (the alias file loader's shape
+# reference); the packed-edge allocation is unchanged. Whole-file hash of the same model.c below.
+MODEL_C_WHOLE_SHA256='06089b7d3c6149a12543a589a67110e771382bd25ee4e1cbf8df6a71365db40d'
 SOURCE_HASHES={
-    'model.c':'dc882f24752a953f769370a23957cb300eb5bd7ac7c699ef048e0eb77084a1be',
+    'model.c':'90cd1fbcbc17823484340fe17d146e094d5969b630fa728a6c0812ec29ae6117',   # brush_edge_digest
     'model.h':'34d8a139baba066b2d775a591b35fc4cd1e8a7326d34ca7759d036a1654244f8',
     'r_draw.c':'08464e4c3bbb98ed197f7c42c5b013818d2ef4fffd1a5727ed9a6a4c3385cce4',
     'asm_draw.h':'15dafafe33898852972379fc48524346c287a342ba95f17c01becdc75926eba1',
 }
+
+def pins():
+    """The pins compared: SOURCE_HASHES, or with AMIWIND_EDGE_PIN=whole model.c by its whole-file hash."""
+    import os
+    if os.environ.get('AMIWIND_EDGE_PIN')=='whole':
+        return dict(SOURCE_HASHES,**{'model.c':MODEL_C_WHOLE_SHA256})
+    return SOURCE_HASHES
+
+def source_digest(source,name):
+    """SHA-256 of an engine file as the pin reads it: model.c by its brush and edge-cache loaders (unless whole)."""
+    import os
+    if name=='model.c' and os.environ.get('AMIWIND_EDGE_PIN')!='whole':
+        from engine_loader_policy import brush_edge_digest
+        return brush_edge_digest((source/name).read_text(encoding='utf-8'))
+    return hashlib.sha256((source/name).read_bytes()).hexdigest()
 
 def runtime_policy(source):
     source=Path(source)
     text=(source/'model.h').read_text()
     if '#define AW_EDGE_CACHE_SPLIT 1' not in text:
         return dict(mode='embedded',edge_cache_split=0,model_slot_static_delta=0)
-    if not SOURCE_HASHES or any(hashlib.sha256((source/name).read_bytes()).hexdigest()!=sha for name,sha in SOURCE_HASHES.items()):
+    if not SOURCE_HASHES or any(source_digest(source,name)!=sha for name,sha in pins().items()):
         raise ValueError('Unrecognized packed-edge allocation policy')
     return dict(mode='world_prefix',edge_cache_split=1,source_sha256=SOURCE_HASHES,
         model_slot_capacity=256,immutable_edge_bytes=4,

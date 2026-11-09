@@ -64,8 +64,19 @@ class CombatSourceContractTests(unittest.TestCase):
     def test_combat_sounds_on_and_flee_off_by_default(self):
         # COMBAT-SOUNDS-RULE-OFF-58: the swing sounds as OpenMW plays them are a shipped feature, default on;
         # the flee rule stays an A/B switch, default off. Order follows the enum in aw_combat.h.
-        self.assertIn('enum {AW_RULE_FLEE,AW_RULE_SOUNDS,AW_RULE_COUNT};', (SRC / 'aw_combat.h').read_text())
-        self.assertRegex(code('aw_combat.c'), r'static int rules\[AW_RULE_COUNT\]=\{0,1\};')
+        # ENEMY-HEALTH-BAR-62: the hit contact (the original's hit cone when the crosshair misses) is on by default too.
+        self.assertIn('enum {AW_RULE_FLEE,AW_RULE_SOUNDS,AW_RULE_CONTACT,AW_RULE_COUNT};', (SRC / 'aw_combat.h').read_text())
+        self.assertRegex(code('aw_combat.c'), r'static int rules\[AW_RULE_COUNT\]=\{0,1,1\};')
+
+    def test_best_attack_on_by_default_in_prefs_and_migrated_once(self):
+        # BEST-ATTACK-OPTION-62: on by default (an AmiWind default), one saved value shown on Options > Prefs, and a
+        # configuration saved before it (defaults level below 2) takes the new default once.
+        self.assertIn('static cvar_t best_cvar={"aw_combat_best_attack","1",true};', code('aw_combat.c'))
+        menu = code('aw_menu.c')
+        self.assertIn('ROW_LABELS,ROW_BEST,ROW_AUTOSAVE};', menu)
+        self.assertIn('Cvar_SetValue("aw_combat_best_attack",Cvar_VariableValue("aw_combat_best_attack")?0:1)', menu)
+        self.assertIn('aw_defaults_migrate=AW_CombatDefaultsMigrate;', code('aw_combat.c'))
+        self.assertIn('#define DEFAULTS_LEVEL 2', (SRC / 'aw_fog.c').read_text(encoding='utf-8'))
 
     def test_settings_names_match_the_builder(self):
         names = re.findall(r'"(\w+)"', code('aw_combat_rules.c').split('names[AW_COMBAT_SETTING_COUNT]={')[1].split('};')[0])
@@ -400,7 +411,7 @@ class CombatBuilderTests(unittest.TestCase):
         self.assertEqual(count, len(prepare_combat.AI_SETTINGS))
         # the Flee and sounds rules are plain switches (no console variables: the resident registry budget); Flee
         # off at start (A/B), sounds on since v0.0.58 (COMBAT-SOUNDS-RULE-OFF-58, test_combat_sounds_on_and_flee_off)
-        self.assertIn('static int rules[AW_RULE_COUNT]={0,1};', code('aw_combat.c'))
+        self.assertIn('static int rules[AW_RULE_COUNT]={0,1,1};', code('aw_combat.c'))   # + hit contact on (v0.0.63)
         self.assertNotIn('aw_combat_flee', code('aw_combat.c'))
 
     def test_sound_generators_follow_openmw(self):

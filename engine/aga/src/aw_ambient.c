@@ -236,6 +236,7 @@ int AW_AmbientEscortStep(long place,long room,float target2,float dest2,float hu
 #include "aw_dial.h"
 #include "aw_spike.h"
 #include "aw_crime.h"
+#include "aw_actorstate.h"
 int AW_AreaPlaceKeys(unsigned long *keys,int max,unsigned long *generation);   /* aw_inventory.c */
 
 #define SLOTS 128
@@ -271,6 +272,7 @@ typedef struct {
     float escort_max;           /* AIEscort: the keep-up distance (AW_AmbientEscortStep) */
     aw_dial_npc_cache_t disp;   /* an NPC's disposition facts for the aggro (DIALOGUE-FIGHT-DISPOSITION-57) */
     unsigned short unsticks;    /* AMBIENT-UNSTUCK-FLOOD-61: stuck searches its steps ran since the counters' reset */
+    unsigned char standing;     /* ROOM-CREATURES-NO-AGGRO-62: no package, the slot runs the engage check alone */
 } slot_t;
 static int aggro_on;static void aggro_facts(slot_t *s);   /* below (aggro on sight) */
 static void travel_end(slot_t *s);
@@ -284,6 +286,7 @@ static saved_pkg_t pend[SAVED_PACKAGES];static int npend;
 static void apply_saved_packages(edict_t *p);
 
 int (*aw_ambient_speed_attribute)(edict_t *e);
+int (*aw_ambient_forced_run)(edict_t *e);
 extern unsigned long aw_sv_move_calls;
 int AW_CompanionEdict(edict_t *e);
 
@@ -306,7 +309,7 @@ static unsigned long rng=1;
 static float scan_at;
 static struct {unsigned long thinks,steps,traces,walks,idles,bad_idles,registered,unknown,no_walk,blob_bytes,manual,stuck,
                levelled,aggro_checks,aggro_engaged,aggro_full,flights,dry,travels,travels_done,follows,follows_done,
-               unsticks,unstick_tests,settles,settled,escorts,crossed;double seconds,worst,elapsed;} st;
+               unsticks,unstick_tests,settles,settled,escorts,crossed,standing;double seconds,worst,elapsed;} st;
 /* sv_phys.c SV_CheckStuck: every search for a clear spot (a box that starts in solid), its position tests, and the
  * searches that found none (AMBIENT-UNSTUCK-FLOOD-61) */
 extern unsigned long aw_stuck_searches,aw_stuck_tests,aw_stuck_failed;
@@ -563,6 +566,26 @@ static int find_actor(edict_t *e,aw_ambient_row_t *r) {
     AW_AmbientLevelled(r,&pkg);st.levelled++;
     return 1;
 }
+/* The row flags tools/ambient_lut.py row_flags gives a creature, from the actor record (mwscript.awm ACTB: kind and
+ * flags); 0 for an NPC or an actor without a record. One read of the record when a slot without a row is made. */
+static unsigned char record_flags(edict_t *e) {
+    aw_actor_base_t b;int row;unsigned char f;
+    if(!AW_ActorStateReady() || (row=AW_ActorFind(source_id(e)))==AW_ACTOR_NONE || row<0 || !AW_ActorBase(row,&b) || b.kind!=1)
+        return 0;
+    f=AW_AMBIENT_CREATURE;
+    if(b.flags&AWR_FLIES)f|=AW_AMBIENT_FLYER;
+    if((b.flags&AWR_SWIMS) && !(b.flags&AWR_WALKS))f|=AW_AMBIENT_SWIMMER;
+    return f;
+}
+/* CREATURE-FLOATING-62 (aw_scene.c aw_actor_walks): a creature by its record that neither flies nor swims */
+extern int (*aw_actor_walks)(edict_t *e);
+static int drop_on=1;   /* "chim actors ambient drop on|off" (default on, id1/default-game.cfg; not saved) */
+static int walks_on_ground(edict_t *e) {
+    aw_actor_base_t b;int row;
+    if(!drop_on || !e || !AW_ActorStateReady() || (row=AW_ActorFind(source_id(e)))==AW_ACTOR_NONE || row<0 || !AW_ActorBase(row,&b))
+        return 0;
+    return b.kind==1 && !(b.flags&(AWR_FLIES|AWR_SWIMS));
+}
 static slot_t *start(edict_t *e,const aw_ambient_row_t *row) {
     slot_t *s=free_slot();aw_ambient_row_t r;long pa,pb,ha,hb;int n=NUM_FOR_EDICT(e);
     if(!s || n<0 || n>=MAX_EDICTS)return NULL;
@@ -586,6 +609,7 @@ static slot_t *start(edict_t *e,const aw_ambient_row_t *row) {
         AW_AmbientAllow(&s->pkg,r.distance);
         if(r.flags&AW_AMBIENT_SWIMMER){memset(s->pkg.allowed,0,sizeof(s->pkg.allowed));s->pkg.count=0;s->pkg.manual=(unsigned char)(r.distance>0);}
     }
+    else s->flags=record_flags(e);   /* no row: creature, flyer and swimmer from the actor record (as the builder's row) */
     s->e=e;s->ref=field(e,"aw_ref",0);VectorCopy(e->v.origin,s->home);
     if(aggro_on)aggro_facts(s);
     s->state=S_CHOOSE;s->at=-1;s->can_walk=(unsigned char)can_walk(e);
@@ -616,7 +640,16 @@ static void scan(edict_t *p) {
         ref=field(e,"aw_ref",0);
         if(ref<=0 || field(e,"aw_intro_role",0)){slot_of[i]=0;continue;}
         if(none_ref[i]==ref)continue;               /* looked up before: not in the table (no disk read again) */
-        if(!find_actor(e,&r)){none_ref[i]=ref;st.unknown++;continue;}
+        if(!find_actor(e,&r)){
+            /* ROOM-CREATURES-NO-AGGRO-62: OpenMW 0.51 runs the engage check (Actors::engageCombat) for every actor in
+             * its processing range, whatever its packages; an actor without a Wander row (a room's placed or levelled
+             * creature the place's table does not answer, an actor whose first package is not Wander or who has none)
+             * gets a standing slot for that check alone, kept only when its Fight can reach 100 */
+            slot_t *s=aggro_on?start(e,NULL):NULL;
+            if(s && s->fight>0){s->state=S_OFF;s->standing=1;st.standing++;continue;}
+            if(s){release(s,0);st.registered--;}
+            none_ref[i]=ref;st.unknown++;continue;
+        }
         if(!start(e,&r))break;
     }
 }
@@ -656,6 +689,8 @@ static void stop_walk(slot_t *s) {
 static float walk_speed(slot_t *s) {
     aw_move_inputs_t in;int attr=aw_ambient_speed_attribute?aw_ambient_speed_attribute(s->e):-1;
     memset(&in,0,sizeof(in));in.speed=(float)(attr>=0?attr:50);in.scale=1;
+    /* ForceRun (OpenMW controlextensions.cpp OpSetMovementFlag; character.cpp: the forced flag makes the actor run) */
+    in.running=aw_ambient_forced_run && aw_ambient_forced_run(s->e);
     return AW_MoveWalkSpeed(&move_defaults,&in)*AW_MOVE_UNIT_SCALE;
 }
 static void walk_frames(slot_t *s,float speed,float dt) {
@@ -915,7 +950,7 @@ static void think(slot_t *s,float dt) {
     if(AW_CombatSlotState(e,NULL)){s->fighting=1;s->mover=0;return;}
     if(s->travel==3 || s->travel==4){follow_think(s,dt);return;}
     if(s->travel==5){escort_think(s,dt);return;}
-    if(s->state==S_OFF)return;
+    if(s->state==S_OFF || s->standing)return;
     /* a greeting pauses the package (aiwander.cpp: the greeting interrupts wandering) */
     if(field(e,"aw_face_until",0)>sv.time){
         if(!s->greeting){s->greeting=1;if(s->state==S_WALK)set_field(e,"aw_moving",0);if(s->state==S_IDLE){s->state=S_CHOOSE;set_field(e,"aw_moving",0);}}
@@ -1260,7 +1295,7 @@ int AW_AmbientWander(edict_t *e,int distance,int duration,int hour,const unsigne
     else{s->pkg.distance=(unsigned short)distance;s->pkg.manual=(unsigned char)(distance>0);}
     /* OpenMW starts a stacked package where the actor stands (mInitialActorPosition); the compiled routes are
      * relative to the spawn position, so the start stays there (an AmiWind simplification, docs/NPC_PATHFINDING.md) */
-    s->state=S_CHOOSE;s->at=-1;s->travel=0;
+    s->state=S_CHOOSE;s->at=-1;s->travel=0;s->standing=0;
     AW_MwvmStateChanged();                      /* a package started: GetCurrentAIPackage / GetAIPackageDone change */
     return 1;
 }
@@ -1276,6 +1311,7 @@ int AW_AmbientAiPackage(edict_t *e,int *done) {
         if(s->travel==5){return 2;}                          /* AIEscort: OpenMW's package 2 (v0.0.62) */
         if(s->travel>=3){return 3;}                          /* AIFollow: OpenMW's package 3, done when it ends */
         if(s->travel){if(done)*done=s->travel==2;return 1;}   /* AITravel: OpenMW's package 1 */
+        if(s->standing)return -1;                            /* no package: the engage check's slot alone */
         if(done){*done=s->state==S_OFF;}
         return 0;
     }
@@ -1307,8 +1343,9 @@ static void status(void) {
     Con_Printf("  %lu registered, %lu actors not in the table, %lu cannot walk (no walk animation), %lu route bytes read\n",
                st.registered,st.unknown,st.no_walk,st.blob_bytes);
     Con_Printf("  %lu flying or swimming steps (straight, off the ground; %lu swim spots out of water skipped, last contents %d)\n",st.flights,st.dry,last_dry);
-    Con_Printf("  %lu levelled creatures on their reference's routes; aggro %s: %lu checks, %lu fights started, %lu waited (4 fighting)\n",
-               st.levelled,aggro_on?"on":"off",st.aggro_checks,st.aggro_engaged,st.aggro_full);
+    Con_Printf("  %lu levelled creatures on their reference's routes; aggro %s: %lu checks, %lu fights started, %lu waited (4 fighting); "
+               "%lu actors without a package watched for it\n",
+               st.levelled,aggro_on?"on":"off",st.aggro_checks,st.aggro_engaged,st.aggro_full,st.standing);
     {long held=0;int k;for(k=0;k<amb_count;k++)held+=amb[k].bytes;
      Con_Printf("  per area (aw_ambient_areas %d): %s; %d areas in memory (%ld bytes, levelled packages %ld rows); %lu loads, "
                 "%lu bytes, %d ms in all, last %d areas %ld bytes %d ms; %lu rows found in memory, %lu actors in none; "
@@ -1355,6 +1392,12 @@ void AW_AmbientCommand(void) {
         aggro_on=!strcmp(Cmd_Argv(4),"on");
         Con_Printf("Ambient: aggro on sight %s (default on, not saved): creatures with a Fight that reaches 100 at "
                    "their distance attack the player they see (OpenMW's fight-distance rule)\n",aggro_on?"ON":"OFF");
+    }
+    else if(!strcmp(a,"drop") && Cmd_Argc()>4){
+        drop_on=!strcmp(Cmd_Argv(4),"on");
+        Con_Printf("Ambient: drop %s (default on, not saved): %s\n",drop_on?"ON":"OFF",drop_on?
+                   "a walking creature without a baked ground point is put on what is under it (up to a cell, OpenMW)":
+                   "the old way: every actor snaps at most 32 units down onto the ground");
     }
     else if(!strcmp(a,"settle") && Cmd_Argc()>4){
         settle_on=!strcmp(Cmd_Argv(4),"on");
@@ -1427,9 +1470,11 @@ void AW_AmbientInit(void) {
     aw_mwscript_follow=AW_AmbientFollow;
     aw_mwscript_package=AW_AmbientPackage;           /* AIFollowCell, AIEscort, AIEscortCell (v0.0.62) */
     aw_mwscript_followers=AW_AmbientFollowersOf;     /* the followers through a door (v0.0.62) */
+    aw_actor_walks=walks_on_ground;                  /* CREATURE-FLOATING-62: aw_scene.c AW_NPCFloor's drop */
     aw_mwscript_packages_export=AW_AmbientPackagesExport;
     aw_mwscript_packages_import=AW_AmbientPackagesImport;
     aw_ambient_speed_attribute=AW_MwscriptSpeedAttribute;
+    aw_ambient_forced_run=AW_MwscriptForcedRun;      /* ForceRun (v0.0.63, MWSCRIPT-GAPS-63) */
     aw_crime_pursue=pursue;                          /* CRIME-59: the guards' pursuit to arrest */
     AW_MoveSettingsDefault(&move_defaults);
 }

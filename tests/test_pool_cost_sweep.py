@@ -57,7 +57,9 @@ REASONS = {
     'tools/chim/heap.py:_frame_ring': SMALL,
     'tools/chim/ownership.py:binary_failures': SMALL,
     'tools/chim/seyda.py:retain_authored_collision': FEW,
-    'tools/chim/units.py:run_units': 'blocks of one frame cut to about the same size (PVS_BLOCKS)',
+    # v0.0.63: the pool call of tools/chim/units.py run_units moved into the shared unit store (stored as each unit
+    # comes back); its callers pass units already cut to about the same size (PVS_BLOCKS in chim/units.py)
+    'tools/unit_store.py:completed_units': 'units its callers cut to about the same size (chim/units.py PVS_BLOCKS)',
     'tools/chim/world.py:frame_visibility': ('a generator in largest-first order of the frames\' own size: each '
                                              'layout is made when the pool asks for it (STREAM)'),
     'tools/chim/world.py:frame_rows': ('a generator in largest-first order of the frames\' own size (placements and '

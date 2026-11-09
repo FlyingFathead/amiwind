@@ -169,6 +169,62 @@ byte *AW_SharedSkinExpand(byte *stored,int *bytes) {
     fclose(f);memcpy(full+head+4+pixels,stored+head+4+AW_SKIN_SHARED_REF,rest);free(stored);
     *bytes=head+4+pixels+rest;return full;
 }
+/* Shared actor shapes (IMAGE-BIGGER-THAN-ORIGINAL-62; tools/payload_share.py, builder option --shared-shapes on):
+ * a single-skin alias may keep its ST block (numverts x 12 bytes) and its triangle block (numtris x 16 bytes) in
+ * progs/shapes/<16 hex>.aws1, stored once for every model that repeats them (ST, then triangles). In their place
+ * the model holds AW_SHAPE_SHARED ("AWSH"), the 16 hex digits, the ST bytes and the triangle bytes (little-endian,
+ * 28 bytes) right after its skin (inline pixels or a shared-skin reference). Both alias loaders read the blocks
+ * from that file into the place they had, so the decoded model is byte-identical and nothing more stays in
+ * memory. An engine without this reads the reference as ST data and refuses the model by its size. */
+#define AW_SHAPE_SHARED 0x48535741U
+#define AW_SHAPE_SHARED_REF 28
+static unsigned int AW_Le32(const byte *p){return p[0]|(p[1]<<8)|(p[2]<<16)|((unsigned int)p[3]<<24);}
+/* Where the one skin of a single-skin alias RAW (BYTES long) ends, or -1. */
+int AW_AliasSkinEnd(const byte *raw,int bytes) {
+    const mdl_t *m=(const mdl_t *)raw;int w,h;unsigned int type;size_t end;
+    if(bytes<(int)sizeof(mdl_t)+4 || memcmp(raw,"IDPO",4) || LittleLong(m->version)!=ALIAS_VERSION ||
+       LittleLong(m->numskins)!=1)return -1;
+    w=LittleLong(m->skinwidth);h=LittleLong(m->skinheight);
+    if(w<1 || (w&3) || h<1 || h>MAX_LBM_HEIGHT)return -1;
+    type=AW_Le32(raw+sizeof(mdl_t));
+    if(type==AW_SKIN_SHARED)end=sizeof(mdl_t)+4+AW_SKIN_SHARED_REF;
+    else if(type==ALIAS_SKIN_SINGLE)end=sizeof(mdl_t)+4+(size_t)w*(size_t)h;
+    else return -1;
+    return end>(size_t)bytes?-1:(int)end;
+}
+int AW_SharedShapePath(const byte *hex,char *path,int size) {
+    int i;
+    for(i=0;i<16;i++)if(!((hex[i]>='0' && hex[i]<='9') || (hex[i]>='a' && hex[i]<='f')))return 0;
+    if(size<(int)sizeof("progs/shapes/0123456789abcdef.aws1"))return 0;
+    memcpy(path,"progs/shapes/",13);memcpy(path+13,hex,16);strcpy(path+29,".aws1");return 1;
+}
+/* REF (AW_SHAPE_SHARED_REF bytes) is a shared-shape reference for NV vertices and NT triangles. */
+int AW_SharedShapeRef(const byte *ref,int nv,int nt) {
+    if(nv<1 || nv>MAXALIASVERTS || nt<1 || nt>(INT_MAX/4)/(int)sizeof(dtriangle_t))return 0;
+    return AW_Le32(ref)==AW_SHAPE_SHARED && AW_Le32(ref+20)==(unsigned int)nv*sizeof(stvert_t) &&
+           AW_Le32(ref+24)==(unsigned int)nt*sizeof(dtriangle_t);
+}
+/* The offset of a stored shared-shape alias's reference, or -1 when RAW (BYTES long) is none. */
+int AW_SharedShapeAt(const byte *raw,int bytes) {
+    int at=AW_AliasSkinEnd(raw,bytes);
+    if(at<0 || bytes-at<AW_SHAPE_SHARED_REF)return -1;
+    return AW_SharedShapeRef(raw+at,LittleLong(((const mdl_t *)raw)->numverts),LittleLong(((const mdl_t *)raw)->numtris))?at:-1;
+}
+/* The whole model a stored shared-shape alias stands for, in a new malloc block (the old one is freed), or NULL
+ * when its shape file is missing or of another size. *BYTES becomes the model's size. */
+byte *AW_SharedShapeExpand(byte *stored,int *bytes) {
+    char path[48];FILE *f=NULL;byte *full;int at=AW_SharedShapeAt(stored,*bytes),size,blocks,rest;
+    if(at<0 || !AW_SharedShapePath(stored+at+4,path,sizeof(path))){free(stored);return NULL;}
+    blocks=(int)(AW_Le32(stored+at+20)+AW_Le32(stored+at+24));rest=*bytes-at-AW_SHAPE_SHARED_REF;
+    size=COM_FOpenFile(path,&f);
+    if(!f || size!=blocks || blocks>INT_MAX-at-rest){if(f)fclose(f);free(stored);return NULL;}
+    full=AW_TryMalloc(at+blocks+rest);
+    if(!full){fclose(f);free(stored);return NULL;}
+    memcpy(full,stored,at);
+    if(AW_LoadRead(full+at,blocks,f)!=(size_t)blocks){fclose(f);free(full);free(stored);return NULL;}
+    fclose(f);memcpy(full+at+blocks,stored+at+AW_SHAPE_SHARED_REF,rest);free(stored);
+    *bytes=at+blocks+rest;return full;
+}
 static void *AW_AliasFile(char *name) {
     FILE *f=NULL;byte *data;int size;
     if(strlen(name)<4 || strcmp(name+strlen(name)-4,".mdl"))return NULL;
@@ -178,6 +234,7 @@ static void *AW_AliasFile(char *name) {
     Draw_BeginDisc();
     if(AW_LoadRead(data,size,f)!=(size_t)size || memcmp(data,"IDPO",4)){free(data);data=NULL;}
     fclose(f);
+    if(data && AW_SharedShapeAt(data,size)>=0)data=AW_SharedShapeExpand(data,&size);
     if(data && AW_SharedSkinPixels(data,size)>=0)data=AW_SharedSkinExpand(data,&size);
     Draw_EndDisc();if(data)aw_alias_file_bytes=size;return data;
 }
@@ -600,6 +657,12 @@ model_t *Mod_LoadModel (model_t *mod, qboolean crash)
             /* Only AW_AliasFile rebuilds a shared-skin model; reaching here its skin file was missing. */
             mod->needload=NL_NEEDS_LOADED;if(alias_file)free(alias_file);
             if(crash)Host_Error("Model %s: its shared skin file is missing or damaged",mod->name);
+            return NULL;
+        }
+        if(AW_SharedShapeAt((byte *)buf,alias_bytes)>=0){
+            /* The same for a shared-shape model (AW_SharedShapeExpand): its shape file was missing. */
+            mod->needload=NL_NEEDS_LOADED;if(alias_file)free(alias_file);
+            if(crash)Host_Error("Model %s: its shared shape file is missing or damaged",mod->name);
             return NULL;
         }
         if(!AW_AliasExceptionAllows(mod->name,LittleLong(((mdl_t *)buf)->numverts),LittleLong(((mdl_t *)buf)->numtris),(byte *)buf,alias_file?aw_alias_file_bytes:com_filesize)){

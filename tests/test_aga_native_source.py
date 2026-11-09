@@ -740,7 +740,7 @@ class NativeSourceTests(unittest.TestCase):
 
     def test_wait_cancel_bounds_calendar_and_debug_time(self):
         self.compile_run('aga_wait_test.c', [Path(SOURCE)/'src'/n for n in
-            ('aw_wait.c','aw_rest_rules.c','aw_clock.c','aw_state.c','view.c','r_sky.c','mathlib.c')],
+            ('aw_wait.c','aw_rest_rules.c','aw_clock.c','aw_state.c','view.c','r_sky.c','mathlib.c','aw_questbook.c')],
             cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])
 
     def test_scenery_cannot_displace_late_npcs_from_visible_list(self):
@@ -871,7 +871,7 @@ class NativeSourceTests(unittest.TestCase):
         # AW-20260928-12: ordinary hinged doors on the engine's own collision (world.c), 90 degrees in one second.
         self.compile_run("aga_hinged_door_test.c", [ROOT/"engine/aga/src/aw_hinged_door.c", Path(SOURCE)/"src/world.c",
                                                     Path(SOURCE)/"src/mathlib.c"],
-                         argument_sets=[["table"], ["badtable"], ["door"], ["chim"], ["census"], ["locks"], ["kept"]],
+                         argument_sets=[["table"], ["badtable"], ["door"], ["chim"], ["census"], ["locks"], ["kept"], ["movers"]],
                          cflags=["-fsanitize=undefined", "-fno-sanitize-recover=all"])
 
     def test_talk_rule_combat_dead_knocked_calm_and_one_read_a_frame(self):
@@ -1103,3 +1103,7 @@ class NativeSourceTests(unittest.TestCase):
         self.assertIn('if(AW_ActorSettle(s->e))st.settled++;', ambient)
         import build_aga
         self.assertIn(b'chim actors ambient settle on\n', build_aga.ACTOR_LOGIC_LINES)
+        # CREATURE-FLOATING-62: the walking creatures' placement drop is the shipped default
+        self.assertIn(b'\nchim actors ambient drop on\n', build_aga.ACTOR_LOGIC_LINES)
+        self.assertIn('static int drop_on=1;', ambient)
+        self.assertIn('if(!drop_on || !e || !AW_ActorStateReady()', ambient)

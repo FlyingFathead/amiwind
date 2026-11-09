@@ -3,8 +3,8 @@
  "note": "Ratchet: tests/test_resident_registry.py fails above these numbers and asks for them to be lowered when the engine needs less. Raise only with a dated, maintainer-approved reason.",
  "totals": {
   "commands": {
-   "count": 297,
-   "hunk_bytes": 9504
+   "count": 298,
+   "hunk_bytes": 9536
   },
   "cvars": {
    "count": 365,
@@ -96,7 +96,8 @@
   "2026-11-07: +1 console variable aw_census_legacy (CENSUS-INTRO-SCRIPTS-62, the maintainer's report that talking to the census captain opened the project's early hand-written box instead of the game's dialogue): the captain now talks through the dialogue window with his own greetings, topics and result scripts; the old box stays selectable behind this switch, default off, by the A/B/C rule of 2026-11-03; 24 structure bytes and 32 zone bytes, no new command. Raised on the worker branch v0.0.62-census; the maintainer approves it at merge.",
   "2026-11-07: merge of v0.0.62-census (aw_census_legacy) and integration 583c0feb (aw_name_labels, aw_name_labels_set): both approved raises recorded separately above; the totals are their union (no new setting)",
   "2026-11-07: maintainer-ordered recovery from a failed load and the clean game reset (HEART-CHAMBER-LOAD-HANG-62, DBG-RESTARTGAME-62, DBG-VERSION-62, critical): four commands (128 hunk bytes): aw_restart_game (dbg restartgame), aw_load_fail (dbg loadfail, the test aid that forces a failed load), aw_version_info (dbg ver / dbg version), aw_memcensus (dbg memcensus, the free Fast RAM in one line); one cvar aw_load_fail_test (24 structure bytes, 32 zone bytes), the count dbg loadfail sets and the map command reads.",
-  "2026-11-08: +1 command aw_topic_colours (32 hunk bytes) and +1 console variable aw_dialogue_topic_colours (24 structure bytes, 32 zone bytes) for the dialogue topic colours switch (DIALOGUE-LINKS-62, the maintainer's dialogue link reports of 2026-11-07); added on the worker branch v0.0.62-dlglinks while its base still had room, recorded at the catch-up with the v0.0.62-dev2 line; the maintainer approves it at merge."
+  "2026-11-08: +1 command aw_topic_colours (32 hunk bytes) and +1 console variable aw_dialogue_topic_colours (24 structure bytes, 32 zone bytes) for the dialogue topic colours switch (DIALOGUE-LINKS-62, the maintainer's dialogue link reports of 2026-11-07); added on the worker branch v0.0.62-dlglinks while its base still had room, recorded at the catch-up with the v0.0.62-dev2 line; the maintainer approves it at merge.",
+  "2026-11-08: +1 command aw_breath (32 hunk bytes; dbg breath) for the breath under water and drowning the maintainer asked for (UNDERWATER-BREATH-62, TG 2026-11-07): the breath left, Water Breathing, the drowning damage and what god mode held back, by number, for the in-game checks; no console variable (the rule has no switch, its settings come from the game data). Added on the worker branch v0.0.63-envhazard; the maintainer approves it at merge."
  ],
  "entries": {
   "commands": [
@@ -160,6 +161,7 @@
    "aw_arenapit",
    "aw_bench",
    "aw_blockers",
+   "aw_breath",
    "aw_cam",
    "aw_camera",
    "aw_cell",

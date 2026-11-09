@@ -676,6 +676,37 @@ def function_table(doc):
     return out
 
 
+# The Solstheim regions (Bloodmoon's exteriors): a script whose area is one of them belongs to an add-on world
+ADDON_REGIONS = ('hirstaang forest region', 'isinfier plains region', 'felsaad coast region',
+                 'moesring mountains region', 'thirsk region', 'brodir grove region', 'solstheim (bloodmoon)',
+                 'mournhold (tribunal)')
+
+
+def why_not_run(rows):
+    """The section that counts the scripts that do not run by their reason (v0.0.63, MWSCRIPT-GAPS-63): the reason is
+    the row's own "why" (a missing function counted as one reason, the functions are in By function), split by where
+    the script's area is: Vvardenfell (the image's world, a start script, dialogue or no place) or an add-on world."""
+    reasons = Counter()
+    for r in rows:
+        if r['state'] == 'runs':
+            continue
+        why = 'calls a function the interpreter does not carry out yet' if r['state'] == 'missing-function' \
+            else r['why']
+        reasons[(LABELS[r['state']], why, r['area'] in ADDON_REGIONS)] += 1
+    table = {}
+    for (label, why, addon), n in reasons.items():
+        table.setdefault((label, why), [0, 0])[1 if addon else 0] += n
+    out = ['## Why the others do not run', '',
+           'Each script that does not run, by its reason, and where its area is: Vvardenfell (the world in the image, '
+           'including the start scripts, the dialogue-only ones and records with no place) or an add-on world '
+           '(Mournhold, Solstheim). A missing function is one reason here; By function names the functions.', '',
+           '| State | Reason | Vvardenfell | Add-on world | All |', '| --- | --- | ---: | ---: | ---: |']
+    for (label, why), (v, a) in sorted(table.items(), key=lambda kv: -sum(kv[1])):
+        out.append('| %s | %s | %s | %s | %s |' % (label, _cell(why), _n(v), _n(a), _n(v + a)))
+    out.append('')
+    return out
+
+
 def render(doc):
     import doc_toc
     use(doc)
@@ -734,6 +765,7 @@ def render(doc):
               '(tools/mwscript/functions.py) whenever the page is rendered, so a function carried out later moves its '
               'scripts without a new measurement.' % (long_date(meas['date']), _n(meas['placed_scripted']),
                                                        _n(meas['bindings']), _n(meas['start_scripts'])), '']
+    lines += why_not_run(rows)
     # where OpenMW deliberately differs from the original engine
     hits = Counter(f for r in rows for f in r.get('openmw', ()))
     dhits = doc['dialogue_results'].get('openmw', {})

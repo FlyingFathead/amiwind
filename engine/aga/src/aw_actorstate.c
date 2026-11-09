@@ -533,6 +533,15 @@ int AW_ActorEquipped(const aw_actor_t *a,int entry){
     /* a worn item the scripts removed is no longer worn */
     return (e[4]&AWI_INV_EQUIPPED) && AW_ActorItemCount(a,(int)U16(e))>0;
 }
+int AW_ActorWearsItem(const aw_actor_t *a,int item){
+    aw_actor_base_t b;unsigned char e[AINV_BYTES];int i;
+    if(!st || !a || item<0 || a->base==AW_ACTOR_NONE || !AW_ActorBase(a->base,&b))return 0;
+    for(i=0;i<b.inv_count;i++){
+        if(!fetch(st->ainv.offset+(uint32_t)(b.inv_first+i)*AINV_BYTES,e,AINV_BYTES))return 0;
+        if((int)U16(e)==item && (e[4]&AWI_INV_EQUIPPED) && AW_ActorItemCount(a,item)>0)return 1;
+    }
+    return 0;
+}
 int AW_ActorWeaponType(int row){
     aw_actor_base_t b;unsigned char e[AINV_BYTES];aw_item_t it;
     if(!st || !AW_ActorBase(row,&b) || b.weapon==0xFF || b.weapon>=b.inv_count)return -1;

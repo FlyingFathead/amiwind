@@ -505,10 +505,36 @@ HOST = {'getpccrimelevel', 'setpccrimelevel', 'modpccrimelevel',
         # chances changed for the rest of the game, saved (skyextensions.cpp OpChangeWeather, OpModRegion;
         # weather.cpp WeatherManager::changeWeather, modRegion; aw_weather.c AW_WeatherScript*): the region is worked
         # out here (codegen.hostcall, the region catalogue's index), a region not in the image is no code
-        'changeweather', 'modregion'}
+        'changeweather', 'modregion',
+        # v0.0.63 (MWSCRIPT-GAPS-63): Secunda drawn in the script colour and back (OpenMW skyextensions.cpp
+        # OpTurnMoonRed, OpTurnMoonWhite; sky.cpp setMoonColour: Secunda only, the fallback Moons_Script_Color), kept
+        # in the saved named facts (aw_story.c AW_MoonRed); an item the actor wears or holds (containerextensions.cpp
+        # OpHasItemEquipped: any equipment slot holds the id); the run forced and cleared (controlextensions.cpp
+        # OpSetMovementFlag, OpClearMovementFlag, OpGetForceRun): the player runs (aw_move.c), an NPC walks its
+        # packages at its run speed (aw_ambient.c), kept in the AWFS save block
+        'turnmoonred', 'turnmoonwhite', 'hasitemequipped', 'forcerun', 'clearforcerun', 'getforcerun',
+        # v0.0.63 (MWSCRIPT-GAPS-63): the object casts a spell on itself, its effects' areas reaching the actors around
+        # it (miscextensions.cpp OpExplodeSpell, spellcasting.cpp inflict, worldimp.cpp explodeSpell; aw_cast.c
+        # AW_CastExplode); an actor the player attacked while its fight goes on (statsextensions.cpp OpGetAttacked);
+        # an effect of the spell active on the actor (miscextensions.cpp OpGetSpellEffects)
+        'explodespell', 'getattacked', 'getspelleffects',
+        # v0.0.63 (MWSCRIPT-GAPS-63): the werewolf set (statsextensions.cpp OpSetWerewolf, OpIsWerewolf,
+        # OpSetWerewolfAcrobatics, OpGetWerewolfKills; player.cpp setWerewolfStats / restoreStats): the player's form
+        # with the werewolf's stats from the game settings and his own kept, his items taken off, the kills counted,
+        # an NPC's flag; saved (AWWF); the beast's body is not drawn yet. GetPCTraveling reads 0 (a travel is one
+        # step here; miscextensions.cpp OpGetPcTraveling)
+        'becomewerewolf', 'undowerewolf', 'iswerewolf', 'setwerewolfacrobatics', 'getwerewolfkills',
+        'getpctraveling',
+        # v0.0.63: an object's drawn size (transformationextensions.cpp OpSetScale, OpModScale, OpGetScale; the edict's
+        # aw_scale, not kept past the map)
+        'setscale', 'modscale', 'getscale'}
 RESISTS = ('resistfire', 'resistfrost', 'resistshock', 'resistmagicka', 'resistdisease', 'resistblight',
            'resistcorprus', 'resistpoison', 'resistnormalweapons', 'resistparalysis')
-HOST |= {verb + r for r in RESISTS for verb in ('get', 'set', 'mod')}
+# v0.0.63 (UNDERWATER-BREATH-62): Get/Set/ModWaterBreathing, the same host call as the resistances (OpenMW 0.51
+# statsextensions.cpp OpGetMagicEffect / OpSetMagicEffect / OpModMagicEffect on Water Breathing, effect 0); the
+# breath under water reads the magnitude (aw_breath.c)
+MAGIC_EFFECT_CALLS = RESISTS + ('waterbreathing',)
+HOST |= {verb + r for r in MAGIC_EFFECT_CALLS for verb in ('get', 'set', 'mod')}
 # v0.0.62: the player's control switches, Disable/Enable and the Get...Disabled readers of the seven input switches,
 # and Disable/EnableTeleporting and -Levitation (aw_story.h AW_Control*, saved; OpenMW controlextensions.cpp
 # OpSetControl / OpGetDisabled, mwinput/controlswitch.cpp, miscextensions.cpp OpEnableTeleporting / OpEnableLevitation;
@@ -525,10 +551,12 @@ HOST |= MENU_ENABLES
 HOST_EFFECTS = set(CONTROL_SETS) | MENU_ENABLES | {'placeatpc', 'placeatme', 'placeitem', 'placeitemcell', 'setangle', 'move', 'moveworld', 'setpos', 'setatstart', 'face', 'wakeuppc',
                                     'rotateworld', 'setdelete', 'payfine', 'payfinethief', 'gotojail',
                                     'fadein', 'fadeout', 'fadeto', 'forcesneak', 'clearforcesneak', 'removesoulgem',
-                                    'hurtstandingactor', 'drop', 'resurrect', 'playbink', 'changeweather', 'modregion',
+                                    'hurtstandingactor', 'drop', 'turnmoonred', 'turnmoonwhite', 'forcerun',
+                                    'clearforcerun', 'explodespell', 'becomewerewolf', 'undowerewolf',
+                                    'setwerewolfacrobatics', 'setscale', 'modscale', 'resurrect', 'playbink', 'changeweather', 'modregion',
                                     'aifollowcell', 'aiescort', 'aiescortcell', 'positioncell','showrestmenu', 'raiserank', 'lowerrank', 'showmap', 'clearinfoactor', 'choice', 'goodbye', 'modfactionreaction', 'setfactionreaction', 'forcegreeting', 'rotate', 'aitravel', 'aifollow', 'position','playgroup', 'loopgroup', 'addtopic', 'cast','setpccrimelevel', 'modpccrimelevel', 'setreputation', 'modreputation', 'pcraiserank',
                 'pclowerrank', 'pcjoinfaction', 'pcexpell', 'pcclearexpelled', 'setpcfacrep', 'modpcfacrep'} | \
-    {verb + r for r in RESISTS for verb in ('set', 'mod')}
+    {verb + r for r in MAGIC_EFFECT_CALLS for verb in ('set', 'mod')}
 
 # Groups the measurement reports as "the engine does not have it yet" (the brief's list), and the rest.
 MISSING_GROUPS = ('ai', 'inventory', 'combat', 'spells', 'position')

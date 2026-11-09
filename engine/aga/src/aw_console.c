@@ -236,6 +236,11 @@ static int route_format(route_t *r,int argc,char **argv,int j,char *out,int capa
         if(used+10>capacity)return 0;
         strcpy(out+used," roulette");used+=9;
     }
+    /* dbg date (LORE-DATE-FORMAT-62): the clock command's date report, no resident command of its own */
+    if(!strcmp(r->command,"aw_set_time") && !strcmp(r->words,"date")){
+        if(used+6>capacity)return 0;
+        strcpy(out+used," date");used+=5;
+    }
     /* dbg doorlocks [on/off]: the hinged door command's lock switch, no resident command of its own */
     if(!strcmp(r->command,"aw_hinged_door") && !strcmp(r->words,"doorlocks")){
         if(used+7>capacity)return 0;

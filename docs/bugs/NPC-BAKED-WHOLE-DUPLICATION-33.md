@@ -1,5 +1,14 @@
 # NPC-BAKED-WHOLE-DUPLICATION-33: every NPC appearance is baked whole, so shared body parts are converted again for each actor
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 2 times; something has to be done
+
+- Reported with v0.0.62 at 2026-11-08 20:32 +0000: Measured in the v0.0.62 release image (3,022 MB): 2,150 whole actor models a_*.mdl take 521 MB (242 KB each), 391 n_*.mdl 96 MB and 96 creature models 28 MB, about 650 MB of the 1,729 MB game folder; v0.0.61 had 606 MB for the same 2,150 (282 KB each). The world partition holds 1,123 MB.
+- Reported with v0.0.62 at 2026-11-09 02:30 +0200: Measured in the v0.0.62 release image by reading the model files (read only). The 2,150 whole actor models take 521.3 MB: skins 366.3 MB (70 %), texture-coordinate and triangle blocks 72.6 MB (14 %), the skeletal block appended to each model 65.2 MB (12.5 %), the one stored frame 16.9 MB (3 %). Whole skins do not repeat: all 2,150 actor skins and all 391 other character skins are different (only 17 are stored once already). Inside the skins 75 % of the 16 x 16 pixel tiles repeat (421,802 distinct of 1,705,216 tiles; 436.5 MB of skins hold about 108.0 MB of distinct tiles; an estimate of what a tile layout could reach). The texture-coordinate and triangle blocks repeat exactly: 340 distinct blocks in 2,709 models, 10.6 MB distinct against 89.1 MB stored, so storing each once saves about 78 MB. Frames and skeletal blocks hardly repeat (4,977 distinct frame blocks of 34.3 MB stored; 2,458 distinct skeletal blocks of 2,474). By race: Dark Elf 1,168 models 286.3 MB (40.7 MB distinct tiles of 202.4 MB skins), Imperial 169 models, Nord 127, Orc 121, then six races of 85 to 97 models each. Share-once for shapes and skin tiles would save about 400 MB of the 655 MB the three character model groups take (tracker IMAGE-BIGGER-THAN-ORIGINAL-62).
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -10,7 +19,7 @@
 | Reproduction | always |
 | Duplicate of | no |
 | Persists in | v0.0.48-rc1 (last seen) |
-| Severity | medium: Build speed and disk: 1,726 distinct parts are baked into 3,500 appearances (6.5 CPU hours); blocks equipment changes. |
+| Severity | high: about 650 MB of the 3,022 MB v0.0.62 image; the main reason the image is bigger than the original game data |
 | Family | Build speed (`build-speed`) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |
 | From commit | source and engine fec142b |
@@ -23,6 +32,7 @@ _Last updated with AmiWind v0.0.45 (19 October 2026)._
 <!-- contents start -->
 ## Contents
 
+- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
 - [Status: 9 October 2026](#status-9-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -156,7 +166,9 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-ENV-FINGERPRINT-GLOBAL-33](BUILD-ENV-FINGERPRINT-GLOBAL-33.md): The stair rule setting invalidates the reuse cache of every build stage, including stages that never read it
 - BUILD-ETA-CHIM-STALE-48 (no report page): The build ETA said the CHIM world had about 4 minutes left for over 20 minutes while 40 % of its frames remained
 - [BUILD-ETA-CLOCK-UTC-ONLY-46](BUILD-ETA-CLOCK-UTC-ONLY-46.md): The build ETA printed its finish time on the container clock (UTC) only: 12:53 read as three hours ago on a +03:00 host
+- BUILD-ETA-FRAME-SCALING-63 (no report page): The build progress scales one-frame test builds up to the whole island: a 34-hour chim estimate
 - [BUILD-EXCLUDE-STAGE-CLOSURE-33](BUILD-EXCLUDE-STAGE-CLOSURE-33.md): The quick test build table entered every conversion stage's fingerprint through the stage scheduler
+- BUILD-FIGHTER-BAKE-SLOWER-62 (no report page): The image step's arena fighter bake took 130 s in the v0.0.62 release build against 44 s before (+198 %) with the same 4 units
 - [BUILD-FLORA-FALLBACK-RETRY-35](BUILD-FLORA-FALLBACK-RETRY-35.md): The routed-hull fallback of a flora overlay could not retry: the failed try's candidate folder was looked up from the wrong place
 - [BUILD-HAND-CATALOG-SERIAL-32](BUILD-HAND-CATALOG-SERIAL-32.md): The hand-catalog stage bakes every race and sex one after another
 - [BUILD-HEAP-GATE-AFTER-STAIRS-46](BUILD-HEAP-GATE-AFTER-STAIRS-46.md): The 12-second CHIM heap gate runs after the two-hour stair walk, so an over-budget frame fails the build late
@@ -253,6 +265,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - GATE-IMAGE-REMOVED-52 (no report page): A cleanup removed the image the gate s Linux host-parity step runs: the in-use check looked at containers only
 - GATE-PRIVACY-NOT-IN-PREGATE-52 (no report page): The privacy word check runs only in the full gate: the quick pre-gate checks passed text the gate then refused
 - [HARVEST-CHIM-COVERAGE-ONE-AREA-48](HARVEST-CHIM-COVERAGE-ONE-AREA-48.md): The image step harvest coverage check failed on every CHIM world of one area (every MiniWind sandbox of one town)
+- IMAGE-BIGGER-THAN-ORIGINAL-62 (no report page): The game image (3,022 MB in v0.0.62) is bigger than the original game data it is made from (1.93 GB)
 - [MINIWIND-NO-INTERIOR-SCOPE-42](MINIWIND-NO-INTERIOR-SCOPE-42.md): A MiniWind of one room built the whole town: no scope converted only the start room
 - [MINIWIND-NOT-MINUTES-33](MINIWIND-NOT-MINUTES-33.md): A reused MiniWind build took about two hours instead of minutes
 - [MINIWIND-SCENE-CHAIN-WEIGHT-42](MINIWIND-SCENE-CHAIN-WEIGHT-42.md): Every MiniWind bakes all playable races and the opening rooms, and walks its whole frame stairs
@@ -264,6 +277,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [ROOM-BAKE-FOOTPRINT-SLOW-48](ROOM-BAKE-FOOTPRINT-SLOW-48.md): The room actor bake's footprint rule with the collision-box test is more than 100 times slower
 - [ROOM-BATCH-CORES-49](ROOM-BATCH-CORES-49.md): The room batches stage ran on about two of its eight cores for minutes before its first room, and kept few of its finished rooms when stopped
 - ROOM-RESIDENTS-KEY-SERIAL-49 (no report page): The room residents step opens its unit cache once per resident: 233 s on one core before any cached resident is restored
+- UNIT-KEY-WHOLE-FILE-63 (no report page): The resident and room unit caches keyed every unit on the whole of their tool files, so an unrelated edit to tools/prepare_area.py re-keyed all 1,769 residents and every room, and the v0.0.63-dev1 build baked them all again
 - [UNIT-STORED-AT-MAP-END-62](UNIT-STORED-AT-MAP-END-62.md): The image step's player view stored its finished bodies only when its whole pool map ended: a step stopped midway kept none of them, so every resume baked every player body again
 
 Related bugs in other categories:

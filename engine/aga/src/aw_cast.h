@@ -65,6 +65,8 @@ int AW_MwscriptLand(struct edict_s *target,const aw_spell_effect_t *e,const aw_m
 /* The player's record (its stats from the character sheet when there is one) and its changes stored back. */
 aw_actor_t *AW_MwscriptPlayerRecord(void);
 void AW_MwscriptPlayerStore(aw_actor_t *a);
+/* GODMODE-LAVA-DEATH-62: how many script or spell losses of the player's health god mode kept back (aw_mwhost.c) */
+unsigned long AW_MwscriptGodHealthHeld(void);
 /* An actor edict's record (made from its base when it has none yet; NULL for objects without one) and its ACTB row. */
 aw_actor_t *AW_MwscriptActorOf(struct edict_s *e,int *row);
 /* dbg cast start: the starting spells the class and the skills gave the character made in this session */
@@ -84,4 +86,9 @@ float AW_CastChanceNow(void);  /* the selected spell's chance now, 0..100 */
 /* The selected spell: an ASPT row (KIND 0) or a made spell (KIND 1), INDEX; -1 none. */
 int AW_CastSelected(int *kind);
 void AW_CastSelect(int kind,int index);
+/* ExplodeSpell (v0.0.63, MWSCRIPT-GAPS-63; OpenMW miscextensions.cpp OpExplodeSpell, spellcasting.cpp inflict,
+ * worldimp.cpp explodeSpell): the object casts the ASPT spell SPELL on itself, always succeeding; an object is no
+ * actor, so its Self and Touch effects land only through their area: on every actor within each effect's area (feet)
+ * of AT (map units), the player included. How many actors it reached; -1 when the spell has no effects here. */
+int AW_CastExplode(const float at[3],int spell);
 #endif

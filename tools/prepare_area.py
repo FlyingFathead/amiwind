@@ -423,8 +423,14 @@ def room_unit(task):
     """(unit cache, inputs) of one interior room (build_room), or (None, None) when the cache is off or the
     game data identity is unknown (BUILD-IMAGE-NO-RESUME-33: a stage resumes from its finished rooms)."""
     import hashlib
-    from pass_cache import UnitCache, game_data_digest, tool_digest
-    cache = UnitCache.open('interior-room', {}, __file__)
+    from unit_store import WORK_PLACE_SETTINGS, bake_keyed_cache
+    from pass_cache import covered_lines, game_data_digest, previous_digests, source_digest, tool_digest
+    # keyed on what makes a room (build_room and its reach), not the whole file (UNIT-KEY-WHOLE-FILE-63); the rooms
+    # stored under the whole-file key of fe90f8ed are found while that code is unchanged (unit_store.LEGACY_SOURCES).
+    # The digest calls stay written here, so this stage's own key covers what the cache key reads.
+    cache = bake_keyed_cache(
+        'interior-room', {}, source_digest((__file__, 'build_room')), previous_digests((__file__, 'build_room')),
+        (__file__,), covered_lines((__file__, 'build_room')), neutral=WORK_PLACE_SETTINGS)
     data_identity = game_data_digest() if cache is not None else None
     if data_identity is None:
         return None, None
@@ -471,8 +477,15 @@ def open_residents():
     repository's sources for its environment and the identity reads the build's input lock (about 7 MB of JSON);
     once per resident that was 233 s on one core for 1,769 residents before the first restore. The same values
     whichever way it is opened, so the same keys."""
-    from pass_cache import UnitCache, game_data_digest
-    cache = UnitCache.open(RESIDENT_UNIT, {}, __file__)
+    from unit_store import WORK_PLACE_SETTINGS, bake_keyed_cache
+    from pass_cache import covered_lines, game_data_digest, previous_digests, source_digest
+    # keyed on what makes a resident (build_resident and publish_resident with their reach), not the whole file
+    # (UNIT-KEY-WHOLE-FILE-63: the own scratch folder of v0.0.63 re-keyed all 1,769 residents); the residents stored
+    # under the whole-file key of fe90f8ed are found while that code is unchanged (unit_store.LEGACY_SOURCES)
+    cache = bake_keyed_cache(
+        RESIDENT_UNIT, {}, source_digest((__file__, 'build_resident'), (__file__, 'publish_resident')),
+        previous_digests((__file__, 'build_resident'), (__file__, 'publish_resident')), (__file__,),
+        covered_lines((__file__, 'build_resident'), (__file__, 'publish_resident')), neutral=WORK_PLACE_SETTINGS)
     identity = game_data_digest() if cache is not None else None
     if identity is None:
         return None, None
@@ -934,6 +947,20 @@ def prepare(data_files,scene,qbsp,vis,light,ffmpeg='ffmpeg',jobs=None,vis_mode='
     return populate(data,scene,rooms,reports,ffmpeg,jobs)
 
 
+def resident_work_folder(scene,report_name='area-report.json'):
+    """The folder one populate() call bakes its residents in, removed when it ends: a fresh folder of its own in the
+    build's scratch (tools/build_scratch.py: RUN/scratch, never a stage output), not scene/resident-work
+    (BUILD-STAGE-WRITES-OTHERS-OUTPUT-63: in the v0.0.62 final the balmora-interiors stage baked its residents in
+    intro-scene/resident-work while chim-town-vivec_city ran beside it; the town stage recorded those files as its
+    outputs, the interiors stage then removed them, and the resume refused the Vivec town: 11 minutes again).
+    AMIWIND_RESIDENT_WORK=scene keeps the earlier folder (scene/resident-work) selectable."""
+    import os
+    if os.environ.get('AMIWIND_RESIDENT_WORK')=='scene':return scene/'resident-work'
+    from build_scratch import scratch_root
+    root=scratch_root(near=scene);root.mkdir(parents=True,exist_ok=True)
+    stem=re.sub(r'[^A-Za-z0-9_.-]','_',Path(report_name).stem)
+    return Path(tempfile.mkdtemp(prefix='resident-work-'+stem+'-',dir=str(root)))
+
 def populate(data,scene,rooms,reports,ffmpeg='ffmpeg',jobs=None,
              include_exterior=True,report_name='area-report.json',doors=True,exclude_residents=()):
     palette=(scene/'id1/gfx/palette.lmp').read_bytes()
@@ -982,7 +1009,7 @@ def populate(data,scene,rooms,reports,ffmpeg='ffmpeg',jobs=None,
         tasks.append((data,palette,appearance,greeting,ffmpeg,npc_lod.task_settings()))
     # one unit per resident through the unit cache (resident-bake, ROOM-RESIDENTS-NOT-CACHED-48): a resident baked
     # once is restored while its inputs are unchanged; each bakes into its own folder, installed in identifier order
-    units=scene/'resident-work'
+    units=resident_work_folder(scene,report_name)
     done={};pending=[]
     # ROOM-RESIDENTS-KEY-SERIAL-49: the unit cache and the game data identity are opened once for the stage (once per
     # resident was 233 s on one core for 1,769 residents), and the restores (file reads, SHA-256 checks, writes, each
@@ -1016,12 +1043,18 @@ def populate(data,scene,rooms,reports,ffmpeg='ffmpeg',jobs=None,
         list(ordered_map(warm_resident_table,warm,max(1,min(resolve_jobs(jobs),len(warm)))))
         print('Residents: %d shared animation table(s) ready for %d bakes in %.1f s'%(
             len(warm),len(pending),time.perf_counter()-started),flush=True)
-    # the bakes left, on the shared pool as before (only the misses)
+    # the bakes left, on the shared pool as before (only the misses); one "[done/total]" line per resident (the time is
+    # since the bakes began: the results come back in order)
+    from unit_store import progress_line
+    if tasks:print('Residents [%d/%d] cached, %d to make'%(len(tasks)-len(pending),len(tasks),len(pending)),flush=True)
+    began=time.perf_counter()
     for (task,cache,inputs,folder),baked in zip(pending,ordered_map(build_resident,[p[0] for p in pending],max(1,min(resolve_jobs(jobs),len(pending) or 1))) if pending else ()):
         identifier,record=publish_resident(folder,*baked)
         record=json_record(record)
         store_resident(cache,inputs,folder,identifier,record)
         done[identifier]=(record,folder,True)
+        print(progress_line('Residents',len(tasks)-len(pending)+sum(1 for d in done.values() if d[2]),len(tasks),
+                            identifier,time.perf_counter()-began),flush=True)
     restored=0
     for identifier in [t[2]['id'] for t in tasks]:
         record,folder,made=done[identifier]

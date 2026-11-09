@@ -71,6 +71,25 @@ typedef struct {
 } aw_journalview_t;
 /* The original's date heading of DAYS into OUT; the length, 0 when it does not fit. */
 int AW_JournalDate(int32_t days,char *out,int capacity);
+/* LORE-DATE-FORMAT-62: the one date layout of every window (OpenMW 0.51, read, not copied: mwgui/journalbooks.cpp,
+ * waitdialog.cpp, savegamedialog.cpp; the hour on a 12-hour clock with a.m./p.m. as OpenMW's Calendar strings):
+ *   JOURNAL  "18 Last Seed (Day 3)"            the journal's day heading
+ *   REST     "18 Last Seed (Day 3) 9 a.m."     the rest and wait window
+ *   SAVE     "18 Last Seed 9 a.m."             a saved game's line
+ *   LORE     "18 Last Seed, 3E 427"            the date with the era year (dbg date)
+ *   NUMERIC  "18/08/427"                       day/month/year (dbg date)
+ * DAYS: days since the start (0 = 16 Last Seed 3E 427). The original shows no weekday anywhere, and its data has no
+ * weekday names, so none is shown. Names: the game data's GMSTs through AW_DateNameSet (KEY sMonth... or sDay),
+ * else their English values. Returns the length, 0 when it does not fit. */
+#define AW_DATE_JOURNAL 0
+#define AW_DATE_REST 1
+#define AW_DATE_SAVE 2
+#define AW_DATE_LORE 3
+#define AW_DATE_NUMERIC 4
+int AW_DateText(int form,int32_t days,int hour,int minute,char *out,int capacity);
+int AW_DateNameSet(const char *key,const char *text);
+const char *AW_DateMonthName(int month);
+void AW_DateNamesEnsure(void);   /* the game's (aw_wait.c): the image's names, read once a session */
 /* Adds one entry (DAYS < 0: a kept stage without a date, no heading) with its text; 1 added, 0 out of memory. */
 int AW_JournalViewAdd(aw_journalview_t *v,int32_t days,const char *text);
 /* Wraps every paragraph to WIDTH and pages the lines, PAGE_LINES a page: a page never starts with a blank line and a

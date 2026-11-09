@@ -6,6 +6,10 @@ char *pr_strings="\0aw_npc\0Resident";
 static edict_t entities[4];static model_t model;
 static float wall=1000,floor_z;static int blocked,steep,chim_on;static eval_t mode,valid,baked;
 edict_t *EDICT_NUM(int n){assert(n>=0 && n<4);return &entities[n];}
+/* CREATURE-FLOATING-62: the actor record's answer (aw_ambient.c sets the hook: a creature that neither flies nor
+ * swims), the drop setting */
+static int record_walks;extern int (*aw_actor_walks)(edict_t *e);
+static int walks(edict_t *e){(void)e;return record_walks;}
 eval_t *GetEdictFieldValue(edict_t *e,char *name){if(!strcmp(name,"aw_ground_mode"))return &mode;if(!strcmp(name,"aw_ground_valid"))return &valid;if(!strcmp(name,"aw_ground_baked"))return &baked;return NULL;}
 void SV_LinkEdict(edict_t *e,qboolean touch){}
 int AW_RegionGroundCoverage(const float *point){return 1;}
@@ -86,5 +90,14 @@ int main(void){
     sv.time=14;assert(AW_NPCFloorRetry()==0 && e->v.origin[2]==144);
     floor_z=-1000;assert(!AW_NPCFloor(e));e->free=true;floor_z=126;sv.time=15;assert(AW_NPCFloorRetry()==0 && e->v.origin[2]==144);
     e->free=false;chim_on=0;
+    /* CREATURE-FLOATING-62: a walking creature without a baked ground point drops onto the ground under it (OpenMW
+     * adjustPosition: up to a cell); an NPC, a flyer, a baked one or aw_actor_drop 0 keep the 32-unit bound */
+    e->v.origin[0]=20;floor_z=26;valid._float=0;
+    e->v.origin[2]=144;assert(!AW_NPCFloor(e) && e->v.origin[2]==144);                 /* no records: bound */
+    aw_actor_walks=walks;record_walks=0;
+    assert(!AW_NPCFloor(e) && e->v.origin[2]==144);       /* an NPC, a flyer, or the drop off: bound */
+    record_walks=1;assert(AW_NPCFloor(e) && e->v.origin[2]==26.25f);                    /* 118 units down */
+    e->v.origin[2]=2100;assert(!AW_NPCFloor(e) && e->v.origin[2]==2100);              /* beyond a cell: stays */
+    aw_actor_walks=NULL;record_walks=0;
     return 0;
 }

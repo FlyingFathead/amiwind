@@ -23,6 +23,9 @@ hinged-doors.txt (AWHD1, AW-20260928-12): every placed DOOR reference of Morrowi
                                                 destination) and every hinged door that names a key
                                                 (DEBUG-GOD-LOCKED-DOORS-51)
   U <text>                                      GMST sKeyUsed (the message after the key's name)
+  M <reference>                                 scripted movers, references ascending (WORLD-BUTTONS-62): placed
+                                                activators, statics, doors and containers a script moves along the
+                                                world (MoveWorld, SetAtStart...), the Ghostgate portcullises first
 flags: 1 locked (a lock level above 0 or a key: OpenMW components/esm3/cellref.cpp for content files), 2 key
 (KNAM), 4 trap (TNAM), 8 the DOOR record has a script. The census hall door keeps its story rule in the engine.
 """
@@ -30,6 +33,7 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+import re
 import struct
 import sys
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
@@ -193,6 +197,54 @@ def door_locks(raw,hinged_rows=()):
     return [locks[n] for n in sorted(locks)],key_used
 
 
+MOVER_FUNCTIONS=('moveworld','move','setatstart','setpos')
+MOVER_TYPES=('ACTI','STAT','DOOR','CONT')
+HINGED_MOVERS=128   # aw_hinged_door.c HD_MOVERS
+_MOVER_CALL=re.compile(r'^\s*(?:(?:"([^"]+)"|([A-Za-z0-9_\-]+))\s*->\s*)?(%s)\b' % '|'.join(MOVER_FUNCTIONS),re.I)
+
+
+def mover_catalogue(raw,exclude=()):
+    """WORLD-BUTTONS-62: the placed references a script moves along the world (Move, MoveWorld, SetPos, SetAtStart),
+    named ("ex_gg_portcullis_01"->MoveWorld z 70) or the script's own object (a bare MoveWorld in a script an object
+    carries), whose record is an activator, static, door or container: the CHIM world draws them as placements without
+    an entity, which the engine moves through the M rows (aw_hinged_door.c). References ascending, EXCLUDE (the hinged
+    doors, D rows) left out. -> (references, {id: [script names]})."""
+    scripts={};carriers={};kinds={}
+    for tag,_,payload in records(raw):
+        if tag=='SCPT':
+            s=dict(subrecords(payload))
+            if 'SCHD' in s:scripts[s['SCHD'][:32].split(b'\0')[0].decode('latin-1').casefold()]=s.get('SCTX',b'').decode('latin-1')
+        elif tag in MOVER_TYPES:
+            s=dict(subrecords(payload))
+            if 'DELE' in s or 'NAME' not in s:continue
+            ident=string(s['NAME']).casefold();kinds[ident]=tag
+            if string(s.get('SCRI',b'')):carriers.setdefault(string(s['SCRI']).casefold(),[]).append(ident)
+    moved={}
+    for name,text in scripts.items():
+        for line in text.splitlines():
+            line=line.split(';',1)[0]
+            m=_MOVER_CALL.match(line)
+            if not m:continue
+            target=(m.group(1) or m.group(2) or '').casefold()
+            for ident in ([target] if target else carriers.get(name,[])):
+                if ident in kinds:moved.setdefault(ident,set()).add(name)
+    refs=set()
+    for tag,_,payload in records(raw):
+        if tag!='CELL':continue
+        ref=None
+        for t,data in subrecords(payload):
+            if t=='FRMR':
+                if ref and not ref.get('deleted') and ref.get('id','').casefold() in moved:refs.add(ref['number'])
+                ref={'number':struct.unpack('<I',data)[0]}
+            elif ref is None:continue
+            elif t=='NAME':ref['id']=string(data)
+            elif t=='DELE':ref['deleted']=True
+        if ref and not ref.get('deleted') and ref.get('id','').casefold() in moved:refs.add(ref['number'])
+    out=sorted(refs-set(exclude))
+    if len(out)>HINGED_MOVERS:raise ValueError('Scripted mover table exceeds the runtime bound (%d > %d)' % (len(out),HINGED_MOVERS))
+    return out,{k:sorted(v) for k,v in sorted(moved.items())}
+
+
 def key_id(text):
     """A key's record ID as the engine compares it (aw_state item IDs, at most 63 characters, printable ASCII)."""
     if len(text)>63 or any(not 32<=ord(c)<127 for c in text):raise ValueError('Unusable key ID: %r' % text)
@@ -209,9 +261,9 @@ def safe_name(text):
     return out[:HINGED_NAME]
 
 
-def hinged_text(bases,rows,sounds,sample,locks=(),key_used=''):
+def hinged_text(bases,rows,sounds,sample,locks=(),key_used='',movers=()):
     """The AWHD1 table. sample(source) -> (path, seconds) converts (or reuses) one SOUN file; LOCKS and KEY_USED from
-    door_locks() (K and U rows)."""
+    door_locks() (K and U rows); MOVERS from mover_catalogue() (M rows)."""
     samples=[];index={}
     def w(identifier):
         if not identifier:return -1
@@ -237,6 +289,7 @@ def hinged_text(bases,rows,sounds,sample,locks=(),key_used=''):
         raise ValueError('Door lock table exceeds the runtime bounds (%d rows)' % len(locks))
     lines+=[('K %d %d %d %s' % (k['reference'],k['lock'],k['flags'],k['key'])).rstrip() for k in locks]
     if key_used:lines.append('U '+key_used)
+    lines+=['M %d' % r for r in sorted(movers)]
     return '\n'.join(lines)+'\n'
 
 
@@ -268,8 +321,9 @@ def prepare(data,scene,ffmpeg='ffmpeg'):
     (scene/'id1/door-sounds.txt').write_text('\n'.join(lines)+'\n',encoding='utf-8',newline='\n')
     bases,hinged,sounds=hinged_catalogue(raw)
     locks,key_used=door_locks(raw,hinged)
-    (scene/'id1/hinged-doors.txt').write_text(hinged_text(bases,hinged,sounds,sample,locks,key_used),encoding='ascii',
-                                               newline='\n')
+    movers,moved=mover_catalogue(raw,{r['reference'] for r in hinged})
+    (scene/'id1/hinged-doors.txt').write_text(hinged_text(bases,hinged,sounds,sample,locks,key_used,movers),
+                                               encoding='ascii',newline='\n')
     pairs=sum(1 for line in lines if line.startswith('p '))
     report={'doors':rows,'files':list(converted.values()),'format':'AWSFX2','pairs':pairs,
             'load_doors':sum(1 for row in rows if row['reference'] not in wanted),'scene_links':sorted(wanted),
@@ -281,7 +335,8 @@ def prepare(data,scene,ffmpeg='ffmpeg'):
                       'scripted':sum(1 for r in hinged if bases[r['base'].casefold()]['script'])},
               'locks':{'rows':len(locks),'load_doors_locked':sum(1 for k in locks if k['reference'] not in
                                                                    {r['reference'] for r in hinged}),
-                       'with_key':sum(1 for k in locks if k['key'])}}
+                       'with_key':sum(1 for k in locks if k['key'])},
+            'movers':{'references':len(movers),'records':moved}}
     (scene/'door-audio.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8',newline='\n');return report
 
 

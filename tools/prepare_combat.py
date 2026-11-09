@@ -39,7 +39,9 @@ SETTINGS = ('fFatigueBase', 'fFatigueMult', 'fCombatDistance', 'fHandToHandReach
             'iBlockMinChance', 'iBlockMaxChance', 'fSwingBlockBase', 'fSwingBlockMult', 'fBlockStillBonus',
             'fFatigueBlockBase', 'fFatigueBlockMult', 'fWeaponFatigueBlockMult',
             'fCombatBlockLeftAngle', 'fCombatBlockRightAngle', 'fCombatDelayNPC',
-            'fNPCHealthBarTime', 'fNPCHealthBarFade', 'fWeaponDamageMult')
+            'fNPCHealthBarTime', 'fNPCHealthBarFade', 'fWeaponDamageMult',
+            # v0.0.63 (HIT-CHANCE-CHECK-62, ENEMY-HEALTH-BAR-62): the hit contact's angles, the Chameleon/Invisibility defence
+            'fCombatAngleXY', 'fCombatAngleZ', 'fCombatInvisoMult')
 # The player's movement rules (engine/aga/src/aw_move.h, the same order; docs/PLAYER_MOVEMENT.md):
 # written as "move NAME VALUE" lines, which the combat loader skips.
 MOVE_SETTINGS = ('fMinWalkSpeed', 'fMaxWalkSpeed', 'fEncumberedMoveEffect', 'fBaseRunMultiplier',
@@ -51,7 +53,11 @@ MOVE_SETTINGS = ('fMinWalkSpeed', 'fMaxWalkSpeed', 'fEncumberedMoveEffect', 'fBa
                  'fFatigueSwimRunBase', 'fFatigueSwimRunMult', 'fFatigueSneakBase', 'fFatigueSneakMult',
                  'fFatigueJumpBase', 'fFatigueJumpMult', 'fFatigueBase', 'fFatigueMult',
                  # fall damage (v0.0.62, SCRIPTED-EVENT-FALLING-MAGE-61; aw_move.h AW_MoveFallDamage)
-                 'fFallDamageDistanceMin', 'fFallDistanceBase', 'fFallDistanceMult', 'fFallAcroBase', 'fFallAcroMult')
+                 'fFallDamageDistanceMin', 'fFallDistanceBase', 'fFallDistanceMult', 'fFallAcroBase', 'fFallAcroMult',
+                 # the werewolf's run (v0.0.63, WEREWOLF-RUN-SPEED-63; aw_move.h AW_MoveRunSpeed): Bloodmoon's
+                 'fWerewolfRunMult')
+# Settings only an add-on master defines: name -> the master (prepare_combat.addon_settings)
+ADDON_SETTINGS = {'fWerewolfRunMult': 'Bloodmoon.esm'}
 # The aggro and flee ratings (engine/aga/src/aw_combat.h aw_combat_ai_t, the same order; docs/COMBAT.md "Combat
 # playground"): written as "ai NAME VALUE" lines, which the melee settings' loader skips.
 AI_SETTINGS = ('iFightDistanceBase', 'fFightDistanceMultiplier', 'fFightDispMult',
@@ -66,6 +72,11 @@ CRIME_SETTINGS = ('fAlarmRadius', 'fCrimeStealing', 'fDispStealing', 'fFightStea
                   'iDispAttackMod', 'fDispAttacking', 'iDispKilling', 'iDispTresspass', 'fDispPickPocketMod',
                   'iFightAttack', 'iFightAttacking', 'iFightKilling', 'iFightTrespass', 'iFightPickpocket',
                   'iDaysinPrisonMod', 'iCrimeThresholdMultiplier', 'fCrimeGoldDiscountMult', 'fCrimeGoldTurnInMult')
+# Breath and drowning under water (engine/aga/src/aw_breath.h, UNDERWATER-BREATH-62; OpenMW 0.51 actors.cpp
+# updateDrowning): written as "breath NAME VALUE" lines, which the other loaders skip; the "drown" sound record as
+# "breath sound PATH SECONDS" (OpenMW plays it while the actor drowns).
+BREATH_SETTINGS = ('fHoldBreathTime', 'fSuffocationDamage')
+BREATH_SOUND = ('drown', 'drown')
 # Settings only the builder needs (armour classes, magicka).
 BUILD_SETTINGS = ('iBaseArmorSkill', 'fLightMaxMod', 'fMedMaxMod', 'iHelmWeight', 'iCuirassWeight',
                   'iPauldronWeight', 'iGreavesWeight', 'iBootsWeight', 'iGauntletWeight', 'iShieldWeight',
@@ -130,6 +141,24 @@ def load(master):
     return kinds
 
 
+def addon_settings(data, kinds):
+    """The settings an add-on master defines (ADDON_SETTINGS: the name and its master): Morrowind.esm's value when it
+    has one, else the add-on's, read only for these names; a setting neither has is left out (the engine keeps the
+    original's value, aw_move_rules.c)."""
+    out = {}
+    for name, master in ADDON_SETTINGS.items():
+        if kinds['GMST'].get(name.casefold()) is not None:
+            out[name] = gmst(kinds, name)
+            continue
+        try:
+            extra = load(child_ci(data, master))
+        except (OSError, FileNotFoundError, KeyError, ValueError):
+            continue
+        if extra.get('GMST', {}).get(name.casefold()) is not None:
+            out[name] = gmst(extra, name)
+    return out
+
+
 def gmst(kinds, name):
     fields = kinds['GMST'].get(name.casefold())
     if fields is None:
@@ -164,7 +193,7 @@ TEXT_SETTINGS = ('sMagicTargetResistsWeapons', 'sCrimeMessage', 'sNotifyMessage4
 def movement_lines(kinds, settings):
     """The movement rules' settings and each race's male/female weight (RADT: heights, weights, flags at the
     end), which scales an NPC's horizontal movement (OpenMW character.cpp, normalise race speed off)."""
-    lines = [f'move {name} {settings[name]:.6g}' for name in MOVE_SETTINGS]
+    lines = [f'move {name} {settings[name]:.6g}' for name in MOVE_SETTINGS if name in settings]
     for key in sorted(kinds['RACE']):
         radt = first(kinds['RACE'][key], 'RADT')
         if len(radt) < 20 or not key.isascii() or len(key) > 63:
@@ -680,7 +709,8 @@ def prepare(data_files, id1, jobs=None, fighters=None):
     id1 = Path(id1)
     kinds = load(child_ci(data, 'Morrowind.esm'))
     settings = {name: gmst(kinds, name) for name in SETTINGS + BUILD_SETTINGS + MOVE_SETTINGS + AI_SETTINGS +
-                CRIME_SETTINGS}
+                CRIME_SETTINGS + BREATH_SETTINGS if name not in ADDON_SETTINGS}
+    settings.update(addon_settings(data, kinds))
     (id1 / 'combat').mkdir(parents=True, exist_ok=True)
     (id1 / 'sound/combat').mkdir(parents=True, exist_ok=True)
     from npc_geometry import Assets
@@ -690,6 +720,7 @@ def prepare(data_files, id1, jobs=None, fighters=None):
     lines += movement_lines(kinds, settings)
     lines += [f'ai {name} {settings[name]:.6g}' for name in AI_SETTINGS]
     lines += [f'crime {name} {settings[name]:.6g}' for name in CRIME_SETTINGS]
+    lines += [f'breath {name} {settings[name]:.6g}' for name in BREATH_SETTINGS]
     sounds = {}
     for key, record in SOUNDS:
         fields = kinds['SOUN'].get(record.casefold())
@@ -700,6 +731,13 @@ def prepare(data_files, id1, jobs=None, fighters=None):
         seconds = convert_wav(raw, id1 / 'sound/combat' / f'{key}.wav')
         lines.append(f'sound {key} combat/{key}.wav')
         sounds[key] = {'record': record, 'source': source, 'seconds': round(seconds, 3)}
+    # the drowning sound (UNDERWATER-BREATH-62): its own line, not one of the swing's sounds (aw_combat.h AW_SND_*)
+    key, record = BREATH_SOUND
+    fields = kinds['SOUN'].get(record.casefold())
+    if fields:
+        source = 'sound/' + string(first(fields, 'FNAM')).replace('\\', '/').casefold()
+        seconds = convert_wav(assets.read(source), id1 / 'sound/combat' / f'{key}.wav')
+        lines.append(f'breath sound combat/{key}.wav {seconds:.3f}')
     # Every creature's sound generators (combat/sndg.txt, the sounds under sound/combat/g/): the combat playground's
     # sounds mode plays them; creature fights and the creatures' own animation keys will use the same table.
     generator_text, generator_sounds = generators_file(sound_generators(kinds))

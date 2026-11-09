@@ -176,6 +176,37 @@ static void area_land(const bolt_t *b,const vec3_t at,edict_t *struck){
         bolt_land(b,e,-1);
     }
 }
+/* ExplodeSpell (aw_cast.h): for each actor, the Self and Touch effects whose area reaches it (OpenMW explodeSpell:
+ * each effect with an area hits the actors within its own radius); a pass over the edicts, once per call */
+static int explode_on(edict_t *t,const vec3_t at,const aw_spell_effect_t *e,const aw_mgef_t *m,int n,int row){
+    aw_spell_effect_t pick[AW_MADE_EFFECTS];aw_mgef_t pm[AW_MADE_EFFECTS];int i,k,range,hit=0;vec3_t d;float dist;
+    VectorSubtract(t->v.origin,at,d);dist=(float)Length(d);
+    for(range=AW_RANGE_SELF;range<=AW_RANGE_TOUCH;range++){
+        for(i=k=0;i<n;i++)
+            if(e[i].range==range && e[i].area>0 && dist<=(float)e[i].area*UNITS_PER_FOOT*SCALE){pick[k]=e[i];pm[k]=m[i];k++;}
+        if(k && AW_MwscriptLand(t==sv_player?NULL:t,pick,pm,k,range,row)>0)hit=1;
+    }
+    return hit;
+}
+int AW_CastExplode(const float at[3],int row){
+    aw_spell_effect_t e[AW_MADE_EFFECTS];aw_mgef_t m[AW_MADE_EFFECTS];int i,n,hits=0;edict_t *t;float radius=0;
+    n=row>=0?AW_ActorSpellEffects(row,e,AW_MADE_EFFECTS):0;
+    if(n<=0)return -1;
+    for(i=0;i<n;i++){
+        if(!AW_ActorMagicEffect(e[i].effect,&m[i]))memset(&m[i],0,sizeof(m[i]));
+        if(e[i].range!=AW_RANGE_TARGET && (float)e[i].area*UNITS_PER_FOOT*SCALE>radius)radius=(float)e[i].area*UNITS_PER_FOOT*SCALE;
+    }
+    if(sv_player && !sv_player->free)hits+=explode_on(sv_player,at,e,m,n,row);
+    for(i=1,t=NEXT_EDICT(sv.edicts);i<sv.num_edicts;i++,t=NEXT_EDICT(t)){
+        vec3_t d;
+        if(t->free || t==sv_player || !GetEdictFieldValue(t,"aw_ref"))continue;
+        VectorSubtract(t->v.origin,at,d);
+        if(Length(d)>radius || !AW_MwscriptActorOf(t,NULL))continue;   /* only near actors: no record made for the rest */
+        hits+=explode_on(t,at,e,m,n,row);
+    }
+    landed+=(unsigned long)hits;
+    return hits;
+}
 static void bolts_frame(float dt){
     int i;
     for(i=0;i<BOLTS;i++){

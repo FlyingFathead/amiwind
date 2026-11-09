@@ -30,6 +30,27 @@ static void dated_journal_test(void){
     assert(AW_JournalDate(138,d,sizeof(d)) && !strcmp(d,"1 Morning Star (Day 139)"));   /* the year turns */
     assert(AW_JournalDate(137,d,sizeof(d)) && !strcmp(d,"31 Evening Star (Day 138)"));
     assert(!AW_JournalDate(0,d,8) && !d[0]);
+    /* LORE-DATE-FORMAT-62: one layout for every window, as OpenMW 0.51 shows the original's calendar (a table of
+     * game dates and what each window shows): day 2 = 18 Last Seed 3E 427 */
+    {static const struct {int form;int32_t days;int hour;const char *text;} rows[]={
+        {AW_DATE_JOURNAL,2,9,"18 Last Seed (Day 3)"},
+        {AW_DATE_REST,2,9,"18 Last Seed (Day 3) 9 a.m."},
+        {AW_DATE_REST,2,0,"18 Last Seed (Day 3) 12 a.m."},
+        {AW_DATE_REST,2,12,"18 Last Seed (Day 3) 12 p.m."},
+        {AW_DATE_REST,2,23,"18 Last Seed (Day 3) 11 p.m."},
+        {AW_DATE_SAVE,2,15,"18 Last Seed 3 p.m."},
+        {AW_DATE_LORE,2,9,"18 Last Seed, 3E 427"},
+        {AW_DATE_LORE,138,9,"1 Morning Star, 3E 428"},
+        {AW_DATE_NUMERIC,2,9,"18/08/427"},
+        {AW_DATE_NUMERIC,138,9,"01/01/428"}};
+    for(i=0;i<(int)(sizeof(rows)/sizeof(rows[0]));i++)
+        assert(AW_DateText(rows[i].form,rows[i].days,rows[i].hour,0,d,sizeof(d)) && !strcmp(d,rows[i].text));}
+    /* the names are the game data's once set (sMonth* and sDay GMSTs); unknown keys and empty text change nothing */
+    assert(AW_DateNameSet("sMonthLastseed","Letzte Saat") && AW_DateNameSet("sDay","Tag") &&
+           !AW_DateNameSet("sMonthNone","x") && !AW_DateNameSet("sDay",""));
+    assert(AW_DateText(AW_DATE_JOURNAL,0,0,0,d,sizeof(d)) && !strcmp(d,"16 Letzte Saat (Tag 1)"));
+    assert(!strcmp(AW_DateMonthName(8),"Letzte Saat") && !*AW_DateMonthName(13));
+    AW_DateNameSet("sMonthLastseed","Last Seed");AW_DateNameSet("sDay","Day");
     memset(&v,0,sizeof(v));
     /* empty: no pages, opens at page 0 */
     assert(AW_JournalViewLayout(&v,wrap10,60,11) && !v.pages && !v.lines && AW_JournalViewNewest(&v)==0);

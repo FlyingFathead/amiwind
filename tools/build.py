@@ -1339,7 +1339,8 @@ def commands(args, tools, run):
                 image_options += ['--night-lamp-lightmaps']  # EXPERIMENTAL, off by default
         if getattr(args, 'media_catalogue', 'off') == 'on':
             image_options += ['--media-catalogue']  # DEBUGGING ONLY, off by default (IMAGE-MEDIA-CATALOGUE-ON-DISK-46)
-        for flag in ('file_aliases', 'shared_skins'):   # on by default since v0.0.47 (docs/PAYLOAD_SHARING.md)
+        # on by default: aliases and skins since v0.0.47, shapes since v0.0.63 (docs/PAYLOAD_SHARING.md)
+        for flag in ('file_aliases', 'shared_skins', 'shared_shapes'):
             if getattr(args, flag, 'off') == 'on':
                 image_options += ['--' + flag.replace('_', '-')]
         if getattr(args, 'shared_sky_source', None) is not None:

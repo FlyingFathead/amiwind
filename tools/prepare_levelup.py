@@ -151,7 +151,11 @@ def books_text(raw):
 REST_SETTINGS = ('fRestMagicMult', 'fEndFatigueMult', 'fFatigueReturnBase', 'fFatigueReturnMult', 'fSleepRandMod',
                  'fSleepRestMod', 'fEncumbranceStrMult')
 REST_TEXTS = ('sNotifyMessage1', 'sNotifyMessage2', 'sNotifyMessage64', 'sRestIllegal', 'sRestMenu3', 'sRestMenu2',
-              'sRest', 'sWait', 'sUntilHealed', 'sSleepInterrupt')
+              'sRest', 'sWait', 'sUntilHealed', 'sSleepInterrupt') + (
+              # LORE-DATE-FORMAT-62: the calendar's names for the shared date layout (aw_questbook.c AW_DateText)
+              'sMonthMorningstar', 'sMonthSunsdawn', 'sMonthFirstseed', 'sMonthRainshand', 'sMonthSecondseed',
+              'sMonthMidyear', 'sMonthSunsheight', 'sMonthLastseed', 'sMonthHeartfire', 'sMonthFrostfall',
+              'sMonthSunsdusk', 'sMonthEveningstar', 'sDay')
 NO_SLEEP = 0x04            # CELL DATA flags: sleeping is illegal here without a bed
 STUNTED_MAGICKA = 136      # the magic effect that stops magicka coming back while resting
 

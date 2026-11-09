@@ -170,6 +170,8 @@ int AW_AmbientPackagesImport (const unsigned char *data, int bytes);
 /* The speed attribute of an actor when the actor record has it (v054-actorstate sets it), else NULL / -1:
  * the walk speed then uses the attribute 50 (an AmiWind stand-in, said in docs/NPC_PATHFINDING.md). */
 extern int (*aw_ambient_speed_attribute)(struct edict_s *e);
+/* 1 when a script's ForceRun makes the actor walk its packages at its run speed (aw_mwhost.c; NULL: walk) */
+extern int (*aw_ambient_forced_run)(struct edict_s *e);
 /* GetCurrentAIPackage / GetAIPackageDone for the interpreter (v054-mwscript sets its aw_mwscript_ai_package hook to
  * this): OpenMW's package number (-1 none, 0 Wander, 1 Travel, 2 Escort, 3 Follow; Activate is not run yet and reads
  * as none), *done 1 once a non-repeating Wander has run its duration or a travel, escort or follow ended. */

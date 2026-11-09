@@ -115,6 +115,7 @@ static void every_entry_translates(void){
        (!strcmp(bar1+1,"restorestats") || !strcmp(bar1+1,"restore stats") || !strcmp(bar1+1,"stats restore"))?" restore":
        (!strcmp(bar1+1,"torch") || !strcmp(bar1+1,"give dbgtorch") || !strcmp(bar1+1,"give debugtorch"))?" give debugtorch":
        !strcmp(bar1+1,"door roulette")?" roulette":!strcmp(bar1+1,"doorlocks")?" locks":
+       !strcmp(bar1+1,"date")?" date":
        !strcmp(bar1+1,"creatures")?" actors creatures":!strcmp(bar1+1,"mwscript")?" about":
        !strcmp(bar1+1,"mwscript stats")?" stats":!strcmp(bar1+1,"mwscript result")?" result":
        !strcmp(bar1+1,"kill")?" actors killpick":
@@ -360,6 +361,10 @@ int main(int count,char **values){
   assert(AW_DebugTranslate(3,clouds,output,sizeof(output))==1 && !strcmp(output,expected));
  }
  assert(AW_DebugTranslate(4,exact,output,sizeof(output))==1 && !strcmp(output,"aw_set_time 0630\n"));
+ { /* LORE-DATE-FORMAT-62: dbg date reaches the clock command's date report */
+  char *date[]={"dbg","date"};
+  assert(AW_DebugTranslate(2,date,output,sizeof(output))==1 && !strcmp(output,"aw_set_time date\n"));
+ }
  assert(AW_DebugTranslate(3,sky,output,sizeof(output))==1 && !strcmp(output,"aw_daynight off\n"));
  {
   /* dbg daynight (clock hold at 12:00) is its own command, not the sky setting

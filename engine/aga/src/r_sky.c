@@ -499,6 +499,7 @@ byte R_SkyNearest(int r,int g,int b)
 static byte sky_night_pixels[AW_NIGHT_SKY_PAYLOAD],sky_night_fade[16*256],sky_night_blue[256];
 static int sky_night_loaded,sky_night_attempted,sky_night_strength,sky_moon_phase[2],sky_night_step,sky_night_points;
 static float sky_moon[2][3],sky_moon_right[2][3],sky_moon_up[2][3];
+static int sky_moon_red;   /* MWSCRIPT-GAPS-63: Secunda in the script colour this frame */
 static unsigned int R_NightHash(const byte *bytes,int length)
 {
     unsigned int hash=2166136261U;int i;
@@ -581,6 +582,7 @@ static void R_NightFrame(int milliseconds,int days)
      * deliberately reduced: source relative sizes and 35/50 degree axes,
      * bounded daily rise drift; no weather-dependent early-shadow model. */
     sky_night_step=(milliseconds/30000)&15;
+    sky_moon_red=AW_MoonRed();   /* TurnMoonRed (MWSCRIPT-GAPS-63): read once a frame, not per pixel */
     for(m=0;m<2;m++){
         if(!R_NightMoonOrbit(m,milliseconds,days,sky_moon[m],&sky_moon_phase[m]))continue;
         horizontal=sqrt((double)sky_moon[m][0]*sky_moon[m][0]+(double)sky_moon[m][1]*sky_moon[m][1]);
@@ -593,6 +595,27 @@ static void R_NightFrame(int milliseconds,int days)
 const float *R_DayNightMoonDirection(int moon)
 {
     return moon>=0 && moon<2 && R_DayNightFogColours() && sky_night_strength && sky_moon[moon][2]>0?sky_moon[moon]:NULL;
+}
+/* TurnMoonRed (v0.0.63, MWSCRIPT-GAPS-63; OpenMW sky.cpp setMoonColour: Secunda's colour times the fallback
+ * Moons_Script_Color 255 20 20): each palette colour of the moon times that colour, the nearest palette entry (255
+ * stays transparent); 256 bytes, built once on the first red frame from the palette of that moment */
+static unsigned char moon_red[256];static const unsigned char *moon_red_palette;
+static unsigned char moon_script_colour(unsigned char pixel)
+{
+    if(moon_red_palette!=host_basepal){
+        int i,j;
+        for(i=0;i<256;i++){
+            int r=host_basepal[3*i],g=host_basepal[3*i+1]*20/255,b=host_basepal[3*i+2]*20/255,best=i;long d,bd=-1;
+            for(j=0;j<255;j++){
+                int dr=host_basepal[3*j]-r,dg=host_basepal[3*j+1]-g,db=host_basepal[3*j+2]-b;
+                d=(long)dr*dr+(long)dg*dg+(long)db*db;
+                if(bd<0 || d<bd){bd=d;best=j;}
+            }
+            moon_red[i]=(unsigned char)best;
+        }
+        moon_red[255]=255;moon_red_palette=host_basepal;
+    }
+    return moon_red[pixel];
 }
 /* One native pixel at a fixed source-cell direction, using the same camera
  * projection as AW_FogDraw. No screen-space random overlay or star-list scan.
@@ -670,6 +693,7 @@ static byte R_NightPixel(byte base,byte source,float x,float y,float z)
         base=back;
         ix=(int)((u+1)*12);iy=(int)((1-v)*12);
         pixel=sky_night_pixels[16384+(m*8+sky_moon_phase[m])*576+iy*24+ix];
+        if(m==1 && pixel!=255 && sky_moon_red)pixel=moon_script_colour(pixel);   /* TurnMoonRed (MWSCRIPT-GAPS-63) */
         if(pixel!=255)base=sky_night_fade[level*256+pixel];
     }
     return base;

@@ -86,10 +86,27 @@ static void AW_AliasStreamSharedSkin(aw_alias_stream_t *s,const byte *ref,int of
     s->crc_on=crc_on;
     fclose(skin);s->file=s->held;s->held=NULL;s->left=left;
 }
+/* A shared shape (model.c AW_SHAPE_SHARED): the member's reference is read (and must equal REF), then the ST and
+ * triangle blocks from progs/shapes/<hex>.aws1 into UVOFF and TRIOFF (< 0: only checked). The member's CRC covers
+ * the blocks, as the whole model's would, and not the reference; its read position and remaining bytes are kept. */
+static void AW_AliasStreamSharedShape(aw_alias_stream_t *s,const byte *ref,int uvoff,int trioff,int nv,int nt) {
+    char path[48];FILE *shape=NULL;byte again[AW_SHAPE_SHARED_REF];long left;int size,crc_on=s->crc_on;
+    s->crc_on=0;AW_AliasStreamRead(s,again,sizeof(again));s->crc_on=crc_on;
+    if(memcmp(ref,again,sizeof(again)))AW_AliasStreamError(s,"shape changed");
+    if(!AW_SharedShapePath(ref+4,path,sizeof(path)))AW_AliasStreamError(s,"shared shape name");
+    left=s->left;size=COM_FOpenFile(path,&shape);
+    if(!shape)AW_AliasStreamError(s,"shared shape file missing");
+    s->held=s->file;s->file=shape;s->left=size;
+    if(size<0 || (size_t)size!=(size_t)nv*sizeof(stvert_t)+(size_t)nt*sizeof(dtriangle_t))
+        AW_AliasStreamError(s,"shared shape size");
+    AW_AliasStreamCopy(s,uvoff,(size_t)nv*sizeof(stvert_t));
+    AW_AliasStreamTriangles(s,nt,nv,trioff);
+    fclose(shape);s->file=s->held;s->held=NULL;s->left=left;
+}
 int Mod_TryStreamAlias(model_t *mod) {
     aw_alias_stream_t s;mdl_t disk,check,*m;daliasskintype_t kind;
     daliasframetype_t framekind;daliasframe_t frame;byte ref[AW_SKIN_SHARED_REF],again[AW_SKIN_SHARED_REF];
-    int shared=0;
+    int shared=0,shaped=0;byte shaperef[AW_SHAPE_SHARED_REF];size_t blocks;
     aliashdr_t *h;maliasskindesc_t *skin;stvert_t *uv;
     long base;int bytes,nv,nt,nf,width,height,i,j,headeroff,modeloff,uvoff,trioff,skinoff,pixeloff,frameoff;
     size_t total=0,head=0,skinbytes=0,standard,skelbytes=0;int skelframes=0;
@@ -129,11 +146,24 @@ int Mod_TryStreamAlias(model_t *mod) {
         if((size_t)(ref[16]|(ref[17]<<8)|(ref[18]<<16)|((unsigned long)ref[19]<<24))!=skinbytes)
             AW_AliasStreamError(&s,"shared skin size");
     }else if(LittleLong(kind.type)!=ALIAS_SKIN_SINGLE)AW_AliasStreamError(&s,"skin type");
+    /* A shared shape (model.c AW_SHAPE_SHARED): its reference sits right after the skin. Looked at here and the
+     * read position put back, so both passes below read the member in order. */
+    blocks=(size_t)nv*sizeof(stvert_t)+(size_t)nt*sizeof(dtriangle_t);
+    if((size_t)s.left>=(shared?0:skinbytes)+sizeof(shaperef)){
+        long here=ftell(s.file);
+        if(here<0 || fseek(s.file,here+(long)(shared?0:skinbytes),SEEK_SET) ||
+           AW_LoadRead(shaperef,sizeof(shaperef),s.file)!=sizeof(shaperef) || fseek(s.file,here,SEEK_SET))
+            AW_AliasStreamError(&s,"member seek");
+        if(AW_Le32(shaperef)==AW_SHAPE_SHARED){
+            if(!AW_SharedShapeRef(shaperef,nv,nt))AW_AliasStreamError(&s,"shared shape size");
+            shaped=1;
+        }
+    }
     /* AmiWind skeletal block (aw_skel.h, docs/MODULAR_NPCS.md method C) after the frames: the bytes past an
      * ordinary MDL of this header must be exactly one block for nv vertices and the model one rest frame;
      * any other trailing data is refused, as before. */
-    standard=sizeof(disk)+sizeof(kind)+(shared?sizeof(ref):skinbytes)+(size_t)nv*sizeof(stvert_t)+
-             (size_t)nt*sizeof(dtriangle_t)+(size_t)nf*(sizeof(daliasframetype_t)+sizeof(daliasframe_t)+(size_t)nv*sizeof(trivertx_t));
+    standard=sizeof(disk)+sizeof(kind)+(shared?sizeof(ref):skinbytes)+(shaped?sizeof(shaperef):blocks)+
+             (size_t)nf*(sizeof(daliasframetype_t)+sizeof(daliasframe_t)+(size_t)nv*sizeof(trivertx_t));
     if((size_t)bytes>standard){
         skelbytes=(size_t)bytes-standard;
         if(skelbytes!=AW_SKEL_BLOCK_HEAD+(size_t)nv*AW_SKEL_VERT_BYTES || nf!=1)AW_AliasStreamError(&s,"trailing member data");
@@ -142,8 +172,8 @@ int Mod_TryStreamAlias(model_t *mod) {
     }
     if(!aw_alias_single_pass.value){
     if(shared)AW_AliasStreamSharedSkin(&s,ref,-1,skinbytes);else AW_AliasStreamCopy(&s,-1,skinbytes);
-    AW_AliasStreamCopy(&s,-1,(size_t)nv*sizeof(stvert_t));
-    AW_AliasStreamTriangles(&s,nt,nv,-1);
+    if(shaped)AW_AliasStreamSharedShape(&s,shaperef,-1,-1,nv,nt);
+    else{AW_AliasStreamCopy(&s,-1,(size_t)nv*sizeof(stvert_t));AW_AliasStreamTriangles(&s,nt,nv,-1);}
     for(i=0;i<nf;i++){
         AW_AliasStreamRead(&s,&framekind,sizeof(framekind));
         if(LittleLong(framekind.type)==ALIAS_GROUP){fclose(s.file);return 0;}
@@ -179,13 +209,14 @@ int Mod_TryStreamAlias(model_t *mod) {
         if(memcmp(ref,again,sizeof(ref)))AW_AliasStreamError(&s,"skin changed");
         AW_AliasStreamSharedSkin(&s,ref,pixeloff,skinbytes);
     }else AW_AliasStreamCopy(&s,pixeloff,skinbytes);
-    AW_AliasStreamCopy(&s,uvoff,(size_t)nv*sizeof(stvert_t));
+    if(shaped)AW_AliasStreamSharedShape(&s,shaperef,uvoff,trioff,nv,nt);   /* the ST block, then the triangles */
+    else AW_AliasStreamCopy(&s,uvoff,(size_t)nv*sizeof(stvert_t));
     uv=(stvert_t *)(AW_AliasStreamData(&s)+uvoff);
     for(i=0;i<nv;i++){
         uv[i].onseam=LittleLong(uv[i].onseam);
         uv[i].s=(int)((unsigned int)LittleLong(uv[i].s)<<16);uv[i].t=(int)((unsigned int)LittleLong(uv[i].t)<<16);
     }
-    AW_AliasStreamTriangles(&s,nt,nv,trioff);
+    if(!shaped)AW_AliasStreamTriangles(&s,nt,nv,trioff);
     for(i=0;i<nf;i++){
         AW_AliasStreamRead(&s,&framekind,sizeof(framekind));
         if(LittleLong(framekind.type)==ALIAS_GROUP && aw_alias_single_pass.value){
@@ -226,7 +257,9 @@ int Mod_TryStreamAlias(model_t *mod) {
         }
     }
     if(s.left || s.used!=s.total)AW_AliasStreamError(&s,"decoded size mismatch");
-    if(s.crc_on && !AW_AliasExceptionMatches(mod->name,nv,nt,bytes,(unsigned long)(s.crc^0xffffffffU))){
+    /* a shared shape: the allowance names the whole model's length (its CRC already covers the shape's blocks) */
+    if(s.crc_on && !AW_AliasExceptionMatches(mod->name,nv,nt,shaped?bytes-(int)sizeof(shaperef)+(int)blocks:bytes,
+                                             (unsigned long)(s.crc^0xffffffffU))){
         /* no byte-matching allowance: the model is not admitted (the generic loader refuses it the same way) */
         if(mod->cache.data)Cache_Free(&mod->cache);
         fclose(s.file);mod->needload=NL_NEEDS_LOADED;return 0;

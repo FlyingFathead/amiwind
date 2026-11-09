@@ -19,7 +19,7 @@ PLAYTESTING|cast strike|aw_magicfx|for tests: the held enchanted weapon's blow l
 PLAYTESTING|census legacy|aw_census_legacy|[0 / 1; no argument prints it] the census office's registration (default 0, not saved): 0 = the original's own scripts and dialogue (the clerk, the captain, the door guard, the papers, the doors, the courtyard barrel and ring); 1 = the project's earlier hand-written registration, kept for an A/B; set it before the office loads
 PLAYTESTING|characterchange|aw_quickchar|[race class birthsign review / all] reopen the pier race, gender, head and hair menu over the current scene; confirm to apply (after registration)
 PLAYTESTING|choosecompanion|aw_pickcompanion|same as companion pick
-PLAYTESTING|combat|aw_combat_cmd|[on/off / seed N / readout on/off / music on/off / dice on/off / style amiwind/original / block hold/auto / flee on/off / bestattack on/off / loadout NAME/off / resistnormal N/off / calm] melee combat: no argument = status, costs; readout = a line per swing; flee on = also by Flee rating (defaults on, readout on, music on, block auto, flee off)
+PLAYTESTING|combat|aw_combat_cmd|[on/off / seed N / readout on/off / music on/off / dice / style amiwind/original / block hold/auto / flee / sounds / bestattack / contact on/off / loadout NAME/off / resistnormal N/off / calm] melee combat: no argument = status; bestattack = Options > Prefs best attack; contact off = crosshair ray only (defaults: flee off, the rest on, block auto)
 PLAYTESTING|combattest|aw_combattest|[opponent] same as arenapit; combattest gallery (or floor): the empty floor test, current hands, then idle/draw/lower/punch/center/help/exit
 PLAYTESTING|companion|aw_companion|[pick/choose/test/off/distance N/mimic speed on/off] NPC follower test (not saved): no argument = status and counters; pick = attack the NPC under the red crosshair; test = spawn one beside you; off = it goes home / is removed; distance 48..512 (default 96); mimic speed (default on)
 PLAYTESTING|companiontest|aw_companiontest|[on/off] same as companion test / companion off; no argument: status
@@ -119,10 +119,11 @@ VIDEO|vanitycam|aw_vanitycam|same as vanitycamera
 VIDEO|vanitycamera|aw_vanitycam|[auto / off / on (now) / delay N/default / fullview on/off] the vanity camera (idle orbit): no argument = state; auto = the original (orbit after fVanityDelay, 30 s idle, 3 deg/s; default); off = never (saved); on = orbit now until any input; delay N = test delay (not saved); fullview on/off: full screen, no HUD (aw_vanity_fullview)
 VIDEO|videoplay|playvid|<1..17 / 01..17 / catalogue name> (alias of playvid)
 VIDEO|vidplay|playvid|<1..17 / 01..17 / catalogue name> (alias of playvid)
+WORLD / TRAVEL|breath|aw_breath|(no argument) breath under water and drowning (docs/PLAYER_MOVEMENT.md): the breath left of fHoldBreathTime, head under water, Water Breathing, drowning damage taken, and what god mode held back (world damage, script and spell losses)
 WORLD / TRAVEL|door|aw_hinged_door|[status / list; no argument: open or close the hinged door under the crosshair, locks ignored] ordinary hinged doors (docs/DOOR_MAPPING.md): status counts the table and this map's doors, list prints each (reference, edict or CHIM, how far open, lock)
 WORLD / TRAVEL|door roulette|aw_teleport|[SEED] one random interior: loads you straight into a room of this disk at the room's own start and prints which (name, map id, cell number) and the seed; the same SEED loads the same room again (random tests of interior loading)
 WORLD / TRAVEL|doorlocks|aw_hinged_door|[on/off, true/false or 1/0; no argument toggles] door locks (default on; not saved): on = a locked load or hinged door opens only with its key or in god mode (the message box says which; else the locked sound); off = every lock ignored, until lockpicks and the Open spell exist
-WORLD / TRAVEL|god|aw_godmode|[on/off, true/false or 1/0; no argument toggles] Quake god mode (no damage; the HUD shows GOD) (not saved)
+WORLD / TRAVEL|god|aw_godmode|[on/off, true/false or 1/0; no argument toggles] Quake god mode (no damage of any kind: blows, lava, falls, drowning, spells and scripts; the HUD shows GOD) (not saved)
 WORLD / TRAVEL|godmode|aw_godmode|same as god
 WORLD / TRAVEL|map format|aw_map_format|2 draws the v2 world map layers (default) / 1 draws a v2 map as the v1 map (terrain and settlements only)
 WORLD / TRAVEL|map lava|aw_map_lava|1/0 molten lava pools on the world map (M), v2 maps only (default 1, saved)
@@ -146,6 +147,7 @@ SKY / LIGHTING|24hrcycle|aw_24hrcycle|[seconds per hour 0.25..60, default 1; off
 SKY / LIGHTING|cloudcontrol|aw_cloud_control_set|legacy/new or 1/2 (legacy also disables midnight clearing)
 SKY / LIGHTING|clouds|aw_clouds|on/off true/false 1/0 (default on, independent of sun)
 SKY / LIGHTING|cloudtype|aw_cloud_type_set|classic/veil or 1/2 (classic default)
+SKY / LIGHTING|date|aw_set_time|the game date and time in every form the game shows it: the journal (18 Last Seed (Day 3)), the rest and wait window (with 9 a.m.), a saved game, the lore form with the era year (18 Last Seed, 3E 427) and day/month/year (18/08/427); month names from the game data
 SKY / LIGHTING|dayclouds|aw_day_clouds_set|0..100% in 10:00..14:00 core; 09:00..10:00/14:00..15:00 fade; dawn/sunset protected
 SKY / LIGHTING|daynight|aw_daynight_set|[on/off] off holds the clock at 12:00 midday (sky, light, lamps, windows; survives map changes, not saved); on resumes from the current time; no argument toggles
 SKY / LIGHTING|daynightcycle|aw_daynightcycle|on/off true/false 1/0 (automatic time; explicit set/wait still work)

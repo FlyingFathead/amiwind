@@ -155,6 +155,8 @@ int AW_ActorItemCount(const aw_actor_t *a,int item);
 int AW_ActorAddItem(aw_actor_t *a,int item,int count);            /* 0 when the change list is full */
 int AW_ActorRemoveItem(aw_actor_t *a,int item,int count);         /* removes up to what it has; returns how many */
 int AW_ActorEquipped(const aw_actor_t *a,int entry);              /* 1: base entry ENTRY is worn or held */
+/* 1 when a worn or held entry of A's base list is the AITM row ITEM, still carried (HasItemEquipped, v0.0.63) */
+int AW_ActorWearsItem(const aw_actor_t *a,int item);
 /* The type of the weapon the record of ROW holds (its weapon entry: the WPDT type, OpenMW's weapon type 0..13), -1
  * none (the animation's stance, aw_animkit.c). */
 int AW_ActorWeaponType(int row);

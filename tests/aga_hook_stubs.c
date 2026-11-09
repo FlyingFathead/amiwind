@@ -71,6 +71,8 @@ WEAK const unsigned char *R_InteriorFogColours(int r,int g,int b){(void)r;(void)
 WEAK void (*aw_combat_actor_died)(struct edict_s *e);
 /* The sky haze level (aw_fog.c, FOG-SKY-UNFOGGED-57): fixtures linking r_sky.c without aw_fog.c see no haze. */
 WEAK int AW_SkyHazeNow(void) {return 0;}
+/* The scripts' moon colour (aw_story.c, MWSCRIPT-GAPS-63): fixtures linking r_sky.c without it see a white Secunda. */
+WEAK int AW_MoonRed(void) {return 0;}
 /* The weather's land light (WEATHER-AMBIENT-SUN-UNUSED-51): never reached without a weather (key 0). */
 WEAK int AW_WeatherLightOn(void) {return 1;}
 WEAK int AW_WeatherMountainLevel(void) {return 0;}

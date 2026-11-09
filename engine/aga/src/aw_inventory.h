@@ -320,6 +320,9 @@ extern int (*aw_placed_admit)(unsigned reference,const char *stem,const float lo
 /* PLACED-PIT-AXE-NO-FOCUS-61 (aw_placed.c): where the view ray from EYE along the unit vector DIR meets the model of
  * the drawn placed row DRAWN (its admit number), as a distance along the ray; -1 when it misses. NULL: not asked. */
 extern float (*aw_placed_ray)(int drawn,const float *eye,const float *dir);
+/* ROOM-OBJECTS-MISSING-62 (aw_placed.c: chim_room.c ChimRoom_RayRef): where the view ray meets the drawn placement box
+ * of a room's container REFERENCE, a distance along the ray; -1 when it misses. NULL: the reference point test only. */
+extern float (*aw_room_ray)(unsigned reference,const float *eye,const float *dir);
 /* Once per client frame (aw_placed.c): read the focus table again when the map or exterior cell changed; 1 outdoors. */
 int AW_PlacedRefresh(void);
 /* What the last read of the placed list saw: keys read (negative outdoors), rows, rows with no item row in the focus

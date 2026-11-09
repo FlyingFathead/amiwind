@@ -31,13 +31,12 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.45 (19 October 2026)._
+_Last updated with AmiWind v0.0.62 (8 November 2026)._
 
-_Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
+## Status: 8 November 2026
 
-## Status: 19 October 2026
-
-Reported by the maintainer; cause not found yet.
+Cause found on 19 October 2026 (below). Seen again in v0.0.62-dev1. First step on the v0.0.63 line: the cloud is
+left out of the CHIM world (Repair); not yet in a build, not yet checked in game.
 
 ## Symptom
 
@@ -69,7 +68,14 @@ Always: noclip to the reported position.
 
 ## Repair
 
-To do: compare this copy's rotation and bounds with the source placement and with OpenMW at the same pose; if the
+First step (v0.0.63 line, 8 November 2026): the blight cloud's placements are left out of the CHIM world. The
+builder reads the effect layer list `config/chim-effect-layers.json` (the model, its record, this bug and the
+reason) and drops those placements from the frames that hold them, recording them in the frame's parity record
+as `effect_layers_removed`; no other frame changes. The original disables the cloud with its EndGame script after
+the Heart is destroyed, so leaving it out loses nothing a script needs. Step 2: a turbulence effect (a few warped,
+translucent shells turning slowly) in its place, measured on the Pi 4B.
+
+Earlier plan, kept for the record: compare this copy's rotation and bounds with the source placement and with OpenMW at the same pose; if the
 tilt is wrong, fix it in the shared converter, then audit every tilted copy on the island.
 
 ## Verification

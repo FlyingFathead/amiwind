@@ -18,8 +18,14 @@ int main(void) {
     aw_move_settings_t s;aw_move_inputs_t in;
     AW_MoveSettingsDefault(&s);
     assert(AW_MoveSettingIndex("fminwalkspeed")==0 && AW_MoveSettingIndex("fFatigueMult")==29 &&
-           AW_MoveSettingIndex("fFallAcroMult")==AW_MOVE_SETTING_COUNT-1);
+           AW_MoveSettingIndex("fFallAcroMult")==AW_MOVE_SETTING_COUNT-2 &&
+           AW_MoveSettingIndex("fWerewolfRunMult")==AW_MOVE_SETTING_COUNT-1 && near(s.fWerewolfRunMult,1.3f));
     assert(AW_MoveSettingIndex("fCombatDistance")<0 && !AW_MoveSettingSet(&s,"nonsense",1));
+    /* WEREWOLF-RUN-SPEED-63 (OpenMW npc.cpp getMaxSpeed): the werewolf's run is fWerewolfRunMult times the run */
+    memset(&in,0,sizeof in);in.speed=50;in.athletics=35;in.scale=1;
+    {float run=AW_MoveRunSpeed(&s,&in);in.werewolf=1;
+     assert(near(AW_MoveRunSpeed(&s,&in),run*1.3f));
+     in.werewolf=0;}
     assert(s.fMinWalkSpeed==100 && s.fMaxWalkSpeed==200 && s.fBaseRunMultiplier==1.75f && s.fAthleticsRunBonus==1);
     assert(AW_MOVE_UNIT_SCALE==.25f);
 

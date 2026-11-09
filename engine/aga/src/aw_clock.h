@@ -6,4 +6,5 @@ int AW_ClockAdvance(int milliseconds);
 int AW_ClockSetHour(double hour);
 int AW_ClockSetTime(int hour,int minute);
 void AW_ClockDate(int *year,int *month,int *day,int *hour,int *minute);
+int AW_ClockDays(void);   /* days since the start, 0 = 16 Last Seed 3E 427 */
 #endif

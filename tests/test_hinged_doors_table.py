@@ -11,7 +11,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / 'tools'), str(ROOT / 'src')]
 
 from prepare_door_audio import (HINGED_BASES, HINGED_KEY_POOL, HINGED_LOCKS, HINGED_NAME, HINGED_ROWS,  # noqa: E402
-                                HINGED_SOUNDS, door_locks, hinged_catalogue, hinged_text, sample_name)
+                                HINGED_MOVERS, HINGED_SOUNDS, door_locks, hinged_catalogue, hinged_text,
+                                mover_catalogue, sample_name)
 
 
 def sub(tag, data):
@@ -139,6 +140,32 @@ class HingedDoorTable(unittest.TestCase):
         line = [l for l in hinged_text(bases, rows, sounds, lambda s: (sample_name(s), 1)).splitlines()
                 if l.startswith('B ')][0]
         self.assertEqual(line, 'B 0 -1 ' + 'A' * HINGED_NAME)
+
+    def test_scripted_movers_are_the_m_rows(self):
+        # WORLD-BUTTONS-62: the Ghostgate's switch script moves the portcullis by name; a bar door's own script moves
+        # itself; a lever that only rotates, an NPC and a hinged door are not rows; the engine's bound is the tool's
+        def script(name, text):
+            return record('SCPT', sub('SCHD', name.encode().ljust(32, b'\0') + bytes(20)) + sub('SCTX', text.encode()))
+        def acti(identifier, script_name=''):
+            data = sub('NAME', z(identifier)) + sub('MODL', z('x\\a.nif'))
+            return record('ACTI', data + (sub('SCRI', z(script_name)) if script_name else b''))
+        raw = master()
+        raw += script('GG_OpenGate1', 'begin GG_OpenGate1\nif ( OnActivate == 1 )\n  ; "ex_gg_portcullis_01"->MoveWorld z 1\n'
+                      'endif\n\t"ex_gg_portcullis_01"->MoveWorld z 70\n"ex_gg_portcullis_01"->SetAtStart\nend')
+        raw += script('BarDoor', 'begin BarDoor\nsetatstart\nRotate z 90\nend')
+        raw += script('Lever', 'begin Lever\nRotate y 45\n"guard"->MoveWorld x 5\nend')
+        raw += acti('ex_gg_portcullis_01') + acti('ex_gg_gateswitch_01', 'GG_OpenGate1') + acti('bar_door', 'BarDoor')
+        raw += acti('lever', 'Lever')
+        raw += cell('Ghostgate', ref(500, 'ex_gg_portcullis_01'), ref(400, 'ex_gg_portcullis_01'), ref(501, 'ex_gg_gateswitch_01'),
+                    ref(502, 'bar_door'), ref(503, 'lever'), ref(504, 'guard'), ref(505, 'bar_door', ('DELE', struct.pack('<i', 0))))
+        bases, rows, sounds = hinged_catalogue(raw)
+        refs, moved = mover_catalogue(raw, {r['reference'] for r in rows} | {502})
+        self.assertEqual(refs, [400, 500])
+        self.assertEqual(moved, {'bar_door': ['bardoor'], 'ex_gg_portcullis_01': ['gg_opengate1']})
+        lines = hinged_text(bases, rows, sounds, lambda s: (sample_name(s), 1), movers=[500, 400]).splitlines()
+        self.assertEqual(lines[-2:], ['M 400', 'M 500'])
+        source = (ROOT / 'engine/aga/src/aw_hinged_door.c').read_text(encoding='utf-8')
+        self.assertEqual(int(dict(re.findall(r'#define (HD_\w+) (\d+)', source))['HD_MOVERS']), HINGED_MOVERS)
 
     def test_a_missing_authored_sound_stops_the_build(self):
         raw = door('d', 'Door', 'Nowhere') + cell('Room', ref(1, 'd'))

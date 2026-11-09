@@ -1,6 +1,6 @@
 # Build profile and stage reuse
 
-_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
+_Last updated with AmiWind v0.0.62 (9 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -704,8 +704,21 @@ What the file holds and how it is worked out:
 - **Stage size**: a stage whose amount of work can be read from its command
   line is compared only with earlier runs of a known size. Today that is the
   chim stage: its frames (one per `--area`, one per `--chim-regions-cells`
-  cell). The history is scaled linearly by frames here / frames there (and
-  named so when the sizes differ by more than 2x); earlier runs whose size is
+  cell). Its history is read from the newest 60 runs, so a full build is found
+  behind a row of MiniWind builds. Runs within 2x of this size are used first,
+  scaled linearly by frames here / frames there; else only runs at least this
+  size, scaled down (named so). A stage's time is never scaled up past the
+  largest size seen: one-frame test builds scaled by 1,351 frames once put the
+  chim stage at 34 hours for a stage of about 48 minutes
+  (BUILD-ETA-FRAME-SCALING-63); such a stage says `no comparable history`, and
+  while it runs its own counter (units left at the rate measured here) gives
+  the estimate. A stage's counter is also read from the unit stores' lines
+  (`Residents [37/80] caius cosades 1m15s`, tools/unit_store.py), with the
+  slowest unit so far; each running stage row in `build-progress.json` carries
+  `counter` and `pools` (every running pool map's done/total and its slowest
+  running unit, from RUN/jobs/NN-stage.pool), and the Monitor shows
+  `[done/total]` beside the stage with the maps and slowest units on hover.
+  Earlier runs whose size is
   unknown do not count, and with none left the stage says `no comparable
   history`, weighs the median like a stage without history, and the ETA says
   `lower bound: no comparable history for chim` (`eta_lower_bound: true`)

@@ -41,8 +41,11 @@ typedef struct {
     float fFatigueBlockBase,fFatigueBlockMult,fWeaponFatigueBlockMult;
     float fCombatBlockLeftAngle,fCombatBlockRightAngle,fCombatDelayNPC;
     float fNPCHealthBarTime,fNPCHealthBarFade,fWeaponDamageMult;
+    /* v0.0.63 (HIT-CHANCE-CHECK-62, ENEMY-HEALTH-BAR-62): the hit contact's angle tolerances (OpenMW 0.51 combat.cpp
+     * getHitContact: the sine of the tolerance angle times 90) and the defence of Chameleon and Invisibility (getHitChance) */
+    float fCombatAngleXY,fCombatAngleZ,fCombatInvisoMult;
 } aw_combat_settings_t;
-#define AW_COMBAT_SETTING_COUNT 36
+#define AW_COMBAT_SETTING_COUNT 39
 
 /* The aggro and flee ratings' game settings (combat/settings.txt "ai NAME VALUE" lines, tools/prepare_combat.py AI_SETTINGS;
  * the master file's GMST names). Kept apart from the melee settings: an image without them still fights, only the
@@ -81,7 +84,13 @@ typedef struct {
      * victim, its Resist Normal Weapons less its Weakness to Normal Weapons in percent (set before each swing at it) */
     unsigned char weapon_normal;
     short resist_normal;
-    unsigned int hit_classes;           /* the armour a blow can land on, 2 bits per AW_CombatArmorHitSlot slot: 0 none,
+    /* HIT-CHANCE-CHECK-62 (OpenMW 0.51 combat.cpp getHitChance, creaturestats.cpp getEvasion), set from the actor's
+     * active effects before each swing (aw_combat.c hit_effects; 0 without an effect list): as an attacker, Fortify
+     * Attack less Blind; as a victim, Sanctuary (at most 100, part of the evasion: none while down or unaware) and the
+     * Chameleon and Invisibility defence (AW_CombatUnseen, counted while its fatigue is not below 0) */
+    short attack_mod;
+    unsigned char sanctuary,unseen;     /* 0..100 and 0..200: the 4 bytes keep the sheet at 184 */
+    unsigned int hit_classes;          /* the armour a blow can land on, 2 bits per AW_CombatArmorHitSlot slot: 0 none,
                                            1 light, 2 medium, 3 heavy (its hit sound; sheet field 12); AW_HIT_CLASS */
     float weapon_health,weapon_health_max,shield_health,shield_health_max;  /* condition; max 0 = unknown (full) */
 } aw_fighter_t;
@@ -120,10 +129,30 @@ int AW_CombatIsNormalWeapon(int flags,int enchanted);
  * zeroed), and as the ATTACKER its fatigue and its weapon's condition (no wear, no break). Pure. */
 void AW_CombatGodVictim(aw_fighter_t *v,const aw_fighter_t *before,aw_swing_t *out);
 void AW_CombatGodAttacker(aw_fighter_t *a,const aw_fighter_t *before,aw_swing_t *out);
+/* GODMODE-LAVA-DEATH-62 (aw_combat_rules.c): world damage held back in god mode (1, added to *HELD), and the health a
+ * script or a spell effect leaves a god-mode player (never below what it had; a heal lands) */
+int AW_CombatGodWorldDamage(int god,float damage,float *held);
+float AW_CombatGodHealth(int god,float before,float after,float maximum);
 #define AW_WEAPON_MAGICAL 1
 #define AW_WEAPON_SILVER 2
 #define AW_EFFECT_WEAKNESS_NORMAL_WEAPONS 36
 #define AW_EFFECT_RESIST_NORMAL_WEAPONS 98
+/* HIT-CHANCE-CHECK-62: the effects of the hit chance (the ESM numbers; Chameleon 40 and Invisibility 39 are aw_effects.h's) */
+#define AW_EFFECT_SANCTUARY 42
+#define AW_EFFECT_BLIND 47
+#define AW_EFFECT_FORTIFY_ATTACK 117
+/* The Chameleon and Invisibility defence of a victim (OpenMW 0.51 combat.cpp getHitChance): min(100, fCombatInvisoMult x
+ * Chameleon) + min(100, fCombatInvisoMult x Invisibility), rounded. Pure. */
+unsigned char AW_CombatUnseen(const aw_combat_settings_t *s,float chameleon,float invisibility);
+/* The player's melee contact (OpenMW 0.51 combat.cpp getHitContact with isInMeleeReach), pure: TO is the vector from
+ * the attacker's position (its feet) to the target's in game units, EYE the attacker's eye height over its feet,
+ * HEIGHT the target's own height, GAP the distance between their bounds, DZ the height difference of their feet,
+ * REACH the weapon's reach, FORWARD the attacker's view direction (unit vector, its z the sine of looking up). 1 when
+ * the target is in reach (gap and |dz| under REACH, DZ_EXTRA added to the height allowance for a flyer, as the flyer's
+ * own strike allows), in front, within asin(fCombatAngleXY / 90) to the side, and its body within fCombatAngleZ / 90
+ * of the view's sine up or down. */
+int AW_CombatContact(const aw_combat_settings_t *s,const float to[3],float eye,float height,float gap,float dz,
+                     float reach,float dz_extra,const float forward[3]);
 /* aw_combat_dice: 1 (default) the original rolls; 0 (AmiWind extension) no dice:
  * every swing in reach hits, nothing is blocked, knockdown by the damage threshold
  * alone, NPC swing strength the mean. docs/COMBAT.md. */
@@ -194,6 +223,7 @@ typedef struct {
     double started,ended,player_down_until;
     int won;
     int player_swings,player_hits,player_misses,npc_swings,npc_hits,npc_misses,npc_flees;
+    int player_contacts;                 /* the player's swings that found their fighter by the hit cone (AW_RULE_CONTACT) */
     float dealt_health,dealt_fatigue,taken_health,taken_fatigue;
     unsigned long player_blocks,npc_blocks,guards;   /* blocked blows (the player's, the NPCs'), block button presses with a shield */
 } aw_combat_stats_t;
@@ -207,8 +237,11 @@ int AW_CombatAiLoaded(void);            /* every "ai" line was in combat/setting
  * resident registry budget). AW_RULE_FLEE: flee by the Flee rating (OpenMW aicombataction.cpp makeFleeDecision);
  * AW_RULE_SOUNDS: the swing's sounds by AW_CombatSwingSounds. Flee off by default (A/B); sounds ON by default since
  * v0.0.58 (COMBAT-SOUNDS-RULE-OFF-58; the player's own footsteps are their own setting, off). The combat playground
- * switches both on for its session. ON < 0 only reads; returns the value before the call. */
-enum {AW_RULE_FLEE,AW_RULE_SOUNDS,AW_RULE_COUNT};
+ * switches both on for its session. ON < 0 only reads; returns the value before the call.
+ * AW_RULE_CONTACT (v0.0.63, ENEMY-HEALTH-BAR-62; dbg combat contact on/off, ON by default): when the crosshair's ray
+ * finds nobody, the player's swing takes the nearest fighter in the original's hit cone (AW_CombatContact; OpenMW
+ * getHitContact), so a flyer or a small creature is struck as in the original; off = the ray alone (the earlier rule). */
+enum {AW_RULE_FLEE,AW_RULE_SOUNDS,AW_RULE_CONTACT,AW_RULE_COUNT};
 int AW_CombatRule(int rule,int on);
 /* Combat sound KEY (AW_SND_*): its file (sound/ relative, "" when the image has none) and playing it locally. */
 const char *AW_CombatSoundPath(int key);
@@ -256,8 +289,13 @@ int AW_CombatGuarding(void);
 float AW_CombatBlockShown(void);
 extern const aw_fighter_t *aw_combat_player_preset;
 void AW_CombatInit(void);
+/* A saved configuration's defaults level (aw_fog.c aw_horizon_defaults) before the current one: the combat options whose
+ * default changed since take the new default (BEST-ATTACK-OPTION-62: best attack on from level 2). */
+void AW_CombatDefaultsMigrate(int level);
 void AW_CombatPhysics(void);
-int AW_CombatHurtPlayer(float damage,const char *cause);  /* world damage (lava); 1 = died now */
+int AW_CombatHurtPlayer(float damage,const char *cause);  /* world damage (lava, falls, drowning); 1 = died now; none in god mode */
+/* GODMODE-LAVA-DEATH-62: how many world damages god mode held back, and their sum in *DAMAGE (may be NULL) */
+unsigned long AW_CombatWorldGodHeld(float *damage);
 void AW_CombatSceneSpawn(void);
 int AW_CombatEnemyBar(float *fraction,float *alpha);
 int AW_CombatHostiles(void);
@@ -318,6 +356,12 @@ int AW_CombatLastHitCount(void);
  * its fight starts: the assault, when it is one), and the player's killing blow (the murder, when it is one). NULL in
  * fixtures. */
 extern void (*aw_combat_assault)(struct edict_s *victim);
+/* GetAttacked (v0.0.63, MWSCRIPT-GAPS-63; OpenMW mechanicsmanagerimp.cpp actorAttacked setAttacked): the player's first
+ * swing or harmful spell at an actor not fighting yet (aw_mwhost.c keeps the victims; NULL in fixtures) */
+extern void (*aw_combat_attacked)(struct edict_s *victim);
+/* GetWerewolfKills (v0.0.63; OpenMW actors.cpp: a kill by the player in werewolf form adds a werewolf kill): the
+ * player's blow or spell killed VICTIM (aw_mwhost.c counts it; NULL in fixtures) */
+extern void (*aw_combat_player_kill)(struct edict_s *victim);
 extern void (*aw_combat_killed)(struct edict_s *victim);
 /* The text the player is shown when an ordinary weapon has no effect (combat/settings.txt "text
  * sMagicTargetResistsWeapons ..."); "" when the image has none. */

@@ -123,6 +123,7 @@ int AW_OpeningStoryHidden (void);
  * defined here so the host tests of the streamer link without it. */
 int (*aw_chim_door_yaw)(unsigned pid, float yaw);
 int (*aw_chim_door_clip)(unsigned pid, vec3_t start, vec3_t mins, vec3_t maxs, vec3_t end, trace_t *trace);
+int (*aw_chim_place_shift)(unsigned pid, const float *d, int relink);
 
 static int		available;			/* chim/world.cwi exists */
 static int		active;				/* the current map is a CHIM frame */
@@ -2141,6 +2142,7 @@ void Chim_Init (void)
 #endif
 	aw_chim_door_yaw = ChimChunks_DoorYaw;
 	aw_chim_door_clip = ChimChunks_DoorClip;
+	aw_chim_place_shift = ChimMovers_Shift;		/* chim_room.c, WORLD-BUTTONS-62 */
 	aw_chim_view_reach = ViewReach;
 #ifdef AMIGA
 	aw_chim_spike_counts = SpikeCounts;

@@ -702,6 +702,7 @@ static void hud_equipment_boxes(int y,int boxes) {
     AW_UIHudPlaceholders(y,boxes);
 }
 int (*aw_combat_enemy_bar)(float *fraction,float *alpha);   /* aw_combat.c */
+int (*aw_breath_bar)(float *fraction,int *flashing);        /* aw_breath.c (UNDERWATER-BREATH-62) */
 int (*aw_combat_guard_marker)(void);   /* aw_combat.c: the player guards (hold to block) */
 void AW_UIHud(void) {
     float current[3]={100,100,100},maximum[3]={100,100,100};
@@ -722,6 +723,12 @@ void AW_UIHud(void) {
         for(i=0;i<3;i++)AW_UIBar(8,y+i*8,75,7,i,maximum[i]>0?current[i]/maximum[i]:0);
     hud_equipment_boxes(y,boxes);
     {float fraction,alpha;if(aw_combat_enemy_bar && aw_combat_enemy_bar(&fraction,&alpha))AW_UIEnemyBar(fraction,alpha);}
+    /* UNDERWATER-BREATH-62: the breath bar while the head is under water without Water Breathing (OpenMW 0.51
+     * openmw_hud.layout "DrowningFrame": a red bar at the top of the view, in the middle; it flashes once the breath is
+     * gone, mwgui/hud.cpp) */
+    {float fraction;int flashing,w=100;
+     if(aw_breath_bar && aw_breath_bar(&fraction,&flashing) && !flashing && (int)vid.width>w+16)
+        AW_UIBar(((int)vid.width-w)/2,r_refdef.vrect.y+8,w,7,0,fraction);}
     /* The guard marker (COMBAT-BLOCKING-36; dropped in v0.0.41-dev1, restored): first person shows no shield yet,
      * so the word "Guard" at the lower right, on the bottom line of the strip under the viewport (object names use
      * its top line), or inside the viewport's lower right corner when there is no strip. */

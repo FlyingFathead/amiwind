@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Store repeated content of the boot payload once, as the last step before the disk layout.
 
-Two methods, each off by default until a playtest image shows the game unchanged (build.py --file-aliases,
---shared-skins; docs/PAYLOAD_SHARING.md):
+Three methods, each a builder option that is on by default (build.py --file-aliases on and --shared-skins on
+since v0.0.47, --shared-shapes on since v0.0.63; off keeps every copy, the method before; docs/PAYLOAD_SHARING.md):
 
 file aliases (IMAGE-DUPLICATE-FILES-46): byte-identical files (SHA-256 of the content) of the kinds the engine
     opens through its file search (models, sounds, sprites, animation layouts and item tags: COM_FindFile) are
@@ -18,9 +18,20 @@ shared skins (IMAGE-ACTOR-SKIN-REPEATS-46): a single-skin actor model (progs/a_*
     decoded model is byte-identical and the game holds no more memory than before. expand_shared_skin is the
     reference of what the engine rebuilds.
 
+shared shapes (IMAGE-BIGGER-THAN-ORIGINAL-62): an actor model (progs/*.mdl: a_, n_, c_, the player bodies, the
+    view models) whose texture coordinates and triangles (the ST block, numverts x 12 bytes, and the triangle
+    block, numtris x 16 bytes) another model repeats stores the two blocks once, ST then triangles, in
+    progs/shapes/<16 hex>.aws1; the model keeps "AWSH", the 16 hex digits of the blocks' SHA-256, the ST bytes and
+    the triangle bytes (28 bytes, little-endian) in their place. Every model of a repeated shape points to the
+    file. The engine's alias loaders read the blocks from that file into the same place before decoding
+    (model.c AW_SharedShapeExpand, model_alias_stream.inc), so the decoded model is byte-identical and resident
+    memory is unchanged. It runs after the shared skins (a model can carry both references) and before the file
+    aliases. expand_shared_shape is the reference of what the engine rebuilds.
+
 Usage (read only, a dry measurement over a staged payload; nothing is written):
 
-    payload_share.py measure BOOT [--file-aliases] [--shared-skins] [--jobs N] [--json OUT]
+    payload_share.py measure BOOT [--file-aliases] [--shared-skins] [--shared-shapes] [--jobs N] [--json OUT]
+    payload_share.py identity ID1 [--jobs N] [--json OUT]   (every shared-shape form rebuilds its model)
 """
 import argparse
 import fnmatch
@@ -45,6 +56,15 @@ SKIN_SINGLE = 0
 MDL_HEADER = 84
 SKIN_REF = 4 + 16 + 4         # type, 16 hex digits, pixel count: in place of type + pixels
 SKIN_FULL_LIMIT = 512 * 1024  # the engine's alias file staging limit (model.c AW_ALIAS_STAGING_LIMIT)
+
+SHAPE_DIR = 'progs/shapes'
+SHAPE_EXT = '.aws1'
+SHAPE_PATTERNS = ('progs/*.mdl',)   # top level of progs/ only (fnmatch's * also matches /: checked in plan_shapes)
+SHAPE_TYPE = b'AWSH'          # in place of the ST block; read little-endian 0x48535741, never an onseam value (0, 0x20)
+SHAPE_REF = 4 + 16 + 4 + 4    # type, 16 hex digits, ST bytes, triangle bytes: in place of both blocks
+ST_BYTES = 12                 # stvert_t: onseam, s, t
+TRI_BYTES = 16                # dtriangle_t: facesfront, 3 vertex indices
+NPC_LOD_MANIFEST = 'progs/npc-lod.txt'   # aw_npc_lod.c checks those files' byte sizes: their models keep their blocks
 
 
 def sha256(data):
@@ -161,6 +181,170 @@ def apply_skins(id1, groups, write=True):
             'files_added': len(groups)}
 
 
+# ---- shared shapes
+
+def _skin_end(raw):
+    """Where the one skin of a single-skin model ends (inline pixels or a shared-skin reference), or None."""
+    if len(raw) < MDL_HEADER + 4 or raw[:4] != b'IDPO' or struct.unpack_from('<i', raw, 4)[0] != 6:
+        return None
+    count, width, height = struct.unpack_from('<3i', raw, 48)
+    if count != 1 or width < 1 or height < 1 or width & 3:
+        return None
+    kind = raw[MDL_HEADER:MDL_HEADER + 4]
+    if kind == SKIN_TYPE:
+        return MDL_HEADER + SKIN_REF
+    if kind == struct.pack('<i', SKIN_SINGLE):
+        return MDL_HEADER + 4 + width * height
+    return None
+
+
+def shape_of(raw):
+    """(offset, ST bytes, triangle bytes) of a single-skin model's two blocks, or None for anything else (skin
+    groups, several skins, a shared shape already, another format, too short)."""
+    at = _skin_end(raw)
+    if at is None:
+        return None
+    verts, tris = struct.unpack_from('<2i', raw, 60)
+    if verts < 1 or tris < 1 or raw[at:at + 4] == SHAPE_TYPE:
+        return None
+    st, tri = verts * ST_BYTES, tris * TRI_BYTES
+    if at + st + tri > len(raw):
+        return None
+    return at, st, tri
+
+
+def shape_name(digest):
+    return SHAPE_DIR + '/' + digest[:16] + SHAPE_EXT
+
+
+def shared_shape_model(raw, digest):
+    """The stored form of RAW whose ST and triangle blocks live in shape_name(DIGEST)."""
+    at, st, tri = shape_of(raw)
+    return raw[:at] + SHAPE_TYPE + digest[:16].encode('ascii') + struct.pack('<2I', st, tri) + raw[at + st + tri:]
+
+
+def is_shape_shared(raw):
+    at = _skin_end(raw)
+    return at is not None and len(raw) >= at + SHAPE_REF and raw[at:at + 4] == SHAPE_TYPE
+
+
+def expand_shared_shape(stored, read_shape):
+    """The model the engine decodes from a stored shared-shape model: READ_SHAPE(id1-relative name) gives the
+    shape file's bytes. Raises ValueError where the engine refuses (model.c AW_SharedShapeExpand)."""
+    if not is_shape_shared(stored):
+        raise ValueError('Not a shared-shape model')
+    at = _skin_end(stored)
+    ref = stored[at + 4:at + 20].decode('ascii')
+    if any(c not in '0123456789abcdef' for c in ref):
+        raise ValueError('Invalid shared shape name')
+    st, tri = struct.unpack_from('<2I', stored, at + 20)
+    verts, tris = struct.unpack_from('<2i', stored, 60)
+    if st != verts * ST_BYTES or tri != tris * TRI_BYTES:
+        raise ValueError('Shared shape size differs from the model header')
+    shape = read_shape(SHAPE_DIR + '/' + ref + SHAPE_EXT)
+    if len(shape) != st + tri:
+        raise ValueError('Shared shape file has the wrong size')
+    return stored[:at] + shape + stored[at + SHAPE_REF:]
+
+
+def _npc_lod_stems(id1):
+    """Model stems named in the NPC level-of-detail manifest (their level files' byte sizes are checked by the
+    engine against the manifest, so they are never rewritten)."""
+    path = Path(id1) / NPC_LOD_MANIFEST
+    if not path.is_file():
+        return ()
+    words = path.read_text(encoding='utf-8', errors='replace').split()
+    return tuple(sorted({w[:-4] for w in words if w.startswith('progs/') and w.endswith('.mdl')}))
+
+
+def _shape_row(path):
+    raw = path.read_bytes()
+    found = shape_of(raw)
+    if not found or len(raw) > SKIN_FULL_LIMIT:
+        return None
+    at, st, tri = found
+    return sha256(raw[at:at + st + tri]), st + tri
+
+
+def plan_shapes(id1, patterns=SHAPE_PATTERNS, jobs=None):
+    """{blocks SHA-256: [id1-relative model paths]} of ST + triangle blocks two or more matching models repeat."""
+    id1 = Path(id1)
+    lod = _npc_lod_stems(id1)
+    paths = []
+    for path in sorted(id1.glob('progs/*.mdl')):
+        rel = path.relative_to(id1).as_posix()
+        if rel.count('/') != 1 or not any(fnmatch.fnmatchcase(rel, p) for p in patterns):
+            continue
+        if any(rel.startswith(stem) for stem in lod):
+            continue
+        paths.append(path)
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=max(1, jobs or 4)) as pool:   # hashlib and reads release the GIL
+        rows = list(pool.map(_shape_row, paths))
+    users = {}
+    for path, row in zip(paths, rows):
+        if row:
+            users.setdefault(row[0], []).append(path.relative_to(id1).as_posix())
+    groups = {d: names for d, names in users.items() if len(names) > 1}
+    prefixes = {}
+    for digest in groups:
+        if prefixes.setdefault(digest[:16], digest) != digest:
+            raise ValueError('Two shared shapes with the same 16-digit name: ' + digest[:16])
+    return dict(sorted(groups.items()))
+
+
+def apply_shapes(id1, groups, write=True):
+    """Store each shape of GROUPS once and rewrite its models (WRITE=False: count only). Returns the record."""
+    id1 = Path(id1)
+    before = after = 0
+    for digest, paths in groups.items():
+        blocks = None
+        for rel in paths:
+            raw = (id1 / rel).read_bytes()
+            at, st, tri = shape_of(raw)
+            mine = raw[at:at + st + tri]
+            if sha256(mine) != digest:
+                raise ValueError('Shape of %s changed while sharing' % rel)
+            stored = shared_shape_model(raw, digest)
+            if expand_shared_shape(stored, lambda name: mine) != raw:
+                raise ValueError('Shared-shape form of %s does not rebuild the model' % rel)
+            before += len(raw)
+            after += len(stored)
+            blocks = mine
+            if write:
+                (id1 / rel).write_bytes(stored)
+        after += len(blocks)
+        if write:
+            target = id1 / shape_name(digest)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(blocks)
+    return {'shapes': len(groups), 'models': sum(len(p) for p in groups.values()),
+            'bytes_before': before, 'bytes_after': after, 'bytes_saved': before - after,
+            'files_added': len(groups)}
+
+
+def identity(id1, jobs=None):
+    """Read only, over a real payload ID1: plan the shapes, make every model's stored form in memory, rebuild it
+    as the engine does (expand_shared_shape with the planned shape files) and compare the bytes with the original
+    model. The engine's own C path is checked over the same models by tests/aga_shared_shape_test.c."""
+    id1 = Path(id1)
+    groups = plan_shapes(id1, jobs=jobs)
+    store, models, same, saved = {}, 0, 0, 0
+    for digest, paths in groups.items():
+        for rel in paths:
+            raw = (id1 / rel).read_bytes()
+            at, st, tri = shape_of(raw)
+            store.setdefault(shape_name(digest), raw[at:at + st + tri])
+            stored = shared_shape_model(raw, digest)
+            rebuilt = expand_shared_shape(stored, lambda name: store[name])
+            models += 1
+            same += rebuilt == raw
+            saved += len(raw) - len(stored)
+    saved -= sum(len(b) for b in store.values())
+    return {'id1': str(id1), 'shapes': len(groups), 'models': models, 'byte_identical': same,
+            'bytes_saved': saved}
+
+
 # ---- file aliases
 
 def table_name(name):
@@ -259,17 +443,28 @@ def _by_kind(groups):
 
 # ---- both, in the image step
 
-def share_payload(id1, *, file_aliases=False, shared_skins=False, jobs=None, write=True, log=print):
+def share_payload(id1, *, file_aliases=False, shared_skins=False, shared_shapes=False, jobs=None, write=True,
+                  log=print):
     """The image step's last payload pass (finalize_image, after every check that reads the payload by name or
-    size): shared skins first (models that then become byte-identical are aliased too), then file aliases.
-    Returns the record for build.json; 'bytes_removed' is what DH0 lost (the layout plan allows for it)."""
+    size): shared skins first, then shared shapes (models that then become byte-identical are aliased too), then
+    file aliases. Returns the record for build.json; 'bytes_removed' is what DH0 lost (the layout plan allows for
+    it)."""
     record = {'file_aliases': bool(file_aliases), 'shared_skins': bool(shared_skins), 'bytes_removed': 0}
+    if shared_shapes:
+        record['shared_shapes'] = True
     if shared_skins:
         skins = apply_skins(id1, plan_skins(id1), write)
         record['skins'] = skins
         record['bytes_removed'] += skins['bytes_saved']
         log('Shared skins (--shared-skins on): %d skins stored once for %d models, %d bytes saved'
             % (skins['skins'], skins['models'], skins['bytes_saved']))
+    if shared_shapes:
+        log('=== Shared shapes (--shared-shapes on): hashing the ST and triangle blocks of progs/*.mdl ===')
+        shapes = apply_shapes(id1, plan_shapes(id1, jobs=jobs), write)
+        record['shapes'] = shapes
+        record['bytes_removed'] += shapes['bytes_saved']
+        log('Shared shapes (--shared-shapes on): %d shapes stored once for %d models, %d bytes saved'
+            % (shapes['shapes'], shapes['models'], shapes['bytes_saved']))
     if file_aliases:
         aliases = apply_aliases(id1, plan_aliases(id1, jobs=jobs), write)
         record['aliases'] = aliases
@@ -281,7 +476,7 @@ def share_payload(id1, *, file_aliases=False, shared_skins=False, jobs=None, wri
     return record
 
 
-def measure(boot, file_aliases, shared_skins, jobs=None):
+def measure(boot, file_aliases, shared_skins, jobs=None, shared_shapes=False):
     """Dry run over a staged payload BOOT (read only): what each method saves on its own and both together.
     Both together are measured on a scratch view: the skin pass's stored forms counted, then aliases over them
     (a model pair that becomes byte-identical only after sharing is counted as the alias pass would see it)."""
@@ -290,6 +485,8 @@ def measure(boot, file_aliases, shared_skins, jobs=None):
     if shared_skins:
         groups = plan_skins(id1)
         out['shared_skins'] = apply_skins(id1, groups, write=False)
+    if shared_shapes:
+        out['shared_shapes'] = apply_shapes(id1, plan_shapes(id1, jobs=jobs), write=False)
     if file_aliases:
         out['file_aliases'] = apply_aliases(id1, plan_aliases(id1, jobs=jobs), write=False)
     if file_aliases and shared_skins:
@@ -341,12 +538,24 @@ def main(argv=None):
     m.add_argument('boot', type=Path)
     m.add_argument('--file-aliases', action='store_true')
     m.add_argument('--shared-skins', action='store_true')
+    m.add_argument('--shared-shapes', action='store_true')
     m.add_argument('--jobs', type=int, default=None)
     m.add_argument('--json', type=Path)
+    k = sub.add_parser('identity', help='Read only: every shared-shape form of a real payload rebuilds its model')
+    k.add_argument('id1', type=Path)
+    k.add_argument('--jobs', type=int, default=None)
+    k.add_argument('--json', type=Path)
     args = parser.parse_args(argv)
-    if not (args.file_aliases or args.shared_skins):
-        args.file_aliases = args.shared_skins = True
-    result = measure(args.boot, args.file_aliases, args.shared_skins, args.jobs)
+    if args.action == 'identity':
+        result = identity(args.id1, args.jobs)
+        text = json.dumps(result, indent=1)
+        if args.json:
+            args.json.write_text(text + '\n', encoding='utf-8', newline='\n')
+        print(text)
+        return 0 if result['byte_identical'] == result['models'] else 1
+    if not (args.file_aliases or args.shared_skins or args.shared_shapes):
+        args.file_aliases = args.shared_skins = args.shared_shapes = True
+    result = measure(args.boot, args.file_aliases, args.shared_skins, args.jobs, args.shared_shapes)
     text = json.dumps(result, indent=1)
     if args.json:
         args.json.write_text(text + '\n', encoding='utf-8', newline='\n')

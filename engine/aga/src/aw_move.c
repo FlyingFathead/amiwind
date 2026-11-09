@@ -47,6 +47,8 @@ int AW_MoveSuperspeed(void) {return superspeed.value!=0;}
 /* MWSCRIPT-GAP-FUNCTIONS-62: a script's ForceSneak on the player (OpenMW creaturestats.cpp getStance: the forced flag
  * or the key); ClearForceSneak clears it (aw_mwhost.c) */
 int aw_move_force_sneak;
+int aw_move_force_run;   /* MWSCRIPT-GAPS-63: ForceRun on the player; ClearForceRun clears it (aw_mwhost.c) */
+int aw_move_werewolf;    /* WEREWOLF-RUN-SPEED-63: the player's werewolf form (aw_mwhost.c) */
 int AW_MoveSneaking(void) {
     edict_t *p=sv.active && svs.clients?svs.clients[0].edict:NULL;
     /* menus clear the held key (cl_input.c IN_AWClearButtons) */
@@ -131,7 +133,9 @@ void AW_MovePlayerInputs(aw_move_inputs_t *in) {
     if(aw_character.valid && aw_character.race>=0 && aw_character.race<aw_race_count)
         for(i=0;i<race_count;i++)if(!Q_strcasecmp(races[i].id,aw_races[aw_character.race].id)){
             in->scale=aw_character.female?races[i].female:races[i].male;break;}
-    in->running=(in_speed.state&1)!=0;
+    /* MWSCRIPT-GAPS-63: a script's ForceRun on the player runs him (OpenMW character.cpp: the forced flag or the key) */
+    in->running=(in_speed.state&1)!=0 || aw_move_force_run;
+    in->werewolf=aw_move_werewolf;   /* WEREWOLF-RUN-SPEED-63 */
     in->sneaking=AW_MoveSneaking();
     in->knocked=AW_CombatPlayerKnocked();
     in->dead=p && p->v.health<=0;

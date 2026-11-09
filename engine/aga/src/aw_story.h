@@ -44,6 +44,12 @@ enum aw_control {
     AW_CONTROL_ALL=511
 };
 #define AW_CONTROL_FACT "amiwind:controls"
+/* TurnMoonRed / TurnMoonWhite (v0.0.63, MWSCRIPT-GAPS-63; OpenMW skyextensions.cpp, sky.cpp setMoonColour): Secunda in
+ * the script colour, one saved named fact ("amiwind:moonred", no new save field; New Game clears it with the facts);
+ * r_sky.c draws it. Set: 1 when kept (0: the named facts are full). */
+#define AW_MOON_FACT "amiwind:moonred"
+int AW_MoonRed(void);
+int AW_MoonRedSet(int red);
 int AW_ControlsDisabled(void);              /* the mask of switches a script turned off */
 int AW_ControlAllowed(int controls);        /* 1 when none of CONTROLS is off */
 int AW_ControlSet(int controls,int enable); /* 1 when kept (0: the named facts are full; nothing changed) */

@@ -189,10 +189,12 @@ static void placed_command(void){
     else if(!strcmp(a,"on") || !strcmp(a,"off")){placed_on=!strcmp(a,"on");Con_Printf("Placed items %s from the next map.\n",a);}
     else status_command();
 }
+float ChimRoom_RayRef(unsigned reference,const float *eye,const float *dir);   /* chim/chim_room.c (ROOM-OBJECTS-MISSING-62) */
 void AW_PlacedInit(void){
     Cmd_AddCommand("aw_placed",placed_command);
     aw_placed_begin=placed_begin;aw_placed_admit=placed_admit;aw_object_drawn=placed_drawn;aw_placed_link=AW_PlacedLink;
     aw_placed_ray=placed_ray;
+    aw_room_ray=ChimRoom_RayRef;     /* ROOM-OBJECTS-MISSING-62: a room's container aimed at by its placement box */
     AW_CStripInit();     /* CONTAINER-WINDOW-59: E on a container opens its strip */
     AW_CorpseInit();     /* CORPSE-LOOT-60: E on a body too; CONTAINER-LEVELLED-CONTENTS-60: the levelled rolls */
 }

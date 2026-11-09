@@ -482,13 +482,16 @@ def run_units(kind, items, worker, jobs, cache, soft=None):
     reused like any result (SoftError). Without SOFT a cached SoftError counts as a miss.
 
     A unit not in the cache under its key is looked up under the key's previous form (UnitKey.previous). For a kind
-    with a code key (CODE_ENTRIES) every built unit's worker is traced, and this call's units are stored only when
-    no worker ran a repository function outside the key's reach (code_key.uncovered). Otherwise none of them is
-    stored, nor any later unit of the kind in this process (KEY_GAPS), and the gap is printed and counted (key_gap):
-    a gap costs reuse, never a unit reused for code its key does not hold. (A function reports once per process, in
-    the call where it first ran there; so a process's earlier units never ran a function its later call reports.)"""
+    with a code key (CODE_ENTRIES) every built unit's worker is traced. Every unit goes into the cache the moment its
+    worker hands it back (UNIT-STORED-AT-MAP-END-62: a map that stops keeps every unit finished before), and one
+    '[done/total]' line per unit says how far the kind is. A unit is stored only while no unit handed back so far
+    ran a repository function outside the key's reach (code_key.uncovered on its own trace): from the first such
+    unit on, none is stored, nor any later unit of the kind in this process (KEY_GAPS), and the gap is printed and
+    counted (key_gap): a gap costs reuse, never a unit reused for code its key does not hold. (A function reports
+    once per process, in the call where it first ran there, and a process hands its units back in the order it ran
+    them; so a unit handed back before the gap never ran the function the gap reports.)"""
     from functools import partial
-    from build_parallel import ordered_map
+    from unit_store import completed_units, progress_line
     cache = cache or UnitCache()
     results = [None] * len(items)
     todo = []
@@ -508,35 +511,38 @@ def run_units(kind, items, worker, jobs, cache, soft=None):
     if todo:
         unit_worker = worker if soft is None else partial(_soft_call, worker, tuple(soft))
         call = partial(_traced, unit_worker) if traced else unit_worker
-        ran, untraced = set(), False
-        for i, value in zip(todo, ordered_map(call, [items[i][1] for i in todo], max(1, min(jobs, len(todo))))):
+        key = None
+        total, done, gapped = len(items), len(items) - len(todo), 0
+        print('CHIM %s units [%d/%d] cached, %d to make' % (kind, done, total, len(todo)), flush=True)
+        for i, took, value in completed_units(call, [(i, items[i][1]) for i in todo], max(1, min(jobs, len(todo)))):
+            executed = ()
             if traced:
                 value, executed = value
-                if executed is None:
-                    untraced = True
-                else:
-                    ran.update(executed)
             results[i] = value
-        store = kind not in KEY_GAPS
-        if traced and store:
-            import code_key
-            if untraced:
-                gaps = [('no trace', 'Python %d.%d has no sys.monitoring' % sys.version_info[:2])]
-            else:
-                gaps = code_key.uncovered(ran, unit_code_key(kind), ROOT)
-            if gaps:
-                KEY_GAPS[kind] = gaps
-                store = False
-                print('[warning] CHIM %s units: a worker ran code outside the unit key (%s); no %s unit is stored in '
-                      'the unit cache from here on (fix: its entry in chim.units.CODE_ENTRIES)' % (
-                          kind, ', '.join('%s %s' % g for g in gaps[:5]) + (' ...' if len(gaps) > 5 else ''), kind),
-                      flush=True)
-        if store:
-            for i in todo:
-                cache.put(kind, items[i][0], results[i])
-        else:
+            done += 1
+            print(progress_line('CHIM %s units' % kind, done, total, unit_name(items[i][1], items[i][0]), took),
+                  flush=True)
+            if traced and kind not in KEY_GAPS:
+                import code_key
+                if executed is None:
+                    gaps = [('no trace', 'Python %d.%d has no sys.monitoring' % sys.version_info[:2])]
+                else:
+                    if key is None:
+                        key = unit_code_key(kind)
+                    gaps = code_key.uncovered(executed, key, ROOT)
+                if gaps:
+                    KEY_GAPS[kind] = gaps
+                    print('[warning] CHIM %s units: a worker ran code outside the unit key (%s); no %s unit is stored '
+                          'in the unit cache from here on (fix: its entry in chim.units.CODE_ENTRIES)' % (
+                              kind, ', '.join('%s %s' % g for g in gaps[:5]) + (' ...' if len(gaps) > 5 else ''),
+                              kind), flush=True)
+            if kind in KEY_GAPS:
+                gapped += 1
+                continue
+            cache.put(kind, items[i][0], value)
+        if gapped:
             s = cache.stats.setdefault(kind, {})
-            s['key_gap'] = s.get('key_gap', 0) + len(todo)
+            s['key_gap'] = s.get('key_gap', 0) + gapped
     cache.count(kind, len(todo), len(items) - len(todo))
     if previous_hits:
         s = cache.stats.setdefault(kind, {})

@@ -271,9 +271,14 @@ def open_units(scene, timings):
     data identity is unknown (as prepare_area.room_unit). Opened once per stage: opening the cache hashes the
     repository's sources for its environment, and once per room that held the first room back for minutes
     (ROOM-BATCH-CORES-49: 935 rooms, about 150 ms each, on one core before any worker started)."""
-    from pass_cache import UnitCache, game_data_digest
+    from unit_store import WORK_PLACE_SETTINGS, bake_keyed_cache
+    from pass_cache import covered_lines, game_data_digest, previous_digests, source_digest
     from interior_plants import plant_mode
-    cache = UnitCache.open(UNIT, {}, __file__)
+    # keyed on what makes a room unit (build_shell and its reach), not the whole file (UNIT-KEY-WHOLE-FILE-63); the
+    # units stored under the whole-file key of fe90f8ed are found while that code is unchanged (unit_store.LEGACY_SOURCES)
+    cache = bake_keyed_cache(
+        UNIT, {}, source_digest((__file__, 'build_shell')), previous_digests((__file__, 'build_shell')), (__file__,),
+        covered_lines((__file__, 'build_shell')), neutral=WORK_PLACE_SETTINGS)
     identity = game_data_digest() if cache is not None else None
     if identity is None:
         return None, None

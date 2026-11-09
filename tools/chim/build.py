@@ -936,6 +936,38 @@ def harvest_numbers(harvest, data_files):
     return {r['number'] for r in source_placements(harvest, data_files)[2]}
 
 
+EFFECT_LAYERS = Path(__file__).resolve().parents[2] / 'config/chim-effect-layers.json'
+
+
+def effect_layer_models(path=EFFECT_LAYERS):
+    """{model path: entry} of config/chim-effect-layers.json: the original's animated, translucent effect layers that
+    CHIM would draw solid and still (BLIGHT-CLOUD-HIDE-62, CHIM-DAGOTH-UR-RUIN-CYLINDER-44)."""
+    data = json.loads(Path(path).read_text(encoding='utf-8'))
+    for key, entry in data['models'].items():
+        if not entry.get('reason') or not entry.get('bug'):
+            raise ValueError('CHIM effect layer without a reason and a bug: ' + key)
+    return {effect_model_key(k): v for k, v in data['models'].items()}
+
+
+def effect_model_key(model):
+    """A record's model path as the effect layer list keys it: lower case, forward slashes, no meshes/ prefix."""
+    key = str(model or '').replace('\\', '/').casefold()
+    return key[len('meshes/'):] if key.startswith('meshes/') else key
+
+
+def effect_layer_references(references, models=None):
+    """(kept references, sorted numbers removed): the placements of the effect layers leave the CHIM world, so only
+    the frames that place one change; nothing else is touched."""
+    models = effect_layer_models() if models is None else models
+    kept, removed = [], []
+    for r in references:
+        if effect_model_key(r.get('model')) in models:
+            removed.append(r['number'])
+        else:
+            kept.append(r)
+    return kept, sorted(removed)
+
+
 def town_flora(town, flora, town_numbers, entries=None):
     """Town flora the image installs (install_town_flora: the same region entries,
     region_references and representation), minus what the town's scenery already places.
@@ -1986,6 +2018,13 @@ def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings
         removed = harvest_set & {r['number'] for r in selected}
         selected = [r for r in selected if r['number'] not in removed]
         parity['harvest_removed'] = sorted(removed)
+    # the original's animated effect layers CHIM would draw solid (config/chim-effect-layers.json, BLIGHT-CLOUD-HIDE-62:
+    # the blight cloud at Dagoth Ur); recorded only where one is placed, so every other area's record stays as it was
+    selected, effect_removed = effect_layer_references(selected)
+    if effect_removed:
+        parity['effect_layers_removed'] = effect_removed
+        print('[chim] %s: %d effect layer placements left out (config/chim-effect-layers.json): %s'
+              % (town, len(effect_removed), ', '.join(map(str, effect_removed))), flush=True)
     with timer.section('ground samples'):
         grids = {tuple(g['cell']): g for g in json.loads((work / 'audit/terrain-source.json').read_text())}
         from import_town import lava_pools

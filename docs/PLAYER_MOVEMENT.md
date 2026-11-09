@@ -1,11 +1,12 @@
 # Player scale, collision and camera motion
 
-_Last updated with AmiWind v0.0.62-dev2 (2026-11-08)._
+_Last updated with AmiWind v0.0.62 (2026-11-08)._
 
 <!-- contents start -->
 ## Contents
 
 - [Movement speed](#movement-speed)
+- [Breath and drowning](#breath-and-drowning)
 - [Verified base dimensions](#verified-base-dimensions)
 - [Physical recheck, v0.0.24-dev2](#physical-recheck-v0024-dev2)
 - [Original race-based heights](#original-race-based-heights)
@@ -100,6 +101,7 @@ Every factor of the OpenMW rules, and where it comes from in AmiWind:
 | Acrobatics | in-air control (fJumpMoveBase / fJumpMoveMult) | later | Quake air control is kept |
 | Slowfall | the falling speed, no fall height | v0.0.62 | the factor 1 - magnitude x 0.005 once each 1/60 s of falling; the engine's gravity stays Quake's |
 | Acrobatics, Jump, fatigue | fall damage on landing (fFallDamageDistanceMin, fFallDistanceBase/Mult, fFallAcroBase/Mult) | v0.0.62 | [MWSCRIPT_BYTECODE.md "Held actors and falls"](MWSCRIPT_BYTECODE.md#held-actors-and-falls); no knockdown yet |
+| Water Breathing | no breath used under water | v0.0.63 | [Breath and drowning](#breath-and-drowning) |
 | Water Walking | water surface | later | magic effects |
 | Werewolf | run x fWereWolfRunMult | later | no werewolf form |
 
@@ -109,6 +111,33 @@ structure (`aw_move_inputs_t`, a field per factor above, 0 = no effect) and appl
 `sv_user.c`, so a later effect only fills its field. `tests/aga_move_test.c` checks the engine side:
 the old numbers under superspeed, the live sheet, the load, the fatigue costs and the command. In-game
 timing against the original is not measured yet.
+
+## Breath and drowning
+
+From v0.0.63 the player holds his breath under water as in the original (the rules as OpenMW 0.51 implements
+them in `mwmechanics/actors.cpp` updateDrowning and `mwgui/hud.cpp`, written independently in
+`engine/aga/src/aw_breath_rules.c`, applied by `engine/aga/src/aw_breath.c` once a frame after the lava damage):
+
+| What | Rule |
+| --- | --- |
+| Under water | the head (the eyes) in a water volume; standing in shallow water or wading is not |
+| Breath | fHoldBreathTime (20) seconds, falling while under water; full again at once on the surface |
+| Drowning | once the breath is gone, fSuffocationDamage (3) health a second, continuously; the game's "drown" sound plays while it lasts |
+| Water Breathing | no breath used at all while any magnitude of it is on the player: a race's ability (the Argonians'), a potion, a spell, a worn Constant Effect item, a script's ModWaterBreathing |
+| The bar | a red bar at the top of the view, in the middle, while the breath is under its full time; it flashes once the breath is gone |
+| God mode | no drowning damage (the one world-damage check, below) |
+
+The two settings and the sound come from the player's own master file at build time (`combat/settings.txt`
+"breath" lines, `tools/prepare_combat.py`); an image without them uses the original's values. The breath is not
+kept in saved games: a load, a new map or New Game gives a full breath, and it stays full in noclip. Scripts read
+and change Water Breathing with GetWaterBreathing, SetWaterBreathing and ModWaterBreathing. `dbg breath` prints
+the breath left, whether the head is under water, the Water Breathing magnitude, the drowning damage taken and
+what god mode held back. Measured in game: not yet.
+
+God mode (`dbg god`) holds back every kind of damage to the player: a blow in a fight, the lava volume and a lava
+script's HurtStandingActor, a fall, drowning (all through `AW_CombatHurtPlayer` in `engine/aga/src/aw_combat.c`),
+and any loss of health from a script or a spell effect (SetHealth, ModCurrentHealth, Damage Health, poison, the
+elements; `player_store` in `engine/aga/src/aw_mwhost.c`), where a heal still lands (GODMODE-LAVA-DEATH-62).
 
 ## Verified base dimensions
 

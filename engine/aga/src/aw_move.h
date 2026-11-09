@@ -33,8 +33,10 @@ typedef struct {
     float fFatigueJumpBase,fFatigueJumpMult,fFatigueBase,fFatigueMult;
     /* fall damage (v0.0.62, SCRIPTED-EVENT-FALLING-MAGE-61; OpenMW 0.51 mwmechanics/character.cpp getFallDamage) */
     float fFallDamageDistanceMin,fFallDistanceBase,fFallDistanceMult,fFallAcroBase,fFallAcroMult;
+    /* the werewolf's run (v0.0.63, WEREWOLF-RUN-SPEED-63; OpenMW 0.51 mwclass/npc.cpp getMaxSpeed) */
+    float fWerewolfRunMult;
 } aw_move_settings_t;
-#define AW_MOVE_SETTING_COUNT 35
+#define AW_MOVE_SETTING_COUNT 36
 
 /* Everything the speed depends on, gathered in one place so later effects plug
  * in without rewriting the rules. Stats are the MODIFIED values (base +
@@ -55,6 +57,7 @@ typedef struct {
     int paralyzed;      /* later: Paralyze effect */
     int dead;           /* now: health <= 0 */
     int godmode;        /* now: dbg godmode (no fatigue cost, Burden ignored) */
+    int werewolf;       /* now: a script's BecomeWerewolf holds (aw_move_werewolf, v0.0.63) */
     /* effects (later: magic effects; magnitudes, 0 = none) */
     float levitate,swift_swim,jump,slowfall,water_walking;
     int levitation_enabled;
@@ -150,6 +153,10 @@ int AW_MoveSuperspeed(void);
 int AW_MoveSneaking(void);
 /* MWSCRIPT-GAP-FUNCTIONS-62: 1 while a script's ForceSneak holds the player in the sneak stance (aw_mwhost.c). */
 extern int aw_move_force_sneak;
+/* MWSCRIPT-GAPS-63: 1 while a script's ForceRun makes the player run (aw_mwhost.c). */
+extern int aw_move_force_run;
+/* WEREWOLF-RUN-SPEED-63: 1 while the player is in werewolf form (aw_mwhost.c sets it with the form). */
+extern int aw_move_werewolf;
 /* The player's inputs as the rules see them this frame (live character sheet). */
 void AW_MovePlayerInputs(aw_move_inputs_t *in);
 /* ENCUMBRANCE-INCOMPLETE-61 (INVENTORY-ORIGINAL-LIMITS-61): the magnitudes of the Burden and Feather effects on the

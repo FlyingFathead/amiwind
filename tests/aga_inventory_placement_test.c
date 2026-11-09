@@ -141,7 +141,8 @@ int main(void){
     assert(aw_ledger.row[0].at==AW_AT_SCENE && aw_ledger.row[0].where==AW_MapId("seyda") && !strcmp(aw_ledger.row[0].extra->item,"fixture0"));
     assert(!aw_state.inventory.dropped[0].count && AW_StateGet(&aw_state,AW_ITEM,item.id)==1);
     AW_LedgerClear(&aw_ledger);
-    reset(0);streamed=1;assert(AW_InventoryDropHere(&item,1) && aw_ledger.count==1 && trace_calls>=6);
+    /* DROP-ROOM-BRUSH-ENTITY-59 (v0.0.63): only the centre is traced now (one trace), no longer every corner */
+    reset(0);streamed=1;assert(AW_InventoryDropHere(&item,1) && aw_ledger.count==1 && trace_calls>=1);
     reset(0);streamed=1;wet=1;refused();assert(aw_ledger.count==1);              /* the traces still see the water */
     AW_LedgerClear(&aw_ledger);
     reset(0);assert(AW_ItemAdd(&aw_state,item.id,40));

@@ -96,10 +96,12 @@ static int tab,focus;
 /* Prefs and Video rows (Prefs: the HUD and gameplay; Video: view, loading, memory). */
 enum {ROW_CROSSHAIR,ROW_COLOUR,ROW_SHAPE,ROW_FRAME,ROW_FONT,ROW_VOICE,ROW_DIALOGUE,ROW_AIMED,ROW_NPC,ROW_OBJECTS,
     ROW_AUTOSAVE,ROW_FOG,ROW_RESET,ROW_FAR,ROW_PHOTO,ROW_AREA,ROW_METHOD,ROW_BUFFER,ROW_MEMORY,ROW_GRAPHICS,ROW_CURSOR,
-    ROW_TOPICS,ROW_LABELS};
-/* Mouse cursor (CURSOR-MW-58): Morrowind's own pointer or AmiWind's, beside the crosshair's choices. */
+    ROW_TOPICS,ROW_LABELS,ROW_BEST};
+/* Mouse cursor (CURSOR-MW-58): Morrowind's own pointer or AmiWind's, beside the crosshair's choices.
+ * Always use best attack (BEST-ATTACK-OPTION-62): the original's Preferences setting, the same saved value as the
+ * console's aw_combat_best_attack and dbg combat bestattack (aw_combat.c); on by default (an AmiWind default). */
 static const unsigned char prefs_rows[]={ROW_CROSSHAIR,ROW_COLOUR,ROW_SHAPE,ROW_CURSOR,ROW_FRAME,ROW_FONT,ROW_VOICE,
-    ROW_DIALOGUE,ROW_TOPICS,ROW_AIMED,ROW_NPC,ROW_OBJECTS,ROW_LABELS,ROW_AUTOSAVE};
+    ROW_DIALOGUE,ROW_TOPICS,ROW_AIMED,ROW_NPC,ROW_OBJECTS,ROW_LABELS,ROW_BEST,ROW_AUTOSAVE};
 static const unsigned char video_rows[]={ROW_FOG,ROW_RESET,ROW_FAR,ROW_PHOTO,ROW_AREA,ROW_METHOD,ROW_BUFFER,ROW_MEMORY
 #if defined(AMIWIND_DEBUG_LUMA) && AMIWIND_DEBUG_LUMA
     ,ROW_GRAPHICS
@@ -361,6 +363,7 @@ static void prefs_video_change(int id,int direction,int enter){
     case ROW_NPC:AW_SceneUIOption(1,direction);break;
     case ROW_OBJECTS:AW_SceneUIOption(2,direction);break;
     case ROW_LABELS:AW_SceneUIOption(3,1);break;   /* two settings: any key switches (INFO-BOX-TEXT-CUT-62) */
+    case ROW_BEST:Cvar_SetValue("aw_combat_best_attack",Cvar_VariableValue("aw_combat_best_attack")?0:1);break;
     case ROW_AUTOSAVE:if(enter)AW_SetAutosaveCount((AW_AutosaveCount()+1)%17);else AW_SetAutosaveCount(AW_AutosaveCount()+direction);break;
     case ROW_FOG:
         if(enter){fog_slider=1;fog_drag=fog_typing=0;fog_typed[0]=0;fog_before=fog_value();}
@@ -646,6 +649,12 @@ static void prefs_video_line(int id,char *line){
     case ROW_OBJECTS:sprintf(line,"Objects: %s",places[AW_SceneUIOption(2,0)-1]);break;
     case ROW_LABELS:strcpy(line,AW_SceneUIOption(3,0)?"Name labels: AmiWind":"Name labels: Morrowind");break;
     case ROW_AUTOSAVE:sprintf(line,"Autosave history: %ld",(long)AW_AutosaveCount());break;
+    case ROW_BEST:{
+        int on=Cvar_VariableValue("aw_combat_best_attack")!=0;
+        strcpy(line,on?"Always use best attack: On":"Always use best attack: Off");
+        if(AW_UIWidth(line)>LIST_W-4){strcpy(line,on?"Best attack: On":"Best attack: Off");}
+        break;
+    }
     case ROW_FOG:sprintf(line,"Fog distance: %ld",(long)AW_DrawDistance());break;
     case ROW_RESET:strcpy(line,"Reset distance: 300");break;
     case ROW_FAR:if(far_index()<0)strcpy(line,"Far detail: Custom");else sprintf(line,"Far detail: %s",far_names[far_index()]);break;

@@ -1265,13 +1265,17 @@ void AW_ActorsRoomTick (void)
 			aw_actors_visitors (room);
 		ApplyLoaded ();
 	}
-	/* keep the room's actors captured as they stand: the room's map goes away without a leave of its own */
+	/* keep the room's actors captured as they stand: the room's map goes away without a leave of its own.
+	 * ROOM-CREATURES-NO-AGGRO-62: one in a fight every tick, as outdoors (Tick), so a fight the player walks out of
+	 * through a load door is on its row when the room goes: the actor stays behind (only followers and escorts go
+	 * through, AW_AmbientFollowersOf, never one in a fight) and takes the fight up again when the player comes back
+	 * (ApplyLoaded: AW_CombatTestEngage with its health), as in the original and OpenMW 0.51 */
 	for (i=1 ; i<sv.num_edicts ; i++)
 	{
 		edict_t *e = EDICT_NUM(i);
 		change_t *c;
-		if (!IsActor (e) || !RefOf (e) || ((int)sv.time * 2 + i) % 64)
-			continue;			/* a few actors a frame, each about every half minute of frames */
+		if (!IsActor (e) || !RefOf (e) || (((int)sv.time * 2 + i) % 64 && AW_CombatSlotState (e, NULL) == 0))
+			continue;			/* a few actors a frame, each about every half minute of frames; fighters always */
 		if ((c = Change (RefOf (e), 1)) != NULL)
 			Capture (e, c);
 	}

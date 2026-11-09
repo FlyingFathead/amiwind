@@ -1,6 +1,6 @@
 # AmiWind console commands
 
-_Generated from `config/debug-commands.txt` with AmiWind v0.0.62._
+_Generated from `config/debug-commands.txt` with AmiWind v0.0.63-dev1._
 
 Open the console with F10 or the backquote key and type
 a command, for example `dbg headlamp on`. This page is generated from
@@ -41,7 +41,7 @@ stops the listing; any other key ends it and works as usual.
 | `dbg census legacy` | - | [0 / 1; no argument prints it] the census office's registration (default 0, not saved): 0 = the original's own scripts and dialogue (the clerk, the captain, the door guard, the papers, the doors, the courtyard barrel and ring); 1 = the project's earlier hand-written registration, kept for an A/B; set it before the office loads |
 | `dbg characterchange` | `dbg quickchar` | [race class birthsign review / all] reopen the pier race, gender, head and hair menu over the current scene; confirm to apply (after registration) |
 | `dbg choosecompanion` | `dbg pickcompanion` | same as companion pick |
-| `dbg combat` | - | [on/off / seed N / readout on/off / music on/off / dice on/off / style amiwind/original / block hold/auto / flee on/off / bestattack on/off / loadout NAME/off / resistnormal N/off / calm] melee combat: no argument = status, costs; readout = a line per swing; flee on = also by Flee rating (defaults on, readout on, music on, block auto, flee off) |
+| `dbg combat` | - | [on/off / seed N / readout on/off / music on/off / dice / style amiwind/original / block hold/auto / flee / sounds / bestattack / contact on/off / loadout NAME/off / resistnormal N/off / calm] melee combat: no argument = status; bestattack = Options > Prefs best attack; contact off = crosshair ray only (defaults: flee off, the rest on, block auto) |
 | `dbg combattest` | - | [opponent] same as arenapit; combattest gallery (or floor): the empty floor test, current hands, then idle/draw/lower/punch/center/help/exit |
 | `dbg companion` | - | [pick/choose/test/off/distance N/mimic speed on/off] NPC follower test (not saved): no argument = status and counters; pick = attack the NPC under the red crosshair; test = spawn one beside you; off = it goes home / is removed; distance 48..512 (default 96); mimic speed (default on) |
 | `dbg companiontest` | - | [on/off] same as companion test / companion off; no argument: status |
@@ -115,9 +115,10 @@ stops the listing; any other key ends it and works as usual.
 
 | Command | Also | Arguments and notes |
 | --- | --- | --- |
+| `dbg breath` | - | (no argument) breath under water and drowning (docs/PLAYER_MOVEMENT.md): the breath left of fHoldBreathTime, head under water, Water Breathing, drowning damage taken, and what god mode held back (world damage, script and spell losses) |
 | `dbg door` | `dbg doorlocks` | [status / list; no argument: open or close the hinged door under the crosshair, locks ignored] ordinary hinged doors (docs/DOOR_MAPPING.md): status counts the table and this map's doors, list prints each (reference, edict or CHIM, how far open, lock) |
 | `dbg door roulette` | - | [SEED] one random interior: loads you straight into a room of this disk at the room's own start and prints which (name, map id, cell number) and the seed; the same SEED loads the same room again (random tests of interior loading) |
-| `dbg god` | `dbg godmode` | [on/off, true/false or 1/0; no argument toggles] Quake god mode (no damage; the HUD shows GOD) (not saved) |
+| `dbg god` | `dbg godmode` | [on/off, true/false or 1/0; no argument toggles] Quake god mode (no damage of any kind: blows, lava, falls, drowning, spells and scripts; the HUD shows GOD) (not saved) |
 | `dbg map format` | - | 2 draws the v2 world map layers (default) / 1 draws a v2 map as the v1 map (terrain and settlements only) |
 | `dbg map lava` | - | 1/0 molten lava pools on the world map (M), v2 maps only (default 1, saved) |
 | `dbg map tp` | `dbg tp map` | select a destination on the world map (alias) |
@@ -141,6 +142,7 @@ stops the listing; any other key ends it and works as usual.
 | `dbg cloudcontrol` | - | legacy/new or 1/2 (legacy also disables midnight clearing) |
 | `dbg clouds` | - | on/off true/false 1/0 (default on, independent of sun) |
 | `dbg cloudtype` | - | classic/veil or 1/2 (classic default) |
+| `dbg date` | `dbg set time`, `dbg settime`, `dbg time` | the game date and time in every form the game shows it: the journal (18 Last Seed (Day 3)), the rest and wait window (with 9 a.m.), a saved game, the lore form with the era year (18 Last Seed, 3E 427) and day/month/year (18/08/427); month names from the game data |
 | `dbg dayclouds` | - | 0..100% in 10:00..14:00 core; 09:00..10:00/14:00..15:00 fade; dawn/sunset protected |
 | `dbg daynight` | - | [on/off] off holds the clock at 12:00 midday (sky, light, lamps, windows; survives map changes, not saved); on resumes from the current time; no argument toggles |
 | `dbg daynightcycle` | - | on/off true/false 1/0 (automatic time; explicit set/wait still work) |
@@ -161,7 +163,6 @@ stops the listing; any other key ends it and works as usual.
 | `dbg nightsky` | - | on/off true/false 1/0 (night layer including moons; default on) |
 | `dbg nightskymode` | - | legacy/clear or 0/1 (midnight clear default, return by 04:00) |
 | `dbg outdoorlantern` | - | [0.25..3.0] light radius of exterior lamps and lanterns at night, relative to the torch (default 1.0) |
-| `dbg set time` | `dbg settime`, `dbg time` | HHMM (0000..2359) or morning/night/midday/day/evening/sunset/sunrise/dusk/dawn |
 | `dbg sky` | - | on/off true/false 1/0 (sky/fog presentation; time control is separate) |
 | `dbg skyhaze` | - | 1/0 (default 1): the sky fades toward the fog colour as the draw distance gets shorter (none at 540 and beyond), so fogged buildings and sky meet in one haze; 0 = the sky as before |
 | `dbg skyline fill` | `dbg skylinefill` | 1/0 object silhouetting horizon: sky below fogged far scenery takes the fog colour; experimental and buggy (sprites need their shapes from the alpha channel); tested but subpar results, kept for future improvement (default 0: land-outline horizon) |

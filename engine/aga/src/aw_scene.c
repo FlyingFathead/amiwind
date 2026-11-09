@@ -327,8 +327,22 @@ int AW_NPCFloorRetry(void) {
 /* aw_fall.c (SCRIPTED-EVENT-FALLING-MAGE-61): 1 while E is an actor held on an object a script will remove (the
  * builder's HELD rows): it stays where the game data placed it, never on the ground under it. NULL: none. */
 int (*aw_fall_held)(edict_t *e);
+/* CREATURE-FLOATING-62: the placement drop of a walking creature without a baked ground point (the actor table's
+ * levelled picks and room creatures: the reference's own position). Rule from OpenMW 0.51 World::adjustPosition (our
+ * own code): an actor that neither flies nor swims is put a little above its position (20 original units, 5 here) and
+ * traced down by up to one cell (8192 original units, 2048 here) onto what is under it. The game data places 942 of
+ * the island's 5,082 levelled creature references more than 128 original units above the LAND surface (the 32-unit
+ * bound below), so their creatures stood in the air. "chim actors ambient drop on|off" (default on,
+ * id1/default-game.cfg; no cvar of its own: the resident registry budget); off = the bound of every actor (the method
+ * before v0.0.63). NPCs keep the bound (a missing floor never moves them a storey). */
+/* aw_ambient.c sets it (the actor record: a creature that neither flies nor swims, and the drop on); NULL: no actor
+ * records (tests, builds without the scripts), every actor keeps the bound */
+int (*aw_actor_walks)(edict_t *e);
+static int walking_creature(edict_t *e) {
+    return aw_actor_walks && aw_actor_walks(e);
+}
 int AW_NPCFloor(edict_t *e) {
-    vec3_t start,end;trace_t tr;eval_t *mode,*valid,*baked;int k;
+    vec3_t start,end;trace_t tr;eval_t *mode,*valid,*baked;int k;float up=8,reach=32;
     mode=GetEdictFieldValue(e,"aw_ground_mode");if(mode && mode->_float)return 0;
     if(aw_fall_held && aw_fall_held(e))return 0;
     if(!AW_RegionGroundCoverage(e->v.origin))return 0;
@@ -341,8 +355,15 @@ int AW_NPCFloor(edict_t *e) {
             fabs(e->v.origin[k]-baked->vector[k])>.001f)break;
         if(k==3){e->v.flags=(int)e->v.flags|FL_ONGROUND;SV_LinkEdict(e,false);return 1;}
     }
-    VectorCopy(e->v.origin,start);VectorCopy(start,end);start[2]+=8;end[2]-=32;
+    if(!(valid && valid->_float==1) && walking_creature(e)){up=5;reach=2048;}
+    VectorCopy(e->v.origin,start);VectorCopy(start,end);start[2]+=up;end[2]-=reach;
     tr=SV_Move(start,vec3_origin,vec3_origin,end,MOVE_NOMONSTERS,e);
+    if(reach>32 && (tr.startsolid || tr.allsolid)){
+        /* a reference inside the ground (63 of them below it by more than 8 units): OpenMW first lifts the position
+         * onto the terrain; here the trace starts 64 units (256 original) higher instead */
+        start[2]+=64;
+        tr=SV_Move(start,vec3_origin,vec3_origin,end,MOVE_NOMONSTERS,e);
+    }
     if(!tr.startsolid && !tr.allsolid && tr.fraction>=1)floor_retry_add(e);
     if(tr.startsolid || tr.allsolid || tr.fraction>=1 || tr.plane.normal[2]<AW_WALKABLE_Z)return 0;
     VectorCopy(tr.endpos,e->v.origin);e->v.origin[2]+=0.25f;

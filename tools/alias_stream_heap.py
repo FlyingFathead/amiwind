@@ -15,8 +15,11 @@ import struct
 # the refused table's message said once per model (26 October 2026, SDK-MALLOC-TRAPS-52: a static list of 64 model
 # pointers, no allocation added), then for extended models (27 October 2026, SKEL-VERTEX-LIMIT-52: a model past
 # 2,000 vertices up to MAXALIASVERTS streams into the same cache block when its model-budgets.txt line matches the
-# CRC-32 computed while reading; a scalar CRC and a flag, no allocation added).
-STREAM_SHA256='811eee9377e8a6560c44d39618ef99763ea36be02ebe09b3d80c999f0eba1d63'
+# CRC-32 computed while reading; a scalar CRC and a flag, no allocation added), then for shared actor shapes
+# (9 November 2026, IMAGE-BIGGER-THAN-ORIGINAL-62: a model's ST and triangle blocks read from progs/shapes/ through
+# the same 4 KiB scratch and 64-triangle batch into the same cache block, a 28-byte reference looked at once; no
+# allocation added).
+STREAM_SHA256='73d0a72919e860dc34b0a741c22aa28fadc0464ff604f94617e90c1786bf3094'
 STREAM_VERTEX_LIMIT=3072       # r_local.h MAXALIASVERTS (past 2,000 only with the model's model-budgets.txt line)
 STREAM_LIMIT=768*1024          # model.c AW_ALIAS_STREAM_LIMIT (tools/npc_anim.py ALIAS_BYTE_BUDGET)
 

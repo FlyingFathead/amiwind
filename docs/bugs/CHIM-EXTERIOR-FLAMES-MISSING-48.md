@@ -1,5 +1,14 @@
 # CHIM-EXTERIOR-FLAMES-MISSING-48: CHIM exteriors draw no fire: campfires, braziers, fire pits and flame lamps outdoors have no flame animation
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 2 times; something has to be done
+
+- Reported with v0.0.62-dev1 at 2026-11-07 (time not recorded): Fire pits (l/furn_de_firepit_f) at Ghostgate draw no fire. The builder writes their flame rows (one per fire pit in the frame maps of cells 2,4, 2,3 and 3,4; no frame over the 128 cap, measured on the v0.0.62 release world); the engine reads flames only from the map it loaded, so a frame entered by a streamed crossing shows none of its own fires.
+- Reported with v0.0.62-dev1 at 2026-11-07 19:50 +0200: Seen again in v0.0.62-dev1: the firepit light models (l/furn_de_firepit*) show no fire, while the fireplace of the Census and Excise Office does.
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -26,6 +35,7 @@ _Last updated with AmiWind v0.0.56 (30 October 2026)._
 <!-- contents start -->
 ## Contents
 
+- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
 - [Status: 23 October 2026](#status-23-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)

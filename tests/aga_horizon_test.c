@@ -23,6 +23,9 @@ extern void (*aw_chim_far_draw)(byte,int);
 static int far_calls,missing_palette;
 static void far_probe(byte colour,int distance){assert(colour==173 && distance==540);far_calls++;}
 static void (*horizon_migrate)(void);
+extern void (*aw_defaults_migrate)(int level);      /* aw_combat.c in the game; here the level it is handed */
+static int migrate_level=-1;
+static void migrate_hook(int level){migrate_level=level;}
 static byte fog_colours[4096];static int inside;
 int AW_Interior(void){return inside;}
 void Cvar_RegisterVariable(cvar_t *v){v->value=atof(v->string);if(!strcmp(v->name,"aw_terrain_horizon"))horizon_switch=v;if(!strcmp(v->name,"aw_fog"))fog_switch=v;
@@ -172,8 +175,12 @@ int main(void) {
     skyline_switch->value=0;reset();depth[10*80+10]=30;AW_FogDraw();
     assert(screen[10*80+10]==173);for(j=11;j<53;j++)assert(sky_kept(j*80+10));
     /* Migration: a saved 1 becomes 0 once; a later explicit 1 is kept. */
-    skyline_switch->value=1;horizon_migrate();assert(skyline_switch->value==0 && defaults_switch->value==1);
+    skyline_switch->value=1;horizon_migrate();assert(skyline_switch->value==0 && defaults_switch->value==2);
     skyline_switch->value=1;horizon_migrate();assert(skyline_switch->value==1);
+    /* BEST-ATTACK-OPTION-62: the defaults level 2 hands a level-1 configuration to the combat options once */
+    aw_defaults_migrate=migrate_hook;defaults_switch->value=1;skyline_switch->value=1;horizon_migrate();
+    assert(skyline_switch->value==1 && defaults_switch->value==2 && migrate_level==1);
+    migrate_level=-1;horizon_migrate();assert(migrate_level==-1);aw_defaults_migrate=NULL;
     puts("horizon methods: land outline (default) keeps the sky; object silhouetting still fills below far scenery; migration once");
 #endif
     puts("resident LAND: 30 independent ray/plane camera cases; valleys, depth, water/material, closure and bounds gates passed");

@@ -1729,8 +1729,9 @@ void SV_Physics (void)
 	/* Enchanted items recharge with unpaused time (OpenMW Engine::frame rechargeItems). */
 	if (svs.maxclients == 1 && aw_magic_frame)
 		AW_SPIKE_STAGE (AW_SP_MAGIC, aw_magic_frame ((float)host_frametime));
-	/* Lava damage (aw_lava.c), after combat: the player's health as combat left it. */
-	AW_SPIKE_STAGE (AW_SP_LAVA, AW_LavaPhysics ());
+	/* Lava damage (aw_lava.c), after combat: the player's health as combat left it; then the breath under water and
+	 * drowning (aw_breath.c, UNDERWATER-BREATH-62), timed with the lava in the same spike stage. */
+	AW_SPIKE_STAGE (AW_SP_LAVA, (AW_LavaPhysics (), AW_BreathPhysics ()));
 
 	if (pr_global_struct->force_retouch)
 		pr_global_struct->force_retouch--;

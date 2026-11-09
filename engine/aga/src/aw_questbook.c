@@ -87,26 +87,72 @@ int AW_QuestBookBuild(aw_questbook_t *b,const aw_qb_quest_t *quests,int n,const 
     return ok;
 }
 /* ---- the dated journal (aw_questbook.h) ---- */
-static const char *const month_name[12]={"Morning Star","Sun's Dawn","First Seed","Rain's Hand","Second Seed","Mid Year",
+/* LORE-DATE-FORMAT-62: the names are the game data's (GMSTs sMonthMorningstar .. sMonthEveningstar and sDay, written
+ * by tools/prepare_levelup.py into levelup/rest.txt and set here through AW_DateNameSet); these are the same GMSTs'
+ * English values, used until the image's own are read (and by the native tests). */
+#define DATE_NAME 32
+static char month_name[12][DATE_NAME]={"Morning Star","Sun's Dawn","First Seed","Rain's Hand","Second Seed","Mid Year",
     "Sun's Height","Last Seed","Heartfire","Frost Fall","Sun's Dusk","Evening Star"};
+static char day_word[DATE_NAME]="Day";
+static const char *const month_keys[12]={"sMonthMorningstar","sMonthSunsdawn","sMonthFirstseed","sMonthRainshand",
+    "sMonthSecondseed","sMonthMidyear","sMonthSunsheight","sMonthLastseed","sMonthHeartfire","sMonthFrostfall",
+    "sMonthSunsdusk","sMonthEveningstar"};
 static const int month_days[12]={31,28,31,30,31,30,31,31,30,31,30,31};
-int AW_JournalDate(int32_t days,char *out,int capacity){
-    char s[64];int32_t d;int m=0,n,i;
+static void name_copy(char *to,const char *text){
+    int i;
+    for(i=0;i<DATE_NAME-1 && text[i] && text[i]!='\r' && text[i]!='\n';i++)to[i]=(unsigned char)text[i]<32?'?':text[i];
+    to[i]=0;
+}
+int AW_DateNameSet(const char *key,const char *text){
+    int m;
+    if(!key || !text || !*text)return 0;
+    if(!strcmp(key,"sDay")){name_copy(day_word,text);return 1;}
+    for(m=0;m<12;m++)if(!strcmp(key,month_keys[m])){name_copy(month_name[m],text);return 1;}
+    return 0;
+}
+const char *AW_DateMonthName(int month){return month>=1 && month<=12?month_name[month-1]:"";}
+/* built by hand: the C library's snprintf is not on every target this file compiles for */
+static int put_text(char *s,int n,const char *t){while(*t && n<120)s[n++]=*t++;return n;}
+static int put_number(char *s,int n,long v){
+    char num[12];int k=0;
+    if(v<0)v=0;
+    do{num[k++]=(char)('0'+v%10);v/=10;}while(v);
+    while(k && n<120)s[n++]=num[--k];
+    return n;
+}
+int AW_DateText(int form,int32_t days,int hour,int minute,char *out,int capacity){
+    char s[128];int32_t d;long year;int m=0,n=0,h12;
     if(!out || capacity<1)return 0;
     if(days<0)days=0;
-    d=(days+227)%365;
+    d=days+227;year=427+d/365;d%=365;
     while(d>=month_days[m])d-=month_days[m++];
-    /* built by hand: the C library's snprintf is not on every target this file compiles for */
-    n=0;
-    {char num[12];int k=0;long v=(long)d+1;do{num[k++]=(char)('0'+v%10);v/=10;}while(v);while(k)s[n++]=num[--k];}
-    s[n++]=' ';for(i=0;month_name[m][i];i++)s[n++]=month_name[m][i];
-    s[n++]=' ';s[n++]='(';s[n++]='D';s[n++]='a';s[n++]='y';s[n++]=' ';
-    {char num[12];int k=0;long v=(long)days+1;do{num[k++]=(char)('0'+v%10);v/=10;}while(v);while(k)s[n++]=num[--k];}
-    s[n++]=')';s[n]=0;
+    if(hour<0)hour=0;
+    if(hour>23)hour=23;
+    if(minute<0)minute=0;
+    if(minute>59)minute=59;
+    h12=hour%12?hour%12:12;
+    if(form==AW_DATE_NUMERIC){
+        /* 18/08/427: day/month/year, the debug form */
+        if(d+1<10)s[n++]='0';
+        n=put_number(s,n,(long)d+1);s[n++]='/';
+        if(m+1<10)s[n++]='0';
+        n=put_number(s,n,(long)m+1);s[n++]='/';n=put_number(s,n,year);
+    }else{
+        n=put_number(s,n,(long)d+1);s[n++]=' ';n=put_text(s,n,month_name[m]);
+        if(form==AW_DATE_LORE){n=put_text(s,n,", 3E ");n=put_number(s,n,year);}
+        if(form==AW_DATE_JOURNAL || form==AW_DATE_REST){
+            s[n++]=' ';s[n++]='(';n=put_text(s,n,day_word);s[n++]=' ';n=put_number(s,n,(long)days+1);s[n++]=')';
+        }
+        if(form==AW_DATE_REST || form==AW_DATE_SAVE){
+            s[n++]=' ';n=put_number(s,n,h12);n=put_text(s,n,hour>=12?" p.m.":" a.m.");
+        }
+    }
+    s[n]=0;
     if(n>=capacity){out[0]=0;return 0;}
     memcpy(out,s,(size_t)n+1);
     return n;
 }
+int AW_JournalDate(int32_t days,char *out,int capacity){return AW_DateText(AW_DATE_JOURNAL,days,0,0,out,capacity);}
 static int jv_para(aw_journalview_t *v,int kind,const char *text){
     uint32_t len=text?(uint32_t)strlen(text):0;
     if(v->paras==v->para_cap){

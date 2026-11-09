@@ -1,10 +1,11 @@
 # MWScript features
 
-_Last updated with AmiWind v0.0.62 (8 November 2026)._
+_Last updated with AmiWind v0.0.63-dev1 (9 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [Why the others do not run](#why-the-others-do-not-run)
 - [Follows OpenMW's fix](#follows-openmws-fix)
 - [By area](#by-area)
 - [By function](#by-function)
@@ -19,15 +20,15 @@ _Last updated with AmiWind v0.0.62 (8 November 2026)._
 
 One row per script record of the game: what names it, where it stands, which functions it calls and what its conditions test, and what state AmiWind has it in. The data is measured from the game's masters with the builder's own compiler; the page lists record ids, counts and states only. When the work list runs dry, the scripting work is taken from here row by row, toward the next landmark: every game script running as in the original. On Vvardenfell the scripts left are the character creation ones; the rest belong to Mournhold and Solstheim.
 
-**588 of 1,207 scripts run**; 71 use a function the interpreter lacks, 13 are attached but not run, 0 are compiled but not attached, 401 belong to an add-on world not in the image yet, 134 are named by nothing (they never run in the original either), 0 are not converted.
+**599 of 1,207 scripts run**; 39 use a function the interpreter lacks, 13 are attached but not run, 0 are compiled but not attached, 422 belong to an add-on world not in the image yet, 134 are named by nothing (they never run in the original either), 0 are not converted.
 
 | State | Scripts | What it means |
 | --- | ---: | --- |
-| runs | 588 | compiles whole, and the build attaches it to its objects or starts it (a record that is never placed: while the player carries its item, on the actor a levelled list gives, or on the object a script places; a script with no function, whose own locals the dialogue keeps on the speaker without it, counts as running) |
-| uses a function the interpreter lacks | 71 | compiles, but calls at least one function the interpreter does not carry out yet (those calls do nothing and read 0) |
+| runs | 599 | compiles whole, and the build attaches it to its objects or starts it (a record that is never placed: while the player carries its item, on the actor a levelled list gives, or on the object a script places; a script with no function, whose own locals the dialogue keeps on the speaker without it, counts as running) |
+| uses a function the interpreter lacks | 39 | compiles, but calls at least one function the interpreter does not carry out yet (those calls do nothing and read 0) |
 | attached, not run | 13 | the game attaches it, but the build does not run it: a hand-written rule carries it, or nothing it does is seen yet |
 | compiled, not attached | 0 | compiles whole, but nothing in the build attaches or starts it: its records are never placed, and nothing makes them at run time yet |
-| only in an add-on world | 401 | compiles whole, but its records are placed (or made by scripts) only in Mournhold or Solstheim, which are not in the image yet |
+| only in an add-on world | 422 | compiles whole, but its records are placed (or made by scripts) only in Mournhold or Solstheim, which are not in the image yet |
 | named by nothing | 134 | compiles whole, but no record, start, StartScript or dialogue result names it, or the records that name it are never placed and nothing makes them: it never runs in the original either |
 | not converted | 0 | does not compile |
 | **All script records** | **1,207** | |
@@ -44,7 +45,20 @@ Dialogue answers that start or change a fight (StartCombat, SetFight, ModFight):
 | the speaker attacks (StartCombat): found by the answer's reference | 124 |
 | a fight between two actors: not carried out (the combat layer fights the player only) | 5 |
 
-Measured on 8 November 2026 from the three masters (Morrowind, Tribunal, Bloodmoon) with the builder's own compiler (tools/mwscript), 11,171 placed scripted references, 9,084 bindings in the compiled file, 4 start scripts. The states are worked out again from the interpreter's function table (tools/mwscript/functions.py) whenever the page is rendered, so a function carried out later moves its scripts without a new measurement.
+Measured on 9 November 2026 from the three masters (Morrowind, Tribunal, Bloodmoon) with the builder's own compiler (tools/mwscript), 11,171 placed scripted references, 9,084 bindings in the compiled file, 4 start scripts. The states are worked out again from the interpreter's function table (tools/mwscript/functions.py) whenever the page is rendered, so a function carried out later moves its scripts without a new measurement.
+
+## Why the others do not run
+
+Each script that does not run, by its reason, and where its area is: Vvardenfell (the world in the image, including the start scripts, the dialogue-only ones and records with no place) or an add-on world (Mournhold, Solstheim). A missing function is one reason here; By function names the functions.
+
+| State | Reason | Vvardenfell | Add-on world | All |
+| --- | --- | ---: | ---: | ---: |
+| only in an add-on world | placed only in an add-on world, not in the image yet | 2 | 417 | 419 |
+| named by nothing | nothing names it: it never runs in the original either | 123 | 0 | 123 |
+| uses a function the interpreter lacks | calls a function the interpreter does not carry out yet | 9 | 30 | 39 |
+| attached, not run | a hand-written rule carries it | 13 | 0 | 13 |
+| named by nothing | its records are never placed and nothing makes them: it never runs in the original either | 11 | 0 | 11 |
+| only in an add-on world | made only by a script of an add-on world, not in the image yet | 3 | 0 | 3 |
 
 ## Follows OpenMW's fix
 
@@ -63,29 +77,29 @@ The area of a script is where most of its placed references stand: the region fo
 
 | Area | Scripts | Runs | Function missing | Attached, not run | Not attached | Add-on world | Named by nothing | Not converted |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| mournhold (tribunal) | 194 | 3 | 19 | 0 | 0 | 172 | 0 | 0 |
+| mournhold (tribunal) | 194 | 3 | 15 | 0 | 0 | 176 | 0 | 0 |
 | named by nothing | 123 | 0 | 0 | 0 | 0 | 0 | 123 | 0 |
 | ascadian isles region | 115 | 114 | 0 | 0 | 0 | 1 | 0 | 0 |
 | hirstaang forest region | 103 | 0 | 5 | 0 | 0 | 98 | 0 | 0 |
-| dialogue only | 82 | 77 | 5 | 0 | 0 | 0 | 0 | 0 |
+| dialogue only | 82 | 79 | 3 | 0 | 0 | 0 | 0 | 0 |
 | azura's coast region | 73 | 73 | 0 | 0 | 0 | 0 | 0 | 0 |
-| records not placed | 69 | 44 | 12 | 0 | 0 | 2 | 11 | 0 |
+| records not placed | 69 | 51 | 4 | 0 | 0 | 3 | 11 | 0 |
 | ashlands region | 66 | 66 | 0 | 0 | 0 | 0 | 0 | 0 |
 | west gash region | 65 | 65 | 0 | 0 | 0 | 0 | 0 | 0 |
-| isinfier plains region | 48 | 0 | 2 | 0 | 0 | 46 | 0 | 0 |
-| felsaad coast region | 45 | 0 | 9 | 0 | 0 | 36 | 0 | 0 |
+| isinfier plains region | 48 | 0 | 1 | 0 | 0 | 47 | 0 | 0 |
+| felsaad coast region | 45 | 0 | 1 | 0 | 0 | 44 | 0 | 0 |
 | bitter coast region | 41 | 29 | 0 | 12 | 0 | 0 | 0 | 0 |
 | molag mar region | 37 | 37 | 0 | 0 | 0 | 0 | 0 | 0 |
-| global scripts | 33 | 28 | 4 | 1 | 0 | 0 | 0 | 0 |
+| global scripts | 33 | 30 | 2 | 1 | 0 | 0 | 0 | 0 |
 | red mountain region | 22 | 21 | 0 | 0 | 0 | 1 | 0 | 0 |
 | thirsk region | 20 | 0 | 0 | 0 | 0 | 20 | 0 | 0 |
-| moesring mountains region | 17 | 0 | 2 | 0 | 0 | 15 | 0 | 0 |
-| solstheim (bloodmoon) | 16 | 0 | 13 | 0 | 0 | 3 | 0 | 0 |
+| moesring mountains region | 17 | 0 | 0 | 0 | 0 | 17 | 0 | 0 |
+| solstheim (bloodmoon) | 16 | 0 | 8 | 0 | 0 | 8 | 0 | 0 |
 | grazelands region | 14 | 14 | 0 | 0 | 0 | 0 | 0 | 0 |
 | sheogorad | 13 | 13 | 0 | 0 | 0 | 0 | 0 | 0 |
 | brodir grove region | 7 | 0 | 0 | 0 | 0 | 7 | 0 | 0 |
 | interior with no way out | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 |
-| **All** | **1207** | **588** | **71** | **13** | **0** | **401** | **134** | **0** |
+| **All** | **1207** | **599** | **39** | **13** | **0** | **422** | **134** | **0** |
 
 ## By function
 
@@ -93,37 +107,23 @@ Every function the game's scripts call. Scripts: the script records that call it
 
 | Function | Group | Carried out | Scripts | Uses | In conditions | Missing in | Only gap | Dialogue | Dialogue missing |
 | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| placeitem | position | host, in part | 24 | 37 | 0 | 19 | 8 | 0 | 0 |
-| becomewerewolf | stats | no | 18 | 22 | 0 | 18 | 12 | 0 | 0 |
-| iswerewolf | stats | no | 14 | 23 | 14 | 14 | 8 | 0 | 0 |
+| placeitem | position | host, in part | 24 | 37 | 0 | 19 | 19 | 0 | 0 |
 | getwaterlevel | cell | no | 9 | 10 | 4 | 9 | 6 | 0 | 0 |
-| positioncell | position | host, in part | 57 | 96 | 0 | 7 | 4 | 14 | 0 |
-| setscale | position | no | 6 | 12 | 0 | 6 | 0 | 0 | 0 |
-| explodespell | spells | no | 5 | 5 | 0 | 5 | 5 | 0 | 0 |
-| getattacked | combat | no | 5 | 5 | 5 | 5 | 5 | 0 | 0 |
-| undowerewolf | stats | no | 5 | 7 | 0 | 5 | 0 | 0 | 0 |
-| getspelleffects | spells | no | 3 | 3 | 3 | 3 | 3 | 0 | 0 |
-| getwerewolfkills | stats | no | 3 | 3 | 3 | 3 | 1 | 0 | 0 |
+| positioncell | position | host, in part | 57 | 96 | 0 | 7 | 7 | 14 | 0 |
 | hurtcollidingactor | combat | no | 3 | 3 | 0 | 3 | 2 | 0 | 0 |
 | setwaterlevel | world | no | 3 | 3 | 0 | 3 | 0 | 0 | 0 |
-| setwerewolfacrobatics | stats | no | 3 | 3 | 0 | 3 | 0 | 0 | 0 |
 | cast | spells | host, in part | 53 | 126 | 0 | 2 | 1 | 5 | 0 |
 | getcollidingpc | world | no | 2 | 2 | 2 | 2 | 1 | 0 | 0 |
-| getpctraveling | stats | no | 2 | 2 | 2 | 2 | 0 | 0 | 0 |
-| hasitemequipped | inventory | no | 2 | 2 | 2 | 2 | 0 | 0 | 0 |
 | enablenamemenu | ui | no | 1 | 1 | 0 | 1 | 1 | 0 | 0 |
 | enableracemenu | ui | no | 1 | 1 | 0 | 1 | 1 | 0 | 0 |
 | enablerest | ui | no | 1 | 1 | 0 | 1 | 1 | 0 | 0 |
-| forcerun | control | no | 1 | 2 | 0 | 1 | 0 | 0 | 0 |
 | getchameleon | spells | no | 1 | 1 | 1 | 1 | 0 | 0 | 0 |
 | getcollidingactor | world | no | 1 | 1 | 1 | 1 | 0 | 0 | 0 |
 | getparalysis | spells | no | 1 | 1 | 1 | 1 | 1 | 0 | 0 |
 | getstandingactor | world | no | 1 | 1 | 1 | 1 | 1 | 0 | 0 |
 | getstat | stats | no | 1 | 1 | 0 | 1 | 1 | 0 | 0 |
-| getweapontype | combat | no | 1 | 1 | 1 | 1 | 0 | 0 | 0 |
+| getweapontype | combat | no | 1 | 1 | 1 | 1 | 1 | 0 | 0 |
 | modwaterlevel | world | no | 1 | 1 | 0 | 1 | 0 | 0 | 0 |
-| turnmoonred | sky | no | 1 | 2 | 0 | 1 | 0 | 0 | 0 |
-| turnmoonwhite | sky | no | 1 | 1 | 0 | 1 | 0 | 0 | 0 |
 | getjournalindex | journal | yes | 547 | 1371 | 535 | 0 | 0 | 0 | 0 |
 | disable | world | yes | 390 | 832 | 0 | 0 | 0 | 52 | 0 |
 | journal | journal | yes | 378 | 610 | 0 | 0 | 0 | 3091 | 0 |
@@ -173,6 +173,7 @@ Every function the game's scripts call. Scripts: the script records that call it
 | geteffect | spells | host | 21 | 32 | 21 | 0 | 0 | 0 | 0 |
 | rotate | position | host | 21 | 51 | 0 | 0 | 0 | 0 | 0 |
 | addtopic | dialogue | host | 20 | 105 | 0 | 0 | 0 | 86 | 0 |
+| becomewerewolf | stats | host | 18 | 22 | 0 | 0 | 0 | 0 | 0 |
 | getspell | spells | yes | 18 | 52 | 17 | 0 | 0 | 0 | 0 |
 | lock | world | yes | 18 | 18 | 0 | 0 | 0 | 1 | 0 |
 | aifollow | ai | host | 17 | 21 | 0 | 0 | 0 | 85 | 0 |
@@ -185,6 +186,7 @@ Every function the game's scripts call. Scripts: the script records that call it
 | gettarget | ai | host | 15 | 36 | 15 | 0 | 0 | 0 | 0 |
 | placeatpc | position | host | 15 | 30 | 0 | 0 | 0 | 7 | 0 |
 | enableplayercontrols | control | host | 14 | 20 | 0 | 0 | 0 | 0 | 0 |
+| iswerewolf | stats | host | 14 | 23 | 14 | 0 | 0 | 0 | 0 |
 | playsound3d | audio | yes | 14 | 15 | 0 | 0 | 0 | 0 | 0 |
 | position | position | host | 14 | 23 | 0 | 0 | 0 | 0 | 0 |
 | getstandingpc | world | host | 13 | 13 | 12 | 0 | 0 | 0 | 0 |
@@ -210,10 +212,13 @@ Every function the game's scripts call. Scripts: the script records that call it
 | modresistparalysis | spells | host | 6 | 12 | 0 | 0 | 0 | 0 | 0 |
 | modresistpoison | spells | host | 6 | 12 | 0 | 0 | 0 | 0 | 0 |
 | setatstart | position | host | 6 | 6 | 0 | 0 | 0 | 0 | 0 |
+| setscale | position | host | 6 | 12 | 0 | 0 | 0 | 0 | 0 |
 | stopsound | audio | yes | 6 | 9 | 0 | 0 | 0 | 0 | 0 |
 | changeweather | sky | host | 5 | 12 | 0 | 0 | 0 | 0 | 0 |
 | enableplayerfighting | control | host | 5 | 5 | 0 | 0 | 0 | 0 | 0 |
 | enableplayermagic | control | host | 5 | 5 | 0 | 0 | 0 | 0 | 0 |
+| explodespell | spells | host | 5 | 5 | 0 | 0 | 0 | 0 | 0 |
+| getattacked | combat | host | 5 | 5 | 5 | 0 | 0 | 0 | 0 |
 | getfatigue | stats | yes | 5 | 8 | 2 | 0 | 0 | 0 | 0 |
 | loopgroup | anim | host | 5 | 5 | 0 | 0 | 0 | 0 | 0 |
 | move | position | host | 5 | 5 | 0 | 0 | 0 | 0 | 0 |
@@ -224,6 +229,7 @@ Every function the game's scripts call. Scripts: the script records that call it
 | playloopsound3d | audio | yes | 5 | 7 | 0 | 0 | 0 | 0 | 0 |
 | setfatigue | stats | yes | 5 | 6 | 0 | 0 | 0 | 1 | 0 |
 | setflee | ai | yes | 5 | 10 | 0 | 0 | 0 | 0 | 0 |
+| undowerewolf | stats | host | 5 | 7 | 0 | 0 | 0 | 0 | 0 |
 | aiescort | ai | host | 4 | 5 | 0 | 0 | 0 | 0 | 0 |
 | clearforcesneak | control | host | 4 | 19 | 0 | 0 | 0 | 4 | 0 |
 | enableteleporting | control | host | 4 | 4 | 0 | 0 | 0 | 0 | 0 |
@@ -244,19 +250,24 @@ Every function the game's scripts call. Scripts: the script records that call it
 | enablestatsmenu | ui | host | 3 | 3 | 0 | 0 | 0 | 0 | 0 |
 | getlevel | stats | yes | 3 | 10 | 3 | 0 | 0 | 0 | 0 |
 | getrace | stats | host | 3 | 22 | 3 | 0 | 0 | 0 | 0 |
+| getspelleffects | spells | host | 3 | 3 | 3 | 0 | 0 | 0 | 0 |
 | getweapondrawn | combat | host | 3 | 5 | 3 | 0 | 0 | 0 | 0 |
+| getwerewolfkills | stats | host | 3 | 3 | 3 | 0 | 0 | 0 | 0 |
 | modwillpower | stats | yes | 3 | 5 | 0 | 0 | 0 | 0 | 0 |
 | setmagicka | stats | yes | 3 | 4 | 0 | 0 | 0 | 0 | 0 |
 | setmarksman | stats | yes | 3 | 4 | 0 | 0 | 0 | 0 | 0 |
+| setwerewolfacrobatics | stats | host | 3 | 3 | 0 | 0 | 0 | 0 | 0 |
 | disablelevitation | control | host | 2 | 3 | 0 | 0 | 0 | 0 | 0 |
 | enablelevitation | control | host | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
 | getinterior | cell | host | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
 | getlos | ai | host | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
 | getpcinjail | stats | host | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
 | getpcsneaking | control | host | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
+| getpctraveling | stats | host | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
 | getsecurity | stats | yes | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
 | getsneak | stats | yes | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
 | getstrength | stats | yes | 2 | 2 | 1 | 0 | 0 | 0 | 0 |
+| hasitemequipped | inventory | host | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
 | hitonme | combat | host | 2 | 3 | 0 | 0 | 0 | 0 | 0 |
 | hurtstandingactor | combat | host | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
 | modagility | stats | yes | 2 | 3 | 0 | 0 | 0 | 0 | 0 |
@@ -291,6 +302,7 @@ Every function the game's scripts call. Scripts: the script records that call it
 | enablevanitymode | control | host | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | face | ai | host | 1 | 6 | 0 | 0 | 0 | 0 | 0 |
 | fall | position | yes | 1 | 3 | 0 | 0 | 0 | 0 | 0 |
+| forcerun | control | host | 1 | 2 | 0 | 0 | 0 | 0 | 0 |
 | getagility | stats | yes | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | getcurrentweather | sky | host | 1 | 4 | 1 | 0 | 0 | 0 | 0 |
 | getdisposition | dialogue | yes | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
@@ -344,6 +356,8 @@ Every function the game's scripts call. Scripts: the script records that call it
 | setmysticism | stats | yes | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | setspear | stats | yes | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | streammusic | audio | yes | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| turnmoonred | sky | host | 1 | 2 | 0 | 0 | 0 | 0 | 0 |
+| turnmoonwhite | sky | host | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | aifollowcell | ai | host | 0 | 0 | 0 | 0 | 0 | 19 | 0 |
 | choice | dialogue | host | 0 | 0 | 0 | 0 | 0 | 1103 | 0 |
 | clearinfoactor | dialogue | host | 0 | 0 | 0 | 0 | 0 | 31 | 0 |
@@ -1044,9 +1058,9 @@ Referenced by: the records that carry the script and their placed references per
 | denegorScript | mournhold (tribunal) | only in an add-on world | 1 NPC; placed 1 (Tribunal 1); speaker of 3 dialogue results | denegor | cellchanged, disable, getdeadcount, gethealth, getjournalindex, journal, menumode, messagebox, ondeath, onknockout, setfatigue | 14: cellchanged, getdeadcount, gethealth, getjournalindex, local, menumode, ondeath, onknockout | - | placed only in an add-on world, not in the image yet |
 | DetritusScript | mournhold (tribunal) | only in an add-on world | 1 NPC; placed 1 (Tribunal 1); speaker of 17 dialogue results | detritus caria | disable, enable, getjournalindex | 4: getjournalindex | - | placed only in an add-on world, not in the image yet |
 | dilbornScript | mournhold (tribunal) | only in an add-on world | 1 NPC; placed 1 (Tribunal 1); speaker of 3 dialogue results | dilborn | cellchanged, disable, getdeadcount, getjournalindex, journal, ondeath, startcombat | 22: cellchanged, getdeadcount, getjournalindex, local, ondeath | - | placed only in an add-on world, not in the image yet |
-| drathasNerusScript | mournhold (tribunal) | uses a function the interpreter lacks | 1 NPC; placed 1 (Tribunal 1); speaker of 9 dialogue results | drathas nerus | getattacked, ondeath, startcombat | 3: getattacked, ondeath, other script | - | 1 not carried out: getattacked |
+| drathasNerusScript | mournhold (tribunal) | only in an add-on world | 1 NPC; placed 1 (Tribunal 1); speaker of 9 dialogue results | drathas nerus | getattacked, ondeath, startcombat | 3: getattacked, ondeath, other script | - | placed only in an add-on world, not in the image yet |
 | DrathasScript | mournhold (tribunal) | only in an add-on world | 1 NPC; placed 1 (Tribunal 1); speaker of 2 dialogue results | drathas reyas | - | - | - | placed only in an add-on world, not in the image yet |
-| DrathasThugScript | mournhold (tribunal) | uses a function the interpreter lacks | 2 NPC; placed 2 (Tribunal 2); speaker of 4 dialogue results | alam merys, melur savil | getattacked, getdeadcount, getjournalindex, ondeath, startcombat | 10: getattacked, getdeadcount, getjournalindex, local, ondeath | - | 1 not carried out: getattacked |
+| DrathasThugScript | mournhold (tribunal) | only in an add-on world | 2 NPC; placed 2 (Tribunal 2); speaker of 4 dialogue results | alam merys, melur savil | getattacked, getdeadcount, getjournalindex, ondeath, startcombat | 10: getattacked, getdeadcount, getjournalindex, local, ondeath | - | placed only in an add-on world, not in the image yet |
 | dravilScript | mournhold (tribunal) | only in an add-on world | 1 NPC; placed 1 (Tribunal 1); speaker of 2 dialogue results | dravil indrano | additem, getjournalindex, journal, messagebox, ondeath, setdisposition, setfight, startcombat | 5: getjournalindex, local, ondeath | - | placed only in an add-on world, not in the image yet |
 | DrothCopy | mournhold (tribunal) | only in an add-on world | 1 WEAP; placed 1 (Tribunal 1) | silver dagger_droth_unique_a | disable, enable, getdisabled, getjournalindex | 4: getdisabled, getjournalindex | - | placed only in an add-on world, not in the image yet |
 | DrothGeon | mournhold (tribunal) | only in an add-on world | 1 NPC; placed 1 (Tribunal 1); speaker of 15 dialogue results | geon auline | getjournalindex, journal, ondeath | 3: getjournalindex, ondeath | - | placed only in an add-on world, not in the image yet |
@@ -1081,7 +1095,7 @@ Referenced by: the records that carry the script and their placed references per
 | IgnatiusScript2 | mournhold (tribunal) | only in an add-on world | 1 NPC; placed 1 (Tribunal 1); speaker of 4 dialogue results | ignatius_flaccus2 | getdeadcount, menumode | 10: getdeadcount, local, menumode | - | placed only in an add-on world, not in the image yet |
 | IlnoriScript | mournhold (tribunal) | only in an add-on world | 1 NPC; placed 1 (Tribunal 1); speaker of 4 dialogue results | ilnori_faustus | cellchanged, disable, getdeadcount | 5: cellchanged, getdeadcount, local | - | placed only in an add-on world, not in the image yet |
 | Irano_note | mournhold (tribunal) | only in an add-on world | 1 book; placed 1 (Tribunal 1) | bk_irano_note | activate, disable, enable, getdisabled, getjournalindex, journal, onactivate | 6: getdisabled, getjournalindex, local, onactivate | - | placed only in an add-on world, not in the image yet |
-| JournalistPals | mournhold (tribunal) | uses a function the interpreter lacks | 3 NPC; placed 3 (Tribunal 3); speaker of 6 dialogue results | feranos hlando, sendel tedas, veros nerethi | getattacked, setdisposition, setfight, startcombat | 1: getattacked | - | 1 not carried out: getattacked |
+| JournalistPals | mournhold (tribunal) | only in an add-on world | 3 NPC; placed 3 (Tribunal 3); speaker of 6 dialogue results | feranos hlando, sendel tedas, veros nerethi | getattacked, setdisposition, setfight, startcombat | 1: getattacked | - | placed only in an add-on world, not in the image yet |
 | karrodDoorScript | mournhold (tribunal) | only in an add-on world | 2 door; placed 2 (Tribunal 2) | in_mh_door_02_throne1, in_mh_door_02_throne2 | activate, messagebox, onactivate | 3: global, onactivate | - | placed only in an add-on world, not in the image yet |
 | karrodfightstopScript | mournhold (tribunal) | only in an add-on world | 5 NPC; placed 5 (Tribunal 5); speaker of 56 dialogue results | diradeni farano, drusus gratus, evo othreloth, ivulen irano, tienius delitian | aiwander, getjournalindex, setalarm, setfight, setflee, startcombat, stopcombat | 19: getjournalindex, global, local | - | placed only in an add-on world, not in the image yet |
 | karrodScript | mournhold (tribunal) | only in an add-on world | 1 NPC; placed 1 (Tribunal 1); speaker of 3 dialogue results | karrod | addspell, forcegreeting, getfatigue, gethealth, getjournalindex, menumode, modblock, modfatigue, modhealth, modmediumarmor, modshortblade, modspeed, modstrength, placeatpc, removespell, resurrect, setdisposition, setfatigue, setfight, setflee, sethealth, startcombat, startscript, stopcombat | 25: getfatigue, gethealth, getjournalindex, global, local, menumode | - | placed only in an add-on world, not in the image yet |
@@ -1184,7 +1198,7 @@ Referenced by: the records that carry the script and their placed references per
 | Sound_SothaLab | mournhold (tribunal) | only in an add-on world | 1 activator; placed 1 (Tribunal 1) | sound_sotha_lab | cellchanged, getsoundplaying, playloopsound3dvp | 2: cellchanged, getsoundplaying | - | placed only in an add-on world, not in the image yet |
 | Sound_SothaRoll | mournhold (tribunal) | only in an add-on world | 1 activator; placed 1 (Tribunal 1) | sound_sotha_roll | cellchanged, getsoundplaying, playloopsound3dvp | 2: cellchanged, getsoundplaying | - | placed only in an add-on world, not in the image yet |
 | SpellCast | mournhold (tribunal) | only in an add-on world | 5 activator; placed 5 (Tribunal 5) | column_cast, column_cast2, column_cast3, column_cast4, column_cast5 | cast | 2: local | - | placed only in an add-on world, not in the image yet |
-| tarenScript | mournhold (tribunal) | uses a function the interpreter lacks | 1 NPC; placed 1 (Tribunal 1); speaker of 5 dialogue results | taren andoren | aifollow, aitravel, clearforcesneak, disable, enable, forcegreeting, forcesneak, getaipackagedone, getattacked, getdeadcount, getdistance, gethealth, getjournalindex, getsecondspassed, journal, menumode, messagebox, ondeath, setdisposition, setfight, startcombat | 42: getaipackagedone, getattacked, getdeadcount, getdistance, gethealth, getjournalindex, local, menumode, ondeath | - | 1 not carried out: getattacked |
+| tarenScript | mournhold (tribunal) | only in an add-on world | 1 NPC; placed 1 (Tribunal 1); speaker of 5 dialogue results | taren andoren | aifollow, aitravel, clearforcesneak, disable, enable, forcegreeting, forcesneak, getaipackagedone, getattacked, getdeadcount, getdistance, gethealth, getjournalindex, getsecondspassed, journal, menumode, messagebox, ondeath, setdisposition, setfight, startcombat | 42: getaipackagedone, getattacked, getdeadcount, getdistance, gethealth, getjournalindex, local, menumode, ondeath | - | placed only in an add-on world, not in the image yet |
 | ThendasTravel | mournhold (tribunal) | only in an add-on world | 1 NPC; placed 1 (Tribunal 1); speaker of 9 dialogue results | arnsa thendas | aitravel, getaipackagedone, getsecondspassed, random | 18: getaipackagedone, local | - | placed only in an add-on world, not in the image yet |
 | Therdon2Script | mournhold (tribunal) | only in an add-on world | 1 NPC; placed 1 (Tribunal 1); speaker of 1 dialogue results | therdon2 | disable, enable, getdeadcount | 4: getdeadcount, local, other script | - | placed only in an add-on world, not in the image yet |
 | TherdonScript | mournhold (tribunal) | only in an add-on world | 1 NPC; placed 1 (Tribunal 1); speaker of 3 dialogue results | therdon | disable | 2: local | - | placed only in an add-on world, not in the image yet |
@@ -1237,7 +1251,7 @@ Referenced by: the records that carry the script and their placed references per
 | packrat | records not placed | runs | 1 creature; placed by scripts (1 records); speaker of 3 dialogue results | rat_pack_rerlas | getjournalindex | 1: getjournalindex | - | runs on the object a script places |
 | replenishammo | records not placed | runs | 1 creature; levelled lists 3 | centurion_projectile | additem, getitemcount, menumode, ondeath | 4: getitemcount, local, menumode, ondeath | - | runs on the actor a levelled list gives |
 | tarenEnableScript | records not placed | named by nothing | 1 activator | script_taren_enable | disable, enable, getdistance, getjournalindex | 8: getdistance, getjournalindex, global, local | - | its records are never placed and nothing makes them: it never runs in the original either |
-| trapProjScript | records not placed | uses a function the interpreter lacks | 1 activator; placed by scripts of Tribunal (not made yet) | trapprojectile | disable, explodespell, getdistance, getpos, getsecondspassed, getsquareroot, menumode, setdelete, setpos | 16: local, menumode | - | 1 not carried out: explodespell |
+| trapProjScript | records not placed | only in an add-on world | 1 activator; placed by scripts of Tribunal (not made yet) | trapprojectile | disable, explodespell, getdistance, getpos, getsecondspassed, getsquareroot, menumode, setdelete, setpos | 16: local, menumode | - | made only by a script of an add-on world, not in the image yet |
 | AzuraEnd | red mountain region | runs | 1 activator; placed 1 (Morrowind 1) | azura spirit | disable, disableplayercontrols, enable, enableplayercontrols, getdisabled, getdistance, getjournalindex, getsecondspassed, journal, menumode, playbink, playgroup | 15: getdisabled, getdistance, getjournalindex, local, menumode | - | - |
 
 ### Bloodmoon
@@ -1256,7 +1270,7 @@ Referenced by: the records that carry the script and their placed references per
 | stoneUlfgarScript | brodir grove region | only in an add-on world | 1 activator; placed 1 (Bloodmoon 1) | act_bm_stone_ulfgar | cast, disable, enable, getjournalindex, menumode, messagebox, onactivate | 6: getjournalindex, menumode, onactivate | - | placed only in an add-on world, not in the image yet |
 | UlfgarGhostScript | brodir grove region | only in an add-on world | 1 NPC; placed 1 (Bloodmoon 1); speaker of 2 dialogue results | ulfgar_ghost | addspell, disable, enable, forcegreeting, getdisabled, getdistance, getjournalindex, getpos, getsecondspassed, menumode, placeitem | 16: getdisabled, getdistance, getjournalindex, local, menumode | - | placed only in an add-on world, not in the image yet |
 | UlfgarScript | brodir grove region | only in an add-on world | 1 NPC; placed 1 (Bloodmoon 1); speaker of 11 dialogue results | ulfgar the unending | forcegreeting, gethealth, getjournalindex, journal | 4: gethealth, getjournalindex, local | - | placed only in an add-on world, not in the image yet |
-| ColonyAssassin | dialogue only | uses a function the interpreter lacks | started by 2 dialogue results | - | additem, aitravel, aiwander, enable, forcerun, getaipackagedone, getdeadcount, getdistance, getjournalindex, getsecondspassed, getstandingpc, gettarget, getweapondrawn, hasitemequipped, journal, menumode, ondeath, position, positioncell, setagility, setfight, setwillpower, startcombat, stopcombat, stopscript | 53: getaipackagedone, getdeadcount, getdistance, getjournalindex, getstandingpc, gettarget, getweapondrawn, global, hasitemequipped, local, menumode, ondeath | - | 2 not carried out: forcerun, hasitemequipped |
+| ColonyAssassin | dialogue only | runs | started by 2 dialogue results | - | additem, aitravel, aiwander, enable, forcerun, getaipackagedone, getdeadcount, getdistance, getjournalindex, getsecondspassed, getstandingpc, gettarget, getweapondrawn, hasitemequipped, journal, menumode, ondeath, position, positioncell, setagility, setfight, setwillpower, startcombat, stopcombat, stopscript | 53: getaipackagedone, getdeadcount, getdistance, getjournalindex, getstandingpc, gettarget, getweapondrawn, global, hasitemequipped, local, menumode, ondeath | - | - |
 | ColonyEstateTimer | dialogue only | runs | started by 3 dialogue results | - | getpccell, journal, stopscript | 20: getpccell, global, local, other script | - | - |
 | ColonyGuards | dialogue only | runs | started by 6 dialogue results | - | disable, enable, getjournalindex, stopscript | 6: getjournalindex, global, local | - | - |
 | ColonyNordAxe | dialogue only | runs | started by 1 dialogue results | - | getdeadcount, getitemcount, getjournalindex, journal, stopscript | 5: getdeadcount, getitemcount, getjournalindex | - | - |
@@ -1269,7 +1283,7 @@ Referenced by: the records that carry the script and their placed references per
 | GlenmorilCaveTeleport | dialogue only | uses a function the interpreter lacks | started by 1 dialogue results | - | menumode, playsound, positioncell, stopscript | 1: menumode | - | 1 not carried out: positioncell |
 | IngmarTeleport | dialogue only | runs | started by 2 dialogue results | - | aiwander, getpccell, positioncell, stopscript | 1: getpccell | - | - |
 | JeleenScript | dialogue only | runs | started by 1 dialogue results | - | additem, cellchanged, getjournalindex, sethealth, stopscript | 2: cellchanged, getjournalindex | - | - |
-| RitualTransform | dialogue only | uses a function the interpreter lacks | started by 1 dialogue results | - | becomewerewolf, getdeadcount, getpos, getsecondspassed, journal, menumode, modfatigue, modhealth, placeitem, resurrect, startcombat | 7: getdeadcount, global, local, menumode | - | 1 not carried out: becomewerewolf |
+| RitualTransform | dialogue only | runs | started by 1 dialogue results | - | becomewerewolf, getdeadcount, getpos, getsecondspassed, journal, menumode, modfatigue, modhealth, placeitem, resurrect, startcombat | 7: getdeadcount, global, local, menumode | - | - |
 | smugdeadScript | dialogue only | runs | started by 1 dialogue results | - | enable, getjournalindex, journal | 4: getjournalindex, global, local | - | - |
 | aeslipScript | felsaad coast region | only in an add-on world | 1 creature; placed 1 (Bloodmoon 1); speaker of 8 dialogue results | draugr_aesliip | forcegreeting, getdistance, getjournalindex, getsecondspassed, journal, ondeath | 11: getdistance, getjournalindex, global, local, ondeath | - | placed only in an add-on world, not in the image yet |
 | BMFrostDaedraScript | felsaad coast region | only in an add-on world | 1 creature; placed 10 (Bloodmoon 10) | atronach_frost_bm | getjournalindex, journal, ondeath | 4: getjournalindex, global, local, ondeath | - | placed only in an add-on world, not in the image yet |
@@ -1300,34 +1314,34 @@ Referenced by: the records that carry the script and their placed references per
 | skaalaradoorScript | felsaad coast region | only in an add-on world | 1 activator; placed 1 (Bloodmoon 1) | act_bm_snowdoor1 | disable, getdisabled, getjournalindex | 3: getdisabled, getjournalindex | - | placed only in an add-on world, not in the image yet |
 | skaaldoorSound | felsaad coast region | only in an add-on world | 1 activator; placed 1 (Bloodmoon 1) | active_bm_attacksound | getjournalindex, menumode, playloopsound3d, stopsound | 5: getjournalindex, global, local, menumode | - | placed only in an add-on world, not in the image yet |
 | skaalGuardScript | felsaad coast region | only in an add-on world | 1 NPC; placed 1 (Bloodmoon 1); speaker of 1 dialogue results | skaal_guard2 | forcegreeting, getsecondspassed, menumode | 7: global, local, menumode | - | placed only in an add-on world, not in the image yet |
-| skaalwere1Script | felsaad coast region | uses a function the interpreter lacks | 2 NPC; placed 2 (Bloodmoon 2) | bm_werewolf_skaal1a3, bm_werewolf_skaal1e3 | becomewerewolf, disable, enable, getdisabled, getjournalindex, journal, ondeath, sethealth, startcombat | 9: getdisabled, getjournalindex, global, local, ondeath | - | 1 not carried out: becomewerewolf |
-| skaalwere2Script | felsaad coast region | uses a function the interpreter lacks | 1 NPC; placed 1 (Bloodmoon 1) | bm_werewolf_skaal1b3 | becomewerewolf, disable, enable, getdisabled, getjournalindex, journal, ondeath, sethealth, startcombat | 10: getdisabled, getjournalindex, global, local, ondeath | - | 1 not carried out: becomewerewolf |
-| skaalwere3Script | felsaad coast region | uses a function the interpreter lacks | 1 NPC; placed 1 (Bloodmoon 1) | bm_werewolf_skaal1c3 | becomewerewolf, disable, enable, getdisabled, getjournalindex, journal, ondeath, sethealth, startcombat | 10: getdisabled, getjournalindex, global, local, ondeath | - | 1 not carried out: becomewerewolf |
-| skaalwere4Script | felsaad coast region | uses a function the interpreter lacks | 1 NPC; placed 1 (Bloodmoon 1) | bm_werewolf_skaal1d3 | becomewerewolf, disable, enable, getdisabled, getjournalindex, journal, ondeath, sethealth, startcombat | 10: getdisabled, getjournalindex, global, local, ondeath | - | 1 not carried out: becomewerewolf |
-| skaalwere5Script | felsaad coast region | uses a function the interpreter lacks | 1 NPC; placed 1 (Bloodmoon 1) | bm_werewolf_skaal1f3 | becomewerewolf, disable, enable, getdisabled, getjournalindex, journal, ondeath, sethealth, startcombat | 10: getdisabled, getjournalindex, global, local, ondeath | - | 1 not carried out: becomewerewolf |
-| skaalwere6Script | felsaad coast region | uses a function the interpreter lacks | 1 NPC; placed 1 (Bloodmoon 1) | bm_werewolf_skaal1g3 | becomewerewolf, disable, enable, getdisabled, getjournalindex, journal, ondeath, sethealth, startcombat | 10: getdisabled, getjournalindex, global, local, ondeath | - | 1 not carried out: becomewerewolf |
+| skaalwere1Script | felsaad coast region | only in an add-on world | 2 NPC; placed 2 (Bloodmoon 2) | bm_werewolf_skaal1a3, bm_werewolf_skaal1e3 | becomewerewolf, disable, enable, getdisabled, getjournalindex, journal, ondeath, sethealth, startcombat | 9: getdisabled, getjournalindex, global, local, ondeath | - | placed only in an add-on world, not in the image yet |
+| skaalwere2Script | felsaad coast region | only in an add-on world | 1 NPC; placed 1 (Bloodmoon 1) | bm_werewolf_skaal1b3 | becomewerewolf, disable, enable, getdisabled, getjournalindex, journal, ondeath, sethealth, startcombat | 10: getdisabled, getjournalindex, global, local, ondeath | - | placed only in an add-on world, not in the image yet |
+| skaalwere3Script | felsaad coast region | only in an add-on world | 1 NPC; placed 1 (Bloodmoon 1) | bm_werewolf_skaal1c3 | becomewerewolf, disable, enable, getdisabled, getjournalindex, journal, ondeath, sethealth, startcombat | 10: getdisabled, getjournalindex, global, local, ondeath | - | placed only in an add-on world, not in the image yet |
+| skaalwere4Script | felsaad coast region | only in an add-on world | 1 NPC; placed 1 (Bloodmoon 1) | bm_werewolf_skaal1d3 | becomewerewolf, disable, enable, getdisabled, getjournalindex, journal, ondeath, sethealth, startcombat | 10: getdisabled, getjournalindex, global, local, ondeath | - | placed only in an add-on world, not in the image yet |
+| skaalwere5Script | felsaad coast region | only in an add-on world | 1 NPC; placed 1 (Bloodmoon 1) | bm_werewolf_skaal1f3 | becomewerewolf, disable, enable, getdisabled, getjournalindex, journal, ondeath, sethealth, startcombat | 10: getdisabled, getjournalindex, global, local, ondeath | - | placed only in an add-on world, not in the image yet |
+| skaalwere6Script | felsaad coast region | only in an add-on world | 1 NPC; placed 1 (Bloodmoon 1) | bm_werewolf_skaal1g3 | becomewerewolf, disable, enable, getdisabled, getjournalindex, journal, ondeath, sethealth, startcombat | 10: getdisabled, getjournalindex, global, local, ondeath | - | placed only in an add-on world, not in the image yet |
 | spiritBearScript | felsaad coast region | only in an add-on world | 1 creature; placed 1 (Bloodmoon 1) | bm_bear_spr_unique | disable, enable, getdisabled, getjournalindex, journal, moddisposition, ondeath | 10: getdisabled, getjournalindex, local, ondeath | - | placed only in an add-on world, not in the image yet |
 | stoneBeastsScript | felsaad coast region | only in an add-on world | 1 activator; placed 1 (Bloodmoon 1) | act_bm_stone_beast_01 | enable, getjournalindex, journal, messagebox, onactivate | 8: getjournalindex, global, local, onactivate | - | placed only in an add-on world, not in the image yet |
 | stoneeffect1Script | felsaad coast region | only in an add-on world | 2 activator; placed 2 (Bloodmoon 2) | act_bm_sun_parts, active_bm_stonesound1 | getjournalindex, playsound | 2: getjournalindex, local | - | placed only in an add-on world, not in the image yet |
 | totemchestScript | felsaad coast region | only in an add-on world | 1 container; placed 1 (Bloodmoon 1) | chest_clawfang_unique | activate, getitemcount, getjournalindex, journal, messagebox, onactivate, removeitem | 5: getitemcount, getjournalindex, global, onactivate | - | placed only in an add-on world, not in the image yet |
 | TymvaulScript | felsaad coast region | only in an add-on world | 1 NPC; placed 1 (Bloodmoon 1); speaker of 4 dialogue results | tymvaul | disable, enable, getjournalindex, journal, ondeath | 5: getjournalindex, ondeath | - | placed only in an add-on world, not in the image yet |
 | UdyrfrykteDead | felsaad coast region | only in an add-on world | 1 creature; placed 1 (Bloodmoon 1) | bm_udyrfrykte | disable, enable, getjournalindex, journal, ondeath, startscript | 4: getjournalindex, ondeath | - | placed only in an add-on world, not in the image yet |
-| wereCeremonyScript | felsaad coast region | uses a function the interpreter lacks | 1 NPC; placed 10 (Bloodmoon 10) | werewolf_ceremony | becomewerewolf, disable, enable, getdisabled, getjournalindex, ondeath | 6: getdisabled, getjournalindex, local, ondeath | - | 1 not carried out: becomewerewolf |
-| wereskaalScript | felsaad coast region | uses a function the interpreter lacks | 1 NPC; placed 2 (Bloodmoon 2) | bm_werewolf_skaal2a | addspell, becomewerewolf, disable, enable, getdeadcount, getdisabled, getjournalindex, journal, ondeath, position, startcombat | 9: getdeadcount, getdisabled, getjournalindex, global, local, ondeath | - | 1 not carried out: becomewerewolf |
+| wereCeremonyScript | felsaad coast region | only in an add-on world | 1 NPC; placed 10 (Bloodmoon 10) | werewolf_ceremony | becomewerewolf, disable, enable, getdisabled, getjournalindex, ondeath | 6: getdisabled, getjournalindex, local, ondeath | - | placed only in an add-on world, not in the image yet |
+| wereskaalScript | felsaad coast region | only in an add-on world | 1 NPC; placed 2 (Bloodmoon 2) | bm_werewolf_skaal2a | addspell, becomewerewolf, disable, enable, getdeadcount, getdisabled, getjournalindex, journal, ondeath, position, startcombat | 9: getdeadcount, getdisabled, getjournalindex, global, local, ondeath | - | placed only in an add-on world, not in the image yet |
 | windbagScript | felsaad coast region | only in an add-on world | 2 container; placed 1 (Bloodmoon 1) | bm_greedyman, bm_windbag | activate, disable, enable, getdisabled, getjournalindex, journal, onactivate, playsound | 7: getdisabled, getjournalindex, onactivate | - | placed only in an add-on world, not in the image yet |
 | windlightScript | felsaad coast region | only in an add-on world | 1 light; placed 10 (Bloodmoon 10) | light_bm_tomb_wind | disable, getdisabled, getjournalindex | 3: getdisabled, getjournalindex | - | placed only in an add-on world, not in the image yet |
 | BloodmoonMain | global scripts | runs | started by hircine1Script | - | disablelevitation, disableteleporting, enablelevitation, enableteleporting, getinterior, getpccell | 5: getinterior, getpccell, local | - | - |
-| bloodmoonScript | global scripts | uses a function the interpreter lacks | started by BMStartUpScript | - | getjournalindex, turnmoonred, turnmoonwhite | 6: getjournalindex, local | - | 2 not carried out: turnmoonred, turnmoonwhite |
+| bloodmoonScript | global scripts | runs | started by BMStartUpScript | - | getjournalindex, turnmoonred, turnmoonwhite | 6: getjournalindex, local | - | - |
 | BMStartUpScript | global scripts | runs | start script | - | disable, getjournalindex, startscript, stopscript | 15: getjournalindex, global | - | - |
 | dbFixScript | global scripts | runs | started by BMStartUpScript | - | cellchanged, getpccell | 4: cellchanged, getpccell, global, local | - | - |
 | EndGame | global scripts | runs | started by DagothDoorDetector | - | changeweather, disable, enableteleporting, journal, modregion, modreputation, playgroup, sethealth, stopscript | - | - | - |
 | MirisaTeleport | global scripts | runs | started by UdyrfrykteDead | - | aiwander, gethealth, getjournalindex, positioncell, stopscript | 2: gethealth, getjournalindex | - | - |
 | plant2Script | global scripts | runs | started by plantScript | - | disable, enable, getdistance | 9: getdistance, global, local | - | - |
 | VampireCheck | global scripts | runs | started by Main, VampTest, VampTest1, VampTest2, VampTest3, testPlayerStats | - | getpcsleep, getspell, messagebox, startscript, stopscript, wakeuppc | 19: getpcsleep, getspell, global, local | - | - |
-| WereChangeScript | global scripts | uses a function the interpreter lacks | started by WereCheckScript | - | addspell, becomewerewolf, disable, disableplayercontrols, enable, enableplayercontrols, fadein, fadeout, getjournalindex, getpcinjail, getpctraveling, getsecondspassed, getwerewolfkills, iswerewolf, journal, menumode, messagebox, playbink, positioncell, removespell, setwerewolfacrobatics, startscript, stopscript, undowerewolf, wakeuppc | 52: getjournalindex, getpcinjail, getpctraveling, getwerewolfkills, global, iswerewolf, local, menumode | - | 7 not carried out: becomewerewolf, getpctraveling, getwerewolfkills, iswerewolf, positioncell, setwerewolfacrobatics, undowerewolf |
+| WereChangeScript | global scripts | uses a function the interpreter lacks | started by WereCheckScript | - | addspell, becomewerewolf, disable, disableplayercontrols, enable, enableplayercontrols, fadein, fadeout, getjournalindex, getpcinjail, getpctraveling, getsecondspassed, getwerewolfkills, iswerewolf, journal, menumode, messagebox, playbink, positioncell, removespell, setwerewolfacrobatics, startscript, stopscript, undowerewolf, wakeuppc | 52: getjournalindex, getpcinjail, getpctraveling, getwerewolfkills, global, iswerewolf, local, menumode | - | 1 not carried out: positioncell |
 | WereCheckScript | global scripts | runs | started by BMStartUpScript | - | getspell, startscript, stopscript | 10: getspell, global, local | - | - |
-| werehungerScript | global scripts | uses a function the interpreter lacks | started by WereChange2Script, WereChangeScript | - | gethealth, iswerewolf, messagebox, modcurrenthealth | 7: global, iswerewolf, local | - | 1 not carried out: iswerewolf |
-| wildhuntStartScript | global scripts | uses a function the interpreter lacks | started by WereChange2Script, WereChangeScript; started by 1 dialogue results | - | disableplayercontrols, fadein, fadeout, getjournalindex, getpcsleep, getsecondspassed, iswerewolf, journal, placeatpc, positioncell, stopscript, wakeuppc | 18: getjournalindex, getpcsleep, iswerewolf, local | - | 2 not carried out: iswerewolf, positioncell |
+| werehungerScript | global scripts | runs | started by WereChange2Script, WereChangeScript | - | gethealth, iswerewolf, messagebox, modcurrenthealth | 7: global, iswerewolf, local | - | - |
+| wildhuntStartScript | global scripts | uses a function the interpreter lacks | started by WereChange2Script, WereChangeScript; started by 1 dialogue results | - | disableplayercontrols, fadein, fadeout, getjournalindex, getpcsleep, getsecondspassed, iswerewolf, journal, placeatpc, positioncell, stopscript, wakeuppc | 18: getjournalindex, getpcsleep, iswerewolf, local | - | 1 not carried out: positioncell |
 | artoriaScript | hirstaang forest region | only in an add-on world | 1 NPC; placed 1 (Bloodmoon 1); speaker of 14 dialogue results | gaea artoria | forcegreeting, getdistance, getjournalindex, ondeath, setfight, startcombat | 8: getdistance, getjournalindex, global, local, ondeath | - | placed only in an add-on world, not in the image yet |
 | bm_bloodskal_creatures | hirstaang forest region | only in an add-on world | 4 creature; placed 5 (Bloodmoon 5); levelled lists 3 | bm skeleton champion gr, bm_draugr_bloodskal, bm_sk_champ_bloodskal01, bm_sk_champ_bloodskal02 | disable, enable, getjournalindex | 3: getjournalindex, local | - | placed only in an add-on world, not in the image yet |
 | bm_bloodskal_sword | hirstaang forest region | only in an add-on world | 1 WEAP; placed 1 (Bloodmoon 1) | bm_nordic_silver_lgswd_bloodska | journal | 2: local | - | placed only in an add-on world, not in the image yet |
@@ -1353,7 +1367,7 @@ Referenced by: the records that carry the script and their placed references per
 | ColonyAlfbrand | hirstaang forest region | only in an add-on world | 1 NPC; placed 1 (Bloodmoon 1); speaker of 2 dialogue results | alfbrand | disable, enable, forcegreeting, getdeadcount, getdisabled, getjournalindex, journal, ondeath, setfight, startcombat | 18: getdeadcount, getdisabled, getjournalindex, global, local, ondeath, other script | - | placed only in an add-on world, not in the image yet |
 | ColonyAssassinItems | hirstaang forest region | only in an add-on world | 1 activator; placed 1 (Bloodmoon 1) | colony_assassin_act | disable, enable, getdisabled, getjournalindex, stopscript | 8: getdisabled, getjournalindex | - | placed only in an add-on world, not in the image yet |
 | ColonyAudmund | hirstaang forest region | only in an add-on world | 1 NPC; placed 1 (Bloodmoon 1); speaker of 2 dialogue results | audmund | disable, enable, forcegreeting, getdeadcount, getdisabled, getjournalindex, journal, ondeath, setfight, startcombat | 18: getdeadcount, getdisabled, getjournalindex, global, local, ondeath, other script | - | placed only in an add-on world, not in the image yet |
-| ColonyBaro | hirstaang forest region | uses a function the interpreter lacks | 1 NPC; placed 1 (Bloodmoon 1); speaker of 5 dialogue results | baro egnatius | disable, enable, getdisabled, getdistance, getjournalindex, getweapondrawn, getweapontype, hasitemequipped, journal, menumode, ondeath | 15: getdisabled, getdistance, getjournalindex, getweapondrawn, getweapontype, global, hasitemequipped, local, menumode, ondeath | - | 2 not carried out: getweapontype, hasitemequipped |
+| ColonyBaro | hirstaang forest region | uses a function the interpreter lacks | 1 NPC; placed 1 (Bloodmoon 1); speaker of 5 dialogue results | baro egnatius | disable, enable, getdisabled, getdistance, getjournalindex, getweapondrawn, getweapontype, hasitemequipped, journal, menumode, ondeath | 15: getdisabled, getdistance, getjournalindex, getweapondrawn, getweapontype, global, hasitemequipped, local, menumode, ondeath | - | 1 not carried out: getweapontype |
 | ColonyBaroShip | hirstaang forest region | only in an add-on world | 3 activator; placed 4 (Bloodmoon 4) | act_ex_de_ship_door_baro, ex_co_ship_baro, ex_co_ship_trapdoorb | disable, enable, getdisabled | 4: getdisabled | - | placed only in an add-on world, not in the image yet |
 | ColonyBryngrim | hirstaang forest region | only in an add-on world | 1 NPC; placed 1 (Bloodmoon 1); speaker of 2 dialogue results | bryngrim | disable, enable, forcegreeting, getdeadcount, getdisabled, getjournalindex, journal, ondeath, setfight, startcombat | 18: getdeadcount, getdisabled, getjournalindex, global, local, ondeath, other script | - | placed only in an add-on world, not in the image yet |
 | ColonyCarnius | hirstaang forest region | only in an add-on world | 1 NPC; placed 1 (Bloodmoon 1); speaker of 118 dialogue results | carnius magius | getdeadcount, getjournalindex, journal, ondeath | 8: getdeadcount, getjournalindex, local, ondeath, other script | - | placed only in an add-on world, not in the image yet |
@@ -1391,10 +1405,10 @@ Referenced by: the records that carry the script and their placed references per
 | ColonyServTrader | hirstaang forest region | only in an add-on world | 2 activator, 1 door; placed 2 (Bloodmoon 2) | ex_colony_sop01_2, ex_colony_sop02, ex_colony_door02_2 | disable, enable, getdisabled, stopscript | 4: getdisabled, global | - | placed only in an add-on world, not in the image yet |
 | ColonyServTraderConst | hirstaang forest region | only in an add-on world | 2 activator; placed 2 (Bloodmoon 2) | ex_colony_const_barn01_2_2t, ex_colony_const_house02_2t | disable, enable, getdisabled, stopscript | 6: getdisabled, global | - | placed only in an add-on world, not in the image yet |
 | ColonyServTraderDisable | hirstaang forest region | only in an add-on world | 4 activator; placed 5 (Bloodmoon 5) | colony flora_tree_bm_snow_01_t1, colony flora_tree_bm_snow_05_t1, colony terrain_rock_bm_59_t1, colony terrain_rock_bm_65_t1 | disable, getdisabled | 4: getdisabled, global | - | placed only in an add-on world, not in the image yet |
-| ColonySpriggan1 | hirstaang forest region | uses a function the interpreter lacks | 1 creature; placed 1 (Bloodmoon 1) | bm_spriggan_co1 | activate, disable, enable, getdisabled, getjournalindex, getpos, getsecondspassed, menumode, modhealth, modresistfire, modresistfrost, modresistmagicka, modresistparalysis, modresistpoison, onactivate, ondeath, placeitem, resurrect, setfight, setscale, startcombat | 23: getdisabled, getjournalindex, local, menumode, onactivate, ondeath | - | 2 not carried out: placeitem, setscale |
-| ColonySpriggan2 | hirstaang forest region | uses a function the interpreter lacks | 1 creature; placed 1 (Bloodmoon 1) | bm_spriggan_co2 | activate, disable, enable, getdisabled, getpos, getsecondspassed, menumode, modhealth, modresistfire, modresistfrost, modresistmagicka, modresistparalysis, modresistpoison, onactivate, ondeath, placeitem, resurrect, setfight, setscale, startcombat | 22: getdisabled, local, menumode, onactivate, ondeath, other script | - | 2 not carried out: placeitem, setscale |
-| ColonySpriggan3 | hirstaang forest region | uses a function the interpreter lacks | 1 creature; placed 1 (Bloodmoon 1) | bm_spriggan_co3 | activate, disable, enable, getdisabled, getpos, getsecondspassed, menumode, modhealth, modresistfire, modresistfrost, modresistmagicka, modresistparalysis, modresistpoison, onactivate, ondeath, placeitem, resurrect, setfight, setscale, startcombat | 22: getdisabled, local, menumode, onactivate, ondeath, other script | - | 2 not carried out: placeitem, setscale |
-| ColonySpriggan4 | hirstaang forest region | uses a function the interpreter lacks | 1 creature; placed 1 (Bloodmoon 1) | bm_spriggan_co4 | activate, disable, enable, getdisabled, getpos, getsecondspassed, journal, menumode, modhealth, modresistfire, modresistfrost, modresistmagicka, modresistparalysis, modresistpoison, onactivate, ondeath, placeitem, resurrect, setfight, setscale, startcombat | 26: getdisabled, local, menumode, onactivate, ondeath, other script | - | 2 not carried out: placeitem, setscale |
+| ColonySpriggan1 | hirstaang forest region | uses a function the interpreter lacks | 1 creature; placed 1 (Bloodmoon 1) | bm_spriggan_co1 | activate, disable, enable, getdisabled, getjournalindex, getpos, getsecondspassed, menumode, modhealth, modresistfire, modresistfrost, modresistmagicka, modresistparalysis, modresistpoison, onactivate, ondeath, placeitem, resurrect, setfight, setscale, startcombat | 23: getdisabled, getjournalindex, local, menumode, onactivate, ondeath | - | 1 not carried out: placeitem |
+| ColonySpriggan2 | hirstaang forest region | uses a function the interpreter lacks | 1 creature; placed 1 (Bloodmoon 1) | bm_spriggan_co2 | activate, disable, enable, getdisabled, getpos, getsecondspassed, menumode, modhealth, modresistfire, modresistfrost, modresistmagicka, modresistparalysis, modresistpoison, onactivate, ondeath, placeitem, resurrect, setfight, setscale, startcombat | 22: getdisabled, local, menumode, onactivate, ondeath, other script | - | 1 not carried out: placeitem |
+| ColonySpriggan3 | hirstaang forest region | uses a function the interpreter lacks | 1 creature; placed 1 (Bloodmoon 1) | bm_spriggan_co3 | activate, disable, enable, getdisabled, getpos, getsecondspassed, menumode, modhealth, modresistfire, modresistfrost, modresistmagicka, modresistparalysis, modresistpoison, onactivate, ondeath, placeitem, resurrect, setfight, setscale, startcombat | 22: getdisabled, local, menumode, onactivate, ondeath, other script | - | 1 not carried out: placeitem |
+| ColonySpriggan4 | hirstaang forest region | uses a function the interpreter lacks | 1 creature; placed 1 (Bloodmoon 1) | bm_spriggan_co4 | activate, disable, enable, getdisabled, getpos, getsecondspassed, journal, menumode, modhealth, modresistfire, modresistfrost, modresistmagicka, modresistparalysis, modresistpoison, onactivate, ondeath, placeitem, resurrect, setfight, setscale, startcombat | 26: getdisabled, local, menumode, onactivate, ondeath, other script | - | 1 not carried out: placeitem |
 | ColonyStalhrim | hirstaang forest region | only in an add-on world | 1 container; placed 26 (Bloodmoon 26) | contain_bm_stalhrim_01 | activate, getitemcount, getjournalindex, journal, messagebox, onactivate | 4: getitemcount, getjournalindex, onactivate | - | placed only in an add-on world, not in the image yet |
 | ColonyToralf | hirstaang forest region | only in an add-on world | 1 NPC; placed 1 (Bloodmoon 1); speaker of 4 dialogue results | toralf | disable, enable, forcegreeting, getdeadcount, getdisabled, getjournalindex, journal, ondeath | 16: getdeadcount, getdisabled, getjournalindex, global, local, ondeath | - | placed only in an add-on world, not in the image yet |
 | ColonyUnel | hirstaang forest region | only in an add-on world | 1 NPC; placed 1 (Bloodmoon 1); speaker of 7 dialogue results | unel lloran | aiwander, disable, enable, forcegreeting, getcurrentaipackage, getdisabled, getdistance, getjournalindex, journal | 7: getcurrentaipackage, getdisabled, getdistance, getjournalindex | - | placed only in an add-on world, not in the image yet |
@@ -1473,15 +1487,15 @@ Referenced by: the records that carry the script and their placed references per
 | stoneTreesScript | isinfier plains region | only in an add-on world | 1 activator; placed 1 (Bloodmoon 1) | act_bm_stone_tree_01 | enable, getjournalindex, journal, messagebox, onactivate | 8: getjournalindex, global, local, onactivate | - | placed only in an add-on world, not in the image yet |
 | ThormoorTeleport | isinfier plains region | only in an add-on world | 1 NPC; placed 1 (Bloodmoon 1); speaker of 6 dialogue results | thormoor gray-wave | disable, enable, getjournalindex, getpccell | 3: getjournalindex, getpccell | - | placed only in an add-on world, not in the image yet |
 | trackerScript | isinfier plains region | only in an add-on world | 1 activator; placed 1 (Bloodmoon 1) | active_bm_tracker1 | aifollow, aitravel, aiwander, forcegreeting, getaipackagedone, getdistance, getitemcount, getjournalindex, journal, placeatpc, playsound, sethealth, sethello | 43: getaipackagedone, getdistance, getitemcount, getjournalindex, global, local | - | placed only in an add-on world, not in the image yet |
-| treesprigScript | isinfier plains region | uses a function the interpreter lacks | 1 creature; placed 5 (Bloodmoon 5) | bm_spriggan_st_unique | activate, aiwander, disable, enable, getdisabled, getitemcount, getjournalindex, getpos, getsecondspassed, menumode, modhealth, modresistfire, modresistfrost, modresistmagicka, modresistparalysis, modresistpoison, onactivate, ondeath, placeitem, resurrect, setfight, setscale, stopcombat | 24: getdisabled, getitemcount, getjournalindex, local, menumode, onactivate, ondeath | - | 2 not carried out: placeitem, setscale |
+| treesprigScript | isinfier plains region | uses a function the interpreter lacks | 1 creature; placed 5 (Bloodmoon 5) | bm_spriggan_st_unique | activate, aiwander, disable, enable, getdisabled, getitemcount, getjournalindex, getpos, getsecondspassed, menumode, modhealth, modresistfire, modresistfrost, modresistmagicka, modresistparalysis, modresistpoison, onactivate, ondeath, placeitem, resurrect, setfight, setscale, stopcombat | 24: getdisabled, getitemcount, getjournalindex, local, menumode, onactivate, ondeath | - | 1 not carried out: placeitem |
 | treesriekScript | isinfier plains region | only in an add-on world | 1 creature; placed 1 (Bloodmoon 1) | bm_riekling_st_unique | disable, enable, getdisabled, getdistance, getitemcount, getjournalindex, journal | 8: getdisabled, getdistance, getitemcount, getjournalindex, local | - | placed only in an add-on world, not in the image yet |
 | ValbrandrDraugr | isinfier plains region | only in an add-on world | 1 creature; placed 1 (Bloodmoon 1) | draugr_valbrandr | gethealth, getjournalindex, hitonme, journal, ondeath | 6: getjournalindex, local, ondeath | - | placed only in an add-on world, not in the image yet |
-| weretrackerScript | isinfier plains region | uses a function the interpreter lacks | 1 activator; placed 1 (Bloodmoon 1) | active_bm_skaaltrackcentral | getdistance, getjournalindex, getsecondspassed, iswerewolf, placeatme | 15: getjournalindex, global, iswerewolf, local | - | 1 not carried out: iswerewolf |
+| weretrackerScript | isinfier plains region | only in an add-on world | 1 activator; placed 1 (Bloodmoon 1) | active_bm_skaaltrackcentral | getdistance, getjournalindex, getsecondspassed, iswerewolf, placeatme | 15: getjournalindex, global, iswerewolf, local | - | placed only in an add-on world, not in the image yet |
 | weretrackerStatScript | isinfier plains region | only in an add-on world | 3 NPC; placed 3 (Bloodmoon 3); placed by scripts (3 records) | skaal_tracker, skaal_tracker2, skaal_tracker3 | aitravel, disable, enable, getdisabled, getdistance, getjournalindex, journal, messagebox, ondeath, startcombat | 11: getdisabled, getdistance, getjournalindex, global, local, ondeath | - | placed only in an add-on world, not in the image yet |
 | WolfenderInnocent | isinfier plains region | only in an add-on world | 3 NPC; placed 1 (Bloodmoon 1) | wolfender_f_imperial, wolfender_f_nord, wolfgiver_f_nord | additem, disable, enable, getitemcount, getjournalindex, journal, modfatigue, modhealth, ondeath | 7: getitemcount, getjournalindex, local, ondeath | - | placed only in an add-on world, not in the image yet |
-| dulkScript | moesring mountains region | uses a function the interpreter lacks | 1 creature; placed 1 (Bloodmoon 1); speaker of 3 dialogue results | bm_riekling_dulk_unique | forcegreeting, getdistance, getjournalindex, iswerewolf | 7: getdistance, getjournalindex, iswerewolf, local | - | 1 not carried out: iswerewolf |
+| dulkScript | moesring mountains region | only in an add-on world | 1 creature; placed 1 (Bloodmoon 1); speaker of 3 dialogue results | bm_riekling_dulk_unique | forcegreeting, getdistance, getjournalindex, iswerewolf | 7: getdistance, getjournalindex, iswerewolf, local | - | placed only in an add-on world, not in the image yet |
 | HrothmundAxe | moesring mountains region | only in an add-on world | 1 activator; placed 1 (Bloodmoon 1) | act_bm_axe_hrothmund | cast, getjournalindex, journal, menumode, messagebox, onactivate | 8: getjournalindex, local, menumode, onactivate | - | placed only in an add-on world, not in the image yet |
-| karstaagdoor1Script | moesring mountains region | uses a function the interpreter lacks | 1 door; placed 1 (Bloodmoon 1) | bm_kartaag_door | activate, getjournalindex, iswerewolf, messagebox, onactivate | 3: getjournalindex, iswerewolf, onactivate | - | 1 not carried out: iswerewolf |
+| karstaagdoor1Script | moesring mountains region | only in an add-on world | 1 door; placed 1 (Bloodmoon 1) | bm_kartaag_door | activate, getjournalindex, iswerewolf, messagebox, onactivate | 3: getjournalindex, iswerewolf, onactivate | - | placed only in an add-on world, not in the image yet |
 | karstaagdoor2Script | moesring mountains region | only in an add-on world | 1 door; placed 1 (Bloodmoon 1) | bm_karstcav_door | activate, getdistance, getjournalindex, messagebox, onactivate | 5: getdistance, getjournalindex, global, onactivate, other script | - | placed only in an add-on world, not in the image yet |
 | karstaagentryScript | moesring mountains region | only in an add-on world | 1 activator; placed 1 (Bloodmoon 1) | active_bm_karstaag | getdistance, getjournalindex, journal | 3: getdistance, getjournalindex, local | - | placed only in an add-on world, not in the image yet |
 | karstaagtrollScript | moesring mountains region | only in an add-on world | 1 creature; placed 8 (Bloodmoon 8) | bm_icetroll_fg_uni | addspell, geteffect, getjournalindex, getspell, journal, ondeath, removespell | 17: geteffect, getjournalindex, getspell, global, local, ondeath | - | placed only in an add-on world, not in the image yet |
@@ -1521,45 +1535,45 @@ Referenced by: the records that carry the script and their placed references per
 | weretracker2Script | named by nothing | named by nothing | - | - | aitravel, getdistance, getjournalindex, journal, messagebox, ondeath, startcombat | 7: getdistance, getjournalindex, global, local, ondeath | - | nothing names it: it never runs in the original either |
 | WitchNoteScript | named by nothing | named by nothing | - | - | activate, getjournalindex, journal, onactivate | 5: getjournalindex, local, onactivate | - | nothing names it: it never runs in the original either |
 | WolfGiver | named by nothing | named by nothing | - | - | cellchanged, disable, getjournalindex | 2: cellchanged, getjournalindex | - | nothing names it: it never runs in the original either |
-| GlenmorilRing | records not placed | uses a function the interpreter lacks | 1 clothing; placed by scripts (1 records) | glenmoril_ring_bm | disable, explodespell, getsecondspassed, setdelete | 2: local | - | 1 not carried out: explodespell |
+| GlenmorilRing | records not placed | runs | 1 clothing; placed by scripts (1 records) | glenmoril_ring_bm | disable, explodespell, getsecondspassed, setdelete | 2: local | - | runs while the player carries one of its items |
 | hircinekey2Script | records not placed | runs | 2 item | key_hircine2, key_hircine3 | getitemcount, getjournalindex, journal | 3: getitemcount, getjournalindex, local | - | runs while the player carries one of its items |
 | hircinekeyScript | records not placed | runs | 1 item | key_hircine1 | getitemcount, getjournalindex, journal | 3: getitemcount, getjournalindex, local | - | runs while the player carries one of its items |
-| hircineringScript | records not placed | uses a function the interpreter lacks | 1 clothing | bm_ring_hircine | addspell, becomewerewolf, disableplayercontrols, enableplayercontrols, fadein, fadeout, getbuttonpressed, getsecondspassed, menumode, messagebox, playbink, removespell, setwerewolfacrobatics, undowerewolf | 32: global, local, menumode | - | 3 not carried out: becomewerewolf, setwerewolfacrobatics, undowerewolf |
-| HroldarRing | records not placed | uses a function the interpreter lacks | 1 clothing; placed by scripts (1 records) | hroldar_ring | disable, explodespell, getsecondspassed, setdelete | 2: local | - | 1 not carried out: explodespell |
+| hircineringScript | records not placed | runs | 1 clothing | bm_ring_hircine | addspell, becomewerewolf, disableplayercontrols, enableplayercontrols, fadein, fadeout, getbuttonpressed, getsecondspassed, menumode, messagebox, playbink, removespell, setwerewolfacrobatics, undowerewolf | 32: global, local, menumode | - | runs while the player carries one of its items |
+| HroldarRing | records not placed | runs | 1 clothing; placed by scripts (1 records) | hroldar_ring | disable, explodespell, getsecondspassed, setdelete | 2: local | - | runs while the player carries one of its items |
 | hunter2Script | records not placed | runs | 1 NPC; placed by scripts (1 records) | skaal_hunter | additem, aitravel, disable, getaipackagedone, getdistance, getitemcount, getjournalindex, journal, messagebox, ondeath, removeitem | 15: getaipackagedone, getdistance, getitemcount, getjournalindex, global, local, ondeath | - | runs on the object a script places |
 | Lycanthropycure | records not placed | runs | 1 book | sc_lycanthropycure | activate, getitemcount, getjournalindex, journal, messagebox, onactivate | 14: getitemcount, getjournalindex, global, local, onactivate | - | runs while the player carries one of its items |
 | SovngardeBook | records not placed | runs | 1 book | bk_sovngarde | activate, getjournalindex, journal, messagebox, onactivate | 7: getjournalindex, local, onactivate | - | runs while the player carries one of its items |
-| Spriggan | records not placed | uses a function the interpreter lacks | 1 creature; levelled lists 4 | bm_spriggan | activate, getpos, getsecondspassed, menumode, modhealth, modresistfire, modresistfrost, modresistmagicka, modresistparalysis, modresistpoison, onactivate, ondeath, placeitem, resurrect, setscale, startcombat | 17: local, menumode, onactivate, ondeath | - | 2 not carried out: placeitem, setscale |
+| Spriggan | records not placed | uses a function the interpreter lacks | 1 creature; levelled lists 4 | bm_spriggan | activate, getpos, getsecondspassed, menumode, modhealth, modresistfire, modresistfrost, modresistmagicka, modresistparalysis, modresistpoison, onactivate, ondeath, placeitem, resurrect, setscale, startcombat | 17: local, menumode, onactivate, ondeath | - | 1 not carried out: placeitem |
 | sprigganeffect | records not placed | only in an add-on world | 2 activator; placed by scripts of Bloodmoon (not made yet) | sprigganup, wildwerewolf | disable, getsecondspassed, loopgroup, menumode, setdelete | 5: local, menumode | - | made only by a script of an add-on world, not in the image yet |
 | stoneeffectbeastScript | records not placed | named by nothing | 1 activator | act_bm_stoneeffect_01 | disable, enable, getdisabled, getjournalindex | 4: getdisabled, getjournalindex | - | its records are never placed and nothing makes them: it never runs in the original either |
 | totemScript | records not placed | runs | 1 item | misc_bm_clawfang_unique | getitemcount, getjournalindex, getlevel, getpcsleep, journal, messagebox, placeatpc, wakeuppc | 9: getitemcount, getjournalindex, getlevel, getpcsleep, local | - | runs while the player carries one of its items |
-| UlfgarRing | records not placed | uses a function the interpreter lacks | 1 clothing; placed by scripts (1 records) | ulfgar_ring | disable, explodespell, getsecondspassed, setdelete | 2: local | - | 1 not carried out: explodespell |
-| wereBearhuntScript | records not placed | uses a function the interpreter lacks | 1 NPC; placed by scripts (1 records) | werewolf_bearhunt | becomewerewolf, ondeath | 2: local, ondeath | - | 1 not carried out: becomewerewolf |
+| UlfgarRing | records not placed | runs | 1 clothing; placed by scripts (1 records) | ulfgar_ring | disable, explodespell, getsecondspassed, setdelete | 2: local | - | runs while the player carries one of its items |
+| wereBearhuntScript | records not placed | runs | 1 NPC; placed by scripts (1 records) | werewolf_bearhunt | becomewerewolf, ondeath | 2: local, ondeath | - | runs on the object a script places |
 | wereeffectScript | records not placed | only in an add-on world | 3 activator; placed by scripts of Bloodmoon (not made yet) | bm_wereeffect, bm_wereeffect2, bm_wereeffect3 | disable, getsecondspassed, menumode, setdelete | 4: local, menumode | - | made only by a script of an add-on world, not in the image yet |
-| werewolf_connor | records not placed | uses a function the interpreter lacks | 1 NPC; levelled lists 1 | bm_werewolf_wildernessc | addspell, becomewerewolf, getpos, getsecondspassed, menumode, ondeath, placeitem, undowerewolf | 11: global, local, menumode, ondeath | - | 3 not carried out: becomewerewolf, placeitem, undowerewolf |
-| Werewolfwilderness | records not placed | uses a function the interpreter lacks | 9 NPC; levelled lists 9 | bm_werewolf_wild01, bm_werewolf_wild02, bm_werewolf_wild03, bm_werewolf_wild04, bm_werewolf_wild05, bm_werewolf_wild06 and 3 more | addspell, becomewerewolf, getpos, getsecondspassed, menumode, ondeath, placeitem, undowerewolf | 11: global, local, menumode, ondeath | - | 3 not carried out: becomewerewolf, placeitem, undowerewolf |
-| wildwereScript | records not placed | uses a function the interpreter lacks | 4 NPC; placed by scripts (4 records) | bm_werewolf_wildhunt, bm_werewolf_wildhunt2, bm_werewolf_wildhunt3, bm_werewolf_wildhunt4 | becomewerewolf, disable, getdisabled, getjournalindex | 3: getdisabled, getjournalindex, local | - | 1 not carried out: becomewerewolf |
+| werewolf_connor | records not placed | uses a function the interpreter lacks | 1 NPC; levelled lists 1 | bm_werewolf_wildernessc | addspell, becomewerewolf, getpos, getsecondspassed, menumode, ondeath, placeitem, undowerewolf | 11: global, local, menumode, ondeath | - | 1 not carried out: placeitem |
+| Werewolfwilderness | records not placed | uses a function the interpreter lacks | 9 NPC; levelled lists 9 | bm_werewolf_wild01, bm_werewolf_wild02, bm_werewolf_wild03, bm_werewolf_wild04, bm_werewolf_wild05, bm_werewolf_wild06 and 3 more | addspell, becomewerewolf, getpos, getsecondspassed, menumode, ondeath, placeitem, undowerewolf | 11: global, local, menumode, ondeath | - | 1 not carried out: placeitem |
+| wildwereScript | records not placed | runs | 4 NPC; placed by scripts (4 records) | bm_werewolf_wildhunt, bm_werewolf_wildhunt2, bm_werewolf_wildhunt3, bm_werewolf_wildhunt4 | becomewerewolf, disable, getdisabled, getjournalindex | 3: getdisabled, getjournalindex, local | - | runs on the object a script places |
 | WolfInnocent | records not placed | named by nothing | 1 creature | bm_werewolf_ritual | disable, enable, getjournalindex, journal, ondeath | 3: getjournalindex, ondeath | - | its records are never placed and nothing makes them: it never runs in the original either |
-| WolfRitualRing | records not placed | uses a function the interpreter lacks | 1 clothing; placed by scripts (1 records) | ritual_ring | disable, explodespell, getsecondspassed, setdelete | 2: local | - | 1 not carried out: explodespell |
+| WolfRitualRing | records not placed | runs | 1 clothing; placed by scripts (1 records) | ritual_ring | disable, explodespell, getsecondspassed, setdelete | 2: local | - | runs while the player carries one of its items |
 | DagothUrCreature1 | red mountain region | runs | 1 creature; placed 1 (Morrowind 1); speaker of 29 dialogue results | dagoth_ur_1 | disable, enable, getdisabled, getdistance, getitemcount, getsecondspassed, menumode, ondeath, playgroup, playsound3d, rotate, say | 12: getdisabled, getdistance, getitemcount, local, menumode, ondeath | - | - |
 | enable_teleport | red mountain region | only in an add-on world | 1 activator; placed 2 (Tribunal 1, Bloodmoon 1) | teleport_enabler | enableteleporting | - | - | placed only in an add-on world, not in the image yet |
 | LorkhanHeart | red mountain region | runs | 1 creature; placed 1 (Morrowind 1) | heart_akulakhan | cellchanged, disable, getdistance, getsoundplaying, hitonme, menumode, playgroup, playloopsound3d, positioncell, say, setfight, sethealth, startcombat, stopsound | 32: cellchanged, getdistance, getsoundplaying, global, local, menumode | - | - |
 | aspect1Script | solstheim (bloodmoon) | uses a function the interpreter lacks | 1 creature; placed 1 (Bloodmoon 1) | bm_hircine_straspect | disable, getangle, getitemcount, getjournalindex, getpos, getsecondspassed, journal, menumode, ondeath, placeitem | 7: getitemcount, getjournalindex, local, menumode, ondeath | - | 1 not carried out: placeitem |
 | aspect2Script | solstheim (bloodmoon) | uses a function the interpreter lacks | 1 creature; placed 1 (Bloodmoon 1) | bm_hircine_spdaspect | disable, getangle, getitemcount, getjournalindex, getpos, getsecondspassed, journal, menumode, ondeath, placeitem | 7: getitemcount, getjournalindex, local, menumode, ondeath | - | 1 not carried out: placeitem |
 | aspect3Script | solstheim (bloodmoon) | uses a function the interpreter lacks | 1 creature; placed 1 (Bloodmoon 1) | bm_hircine_huntaspect | disable, getangle, getitemcount, getjournalindex, getpos, getsecondspassed, journal, menumode, ondeath, placeitem | 7: getitemcount, getjournalindex, local, menumode, ondeath | - | 1 not carried out: placeitem |
-| cariushuntScript | solstheim (bloodmoon) | uses a function the interpreter lacks | 1 NPC; placed 1 (Bloodmoon 1); speaker of 5 dialogue results | falx carius2 | aiwander, forcegreeting, getcurrentaipackage, getdistance, getjournalindex, getsecondspassed, iswerewolf, journal, ondeath | 17: getcurrentaipackage, getdistance, getjournalindex, iswerewolf, local, ondeath | - | 1 not carried out: iswerewolf |
+| cariushuntScript | solstheim (bloodmoon) | only in an add-on world | 1 NPC; placed 1 (Bloodmoon 1); speaker of 5 dialogue results | falx carius2 | aiwander, forcegreeting, getcurrentaipackage, getdistance, getjournalindex, getsecondspassed, iswerewolf, journal, ondeath | 17: getcurrentaipackage, getdistance, getjournalindex, iswerewolf, local, ondeath | - | placed only in an add-on world, not in the image yet |
 | giantScript | solstheim (bloodmoon) | only in an add-on world | 1 creature; placed 1 (Bloodmoon 1) | bm_frost_giant | addspell, getdistance, geteffect, getjournalindex, journal, ondeath, removespell | 13: getdistance, geteffect, getjournalindex, local, ondeath | - | placed only in an add-on world, not in the image yet |
-| heartfanghuntScript | solstheim (bloodmoon) | uses a function the interpreter lacks | 1 NPC; placed 1 (Bloodmoon 1); speaker of 6 dialogue results | tharsten heart-fang2 | additem, becomewerewolf, forcegreeting, getangle, getdistance, getjournalindex, getpos, getsecondspassed, gettarget, iswerewolf, journal, menumode, messagebox, ondeath, placeitem, setfight, startcombat, stopcombat | 19: getdistance, getjournalindex, gettarget, iswerewolf, local, menumode, ondeath | - | 3 not carried out: becomewerewolf, iswerewolf, placeitem |
+| heartfanghuntScript | solstheim (bloodmoon) | uses a function the interpreter lacks | 1 NPC; placed 1 (Bloodmoon 1); speaker of 6 dialogue results | tharsten heart-fang2 | additem, becomewerewolf, forcegreeting, getangle, getdistance, getjournalindex, getpos, getsecondspassed, gettarget, iswerewolf, journal, menumode, messagebox, ondeath, placeitem, setfight, startcombat, stopcombat | 19: getdistance, getjournalindex, gettarget, iswerewolf, local, menumode, ondeath | - | 1 not carried out: placeitem |
 | hircine1Script | solstheim (bloodmoon) | uses a function the interpreter lacks | 1 creature; placed 1 (Bloodmoon 1) | bm_hircine | disable, disableplayercontrols, enable, enableplayercontrols, getangle, getpos, getsecondspassed, journal, placeitem, say, saydone, startscript | 9: local, saydone | - | 1 not carried out: placeitem |
 | hircine2Script | solstheim (bloodmoon) | uses a function the interpreter lacks | 1 creature; placed 1 (Bloodmoon 1) | bm_hircine2 | disable, disableplayercontrols, enable, enableplayercontrols, getangle, getbuttonpressed, getdisabled, getdistance, getjournalindex, getpos, getsecondspassed, journal, messagebox, placeitem, say, saydone | 30: getdisabled, getdistance, getjournalindex, local, saydone | - | 1 not carried out: placeitem |
 | hircinechestScript | solstheim (bloodmoon) | only in an add-on world | 1 container; placed 1 (Bloodmoon 1) | com_chest_01_hircine2 | activate, onactivate | 2: onactivate, other script | - | placed only in an add-on world, not in the image yet |
-| mazegate1Script | solstheim (bloodmoon) | uses a function the interpreter lacks | 1 door; placed 1 (Bloodmoon 1) | bm_mazegate_01 | activate, getitemcount, iswerewolf, messagebox, onactivate | 3: getitemcount, iswerewolf, onactivate | - | 1 not carried out: iswerewolf |
-| mazegate2Script | solstheim (bloodmoon) | uses a function the interpreter lacks | 1 door; placed 1 (Bloodmoon 1) | bm_mazegate_02 | activate, getitemcount, iswerewolf, messagebox, onactivate | 3: getitemcount, iswerewolf, onactivate | - | 1 not carried out: iswerewolf |
-| mazegate3Script | solstheim (bloodmoon) | uses a function the interpreter lacks | 1 door; placed 1 (Bloodmoon 1) | bm_mazegate_03 | disable, enable, getdeadcount, getitemcount, getjournalindex, iswerewolf, journal, messagebox, onactivate, playbink, positioncell | 8: getdeadcount, getitemcount, getjournalindex, iswerewolf, local, onactivate | - | 1 not carried out: iswerewolf |
+| mazegate1Script | solstheim (bloodmoon) | only in an add-on world | 1 door; placed 1 (Bloodmoon 1) | bm_mazegate_01 | activate, getitemcount, iswerewolf, messagebox, onactivate | 3: getitemcount, iswerewolf, onactivate | - | placed only in an add-on world, not in the image yet |
+| mazegate2Script | solstheim (bloodmoon) | only in an add-on world | 1 door; placed 1 (Bloodmoon 1) | bm_mazegate_02 | activate, getitemcount, iswerewolf, messagebox, onactivate | 3: getitemcount, iswerewolf, onactivate | - | placed only in an add-on world, not in the image yet |
+| mazegate3Script | solstheim (bloodmoon) | only in an add-on world | 1 door; placed 1 (Bloodmoon 1) | bm_mazegate_03 | disable, enable, getdeadcount, getitemcount, getjournalindex, iswerewolf, journal, messagebox, onactivate, playbink, positioncell | 8: getdeadcount, getitemcount, getjournalindex, iswerewolf, local, onactivate | - | placed only in an add-on world, not in the image yet |
 | ringdoorScript | solstheim (bloodmoon) | only in an add-on world | 1 door; placed 1 (Bloodmoon 1) | ex_bm_ringdoor | messagebox, onactivate | 1: onactivate | - | placed only in an add-on world, not in the image yet |
-| weremazeScript | solstheim (bloodmoon) | uses a function the interpreter lacks | 1 NPC; placed 31 (Bloodmoon 31); placed by scripts (1 records) | bm_werewolf_maze1 | becomewerewolf | 1: local | - | 1 not carried out: becomewerewolf |
-| werestatue1Script | solstheim (bloodmoon) | uses a function the interpreter lacks | 1 activator; placed 4 (Bloodmoon 4) | act_werewolf_statue_1 | disable, getangle, getdistance, getitemcount, getpos, iswerewolf, placeitem | 4: getdistance, getitemcount, iswerewolf, local | - | 2 not carried out: iswerewolf, placeitem |
-| werestatue2Script | solstheim (bloodmoon) | uses a function the interpreter lacks | 1 activator; placed 5 (Bloodmoon 5) | act_werewolf_statue_2 | disable, getangle, getdistance, getitemcount, getpos, iswerewolf, placeitem | 4: getdistance, getitemcount, iswerewolf, local | - | 2 not carried out: iswerewolf, placeitem |
+| weremazeScript | solstheim (bloodmoon) | only in an add-on world | 1 NPC; placed 31 (Bloodmoon 31); placed by scripts (1 records) | bm_werewolf_maze1 | becomewerewolf | 1: local | - | placed only in an add-on world, not in the image yet |
+| werestatue1Script | solstheim (bloodmoon) | uses a function the interpreter lacks | 1 activator; placed 4 (Bloodmoon 4) | act_werewolf_statue_1 | disable, getangle, getdistance, getitemcount, getpos, iswerewolf, placeitem | 4: getdistance, getitemcount, iswerewolf, local | - | 1 not carried out: placeitem |
+| werestatue2Script | solstheim (bloodmoon) | uses a function the interpreter lacks | 1 activator; placed 5 (Bloodmoon 5) | act_werewolf_statue_2 | disable, getangle, getdistance, getitemcount, getpos, iswerewolf, placeitem | 4: getdistance, getitemcount, iswerewolf, local | - | 1 not carried out: placeitem |
 | BrynjolfrScript | thirsk region | only in an add-on world | 1 NPC; placed 1 (Bloodmoon 1); speaker of 42 dialogue results | brynjolfr | - | 1: global, local | - | placed only in an add-on world, not in the image yet |
 | ErichScript | thirsk region | only in an add-on world | 1 NPC; placed 1 (Bloodmoon 1); speaker of 4 dialogue results | erich the unworthy | disable, forcegreeting, getdistance, getjournalindex, journal, ondeath, sethealth | 8: getdistance, getjournalindex, local, ondeath | - | placed only in an add-on world, not in the image yet |
 | GrissSkull | thirsk region | only in an add-on world | 1 activator; placed 1 (Bloodmoon 1) | bm_griss_skull | disable, getjournalindex | 1: getjournalindex | - | placed only in an add-on world, not in the image yet |

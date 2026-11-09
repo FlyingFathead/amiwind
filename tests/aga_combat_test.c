@@ -20,6 +20,7 @@ unsigned long aw_sv_move_calls;aw_character_t aw_character;
 /* the hooks live beside their callers (aw_ui.c, aw_scene.c) */
 int (*aw_combat_enemy_bar)(float *,float *);void (*aw_combat_scene)(void);int (*aw_combat_input_locked)(void);
 int (*aw_combat_buttons)(int);int (*aw_combat_guard_marker)(void);   /* cl_input.c, aw_ui.c */
+void (*aw_defaults_migrate)(int level);                                /* aw_fog.c: the saved configuration's defaults level */
 /* aw_items.c (carried weapon/shield entities; its own fixture aga_items_test.c): counted here. */
 #include "aw_items.h"
 static int items_shown,items_hidden;
@@ -184,6 +185,7 @@ int main(void){
         "iBlockMinChance 10\niBlockMaxChance 50\nfSwingBlockBase 1\nfSwingBlockMult 1\nfBlockStillBonus 1.25\n"
         "fFatigueBlockBase 4\nfFatigueBlockMult 0\nfWeaponFatigueBlockMult 1\nfCombatBlockLeftAngle -90\n"
         "fCombatBlockRightAngle 30\nfCombatDelayNPC 0.1\nfNPCHealthBarTime 3\nfNPCHealthBarFade 0.5\nfWeaponDamageMult 0.1\n"
+        "fCombatAngleXY 60\nfCombatAngleZ 60\nfCombatInvisoMult 0.2\n"
         "anim knockdown 2.667\nanim block 1.333 0.25\n"
         "sound health combat/health.wav\nsound miss combat/miss.wav\nsound ../bad x\n");
     write_actors();
@@ -202,7 +204,7 @@ int main(void){
     *resident=*npc;resident->v.origin[1]=500;resident->v.netname=add_string("A Guard");
     fields[3][3].string=add_string("a guard");
     AW_CombatInit();aw_combat_result=result;aw_combat_voice=bark;
-    assert(aw_combat_enemy_bar && aw_combat_scene);
+    assert(aw_combat_enemy_bar && aw_combat_scene && aw_defaults_migrate==AW_CombatDefaultsMigrate);
 
     /* data files */
     assert(AW_CombatSettingsLoad() && aw_combat_settings.fNPCHealthBarTime==3);
@@ -272,6 +274,30 @@ int main(void){
     fields[1][0]._float=2;
     tick(120);assert(aw_combat_enemy_bar(&fraction,&alpha) && alpha<1 && alpha>0);
     tick(20);assert(!aw_combat_enemy_bar(&fraction,&alpha));
+    /* ENEMY-HEALTH-BAR-62: the crosshair's ray meets nobody (a flyer or a small creature beside the crosshair); the
+     * swing takes the fighter in the original's hit cone, and the bar shows its health share from that first swing */
+    {int contacts=AW_CombatStats()->player_contacts,swings;const aw_fighter_t *foe=AW_CombatFighter(npc);
+     target=NULL;p->v.v_angle[1]=npc->v.origin[0]<p->v.origin[0]?180:0;
+     p->v.button0=1;tick(1);fields[1][0]._float=3;fields[1][1]._float=(float)sv.time;p->v.button0=0;tick(50);fields[1][0]._float=2;
+     assert(AW_CombatStats()->player_contacts==contacts+1);
+     assert(aw_combat_enemy_bar(&fraction,&alpha) && alpha==1 && foe && fabsf(fraction-foe->health/foe->health_max)<.001f);
+     tick(160);assert(!aw_combat_enemy_bar(&fraction,&alpha));       /* gone after fNPCHealthBarTime */
+     /* facing away: no contact, no bar */
+     p->v.v_angle[1]+=180;swings=AW_CombatStats()->player_swings;
+     p->v.button0=1;tick(1);fields[1][0]._float=3;fields[1][1]._float=(float)sv.time;p->v.button0=0;tick(50);fields[1][0]._float=2;
+     assert(AW_CombatStats()->player_swings==swings+1 && AW_CombatStats()->player_contacts==contacts+1 && !aw_combat_enemy_bar(&fraction,&alpha));
+     /* dbg combat contact off: the ray alone (the earlier rule) */
+     p->v.v_angle[1]-=180;run("aw_combat_cmd contact off");
+     p->v.button0=1;tick(1);fields[1][0]._float=3;fields[1][1]._float=(float)sv.time;p->v.button0=0;tick(50);fields[1][0]._float=2;
+     assert(AW_CombatStats()->player_contacts==contacts+1 && !aw_combat_enemy_bar(&fraction,&alpha));
+     run("aw_combat_cmd contact on");p->v.v_angle[1]=0;target=npc;}
+    /* BEST-ATTACK-OPTION-62: on by default; a configuration from before level 2 takes it once */
+    {int i,found=0;
+     for(i=0;i<cvar_count;i++)if(!strcmp(cvars[i]->name,"aw_combat_best_attack")){found=1;assert(!strcmp(cvars[i]->string,"1"));
+         Cvar_SetValue("aw_combat_best_attack",0);AW_CombatDefaultsMigrate(1);assert(cvars[i]->value==1);
+         Cvar_SetValue("aw_combat_best_attack",0);AW_CombatDefaultsMigrate(2);assert(cvars[i]->value==0);
+         run("aw_combat_cmd bestattack on");assert(cvars[i]->value==1);}
+     assert(found);}
 
     /* the opponent dies: result won, explore music again */
     sheet=AW_CombatFighter(npc);assert(sheet);

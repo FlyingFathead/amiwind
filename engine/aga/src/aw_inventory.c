@@ -1387,18 +1387,29 @@ static int inv_support(const float low[3],const float high[3]){
 /* CELL-CHANGES-59: on a streamed (CHIM) map the hull query below sees only the frame's own BSP, not the streamed
  * ground and models (DROP-CHIM-REFUSED-59); there the footprint is checked with point traces, which see all of it
  * (SV_Move): under each bottom corner of the item and its centre dry, walkable ground within a few units, and no
- * corner starting inside something solid (a wall, a crate). */
+ * corner starting inside something solid (a wall, a crate).
+ * DROP-ROOM-BRUSH-ENTITY-59 (v0.0.63): the original and OpenMW (World::dropObjectOnGround) drop an item on the ground
+ * under the drop point and never refuse it for an uneven floor; tomb and cave floors (Andrano Ancestral Tomb) failed
+ * the every-corner rule. Now only the centre needs dry, walkable ground; the corners are no longer a refusal. */
 static int inv_trace_support(const float position[3],const float mins[3],const float maxs[3],edict_t *p){
-    int corner;vec3_t start,end;trace_t tr;float bottom=position[2]+mins[2];
-    for(corner=0;corner<5;corner++){
-        start[0]=position[0]+(corner==4?0:(corner&1)?maxs[0]:mins[0]);
-        start[1]=position[1]+(corner==4?0:(corner&2)?maxs[1]:mins[1]);
-        start[2]=bottom+8;VectorCopy(start,end);end[2]=bottom-6;
-        tr=SV_Move(start,vec3_origin,vec3_origin,end,MOVE_NORMAL,p);
-        if(tr.startsolid || tr.allsolid || tr.fraction>=1 || tr.plane.normal[2]<.69f ||
-           SV_PointContents(tr.endpos)<=CONTENTS_WATER)return 0;
-    }
+    vec3_t start,end;trace_t tr;float bottom=position[2]+mins[2];
+    (void)maxs;
+    VectorCopy(position,start);start[2]=bottom+8;VectorCopy(start,end);end[2]=bottom-6;
+    tr=SV_Move(start,vec3_origin,vec3_origin,end,MOVE_NORMAL,p);
+    if(tr.startsolid || tr.allsolid || tr.fraction>=1 || tr.plane.normal[2]<.69f ||
+       SV_PointContents(tr.endpos)<=CONTENTS_WATER)return 0;
     return 1;
+}
+/* DROP-ROOM-BRUSH-ENTITY-59: when the spot ahead fails, the item goes on the floor under the player, as OpenMW does
+ * (dropObjectOnGround uses the actor's own position). POSITION gets the ground point raised by -MINS[2]. */
+static int inv_feet_drop(edict_t *p,const float mins[3],const float maxs[3],float position[3]){
+    vec3_t start,end;trace_t tr;
+    VectorCopy(p->v.origin,start);VectorCopy(start,end);end[2]-=256;
+    tr=SV_Move(start,vec3_origin,vec3_origin,end,MOVE_NORMAL,p);
+    if(tr.startsolid || tr.allsolid || tr.fraction>=1 || tr.plane.normal[2]<.69f ||
+       SV_PointContents(tr.endpos)<=CONTENTS_WATER)return 0;
+    VectorCopy(tr.endpos,position);position[2]-=mins[2];position[2]+=.0625f;
+    return inv_trace_support(position,mins,maxs,p);
 }
 int AW_InventoryDropHere(const aw_inventory_item_t *item,int32_t count){
     edict_t *p,*e;trace_t tr;vec3_t forward,right,up,eye,start,end,position,mins,maxs,low,high,swept_low,swept_high,point;
@@ -1456,7 +1467,7 @@ int AW_InventoryDropHere(const aw_inventory_item_t *item,int32_t count){
      * Census Office floor), so with the world change list a room is checked by the same point traces */
     if(chim || aw_ledger_on){
         drop_reason="Item footprint unsupported; kept.";
-        if(!inv_trace_support(position,mins,maxs,p))return 0;
+        if(!inv_trace_support(position,mins,maxs,p) && !inv_feet_drop(p,mins,maxs,position))return 0;
     }else{
     drop_reason="Item path or footprint obstructed; kept.";
     if(!inv_space_clear(swept_low,swept_high,p) || !inv_space_clear(low,high,p))return 0;
@@ -2962,6 +2973,7 @@ int AW_PlacedLocal(int at,int32_t where,const float *game,float *local){
 int (*aw_placed_begin)(void);
 int (*aw_placed_admit)(unsigned reference,const char *stem,const float local[3],const float angles[3],float scale);
 float (*aw_placed_ray)(int drawn,const float *eye,const float *dir);
+float (*aw_room_ray)(unsigned reference,const float *eye,const float *dir);
 /* What the last read of the list saw (aw_placed status): keys read, rows, rows without an item row in the focus table,
  * rows the map draws itself, rows outside this map, rows offered. */
 static int placed_seen[6];
@@ -3177,6 +3189,16 @@ static int placed_target(void){
             VectorMA(eye,hit,f,at);
             tr=SV_Move(eye,vec3_origin,vec3_origin,at,MOVE_NOMONSTERS,p);
             if(tr.fraction<1 && (1-tr.fraction)*hit>6)continue;        /* something in front of the item */
+            nearest=hit;best=i;continue;
+        }
+        /* ROOM-OBJECTS-MISSING-62: a room's container is aimed at where the view ray meets its drawn placement box
+         * (the 6-unit test at its reference point missed most urns and sacks), with the same clear line to that point */
+        if(row->kind=='C' && !focus_outdoor && aw_room_ray && length<=(reach+64)*(reach+64) &&
+           (hit=aw_room_ray(row->reference,eye,f))>=0){
+            if(hit>nearest)continue;
+            VectorMA(eye,hit,f,at);
+            tr=SV_Move(eye,vec3_origin,vec3_origin,at,MOVE_NOMONSTERS,p);
+            if(tr.fraction<1 && (1-tr.fraction)*hit>6)continue;        /* a wall in front of the container */
             nearest=hit;best=i;continue;
         }
         VectorAdd(row->at,shift,at);along=DotProduct(delta,f);

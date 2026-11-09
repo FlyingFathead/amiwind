@@ -1123,6 +1123,15 @@
       "to": "table",
       "source": "tools/room_levelled.py, tools/chim/actors.py room_placed_creatures (TOMB-NO-CREATURES-61)",
       "note": "Every creature placed in a converted room gets a list of one in the actor table, a model in the actor library and an aw_levelled entity in its room map, spawned by the engine from its table base as the outdoor creatures are; off = none of these, the rooms before (only the creatures config/interior_creatures.json lists)"
+    },
+    {
+      "version": "0.0.63-dev1",
+      "option": "shared_shapes",
+      "flag": "--shared-shapes",
+      "change": "added",
+      "to": "on",
+      "source": "tools/payload_share.py (IMAGE-BIGGER-THAN-ORIGINAL-62)",
+      "note": "The texture coordinates and triangles several actor models repeat are stored once in progs/shapes/ and the engine rebuilds each model byte for byte before decoding (docs/PAYLOAD_SHARING.md; about 78 MB less on the v0.0.62 payload); off keeps both blocks in every model (the method before)"
     }
   ],
   "current": {
@@ -1285,6 +1294,7 @@
       "seyda_entities": "list",
       "seyda_recorded": null,
       "seyda_scene_source": "auto",
+      "shared_shapes": "on",
       "shared_skins": "on",
       "shared_sky_source": null,
       "skip_census": null,

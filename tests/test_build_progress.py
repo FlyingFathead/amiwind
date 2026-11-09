@@ -482,12 +482,12 @@ class WorkMeasureTests(unittest.TestCase):
     runs and ran 1 h 48 min; the progress said 27 %, about 22 minutes left."""
     CELLS = [f'{x},{y}:l' for x in range(-5, 5) for y in range(27)]   # 270 region cells
 
-    def history(self, workspace, with_commands=True):
+    def history(self, workspace, with_commands=True, cells=()):
         for name, wall in (('a', 150), ('b', 154), ('c', 160)):
             write_profile(workspace / name, [('setup', 1, 1, 1), ('chim', wall, wall * 4, 8)])
             if with_commands:
                 (workspace / name / 'build-state.json').write_text(json.dumps(
-                    {'steps': [{'name': 'chim', 'command': chim_command()}]}), encoding='utf-8')
+                    {'steps': [{'name': 'chim', 'command': chim_command(cells=cells)}]}), encoding='utf-8')
         current = workspace / 'now'
         current.mkdir()
         return build_progress.history_samples(current)[0]
@@ -505,21 +505,55 @@ class WorkMeasureTests(unittest.TestCase):
         self.assertIsNone(build_progress.work_measure('image', chim_command()))
         self.assertIsNone(build_progress.work_measure('chim', None))
 
-    def test_history_is_scaled_by_the_frames_of_this_build(self):
+    def test_history_of_about_this_size_is_scaled_by_the_frames_of_this_build(self):
         with tempfile.TemporaryDirectory() as temp:
             samples = self.history(Path(temp))
         self.assertEqual([row['work'] for row in samples['chim']], [3, 3, 3])
-        expected = build_progress.expected_durations(['setup', 'chim'], 8, samples, work={'chim': ('frames', 273)})
-        self.assertAlmostEqual(expected['chim']['seconds'], 154 * 273 / 3, delta=0.1)
-        self.assertIn('scaled by frames: 273 here, 3', expected['chim']['basis'])
-        self.assertEqual(expected['setup']['basis'], 'history (3 run(s))')
+        self.assertEqual(build_progress.expected_durations(['setup'], 8, samples)['setup']['basis'],
+                         'history (3 run(s))')
         same = build_progress.expected_durations(['chim'], 8, samples, work={'chim': ('frames', 4)})
         self.assertAlmostEqual(same['chim']['seconds'], 154 * 4 / 3, delta=0.1)
         self.assertTrue(same['chim']['basis'].startswith('history (3 run(s), 3 frames there'))
-        # 22 minutes into a stage now expected at about 3.9 hours: no "about 22 minutes left".
-        result = self.running(expected)
-        self.assertGreater(result['eta_seconds'], 3 * 3600)
-        self.assertFalse(result['eta_lower_bound'])
+
+    def test_small_runs_are_never_scaled_up_to_a_big_build(self):
+        """BUILD-ETA-FRAME-SCALING-63: one-frame test builds scaled by 1,351 frames put the v0.0.62 final's chim
+        stage at 34 hours; it took about 48 minutes. Small history says "no comparable history" instead."""
+        with tempfile.TemporaryDirectory() as temp:
+            samples = self.history(Path(temp))
+        expected = build_progress.expected_durations(['setup', 'chim'], 8, samples, work={'chim': ('frames', 273)})
+        self.assertIsNone(expected['chim']['seconds'])
+        self.assertEqual(expected['chim']['source'], build_progress.NO_COMPARABLE)
+        self.assertIn('273 frames here, at most 3 in 3 earlier run(s), never scaled up', expected['chim']['basis'])
+        self.assertTrue(self.running(expected)['eta_lower_bound'])
+
+    def test_bigger_runs_are_scaled_down(self):
+        with tempfile.TemporaryDirectory() as temp:
+            samples = self.history(Path(temp), cells=self.CELLS)
+        expected = build_progress.expected_durations(['chim'], 8, samples, work={'chim': ('frames', 3)})
+        self.assertAlmostEqual(expected['chim']['seconds'], 154 * 3 / 273, delta=0.1)
+        self.assertIn('scaled by frames: 3 here, 273', expected['chim']['basis'])
+
+    def test_a_full_build_behind_many_test_builds_is_found(self):
+        """The full build's own stage seconds are the basis, even with more than HISTORY_RUNS small runs after it."""
+        with tempfile.TemporaryDirectory() as temp:
+            workspace = Path(temp)
+            write_profile(workspace / 'full', [('setup', 1, 1, 1), ('chim', 2880, 2880 * 20, 24)], budget=24)
+            (workspace / 'full' / 'build-state.json').write_text(json.dumps(
+                {'steps': [{'name': 'chim', 'command': chim_command(cells=self.CELLS)}]}), encoding='utf-8')
+            old = time.time() - 3600
+            os.utime(workspace / 'full' / build_progress.PROFILE_NAME, (old, old))
+            for index in range(build_progress.HISTORY_RUNS + 2):
+                small = workspace / f'mini{index:02d}'
+                write_profile(small, [('setup', 1, 1, 1), ('chim', 60, 240, 8)])
+                (small / 'build-state.json').write_text(json.dumps(
+                    {'steps': [{'name': 'chim', 'command': chim_command(areas=('balmora',))}]}), encoding='utf-8')
+            current = workspace / 'now'
+            current.mkdir()
+            samples, _ = build_progress.history_samples(current)
+        self.assertEqual(len(samples['setup']), build_progress.HISTORY_RUNS)
+        expected = build_progress.expected_durations(['chim'], 24, samples, work={'chim': ('frames', 273)})
+        self.assertAlmostEqual(expected['chim']['seconds'], 2880, delta=1)
+        self.assertTrue(expected['chim']['basis'].startswith('history (1 run(s), 273 frames there'))
 
     def test_no_comparable_history_is_said_not_guessed(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -540,7 +574,7 @@ class WorkMeasureTests(unittest.TestCase):
     def test_progress_record_and_status_show_the_basis(self):
         with tempfile.TemporaryDirectory() as temp:
             workspace = Path(temp)
-            self.history(workspace)
+            self.history(workspace, cells=self.CELLS[:136])     # 139 frames there, 273 here: about this size
             run = workspace / 'now'
             tracker = build_progress.Tracker(run, ['setup', 'chim'], {'chim': ['setup']}, {'compiler_jobs': 8},
                                              interval=3600, commands={'chim': chim_command(cells=self.CELLS)})
@@ -551,10 +585,45 @@ class WorkMeasureTests(unittest.TestCase):
                 tracker.close('cancelled')
         row = next(row for row in record['stages'] if row['name'] == 'chim')
         self.assertEqual(row['work'], 273)
-        self.assertIn('scaled by frames', row['expected_basis'])
-        self.assertAlmostEqual(row['expected_seconds'], 154 * 91, delta=1)
+        self.assertIn('history (3 run(s), 139 frames there, 273 here)', row['expected_basis'])
+        self.assertAlmostEqual(row['expected_seconds'], 154 * 273 / 139, delta=1)
         text = '\n'.join(build_progress.status_lines(record, now=time.time()))
-        self.assertIn('scaled by frames: 273 here', text)
+        self.assertIn('Expected durations from 3 earlier run(s)', text)
+        self.assertNotIn('scaled', text)
+
+
+class UnitCounterTests(unittest.TestCase):
+    """[done/total] of the unit stores' lines and of the pool maps reach build-progress.json for the Monitor."""
+
+    def test_unit_store_lines_are_counted_with_the_slowest_unit(self):
+        import unit_store
+        lines = ['Residents [3/10] cached, 7 to make',
+                 unit_store.progress_line('Residents', 4, 10, 'caius cosades', 75),
+                 unit_store.progress_line('Residents', 5, 10, 'fargoth', 12),
+                 unit_store.progress_line('Player view', 2, 80, 'body argonian female', 2472, failed=True)]
+        with tempfile.TemporaryDirectory() as temp:
+            log = Path(temp) / '12-area.log'
+            log.write_text('\n'.join(lines[:3]) + '\n', encoding='utf-8')
+            counter = build_progress.log_counter(log)
+            self.assertEqual((counter['name'], counter['done'], counter['total']), ('Residents', 5, 10))
+            self.assertEqual(counter['slowest'], {'name': 'caius cosades', 'seconds': 75})
+        row = build_progress.unit_line(lines[3])
+        self.assertEqual((row['label'], row['unit_name'], row['seconds'], row['failed']),
+                         ('Player view', 'body argonian female', 2472, True))
+        self.assertTrue(build_progress.unit_line(lines[0])['cached'])
+
+    def test_pool_maps_give_done_of_total_and_the_slowest_running_unit(self):
+        with tempfile.TemporaryDirectory() as temp:
+            allowance = Path(temp) / '39-chim'
+            record = {'pid': 1, 'updated': 1000.0, 'maps': {
+                'a': {'label': 'frames', 'queued': 5, 'running': 2, 'done': 13, 'slowest': ['vivec_city', 812.0]},
+                'b': {'label': 'stream', 'queued': None, 'running': 1, 'done': 4, 'slowest': None}}}
+            Path(str(allowance) + '.pool').write_text(json.dumps(record), encoding='utf-8')
+            maps = build_progress.pool_maps(allowance, now=1010.0)
+            self.assertEqual(build_progress.pool_maps(allowance, now=2000.0), [])
+        self.assertEqual(maps[0], {'label': 'frames', 'done': 13, 'running': 2, 'total': 20,
+                                   'slowest': ['vivec_city', 812.0]})
+        self.assertIsNone(maps[1]['total'])
 
 
 class TimelineExpectationTests(unittest.TestCase):

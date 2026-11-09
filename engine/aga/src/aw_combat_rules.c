@@ -6,6 +6,7 @@
  * fight swing for swing.
  */
 #include <string.h>
+#include <math.h>
 #include "aw_combat.h"
 
 static const char *const names[AW_COMBAT_SETTING_COUNT]={
@@ -18,7 +19,8 @@ static const char *const names[AW_COMBAT_SETTING_COUNT]={
     "iBlockMinChance","iBlockMaxChance","fSwingBlockBase","fSwingBlockMult","fBlockStillBonus",
     "fFatigueBlockBase","fFatigueBlockMult","fWeaponFatigueBlockMult",
     "fCombatBlockLeftAngle","fCombatBlockRightAngle","fCombatDelayNPC",
-    "fNPCHealthBarTime","fNPCHealthBarFade","fWeaponDamageMult"
+    "fNPCHealthBarTime","fNPCHealthBarFade","fWeaponDamageMult",
+    "fCombatAngleXY","fCombatAngleZ","fCombatInvisoMult"
 };
 /* The struct holds the floats in the order of names[]. */
 const char *AW_CombatSettingName(int index) {
@@ -64,13 +66,44 @@ static int skill_of(const aw_fighter_t *f) {
     return f->skills[f->weapon?f->weapon_skill:AW_SK_H2H];
 }
 /* getHitChance: attack term minus the victim's evasion (none while knocked
- * down or unaware; none at all below zero fatigue). Not clamped. */
+ * down or unaware; none at all below zero fatigue). Not clamped.
+ * HIT-CHANCE-CHECK-62: with the effects as OpenMW 0.51 counts them: the evasion holds Sanctuary (getEvasion, at most
+ * 100), the Chameleon and Invisibility defence counts whenever the victim's fatigue is not below 0, and the attack term
+ * gains Fortify Attack and loses Blind after the fatigue factor. */
 int AW_CombatHitChance(const aw_combat_settings_t *s,const aw_fighter_t *a,const aw_fighter_t *v) {
     float defense=0,attack;
-    if(v->fatigue>=0 && !v->knocked && v->aware)
-        defense=(v->attributes[AW_AGI]/5.0f+v->attributes[AW_LUC]/10.0f)*AW_CombatFatigueTerm(s,v);
-    attack=(skill_of(a)+a->attributes[AW_AGI]/5.0f+a->attributes[AW_LUC]/10.0f)*AW_CombatFatigueTerm(s,a);
+    if(v->fatigue>=0){
+        if(!v->knocked && v->aware)
+            defense=(v->attributes[AW_AGI]/5.0f+v->attributes[AW_LUC]/10.0f)*AW_CombatFatigueTerm(s,v)+
+                    (v->sanctuary<100?v->sanctuary:100);
+        defense+=v->unseen;
+    }
+    attack=(skill_of(a)+a->attributes[AW_AGI]/5.0f+a->attributes[AW_LUC]/10.0f)*AW_CombatFatigueTerm(s,a)+a->attack_mod;
     return rounded(attack-defense);
+}
+unsigned char AW_CombatUnseen(const aw_combat_settings_t *s,float chameleon,float invisibility) {
+    float c=s->fCombatInvisoMult*(chameleon>0?chameleon:0),i=s->fCombatInvisoMult*(invisibility>0?invisibility:0);
+    if(!(c==c))c=0;
+    if(!(i==i))i=0;
+    return (unsigned char)rounded((c<100?c:100)+(i<100?i:100));
+}
+/* getHitContact for the player (one candidate; the caller keeps the nearest): isInMeleeReach, in front, the side
+ * angle by the perp dot product's sine, the vertical tolerance at the feet and the head. */
+int AW_CombatContact(const aw_combat_settings_t *s,const float to[3],float eye,float height,float gap,float dz,
+                     float reach,float dz_extra,const float forward[3]) {
+    float xy=(float)sqrt(to[0]*to[0]+to[1]*to[1]),fxy=(float)sqrt(forward[0]*forward[0]+forward[1]*forward[1]);
+    float ux,uy,fx,fy,feet[3],head[3],n,angle_z=s->fCombatAngleZ/90.0f;
+    if(!(gap<reach) || !(dz<reach+dz_extra && dz>-reach-dz_extra))return 0;
+    if(xy<.001f)return 1;                                  /* right over the attacker's feet: in front of it */
+    if(fxy<.001f)return 0;
+    ux=to[0]/xy;uy=to[1]/xy;fx=forward[0]/fxy;fy=forward[1]/fxy;
+    if(ux*fx+uy*fy<=0)return 0;                            /* behind */
+    n=ux*fy-uy*fx;if((n<0?-n:n)>s->fCombatAngleXY/90.0f)return 0;
+    feet[0]=head[0]=to[0];feet[1]=head[1]=to[1];feet[2]=to[2]-eye;head[2]=feet[2]+height;
+    n=(float)sqrt(feet[0]*feet[0]+feet[1]*feet[1]+feet[2]*feet[2]);if(n>0)feet[2]/=n;
+    n=(float)sqrt(head[0]*head[0]+head[1]*head[1]+head[2]*head[2]);if(n>0)head[2]/=n;
+    if(forward[2]-head[2]>angle_z || forward[2]-feet[2]<-angle_z)return 0;
+    return 1;
 }
 /* AiCombat chooseBestAttack: a damage-weighted pick of slash/thrust/chop. */
 int AW_CombatBestAttack(const aw_fighter_t *f,aw_combat_rng_t *r) {
@@ -164,6 +197,21 @@ void AW_CombatGodAttacker(aw_fighter_t *a,const aw_fighter_t *before,aw_swing_t 
     a->fatigue=before->fatigue;a->weapon_health=before->weapon_health;
     a->weapon=before->weapon;a->weapon_skill=before->weapon_skill;
     if(out){out->weapon_wear=0;out->weapon_broke=0;}
+}
+/* GODMODE-LAVA-DEATH-62: world damage (lava, a fall, drowning) to a god-mode player is held back (1, and added to
+ * *HELD); 0: it lands. */
+int AW_CombatGodWorldDamage(int god,float damage,float *held) {
+    if(!god || !(damage>0))return 0;
+    if(held)*held+=damage;
+    return 1;
+}
+/* GODMODE-LAVA-DEATH-62: the player's health after a change of a script or a spell effect (SetHealth, ModCurrentHealth,
+ * Damage Health, poison, the elements): in god mode it never falls below BEFORE (a heal still lands); MAXIMUM caps
+ * what is kept when the maximum itself fell (never below 1). Not in god mode: AFTER as it is. */
+float AW_CombatGodHealth(int god,float before,float after,float maximum) {
+    if(!god || !(after<before))return after;
+    if(maximum>0 && before>maximum)before=maximum<1?1:maximum;
+    return after>before?after:before;
 }
 int AW_CombatIsNormalWeapon(int flags,int enchanted) {
     return !(flags&(AW_WEAPON_MAGICAL|AW_WEAPON_SILVER)) && !enchanted;

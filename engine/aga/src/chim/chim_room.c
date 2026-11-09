@@ -16,6 +16,7 @@
  */
 #include "quakedef.h"
 #include "chim_local.h"
+#include "aw_activate.h"
 
 extern efrag_t	**lastlink;
 extern vec3_t	r_emins, r_emaxs;
@@ -72,6 +73,63 @@ int ChimRoom_DoorYaw (unsigned pid, float yaw)
 			return 1;
 		}
 	return 0;
+}
+
+/* Scripted movers (WORLD-BUTTONS-62; aw_hinged_door.c through
+ * aw_chim_place_shift): every copy of placement pid moves by d with its drawn
+ * box, in a CHIM room or in the frame's chunks (owner and reach copies,
+ * active or only loaded); the room's or chunk's box grows to hold it (the
+ * collision broadphase). A mover carries CHIM_PLACE_HINGED: the frames' door
+ * hook (AW_HingedDoorPlacement) answers 1 for it, so its box holds every yaw
+ * and the records' reader needs nothing new. RELINK 1 (a frame): its efrags
+ * move too, through ChimChunks_GonePid (out now, linked again by the
+ * reconcile at the new box); the host asks for it every AW_MOVER_RELINK units
+ * of travel and at the end of a move. Returns the copies moved. Kept here,
+ * not in chim_chunks.c, so the world's build key does not change. */
+static void ShiftPlace (chim_place_t *p, const float *d, vec3_t mins, vec3_t maxs)
+{
+	int k;
+	VectorAdd (p->ent.origin, d, p->ent.origin);
+	VectorAdd (p->mins, d, p->mins);
+	VectorAdd (p->maxs, d, p->maxs);
+	for (k=0 ; k<3 ; k++)
+	{
+		if (p->mins[k] < mins[k]) mins[k] = p->mins[k];
+		if (p->maxs[k] > maxs[k]) maxs[k] = p->maxs[k];
+	}
+}
+
+int ChimMovers_Shift (unsigned pid, const float *d, int relink)
+{
+	int i, j, n = 0;
+	if (ChimRoom_Active ())
+	{
+		for (i=0 ; i<room.count ; i++)
+			if (room.places[i].pid == pid && (room.places[i].flags & CHIM_PLACE_HINGED))
+			{
+				ShiftPlace (&room.places[i], d, room.mins, room.maxs);
+				n++;
+			}
+		return n;
+	}
+	if (relink)
+		ChimChunks_GonePid (pid, 1);
+	for (i=0 ; i<chim_frame.count ; i++)
+	{
+		chim_entry_t *e = &chim_frame.entries[i];
+		chim_chunk_t *c = e->chunk.data;
+		if (e->state == CHIM_STATE_ABSENT || !c)
+			continue;
+		for (j=0 ; j<c->records ; j++)
+			if (c->places[j].pid == pid && (c->places[j].flags & CHIM_PLACE_HINGED))
+			{
+				ShiftPlace (&c->places[j], d, c->mins, c->maxs);
+				n++;
+			}
+	}
+	if (relink)
+		ChimChunks_GonePid (pid, 0);
+	return n;
 }
 
 /* The trace against door placement pid alone (through ChimChunks_DoorClip):
@@ -434,6 +492,28 @@ int ChimRoom_Has (unsigned reference)
 			(ChimFormat_U32 (room.records + (long)i*CHIM_RECORD_BYTES_PLACED + 4) & ROOM_SOURCE_MASK) == reference)
 			found++;
 	return found;
+}
+/* ROOM-OBJECTS-MISSING-62: where the view ray from EYE along the unit vector DIR first enters the drawn box of a
+ * linked placement of REFERENCE (map units along the ray), -1 when it misses them all or the room is off. A
+ * container is aimed at by its box, as a placed item by its model (PLACED-PIT-AXE-NO-FOCUS-61). Called through
+ * aw_placed.c's room ray hook, which declares it there. */
+float ChimRoom_RayRef (unsigned reference, const float *eye, const float *dir);
+float ChimRoom_RayRef (unsigned reference, const float *eye, const float *dir)
+{
+	int i;
+	float best = -1, lo, hi;
+	if (!room.on || !reference)
+		return -1;
+	for (i=0 ; i<room.count ; i++)
+	{
+		chim_place_t *p = &room.places[i];
+		if (!p->linked ||
+			(ChimFormat_U32 (room.records + (long)i*CHIM_RECORD_BYTES_PLACED + 4) & ROOM_SOURCE_MASK) != reference)
+			continue;
+		if (AW_RayBox (eye, dir, p->mins, p->maxs, &lo, &hi) && (best < 0 || lo < best))
+			best = lo;
+	}
+	return best;
 }
 int ChimRoom_Hide (unsigned reference, int hide)
 {

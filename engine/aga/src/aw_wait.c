@@ -7,6 +7,7 @@
 #include "aw_story.h"
 #include "aw_character.h"
 #include "aw_clock.h"
+#include "aw_questbook.h"
 #include "aw_state.h"
 #include "aw_sky.h"
 #include "aw_mappath.h"
@@ -373,6 +374,32 @@ static void rest_line_in(char *line)
         snprintf(rest_read.owner,sizeof(rest_read.owner),"%s",field[3]);rest_read.bed_rank=n;rest_read.bed_hit=1;
     }
 }
+/* LORE-DATE-FORMAT-62: the month names and sDay of the game data (levelup/rest.txt "text" rows, tools/prepare_levelup.py)
+ * into the shared date layout (aw_questbook.c AW_DateText), read once a session at the first date shown (an event: the
+ * rest window, the journal, dbg time), never in play; the rest window's own read sets them as well. */
+static int date_names_read;
+void AW_DateNamesEnsure(void)
+{
+    FILE *f=NULL;char line[200];
+    if(date_names_read)return;
+    date_names_read=1;
+    if(COM_FOpenFile("levelup/rest.txt",&f)<0 || !f)return;
+    if(fgets(line,sizeof(line),f) && !strncmp(line,"AWRS1",5))
+        while(fgets(line,sizeof(line),f)){
+            char key[40];int n;
+            line[strcspn(line,"\r\n")]=0;
+            if(strncmp(line,"text s",6))continue;
+            n=(int)strcspn(line+5," ");if(n<=0 || n>=(int)sizeof(key) || !line[5+n])continue;
+            memcpy(key,line+5,n);key[n]=0;AW_DateNameSet(key,line+6+n);
+        }
+    fclose(f);
+}
+static void date_now(int form,char *out,int capacity)
+{
+    int y,m,d,h,n;
+    AW_DateNamesEnsure();AW_ClockDate(&y,&m,&d,&h,&n);
+    if(!AW_DateText(form,AW_ClockDays(),h,n,out,capacity) && capacity>0)out[0]=0;
+}
 static int rest_load(void)
 {
     FILE *f=NULL;char line[200];int ok=0;
@@ -414,7 +441,7 @@ int AW_RestWake(void){if(!AW_RestSleeping())return 0;close_modal();return 1;}
 /* T or a bed: the refusals, then the window in rest or wait mode. BED_REFERENCE: the bed used (0 for T). */
 int AW_RestOpen(unsigned long bed_reference)
 {
-    edict_t *p;int refusal,y,m,d,h,n;long cx,cy;static char id[64];char line[200];const char *region;aw_rest_body_t b;
+    edict_t *p;int refusal;long cx,cy;static char id[64];char line[200];const char *region;aw_rest_body_t b;
     if(modal || gallery_active)return 0;
     if(!sv.active || svs.maxclients!=1 || !svs.clients || !(p=svs.clients[0].edict) || cls.state!=ca_connected ||
        AW_StoryRestricted() || AW_CharacterActive() || AW_ReaderActive() || p->v.health<=0)return 0;   /* rest not unlocked */
@@ -459,8 +486,7 @@ int AW_RestOpen(unsigned long bed_reference)
     if(!rest_sleeping || rest_read.kind!=1)rest_list[0]=0;
     rest_body(&b);
     rest_until=rest_sleeping?AW_RestUntilHealed(&rest_settings,&b):0;
-    AW_ClockDate(&y,&m,&d,&h,&n);
-    snprintf(rest_line[0],sizeof(rest_line[0]),"%02ld:%02ld  %02ld/%02ld/%ld",(long)h,(long)n,(long)d,(long)m,(long)y);
+    date_now(AW_DATE_REST,rest_line[0],sizeof(rest_line[0]));   /* "18 Last Seed (Day 3) 9 a.m." (LORE-DATE-FORMAT-62) */
     if(rest_sleeping)rest_text("sRestMenu3","Rest",rest_line[1],sizeof(rest_line[1]));
     else rest_text("sRestIllegal","Resting here is illegal. You'll need to find a bed.",rest_line[1],sizeof(rest_line[1]));
     rest_text("sRestMenu2","Hours",rest_line[2],sizeof(rest_line[2]));
@@ -473,7 +499,7 @@ int AW_RestOpen(unsigned long bed_reference)
  * interruption, then the level-up when a full rest ends with it due. */
 static void rest_run(int wanted)
 {
-    int done=0,stop=0,interrupted=0,y,m,d,h,n;aw_rest_body_t b;char line[160],verb[16];
+    int done=0,stop=0,interrupted=0;aw_rest_body_t b;char line[160],verb[16];
     if(rest_sleeping && rest_list[0] && rest_data)stop=AW_RestInterruptAt(&rest_settings,wanted,rand()%wanted);
     while(done<(stop?stop:wanted)){
         if(!AW_ClockAdvance(3600000))break;
@@ -492,9 +518,10 @@ static void rest_run(int wanted)
         if(aw_rest_spawn)aw_rest_spawn(rest_list);
         return;
     }
-    AW_ClockDate(&y,&m,&d,&h,&n);
+    {char date[80];
+    date_now(AW_DATE_REST,date,sizeof(date));
     rest_text(rest_sleeping?"sRest":"sWait",rest_sleeping?"Rest":"Wait",verb,sizeof(verb));
-    snprintf(line,sizeof(line),"%s: %ld h. %02ld:%02ld, %02ld/%02ld/%ld",verb,(long)done,(long)h,(long)n,(long)d,(long)m,(long)y);
+    snprintf(line,sizeof(line),"%s: %ld h. %s",verb,(long)done,date);}
     AW_UISubtitle("",line,5);
     /* only a full rest opens a due level-up (OpenMW WaitDialog::onWaitingFinished) */
     if(rest_sleeping && done==wanted)AW_LevelupRested();
@@ -540,8 +567,9 @@ static int named_minutes(char *s) {
     return -1;
 }
 static void report_time(void) {
-    int y,m,d,h,n;AW_ClockDate(&y,&m,&d,&h,&n);
-    Con_Printf("Time %02ld:%02ld, %02ld/%02ld/%ld (day/month/year)\n",(long)h,(long)n,(long)d,(long)m,(long)y);
+    int y,m,d,h,n;char lore[80],number[24];AW_ClockDate(&y,&m,&d,&h,&n);
+    date_now(AW_DATE_LORE,lore,sizeof(lore));date_now(AW_DATE_NUMERIC,number,sizeof(number));
+    Con_Printf("Time %02ld:%02ld, %s (%s, day/month/year)\n",(long)h,(long)n,lore,number);
     if(daynight_hold)Con_Printf("Day/night off: held at 12:00 (dbg daynight on resumes).\n");
 }
 /* Exact debug input: four decimal digits, HH 00..23 and MM 00..59.
@@ -550,6 +578,13 @@ static void set_time(void) {
     char *s=Cmd_Argv(1);int hour,minute=0,i,named;
     if(!sv.active){Con_Printf("Start the local game first.\n");return;}
     if(Cmd_Argc()==1){report_time();return;} /* dbg time: what time is it */
+    /* dbg date (LORE-DATE-FORMAT-62): the date in every form of the shared layout and the time */
+    if(Cmd_Argc()==2 && !Q_strcasecmp(s,"date")){
+        char text[80];int form;static const char *const names[]={"journal","rest/wait","saved game","lore","day/month/year"};
+        report_time();
+        for(form=AW_DATE_JOURNAL;form<=AW_DATE_NUMERIC;form++){date_now(form,text,sizeof(text));Con_Printf("  %-15s %s\n",names[form],text);}
+        return;
+    }
     if(Cmd_Argc()!=2)goto invalid;
     if(held())return;
     named=named_minutes(s);
@@ -615,6 +650,7 @@ void AW_WaitTick(void) {
     double delta;int whole;
     /* daynight_hold is kept here on purpose: it outlives the map change. */
     if(!sv.active){modal=0;clock_fraction=0;gallery_stop();cycle_steps=0;light_active=0;return;}
+    if(!date_names_read)AW_DateNamesEnsure();   /* once a session, the first game's arrival: the journal's month names */
     if(daynight_hold)hold_clock();
     (void)AW_DayGalleryClock(0);
     if(cycle_steps){
@@ -648,7 +684,7 @@ void AW_WaitTick(void) {
     }
 }
 int AW_WaitKey(int key) {
-    char line[80];int y,m,d,h,n;
+    char line[96];
     if(cycle_steps && key_dest==key_game && key==K_ESCAPE){cycle_stop("24 h cycle stopped.");return 1;}
     if(light_active && key_dest==key_game){
         if(key==K_ESCAPE){light_active=0;AW_UISubtitle("","Light gallery closed; real time shown.",3);return 1;}
@@ -689,14 +725,14 @@ int AW_WaitKey(int key) {
          * (OpenMW World::advanceTime, not incremental). */
         if(timescale.value>0 && aw_magic_frame)aw_magic_frame(hours*3600.0f/timescale.value);
         clock_fraction=0;
-        AW_ClockDate(&y,&m,&d,&h,&n);close_modal();
-        sprintf(line,"Waited %ld hour%s. %02ld:%02ld, %02ld/%02ld/%ld",(long)hours,hours==1?"":"s",(long)h,(long)n,(long)d,(long)m,(long)y);
+        {char date[80];date_now(AW_DATE_REST,date,sizeof(date));close_modal();
+        snprintf(line,sizeof(line),"Waited %ld hour%s. %.60s",(long)hours,hours==1?"":"s",date);}
         AW_UISubtitle("",line,5);
     }
     return 1;
 }
 int AW_WaitDraw(void) {
-    int y,m,d,h,n;char line[96];
+    char line[96];
     if(!modal || key_dest!=key_menu)return 0;
     if(modal==3){
         AW_UIBox(18,24,284,152);AW_UISmallBegin();
@@ -711,9 +747,8 @@ int AW_WaitDraw(void) {
     }
     if(modal==1){
         AW_UIBox(18,24,284,152);AW_UISmallBegin();
-        AW_ClockDate(&y,&m,&d,&h,&n);
         AW_UITextBox(26,32,268,20,"Wait",-1);
-        sprintf(line,"%02ld:%02ld  %02ld/%02ld/%ld",(long)h,(long)n,(long)d,(long)m,(long)y);
+        date_now(AW_DATE_REST,line,sizeof(line));
         AW_UITextBox(26,57,268,20,line,-1);
         sprintf(line,"Wait for %ld hour%s",(long)hours,hours==1?"":"s");AW_UITextBox(26,85,268,22,line,-1);
         AW_UITextBox(26,116,268,20,"Arrows / A D: 1 to 24 hours",-1);

@@ -15,11 +15,12 @@ static const char *names[AW_MOVE_SETTING_COUNT]={
     "fFatigueRunBase","fFatigueRunMult","fFatigueSwimWalkBase","fFatigueSwimWalkMult",
     "fFatigueSwimRunBase","fFatigueSwimRunMult","fFatigueSneakBase","fFatigueSneakMult",
     "fFatigueJumpBase","fFatigueJumpMult","fFatigueBase","fFatigueMult",
-    "fFallDamageDistanceMin","fFallDistanceBase","fFallDistanceMult","fFallAcroBase","fFallAcroMult"};
+    "fFallDamageDistanceMin","fFallDistanceBase","fFallDistanceMult","fFallAcroBase","fFallAcroMult",
+    "fWerewolfRunMult"};
 /* Morrowind.esm values of the same settings, in the same order. */
 static const float originals[AW_MOVE_SETTING_COUNT]={
     100,200,.3f,1.75f,1, .5f,.1f,.75f,5, 5,300, 128,4,.5f,1, 1,.5f,.5f,
-    5,2,2.5f,0, 7,0,1.5f,1.5f, 5,0,1.25f,.5f, 400,0,.07f,.25f,.01f};
+    5,2,2.5f,0, 7,0,1.5f,1.5f, 5,0,1.25f,.5f, 400,0,.07f,.25f,.01f, 1.3f};
 
 const char *AW_MoveSettingName(int index) {
     return index>=0 && index<AW_MOVE_SETTING_COUNT?names[index]:0;
@@ -69,7 +70,9 @@ float AW_MoveWalkSpeed(const aw_move_settings_t *s,const aw_move_inputs_t *in) {
     return walk;
 }
 float AW_MoveRunSpeed(const aw_move_settings_t *s,const aw_move_inputs_t *in) {
-    return AW_MoveWalkSpeed(s,in)*(.01f*in->athletics*s->fAthleticsRunBonus+s->fBaseRunMultiplier);
+    /* npc.cpp getMaxSpeed: a werewolf's run times fWerewolfRunMult (WEREWOLF-RUN-SPEED-63) */
+    return AW_MoveWalkSpeed(s,in)*(.01f*in->athletics*s->fAthleticsRunBonus+s->fBaseRunMultiplier)*
+           (in->werewolf?s->fWerewolfRunMult:1);
 }
 float AW_MoveSwimSpeed(const aw_move_settings_t *s,const aw_move_inputs_t *in) {
     float base=in->running?AW_MoveRunSpeed(s,in):AW_MoveWalkSpeed(s,in);
