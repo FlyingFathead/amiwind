@@ -30,6 +30,7 @@ DEFAULTS_FILE = ROOT / 'config' / 'build-defaults.json'
 # Options that bring in work of an earlier build or a cache outside the workspace: (dest, flag, why).
 CLEAN_REFUSED = (
     ('reuse_from', '--reuse-from', 'takes the stages of an earlier run'),
+    ('reuse_all_available', '--reuse-all-available', 'takes the stages of every earlier run'),
     ('rebuild_stage', '--rebuild-stage', 'works only with --reuse-from'),
     ('rebuild_unit', '--rebuild-unit', 'reruns a unit an earlier build stored in the cache'),
     ('prerendered', '--prerendered', 'takes stage outputs an earlier build stored'),

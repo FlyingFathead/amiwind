@@ -37,6 +37,21 @@ LEGACY_SOURCES = {
         ('9e0e915fef811882a5c341a96549762b7fb07ea768a876fa0f0c9411ce8d1786',),
     ('interior-room-chim', '02b87fd3252e52456b3e2688fcc2ce3172853ef735ae43d159ef43f1a9983d49'):
         ('115d5e69098e1c5ffd0cf15e11c4431f326b8767ea01d5f650b0885fa1604b0a',),
+    # The voice and dialogue tables (tools/greeting_lut.py, tools/dialogue_lut.py image_step) keyed their one unit on
+    # whole files, which counted the script compiler's game data and function table, so every v0.0.63 dev build
+    # baked them again (BUILD-TABLE-UNITS-REBAKE-63). Their bake reaches (voice: build_master + sound_resolver;
+    # dialogue: build_master) were the same at 1d5eda8 (v0.0.62), d2c6408 (v0.0.63-dev2), 6e68096 (dev3) and
+    # e7c5fa5a (dev4) as now, apart from the hearing rule and the declaration reader moved unchanged into
+    # mwscript/hearing.py and mwscript/lexer.py; the whole-file digests of those four trees follow, in that order.
+    ('npc-voice-table', '60f51a53b786fbf51e951a08225b0b4076b0316eb1874a8c048ac0010c20fb20'):
+        ('1a15a9d2fe67c7a26d1a4964d0aef607b353a5c54853f2d5dbee49d6cc23cacb',
+         'ca0e34d0e6789ffbc9022a46df1c32d937f80b9d41a16e36363855d8cb24cfae',
+         'c45e26df3692c2f1c2b91b070023481e754121a788bce552c6d4177655bea662'),
+    ('dialogue-table', 'e189af83bf90d3879a820f1837ca40cef7a911c2f79830ec5b0402f63f095b27'):
+        ('70a96892b66c2aad94773dbf2c16cc0b04a0e63016fd6de7845c3df4b3821007',
+         '004a9ca21f8a211f5e514ed00c236ab97f722d3c35d49d32a8a9addc3fdf07cc',
+         '2caa0d24bbe95f1c55921cabef06dd6a8f834c1e3a189790994138acc7a4cfc4',
+         '5a291620b94d3f6ffeb02d87d2e689f3600a64ee7c1afd2d38900d221ac061cc'),
 }
 
 # AMIWIND_* settings that say where a stage does its work, never what a unit is made of: left out of a unit key

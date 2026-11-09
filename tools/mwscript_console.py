@@ -48,8 +48,12 @@ def sync(data):
             fn = F.FUNCTIONS.get(n)
             if n in COMPILED_ARGUMENTS:
                 why = 'its arguments are worked out by the compiler (%s)' % COMPILED_ARGUMENTS[n]
+            elif fn is None and n in NOT_YET:
+                why = 'a console-only command with no AmiWind counterpart yet: ' + NOT_YET[n]
             elif fn is None:
                 why = 'a console-only command with no AmiWind counterpart yet'
+            elif not fn.run and n in NOT_YET:
+                why = 'not carried out yet: ' + NOT_YET[n]
             elif not fn.run:
                 why = 'not carried out by the interpreter yet (scripts too)'
             else:
@@ -103,19 +107,58 @@ FUNCTIONS_FILE = ROOT / 'config/mwconsole-functions.txt'   # staged as id1/mwcon
 COMPILED_ARGUMENTS = {
     'cast': 'the spell\'s effect row', 'hasitemequipped': 'the item\'s row', 'getspelleffects': 'the spell\'s row',
     'becomewerewolf': 'the werewolf settings', 'setwerewolfacrobatics': 'the werewolf settings',
-    'explodespell': 'the spell\'s row', 'geteffect': 'the effect number', 'addtopic': 'the topic row',
+    'explodespell': 'the spell\'s row', 'removespelleffects': 'the spell\'s row', 'geteffect': 'the effect number', 'addtopic': 'the topic row',
     'changeweather': 'the region index', 'modregion': 'the region index', 'positioncell': 'the room and its move row',
     'placeatpc': 'the placing rows', 'placeatme': 'the placing rows', 'placeitem': 'the placing rows',
     'placeitemcell': 'the placing rows', 'drop': 'the item\'s row', 'aifollowcell': 'the room number',
     'aiescortcell': 'the room number', 'choice': 'a dialogue result only', 'goodbye': 'a dialogue result only',
     'clearinfoactor': 'a dialogue result only'}
+# v0.0.63 (MWSCRIPT-GAPS-63): why each function still not carried out stays so (the console table and the tracker)
+NOT_YET = {
+    'setwaterlevel': 'a room\'s water is baked into its map; moving it needs moving water in the engine',
+    'modwaterlevel': 'a room\'s water is baked into its map; moving it needs moving water in the engine',
+    'getwindspeed': 'the weather has no wind speed yet',
+    'equip': 'an NPC\'s worn and held entries come from its record; the actor table has no change of them yet '
+             '(the player\'s Equip works as an alias)',
+    'aiactivate': 'the ambient tables have no package that walks to an object and uses it',
+    'hitattemptonme': 'the combat layer keeps only the blows that land (HitOnMe); a missed swing is not kept',
+    'skipanim': 'the animation kit has no per-frame skip',
+    'filljournal': 'a debug fill of every journal entry: the dated history keeps only what was earned',
+    'fillmap': 'a debug fill of every map place: the revealed places come one by one from ShowMap',
+    'getpcvisionbonus': 'the renderer has no player-side brightness term (Night Eye) yet; it needs an A/B on the Pi',
+    'setpcvisionbonus': 'the renderer has no player-side brightness term (Night Eye) yet; it needs an A/B on the Pi',
+    'modpcvisionbonus': 'the renderer has no player-side brightness term (Night Eye) yet; it needs an A/B on the Pi',
+    'addtolevcreature': 'the levelled lists are read from the actor table on disk; an edit needs a saved change list',
+    'removefromlevcreature': 'the levelled lists are read from the actor table on disk; an edit needs a saved change '
+                             'list',
+    'addtolevitem': 'the levelled lists are read from the actor table on disk; an edit needs a saved change list',
+    'removefromlevitem': 'the levelled lists are read from the actor table on disk; an edit needs a saved change list',
+    # the original's console-only toggles with no AmiWind switch: each is a new on-screen readout (a command or a
+    # cvar of 32 to 56 bytes, plus its drawing and its data), none of them cheap enough to add as a stand-in
+    'toggledialoguestats': 'a readout of the dialogue filter checks; the dialogue window has no such trace yet',
+    'togglegrid': 'the exterior cell grid drawn over the world; the renderer has no such overlay yet',
+    'togglekillstats': 'a count of the kills by kind; the change list keeps deaths per actor, no tally readout yet',
+    'togglemagicstats': 'a readout of the active effects; dbg cast spell lists spells, not a live overlay',
+    'toggleloadfade': 'AmiWind\'s loading screen has no fade to switch',
+    # batch 3 (v0.0.63): the console group's drawing switches and cell tests left, each with what it lacks
+    'togglesky': 'the sky is drawn as part of the world map\'s sky surfaces; the renderer has no switch to leave it out',
+    'togglewater': 'a room\'s water is baked into its map as world surfaces; the renderer has no switch to leave it out',
+    'toggleworld': 'the renderer has no switch to leave out the world map while drawing the objects',
+    'togglepathgrid': 'the path grids are read per actor from the ambient table; nothing draws them yet',
+    'togglecollisionboxes': 'the renderer has no overlay of the collision boxes yet',
+    'togglecollisiongrid': 'the renderer has no overlay of the collision grid yet',
+    'toggleborders': 'the renderer has no overlay of the cell borders yet',
+    'togglefogofwar': 'the map screen reveals places one by one from ShowMap; it has no fog of war to switch off',
+    'togglefullhelp': 'the aim box shows the name only; it has no extended reference readout to switch on',
+    'testcells': 'loading every exterior cell in turn: a test of a desktop engine, far beyond a 32 MB machine',
+    'testinteriorcells': 'loading every interior cell in turn: a test of a desktop engine, far beyond a 32 MB machine',
+}
 # the interpreter's own opcodes (functions.RUN) the console carries by name in aw_mwhost.c console_special, with the
 # host function each one calls
 SPECIAL = {'lock': 'host_object', 'unlock': 'host_object', 'getlocked': 'host_object', 'activate': 'host_object',
            'startcombat': 'host_combat', 'stopcombat': 'host_combat', 'getdeadcount': 'host_dead_count',
            'getcurrentaipackage': 'host_ai_package', 'getaipackagedone': 'host_ai_package', 'getspell': 'host_spell',
            'getcommondisease': 'host_spell', 'getblightdisease': 'host_spell', 'getdistance': 'host_distance'}
-
 
 def function_rows():
     """The console's function table (AWMF1), from the compiler's own table (tools/mwscript/functions.py): per line

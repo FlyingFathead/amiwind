@@ -986,6 +986,11 @@ class ScriptCompiler:
                 if ref is not None:
                     self.e.op('REF', self.p.object(ref))
                 return self.notyet(fn, None, [('str', spell), ('str', who), ('int', row)], None, carried=True)
+        if fn.name == 'removespelleffects' and args and args[0][0] == 'str':
+            # v0.0.63 (MWSCRIPT-GAPS-63): the spell's ASPT row (the active effects' source) as the call's number
+            if ref is not None:
+                self.e.op('REF', self.p.object(ref))
+            return self.notyet(fn, None, [args[0], ('int', self.p.spell(args[0][1]))], None, carried=True)
         if fn.name in ('hasitemequipped', 'getspelleffects') and args and args[0][0] == 'str':
             # v0.0.63 (MWSCRIPT-GAPS-63): the item's AITM row (an NPC's worn list) / the spell's ASPT row (the active
             # effects' source) as the call's number, the id kept as its string; both reads ask every frame (VOLATILE)
@@ -1013,7 +1018,11 @@ class ScriptCompiler:
             return self.notyet(fn, None, [('int', self.p.spell(spell))], None, carried=True)
         if fn.name in ('gettarget', 'getstandingpc', 'getangle', 'getdetected', 'getlos', 'getlineofsight',
                        'onknockout', 'getcurrentweather', 'getpcsneaking', 'getweapondrawn', 'getpcinjail',
-                       'hassoulgem', 'hitonme', 'getwaterlevel', 'getcollidingpc', 'getweapontype') or \
+                       'hassoulgem', 'hitonme', 'getwaterlevel', 'getcollidingpc', 'getweapontype',
+                       'getcurrenttime', 'getmasserphase', 'getsecundaphase', 'getstartingpos', 'getstartingangle',
+                       'pcget3rdperson', 'getpcjumping', 'getspellreadied', 'getstandingactor',
+                       'getcollidingactor', 'getpcrunning', 'getforcejump', 'getforcemovejump', 'getarmortype',
+                       'samefaction', 'getfactionreaction') or \
                 (fn.name.startswith('get') and fn.name[3:] in MAGIC_EFFECT_CALLS):
             # a fight starts without the state generation moving: the script asks every frame; so do the angles, the
             # detection, the line of sight, a knockdown and the weather (v0.0.62), as GetPos does

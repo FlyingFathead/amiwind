@@ -1,11 +1,12 @@
-# BUILD-SHARED-WRITES-UNATTRIBUTED-52: stages running side by side write the same files, so their records are refused and they rebuild every time
+# BUILD-SHARED-WRITES-UNATTRIBUTED-52: Stages running side by side write the same files, so their records are refused and they rebuild every time
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 2 times; something has to be done
+## PERSISTING: reported 3 times; something has to be done
 
 - Reported with v0.0.63-dev2 at 2026-11-09 10:21 +0200: Seen again in the reuse plan of v0.0.63-dev2 against 2026_11_09_v0.0.63-dev1_full-v0.0.63-dev1_dc356e3: chim-town-seyda and chim-town-vivec_city both refused, because both changed intro-scene/id1/sound/env/lava_layer.wav and 10 more shared files while running side by side; both towns rebuild again.
 - Reported with v0.0.63-dev2 at 2026-11-09 11:28 +0200: Cause found in the v0.0.63-dev1 records: the two towns did not write the 11 files. world-terrain wrote the lava loop sound and world-ui the 10 world files while both towns ran beside them. The records were judged pair by pair in name order, so the two towns were compared before the world stages had taken their files back, and both towns were refused. Fixed: every pair that the traces can attribute is settled first, a record refused only for such files is reusable when read again, and the files two stages write are listed and kept from growing by a test (config/shared-writes.json, 50 files left for one owner each). The reuse plan of v0.0.63-dev2 against the dev1 build now reuses both towns: 41 of 47 stages, 0 unexpected.
+- Reported with v0.0.63-dev1 at 2026-11-09 11:43 +0200: The reuse plan of the next build against the v0.0.63-dev1 run refuses the records of chim-town-seyda and chim-town-vivec_city: both changed intro-scene/id1/sound/env/lava_layer.wav and ten more files while running side by side, so both stages are rebuilt.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -34,7 +35,9 @@ _Last updated with AmiWind v0.0.63-dev2 (9 November 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
+- [What happens](#what-happens)
+- [Seen](#seen)
 - [Status: 9 November 2026](#status-9-november-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -47,6 +50,19 @@ _Last updated with AmiWind v0.0.63-dev2 (9 November 2026)._
 - [Bugs in the same category](#bugs-in-the-same-category)
 
 <!-- contents end -->
+
+## What happens
+
+When two build stages run side by side and both write the same file, the builder cannot tell which stage the
+file belongs to. It refuses both stages' records, so the next build with reuse runs both stages again although
+their own inputs did not change.
+
+## Seen
+
+- v0.0.52-dev1: the town carried-item models and the room door audio.
+- v0.0.63-dev1: the reuse plan of the next build against the v0.0.63-dev1 run refuses the records of the
+  Seyda Neen and Vivec town stages: both changed the lava sound layer of the intro scene and ten more files
+  while running side by side.
 
 ## Status: 9 November 2026
 
@@ -179,6 +195,7 @@ Family: Build reuse keys and output attribution (`build-cache-reuse`). A unit is
 - [BUILD-SPRITE-KEY-HASHLIB-47](BUILD-SPRITE-KEY-HASHLIB-47.md): The CHIM stage failed 45 minutes into a build: the sprite recipe key used hashlib without importing it
 - BUILD-STAGE-KEY-CLIENT-H-58 (no report page): An engine declaration added to client.h re-converts the CHIM world and its interiors
 - BUILD-STAGE-KEY-TEXT-DEFINES-59 (no report page): The CHIM world and CHIM rooms stages rebuild when tools/text_defines.py changes, although the world does not use the text macros
+- BUILD-STAGE-KEY-UNIT-STORE-63 (no report page): Five stage keys count the unit store code as a whole file, so one reuse table row rebuilds them
 - BUILD-STAGE-KEY-WHOLE-CLASS-48 (no report page): A one-method edit in tools/actor_grounding.py rekeyed the CHIM stages: a class was import-time code of its module, so every stage importing the module hashed every method
 - [BUILD-STAGE-READS-UNFINGERPRINTED-48](BUILD-STAGE-READS-UNFINGERPRINTED-48.md): Two stages read repository files their fingerprint leaves out, so their records are refused and they rerun on every reuse
 - BUILD-STAGE-WRITES-OTHERS-OUTPUT-63 (no report page): A failed image step wrote into a file another stage owns, so resuming rebuilt Vivec city (11 min), the actor library (40 min) and the Vivec rooms (28 min)
@@ -186,6 +203,7 @@ Family: Build reuse keys and output attribution (`build-cache-reuse`). A unit is
 - [BUILD-STAIR-PASS-NOT-KEPT-41](BUILD-STAIR-PASS-NOT-KEPT-41.md): A frame's passed stair walk is not reused when the build it ran in failed, and the walker key changes with converter code
 - [BUILD-SURVEY-KEY-CONFIG-35](BUILD-SURVEY-KEY-CONFIG-35.md): World survey, world terrain, world UI and CHIM stage keys counted every file under config/: a path built from a loop name read as the whole folder
 - [BUILD-SURVEY-NOT-REPRODUCIBLE-33](BUILD-SURVEY-NOT-REPRODUCIBLE-33.md): The world-survey stage writes its wall time into its outputs, so a rerun never has the same outputs
+- BUILD-TABLE-UNITS-REBAKE-63 (no report page): Every build bakes the dialogue and voice tables and the actor ground check again
 - [BUILD-VERSION-GETATTR-TRACE-49](BUILD-VERSION-GETATTR-TRACE-49.md): The v0.0.49 final rebuilt the CHIM world: the lazy VERSION (a module __getattr__ in project_version) ran in the CHIM stage, its read trace recorded it and the key could not
 - [CACHE-NO-PROVENANCE-36](CACHE-NO-PROVENANCE-36.md): Cache and pool entries were keyed by SHA-256 but did not record when, by which run, from which version and commit they were made, and some recorded no output hash
 - CHIM-COLLISION-UNION-FAIL-NOT-CACHED-48 (no report page): A collision union that fails is compiled again for every room that uses the same mesh packet

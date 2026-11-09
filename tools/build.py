@@ -1339,8 +1339,9 @@ def commands(args, tools, run):
                 image_options += ['--night-lamp-lightmaps']  # EXPERIMENTAL, off by default
         if getattr(args, 'media_catalogue', 'off') == 'on':
             image_options += ['--media-catalogue']  # DEBUGGING ONLY, off by default (IMAGE-MEDIA-CATALOGUE-ON-DISK-46)
-        # on by default: aliases and skins since v0.0.47, shapes since v0.0.63 (docs/PAYLOAD_SHARING.md)
-        for flag in ('file_aliases', 'shared_skins', 'shared_shapes'):
+        # on by default: aliases and skins since v0.0.47, shapes since v0.0.63; skin tiles EXPERIMENTAL, off by
+        # default (docs/PAYLOAD_SHARING.md)
+        for flag in ('file_aliases', 'shared_skins', 'shared_shapes', 'skin_tiles'):
             if getattr(args, flag, 'off') == 'on':
                 image_options += ['--' + flag.replace('_', '-')]
         if getattr(args, 'shared_sky_source', None) is not None:
@@ -3027,6 +3028,16 @@ def _main(argv=None):
             from build_cache import require_reuse_allowed
             require_reuse_allowed(VERSION, args.allow_release_reuse)
             args.reuse_from = args.reuse_from.expanduser().resolve()
+        if getattr(args, 'reuse_all_available', False):
+            if args.no_profile or args.recover_image_from or args.dry_run:
+                raise ValueError('--reuse-all-available needs a profiled AGA or terrain build (not --no-profile, '
+                                 '--recover-image-from or --dry-run)')
+            from build_cache import require_reuse_allowed
+            require_reuse_allowed(VERSION, args.allow_release_reuse)
+            from reuse_all import parse_allowed
+            args.allow_rebuild_map = parse_allowed(args.allow_rebuild)
+        elif getattr(args, 'allow_rebuild', None):
+            raise ValueError('--allow-rebuild goes with --reuse-all-available')
         if args.prerendered:
             if args.no_profile or args.recover_image_from or args.dry_run:
                 raise ValueError('--prerendered needs a profiled AGA or terrain build (not --no-profile, '
@@ -3315,8 +3326,9 @@ def _main(argv=None):
         forced = [name for name in (getattr(args, 'rebuild_stage', '') or '').split(',') if name]
         if forced:
             unknown = sorted(set(forced) - {name for name, _ in steps})
-            if unknown or not args.reuse_from:
-                raise ValueError('--rebuild-stage needs --reuse-from and stage names of this plan'
+            if unknown or not (args.reuse_from or getattr(args, 'reuse_all_available', False)):
+                raise ValueError('--rebuild-stage needs --reuse-from (or --reuse-all-available) and stage names of '
+                                 'this plan'
                                  + (': unknown ' + ', '.join(unknown) if unknown else ''))
         metadata['storage_pool_dir'] = str(storage_pool_dir(args))
         reuse_mode = args.reuse_mode
@@ -3329,7 +3341,10 @@ def _main(argv=None):
         steps = build_cache.prepare(steps, run, metadata, args.reuse_from, reuse_mode,
                                     scope=getattr(args, 'fingerprint_scope', 'units'), prerendered=store,
                                     pool=storage_pool_dir(args), forced=forced,
-                                    accept_rebuild=getattr(args, 'accept_rebuild', False))
+                                    accept_rebuild=getattr(args, 'accept_rebuild', False),
+                                    reuse_all=({'workspace': str(Path(args.workspace).resolve()),
+                                                'allowed': getattr(args, 'allow_rebuild_map', {})}
+                                               if getattr(args, 'reuse_all_available', False) else None))
         if args.reuse_from and args.allow_release_reuse:
             metadata['stage_cache']['release_reuse'] = 'allowed: the from-scratch gate runs separately'
         resource_preflight(args, steps, metadata)
@@ -3358,12 +3373,17 @@ def _main(argv=None):
             mode = live_tracker.choose(args.live_tracker, args.tracker_declined, sys.stdin.isatty() and not args.yes)
             if mode:
                 live = live_tracker.LiveTracker(run, mode, len(steps), data_files=args.data_files).start()
+        import reuse_all
         try:
             execute(steps, run, metadata)
         except BaseException:
             if live:
                 live.stop()
+            if not args.dry_run:
+                reuse_all.record_run(run, args.workspace)   # its passed stages go into the stage index
             raise
+        if not args.dry_run:
+            reuse_all.record_run(run, args.workspace)
         if args.dry_run:
             result = run / "image" / f"AmiWind-v{VERSION}-dry-run.hdf"
             print('No game assets or ROMs were used. This is not a playable demo.')

@@ -1,6 +1,6 @@
 # Character animation
 
-_Last updated with AmiWind v0.0.61-dev3 (2026-11-06)._
+_Last updated with AmiWind v0.0.63-dev2 (2026-11-09)._
 
 <!-- contents start -->
 ## Contents
@@ -202,6 +202,16 @@ actor wears it; when it stops (companion released, fight over, or a dead
 fighter's death clip done) the actor goes back to its standing model and the
 mover's Cache block is freed at once. Saves name the standing model. Console:
 `aw_npc_movers 0|1`.
+
+An outdoor session is one level for the whole island and every room it joins, so
+the engine's per-level tables must hold everything met in a long session: the
+mover name table holds 64 names (the game has 39 movers; 16 ran out, and every
+creature met later glided on its standing idle), and a full layout table (64
+models) gives an entry no live actor uses to the next model instead of leaving
+it on the default idle frames. `tools/actor_anim_reach.py --id1 <image id1>
+--library <build>/actor-library/creature-library.json` checks a build: every
+creature whose original animation has walk, run or attack reaches those groups
+through its layout or its mover, and the movers fit the name table.
 
 ### Combat
 

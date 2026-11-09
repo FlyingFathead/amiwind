@@ -74,9 +74,17 @@ import struct
 # Re-pinned 2026-11-09 for the shared actor shapes (IMAGE-BIGGER-THAN-ORIGINAL-62, BUILD-EDGE-PIN-SHARED-SHAPES-63):
 # the digest gains only the two defines AW_SHAPE_SHARED and AW_SHAPE_SHARED_REF (the alias file loader's shape
 # reference); the packed-edge allocation is unchanged. Whole-file hash of the same model.c below.
-MODEL_C_WHOLE_SHA256='06089b7d3c6149a12543a589a67110e771382bd25ee4e1cbf8df6a71365db40d'
+# Re-pinned 2026-11-09 for the actor skin tiles (IMAGE-BIGGER-THAN-ORIGINAL-63, method B, off by default): the digest
+# gains only the five defines AW_SKIN_TILED, AW_TILE, AW_TILE_BYTES, AW_TILE_RUN and AW_TILE_GAP of the alias file
+# loader's tiled skin (checked: the dev2 model.c gives the earlier digest 90cd1fbc...; no other define or brush or
+# edge-cache line differs); the packed-edge allocation is unchanged. Whole-file hash of the same model.c below.
+# Re-pinned 2026-11-09 for BUILD-CHIM-HEAP-KEY-LOADER-63 (engine_loader_policy VERSION 2): a #define or declaration
+# counts only when the brush and edge-cache loaders reach it, directly or through other counted items, so the tiled
+# skin and shared shape defines of the alias file loader drop out (checked: the dev2 model.c gives the same digest
+# b86d25b6...); model.c itself is unchanged and so is the packed-edge allocation. Whole-file hash unchanged below.
+MODEL_C_WHOLE_SHA256='ce7143b369cec7c708558170402b4bd62a1f7dd05681c7e501f50d7f51a76e3b'
 SOURCE_HASHES={
-    'model.c':'90cd1fbcbc17823484340fe17d146e094d5969b630fa728a6c0812ec29ae6117',   # brush_edge_digest
+    'model.c':'b86d25b65444048d241bfbcfc11000cfd235e73bbced80f47bd5c4280020ac75',   # brush_edge_digest
     'model.h':'34d8a139baba066b2d775a591b35fc4cd1e8a7326d34ca7759d036a1654244f8',
     'r_draw.c':'08464e4c3bbb98ed197f7c42c5b013818d2ef4fffd1a5727ed9a6a4c3385cce4',
     'asm_draw.h':'15dafafe33898852972379fc48524346c287a342ba95f17c01becdc75926eba1',

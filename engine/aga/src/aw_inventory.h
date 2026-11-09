@@ -254,8 +254,12 @@ extern int (*aw_inventory_command)(void);
 /* the same two for the inventory window (aw_worldui.c defines them, so its fixtures link without aw_inventory.c) */
 extern int (*aw_worldui_use)(const aw_inventory_item_t *it);
 /* MWSCRIPT-GAP-FUNCTIONS-62: the item's script around its equipping (aw_mwhost.c; phase 0 before: 1 = its
- * PCSkipEquip takes the equipping; phase 1 after it was worn: OnPCEquip set) */
+ * PCSkipEquip takes the equipping; phase 1 after it was worn: OnPCEquip set; phase 2 after it was taken off: OnPCEquip
+ * 0, as OpenMW 0.51 InventoryStore::unequipSlot) */
 extern int (*aw_worldui_equip_script)(const aw_inventory_item_t *it,int phase);
+/* the same hook for the console's aw_inventory equip / unequip (aw_inventory.c defines it, aw_mwhost.c sets it;
+ * MWSCRIPT-UNPLACED-RECORD-SCRIPTS-61) */
+extern int (*aw_inventory_equip_script)(const aw_inventory_item_t *it,int phase);
 extern void (*aw_worldui_alchemy_open)(void);
 /* MADE-ITEM-NO-PICTURE-62: the id whose picture the inventory row shows (a made item's base item; aw_alchemy.c) */
 extern const char *(*aw_worldui_icon_id)(const char *id);

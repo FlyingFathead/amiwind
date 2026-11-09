@@ -1,6 +1,6 @@
 # AmiWind console commands
 
-_Generated from `config/debug-commands.txt` with AmiWind v0.0.63-dev2._
+_Generated from `config/debug-commands.txt` with AmiWind v0.0.63-dev4._
 
 Open the console with F10 or the backquote key and type
 a command, for example `dbg headlamp on`. This page is generated from

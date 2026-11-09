@@ -399,8 +399,10 @@ static void inventory_action(int action){
             inventory->context=0;inventory_refresh();return;
         }
         AW_CombatEquipmentStore();
-        if(worn)ok=AW_InventoryUnequip(&aw_state,item->id);
-        else if(aw_worldui_equip_script && aw_worldui_equip_script(item,0)){
+        if(worn){
+            ok=AW_InventoryUnequip(&aw_state,item->id);
+            if(ok && aw_worldui_equip_script)aw_worldui_equip_script(item,2);   /* taken off: OnPCEquip 0 */
+        }else if(aw_worldui_equip_script && aw_worldui_equip_script(item,0)){
             /* its script took the equipping (PCSkipEquip): nothing is worn, the script says what happens */
             inventory->message[0]=0;inventory->context=0;inventory_refresh();return;
         }else{

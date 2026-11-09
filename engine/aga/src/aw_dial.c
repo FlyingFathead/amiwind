@@ -155,6 +155,12 @@ static int reaction_of(const aw_dial_t *d,int a,int b) {
         if(same_id(changes[i].a,na) && same_id(changes[i].b,nb))return changes[i].set?changes[i].value:base+changes[i].value;
     return base;
 }
+/* v0.0.63 (MWSCRIPT-GAPS-63; OpenMW 0.51 dialogueextensions.cpp OpGetFactionReaction): faction A's reaction toward B
+ * with the scripts' changes; 0 when either faction is unknown */
+int AW_DialReaction(const aw_dial_t *d,const char *a,const char *b) {
+    int x=faction_index(d,a),y=faction_index(d,b);
+    return x<0 || y<0?0:reaction_of(d,x,y);
+}
 /* saved: "AWFR" u8 rows, each u8 a length, a, u8 b length, b, u8 set, i32 value. Bytes written, -1 no room. */
 int AW_DialReactionsExport(unsigned char *out,int capacity) {
     int i,at=5,need=5;

@@ -1,6 +1,6 @@
 # Build cache: resuming and reusing work safely
 
-_Last updated with AmiWind v0.0.63-dev2 (9 November 2026)._
+_Last updated with AmiWind v0.0.63-dev4 (9 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -10,9 +10,11 @@ _Last updated with AmiWind v0.0.63-dev2 (9 November 2026)._
 - [Why reuse is safe](#why-reuse-is-safe)
 - [Early cutoff](#early-cutoff)
 - [Code keys and early cutoff in the unit caches](#code-keys-and-early-cutoff-in-the-unit-caches)
+  - [The table units and the actor ground fit (v0.0.63-dev4)](#the-table-units-and-the-actor-ground-fit-v0063-dev4)
   - [Collision defaults of v0.0.48-dev2: what rebuilds once](#collision-defaults-of-v0048-dev2-what-rebuilds-once)
 - [Narrowed reuse: what a stage really used](#narrowed-reuse-what-a-stage-really-used)
 - [Reuse preflight](#reuse-preflight)
+- [Reuse every earlier run](#reuse-every-earlier-run)
 - [Run names](#run-names)
 - [Entry check](#entry-check)
 - [Developer mode](#developer-mode)
@@ -73,6 +75,8 @@ A failure forces the builder to rebuild only the minimum, within safe limits:
 | Image step units | one guard torch model; one player view model (body, torch body, water body or inventory poses of one race and sex, 80 in all) | the game data (the build's input lock), the palette, the unit's record (for the player view: race, sex and the body fields a torch or water body reads), the sources, the settings | `prepare_guard_torches`, `player_view_schedule.run_view` (`player-view`; also the fitting try that fitted each body, as a `fit` entry) |
 | Stage units | one NPC appearance of the actor library (one standing model for every record that looks the same); one creature or corpse model of the actor library | the game data (the build's input lock), the palette, the unit's record (for an appearance: the appearance as the bake reads it, its library key and animation profile; for a creature: method, creature, mesh, scale), the code the bake runs (`bake_standing`, `_unit`) and the settings that code reads; never which records the CHIM towns place | `tools/actor_units.py` (`npc-appearance`, `creature-model`); `tools/actor_units_seed.py` imports a finished stage folder once, only for unchanged bake code |
 | Image step units | one CHIM room resident's ground fit (2,342 placements in 761 rooms) | the room map as installed (before the fit writes origins), the store models the room places, the actor's model and layout, the placement (entity, authored origin, angles), the fit code (`_fit_head`, `_fit_search`, `finish`) and its settings | `tools/actor_units.py` (`room-actor`), called by `room_actor_bake._bake`; each placement kept the moment its search settles |
+| Image step units | one actor ground fit of the map bake (every ground-mode actor of the staged maps, one unit per placement) | the bytes of the map that holds the placement, the placement (entity, authored origin, angles), the actor's model and layout, for a town map its directory of core maps and which maps it names exist, the fit code (`_fit_head`, `_fit_search`, `finish`) and the settings it reads (the search mode) | `tools/actor_grounding.py` (`actor-ground`), called by `bake_ground`; each placement kept the moment its search settles; `--rebuild-unit actor-ground:MAP:REF` fits one again |
+| Image step units | the NPC voice table (`npc-voices.lut`) and the dialogue table (`dialogue.lut`), one unit each | the masters' SHA-256 (the voice table also the sound sources and the media stage's converted lengths) and the code the bake runs (voice: `build_master`, `sound_resolver`; dialogue: `build_master`) | `tools/greeting_lut.py` (`npc-voice-table`), `tools/dialogue_lut.py` (`dialogue-table`) |
 | Image step units | one guard torch skip verdict (a guard whose base model the source bake does not reproduce) | the guard cache's own inputs and the code `_convert_guard` runs | `tools/actor_units.py` (`guard-torch-skip`), called by `prepare_guard_torches.prepare` |
 | Image step units | one arena fighter (its own fight frame groups, carried weapon and shield) | the game data (the build's input lock), the palette, the record id and stance, the code `bake_fighter` runs and the settings it reads | `tools/actor_units.py` (`arena-fighter`), called by `prepare_combat` |
 | Stage units | one world terrain map, one NPC gallery model, one CHIM unit, one sound or movie | each stage's own content-addressed cache (a gallery model: its appearance record, the bytes of its meshes and textures, the palette, and the code its converter can reach) | `world-terrain-v1`, `npc-gallery-v1`, `chim-units`, `asset-pool-v1` |
@@ -216,10 +220,12 @@ when its own source tree (the checkout its stage ran from) gives exactly its rec
 Until 27 October 2026 the actor record's and the magic effects' header edits planned a full CHIM world rebuild for
 v0.0.54 builds.
 
-`engine/aga/src/model.c` counts as its loader policy (`tools/engine_loader_policy.py`, `policy1:`,
+`engine/aga/src/model.c` counts as its loader policy (`tools/engine_loader_policy.py`, `policy2:`,
 BUILD-CHIM-HEAP-KEY-LOADER-63) when only the heap audits name it (engine_facts `POLICY_MODULES`): the sprite, BSP slice,
 alias stream and packed-edge policies they extract, each policy's refusal text when it does not recognise the loader,
-and the digest of the brush and edge-cache loaders (every `#define` and declaration of the file counts too). The
+and the digest of the brush and edge-cache loaders. A `#define` or declaration (a limit, a table, a static buffer, a
+type) counts only when those loaders reach it, directly or through other counted items, and an item that names
+nothing always counts; since `policy2:` a define that only the alias or sprite readers use re-keys nothing. The
 packed-edge pin (`tools/edge_cache_heap.py`) compares that digest instead of the whole file (`AMIWIND_EDGE_PIN=whole`
 keeps the whole-file pin selectable). An alias or sprite reader edit, or a console message, re-keys no CHIM world
 stage; a loader limit or a brush loader edit does (tests/test_engine_loader_policy.py). Until 9 November 2026 every
@@ -260,6 +266,18 @@ not on whole source files (`tools/code_key.py`):
   not found under its key is looked up under that form, and a gallery model under its
   previous identity, so the first build with code keys reuses everything stored before.
   `AMIWIND_UNIT_CODE_KEYS=off` keeps the whole-file keys (A/B).
+
+### The table units and the actor ground fit (v0.0.63-dev4)
+
+Before v0.0.63-dev4 the voice and dialogue tables keyed their one unit on whole files, and through them on the script
+compiler's game data and function table (`tools/mwscript/gamedata.py`, `functions.py`), which change in most builds
+while the tables' bytes do not: every v0.0.63 dev build baked both again (about 15 s each), and the dialogue key named
+a module the build's minute-one check could not resolve, so it reported the key as unreadable. Both now key on their
+bake's reach; the two rules they read of the script compiler (a sound's hearing distances, a script's local slots) live
+in small modules of their own (`mwscript/hearing.py`, `mwscript/lexer.py`), unchanged. Their units stored by the
+v0.0.62 and v0.0.63 dev builds are found again (`unit_store.LEGACY_SOURCES`). The map bake's actor ground fit
+(`bake_ground`, about 41 s) had no cache; it keeps one unit per placement (`actor-ground`). Tests:
+`tests/test_table_unit_keys.py`.
 
 ### Collision defaults of v0.0.48-dev2: what rebuilds once
 
@@ -381,6 +399,56 @@ options after `--` when given, else the options OLD_RUN recorded (`build_argv` i
 `build-state.json`, recorded by every build from 20 October 2026), else the build defaults,
 and prints which (`Stage environment: ...`). The build and the plan set that environment
 through the same functions (`export_option_environment`, `export_converter_environment`).
+
+## Reuse every earlier run
+
+`--reuse-from RUN` reuses stages of exactly one earlier run. `--reuse-all-available`
+looks every stage up in every earlier run of the workspace and takes it from the newest
+run that can deliver it. The rule is the same: the checksum of exactly what a stage
+reads; equal means reuse, different means run. Origin: the stopped v0.0.63-dev1 run had
+26 passed stages, and they could not be combined with the stages of the v0.0.62 release
+run (BUILD-UNIT-PREFLIGHT-63).
+
+- **The stage index.** `WORKSPACE/cache/stage-index-v1.json` holds one row per passed
+  stage of every run (run, stage, fingerprint, start time), read from the runs'
+  `build-state.json`. A run whose state changed since is read again (one file status per
+  run), so the lookup takes seconds. Every build writes it when it ends, passed or not:
+  the stages a stopped run passed count too. `python3 tools/reuse_all.py index WORKSPACE`
+  prints it.
+- **The sources.** The runs holding at least one stage with its fingerprint now, newest
+  first, and the two newest runs that passed any of the same stages (for narrowed reuse),
+  at most eight; a `--reuse-from RUN` given with it is looked at first. Each is planned
+  exactly as `--reuse-from` plans it: fingerprint, complete output record, every file's
+  SHA-256, the files later stages replace there. A stage a newer run already delivers is
+  not hashed again in an older one.
+- **Combining.** Each stage takes the newest run that delivers it, unless
+  - an earlier stage it depends on comes from another run whose recorded outputs of that
+    stage differ (the stage then takes the run its dependency comes from, or runs); or
+  - a file it leaves to a later stage (replaced there in its own run) is not delivered by
+    that later stage as this build takes it.
+  The checks of a single source stay: a stage whose earlier stages ran again in this build
+  is reused only if they wrote the same files again.
+- **Minute one.** Before any stage runs, one line per stage: `reused from RUN`, or
+  `rebuild: WHY`, and for a stage that bakes into a unit cache
+  `CACHE: N of T units from the cache` (N: units stored under this build's key for that
+  cache or an older key form it still looks up; T: the units the cache holds under one key).
+- **The stop.** The build stops in its first minute when a stage it rebuilds would bake
+  again more than 5 % of the units its unit caches hold, or reaches a per-item bake with no
+  cache (every item made again). `--allow-rebuild STAGE:REASON` (repeatable) lets that
+  stage run; the reason goes into `build-state.json` (`stage_cache.minute_one`). The
+  per-item bakes with no cache are listed in `tools/reuse_all.py` (`KNOWN_UNCACHED_BAKES`):
+  the NPC standing models, the creature library and the arena fighters (moving onto the
+  gallery and parts caches), and the actors' ground heights. `tests/test_reuse_all.py`
+  fails on any new one.
+
+`python3 tools/reuse_all.py predict RUN --workspace WORKSPACE` is the read-only dry run:
+RUN's stages keyed with this checkout and looked up in the index (an upper bound, no outputs
+checked). Example: the v0.0.63-dev1 head's own stage keys, looked up in the 123 runs of the
+development workspace, found 25 of 47 stages in earlier runs (all 25 in the stopped dev1
+run, the newest); `--reuse-from` the v0.0.62 release run alone holds 24 of them.
+
+The build server's development and release chains build with `--reuse-all-available`; the
+`--reuse-from` run the request names is looked at first (docs/AW.md).
 
 ## Run names
 

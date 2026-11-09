@@ -334,6 +334,132 @@ class NotYetByCallSites(unittest.TestCase):
         self.assertNotIn('setwaterlevel', F.HOST)
 
 
+class Uncalled(unittest.TestCase):
+    # v0.0.63 (MWSCRIPT-GAPS-63): functions no game script calls, carried for the console and add-on content: the
+    # magic effect family past the resistances (OpenMW statsextensions.cpp's table) and the reads of uncalled_call
+    EFFECTS = {'chameleon': '40', 'waterwalking': '2', 'swimspeed': '1', 'superjump': '9', 'flying': '10',
+               'armorbonus': '3', 'castpenalty': '48', 'silence': '46', 'blindness': 'AW_EFFECT_BLIND',
+               'paralysis': '45', 'invisible': '39', 'attackbonus': 'AW_EFFECT_FORTIFY_ATTACK',
+               'defendbonus': 'AW_EFFECT_SANCTUARY'}
+    READS = ('getcurrenttime', 'getmasserphase', 'getsecundaphase', 'getstartingpos', 'getstartingangle',
+             'pcget3rdperson', 'pcforce1stperson', 'pcforce3rdperson', 'getpcjumping', 'getspellreadied',
+             'getstandingactor', 'getcollidingactor')
+
+    def test_each_carried_by_the_host_and_in_the_console(self):
+        sys.path.insert(0, str(ROOT / 'tools'))
+        from mwscript import functions as F
+        host = (SRC / 'aw_mwhost.c').read_text(encoding='utf-8')
+        code = (SRC / 'aw_mwcode.h').read_text(encoding='utf-8')
+        table = (ROOT / 'config/mwconsole-functions.txt').read_text(encoding='ascii').split('\n')
+        for e, number in self.EFFECTS.items():
+            row = '{AWF_GET%s,AWF_SET%s,AWF_MOD%s,%s,-1,-1}' % (e.upper(), e.upper(), e.upper(), number)
+            self.assertIn(row, host)
+            for verb in ('get', 'set', 'mod'):
+                name = verb + e
+                self.assertIn(name, F.HOST, name)
+                self.assertTrue(F.FUNCTIONS[name].run)
+                self.assertIn('#define AWF_%s %d\n' % (name.upper(), F.FUNCTION_NUMBERS[name]), code)
+                self.assertTrue(any(l.startswith(name + ' host ') for l in table), name)
+            self.assertIn('set' + e, F.HOST_EFFECTS)
+        for name in self.READS:
+            self.assertIn(name, F.HOST, name)
+            self.assertIn('#define AWF_%s %d\n' % (name.upper(), F.FUNCTION_NUMBERS[name]), code)
+            self.assertIn('AWF_' + name.upper(), host.split('static int uncalled_call(')[1].split('static int gap_call(')[0])
+            self.assertTrue(any(l.startswith(name + ' host ') for l in table), name)
+        self.assertTrue({'pcforce1stperson', 'pcforce3rdperson'} <= F.HOST_EFFECTS)
+        self.assertIn('if(k>=RESIST_PASSIVE_FIRST)', host)
+        self.assertIn('{AWF_GETWATERBREATHING,AWF_SETWATERBREATHING,AWF_MODWATERBREATHING,AW_EFFECT_WATER_BREATHING,-1,-1},\n'
+                      '    /* v0.0.63', host)   # Water Breathing stays row 10, RESIST_PASSIVE_FIRST
+
+    BATCH2 = ('getpcrunning', 'forcejump', 'clearforcejump', 'forcemovejump', 'clearforcemovejump', 'getforcejump',
+              'getforcemovejump', 'getarmortype', 'samefaction', 'getfactionreaction', 'removeeffects',
+              'removespelleffects', 'addsoulgem', 'dropsoulgem', 'enablelevelupmenu')
+
+    def test_batch2_carried(self):
+        sys.path.insert(0, str(ROOT / 'tools'))
+        from mwscript import functions as F
+        host = (SRC / 'aw_mwhost.c').read_text(encoding='utf-8')
+        code = (SRC / 'aw_mwcode.h').read_text(encoding='utf-8')
+        body = host.split('static int uncalled_call(')[1].split('static int gap_call(')[0]
+        table = (ROOT / 'config/mwconsole-functions.txt').read_text(encoding='ascii').split('\n')
+        for name in self.BATCH2:
+            self.assertIn(name, F.HOST, name)
+            self.assertIn('#define AWF_%s %d\n' % (name.upper(), F.FUNCTION_NUMBERS[name]), code)
+            self.assertIn('AWF_' + name.upper(), body)
+            if name != 'removespelleffects':   # its argument is the compiler's spell row
+                self.assertTrue(any(l.startswith(name + ' host ') for l in table), name)
+        move = (SRC / 'aw_move.c').read_text(encoding='utf-8')
+        self.assertIn('if(ground_now && (aw_move_force_jump || (aw_move_force_move_jump && last_factor>0)))p->v.button2=1;',
+                      move)
+        self.assertIn('int AW_DialReaction(const aw_dial_t *d,const char *a,const char *b) {',
+                      (SRC / 'aw_dial.c').read_text(encoding='utf-8'))
+        # the ones left keep a named reason in the census
+        doc = json.loads(C.CONFIG.read_text(encoding='utf-8'))
+        why = {r['name'].casefold(): r.get('why', '') for r in doc['commands'] if r['state'] == 'planned'}
+        for name in ('setwaterlevel', 'getwindspeed', 'togglegrid', 'toggleloadfade'):
+            if name in why:
+                self.assertIn(C.NOT_YET[name], why[name])
+
+    BATCH3 = ('show', 'showvars', 'sv', 'togglescripts', 'toggleai', 'tai', 'resetactors', 'ra', 'outputrefinfo',
+              'ori', 'user1', 'user2', 'user3', 'user4', 'togglecollision', 'tcl', 'togglegodmode', 'tgm',
+              'togglemenus', 'tm', 'togglevanitymode', 'tvm', 'centeroncell', 'coc', 'centeronexterior', 'coe', 'fixme')
+
+    def test_batch3_console_group_carried(self):
+        # v0.0.63 batch 3: the console group as script functions too (aw_mwhost.c console_group_call)
+        sys.path.insert(0, str(ROOT / 'tools'))
+        from mwscript import functions as F
+        host = (SRC / 'aw_mwhost.c').read_text(encoding='utf-8')
+        code = (SRC / 'aw_mwcode.h').read_text(encoding='utf-8')
+        body = host.split('static int console_group_call(')[1].split('static int gap_call(')[0]
+        table = (ROOT / 'config/mwconsole-functions.txt').read_text(encoding='ascii').split('\n')
+        for name in self.BATCH3:
+            self.assertIn(name, F.HOST, name)
+            self.assertIn(name, F.HOST_EFFECTS, name)
+            self.assertTrue(F.FUNCTIONS[name].run, name)
+            self.assertIn('#define AWF_%s %d\n' % (name.upper(), F.FUNCTION_NUMBERS[name]), code)
+            self.assertIn('AWF_' + name.upper(), body)
+            self.assertTrue(any(l.startswith(name + ' host ') for l in table), name)
+        self.assertIn('if((k=console_group_call(instance,target,function,numbers,count,strings,nstrings,result))!=0)',
+                      host)
+        amb = (SRC / 'aw_ambient.c').read_text(encoding='utf-8')
+        self.assertIn('int AW_AmbientEnabled(void) {return ambient_on;}', amb)
+        self.assertIn('int AW_AmbientResetActors(void) {', amb)
+        # the aliases keep their AmiWind line: the script form runs the same one
+        con = (SRC / 'aw_mwconsole.c').read_text(encoding='utf-8')
+        for line in ('"noclip"', '"dbg god"', '"dbg killhud"', '"dbg vanitycam on"', '"dbg unstuck"'):
+            self.assertIn(line, con)
+            self.assertIn('console_exec(%s)' % line, body)
+        doc = json.loads(C.CONFIG.read_text(encoding='utf-8'))
+        state = {r['name'].casefold(): r['state'] for r in doc['commands']}
+        for name in ('show', 'showvars', 'togglescripts', 'toggleai', 'resetactors', 'ori', 'outputrefinfo', 'user1'):
+            self.assertEqual(state[name], 'vm', name)
+        why = {r['name'].casefold(): r.get('why', '') for r in doc['commands'] if r['state'] == 'planned'}
+        for name in ('togglesky', 'togglewater', 'toggleworld', 'testcells', 'togglefogofwar'):
+            self.assertIn(C.NOT_YET[name], why[name])
+
+    def test_console_only_toggles_mapped(self):
+        # the original's console-only toggles with an AmiWind switch: aliases; "toggle CVAR" flips it in console_exec
+        con = (SRC / 'aw_mwconsole.c').read_text(encoding='utf-8')
+        host = (SRC / 'aw_mwhost.c').read_text(encoding='utf-8')
+        for row in ('{"tdt","toggledebugtext","dbg hud",0}', '{"tst","togglestats","dbg fps",0}',
+                    '{"tcs","togglecombatstats","toggle aw_combat_readout",0}',
+                    '{"tl","togglelights","toggle r_fullbright",0}', '{"repairedonme",NULL,"echo 0",0}'):
+            self.assertIn(row, con)
+        self.assertIn('if(!strncmp(text,"toggle ",7)){', host)
+        self.assertIn('Cvar_SetValue(v->name,v->value?0.0f:1.0f);', host)
+        doc = json.loads(C.CONFIG.read_text(encoding='utf-8'))
+        state = {r['name'].casefold(): r['state'] for r in doc['commands']}
+        for name in ('toggledebugtext', 'togglestats', 'togglecombatstats', 'togglelights', 'repairedonme'):
+            self.assertEqual(state[name], 'alias', name)
+
+    def test_the_census_names_them_vm(self):
+        doc = json.loads(C.CONFIG.read_text(encoding='utf-8'))
+        state = {r['name'].casefold(): r['state'] for r in doc['commands']}
+        for name in ('getchameleon', 'setinvisible', 'getcurrenttime', 'pcforce3rdperson'):
+            if name in state:
+                self.assertEqual(state[name], 'vm', name)
+
+
 class FunctionTable(unittest.TestCase):
     def test_the_table_is_the_compilers(self):
         sys.path.insert(0, str(ROOT / 'tools'))

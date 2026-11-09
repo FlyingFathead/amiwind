@@ -158,6 +158,7 @@ void AW_LevelupRestore(aw_character_t *c)
     int i;
     if(!c)return;
     for(i=0;i<3;i++)if(c->current[i]<c->maximum[i])c->current[i]=c->maximum[i];
+    c->current[0]=c->maximum[0];   /* PLAYER-HEALTH-OVER-MAX-63: health restores to its maximum, never stays above it */
 }
 void AW_LevelupMax(const aw_levelup_rules_t *r,aw_character_t *c,float magicka_mult)
 {

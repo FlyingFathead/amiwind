@@ -200,5 +200,20 @@ class LevelupSourceContractTests(unittest.TestCase):
         self.assertIn('Levelling', (ROOT / 'docs/COMBAT.md').read_text(encoding='utf-8'))
 
 
+class SpawnHealthTests(unittest.TestCase):
+    """PLAYER-HEALTH-OVER-MAX-63: a map loaded fresh (a console map, a restart) gave the player Quake's 100 of a
+    sheet maximum of 40; the spawn takes the sheet's health, never above its maximum."""
+
+    def test_fresh_spawn_takes_the_sheet_health_capped_at_the_maximum(self):
+        scene = code('aw_scene.c')
+        spawn = scene[scene.index('void AW_SceneSpawn(edict_t *p)'):scene.index('void AW_SceneTick(void)')]
+        fresh = spawn[spawn.index('aw_scene_followers(p,-1)'):spawn.index('AW_IntroSpawn();')]
+        self.assertIn('if(aw_character.valid && aw_character.maximum[0]>0)', fresh)
+        self.assertIn('p->v.health=aw_character.current[0]>0&&aw_character.current[0]<=aw_character.maximum[0]?'
+                      'aw_character.current[0]:aw_character.maximum[0];', re.sub(r'\s+', '', fresh))
+        # a load sets its own health after this
+        self.assertLess(spawn.index('aw_character.maximum[0]>0'), spawn.index('AW_SaveSpawn();'))
+
+
 if __name__ == '__main__':
     unittest.main()

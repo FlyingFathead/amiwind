@@ -140,7 +140,8 @@ int Mod_TryStreamAlias(model_t *mod) {
     if(total>AW_ALIAS_STREAM_LIMIT){fclose(s.file);return 0;}
     s.total=(int)total;
     AW_AliasStreamRead(&s,&kind,sizeof(kind));
-    if(LittleLong(kind.type)==ALIAS_SKIN_GROUP){fclose(s.file);return 0;}
+    /* A tiled skin (model.c AW_SKIN_TILED) is rebuilt by the file loader (AW_AliasFile, AW_TiledSkinExpand). */
+    if(LittleLong(kind.type)==ALIAS_SKIN_GROUP || (unsigned int)LittleLong(kind.type)==AW_SKIN_TILED){fclose(s.file);return 0;}
     if(LittleLong(kind.type)==AW_SKIN_SHARED){
         shared=1;AW_AliasStreamRead(&s,ref,sizeof(ref));
         if((size_t)(ref[16]|(ref[17]<<8)|(ref[18]<<16)|((unsigned long)ref[19]<<24))!=skinbytes)

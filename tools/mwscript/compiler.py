@@ -143,12 +143,16 @@ def dialogue_read_slots(data, program):
     return out
 
 
-def bindings(program, compiled=None):
+def bindings(program, compiled=None, addons=()):
     """The placed references that carry a script, sorted by reference number:
     [{'reference', 'script' (index), 'flags', 'cell' (x, y) or interior string index, 'position' (source units)}].
-    COMPILED: leave out the references whose script is inert today (dead weight; back when it is compiled again)."""
+    COMPILED: leave out the references whose script is inert today (dead weight; back when it is compiled again).
+    ADDONS: the add-on masters whose world the image carries (MWSCRIPT-ADDON-ATTACH-62, e.g. ('Tribunal.esm',)):
+    their own placements are bound too, by their load-order key (gamedata.addon_key); none today."""
     rows = []
-    for ref in program.data.references:
+    wanted = {m.casefold() for m in addons}
+    extra = [r for r in getattr(program.data, 'addon_references', []) if r['master'].casefold() in wanted]
+    for ref in list(program.data.references) + extra:
         key = ref['script']
         if key not in program.scripts.index:
             continue

@@ -137,6 +137,8 @@ int main(void)
      assert(AW_LevelupSetLevel(&rules,&s,AW_LEVEL_MAX)==83);
      s.current[0]=1;AW_LevelupRestore(&s);assert(s.current[0]==s.maximum[0] && s.current[1]==100 && s.current[2]==200);
      s.current[2]=250;AW_LevelupRestore(&s);assert(s.current[2]==250);           /* above the maximum: kept */
+     /* PLAYER-HEALTH-OVER-MAX-63: health above its maximum (Quake's spawn 100 of 40) restores to the maximum */
+     {float m=s.maximum[0];s.current[0]=m+60;AW_LevelupRestore(&s);assert(s.current[0]==m);}
      s.modifiers[1]=10;s.modifiers[0]=5;s.damage[3]=20;s.skills[4]=12;s.progress[4]=.5f;
      AW_LevelupMax(&rules,&s,1.5f);
      for(i=0;i<8;i++)assert(s.attributes[i]==100 && !s.damage[i]);

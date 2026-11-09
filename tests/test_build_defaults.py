@@ -289,6 +289,8 @@ OPTIONS = {
     'no_profile': 'tooling', 'perf_guard': 'tooling', 'perf_guard_baselines': 'tooling', 'size_guard': 'tooling', 'size_baseline': 'tooling',
     'size_growth_margin': 'tooling', 'size_growth_reason': 'tooling', 'log_level': 'tooling', 'quiet': 'tooling', 'reuse_from': 'tooling', 'reuse_mode': 'tooling', 'rebuild_stage': 'tooling',
     'accept_rebuild': 'tooling', 'any_run_name': 'tooling',
+    # Reuse every earlier run (tools/reuse_all.py, BUILD-UNIT-PREFLIGHT-63): which run a stage is taken from, never what it holds.
+    'reuse_all_available': 'tooling', 'allow_rebuild': 'tooling',
     # A first-time user's build and the release's from-scratch check (tools/clean_build.py): outputs unchanged.
     'clean': 'check', 'public_defaults': 'check', 'source_commit': 'tooling',
     'developer_mode': 'tooling', 'working_version': 'tooling', 'accept_version_mismatch': 'tooling',
@@ -316,6 +318,8 @@ OPTIONS = {
     'media_catalogue': 'mode',
     # Repeated content stored once (tools/payload_share.py): on by default since v0.0.47; off stores every copy
     'file_aliases': 'shipped default', 'shared_skins': 'shipped default', 'shared_shapes': 'shipped default',
+    # Skin tiles (IMAGE-BIGGER-THAN-ORIGINAL-62, method B): EXPERIMENTAL, off by default until measured on the Pi 4B
+    'skin_tiles': 'mode',
     # Modular NPCs (docs/MODULAR_NPCS.md): EXPERIMENTAL, whole by default
     'npc_models': 'mode', 'npc_parts_face_cap': 'tooling', 'npc_parts_policy': 'tooling', 'parts_cache': 'tooling', 'storage_pool_dir': 'tooling', 'stair_walk': 'check',
     # The free space a build needs (tools/disk_need.py, BUILD-DISK-NEED-UNKNOWN-52): machine settings
@@ -388,6 +392,9 @@ class DefaultBuildShipsTheRelease(unittest.TestCase):
         self.assertIn('--shared-shapes', image)
         self.assertNotIn('--shared-shapes', dict(steps('--shared-shapes', 'off'))['image'])
         self.assertNotEqual(steps('--shared-shapes', 'off'), steps())
+        # skin tiles (method B): EXPERIMENTAL, off by default; on passes it to the image step
+        self.assertNotIn('--skin-tiles', image)
+        self.assertIn('--skin-tiles', dict(steps('--skin-tiles', 'on'))['image'])
 
     def test_default_build_has_the_v047_dev2_switches(self):
         # Decided for the project, 2026-10-21: v0.0.47 ships v0.0.47-dev2's content. That build was made with

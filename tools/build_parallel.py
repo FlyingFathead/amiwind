@@ -583,12 +583,19 @@ def completed_map(function, items, jobs=None, cost=None):
                             return
                         pending.add(_submit_chunk(pool, function, batch, status, chunks))
 
+                # Results come back to the caller one at a time; between two of them the finished tasks are collected
+                # and freed workers get their next unit before the caller's work on the result runs (a caller that
+                # stores each unit, unit_store.run_each, took the whole batch of finished units in one go while the
+                # pool sat with queued units and free workers: BUILD-IMAGE-QUEUE-STALL-62, 4 queued / 0 running)
+                ready = []
                 try:
                     refill()
-                    while pending:
+                    while pending or ready:
                         # under the scheduler a short wait, so a raised allowance starts more units at once, not only
-                        # when a unit finishes (maintainer 2026-10-19: pools follow the live allowance continuously)
-                        done, pending = wait(pending, timeout=None if limit is None else _grow_seconds(),
+                        # when a unit finishes (maintainer 2026-10-19: pools follow the live allowance continuously);
+                        # with results still to hand back, only what has finished by now
+                        done, pending = wait(pending, timeout=0 if ready else (None if limit is None
+                                                                               else _grow_seconds()),
                                              return_when=FIRST_COMPLETED)
                         results, error = [], None
                         for future in done:
@@ -612,9 +619,15 @@ def completed_map(function, items, jobs=None, cost=None):
                             flight = room()
                         if error is None and lost is None:
                             refill()
-                        yield from results
+                        ready.extend(results)
                         if error is not None:
+                            yield from ready
                             raise error
+                        if lost is not None:
+                            yield from ready      # nothing is out any more: hand back the rest, then a fresh pool
+                            break
+                        if ready:
+                            yield ready.pop(0)
                 finally:
                     for future in pending:
                         future.cancel()
@@ -748,17 +761,18 @@ def spread_map(function, items, jobs=None, cost=None, spread=None):
             if status:
                 status.end_of_input()
 
+        ready = []    # handed back one at a time, freed cores refilled between two (BUILD-IMAGE-QUEUE-STALL-62)
         try:
             refill()
-            while pending:
-                done, _ = wait(list(pending), timeout=None if limit is None else _grow_seconds(),
+            while pending or ready:
+                done, _ = wait(list(pending), timeout=0 if ready else (None if limit is None else _grow_seconds()),
                                return_when=FIRST_COMPLETED)
-                results = []
                 for future in done:
                     pending.pop(future)
-                    results.append(future.result())
+                    ready.append(future.result())
                 refill()
-                yield from results
+                if ready:
+                    yield ready.pop(0)
         finally:
             for future in pending:
                 future.cancel()

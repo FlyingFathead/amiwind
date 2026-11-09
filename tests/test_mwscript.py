@@ -111,8 +111,8 @@ if ( OnActivate == 1 )
     Activate
     PlaySound "Chime"
 endif
-COE 100 5
-COE 100 5
+ModWaterLevel 100
+ModWaterLevel 100
 End''',
     # the actor record (v0.0.54): stats, items, spells, combat, wander and the dead count reach the host
     'ActorUser': '''Begin ActorUser
@@ -773,9 +773,10 @@ class CompilerTests(unittest.TestCase):
         names = {c.name: c for c in compiled}
         calls = [a for _, n, a in awms.decode(names['NotYetUser'].code) if n == 'NOTYET']
         self.assertEqual(len(calls), 2)
-        self.assertEqual(calls[0][0], FUNCTION_NUMBERS['coe'])     # v0.0.62: FadeTo is carried out now
-        self.assertEqual(prog.strings.rows[calls[0][1]], 'coe')
-        self.assertEqual(calls[0][2] & 0x1F, 2)                    # two numbers: 100 5
+        # v0.0.63 batch 3: COE is carried out now; ModWaterLevel stays not yet (the water is baked into the maps)
+        self.assertEqual(calls[0][0], FUNCTION_NUMBERS['modwaterlevel'])
+        self.assertEqual(prog.strings.rows[calls[0][1]], 'modwaterlevel')
+        self.assertEqual(calls[0][2] & 0x1F, 1)                    # one number: 100
         cell = names['CellUser']
         # PositionCell: the player's moves are worked out here; the player's into a room no list names stays not yet;
         # another object's goes to the host (v0.0.62): the same NOTYET form, not counted as not yet
@@ -1817,7 +1818,7 @@ class InterpreterTests(unittest.TestCase):
         stats = next(l for l in out if l.startswith('stats')).split()
         self.assertGreater(int(stats[4]), 0)                       # quiet skips happened
         notyet = [l for l in out if l.split()[1:2] == ['notyet']]
-        # COE and PositionCell (the player's into a room no list names; the stub host carries out no call, so the
+        # ModWaterLevel and PositionCell (the player's into a room no list names; the stub host carries out no call, so the
         # other object's goes the same way), once each (OnActivate and Activate run since v0.0.51; never used here,
         # OnActivate reads 0; AIWander runs since v0.0.54)
         self.assertEqual(len(notyet), 2, notyet)
@@ -1959,15 +1960,16 @@ class ImportRouteTests(unittest.TestCase):
 
     def test_not_yet_calls_are_counted_and_handed_to_the_host(self):
         from mwscript.functions import FUNCTION_NUMBERS
-        travel = FUNCTION_NUMBERS['coe']
+        travel = FUNCTION_NUMBERS['modwaterlevel']    # v0.0.63 batch 3: COE is carried out now
         out = self.run_vm(4)
         calls = [l.split()[1:] for l in out if l.split()[1:3] == ['call', str(travel)]]
         self.assertTrue(calls, out)
-        self.assertEqual(calls[0], ['call', str(travel), '2', '100', '5', 'strings', '0'])
+        self.assertEqual(calls[0][:4], ['call', str(travel), '1', calls[0][3]])
+        self.assertEqual(calls[0][4:], ['strings', '0'])
         counted = {int(l.split()[1]): l.split() for l in out if l.startswith('function')}
         self.assertEqual(int(counted[travel][2]), len(calls))
-        self.assertEqual(int(counted[travel][3]), self.prog.strings.index['coe'])
-        travel_line = str(self.prog.strings.index['coe'])
+        self.assertEqual(int(counted[travel][3]), self.prog.strings.index['modwaterlevel'])
+        travel_line = str(self.prog.strings.index['modwaterlevel'])
         self.assertEqual(len([l for l in out if l.split()[1:3] == ['notyet', travel_line]]), 1)    # logged once
         # carried out by number (the host answers): no log, the host count instead
         out = self.run_vm(4, env={'CALLS': str(travel)})

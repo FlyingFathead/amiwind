@@ -207,7 +207,8 @@ int AW_CombatGodWorldDamage(int god,float damage,float *held) {
 }
 /* GODMODE-LAVA-DEATH-62: the player's health after a change of a script or a spell effect (SetHealth, ModCurrentHealth,
  * Damage Health, poison, the elements): in god mode it never falls below BEFORE (a heal still lands); MAXIMUM caps
- * what is kept when the maximum itself fell (never below 1). Not in god mode: AFTER as it is. */
+ * what is kept when the maximum itself fell (never below 1); MAXIMUM 0: the maximum did not fall, nothing is capped.
+ * Not in god mode: AFTER as it is. */
 float AW_CombatGodHealth(int god,float before,float after,float maximum) {
     if(!god || !(after<before))return after;
     if(maximum>0 && before>maximum)before=maximum<1?1:maximum;

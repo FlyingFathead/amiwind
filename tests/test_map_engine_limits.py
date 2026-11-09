@@ -111,8 +111,11 @@ class EngineLimitsTests(unittest.TestCase):
         self.assertEqual(writers, {'aw_arena.c', 'aw_items.c', 'aw_anim.c', 'aw_inventory.c', 'aw_halloween.c'})
         self.assertIn('if(i>=MAX_MODELS || model_names_used>=AW_HALLOWEEN_MAX_ROWS)return 0;',
                       (SRC / 'aw_halloween.c').read_text())
-        # aw_anim.c registers a layout's mover model only while the map loads (model_extras reads '>PATH')
-        self.assertIn("sv.state!=ss_loading || lazies>=MOVERS", (SRC / 'aw_anim.c').read_text())
+        # aw_anim.c registers a layout's mover model only while the map loads (model_extras reads '>PATH'), at most
+        # LAZIES names a level (CREATURE-BIPED-ANIMS-62: 16 ran out in a CHIM session, the masters have 39 movers)
+        anim = (SRC / 'aw_anim.c').read_text()
+        self.assertIn("if(i>=MAX_MODELS || sv.state!=ss_loading)return 0;", anim)
+        self.assertIn("if(lazies>=LAZIES)", anim)
         # aw_items.c precaches only while the map loads, from the .tag files model_extras reads
         self.assertIn("sv.state!=ss_loading", (SRC / 'aw_items.c').read_text())
         # the arena's slot and the dropped items' guaranteed room; more drops take only free slots (ITEM-WORLD-MODELS-58)

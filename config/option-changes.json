@@ -1132,6 +1132,33 @@
       "to": "on",
       "source": "tools/payload_share.py (IMAGE-BIGGER-THAN-ORIGINAL-62)",
       "note": "The texture coordinates and triangles several actor models repeat are stored once in progs/shapes/ and the engine rebuilds each model byte for byte before decoding (docs/PAYLOAD_SHARING.md; about 78 MB less on the v0.0.62 payload); off keeps both blocks in every model (the method before)"
+    },
+    {
+      "version": "0.0.63-dev3",
+      "option": "skin_tiles",
+      "flag": "--skin-tiles",
+      "change": "added",
+      "to": "off",
+      "source": "tools/payload_share.py (IMAGE-BIGGER-THAN-ORIGINAL-62, method B)",
+      "note": "EXPERIMENTAL, off by default until its place-load time is measured on the Pi 4B: on cuts the skins of the actor models into 16x16 tiles stored once in progs/tiles/ and each model keeps a table of tile numbers; the engine rebuilds each model byte for byte before decoding (docs/PAYLOAD_SHARING.md; about 319 MB less on the v0.0.63-dev1 payload, about 78 reads per skin load in place of one); off keeps the pixels in every model"
+    },
+    {
+      "version": "0.0.63-dev3",
+      "option": "reuse_all_available",
+      "flag": "--reuse-all-available",
+      "change": "added",
+      "to": false,
+      "source": "tools/reuse_all.py, tools/build_cache.py plan_all (BUILD-UNIT-PREFLIGHT-63)",
+      "note": "Every stage is looked up in every earlier run of the workspace (the stage index) and reused from the newest one that can deliver it, with every --reuse-from check; one line per stage before any stage runs, and a stop when a stage would bake stored units again or runs a per-item bake with no cache. Off = --reuse-from RUN alone, as before; the build server's development and release chains turn it on"
+    },
+    {
+      "version": "0.0.63-dev3",
+      "option": "allow_rebuild",
+      "flag": "--allow-rebuild",
+      "change": "added",
+      "to": [],
+      "source": "tools/reuse_all.py parse_allowed (BUILD-UNIT-PREFLIGHT-63)",
+      "note": "STAGE:REASON, repeatable: a stage the --reuse-all-available stop names runs anyway, the reason recorded in build-state.json"
     }
   ],
   "current": {
@@ -1169,6 +1196,7 @@
       "allow_data_differences": false,
       "allow_known_actor_ground_findings": null,
       "allow_placeholder": [],
+      "allow_rebuild": [],
       "amiga_libs": null,
       "amiga_libs_policy": "warn",
       "anim_kit": "on",
@@ -1285,6 +1313,7 @@
       "resource_plan": false,
       "resource_plan_json": null,
       "resource_threads": null,
+      "reuse_all_available": false,
       "room_batches": "all",
       "room_levelled_creatures": "table",
       "room_placed_creatures": "table",
@@ -1297,6 +1326,7 @@
       "shared_shapes": "on",
       "shared_skins": "on",
       "shared_sky_source": null,
+      "skin_tiles": "off",
       "skip_census": null,
       "skip_dressing": false,
       "stage": "aga",

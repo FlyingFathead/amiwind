@@ -419,8 +419,10 @@ def _fit_search(task):
 SEARCH_SLICE = 32
 
 
-def _fit_all(tasks, jobs):
-    """Heads, then the sliced offset searches, in ONE worker pool.
+def _fit_all(tasks, jobs, on_final=None):
+    """Heads, then the sliced offset searches, in ONE worker pool. ON_FINAL(index, result): called in this process the
+    moment a placement's result is final (its head needs no search, or every slice before its first hit is back, or
+    its search is exhausted), with a copy of what bake_ground reports for it (finish), so it can be stored at once.
 
     A placement whose authored spot fails searches OFFSETS in slices. Slices of
     all such placements are fed round-robin into the pool, so one long search
@@ -442,25 +444,43 @@ def _fit_all(tasks, jobs):
     def search_task(index, number, head):
         first = number * SEARCH_SLICE
         return (*tasks[index], head[1], first, min(first + SEARCH_SLICE, offsets))
+    def final(index, head, hit):
+        if on_final is not None:
+            on_final(index, dict(head[0]) if head[1] is None else finish(dict(head[0]), hit))
     if jobs <= 1 or not tasks:
-        heads = [_fit_head(task) for task in tasks]
-        found = {}
-        for index, head in enumerate(heads):
-            if head[1] is None:
-                continue
-            for number in range(slices):
-                hit = _fit_search(search_task(index, number, head))
-                if hit is not None:
-                    found[index] = hit
-                    break
+        heads, found = [], {}
+        for index, task in enumerate(tasks):
+            head = _fit_head(task)
+            heads.append(head)
+            if head[1] is not None:
+                for number in range(slices):
+                    hit = _fit_search(search_task(index, number, head))
+                    if hit is not None:
+                        found[index] = hit
+                        break
+            final(index, head, found.get(index))
         return heads, found
     workers = max(1, min(jobs, len(tasks) * slices))
     with worker_environment(), process_pool(workers) as pool:
         heads = list(pool.map(_fit_head, tasks))
         open_ = [index for index, head in enumerate(heads) if head[1] is not None]
+        for index, head in enumerate(heads):
+            if head[1] is None:
+                final(index, head, None)
         following = dict.fromkeys(open_, 0)
         first_hit, found, pending = {}, {}, {}
+        back = {index: set() for index in open_}     # slice numbers come back, per placement
+        closed = set()
         turn = [0]
+
+        def settle(index):
+            # final once every slice before the first hit is back (or every slice, without a hit)
+            if index in closed:
+                return
+            limit = first_hit.get(index, slices)
+            if following[index] >= limit and all(number in back[index] for number in range(limit)):
+                closed.add(index)
+                final(index, heads[index], found.get(index))
 
         def wanted(index):
             return following[index] < min(slices, first_hit.get(index, slices))
@@ -482,15 +502,20 @@ def _fit_all(tasks, jobs):
                 for future in done:
                     index, number = pending.pop(future)
                     hit = future.result()
+                    back[index].add(number)
                     if hit is not None and number < first_hit.get(index, slices):
                         first_hit[index], found[index] = number, hit
                 for future, (index, number) in list(pending.items()):
                     if number > first_hit.get(index, slices) and future.cancel():
                         pending.pop(future)
                 submit()
+                for index in open_:
+                    settle(index)
         finally:
             for future in pending:
                 future.cancel()
+        for index in open_:
+            settle(index)           # every placement settled by now; each handed on once
     return heads, found
 
 
@@ -518,6 +543,62 @@ def _bake_map(task):
     text = ENTITY_BLOCK.sub(update, data[0].decode('cp1252'))
     if changed[0]: data[0] = text.encode('cp1252'); path.write_bytes(pack_lumps(data))
     return path.name
+
+
+def ground_cache():
+    """The actor ground fit's share of the unit cache (tools/pass_cache.py UnitCache, AMIWIND_PASS_CACHE), or None when
+    the cache is off. One unit per placement, keyed on the fit's code (the head, the offset search and finish, with
+    what they reach: the collision scene, the sole samples, the core map check, the grounding policy files) and the
+    AMIWIND_* settings it reads (the search mode); the placement's own inputs are placement_inputs. (No module-level
+    names for it: this module's import-time code is in the keys of the room actor and CHIM region actor caches.)"""
+    import pass_cache
+    import unit_store
+    import check_actor_ground
+    return unit_store.bake_keyed_cache(
+        'actor-ground', {'format': 1},
+        pass_cache.source_digest((__file__, '_fit_head'), (__file__, '_fit_search'), (__file__, 'finish')),
+        pass_cache.previous_digests((__file__, '_fit_head'), (__file__, '_fit_search'), (__file__, 'finish')),
+        (__file__, check_actor_ground.__file__),
+        pass_cache.covered_lines((__file__, '_fit_head'), (__file__, '_fit_search'), (__file__, 'finish')))
+
+
+def _file_digest(path):
+    """SHA-256 of a file's bytes (None when it is missing), once per path and size/time in this process."""
+    import hashlib
+    memo = _file_digest.__dict__.setdefault('memo', {})
+    path = Path(path)
+    try:
+        info = path.stat()
+    except OSError:
+        return None
+    key = (str(path), info.st_size, info.st_mtime_ns)
+    if key not in memo:
+        memo[key] = hashlib.sha256(path.read_bytes()).hexdigest()
+    return memo[key]
+
+
+def placement_inputs(maps, name, e, authored, angles):
+    """What one placement's fit (_Fitter.head and .search) reads, by content: its owner map NAME (collision scene,
+    entities and models), its entity fields, authored spot and angles, the actor model and its kit layout beside it
+    (the sole samples), and, for a town map, the town's owner directory and which of the maps it names exist (the
+    owner check of every candidate spot). The code is in the cache key (ground_cache)."""
+    from actor_frames import layout_path
+    from town_config import runtime_towns
+    maps = Path(maps)
+    model = maps.parent / e['model']
+    inputs = {'entry': {'name': '%s:%s' % (name, e.get('aw_ref', 'intro'))}, 'map': name,
+              'map_sha256': _file_digest(maps / (name + '.bsp')), 'entity': sorted(e.items()),
+              'authored': list(authored), 'angles': list(angles),
+              'model_sha256': _file_digest(model), 'layout_sha256': _file_digest(layout_path(model))}
+    for town in runtime_towns():
+        if name == town['name'] or re.fullmatch(town['prefix'] + r'\d{3}', name):
+            directory = maps.parent / town['regions']
+            inputs['owners'] = [town['name'], _file_digest(directory)]
+            if directory.is_file():
+                listed = [line.split()[0] for line in directory.read_text().splitlines()[1:] if line.split()]
+                inputs['owners'].append(sorted(m for m in set(listed) if (maps / (m + '.bsp')).is_file()))
+            break
+    return inputs
 
 
 def bake_ground(maps, jobs=1, exclude=()):
@@ -561,10 +642,50 @@ def bake_ground(maps, jobs=1, exclude=()):
     import uuid
     token = uuid.uuid4().hex
     owners = sorted(pending)
-    tasks = [(token, str(maps), *item) for o in owners for item in pending[o]]
-    heads, best = _fit_all(tasks, jobs)
-    flat = iter([result if original is None else finish(result, best.get(index))
-                 for index, (result, original) in enumerate(heads)])
+    items = [item for o in owners for item in pending[o]]
+    # each placement's fit through the unit cache (BUILD-TABLE-UNITS-REBAKE-63), keyed on what its fit reads
+    # (placement_inputs) and on the fit's code (ground_cache), stored the moment its result is final
+    import time
+    import unit_store
+    from pass_cache import forced, json_exact
+    cache = ground_cache()
+    inputs = [placement_inputs(maps, *item) for item in items] if cache is not None else []
+    results_by_item = {}
+    for index in range(len(items) if cache is not None else 0):
+        if forced('actor-ground', inputs[index]['entry']['name']):
+            continue                      # --rebuild-unit actor-ground:'MAP:REF'
+        hit = cache.load_unit(inputs[index])
+        if hit is not None and isinstance(hit[0], dict) and 'result' in hit[0]:
+            results_by_item[index] = hit[0]['result']
+    missing = [index for index in range(len(items)) if index not in results_by_item]
+    if cache is not None:
+        print('Actor support [%d/%d] cached, %d to fit (unit cache actor-ground)' % (
+            len(results_by_item), len(items), len(missing)), flush=True)
+    lost, began = [], time.monotonic()
+
+    def keep(position, result):
+        index = missing[position]
+        try:
+            # the JSON form for every fit, fitted now or taken from the cache (tuples as lists), so both report and
+            # write the same (as tools/actor_units.py fit_room_actors)
+            result = json.loads(json.dumps(result))
+        except (TypeError, ValueError):
+            pass
+        results_by_item[index] = result
+        if cache is None:
+            return
+        name = inputs[index]['entry']['name']
+        print(unit_store.progress_line('Actor support', len(results_by_item), len(items), name,
+                                       time.monotonic() - began), flush=True)
+        if json_exact(result) and not unit_store.stored(cache, inputs[index], {'result': result}, {}):
+            lost.append(name)
+            print('!! Actor support: STORE FAILED: %s is not in the unit cache after it was stored' % name, flush=True)
+    if missing:
+        _fit_all([(token, str(maps), *items[index]) for index in missing], jobs, keep)
+    if lost:
+        raise RuntimeError('Actor support: %d stores FAILED (%s; UNIT-CACHE-STORE-ERRORS-SILENT-63)'
+                           % (len(lost), ', '.join(lost[:8])))
+    flat = iter([results_by_item[index] for index in range(len(items))])
     fitted = {o: [next(flat) for _ in pending[o]] for o in owners}
     results, report = {}, []
     for key, selected, e in order:

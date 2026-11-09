@@ -131,6 +131,10 @@ int AW_DialHeardExport(unsigned char *out,int capacity);
 int AW_DialHeardImport(const unsigned char *p,int bytes);
 void AW_DialReactionsReset(void);
 int AW_DialReactionChange(const char *a,const char *b,int value,int set);
+/* v0.0.63 (MWSCRIPT-GAPS-63): A's reaction toward B with the scripts' changes, 0 for an unknown faction; the window's
+ * loaded table (AW_DialWindowReaction) for GetFactionReaction */
+int AW_DialReaction(const aw_dial_t *d,const char *a,const char *b);
+int AW_DialWindowReaction(const char *a,const char *b);
 int AW_DialReactionsExport(unsigned char *out,int capacity);
 int AW_DialReactionsImport(const unsigned char *p,int bytes);
 /* One persuasion of KIND (AW_PERSUADE_*) with the NPC's derived DISPOSITION, ROLL 0..99 and its FIGHT and FLEE. */

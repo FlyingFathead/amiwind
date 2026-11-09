@@ -187,6 +187,7 @@ int AW_ActorItemId(int item,char *out,int capacity);
 typedef struct {uint32_t flags;float base_cost;int school;char name[32];} aw_mgef_t;   /* name: the game's word */
 typedef struct {int16_t effect;signed char skill,attribute;unsigned char range;unsigned short area,duration,magnitude_min,magnitude_max;} aw_spell_effect_t;
 int AW_ActorMagicEffect(int index,aw_mgef_t *out);
+#define AW_MGEF_FLAG_NO_MAGNITUDE 0x8u   /* the MGEF NoMagnitude flag (as aw_cast.h AW_MGEF_NO_MAGNITUDE) */
 int AW_ActorSpellEffects(int spell,aw_spell_effect_t *out,int max);
 /* A spell's SPDT flags (ASPT byte 3, v0.0.61): AW_SPELL_AUTOCALC, AW_SPELL_PC_START, AW_SPELL_ALWAYS; 0 in older
  * tables. */

@@ -1,6 +1,6 @@
 # aw: the master builder command line
 
-_Last updated with AmiWind v0.0.59 (3 November 2026)._
+_Last updated with AmiWind v0.0.63 (9 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -244,7 +244,11 @@ A build request is checked first, in this order; any failure refuses it before t
    (`--legacy-area`, `--chim-native-towns off`) are refused unless `override.allow` names
    `retired-flags` - an A/B test of a historical regression: the run name then carries
    `ab-regression`. The config's `default_flags` are added when the request does not name
-   that option.
+   that option. `--reuse-all-available` and `--allow-rebuild STAGE:REASON` go in the
+   request's flags: the builder then takes each stage from the newest earlier run of the
+   workspace that holds it, the request's `reuse_from` run first (docs/BUILD_CACHE.md
+   "Reuse every earlier run"). The project's development and release builds add
+   `--reuse-all-available` by default for a commit whose builder has it.
 4. **Run name:** `YYYY_MM_DD_vX.Y.Z[-suffix]_<purpose>-<reason>_<git>`; a name already in
    the register or in the workspace's build folder gets `-try2`, `-try3`, ...
 5. **Source:** the commit (never a working tree) is exported with `git archive` into the

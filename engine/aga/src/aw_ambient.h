@@ -144,6 +144,12 @@ void AW_AmbientServerReset (void);
 void AW_ActorsRoomTick (void);
 /* "chim actors ambient [on|off|think S|list|reset]", forwarded by aw_actors.c (no command or cvar of its own). */
 void AW_AmbientCommand (void);
+/* v0.0.63 (MWSCRIPT-GAPS-63): 1 while the walking packages run ("chim actors ambient on", the default); MWScript
+ * ToggleAI flips it through that command. */
+int AW_AmbientEnabled (void);
+/* v0.0.63 (MWSCRIPT-GAPS-63, MWScript ResetActors): every actor this module walks stands again where it was taken in
+ * (its spawn spot) and chooses its package anew; the number moved. */
+int AW_AmbientResetActors (void);
 /* MWScript's AIWander (the interpreter's call; v054-actorstate): the package of E becomes DISTANCE (original
  * units), DURATION (game hours), HOUR (stored, unused as in OpenMW), IDLE[8] (Idle2..Idle9 chances, 0..100) and
  * REPEAT, as OpenMW's OpAiWander stacks it. Returns 1 when set (the actor is then run by this module; an actor

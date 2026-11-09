@@ -1,11 +1,11 @@
 # Roadmap and implementation options
 
-_Last updated with AmiWind v0.0.63-dev2 (9 November 2026)._
+_Last updated with AmiWind v0.0.63-dev4 (9 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
-- [v0.0.63: in development, dev1 and dev2 on 9 November 2026](#v0063-in-development-dev1-and-dev2-on-9-november-2026)
+- [v0.0.63: in development, dev1 to dev4 on 9 November 2026](#v0063-in-development-dev1-to-dev4-on-9-november-2026)
 - [v0.0.62: released 8 November 2026; v0.0.63 next](#v0062-released-8-november-2026-v0063-next)
 - [v0.0.61: released 6 November 2026](#v0061-released-6-november-2026)
 - [v0.0.60: released 4 November 2026](#v0060-released-4-november-2026)
@@ -112,11 +112,31 @@ _Last updated with AmiWind v0.0.63-dev2 (9 November 2026)._
 
 15 October 2026: exact-source validation completed 4,231 tests: 4,225 passed, three Windows-only skips and three tracked Census expected failures. The 71 focused tests and original-data readback across nine frame positions passed, consistently hiding 33 of 158 original references at stronghold state 6 while preserving unknown scripts. All 243 player resources are reusable after exact producer, input and file verification. Complete combined-world conversion, native comparison, packaging and shipment remain pending; coverage counts are unchanged.
 
-## v0.0.63: in development, dev1 and dev2 on 9 November 2026
+## v0.0.63: in development, dev1 to dev4 on 9 November 2026
 
 The first snapshot, [v0.0.63-dev1](releases/notes/RELEASE-v0.0.63-dev1.md), carries the first part of the list; the
-second, [v0.0.63-dev2](releases/notes/RELEASE-v0.0.63-dev2.md), the next. Their changes are checked by tests, not yet
+second, [v0.0.63-dev2](releases/notes/RELEASE-v0.0.63-dev2.md), the next; the third,
+[v0.0.63-dev3](releases/notes/RELEASE-v0.0.63-dev3.md), the one after; the fourth,
+[v0.0.63-dev4](releases/notes/RELEASE-v0.0.63-dev4.md), the one after that. Their changes are checked by tests, not yet
 in play.
+
+**In dev4:**
+
+- **The game's scripts:** 27 more functions carried out (460 of 504), the console's own commands callable from scripts;
+  605 of 1,207 scripts run, as in dev3; the 28 that lack a function belong to the add-on worlds.
+- **The builder:** worker pools start queued units between two results; the world key counts only what the model
+  file's loaders reach, so a change to the actor model reader no longer rebuilds the world; the dialogue and voice
+  tables and the actor ground check come from the unit cache.
+
+**In dev3:**
+
+- **Creatures walk, run and attack again** wherever they are met: the engine's animation tables no longer fill up over a
+  session, and the arena's fighters move and show their shields.
+- **The game's scripts:** 66 more functions carried out (433 of 504): the magic effect family, the game hour, the moons,
+  placed position and angle, the view switches, jumping, the readied spell, the armour type, faction reactions, the soul
+  gems and the level-up window; five console toggles mapped; 605 of 1,207 scripts run, as in dev2.
+- **The builder** reuses every earlier run at once and shows its plan for each stage before any stage runs.
+- **The image:** a read-only size report, and actor skin tiles as an experimental method that is off by default.
 
 **In dev2:**
 
@@ -143,8 +163,8 @@ in play.
 - **Combat:** the best-attack option in Options, the original's hit chance with the active effects, and its hit cone.
 - **Drops on uneven room floors;** the blight cloud at Dagoth Ur no longer drawn as a solid shape.
 
-**Still to do in v0.0.63:** the in-game check of the v0.0.62 fixes, of dev1 and of dev2; the rest of the builder work
-(keys that rebuild only for their own inputs, every stage on all cores); the werewolf's body; more of the
+**Still to do in v0.0.63:** the in-game check of the v0.0.62 fixes, of dev1, of dev2, of dev3 and of dev4; the rest of the builder work
+(a build that proves the new keys, every stage on all cores); the werewolf's body; more of the
 game's scripts; the shorelines; pickpocketing and owned locks; enchanting and spellmaking; per-area data tables;
 outdoor items that can be picked up; dropped lights with their flame.
 
@@ -172,7 +192,7 @@ number ([release notes](releases/notes/RELEASE-v0.0.62.md); snapshots [dev1](rel
 **Shipped, with its in-game check still to do:** the pieces listed under "Not yet seen in game" in the release notes.
 
 **Still to do (v0.0.63 and later):** pickpocketing and picking owned locks; enchanting; spellmaking; the rest of the
-game's scripts (605 of 1,207 run in v0.0.63-dev2 and 8 more are carried by AmiWind's own opening code:
+game's scripts (605 of 1,207 run in v0.0.63-dev4 and 8 more are carried by AmiWind's own opening code:
 TurnMoonRed, HasItemEquipped, ForceRun, ExplodeSpell, GetAttacked, GetSpellEffects, the werewolf functions and
 SetScale added, the opening's tutorial hints run, a later master's script attaches); per-area data tables for containers, doors, items, activators and creatures; outdoor items that can be
 picked up; dropped lights with their flame; the Constant Effect items of other characters; summoned creatures that fight

@@ -120,6 +120,8 @@ int AW_AnimKitCombatCycle(struct edict_s *e){cycles++;cycled=e;cycle_on=1;return
 int AW_AnimKitLabel(char *out,int size){if(!cycle_on)return 0;snprintf(out,size,"weapononehand: slash");return 1;}
 void AW_AnimKitStop(void){stops++;cycle_on=0;}
 void AW_AnimPrep(struct edict_s *e){(void)e;preps++;}
+static int item_preps;
+void AW_ItemsPrep(struct edict_s *e){(void)e;item_preps++;}
 int AW_CombatAggro(struct edict_s *e,const aw_fighter_t *f,const char *layout,int disposition,int *rating,float *distance){
     (void)layout;assert(disposition==50);aggro_calls++;
     *distance=(e->v.origin[0]+240)/.25f;*rating=f->fight+(int)(20-.005f*(*distance));
@@ -239,7 +241,10 @@ int main(void){
 
     /* a gallery opponent (one pose: its own frames) */
     run("aw_arenapit caius cosades");
-    spawn_scene("vai000");foe=&edicts[5];assert(!strncmp(sv.model_precache[(int)foe->v.modelindex],"gallery/",8));
+    {int was=preps,items=item_preps;   /* its layout and worn gear prepared in the duel, as a placed actor's spawn
+                                        * (CREATURE-BIPED-ANIMS-62: Zennammu fought on idle frames, no shield) */
+     spawn_scene("vai000");foe=&edicts[5];assert(!strncmp(sv.model_precache[(int)foe->v.modelindex],"gallery/",8));
+     assert(preps==was+1 && item_preps==items+1);}
     AW_ArenaSpawn(p);draw();realtime+=4;draw();draw();assert(!strcmp(last_layout,"(own frames)"));
     AW_ArenaEnd();
     /* the stand-in: a resident's model of the scene */
@@ -269,9 +274,9 @@ int main(void){
     run("aw_arenapit modes");assert(strstr(printed,"aggro") && strstr(printed,"group [N]"));
     run("aw_arenapit creatures");assert(strstr(printed,"Creature fights: a creature's sheet comes from the actor record"));
     {   /* group: the baked fighters at once, side by side on the pit, all engaged; the Flee rule on for the session */
-        int before=engages;
+        int before=engages,prepped=preps;
         run("aw_arenapit group");assert(strstr(printed,"group mode, 2 actors"));
-        spawn_scene("vai000");assert(sv.num_edicts==7 && preps==2);
+        spawn_scene("vai000");assert(sv.num_edicts==7 && preps==prepped+2);
         AW_ArenaSpawn(p);
         assert(edicts[5].v.origin[1]==150 && edicts[6].v.origin[1]==150 && edicts[5].v.origin[0]<edicts[6].v.origin[0]);
         draw();realtime+=4;draw();assert(engages==before+2 && flee_cvar==1);

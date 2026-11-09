@@ -102,6 +102,7 @@ int AW_InventoryEquipped(const aw_state_t *s,const char *id){
 }
 /* EQUIP-ACTION-REGRESSION-62 (aw_inventory.h): the beast races' rules, pure, beside the slot rules */
 int (*aw_inventory_player_beast)(void);
+int (*aw_inventory_equip_script)(const aw_inventory_item_t *it,int phase);   /* aw_inventory.h; aw_mwhost.c sets it */
 static const char *equip_refusal;
 const char *AW_InventoryEquipRefusal(void){return equip_refusal;}
 const char *AW_InventoryBeastRefusal(const aw_inventory_item_t *it,int beast){
@@ -1121,8 +1122,14 @@ void AW_InventoryGrantCommand(void){
             Con_Printf("Diagnostic inventory equip refused.\n");return;
         }
         AW_CombatEquipmentStore();
-        if(!AW_InventoryEquipped(&aw_state,item.id) && !AW_InventoryEquip(&aw_state,&item)){
-            Con_Printf("Diagnostic inventory equip refused.\n");return;
+        if(!AW_InventoryEquipped(&aw_state,item.id)){
+            /* MWSCRIPT-UNPLACED-RECORD-SCRIPTS-61 (v0.0.63-dev3: Sunder equipped here never set its script's
+             * OnPCEquip): the item's script around the equipping, as the window's E (PCSkipEquip, then OnPCEquip) */
+            if(aw_inventory_equip_script && aw_inventory_equip_script(&item,0)){
+                Con_Printf("DIAGNOSTIC inventory equip: %s taken by its script (PCSkipEquip).\n",item.id);return;
+            }
+            if(!AW_InventoryEquip(&aw_state,&item)){Con_Printf("Diagnostic inventory equip refused.\n");return;}
+            if(aw_inventory_equip_script)aw_inventory_equip_script(&item,1);
         }
         AW_CombatEquipmentChanged();Con_Printf("DIAGNOSTIC inventory equip: %s.\n",item.id);return;
     }
@@ -1162,6 +1169,7 @@ void AW_InventoryGrantCommand(void){
         if(!AW_InventoryEquipped(&aw_state,Cmd_Argv(2)) || !AW_InventoryUnequip(&aw_state,Cmd_Argv(2))){
             Con_Printf("Diagnostic inventory unequip refused: not worn.\n");return;
         }
+        if(aw_inventory_equip_script && AW_InventoryRead(Cmd_Argv(2),&item))aw_inventory_equip_script(&item,2);
         AW_CombatEquipmentChanged();Con_Printf("DIAGNOSTIC inventory unequip: %s.\n",Cmd_Argv(2));return;
     }
     /* aw_inventory drop "<id>" [N] (CELL-CHANGES-59 slice 2, test sessions): drop a carried item in front of the

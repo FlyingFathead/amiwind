@@ -18,8 +18,9 @@ import struct
 # CRC-32 computed while reading; a scalar CRC and a flag, no allocation added), then for shared actor shapes
 # (9 November 2026, IMAGE-BIGGER-THAN-ORIGINAL-62: a model's ST and triangle blocks read from progs/shapes/ through
 # the same 4 KiB scratch and 64-triangle batch into the same cache block, a 28-byte reference looked at once; no
-# allocation added).
-STREAM_SHA256='73d0a72919e860dc34b0a741c22aa28fadc0464ff604f94617e90c1786bf3094'
+# allocation added), then for actor skin tiles (9 November 2026, IMAGE-BIGGER-THAN-ORIGINAL-62 method B: a tiled
+# skin is left to the file loader, which rebuilds it in its existing malloc staging; nothing added here).
+STREAM_SHA256='d2cca259da85443086f416a60393a5a390d686775756d19c3590b695c9b59f08'
 STREAM_VERTEX_LIMIT=3072       # r_local.h MAXALIASVERTS (past 2,000 only with the model's model-budgets.txt line)
 STREAM_LIMIT=768*1024          # model.c AW_ALIAS_STREAM_LIMIT (tools/npc_anim.py ALIAS_BYTE_BUDGET)
 

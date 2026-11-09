@@ -1,10 +1,12 @@
 # Changelog
 
-_Last updated with AmiWind v0.0.63-dev2 (9 November 2026)._
+_Last updated with AmiWind v0.0.63-dev4 (9 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.63-dev4: fourth snapshot of v0.0.63, 9 November 2026](#v0063-dev4-fourth-snapshot-of-v0063-9-november-2026)
+- [v0.0.63-dev3: third snapshot of v0.0.63, 9 November 2026](#v0063-dev3-third-snapshot-of-v0063-9-november-2026)
 - [v0.0.63-dev2: second snapshot of v0.0.63, 9 November 2026](#v0063-dev2-second-snapshot-of-v0063-9-november-2026)
 - [v0.0.63-dev1: first snapshot of v0.0.63, 9 November 2026](#v0063-dev1-first-snapshot-of-v0063-9-november-2026)
 - [v0.0.62: Stick To The Script, 8 November 2026](#v0062-stick-to-the-script-8-november-2026)
@@ -174,6 +176,42 @@ _Last updated with AmiWind v0.0.63-dev2 (9 November 2026)._
 - [CHIM source candidate - 14 October 2026, v0.0.40-dev1](#chim-source-candidate---14-october-2026-v0040-dev1)
 
 <!-- contents end -->
+
+## v0.0.63-dev4: fourth snapshot of v0.0.63, 9 November 2026
+
+The fourth development snapshot of v0.0.63 ([release notes](releases/notes/RELEASE-v0.0.63-dev4.md)). It needs 32 MB
+of Fast RAM. Its changes are checked by tests, not yet in play. v0.0.63-dev3 was not published on its own; its changes
+come to the main line with this snapshot.
+
+- Four things found in play on v0.0.63-dev3 are fixed: the player starts with health at its maximum (a map loaded from
+  the console kept a spawn health above it), god mode keeps the player's health when a script lowers it, an Argonian's
+  Water Breathing works, and Sunder hurts its bearer without Wraithguard when equipped from the console too.
+- 27 more functions of the original's scripting are carried out (460 of 504), among them the console's own commands
+  callable from scripts (Show, ShowVars, ToggleScripts, ToggleAI, ResetActors, OutputRefInfo, User1 to User4 and the
+  console aliases); every console function still left names its reason. 605 of 1,207 scripts run, as in
+  v0.0.63-dev3; the 28 that still lack a function belong to the add-on worlds.
+- The builder's worker pools start queued units between two results, so workers no longer stand idle while units wait.
+- The CHIM world key counts only what the model file's brush and edge-cache loaders reach: a change to the actor model
+  reader no longer rebuilds the whole world.
+- The dialogue and voice tables and the actor ground check come from the unit cache instead of being baked again in
+  every build.
+
+## v0.0.63-dev3: third snapshot of v0.0.63, 9 November 2026
+
+The third development snapshot of v0.0.63 ([release notes](releases/notes/RELEASE-v0.0.63-dev3.md)). It needs 32 MB
+of Fast RAM. Its changes are checked by tests, not yet in play.
+
+- Creatures walk, run and attack again wherever they are met (the engine's animation tables no longer fill up over a
+  session), and the arena's fighters move and show their shields.
+- 66 more functions of the original's scripting are carried out (433 of 504): the magic effect family, the game hour,
+  the moons, placed position and angle, the view switches, jumping, the readied spell, actors on or at an object, the
+  armour type, faction reactions, removing effects, the soul gems and the level-up window; five console toggles are
+  mapped, add-on placements are keyed by load order, and the console takes up to 1,000 commands. 605 of 1,207
+  scripts run, as in v0.0.63-dev2.
+- The builder can reuse every earlier run at once (`--reuse-all-available`), prints a plan for each stage before any
+  stage runs and stops when a stage would redo work that is already stored.
+- A read-only report of what an image holds, and actor skin tiles as an experimental way to store the skins (off by
+  default, not a change for players).
 
 ## v0.0.63-dev2: second snapshot of v0.0.63, 9 November 2026
 

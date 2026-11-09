@@ -76,10 +76,29 @@ class GodModeTests(unittest.TestCase):
         store = host[host.index('static void player_store(const aw_actor_t *a){'):]
         store = store[:store.index('\n}\n')]
         self.assertIn('AW_CombatGodHealth(((int)sv_player->v.flags&FL_GODMODE)!=0,sv_player->v.health,', store)
+        # GODMODE-LAVA-DEATH-62 (v0.0.63-dev3): the maximum caps only when the change drained it
+        self.assertIn('old_max=aw_character.maximum[0];', store)
+        self.assertIn('a->dyn_base[0]<old_max?a->dyn_base[0]:0);', store)
         self.assertIn('God mode is on: no death', code('aw_view.c'))
         # the lava volume and the lava script both reach the player through the one check
         self.assertIn('AW_CombatHurtPlayer(AW_LavaDamage(lava_dps.value,dt),"lava")', code('aw_lava.c'))
         self.assertIn('AW_CombatHurtPlayer(hurt,"lava")', host)
+
+
+class RaceWaterBreathingTests(unittest.TestCase):
+    """UNDERWATER-BREATH-62 (v0.0.63-dev3): an Argonian read Water Breathing 0: the ability's effect has no magnitude
+    (stored 0) and the kept value was not read again after the race changed (as many spells removed as added)."""
+
+    def test_no_magnitude_counts_one_and_a_race_change_reads_again(self):
+        state = code('aw_actorstate.c')
+        passive = state[state.index('float AW_ActorPassiveMagnitude(const aw_actor_t *a,int effect){'):]
+        passive = passive[:passive.index('\n}\n')]
+        self.assertIn('unit=AW_ActorMagicEffect(effect,&mg) && (mg.flags&AW_MGEF_FLAG_NO_MAGNITUDE);', passive)
+        self.assertIn('sum+=unit?1.0f:', passive)
+        host = code('aw_mwhost.c')
+        spells = host[host.index('static void creation_spells(aw_actor_t *a){'):]
+        self.assertIn('creation_generation++;', spells[:spells.index('\n}\n')])
+        self.assertIn('unsigned long g=AW_EffectsGeneration()+creation_generation;', host)
 
 
 class WaterBreathingScriptTests(unittest.TestCase):

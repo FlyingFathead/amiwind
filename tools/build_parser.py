@@ -218,6 +218,13 @@ def add_media_catalogue_group(p):
                         'the engine rebuilds each model before decoding it, byte for byte '
                         '(tools/payload_share.py, IMAGE-BIGGER-THAN-ORIGINAL-62, docs/PAYLOAD_SHARING.md; about '
                         '78 MB less on the v0.0.62 payload); off keeps both blocks in every model (the method before)')
+    p.add_argument('--skin-tiles', choices=('on', 'off'), default='off',
+                   help='EXPERIMENTAL (off by default until its place-load time is measured on the Pi 4B): on cuts the '
+                        'skins of the actor models (progs/a_*.mdl, n_*.mdl) into 16x16 tiles stored once in '
+                        'progs/tiles/ and each model keeps a table of tile numbers; the engine rebuilds each model '
+                        'before decoding it, byte for byte (tools/payload_share.py, IMAGE-BIGGER-THAN-ORIGINAL-62, '
+                        'docs/PAYLOAD_SHARING.md; about 319 MB less on the v0.0.63-dev1 payload, about 78 reads per '
+                        'skin load in place of one); off keeps the pixels in every model')
     p.add_argument('--night-lamp-lightmaps', choices=('on', 'off'), default='off',
                    help='EXPERIMENTAL (off by default): legacy Balmora cores get baked night-lamp lightmaps on '
                         'lightstyle 32 (prototype, tools/lamp_lightmaps.py; docs/EXPERIMENTAL_FLAGS.md); off keeps '
@@ -467,6 +474,16 @@ def add_serial_stages_group(p):
                    help='Development builds: copy the verified outputs of stages whose input fingerprint is unchanged '
                         'from this earlier run instead of running them; refused for release candidates and finals. '
                         'See docs/BUILD_PROFILE.md')
+    p.add_argument('--reuse-all-available', action='store_true',
+                   help='Development builds: look every stage\'s fingerprint up in every earlier run of the workspace '
+                        'that passed it (the stage index, WORKSPACE/cache/stage-index-v1.json) and reuse it from the '
+                        'newest run that can deliver it, with every --reuse-from check; a --reuse-from RUN is looked '
+                        'at first. Prints one line per stage before any stage runs and stops when a stage would bake '
+                        'again stored units or runs a per-item bake with no cache (see --allow-rebuild). '
+                        'See docs/BUILD_CACHE.md "Reuse every earlier run"')
+    p.add_argument('--allow-rebuild', action='append', default=[], metavar='STAGE:REASON',
+                   help='With --reuse-all-available: let STAGE run although the stage plan would stop on it, for the '
+                        'reason given (recorded in build-state.json); repeatable')
     p.add_argument('--rebuild-stage', metavar='NAME[,NAME]', default='',
                    help='With --reuse-from: run these stages again although they could be reused; every stage after '
                         'them is still decided by its key (reused only if the forced stages write the same outputs). '

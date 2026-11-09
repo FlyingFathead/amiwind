@@ -26,9 +26,8 @@
     "OpenMW 0.51"
    ],
    "group": "Misc",
-   "state": "planned",
-   "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
    "name": "addspell",
@@ -47,7 +46,7 @@
    "group": "Misc",
    "state": "planned",
    "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "why": "not carried out yet: the levelled lists are read from the actor table on disk; an edit needs a saved change list"
   },
   {
    "name": "addtolevitem",
@@ -57,7 +56,7 @@
    "group": "Misc",
    "state": "planned",
    "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "why": "not carried out yet: the levelled lists are read from the actor table on disk; an edit needs a saved change list"
   },
   {
    "name": "addtopic",
@@ -77,7 +76,7 @@
    "group": "Ai",
    "state": "planned",
    "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "why": "not carried out yet: the ambient tables have no package that walks to an object and uses it"
   },
   {
    "name": "aiescort",
@@ -224,9 +223,8 @@
     "OpenMW 0.51"
    ],
    "group": "Control",
-   "state": "planned",
-   "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
    "name": "clearforcemovejump",
@@ -234,9 +232,8 @@
     "OpenMW 0.51"
    ],
    "group": "Misc",
-   "state": "planned",
-   "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
    "name": "clearforcerun",
@@ -319,9 +316,8 @@
     "OpenMW 0.51"
    ],
    "group": "Misc",
-   "state": "planned",
-   "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
    "name": "enable",
@@ -365,9 +361,8 @@
     "OpenMW 0.51"
    ],
    "group": "Gui",
-   "state": "planned",
-   "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
    "name": "enablelevitation",
@@ -523,7 +518,7 @@
    "group": "Dialogue",
    "state": "planned",
    "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "why": "not carried out yet: a debug fill of every journal entry: the dated history keeps only what was earned"
   },
   {
    "name": "fillmap",
@@ -533,7 +528,7 @@
    "group": "Gui",
    "state": "planned",
    "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "why": "not carried out yet: a debug fill of every map place: the revealed places come one by one from ShowMap"
   },
   {
    "name": "fixme",
@@ -559,9 +554,8 @@
     "OpenMW 0.51"
    ],
    "group": "Control",
-   "state": "planned",
-   "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
    "name": "forcemovejump",
@@ -569,9 +563,8 @@
     "OpenMW 0.51"
    ],
    "group": "Control",
-   "state": "planned",
-   "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
    "name": "forcerun",
@@ -660,9 +653,8 @@
     "OpenMW 0.51"
    ],
    "group": "Container",
-   "state": "planned",
-   "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
    "name": "getathletics",
@@ -743,9 +735,8 @@
     "OpenMW 0.51"
    ],
    "group": "Misc",
-   "state": "planned",
-   "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
    "name": "getcurrentweather",
@@ -844,9 +835,8 @@
     "OpenMW 0.51"
    ],
    "group": "Dialogue",
-   "state": "planned",
-   "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
    "name": "getfatigue",
@@ -881,9 +871,8 @@
     "OpenMW 0.51"
    ],
    "group": "Control",
-   "state": "planned",
-   "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
    "name": "getforcerun",
@@ -1072,9 +1061,8 @@
     "OpenMW 0.51"
    ],
    "group": "Sky",
-   "state": "planned",
-   "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
    "name": "getmediumarmor",
@@ -1146,9 +1134,8 @@
     "OpenMW 0.51"
    ],
    "group": "Misc",
-   "state": "planned",
-   "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
    "name": "getpcrank",
@@ -1165,9 +1152,8 @@
     "OpenMW 0.51"
    ],
    "group": "Control",
-   "state": "planned",
-   "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
    "name": "getpcsleep",
@@ -1204,7 +1190,7 @@
    "group": "Stats",
    "state": "planned",
    "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "why": "not carried out yet: the renderer has no player-side brightness term (Night Eye) yet; it needs an A/B on the Pi"
   },
   {
    "name": "getpersonality",
@@ -1276,9 +1262,8 @@
     "OpenMW 0.51"
    ],
    "group": "Sky",
-   "state": "planned",
-   "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
    "name": "getsecurity",
@@ -1368,9 +1353,8 @@
     "OpenMW 0.51"
    ],
    "group": "Transformation",
-   "state": "planned",
-   "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
    "name": "getstat",
@@ -1461,7 +1445,7 @@
    "group": "Misc",
    "state": "planned",
    "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "why": "not carried out yet: the weather has no wind speed yet"
   },
   {
    "name": "goodbye",
@@ -1508,7 +1492,7 @@
    "group": "Misc",
    "state": "planned",
    "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "why": "not carried out yet: the combat layer keeps only the blows that land (HitOnMe); a missed swing is not kept"
   },
   {
    "name": "hitonme",
@@ -1952,7 +1936,7 @@
    "group": "Stats",
    "state": "planned",
    "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "why": "not carried out yet: the renderer has no player-side brightness term (Night Eye) yet; it needs an A/B on the Pi"
   },
   {
    "name": "modpersonality",
@@ -2080,7 +2064,7 @@
    "group": "Cell",
    "state": "planned",
    "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "why": "not carried out yet: a room's water is baked into its map; moving it needs moving water in the engine"
   },
   {
    "name": "modwillpower",
@@ -2152,9 +2136,8 @@
     "OpenMW 0.51"
    ],
    "group": "Misc",
-   "state": "planned",
-   "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
    "name": "outputrefinfo",
@@ -2162,9 +2145,8 @@
     "OpenMW 0.51"
    ],
    "group": "Misc",
-   "state": "planned",
-   "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
    "name": "payfine",
@@ -2217,9 +2199,8 @@
     "OpenMW 0.51"
    ],
    "group": "Misc",
-   "state": "planned",
-   "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
    "name": "pcforce3rdperson",
@@ -2227,9 +2208,8 @@
     "OpenMW 0.51"
    ],
    "group": "Misc",
-   "state": "planned",
-   "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
    "name": "pcget3rdperson",
@@ -2237,9 +2217,8 @@
     "OpenMW 0.51"
    ],
    "group": "Misc",
-   "state": "planned",
-   "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
    "name": "pcjoinfaction",
@@ -2438,9 +2417,8 @@
     "OpenMW 0.51"
    ],
    "group": "Stats",
-   "state": "planned",
-   "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
    "name": "removefromlevcreature",
@@ -2450,7 +2428,7 @@
    "group": "Misc",
    "state": "planned",
    "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "why": "not carried out yet: the levelled lists are read from the actor table on disk; an edit needs a saved change list"
   },
   {
    "name": "removefromlevitem",
@@ -2460,7 +2438,7 @@
    "group": "Misc",
    "state": "planned",
    "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "why": "not carried out yet: the levelled lists are read from the actor table on disk; an edit needs a saved change list"
   },
   {
    "name": "removeitem",
@@ -2497,7 +2475,7 @@
    "group": "Misc",
    "state": "planned",
    "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "why": "its arguments are worked out by the compiler (the spell's row)"
   },
   {
    "name": "repairedonme",
@@ -2505,9 +2483,8 @@
     "OpenMW 0.51"
    ],
    "group": "Misc",
-   "state": "planned",
-   "amiwind": "",
-   "why": "a console-only command with no AmiWind counterpart yet"
+   "state": "alias",
+   "amiwind": "echo 0 (as OpenMW 0.51: always 0)"
   },
   {
    "name": "resetactors",
@@ -2517,9 +2494,8 @@
     "original"
    ],
    "group": "Transformation",
-   "state": "planned",
-   "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
    "name": "resurrect",
@@ -2554,9 +2530,8 @@
     "OpenMW 0.51"
    ],
    "group": "Dialogue",
-   "state": "planned",
-   "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
    "name": "say",
@@ -2965,7 +2940,7 @@
    "group": "Stats",
    "state": "planned",
    "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "why": "not carried out yet: the renderer has no player-side brightness term (Night Eye) yet; it needs an A/B on the Pi"
   },
   {
    "name": "setpersonality",
@@ -3092,7 +3067,7 @@
    "group": "Cell",
    "state": "planned",
    "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "why": "not carried out yet: a room's water is baked into its map; moving it needs moving water in the engine"
   },
   {
    "name": "setwerewolfacrobatics",
@@ -3119,9 +3094,8 @@
     "OpenMW 0.51"
    ],
    "group": "Misc",
-   "state": "planned",
-   "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
    "name": "showmap",
@@ -3160,9 +3134,8 @@
     "original"
    ],
    "group": "Misc",
-   "state": "planned",
-   "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
    "name": "skipanim",
@@ -3172,7 +3145,7 @@
    "group": "Animation",
    "state": "planned",
    "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "why": "not carried out yet: the animation kit has no per-frame skip"
   },
   {
    "name": "startcombat",
@@ -3248,7 +3221,7 @@
    "group": "Cell",
    "state": "planned",
    "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "why": "not carried out yet: loading every exterior cell in turn: a test of a desktop engine, far beyond a 32 MB machine"
   },
   {
    "name": "testinteriorcells",
@@ -3258,7 +3231,7 @@
    "group": "Cell",
    "state": "planned",
    "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "why": "not carried out yet: loading every interior cell in turn: a test of a desktop engine, far beyond a 32 MB machine"
   },
   {
    "name": "testmodels",
@@ -3288,9 +3261,8 @@
     "original"
    ],
    "group": "Ai",
-   "state": "planned",
-   "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
    "name": "toggleborders",
@@ -3302,7 +3274,7 @@
    "group": "Misc",
    "state": "planned",
    "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "why": "not carried out yet: the renderer has no overlay of the cell borders yet"
   },
   {
    "name": "togglecollision",
@@ -3325,7 +3297,7 @@
    "group": "Misc",
    "state": "planned",
    "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "why": "not carried out yet: the renderer has no overlay of the collision boxes yet"
   },
   {
    "name": "togglecollisiongrid",
@@ -3337,7 +3309,7 @@
    "group": "Misc",
    "state": "planned",
    "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "why": "not carried out yet: the renderer has no overlay of the collision grid yet"
   },
   {
    "name": "togglecombatstats",
@@ -3346,9 +3318,8 @@
     "original"
    ],
    "group": "Console",
-   "state": "planned",
-   "amiwind": "",
-   "why": "a console-only command with no AmiWind counterpart yet"
+   "state": "alias",
+   "amiwind": "aw_combat_readout toggled (the combat rolls on the console)"
   },
   {
    "name": "toggledebugtext",
@@ -3357,9 +3328,8 @@
     "original"
    ],
    "group": "Console",
-   "state": "planned",
-   "amiwind": "",
-   "why": "a console-only command with no AmiWind counterpart yet"
+   "state": "alias",
+   "amiwind": "dbg hud (the debug HUD, toggles)"
   },
   {
    "name": "toggledialoguestats",
@@ -3370,7 +3340,7 @@
    "group": "Console",
    "state": "planned",
    "amiwind": "",
-   "why": "a console-only command with no AmiWind counterpart yet"
+   "why": "a console-only command with no AmiWind counterpart yet: a readout of the dialogue filter checks; the dialogue window has no such trace yet"
   },
   {
    "name": "togglefogofwar",
@@ -3382,7 +3352,7 @@
    "group": "Gui",
    "state": "planned",
    "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "why": "not carried out yet: the map screen reveals places one by one from ShowMap; it has no fog of war to switch off"
   },
   {
    "name": "togglefullhelp",
@@ -3394,7 +3364,7 @@
    "group": "Gui",
    "state": "planned",
    "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "why": "not carried out yet: the aim box shows the name only; it has no extended reference readout to switch on"
   },
   {
    "name": "togglegodmode",
@@ -3416,7 +3386,7 @@
    "group": "Console",
    "state": "planned",
    "amiwind": "",
-   "why": "a console-only command with no AmiWind counterpart yet"
+   "why": "a console-only command with no AmiWind counterpart yet: the exterior cell grid drawn over the world; the renderer has no such overlay yet"
   },
   {
    "name": "togglekillstats",
@@ -3427,7 +3397,7 @@
    "group": "Console",
    "state": "planned",
    "amiwind": "",
-   "why": "a console-only command with no AmiWind counterpart yet"
+   "why": "a console-only command with no AmiWind counterpart yet: a count of the kills by kind; the change list keeps deaths per actor, no tally readout yet"
   },
   {
    "name": "togglelights",
@@ -3436,9 +3406,8 @@
     "original"
    ],
    "group": "Console",
-   "state": "planned",
-   "amiwind": "",
-   "why": "a console-only command with no AmiWind counterpart yet"
+   "state": "alias",
+   "amiwind": "r_fullbright toggled (the lighting off and on)"
   },
   {
    "name": "toggleloadfade",
@@ -3448,7 +3417,7 @@
    "group": "Console",
    "state": "planned",
    "amiwind": "",
-   "why": "a console-only command with no AmiWind counterpart yet"
+   "why": "a console-only command with no AmiWind counterpart yet: AmiWind's loading screen has no fade to switch"
   },
   {
    "name": "togglemagicstats",
@@ -3459,7 +3428,7 @@
    "group": "Console",
    "state": "planned",
    "amiwind": "",
-   "why": "a console-only command with no AmiWind counterpart yet"
+   "why": "a console-only command with no AmiWind counterpart yet: a readout of the active effects; dbg cast spell lists spells, not a live overlay"
   },
   {
    "name": "togglemenus",
@@ -3491,7 +3460,7 @@
    "group": "Misc",
    "state": "planned",
    "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "why": "not carried out yet: the path grids are read per actor from the ambient table; nothing draws them yet"
   },
   {
    "name": "togglerecastmesh",
@@ -3509,9 +3478,8 @@
     "original"
    ],
    "group": "Misc",
-   "state": "planned",
-   "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
    "name": "togglesky",
@@ -3523,7 +3491,7 @@
    "group": "Sky",
    "state": "planned",
    "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "why": "not carried out yet: the sky is drawn as part of the world map's sky surfaces; the renderer has no switch to leave it out"
   },
   {
    "name": "togglestats",
@@ -3532,9 +3500,8 @@
     "original"
    ],
    "group": "Console",
-   "state": "planned",
-   "amiwind": "",
-   "why": "a console-only command with no AmiWind counterpart yet"
+   "state": "alias",
+   "amiwind": "dbg fps (the FPS counter, toggles)"
   },
   {
    "name": "toggletexturestring",
@@ -3567,7 +3534,7 @@
    "group": "Misc",
    "state": "planned",
    "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "why": "not carried out yet: a room's water is baked into its map as world surfaces; the renderer has no switch to leave it out"
   },
   {
    "name": "togglewireframe",
@@ -3590,7 +3557,7 @@
    "group": "Misc",
    "state": "planned",
    "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "why": "not carried out yet: the renderer has no switch to leave out the world map while drawing the objects"
   },
   {
    "name": "turnmoonred",
@@ -3634,9 +3601,8 @@
     "OpenMW 0.51"
    ],
    "group": "User",
-   "state": "planned",
-   "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
    "name": "user2",
@@ -3644,9 +3610,8 @@
     "OpenMW 0.51"
    ],
    "group": "User",
-   "state": "planned",
-   "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
    "name": "user3",
@@ -3654,9 +3619,8 @@
     "OpenMW 0.51"
    ],
    "group": "User",
-   "state": "planned",
-   "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
    "name": "user4",
@@ -3664,9 +3628,8 @@
     "OpenMW 0.51"
    ],
    "group": "User",
-   "state": "planned",
-   "amiwind": "",
-   "why": "not carried out by the interpreter yet (scripts too)"
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
    "name": "wakeuppc",

@@ -51,6 +51,12 @@ static const alias_t aliases[]={
     {"enableclassmenu",NULL,"dbg quickchar class",0},
     {"enablebirthmenu",NULL,"dbg quickchar birthsign",0},
     {"enablestatreviewmenu",NULL,"dbg quickchar review",0},
+    /* v0.0.63 (MW-CONSOLE-COMMANDS-62): the original's console-only toggles mapped to AmiWind's own switches */
+    {"tdt","toggledebugtext","dbg hud",0},               /* the debug text: AmiWind's debug HUD (toggles) */
+    {"tst","togglestats","dbg fps",0},                   /* the frame statistics: the FPS counter (toggles) */
+    {"tcs","togglecombatstats","toggle aw_combat_readout",0},  /* the combat rolls on the console */
+    {"tl","togglelights","toggle r_fullbright",0},       /* the lighting off and on (Quake's full-bright drawing) */
+    {"repairedonme",NULL,"echo 0",0},                    /* OpenMW 0.51 OpRepairedOnMe: always 0 */
 };
 #define NALIAS ((int)(sizeof(aliases)/sizeof(aliases[0])))
 const char *AW_MwConsoleAlias(int n,const char **amiwind){

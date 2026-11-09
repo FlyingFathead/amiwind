@@ -179,6 +179,86 @@ byte *AW_SharedSkinExpand(byte *stored,int *bytes) {
 #define AW_SHAPE_SHARED 0x48535741U
 #define AW_SHAPE_SHARED_REF 28
 static unsigned int AW_Le32(const byte *p){return p[0]|(p[1]<<8)|(p[2]<<16)|((unsigned int)p[3]<<24);}
+/* Actor skin tiles (IMAGE-BIGGER-THAN-ORIGINAL-62, method B; tools/payload_share.py, builder option --skin-tiles):
+ * a single-skin alias whose skin cuts into whole 16x16 tiles may keep only a table of tile numbers. Its skin type
+ * is then AW_SKIN_TILED ("AWTL"), followed by the 16 hex digits of the tile pool, the pixel count, the tile count
+ * and one u32 tile number per tile (row-major tile order; little-endian). The tiles, 16 rows of 16 bytes each, are
+ * stored once for every actor skin in progs/tiles/<hex>-<chunk>.awtp, 65,536 tiles (16 MiB) a chunk file: a
+ * number's high 16 bits name the chunk, the low 16 the tile in it. AW_TiledSkinExpand reads the wanted tiles in
+ * sorted runs (up to AW_TILE_RUN tiles a read through a 16 KiB transient buffer, reading through holes of up to
+ * AW_TILE_GAP tiles) and puts them where the pixels were, so the decoded model is byte-identical and nothing more
+ * stays in memory. Only the file loader (AW_AliasFile) rebuilds it; the stream loader leaves it to that. */
+#define AW_SKIN_TILED 0x4C545741U
+#define AW_TILE 16
+#define AW_TILE_BYTES (AW_TILE*AW_TILE)
+#define AW_TILE_RUN 64
+#define AW_TILE_GAP 8
+static int AW_TiledRefBytes(int tiles){return 16+4+4+4*tiles;}
+/* The tile count of a stored tiled-skin alias RAW (BYTES long), or -1 when it is none. */
+int AW_TiledSkinTiles(const byte *raw,int bytes) {
+    const mdl_t *m=(const mdl_t *)raw;int w,h;unsigned int pixels,tiles;
+    if(bytes<(int)sizeof(mdl_t)+28 || memcmp(raw,"IDPO",4) || LittleLong(m->version)!=ALIAS_VERSION ||
+       LittleLong(m->numskins)!=1 || AW_Le32(raw+sizeof(mdl_t))!=AW_SKIN_TILED)return -1;
+    w=LittleLong(m->skinwidth);h=LittleLong(m->skinheight);
+    if(w<AW_TILE || h<AW_TILE || (w%AW_TILE) || (h%AW_TILE) || h>MAX_LBM_HEIGHT || w>2048)return -1;
+    pixels=AW_Le32(raw+sizeof(mdl_t)+20);tiles=AW_Le32(raw+sizeof(mdl_t)+24);
+    if(pixels!=(unsigned int)(w*h) || tiles!=pixels/AW_TILE_BYTES ||
+       (size_t)sizeof(mdl_t)+4+(size_t)AW_TiledRefBytes((int)tiles)>(size_t)bytes)return -1;
+    return (int)tiles;
+}
+static int AW_TilePairOrder(const void *a,const void *b){
+    unsigned int x=((const unsigned int *)a)[0],y=((const unsigned int *)b)[0];
+    return x<y?-1:x>y;
+}
+/* The whole model a stored tiled-skin alias stands for, in a new malloc block (the old one is freed), or NULL when
+ * a chunk file is missing, short or not read. *BYTES becomes the model's size. */
+byte *AW_TiledSkinExpand(byte *stored,int *bytes) {
+    char path[48];FILE *f=NULL;byte *full=NULL,*run=NULL,*dst;unsigned int *pairs=NULL,n,start,last;
+    int tiles=AW_TiledSkinTiles(stored,*bytes),head=sizeof(mdl_t),w,pixels,rest,i,j,k,r,across,chunk=-1,count=0,size=0;
+    long base=0,at=-1;
+    if(tiles<0){free(stored);return NULL;}
+    for(i=0;i<16;i++){byte c=stored[head+4+i];if(!((c>='0' && c<='9') || (c>='a' && c<='f'))){free(stored);return NULL;}}
+    w=LittleLong(((mdl_t *)stored)->skinwidth);pixels=tiles*AW_TILE_BYTES;across=w/AW_TILE;
+    rest=*bytes-head-4-AW_TiledRefBytes(tiles);
+    full=AW_TryMalloc(head+4+pixels+rest);pairs=AW_TryMalloc((size_t)tiles*2*sizeof(unsigned int));
+    run=AW_TryMalloc(AW_TILE_RUN*AW_TILE_BYTES);
+    if(!full || !pairs || !run)goto fail;
+    for(i=0;i<tiles;i++){pairs[2*i]=AW_Le32(stored+head+28+4*i);pairs[2*i+1]=(unsigned int)i;}
+    qsort(pairs,(size_t)tiles,2*sizeof(unsigned int),AW_TilePairOrder);
+    memcpy(full,stored,head);*(int *)(full+head)=LittleLong(ALIAS_SKIN_SINGLE);dst=full+head+4;
+    for(i=0;i<tiles;i=j){
+        start=last=pairs[2*i];
+        for(j=i+1;j<tiles && pairs[2*j]-start<AW_TILE_RUN && pairs[2*j]-last<=AW_TILE_GAP && (pairs[2*j]>>16)==(start>>16);j++)
+            last=pairs[2*j];
+        if((int)(start>>16)!=chunk){
+            if(f){fclose(f);f=NULL;}
+            chunk=(int)(start>>16);
+            if(chunk>0xff)goto fail;
+            memcpy(path,"progs/tiles/",12);memcpy(path+12,stored+head+4,16);
+            sprintf(path+28,"-%02x.awtp",chunk);
+            size=COM_FOpenFile(path,&f);
+            if(!f || size<0 || size%AW_TILE_BYTES)goto fail;
+            count=size/AW_TILE_BYTES;base=ftell(f);at=0;
+            if(base<0)goto fail;
+        }
+        if((int)(last&0xffff)>=count)goto fail;
+        n=last-start+1;
+        if(at!=(long)(start&0xffff) && fseek(f,base+(long)(start&0xffff)*AW_TILE_BYTES,SEEK_SET))goto fail;
+        if(AW_LoadRead(run,(size_t)n*AW_TILE_BYTES,f)!=(size_t)n*AW_TILE_BYTES)goto fail;
+        at=(long)(last&0xffff)+1;
+        for(k=i;k<j;k++){
+            const byte *tile=run+(pairs[2*k]-start)*AW_TILE_BYTES;int slot=(int)pairs[2*k+1];
+            byte *to=dst+(slot/across)*AW_TILE*w+(slot%across)*AW_TILE;
+            for(r=0;r<AW_TILE;r++)memcpy(to+r*w,tile+r*AW_TILE,AW_TILE);
+        }
+    }
+    if(f)fclose(f);
+    memcpy(full+head+4+pixels,stored+head+4+AW_TiledRefBytes(tiles),rest);
+    free(run);free(pairs);free(stored);*bytes=head+4+pixels+rest;return full;
+fail:
+    if(f)fclose(f);
+    free(run);free(pairs);free(full);free(stored);return NULL;
+}
 /* Where the one skin of a single-skin alias RAW (BYTES long) ends, or -1. */
 int AW_AliasSkinEnd(const byte *raw,int bytes) {
     const mdl_t *m=(const mdl_t *)raw;int w,h;unsigned int type;size_t end;
@@ -187,7 +267,8 @@ int AW_AliasSkinEnd(const byte *raw,int bytes) {
     w=LittleLong(m->skinwidth);h=LittleLong(m->skinheight);
     if(w<1 || (w&3) || h<1 || h>MAX_LBM_HEIGHT)return -1;
     type=AW_Le32(raw+sizeof(mdl_t));
-    if(type==AW_SKIN_SHARED)end=sizeof(mdl_t)+4+AW_SKIN_SHARED_REF;
+    if(type==AW_SKIN_TILED){int tiles=AW_TiledSkinTiles(raw,bytes);if(tiles<0)return -1;end=sizeof(mdl_t)+4+AW_TiledRefBytes(tiles);}
+    else if(type==AW_SKIN_SHARED)end=sizeof(mdl_t)+4+AW_SKIN_SHARED_REF;
     else if(type==ALIAS_SKIN_SINGLE)end=sizeof(mdl_t)+4+(size_t)w*(size_t)h;
     else return -1;
     return end>(size_t)bytes?-1:(int)end;
@@ -236,6 +317,7 @@ static void *AW_AliasFile(char *name) {
     fclose(f);
     if(data && AW_SharedShapeAt(data,size)>=0)data=AW_SharedShapeExpand(data,&size);
     if(data && AW_SharedSkinPixels(data,size)>=0)data=AW_SharedSkinExpand(data,&size);
+    if(data && AW_TiledSkinTiles(data,size)>=0)data=AW_TiledSkinExpand(data,&size);
     Draw_EndDisc();if(data)aw_alias_file_bytes=size;return data;
 }
 
@@ -663,6 +745,12 @@ model_t *Mod_LoadModel (model_t *mod, qboolean crash)
             /* The same for a shared-shape model (AW_SharedShapeExpand): its shape file was missing. */
             mod->needload=NL_NEEDS_LOADED;if(alias_file)free(alias_file);
             if(crash)Host_Error("Model %s: its shared shape file is missing or damaged",mod->name);
+            return NULL;
+        }
+        if(AW_TiledSkinTiles((byte *)buf,alias_bytes)>=0){
+            /* The same for a tiled-skin model (AW_TiledSkinExpand): a tile pool chunk was missing or short. */
+            mod->needload=NL_NEEDS_LOADED;if(alias_file)free(alias_file);
+            if(crash)Host_Error("Model %s: its skin tile pool is missing or damaged",mod->name);
             return NULL;
         }
         if(!AW_AliasExceptionAllows(mod->name,LittleLong(((mdl_t *)buf)->numverts),LittleLong(((mdl_t *)buf)->numtris),(byte *)buf,alias_file?aw_alias_file_bytes:com_filesize)){

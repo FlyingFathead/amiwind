@@ -2,7 +2,7 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 9 times; something has to be done
+## PERSISTING: reported 11 times; something has to be done
 
 - Reported with v0.0.32-dev at 2026-10-08 (time not recorded): BUILD-IMAGE-UNDERUSED-32: parts of the image step still serial
 - Reported with v0.0.36-dev3 at 2026-10-11 00:43 +0300: audio payload and CHIM maps serial, stats on one core
@@ -13,6 +13,8 @@
 - Reported with v0.0.47-dev2 at 2026-10-21 17:30 +0300: dev2 try 3, FIX-NOW: frame-read pool 102 s on 2.96 of 24 cores, 91 units; see BUILD-IMAGE-WORLD-READ-FRAMES-47
 - Reported with v0.0.48-dev2 at 2026-10-23 (time not recorded): dev2 try8 payload preflight 47 s on 1.6 of 24 cores; try5 bake_unit map 66 s on 0.0 of 24 (waits); image failed both runs
 - Reported with v0.0.62-dev1 at 2026-11-07 (time not recorded): Seen again in the v0.0.62-dev1 build: the image stage ran on 6.3 of 24 cores for 81 s with 4 units queued and none running, so the scheduler left work waiting (tracker BUILD-IMAGE-QUEUE-STALL-62).
+- Reported with v0.0.63-dev2 at 2026-11-09 13:44 +0200: v0.0.63-dev2 full build: image step 1,638 s. CHIM room actor bake 2,342 placements on 24 workers in 9 min 36 s (20.7 of 24 cores; the last 40 placements took the final 4 minutes). Guard torches: 6 models on 6 workers for 5 min 36 s (4.7 cores), all 6 ended as skips. CHIM frame maps 31 s on 2.9 cores (town frame maps one worker per map). Partitions 1 min 13 s on 1.5 cores. Underused lines: 4 queued / 0 running for 60 s; 2 queued / 0 running in the partitions. Fix on v0.0.63-imagequeue: the shared pools (completed_map, spread_map) start queued units between two results handed back (BUILD-IMAGE-QUEUE-STALL-62).
+- Reported with v0.0.63-dev3 at 2026-11-09 15:10 +0200: Seen in the v0.0.63-dev3 build (run 2026_11_09_v0.0.63-dev3_full-v0.0.63-dev3-try2_6e68096): the CHIM room actor bake took all 2,342 placements from its unit cache room-actor (0 fitted), yet the step took 1m22s on 1.3 of 24 cores: the cached units are read one after another. The image stage itself went from 1,638 s (dev2, which filled the cache) to 544 s.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -38,7 +40,7 @@ _Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 9 times; something has to be done](#persisting-reported-9-times-something-has-to-be-done)
+- [PERSISTING: reported 11 times; something has to be done](#persisting-reported-11-times-something-has-to-be-done)
 - [Seen again: 7 November 2026 (v0.0.62-dev1)](#seen-again-7-november-2026-v0062-dev1)
 - [Status: 23 October 2026 (v0.0.48)](#status-23-october-2026-v0048)
 - [Status: 8 October 2026](#status-8-october-2026)

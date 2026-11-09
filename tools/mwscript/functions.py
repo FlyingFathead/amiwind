@@ -539,6 +539,31 @@ RESISTS = ('resistfire', 'resistfrost', 'resistshock', 'resistmagicka', 'resistd
 # statsextensions.cpp OpGetMagicEffect / OpSetMagicEffect / OpModMagicEffect on Water Breathing, effect 0); the
 # breath under water reads the magnitude (aw_breath.c)
 MAGIC_EFFECT_CALLS = RESISTS + ('waterbreathing',)
+# v0.0.63 (MWSCRIPT-GAPS-63, functions no game script of the three masters calls: the console's and add-on content):
+# the other effects of OpenMW 0.51 statsextensions.cpp's magic effect table (Chameleon, Water Walking, Swift Swim,
+# Jump, Levitate, Shield, Sound, Silence, Blind, Paralyze, Invisibility, Fortify Attack, Sanctuary), the same host call
+MAGIC_EFFECT_CALLS += ('chameleon', 'waterwalking', 'swimspeed', 'superjump', 'flying', 'armorbonus', 'castpenalty',
+                       'silence', 'blindness', 'paralysis', 'invisible', 'attackbonus', 'defendbonus')
+# and the reads and view switches of aw_mwhost.c uncalled_call: the game hour, the moons' phases, the placed position
+# and angle, the third-person view, the player's jump, the readied spell, an actor standing on or touching the object
+HOST |= {'getcurrenttime', 'getmasserphase', 'getsecundaphase', 'getstartingpos', 'getstartingangle',
+         'pcget3rdperson', 'pcforce1stperson', 'pcforce3rdperson', 'getpcjumping', 'getspellreadied',
+         'getstandingactor', 'getcollidingactor',
+         # batch 2: the player's run and the jump flags (aw_move.c), the armour's weight class in a slot, the faction
+         # reads (aw_dial.c), effects ended by number or by spell, the soul gems, the level-up window
+         'getpcrunning', 'forcejump', 'clearforcejump', 'forcemovejump', 'clearforcemovejump', 'getforcejump',
+         'getforcemovejump', 'getarmortype', 'samefaction', 'getfactionreaction', 'removeeffects',
+         'removespelleffects', 'addsoulgem', 'dropsoulgem', 'enablelevelupmenu'}
+# batch 3 (v0.0.63, MWSCRIPT-GAPS-63): the console group, which OpenMW 0.51 compiles in any script too (aw_mwhost.c
+# console_group_call): Show (a global's value), ShowVars (the object's locals by slot, else the globals), ToggleScripts
+# (the dbg mwscript switch), ToggleAI (the walking packages, chim actors ambient), ResetActors (the actors back at their
+# start), OutputRefInfo (the reference's id, number, place, script), User1..User4 (OpenMW's test hooks: the name only),
+# and the original's console aliases run from a script (noclip, dbg god, dbg killhud, dbg vanitycam, dbg unstuck, dbg tp)
+CONSOLE_GROUP = {'show', 'showvars', 'sv', 'togglescripts', 'toggleai', 'tai', 'resetactors', 'ra', 'outputrefinfo',
+                 'ori', 'user1', 'user2', 'user3', 'user4', 'togglecollision', 'tcl', 'togglegodmode', 'tgm',
+                 'togglemenus', 'tm', 'togglevanitymode', 'tvm', 'centeroncell', 'coc', 'centeronexterior', 'coe',
+                 'fixme'}
+HOST |= CONSOLE_GROUP
 HOST |= {verb + r for r in MAGIC_EFFECT_CALLS for verb in ('get', 'set', 'mod')}
 # v0.0.62: the player's control switches, Disable/Enable and the Get...Disabled readers of the seven input switches,
 # and Disable/EnableTeleporting and -Levitation (aw_story.h AW_Control*, saved; OpenMW controlextensions.cpp
@@ -561,11 +586,14 @@ HOST_EFFECTS = set(CONTROL_SETS) | MENU_ENABLES | {'placeatpc', 'placeatme', 'pl
                                     'rotateworld', 'setdelete', 'payfine', 'payfinethief', 'gotojail',
                                     'fadein', 'fadeout', 'fadeto', 'forcesneak', 'clearforcesneak', 'removesoulgem',
                                     'hurtstandingactor', 'hurtcollidingactor', 'drop', 'turnmoonred', 'turnmoonwhite', 'forcerun',
-                                    'clearforcerun', 'explodespell', 'becomewerewolf', 'undowerewolf',
+                                    'clearforcerun', 'explodespell', 'pcforce1stperson', 'pcforce3rdperson',
+                                    'forcejump', 'clearforcejump', 'forcemovejump', 'clearforcemovejump',
+                                    'removeeffects', 'removespelleffects', 'addsoulgem', 'dropsoulgem',
+                                    'enablelevelupmenu', 'becomewerewolf', 'undowerewolf',
                                     'setwerewolfacrobatics', 'setscale', 'modscale', 'resurrect', 'playbink', 'changeweather', 'modregion',
                                     'aifollowcell', 'aiescort', 'aiescortcell', 'positioncell','showrestmenu', 'raiserank', 'lowerrank', 'showmap', 'clearinfoactor', 'choice', 'goodbye', 'modfactionreaction', 'setfactionreaction', 'forcegreeting', 'rotate', 'aitravel', 'aifollow', 'position','playgroup', 'loopgroup', 'addtopic', 'cast','setpccrimelevel', 'modpccrimelevel', 'setreputation', 'modreputation', 'pcraiserank',
                 'pclowerrank', 'pcjoinfaction', 'pcexpell', 'pcclearexpelled', 'setpcfacrep', 'modpcfacrep'} | \
-    {verb + r for r in MAGIC_EFFECT_CALLS for verb in ('set', 'mod')}
+    {verb + r for r in MAGIC_EFFECT_CALLS for verb in ('set', 'mod')} | CONSOLE_GROUP
 
 # Groups the measurement reports as "the engine does not have it yet" (the brief's list), and the rest.
 MISSING_GROUPS = ('ai', 'inventory', 'combat', 'spells', 'position')

@@ -164,6 +164,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - JOURNAL-BOOK-32-QUESTS-59 (no report page): The journal book lists only the quests of the old 32-slot table, although every quest's stage is now kept
 - [LOADED-ITEMS-NOT-WEIGHED-61](LOADED-ITEMS-NOT-WEIGHED-61.md): After loading a save of another character the carried weight reads 0 until the next place load
 - MWSCRIPT-CELLCHANGED-VOLATILE-54 (no report page): CellChanged made the sound-marker scripts volatile: 85 percent of Vivec's per-frame script work
+- MWSCRIPT-CONSOLE-LOCAL-NAMES-63 (no report page): Show and ShowVars cannot name a script's local variables: Show reads globals only, ShowVars lists the locals by slot number, and ToggleScripts flips the saved scripts switch
 - MWSCRIPT-DATA-UNKNOWN-NAMES-48 (no report page): Four Bloodmoon scripts read names declared nowhere in the game data and do not compile
 - MWSCRIPT-INERT-SEEN-62 (no report page): Scripts whose only effect is a message box, a door or item use they take over, or a local the dialogue reads were left out of the build as doing nothing
 - MWSCRIPT-INTERIOR-PLACEMENTS-48 (no report page): Scripted placements in rooms that have no edict are not attached: the engine has no room identity to match them (3,612 of 4,907 bindings are in rooms)
@@ -193,6 +194,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - PLACED-PIT-AXE-NO-FOCUS-61 (no report page): The iron shardaxe in the Seyda Neen pit is drawn but shows no item box and cannot be taken
 - [PLAYER-DEATH-LIMBO-35](PLAYER-DEATH-LIMBO-35.md): After the player dies there is no way out: the game stays in a limbo with no reload or retry
 - PLAYER-FORTIFY-END-AS-DAMAGE-61 (no report page): When a Fortify Attribute effect on the player ends, the character sheet keeps it as a raised modifier and records the drop as damage
+- PLAYER-HEALTH-OVER-MAX-63 (no report page): The player starts with health above its maximum (100 of 40) and restoring the stats keeps it there
 - [PLAYER-JUMP-ORIGINAL-RULES-48](PLAYER-JUMP-ORIGINAL-RULES-48.md): The jump height and in-air control are still Quake's, not the original's Acrobatics, load and fatigue rules
 - [PLAYER-JUMP-THIRDPERSON-38](PLAYER-JUMP-THIRDPERSON-38.md): Third-person player jump animation is missing
 - [PLAYER-MOVEMENT-STATS-PARITY-39](PLAYER-MOVEMENT-STATS-PARITY-39.md): Walking/running use fixed debug speeds and do not apply original stats or running fatigue

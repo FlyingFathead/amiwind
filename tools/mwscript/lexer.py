@@ -119,3 +119,25 @@ def tokenize(text, warnings=None):
     out.append(Token('nl', None, line))
     out.append(Token('eof', None, line))
     return out
+
+
+# The declaration reader lives here, beside the tokens it reads, not in parser.py (BUILD-TABLE-UNITS-REBAKE-63): the
+# dialogue table reads a speaker's local slots with it, and the parser module imports the whole function table
+# (functions.py), whose every new entry re-keyed the dialogue table's unit although the slots never depend on it.
+TYPES = {'short': 's', 'long': 'l', 'float': 'f'}
+
+
+def declarations(tokens):
+    """{local name (folded): (type letter, order)} from every 'short/long/float name' line start."""
+    out, start = {}, True
+    for i, t in enumerate(tokens):
+        if t.kind == 'nl':
+            start = True; continue
+        if start and t.kind == 'name' and not t.quoted and t.value.casefold() in TYPES:
+            nxt = tokens[i + 1] if i + 1 < len(tokens) else None
+            if nxt is not None and nxt.kind == 'name':
+                name = nxt.value.casefold()
+                if name not in out:
+                    out[name] = (TYPES[t.value.casefold()], len(out))
+        start = False
+    return out

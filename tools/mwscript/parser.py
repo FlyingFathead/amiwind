@@ -17,7 +17,7 @@ Quirks handled (each seen in the game data or documented by OpenMW's compiler; o
 """
 import re
 
-from .lexer import tokenize
+from .lexer import tokenize, TYPES, declarations  # noqa: F401  (declarations: lexer.py, BUILD-TABLE-UNITS-REBAKE-63)
 from .functions import lookup, KEYWORDS
 
 
@@ -25,7 +25,6 @@ class ParseError(ValueError):
     pass
 
 
-TYPES = {'short': 's', 'long': 'l', 'float': 'f'}
 _NUMBER = re.compile(r'[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?')
 
 
@@ -37,22 +36,6 @@ def _leading_number(text):
         return float(m.group(0)) if m else 0.0
     except ValueError:
         return 0.0
-
-
-def declarations(tokens):
-    """{local name (folded): (type letter, order)} from every 'short/long/float name' line start."""
-    out, start = {}, True
-    for i, t in enumerate(tokens):
-        if t.kind == 'nl':
-            start = True; continue
-        if start and t.kind == 'name' and not t.quoted and t.value.casefold() in TYPES:
-            nxt = tokens[i + 1] if i + 1 < len(tokens) else None
-            if nxt is not None and nxt.kind == 'name':
-                name = nxt.value.casefold()
-                if name not in out:
-                    out[name] = (TYPES[t.value.casefold()], len(out))
-        start = False
-    return out
 
 
 class Parser:

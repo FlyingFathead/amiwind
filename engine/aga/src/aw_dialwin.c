@@ -1452,6 +1452,9 @@ static int read_rank_req(void *user,long offset,void *out,long bytes){
     memcpy(out,rank_req_row,AW_DIAL_RANK_REQ);
     return 1;
 }
+int AW_DialWindowReaction(const char *a,const char *b){   /* v0.0.63: GetFactionReaction (aw_mwhost.c) */
+    return load()?AW_DialReaction(&table,a,b):0;
+}
 int AW_DialWindowRankRequirement(const char *faction,int rank,const short *attributes,const short *skills,int reputation){
     if(!load())return 0;
     return AW_DialRankRequirement(&table,faction,rank,attributes,skills,reputation,read_rank_req,NULL);

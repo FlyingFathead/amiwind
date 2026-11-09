@@ -49,6 +49,8 @@
 #include "aw_lava.h"           /* HurtStandingActor holds the lava volume's own damage back */
 #include "aw_mwconsole.h"      /* the original's console commands (v0.0.63, MW-CONSOLE-COMMANDS-62) */
 #include "aw_listbox.h"        /* the console target finder */
+#include "aw_clock.h"          /* GetCurrentTime, the moons' phases (v0.0.63, MWSCRIPT-GAPS-63) */
+#include "aw_sky.h"
 #include <ctype.h>
 
 #define FILE_NAME "mwscript.awm"
@@ -1031,6 +1033,9 @@ void AW_MwscriptStartSpellsReport(void){
         Con_Printf(" %d %s (cost %d)\n",start_chosen[i],name,cost);
     }
 }
+/* UNDERWATER-BREATH-62: counts every change of the player's race, birthsign or class spells, so the kept always-active
+ * magnitudes (passive_of) are read again: a race swap removes and adds as many spells, the list size alone stays */
+static unsigned long creation_generation;
 static void creation_spells(aw_actor_t *a){
     int want[AWS_SPELLS],n=0,i,j,held[128],h,type,cost,nrace;long tb;const unsigned char *t;char name[8];
     if(!aw_character.valid || (aw_character.race==applied_race && aw_character.birth==applied_birth &&
@@ -1053,7 +1058,7 @@ static void creation_spells(aw_actor_t *a){
     }else for(i=0;i<applied_n;i++){for(j=0;j<n && want[j]!=applied[i];j++);if(j==n)AW_ActorRemoveSpell(a,applied[i]);}
     for(i=0;i<n;i++)if(!AW_ActorHasSpell(a,want[i]))AW_ActorAddSpell(a,want[i]);
     memcpy(applied,want,sizeof(int)*(size_t)n);applied_n=n;applied_race=aw_character.race;applied_birth=aw_character.birth;
-    applied_class=aw_character.clas;
+    applied_class=aw_character.clas;creation_generation++;
     Con_DPrintf("Player spells: %d from the race, the birthsign, the class and the skills (%d starting spells)\n",n,start_chosen_n);
 }
 static unsigned long god_health_held;   /* GODMODE-LAVA-DEATH-62: script or spell health losses god mode kept back */
@@ -1070,8 +1075,9 @@ static aw_actor_t *player_record(void){
     return a;
 }
 static void player_store(const aw_actor_t *a){
-    int i;
+    int i;float old_max;
     if(!a || !aw_character.valid)return;
+    old_max=aw_character.maximum[0];
     for(i=0;i<8;i++){
         int mod=a->attr_mod[i];
         aw_character.attributes[i]=a->attr_base[i];
@@ -1085,9 +1091,11 @@ static void player_store(const aw_actor_t *a){
     aw_character.level=a->level;
     /* GODMODE-LAVA-DEATH-62: every script and spell change of the player's health comes back here (SetHealth,
      * ModCurrentHealth, Damage Health, poison, the elements, a drain of the maximum): in god mode it never falls below
-     * the edict's live health (a heal still lands) */
+     * the edict's live health (a heal still lands); the maximum caps it only when the change drained the maximum itself
+     * (v0.0.63-dev3: a health above an unchanged maximum, 100 of 40, let ModCurrentHealth -50 land) */
     if(sv_player){
-        float h=AW_CombatGodHealth(((int)sv_player->v.flags&FL_GODMODE)!=0,sv_player->v.health,a->dyn_cur[0],a->dyn_base[0]);
+        float h=AW_CombatGodHealth(((int)sv_player->v.flags&FL_GODMODE)!=0,sv_player->v.health,a->dyn_cur[0],
+                                   a->dyn_base[0]<old_max?a->dyn_base[0]:0);
         if(h!=a->dyn_cur[0]){god_health_held++;aw_character.current[0]=h;}
         sv_player->v.health=h;
     }
@@ -1179,7 +1187,7 @@ static struct {uint32_t ref;int effect,nspells;uint16_t base;unsigned long gener
 static int passive_next;
 static unsigned long passive_reads,passive_kept;
 static float passive_of(const aw_actor_t *a,uint32_t ref,int effect){
-    int i;unsigned long g=AW_EffectsGeneration();
+    int i;unsigned long g=AW_EffectsGeneration()+creation_generation;   /* either changes: read again */
     if(!a)return 0;
     for(i=0;i<PASSIVE_MEMO;i++)
         if(passive_memo[i].ref==ref && passive_memo[i].effect==effect && passive_memo[i].nspells==a->nspells &&
@@ -2745,7 +2753,26 @@ static const struct {int get,set,mod,effect,weakness,shield;} resists[]={
     {AWF_GETRESISTPARALYSIS,AWF_SETRESISTPARALYSIS,AWF_MODRESISTPARALYSIS,99,-1,-1},
     /* v0.0.63 (UNDERWATER-BREATH-62): Get/Set/ModWaterBreathing, the same calls on Water Breathing; the read also
      * counts the always-active spells of the actor's list (the Argonians' ability), as OpenMW's magic effects do */
-    {AWF_GETWATERBREATHING,AWF_SETWATERBREATHING,AWF_MODWATERBREATHING,AW_EFFECT_WATER_BREATHING,-1,-1}};
+    {AWF_GETWATERBREATHING,AWF_SETWATERBREATHING,AWF_MODWATERBREATHING,AW_EFFECT_WATER_BREATHING,-1,-1},
+    /* v0.0.63 (MWSCRIPT-GAPS-63, the functions no game script calls: the console's): the other magic effects of the
+     * script family, by OpenMW 0.51 statsextensions.cpp's table (OpGetMagicEffect / OpSetMagicEffect /
+     * OpModMagicEffect): Chameleon, Water Walking, Swift Swim (SwimSpeed), Jump (SuperJump), Levitate (Flying), Shield
+     * (ArmorBonus), Sound (CastPenalty), Silence, Blind, Paralyze, Invisibility, Fortify Attack (AttackBonus),
+     * Sanctuary (DefendBonus); no weakness, no shield; the read counts the always-active spells as Water Breathing's */
+    {AWF_GETCHAMELEON,AWF_SETCHAMELEON,AWF_MODCHAMELEON,40,-1,-1},
+    {AWF_GETWATERWALKING,AWF_SETWATERWALKING,AWF_MODWATERWALKING,2,-1,-1},
+    {AWF_GETSWIMSPEED,AWF_SETSWIMSPEED,AWF_MODSWIMSPEED,1,-1,-1},
+    {AWF_GETSUPERJUMP,AWF_SETSUPERJUMP,AWF_MODSUPERJUMP,9,-1,-1},
+    {AWF_GETFLYING,AWF_SETFLYING,AWF_MODFLYING,10,-1,-1},
+    {AWF_GETARMORBONUS,AWF_SETARMORBONUS,AWF_MODARMORBONUS,3,-1,-1},
+    {AWF_GETCASTPENALTY,AWF_SETCASTPENALTY,AWF_MODCASTPENALTY,48,-1,-1},
+    {AWF_GETSILENCE,AWF_SETSILENCE,AWF_MODSILENCE,46,-1,-1},
+    {AWF_GETBLINDNESS,AWF_SETBLINDNESS,AWF_MODBLINDNESS,AW_EFFECT_BLIND,-1,-1},
+    {AWF_GETPARALYSIS,AWF_SETPARALYSIS,AWF_MODPARALYSIS,45,-1,-1},
+    {AWF_GETINVISIBLE,AWF_SETINVISIBLE,AWF_MODINVISIBLE,39,-1,-1},
+    {AWF_GETATTACKBONUS,AWF_SETATTACKBONUS,AWF_MODATTACKBONUS,AW_EFFECT_FORTIFY_ATTACK,-1,-1},
+    {AWF_GETDEFENDBONUS,AWF_SETDEFENDBONUS,AWF_MODDEFENDBONUS,AW_EFFECT_SANCTUARY,-1,-1}};
+#define RESIST_PASSIVE_FIRST 10   /* Water Breathing's row and the rows after it count the always-active spells */
 static unsigned long resist_calls,resist_refused,fades;
 static float resist_value(uint32_t owner,int k){
     float v=AW_EffectsMagnitude(owner,resists[k].effect,AW_EFFECT_NO_ARG);
@@ -2838,6 +2865,9 @@ static int equip_script(const aw_inventory_item_t *it,int phase){
     equip_row_t r;uint32_t key;
     if(!it || !it->script[0] || !equip_row(it->id,&r))return 0;
     key=carried_key(it->id);carried_add(it->id,r.script);
+    /* PHASE 2, taken off (OpenMW 0.51 InventoryStore::unequipSlot): OnPCEquip 0, so a script that acts while its
+     * item is worn (ouch_sunder, MWSCRIPT-UNPLACED-RECORD-SCRIPTS-61) stops acting */
+    if(phase==2){if(r.on>=0){AW_MwvmLocalSet(key,r.script,r.on,0);AW_MwvmStateChanged();}return 0;}
     if(phase==0){
         aw_mwcell_t v;int s;
         if(r.skip>=0 && AW_MwvmLocalGet(key,r.skip,&s,&v) && s==r.script && v.i==1){
@@ -2920,6 +2950,248 @@ static int hit_on_me(int instance,int target,const char *weapon){
     if(!AW_CombatLastHitTake(ref,id_hash(weapon)))return 0;
     hits_matched++;return 1;
 }
+/* v0.0.63 (MWSCRIPT-GAPS-63): functions no game script of the three masters calls, carried out for the console and
+ * for add-on content. Every one is a read or a view switch; nothing resident is added (a few counters). */
+static unsigned long uncalled_calls,uncalled_refused;
+static int actor_touches(const edict_t *x,const edict_t *e,int standing){
+    int i;
+    if(!x || x->free || x==e || (x!=sv_player && !is_actor(x)) || x->v.health<=0)return 0;
+    if(standing)return ((int)x->v.flags&FL_ONGROUND) && PROG_TO_EDICT(x->v.groundentity)==e;
+    for(i=0;i<3;i++)if(x->v.absmin[i]>e->v.absmax[i]+1 || x->v.absmax[i]<e->v.absmin[i]-1)return 0;
+    return 1;
+}
+static int uncalled_call(int instance,int target,int function,const aw_mwcell_t *numbers,int count,
+                         const unsigned char *strings,int nstrings,aw_mwcell_t *result){
+    edict_t *e;
+    switch(function){
+    /* --- batch 2 (v0.0.63, MWSCRIPT-GAPS-63) --- */
+    case AWF_GETPCRUNNING:
+        /* GetPCRunning (controlextensions.cpp OpGetPcRunning: running and moving): the player's last move (aw_move.c) */
+        result->i=AW_MovePlayerRunning();return AW_MWVM_CALL_READ;
+    case AWF_FORCEJUMP:case AWF_CLEARFORCEJUMP:case AWF_FORCEMOVEJUMP:case AWF_CLEARFORCEMOVEJUMP:
+        /* ForceJump / ForceMoveJump and their Clear (controlextensions.cpp OpSetMovementFlag, OpClearMovementFlag:
+         * Flag_ForceJump jumps, Flag_ForceMoveJump jumps while moving): the player's jump button held by the flag
+         * (aw_move.c); another actor has no jump here: nothing */
+        if(target!=AW_MWVM_PLAYER){uncalled_refused++;return 1;}
+        if(function==AWF_FORCEJUMP || function==AWF_CLEARFORCEJUMP)aw_move_force_jump=function==AWF_FORCEJUMP;
+        else aw_move_force_move_jump=function==AWF_FORCEMOVEJUMP;
+        uncalled_calls++;return 1;
+    case AWF_GETFORCEJUMP:result->i=target==AW_MWVM_PLAYER && aw_move_force_jump;return AW_MWVM_CALL_READ;
+    case AWF_GETFORCEMOVEJUMP:result->i=target==AW_MWVM_PLAYER && aw_move_force_move_jump;return AW_MWVM_CALL_READ;
+    case AWF_GETARMORTYPE:{
+        /* GetArmorType SLOT (containerextensions.cpp OpGetArmorType: the armour in that equipment slot by its weight
+         * class, 0 light, 1 medium, 2 heavy; -1 none or not armour): the player's slot (the slots are the original's
+         * order, aw_inventory.h); an NPC's worn armour has no weight class in the actor table yet: -1 */
+        aw_inventory_item_t it;int slot=count>=1?numbers[0].i:-1;
+        result->i=-1;
+        if(target==AW_MWVM_PLAYER && slot>=0 && slot<=AW_SLOT_AMMUNITION && AW_InventoryEquippedItem(slot,&it) &&
+           it.category==AW_INV_ARMOUR && it.shield_class>=0 && it.shield_class<=2)result->i=it.shield_class;
+        return AW_MWVM_CALL_READ;}
+    case AWF_SAMEFACTION:{
+        /* SameFaction (statsextensions.cpp OpSameFaction: the player is in the actor's faction) */
+        char own[64];const char *f=actor_faction(instance,target,own,sizeof(own));
+        result->i=f && AW_StandingRank(f)>=0;return AW_MWVM_CALL_READ;}
+    case AWF_GETFACTIONREACTION:{
+        /* GetFactionReaction FACTION1 FACTION2 (dialogueextensions.cpp OpGetFactionReaction): 1's reaction toward 2,
+         * the dialogue table's with the scripts' changes (aw_dial.c) */
+        const char *a=call_string(strings,nstrings,0),*b=call_string(strings,nstrings,1);
+        result->i=a && b?AW_DialWindowReaction(a,b):0;return AW_MWVM_CALL_READ;}
+    case AWF_REMOVEEFFECTS:case AWF_REMOVESPELLEFFECTS:{
+        /* RemoveEffects EFFECT / RemoveSpellEffects SPELL (miscextensions.cpp OpRemoveEffects,
+         * OpRemoveSpellEffects): the actor's active effects of that number / of that spell (the compiler's ASPT row)
+         * end, each undone as at its end (aw_effects.c) */
+        aw_actor_t *a;uint32_t owner;int n;
+        if(count<1)return 1;
+        if(target==AW_MWVM_PLAYER){a=player_record();owner=AW_ACTOR_PLAYER_REF;}
+        else if((a=actor_of(instance,target,&e))!=NULL)owner=a->reference;
+        else{uncalled_refused++;return 1;}
+        n=function==AWF_REMOVEEFFECTS?AW_EffectsEnd(a,owner,numbers[0].i):a?AW_EffectsRemoveSource(a,numbers[0].i):0;
+        if(n){if(target==AW_MWVM_PLAYER && a)player_store(a);AW_MwvmStateChanged();}
+        uncalled_calls++;return 1;}
+    case AWF_ADDSOULGEM:case AWF_DROPSOULGEM:{
+        /* AddSoulGem CREATURE GEM (miscextensions.cpp OpAddSoulGem: a gem of that kind filled with the creature's
+         * soul into the inventory) and DropSoulGem CREATURE (OpDropSoulGem: the first gem holding that soul leaves
+         * the inventory; OpenMW lays it on the ground, here it is not laid down yet): the player's filled gems
+         * (aw_actorstate.c AW_Gem*) */
+        const char *creature=call_string(strings,nstrings,0),*gem=call_string(strings,nstrings,1);int row,i,soul;char id[40];
+        if(target!=AW_MWVM_PLAYER || !creature || !AW_MwscriptActors() || (row=AW_ActorFind(creature))<0){
+            uncalled_refused++;return 1;}
+        if(function==AWF_ADDSOULGEM){
+            if(!gem || !AW_GemAdd(gem,row)){uncalled_refused++;return 1;}
+            AW_ItemAdd(&aw_state,gem,1);
+        }else{
+            for(i=0;i<AW_GemCount();i++)if(AW_GemAt(i,id,sizeof(id),&soul) && soul==row)break;
+            if(i==AW_GemCount())return 1;
+            AW_GemRemove(i);AW_ItemAdd(&aw_state,id,-1);
+        }
+        AW_MwvmStateChanged();uncalled_calls++;return 1;}
+    case AWF_ENABLELEVELUPMENU:
+        /* EnableLevelupMenu (guiextensions.cpp: the level-up window): opened when a level is due (aw_levelup.c, the
+         * rest's own box); nothing when none is */
+        AW_LevelupRested();uncalled_calls++;return 1;
+    case AWF_GETCURRENTTIME:{
+        /* GetCurrentTime (OpenMW 0.51 miscextensions.cpp OpGetCurrentTime: the GameHour global): the saved clock's
+         * hour of the day (aw_clock.c, the global amiwind:clock:ms) */
+        result->f=AW_ClockEnsure()?(float)AW_StateGet(&aw_state,AW_GLOBAL,"amiwind:clock:ms")/3600000.0f:0;
+        uncalled_calls++;return AW_MWVM_CALL_READ;}
+    case AWF_GETMASSERPHASE:case AWF_GETSECUNDAPHASE:{
+        /* GetMasserPhase / GetSecundaPhase (skyextensions.cpp; weather.cpp MoonModel: the day of the 24-day cycle in
+         * steps of three, 0 full): the sky's own orbit of that moon on the saved clock (r_sky.c R_NightMoonOrbit) */
+        float dir[3];int phase=0,ms=0,days=0;
+        if(AW_ClockEnsure()){ms=AW_StateGet(&aw_state,AW_GLOBAL,"amiwind:clock:ms");days=AW_ClockDays();}
+        R_NightMoonOrbit(function==AWF_GETSECUNDAPHASE,ms,days,dir,&phase);
+        result->i=phase;uncalled_calls++;return AW_MWVM_CALL_READ;}
+    case AWF_GETSTARTINGPOS:case AWF_GETSTARTINGANGLE:{
+        /* GetStartingPos / GetStartingAngle AXIS (transformationextensions.cpp OpGetStartingPos, OpGetStartingAngle: the
+         * reference's placed position and rotation): where a script's first move found it (SetAtStart's record), else
+         * where it is now (never moved by a script on this map); the player: where he is */
+        const char *axis=call_string(strings,nstrings,0);float game[3];int a,i;
+        result->f=0;
+        if(!axis || !(e=transform_target(instance,target)))return AW_MWVM_CALL_READ;
+        a=tolower((unsigned char)axis[0]);i=e==sv_player?-1:start_find(e);
+        if(function==AWF_GETSTARTINGANGLE){
+            result->f=AW_MoveScriptAngle(i>=0?starts[i].angles:e==sv_player?sv_player->v.v_angle:e->v.angles,
+                                         (unsigned char)a,actor_like(e));
+        }else if(a>='x' && a<='z'){
+            to_game_units(i>=0?starts[i].origin:e->v.origin,game);result->f=game[a-'x'];
+        }
+        uncalled_calls++;return AW_MWVM_CALL_READ;}
+    case AWF_PCGET3RDPERSON:result->i=chase_active.value!=0;return AW_MWVM_CALL_READ;
+    case AWF_PCFORCE1STPERSON:case AWF_PCFORCE3RDPERSON:
+        /* PCForce1stPerson / PCForce3rdPerson (controlextensions.cpp OpPCForce1stPerson, OpPCForce3rdPerson): the
+         * player's view switched as his own key does (the chase camera, aw_view.c) */
+        Cvar_SetValue("chase_active",function==AWF_PCFORCE3RDPERSON);uncalled_calls++;return 1;
+    case AWF_GETPCJUMPING:
+        /* GetPCJumping (statsextensions.cpp OpGetPCJumping, Player::getJumping: from the jump until the landing): the
+         * player off the ground and not swimming (a fall from a ledge counts too here) */
+        result->i=sv_player && !((int)sv_player->v.flags&FL_ONGROUND) && sv_player->v.waterlevel<2 &&
+                  !((int)sv_player->v.flags&FL_FLY);
+        return AW_MWVM_CALL_READ;
+    case AWF_GETSPELLREADIED:
+        /* GetSpellReadied (miscextensions.cpp OpGetSpellReadied: the draw state is the spell): the player's readied
+         * magic (aw_cast.c); another actor readies no spell outside its cast here: 0 */
+        result->i=target==AW_MWVM_PLAYER?AW_CastReady()!=0:0;return AW_MWVM_CALL_READ;
+    case AWF_GETSTANDINGACTOR:case AWF_GETCOLLIDINGACTOR:{
+        /* GetStandingActor / GetCollidingActor (miscextensions.cpp; World::getActorStandingOn, getActorCollidingWith):
+         * any actor, the player included, standing on the object's entity or touching its box (a unit apart) */
+        vec3_t at;int n=locate(instance,target,at),i,hit=0;
+        e=n>0?edict_of(n):NULL;
+        if(e && !e->free){
+            hit=actor_touches(sv_player,e,function==AWF_GETSTANDINGACTOR);
+            for(i=1;!hit && i<sv.num_edicts;i++)hit=actor_touches(EDICT_NUM(i),e,function==AWF_GETSTANDINGACTOR);
+        }
+        result->i=hit;uncalled_calls++;return AW_MWVM_CALL_READ;}
+    }
+    return 0;
+}
+/* v0.0.63 (MWSCRIPT-GAPS-63 batch 3): the console group as script functions too (OpenMW 0.51 compiles them in any
+ * script: miscextensions.cpp, consoleextensions, aiextensions.cpp OpToggleAI, transformationextensions.cpp
+ * OpResetActors, userextensions.cpp). The original's console aliases run the same AmiWind line (aw_mwconsole.c);
+ * the rest print to the console. Nothing resident (one counter). */
+static void console_exec(const char *text);
+static unsigned long console_group_calls;
+static void show_global(int g){
+    int type=0;const char *name=global_names+global_offsets[g];
+    AW_MwvmGlobalName(g,&type);
+    if(type==2)Con_Printf("%s = %g\n",name,(double)AW_MwvmGlobalFloat(g));
+    else Con_Printf("%s = %ld\n",name,(long)AW_MwvmGlobalInt(g));
+}
+/* the instance of the object a call names (its own script's locals), -1 none */
+static int object_instance(int instance,int target,edict_t **out){
+    int k,n=AW_MwvmInstanceCount(),num;aw_mwvm_instance_t *in;edict_t *e=transform_entity(instance,target);
+    *out=e;
+    if(target==AW_MWVM_SELF)return instance;
+    if(!e || e==sv_player)return -1;
+    num=NUM_FOR_EDICT(e);
+    for(k=0;k<n;k++)if((in=AW_MwvmInstance(k))!=NULL && (in->flags&AWI_USED) && !(in->flags&AWI_GLOBAL) && in->entity==num)
+        return k;
+    return -1;
+}
+static int console_group_call(int instance,int target,int function,const aw_mwcell_t *numbers,int count,
+                              const unsigned char *strings,int nstrings,aw_mwcell_t *result){
+    const char *s=call_string(strings,nstrings,0);char line[128];int g,k;edict_t *e;aw_mwvm_instance_t *in;
+    (void)result;
+    switch(function){
+    case AWF_SHOW:{
+        /* Show NAME (OpenMW OpShow: the variable's value on the console): a global by its name; a script local's name
+         * is not kept in the engine (the compiler makes it a slot): ShowVars prints the locals by slot */
+        if(!s)return 1;
+        global_names_load();
+        for(g=0;global_names && global_offsets && g<global_count;g++)
+            if(global_offsets[g]>=0 && same_id(global_names+global_offsets[g],s)){show_global(g);break;}
+        if(!global_names || !global_offsets || g>=global_count)
+            Con_Printf("Show: %s is no global (a local's name is not kept: ShowVars lists the locals by slot)\n",s);
+        console_group_calls++;return 1;}
+    case AWF_SHOWVARS:case AWF_SV:
+        /* ShowVars (OpenMW OpShowVars: the reference's local variables, else the globals): the object's script's
+         * locals by slot (each shown as a whole number and as a fraction: the slot's type is the compiler's), the
+         * player or no object: every global */
+        if(target!=AW_MWVM_PLAYER && (k=object_instance(instance,target,&e))>=0 && (in=AW_MwvmInstance(k))!=NULL){
+            int n=AW_MwvmLocalCount(in->script),i;aw_mwcell_t v;
+            Con_Printf("ShowVars: script %d, %d locals\n",(int)in->script,n);
+            for(i=0;i<n;i++){v=AW_MwvmLocal(k,i);Con_Printf("  local %d = %ld / %g\n",i,(long)v.i,(double)v.f);}
+        }else if(target!=AW_MWVM_PLAYER && target!=AW_MWVM_SELF){
+            Con_Printf("ShowVars: the object has no script here\n");
+        }else{
+            global_names_load();
+            for(g=0;global_names && global_offsets && g<global_count;g++)if(global_offsets[g]>=0)show_global(g);
+        }
+        console_group_calls++;return 1;
+    case AWF_TOGGLESCRIPTS:
+        /* ToggleScripts (OpenMW OpToggleScripts): the compiled scripts off and on, the dbg mwscript switch */
+        Cvar_SetValue(mwscript.name,mwscript.value?0.0f:1.0f);
+        Con_Printf("Scripts %s\n",mwscript.value?"on":"off");console_group_calls++;return 1;
+    case AWF_TOGGLEAI:case AWF_TAI:
+        /* ToggleAI (OpenMW OpToggleAI: the actors' AI processing off and on): the walking packages ("chim actors
+         * ambient off" keeps every actor standing); the combat layer is its own */
+        console_exec(AW_AmbientEnabled()?"chim actors ambient off":"chim actors ambient on");
+        console_group_calls++;return 1;
+    case AWF_RESETACTORS:case AWF_RA:{
+        /* ResetActors (OpenMW World::resetActors): the actors a script moved back where the map put them (SetAtStart's
+         * record), then every walker of the map at its spawn spot, choosing again (aw_ambient.c) */
+        int i,n=0;
+        for(i=0;i<STARTS;i++)if(starts[i].ref && starts[i].map==attached_map && starts[i].entity>0 &&
+                                 starts[i].entity<sv.num_edicts){
+            e=EDICT_NUM(starts[i].entity);
+            if(e->free || !is_actor(e))continue;
+            VectorCopy(starts[i].origin,e->v.origin);VectorCopy(starts[i].angles,e->v.angles);SV_LinkEdict(e,false);n++;
+        }
+        n+=AW_AmbientResetActors();
+        Con_Printf("ResetActors: %d actors back at their start\n",n);console_group_calls++;return 1;}
+    case AWF_OUTPUTREFINFO:case AWF_ORI:{
+        /* OutputRefInfo (OpenMW OpOutputRefInfo... the reference's id, number, place and script on the console) */
+        float game[3];eval_t *v,*scale;uint32_t ref=transform_reference(instance,target);
+        k=target==AW_MWVM_PLAYER?-1:object_instance(instance,target,&e);
+        if(target==AW_MWVM_PLAYER)e=sv_player;
+        if(!e){Con_Printf("OutputRefInfo: no such reference here\n");return 1;}
+        v=GetEdictFieldValue(e,"aw_source_id");scale=GetEdictFieldValue(e,"aw_scale");
+        to_game_units(e->v.origin,game);
+        Con_Printf("RefID: %s\nRefNum: %lu\nPosition: %g %g %g\nAngle Z: %g\nScale: %g\nScript: %d\n",
+                   e==sv_player?"player":v && v->string?pr_strings+v->string:"(none)",(unsigned long)ref,
+                   (double)game[0],(double)game[1],(double)game[2],(double)e->v.angles[1],
+                   (double)(scale && scale->_float>0?scale->_float:1.0f),
+                   k>=0 && (in=AW_MwvmInstance(k))!=NULL?(int)in->script:-1);
+        console_group_calls++;return 1;}
+    case AWF_USER1:case AWF_USER2:case AWF_USER3:case AWF_USER4:
+        /* User1..User4 (OpenMW userextensions.cpp: the developers' test hooks, no game effect): the name on the console */
+        Con_Printf("User%d\n",function-AWF_USER1+1);console_group_calls++;return 1;
+    /* the original's console aliases (aw_mwconsole.c aliases[]): the same AmiWind line from a script */
+    case AWF_TOGGLECOLLISION:case AWF_TCL:console_exec("noclip");console_group_calls++;return 1;
+    case AWF_TOGGLEGODMODE:case AWF_TGM:console_exec("dbg god");console_group_calls++;return 1;
+    case AWF_TOGGLEMENUS:case AWF_TM:console_exec("dbg killhud");console_group_calls++;return 1;
+    case AWF_TOGGLEVANITYMODE:case AWF_TVM:console_exec("dbg vanitycam on");console_group_calls++;return 1;
+    case AWF_FIXME:console_exec("dbg unstuck");console_group_calls++;return 1;
+    case AWF_CENTERONCELL:case AWF_COC:
+        if(!s)return 1;
+        Q_snprintf(line,sizeof(line),"dbg tp \"%s\"",s);console_exec(line);console_group_calls++;return 1;
+    case AWF_CENTERONEXTERIOR:case AWF_COE:
+        /* an exterior cell's grid X, Y: its centre (as the console's coe) */
+        if(count<2)return 1;
+        Q_snprintf(line,sizeof(line),"dbg tp %ld %ld",(long)numbers[0].i*8192L+4096L,(long)numbers[1].i*8192L+4096L);
+        console_exec(line);console_group_calls++;return 1;
+    }
+    return 0;
+}
 static int gap_call(int instance,int target,int function,const aw_mwcell_t *numbers,int count,
                     const unsigned char *strings,int nstrings,aw_mwcell_t *result){
     int k;
@@ -2971,6 +3243,8 @@ static int gap_call(int instance,int target,int function,const aw_mwcell_t *numb
         if(hurt>0){AW_CombatHurtPlayer(hurt,"lava");hurts++;}
         return 1;
     }
+    if((k=uncalled_call(instance,target,function,numbers,count,strings,nstrings,result))!=0)return k;   /* v0.0.63, MWSCRIPT-GAPS-63 */
+    if((k=console_group_call(instance,target,function,numbers,count,strings,nstrings,result))!=0)return k;   /* batch 3 */
     if(function==AWF_GETSTAT){result->i=0;return AW_MWVM_CALL_READ;}   /* OpenMW OpGetStat: a dummy, 0 */
     if(function==AWF_GETWEAPONTYPE){
         /* GetWeaponType (containerextensions.cpp OpGetWeaponType): the right hand's weapon type, -1 none: the player's
@@ -3013,7 +3287,7 @@ static int gap_call(int instance,int target,int function,const aw_mwcell_t *numb
         if(function==resists[k].get){
             float v=resist_value(owner,k);
 #ifdef AW_COMBAT_EFFECT_MAGNITUDE
-            if(resists[k].effect==AW_EFFECT_WATER_BREATHING)
+            if(k>=RESIST_PASSIVE_FIRST)
                 v+=passive_of(target==AW_MWVM_PLAYER?player_record():a,owner,resists[k].effect);
 #endif
             result->i=(int)v;resist_calls++;return AW_MWVM_CALL_READ;}
@@ -4943,6 +5217,7 @@ void AW_MwscriptInit(void){
     aw_save_new_game=new_game_hook;   /* the original's run-once new-game scripts (NPC-STORY-DISABLED-AT-START-42) */
     AW_FallInit();                    /* held and falling actors (SCRIPTED-EVENT-FALLING-MAGE-61) */
     aw_worldui_equip_script=equip_script;   /* OnPCEquip and PCSkipEquip (MWSCRIPT-GAP-FUNCTIONS-62) */
+    aw_inventory_equip_script=equip_script;   /* and the console's equip / unequip (MWSCRIPT-UNPLACED-RECORD-SCRIPTS-61) */
     AW_StandingReset();AW_EffectsReset();
     aw_save_actors_export=actors_export;aw_save_actors_import=actors_import;   /* the actor record (feature 16) */
     aw_save_objects_export=objects_export;aw_save_objects_import=objects_import;
@@ -5354,7 +5629,17 @@ void AW_MwscriptResultsPrepare(void){
 }
 /* --- the original's console commands (MW-CONSOLE-COMMANDS-62, aw_mwconsole.h): a stat line runs through host_actor,
  * the call a compiled SetStrength or GetHealth makes; the player now (a target from the console finder later) --- */
-static void console_exec(const char *text){Cbuf_InsertText("\n");Cbuf_InsertText((char *)text);}
+static void console_exec(const char *text){
+    if(!strncmp(text,"toggle ",7)){
+        /* v0.0.63 (MW-CONSOLE-COMMANDS-62): an alias's "toggle CVAR" flips an AmiWind switch 0 <-> 1 (the original's
+         * console-only toggles: ToggleCombatStats, ToggleLights), no new command */
+        cvar_t *v=Cvar_FindVar((char *)text+7);
+        if(!v){Con_Printf("%s: no such setting\n",text+7);return;}
+        Cvar_SetValue(v->name,v->value?0.0f:1.0f);
+        Con_Printf("%s %s\n",v->name,v->value?"on":"off");return;
+    }
+    Cbuf_InsertText("\n");Cbuf_InsertText((char *)text);
+}
 /* the console target (dbg mw target: picked in the finder or named): an entity and its id; 0 none (the player) */
 static int console_entity;static char console_id[64];
 static const char *edict_id(edict_t *e){

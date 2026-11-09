@@ -1,6 +1,6 @@
 # Build profile and stage reuse
 
-_Last updated with AmiWind v0.0.63-dev2 (9 November 2026)._
+_Last updated with AmiWind v0.0.63-dev3 (9 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -529,6 +529,17 @@ a large input (the heap gate's position slices of one frame) send it once. Each
 unit still runs its function on its item and yields its own result; a failing
 unit ends the map as before. `AMIWIND_POOL_CHUNKS=off` keeps one task per unit
 (the method before v0.0.48); it is not part of any key.
+
+**A queued unit with a free worker always starts** (BUILD-IMAGE-QUEUE-STALL-62,
+v0.0.63). `completed_map` and `spread_map` hand their results back one at a
+time, and between two results they collect every task that has finished and
+start the next queued units. Before, a whole batch of finished units went to
+the caller first: a caller with real work per unit (the unit cache stores and
+reads back every unit) left the workers idle while units waited, as in the
+v0.0.62-dev1 image step (4 units queued, none running, 6.3 of 24 cores for
+81 s). Units still go out longest first by their recorded times (`cost=`, the
+item cost history). Scheduling only: every unit runs once and yields its own
+result; no stage or unit key changes. Guard: `tests/test_pool_queue_refill.py`.
 
 **A machine without a container is guarded too** (BUILD-GUARD-BLIND-NO-CGROUP-55,
 v0.0.55). The guard, its ALARM, the start check and every pool's governor read

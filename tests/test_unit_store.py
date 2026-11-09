@@ -209,8 +209,6 @@ class ResidentAndRoomKeys(unittest.TestCase):
 # written in the call). Kept here, not in tools/unit_store.py (file names there would count in its users' keys).
 WHOLE_FILE_KEYS = frozenset({
     ('ambient_lut.py', "'npc-ambient-table'"),
-    ('dialogue_lut.py', "'dialogue-table'"),
-    ('greeting_lut.py', "'npc-voice-table'"),
     ('import_town.py', "'town-region'"),
     ('prepare_player_fp_parts.py', 'UNIT_CACHE'),
     ('prepare_player_parts.py', 'UNIT_CACHE'),

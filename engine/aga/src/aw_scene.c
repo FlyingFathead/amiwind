@@ -1292,6 +1292,12 @@ void AW_SceneSpawn(edict_t *p) {
         if(aw_scene_followers)aw_scene_followers(p,-1);   /* another map loaded (a load, a restart): none come along */
         pending=shroompicker_view=0;memset(&hand_snapshot,0,sizeof(hand_snapshot));AW_TorchResetAnimation();
         load_recovering=0;load_from.valid=0;
+        /* PLAYER-HEALTH-OVER-MAX-63: the game's own spawn gives Quake's 100; the player's health is the sheet's (a new
+         * sheet starts at its maximum, (Strength + Endurance) / 2), never above that maximum; a load sets its own
+         * after this (AW_SaveSpawn) and an arrival through a door keeps what it had (above) */
+        if(aw_character.valid && aw_character.maximum[0]>0)
+            p->v.health=aw_character.current[0]>0 && aw_character.current[0]<=aw_character.maximum[0]?
+                aw_character.current[0]:aw_character.maximum[0];
         if(AW_Interior() || AW_TownFlag(sv.name,AW_TOWN_GROUND_PLACE) || AW_TerrainId(sv.name)>=0)AW_InteriorPlace(p,p->v.origin);
         else AW_PlacePlayer(p,p->v.origin);
     }

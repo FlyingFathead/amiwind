@@ -4,6 +4,7 @@ without one: the dbg mw target, else the player). The table: docs/CONSOLE_COMMAN
 
  activate: runs
  additem: runs
+ addsoulgem: runs
  addspell: runs
  aiescort: runs
  aifollow: runs
@@ -11,15 +12,19 @@ without one: the dbg mw target, else the player). The table: docs/CONSOLE_COMMAN
  aiwander: runs
  centeroncell / coc: dbg tp "<cell>"
  centeronexterior / coe: dbg tp <x*8192+4096> <y*8192+4096>
+ clearforcejump: runs
+ clearforcemovejump: runs
  clearforcerun: runs
  clearforcesneak: runs
  disable: runs
  disablelevitation: runs
  disableteleporting: runs
+ dropsoulgem: runs
  enable: runs
  enablebirthmenu: dbg quickchar birthsign
  enableclassmenu: dbg quickchar class
  enableinventorymenu: runs
+ enablelevelupmenu: runs
  enablelevitation: runs
  enablemagicmenu: runs
  enablemapmenu: runs
@@ -36,6 +41,8 @@ without one: the dbg mw target, else the player). The table: docs/CONSOLE_COMMAN
  fadeto: runs
  fixme: dbg unstuck
  forcegreeting: runs
+ forcejump: runs
+ forcemovejump: runs
  forcerun: runs
  forcesneak: runs
  getacrobatics: runs
@@ -45,6 +52,7 @@ without one: the dbg mw target, else the player). The table: docs/CONSOLE_COMMAN
  getalteration: runs
  getangle: runs
  getarmorer: runs
+ getarmortype: runs
  getathletics: runs
  getattacked: runs
  getaxe: runs
@@ -52,6 +60,7 @@ without one: the dbg mw target, else the player). The table: docs/CONSOLE_COMMAN
  getbluntweapon: runs
  getcollidingpc: runs
  getconjuration: runs
+ getcurrenttime: runs
  getcurrentweather: runs
  getdeadcount: runs
  getdestruction: runs
@@ -61,9 +70,11 @@ without one: the dbg mw target, else the player). The table: docs/CONSOLE_COMMAN
  getdistance: runs
  getenchant: runs
  getendurance: runs
+ getfactionreaction: runs
  getfatigue: runs
  getfight: runs
  getflee: runs
+ getforcejump: runs
  getforcerun: runs
  getforcesneak: runs
  gethandtohand: runs
@@ -83,13 +94,16 @@ without one: the dbg mw target, else the player). The table: docs/CONSOLE_COMMAN
  getluck: runs
  getmagicka: runs
  getmarksman: runs
+ getmasserphase: runs
  getmediumarmor: runs
  getmercantile: runs
  getmysticism: runs
  getpccrimelevel: runs
  getpcfacrep: runs
  getpcinjail: runs
+ getpcjumping: runs
  getpcrank: runs
+ getpcrunning: runs
  getpcsleep: runs
  getpcsneaking: runs
  getpctraveling: runs
@@ -99,6 +113,7 @@ without one: the dbg mw target, else the player). The table: docs/CONSOLE_COMMAN
  getreputation: runs
  getrestoration: runs
  getscale: runs
+ getsecundaphase: runs
  getsecurity: runs
  getshortblade: runs
  getsneak: runs
@@ -107,6 +122,7 @@ without one: the dbg mw target, else the player). The table: docs/CONSOLE_COMMAN
  getspeed: runs
  getspell: runs
  getstandingpc: runs
+ getstartingpos: runs
  getstat: runs
  getstrength: runs
  gettarget: runs
@@ -181,11 +197,16 @@ without one: the dbg mw target, else the player). The table: docs/CONSOLE_COMMAN
  ondeath: runs
  onknockout: runs
  onmurder: runs
+ ori: runs
+ outputrefinfo: runs
  payfine: runs
  payfinethief: runs
  pcclearexpelled: runs
  pcexpell: runs
  pcexpelled: runs
+ pcforce1stperson: runs
+ pcforce3rdperson: runs
+ pcget3rdperson: runs
  pcjoinfaction: runs
  pclowerrank: runs
  pcraiserank: runs
@@ -193,12 +214,16 @@ without one: the dbg mw target, else the player). The table: docs/CONSOLE_COMMAN
  position: runs
  positioncell: runs
  raiserank: runs
+ removeeffects: runs
  removeitem: runs
  removesoulgem: runs
  removespell: runs
+ repairedonme: echo 0
+ resetactors / ra: runs
  resurrect: runs
  rotate: runs
  rotateworld: runs
+ samefaction: runs
  setacrobatics: runs
  setagility: runs
  setalarm: runs
@@ -252,18 +277,30 @@ without one: the dbg mw target, else the player). The table: docs/CONSOLE_COMMAN
  setstrength: runs
  setunarmored: runs
  setwillpower: runs
+ show: runs
  showmap: runs
  showrestmenu: runs
+ showvars / sv: runs
  startcombat: runs
  stopcombat: runs
+ toggleai / tai: runs
  togglecollision / tcl: noclip
+ togglecombatstats / tcs: aw_combat_readout toggled
+ toggledebugtext / tdt: dbg hud
  togglegodmode / tgm: dbg god
+ togglelights / tl: r_fullbright toggled
  togglemenus / tm: dbg killhud
+ togglescripts: runs
+ togglestats / tst: dbg fps
  togglevanitymode / tvm: dbg vanitycam on
  turnmoonred: runs
  turnmoonwhite: runs
  undowerewolf: runs
  unlock: runs
+ user1: runs
+ user2: runs
+ user3: runs
+ user4: runs
  wakeuppc: runs
 
 AmiWind's own command of the same name (kept):

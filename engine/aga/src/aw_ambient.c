@@ -570,6 +570,21 @@ static void reset_all(void) {
 /* SV_SpawnServer: every slot's edict is stale, also on a reload of the same map, which the world check cannot see
  * (HORS-AFTER-HALLOWEEN-CRASH-58): the next tick resets every slot without touching its old edict. */
 void AW_AmbientServerReset(void) {slots_world=NULL;}
+int AW_AmbientEnabled(void) {return ambient_on;}
+/* ResetActors (OpenMW 0.51 worldimp.cpp World::resetActors: every active actor but the player back at its placed
+ * position, its walking packages started again): a walker of this map at its home (where it was taken in), its slot released so it
+ * chooses its package again at the next think. Nothing resident. */
+int AW_AmbientResetActors(void) {
+    int i,n=0;vec3_t home;edict_t *e;
+    if(slots_world!=sv.worldmodel)return 0;
+    for(i=0;i<SLOTS;i++){
+        if(!(e=slots[i].e) || e->free || e==sv_player || e->v.health<=0)continue;
+        VectorCopy(slots[i].home,home);
+        release(&slots[i],1);
+        VectorCopy(home,e->v.origin);VectorCopy(vec3_origin,e->v.velocity);SV_LinkEdict(e,false);n++;
+    }
+    return n;
+}
 static slot_t *free_slot(void) {int i;for(i=0;i<SLOTS;i++)if(!slots[i].e)return &slots[i];return NULL;}
 static int is_actor(edict_t *e) {
     const char *c;

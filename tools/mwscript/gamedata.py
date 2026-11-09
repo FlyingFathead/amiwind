@@ -4,7 +4,8 @@ carry a script and the placed references of those records.
 
 Masters load in order (Morrowind, Tribunal, Bloodmoon); a later master's record with the same id replaces the
 earlier one, as in the game. Placed references are read from Morrowind.esm (Vvardenfell, the world the image has);
-the add-ons' references are counted, not bound (their reference numbers need the add-on's load-order index).
+the add-ons' own placements are keyed by their load-order index (addon_key, since v0.0.63) and kept apart
+(addon_references): an image binds them only for the add-on worlds it carries (compiler.bindings ADDONS).
 """
 import hashlib
 import re
@@ -17,6 +18,11 @@ from mwad.esm import records, subrecords, string  # noqa: E402
 from mwad.dialogue import conditions as dialogue_conditions  # noqa: E402
 
 MASTERS = ('Morrowind.esm', 'Tribunal.esm', 'Bloodmoon.esm')
+# MWSCRIPT-ADDON-ATTACH-62 (v0.0.63): an add-on placement's reference key = its file's place in MASTERS x this + its
+# number: 2^22 keeps three masters' keys below 2^24, exact in the engine's float aw_ref (the masters' numbers are far
+# below 2^22); Morrowind.esm's keys are its numbers, unchanged. The world builder stamps the same key when it converts
+# Mournhold or Solstheim.
+ADDON_KEY_STRIDE = 1 << 22
 # The global script the game always runs (OpenMW 0.51 apps/openmw/mwscript/globalscripts.cpp GlobalScripts::addStartup
 # adds "main" before the masters' start scripts). A new game sets CharGenState to 1 (OpenMW mwworld/worldimp.cpp
 # startNewGame); Main's block under that test starts the new game's run-once scripts (Startup, whose ->Disable lines
@@ -134,6 +140,10 @@ class GameData:
         self.bases = {}            # folded record id -> (type, folded script id)
         self.references = []       # Morrowind.esm placed refs whose base has a script (its final one; load())
         self._placed_mw = []       # every Morrowind.esm placed ref with a record, bound after the last master
+        self._placed_addon = []    # the add-ons' own placed refs with a record (MWSCRIPT-ADDON-ATTACH-62)
+        self.addon_references = []  # those whose record has a script, keyed by load order (load(), addon_key)
+        self.addon_refs_unkeyed = 0  # add-on placements whose file is not loaded or whose number is too large
+        self.master_lists = {}     # master -> its own MAST list (the TES3 header)
         self.reference_counts = {m: 0 for m in MASTERS}     # placed scripted references per master
         self.object_refs = {}      # folded base id -> [reference numbers] (Morrowind.esm, every placed ref)
         # the cell each placed actor (an NPC_ or CREA reference of Morrowind.esm) stands in: reference number -> the
@@ -179,14 +189,9 @@ class GameData:
     def sound_range(self, soun):
         """(min, max) hearing distance of a SOUN record in game units: its bytes times the game settings
         fAudioMinDistanceMult/fAudioMaxDistanceMult, the defaults when both are 0 (rule from OpenMW
-        apps/openmw/mwsound/soundbuffer.cpp; the values are the game data's own GMSTs)."""
-        g = self.gmst
-        lo, hi = (soun['min'], soun['max']) if soun else (0, 0)
-        if lo == 0 and hi == 0:
-            lo, hi = g.get('faudiodefaultmindistance', 5.0), g.get('faudiodefaultmaxdistance', 40.0)
-        lo *= g.get('faudiomindistancemult', 20.0)
-        hi *= g.get('faudiomaxdistancemult', 50.0)
-        return int(round(lo)), int(round(max(lo, hi)))
+        apps/openmw/mwsound/soundbuffer.cpp; the values are the game data's own GMSTs). The rule is hearing.py's."""
+        from .hearing import sound_range
+        return sound_range(self.gmst, soun)
 
     def load(self, data_files, masters=MASTERS):
         from mwad.paths import child_ci
@@ -210,11 +215,40 @@ class GameData:
             base = self.bases.get(r['id'].casefold())
             if base and base[1]:
                 self.references.append(dict(r, type=base[0], script=base[1]))
+        # MWSCRIPT-ADDON-ATTACH-62: the add-ons' own placements, keyed by their load-order index, with their records'
+        # final scripts; bound only for the add-on worlds an image carries (compiler.bindings ADDONS)
+        self.addon_references = []
+        for r in self._placed_addon:
+            base = self.bases.get(r['id'].casefold())
+            if base and base[1]:
+                self.addon_references.append(dict(r, type=base[0], script=base[1]))
         return self
+
+    def addon_key(self, master, number):
+        """The reference key of an add-on's placement NUMBER (its FRMR): the owning file is the add-on itself (top byte
+        0) or its k-th master (top byte k); the key is that file's place in MASTERS times ADDON_KEY_STRIDE plus the
+        low bits, so Morrowind.esm's references keep their numbers and every key stays exact in the engine's float
+        aw_ref field (below 2^24). None when that file is not loaded or the number is too large for the stride."""
+        top, low = number >> 24, number & 0xFFFFFF
+        if top == 0:
+            owner = master
+        else:
+            masts = self.master_lists.get(master, [])
+            if top > len(masts):
+                return None
+            owner = next((m for m in MASTERS if m.casefold() == masts[top - 1].casefold()), None)
+        if owner is None or low >= ADDON_KEY_STRIDE:
+            return None
+        return MASTERS.index(owner) * ADDON_KEY_STRIDE + low
 
     def _master(self, master, raw):
         pending_refs = []
         for tag, flags, payload in records(raw):
+            if tag == 'TES3':
+                # MWSCRIPT-ADDON-ATTACH-62: the file's own master list (MAST, in order): a reference number's top
+                # byte k > 0 names its k-th master (OpenMW components/esm3/loadcell.cpp adjustRefNum)
+                self.master_lists[master] = [_text(d) for t, d in subrecords(payload) if t == 'MAST']
+                continue
             if tag in RECORD_TAGS:
                 parts = list(subrecords(payload))
                 if tag in ('SKIL', 'MGEF'):              # keyed by INDX: these have no NAME
@@ -372,6 +406,14 @@ class GameData:
                 self._placed_mw.append({'reference': r['number'], 'id': r['id'], 'interior': interior,
                                         'cell': cell_name if interior else (gx, gy),
                                         'position': r.get('position', [0.0, 0.0, 0.0])})
+            if master != 'Morrowind.esm' and base:
+                key = self.addon_key(master, r['number'])
+                if key is None:
+                    self.addon_refs_unkeyed += 1
+                elif key >= ADDON_KEY_STRIDE:   # the add-on's own placement (a Morrowind.esm one is bound above)
+                    self._placed_addon.append({'reference': key, 'id': r['id'], 'interior': interior,
+                                               'cell': cell_name if interior else (gx, gy), 'master': master,
+                                               'position': r.get('position', [0.0, 0.0, 0.0])})
             if not base or not base[1]:
                 continue
             self.reference_counts[master] += 1

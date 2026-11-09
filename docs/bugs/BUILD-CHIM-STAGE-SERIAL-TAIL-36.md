@@ -2,7 +2,7 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 15 times; something has to be done
+## PERSISTING: reported 16 times; something has to be done
 
 - Reported with v0.0.36-dev3 at 2026-10-11 01:43 +0300: maintainer via the Monitor: chim 19.0-29.1 min on about 1 core in the 270-frame coast build; validation 8 min, heap gate and zone walk 1 min each (file times)
 - Reported with v0.0.36-dev4 at 2026-10-11 10:20 +0300: perf guard seed: CHIM heap gate 295 s on 0.94 of 12 cores in the dev4 whole-city Vivec MiniWind (e7a8e82); the chim-speed repair has not reached the line
@@ -19,6 +19,7 @@
 - Reported with v0.0.54-dev2 at 2026-10-28 04:51 +0200: The builder's detector: chim ran on 7.4 of 24 cores for 150 s with 1351 units queued and 0 running, between the far-terrain and cut-group phases; chim's end 166 s on one core.
 - Reported with v0.0.59-dev3 at 2026-11-02 02:43 +0200: Seen again in 2026_11_02_v0.0.59-dev3_full-v0.0.59-dev3_0ce2752: the chim stage ran 17m38s at 15.1 of 23.5 cores, under half its cores with units queued twice, longest 3m31s. Its resource plan held it to 18 of 24 workers for memory (about 775 MiB each beside a 20 GiB parent).
 - Reported with v0.0.62-dev1 at 2026-11-07 (time not recorded): Seen again in the v0.0.62-dev1 build: the CHIM validation ran 298 s on 3.49 of 24 cores; its waiver expired on 2026-11-03.
+- Reported with v0.0.63-dev3 at 2026-11-09 15:12 +0200: Seen again in the v0.0.63-dev3 build (run 2026_11_09_v0.0.63-dev3_full-v0.0.63-dev3-try2_6e68096), the first full CHIM world rebuild since the waiver expired on 3 November: the perf guard stopped the build's perf check on "CHIM validation: 172 s on 3.75 of 24 usable cores with independent frames" (the build itself passed and was delivered). The same step took 7m16s on 14.5 cores in the v0.0.63-dev1 build, so the validation is faster but still mostly serial. Then the zone walk gate (about 70 s) and the room actor cache read run on few cores too.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -47,7 +48,7 @@ _Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 15 times; something has to be done](#persisting-reported-15-times-something-has-to-be-done)
+- [PERSISTING: reported 16 times; something has to be done](#persisting-reported-16-times-something-has-to-be-done)
 - [Status: 3 November 2026 (v0.0.59)](#status-3-november-2026-v0059)
 - [Status: 23 October 2026 (v0.0.48)](#status-23-october-2026-v0048)
 - [Status: 16 October 2026](#status-16-october-2026)

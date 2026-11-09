@@ -65,6 +65,42 @@ class LoaderPolicyKey(unittest.TestCase):
             return text.replace(head, head + '\n    int aw_scratch_unused = 0; (void)aw_scratch_unused;', 1)
         self.assertNotEqual(self.value(), self.value(edit))
 
+    def test_an_alias_reader_define_keeps_the_key(self):
+        def edit(text):
+            changed = text.replace('#define AW_TILE_RUN 64', '#define AW_TILE_RUN 65')
+            self.assertNotEqual(changed, text)
+            return changed
+        self.assertEqual(self.value(), self.value(edit))
+
+    def test_an_unused_new_define_keeps_the_key(self):
+        def edit(text):
+            return '#define AW_CK_NOBODY_READS_THIS 3\n' + text
+        self.assertEqual(self.value(), self.value(edit))
+
+    def loader_reads(self, prelude, use):
+        """An edit that puts PRELUDE at the top of model.c and USE into Mod_LoadEdges."""
+        head = 'void Mod_LoadEdges (lump_t *l)\n{'
+
+        def edit(text):
+            self.assertIn(head, text)
+            return prelude + '\n' + text.replace(head, head + '\n    ' + use, 1)
+        return edit
+
+    def test_a_define_a_loader_uses_changes_the_key(self):
+        use = 'int aw_ck = AW_CK_LIMIT; (void)aw_ck;'
+        self.assertNotEqual(self.value(self.loader_reads('#define AW_CK_LIMIT 3', use)),
+                            self.value(self.loader_reads('#define AW_CK_LIMIT 4', use)))
+
+    def test_a_define_reached_through_a_macro_changes_the_key(self):
+        use = 'int aw_ck = AW_CK_OUTER; (void)aw_ck;'
+        self.assertNotEqual(self.value(self.loader_reads('#define AW_CK_INNER 3\n#define AW_CK_OUTER (AW_CK_INNER*2)', use)),
+                            self.value(self.loader_reads('#define AW_CK_INNER 4\n#define AW_CK_OUTER (AW_CK_INNER*2)', use)))
+
+    def test_a_static_table_a_loader_indexes_changes_the_key(self):
+        use = 'int aw_ck = aw_ck_table[1]; (void)aw_ck;'
+        self.assertNotEqual(self.value(self.loader_reads('static const int aw_ck_table[2] = {1, 2};', use)),
+                            self.value(self.loader_reads('static const int aw_ck_table[2] = {1, 3};', use)))
+
     def test_chim_world_stage_keys_model_c_by_policy(self):
         import build_cache
         index = build_cache.SourceIndex(ROOT, top_format=build_cache.STAGE_TOP_FORMAT)

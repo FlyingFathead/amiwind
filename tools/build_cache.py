@@ -3899,10 +3899,12 @@ def requalify(manifest):
 
 
 def plan_reuse(steps, fingerprints, dependencies, components, problems, old_run, forced=(), index=None,
-               narrowed=None):
+               narrowed=None, skip_verify=(), for_combine=False):
     """({stage: plan}, {stage: reason not reused}) against a completed earlier run. INDEX (this checkout's
     SourceIndex): a stage whose key differs only in its sources is reused when what it used is unchanged
-    (narrowed_unchanged); NARROWED (a dict) gets {stage: the changed key files it never used}."""
+    (narrowed_unchanged); NARROWED (a dict) gets {stage: the changed key files it never used}. SKIP_VERIFY: stages a
+    newer run already delivers (--reuse-all-available): their files are not hashed here and their plans are marked
+    'unverified' (never applied); they still count as reused for the stages around them."""
     old_run = Path(old_run)
     state_path = old_run / 'build-state.json'
     if not state_path.is_file():
@@ -4051,7 +4053,7 @@ def plan_reuse(steps, fingerprints, dependencies, components, problems, old_run,
                 else:
                     skips[name] = skip
         # Verify every file to copy now (SHA-256), so a damaged old run never starts a mixed build.
-        pending = sorted({path for name in candidates for path in manifests[name]['files']
+        pending = sorted({path for name in candidates if name not in skip_verify for path in manifests[name]['files']
                           if path not in skips[name] and path not in verified})
         def check(path):
             try:
@@ -4062,6 +4064,8 @@ def plan_reuse(steps, fingerprints, dependencies, components, problems, old_run,
             verified.update(zip(pending, pool.map(check, pending)))
         damaged = False
         for name in sorted(candidates):
+            if name in skip_verify:
+                continue
             for path, info in manifests[name]['files'].items():
                 if path not in skips[name] and verified.get(path) != info['sha256']:
                     candidates.discard(name)
@@ -4131,6 +4135,11 @@ def plan_reuse(steps, fingerprints, dependencies, components, problems, old_run,
                        # {reused stage: files it left out}: a stage that ran again in this build after all wrote
                        # its own versions, so its share is no hazard any more (BUILD-RESUME-HAZARD-STATIC-35).
                        'rebuild_hazard_stages': dict(sorted(hazard_stages.get(name, {}).items()))}
+        if for_combine:
+            # for --reuse-all-available's combine: the later stages that deliver the files this one leaves out
+            plans[name]['skipped'] = dict(skips[name])
+            if name in skip_verify:
+                plans[name]['unverified'] = True
     return plans, reasons
 
 
@@ -4195,8 +4204,97 @@ def advisory_stages(steps, dependencies):
     return {name for name, command in steps if '--never-fail' in map(str, command) and name not in needed}
 
 
+def plan_all(steps, run, fingerprints, components, dependencies, problems, index, reuse_all, preferred=None, forced=()):
+    """--reuse-all-available (tools/reuse_all.py): every earlier run of the workspace that holds a stage with its key
+    now is planned like --reuse-from (PREFERRED first, then newest first) and the plans are combined stage by stage.
+    Returns (plans, reasons, compared, primary run, narrowed, summary); the primary run is the source of most stages
+    (the reuse preflight compares against it)."""
+    import reuse_all as RA
+    workspace = Path(reuse_all['workspace'])
+    stage_index = RA.update_index(workspace)
+    sources = RA.candidate_runs(stage_index, fingerprints, exclude={Path(run).name},
+                                preferred=Path(preferred).name if preferred else None)
+    options, planned, delivered, narrowed_by = {}, {}, set(), {}
+    for source in sources:
+        old = (workspace / 'build' / source).resolve()
+        try:
+            old_details = json.loads((old / 'profile' / 'fingerprints.json').read_text())
+        except (OSError, ValueError):
+            old_details = {}
+        compared = comparable_all(components, old_details, run, old)
+        narrowed = {}
+        try:
+            plans, reasons = plan_reuse(steps, fingerprints, dependencies, compared, problems, old, forced=set(forced),
+                                        index=index, narrowed=narrowed, skip_verify=set(delivered), for_combine=True)
+        except ValueError as exc:
+            print(f'Reuse: {source} left out ({exc}).', flush=True)
+            continue
+        planned[source] = (old, compared, reasons)
+        narrowed_by[source] = narrowed
+        for name, plan in plans.items():
+            if not plan.get('unverified'):
+                options.setdefault(name, []).append((str(old), plan))
+                delivered.add(name)
+    order = [name for name, _ in steps]
+    taken, passed_over = RA.combine(order, dependencies, options, RA.outputs_equal_from_records())
+    plans = RA.finish_plans(taken, dependencies)
+    counts = {}
+    for name, plan in plans.items():
+        counts[Path(plan['from']).name] = counts.get(Path(plan['from']).name, 0) + 1
+    primary = max(planned, key=lambda s: (counts.get(s, 0), -sources.index(s))) if planned else None
+    reasons, compared, narrowed = {}, components, {}
+    if primary is not None:
+        _, compared, primary_reasons = planned[primary]
+        narrowed = {name: files for name, files in narrowed_by[primary].items() if name in plans
+                    and Path(plans[name]['from']).name == primary}
+    else:
+        primary_reasons = {}
+    for name in order:
+        if name in plans:
+            continue
+        why = primary_reasons.get(name) or (NON_REUSABLE.get(name) if name in NON_REUSABLE else None)
+        if not why:
+            why = (f'no earlier run of the workspace holds it ({len(stage_index["runs"])} runs indexed)'
+                   if not passed_over.get(name) else 'its sources were passed over: ' + '; '.join(passed_over[name]))
+        reasons[name] = why
+    summary = {'workspace': str(workspace), 'candidates': sources, 'sources': counts,
+               'primary': primary, 'passed_over': {name: notes[:3] for name, notes in passed_over.items()}}
+    return plans, reasons, compared, (planned[primary][0] if primary else None), narrowed, summary
+
+
+def minute_one(steps, run, metadata, cache, reasons, index, reuse_all):
+    """The --reuse-all-available report before any stage runs: one line per stage (reused from RUN, or rebuild: WHY
+    with the units its unit caches would give), then the strict stop (tools/reuse_all.py strict_problems)."""
+    import pass_cache
+    import reuse_all as RA
+    plans = PLANS.get(str(run), {})
+    rebuilt = {name for name, _ in steps if name not in plans}
+    closures = (CLOSURES.get(str(run)) or {}).get('stages') or {}
+    units = (CLOSURES.get(str(run)) or {}).get('units') or {}
+    unit_rows = RA.unit_report(steps, closures, units, pass_cache.folder(), reuse_all['workspace'], rebuilt,
+                               root=index.root)
+    print('Stage plan (--reuse-all-available), before any stage runs:', flush=True)
+    for line in RA.minute_one_lines(steps, plans, reasons, unit_rows):
+        print(line, flush=True)
+    allowed = reuse_all.get('allowed') or {}
+    problems = RA.strict_problems(steps, rebuilt, unit_rows, closures, RA.uncached_bakes(index.root), allowed,
+                                  units=units)
+    cache['minute_one'] = {'units': {name: [list(row) for row in found] for name, found in unit_rows.items()},
+                           'allowed': allowed, 'stops': [list(row) for row in problems]}
+    for stage, reason in sorted(allowed.items()):
+        if stage in rebuilt:
+            print(f'   allowed to rebuild: {stage}: {reason}', flush=True)
+    if problems:
+        metadata['stage_cache'] = cache
+        for stage, why in problems:
+            print(f'STOP {stage}: {why}', flush=True)
+        stages = sorted({stage for stage, _ in problems})
+        raise ValueError(f"Reuse stop (--reuse-all-available): {len(stages)} stage(s) would redo stored work "
+                         f"({', '.join(stages[:6])}); fix it, or pass --allow-rebuild STAGE:REASON for each")
+
+
 def prepare(steps, run, metadata, reuse_from=None, mode='copy', index=None, scope=DEFAULT_SCOPE, prerendered=None,
-            pool=None, forced=(), accept_rebuild=False):
+            pool=None, forced=(), accept_rebuild=False, reuse_all=None):
     """Fingerprint every stage; with REUSE_FROM, swap reusable stages for verified copies.
 
     Records metadata['stage_cache'] (part of build-state.json) and returns the steps.
@@ -4225,15 +4323,20 @@ def prepare(steps, run, metadata, reuse_from=None, mode='copy', index=None, scop
         reuse_from = Path(reuse_from).resolve()
         if reuse_from == Path(run).resolve():
             raise ValueError('--reuse-from must name an earlier run, not this one')
-        # Compared in the reuse source's own fingerprint form (comparable); recorded in this run's form.
-        try:
-            old_details = json.loads((reuse_from / 'profile' / 'fingerprints.json').read_text())
-        except (OSError, ValueError):
-            old_details = {}
-        compared = comparable_all(components, old_details, run, reuse_from)
-        narrowed = {}
-        plans, reasons = plan_reuse(steps, fingerprints, dependencies, compared, problems, reuse_from,
-                                    forced=set(forced), index=index, narrowed=narrowed)
+    if reuse_all is not None:
+        plans, reasons, compared, reuse_from, narrowed, cache['reuse_all'] = plan_all(
+            steps, run, fingerprints, components, dependencies, problems, index, reuse_all, reuse_from, forced)
+    if reuse_from is not None:
+        if reuse_all is None:
+            # Compared in the reuse source's own fingerprint form (comparable); recorded in this run's form.
+            try:
+                old_details = json.loads((reuse_from / 'profile' / 'fingerprints.json').read_text())
+            except (OSError, ValueError):
+                old_details = {}
+            compared = comparable_all(components, old_details, run, reuse_from)
+            narrowed = {}
+            plans, reasons = plan_reuse(steps, fingerprints, dependencies, compared, problems, reuse_from,
+                                        forced=set(forced), index=index, narrowed=narrowed)
         if narrowed:
             cache['narrowed'] = {name: files[:20] for name, files in narrowed.items() if name in plans}
         if forced:
@@ -4245,19 +4348,27 @@ def prepare(steps, run, metadata, reuse_from=None, mode='copy', index=None, scop
         for name, command in steps:
             if name in plans:
                 plan = plans[name]
-                cache['reused'][name] = {'from': str(reuse_from), 'fingerprint': plan['fingerprint'],
+                cache['reused'][name] = {'from': str(plan.get('from') or reuse_from), 'fingerprint': plan['fingerprint'],
                                          'files': len(plan['files']), 'bytes': sum(i['size'] for i in plan['files'].values()),
                                          'original_command': [str(part) for part in command]}
                 result.append((name, [sys.executable, str(Path(__file__).resolve()), 'apply', '--run', str(run),
                                       '--stage', name, '--', *map(str, command)]))
             else:
                 result.append((name, command))
-        print(f'Reuse from {reuse_from}: {len(plans)} of {len(steps)} stages reused ({mode}); '
-              f'every other stage runs.', flush=True)
+        if reuse_all is not None:
+            print(f"Reuse of every earlier run of the workspace (--reuse-all-available): {len(plans)} of {len(steps)} "
+                  f"stages reused ({mode}) from {len(cache['reuse_all']['sources'])} run(s); every other stage runs.",
+                  flush=True)
+            for source, count in sorted(cache['reuse_all']['sources'].items(), key=lambda item: -item[1]):
+                print(f'   {count:3d} stage(s) from {source}', flush=True)
+        else:
+            print(f'Reuse from {reuse_from}: {len(plans)} of {len(steps)} stages reused ({mode}); '
+                  f'every other stage runs.', flush=True)
         for name, _ in steps:
             if name in plans:
                 after = plans[name]['rebuilt_ancestors']
-                print(f'   reused  {name} (fingerprint {fingerprints[name][:12]})'
+                origin = f' from {Path(plans[name]["from"]).name}' if reuse_all is not None else ''
+                print(f'   reused  {name}{origin} (fingerprint {fingerprints[name][:12]})'
                       + (f" if {', '.join(after)} write the same files again" if after else ''), flush=True)
                 if name in narrowed:
                     files = narrowed[name]
@@ -4304,6 +4415,8 @@ def prepare(steps, run, metadata, reuse_from=None, mode='copy', index=None, scop
                 result[position] = (name, [sys.executable, str(Path(__file__).resolve()), 'apply', '--run', str(run),
                                            '--stage', name, '--', *map(str, originals[name])])
         cache['reuse_mode'] = cache['reuse_mode'] or (mode if hits else None)
+    if reuse_all is not None:
+        minute_one(steps, run, metadata, cache, reasons, index, reuse_all)
     cache['fingerprint_seconds'] = round(time.monotonic() - began, 3)
     metadata['stage_cache'] = cache
     return result

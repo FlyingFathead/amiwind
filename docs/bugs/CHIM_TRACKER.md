@@ -1,6 +1,6 @@
 # CHIM Engine tracker
 
-_Generated from `docs/bugs/bugs.json` with AmiWind v0.0.63-dev2._
+_Generated from `docs/bugs/bugs.json` with AmiWind v0.0.63-dev4._
 
 <!-- Generated whole by tools/bug_register.py render from docs/bugs/bugs.json and docs/BUG_JOURNAL.md; do not edit by hand. -->
 
@@ -22,7 +22,7 @@ CHIM version: 0.2.2. 363 CHIM bugs: 182 open, 164 fixed, 17 closed.
 Bugs reported two or more times. Most reports first. Each has its report lines on its page.
 
 - [CHIM-SEYDA-BALMORA-LOAD-HANG-43](CHIM-SEYDA-BALMORA-LOAD-HANG-43.md): Travelling from Seyda Neen to Balmora sometimes hangs on the Loading screen (boot smoke, 2 of about 5 runs) (reported 34 times, open)
-- [BUILD-CHIM-STAGE-SERIAL-TAIL-36](BUILD-CHIM-STAGE-SERIAL-TAIL-36.md): After the parallel world build the chim stage ran its validation, heap gate and zone walk on one core (about 10 minutes of the 270-frame coast build) (reported 15 times, open)
+- [BUILD-CHIM-STAGE-SERIAL-TAIL-36](BUILD-CHIM-STAGE-SERIAL-TAIL-36.md): After the parallel world build the chim stage ran its validation, heap gate and zone walk on one core (about 10 minutes of the 270-frame coast build) (reported 16 times, open)
 - [BUILD-CHIM-CELLS-PRIVATE-LIST-47](BUILD-CHIM-CELLS-PRIVATE-LIST-47.md): The releases' CHIM cell list was not in the source tree; public builds had no CHIM exterior cells (reported 11 times, fixed)
 - [CHIM-AZURA-FLOATING-FLORA-43](CHIM-AZURA-FLOATING-FLORA-43.md): Plant or tree pieces hang in the air at Azura's Coast (cell 16,7) (reported 7 times, open)
 - [BUILD-CHIM-SERIAL-SECTIONS-44](BUILD-CHIM-SERIAL-SECTIONS-44.md): The CHIM stage runs several sections on one core while units wait: visibility rows starve their workers (reported 6 times, open)
@@ -43,6 +43,7 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 - [BUILD-LEGACY-TOWN-MAPS-SHIPPED-36](BUILD-LEGACY-TOWN-MAPS-SHIPPED-36.md): CHIM-native Seyda Neen is still built through the legacy chain: 65 sn maps are built and removed before packing (build time, not payload) (reported 3 times, fixed)
 - [BUILD-PARTITION-GROWTH-UNGATED-36](BUILD-PARTITION-GROWTH-UNGATED-36.md): Nothing gates the number of world partitions or the growth of the image (reported 3 times, open)
 - [BUILD-PROGRESS-ETA-BASIS-36](BUILD-PROGRESS-ETA-BASIS-36.md): The live build progress took a stage's expected time from earlier runs of any size: dev3's chim stage was expected at 154 s and ran 1 h 48 min (reported 3 times, open)
+- [BUILD-SHARED-WRITES-UNATTRIBUTED-52](BUILD-SHARED-WRITES-UNATTRIBUTED-52.md): Stages running side by side write the same files, so their records are refused and they rebuild every time: the town carried-item models, the room door audio (reported 3 times, open)
 - [BUILD-STAGE-READS-UNFINGERPRINTED-48](BUILD-STAGE-READS-UNFINGERPRINTED-48.md): Two stages read repository files their fingerprint leaves out, so their records are refused and they rerun on every reuse (reported 3 times, fixed)
 - [CHIM-AUTO-BANK-CLIFF-51](CHIM-AUTO-BANK-CLIFF-51.md): 32 MB of Fast RAM got no automatic CHIM cache bank: 13 MiB free gave a 7 MiB budget and the first bank needed 8 MiB (reported 3 times, open)
 - [CHIM-CROSSING-SLUGGISH-43](CHIM-CROSSING-SLUGGISH-43.md): Crossing between CHIM cells is sluggish, worst at cell corners (reported 3 times, open)
@@ -61,7 +62,6 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 - [BUILD-IMAGE-REGION-MAPS-SERIAL-43](BUILD-IMAGE-REGION-MAPS-SERIAL-43.md): The image step's CHIM frame-map phases run on one core: the world read six times, ground traces on whole frames (reported 2 times, open)
 - [BUILD-LEGACY-CHAIN-DEFAULT-36](BUILD-LEGACY-CHAIN-DEFAULT-36.md): Builds still prepared CHIM towns through the legacy region-map chain by default, and a retired flag (--legacy-area) was accepted with only a warning (reported 2 times, fixed)
 - [BUILD-PLAN-PESSIMISTIC-48](BUILD-PLAN-PESSIMISTIC-48.md): The start-up resource plan predicts hours for stages that run in minutes: it sums every stage that could run beside one at full speed (reported 2 times, open)
-- [BUILD-SHARED-WRITES-UNATTRIBUTED-52](BUILD-SHARED-WRITES-UNATTRIBUTED-52.md): Stages running side by side write the same files, so their records are refused and they rebuild every time: the town carried-item models, the room door audio (reported 2 times, open)
 - [BUILD-SILENT-PHASES-36](BUILD-SILENT-PHASES-36.md): Builder phases run silent: no start/end timing, no progress, no heartbeat; the CHIM stats step is a single-core tail (reported 2 times, open)
 - [BUILD-STAIR-WALK-BRUTE-FORCE-46](BUILD-STAIR-WALK-BRUTE-FORCE-46.md): The builder walks every step of the island to find out whether its own collision can be walked, an answer the game data already holds (reported 2 times, open)
 - [CHIM-EXTERIOR-FLAMES-MISSING-48](CHIM-EXTERIOR-FLAMES-MISSING-48.md): CHIM exteriors draw no fire: campfires, braziers, fire pits and flame lamps outdoors have no flame animation (reported 2 times, open)

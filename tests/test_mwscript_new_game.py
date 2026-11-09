@@ -142,6 +142,40 @@ class LaterMasterScriptTests(unittest.TestCase):
             shutil.rmtree(tmp, ignore_errors=True)
 
 
+class AddonBindingTests(unittest.TestCase):
+    # MWSCRIPT-ADDON-ATTACH-62 (v0.0.63): an add-on's own placement is keyed by its load-order index (2^22 a master),
+    # a Morrowind.esm reference an add-on cell repeats (top byte 1: its first MAST) is not bound twice; the add-on
+    # placements are bound only for the add-on worlds asked for
+    def test_addon_placements_keyed_and_bound_on_request(self):
+        from mwscript.gamedata import ADDON_KEY_STRIDE
+        from mwscript.compiler import bindings
+        tmp = Path(tempfile.mkdtemp(prefix='aw-addonbind-'))
+        try:
+            mw = [record('TES3', sub('HEDR', b'\0' * 300)), record('LIGH', sub('NAME', 'lamp_x')),
+                  cell_exterior(1, 2, [(301, 'lamp_x', (0, 0, 0))])]
+            tr = [record('TES3', sub('HEDR', b'\0' * 300), sub('MAST', 'Morrowind.esm'), sub('DATA', b'\0' * 8)),
+                  scpt('LampScript', 'begin LampScript\nDisable\nend'),
+                  record('LIGH', sub('NAME', 'lamp_x'), sub('SCRI', 'LampScript')),
+                  cell_exterior(3, 4, [(77, 'lamp_x', (1, 2, 3)), ((1 << 24) | 301, 'lamp_x', (0, 0, 0)),
+                                       ((5 << 24) | 9, 'lamp_x', (0, 0, 0))])]
+            (tmp / 'Morrowind.esm').write_bytes(b''.join(mw))
+            (tmp / 'Tribunal.esm').write_bytes(b''.join(tr))
+            data = GameData().load(tmp)
+            self.assertEqual(data.master_lists['Tribunal.esm'], ['Morrowind.esm'])
+            self.assertEqual([r['reference'] for r in data.references], [301])
+            self.assertEqual([(r['reference'], r['script'], r['master']) for r in data.addon_references],
+                             [(ADDON_KEY_STRIDE + 77, 'lampscript', 'Tribunal.esm')])
+            self.assertEqual(data.addon_refs_unkeyed, 1)              # top byte 5: no such master
+            self.assertLess(3 * ADDON_KEY_STRIDE, 1 << 24)            # exact in the engine's float aw_ref
+            self.assertEqual(data.addon_key('Bloodmoon.esm', 12), 2 * ADDON_KEY_STRIDE + 12)
+            prog, _ = compile_program(data, None, handwritten=(), rooms={})
+            self.assertEqual([r['reference'] for r in bindings(prog)], [301])
+            self.assertEqual([r['reference'] for r in bindings(prog, addons=('Tribunal.esm',))],
+                             [301, ADDON_KEY_STRIDE + 77])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
 class ReaderTests(unittest.TestCase):
     def test_main_block_only(self):
         # the scripts under CharGenState == 1 at any depth inside it; a StartScript outside the block is not one

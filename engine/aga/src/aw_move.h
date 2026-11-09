@@ -155,6 +155,8 @@ int AW_MoveSneaking(void);
 extern int aw_move_force_sneak;
 /* MWSCRIPT-GAPS-63: 1 while a script's ForceRun makes the player run (aw_mwhost.c). */
 extern int aw_move_force_run;
+extern int aw_move_force_jump,aw_move_force_move_jump;   /* v0.0.63: ForceJump / ForceMoveJump (aw_mwhost.c) */
+int AW_MovePlayerRunning(void);   /* v0.0.63: GetPCRunning: the last move ran (not sneaking, not swimming) */
 /* WEREWOLF-RUN-SPEED-63: 1 while the player is in werewolf form (aw_mwhost.c sets it with the form). */
 extern int aw_move_werewolf;
 /* The player's inputs as the rules see them this frame (live character sheet). */

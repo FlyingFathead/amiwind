@@ -16,11 +16,12 @@ import json
 from pathlib import Path
 
 MODEL_C = 'engine/aga/src/model.c'
-VERSION = 1
+# Version 2 (2026-11-09): body-less items count only when the loaders reach them (brush_edge_items).
+VERSION = 2
 PREFIX = 'policy%d:' % VERSION
 # The brush and edge-cache loaders of model.c (BSP lumps, sections, records, the edge cache, the brush stream): the code
 # the packed-edge allocation policy depends on. Every #define and every declaration that is not a function body counts
-# too (limits, tables, static buffers).
+# too when these loaders reach it, directly or through other such items (limits, tables, static buffers, types).
 BRUSH_EDGE_FUNCTIONS = frozenset((
     'AW_RecordSection AW_TryStreamBrush AW_BrushError AW_BrushCaught AW_BrushAlloc AW_BrushMark AW_BrushFreeToMark '
     'AW_LumpBytes AW_RecordsBegin AW_SliceWindow AW_RecordsNext AW_WindowBytes AW_LoadTextureRefs Mod_LoadTextures '
@@ -36,7 +37,26 @@ def brush_edge_items(text):
     """The items of model.c TEXT the packed-edge pin covers (engine_facts.parse_header items)."""
     import engine_facts
     items = engine_facts.parse_header(text, 2)
-    return [item for item in items if not item.get('body') or item['defines'] & BRUSH_EDGE_FUNCTIONS]
+    loaders = [item for item in items if item.get('body') and item['defines'] & BRUSH_EDGE_FUNCTIONS]
+    # A body-less item (a #define, a declaration, a static table, a struct type) counts only when the loaders reach it:
+    # their identifiers, then the identifiers of every item reached so far, until nothing new is added. 'uses' holds
+    # the words of an item's #if/#ifdef conditions too, so a macro guarding reached code is reached as well. An item
+    # that defines nothing nameable (an #error, a bare directive) cannot be told apart and always counts.
+    bodyless = [item for item in items if not item.get('body')]
+    reached, wanted = set(), set()
+    for item in loaders:
+        wanted |= item['uses'] | item['defines']
+    pending = True
+    while pending:
+        pending = False
+        for index, item in enumerate(bodyless):
+            if index not in reached and item['defines'] & wanted:
+                reached.add(index)
+                wanted |= item['uses'] | item['defines']
+                pending = True
+    keep = {id(item) for index, item in enumerate(bodyless) if index in reached or not item['defines']}
+    keep |= {id(item) for item in loaders}
+    return [item for item in items if id(item) in keep]
 
 
 def brush_edge_digest(text):

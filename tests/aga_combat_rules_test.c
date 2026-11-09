@@ -279,6 +279,11 @@ int main(void) {
         assert(AW_CombatGodHealth(1,50,80,100)==80);            /* a heal lands */
         assert(AW_CombatGodHealth(1,50,40,40)==40);             /* the maximum drained to 40: capped there */
         assert(AW_CombatGodHealth(1,50,0,0.5f)==1);             /* never below 1 */
+        /* v0.0.63-dev3: health 100 over an unchanged maximum 40 (the caller passes 0: the maximum did not fall);
+         * ModCurrentHealth -50 and -20 are held back */
+        assert(AW_CombatGodHealth(1,100,50,0)==100);
+        assert(AW_CombatGodHealth(1,99,79,0)==99);
+        assert(AW_CombatGodHealth(0,100,50,0)==50);
     }
     /* bow 10 and crossbow 11 are two-handed (weapontype.cpp), thrown 12 is not */
     for(i=1;i<=12;i++)assert(AW_TWO_HANDED(i)==(i==3 || i==5 || i==6 || i==7 || i==9 || i==10 || i==11));

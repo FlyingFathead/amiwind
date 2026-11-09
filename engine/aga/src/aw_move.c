@@ -48,6 +48,8 @@ int AW_MoveSuperspeed(void) {return superspeed.value!=0;}
  * or the key); ClearForceSneak clears it (aw_mwhost.c) */
 int aw_move_force_sneak;
 int aw_move_force_run;   /* MWSCRIPT-GAPS-63: ForceRun on the player; ClearForceRun clears it (aw_mwhost.c) */
+int aw_move_force_jump,aw_move_force_move_jump;   /* v0.0.63: ForceJump / ForceMoveJump on the player (aw_mwhost.c) */
+int AW_MovePlayerRunning(void){return last_factor>0 && last_running && !last_sneaking && !last_swimming;}
 int aw_move_werewolf;    /* WEREWOLF-RUN-SPEED-63: the player's werewolf form (aw_mwhost.c) */
 int AW_MoveSneaking(void) {
     edict_t *p=sv.active && svs.clients?svs.clients[0].edict:NULL;
@@ -254,6 +256,9 @@ static void after(float seconds) {
      * of the frame before counts too, else only a held key was ever a jump (no Acrobatics use, no jump fatigue). */
     jumped=prev_ground && !ground_now && p->v.velocity[2]>0 && (p->v.button2 || prev_jump);
     prev_ground=ground_now;prev_jump=p->v.button2!=0;
+    /* v0.0.63 (MWSCRIPT-GAPS-63): ForceJump holds the jump button; ForceMoveJump while the player moves (OpenMW
+     * controlextensions.cpp Flag_ForceJump, Flag_ForceMoveJump); the game code's next think jumps from the ground */
+    if(ground_now && (aw_move_force_jump || (aw_move_force_move_jump && last_factor>0)))p->v.button2=1;
     if(AW_MoveSuperspeed() || (last_factor<=0 && !jumped)){last_factor=0;return;}
     AW_MovePlayerInputs(&in);in.swimming=last_swimming;in.running=last_running;in.sneaking=last_sneaking;
     loss=AW_MoveMaxSpeed(&settings,&in)>0?AW_MoveFatigueRate(&settings,&in)*last_factor*seconds:0;

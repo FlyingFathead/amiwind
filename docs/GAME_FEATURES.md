@@ -1,6 +1,6 @@
 # Game features
 
-_Last updated with AmiWind v0.0.63-dev2 (7 November 2026)._
+_Last updated with AmiWind v0.0.63-dev4 (7 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -39,7 +39,7 @@ tools/mwscript/functions.py (the compiler's own table, counted in the builder co
 | | Count |
 | --- | ---: |
 | Functions and instructions in the compiler's table | 504 |
-| Carried out by the interpreter and the host | 367 (72.8 %) |
+| Carried out by the interpreter and the host | 460 (91.3 %) |
 | Distinct functions the game's scripts use (23 October 2026, over the three masters) | 251 |
 | Of those, carried out | used: pending |
 | Scripts in the three masters | 1,207 |
@@ -55,7 +55,7 @@ Each has its own source file and its own check.
 | Tracker | Headline |
 | --- | --- |
 | [Dialogue features](DIALOGUE_FEATURES.md) | 5 of 29 done, 19 partial, 5 missing |
-| [MWScript features](MWSCRIPT_FEATURES.md) | 605 of 1207 scripts run, 29 use a function the interpreter lacks |
+| [MWScript features](MWSCRIPT_FEATURES.md) | 605 of 1207 scripts run, 28 use a function the interpreter lacks |
 | [Voices and sounds](VOICE_FEATURES.md) | per kind of line, with its proof |
 | [CHIM features](chim/FEATURES.md) | engine features with measured gains |
 | [World, cell by cell](chim/CELL_TRACKER.md) | every cell converted and audited |

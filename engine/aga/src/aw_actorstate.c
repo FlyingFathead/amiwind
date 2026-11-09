@@ -939,14 +939,17 @@ int AW_ActorSpellFlags(int spell){
 }
 /* RESIST-NORMAL-WEAPONS-61 (v0.0.62, aw_actorstate.h): the always-active spells' magnitudes of EFFECT */
 float AW_ActorPassiveMagnitude(const aw_actor_t *a,int effect){
-    int held[64],n,i,k,m,type;aw_spell_effect_t e[AW_MADE_EFFECTS];float sum=0;
+    int held[64],n,i,k,m,type,unit;aw_spell_effect_t e[AW_MADE_EFFECTS];float sum=0;aw_mgef_t mg;
     if(!st || !a || effect<0)return 0;
+    /* UNDERWATER-BREATH-62 (v0.0.63-dev3: an Argonian read Water Breathing 0): an effect without a magnitude (the
+     * game's NoMagnitude flag: Water Breathing, Water Walking, ...) counts 1 per spell, as the cast path does */
+    unit=AW_ActorMagicEffect(effect,&mg) && (mg.flags&AW_MGEF_FLAG_NO_MAGNITUDE);
     n=AW_ActorSpells(a,held,64);
     for(i=0;i<n;i++){
         type=spell_type(held[i]);
         if(type<0 || type==0 || type==5)continue;          /* a castable spell or a power: only when cast */
         m=AW_ActorSpellEffects(held[i],e,AW_MADE_EFFECTS);
-        for(k=0;k<m;k++)if(e[k].effect==effect)sum+=.5f*((float)e[k].magnitude_min+(float)e[k].magnitude_max);
+        for(k=0;k<m;k++)if(e[k].effect==effect)sum+=unit?1.0f:.5f*((float)e[k].magnitude_min+(float)e[k].magnitude_max);
     }
     return sum;
 }

@@ -169,6 +169,81 @@ class SharedShapes(unittest.TestCase):
                 self.assertEqual(share.expand_shared_skin(share.expand_shared_shape(stored, read), read), raw)
 
 
+def tiled(pattern, frames=b'frames', width=32, height=32, verts=3, tris=2):
+    """A single-skin alias model with a 32 x 32 skin (4 tiles) whose pixels are PATTERN(x, y), then ST + triangles."""
+    raw = bytearray(shaped(9, frames, verts, tris, width, height))
+    for y in range(height):
+        for x in range(width):
+            raw[88 + y * width + x] = pattern(x, y) & 255
+    return bytes(raw)
+
+
+class SkinTiles(unittest.TestCase):
+    def test_stored_form_rebuilds_the_model(self):
+        raw = tiled(lambda x, y: x * 7 + y)
+        at, width, height = share.tile_skin_of(raw)
+        cut = share.cut_tiles(raw[at:at + width * height], width, height)
+        self.assertEqual((len(cut), len(cut[0])), (4, 256))
+        numbers = [3, 0, 65536 + 1, 1]                           # a tile of chunk 1 too
+        chunks = {0: b''.join([cut[1], cut[3], cut[0], cut[0]]), 1: bytes(256) + cut[2]}
+        digest = '0123456789abcdef' * 4
+        stored = share.tiled_model(raw, digest, numbers)
+        self.assertTrue(share.is_tiled(stored))
+        self.assertEqual(len(stored), len(raw) - width * height + 24 + 4 * 4)
+        read = lambda name: chunks[int(name[-7:-5], 16)]
+        self.assertEqual(share.tile_pool_name(digest, 1), 'progs/tiles/0123456789abcdef-01.awtp')
+        self.assertEqual(share.expand_tiled_skin(stored, read), raw)
+        self.assertIsNone(share.tile_skin_of(stored))            # never tiled twice
+        # the shape pass sees past the table
+        sat, st, tri = share.shape_of(stored)
+        self.assertEqual((sat, st, tri), (84 + 4 + 24 + 16, 36, 32))
+        with self.assertRaises(ValueError):
+            share.expand_tiled_skin(stored, lambda name: chunks[0][:256])
+        self.assertEqual(share.read_plan([0, 1, 2, 70, 65536]), (3, 5))   # a run ends at 64 tiles and at a chunk
+        self.assertEqual(share.read_plan([0, 9, 10, 100]), (3, 4))        # a hole of 9 tiles is sought over
+
+    def test_one_pool_for_the_actor_skins(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            id1 = Path(tmp) / 'id1'
+            (id1 / 'progs').mkdir(parents=True)
+            originals = {'progs/a_one.mdl': tiled(lambda x, y: x // 16), 'progs/n_two.mdl': tiled(lambda x, y: 2 * (y // 16)),
+                         'progs/c_three.mdl': tiled(lambda x, y: x // 16), 'progs/a_odd.mdl': tiled(lambda x, y: x,
+                                                                                                 width=24),
+                         'progs/npc_lod_x.mdl': tiled(lambda x, y: 1)}
+            for rel, raw in originals.items():
+                (id1 / rel).write_bytes(raw)
+            (id1 / share.NPC_LOD_MANIFEST).write_text('progs/npc_lod_x.mdl 1 2 3\n', encoding='ascii')
+            pool = share.plan_tiles(id1, jobs=2)
+            self.assertEqual(sorted(rel for rel, _ in pool['models']), ['progs/a_one.mdl', 'progs/n_two.mdl'])
+            self.assertEqual(len(pool['tiles']), 3)                  # (0, 1) by x and (0, 2) by y share the 0 tile
+            self.assertEqual(pool['tiles'][0], bytes(256))           # the shared tile first
+            record = share.apply_tiles(id1, pool)
+            self.assertEqual((record['models'], record['chunks'], record['tiles']), (2, 1, 3))
+            for rel, raw in originals.items():
+                stored = (id1 / rel).read_bytes()
+                rebuilt = share.expand_tiled_skin(stored, lambda name: (id1 / name).read_bytes()) \
+                    if share.is_tiled(stored) else stored
+                self.assertEqual(rebuilt, raw, rel)
+            self.assertEqual(record['bytes_saved'], sum(len(r) for r in originals.values()) - sum(
+                p.stat().st_size for p in id1.rglob('*.mdl')) - 3 * 256)
+
+    def test_payload_pass_with_shapes_and_tiles(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            id1 = Path(tmp)
+            (id1 / 'progs').mkdir()
+            for name, value in (('a_x.mdl', 1), ('a_y.mdl', 2)):
+                (id1 / 'progs' / name).write_bytes(tiled(lambda x, y, v=value: v * (x // 16), bytes(5000)))
+            originals = {p.name: p.read_bytes() for p in (id1 / 'progs').iterdir()}
+            record = share.share_payload(id1, shared_skins=True, shared_shapes=True, skin_tiles=True,
+                                         file_aliases=True, log=lambda line: None)
+            self.assertEqual((record['shapes']['models'], record['tiles']['models']), (2, 2))
+            read = lambda rel: (id1 / rel).read_bytes()
+            for name, raw in originals.items():
+                stored = read('progs/' + name)
+                self.assertEqual(share.expand_tiled_skin(share.expand_shared_shape(stored, read), read), raw)
+                self.assertEqual(share.expand_shared_shape(share.expand_tiled_skin(stored, read), read), raw)
+
+
 class FileAliases(unittest.TestCase):
     def payload(self, root):
         id1 = Path(root)
@@ -245,6 +320,16 @@ class EngineReaders(unittest.TestCase):
             [SRC / name for name in ('model.c', 'aw_skel.c', 'aw_skel_load.c', 'mathlib.c')],
             cflags=['-fsanitize=address,undefined', '-fno-sanitize-recover=all', '-Wl,--wrap=malloc'],
             arguments=models)
+
+    def test_tiled_skin_models_decode_like_inline_skins(self):
+        # AMIWIND_TILE_PAYLOAD: "TILED_ID1 ORIGINAL_ID1 LIST" of a real payload tiled by apply_tiles (read only):
+        # every listed model is rebuilt byte for byte and the reader timed against the whole file.
+        import test_aga_native_source as native
+        listed = os.environ.get('AMIWIND_TILE_PAYLOAD')
+        native.NativeSourceTests().compile_run('aga_tiled_skin_test.c',
+            [SRC / name for name in ('model.c', 'aw_skel.c', 'aw_skel_load.c', 'mathlib.c')],
+            cflags=['-fsanitize=address,undefined', '-fno-sanitize-recover=all', '-Wl,--wrap=malloc'],
+            arguments=listed.split() if listed else [])
 
 
 class Wiring(unittest.TestCase):

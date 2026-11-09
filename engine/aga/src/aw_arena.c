@@ -28,6 +28,7 @@
 #include "aw_animkit.h"
 #include "aw_anim.h"
 #include "aw_actors.h"
+#include "aw_items.h"
 
 #define MAP_PIT "vai000"
 #define MAP_FLOOR "charplane"
@@ -346,9 +347,12 @@ void AW_ArenaEntities(void) {
             SetMinMaxSize(e,low,high,false);
         }
         {eval_t *v=GetEdictFieldValue(e,"aw_source_id");if(v)v->string=ED_NewString(o->id)-pr_strings;}
-        /* its <model>.anm: the anim mode's groups of a baked model; a record drawn with its world model (a creature's
-         * standing model naming its mover) in every mode, so its fight has its own run and attack frames */
-        if(mode!=MODE_DUEL || (o->source==SOURCE_STANDIN && o->model[0] && index!=standin))AW_AnimPrep(e);
+        /* its <model>.anm and <model>.tag, as a placed actor's spawn (world.qc aw_npc -> aw_animprep: the layout
+         * with its mover, the worn weapon and shield) in every mode, so its fight has its own walk, run and attack
+         * frames and shows its gear. The duel prepared only a record's stand-in, so a gallery NPC (Zennammu) fought
+         * on the default idle frames with no shield drawn (CREATURE-BIPED-ANIMS-62). A borrowed stand-in model
+         * of the duel stays as it was. */
+        if(mode!=MODE_DUEL || index!=standin || (o->source==SOURCE_STANDIN && o->model[0])){AW_AnimPrep(e);AW_ItemsPrep(e);}
         opponents[k]=e;
     }
 }

@@ -3,6 +3,12 @@
  "about": "Every 4000 / 4096 / 4095 in the engine and the builder's frame checks, classified against the coordinate range (CHIM-FRAME-COORD-RANGE-33, engine/aga/src/aw_coord.h): bound = follows the coordinate bound (AW_COORD_BOUND; tools/coord_range.py in the builder: wide by default since v0.0.36, narrow with --coord-range narrow); kept = about positions or distances but deliberately unchanged (why in note); unrelated = not a position. tests/test_coord_range_audit.py fails on any new occurrence that is not listed.",
  "entries": [
   {
+   "file": "engine/aga/src/aw_mwhost.c",
+   "contains": "(long)numbers[0].i*8192L+4096L,(long)numbers[1].i*8192L+4096L",
+   "class": "unrelated",
+   "note": "CenterOnExterior from a script (MWSCRIPT-GAPS-63): the centre of an original Morrowind cell in original coordinates (half the cell's 8,192), handed to dbg tp as the console's coe, not a map-space position against the coordinate range"
+  },
+  {
    "file": "engine/aga/src/aw_mwconsole.c",
    "contains": "(long)x*8192L+4096L,(long)y*8192L+4096L",
    "class": "unrelated",

@@ -305,9 +305,7 @@ def sound_table(data, resolve, media=None):
     # the SOUN rows: the compiled scripts' sounds (PlaySound, PlayLoopSound, StopSound ...) by the same resolution
     # as mwscript.media.MediaMap (a .wav the data has only as .mp3, the catalogue's converted file)
     from types import SimpleNamespace
-    from mwscript.gamedata import GameData
-    hearing = GameData()
-    hearing.gmst = gmst
+    from mwscript.hearing import sound_range      # GameData.sound_range's rule, without the scripts' game data
     mapper = None
     catalogue = Path(media) / 'media-coverage.json' if media is not None else None
     if catalogue is not None and catalogue.is_file():
@@ -316,7 +314,7 @@ def sound_table(data, resolve, media=None):
     soun_rows, mapped, soun_unmapped = [], 0, []
     for key in soun_order(sounds):
         rec = sounds[key]
-        near, far = hearing.sound_range(rec)
+        near, far = sound_range(gmst, rec)
         if mapper is not None:
             r = mapper.sound(rec['id'])
             name = (r.get('path_pool') or '').rsplit('/', 1)[-1] if r.get('resolved') else ''
@@ -955,7 +953,6 @@ def image_step(data, id1, out=None, jobs=1, media=None):
     from build_scratch import scratch_dir
     from mwad.esm import sha256_file
     from mwad.paths import child_ci
-    from pass_cache import UnitCache
     master = child_ci(Path(data), 'Morrowind.esm')
     resolver = sound_resolver(data)
     inputs = {'master_sha256': sha256_file(master),
@@ -967,7 +964,18 @@ def image_step(data, id1, out=None, jobs=1, media=None):
     lengths = media_lengths(media) if media is not None else None
     inputs['media_lengths_sha256'] = None if lengths is None else hashlib.sha256(
         json.dumps(lengths, sort_keys=True).encode()).hexdigest()
-    cache = UnitCache.open('npc-voice-table', {'format': 'AWGL%d' % VERSION}, __file__, text_defines.__file__)
+    import pass_cache
+    import unit_store
+    # keyed on what the bake runs (build_master, sound_resolver and their reach), not the whole files: the whole-file
+    # key counted the script compiler's game data (mwscript/gamedata.py) and re-keyed the table in every build that
+    # changed it (BUILD-TABLE-UNITS-REBAKE-63); units stored under the whole-file keys of the v0.0.63 dev builds are
+    # found while the bake code is unchanged (unit_store.LEGACY_SOURCES)
+    cache = unit_store.bake_keyed_cache(
+        'npc-voice-table', {'format': 'AWGL%d' % VERSION},
+        pass_cache.source_digest((__file__, 'build_master'), (__file__, 'sound_resolver')),
+        pass_cache.previous_digests((__file__, 'build_master'), (__file__, 'sound_resolver')),
+        (__file__, text_defines.__file__),
+        pass_cache.covered_lines((__file__, 'build_master'), (__file__, 'sound_resolver')))
     target = Path(id1) / NAME
     t0 = time.time()
     print('Voice table: start (1 unit cache lookup, then %d jobs if built)' % jobs, flush=True)

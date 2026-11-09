@@ -4,7 +4,7 @@
 
 # AmiWind
 
-_Last updated with AmiWind v0.0.63-dev2 (9 November 2026)._
+_Last updated with AmiWind v0.0.63-dev4 (9 November 2026)._
 
 An unofficial, experimental RPG engine and enthusiast project bringing Morrowind
 to the Commodore Amiga, featuring CHIM: an AmiQuake-based engine and an asset
@@ -27,13 +27,20 @@ More in the [gallery](docs/GALLERY.md).
 
 ## Where AmiWind stands (9 November 2026)
 
-In development: **v0.0.63-dev2**, the second snapshot of v0.0.63
-([dev2 notes](docs/releases/notes/RELEASE-v0.0.63-dev2.md)): characters that fight each other, allies, guards and
-followers that take sides, an opening closer to the original, the original game's console commands, fire pits and
-scripted turning objects kept in saves, 605 of the 1,207 scripts running, and a builder that runs its risky stages
-first. Its changes are checked by tests, not yet in play.
+In development: **v0.0.63-dev4**, the fourth snapshot of v0.0.63
+([dev4 notes](docs/releases/notes/RELEASE-v0.0.63-dev4.md)): 27 more functions of the original's scripting carried out
+(460 of 504, with the console's own commands callable from scripts; 605 of the 1,207 scripts running), and a builder
+whose worker pools stay busy, whose world key no longer rebuilds for a change to the actor model reader, and which
+reads the dialogue and voice tables and the actor ground check from its unit cache. Its changes are checked by tests,
+not yet in play.
 
-Before it, **v0.0.63-dev1** ([dev1 notes](docs/releases/notes/RELEASE-v0.0.63-dev1.md)) brought a builder that keeps every finished unit the moment it
+Before it, **v0.0.63-dev3** ([dev3 notes](docs/releases/notes/RELEASE-v0.0.63-dev3.md)) brought creatures that walk,
+run and attack again wherever they are met, 66 more functions of the original's scripting, and a builder that reuses
+every earlier run at once and shows its plan before any stage runs.
+Before that, **v0.0.63-dev2** ([dev2 notes](docs/releases/notes/RELEASE-v0.0.63-dev2.md)) brought characters that fight
+each other, allies, guards and followers that take sides, an opening closer to the original, the original game's
+console commands, fire pits and scripted turning objects kept in saves, and a builder that runs its risky stages first.
+Before that, **v0.0.63-dev1** ([dev1 notes](docs/releases/notes/RELEASE-v0.0.63-dev1.md)) brought a builder that keeps every finished unit the moment it
 comes back, actor models that share their repeated shape data in the image (78.4 MB less on the v0.0.62 payload),
 599 of the game's 1,207 scripts running, breath and drowning under water, god mode against every damage, creatures
 that stand on the ground and attack on sight, the best-attack option and the original's hit chance and hit cone, and
@@ -74,7 +81,8 @@ delivered. v0.0.61 shipped as its third snapshot with the final version number
 ([release notes](docs/releases/notes/RELEASE-v0.0.61.md)).
 
 What comes next is in the [roadmap](docs/ROADMAP.md). Still to come after v0.0.62: the rest of the crime system
-(pickpocketing, picking owned locks), enchanting and spellmaking, more of the game's scripts, per-area data tables for
+(pickpocketing, picking owned locks), enchanting and spellmaking, more of the game's scripts (44 of the original's 504 script functions are not carried
+out yet), per-area data tables for
 containers, doors, items, activators and creatures, outdoor items that can be picked up, dropped lights with their
 flame, the Constant Effect items of non-player characters, summoned creatures that fight for the player, and the in-game
 check of the pieces not yet seen in play. Items that are in no version's list yet stay in the backlog until they are
@@ -258,7 +266,8 @@ front page used to carry are kept in [earlier README sections](docs/README_ARCHI
 - **Play:** create your character through the opening sequence; the inventory (no limit on the kinds of item, only
   carry weight, with the armour rating and a preview that follows what you wear), the journal and the map; saving and
   loading, with what you change in the world staying changed; melee combat with the original's rules (damage, armour,
-  block, knockdown, knockout, fatigue, death) and weapons and shields of every type in first and third person;
+  block, knockdown, knockout, fatigue, death), creatures that walk, run and attack with their own animations, and
+  weapons and shields of every type in first and third person;
   casting spells, with the original's chance, cost and effects, and enchanted items that cast; talking to people
   (topics, choices, disposition, persuasion and the services); containers and the bodies of the dead opened in a strip;
   crimes seen by a witness bring the guards, with the arrest, the fine and jail; alchemy (making and drinking
@@ -266,8 +275,8 @@ front page used to carry are kept in [earlier README sections](docs/README_ARCHI
   to explore Vvardenfell at night and underground; mushrooms to pick indoors and out; the original movement speeds;
   weather by region, and music streamed from disk; travel by silt strider, boat, gondola and guild guide.
 - **Not yet:** most quests and other game logic that depends on scripts the game does not run yet (588 of the 1,207
-  scripts run in v0.0.62, 599 in v0.0.63-dev1, 605 in v0.0.63-dev2 and 8 more the game's own opening code
-  carries; [the MWScript tracker](docs/MWSCRIPT_FEATURES.md)), pickpocketing and picking owned locks, trespass,
+  scripts run in v0.0.62, 599 in v0.0.63-dev1, 605 from v0.0.63-dev2 to v0.0.63-dev4, and 8 more the game's own opening code
+  carries, with 460 of the original's 504 script functions carried out; [the MWScript tracker](docs/MWSCRIPT_FEATURES.md)), pickpocketing and picking owned locks, trespass,
   making your own enchantments, the
   shot of a bow or a thrown weapon, schedules by the time of day and most of the scripted AI packages, and Dagoth Ur's
   fight and voice. The jail markers are in the door table for the jail system to come. The Unmarked Shipwreck's upper
@@ -314,8 +323,8 @@ test image of one spot see [MiniWind: the test ground](docs/MINIWIND.md), the
 Everything else about building, the build speed options, the FPU support library and running the image in FS-UAE or
 WinUAE: [Building and playing](docs/BUILDING_AND_PLAYING.md), the [Linux build guide](docs/LINUX_BUILD.md) and the
 [FS-UAE launcher](docs/FS-UAE-LAUNCHER.md). The newest emulator presets are
-[`AmiWind-v0.0.63-dev2-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.63-dev2-FS-UAE.fs-uae) and
-[`AmiWind-v0.0.63-dev2-WinUAE.uae`](resources/emulators/AmiWind-v0.0.63-dev2-WinUAE.uae) (for the v0.0.62 release:
+[`AmiWind-v0.0.63-dev4-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.63-dev4-FS-UAE.fs-uae) and
+[`AmiWind-v0.0.63-dev4-WinUAE.uae`](resources/emulators/AmiWind-v0.0.63-dev4-WinUAE.uae) (for the v0.0.62 release:
 [`AmiWind-v0.0.62-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.62-FS-UAE.fs-uae) and
 [`AmiWind-v0.0.62-WinUAE.uae`](resources/emulators/AmiWind-v0.0.62-WinUAE.uae)); all start with 32 MB of
 Fast RAM.

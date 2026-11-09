@@ -42,7 +42,7 @@ LEGACY_IMAGE_OPTIONS = (
     '--sdk', '--shared-shapes', '--shared-skins', '--town-flora-scene-report', '--town-flora-source-index', '--town-scenery', '--vis',
     '--world-bounds', '--world-flora', '--world-scenery', '--xdftool')
 # --world-bounds: a game setting for every builder (default on); --file-aliases / --shared-skins: the payload pass of
-# every image, on by default since v0.0.47 (--shared-shapes since v0.0.63); --halloween: the Halloween scene's cast in every full-world image (v0.0.54,
+# every image, on by default since v0.0.47 (--shared-shapes since v0.0.63; --skin-tiles is off by default); --halloween: the Halloween scene's cast in every full-world image (v0.0.54,
 # the image step only; --halloween-cast off). No --chim-crossing and no actor table: a legacy image has no CHIM world.
 BOTH = ['--jobs', '4', '--builder', 'chim', '--chim-area', 'balmora', '--chim-area', 'seyda']
 

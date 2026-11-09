@@ -78,6 +78,11 @@ def master_bytes():
                       sub('ENAM', struct.pack('<hbbiiiii', 98, -1, -1, 0, 0, 10, 50, 50))))
     out.append(record('SPEL', sub('NAME', 'rat power'), sub('SPDT', struct.pack('<3i', 5, 0, 0)),
                       sub('ENAM', struct.pack('<hbbiiiii', 98, -1, -1, 0, 0, 10, 50, 50))))
+    # UNDERWATER-BREATH-62 (v0.0.63-dev3): Water Breathing (0) has the NoMagnitude flag (0x8) and an ability with it
+    # stores magnitude 0 (the Argonian's): it counts 1
+    out.append(record('MGEF', sub('INDX', struct.pack('<i', 0)), sub('MEDT', struct.pack('<ifi', 1, 5.0, 0x8) + bytes(24))))
+    out.append(record('SPEL', sub('NAME', 'rat gills'), sub('SPDT', struct.pack('<3i', 1, 0, 0)),
+                      sub('ENAM', struct.pack('<hbbiiiii', 0, -1, -1, 0, 0, 0, 0, 0))))
     # v0.0.61 (PLAYER-CASTING-59): three starting spells (SPDT flags 2; one always succeeds, flag 4; one too dear for
     # any magicka) and two enchantments: a Cast When Strikes one on the sword, an autocalculated Cast When Used one
     out.append(record('SPEL', sub('NAME', 'start fire'), sub('SPDT', struct.pack('<3i', 0, 5, 2)),
@@ -114,7 +119,7 @@ def master_bytes():
     crea = struct.pack('<24i', 0, 4, *([20] * 8), 30, 0, 60, 10, 40, 5, 15, 1, 3, 2, 4, 0, 0, 0)
     out.append(record('CREA', sub('NAME', 'test_rat'), sub('NPDT', crea), sub('FLAG', struct.pack('<I', 0x48)),
                       aidt(0, 100, 0, 0), npcs('other spell'), npcs('rat immunity'), npcs('rat pox'),
-                      npcs('rat shield spell'), npcs('rat power')))
+                      npcs('rat shield spell'), npcs('rat power'), npcs('rat gills')))
     return b''.join(out)
 
 
@@ -414,8 +419,10 @@ int main(int argc,char **argv){
      AW_ActorStateImport(NULL,0);x=AW_ActorGet(31337,rat,1);
      P("passive %.0f %.0f %.0f",AW_ActorPassiveMagnitude(x,98),AW_ActorPassiveMagnitude(x,36),AW_ActorPassiveMagnitude(x,14));
      AW_ActorRemoveSpell(x,immunity);
-     P(" removed %.0f npc %.0f none %.0f\n",AW_ActorPassiveMagnitude(x,98),
-       AW_ActorPassiveMagnitude(AW_ActorGet(31338,row,1),98),AW_ActorPassiveMagnitude(NULL,98));}
+     P(" removed %.0f npc %.0f none %.0f",AW_ActorPassiveMagnitude(x,98),
+       AW_ActorPassiveMagnitude(AW_ActorGet(31338,row,1),98),AW_ActorPassiveMagnitude(NULL,98));
+     /* UNDERWATER-BREATH-62: the NoMagnitude ability (stored magnitude 0) counts 1 */
+     P(" water breathing %.0f\n",AW_ActorPassiveMagnitude(x,0));}
     AW_ActorStateClose();free(file);return 0;
 }
 '''
@@ -536,7 +543,7 @@ class EngineTests(unittest.TestCase):
         # RESIST-NORMAL-WEAPONS-61 (v0.0.62, OpenMW 0.51 activespells.cpp): abilities, blights, diseases and curses of
         # the actor's list act always (the ability's 100 + the disease's 5; the disease's weakness 30, the middle of
         # 20-40); a castable spell and a power only when cast; a removed ability no longer counts; no record, nothing
-        self.assertEqual(self.out[44], 'passive 105 30 0 removed 5 npc 0 none 0')
+        self.assertEqual(self.out[44], 'passive 105 30 0 removed 5 npc 0 none 0 water breathing 1')
 
     def test_pool_at_the_games_counts(self):
         # CELL-CHANGES-59 slice 6: 8,192 changed records (the game: 3,437 actor bases, 2,673 NPCs placed), each with an

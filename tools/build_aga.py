@@ -3406,7 +3406,8 @@ def finalize_image(args):
     from payload_share import share_payload
     payload_sharing = share_payload(boot/'id1', file_aliases=getattr(args, 'file_aliases', False),
                                     shared_skins=getattr(args, 'shared_skins', False),
-                                    shared_shapes=getattr(args, 'shared_shapes', False), jobs=jobs,
+                                    shared_shapes=getattr(args, 'shared_shapes', False),
+                                    skin_tiles=getattr(args, 'skin_tiles', False), jobs=jobs,
                                     log=lambda line: print(line, flush=True))
     suffix = '' if actor_acceptance['production_gate_passed'] and budget_decision['production_memory_gate_passed'] else '-private-test'
     if suffix:
@@ -3718,6 +3719,10 @@ def main():
     i.add_argument('--shared-shapes',action='store_true',
                    help='build.py --shared-shapes on (its default since v0.0.63): store the texture coordinates and triangles '
                         'several actor models repeat once in progs/shapes/ (tools/payload_share.py, IMAGE-BIGGER-THAN-ORIGINAL-62)')
+    i.add_argument('--skin-tiles',action='store_true',
+                   help='EXPERIMENTAL (build.py --skin-tiles on, off by default): cut the actor skins into 16x16 tiles '
+                        'stored once in progs/tiles/, each model keeping a table of tile numbers (tools/payload_share.py, '
+                        'IMAGE-BIGGER-THAN-ORIGINAL-62)')
     i.add_argument('--media-catalogue',action='store_true',
                    help='DEBUGGING ONLY (build.py --media-catalogue on): also put the media catalogue (the media coverage '
                         'report, about 64 MB) on the boot disk as id1/media/catalogue.json. Nothing in the game reads it; '

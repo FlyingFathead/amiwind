@@ -309,9 +309,13 @@ static char names[TABLE*2][AW_ANIM_SOUND_NAME];    /* precache needs names that 
 static int named;
 
 static const char *precached(const char *name);
-/* Mover models: registered by name at spawn (no load), loaded while worn. */
+/* Mover models: registered by name at spawn (no load), loaded while worn. MOVERS: worn at once; LAZIES: names
+ * registered in one level (a CHIM session is one level for the whole island and its joined rooms, and the masters
+ * have 39 movers: 16 names ran out, so every creature met later had no mover and glided on its standing idle,
+ * CREATURE-BIPED-ANIMS-62). 64 names x 64 bytes. */
 #define MOVERS 16
-static char lazy[MOVERS][AW_ANIM_MOVER_NAME];
+#define LAZIES 64
+static char lazy[LAZIES][AW_ANIM_MOVER_NAME];
 static int lazies;
 static struct {edict_t *e;short base,mover;string_t model;} worn[MOVERS];
 static cvar_t movers_on={"aw_npc_movers","1",true};
@@ -336,17 +340,38 @@ int AW_AnimLazy(const char *name) {
 static int lazy_index(const char *name) {
     int i;
     for(i=1;i<MAX_MODELS && sv.model_precache[i];i++)if(!strcmp(sv.model_precache[i],name))return i;
-    if(i>=MAX_MODELS || sv.state!=ss_loading || lazies>=MOVERS)return 0;
+    if(i>=MAX_MODELS || sv.state!=ss_loading)return 0;
+    if(lazies>=LAZIES){Con_Printf("Mover %s: %ld mover names registered already\n",name,(long)LAZIES);return 0;}
     strcpy(lazy[lazies],name);
     sv.model_precache[i]=lazy[lazies++];
     sv.models[i]=Mod_FindName(sv.model_precache[i]);   /* the name only: nothing is loaded */
     return i;
 }
 #define AW_ANIM_UNLOADED_FRAMES 1000000   /* a skeletal table's frames at most (aw_skel.c parse) */
+static model_t *model_of(edict_t *e);
+/* A table entry no live actor uses (by its model, a worn mover's standing model too), for a new model: -1 none.
+ * The table was filled once per level and never freed: a CHIM session is one level (the island and every room
+ * it joins), so after 64 actor models every later actor got no layout and glided on the default idle frames
+ * (CREATURE-BIPED-ANIMS-62). Runs only when the table is full, at a spawn. */
+static int reclaim(void) {
+    unsigned char busy[TABLE];int i,k;model_t *m;
+    memset(busy,0,sizeof(busy));
+    for(i=1;i<sv.num_edicts;i++){
+        edict_t *e=EDICT_NUM(i);
+        if(e->free || !(m=model_of(e)))continue;
+        for(k=0;k<used;k++)if(table[k].model==m)busy[k]=1;
+    }
+    for(i=0;i<MOVERS;i++)if(worn[i].e && worn[i].base>0 && worn[i].base<MAX_MODELS)
+        for(k=0;k<used;k++)if(table[k].model==sv.models[worn[i].base])busy[k]=1;
+    for(k=0;k<used;k++)if(!busy[k])return k;
+    return -1;
+}
 static void prep_layout(model_t *m,const char *path,int numframes) {
-    char anm[MAX_QPATH+4];byte *text;int mark,k,i;size_t n=strlen(path);aw_anim_t *a;
-    if(used>=TABLE)return;
-    a=&table[used].anim;table[used++].model=m;
+    char anm[MAX_QPATH+4];byte *text;int mark,k,i,at;size_t n=strlen(path);aw_anim_t *a;
+    if(used<TABLE)at=used++;
+    else if((at=reclaim())<0){Con_Printf("Animation layout %s: %ld models in use, idle only\n",path,(long)TABLE);return;}
+    memset(&table[at],0,sizeof(table[at]));
+    a=&table[at].anim;table[at].model=m;
     if(n<5 || n>=sizeof(anm) || strcmp(path+n-4,".mdl")){AW_AnimDefault(a,numframes);return;}
     memcpy(anm,path,n-4);strcpy(anm+n-4,".anm");
     mark=Hunk_LowMark();
@@ -355,7 +380,7 @@ static void prep_layout(model_t *m,const char *path,int numframes) {
     if(!AW_AnimParse(a,(const char *)text,numframes))
         Con_Printf("Animation layout %s: invalid against %d model frames, idle only\n",anm,numframes);
     Hunk_FreeToLowMark(mark);
-    {int g,need,last=used-1;table[last].needed=0;
+    {int g,need,last=at;table[last].needed=0;
      for(g=0;g<AW_ANIM_GROUPS;g++)if(a->g[g].present){need=(int)a->g[g].base+(int)a->g[g].count;if(need>table[last].needed)table[last].needed=need;}}
     for(k=0;k<AW_ANIM_EVENT_KINDS;k++)for(i=0;i<AW_ANIM_MEDIA;i++)
         if(a->sound[k][i][0] && !precached(a->sound[k][i]))a->sound[k][i][0]=0;
@@ -380,7 +405,7 @@ static aw_anim_t *slot(model_t *m) {
 void AW_AnimPrep(edict_t *e) {
     model_t *m,*mover;aw_anim_t *a;int i;
     level_check();
-    if(!(m=model_of(e)) || slot(m) || used>=TABLE)return;
+    if(!(m=model_of(e)) || slot(m))return;      /* a full table frees an unused entry (reclaim) */
     /* a model known by name only (not loaded yet: numframes 0) has its layout checked against its frames when it
      * loads (AW_AnimOf, as a mover's); parsed against 0 frames every group failed and the actor kept only its idle,
      * dragged through a walk or a fight (ANIMKIT-COVERAGE-35, WALK-CYCLES-57 sweep of v0.0.57-dev2) */
@@ -553,6 +578,8 @@ int AW_AnimMover(edict_t *e,int on) {
         sv.models[index]=m;
         worn[k].e=e;worn[k].base=(short)e->v.modelindex;worn[k].mover=(short)index;worn[k].model=e->v.model;
         e->v.modelindex=index;e->v.model=sv.model_precache[index]-pr_strings;
+        /* its layout again when a full table gave its entry to another model while nobody wore it (reclaim) */
+        if(!slot(m)){char name[AW_ANIM_MOVER_NAME];strncpy(name,a->mover,sizeof(name)-1);name[sizeof(name)-1]=0;prep_layout(m,name,m->numframes);}
         return 1;
     }
     if(k<0)return 0;

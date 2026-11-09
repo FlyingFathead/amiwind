@@ -227,8 +227,7 @@ def script_slots(kinds, ident):
     reader (tools/mwscript: the interpreter's slots); {} without a script."""
     from mwad.esm import text
     from mwad.dialogue import speaker
-    from mwscript.lexer import tokenize
-    from mwscript.parser import declarations
+    from mwscript.lexer import tokenize, declarations
     script = speaker(kinds, ident)['script']
     source = text(kinds.get('SCPT', {}).get(script, []), 'SCTX') if script else ''
     return declarations(tokenize(source, [])) if source else {}
@@ -1324,12 +1323,22 @@ def image_step(data, id1, out=None, jobs=1):
     from build_scratch import scratch_dir
     from mwad.esm import sha256_file
     from mwad.paths import child_ci
-    from pass_cache import UnitCache
+    import pass_cache
+    import unit_store
     master = child_ci(Path(data), 'Morrowind.esm')
     inputs = {'master_sha256': sha256_file(master)}
     import mwad.dialogue
-    cache = UnitCache.open('dialogue-table', {'format': 'AWDL%d' % VERSION}, __file__, G.__file__,
-                           mwad.dialogue.__file__, text_defines.__file__)
+    # keyed on what the bake runs (build_master and its reach: the voice table's code it calls, mwad.dialogue, the
+    # declaration reader), not the whole files. The whole-file key named mwad.dialogue.__file__, which the build's
+    # minute-one check cannot read (a dotted module), and counted the script parser's function table, so the unit
+    # was baked again in every build (BUILD-TABLE-UNITS-REBAKE-63); units stored under the whole-file keys of the
+    # v0.0.63 dev builds are found while the bake code is unchanged (unit_store.LEGACY_SOURCES)
+    cache = unit_store.bake_keyed_cache(
+        'dialogue-table', {'format': 'AWDL%d' % VERSION},
+        pass_cache.source_digest((__file__, 'build_master')),
+        pass_cache.previous_digests((__file__, 'build_master')),
+        (__file__, G.__file__, mwad.dialogue.__file__, text_defines.__file__),
+        pass_cache.covered_lines((__file__, 'build_master')))
     target = Path(id1) / NAME
     t0 = time.time()
     print('Dialogue table: start (1 unit cache lookup, then %d jobs if built)' % jobs, flush=True)

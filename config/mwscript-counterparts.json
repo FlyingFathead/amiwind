@@ -26,7 +26,12 @@
     {"original": ["Equip"], "amiwind": "the inventory's equip (aw_inventory.c AW_InventoryEquip)", "verdict": "partial", "note": "the player only; an actor's equipment from a console line: not yet"},
     {"original": ["PositionCell"], "amiwind": "dbg tp", "verdict": "partial", "note": "the player to the cell by its name; the point in the cell and another reference: not yet"},
     {"original": ["EnableNameMenu", "EnableRaceMenu", "EnableClassMenu", "EnableBirthMenu", "EnableStatReviewMenu"], "amiwind": "dbg quickchar name / dbg characterchange race / dbg quickchar class, birthsign, review", "verdict": "same", "note": "the character creation pages"},
-    {"original": ["Set/Mod/Get<attribute, skill, Health, Magicka, Fatigue>", "ModCurrent<Health, Magicka, Fatigue>"], "amiwind": "aw_mwhost.c host_actor", "verdict": "same", "note": "the MWScript host's actor call that a compiled script line makes; on the player"}
+    {"original": ["Set/Mod/Get<attribute, skill, Health, Magicka, Fatigue>", "ModCurrent<Health, Magicka, Fatigue>"], "amiwind": "aw_mwhost.c host_actor", "verdict": "same", "note": "the MWScript host's actor call that a compiled script line makes; on the player"},
+    {"original": ["ToggleDebugText", "tdt"], "amiwind": "dbg hud", "verdict": "partial", "note": "AmiWind's debug HUD (position, target identity) instead of the original's debug text lines"},
+    {"original": ["ToggleStats", "tst"], "amiwind": "dbg fps", "verdict": "partial", "note": "the frame rate counter; the original also lists render counts"},
+    {"original": ["ToggleCombatStats", "tcs"], "amiwind": "aw_combat_readout toggled", "verdict": "same", "note": "the combat rolls printed on the console"},
+    {"original": ["ToggleLights", "tl"], "amiwind": "r_fullbright toggled", "verdict": "partial", "note": "the lighting off and on as the engine draws it"},
+    {"original": ["RepairedOnMe"], "amiwind": "echo 0", "verdict": "same", "note": "OpenMW 0.51 reads it as always 0"}
   ],
   "entries": [
     {"script": "CharGen", "what": "the new game's start: the player's controls off, the player placed on the prison ship, the Bitter Coast weather set to cloudy, CharGenState 10",

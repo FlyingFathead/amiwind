@@ -137,5 +137,37 @@ class EquipClassEngineTests(unittest.TestCase):
         self.assertIn('action=0', opened)          # Close only: a carried book is not taken again
 
 
+class EquipScriptRouteTests(unittest.TestCase):
+    """MWSCRIPT-UNPLACED-RECORD-SCRIPTS-61 (v0.0.63-dev3): Sunder equipped with the console's aw_inventory equip never
+    set its script's OnPCEquip, so ouch_sunder (which acts only while OnPCEquip is 1) did nothing. Every equip route
+    sets it, and taking the item off sets it back to 0 (OpenMW 0.51 InventoryStore::unequipSlot)."""
+
+    @staticmethod
+    def src(name):
+        return (ROOT / 'engine/aga/src' / name).read_text(encoding='utf-8')
+
+    def test_console_equip_and_unequip_run_the_items_script(self):
+        inv_c = self.src('aw_inventory.c')
+        equip = inv_c[inv_c.index('!Q_strcasecmp(Cmd_Argv(1),"equip")){'):]
+        equip = equip[:equip.index('DIAGNOSTIC inventory equip: %s.\\n')]
+        self.assertLess(equip.index('aw_inventory_equip_script(&item,0)'), equip.index('AW_InventoryEquip(&aw_state,&item)'))
+        self.assertLess(equip.index('AW_InventoryEquip(&aw_state,&item)'), equip.index('aw_inventory_equip_script(&item,1)'))
+        unequip = inv_c[inv_c.index('!Q_strcasecmp(Cmd_Argv(1),"unequip")){'):]
+        unequip = unequip[:unequip.index('DIAGNOSTIC inventory unequip: %s.\\n')]
+        self.assertIn('aw_inventory_equip_script(&item,2)', unequip)
+        self.assertIn('int (*aw_inventory_equip_script)(const aw_inventory_item_t *it,int phase);', inv_c)
+        host = self.src('aw_mwhost.c')
+        self.assertIn('aw_inventory_equip_script=equip_script;', host)
+        body = host[host.index('static int equip_script(const aw_inventory_item_t *it,int phase){'):]
+        body = body[:body.index('\n}\n')]
+        self.assertIn('if(phase==2){if(r.on>=0){AW_MwvmLocalSet(key,r.script,r.on,0);', body)
+
+    def test_window_unequip_clears_on_pc_equip(self):
+        ui = self.src('aw_worldui.c')
+        action = ui[ui.index('static void inventory_action(int action){'):]
+        action = action[:action.index('\n}\n')]
+        self.assertIn('if(ok && aw_worldui_equip_script)aw_worldui_equip_script(item,2);', action)
+
+
 if __name__ == '__main__':
     unittest.main()

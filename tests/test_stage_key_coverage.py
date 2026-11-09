@@ -96,6 +96,7 @@ class NamedInPartsTests(unittest.TestCase):
         runs from every fingerprint. None may exist outside the reviewed uses below (none names a stage's code)."""
         reviewed = {  # path: why the computed name is not code a stage runs
             'tools/build_cache.py': 'the fingerprint scanner itself',
+            'tools/reuse_all.py': 'the reuse planner resolves an import to its module file to read it; it runs none',
         }
         found = []
         for base in ('tools', 'src'):
