@@ -2473,7 +2473,12 @@ def write_world_doors(args, id1, out, chim_frames):
     if getattr(args, 'chim_room_batches', None):
         record = json.loads((Path(args.chim_room_batches) / room_batches.RECORD).read_text(encoding='utf-8'))
         rooms.update({r['room'].casefold(): r['map'] for r in record['rooms'] if map_file(maps, r['map']).is_file()})
-    doors = original_doors(child_ci(args.data_files, 'Morrowind.esm').read_bytes())
+    master_raw = child_ci(args.data_files, 'Morrowind.esm').read_bytes()
+    doors = original_doors(master_raw)
+    # dbg tp's list box: one "(interior)" row for every room this image holds (tools/tp_places_lut.py,
+    # TP-MENU-INTERIORS-63); it opens the room through dbg tp <map>, at its door's arrival
+    from tp_places_lut import image_rooms as tp_places_rooms
+    tp_places_rooms(id1, rooms, master_raw, out)
     rows = world_doors.table(doors, rooms, towns, regions, room_offsets())
     wanted = {row['reference'] for row in rows if row['kind'] == 'door' and 'source' in row and 'target' in row}
     bounds = door_mesh_bounds(args.data_files, [d for d in doors if d['number'] in wanted])

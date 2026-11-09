@@ -96,6 +96,7 @@ Family: Rendering cost and visibility (`render-performance`). Read the visibilit
 - [ENGINE-VID-UPDATE-FIRST-RECT-35](ENGINE-VID-UPDATE-FIRST-RECT-35.md): VID_Update converted only the first rectangle of the update list
 - [FOG-SKY-UNFOGGED-57](FOG-SKY-UNFOGGED-57.md): With the 300 fog distance, buildings 20 m away turn solid fog colour while the sky stays clouds: a ragged patch of sky hangs between rooftops
 - FP-ARMS-PARTS-COST-59 (no report page): First-person arms from parts cost about twice the baked arms per frame; their models carry about three times the vertices
+- HEART-CHAMBER-POLYCOUNT-63 (no report page): Akulakhan's Chamber is to be measured on the polycount heatmap: its room models are likely too heavy
 - [INTERIOR-MORAG-TONG-FPS-43](INTERIOR-MORAG-TONG-FPS-43.md): The Morag Tong Guild interior runs at a very low frame rate
 - MODAL-WORLD-29 (no report page): Head/race and journal backgrounds consume world work
 - [NPC-TARGET-REDUNDANT-31](NPC-TARGET-REDUNDANT-31.md): NPC targeting runs 2-4 times per frame and checks every NPC

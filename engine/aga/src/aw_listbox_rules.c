@@ -119,16 +119,21 @@ static long signed32(const unsigned char *p) {
 long AW_TpPlacesRows(const unsigned char *data,long size) {
     unsigned long rows;
     if(!data || size<AW_TP_HEADER || memcmp(data,"AWTP",4))return -1;
-    if(data[4]!=0 || data[5]!=1 || data[6]!=0 || data[7]!=AW_TP_ROW)return -1;
+    if(data[4]!=0 || data[6]!=0 || !((data[5]==1 && data[7]==AW_TP_ROW) || (data[5]==2 && data[7]==AW_TP_ROW2)))return -1;
     rows=be32(data+8);
-    if(rows>65535ul || (long)(AW_TP_HEADER+rows*AW_TP_ROW)!=size)return -1;
+    if(rows>65535ul || (long)(AW_TP_HEADER+rows*data[7])!=size)return -1;
     return (long)rows;
 }
 void AW_TpPlacesRow(const unsigned char *data,long i,aw_tp_place_t *p) {
-    const unsigned char *r=data+AW_TP_HEADER+i*AW_TP_ROW;
-    memcpy(p->name,r,AW_TP_NAME);p->name[AW_TP_NAME-1]=0;
-    p->x=signed32(r+32);p->y=signed32(r+36);p->z=signed32(r+40);
-    p->flags=r[44];p->cells=r[45];
+    int v2=data[5]==2,name=v2?AW_TP_NAME:AW_TP_NAME1;
+    const unsigned char *r=data+AW_TP_HEADER+i*(long)data[7];
+    memset(p,0,sizeof(*p));
+    memcpy(p->name,r,(size_t)name);p->name[name-1]=0;
+    r+=name;
+    p->x=signed32(r);p->y=signed32(r+4);p->z=signed32(r+8);
+    p->flags=r[12];p->cells=r[13];
+    if(v2){memcpy(p->map,r+16,AW_TP_MAP);p->map[AW_TP_MAP-1]=0;}
+    else p->flags&=~AW_TP_ROOM;
 }
 static int put_number(char *out,int at,int size,long v) {
     char digits[12];int n=0;unsigned long u=v<0?(unsigned long)(-(v+1))+1ul:(unsigned long)v;
@@ -139,7 +144,18 @@ static int put_number(char *out,int at,int size,long v) {
     return at;
 }
 int AW_TpPlacesCommand(const aw_tp_place_t *p,char *out,int size) {
-    static const char head[]="aw_teleport ";int at=(int)sizeof(head)-1;
+    static const char head[]="aw_teleport ",room[]="dbg tp ";int at=(int)sizeof(head)-1;
+    if(p && out && (p->flags&AW_TP_ROOM)){
+        int n=0;at=(int)sizeof(room)-1;
+        for(;p->map[n];n++){
+            char c=p->map[n];
+            if(!((c>='a' && c<='z') || (c>='0' && c<='9') || c=='_'))return -1;
+        }
+        if(!n || at+n+2>size)return -1;
+        memcpy(out,room,(size_t)at);memcpy(out+at,p->map,(size_t)n);at+=n;
+        out[at++]='\n';out[at]=0;
+        return at;
+    }
     if(!p || !out || size<=at+8)return -1;
     memcpy(out,head,(size_t)at);
     if((at=put_number(out,at,size,p->x))<0 || at+1>=size)return -1;

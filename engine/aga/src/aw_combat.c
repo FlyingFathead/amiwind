@@ -329,8 +329,16 @@ void AW_CombatPlayerSheet(aw_fighter_t *o) {
     edict_t *p=sv.active && svs.clients?svs.clients[0].edict:NULL;int i;
     if(aw_combat_player_preset){
         *o=*aw_combat_player_preset;strcpy(o->name,"You");o->aware=1;o->knocked=o->dead=0;
+        /* PLAYER-HEALTH-OVER-MAX-63 (v0.0.63-dev5 release check: 920/93 after dbg maxstats in the arena): the arena
+         * gives the character the set fighter's maxima at the start (aw_arena.c); later changes of the sheet (dbg
+         * maxstats, a level) raise the character's, so a higher maximum of the character is taken, and the current
+         * values are never above the maxima */
+        if(aw_character.valid && aw_character.maximum[0]>o->health_max)o->health_max=aw_character.maximum[0];
+        if(aw_character.valid && aw_character.maximum[2]>o->fatigue_max)o->fatigue_max=aw_character.maximum[2];
         o->health=p?p->v.health:o->health_max;
+        if(o->health>o->health_max)o->health=o->health_max;
         o->fatigue=aw_character.valid?aw_character.current[2]:o->fatigue_max;
+        if(o->fatigue>o->fatigue_max)o->fatigue=o->fatigue_max;
         if(aw_combat_equipment)aw_combat_equipment(o);
         return;
     }
@@ -343,6 +351,7 @@ void AW_CombatPlayerSheet(aw_fighter_t *o) {
     o->level=(short)(aw_character.valid?aw_character.level:1);
     o->health_max=aw_character.valid && aw_character.maximum[0]>0?aw_character.maximum[0]:100;
     o->health=p?p->v.health:o->health_max;
+    if(o->health>o->health_max)o->health=o->health_max;   /* PLAYER-HEALTH-OVER-MAX-63: never above the maximum */
     o->fatigue_max=aw_character.valid && aw_character.maximum[2]>0?aw_character.maximum[2]:
         (float)(o->attributes[AW_STR]+o->attributes[AW_WIL]+o->attributes[AW_AGI]+o->attributes[AW_END]);
     o->fatigue=aw_character.valid?aw_character.current[2]:o->fatigue_max;

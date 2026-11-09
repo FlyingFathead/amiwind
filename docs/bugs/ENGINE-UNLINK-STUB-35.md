@@ -102,6 +102,7 @@ Family: Debug commands and remote control (`debug-commands`). dbg commands, tele
 - TELEPORT-XY-006 (no report page): No dbg tp X Y; map teleport could land underwater
 - TP-ARRIVAL-ABOVE-DOOR-57 (no report page): Settlement sweep: Bal Isra lands about 250 units above its door arrival (on top of the ruin?)
 - TP-ARRIVAL-BELOW-DOOR-57 (no report page): Settlement sweep: Vivec, Temple and Uvirith s Grave land 160 to 290 units below their door arrivals
+- TP-MENU-LABEL-CUT-63 (no report page): The dbg tp list box is narrower than the longest room names, so their (interior) mark can be cut off
 - TP-PICKER-OPEN-FRAME-COST-57 (no report page): The dbg tp list box redraws the whole paused world every frame: 100 ms a frame open against 16 ms closed
 - TP-PLACES-NO-DOOR-SEA-57 (no report page): Settlement list: Fields of Kummu arrives in the water (a place without a door used its cell middle)
 

@@ -26,9 +26,16 @@ apps/openmw/mwworld/worldimp.cpp findExteriorPosition):
 The height of 1 and 2 is the marker's own plus 32 units, so "the floor at or below it" (dbg tp X Y Z) is that
 street.
 
-File (big-endian): header 16 bytes: "AWTP", u16 version 1, u16 row bytes 48, u32 rows, u32 0. Rows x 48, sorted by
-name (case ignored): name[32] (Latin-1, NUL-padded, at most 31 bytes), i32 x, i32 y, i32 z (original global
-units), u8 flags (1 z given, 2 door arrival, 4 CocMarkerHeading), u8 the place's cells (at most 255), u16 0.
+Rooms (TP-MENU-INTERIORS-63): the image step adds one row for every converted room the image holds
+(add_rooms, called where the image knows its room maps), labelled "<the room's cell name> (interior)" on every room
+row, so a room never clashes with an outdoor place of the same name and typing "interior" filters to the rooms.
+A room row has flag 8 and its room map name; choosing it runs `dbg tp <map>`, which enters at the door's arrival.
+
+File (big-endian): header 16 bytes: "AWTP", u16 version 2, u16 row bytes 96, u32 rows, u32 0. Rows x 96, sorted by
+name (case ignored): name[64] (Latin-1, NUL-padded, at most 63 bytes), i32 x, i32 y, i32 z (original global
+units), u8 flags (1 z given, 2 door arrival, 4 CocMarkerHeading, 8 a room), u8 the place's cells (at most 255),
+u16 0, map[16] (a room row's map name, NUL-padded; else zero). Version 1 (row 48: name[32], then the same 16 bytes,
+no map) is the earlier table; the engine and read_table read both, so an older disk keeps its settlements list.
 
   python3 tools/tp_places_lut.py --data-files DIR --out tp-places.lut [--report report.json]
 """
@@ -49,11 +56,15 @@ for _p in (ROOT / 'tools', ROOT / 'src'):
 from mwad.audit import cell_data, records, subrecords  # noqa: E402  (the package, before tools/mwad.py)
 
 MAGIC = b'AWTP'
-VERSION = 1
+VERSION = 2
 NAME = 'tp-places.lut'
 HEADER = 16
-ROW = 48
-NAME_BYTES = 32
+ROW = 96
+NAME_BYTES = 64
+MAP_BYTES = 16
+ROW_V1, NAME_BYTES_V1 = 48, 32   # the earlier table (no rooms), still read
+ROOM_SUFFIX = ' (interior)'
+F_ROOM = 8
 CELL_UNITS = 8192
 LIFT = 32                       # original units above the marker: "the floor at or below" is its street
 SEA_LEVEL = 0                   # the open world's water level (original units)
@@ -199,13 +210,7 @@ def build_master(master):
         rows.append({'name': place['name'], 'x': x, 'y': y, 'z': z, 'flags': flags,
                      'cells': len(place['cells']), 'cut': len(place['name'].encode('latin-1', 'replace'))
                      >= NAME_BYTES})
-    if len(rows) > 65535:
-        raise ValueError('Settlements table: %d places, at most 65535' % len(rows))
-    out = bytearray(MAGIC + struct.pack('>HHII', VERSION, ROW, len(rows), 0))
-    for r in rows:
-        out += encode_name(r['name']).ljust(NAME_BYTES, b'\0')
-        out += struct.pack('>iiiBBH', r['x'], r['y'], r['z'], r['flags'], min(255, r['cells']), 0)
-    data = bytes(out)
+    data = encode_table(rows)
     report = {
         'format': 'AWTP%d' % VERSION, 'rows': len(rows), 'bytes': len(data),
         'sha256': hashlib.sha256(data).hexdigest(),
@@ -220,19 +225,97 @@ def build_master(master):
     return data, report
 
 
+def encode_table(rows):
+    """The AWTP2 bytes of ROWS ({'name', 'x', 'y', 'z', 'flags', 'cells'[, 'map']}), sorted by name (case ignored)."""
+    if len(rows) > 65535:
+        raise ValueError('Settlements table: %d places, at most 65535' % len(rows))
+    rows = sorted(rows, key=lambda r: (r['name'].casefold(), r['name'], r.get('map', '')))
+    out = bytearray(MAGIC + struct.pack('>HHII', VERSION, ROW, len(rows), 0))
+    for r in rows:
+        out += encode_name(r['name']).ljust(NAME_BYTES, b'\0')
+        out += struct.pack('>iiiBBH', r['x'], r['y'], r['z'], r['flags'], min(255, r['cells']), 0)
+        out += r.get('map', '').encode('ascii')[:MAP_BYTES].ljust(MAP_BYTES, b'\0')
+    return bytes(out)
+
+
+def room_label(cell_name):
+    """"<cell name> (interior)", the cell name cut so the suffix always fits the name field."""
+    keep = NAME_BYTES - 1 - len(ROOM_SUFFIX)
+    return cell_name.encode('latin-1', 'replace')[:keep].decode('latin-1').rstrip() + ROOM_SUFFIX
+
+
+def interior_names(raw):
+    """{cell casefold: the cell's own name} of every interior cell of a master (path or bytes)."""
+    raw = raw if isinstance(raw, (bytes, bytearray)) else Path(raw).read_bytes()
+    out = {}
+    for tag, flags, payload in records(raw):
+        if tag != 'CELL' or flags & 0x20:
+            continue
+        f = {}
+        for sub_tag, sub_data in subrecords(payload):   # the cell's own NAME and DATA come before its references'
+            f.setdefault(sub_tag, sub_data)
+        if len(f.get('DATA', b'')) >= 4 and struct.unpack_from('<I', f['DATA'])[0] & 1 and f.get('NAME'):
+            name = f['NAME'].split(b'\0')[0].decode('latin-1').strip()
+            if name:
+                out.setdefault(name.casefold(), name)
+    return out
+
+
+def add_rooms(table, rooms, names=None):
+    """(AWTP2 bytes, report) of TABLE (v1 or v2) with one row per room of ROOMS {cell casefold: map name}: the label
+    room_label of the cell's own name (NAMES {casefold: name}, else the key), flag F_ROOM, the map; earlier room rows
+    are replaced. A room whose map name does not fit, or is not lower-case letters, digits and _, is left out (listed)."""
+    names = names or {}
+    rows = [r for r in read_table(table) if not r['flags'] & F_ROOM]
+    added, left_out = 0, []
+    for key in sorted(rooms):
+        m = rooms[key]
+        if not m or len(m) >= MAP_BYTES or not all(c.isdigit() or c == '_' or 'a' <= c <= 'z' for c in m):
+            left_out.append(key)
+            continue
+        rows.append({'name': room_label(names.get(key, key)), 'x': 0, 'y': 0, 'z': 0, 'flags': F_ROOM, 'cells': 0,
+                     'map': m})
+        added += 1
+    data = encode_table(rows)
+    return data, {'rows': len(rows), 'rooms': added, 'rooms_left_out': left_out, 'bytes': len(data),
+                  'sha256': hashlib.sha256(data).hexdigest(), 'open_bytes': len(data), 'resident_bytes': 0}
+
+
+def image_rooms(id1, rooms, master, out=None):
+    """The image's room rows: id1/tp-places.lut rewritten with ROOMS {cell casefold: map} (the room maps this image
+    holds) named from MASTER's interior cells; the report beside the table's (tp-places-rooms.json)."""
+    target = Path(id1) / NAME
+    if not target.is_file():
+        return None
+    t0 = time.time()
+    data, report = add_rooms(target.read_bytes(), rooms, interior_names(master))
+    target.write_bytes(data)
+    if out is not None:
+        (Path(out) / 'tp-places-rooms.json').write_text(json.dumps(report, indent=1, sort_keys=True) + '\n',
+                                                         encoding='utf-8', newline='\n')
+    print('Settlements table: %d rooms added, %d rows, %d bytes while the box is open (%d left out; took %.1f s, '
+          '1 core; 0 bytes resident)' % (report['rooms'], report['rows'], report['bytes'],
+                                          len(report['rooms_left_out']), time.time() - t0), flush=True)
+    return report
+
+
 def read_table(data):
-    """[{'name', 'x', 'y', 'z', 'flags', 'cells'}] of an AWTP1 table (the engine's AW_TpPlacesRows/Row)."""
+    """[{'name', 'x', 'y', 'z', 'flags', 'cells', 'map'}] of an AWTP2 or AWTP1 table (the engine's
+    AW_TpPlacesRows/Row; version 1 rows have no map)."""
     if data[:4] != MAGIC:
         raise ValueError('not AWTP')
     version, row, count, _ = struct.unpack_from('>HHII', data, 4)
-    if version != VERSION or row != ROW or len(data) != HEADER + count * ROW:
+    sizes = {1: (ROW_V1, NAME_BYTES_V1), 2: (ROW, NAME_BYTES)}
+    if version not in sizes or row != sizes[version][0] or len(data) != HEADER + count * row:
         raise ValueError('AWTP header or size mismatch')
+    name_bytes = sizes[version][1]
     rows = []
     for i in range(count):
-        at = HEADER + i * ROW
-        name = data[at:at + NAME_BYTES].split(b'\0')[0].decode('latin-1')
-        x, y, z, flags, cells, _ = struct.unpack_from('>iiiBBH', data, at + NAME_BYTES)
-        rows.append({'name': name, 'x': x, 'y': y, 'z': z, 'flags': flags, 'cells': cells})
+        at = HEADER + i * row
+        name = data[at:at + name_bytes].split(b'\0')[0].decode('latin-1')
+        x, y, z, flags, cells, _ = struct.unpack_from('>iiiBBH', data, at + name_bytes)
+        m = data[at + name_bytes + 16:at + row].split(b'\0')[0].decode('ascii') if version == 2 else ''
+        rows.append({'name': name, 'x': x, 'y': y, 'z': z, 'flags': flags, 'cells': cells, 'map': m})
     return rows
 
 

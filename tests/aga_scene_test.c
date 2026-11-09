@@ -206,7 +206,11 @@ int COM_FOpenFile(char *name,FILE **f){
    !strcmp(name,"maps/census.bsp")?
    "{\n\"classname\" \"worldspawn\"\n\"message\" \"Census and Excise Office\"\n}\n"
    "{\n\"classname\" \"info_player_start\"\n\"origin\" \"12 34 77\"\n}\n":
-   roulette_fixture==2 && !strcmp(name,"maps/mi5b8154939f7aa.bsp")?"{\n\"classname\" \"worldspawn\"\n}\n":NULL;
+   roulette_fixture==2 && !strcmp(name,"maps/mi5b8154939f7aa.bsp")?"{\n\"classname\" \"worldspawn\"\n}\n":
+   /* CONSOLE-TP-ROOM-NAME-63: the Andrano tomb, no door bank of this disk leads in; its start = its door's arrival */
+   roulette_fixture==3 && !strcmp(name,"maps/ri8c361151ce.bsp")?
+   "{\n\"classname\" \"worldspawn\"\n\"message\" \"Andrano Ancestral Tomb\"\n}\n"
+   "{\n\"classname\" \"info_player_start\"\n\"origin\" \"24 -40 64\"\n\"angle\" \"180\"\n}\n":NULL;
   unsigned char h[124];long n;
   if(!strncmp(name,"maps/",5)){
    if(!text){*f=NULL;return -1;}
@@ -1111,6 +1115,19 @@ int main(void){
   /* no seed: one of its own, a room all the same */
   command_argc=1;AW_SceneCancelTransition();queued[0]=0;roulette();
   assert(!strcmp(queued,"map bmcaius\n") || !strcmp(queued,"map census\n"));
+  AW_SceneCancelTransition();roulette_fixture=0;command_argc=1;
+ }
+ /* CONSOLE-TP-ROOM-NAME-63 / DEBUG-TP-ROOM-ENTRANCE-50: dbg tp ROOM whose door is in no door bank of the disk (the
+  * Andrano tomb's door stands in a cell without a frame): the room loads at its own start (its door's arrival),
+  * never "no entrance"; a room in a bank still takes that door's arrival (Caius Cosades from Balmora). */
+ {
+  assert(scene);roulette_fixture=3;occluded=target_trace=travel_trace=0;door_duration=0;
+  AW_SceneCancelTransition();CL_ClearState();strcpy(sv.name,"seyda");sv.active=true;AW_SceneSpawn(&p);finish_signon(&p);
+  p.v.movetype=MOVETYPE_WALK;p.v.health=73;cls.state=ca_connected;key_dest=key_game;
+  command_args[0]="aw_scene";command_args[1]="ri8c361151ce";command_argc=2;queued[0]=0;scene();
+  assert(!strcmp(queued,"map ri8c361151ce\n"));
+  CL_ClearState();strcpy(sv.name,"ri8c361151ce");AW_SceneSpawn(&p);finish_signon(&p);
+  assert(p.v.origin[0]==24 && p.v.origin[1]==-40 && p.v.angles[1]==180);
   AW_SceneCancelTransition();roulette_fixture=0;command_argc=1;
  }
  puts("scene, real client reset/signon, exact streaming view, drift policy, reverse/world crossings and explicit arrivals passed");

@@ -1413,6 +1413,7 @@ static int named_place(const char *name,aw_scene_link_t *r) {
     }
     fclose(f);return found;
 }
+static int roulette_room(const char *name,aw_scene_link_t *r,char *title,int size,long *cell);
 static void scene_command(void) {
     aw_scene_link_t r;const char *s=Cmd_Argv(1);char path[40];int i,size;
     if(!Q_strcasecmp((char *)s,"seydaneen") || !Q_strcasecmp((char *)s,"seyda") ||
@@ -1484,7 +1485,16 @@ static void scene_command(void) {
                 load_scene(&links[i],1);return;
             }
         for(i=0;i<count;i++)if(!strcmp(links[i].target,s)){load_scene(&links[i],1);return;}
-        Con_Printf("No converted entrance to %s.\n",s);return;
+        /* No door of that bank leads in (a room entered from a region frame, another town or a cell with no frame,
+         * CONSOLE-TP-ROOM-NAME-63, DEBUG-TP-ROOM-ENTRANCE-50): the room's own start, which the builder puts at the
+         * first original door's arrival (tools/chim_room_batches.py, prepare_area.spawn_entrance), the place a
+         * player walking in through that door arrives; read from the map's entity lump, as the door roulette does. */
+        {char title[96];long cell;
+         if(roulette_room(s,&r,title,sizeof(title),&cell)){
+             Con_Printf("%s: at its door's arrival %ld %ld %ld.\n",title,(long)r.arrival[0],(long)r.arrival[1],(long)r.arrival[2]);
+             load_scene(&r,1);return;
+         }}
+        Con_Printf("No entrance or start found for %s.\n",s);return;
     }
     memset(&r,0,sizeof(r));copy_name(r.target,sizeof(r.target),!strcmp(s,"ship")?"prison":"seyda");
     if(!strcmp(s,"ship")){r.arrival[1]=-35;r.arrival[2]=-4;r.yaw=90;}

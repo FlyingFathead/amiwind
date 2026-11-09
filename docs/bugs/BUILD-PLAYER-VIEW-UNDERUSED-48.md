@@ -21,7 +21,7 @@
 | Persists in | v0.0.62 (last seen) |
 | Severity | high: Regressed in v0.0.62 (was medium): two minutes of every image step; the project rule is every core busy |
 | Family | Build speed (`build-speed`) |
-| Deferred by the maintainer | 2026-11-09: deferred by the maintainer to v0.0.63 (app chat 2026-11-09, on the v0.0.62 release guard's eight persisting bugs: "Defer all 8 to v0.0.63"), with the v0.0.63 work. |
+| Deferred by the maintainer | 2026-11-09: deferred by the maintainer to v0.0.64 (the v0.0.63 release triage: "Defer all six") |
 | Came back (regression) | in v0.0.62 (fixed in v0.0.48-dev2 before) |
 | Playtest version | 2026_10_22_v0.0.48-dev2_miniwind-balmora-rooms-bsp_1336ba94 |
 | From commit | source 1336ba9, engine 1336ba9, CHIM world 1336ba9 |

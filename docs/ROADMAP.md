@@ -1,12 +1,13 @@
 # Roadmap and implementation options
 
-_Last updated with AmiWind v0.0.63-dev5 (9 November 2026)._
+_Last updated with AmiWind v0.0.63 (9 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
-- [v0.0.63: in development, dev1 to dev5 on 9 November 2026](#v0063-in-development-dev1-to-dev5-on-9-november-2026)
-- [v0.0.62: released 8 November 2026; v0.0.63 next](#v0062-released-8-november-2026-v0063-next)
+- [v0.0.64: Gone Beyond The Gate, next](#v0064-gone-beyond-the-gate-next)
+- [v0.0.63: Every Script Of Vvardenfell, released 9 November 2026](#v0063-every-script-of-vvardenfell-released-9-november-2026)
+- [v0.0.62: released 8 November 2026](#v0062-released-8-november-2026)
 - [v0.0.61: released 6 November 2026](#v0061-released-6-november-2026)
 - [v0.0.60: released 4 November 2026](#v0060-released-4-november-2026)
 - [v0.0.59: released 3 November 2026](#v0059-released-3-november-2026)
@@ -112,13 +113,50 @@ _Last updated with AmiWind v0.0.63-dev5 (9 November 2026)._
 
 15 October 2026: exact-source validation completed 4,231 tests: 4,225 passed, three Windows-only skips and three tracked Census expected failures. The 71 focused tests and original-data readback across nine frame positions passed, consistently hiding 33 of 158 original references at stronghold state 6 while preserving unknown scripts. All 243 player resources are reusable after exact producer, input and file verification. Complete combined-world conversion, native comparison, packaging and shipment remain pending; coverage counts are unchanged.
 
-## v0.0.63: in development, dev1 to dev5 on 9 November 2026
+## v0.0.64: Gone Beyond The Gate, next
 
-The fifth, [v0.0.63-dev5](releases/notes/RELEASE-v0.0.63-dev5.md), follows the fourth. The first snapshot, [v0.0.63-dev1](releases/notes/RELEASE-v0.0.63-dev1.md), carries the first part of the list; the
-second, [v0.0.63-dev2](releases/notes/RELEASE-v0.0.63-dev2.md), the next; the third,
-[v0.0.63-dev3](releases/notes/RELEASE-v0.0.63-dev3.md), the one after; the fourth,
-[v0.0.63-dev4](releases/notes/RELEASE-v0.0.63-dev4.md), the one after that. Their changes are checked by tests, not yet
-in play.
+The next release brings the two expansion worlds and the scripts that wait for them.
+
+- **Tribunal (Mournhold) and Bloodmoon (Solstheim) built in by default** where the player owns them. The builder warns
+  when their files are not found and has a switch to build the base game only. The builder already reports what it
+  finds of each.
+- **Their scripting:** the 431 scripts of Mournhold and Solstheim that wait for those worlds, and the 28 that also lack
+  a function (placing their own records, moving into their cells, the water level), so that the scripts of all three
+  game files run.
+- **Scripted world events,** such as the Ghostgate's doors and the traps that poison when opened.
+- **The remaining partial systems** of the [game systems table](GAME_FEATURES.md) (7 of 49 done, 39 partial, 3 missing at
+  v0.0.63), among them pickpocketing and owned locks, enchanting at an altar and spellmaking in play, per-area data
+  tables, outdoor items that can be picked up, dropped lights with their flame, the werewolf's body, the shorelines,
+  and the in-game check of the pieces listed under "Not yet seen in game" in the
+  [v0.0.63 release notes](releases/notes/RELEASE-v0.0.63.md).
+- **The builder and the image:** a build that proves the new world key, every stage on all cores, and a smaller image.
+
+## v0.0.63: Every Script Of Vvardenfell, released 9 November 2026
+
+v0.0.63, "Every Script Of Vvardenfell", shipped with its final version number after five development snapshots
+([release notes](releases/notes/RELEASE-v0.0.63.md)): [dev1](releases/notes/RELEASE-v0.0.63-dev1.md),
+[dev2](releases/notes/RELEASE-v0.0.63-dev2.md), [dev3](releases/notes/RELEASE-v0.0.63-dev3.md) (not published on its own;
+it came to the main line with dev4), [dev4](releases/notes/RELEASE-v0.0.63-dev4.md) and
+[dev5](releases/notes/RELEASE-v0.0.63-dev5.md).
+
+**Done in v0.0.63:**
+
+- **The base game's scripting:** 605 of the 1,074 scripts the original game uses run and 9 more are carried by AmiWind's own code (133 scripts that nothing in the original names are listed apart), so every
+  script of Vvardenfell that has something to do runs; 460 of the original's 504 script functions are carried out; the
+  original game's console commands. The scripts of Mournhold and Solstheim wait for those worlds.
+- **The game systems table:** 49 systems with their state, proof and the work that carries the rest (7 done, 39
+  partial, 3 missing; [game features](GAME_FEATURES.md)).
+- **Combat, creatures and the player:** creatures that walk, run and attack wherever they are met; characters that fight
+  each other; the original's chance to hit; breath and drowning under water; god mode against every damage; health that
+  never stands above its maximum.
+- **The text box of a spoken line** drawn at once, leaving the stats visible; the opening closer to the original; fire
+  pits and scripted turning objects; `dbg tp` into any room.
+- **The builder and the image:** every finished unit kept the moment it comes back, the plan of a build shown before any
+  stage runs, world stages keyed on their own inputs only, actor models sharing their repeated shapes.
+
+**Shipped, with its in-game check still to do:** the pieces listed under "Not yet seen in game" in the release notes.
+
+**The snapshots of v0.0.63:**
 
 **In dev5:**
 
@@ -172,12 +210,9 @@ in play.
 - **Combat:** the best-attack option in Options, the original's hit chance with the active effects, and its hit cone.
 - **Drops on uneven room floors;** the blight cloud at Dagoth Ur no longer drawn as a solid shape.
 
-**Still to do in v0.0.63:** the in-game check of the v0.0.62 fixes, of dev1, of dev2, of dev3, of dev4 and of dev5; the rest of the builder work
-(a build that proves the new keys, every stage on all cores); the werewolf's body; more of the
-game's scripts; the shorelines; pickpocketing and owned locks; enchanting and spellmaking; per-area data tables;
-outdoor items that can be picked up; dropped lights with their flame.
+**Moved to v0.0.64:** see "v0.0.64: Gone Beyond The Gate, next" above.
 
-## v0.0.62: released 8 November 2026; v0.0.63 next
+## v0.0.62: released 8 November 2026
 
 v0.0.62, "Stick To The Script", shipped as what was to be its third development snapshot, with its final version
 number ([release notes](releases/notes/RELEASE-v0.0.62.md); snapshots [dev1](releases/notes/RELEASE-v0.0.62-dev1.md) and
@@ -200,12 +235,11 @@ number ([release notes](releases/notes/RELEASE-v0.0.62.md); snapshots [dev1](rel
 
 **Shipped, with its in-game check still to do:** the pieces listed under "Not yet seen in game" in the release notes.
 
-**Still to do (v0.0.63 and later):** pickpocketing and picking owned locks; enchanting; spellmaking; the rest of the
-game's scripts (605 of 1,207 run in v0.0.63-dev4 and 8 more are carried by AmiWind's own opening code:
-TurnMoonRed, HasItemEquipped, ForceRun, ExplodeSpell, GetAttacked, GetSpellEffects, the werewolf functions and
-SetScale added, the opening's tutorial hints run, a later master's script attaches); per-area data tables for containers, doors, items, activators and creatures; outdoor items that can be
-picked up; dropped lights with their flame; the Constant Effect items of other characters; summoned creatures that fight
-for the player.
+**Moved on from v0.0.62:** the rest of the game's scripts and the script functions listed there shipped in v0.0.63
+(605 of 1,207 run, 9 more carried). Still open after v0.0.63, and moved to v0.0.64: pickpocketing and picking owned
+locks; enchanting at an altar and spellmaking in play; per-area data tables for containers, doors, items, activators and
+creatures; outdoor items that can be picked up; dropped lights with their flame; the Constant Effect items of other
+characters; summoned creatures that fight for the player.
 
 ## v0.0.61: released 6 November 2026
 

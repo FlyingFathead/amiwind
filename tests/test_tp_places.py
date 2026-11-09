@@ -132,15 +132,15 @@ class TableTests(unittest.TestCase):
 
     def test_places_are_the_named_exterior_cells_sorted(self):
         names = [r['name'] for r in T.read_table(self.raw)]
-        self.assertEqual(names, ['Ald-ruhn', 'Fields of Kummu', 'Seyda Neen', 'The Very Long Name Of A Place O',
-                                 'Vivec, Foreign Quarter'])
+        self.assertEqual(names, ['Ald-ruhn', 'Fields of Kummu', 'Seyda Neen',
+                                 'The Very Long Name Of A Place On Vvardenfell', 'Vivec, Foreign Quarter'])
         self.assertEqual(self.rows['Seyda Neen']['cells'], 2)
-        self.assertEqual(self.report['names_cut'], ['The Very Long Name Of A Place On Vvardenfell'])
+        self.assertEqual(self.report['names_cut'], [])
         self.assertEqual(self.report['resident_bytes'], 0)
 
     def test_arrival_order(self):
         self.assertEqual(self.rows['Ald-ruhn'], {'name': 'Ald-ruhn', 'x': -15000, 'y': 53000, 'z': 2400 + T.LIFT,
-                                                 'flags': T.F_HAS_Z | T.F_COC, 'cells': 1})
+                                                 'flags': T.F_HAS_Z | T.F_COC, 'cells': 1, 'map': ''})
         seyda = self.rows['Seyda Neen']
         self.assertEqual((seyda['x'], seyda['y'], seyda['z'], seyda['flags']),
                          (-17000, -73000, 300 + T.LIFT, T.F_HAS_Z | T.F_DOOR))
@@ -152,13 +152,69 @@ class TableTests(unittest.TestCase):
         self.assertEqual(self.report['arrivals'], {'coc_marker': 1, 'door': 3, 'cell_middle': 1})
 
     def test_file_layout(self):
-        self.assertEqual(self.raw[:8], b'AWTP\x00\x01\x00\x30')
+        self.assertEqual(self.raw[:8], b'AWTP\x00\x02\x00\x60')
         self.assertEqual(len(self.raw), T.HEADER + 5 * T.ROW)
         with self.assertRaises(ValueError):
             T.read_table(self.raw[:-1])
 
     def test_same_input_same_bytes(self):
         self.assertEqual(T.build_master(master())[0], self.raw)
+
+
+def v1_table(rows):
+    """An older disk's AWTP1 table (row 48, name[32], no map)."""
+    out = bytearray(b'AWTP' + struct.pack('>HHII', 1, 48, len(rows), 0))
+    for name, x, y, zz, flags in rows:
+        out += name.encode('latin-1')[:31].ljust(32, b'\0') + struct.pack('>iiiBBH', x, y, zz, flags, 1, 0)
+    return bytes(out)
+
+
+class RoomRowTests(unittest.TestCase):
+    """TP-MENU-INTERIORS-63: one "(interior)" row per room the image holds, its map, sorted with the places."""
+
+    def test_room_rows_labels_and_maps(self):
+        table = T.build_master(master())[0]
+        names = T.interior_names(master())
+        self.assertEqual(names, {"arrille's tradehouse": "Arrille's Tradehouse"})
+        rooms = {"arrille's tradehouse": 'ri0123abcd', 'seyda neen': 'seyda_cellar', 'bad room': 'Has Space',
+                 'sectioned': None}
+        names = dict(names, **{'seyda neen': 'Seyda Neen'})
+        data, report = T.add_rooms(table, rooms, names)
+        rows = T.read_table(data)
+        by = {r['name']: r for r in rows}
+        self.assertEqual(by["Arrille's Tradehouse (interior)"],
+                         {'name': "Arrille's Tradehouse (interior)", 'x': 0, 'y': 0, 'z': 0, 'flags': T.F_ROOM,
+                          'cells': 0, 'map': 'ri0123abcd'})
+        # a room of an outdoor place's name never clashes with it
+        self.assertEqual(by['Seyda Neen (interior)']['map'], 'seyda_cellar')
+        self.assertEqual(by['Seyda Neen']['flags'], T.F_HAS_Z | T.F_DOOR)
+        self.assertEqual(report['rooms'], 2)
+        self.assertEqual(report['rooms_left_out'], ['bad room', 'sectioned'])
+        self.assertEqual(report['rows'], 7)
+        self.assertEqual(report['bytes'], T.HEADER + 7 * T.ROW)
+        self.assertEqual([r['name'] for r in rows], sorted((r['name'] for r in rows), key=str.casefold))
+        # adding again replaces the room rows (same bytes)
+        self.assertEqual(T.add_rooms(data, rooms, names)[0], data)
+
+    def test_long_room_names_keep_the_suffix(self):
+        label = T.room_label('A' * 80)
+        self.assertTrue(label.endswith(' (interior)'))
+        self.assertEqual(len(label), T.NAME_BYTES - 1)
+
+    def test_older_table_without_rooms(self):
+        old = v1_table([('Balmora', -20536, -13960, 378, T.F_HAS_Z | T.F_DOOR), ('Ald-ruhn', 1, 2, 0, 0)])
+        rows = T.read_table(old)
+        self.assertEqual([(r['name'], r['map']) for r in rows], [('Balmora', ''), ('Ald-ruhn', '')])
+        data, report = T.add_rooms(old, {'andrano ancestral tomb': 'ri8c361151ce'},
+                                   {'andrano ancestral tomb': 'Andrano Ancestral Tomb'})
+        self.assertEqual(data[:8], b'AWTP\x00\x02\x00\x60')
+        self.assertEqual([r['name'] for r in T.read_table(data)],
+                         ['Ald-ruhn', 'Andrano Ancestral Tomb (interior)', 'Balmora'])
+
+    def test_the_image_adds_rooms_where_it_knows_them(self):
+        build = (ROOT / 'tools' / 'build_aga.py').read_text(encoding='utf-8')
+        doors = build[build.index('def write_world_doors('):]
+        self.assertLess(doors.index('rooms.update('), doors.index('tp_places_rooms(id1, rooms, master_raw, out)'))
 
 
 @unittest.skipIf(os.name == 'nt', 'native fixtures run on Linux, including the Docker gate')

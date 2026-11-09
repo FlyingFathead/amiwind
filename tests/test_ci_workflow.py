@@ -55,9 +55,11 @@ class WorkflowLayoutTests(unittest.TestCase):
         matrix = re.search(r'^        shard: \[([0-9, ]+)\]\s*$', tests, re.M).group(1)
         self.assertEqual([int(x) for x in matrix.split(',')], list(range(1, count + 1)))
         self.assertIn('fail-fast: false', tests)
-        self.assertIn('python tools/run_tests.py -v --module-timeout 900 --shard "${{ matrix.shard }}/$TEST_SHARDS"',
-                      tests)
+        self.assertIn('python tools/run_tests.py -v --module-timeout 900 --part-seconds 12 '
+                      '--shard "${{ matrix.shard }}/$TEST_SHARDS"', tests)
         self.assertEqual(self.text.count('tools/run_tests.py'), 1)
+        # Slow runners: small parts of the long modules, and the native checks' own time limit scaled.
+        self.assertIn('AMIWIND_TEST_TIMEOUT_FACTOR: "4.5"', tests)
 
     def test_test_jobs_have_a_descriptive_name_that_counts_the_shards(self):
         # CI-JOBS-UNNAMED-53: the displayed names are what the release publisher requires

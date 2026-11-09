@@ -277,6 +277,9 @@ int AW_ActorStateImportRecords(const unsigned char *data,int bytes);
  * save, every changed record and dead count goes (how many). */
 int AW_ActorForget(uint32_t reference);
 int AW_ActorStateDropAll(void);
+/* UNDERWATER-BREATH-62: how many times the pool (the player's record included) was emptied; a change = the
+ * character's spells must be applied again */
+unsigned long AW_ActorStateEpoch(void);
 /* Live records now and changed ones (for the status line and the tests). */
 int AW_ActorStateLive(int *changed);
 const aw_actorstate_stats_t *AW_ActorStateStats(void);

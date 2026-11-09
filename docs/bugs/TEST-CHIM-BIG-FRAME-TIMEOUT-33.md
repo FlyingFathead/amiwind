@@ -18,12 +18,12 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
+_Last updated with AmiWind v0.0.63-dev5 (9 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
-- [Status: 9 October 2026](#status-9-october-2026)
+- [Status: 9 November 2026](#status-9-november-2026)
 - [Symptom](#symptom)
 - [Where](#where)
 - [How it happened](#how-it-happened)
@@ -36,10 +36,14 @@ _Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 
 <!-- contents end -->
 
-## Status: 9 October 2026
+## Status: 9 November 2026
 
-Open. Failed in two gates on a loaded machine and passed in the gate before on the same code. Run alone on 2 CPUs
-with the host at 100 % CPU, the test takes 206 s of its 300 s limit.
+Open, persisting: reported twice. Failed in two gates on a loaded machine in v0.0.33-rc1 and passed in the gate before
+on the same code. Run alone on 2 CPUs with the host at 100 % CPU, the test takes 206 s of its 300 s limit. Seen again in
+v0.0.63-dev4: the first part of the CI test suite failed after 1,607 s, and the next run (v0.0.63-dev5) passed. The
+module takes 94 s as a whole on the build machine; on the CI machine its four parts took about 420 s each. Local suite
+runs also showed it failing now and then under load. A fix is on the v0.0.63 line (see Repair); this stays open until
+CI has run green with it.
 
 ## Symptom
 
@@ -65,12 +69,17 @@ Intermittent: run the full suite with eight workers while the host is busy.
 
 ## Repair
 
-Not done yet. Options: scale the limit with the measured host load, or give the big-frame fixture its own longer limit
-and run it early (priority) so it does not share the tail of the suite with other heavy fixtures.
+Two changes, neither alters what the tests check. The suite runner has a new option, `--part-seconds`, a ceiling for
+the recorded time of one part of a split module; CI uses 12 s, so the native engine test module runs in 8 parts
+instead of 4 (the extra parts queue behind the running ones), each part about 12 s of recorded time. And the time limit
+of each compiled check in that module is 300 s times the factor in `AMIWIND_TEST_TIMEOUT_FACTOR` (never below 300 s);
+CI sets 4.5, which gives 1,350 s. Every module still runs exactly once across the six CI parts.
 
 ## Verification
 
-The gate rerun on an idle machine passes; a load test (suite beside a second gate) passes after the repair.
+The gate rerun on an idle machine passes; a load test (suite beside a second gate) passes after the repair. The split
+rule and the limit factor are covered by tests (tests/test_run_tests.py, tests/test_chim_engine_native.py,
+tests/test_ci_workflow.py). Still to confirm: a CI run with all six test parts green.
 
 ## Prevention
 
@@ -152,6 +161,8 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - SESSION-PASS-DEAD-ENGINE-57 (no report page): The scripted test session reported PASS while the engine had crashed
 - SESSION-STALL-CENSUS-QUICKSTART-58 (no report page): On the v0.0.58-dev6 image a session that quick-starts into the Census and Excise Office at 135 172 64 stalls before its first still: the runner reports game stalled with the game clock frozen at 23.23 s
 - [SMOKE-DELIVERY-OLD-COPY-58](SMOKE-DELIVERY-OLD-COPY-58.md): The playtest delivery ran an old copy of the boot smoke: the v0.0.58 release smoke failed four times on a working image
+- SMOKE-IDE-TRACE-LOG-63 (no report page): The gate smoke runs the emulator with its IDE trace log on, about 41 MB per two-minute run
+- SMOKE-INPLAY-UNSAMPLED-63 (no report page): The boot smoke never examines a stop where the game does not get into play after a load
 - SMOKE-KEY-DURING-LOGO-52 (no report page): The engine smoke can type its console command while the logo is still up: the m of map is the logo s not-now key for the extra Fast RAM, so the start runs without the CHIM cache and the 32 MB zone check fails falsely
 - SMOKE-M-KEY-SKIPS-CHIM-CACHE-57 (no report page): The gate's boot smoke sometimes fails with the CHIM zone full: an M typed while the startup memory notice shows turns the CHIM cache off for that start
 - [SMOKE-MUSIC-REREAD-FLAKY-57](SMOKE-MUSIC-REREAD-FLAKY-57.md): The boot smoke's music check fails now and then: music is not read again after dbg music on (reads 35 -> 35), a rerun passes

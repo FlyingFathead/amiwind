@@ -21,10 +21,9 @@
 | Where | Stage keys of chim, chim-town, world-flora (engine folder named by three builder modules) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.62 (last seen) |
+| Persists in | fixed in v0.0.63 |
 | Severity | critical: Regressed in v0.0.62 (was high): Regressed in v0.0.59-dev6 (was medium): An engine-only edit reruns the CHIM world stages again (came back in v0.0.54-dev1),... |
 | Family | Build speed (`build-speed`) |
-| Deferred by the maintainer | 2026-11-09: deferred by the maintainer to v0.0.63 (app chat 2026-11-09, on the v0.0.62 release guard's eight persisting bugs: "Defer all 8 to v0.0.63"), with the v0.0.63 work. |
 | Came back (regression) | in v0.0.59-dev6 (fixed in v0.0.54-dev1 before); in v0.0.62 (fixed in v0.0.59-dev7 before) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |
 | From commit | source and engine 25b0d62 |

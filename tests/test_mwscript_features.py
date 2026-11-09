@@ -54,6 +54,30 @@ class Tracker(unittest.TestCase):
         row['error'] = True
         self.assertEqual(F.state_of(row)[0], 'not-converted')
 
+    def test_headline_counts_only_the_used_scripts(self):
+        # the scripts nothing in the original names are listed apart, not in the headline or the per-script tables
+        text = F.render(copy.deepcopy(self.doc))
+        rows = self.doc['scripts']
+        inert = [r for r in rows if r['state'] == 'inert']
+        used = len(rows) - len(inert)
+        self.assertIn('Of the {:,} scripts the original game uses'.format(used), text)
+        self.assertIn('The {:,} scripts that nothing in the original game ever names'.format(len(inert)), text)
+        head, _, tail = text.partition('## Not used in the original game')
+        self.assertTrue(tail)
+        for r in inert:
+            self.assertIn('| %s |' % r['id'], tail)
+            self.assertNotIn('| %s | %s | %s |' % (r['id'], r['area'], 'Named by nothing'), head)
+        self.assertEqual(len(rows), self.doc['measured'].get('scripts', len(rows)))
+
+    def test_main_script_is_carried(self):
+        # the game always starts the global script Main (OpenMW GlobalScripts::addStartup), named by nothing or not
+        r = {'id': 'Main', 'error': False, 'handwritten': False, 'inert': True, 'notyet': [], 'bound': 0,
+             'start': False, 'started_by': [], 'refs': {'records': {}, 'placed': {}, 'levelled': 0,
+                                                         'dialogue_starts': 0, 'dialogue_speaker': 0}}
+        self.assertEqual(F.state_of(r)[0], 'carried')
+        r['id'] = 'main'
+        self.assertEqual(F.state_of(r)[0], 'carried')
+
     def test_state_rules(self):
         base = {'error': False, 'handwritten': False, 'inert': False, 'notyet': [], 'bound': 0, 'start': False,
                 'started_by': [], 'refs': {'records': {}, 'placed': {}, 'levelled': 0, 'dialogue_starts': 0,

@@ -118,6 +118,7 @@ Family: Map heap and memory budget (`heap-memory`). The heap model must match wh
 - SMOKE-16MB-MAPLOAD-54 (no report page): Below the 32 MB requirement: at 16 MB Fast RAM the boot smoke loads no map (dbg tp to Seyda Neen)
 - [VIVEC-HEAP-31](VIVEC-HEAP-31.md): Dense Vivec maps exceed the loader heap budget once mappings and extents no longer stop them
 - WORLD-FLORA-HEAP-010 (no report page): Seyda sprite payload exceeds the final map heap headroom
+- ZONE-FREE-SHRINK-63 (no report page): The largest free block of the small memory zone shrinks about 140 bytes with every load
 
 Related bugs in other categories:
 

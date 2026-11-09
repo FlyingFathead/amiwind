@@ -1036,9 +1036,14 @@ void AW_MwscriptStartSpellsReport(void){
 /* UNDERWATER-BREATH-62: counts every change of the player's race, birthsign or class spells, so the kept always-active
  * magnitudes (passive_of) are read again: a race swap removes and adds as many spells, the list size alone stays */
 static unsigned long creation_generation;
+static unsigned long applied_epoch;   /* AW_ActorStateEpoch when applied: a load or New Game empties the record */
 static void creation_spells(aw_actor_t *a){
     int want[AWS_SPELLS],n=0,i,j,held[128],h,type,cost,nrace;long tb;const unsigned char *t;char name[8];
-    if(!aw_character.valid || (aw_character.race==applied_race && aw_character.birth==applied_birth &&
+    /* UNDERWATER-BREATH-62 (v0.0.63-dev5 release check: an Argonian read Water Breathing 0): the player's record was
+     * emptied since the spells were applied (a loaded game, a New Game), so it holds only its base list again:
+     * apply from the start, as the first time */
+    if(applied_epoch!=AW_ActorStateEpoch()){applied_race=applied_birth=applied_class=-2;applied_n=0;}
+    if(!aw_character.valid ||(aw_character.race==applied_race && aw_character.birth==applied_birth &&
                                aw_character.clas==applied_class))return;
     if(!(t=AW_AreaStatsShared(&tb)))return;
     if(aw_character.race>=0 && aw_character.race<aw_race_count)
@@ -1058,7 +1063,7 @@ static void creation_spells(aw_actor_t *a){
     }else for(i=0;i<applied_n;i++){for(j=0;j<n && want[j]!=applied[i];j++);if(j==n)AW_ActorRemoveSpell(a,applied[i]);}
     for(i=0;i<n;i++)if(!AW_ActorHasSpell(a,want[i]))AW_ActorAddSpell(a,want[i]);
     memcpy(applied,want,sizeof(int)*(size_t)n);applied_n=n;applied_race=aw_character.race;applied_birth=aw_character.birth;
-    applied_class=aw_character.clas;creation_generation++;
+    applied_class=aw_character.clas;creation_generation++;applied_epoch=AW_ActorStateEpoch();
     Con_DPrintf("Player spells: %d from the race, the birthsign, the class and the skills (%d starting spells)\n",n,start_chosen_n);
 }
 static unsigned long god_health_held;   /* GODMODE-LAVA-DEATH-62: script or spell health losses god mode kept back */

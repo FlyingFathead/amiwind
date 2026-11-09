@@ -30,7 +30,7 @@
 | Persists in | v0.0.62-dev1 (last seen) |
 | Severity | high: Regressed in v0.0.62-dev1 (was medium): Several image passes run serially or leave most CPUs idle, slowing builds. |
 | Family | Build speed (`build-speed`) |
-| Deferred by the maintainer | 2026-11-09: deferred by the maintainer to v0.0.63 (app chat 2026-11-09, on the v0.0.62 release guard's eight persisting bugs: "Defer all 8 to v0.0.63"), with the v0.0.63 work. |
+| Deferred by the maintainer | 2026-11-09: deferred by the maintainer to v0.0.64 (the v0.0.63 release triage: "Defer all six") |
 | Came back (regression) | in v0.0.62-dev1 (fixed in v0.0.48 before) |
 
 <!-- END GENERATED FACTS -->

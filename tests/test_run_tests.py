@@ -400,6 +400,24 @@ class SchedulingTests(RunnerCase):
         self.assertEqual([t[2] for t in tasks if t[0] == 'unrecorded'], [1])
         self.assertEqual(len(run_tests.plan_tasks(modules, {'m'}, {'m': 40.0}, 3, 0)), 3)
 
+    def test_part_seconds_adds_parts_beyond_the_jobs_and_covers_every_test_once(self):
+        ids = ['m.T.test_%d' % n for n in range(62)]
+        modules = {'m': ids, 'fixtures': ['fixtures.T.t'], 'unrecorded': ids[:1]}
+        timings = {'m': 94.43, 'fixtures': 94.43}
+        args = (modules, {'m', 'unrecorded'}, timings)
+        # Off: at most one part per job (4 parts of 23.6 s).
+        self.assertEqual(len([t for t in run_tests.plan_tasks(*args, 4, 10) if t[0] == 'm']), 4)
+        # 12 s ceiling: 8 parts, more than the jobs; each part's estimate within it; no test twice or lost.
+        tasks = [t for t in run_tests.plan_tasks(*args, 4, 10, 12) if t[0] == 'm']
+        self.assertEqual(len(tasks), 8)
+        self.assertTrue(all(t[4] <= 12 for t in tasks))
+        self.assertEqual(sorted(i for t in tasks for i in t[3]), sorted(ids))
+        # Never past the test count, never for a module with fixtures or no record.
+        tiny = {'m': ids[:3]}
+        self.assertEqual(len(run_tests.plan_tasks(tiny, {'m'}, {'m': 94.43}, 4, 10, 12)), 3)
+        others = run_tests.plan_tasks(modules, {'m', 'unrecorded'}, timings, 4, 10, 12)
+        self.assertEqual([t[2] for t in others if t[0] in ('fixtures', 'unrecorded')], [1, 1])
+
     def test_split_module_gives_the_same_outcomes_and_class_fixtures_stay_whole(self):
         files = {
             'test_fx_many.py': 'import unittest\nclass Many(unittest.TestCase):\n' + ''.join(

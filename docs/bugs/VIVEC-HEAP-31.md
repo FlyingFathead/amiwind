@@ -120,6 +120,7 @@ Family: Map heap and memory budget (`heap-memory`). The heap model must match wh
 - SKEL-TABLE-SIZE-52 (no report page): The shared humanoid animation table is 4.3 MB held in RAM: all 61 skeleton nodes at 15 frames a second, too much beside the game on 16 MB
 - SMOKE-16MB-MAPLOAD-54 (no report page): Below the 32 MB requirement: at 16 MB Fast RAM the boot smoke loads no map (dbg tp to Seyda Neen)
 - WORLD-FLORA-HEAP-010 (no report page): Seyda sprite payload exceeds the final map heap headroom
+- ZONE-FREE-SHRINK-63 (no report page): The largest free block of the small memory zone shrinks about 140 bytes with every load
 
 Related bugs in other categories:
 

@@ -2,7 +2,7 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 34 times; something has to be done
+## PERSISTING: reported 35 times; something has to be done
 
 - Reported with v0.0.46 at 2026-10-20 20:09 +0300: Listed under Known in this build in the v0.0.46 release notes (still open at the release).
 - Reported with v0.0.53-dev2 at 2026-10-26 (time not recorded): 19:14 UTC door sample: the Yassu Mine room load (ri9f4c8ccd45) stopped after its BSP while a gate ran its emulator; the next try loaded in 7.6 s
@@ -38,6 +38,7 @@
 - Reported with v0.0.61-dev1 at 2026-11-05 23:16 +0200: Delivered image (run 2026_11_05_v0.0.61-dev1_full-v0.0.61-dev1_374d59b), FS-UAE 3.1.66 at 32 MB Fast, JIT, disks on IDE, a busy host: dbg scene seyda after a quickload in Arrilles Tradehouse stopped with the game clock frozen; the stall check found 5 of 5 program counter samples in exec idle, the game waiting on SIGF_DOS, no request holder found. 5 earlier sessions of the same image the same evening passed their Seyda Neen loads.
 - Reported with v0.0.61 at 2026-11-07 03:39 +0200: Release image: a coordinate teleport from Seyda Neen to Ebonheart about 60 s after arrival stopped the game: the clock stood still, the processor idle and the game waiting on a file request no handler held. The emulator was not under load at the time. The same teleport worked in the session before and in the rerun.
 - Reported with v0.0.61 at 2026-11-07 05:21 +0200: The v0.0.61 release image on the emulator (32 MB Fast, JIT, busy host): the second load of Seyda Neen at the start of a scripted session stopped at the second sign-on step and stayed on the Loading screen; the same script prefix loaded normally in the session before.
+- Reported with v0.0.63 at 2026-11-09 22:07 +0200: Seen again in a gate boot smoke on the v0.0.63 dbg tp room menu branch (a84fbd8a, gate 9950): "the second load (balmora) is not in play: screen game, signon 2, world leaves 12"; all 7,248 tests passed and the branch does not touch map loading (the dbg tp list box only); the same smoke passed on the release line one gate earlier (9981).
 
 <!-- END GENERATED PERSISTING -->
 
@@ -66,7 +67,7 @@ _Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 34 times; something has to be done](#persisting-reported-34-times-something-has-to-be-done)
+- [PERSISTING: reported 35 times; something has to be done](#persisting-reported-35-times-something-has-to-be-done)
 - [Symptom](#symptom)
 - [Where](#where)
 - [How it happened](#how-it-happened)

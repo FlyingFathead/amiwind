@@ -423,6 +423,14 @@ int main(int argc,char **argv){
        AW_ActorPassiveMagnitude(AW_ActorGet(31338,row,1),98),AW_ActorPassiveMagnitude(NULL,98));
      /* UNDERWATER-BREATH-62: the NoMagnitude ability (stored magnitude 0) counts 1 */
      P(" water breathing %.0f\n",AW_ActorPassiveMagnitude(x,0));}
+    /* UNDERWATER-BREATH-62 (v0.0.63-dev5 release check): an ability added to the player's record (the race's) is gone
+     * after a load, since the player's record is not in the actor block; the pool's epoch moves so the host adds it
+     * again */
+    {aw_actor_t *p;unsigned long e0;int imm=atoi(argv[7]);
+     AW_ActorStateImport(NULL,0);p=AW_ActorPlayer();AW_ActorAddSpell(p,imm);e0=AW_ActorStateEpoch();
+     P("player ability %d",AW_ActorHasSpell(p,imm));
+     n=AW_ActorStateExport(save,sizeof(save));AW_ActorStateImport(save,n>0?n:0);p=AW_ActorPlayer();
+     P(" after load %d epoch moved %d\n",AW_ActorHasSpell(p,imm),AW_ActorStateEpoch()!=e0);}
     AW_ActorStateClose();free(file);return 0;
 }
 '''
@@ -544,6 +552,11 @@ class EngineTests(unittest.TestCase):
         # the actor's list act always (the ability's 100 + the disease's 5; the disease's weakness 30, the middle of
         # 20-40); a castable spell and a power only when cast; a removed ability no longer counts; no record, nothing
         self.assertEqual(self.out[44], 'passive 105 30 0 removed 5 npc 0 none 0 water breathing 1')
+
+    def test_a_load_empties_the_player_record_and_moves_the_epoch(self):
+        # UNDERWATER-BREATH-62 (v0.0.63-dev5): the race's ability added to the player is gone after a load; the
+        # epoch tells the host to add the character's spells again
+        self.assertEqual(self.out[45], 'player ability 1 after load 0 epoch moved 1')
 
     def test_pool_at_the_games_counts(self):
         # CELL-CHANGES-59 slice 6: 8,192 changed records (the game: 3,437 actor bases, 2,673 NPCs placed), each with an

@@ -9,7 +9,7 @@
 | Where | tools/prepare_player_view.py run_units: the unit cache of the image step |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.62 (last seen) |
+| Persists in | fixed in v0.0.63 |
 | Severity | high: every stopped or resumed release build lost about an hour of finished player bodies |
 | Family | Build speed (`build-speed`) |
 | Playtest version | 2026_11_08_v0.0.62_full-v0.0.62_7011540 |

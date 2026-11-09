@@ -136,7 +136,7 @@ WORLD / TRAVEL|reset location|amiwind_debug_reset_location|0
 WORLD / TRAVEL|scene|aw_scene|ship/town/balmora/<map name>
 WORLD / TRAVEL|scene change|aw_scene_menu|(scene picker)
 WORLD / TRAVEL|superspeed|superspeed|[on/off, true/false or 1/0; no argument toggles; then the speeds] the old fixed fast walk/run (cl_forwardspeed, Shift x cl_movespeedkey), not the original's speed from Speed, Athletics and load; endless stamina; Speed, Athletics, Acrobatics read as 100 while on (default off; not saved; also plain superspeed)
-WORLD / TRAVEL|tp|aw_teleport|[X Y [Z] original global coordinates (Z: the floor at or below it) / mark or marker (the map marker you set on the map screen) / seydaneen / prisonship / balmora / vivec (the whole city vivec_city, else the Vivec Arena) / tel_uvirith (teluvirith) / heartchamber / suran / suranclub / aldruhn / khuul / arenapit / <map name>; no argument: town list]
+WORLD / TRAVEL|tp|aw_teleport|[X Y [Z] original global coordinates (Z: the floor at or below it) / mark or marker (your map screen marker) / seydaneen / prisonship / balmora / vivec (the whole city vivec_city, else the Vivec Arena) / tel_uvirith (teluvirith) / heartchamber / suran / suranclub / aldruhn / khuul / arenapit / <map or room name>; no argument: place and room list]
 WORLD / TRAVEL|tp map|aw_teleport_map|select a destination on the world map
 WORLD / TRAVEL|tp menu|aw_scene_menu|(teleport picker)
 WORLD / TRAVEL|unburdened|aw_inventory|same as noburden

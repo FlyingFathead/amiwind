@@ -20,7 +20,7 @@
 | Where | Dagoth Ur, cell 2,8: CHIM placement 174155, x/ex_dwrv_ruin20 tilted copy, ref 210906 |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.44-dev1 (last seen) |
+| Persists in | fixed in v0.0.63 |
 | Severity | medium: a large wrong shape at a key place of the main quest |
 | Family | Object placement and in-game geometry (`placement-geometry`) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |

@@ -214,6 +214,26 @@ class SpawnHealthTests(unittest.TestCase):
         # a load sets its own health after this
         self.assertLess(spawn.index('aw_character.maximum[0]>0'), spawn.index('AW_SaveSpawn();'))
 
+    def test_the_fight_sheet_reads_the_characters_maxima_and_caps_the_current(self):
+        # v0.0.63-dev5 release check: in the arena after dbg maxstats the status read 920/93: the set fighter's
+        # maximum (93) beside the entity's health (920, the sheet's new maximum). The fight sheet takes the
+        # character's maxima (the arena copies the set fighter's into the character at the start) and never a
+        # current value above them, with a set fighter and without
+        combat = code('aw_combat.c')
+        sheet = combat[combat.index('void AW_CombatPlayerSheet(aw_fighter_t *o) {'):]
+        sheet = sheet[:sheet.index('\n}\n')]
+        preset = sheet[sheet.index('if(aw_combat_player_preset){'):sheet.index('return;')]
+        self.assertIn('if(aw_character.valid && aw_character.maximum[0]>o->health_max)o->health_max=aw_character.maximum[0];',
+                      preset)
+        self.assertIn('if(aw_character.valid && aw_character.maximum[2]>o->fatigue_max)o->fatigue_max=aw_character.maximum[2];',
+                      preset)
+        self.assertIn('if(o->health>o->health_max)o->health=o->health_max;', preset)
+        self.assertIn('if(o->fatigue>o->fatigue_max)o->fatigue=o->fatigue_max;', preset)
+        own = sheet[sheet.index('return;'):]
+        self.assertIn('if(o->health>o->health_max)o->health=o->health_max;', own)
+        arena = code('aw_arena.c')
+        self.assertIn('aw_character.maximum[0]=player_preset.health_max;', arena)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -302,12 +302,16 @@ def check_shards(modules, shards):
                            'not discovered %s' % (twice, missing, unknown))
 
 
-def plan_tasks(modules, splittable, timings, jobs, split_above):
+def plan_tasks(modules, splittable, timings, jobs, split_above, part_seconds=0):
     """Longest-first list of (module, shard, shards, ids or None, estimate).
 
     Modules without a record are estimated from their test count at the mean
     recorded rate. Only recorded, fixture-free modules longer than split_above
     seconds are split, into at most ``jobs`` shards of round-robin test IDs.
+    ``part_seconds`` (0: off) is a ceiling for the estimate of one part: such a
+    module gets as many parts as that needs, more than ``jobs`` when it must
+    (the extra parts queue), so that a slow machine keeps every part well under
+    the per-module time limit.
     """
     estimate_of = estimates(modules, timings)
     tasks = []
@@ -318,6 +322,8 @@ def plan_tasks(modules, splittable, timings, jobs, split_above):
         shards = 1
         if split_above and module in timings and module in splittable:
             shards = max(1, min(len(ids), jobs, math.ceil(estimate / split_above)))
+        if part_seconds and module in timings and module in splittable:
+            shards = max(shards, min(len(ids), math.ceil(estimate / part_seconds)))
         ordered = sorted(ids)
         for shard in range(shards):
             subset = None if shards == 1 else ordered[shard::shards]
@@ -492,7 +498,7 @@ def select_shard(modules, timings, shard):
 
 
 def run(start_dir='tests', pattern=DEFAULT_PATTERN, jobs=1, timings=None, split_above=0,
-        module_timeout=0, allowlist=None, progress=None, shard=None):
+        module_timeout=0, allowlist=None, progress=None, shard=None, part_seconds=0):
     """Discover, run in parallel and return (report, outcomes).
 
     ``timings`` is a path; None reads the timings file in start_dir when present.
@@ -513,7 +519,7 @@ def run(start_dir='tests', pattern=DEFAULT_PATTERN, jobs=1, timings=None, split_
             # A skip allowlist names tests of the whole suite: in one shard only that shard's entries apply.
             ids = {i for module_ids in modules.values() for i in module_ids}
             allow = {test: reason for test, reason in allow.items() if test in ids}
-    tasks = plan_tasks(modules, splittable, recorded, jobs, split_above)
+    tasks = plan_tasks(modules, splittable, recorded, jobs, split_above, part_seconds)
     python_flags = ['-B'] if sys.dont_write_bytecode else []
     outcomes = []
     scratch = tempfile.mkdtemp(prefix='amiwind-tests-')
@@ -576,6 +582,10 @@ def main(argv=None):
                         help="Merge this run's per-module seconds into this file")
     parser.add_argument('--split-above', type=float, default=10.0, metavar='SECONDS',
                         help='Split recorded, fixture-free modules longer than this (0: never; default 10)')
+    parser.add_argument('--part-seconds', type=float, default=0, metavar='SECONDS',
+                        help='Ceiling for the recorded time of one part of a split module: more parts than '
+                             'jobs when needed, so a slow machine keeps each part far below --module-timeout '
+                             '(default 0: off)')
     parser.add_argument('--json', type=Path, help='Write the merged report as JSON')
     parser.add_argument('--module-timeout', type=float, default=0, metavar='SECONDS',
                         help='Kill a worker process after this long (default: no limit)')
@@ -590,8 +600,8 @@ def main(argv=None):
         sys.path.pop(1)
     add_jobs(parser)
     args = parser.parse_args(argv)
-    if args.split_above < 0:
-        parser.error('--split-above must not be negative')
+    if args.split_above < 0 or args.part_seconds < 0:
+        parser.error('--split-above and --part-seconds must not be negative')
     shard = None
     if args.shard is not None:
         try:
@@ -616,7 +626,7 @@ def main(argv=None):
               flush=True)
 
     report, outcomes = run(args.start_dir, args.pattern, jobs, args.timings, args.split_above,
-                           args.module_timeout, args.skip_allowlist, progress, shard)
+                           args.module_timeout, args.skip_allowlist, progress, shard, args.part_seconds)
     print_report(report, outcomes, args.verbose)
     if shard is not None:
         record = report['shard']

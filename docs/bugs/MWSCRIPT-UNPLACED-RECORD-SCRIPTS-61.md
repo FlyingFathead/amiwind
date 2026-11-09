@@ -1,5 +1,14 @@
 # MWSCRIPT-UNPLACED-RECORD-SCRIPTS-61: scripts of records that are never placed in a cell are compiled but never run
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 2 times; something has to be done
+
+- Reported with v0.0.63-dev3 at 2026-11-09 16:11 +0200: In game on v0.0.63-dev3 in the Andrano Ancestral Tomb: Sunder given and equipped without Wraithguard stayed in the right hand and the health stayed at 99 before and after; no effect of its script was seen.
+- Reported with v0.0.63-dev5 at 2026-11-09 20:13 +0200: Sunder equipped by the console without Wraithguard (32 MB Fast): health stayed at 40 of 40 for about 9 seconds (three readings), then the player died at once (40 to 0 in one step); no drop each second was seen. After unequipping and a reload of the stats health stayed 40.
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -25,6 +34,7 @@ _Last updated with AmiWind v0.0.62-dev2 (8 November 2026)._
 <!-- contents start -->
 ## Contents
 
+- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
 - [Status: 8 November 2026](#status-8-november-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -178,6 +188,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - DROP-STACK-ONE-ROW-PER-UNIT-59 (no report page): Dropping a stack drops one piece per key press, each its own ground item, so the map's ground item limit (32) fills with single coins
 - [DROPPED-LIGHT-NO-EFFECTS-61](DROPPED-LIGHT-NO-EFFECTS-61.md): A carriable light that is dropped shows no flame and gives no light where it lies
 - [ENCUMBRANCE-INCOMPLETE-61](ENCUMBRANCE-INCOMPLETE-61.md): Carry weight is only half there: no burden shown, no message over the limit, Burden and Feather do nothing, and the kinds of item are capped
+- ENDGAME-CHAMBER-COLLAPSE-63 (no report page): The ending in the Heart Chamber cannot play: the heart is not placed and the collapse is not animated
 - ENEMY-HEALTH-BAR-62 (no report page): In a fight with a cliff racer the HUD shows no enemy health bar
 - [ENGINE-ANGLEMOD-RANGE-35](ENGINE-ANGLEMOD-RANGE-35.md): anglemod returned 360 for -360 and passed NaN and out-of-range values on
 - [ENGINE-QC-ARGS-SYSERROR-35](ENGINE-QC-ARGS-SYSERROR-35.md): Bad QuakeC sound arguments stopped the program; lightstyle had no range check
@@ -263,7 +274,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - TRAVEL-SERVICES-CHIM-51 (no report page): Silt strider rides between towns do not work: travel knows only the old Seyda Neen and Balmora town maps, not the CHIM world, and none of the other routes
 - UI-HUD-TOGGLE-KEY-51 (no report page): Requested: a key combination (for example Ctrl+Alt+H) that hides and shows the whole HUD in game, the crosshair with it
 - [UI-INVENTORY-INTEGRATION-40](UI-INVENTORY-INTEGRATION-40.md): Inventory integration and safe world placement remain incomplete
-- UNDERWATER-BREATH-62 (no report page): Underwater there is no breath meter and no drowning, and Water Breathing is not applied
+- [UNDERWATER-BREATH-62](UNDERWATER-BREATH-62.md): Underwater there is no breath meter and no drowning, and Water Breathing is not applied
 - [WAIT-DURING-COMBAT-36](WAIT-DURING-COMBAT-36.md): Waiting is allowed in the middle of a fight
 - [WAIT-FEET-IN-WATER-36](WAIT-FEET-IN-WATER-36.md): Waiting is allowed with the feet in water (the original refuses it)
 - [WATER-GAMEPLAY-PARITY-38](WATER-GAMEPLAY-PARITY-38.md): Water gameplay lacks complete original behavior verification

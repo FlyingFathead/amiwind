@@ -1,6 +1,6 @@
 # MWScript features
 
-_Last updated with AmiWind v0.0.63-dev5 (9 November 2026)._
+_Last updated with AmiWind v0.0.63 (9 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -22,6 +22,10 @@ _Last updated with AmiWind v0.0.63-dev5 (9 November 2026)._
   - [Morrowind](#morrowind)
   - [Tribunal](#tribunal)
   - [Bloodmoon](#bloodmoon)
+- [Not used in the original game](#not-used-in-the-original-game)
+  - [Morrowind (88)](#morrowind-88)
+  - [Tribunal (19)](#tribunal-19)
+  - [Bloodmoon (26)](#bloodmoon-26)
 
 <!-- contents end -->
 
@@ -29,19 +33,26 @@ _Last updated with AmiWind v0.0.63-dev5 (9 November 2026)._
 
 One row per script record of the game: what names it, where it stands, which functions it calls and what its conditions test, and what state AmiWind has it in. The data is measured from the game's masters with the builder's own compiler; the page lists record ids, counts and states only. When the work list runs dry, the scripting work is taken from here row by row, toward the next landmark: every game script running as in the original. On Vvardenfell the scripts left are the character creation ones; the rest belong to Mournhold and Solstheim.
 
-**605 of 1,207 scripts run** as scripts and **8 are carried by AmiWind's own code**; of the rest, 28 use a function the interpreter lacks, 0 are attached but not run, 0 are compiled but not attached, 432 belong to an add-on world not in the image yet, 134 are named by nothing (they never run in the original either), 0 are not converted.
+Of the 1,074 scripts the original game uses, **605 run** as scripts and **9 are carried by AmiWind's own code**; of the rest, 28 use a function the interpreter lacks, 0 are attached but not run, 0 are compiled but not attached, 432 belong to an add-on world not in the image yet, 0 are not converted. The 133 scripts that nothing in the original game ever names (test and example scripts, replaced versions, cut content) are listed apart under Not used in the original game.
 
 | State | Scripts | What it means |
 | --- | ---: | --- |
 | runs | 605 | compiles whole, and the build attaches it to its objects or starts it (a record that is never placed: while the player carries its item, on the actor a levelled list gives, or on the object a script places; a script with no function, whose own locals the dialogue keeps on the speaker without it, counts as running) |
-| carried by AmiWind's own code | 8 | not run as a script because AmiWind's own code does what it does (the section Carried by AmiWind's own code names the code and compares it step by step) |
+| carried by AmiWind's own code | 9 | not run as a script because AmiWind's own code does what it does (the section Carried by AmiWind's own code names the code and compares it step by step) |
 | uses a function the interpreter lacks | 28 | compiles, but calls at least one function the interpreter does not carry out yet (those calls do nothing and read 0) |
 | attached, not run | 0 | the game attaches it, but the build does not run it: a hand-written rule carries it, or nothing it does is seen yet |
 | compiled, not attached | 0 | compiles whole, but nothing in the build attaches or starts it: its records are never placed, and nothing makes them at run time yet |
 | only in an add-on world | 432 | compiles whole, but its records are placed (or made by scripts) only in Mournhold or Solstheim, which are not in the image yet |
-| named by nothing | 134 | compiles whole, but no record, start, StartScript or dialogue result names it, or the records that name it are never placed and nothing makes them: it never runs in the original either |
 | not converted | 0 | does not compile |
+| **Used in the original game** | **1,074** | |
+| Not used in the original game (listed apart) | 133 | compiles whole, but no record, start, StartScript or dialogue result names it, or the records that name it are never placed and nothing makes them: it never runs in the original either |
 | **All script records** | **1,207** | |
+
+| Game file | All | Used in the original | Runs | AmiWind code | Function missing | Attached, not run | Not attached | Add-on world | Not converted | Not used |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Morrowind.esm | 616 | 528 | 518 | 9 | 0 | 0 | 0 | 1 | 0 | 88 |
+| Tribunal.esm | 255 | 236 | 42 | 0 | 8 | 0 | 0 | 186 | 0 | 19 |
+| Bloodmoon.esm | 336 | 310 | 45 | 0 | 20 | 0 | 0 | 245 | 0 | 26 |
 
 Dialogue result scripts (the lines a topic answer runs) are compiled as scripts of their own: 7,411 results, 7,411 run whole, 0 use a function the interpreter lacks, 0 are not converted.
 
@@ -64,7 +75,7 @@ Each script that does not run, by its reason, and where its area is: Vvardenfell
 | State | Reason | Vvardenfell | Add-on world | All |
 | --- | --- | ---: | ---: | ---: |
 | only in an add-on world | placed only in an add-on world, not in the image yet | 1 | 428 | 429 |
-| named by nothing | nothing names it: it never runs in the original either | 123 | 0 | 123 |
+| named by nothing | nothing names it: it never runs in the original either | 122 | 0 | 122 |
 | uses a function the interpreter lacks | calls a function the interpreter does not carry out yet | 9 | 19 | 28 |
 | named by nothing | its records are never placed and nothing makes them: it never runs in the original either | 11 | 0 | 11 |
 | only in an add-on world | made only by a script of an add-on world, not in the image yet | 3 | 0 | 3 |
@@ -202,7 +213,7 @@ The area of a script is where most of its placed references stand: the region fo
 | Area | Scripts | Runs | AmiWind code | Function missing | Attached, not run | Not attached | Add-on world | Named by nothing | Not converted |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | mournhold (tribunal) | 194 | 3 | 0 | 5 | 0 | 0 | 186 | 0 | 0 |
-| named by nothing | 123 | 0 | 0 | 0 | 0 | 0 | 0 | 123 | 0 |
+| named by nothing | 123 | 0 | 1 | 0 | 0 | 0 | 0 | 122 | 0 |
 | ascadian isles region | 115 | 115 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | hirstaang forest region | 103 | 0 | 0 | 4 | 0 | 0 | 99 | 0 | 0 |
 | dialogue only | 82 | 79 | 0 | 3 | 0 | 0 | 0 | 0 | 0 |
@@ -223,7 +234,7 @@ The area of a script is where most of its placed references stand: the region fo
 | sheogorad | 13 | 13 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | brodir grove region | 7 | 0 | 0 | 0 | 0 | 0 | 7 | 0 | 0 |
 | interior with no way out | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| **All** | **1207** | **605** | **8** | **28** | **0** | **0** | **432** | **134** | **0** |
+| **All** | **1207** | **605** | **9** | **28** | **0** | **0** | **432** | **133** | **0** |
 
 ## By function
 
@@ -904,97 +915,12 @@ Referenced by: the records that carry the script and their placed references per
 | LocalState | mournhold (tribunal) | runs | 17 activator, 1 NPC; placed 16 (Morrowind 3, Tribunal 13); speaker of 5 dialogue results | act_sotha_door10, act_sotha_door3, act_sotha_door9, act_sotha_mach_door1, act_sotha_mach_door2, act_sotha_oilbridge and 12 more | - | - | - | - |
 | nohello | mournhold (tribunal) | runs | 10 NPC; placed 10 (Morrowind 5, Tribunal 5) | anden thilarvel, arnas therethi, drals indobar, ervis ules, sadas mavandes, sarvil sadus and 4 more | - | - | - | nothing to run but its own locals, which the dialogue keeps on the speaker |
 | Sound_Bubbles | mournhold (tribunal) | only in an add-on world | 1 activator; placed 9 (Tribunal 9) | sound_bubbles00 | cellchanged, getsoundplaying, playloopsound3dvp | 2: cellchanged, getsoundplaying | - | placed only in an add-on world, not in the image yet |
-| Akula_doors | named by nothing | named by nothing | - | - | getsecondspassed, menumode, onactivate, rotate | 7: local, menumode, onactivate | - | nothing names it: it never runs in the original either |
-| AzurasStarScript | named by nothing | named by nothing | - | - | additem | 1: local | - | nothing names it: it never runs in the original either |
-| BILL_FG_Berwen_Corp | named by nothing | named by nothing | - | - | enable, getdeadcount, getjournalindex, menumode, messagebox, moddisposition | 8: local, menumode | - | nothing names it: it never runs in the original either |
-| BILL_shrineMaarGan | named by nothing | named by nothing | - | - | cast, getdeadcount, getdistance, getjournalindex, journal, menumode, messagebox, onactivate | 6: local, menumode, onactivate | - | nothing names it: it never runs in the original either |
-| BILL_shrineSanctus | named by nothing | named by nothing | - | - | cast, getdistance, getjournalindex, journal, menumode, messagebox, onactivate | 5: local, menumode, onactivate | - | nothing names it: it never runs in the original either |
-| BILL_TT_Bjadmund | named by nothing | named by nothing | - | - | getjournalindex, journal, menumode, ondeath | 3: local, menumode | - | nothing names it: it never runs in the original either |
-| BILL_TT_Dagoth_Fovon | named by nothing | named by nothing | - | - | getjournalindex, journal, ondeath | 2: getjournalindex, ondeath | - | nothing names it: it never runs in the original either |
-| BILL_TT_Delvam_Andarys | named by nothing | named by nothing | - | - | getjournalindex, journal, ondeath | 2: getjournalindex, ondeath | - | nothing names it: it never runs in the original either |
-| BILL_TT_MinistryHeathen | named by nothing | named by nothing | - | - | getjournalindex, getspell, journal, menumode, moddisposition, ondeath, say | 9: local, menumode | - | nothing names it: it never runs in the original either |
-| BILL_TT_MountKand01 | named by nothing | named by nothing | - | - | cast, getdistance, getjournalindex, journal, menumode, messagebox, onactivate | 5: local, menumode, onactivate | - | nothing names it: it never runs in the original either |
-| BILL_TT_MountKand02 | named by nothing | named by nothing | - | - | journal, menumode, ondeath | 2: local, menumode | - | nothing names it: it never runs in the original either |
-| BILL_TT_MountKand03 | named by nothing | named by nothing | - | - | journal, menumode, ondeath | 2: local, menumode | - | nothing names it: it never runs in the original either |
-| BILL_TT_MountKand04 | named by nothing | named by nothing | - | - | journal, menumode, ondeath | 2: local, menumode | - | nothing names it: it never runs in the original either |
-| BILL_TT_Tralas_Rendas | named by nothing | named by nothing | - | - | cast, menumode | 2: local, menumode | - | nothing names it: it never runs in the original either |
-| boethiabuildScript | named by nothing | named by nothing | - | - | disable, enable, getdisabled | 7: getdisabled, local | - | nothing names it: it never runs in the original either |
-| bulfimScript | named by nothing | named by nothing | - | - | getdisabled, getjournalindex, getspelleffects, journal | 3: getdisabled, getjournalindex, getspelleffects | - | nothing names it: it never runs in the original either |
-| CharGenDoorExit | named by nothing | named by nothing | - | - | activate, enableinventorymenu, enablemagicmenu, enablemapmenu, enableplayerfighting, enableplayermagic, enablestatsmenu, onactivate | 2: local, onactivate | - | nothing names it: it never runs in the original either |
-| da_bullnetchScript | named by nothing | named by nothing | - | - | getjournalindex, journal, ondeath | 3: getjournalindex, ondeath | - | nothing names it: it never runs in the original either |
-| daric_bielleScript | named by nothing | named by nothing | - | - | getrace | 10: getrace | - | nothing names it: it never runs in the original either |
-| diseaseChills | named by nothing | named by nothing | - | - | addspell, cellchanged, dontsaveobject, getcommondisease | 2: cellchanged, getcommondisease | dontsaveobject-ignored | nothing names it: it never runs in the original either |
-| diseaseCorprus | named by nothing | named by nothing | - | - | addspell, cellchanged, dontsaveobject, getblightdisease | 2: cellchanged, getblightdisease | dontsaveobject-ignored | nothing names it: it never runs in the original either |
-| diseaseDampworm | named by nothing | named by nothing | - | - | addspell, cellchanged, dontsaveobject, getcommondisease | 2: cellchanged, getcommondisease | dontsaveobject-ignored | nothing names it: it never runs in the original either |
-| diseaseGreenspore | named by nothing | named by nothing | - | - | addspell, cellchanged, dontsaveobject, getcommondisease | 2: cellchanged, getcommondisease | dontsaveobject-ignored | nothing names it: it never runs in the original either |
-| diseaseRattles | named by nothing | named by nothing | - | - | addspell, cellchanged, dontsaveobject, getcommondisease | 2: cellchanged, getcommondisease | dontsaveobject-ignored | nothing names it: it never runs in the original either |
-| diseaseRockjoint | named by nothing | named by nothing | - | - | addspell, cellchanged, dontsaveobject, getcommondisease | 2: cellchanged, getcommondisease | dontsaveobject-ignored | nothing names it: it never runs in the original either |
-| diseaseRustChancre | named by nothing | named by nothing | - | - | addspell, cellchanged, dontsaveobject, getcommondisease | 2: cellchanged, getcommondisease | dontsaveobject-ignored | nothing names it: it never runs in the original either |
-| diseaseSerpiginous | named by nothing | named by nothing | - | - | addspell, cellchanged, dontsaveobject, getcommondisease | 2: cellchanged, getcommondisease | dontsaveobject-ignored | nothing names it: it never runs in the original either |
-| diseaseWtichwither | named by nothing | named by nothing | - | - | addspell, cellchanged, dontsaveobject, getcommondisease | 2: cellchanged, getcommondisease | dontsaveobject-ignored | nothing names it: it never runs in the original either |
-| doortestwarp | named by nothing | named by nothing | - | - | getdistance, menumode, onactivate | 2: getdistance, menumode | - | nothing names it: it never runs in the original either |
-| Dummy | named by nothing | named by nothing | - | - | - | - | - | nothing names it: it never runs in the original either |
-| DwRuins_Ark_Lv_A | named by nothing | named by nothing | - | - | getsecondspassed, menumode, onactivate, rotate | 8: local, menumode, onactivate | - | nothing names it: it never runs in the original either |
-| example_Containers | named by nothing | named by nothing | - | - | activate, onactivate | 1: onactivate | - | nothing names it: it never runs in the original either |
-| Example_NPC_Stuff | named by nothing | named by nothing | - | - | additem, aifollow, forcegreeting, getcurrentaipackage, getdistance, getsecondspassed, getspelleffects, journal, ondeath, onknockout, setfight, startcombat, stopcombat | 11: getcurrentaipackage, getdistance, getspelleffects, local, ondeath, onknockout | - | nothing names it: it never runs in the original either |
-| Example_NPC_Stuff_Gold_Edition | named by nothing | named by nothing | - | - | disable, getdistance, getjournalindex, getpccell, getspell, getspelleffects, journal, modmercantile, placeatpc, removespell | 16: getdistance, getjournalindex, getpccell, getspell, getspelleffects, local | - | nothing names it: it never runs in the original either |
-| fightGnawTooth | named by nothing | named by nothing | - | - | getdeadcount, getdistance, startcombat | 7: getdeadcount, getdistance, local | - | nothing names it: it never runs in the original either |
-| fools_dead_check | named by nothing | named by nothing | - | - | getdeadcount, menumode | 4: getdeadcount, menumode | - | nothing names it: it never runs in the original either |
-| gameRatScript | named by nothing | named by nothing | - | - | getblightdisease | 2: getblightdisease, local | - | nothing names it: it never runs in the original either |
-| GlobalFixNPCs | named by nothing | named by nothing | - | - | getjournalindex, getpos, position, stopscript | 3: getjournalindex, getpos | - | nothing names it: it never runs in the original either |
-| GnisisEggmineDoor | named by nothing | named by nothing | - | - | getdistance, getsecondspassed, menumode, positioncell | 3: getdistance, local, menumode | - | nothing names it: it never runs in the original either |
-| GnisisWarpDoor | named by nothing | named by nothing | - | - | getdistance, getsecondspassed, position, streammusic | 2: getdistance, local | - | nothing names it: it never runs in the original either |
-| high_fane_alert | named by nothing | named by nothing | - | - | forcegreeting, getdistance, getjournalindex, getsecondspassed | 6: getdistance, getjournalindex, local | - | nothing names it: it never runs in the original either |
-| Huleeya_disposition_check | named by nothing | named by nothing | - | - | getdisposition, menumode | 2: getdisposition, menumode | - | nothing names it: it never runs in the original either |
-| jeanneScript | named by nothing | named by nothing | - | - | forcegreeting, getdetected, getdistance, getjournalindex, getsecondspassed, journal | 6: getdetected, getdistance, getjournalindex, local | - | nothing names it: it never runs in the original either |
-| letteScript | named by nothing | named by nothing | - | - | getjournalindex, getspell, journal, say | 2: getjournalindex, getspell | - | nothing names it: it never runs in the original either |
-| Main | named by nothing | named by nothing | - | - | menumode, random, scriptrunning, startscript | 3: global, menumode, scriptrunning | - | nothing names it: it never runs in the original either |
-| marksmanToggle | named by nothing | named by nothing | - | - | getdistance, getmarksman, menumode, setmarksman | 6: getdistance, getmarksman, local, menumode | - | nothing names it: it never runs in the original either |
-| menhirTelUvirith | named by nothing | named by nothing | - | - | disable, enable, getpcrank | 1: local | - | nothing names it: it never runs in the original either |
-| MessageTest | named by nothing | named by nothing | - | - | getbuttonpressed, getdistance, menumode, messagebox, rotate | 11: getdistance, local, menumode | - | nothing names it: it never runs in the original either |
-| MiloKey | named by nothing | named by nothing | - | - | enable, getdisabled, getjournalindex, messagebox | 2: getdisabled, getjournalindex | - | nothing names it: it never runs in the original either |
-| MiloTravel | named by nothing | named by nothing | - | - | aiwander, getaipackagedone, getcurrentaipackage, menumode | 4: getaipackagedone, getcurrentaipackage, local, menumode | - | nothing names it: it never runs in the original either |
-| MoveAndTurn | named by nothing | named by nothing | - | - | getsecondspassed, menumode, move, rotate | 2: local, menumode | - | nothing names it: it never runs in the original either |
-| NibaniWaitOneDay | named by nothing | named by nothing | - | - | getjournalindex, journal | 5: getjournalindex, global, local | - | nothing names it: it never runs in the original either |
-| noflee | named by nothing | named by nothing | - | - | - | - | - | nothing names it: it never runs in the original either |
-| noidle | named by nothing | named by nothing | - | - | - | - | - | nothing names it: it never runs in the original either |
-| nointruder | named by nothing | named by nothing | - | - | - | - | - | nothing names it: it never runs in the original either |
-| nothief | named by nothing | named by nothing | - | - | - | - | - | nothing names it: it never runs in the original either |
-| ouch_falsesunder | named by nothing | named by nothing | - | - | activate, journal, onactivate | 2: local, onactivate | - | nothing names it: it never runs in the original either |
-| Pub_TelAruhn_Plot | named by nothing | named by nothing | - | - | cellchanged | 6: cellchanged, global, local | - | nothing names it: it never runs in the original either |
-| ranisScript | named by nothing | named by nothing | - | - | - | - | - | nothing names it: it never runs in the original either |
-| ratScript | named by nothing | named by nothing | - | - | getjournalindex, journal, ondeath | 6: getjournalindex, local, ondeath | - | nothing names it: it never runs in the original either |
-| ringDrarelSummoning | named by nothing | named by nothing | - | - | getjournalindex, getsecondspassed, journal, placeatpc | 3: getjournalindex, local | - | nothing names it: it never runs in the original either |
-| shashurariDoor | named by nothing | named by nothing | - | - | activate, getdeadcount, getjournalindex, onactivate, position | 4: getdeadcount, local, onactivate | - | nothing names it: it never runs in the original either |
-| SheogorathBlessing | named by nothing | named by nothing | - | - | cast, getbuttonpressed, messagebox, modcurrenthealth, onactivate, playsound | 7: local, onactivate | - | nothing names it: it never runs in the original either |
-| shrineBalUr | named by nothing | named by nothing | - | - | cast, journal, messagebox, onactivate | 1: onactivate | - | nothing names it: it never runs in the original either |
-| shrineVivecHumility | named by nothing | named by nothing | - | - | cast, getblightdisease, getbuttonpressed, getcommondisease, geteffect, getitemcount, getpcrank, menumode, messagebox, onactivate, removeitem | 26: getblightdisease, getcommondisease, geteffect, getitemcount, getpcrank, local, menumode, onactivate | - | nothing names it: it never runs in the original either |
-| shrineVivecMystery | named by nothing | named by nothing | - | - | cast, getblightdisease, getbuttonpressed, getcommondisease, geteffect, getitemcount, getpcrank, menumode, messagebox, onactivate, removeitem | 26: getblightdisease, getcommondisease, geteffect, getitemcount, getpcrank, local, menumode, onactivate | - | nothing names it: it never runs in the original either |
-| Sound_Fire | named by nothing | named by nothing | - | - | cellchanged, getsoundplaying, playloopsound3dvp | 2: cellchanged, getsoundplaying | - | nothing names it: it never runs in the original either |
-| Sound_Fire_Small | named by nothing | named by nothing | - | - | cellchanged, getsoundplaying, playloopsound3dvp | 2: cellchanged, getsoundplaying | - | nothing names it: it never runs in the original either |
-| Strong2_Not | named by nothing | named by nothing | - | - | disable, enable, getdisabled | 3: getdisabled, global | - | nothing names it: it never runs in the original either |
-| StrongZero | named by nothing | named by nothing | - | - | disable, enable, getdisabled | 3: getdisabled, global | - | nothing names it: it never runs in the original either |
-| TelVosTeleport2 | named by nothing | named by nothing | - | - | menumode, onactivate, position | 2: menumode, onactivate | - | nothing names it: it never runs in the original either |
-| Test_AddSanguine | named by nothing | named by nothing | - | - | additem, stopscript | - | - | nothing names it: it never runs in the original either |
-| TestMakePCVampire | named by nothing | named by nothing | - | - | onactivate, startscript | 1: onactivate | - | nothing names it: it never runs in the original either |
-| TestRefRotate | named by nothing | named by nothing | - | - | getsecondspassed, menumode, onactivate, rotate | 5: local, menumode, onactivate | - | nothing names it: it never runs in the original either |
-| TestRotate | named by nothing | named by nothing | - | - | getdistance, getsecondspassed, menumode, rotate | 6: getdistance, local, menumode | - | nothing names it: it never runs in the original either |
-| TestRotateSlow | named by nothing | named by nothing | - | - | menumode, rotate | 1: menumode | - | nothing names it: it never runs in the original either |
-| TGDiscountScript | named by nothing | named by nothing | - | - | getpccrimelevel, messagebox, payfine, removeitem, setpccrimelevel, stopscript | - | - | nothing names it: it never runs in the original either |
-| ThiefTraderScript | named by nothing | named by nothing | - | - | disable, getdistance, getjournalindex, getpccell, placeatpc, setfight, stopscript | 5: getdistance, getjournalindex, getpccell, local | - | nothing names it: it never runs in the original either |
-| UseTest | named by nothing | named by nothing | - | - | - | - | - | nothing names it: it never runs in the original either |
-| uupse_Bagrum | named by nothing | named by nothing | - | - | getattacked, setdisposition, setfight, startcombat | 2: getattacked, local | - | nothing names it: it never runs in the original either |
-| VampTest | named by nothing | named by nothing | - | - | startscript, stopscript | - | - | nothing names it: it never runs in the original either |
-| VampTest1 | named by nothing | named by nothing | - | - | startscript, stopscript | - | - | nothing names it: it never runs in the original either |
-| VampTest2 | named by nothing | named by nothing | - | - | startscript, stopscript | - | - | nothing names it: it never runs in the original either |
-| VampTest3 | named by nothing | named by nothing | - | - | startscript, stopscript | - | - | nothing names it: it never runs in the original either |
-| Akula_outerdoors | records not placed | named by nothing | 1 activator | in_dwrv_crank_akula10 | getsecondspassed, menumode, onactivate, rotate, setangle | 7: local, menumode, onactivate | - | its records are never placed and nothing makes them: it never runs in the original either |
+| Main | named by nothing | carried by AmiWind's own code | - | - | menumode, random, scriptrunning, startscript | 3: global, menumode, scriptrunning | - | the game always runs it (OpenMW GlobalScripts::addStartup); AmiWind runs the new game scripts it starts (Startup, VampireCheck) and carries CharGen |
 | amuletAundaeScript | records not placed | runs | 1 clothing | amulet_aundae | getbuttonpressed, messagebox, positioncell | 10: global, local | - | runs while the player carries one of its items |
 | amuletBerneScript | records not placed | runs | 1 clothing | amulet_berne | getbuttonpressed, messagebox, positioncell | 10: global, local | - | runs while the player carries one of its items |
 | amuletDaedraScript | records not placed | runs | 1 clothing; held by placed containers and actors 1 | daedric_special | getbuttonpressed, messagebox, positioncell | 9: local | - | runs on the items placed containers and actors hold, while their area is loaded |
 | amuletQuarraScript | records not placed | runs | 1 clothing | amulet_quarra | getbuttonpressed, messagebox, positioncell | 10: global, local | - | runs while the player carries one of its items |
 | amuletTelFyrScript | records not placed | runs | 1 clothing; held by placed containers and actors 1 | daedric_special01 | getbuttonpressed, messagebox, positioncell | 9: local | - | runs on the items placed containers and actors hold, while their area is loaded |
-| BILL_common_trapped_rug | records not placed | named by nothing | 1 activator | ac_furn_rug_big_04_dren | cast, getsecondspassed, getstandingpc, menumode, messagebox | 4: local, menumode | - | its records are never placed and nothing makes them: it never runs in the original either |
 | BILL_FG_Nchurdamz04 | records not placed | runs | 1 clothing | common_ring_01_fg_nchur04 | getdeadcount, getdistance, getitemcount, getjournalindex, menumode, onactivate, say | 12: local, menumode, onactivate | - | runs while the player carries one of its items |
 | BILL_MT_WritNavil2 | records not placed | runs | 1 NPC; placed by scripts (1 records); speaker of 1 dialogue results | ranes ienith | cellchanged, getdeadcount, getjournalindex, getpccrimelevel, journal, menumode, ondeath | 7: cellchanged, getdeadcount, getjournalindex, local, menumode, ondeath | - | runs on the object a script places |
 | BILL_TT_MountKand05 | records not placed | runs | 1 clothing | common_ring_01_tt_mountkand | getdistance, getjournalindex, menumode, onactivate, setfight | 10: local, menumode, onactivate | - | runs while the player carries one of its items |
@@ -1011,14 +937,11 @@ Referenced by: the records that carry the script and their placed references per
 | gloveScript | records not placed | runs | 1 clothing | common_glove_r_balmolagmer | - | 1: local | - | runs while the player carries one of its items |
 | lightofdayScript | records not placed | runs | 1 WEAP; held by placed containers and actors 1 | lightofday_unique | getsecondspassed, menumode, messagebox, modcurrenthealth | 5: global, local, menumode | - | runs on the items placed containers and actors hold, while their area is loaded |
 | lucanScript2 | records not placed | runs | 1 NPC; placed by scripts (1 records); speaker of 1 dialogue results | lucan ostorius2 | forcegreeting, getdistance | 2: getdistance, local | - | runs on the object a script places |
-| menhirTelNaga | records not placed | named by nothing | 1 activator | ex_t_menhir_crystal | disable, enable, getpcrank | 1: local | - | its records are never placed and nothing makes them: it never runs in the original either |
-| MoveTriolith | records not placed | named by nothing | 1 activator | active_triolith_01a | getsecondspassed, menumode, move, onactivate, playsound3dvp | 6: local, menumode, onactivate | - | its records are never placed and nothing makes them: it never runs in the original either |
 | ouch_sunder | records not placed | runs | 1 WEAP; held by placed containers and actors 1 | sunder | gethealth, getitemcount, getsecondspassed, journal, menumode, messagebox, modcurrenthealth, random | 8: gethealth, getitemcount, global, local, menumode | - | runs on the items placed containers and actors hold, while their area is loaded |
 | ouch_wraithguard | records not placed | runs | 1 armour | wraithguard_jury_rig | modhealth, random | 2: local | - | runs while the player carries one of its items |
 | pillowScript | records not placed | runs | 1 item | misc_uni_pillow_unique | getitemcount, getpcsleep, messagebox | 7: getitemcount, getpcsleep, global, local | - | runs while the player carries one of its items |
 | sealedTreasuryOrders | records not placed | runs | 3 book; held by placed containers and actors 1 | bk_landdeed_hhrd, bk_landdeedfake_hhrd, bk_treasuryorders | activate, additem, disable, getbuttonpressed, getdisabled, getsecurity, messagebox, onactivate, random | 20: getdisabled, getsecurity, local, onactivate | - | runs on the items placed containers and actors hold, while their area is loaded |
 | sealedTreasuryReport | records not placed | runs | 1 book | bk_treasuryreport | activate, additem, disable, getbuttonpressed, getdisabled, getsecurity, messagebox, onactivate, random | 20: getdisabled, getsecurity, local, onactivate | - | runs while the player carries one of its items |
-| TelVosTeleport1 | records not placed | named by nothing | 1 activator | a_light_dw_neon | menumode, onactivate, position | 2: menumode, onactivate | - | its records are never placed and nothing makes them: it never runs in the original either |
 | theranaSkirtScript | records not placed | runs | 1 clothing | therana's skirt | - | 1: local | - | runs while the player carries one of its items |
 | wraithguardScript | records not placed | runs | 1 armour | wraithguard | - | 1: local | - | runs while the player carries one of its items |
 | Akula_innerdoors | red mountain region | runs | 1 activator; placed 1 (Morrowind 1) | in_dwrv_crank_akula00 | getsecondspassed, menumode, onactivate, playsound, rotate, setangle | 10: local, menumode, onactivate | - | - |
@@ -1345,36 +1268,17 @@ Referenced by: the records that carry the script and their placed references per
 | WritBerano | mournhold (tribunal) | only in an add-on world | 1 NPC; placed 1 (Tribunal 1); speaker of 4 dialogue results | forven berano | cellchanged, getjournalindex, getpccrimelevel, journal, menumode, ondeath | 5: cellchanged, getjournalindex, local, menumode, ondeath | - | placed only in an add-on world, not in the image yet |
 | WritHloggar | mournhold (tribunal) | only in an add-on world | 1 NPC; placed 1 (Tribunal 1); speaker of 3 dialogue results | hloggar the bloody | cellchanged, getjournalindex, getpccrimelevel, journal, menumode, ondeath | 5: cellchanged, getjournalindex, local, menumode, ondeath | - | placed only in an add-on world, not in the image yet |
 | yarnarScript | mournhold (tribunal) | only in an add-on world | 1 NPC; placed 1 (Tribunal 1) | yarnar | journal, ondeath | 2: local, ondeath | - | placed only in an add-on world, not in the image yet |
-| audienceScript1 | named by nothing | named by nothing | - | - | aitravel, menumode | 2: local, menumode | - | nothing names it: it never runs in the original either |
-| bardoor3Script | named by nothing | named by nothing | - | - | activate, getjournalindex, messagebox, onactivate, playsound | 2: getjournalindex, onactivate | - | nothing names it: it never runs in the original either |
-| dbattackScriptOLD | named by nothing | named by nothing | - | - | getjournalindex, getlevel, getpccell, getpcsleep, messagebox, placeatpc, random, wakeuppc | 24: getjournalindex, getlevel, getpccell, getpcsleep, local | - | nothing names it: it never runs in the original either |
-| dbdartScript | named by nothing | named by nothing | - | - | getitemcount, getjournalindex, journal | 3: getitemcount, getjournalindex | - | nothing names it: it never runs in the original either |
-| DrothChest | named by nothing | named by nothing | - | - | removeitem | 1: global | - | nothing names it: it never runs in the original either |
-| explosion_pushout | named by nothing | named by nothing | - | - | disable, getcollidingactor, getcollidingpc, getpos, getsecondspassed, hurtcollidingactor, menumode, messagebox, setdelete, sethealth, setpos | 7: getcollidingactor, getcollidingpc, local, menumode | - | nothing names it: it never runs in the original either |
-| Museum | named by nothing | named by nothing | - | - | additem, disable, onactivate, playsound | 3: onactivate, other script | - | nothing names it: it never runs in the original either |
-| PlagueHallRat1a | named by nothing | named by nothing | - | - | disable, enable, getdisabled, getjournalindex, ondeath, startcombat | 7: getdisabled, getjournalindex, ondeath | - | nothing names it: it never runs in the original either |
-| PlagueNerile | named by nothing | named by nothing | - | - | getjournalindex, journal, ondeath, startcombat | 5: getjournalindex, local, ondeath | - | nothing names it: it never runs in the original either |
-| poisonsteam | named by nothing | named by nothing | - | - | getdistance, menumode, modhealth | 4: getdistance, local, menumode | - | nothing names it: it never runs in the original either |
-| Sound_SothaSparks | named by nothing | named by nothing | - | - | cellchanged, getsoundplaying, playloopsound3dvp | 2: cellchanged, getsoundplaying | - | nothing names it: it never runs in the original either |
-| Sound_Water_break | named by nothing | named by nothing | - | - | cellchanged, getsoundplaying, playloopsound3dvp | 2: cellchanged, getsoundplaying | - | nothing names it: it never runs in the original either |
-| Sound_Waterfall | named by nothing | named by nothing | - | - | cellchanged, getsoundplaying, playloopsound3dvp | 2: cellchanged, getsoundplaying | - | nothing names it: it never runs in the original either |
-| TestMoveRock | named by nothing | named by nothing | - | - | getpos, getstandingactor, playsound, setpos, stopscript | 4: getstandingactor, local | - | nothing names it: it never runs in the original either |
-| weatherScript | named by nothing | named by nothing | - | - | messagebox | 15: local | - | nothing names it: it never runs in the original either |
 | bladeScript | records not placed | runs | 1 WEAP | nerevarblade_01_flame | additem, getitemcount, getweapondrawn, removeitem | 11: getitemcount, getweapondrawn, local | - | runs while the player carries one of its items |
 | CharGen_ring_keley | records not placed | runs | 1 clothing; held by placed containers and actors 1 | ring_keley | enablemagicmenu, getbuttonpressed, menumode, messagebox, xbox | 11: getbuttonpressed, global, local, menumode, xbox | - | runs on the items placed containers and actors hold, while their area is loaded |
 | db_assassinScript | records not placed | runs | 5 NPC; placed by scripts (5 records) | db_assassin1, db_assassin1b, db_assassin2, db_assassin3, db_assassin4 | getdistance, getitemcount, getjournalindex, journal, menumode, ondeath, setfight, setflee, startcombat | 8: getdistance, getitemcount, getjournalindex, local, menumode, ondeath | - | runs on the object a script places |
 | dbcontractScript | records not placed | runs | 1 book | bk_dbcontract | getitemcount, journal | 2: getitemcount, local | - | runs while the player carries one of its items |
 | DrothDagger | records not placed | runs | 1 WEAP | silver dagger_droth_unique | getitemcount, journal | 2: getitemcount, global | - | runs while the player carries one of its items |
-| drowned | records not placed | named by nothing | 1 activator | in_m_sewer_drain_uni | gethealth, getwaterlevel, messagebox, playgroup, position, sethealth | 9: gethealth, getwaterlevel, local | - | its records are never placed and nothing makes them: it never runs in the original either |
-| fluctuateWaterLevel | records not placed | named by nothing | 1 activator | act_waterlevel_changer | getsecondspassed, getwaterlevel, menumode, messagebox, random, setwaterlevel | 10: local, menumode | - | its records are never placed and nothing makes them: it never runs in the original either |
-| gateSound | records not placed | named by nothing | 1 activator | ex_gg_particles_01_bbot2 | getjournalindex, getsecondspassed, playsound, random | 3: getjournalindex, local | - | its records are never placed and nothing makes them: it never runs in the original either |
 | karrodguardScript | records not placed | runs | 1 NPC; placed by scripts (1 records) | royal guard_karrod | cellchanged, disable, forcegreeting, getsecondspassed, menumode | 7: cellchanged, global, local, menumode | - | runs on the object a script places |
 | mazedbandEnd_Script | records not placed | uses a function the interpreter lacks | 1 clothing | mazed_band_end | getbuttonpressed, getjournalindex, messagebox, playsound, positioncell | 17: getjournalindex, local | - | 1 not carried out: positioncell |
 | mazedbandScript | records not placed | runs | 1 clothing | mazed_band | getitemcount, journal, menumode | 4: getitemcount, local, menumode | - | runs while the player carries one of its items |
 | MuseumStendarHammer | records not placed | runs | 1 WEAP | stendar_hammer_unique_x | activate, additem, disable, enable, onactivate, removeitem | 3: onactivate, other script | - | runs while the player carries one of its items |
 | packrat | records not placed | runs | 1 creature; placed by scripts (1 records); speaker of 3 dialogue results | rat_pack_rerlas | getjournalindex | 1: getjournalindex | - | runs on the object a script places |
 | replenishammo | records not placed | runs | 1 creature; levelled lists 3 | centurion_projectile | additem, getitemcount, menumode, ondeath | 4: getitemcount, local, menumode, ondeath | - | runs on the actor a levelled list gives |
-| tarenEnableScript | records not placed | named by nothing | 1 activator | script_taren_enable | disable, enable, getdistance, getjournalindex | 8: getdistance, getjournalindex, global, local | - | its records are never placed and nothing makes them: it never runs in the original either |
 | trapProjScript | records not placed | only in an add-on world | 1 activator; placed by scripts of Tribunal (not made yet) | trapprojectile | disable, explodespell, getdistance, getpos, getsecondspassed, getsquareroot, menumode, setdelete, setpos | 16: local, menumode | - | made only by a script of an add-on world, not in the image yet |
 | AzuraEnd | red mountain region | runs | 1 activator; placed 1 (Morrowind 1) | azura spirit | disable, disableplayercontrols, enable, enableplayercontrols, getdisabled, getdistance, getjournalindex, getsecondspassed, journal, menumode, playbink, playgroup | 15: getdisabled, getdistance, getjournalindex, local, menumode | - | - |
 
@@ -1635,30 +1539,6 @@ Referenced by: the records that carry the script and their placed references per
 | watersScript | moesring mountains region | only in an add-on world | 1 item; placed 1 (Bloodmoon 1) | bm_waterlife_unique1 | disable, enable, getdisabled, getitemcount, getjournalindex, journal | 6: getdisabled, getitemcount, getjournalindex | - | placed only in an add-on world, not in the image yet |
 | WolfDoorScript | moesring mountains region | only in an add-on world | 2 door; placed 1 (Bloodmoon 1) | bm_ic_door_pelt_wolf, ex_nord_door_wolf | activate, getbuttonpressed, getjournalindex, journal, menumode, messagebox, onactivate, say | 9: getjournalindex, local, menumode, onactivate | - | placed only in an add-on world, not in the image yet |
 | reeh_jahScript | molag mar region | runs | 1 NPC; placed 1 (Morrowind 1); speaker of 5 dialogue results | reeh_jah | cellchanged, disable, getcurrentaipackage, getdisabled, getdistance, getjournalindex, journal, ondeath | 11: cellchanged, getcurrentaipackage, getdisabled, getdistance, getjournalindex, ondeath | - | - |
-| bearheartScript | named by nothing | named by nothing | - | - | getitemcount, journal | 2: getitemcount, local | - | nothing names it: it never runs in the original either |
-| begin | named by nothing | named by nothing | - | - | cellchanged | 6: cellchanged, global, local | - | nothing names it: it never runs in the original either |
-| Colony_D_1_m | named by nothing | named by nothing | - | - | disable, getdisabled, stopscript | 2: getdisabled, global | - | nothing names it: it never runs in the original either |
-| Colony_E_1_I | named by nothing | named by nothing | - | - | disable, enable, getdisabled | 4: getdisabled, global | - | nothing names it: it never runs in the original either |
-| ColonyAfer | named by nothing | named by nothing | - | - | disable, enable, getdisabled, getjournalindex | 5: getdisabled, getjournalindex, global | - | nothing names it: it never runs in the original either |
-| heartfangChangeScript | named by nothing | named by nothing | - | - | forcegreeting, getdistance, menumode | 4: getdistance, local, menumode | - | nothing names it: it never runs in the original either |
-| hunteract1Script | named by nothing | named by nothing | - | - | getdistance | - | - | nothing names it: it never runs in the original either |
-| JeleenNote | named by nothing | named by nothing | - | - | disable, getjournalindex | 1: getjournalindex | - | nothing names it: it never runs in the original either |
-| MockChangeScript | named by nothing | named by nothing | - | - | disableplayercontrols, enableplayercontrols, fadein, fadeout, getsecondspassed, getwerewolfkills, messagebox, removespell | 15: getwerewolfkills, global, local | - | nothing names it: it never runs in the original either |
-| SacrificeNordFemale | named by nothing | named by nothing | - | - | disable, enable, getjournalindex, modfatigue | 2: getjournalindex | - | nothing names it: it never runs in the original either |
-| ThirskSvenjaDeath | named by nothing | named by nothing | - | - | getjournalindex, sethealth | 1: getjournalindex | - | nothing names it: it never runs in the original either |
-| ThirskUdyrfrykte | named by nothing | named by nothing | - | - | disable, enable, getjournalindex | 1: getjournalindex | - | nothing names it: it never runs in the original either |
-| TorchdayScript | named by nothing | named by nothing | - | - | disable, enable, getdisabled, menumode | 7: getdisabled, global, menumode | - | nothing names it: it never runs in the original either |
-| TorchNightScript | named by nothing | named by nothing | - | - | disable, enable, getdisabled, menumode | 7: getdisabled, global, menumode | - | nothing names it: it never runs in the original either |
-| tracksound1Script | named by nothing | named by nothing | - | - | playsound | 4: local, other script | - | nothing names it: it never runs in the original either |
-| tracksound2Script | named by nothing | named by nothing | - | - | playsound | 4: local, other script | - | nothing names it: it never runs in the original either |
-| waterbottleScript | named by nothing | named by nothing | - | - | disable, enable, getdisabled, getjournalindex | 4: getdisabled, getjournalindex | - | nothing names it: it never runs in the original either |
-| WereChange2Script | named by nothing | named by nothing | - | - | addspell, becomewerewolf, disable, disableplayercontrols, enable, enableplayercontrols, fadein, fadeout, getjournalindex, getpcinjail, getpctraveling, getsecondspassed, getwerewolfkills, iswerewolf, journal, menumode, playbink, positioncell, removespell, setwerewolfacrobatics, startscript, stopscript, undowerewolf, wakeuppc | 44: getjournalindex, getpcinjail, getpctraveling, getwerewolfkills, global, iswerewolf, local, menumode | - | nothing names it: it never runs in the original either |
-| wereDreamScript1 | named by nothing | named by nothing | - | - | getjournalindex, getpcsleep, journal, playbink | 5: getjournalindex, getpcsleep, global, local | - | nothing names it: it never runs in the original either |
-| wereDreamScript2 | named by nothing | named by nothing | - | - | getjournalindex, getpcsleep, journal, playbink | 7: getjournalindex, getpcsleep, global, local | - | nothing names it: it never runs in the original either |
-| wereDreamScript3 | named by nothing | named by nothing | - | - | getjournalindex, getpcsleep, journal, playbink | 7: getjournalindex, getpcsleep, global, local | - | nothing names it: it never runs in the original either |
-| weretracker2Script | named by nothing | named by nothing | - | - | aitravel, getdistance, getjournalindex, journal, messagebox, ondeath, startcombat | 7: getdistance, getjournalindex, global, local, ondeath | - | nothing names it: it never runs in the original either |
-| WitchNoteScript | named by nothing | named by nothing | - | - | activate, getjournalindex, journal, onactivate | 5: getjournalindex, local, onactivate | - | nothing names it: it never runs in the original either |
-| WolfGiver | named by nothing | named by nothing | - | - | cellchanged, disable, getjournalindex | 2: cellchanged, getjournalindex | - | nothing names it: it never runs in the original either |
 | GlenmorilRing | records not placed | runs | 1 clothing; placed by scripts (1 records) | glenmoril_ring_bm | disable, explodespell, getsecondspassed, setdelete | 2: local | - | runs while the player carries one of its items |
 | hircinekey2Script | records not placed | runs | 2 item | key_hircine2, key_hircine3 | getitemcount, getjournalindex, journal | 3: getitemcount, getjournalindex, local | - | runs while the player carries one of its items |
 | hircinekeyScript | records not placed | runs | 1 item | key_hircine1 | getitemcount, getjournalindex, journal | 3: getitemcount, getjournalindex, local | - | runs while the player carries one of its items |
@@ -1669,7 +1549,6 @@ Referenced by: the records that carry the script and their placed references per
 | SovngardeBook | records not placed | runs | 1 book | bk_sovngarde | activate, getjournalindex, journal, messagebox, onactivate | 7: getjournalindex, local, onactivate | - | runs while the player carries one of its items |
 | Spriggan | records not placed | uses a function the interpreter lacks | 1 creature; levelled lists 4 | bm_spriggan | activate, getpos, getsecondspassed, menumode, modhealth, modresistfire, modresistfrost, modresistmagicka, modresistparalysis, modresistpoison, onactivate, ondeath, placeitem, resurrect, setscale, startcombat | 17: local, menumode, onactivate, ondeath | - | 1 not carried out: placeitem |
 | sprigganeffect | records not placed | only in an add-on world | 2 activator; placed by scripts of Bloodmoon (not made yet) | sprigganup, wildwerewolf | disable, getsecondspassed, loopgroup, menumode, setdelete | 5: local, menumode | - | made only by a script of an add-on world, not in the image yet |
-| stoneeffectbeastScript | records not placed | named by nothing | 1 activator | act_bm_stoneeffect_01 | disable, enable, getdisabled, getjournalindex | 4: getdisabled, getjournalindex | - | its records are never placed and nothing makes them: it never runs in the original either |
 | totemScript | records not placed | runs | 1 item | misc_bm_clawfang_unique | getitemcount, getjournalindex, getlevel, getpcsleep, journal, messagebox, placeatpc, wakeuppc | 9: getitemcount, getjournalindex, getlevel, getpcsleep, local | - | runs while the player carries one of its items |
 | UlfgarRing | records not placed | runs | 1 clothing; placed by scripts (1 records) | ulfgar_ring | disable, explodespell, getsecondspassed, setdelete | 2: local | - | runs while the player carries one of its items |
 | wereBearhuntScript | records not placed | runs | 1 NPC; placed by scripts (1 records) | werewolf_bearhunt | becomewerewolf, ondeath | 2: local, ondeath | - | runs on the object a script places |
@@ -1677,7 +1556,6 @@ Referenced by: the records that carry the script and their placed references per
 | werewolf_connor | records not placed | uses a function the interpreter lacks | 1 NPC; levelled lists 1 | bm_werewolf_wildernessc | addspell, becomewerewolf, getpos, getsecondspassed, menumode, ondeath, placeitem, undowerewolf | 11: global, local, menumode, ondeath | - | 1 not carried out: placeitem |
 | Werewolfwilderness | records not placed | uses a function the interpreter lacks | 9 NPC; levelled lists 9 | bm_werewolf_wild01, bm_werewolf_wild02, bm_werewolf_wild03, bm_werewolf_wild04, bm_werewolf_wild05, bm_werewolf_wild06 and 3 more | addspell, becomewerewolf, getpos, getsecondspassed, menumode, ondeath, placeitem, undowerewolf | 11: global, local, menumode, ondeath | - | 1 not carried out: placeitem |
 | wildwereScript | records not placed | runs | 4 NPC; placed by scripts (4 records) | bm_werewolf_wildhunt, bm_werewolf_wildhunt2, bm_werewolf_wildhunt3, bm_werewolf_wildhunt4 | becomewerewolf, disable, getdisabled, getjournalindex | 3: getdisabled, getjournalindex, local | - | runs on the object a script places |
-| WolfInnocent | records not placed | named by nothing | 1 creature | bm_werewolf_ritual | disable, enable, getjournalindex, journal, ondeath | 3: getjournalindex, ondeath | - | its records are never placed and nothing makes them: it never runs in the original either |
 | WolfRitualRing | records not placed | runs | 1 clothing; placed by scripts (1 records) | ritual_ring | disable, explodespell, getsecondspassed, setdelete | 2: local | - | runs while the player carries one of its items |
 | DagothUrCreature1 | red mountain region | runs | 1 creature; placed 1 (Morrowind 1); speaker of 29 dialogue results | dagoth_ur_1 | disable, enable, getdisabled, getdistance, getitemcount, getsecondspassed, menumode, ondeath, playgroup, playsound3d, rotate, say | 12: getdisabled, getdistance, getitemcount, local, menumode, ondeath | - | - |
 | enable_teleport | red mountain region | only in an add-on world | 1 activator; placed 2 (Tribunal 1, Bloodmoon 1) | teleport_enabler | enableteleporting | - | - | placed only in an add-on world, not in the image yet |
@@ -1718,3 +1596,155 @@ Referenced by: the records that carry the script and their placed references per
 | ThirskRubble | thirsk region | only in an add-on world | 6 activator; placed 6 (Bloodmoon 6) | in_thirsk_archpiece01, in_thirsk_archpiece02, in_thirsk_beampiece01, in_thirsk_beampiece03, in_thirsk_columnpiece01, in_thirsk_columnpiece02 | disable, enable, getjournalindex, getpccell | 6: getjournalindex, getpccell | - | placed only in an add-on world, not in the image yet |
 | ThormoorOutside | thirsk region | only in an add-on world | 1 NPC; placed 1 (Bloodmoon 1); speaker of 3 dialogue results | thormoor_out | disable, enable, gethealth, getjournalindex | 12: gethealth, getjournalindex | - | placed only in an add-on world, not in the image yet |
 | ThormoorThirsk | thirsk region | only in an add-on world | 1 NPC; placed 1 (Bloodmoon 1); speaker of 3 dialogue results | thormoor_thirsk | disable, enable, gethealth, getjournalindex | 16: gethealth, getjournalindex | - | placed only in an add-on world, not in the image yet |
+
+## Not used in the original game
+
+Scripts that no object, character, item, dialogue line, start record or other script ever names or starts, so they never ran in the original game either: the developers' test and example scripts, earlier versions replaced by others, and cut content. They stay in the game as they are; the counts above count only the scripts the original uses, and the data file keeps every script with its state.
+
+### Morrowind (88)
+
+| Script | Why |
+| --- | --- |
+| Akula_doors | nothing names it: it never runs in the original either |
+| Akula_outerdoors | its records are never placed and nothing makes them: it never runs in the original either |
+| AzurasStarScript | nothing names it: it never runs in the original either |
+| BILL_common_trapped_rug | its records are never placed and nothing makes them: it never runs in the original either |
+| BILL_FG_Berwen_Corp | nothing names it: it never runs in the original either |
+| BILL_shrineMaarGan | nothing names it: it never runs in the original either |
+| BILL_shrineSanctus | nothing names it: it never runs in the original either |
+| BILL_TT_Bjadmund | nothing names it: it never runs in the original either |
+| BILL_TT_Dagoth_Fovon | nothing names it: it never runs in the original either |
+| BILL_TT_Delvam_Andarys | nothing names it: it never runs in the original either |
+| BILL_TT_MinistryHeathen | nothing names it: it never runs in the original either |
+| BILL_TT_MountKand01 | nothing names it: it never runs in the original either |
+| BILL_TT_MountKand02 | nothing names it: it never runs in the original either |
+| BILL_TT_MountKand03 | nothing names it: it never runs in the original either |
+| BILL_TT_MountKand04 | nothing names it: it never runs in the original either |
+| BILL_TT_Tralas_Rendas | nothing names it: it never runs in the original either |
+| boethiabuildScript | nothing names it: it never runs in the original either |
+| bulfimScript | nothing names it: it never runs in the original either |
+| CharGenDoorExit | nothing names it: it never runs in the original either |
+| da_bullnetchScript | nothing names it: it never runs in the original either |
+| daric_bielleScript | nothing names it: it never runs in the original either |
+| diseaseChills | nothing names it: it never runs in the original either |
+| diseaseCorprus | nothing names it: it never runs in the original either |
+| diseaseDampworm | nothing names it: it never runs in the original either |
+| diseaseGreenspore | nothing names it: it never runs in the original either |
+| diseaseRattles | nothing names it: it never runs in the original either |
+| diseaseRockjoint | nothing names it: it never runs in the original either |
+| diseaseRustChancre | nothing names it: it never runs in the original either |
+| diseaseSerpiginous | nothing names it: it never runs in the original either |
+| diseaseWtichwither | nothing names it: it never runs in the original either |
+| doortestwarp | nothing names it: it never runs in the original either |
+| Dummy | nothing names it: it never runs in the original either |
+| DwRuins_Ark_Lv_A | nothing names it: it never runs in the original either |
+| example_Containers | nothing names it: it never runs in the original either |
+| Example_NPC_Stuff | nothing names it: it never runs in the original either |
+| Example_NPC_Stuff_Gold_Edition | nothing names it: it never runs in the original either |
+| fightGnawTooth | nothing names it: it never runs in the original either |
+| fools_dead_check | nothing names it: it never runs in the original either |
+| gameRatScript | nothing names it: it never runs in the original either |
+| GlobalFixNPCs | nothing names it: it never runs in the original either |
+| GnisisEggmineDoor | nothing names it: it never runs in the original either |
+| GnisisWarpDoor | nothing names it: it never runs in the original either |
+| high_fane_alert | nothing names it: it never runs in the original either |
+| Huleeya_disposition_check | nothing names it: it never runs in the original either |
+| jeanneScript | nothing names it: it never runs in the original either |
+| letteScript | nothing names it: it never runs in the original either |
+| marksmanToggle | nothing names it: it never runs in the original either |
+| menhirTelNaga | its records are never placed and nothing makes them: it never runs in the original either |
+| menhirTelUvirith | nothing names it: it never runs in the original either |
+| MessageTest | nothing names it: it never runs in the original either |
+| MiloKey | nothing names it: it never runs in the original either |
+| MiloTravel | nothing names it: it never runs in the original either |
+| MoveAndTurn | nothing names it: it never runs in the original either |
+| MoveTriolith | its records are never placed and nothing makes them: it never runs in the original either |
+| NibaniWaitOneDay | nothing names it: it never runs in the original either |
+| noflee | nothing names it: it never runs in the original either |
+| noidle | nothing names it: it never runs in the original either |
+| nointruder | nothing names it: it never runs in the original either |
+| nothief | nothing names it: it never runs in the original either |
+| ouch_falsesunder | nothing names it: it never runs in the original either |
+| Pub_TelAruhn_Plot | nothing names it: it never runs in the original either |
+| ranisScript | nothing names it: it never runs in the original either |
+| ratScript | nothing names it: it never runs in the original either |
+| ringDrarelSummoning | nothing names it: it never runs in the original either |
+| shashurariDoor | nothing names it: it never runs in the original either |
+| SheogorathBlessing | nothing names it: it never runs in the original either |
+| shrineBalUr | nothing names it: it never runs in the original either |
+| shrineVivecHumility | nothing names it: it never runs in the original either |
+| shrineVivecMystery | nothing names it: it never runs in the original either |
+| Sound_Fire | nothing names it: it never runs in the original either |
+| Sound_Fire_Small | nothing names it: it never runs in the original either |
+| Strong2_Not | nothing names it: it never runs in the original either |
+| StrongZero | nothing names it: it never runs in the original either |
+| TelVosTeleport1 | its records are never placed and nothing makes them: it never runs in the original either |
+| TelVosTeleport2 | nothing names it: it never runs in the original either |
+| Test_AddSanguine | nothing names it: it never runs in the original either |
+| TestMakePCVampire | nothing names it: it never runs in the original either |
+| TestRefRotate | nothing names it: it never runs in the original either |
+| TestRotate | nothing names it: it never runs in the original either |
+| TestRotateSlow | nothing names it: it never runs in the original either |
+| TGDiscountScript | nothing names it: it never runs in the original either |
+| ThiefTraderScript | nothing names it: it never runs in the original either |
+| UseTest | nothing names it: it never runs in the original either |
+| uupse_Bagrum | nothing names it: it never runs in the original either |
+| VampTest | nothing names it: it never runs in the original either |
+| VampTest1 | nothing names it: it never runs in the original either |
+| VampTest2 | nothing names it: it never runs in the original either |
+| VampTest3 | nothing names it: it never runs in the original either |
+
+### Tribunal (19)
+
+| Script | Why |
+| --- | --- |
+| audienceScript1 | nothing names it: it never runs in the original either |
+| bardoor3Script | nothing names it: it never runs in the original either |
+| dbattackScriptOLD | nothing names it: it never runs in the original either |
+| dbdartScript | nothing names it: it never runs in the original either |
+| DrothChest | nothing names it: it never runs in the original either |
+| drowned | its records are never placed and nothing makes them: it never runs in the original either |
+| explosion_pushout | nothing names it: it never runs in the original either |
+| fluctuateWaterLevel | its records are never placed and nothing makes them: it never runs in the original either |
+| gateSound | its records are never placed and nothing makes them: it never runs in the original either |
+| Museum | nothing names it: it never runs in the original either |
+| PlagueHallRat1a | nothing names it: it never runs in the original either |
+| PlagueNerile | nothing names it: it never runs in the original either |
+| poisonsteam | nothing names it: it never runs in the original either |
+| Sound_SothaSparks | nothing names it: it never runs in the original either |
+| Sound_Water_break | nothing names it: it never runs in the original either |
+| Sound_Waterfall | nothing names it: it never runs in the original either |
+| tarenEnableScript | its records are never placed and nothing makes them: it never runs in the original either |
+| TestMoveRock | nothing names it: it never runs in the original either |
+| weatherScript | nothing names it: it never runs in the original either |
+
+### Bloodmoon (26)
+
+| Script | Why |
+| --- | --- |
+| bearheartScript | nothing names it: it never runs in the original either |
+| begin | nothing names it: it never runs in the original either |
+| Colony_D_1_m | nothing names it: it never runs in the original either |
+| Colony_E_1_I | nothing names it: it never runs in the original either |
+| ColonyAfer | nothing names it: it never runs in the original either |
+| heartfangChangeScript | nothing names it: it never runs in the original either |
+| hunteract1Script | nothing names it: it never runs in the original either |
+| JeleenNote | nothing names it: it never runs in the original either |
+| MockChangeScript | nothing names it: it never runs in the original either |
+| SacrificeNordFemale | nothing names it: it never runs in the original either |
+| stoneeffectbeastScript | its records are never placed and nothing makes them: it never runs in the original either |
+| ThirskSvenjaDeath | nothing names it: it never runs in the original either |
+| ThirskUdyrfrykte | nothing names it: it never runs in the original either |
+| TorchdayScript | nothing names it: it never runs in the original either |
+| TorchNightScript | nothing names it: it never runs in the original either |
+| tracksound1Script | nothing names it: it never runs in the original either |
+| tracksound2Script | nothing names it: it never runs in the original either |
+| waterbottleScript | nothing names it: it never runs in the original either |
+| WereChange2Script | nothing names it: it never runs in the original either |
+| wereDreamScript1 | nothing names it: it never runs in the original either |
+| wereDreamScript2 | nothing names it: it never runs in the original either |
+| wereDreamScript3 | nothing names it: it never runs in the original either |
+| weretracker2Script | nothing names it: it never runs in the original either |
+| WitchNoteScript | nothing names it: it never runs in the original either |
+| WolfGiver | nothing names it: it never runs in the original either |
+| WolfInnocent | its records are never placed and nothing makes them: it never runs in the original either |

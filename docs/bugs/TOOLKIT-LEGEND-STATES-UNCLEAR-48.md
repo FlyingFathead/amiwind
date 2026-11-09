@@ -134,6 +134,7 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - HANDOFF-WRAPPER-01 (no report page): Source handoff wrapper reused an existing extraction directory
 - IMAGE-HDF-COPY-SPARSE-JDRIVE-59 (no report page): Copying a padded HDF from the build volume onto a mounted folder fails with Permission denied
 - MONITOR-WARNINGS-ROW-54 (no report page): Requested: the Toolkit build monitor gathers every warning of a build in one yellow row, Warnings: N with a view of the lines
+- MWSCRIPT-TRACKER-MAIN-INERT-63 (no report page): The script tracker called Main named by nothing, although the game always starts it and AmiWind carries its work
 - PACKAGE-PORTABILITY-28 (no report page): Rebundled ZIPs lost exec modes; Windows path aliases accepted
 - [PKG-STALE-RUNTIME-32](PKG-STALE-RUNTIME-32.md): The sealed v0.0.31 playtest contains a stale launcher preset folder
 - PLAYTEST-KNOWN-ISSUES-STALE-54 (no report page): The v0.0.54 playtest package's KNOWN-ISSUES list was made from the register of the build commit, older than the release's register

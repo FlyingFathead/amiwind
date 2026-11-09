@@ -4,7 +4,7 @@
 
 # AmiWind
 
-_Last updated with AmiWind v0.0.63-dev5 (9 November 2026)._
+_Last updated with AmiWind v0.0.63 (9 November 2026)._
 
 An unofficial, experimental RPG engine and enthusiast project bringing Morrowind
 to the Commodore Amiga, featuring CHIM: an AmiQuake-based engine and an asset
@@ -27,29 +27,46 @@ More in the [gallery](docs/GALLERY.md).
 
 ## Where AmiWind stands (9 November 2026)
 
-In development: **v0.0.63-dev5**, the fifth snapshot of v0.0.63
-([dev5 notes](docs/releases/notes/RELEASE-v0.0.63-dev5.md)): the box of a spoken line is drawn at once, without the
-rising animation, and the stats under the view stay visible (text box type 2, the new default; type 1 stays a choice
-in Options), and the builder states whether the files of Tribunal and Bloodmoon were found and what of each it uses.
-Its changes are checked by tests, not yet in play.
+The newest release is **v0.0.63: Every Script Of Vvardenfell**, the release of the base game's scripting
+([release notes](docs/releases/notes/RELEASE-v0.0.63.md)). It follows five development snapshots
+([dev1](docs/releases/notes/RELEASE-v0.0.63-dev1.md), [dev2](docs/releases/notes/RELEASE-v0.0.63-dev2.md),
+[dev3](docs/releases/notes/RELEASE-v0.0.63-dev3.md), [dev4](docs/releases/notes/RELEASE-v0.0.63-dev4.md) and
+[dev5](docs/releases/notes/RELEASE-v0.0.63-dev5.md)), whose work it carries, with the fixes made after dev5. It runs on
+CHIM Engine v0.2.2 and needs 32 MB of Fast RAM. Its fixes were checked by tests, and a release check on the last
+snapshot was played in the emulator and on a Raspberry Pi 4B; the rest is not yet seen in play.
 
-Before it, **v0.0.63-dev4** ([dev4 notes](docs/releases/notes/RELEASE-v0.0.63-dev4.md)) carried 27 more functions of
-the original's scripting (460 of 504, with the console's own commands callable from scripts; 605 of the 1,207 scripts
-running), and a builder whose worker pools stay busy, whose world key no longer rebuilds for a change to the actor
-model reader, and which reads the dialogue and voice tables and the actor ground check from its unit cache.
-Before that, **v0.0.63-dev3** ([dev3 notes](docs/releases/notes/RELEASE-v0.0.63-dev3.md)) brought creatures that walk,
-run and attack again wherever they are met, 66 more functions of the original's scripting, and a builder that reuses
-every earlier run at once and shows its plan before any stage runs.
-Before that, **v0.0.63-dev2** ([dev2 notes](docs/releases/notes/RELEASE-v0.0.63-dev2.md)) brought characters that fight
-each other, allies, guards and followers that take sides, an opening closer to the original, the original game's
-console commands, fire pits and scripted turning objects kept in saves, and a builder that runs its risky stages first.
-Before that, **v0.0.63-dev1** ([dev1 notes](docs/releases/notes/RELEASE-v0.0.63-dev1.md)) brought a builder that keeps every finished unit the moment it
-comes back, actor models that share their repeated shape data in the image (78.4 MB less on the v0.0.62 payload),
-599 of the game's 1,207 scripts running, breath and drowning under water, god mode against every damage, creatures
-that stand on the ground and attack on sight, the best-attack option and the original's hit chance and hit cone, and
-drops on uneven room floors.
+### Highlights of v0.0.63
 
-The newest release is **v0.0.62: Stick To The Script**, the scripts, crime and alchemy release: alchemy as in
+- **The base game's scripting.** The three game files hold 1,207 scripts, of which the original game uses 1,074; the
+  other 133 are scripts that no object, character, item, dialogue line, start record or other script ever names or
+  starts, so they never ran in the original game either (the developers' test and example scripts, earlier versions
+  replaced by others, and cut content). They stay in the game and are listed apart in the tracker. Of the 1,074 the
+  original uses, 605 run as scripts and 9 are carried by AmiWind's own code (the opening's and the game's main script);
+  the rest wait for Mournhold and Solstheim or for a function not carried out yet. Of Morrowind.esm's 616 scripts, 528
+  are used: 518 run, 9 are carried and 1 belongs to an add-on, so every script of the base game that the original uses
+  runs, except one that Tribunal places (88 are not used). Of Tribunal.esm's 255, 236 are used: 42 run in Vvardenfell, 8
+  wait for a function, 186 belong to Mournhold (19 are not used). Of Bloodmoon.esm's 336, 310 are used: 45 run, 20 wait
+  for a function, 245 belong to Solstheim (26 are not used). Mournhold and Solstheim come with the expansions, the goal
+  of the next release. 460 of the original's 504 script functions are carried out, and the original game's console
+  commands work on any reference (`dbg help mw`). Every script with its state:
+  [the MWScript tracker](docs/MWSCRIPT_FEATURES.md).
+- **The game's systems, in one table.** 49 systems of the base game with their state and proof: 7 done, 39 partial, 3
+  missing ([game features](docs/GAME_FEATURES.md)).
+- **Creatures and fights.** Creatures walk, run and attack wherever they are met and stand on the ground; hostile ones
+  attack on sight; characters fight each other, and allies, guards and followers take sides; the original's chance to
+  hit and hit cone, and an Always use best attack option in Options.
+- **Breath and drowning under water,** with Water Breathing from the race, potions, spells and worn items, and a god mode
+  that holds back every damage.
+- **A text box that leaves the stats visible:** a spoken line's box is drawn at once (type 2, the new default; type 1
+  stays a choice in Options).
+- **A world that follows its scripts:** the opening as in the original, scripts that move and turn the objects they name
+  (the Ghostgate's portcullises), fire pits that burn, containers in rooms that open, items that can be dropped on
+  uneven tomb and cave floors.
+- **A builder that keeps its work:** every finished unit is kept the moment it comes back, a later build reuses what
+  exists and shows its plan before any stage runs, and actor models share their repeated shapes (78.4 MB less on the
+  v0.0.62 payload).
+
+The release before it was **v0.0.62: Stick To The Script**, the scripts, crime and alchemy release: alchemy as in
 the original, the creatures placed in rooms, 588 of the game's 1,207 scripts running (the
 [tracker of the game's scripts](docs/MWSCRIPT_FEATURES.md)), the census office running its own scripts, dialogue choices
 as rows to pick, guards who arrest for crimes with the fine and the jail of the original, persuasion and dialogue links
@@ -83,14 +100,33 @@ a new game and the falling mage, and its second ([dev2 notes](docs/releases/note
 delivered. v0.0.61 shipped as its third snapshot with the final version number
 ([release notes](docs/releases/notes/RELEASE-v0.0.61.md)).
 
-What comes next is in the [roadmap](docs/ROADMAP.md). Still to come after v0.0.63-dev5: the in-game check of the
-text box and of the builder's expansion report, and the rest of the crime system
-(pickpocketing, picking owned locks), enchanting and spellmaking, more of the game's scripts (44 of the original's 504 script functions are not carried
-out yet), per-area data tables for
+What comes next is in the [roadmap](docs/ROADMAP.md). The next release is **v0.0.64: Gone Beyond The Gate**:
+Tribunal (Mournhold) and Bloodmoon (Solstheim) built in by default where you own them (a warning when the files are
+not found, and a builder switch for the base game only), their scripting, and scripted world events such as the
+Ghostgate's doors and the traps that poison when opened; then the remaining partial systems, among them the rest of the
+crime system (pickpocketing, picking owned locks), enchanting and spellmaking in play, per-area data tables for
 containers, doors, items, activators and creatures, outdoor items that can be picked up, dropped lights with their
 flame, the Constant Effect items of non-player characters, summoned creatures that fight for the player, and the in-game
 check of the pieces not yet seen in play. Items that are in no version's list yet stay in the backlog until they are
 scheduled.
+
+### What v0.0.63 changed
+
+The base game's scripting: 605 of the 1,074 scripts the original uses run and 9 more are carried by AmiWind's own code, with 460 of the
+original's 504 script functions carried out (the werewolf, forced run, scale, moon, magic effect, game hour, soul gem and
+console functions among them) and the original game's console commands usable on any reference; Mournhold's and
+Solstheim's scripts wait for those worlds. Creatures that walk, run and attack wherever they are met, stand on the ground
+and attack on sight; characters that fight each other, with allies, guards and followers taking sides; the original's
+hit chance and hit cone; breath and drowning under water, god mode against every damage, and health that never stands
+above its maximum. The opening closer to the original, scripts that move and turn the objects they name, fire pits,
+containers in rooms that open, drops on uneven floors, dates as in the original, and `dbg tp` into any room (its menu lists the rooms too). A spoken
+line's text box that leaves the stats visible. A builder that keeps every finished unit, reuses every earlier run and
+shows its plan first, with world stages keyed on their own inputs, and an image whose actor models share their repeated
+shapes. The [game systems table](docs/GAME_FEATURES.md) is refreshed (7 of 49 done, 39 partial, 3 missing). Known limits:
+the race's Water Breathing is checked by tests only after two failed reports, a player who becomes a werewolf is not
+drawn as one, pickpocketing and owned locks are not done, the Heart Chamber may not load at 32 MB Fast RAM, and the
+fixes of the release were checked by tests, not yet in play. Full list:
+[v0.0.63 release notes](docs/releases/notes/RELEASE-v0.0.63.md).
 
 ### What v0.0.62 changed
 
@@ -275,22 +311,24 @@ front page used to carry are kept in [earlier README sections](docs/README_ARCHI
   casting spells, with the original's chance, cost and effects, and enchanted items that cast; talking to people
   (topics, choices, disposition, persuasion and the services; spoken lines show in a box that leaves the stats visible); containers and the bodies of the dead opened in a strip;
   crimes seen by a witness bring the guards, with the arrest, the fine and jail; alchemy (making and drinking
-  potions); a torch, a candle, a candlestick or a lantern in the hand
+  potions); breath and drowning under water; a torch, a candle, a candlestick or a lantern in the hand
   to explore Vvardenfell at night and underground; mushrooms to pick indoors and out; the original movement speeds;
   weather by region, and music streamed from disk; travel by silt strider, boat, gondola and guild guide.
-- **Not yet:** Mournhold (Tribunal) and Solstheim (Bloodmoon), and with them their scripts; the quests played through
+- **Not yet:** Mournhold (Tribunal) and Solstheim (Bloodmoon), and with them their scripts (the goal of v0.0.64); the quests played through
   from start to end in a test; pickpocketing and picking owned locks, trespass,
   making your own enchantments, the
   shot of a bow or a thrown weapon, schedules by the time of day and most of the scripted AI packages, and Dagoth Ur's
   fight and voice. The jail markers are in the door table for the jail system to come. The Unmarked Shipwreck's upper
   trapdoor still keeps the use key out of reach ([v0.0.55 release notes](docs/releases/notes/RELEASE-v0.0.55.md#known-in-this-build)).
   [The game feature tracker](docs/GAME_FEATURES.md) lists every system of the base game with its state.
-- **The game's scripts:** the three game files hold 1,207 script records. Every one of Vvardenfell that the original
-  runs also runs here: 605 run as scripts and 8 more, the opening's, are carried by the game's own code (in every
-  Vvardenfell region all of them, for example the Ascadian Isles 115 of 115 and the Ashlands 66 of 66). 460 belong to
-  Mournhold or Solstheim and wait for those worlds to be built (28 of them also call a function not carried out yet,
-  such as placing their own records there). The other 134 are named by nothing in the game and never run in the
-  original either. 460 of the original's 504 script functions are carried out
+- **The game's scripts:** the three game files hold 1,207 script records, 1,074 of them used by the original game.
+  Every one of Vvardenfell that the original runs also runs here: 605 run as scripts and 9 more, the opening's and the
+  game's main script, are carried by the game's own code (in every Vvardenfell region all of them, for example the
+  Ascadian Isles 115 of 115 and the Ashlands 66 of 66). The other 460 of the 1,074 wait: 432 belong to Mournhold or
+  Solstheim and wait for those worlds to be built (one of them is a Morrowind.esm script that Tribunal places), and 28
+  also call a function not carried out yet, such as placing their own records there. The remaining 133 are not named or
+  started by anything in the original game and never ran there either; they stay in the game and are listed apart.
+  460 of the original's 504 script functions are carried out
   ([the MWScript tracker](docs/MWSCRIPT_FEATURES.md) lists every script with its state and area).
 - The reference target is an A1200 with AGA, a 68040 with FPU, 2 MiB Chip and 32 MiB Fast RAM (the safe minimum;
   16 MiB starts with a warning); development and
@@ -333,11 +371,11 @@ test image of one spot see [MiniWind: the test ground](docs/MINIWIND.md), the
 Everything else about building, the build speed options, the FPU support library and running the image in FS-UAE or
 WinUAE: [Building and playing](docs/BUILDING_AND_PLAYING.md), the [Linux build guide](docs/LINUX_BUILD.md) and the
 [FS-UAE launcher](docs/FS-UAE-LAUNCHER.md). The newest emulator presets are
-[`AmiWind-v0.0.63-dev5-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.63-dev5-FS-UAE.fs-uae) and
-[`AmiWind-v0.0.63-dev5-WinUAE.uae`](resources/emulators/AmiWind-v0.0.63-dev5-WinUAE.uae) (for the v0.0.62 release:
+[`AmiWind-v0.0.63-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.63-FS-UAE.fs-uae) and
+[`AmiWind-v0.0.63-WinUAE.uae`](resources/emulators/AmiWind-v0.0.63-WinUAE.uae) (for the v0.0.62 release:
 [`AmiWind-v0.0.62-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.62-FS-UAE.fs-uae) and
 [`AmiWind-v0.0.62-WinUAE.uae`](resources/emulators/AmiWind-v0.0.62-WinUAE.uae)); all start with 32 MB of
-Fast RAM.
+Fast RAM, which is the requirement.
 
 ## Where to read more
 

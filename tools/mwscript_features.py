@@ -51,6 +51,7 @@ for _p in (ROOT / 'src', ROOT / 'tools'):
 
 from mwscript.functions import FUNCTIONS, HOST  # noqa: E402
 from mwscript import dialogue_combat  # noqa: E402
+from mwscript import gamedata  # noqa: E402
 
 DATA = ROOT / 'docs' / 'mwscript-features.json'
 OUT = ROOT / 'docs' / 'MWSCRIPT_FEATURES.md'
@@ -231,6 +232,9 @@ def state_of(row):
         if c:
             return 'carried', 'carried by %s %s' % (c['counterpart']['file'], c['counterpart']['function'])
         return 'attached-not-run', 'a hand-written rule carries it'
+    if row.get('id', '').casefold() == gamedata.MAIN_SCRIPT:
+        return 'carried', ('the game always runs it (OpenMW GlobalScripts::addStartup); AmiWind runs the new game '
+                           'scripts it starts (Startup, VampireCheck) and carries CharGen')
     game = row['refs']
     started = row['start'] or row['started_by'] or game['dialogue_starts']
     if not (started or row['bound'] or row.get('held') or game['records']):
@@ -827,13 +831,14 @@ def render(doc):
     lines = ['# MWScript features', '',
              '_Last updated with AmiWind v%s (%s)._' % (doc['version'], long_date(doc['updated'])), '',
              GENERATED, '', doc['intro'], '',
-             '**%s of %s scripts run** as scripts and **%s are carried by AmiWind\'s own code**; of the rest, %s use '
-             'a function the interpreter lacks, %s are attached but not run, %s are '
-             'compiled but not attached, %s belong to an add-on world not in the image yet, %s are named by nothing '
-             '(they never run in the original either), %s are not converted.' % (
-                 _n(st['runs']), _n(len(rows)), _n(st['carried']), _n(st['missing-function']),
-                 _n(st['attached-not-run']),
-                 _n(st['not-attached']), _n(st['not-in-image']), _n(st['inert']), _n(st['not-converted'])), '',
+             'Of the %s scripts the original game uses, **%s run** as scripts and **%s are carried by AmiWind\'s own '
+             'code**; of the rest, %s use a function the interpreter lacks, %s are attached but not run, %s are '
+             'compiled but not attached, %s belong to an add-on world not in the image yet, %s are not converted. '
+             'The %s scripts that nothing in the original game ever names (test and example scripts, replaced '
+             'versions, cut content) are listed apart under Not used in the original game.' % (
+                 _n(len(rows) - st['inert']), _n(st['runs']), _n(st['carried']), _n(st['missing-function']),
+                 _n(st['attached-not-run']), _n(st['not-attached']), _n(st['not-in-image']), _n(st['not-converted']),
+                 _n(st['inert'])), '',
              '| State | Scripts | What it means |', '| --- | ---: | --- |']
     meaning = {'runs': 'compiles whole, and the build attaches it to its objects or starts it (a record that is never '
                        'placed: while the player carries its item, on the actor a levelled list gives, or on the '
@@ -853,9 +858,21 @@ def render(doc):
                'carried': 'not run as a script because AmiWind\'s own code does what it does (the section Carried by '
                           'AmiWind\'s own code names the code and compares it step by step)'}
     for s in STATES:
-        lines.append('| %s | %s | %s |' % (LABELS[s], _n(st[s]), meaning[s]))
+        if s != 'inert':
+            lines.append('| %s | %s | %s |' % (LABELS[s], _n(st[s]), meaning[s]))
     d = doc['dialogue']
-    lines += ['| **All script records** | **%s** | |' % _n(len(rows)), '',
+    lines += ['| **Used in the original game** | **%s** | |' % _n(len(rows) - st['inert']),
+              '| Not used in the original game (listed apart) | %s | %s |' % (_n(st['inert']), meaning['inert']),
+              '| **All script records** | **%s** | |' % _n(len(rows)), '',
+              '| Game file | All | Used in the original | ' + ' | '.join(SHORT[s] for s in STATES if s != 'inert') +
+              ' | Not used |',
+              '| --- | ---: | ---: | ' + ' | '.join('---:' for s in STATES if s != 'inert') + ' | ---: |']
+    for master in MASTERS:
+        mc = Counter(r['state'] for r in rows if r['master'] == master)
+        if sum(mc.values()):
+            lines.append('| %s | %s | %s | ' % (master, _n(sum(mc.values())), _n(sum(mc.values()) - mc['inert'])) +
+                         ' | '.join(_n(mc[s]) for s in STATES if s != 'inert') + ' | %s |' % _n(mc['inert']))
+    lines += ['',
               'Dialogue result scripts (the lines a topic answer runs) are compiled as scripts of their own: '
               '%s results, %s run whole, %s use a function the interpreter lacks, %s are not converted.'
               % (_n(doc['dialogue_results']['total']), _n(d['runs']), _n(d['missing-function']),
@@ -940,7 +957,7 @@ def render(doc):
               'lists, the start scripts, StartScript in other scripts and in dialogue results. Conditions: the number '
               'of if, elseif and while tests and what they read.', '']
     for master in MASTERS:
-        mine = [r for r in rows if r['master'] == master]
+        mine = [r for r in rows if r['master'] == master and r['state'] != 'inert']
         if not mine:
             continue
         lines += ['### %s' % master.split('.')[0], '',
@@ -952,6 +969,19 @@ def render(doc):
             cells = [r['id'], r['area'], LABELS[r['state']], _refs(r), _records(r),
                      ', '.join(r['functions']) or '-', conds, ', '.join(r.get('openmw', ())) or '-', r['why'] or '-']
             lines.append('| ' + ' | '.join(_cell(x) for x in cells) + ' |')
+        lines.append('')
+    lines += ['## Not used in the original game', '',
+              'Scripts that no object, character, item, dialogue line, start record or other script ever names or '
+              'starts, so they never ran in the original game either: the developers\' test and example scripts, '
+              'earlier versions replaced by others, and cut content. They stay in the game as they are; the counts '
+              'above count only the scripts the original uses, and the data file keeps every script with its state.', '']
+    for master in MASTERS:
+        mine = [r for r in rows if r['master'] == master and r['state'] == 'inert']
+        if not mine:
+            continue
+        lines += ['### %s (%s)' % (master.split('.')[0], _n(len(mine))), '', '| Script | Why |', '| --- | --- |']
+        for r in sorted(mine, key=lambda r: r['id'].casefold()):
+            lines.append('| %s | %s |' % (_cell(r['id']), _cell(r['why'] or '-')))
         lines.append('')
     return doc_toc.render('\n'.join(lines).rstrip('\n') + '\n')
 

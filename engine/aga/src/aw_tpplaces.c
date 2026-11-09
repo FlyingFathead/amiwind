@@ -9,7 +9,9 @@
 #include "aw_listbox.h"
 #include "aw_tryalloc.h"
 
-#define TABLE_MAX (AW_TP_HEADER+1024L*AW_TP_ROW)   /* 82 places on Vvardenfell; room for Solstheim and more */
+/* 82 places and up to about 1,341 listed rooms on Vvardenfell (TP-MENU-INTERIORS-63: about 137 KB while open);
+ * 3,000 rows (288,016 bytes) leaves room for Solstheim and more */
+#define TABLE_MAX (AW_TP_HEADER+3000L*AW_TP_ROW2)
 static const char path[]="tp-places.lut";
 static unsigned char *table;
 static long rows;
@@ -44,11 +46,11 @@ int AW_TpPlacesOpen(void){
     }
     if(!(table=(unsigned char *)AW_TryMalloc((unsigned long)size))){fclose(f);Con_Printf("Teleport list: not enough memory.\n");return 0;}
     if((long)fread(table,1,(size_t)size,f)!=size || (rows=AW_TpPlacesRows(table,size))<1){
-        fclose(f);Con_Printf("Teleport list: %s is not AWTP1\n",path);closed(NULL);return 0;
+        fclose(f);Con_Printf("Teleport list: %s is not AWTP1 or AWTP2\n",path);closed(NULL);return 0;
     }
     fclose(f);
     memset(&s,0,sizeof(s));
-    s.title="Teleport to a settlement";s.count=(int)rows;s.label=label;s.chosen=chosen;s.closed=closed;
+    s.title="Teleport to a place or room";s.count=(int)rows;s.label=label;s.chosen=chosen;s.closed=closed;
     if(!AW_ListBoxOpen(&s)){closed(NULL);return 0;}
     Con_DPrintf("Teleport list: %ld places, %ld bytes while open\n",rows,size);
     return 1;

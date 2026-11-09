@@ -1,6 +1,6 @@
 # Development overlays
 
-_Last updated with AmiWind v0.0.62-dev1 (7 November 2026)._
+_Last updated with AmiWind v0.0.63-dev5 (9 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -321,8 +321,15 @@ else the outside end of a door into the place, the one nearest the place's middl
 lowest walkway near the middle), else where a placed object stands on land near the middle, on the ground there. The choice runs the same coordinate teleport as `dbg tp X Y Z`, so a place
 that is not on this disk says so and leaves you where you are.
 
-The list is a small table the builder makes from the game data (`tp-places.lut`, about 4 KB for 82 places,
-`tools/tp_places_lut.py`). The game reads it from the disk when the box opens and frees it when the box closes;
+The list also holds every converted room the disk carries (v0.0.63), each shown with its cell name and
+"(interior)" after it, so a room never shares a name with an outdoor place and typing `interior` lists only the
+rooms; `andrano` finds Andrano Ancestral Tomb (interior). Choosing a room runs `dbg tp` with its room map, so you
+enter at the arrival point of its door, as with `dbg tp <room map>`. A long room name may run past the right edge
+of the box; the search still finds it.
+
+The list is a small table the builder makes from the game data and the rooms in the image (`tp-places.lut`,
+`tools/tp_places_lut.py`; 96 bytes a row, about 140 KB with every room, a disk without rooms reads its older
+table as before). The game reads it from the disk when the box opens and frees it when the box closes;
 nothing of it stays in memory while you play. The same box is meant for the weapon and gear pickers next.
 `debug tp ...` and `amiwind debug tp ...` use the same handler. Teleport uses the
 existing scene state capture and checked arrival path, not a New Game reset.

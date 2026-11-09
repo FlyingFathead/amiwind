@@ -19,7 +19,7 @@
 | Where | tools (the per-actor record), engine aw_combat.c, aw_anim.c, aw_npcpath.c |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.52-dev1 (last seen) |
+| Persists in | fixed in v0.0.63 |
 | Severity | high: Without it nobody attacks on sight (hostile creatures, Dagoth Ur) and every NPC idles the same way |
 | Family | Actors and NPCs (`actors-npc`) |
 | Playtest version | v0.0.52-dev-source-cdb66e02 |

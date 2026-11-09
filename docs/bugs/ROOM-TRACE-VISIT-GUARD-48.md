@@ -137,6 +137,8 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - SESSION-PASS-DEAD-ENGINE-57 (no report page): The scripted test session reported PASS while the engine had crashed
 - SESSION-STALL-CENSUS-QUICKSTART-58 (no report page): On the v0.0.58-dev6 image a session that quick-starts into the Census and Excise Office at 135 172 64 stalls before its first still: the runner reports game stalled with the game clock frozen at 23.23 s
 - [SMOKE-DELIVERY-OLD-COPY-58](SMOKE-DELIVERY-OLD-COPY-58.md): The playtest delivery ran an old copy of the boot smoke: the v0.0.58 release smoke failed four times on a working image
+- SMOKE-IDE-TRACE-LOG-63 (no report page): The gate smoke runs the emulator with its IDE trace log on, about 41 MB per two-minute run
+- SMOKE-INPLAY-UNSAMPLED-63 (no report page): The boot smoke never examines a stop where the game does not get into play after a load
 - SMOKE-KEY-DURING-LOGO-52 (no report page): The engine smoke can type its console command while the logo is still up: the m of map is the logo s not-now key for the extra Fast RAM, so the start runs without the CHIM cache and the 32 MB zone check fails falsely
 - SMOKE-M-KEY-SKIPS-CHIM-CACHE-57 (no report page): The gate's boot smoke sometimes fails with the CHIM zone full: an M typed while the startup memory notice shows turns the CHIM cache off for that start
 - [SMOKE-MUSIC-REREAD-FLAKY-57](SMOKE-MUSIC-REREAD-FLAKY-57.md): The boot smoke's music check fails now and then: music is not read again after dbg music on (reads 35 -> 35), a rerun passes

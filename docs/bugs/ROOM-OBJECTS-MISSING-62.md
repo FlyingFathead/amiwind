@@ -9,7 +9,7 @@
 | Where | Room conversion: placed containers, items, activators and creatures (Andrano Ancestral Tomb) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.61 (last seen) |
+| Persists in | fixed in v0.0.63 |
 | Severity | high: rooms are empty of everything but doors; it may hold for every room of the game |
 | Family | Content silently missing from a build (`build-content-missing`) |
 | Playtest version | v0.0.61 |

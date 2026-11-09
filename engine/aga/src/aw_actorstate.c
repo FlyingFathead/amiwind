@@ -47,8 +47,14 @@ static void release(aw_actor_t *a){
     if(a->spells)free(a->spells);
     a->items=NULL;a->spells=NULL;a->nitems=a->nspells=a->items_capacity=a->spells_capacity=0;
 }
+/* UNDERWATER-BREATH-62 (v0.0.63 release check): counts every emptying of the pool (a loaded game, a New Game, the
+ * table opened again): the player's record then starts again from its base, so what was added to it (the race's
+ * abilities) has to be added again (aw_mwhost.c creation_spells) */
+static unsigned long pool_epoch;
+unsigned long AW_ActorStateEpoch(void){return pool_epoch;}
 static void pool_empty(void){
     int i;
+    pool_epoch++;
     for(i=0;i<RECORDS();i++)release(REC(i));
     for(i=0;i<st->blocks;i++)memset(st->block[i],0,sizeof(aw_actor_t)*AW_ACTOR_POOL);
     release(&st->player);memset(&st->player,0,sizeof(st->player));

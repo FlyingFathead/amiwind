@@ -1,5 +1,14 @@
 # DEBUG-TP-ROOM-ENTRANCE-50: dbg tp with a room's map name reaches only rooms entered from Balmora
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 2 times; something has to be done
+
+- Reported with v0.0.50 at 2026-10-24 19:03 +0300
+- Reported with v0.0.63-dev5 at 2026-11-09 21:13 +0200: Seen again: dbg tp ri8c361151ce (Andrano Ancestral Tomb, its door in a cell without a frame) printed No converted entrance; same cause as CONSOLE-TP-ROOM-NAME-63.
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -9,7 +18,7 @@
 | Where | engine/aga/src/aw_scene.c scene_command (read_links_for seyda or balmora) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.50 (last seen) |
+| Persists in | fixed in v0.0.63 |
 | Severity | low: Debug teleport only; the doors themselves are not affected; it stopped the v0.0.50 scripted room check |
 | Family | Development tooling, receipts and packaging (`tracker-tooling`) |
 | Playtest version | 2026_10_24_v0.0.50_final_ffb87463 |
@@ -20,6 +29,22 @@
 <!-- END GENERATED FACTS -->
 
 _Last updated with AmiWind v0.0.50 (24 October 2026)._
+
+<!-- contents start -->
+## Contents
+
+- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [Status: 24 October 2026](#status-24-october-2026)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
 
 ## Status: 24 October 2026
 
@@ -96,6 +121,7 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - HANDOFF-WRAPPER-01 (no report page): Source handoff wrapper reused an existing extraction directory
 - IMAGE-HDF-COPY-SPARSE-JDRIVE-59 (no report page): Copying a padded HDF from the build volume onto a mounted folder fails with Permission denied
 - MONITOR-WARNINGS-ROW-54 (no report page): Requested: the Toolkit build monitor gathers every warning of a build in one yellow row, Warnings: N with a view of the lines
+- MWSCRIPT-TRACKER-MAIN-INERT-63 (no report page): The script tracker called Main named by nothing, although the game always starts it and AmiWind carries its work
 - PACKAGE-PORTABILITY-28 (no report page): Rebundled ZIPs lost exec modes; Windows path aliases accepted
 - [PKG-STALE-RUNTIME-32](PKG-STALE-RUNTIME-32.md): The sealed v0.0.31 playtest contains a stale launcher preset folder
 - PLAYTEST-KNOWN-ISSUES-STALE-54 (no report page): The v0.0.54 playtest package's KNOWN-ISSUES list was made from the register of the build commit, older than the release's register
@@ -144,5 +170,9 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - TRACKER-SEA-CELL-LAND-GREEN-57 (no report page): The world map paints in-game sea cells land-green in its build view: a lone tile at -15,-8 looks like leftover land
 - [TRACKER-SEA-CELL-SET-36](TRACKER-SEA-CELL-SET-36.md): The CHIM tracker's island view leaves out 37 land cells that hold only terrain and sea; one is labelled Solstheim
 - WIN-02 (no report page): Cancelled Windows stage leaves child workers alive
+
+Related bugs in other categories:
+
+- CONSOLE-TP-ROOM-NAME-63 (no report page): The console teleport to a room map name stays in the current town instead of entering the room
 
 <!-- END GENERATED CATEGORY -->

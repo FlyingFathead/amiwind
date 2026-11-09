@@ -18,7 +18,7 @@
 | Where | actor library stage (tools/npc_library.py, tools/creature_library.py) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.63-dev1 (last seen) |
+| Persists in | fixed in v0.0.63 |
 | Severity | high: each refused reuse of the stage costs 2,600 to 2,750 s re-baking 418 appearances and 57 creature models whose own inputs had not changed |
 | Family | Build speed (`build-speed`) |
 | Playtest version | 2026_11_09_v0.0.63-dev1_full-v0.0.63-dev1_dc356e3 |

@@ -19,7 +19,7 @@ static void put32(unsigned char *p,long v){unsigned long u=(unsigned long)v;p[0]
 
 int main(void){
     aw_listbox_t b;int shown[PLACES],i;char line[64];
-    unsigned char table[AW_TP_HEADER+2*AW_TP_ROW];aw_tp_place_t p;
+    unsigned char table[AW_TP_HEADER+2*AW_TP_ROW];unsigned char table2[AW_TP_HEADER+2*AW_TP_ROW2];aw_tp_place_t p;
 
     /* matching: letters and digits only, case ignored, anywhere in the label */
     assert(AW_ListBoxMatches("Ald-ruhn","aldruhn") && AW_ListBoxMatches("Ald-ruhn","ALD RU") && AW_ListBoxMatches("Seyda Neen","neen"));
@@ -82,7 +82,7 @@ int main(void){
     memcpy(table,"AWTP",4);table[5]=1;table[7]=AW_TP_ROW;put32(table+8,2);
     memcpy(table+AW_TP_HEADER,"Balmora",7);put32(table+AW_TP_HEADER+32,-20536);put32(table+AW_TP_HEADER+36,-13960);
     put32(table+AW_TP_HEADER+40,378);table[AW_TP_HEADER+44]=AW_TP_HAS_Z|AW_TP_DOOR;table[AW_TP_HEADER+45]=4;
-    memset(table+AW_TP_HEADER+AW_TP_ROW,'x',AW_TP_NAME);                         /* no NUL: cut at 31 */
+    memset(table+AW_TP_HEADER+AW_TP_ROW,'x',AW_TP_NAME1);                        /* no NUL: cut at 31 */
     put32(table+AW_TP_HEADER+AW_TP_ROW+32,12288);put32(table+AW_TP_HEADER+AW_TP_ROW+36,-36864);
     assert(AW_TpPlacesRows(table,sizeof(table))==2);
     assert(AW_TpPlacesRows(table,sizeof(table)-1)==-1 && AW_TpPlacesRows(table,8)==-1 && AW_TpPlacesRows(NULL,64)==-1);
@@ -93,11 +93,33 @@ int main(void){
     assert(!strcmp(p.name,"Balmora") && p.x==-20536 && p.y==-13960 && p.z==378 && p.flags==3 && p.cells==4);
     assert(AW_TpPlacesCommand(&p,line,sizeof(line))>0 && !strcmp(line,"aw_teleport -20536 -13960 378\n"));
     AW_TpPlacesRow(table,1,&p);
-    assert(strlen(p.name)==AW_TP_NAME-1 && p.x==12288 && p.y==-36864 && p.flags==0);
+    assert(strlen(p.name)==AW_TP_NAME1-1 && p.x==12288 && p.y==-36864 && p.flags==0);
     assert(AW_TpPlacesCommand(&p,line,sizeof(line))>0 && !strcmp(line,"aw_teleport 12288 -36864\n"));  /* no z: the floor below */
     assert(AW_TpPlacesCommand(&p,line,20)==-1 && AW_TpPlacesCommand(NULL,line,sizeof(line))==-1);
     p.x=-2147483647L;p.y=2147483647L;p.z=-1;p.flags=AW_TP_HAS_Z;
     assert(AW_TpPlacesCommand(&p,line,sizeof(line))>0 && !strcmp(line,"aw_teleport -2147483647 2147483647 -1\n"));
+    /* an old (version 1) row never reads as a room, even with bit 8 set */
+    table[AW_TP_HEADER+44]|=AW_TP_ROOM;AW_TpPlacesRow(table,0,&p);
+    assert(!(p.flags&AW_TP_ROOM) && !p.map[0] && !strcmp(line,"aw_teleport -2147483647 2147483647 -1\n"));
+
+    /* version 2 (TP-MENU-INTERIORS-63): a long name, a room row with its map, dbg tp <map> */
+    memset(table2,0,sizeof(table2));
+    memcpy(table2,"AWTP",4);table2[5]=2;table2[7]=AW_TP_ROW2;put32(table2+8,2);
+    memcpy(table2+AW_TP_HEADER,"Andrano Ancestral Tomb (interior)",33);
+    table2[AW_TP_HEADER+64+12]=AW_TP_ROOM;memcpy(table2+AW_TP_HEADER+80,"ri8c361151ce",12);
+    memcpy(table2+AW_TP_HEADER+AW_TP_ROW2,"Balmora",7);put32(table2+AW_TP_HEADER+AW_TP_ROW2+64,-20536);
+    put32(table2+AW_TP_HEADER+AW_TP_ROW2+68,-13960);
+    assert(AW_TpPlacesRows(table2,sizeof(table2))==2 && AW_TpPlacesRows(table2,sizeof(table2)-1)==-1);
+    table2[7]=AW_TP_ROW;assert(AW_TpPlacesRows(table2,sizeof(table2))==-1);table2[7]=AW_TP_ROW2;
+    AW_TpPlacesRow(table2,0,&p);
+    assert(!strcmp(p.name,"Andrano Ancestral Tomb (interior)") && p.flags==AW_TP_ROOM && !strcmp(p.map,"ri8c361151ce"));
+    assert(AW_TpPlacesCommand(&p,line,sizeof(line))>0 && !strcmp(line,"dbg tp ri8c361151ce\n"));
+    assert(AW_TpPlacesCommand(&p,line,20)==-1);
+    p.map[2]=';';assert(AW_TpPlacesCommand(&p,line,sizeof(line))==-1);       /* never a second console command */
+    p.map[0]=0;assert(AW_TpPlacesCommand(&p,line,sizeof(line))==-1);
+    AW_TpPlacesRow(table2,1,&p);
+    assert(!strcmp(p.name,"Balmora") && !p.map[0] && AW_TpPlacesCommand(&p,line,sizeof(line))>0
+        && !strcmp(line,"aw_teleport -20536 -13960\n"));
     puts("listbox rules ok");
     return 0;
 }

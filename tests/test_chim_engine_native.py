@@ -31,6 +31,19 @@ MAP_PATH_USERS = ('aw_region.c', 'aw_section.c', 'aw_scene.c', 'aw_gallery.c', '
                   'sv_main.c', 'chim_world.c')
 
 
+RUN_LIMIT_FLOOR = 300
+
+
+def run_limit(environ=None):
+    """Seconds one compiled check may run: 300 s, times AMIWIND_TEST_TIMEOUT_FACTOR (>= 1) on a slow machine."""
+    text = (os.environ if environ is None else environ).get('AMIWIND_TEST_TIMEOUT_FACTOR', '')
+    try:
+        factor = float(text)
+    except ValueError:
+        factor = 1.0
+    return RUN_LIMIT_FLOOR * max(1.0, factor)
+
+
 def compile_and_run(test, fixture, sources, arguments_sets=((),), extra=(), cwd=None):
     sources = [Path(p) for p in sources]
     if any(p.name in MAP_PATH_USERS for p in sources) and not any(p.name == 'aw_mappath.c' for p in sources):
@@ -49,7 +62,7 @@ def compile_and_run(test, fixture, sources, arguments_sets=((),), extra=(), cwd=
         outputs = []
         for argv in arguments_sets:
             result = subprocess.run([str(exe), *map(str, argv)], cwd=cwd or tmp, capture_output=True, text=True,
-                                    env=dict(os.environ, ASAN_OPTIONS='detect_leaks=0'), timeout=300)
+                                    env=dict(os.environ, ASAN_OPTIONS='detect_leaks=0'), timeout=run_limit())
             test.assertEqual(result.returncode, 0, ' '.join(map(str, argv)) + ': ' + result.stdout + result.stderr)
             outputs.append(result.stdout)
         return outputs
@@ -103,6 +116,16 @@ class ChimHookContractTests(unittest.TestCase):
 
 @unittest.skipIf(os.name == 'nt', 'native helper fixtures run on Linux, including the Docker gate')
 @unittest.skipUnless(COMPILER, 'install a host C compiler')
+class RunLimitTests(unittest.TestCase):
+    """The limit of one compiled check is 300 s and only ever grows with the machine's slowness factor."""
+
+    def test_floor_and_factor(self):
+        self.assertEqual(run_limit({}), 300)
+        self.assertEqual(run_limit({'AMIWIND_TEST_TIMEOUT_FACTOR': '4.5'}), 1350)
+        self.assertEqual(run_limit({'AMIWIND_TEST_TIMEOUT_FACTOR': '0.1'}), 300)
+        self.assertEqual(run_limit({'AMIWIND_TEST_TIMEOUT_FACTOR': 'fast'}), 300)
+
+
 class ChimZoneTests(unittest.TestCase):
     def test_zone_fit_lru_locks_banks_and_stress(self):
         out = compile_and_run(self, 'aga_chim_zone_test.c', [SRC / 'chim/chim_zone.c'])

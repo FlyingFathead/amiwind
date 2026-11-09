@@ -1,10 +1,11 @@
 # Changelog
 
-_Last updated with AmiWind v0.0.63-dev5 (9 November 2026)._
+_Last updated with AmiWind v0.0.63 (9 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.63: Every Script Of Vvardenfell, 9 November 2026](#v0063-every-script-of-vvardenfell-9-november-2026)
 - [v0.0.63-dev5: fifth snapshot of v0.0.63, 9 November 2026](#v0063-dev5-fifth-snapshot-of-v0063-9-november-2026)
 - [v0.0.63-dev4: fourth snapshot of v0.0.63, 9 November 2026](#v0063-dev4-fourth-snapshot-of-v0063-9-november-2026)
 - [v0.0.63-dev3: third snapshot of v0.0.63, 9 November 2026](#v0063-dev3-third-snapshot-of-v0063-9-november-2026)
@@ -177,6 +178,46 @@ _Last updated with AmiWind v0.0.63-dev5 (9 November 2026)._
 - [CHIM source candidate - 14 October 2026, v0.0.40-dev1](#chim-source-candidate---14-october-2026-v0040-dev1)
 
 <!-- contents end -->
+
+## v0.0.63: Every Script Of Vvardenfell, 9 November 2026
+
+v0.0.63 is the release of the base game's scripting ([release notes](releases/notes/RELEASE-v0.0.63.md)); it covers
+everything since v0.0.62: the five development snapshots (dev1 to dev5; dev3 came to the main line with dev4) and the
+fixes made after dev5. It needs 32 MB of Fast RAM. Grouped by what a player notices:
+
+- **Scripts:** of the 1,074 scripts the original game uses (1,207 in the three game files), 605 run as scripts (588 in
+  v0.0.62) and 9 more, the opening's and the game's main script, are carried by AmiWind's own code: every script of the
+  base game that the original uses runs, except one that Tribunal places. Morrowind.esm uses 528 of its 616: 518 run, 9
+  carried, 1 add-on; Tribunal.esm uses 236 of 255: 42 run in Vvardenfell, 8 wait for a function, 186 belong to
+  Mournhold; Bloodmoon.esm uses 310 of 336: 45 run, 20 wait for a function, 245 belong to Solstheim. The 133 scripts
+  that nothing in the original game names or starts (88, 19 and 26) stay in the game and are listed apart
+  ([MWScript tracker](MWSCRIPT_FEATURES.md)). 460 of the
+  original's 504 script functions are carried out, among them the werewolf, forced run, scale, moon, magic effect,
+  game hour, soul gem and console functions; the original game's console commands work on any reference
+  (`dbg help mw`).
+- **The opening and the world:** a new game starts with the original's opening state; scripts move and turn the objects
+  they name (the Ghostgate portcullises), kept in saved games; fire pits burn; containers in rooms can be opened again;
+  items can be dropped on uneven tomb and cave floors; dates read as in the original; the blight cloud at Dagoth Ur no
+  longer shows as a solid shape.
+- **Combat and creatures:** creatures walk, run and attack wherever they are met and stand on the ground; hostile
+  creatures attack on sight; characters fight each other, and allies, guards and followers take sides; Always use best
+  attack in Options (on by default); the original's chance to hit with the active effects and its hit cone; god mode
+  holds back every damage; health and fatigue never stand above their maximum.
+- **Breath and water:** breath and drowning under water, with Water Breathing from the race, potions, spells and worn
+  items (the race's ability is given again after a load or a New Game; checked by tests, not yet in play).
+- **Dialogue and the text box:** a spoken line's box is drawn at once and leaves the stats under the view visible (text
+  box type 2, the new default; type 1 stays a choice in Options).
+- **Debug tools:** `dbg tp` enters any room at its door's arrival, also when its door stands on another frame, and its
+  menu lists the rooms as well as the settlements, each as "<name> (interior)" (the longest names run past the box).
+- **Tests and CI:** the native engine checks run in smaller parts with a time limit that fits slower machines, and the
+  test jobs get 45 minutes (the timeout entry stays open until the checks run green with it).
+- **The builder and the image:** every finished unit is kept the moment it comes back and reused by later builds
+  (`--reuse-all-available` with a plan before any stage); the world stages rebuild only for their own inputs; the risky
+  stages run first; worker pools stay busy; actor models share their repeated shapes (78.4 MB less on the v0.0.62
+  payload); the builder states what it found of Tribunal and Bloodmoon.
+- **The game systems table** ([game features](GAME_FEATURES.md)) is refreshed: 7 of 49 systems done, 39 partial, 3
+  missing.
+- Everything from the snapshots below. The release's own fixes were checked by tests, not yet in play.
 
 ## v0.0.63-dev5: fifth snapshot of v0.0.63, 9 November 2026
 

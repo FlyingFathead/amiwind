@@ -100,6 +100,22 @@ class RaceWaterBreathingTests(unittest.TestCase):
         self.assertIn('creation_generation++;', spells[:spells.index('\n}\n')])
         self.assertIn('unsigned long g=AW_EffectsGeneration()+creation_generation;', host)
 
+    def test_an_emptied_player_record_gets_the_race_spells_again(self):
+        # v0.0.63-dev5 release check: a loaded game (and the arrival snapshot's restore) empties the actor pool, the
+        # player's record with it, while the applied race stayed the same, so the race's abilities were never added
+        # back; the pool's epoch makes creation_spells apply everything again (the harness in test_actorstate.py
+        # shows the added ability gone after a load and the epoch moved)
+        state = code('aw_actorstate.c')
+        empty = state[state.index('static void pool_empty(void){'):]
+        self.assertIn('pool_epoch++;', empty[:empty.index('\n}\n')])
+        host = code('aw_mwhost.c')
+        spells = host[host.index('static void creation_spells(aw_actor_t *a){'):]
+        spells = spells[:spells.index('\n}\n')]
+        self.assertIn('if(applied_epoch!=AW_ActorStateEpoch()){applied_race=applied_birth=applied_class=-2;applied_n=0;}',
+                      spells)
+        self.assertLess(spells.index('applied_epoch!=AW_ActorStateEpoch()'), spells.index('aw_character.race==applied_race'))
+        self.assertIn('applied_epoch=AW_ActorStateEpoch();', spells)
+
 
 class WaterBreathingScriptTests(unittest.TestCase):
     def test_get_set_and_mod_go_through_the_host(self):

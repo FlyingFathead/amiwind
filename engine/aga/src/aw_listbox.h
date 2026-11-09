@@ -58,21 +58,28 @@ typedef struct {
 int AW_ListBoxOpen(const aw_listbox_spec_t *spec);
 int AW_ListBoxActive(void);
 
-/* The settlements table (tools/tp_places_lut.py, AWTP1, id1/tp-places.lut), big-endian: header 16 bytes "AWTP",
- * u16 version 1, u16 row bytes 48, u32 rows, u32 0; rows x 48: name[32] (Latin-1, NUL-padded), i32 x, y, z
- * (original global units: the arrival point), u8 flags (AW_TP_*), u8 named cells, u16 0. Sorted by name. */
+/* The settlements table (tools/tp_places_lut.py, id1/tp-places.lut), big-endian: header 16 bytes "AWTP",
+ * u16 version, u16 row bytes, u32 rows, u32 0. Version 2 (TP-MENU-INTERIORS-63), rows x 96: name[64] (Latin-1,
+ * NUL-padded), i32 x, y, z (original global units: the arrival point), u8 flags (AW_TP_*), u8 named cells, u16 0,
+ * map[16] (a room row's map name). Version 1 (an older disk), rows x 48: name[32], the same 16 bytes, no map.
+ * Sorted by name. */
 #define AW_TP_HEADER 16
-#define AW_TP_ROW 48
-#define AW_TP_NAME 32
+#define AW_TP_ROW 48         /* version 1 */
+#define AW_TP_ROW2 96        /* version 2 */
+#define AW_TP_NAME1 32
+#define AW_TP_NAME 64
+#define AW_TP_MAP 16
 #define AW_TP_HAS_Z 1        /* z is the arrival height (else: the floor at or below the point) */
 #define AW_TP_DOOR 2         /* the arrival of a door into the place (on the street) */
 #define AW_TP_COC 4          /* the game's own CocMarkerHeading */
-typedef struct {char name[AW_TP_NAME];long x,y,z;int flags,cells;} aw_tp_place_t;
-/* rows of a table of SIZE bytes (header checked, size exact); -1 when it is no AWTP1 table */
+#define AW_TP_ROOM 8         /* a converted room: map is its room map, entered through dbg tp <map> */
+typedef struct {char name[AW_TP_NAME];char map[AW_TP_MAP];long x,y,z;int flags,cells;} aw_tp_place_t;
+/* rows of a table of SIZE bytes (header checked, size exact); -1 when it is no AWTP1/AWTP2 table */
 long AW_TpPlacesRows(const unsigned char *data,long size);
-/* row I of a checked table into P (the name always ends in a NUL) */
+/* row I of a checked table into P (the name and the map always end in a NUL) */
 void AW_TpPlacesRow(const unsigned char *data,long i,aw_tp_place_t *p);
-/* the console line that takes you there ("aw_teleport X Y [Z]\n"), the existing coordinate path; length or -1 */
+/* the console line that takes you there: "aw_teleport X Y [Z]\n" (the coordinate path), for a room row
+ * "dbg tp <map>\n" (the room path, at its door's arrival); length or -1 */
 int AW_TpPlacesCommand(const aw_tp_place_t *p,char *out,int size);
 
 /* dbg tp with no argument (aw_tpplaces.c): the settlements box from id1/tp-places.lut, read when it opens and

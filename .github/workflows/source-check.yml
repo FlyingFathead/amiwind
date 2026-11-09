@@ -142,14 +142,16 @@ jobs:
     # tests, so it is skipped on tags too. tests/test_ci_workflow.py keeps this condition.
     if: ${{ !startsWith(github.ref, 'refs/tags/') }}
     runs-on: ubuntu-24.04
-    # One shard is about a sixth of the suite; the limit leaves room for the whole suite's growth
-    timeout-minutes: 30
+    # One shard is about a sixth of the suite; the limit leaves room for the whole suite's growth. 45 since v0.0.63:
+    # part 1 (the native CHIM engine checks) took 27 minutes on a slow runner (TEST-CHIM-BIG-FRAME-TIMEOUT-33)
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
         shard: [1, 2, 3, 4, 5, 6]
     env:
       PYTHONPATH: ${{ github.workspace }}/src:${{ github.workspace }}/tools
+      AMIWIND_TEST_TIMEOUT_FACTOR: "4.5"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -173,7 +175,7 @@ jobs:
         run: |
           grep -m1 'model name' /proc/cpuinfo
           python -c 'import numpy; print("numpy", numpy.__version__, numpy.__config__.CONFIG["Build Dependencies"]["blas"].get("openblas configuration"))'
-          python tools/run_tests.py -v --module-timeout 900 --shard "${{ matrix.shard }}/$TEST_SHARDS"
+          python tools/run_tests.py -v --module-timeout 900 --part-seconds 12 --shard "${{ matrix.shard }}/$TEST_SHARDS"
 
   dry-run:
     needs: [tools, source-checks, tests]
