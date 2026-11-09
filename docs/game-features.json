@@ -1,6 +1,6 @@
 {
   "schema": "game-features 1",
-  "updated": "2026-11-07",
+  "updated": "2026-11-09",
   "intro": "One row per system of the base game: what state AmiWind has it in, which reference decides how it should behave, where the proof is, and which work items and register entries carry the rest. The states are taken from the work lists and the bug register; a row is marked done only when it names a proof.",
   "mwscript": {
     "source": "tools/mwscript/functions.py (the compiler's own table, counted in the builder container on 9 November 2026) and the builder's script measurement (docs/MWSCRIPT_BYTECODE.md)",

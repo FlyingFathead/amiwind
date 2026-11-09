@@ -1,10 +1,11 @@
 # Changelog
 
-_Last updated with AmiWind v0.0.63-dev4 (9 November 2026)._
+_Last updated with AmiWind v0.0.63-dev5 (9 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.63-dev5: fifth snapshot of v0.0.63, 9 November 2026](#v0063-dev5-fifth-snapshot-of-v0063-9-november-2026)
 - [v0.0.63-dev4: fourth snapshot of v0.0.63, 9 November 2026](#v0063-dev4-fourth-snapshot-of-v0063-9-november-2026)
 - [v0.0.63-dev3: third snapshot of v0.0.63, 9 November 2026](#v0063-dev3-third-snapshot-of-v0063-9-november-2026)
 - [v0.0.63-dev2: second snapshot of v0.0.63, 9 November 2026](#v0063-dev2-second-snapshot-of-v0063-9-november-2026)
@@ -176,6 +177,20 @@ _Last updated with AmiWind v0.0.63-dev4 (9 November 2026)._
 - [CHIM source candidate - 14 October 2026, v0.0.40-dev1](#chim-source-candidate---14-october-2026-v0040-dev1)
 
 <!-- contents end -->
+
+## v0.0.63-dev5: fifth snapshot of v0.0.63, 9 November 2026
+
+The fifth development snapshot of v0.0.63 ([release notes](releases/notes/RELEASE-v0.0.63-dev5.md)). It needs 32 MB
+of Fast RAM. Its changes are checked by tests, not yet in play.
+
+- The box of a spoken line (random and idle lines, greetings, notices) is drawn at once where it always was, without
+  the rising animation, and blackens nothing outside the box, so the stats under the view stay visible. This text box
+  type 2 is the new default; type 1, the old rising strip, stays as a choice in Options, Prefs and as
+  `dbg ui textbox 1|2`.
+- The builder states for Tribunal and Bloodmoon whether their files were found and what of each it uses (records,
+  archive files, scripts that run or wait, creatures built), in the build summary and in the build records.
+- The README gives the breakdown of the game's 1,207 scripts: 605 run as scripts, 8 are carried by the game's own
+  code, 460 wait for Mournhold and Solstheim and 134 are named by nothing.
 
 ## v0.0.63-dev4: fourth snapshot of v0.0.63, 9 November 2026
 

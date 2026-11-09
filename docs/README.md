@@ -1,6 +1,6 @@
 # AmiWind documentation
 
-_Generated from `docs/README.topics.json` with AmiWind v0.0.63-dev4._
+_Generated from `docs/README.topics.json` with AmiWind v0.0.63-dev5._
 
 Every document of the project, by topic, with the version and date of its last update. A document marked "needs a refresh" predates the current state of its subject and is due for a review; its facts may be out of date. Release notes and whitespace baselines are listed in [releases](releases/README.md); one-off records and replaced documents in [history](history/README.md).
 
@@ -37,7 +37,7 @@ Every document of the project, by topic, with the version and date of its last u
 | [BUILD_OUTPUT.md](BUILD_OUTPUT.md) | Build completion output | v0.0.59 (4 November 2026) |
 | [BUILD_PROFILE.md](BUILD_PROFILE.md) | Build profile and stage reuse | v0.0.63-dev3 (9 November 2026) |
 | [BUILD_RECIPES.md](BUILD_RECIPES.md) | Build recipes | v0.0.36 (11 October 2026), needs a refresh |
-| [KNOWN_INPUTS.md](KNOWN_INPUTS.md) | Known inputs: which files did the builder get? | v0.0.32-dev1 (8 October 2026), needs a refresh |
+| [KNOWN_INPUTS.md](KNOWN_INPUTS.md) | Known inputs: which files did the builder get? | v0.0.63-dev5 (2026-11-09), needs a refresh |
 | [CONTAINERS.md](CONTAINERS.md) | Town containers and inventory plan | v0.0.42-dev1 (17 October 2026), needs a refresh |
 | [COMPILER_TROUBLESHOOTING.md](COMPILER_TROUBLESHOOTING.md) | Compiler troubleshooting options and evidence | v0.0.42-dev1 (17 October 2026), needs a refresh |
 | [CONVERSION_RECIPES.md](CONVERSION_RECIPES.md) | Reusable conversion recipes | v0.0.42-dev1 (17 October 2026), needs a refresh |
@@ -74,7 +74,7 @@ Every document of the project, by topic, with the version and date of its last u
 | [CRASH_REPORTING.md](CRASH_REPORTING.md) | Fatal error reports | v0.0.28 (4 October 2026), needs a refresh |
 | [DEBUG_OVERLAYS.md](DEBUG_OVERLAYS.md) | Development overlays | v0.0.62-dev1 (7 November 2026) |
 | [GAME_RECORDER.md](GAME_RECORDER.md) | Gameplay recorder | v0.0.62-dev1 (2026-11-07) |
-| [AMIWIND_CONSOLE_COMMANDS.md](AMIWIND_CONSOLE_COMMANDS.md) | AmiWind console commands | generated (v0.0.63-dev4) |
+| [AMIWIND_CONSOLE_COMMANDS.md](AMIWIND_CONSOLE_COMMANDS.md) | AmiWind console commands | generated (v0.0.63-dev5) |
 | [CONSOLE_COMMANDS_MORROWIND.md](CONSOLE_COMMANDS_MORROWIND.md) | The original game's console commands in AmiWind | v0.0.63-dev3 (9 November 2026) |
 | [GAME_STATE_RESET.md](GAME_STATE_RESET.md) | Game state reset and failed loads | v0.0.62-dev2 (8 November 2026) |
 | [MEMORY_ALLOCATION.md](MEMORY_ALLOCATION.md) | Memory allocation and heap clearance | v0.0.42-dev1 (17 October 2026), needs a refresh |
@@ -120,9 +120,9 @@ Every document of the project, by topic, with the version and date of its last u
 
 | Document | Title | Last updated |
 | --- | --- | --- |
-| [GAME_FEATURES.md](GAME_FEATURES.md) | Game features | v0.0.63-dev4 (7 November 2026) |
+| [GAME_FEATURES.md](GAME_FEATURES.md) | Game features | v0.0.63-dev5 (9 November 2026) |
 | [game-features.json](game-features.json) | game-features.json | data file |
-| [MWSCRIPT_FEATURES.md](MWSCRIPT_FEATURES.md) | MWScript features | v0.0.63-dev4 (9 November 2026) |
+| [MWSCRIPT_FEATURES.md](MWSCRIPT_FEATURES.md) | MWScript features | v0.0.63-dev5 (9 November 2026) |
 | [mwscript-features.json](mwscript-features.json) | mwscript-features.json | data file |
 | [ACTOR_PLACEMENT.md](ACTOR_PLACEMENT.md) | Actor placement: how actors stand, fly, swim and float | v0.0.52-dev (26 October 2026) |
 | [ITEMS_INDEX.md](ITEMS_INDEX.md) | Items index: what can be picked up in the world | v0.0.59-dev5 (3 November 2026) |
@@ -196,9 +196,9 @@ Every document of the project, by topic, with the version and date of its last u
 | [AUDIO.md](AUDIO.md) | Streamed music and speech | v0.0.61-dev3 (2026-11-06) |
 | [NPC_VOICE_TABLE.md](NPC_VOICE_TABLE.md) | NPC voice table (AWGL1) | v0.0.58 (31 October 2026) |
 | [VOICED_DIALOGUE.md](VOICED_DIALOGUE.md) | Voiced dialogue: event lookup and runtime plan | v0.0.48-dev2 (23 October 2026) |
-| [DIALOGUE_AND_WAIT.md](DIALOGUE_AND_WAIT.md) | Dialogue, character confirmation and waiting — v0.0.23-dev4 | v0.0.62-dev1 (7 November 2026), needs a refresh |
+| [DIALOGUE_AND_WAIT.md](DIALOGUE_AND_WAIT.md) | Dialogue, character confirmation and waiting — v0.0.23-dev4 | v0.0.63-dev5 (9 November 2026), needs a refresh |
 | [DIALOGUE_DESIGN.md](DIALOGUE_DESIGN.md) | Dialogue: design (topics, conditions, choices, disposition, journal) | v0.0.62-dev2 (2026-11-08) |
-| [DIALOGUE_FEATURES.md](DIALOGUE_FEATURES.md) | Dialogue features | v0.0.63-dev4 (8 November 2026) |
+| [DIALOGUE_FEATURES.md](DIALOGUE_FEATURES.md) | Dialogue features | v0.0.63-dev5 (9 November 2026) |
 | [dialogue-features.json](dialogue-features.json) | dialogue-features.json | data file |
 | [dialogue-choices.json](dialogue-choices.json) | dialogue-choices.json | data file |
 | [VOICE_FEATURES.md](VOICE_FEATURES.md) | Voices and sounds | v0.0.59-dev4 (2 November 2026) |
@@ -250,15 +250,15 @@ Every document of the project, by topic, with the version and date of its last u
 
 | Document | Title | Last updated |
 | --- | --- | --- |
-| [BUGS.md](BUGS.md) | Bug register | generated (v0.0.63-dev4) |
+| [BUGS.md](BUGS.md) | Bug register | generated (v0.0.63-dev5) |
 | [BUG_JOURNAL.md](BUG_JOURNAL.md) | Bug journal | v0.0.62-dev1 (7 November 2026) |
 
 ## Releases
 
 | Document | Title | Last updated |
 | --- | --- | --- |
-| [CHANGELOG.md](CHANGELOG.md) | Changelog | v0.0.63-dev4 (9 November 2026) |
-| [ROADMAP.md](ROADMAP.md) | Roadmap and implementation options | v0.0.63-dev4 (9 November 2026) |
+| [CHANGELOG.md](CHANGELOG.md) | Changelog | v0.0.63-dev5 (9 November 2026) |
+| [ROADMAP.md](ROADMAP.md) | Roadmap and implementation options | v0.0.63-dev5 (9 November 2026) |
 | [RELEASE_WORKFLOW.md](RELEASE_WORKFLOW.md) | AmiWind release workflow | v0.0.61-dev1 (5 November 2026) |
 | [CI.md](CI.md) | Build audit and the local pipeline | v0.0.54 (27 October 2026) |
 | [CI_DRY_RUN.md](CI_DRY_RUN.md) | Asset-free compilation and boot image | v0.0.54 (27 October 2026) |

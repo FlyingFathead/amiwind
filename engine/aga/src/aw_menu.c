@@ -96,12 +96,12 @@ static int tab,focus;
 /* Prefs and Video rows (Prefs: the HUD and gameplay; Video: view, loading, memory). */
 enum {ROW_CROSSHAIR,ROW_COLOUR,ROW_SHAPE,ROW_FRAME,ROW_FONT,ROW_VOICE,ROW_DIALOGUE,ROW_AIMED,ROW_NPC,ROW_OBJECTS,
     ROW_AUTOSAVE,ROW_FOG,ROW_RESET,ROW_FAR,ROW_PHOTO,ROW_AREA,ROW_METHOD,ROW_BUFFER,ROW_MEMORY,ROW_GRAPHICS,ROW_CURSOR,
-    ROW_TOPICS,ROW_LABELS,ROW_BEST};
+    ROW_TOPICS,ROW_LABELS,ROW_BEST,ROW_TEXTBOX};
 /* Mouse cursor (CURSOR-MW-58): Morrowind's own pointer or AmiWind's, beside the crosshair's choices.
  * Always use best attack (BEST-ATTACK-OPTION-62): the original's Preferences setting, the same saved value as the
  * console's aw_combat_best_attack and dbg combat bestattack (aw_combat.c); on by default (an AmiWind default). */
 static const unsigned char prefs_rows[]={ROW_CROSSHAIR,ROW_COLOUR,ROW_SHAPE,ROW_CURSOR,ROW_FRAME,ROW_FONT,ROW_VOICE,
-    ROW_DIALOGUE,ROW_TOPICS,ROW_AIMED,ROW_NPC,ROW_OBJECTS,ROW_LABELS,ROW_BEST,ROW_AUTOSAVE};
+    ROW_DIALOGUE,ROW_TEXTBOX,ROW_TOPICS,ROW_AIMED,ROW_NPC,ROW_OBJECTS,ROW_LABELS,ROW_BEST,ROW_AUTOSAVE};
 static const unsigned char video_rows[]={ROW_FOG,ROW_RESET,ROW_FAR,ROW_PHOTO,ROW_AREA,ROW_METHOD,ROW_BUFFER,ROW_MEMORY
 #if defined(AMIWIND_DEBUG_LUMA) && AMIWIND_DEBUG_LUMA
     ,ROW_GRAPHICS
@@ -358,6 +358,7 @@ static void prefs_video_change(int id,int direction,int enter){
     case ROW_FONT:font_step(direction);break;
     case ROW_VOICE:AW_UIVoiceNamesToggle();break;
     case ROW_DIALOGUE:AW_UIDialogueCycle(direction);break;
+    case ROW_TEXTBOX:AW_UITextBoxTypeSet(3-AW_UITextBoxType());break;   /* SUBTITLE-BOX-HIDES-STATS-63 */
     case ROW_TOPICS:AW_DialTopicColoursToggle();break;
     case ROW_AIMED:AW_SceneUIOption(0,direction);break;
     case ROW_NPC:AW_SceneUIOption(1,direction);break;
@@ -643,6 +644,7 @@ static void prefs_video_line(int id,char *line){
     case ROW_FONT:value=AW_UIFontSize();if(value)sprintf(line,"UI font: %ld px",(long)value);else strcpy(line,"UI font: fallback");break;
     case ROW_VOICE:strcpy(line,AW_UIVoiceStyle()==2?"Voice identity: Aim only":AW_UIVoiceNames()?"Voice speaker names: On":"Voice speaker names: Off");break;
     case ROW_DIALOGUE:sprintf(line,"Dialogue style: %ld",(long)AW_UIDialogueMethod());break;
+    case ROW_TEXTBOX:sprintf(line,"Text box: type %ld",(long)AW_UITextBoxType());break;
     case ROW_TOPICS:strcpy(line,AW_DialTopicColours()?"Topic colours: On":"Topic colours: Off");break;
     case ROW_AIMED:strcpy(line,AW_SceneUIOption(0,0)?"Aimed NPC names: On":"Aimed NPC names: Off");break;
     case ROW_NPC:sprintf(line,"NPC: %s",places[AW_SceneUIOption(1,0)-1]);break;

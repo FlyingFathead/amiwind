@@ -4,7 +4,7 @@
 
 # AmiWind
 
-_Last updated with AmiWind v0.0.63-dev4 (9 November 2026)._
+_Last updated with AmiWind v0.0.63-dev5 (9 November 2026)._
 
 An unofficial, experimental RPG engine and enthusiast project bringing Morrowind
 to the Commodore Amiga, featuring CHIM: an AmiQuake-based engine and an asset
@@ -27,14 +27,17 @@ More in the [gallery](docs/GALLERY.md).
 
 ## Where AmiWind stands (9 November 2026)
 
-In development: **v0.0.63-dev4**, the fourth snapshot of v0.0.63
-([dev4 notes](docs/releases/notes/RELEASE-v0.0.63-dev4.md)): 27 more functions of the original's scripting carried out
-(460 of 504, with the console's own commands callable from scripts; 605 of the 1,207 scripts running), and a builder
-whose worker pools stay busy, whose world key no longer rebuilds for a change to the actor model reader, and which
-reads the dialogue and voice tables and the actor ground check from its unit cache. Its changes are checked by tests,
-not yet in play.
+In development: **v0.0.63-dev5**, the fifth snapshot of v0.0.63
+([dev5 notes](docs/releases/notes/RELEASE-v0.0.63-dev5.md)): the box of a spoken line is drawn at once, without the
+rising animation, and the stats under the view stay visible (text box type 2, the new default; type 1 stays a choice
+in Options), and the builder states whether the files of Tribunal and Bloodmoon were found and what of each it uses.
+Its changes are checked by tests, not yet in play.
 
-Before it, **v0.0.63-dev3** ([dev3 notes](docs/releases/notes/RELEASE-v0.0.63-dev3.md)) brought creatures that walk,
+Before it, **v0.0.63-dev4** ([dev4 notes](docs/releases/notes/RELEASE-v0.0.63-dev4.md)) carried 27 more functions of
+the original's scripting (460 of 504, with the console's own commands callable from scripts; 605 of the 1,207 scripts
+running), and a builder whose worker pools stay busy, whose world key no longer rebuilds for a change to the actor
+model reader, and which reads the dialogue and voice tables and the actor ground check from its unit cache.
+Before that, **v0.0.63-dev3** ([dev3 notes](docs/releases/notes/RELEASE-v0.0.63-dev3.md)) brought creatures that walk,
 run and attack again wherever they are met, 66 more functions of the original's scripting, and a builder that reuses
 every earlier run at once and shows its plan before any stage runs.
 Before that, **v0.0.63-dev2** ([dev2 notes](docs/releases/notes/RELEASE-v0.0.63-dev2.md)) brought characters that fight
@@ -80,7 +83,8 @@ a new game and the falling mage, and its second ([dev2 notes](docs/releases/note
 delivered. v0.0.61 shipped as its third snapshot with the final version number
 ([release notes](docs/releases/notes/RELEASE-v0.0.61.md)).
 
-What comes next is in the [roadmap](docs/ROADMAP.md). Still to come after v0.0.62: the rest of the crime system
+What comes next is in the [roadmap](docs/ROADMAP.md). Still to come after v0.0.63-dev5: the in-game check of the
+text box and of the builder's expansion report, and the rest of the crime system
 (pickpocketing, picking owned locks), enchanting and spellmaking, more of the game's scripts (44 of the original's 504 script functions are not carried
 out yet), per-area data tables for
 containers, doors, items, activators and creatures, outdoor items that can be picked up, dropped lights with their
@@ -269,19 +273,25 @@ front page used to carry are kept in [earlier README sections](docs/README_ARCHI
   block, knockdown, knockout, fatigue, death), creatures that walk, run and attack with their own animations, and
   weapons and shields of every type in first and third person;
   casting spells, with the original's chance, cost and effects, and enchanted items that cast; talking to people
-  (topics, choices, disposition, persuasion and the services); containers and the bodies of the dead opened in a strip;
+  (topics, choices, disposition, persuasion and the services; spoken lines show in a box that leaves the stats visible); containers and the bodies of the dead opened in a strip;
   crimes seen by a witness bring the guards, with the arrest, the fine and jail; alchemy (making and drinking
   potions); a torch, a candle, a candlestick or a lantern in the hand
   to explore Vvardenfell at night and underground; mushrooms to pick indoors and out; the original movement speeds;
   weather by region, and music streamed from disk; travel by silt strider, boat, gondola and guild guide.
-- **Not yet:** most quests and other game logic that depends on scripts the game does not run yet (588 of the 1,207
-  scripts run in v0.0.62, 599 in v0.0.63-dev1, 605 from v0.0.63-dev2 to v0.0.63-dev4, and 8 more the game's own opening code
-  carries, with 460 of the original's 504 script functions carried out; [the MWScript tracker](docs/MWSCRIPT_FEATURES.md)), pickpocketing and picking owned locks, trespass,
+- **Not yet:** Mournhold (Tribunal) and Solstheim (Bloodmoon), and with them their scripts; the quests played through
+  from start to end in a test; pickpocketing and picking owned locks, trespass,
   making your own enchantments, the
   shot of a bow or a thrown weapon, schedules by the time of day and most of the scripted AI packages, and Dagoth Ur's
   fight and voice. The jail markers are in the door table for the jail system to come. The Unmarked Shipwreck's upper
   trapdoor still keeps the use key out of reach ([v0.0.55 release notes](docs/releases/notes/RELEASE-v0.0.55.md#known-in-this-build)).
   [The game feature tracker](docs/GAME_FEATURES.md) lists every system of the base game with its state.
+- **The game's scripts:** the three game files hold 1,207 script records. Every one of Vvardenfell that the original
+  runs also runs here: 605 run as scripts and 8 more, the opening's, are carried by the game's own code (in every
+  Vvardenfell region all of them, for example the Ascadian Isles 115 of 115 and the Ashlands 66 of 66). 460 belong to
+  Mournhold or Solstheim and wait for those worlds to be built (28 of them also call a function not carried out yet,
+  such as placing their own records there). The other 134 are named by nothing in the game and never run in the
+  original either. 460 of the original's 504 script functions are carried out
+  ([the MWScript tracker](docs/MWSCRIPT_FEATURES.md) lists every script with its state and area).
 - The reference target is an A1200 with AGA, a 68040 with FPU, 2 MiB Chip and 32 MiB Fast RAM (the safe minimum;
   16 MiB starts with a warning); development and
   every performance figure so far come from emulators and are relative. The first real-hardware figures, from testers
@@ -323,8 +333,8 @@ test image of one spot see [MiniWind: the test ground](docs/MINIWIND.md), the
 Everything else about building, the build speed options, the FPU support library and running the image in FS-UAE or
 WinUAE: [Building and playing](docs/BUILDING_AND_PLAYING.md), the [Linux build guide](docs/LINUX_BUILD.md) and the
 [FS-UAE launcher](docs/FS-UAE-LAUNCHER.md). The newest emulator presets are
-[`AmiWind-v0.0.63-dev4-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.63-dev4-FS-UAE.fs-uae) and
-[`AmiWind-v0.0.63-dev4-WinUAE.uae`](resources/emulators/AmiWind-v0.0.63-dev4-WinUAE.uae) (for the v0.0.62 release:
+[`AmiWind-v0.0.63-dev5-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.63-dev5-FS-UAE.fs-uae) and
+[`AmiWind-v0.0.63-dev5-WinUAE.uae`](resources/emulators/AmiWind-v0.0.63-dev5-WinUAE.uae) (for the v0.0.62 release:
 [`AmiWind-v0.0.62-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.62-FS-UAE.fs-uae) and
 [`AmiWind-v0.0.62-WinUAE.uae`](resources/emulators/AmiWind-v0.0.62-WinUAE.uae)); all start with 32 MB of
 Fast RAM.

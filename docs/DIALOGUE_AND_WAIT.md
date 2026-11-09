@@ -1,6 +1,6 @@
 # Dialogue, character confirmation and waiting — v0.0.23-dev4
 
-_Last updated with AmiWind v0.0.62-dev1 (7 November 2026)._
+_Last updated with AmiWind v0.0.63-dev5 (9 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -46,6 +46,17 @@ so fragments of bars/action hints do not appear beside a compact box.
 | `1` | Previous full-width, fixed-height, left-aligned body |
 | `2` | Full width with centered text; shorter single-line panel |
 | `3` (default) | Content width and height, equal padding, centered text |
+
+### Text box type (how the box appears)
+
+`aw_text_box_type` (Options → Prefs → **Text box: type 1 / type 2**, also
+`dbg ui textbox 1|2`; saved; default **2**) applies to every spoken line, greeting,
+notice and skill raise:
+
+| Type | Behaviour |
+| --- | --- |
+| `1` | The box rises in over about a sixth of a second and the whole strip under the view is cleared first, as described above (health, magicka and fatigue are hidden while a line shows) |
+| `2` (default) | The same box in the same place, drawn at once with no animation, and nothing outside the box itself is cleared: the stat bars beside it stay visible. The status strip is repainted every frame, so nothing is left behind when the box goes |
 
 The classic name-inside speaker method 1 deliberately retains its original
 geometry and spacing. Other speaker methods use the selected box layout.

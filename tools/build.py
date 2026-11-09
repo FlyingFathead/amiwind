@@ -2166,6 +2166,16 @@ def check_known_game_data(args, data):
         print(f"[warning] {len(report['warnings'])} game data file(s) not known (listed above); "
               'they are used (--game-data-policy warn). See docs/KNOWN_INPUTS.md', flush=True)
     args.known_game_data = report
+    # Tribunal and Bloodmoon, plainly: found or not, used now, waiting (tools/expansions_report.py; report only).
+    # The coming --no-dlc flag (DLC-BUILD-LATER) sets args.no_dlc.
+    try:
+        import expansions_report
+        args.expansions_record = expansions_report.report(report, no_dlc=getattr(args, 'no_dlc', False))
+        for text in expansions_report.lines(args.expansions_record):
+            print(text, flush=True)
+    except Exception as exc:  # the report never stops a build
+        print('[warning] expansions report not made: %s' % exc, flush=True)
+        args.expansions_record = None
     return report
 
 
@@ -3265,6 +3275,9 @@ def _main(argv=None):
             print(metadata["jobs_warning"], flush=True)  # once per build; recorded in build-state and summary
         summary.record_environment(metadata)
         summary.known_inputs = metadata.get('known_inputs')
+        # The expansions block (tools/expansions_report.py): build-state.json and the summary, never a stage key.
+        metadata['expansions'] = getattr(args, 'expansions_record', None)
+        summary.expansions = metadata['expansions']
         lock = getattr(args, '_input_lock', None)
         lock_path = lock.save() if lock is not None else None
         if lock_path:

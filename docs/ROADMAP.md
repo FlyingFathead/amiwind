@@ -1,11 +1,11 @@
 # Roadmap and implementation options
 
-_Last updated with AmiWind v0.0.63-dev4 (9 November 2026)._
+_Last updated with AmiWind v0.0.63-dev5 (9 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
-- [v0.0.63: in development, dev1 to dev4 on 9 November 2026](#v0063-in-development-dev1-to-dev4-on-9-november-2026)
+- [v0.0.63: in development, dev1 to dev5 on 9 November 2026](#v0063-in-development-dev1-to-dev5-on-9-november-2026)
 - [v0.0.62: released 8 November 2026; v0.0.63 next](#v0062-released-8-november-2026-v0063-next)
 - [v0.0.61: released 6 November 2026](#v0061-released-6-november-2026)
 - [v0.0.60: released 4 November 2026](#v0060-released-4-november-2026)
@@ -112,13 +112,22 @@ _Last updated with AmiWind v0.0.63-dev4 (9 November 2026)._
 
 15 October 2026: exact-source validation completed 4,231 tests: 4,225 passed, three Windows-only skips and three tracked Census expected failures. The 71 focused tests and original-data readback across nine frame positions passed, consistently hiding 33 of 158 original references at stronghold state 6 while preserving unknown scripts. All 243 player resources are reusable after exact producer, input and file verification. Complete combined-world conversion, native comparison, packaging and shipment remain pending; coverage counts are unchanged.
 
-## v0.0.63: in development, dev1 to dev4 on 9 November 2026
+## v0.0.63: in development, dev1 to dev5 on 9 November 2026
 
-The first snapshot, [v0.0.63-dev1](releases/notes/RELEASE-v0.0.63-dev1.md), carries the first part of the list; the
+The fifth, [v0.0.63-dev5](releases/notes/RELEASE-v0.0.63-dev5.md), follows the fourth. The first snapshot, [v0.0.63-dev1](releases/notes/RELEASE-v0.0.63-dev1.md), carries the first part of the list; the
 second, [v0.0.63-dev2](releases/notes/RELEASE-v0.0.63-dev2.md), the next; the third,
 [v0.0.63-dev3](releases/notes/RELEASE-v0.0.63-dev3.md), the one after; the fourth,
 [v0.0.63-dev4](releases/notes/RELEASE-v0.0.63-dev4.md), the one after that. Their changes are checked by tests, not yet
 in play.
+
+**In dev5:**
+
+- **The text box of a spoken line** is drawn at once, without the rising animation, and blackens nothing outside the
+  box, so the stats under the view stay visible; this box type is the default, the old rising strip stays a choice in
+  Options.
+- **The builder** states for Tribunal and Bloodmoon whether their files were found and what of each it uses and what
+  still waits.
+- **The game's scripts:** unchanged, 605 of 1,207 run; the README gives the breakdown of all 1,207.
 
 **In dev4:**
 
@@ -163,7 +172,7 @@ in play.
 - **Combat:** the best-attack option in Options, the original's hit chance with the active effects, and its hit cone.
 - **Drops on uneven room floors;** the blight cloud at Dagoth Ur no longer drawn as a solid shape.
 
-**Still to do in v0.0.63:** the in-game check of the v0.0.62 fixes, of dev1, of dev2, of dev3 and of dev4; the rest of the builder work
+**Still to do in v0.0.63:** the in-game check of the v0.0.62 fixes, of dev1, of dev2, of dev3, of dev4 and of dev5; the rest of the builder work
 (a build that proves the new keys, every stage on all cores); the werewolf's body; more of the
 game's scripts; the shorelines; pickpocketing and owned locks; enchanting and spellmaking; per-area data tables;
 outdoor items that can be picked up; dropped lights with their flame.

@@ -167,10 +167,13 @@ static void check_prefs(void){
  down(1); /* UI font */
  down(1);M_Keydown(K_ENTER);assert(AW_UIVoiceNames());
  down(1);M_Keydown(K_RIGHTARROW);assert(AW_UIDialogueMethod()==3);
+ /* Text box: type 2 by default (SUBTITLE-BOX-HIDES-STATS-63); Enter or an arrow switches the one saved value */
+ down(1);assert(AW_UITextBoxType()==2);M_Keydown(K_ENTER);assert(AW_UITextBoxType()==1);
+ M_Keydown(K_RIGHTARROW);assert(AW_UITextBoxType()==2);
  /* Topic colours (TOPIC-COLOURS-62): on by default, Enter switches them */
  down(1);assert(AW_DialTopicColours());M_Keydown(K_ENTER);assert(!AW_DialTopicColours());M_Keydown(K_ENTER);assert(AW_DialTopicColours());
  down(1);M_Keydown(K_ENTER);assert(!AW_SceneUIOption(0,0));
- down(1);assert(scroll_top==4 && highlight_y==36+6*19);M_Keydown(K_RIGHTARROW);assert(AW_SceneUIOption(1,0)==3);
+ down(1);assert(scroll_top==5 && highlight_y==36+6*19);M_Keydown(K_RIGHTARROW);assert(AW_SceneUIOption(1,0)==3);
  down(1);M_Keydown(K_RIGHTARROW);assert(AW_SceneUIOption(2,0)==2);
  /* Name labels (INFO-BOX-TEXT-CUT-62): AmiWind by default, Enter or an arrow switches to Morrowind and back */
  down(1);assert(AW_SceneUIOption(3,0)==1);M_Keydown(K_ENTER);assert(AW_SceneUIOption(3,0)==0);M_Keydown(K_RIGHTARROW);assert(AW_SceneUIOption(3,0)==1);
@@ -179,7 +182,7 @@ static void check_prefs(void){
  M_Keydown(K_ENTER);M_Draw();assert(best_attack==0 && !strcmp(best_label,"Always use best attack: Off"));
  M_Keydown(K_RIGHTARROW);M_Draw();assert(best_attack==1 && !strcmp(best_label,"Always use best attack: On"));
  best_attack=0;M_Draw();assert(!strcmp(best_label,"Always use best attack: Off"));best_attack=1;   /* a console change shows at once */
- down(1);assert(scroll_total==15 && scroll_top==8 && highlight_y==150); /* Autosave history, the last row (15 rows: topic colours, name labels, best attack) */
+ down(1);assert(scroll_total==16 && scroll_top==9 && highlight_y==150); /* Autosave history, the last row (16 rows: topic colours, name labels, best attack, text box) */
  /* Past the last row: Back, which holds; Up returns to the last row, Up past the first to the tabs. */
  down(3);assert(highlight_y==179 && highlight_w==74 && !strcmp(help,"Enter: back to the menu"));
  up(1);assert(highlight_y==150 && highlight_w==280);
@@ -335,6 +338,7 @@ static int voices,dialogue=2,scene_options[]={1,2,1,1};
 int AW_UIVoiceStyle(void){return 1;}
 int AW_UIVoiceNames(void){return voices;}void AW_UIVoiceNamesToggle(void){voices=!voices;}
 int AW_UIDialogueMethod(void){return dialogue;}void AW_UIDialogueCycle(int step){dialogue=(dialogue-1+step+4)%4+1;}
+static int text_box=2;int AW_UITextBoxType(void){return text_box;}void AW_UITextBoxTypeSet(int type){text_box=type==1?1:2;}
 static int topic_colours=1;int AW_DialTopicColours(void){return topic_colours;}void AW_DialTopicColoursToggle(void){topic_colours=!topic_colours;}
 int AW_SceneUIOption(int n,int change){if(change)scene_options[n]=n && n!=3?(scene_options[n]-1+change+3)%3+1:!scene_options[n];return scene_options[n];}
 

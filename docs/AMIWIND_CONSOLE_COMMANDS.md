@@ -1,6 +1,6 @@
 # AmiWind console commands
 
-_Generated from `config/debug-commands.txt` with AmiWind v0.0.63-dev4._
+_Generated from `config/debug-commands.txt` with AmiWind v0.0.63-dev5._
 
 Open the console with F10 or the backquote key and type
 a command, for example `dbg headlamp on`. This page is generated from
@@ -199,6 +199,7 @@ original: [the table of them](CONSOLE_COMMANDS_MORROWIND.md).
 | `dbg ui preview` | - | - |
 | `dbg ui targetnames` | - | on/off (after creation) |
 | `dbg ui targetplace` | - | below/topright/hudleft |
+| `dbg ui textbox` | - | [1/2; no argument: the setting] text box type for spoken lines and notices: 1 the strip rises in and blackens the strip under the view, 2 the same box drawn at once with nothing outside it covered, the stat bars stay visible (default 2, saved; also Options > Prefs > Text box) |
 | `dbg ui topiccolours` | - | 1/0 the topic list's colours: a topic whose answer is for this speaker alone in blue, one with nothing new left in grey (default 1, saved; also Options > Prefs > Topic colours); no argument: the setting |
 
 ## Input

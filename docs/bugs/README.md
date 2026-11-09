@@ -331,7 +331,7 @@ family links to its list in the register.
 | [Harvestable plants](../BUGS.md#harvestable-plants-harvest) | `harvest` | 11 of 19 | Harvest catalogues are built by the builder for the shipped maps and counted by the entity tracker. |
 | [Town and interior import](../BUGS.md#town-and-interior-import-town-import) | `town-import` | 5 of 10 | The town importer converts every town and interior within engine limits; doors lead somewhere. |
 | [Scene changes, arrivals and handoffs](../BUGS.md#scene-changes-arrivals-and-handoffs-transitions-arrivals) | `transitions-arrivals` | 7 of 21 | Cell, region and scene changes keep the player, view, equipment and sound intact. |
-| [Menus, HUD, map screen and text](../BUGS.md#menus-hud-map-screen-and-text-ui-text) | `ui-text` | 48 of 87 | Menus, HUD, map screen, fonts and messages. |
+| [Menus, HUD, map screen and text](../BUGS.md#menus-hud-map-screen-and-text-ui-text) | `ui-text` | 49 of 88 | Menus, HUD, map screen, fonts and messages. |
 | [Debug commands and remote control](../BUGS.md#debug-commands-and-remote-control-debug-commands) | `debug-commands` | 22 of 43 | dbg commands, teleports, debug map loads and the remote console. |
 | [Boot and engine start-up](../BUGS.md#boot-and-engine-start-up-boot-startup) | `boot-startup` | 5 of 14 | The boot check and engine start-up report problems clearly and never stop the game silently. |
 | [Game logic (QuakeC) and saves](../BUGS.md#game-logic-quakec-and-saves-game-logic) | `game-logic` | 120 of 164 | QuakeC entities, saves and game state. |

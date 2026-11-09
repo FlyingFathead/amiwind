@@ -4,7 +4,7 @@
 viddef_t vid;refdef_t r_refdef;keydest_t key_dest=key_game;double realtime,host_frametime=1;
 client_static_t cls;server_t sv;server_static_t svs;int scr_copyeverything;
 static byte pal[768],glyphs[16384],frame[64004];byte *host_basepal=pal,*draw_chars=glyphs;
-static cvar_t *vars[16];static int count,prompt;static int photo;
+static cvar_t *vars[32];static int count,prompt;static int photo;
 int AW_IntroPromptActive(void){return prompt;}
 int AW_LoadingScreen(void){return 0;}int AW_MenuFrontEnd(void){return 0;}
 double AW_SpeechRemaining(void){return 0;}
@@ -32,6 +32,9 @@ int main(void){
     for(i=0;i<256;i++)pal[i*3]=pal[i*3+1]=pal[i*3+2]=i;
     memset(glyphs,255,sizeof(glyphs));vid.width=320;vid.height=200;vid.rowbytes=320;vid.buffer=frame+2;
     r_refdef.vrect.height=152;AW_UIInit();assert(AW_UIDialogueMethod()==3);
+    /* SUBTITLE-BOX-HIDES-STATS-63: type 2 is the default; everything below up to the type 2 block checks type 1,
+     * the rising strip, exactly as before */
+    assert(AW_UITextBoxType()==2);AW_UITextBoxTypeSet(1);assert(AW_UITextBoxType()==1);
     Cvar_SetValue("aw_dialogue_box_display_method",2);
     Cvar_SetValue("aw_dialogue_box_layout",1);
     AW_UISubtitle("Speaker","AAAA\nBBBB\nCCCC",10);clean();AW_UIDraw();
@@ -149,6 +152,30 @@ int main(void){
      realtime=403.5;clean();AW_UIDraw();assert(!AW_UISubtitleIs("Raised"));   /* the voice line now (it has a speaker) */
      clean();AW_UIDraw();for(i=0;i<64000;i++)assert(vid.buffer[i]==137);    /* not held: no strip, nothing */
      r_refdef.vrect.height=152;}
+    /* SUBTITLE-BOX-HIDES-STATS-63, type 2: the same box in the same place on the first frame (no slide, even with
+     * host_frametime 0), and nothing outside its rectangle drawn: the stat rows at x 8..83 (y 174..197) and the rest
+     * of the strip keep their pixels. Type 1 on the same line: the strip is blackened and the box rises. */
+    {int bx0=320,bx1=-1,by0=200,by1=-1,type1_top=200;
+     Cvar_SetValue("aw_dialogue_box_layout",3);Cvar_SetValue("aw_dialogue_box_display_method",3);
+     r_refdef.vrect.height=152;realtime=500;host_frametime=1;
+     AW_UITextBoxTypeSet(1);clean();AW_UIDraw();host_frametime=0;   /* the old line has gone: the strip is down */AW_UISubtitle("","AAAA",10);clean();AW_UIDraw();
+     for(i=0;i<64000;i++)assert(vid.buffer[i]==137);          /* type 1: no frame time, no rise yet */
+     host_frametime=1;clean();AW_UIDraw();
+     assert(vid.buffer[180*320+20]==0 && vid.buffer[160*320+300]==0);   /* type 1 blackens the whole strip */
+     for(i=0;i<64000;i++)if(framed(i%320,i/320) && i/320<type1_top)type1_top=i/320;
+     AW_UITextBoxTypeSet(2);host_frametime=0;
+     AW_UISubtitle("","AAAA",10);clean();AW_UIDraw();
+     for(i=0;i<64000;i++)if(changed(i%320,i/320)){
+         x=i%320;y=i/320;if(x<bx0)bx0=x;if(x>bx1)bx1=x;if(y<by0)by0=y;if(y>by1)by1=y;}
+     assert(bx1>=0 && by0==type1_top && by1==199);            /* at its target on the first frame, same top as type 1 */
+     for(i=0;i<152*320;i++)assert(vid.buffer[i]==137);        /* the view untouched */
+     for(y=152;y<200;y++)for(x=0;x<320;x++)
+         if(x<bx0 || x>bx1 || y<by0)assert(vid.buffer[y*320+x]==137);   /* nothing outside the box */
+     assert(bx0>83);                                          /* the stat bars' columns stay uncovered */
+     for(y=174;y<198;y++)for(x=8;x<84;x++)assert(vid.buffer[y*320+x]==137);
+     clean();AW_UIDraw();assert(by0==type1_top);              /* the next frame: the same, no movement */
+     realtime=511;clean();AW_UIDraw();for(i=0;i<64000;i++)assert(vid.buffer[i]==137);   /* gone at once */
+     AW_UITextBoxTypeSet(7);assert(AW_UITextBoxType()==2);}
     return 0;
 }
 int AW_PhotoModeActive(void){return photo;}

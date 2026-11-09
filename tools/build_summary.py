@@ -370,6 +370,7 @@ class BuildSummary:
         self.finished = False
         self.environment = None
         self.known_inputs = None  # known-inputs verdicts and hash mode (tools/known_inputs.py)
+        self.expansions = None  # Tribunal and Bloodmoon found or not, used, waiting (tools/expansions_report.py)
         self.build_type = None  # a build type other than the normal one (tools/miniwind.py)
         self.retired_flags = []  # flags retired since CHIM v0.1.0 that this build used
         self.build_recipe = None  # the build's recipe record (tools/build_recipe.py)
@@ -445,6 +446,12 @@ class BuildSummary:
         stair_check = read_stair_check(self.run)
         resident_fallback = read_resident_fallback(self.run)
         interiors = read_interior_counts(self.run)
+        try:
+            import expansions_report
+            expansions = expansions_report.finish(self.expansions, self.run)
+        except Exception as exc:          # the report never fails a build
+            print('[summary] expansions report not made: %s' % exc, flush=True)
+            expansions = None
         import size_ledger
         sizes = size_ledger.read(self.run) if status == 'passed' else None
         elapsed = max(0, time.monotonic() - self.started)
@@ -475,6 +482,7 @@ class BuildSummary:
                   **({'interior_counts': interiors} if interiors is not None else {}),
                   'size_ledger': sizes,
                   'known_inputs': self.known_inputs,
+                  **({'expansions': expansions} if expansions else {}),
                   **({'build_type': self.build_type} if self.build_type else {}),
                   'retired_flags_used': self.retired_flags,
                   'build_recipe': self.build_recipe,
@@ -562,6 +570,8 @@ class BuildSummary:
         if self.known_inputs:
             from known_inputs import summary_lines as known_input_lines
             lines.extend(known_input_lines(self.known_inputs))
+        if expansions:
+            lines.extend(expansions_report.lines(expansions, at_end=True))
         if harvest is not None:
             lines.append(harvest_line(harvest))
         lines.extend(file_cache_lines(file_cache))

@@ -719,6 +719,8 @@ int AW_UIVoiceStyle(void);
 int AW_UIVoiceAimOnly(void);
 void AW_UIVoiceNamesToggle(void);
 void AW_UIDialogueCycle(int step);
+int AW_UITextBoxType(void);
+void AW_UITextBoxTypeSet(int type);
 int AW_DialTopicColours(void);          /* aw_dialwin.c: OpenMW's topic colours on (TOPIC-COLOURS-62) */
 void AW_DialTopicColoursToggle(void);
 void AW_UIVoiceSubtitle(const char *name,const char *text,double duration);

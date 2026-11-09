@@ -208,6 +208,7 @@ UI / CONSOLE|ui namelabels|aw_name_labels_set|amiwind/morrowind (amiwind: name a
 UI / CONSOLE|ui preview|aw_ui_preview|
 UI / CONSOLE|ui targetnames|aw_target_names_set|on/off (after creation)
 UI / CONSOLE|ui targetplace|aw_target_place|below/topright/hudleft
+UI / CONSOLE|ui textbox|aw_text_box|[1/2; no argument: the setting] text box type for spoken lines and notices: 1 the strip rises in and blackens the strip under the view, 2 the same box drawn at once with nothing outside it covered, the stat bars stay visible (default 2, saved; also Options > Prefs > Text box)
 UI / CONSOLE|ui topiccolours|aw_topic_colours|1/0 the topic list's colours: a topic whose answer is for this speaker alone in blue, one with nothing new left in grey (default 1, saved; also Options > Prefs > Topic colours); no argument: the setting
 INPUT|input trace|aw_input_trace|on/off true/false 1/0 (alias; default off)
 INPUT|inputtrace|aw_input_trace|on/off true/false 1/0 (raw keys and mouse events; default off)

@@ -217,7 +217,8 @@ class Layers(unittest.TestCase):
         self.assertIn('aw_msgbox_draw ();', after)
         # the notice box leaves the strip under the view alone while over a window or the container strip
         self.assertIn('aw_ui_over_window = over_window || (aw_cstrip_open_now && aw_cstrip_open_now ());', update)
-        self.assertIn('if(centered && !aw_ui_over_window)AW_UIFill(', body(code('aw_ui.c'), 'void AW_UIDraw(void) {'))
+        # (and text box type 2, the default, never fills the strip: SUBTITLE-BOX-HIDES-STATS-63)
+        self.assertIn('if(centered && !aw_ui_over_window && AW_UITextBoxType()==1)AW_UIFill(', body(code('aw_ui.c'), 'void AW_UIDraw(void) {'))
         # a box with buttons over a world window: drawn and given its keys before the window's
         box = code('aw_msgbox.c')
         self.assertIn('return key_dest==key_game || (key_dest==key_menu && AW_WorldUIActive());', box)

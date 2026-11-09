@@ -1,6 +1,19 @@
 # Known inputs: which files did the builder get?
 
-_Last updated with AmiWind v0.0.32-dev1 (8 October 2026)._
+_Last updated with AmiWind v0.0.63-dev5 (2026-11-09)._
+
+<!-- contents start -->
+## Contents
+
+- [Verdicts](#verdicts)
+- [Policies](#policies)
+- [Editions](#editions)
+- [Where the verdicts are recorded](#where-the-verdicts-are-recorded)
+- [Expansions: found or not](#expansions-found-or-not)
+- [Input lock and `--check-hashes`](#input-lock-and---check-hashes)
+- [Adding a known build](#adding-a-known-build)
+
+<!-- contents end -->
 
 The builder converts files you supply: your Morrowind data, optionally your own Amiga
 FPU support libraries (`--amiga-libs`) and your Kickstart ROM (`--kickstart-file`).
@@ -72,6 +85,32 @@ BUILD-EDITION-DIFFERENCES-32.
 - Amiga libraries also in `image/fpu-support.json`, `fpu_support` of
   `image/build.json` and the `FPU support library:` summary lines
   ([FPU support library](FPU_SUPPORT_LIBRARY.md#known-versions)).
+
+## Expansions: found or not
+
+Right after the game-file check, every build prints one plain block for the two
+expansions, again in the end-of-build summary, and keeps it as `expansions` in
+`build-state.json` and `build-summary.json` (`tools/expansions_report.py`):
+
+```
+Expansions:
+  Tribunal: FOUND (Tribunal.esm v1.30 + Tribunal.bsa, Game of the Year edition (GOG and Steam, identical)). Used now: 9,999 records in its master, 1,174 files in its archive, 42 of its 255 scripts run in Vvardenfell, 0 of 63 creatures built (CREATURE-EXPANSION-62). Waits for its world: Mournhold (186 scripts, DLC-BUILD-LATER).
+  Bloodmoon: FOUND (...). Used now: ... Waits for its world: Solstheim (...).
+```
+
+- `FOUND`: the master and its archive are there and usable.
+- `PARTLY FOUND` (a warning line): the master is there, its archive is not.
+- `NOT FOUND` (a warning line): no usable master; the expansion is left out.
+- `LEFT OUT by --no-dlc`: kept for the planned option that builds without the
+  expansions (DLC-BUILD-LATER); the option itself does not exist yet.
+
+The counts come only from what the build already has at hand, so the block costs
+milliseconds: the record count in the master's header and the archive's file count
+(both read by the game-file check), the scripts from the MWScript tracker
+([`docs/mwscript-features.json`](mwscript-features.json)) only when it was measured on
+masters with the same SHA-256, and the creatures from the image step's creature census
+(so they show in the summary at the end). The report is information only: it changes no
+build output and no stage key.
 
 ## Input lock and `--check-hashes`
 

@@ -13,9 +13,9 @@
    "hunk_bytes": 9600
   },
   "cvars": {
-   "count": 365,
-   "static_bytes": 8760,
-   "zone_bytes": 11904
+   "count": 366,
+   "static_bytes": 8784,
+   "zone_bytes": 11936
   },
   "tables": {
    "count": 0,
@@ -106,7 +106,8 @@
   "2026-11-08: +1 command aw_breath (32 hunk bytes; dbg breath) for the breath under water and drowning the maintainer asked for (UNDERWATER-BREATH-62, TG 2026-11-07): the breath left, Water Breathing, the drowning damage and what god mode held back, by number, for the in-game checks; no console variable (the rule has no switch, its settings come from the game data). Added on the worker branch v0.0.63-envhazard; the maintainer approves it at merge.",
   "2026-11-09: +2 commands aw_mw_help (dbg help mw / dbg mw help, the original game's console commands paged from a file on disk, one offset and a 256-byte line buffer kept) and aw_mw_target (dbg mw target, the finder for a console line's target: 256 rows of 82 bytes only while its list is open), 64 hunk bytes, no cvar: the original console commands the maintainer asked for (MW-CONSOLE-COMMANDS-62, TG 2026-11-07, and the finder menu like dbg tp's, the same day). The entry list also gains five commands whose raises were approved and recorded above but whose names were never added: aw_restart_game, aw_load_fail, aw_version_info, aw_memcensus (2026-11-07) and aw_topic_colours (2026-11-08).",
   "2026-11-09: the command cap raised to 512 commands (512 x 32 = 16,384 hunk bytes; 300 in use, 9,600 bytes) by the maintainer's decision the same day (app chat, while dev2 was gated), so new console commands asked for do not each need a raise; the ratchet still refuses growth past 512 and the cvar, table and growing budgets are unchanged.",
-  "2026-11-09: the command cap raised from 512 to 1,000 commands (1,000 x 32 = 32,000 hunk bytes; 300 in use, 9,600 bytes) by the maintainer's decision the same day (app chat), so the original game's console commands and AmiWind's own can grow without a raise each; the ratchet still refuses growth past 1,000 and the cvar, table and growing budgets are unchanged."
+  "2026-11-09: the command cap raised from 512 to 1,000 commands (1,000 x 32 = 32,000 hunk bytes; 300 in use, 9,600 bytes) by the maintainer's decision the same day (app chat), so the original game's console commands and AmiWind's own can grow without a raise each; the ratchet still refuses growth past 1,000 and the cvar, table and growing budgets are unchanged.",
+  "2026-11-09: +1 console variable aw_text_box_type, the saved text box type (1 rising strip / 2 box only, the default) the maintainer asked for, with its Options entry and dbg ui textbox; the command aw_text_box sits under the commands cap (SUBTITLE-BOX-HIDES-STATS-63)"
  ],
  "entries": {
   "commands": [

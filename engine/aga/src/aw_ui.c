@@ -139,6 +139,13 @@ static cvar_t voice_style={"aw_voice_dialogue_display_style","2",true};
 static int subtitle_voice;
 static int subtitle_pickup;
 static cvar_t animate_item_pickups={"aw_animate_item_pickups","1",true};
+/* SUBTITLE-BOX-HIDES-STATS-63: the text box type. 1 = the strip rises in (about a sixth of a second) and the whole
+ * strip under the view is blackened first; 2 (the default) = the same box in the same place, drawn at once (no
+ * per-frame slide) and nothing outside its own rectangle drawn, so the stat bars beside it stay visible. The HUD
+ * (AW_UIHud) repaints the strip every frame, so the box leaves no pixels behind when it goes. */
+static cvar_t text_box_type={"aw_text_box_type","2",true};
+int AW_UITextBoxType(void){return text_box_type.value==1?1:2;}
+void AW_UITextBoxTypeSet(int type){Cvar_SetValue(text_box_type.name,type==1?1:2);scr_copyeverything=1;}
 static unsigned subtitle_revision;
 static int ink[3],black,muted;
 static char subtitle[4096],speaker[80];
@@ -420,6 +427,12 @@ static void layout_command(void) {
     if(Cmd_Argc()==2 && (!strcmp(s,"1") || !strcmp(s,"2") || !strcmp(s,"3")))
         Cvar_SetValue(dialogue_layout.name,s[0]-'0');
     else Con_Printf("dbg ui layout 1 legacy / 2 full width centered / 3 padded content (default)\n");
+}
+static void text_box_command(void) {
+    char *s=Cmd_Argv(1);
+    if(Cmd_Argc()==2 && (!strcmp(s,"1") || !strcmp(s,"2")))AW_UITextBoxTypeSet(s[0]-'0');
+    else if(Cmd_Argc()!=1)Con_Printf("dbg ui textbox 1 rising strip / 2 box only, no animation (default)\n");
+    Con_Printf("Text box: type %ld\n",(long)AW_UITextBoxType());
 }
 /* chars 2 and 3 are the dialogue's link marks (AW_DIAL_LINK_OPEN/CLOSE): no width, never drawn */
 static int advance(int c){return c==2 || c==3?0:(font_bytes?font[8+c*8+6]:8);}
@@ -963,7 +976,7 @@ void AW_UIDraw(void) {
     if(!legacy && maxlines>3)maxlines=3;
 
     target=subtitle_until>realtime && subtitle[0]?1:0;step=host_frametime*6;
-    if(subtitle_pickup && !animate_item_pickups.value)panel_position=target;
+    if((subtitle_pickup && !animate_item_pickups.value) || AW_UITextBoxType()==2)panel_position=target;
     if(panel_position<target){panel_position+=step;if(panel_position>target)panel_position=target;}
     if(panel_position>target){panel_position-=step;if(panel_position<target)panel_position=target;}
     if(panel_position<=0)return;
@@ -1008,7 +1021,7 @@ void AW_UIDraw(void) {
     }
     /* The old full-width panel covered bars and action hints. Clear their
      * strip before a compact box too, so partial labels cannot leak beside it. */
-    if(centered && !aw_ui_over_window)AW_UIFill(0,r_refdef.vrect.y+r_refdef.vrect.height,vid.width,vid.height,black);
+    if(centered && !aw_ui_over_window && AW_UITextBoxType()==1)AW_UIFill(0,r_refdef.vrect.y+r_refdef.vrect.height,vid.width,vid.height,black);
     y=vid.height-(int)(h*panel_position);AW_UIBox(boxx,y,boxwidth,h);
     row=y+(legacy?6:4);
     if(show_name){
@@ -1042,6 +1055,8 @@ void AW_UIInit(void) {
     Cvar_RegisterVariable(&voice_names);
     Cvar_RegisterVariable(&voice_style);
     Cvar_RegisterVariable(&animate_item_pickups);
+    Cvar_RegisterVariable(&text_box_type);
+    Cmd_AddCommand("aw_text_box",text_box_command);
     Cvar_RegisterVariable(&cursor_type);
     Cmd_AddCommand("aw_dialogue_method",dialogue_command);Cmd_AddCommand("aw_dialogue_layout",layout_command);
     Cmd_AddCommand("aw_ui_ink",ink_command);Cmd_AddCommand("aw_ui_select",font_command);Cmd_AddCommand("aw_ui_preview",preview);
