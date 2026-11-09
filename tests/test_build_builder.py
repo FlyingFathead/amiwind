@@ -209,14 +209,16 @@ class ChimStageTests(unittest.TestCase):
                                                         'items-index',     # ITEMS-INDEX-57, CHIM builder only
                                                         'item-models',    # ITEM-WORLD-MODELS-58, CHIM builder only
                                                         # every room batch, by default since v0.0.48
-                                                        'chim-room-batches')],
+                                                        'chim-room-batches',
+                                                        'player-view')],  # BUILD-RISKY-STAGES-FIRST-63, CHIM builder only
                          # NPC Gallery v2.0 (NPC-GALLERY-V2): no npc-gallery stage on the CHIM builder; the legacy
                          # plan keeps the baked gallery
                          [n for n in legacy if n not in ('balmora', 'npc-gallery')])
         self.assertLess(names.index('census'), names.index('chim'))
         self.assertLess(names.index('chim'), names.index('image'))
         # CHIM rooms (docs/chim/INTERIOR_STORE.md, the default): right before the image, after every room stage
-        self.assertEqual(names.index('chim-interiors'), names.index('image') - 1)
+        # (only the player-view stage, BUILD-RISKY-STAGES-FIRST-63, sits between them: it runs beside the world stages)
+        self.assertEqual(names[names.index('chim-interiors') + 1:names.index('image')], ['player-view'])
         command = [str(part) for part in dict(steps)['chim']]
         self.assertTrue(command[1].endswith('tools/chim_build.py'))
 

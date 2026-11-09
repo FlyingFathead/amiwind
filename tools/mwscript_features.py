@@ -55,11 +55,13 @@ from mwscript import dialogue_combat  # noqa: E402
 DATA = ROOT / 'docs' / 'mwscript-features.json'
 OUT = ROOT / 'docs' / 'MWSCRIPT_FEATURES.md'
 SCHEMA = 'mwscript-features 1'
-STATES = ('runs', 'missing-function', 'attached-not-run', 'not-attached', 'not-in-image', 'inert', 'not-converted')
-LABELS = {'runs': 'runs', 'missing-function': 'uses a function the interpreter lacks',
+STATES = ('runs', 'carried', 'missing-function', 'attached-not-run', 'not-attached', 'not-in-image', 'inert',
+          'not-converted')
+LABELS = {'runs': 'runs', 'carried': 'carried by AmiWind\'s own code',
+          'missing-function': 'uses a function the interpreter lacks',
           'attached-not-run': 'attached, not run', 'not-attached': 'compiled, not attached',
           'not-in-image': 'only in an add-on world', 'inert': 'named by nothing', 'not-converted': 'not converted'}
-SHORT = {'runs': 'Runs', 'missing-function': 'Function missing', 'attached-not-run': 'Attached, not run',
+SHORT = {'runs': 'Runs', 'carried': 'AmiWind code', 'missing-function': 'Function missing', 'attached-not-run': 'Attached, not run',
          'not-attached': 'Not attached', 'not-in-image': 'Add-on world', 'inert': 'Named by nothing',
          'not-converted': 'Not converted'}
 # the record types the player can carry (tools/mwscript/awms.py CARRIED: their scripts run while carried, PADD rows)
@@ -114,11 +116,120 @@ def missing_now(names):
     return sorted(set(out))
 
 
+COUNTERPARTS = ROOT / 'config' / 'mwscript-counterparts.json'
+VERDICTS = ('same', 'partial', 'different')
+_counterparts = None
+
+
+def counterparts(path=None):
+    """{folded script id: entry} of config/mwscript-counterparts.json (v0.0.63): the scripts AmiWind's own code
+    carries, with the counterpart and the parity check; {} when the file is missing."""
+    global _counterparts
+    if path is not None or _counterparts is None:
+        p = Path(path) if path else COUNTERPARTS
+        doc = json.loads(p.read_text(encoding='utf-8')) if p.exists() else {'entries': []}
+        found = {e['script'].casefold(): e for e in doc.get('entries', [])}
+        if path is not None:
+            return found
+        _counterparts = found
+    return _counterparts
+
+
+def counterpart_problems(doc):
+    """What the counterparts tracker refuses: an entry without a counterpart file and function, a verdict outside
+    VERDICTS, a step without its four fields, an in-game check left empty."""
+    out = []
+    if doc.get('schema') != 'mwscript-counterparts 1':
+        out.append('schema is not mwscript-counterparts 1')
+    for e in doc.get('entries', []):
+        sid = e.get('script') or '?'
+        cp = e.get('counterpart') or {}
+        if not cp.get('file') or not cp.get('function'):
+            out.append('%s: no counterpart file and function' % sid)
+        if e.get('verdict') not in VERDICTS:
+            out.append('%s: verdict must be one of %s' % (sid, ', '.join(VERDICTS)))
+        if not e.get('what') or not e.get('ingame'):
+            out.append('%s: what it does and the in-game check are needed' % sid)
+        for s in e.get('steps') or [None]:
+            if not s or any(not s.get(k) for k in ('step', 'original', 'amiwind', 'verdict')) or \
+                    s.get('verdict') not in VERDICTS:
+                out.append('%s: every step needs step, original, amiwind and a verdict' % sid)
+                break
+        if not isinstance(e.get('register'), list):
+            out.append('%s: register is a list' % sid)
+    for e in doc.get('functions', []):
+        names = ', '.join(e.get('functions') or ['?'])
+        cp = e.get('counterpart') or {}
+        if not e.get('functions') or not cp.get('file') or not cp.get('function') or e.get('verdict') not in VERDICTS \
+                or not e.get('what') or not e.get('ingame') or not isinstance(e.get('register'), list):
+            out.append('functions %s: functions, what, counterpart file and function, a verdict, the in-game check '
+                       'and register are needed' % names)
+    return out
+
+
+def counterpart_functions():
+    """The functions AmiWind's own code carries (config/mwscript-counterparts.json "functions", v0.0.63)."""
+    p = COUNTERPARTS
+    return json.loads(p.read_text(encoding='utf-8')).get('functions', []) if p.exists() else []
+
+
+def counterparts_section():
+    """The "carried by AmiWind's own code" section: per script its counterpart, verdict, in-game check, register IDs
+    and the step table."""
+    entries = sorted(counterparts().values(), key=lambda e: e['script'].casefold())
+    if not entries:
+        return []
+    out = ['## Carried by AmiWind\'s own code', '',
+           'The game scripts AmiWind carries with its own code instead of running them, each with the code that does '
+           'it and a step-by-step comparison with the script (the tracker of these is config/mwscript-counterparts.json, '
+           'checked by its test). Decided for the project: the opening from the prison ship to the census office is '
+           'AmiWind\'s own implementation.', '',
+           '| Script | What it does | AmiWind counterpart | Parity | In game | Register |',
+           '| --- | --- | --- | --- | --- | --- |']
+    for e in entries:
+        out.append('| %s | %s | %s %s | %s | %s | %s |' % (
+            e['script'], _cell(e['what']), e['counterpart']['file'], _cell(e['counterpart']['function']),
+            e['verdict'], _cell(e['ingame']), ', '.join(e['register']) or '-'))
+    out.append('')
+    funcs = counterpart_functions()
+    if funcs:
+        out += ['Functions whose work AmiWind\'s own code does (the script calls into it):', '',
+                '| Functions | What | AmiWind counterpart | Parity | Note | In game |',
+                '| --- | --- | --- | --- | --- | --- |']
+        out += ['| %s | %s | %s %s | %s | %s | %s |' % (', '.join(e['functions']), _cell(e['what']),
+                                                        e['counterpart']['file'], _cell(e['counterpart']['function']),
+                                                        e['verdict'], _cell(e.get('note', '')), _cell(e['ingame']))
+                for e in funcs]
+        out.append('')
+    console = json.loads(COUNTERPARTS.read_text(encoding='utf-8')).get('console', []) if COUNTERPARTS.exists() else []
+    cfile = ROOT / 'config' / 'mwscript-console.json'
+    if console and cfile.exists():   # MW-CONSOLE-COMMANDS-62: the original's console commands (v0.0.63)
+        rows = json.loads(cfile.read_text(encoding='utf-8'))['commands']
+        n = {s: sum(1 for r in rows if r['state'] == s) for s in ('alias', 'vm', 'collision', 'planned', 'not applicable')}
+        out += ['The original game\'s console commands (docs/CONSOLE_COMMANDS_MORROWIND.md): %d in all; %d run AmiWind\'s '
+                'own command, %d run through the script interpreter\'s host, %d are AmiWind\'s own names (kept), %d '
+                'planned, %d not applicable. The aliases:' % (len(rows), n['alias'], n['vm'], n['collision'],
+                                                             n['planned'], n['not applicable']), '',
+                '| Original | AmiWind | Parity | Note |', '| --- | --- | --- | --- |']
+        out += ['| %s | %s | %s | %s |' % (', '.join(c['original']), _cell(c['amiwind']), c['verdict'], _cell(c['note']))
+                for c in console]
+        out.append('')
+    for e in entries:
+        out += ['### %s' % e['script'], '', '| Step | Original | AmiWind | Same? |', '| --- | --- | --- | --- |']
+        out += ['| %s | %s | %s | %s |' % (_cell(s['step']), _cell(s['original']), _cell(s['amiwind']), s['verdict'])
+                for s in e['steps']]
+        out.append('')
+    return out
+
+
 def state_of(row):
     """(state, why) of one script row."""
     if row['error']:
         return 'not-converted', 'does not compile'
     if row['handwritten']:
+        c = counterparts().get(row.get('id', '').casefold())
+        if c:
+            return 'carried', 'carried by %s %s' % (c['counterpart']['file'], c['counterpart']['function'])
         return 'attached-not-run', 'a hand-written rule carries it'
     game = row['refs']
     started = row['start'] or row['started_by'] or game['dialogue_starts']
@@ -688,9 +799,9 @@ def why_not_run(rows):
     the script's area is: Vvardenfell (the image's world, a start script, dialogue or no place) or an add-on world."""
     reasons = Counter()
     for r in rows:
-        if r['state'] == 'runs':
+        if r['state'] in ('runs', 'carried'):
             continue
-        why = 'calls a function the interpreter does not carry out yet' if r['state'] == 'missing-function' \
+        why ='calls a function the interpreter does not carry out yet' if r['state'] == 'missing-function' \
             else r['why']
         reasons[(LABELS[r['state']], why, r['area'] in ADDON_REGIONS)] += 1
     table = {}
@@ -716,10 +827,12 @@ def render(doc):
     lines = ['# MWScript features', '',
              '_Last updated with AmiWind v%s (%s)._' % (doc['version'], long_date(doc['updated'])), '',
              GENERATED, '', doc['intro'], '',
-             '**%s of %s scripts run**; %s use a function the interpreter lacks, %s are attached but not run, %s are '
+             '**%s of %s scripts run** as scripts and **%s are carried by AmiWind\'s own code**; of the rest, %s use '
+             'a function the interpreter lacks, %s are attached but not run, %s are '
              'compiled but not attached, %s belong to an add-on world not in the image yet, %s are named by nothing '
              '(they never run in the original either), %s are not converted.' % (
-                 _n(st['runs']), _n(len(rows)), _n(st['missing-function']), _n(st['attached-not-run']),
+                 _n(st['runs']), _n(len(rows)), _n(st['carried']), _n(st['missing-function']),
+                 _n(st['attached-not-run']),
                  _n(st['not-attached']), _n(st['not-in-image']), _n(st['inert']), _n(st['not-converted'])), '',
              '| State | Scripts | What it means |', '| --- | ---: | --- |']
     meaning = {'runs': 'compiles whole, and the build attaches it to its objects or starts it (a record that is never '
@@ -736,7 +849,9 @@ def render(doc):
                                    'it, or nothing it does is seen yet',
                'not-attached': 'compiles whole, but nothing in the build attaches or starts it: its records are never '
                                'placed, and nothing makes them at run time yet',
-               'not-converted': 'does not compile'}
+               'not-converted': 'does not compile',
+               'carried': 'not run as a script because AmiWind\'s own code does what it does (the section Carried by '
+                          'AmiWind\'s own code names the code and compares it step by step)'}
     for s in STATES:
         lines.append('| %s | %s | %s |' % (LABELS[s], _n(st[s]), meaning[s]))
     d = doc['dialogue']
@@ -752,8 +867,7 @@ def render(doc):
                  'other-startcombat': 'another actor attacks (StartCombat on a reference)',
                  'speaker-fight': 'the speaker\'s Fight changes: weighed when the talk ends',
                  'other-fight': 'another actor\'s Fight changes: weighed by that actor\'s next aggression check',
-                 'startcombat-actor': 'a fight between two actors: not carried out (the combat layer fights the '
-                                      'player only)',
+                 'startcombat-actor': 'a fight between two actors: both are set against each other (since v0.0.63)',
                  'not-run': 'the answer does not run whole'}
         lines += ['Dialogue answers that start or change a fight (StartCombat, SetFight, ModFight): %s.' %
                   _n(sum(fight.values())), '', '| Engine path | Answers |', '| --- | ---: |']
@@ -766,6 +880,7 @@ def render(doc):
               'scripts without a new measurement.' % (long_date(meas['date']), _n(meas['placed_scripted']),
                                                        _n(meas['bindings']), _n(meas['start_scripts'])), '']
     lines += why_not_run(rows)
+    lines += counterparts_section()
     # where OpenMW deliberately differs from the original engine
     hits = Counter(f for r in rows for f in r.get('openmw', ()))
     dhits = doc['dialogue_results'].get('openmw', {})

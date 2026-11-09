@@ -164,6 +164,8 @@ int main(void)
     AW_CharacterMouse(0,128);AW_CharacterKey(K_MOUSE1);AW_CharacterKey(K_ENTER);
     assert(AW_CharacterDone()==1);
     AW_StoryReset(1);assert(AW_StoryRestricted());assert(!AW_StoryTransition(AW_STAGE_OFFICE));
+    /* CHARGENSTATE-START-VALUE-63: a new game leaves CharGenState at the CharGen script's 10 */
+    assert(AW_StateGet(&aw_state,AW_GLOBAL,"CharGenState")==10);
     /* CHARGEN-INVENTORY-LOCKED-60: the inventory opens from the papers' activation on (CharGenStatsSheet:
      * EnableInventoryMenu), still inside the registration; never before the papers are laid out */
     assert(!AW_StoryInventoryAllowed());aw_story.stage=AW_STAGE_REVIEW;

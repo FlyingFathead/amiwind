@@ -197,16 +197,17 @@ def door_locks(raw,hinged_rows=()):
     return [locks[n] for n in sorted(locks)],key_used
 
 
-MOVER_FUNCTIONS=('moveworld','move','setatstart','setpos')
+MOVER_FUNCTIONS=('moveworld','move','setatstart','setpos','rotateworld','rotate','setangle')
 MOVER_TYPES=('ACTI','STAT','DOOR','CONT')
 HINGED_MOVERS=128   # aw_hinged_door.c HD_MOVERS
 _MOVER_CALL=re.compile(r'^\s*(?:(?:"([^"]+)"|([A-Za-z0-9_\-]+))\s*->\s*)?(%s)\b' % '|'.join(MOVER_FUNCTIONS),re.I)
 
 
 def mover_catalogue(raw,exclude=()):
-    """WORLD-BUTTONS-62: the placed references a script moves along the world (Move, MoveWorld, SetPos, SetAtStart),
-    named ("ex_gg_portcullis_01"->MoveWorld z 70) or the script's own object (a bare MoveWorld in a script an object
-    carries), whose record is an activator, static, door or container: the CHIM world draws them as placements without
+    """WORLD-BUTTONS-62: the placed references a script moves or turns (Move, MoveWorld, SetPos, SetAtStart, Rotate,
+    RotateWorld, SetAngle), named ("ex_gg_portcullis_01"->MoveWorld z 70) or the script's own object when the script
+    reads OnActivate (a crank's Rotate X 20), whose record is an activator, static, door or container: the CHIM world
+    draws them as placements without
     an entity, which the engine moves through the M rows (aw_hinged_door.c). References ascending, EXCLUDE (the hinged
     doors, D rows) left out. -> (references, {id: [script names]})."""
     scripts={};carriers={};kinds={}
@@ -226,6 +227,10 @@ def mover_catalogue(raw,exclude=()):
             m=_MOVER_CALL.match(line)
             if not m:continue
             target=(m.group(1) or m.group(2) or '').casefold()
+            # the script's own object only when its use drives it (OnActivate: cranks, bar doors, the Shishi skull);
+            # a script that turns its object every frame on its own (the swinging signs, the floating crates: 950
+            # placements) waits for a cheaper per-frame path (its cost per frame, WORLD-BUTTONS-62)
+            if not target and 'onactivate' not in text.casefold():continue
             for ident in ([target] if target else carriers.get(name,[])):
                 if ident in kinds:moved.setdefault(ident,set()).add(name)
     refs=set()

@@ -230,5 +230,7 @@ void AW_CrimeInit(void);
  * disabled one is never seen nor sees); OBSERVER notices ACTOR when it sees it and its kept roll is at least the
  * awareness target (the settings of the crime rules; without them every seen actor is noticed). */
 int AW_CrimeSight(struct edict_s *from,struct edict_s *to);
+/* fAlarmRadius in map units (the guards' reach for joining a fight, COMBAT-ACTOR-VS-ACTOR-62); 0 without the table */
+float AW_CrimeAlarmRadius(void);
 int AW_CrimeDetects(struct edict_s *observer,const aw_crime_observer_t *o,struct edict_s *actor,const aw_crime_thief_t *t);
 #endif

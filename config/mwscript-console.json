@@ -1,0 +1,3691 @@
+{
+ "schema": "mwscript-console 1",
+ "note": "The original game's console commands and OpenMW 0.51's (MW-CONSOLE-COMMANDS-62): each with its state in AmiWind's console. alias: the line runs AmiWind's own command; vm: run through the MWScript host, as a compiled script line; collision: the name is AmiWind's own command, kept; planned: not in the console yet; not applicable: a tool of another engine. Sources: OpenMW 0.51 components/compiler/extensions0.cpp and the console toggles of the original game (with thanks to the UESP's Morrowind:Console page). Rendered by tools/mwscript_console.py, checked by tests/test_mwscript_console.py.",
+ "commands": [
+  {
+   "name": "activate",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (host_object), on any reference by id-> or the console target"
+  },
+  {
+   "name": "additem",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Container",
+   "state": "vm",
+   "amiwind": "the MWScript host (aw_mwhost.c host_item (an id no actor carries: the player's inventory, dbg give's own call)), on any reference by id-> or the console target"
+  },
+  {
+   "name": "addsoulgem",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "addspell",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host (aw_mwhost.c host_spell), on any reference by id-> or the console target"
+  },
+  {
+   "name": "addtolevcreature",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "addtolevitem",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "addtopic",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Dialogue",
+   "state": "planned",
+   "amiwind": "",
+   "why": "its arguments are worked out by the compiler (the topic row)"
+  },
+  {
+   "name": "aiactivate",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Ai",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "aiescort",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Ai",
+   "state": "vm",
+   "amiwind": "the MWScript host (aw_mwhost.c host_call AIEscort), on any reference by id-> or the console target"
+  },
+  {
+   "name": "aiescortcell",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Ai",
+   "state": "planned",
+   "amiwind": "",
+   "why": "its arguments are worked out by the compiler (the room number)"
+  },
+  {
+   "name": "aifollow",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Ai",
+   "state": "vm",
+   "amiwind": "the MWScript host (aw_mwhost.c host_call AIFollow), on any reference by id-> or the console target"
+  },
+  {
+   "name": "aifollowcell",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Ai",
+   "state": "planned",
+   "amiwind": "",
+   "why": "its arguments are worked out by the compiler (the room number)"
+  },
+  {
+   "name": "aitravel",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Ai",
+   "state": "vm",
+   "amiwind": "the MWScript host (aw_mwhost.c host_call AITravel), on any reference by id-> or the console target"
+  },
+  {
+   "name": "aiwander",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Ai",
+   "state": "vm",
+   "amiwind": "the MWScript host (aw_mwhost.c host_wander), on any reference by id-> or the console target"
+  },
+  {
+   "name": "becomewerewolf",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "planned",
+   "amiwind": "",
+   "why": "its arguments are worked out by the compiler (the werewolf settings)"
+  },
+  {
+   "name": "betacomment",
+   "short": "bc",
+   "sources": [
+    "OpenMW 0.51",
+    "original"
+   ],
+   "group": "Misc",
+   "state": "not applicable",
+   "amiwind": "editor note"
+  },
+  {
+   "name": "cast",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "planned",
+   "amiwind": "",
+   "why": "its arguments are worked out by the compiler (the spell's effect row)"
+  },
+  {
+   "name": "cellchanged",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Cell",
+   "state": "planned",
+   "amiwind": "",
+   "why": "an interpreter opcode with compiled arguments (a sound, topic, script or message row)"
+  },
+  {
+   "name": "centeroncell",
+   "short": "coc",
+   "sources": [
+    "OpenMW 0.51",
+    "original"
+   ],
+   "group": "Cell",
+   "state": "alias",
+   "amiwind": "dbg tp \"<cell>\""
+  },
+  {
+   "name": "centeronexterior",
+   "short": "coe",
+   "sources": [
+    "OpenMW 0.51",
+    "original"
+   ],
+   "group": "Cell",
+   "state": "alias",
+   "amiwind": "dbg tp <x*8192+4096> <y*8192+4096>"
+  },
+  {
+   "name": "changeweather",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Sky",
+   "state": "planned",
+   "amiwind": "",
+   "why": "its arguments are worked out by the compiler (the region index)"
+  },
+  {
+   "name": "choice",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "planned",
+   "amiwind": "",
+   "why": "its arguments are worked out by the compiler (a dialogue result only)"
+  },
+  {
+   "name": "clearforcejump",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Control",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "clearforcemovejump",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "clearforcerun",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Control",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "clearforcesneak",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Control",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "clearinfoactor",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Dialogue",
+   "state": "planned",
+   "amiwind": "",
+   "why": "its arguments are worked out by the compiler (a dialogue result only)"
+  },
+  {
+   "name": "disable",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "vm",
+   "amiwind": "the MWScript host (aw_mwhost.c host_object), on any reference by id-> or the console target"
+  },
+  {
+   "name": "disablelevitation",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "disableteleporting",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "dontsaveobject",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "planned",
+   "amiwind": "",
+   "why": "an interpreter opcode with compiled arguments (a sound, topic, script or message row)"
+  },
+  {
+   "name": "drop",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "planned",
+   "amiwind": "",
+   "why": "its arguments are worked out by the compiler (the item's row)"
+  },
+  {
+   "name": "dropsoulgem",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "enable",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "vm",
+   "amiwind": "the MWScript host (aw_mwhost.c host_object), on any reference by id-> or the console target"
+  },
+  {
+   "name": "enablebirthmenu",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Gui",
+   "state": "alias",
+   "amiwind": "dbg quickchar birthsign"
+  },
+  {
+   "name": "enableclassmenu",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Gui",
+   "state": "alias",
+   "amiwind": "dbg quickchar class"
+  },
+  {
+   "name": "enableinventorymenu",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Gui",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "enablelevelupmenu",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Gui",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "enablelevitation",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "enablemagicmenu",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Gui",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "enablemapmenu",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Gui",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "enablenamemenu",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Gui",
+   "state": "alias",
+   "amiwind": "dbg quickchar name"
+  },
+  {
+   "name": "enableracemenu",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Gui",
+   "state": "alias",
+   "amiwind": "dbg characterchange race"
+  },
+  {
+   "name": "enablerest",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Gui",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "enablestatreviewmenu",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Gui",
+   "state": "alias",
+   "amiwind": "dbg quickchar review"
+  },
+  {
+   "name": "enablestatsmenu",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Gui",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "enableteleporting",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "equip",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Container",
+   "state": "vm",
+   "amiwind": "the MWScript host (aw_mwhost.c the inventory's equip (the player only)), on any reference by id-> or the console target"
+  },
+  {
+   "name": "explodespell",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "planned",
+   "amiwind": "",
+   "why": "its arguments are worked out by the compiler (the spell's row)"
+  },
+  {
+   "name": "face",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Ai",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "fadein",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "fadeout",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "fadeto",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "fall",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "planned",
+   "amiwind": "",
+   "why": "an interpreter opcode with compiled arguments (a sound, topic, script or message row)"
+  },
+  {
+   "name": "filljournal",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Dialogue",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "fillmap",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Gui",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "fixme",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Transformation",
+   "state": "alias",
+   "amiwind": "dbg unstuck"
+  },
+  {
+   "name": "forcegreeting",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Dialogue",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "forcejump",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Control",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "forcemovejump",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Control",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "forcerun",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Control",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "forcesneak",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Control",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getacrobatics",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "getagility",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "getalarm",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Ai",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (host_actor), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getalchemy",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "getalteration",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "getangle",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Transformation",
+   "state": "vm",
+   "amiwind": "the MWScript host (aw_mwhost.c host_call GetAngle), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getarmorer",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "getarmortype",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Container",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "getathletics",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "getattacked",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getaxe",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "getblock",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "getbluntweapon",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "getbuttonpressed",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Gui",
+   "state": "planned",
+   "amiwind": "",
+   "why": "an interpreter opcode with compiled arguments (a sound, topic, script or message row)"
+  },
+  {
+   "name": "getcollidingpc",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getconjuration",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "getcurrenttime",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "getcurrentweather",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Sky",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getdeadcount",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (host_dead_count), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getdestruction",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "getdetected",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Ai",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getdisabled",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "vm",
+   "amiwind": "the MWScript host (aw_mwhost.c host_object), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getdisposition",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (host_actor), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getdistance",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Transformation",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (host_distance), on any reference by id-> or the console target"
+  },
+  {
+   "name": "geteffect",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "planned",
+   "amiwind": "",
+   "why": "its arguments are worked out by the compiler (the effect number)"
+  },
+  {
+   "name": "getenchant",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "getendurance",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "getfactionreaction",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Dialogue",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "getfatigue",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "getfight",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Ai",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (host_actor), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getflee",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Ai",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (host_actor), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getforcejump",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Control",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "getforcerun",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Control",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getforcesneak",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Control",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "gethandtohand",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "gethealth",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "getheavyarmor",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "gethello",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Ai",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (host_actor), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getillusion",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "getintelligence",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "getinterior",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Cell",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getitemcount",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Container",
+   "state": "vm",
+   "amiwind": "the MWScript host (aw_mwhost.c host_item), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getjournalindex",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Dialogue",
+   "state": "planned",
+   "amiwind": "",
+   "why": "an interpreter opcode with compiled arguments (a sound, topic, script or message row)"
+  },
+  {
+   "name": "getlevel",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (host_actor), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getlightarmor",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "getlineofsight",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Ai",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getlocked",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (host_object), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getlongblade",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "getlos",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Ai",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getluck",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "getmagicka",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "getmarksman",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "getmasserphase",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Sky",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "getmediumarmor",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "getmercantile",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "getmysticism",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "getpccell",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Cell",
+   "state": "planned",
+   "amiwind": "",
+   "why": "an interpreter opcode with compiled arguments (a sound, topic, script or message row)"
+  },
+  {
+   "name": "getpccrimelevel",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getpcfacrep",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getpcinjail",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getpcjumping",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "getpcrank",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getpcrunning",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Control",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "getpcsleep",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getpcsneaking",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Control",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getpctraveling",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getpcvisionbonus",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "getpersonality",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "getpos",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Transformation",
+   "state": "vm",
+   "amiwind": "the MWScript host (aw_mwhost.c host_position), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getrace",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getreputation",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Dialogue",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getrestoration",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "getscale",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Transformation",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getsecondspassed",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "planned",
+   "amiwind": "",
+   "why": "an interpreter opcode with compiled arguments (a sound, topic, script or message row)"
+  },
+  {
+   "name": "getsecundaphase",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Sky",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "getsecurity",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "getshortblade",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "getsneak",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "getspear",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "getspeechcraft",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "getspeed",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "getspell",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (host_spell), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getsquareroot",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "planned",
+   "amiwind": "",
+   "why": "an interpreter opcode with compiled arguments (a sound, topic, script or message row)"
+  },
+  {
+   "name": "getstandingpc",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getstartingpos",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Transformation",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "getstat",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getstrength",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "gettarget",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Ai",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getunarmored",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "getwaterlevel",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Cell",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getweapondrawn",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getweapontype",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Container",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getwerewolfkills",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getwillpower",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "getwindspeed",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "goodbye",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Dialogue",
+   "state": "planned",
+   "amiwind": "",
+   "why": "its arguments are worked out by the compiler (a dialogue result only)"
+  },
+  {
+   "name": "gotojail",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "hassoulgem",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Container",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "help",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "collision",
+   "amiwind": "AmiWind's help (dbg help); the original's list of commands is under dbg help mw"
+  },
+  {
+   "name": "hitattemptonme",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "hitonme",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "hurtcollidingactor",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "hurtstandingactor",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "iswerewolf",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "journal",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Dialogue",
+   "state": "planned",
+   "amiwind": "",
+   "why": "an interpreter opcode with compiled arguments (a sound, topic, script or message row)"
+  },
+  {
+   "name": "lock",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (host_object), on any reference by id-> or the console target"
+  },
+  {
+   "name": "loopgroup",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Animation",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "lowerrank",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "menumode",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "planned",
+   "amiwind": "",
+   "why": "an interpreter opcode with compiled arguments (a sound, topic, script or message row)"
+  },
+  {
+   "name": "menutest",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Gui",
+   "state": "not applicable",
+   "amiwind": "OpenMW test"
+  },
+  {
+   "name": "modacrobatics",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "modagility",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "modalarm",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Ai",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (host_actor), on any reference by id-> or the console target"
+  },
+  {
+   "name": "modalchemy",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "modalteration",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "modarmorer",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "modathletics",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "modaxe",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "modblock",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "modbluntweapon",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "modconjuration",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "modcurrentfatigue",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "modcurrenthealth",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "modcurrentmagicka",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "moddestruction",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "moddisposition",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (host_actor), on any reference by id-> or the console target"
+  },
+  {
+   "name": "modenchant",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "modendurance",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "modfactionreaction",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Dialogue",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "modfatigue",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "modfight",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Ai",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (host_actor), on any reference by id-> or the console target"
+  },
+  {
+   "name": "modflee",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Ai",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (host_actor), on any reference by id-> or the console target"
+  },
+  {
+   "name": "modhandtohand",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "modhealth",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "modheavyarmor",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "modhello",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Ai",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (host_actor), on any reference by id-> or the console target"
+  },
+  {
+   "name": "modillusion",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "modintelligence",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "modlightarmor",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "modlongblade",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "modluck",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "modmagicka",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "modmarksman",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "modmediumarmor",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "modmercantile",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "modmysticism",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "modpccrimelevel",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "modpcfacrep",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "modpcvisionbonus",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "modpersonality",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "modregion",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Sky",
+   "state": "planned",
+   "amiwind": "",
+   "why": "its arguments are worked out by the compiler (the region index)"
+  },
+  {
+   "name": "modreputation",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Dialogue",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "modrestoration",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "modscale",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Transformation",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "modsecurity",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "modshortblade",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "modsneak",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "modspear",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "modspeechcraft",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "modspeed",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "modstrength",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "modunarmored",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "modwaterlevel",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Cell",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "modwillpower",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "move",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Transformation",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "moveworld",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Transformation",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "onactivate",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "planned",
+   "amiwind": "",
+   "why": "an interpreter opcode with compiled arguments (a sound, topic, script or message row)"
+  },
+  {
+   "name": "ondeath",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (host_actor), on any reference by id-> or the console target"
+  },
+  {
+   "name": "onknockout",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "onmurder",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "ori",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "outputrefinfo",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "payfine",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "payfinethief",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "pcclearexpelled",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "pcexpell",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "pcexpelled",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "pcforce1stperson",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "pcforce3rdperson",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "pcget3rdperson",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "pcjoinfaction",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "pclowerrank",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "pcraiserank",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "placeatme",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Transformation",
+   "state": "planned",
+   "amiwind": "",
+   "why": "its arguments are worked out by the compiler (the placing rows)"
+  },
+  {
+   "name": "placeatpc",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Transformation",
+   "state": "planned",
+   "amiwind": "",
+   "why": "its arguments are worked out by the compiler (the placing rows)"
+  },
+  {
+   "name": "placeitem",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Transformation",
+   "state": "planned",
+   "amiwind": "",
+   "why": "its arguments are worked out by the compiler (the placing rows)"
+  },
+  {
+   "name": "placeitemcell",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Transformation",
+   "state": "planned",
+   "amiwind": "",
+   "why": "its arguments are worked out by the compiler (the placing rows)"
+  },
+  {
+   "name": "playbink",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "not applicable",
+   "amiwind": "the original's video player (AmiWind: dbg playvid)"
+  },
+  {
+   "name": "playgroup",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Animation",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "playloopsound3d",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "planned",
+   "amiwind": "",
+   "why": "an interpreter opcode with compiled arguments (a sound, topic, script or message row)"
+  },
+  {
+   "name": "playloopsound3dvp",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "planned",
+   "amiwind": "",
+   "why": "an interpreter opcode with compiled arguments (a sound, topic, script or message row)"
+  },
+  {
+   "name": "playsound",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Sound",
+   "state": "planned",
+   "amiwind": "",
+   "why": "an interpreter opcode with compiled arguments (a sound, topic, script or message row)"
+  },
+  {
+   "name": "playsound3d",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Sound",
+   "state": "planned",
+   "amiwind": "",
+   "why": "an interpreter opcode with compiled arguments (a sound, topic, script or message row)"
+  },
+  {
+   "name": "playsound3dvp",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Sound",
+   "state": "planned",
+   "amiwind": "",
+   "why": "an interpreter opcode with compiled arguments (a sound, topic, script or message row)"
+  },
+  {
+   "name": "playsoundvp",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Sound",
+   "state": "planned",
+   "amiwind": "",
+   "why": "an interpreter opcode with compiled arguments (a sound, topic, script or message row)"
+  },
+  {
+   "name": "position",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Transformation",
+   "state": "vm",
+   "amiwind": "the MWScript host (aw_mwhost.c host_call Position), on any reference by id-> or the console target"
+  },
+  {
+   "name": "positioncell",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Transformation",
+   "state": "vm",
+   "amiwind": "the MWScript host (aw_mwhost.c dbg tp to the cell (the player only)), on any reference by id-> or the console target"
+  },
+  {
+   "name": "raiserank",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "random",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "planned",
+   "amiwind": "",
+   "why": "an interpreter opcode with compiled arguments (a sound, topic, script or message row)"
+  },
+  {
+   "name": "reloadlua",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "not applicable",
+   "amiwind": "OpenMW Lua"
+  },
+  {
+   "name": "removeeffects",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "removefromlevcreature",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "removefromlevitem",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "removeitem",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Container",
+   "state": "vm",
+   "amiwind": "the MWScript host (aw_mwhost.c host_item), on any reference by id-> or the console target"
+  },
+  {
+   "name": "removesoulgem",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "removespell",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host (aw_mwhost.c host_spell), on any reference by id-> or the console target"
+  },
+  {
+   "name": "removespelleffects",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "repairedonme",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "planned",
+   "amiwind": "",
+   "why": "a console-only command with no AmiWind counterpart yet"
+  },
+  {
+   "name": "resetactors",
+   "short": "ra",
+   "sources": [
+    "OpenMW 0.51",
+    "original"
+   ],
+   "group": "Transformation",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "resurrect",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "rotate",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Transformation",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "rotateworld",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Transformation",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "samefaction",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Dialogue",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "say",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Sound",
+   "state": "collision",
+   "amiwind": "the engine's chat line (say); the script function Say runs from scripts"
+  },
+  {
+   "name": "saydone",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Sound",
+   "state": "planned",
+   "amiwind": "",
+   "why": "an interpreter opcode with compiled arguments (a sound, topic, script or message row)"
+  },
+  {
+   "name": "scriptrunning",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "planned",
+   "amiwind": "",
+   "why": "an interpreter opcode with compiled arguments (a sound, topic, script or message row)"
+  },
+  {
+   "name": "setacrobatics",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "setagility",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "setalarm",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Ai",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (host_actor), on any reference by id-> or the console target"
+  },
+  {
+   "name": "setalchemy",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "setalteration",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "setangle",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Transformation",
+   "state": "vm",
+   "amiwind": "the MWScript host (aw_mwhost.c host_call SetAngle), on any reference by id-> or the console target"
+  },
+  {
+   "name": "setarmorer",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "setathletics",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "setatstart",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Transformation",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "setaxe",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "setblock",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "setbluntweapon",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "setconjuration",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "setdelete",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "setdestruction",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "setdisposition",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (host_actor), on any reference by id-> or the console target"
+  },
+  {
+   "name": "setenchant",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "setendurance",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "setfactionreaction",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Dialogue",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "setfatigue",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "setfight",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Ai",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (host_actor), on any reference by id-> or the console target"
+  },
+  {
+   "name": "setflee",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Ai",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (host_actor), on any reference by id-> or the console target"
+  },
+  {
+   "name": "sethandtohand",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "sethealth",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "setheavyarmor",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "sethello",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Ai",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (host_actor), on any reference by id-> or the console target"
+  },
+  {
+   "name": "setillusion",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "setintelligence",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "setjournalindex",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Dialogue",
+   "state": "planned",
+   "amiwind": "",
+   "why": "an interpreter opcode with compiled arguments (a sound, topic, script or message row)"
+  },
+  {
+   "name": "setlevel",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "alias",
+   "amiwind": "dbg setlvl <n> (the player)"
+  },
+  {
+   "name": "setlightarmor",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "setlongblade",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "setluck",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "setmagicka",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "setmarksman",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "setmediumarmor",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "setmercantile",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "setmysticism",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "setnavmeshnumber",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "not applicable",
+   "amiwind": "OpenMW navigation mesh"
+  },
+  {
+   "name": "setpccrimelevel",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "setpcfacrep",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "setpcvisionbonus",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "setpersonality",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "setpos",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Transformation",
+   "state": "vm",
+   "amiwind": "the MWScript host (aw_mwhost.c host_call SetPos), on any reference by id-> or the console target"
+  },
+  {
+   "name": "setreputation",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Dialogue",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "setrestoration",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "setscale",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Transformation",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "setsecurity",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "setshortblade",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "setsneak",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "setspear",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "setspeechcraft",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "setspeed",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "setstrength",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "setunarmored",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "setwaterlevel",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Cell",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "setwerewolfacrobatics",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "planned",
+   "amiwind": "",
+   "why": "its arguments are worked out by the compiler (the werewolf settings)"
+  },
+  {
+   "name": "setwillpower",
+   "sources": [
+    "original"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "show",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "showmap",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Gui",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "showrestmenu",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Gui",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "showscenegraph",
+   "short": "ssg",
+   "sources": [
+    "OpenMW 0.51",
+    "original"
+   ],
+   "group": "Misc",
+   "state": "not applicable",
+   "amiwind": "OpenMW scene graph"
+  },
+  {
+   "name": "showvars",
+   "short": "sv",
+   "sources": [
+    "OpenMW 0.51",
+    "original"
+   ],
+   "group": "Misc",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "skipanim",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Animation",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "startcombat",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Ai",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (host_combat), on any reference by id-> or the console target"
+  },
+  {
+   "name": "startscript",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "planned",
+   "amiwind": "",
+   "why": "an interpreter opcode with compiled arguments (a sound, topic, script or message row)"
+  },
+  {
+   "name": "stopcombat",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Ai",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (host_combat), on any reference by id-> or the console target"
+  },
+  {
+   "name": "stopscript",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "planned",
+   "amiwind": "",
+   "why": "an interpreter opcode with compiled arguments (a sound, topic, script or message row)"
+  },
+  {
+   "name": "stopsound",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Sound",
+   "state": "collision",
+   "amiwind": "the engine's stopsound (all sounds); the script function StopSound runs from scripts"
+  },
+  {
+   "name": "streammusic",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Sound",
+   "state": "planned",
+   "amiwind": "",
+   "why": "an interpreter opcode with compiled arguments (a sound, topic, script or message row)"
+  },
+  {
+   "name": "t3d",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "not applicable",
+   "amiwind": "renderer test"
+  },
+  {
+   "name": "testcells",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Cell",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "testinteriorcells",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Cell",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "testmodels",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "not applicable",
+   "amiwind": "OpenMW model loader test"
+  },
+  {
+   "name": "toggleactorspaths",
+   "short": "tap",
+   "sources": [
+    "OpenMW 0.51",
+    "original"
+   ],
+   "group": "Misc",
+   "state": "not applicable",
+   "amiwind": "OpenMW navigation mesh"
+  },
+  {
+   "name": "toggleai",
+   "short": "tai",
+   "sources": [
+    "OpenMW 0.51",
+    "original"
+   ],
+   "group": "Ai",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "toggleborders",
+   "short": "tb",
+   "sources": [
+    "OpenMW 0.51",
+    "original"
+   ],
+   "group": "Misc",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "togglecollision",
+   "short": "tcl",
+   "sources": [
+    "OpenMW 0.51",
+    "original"
+   ],
+   "group": "Control",
+   "state": "alias",
+   "amiwind": "noclip (AmiWind's own tcl)"
+  },
+  {
+   "name": "togglecollisionboxes",
+   "short": "tcb",
+   "sources": [
+    "OpenMW 0.51",
+    "original"
+   ],
+   "group": "Misc",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "togglecollisiongrid",
+   "short": "tcg",
+   "sources": [
+    "OpenMW 0.51",
+    "original"
+   ],
+   "group": "Misc",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "togglecombatstats",
+   "short": "tcs",
+   "sources": [
+    "original"
+   ],
+   "group": "Console",
+   "state": "planned",
+   "amiwind": "",
+   "why": "a console-only command with no AmiWind counterpart yet"
+  },
+  {
+   "name": "toggledebugtext",
+   "short": "tdt",
+   "sources": [
+    "original"
+   ],
+   "group": "Console",
+   "state": "planned",
+   "amiwind": "",
+   "why": "a console-only command with no AmiWind counterpart yet"
+  },
+  {
+   "name": "toggledialoguestats",
+   "short": "tds",
+   "sources": [
+    "original"
+   ],
+   "group": "Console",
+   "state": "planned",
+   "amiwind": "",
+   "why": "a console-only command with no AmiWind counterpart yet"
+  },
+  {
+   "name": "togglefogofwar",
+   "short": "tfow",
+   "sources": [
+    "OpenMW 0.51",
+    "original"
+   ],
+   "group": "Gui",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "togglefullhelp",
+   "short": "tfh",
+   "sources": [
+    "OpenMW 0.51",
+    "original"
+   ],
+   "group": "Gui",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "togglegodmode",
+   "short": "tgm",
+   "sources": [
+    "OpenMW 0.51",
+    "original"
+   ],
+   "group": "Misc",
+   "state": "alias",
+   "amiwind": "dbg god"
+  },
+  {
+   "name": "togglegrid",
+   "short": "tg",
+   "sources": [
+    "original"
+   ],
+   "group": "Console",
+   "state": "planned",
+   "amiwind": "",
+   "why": "a console-only command with no AmiWind counterpart yet"
+  },
+  {
+   "name": "togglekillstats",
+   "short": "tks",
+   "sources": [
+    "original"
+   ],
+   "group": "Console",
+   "state": "planned",
+   "amiwind": "",
+   "why": "a console-only command with no AmiWind counterpart yet"
+  },
+  {
+   "name": "togglelights",
+   "short": "tl",
+   "sources": [
+    "original"
+   ],
+   "group": "Console",
+   "state": "planned",
+   "amiwind": "",
+   "why": "a console-only command with no AmiWind counterpart yet"
+  },
+  {
+   "name": "toggleloadfade",
+   "sources": [
+    "original"
+   ],
+   "group": "Console",
+   "state": "planned",
+   "amiwind": "",
+   "why": "a console-only command with no AmiWind counterpart yet"
+  },
+  {
+   "name": "togglemagicstats",
+   "short": "tms",
+   "sources": [
+    "original"
+   ],
+   "group": "Console",
+   "state": "planned",
+   "amiwind": "",
+   "why": "a console-only command with no AmiWind counterpart yet"
+  },
+  {
+   "name": "togglemenus",
+   "short": "tm",
+   "sources": [
+    "OpenMW 0.51",
+    "original"
+   ],
+   "group": "Gui",
+   "state": "alias",
+   "amiwind": "dbg killhud"
+  },
+  {
+   "name": "togglenavmesh",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "not applicable",
+   "amiwind": "OpenMW navigation mesh"
+  },
+  {
+   "name": "togglepathgrid",
+   "short": "tpg",
+   "sources": [
+    "OpenMW 0.51",
+    "original"
+   ],
+   "group": "Misc",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "togglerecastmesh",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "not applicable",
+   "amiwind": "OpenMW navigation mesh"
+  },
+  {
+   "name": "togglescripts",
+   "sources": [
+    "OpenMW 0.51",
+    "original"
+   ],
+   "group": "Misc",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "togglesky",
+   "short": "ts",
+   "sources": [
+    "OpenMW 0.51",
+    "original"
+   ],
+   "group": "Sky",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "togglestats",
+   "short": "tst",
+   "sources": [
+    "original"
+   ],
+   "group": "Console",
+   "state": "planned",
+   "amiwind": "",
+   "why": "a console-only command with no AmiWind counterpart yet"
+  },
+  {
+   "name": "toggletexturestring",
+   "short": "tts",
+   "sources": [
+    "original"
+   ],
+   "group": "Console",
+   "state": "not applicable",
+   "amiwind": "original renderer readout"
+  },
+  {
+   "name": "togglevanitymode",
+   "short": "tvm",
+   "sources": [
+    "OpenMW 0.51",
+    "original"
+   ],
+   "group": "Misc",
+   "state": "alias",
+   "amiwind": "dbg vanitycam on"
+  },
+  {
+   "name": "togglewater",
+   "short": "twa",
+   "sources": [
+    "OpenMW 0.51",
+    "original"
+   ],
+   "group": "Misc",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "togglewireframe",
+   "short": "twf",
+   "sources": [
+    "OpenMW 0.51",
+    "original"
+   ],
+   "group": "Misc",
+   "state": "not applicable",
+   "amiwind": "renderer"
+  },
+  {
+   "name": "toggleworld",
+   "short": "tw",
+   "sources": [
+    "OpenMW 0.51",
+    "original"
+   ],
+   "group": "Misc",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "turnmoonred",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Sky",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "turnmoonwhite",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Sky",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "undowerewolf",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "unlock",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (host_object), on any reference by id-> or the console target"
+  },
+  {
+   "name": "user1",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "User",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "user2",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "User",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "user3",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "User",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "user4",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "User",
+   "state": "planned",
+   "amiwind": "",
+   "why": "not carried out by the interpreter yet (scripts too)"
+  },
+  {
+   "name": "wakeuppc",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "xbox",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "planned",
+   "amiwind": "",
+   "why": "an interpreter opcode with compiled arguments (a sound, topic, script or message row)"
+  }
+ ]
+}

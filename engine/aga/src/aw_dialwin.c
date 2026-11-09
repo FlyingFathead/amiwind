@@ -1376,6 +1376,7 @@ int AW_DialWindowOpen(edict_t *e,const char *greeting,int again){
         speaker_reference=ref?(unsigned long)ref->_float:0;
         original_base=current_base=facts.base;permanent_change=0;mode=0;fight_started=travel_after=leave_after=0;
         choice_count=0;choice_topic=-1;goodbye_only=0;train_count=sale_count=0;
+        AW_MwscriptResultsPrepare();   /* MWSCRIPT-RESULT-LONG-FRAME-62: the results' index, once per load (in "facts") */
     }
     PHASE();
     if(COM_FOpenFile((char *)path,&file)<0 || !file){file=NULL;return 0;}

@@ -7,6 +7,10 @@
 typedef struct {vec3_t centre,axis[3],half;} aw_barrier_t;
 static aw_barrier_t boxes[AW_BARRIERS];
 static int count;
+/* OPENING-SHIP-BLOCKER-NOT-CONVERTED-63 (v0.0.63): the prison ship's own blocker (intro/barriers-ship.awb, the same
+ * format, the ship map's units), CharGenDisable's one placement inside the ship */
+static aw_barrier_t ship_boxes[AW_BARRIERS];
+static int ship_count;
 
 static float read_float(const byte *p)
 {
@@ -44,17 +48,26 @@ int AW_BarrierDecode(const byte *raw,int size)
     return 1;
 }
 
+static int load_file(const char *name,byte *raw,int capacity)
+{
+    FILE *f=NULL;int size=COM_FOpenFile((char *)name,&f);
+    if(!f)return -1;
+    if(size<6 || size>capacity || fread(raw,1,size,f)!=(size_t)size){fclose(f);return -1;}
+    fclose(f);
+    return size;
+}
 int AW_BarrierLoad(void)
 {
-    FILE *f=NULL;
     byte raw[6+AW_BARRIERS*60];
-    int size;
-    count=0;
-    size=COM_FOpenFile("intro/barriers.awb",&f);
-    if(!f)return 0;
-    if(size<6 || size>(int)sizeof(raw) || fread(raw,1,size,f)!=(size_t)size){fclose(f);return 0;}
-    fclose(f);
-    return AW_BarrierDecode(raw,size);
+    int size,ok;
+    count=ship_count=0;
+    /* the ship's first: AW_BarrierDecode fills the dock's set, so the ship's is decoded there and moved */
+    if((size=load_file("intro/barriers-ship.awb",raw,(int)sizeof(raw)))>0 && AW_BarrierDecode(raw,size)){
+        memcpy(ship_boxes,boxes,sizeof(boxes));ship_count=count;count=0;
+    }
+    if((size=load_file("intro/barriers.awb",raw,(int)sizeof(raw)))<0)return 0;
+    ok=AW_BarrierDecode(raw,size);
+    return ok;
 }
 
 /* Swept separating-axis test for an AABB and an OBB. The 15 axes include the
@@ -133,9 +146,11 @@ void AW_BarrierClip(vec3_t start,vec3_t mins,vec3_t maxs,vec3_t end,
                     edict_t *entity,trace_t *trace)
 {
     int i;
-    if(!count || !AW_StoryRestricted() || strcmp(sv.name,"seyda") ||
-       !svs.clients || entity!=svs.clients[0].edict ||
+    if(!AW_StoryRestricted() || !svs.clients || entity!=svs.clients[0].edict ||
        entity->v.movetype!=MOVETYPE_WALK || maxs[2]-mins[2]<1)return;
+    /* the ship's blocker on the ship (CharGenDisable keeps it while CharGenState is 0 or over, as the dock's) */
+    if(!strcmp(sv.name,"prison")){for(i=0;i<ship_count;i++)sweep(&ship_boxes[i],start,mins,maxs,end,trace);return;}
+    if(!count || strcmp(sv.name,"seyda"))return;
     for(i=0;i<count;i++)sweep(&boxes[i],start,mins,maxs,end,trace);
     pier_clip(start,mins,maxs,end,trace);
 }

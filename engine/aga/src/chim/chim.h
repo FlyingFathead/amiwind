@@ -40,6 +40,17 @@ extern int (*aw_chim_door_clip)(unsigned pid, vec3_t start, vec3_t mins, vec3_t 
  * (WORLD-BUTTONS-62; chim_room.c ChimMovers_Shift, set by Chim_Init) */
 extern int (*aw_chim_place_shift)(unsigned pid, const float *d, int relink);
 int ChimMovers_Shift (unsigned pid, const float *d, int relink);
+/* ... and turn every copy by d (Quake angles; chim_room.c ChimMovers_Turn; NOW
+ * gets the angles after it, may be NULL): the cranks, bar doors, Dwemer doors */
+extern int (*aw_chim_place_turn)(unsigned pid, const float *d, float *now);
+int ChimMovers_Turn (unsigned pid, const float *d, float *now);
+#define CHIM_PLACE_TURNED	0x40000		/* run-time: a turned mover's box holds every pose */
+/* The window's slot i (1 used: its frame and frame-local -> session offset;
+ * 0 for every slot without a window) and a frame map's own frame: for the
+ * flames of every frame (FIREPIT-FLAMES-62; aw_debug.c hands them to
+ * aw_guard_torch.c) */
+int Chim_WindowSlot (int i, int *cx, int *cy, float *offset);
+int Chim_MapFrame (const char *entities, int *cx, int *cy);
 
 void Chim_Init (void);
 int Chim_Active (void);

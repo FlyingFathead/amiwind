@@ -2,11 +2,13 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 3 times; something has to be done
+## PERSISTING: reported 5 times; something has to be done
 
 - Reported with v0.0.45 at 2026-10-20 02:30 +0300: v0.0.45 release build: engine/aga/src edits (aw_debug.c, aw_heapsize.c and 20 more) rebuilt world-flora and chim-town stages
 - Reported with v0.0.46-dev1 at 2026-10-20 14:48 +0300: v0.0.46-dev1: still open; key breadth repeats in the CHIM unit and gallery keys (see the -46 bugs)
 - Reported with v0.0.62-dev2 at 2026-11-07 21:34 +0200: Seen again in 2026_11_07_v0.0.62-dev2_full-v0.0.62-dev2_ca39212: the chim stage was not reused because engine sources changed (aw_character.h, aw_harvest_runtime.c/.h and 3 more), which do not change the world geometry; the town and room stages also named amiwind-toolkit/seam-check.html (a Toolkit page) among their changed inputs. Reuse preflight: 13 of 47 stages reused, 34 rebuilt, "0 unexpected".
+- Reported with v0.0.63-dev1 at 2026-11-09 04:26 +0000: Seen again on the v0.0.63 scripting line: edits of engine/aga/src/aw_combat.c and aw_combat.h (the fights between two actors, GetAttacked, the werewolf kills) re-key the chim, world-flora and chim-town stages in the reuse plan against the v0.0.62 build; the chim stage keys the whole file for one define (tools/map_engine_limits.py reads SLOTS from aw_combat.c).
+- Reported with v0.0.63-dev1 at 2026-11-09 07:19 +0200: aw_combat.c edits re-keyed chim, chim-town-balmora, chim-town-seyda, chim-town-vivec_city and world-flora
 
 <!-- END GENERATED PERSISTING -->
 
@@ -35,7 +37,7 @@ _Last updated with AmiWind v0.0.51 (24 October 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
+- [PERSISTING: reported 5 times; something has to be done](#persisting-reported-5-times-something-has-to-be-done)
 - [Status: 27 October 2026](#status-27-october-2026)
 - [Status: 24 October 2026](#status-24-october-2026)
 - [Status: 10 October 2026](#status-10-october-2026)
@@ -272,6 +274,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [MINIWIND-SCENE-CHAIN-WEIGHT-42](MINIWIND-SCENE-CHAIN-WEIGHT-42.md): Every MiniWind bakes all playable races and the opening rooms, and walks its whole frame stairs
 - NPC-BAKE-STAGES-OVERRUN-62 (no report page): The new seam and floor character bake made every stage that bakes characters run far past its history: room batches about 2 h 40 min, actor library about 40 min, player bodies 35+ min
 - [NPC-BAKED-WHOLE-DUPLICATION-33](NPC-BAKED-WHOLE-DUPLICATION-33.md): Every NPC appearance is baked whole: shared body parts are converted again for each actor, and equipment cannot change
+- [NPC-LIBRARY-NO-UNIT-CACHE-63](NPC-LIBRARY-NO-UNIT-CACHE-63.md): The NPC appearance bakes of the actor library stage had no unit cache, so every rebuild of the stage baked all 418 appearances again (about 45 minutes)
 - [PERF-GUARD-RESIDENT-BUSY-HOST-57](PERF-GUARD-RESIDENT-BUSY-HOST-57.md): The dev5 full build's perf guard failed chim-town-balmora and chim-town-vivec_city build_resident as slower (129 s, was 52 s; 147 s, was 62 s) while two other builds ran beside it: contention, not code
 - PLAYER-VIEW-SKIN-ROWS-STOP-62 (no report page): The image step's player view stopped the v0.0.62 final build after 1 h 13 min: an Alias skin rows overflow ended it instead of trying the next smaller body
 - RELEASE-GUARD-SLOW-CLONE-51 (no report page): The release guard, the fail-fast first step of a release, took 6 minutes on about 0.14 of a core: its release check clones the whole repository through the Windows-mounted drive
@@ -279,6 +282,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [ROOM-BAKE-FOOTPRINT-SLOW-48](ROOM-BAKE-FOOTPRINT-SLOW-48.md): The room actor bake's footprint rule with the collision-box test is more than 100 times slower
 - [ROOM-BATCH-CORES-49](ROOM-BATCH-CORES-49.md): The room batches stage ran on about two of its eight cores for minutes before its first room, and kept few of its finished rooms when stopped
 - ROOM-RESIDENTS-KEY-SERIAL-49 (no report page): The room residents step opens its unit cache once per resident: 233 s on one core before any cached resident is restored
+- UNIT-CACHE-STORE-ERRORS-SILENT-63 (no report page): A unit that the unit cache failed to store was reported as stored: a cache folder the build user could not write lost every unit without a word
 - UNIT-KEY-WHOLE-FILE-63 (no report page): The resident and room unit caches keyed every unit on the whole of their tool files, so an unrelated edit to tools/prepare_area.py re-keyed all 1,769 residents and every room, and the v0.0.63-dev1 build baked them all again
 - [UNIT-STORED-AT-MAP-END-62](UNIT-STORED-AT-MAP-END-62.md): The image step's player view stored its finished bodies only when its whole pool map ended: a step stopped midway kept none of them, so every resume baked every player body again
 

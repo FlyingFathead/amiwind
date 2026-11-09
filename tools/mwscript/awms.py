@@ -28,6 +28,9 @@
   STRT  2 bytes a start script: u16 script
   NEWG  2 bytes a script a new game starts once (Main's CharGenState block: Startup, VampireCheck; v0.0.62,
         NPC-STORY-DISABLED-AT-START-42): u16 script; resident, optional (an older file: none)
+  NGWE  4 bytes a region's weather a new game sets for a new-game script AmiWind's own code carries (v0.0.63,
+        OPENING-WEATHER-NOT-CLOUDY-63; CharGen's ChangeWeather): u16 the region's catalogue index (sorted Morrowind.esm
+        region ids, as ChangeWeather's), u8 weather, u8 0; resident, optional (an older file: none)
   HELD  20 bytes an actor standing on an object a script disables (events.py; v0.0.62, SCRIPTED-EVENT-FALLING-MAGE-61),
         sorted by actor: u32 the actor's reference u32 the object's reference f32 x y z (the actor's placed position,
         game units); resident, optional (an older file: none)
@@ -42,6 +45,8 @@
   LACT  8 bytes a scripted NPC or creature record a levelled list names (resident; write() below)
   EQUP  8 bytes a carried item whose script has OnPCEquip or PCSkipEquip (resident; write() below)
   TOPC  2 bytes a dialogue topic (DIAL type 0), sorted by folded id: u16 name (on disk; AddTopic hands the row)
+  AIDX, ASPX  2 bytes a row: the AITM / ASPT rows sorted by folded id (v0.0.63, MW-CONSOLE-COMMANDS-62: the
+        console's lookup of an item or spell id, a binary search); on disk, optional (an older file: a scan)
   DRSC  12 bytes a dialogue result script, sorted: u32 FNV-1a of its text, u16 length, u16 speaker script, u16 its
         compiled script (_dlg_N), u16 flags (1 did not compile); on disk
 
@@ -54,11 +59,13 @@ from .opcodes import NAME, LAYOUT
 MAGIC = b'AWMS'
 VERSION = 1
 TYPES = {'s': 0, 'l': 1, 'f': 2}
-ORDER = ('CONF', 'GLOB', 'JRNL', 'SNDS', 'VOIC', 'MUSI', 'OBJS', 'SCRP', 'STRT', 'NEWG', 'HELD', 'OACT', 'PCEL', 'PMOV', 'SPFX', 'VISI', 'PLAC', 'PADD', 'LACT', 'EQUP', 'CODE', 'BIND', 'STRS',
-         'ACTB', 'AINV', 'AITM', 'ASPT', 'ASPL', 'TOPC', 'ASPC', 'ASPE', 'AEFF', 'AMGE', 'DRSC', 'AENC', 'APCS')
+ORDER = ('CONF', 'GLOB', 'JRNL', 'SNDS', 'VOIC', 'MUSI', 'OBJS', 'SCRP', 'STRT', 'NEWG', 'NGWE', 'HELD', 'OACT', 'PCEL', 'PMOV', 'SPFX', 'VISI', 'PLAC', 'PADD', 'LACT', 'EQUP', 'CODE', 'BIND', 'STRS',
+         'ACTB', 'AINV', 'AITM', 'ASPT', 'ASPL', 'TOPC', 'ASPC', 'ASPE', 'AEFF', 'AMGE', 'DRSC', 'AENC', 'APCS',
+         'AIDX', 'ASPX')
 # The actor sections (actors.py, docs/ACTOR_STATE.md): OACT is resident (a script's target -> its actor row); the
 # others stay on disk and are read a row at a time by the engine's actor state (aw_actorstate.c).
-ACTOR_SECTIONS = ('OACT', 'ACTB', 'AINV', 'AITM', 'ASPT', 'ASPL', 'ASPC', 'ASPE', 'AEFF', 'AMGE', 'AENC', 'APCS')
+ACTOR_SECTIONS = ('OACT', 'ACTB', 'AINV', 'AITM', 'ASPT', 'ASPL', 'ASPC', 'ASPE', 'AEFF', 'AMGE', 'AENC', 'APCS',
+                  'AIDX', 'ASPX')
 DEFAULT_CONF = {'range_units': 12288, 'ops_per_frame': 4000, 'ops_per_run': 2000}
 RESIDENT = ORDER[:ORDER.index('BIND')]
 # The engine's limits (the interpreter's MAX_SCRIPTS and MAX_GLOBALS; tests/test_mwscript.py keeps them equal): a file over them is refused there and every
@@ -126,6 +133,28 @@ def fnv1a(text):
 
 
 NO_SLOT = 0xFF   # a PADD row whose script has no OnPCAdd local: the script runs while carried, nothing is set
+
+
+def new_game_weather_rows(program, compiled):
+    """The NGWE rows (v0.0.63, OPENING-WEATHER-NOT-CLOUDY-63): [(region index, weather)] of the ChangeWeather lines of
+    the new game's scripts (Main's CharGenState block) that the build does not run, because AmiWind's own code
+    carries them (compiled hand-written: CharGen). A script that runs sets its own weather. A region the image has not
+    is left out, as ChangeWeather's call is no code then."""
+    from .codegen import SCRIPT_HANDWRITTEN
+    from .gamedata import new_game_weather
+    p = program
+    regions = sorted(getattr(p.data, 'base_regions', ()) or ())
+    scripts = getattr(p.data, 'scripts', {})
+    out = []
+    for name in getattr(p.data, 'new_game', []):
+        k = p.scripts.index.get(name)
+        if k is None or not (compiled[k].flags & SCRIPT_HANDWRITTEN):
+            continue
+        s = scripts.get(name)
+        for region, weather in new_game_weather(getattr(s, 'text', '') if s else ''):
+            if region in regions and 0 <= weather < 10:
+                out.append((regions.index(region), weather))
+    return out
 
 
 def pcadd_rows(program):
@@ -214,6 +243,7 @@ def write(program, compiled, binds, conf=None):
     strt = b''.join(struct.pack('>H', p.scripts.index[s]) for s in p.data.start_scripts if s in p.scripts.index)
     newg = b''.join(struct.pack('>H', p.scripts.index[s]) for s in getattr(p.data, 'new_game', [])
                     if s in p.scripts.index)
+    ngwe_rows = new_game_weather_rows(p, compiled)
     held_rows = getattr(p, 'held', None) or []
     held = b''.join(struct.pack('>IIfff', r['actor'], r['support'], *r['position'])
                     for r in sorted(held_rows, key=lambda r: r['actor']))
@@ -281,7 +311,8 @@ def write(program, compiled, binds, conf=None):
                 'OBJS': (objs, len(p.objects)), 'SCRP': (bytes(scrp), len(compiled)),
                 'CODE': (bytes(code), len(compiled)), 'BIND': (bytes(bind), len(binds)),
                 'STRT': (strt, len(strt) // 2), 'NEWG': (newg, len(newg) // 2), 'HELD': (held, len(held_rows)), 'PCEL': pcel, 'PMOV': pmov, 'TOPC': topc, 'SPFX': spfx,
-                'VISI': visi, 'PLAC': plac, 'EQUP': equp, 'DRSC': drsc}
+                'VISI': visi, 'PLAC': plac, 'EQUP': equp, 'DRSC': drsc,
+                'NGWE': (b''.join(struct.pack('>HBB', r, w, 0) for r, w in ngwe_rows), len(ngwe_rows))}
     # PADD (v0.0.62, CENSUS-INTRO-SCRIPTS-62, MWSCRIPT-UNPLACED-ATTACH-62): 8 bytes a carryable item record that names
     # a script, sorted by the FNV-1a of its folded id: u32 hash, u16 script, u8 the OnPCAdd local's slot (0xFF: none),
     # u8 0; resident

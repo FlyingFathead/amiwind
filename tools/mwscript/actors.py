@@ -506,7 +506,11 @@ class ActorTables:
                 or len(self.spell_list) > 0xFFFF:
             raise ValueError('actor tables too large for 16-bit indexes')
         assert len(actb) == ACTB_BYTES * len(self.rows)
-        return {'ACTB': (bytes(actb), len(self.rows)), 'AINV': (ainv, len(self.inventory)),
+
+        def by_id(index):   # v0.0.63 (MW-CONSOLE-COMMANDS-62): the rows sorted by folded id, for a lookup by id
+            order = sorted(index.items(), key=lambda kv: kv[0].encode('cp1252', 'replace'))
+            return b''.join(struct.pack('>H', row) for _key, row in order), len(order)
+        return {'AIDX': by_id(self.item_index), 'ASPX': by_id(self.spell_index),'ACTB': (bytes(actb), len(self.rows)), 'AINV': (ainv, len(self.inventory)),
                 'AITM': (aitm, len(self.items)), 'ASPT': (aspt, len(self.spells)), 'ASPL': (aspl, len(self.spell_list)),
                 'ASPC': (aspc, len(self.spells)), 'ASPE': (bytes(aspe), len(self.spells)),
                 'AEFF': (bytes(aeff), len(aeff) // AEFF_BYTES), 'AMGE': (bytes(amge), MAGIC_EFFECTS),

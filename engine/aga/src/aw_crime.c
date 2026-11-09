@@ -91,6 +91,7 @@ static int load(void){
     loaded=2;return 1;
 }
 static int full(void){return load() && loaded==2;}
+float AW_CrimeAlarmRadius(void){return full()?settings.fAlarmRadius*SCALE:0;}   /* aw_crime.h (COMBAT-ACTOR-VS-ACTOR-62) */
 static edict_t *player(void){return sv.active && svs.maxclients>=1 && svs.clients?svs.clients[0].edict:NULL;}
 static const char *source_id(edict_t *e){eval_t *v=GetEdictFieldValue(e,"aw_source_id");return v && v->string?pr_strings+v->string:"";}
 static unsigned long ref_of(edict_t *e){eval_t *v=GetEdictFieldValue(e,"aw_ref");return v && v->_float>0?(unsigned long)v->_float:0;}

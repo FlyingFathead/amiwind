@@ -274,6 +274,7 @@ def preflight(order, reasons, details, old_details, old_sources, files, reused=(
     resolve_follows(rows, ctx['classes'])
     taken = set(reused)
     return {'format': 'AmiWind reuse preflight 1', 'stages': len(order),
+            'at_risk': reuse_at_risk(order, reasons, details, taken),
             'reused': sum(name in taken for name in order), 'rebuilt': len(rows),
             'unexpected': sum(row['class'] == 'UNEXPECTED' for row in rows),
             # Keys too broad (the preflight stops the build on these); a damaged or refused old record is
@@ -282,6 +283,43 @@ def preflight(order, reasons, details, old_details, old_sources, files, reused=(
                           or (row['cause'] == 'follows' and any(ctx['causes'].get(d) in TOO_BROAD
                                                                 for d in re.findall(r'[a-z0-9_-]+', row['detail'].split(':', 1)[-1])))],
             'policy': sum(row['cause'] == 'policy' for row in rows), 'source_diff': diff, 'rows': rows}
+
+
+def reuse_at_risk(order, reasons, details, reused):
+    """{stage: [stages it reads that are rebuilt or themselves at risk]} of the stages planned for reuse
+    (NPC-LIBRARY-NO-UNIT-CACHE-63). A stage whose own key is unchanged is planned for reuse although a stage it reads
+    is rebuilt: it is reused only if that stage writes the same outputs again, which no plan can know (the v0.0.63-dev1
+    plan listed the actor library as reused; the CHIM towns it reads ran again with other outputs and it was baked
+    again for 45 minutes). DETAILS: the stages' fingerprint components ('dependencies': {stage: fingerprint})."""
+    rebuilt = {name for name in order if name in reasons}
+    risky = {}
+    changed = True
+    while changed:              # transitively: a stage reading an at-risk stage is at risk too
+        changed = False
+        for name in order:
+            if name not in reused or name in rebuilt or name in risky:
+                continue
+            reads = sorted((details.get(name) or {}).get('dependencies') or {})
+            named = [stage for stage in reads if stage in rebuilt or stage in risky]
+            if named:
+                risky[name] = named
+                changed = True
+    return risky
+
+
+def at_risk_lines(result):
+    """'STAGE: reuse at risk: reads A, B (rebuilt), C (at risk)' per at-risk stage of a preflight RESULT."""
+    rebuilt = {row['stage'] for row in result.get('rows') or ()}
+    lines = []
+    for name, reads in sorted((result.get('at_risk') or {}).items()):
+        parts = []
+        for kind in ('rebuilt', 'at risk'):
+            named = [stage for stage in reads if (stage in rebuilt) == (kind == 'rebuilt')]
+            if named:
+                parts.append('%s (%s)' % (', '.join(named), kind))
+        lines.append('%s: reuse at risk: reads %s; reused only if they write the same outputs again'
+                     % (name, ', '.join(parts)))
+    return lines
 
 
 def explain_parts(old, new):
@@ -306,6 +344,8 @@ def print_preflight(result, stream=None, accepted=False):
         touched = f" | changed files: {', '.join(files[:5])}{more}" if files else ''
         print(f"{mark} rebuild {row['stage']:<24} {row['class']:<10} {row['cause']}: {row['detail'][:200]}{touched}",
               file=stream)
+    for line in at_risk_lines(result):
+        print('?? ' + line, file=stream)
     reusable = result['stages'] - result['policy']
     rebuilt = result['rebuilt'] - result['policy']
     if reusable and result['reused'] == 0:

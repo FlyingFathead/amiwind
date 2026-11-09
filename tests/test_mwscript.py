@@ -334,6 +334,12 @@ endif
 set r to ( player->GetSpellEffects "proj_trap_spell" )
 set r to ( "chime_obj"->HasItemEquipped "iron dagger" )
 End''',
+    # v0.0.63 (MWSCRIPT-GAPS-63, batch 6): the ship and dock's menus and the rest allowed
+    'GapUser63d': '''Begin GapUser63d
+EnableNameMenu
+EnableRaceMenu
+EnableRest
+End''',
     # v0.0.63 (MWSCRIPT-GAPS-63, batch 3): the werewolf set, the travel read and the scale
     'GapUser63c': '''Begin GapUser63c
 short r
@@ -1160,6 +1166,22 @@ End''')
         self.assertIn('int AW_CastExplode(', (ROOT / 'engine/aga/src/aw_cast.c').read_text(encoding='utf-8'))
         self.assertIn('aw_combat_attacked(t)', (ROOT / 'engine/aga/src/aw_combat.c').read_text(encoding='utf-8'))
 
+    def test_name_race_menus_and_rest_go_through_the_host_call(self):
+        # v0.0.63 (MWSCRIPT-GAPS-63, batch 6): EnableNameMenu, EnableRaceMenu, EnableRest carried out by the host
+        # (aw_intro.c, aw_opening.c, aw_story.h AW_MENU_REST), in order, and they keep the script attached
+        from mwscript.functions import FUNCTION_NUMBERS
+        prog, compiled, _, _ = program()
+        user = {c.name: c for c in compiled}['GapUser63d']
+        self.assertEqual(user.notyet, [])
+        self.assertFalse(user.flags & (SCRIPT_NOTYET | SCRIPT_INERT))
+        calls = [a for _, n, a in awms.decode(user.code) if n == 'NOTYET']
+        self.assertEqual([a[0] for a in calls], [FUNCTION_NUMBERS[n] for n in (
+            'enablenamemenu', 'enableracemenu', 'enablerest')])
+        host = (ROOT / 'engine/aga/src/aw_mwhost.c').read_text(encoding='utf-8')
+        for case in ('case AWF_ENABLENAMEMENU:', 'case AWF_ENABLERACEMENU:', 'case AWF_ENABLEREST:'):
+            self.assertIn(case, host)
+        self.assertIn('AW_MENU_REST', (ROOT / 'engine/aga/src/aw_wait.c').read_text(encoding='utf-8'))
+
     def test_werewolf_set_and_scale_go_through_the_host_call(self):
         # v0.0.63 (MWSCRIPT-GAPS-63, batch 3): BecomeWerewolf hands the werewolf's 35 stats four to a number (9
         # numbers, 255 where the data has no setting), SetWerewolfAcrobatics its one value; the rest by number
@@ -1292,6 +1314,16 @@ static const aw_mwvm_host_t host={h_sound,h_playing,h_say,h_saydone,h_music,h_di
     h_actor,h_item,h_spell,h_combat,h_dead,h_wander,h_call,h_cell,h_pos,h_move,h_ai};
 static unsigned char buf[1<<20];static long nbuf;
 static int read_mem(void *u,uint32_t off,void *out,uint32_t n){(void)u;if((long)off+(long)n>nbuf)return 0;memcpy(out,buf+off,n);return 1;}
+/* MWSCRIPT-RESULT-LONG-FRAME-62: DRSC rows in memory; every read counted (a probe), and the 768-byte blocks the host's
+ * one-block cache (aw_mwhost.c read_file_at) would load from disk */
+static const unsigned char *drsc_rows;static long drsc_probes,drsc_blocks,drsc_last_block=-1;
+static int read_rows(void *u,uint32_t off,void *out,uint32_t n){
+    long b=(long)(off/(12u*AW_DRSC_BLOCK));(void)u;
+    drsc_probes++;
+    if(b!=drsc_last_block){drsc_blocks++;drsc_last_block=b;}
+    if(off+n>12u*7411u)return 0;
+    memcpy(out,drsc_rows+off,n);return 1;
+}
 /* CELL-CHANGES-59 slice 5: the scripts' state through the world change list as the engine's host keeps it
  * (aw_mwhost.c locals_export / locals_import): a script's name hash here is the hash of "s<row>" */
 static uint32_t name_hash(int script){char s[16];sprintf(s,"s%d",script);return AW_LedgerNameHash(s);}
@@ -1440,6 +1472,33 @@ int main(int argc,char **argv){
             printf("block %u %ld %.*s|\n",(unsigned)refs[i],b?(long)(b-text):-1L,b?(int)length:0,b?b:"");}
         return 0;
     }
+    if(getenv("DRSCBIG")){   /* MWSCRIPT-RESULT-LONG-FRAME-62: 7,411 rows, the search with and without the index */
+        static unsigned char drows[12*7411];static aw_drsc_index_t idx;int nrows=7411,q,k,got,rs,br,bad=0;
+        long probes_plain=0,probes_index=0,blocks_index=0,worst_index=0;
+        for(q=0;q<nrows;q++){uint32_t h=(uint32_t)q*577u+(uint32_t)(q/3);   /* sorted (hash, length) */
+            unsigned char *w=drows+12*q;
+            w[0]=(unsigned char)(h>>24);w[1]=(unsigned char)(h>>16);w[2]=(unsigned char)(h>>8);w[3]=(unsigned char)h;
+            w[4]=0;w[5]=(unsigned char)(10+q%3);w[6]=0xFF;w[7]=0xFF;
+            w[8]=(unsigned char)(q>>8);w[9]=(unsigned char)q;w[10]=0;w[11]=0;}
+        drsc_rows=drows;drsc_probes=0;drsc_last_block=-1;drsc_blocks=0;
+        got=AW_MwvmDialogueIndexBuild(read_rows,NULL,0,(uint32_t)nrows,&idx);
+        printf("index %d count %d\n",got,idx.count);
+        printf("index reads %ld\n",drsc_probes);
+        for(k=0;k<nrows;k+=37){
+            uint32_t h=(uint32_t)k*577u+(uint32_t)(k/3);int len=10+k%3;
+            drsc_probes=0;got=AW_MwvmFindDialogueRows(read_rows,NULL,0,(uint32_t)nrows,NULL,h,len,-1,&rs,&br);
+            probes_plain+=drsc_probes;if(got!=k)bad++;
+            drsc_probes=0;drsc_last_block=-1;drsc_blocks=0;
+            got=AW_MwvmFindDialogueRows(read_rows,NULL,0,(uint32_t)nrows,&idx,h,len,-1,&rs,&br);
+            probes_index+=drsc_probes;blocks_index+=drsc_blocks;if(drsc_blocks>worst_index)worst_index=drsc_blocks;
+            if(got!=k)bad++;
+        }
+        drsc_last_block=-1;drsc_blocks=0;
+        printf("missing %d\n",AW_MwvmFindDialogueRows(read_rows,NULL,0,(uint32_t)nrows,&idx,0xFFFFFFFFu,5,-1,&rs,&br));
+        printf("searches %d bad %d plain probes %ld index probes %ld index blocks %ld worst %ld\n",
+               (nrows+36)/37,bad,probes_plain,probes_index,blocks_index,worst_index);
+        return 0;
+    }
     if(getenv("DIALOGUE")){   /* a result text run on reference 103 (the Quiet object) through its DRSC row */
         const char *text=getenv("DIALOGUE");int speaker=-1,row_speaker,broken,script,k,ps;aw_mwcell_t pv;
         if(getenv("DETACHED"))printf("detached %d\n",AW_MwvmDetach(103));   /* the speaker's script not attached */
@@ -1537,6 +1596,24 @@ class InterpreterTests(unittest.TestCase):
         self.assertIn('done 7', out)
         self.assertTrue(any(l.split()[1:3] == ['call', '22'] for l in out), out)
         self.assertIn('missing -1', out)
+
+    def test_a_result_reads_one_block_of_rows(self):
+        # MWSCRIPT-RESULT-LONG-FRAME-62: a result held its frame for seconds: the 7,411 DRSC rows binary-searched on
+        # disk, each probe a seek refilling the file buffer. With the index (every 64th row's key, read once at the
+        # scripts' load) a result's probes stay in one block of 64 rows: one 768-byte read from disk
+        out = self.run_vm(0, env={'DRSCBIG': '1'})
+        self.assertIn('index 1 count 116', out)
+        self.assertIn('index reads 116', out)
+        self.assertIn('missing -1', out)
+        line = next(l for l in out if l.startswith('searches')).split()
+        searches, bad, plain, probes, blocks, worst = (int(line[i]) for i in (1, 3, 6, 9, 12, 14))
+        self.assertEqual(bad, 0)
+        self.assertLessEqual(worst, 2)        # one block per result; two when the text starts a block
+        self.assertLess(blocks, searches * 1.1)
+        self.assertLess(probes, plain)
+        host = (ROOT / 'engine/aga/src/aw_mwhost.c').read_text(encoding='utf-8')
+        self.assertIn('AW_MwscriptResultsPrepare();   /* MWSCRIPT-RESULT-LONG-FRAME-62', host)
+        self.assertNotIn('COM_FOpenFile(FILE_NAME,&r.f)', host)   # no open per result
 
     def test_dialogue_result_keeps_a_detached_speakers_locals(self):
         # CENSUS-INTRO-SCRIPTS-62: a result run while the speaker's script is not attached (Sellus Gravius's Greeting 1,

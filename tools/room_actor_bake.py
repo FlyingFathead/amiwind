@@ -391,14 +391,23 @@ def _fit_search(task):
 SEARCH_SLICE = 32
 
 
-def _fit_all(tasks, jobs):
+def _fit_all(tasks, jobs, keep=None):
     """actor_grounding._fit_all with the room fitter: heads, then the sliced offset searches, in one worker pool; the
-    first passing offset in search order wins."""
+    first passing offset in search order wins. KEEP(index, final result) is called for each placement the moment its
+    result is final (its head needs no search, or every slice up to its first hit is back), so a unit cache keeps it
+    at once (NPC-LIBRARY-NO-UNIT-CACHE-63)."""
     from concurrent.futures import FIRST_COMPLETED, wait
     from build_parallel import live_jobs, process_pool, worker_environment
     offsets = len(search_offsets())
     slices = -(-offsets // SEARCH_SLICE)
     jobs = live_jobs(jobs)
+    kept = set()
+
+    def final(index, heads, found):
+        if keep is not None and index not in kept:
+            kept.add(index)
+            result, original = heads[index]
+            keep(index, result if original is None else finish(result, found.get(index)))
 
     def search_task(index, number, head):
         first = number * SEARCH_SLICE
@@ -408,12 +417,14 @@ def _fit_all(tasks, jobs):
         found = {}
         for index, head in enumerate(heads):
             if head[1] is None:
+                final(index, heads, found)
                 continue
             for number in range(slices):
                 hit = _fit_search(search_task(index, number, head))
                 if hit is not None:
                     found[index] = hit
                     break
+            final(index, heads, found)
         return heads, found
     workers = max(1, min(jobs, len(tasks) * slices))
     with worker_environment(), process_pool(workers) as pool:
@@ -421,7 +432,15 @@ def _fit_all(tasks, jobs):
         open_ = [index for index, head in enumerate(heads) if head[1] is not None]
         following = dict.fromkeys(open_, 0)
         first_hit, found, pending = {}, {}, {}
+        returned = {index: set() for index in open_}
+        for index, head in enumerate(heads):
+            if head[1] is None:
+                final(index, heads, found)
         turn = [0]
+
+        def settled(index):
+            limit = min(slices, first_hit.get(index, slices))
+            return following[index] >= limit and all(n in returned[index] for n in range(limit))
 
         def wanted(index):
             return following[index] < min(slices, first_hit.get(index, slices))
@@ -440,18 +459,26 @@ def _fit_all(tasks, jobs):
             submit()
             while pending:
                 done, _ = wait(pending, return_when=FIRST_COMPLETED)
+                touched = set()
                 for future in done:
                     index, number = pending.pop(future)
                     hit = future.result()
+                    returned[index].add(number)
+                    touched.add(index)
                     if hit is not None and number < first_hit.get(index, slices):
                         first_hit[index], found[index] = number, hit
                 for future, (index, number) in list(pending.items()):
                     if number > first_hit.get(index, slices) and future.cancel():
                         pending.pop(future)
+                for index in sorted(touched):
+                    if settled(index):
+                        final(index, heads, found)
                 submit()
         finally:
             for future in pending:
                 future.cancel()
+    for index in open_:
+        final(index, heads, found)     # every placement settled by now; kept once
     return heads, found
 
 
@@ -473,9 +500,20 @@ def _bake(maps, paths, jobs, token):
             order.append((key, selected, e))
     owners = sorted(pending)
     tasks = [(token, str(maps), *item) for o in owners for item in pending[o]]
-    heads, best = _fit_all(tasks, jobs)
-    flat = iter([result if original is None else finish(result, best.get(index))
-                 for index, (result, original) in enumerate(heads)])
+    # every placement from the unit cache room-actor when it was fitted before on the same room, store models, actor
+    # model and entity, with the same fit code and settings; the rest fitted, each kept the moment its result is final
+    # (tools/actor_units.py, NPC-LIBRARY-NO-UNIT-CACHE-63: 2,342 placements fitted again in every image step)
+    import actor_grounding
+    import actor_units
+    import pass_cache
+    cache = actor_units.open_cache(
+        actor_units.ROOM_ACTOR_CACHE,
+        ((__file__, '_fit_head'), (__file__, '_fit_search'), (actor_grounding.__file__, 'finish')),
+        pass_cache.source_digest((__file__, '_fit_head'), (__file__, '_fit_search'), (actor_grounding.__file__, 'finish')),
+        pass_cache.previous_digests((__file__, '_fit_head'), (__file__, '_fit_search'),
+                                    (actor_grounding.__file__, 'finish')),
+        pass_cache.covered_lines((__file__, '_fit_head'), (__file__, '_fit_search'), (actor_grounding.__file__, 'finish')))
+    flat = iter(actor_units.fit_room_actors(tasks, jobs, cache, maps, _fit_all))
     fitted = {o: [next(flat) for _ in pending[o]] for o in owners}
     results, report = {}, []
     for key, selected, e in order:

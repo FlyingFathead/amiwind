@@ -45,9 +45,25 @@ import re
 #   chunk code names a slot and quakedef.h's disk wait wrappers call the macros: three timing edits of v0.0.59
 #   re-keyed the CHIM world and its interiors. A struct, union, typedef or object-like macro there still counts, and a
 #   timing item still counts when such a layout item names it.
+# 4 (BUILD-ENGINE-SOURCE-KEY-BROAD-36, CHIM-KEYS-TOO-BROAD-62): an engine file named only in define() calls or the
+#   DEFINES table (DEFINE_READ_FUNCTIONS_2), and included by nothing else the key counts, counts as the VALUES those
+#   readers return (define_value: the first match of each reader's pattern for each name read), not as its C facts,
+#   and its own #include lines leave the key. map_engine_limits reads one define (SLOTS) of aw_combat.c: the facts
+#   kept every declaration whose name is an English word in a string of the reached code (slots, you, retry, cost,
+#   music, rules, ...), so combat edits re-keyed the CHIM world, the three towns and the flora (about 2,700 s).
 # A record made by an earlier version is compared through its own source tree (translate).
-VERSION = 3
-PREFIXES = {1: 'cfacts1:', 2: 'cfacts2:', 3: 'cfacts3:'}
+VERSION = 4
+PREFIXES = {1: 'cfacts1:', 2: 'cfacts2:', 3: 'cfacts3:', 4: 'cfacts4:'}
+# Version 4: the patterns of the define readers (engine_limits.define on the comment-free text, world_estimate._define,
+# engine_limits._mib_define and cvar_default on the raw text); a define-only file counts as the first match of each
+# for every name read (tests/test_stage_key_engine_defines.py checks each reader against them).
+DEFINE_PATTERNS = {
+    'define': ('stripped', r'^\s*#\s*define\s+%s\s+(\d+)\b', re.M),      # engine_limits.define, the DEFINES table
+    '_define': ('raw', r'^\s*#\s*define\s+%s\s+(\d+)', re.M),             # world_estimate._define
+    '_mib_define': ('raw', r'#\s*define\s+%s\s+\(\s*(\d+)UL\s*\*\s*CHIM_AUTO_MIB\s*\)', 0),
+    'cvar_default': ('raw', r'\{\s*"%s"\s*,\s*"(-?\d+)"', 0),
+}
+DEFINES_TAG = 'defs:'
 # Engine headers that only time frames (spike slots, wait counters, their macros): version 3 reads them by layout
 TIMING_HEADERS = frozenset({'engine/aga/src/aw_spike.h'})
 PREFIX = PREFIXES[VERSION]
@@ -341,6 +357,43 @@ def value(items, version=VERSION):
     return PREFIXES[version] + hashlib.sha256(json.dumps(rows, separators=(',', ':')).encode('utf-8')).hexdigest()
 
 
+def define_rows(text, reads):
+    """[[reader, name, its first match or None], ...] of a file's TEXT for READS {(name, reader)} (version 4): every
+    value those readers return for those names, nothing else of the file."""
+    stripped = re.sub(r'/\*.*?\*/|//[^\n]*', '', text, flags=re.S)
+    rows = []
+    for name, reader in sorted(reads):
+        which, pattern, flags = DEFINE_PATTERNS[reader]
+        match = re.search(pattern % re.escape(name), stripped if which == 'stripped' else text, flags)
+        rows.append([reader, name, match.group(1) if match else None])
+    return rows
+
+
+def define_value(text, names):
+    """The key value of a define-only file (version 4): its prefix, DEFINES_TAG and the SHA-256 of define_rows."""
+    rows = define_rows(text, names)
+    return PREFIXES[4] + DEFINES_TAG + hashlib.sha256(json.dumps(rows, separators=(',', ':')).encode('utf-8')).hexdigest()
+
+
+def _define_read(node, parents):
+    """(name, reader) a define-context string constant NODE is read for: the call's second argument and the called
+    reader, or the DEFINES table entry's NAME (read by engine_limits.define); None when it is not a literal or the
+    reader has no pattern."""
+    child, above = node, parents.get(node)
+    while isinstance(above, ast.BinOp):
+        child, above = above, parents.get(above)
+    if isinstance(above, ast.Call) and len(above.args) >= 2 and above.args[0] is child \
+            and isinstance(above.args[1], ast.Constant) and isinstance(above.args[1].value, str):
+        read = (above.args[1].value, _callee(above))
+    else:
+        parent = parents.get(node)
+        if not (isinstance(parent, ast.Tuple) and len(parent.elts) == 2 and isinstance(parent.elts[1], ast.Constant)
+                and isinstance(parent.elts[1].value, str)):
+            return None
+        read = (parent.elts[1].value, 'define')
+    return read if IDENTIFIER.fullmatch(read[0]) and read[1] in DEFINE_PATTERNS else None
+
+
 # --------------------------------------------------------------------------
 # How the reached Python code names the engine files
 
@@ -447,7 +500,7 @@ def narrow(index, script, selected, folders, readers):
     by_base = {}
     for path in engine:
         by_base.setdefault(path.rsplit('/', 1)[-1], set()).add(path)
-    contexts, probes, roots, writers = {}, set(), set(), False
+    contexts, probes, roots, writers, define_names = {}, set(), set(), False, {}
     for relative, unit_names in reached.items():
         symbols = index._module_symbols(relative)
         for unit in unit_names:
@@ -480,6 +533,8 @@ def narrow(index, script, selected, folders, readers):
                 if path in POLICY_FILES and relative in POLICY_MODULES and found == 'text':
                     found = 'policy'
                 contexts.setdefault(path, set()).add(found)
+                if found == 'define' and version >= 4:
+                    define_names.setdefault(path, set()).add(_define_read(node, parents))
     kinds = {}
     for path, found in contexts.items():
         if found & {'policy'} and not ('text' in found or ('receipt' in found and writers)):
@@ -492,7 +547,15 @@ def narrow(index, script, selected, folders, readers):
             kinds[path] = 'doc'
         else:
             kinds[path] = 'receipt'
-    closure = index.include_closure(sorted({path for path, kind in kinds.items() if kind not in ('receipt', 'policy')}
+    defines_only = set()
+    if version >= 4:
+        # read only by the define readers and included by nothing else the key counts: the values read (define_value)
+        others = index.include_closure(sorted({path for path, kind in kinds.items()
+                                               if kind not in ('receipt', 'policy', 'define')} | probes))
+        defines_only = {path for path, kind in kinds.items() if kind == 'define' and path not in others
+                        and define_names.get(path) and None not in define_names[path]}
+    closure = index.include_closure(sorted({path for path, kind in kinds.items()
+                                            if kind not in ('receipt', 'policy') and path not in defines_only}
                                            | probes))
     # what the folder rule put in the key: every named file and the closure of them all (receipts included)
     named_closure = index.include_closure(sorted(set(kinds) | probes))
@@ -502,7 +565,9 @@ def narrow(index, script, selected, folders, readers):
         kind = kinds.get(path)
         if path not in out:
             out[path] = index.files[path]
-        if kind == 'policy' and path not in closure:
+        if path in defines_only:
+            out[path] = define_value(read_text(index, path), define_names[path])
+        elif kind == 'policy' and path not in closure:
             import engine_loader_policy
             out[path] = engine_loader_policy.key_value(index.root)
         elif kind == 'text':

@@ -198,10 +198,15 @@ class CrimeSourceTests(unittest.TestCase):
         mf.use(doc)
         paths = mf.combat_paths(doc['dialogue_results'])
         self.assertEqual(sum(paths.values()), 293, paths)
+        # COMBAT-ACTOR-VS-ACTOR-62 (v0.0.63): the fight between two actors is carried out too (host_combat ->
+        # AW_CombatEngageAgainst), so every answer is on a handled path
         self.assertEqual({k: paths.get(k, 0) for k in dc.HANDLED},
-                         {'speaker-startcombat': 124, 'other-startcombat': 9, 'speaker-fight': 148, 'other-fight': 7})
+                         {'speaker-startcombat': 124, 'other-startcombat': 9, 'speaker-fight': 148, 'other-fight': 7,
+                          'startcombat-actor': 5})
         unhandled = {k: v for k, v in paths.items() if k not in dc.HANDLED}
-        self.assertEqual(unhandled, {'startcombat-actor': 5}, 'an answer that starts a fight is not carried out')
+        self.assertEqual(unhandled, {}, 'an answer that starts a fight is not carried out')
+        self.assertIn('AW_CombatEngageAgainst(e,&sheet,o,&other_sheet)',
+                      body('aw_mwhost.c', 'static void host_combat(int instance,int target,int verb,int other){'))
         # the engine side of each path
         self.assertIn('if(!e)e=speaker_edict(ref);', body('aw_mwhost.c', 'static aw_actor_t *actor_of('))
         self.assertIn('AW_MwscriptSpeakerAggro(e,dispo);', body('aw_dialwin.c', 'static void closed(void)'))

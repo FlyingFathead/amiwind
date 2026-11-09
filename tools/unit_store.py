@@ -111,11 +111,52 @@ def progress_line(label, done, total, name, seconds, failed=False):
     return '%s [%d/%d] %s %s%s' % (label, done, total, name, 'FAILED ' if failed else '', took)
 
 
+def stored(cache, inputs, row, contents):
+    """Store a unit (UnitCache.store_files) and read its entry back: True when the record and every file are there
+    with their SHA-256 (UNIT-CACHE-STORE-ERRORS-SILENT-63: a store never raises, so a folder the build cannot write,
+    made by another user, lost every unit without a word). The read-back looks at the files only: it is no lookup, so
+    it counts no hit and records no reuse."""
+    import hashlib
+    import json
+    from pass_cache import input_digest
+    cache.store_files(inputs, row, contents)
+    meta, _ = cache._paths(input_digest(inputs))
+    try:
+        record = json.loads(meta.read_text(encoding='utf-8'))
+        files = record['row']['files']
+        if record.get('input_sha256') != input_digest(inputs) or set(files) != set(contents):
+            return False
+        return all(hashlib.sha256(cache._blob(digest).read_bytes()).hexdigest() == digest ==
+                   hashlib.sha256(contents[name]).hexdigest() for name, digest in files.items())
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        return False
+
+
+def unwritable_folders(root, user=None):
+    """The folders of the unit and pass cache ROOT (each cache's folder and its two-letter and files folders) this
+    process cannot write: a build run as the build user stops on them in its first minute instead of losing every
+    unit it makes (UNIT-CACHE-STORE-ERRORS-SILENT-63: a seed run as root left a cache folder the builds could not
+    write). Missing folders are fine (made when first needed)."""
+    import os
+    from pathlib import Path
+    root = Path(root)
+    if not root.is_dir():
+        return []
+    out = [] if os.access(root, os.W_OK | os.X_OK) else [str(root)]
+    for cache in sorted(p for p in root.iterdir() if p.is_dir()):
+        folders = [cache] + [p for p in cache.iterdir() if p.is_dir()]
+        folders += [p for p in (cache / 'files').iterdir() if p.is_dir()] if (cache / 'files').is_dir() else []
+        out += [str(p) for p in folders if not os.access(p, os.W_OK | os.X_OK)]
+    return out
+
+
 def run_each(costs, function, items, names, jobs, keep, fallback=None, label=None, already=0, log=print):
     """Run FUNCTION(task) for ITEMS [(index, task)] on the worker pool, longest first by the cost history COSTS (or
     FALLBACK(name) seconds), and call KEEP(index, result) for each unit the moment it is back. NAMES: one stable name
     per item. LABEL: print '[done/total]' for every unit as it comes back, ALREADY units counted done before (taken
-    from the unit cache). Returns ['name: error'] of the units that failed (empty when all passed)."""
+    from the unit cache). Returns ['name: error'] of the units that failed (empty when all passed).
+    A KEEP that returns False (its store was not found again, stored()) gets a loud line at once; when the map has
+    ended, the count ('K stores FAILED') is printed and the stage fails (UNIT-CACHE-STORE-ERRORS-SILENT-63)."""
     from build_costs import estimator, record
     from build_parallel import completed_map
     names = [str(n) for n in names]
@@ -127,7 +168,7 @@ def run_each(costs, function, items, names, jobs, keep, fallback=None, label=Non
     by_index = {index: name for (index, _), name in zip(items, names)}
     estimate = estimator(costs, names, fallback)
     cost = None if estimate is None else (lambda work: estimate(by_index[work[0]]))
-    seconds, failed = {}, []
+    seconds, failed, lost = {}, [], []
     try:
         for index, took, result in completed_map(timed, [(index, function, task) for index, task in items], jobs,
                                                  cost=cost):
@@ -138,7 +179,15 @@ def run_each(costs, function, items, names, jobs, keep, fallback=None, label=Non
             if isinstance(result, Failed):
                 failed.append('%s: %s' % (by_index[index], result.message))
                 continue
-            keep(index, result)
+            if keep(index, result) is False:
+                lost.append(by_index[index])
+                log('!! %s: STORE FAILED: %s is not in the unit cache after it was stored (is the cache folder '
+                    'writable by this user?)' % (label or costs, by_index[index]), flush=True)
     finally:
         record(costs, [by_index[index] for index in seconds], [seconds[index] for index in seconds])
+    if lost:
+        log('!! %s: %d stores FAILED (%s)' % (label or costs, len(lost), ', '.join(lost[:8])), flush=True)
+        raise RuntimeError('%s: %d stores FAILED: the unit cache did not keep %s; every unit made here would be made '
+                           'again by the next build (UNIT-CACHE-STORE-ERRORS-SILENT-63)'
+                           % (label or costs, len(lost), ', '.join(lost[:8])))
     return failed

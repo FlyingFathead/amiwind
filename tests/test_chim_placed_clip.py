@@ -175,8 +175,10 @@ class PlacedClipContractTests(unittest.TestCase):
         # a room record holds placed records only (0.8 and later, ChimFormat_Room): its matrix per record, and
         # the same collision function as a chunk's placements
         room = (SRC / 'chim/chim_room.c').read_text(encoding='utf-8')
-        # the matrix at load and a turning hinged door's matrix (RoomYaw, AW-20260928-12)
-        self.assertEqual(room.count('ChimPlaced_'), 2)
+        # the matrix at load, a turning hinged door's matrix (RoomYaw, AW-20260928-12) and a turned scripted mover's
+        # (TurnPlace, WORLD-BUTTONS-62: a room's or a chunk's matrix, NULL for a chunk without one)
+        self.assertEqual(room.count('ChimPlaced_'), 3)
+        self.assertIn('ChimPlaced_AnglesMatrix (p->ent.angles, (float (*)[3])rot);', room)
         self.assertIn('ChimPlaced_AnglesMatrix (p->ent.angles, (float (*)[3])(room.rot + 9*i));', room)
         self.assertIn('ChimChunks_ClipPlace (p, room.rot + 9*i, start, mins, maxs, end, best);', room)
         models = (SRC / 'chim/chim_models.c').read_text(encoding='utf-8')

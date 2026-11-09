@@ -56,6 +56,8 @@ SHIPPED_STAGES = {
     # v0.0.47 (--chim-actor-table on by default, CHIM-EXTERIOR-ACTORS-MISSING-46): exterior creature and NPC models
     # for the actor table
     'actor-library': 'exterior creature and NPC models named by maps/chim-actors.cca',
+    # v0.0.63 (BUILD-RISKY-STAGES-FIRST-63): the player bodies baked early into the unit cache, the image takes them
+    'player-view': 'player bodies (progs/body/*) through the unit cache',
     'door-audio': 'door-sounds.txt', 'character': 'character/*.awh', 'reading': 'reading/*',
     'opening-references': 'opening references', 'world-survey': 'world/regions.awr, map.awm',
     'world-ui': 'world/journal.awj, quests.awq', 'actor-contact': 'actor ground gate',

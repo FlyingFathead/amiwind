@@ -40,6 +40,7 @@ static int script_lock(unsigned reference,int original){return reference==script
 int (*aw_chim_door_yaw)(unsigned pid,float yaw);
 int (*aw_chim_door_clip)(unsigned pid,vec3_t start,vec3_t mins,vec3_t maxs,vec3_t end,trace_t *trace);
 int (*aw_chim_place_shift)(unsigned pid,const float *d,int relink);
+int (*aw_chim_place_turn)(unsigned pid,const float *d,float *now);
 
 static const char *table;
 static int opens,started,stopped,last_entity,last_channel;static float last_volume,last_attenuation;
@@ -562,10 +563,58 @@ static void movers_mode(void){
     aw_chim_place_shift=NULL;
     printf("movers ok\n");
 }
+/* WORLD-BUTTONS-62 part 2: a crank (its own script's Rotate X 20) and a Dwemer door (named, Rotate Z) turn as
+ * placements; SetAngle sets one angle from the placement's own; SetAtStart and New Game undo the turns */
+static unsigned turned_pid;static float turned[3]={0,0,0},placed_angles[3]={0,90,0};static int turns;
+static int chim_turn(unsigned pid,const float *d,float *now){
+    int k;turned_pid=pid;turns++;
+    for(k=0;k<3;k++){turned[k]+=d[k];placed_angles[k]+=d[k];}
+    if(now)for(k=0;k<3;k++)now[k]=placed_angles[k];
+    return 1;
+}
+static void turns_mode(void){
+    float d[3]={0,0,0},yaw=0;int i;
+    table="AWHD1\nW doors/d0123456789abcdef.wav 0.5 1.2\nB 0 0 Door\nD 100 0 0 0\nM 7000\nM 7100\n";
+    aw_chim_place_turn=chim_turn;
+    assert(AW_MoverCount()==2);
+    AW_HingedDoorMapBegin();
+    /* turned before it loads: kept; loaded: turned to it on the next tick */
+    d[0]=10;assert(AW_MoverTurn(7000,d) && turns==0 && AW_MoverMoved()==1);
+    assert(AW_HingedDoorPlacement(55,7000,d,10,&yaw));
+    AW_HingedDoorTick(.02);assert(turns==1 && turned_pid==55 && turned[0]==10);
+    /* the crank turns 20 degrees a second for a second (10 frames) */
+    d[0]=2;for(i=0;i<10;i++)assert(AW_MoverTurn(7000,d));
+    assert(turns==11 && fabs(turned[0]-30)<.01f);
+    /* SetAngle on yaw: from its angle now (90) to 45, one turn of -45 */
+    assert(AW_MoverSetAngle(7000,1,45) && fabs(placed_angles[1]-45)<.01f && fabs(turned[1]+45)<.01f);
+    /* not a mover; a mover not loaded cannot take SetAngle */
+    assert(!AW_MoverTurn(4242,d) && !AW_MoverSetAngle(7100,1,0));
+    /* SetAtStart: every turn undone */
+    assert(AW_MoverAtStart(7000) && fabs(turned[0])<.01f && fabs(turned[1])<.01f && AW_MoverMoved()==0);
+    d[0]=0;d[1]=5;assert(AW_MoverTurn(7100,d) && AW_MoverMoved()==1);AW_MoverReset();assert(AW_MoverMoved()==0);
+    /* WORLD-BUTTONS-62 part 3: saved games keep the moved ones (AWMV), a game without them loads none moved */
+    {unsigned char block[256];int n;float s[3]={0,0,52.5f};
+     d[0]=0;d[1]=-90;d[2]=0;assert(AW_MoverTurn(7100,d) && AW_MoverShift(7000,s));
+     assert(AW_MoverExport(block,6)==-1);
+     n=AW_MoverExport(block,sizeof(block));assert(n==7+2*28 && !memcmp(block,"AWMV",4) && block[4]==1 && block[6]==2);
+     AW_MoverReset();assert(AW_MoverMoved()==0);
+     turns=0;assert(AW_MoverImport(block,n)==n && AW_MoverMoved()==2);
+     /* 7000's placement is loaded (pid 55): it is turned and moved on the next tick; 7100's when it loads */
+     shifts=0;aw_chim_place_shift=chim_shift;shifted[2]=0;
+     AW_HingedDoorTick(.02);assert(shifts==1 && fabs(shifted[2]-52.5f)<.01f);
+     /* a cut block or a bad number: unreadable; a row of other game data: left out */
+     assert(AW_MoverImport(block,n-1)==-1);
+     block[7+3]=0x99;AW_MoverReset();assert(AW_MoverImport(block,n)==n && AW_MoverMoved()==1);
+     memcpy(block+7+4,"\x7f\xc0\x00\x00",4);assert(AW_MoverImport(block,n)==-1);
+     aw_chim_place_shift=NULL;}
+    aw_chim_place_turn=NULL;
+    printf("turns ok\n");
+}
 
 int main(int argc,char **argv){
     assert(argc==2);
     if(!strcmp(argv[1],"movers")){movers_mode();return 0;}
+    if(!strcmp(argv[1],"turns")){turns_mode();return 0;}
     if(!strcmp(argv[1],"locks")){locks_mode();return 0;}
     if(!strcmp(argv[1],"kept")){kept_mode();return 0;}
     if(!strcmp(argv[1],"table"))table_mode();

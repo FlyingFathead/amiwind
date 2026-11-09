@@ -100,6 +100,48 @@ def compiled_program(scripts=SCRIPTS):
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+class NewGameWeatherTests(unittest.TestCase):
+    # v0.0.63 (OPENING-WEATHER-NOT-CLOUDY-63): CharGen's ChangeWeather, carried by AmiWind's own opening, becomes an
+    # NGWE row the engine sets at a new game; a script that runs (not hand-written) sets its own, no row
+    def test_carried_chargen_weather_is_a_row(self):
+        from mwscript.gamedata import new_game_weather
+        self.assertEqual(new_game_weather('begin CharGen\nChangeWeather "Bitter Coast Region" 1 ;cloudy\n'
+                                          'ChangeWeather, Foo 9\nChangeWeather Bar x\nend'),
+                         [('bitter coast region', 1), ('foo', 9)])
+        scripts = dict(SCRIPTS, CharGen='begin CharGen\nChangeWeather "Bitter Coast Region" 1\n'
+                                         'set CharGenState to 10\nend')
+        prog, compiled, data = compiled_program(scripts)
+        data.base_regions = {'ascadian isles region', 'bitter coast region'}
+        self.assertEqual(awms.new_game_weather_rows(prog, compiled), [(1, 1)])   # sorted: ascadian 0, bitter 1
+        prog2, compiled2 = compile_program(data, None, handwritten=(), rooms={})
+        self.assertEqual(awms.new_game_weather_rows(prog2, compiled2), [])       # CharGen runs: its own call
+        self.assertIn('NGWE', awms.RESIDENT)
+        host = (ROOT / 'engine/aga/src/aw_mwhost.c').read_text(encoding='utf-8')
+        self.assertIn('AW_MwvmSection("NGWE"', host)
+        self.assertIn('new_game_weather();', host)
+
+
+class LaterMasterScriptTests(unittest.TestCase):
+    # MWSCRIPT-LATER-MASTER-SCRIPT-61 (v0.0.63): a Morrowind.esm placement whose record a later master gives a script
+    # is bound with that script (the blue candle bulbs and Tribunal's fab_attack_disable)
+    def test_a_later_masters_script_binds_the_placement(self):
+        tmp = Path(tempfile.mkdtemp(prefix='aw-latermaster-'))
+        try:
+            mw = [record('TES3', sub('HEDR', b'\0' * 300)), record('LIGH', sub('NAME', 'lamp_x')),
+                  cell_exterior(1, 2, [(301, 'lamp_x', (0, 0, 0))])]
+            tr = [record('TES3', sub('HEDR', b'\0' * 300)), scpt('LampScript', 'begin LampScript\nDisable\nend'),
+                  record('LIGH', sub('NAME', 'lamp_x'), sub('SCRI', 'LampScript'))]
+            (tmp / 'Morrowind.esm').write_bytes(b''.join(mw))
+            (tmp / 'Tribunal.esm').write_bytes(b''.join(tr))
+            data = GameData().load(tmp)
+            refs = [r for r in data.references if r['reference'] == 301]
+            self.assertEqual(len(refs), 1)
+            self.assertEqual(refs[0]['script'], 'lampscript')
+            self.assertEqual(refs[0]['type'], 'LIGH')
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
 class ReaderTests(unittest.TestCase):
     def test_main_block_only(self):
         # the scripts under CharGenState == 1 at any depth inside it; a StartScript outside the block is not one

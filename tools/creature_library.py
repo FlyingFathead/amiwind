@@ -120,7 +120,8 @@ def bake(data, palette, meshes, out_id1, jobs=1, method=DEFAULT_METHOD, bipedal=
     besides 1 ('kf' only). CORPSES: {mesh: [creature ids]} of authored-dead creatures (plan()['corpses']): one
     corpse model per mesh, the last key of the creature's own death group (key corpse_key(mesh), 'kf' only).
     Returns {variant key: record} and {variant key: error} (left out with the reason)."""
-    from build_parallel import ordered_map
+    import actor_units
+    import pass_cache
     if method not in METHODS:
         raise ValueError('Unknown creature library method: ' + str(method))
     tasks = []
@@ -136,7 +137,18 @@ def bake(data, palette, meshes, out_id1, jobs=1, method=DEFAULT_METHOD, bipedal=
     done, failed = {}, {}
     seam = {'passing': 0, 'baselined': 0, 'entry': 0, 'new': 0, 'worse': 0}
     stops = []
-    for key, out, seconds, error in ordered_map(_unit, tasks, jobs=max(1, jobs)):
+    # every model from the unit cache creature-model when it was baked before with the same inputs, bake code and
+    # settings; the rest baked and each kept the moment it is back (tools/actor_units.py, NPC-LIBRARY-NO-UNIT-CACHE-63)
+    cache = actor_units.open_cache(actor_units.CREATURE_CACHE, ((__file__, '_unit'),),
+                                   pass_cache.source_digest((__file__, '_unit')),
+                                   pass_cache.previous_digests((__file__, '_unit')),
+                                   pass_cache.covered_lines((__file__, '_unit')))
+    palette_sha256 = actor_units.palette_digest(palette)
+    results, cached = actor_units.bake_creatures(tasks, jobs, cache,
+                                                 lambda task: actor_units.creature_inputs(task, palette_sha256))
+    print('Creature library: %d models (%d from the unit cache %s, %d baked)' % (
+        len(tasks), cached, actor_units.CREATURE_CACHE, len(tasks) - cached), flush=True)
+    for key, out, seconds, error in results:
         if out is None and error and error.startswith('BakeStop'):
             # the seam stop is never a mesh left out: every one is listed, then the stage fails
             stops.append('%s: %s' % (key, error))

@@ -818,18 +818,17 @@ def prepare(data_files, id1, jobs=None, bodies=True):
     entries = []
     count = len(tasks)
     started = time.monotonic()
+    import player_view_schedule
     with stage_pool(jobs, 'player view'):
-        first, reused = run_units([('body', t) for t in tasks] + [('swim', t) for t in swim_tasks] +
-                                  [('inventory', t) for t in tasks], cache, jobs)
-        for path, raw, layout, row in first[:count]:
-            (id1 / path).write_bytes(raw)
-            (id1 / (path[:-4] + '.anm')).write_text(layout + '\n', encoding='ascii', newline='\n')
-            (id1 / path).with_suffix('.tag').write_text(row.pop('_item_tags'), encoding='ascii', newline='\n')
-            entries.append((row['race'], row['female'], path))
-            report['bodies'].append(row)
-        torch_tasks = [(str(data), palette, row['race'], row['female'], row) for row in report['bodies']]
-        torch, torch_reused = run_units([('torch', t) for t in torch_tasks], cache, jobs)
-    reused += torch_reused
+        # one flow (BUILD-PLAYER-VIEW-UNDERUSED-48): each torch body starts when its body is done, a body's fitting
+        # tries spread over idle workers; the two maps one after the other (run_units) stay for comparison
+        first, torch, reused = player_view_schedule.run_view(tasks, swim_tasks, cache, jobs)
+    for path, raw, layout, row in first[:count]:
+        (id1 / path).write_bytes(raw)
+        (id1 / (path[:-4] + '.anm')).write_text(layout + '\n', encoding='ascii', newline='\n')
+        (id1 / path).with_suffix('.tag').write_text(row.pop('_item_tags'), encoding='ascii', newline='\n')
+        entries.append((row['race'], row['female'], path))
+        report['bodies'].append(row)
     for body_path_, body_raw, layout, held_path, held_raw, metadata_path, metadata, row in torch:
         for path, raw in ((body_path_, body_raw), (held_path, held_raw), (metadata_path, metadata)):
             (id1 / path).write_bytes(raw)

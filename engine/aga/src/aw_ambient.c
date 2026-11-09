@@ -227,6 +227,7 @@ int AW_AmbientEscortStep(long place,long room,float target2,float dest2,float hu
 #include "aw_anim.h"
 #include "aw_skel.h"
 #include "aw_npcpath.h"
+#include "aw_follow.h"   /* the one follow think (ESCORT-FOLLOW-63) */
 #include "aw_actors.h"
 #include "aw_move.h"
 #include "aw_clock.h"
@@ -273,7 +274,17 @@ typedef struct {
     aw_dial_npc_cache_t disp;   /* an NPC's disposition facts for the aggro (DIALOGUE-FIGHT-DISPOSITION-57) */
     unsigned short unsticks;    /* AMBIENT-UNSTUCK-FLOOD-61: stuck searches its steps ran since the counters' reset */
     unsigned char standing;     /* ROOM-CREATURES-NO-AGGRO-62: no package, the slot runs the engage check alone */
+    unsigned char follower;     /* ESCORT-FOLLOW-63: its follow state in follow_pool (index + 1), 0 none */
 } slot_t;
+/* ESCORT-FOLLOW-63: the follow states of the following and escorting slots, the debug companion's follow think
+ * (aw_follow.h, aw_companion.c) per follower; 8 at once (the game's scripts start at most 3 in one area). An entry
+ * belongs to the slot whose `follower` names it; a released slot's entry is free again. NULL hooks (the host test
+ * builds without aw_companion.c): the slot's own walk, as before. */
+#define FOLLOWERS 8
+static struct {aw_follow_t f;short owner;} follow_pool[FOLLOWERS];
+void (*aw_ambient_follow_start)(aw_follow_t *f,edict_t *e);
+int (*aw_ambient_follow_think)(aw_follow_t *f,edict_t *e,edict_t *target,const float goal[3],
+                               const aw_follow_rules_t *r,float dt);
 static int aggro_on;static void aggro_facts(slot_t *s);   /* below (aggro on sight) */
 static void travel_end(slot_t *s);
 static void follow_think(slot_t *s,float dt);
@@ -301,6 +312,23 @@ static FILE *file;long file_base;
 static int loaded;              /* 0 not tried, 1 usable, -1 unavailable */
 static long resident_size;      /* rows + idle profiles kept (the console answer) */
 static slot_t slots[SLOTS];
+/* the slot's follow state (ESCORT-FOLLOW-63): its own pool entry, else a free one, started at its place; NULL when the
+ * pool is full or the hooks are not set (then the slot walks as before, counted) */
+static unsigned long follow_pool_full;
+static aw_follow_t *follower_of(slot_t *s) {
+    int me=(int)(s-slots)+1,k;
+    if(!aw_ambient_follow_think || !aw_ambient_follow_start)return NULL;
+    if(s->follower>0 && s->follower<=FOLLOWERS && follow_pool[s->follower-1].owner==me)return &follow_pool[s->follower-1].f;
+    for(k=0;k<FOLLOWERS;k++){
+        int o=follow_pool[k].owner;
+        if(o<=0 || o>SLOTS || slots[o-1].follower!=k+1){
+            follow_pool[k].owner=(short)me;s->follower=(unsigned char)(k+1);
+            aw_ambient_follow_start(&follow_pool[k].f,s->e);
+            return &follow_pool[k].f;
+        }
+    }
+    follow_pool_full++;return NULL;
+}
 static short slot_of[MAX_EDICTS];   /* slot + 1 per edict */
 static float none_ref[MAX_EDICTS];
 static int last_dry;               /* the contents at the last swim spot refused (status line) */  /* the reference an edict had when it was not found in the table */
@@ -741,6 +769,9 @@ static void aggro(slot_t *s) {
     aw_fighter_t sheet;int got,disposition=50,npc=!(s->flags&AW_AMBIENT_CREATURE),now=-1;
     if(!aggro_on || sv.time<s->engage_at || !s->fight)return;   /* 0: not read yet (aggro_facts) */
     s->engage_at=(float)sv.time+0.75f+0.5f*(float)(roll16()&1023)/1023.0f;
+    /* v0.0.63 (COMBAT-ACTOR-VS-ACTOR-62; OpenMW actors.cpp engageCombat): the player's own followers and escorts
+     * never start a fight with the player by their Fight value */
+    if((s->travel==3 || s->travel==4 || s->travel==5) && sv_player && s->follow_num==NUM_FOR_EDICT(sv_player))return;
     if(!AW_CombatAiLoaded())return;
     /* DIALOGUE-AGGRO-62: a script's or an answer's SetFight / ModFight on this actor (not only the speaker's: a
      * dialogue result may raise a bystander's Fight, "sosia caristiana"->SetFight 100) counts from the next check, as
@@ -1084,6 +1115,18 @@ static void follow_think(slot_t *s,float dt) {
     s->manual_goal[0]=t->v.origin[0];s->manual_goal[1]=t->v.origin[1];s->manual_walk=1;
     if(s->state!=S_WALK)begin_walk(s);
     s->follow_moving=1;
+    {
+        /* ESCORT-FOLLOW-63: the companion's follow think moves it (its path search, stuck detectors and response;
+         * OpenMW's follow distance; no placement near the target inside a cell, no speed matching) */
+        aw_follow_t *f=follower_of(s);
+        if(f){
+            aw_follow_rules_t r;float at[3];
+            r.distance=(int)fd;r.kind=AW_ACTOR_FOLLOWER;r.mimic=0;r.place=0;r.name="Follower";
+            at[0]=t->v.origin[0];at[1]=t->v.origin[1];at[2]=t->v.origin[2]+t->v.mins[2];
+            aw_ambient_follow_think(f,e,t,at,&r,dt);st.steps++;
+            return;
+        }
+    }
     walk(s,dt);
 }
 int AW_AmbientFollow(edict_t *e,edict_t *target,float hours,const float *final) {
@@ -1097,6 +1140,7 @@ int AW_AmbientFollow(edict_t *e,edict_t *target,float hours,const float *final) 
     s->follow_final=(unsigned char)(final && (final[0]!=0 || final[1]!=0 || final[2]!=0));
     if(s->follow_final)VectorCopy(final,s->travel_to);
     s->follow_place=0;s->escort_max=0;
+    s->follower=0;                                   /* a fresh follow state at the first think (ESCORT-FOLLOW-63) */
     st.follows++;AW_MwvmStateChanged();
     return 1;
 }
@@ -1127,6 +1171,17 @@ static void escort_think(slot_t *s,float dt) {
     }
     s->manual_goal[0]=s->travel_to[0];s->manual_goal[1]=s->travel_to[1];s->manual_walk=1;
     if(s->state!=S_WALK)begin_walk(s);
+    {
+        /* ESCORT-FOLLOW-63: the companion's follow think walks it to the destination (the escort rule above decides
+         * when it waits and when it is done) */
+        aw_follow_t *f=follower_of(s);
+        if(f){
+            aw_follow_rules_t r;
+            r.distance=1;r.kind=AW_ACTOR_FOLLOWER;r.mimic=0;r.place=0;r.name="Escort";
+            aw_ambient_follow_think(f,e,NULL,s->travel_to,&r,dt);st.steps++;
+            return;
+        }
+    }
     walk(s,dt);
 }
 int AW_AmbientPackage(edict_t *e,edict_t *target,int kind,float hours,const float *point,long place) {
@@ -1148,7 +1203,7 @@ int AW_AmbientPackage(edict_t *e,edict_t *target,int kind,float hours,const floa
     if(s->state==S_WALK)stop_walk(s);
     s->travel=5;s->follow_num=(short)NUM_FOR_EDICT(target);s->follow_hours=hours>0?hours:0;minutes_now(&s->follow_minutes);
     VectorCopy(point,s->travel_to);s->follow_final=1;s->follow_place=place;s->escort_max=0;
-    s->follow_moving=0;s->remain=0;s->repeat=0;s->state=S_CHOOSE;
+    s->follow_moving=0;s->remain=0;s->repeat=0;s->state=S_CHOOSE;s->follower=0;   /* ESCORT-FOLLOW-63 */
     st.escorts++;AW_MwvmStateChanged();
     return 1;
 }
@@ -1162,6 +1217,16 @@ static void keep_package(slot_t *s,saved_pkg_t *k) {
         k->final=s->follow_final;
     }else k->final=1;
     VectorCopy(s->travel_to,k->to);
+}
+/* aw_ambient.h: the actor E follows or escorts (AIFollow, AIFollowCell, AIEscort, AIEscortCell), NULL none; a read
+ * only (the fights' sides, COMBAT-ACTOR-VS-ACTOR-62; OpenMW AiPackage::sideWithTarget) */
+edict_t *AW_AmbientLeaderOf(edict_t *e) {
+    slot_t *s;edict_t *t;
+    if(!e || e->free || slots_world!=sv.worldmodel || !(s=slot_for(e)))return NULL;
+    if(s->travel!=3 && s->travel!=4 && s->travel!=5)return NULL;
+    if(s->follow_num<=0 || s->follow_num>=sv.num_edicts)return NULL;
+    t=EDICT_NUM(s->follow_num);
+    return t->free?NULL:t;
 }
 int AW_AmbientFollowersOf(edict_t *p,edict_t **out,int max) {
     int i,j,n=0;
@@ -1475,6 +1540,8 @@ void AW_AmbientInit(void) {
     aw_mwscript_packages_import=AW_AmbientPackagesImport;
     aw_ambient_speed_attribute=AW_MwscriptSpeedAttribute;
     aw_ambient_forced_run=AW_MwscriptForcedRun;      /* ForceRun (v0.0.63, MWSCRIPT-GAPS-63) */
+    aw_ambient_follow_start=AW_FollowStart;          /* the companion's follow think (v0.0.63, ESCORT-FOLLOW-63) */
+    aw_ambient_follow_think=AW_FollowThink;
     aw_crime_pursue=pursue;                          /* CRIME-59: the guards' pursuit to arrest */
     AW_MoveSettingsDefault(&move_defaults);
 }

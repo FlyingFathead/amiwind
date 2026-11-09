@@ -8,7 +8,11 @@ void AW_StoryReset(int new_game)
 {
     memset(&aw_story,0,sizeof(aw_story));
     AW_StateReset();
-    if(new_game)AW_StateSet(&aw_state,AW_GLOBAL,"CharGenState",1);
+    /* CHARGENSTATE-START-VALUE-63: the game sets 1 at New Game and Main's block starts CharGen, whose first run sets
+     * 10 (OpenMW worldimp.cpp startNewGame; the CharGen script); AmiWind carries CharGen with this reset (the scripts
+     * of Main's block start through the NEWG rows), so the value after it is the game's 10. Every reader tests -1,
+     * not -1 or 0 and over (the opening's scripts and the one dialogue filter, CharGenState != -1). */
+    if(new_game)AW_StateSet(&aw_state,AW_GLOBAL,"CharGenState",10);
     aw_story.stage=new_game?AW_STAGE_SHIP:AW_STAGE_DEMO;
 }
 

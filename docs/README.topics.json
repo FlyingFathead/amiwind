@@ -71,6 +71,7 @@
         "DEBUG_OVERLAYS.md",
         "GAME_RECORDER.md",
         "AMIWIND_CONSOLE_COMMANDS.md",
+        "CONSOLE_COMMANDS_MORROWIND.md",
         "GAME_STATE_RESET.md",
         "MEMORY_ALLOCATION.md",
         "HEAP_WATCHER.md",

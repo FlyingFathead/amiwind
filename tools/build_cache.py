@@ -3651,36 +3651,55 @@ class Recorder:
         names = sorted(self.manifests)
         touched = {name: set(self.manifests[name]['files']) | set(self.manifests[name]['links'])
                    | set(self.manifests[name]['deleted']) for name in names}
+        native = getattr(self, 'native', {})
+
+        def settle(first, second):
+            """Attribute the paths FIRST and SECOND both saw change to the one that wrote them; False when they
+            share paths no trace can give to either."""
+            shared = sorted(touched[first] & touched[second])
+            if not shared:
+                return True
+            writer = attribute(shared, self.writes.get(first), self.writes.get(second),
+                               native.get(first), native.get(second))
+            if writer is None:
+                return False
+            # Both saw the files change, but only one stage wrote them (its trace): they are its
+            # outputs, not the other's (BUILD-REUSE-ATTRIBUTION-33).
+            observer = second if writer == 0 else first
+            manifest = self.manifests[observer]
+            for field in ('files', 'links'):
+                manifest[field] = {path: value for path, value in manifest[field].items() if path not in shared}
+            manifest['deleted'] = [path for path in manifest['deleted'] if path not in shared]
+            owner = self.manifests[first if writer == 0 else second]
+            foreign = foreign_directories(manifest['directories'], [*manifest['files'], *manifest['links']],
+                                          [*owner['files'], *owner['links']], owner['directories'])
+            manifest['directories'] = [path for path in manifest['directories'] if path not in foreign]
+            manifest['counts'] = {'files': len(manifest['files']),
+                                  'bytes': sum(row['size'] for row in manifest['files'].values())}
+            from unit_tree import of_manifest
+            manifest['tree'] = of_manifest(manifest)
+            manifest.setdefault('attributed', []).append(
+                {'stage': first if writer == 0 else second, 'paths': len(shared), 'first': shared[0]})
+            touched[observer] -= set(shared)
+            self._write(observer, manifest)
+            return True
+
+        # Every pair that can be attributed is settled first, and only then are the rest judged
+        # (BUILD-SHARED-WRITES-UNATTRIBUTED-52, v0.0.63-dev1): chim-town-seyda and chim-town-vivec_city both saw
+        # the files world-terrain and world-ui wrote beside them; judged in name order, the two towns were
+        # compared before the world stages had taken their files back, neither town had written them, and both
+        # towns were refused. A path a third stage wrote is that stage's, never a reason to refuse two others.
+        pending = []
         for i, first in enumerate(names):
             for second in names[i + 1:]:
                 a, b = self.manifests[first]['window'], self.manifests[second]['window']
-                if not (a[0] < b[1] and b[0] < a[1]):
-                    continue
-                shared = sorted(touched[first] & touched[second])
-                writer = attribute(shared, self.writes.get(first), self.writes.get(second),
-                                   getattr(self, 'native', {}).get(first), getattr(self, 'native', {}).get(second))
-                if shared and writer is not None:
-                    # Both saw the files change, but only one stage wrote them (its trace): they are its
-                    # outputs, not the other's (BUILD-REUSE-ATTRIBUTION-33).
-                    observer = second if writer == 0 else first
-                    manifest = self.manifests[observer]
-                    for field in ('files', 'links'):
-                        manifest[field] = {path: value for path, value in manifest[field].items() if path not in shared}
-                    manifest['deleted'] = [path for path in manifest['deleted'] if path not in shared]
-                    owner = self.manifests[first if writer == 0 else second]
-                    foreign = foreign_directories(manifest['directories'], [*manifest['files'], *manifest['links']],
-                                                  [*owner['files'], *owner['links']], owner['directories'])
-                    manifest['directories'] = [path for path in manifest['directories'] if path not in foreign]
-                    manifest['counts'] = {'files': len(manifest['files']),
-                                          'bytes': sum(row['size'] for row in manifest['files'].values())}
-                    from unit_tree import of_manifest
-                    manifest['tree'] = of_manifest(manifest)
-                    manifest.setdefault('attributed', []).append(
-                        {'stage': first if writer == 0 else second, 'paths': len(shared), 'first': shared[0]})
-                    touched[observer] -= set(shared)
-                    self._write(observer, manifest)
-                    continue
-                if shared:
+                if a[0] < b[1] and b[0] < a[1] and not settle(first, second):
+                    pending.append((first, second))
+        for first, second in pending:
+            if settle(first, second):
+                continue
+            shared = sorted(touched[first] & touched[second])
+            if shared:
                     for name, other in ((first, second), (second, first)):
                         manifest = self.manifests[name]
                         manifest['reusable'] = False
@@ -3691,6 +3710,18 @@ class Recorder:
                         'window': m['window'], 'files': m['counts']['files'], 'bytes': m['counts']['bytes']}
                  for name, m in self.manifests.items()}
         (self.folder / 'index.json').write_text(json.dumps(index, indent=1, sort_keys=True) + '\n')
+        # Files two stages wrote (BUILD-STAGE-WRITES-OTHERS-OUTPUT-63): recorded with the run; one the catalogue
+        # (config/shared-writes.json) does not list is printed, and the gate's catalogue test keeps the list closed.
+        try:
+            found = shared_writes({name: paths for name, paths in self.writes.items() if paths})
+            new = new_shared_writes(found, load_shared_writes_catalogue())
+            (self.folder / 'shared-writes.json').write_text(
+                json.dumps({'found': found, 'new': new}, indent=1, sort_keys=True) + '\n', encoding='utf-8', newline='\n')
+            for path, stages in new.items():
+                print(f'[shared-writes] NEW: {path} written by {", ".join(stages)} '
+                      '(BUILD-STAGE-WRITES-OTHERS-OUTPUT-63)', flush=True)
+        except Exception as exc:  # noqa: BLE001
+            print(f'[warning] shared writes not recorded: {exc}', flush=True)
         if self.store is not None:
             try:
                 self.store.finish(receipt, self.manifests)
@@ -3737,6 +3768,45 @@ def attribute(shared, first_writes, second_writes, first_native=(), second_nativ
     return None
 
 
+SHARED_WRITES_CATALOGUE = 'config/shared-writes.json'
+
+
+def shared_writes(writes):
+    """{run path: sorted stages} of every path two or more stages wrote (their traces' '>' lines; WRITES:
+    {stage: set of paths or None when untraced}). BUILD-STAGE-WRITES-OTHERS-OUTPUT-63: no stage may write a
+    file another stage writes; the known ones are listed in config/shared-writes.json until each has one owner."""
+    found = {}
+    for stage, paths in writes.items():
+        for path in paths or ():
+            found.setdefault(path, set()).add(stage)
+    return {path: sorted(stages) for path, stages in sorted(found.items()) if len(stages) > 1}
+
+
+def load_shared_writes_catalogue(root=None):
+    """{path: stages} of the shared writes known and listed (config/shared-writes.json), {} when absent."""
+    path = Path(root or Path(__file__).resolve().parents[1]) / SHARED_WRITES_CATALOGUE
+    try:
+        return {row['path']: sorted(row['stages']) for row in json.loads(path.read_text(encoding='utf-8'))['paths']}
+    except (OSError, ValueError, KeyError, TypeError):
+        return {}
+
+
+def new_shared_writes(found, known):
+    """The FOUND shared writes (shared_writes) the catalogue KNOWN does not list, or lists with fewer stages."""
+    return {path: stages for path, stages in found.items() if not set(stages) <= set(known.get(path, ()))}
+
+
+def run_shared_writes(run):
+    """shared_writes of a finished run, from the stage traces it kept (profile/reads/NN-stage.txt)."""
+    folder = Path(run) / 'profile' / 'reads'
+    writes = {}
+    for trace in sorted(folder.glob('*.txt')) if folder.is_dir() else ():
+        stage = trace.stem.split('-', 1)[1] if '-' in trace.stem and trace.stem.split('-', 1)[0].isdigit() else trace.stem
+        lines = trace.read_text(encoding='utf-8', errors='surrogateescape').splitlines()
+        writes.setdefault(stage, set()).update(line[1:] for line in lines if line.startswith('>'))
+    return shared_writes(writes)
+
+
 def holding_folders(paths):
     """Every folder that holds one of PATHS (relative, '/'-separated), at any depth."""
     folders = set()
@@ -3775,7 +3845,43 @@ def read_manifest(path):
         manifest = json.loads(path.read_text())
     except (OSError, ValueError):
         return None
-    return requalify(manifest) if manifest.get('schema') == MANIFEST_SCHEMA else None
+    if manifest.get('schema') != MANIFEST_SCHEMA:
+        return None
+    return resettle(requalify(manifest), path.parent)
+
+
+UNATTRIBUTED_REASON = re.compile(r'changed .+ while (?P<other>[A-Za-z0-9_.-]+) ran; outputs cannot be attributed$')
+
+
+def touched_paths(manifest):
+    return set(manifest.get('files') or ()) | set(manifest.get('links') or ()) | set(manifest.get('deleted') or ())
+
+
+def resettle(manifest, folder):
+    """A record refused only because a stage beside it saw the same files change (UNATTRIBUTED_REASON), made before
+    Recorder.close settled every attributable pair first (BUILD-SHARED-WRITES-UNATTRIBUTED-52, v0.0.63-dev1): when
+    the two records, as written, no longer share a single path (a third stage's trace took them back), the reason
+    is gone and the record is reusable. Any other reason, or a missing or still overlapping other record, keeps it
+    refused; the fingerprint and same-output checks apply as usual."""
+    if manifest.get('reusable') or not manifest.get('reasons'):
+        return manifest
+    others = []
+    for reason in manifest['reasons']:
+        match = UNATTRIBUTED_REASON.match(reason)
+        if not match:
+            return manifest
+        others.append(match.group('other'))
+    own = touched_paths(manifest)
+    for other in others:
+        path = Path(folder) / f'{other}.json'
+        try:
+            record = json.loads(path.read_text()) if path.is_file() else None
+        except (OSError, ValueError):
+            record = None
+        if not record or record.get('schema') != MANIFEST_SCHEMA or own & touched_paths(record):
+            return manifest
+    return dict(manifest, reusable=True, reasons=[],
+                resettled='refused only for files a third stage wrote beside it (BUILD-SHARED-WRITES-UNATTRIBUTED-52)')
 
 
 SCRATCH_ONLY_REASON = 'created run-folder entries outside every declared stage path: scratch'

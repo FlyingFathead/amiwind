@@ -4,7 +4,7 @@
 
 # AmiWind
 
-_Last updated with AmiWind v0.0.63-dev1 (9 November 2026)._
+_Last updated with AmiWind v0.0.63-dev2 (9 November 2026)._
 
 An unofficial, experimental RPG engine and enthusiast project bringing Morrowind
 to the Commodore Amiga, featuring CHIM: an AmiQuake-based engine and an asset
@@ -27,12 +27,17 @@ More in the [gallery](docs/GALLERY.md).
 
 ## Where AmiWind stands (9 November 2026)
 
-In development: **v0.0.63-dev1**, the first snapshot of v0.0.63
-([dev1 notes](docs/releases/notes/RELEASE-v0.0.63-dev1.md)): a builder that keeps every finished unit the moment it
+In development: **v0.0.63-dev2**, the second snapshot of v0.0.63
+([dev2 notes](docs/releases/notes/RELEASE-v0.0.63-dev2.md)): characters that fight each other, allies, guards and
+followers that take sides, an opening closer to the original, the original game's console commands, fire pits and
+scripted turning objects kept in saves, 605 of the 1,207 scripts running, and a builder that runs its risky stages
+first. Its changes are checked by tests, not yet in play.
+
+Before it, **v0.0.63-dev1** ([dev1 notes](docs/releases/notes/RELEASE-v0.0.63-dev1.md)) brought a builder that keeps every finished unit the moment it
 comes back, actor models that share their repeated shape data in the image (78.4 MB less on the v0.0.62 payload),
 599 of the game's 1,207 scripts running, breath and drowning under water, god mode against every damage, creatures
 that stand on the ground and attack on sight, the best-attack option and the original's hit chance and hit cone, and
-drops on uneven room floors. Its changes are checked by tests, not yet in play.
+drops on uneven room floors.
 
 The newest release is **v0.0.62: Stick To The Script**, the scripts, crime and alchemy release: alchemy as in
 the original, the creatures placed in rooms, 588 of the game's 1,207 scripts running (the
@@ -261,7 +266,8 @@ front page used to carry are kept in [earlier README sections](docs/README_ARCHI
   to explore Vvardenfell at night and underground; mushrooms to pick indoors and out; the original movement speeds;
   weather by region, and music streamed from disk; travel by silt strider, boat, gondola and guild guide.
 - **Not yet:** most quests and other game logic that depends on scripts the game does not run yet (588 of the 1,207
-  scripts run in v0.0.62, 599 in v0.0.63-dev1; [the MWScript tracker](docs/MWSCRIPT_FEATURES.md)), pickpocketing and picking owned locks, trespass,
+  scripts run in v0.0.62, 599 in v0.0.63-dev1, 605 in v0.0.63-dev2 and 8 more the game's own opening code
+  carries; [the MWScript tracker](docs/MWSCRIPT_FEATURES.md)), pickpocketing and picking owned locks, trespass,
   making your own enchantments, the
   shot of a bow or a thrown weapon, schedules by the time of day and most of the scripted AI packages, and Dagoth Ur's
   fight and voice. The jail markers are in the door table for the jail system to come. The Unmarked Shipwreck's upper
@@ -308,8 +314,8 @@ test image of one spot see [MiniWind: the test ground](docs/MINIWIND.md), the
 Everything else about building, the build speed options, the FPU support library and running the image in FS-UAE or
 WinUAE: [Building and playing](docs/BUILDING_AND_PLAYING.md), the [Linux build guide](docs/LINUX_BUILD.md) and the
 [FS-UAE launcher](docs/FS-UAE-LAUNCHER.md). The newest emulator presets are
-[`AmiWind-v0.0.63-dev1-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.63-dev1-FS-UAE.fs-uae) and
-[`AmiWind-v0.0.63-dev1-WinUAE.uae`](resources/emulators/AmiWind-v0.0.63-dev1-WinUAE.uae) (for the v0.0.62 release:
+[`AmiWind-v0.0.63-dev2-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.63-dev2-FS-UAE.fs-uae) and
+[`AmiWind-v0.0.63-dev2-WinUAE.uae`](resources/emulators/AmiWind-v0.0.63-dev2-WinUAE.uae) (for the v0.0.62 release:
 [`AmiWind-v0.0.62-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.62-FS-UAE.fs-uae) and
 [`AmiWind-v0.0.62-WinUAE.uae`](resources/emulators/AmiWind-v0.0.62-WinUAE.uae)); all start with 32 MB of
 Fast RAM.

@@ -20,6 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // cmd.c -- Quake script command processing module
 
 #include "quakedef.h"
+#include "aw_mwconsole.h"
 
 void Cmd_ForwardToServer (void);
 
@@ -663,7 +664,12 @@ void	Cmd_ExecuteString (char *text, cmd_source_t src)
 
 // check cvars
 	if (!Cvar_Command ())
+	{
+		// v0.0.63 (MW-CONSOLE-COMMANDS-62): the original game's console commands, aw_mwconsole.h
+		if (src == src_command && AW_MwConsoleLine (text))
+			return;
 		Con_Printf ("Unknown command \"%s\"\n", Cmd_Argv(0));
+	}
 
 }
 

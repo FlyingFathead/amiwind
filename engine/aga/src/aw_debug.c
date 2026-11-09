@@ -13,6 +13,8 @@
 #include "aw_spike.h"
 #include "aw_hinged_door.h"
 #include "aw_talk.h"
+#include "aw_mappath.h"
+#include "aw_tryalloc.h"
 #ifdef AMIGA
 #include <proto/dos.h>
 #endif
@@ -283,6 +285,20 @@ static void godmode_command(void)
  * links follow in CHIM's frame world rebuild), the client's entities (both interpolation ends and baselines),
  * static entities, dynamic lights, particles and sound channels. Engine modules keeping positions of their own
  * (paths, companions, combat) are not moved yet: the forced recentre is there to find exactly those. */
+/* FIREPIT-FLAMES-62: the entity lump of cell (cx, cy)'s frame map (maps/<its map>.chim or .bsp), a NUL-terminated
+ * malloc'd text the caller frees; NULL when it cannot be read. One open and one read of that lump (a crossing). */
+static char *frame_map_entities(int cx,int cy){
+    char name[48],path[AW_MAP_PATH_SIZE],*text;FILE *f=NULL;dheader_t h;long base,ofs,len;
+    if(!AW_CellMap(cx,cy,name,sizeof(name)))return NULL;
+    if(COM_FOpenFile(AW_MapPath(name,path,sizeof(path)),&f)<(int)sizeof(h) || !f){if(f)fclose(f);return NULL;}
+    base=ftell(f);
+    if(fread(&h,1,sizeof(h),f)!=sizeof(h) || LittleLong(h.version)!=BSPVERSION){fclose(f);return NULL;}
+    ofs=LittleLong(h.lumps[LUMP_ENTITIES].fileofs);len=LittleLong(h.lumps[LUMP_ENTITIES].filelen);
+    if(ofs<(long)sizeof(h) || len<=0 || len>1024*1024 || !(text=(char *)AW_TryMalloc((unsigned long)len+1))){fclose(f);return NULL;}
+    if(fseek(f,base+ofs,SEEK_SET) || fread(text,1,(size_t)len,f)!=(size_t)len){free(text);fclose(f);return NULL;}
+    fclose(f);text[len]=0;
+    return text;
+}
 extern particle_t *active_particles;
 static void AW_SessionShift(const float *d) {
     int i,k;edict_t *e;particle_t *pt;
@@ -331,6 +347,9 @@ void AW_DebugInit(void) {
     AW_GalleryInit();AW_SweepInit();AW_WorldUIInit();AW_PlacedInit();AW_StatsWindowInit();AW_AlchemyInit();AW_DebugTorchInit();    AW_StreamInit();AW_PhotoInit();AW_SpikeInit();Chim_Init();
     /* CHIM's window (type 1 crossings) names a cell's region map through the world directory. */
     {extern int (*chim_cell_map)(int,int,char *,int);chim_cell_map=AW_CellMap;}
+    {extern int (*aw_chim_window_slot)(int,int *,int *,float *);extern int (*aw_chim_map_frame)(const char *,int *,int *);
+     extern char *(*aw_frame_map_entities)(int,int);   /* FIREPIT-FLAMES-62: every frame's flames (aw_guard_torch.c) */
+     aw_chim_window_slot=Chim_WindowSlot;aw_chim_map_frame=Chim_MapFrame;aw_frame_map_entities=frame_map_entities;}
     {extern void (*aw_session_shift)(const float *);aw_session_shift=AW_SessionShift;}
     AW_MiniwindInit();AW_QuickCharInit();AW_TestBoxInit();
     Cvar_RegisterVariable(&aw_census_legacy);aw_intro_census_legacy=AW_CensusLegacy;   /* CENSUS-INTRO-SCRIPTS-62 */

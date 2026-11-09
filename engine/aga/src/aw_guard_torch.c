@@ -498,24 +498,26 @@ int (*aw_static_flame_gone)(unsigned int reference);
  * (its order among the map's aw_flame entities). Kept for the map they came with, whether the flames are read yet
  * or not. */
 static unsigned flame_link[STATIC_FLAME_MAX];static model_t *flame_link_world;
+static int window_on;static void window_rebuild(void);   /* FIREPIT-FLAMES-62, below */
 void AW_StaticFlameLink(model_t *world,int ordinal,unsigned reference)
 {
     int i;
     if(!world || ordinal<0 || ordinal>=STATIC_FLAME_MAX)return;
     if(flame_link_world!=world){memset(flame_link,0,sizeof(flame_link));flame_link_world=world;}
     flame_link[ordinal]=reference;
-    if(static_flame_world==world)
+    if(static_flame_world==world){
         for(i=0;i<static_flame_count;i++)if(static_flames[i].ordinal==ordinal && !static_flames[i].named)
             static_flames[i].reference=reference;
+        if(window_on)window_rebuild();   /* FIREPIT-FLAMES-62: the window's copy takes the link too */
+    }
 }
-static void static_flames_load(model_t *world)
+/* The aw_flame rows of an entity text into OUT (at most MAX; LINKS: the ordinal links of that map, or NULL).
+ * Returns the rows kept; *dropped counts the rows past MAX. */
+static int flames_parse(char *data,aw_static_flame_t *out,int max,const unsigned *links,int *dropped)
 {
-    char *data,key[64];int flame,ordinal=0;vec3_t origin;float scale,shape[3];unsigned long reference;
-    static_flame_count=0;static_flame_world=world;
-    if(flame_link_world!=world){memset(flame_link,0,sizeof(flame_link));flame_link_world=world;}
-    if(!world || !world->entities)return;
-    data=world->entities;
-    while((data=COM_Parse(data))!=NULL && com_token[0]=='{'){
+    char key[64];int flame,ordinal=0,count=0;vec3_t origin;float scale,shape[3];unsigned long reference;
+    if(dropped)*dropped=0;
+    while(data && (data=COM_Parse(data))!=NULL && com_token[0]=='{'){
         flame=0;origin[0]=origin[1]=origin[2]=0;scale=1;shape[0]=shape[1]=shape[2]=0;reference=0;
         while((data=COM_Parse(data))!=NULL && com_token[0]!='}'){
             strncpy(key,com_token,sizeof(key)-1);key[sizeof(key)-1]=0;
@@ -527,19 +529,129 @@ static void static_flames_load(model_t *world)
             else if(!strcmp(key,"aw_flame_shape") &&
                 Q_sscanf(com_token,"%f %f %f",&shape[0],&shape[1],&shape[2])!=3)shape[0]=shape[1]=shape[2]=0;
         }
-        if(flame && static_flame_count<STATIC_FLAME_MAX && isfinite(scale) && scale>0 && scale<=16){
-            VectorCopy(origin,static_flames[static_flame_count].origin);
-            static_flames[static_flame_count].shape[0]=isfinite(shape[0]) && shape[0]>0 && shape[0]<64?shape[0]:0;
-            static_flames[static_flame_count].shape[1]=isfinite(shape[1]) && shape[1]>=0 && shape[1]<128?shape[1]:0;
-            static_flames[static_flame_count].shape[2]=isfinite(shape[2]) && shape[2]>=0 && shape[2]<64?shape[2]:0;
-            static_flames[static_flame_count].named=reference!=0;
-            static_flames[static_flame_count].ordinal=ordinal;
-            static_flames[static_flame_count].reference=reference?(unsigned)reference:ordinal<STATIC_FLAME_MAX?flame_link[ordinal]:0;
-            static_flames[static_flame_count++].scale=scale;
+        if(flame && isfinite(scale) && scale>0 && scale<=16){
+            if(count>=max){if(dropped)(*dropped)++;}
+            else{
+            aw_static_flame_t *f=&out[count++];
+            VectorCopy(origin,f->origin);
+            f->shape[0]=isfinite(shape[0]) && shape[0]>0 && shape[0]<64?shape[0]:0;
+            f->shape[1]=isfinite(shape[1]) && shape[1]>=0 && shape[1]<128?shape[1]:0;
+            f->shape[2]=isfinite(shape[2]) && shape[2]>=0 && shape[2]<64?shape[2]:0;
+            f->named=reference!=0;
+            f->ordinal=ordinal;
+            f->reference=reference?(unsigned)reference:links && ordinal<STATIC_FLAME_MAX?links[ordinal]:0;
+            f->scale=scale;
+            }
         }
         if(flame)ordinal++;
         if(!data)break;
     }
+    return count;
+}
+static void static_flames_load(model_t *world)
+{
+    static_flame_count=0;static_flame_world=world;
+    if(flame_link_world!=world){memset(flame_link,0,sizeof(flame_link));flame_link_world=world;}
+    if(!world || !world->entities)return;
+    static_flame_count=flames_parse(world->entities,static_flames,STATIC_FLAME_MAX,flame_link,NULL);
+}
+/* ---- FIREPIT-FLAMES-62: the flames of every frame of a CHIM window ----
+ * A CHIM region map is a window of up to four frames (chim_window.c); its map's entity text holds only its own
+ * frame's aw_flame rows, so a frame entered by a streamed crossing showed none of its fires (the Ghostgate fire
+ * pits). Each window slot keeps its frame's rows here, frame-local: the map's own frame from the loaded map (its
+ * ordinal links kept), every other frame read once from its frame map's entity lump when it joins the window (one
+ * file open and one read of that lump, at a crossing, never per frame). The drawn list is all slots' rows at their
+ * slot's offset (frame-local -> session), rebuilt only when a slot or an offset changes. Without a window (rooms,
+ * legacy maps) nothing changes. Cost: 4 x 64 x 44 + 384 x 44 bytes (28 KB) resident; per crossing one entity lump
+ * read (a region frame map's: a few KB). The builder's frames carry at most 49 rows (v0.0.62 world). */
+#define WINDOW_SLOTS 4
+#define SLOT_FLAMES 64            /* tests/test_window_flames.py keeps it at or above the busiest frame's rows */
+#define WINDOW_FLAMES (STATIC_FLAME_MAX+WINDOW_SLOTS*SLOT_FLAMES)
+/* set by aw_debug.c at start-up (NULL in the host tests): chim_world.c Chim_WindowSlot (0: slot not used, no
+ * window), Chim_MapFrame (a frame map's own frame), and aw_debug.c's frame map entity reader (the entity lump of
+ * cell (cx, cy)'s frame map as a NUL-terminated malloc'd text, NULL when it cannot be read) */
+int (*aw_chim_window_slot)(int slot,int *cx,int *cy,float *offset);
+int (*aw_chim_map_frame)(const char *entities,int *cx,int *cy);
+char *(*aw_frame_map_entities)(int cx,int cy);
+static struct {int used,own,cx,cy,count;float offset[2];aw_static_flame_t f[SLOT_FLAMES];} flame_slot[WINDOW_SLOTS];
+static aw_static_flame_t window_flames[WINDOW_FLAMES];
+static int window_count,own_cx,own_cy,own_known;static model_t *own_world;
+static unsigned long window_reads,window_rows,window_dropped,window_failed;
+/* the aw_flame rows of frame (cx, cy) from its frame map's entity lump; -1 when it cannot be read */
+static int frame_flames_read(int cx,int cy,aw_static_flame_t *out,int max)
+{
+    char *text;int n,dropped=0;
+    if(!aw_frame_map_entities || !(text=aw_frame_map_entities(cx,cy)))return -1;
+    n=flames_parse(text,out,max,NULL,&dropped);
+    free(text);
+    window_reads++;window_rows+=n;window_dropped+=dropped;
+    return n;
+}
+static void window_rebuild(void)
+{
+    int i,k,n;const aw_static_flame_t *src;
+    window_count=0;
+    for(i=0;i<WINDOW_SLOTS;i++){
+        if(!flame_slot[i].used)continue;
+        src=flame_slot[i].own?static_flames:flame_slot[i].f;n=flame_slot[i].own?static_flame_count:flame_slot[i].count;
+        for(k=0;k<n && window_count<WINDOW_FLAMES;k++){
+            window_flames[window_count]=src[k];
+            window_flames[window_count].origin[0]+=flame_slot[i].offset[0];
+            window_flames[window_count++].origin[1]+=flame_slot[i].offset[1];
+        }
+    }
+}
+/* once a drawn frame: the window's slots against the kept ones (a few comparisons); reads a joined frame's rows */
+static void window_update(void)
+{
+    int i,cx,cy,used,changed=0;float offset[2];
+    window_on=0;
+    if(!aw_chim_window_slot || !cl.worldmodel)return;
+    if(own_world!=cl.worldmodel){
+        own_world=cl.worldmodel;memset(flame_slot,0,sizeof(flame_slot));changed=1;
+        own_known=aw_chim_map_frame && cl.worldmodel->entities && aw_chim_map_frame(cl.worldmodel->entities,&own_cx,&own_cy);
+    }
+    if(!own_known)return;
+    for(i=0;i<WINDOW_SLOTS;i++){
+        used=aw_chim_window_slot(i,&cx,&cy,offset);
+        if(!used){if(flame_slot[i].used){flame_slot[i].used=0;changed=1;}continue;}
+        if(!flame_slot[i].used || flame_slot[i].cx!=cx || flame_slot[i].cy!=cy){
+            flame_slot[i].used=1;flame_slot[i].cx=cx;flame_slot[i].cy=cy;changed=1;
+            flame_slot[i].own=cx==own_cx && cy==own_cy;
+            flame_slot[i].count=0;
+            if(!flame_slot[i].own){
+                int n=frame_flames_read(cx,cy,flame_slot[i].f,SLOT_FLAMES);
+                if(n<0){window_failed++;n=0;}
+                flame_slot[i].count=n;
+            }
+            flame_slot[i].offset[0]=offset[0];flame_slot[i].offset[1]=offset[1];
+        }else if(flame_slot[i].offset[0]!=offset[0] || flame_slot[i].offset[1]!=offset[1]){
+            flame_slot[i].offset[0]=offset[0];flame_slot[i].offset[1]=offset[1];changed=1;
+        }
+        window_on=1;
+    }
+    if(changed)window_rebuild();
+}
+/* the flames to draw: the window's when the map runs one, else the loaded map's */
+static const aw_static_flame_t *flame_list(int *count)
+{
+    if(window_on){*count=window_count;return window_flames;}
+    *count=static_flame_count;return static_flames;
+}
+/* The flames a frame draws from (the loaded map's, read when it changes, or the window's): AW_StaticFlamesDraw's
+ * first step, the host test's way in. */
+const aw_static_flame_t *AW_StaticFlamesList(int *count)
+{
+    if(cl.worldmodel!=static_flame_world)static_flames_load(cl.worldmodel);
+    window_update();
+    return flame_list(count);
+}
+/* the window's flame counters, for the host test and a later report: reads, rows kept, rows past SLOT_FLAMES,
+ * frames that could not be read, rows drawn from, window on */
+void AW_StaticFlamesWindowCounts(unsigned long *counts)
+{
+    counts[0]=window_reads;counts[1]=window_rows;counts[2]=window_dropped;counts[3]=window_failed;
+    counts[4]=(unsigned long)window_count;counts[5]=(unsigned long)window_on;
 }
 /* Drawn particle size of a flame in map units: the authored size or
  * flame_particle's 1.5*scale, whichever is larger. */
@@ -622,9 +734,11 @@ static int flame_depth_limit(void)
     if(aw_static_flames.value && cl.worldmodel && (r_campfires || !R_SkyExterior())){
         /* Not read yet for this map (AW_StaticFlamesDraw reads it): unknown
          * flames, so nothing may be left out this frame. */
+        int n;const aw_static_flame_t *list;
         if(cl.worldmodel!=static_flame_world)return 0;
-        for(i=0;i<static_flame_count;i++){
-            f=&static_flames[i];
+        list=flame_list(&n);
+        for(i=0;i<n;i++){
+            f=&list[i];
             VectorSubtract(f->origin,r_refdef.vieworg,delta);
             if(DotProduct(delta,delta)>STATIC_FLAME_RANGE)continue;
             limit=flame_limit(f->origin,flame_reach(f),limit);
@@ -634,15 +748,15 @@ static int flame_depth_limit(void)
 }
 void AW_StaticFlamesDraw(void)
 {
-    int i,k,count,core,chosen[STATIC_FLAME_DRAW];
+    int i,k,count,core,chosen[STATIC_FLAME_DRAW],listed;aw_static_flame_t *list;
     if(!aw_static_flames.value || !cl.worldmodel)return;
     if(!r_campfires && R_SkyExterior())return;      /* dbg campfires off: no fire outdoors */
-    if(cl.worldmodel!=static_flame_world)static_flames_load(cl.worldmodel);
-    if(!static_flame_count || !flame_pixels || !vid.buffer || !d_pzbuffer || d_zwidth<vid.width)return;
-    count=AW_StaticFlamesPick(static_flames,static_flame_count,aw_static_flames_nearest.value!=0,chosen);
+    list=(aw_static_flame_t *)AW_StaticFlamesList(&listed);              /* FIREPIT-FLAMES-62: every frame's of the window */
+    if(!listed || !flame_pixels || !vid.buffer || !d_pzbuffer || d_zwidth<vid.width)return;
+    count=AW_StaticFlamesPick(list,listed,aw_static_flames_nearest.value!=0,chosen);
     core=AW_TorchFlameCoreColor();
     for(i=0;i<count;i++){
-        float scale=static_flames[chosen[i]].scale,*shape=static_flames[chosen[i]].shape;
+        float scale=list[chosen[i]].scale,*shape=list[chosen[i]].shape;
         if(shape[0]>0){
             /* Emitter shape from the original mesh: STATIC_FLAME_PARTS particles
              * of the authored size, spread over the authored cone and lifted by
@@ -650,17 +764,17 @@ void AW_StaticFlamesDraw(void)
             vec3_t at;
             if(shape[0]>=4){if(!hearth_lut_ready)hearth_lut_build();flame_lut=hearth_lut;}
             for(k=0;k<STATIC_FLAME_PARTS;k++){
-                VectorCopy(static_flames[chosen[i]].origin,at);
+                VectorCopy(list[chosen[i]].origin,at);
                 at[0]+=shape[2]*aw_static_flame_offsets[k][0];at[1]+=shape[2]*aw_static_flame_offsets[k][1];
                 flame_particle(at,k,(shape[0]>scale*1.5f?shape[0]:scale*1.5f)/1.5f,core,64,shape[1]/2.7f,2,96);
             }
             flame_lut=NULL;
             /* Hearth embers (Quake particles): about 8 per second per fire. */
             if(shape[0]>=4 && (rand()&1023)<(int)(host_frametime*8*1024))
-                AW_EmberSpawn(static_flames[chosen[i]].origin,shape[2]+shape[0]*0.5f,shape[1]*1.2f);
+                AW_EmberSpawn(list[chosen[i]].origin,shape[2]+shape[0]*0.5f,shape[1]*1.2f);
             continue;
         }
         for(k=0;k<3;k++)
-            flame_particle(static_flames[chosen[i]].origin,k,scale,core,48,scale<2.5f?scale:2.5f,2,96);
+            flame_particle(list[chosen[i]].origin,k,scale,core,48,scale<2.5f?scale:2.5f,2,96);
     }
 }

@@ -58,7 +58,9 @@ const char *AW_ControlName(int control);    /* "playercontrols" ... for one bit,
  * census office's scripts; OpenMW guiextensions.cpp OpEnableWindow): one bit mask in the saved named facts
  * ("amiwind:menus", no new save field; New Game clears it with the facts). They add to the opening's own rule above
  * (a menu is there when either allows it). */
-enum aw_menu { AW_MENU_STATS=1, AW_MENU_INVENTORY=2, AW_MENU_MAGIC=4, AW_MENU_MAP=8, AW_MENU_ALL=15 };
+/* AW_MENU_REST (v0.0.63, MWSCRIPT-GAPS-63; OpenMW guiextensions.cpp OpEnableRest, WindowManager::enableRest): the
+ * rest allowed while the opening's restriction holds (CharGenBed's EnableRest before its ShowRestMenu) */
+enum aw_menu { AW_MENU_STATS=1, AW_MENU_INVENTORY=2, AW_MENU_MAGIC=4, AW_MENU_MAP=8, AW_MENU_REST=16, AW_MENU_ALL=31 };
 #define AW_MENU_FACT "amiwind:menus"
 int AW_StoryMenus(void);                    /* the mask of menus a script turned on */
 int AW_StoryMenuEnable(int menus);          /* 1 when kept (0: the named facts are full; nothing changed) */

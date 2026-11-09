@@ -444,7 +444,8 @@ int AW_RestOpen(unsigned long bed_reference)
     edict_t *p;int refusal;long cx,cy;static char id[64];char line[200];const char *region;aw_rest_body_t b;
     if(modal || gallery_active)return 0;
     if(!sv.active || svs.maxclients!=1 || !svs.clients || !(p=svs.clients[0].edict) || cls.state!=ca_connected ||
-       AW_StoryRestricted() || AW_CharacterActive() || AW_ReaderActive() || p->v.health<=0)return 0;   /* rest not unlocked */
+       (AW_StoryRestricted() && !(AW_StoryMenus()&AW_MENU_REST)) || AW_CharacterActive() || AW_ReaderActive() ||
+       p->v.health<=0)return 0;   /* rest not unlocked (a script's EnableRest unlocks it, v0.0.63) */
     if(!AW_ClockEnsure()){Con_Printf("Clock state unavailable.\n");return 0;}
     if(daynight_hold){AW_UISubtitle("","Time is held at 12:00 (dbg daynight on).",4);return 0;}
     memset(&rest_read,0,sizeof(rest_read));

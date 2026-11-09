@@ -163,6 +163,8 @@ int AW_AmbientPackage (struct edict_s *e, struct edict_s *target, int kind, floa
 /* The player's followers within OpenMW's 800 units (actionteleport.cpp getFollowers), not fighting: up to MAX into
  * OUT, and each one's package kept (as a saved one) to be applied when the follower is in the next map; the count. */
 int AW_AmbientFollowersOf (struct edict_s *player, struct edict_s **out, int max);
+/* the actor E follows or escorts (its package's target), NULL none (COMBAT-ACTOR-VS-ACTOR-62: the fights' sides) */
+struct edict_s *AW_AmbientLeaderOf (struct edict_s *e);
 /* Saved games (v0.0.57, SAVEGAME-COMPLETE-57): the actors' travel and follow packages as an "AWPK" block (bytes, -1
  * too small); a loaded block's packages wait until their actors are in the map (1, or 0 for a bad block). */
 int AW_AmbientPackagesExport (unsigned char *out, int capacity);

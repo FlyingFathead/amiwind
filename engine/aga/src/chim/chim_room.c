@@ -99,6 +99,82 @@ static void ShiftPlace (chim_place_t *p, const float *d, vec3_t mins, vec3_t max
 	}
 }
 
+/* Scripted movers turned (WORLD-BUTTONS-62 part 2: Rotate, RotateWorld and
+ * SetAngle on the cranks, bar doors and Dwemer doors): every copy of pid turns
+ * by d (Quake angles: pitch, yaw, roll) with its collision (yaw sine and
+ * cosine, the placed records' matrix); the first turn makes its box hold every
+ * pose (the farthest corner's distance on every axis; CHIM_PLACE_TURNED) and
+ * relinks it once. NOW (may be NULL) gets the angles of the first copy found.
+ * Returns the copies turned. A frame's older records (no matrix) turn about
+ * yaw only. */
+static void TurnPlace (chim_place_t *p, float *rot, const float *d, vec3_t mins, vec3_t maxs)
+{
+	int k;
+	VectorAdd (p->ent.angles, d, p->ent.angles);
+	Q_SinCosDeg (p->ent.angles[YAW], &p->s, &p->c);
+	if (rot)
+		ChimPlaced_AnglesMatrix (p->ent.angles, (float (*)[3])rot);
+	if (!(p->flags & CHIM_PLACE_TURNED))
+	{
+		float r = 0, x;
+		for (k=0 ; k<3 ; k++)
+		{
+			x = p->maxs[k] - p->ent.origin[k] > p->ent.origin[k] - p->mins[k] ?
+				p->maxs[k] - p->ent.origin[k] : p->ent.origin[k] - p->mins[k];
+			r += x*x;
+		}
+		r = (float)sqrt (r);
+		for (k=0 ; k<3 ; k++)
+		{
+			p->mins[k] = p->ent.origin[k] - r;
+			p->maxs[k] = p->ent.origin[k] + r;
+			if (p->mins[k] < mins[k]) mins[k] = p->mins[k];
+			if (p->maxs[k] > maxs[k]) maxs[k] = p->maxs[k];
+		}
+		p->flags |= CHIM_PLACE_TURNED;
+	}
+}
+
+int ChimMovers_Turn (unsigned pid, const float *d, float *now)
+{
+	int i, j, n = 0, grown = 0;
+	if (ChimRoom_Active ())
+	{
+		for (i=0 ; i<room.count ; i++)
+			if (room.places[i].pid == pid && (room.places[i].flags & CHIM_PLACE_HINGED))
+			{
+				TurnPlace (&room.places[i], room.rot + 9*i, d, room.mins, room.maxs);
+				if (now && !n)
+					VectorCopy (room.places[i].ent.angles, now);
+				n++;
+			}
+		return n;
+	}
+	for (i=0 ; i<chim_frame.count ; i++)
+	{
+		chim_entry_t *e = &chim_frame.entries[i];
+		chim_chunk_t *c = e->chunk.data;
+		if (e->state == CHIM_STATE_ABSENT || !c)
+			continue;
+		for (j=0 ; j<c->records ; j++)
+			if (c->places[j].pid == pid && (c->places[j].flags & CHIM_PLACE_HINGED))
+			{
+				if (!(c->places[j].flags & CHIM_PLACE_TURNED) && !grown)
+				{
+					ChimChunks_GonePid (pid, 1);	/* out before the box grows */
+					grown = 1;
+				}
+				TurnPlace (&c->places[j], c->rot ? c->rot + 9*j : NULL, d, c->mins, c->maxs);
+				if (now && !n)
+					VectorCopy (c->places[j].ent.angles, now);
+				n++;
+			}
+	}
+	if (grown)
+		ChimChunks_GonePid (pid, 0);
+	return n;
+}
+
 int ChimMovers_Shift (unsigned pid, const float *d, int relink)
 {
 	int i, j, n = 0;

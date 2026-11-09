@@ -1488,6 +1488,23 @@ def commands(args, tools, run):
     if args.stage == 'aga' and not getattr(args, 'dry_run', False) and \
             (getattr(args, 'skip_census_record', None) or {}).get('on'):
         steps = [(name, command + ['--skip-census'] if name == 'image' else command) for name, command in steps]
+    # BUILD-RISKY-STAGES-FIRST-63: the player bodies, the riskiest bake, as their own stage right after the census
+    # (tools/player_view_stage.py: a pre-flight of the stored models, then every unit into the image unit cache,
+    # beside the world stages); the image step takes them from the unit cache. Not with --player-body off.
+    names = [name for name, _ in steps]
+    image = dict(steps).get('image')
+    # the legacy builder's plan stays as it was (tests/test_chim_no_legacy.py pins it): CHIM builds only
+    if 'census' in names and image is not None and '--no-player-body' not in map(str, image) and \
+            'player-view' not in names and getattr(args, 'builder', 'chim') != 'legacy':
+        # placed before the image (a stage without a DEPENDENCIES row waits for the one before it in the plan, so it
+        # must not sit inside the scene chain); it starts once the census is done, risk first (build_parallel.RISK_FIRST)
+        steps.insert(names.index('image'), ('player-view', tool(
+            'player_view_stage.py', '--data-files', args.data_files,
+            '--palette', run / 'intro-scene/id1/gfx/palette.lmp', '--out', run / 'player-view', '--jobs', jobs)))
+        record = getattr(args, 'miniwind_record', None)
+        if isinstance(record, dict) and isinstance(record.get('stages'), list) and 'image' in record['stages'] \
+                and 'player-view' not in record['stages']:
+            record['stages'].insert(record['stages'].index('image'), 'player-view')
     return steps
 
 
@@ -3316,6 +3333,17 @@ def _main(argv=None):
         if args.reuse_from and args.allow_release_reuse:
             metadata['stage_cache']['release_reuse'] = 'allowed: the from-scratch gate runs separately'
         resource_preflight(args, steps, metadata)
+        if not args.dry_run:
+            # every unit and pass cache folder writable by this build's user, in the first minute: a store never
+            # raises, and a folder made by another user (root) lost every unit stored into it without a word
+            # (UNIT-CACHE-STORE-ERRORS-SILENT-63)
+            import unit_store
+            unwritable = unit_store.unwritable_folders(Path(args.workspace) / 'cache' / 'image-passes')
+            if unwritable:
+                raise ValueError('%d unit cache folders are not writable by this build\'s user (uid %s), first: %s; '
+                                 'give them to the build user (chown 1000:1000) and start again (every unit stored '
+                                 'there would be lost)' % (len(unwritable), os.getuid() if hasattr(os, 'getuid')
+                                                           else '?', ', '.join(unwritable[:3])))
         if args.builder_options['builder'] == 'chim' and not args.dry_run and any(name == 'chim' for name, _ in steps):
             # every reduction row checked against the collision surface gate before the CHIM stage meets it
             # (RECIPE-ROW-MOVES-COLLISION-57; tools/recipe_collision_preflight.py): seconds when cached

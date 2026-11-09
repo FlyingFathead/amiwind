@@ -197,6 +197,8 @@ SKY / LIGHTING|weather|aw_weather_set|[on/off / skyonly / auto / clear cloudy fo
 UI / CONSOLE|console bg color|aw_console_color|black/blue/gray or R G B
 UI / CONSOLE|console font|aw_console_size|small/normal
 UI / CONSOLE|font|aw_console_font|readable/retro
+UI / CONSOLE|mw help|aw_mw_help|the original game's console commands that work in AmiWind (tgm, coc, player->AddItem, SetStrength and the rest; docs/CONSOLE_COMMANDS_MORROWIND.md), page by page from the disk; also dbg help mw
+UI / CONSOLE|mw target|aw_mw_target|[ID / clear; no argument: the finder] the target of the original's commands typed without id->: a list of this map's references with an id, nearest first (name, id, kind, distance), typed to filter; Enter sets it and the input line shows [id->]; clear: the player again
 UI / CONSOLE|ui dialogue|aw_dialogue_method|1/2/3/4 (default 3)
 UI / CONSOLE|ui font|aw_ui_select|16/14/12/fallback
 UI / CONSOLE|ui ink|aw_ui_ink|original/readable

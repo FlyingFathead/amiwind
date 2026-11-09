@@ -70,7 +70,7 @@ class EngineWiringTests(unittest.TestCase):
 
     def test_built_into_the_engine(self):
         make = (ROOT / 'engine' / 'aga' / 'Makefile').read_text(encoding='utf-8')
-        self.assertIn('aw_mwhost.c aw_msgbox_rules.c aw_msgbox.c', make)
+        self.assertIn('aw_mwhost.c aw_mwconsole.c aw_msgbox_rules.c aw_msgbox.c', make)  # aw_mwconsole.c: MW-CONSOLE-COMMANDS-62
 
 
 if __name__ == '__main__':

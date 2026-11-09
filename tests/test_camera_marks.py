@@ -196,7 +196,8 @@ class Orbit(unittest.TestCase):
     def test_notarget_reaches_the_ai(self):
         combat = (SRC / 'aw_combat.c').read_text(encoding='utf-8')
         think = combat[combat.index('static void think(slot_t *s,edict_t *p,float dt) {'):]
-        self.assertIn('if((int)p->v.flags&FL_NOTARGET){if(s->group!=G_IDLE)set_state(s,S_CHASE,G_IDLE);return;}', think[:3000])
+        # COMBAT-ACTOR-VS-ACTOR-62: notarget holds the slots whose target is the player (target_num 0)
+        self.assertIn('if(!s->target_num && ((int)p->v.flags&FL_NOTARGET)){if(s->group!=G_IDLE)set_state(s,S_CHASE,G_IDLE);return;}', think[:4000])
         self.assertIn("if(!you.dead && !((int)p->v.flags&FL_NOTARGET))npc_strike(s,p);", combat)
         bark = (SRC / 'pr_cmds.c').read_text(encoding='utf-8')
         bark = bark[bark.index('static void PF_aw_bark(void)'):bark.index('builtin_t pr_builtin[]')]

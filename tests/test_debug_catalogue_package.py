@@ -15,7 +15,7 @@ class DebugCataloguePackageTests(unittest.TestCase):
             target = Path(tmp)
             receipt = build_aga.stage_debug_catalogues(target, debug_luma=True)
             self.assertEqual(set(receipt), {'debug-commands.txt', 'shroompicker.txt', 'camera-marks.txt',
-                                            'teleport-names.txt'})
+                                            'teleport-names.txt', 'mwconsole-help.txt', 'mwconsole-functions.txt'})
             for name, record in receipt.items():
                 self.assertEqual((target/name).read_bytes(),
                                  (build_aga.ROOT/'config'/name).read_bytes())

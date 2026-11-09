@@ -124,6 +124,7 @@ int AW_OpeningStoryHidden (void);
 int (*aw_chim_door_yaw)(unsigned pid, float yaw);
 int (*aw_chim_door_clip)(unsigned pid, vec3_t start, vec3_t mins, vec3_t maxs, vec3_t end, trace_t *trace);
 int (*aw_chim_place_shift)(unsigned pid, const float *d, int relink);
+int (*aw_chim_place_turn)(unsigned pid, const float *d, float *now);
 
 static int		available;			/* chim/world.cwi exists */
 static int		active;				/* the current map is a CHIM frame */
@@ -932,6 +933,29 @@ static int WorldspawnFrame (const char *entities, int *cx, int *cy)
 	if (!key || key > end)
 		return 0;
 	return Q_sscanf (key + 13, " \"%d %d\"", cx, cy) == 2;
+}
+
+/* FIREPIT-FLAMES-62 (aw_guard_torch.c reads the flames of every frame of the
+ * window): slot i of the window: 1 when used, its frame and its offset
+ * (frame-local -> session); 0 for every slot when the map runs no window. */
+int Chim_WindowSlot (int i, int *cx, int *cy, float *offset)
+{
+	const chim_slot_t *s;
+	if (!active || !chim_frame.window || i < 0 || i >= CHIM_WINDOW_SLOTS)
+		return 0;
+	s = &chim_frame.slot[i];
+	if (!s->used)
+		return 0;
+	*cx = s->cx;
+	*cy = s->cy;
+	offset[0] = s->offset[0];
+	offset[1] = s->offset[1];
+	return 1;
+}
+
+int Chim_MapFrame (const char *entities, int *cx, int *cy)
+{
+	return WorldspawnFrame (entities, cx, cy);
 }
 
 int Chim_FarOnly (void)
@@ -2143,7 +2167,7 @@ void Chim_Init (void)
 	aw_chim_door_yaw = ChimChunks_DoorYaw;
 	aw_chim_door_clip = ChimChunks_DoorClip;
 	aw_chim_place_shift = ChimMovers_Shift;		/* chim_room.c, WORLD-BUTTONS-62 */
-	aw_chim_view_reach = ViewReach;
+	aw_chim_place_turn = ChimMovers_Turn;	aw_chim_view_reach = ViewReach;
 #ifdef AMIGA
 	aw_chim_spike_counts = SpikeCounts;
 #endif

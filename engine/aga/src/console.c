@@ -32,6 +32,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #endif
 #include "quakedef.h"
 #include "aw_links.h"
+#include "aw_mwconsole.h"
 #include "aw_remote.h"
 #include "aw_testbox.h"
 
@@ -512,6 +513,25 @@ Con_DrawInput
 The input line scrolls horizontally if typing goes beyond the right edge
 ================
 */
+/* MW-CONSOLE-COMMANDS-62: the console target (dbg mw target) at the right end of the input line, while the typing
+ * leaves room for it */
+static void Con_DrawTarget (int y)
+{
+	const char	*id = AW_MwConsoleTarget ();
+	char		label[40];
+	int			i, n, x;
+	if (!id || !id[0])
+		return;
+	n = snprintf (label, sizeof(label), "[%.32s->]", id);
+	if (n < 0 || n >= (int)sizeof(label))
+		n = (int)sizeof(label) - 1;
+	x = con_linewidth - n;
+	if (x <= key_linepos + 2)
+		return;
+	for (i=0 ; i<n ; i++)
+		AW_ConsoleCharacter ((x+i+1)*AW_ConsoleCharWidth(), y, label[i]);
+}
+
 void Con_DrawInput (void)
 {
 	int		y;
@@ -541,6 +561,7 @@ void Con_DrawInput (void)
 		y = con_vislines-2*AW_ConsoleCharHeight();
 		for (i=0 ; i<con_linewidth && start+i<MAXCMDLINE ; i++)
 			AW_ConsoleCharacter ((i+1)*AW_ConsoleCharWidth(), y, line[start+i]);
+		Con_DrawTarget (y);
 		return;
 	}
 
@@ -562,6 +583,7 @@ void Con_DrawInput (void)
 
 	for (i=0 ; i<con_linewidth ; i++)
 		AW_ConsoleCharacter ((i+1)*AW_ConsoleCharWidth(), y, text[i]);
+	Con_DrawTarget (y);
 
 // remove cursor
 	key_lines[edit_line][key_linepos] = 0;

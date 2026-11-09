@@ -160,7 +160,8 @@ static int check_code(const unsigned char *code,unsigned long n,int nlocals){
     }
     return 1;
 }
-void AW_MwvmReset(void){if(vmp)memset(vmp,0,sizeof(*vmp));}
+static aw_drsc_index_t drsc_index;static int drsc_index_state;   /* the DRSC index: 0 not tried, 1 built, -1 failed */
+void AW_MwvmReset(void){if(vmp)memset(vmp,0,sizeof(*vmp));drsc_index_state=0;drsc_index.count=0;}
 int AW_MwvmLoaded(void){return vmp && vm.loaded;}
 /* GAME-RECORDER-FIGHT-SEED-61: Random's generator set from the gameplay recorder's seed at its frame 0 */
 void AW_MwvmSeed(unsigned long seed){if(vmp)vm.rng=seed?(uint32_t)seed:0x2545F491u;}
@@ -921,6 +922,23 @@ int AW_MwvmRunDialogue(int script,uint32_t reference,int speaker){
     vm.stats.dialogue_runs++;
     return 1;
 }
+/* MW-CONSOLE-COMMANDS-62: a console line's target as the instance a script line runs on (its REFERENCE and ENTITY),
+ * so the host finds it as it finds a script's own reference (AW_MWVM_SELF); no locals, nothing run; given back with
+ * AW_MwvmScratchEnd before the next frame. The instance, -1 none free. */
+int AW_MwvmScratch(uint32_t reference,int entity){
+    int k;aw_mwvm_instance_t *in;
+    if(!ON || !reference || (k=new_instance())<0)return -1;
+    in=&vm.inst[k];
+    memset(in,0,sizeof(*in));
+    in->script=0;in->flags=AWI_USED|AWI_GLOBAL;in->reference=reference;in->entity=entity;in->locals=vm.high;
+    in->last_run=vm.now;
+    return k;
+}
+void AW_MwvmScratchEnd(int k){
+    if(!ON || k<0 || k>=vm.ninst)return;
+    vm.inst[k].flags=0;
+    while(vm.ninst>0 && !(vm.inst[vm.ninst-1].flags&AWI_USED))vm.ninst--;
+}
 uint32_t AW_MwvmTextHash(const char *text,int length){
     uint32_t h=0x811C9DC5u;int i;
     for(i=0;i<length;i++){h^=(unsigned char)text[i];h*=0x01000193u;}
@@ -929,12 +947,47 @@ uint32_t AW_MwvmTextHash(const char *text,int length){
 /* The DRSC row of a result text (its HASH and LENGTH; the section on disk read through READ at file offsets): of the
  * rows for the text, the one compiled with SPEAKER (the speaker's attached script, -1 none) or, failing that, the
  * first; its script, ROW_SPEAKER (the script whose locals it was compiled with, -1 none) and BROKEN. -1 none. */
+/* MWSCRIPT-RESULT-LONG-FRAME-62: every AW_DRSC_BLOCK-th row's key, read once (one 12-byte read per block); 1 built.
+ * A section of more rows than the index holds: not built (the whole search on disk, as before). */
+int AW_MwvmDialogueIndexBuild(int (*read)(void *user,uint32_t offset,void *out,uint32_t bytes),void *user,
+                              uint32_t offset,uint32_t rows,aw_drsc_index_t *index){
+    uint32_t k,n=(rows+AW_DRSC_BLOCK-1)/AW_DRSC_BLOCK;unsigned char r[12];
+    index->count=0;
+    if(!read || !rows || n>AW_DRSC_INDEX)return 0;
+    for(k=0;k<n;k++){
+        if(!read(user,offset+12u*k*AW_DRSC_BLOCK,r,12)){index->count=0;return 0;}
+        index->hash[k]=u32(r);index->length[k]=U16(r+4);
+    }
+    index->count=(int)n;
+    return 1;
+}
+int AW_MwvmDialogueIndex(int (*read)(void *user,uint32_t offset,void *out,uint32_t bytes),void *user){
+    uint32_t off,rows,bytes;
+    if(drsc_index_state)return drsc_index_state>0;
+    drsc_index_state=AW_MwvmSection("DRSC",&off,&rows,&bytes) && AW_MwvmDialogueIndexBuild(read,user,off,rows,&drsc_index)?1:-1;
+    return drsc_index_state>0;
+}
 int AW_MwvmFindDialogue(int (*read)(void *user,uint32_t offset,void *out,uint32_t bytes),void *user,uint32_t hash,
                         int length,int speaker,int *row_speaker,int *broken){
-    uint32_t off,rows,bytes,lo=0,hi,mid;unsigned char r[12];int i,chosen=-1,want=length>0xFFFF?0xFFFF:length;
+    uint32_t off,rows,bytes;
     *row_speaker=-1;*broken=0;
     if(!read || !AW_MwvmSection("DRSC",&off,&rows,&bytes) || !rows)return -1;
-    hi=rows;
+    return AW_MwvmFindDialogueRows(read,user,off,rows,drsc_index_state>0?&drsc_index:NULL,hash,length,speaker,
+                                   row_speaker,broken);
+}
+int AW_MwvmFindDialogueRows(int (*read)(void *user,uint32_t offset,void *out,uint32_t bytes),void *user,
+                            uint32_t off,uint32_t rows,const aw_drsc_index_t *index,uint32_t hash,int length,
+                            int speaker,int *row_speaker,int *broken){
+    uint32_t lo=0,hi=rows,mid;unsigned char r[12];int i,chosen=-1,want=length>0xFFFF?0xFFFF:length;
+    *row_speaker=-1;*broken=0;
+    if(!read || !rows)return -1;
+    if(index && index->count>0){   /* the first indexed row at or after the key: the answer is in the block before it */
+        int a=0,b=index->count;
+        while(a<b){int m=(a+b)/2;
+            if(index->hash[m]<hash || (index->hash[m]==hash && (int)index->length[m]<want))a=m+1;else b=m;}
+        if(a>0)lo=(uint32_t)(a-1)*AW_DRSC_BLOCK+1;
+        if(a<index->count)hi=(uint32_t)a*AW_DRSC_BLOCK;
+    }
     while(lo<hi){   /* the first row at or after (hash, length) */
         uint32_t h;int n;
         mid=(lo+hi)/2;
@@ -943,7 +996,9 @@ int AW_MwvmFindDialogue(int (*read)(void *user,uint32_t offset,void *out,uint32_
         if(h<hash || (h==hash && n<want))lo=mid+1;else hi=mid;
     }
     for(i=(int)lo;(uint32_t)i<rows;i++){
-        int sp,script;
+        int sp,script,b=i/AW_DRSC_BLOCK;
+        if(index && i%AW_DRSC_BLOCK==0 && b<index->count &&   /* the next block's first row known: no read for it */
+           (index->hash[b]!=hash || (int)index->length[b]!=want))break;
         if(!read(user,off+12u*(uint32_t)i,r,12) || u32(r)!=hash || (int)U16(r+4)!=want)break;
         sp=(int)U16(r+6);script=(int)U16(r+8);
         if(chosen<0 || sp==speaker || (sp==0xFFFF && speaker<0)){

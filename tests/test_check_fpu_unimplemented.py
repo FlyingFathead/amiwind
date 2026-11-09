@@ -113,6 +113,20 @@ class GraphTests(unittest.TestCase):
         self.assertFalse(result['passed'])
         self.assertEqual(result['unimplemented_instructions'], 1)
 
+    def test_a_switch_jump_table_is_data(self):
+        # v0.0.63 (MW-CONSOLE-COMMANDS-62): host_call's switch table: 16-bit offsets after "jmp %pc@(T,d0:w)" decode
+        # as fgetexp (0xf210 0x159e); the words up to the first case past the table are data. A real instruction
+        # at that case still fails.
+        table = dis(
+            '   40:\t4efb 0002      \tjmp %pc@(0x44,d0:w)',
+            '   44:\tf210           \t.short 0xf210',
+            '   46:\tf210 159e      \tfgetexpx %fp5,%fp3',
+            '   4a:\t000c           \torib #12,d0',
+            '   4c:\t0010           \t.short 0x0010',
+            '   50:\tf203 0003      \tfintrzx %fp0,%fp0')
+        result = self.run_check(table)
+        self.assertEqual(result['unimplemented_instructions'], 1, result)   # only the case code at 0x50
+
 
 class Cpu68060Tests(unittest.TestCase):
     """--cpu 68060 (docs/68060.md, ENGINE-060-FSCC-41): the 68060's unimplemented set, in the objdump

@@ -148,14 +148,22 @@ def catalogue(master, eye_base=None, spells_out=None):
                               'eye_above_feet': eyes, 'camera_base': eye_base}
 
 
-def barriers(master):
+SHIP_CELL = 'imperial prison ship'
+
+
+def barriers(master, interior=None):
+    """The opening's collision-only blockers (the CharGenCollision - extra placements, CharGenDisable's): the
+    exterior ones (Seyda Neen's dock, centred as the dock map), or INTERIOR's (v0.0.63, OPENING-SHIP-BLOCKER-NOT-
+    CONVERTED-63: the one inside the prison ship, in the ship map's own units, the original's times 0.25, no offset)."""
     import numpy as np
     boxes = []
     for tag, flags, raw in records(Path(master).read_bytes()):
         if tag != 'CELL':
             continue
         cell = cell_data(list(subrecords(raw)))
-        if cell['flags'] & 1:
+        if interior is None and cell['flags'] & 1:
+            continue
+        if interior is not None and (not cell['flags'] & 1 or (cell.get('name') or '').casefold() != interior):
             continue
         for ref in cell['refs']:
             if ref['id'].casefold() != 'chargencollision - extra' or ref.get('deleted'):
@@ -171,7 +179,7 @@ def barriers(master):
             rotation = (np.array([[1,0,0],[0,cx,-sx],[0,sx,cx]]) @
                         np.array([[cy,0,sy],[0,1,0],[-sy,0,cy]]) @
                         np.array([[cz,-sz,0],[sz,cz,0],[0,0,1]]))
-            pos = [(ref['position'][i] - (CENTRE[i] if i < 2 else 0)) * .25 for i in range(3)]
+            pos = [(ref['position'][i] - (CENTRE[i] if i < 2 and interior is None else 0)) * .25 for i in range(3)]
             half = [v * ref.get('scale', 1) for v in (32, 32, 8)]
             boxes.append((ref['number'], struct.pack('<15f', *pos, *rotation.T.flat, *half)))
     if not 0 < len(boxes) <= 32:
@@ -289,6 +297,9 @@ def prepare(data_files, scene, previews=True, jobs=None):
     (dest/'catalog.awc').write_bytes(raw)
     (dest/'spells.aws').write_bytes(spells[0])
     raw, refs = barriers(master); (scene/'id1/intro/barriers.awb').write_bytes(raw)
+    # OPENING-SHIP-BLOCKER-NOT-CONVERTED-63 (v0.0.63): the prison ship's own blocker, in the ship map's units
+    raw, ship_refs = barriers(master, SHIP_CELL); (scene/'id1/intro/barriers-ship.awb').write_bytes(raw)
+    refs = refs + ship_refs
     (scene/'id1/intro/seyda.awn').write_bytes(exterior_navigation(master))
     if previews:
         palette = (scene/'id1/gfx/palette.lmp').read_bytes()

@@ -29,6 +29,7 @@ int AW_Interior(void){return interior;}
 void Con_ToggleConsole_f(void){key_dest=key_game;}
 int AW_CharacterActive(void){return 0;}int AW_ReaderActive(void){return 0;}int AW_IntroUse(void){return restricted;}
 int AW_StoryRestricted(void){return restricted;}double AW_SpeechRemaining(void){return speech;}
+static int story_menus;int AW_StoryMenus(void){return story_menus;}   /* EnableRest (v0.0.63): AW_MENU_REST */
 static char subtitle[256];
 /* WAIT-DURING-COMBAT-36: the one fight check (aw_combat.c) and the refusal text written by the builder */
 static int in_combat,settings_text;

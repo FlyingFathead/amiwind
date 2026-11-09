@@ -586,6 +586,8 @@ void AW_AreaEffectsApply(void);
 /* the hash the 'F' links name a frame map by: its file stem ("maps/vivec_city-chim.chim" -> "vivec_city-chim") */
 unsigned long AW_AreaMapHash(const char *path);
 int AW_StaticFlamesPick(const aw_static_flame_t *flames,int count,int nearest,int *chosen);
+void AW_StaticFlamesWindowCounts(unsigned long *counts);
+const aw_static_flame_t *AW_StaticFlamesList(int *count);   /* the flames a frame draws from */   /* FIREPIT-FLAMES-62: six counters, aw_guard_torch.c */
 /* aw_mwhost.c sets it (AW_ObjectDisabled): 1 when the flame's placement was taken or disabled, so its flame is not
  * drawn (aw_guard_torch.c). NULL: every flame burns. */
 extern int (*aw_static_flame_gone)(unsigned int reference);
@@ -909,7 +911,9 @@ void AW_OpeningSpawn(void);
 int AW_OpeningUse(void);
 extern cvar_t aw_census_legacy;   /* CENSUS-INTRO-SCRIPTS-62, aw_opening.c; registered in aw_debug.c */
 int AW_CensusLegacy(void);   /* 1: the old hand-written captain box instead of his dialogue */
-int AW_OpeningScriptMenu(int kind);  /* a script's class (2), birth (3), review (4) window; 1 opened */
+int AW_OpeningScriptMenu(int kind);  /* a script's race (1), class (2), birth (3), review (4) window; 1 opened */
+int AW_IntroNamePrompt(void);        /* a script's name window (EnableNameMenu, v0.0.63); 1 opened */
+int AW_IntroNamePromptOpen(void);    /* 1 while the name window is open */
 extern int (*aw_intro_census_legacy)(void);   /* aw_intro.c's view of it (set in aw_debug.c; NULL: the new path) */
 int AW_OpeningHint(const char **name,const char **action);
 int AW_BarrierDecode(const byte *raw,int size);

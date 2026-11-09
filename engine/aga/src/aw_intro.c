@@ -232,7 +232,13 @@ void AW_IntroTick(void) {
         return;
     }
     if(!active || failed || strcmp(sv.name,"prison") || prompt)return;
-    dt=host_frametime;if(dt>.1)dt=.1;elapsed+=dt;jiub_timer+=dt;guard_timer+=dt;upper_timer+=dt;
+    dt=host_frametime;if(dt>.1)dt=.1;elapsed+=dt;
+    /* the repeat lines' timers advance only while the player is near, as the scripts' do (CharGenNameNPC state -1
+     * within 150, CharGenWalkNPC state -1 within 150, CharGenBoatWomen within 180 and its last line done; v0.0.63,
+     * the tracker's parity check, config/mwscript-counterparts.json); the timers of the other steps run as before */
+    jiub_timer+=jiub_state!=50 || distance(roles[1],player())<37.5?dt:0;
+    guard_timer+=guard_state!=70 || distance(roles[2],player())<37.5?dt:0;
+    upper_timer+=roles[3] && distance(roles[3],player())<45 && AW_SpeechRemaining()<=0?dt:0;
     if(jiub_state==0 && jiub_timer>=1 && AW_IntroSpeak(1,"chargenname1")){jiub_state=10;jiub_timer=0;}
     else if(jiub_state==10 && AW_SpeechRemaining()<=0){prompt=1;IN_AWClearButtons();}
     else if(jiub_state==20 && jiub_timer>=1 && AW_IntroSpeak(1,"chargenname2")){jiub_state=40;jiub_timer=0;}
@@ -245,7 +251,8 @@ void AW_IntroTick(void) {
         if(result>0){if(guard_state==10)guard_state=20;
             else if(guard_state==50){if(travel(185,174,170))guard_state=57;}
             else guard_state=60;}
-    }else if(guard_state==20 && jiub_state>=50 && AW_IntroSpeak(2,"chargenwalk1"))guard_state=30;
+    }else if(guard_state==20 && AW_IntroSpeak(2,"chargenwalk1"))guard_state=30;   /* arrived: his line (CharGenWalkNPC
+                                                                                 * state 20; OPENING-SHIP-GUARD-STEPS-63) */
     else if(guard_state==30 && AW_SpeechRemaining()<=0){prompt=2;IN_AWClearButtons();}
     else if(guard_state==60 && distance(roles[2],player())<=50 && AW_IntroSpeak(2,"chargenwalk2")){guard_state=70;guard_timer=0;}
     else if(guard_state==70 && guard_timer>6 && distance(roles[2],player())<37.5 && AW_IntroSpeak(2,"chargenwalk3"))guard_timer=0;
@@ -319,13 +326,26 @@ void AW_NameDraw(int x,int y,const char *name) {
 }
 /* CONTAINER-WINDOW-59: the container strip's keys and drawing (aw_cstrip.c sets them; NULL: no strip) */
 int (*aw_cstrip_key)(int key);
+/* EnableNameMenu (v0.0.63, MWSCRIPT-GAPS-63; OpenMW guiextensions.cpp OpShowDialogue GM_Name): the name window, the
+ * same prompt the ship's hand-written steps open; a script's opening leaves the steps' own state alone. 1 opened. */
+static int name_scripted;
+int AW_IntroNamePrompt(void) {
+    if(!active || prompt)return 0;
+    prompt=1;name_scripted=1;IN_AWClearButtons();
+    return 1;
+}
+int AW_IntroNamePromptOpen(void) {return prompt==1;}
 void (*aw_cstrip_draw)(void);
 int AW_IntroKey(int key) {
     if(AW_ReaderKey(key) || (aw_cstrip_key && aw_cstrip_key(key)) || AW_CharacterKey(key) || AW_QuickCharKey(key))return 1;
     if(!active || !prompt || key_dest!=key_game)return 0;
     if(key==K_ESCAPE)return 0;
     if(prompt==1){
-        if(AW_NameEdit(player_name,sizeof(player_name),key)){prompt=0;jiub_state=20;jiub_timer=0;Con_Printf("Player name accepted.\n");}
+        if(AW_NameEdit(player_name,sizeof(player_name),key)){
+            prompt=0;Con_Printf("Player name accepted.\n");
+            if(!name_scripted){jiub_state=20;jiub_timer=0;}   /* the script's own wait goes on (CharGenNameNPC) */
+            name_scripted=0;
+        }
     }else if(prompt==2 && key==K_ENTER){prompt=0;unlocked=1;if(travel(195,100,170))guard_state=50;}
     return 1;
 }
@@ -336,7 +356,9 @@ void AW_IntroDraw(void) {
     if(!prompt || key_dest!=key_game)return;
     y=r_refdef.vrect.y+r_refdef.vrect.height;AW_UIBox(0,y,vid.width,vid.height-y);
     if(prompt==1){AW_UIText(10,y+4,"Name (Enter to accept)",-1);AW_NameDraw(10,y+22,player_name);}
-    else AW_UICenteredLines(0,y,vid.width,vid.height-y,"WASD: move. E: activate.\nEnter to follow the guard.");
+    /* CharGenWalkNPC's own hint, with AmiWind's keys for its key names (OPENING-SHIP-GUARD-STEPS-63) */
+    else AW_UICenteredLines(0,y,vid.width,vid.height-y,"W and S move forward and back. A and D move side to side, "
+                                                        "and the mouse looks around.\nEnter: Ok");
 }
 static void status(void){Con_Printf("Intro active %ld / Jiub %ld / guard %ld / prompt %ld / unlocked %ld / failed %ld\n",
     (long)active,(long)jiub_state,(long)guard_state,(long)prompt,(long)unlocked,(long)failed);

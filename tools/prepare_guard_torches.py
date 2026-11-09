@@ -513,11 +513,28 @@ def prepare(data_files, id1, output_id1=None, jobs=None):
     cache = _guard_cache()
     tasks = [(str(data_files), str(id1), entry, outfit(kinds, entry['source_id']), mesh, palette, cache)
              for entry in entries]
-    jobs = max(1, min(resolve_jobs(jobs), len(tasks) or 1))
+    # A guard whose base model the source bake does not reproduce is skipped, and that verdict was never kept: every
+    # image step tried each again at every level (v0.0.63-dev1: 6 of 6 skipped, 5 min 20 s). The verdict is kept in
+    # the unit cache guard-torch-skip, keyed on the same inputs as the guard cache and the code _convert_guard runs
+    # (NPC-LIBRARY-NO-UNIT-CACHE-63); a guard with a kept verdict is not tried again.
+    import actor_units
+    import pass_cache
+    skips = actor_units.open_cache(actor_units.GUARD_SKIP_CACHE, ((__file__, '_convert_guard'),),
+                                   pass_cache.source_digest((__file__, '_convert_guard')),
+                                   pass_cache.previous_digests((__file__, '_convert_guard')),
+                                   pass_cache.covered_lines((__file__, '_convert_guard')))
+    known, todo = actor_units.known_guard_skips(tasks, skips, lambda task: actor_frames.layout_text(
+        Path(task[1]) / task[2]['base_model']))
+    jobs = max(1, min(resolve_jobs(jobs), len(todo) or 1))
     files = {}; rows = []; inputs = {}; reused = 0; skipped = []
     with build_profile.phase('Guard torches', detail='%d models, %d workers' % (len(tasks), jobs),
                              total=len(tasks), unit='models') as timer:
-        for (_, _, entry, appearance, *_), result in zip(tasks, ordered_map(_convert_guard, tasks, jobs)):
+        made = iter(ordered_map(_convert_guard, [tasks[i] for i in todo], jobs))
+        for index, (_, _, entry, appearance, *_) in enumerate(tasks):
+            result = known[index] if index in known else next(made)
+            if 'skipped' in result and index not in known:
+                actor_units.keep_guard_skip(skips, tasks[index], result, lambda task: actor_frames.layout_text(
+                    Path(task[1]) / task[2]['base_model']))
             if 'skipped' in result:
                 skipped.append({'source_id': entry['source_id'], 'base_model': entry['base_model'],
                                 'reason': result['skipped']})
@@ -541,7 +558,8 @@ def prepare(data_files, id1, output_id1=None, jobs=None):
             build_profile.progress(progress_line.line('Guard torches', entry['base_model'],
                                                       'reused' if result['reused'] else 'made',
                                                       (timer.count, timer.total, 'models')))
-        timer.done('Guard torches: %d models (%d from the pass cache, %d skipped)' % (len(rows), reused, len(skipped)))
+        timer.done('Guard torches: %d models (%d from the pass cache, %d skipped, %d of them by a verdict from the '
+                   'unit cache %s)' % (len(rows), reused, len(skipped), len(known), actor_units.GUARD_SKIP_CACHE))
     check_skips(skipped)
     files['gfx/guard-torches.awg'] = registry(rows)
     report = {'format': 'AmiWind original guard torch companions 1', 'registry': 'gfx/guard-torches.awg',

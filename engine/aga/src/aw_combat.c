@@ -58,6 +58,7 @@ typedef struct {
     float run_x;                /* the run group's own speed (layout X, units a second; 0: by time) */
     float gait;vec3_t gait_at;  /* WALK-CYCLES-57: seconds into the run group by distance, and where it was counted */
     signed char sound_group,sound_frame;   /* the group frame whose sound keys last played (CREATURE-ANIM-SOUND-54) */
+    short target_num;           /* COMBAT-ACTOR-VS-ACTOR-62: the actor it fights (edict number), 0 = the player */
 } slot_t;
 
 aw_combat_settings_t aw_combat_settings;
@@ -620,7 +621,9 @@ int AW_CombatHealthPercent(edict_t *e) {
 int AW_PlayerInCombat(void) {return AW_CombatHostiles()>0 && !you.dead;}
 int AW_CombatHostiles(void) {
     int i,n=0;
-    for(i=0;i<SLOTS;i++)if(slots[i].e && !slots[i].e->free && !slots[i].f.dead)n++;
+    /* COMBAT-ACTOR-VS-ACTOR-62: a slot that fights another actor is no hostile of the player (no battle music, no
+     * wait refusal, no win) */
+    for(i=0;i<SLOTS;i++)if(slots[i].e && !slots[i].e->free && !slots[i].f.dead && !slots[i].target_num)n++;
     return n;
 }
 /* GAME-RECORDER-FIGHT-SEED-61: while the gameplay recorder records or plays back, the fights draw their seeds from the
@@ -846,6 +849,84 @@ static void npc_strike(slot_t *s,edict_t *p) {
     else if(aw_combat_strike_enchant && s->f.weapon && out.outcome!=AW_HIT_MISS)aw_combat_strike_enchant(s->e,p);
     /* MWSCRIPT-INVENTORY-HITONME-62: the weapon's id as the player's last hit object (OpenMW Npc::onHit) */
     if(aw_combat_weapon_hit && s->f.weapon && out.outcome!=AW_HIT_MISS)aw_combat_weapon_hit(s->e,p);
+}
+/* ---- fights between two actors (v0.0.63, COMBAT-ACTOR-VS-ACTOR-62; rules from OpenMW 0.51 mechanicsmanagerimp.cpp
+ * startCombat, aicombat.cpp, combat.cpp, written independently; the design note of 9 November 2026) ---- */
+/* the slot S fights (its target's slot), NULL when the target is the player, dead, gone or not in a fight */
+static slot_t *actor_target(slot_t *s) {
+    edict_t *t;slot_t *v;
+    if(!s->target_num || s->target_num>=sv.num_edicts)return NULL;
+    t=EDICT_NUM(s->target_num);
+    if(t->free || t==s->e || !(v=slot_of(t)) || v->f.dead || v->state==S_DEAD)return NULL;
+    return v;
+}
+/* the outcome of a blow on the actor slot V (as the player's strike applies it): the block, the miss reaction, the
+ * death (the change list, the essential rule), the knockdown or the hit recovery; 1 when V died */
+static int victim_outcome(slot_t *v,edict_t *attacker,const aw_swing_t *out) {
+    if(out->outcome==AW_HIT_BLOCKED){if(v->state!=S_KNOCK && !v->f.dead)start_block(v);}
+    else if(out->outcome==AW_HIT_MISS){if(miss_cvar.value)npc_react_miss(v,attacker,out);}
+    if(v->f.dead){
+        set_state(v,S_DEAD,G_DEATH);v->e->v.solid=SOLID_NOT;SV_LinkEdict(v->e,false);
+        if(v->rolled){v->e->v.angles[2]=90;v->e->v.origin[2]+=2;}
+        if(aw_combat_actor_died)aw_combat_actor_died(v->e);
+        essential_death(v->e);
+        if(readout.value)Con_Printf("Combat: %s is dead\n",v->f.name);
+        voice(v->e,AW_VOICE_DEATH);
+        return 1;
+    }
+    if(v->f.knocked && v->state!=S_KNOCK)set_state(v,S_KNOCK,G_KNOCK);
+    else if(out->outcome>=AW_HIT_FATIGUE && !out->no_effect && v->state!=S_KNOCK)set_state(v,S_HIT,G_HIT);
+    if(out->outcome>=AW_HIT_FATIGUE && !out->no_effect)voice(v->e,AW_VOICE_HIT);
+    return 0;
+}
+/* the strike of slot S on the actor slot V: the reach test, the swing between their sheets, its outcome; the swing's
+ * sounds only within earshot of the player (the layer's sounds are not placed in the world), no crime */
+static unsigned long actor_strikes,actor_hits,actor_deaths;
+static void npc_strike_actor(slot_t *s,slot_t *v) {
+    aw_swing_t out;float dz,gap=gap_to(s->e,v->e,&dz),reach=AW_CombatReach(&aw_combat_settings,&s->f)*SCALE;
+    edict_t *p=player();
+    if(v->f.dead)return;
+    if(gap>reach || dz>reach || dz<-reach){
+        s->f.fatigue-=aw_combat_settings.fFatigueAttackBase+(s->f.weapon?s->f.weight*s->strength*aw_combat_settings.fWeaponFatigueMult:0);
+        return;
+    }
+    s->f.weapon_normal=(unsigned char)(s->f.weapon!=0);
+    v->f.resist_normal=s->f.weapon_normal?normal_resistance(v->e,0):0;
+    hit_effects(s->e,&s->f);hit_effects(v->e,&v->f);
+    AW_CombatSwing(&aw_combat_settings,&s->f,&v->f,s->attack,s->strength,bearing(v->e,s->e,90),!v->f.moving,&rng,&out);
+    v->f.aware=1;actor_strikes++;
+    if(p && original_distance(s->e,p)<1024)swing_sounds(&out,&v->f,0);
+    if(out.outcome!=AW_HIT_MISS && out.outcome!=AW_HIT_BLOCKED)actor_hits++;
+    if(readout.value)print_swing(s->f.name,v->f.name,s->attack,&out);
+    /* the victim fights back (OpenMW onHit: the attacked actor takes the attacker as its target) unless it fights
+     * the player */
+    if(!v->f.dead && v->target_num && v->target_num!=(short)NUM_FOR_EDICT(s->e) && !actor_target(v))
+        v->target_num=(short)NUM_FOR_EDICT(s->e);
+    if(victim_outcome(v,s->e,&out))actor_deaths++;
+    if(aw_combat_strike_enchant && s->f.weapon && out.outcome!=AW_HIT_MISS)aw_combat_strike_enchant(s->e,v->e);
+    if(aw_combat_weapon_hit && s->f.weapon && out.outcome!=AW_HIT_MISS)aw_combat_weapon_hit(s->e,v->e);
+}
+/* aw_combat.h: E (sheet A) and V (sheet B) fight each other; an actor already fighting the player keeps the player
+ * (only the other one takes it as its target). 1 when at least E fights V. */
+int AW_CombatEngageAgainst(edict_t *e,const aw_fighter_t *a,edict_t *v,const aw_fighter_t *b) {
+    slot_t *se,*sv_;int was_e,was_v;
+    if(!e || !v || e==v || e->free || v->free)return 0;
+    was_e=slot_of(e)!=NULL;was_v=slot_of(v)!=NULL;
+    if(!was_e && !AW_CombatEngage(e,a,NULL))return 0;
+    if(!was_v && b && !AW_CombatEngage(v,b,NULL)){if(!was_e)AW_CombatActorEnd(e);return 0;}
+    se=slot_of(e);sv_=slot_of(v);
+    if(!se || !sv_)return 0;
+    if(!was_e || se->target_num)se->target_num=(short)NUM_FOR_EDICT(v);
+    if(!was_v)sv_->target_num=(short)NUM_FOR_EDICT(e);
+    return 1;
+}
+/* aw_combat.h: the actor E fights (NULL: the player or no fight; *player 1 when it fights the player) */
+edict_t *AW_CombatTargetOf(edict_t *e,int *fights_player) {
+    slot_t *s=e?slot_of(e):NULL,*v;
+    if(fights_player)*fights_player=s && !s->f.dead && !s->target_num;
+    if(!s || !s->target_num)return NULL;
+    v=actor_target(s);
+    return v?v->e:NULL;
 }
 /* Damage from the world, not from a fighter (lava, aw_lava.c, docs/LAVA.md): the
  * player's live health as combat keeps it; a death ends like a death in combat.
@@ -1171,9 +1252,11 @@ static void think(slot_t *s,edict_t *p,float dt) {
         if(s->state_time>=DODGE_SECONDS+.1f)set_state(s,S_CHASE,G_IDLE);
         return;
     }
-    if(you.dead){if(s->group!=G_IDLE)set_state(s,S_CHASE,G_IDLE);return;}
+    /* P is the slot's target: the player, or since v0.0.63 another actor (COMBAT-ACTOR-VS-ACTOR-62; the player's own
+     * states below apply only to the player) */
+    if(!s->target_num && you.dead){if(s->group!=G_IDLE)set_state(s,S_CHASE,G_IDLE);return;}
     /* Quake notarget (the camera orbit detaches the player, dbg cam orbit): no chase, no attack */
-    if((int)p->v.flags&FL_NOTARGET){if(s->group!=G_IDLE)set_state(s,S_CHASE,G_IDLE);return;}
+    if(!s->target_num && ((int)p->v.flags&FL_NOTARGET)){if(s->group!=G_IDLE)set_state(s,S_CHASE,G_IDLE);return;}
     /* Unreachable player (no path): flee, never warp, no combat timeout.
      * OpenMW 0.51 aicombat.cpp 295-339 and 363-467: with no route the actor
      * drops the attack and flees; without a pathgrid it runs directly away
@@ -1346,9 +1429,16 @@ void AW_CombatPhysics(void) {
         slot_t *s=&slots[i];
         if(!s->e)continue;
         if(s->e->free){AW_ItemsHide(s->item);memset(s,0,sizeof(*s));continue;}
-        any=1;s->state_time+=dt;
+        /* COMBAT-ACTOR-VS-ACTOR-62: a fight against another actor ends when that actor is dead or gone (OpenMW
+         * aicombat.cpp: the package ends with its target); the slot is released, the actor calms down */
+        if(s->target_num && s->state!=S_DEAD && !s->f.dead && !actor_target(s)){release(s);continue;}
+        any=any || !s->target_num;s->state_time+=dt;
         if(s->state==S_SWING){
-            if(!s->struck && s->state_time>=s->swing_time*s->hit_fraction){s->struck=1;if(!you.dead && !((int)p->v.flags&FL_NOTARGET))npc_strike(s,p);}
+            if(!s->struck && s->state_time>=s->swing_time*s->hit_fraction){
+                s->struck=1;
+                if(s->target_num){slot_t *v=actor_target(s);if(v)npc_strike_actor(s,v);}
+                else if(!you.dead && !((int)p->v.flags&FL_NOTARGET))npc_strike(s,p);
+            }
             if(s->state_time>=s->swing_time){
                 s->f.attacking=0;set_state(s,S_CHASE,G_IDLE);
                 s->cooldown=aw_combat_settings.fCombatDelayNPC+.01f*AW_CombatRoll100(&rng);
@@ -1359,7 +1449,9 @@ void AW_CombatPhysics(void) {
             interval=think_interval.value<.05f?.05f:think_interval.value>.2f?.2f:think_interval.value;
             dt=(float)(sv.time-s->last_think);if(dt>.3f)dt=.3f;if(dt<0)dt=interval;
             s->last_think=(float)sv.time;s->next_think=(float)sv.time+interval;
-            t0=Sys_FloatTime();think(s,p,dt);t0=Sys_FloatTime()-t0;
+            t0=Sys_FloatTime();
+            {slot_t *v=s->target_num?actor_target(s):NULL;if(!s->target_num || v)think(s,v?v->e:p,dt);}
+            t0=Sys_FloatTime()-t0;
             cost.thinks++;cost.seconds+=t0;if(t0>cost.max)cost.max=t0;
             dt=(float)host_frametime;
         }

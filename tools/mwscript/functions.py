@@ -527,7 +527,12 @@ HOST = {'getpccrimelevel', 'setpccrimelevel', 'modpccrimelevel',
         'getpctraveling',
         # v0.0.63: an object's drawn size (transformationextensions.cpp OpSetScale, OpModScale, OpGetScale; the edict's
         # aw_scale, not kept past the map)
-        'setscale', 'modscale', 'getscale'}
+        'setscale', 'modscale', 'getscale',
+        # v0.0.63 (MW-CONSOLE-COMMANDS-62, the not-yet functions by call sites): GetWaterLevel (cellextensions.cpp
+        # OpGetWaterLevel: 0 outdoors, the room's water surface), GetCollidingPC and HurtCollidingActor
+        # (miscextensions.cpp: the player touching the object; as HurtStandingActor), GetWeaponType
+        # (containerextensions.cpp: the right hand's weapon type, -1 none) and GetStat (statsextensions.cpp: a dummy, 0)
+        'getwaterlevel', 'getcollidingpc', 'hurtcollidingactor', 'getweapontype', 'getstat'}
 RESISTS = ('resistfire', 'resistfrost', 'resistshock', 'resistmagicka', 'resistdisease', 'resistblight',
            'resistcorprus', 'resistpoison', 'resistnormalweapons', 'resistparalysis')
 # v0.0.63 (UNDERWATER-BREATH-62): Get/Set/ModWaterBreathing, the same host call as the resistances (OpenMW 0.51
@@ -546,12 +551,16 @@ HOST |= CONTROL_SETS | {'get' + c + 'disabled' for c in CONTROLS}
 # OpEnableWindow for the stats, inventory, magic and map windows, OpShowDialogue for the class, birth and review
 # windows of character creation): aw_story.c AW_StoryMenuEnable (saved), aw_opening.c AW_OpeningScriptMenu
 MENU_ENABLES = {'enablestatsmenu', 'enableinventorymenu', 'enablemagicmenu', 'enablemapmenu',
-                'enableclassmenu', 'enablebirthmenu', 'enablestatreviewmenu'}
+                'enableclassmenu', 'enablebirthmenu', 'enablestatreviewmenu',
+                # v0.0.63 (MWSCRIPT-GAPS-63): the ship and dock's scripts: the name and race windows (OpShowDialogue
+                # GM_Name, GM_Race; aw_intro.c AW_IntroNamePrompt, aw_opening.c AW_OpeningScriptMenu) and the rest
+                # allowed (OpEnableRest; aw_story.h AW_MENU_REST, saved)
+                'enablenamemenu', 'enableracemenu', 'enablerest'}
 HOST |= MENU_ENABLES
 HOST_EFFECTS = set(CONTROL_SETS) | MENU_ENABLES | {'placeatpc', 'placeatme', 'placeitem', 'placeitemcell', 'setangle', 'move', 'moveworld', 'setpos', 'setatstart', 'face', 'wakeuppc',
                                     'rotateworld', 'setdelete', 'payfine', 'payfinethief', 'gotojail',
                                     'fadein', 'fadeout', 'fadeto', 'forcesneak', 'clearforcesneak', 'removesoulgem',
-                                    'hurtstandingactor', 'drop', 'turnmoonred', 'turnmoonwhite', 'forcerun',
+                                    'hurtstandingactor', 'hurtcollidingactor', 'drop', 'turnmoonred', 'turnmoonwhite', 'forcerun',
                                     'clearforcerun', 'explodespell', 'becomewerewolf', 'undowerewolf',
                                     'setwerewolfacrobatics', 'setscale', 'modscale', 'resurrect', 'playbink', 'changeweather', 'modregion',
                                     'aifollowcell', 'aiescort', 'aiescortcell', 'positioncell','showrestmenu', 'raiserank', 'lowerrank', 'showmap', 'clearinfoactor', 'choice', 'goodbye', 'modfactionreaction', 'setfactionreaction', 'forcegreeting', 'rotate', 'aitravel', 'aifollow', 'position','playgroup', 'loopgroup', 'addtopic', 'cast','setpccrimelevel', 'modpccrimelevel', 'setreputation', 'modreputation', 'pcraiserank',

@@ -10,15 +10,16 @@ The paths, as the engine carries a dialogue answer out (OpenMW 0.51 alike):
                        (AW_MwscriptSpeakerAggro)
   other-fight          another actor's SetFight / ModFight: the ambient aggression reads that actor's Fight now
                        (aw_ambient_fight_now) at its next check
-  startcombat-actor    StartCombat against another actor (not the player): the combat layer fights the player only
+  startcombat-actor    StartCombat against another actor (not the player): host_combat sets both against each other
+                       (v0.0.63, COMBAT-ACTOR-VS-ACTOR-62; aw_combat.c AW_CombatEngageAgainst)
   not-run              the answer does not run whole (a compile error, or a function not carried out yet)
 """
 import re
 
 CALL = re.compile(r'^\s*(?:"?(?P<ref>[^"\r\n]+?)"?\s*->\s*)?(?P<fn>startcombat|setfight|modfight)\b[\s,]*'
                   r'(?P<arg>"[^"]*"|[^\s;]+)?', re.I)
-HANDLED = ('speaker-startcombat', 'other-startcombat', 'speaker-fight', 'other-fight')
-UNHANDLED = ('startcombat-actor', 'not-run')
+HANDLED = ('speaker-startcombat', 'other-startcombat', 'speaker-fight', 'other-fight', 'startcombat-actor')
+UNHANDLED = ('not-run',)
 
 
 def calls(text):

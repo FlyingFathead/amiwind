@@ -301,6 +301,11 @@ int AW_CombatEnemyBar(float *fraction,float *alpha);
 int AW_CombatHostiles(void);
 /* Someone fights the player and the player is alive: the battle music and the wait refusal ask this one check. */
 int AW_PlayerInCombat(void);
+/* COMBAT-ACTOR-VS-ACTOR-62 (v0.0.63): E (sheet A) and V (sheet B, NULL when V fights already) fight each other (a
+ * script's or an answer's StartCombat on another actor); an actor already fighting the player keeps the player. 1 when
+ * E fights V. TargetOf: the actor E fights, NULL for the player or no fight (*fights_player 1 for the player). */
+int AW_CombatEngageAgainst(struct edict_s *e,const aw_fighter_t *a,struct edict_s *v,const aw_fighter_t *b);
+struct edict_s *AW_CombatTargetOf(struct edict_s *e,int *fights_player);
 struct edict_s;
 int AW_CombatEngage(struct edict_s *e,const aw_fighter_t *fighter,const char *layout);
 /* THE hand-off between combat and the other actor layers (ambient wander/idles, MWScript): one check, one end, one

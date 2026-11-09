@@ -128,7 +128,9 @@ def render(text, stamp=None):
            'Type: "dbg help" for help.', '```', '',
            'Long listings (`dbg`, `dbg help`, `dbg help <word>`) are shown one console screen at a time, with the',
            'line `---------- [ more: ENTER | stop: q ] ----------` between the pages: Enter shows the next page, q',
-           'stops the listing; any other key ends it and works as usual.', '']
+           'stops the listing; any other key ends it and works as usual.', '',
+           'The original game\'s console commands (tgm, coc, SetStrength and the rest) also work, typed as in the',
+           'original: [the table of them](CONSOLE_COMMANDS_MORROWIND.md).', '']
     for group, cmds in groups.items():
         out += ['## ' + group.title(), '', '| Command | Also | Arguments and notes |', '| --- | --- | --- |']
         for cmd in cmds.values():

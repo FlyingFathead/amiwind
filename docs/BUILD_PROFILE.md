@@ -1,6 +1,6 @@
 # Build profile and stage reuse
 
-_Last updated with AmiWind v0.0.62 (9 November 2026)._
+_Last updated with AmiWind v0.0.63-dev2 (9 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -435,6 +435,33 @@ combat data, and the carried torch beside the NPC gallery and the torch test map
 (BUILD-IMAGE-FINALIZE-UNDERUSED-48). Before this, the v0.0.54-dev1 magic MiniWind
 ran the torch, the combat data, the player view and the world UI one after the
 other, on about one core each.
+
+The player view's 80 units run as one flow (`tools/player_view_schedule.py`,
+BUILD-PLAYER-VIEW-UNDERUSED-48): each torch body starts the moment its body is
+done, and the fitting tries of one body (the hair share, the head reducer, the
+fallback body rules, in the order the bake tries them) are units of their own, so
+a worker with nothing else to do starts the next try of a body still running and
+the tries no longer needed are stopped at once. The result is the first try in
+order that fits, byte for byte what the whole body bake makes; the try that
+fitted is kept in the unit cache, so a later build with the same bake code starts
+a body at that try. On the unit times of the v0.0.62 release build (24 workers)
+the step goes from 95 min (two maps one after the other) to about 70 min in the
+first build with the flow, about 59 min once the tries are timed, and about
+44 min with the fitted tries known (`tests/test_player_view_schedule.py`).
+
+Risky stages first (BUILD-RISKY-STAGES-FIRST-63): the player bodies are their
+own stage, `player-view` (`tools/player_view_stage.py`), right after the census:
+it needs only the game data and the census palette, so it runs beside the world
+stages and a body that does not fit stops the build in its first hour, not in
+the image step at its end. It first checks every player model already in the
+unit cache against the engine's model limits (bytes, frames, vertices,
+triangles) and names every one over a limit before anything is baked; then it
+bakes the missing units into the unit cache, and the image step takes all of
+them from there. With the unit cache off the stage bakes nothing and the image
+step bakes the player view as before. Among the stages ready at the same moment
+the scheduler starts the risky ones first (`build_parallel.RISK_FIRST`: the
+player view, the actor library); a gate test fails when a risky stage that needs
+no world stage is placed after a world stage (`tests/test_risky_stages_first.py`).
 
 The build summary's digest (`tools/build_digest.py`) is written into
 `RUN/build-summary.json` (schema `amiwind-build-summary-v2`, key `digest`) and
@@ -1083,7 +1110,15 @@ prints the reason for every stage:
    changed the same path, unless the write trace shows that only one of the
    two wrote it: the file is then that stage's output and leaves the other's
    manifest (`attributed` in it; BUILD-REUSE-ATTRIBUTION-33). With a writer the
-   trace cannot see (a map compiler) or two writers, both stay not reusable;
+   trace cannot see (a map compiler) or two writers, both stay not reusable.
+   Every pair the traces can attribute is settled before any pair is
+   refused, so a file a third stage wrote beside two others refuses neither
+   of them; an older record refused only for such files is reusable when read
+   (`resettled` in it; BUILD-SHARED-WRITES-UNATTRIBUTED-52). The files two
+   stages write are recorded in each run (`profile/manifests/shared-writes.json`);
+   the known ones are listed in `config/shared-writes.json`, the build prints
+   any other as NEW, and a test keeps that list from growing
+   (BUILD-STAGE-WRITES-OTHERS-OUTPUT-63);
 3. every stage it depends on is reused too;
 4. the files it wrote still exist in the old run: a file a later stage
    replaced is only skipped when that later stage is reused as well;

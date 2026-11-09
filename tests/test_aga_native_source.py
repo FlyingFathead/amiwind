@@ -296,6 +296,12 @@ class NativeSourceTests(unittest.TestCase):
         self.compile_run('aga_static_flame_offsets_test.c', [Path(SOURCE)/'src'/n for n in
             ('aw_guard_torch.c','mathlib.c')])
 
+    def test_window_flames_every_frame_of_a_chim_window(self):
+        # FIREPIT-FLAMES-62: a frame entered by a streamed crossing draws its own fires (read once, at its offset)
+        self.compile_run('aga_window_flames_test.c', [Path(SOURCE)/'src'/n for n in
+            ('aw_guard_torch.c','mathlib.c')],
+            cflags=['-fsanitize=undefined,float-cast-overflow','-fno-sanitize-recover=all'])
+
     def test_static_flame_budget_keeps_flames_in_view(self):
         # FLAME-RANGE-NEAREST-32: on-screen, size-ranked default; nearest-first kept.
         self.compile_run('aga_static_flame_select_test.c', [Path(SOURCE)/'src'/n for n in
@@ -871,7 +877,7 @@ class NativeSourceTests(unittest.TestCase):
         # AW-20260928-12: ordinary hinged doors on the engine's own collision (world.c), 90 degrees in one second.
         self.compile_run("aga_hinged_door_test.c", [ROOT/"engine/aga/src/aw_hinged_door.c", Path(SOURCE)/"src/world.c",
                                                     Path(SOURCE)/"src/mathlib.c"],
-                         argument_sets=[["table"], ["badtable"], ["door"], ["chim"], ["census"], ["locks"], ["kept"], ["movers"]],
+                         argument_sets=[["table"], ["badtable"], ["door"], ["chim"], ["census"], ["locks"], ["kept"], ["movers"], ["turns"]],
                          cflags=["-fsanitize=undefined", "-fno-sanitize-recover=all"])
 
     def test_talk_rule_combat_dead_knocked_calm_and_one_read_a_frame(self):

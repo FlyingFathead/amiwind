@@ -95,7 +95,7 @@
    "id": "character",
    "description": "Character creation: head and hair catalogue, Seyda Neen names, barriers",
    "steps": ["character"],
-   "patterns": ["id1/character/*", "id1/intro/barriers.awb", "id1/intro/seyda.awn"]
+   "patterns": ["id1/character/*", "id1/intro/barriers.awb", "id1/intro/barriers-ship.awb", "id1/intro/seyda.awn"]
   },
   {
    "id": "reading",

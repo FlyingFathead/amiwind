@@ -361,8 +361,11 @@ def stage_debug_catalogues(id1, debug_luma=False):
     # camera-marks.txt: the public camera marks of dbg cam recall (docs/CAMERA_MARKS.md), checked as the engine reads them.
     # teleport-names.txt: the named places of dbg tp NAME (engine aw_scene.c named_place), checked as the engine reads them.
     files = [('debug-commands.txt', b'AWDC1'), ('shroompicker.txt', b'AWSP1'), ('camera-marks.txt', b'AWCM1'),
-             ('teleport-names.txt', b'AWTN1')]
-    limits = {'debug-commands.txt': 65536, 'camera-marks.txt': 16384}
+             ('teleport-names.txt', b'AWTN1'), ('mwconsole-help.txt', b'AWMH1'), ('mwconsole-functions.txt', b'AWMF1')]
+    # mwconsole-help.txt: dbg help mw, paged from the disk; mwconsole-functions.txt: the console's function table, read
+    # a line at a time (MW-CONSOLE-COMMANDS-62; both written by tools/mwscript_console.py)
+    limits = {'debug-commands.txt': 65536, 'camera-marks.txt': 16384, 'mwconsole-help.txt': 32768,
+              'mwconsole-functions.txt': 32768}
     payloads = []
     for name, magic in files:
         raw = (ROOT/'config'/name).read_bytes()

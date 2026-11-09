@@ -41,6 +41,7 @@ static char dir[64],last_sound[64];static double clock_now;
 
 static int add_string(const char *s){int at=string_at;strcpy(strings+at,s);string_at+=strlen(s)+1;return at;}
 edict_t *EDICT_NUM(int n){return &edicts[n];}
+int NUM_FOR_EDICT(edict_t *e){return (int)(e-edicts);}   /* COMBAT-ACTOR-VS-ACTOR-62: a slot's target by number */
 eval_t *GetEdictFieldValue(edict_t *e,char *name){
     static const char *names[]={"aw_hand_state","aw_hand_started","aw_hand_punch","aw_source_id"};
     int i;for(i=0;i<4;i++)if(!strcmp(name,names[i]))return &fields[e-edicts][i];
@@ -502,6 +503,28 @@ int main(void){
      assert(skill_uses[AW_SK_H2H]>0 && armour>0);
      printf("skill uses ok: hand-to-hand %ld, block %ld, armour or unarmored %ld\n",(long)skill_uses[AW_SK_H2H],
             (long)skill_uses[AW_SK_BLOCK],(long)armour);}
+    /* COMBAT-ACTOR-VS-ACTOR-62 (v0.0.63): two actors set against each other fight each other, not the player: each
+     * targets the other, no battle music, no hostile of the player; the blows land between them (the guard's health
+     * falls); the fight ends when one is dead: the other is released, and a fight with the player is untouched */
+    {aw_fighter_t a,b;int fights=0,k;
+     AW_CombatClear();p->v.health=60;p->v.button0=0;music_on=0;
+     npc->v.solid=resident->v.solid=SOLID_BBOX;npc->v.health=resident->v.health=0;
+     npc->v.origin[0]=1000;npc->v.origin[1]=0;resident->v.origin[0]=1020;resident->v.origin[1]=0;
+     p->v.origin[0]=300;
+     assert(AW_CombatActorLoad("mevil molor",&a) && AW_CombatActorLoad("a guard",&b));
+     b.health=b.health_max=8;
+     assert(AW_CombatEngageAgainst(npc,&a,resident,&b));
+     assert(AW_CombatTargetOf(npc,&fights)==resident && !fights);
+     assert(AW_CombatTargetOf(resident,&fights)==npc && !fights);
+     assert(AW_CombatHostiles()==0 && !AW_PlayerInCombat());     /* no hostile of the player */
+     for(k=0;k<4000 && AW_CombatActorState(resident)==1 && AW_CombatActorState(npc)==1;k++)tick(1);
+     assert(AW_CombatActorState(resident)==2 || AW_CombatActorState(npc)==2);   /* one of them died of the other's blows */
+     tick(2);
+     assert(!AW_CombatTargetOf(npc,&fights) && !AW_CombatTargetOf(resident,&fights));
+     assert(AW_CombatActorState(npc)!=1 || AW_CombatActorState(resident)!=1);  /* the survivor was released */
+     assert(music_on==0);
+     AW_CombatClear();
+     printf("actor vs actor ok: %ld ticks\n",(long)k);}
     printf("combat ok: %ld steps, %ld sounds\n",(long)steps,(long)sounds);
     AW_CombatClear();assert(items_hidden>=items_shown);   /* every release hides them */
     return 0;

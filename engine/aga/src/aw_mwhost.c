@@ -41,11 +41,14 @@
 #include "aw_crime.h"
 #include "aw_levelup.h"
 #include "aw_mappath.h"
-#include "aw_npcpath.h"   /* aw_path_fan: the followers' arrival spots (v0.0.62) */
+#include "aw_npcpath.h"
+#include "aw_ambient.h"   /* AW_AmbientLeaderOf: the fights' sides (COMBAT-ACTOR-VS-ACTOR-62) */   /* aw_path_fan: the followers' arrival spots (v0.0.62) */
 #include "aw_story.h"     /* the player's control switches (v0.0.62, MWSCRIPT-PLAYER-CONTROL-62) */
 #include "aw_weather.h"   /* GetCurrentWeather (v0.0.62, MWSCRIPT-SMALL-FUNCTIONS-62) */
 #include "aw_forced_rules.h"   /* the AWFS save block (v0.0.62, MWSCRIPT-GAP-FUNCTIONS-62) */
 #include "aw_lava.h"           /* HurtStandingActor holds the lava volume's own damage back */
+#include "aw_mwconsole.h"      /* the original's console commands (v0.0.63, MW-CONSOLE-COMMANDS-62) */
+#include "aw_listbox.h"        /* the console target finder */
 #include <ctype.h>
 
 #define FILE_NAME "mwscript.awm"
@@ -96,6 +99,8 @@ unsigned long AW_MwscriptStringReads(void){return string_reads;}
 /* ARRIVAL-LONG-FRAME-DEV6-59: the file is opened once and kept open while it is loaded (one handle), never once per
  * string read (five opens, about 1 s, in the arrival frame); closed when the scripts load again */
 static FILE *str_file;static long str_base;
+static void mw_target(void);       /* the console target finder (MW-CONSOLE-COMMANDS-62), below */
+static void results_close(void);   /* the result scripts' handle (MWSCRIPT-RESULT-LONG-FRAME-62), closed at a load */
 static void string_cache_clear(void){int i;for(i=0;i<STR_CACHE;i++)str_cache[i].index=-1;str_cache_next=0;str_cache_ready=1;
     if(str_file){fclose(str_file);str_file=NULL;}}
 static int read_string(int index,char *out,int capacity){
@@ -913,6 +918,7 @@ int (*aw_mwscript_packages_import)(const unsigned char *data,int bytes);
 static unsigned long travels,travels_refused,follows,follows_refused,positions,positions_refused;
 static FILE *actor_file;static long actor_base;static int actors_failed,dagoth_ur_1=-2;
 static unsigned long actor_calls,actor_misses,combat_starts,combat_stops,wanders;
+static unsigned long combat_between,combat_refused;   /* COMBAT-ACTOR-VS-ACTOR-62: fights between two actors started, refused */
 static int actor_read(void *context,uint32_t offset,void *out,uint32_t bytes){
     (void)context;
     if(!actor_file || fseek(actor_file,actor_base+(long)offset,SEEK_SET))return 1;
@@ -1401,7 +1407,23 @@ static void host_combat(int instance,int target,int verb,int other){
     if(verb==0){
         /* StartCombat with the player (the one fight the combat layer has): not when either is dead (OpenMW) */
         aw_fighter_t sheet;eval_t *v=GetEdictFieldValue(e,"aw_source_id");
-        if(other!=AW_MWVM_PLAYER || (a->flags&AWL_DEAD) || !sv_player || sv_player->v.health<=0)return;
+        if((a->flags&AWL_DEAD))return;
+        if(other!=AW_MWVM_PLAYER){
+            /* COMBAT-ACTOR-VS-ACTOR-62 (v0.0.63): StartCombat on another actor (OpenMW mechanicsmanagerimp.cpp
+             * startCombat): both fight each other, each with its own sheet; the other one only when it has an entity
+             * here and is alive */
+            vec3_t at;int n=locate(instance,other,at);edict_t *o=n>0?edict_of(n):NULL;aw_actor_t *b;eval_t *w;
+            aw_fighter_t other_sheet;
+            if(!o || o==e || o==sv_player || !(b=record_of_edict(o)) || (b->flags&AWL_DEAD)){combat_refused++;return;}
+            w=GetEdictFieldValue(o,"aw_source_id");
+            if(!v || !v->string || !AW_CombatActorLoad(pr_strings+v->string,&sheet) ||
+               !w || !w->string || !AW_CombatActorLoad(pr_strings+w->string,&other_sheet)){combat_refused++;return;}
+            to_fighter(a,&sheet);to_fighter(b,&other_sheet);
+            if(AW_CombatEngageAgainst(e,&sheet,o,&other_sheet)){a->flags|=AWL_COMBAT;b->flags|=AWL_COMBAT;combat_starts++;
+                                                                combat_between++;}
+            return;
+        }
+        if(!sv_player || sv_player->v.health<=0)return;
         if(!v || !v->string || !AW_CombatActorLoad(pr_strings+v->string,&sheet))return;
         to_fighter(a,&sheet);
         if(AW_CombatEngage(e,&sheet,NULL)){a->flags|=AWL_COMBAT;combat_starts++;}
@@ -1628,8 +1650,16 @@ static int force_greeting(edict_t *e){
     pr_global_struct->self=self;pr_global_struct->other=other;
     greetings++;return 1;
 }
+/* MW-CONSOLE-COMMANDS-62: a console line's own words (an axis, a target id) given to a host call as the string
+ * indexes CONSOLE_STRING+k, never a row of the file's strings (whose count stays far below it) */
+#define CONSOLE_STRING 0xFFF0
+static const char *console_texts[4];
 static const char *call_string(const unsigned char *strings,int nstrings,int i){
-    return i<nstrings?cached_id((strings[2*i]<<8)|strings[2*i+1]):NULL;
+    int k;
+    if(i>=nstrings)return NULL;
+    k=(strings[2*i]<<8)|strings[2*i+1];
+    if(k>=CONSOLE_STRING && k<CONSOLE_STRING+4)return console_texts[k-CONSOLE_STRING];
+    return cached_id(k);
 }
 static const char *actor_faction(int instance,int target,char *out,int capacity){
     edict_t *e;aw_actor_t *a;aw_actor_base_t b;
@@ -2549,7 +2579,14 @@ static int small_call(int instance,int target,int function,const aw_mwcell_t *nu
     case AWF_SETANGLE:{
         /* SetAngle AXIS DEGREES (OpenMW OpSetAngle, rotateObject): the reference turned to it; the player's view too */
         float q;int k;
-        if(!axis || count<1 || !(e=transform_target(instance,target)))return 1;
+        if(!axis || count<1)return 1;
+        if(!(e=transform_entity(instance,target))){
+            /* a scripted mover placement (WORLD-BUTTONS-62 part 2): its angle set, as an object's (not an actor's) */
+            if((k=AW_MoveScriptAngleSet((unsigned char)axis[0],numbers[0].f,0,&q))>=0 &&
+               AW_MoverSetAngle(transform_reference(instance,target),k,q)){mover_moves++;transforms++;}
+            else transforms_missed++;
+            return 1;
+        }
         if((k=AW_MoveScriptAngleSet((unsigned char)axis[0],numbers[0].f,actor_like(e),&q))<0){transforms_missed++;return 1;}
         start_keep(e);
         if(e==sv_player){sv_player->v.v_angle[k]=q;VectorCopy(sv_player->v.v_angle,sv_player->v.angles);sv_player->v.fixangle=1;}
@@ -2654,7 +2691,16 @@ static int small_call(int instance,int target,int function,const aw_mwcell_t *nu
          * an actor only about z). About z that is Rotate's turn; about x and y it is taken as Quake's pitch and roll,
          * exact for an object standing upright (the game's one use turns a door about z) */
         float step=count>=1?numbers[0].f*(float)host_frametime:0;int k;
-        if(!axis || !(e=transform_target(instance,target)))return 1;
+        if(!axis)return 1;
+        if(!(e=transform_entity(instance,target))){
+            /* a scripted mover placement (the Shishi skull, RotateWorld z): as an upright entity turns */
+            float d[3]={0,0,0};
+            k=tolower((unsigned char)axis[0]);
+            if(k=='z')d[1]=-step;else if(k=='x')d[0]=step;else if(k=='y')d[2]=step;
+            if(k>='x' && k<='z' && AW_MoverTurn(transform_reference(instance,target),d)){mover_moves++;transforms++;}
+            else transforms_missed++;
+            return 1;
+        }
         k=tolower((unsigned char)axis[0]);
         if(k!='z' && ((k!='x' && k!='y') || actor_like(e))){transforms_missed++;return 1;}
         start_keep(e);
@@ -2911,6 +2957,48 @@ static int gap_call(int instance,int target,int function,const aw_mwcell_t *numb
         if(hurt>0){AW_CombatHurtPlayer(hurt,"lava");aw_lava_script_hurt=realtime;hurts++;}
         return 1;
     }
+    if(function==AWF_HURTCOLLIDINGACTOR || function==AWF_GETCOLLIDINGPC){
+        /* GetCollidingPC / HurtCollidingActor HEALTH-A-SECOND (OpenMW 0.51 miscextensions.cpp OpGetCollidingPc,
+         * OpHurtCollidingActor; World::getPlayerCollidingWith, hurtCollidingActors): the player's box touching the
+         * object's (a unit apart at most), as HurtStandingActor's rule above (not in menus, not in god mode) */
+        vec3_t at;int n=locate(instance,target,at),i,touch;edict_t *e=n>0?edict_of(n):NULL;float hurt;
+        touch=e && !e->free && sv_player && e!=sv_player;
+        for(i=0;i<3 && touch;i++)
+            if(sv_player->v.absmin[i]>e->v.absmax[i]+1 || sv_player->v.absmax[i]<e->v.absmin[i]-1)touch=0;
+        if(function==AWF_GETCOLLIDINGPC){result->i=touch;return AW_MWVM_CALL_READ;}
+        if(!touch || host_menu_mode() || sv_player->v.health<=0 || ((int)sv_player->v.flags&FL_GODMODE) || count<1)return 1;
+        hurt=numbers[0].f*(float)host_frametime;
+        if(hurt>0){AW_CombatHurtPlayer(hurt,"lava");hurts++;}
+        return 1;
+    }
+    if(function==AWF_GETSTAT){result->i=0;return AW_MWVM_CALL_READ;}   /* OpenMW OpGetStat: a dummy, 0 */
+    if(function==AWF_GETWEAPONTYPE){
+        /* GetWeaponType (containerextensions.cpp OpGetWeaponType): the right hand's weapon type, -1 none: the player's
+         * equipped weapon (aw_inventory.c), an NPC's record weapon (aw_actorstate.c AW_ActorWeaponType) */
+        edict_t *e;aw_actor_t *a;
+        if(target==AW_MWVM_PLAYER){result->i=AW_InventoryEquippedWeaponType();return AW_MWVM_CALL_READ;}
+        a=actor_of(instance,target,&e);
+        result->i=!a?-1:a->reference==AW_ACTOR_PLAYER_REF?AW_InventoryEquippedWeaponType():AW_ActorWeaponType(a->base);
+        return AW_MWVM_CALL_READ;
+    }
+    if(function==AWF_GETWATERLEVEL){
+        /* GetWaterLevel (cellextensions.cpp OpGetWaterLevel): 0 outdoors (the original's oddity); in a room the water
+         * surface in the original's units: the top of the water in the player's column, found from the room map's
+         * contents (the room's own water is baked into it); 0 when the column has no water */
+        int x,y;vec3_t p;float game[3];int k2,in;
+        result->f=0;
+        if(!sv.active || !sv_player || host_player_cell(&x,&y)!=2)return AW_MWVM_CALL_READ;
+        VectorCopy(sv_player->v.origin,p);
+        in=SV_PointContents(p)<=CONTENTS_WATER && SV_PointContents(p)>=CONTENTS_LAVA;
+        for(k2=0;k2<1024;k2++){   /* two units a step: down to the water, or up out of it */
+            int c=SV_PointContents(p),w=c<=CONTENTS_WATER && c>=CONTENTS_LAVA;
+            if(in?!w:w)break;
+            p[2]+=in?2:-2;
+        }
+        if(k2>=1024)return AW_MWVM_CALL_READ;
+        to_game_units(p,game);result->f=game[2];
+        return AW_MWVM_CALL_READ;
+    }
     if(function==AWF_HASSOULGEM){result->i=soul_gems(function,target,call_string(strings,nstrings,0),0);
                                  return AW_MWVM_CALL_READ;}
     if(function==AWF_REMOVESOULGEM){
@@ -3012,6 +3100,16 @@ static int gap_call(int instance,int target,int function,const aw_mwcell_t *numb
  * or a passive effect by its number) lands on the player, each magnitude rolled once; 0 when the row is not there.
  * Cast and ExplodeSpell share it (v0.0.63). */
 static unsigned long explodes,explodes_missed;   /* v0.0.63, MWSCRIPT-GAPS-63 */
+/* OPENING-WEATHER-NOT-CLOUDY-63: the NGWE rows (awms.py: u16 region catalogue index, u8 weather, u8 0), the weather
+ * a carried new-game script sets (CharGen: Bitter Coast Region cloudy), set as its ChangeWeather would (aw_weather.c) */
+static void new_game_weather(void){
+    uint32_t off,rows,bytes,i;
+    if(!resident || !AW_MwvmSection("NGWE",&off,&rows,&bytes) || off+bytes>resident_bytes || 4ul*rows>bytes)return;
+    for(i=0;i<rows;i++){
+        const unsigned char *r=resident+off+4*i;
+        if(AW_WeatherChangeByScript((r[0]<<8)|r[1],r[2]))weather_calls++;else weather_refused++;
+    }
+}
 static int land_spfx(int row){
     uint32_t off,rows,bytes;int e;aw_actor_t *p=player_record();
     if(!p || !AW_MwvmSection("SPFX",&off,&rows,&bytes) || row<0 || (uint32_t)row>=rows ||
@@ -3129,6 +3227,21 @@ static int host_call(int instance,int target,int function,const aw_mwcell_t *num
         if(!AW_StoryMenuEnable(menu)){Con_DPrintf("MWScript: a menu switch not kept (named facts full)\n");return 0;}
         if(AW_StoryMenus()!=before)AW_MwvmStateChanged();
         return 1;}
+    case AWF_ENABLERACEMENU:
+        /* v0.0.63 (MWSCRIPT-GAPS-63; OpenMW OpShowDialogue GM_Race, CharGenRaceNPC): the race window (aw_opening.c) */
+        if(!AW_OpeningScriptMenu(1))return 0;
+        AW_MwvmStateChanged();return 1;
+    case AWF_ENABLENAMEMENU:
+        /* v0.0.63 (OpShowDialogue GM_Name, CharGenNameNPC): the name window (aw_intro.c) */
+        if(!AW_IntroNamePrompt())return 0;
+        AW_MwvmStateChanged();return 1;
+    case AWF_ENABLEREST:{
+        /* v0.0.63 (OpenMW OpEnableRest, CharGenBed): the rest allowed while the opening's restriction holds, saved
+         * with the scripts' menus (aw_story.c AW_MENU_REST) */
+        int before=AW_StoryMenus();
+        if(!AW_StoryMenuEnable(AW_MENU_REST)){Con_DPrintf("MWScript: EnableRest not kept (named facts full)\n");return 0;}
+        if(AW_StoryMenus()!=before)AW_MwvmStateChanged();
+        return 1;}
     case AWF_ENABLECLASSMENU:case AWF_ENABLEBIRTHMENU:case AWF_ENABLESTATREVIEWMENU:
         /* the clerk's class, birth and review windows (CharGenClassNPC; OpenMW OpShowDialogue): aw_opening.c */
         if(!AW_OpeningScriptMenu(function==AWF_ENABLECLASSMENU?2:function==AWF_ENABLEBIRTHMENU?3:4))return 0;
@@ -3232,11 +3345,15 @@ static int host_call(int instance,int target,int function,const aw_mwcell_t *num
         /* GetTarget ID (OpenMW aiextensions.cpp OpGetTarget: 1 when the actor's combat package targets ID): the
          * combat layer here fights the player only (aw_combat.c), so the answer is 1 for the player while the actor
          * is in a fight and alive, 0 for anyone else */
-        const char *id=call_string(strings,nstrings,0);vec3_t at;edict_t *e;int n=locate(instance,target,at);
-        const aw_fighter_t *f;
+        const char *id=call_string(strings,nstrings,0);vec3_t at;edict_t *e,*t;int n=locate(instance,target,at),pl=0;
         e=n>0?edict_of(n):NULL;
-        result->i=id && !Q_strcasecmp((char *)id,"player") && e && e!=sv_player && (f=AW_CombatFighter(e))!=NULL &&
-                  !f->dead;
+        result->i=0;
+        if(!id || !e || e==sv_player)return AW_MWVM_CALL_READ;
+        /* COMBAT-ACTOR-VS-ACTOR-62 (v0.0.63): the actor's target, the player or another actor (by its record id) */
+        t=AW_CombatTargetOf(e,&pl);
+        if(!Q_strcasecmp((char *)id,"player"))result->i=pl;
+        else if(t){eval_t *w=GetEdictFieldValue(t,"aw_source_id");
+                   result->i=w && w->string && !Q_strcasecmp(pr_strings+w->string,(char *)id);}
         return AW_MWVM_CALL_READ;}
     case AWF_ROTATE:{
         /* Rotate AXIS DEGREES-A-SECOND (OpenMW transformationextensions.cpp OpRotate: by that many degrees times the
@@ -3245,6 +3362,14 @@ static int host_call(int instance,int target,int function,const aw_mwcell_t *num
         const char *axis=call_string(strings,nstrings,0);vec3_t at;edict_t *e;int n=locate(instance,target,at);
         float step=count>=1?numbers[0].f*(float)host_frametime:0;
         e=n>0?edict_of(n):NULL;
+        if(axis && (!e || e->free)){
+            /* WORLD-BUTTONS-62 part 2: a scripted mover placement (a crank, a bar door, a Dwemer door) turns the
+             * same way about its own axes */
+            float d[3]={0,0,0};int a=tolower((unsigned char)axis[0]);
+            if(a=='z')d[1]=-step;else if(a=='x')d[0]=step;else if(a=='y')d[2]=step;
+            if((d[0] || d[1] || d[2] || !step) && AW_MoverTurn(transform_reference(instance,target),d)){
+                mover_moves++;rotations++;return 1;}
+        }
         if(!axis || !e || e->free){rotations_missed++;return 1;}
         if(e==sv_player || tolower((unsigned char)axis[0])=='z')e->v.angles[1]-=step;
         else if(tolower((unsigned char)axis[0])=='x')e->v.angles[0]+=step;
@@ -3605,7 +3730,7 @@ static void new_game_hook(void){new_game_pending=1;new_game_started=0;}
 static int load(void){
     FILE *f=NULL;int length,i,n;unsigned char head[16];uint32_t wanted;char name[64];long base;
     if(resident || load_failed)return resident!=NULL;
-    load_failed=1;string_cache_clear();
+    load_failed=1;string_cache_clear();results_close();
     length=COM_FOpenFile(FILE_NAME,&f);
     if(!f){load_why="no id1/mwscript.awm in this image";Con_Printf("MWScript: no %s in this image.\n",FILE_NAME);return 0;}
     file_bytes=length>0?(unsigned long)length:0;
@@ -3619,6 +3744,7 @@ static int load(void){
     fclose(f);resident_bytes=wanted;
     if(!AW_MwvmLoad(resident,resident_bytes,&host)){
         free(resident);resident=NULL;load_why="the interpreter refused it (format or version)";Con_Printf("MWScript: refused.\n");return 0;}
+    AW_MwscriptResultsPrepare();   /* MWSCRIPT-RESULT-LONG-FRAME-62: the results' index at the load, not in a talk */
     n=AW_MwvmTopicCount();
     topic_offsets=(int *)AW_TryMalloc(sizeof(int)*(n+1));topic_values=(int32_t *)AW_TryMalloc(sizeof(int32_t)*(n+1));
     topic_names=(char *)AW_TryMalloc(64*(n+1));
@@ -3861,6 +3987,73 @@ static int ambience_playing(void){
     int i;for(i=0;i<LOOPS;i++)if(loops[i].used && loops[i].looping && loops[i].ambience)return 1;
     return 0;
 }
+/* --- who joins a fight (v0.0.63, COMBAT-ACTOR-VS-ACTOR-62; rules from OpenMW 0.51 mwmechanics/actors.cpp
+ * engageCombat, written independently). Once a second, every live NPC or creature within the actors' processing range
+ * (7168 original units) of the player that does not fight yet is checked against each fighter:
+ *   allies: the actor it follows or escorts and the actors following or escorting it (AiPackage sideWithTarget,
+ *     one level each way); an ally fighting X makes it aggressive to X, the player included;
+ *   guards (class Guard): a creature in a fight within fAlarmRadius makes a guard aggressive to it, unless the
+ *     creature follows or escorts someone;
+ * an aggressive actor joins only when it sees X and notices it (World::getLOS, MechanicsManager::awarenessCheck: the
+ * crime rules' sight and detection here). The Fight-value aggression against the player stays the ambient tables'
+ * (aw_ambient.c aggro). Not yet: OpenMW's "both sides are in combat with actor1" rule for player followers. */
+static float join_clock;static unsigned long joins_allies,joins_guards;
+static int crime_guard(edict_t *e);
+static int fight_sheet(edict_t *e,aw_fighter_t *out){
+    eval_t *v=GetEdictFieldValue(e,"aw_source_id");aw_actor_t *a=record_of_edict(e);
+    if(!a || (a->flags&AWL_DEAD) || !v || !v->string || !AW_CombatActorLoad(pr_strings+v->string,out))return 0;
+    to_fighter(a,out);return 1;
+}
+static void join_against(edict_t *e,edict_t *x){
+    aw_fighter_t sheet;aw_actor_t *a=record_of_edict(e);
+    if(!fight_sheet(e,&sheet))return;
+    if(x==sv_player){if(AW_CombatEngage(e,&sheet,NULL) && a)a->flags|=AWL_COMBAT;}
+    else if(AW_CombatEngageAgainst(e,&sheet,x,NULL) && a)a->flags|=AWL_COMBAT;
+}
+static void join_fights(float dt){
+    /* the fighters once (at most the combat layer's 16 slots), then each actor against them: the cost is the actors
+     * in range x the fighters, once a second, and nothing while nobody fights */
+    struct {edict_t *f,*t;const aw_fighter_t *ff;edict_t *leader;} fights[32];
+    int i,j,nf=0;float range=7168*AW_MOVE_UNIT_SCALE,alarm;
+    join_clock+=dt;if(join_clock<1)return;join_clock=0;
+    if(!sv_player || sv_player->v.health<=0 || !AW_MwscriptActors())return;
+    for(j=1;j<sv.num_edicts && nf<32;j++){
+        edict_t *f=EDICT_NUM(j),*t;const aw_fighter_t *ff;int pl=0;
+        if(f->free || f==sv_player || !(ff=AW_CombatFighter(f)) || ff->dead)continue;
+        t=AW_CombatTargetOf(f,&pl);if(pl)t=sv_player;
+        if(!t)continue;
+        fights[nf].f=f;fights[nf].t=t;fights[nf].ff=ff;fights[nf].leader=AW_AmbientLeaderOf(f);nf++;
+    }
+    if(!nf)return;
+    alarm=AW_CrimeAlarmRadius();
+    for(i=1;i<sv.num_edicts;i++){
+        edict_t *e=EDICT_NUM(i),*leader,*x=NULL;vec3_t d;int guard,why;
+        if(e->free || e==sv_player || !is_actor(e) || AW_CombatFighter(e) || e->v.health<0)continue;
+        VectorSubtract(e->v.origin,sv_player->v.origin,d);
+        if(DotProduct(d,d)>range*range)continue;
+        leader=AW_AmbientLeaderOf(e);guard=-1;why=0;
+        for(j=0;j<nf && !x;j++){
+            edict_t *f=fights[j].f,*t=fights[j].t;const aw_fighter_t *ff=fights[j].ff;
+            if(f==e || t==e)continue;
+            /* the player's own follower or escort: the player is its ally, so an actor fighting the player (it attacked
+             * the player, or the player attacked it) becomes its enemy (OpenMW: the ally's hit attempt actor) */
+            if(leader==sv_player && t==sv_player){x=f;why=1;break;}
+            /* an ally fights T: aggressive to T */
+            if(f==leader || fights[j].leader==e){x=t;why=1;break;}
+            /* a guard: a creature in a fight within fAlarmRadius, unless it follows or escorts someone */
+            if(ff->creature && alarm>0 && !fights[j].leader){
+                vec3_t g;
+                if(guard<0)guard=crime_guard(e);
+                VectorSubtract(f->v.origin,e->v.origin,g);
+                if(guard && DotProduct(g,g)<=alarm*alarm){x=f;why=2;break;}
+            }
+        }
+        if(!x || (x!=sv_player && x->free))continue;
+        if(!AW_CrimeSight(e,x) || !detected(e,x))continue;   /* getLOS and the awareness check */
+        join_against(e,x);
+        if(why==1)joins_allies++;else joins_guards++;
+    }
+}
 void AW_MwscriptTick(float dt){
     int k,n,i;vec3_t player;
     /* no game running (a load, the main menu): a script's message box goes with it */
@@ -3880,6 +4073,7 @@ void AW_MwscriptTick(float dt){
             new_game_pending=0;
             if(was)script_import(&aw_ledger);
             new_game_started=AW_MwvmNewGame();new_games++;
+            new_game_weather();   /* CharGen's ChangeWeather, carried by AmiWind's own opening (v0.0.63) */
         }
         t1=Sys_FloatTime();
         if(script_model!=map_model){script_model=map_model;attach_map();carried_sync();}
@@ -3936,6 +4130,7 @@ void AW_MwscriptTick(float dt){
     /* SCRIPTED-EVENT-FALLING-MAGE-61: actors held on an object a script removes fall once it is gone (aw_fall.c) */
     AW_FallTick(dt);
     AW_CrimeTick(dt);   /* CRIME-59: the guards' pursuit and arrest on sight, a jail waiting for its conversation to end */
+    join_fights(dt);    /* COMBAT-ACTOR-VS-ACTOR-62: allies and guards join fights (OpenMW Actors::engageCombat) */
 }
 static void status_counts(void){
     const aw_mwvm_stats_t *s=AW_MwvmStats();int k,n=AW_MwvmInstanceCount(),attached=0,global=0,active=0,looping=0;
@@ -4577,6 +4772,9 @@ static int actors_export(unsigned char *out,int capacity){
      t+=k;
      k=were_export(out+n+s+t,capacity-n-s-t-8);              /* the werewolf state (AWWF, v0.0.63) */
      if(k<0)return -1;
+     t+=k;
+     k=AW_MoverExport(out+n+s+t,capacity-n-s-t-8);           /* the scripts' moved placements (AWMV, v0.0.63) */
+     if(k<0)return -1;
      t+=k;}
     if(aw_mwscript_packages_export){   /* the actors' travel and follow packages (aw_ambient.c, SAVEGAME-COMPLETE-57) */
         int k=aw_mwscript_packages_export(out+n+s+t,capacity-n-s-t-8);
@@ -4588,7 +4786,7 @@ static int actors_export(unsigned char *out,int capacity){
 static void actors_import(const unsigned char *data,int bytes){
     int actors=bytes;
     forced_reset();V_ScreenFade(0,0);   /* MWSCRIPT-GAP-FUNCTIONS-62: an older save has no AWFS block: none, unfaded */
-    AW_MoverReset();                    /* WORLD-BUTTONS-62: every scripted mover back at its start (not saved yet) */
+    AW_MoverReset();                    /* WORLD-BUTTONS-62: every scripted mover at its start until the AWMV block */
     AW_CombatLastHitReset();            /* MWSCRIPT-INVENTORY-HITONME-62: no blow of the last game is remembered */
     AW_WeatherScriptClear();            /* MWSCRIPT-COMPLETE-LANDMARK: no region's weather changed by a script */
     carried_reset();                     /* the carried items' scripts run again from their next equipping */
@@ -4665,6 +4863,11 @@ static void actors_import(const unsigned char *data,int bytes){
                     int k=were_import(p+rest,(int)(tail-rest));
                     if(k<0)Con_Printf("Saved werewolf state unreadable: none kept.\n");else rest+=(unsigned long)k;
                 }
+                if(rest+7<=tail && !memcmp(p+rest,"AWMV",4)){   /* the scripts' moved placements (v0.0.63) */
+                    int k=AW_MoverImport(p+rest,(int)(tail-rest));
+                    if(k<0){AW_MoverReset();Con_Printf("Saved moved objects unreadable: they stand where the game put them.\n");}
+                    else rest+=(unsigned long)k;
+                }
                 if(rest+6<=tail && !memcmp(p+rest,"AWPK",4) && aw_mwscript_packages_import &&
                    !aw_mwscript_packages_import(p+rest,(int)(tail-rest)))Con_Printf("Saved actor packages unreadable: none kept.\n");
             }
@@ -4685,6 +4888,7 @@ void AW_MwscriptNewGameReset(void){
     actors_import(NULL,0);
     if(resident && AW_MwvmLoaded()){
         if(!AW_MwvmLoad(resident,resident_bytes,&host)){free(resident);resident=NULL;load_failed=0;}
+        else AW_MwscriptResultsPrepare();
         if(topic_values && topic_offsets)memset(topic_values,0,sizeof(int32_t)*(size_t)AW_MwvmTopicCount());
     }
     if(topic_bytes && known_topics)memset(known_topics,0,topic_bytes);
@@ -4761,6 +4965,7 @@ void AW_MwscriptInit(void){
     aw_combat_effect_magnitude=effect_magnitude_of;   /* RESIST-NORMAL-WEAPONS-61: the blow's resistance (v0.0.61-weapons) */
 #endif
     Cmd_AddCommand("aw_mwscript_status",status);
+    Cmd_AddCommand("aw_mw_target",mw_target);   /* MW-CONSOLE-COMMANDS-62: the console target finder (dbg mw target) */
     /* STEAL-WITNESSED-NO-CRIME-61: the crime rules read the witnesses and the player here */
     aw_crime_witness=crime_witness;aw_crime_attack=crime_attack;aw_crime_thief=crime_thief;
     /* CRIME-59: the other crimes, the arrest and the fine */
@@ -5094,24 +5299,377 @@ float AW_MwscriptSpeakerStat(const char *record,unsigned long reference,int stat
  * speaker's script) by its hash and length, so a hash collision with another length never runs another text's
  * script; of the rows for the text, the one compiled with the speaker's own script runs on its instance. */
 static unsigned long results_run,results_missing,results_broken;
-/* the file's bytes at OFFSET (from its start), for the DRSC rows on disk */
-typedef struct {FILE *f;long base;} file_reader_t;
-static int read_file_at(void *user,uint32_t offset,void *out,uint32_t bytes){
-    file_reader_t *r=(file_reader_t *)user;
-    return !fseek(r->f,r->base+(long)offset,SEEK_SET) && fread(out,1,bytes,r->f)==bytes;
+/* MWSCRIPT-RESULT-LONG-FRAME-62: a result held its frame 4.6 to 8.4 s: every result opened the file and binary-searched
+ * the 7,411 DRSC rows on disk, each probe a seek that refilled the 16 KB file buffer. Now the file is opened once (a
+ * 1 KB buffer, kept open as the strings' handle is), the DRSC index is read when a talk opens, and a result reads one
+ * block of 64 rows (768 bytes) into memory, which the probes then use. */
+static FILE *results_file;static long results_base;
+static unsigned char results_block[12*AW_DRSC_BLOCK];static long results_block_at=-1;static uint32_t results_block_bytes;
+static unsigned long results_reads;   /* disk reads for the DRSC rows (the test and dbg count) */
+static int results_open(void){
+    if(!results_file){
+        extern int com_fopen_buffer;int got;
+        com_fopen_buffer=1024;got=COM_FOpenFile(FILE_NAME,&results_file);com_fopen_buffer=0;
+        if(got<=0 || !results_file){if(results_file)fclose(results_file);results_file=NULL;return 0;}
+        results_base=ftell(results_file);results_block_at=-1;
+    }
+    return 1;
 }
+/* the file's bytes at OFFSET (from its start), for the DRSC rows: served from the block in memory when it holds them */
+static int read_file_at(void *user,uint32_t offset,void *out,uint32_t bytes){
+    uint32_t off,rows,size,at;(void)user;
+    if(!results_file)return 0;
+    if(AW_MwvmSection("DRSC",&off,&rows,&size) && offset>=off && offset+bytes<=off+12u*rows){
+        at=off+(offset-off)/sizeof(results_block)*sizeof(results_block);
+        if(results_block_at!=(long)at){
+            uint32_t n=off+12u*rows-at;if(n>sizeof(results_block))n=sizeof(results_block);
+            results_reads++;results_block_at=-1;
+            if(fseek(results_file,results_base+(long)at,SEEK_SET) || fread(results_block,1,n,results_file)!=n)return 0;
+            results_block_at=(long)at;results_block_bytes=n;
+        }
+        if(offset-at+bytes>results_block_bytes)return 0;
+        memcpy(out,results_block+(offset-at),bytes);return 1;
+    }
+    results_reads++;
+    return !fseek(results_file,results_base+(long)offset,SEEK_SET) && fread(out,1,bytes,results_file)==bytes;
+}
+static void results_close(void){if(results_file){fclose(results_file);results_file=NULL;}results_block_at=-1;}
+/* the index's reads (every block's first row, in order): each block read whole and in sequence, so the section is
+ * read once from start to end (no seek between blocks), about 89 KB, at the scripts' load */
+static long index_next=-1;
+static int read_index_row(void *user,uint32_t offset,void *out,uint32_t bytes){
+    uint32_t off,rows,size,n;(void)user;
+    if(!results_file || !AW_MwvmSection("DRSC",&off,&rows,&size) || offset<off)return 0;
+    n=off+12u*rows-offset;if(n>sizeof(results_block))n=sizeof(results_block);
+    if(n<bytes)return 0;
+    if(index_next!=(long)offset && fseek(results_file,results_base+(long)offset,SEEK_SET))return 0;
+    results_reads++;results_block_at=-1;
+    if(fread(results_block,1,n,results_file)!=n){index_next=-1;return 0;}
+    index_next=(long)offset+(long)n;
+    memcpy(out,results_block,bytes);return 1;
+}
+/* the scripts' load and a talk's open (aw_dialwin.c): the DRSC index read once per load, so a result reads one block */
+void AW_MwscriptResultsPrepare(void){
+    if(AW_MwvmLoaded() && results_open()){index_next=-1;AW_MwvmDialogueIndex(read_index_row,NULL);index_next=-1;}
+}
+/* --- the original's console commands (MW-CONSOLE-COMMANDS-62, aw_mwconsole.h): a stat line runs through host_actor,
+ * the call a compiled SetStrength or GetHealth makes; the player now (a target from the console finder later) --- */
+static void console_exec(const char *text){Cbuf_InsertText("\n");Cbuf_InsertText((char *)text);}
+/* the console target (dbg mw target: picked in the finder or named): an entity and its id; 0 none (the player) */
+static int console_entity;static char console_id[64];
+static const char *edict_id(edict_t *e){
+    eval_t *v=e?GetEdictFieldValue(e,"aw_source_id"):NULL;
+    return v && v->string?pr_strings+v->string:NULL;
+}
+/* TARGET as a line names it ("" the console target or else the player; "player"; a reference's id: the nearest
+ * entity of that id on this map, as AIFollow finds its target); NULL none */
+static edict_t *console_resolve(const char *target){
+    int i;float best=0;edict_t *found=NULL;
+    if(!sv.active || !sv_player)return NULL;
+    if(!target[0]){
+        if(console_entity>0 && console_entity<sv.num_edicts){
+            edict_t *e=EDICT_NUM(console_entity);const char *id=edict_id(e);
+            if(!e->free && id && !Q_strcasecmp((char *)id,console_id))return e;
+            console_entity=0;Con_Printf("The console target %s is gone; lines run on the player.\n",console_id);
+        }
+        return sv_player;
+    }
+    if(!Q_strcasecmp((char *)target,"player"))return sv_player;
+    for(i=1;i<sv.num_edicts;i++){
+        edict_t *x=EDICT_NUM(i);const char *id;vec3_t d;float dd;
+        if(x->free || !(id=edict_id(x)) || Q_strcasecmp((char *)id,(char *)target))continue;
+        VectorSubtract(x->v.origin,sv_player->v.origin,d);dd=DotProduct(d,d);
+        if(!found || dd<best){found=x;best=dd;}
+    }
+    return found;
+}
+/* the line's target as the VM's own: the player, or a scratch instance on the reference (AW_MWVM_SELF, as a script's
+ * own reference is found); 0 none */
+static int console_begin(const char *target,int *instance,int *who,edict_t **edict){
+    edict_t *e=console_resolve(target);eval_t *r;
+    *instance=-1;*who=AW_MWVM_PLAYER;*edict=e;
+    if(!e)return 0;
+    if(e==sv_player)return 1;
+    if(!(r=GetEdictFieldValue(e,"aw_ref")) || r->_float<=0)return 0;
+    if((*instance=AW_MwvmScratch((uint32_t)r->_float,NUM_FOR_EDICT(e)))<0)return 0;
+    *who=AW_MWVM_SELF;
+    return 1;
+}
+static int console_stat(const char *target,int verb,int stat,float *value){
+    static const int verbs[4]={AWV_GET,AWV_SET,AWV_MOD,AWV_MODCURRENT};
+    aw_mwcell_t v,out;int whole=stat>=AWA_LEVEL,k,who;edict_t *e;
+    if(!AW_MwscriptActors() || !console_begin(target,&k,&who,&e))return 0;
+    if(whole)v.i=(int32_t)*value;else v.f=*value;
+    out=host_actor(k,who,verbs[verb],stat,v);
+    AW_MwvmScratchEnd(k);
+    if(verb==AW_MWCON_GET)*value=whole?(float)out.i:out.f;
+    return 1;
+}
+/* the AITM row of an item id (the actor table's items: what an actor carries or a script names), -1 none; the ASPT
+ * row of a spell id. A scan of the rows on disk: a console line, never a frame of play */
+static unsigned long console_id_probes;   /* rows read by the id lookups */
+static int console_row_id(int spell,int row,char *s,int capacity){   /* the id string of an AITM / ASPT row */
+    uint32_t off,rows,bytes;unsigned char b[4];aw_item_t it;
+    console_id_probes++;
+    if(!spell)return AW_ActorItem(row,&it) && read_string(it.id,s,capacity);
+    return AW_MwvmSection("ASPT",&off,&rows,&bytes) && actor_read(NULL,off+4u*(uint32_t)row,b,4) &&
+           read_string((b[0]<<8)|b[1],s,capacity);
+}
+static int id_compare(const char *a,const char *b){   /* folded, unsigned bytes: the builder's sort (cp1252) */
+    for(;;a++,b++){
+        int x=tolower((unsigned char)*a),y=tolower((unsigned char)*b);
+        if(x!=y || !x)return x-y;
+    }
+}
+/* the row of an item (SPELL 0, AITM) or spell (1, ASPT) id: a binary search over the build's sorted index (AIDX,
+ * ASPX: about 13 probes), else (an older file) a scan of every row; -1 none */
+static int console_row(int spell,const char *id){
+    uint32_t off,rows,bytes,lo=0,hi;unsigned char b[2];char s[64];int row,c;
+    if(AW_MwvmSection(spell?"ASPX":"AIDX",&off,&rows,&bytes) && rows){
+        hi=rows;
+        while(lo<hi){
+            uint32_t mid=(lo+hi)/2;
+            if(!actor_read(NULL,off+2u*mid,b,2))return -1;
+            row=(b[0]<<8)|b[1];
+            if(!console_row_id(spell,row,s,sizeof(s)))return -1;
+            if(!(c=id_compare(s,id)))return row;
+            if(c<0)lo=mid+1;else hi=mid;
+        }
+        return -1;
+    }
+    if(!AW_MwvmSection(spell?"ASPT":"AITM",&off,&rows,&bytes))return -1;
+    for(lo=0;lo<rows;lo++)if(console_row_id(spell,(int)lo,s,sizeof(s)) && same_id(s,id))return (int)lo;
+    return -1;
+}
+static int console_item_row(const char *id){return console_row(0,id);}
+static int console_spell_row(const char *id){return console_row(1,id);}
+static float console_number(const char *s){return (float)Q_atof((char *)s);}
+static int console_command(const char *target,int command,const aw_mwcon_line_t *l,char *answer,int capacity){
+    int k,who,row,n,i;edict_t *e;aw_mwcell_t numbers[6],result;unsigned char strings[4];int32_t values[13];
+    const char *name=AW_MwConsoleCommandName(command,NULL);
+    if(!console_begin(target,&k,&who,&e))return 0;
+    result.i=0;memset(numbers,0,sizeof(numbers));memset(strings,0,sizeof(strings));
+    switch(command){
+    case AW_MWCON_ADDITEM:case AW_MWCON_REMOVEITEM:case AW_MWCON_GETITEMCOUNT:
+        n=l->args>1?(int)console_number(l->arg[1]):1;
+        if(who==AW_MWVM_PLAYER && command==AW_MWCON_ADDITEM && (row=console_item_row(l->arg[0]))<0){
+            /* an item no actor carries and no script names: the player's inventory by its id (dbg give's own call) */
+            if(AW_InventoryGive(l->arg[0],n))Q_snprintf(answer,capacity,"%s: %d %s given.\n",name,n,l->arg[0]);
+            else Q_snprintf(answer,capacity,"%s: no such item id: %s\n",name,l->arg[0]);
+            break;
+        }
+        if((row=console_item_row(l->arg[0]))<0){Q_snprintf(answer,capacity,"%s: no such item id: %s\n",name,l->arg[0]);break;}
+        n=(int)host_item(k,who,command==AW_MWCON_ADDITEM?1:command==AW_MWCON_REMOVEITEM?2:0,row,n);
+        Q_snprintf(answer,capacity,"%s %s -> %d\n",name,l->arg[0],n);
+        break;
+    case AW_MWCON_EQUIP:{
+        aw_inventory_item_t it;
+        if(who!=AW_MWVM_PLAYER){Q_snprintf(answer,capacity,"%s: the player only for now.\n",name);break;}
+        if(!AW_InventoryRead(l->arg[0],&it) || !AW_InventoryEquip(&aw_state,&it))
+            Q_snprintf(answer,capacity,"%s: %s not equipped (no such item, or not carried).\n",name,l->arg[0]);
+        break;}
+    case AW_MWCON_ADDSPELL:case AW_MWCON_REMOVESPELL:
+        if((row=console_spell_row(l->arg[0]))<0){Q_snprintf(answer,capacity,"%s: no such spell id: %s\n",name,l->arg[0]);break;}
+        n=(int)host_spell(k,who,command==AW_MWCON_ADDSPELL?1:2,row);
+        Q_snprintf(answer,capacity,"%s %s -> %d\n",name,l->arg[0],n);
+        break;
+    case AW_MWCON_ENABLE:case AW_MWCON_DISABLE:case AW_MWCON_GETDISABLED:
+        n=(int)host_object(k,who,command==AW_MWCON_ENABLE?AWM_ENABLE:command==AW_MWCON_DISABLE?AWM_DISABLE:AWM_GETDISABLED,0);
+        if(command==AW_MWCON_GETDISABLED)Q_snprintf(answer,capacity,"%s -> %d\n",name,n);
+        break;
+    case AW_MWCON_GETPOS:
+        i=tolower((unsigned char)l->arg[0][0])-'x';
+        if(i<0 || i>2){Q_snprintf(answer,capacity,"%s: X, Y or Z.\n",name);break;}
+        Q_snprintf(answer,capacity,"%s %c -> %g\n",name,'X'+i,(double)host_position(k,who,i));
+        break;
+    case AW_MWCON_SETPOS:case AW_MWCON_SETANGLE:case AW_MWCON_GETANGLE:
+        console_texts[0]=l->arg[0];strings[0]=CONSOLE_STRING>>8;strings[1]=CONSOLE_STRING&255;
+        numbers[0].f=l->args>1?console_number(l->arg[1]):0;
+        host_call(k,who,command==AW_MWCON_SETPOS?AWF_SETPOS:command==AW_MWCON_SETANGLE?AWF_SETANGLE:AWF_GETANGLE,
+                  numbers,command==AW_MWCON_GETANGLE?0:1,strings,1,&result);
+        if(command==AW_MWCON_GETANGLE)Q_snprintf(answer,capacity,"%s %s -> %g\n",name,l->arg[0],(double)result.f);
+        break;
+    case AW_MWCON_POSITION:case AW_MWCON_AITRAVEL:
+        for(i=0;i<3;i++)numbers[i].f=console_number(l->arg[i]);
+        numbers[3].f=l->args>3?console_number(l->arg[3]):0;
+        host_call(k,who,command==AW_MWCON_POSITION?AWF_POSITION:AWF_AITRAVEL,numbers,4,strings,0,&result);
+        break;
+    case AW_MWCON_POSITIONCELL:
+        /* PositionCell X Y Z ZROT CELL: the player to the cell by dbg tp (as CenterOnCell); the point in it is not
+         * applied yet. Another reference: not yet (its PMOV row is the compiler's) */
+        if(who!=AW_MWVM_PLAYER || l->args<5){Q_snprintf(answer,capacity,"%s: the player and a cell name only for now.\n",name);break;}
+        Q_snprintf(answer,capacity,"%s: to %s (dbg tp).\n",name,l->arg[4]);
+        {char line[128];Q_snprintf(line,sizeof(line),"dbg tp \"%s\"",l->arg[4]);console_exec(line);}
+        break;
+    case AW_MWCON_AIWANDER:
+        for(n=0;n<l->args && n<AW_MWCON_ARGS;n++)values[n]=(int32_t)console_number(l->arg[n]);
+        host_wander(k,who,values,n);
+        break;
+    case AW_MWCON_AIFOLLOW:case AW_MWCON_AIESCORT:
+        /* AIFollow ID DURATION [X Y Z]; AIEscort ID DURATION X Y Z */
+        console_texts[0]=l->arg[0];strings[0]=CONSOLE_STRING>>8;strings[1]=CONSOLE_STRING&255;
+        for(i=1;i<l->args && i<5;i++)numbers[i-1].f=console_number(l->arg[i]);
+        host_call(k,who,command==AW_MWCON_AIFOLLOW?AWF_AIFOLLOW:AWF_AIESCORT,numbers,4,strings,1,&result);
+        break;
+    }
+    console_texts[0]=NULL;
+    AW_MwvmScratchEnd(k);
+    return 1;
+}
+/* --- every other function the interpreter carries out, by the compiler's own table (id1/mwconsole-functions.txt,
+ * tools/mwscript_console.py from tools/mwscript/functions.py): read a line at a time from the disk when a name is
+ * not one of the console's own; nothing of it stays in memory. A line: NAME KIND ...; kind host: NUMBER RET ARGS
+ * (the host's call by number, the arguments typed by the letters: c S a string, l s a whole number, f a fraction,
+ * x z X j the game ignores them); actor: VERB STAT RET (host_actor); special: NUMBER RET ARGS (below) --- */
+static int console_table_find(const char *name,char *out,int capacity){
+    FILE *f=NULL;int n=(int)strlen(name),found=0;
+    {extern int com_fopen_buffer;com_fopen_buffer=1024;COM_FOpenFile("mwconsole-functions.txt",&f);com_fopen_buffer=0;}
+    if(!f)return 0;
+    while(fgets(out,capacity,f))
+        if(!Q_strncasecmp(out,(char *)name,n) && out[n]==' '){found=1;break;}
+    fclose(f);
+    return found;
+}
+static int console_special(const char *name,int k,int who,edict_t *e,const aw_mwcon_line_t *l,char *answer,int capacity){
+    int32_t v;int row;
+    if(!strcmp(name,"lock")){host_object(k,who,AWM_LOCK,l->args?(int32_t)console_number(l->arg[0]):-1);return 1;}
+    if(!strcmp(name,"unlock")){host_object(k,who,AWM_UNLOCK,0);return 1;}
+    if(!strcmp(name,"activate")){host_object(k,who,AWM_ACTIVATE,0);return 1;}
+    if(!strcmp(name,"getlocked")){Q_snprintf(answer,capacity,"getlocked -> %ld\n",(long)host_object(k,who,AWM_GETLOCKED,0));return 1;}
+    if(!strcmp(name,"startcombat") || !strcmp(name,"stopcombat")){
+        if(name[1]=='t' && name[2]=='a' && (!l->args || Q_strcasecmp((char *)l->arg[0],"player"))){
+            Q_snprintf(answer,capacity,"startcombat: against the player only from the console for now.\n");return 1;}
+        host_combat(k,who,name[2]=='a'?0:1,AW_MWVM_PLAYER);return 1;
+    }
+    if(!strcmp(name,"getdeadcount")){
+        row=l->args?AW_ActorFind(l->arg[0]):AW_ACTOR_NONE;
+        Q_snprintf(answer,capacity,"getdeadcount -> %ld\n",(long)(row==AW_ACTOR_NONE?0:host_dead_count(row)));return 1;
+    }
+    if(!strcmp(name,"getcurrentaipackage") || !strcmp(name,"getaipackagedone")){
+        v=host_ai_package(k,who,name[3]=='c'?0:1);Q_snprintf(answer,capacity,"%s -> %ld\n",name,(long)v);return 1;}
+    if(!strcmp(name,"getspell")){
+        row=l->args?console_spell_row(l->arg[0]):-1;
+        Q_snprintf(answer,capacity,"getspell -> %ld\n",(long)(row<0?0:host_spell(k,who,0,row)));return 1;
+    }
+    if(!strcmp(name,"getcommondisease") || !strcmp(name,"getblightdisease")){
+        v=host_spell(k,who,name[3]=='c'?AWM_SPELL_COMMON_DISEASE:AWM_SPELL_BLIGHT_DISEASE,0);
+        Q_snprintf(answer,capacity,"%s -> %ld\n",name,(long)v);return 1;
+    }
+    if(!strcmp(name,"getdistance")){   /* the game units between the target and the reference named (as GetDistance) */
+        edict_t *o=l->args?console_resolve(l->arg[0]):NULL;vec3_t d;
+        if(!o || !e){Q_snprintf(answer,capacity,"getdistance: no such reference here.\n");return 1;}
+        VectorSubtract(o->v.origin,e->v.origin,d);
+        Q_snprintf(answer,capacity,"getdistance -> %g\n",(double)(sqrt(DotProduct(d,d))*4));return 1;
+    }
+    return 0;
+}
+static int console_table(const char *target,const aw_mwcon_line_t *l,char *answer,int capacity){
+    static char row[160];char name[64],kind[16],ret[4],args[64];int a,b,k,who,i,j,nn=0,ns=0,got;edict_t *e;
+    aw_mwcell_t numbers[16],result;unsigned char strings[8];const char *p;
+    if(!console_table_find(l->name,row,sizeof(row)))return -1;
+    args[0]=0;b=0;
+    if(Q_sscanf(row,"%63s %15s",name,kind)<2)return -1;
+    if(!strcmp(kind,"actor")){if(Q_sscanf(row,"%63s %15s %d %d %3s",name,kind,&a,&b,ret)<5)return -1;}
+    else if(Q_sscanf(row,"%63s %15s %d %3s %63s",name,kind,&a,ret,args)<4)return -1;
+    if(!console_begin(target,&k,&who,&e))return 0;
+    memset(numbers,0,sizeof(numbers));memset(strings,0,sizeof(strings));result.i=0;
+    if(!strcmp(kind,"actor")){   /* A the verb, B the stat */
+        aw_mwcell_t v;int whole=b>=AWA_LEVEL && a!=AWV_RATIO;
+        v.i=0;
+        if(a!=AWV_GET && a!=AWV_RATIO){
+            if(!l->args){Q_snprintf(answer,capacity,"%s: one number.\n",l->name);AW_MwvmScratchEnd(k);return 1;}
+            if(whole)v.i=(int32_t)console_number(l->arg[0]);else v.f=console_number(l->arg[0]);
+        }
+        result=host_actor(k,who,a,b,v);
+        if(a==AWV_GET || a==AWV_RATIO)Q_snprintf(answer,capacity,"%s -> %g\n",l->name,whole?(double)result.i:(double)result.f);
+        AW_MwvmScratchEnd(k);return 1;
+    }
+    if(!strcmp(kind,"special")){
+        got=console_special(name,k,who,e,l,answer,capacity);
+        AW_MwvmScratchEnd(k);return got?1:-1;
+    }
+    for(i=0,j=0,p=args;*p && *p!='\n' && j<l->args;p++){
+        if(*p=='/' || *p=='-')continue;
+        if(*p=='j'){continue;}
+        if((*p=='c' || *p=='S' || *p=='x' || (*p=='z' && !isdigit((unsigned char)l->arg[j][0]))) && ns<4){
+            console_texts[ns]=l->arg[j];strings[2*ns]=CONSOLE_STRING>>8;strings[2*ns+1]=(unsigned char)(CONSOLE_STRING&255)+ns;
+            ns++;j++;
+        }else if(nn<16){
+            if(*p=='f')numbers[nn].f=console_number(l->arg[j]);else numbers[nn].i=(int32_t)console_number(l->arg[j]);
+            nn++;j++;
+        }
+        i++;
+    }
+    got=host_call(k,who,a,numbers,nn,strings,ns,&result);
+    for(i=0;i<4;i++)console_texts[i]=NULL;
+    AW_MwvmScratchEnd(k);
+    if(!got)Q_snprintf(answer,capacity,"%s: not carried out here with these arguments.\n",l->name);
+    else if(ret[0]=='l')Q_snprintf(answer,capacity,"%s -> %ld\n",l->name,(long)result.i);
+    else if(ret[0]=='f')Q_snprintf(answer,capacity,"%s -> %g\n",l->name,(double)result.f);
+    return 1;
+}
+static void console_print(const char *text){Con_Printf("%s",text);}
+int AW_MwConsoleLine(const char *text){
+    static const aw_mwcon_host_t h={console_exec,console_command,console_stat,console_print,console_table};
+    return AW_MwConsoleRun(text,&h);
+}
+/* --- the console target finder (dbg mw target; the original selects by a click): the references of this map with an
+ * id, nearest first, typed to filter by name, id, kind; Enter sets the target of lines without "id->". The rows are
+ * held only while the box is open --- */
+#define FINDER_ROWS 256
+typedef struct {short entity;char label[80];} finder_row_t;
+static finder_row_t *finder;static int finder_count;
+static const char *finder_label(void *ctx,int row){(void)ctx;return row>=0 && row<finder_count?finder[row].label:"";}
+static void finder_set(edict_t *e){
+    const char *id=edict_id(e);
+    if(!e || !id){console_entity=0;console_id[0]=0;Con_Printf("Console target: the player.\n");return;}
+    console_entity=NUM_FOR_EDICT(e);Q_snprintf(console_id,sizeof(console_id),"%s",id);
+    Con_Printf("Console target: %s (lines without id-> run on it; dbg mw target clear: the player).\n",console_id);
+}
+static void finder_chosen(void *ctx,int row){(void)ctx;if(row>=0 && row<finder_count)finder_set(EDICT_NUM(finder[row].entity));}
+static void finder_closed(void *ctx){(void)ctx;if(finder)free(finder);finder=NULL;finder_count=0;}
+static int finder_near(const void *a,const void *b){
+    return atoi(((const finder_row_t *)a)->label+67)-atoi(((const finder_row_t *)b)->label+67);
+}
+static void mw_target(void){
+    aw_listbox_spec_t s;int i;
+    if(Cmd_Argc()>=2 && !Q_strcasecmp(Cmd_Argv(1),"clear")){finder_set(NULL);return;}
+    if(!sv.active || !sv_player){Con_Printf("Not in a game.\n");return;}
+    if(Cmd_Argc()>=2){
+        edict_t *e=console_resolve(Cmd_Argv(1));
+        if(!e || e==sv_player)Con_Printf("No reference %s on this map.\n",Cmd_Argv(1));else finder_set(e);
+        return;
+    }
+    if(finder || !(finder=(finder_row_t *)AW_TryMalloc(FINDER_ROWS*sizeof(*finder)))){Con_Printf("Target list: no memory.\n");return;}
+    for(i=1;i<sv.num_edicts && finder_count<FINDER_ROWS;i++){
+        edict_t *x=EDICT_NUM(i);const char *id=edict_id(x),*name;vec3_t d;finder_row_t *r;
+        if(x->free || !id || x==sv_player)continue;
+        name=x->v.netname && pr_strings[x->v.netname]?pr_strings+x->v.netname:id;
+        VectorSubtract(x->v.origin,sv_player->v.origin,d);
+        r=&finder[finder_count++];r->entity=(short)i;
+        /* name, id, kind (its class), distance in the original's units; the distance at column 67 for the sort */
+        Q_snprintf(r->label,sizeof(r->label),"%-22.22s %-24.24s %-18.18s %5d",name,id,pr_strings+x->v.classname,
+                   (int)(sqrt(DotProduct(d,d))*4));
+    }
+    if(!finder_count){finder_closed(NULL);Con_Printf("No reference with an id on this map.\n");return;}
+    qsort(finder,(size_t)finder_count,sizeof(*finder),finder_near);
+    memset(&s,0,sizeof(s));
+    s.title="Console target: type to filter (name, id, kind), Enter sets it";
+    s.count=finder_count;s.label=finder_label;s.chosen=finder_chosen;s.closed=finder_closed;
+    if(!AW_ListBoxOpen(&s))finder_closed(NULL);
+}
+/* the console prompt's label of the target ("" the player) */
+const char *AW_MwConsoleTarget(void){return console_entity?console_id:"";}
 int AW_MwscriptRunResult(const char *record,unsigned long reference,const char *text,int length){
-    int speaker=-1,k,chosen,row_speaker,broken;file_reader_t r;
+    int speaker=-1,k,chosen,row_speaker,broken;
     if(!text || length<=0)return 0;
     for(k=0;k<AW_MwvmInstanceCount();k++){   /* the speaker's attached script, when it has one */
         aw_mwvm_instance_t *in=AW_MwvmInstance(k);
         if(in && (in->flags&(AWI_USED|AWI_GLOBAL))==AWI_USED && in->reference==(uint32_t)reference){speaker=in->script;break;}
     }
-    r.f=NULL;
-    if(COM_FOpenFile(FILE_NAME,&r.f)<=0 || !r.f){if(r.f)fclose(r.f);return 0;}
-    r.base=ftell(r.f);
-    chosen=AW_MwvmFindDialogue(read_file_at,&r,AW_MwvmTextHash(text,length),length,speaker,&row_speaker,&broken);
-    fclose(r.f);
+    AW_MwscriptResultsPrepare();
+    if(!results_file)return 0;
+    chosen=AW_MwvmFindDialogue(read_file_at,NULL,AW_MwvmTextHash(text,length),length,speaker,&row_speaker,&broken);
     (void)record;
     if(chosen<0){results_missing++;Con_DPrintf("Dialogue: no compiled result script for this answer\n");return 0;}
     if(broken){

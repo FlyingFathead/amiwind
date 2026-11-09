@@ -14,9 +14,12 @@ sys.path[:0] = [str(ROOT / 'src'), str(ROOT / 'tools')]
 # the census office's scripts (Morrowind.esm), in the order they come off the list
 OFF_THE_LIST = ('chargendoorentercaptain', 'chargendoorexit', 'chargendoorexitcaptain', 'chargenfatiguebarrel',
                'chargendoorguardtalker', 'chargenclassnpc', 'chargenstatssheet', 'chargen_ring_keley')
-STILL_HANDWRITTEN = ('chargen', 'chargenbed', 'chargenboatnpc', 'chargenboatwomen', 'chargencustomsdoor', 'chargendagger',
-                     'chargendialoguemessage', 'chargendisable', 'chargenjournalmessage', 'chargennamenpc',
-                     'chargenracenpc', 'chargenstuffroom', 'chargenwalknpc')
+STILL_HANDWRITTEN = ('chargen', 'chargenboatnpc', 'chargenboatwomen',
+                     'chargendialoguemessage', 'chargendisable', 'chargennamenpc',
+                     'chargenracenpc', 'chargenwalknpc')
+# v0.0.63 (the tracker's parity check, config/mwscript-counterparts.json): the engine's own opening never carried
+# these message boxes, the bed's rest or the dagger's equip hint, so they run as the game's scripts
+RUN_SINCE_63 = ('chargenbed', 'chargencustomsdoor', 'chargendagger', 'chargenjournalmessage', 'chargenstuffroom')
 CENSUS = ()
 
 
@@ -40,8 +43,10 @@ class CensusScripts(unittest.TestCase):
     def test_the_rest_of_the_opening_stays_handwritten(self):
         self.assertEqual([n for n in STILL_HANDWRITTEN if not self.handwritten(n)], [])
         # nothing else of the original's chargen* names slipped off: only the counted ones run
-        running = [n for n in OFF_THE_LIST + CENSUS + STILL_HANDWRITTEN if not self.handwritten(n)]
-        self.assertEqual(len(running), len(OFF_THE_LIST) + len([n for n in CENSUS if not self.handwritten(n)]))
+        self.assertEqual([n for n in RUN_SINCE_63 if self.handwritten(n)], [])
+        running = [n for n in OFF_THE_LIST + CENSUS + STILL_HANDWRITTEN + RUN_SINCE_63 if not self.handwritten(n)]
+        self.assertEqual(len(running), len(OFF_THE_LIST) + len(RUN_SINCE_63) +
+                         len([n for n in CENSUS if not self.handwritten(n)]))
 
     def test_every_script_off_the_list_is_held_on_the_old_path(self):
         held = engine_list()

@@ -198,6 +198,9 @@ WEAK void AW_RecorderLine(const char *text){(void)text;}
 WEAK void AW_RecorderMove(usercmd_t *cmd){(void)cmd;}
 WEAK const char *AW_RecorderSuffix(void){return "";}
 WEAK int AW_RecorderLineShown(void){return 0;}
+/* the original's console commands (aw_mwhost.c, MW-CONSOLE-COMMANDS-62): no target, no line taken in fixtures */
+WEAK const char *AW_MwConsoleTarget(void){return "";}
+WEAK int AW_MwConsoleLine(const char *text){(void)text;return 0;}
 WEAK void AW_RecorderDraw(void){}
 /* dbg tp's settlements box (aw_tpplaces.c, TP-PICKER-57): no table in fixtures, so the scene picker opens as before. */
 WEAK int AW_TpPlacesOpen(void){return 0;}

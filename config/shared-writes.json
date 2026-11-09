@@ -1,0 +1,382 @@
+{
+ "schema": 1,
+ "about": "Run files that two build stages both write (from their traces), known and waiting for one owner each (BUILD-STAGE-WRITES-OTHERS-OUTPUT-63). The builder prints a file not listed here as NEW, and tests/test_shared_writes.py keeps the list from growing: move a file to one owner, never add it.",
+ "recorded_from": "2026_11_09_v0.0.63-dev1_full-v0.0.63-dev1_dc356e3",
+ "paths": [
+  {
+   "path": "intro-scene/asset-name-map.json",
+   "stages": [
+    "area",
+    "balmora-interiors",
+    "census",
+    "intro"
+   ]
+  },
+  {
+   "path": "intro-scene/door-conversion.json",
+   "stages": [
+    "area",
+    "balmora-interiors",
+    "census",
+    "intro"
+   ]
+  },
+  {
+   "path": "intro-scene/id1/doors-addamasartus.txt",
+   "stages": [
+    "area",
+    "balmora-interiors"
+   ]
+  },
+  {
+   "path": "intro-scene/id1/doors-balmora.txt",
+   "stages": [
+    "area",
+    "balmora-interiors",
+    "census",
+    "intro"
+   ]
+  },
+  {
+   "path": "intro-scene/id1/doors-census.txt",
+   "stages": [
+    "area",
+    "balmora-interiors",
+    "census"
+   ]
+  },
+  {
+   "path": "intro-scene/id1/doors-draren.txt",
+   "stages": [
+    "area",
+    "balmora-interiors"
+   ]
+  },
+  {
+   "path": "intro-scene/id1/doors-eldafire.txt",
+   "stages": [
+    "area",
+    "balmora-interiors"
+   ]
+  },
+  {
+   "path": "intro-scene/id1/doors-erene.txt",
+   "stages": [
+    "area",
+    "balmora-interiors"
+   ]
+  },
+  {
+   "path": "intro-scene/id1/doors-fargoth.txt",
+   "stages": [
+    "area",
+    "balmora-interiors"
+   ]
+  },
+  {
+   "path": "intro-scene/id1/doors-finemouth.txt",
+   "stages": [
+    "area",
+    "balmora-interiors"
+   ]
+  },
+  {
+   "path": "intro-scene/id1/doors-foryn.txt",
+   "stages": [
+    "area",
+    "balmora-interiors"
+   ]
+  },
+  {
+   "path": "intro-scene/id1/doors-indrele.txt",
+   "stages": [
+    "area",
+    "balmora-interiors"
+   ]
+  },
+  {
+   "path": "intro-scene/id1/doors-lighthouse.txt",
+   "stages": [
+    "area",
+    "balmora-interiors"
+   ]
+  },
+  {
+   "path": "intro-scene/id1/doors-prison.txt",
+   "stages": [
+    "area",
+    "balmora-interiors",
+    "census",
+    "intro"
+   ]
+  },
+  {
+   "path": "intro-scene/id1/doors-seyda.txt",
+   "stages": [
+    "area",
+    "balmora-interiors",
+    "census",
+    "intro"
+   ]
+  },
+  {
+   "path": "intro-scene/id1/doors-terurise.txt",
+   "stages": [
+    "area",
+    "balmora-interiors"
+   ]
+  },
+  {
+   "path": "intro-scene/id1/doors-tradehouse.txt",
+   "stages": [
+    "area",
+    "balmora-interiors"
+   ]
+  },
+  {
+   "path": "intro-scene/id1/doors-vodunius.txt",
+   "stages": [
+    "area",
+    "balmora-interiors"
+   ]
+  },
+  {
+   "path": "intro-scene/id1/doors-warehouse.txt",
+   "stages": [
+    "area",
+    "balmora-interiors"
+   ]
+  },
+  {
+   "path": "intro-scene/id1/gfx/colormap.lmp",
+   "stages": [
+    "census",
+    "intro"
+   ]
+  },
+  {
+   "path": "intro-scene/id1/gfx/fog.lmp",
+   "stages": [
+    "census",
+    "intro"
+   ]
+  },
+  {
+   "path": "intro-scene/id1/gfx/palette.lmp",
+   "stages": [
+    "census",
+    "intro"
+   ]
+  },
+  {
+   "path": "intro-scene/id1/maps/seyda.bsp",
+   "stages": [
+    "area",
+    "intro",
+    "opening-references"
+   ]
+  },
+  {
+   "path": "intro-scene/id1/maps/seyda.bsp.replacing",
+   "stages": [
+    "area",
+    "opening-references"
+   ]
+  },
+  {
+   "path": "intro-scene/id1/scene-doors-addamasartus.txt",
+   "stages": [
+    "area",
+    "balmora-interiors"
+   ]
+  },
+  {
+   "path": "intro-scene/id1/scene-doors-balmora.txt",
+   "stages": [
+    "area",
+    "balmora-interiors",
+    "census"
+   ]
+  },
+  {
+   "path": "intro-scene/id1/scene-doors-census.txt",
+   "stages": [
+    "area",
+    "balmora-interiors",
+    "census"
+   ]
+  },
+  {
+   "path": "intro-scene/id1/scene-doors-draren.txt",
+   "stages": [
+    "area",
+    "balmora-interiors"
+   ]
+  },
+  {
+   "path": "intro-scene/id1/scene-doors-eldafire.txt",
+   "stages": [
+    "area",
+    "balmora-interiors"
+   ]
+  },
+  {
+   "path": "intro-scene/id1/scene-doors-erene.txt",
+   "stages": [
+    "area",
+    "balmora-interiors"
+   ]
+  },
+  {
+   "path": "intro-scene/id1/scene-doors-fargoth.txt",
+   "stages": [
+    "area",
+    "balmora-interiors"
+   ]
+  },
+  {
+   "path": "intro-scene/id1/scene-doors-finemouth.txt",
+   "stages": [
+    "area",
+    "balmora-interiors"
+   ]
+  },
+  {
+   "path": "intro-scene/id1/scene-doors-foryn.txt",
+   "stages": [
+    "area",
+    "balmora-interiors"
+   ]
+  },
+  {
+   "path": "intro-scene/id1/scene-doors-indrele.txt",
+   "stages": [
+    "area",
+    "balmora-interiors"
+   ]
+  },
+  {
+   "path": "intro-scene/id1/scene-doors-lighthouse.txt",
+   "stages": [
+    "area",
+    "balmora-interiors"
+   ]
+  },
+  {
+   "path": "intro-scene/id1/scene-doors-prison.txt",
+   "stages": [
+    "area",
+    "balmora-interiors",
+    "census"
+   ]
+  },
+  {
+   "path": "intro-scene/id1/scene-doors-seyda.txt",
+   "stages": [
+    "area",
+    "balmora-interiors",
+    "census"
+   ]
+  },
+  {
+   "path": "intro-scene/id1/scene-doors-terurise.txt",
+   "stages": [
+    "area",
+    "balmora-interiors"
+   ]
+  },
+  {
+   "path": "intro-scene/id1/scene-doors-tradehouse.txt",
+   "stages": [
+    "area",
+    "balmora-interiors"
+   ]
+  },
+  {
+   "path": "intro-scene/id1/scene-doors-vodunius.txt",
+   "stages": [
+    "area",
+    "balmora-interiors"
+   ]
+  },
+  {
+   "path": "intro-scene/id1/scene-doors-warehouse.txt",
+   "stages": [
+    "area",
+    "balmora-interiors"
+   ]
+  },
+  {
+   "path": "intro-scene/id1/scene-doors.txt",
+   "stages": [
+    "area",
+    "balmora-interiors",
+    "census",
+    "intro"
+   ]
+  },
+  {
+   "path": "intro-scene/id1/view/npc_parts/dir.awnd",
+   "stages": [
+    "area",
+    "balmora-interiors"
+   ]
+  },
+  {
+   "path": "intro-scene/interior-reference.json",
+   "stages": [
+    "area",
+    "balmora-interiors",
+    "census",
+    "intro"
+   ]
+  },
+  {
+   "path": "intro-scene/interior-reference.md",
+   "stages": [
+    "area",
+    "balmora-interiors",
+    "census",
+    "intro"
+   ]
+  },
+  {
+   "path": "intro-scene/seyda-entities.json",
+   "stages": [
+    "area",
+    "intro",
+    "opening-references"
+   ]
+  },
+  {
+   "path": "intro-scene/seyda-entities.json.replacing",
+   "stages": [
+    "area",
+    "intro",
+    "opening-references"
+   ]
+  },
+  {
+   "path": "intro-scene/seyda.bsp",
+   "stages": [
+    "area",
+    "intro",
+    "opening-references"
+   ]
+  },
+  {
+   "path": "intro-scene/seyda.bsp.replacing",
+   "stages": [
+    "area",
+    "opening-references"
+   ]
+  },
+  {
+   "path": "intro-scene/standing-collision.map",
+   "stages": [
+    "census",
+    "intro"
+   ]
+  }
+ ]
+}

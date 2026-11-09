@@ -1,11 +1,20 @@
 # MWScript features
 
-_Last updated with AmiWind v0.0.63-dev1 (9 November 2026)._
+_Last updated with AmiWind v0.0.63-dev2 (9 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [Why the others do not run](#why-the-others-do-not-run)
+- [Carried by AmiWind's own code](#carried-by-amiwinds-own-code)
+  - [CharGen](#chargen)
+  - [CharGenBoatNPC](#chargenboatnpc)
+  - [CharGenBoatWomen](#chargenboatwomen)
+  - [CharGenDialogueMessage](#chargendialoguemessage)
+  - [CharGenDisable](#chargendisable)
+  - [CharGenNameNPC](#chargennamenpc)
+  - [CharGenRaceNPC](#chargenracenpc)
+  - [CharGenWalkNPC](#chargenwalknpc)
 - [Follows OpenMW's fix](#follows-openmws-fix)
 - [By area](#by-area)
 - [By function](#by-function)
@@ -20,15 +29,16 @@ _Last updated with AmiWind v0.0.63-dev1 (9 November 2026)._
 
 One row per script record of the game: what names it, where it stands, which functions it calls and what its conditions test, and what state AmiWind has it in. The data is measured from the game's masters with the builder's own compiler; the page lists record ids, counts and states only. When the work list runs dry, the scripting work is taken from here row by row, toward the next landmark: every game script running as in the original. On Vvardenfell the scripts left are the character creation ones; the rest belong to Mournhold and Solstheim.
 
-**599 of 1,207 scripts run**; 39 use a function the interpreter lacks, 13 are attached but not run, 0 are compiled but not attached, 422 belong to an add-on world not in the image yet, 134 are named by nothing (they never run in the original either), 0 are not converted.
+**605 of 1,207 scripts run** as scripts and **8 are carried by AmiWind's own code**; of the rest, 29 use a function the interpreter lacks, 0 are attached but not run, 0 are compiled but not attached, 431 belong to an add-on world not in the image yet, 134 are named by nothing (they never run in the original either), 0 are not converted.
 
 | State | Scripts | What it means |
 | --- | ---: | --- |
-| runs | 599 | compiles whole, and the build attaches it to its objects or starts it (a record that is never placed: while the player carries its item, on the actor a levelled list gives, or on the object a script places; a script with no function, whose own locals the dialogue keeps on the speaker without it, counts as running) |
-| uses a function the interpreter lacks | 39 | compiles, but calls at least one function the interpreter does not carry out yet (those calls do nothing and read 0) |
-| attached, not run | 13 | the game attaches it, but the build does not run it: a hand-written rule carries it, or nothing it does is seen yet |
+| runs | 605 | compiles whole, and the build attaches it to its objects or starts it (a record that is never placed: while the player carries its item, on the actor a levelled list gives, or on the object a script places; a script with no function, whose own locals the dialogue keeps on the speaker without it, counts as running) |
+| carried by AmiWind's own code | 8 | not run as a script because AmiWind's own code does what it does (the section Carried by AmiWind's own code names the code and compares it step by step) |
+| uses a function the interpreter lacks | 29 | compiles, but calls at least one function the interpreter does not carry out yet (those calls do nothing and read 0) |
+| attached, not run | 0 | the game attaches it, but the build does not run it: a hand-written rule carries it, or nothing it does is seen yet |
 | compiled, not attached | 0 | compiles whole, but nothing in the build attaches or starts it: its records are never placed, and nothing makes them at run time yet |
-| only in an add-on world | 422 | compiles whole, but its records are placed (or made by scripts) only in Mournhold or Solstheim, which are not in the image yet |
+| only in an add-on world | 431 | compiles whole, but its records are placed (or made by scripts) only in Mournhold or Solstheim, which are not in the image yet |
 | named by nothing | 134 | compiles whole, but no record, start, StartScript or dialogue result names it, or the records that name it are never placed and nothing makes them: it never runs in the original either |
 | not converted | 0 | does not compile |
 | **All script records** | **1,207** | |
@@ -43,9 +53,9 @@ Dialogue answers that start or change a fight (StartCombat, SetFight, ModFight):
 | another actor attacks (StartCombat on a reference) | 9 |
 | the speaker's Fight changes: weighed when the talk ends | 148 |
 | the speaker attacks (StartCombat): found by the answer's reference | 124 |
-| a fight between two actors: not carried out (the combat layer fights the player only) | 5 |
+| a fight between two actors: both are set against each other (since v0.0.63) | 5 |
 
-Measured on 9 November 2026 from the three masters (Morrowind, Tribunal, Bloodmoon) with the builder's own compiler (tools/mwscript), 11,171 placed scripted references, 9,084 bindings in the compiled file, 4 start scripts. The states are worked out again from the interpreter's function table (tools/mwscript/functions.py) whenever the page is rendered, so a function carried out later moves its scripts without a new measurement.
+Measured on 9 November 2026 from the three masters (Morrowind, Tribunal, Bloodmoon) with the builder's own compiler (tools/mwscript), 11,171 placed scripted references, 9,095 bindings in the compiled file, 4 start scripts. The states are worked out again from the interpreter's function table (tools/mwscript/functions.py) whenever the page is rendered, so a function carried out later moves its scripts without a new measurement.
 
 ## Why the others do not run
 
@@ -53,12 +63,121 @@ Each script that does not run, by its reason, and where its area is: Vvardenfell
 
 | State | Reason | Vvardenfell | Add-on world | All |
 | --- | --- | ---: | ---: | ---: |
-| only in an add-on world | placed only in an add-on world, not in the image yet | 2 | 417 | 419 |
+| only in an add-on world | placed only in an add-on world, not in the image yet | 1 | 427 | 428 |
 | named by nothing | nothing names it: it never runs in the original either | 123 | 0 | 123 |
-| uses a function the interpreter lacks | calls a function the interpreter does not carry out yet | 9 | 30 | 39 |
-| attached, not run | a hand-written rule carries it | 13 | 0 | 13 |
+| uses a function the interpreter lacks | calls a function the interpreter does not carry out yet | 9 | 20 | 29 |
 | named by nothing | its records are never placed and nothing makes them: it never runs in the original either | 11 | 0 | 11 |
 | only in an add-on world | made only by a script of an add-on world, not in the image yet | 3 | 0 | 3 |
+
+## Carried by AmiWind's own code
+
+The game scripts AmiWind carries with its own code instead of running them, each with the code that does it and a step-by-step comparison with the script (the tracker of these is config/mwscript-counterparts.json, checked by its test). Decided for the project: the opening from the prison ship to the census office is AmiWind's own implementation.
+
+| Script | What it does | AmiWind counterpart | Parity | In game | Register |
+| --- | --- | --- | --- | --- | --- |
+| CharGen | the new game's start: the player's controls off, the player placed on the prison ship, the Bitter Coast weather set to cloudy, CharGenState 10 | engine/aga/src/aw_story.c AW_StoryReset (with aw_intro.c AW_IntroBegin) | same | not yet | OPENING-WEATHER-NOT-CLOUDY-63, CHARGENSTATE-START-VALUE-63 |
+| CharGenBoatNPC | the guard on deck: sends the player down to the dock, repeats | engine/aga/src/aw_intro.c AW_IntroTick, the deck_state steps | same | not yet | - |
+| CharGenBoatWomen | the woman on the upper deck: hurries the player, repeats | engine/aga/src/aw_intro.c AW_IntroTick, the upper_state steps | same | not yet | - |
+| CharGenDialogueMessage | the hint about talking to the captain when the player comes near him | engine/aga/src/aw_opening.c AW_OpeningTick, captain_hint | same | not yet | OPENING-CAPTAIN-HINT-SUBTITLE-63 |
+| CharGenDisable | the opening's invisible blockers (the ACTI CharGenCollision - extra placements) kept while CharGenState is 0 or over, disabled after | engine/aga/src/aw_barrier.c AW_BarrierClip (the blockers converted by tools/prepare_character.py, active while AW_StoryRestricted) | same | not yet | OPENING-SHIP-BLOCKER-NOT-CONVERTED-63 |
+| CharGenNameNPC | Jiub on the ship: wakes the player, asks the name, talks about the storm, warns of the guard, repeats his warning | engine/aga/src/aw_intro.c AW_IntroTick, the jiub_state steps | same | not yet | - |
+| CharGenRaceNPC | the dock guard: walks to the plank, greets the player, the race window, leads him to the office door, repeats | engine/aga/src/aw_opening.c AW_OpeningTick, the aw_story.dock steps | same | not yet | INTRO-DOCK-GUARD-BLOCKS-DOOR-62 |
+| CharGenWalkNPC | the ship's guard: comes to the player, the movement hint, leads him to the deck hatch, repeats his order | engine/aga/src/aw_intro.c AW_IntroTick, the guard_state steps | same | not yet | OPENING-SHIP-GUARD-STEPS-63 |
+
+Functions whose work AmiWind's own code does (the script calls into it):
+
+| Functions | What | AmiWind counterpart | Parity | Note | In game |
+| --- | --- | --- | --- | --- | --- |
+| AIFollow, AIFollowCell, AIEscort, AIEscortCell | an actor follows or escorts a target; the packages' rules (the hours, the place, the end that GetAIPackageDone reads) in aw_ambient.c | engine/aga/src/aw_companion.c AW_FollowThink (the debug companion's follow think, aw_follow.h; the movement of the packages since v0.0.63) | same | one implementation since ESCORT-FOLLOW-63; the packages never place a follower near its target inside a cell, which is OpenMW's own rule (the follower catches up through doors with the player, aw_ambient.c) | not yet |
+| StartCombat, StopCombat, GetTarget | an actor fights the player or another actor; the fight ends; whom it fights | engine/aga/src/aw_combat.c AW_CombatEngage, AW_CombatEngageAgainst (a slot's target: the player or another actor), AW_CombatTargetOf; through aw_mwhost.c host_combat | same | fights between two actors since COMBAT-ACTOR-VS-ACTOR-62; allies (followers and escorts, both ways) and guards (against creatures in a fight) join on sight (aw_mwhost.c join_fights, OpenMW actors.cpp engageCombat); the player's own followers and escorts help the player against whoever fights him and never start a fight with the player by their Fight value; OpenMW's optional setting for followers attacking on sight (off by default) is not carried | not yet |
+
+The original game's console commands (docs/CONSOLE_COMMANDS_MORROWIND.md): 391 in all; 13 run AmiWind's own command, 250 run through the script interpreter's host, 3 are AmiWind's own names (kept), 112 planned, 13 not applicable. The aliases:
+
+| Original | AmiWind | Parity | Note |
+| --- | --- | --- | --- |
+| ToggleGodMode, tgm | dbg god | same | no damage of any kind |
+| ToggleCollision, tcl | noclip (AmiWind's own tcl) | same | walk through walls and fly |
+| CenterOnCell, coc | dbg tp | partial | the cell name goes to dbg tp, which knows the towns and the map names; an original interior cell name tp does not know gives tp's own list |
+| CenterOnExterior, coe | dbg tp X Y | same | the exterior cell's centre in the original's coordinates (8192 a cell) |
+| FixMe | dbg unstuck | partial | OpenMW moves the player a short way; unstuck takes the nearest clear standing spot |
+| ToggleMenus, tm | dbg killhud | partial | the HUD hidden; killhud also frees the camera (photo mode) |
+| ToggleVanityMode, tvm | dbg vanitycam on | same | the idle orbit now |
+| SetLevel | dbg setlvl | same | the player's level, as the game's SetLevel |
+| AddItem, RemoveItem, GetItemCount | aw_mwhost.c host_item | same | on any reference by id-> or the console target (dbg mw target), found as a script's own reference; an item no actor carries and no script names: the player's inventory by its id (dbg give's own call) |
+| AddSpell, RemoveSpell | aw_mwhost.c host_spell | same | on any actor |
+| Enable, Disable, GetDisabled | aw_mwhost.c host_object | same | on any reference |
+| Position, SetPos, GetPos, SetAngle, GetAngle | aw_mwhost.c host_call, host_position | same | as a script line moves or turns the reference |
+| AIWander, AITravel, AIFollow, AIEscort | aw_mwhost.c host_wander, host_call | same | the ambient tables' packages, as from a script |
+| Equip | the inventory's equip (aw_inventory.c AW_InventoryEquip) | partial | the player only; an actor's equipment from a console line: not yet |
+| PositionCell | dbg tp | partial | the player to the cell by its name; the point in the cell and another reference: not yet |
+| EnableNameMenu, EnableRaceMenu, EnableClassMenu, EnableBirthMenu, EnableStatReviewMenu | dbg quickchar name / dbg characterchange race / dbg quickchar class, birthsign, review | same | the character creation pages |
+| Set/Mod/Get<attribute, skill, Health, Magicka, Fatigue>, ModCurrent<Health, Magicka, Fatigue> | aw_mwhost.c host_actor | same | the MWScript host's actor call that a compiled script line makes; on the player |
+
+### CharGen
+
+| Step | Original | AmiWind | Same? |
+| --- | --- | --- | --- |
+| controls | DisablePlayerControls, -Jumping, -ViewSwitch, VanityMode, -Fighting, -Magic | the opening's own restriction (AW_StoryRestricted, AW_IntroUse) holds the same controls | same |
+| the ship | PositionCell into Imperial Prison Ship at 61, -135, 24, facing 340 | the new game starts on the ship map at its arrival | same |
+| weather | ChangeWeather Bitter Coast Region 1 (cloudy) | set cloudy at a new game from the script's own call (the compiler's NGWE row, aw_mwhost.c new_game_weather; v0.0.63) | same |
+| CharGenState | set to 10 | set to 10 (fixed in v0.0.63; every reader of the game tests -1, not -1 or 0 and over) | same |
+
+### CharGenBoatNPC
+
+| Step | Original | AmiWind | Same? |
+| --- | --- | --- | --- |
+| first | the player within 180, no line playing: CharGenBoat1 | within 45 map units (180 original), no line playing: chargenboat1 | same |
+| repeat | every 6 s near: CharGenBoat2 | every 6 s near: chargenboat2 | same |
+
+### CharGenBoatWomen
+
+| Step | Original | AmiWind | Same? |
+| --- | --- | --- | --- |
+| first | the player within 180, no line playing: CharGenWoman1 | within 45 map units, after the hatch is open: chargenwoman1 | same |
+| repeat | every 6 s near, the last line done: CharGenWoman2 | the same; its timer advances only while the player is near and no line plays (fixed in v0.0.63) | same |
+
+### CharGenDialogueMessage
+
+| Step | Original | AmiWind | Same? |
+| --- | --- | --- | --- |
+| once | the player within 300: a message box with an Ok button | within 75 map units (300 original): the same text in a message box with an Ok button (v0.0.63) | same |
+
+### CharGenDisable
+
+| Step | Original | AmiWind | Same? |
+| --- | --- | --- | --- |
+| every frame | CharGenState below 0: Disable, on each of its 23 placed references | the blockers clip the player while CharGenState is 0 or over and stop after (the same rule); all 23 are converted: the 22 outdoor ones and, since v0.0.63, the one inside the prison ship (reference 481585, intro/barriers-ship.awb) | same |
+
+### CharGenNameNPC
+
+| Step | Original | AmiWind | Same? |
+| --- | --- | --- | --- |
+| 0 | after 1 s: CharGenName1 | after 1 s: chargenname1 | same |
+| 10 | line done: EnableNameMenu | line done: the name window | same |
+| 20 | 1 s after the window: CharGenName2 | 1 s after the name: chargenname2 | same |
+| 40 | line done and the second guard within 400: CharGenName3 | the second guard within 100 map units (400 original): chargenname3 | same |
+| -1 | every 14 s the player stays within 150: CharGenName4 | the same; its timer advances only while the player is near (fixed in v0.0.63) | same |
+
+### CharGenRaceNPC
+
+| Step | Original | AmiWind | Same? |
+| --- | --- | --- | --- |
+| 0-10 | AITravel to the plank; the player within 108 | the route to the plank; the player within 27 map units (108 original) | same |
+| 20-30 | controls off, CharGenDock1; line done: EnableRaceMenu | the player held, chargendock1; line done: the race window | same |
+| 40 | 1.5 s after the window: CharGenDock2 | 1.5 s after the race is accepted: chargendock2 | same |
+| 50 | line done: controls on, AITravel next to the door (-9944, -72481) | line done: the player free, the route to the script's own point next to the door, standing as the walk leaves him (v0.0.63). Measured in the dock map's units against the shipped door table: his box x 322.68..337.32, y -207.37..-193.13; the office door's box x 308.86..332.61, y -173.38..-149.62; no overlap, 19.75 units between them, wider than the player's box (14.64), so the player can pass between him and the door (INTRO-DOCK-GUARD-BLOCKS-DOOR-62 not brought back) | same |
+| -1 | every 6 s near: CharGenDock3 | every 6 s near: chargendock3 | same |
+
+### CharGenWalkNPC
+
+| Step | Original | AmiWind | Same? |
+| --- | --- | --- | --- |
+| 0-10 | after 8 s: AITravel 90, -90, -88 | after 8 s: the route to 90, -90, -88 | same |
+| 20 | arrived: CharGenWalk1 | arrived: chargenwalk1 (the wait for Jiub's warning removed in v0.0.63) | same |
+| 30 | line done: a message box with the movement keys and Ok | line done: the script's text with AmiWind's keys, closed with Enter (Ok) (v0.0.63) | same |
+| 40-57 | EnablePlayerControls, AIEscort to 195, 100, 170, then AITravel 185, 174, 170 | the controls free, the route to 195, 100, 170, then to 185, 174, 170 | same |
+| 60 | the player within 200: CharGenWalk2 | within 50 map units (200 original): chargenwalk2 | same |
+| -1 | every 6 s the player stays within 150: CharGenWalk3 | the same; its timer advances only while the player is near (fixed in v0.0.63) | same |
 
 ## Follows OpenMW's fix
 
@@ -75,31 +194,31 @@ Where OpenMW 0.51 deliberately differs from the original engine in what a script
 
 The area of a script is where most of its placed references stand: the region for the exteriors, the region its doors lead out to for an interior. Scripts with no placed reference are grouped by what starts them.
 
-| Area | Scripts | Runs | Function missing | Attached, not run | Not attached | Add-on world | Named by nothing | Not converted |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| mournhold (tribunal) | 194 | 3 | 15 | 0 | 0 | 176 | 0 | 0 |
-| named by nothing | 123 | 0 | 0 | 0 | 0 | 0 | 123 | 0 |
-| ascadian isles region | 115 | 114 | 0 | 0 | 0 | 1 | 0 | 0 |
-| hirstaang forest region | 103 | 0 | 5 | 0 | 0 | 98 | 0 | 0 |
-| dialogue only | 82 | 79 | 3 | 0 | 0 | 0 | 0 | 0 |
-| azura's coast region | 73 | 73 | 0 | 0 | 0 | 0 | 0 | 0 |
-| records not placed | 69 | 51 | 4 | 0 | 0 | 3 | 11 | 0 |
-| ashlands region | 66 | 66 | 0 | 0 | 0 | 0 | 0 | 0 |
-| west gash region | 65 | 65 | 0 | 0 | 0 | 0 | 0 | 0 |
-| isinfier plains region | 48 | 0 | 1 | 0 | 0 | 47 | 0 | 0 |
-| felsaad coast region | 45 | 0 | 1 | 0 | 0 | 44 | 0 | 0 |
-| bitter coast region | 41 | 29 | 0 | 12 | 0 | 0 | 0 | 0 |
-| molag mar region | 37 | 37 | 0 | 0 | 0 | 0 | 0 | 0 |
-| global scripts | 33 | 30 | 2 | 1 | 0 | 0 | 0 | 0 |
-| red mountain region | 22 | 21 | 0 | 0 | 0 | 1 | 0 | 0 |
-| thirsk region | 20 | 0 | 0 | 0 | 0 | 20 | 0 | 0 |
-| moesring mountains region | 17 | 0 | 0 | 0 | 0 | 17 | 0 | 0 |
-| solstheim (bloodmoon) | 16 | 0 | 8 | 0 | 0 | 8 | 0 | 0 |
-| grazelands region | 14 | 14 | 0 | 0 | 0 | 0 | 0 | 0 |
-| sheogorad | 13 | 13 | 0 | 0 | 0 | 0 | 0 | 0 |
-| brodir grove region | 7 | 0 | 0 | 0 | 0 | 7 | 0 | 0 |
-| interior with no way out | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 |
-| **All** | **1207** | **599** | **39** | **13** | **0** | **422** | **134** | **0** |
+| Area | Scripts | Runs | AmiWind code | Function missing | Attached, not run | Not attached | Add-on world | Named by nothing | Not converted |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| mournhold (tribunal) | 194 | 3 | 0 | 6 | 0 | 0 | 185 | 0 | 0 |
+| named by nothing | 123 | 0 | 0 | 0 | 0 | 0 | 0 | 123 | 0 |
+| ascadian isles region | 115 | 115 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| hirstaang forest region | 103 | 0 | 0 | 4 | 0 | 0 | 99 | 0 | 0 |
+| dialogue only | 82 | 79 | 0 | 3 | 0 | 0 | 0 | 0 | 0 |
+| azura's coast region | 73 | 73 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| records not placed | 69 | 51 | 0 | 4 | 0 | 0 | 3 | 11 | 0 |
+| ashlands region | 66 | 66 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| west gash region | 65 | 65 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| isinfier plains region | 48 | 0 | 0 | 1 | 0 | 0 | 47 | 0 | 0 |
+| felsaad coast region | 45 | 0 | 0 | 1 | 0 | 0 | 44 | 0 | 0 |
+| bitter coast region | 41 | 34 | 7 | 0 | 0 | 0 | 0 | 0 | 0 |
+| molag mar region | 37 | 37 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| global scripts | 33 | 30 | 1 | 2 | 0 | 0 | 0 | 0 | 0 |
+| red mountain region | 22 | 21 | 0 | 0 | 0 | 0 | 1 | 0 | 0 |
+| thirsk region | 20 | 0 | 0 | 0 | 0 | 0 | 20 | 0 | 0 |
+| moesring mountains region | 17 | 0 | 0 | 0 | 0 | 0 | 17 | 0 | 0 |
+| solstheim (bloodmoon) | 16 | 0 | 0 | 8 | 0 | 0 | 8 | 0 | 0 |
+| grazelands region | 14 | 14 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sheogorad | 13 | 13 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| brodir grove region | 7 | 0 | 0 | 0 | 0 | 0 | 7 | 0 | 0 |
+| interior with no way out | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| **All** | **1207** | **605** | **8** | **29** | **0** | **0** | **431** | **134** | **0** |
 
 ## By function
 
@@ -108,21 +227,13 @@ Every function the game's scripts call. Scripts: the script records that call it
 | Function | Group | Carried out | Scripts | Uses | In conditions | Missing in | Only gap | Dialogue | Dialogue missing |
 | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | placeitem | position | host, in part | 24 | 37 | 0 | 19 | 19 | 0 | 0 |
-| getwaterlevel | cell | no | 9 | 10 | 4 | 9 | 6 | 0 | 0 |
 | positioncell | position | host, in part | 57 | 96 | 0 | 7 | 7 | 14 | 0 |
-| hurtcollidingactor | combat | no | 3 | 3 | 0 | 3 | 2 | 0 | 0 |
-| setwaterlevel | world | no | 3 | 3 | 0 | 3 | 0 | 0 | 0 |
+| setwaterlevel | world | no | 3 | 3 | 0 | 3 | 2 | 0 | 0 |
 | cast | spells | host, in part | 53 | 126 | 0 | 2 | 1 | 5 | 0 |
-| getcollidingpc | world | no | 2 | 2 | 2 | 2 | 1 | 0 | 0 |
-| enablenamemenu | ui | no | 1 | 1 | 0 | 1 | 1 | 0 | 0 |
-| enableracemenu | ui | no | 1 | 1 | 0 | 1 | 1 | 0 | 0 |
-| enablerest | ui | no | 1 | 1 | 0 | 1 | 1 | 0 | 0 |
 | getchameleon | spells | no | 1 | 1 | 1 | 1 | 0 | 0 | 0 |
-| getcollidingactor | world | no | 1 | 1 | 1 | 1 | 0 | 0 | 0 |
+| getcollidingactor | world | no | 1 | 1 | 1 | 1 | 1 | 0 | 0 |
 | getparalysis | spells | no | 1 | 1 | 1 | 1 | 1 | 0 | 0 |
 | getstandingactor | world | no | 1 | 1 | 1 | 1 | 1 | 0 | 0 |
-| getstat | stats | no | 1 | 1 | 0 | 1 | 1 | 0 | 0 |
-| getweapontype | combat | no | 1 | 1 | 1 | 1 | 1 | 0 | 0 |
 | modwaterlevel | world | no | 1 | 1 | 0 | 1 | 0 | 0 | 0 |
 | getjournalindex | journal | yes | 547 | 1371 | 535 | 0 | 0 | 0 | 0 |
 | disable | world | yes | 390 | 832 | 0 | 0 | 0 | 52 | 0 |
@@ -197,6 +308,7 @@ Every function the game's scripts call. Scripts: the script records that call it
 | resurrect | stats | host | 10 | 16 | 0 | 0 | 0 | 0 | 0 |
 | setdelete | world | host | 10 | 10 | 0 | 0 | 0 | 0 | 0 |
 | xbox | core | yes | 10 | 13 | 10 | 0 | 0 | 0 | 0 |
+| getwaterlevel | cell | host | 9 | 10 | 4 | 0 | 0 | 0 | 0 |
 | modcurrenthealth | stats | yes | 9 | 12 | 0 | 0 | 0 | 0 | 0 |
 | moddisposition | dialogue | yes | 9 | 10 | 0 | 0 | 0 | 1219 | 0 |
 | setpos | position | host | 8 | 12 | 0 | 0 | 0 | 0 | 0 |
@@ -253,12 +365,14 @@ Every function the game's scripts call. Scripts: the script records that call it
 | getspelleffects | spells | host | 3 | 3 | 3 | 0 | 0 | 0 | 0 |
 | getweapondrawn | combat | host | 3 | 5 | 3 | 0 | 0 | 0 | 0 |
 | getwerewolfkills | stats | host | 3 | 3 | 3 | 0 | 0 | 0 | 0 |
+| hurtcollidingactor | combat | host | 3 | 3 | 0 | 0 | 0 | 0 | 0 |
 | modwillpower | stats | yes | 3 | 5 | 0 | 0 | 0 | 0 | 0 |
 | setmagicka | stats | yes | 3 | 4 | 0 | 0 | 0 | 0 | 0 |
 | setmarksman | stats | yes | 3 | 4 | 0 | 0 | 0 | 0 | 0 |
 | setwerewolfacrobatics | stats | host | 3 | 3 | 0 | 0 | 0 | 0 | 0 |
 | disablelevitation | control | host | 2 | 3 | 0 | 0 | 0 | 0 | 0 |
 | enablelevitation | control | host | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
+| getcollidingpc | world | host | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
 | getinterior | cell | host | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
 | getlos | ai | host | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
 | getpcinjail | stats | host | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
@@ -296,8 +410,11 @@ Every function the game's scripts call. Scripts: the script records that call it
 | disablevanitymode | control | host | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | enablebirthmenu | ui | host | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | enableclassmenu | ui | host | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| enablenamemenu | ui | host | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | enableplayerjumping | control | host | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | enableplayerviewswitch | control | host | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| enableracemenu | ui | host | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| enablerest | ui | host | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | enablestatreviewmenu | ui | host | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | enablevanitymode | control | host | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | face | ai | host | 1 | 6 | 0 | 0 | 0 | 0 | 0 |
@@ -315,6 +432,8 @@ Every function the game's scripts call. Scripts: the script records that call it
 | getpersonality | stats | yes | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | getspeed | stats | yes | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | getsquareroot | core | yes | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| getstat | stats | host | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| getweapontype | combat | host | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | getwillpower | stats | yes | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | gotojail | stats | host | 1 | 1 | 0 | 0 | 0 | 1 | 0 |
 | modarmorer | stats | yes | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
@@ -625,24 +744,24 @@ Referenced by: the records that carry the script and their placed references per
 | vedeleaFollow | azura's coast region | runs | 1 NPC; placed 1 (Morrowind 1); speaker of 3 dialogue results | vedelea othril | aiwander, getcurrentaipackage, getdistance, gethealth, getjournalindex, getsecondspassed, journal, menumode, say, sethello | 11: getcurrentaipackage, getdistance, gethealth, getjournalindex, global, local, menumode | - | - |
 | Warp_Falen | azura's coast region | runs | 1 activator; placed 2 (Morrowind 2) | active_port_falen | getitemcount, menumode, messagebox, onactivate, playsound, positioncell | 3: getitemcount, menumode, onactivate | - | - |
 | BILL_MT_WritBrilnosu | bitter coast region | runs | 1 NPC; placed 1 (Morrowind 1); speaker of 1 dialogue results | brilnosu llarys | cellchanged, getjournalindex, getpccrimelevel, journal, menumode, ondeath | 5: cellchanged, getjournalindex, local, menumode, ondeath | - | - |
-| CharGenBed | bitter coast region | attached, not run | 1 activator; placed 1 (Morrowind 1) | chargen_bed | enablerest, menumode, messagebox, onactivate, showrestmenu, xbox | 4: local, menumode, onactivate, xbox | - | a hand-written rule carries it |
-| CharGenBoatNPC | bitter coast region | attached, not run | 1 NPC; placed 1 (Morrowind 1) | chargen boat guard 1 | getdisabled, getdistance, getsecondspassed, menumode, onactivate, say, saydone | 8: getdisabled, getdistance, local, menumode, onactivate, saydone | - | a hand-written rule carries it |
-| CharGenBoatWomen | bitter coast region | attached, not run | 1 NPC; placed 1 (Morrowind 1) | chargen boat guard 3 | getdistance, getsecondspassed, menumode, onactivate, say, saydone | 7: getdistance, local, menumode, onactivate, saydone | - | a hand-written rule carries it |
+| CharGenBed | bitter coast region | runs | 1 activator; placed 1 (Morrowind 1) | chargen_bed | enablerest, menumode, messagebox, onactivate, showrestmenu, xbox | 4: local, menumode, onactivate, xbox | - | - |
+| CharGenBoatNPC | bitter coast region | carried by AmiWind's own code | 1 NPC; placed 1 (Morrowind 1) | chargen boat guard 1 | getdisabled, getdistance, getsecondspassed, menumode, onactivate, say, saydone | 8: getdisabled, getdistance, local, menumode, onactivate, saydone | - | carried by engine/aga/src/aw_intro.c AW_IntroTick, the deck_state steps |
+| CharGenBoatWomen | bitter coast region | carried by AmiWind's own code | 1 NPC; placed 1 (Morrowind 1) | chargen boat guard 3 | getdistance, getsecondspassed, menumode, onactivate, say, saydone | 7: getdistance, local, menumode, onactivate, saydone | - | carried by engine/aga/src/aw_intro.c AW_IntroTick, the upper_state steps |
 | CharGenClassNPC | bitter coast region | runs | 1 NPC; placed 1 (Morrowind 1); speaker of 7 dialogue results | chargen class | activate, disable, disableplayercontrols, enable, enablebirthmenu, enableclassmenu, enableplayercontrols, enableplayerviewswitch, enablestatreviewmenu, enablestatsmenu, enablevanitymode, getdistance, gethealth, getitemcount, getsecondspassed, menumode, messagebox, onactivate, say, saydone, sethello, startscript, xbox | 39: getdistance, gethealth, getitemcount, global, local, menumode, onactivate, other script, saydone, xbox | - | - |
-| CharGenCustomsDoor | bitter coast region | attached, not run | 1 door; placed 1 (Morrowind 1) | chargen_shipdoor | getdistance, menumode, messagebox, xbox | 4: getdistance, local, menumode, xbox | - | a hand-written rule carries it |
-| CharGenDagger | bitter coast region | attached, not run | 1 WEAP; placed 1 (Morrowind 1) | chargen dagger | activate, messagebox, onactivate, xbox | 9: global, local, onactivate, xbox | - | a hand-written rule carries it |
-| CharGenDialogueMessage | bitter coast region | attached, not run | 1 NPC; placed 1 (Morrowind 1); speaker of 7 dialogue results | chargen captain | getdistance, menumode, messagebox, xbox | 4: getdistance, local, menumode, xbox | - | a hand-written rule carries it |
-| CharGenDisable | bitter coast region | attached, not run | 1 activator; placed 23 (Morrowind 23) | chargencollision - extra | disable | 1: global | - | a hand-written rule carries it |
+| CharGenCustomsDoor | bitter coast region | runs | 1 door; placed 1 (Morrowind 1) | chargen_shipdoor | getdistance, menumode, messagebox, xbox | 4: getdistance, local, menumode, xbox | - | - |
+| CharGenDagger | bitter coast region | runs | 1 WEAP; placed 1 (Morrowind 1) | chargen dagger | activate, messagebox, onactivate, xbox | 9: global, local, onactivate, xbox | - | - |
+| CharGenDialogueMessage | bitter coast region | carried by AmiWind's own code | 1 NPC; placed 1 (Morrowind 1); speaker of 7 dialogue results | chargen captain | getdistance, menumode, messagebox, xbox | 4: getdistance, local, menumode, xbox | - | carried by engine/aga/src/aw_opening.c AW_OpeningTick, captain_hint |
+| CharGenDisable | bitter coast region | carried by AmiWind's own code | 1 activator; placed 23 (Morrowind 23) | chargencollision - extra | disable | 1: global | - | carried by engine/aga/src/aw_barrier.c AW_BarrierClip (the blockers converted by tools/prepare_character.py, active while AW_StoryRestricted) |
 | CharGenDoorEnterCaptain | bitter coast region | runs | 1 door; placed 1 (Morrowind 1) | chargen door captain | activate, getitemcount, messagebox, onactivate | 3: getitemcount, local, onactivate | - | - |
 | CharGenDoorExitCaptain | bitter coast region | runs | 1 door; placed 1 (Morrowind 1) | chargen exit door | activate, enableinventorymenu, enablemagicmenu, enablemapmenu, enableplayerfighting, enableplayermagic, enablestatsmenu, getitemcount, messagebox, onactivate | 3: getitemcount, local, onactivate | - | - |
 | CharGenDoorGuardTalker | bitter coast region | runs | 1 NPC; placed 1 (Morrowind 1) | chargen door guard | enableplayerfighting, enableplayermagic, getdistance, getitemcount, getsecondspassed, menumode, playsound3d, say, saydone, unlock | 8: getdistance, getitemcount, local, menumode, saydone | - | - |
 | CharGenFatigueBarrel | bitter coast region | runs | 1 container; placed 1 (Morrowind 1) | chargen barrel fatigue | enablemapmenu, enableplayerfighting, enableplayerjumping, enableplayermagic, getdistance, menumode, messagebox | 3: getdistance, local, menumode | - | - |
-| CharGenJournalMessage | bitter coast region | attached, not run | 1 door; placed 1 (Morrowind 1) | chargendoorjournal | getdistance, menumode, messagebox, xbox | 4: getdistance, local, menumode, xbox | - | a hand-written rule carries it |
-| CharGenNameNPC | bitter coast region | attached, not run | 1 NPC; placed 1 (Morrowind 1) | chargen name | enablenamemenu, getdistance, getsecondspassed, menumode, onactivate, say, saydone | 17: getdistance, local, menumode, onactivate, saydone | - | a hand-written rule carries it |
-| CharGenRaceNPC | bitter coast region | attached, not run | 1 NPC; placed 1 (Morrowind 1) | chargen dock guard | aitravel, aiwander, disableplayercontrols, enableplayercontrols, enableracemenu, getdisabled, getdistance, getsecondspassed, menumode, onactivate, say, saydone | 16: getdisabled, getdistance, local, menumode, onactivate, saydone | - | a hand-written rule carries it |
+| CharGenJournalMessage | bitter coast region | runs | 1 door; placed 1 (Morrowind 1) | chargendoorjournal | getdistance, menumode, messagebox, xbox | 4: getdistance, local, menumode, xbox | - | - |
+| CharGenNameNPC | bitter coast region | carried by AmiWind's own code | 1 NPC; placed 1 (Morrowind 1) | chargen name | enablenamemenu, getdistance, getsecondspassed, menumode, onactivate, say, saydone | 17: getdistance, local, menumode, onactivate, saydone | - | carried by engine/aga/src/aw_intro.c AW_IntroTick, the jiub_state steps |
+| CharGenRaceNPC | bitter coast region | carried by AmiWind's own code | 1 NPC; placed 1 (Morrowind 1) | chargen dock guard | aitravel, aiwander, disableplayercontrols, enableplayercontrols, enableracemenu, getdisabled, getdistance, getsecondspassed, menumode, onactivate, say, saydone | 16: getdisabled, getdistance, local, menumode, onactivate, saydone | - | carried by engine/aga/src/aw_opening.c AW_OpeningTick, the aw_story.dock steps |
 | CharGenStatsSheet | bitter coast region | runs | 1 book; placed 1 (Morrowind 1) | chargen statssheet | activate, enableinventorymenu, enableplayerfighting, enableplayermagic, menumode, messagebox, onactivate, xbox | 7: local, menumode, onactivate, xbox | - | - |
-| CharGenStuffRoom | bitter coast region | attached, not run | 1 activator; placed 1 (Morrowind 1) | chargen stuff room | getitemcount, getstandingpc, menumode, messagebox, xbox | 17: getitemcount, getstandingpc, global, local, menumode, xbox | - | a hand-written rule carries it |
-| CharGenWalkNPC | bitter coast region | attached, not run | 1 NPC; placed 1 (Morrowind 1) | chargen boat guard 2 | aiescort, aitravel, enableplayercontrols, getaipackagedone, getdistance, getsecondspassed, menumode, messagebox, onactivate, say, saydone, xbox | 22: getaipackagedone, getdistance, local, menumode, onactivate, saydone, xbox | - | a hand-written rule carries it |
+| CharGenStuffRoom | bitter coast region | runs | 1 activator; placed 1 (Morrowind 1) | chargen stuff room | getitemcount, getstandingpc, menumode, messagebox, xbox | 17: getitemcount, getstandingpc, global, local, menumode, xbox | - | - |
+| CharGenWalkNPC | bitter coast region | carried by AmiWind's own code | 1 NPC; placed 1 (Morrowind 1) | chargen boat guard 2 | aiescort, aitravel, enableplayercontrols, getaipackagedone, getdistance, getsecondspassed, menumode, messagebox, onactivate, say, saydone, xbox | 22: getaipackagedone, getdistance, local, menumode, onactivate, saydone, xbox | - | carried by engine/aga/src/aw_intro.c AW_IntroTick, the guard_state steps |
 | CorprusOnPC | bitter coast region | runs | 1 creature; placed 1 (Morrowind 1); speaker of 7 dialogue results | dagoth gares | addspell, forcegreeting, getdistance, journal, messagebox, ondeath | 3: getdistance, local, ondeath | - | - |
 | DaedraBoethiah | bitter coast region | runs | 2 activator; placed 1 (Morrowind 1) | active_dae_b_bo_head, active_dae_boethiah_ruin | addtopic, getdeadcount, getjournalindex, journal, menumode, onactivate, say, saydone | 10: getdeadcount, getjournalindex, local, menumode, onactivate, saydone | - | - |
 | DaedraBoethiah2 | bitter coast region | runs | 2 activator; placed 1 (Morrowind 1) | active_dae_boethiah, ex_dae_boethiah_fixed | additem, getjournalindex, journal, messagebox, onactivate, say, saydone | 7: getjournalindex, local, onactivate, saydone | - | - |
@@ -711,7 +830,7 @@ Referenced by: the records that carry the script and their placed references per
 | TopicsWebspinner | dialogue only | runs | started by 1 dialogue results | - | addtopic, stopscript | - | - | - |
 | All_Hortator | global scripts | runs | started by MoonAndStar | - | getjournalindex, journal, stopscript | 3: getjournalindex | - | - |
 | All_Nerevarine | global scripts | runs | started by MoonAndStar | - | getjournalindex, journal, stopscript | 4: getjournalindex | - | - |
-| CharGen | global scripts | attached, not run | started by Main | - | changeweather, disableplayercontrols, disableplayerfighting, disableplayerjumping, disableplayermagic, disableplayerviewswitch, disablevanitymode, positioncell, stopscript | - | - | a hand-written rule carries it |
+| CharGen | global scripts | carried by AmiWind's own code | started by Main | - | changeweather, disableplayercontrols, disableplayerfighting, disableplayerjumping, disableplayermagic, disableplayerviewswitch, disablevanitymode, positioncell, stopscript | - | - | carried by engine/aga/src/aw_story.c AW_StoryReset (with aw_intro.c AW_IntroBegin) |
 | CouncilorTopicsHlaalu | global scripts | runs | started by yellowBookScript; started by 2 dialogue results | - | addtopic, stopscript | - | - | - |
 | CouncilorTopicsRedoran | global scripts | runs | started by redBookScript | - | addtopic, stopscript | - | - | - |
 | CouncilorTopicsTelvanni | global scripts | runs | started by brownBookScript | - | addtopic | - | - | - |
@@ -998,7 +1117,7 @@ Referenced by: the records that carry the script and their placed references per
 
 | Script | Area | State | Referenced by | Records | Functions | Conditions | Follows OpenMW's fix | Why |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| fab_attack_disable | ascadian isles region | only in an add-on world | 3 activator, 1 light; placed 20 (Morrowind 11, Tribunal 9) | ex_mh_almalexia_statue, ex_mh_pav_top, ex_mh_pav_water_spray, blue candle bulb_177 | disable | 1: global | - | placed only in an add-on world, not in the image yet |
+| fab_attack_disable | ascadian isles region | runs | 3 activator, 1 light; placed 20 (Morrowind 11, Tribunal 9) | ex_mh_almalexia_statue, ex_mh_pav_top, ex_mh_pav_water_spray, blue candle bulb_177 | disable | 1: global | - | - |
 | lucan_ostorius | ashlands region | runs | 1 activator; placed 1 (Morrowind 1) | lucan_scriptholder | disable, getdeadcount, getjournalindex, getpccell, placeatpc | 11: getdeadcount, getjournalindex, getpccell, local | - | - |
 | BILL_MT_calc_legit_kills | dialogue only | runs | started by 8 dialogue results | - | getitemcount, getjournalindex, getpccrimelevel, stopscript | 70: getitemcount, getjournalindex | - | - |
 | BILL_MT_redeem_writs | dialogue only | runs | started by 3 dialogue results | - | getitemcount, getjournalindex, removeitem, setpccrimelevel, stopscript | 74: getitemcount, getjournalindex, global, local | - | - |
@@ -1048,10 +1167,10 @@ Referenced by: the records that carry the script and their placed references per
 | BolsIndalen | mournhold (tribunal) | only in an add-on world | 1 NPC; placed 1 (Tribunal 1); speaker of 56 dialogue results | bols indalen | - | 1: global, local | - | placed only in an add-on world, not in the image yet |
 | cavein_script | mournhold (tribunal) | only in an add-on world | 1 activator; placed 2 (Tribunal 2) | act_dwe_cavein00 | getangle, getbuttonpressed, getdistance, getitemcount, getpos, getsecondspassed, messagebox, onactivate, playgroup, removeitem, sethealth | 20: getdistance, getitemcount, local, onactivate | - | placed only in an add-on world, not in the image yet |
 | cent_fab_attack | mournhold (tribunal) | only in an add-on world | 1 creature; placed 1 (Tribunal 1) | centurion_steam_c_l | cellchanged, sethealth, startcombat | 3: cellchanged, local, other script | - | placed only in an add-on world, not in the image yet |
-| changeWater_-550_400 | mournhold (tribunal) | uses a function the interpreter lacks | 1 activator; placed 2 (Tribunal 2) | act_h20crank_-550_400 | getangle, getsecondspassed, getwaterlevel, menumode, onactivate, playsound3d, setangle, setwaterlevel | 15: local, menumode, onactivate | - | 2 not carried out: getwaterlevel, setwaterlevel |
+| changeWater_-550_400 | mournhold (tribunal) | uses a function the interpreter lacks | 1 activator; placed 2 (Tribunal 2) | act_h20crank_-550_400 | getangle, getsecondspassed, getwaterlevel, menumode, onactivate, playsound3d, setangle, setwaterlevel | 15: local, menumode, onactivate | - | 1 not carried out: setwaterlevel |
 | chapeldoorScript | mournhold (tribunal) | only in an add-on world | 2 door; placed 4 (Tribunal 4) | ex_mh_temple_door_01_ch, in_mh_door_02_chapel | activate, getjournalindex, messagebox, onactivate, playsound | 3: getjournalindex, local, onactivate | - | placed only in an add-on world, not in the image yet |
-| Collide_damage_100 | mournhold (tribunal) | uses a function the interpreter lacks | 1 activator; placed 2 (Tribunal 2) | act_sotha_spikes | hurtcollidingactor | - | - | 1 not carried out: hurtcollidingactor |
-| Collide_damage_kill | mournhold (tribunal) | uses a function the interpreter lacks | 2 activator; placed 5 (Tribunal 5) | act_sotha_dicer, act_sotha_tenderizer | hurtcollidingactor | - | - | 1 not carried out: hurtcollidingactor |
+| Collide_damage_100 | mournhold (tribunal) | only in an add-on world | 1 activator; placed 2 (Tribunal 2) | act_sotha_spikes | hurtcollidingactor | - | - | placed only in an add-on world, not in the image yet |
+| Collide_damage_kill | mournhold (tribunal) | only in an add-on world | 2 activator; placed 5 (Tribunal 5) | act_sotha_dicer, act_sotha_tenderizer | hurtcollidingactor | - | - | placed only in an add-on world, not in the image yet |
 | cryptboulderScript | mournhold (tribunal) | only in an add-on world | 4 activator; placed 4 (Tribunal 4) | in_moldboulder00_uni, in_moldboulder01_uni, in_moldrock05_uni, in_moldrock06_uni | disable, enable, getdisabled, getjournalindex, menumode | 5: getdisabled, getjournalindex, local, menumode | - | placed only in an add-on world, not in the image yet |
 | dandrasScript | mournhold (tribunal) | only in an add-on world | 1 NPC; placed 1 (Tribunal 1); speaker of 2 dialogue results | dandras vules | forcegreeting, gethealth, modhealth, resurrect | 4: local | - | placed only in an add-on world, not in the image yet |
 | dbHideoutScript | mournhold (tribunal) | only in an add-on world | 1 activator; placed 3 (Tribunal 3) | active_dbhideout | getdistance, getjournalindex, journal | 4: getdistance, getjournalindex, local | - | placed only in an add-on world, not in the image yet |
@@ -1064,10 +1183,10 @@ Referenced by: the records that carry the script and their placed references per
 | dravilScript | mournhold (tribunal) | only in an add-on world | 1 NPC; placed 1 (Tribunal 1); speaker of 2 dialogue results | dravil indrano | additem, getjournalindex, journal, messagebox, ondeath, setdisposition, setfight, startcombat | 5: getjournalindex, local, ondeath | - | placed only in an add-on world, not in the image yet |
 | DrothCopy | mournhold (tribunal) | only in an add-on world | 1 WEAP; placed 1 (Tribunal 1) | silver dagger_droth_unique_a | disable, enable, getdisabled, getjournalindex | 4: getdisabled, getjournalindex | - | placed only in an add-on world, not in the image yet |
 | DrothGeon | mournhold (tribunal) | only in an add-on world | 1 NPC; placed 1 (Tribunal 1); speaker of 15 dialogue results | geon auline | getjournalindex, journal, ondeath | 3: getjournalindex, ondeath | - | placed only in an add-on world, not in the image yet |
-| drownOnExit | mournhold (tribunal) | uses a function the interpreter lacks | 4 NPC; placed 4 (Tribunal 4) | black dart adren, black dart gilur, black dart malar, black dart urvyn | cellchanged, gethealth, getwaterlevel, sethealth | 4: cellchanged, gethealth, getwaterlevel, local | - | 1 not carried out: getwaterlevel |
+| drownOnExit | mournhold (tribunal) | only in an add-on world | 4 NPC; placed 4 (Tribunal 4) | black dart adren, black dart gilur, black dart malar, black dart urvyn | cellchanged, gethealth, getwaterlevel, sethealth | 4: cellchanged, gethealth, getwaterlevel, local | - | placed only in an add-on world, not in the image yet |
 | dulniScript | mournhold (tribunal) | only in an add-on world | 1 NPC; placed 1 (Tribunal 1); speaker of 7 dialogue results | urvel dulni | aifollow, aitravel, disable, enable, forcegreeting, getaipackagedone, getdistance, getjournalindex, getsecondspassed, journal, menumode, playgroup, playsound | 17: getaipackagedone, getdistance, getjournalindex, local, menumode | - | placed only in an add-on world, not in the image yet |
 | enoScript | mournhold (tribunal) | only in an add-on world | 1 NPC; placed 1 (Tribunal 1); speaker of 3 dialogue results | eno romari | disable, enable, getdisabled, getjournalindex | 5: getdisabled, getjournalindex, local | - | placed only in an add-on world, not in the image yet |
-| ExitBlockMessage | mournhold (tribunal) | uses a function the interpreter lacks | 1 activator; placed 5 (Tribunal 5) | editormarker_box_02 | getcollidingpc, messagebox | 2: getcollidingpc, local | - | 1 not carried out: getcollidingpc |
+| ExitBlockMessage | mournhold (tribunal) | only in an add-on world | 1 activator; placed 5 (Tribunal 5) | editormarker_box_02 | getcollidingpc, messagebox | 2: getcollidingpc, local | - | placed only in an add-on world, not in the image yet |
 | fab_attack_1 | mournhold (tribunal) | only in an add-on world | 1 creature; placed 4 (Tribunal 4) | fabricant_hulkin_attack | disable, enable, getjournalindex, journal, startcombat | 3: getjournalindex, global, local | - | placed only in an add-on world, not in the image yet |
 | fab_attack_2 | mournhold (tribunal) | only in an add-on world | 1 creature; placed 4 (Tribunal 4) | fabricant_verm_attack | disable, enable, startcombat | 1: global | - | placed only in an add-on world, not in the image yet |
 | fab_attack_enable | mournhold (tribunal) | only in an add-on world | 15 activator; placed 17 (Tribunal 17) | ex_mh_pav_bstatue_01, ex_mh_pav_bstatue_02, ex_mh_pav_bstatue_03, ex_mh_pav_bstatue_05, ex_mh_pav_bstatue_06, ex_mh_pav_bstatue_07 and 9 more | disable, enable | 1: global | - | placed only in an add-on world, not in the image yet |
@@ -1077,7 +1196,7 @@ Referenced by: the records that carry the script and their placed references per
 | fab_cent_attack | mournhold (tribunal) | only in an add-on world | 1 creature; placed 1 (Tribunal 1) | fabricant_hulking_c_l | cellchanged, sethealth, startcombat | 3: cellchanged, local, other script | - | placed only in an add-on world, not in the image yet |
 | fab_cent_fight_die | mournhold (tribunal) | only in an add-on world | 2 creature; placed 9 (Tribunal 9) | fabricant_hulking_c, fabricant_verminous_c | cellchanged, sethealth | 2: cellchanged, other script | - | placed only in an add-on world, not in the image yet |
 | fab_cent_fight_watch | mournhold (tribunal) | uses a function the interpreter lacks | 1 activator; placed 1 (Tribunal 1) | fab_cent_fight_watcher | cellchanged, getdistance, journal, menumode, placeitem | 7: cellchanged, getdistance, local, menumode | - | 1 not carried out: placeitem |
-| floatAboveStartHeight | mournhold (tribunal) | uses a function the interpreter lacks | 1 container; placed 9 (Tribunal 9) | crate_01_float1 | getangle, getpos, getsecondspassed, getwaterlevel, menumode, random, setangle, setpos | 8: local, menumode | - | 1 not carried out: getwaterlevel |
+| floatAboveStartHeight | mournhold (tribunal) | only in an add-on world | 1 container; placed 9 (Tribunal 9) | crate_01_float1 | getangle, getpos, getsecondspassed, getwaterlevel, menumode, random, setangle, setpos | 8: local, menumode | - | placed only in an add-on world, not in the image yet |
 | Gaenor_bScript | mournhold (tribunal) | only in an add-on world | 1 NPC; placed 1 (Tribunal 1); speaker of 1 dialogue results | gaenor_b | disable, enable, forcegreeting, getdisabled, getdistance, getjournalindex, journal, menumode, ondeath | 9: getdisabled, getdistance, getjournalindex, local, menumode, ondeath | - | placed only in an add-on world, not in the image yet |
 | GaenorScript | mournhold (tribunal) | uses a function the interpreter lacks | 1 NPC; placed 1 (Tribunal 1); speaker of 20 dialogue results | gaenor | cast, disable, forcegreeting, getchameleon, getjournalindex, journal, menumode, ondeath, stopscript | 8: getchameleon, getjournalindex, local, menumode, ondeath | - | 2 not carried out: cast, getchameleon |
 | galmsScript | mournhold (tribunal) | only in an add-on world | 1 NPC; placed 1 (Tribunal 1); speaker of 11 dialogue results | galms seles | random | - | - | placed only in an add-on world, not in the image yet |
@@ -1139,7 +1258,7 @@ Referenced by: the records that carry the script and their placed references per
 | NarisaAdus | mournhold (tribunal) | only in an add-on world | 2 NPC; placed 1 (Tribunal 1); speaker of 11 dialogue results | narisa adus, narissa adus | - | 1: global, local | - | placed only in an add-on world, not in the image yet |
 | OvisScript | mournhold (tribunal) | only in an add-on world | 1 NPC; placed 1 (Tribunal 1); speaker of 2 dialogue results | ovis velas | disable, enable, forcegreeting, getdistance, getjournalindex, getsecondspassed, journal, menumode, ondeath, playsound, setdisposition, setfight, startcombat, stopscript | 13: getdistance, getjournalindex, local, menumode, ondeath, other script | - | placed only in an add-on world, not in the image yet |
 | passageScript | mournhold (tribunal) | only in an add-on world | 1 activator, 1 door; placed 4 (Tribunal 4) | act_black_load03, door_load_darkness00 | activate, getbuttonpressed, messagebox, onactivate | 5: local, onactivate | - | placed only in an add-on world, not in the image yet |
-| Plague_Gedna | mournhold (tribunal) | uses a function the interpreter lacks | 1 creature; placed 1 (Tribunal 1); speaker of 2 dialogue results | lich_relvel | forcegreeting, getdistance, getjournalindex, getstat, journal, menumode, modhealth, ondeath | 6: getdistance, getjournalindex, local, menumode, ondeath | - | 1 not carried out: getstat |
+| Plague_Gedna | mournhold (tribunal) | only in an add-on world | 1 creature; placed 1 (Tribunal 1); speaker of 2 dialogue results | lich_relvel | forcegreeting, getdistance, getjournalindex, getstat, journal, menumode, modhealth, ondeath | 6: getdistance, getjournalindex, local, menumode, ondeath | - | placed only in an add-on world, not in the image yet |
 | PlagueAthelyn | mournhold (tribunal) | only in an add-on world | 1 NPC; placed 1 (Tribunal 1); speaker of 3 dialogue results | athelyn malas | disable, enable, getdisabled, getjournalindex, removespell | 8: getdisabled, getjournalindex, local | - | placed only in an add-on world, not in the image yet |
 | PlagueHallRat1 | mournhold (tribunal) | only in an add-on world | 2 creature; placed 7 (Tribunal 7) | rat_plague_hall1, rat_plague_hall1a | disable, enable, getdisabled, getjournalindex, ondeath | 7: getdisabled, getjournalindex, ondeath | - | placed only in an add-on world, not in the image yet |
 | PlagueHallRat2 | mournhold (tribunal) | only in an add-on world | 1 creature; placed 1 (Tribunal 1) | rat_plague_hall2 | disable, enable, getdisabled, getjournalindex | 6: getdisabled, getjournalindex | - | placed only in an add-on world, not in the image yet |
@@ -1157,7 +1276,7 @@ Referenced by: the records that carry the script and their placed references per
 | projectileMine | mournhold (tribunal) | uses a function the interpreter lacks | 1 activator; placed 3 (Tribunal 3) | prox_proj_mine | getangle, getdistance, getpcsneaking, getpos, getsecondspassed, getsneak, menumode, placeitem, random | 7: getpcsneaking, local, menumode | - | 1 not carried out: placeitem |
 | proximityMine | mournhold (tribunal) | only in an add-on world | 1 activator; placed 11 (Tribunal 11) | misc_dwrv_prox_mine | cast, getdistance, getpcsneaking, getsecondspassed, getsneak, menumode, random | 12: getpcsneaking, local, menumode | - | placed only in an add-on world, not in the image yet |
 | radacScript | mournhold (tribunal) | only in an add-on world | 1 creature; placed 1 (Tribunal 1); speaker of 3 dialogue results | dwarven ghost_radac | disable, enable, getdisabled, getjournalindex | 4: getdisabled, getjournalindex | - | placed only in an add-on world, not in the image yet |
-| raiseWaterToOpen | mournhold (tribunal) | uses a function the interpreter lacks | 2 door; placed 2 (Tribunal 2) | ex_mh_swr_trapdr_blkd, in_m_sewer_trapdoor_01_blkd | activate, getwaterlevel, messagebox, onactivate | 3: local, onactivate | - | 1 not carried out: getwaterlevel |
+| raiseWaterToOpen | mournhold (tribunal) | only in an add-on world | 2 door; placed 2 (Tribunal 2) | ex_mh_swr_trapdr_blkd, in_m_sewer_trapdoor_01_blkd | activate, getwaterlevel, messagebox, onactivate | 3: local, onactivate | - | placed only in an add-on world, not in the image yet |
 | replenishammoShock | mournhold (tribunal) | only in an add-on world | 1 creature; placed 2 (Tribunal 2) | centurion_projectile_c | additem, getitemcount, menumode, ondeath | 4: getitemcount, local, menumode, ondeath | - | placed only in an add-on world, not in the image yet |
 | rerlas | mournhold (tribunal) | only in an add-on world | 1 NPC; placed 1 (Tribunal 1); speaker of 11 dialogue results | rerlas mon | - | - | - | placed only in an add-on world, not in the image yet |
 | rockslide | mournhold (tribunal) | only in an add-on world | 1 activator; placed 1 (Tribunal 1) | act_rockslide01 | disable, getdisabled, getjournalindex, getpccell, getsecondspassed, playgroup, playsound | 6: getdisabled, getjournalindex, getpccell, local | - | placed only in an add-on world, not in the image yet |
@@ -1203,7 +1322,7 @@ Referenced by: the records that carry the script and their placed references per
 | Therdon2Script | mournhold (tribunal) | only in an add-on world | 1 NPC; placed 1 (Tribunal 1); speaker of 1 dialogue results | therdon2 | disable, enable, getdeadcount | 4: getdeadcount, local, other script | - | placed only in an add-on world, not in the image yet |
 | TherdonScript | mournhold (tribunal) | only in an add-on world | 1 NPC; placed 1 (Tribunal 1); speaker of 3 dialogue results | therdon | disable | 2: local | - | placed only in an add-on world, not in the image yet |
 | ThrudScript | mournhold (tribunal) | only in an add-on world | 1 NPC; placed 1 (Tribunal 1); speaker of 8 dialogue results | thrud | aiwander, cellchanged, disable, getdeadcount, getjournalindex, ondeath | 11: cellchanged, getdeadcount, getjournalindex, local, ondeath | - | placed only in an add-on world, not in the image yet |
-| torch_lever | mournhold (tribunal) | uses a function the interpreter lacks | 1 activator; placed 1 (Tribunal 1) | act_torch_lever_uni | gethealth, getsecondspassed, getwaterlevel, menumode, messagebox, modwaterlevel, onactivate, playgroup, playsound, sethealth, setwaterlevel | 10: gethealth, local, menumode, onactivate | - | 3 not carried out: getwaterlevel, modwaterlevel, setwaterlevel |
+| torch_lever | mournhold (tribunal) | uses a function the interpreter lacks | 1 activator; placed 1 (Tribunal 1) | act_torch_lever_uni | gethealth, getsecondspassed, getwaterlevel, menumode, messagebox, modwaterlevel, onactivate, playgroup, playsound, sethealth, setwaterlevel | 10: gethealth, local, menumode, onactivate | - | 2 not carried out: modwaterlevel, setwaterlevel |
 | tr_weathlev1 | mournhold (tribunal) | only in an add-on world | 3 activator; placed 3 (Tribunal 3) | act_dwe_lever_a, act_dwe_lever_b, act_dwe_lever_c | getjournalindex, messagebox, onactivate, playgroup | 6: getjournalindex, local, onactivate, other script | - | placed only in an add-on world, not in the image yet |
 | tr_weathmachine | mournhold (tribunal) | only in an add-on world | 1 activator; placed 1 (Tribunal 1) | act_dwe_weather00 | changeweather, getangle, getsecondspassed, journal, menumode, modregion, playsound, setangle | 35: local, menumode | - | placed only in an add-on world, not in the image yet |
 | treedeadScript | mournhold (tribunal) | only in an add-on world | 2 activator; placed 136 (Tribunal 136) | act_flora_treedead_mh_01, act_flora_treedead_mh_02 | disable, enable, getdisabled | 4: getdisabled, global, local | - | placed only in an add-on world, not in the image yet |
@@ -1214,8 +1333,8 @@ Referenced by: the records that carry the script and their placed references per
 | VarninerGhost | mournhold (tribunal) | only in an add-on world | 1 creature; placed 1 (Tribunal 1); speaker of 3 dialogue results | ancestor_ghost_variner | cellchanged, disable, enable, getdisabled, getjournalindex, journal, ondeath | 13: cellchanged, getdisabled, getjournalindex, local, ondeath | - | placed only in an add-on world, not in the image yet |
 | velnyaWalkScript | mournhold (tribunal) | only in an add-on world | 1 NPC; placed 1 (Tribunal 1); speaker of 2 dialogue results | velyna seran | aitravel, aiwander, disable, getaipackagedone, getjournalindex, journal, menumode, ondeath | 17: getaipackagedone, getjournalindex, local, menumode, ondeath, other script | - | placed only in an add-on world, not in the image yet |
 | WarlordOren | mournhold (tribunal) | only in an add-on world | 1 NPC; placed 1 (Tribunal 1); speaker of 20 dialogue results | dovor oren | activate, getjournalindex, journal, onactivate, ondeath | 5: getjournalindex, onactivate, ondeath | - | placed only in an add-on world, not in the image yet |
-| waterstate_torchdisable | mournhold (tribunal) | uses a function the interpreter lacks | 3 light; placed 16 (Tribunal 16) | light_com_torch_01_uni, light_logpile_uni, light_tikitorch00_uni | disable, enable, getpos, getwaterlevel | 4: getwaterlevel, local | - | 1 not carried out: getwaterlevel |
-| waterstate_torchenable | mournhold (tribunal) | uses a function the interpreter lacks | 1 activator, 2 light; placed 16 (Tribunal 16) | active_tikitorch_uni, light_com_torch_burnedout_uni, light_logpile_burnedout | disable, enable, getpos, getwaterlevel | 4: getwaterlevel, local | - | 1 not carried out: getwaterlevel |
+| waterstate_torchdisable | mournhold (tribunal) | only in an add-on world | 3 light; placed 16 (Tribunal 16) | light_com_torch_01_uni, light_logpile_uni, light_tikitorch00_uni | disable, enable, getpos, getwaterlevel | 4: getwaterlevel, local | - | placed only in an add-on world, not in the image yet |
+| waterstate_torchenable | mournhold (tribunal) | only in an add-on world | 1 activator, 2 light; placed 16 (Tribunal 16) | active_tikitorch_uni, light_com_torch_burnedout_uni, light_logpile_burnedout | disable, enable, getpos, getwaterlevel | 4: getwaterlevel, local | - | placed only in an add-on world, not in the image yet |
 | weatherpowerScript | mournhold (tribunal) | only in an add-on world | 1 item; placed 1 (Tribunal 1) | misc_dwrv_weather2 | disable, messagebox, onactivate | 4: local, onactivate, other script | - | placed only in an add-on world, not in the image yet |
 | WritAlen | mournhold (tribunal) | only in an add-on world | 1 NPC; placed 1 (Tribunal 1); speaker of 4 dialogue results | bedal alen | cellchanged, getjournalindex, getpccrimelevel, journal, menumode, ondeath | 5: cellchanged, getjournalindex, local, menumode, ondeath | - | placed only in an add-on world, not in the image yet |
 | WritBerano | mournhold (tribunal) | only in an add-on world | 1 NPC; placed 1 (Tribunal 1); speaker of 4 dialogue results | forven berano | cellchanged, getjournalindex, getpccrimelevel, journal, menumode, ondeath | 5: cellchanged, getjournalindex, local, menumode, ondeath | - | placed only in an add-on world, not in the image yet |
@@ -1367,7 +1486,7 @@ Referenced by: the records that carry the script and their placed references per
 | ColonyAlfbrand | hirstaang forest region | only in an add-on world | 1 NPC; placed 1 (Bloodmoon 1); speaker of 2 dialogue results | alfbrand | disable, enable, forcegreeting, getdeadcount, getdisabled, getjournalindex, journal, ondeath, setfight, startcombat | 18: getdeadcount, getdisabled, getjournalindex, global, local, ondeath, other script | - | placed only in an add-on world, not in the image yet |
 | ColonyAssassinItems | hirstaang forest region | only in an add-on world | 1 activator; placed 1 (Bloodmoon 1) | colony_assassin_act | disable, enable, getdisabled, getjournalindex, stopscript | 8: getdisabled, getjournalindex | - | placed only in an add-on world, not in the image yet |
 | ColonyAudmund | hirstaang forest region | only in an add-on world | 1 NPC; placed 1 (Bloodmoon 1); speaker of 2 dialogue results | audmund | disable, enable, forcegreeting, getdeadcount, getdisabled, getjournalindex, journal, ondeath, setfight, startcombat | 18: getdeadcount, getdisabled, getjournalindex, global, local, ondeath, other script | - | placed only in an add-on world, not in the image yet |
-| ColonyBaro | hirstaang forest region | uses a function the interpreter lacks | 1 NPC; placed 1 (Bloodmoon 1); speaker of 5 dialogue results | baro egnatius | disable, enable, getdisabled, getdistance, getjournalindex, getweapondrawn, getweapontype, hasitemequipped, journal, menumode, ondeath | 15: getdisabled, getdistance, getjournalindex, getweapondrawn, getweapontype, global, hasitemequipped, local, menumode, ondeath | - | 1 not carried out: getweapontype |
+| ColonyBaro | hirstaang forest region | only in an add-on world | 1 NPC; placed 1 (Bloodmoon 1); speaker of 5 dialogue results | baro egnatius | disable, enable, getdisabled, getdistance, getjournalindex, getweapondrawn, getweapontype, hasitemequipped, journal, menumode, ondeath | 15: getdisabled, getdistance, getjournalindex, getweapondrawn, getweapontype, global, hasitemequipped, local, menumode, ondeath | - | placed only in an add-on world, not in the image yet |
 | ColonyBaroShip | hirstaang forest region | only in an add-on world | 3 activator; placed 4 (Bloodmoon 4) | act_ex_de_ship_door_baro, ex_co_ship_baro, ex_co_ship_trapdoorb | disable, enable, getdisabled | 4: getdisabled | - | placed only in an add-on world, not in the image yet |
 | ColonyBryngrim | hirstaang forest region | only in an add-on world | 1 NPC; placed 1 (Bloodmoon 1); speaker of 2 dialogue results | bryngrim | disable, enable, forcegreeting, getdeadcount, getdisabled, getjournalindex, journal, ondeath, setfight, startcombat | 18: getdeadcount, getdisabled, getjournalindex, global, local, ondeath, other script | - | placed only in an add-on world, not in the image yet |
 | ColonyCarnius | hirstaang forest region | only in an add-on world | 1 NPC; placed 1 (Bloodmoon 1); speaker of 118 dialogue results | carnius magius | getdeadcount, getjournalindex, journal, ondeath | 8: getdeadcount, getjournalindex, local, ondeath, other script | - | placed only in an add-on world, not in the image yet |

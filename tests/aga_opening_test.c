@@ -36,6 +36,10 @@ int AW_ReaderActive(void){return 0;}
 int AW_ReaderResult(void){return 0;}
 int AW_ReaderOpen(const char *s,int n){reads++;return 1;}
 void AW_UISubtitle(const char *a,const char *b,double t){}
+/* OPENING-CAPTAIN-HINT-SUBTITLE-63: the captain hint is CharGenDialogueMessage's box with its Ok button */
+static char box_text[256];static int box_buttons=-1;
+void AW_MsgBoxShow(const char *text,const char *const *buttons,int count){
+    strncpy(box_text,text,sizeof(box_text)-1);box_buttons=count && buttons && !strcmp(buttons[0],"Ok")?count:-1;}
 void IN_AWClearButtons(void){}
 void Con_Printf(char *s,...){}
 float AW_DoorSound(unsigned ref,int close){door_sounds++;return 0;}
@@ -81,25 +85,18 @@ int main(void)
     done=1;menu=0;AW_OpeningTick();assert(aw_story.stage==AW_STAGE_OFFICE && AW_OpeningLocked());
     for(i=0;i<16;i++)AW_OpeningTick();assert(aw_story.dock==50 && !strcmp(line,"chargendock2") && AW_OpeningLocked());
     speech=0;AW_OpeningTick();assert(aw_story.dock==-1 && !AW_OpeningLocked() && nav_starts==2);
-    assert(nav_goal[0]==299 && nav_goal[1]==-202);
+    /* v0.0.63 (the parity check): CharGenRaceNPC's own post, AITravel -9944 -72481 "next to door", in the dock map's
+     * units ((x+11264)/4, (y+71680)/4): 330 -200.25; he stands as the travel left him (no forced facing) */
+    assert(nav_goal[0]==330.f && nav_goal[1]==-200.25f);
     guard.v.angles[1]=10;nav_result=0;AW_OpeningTick();assert(guard.v.angles[1]==10);
-    nav_result=1;AW_OpeningTick();assert(guard.v.angles[1]==225);
-    for(i=0;i<5;i++)AW_OpeningTick();assert(nav_starts==2 && guard.v.angles[1]==225);
-    /* INTRO-DOCK-GUARD-BLOCKS-DOOR-62: the post is on the LEFT of the office door as the player comes up from the
-     * pier, clear of the doorway, and he faces the pier there. Door 113893 (doors-seyda.txt box 308.9..332.6,
-     * -173.4..-149.6, centre 320.7 -161.5); the ship's arrival on the deck 695.5 -486.7. */
-    {
-        float door[2]={320.7f,-161.5f},pier[2]={695.5f,-486.7f},walk[2],left[2],rel[2],len,face,want;
-        walk[0]=door[0]-pier[0];walk[1]=door[1]-pier[1];len=(float)sqrt(walk[0]*walk[0]+walk[1]*walk[1]);
-        walk[0]/=len;walk[1]/=len;left[0]=-walk[1];left[1]=walk[0];
-        rel[0]=nav_goal[0]-door[0];rel[1]=nav_goal[1]-door[1];
-        assert(rel[0]*left[0]+rel[1]*left[1]>30);                  /* left of the door, well clear of its frame */
-        assert(sqrt(rel[0]*rel[0]+rel[1]*rel[1])<64);               /* still beside it */
-        face=guard.v.angles[1]+90;                                  /* converted actors face local +Y */
-        want=(float)(atan2(pier[1]-nav_goal[1],pier[0]-nav_goal[0])*180/M_PI);
-        while(face-want>180)face-=360;while(want-face>180)face+=360;
-        assert(fabs(face-want)<15);                                 /* he faces the pier */
-    }
+    nav_result=1;AW_OpeningTick();assert(guard.v.angles[1]==10);
+    for(i=0;i<5;i++)AW_OpeningTick();assert(nav_starts==2 && guard.v.angles[1]==10);
+    /* INTRO-DOCK-GUARD-BLOCKS-DOOR-62, by numbers: his box at the post (half widths 7.32 x 7.12, as the converted
+     * actors') and the office door's box of the shipped door table (doors-seyda.txt 113893: 308.86..332.61,
+     * -173.38..-149.62) do not overlap, and the space between them is wider than the player's box (2 x 7.32): the
+     * player passes between him and the door */
+    {float guard_top=nav_goal[1]+7.12f,door_bottom=-173.37754f,gap=door_bottom-guard_top;
+     assert(gap>0 && gap>2*7.32f);}
     assert(AW_StoryRestricted()); /* Race completion must not remove the enclosure. */
     for(i=0;i<70;i++)AW_OpeningTick();assert(!strcmp(line,"chargendock3"));
     /* Prompt and E share aim/range/visibility and the same stateful target. */
@@ -186,6 +183,12 @@ int main(void)
             aw_census_legacy.value=0;
             clerk.v.modelindex=0;sv.num_edicts=4;captain.v.modelindex=1;captain.v.netname=1;
             captain.v.origin[0]=20;captain.v.origin[2]=-14;
+            /* OPENING-CAPTAIN-HINT-SUBTITLE-63: within 75 map units (300 original) the hint is CharGenDialogueMessage's
+             * message box with its Ok button, once */
+            AW_StoryReset(1);aw_story.stage=AW_STAGE_CAPTAIN;aw_story.census=-1;aw_story.captain_hint=0;box_buttons=-1;
+            AW_OpeningTick();
+            assert(aw_story.captain_hint==1 && box_buttons==1 && strstr(box_text,"talk to the Captain"));
+            box_buttons=-1;AW_OpeningTick();assert(box_buttons==-1);
             AW_StoryReset(1);aw_story.stage=AW_STAGE_CAPTAIN;aw_story.census=-1;aw_story.captain_hint=1;
             assert(AW_ItemAdd(&aw_state,"chargen statssheet",1) && AW_Papers()==1);
             assert(!AW_CensusLegacy());
@@ -235,11 +238,18 @@ int main(void)
         assert(AW_StoryMenus()==(AW_MENU_INVENTORY|AW_MENU_STATS));
         assert(AW_StoryInventoryAllowed() && (AW_StoryHudChannels()&AW_HUD_STATS) && !(AW_StoryHudChannels()&AW_HUD_MAGIC));
         assert(AW_StoryMenuEnable(AW_MENU_MAGIC) && (AW_StoryHudChannels()&AW_HUD_MAGIC));
+        /* EnableRest (v0.0.63, MWSCRIPT-GAPS-63): its own bit, kept with the others, cleared by New Game */
+        assert(AW_StoryMenuEnable(AW_MENU_REST) && (AW_StoryMenus()&AW_MENU_REST) && AW_StoryRestricted());
         AW_StoryReset(1);assert(!AW_StoryMenus());
         menu=0;aw_story.stage=AW_STAGE_OFFICE;
         assert(AW_OpeningScriptMenu(2) && menu==2 && aw_story.stage==AW_STAGE_CLASS);
         assert(AW_OpeningScriptMenu(3) && menu==3 && aw_story.stage==AW_STAGE_CLASS);
-        assert(AW_OpeningScriptMenu(4) && menu==4 && !AW_OpeningScriptMenu(1) && !AW_OpeningScriptMenu(5) && menu==4);
+        assert(AW_OpeningScriptMenu(4) && menu==4 && !AW_OpeningScriptMenu(5) && menu==4);
+        /* EnableRaceMenu (v0.0.63, MWSCRIPT-GAPS-63): the race window opens; only on the ship or the dock does it make
+         * the RACE stage (in the office the stage stays) */
+        assert(AW_OpeningScriptMenu(1) && menu==1 && aw_story.stage==AW_STAGE_CLASS);
+        menu=0;aw_story.stage=AW_STAGE_DOCK;
+        assert(AW_OpeningScriptMenu(1) && menu==1 && aw_story.stage==AW_STAGE_RACE);
     }
     /* CENSUS-INTRO-SCRIPTS-62: the clerk runs CharGenClassNPC. The opening says nothing for him, does not lock the
      * player and does not aim at him; his script's windows move the stages on: class -> birth -> review -> papers,

@@ -240,7 +240,8 @@ def build(data, palette, ids, out_id1, jobs=1, kinds=None):
     """Bake the standing models of the NPC records IDS into OUT_ID1 (progs/n_<key>.mdl + .anm, sound/...); returns
     the manifest {'format', 'profile', 'models': {key: facts + model}, 'npcs': {id: {key, name, dead}},
     'left_out': {id or key: reason}}."""
-    from build_parallel import ordered_map
+    import actor_units
+    import pass_cache
     from mwad.npc import load_master, text
     from mwad.paths import child_ci
     data = Path(data)
@@ -254,10 +255,25 @@ def build(data, palette, ids, out_id1, jobs=1, kinds=None):
     tasks = [(k, data, palette, apps[v[0]], profile) for k, v in sorted(groups.items())]
     print('NPC library: %d NPC records, %d appearances, profile %s, %d jobs' % (
         len(apps), len(tasks), profile, jobs), flush=True)
+    # every appearance from the unit cache npc-appearance when it was baked before with the same inputs, bake code and
+    # settings; the rest baked and each kept the moment it is back (tools/actor_units.py, NPC-LIBRARY-NO-UNIT-CACHE-63)
+    cache = actor_units.open_cache(actor_units.NPC_CACHE, ((__file__, 'bake_standing'),),
+                                   pass_cache.source_digest((__file__, 'bake_standing')),
+                                   pass_cache.previous_digests((__file__, 'bake_standing')),
+                                   pass_cache.covered_lines((__file__, 'bake_standing')))
+    palette_sha256 = actor_units.palette_digest(palette)
+    done, errors, cached = actor_units.bake_appearances(
+        tasks, {key: idents[0] for key, idents in groups.items()}, jobs, cache,
+        lambda task: actor_units.npc_inputs(task[3], task[0], task[4], palette_sha256))
+    print('NPC library: %d appearances (%d from the unit cache %s, %d baked)' % (
+        len(tasks), cached, actor_units.NPC_CACHE, len(tasks) - cached), flush=True)
     models = {}
     seam = {'passing': 0, 'baselined': 0, 'entry': 0, 'new': 0, 'worse': 0}
     stops = []
-    for key, result, seconds, error in ordered_map(_unit, tasks, jobs=max(1, jobs)):
+    for key in [task[0] for task in tasks]:
+        # in key order, as the bake map handed them back before (the same manifest and files)
+        result, seconds = done.get(key, (None, 0.))
+        error = errors.get(key)
         if result is None and error and error.startswith('BakeStop'):
             # the seam stop is never an appearance left out: every one is listed, then the stage fails
             stops.append('%s (%s): %s' % (key, groups[key][0], error))

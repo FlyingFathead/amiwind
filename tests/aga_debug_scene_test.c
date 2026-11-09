@@ -57,6 +57,7 @@ sfx_t *S_PrecacheSound(char *name){assert(0);return NULL;}
 void S_StartSound(int e,int channel,sfx_t *s,vec3_t p,float volume,float attenuation){assert(0);}
 void AW_UIVoiceSubtitle(const char *who,const char *text,double duration){assert(0);}
 void AW_UISubtitle(const char *who,const char *text,double duration){}
+void AW_MsgBoxShow(const char *text,const char *const *buttons,int count){(void)text;(void)buttons;(void)count;}
 void Cmd_ExecuteString(char *text,cmd_source_t source){
     assert(source==src_command);maps++;strcpy(last_map,text);
     assert(!strcmp(text,"map seyda"));assert(!character);

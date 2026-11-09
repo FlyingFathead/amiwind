@@ -57,9 +57,11 @@ typedef struct {unsigned ref;unsigned char lock,flags;unsigned short key;} hd_lo
 static hd_lock_t locks[HD_LOCKS];static int lock_count,key_pool_used;static char key_pool[HD_KEY_POOL];
 static char key_used[48];   /* GMST sKeyUsed */
 /* WORLD-BUTTONS-62: the M rows, references ascending; pid: its CHIM placement once loaded (0 none); shift: how far
- * the scripts moved it (map units); since: travel since its efrags were last relinked. 128 x 24 = 3,072 bytes. */
+ * the scripts moved it (map units); turn: how far they turned it (Quake angles: pitch, yaw, roll); since: travel since
+ * its efrags were last relinked, -1 while a loaded placement waits for the next tick. 128 x 36 = 4,608 bytes. */
 #define HD_MOVERS 128
-typedef struct {unsigned ref,pid;vec3_t shift;float since;} hd_mover_t;
+typedef struct {unsigned ref,pid;vec3_t shift,turn;float since;} hd_mover_t;
+#define MOVED(m) ((m)->shift[0] || (m)->shift[1] || (m)->shift[2] || (m)->turn[0] || (m)->turn[1] || (m)->turn[2])
 static hd_mover_t movers[HD_MOVERS];static int mover_count,mover_pending;
 static void movers_pending(void);
 /* dbg doorlocks on|off (the coordinator, 2026-10-27: on by default, a debug switch until lockpicks and the Open
@@ -397,7 +399,7 @@ static int mover_find(unsigned reference){
 int AW_MoverCount(void){load();return mover_count;}
 int AW_MoverMoved(void){
     int i,n=0;
-    for(i=0;i<mover_count;i++)if(movers[i].shift[0] || movers[i].shift[1] || movers[i].shift[2])n++;
+    for(i=0;i<mover_count;i++)if(MOVED(&movers[i]))n++;
     return n;
 }
 /* The frames' door hook for a mover (through AW_HingedDoorPlacement): 1, the placement keeps its pid; one that has
@@ -407,16 +409,44 @@ int AW_MoverPlacement(unsigned pid,unsigned reference){
     if(!mover_count && loaded)return 0;
     if((i=mover_find(reference))<0)return 0;
     movers[i].pid=pid;
-    if(movers[i].shift[0] || movers[i].shift[1] || movers[i].shift[2]){movers[i].since=-1;mover_pending=1;}
+    if(MOVED(&movers[i])){movers[i].since=-1;mover_pending=1;}
     return 1;
 }
 static void mover_place(hd_mover_t *m,const float *d,int relink){
     if(m->pid && aw_chim_place_shift)aw_chim_place_shift(m->pid,d,relink);
 }
+static int mover_turn(hd_mover_t *m,const float *d,float *now){
+    return m->pid && aw_chim_place_turn?aw_chim_place_turn(m->pid,d,now):0;
+}
 static void movers_pending(void){
     int i;
     mover_pending=0;
-    for(i=0;i<mover_count;i++)if(movers[i].since<0){movers[i].since=0;mover_place(&movers[i],movers[i].shift,1);}
+    for(i=0;i<mover_count;i++)if(movers[i].since<0){
+        movers[i].since=0;
+        if(movers[i].turn[0] || movers[i].turn[1] || movers[i].turn[2])mover_turn(&movers[i],movers[i].turn,NULL);
+        mover_place(&movers[i],movers[i].shift,1);
+    }
+}
+/* Rotate / RotateWorld (WORLD-BUTTONS-62 part 2; OpenMW 0.51 transformationextensions.cpp OpRotate, OpRotateWorld):
+ * the mover turns by D (Quake angles, as aw_mwhost.c turns an entity). 1 when it is a mover. */
+int AW_MoverTurn(unsigned reference,const float *d){
+    int i;hd_mover_t *m;
+    if((i=mover_find(reference))<0)return 0;
+    m=&movers[i];
+    VectorAdd(m->turn,d,m->turn);
+    if(m->since>=0)mover_turn(m,d,NULL);
+    return 1;
+}
+/* SetAngle (OpenMW OpSetAngle): Quake angle K of the mover to VALUE; needs its placement loaded (its angle now).
+ * 1 when done. */
+int AW_MoverSetAngle(unsigned reference,int k,float value){
+    int i;hd_mover_t *m;float now[3],d[3]={0,0,0};
+    if(k<0 || k>2 || (i=mover_find(reference))<0)return 0;
+    m=&movers[i];
+    if(m->since<0)movers_pending();
+    if(!mover_turn(m,d,now))return 0;
+    d[k]=value-now[k];
+    return AW_MoverTurn(reference,d);
 }
 int AW_MoverShift(unsigned reference,const float *d){
     int i,relink;hd_mover_t *m;
@@ -430,17 +460,56 @@ int AW_MoverShift(unsigned reference,const float *d){
     return 1;
 }
 int AW_MoverAtStart(unsigned reference){
-    int i;hd_mover_t *m;vec3_t back;
+    int i;hd_mover_t *m;vec3_t back,unturn;
     if((i=mover_find(reference))<0)return 0;
     m=&movers[i];
     VectorScale(m->shift,-1,back);m->shift[0]=m->shift[1]=m->shift[2]=0;
-    if(m->since>=0 && (back[0] || back[1] || back[2]))mover_place(m,back,1);   /* a pending one is still at its start */
+    VectorScale(m->turn,-1,unturn);m->turn[0]=m->turn[1]=m->turn[2]=0;
+    if(m->since>=0){   /* a pending one is still at its start */
+        if(unturn[0] || unturn[1] || unturn[2])mover_turn(m,unturn,NULL);
+        if(back[0] || back[1] || back[2])mover_place(m,back,1);
+    }
     m->since=0;
     return 1;
 }
 void AW_MoverReset(void){
     int i;
     for(i=0;i<mover_count;i++)AW_MoverAtStart(movers[i].ref);
+}
+/* Saved games (WORLD-BUTTONS-62 part 3; OpenMW keeps a moved reference's position and rotation with the game):
+ * "AWMV" u8 1 u16 count, count x (u32 reference, f32 shift x y z, f32 turn pitch yaw roll), big-endian: 7 + 28 x
+ * count bytes, only the movers away from their start. Import: a row whose reference is not a mover of this image is
+ * left out (other game data); the movers stand there when their placements load. -1: no room / unreadable. */
+static void mv_put32(unsigned char *p,unsigned long v){p[0]=(unsigned char)(v>>24);p[1]=(unsigned char)(v>>16);p[2]=(unsigned char)(v>>8);p[3]=(unsigned char)v;}
+static unsigned long mv_get32(const unsigned char *p){return ((unsigned long)p[0]<<24)|((unsigned long)p[1]<<16)|((unsigned long)p[2]<<8)|p[3];}
+static void mv_putf(unsigned char *p,float f){union{float f;unsigned int u;}x;x.f=f;mv_put32(p,x.u);}
+static float mv_getf(const unsigned char *p){union{float f;unsigned int u;}x;x.u=(unsigned int)mv_get32(p);return x.f;}
+int AW_MoverExport(unsigned char *out,int capacity){
+    int i,k,n=0,at=7;
+    for(i=0;i<mover_count;i++)if(MOVED(&movers[i]))n++;
+    if(capacity<7+28*n)return -1;
+    memcpy(out,"AWMV",4);out[4]=1;out[5]=(unsigned char)(n>>8);out[6]=(unsigned char)n;
+    for(i=0;i<mover_count;i++){
+        if(!MOVED(&movers[i]))continue;
+        mv_put32(out+at,movers[i].ref);at+=4;
+        for(k=0;k<3;k++){mv_putf(out+at,movers[i].shift[k]);at+=4;}
+        for(k=0;k<3;k++){mv_putf(out+at,movers[i].turn[k]);at+=4;}
+    }
+    return at;
+}
+int AW_MoverImport(const unsigned char *p,int bytes){
+    int i,k,n,at=7,row;
+    if(bytes<7 || memcmp(p,"AWMV",4) || p[4]!=1)return -1;
+    n=(p[5]<<8)|p[6];
+    if(bytes<7+28*n)return -1;
+    for(i=0;i<n;i++,at+=28){
+        float v[6];
+        for(k=0;k<6;k++){v[k]=mv_getf(p+at+4+4*k);if(!isfinite(v[k]) || v[k]>1e6f || v[k]<-1e6f)return -1;}
+        if((row=mover_find((unsigned)mv_get32(p+at)))<0)continue;
+        for(k=0;k<3;k++){movers[row].shift[k]=v[k];movers[row].turn[k]=v[3+k];}
+        if(movers[row].pid){movers[row].since=-1;mover_pending=1;}   /* loaded already: placed on the next tick */
+    }
+    return at;
 }
 int AW_HingedDoorProtect(edict_t *e){
     eval_t *v=GetEdictFieldValue(e,"aw_ref");

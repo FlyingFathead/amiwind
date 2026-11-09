@@ -1,6 +1,6 @@
 # Build cache: resuming and reusing work safely
 
-_Last updated with AmiWind v0.0.62 (9 November 2026)._
+_Last updated with AmiWind v0.0.63-dev2 (9 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -70,8 +70,27 @@ A failure forces the builder to rebuild only the minimum, within safe limits:
 | Stage units | one region of world scenery or world flora | the region record, its input bytes, every shared input by content, the sources, the settings | `tools/pass_cache.py` `UnitCache` |
 | Stage units | one interior room (Balmora interiors, the area rooms, town interiors), one town region (Balmora and the other towns), one character head preview | the room or region record, the game data (the build's input lock), the palette, the map compilers by content, the shared town inputs by content, the sources, the settings | `prepare_area.build_room_cached`, `import_town`, `prepare_character` |
 | Stage units | one batch room (stage `chim-room-batches`, `--room-batches`): its scenery export, kept placements, plant sprites and shell room map, no compiled visual world | the room record (map name, cell, room policy, recentring), the game data (the build's input lock), the palette and colormap, the plant mode, the hand timings, the sources | `tools/chim_room_batches.py` (`interior-room-chim`) |
-| Image step units | one guard torch model; one player view model (body, torch body, water body or inventory poses of one race and sex, 80 in all) | the game data (the build's input lock), the palette, the unit's record (for the player view: race, sex and the body fields a torch or water body reads), the sources, the settings | `prepare_guard_torches`, `prepare_player_view.run_units` (`player-view`) |
+| Image step units | one guard torch model; one player view model (body, torch body, water body or inventory poses of one race and sex, 80 in all) | the game data (the build's input lock), the palette, the unit's record (for the player view: race, sex and the body fields a torch or water body reads), the sources, the settings | `prepare_guard_torches`, `player_view_schedule.run_view` (`player-view`; also the fitting try that fitted each body, as a `fit` entry) |
+| Stage units | one NPC appearance of the actor library (one standing model for every record that looks the same); one creature or corpse model of the actor library | the game data (the build's input lock), the palette, the unit's record (for an appearance: the appearance as the bake reads it, its library key and animation profile; for a creature: method, creature, mesh, scale), the code the bake runs (`bake_standing`, `_unit`) and the settings that code reads; never which records the CHIM towns place | `tools/actor_units.py` (`npc-appearance`, `creature-model`); `tools/actor_units_seed.py` imports a finished stage folder once, only for unchanged bake code |
+| Image step units | one CHIM room resident's ground fit (2,342 placements in 761 rooms) | the room map as installed (before the fit writes origins), the store models the room places, the actor's model and layout, the placement (entity, authored origin, angles), the fit code (`_fit_head`, `_fit_search`, `finish`) and its settings | `tools/actor_units.py` (`room-actor`), called by `room_actor_bake._bake`; each placement kept the moment its search settles |
+| Image step units | one guard torch skip verdict (a guard whose base model the source bake does not reproduce) | the guard cache's own inputs and the code `_convert_guard` runs | `tools/actor_units.py` (`guard-torch-skip`), called by `prepare_guard_torches.prepare` |
+| Image step units | one arena fighter (its own fight frame groups, carried weapon and shield) | the game data (the build's input lock), the palette, the record id and stance, the code `bake_fighter` runs and the settings it reads | `tools/actor_units.py` (`arena-fighter`), called by `prepare_combat` |
 | Stage units | one world terrain map, one NPC gallery model, one CHIM unit, one sound or movie | each stage's own content-addressed cache (a gallery model: its appearance record, the bytes of its meshes and textures, the palette, and the code its converter can reach) | `world-terrain-v1`, `npc-gallery-v1`, `chim-units`, `asset-pool-v1` |
+
+A store is read back (`unit_store.stored`): a unit the cache did not keep prints a `STORE FAILED` line at once,
+the stage prints how many failed and stops, and the build's first minute stops on any cache folder its user cannot
+write. A store never raises on its own, so a folder made by another user lost every unit without a word before.
+
+Why the actor library and the arena fighters do not use the NPC gallery cache (`gallery_cache.py`) or the parts
+library (`npc_parts.py`, `--parts-cache`): those hold the gallery's model of an appearance, one static pose made by
+`prepare_gallery.convert_model` (a verified single MDL, checked against the gallery's face budget) and, for the parts
+method, each body part at a triangle quota in that one pose. The actor library bakes another output from the same
+records: an animated standing model on the animation kit's frames with its `.anm` layout and footstep sounds, or a
+skeletal model on a shared animation table (`npc_library.bake_standing`); the arena fighter is a third, with the
+fight groups and the carried weapon. Their keys differ too (the gallery's converter reach and quality settings against
+the standing bake's reach, profile and body settings). A part baked in one pose cannot stand in for a part posed on
+every animation frame, so the parts library cannot be shared without moving the standing bake onto per-part,
+per-frame units, which would re-key every appearance; the three stores stay separate, one per kind of model.
 
 Every build uses every cache, release candidates and finals included (since
 v0.0.49): the caches are keyed by content, so the release kind never changes a
@@ -179,6 +198,18 @@ by its function bodies, so a status print added to `chim_world.c` re-keys no CHI
 fseek to) counts only by what can carry a layout: its functions, prototypes, extern counters, function-like timing
 macros, `#undef` lines and slot enums stay out of the key unless a struct, typedef, variable or object-like macro
 names them, so a timing edit re-keys no CHIM world stage (BUILD-ENGINE-SOURCE-KEY-BROAD-36; version 3, `cfacts3:`).
+An engine file named only in `define()`-style reads (`define`, `_define`, `_mib_define`, `cvar_default`, the `DEFINES`
+table) and included by nothing else the key counts now counts as the values those reads return: for each name read,
+the first match of that reader's own pattern (engine_facts `DEFINE_PATTERNS`), and nothing else of the file; its own
+`#include` lines leave the key (version 4, `cfacts4:defs:`; BUILD-ENGINE-SOURCE-KEY-BROAD-36 seen again 9 November
+2026). `tools/map_engine_limits.py` reads one define of `aw_combat.c` (`SLOTS`); as C facts, every declaration whose
+name is also a common word in a string of the builder code stayed in the key, so combat edits re-keyed the CHIM world,
+the three CHIM towns and the world flora. Now only a change of `SLOTS` does. The same applies to `chim/chim_world.c`
+and `chim/chim_statics.c` (BUILD-CHIM-KEY-ENGINE-FILE-WHOLE-54) and to the headers the town and flora stages read only
+for limits. Records made by version 3 are compared through their own source tree, as below: when that tree, read
+with version 3, gives exactly the recorded sources, every file whose version 4 value is the same on both trees takes
+the record's value; otherwise the stage is compared as before (nothing is accepted on less). The engine files these
+stages still key whole are a reviewed list (tests/test_stage_key_engine_defines.py); a new one fails the gate.
 The CHIM pool's per-unit code keys (`tools/chim/units.py`) reach no engine file. Anything the reading cannot explain (an engine folder named whole, a token-pasting macro in the
 facts) keeps the stage's engine files whole. A reuse source keyed with whole engine files is compared by its C facts
 when its own source tree (the checkout its stage ran from) gives exactly its recorded sources; otherwise as before.

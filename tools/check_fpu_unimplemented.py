@@ -73,6 +73,8 @@ INSTRUCTION = re.compile(r'^\s*([0-9a-f]+):\s+(?:[0-9a-f]{4} )+\s*(\S+)\s*(.*)$'
 ABSOLUTE = re.compile(r'(?<![#\w@(])0x([0-9a-f]+)|(?:^|\s)([0-9a-f]{3,8})(?= <)')
 PCREL = re.compile(r'%pc@\(0x([0-9a-f]+)\)')
 RELOC = re.compile(r'^\s*([0-9a-f]+):\s+RELOC\S*\s+(\S+)')
+RAW_WORDS = re.compile(r'^\s*([0-9a-f]+):\s+((?:[0-9a-f]{4} ?)+)\s')
+JUMP_TABLE = re.compile(r'%pc@\([^)]*,%?[ad][0-7]:[wl]\)')   # jmp %pc@(0x...,d0:w): a switch's table follows
 MAP_SYMBOL = re.compile(r'^\s+0x([0-9a-f]+)\s+([A-Za-z_.$][\w.$]*)\s*$')
 MAP_SECTION = re.compile(r'^ \.text\s+0x([0-9a-f]+)\s+0x([0-9a-f]+)\s+(\S+)')
 
@@ -200,6 +202,7 @@ def analyse(disassembly, functions, cpu='68040'):
 
     sites, calls = {}, {}
     relocated = set()   # addresses of relocated longwords (pointers): data, never an opcode
+    tabled = set()      # addresses inside a switch's jump table: data
     pending = None      # (function, absolute operands) waiting for their RELOC lines
 
     def refer(function, address):
@@ -207,7 +210,24 @@ def analyse(disassembly, functions, cpu='68040'):
         if target and target != function:
             calls.setdefault(function, set()).add(target)
 
+    # A switch's jump table follows its "jmp %pc@(2,%dN:w)": 16-bit offsets from the table's start, which objdump
+    # decodes as instructions (0xf210 0x159e reads as fgetexp). The words up to the first case target past the
+    # table are data, never code (MW-CONSOLE-COMMANDS-62: host_call's table, v0.0.63).
+    table = None        # [start, end] of the jump table being read
     for line in disassembly.splitlines():
+        raw = RAW_WORDS.match(line)
+        if raw and table is not None:
+            address = int(raw.group(1), 16)
+            if address >= table[1]:
+                table = None
+            else:
+                tabled.add(address)
+                for word in raw.group(2).split():
+                    value = int(word, 16)
+                    target = table[0] + (value - 0x10000 if value & 0x8000 else value)
+                    if target > table[0]:
+                        table[1] = min(table[1], target)
+                continue
         r = RELOC.match(line)
         if r:
             relocated.add(int(r.group(1), 16))
@@ -226,6 +246,8 @@ def analyse(disassembly, functions, cpu='68040'):
         function = owner(address)
         if function is None:
             continue
+        if mnemonic == 'jmp' and JUMP_TABLE.search(operands):
+            table = [address + 4, address + 4 + 0x10000]
         kind = trap_kind(mnemonic, operands, cpu)
         if kind:
             sites.setdefault(function, []).append((address, '%x %s %s' % (address, mnemonic, operands.strip()), kind))
@@ -239,7 +261,7 @@ def analyse(disassembly, functions, cpu='68040'):
     # in such a table (e.g. 0x0003f2xx reads as fintrz), never code: real
     # instructions carry relocations only in their operands
     # (ENGINE-FPU-DATA-DECODE-33).
-    data = lambda address: any(address - k in relocated for k in range(4))
+    data = lambda address: address in tabled or any(address - k in relocated for k in range(4))
     sites = {f: [(text, kind) for address, text, kind in rows if not data(address)] for f, rows in sites.items()}
     sites = {f: rows for f, rows in sites.items() if rows}
     return sites, calls

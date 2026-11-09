@@ -1174,9 +1174,30 @@ DEPENDENCIES = {
     'chargen': (),
     # The item model table (ITEM-WORLD-MODELS-58): the game data and the census palette.
     'item-models': ('census',),
+    # The player bodies (tools/player_view_stage.py, BUILD-RISKY-STAGES-FIRST-63): the game data and the census palette.
+    'player-view': ('census',),
     'image': ('world-terrain', 'world-scenery', 'npc-gallery', 'music', 'media', 'engine', 'dialogue-lookup'),
     'dry-run-image': ('engine',),
 }
+
+
+# BUILD-RISKY-STAGES-FIRST-63: the stages most likely to fail a build late (the bakes whose rules change most) start
+# first among the stages ready at the same moment, so a failure shows in minutes, not after the world. The player
+# view depends on no world stage (DEPENDENCIES): it starts right after the census, beside the world.
+RISK_FIRST = ('player-view', 'actor-library')
+# Stages that build the world (a risky stage that needs none of them must never wait for one).
+WORLD_STAGES = ('world-terrain', 'world-scenery', 'world-flora', 'chim', 'cell-progress', 'chim-room-batches',
+                'chim-interiors')
+WORLD_PREFIXES = ('chim-town-', 'chim-rooms-')
+
+
+def risk_first(ready):
+    """READY [(position, (name, command))] with the RISK_FIRST stages first, the rest in plan order."""
+    return sorted(ready, key=lambda item: (item[1][0] not in RISK_FIRST, item[0]))
+
+
+def world_stage(name):
+    return name in WORLD_STAGES or name.startswith(WORLD_PREFIXES) or name == 'image'
 
 
 def plan_skipped(metadata):
@@ -1263,6 +1284,8 @@ def stage_dependencies(steps, skipped=()):
             deps = ('census', *(n for n in names if n.startswith('chim-town-')))
         if name == 'image' and 'actor-library' in names:
             deps = (*deps, 'actor-library')
+        if name == 'image' and 'player-view' in names:
+            deps = (*deps, 'player-view')
         if name == 'image' and 'chim' in names:
             # the image installs every CHIM town's stage output and its rooms (BUILD-CHIM-ROOMS-IMAGE-RACE-36: the
             # image ran beside chim-rooms-vivec_city and read its record before it existed)
@@ -1419,7 +1442,7 @@ def execute_parallel(steps, run, metadata, root):
             print('[summary] not updated: %s' % exc, flush=True)
     try:
         while pending or active:
-            ready = [item for item in pending if set(dependencies[item[1][0]]) <= passed]
+            ready = risk_first([item for item in pending if set(dependencies[item[1][0]]) <= passed])
             if alone_stages:
                 # BUILD-CHIM-POOL-MEMORY-THROTTLE-59: a stage the plan runs alone gets the memory without the other
                 # memory-heavy stages; they wait and run at full width after it

@@ -364,6 +364,8 @@ int AW_MwscriptKnownEffects(aw_spell_effect_t *out,int max);
  * Choice and Goodbye arrive through aw_dial_result_choice while it runs. 1 ran, 0 none compiled for it, -1 it did not
  * compile (said in the log) */
 int AW_MwscriptRunResult(const char *record,unsigned long reference,const char *text,int length);
+/* a talk opens: the result scripts' DRSC index read once (MWSCRIPT-RESULT-LONG-FRAME-62) */
+void AW_MwscriptResultsPrepare(void);
 extern void (*aw_dial_result_choice)(const char **texts,int ntexts,const aw_mwcell_t *numbers,int count);
 extern void (*aw_dial_result_clear)(void);       /* ClearInfoActor while a result runs */
 /* the journal's topic pages read the table (aw_dialwin.c): a topic's name, a heard entry's text; 1 read */

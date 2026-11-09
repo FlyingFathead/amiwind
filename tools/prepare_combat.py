@@ -793,7 +793,6 @@ def prepare(data_files, id1, jobs=None, fighters=None):
     chosen = fighters if fighters is not None else [row['id'] for row in config['fighters']]
     if chosen:
         from build_jobs import resolve_jobs
-        from build_parallel import ordered_map
         palette = (id1 / 'gfx/palette.lmp').read_bytes()
         tasks = []
         for identifier in chosen:
@@ -804,7 +803,22 @@ def prepare(data_files, id1, jobs=None, fighters=None):
             tasks.append((data, palette, key, STANCE[weapon[2] if weapon else None]))
         (id1 / 'arena').mkdir(parents=True, exist_ok=True)
         rows, baked = [f'AWAF1 {len(tasks)}'], {}
-        for identifier, raw, record in ordered_map(bake_fighter, tasks, min(resolve_jobs(jobs), len(tasks))):
+        # every fighter from the unit cache arena-fighter when it was baked before with the same record, stance,
+        # palette, bake code and settings; the rest baked and each kept the moment it is back (tools/actor_units.py,
+        # NPC-LIBRARY-NO-UNIT-CACHE-63: the image step baked all of them again in every build)
+        import actor_units
+        import pass_cache
+        cache = actor_units.open_cache(actor_units.FIGHTER_CACHE, ((__file__, 'bake_fighter'),),
+                                       pass_cache.source_digest((__file__, 'bake_fighter')),
+                                       pass_cache.previous_digests((__file__, 'bake_fighter')),
+                                       pass_cache.covered_lines((__file__, 'bake_fighter')))
+        made, cached = actor_units.bake_fighters(tasks, min(resolve_jobs(jobs), len(tasks)), cache,
+                                                 actor_units.fighter_inputs,
+                                                 log=lambda *a, **k: print(*a, file=sys.stderr, **k))
+        print('Arena fighters: %d (%d from the unit cache %s, %d baked)' % (
+            len(tasks), cached, actor_units.FIGHTER_CACHE, len(tasks) - cached), file=sys.stderr, flush=True)
+        for identifier, raw, record in made:
+            record = dict(record)
             stem = 'f' + hashlib.sha256(identifier.encode()).hexdigest()[:12]
             (id1 / 'arena' / f'{stem}.mdl').write_bytes(raw)
             # Voice lines beside the model (the animation kit's layout file; docs/ANIMATION.md "Voices"):

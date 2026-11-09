@@ -2,10 +2,11 @@
   "schema": "amiwind-mwscript-1",
   "note": "MWScript compiled by the builder (tools/prepare_mwscript.py, docs/MWSCRIPT_BYTECODE.md). Every content setting of the compiled scripts lives here as the default.",
   "handwritten": {
-    "patterns": ["chargen", "chargenbed", "chargenboat*","chargencustomsdoor", "chargendagger",
+    "patterns": ["chargen", "chargenboat*",
                  "chargendialoguemessage", "chargendisable",
-                 "chargenjournalmessage", "chargennamenpc", "chargenracenpc", "chargenstuffroom",
+                 "chargennamenpc", "chargenracenpc",
                  "chargenwalknpc"],
+    "patterns_note": "v0.0.63 (the tracker's parity check, config/mwscript-counterparts.json): CharGenBed, CharGenCustomsDoor, CharGenDagger, CharGenJournalMessage and CharGenStuffRoom came off the list: the engine's own opening never carried their message boxes, the rest allowed from the bed or the dagger's equip hints, so they run as the game's scripts.",
     "reason": "The opening (the prison ship, the census office and the papers) is carried today by the engine's hand-written story rules (engine/aga/src/aw_opening.c, aw_intro.c). Its scripts are compiled and measured but not run, so nothing happens twice; each comes off this list when its hand-written rule is replaced by the compiled script. Off the list (CENSUS-INTRO-SCRIPTS-62): the census office's door scripts CharGenDoorEnterCaptain, CharGenDoorExit, CharGenDoorExitCaptain; the courtyard's fatigue barrel CharGenFatigueBarrel; the hall door guard CharGenDoorGuardTalker (his lines, the hall door's Unlock); the clerk CharGenClassNPC (his lines, the class, birth and review windows, the papers shown); the papers CharGenStatsSheet and the courtyard ring CharGen_ring_keley (both read OnPCAdd, which the engine sets when the item enters the inventory). The engine holds every script it runs instead of the old path while aw_census_legacy is 1 (aw_mwhost.c census_scripts)."
   },
   "activation": {

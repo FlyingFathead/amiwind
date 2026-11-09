@@ -105,10 +105,15 @@ class Budget(unittest.TestCase):
         found = registry.scan()
         self.assertEqual(found['problems'], [], 'tools/resident_registry.py cannot read these registrations')
         budget = registry.load_budget()
-        messages = registry.over_budget(found, budget)
+        # "caps" (the maintainer, 2026-11-09: the command cap to 512): a capped group may grow up to its cap without
+        # a raise; every other group stays an exact ratchet (down freely, up only with a dated reason).
+        caps = budget.get('caps', {})
+        capped = dict(budget, totals=dict(budget['totals'], **caps))
+        messages = registry.over_budget(found, capped)
         self.assertEqual(messages, [], 'resident registries grew above tests/resident_registry_budget.json: '
                          + '; '.join(messages) + '. ' + registry.ADVICE)
-        self.assertEqual(registry.totals(found), budget['totals'],
+        exact = {group: value for group, value in registry.totals(found).items() if group not in caps}
+        self.assertEqual(exact, {group: value for group, value in budget['totals'].items() if group not in caps},
                          'the engine needs less than its budget: ratchet it down with '
                          'python tools/resident_registry.py --lower-budget')
         for reason in budget['reasons']:

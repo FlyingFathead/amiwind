@@ -172,10 +172,25 @@ int AW_MwvmInstanceCount(void);
 void AW_MwvmStartScript(int script);
 /* a dialogue result script (_dlg_N) once on the speaker (its reference and script; -1 none); 1 ran */
 int AW_MwvmRunDialogue(int script,uint32_t reference,int speaker);
+/* a console line's target as an instance (no script run; see aw_mwvm.c), -1 none; given back at once */
+int AW_MwvmScratch(uint32_t reference,int entity);
+void AW_MwvmScratchEnd(int instance);
 /* the DRSC key of a result text (32-bit FNV-1a) and its row (on disk, read through READ): see aw_mwvm.c */
 uint32_t AW_MwvmTextHash(const char *text,int length);
 int AW_MwvmFindDialogue(int (*read)(void *user,uint32_t offset,void *out,uint32_t bytes),void *user,uint32_t hash,
                         int length,int speaker,int *row_speaker,int *broken);
+/* MWSCRIPT-RESULT-LONG-FRAME-62: the sparse index of the DRSC rows (every AW_DRSC_BLOCK-th row's key), built once
+ * from disk when a talk opens; the search then reads only one block of rows. The rows of a section at OFFSET with
+ * ROWS rows (the search the two above use; INDEX NULL: the whole section binary-searched on disk). */
+#define AW_DRSC_BLOCK 64
+#define AW_DRSC_INDEX 512
+typedef struct {uint32_t hash[AW_DRSC_INDEX];uint16_t length[AW_DRSC_INDEX];int count;} aw_drsc_index_t;
+int AW_MwvmDialogueIndex(int (*read)(void *user,uint32_t offset,void *out,uint32_t bytes),void *user);
+int AW_MwvmDialogueIndexBuild(int (*read)(void *user,uint32_t offset,void *out,uint32_t bytes),void *user,
+                              uint32_t offset,uint32_t rows,aw_drsc_index_t *index);
+int AW_MwvmFindDialogueRows(int (*read)(void *user,uint32_t offset,void *out,uint32_t bytes),void *user,
+                            uint32_t offset,uint32_t rows,const aw_drsc_index_t *index,uint32_t hash,int length,
+                            int speaker,int *row_speaker,int *broken);
 /* One frame: DT seconds of game time, PLAYER the player's position (engine units). */
 void AW_MwvmTick(float dt,const float player[3]);
 const aw_mwvm_stats_t *AW_MwvmStats(void);

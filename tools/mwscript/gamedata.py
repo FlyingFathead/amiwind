@@ -64,6 +64,20 @@ def new_game_scripts(text):
     return names
 
 
+_WEATHER = re.compile(r'^changeweather[\s,]+' + _TARGET + r'[\s,]+(\d+)$', re.I)
+
+
+def new_game_weather(text):
+    """[(folded region, weather)] of a script's ChangeWeather lines with a constant weather, in order (v0.0.63,
+    OPENING-WEATHER-NOT-CLOUDY-63: CharGen's "ChangeWeather Bitter Coast Region 1", which AmiWind's own opening carries)."""
+    out = []
+    for line in _statements(text):
+        m = _WEATHER.match(line)
+        if m:
+            out.append((_target(m).casefold(), int(m.group(3))))
+    return out
+
+
 def unconditional_disables(text):
     """The folded ids of a script's `ID->Disable` lines outside every if block, in order (what a run-once script such
     as Startup always disables)."""
@@ -118,7 +132,8 @@ class GameData:
         self.start_scripts = []    # folded script ids (SSCR), in order
         self.new_game = []         # folded script ids Main starts when a new game begins (new_game_scripts)
         self.bases = {}            # folded record id -> (type, folded script id)
-        self.references = []       # Morrowind.esm placed refs whose base has a script
+        self.references = []       # Morrowind.esm placed refs whose base has a script (its final one; load())
+        self._placed_mw = []       # every Morrowind.esm placed ref with a record, bound after the last master
         self.reference_counts = {m: 0 for m in MASTERS}     # placed scripted references per master
         self.object_refs = {}      # folded base id -> [reference numbers] (Morrowind.esm, every placed ref)
         # the cell each placed actor (an NPC_ or CREA reference of Morrowind.esm) stands in: reference number -> the
@@ -189,6 +204,12 @@ class GameData:
         self.interior_numbers = {r['cell'].casefold(): r['number'] for r in number_cells(self.interior_ids)}
         main = self.scripts.get(MAIN_SCRIPT)
         self.new_game = new_game_scripts(main.text) if main else []
+        # the Morrowind.esm placements with their records' final scripts (MWSCRIPT-LATER-MASTER-SCRIPT-61)
+        self.references = []
+        for r in self._placed_mw:
+            base = self.bases.get(r['id'].casefold())
+            if base and base[1]:
+                self.references.append(dict(r, type=base[0], script=base[1]))
         return self
 
     def _master(self, master, raw):
@@ -344,12 +365,13 @@ class GameData:
                     x, y, z = r.get('position', [0.0, 0.0, 0.0])
                     self.placements[r['number']] = (base[0], r['id'].casefold(),
                                                     cell_name.casefold() if interior else (gx, gy), x, y, z)
+            if master == 'Morrowind.esm' and base:
+                # MWSCRIPT-LATER-MASTER-SCRIPT-61 (v0.0.63): every placed reference with a record is kept here and
+                # bound after the last master is read (load), with its record's FINAL script: a later master may give
+                # the record one (Tribunal's fab_attack_disable on Vvardenfell's blue candle bulbs)
+                self._placed_mw.append({'reference': r['number'], 'id': r['id'], 'interior': interior,
+                                        'cell': cell_name if interior else (gx, gy),
+                                        'position': r.get('position', [0.0, 0.0, 0.0])})
             if not base or not base[1]:
                 continue
             self.reference_counts[master] += 1
-            if master != 'Morrowind.esm':
-                continue
-            pos = r.get('position', [0.0, 0.0, 0.0])
-            self.references.append({'reference': r['number'], 'id': r['id'], 'type': base[0], 'script': base[1],
-                                    'interior': interior, 'cell': cell_name if interior else (gx, gy),
-                                    'position': pos})

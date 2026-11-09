@@ -1,6 +1,6 @@
 # AmiWind console commands
 
-_Generated from `config/debug-commands.txt` with AmiWind v0.0.63-dev1._
+_Generated from `config/debug-commands.txt` with AmiWind v0.0.63-dev2._
 
 Open the console with F10 or the backquote key and type
 a command, for example `dbg headlamp on`. This page is generated from
@@ -20,6 +20,9 @@ Type: "dbg help" for help.
 Long listings (`dbg`, `dbg help`, `dbg help <word>`) are shown one console screen at a time, with the
 line `---------- [ more: ENTER | stop: q ] ----------` between the pages: Enter shows the next page, q
 stops the listing; any other key ends it and works as usual.
+
+The original game's console commands (tgm, coc, SetStrength and the rest) also work, typed as in the
+original: [the table of them](CONSOLE_COMMANDS_MORROWIND.md).
 
 ## Playtesting
 
@@ -185,6 +188,8 @@ stops the listing; any other key ends it and works as usual.
 | `dbg console bg color` | - | black/blue/gray or R G B |
 | `dbg console font` | - | small/normal |
 | `dbg font` | - | readable/retro |
+| `dbg mw help` | - | the original game's console commands that work in AmiWind (tgm, coc, player->AddItem, SetStrength and the rest; docs/CONSOLE_COMMANDS_MORROWIND.md), page by page from the disk; also dbg help mw |
+| `dbg mw target` | - | [ID / clear; no argument: the finder] the target of the original's commands typed without id->: a list of this map's references with an id, nearest first (name, id, kind, distance), typed to filter; Enter sets it and the input line shows [id->]; clear: the player again |
 | `dbg ui dialogue` | - | 1/2/3/4 (default 3) |
 | `dbg ui font` | - | 16/14/12/fallback |
 | `dbg ui ink` | - | original/readable |

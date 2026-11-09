@@ -1,10 +1,11 @@
 # Changelog
 
-_Last updated with AmiWind v0.0.62 (8 November 2026)._
+_Last updated with AmiWind v0.0.63-dev2 (9 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.63-dev2: second snapshot of v0.0.63, 9 November 2026](#v0063-dev2-second-snapshot-of-v0063-9-november-2026)
 - [v0.0.63-dev1: first snapshot of v0.0.63, 9 November 2026](#v0063-dev1-first-snapshot-of-v0063-9-november-2026)
 - [v0.0.62: Stick To The Script, 8 November 2026](#v0062-stick-to-the-script-8-november-2026)
 - [v0.0.62-dev2: second snapshot of v0.0.62, 7 November 2026 (not delivered; its work ships in v0.0.62)](#v0062-dev2-second-snapshot-of-v0062-7-november-2026-not-delivered-its-work-ships-in-v0062)
@@ -173,6 +174,24 @@ _Last updated with AmiWind v0.0.62 (8 November 2026)._
 - [CHIM source candidate - 14 October 2026, v0.0.40-dev1](#chim-source-candidate---14-october-2026-v0040-dev1)
 
 <!-- contents end -->
+
+## v0.0.63-dev2: second snapshot of v0.0.63, 9 November 2026
+
+The second development snapshot of v0.0.63 ([release notes](releases/notes/RELEASE-v0.0.63-dev2.md)). It needs 32 MB
+of Fast RAM. Its changes are checked by tests, not yet in play.
+
+- Characters fight each other when a script sets them against one another; allies and guards join fights, and
+  followers side with the player, moving by one follow behaviour.
+- The opening follows the original more closely: the character generation state, the ship guard's steps, the
+  captain's hint box, cloudy Bitter Coast weather, the dock guard's own post and the prison ship's blocker.
+- The original game's console commands, with their aliases and the stat family, on any reference (`dbg help mw`).
+- 605 of 1,207 scripts run (599 in v0.0.63-dev1) and 8 more are carried by the game's own code.
+- Fire pits burn; scripts turn the objects they name, and moved objects are kept in saved games.
+- The builder keeps every NPC appearance, creature model, arena fighter, room resident fit and guard torch verdict as
+  its own unit the moment it is finished, read back at once; it bakes the player's view in one flow and runs the
+  risky stages first; world stages no longer rebuild for
+  engine files they read a single define from, and two stages that ran side by side are no longer refused for reuse
+  over a file a third stage wrote.
 
 ## v0.0.63-dev1: first snapshot of v0.0.63, 9 November 2026
 

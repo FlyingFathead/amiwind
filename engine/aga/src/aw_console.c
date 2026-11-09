@@ -5,6 +5,7 @@
  */
 #include "quakedef.h"
 #include "aw_tryalloc.h"
+#include "aw_mwconsole.h"
 static cvar_t colour={"_aw_console_colour","255",true};
 extern int scr_copyeverything;
 extern byte *draw_chars;
@@ -364,13 +365,41 @@ static void pager_show(void) {
     if(!pager_collect){return;}
     pager_collect=0;pager_pos=0;pager_page();
 }
+/* MW-CONSOLE-COMMANDS-62: dbg help mw / dbg mw help, the original game's console commands, paged straight from
+ * id1/mwconsole-help.txt (tools/mwscript_console.py): each page opens the file, reads from where the last page ended
+ * and closes it; only the offset and one line's buffer are kept between the pages, never the list. */
+static long mwhelp_at=-1;
+static void mwhelp_page(void) {
+    FILE *f=NULL;int length,rows=AW_ConsolePageRows(),width=AW_ConsoleWidth(),used=0,need,n;long base,at;
+    static char line[256];
+    length=COM_FOpenFile("mwconsole-help.txt",&f);
+    if(!f || length<6){if(f)fclose(f);mwhelp_at=-1;Con_Printf("No mwconsole-help.txt in this image.\n");return;}
+    base=ftell(f);at=mwhelp_at;
+    if(at==0){   /* the header line AWMH1 */
+        if(!fgets(line,sizeof(line),f) || strncmp(line,"AWMH1",5)){fclose(f);mwhelp_at=-1;Con_Printf("mwconsole-help.txt: bad file.\n");return;}
+        at=(long)strlen(line);
+    }else if(fseek(f,base+at,SEEK_SET)){fclose(f);mwhelp_at=-1;return;}
+    while(at<length && fgets(line,sizeof(line),f)){
+        n=(int)strlen(line);
+        need=n<=1?1:(n-1+width-1)/width;
+        if(used && used+need>rows)break;
+        Con_Printf("%s",line);used+=need;at+=n;
+    }
+    fclose(f);
+    if(at<length){mwhelp_at=at;pager_waiting=1;Con_Printf("\n%s\n\n",AW_PAGER_LINE);}
+    else mwhelp_at=-1;
+}
+void AW_MwConsoleHelp(void) {
+    pager_end();mwhelp_at=0;mwhelp_page();
+}
+static void mw_help(void) {AW_MwConsoleHelp();}
 /* keys.c Key_Console, before the input line: 1 = the pager took the key */
 int AW_ConsolePagerKey(int key);
 int AW_ConsolePagerKey(int key) {
     if(!pager_waiting)return 0;
-    if(key==K_ENTER){pager_waiting=0;pager_page();return 1;}
-    if(key=='q' || key=='Q'){pager_end();Con_Printf("(listing stopped)\n");return 1;}
-    pager_end();          /* any other key (Esc included) ends the listing and does what it always did */
+    if(key==K_ENTER){pager_waiting=0;if(mwhelp_at>0)mwhelp_page();else pager_page();return 1;}
+    if(key=='q' || key=='Q'){pager_end();mwhelp_at=-1;Con_Printf("(listing stopped)\n");return 1;}
+    pager_end();mwhelp_at=-1;   /* any other key (Esc included) ends the listing and does what it always did */
     return 0;
 }
 static void catalogue_error(void) {
@@ -406,6 +435,7 @@ static void help(void) {
  * streamed from the disk file like the full list. */
 static void help_for(char *word) {
     FILE *f;route_t r;int left,status,n=strlen(word),shown=0,omitted;char line[DEBUG_LINE];
+    if(!Q_strcasecmp(word,"mw")){AW_MwConsoleHelp();return;}   /* dbg help mw: the original's console commands */
     f=catalogue_open(&left,line);if(!f){catalogue_error();return;}
     omitted=AW_GalleryOmitted();
     pager_begin();
@@ -489,6 +519,7 @@ void AW_ConsoleInit(void) {
     Cmd_AddCommand("aw_heap_audit",heap_audit);
     Cmd_AddCommand("debug",dispatch);Cmd_AddCommand("dbg",dispatch);Cmd_AddCommand("aw",dispatch);
     Cmd_AddCommand("amiwind",dispatch);
+    Cmd_AddCommand("aw_mw_help",mw_help);   /* dbg mw help (MW-CONSOLE-COMMANDS-62) */
     aw_console_pager_key=AW_ConsolePagerKey;   /* keys.c Key_Console (DBG-HELP-PAGER-62) */
     Cmd_AddCommand("aw_console_color",set_colour);
     Cmd_AddCommand("aw_console_font",set_font);

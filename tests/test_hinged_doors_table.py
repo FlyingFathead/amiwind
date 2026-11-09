@@ -152,7 +152,9 @@ class HingedDoorTable(unittest.TestCase):
         raw = master()
         raw += script('GG_OpenGate1', 'begin GG_OpenGate1\nif ( OnActivate == 1 )\n  ; "ex_gg_portcullis_01"->MoveWorld z 1\n'
                       'endif\n\t"ex_gg_portcullis_01"->MoveWorld z 70\n"ex_gg_portcullis_01"->SetAtStart\nend')
-        raw += script('BarDoor', 'begin BarDoor\nsetatstart\nRotate z 90\nend')
+        raw += script('BarDoor', 'begin BarDoor\nif ( OnActivate == 1 )\nsetatstart\nendif\nRotate z 90\nend')
+        # a sign that swings on its own (no OnActivate): its object is not a row (its cost per frame); a named
+        # target that is not a placed record (an NPC) is not either
         raw += script('Lever', 'begin Lever\nRotate y 45\n"guard"->MoveWorld x 5\nend')
         raw += acti('ex_gg_portcullis_01') + acti('ex_gg_gateswitch_01', 'GG_OpenGate1') + acti('bar_door', 'BarDoor')
         raw += acti('lever', 'Lever')

@@ -168,11 +168,14 @@ class EntitySpawnContractTests(unittest.TestCase):
         self.assertEqual(len(entities[1]['aw_flame_shape'].split()), 3)
         # The engine's static-flame table still reads these same names.
         reader = (SRC / 'aw_guard_torch.c').read_text(encoding='latin-1')
-        reader = reader[reader.index('static void static_flames_load'):]
-        reader = reader[:reader.index('\n}\n')]
+        # (FIREPIT-FLAMES-62: the row parser is flames_parse, shared by the loaded map and the window's frames)
+        parser = reader[reader.index('static int flames_parse'):]
+        parser = parser[:parser.index('\n}\n')]
         for name in ('"aw_flame"', '"aw_flame_size"', '"aw_flame_shape"', '"origin"', '"aw_ref"'):
-            self.assertIn(name, reader)
-        self.assertIn('world->entities', reader, 'static flames must come from the map text, not live edicts')
+            self.assertIn(name, parser)
+        loader = reader[reader.index('static void static_flames_load'):]
+        loader = loader[:loader.index('\n}\n')]
+        self.assertIn('flames_parse(world->entities', loader, 'static flames must come from the map text, not live edicts')
 
     def test_aw_flame_spawn_removes_the_edict_like_the_old_load_path(self):
         # Before the fix the loader freed the unknown edict (ED_Free); the spawn

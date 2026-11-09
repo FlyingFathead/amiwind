@@ -99,7 +99,9 @@ class CombatSourceContractTests(unittest.TestCase):
         self.assertNotIn('AW_CombatSwing', player)
         start = combat[combat.index('static void start_block'):combat.index('static void npc_react_miss')]
         self.assertIn('*block_hit', start)
-        self.assertEqual(combat.count('AW_CombatSwing('), 2)        # one per strike, at the hit key
+        # one per strike, at the hit key: the player's, an actor's on the player, and since v0.0.63 an actor's on
+        # another actor (COMBAT-ACTOR-VS-ACTOR-62)
+        self.assertEqual(combat.count('AW_CombatSwing('), 3)
 
     def test_right_mouse_button_default_bind(self):
         # COMPANION-PICK-RMB-33: the Amiga right button arrives as MOUSE3 (vid_amiga.c maps
@@ -532,7 +534,7 @@ class HitOnMeWiring(unittest.TestCase):
         header = (SRC / 'aw_mwcode.h').read_text(encoding='utf-8')
         self.assertIn('#define AWF_HITONME %d' % FUNCTION_NUMBERS['hitonme'], header)
         codegen = (ROOT / 'tools' / 'mwscript' / 'codegen.py').read_text(encoding='utf-8')
-        self.assertIn("'hassoulgem', 'hitonme') or", codegen)
+        self.assertRegex(codegen, r"'hassoulgem', 'hitonme'[^)]*\) or")   # in the every-frame (volatile) list
 
 
 if __name__ == '__main__':

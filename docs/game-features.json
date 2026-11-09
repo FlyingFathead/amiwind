@@ -5,7 +5,7 @@
   "mwscript": {
     "source": "tools/mwscript/functions.py (the compiler's own table, counted in the builder container on 9 November 2026) and the builder's script measurement (docs/MWSCRIPT_BYTECODE.md)",
     "table_functions": 504,
-    "carried_out": 359,
+    "carried_out": 367,
     "used_by_game": 251,
     "used_measured": "23 October 2026, over the three masters",
     "used_and_carried_out": null,

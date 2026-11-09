@@ -1013,7 +1013,7 @@ class ScriptCompiler:
             return self.notyet(fn, None, [('int', self.p.spell(spell))], None, carried=True)
         if fn.name in ('gettarget', 'getstandingpc', 'getangle', 'getdetected', 'getlos', 'getlineofsight',
                        'onknockout', 'getcurrentweather', 'getpcsneaking', 'getweapondrawn', 'getpcinjail',
-                       'hassoulgem', 'hitonme') or \
+                       'hassoulgem', 'hitonme', 'getwaterlevel', 'getcollidingpc', 'getweapontype') or \
                 (fn.name.startswith('get') and fn.name[3:] in MAGIC_EFFECT_CALLS):
             # a fight starts without the state generation moving: the script asks every frame; so do the angles, the
             # detection, the line of sight, a knockdown and the weather (v0.0.62), as GetPos does

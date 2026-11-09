@@ -7,6 +7,7 @@
 #include "aw_character.h"
 #include "aw_activated.h"
 #include "aw_hinged_door.h"
+#include "aw_msgbox.h"
 static int route_started,route_failed,route_done;
 /* CENSUS-INTRO-SCRIPTS-62: Sellus Gravius ("chargen captain") talks through the ordinary dialogue window, as in the
  * original: his Greeting 1 result takes the papers ("player->removeitem chargen statssheet" and his local state -1)
@@ -20,12 +21,16 @@ int AW_CensusLegacy(void){return aw_census_legacy.value!=0;}
  * old path's census step 10 made it; the windows' results move the stages on in AW_OpeningTick. 1 opened. */
 int AW_OpeningScriptMenu(int kind)
 {
-    if(kind<2 || kind>4 || !AW_CharacterOpen(kind))return 0;
+    if(kind<1 || kind>4 || !AW_CharacterOpen(kind))return 0;
+    /* EnableRaceMenu (v0.0.63, MWSCRIPT-GAPS-63; CharGenRaceNPC): the race window is the dock's RACE stage, as the
+     * hand-written dock step 30 makes it */
+    if(kind==1 && (aw_story.stage==AW_STAGE_SHIP || aw_story.stage==AW_STAGE_DOCK))AW_StoryTransition(AW_STAGE_RACE);
     if(kind==2 && aw_story.stage==AW_STAGE_OFFICE)AW_StoryTransition(AW_STAGE_CLASS);
     return 1;
 }
 /* The captain is an intro role only on the old path; on the new one he is an ordinary speaker (aw_talk.c, world.qc,
  * aw_scene.c read aw_intro_role) bound to role 7 by his record id for the distance rules below. */
+static const char *const captain_hint_ok[]={"Ok"};   /* CharGenDialogueMessage's button */
 static int captain_papers=-1;   /* the papers carried at the last tick in his reach: the greeting's take is seen */
 static float near_actor(int role)
 {
@@ -43,8 +48,11 @@ static int dock_route(int second)
     vec3_t goal;
     /* The final post is left of the door when approaching from the pier.
      * Leave the doorway clear and face southeast, out toward the docks. */
-    goal[0]=second?299.f:(-8914.f+11264)*.25f;
-    goal[1]=second?-202.f:(-73093.f+71680)*.25f;goal[2]=31.5f;
+    /* CharGenRaceNPC's own two AITravel points (state 0: -8914 -73093, before the plank; state 50: -9944 -72481, next
+     * to the door), in the dock map's units; the second was moved left of the door for INTRO-DOCK-GUARD-BLOCKS-DOOR-62
+     * and is the script's own again since v0.0.63 (the parity check, config/mwscript-counterparts.json) */
+    goal[0]=second?(-9944.f+11264)*.25f:(-8914.f+11264)*.25f;
+    goal[1]=second?(-72481.f+71680)*.25f:(-73093.f+71680)*.25f;goal[2]=31.5f;
     route_started=AW_NavStart(AW_IntroRole(5),goal);
     if(!route_started){
         route_failed=1;Con_Printf("Dock route unavailable; story held for inspection.\n");
@@ -152,19 +160,16 @@ int AW_OpeningTick(void)
                 aw_story.dock_timer+=dt;
                 if(aw_story.dock_timer>6 && AW_IntroSpeak(5,"chargendock3"))aw_story.dock_timer=0;
             }
-            if(route_done){
-                /* Converted actors face local +Y: native yaw 225 faces the
-                 * dock at world yaw 315. Do not keep following the player. */
-                AW_IntroRole(5)->v.angles[1]=225;
-                SV_LinkEdict(AW_IntroRole(5),false);
-            }
+            /* at his post he stands as the travel left him (the script's AITravel sets no facing; the forced face toward
+             * the pier went with the script's own post in v0.0.63) and does not keep following the player */
         }
     }
     if(strcmp(sv.name,"census") || aw_story.stage<AW_STAGE_OFFICE)return 0;
     if(!aw_story.captain_hint && near_actor(7)<75){   /* CharGenDialogueMessage: GetDistance Player < 300 */
         aw_story.captain_hint=1;
-        AW_UISubtitle("","Press E to talk to the Captain. Select topics to ask about them. Don't try persuasion on him. "
-                         "If you're not good at it, he will start to dislike you.",9);
+        /* CharGenDialogueMessage's own message box with its Ok button (OPENING-CAPTAIN-HINT-SUBTITLE-63) */
+        AW_MsgBoxShow("Press E to talk to the Captain. Select topics to ask about them. Don't try persuasion on him. "
+                      "If you're not good at it, he will start to dislike you.",captain_hint_ok,1);
     }
     if(!AW_CensusLegacy() && aw_story.stage>=AW_STAGE_CAPTAIN && !aw_story.captain){
         /* his greeting's result took the papers (Greeting 1: removeitem "chargen statssheet", set state to -1) */

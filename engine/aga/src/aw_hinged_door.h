@@ -92,6 +92,14 @@ void AW_HingedDoorRecentre(const float *d);
 int AW_MoverPlacement(unsigned pid,unsigned reference);
 int AW_MoverShift(unsigned reference,const float *d);
 int AW_MoverAtStart(unsigned reference);
+/* Rotate / RotateWorld: turn by D (Quake angles: pitch, yaw, roll); SetAngle: Quake angle K to VALUE (its placement
+ * loaded). 1 when it is a mover (and, for SetAngle, done). SetAtStart and AW_MoverReset undo turns too. */
+int AW_MoverTurn(unsigned reference,const float *d);
+int AW_MoverSetAngle(unsigned reference,int k,float value);
+/* Saved games: the AWMV block of the movers away from their start (bytes written, -1 no room) and its import
+ * (bytes read, -1 unreadable; rows of other game data left out). */
+int AW_MoverExport(unsigned char *out,int capacity);
+int AW_MoverImport(const unsigned char *p,int bytes);
 void AW_MoverReset(void);
 int AW_MoverCount(void);
 int AW_MoverMoved(void);
