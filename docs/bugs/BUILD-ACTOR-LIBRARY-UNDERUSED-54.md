@@ -2,11 +2,12 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 3 times; something has to be done
+## PERSISTING: reported 4 times; something has to be done
 
 - Reported with v0.0.57-dev1 at 2026-10-30 11:17 +0200: v0.0.57-dev2 full build (2026_10_30_v0.0.57-dev1_full-dev2_2a4027c): actor-library again at 1.6 of 12 cores with 415 units queued and none running, the same start-up stall as the dev1 build
 - Reported with v0.0.57-dev4 at 2026-10-30 19:19 +0200: PERSISTING: dev4 full run 2026_10_30_v0.0.57-dev4_full-...-after-the-collision-fix_c53994d, actor-library at 11.78 of 24 cores with 37 units queued and 23 running (fail_watch UNDERUSED); the resource plan had already throttled it to 19 workers for memory (672 MiB each beside a 741 MiB parent), so part of this is the memory limit, part the slowest unit's tail
 - Reported with v0.0.58-dev1 at 2026-10-31 16:20 +0200: v0.0.58-dev1 build: 8.99 of 24 cores, 192 queued, 8 running, again. Cause found: build.py gives the stage --jobs 12 (log: 'Actor library ... 12 jobs'), actor_library.py splits 12 into 3 creature + 9 NPC jobs (npc_library 'NPC library ... 9 jobs'). The share is fixed at stage start (half of 24, other stages beside it) and never grows when they finish. Fix: take the pool's live share, or the full allowed count when it runs alone.
+- Reported with v0.0.62-dev1 at 2026-11-07 17:45 +0200: Seen again in the v0.0.62-dev1 summons MiniWind build (run 2026_11_07_v0.0.62-dev1_miniwind-seyda-summon_5101308): the actor-library stage ran alone on 2 of 8 workers, under half its cores for over a minute.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -38,7 +39,7 @@ _Last updated with AmiWind v0.0.57-dev5 (30 October 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
+- [PERSISTING: reported 4 times; something has to be done](#persisting-reported-4-times-something-has-to-be-done)
 - [Status: 30 October 2026](#status-30-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -95,6 +96,7 @@ The failure watcher's UNDERUSED alarm reports every stage below half its cores f
 
 Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-stage time and CPU in the build profile. See [families](README.md#families).
 
+- ACTOR-CONTACT-NEW-BODY-62 (no report page): With the v0.0.62 character bake one cave resident (Breves Omoril in Kunirai) no longer fits his floor: the actor placement gate stopped the release build late in the image step
 - [AW-CONCURRENT-BUILDS-OVERSUBSCRIBE-36](AW-CONCURRENT-BUILDS-OVERSUBSCRIBE-36.md): Concurrent master-builder builds oversubscribe the machine: a gate step fails with 'cp: Cannot allocate memory'
 - AW-LEASE-DEAD-CONTAINER-54 (no report page): A core lease whose build was killed keeps its cores and memory for 24 hours
 - [AW-LEASE-MEMORY-DEADLOCK-36](AW-LEASE-MEMORY-DEADLOCK-36.md): Memory leases deadlocked builds: a 44 GiB build never fit while any gate held its 6 GiB, so builds queued for hours
@@ -156,6 +158,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-IMAGE-WORLD-READ-FRAMES-47](BUILD-IMAGE-WORLD-READ-FRAMES-47.md): The image step CHIM world read ran its frame-read pool at 2.96 of 24 cores for 102 s (91 units): perf guard FIX-NOW
 - [BUILD-INPUTCHECK-SLOW-32](BUILD-INPUTCHECK-SLOW-32.md): The game data reference check takes over 12 minutes through Docker
 - BUILD-INPUTS-LOCK-TMP-RACE-54 (no report page): Two MiniWinds started together race on the input lock: one fixed temp name, so the first build dies at start
+- BUILD-INTERIORS-UNDERUSED-62 (no report page): The Balmora interiors stage ran at 2.46 of 12 allowed cores with 16 units queued in the v0.0.62 release build
 - [BUILD-JOBS-RESOLVE-PER-STAGE-32](BUILD-JOBS-RESOLVE-PER-STAGE-32.md): With automatic jobs, stages of one build plan can get different worker counts
 - BUILD-M68K-ICE-SKEL-PARSE-52 (no report page): The m68k compiler crashed on the animation table parse (internal compiler error in patch_jump_insn); the host tests compile it with the host compiler only
 - [BUILD-MINIWIND-FINGERPRINT-ENGINE-33](BUILD-MINIWIND-FINGERPRINT-ENGINE-33.md): Every build stage's source fingerprint took in the engine sources through the MiniWind module
@@ -195,7 +198,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-REUSE-KEYS-TOO-BROAD-35](BUILD-REUSE-KEYS-TOO-BROAD-35.md): A whole build reused no stage, and the cost was not visible before the build started
 - [BUILD-REUSE-TMP-UNDECLARED-33](BUILD-REUSE-TMP-UNDECLARED-33.md): A stage that runs while a reused stage is copied becomes non-reusable
 - [BUILD-REUSE-VERIFY-DISK-48](BUILD-REUSE-VERIFY-DISK-48.md): Reusing the chim stage reads and hashes all 9.35 GB of its outputs again: 78 s at 1.7 of 11 cores, counted as an underused stage
-- BUILD-ROOM-BATCHES-UNDERUSED-54 (no report page): The chim-room-batches stage ran 43.5 minutes at 9 of 24 cores in the v0.0.54-dev2 full build
+- [BUILD-ROOM-BATCHES-UNDERUSED-54](BUILD-ROOM-BATCHES-UNDERUSED-54.md): The chim-room-batches stage ran 43.5 minutes at 9 of 24 cores in the v0.0.54-dev2 full build
 - [BUILD-SCHEDULER-EVEN-SHARE-33](BUILD-SCHEDULER-EVEN-SHARE-33.md): The stage scheduler splits the workers evenly between running stages, so the longest stage gets no more than the shortest (MiniWind media on 1 of 4 workers for 1,195 s)
 - [BUILD-SCHEDULER-JOBSHARE-32](BUILD-SCHEDULER-JOBSHARE-32.md): The stage scheduler fixes a stage's worker share when it starts
 - [BUILD-SCHEDULER-LOWBUDGET-33](BUILD-SCHEDULER-LOWBUDGET-33.md): With a small --jobs budget the stage scheduler starts nothing when more branches are ready than the budget (busy loop)
@@ -232,12 +235,15 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [MINIWIND-NO-INTERIOR-SCOPE-42](MINIWIND-NO-INTERIOR-SCOPE-42.md): A MiniWind of one room built the whole town: no scope converted only the start room
 - [MINIWIND-NOT-MINUTES-33](MINIWIND-NOT-MINUTES-33.md): A reused MiniWind build took about two hours instead of minutes
 - [MINIWIND-SCENE-CHAIN-WEIGHT-42](MINIWIND-SCENE-CHAIN-WEIGHT-42.md): Every MiniWind bakes all playable races and the opening rooms, and walks its whole frame stairs
+- NPC-BAKE-STAGES-OVERRUN-62 (no report page): The new seam and floor character bake made every stage that bakes characters run far past its history: room batches about 2 h 40 min, actor library about 40 min, player bodies 35+ min
 - [NPC-BAKED-WHOLE-DUPLICATION-33](NPC-BAKED-WHOLE-DUPLICATION-33.md): Every NPC appearance is baked whole: shared body parts are converted again for each actor, and equipment cannot change
 - [PERF-GUARD-RESIDENT-BUSY-HOST-57](PERF-GUARD-RESIDENT-BUSY-HOST-57.md): The dev5 full build's perf guard failed chim-town-balmora and chim-town-vivec_city build_resident as slower (129 s, was 52 s; 147 s, was 62 s) while two other builds ran beside it: contention, not code
+- PLAYER-VIEW-SKIN-ROWS-STOP-62 (no report page): The image step's player view stopped the v0.0.62 final build after 1 h 13 min: an Alias skin rows overflow ended it instead of trying the next smaller body
 - RELEASE-GUARD-SLOW-CLONE-51 (no report page): The release guard, the fail-fast first step of a release, took 6 minutes on about 0.14 of a core: its release check clones the whole repository through the Windows-mounted drive
 - RELEASE-SUITE-RECORD-SERIAL-51 (no report page): The release's suite record runs the whole test suite again on one core for about 22 minutes, right after the gate ran the same tests in about 2 minutes
 - [ROOM-BAKE-FOOTPRINT-SLOW-48](ROOM-BAKE-FOOTPRINT-SLOW-48.md): The room actor bake's footprint rule with the collision-box test is more than 100 times slower
 - [ROOM-BATCH-CORES-49](ROOM-BATCH-CORES-49.md): The room batches stage ran on about two of its eight cores for minutes before its first room, and kept few of its finished rooms when stopped
 - ROOM-RESIDENTS-KEY-SERIAL-49 (no report page): The room residents step opens its unit cache once per resident: 233 s on one core before any cached resident is restored
+- [UNIT-STORED-AT-MAP-END-62](UNIT-STORED-AT-MAP-END-62.md): The image step's player view stored its finished bodies only when its whole pool map ended: a step stopped midway kept none of them, so every resume baked every player body again
 
 <!-- END GENERATED CATEGORY -->

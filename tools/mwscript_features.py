@@ -19,12 +19,21 @@ area (the region of its placed references; an interior takes the region its door
 (the records that carry it and their placed references per master, levelled lists, the start scripts, StartScript in
 other scripts and in dialogue results), every function it calls and every function its conditions test, and our
 state:
-  runs               compiles whole, and the build attaches or starts it
+  runs               compiles whole, and the build attaches or starts it; or it calls no function at all, so it only
+                     sets its own locals, which the dialogue keeps on the speaker without it (MWSCRIPT-COMPLETE-LANDMARK)
   missing-function   calls a function the interpreter does not carry out yet (it compiles; those calls read 0)
   attached-not-run   the game attaches it, but the build does not run it: a hand-written rule carries it
                      (config/mwscript.json), or nothing it does is seen yet (left out of the file)
   not-attached       compiles whole, but nothing in the build attaches or starts it
+  not-in-image       its records are placed (or made by the scripts) only in an add-on's world (Mournhold, Solstheim),
+                     not in the image yet
+  inert              nothing names it (no record, no start, no StartScript, no dialogue), or its records are never
+                     placed in any world and nothing makes them (refs made_by: the masters of the scripts whose Place
+                     call names one): it never runs in the original either
   not-converted      does not compile
+A script whose records are never placed runs when the build attaches it at run time (MWSCRIPT-UNPLACED-ATTACH-62, as
+OpenMW 0.51 does): an item's script while the player carries one, an actor's script on the actor a levelled list gives,
+an object's script on the object a script places (PlaceAtPC, PlaceAtMe, PlaceItem, PlaceItemCell).
 """
 import argparse
 from collections import Counter
@@ -41,16 +50,20 @@ for _p in (ROOT / 'src', ROOT / 'tools'):
         sys.path.insert(0, str(_p))
 
 from mwscript.functions import FUNCTIONS, HOST  # noqa: E402
+from mwscript import dialogue_combat  # noqa: E402
 
 DATA = ROOT / 'docs' / 'mwscript-features.json'
 OUT = ROOT / 'docs' / 'MWSCRIPT_FEATURES.md'
 SCHEMA = 'mwscript-features 1'
-STATES = ('runs', 'missing-function', 'attached-not-run', 'not-attached', 'not-converted')
+STATES = ('runs', 'missing-function', 'attached-not-run', 'not-attached', 'not-in-image', 'inert', 'not-converted')
 LABELS = {'runs': 'runs', 'missing-function': 'uses a function the interpreter lacks',
           'attached-not-run': 'attached, not run', 'not-attached': 'compiled, not attached',
-          'not-converted': 'not converted'}
+          'not-in-image': 'only in an add-on world', 'inert': 'named by nothing', 'not-converted': 'not converted'}
 SHORT = {'runs': 'Runs', 'missing-function': 'Function missing', 'attached-not-run': 'Attached, not run',
-         'not-attached': 'Not attached', 'not-converted': 'Not converted'}
+         'not-attached': 'Not attached', 'not-in-image': 'Add-on world', 'inert': 'Named by nothing',
+         'not-converted': 'Not converted'}
+# the record types the player can carry (tools/mwscript/awms.py CARRIED: their scripts run while carried, PADD rows)
+CARRIED = ('ALCH', 'APPA', 'ARMO', 'BOOK', 'CLOT', 'INGR', 'LIGH', 'LOCK', 'MISC', 'PROB', 'REPA', 'WEAP')
 MASTERS = ('Morrowind.esm', 'Tribunal.esm', 'Bloodmoon.esm')
 ADDON_AREA = {'Tribunal.esm': 'mournhold (tribunal)', 'Bloodmoon.esm': 'solstheim (bloodmoon)'}
 GLOBAL_AREA, DIALOGUE_AREA, UNPLACED_AREA, NOBODY_AREA = ('global scripts', 'dialogue only', 'records not placed',
@@ -107,21 +120,55 @@ def state_of(row):
         return 'not-converted', 'does not compile'
     if row['handwritten']:
         return 'attached-not-run', 'a hand-written rule carries it'
+    game = row['refs']
+    started = row['start'] or row['started_by'] or game['dialogue_starts']
+    if not (started or row['bound'] or row.get('held') or game['records']):
+        # named by nothing: it never runs in the original either, so a function it lacks keeps nothing from running
+        return 'inert', 'nothing names it: it never runs in the original either'
+    made = game.get('made_by')
+    if made is not None and not (started or row['bound'] or row.get('held') or game['levelled'] or made or
+                                 any(game['placed'].values()) or set(game['records']) & set(CARRIED)):
+        # MWSCRIPT-COMPLETE-LANDMARK: its records are never placed in any world, no list gives them, nothing holds them
+        # and no script or dialogue result places one: they never exist in the original either
+        return 'inert', 'its records are never placed and nothing makes them: it never runs in the original either'
     missing = missing_now(row['notyet'])
     if missing:
         return 'missing-function', '%d not carried out: %s' % (len(missing), ', '.join(missing))
-    game = row['refs']
-    started = row['start'] or row['started_by'] or game['dialogue_starts']
     if row['inert'] and (started or game['placed'].get('Morrowind.esm')):
+        if row.get('functions') == {}:
+            # MWSCRIPT-COMPLETE-LANDMARK: no function at all, so it can only set its own locals, and nothing reads
+            # them but the dialogue, which keeps them on the speaker without the script (the parked locals: a result
+            # sets them, a filter reads them); running it would change nothing seen
+            return 'runs', 'nothing to run but its own locals, which the dialogue keeps on the speaker'
         return 'attached-not-run', 'nothing it does is seen yet: left out of the file'
     if row['bound'] or started:
         return 'runs', ''
+    if row.get('held') and not row['inert']:
+        return 'runs', 'runs on the items placed containers and actors hold, while their area is loaded'
     placed_addon = any(game['placed'].get(m) for m in MASTERS[1:])
     if placed_addon:
-        return 'not-attached', 'placed only in an add-on world, not in the image yet'
-    if game['records']:
-        return 'not-attached', 'its records are never placed (carried, sold or levelled)'
-    return 'not-attached', 'nothing names it'
+        return 'not-in-image', 'placed only in an add-on world, not in the image yet'
+    runtime = runtime_attach(row)
+    if runtime and row['inert']:
+        return 'attached-not-run', 'nothing it does is seen yet: left out of the file'
+    if runtime:
+        return 'runs', runtime
+    if made and all(m in MASTERS[1:] for m in made):
+        return 'not-in-image', 'made only by a script of an add-on world, not in the image yet'
+    return 'not-attached', 'its records are never placed, and nothing makes them at run time yet'
+
+
+def runtime_attach(row):
+    """How the build attaches the script of a record that is never placed (MWSCRIPT-UNPLACED-ATTACH-62), '' none."""
+    game = row['refs']
+    kinds = set(game['records'])
+    if kinds & set(CARRIED):
+        return 'runs while the player carries one of its items'
+    if game['levelled'] and kinds & {'CREA', 'NPC_'}:
+        return 'runs on the actor a levelled list gives'
+    if game.get('placed_by_scripts'):
+        return 'runs on the object a script places'
+    return ''
 
 
 def dialogue_state(row):
@@ -358,7 +405,26 @@ def measure(data_files):
     print('=== PHASE 3/4: the compiler, as the builder runs it ===', flush=True)
     program, compiled = compile_program(data, None, handwritten=handwritten_patterns())
     binds = bindings(program, compiled)
-    bound = Counter(b['script'] for b in binds)
+    # MWSCRIPT-INVENTORY-HITONME-62: the rows of items placed containers and actors hold count apart (held)
+    from mwscript.compiler import BIND_HELD
+    bound = Counter(b['script'] for b in binds if not b['flags'] & BIND_HELD)
+    held = Counter(b['script'] for b in binds if b['flags'] & BIND_HELD)
+    # MWSCRIPT-UNPLACED-ATTACH-62: the records a script's Place call can make (PLAC rows the engine can make), by script
+    from mwscript.codegen import PLACE_ROWS_MAX
+    from mwscript.opcodes import NONE
+    place_made = Counter(r['script'] for k, r in enumerate(program.place_rows())
+                         if r['carried'] and r['script'] != NONE and k < PLACE_ROWS_MAX)
+    # MWSCRIPT-COMPLETE-LANDMARK: who makes each record at run time, whether the engine can or not: the masters of the
+    # scripts whose Place call names it ('dialogue' for a dialogue result)
+    from mwscript.codegen import PLACE_CALL
+    makers = {}
+    for maker, texts in ([(s.master, [s.text]) for s in data.scripts.values()] +
+                         [('dialogue', [t for (_speaker, t) in data.results])]):
+        for text in texts:
+            for line in (text or '').splitlines():
+                for m in PLACE_CALL.finditer(line.split(';', 1)[0]):
+                    if m.group(1).casefold() != 'drop':
+                        makers.setdefault(m.group(2).strip('"').casefold(), set()).add(maker)
     names = [row['name'] for row in program.scripts.rows]
     started_by = {}
     for i, c in enumerate(compiled):
@@ -402,7 +468,8 @@ def measure(data_files):
             except Exception:   # noqa: BLE001 (a result that does not parse: counted as not converted)
                 rtree = None
             results.append({'error': c.error is not None, 'notyet': sorted(set(c.notyet)),
-                            'functions': sorted(set(c.calls)), 'openmw': openmw_fixes(rtree)})
+                            'functions': sorted(set(c.calls)), 'openmw': openmw_fixes(rtree),
+                            'fight': dialogue_combat.calls(row['script'].text)})
             continue
         ident = c.ident
         s = row['script']
@@ -439,9 +506,11 @@ def measure(data_files):
             'refs': {'records': records_,
                      'placed': {m: dict(sorted(n.items())) for m, n in per_master.items()},
                      'levelled': sum(levelled.get(b, 0) for _, b in by_script.get(ident, [])),
-                     'dialogue_starts': from_dialogue, 'dialogue_speaker': speakers.get(ident, 0)},
+                     'dialogue_starts': from_dialogue, 'dialogue_speaker': speakers.get(ident, 0),
+                     'placed_by_scripts': place_made.get(i, 0),
+                     'made_by': sorted({m for _, base in by_script.get(ident, []) for m in makers.get(base, ())})},
             'start': bool(c.flags & SCRIPT_START), 'started_by': from_scripts,
-            'bound': bound.get(i, 0),
+            'bound': bound.get(i, 0), 'held': held.get(i, 0),
             'handwritten': bool(c.flags & SCRIPT_HANDWRITTEN), 'inert': bool(c.flags & SCRIPT_INERT),
             'error': c.error is not None,
             'functions': dict(sorted(Counter(c.calls).items())),
@@ -455,7 +524,12 @@ def measure(data_files):
                'functions': dict(sorted(Counter(n for r in results for n in r['functions']).items())),
                'openmw': dict(sorted(Counter(f for r in results for f in r['openmw']).items())),
                'gaps': sorted(({'error': r['error'], 'notyet': r['notyet']} for r in results
-                               if r['error'] or r['notyet']), key=lambda g: (g['error'], g['notyet']))}
+                               if r['error'] or r['notyet']), key=lambda g: (g['error'], g['notyet'])),
+               # DIALOGUE-AGGRO-62: every answer that starts or changes a fight, its calls (no text) and whether it
+               # compiles; its engine path is worked out from them (combat_paths), so a function carried out later
+               # moves it
+               'fight': sorted(({'calls': r['fight'], 'error': r['error'], 'notyet': r['notyet']} for r in results
+                                if r['fight']), key=lambda f: json.dumps(f, sort_keys=True))}
     print('  %d script rows, %d dialogue results (%.1f s)' % (len(rows), results['total'], time.time() - started),
           flush=True)
     measured = {'masters': {m: data.master_sha256.get(m) for m in MASTERS}, 'compiler': compiler_identity(),
@@ -472,6 +546,15 @@ def dialogue_counts(results):
     d = Counter(dialogue_state(r) for r in results['gaps'])
     return {'runs': results['total'] - d['missing-function'] - d['not-converted'],
             'missing-function': d['missing-function'], 'not-converted': d['not-converted']}
+
+
+def combat_paths(results):
+    """DIALOGUE-AGGRO-62: how many fight-starting answers go down each engine path (tools/mwscript/dialogue_combat.py),
+    with the functions not carried out now (a function carried out later moves its answers to their path)."""
+    out = Counter()
+    for f in results.get('fight', ()):
+        out[dialogue_combat.path(f['calls'], runs=not f['error'] and not missing_now(f['notyet']))] += 1
+    return dict(sorted(out.items()))
 
 
 def apply_states(doc):
@@ -548,6 +631,12 @@ def _refs(row):
                                                           for m, v in r['placed'].items())))
     if r['levelled']:
         parts.append('levelled lists %d' % r['levelled'])
+    if row.get('held'):
+        parts.append('held by placed containers and actors %d' % row['held'])
+    if r.get('placed_by_scripts'):
+        parts.append('placed by scripts (%d records)' % r['placed_by_scripts'])
+    elif r.get('made_by'):
+        parts.append('placed by scripts of %s (not made yet)' % ', '.join(m.replace('.esm', '') for m in r['made_by']))
     if row['start']:
         parts.append('start script')
     if row['started_by']:
@@ -597,17 +686,25 @@ def render(doc):
              '_Last updated with AmiWind v%s (%s)._' % (doc['version'], long_date(doc['updated'])), '',
              GENERATED, '', doc['intro'], '',
              '**%s of %s scripts run**; %s use a function the interpreter lacks, %s are attached but not run, %s are '
-             'compiled but not attached, %s are not converted.' % (
+             'compiled but not attached, %s belong to an add-on world not in the image yet, %s are named by nothing '
+             '(they never run in the original either), %s are not converted.' % (
                  _n(st['runs']), _n(len(rows)), _n(st['missing-function']), _n(st['attached-not-run']),
-                 _n(st['not-attached']), _n(st['not-converted'])), '',
+                 _n(st['not-attached']), _n(st['not-in-image']), _n(st['inert']), _n(st['not-converted'])), '',
              '| State | Scripts | What it means |', '| --- | ---: | --- |']
-    meaning = {'runs': 'compiles whole, and the build attaches it to its objects or starts it',
+    meaning = {'runs': 'compiles whole, and the build attaches it to its objects or starts it (a record that is never '
+                       'placed: while the player carries its item, on the actor a levelled list gives, or on the '
+                       'object a script places; a script with no function, whose own locals the dialogue keeps on the '
+                       'speaker without it, counts as running)',
+               'not-in-image': 'compiles whole, but its records are placed (or made by scripts) only in Mournhold or '
+                               'Solstheim, which are not in the image yet',
+               'inert': 'compiles whole, but no record, start, StartScript or dialogue result names it, or the records '
+                        'that name it are never placed and nothing makes them: it never runs in the original either',
                'missing-function': 'compiles, but calls at least one function the interpreter does not carry out yet '
                                    '(those calls do nothing and read 0)',
                'attached-not-run': 'the game attaches it, but the build does not run it: a hand-written rule carries '
                                    'it, or nothing it does is seen yet',
-               'not-attached': 'compiles whole, but nothing in the build attaches or starts it (its area is not in '
-                               'the image, or its records are never placed)',
+               'not-attached': 'compiles whole, but nothing in the build attaches or starts it: its records are never '
+                               'placed, and nothing makes them at run time yet',
                'not-converted': 'does not compile'}
     for s in STATES:
         lines.append('| %s | %s | %s |' % (LABELS[s], _n(st[s]), meaning[s]))
@@ -616,7 +713,21 @@ def render(doc):
               'Dialogue result scripts (the lines a topic answer runs) are compiled as scripts of their own: '
               '%s results, %s run whole, %s use a function the interpreter lacks, %s are not converted.'
               % (_n(doc['dialogue_results']['total']), _n(d['runs']), _n(d['missing-function']),
-                 _n(d['not-converted'])), '',
+                 _n(d['not-converted'])), '']
+    fight = combat_paths(doc['dialogue_results'])
+    if fight:
+        # DIALOGUE-AGGRO-62: the answers that start or change a fight, by the engine path that carries them out
+        names = {'speaker-startcombat': 'the speaker attacks (StartCombat): found by the answer\'s reference',
+                 'other-startcombat': 'another actor attacks (StartCombat on a reference)',
+                 'speaker-fight': 'the speaker\'s Fight changes: weighed when the talk ends',
+                 'other-fight': 'another actor\'s Fight changes: weighed by that actor\'s next aggression check',
+                 'startcombat-actor': 'a fight between two actors: not carried out (the combat layer fights the '
+                                      'player only)',
+                 'not-run': 'the answer does not run whole'}
+        lines += ['Dialogue answers that start or change a fight (StartCombat, SetFight, ModFight): %s.' %
+                  _n(sum(fight.values())), '', '| Engine path | Answers |', '| --- | ---: |']
+        lines += ['| %s | %s |' % (names.get(k, k), _n(v)) for k, v in fight.items()]
+    lines += ['',
               'Measured on %s from the three masters (Morrowind, Tribunal, Bloodmoon) with the builder\'s own compiler '
               '(tools/mwscript), %s placed scripted references, %s bindings in the compiled file, %s start scripts. '
               'The states are worked out again from the interpreter\'s function table '
@@ -642,18 +753,14 @@ def render(doc):
               'The area of a script is where most of its placed references stand: the region for the exteriors, the '
               'region its doors lead out to for an interior. Scripts with no placed reference are grouped by what '
               'starts them.', '',
-              '| Area | Scripts | Runs | Function missing | Attached, not run | Not attached | Not converted |',
-              '| --- | ---: | ---: | ---: | ---: | ---: | ---: |']
+              '| Area | Scripts | ' + ' | '.join(SHORT[s] for s in STATES) + ' |',
+              '| --- | ---: | ' + ' | '.join('---:' for _ in STATES) + ' |']
     areas = {}
     for r in rows:
         areas.setdefault(r['area'], Counter())[r['state']] += 1
     for area, c in sorted(areas.items(), key=lambda kv: (-sum(kv[1].values()), kv[0])):
-        lines.append('| %s | %d | %d | %d | %d | %d | %d |' % (_cell(area), sum(c.values()), c['runs'],
-                                                               c['missing-function'], c['attached-not-run'],
-                                                               c['not-attached'], c['not-converted']))
-    lines.append('| **All** | **%d** | **%d** | **%d** | **%d** | **%d** | **%d** |' % (
-        len(rows), st['runs'], st['missing-function'], st['attached-not-run'], st['not-attached'],
-        st['not-converted']))
+        lines.append('| %s | %d | ' % (_cell(area), sum(c.values())) + ' | '.join('%d' % c[s] for s in STATES) + ' |')
+    lines.append('| **All** | **%d** | ' % len(rows) + ' | '.join('**%d**' % st[s] for s in STATES) + ' |')
     # per function
     table = function_table(doc)
     lines += ['', '## By function', '',

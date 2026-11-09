@@ -4,6 +4,7 @@
  * Explicit font changes read one atlas from disk.
  */
 #include "quakedef.h"
+#include "aw_tryalloc.h"
 static cvar_t colour={"_aw_console_colour","255",true};
 extern int scr_copyeverything;
 extern byte *draw_chars;
@@ -65,8 +66,42 @@ static int route_match(char *words,int argc,char **argv,int start) {
     }
     return *words?0:j;
 }
+/* DBG-SUPERSPEED-62: every on/off debug command turns the other way when typed bare. A pure on/off entry is one whose
+ * help starts with the switch words only (on/off, true/false, 1/0, 0/1, "or", commas), not followed by another choice
+ * ("/ list"). Bare, a route onto a setting gets the other value of that setting; a route onto a command whose state
+ * is a setting (the table) gets "on" or "off" by that setting; commands that turn themselves (god, photomode,
+ * crosshair, noburden, superspeed, the debug overlays) get nothing added. tests/aga_console_test.c checks every pure
+ * on/off entry of the catalogue. */
+static const char *const toggle_state[][2]={
+    {"footsteps","aw_player_footsteps"},{"music","aw_music"},{"worldbounds","aw_world_bounds"},
+    {"headlamp","aw_headlamp"},{"hlamp","aw_headlamp"},{"ui targetnames","aw_target_names"},{"logs live","aw_logs_live"},
+    {"camera parts","aw_player_body_parts"},{"camera hands","aw_hand_parts"},{"camera fpview","aw_fp_view"},
+    {"ui topiccolours","aw_dialogue_topic_colours"}};
+int AW_DebugPureToggle(const char *a);
+int AW_DebugPureToggle(const char *a) {
+    int words=0,n;
+    if(!a)return 0;
+    if(*a=='[')a++;
+    for(;;){
+        while(*a==' ' || *a==',')a++;
+        for(n=0;a[n] && a[n]!=' ' && a[n]!=',' && a[n]!=';' && a[n]!=']';n++);
+        if(!n)break;
+        if((n==6 && !strncmp(a,"on/off",6)) || (n==10 && !strncmp(a,"true/false",10)) ||
+           (n==3 && (!strncmp(a,"1/0",3) || !strncmp(a,"0/1",3))) || (n==2 && !strncmp(a,"or",2))){words++;a+=n;continue;}
+        if(*a=='/')return 0;                    /* another choice follows: not a plain switch */
+        break;
+    }
+    return words>0;
+}
+const char *AW_DebugToggleState(const char *words,const char *command);
+const char *AW_DebugToggleState(const char *words,const char *command) {
+    int i;
+    if(Cvar_FindVar((char *)command))return command;
+    for(i=0;i<(int)(sizeof(toggle_state)/sizeof(toggle_state[0]));i++)if(!strcmp(words,toggle_state[i][0]))return toggle_state[i][1];
+    return NULL;
+}
 static int route_format(route_t *r,int argc,char **argv,int j,char *out,int capacity) {
-    int used,n,k,setting,quoted,spaced;char *token;
+    int used,n,k,setting,quoted,spaced;char *token;const char *flip;
     if(!strcmp(r->command,"aw_teleport") && argc-j>3)return 0;   /* dbg tp X Y [Z] */
     if(!strcmp(r->command,"aw_shroomtracker") && argc!=j)return 0;
     if(!strcmp(r->command,"aw_shroompicker")){
@@ -86,16 +121,37 @@ static int route_format(route_t *r,int argc,char **argv,int j,char *out,int capa
     if(!strcmp(r->command,"aw_cull") && (!strcmp(r->words,"fog rule") || !strcmp(r->words,"cut groups"))){
         int bit=r->words[0]=='f'?AW_CULL_FOG_RULE:AW_CULL_GROUPS,value=(int)Cvar_VariableValue("aw_cull"),on;
         if(argc-j>1 || capacity<16)return 0;
-        if(argc==j){strcpy(out,"aw_cull\n");return 1;}
-        token=argv[j];
-        on=!Q_strcasecmp(token,"on") || !Q_strcasecmp(token,"true") || !strcmp(token,"1")?1:
-            !Q_strcasecmp(token,"off") || !Q_strcasecmp(token,"false") || !strcmp(token,"0")?0:-1;
+        /* bare: the switch turns the other way (DBG-SUPERSPEED-62; it printed aw_cull before) */
+        if(argc==j)on=!(value&bit);
+        else{
+            token=argv[j];
+            on=!Q_strcasecmp(token,"on") || !Q_strcasecmp(token,"true") || !strcmp(token,"1")?1:
+                !Q_strcasecmp(token,"off") || !Q_strcasecmp(token,"false") || !strcmp(token,"0")?0:-1;
+        }
         if(on<0)return 0;
         value=on?value|bit:value&~bit;
         sprintf(out,"aw_cull %d\n",value&AW_CULL_MAX);return 1;
     }
+    /* DBG-SUPERSPEED-62: a bare pure on/off command turns the other way (AW_DebugPureToggle above): the word is added
+     * at the end, after any words the route adds */
+    flip=NULL;
+    if(argc==j && AW_DebugPureToggle(r->arguments)){
+        const char *state=AW_DebugToggleState(r->words,r->command);
+        if(state){
+            int on=Cvar_VariableValue((char *)state)==0;
+            flip=!strcmp(state,r->command)?(on?"1":"0"):(on?"on":"off");
+        }
+    }
     used=(int)strlen(r->command);if(used+2>capacity)return 0;
     strcpy(out,r->command);
+    /* dbg camera fpview|hands|parts and dbg cast casting|now|ready|spell|start|strike (DBG-SUPERSPEED-62): the
+     * command's own word goes with what follows; up to v0.0.62-dev2 the route dropped it ("aw_camera off") */
+    if((!strcmp(r->command,"aw_camera") && !strncmp(r->words,"camera ",7)) ||
+       (!strcmp(r->command,"aw_magicfx") && !strncmp(r->words,"cast ",5))){
+        const char *sub=strchr(r->words,' ');
+        n=(int)strlen(sub);if(used+n+2>capacity)return 0;
+        strcpy(out+used,sub);used+=n;
+    }
     /* The appearance-only alias reuses quickchar; no second resident command. */
     if(!strcmp(r->words,"characterchange") && argc==j){
         if(used+13>capacity)return 0;
@@ -105,10 +161,39 @@ static int route_format(route_t *r,int argc,char **argv,int j,char *out,int capa
         if(used+7>capacity)return 0;
         strcpy(out+used," grant");used+=6;
     }
+    /* dbg torch, dbg give dbgtorch, dbg give debugtorch (TORCH-HIDES-HELM-62): one more debug torch, through the
+     * inventory command, no resident command of its own */
+    if(!strcmp(r->command,"aw_inventory") && (!strcmp(r->words,"torch") || !strcmp(r->words,"give dbgtorch") ||
+                                              !strcmp(r->words,"give debugtorch"))){
+        if(argc!=j || used+17>capacity)return 0;
+        strcpy(out+used," give debugtorch");used+=16;
+    }
     /* dbg give weapons [stats] (DBG-GIVE-WEAPONS-59): the inventory command's weapon kit, no resident command of its own */
     if(!strcmp(r->command,"aw_inventory") && !strcmp(r->words,"give weapons")){
         if(argc-j>1 || (argc>j && Q_strcasecmp(argv[j],"stats")) || used+14>capacity)return 0;
         strcpy(out+used," give weapons");used+=13;
+    }
+    /* dbg give [ID [N] / money|coin|rich [N]] and dbg additem, the same (DBG-GIVE-MONEY-62): the inventory command's give
+     * words (alone: the item picker), no resident command of their own */
+    if(!strcmp(r->command,"aw_inventory") && (!strcmp(r->words,"give") || !strcmp(r->words,"additem") ||
+       !strcmp(r->words,"give money") || !strcmp(r->words,"give coin") || !strcmp(r->words,"give rich"))){
+        int money=r->words[0]=='g' && r->words[4]==' ';
+        if(argc-j>(money?1:2) || used+12>capacity)return 0;
+        strcpy(out+used,money?" give money":" give");used+=money?11:5;
+    }
+    /* dbg noburden / unburdened / noweight [on/off] (DBG-NOBURDEN-62): the inventory command's no-burden mode, no
+     * resident command or setting of its own */
+    if(!strcmp(r->command,"aw_inventory") && (!strcmp(r->words,"noburden") || !strcmp(r->words,"unburdened") ||
+       !strcmp(r->words,"noweight"))){
+        if(argc-j>1 || used+10>capacity)return 0;
+        strcpy(out+used," noburden");used+=9;
+    }
+    /* dbg setlvl|setlevel [N], dbg restorestats|restore stats|stats restore, dbg maxstats|maxstat
+     * (DBG-STATS-COMMANDS-62): the levelling command's words, no resident command of their own */
+    if(!strcmp(r->command,"aw_levelup") && strcmp(r->words,"levelup") && strcmp(r->words,"skill progress")){
+        const char *w=r->words[0]=='s' && r->words[1]=='e'?" setlevel":r->words[0]=='m'?" max":" restore";
+        if(argc-j>(w[1]=='s'?1:0) || used+10>capacity)return 0;
+        strcpy(out+used,w);used+=(int)strlen(w);
     }
     /* dbg weapon / dbg gear (WEAPONS-57): the inventory command's list box, no resident command of its own */
     if(!strcmp(r->command,"aw_inventory") && (!strcmp(r->words,"weapon") || !strcmp(r->words,"gear"))){
@@ -123,8 +208,10 @@ static int route_format(route_t *r,int argc,char **argv,int j,char *out,int capa
     /* dbg kill [REF] (DBG-KILL-60): "chim actors killpick" (the red crosshair pick) or "chim actors kill REF"; no
      * resident command of its own */
     if(!strcmp(r->command,"chim") && !strcmp(r->words,"kill")){
-        if(argc-j>1 || used+20>capacity)return 0;
+        if(argc-j>1 || used+26>capacity)return 0;
         if(argc==j){strcpy(out+used," actors killpick\n");return 1;}
+        /* dbg kill crime (CRIME-59): the same pick, the kill counted as the player's (the murder when it is one) */
+        if(!Q_strcasecmp(argv[j],"crime")){strcpy(out+used," actors killpick crime\n");return 1;}
         strcpy(out+used," actors kill");used+=12;
     }
     /* dbg mwscript alone: what the compiled scripts do and what was loaded (DBG-MWSCRIPT-SILENT-56); dbg mwscript
@@ -183,6 +270,7 @@ static int route_format(route_t *r,int argc,char **argv,int j,char *out,int capa
         out[used++]=' ';if(quoted)out[used++]='"';
         memcpy(out+used,token,n);used+=n;if(quoted)out[used++]='"';
     }
+    if(flip){n=(int)strlen(flip);if(used+n+3>capacity)return 0;out[used++]=' ';memcpy(out+used,flip,n);used+=n;}
     out[used++]='\n';out[used]=0;return 1;
 }
 /* Return -1 for missing/invalid catalogue, 0 for bad command, 1 translated,
@@ -226,6 +314,60 @@ int AW_ConsoleWidth(void) {
     int width=con_linewidth;
     return width<1?38:width>128?128:width;
 }
+/* The console pager (DBG-HELP-PAGER-62): a long listing (dbg, dbg help, dbg help WORD) is collected while it is
+ * made, then shown one console screen at a time with AW_PAGER_LINE between the pages; Enter shows the next page,
+ * q (or Esc) stops. The text is held only while the pager waits (malloc, given back when it ends). */
+#define AW_PAGER_LINE "---------- [ more: ENTER | stop: q ] ----------"
+#define AW_PAGER_BYTES (DEBUG_BYTES+16384)
+static char *pager_text;static int pager_used,pager_pos,pager_collect,pager_waiting;
+static void pager_end(void) {
+    if(pager_text)free(pager_text);
+    pager_text=NULL;pager_used=pager_pos=pager_collect=pager_waiting=0;
+}
+static void say(const char *fmt,...) {
+    char text[DEBUG_LINE+160];va_list args;int n;
+    va_start(args,fmt);vsnprintf(text,sizeof(text),fmt,args);va_end(args);
+    n=(int)strlen(text);
+    if(pager_collect && pager_text && pager_used+n<AW_PAGER_BYTES){memcpy(pager_text+pager_used,text,n+1);pager_used+=n;return;}
+    Con_Printf("%s",text);
+}
+static void pager_begin(void) {
+    pager_end();
+    pager_text=AW_TryMalloc(AW_PAGER_BYTES);   /* NULL: the listing is printed whole, as before the pager */
+    if(pager_text){pager_text[0]=0;pager_collect=1;}
+}
+/* the console rows one page may use: half the screen of console text, less the input line and the pager line */
+int AW_ConsolePageRows(void);
+int AW_ConsolePageRows(void) {
+    int rows=(int)vid.conheight/8/2-5;
+    return rows<8?20:rows;
+}
+static void pager_page(void) {
+    int rows=AW_ConsolePageRows(),width=AW_ConsoleWidth(),used=0,n,need;char *line,*end,keep;
+    while(pager_text && pager_pos<pager_used){
+        line=pager_text+pager_pos;end=strchr(line,'\n');
+        n=end?(int)(end-line):(int)strlen(line);
+        need=n<1?1:(n+width-1)/width;
+        if(used && used+need>rows)break;
+        keep=line[n];line[n]=0;Con_Printf("%s\n",line);line[n]=keep;
+        used+=need;pager_pos+=n+(end?1:0);
+    }
+    if(pager_text && pager_pos<pager_used){pager_waiting=1;Con_Printf("\n%s\n\n",AW_PAGER_LINE);}
+    else pager_end();
+}
+static void pager_show(void) {
+    if(!pager_collect){return;}
+    pager_collect=0;pager_pos=0;pager_page();
+}
+/* keys.c Key_Console, before the input line: 1 = the pager took the key */
+int AW_ConsolePagerKey(int key);
+int AW_ConsolePagerKey(int key) {
+    if(!pager_waiting)return 0;
+    if(key==K_ENTER){pager_waiting=0;pager_page();return 1;}
+    if(key=='q' || key=='Q'){pager_end();Con_Printf("(listing stopped)\n");return 1;}
+    pager_end();          /* any other key (Esc included) ends the listing and does what it always did */
+    return 0;
+}
 static void catalogue_error(void) {
     Con_Printf("Debug catalogue missing/invalid: debug-commands.txt\n");
     Con_Printf("Restore the matching build's file; legacy command names still work.\n");
@@ -238,20 +380,22 @@ static void help(void) {
     if(width<1)width=38;
     if(width>128)width=128;
     memset(separator,'-',width);separator[width]=0;group[0]=0;
-    Con_Printf("AmiWind debug commands (PageUp scrolls)\n");
-    Con_Printf("Prefix: debug / dbg / amiwind debug\n");
+    pager_begin();
+    say("AmiWind debug commands (Enter: next page, q: stop)\n");
+    say("Prefix: debug / dbg / amiwind debug\n");
     while((status=catalogue_line(f,&left,line))>0){
         if(!*line || *line=='#')continue;
         if(!catalogue_route(line,&r)){status=-1;break;}
         if(strcmp(group,r.group)){
-            strcpy(group,r.group);Con_Printf("\n%s\n%s\n",group,separator);
+            strcpy(group,r.group);say("\n%s\n%s\n",group,separator);
         }
-        Con_Printf(" %s %s%s\n",r.words,r.arguments,availability(omitted,&r));
+        say(" %s %s%s\n",r.words,r.arguments,availability(omitted,&r));
     }
-    fclose(f);if(status<0){catalogue_error();return;}
-    Con_Printf(" help: this list; old names still work\n");
-    Con_Printf("Toggle values: on/off true/false 1/0\n");
-    Con_Printf("Noclip: look+WASD, E/Q vertical, Shift\n");
+    fclose(f);if(status<0){pager_end();catalogue_error();return;}
+    say(" help: this list; old names still work\n");
+    say("Toggle values: on/off true/false 1/0; none: the other way\n");
+    say("Noclip: look+WASD, E/Q vertical, Shift\n");
+    pager_show();
 }
 /* dbg help <word>: only the catalogue lines whose command starts with that word,
  * streamed from the disk file like the full list. */
@@ -259,13 +403,15 @@ static void help_for(char *word) {
     FILE *f;route_t r;int left,status,n=strlen(word),shown=0,omitted;char line[DEBUG_LINE];
     f=catalogue_open(&left,line);if(!f){catalogue_error();return;}
     omitted=AW_GalleryOmitted();
+    pager_begin();
     while((status=catalogue_line(f,&left,line))>0){
         if(!*line || *line=='#')continue;
         if(!catalogue_route(line,&r)){status=-1;break;}
         if(Q_strncasecmp(r.words,word,n) || (r.words[n] && r.words[n]!=' '))continue;
-        Con_Printf(" dbg %s %s%s\n",r.words,r.arguments,availability(omitted,&r));shown++;
+        say(" dbg %s %s%s\n",r.words,r.arguments,availability(omitted,&r));shown++;
     }
-    fclose(f);if(status<0){catalogue_error();return;}
+    fclose(f);if(status<0){pager_end();catalogue_error();return;}
+    pager_show();
     if(!shown)Con_Printf("No debug command starts with \"%s\"; use debug help\n",word);
 }
 static void dispatch(void) {
@@ -338,6 +484,7 @@ void AW_ConsoleInit(void) {
     Cmd_AddCommand("aw_heap_audit",heap_audit);
     Cmd_AddCommand("debug",dispatch);Cmd_AddCommand("dbg",dispatch);Cmd_AddCommand("aw",dispatch);
     Cmd_AddCommand("amiwind",dispatch);
+    aw_console_pager_key=AW_ConsolePagerKey;   /* keys.c Key_Console (DBG-HELP-PAGER-62) */
     Cmd_AddCommand("aw_console_color",set_colour);
     Cmd_AddCommand("aw_console_font",set_font);
     Cmd_AddCommand("aw_console_size",set_size);

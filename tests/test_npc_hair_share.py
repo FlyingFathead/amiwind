@@ -104,7 +104,21 @@ def open_edges(points, faces):
 
 
 class HairShare(unittest.TestCase):
+    """The hair shares on the previous body share (AMIWIND_NPC_BODY_SHARE budget): with the default body share a
+    body part below its v0.0.53 share takes faces back from the hair first (tests/test_npc_body_share.py)."""
     palette = bytes(range(256)) * 3
+
+    @classmethod
+    def setUpClass(cls):
+        cls._share = os.environ.get('AMIWIND_NPC_BODY_SHARE')
+        os.environ['AMIWIND_NPC_BODY_SHARE'] = 'budget'
+
+    @classmethod
+    def tearDownClass(cls):
+        if cls._share is None:
+            os.environ.pop('AMIWIND_NPC_BODY_SHARE', None)
+        else:
+            os.environ['AMIWIND_NPC_BODY_SHARE'] = cls._share
     materials = [{'texture_index': None, 'diffuse': [1., 1., 1.], 'alpha': 1.}]
 
     def shapes(self):

@@ -49,6 +49,7 @@ static const debug_scene_t *debug_scene;
 static int debug_scene_ready;
 #define player_name aw_story.name
 static edict_t *roles[9];
+int (*aw_intro_census_legacy)(void);   /* aw_opening.c AW_CensusLegacy, set in aw_debug.c */
 static edict_t *player(void){return svs.clients[0].edict;}
 /* Region loads can drop actors outside the new sub-cell and compact the edict
  * table after AW_IntroSpawn bound the roles. Clear any role that no longer
@@ -91,9 +92,13 @@ static int travel(float x,float y,float z) {
     vec3_t goal;goal[0]=x*.25;goal[1]=y*.25;goal[2]=z*.25;
     if(!AW_NavStart(roles[2],goal)){failure("No connected guard route");return 0;}return 1;
 }
+/* NEWGAME-STATE-RESET-62: New Game resets every registered game state (aw_reset.h, set by aw_loadfail.c); without the
+ * registry (host tests) the three resets it holds */
+void (*aw_game_reset)(int new_game);
 void AW_IntroBegin(void) {
     debug_scene=NULL;debug_scene_ready=0;
-    AW_StoryReset(1);AW_CharacterReset();AW_SaveReset();
+    if(aw_game_reset)aw_game_reset(1);
+    else {AW_StoryReset(1);AW_CharacterReset();AW_SaveReset();}
     pending=1;active=0;deck_state=0;deck_timer=0;IN_AWClearButtons();key_dest=key_game;
     opening_music_pending=1;opening_music_frames=0;AW_MusicHold();
     AW_EndLoadingStyle();
@@ -175,6 +180,13 @@ void AW_IntroSpawn(void) {
      * adapter ends; keep the deck guard's local state across door round trips. */
     memset(roles,0,sizeof(roles));
     for(i=1;i<sv.num_edicts;i++){e=EDICT_NUM(i);if(e->free)continue;v=GetEdictFieldValue(e,"aw_intro_role");role=v?(int)v->_float:0;
+        /* CENSUS-INTRO-SCRIPTS-62: Sellus Gravius is an ordinary speaker (the dialogue window, his own greetings and
+         * result scripts); role 7 stays bound, by his record id once the field is cleared, for the distance rules */
+        /* (the clerk, role 6, and the door guard, role 8, too: their own scripts and the dialogue window) */
+        if(role>=6 && role<=8 && !(aw_intro_census_legacy && aw_intro_census_legacy()) && v)v->_float=0;
+        if(!role){eval_t *id=GetEdictFieldValue(e,"aw_source_id");const char *s=id && id->string?pr_strings+id->string:"";
+            role=!Q_strcasecmp((char *)s,(char *)"chargen class")?6:!Q_strcasecmp((char *)s,(char *)"chargen captain")?7:
+                 !Q_strcasecmp((char *)s,(char *)"chargen door guard")?8:0;}
         if(role>0 && role<9)roles[role]=e;}
     if(debug_scene_spawn())return;
     if(!pending){

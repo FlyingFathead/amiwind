@@ -59,6 +59,14 @@ static int guard_open,guard_added;
  * held key (left by a crashed program) made Intuition move the mouse pointer with the
  * cursor keys in the menu (ENGINE-CRASH-EXIT-KEYBOARD-36). */
 static volatile UWORD guard_amiga_held;
+/* INVENTORY-ARROWS-SCROLL-62:the raw keys that never carry an Amiga qualifier to Intuition on our screen, even while an
+ * Amiga key looks held: M and N (screen flips) and the four cursor keys 0x4C..0x4F. With Amiga held, Intuition moves
+ * the mouse pointer with the cursor keys (its keyboard mouse) and the game never sees them. On FS-UAE the host's
+ * Super or Alt key is an Amiga key; a host shortcut (Alt-Tab, a workspace switch) takes its key-up away, the guard
+ * then thinks it held, and every menu's arrows moved the pointer until a reboot. The game never uses Amiga+cursor. */
+int AW_InputGuardKeyStrips(int raw){
+    return raw==0x37 || raw==0x36 || (raw>=0x4C && raw<=0x4F);
+}
 struct InputEvent *AW_InputGuardEvents(struct InputEvent *events){
     struct InputEvent *e;int key;
     for(e=events;e;e=e->ie_NextEvent)
@@ -69,7 +77,7 @@ struct InputEvent *AW_InputGuardEvents(struct InputEvent *events){
     if(video_window && IntuitionBase->FirstScreen==video_window->WScreen &&
        (video_window->Flags&WFLG_WINDOWACTIVE))
         for(e=events;e;e=e->ie_NextEvent)
-            if(e->ie_Class==IECLASS_RAWKEY && ((e->ie_Code&0x7f)==0x37 || (e->ie_Code&0x7f)==0x36 || !guard_amiga_held))
+            if(e->ie_Class==IECLASS_RAWKEY && (AW_InputGuardKeyStrips(e->ie_Code&0x7f) || !guard_amiga_held))
                 e->ie_Qualifier&=~(IEQUALIFIER_LCOMMAND|IEQUALIFIER_RCOMMAND);
     return events;
 }

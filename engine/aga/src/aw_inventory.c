@@ -5,6 +5,7 @@
 #include "quakedef.h"
 #include "aw_links.h"
 #include "aw_combat.h"
+#include "aw_activate.h"
 #include "aw_character.h"
 #include "aw_story.h"
 #include "chim/chim.h"
@@ -17,6 +18,7 @@ extern int AW_SceneryCount(void);
 #include "aw_inventory.h"
 #include "aw_tryalloc.h"
 #include "aw_actorstate.h"
+#include "aw_move.h"
 /* the inventory window's records of every carried kind (AW_InventoryCarried, set by AW_InventoryInit; NULL in the
  * rules-only fixtures: the window reads one record per kind) */
 int (*aw_inventory_carried)(void (*row)(void *ctx,int state_row,const aw_inventory_item_t *it,int file_row),void *ctx);
@@ -97,6 +99,16 @@ int AW_InventoryEquipped(const aw_state_t *s,const char *id){
     int i,n=0;if(!s || !inv_id(id,64))return 0;
     for(i=0;i<AW_INVENTORY_SLOTS;i++)if(!strcmp(s->inventory.equipped[i],id))n++;
     return n;
+}
+/* EQUIP-ACTION-REGRESSION-62 (aw_inventory.h): the beast races' rules, pure, beside the slot rules */
+int (*aw_inventory_player_beast)(void);
+static const char *equip_refusal;
+const char *AW_InventoryEquipRefusal(void){return equip_refusal;}
+const char *AW_InventoryBeastRefusal(const aw_inventory_item_t *it,int beast){
+    if(!it || !beast)return NULL;
+    if(it->flags&AW_INV_BEAST_HEAD)return "sNotifyMessage13";
+    if(it->flags&AW_INV_BEAST_FEET)return it->category==AW_INV_ARMOUR?"sNotifyMessage14":"sNotifyMessage15";
+    return NULL;
 }
 int AW_InventoryEquipSlot(aw_state_t *s,const aw_inventory_item_t *item,int slot){
     int i,used=0;
@@ -365,6 +377,37 @@ int AW_GearBoxLabel(const aw_inventory_item_t *it,char *out,int size){
     if(n<0)return -1;
     return n<size?n:size-1;
 }
+/* INVENTORY-DOUBLECLICK-62 (aw_inventory.h): the window's double-click and its count box, pure */
+int AW_InventoryDoubleClick(int last_row,double last_time,int row,double now){
+    return row>=0 && row==last_row && now>=last_time && now-last_time<=AW_INV_DOUBLE_CLICK_SECONDS;
+}
+int AW_InventorySliderCount(int x,int rail_x,int rail_w,int max){
+    if(max<=1 || rail_w<2)return max<1?1:max;
+    if(x<=rail_x)return 1;
+    if(x>=rail_x+rail_w-1)return max;
+    return 1+(int)(((long)(x-rail_x)*(long)(max-1)+(long)(rail_w-1)/2)/(long)(rail_w-1));
+}
+int AW_InventorySliderX(int count,int rail_x,int rail_w,int max){
+    if(max<=1 || rail_w<2)return rail_x;
+    if(count<1)count=1;
+    if(count>max)count=max;
+    return rail_x+(int)(((long)(count-1)*(long)(rail_w-1)+(long)(max-1)/2)/(long)(max-1));
+}
+int AW_InventoryCountType(int count,int fresh,int key,int max){
+    if(key=='\b')return fresh?0:count/10;
+    if(key<'0' || key>'9')return count;
+    count=fresh?key-'0':count*10+(key-'0');
+    return count>max?max:count;
+}
+/* DBG-GIVE-MONEY-62: a count in at most four characters, by OpenMW 0.51 mwgui/itemwidget.cpp getCountString (the small
+ * text rule): up to 9999 as it is, then thousands "k", millions "m", thousands of millions "b", whole numbers only */
+int AW_InventoryCountText(long count,char *out,int size){
+    if(!out || size<6)return -1;
+    if(count>999999999L)return snprintf(out,(size_t)size,"%ldb",count/1000000000L);
+    if(count>999999L)return snprintf(out,(size_t)size,"%ldm",count/1000000L);
+    if(count>9999L)return snprintf(out,(size_t)size,"%ldk",count/1000L);
+    return snprintf(out,(size_t)size,"%ld",count);
+}
 
 #ifndef AW_INVENTORY_RULES_ONLY
 #include "aw_ledger.h"
@@ -485,7 +528,7 @@ static int inv_parse_row(const byte *row,aw_inventory_item_t *out){
             if(value.category<1 || value.category>7 || value.value<0 ||
                !(value.weight>=0 && value.weight<=1000000) ||
                (value.slots&~((1U<<AW_INVENTORY_SLOTS)-1)) ||
-               (value.flags&~127U) ||
+               (value.flags&~(127U|AW_INV_BEAST_HEAD|AW_INV_BEAST_FEET)) ||
                value.weapon<0 || value.weapon>12 ||
                value.weapon_skill<0 || value.weapon_skill>=27 ||
                !(value.reach>=0 && value.reach<=100) ||
@@ -793,7 +836,10 @@ int AW_InventoryEquippedWeaponType(void){
     return item.weapon-1;
 }
 int AW_InventoryCanEquip(const aw_inventory_item_t *item){
+    equip_refusal=NULL;
     if(!item || (item->flags&(AW_INV_EQUIP|AW_INV_EQUIP_SUPPORTED))!=(AW_INV_EQUIP|AW_INV_EQUIP_SUPPORTED))return 0;
+    /* a beast race (OpenMW 0.51 armor.cpp / clothing.cpp canBeEquipped): no piece over the head, nothing on the feet */
+    if((equip_refusal=AW_InventoryBeastRefusal(item,aw_inventory_player_beast && aw_inventory_player_beast())))return 0;
     if(item->category==AW_INV_WEAPON || (item->category==AW_INV_ARMOUR && item->subtype==8)){
         int index=inv_item_index(&aw_state,item->id),count=AW_StateGet(&aw_state,AW_ITEM,item->id);
         /* one of it, except thrown weapons, which are held as their stack (OpenMW: the stack is the equipped item) */
@@ -983,6 +1029,64 @@ static void weapon_kit(int give){
     Con_Printf("equip: aw_inventory equip \"ID\" or I; carry: not equippable yet\n");
     free(rows);
 }
+/* DBG-GIVE-MONEY-62: COUNT of catalogue item ID to the player, saved like any grant; gold is held at the cap
+ * (aw_state.h AW_GOLD_MAX). A console line and the same notice on screen as dbg torch. */
+int AW_InventoryGive(const char *id,long count){
+    aw_inventory_item_t item;char line[160];long before,after;
+    if(!sv.active || svs.maxclients!=1){Con_Printf("Start or load a game first.\n");return 0;}
+    if(!id || !AW_InventoryRead(id,&item)){Con_Printf("dbg give: \"%s\" is not in the item catalogue (dbg give alone lists them).\n",id?id:"");return 0;}
+    if(count<1){Con_Printf("dbg give: a count of 1 or more.\n");return 0;}
+    before=(long)AW_StateGet(&aw_state,AW_ITEM,item.id);
+    if(!Q_strcasecmp(item.id,AW_GOLD_ID) && count>AW_GOLD_MAX-before)count=AW_GOLD_MAX-before;
+    if(count<1){Con_Printf("dbg give: your gold is at its limit, %ld.\n",(long)AW_GOLD_MAX);return 0;}
+    if(!AW_ItemAdd(&aw_state,item.id,(int32_t)count)){
+        Con_Printf("dbg give refused: %s.\n",AW_ItemRefusalText(&aw_state,AW_ItemRefusal(&aw_state,item.id,(int32_t)count)));return 0;
+    }
+    after=(long)AW_StateGet(&aw_state,AW_ITEM,item.id);
+    if(count==1)Q_snprintf(line,sizeof(line),"%s added to your inventory.",item.name[0]?item.name:item.id);
+    else Q_snprintf(line,sizeof(line),"%ld %s added to your inventory.",count,item.name[0]?item.name:item.id);
+    Con_Printf("DIAGNOSTIC %s Now %ld carried (%s).%s\n",line,after,item.id,
+               !Q_strcasecmp(item.id,AW_GOLD_ID) && after>=AW_GOLD_MAX?" Gold limit reached.":"");
+    AW_UISubtitle("",line,4);
+    return 1;
+}
+static int give_number(const char *s,long maximum,long *out){
+    long n=0;
+    if(!s || !*s)return 0;
+    for(;*s;s++){if(*s<'0' || *s>'9')return 0;n=n*10+(*s-'0');if(n>maximum)return 0;}
+    *out=n;return n>0;
+}
+/* aw_inventory give [money|coin|rich [N] | ID [N]] (routed from dbg give and dbg additem, aw_console.c; no resident
+ * command of its own): no word opens the picker; money gives N gold (default 1,000,000, at most the gold limit) */
+static void give_command(void){
+    long n;char *what;
+    if(Cmd_Argc()==2){AW_GiveBoxOpen();return;}
+    what=Cmd_Argv(2);
+    if(!Q_strcasecmp(what,"money") || !Q_strcasecmp(what,"coin") || !Q_strcasecmp(what,"rich")){
+        n=AW_GIVE_MONEY_DEFAULT;
+        if(Cmd_Argc()==4 && !give_number(Cmd_Argv(3),AW_GOLD_MAX,&n)){
+            Con_Printf("Usage: dbg give money [N] (1 to %ld; default %ld)\n",(long)AW_GOLD_MAX,AW_GIVE_MONEY_DEFAULT);return;}
+        AW_InventoryGive(AW_GOLD_ID,n);return;
+    }
+    n=1;
+    if(Cmd_Argc()==4 && !give_number(Cmd_Argv(3),AW_GIVE_ITEMS_MAX,&n)){
+        Con_Printf("Usage: dbg give ID [N] (N 1 to %ld; dbg give alone lists the items)\n",AW_GIVE_ITEMS_MAX);return;}
+    AW_InventoryGive(what,n);
+}
+/* DBG-NOBURDEN-62 (aw_move.h): the no-burden debug mode, through the inventory command (no resident command or setting
+ * of its own); a console line and the notice on screen say which way it went */
+static void noburden_command(void){
+    char *w=Cmd_Argc()==3?Cmd_Argv(2):NULL;int on;
+    if(!w)on=!AW_MoveNoBurdenOn();
+    else if(!Q_strcasecmp(w,"on") || !Q_strcasecmp(w,"true") || !Q_strcasecmp(w,"yes") || !strcmp(w,"1"))on=1;
+    else if(!Q_strcasecmp(w,"off") || !Q_strcasecmp(w,"false") || !Q_strcasecmp(w,"no") || !strcmp(w,"0"))on=0;
+    else{Con_Printf("Usage: dbg noburden [on/off]; no word turns it the other way (not saved)\n");return;}
+    AW_MoveNoBurdenSet(on);
+    Con_Printf("No burden %s: %s (not saved; off at New Game).\n",on?"ON":"OFF",
+               on?"the carried weight slows nothing and never stops you; the inventory shows the load over 999999":
+                  "the original's carry weight again");
+    AW_UISubtitle("",on?"No burden: on. Carry weight has no limit.":"No burden: off.",3);
+}
 /* MWSCRIPT-TRAY-SMOKE-58: what the last refused space check met (the map, or an entity's number and model), for
  * the test route's refusal line (aw_inventory drop) */
 static char space_blocker[80];
@@ -997,11 +1101,19 @@ void AW_InventoryGrantCommand(void){
         if(!sv.active || svs.maxclients!=1){Con_Printf("Start or load a game first.\n");return;}
         AW_GearBoxOpen(kind);return;
     }
+    /* dbg torch, dbg give dbgtorch / debugtorch (TORCH-HIDES-HELM-62, aw_debug_torch.c) */
+    if(cmd_source==src_command && Cmd_Argc()==3 && !Q_strcasecmp(Cmd_Argv(1),"give") &&
+       !Q_strcasecmp(Cmd_Argv(2),"debugtorch")){AW_DebugTorchGive();return;}
     if(cmd_source==src_command && (Cmd_Argc()==3 || Cmd_Argc()==4) && !Q_strcasecmp(Cmd_Argv(1),"give") &&
        !Q_strcasecmp(Cmd_Argv(2),"weapons")){
         if(Cmd_Argc()==4 && Q_strcasecmp(Cmd_Argv(3),"stats")){Con_Printf("dbg give weapons [stats]\n");return;}
         weapon_kit(Cmd_Argc()==3);return;
     }
+    /* DBG-GIVE-MONEY-62: dbg give (the picker), dbg give money|coin|rich [N], dbg give ID [N], dbg additem the same */
+    if(cmd_source==src_command && Cmd_Argc()==2 && !Q_strcasecmp(Cmd_Argv(1),"givecount")){AW_GiveCountBoxOpen();return;}
+    if(cmd_source==src_command && Cmd_Argc()>=2 && Cmd_Argc()<=4 && !Q_strcasecmp(Cmd_Argv(1),"give")){give_command();return;}
+    /* DBG-NOBURDEN-62: dbg noburden / unburdened / noweight [on/off]; no word turns it the other way */
+    if(cmd_source==src_command && Cmd_Argc()<=3 && Cmd_Argc()>=2 && !Q_strcasecmp(Cmd_Argv(1),"noburden")){noburden_command();return;}
     /* dbg inventory equip "<id>": equip a carried item as the inventory window's E does (tests of first- and
      * third-person gear, PLAYER-GEAR-VISUAL-59); the same rules, refused when the window would refuse it. */
     if(cmd_source==src_command && sv.active && svs.maxclients==1 && Cmd_Argc()==3 && !Q_strcasecmp(Cmd_Argv(1),"equip")){
@@ -1438,8 +1550,12 @@ int AW_InventoryPropertiesLine(const char *id,int columns,char *out,int size){
     if(columns>0 && columns<size && (int)strlen(out)>columns)out[columns]=0;
     return 1;
 }
+/* FOCUS-NPC-OVERRIDES-ITEM-62: the distance along the view of the last aimed drop (inv_target, ledger_target) and
+ * placed row (placed_target), map units from the eye; -1 none */
+static float drop_aim=-1,placed_aim=-1;
 static int inv_target(void){
     int i,best=-1;float distance=AW_ActivateDistance(),along,side;edict_t *p;vec3_t f,r,u,eye,delta;trace_t tr;
+    drop_aim=-1;
     if(!sv.active || svs.maxclients!=1 || !svs.clients || !(p=svs.clients[0].edict))return -1;
     inv_level();VectorCopy(p->v.origin,eye);eye[2]+=p->v.view_ofs[2];
     AngleVectors(p->v.v_angle,f,r,u);
@@ -1452,11 +1568,13 @@ static int inv_target(void){
         if(tr.fraction<1)continue;
         distance=along;best=i;
     }
+    if(best>=0)drop_aim=distance;
     return best;
 }
 /* CELL-CHANGES-59: the same aim over the drops of the world change list this map shows */
 static int ledger_target(void){
     int i,best=-1;float distance=AW_ActivateDistance(),along,side;edict_t *p,*e;vec3_t f,r,u,eye,delta;trace_t tr;
+    drop_aim=-1;
     if(!sv.active || svs.maxclients!=1 || !svs.clients || !(p=svs.clients[0].edict))return -1;
     inv_level();VectorCopy(p->v.origin,eye);eye[2]+=p->v.view_ofs[2];
     AngleVectors(p->v.v_angle,f,r,u);
@@ -1469,10 +1587,18 @@ static int ledger_target(void){
         if(tr.fraction<1)continue;
         distance=along;best=i;
     }
+    if(best>=0)drop_aim=distance;
     return best;
 }
 /* the aimed drop of either store, -1 none */
 static int drop_aimed(void){return aw_ledger_on?ledger_target():inv_target();}
+/* FOCUS-NPC-OVERRIDES-ITEM-62 (aw_inventory.h) */
+static int placed_target(void);
+float AW_InventoryAimDistance(void){
+    float drop=drop_aimed()>=0?drop_aim:-1,placed=placed_target()>=0?placed_aim:-1;
+    if(drop<0)return placed;
+    return placed<0 || drop<placed?drop:placed;
+}
 const char *AW_InventoryHint(void){
     int i=drop_aimed();
     return i<0?NULL:aw_ledger_on?map_drops[i].label:drop_label[i];
@@ -1522,7 +1648,11 @@ int AW_InventoryFocus(const char **name,char *weight_line,char *value_line,int l
 #define FOCUS_ACT_MAGIC_SCROLL 8
 static int focus_stride=FOCUS_ROW;
 /* lock: a container's lock level in the data (CONTAINER-WINDOW-59, row byte 3; 0 for everything else) */
-typedef struct {vec3_t at;float weight;int value;unsigned reference;char kind,owned,edict,live,action,name[37];short drawn;unsigned char lock;} focus_row_t;
+/* name: 35 characters of the row's name field, and for a door (the destination cell's name) the rest of a longer name
+ * from the row's id field, which a door does not use (INFO-BOX-TEXT-CUT-62): up to 35 + 31 characters */
+#define FOCUS_NAME_FIELD 36
+#define FOCUS_NAME_LONG (FOCUS_NAME_FIELD-1+FOCUS_ID-1)
+typedef struct {vec3_t at;float weight;int value;unsigned reference;char kind,owned,edict,live,action,name[FOCUS_NAME_LONG+1];short drawn;unsigned char lock;} focus_row_t;
 static focus_row_t *focus_rows;
 static int focus_count;
 static model_t *focus_world;
@@ -1560,7 +1690,12 @@ static void focus_add_row(const byte *row){
     r->lock=(unsigned char)(row[0]=='C' && row[3]<=100?row[3]:0);
     for(j=0;j<3;j++)r->at[j]=(float)(int32_t)focus_u32(row+8+4*j);
     bits=focus_u32(row+20);memcpy(&r->weight,&bits,4);r->value=(int)(int32_t)focus_u32(row+24);
-    memcpy(r->name,row+28,36);r->name[36]=0;
+    memcpy(r->name,row+28,FOCUS_NAME_FIELD);r->name[FOCUS_NAME_FIELD-1]=0;
+    /* INFO-BOX-TEXT-CUT-62: a door's name that filled the whole name field goes on in its id field (tools/prepare_focus.py
+     * name_tail); an older file has nothing there and the name stays as it was written */
+    if(row[0]=='D' && strlen(r->name)==FOCUS_NAME_FIELD-1 && row[FOCUS_ROW]){
+        memcpy(r->name+FOCUS_NAME_FIELD-1,row+FOCUS_ROW,FOCUS_ID-1);r->name[FOCUS_NAME_LONG]=0;
+    }
     for(j=0;r->name[j];j++)if((unsigned char)r->name[j]<32)r->name[j]=' ';
     if(!r->name[0] || !(r->weight>=0 && r->weight<1000000))return;
     focus_count++;
@@ -1579,6 +1714,7 @@ static int focus_read_key_id(FILE *f,long base,unsigned long rooms,unsigned long
     if(!rows)return 1;
     if(rows>FOCUS_ROWS || fseek(f,base+8+(long)rooms*12+(long)first*focus_stride,SEEK_SET))return 0;
     for(i=0;i<(int)rows && (want || focus_count<FOCUS_ROWS);i++){
+        if(focus_stride<FOCUS_ROW2)memset(row,0,sizeof(row));   /* AWF1: no id field, never a stale name tail */
         if(fread(row,1,focus_stride,f)!=(size_t)focus_stride)break;
         if(want){
             if(row[0]!='I' || focus_u32(row+4)!=want || focus_stride!=FOCUS_ROW2)continue;
@@ -2108,12 +2244,12 @@ static int area_item(const char *id,aw_inventory_item_t *out){
 static int pic_answer(const char *id,int *w,int *h,byte *pixels,int maxw,int maxh);
 int AW_AreaIcon(const char *key,int *w,int *h,byte *pixels,int maxw,int maxh){
     int k;
-    if(!key || strncmp(key,"item:",5))return 0;
+    if(!key || strncmp(key,"big:",4))return 0;   /* ITEM-ICONS-MISSING-62: an item's strip picture is "big:<id>" now */
     {
         /* the loaded areas, then the carried items' pictures, then the item directory's area (narrow) */
-        const area_t *a=area_item_loaded(key+5,&k);unsigned long o,n;const byte *p;
-        if(!a && (k=pic_answer(key+5,w,h,pixels,maxw,maxh))!=0)return k;
-        if(!a && !(a=area_item_area(key+5,&k)))return 0;
+        const area_t *a=area_item_loaded(key+4,&k);unsigned long o,n;const byte *p;
+        if(!a && (k=pic_answer(key+4,w,h,pixels,maxw,maxh))!=0)return k;
+        if(!a && !(a=area_item_area(key+4,&k)))return 0;
         o=focus_u32(a->pic+k*8);n=focus_u32(a->pic+k*8+4);
         if(!n){area_hits++;return -1;}        /* the build has no picture of it: known, nothing to search */
         if(o+n>(unsigned long)a->bytes || n<8)return 0;
@@ -2142,7 +2278,7 @@ static int pic_find(const char *id){
 static void pic_warm(const char *id){
     char key[72];pic_t *p;int w=0,h=0,k;
     if(!aw_area_picture_read || strlen(id)>=sizeof(p->id) || pic_find(id)>=0)return;
-    Q_snprintf(key,sizeof(key),"item:%s",id);
+    Q_snprintf(key,sizeof(key),"big:%s",id);
     /* the place's own areas have it (the cache of areas left is not counted on: it may be trimmed) */
     {int i;for(i=0;i<area_count;i++)if((k=area_item_find(&areas[i],id))>=0 && focus_u32(areas[i].pic+k*8+4))return;}
     if(!pic_cache && !(pic_cache=(pic_t *)AW_TryMalloc(PIC_CACHE*sizeof(pic_t))))return;
@@ -2162,7 +2298,7 @@ static int pic_answer(const char *id,int *w,int *h,byte *pixels,int maxw,int max
     return 1;
 }
 /* the icon lookups that had to search gfx/icons.awl in play (aw_icons.c counts them here) */
-void AW_AreaIconFallback(const char *key){if(key && !strncmp(key,"item:",5) && !area_loading)area_fallback[3]++;}
+void AW_AreaIconFallback(const char *key){if(key && !strncmp(key,"big:",4) && !area_loading)area_fallback[3]++;}
 /* the owner of REFERENCE in a loaded area: 1 found, 0 not owned there, -1 no loaded area has the reference */
 static int area_owner(unsigned reference,char *owner,int *faction){
     int i,j,lo,hi,mid;
@@ -2525,7 +2661,6 @@ int AW_ContainerPut(unsigned reference,const char *id,int count,const char **why
     AW_CombatEquipmentChanged();
     return count;
 }
-static int placed_target(void);
 static void focus_refresh(const edict_t *p);
 /* The container the console acts on: the aimed one, else the nearest container row of this room or cell. */
 static focus_row_t *container_row(void){
@@ -3027,10 +3162,13 @@ static int placed_target(void){
     if(!focus_count)return -1;
     VectorCopy(p->v.origin,eye);eye[2]+=p->v.view_ofs[2];AngleVectors(p->v.v_angle,f,r,u);
     if(focus_outdoor)shift[0]=shift[1]=shift[2]=0;else AW_MwscriptRoomShift(shift);
-    nearest=reach;
+    nearest=reach;placed_aim=-1;
     for(i=0;i<focus_count;i++){
         focus_row_t *row=&focus_rows[i];
         if(row->edict || AW_ObjectDisabled(row->reference))continue;
+        /* FOCUS-NPC-OVERRIDES-ITEM-62: an actor's row is never used here (AW_PlacedFocus and the use refuse it; the
+         * actor himself is aimed at by aw_scene.c), so his feet near the crosshair line no longer hide an item */
+        if(row->kind=='A')continue;
         VectorAdd(row->at,shift,at);VectorSubtract(at,eye,delta);length=DotProduct(delta,delta);
         /* the ray asked only of drawn rows whose origin is within the reach and 64 units (the longest item) */
         if(row->kind=='I' && row->drawn>0 && aw_placed_ray && length<=(reach+64)*(reach+64) &&
@@ -3049,6 +3187,8 @@ static int placed_target(void){
         if(tr.fraction<1 && (1-tr.fraction)*sqrt(length)>6)continue;      /* a wall between: not in view */
         nearest=along;best=i;
     }
+    /* what the use key takes or opens (placed_use): an item or a container */
+    if(best>=0 && (focus_rows[best].kind=='I' || focus_rows[best].kind=='C'))placed_aim=nearest;
     return best;
 }
 /* aw_placed aim (PLACED-PIT-AXE-NO-FOCUS-61, a check command): every focus row within twice the reach of the eye and
@@ -3074,6 +3214,14 @@ void AW_PlacedAimReport(void){
                    tr.fraction,(1-tr.fraction)*(float)sqrt(length),
                    row->drawn>0 && aw_placed_ray?aw_placed_ray(row->drawn,eye,f):-2.0f);
         shown++;
+    }
+    /* FOCUS-NPC-OVERRIDES-ITEM-62: who the use key goes to, with the numbers it was chosen by (map units from the eye) */
+    {
+        edict_t *actor=AW_ActivateActor(p,p->v.v_angle),*seen=AW_NPCTarget(p,p->v.v_angle);
+        Con_Printf("aw_placed aim: use goes to %s; actor %s box %.1f..%.1f, item %.1f, plant %.1f\n",
+                   aw_activate_last.item_first?"the item":actor?"the actor":"no actor",
+                   seen && seen->v.netname?pr_strings+seen->v.netname:"none",aw_activate_last.actor_near,
+                   aw_activate_last.actor_far,aw_activate_last.item,aw_activate_last.plant);
     }
 }
 int AW_PlacedFocus(const char **name,char *weight_line,char *value_line,int line_size,int *owned){
@@ -3183,10 +3331,23 @@ int AW_PlacedTake(unsigned reference){
     focus_row_t *row=placed_row(reference);
     return row && !AW_ObjectDisabled(reference)?take_row(row):0;
 }
+/* the scripts' OnActivate on a placed item (aw_mwhost.c sets it: object_intercept; NULL without the scripts) */
+int (*aw_inventory_intercept)(unsigned reference);
+/* A script's Activate on the placed item REFERENCE (aw_mwhost.c object_activate; CENSUS-INTRO-SCRIPTS-62: the census
+ * papers' CharGenStatsSheet takes the player's use and passes it on): the item's own use, as E without a script. */
+int AW_PlacedActivate(unsigned reference){
+    focus_row_t *row=placed_row(reference);
+    if(!row || AW_ObjectDisabled(reference))return 0;
+    if((row->action&3)==FOCUS_ACT_READ && aw_book_reader && aw_book_reader(row->reference))return 1;
+    return take_row(row);
+}
 static int placed_use(void){
     int best=placed_target();focus_row_t *row;
     if(best>=0 && focus_rows[best].kind=='C')return container_open(&focus_rows[best]);   /* CONTAINER-WINDOW-59 */
     if(best<0 || (row=&focus_rows[best])->kind!='I')return 0;
+    /* an item whose script reads OnActivate takes the use (the original's rule, as for doors and actors: aw_mwhost.c
+     * object_intercept); the item does nothing until the script's Activate (AW_PlacedActivate above) */
+    if(aw_inventory_intercept && aw_inventory_intercept(row->reference))return 1;
     /* a readable book opens the reader (reading is free); Take or Steal is inside it */
     if((row->action&3)==FOCUS_ACT_READ && aw_book_reader && aw_book_reader(row->reference))return 1;
     return take_row(row);

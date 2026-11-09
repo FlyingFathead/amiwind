@@ -1,6 +1,6 @@
 # Build AmiWind on Linux
 
-_Last updated with AmiWind v0.0.57 (30 October 2026)._
+_Last updated with AmiWind v0.0.62 (8 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -595,7 +595,8 @@ holds, the measured figures per map and what 12 MiB costs: [chim/build_guide/MEM
 
 ## NPC model levels of detail
 
-With `--npc-lod on`, every resident is baked at several levels of detail from the same
+A resident is baked once per appearance, not once per actor: actors with the same appearance share one
+model, found in the cache by the digest of that appearance. With `--npc-lod on`, every appearance is baked at several levels of detail from the same
 recipe and the same animation frames, and the engine draws each actor with the level its
 distance calls for ([NPC model levels of detail](NPC_MODEL_CACHE.md#npc-model-levels-of-detail)):
 
@@ -605,7 +606,7 @@ by default is a change of that file. A `--build-config` file overrides it, the c
 
 | Option | Values | Default |
 | --- | --- | --- |
-| `--npc-lod` | `on`, or `off` for one model per resident (the earlier method) | `off` |
+| `--npc-lod` | `on`, or `off` for one model per appearance (the earlier method) | `off` |
 | `--npc-lod-levels` | `2` (near + the map's own model), `3` (+ mid distance), `4` (+ crowds far away) | `3` |
 | `--npc-face-lod` | which residents may use the near level: `all`, `measured`, `named`, or `list` with `--npc-face-lod-list FILE` | `all` |
 | `--npc-lod-disk-mib` | disk for the level files (not the map models): coarse levels first, then near levels by head detail lost, until this many MiB | `96` |

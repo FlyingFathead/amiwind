@@ -1,6 +1,6 @@
 # Lava
 
-_Last updated with AmiWind v0.0.36 (11 October 2026)._
+_Last updated with AmiWind v0.0.62-dev1 (7 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -139,6 +139,11 @@ Where it is implemented, once for every builder:
 | `aw_lava_tint_min` | 110 | tint strength (0-255) on stepping in |
 | `aw_lava_tint_max` | 230 | tint strength after `aw_lava_tint_ramp` seconds in lava |
 | `aw_lava_tint_ramp` | 3 | seconds from the first to the full tint ("red, then more red") |
+
+Since v0.0.62 the game's own lava script runs: its HurtStandingActor hurts the player standing on a lava object that
+has an entity, with the script's own number. While it does, the lava volume's damage holds back, so the player is
+hurt once. The volume's damage covers only the lava where the script cannot see the player standing on its object
+(the lava drawn as world scenery, which has no entity).
 
 The blood red is darker and more saturated than the damage flash (190, 20, 20) and far from the planned blight
 weather tint (a dusty brown red at low strength, [ROADMAP.md](ROADMAP.md#weather-ash-storms-and-blight-winds)), so

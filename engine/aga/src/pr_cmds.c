@@ -1865,7 +1865,8 @@ int AW_MwscriptUseInView(const float *eye,const float *forward);   /* aw_mwhost.
 static void PF_aw_npctarget(void)
 {
     edict_t *player=G_EDICT(OFS_PARM0);
-    edict_t *target=AW_NPCTarget(player,player->v.v_angle);
+    /* FOCUS-NPC-OVERRIDES-ITEM-62: an item before the actor or by him takes the use (aw_activate.h) */
+    edict_t *target=AW_ActivateActor(player,player->v.v_angle),*actor=target;
     /* a script that reads OnActivate takes the actor's use (the original's rule, as for doors: aw_mwhost.c
      * object_intercept): E talks to nobody and the script's OnActivate reads 1 on its next run (MWSCRIPT-MORE-57) */
     if(target && aw_scene_intercept){
@@ -1874,7 +1875,7 @@ static void PF_aw_npctarget(void)
     }
     /* no actor under the crosshair: a scripted object in view that reads OnActivate takes the use (activators and the
      * other placements the CHIM world keeps without an edict; aw_mwhost.c) */
-    if(!AW_NPCTarget(player,player->v.v_angle)){
+    if(!actor){
         vec3_t eye,forward,right,up;
         VectorAdd(player->v.origin,player->v.view_ofs,eye);AngleVectors(player->v.v_angle,forward,right,up);
         AW_MwscriptUseInView(eye,forward);

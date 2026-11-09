@@ -470,6 +470,12 @@ HOST = {'getpccrimelevel', 'setpccrimelevel', 'modpccrimelevel',
         'getangle', 'setangle', 'move', 'moveworld', 'setpos', 'setatstart', 'face', 'rotateworld',
         'getdetected', 'getlos', 'getlineofsight', 'getinterior', 'getcurrentweather', 'onknockout', 'wakeuppc',
         'getpcsneaking', 'getweapondrawn', 'setdelete',
+        # v0.0.62: the crimes (CRIME-59; aw_crime.c): OnMurder (statsextensions.cpp OpOnMurder: 1 once after the
+        # actor's murder was reported), PayFine (bounty 0, the stolen goods taken, the witnesses calmed), PayFineThief
+        # (bounty 0, calmed, the goods kept), GotoJail (the sentence: days pass, skills change, released at the nearest
+        # prison marker) and GetPCInJail (miscextensions.cpp OpPayFine, OpPayFineThief, OpGoToJail, OpGetPcInJail;
+        # worldimp.cpp goToJail; jailscreen.cpp)
+        'onmurder', 'payfine', 'payfinethief', 'gotojail', 'getpcinjail',
         # v0.0.62 (MWSCRIPT-GAP-FUNCTIONS-62): the screen faded to black and back (OpenMW miscextensions.cpp OpFadeIn,
         # OpFadeOut, OpFadeTo, mwgui/screenfader.cpp: from the fade of the moment, over the seconds given; FadeTo's
         # number is a percent), Quake's palette shift (view.c V_ScreenFade); the sneak stance forced and cleared
@@ -481,7 +487,25 @@ HOST = {'getpccrimelevel', 'setpccrimelevel', 'modpccrimelevel',
         'fadein', 'fadeout', 'fadeto', 'forcesneak', 'clearforcesneak', 'getforcesneak',
         # v0.0.62: the player's filled soul gems by their soul (miscextensions.cpp OpHasSoulGem, OpRemoveSoulGem;
         # aw_mwhost.c soul_gems)
-        'hassoulgem', 'removesoulgem'}
+        'hassoulgem', 'removesoulgem',
+        # v0.0.62: the player standing on the object hurt (miscextensions.cpp OpHurtStandingActor; the lava volume's
+        # own damage holds back meanwhile, aw_lava.c)
+        'hurtstandingactor',
+        # v0.0.62: Drop of a carried item that can lie in the world (miscextensions.cpp OpDrop; codegen.drop)
+        'drop',
+        # v0.0.62: an actor reset to its game data (statsextensions.cpp OpResurrect; aw_mwhost.c resurrect)
+        'resurrect',
+        # v0.0.62 (MWSCRIPT-UNPLACED-ATTACH-62): a video played over the scene, which goes on after it
+        # (miscextensions.cpp OpPlayBink; aw_movie.c AW_MovieScript)
+        'playbink',
+        # v0.0.62 (MWSCRIPT-INVENTORY-HITONME-62): the actor's last hit object, read and cleared (miscextensions.cpp
+        # OpHitOnMe; the player's weapon kept per victim by aw_combat.c AW_CombatLastHit*, aw_mwhost.c hit_on_me)
+        'hitonme',
+        # v0.0.62 (MWSCRIPT-COMPLETE-LANDMARK): a region's weather set until the next weather change and its weather
+        # chances changed for the rest of the game, saved (skyextensions.cpp OpChangeWeather, OpModRegion;
+        # weather.cpp WeatherManager::changeWeather, modRegion; aw_weather.c AW_WeatherScript*): the region is worked
+        # out here (codegen.hostcall, the region catalogue's index), a region not in the image is no code
+        'changeweather', 'modregion'}
 RESISTS = ('resistfire', 'resistfrost', 'resistshock', 'resistmagicka', 'resistdisease', 'resistblight',
            'resistcorprus', 'resistpoison', 'resistnormalweapons', 'resistparalysis')
 HOST |= {verb + r for r in RESISTS for verb in ('get', 'set', 'mod')}
@@ -492,9 +516,16 @@ HOST |= {verb + r for r in RESISTS for verb in ('get', 'set', 'mod')}
 CONTROL_SWITCHES = CONTROLS + ('teleporting', 'levitation')
 CONTROL_SETS = {verb + c for c in CONTROL_SWITCHES for verb in ('enable', 'disable')}
 HOST |= CONTROL_SETS | {'get' + c + 'disabled' for c in CONTROLS}
-HOST_EFFECTS = set(CONTROL_SETS) | {'placeatpc', 'placeatme', 'placeitem', 'placeitemcell', 'setangle', 'move', 'moveworld', 'setpos', 'setatstart', 'face', 'wakeuppc',
-                                    'rotateworld', 'setdelete', 'fadein', 'fadeout', 'fadeto', 'forcesneak',
-                                    'clearforcesneak', 'removesoulgem',
+# v0.0.62: the menus the census office's scripts turn on (CENSUS-INTRO-SCRIPTS-62; OpenMW guiextensions.cpp
+# OpEnableWindow for the stats, inventory, magic and map windows, OpShowDialogue for the class, birth and review
+# windows of character creation): aw_story.c AW_StoryMenuEnable (saved), aw_opening.c AW_OpeningScriptMenu
+MENU_ENABLES = {'enablestatsmenu', 'enableinventorymenu', 'enablemagicmenu', 'enablemapmenu',
+                'enableclassmenu', 'enablebirthmenu', 'enablestatreviewmenu'}
+HOST |= MENU_ENABLES
+HOST_EFFECTS = set(CONTROL_SETS) | MENU_ENABLES | {'placeatpc', 'placeatme', 'placeitem', 'placeitemcell', 'setangle', 'move', 'moveworld', 'setpos', 'setatstart', 'face', 'wakeuppc',
+                                    'rotateworld', 'setdelete', 'payfine', 'payfinethief', 'gotojail',
+                                    'fadein', 'fadeout', 'fadeto', 'forcesneak', 'clearforcesneak', 'removesoulgem',
+                                    'hurtstandingactor', 'drop', 'resurrect', 'playbink', 'changeweather', 'modregion',
                                     'aifollowcell', 'aiescort', 'aiescortcell', 'positioncell','showrestmenu', 'raiserank', 'lowerrank', 'showmap', 'clearinfoactor', 'choice', 'goodbye', 'modfactionreaction', 'setfactionreaction', 'forcegreeting', 'rotate', 'aitravel', 'aifollow', 'position','playgroup', 'loopgroup', 'addtopic', 'cast','setpccrimelevel', 'modpccrimelevel', 'setreputation', 'modreputation', 'pcraiserank',
                 'pclowerrank', 'pcjoinfaction', 'pcexpell', 'pcclearexpelled', 'setpcfacrep', 'modpcfacrep'} | \
     {verb + r for r in RESISTS for verb in ('set', 'mod')}

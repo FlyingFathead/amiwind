@@ -191,8 +191,8 @@ static void strip_act(int how){
         }
         if(refused>=0)AW_InventoryRefused(strip->title,l->row[AW_CSTRIP_CONTAINER][refused].id,
                                           l->row[AW_CSTRIP_CONTAINER][refused].count);
-        if(moved){
-            Q_snprintf(line,sizeof(line),"%s: %d taken%s",strip->title,moved,strip->owned?" (stolen)":"");
+        if(moved && AW_SceneNameLabelsAmiWind()){   /* the AmiWind style says it; the Morrowind style shows no text */
+            AW_CStripTakeLine(line,sizeof(line),NULL,0,strip->owned,strip->title,moved);
             AW_UIPickupNotice(line,3);
         }
         strip_fill();return;
@@ -200,7 +200,7 @@ static void strip_act(int how){
     if(!e)return;
     if(l->side==AW_CSTRIP_CONTAINER){
         moved=AW_ContainerTake(strip->reference,e->id,how?e->count:1,strip->owned,&why);
-        if(moved){Q_snprintf(line,sizeof(line),"%s%s%s",e->name,moved>1?va(" x %d",moved):"",strip->owned?" (stolen)":"");AW_UIPickupNotice(line,3);}
+        if(moved && AW_SceneNameLabelsAmiWind()){AW_CStripTakeLine(line,sizeof(line),e->name,moved,strip->owned,NULL,0);AW_UIPickupNotice(line,3);}
         else if(!strcmp(why,"capacity"))AW_InventoryRefused(strip->title,e->id,how?e->count:1);
     }else{
         moved=AW_ContainerPut(strip->reference,e->id,how?e->count:1,&why);
@@ -266,13 +266,13 @@ int AW_CStripKey(int key){
     return 1;   /* every other key waits while the strip is open */
 }
 void AW_CStripDraw(void){
-    static int white=-1,red,grey,dark,gold;
+    static int white=-1,red,grey,gold;
     int left,columns,c,y,right=(int)vid.width-AW_CSTRIP_FRAME-4;aw_cstrip_list_t *l;const aw_cstrip_entry_t *e;char line[96];
     aw_cstrip_layout_t o;
     if(!strip)return;
     if(!sv.active || cls.state!=ca_connected || key_dest!=key_game){strip_close();return;}
     if(white<0){white=AW_UIColor(255,255,255);red=AW_UIColor(220,40,40);grey=AW_UIColor(150,140,120);
-                dark=AW_UIColor(24,20,16);gold=AW_UIColor(223,199,144);}
+                gold=AW_UIColor(223,199,144);}
     l=&strip->list;
     layout(&o);left=o.left;columns=o.columns;
     if(l->columns!=columns){l->columns=columns;AW_CStripClamp(l);}
@@ -283,20 +283,20 @@ void AW_CStripDraw(void){
     AW_UITextBox(left,o.title_y,AW_UIWidth(strip->title),STRIP_TITLE,strip->title,
                  l->side==AW_CSTRIP_CONTAINER?(strip->owned?red:gold):grey);
     AW_UITextBox(left+124,o.title_y,AW_UIWidth("Inventory"),STRIP_TITLE,"Inventory",l->side==AW_CSTRIP_INVENTORY?gold:grey);
-    AW_UIBox(right-2*STRIP_BUTTON_W-4,o.title_y,STRIP_BUTTON_W,STRIP_TITLE);
-    AW_UITextBox(right-2*STRIP_BUTTON_W-4,o.title_y,STRIP_BUTTON_W,STRIP_TITLE,"Take All",strip->owned?red:white);
-    AW_UIBox(right-STRIP_BUTTON_W,o.title_y,STRIP_BUTTON_W,STRIP_TITLE);
-    AW_UITextBox(right-STRIP_BUTTON_W,o.title_y,STRIP_BUTTON_W,STRIP_TITLE,"Close",white);
+    /* the house button style: a 1 pixel line, the text centred in the whole 56 x 14 (UI-THIN-BUTTON-62) */
+    AW_UIButton(right-2*STRIP_BUTTON_W-4,o.title_y,STRIP_BUTTON_W,STRIP_TITLE,"Take All",0,strip->owned?red:white);
+    AW_UIButton(right-STRIP_BUTTON_W,o.title_y,STRIP_BUTTON_W,STRIP_TITLE,"Close",0,white);
     AW_UISmallEnd();
     /* the cells: picture, count, the selected one framed */
     y=o.cells_y;
     {double t0=Sys_FloatTime();int loaded=0;
      for(c=0;c<columns;c++){
-        int i=l->first[l->side]+c;char key[48];
+        int i=l->first[l->side]+c;char key[64];
         if(i>=l->count[l->side])break;
-        Q_snprintf(key,sizeof(key),"item:%s",l->row[l->side][i].id);
+        /* ITEM-ICONS-MISSING-62: the item's own picture, the one the inventory window shows ("big:" then "inv:") */
+        Q_snprintf(key,sizeof(key),"item*%s",l->row[l->side][i].id);
         if(strcmp(strip->icon[c].key,key))loaded++;
-        AW_IconLoad(&strip->icon[c],key);
+        AW_IconLoadItem(&strip->icon[c],l->row[l->side][i].id);
      }
      /* the pictures' share of an open or a change (aw_magic stats: how many came from the area tables) */
      if(strip_pictures_pending && loaded)
@@ -306,19 +306,17 @@ void AW_CStripDraw(void){
     if(l->first[l->side]+columns<l->count[l->side])
         ctext(left+columns*STRIP_CELL,y+(STRIP_CELL-o.char_h)/2,">",(int)vid.width-AW_CSTRIP_FRAME,-1);
     for(c=0;c<columns;c++){
-        int i=l->first[l->side]+c,x=left+c*STRIP_CELL;char key[48];
-        AW_UIFill(x,y,STRIP_CELL-2,STRIP_CELL-2,dark);
+        int i=l->first[l->side]+c,x=left+c*STRIP_CELL;
+        AW_UIFill(x,y,STRIP_CELL-2,STRIP_CELL-2,AW_UIColor(0,0,0));   /* the item slots are black (ITEM-ICONS-MISSING-62) */
         if(i>=l->count[l->side])continue;
         e=&l->row[l->side][i];
         if(i==l->selected[l->side]){AW_UIFill(x-1,y-1,STRIP_CELL,1,gold);AW_UIFill(x-1,y+STRIP_CELL-2,STRIP_CELL,1,gold);
                                     AW_UIFill(x-1,y-1,1,STRIP_CELL,gold);AW_UIFill(x+STRIP_CELL-2,y-1,1,STRIP_CELL,gold);}
-        Q_snprintf(key,sizeof(key),"item:%s",e->id);
-        /* the picture centred in its cell (LOOT-WINDOW-LAYOUT-60); without one, the name in the console font, wrapped
+        /* the picture fills its cell, centred with an even margin (the shared slot fit, aw_icons.c AW_IconDrawFit,
+         * ITEM-ICONS-MISSING-62); only an item that truly has no picture shows its name in the console font, wrapped
          * over the cell's lines (never cut to a few letters) */
-        if(AW_IconLoad(&strip->icon[c],key)){
-            int iw=strip->icon[c].w>0 && strip->icon[c].w<=STRIP_CELL-2?strip->icon[c].w:32;
-            int ih=strip->icon[c].h>0 && strip->icon[c].h<=STRIP_CELL-2?strip->icon[c].h:32;
-            AW_IconDraw(&strip->icon[c],x+(STRIP_CELL-2-iw)/2,y+(STRIP_CELL-2-ih)/2);
+        if(AW_IconLoadItem(&strip->icon[c],e->id)){
+            AW_IconDrawFit(&strip->icon[c],x,y,STRIP_CELL-2,STRIP_CELL-2,AW_UIColor(0,0,0));
         }else{
             int cols=(STRIP_CELL-4)/o.char_w,rows=(STRIP_CELL-4)/o.char_h,r;const char *p=e->name;
             for(r=0;r<rows && p && *p;r++){

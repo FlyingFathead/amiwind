@@ -18,7 +18,7 @@ static int audio_sets;
 static int highlight_y,highlight_w,scroll_top,scroll_total;
 static int own_cursor;   /* the menu's own (AmiWind) cursor strokes drawn: AW_UICursor below said no */
 /* Controls > Combat style / Dice rolls / Blocking (aw_combat.c's saved options). */
-static float combat_miss=1,combat_dice=1,combat_block=1;
+static float combat_miss=1,combat_dice=1,combat_block=0;   /* the shipped defaults (COMBAT-BLOCK-DEFAULT-62: automatic block) */
 /* Controls > Weapon sway (aw_fp_sway, FP-WEAPON-SWAY-61: 1 AmiWind groove, the default; 2 Morrowind stiff). */
 static float fp_sway=1;
 /* Video > Far detail (aw_cull, aw_fog.c; the engine default 4 = Strong). */
@@ -161,10 +161,14 @@ static void check_prefs(void){
  down(1); /* UI font */
  down(1);M_Keydown(K_ENTER);assert(AW_UIVoiceNames());
  down(1);M_Keydown(K_RIGHTARROW);assert(AW_UIDialogueMethod()==3);
+ /* Topic colours (TOPIC-COLOURS-62): on by default, Enter switches them */
+ down(1);assert(AW_DialTopicColours());M_Keydown(K_ENTER);assert(!AW_DialTopicColours());M_Keydown(K_ENTER);assert(AW_DialTopicColours());
  down(1);M_Keydown(K_ENTER);assert(!AW_SceneUIOption(0,0));
- down(1);assert(scroll_top==3 && highlight_y==36+6*19);M_Keydown(K_RIGHTARROW);assert(AW_SceneUIOption(1,0)==3);
+ down(1);assert(scroll_top==4 && highlight_y==36+6*19);M_Keydown(K_RIGHTARROW);assert(AW_SceneUIOption(1,0)==3);
  down(1);M_Keydown(K_RIGHTARROW);assert(AW_SceneUIOption(2,0)==2);
- down(1);assert(scroll_total==12 && scroll_top==5 && highlight_y==150); /* Autosave history, the last row */
+ /* Name labels (INFO-BOX-TEXT-CUT-62): AmiWind by default, Enter or an arrow switches to Morrowind and back */
+ down(1);assert(AW_SceneUIOption(3,0)==1);M_Keydown(K_ENTER);assert(AW_SceneUIOption(3,0)==0);M_Keydown(K_RIGHTARROW);assert(AW_SceneUIOption(3,0)==1);
+ down(1);assert(scroll_total==14 && scroll_top==7 && highlight_y==150); /* Autosave history, the last row (14 rows: topic colours and name labels both) */
  /* Past the last row: Back, which holds; Up returns to the last row, Up past the first to the tabs. */
  down(3);assert(highlight_y==179 && highlight_w==74 && !strcmp(help,"Enter: back to the menu"));
  up(1);assert(highlight_y==150 && highlight_w==280);
@@ -209,8 +213,8 @@ static void check_controls(void){
  /* Weapon sway above it (FP-WEAPON-SWAY-61): Enter and the arrows switch AmiWind groove / Morrowind stiff */
  M_Keydown(K_UPARROW);M_Keydown(K_ENTER);assert(fp_sway==2);M_Draw();M_Keydown(K_RIGHTARROW);assert(fp_sway==1);
  /* Blocking, Dice rolls, Combat style above it: Enter and the arrows switch the three options */
- M_Keydown(K_UPARROW);M_Keydown(K_ENTER);assert(combat_block==0 && combat_dice==1 && combat_miss==1);
- M_Keydown(K_RIGHTARROW);assert(combat_block==1);
+ M_Keydown(K_UPARROW);M_Keydown(K_ENTER);assert(combat_block==1 && combat_dice==1 && combat_miss==1);
+ M_Keydown(K_RIGHTARROW);assert(combat_block==0);
  M_Keydown(K_UPARROW);M_Keydown(K_ENTER);assert(combat_dice==0 && combat_miss==1);
  M_Keydown(K_RIGHTARROW);assert(combat_dice==1);
  M_Keydown(K_UPARROW);M_Keydown(K_ENTER);assert(combat_miss==0);M_Draw();M_Keydown(K_LEFTARROW);assert(combat_miss==1);
@@ -316,10 +320,11 @@ static int load_method=1,buffer_index;
 int AW_CellChangeMethod(void){return load_method;}
 int AW_StreamOption(int option,int step){static const int sizes[]={128,256,512};if(!option){if(step)load_method=3-load_method;return load_method;}if(step)buffer_index=(buffer_index+(step>0?1:2))%3;return sizes[buffer_index];}
 
-static int voices,dialogue=2,scene_options[]={1,2,1};
+static int voices,dialogue=2,scene_options[]={1,2,1,1};
 int AW_UIVoiceStyle(void){return 1;}
 int AW_UIVoiceNames(void){return voices;}void AW_UIVoiceNamesToggle(void){voices=!voices;}
 int AW_UIDialogueMethod(void){return dialogue;}void AW_UIDialogueCycle(int step){dialogue=(dialogue-1+step+4)%4+1;}
-int AW_SceneUIOption(int n,int change){if(change)scene_options[n]=n?(scene_options[n]-1+change+3)%3+1:!scene_options[n];return scene_options[n];}
+static int topic_colours=1;int AW_DialTopicColours(void){return topic_colours;}void AW_DialTopicColoursToggle(void){topic_colours=!topic_colours;}
+int AW_SceneUIOption(int n,int change){if(change)scene_options[n]=n && n!=3?(scene_options[n]-1+change+3)%3+1:!scene_options[n];return scene_options[n];}
 
 int AW_WorldUIDraw(void){return 0;}

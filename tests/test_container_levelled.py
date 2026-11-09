@@ -135,8 +135,9 @@ class EngineSourceTests(unittest.TestCase):
         aim = scene[scene.index('edict_t *AW_NPCTargetReach('):scene.index('static edict_t *npc_target(void)')]
         self.assertIn('Cache_Check(&m->cache)', aim)
         self.assertIn('fd=&h->frames[f];', aim)
-        self.assertIn('a=(fmins[j]-o)/d;b=(fmaxs[j]-o)/d;', aim)
-        self.assertNotIn('a=(m->mins[j]-o)/d', aim)
+        # the ray against that box (FOCUS-NPC-OVERRIDES-ITEM-62: the slab test is aw_activate_rules.c AW_RayBox)
+        self.assertIn('AW_RayBox(end,ray,fmins,fmaxs,&lo,&hi)', aim)
+        self.assertNotIn('m->mins,m->maxs,&lo', aim)
         actors = (self.SRC / 'aw_actors.c').read_text(encoding='utf-8')
         self.assertIn('dead again: %s', actors)
         # a room lays its bodies down only once the player is in (the scene set-up empties the combat slots before)

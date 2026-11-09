@@ -221,6 +221,50 @@ int main(void)
         AW_WeatherMountainBlend(&table,0,&b);
         for(s=0;s<4;s++)for(k=0;k<3;k++)assert(b.sky[s][k]==table.look[0].sky[s][k]);
     }
+    {   /* The scripts' weather (MWSCRIPT-COMPLETE-LANDMARK; OpenMW weather.cpp changeWeather, modRegion): EndGame's
+         * ModRegion "Red Mountain Region" 50 50 0 0 0 0 0 0, then ChangeWeather "Red Mountain Region" 0 */
+        static aw_weather_script_t sc,back;unsigned char saved[5+17*AW_WEATHER_SCRIPT_ROWS];
+        static const int endgame[8]={50,50,0,0,0,0,0,0},few[2]={0,100};
+        const unsigned char *c;int days=3,ms=3600000,period=AW_WeatherPeriod(days,ms,table.hours),r,n,w,k;
+        AW_WeatherScriptReset(&sc);
+        assert(AW_WeatherScripted(&sc,&table,1,days,ms)==AW_WEATHER_BLIGHT);     /* no change: the table's */
+        assert(AW_WeatherScripted(&sc,&table,0,days,ms)==AW_WeatherOfRegion(&table,0,days,ms));
+        /* blight no longer allowed: the new chances choose (clear or cloudy), from now on, every period */
+        assert(AW_WeatherScriptModRegion(&sc,&table,1,endgame,8,period));
+        c=AW_WeatherChancesOf(&sc,&table,1);
+        assert(c && c[0]==50 && c[1]==50 && c[AW_WEATHER_BLIGHT]==0 && c[AW_WEATHER_ASH]==0);
+        assert(table.chances[1][AW_WEATHER_BLIGHT]==100);                         /* the table itself unchanged */
+        for(r=0;r<40;r++){w=AW_WeatherScripted(&sc,&table,1,days+r,ms);assert(w==0 || w==1);}
+        /* ChangeWeather holds until the region's period ends, then the chances choose again */
+        assert(AW_WeatherScriptChange(&sc,&table,1,5,period));
+        assert(AW_WeatherScripted(&sc,&table,1,days,ms)==5);
+        w=AW_WeatherScripted(&sc,&table,1,days+1,ms);assert(w==0 || w==1);
+        assert(AW_WeatherScriptChange(&sc,&table,1,0,period) && AW_WeatherScripted(&sc,&table,1,days,ms)==0);
+        /* refused: a weather past the list, a region the table has not; a full list */
+        assert(!AW_WeatherScriptChange(&sc,&table,1,AW_WEATHERS,period) && !AW_WeatherScriptChange(&sc,&table,3,0,period));
+        assert(!AW_WeatherScriptModRegion(&sc,&table,-1,endgame,8,period) && sc.count==1);
+        /* a weather the new chances still allow stays for the period (only the first chances replaced: the rest kept) */
+        w=AW_WeatherScripted(&sc,&table,0,days,ms);
+        {int keep[AW_WEATHERS];for(r=0;r<AW_WEATHERS;r++)keep[r]=r==w?7:0;
+         assert(AW_WeatherScriptModRegion(&sc,&table,0,keep,w+1,period));}
+        assert(AW_WeatherScripted(&sc,&table,0,days,ms)==w);
+        c=AW_WeatherChancesOf(&sc,&table,0);assert(c[w]==7);
+        for(r=w+1;r<AW_WEATHERS;r++)assert(c[r]==table.chances[0][r]);
+        assert(AW_WeatherScriptModRegion(&sc,&table,2,few,2,period));           /* a zero list given cloudy 100 */
+        assert(AW_WeatherScripted(&sc,&table,2,days+5,ms)==1);
+        /* saved and read back the same; a bad block refused, leaving nothing changed */
+        n=AW_WeatherScriptExport(&sc,saved,(int)sizeof saved);
+        assert(n==5+17*3 && !memcmp(saved,"AWWR",4) && saved[4]==3);
+        assert(AW_WeatherScriptExport(&sc,saved,10)==-1);
+        assert(AW_WeatherScriptImport(&back,saved,n)==n && back.count==3);
+        for(r=0;r<40;r++)for(k=0;k<3;k++)
+            assert(AW_WeatherScripted(&back,&table,k,days+r,ms)==AW_WeatherScripted(&sc,&table,k,days+r,ms));
+        saved[5+1]=(unsigned char)AW_WEATHERS;
+        assert(AW_WeatherScriptImport(&back,saved,n)==-1 && back.count==0);
+        assert(AW_WeatherScriptImport(&back,saved,4)==-1);
+        AW_WeatherScriptReset(&sc);
+        assert(sc.count==0 && AW_WeatherScripted(&sc,&table,1,days,ms)==AW_WEATHER_BLIGHT);
+    }
     puts("weather rules ok");
     return 0;
 }

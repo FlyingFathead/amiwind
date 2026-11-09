@@ -372,7 +372,9 @@ typedef struct
 	float	scale;			/* the table's instance scale (1: none) */
 	short	visitor;		/* 1: an actor of another place a PositionCell brought here (its row places it) */
 	float	ref;			/* its reference (aw_ref), once read (kept: disabled) */
+	unsigned	levelled;	/* a levelled list's pick: its record's base hash (0 none; MWSCRIPT-UNPLACED-ATTACH-62) */
 } pending_t;
+void (*aw_actors_levelled_spawned)(edict_t *ent, unsigned hash);
 static edict_t	*spawned_last;	/* SpawnOne's edict when it spawned one */
 
 static pending_t	pending[MAX_PENDING];
@@ -659,6 +661,8 @@ static int SpawnOne (pending_t *q)
 	}
 	st.spawned++;
 	spawned_last = ent;
+	if (q->levelled && aw_actors_levelled_spawned && !ent->free)
+		aw_actors_levelled_spawned (ent, q->levelled);	/* its record's script (aw_mwhost.c) */
 	return 1;
 }
 
@@ -775,6 +779,7 @@ static void TableJoin (int cx, int cy, const float *offset)
 	for (k=0 ; k<cell.count ; k++)
 	{
 		pending_t *q;
+		unsigned picked = 0;		/* a levelled pick's record hash (MWSCRIPT-UNPLACED-ATTACH-62) */
 		if (fseek (f, at + (long)table.head.records_at + (long)(cell.first + k)*CHIM_ACTOR_RECORD_BYTES, SEEK_SET) ||
 			fread (raw, 1, sizeof(raw), f) != sizeof(raw) || !ChimActors_Record (raw, &table.head, &r) ||
 			!ChimActors_Base (table.bases + r.base*CHIM_ACTOR_BASE_BYTES, &table.head, &b))
@@ -812,6 +817,7 @@ static void TableJoin (int cx, int cy, const float *offset)
 				table.no_model++;
 				continue;
 			}
+			picked = b.hash;
 		}
 		if (!b.bytes)
 		{
@@ -844,6 +850,7 @@ static void TableJoin (int cx, int cy, const float *offset)
 		q->rec = r;
 		q->scale = table.scales ? ChimActors_Scale (table.scales, cell.first + k) : 1.0f;
 		q->visitor = 0;
+		q->levelled = picked;
 		VectorCopy (r.origin, q->origin);
 		q->offset[0] = offset[0];
 		q->offset[1] = offset[1];
@@ -928,6 +935,7 @@ static void LevelledEntity (edict_t *ent)
 	VectorCopy (ent->v.origin, q.rec.origin);
 	q.rec.yaw = ent->v.angles[1];
 	q.rec.flags = 0;
+	q.levelled = b.hash;		/* its record's script (MWSCRIPT-UNPLACED-ATTACH-62) */
 	if (SpawnOne (&q) > 0)
 		table.spawnable++;
 	free (q.text);
@@ -1092,6 +1100,7 @@ static void Join (int cx, int cy, const char *map, const float *offset)
 			q->table = 0;
 			q->scale = 1.0f;
 			q->visitor = 0;
+			q->levelled = 0;
 			npending++;
 			queued++;
 		}
@@ -1545,6 +1554,8 @@ static void Command (void)
 			}
 			creatures_on = on;
 		}
+		else
+			creatures_on = !creatures_on;	/* DBG-SUPERSPEED-62: bare turns it the other way */
 		for (i=1 ; sv.active && i<sv.num_edicts ; i++)
 		{
 			e = EDICT_NUM(i);
@@ -1589,6 +1600,11 @@ static void Command (void)
 	if (Cmd_Argc () == 3 && !strcmp (a, "killpick"))
 	{
 		AW_CompanionKillMode ();	/* dbg kill: the red crosshair pick (aw_companion.c) */
+		return;
+	}
+	if (Cmd_Argc () == 4 && !strcmp (a, "killpick") && !strcmp (Cmd_Argv (3), "crime"))
+	{
+		AW_CompanionKillCrime ();	/* dbg kill crime (CRIME-59): the pick's kill is the player's */
 		return;
 	}
 	if (Cmd_Argc () == 4 && !strcmp (a, "kill"))
@@ -1911,6 +1927,20 @@ void AW_ActorsCapture (edict_t *e)
 		Capture (e, c);
 }
 
+/* Resurrect (v0.0.62, MWSCRIPT-GAP-FUNCTIONS-62; OpenMW 0.51 statsextensions.cpp OpResurrect: an actor other than the
+ * player is reset to its game data, as the original engine does): its change row, its live record and what was taken
+ * from or put into its body go, as a respawn does (Respawned). The caller removes and spawns the entity again. */
+void AW_ActorsReset (unsigned reference)
+{
+	change_t *c = Change ((float)reference, 0);
+	if (c)
+		AW_LedgerActorReset (c);
+	if (aw_actors_forget)
+		aw_actors_forget (reference);
+	if (aw_ledger_on)
+		AW_LedgerContentDrop (&aw_ledger, reference);
+}
+
 void AW_ActorsRemove (edict_t *e)
 {
 	if (!e || e->free)
@@ -1984,10 +2014,13 @@ int AW_ActorsPlaceRow (unsigned reference, const float local[3], float yaw)
 {
 	change_t *c;
 	float d[3];
-	if (reference < AW_ACTORS_PLACED || reference > (AW_ACTORS_PLACED | 0xFFFFF) || !(c = Change ((float)reference, 1)))
+	int summoned = reference >= AW_ACTORS_SUMMONED && reference < AW_ACTORS_SUMMONED + AW_ACTORS_SUMMONED_SLOTS;
+	if ((!summoned && (reference < AW_ACTORS_PLACED || reference > (AW_ACTORS_PLACED | 0xFFFFF))) ||
+		!(c = Change ((float)reference, 1)))
 		return 0;
 	AW_LedgerActorReset (c);
 	c->moved = 1;
+	c->follow = summoned;		/* a summoned creature goes where its caster goes */
 	c->room = (int32_t)RoomNumber ();
 	IslandOffset (d);
 	if (c->room)
@@ -2000,10 +2033,27 @@ int AW_ActorsPlaceRow (unsigned reference, const float local[3], float yaw)
 	return 1;
 }
 
+/* v0.0.62 (MWSCRIPT-GAP-FUNCTIONS-62): where a placed row puts REFERENCE in this session's units (a room its own,
+ * outdoors the island position less the session's origin) and its angles; 1 when it has a place */
+int AW_ActorsRowPlace (unsigned reference, float origin[3], float angles[3])
+{
+	change_t *c = Change ((float)reference, 0);
+	float d[3];
+	if (!c || !c->moved)
+		return 0;
+	IslandOffset (d);
+	if (c->room)
+		d[0] = d[1] = d[2] = 0;
+	VectorSubtract (c->origin, d, origin);
+	VectorCopy (c->angles, angles);
+	return 1;
+}
+
 void AW_ActorsPlacedForget (unsigned reference)
 {
 	change_t *c = Change ((float)reference, 0);
-	if (c && reference >= AW_ACTORS_PLACED)
+	if (c && reference >= AW_ACTORS_SUMMONED && (reference >= AW_ACTORS_PLACED ||
+		reference < AW_ACTORS_SUMMONED + AW_ACTORS_SUMMONED_SLOTS))
 		AW_LedgerActorReset (c);	/* no field left: not saved, the key free again */
 }
 

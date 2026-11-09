@@ -43,6 +43,10 @@ void AW_MoveSettingsDefault(aw_move_settings_t *s) {
     memcpy(s,originals,sizeof(originals));
 }
 
+/* DBG-NOBURDEN-62 (aw_move.h): no load in any rule while the debug mode is on */
+void AW_MoveNoBurden(aw_move_inputs_t *in) {
+    if(in)in->carried=in->burden=in->feather=0;
+}
 /* Npc::getCapacity: modified Strength x fEncumbranceStrMult. */
 float AW_MoveCapacity(const aw_move_settings_t *s,const aw_move_inputs_t *in) {
     return in->strength*s->fEncumbranceStrMult;

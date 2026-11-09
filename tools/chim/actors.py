@@ -169,6 +169,38 @@ def creature_ids(master):
     return out
 
 
+SCRIPT_PLACE = re.compile(r'(?i)\bplace(?:atpc|atme|itemcell|item)\b[\s,]+("[^"]+"|[^\s,"]+)')
+
+
+def script_placed_actors(master):
+    """{'NPC_': [ids], 'CREA': [ids]} (lower case, sorted): the NPC and creature records of the master that a
+    PlaceAtPC, PlaceAtMe, PlaceItem or PlaceItemCell of its scripts or dialogue results names (v0.0.62,
+    MWSCRIPT-GAP-FUNCTIONS-62). The actor library makes their models and the actor table gives each a base of its own,
+    so the engine can make one even when no reference of the record is placed (aw_mwhost.c placed_text, the base text:
+    BILL_MT_WritNavil's PlaceAtPC of Ranes Ienith). The same text scan as the compiler's place rows."""
+    from mwad.audit import records, string, subrecords
+    named, kinds = set(), {}
+    for tag, flags, payload in records(master):
+        if flags & 0x20:
+            continue
+        fields = list(subrecords(payload))
+        if tag in ('NPC_', 'CREA'):
+            name = next((d for t, d in fields if t == 'NAME'), None)
+            if name is not None and not any(t == 'DELE' for t, _ in fields):
+                kinds[string(name, errors='replace').casefold()] = tag
+        elif tag in ('SCPT', 'INFO'):
+            for t, d in fields:
+                if t in ('SCTX', 'BNAM'):
+                    for line in string(d, errors='replace').splitlines():
+                        for m in SCRIPT_PLACE.finditer(line.split(';', 1)[0]):
+                            named.add(m.group(1).strip('"').casefold())
+    out = {'NPC_': [], 'CREA': []}
+    for ident in sorted(named):
+        if ident in kinds:
+            out[kinds[ident]].append(ident)
+    return out
+
+
 def used_lists(lists, roots):
     """The lists ROOTS reach, themselves and every list inside them, sorted (the table's list order)."""
     seen, todo = set(), [r for r in roots if r in lists]
@@ -378,6 +410,44 @@ def with_placed(lists, placed=()):
     return out
 
 
+# ---------------------------------------------------------------- summoned creatures (v0.0.62, SUMMONED-CREATURES-62)
+# The summoning effects (magic effect number: the game setting naming the creature it calls up), the rule of OpenMW
+# 0.51 apps/openmw/mwmechanics/summoning.cpp (the summoned creature's id is read from the effect's setting); the
+# expansions' effects are listed too and are used only when a master read names their setting.
+SUMMON_EFFECTS = {102: 'sMagicScampID', 103: 'sMagicClannfearID', 104: 'sMagicDaedrothID', 105: 'sMagicDremoraID',
+                  106: 'sMagicAncestralGhostID', 107: 'sMagicSkeletalMinionID', 108: 'sMagicLeastBonewalkerID',
+                  109: 'sMagicGreaterBonewalkerID', 110: 'sMagicBonelordID', 111: 'sMagicWingedTwilightID',
+                  112: 'sMagicHungerID', 113: 'sMagicGoldenSaintID', 114: 'sMagicFlameAtronachID',
+                  115: 'sMagicFrostAtronachID', 116: 'sMagicStormAtronachID', 134: 'sMagicCenturionSphereID',
+                  137: 'sMagicFabricantID', 138: 'sMagicWolfID', 139: 'sMagicBearID', 140: 'sMagicBonewolfID',
+                  141: 'sMagicCreature04ID', 142: 'sMagicCreature05ID'}
+SUMMONS_FILE = 'chim-summons.txt'   # in maps/, beside the table: "<effect number> <creature id>" a line
+
+
+def summoned_creatures(master):
+    """{effect number: creature id (lower case)} of the summoning settings the master's GMSTs name (SUMMON_EFFECTS)."""
+    from mwad.audit import records, string, subrecords
+    names = {v.casefold(): k for k, v in SUMMON_EFFECTS.items()}
+    out = {}
+    for tag, flags, payload in records(master):
+        if tag != 'GMST' or flags & 0x20:
+            continue
+        fields = dict(subrecords(payload))
+        if 'NAME' in fields and 'STRV' in fields:
+            effect = names.get(string(fields['NAME']).casefold())
+            ident = string(fields['STRV']).strip().casefold()
+            if effect is not None and ident:
+                out[effect] = ident
+    return dict(sorted(out.items()))
+
+
+def summons_text(summoned, creatures):
+    """The summons file: one line per summoning effect whose creature is a creature record of the masters (an id may
+    hold spaces: 'golden saint_summon'; the engine reads the rest of the line)."""
+    return ''.join('%d %s\n' % (e, i) for e, i in sorted(summoned.items())
+                   if i in creatures and i == i.strip() and all(32 <= ord(c) < 127 for c in i))
+
+
 def table_list_order(lists, refs, room_roots=(), placed=()):
     """The table's levelled lists in order: every list the exterior references and the rooms' ROOM_ROOTS reach
     (used_lists, sorted), then a list of one per creature placed in a room (PLACED: room_placed_creatures; keys
@@ -387,7 +457,8 @@ def table_list_order(lists, refs, room_roots=(), placed=()):
     return used_lists(lists, roots) + [(PLACED, i) for i in sorted({p.casefold() for p in placed})]
 
 
-def build_table(refs, built=None, lists=None, creatures=None, library=None, scales=None, room_roots=(), placed=()):
+def build_table(refs, built=None, lists=None, creatures=None, library=None, scales=None, room_roots=(), placed=(),
+                script_placed=(), summoned=()):
     """(table bytes, report) from exterior_actors' rows and built_actors' rows (keyed by reference number).
 
     Without LISTS: version 1, as before. With LISTS (levelled_lists of the master) and CREATURES (creature_ids):
@@ -477,6 +548,21 @@ def build_table(refs, built=None, lists=None, creatures=None, library=None, scal
                 missing.append((lid, entry))
             out_entries.append((min(level, 0xFFFF), target))
         table_lists.append((chance, flags & 0xFF, out_entries))
+    # v0.0.62 (MWSCRIPT-GAP-FUNCTIONS-62): a base for every actor a script places (script_placed_actors: (id, tag)),
+    # with its library text, so the engine can make one with no placed reference (AW_ActorsBaseText); one already
+    # made above is the same base
+    script_bases = 0
+    for ident, tag in (script_placed if v2 else ()):
+        text = library.get(ident.casefold(), '')
+        if text:
+            before = len(bases)
+            base_of(ident, KINDS[tag], text)
+            script_bases += len(bases) > before
+    # SUMMONED (summoned_creatures' ids; version 2 only): a creature base each, after every other base, so the bases
+    # before them keep their indices; the engine finds one by its id (aw_actors.c AW_ActorsBaseText) when a summoning
+    # effect lands
+    summon_bases = [base_of(i, KINDS['CREA'], text_at(i, 1.0)) for i in sorted({s.casefold() for s in summoned})
+                    if v2 and i in creatures]
     if len(bases) > (0x7FFF if v2 else 0xFFFF):
         raise ValueError('Too many actor bases')
     records.sort(key=lambda r: ((r[0][0] // PAGE, r[0][1] // PAGE), r[0], r[1]))
@@ -524,6 +610,7 @@ def build_table(refs, built=None, lists=None, creatures=None, library=None, scal
     out += lists_raw
     spawnable = sum(1 for r in records if bases[r[2]][1])
     report = {'records': len(records), 'cells': len(cells), 'bases': len(bases), 'bytes': len(out),
+              'script_placed_bases': script_bases,
               'text_bytes': len(texts), 'spawnable_records': spawnable,
               'by_kind': {k: kinds_seen.get(v, 0) for k, v in KINDS.items()},
               'built_rows_used': sum(1 for r in records if r[3] & FLAG_BUILT),
@@ -536,6 +623,8 @@ def build_table(refs, built=None, lists=None, creatures=None, library=None, scal
                               'entries_naming_nothing': len(missing), 'scaled_list_copies': len(copies),
                               'placed_lists': len(placed)}
         report['scaled_records'] = sum(1 for r in records if r[6] != 1.0)
+        report['summoned'] = {'creatures': len(summon_bases),
+                              'with_model': sum(1 for b in summon_bases if bases[b][1])}
     return bytes(out), report
 
 
@@ -629,8 +718,11 @@ def master_tables(master_path):
     out beside its finalize checks and hands it to write_table (BUILD-IMAGE-FINALIZE-UNDERUSED-48)."""
     master = Path(master_path).read_bytes()
     rooms = room_references(master)
+    by_script = script_placed_actors(master)
     return (exterior_actors(master), levelled_lists(master), creature_ids(master), exterior_scales(master),
-            rooms['LEVC'], room_placed_creatures(master, references=rooms))
+            rooms['LEVC'], room_placed_creatures(master, references=rooms),
+            [(i, 'NPC_') for i in by_script['NPC_']] + [(i, 'CREA') for i in by_script['CREA']],
+            summoned_creatures(master))
 
 
 def write_table(path, master_path, maps, chim_root=None, library=None, tables=None):
@@ -642,14 +734,21 @@ def write_table(path, master_path, maps, chim_root=None, library=None, tables=No
     refs, levelled, creatures, scales, *rest = master_tables(master_path) if tables is None else tables
     room_roots = rest[0] if rest else ()
     placed = rest[1] if len(rest) > 1 else ()
+    script_placed = rest[2] if len(rest) > 2 else ()
+    summoned = rest[3] if len(rest) > 3 else {}
     built = built_actors(maps, frame_centres(chim_root) if chim_root else {})
     if library is not None and not isinstance(library, dict):
         from creature_library import base_texts
         library = base_texts(library)
-    data, report = build_table(refs, built, levelled, creatures, library, scales, room_roots, placed)
+    data, report = build_table(refs, built, levelled, creatures, library, scales, room_roots, placed, script_placed,
+                               summoned=summoned.values())
     report['room_list_roots'] = len(room_roots)
     report['room_placed_creatures'] = len(placed)
     Path(path).write_bytes(data)
+    # the summoning effects' creatures for the engine (aw_mwhost.c summons): written with every table, empty when
+    # the masters name none
+    Path(path).with_name(SUMMONS_FILE).write_text(summons_text(summoned, set(creatures)), encoding='ascii',
+                                                  newline='\n')
     return report
 
 

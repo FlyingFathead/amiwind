@@ -213,6 +213,11 @@ void AW_MovieStartup(void){
 static void startup_logo(void){
     if(!start_movie("intro/amiwind.awv",1))Cbuf_AddText((char *)AW_MiniwindAfterLogo());
 }
+/* dbg restartgame (aw_scene.c): the logo again, then the main menu, as at boot (no Fast RAM box a second time). */
+void AW_MovieRestartLogo(void){
+    close_movie();ram_warning=0;holding=0;IN_AWClearButtons();Key_ClearStates();key_dest=key_game;
+    startup_logo();
+}
 static void ram_warning_done(void){
     ram_warning=0;IN_AWClearButtons();Key_ClearStates();
     Con_Printf("Fast RAM warning: continued.\n");
@@ -285,6 +290,23 @@ static void playvid(void){
     debug_return_dest=key_dest;
     if(!start_movie(path,2))return;
     IN_AWClearButtons();Key_ClearStates();key_dest=key_game;
+}
+/* PlayBink FILE (MWSCRIPT-UNPLACED-ATTACH-62; OpenMW 0.51 miscextensions.cpp OpPlayBink): the video of that catalogue
+ * name (the file name less its extension, "mw_end.bik" -> mw_end) plays over the scene as the debug video does, and
+ * the scene goes on after it; absent (a build without videos, a name the catalogue lacks): said once, 0. */
+int AW_MovieScript(const char *file){
+    char name[32],path[64];int i;
+    if(!file)return 0;
+    for(i=0;file[i] && file[i]!='.' && i<31;i++)name[i]=(char)(file[i]>='A' && file[i]<='Z'?file[i]+32:file[i]);
+    name[i]=0;path[0]=0;
+    if(!name[0] || buffers || !catalogue_path(name,path,sizeof(path))){
+        if(!AW_ContentExcludedSay("video",1))Con_Printf("PlayBink: video %s is absent; the script goes on.\n",name);
+        return 0;
+    }
+    debug_return_dest=key_dest;
+    if(!start_movie(path,2))return 0;
+    IN_AWClearButtons();Key_ClearStates();key_dest=key_game;
+    return 1;
 }
 void AW_MovieUpdate(void){
     long position,frame;

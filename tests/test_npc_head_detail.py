@@ -44,7 +44,21 @@ def needs_numpy(test):
 
 
 class HeadRule(unittest.TestCase):
+    """The plan's rules on the previous body share (AMIWIND_NPC_BODY_SHARE budget, kept selectable); the default
+    body share has its own tests (tests/test_npc_body_share.py, NPC-BODY-REGRESSION-62)."""
     palette = bytes(range(256)) * 3
+
+    @classmethod
+    def setUpClass(cls):
+        cls._share = os.environ.get('AMIWIND_NPC_BODY_SHARE')
+        os.environ['AMIWIND_NPC_BODY_SHARE'] = 'budget'
+
+    @classmethod
+    def tearDownClass(cls):
+        if cls._share is None:
+            os.environ.pop('AMIWIND_NPC_BODY_SHARE', None)
+        else:
+            os.environ['AMIWIND_NPC_BODY_SHARE'] = cls._share
     materials = [{'texture_index': None, 'diffuse': [1., 1., 1.], 'alpha': 1.}]
 
     def shapes(self, head=(8, 8), hair=(6, 4)):

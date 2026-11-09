@@ -35,6 +35,9 @@ typedef struct {
     uint32_t nactb,naitm,naspt;       /* the actor table's rows (on disk: only their counts, for the load check) */
     uint32_t range;int ops_frame,ops_run;
     unsigned char runnable[MAX_SCRIPTS];      /* passed the load check and not hand-written/broken */
+    int16_t story_held[AW_MWVM_HELD_SCRIPTS];int nheld_scripts;   /* held by the host now (AW_MwvmScriptHold) */
+    const unsigned char *padd;int npadd;      /* the carried items' script rows (PADD; older file: none) */
+    const unsigned char *lact;int nlact;      /* the levelled lists' scripted actors (LACT; older file: none) */
     int16_t global_instance[MAX_SCRIPTS];
     aw_mwcell_t globals[MAX_GLOBALS];
     aw_mwvm_instance_t inst[AW_MWVM_INSTANCES];int ninst,cursor;
@@ -198,6 +201,12 @@ int AW_MwvmLoad(const unsigned char *data,unsigned long bytes,const aw_mwvm_host
     /* the actors held on an object a script removes (v0.0.62, SCRIPTED-EVENT-FALLING-MAGE-61; older file: none) */
     vm.held=section("HELD",&vm.nheld,&len);
     if(!vm.held || vm.nheld<0 || 20ul*(unsigned long)vm.nheld>len)vm.nheld=0;
+    /* the carried items whose script reads OnPCAdd (v0.0.62, CENSUS-INTRO-SCRIPTS-62; a file without them: none) */
+    vm.padd=section("PADD",&vm.npadd,&len);
+    if(!vm.padd || vm.npadd<0 || 8ul*(unsigned long)vm.npadd>len)vm.npadd=0;
+    /* the scripted actors a levelled list can give (v0.0.62, MWSCRIPT-UNPLACED-ATTACH-62; a file without them: none) */
+    vm.lact=section("LACT",&vm.nlact,&len);
+    if(!vm.lact || vm.nlact<0 || 8ul*(unsigned long)vm.nlact>len)vm.nlact=0;
     vm.range=u32(conf);vm.ops_frame=(int)U16(conf+4);vm.ops_run=(int)U16(conf+6);
     if(vm.ops_frame<1)vm.ops_frame=1;
     if(vm.ops_run<1)vm.ops_run=1;
@@ -216,6 +225,8 @@ int AW_MwvmLoad(const unsigned char *data,unsigned long bytes,const aw_mwvm_host
 static const aw_mwvm_stats_t no_stats;
 int AW_MwvmScriptCount(void){return ON?vm.nscrp:0;}
 int AW_MwvmScriptFlags(int s){return ON && s>=0 && s<vm.nscrp?(int)U16(vm.scrp+16*s+4)|(vm.runnable[s]?0:AWS_BROKEN):0;}
+/* SCRIPTED-EVENT-PAST-DRAW-DISTANCE-62: the script's far-event trigger (game units, 0 none; awms.py SCRP) */
+int AW_MwvmScriptFarTrigger(int s){return ON && s>=0 && s<vm.nscrp?(int)U16(vm.scrp+16*s+6):0;}
 int AW_MwvmScriptName(int s){return ON && s>=0 && s<vm.nscrp?(int)U16(vm.scrp+16*s):-1;}
 int AW_MwvmSound(int k,unsigned char hash[8],int *centis,int *volume,int *near_units,int *far_units){
     const unsigned char *r;if(!ON || k<0 || k>=vm.nsnds)return 0;
@@ -298,6 +309,9 @@ void AW_MwvmBeginMap(void){
         aw_mwvm_instance_t *in=&vm.inst[k];
         if(!(in->flags&AWI_USED))continue;
         if(in->flags&AWI_GLOBAL){in->flags|=AWI_CELLCHANGED;in->flags&=~AWI_QUIET;continue;}
+        /* MWSCRIPT-INVENTORY-HITONME-62: a held item's values are not parked (each visit starts them again; the
+         * parking store stays for the placed objects) */
+        if(AWB_HELD_KEY(in->reference)){in->flags=0;continue;}
         {parked_t *p=park_slot(in->reference,in->script);
          if(p)memcpy(&vm.park[p->at],&vm.cells[in->locals],p->count*sizeof(aw_mwcell_t));}
         in->flags=0;
@@ -305,9 +319,30 @@ void AW_MwvmBeginMap(void){
     while(vm.ninst>0 && !(vm.inst[vm.ninst-1].flags&AWI_USED))vm.ninst--;
     vm.low=0;vm.cursor=0;
 }
+/* CENSUS-INTRO-SCRIPTS-62: a script the host holds is not attached or started while held (the census office's
+ * scripts while the old hand-written opening path is chosen, aw_census_legacy); the hold changes nothing
+ * already attached, so the host sets it before a map's objects are attached. 1 kept (0: the list is full). */
+int AW_MwvmScriptHeld(int script){
+    int i;
+    if(!ON)return 0;
+    for(i=0;i<vm.nheld_scripts;i++)if(vm.story_held[i]==script)return 1;
+    return 0;
+}
+int AW_MwvmScriptHold(int script,int hold){
+    int i;
+    if(!ON || script<0 || script>=vm.nscrp)return 0;
+    for(i=0;i<vm.nheld_scripts && vm.story_held[i]!=script;i++);
+    if(hold){
+        if(i<vm.nheld_scripts)return 1;
+        if(vm.nheld_scripts>=AW_MWVM_HELD_SCRIPTS)return 0;
+        vm.story_held[vm.nheld_scripts++]=(int16_t)script;return 1;
+    }
+    if(i<vm.nheld_scripts)vm.story_held[i]=vm.story_held[--vm.nheld_scripts];
+    return 1;
+}
 int AW_MwvmAttach(uint32_t reference,int script,int bind_flags,int entity,const float origin[3]){
     int k,n;parked_t *p;aw_mwvm_instance_t *in;
-    if(!ON || script<0 || script>=vm.nscrp || !vm.runnable[script])return -1;
+    if(!ON || script<0 || script>=vm.nscrp || !vm.runnable[script] || AW_MwvmScriptHeld(script))return -1;
     for(k=0;k<vm.ninst;k++)if((vm.inst[k].flags&AWI_USED) && !(vm.inst[k].flags&AWI_GLOBAL) &&
                                vm.inst[k].reference==reference)return k;   /* attached once */
     n=nlocals(script);
@@ -333,7 +368,7 @@ int AW_MwvmDetach(uint32_t reference){
     for(k=0;k<vm.ninst;k++){
         aw_mwvm_instance_t *in=&vm.inst[k];parked_t *p;
         if(!(in->flags&AWI_USED) || (in->flags&AWI_GLOBAL) || in->reference!=reference)continue;
-        if((p=park_slot(in->reference,in->script))!=NULL)
+        if(!AWB_HELD_KEY(reference) && (p=park_slot(in->reference,in->script))!=NULL)
             memcpy(&vm.park[p->at],&vm.cells[in->locals],p->count*sizeof(aw_mwcell_t));
         in->flags=0;in->entity=-1;
         return 1;
@@ -389,7 +424,7 @@ static int global_instance(int script,int create){
 }
 void AW_MwvmStartScript(int script){
     int k;
-    if(!ON || script<0 || script>=vm.nscrp || !vm.runnable[script])return;
+    if(!ON || script<0 || script>=vm.nscrp || !vm.runnable[script] || AW_MwvmScriptHeld(script))return;
     k=global_instance(script,1);
     if(k>=0)vm.inst[k].flags|=AWI_RUNNING;
 }
@@ -494,6 +529,66 @@ int AW_MwvmLocalGet(uint32_t reference,int slot,int *script,aw_mwcell_t *out){
     if(!ON || !(p=find_parked(reference)) || slot<0 || slot>=p->count)return 0;
     *script=p->script;*out=vm.park[p->at+slot];
     return 1;
+}
+/* OnPCAdd (v0.0.62, CENSUS-INTRO-SCRIPTS-62; OpenMW 0.51: the local OnPCAdd of an item's script reads 1 once the item
+ * is in the player's inventory): the PADD row of the item whose folded id hashes to HASH: its script and the slot.
+ * 1 found (binary search on the resident rows; nothing read from disk). */
+int AW_MwvmPcAddRow(uint32_t hash,int *script,int *slot){
+    int low=0,high=ON?vm.npadd-1:-1;
+    while(low<=high){
+        int mid=(low+high)/2;uint32_t h=u32(vm.padd+8*mid);
+        if(h<hash)low=mid+1;else if(h>hash)high=mid-1;
+        else{*script=(int)U16(vm.padd+8*mid+4);*slot=vm.padd[8*mid+6];return 1;}
+    }
+    return 0;
+}
+/* The item entered the player's inventory: its script's OnPCAdd reads 1 from its next run. The placed reference
+ * REFERENCE the player took keeps running its own values (a book read on the table, then taken); without one, the
+ * item's script runs as it is carried, one instance per script (the carried ring). 1 an attached placement, 2 the
+ * carried instance, 0 none (not runnable, held, or the slot out of range). */
+/* MWSCRIPT-UNPLACED-ATTACH-62: SLOT AW_MWVM_NO_SLOT (a PADD row of a script with no OnPCAdd local): the item's
+ * script runs while carried (OpenMW 0.51 runs the scripts of the items in the player's inventory), nothing is set.
+ * A carried instance that already runs is left as it is (no wake, no state change). */
+int AW_MwvmPcAdd(uint32_t reference,int script,int slot){
+    int k,none=slot==AW_MWVM_NO_SLOT;
+    if(!ON || script<0 || script>=vm.nscrp || !vm.runnable[script] || AW_MwvmScriptHeld(script) || slot<0 ||
+       (!none && slot>=nlocals(script)))return 0;
+    if(reference && (k=attached_instance(reference))>=0 && vm.inst[k].script==script){
+        if(none)return 1;
+        vm.cells[vm.inst[k].locals+slot].i=1;vm.inst[k].flags&=~AWI_QUIET;vm.generation++;return 1;
+    }
+    if((k=global_instance(script,1))<0)return 0;
+    if(none && (vm.inst[k].flags&AWI_RUNNING))return 2;
+    if(!none){vm.cells[vm.inst[k].locals+slot].i=1;vm.generation++;}
+    vm.inst[k].flags|=AWI_RUNNING|(none?AWI_CELLCHANGED:0);vm.inst[k].flags&=~AWI_QUIET;
+    return 2;
+}
+/* The last item of SCRIPT left the player's inventory: its carried instance stops (its values stay, as OpenMW keeps
+ * an item's locals with the item). 1 when one was running. */
+int AW_MwvmCarriedStop(int script){
+    int k;
+    if(!ON || script<0 || script>=vm.nscrp || (k=global_instance(script,0))<0 || !(vm.inst[k].flags&AWI_RUNNING))return 0;
+    vm.inst[k].flags&=~AWI_RUNNING;
+    return 1;
+}
+/* 1 when an object attached to the loaded map runs SCRIPT (a placement the player took keeps its own instance) */
+int AW_MwvmScriptAttached(int script){
+    int k;
+    if(!ON)return 0;
+    for(k=0;k<vm.ninst;k++)
+        if((vm.inst[k].flags&(AWI_USED|AWI_GLOBAL))==AWI_USED && (int)vm.inst[k].script==script)return 1;
+    return 0;
+}
+/* LACT (MWSCRIPT-UNPLACED-ATTACH-62): the script of the NPC or creature record whose folded id hashes to HASH (the
+ * actor table's base hash), when a levelled list can give it; 1 found (a binary search on the resident rows). */
+int AW_MwvmLevelledScript(uint32_t hash,int *script){
+    int low=0,high=ON?vm.nlact-1:-1;
+    while(low<=high){
+        int mid=(low+high)/2;uint32_t h=u32(vm.lact+8*mid);
+        if(h<hash)low=mid+1;else if(h>hash)high=mid-1;
+        else{*script=(int)U16(vm.lact+8*mid+4);return *script<vm.nscrp;}
+    }
+    return 0;
 }
 int AW_MwvmGlobalScriptSet(int script,int running){
     int k;

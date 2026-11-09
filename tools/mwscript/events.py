@@ -119,6 +119,31 @@ def check(data):
     return r
 
 
+_DISTANCE_PLAYER = re.compile(r'getdistance\s*,?\s*"?player"?\s*\)?\s*(<=|<)\s*([0-9]+(?:\.[0-9]*)?)', re.I)
+
+
+def far_triggers(data, rows):
+    """{folded script name: trigger distance in game units} for the scripted sky and far events
+    (SCRIPTED-EVENT-PAST-DRAW-DISTANCE-62): every script that disables the object a held actor stands on (rows of
+    held_actors) and waits for the player's distance (`GetDistance Player <= N`). The engine fires such a check at
+    the smaller of N and the player's live draw distance less a margin, so the event is always seen (aw_mwhost.c
+    host_distance). The largest N of the script counts."""
+    supports = {r['support_id'] for r in rows}
+    if not supports:
+        return {}
+    out = {}
+    for name, s in data.scripts.items():
+        code = _code(s.text)
+        hit = any((m.group(1) or m.group(2)).strip().casefold() in supports for m in _DISABLE_REF.finditer(code))
+        if not hit:
+            continue
+        for m in _DISTANCE_PLAYER.finditer(code):
+            n = int(round(float(m.group(2))))
+            if 0 < n <= 0xFFFF:
+                out[name.casefold()] = max(out.get(name.casefold(), 0), n)
+    return out
+
+
 def census(data):
     """Every placed scripted object whose script tests the player's distance and changes the world: [{script, id,
     type, cell, reference, does: [verbs]}], sorted by script and cell; one row per script and placement (Morrowind.esm

@@ -60,7 +60,12 @@ AI_SETTINGS = ('iFightDistanceBase', 'fFightDistanceMultiplier', 'fFightDispMult
 # written as "crime NAME VALUE" lines, which the melee settings' loader skips.
 CRIME_SETTINGS = ('fAlarmRadius', 'fCrimeStealing', 'fDispStealing', 'fFightStealing',
                   'fSneakSkillMult', 'fSneakBootMult', 'fSneakDistanceBase', 'fSneakDistanceMultiplier',
-                  'fSneakNoViewMult', 'fSneakViewMult', 'iCrimeThreshold')
+                  'fSneakNoViewMult', 'fSneakViewMult', 'iCrimeThreshold',
+                  # v0.0.62 (CRIME-59): the other crimes' bounties, disposition changes and Fight, the arrest and jail
+                  'iCrimeAttack', 'iCrimeKilling', 'iCrimeTresspass', 'iCrimePickPocket',
+                  'iDispAttackMod', 'fDispAttacking', 'iDispKilling', 'iDispTresspass', 'fDispPickPocketMod',
+                  'iFightAttack', 'iFightAttacking', 'iFightKilling', 'iFightTrespass', 'iFightPickpocket',
+                  'iDaysinPrisonMod', 'iCrimeThresholdMultiplier', 'fCrimeGoldDiscountMult', 'fCrimeGoldTurnInMult')
 # Settings only the builder needs (armour classes, magicka).
 BUILD_SETTINGS = ('iBaseArmorSkill', 'fLightMaxMod', 'fMedMaxMod', 'iHelmWeight', 'iCuirassWeight',
                   'iPauldronWeight', 'iGreavesWeight', 'iBootsWeight', 'iGauntletWeight', 'iShieldWeight',
@@ -150,8 +155,10 @@ def gmst_text(kinds, name):
 
 
 # The texts the combat layer shows (RESIST-NORMAL-WEAPONS-61: a weapon with no effect on a target that resists it)
-# and the crime rules (STEAL-WITNESSED-NO-CRIME-61: the bounty rose)
-TEXT_SETTINGS = ('sMagicTargetResistsWeapons', 'sCrimeMessage')
+# and the crime rules (STEAL-WITNESSED-NO-CRIME-61: the bounty rose; CRIME-59: the release from jail after one day or
+# more, a skill that fell there)
+TEXT_SETTINGS = ('sMagicTargetResistsWeapons', 'sCrimeMessage', 'sNotifyMessage42', 'sNotifyMessage43',
+                 'sNotifyMessage44')
 
 
 def movement_lines(kinds, settings):

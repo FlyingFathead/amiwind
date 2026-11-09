@@ -56,6 +56,13 @@ int AW_RestSleeping(void);                      /* GetPCSleep: the window is ope
 int AW_RestWake(void);                          /* WakeUpPC: the rest window closes; 1 when the player slept */
 /* A refused bed (the trespass crime, CRIME-59; NULL until it lands): the bed's reference and its owner or faction. */
 extern void (*aw_rest_bed_refused)(unsigned long reference,const char *owner);
+/* v0.0.62 (CRIME-59; OpenMW sleepInBed): someone else's bed is a crime when seen; the hook (aw_crime.c) commits it and
+ * returns 1 when it was seen: then sNotifyMessage64 and no sleep; unseen, the player sleeps in it. NULL: the bed is
+ * refused as before. */
+extern int (*aw_rest_bed_crime)(unsigned long reference,const char *owner,int faction);
+/* HOURS passed as a rest (SLEEPING) or a wait, without the window: the clock, recharge, effects and the stats by the
+ * rules, no interruption and no level-up (the jail's sentence, CRIME-59). */
+void AW_RestPass(int hours,int sleeping);
 /* The interruption's creature (one from the region's sleep list, levelled at the player's level, within 220 units;
  * NULL until creatures can be placed from a levelled list). */
 extern void (*aw_rest_spawn)(const char *sleep_list);

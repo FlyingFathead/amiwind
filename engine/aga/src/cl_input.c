@@ -367,6 +367,7 @@ void CL_BaseMove (usercmd_t *cmd)
 CL_SendMove
 ==============
 */
+void (*aw_walkto_move)(usercmd_t *);	/* the aw_walkto test aid (aw_debug.c) */
 void CL_SendMove (usercmd_t *cmd)
 {
 	int		i;
@@ -378,6 +379,8 @@ void CL_SendMove (usercmd_t *cmd)
 	buf.cursize = 0;
 	buf.data = data;
 
+	if (aw_walkto_move)
+		aw_walkto_move(cmd);	/* aw_walkto test aid (aw_debug.c); NULL in fixtures */
 	AW_IntroMove(cmd);
 	cl.cmd = *cmd;
 

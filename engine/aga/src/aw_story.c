@@ -60,6 +60,9 @@ int AW_StoryHudChannels(void)
         channels|=AW_HUD_WEAPON;
     /* The placed-container fact survives dropping/returning the ring. */
     if(aw_story.stage>=AW_STAGE_CAPTAIN || !AW_CourtyardRingAvailable())channels|=AW_HUD_MAGIC;
+    /* the scripts' EnableStatsMenu / EnableMagicMenu (CENSUS-INTRO-SCRIPTS-62) */
+    if(AW_StoryMenus()&AW_MENU_STATS)channels|=AW_HUD_STATS;
+    if(AW_StoryMenus()&AW_MENU_MAGIC)channels|=AW_HUD_MAGIC;
     return channels;
 }
 
@@ -79,7 +82,8 @@ int AW_StoryInventoryAllowed(void)
      * CharGenDoorExit / CharGenDoorExitCaptain enable every menu again. The activation is the papers_read global
      * AW_StoryPapersRead records; taking the papers (COURTYARD) or the hall guard's word (hall) imply it. */
     return !AW_StoryRestricted() || aw_story.stage>=AW_STAGE_COURTYARD || aw_story.hall ||
-        (aw_story.stage>=AW_STAGE_PAPERS && AW_StateGet(&aw_state,AW_GLOBAL,"amiwind:opening:papers_read")>0);
+        (aw_story.stage>=AW_STAGE_PAPERS && AW_StateGet(&aw_state,AW_GLOBAL,"amiwind:opening:papers_read")>0) ||
+        (AW_StoryMenus()&AW_MENU_INVENTORY);   /* a script's EnableInventoryMenu (CENSUS-INTRO-SCRIPTS-62) */
 }
 
 int AW_StoryViewAllowed(void)
@@ -108,6 +112,16 @@ int AW_ControlSet(int controls,int enable)
     int now=AW_ControlsDisabled(),next=enable?now&~controls:now|(controls&AW_CONTROL_ALL);
     if(next==now)return 1;               /* no row is taken for a switch that does not change */
     return AW_StateSet(&aw_state,AW_GLOBAL,AW_CONTROL_FACT,next);
+}
+int AW_StoryMenus(void)
+{
+    return (int)AW_StateGet(&aw_state,AW_GLOBAL,AW_MENU_FACT)&AW_MENU_ALL;
+}
+int AW_StoryMenuEnable(int menus)
+{
+    int now=AW_StoryMenus(),next=now|(menus&AW_MENU_ALL);
+    if(next==now)return 1;               /* a script that repeats the call takes no row */
+    return AW_StateSet(&aw_state,AW_GLOBAL,AW_MENU_FACT,next);
 }
 const char *AW_ControlName(int control)
 {

@@ -287,6 +287,12 @@ End''',
 short r
 set r to GetInterior
 End''',
+    # CRIME-59 (CRIME-FINE-GOLD-NOT-TAKEN-62): the guards' fine answer, a function call in an explicit reference's count
+    'FineUser': '''Begin FineUser
+Player->RemoveItem Gold_001 GetPCCrimeLevel
+SetPCCrimeLevel 0
+PayFine
+End''',
     # v0.0.62 (MWSCRIPT-GAP-FUNCTIONS-62): the fades, the forced sneak and the resistances; never placed
     'GapUser': '''Begin GapUser
 short r
@@ -302,6 +308,10 @@ set r to GetResistShock
 set r to ( "chime_obj"->GetResistParalysis )
 if ( ( player->HasSoulGem "skink" ) > 0 )
     player->RemoveSoulGem "skink" 2
+endif
+HurtStandingActor 20
+if ( ( "chime_obj"->GetHealth ) < 1 )
+    "chime_obj"->Resurrect
 endif
 End''',
     # CELL-CHANGES-59 slice 5: a global script that starts another one and stops itself (never placed: the harness
@@ -397,6 +407,149 @@ def program(handwritten=('chargen*',)):
         media = MediaMap(s.data, catalogue(), SOUNDTRACK)
         prog, compiled = compile_program(s.data, media, handwritten=handwritten, rooms=ROOMS)
         return prog, compiled, bindings(prog), s.data
+
+
+class SeenScriptTests(unittest.TestCase):
+    """MWSCRIPT-INERT-SEEN-62: a script whose only effect is a message box, its object's use taken over (OnActivate),
+    or a local the speaker's dialogue filters read is seen in the game, so it is not inert and its object binds."""
+
+    def test_message_box_activation_and_dialogue_locals_are_seen(self):
+        scripts = dict(SCRIPTS,
+                       BoxOnUse='Begin BoxOnUse\nif ( OnActivate == 1 )\n    MessageBox "This door is blocked."\n'
+                                'endif\nEnd BoxOnUse\n',
+                       KeepUse='Begin KeepUse\nif ( OnActivate == 1 )\n    return\nendif\nEnd KeepUse\n',
+                       DeedFlag='Begin DeedFlag\nshort hasDeed\nshort noLore\n'
+                                'if ( GetItemCount "plain_misc" > 0 )\n    set hasDeed to 1\nendif\nEnd DeedFlag\n',
+                       QuietFlag='Begin QuietFlag\nshort unread\nset unread to 1\nEnd QuietFlag\n',
+                       OnlyLocals='Begin OnlyLocals\nshort noLore\nEnd OnlyLocals\n')
+        records = [record('MISC', sub('NAME', 'plain_misc')),
+                   record('DOOR', sub('NAME', 'box_door'), sub('SCRI', 'BoxOnUse')),
+                   record('MISC', sub('NAME', 'keep_misc'), sub('SCRI', 'KeepUse')),
+                   record('NPC_', sub('NAME', 'deed_npc'), sub('SCRI', 'DeedFlag')),
+                   record('NPC_', sub('NAME', 'quiet_npc'), sub('SCRI', 'QuietFlag')),
+                   record('NPC_', sub('NAME', 'lore_npc'), sub('SCRI', 'OnlyLocals')),
+                   # the dialogue filter Local hasDeed == 1 and NotLocal noLore (SCVR: index, type, function, op)
+                   record('DIAL', sub('NAME', 'land deed'), sub('DATA', b'\0')),
+                   record('INFO', sub('INAM', '7'), sub('NAME', 'You have the deed.'),
+                          sub('SCVR', '03X00hasDeed'), sub('INTV', struct.pack('<i', 1)),
+                          sub('SCVR', '1CX00noLore'), sub('INTV', struct.pack('<i', 0)))]
+        d = Path(tempfile.mkdtemp(prefix='aw-mwscript-seen-'))
+        try:
+            (d / 'Morrowind.esm').write_bytes(master_bytes(scripts, records, room_refs=[
+                (401, 'box_door', (0, 0, 0)), (402, 'keep_misc', (0, 0, 0)), (403, 'deed_npc', (0, 0, 0)),
+                (404, 'quiet_npc', (0, 0, 0)), (405, 'lore_npc', (0, 0, 0))]))
+            data = GameData().load(d)
+            prog, compiled = compile_program(data, None, handwritten=(), rooms=ROOMS)
+            binds = bindings(prog, compiled)
+        finally:
+            shutil.rmtree(d, ignore_errors=True)
+        self.assertEqual(data.dialogue_locals, {'hasdeed', 'nolore'})
+        names = {c.name: c for c in compiled}
+        for seen in ('BoxOnUse', 'KeepUse', 'DeedFlag'):
+            self.assertFalse(names[seen].flags & SCRIPT_INERT, seen)
+        for unseen in ('QuietFlag', 'OnlyLocals'):      # a local nothing reads; a declaration alone sets nothing
+            self.assertTrue(names[unseen].flags & SCRIPT_INERT, unseen)
+        bound = {b['reference'] for b in binds}
+        self.assertTrue({401, 402, 403} <= bound)
+        self.assertFalse({404, 405} & bound)
+
+
+class WeatherCallTests(unittest.TestCase):
+    """MWSCRIPT-COMPLETE-LANDMARK: ChangeWeather and ModRegion go to the host with the region's catalogue index (the
+    sorted Morrowind.esm region ids) first; a region the image has not is no code (OpenMW finds no such region)."""
+
+    def test_the_region_is_worked_out_at_build_time(self):
+        from mwscript.awms import decode
+        from mwscript.functions import FUNCTION_NUMBERS, HOST, HOST_EFFECTS
+        text = ('Begin WeatherEnd\nModRegion "Bitter Coast Region" 50 50 0 0 0 0 0 0\n'
+                'ChangeWeather "bitter coast region" 0\nChangeWeather "Mournhold Region" 1\n'
+                'ModRegion "Mournhold Region" 100 0 0 0 0 0 0 0\nStopScript WeatherEnd\nEnd WeatherEnd\n')
+        records = [record('REGN', sub('NAME', 'Ascadian Isles Region'), sub('FNAM', 'Ascadian Isles Region'))]
+        d = Path(tempfile.mkdtemp(prefix='aw-mwscript-weather-'))
+        try:
+            (d / 'Morrowind.esm').write_bytes(master_bytes(dict(SCRIPTS, WeatherEnd=text), records))
+            data = GameData().load(d)
+            prog, compiled = compile_program(data, None, handwritten=(), rooms=ROOMS)
+        finally:
+            shutil.rmtree(d, ignore_errors=True)
+        self.assertEqual(data.base_regions, {'ascadian isles region', 'bitter coast region'})
+        self.assertTrue({'changeweather', 'modregion'} <= HOST & HOST_EFFECTS)
+        c = next(c for c in compiled if c.name == 'WeatherEnd')
+        self.assertEqual(c.notyet, [])
+        ops = list(decode(c.code))
+        calls = [(i, a) for i, (_, n, a) in enumerate(ops) if n == 'NOTYET']
+        self.assertEqual([a[0] for _, a in calls], [FUNCTION_NUMBERS['modregion'], FUNCTION_NUMBERS['changeweather']])
+        (m, mod), (k, change) = calls
+        self.assertEqual(mod[2] & 0x1F, 9)             # the region's index and eight chances
+        self.assertEqual(change[2] & 0x1F, 2)          # the region's index and the weather
+        pushes = [(n, a) for _, n, a in ops[m - 9:m]]
+        self.assertEqual(pushes[0], ('PUSHB', [1]))    # bitter coast region: second of the sorted ids
+        self.assertEqual(ops[k - 2][1:], ('PUSHB', [1]))
+        self.assertTrue(any('a region the image has not' in w for w in c.warnings))
+        self.assertEqual(len(calls), 2)                # Mournhold's calls: no code
+
+
+class HeldItemBindingTests(unittest.TestCase):
+    """MWSCRIPT-INVENTORY-HITONME-62: the scripts of items a placed container holds (OpenMW 0.51 localscripts.cpp
+    addCell: the active cells' containers' and actors' items run their scripts) are BIND_HELD rows at the holder."""
+
+    def test_a_container_s_scripted_items_bind_at_the_container(self):
+        from mwscript.compiler import BIND_HELD, BIND_INTERIOR, BIND_EDICT, HELD_BIT, held_key
+        held = ('Begin HeldItem\nshort OnPCEquip\nif ( OnPCEquip == 1 )\n    set QuestFlag to 1\nendif\n'
+                'End HeldItem\n')
+        other = 'Begin HeldOther\nset Counter to 2\nEnd HeldOther\n'
+
+        def npco(count, ident):
+            return sub('NPCO', struct.pack('<i', count) + ident.encode('cp1252').ljust(32, b'\0'))
+        records = [record('MISC', sub('NAME', 'held_misc'), sub('SCRI', 'HeldItem')),
+                   record('MISC', sub('NAME', 'held_two'), sub('SCRI', 'HeldOther')),
+                   record('MISC', sub('NAME', 'plain_misc')),
+                   record('CONT', sub('NAME', 'test_chest'), npco(2, 'held_misc'), npco(1, 'plain_misc'),
+                          npco(1, 'held_misc'), npco(1, 'held_two')),
+                   record('CONT', sub('NAME', 'empty_chest'))]
+        d = Path(tempfile.mkdtemp(prefix='aw-mwscript-held-'))
+        try:
+            (d / 'Morrowind.esm').write_bytes(master_bytes(dict(SCRIPTS, HeldItem=held, HeldOther=other), records,
+                                                           room_refs=[(301, 'test_chest', (40, 80, 0)),
+                                                                      (302, 'empty_chest', (0, 0, 0))]))
+            data = GameData().load(d)
+            self.assertEqual(data.holdings['test_chest'], ['held_misc', 'plain_misc', 'held_misc', 'held_two'])
+            prog, compiled = compile_program(data, None, handwritten=(), rooms=ROOMS)
+            binds = bindings(prog, compiled)
+        finally:
+            shutil.rmtree(d, ignore_errors=True)
+        rows = [b for b in binds if b['flags'] & BIND_HELD]
+        self.assertEqual([b['reference'] for b in rows], [held_key(301, 0), held_key(301, 1)])
+        self.assertEqual(held_key(301, 1), HELD_BIT | (1 << 24) | 301)
+        self.assertEqual([prog.scripts.rows[b['script']]['name'] for b in rows], ['HeldItem', 'HeldOther'])
+        for b in rows:
+            self.assertEqual(b['flags'], BIND_HELD | BIND_INTERIOR | BIND_EDICT)
+            self.assertEqual((b['holder'], b['position']), (301, [40, 80, 0]))
+        self.assertEqual([b['reference'] for b in binds], sorted(b['reference'] for b in binds))
+        self.assertGreater(binds[-1]['reference'], 0xFFFFFF)          # after every placed reference
+        f = awms.read(awms.write(prog, compiled, binds)[0])
+        self.assertEqual(f['BIND_rows'], len(binds))
+        self.assertEqual(struct.unpack_from('>I', f['BIND'], 24 * (len(binds) - 1))[0], held_key(301, 1))
+        with self.assertRaises(ValueError):
+            held_key(0x1000000, 0)
+
+    def test_the_engine_attaches_held_rows_at_the_holder_while_it_has_the_item(self):
+        from mwscript.compiler import BIND_HELD, HELD_BIT
+        src = ROOT / 'engine/aga/src'
+        header = (src / 'aw_mwcode.h').read_text(encoding='utf-8')
+        self.assertIn('#define AWB_HELD %d' % BIND_HELD, header)
+        self.assertIn('#define AWB_HELD_BIT 0x%08xu' % HELD_BIT, header)
+        host = (src / 'aw_mwhost.c').read_text(encoding='utf-8')
+        attach = host[host.index('static void attach_map(void){'):]
+        attach = attach[:attach.index('\n}\n')]
+        self.assertIn('entity=entity_of_reference(AWB_HELD_HOLDER(ref));', attach)
+        self.assertEqual(attach.count('held_attach('), 3)            # an edict holder, outdoors, a room's spot
+        self.assertIn('if(held_attached_now>=HELD_MAX){held_over++;return -1;}', host)
+        self.assertIn('held_recheck(script);', host[host.index('static void pcadd_flush(void){'):])
+        self.assertIn('if(!global && AWB_HELD_KEY(reference))return;', host)
+        vm = (src / 'aw_mwvm.c').read_text(encoding='utf-8')
+        self.assertIn('if(AWB_HELD_KEY(in->reference)){in->flags=0;continue;}', vm)
+        self.assertIn('if(!AWB_HELD_KEY(reference) && (p=park_slot(', vm)
 
 
 class ResultKeyTests(unittest.TestCase):
@@ -675,13 +828,31 @@ PlaceItem "shiny_coin" 100 200 300 90
 PlaceItem "magic_glow" 1 2 3 0
 PlaceItemCell "summon_npc" "Test Room" 4100 8000 -200 90
 PlaceItemCell "summon_npc" "No Such Place" 0 0 0 0
+"cell_obj"->Drop "shiny_coin" 2
+Drop "magic_glow" 1
 End''', SummonedScript='''Begin SummonedScript
 short done
 set done to 1
+End''', EquipNote='''Begin EquipNote
+short OnPCEquip
+short PCSkipEquip
+short button
+short asked
+if ( OnPCEquip == 1 )
+    if ( asked == 0 )
+        MessageBox "Wear it?" "Cancel" "OK"
+        set asked to 1
+    endif
+    set button to GetButtonPressed
+    if ( button == 1 )
+        set OnPCEquip to 0
+        set asked to 0
+    endif
+endif
 End''')
         extra = (record('NPC_', sub('NAME', 'summon_npc'), sub('SCRI', 'SummonedScript')),
                  record('CREA', sub('NAME', 'lone_rat')), record('MISC', sub('NAME', 'shiny_coin')),
-                 acti('magic_glow', ''))
+                 acti('magic_glow', ''), record('WEAP', sub('NAME', 'note_dagger'), sub('SCRI', 'EquipNote')))
         tmp = Path(tempfile.mkdtemp(prefix='aw-mwscript-place-'))
         try:
             (tmp / 'Morrowind.esm').write_bytes(master_bytes(scripts, extra, [(301, 'summon_npc', (0, 0, 0))]))
@@ -691,7 +862,9 @@ End''')
             shutil.rmtree(tmp, ignore_errors=True)
         names = {c.name: c for c in compiled}
         placer = names['PlacerScript']
-        self.assertEqual(sorted(placer.notyet), ['placeatpc', 'placeitem'])     # the rat placed nowhere, the activator
+        # v0.0.62: the rat placed nowhere is made from its actor table base (MWSCRIPT-GAP-FUNCTIONS-62); the activator
+        # with no placed reference (no template) stays not yet, placed and dropped
+        self.assertEqual(sorted(placer.notyet), ['drop', 'placeitem'])
         self.assertTrue(any('No Such Place' in w for w in placer.warnings))
         rows = prog.place_rows()
         self.assertEqual([r['key'] for r in rows], ['lone_rat', 'magic_glow', 'shiny_coin', 'summon_npc'])
@@ -699,8 +872,8 @@ End''')
         self.assertEqual((npc['kind'], npc['template'], npc['carried']), (PLACE_KINDS['actor'], 301, True))
         self.assertEqual(npc['home'], prog.strings.index['ri0123456789'])
         self.assertEqual(npc['script'], prog.scripts.index['summonedscript'])
-        self.assertEqual((rows[0]['carried'], rows[1]['kind'], rows[2]['kind']), (False, PLACE_KINDS['other'],
-                                                                                 PLACE_KINDS['item']))
+        self.assertEqual((rows[0]['carried'], rows[1]['kind'], rows[1]['carried'], rows[2]['kind']),
+                         (True, PLACE_KINDS['other'], False, PLACE_KINDS['item']))
         ops = [(n, a) for _, n, a in awms.decode(placer.code)]
         calls = [(k, a) for k, (n, a) in enumerate(ops) if n == 'NOTYET' and
                  a[0] in (FUNCTION_NUMBERS['placeatpc'], FUNCTION_NUMBERS['placeatme'], FUNCTION_NUMBERS['placeitem'],
@@ -726,7 +899,8 @@ End''')
         at_pc = by_fn[FUNCTION_NUMBERS['placeatpc']]
         self.assertEqual(at_pc[0][1][2] & 0x1F, 4)                 # count, distance, direction, row
         self.assertEqual(pushed(at_pc[0][0], 4), [1, 128.0, 1, 3])
-        self.assertEqual(at_pc[1][1][2] & 0x1F, 3)                 # the rat: not yet, its own numbers only
+        self.assertEqual(at_pc[1][1][2] & 0x1F, 4)                 # the rat: from its base, with its row (v0.0.62)
+        self.assertEqual(pushed(at_pc[1][0], 4), [1, 256.0, 0, 0])
         at_me = by_fn[FUNCTION_NUMBERS['placeatme']][0]
         self.assertEqual(pushed(at_me[0], 4), [2, 64.0, 3, 3])
         self.assertEqual(before(at_me[0]), 'REF')
@@ -736,6 +910,12 @@ End''')
         self.assertEqual(cell[1][2] & 0x1F, 7)
         room = data.interior_numbers['test room']
         self.assertEqual(pushed(cell[0], 7), [1000.0, 2000.0, -50.0, 270.0, 2, room, 3])
+        # v0.0.62: Drop of the coin on the object REF names: count, its AITM row, its PLAC row (2); the activator's
+        # Drop stays not yet (its own number only)
+        drops = [(k, a) for k, (n, a) in enumerate(ops) if n == 'NOTYET' and a[0] == FUNCTION_NUMBERS['drop']]
+        self.assertEqual([a[2] & 0x1F for _, a in drops], [3, 1])
+        self.assertEqual(pushed(drops[0][0], 3), [2, prog.actors.item('shiny_coin'), 2])
+        self.assertEqual(before(drops[0][0]), 'REF')
         f = awms.read(awms.write(prog, compiled, bindings(prog))[0])
         self.assertEqual(f['PLAC_rows'], 4)
         self.assertEqual(struct.unpack_from('>HHIHBB', f['PLAC'], 36),
@@ -743,6 +923,16 @@ End''')
         self.assertIn('PLAC', awms.RESIDENT)
         # the placed record's own script is compiled (it runs on the placed actor's instance)
         self.assertIn('SummonedScript', names)
+        # v0.0.62 (MWSCRIPT-GAP-FUNCTIONS-62): the dagger whose script declares OnPCEquip and PCSkipEquip is an EQUP
+        # row (its script, the two slots: 0 and 1); its message box with buttons and GetButtonPressed run whole
+        equips = prog.equip_rows()
+        self.assertEqual([(r[0], r[2], r[3], r[4]) for r in equips],
+                         [('note_dagger', prog.scripts.index['equipnote'], 0, 1)])
+        self.assertEqual(names['EquipNote'].notyet, [])
+        self.assertEqual(f['EQUP_rows'], 1)
+        self.assertEqual(struct.unpack('>HHBBH', f['EQUP']), (prog.string('note_dagger'),
+                                                             prog.scripts.index['equipnote'], 0, 1, 0))
+        self.assertIn('EQUP', awms.RESIDENT)
 
     def test_ai_follow_cell_and_escort(self):
         # v0.0.62 (MWSCRIPT-POSITIONCELL-ACTORS-62; OpenMW aiextensions.cpp OpAiFollowCell, OpAiEscort, OpAiEscortCell):
@@ -837,6 +1027,37 @@ End''')
         found = {m.group(1).lower(): int(m.group(2)) for m in re.finditer(r'#define AWF_(\w+) (\d+)', header)}
         self.assertEqual(found, {n: FUNCTION_NUMBERS[n] for n in HOST})
 
+    def test_a_blessing_of_passive_effects_is_carried(self):
+        # MWSCRIPT-UNPLACED-ATTACH-62 (the shrines): Shield, a resistance, Levitate and Fortify Attack land by their
+        # effect number (SPFX kind 5); a spell with an action effect (Mark) stays "not yet"
+        prog, _, _, _ = program()
+        spel = prog.data.records['SPEL']
+
+        def enam(number, duration, low, high):
+            return ('ENAM', struct.pack('<hbbiiiii', number, -1, -1, 0, 0, duration, low, high))
+        spel['blessing test sp'] = [enam(3, 2880, 10, 10), enam(92, 2880, 20, 20), enam(10, 1440, 100, 100),
+                                    enam(117, 2880, 5, 5)]
+        spel['mark test sp'] = [enam(3, 60, 5, 5), enam(60, 0, 0, 0)]
+        row = prog.spell_effects('Blessing Test SP')
+        self.assertIsNotNone(row)
+        self.assertEqual(prog.spfx.rows[row]['effects'], [(5, 3, 2880, 10, 10), (5, 92, 2880, 20, 20),
+                                                          (5, 10, 1440, 100, 100), (5, 117, 2880, 5, 5)])
+        self.assertIsNone(prog.spell_effects('mark test sp'))
+        host = (ROOT / 'engine/aga/src/aw_mwhost.c').read_text(encoding='utf-8')
+        self.assertIn('if(x[0]==5)', host)                        # the engine lands kind 5 by its number
+
+    def test_a_call_in_a_referenced_count_keeps_the_reference(self):
+        # CRIME-FINE-GOLD-NOT-TAKEN-62: "Player->RemoveItem Gold_001 GetPCCrimeLevel": the count's call (which resets
+        # the target) comes first, then the player as the target, then the item change; PayFine is carried out
+        prog, compiled, _, _ = program()
+        user = {c.name: c for c in compiled}['FineUser']
+        ops = [(n, a) for _, n, a in awms.decode(user.code)]
+        names = [n for n, _ in ops]
+        k = names.index('ITEM')
+        self.assertEqual(ops[k - 1], ('REF', [0xFFFF]))            # the player, right before the change
+        self.assertIn('NOTYET', names[:k - 1])                     # GetPCCrimeLevel before the reference
+        self.assertEqual(user.notyet, [])
+
     def test_fades_forced_sneak_and_resistances_go_through_the_host_call(self):
         # v0.0.62 (MWSCRIPT-GAP-FUNCTIONS-62): carried out by the host (not "not yet"), in order, with their numbers;
         # the resistances' reads make the script VOLATILE (an effect lands or ends without the state generation)
@@ -850,7 +1071,7 @@ End''')
         calls = [a for _, n, a in awms.decode(user.code) if n == 'NOTYET']
         self.assertEqual([a[0] for a in calls], [FUNCTION_NUMBERS[n] for n in (
             'fadeout', 'fadein', 'fadeto', 'forcesneak', 'getforcesneak', 'clearforcesneak', 'modresistfire',
-            'setresistfrost', 'getresistshock', 'getresistparalysis', 'hassoulgem', 'removesoulgem')])
+            'setresistfrost', 'getresistshock', 'getresistparalysis', 'hassoulgem', 'removesoulgem', 'hurtstandingactor', 'resurrect')])
 
     def test_the_small_functions_go_through_the_host_call(self):
         # v0.0.62 (MWSCRIPT-SMALL-FUNCTIONS-62): angles, moves, SetAtStart, Face, detection, the line of sight, the
@@ -1033,6 +1254,11 @@ int main(int argc,char **argv){
     if(getenv("CALLS"))answer=atoi(getenv("CALLS"));
     if(!AW_MwvmLoad(buf,(unsigned long)n,&host)){printf("load failed\n");return 1;}
     AW_MwvmBeginMap();
+    if(getenv("HOLD")){   /* CENSUS-INTRO-SCRIPTS-62: a held script is not attached; released, it is */
+        int s=atoi(getenv("HOLD")),done=AW_MwvmScriptHold(s,1);
+        printf("hold %d held %d\n",done,AW_MwvmScriptHeld(s));
+        if(getenv("RELEASE")){done=AW_MwvmScriptHold(s,0);printf("release %d held %d\n",done,AW_MwvmScriptHeld(s));}
+    }
     AW_MwvmSection("BIND",&off,&rows,&bytes);
     for(r=0;r<rows;r++){
         unsigned char *p=buf+off+24*r;float o[3];
@@ -1046,6 +1272,36 @@ int main(int argc,char **argv){
         for(k=0;AW_MwvmHeld(k,&a,&s,at);k++)printf("held %u %u %.1f %.1f %.1f find %d\n",(unsigned)a,(unsigned)s,
                                                    at[0],at[1],at[2],AW_MwvmHeldFind(a));
         printf("held rows %d find-none %d\n",AW_MwvmHeldCount(),AW_MwvmHeldFind(1));
+        return 0;
+    }
+    if(getenv("PCADD")){   /* CENSUS-INTRO-SCRIPTS-62: OnPCAdd on the taken placement 103, then a carried instance */
+        int s=atoi(getenv("PCADD")),ps,k,running=0;aw_mwcell_t pv;
+        printf("pcadd placed %d\n",AW_MwvmPcAdd(103,s,0));
+        if(AW_MwvmLocalGet(103,0,&ps,&pv))printf("placed local %d\n",(int)pv.i);
+        printf("pcadd carried %d\n",AW_MwvmPcAdd(0,s,0));
+        for(k=0;k<AW_MwvmInstanceCount();k++){aw_mwvm_instance_t *in=AW_MwvmInstance(k);
+            if(in && (in->flags&AWI_GLOBAL) && (int)in->script==s && (in->flags&AWI_RUNNING))running=(int)AW_MwvmLocal(k,0).i;}
+        printf("carried local %d\n",running);
+        printf("pcadd slot %d held %d\n",AW_MwvmPcAdd(0,s,999),(AW_MwvmScriptHold(s,1),AW_MwvmPcAdd(0,s,0)));
+        printf("pcadd row %d\n",AW_MwvmPcAddRow(0x12345678u,&ps,&k));
+        return 0;
+    }
+    if(getenv("CARRIED")){   /* MWSCRIPT-UNPLACED-ATTACH-62: an item's script runs while carried, stops with the last */
+        int s=atoi(getenv("CARRIED")),k,running=0,value=-1,ls=-1;
+        int a,b,c;   /* each call its own statement: the order of a call's arguments is not defined */
+        a=AW_MwvmPcAdd(0,s,AW_MWVM_NO_SLOT);b=AW_MwvmPcAdd(0,s,AW_MWVM_NO_SLOT);
+        printf("carried start %d again %d\n",a,b);
+        for(k=0;k<AW_MwvmInstanceCount();k++){aw_mwvm_instance_t *in=AW_MwvmInstance(k);
+            if(in && (in->flags&AWI_GLOBAL) && (int)in->script==s){running=(in->flags&AWI_RUNNING)!=0;value=(int)AW_MwvmLocal(k,0).i;}}
+        printf("carried running %d local %d\n",running,value);
+        printf("carried placed %d\n",AW_MwvmPcAdd(103,s,AW_MWVM_NO_SLOT));
+        a=AW_MwvmCarriedStop(s);b=AW_MwvmCarriedStop(s);c=AW_MwvmScriptRunning(s);
+        printf("carried stop %d again %d running %d\n",a,b,c);
+        printf("attached %d none %d\n",AW_MwvmScriptAttached(s),AW_MwvmScriptAttached(AW_MwvmScriptCount()-1));
+        a=AW_MwvmLevelledScript((uint32_t)strtoul(getenv("LEVELLED"),NULL,10),&ls);
+        printf("levelled %d script %d\n",a,ls);
+        ls=-1;a=AW_MwvmLevelledScript(0x12345678u,&ls);
+        printf("levelled none %d script %d\n",a,ls);
         return 0;
     }
     if(getenv("LOCALS"))return locals_test(dt,atoi(getenv("LOCALS")),atoi(getenv("COUNTER")));
@@ -1071,7 +1327,8 @@ int main(int argc,char **argv){
         return 0;
     }
     if(getenv("DIALOGUE")){   /* a result text run on reference 103 (the Quiet object) through its DRSC row */
-        const char *text=getenv("DIALOGUE");int speaker=-1,row_speaker,broken,script,k;
+        const char *text=getenv("DIALOGUE");int speaker=-1,row_speaker,broken,script,k,ps;aw_mwcell_t pv;
+        if(getenv("DETACHED"))printf("detached %d\n",AW_MwvmDetach(103));   /* the speaker's script not attached */
         for(k=0;k<AW_MwvmInstanceCount();k++){aw_mwvm_instance_t *in=AW_MwvmInstance(k);
             if(in && (in->flags&AWI_USED) && in->reference==103)speaker=in->script;}
         script=AW_MwvmFindDialogue(read_mem,NULL,AW_MwvmTextHash(text,(int)strlen(text)),(int)strlen(text),speaker,&row_speaker,&broken);
@@ -1079,6 +1336,7 @@ int main(int argc,char **argv){
                script>=0?AW_MwvmRunDialogue(script,103,row_speaker):0);
         for(k=0;k<AW_MwvmInstanceCount();k++){aw_mwvm_instance_t *in=AW_MwvmInstance(k);
             if(in && (in->flags&AWI_USED) && in->reference==103)printf("done %d\n",(int)AW_MwvmLocal(k,0).i);}
+        printf("parked %d\n",AW_MwvmLocalGet(103,0,&ps,&pv)?(int)pv.i:-1);
         printf("missing %d\n",AW_MwvmFindDialogue(read_mem,NULL,AW_MwvmTextHash("nothing",7),7,speaker,&row_speaker,&broken));
         return 0;
     }
@@ -1107,6 +1365,9 @@ class InterpreterTests(unittest.TestCase):
     def setUpClass(cls):
         cls.tmp = Path(tempfile.mkdtemp(prefix='aw-mwvm-'))
         cls.prog, cls.compiled, binds, _ = program()
+        # MWSCRIPT-UNPLACED-ATTACH-62: a creature record with the Quiet script that a levelled list names (LACT row)
+        cls.prog.data.bases['lev_crea'] = ('CREA', 'quiet')
+        cls.prog.data.levelled_lists = {'lev_test': ['lev_crea']}
         raw, _ = awms.write(cls.prog, cls.compiled, binds, {'ops_per_run': 500})
         (cls.tmp / 'test.awm').write_bytes(raw)
         (cls.tmp / 'h.c').write_text(HARNESS, encoding='utf-8')
@@ -1162,6 +1423,118 @@ class InterpreterTests(unittest.TestCase):
         self.assertIn('done 7', out)
         self.assertTrue(any(l.split()[1:3] == ['call', '22'] for l in out), out)
         self.assertIn('missing -1', out)
+
+    def test_dialogue_result_keeps_a_detached_speakers_locals(self):
+        # CENSUS-INTRO-SCRIPTS-62: a result run while the speaker's script is not attached (Sellus Gravius's Greeting 1,
+        # "set state to -1") writes his parked locals, and AW_MwvmLocalGet (the dialogue's Local condition, aw_mwhost.c
+        # live_local) reads them back: the next greeting sees state -1
+        out = self.run_vm(0, env={'DIALOGUE': RESULT_TEXT, 'CALLS': '-1', 'DETACHED': '1'})
+        self.assertIn('detached 1', out)
+        line = next(l for l in out if l.startswith('dialogue')).split()
+        quiet = str(self.index('scripts', 'quiet'))
+        self.assertEqual(line[3], '-1')                           # no attached speaker
+        self.assertEqual(line[5], quiet)                          # the row still runs with his locals
+        self.assertEqual(line[9], '1')
+        self.assertNotIn('done 7', out)                           # nothing attached
+        self.assertIn('parked 7', out)                            # kept where the condition reads it
+
+    def test_a_held_script_is_not_attached(self):
+        # CENSUS-INTRO-SCRIPTS-62: with the old opening chosen (aw_census_legacy 1) the census office's scripts are
+        # held: reference 103's script is not attached while held, and is once released
+        quiet = self.index('scripts', 'quiet')
+        held = self.run_vm(0, env={'HOLD': str(quiet), 'DIALOGUE': RESULT_TEXT, 'CALLS': '-1'})
+        self.assertIn('hold 1 held 1', held)
+        self.assertIn('attach 103 -1', held)
+        self.assertEqual(next(l for l in held if l.startswith('dialogue')).split()[3], '-1')
+        free = self.run_vm(0, env={'HOLD': str(quiet), 'RELEASE': '1', 'DIALOGUE': RESULT_TEXT, 'CALLS': '-1'})
+        self.assertIn('release 1 held 0', free)
+        self.assertNotIn('attach 103 -1', free)
+        self.assertEqual(next(l for l in free if l.startswith('dialogue')).split()[3], str(quiet))
+
+    def test_onpcadd_reaches_the_taken_placement_or_the_carried_instance(self):
+        # CENSUS-INTRO-SCRIPTS-62: OnPCAdd 1 on the placement the player took (its own values go on), else on the
+        # item's carried instance (started); a slot out of range or a held script: nothing; an unknown item: no row
+        quiet = self.index('scripts', 'quiet')
+        out = self.run_vm(0, env={'PCADD': str(quiet)})
+        self.assertIn('pcadd placed 1', out)
+        self.assertIn('placed local 1', out)
+        self.assertIn('pcadd carried 2', out)
+        self.assertIn('carried local 1', out)
+        self.assertIn('pcadd slot 0 held 0', out)
+        self.assertIn('pcadd row 0', out)
+
+    def test_a_carried_items_script_runs_and_stops_with_the_last_one(self):
+        # MWSCRIPT-UNPLACED-ATTACH-62: a carried item whose script has no OnPCAdd: its carried instance starts (no
+        # local set), a second start changes nothing, the taken placement keeps its own; the last one leaving stops it
+        # (once); the LACT row of the levelled creature names its script, an unknown record none
+        from mwscript.awms import fnv1a
+        quiet = self.index('scripts', 'quiet')
+        out = self.run_vm(0, env={'CARRIED': str(quiet), 'LEVELLED': str(fnv1a('lev_crea'))})
+        self.assertIn('carried start 2 again 2', out)
+        self.assertIn('carried running 1 local 0', out)
+        self.assertIn('carried placed 1', out)
+        self.assertIn('carried stop 1 again 0 running 0', out)
+        self.assertIn('attached 1 none 0', out)
+        self.assertIn('levelled 1 script %d' % quiet, out)
+        self.assertIn('levelled none 0 script -1', out)
+
+    def test_pcadd_rows_name_each_carried_items_onpcadd_slot(self):
+        # PADD: a carryable record whose script declares OnPCAdd gives one row (hash of the folded id, script, slot);
+        # a container's script or a script without the local gives none
+        from mwscript.awms import pcadd_rows, fnv1a
+
+        class Index:
+            def __init__(self, names):
+                self.index = {n: i for i, n in enumerate(names)}
+
+        class Data:
+            bases = {'ring_keley': ('CLOT', 'chargen_ring_keley'), 'chargen statssheet': ('BOOK', 'chargenstatssheet'),
+                     'barrel': ('CONT', 'chargen_ring_keley'), 'plain': ('MISC', 'noadd')}
+
+        class P:
+            data = Data()
+            scripts = Index(['chargen_ring_keley', 'chargenstatssheet', 'noadd'])
+            script_locals = {'chargen_ring_keley': {'state': ('s', 0), 'onpcadd': ('s', 1)},
+                             'chargenstatssheet': {'state': ('s', 0), 'onpcadd': ('s', 1)}, 'noadd': {'x': ('s', 0)}}
+        rows = pcadd_rows(P())
+        # MWSCRIPT-UNPLACED-ATTACH-62: an item whose script has no OnPCAdd gives a row too (NO_SLOT: it runs carried)
+        self.assertEqual(rows, sorted([(fnv1a('ring_keley'), 0, 1), (fnv1a('chargen statssheet'), 1, 1),
+                                       (fnv1a('plain'), 2, awms.NO_SLOT)]))
+        self.assertEqual(fnv1a('A'), fnv1a('a'))
+
+    def test_levelled_actor_rows_name_the_scripted_actors_a_list_gives(self):
+        # LACT (MWSCRIPT-UNPLACED-ATTACH-62): a scripted creature or NPC record a levelled list names gives one row
+        # (hash of the folded id, script); an item, an actor with no script or a record no list names gives none
+        from mwscript.awms import levelled_actor_rows, fnv1a
+
+        class Index:
+            def __init__(self, names):
+                self.index = {n: i for i, n in enumerate(names)}
+
+        class Data:
+            bases = {'kagouti_diseased': ('CREA', 'diseaseyellowtick'), 'cattle_arg_f01': ('NPC_', 'cattlescript'),
+                     'mudcrab': ('CREA', ''), 'sunder': ('WEAP', 'ouch_sunder'), 'placed_only': ('CREA', 'cattlescript')}
+            levelled_actors = ['kagouti_diseased', 'cattle_arg_f01', 'mudcrab', 'sunder', 'nobody']
+
+        class P:
+            data = Data()
+            scripts = Index(['diseaseyellowtick', 'cattlescript', 'ouch_sunder'])
+        self.assertEqual(levelled_actor_rows(P()), sorted([(fnv1a('kagouti_diseased'), 0),
+                                                            (fnv1a('cattle_arg_f01'), 1)]))
+
+    def test_gamedata_reads_the_levelled_creature_lists(self):
+        # MWSCRIPT-UNPLACED-ATTACH-62: every actor a LEVC record names (the last master's record wins)
+        lev = record('LEVC', sub('NAME', 'lev_test'), sub('DATA', struct.pack('<i', 0)), sub('NNAM', b'\0'),
+                     sub('INDX', struct.pack('<i', 2)), sub('CNAM', 'Lev_Crea'), sub('INTV', struct.pack('<h', 1)),
+                     sub('CNAM', 'other_crea'), sub('INTV', struct.pack('<h', 5)))
+        d = Path(tempfile.mkdtemp(prefix='aw-mwscript-lev-'))
+        try:
+            (d / 'Morrowind.esm').write_bytes(master_bytes(records=[lev]))
+            data = GameData().load(d)
+        finally:
+            shutil.rmtree(d, ignore_errors=True)
+        self.assertEqual(data.levelled_lists, {'lev_test': ['lev_crea', 'other_crea']})
+        self.assertEqual(data.levelled_actors, ['lev_crea', 'other_crea'])
 
     def test_a_file_with_the_dialogue_scripts_loads(self):
         # MWSCRIPT-REFUSED-SCRIPT-COUNT-58: the dialogue result scripts made v0.0.58-dev5's file 8,618 scripts and the
@@ -1444,7 +1817,16 @@ int main(void){
      printf("saved %d %d %d %d %d %d %d\n",n,i,AW_StandingCrime(),AW_StandingReputation(),
             AW_StandingRank("TEMPLE"),AW_StandingExpelled("thieves guild"),AW_StandingFactionReputation("Temple"));
      i=AW_StandingImport(block,n-1);
-     printf("bad %d %d\n",i,AW_StandingRank("Temple"));}
+     printf("bad %d %d\n",i,AW_StandingRank("Temple"));
+     /* v0.0.62 (CRIME-59): the crimes' numbers (a new one, the last paid), saved (AWPS2) */
+     AW_StandingReset();printf("none %d\n",AW_StandingCrimeLast());
+     AW_StandingCrimeNew();AW_StandingCrimeNew();AW_StandingCrimePaid();AW_StandingCrimeNew();
+     n=AW_StandingExport(block,sizeof(block));AW_StandingReset();i=AW_StandingImport(block,n);
+     printf("crimes %d %d %d %d\n",n,i,AW_StandingCrimeLast(),AW_StandingCrimeNew());
+     /* a block saved before v0.0.62 (AWPS1: no crimes' numbers) still loads */
+     AW_StandingReset();AW_StandingSetCrime(5);n=AW_StandingExport(block,sizeof(block));block[4]=1;
+     AW_StandingReset();i=AW_StandingImport(block,n-8);
+     printf("v1 %d %d %d\n",i,AW_StandingCrime(),AW_StandingCrimeLast());}
     return 0;
 }
 '''
@@ -1469,7 +1851,8 @@ class StandingTests(unittest.TestCase):
             shutil.rmtree(tmp, ignore_errors=True)
         self.assertEqual(out, ['-1 0', 'crime 0', 'crime 1450', 'rep 255', 'rank -1', 'rank 0', 'rank 9', 'rank 9',
                                'expelled 1 -1', 'left -1 0', 'facrep 7 0', 'full 1 -1',
-                               'saved 88 1 70000 12 1 1 -3', 'bad 0 -1'])
+                               'saved 96 1 70000 12 1 1 -3', 'bad 0 -1', 'none -1', 'crimes 20 1 1 3',
+                               'v1 1 5 -1'])
 
 
 EFFECT_HARNESS = r'''
@@ -1590,6 +1973,29 @@ int main(void){
 '''
 
 
+# v0.0.62 (SUMMONED-CREATURES-62): the summoning effects by number, and one effect ended at once (a summoned creature
+# died) while another of its owner's and the same effect of another owner stay; a Fortify ended so is undone.
+EFFECT_SUMMON_HARNESS = r'''
+#include <stdio.h>
+#include <string.h>
+#include "aw_effects.h"
+int main(void){
+    static aw_actor_t p;int e,n=0;
+    for(e=0;e<AW_EFFECT_COUNT;e++)n+=AW_EffectSummon(e);
+    printf("summons %d %d %d %d %d\n",n,AW_EffectSummon(102),AW_EffectSummon(116),AW_EffectSummon(134),AW_EffectSummon(117));
+    memset(&p,0,sizeof(p));p.reference=AW_ACTOR_PLAYER_REF;p.attr_mod[0]=0;
+    AW_EffectsReset();
+    AW_EffectsLand(&p,102,AW_EFFECT_NO_ARG,1,60,1);AW_EffectsLand(&p,79,0,10,60,1);
+    {static aw_actor_t q;memset(&q,0,sizeof(q));q.reference=0x42;AW_EffectsLand(&q,102,AW_EFFECT_NO_ARG,1,60,2);}
+    n=AW_EffectsEnd(NULL,AW_ACTOR_PLAYER_REF,102);
+    printf("ended %d %d %d %d\n",n,AW_EffectsHas(102),AW_EffectsHasOn(0x42,102),AW_EffectsCount());
+    e=p.attr_mod[0];n=AW_EffectsEnd(&p,AW_ACTOR_PLAYER_REF,79);
+    printf("fortify %d %d %d\n",e,n,p.attr_mod[0]);
+    return 0;
+}
+'''
+
+
 # v0.0.62 (MWSCRIPT-GAP-FUNCTIONS-62): a script's base modifier (ModResistFire / SetResistFire): it adds to the
 # magnitude, may go below 0, is not an active spell (GetEffect), survives the clock and the save, and goes at 0;
 # a stat effect (Fortify Strength, 79) refused
@@ -1613,6 +2019,26 @@ int main(void){
            AW_EffectsMagnitude(0x42,28,AW_EFFECT_NO_ARG));
     AW_EffectsBaseModify(0x42,90,-100);
     printf("back %.1f count %d\n",AW_EffectsMagnitude(0x42,90,AW_EFFECT_NO_ARG),AW_EffectsCountOn(0x42));
+    return 0;
+}
+'''
+
+
+# v0.0.62 (MWSCRIPT-GAP-FUNCTIONS-62): the AWFS save block of the forced sneak and the fade
+FORCED_HARNESS = r'''
+#include <stdio.h>
+#include "aw_forced_rules.h"
+int main(void){
+    unsigned char b[64];uint32_t in[2]={0x01020304u,0xA0B0C0D0u},out[4];int n,player=9,count=9;float fade=-1;
+    n=AW_ForcedPack(b,sizeof(b),1,in,2,0.5f);
+    printf("pack %d %c%c%c%c %d %d %d small %d\n",n,b[0],b[1],b[2],b[3],b[4],b[5],b[6],AW_ForcedPack(b,18,1,in,2,0));
+    {int k=AW_ForcedUnpack(b,n,&player,out,4,&count,&fade);
+     printf("unpack %d %d %d %08x %08x %.2f\n",k,player,count,(unsigned)out[0],(unsigned)out[1],fade);}
+    {int cut=AW_ForcedUnpack(b,n-1,&player,out,4,&count,&fade),many=AW_ForcedUnpack(b,n,&player,out,1,&count,&fade),tag;
+     b[0]='X';tag=AW_ForcedUnpack(b,n,&player,out,4,&count,&fade);
+     printf("refused %d %d %d\n",cut,many,tag);}
+    n=AW_ForcedPack(b,sizeof(b),0,in,0,2.0f);
+    printf("badfade %d %d\n",n,AW_ForcedUnpack(b,n,&player,out,4,&count,&fade));
     return 0;
 }
 '''
@@ -1818,8 +2244,39 @@ class EffectTests(unittest.TestCase):
         # a creature has no skills: Fortify Skill on it changes nothing, nor undoes anything at its end
         self.assertEqual(out, ['now 40.0 20.0 0.0', 'after4 25.0 20.0 health 60.0', 'creature 0 10', 'creature after 0 0'])
 
-    def test_a_scripts_base_modifier(self):
+    def test_the_forced_sneak_and_fade_save_block(self):
+        tmp = Path(tempfile.mkdtemp(prefix='aw-forced-'))
+        try:
+            (tmp / 'h.c').write_text(FORCED_HARNESS, encoding='utf-8')
+            src = ROOT / 'engine/aga/src'
+            built = subprocess.run(['cc', '-std=gnu89', '-Wall', '-Werror', '-Wshadow', '-fsanitize=undefined,address',
+                                    '-fno-sanitize-recover=all', '-I' + str(src), str(tmp / 'h.c'),
+                                    str(src / 'aw_forced_rules.c'), '-o', str(tmp / 'h')], capture_output=True, text=True)
+            self.assertEqual(built.returncode, 0, built.stdout + built.stderr)
+            out = subprocess.run([str(tmp / 'h')], capture_output=True, text=True, check=True).stdout.splitlines()
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+        # 11 + 2 x 4 bytes, round trip; a cut block, too many references, a wrong tag and a fade past 1 refused
+        self.assertEqual(out, ['pack 19 AWFS 1 1 2 small -1', 'unpack 19 1 2 01020304 a0b0c0d0 0.50',
+                               'refused -1 -1 -1', 'badfade 11 -1'])
+
+    def test_summoning_effects_and_one_effect_ended(self):
         tmp = Path(tempfile.mkdtemp(prefix='aw-effects5-'))
+        try:
+            (tmp / 'h.c').write_text(EFFECT_SUMMON_HARNESS, encoding='utf-8')
+            src = ROOT / 'engine/aga/src'
+            built = subprocess.run(['cc', '-std=gnu89', '-Wall', '-Werror', '-Wshadow', '-fsanitize=undefined,address',
+                                    '-fno-sanitize-recover=all', '-I' + str(src), str(tmp / 'h.c'),
+                                    str(src / 'aw_effects.c'), '-o', str(tmp / 'h')], capture_output=True, text=True)
+            self.assertEqual(built.returncode, 0, built.stdout + built.stderr)
+            out = subprocess.run([str(tmp / 'h')], capture_output=True, text=True, check=True).stdout.splitlines()
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+        # 15 of the base game (102-116), the centurion sphere (134) and the expansions' 6 (137-142)
+        self.assertEqual(out, ['summons 22 1 1 1 0', 'ended 1 0 1 2', 'fortify 10 1 0'])
+
+    def test_a_scripts_base_modifier(self):
+        tmp = Path(tempfile.mkdtemp(prefix='aw-effects6-'))
         try:
             (tmp / 'h.c').write_text(EFFECT_BASE_HARNESS, encoding='utf-8')
             src = ROOT / 'engine/aga/src'

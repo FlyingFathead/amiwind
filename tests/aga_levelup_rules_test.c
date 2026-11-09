@@ -121,6 +121,31 @@ int main(void)
     assert(!strcmp(AW_LevelupClassImage(2,6,2),"sorcerer"));
     assert(!strcmp(AW_LevelupClassImage(5,5,0),"witchhunter"));
     assert(!strcmp(AW_LevelupClassImage(3,3,3),"bard"));
+    /* DBG-STATS-COMMANDS-62: the sheet before and after. setlvl 50 from level 1 with Endurance 50: health + 49 x 50 x
+     * .1 = 245, nothing else raised; down to 10 takes 40 x 5 = 200 off again; out of range refused; restore fills the
+     * three; maxstats: attributes and skills 100, level 83, health 100 + 82 x 10 = 920, magicka 100 x 1.5 (+10
+     * Intelligence modifier: 165), fatigue 400 (+5 Strength modifier: 405), all full */
+    {aw_character_t s,before;
+     memset(&s,0,sizeof(s));s.valid=1;s.level=1;for(i=0;i<8;i++)s.attributes[i]=50;
+     s.maximum[0]=50;s.current[0]=20;s.maximum[1]=100;s.current[1]=3;s.maximum[2]=200;s.current[2]=7;s.level_progress=4;s.raises[2]=3;
+     before=s;
+     assert(AW_LevelupSetLevel(&rules,&s,50)==50 && s.level==50 && s.level_progress==0 && !s.raises[2]);
+     assert(s.maximum[0]>294.9f && s.maximum[0]<295.1f && s.current[0]>264.9f && s.current[0]<265.1f);
+     assert(!memcmp(s.attributes,before.attributes,sizeof(s.attributes)) && s.current[1]==3 && s.current[2]==7);
+     assert(AW_LevelupSetLevel(&rules,&s,10)==10 && s.maximum[0]>94.9f && s.maximum[0]<95.1f && s.current[0]<=s.maximum[0]);
+     before=s;assert(!AW_LevelupSetLevel(&rules,&s,0) && !AW_LevelupSetLevel(&rules,&s,AW_LEVEL_MAX+1) && !memcmp(&s,&before,sizeof(s)));
+     assert(AW_LevelupSetLevel(&rules,&s,AW_LEVEL_MAX)==83);
+     s.current[0]=1;AW_LevelupRestore(&s);assert(s.current[0]==s.maximum[0] && s.current[1]==100 && s.current[2]==200);
+     s.current[2]=250;AW_LevelupRestore(&s);assert(s.current[2]==250);           /* above the maximum: kept */
+     s.modifiers[1]=10;s.modifiers[0]=5;s.damage[3]=20;s.skills[4]=12;s.progress[4]=.5f;
+     AW_LevelupMax(&rules,&s,1.5f);
+     for(i=0;i<8;i++)assert(s.attributes[i]==100 && !s.damage[i]);
+     for(i=0;i<27;i++)assert(s.skills[i]==100 && s.progress[i]==0);
+     assert(s.level==AW_LEVEL_MAX && s.maximum[0]>919.9f && s.maximum[0]<920.1f);
+     assert(s.maximum[1]>164.9f && s.maximum[1]<165.1f && s.maximum[2]==405);
+     for(i=0;i<3;i++)assert(s.current[i]==s.maximum[i]);
+     printf("dbg stats: setlvl 50 health 50 -> %.0f, maxstats health %.0f magicka %.0f fatigue %.0f\n",
+            before.maximum[0],s.maximum[0],s.maximum[1],s.maximum[2]);}
     puts("levelling rules ok: requirement, use, raises, level progress, multipliers, box, level-up, picture");
     return 0;
 }

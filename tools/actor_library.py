@@ -68,6 +68,9 @@ def plan(master, residents=(), town_refs=None):
     used = A.table_list_order(lists, refs, rooms['LEVC'], placed)
     lists = A.with_placed(lists, placed)
     want = {b.casefold() for _, b, t, *_ in refs if t == 'CREA'}
+    # v0.0.62 (MWSCRIPT-GAP-FUNCTIONS-62): every actor a script places, placed in the world or not
+    by_script = A.script_placed_actors(master)
+    want |= set(by_script['CREA'])
     for lid in used:
         want |= {e for e, _ in lists[lid][2] if e in creatures}
     planned = L.plan(master)
@@ -90,7 +93,8 @@ def plan(master, residents=(), town_refs=None):
                 scales.setdefault(b['mesh'], set()).add(round(float(scale), 4))
     residents = {r.casefold() for r in residents}
     npcs = sorted({b.casefold() for n, b, t, *_ in refs if t == 'NPC_' and
-                   (b.casefold() not in residents or (town_refs is not None and n not in town_refs))})
+                   (b.casefold() not in residents or (town_refs is not None and n not in town_refs))} |
+                  set(by_script['NPC_']))
     return meshes, bipedal, {m: sorted(v) for m, v in scales.items()}, npcs, planned, corpses
 
 

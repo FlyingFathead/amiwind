@@ -62,6 +62,34 @@ int main(void){
     assert(AW_ItemCount(&state)==400 && AW_StateGet(&state,AW_ITEM,"unknown_item")==1 && !AW_StateGet(&state,AW_ITEM,"item100"));
     assert(AW_ItemAdd(&state,"kind400",1) && AW_ItemCount(&state)==401 && AW_ItemIndex(&state,"kind400")==400);
     assert(AW_ItemAdd(&state,"never_held",0) && AW_ItemCount(&state)==401);   /* none of it: no row */
+    /* DBG-GIVE-MONEY-62: the gold limit 999,999,999 (aw_state.h AW_GOLD_MAX): a gain past it is kept up to it, never
+     * refused or wrapped; at the limit nothing more; spending works from it; any case of the id; a loaded save's row too;
+     * other items keep the 32-bit limit. The count column shows it in four characters (OpenMW getCountString). */
+    {
+        aw_state_t g;char text[16];
+        memset(&g,0,sizeof(g));
+        assert(AW_GOLD_MAX==999999999L);
+        assert(AW_ItemAdd(&g,"gold_001",1000000) && AW_StateGet(&g,AW_ITEM,"gold_001")==1000000);
+        assert(AW_ItemAdd(&g,"Gold_001",999000000) && AW_StateGet(&g,AW_ITEM,"gold_001")==AW_GOLD_MAX);   /* held */
+        assert(AW_ItemAdd(&g,"gold_001",65535) && AW_StateGet(&g,AW_ITEM,"gold_001")==AW_GOLD_MAX);      /* at it */
+        assert(AW_StateSet(&g,AW_ITEM,"GOLD_001",INT32_MAX) && AW_StateGet(&g,AW_ITEM,"gold_001")==AW_GOLD_MAX);
+        assert(AW_ItemAdd(&g,"gold_001",-1) && AW_StateGet(&g,AW_ITEM,"gold_001")==AW_GOLD_MAX-1);
+        assert(AW_ItemAdd(&g,"gold_001",AW_GOLD_MAX) && AW_StateGet(&g,AW_ITEM,"gold_001")==AW_GOLD_MAX); /* no wrap */
+        assert(AW_ItemAdd(&g,"gold_005",2000000000) && AW_StateGet(&g,AW_ITEM,"gold_005")==2000000000);  /* not gold_001 */
+        assert(AW_GoldCap("gold_001",INT32_MAX)==AW_GOLD_MAX && AW_GoldCap("gold_001",5)==5 && AW_GoldCap("arrow",INT32_MAX)==INT32_MAX);
+        AW_ItemsFree(&g);memset(&g,0,sizeof(g));
+        assert(AW_ItemAppend(&g,"gold_001",INT32_MAX) && AW_StateGet(&g,AW_ITEM,"gold_001")==AW_GOLD_MAX);   /* a save */
+        AW_ItemsFree(&g);
+        assert(AW_InventoryCountText(1,text,sizeof(text))==1 && !strcmp(text,"1"));
+        AW_InventoryCountText(9999,text,sizeof(text));assert(!strcmp(text,"9999"));
+        AW_InventoryCountText(10000,text,sizeof(text));assert(!strcmp(text,"10k"));
+        AW_InventoryCountText(999999,text,sizeof(text));assert(!strcmp(text,"999k"));
+        AW_InventoryCountText(1000000,text,sizeof(text));assert(!strcmp(text,"1m"));
+        AW_InventoryCountText(AW_GOLD_MAX,text,sizeof(text));assert(!strcmp(text,"999m"));
+        AW_InventoryCountText(2000000000L,text,sizeof(text));assert(!strcmp(text,"2b"));
+        assert(AW_InventoryCountText(5,text,5)==-1);
+        printf("gold limit %ld: held on add, set and load; count column 1m / 999m pass\n",(long)AW_GOLD_MAX);
+    }
     /* the running weight (ENCUMBRANCE-INCOMPLETE-61): no record weight in these fixtures, so the hook gives it */
     {
         aw_state_t w;int k;

@@ -129,6 +129,7 @@ void AW_HarvestSpawn(void)
         }
     }
 }
+static float aim_distance=-1;   /* FOCUS-NPC-OVERRIDES-ITEM-62: the last target()'s distance along the ray */
 static int target(void)
 {
     edict_t *p,*e=NULL;entity_t *proxy;model_t *m;trace_t tr,inside;int i,j,index,best=-1;
@@ -177,8 +178,10 @@ static int target(void)
         }
         nearest=lo;best=i;
     }
+    aim_distance=best>=0?nearest:-1;
     return best;
 }
+float AW_HarvestAimDistance(void){return target()>=0?aim_distance:-1;}
 const char *AW_HarvestHint(void){int i=target();return i<0?NULL:AW_HarvestText(&harvest,harvest.plant[i].label);}
 static int crosshair_owned(void){int i=sv.active?target():-1;return i>=0 && harvest.plant[i].owner;}
 int AW_HarvestUse(void)

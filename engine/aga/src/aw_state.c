@@ -106,10 +106,16 @@ int AW_ItemReserve(aw_state_t *s,int kinds)
     if(fresh>0 && !rows_room(t,t->count+fresh))return 0;
     return names_room(t,(uint32_t)kinds*64U);
 }
+/* DBG-GIVE-MONEY-62 (aw_state.h): VALUE for the folded id, gold held at AW_GOLD_MAX */
+int32_t AW_GoldCap(const char *folded_id,int32_t value)
+{
+    return folded_id && value>(int32_t)AW_GOLD_MAX && !strcmp(folded_id,AW_GOLD_ID)?(int32_t)AW_GOLD_MAX:value;
+}
 int AW_ItemAppend(aw_state_t *s,const char *id,int32_t value)
 {
     aw_items_t *t=&s->items;aw_item_row_t *r;uint32_t n;
     if(!id || !id[0] || (n=(uint32_t)strlen(id))>63 || !rows_room(t,t->count+1) || !names_room(t,n+1))return 0;
+    value=AW_GoldCap(id,value);
     r=&t->block[t->count/AW_ITEM_BLOCK][t->count%AW_ITEM_BLOCK];t->count++;
     memset(r,0,sizeof(*r));r->hash=item_hash(id);r->value=value;r->name=names_add(t,id);
     return 1;
@@ -177,6 +183,7 @@ static int item_set(aw_state_t *s,const char *name,int32_t value)
 {
     aw_items_t *t=&s->items;uint32_t hash=item_hash(name);int i=item_find(s,name,hash);aw_item_row_t *r;
     if(value<0)return 0;
+    value=AW_GoldCap(name,value);   /* DBG-GIVE-MONEY-62 */
     if(i<0){
         if(!value)return 1;                  /* none of an item not carried: nothing to keep */
         /* a row whose count fell to 0 first (its condition and charge went with the last one), then a new row */
@@ -281,6 +288,10 @@ int AW_JournalAdd(aw_state_t *state,const char *id,int32_t index)
     }
     return 1;
 }
+/* an item entered the player's inventory (aw_mwhost.c: its script's OnPCAdd, CENSUS-INTRO-SCRIPTS-62); NULL: none */
+void (*aw_item_added)(const char *id,int32_t count);
+/* the last of an item left the player's inventory (aw_mwhost.c: its carried script stops, MWSCRIPT-UNPLACED-ATTACH-62) */
+void (*aw_item_removed)(const char *id);
 int AW_ItemAdd(aw_state_t *state,const char *id,int32_t count)
 {
     char normalized[64];int32_t old;
@@ -290,6 +301,7 @@ int AW_ItemAdd(aw_state_t *state,const char *id,int32_t count)
     if(count>0 && old>INT32_MAX-count)return 0;
     if(count<0 && count < -old)return 0;
     if(!AW_StateSet(state,AW_ITEM,id,old+count))return 0;
+    if(count>0 && state==&aw_state && aw_item_added)aw_item_added(id,count);
     if(count<0){
         int i,index=AW_ItemIndex(state,id),used=0;
         for(i=0;i<AW_INVENTORY_SLOTS;i++)if(!strcmp(state->inventory.equipped[i],id)){
@@ -301,6 +313,7 @@ int AW_ItemAdd(aw_state_t *state,const char *id,int32_t count)
             /* A selected item that leaves the inventory is no longer selected. */
             if(!strcmp(state->magic.selected,id))memset(state->magic.selected,0,64);
         }
+        if(old+count==0 && state==&aw_state && aw_item_removed)aw_item_removed(id);
     }
     return 1;
 }

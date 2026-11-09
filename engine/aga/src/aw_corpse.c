@@ -23,7 +23,8 @@ static int player_level(void){
 static edict_t *corpse_target(unsigned *reference){
     edict_t *p,*e;eval_t *v;
     if(!sv.active || svs.maxclients!=1 || !svs.clients || !(p=svs.clients[0].edict))return NULL;
-    if(!(e=AW_NPCTarget(p,p->v.v_angle)) || AW_CombatSlotState(e,NULL)!=2)return NULL;
+    /* FOCUS-NPC-OVERRIDES-ITEM-62: an item lying by the body (Tarhiel's journal) is taken, not the body searched */
+    if(!(e=AW_ActivateActor(p,p->v.v_angle)) || AW_CombatSlotState(e,NULL)!=2)return NULL;
     if(!(v=GetEdictFieldValue(e,"aw_ref")) || v->_float<1 || v->_float>16777215.0f)return NULL;
     *reference=(unsigned)v->_float;
     return e;

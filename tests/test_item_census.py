@@ -121,6 +121,22 @@ class ItemCensusTests(unittest.TestCase):
             self.assertEqual(icons, {'ring_a'})
             self.assertEqual(drawn, {'ring_a'})
 
+    def test_the_census_counts_the_strip_pictures_when_the_image_has_them(self):
+        # ITEM-ICONS-MISSING-62: "icon built" is the big: picture the container strip shows (every item with an icon);
+        # an image from before it has only inv: pictures and is counted by those
+        with tempfile.TemporaryDirectory() as tmp:
+            id1 = Path(tmp)
+            (id1 / 'gfx').mkdir()
+            rows = [b'big:Robe_A', b'big:cap_b', b'inv:Robe_A', b'inv:only_inv', b'inv:Robe_A:equip']
+            (id1 / 'gfx' / 'icons.awl').write_bytes(b'AWL2' + struct.pack('<I', len(rows)) +
+                                                    b''.join(r.ljust(160, b'\0') for r in rows))
+            icons, _ = ic.read_image(id1)
+            self.assertEqual(icons, {'robe_a', 'cap_b'})
+            rows = [b'inv:Robe_A', b'inv:only_inv', b'inv:Robe_A:equip']
+            (id1 / 'gfx' / 'icons.awl').write_bytes(b'AWL2' + struct.pack('<I', len(rows)) +
+                                                    b''.join(r.ljust(160, b'\0') for r in rows))
+            self.assertEqual(ic.read_image(id1)[0], {'robe_a', 'only_inv'})
+
     def test_every_item_type_of_the_coverage_tool_is_catalogued(self):
         """A record type the coverage tool counts as an item but the inventory builder does not catalogue could
         be neither owned nor dropped."""

@@ -45,6 +45,22 @@ static int held_item(char id[64],char model[64],int *radius,int *flags,int *torc
     *radius=item.light_radius;*flags=item.light_flags;*torch_radius=torch;
     return 1;
 }
+/* dbg torch, dbg give dbgtorch, dbg give debugtorch (TORCH-HIDES-HELM-62): one more debug torch in the inventory, a
+ * light of our own record that never burns out, equipped in the carried-left slot like any light; a message says so.
+ * No resident command of its own: the dbg catalogue routes it to "aw_inventory give debugtorch" (aw_console.c). */
+void AW_DebugTorchGive(void)
+{
+    aw_inventory_item_t item;char line[96];
+    if(!sv.active || svs.maxclients!=1){Con_Printf("Start or load a game first.\n");return;}
+    if(!AW_InventoryRead(AW_DEBUG_TORCH_ID,&item) || !(item.flags&AW_INV_LIGHT)){
+        Con_Printf("Debug torch (test only) unavailable in this image's item catalogue.\n");return;
+    }
+    if(!AW_ItemAdd(&aw_state,AW_DEBUG_TORCH_ID,1)){Con_Printf("No room for the debug torch.\n");return;}
+    Q_snprintf(line,sizeof(line),"%s added to your inventory.",item.name);
+    Con_Printf("%s Now %ld carried (never burns out; equip it in the inventory).\n",line,
+               (long)AW_StateGet(&aw_state,AW_ITEM,AW_DEBUG_TORCH_ID));
+    AW_UISubtitle("",line,4);
+}
 void AW_DebugTorchInit(void)
 {
     Cvar_RegisterVariable(&aw_debug_torch);

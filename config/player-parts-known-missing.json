@@ -1,0 +1,7 @@
+{
+ "about": "Worn parts the player parts stage cannot build yet (tools/prepare_player_parts.py part_coverage). Every other drawn part without a model stops the build. Each row names its register entry and why.",
+ "parts": [
+  {"skeleton": "meshes/base_anim.nif", "body": "a_tenpaceboot", "register": "ROBE-PART-NOT-BAKED-62",
+   "reason": "The Ten Pace Boots' part mesh (a/A_TenPaceboot.NIF) has no geometry attached to the Right Foot or Left Foot node the record names; how the original draws it is to be measured."}
+ ]
+}

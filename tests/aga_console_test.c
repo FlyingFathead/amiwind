@@ -12,7 +12,7 @@ byte *host_basepal;
 byte *draw_chars;
 static int font_size=-1,catalogue_opens,catalogue_missing,catalogue_size_adjust;
 static const char *catalogue_path,*catalogue_override;
-static char printed[20000];
+static char printed[160000];
 /* The gallery marker check (aw_gallery.c) as seen by the listing code. */
 static int gallery_omitted,gallery_checks;
 int AW_GalleryOmitted(void){gallery_checks++;return gallery_omitted;}
@@ -57,8 +57,38 @@ void Cmd_AddCommand(char *name,void (*fn)(void)){
  if(!strcmp(name,"aw_console_font"))font_command=fn;
 }
 cvar_t *Cvar_FindVar(char *n){static cvar_t c;return !strcmp(n,"aw_fog") || !strcmp(n,"aw_skyline_fill")?&c:NULL;}
-static float cull_value=4;
-float Cvar_VariableValue(char *n){assert(!strcmp(n,"aw_cull"));return cull_value;}
+static float cull_value=4,switch_value;   /* switch_value: every other setting a bare switch reads (DBG-SUPERSPEED-62) */
+float Cvar_VariableValue(char *n){return !strcmp(n,"aw_cull")?cull_value:switch_value;}
+int AW_DebugPureToggle(const char *a);
+const char *AW_DebugToggleState(const char *words,const char *command);
+/* The console pager (DBG-HELP-PAGER-62): Enter until the listing has ended; returns the pages shown. */
+int (*aw_console_pager_key)(int key);   /* keys.c's hook, set by AW_ConsoleInit */
+#define PAGER_LINE "\n---------- [ more: ENTER | stop: q ] ----------\n\n"
+static int page_all(void){int pages=1;while(AW_ConsolePagerKey(K_ENTER))pages++;return pages;}
+static void pager_checks(void){
+ char *p;int lines=0,pages;
+ assert(aw_console_pager_key==AW_ConsolePagerKey);   /* keys.c Key_Console asks the pager first */
+ argc=2;args[0]="dbg";args[1]="help";printed[0]=0;debug_command();
+ /* the first page only: the console rows of one page, then the pager line, nothing after it */
+ p=strstr(printed,PAGER_LINE);assert(p && !p[strlen(PAGER_LINE)]);
+ for(p=printed;*p;p++)if(*p=='\n')lines++;
+ assert(lines<=AW_ConsolePageRows()+3 &&!strstr(printed,"Noclip: look+WASD"));
+ /* q stops: no more pages, Enter goes back to the input line */
+ printed[0]=0;assert(AW_ConsolePagerKey('q')==1 && strstr(printed,"(listing stopped)"));
+ assert(AW_ConsolePagerKey(K_ENTER)==0);
+ /* Enter pages to the end: the whole list, the pager line between pages, never after the last */
+ printed[0]=0;debug_command();pages=page_all();
+ assert(pages>2 && strstr(printed,"Noclip: look+WASD, E/Q vertical, Shift\n"));
+ {int n=0;for(p=printed;(p=strstr(p,PAGER_LINE));p++)n++;assert(n==pages-1);}
+ assert(strstr(printed," restartgame (ends the running game cleanly"));
+ /* another key ends the listing and is not taken */
+ printed[0]=0;debug_command();assert(AW_ConsolePagerKey('x')==0 && AW_ConsolePagerKey(K_ENTER)==0);
+ /* a short listing (dbg help WORD) shows whole, no pager line */
+ argc=3;args[2]="restartgame";printed[0]=0;debug_command();
+ assert(!strstr(printed,PAGER_LINE) && strstr(printed," dbg restartgame "));
+ assert(AW_ConsolePagerKey(K_ENTER)==0);
+ printf("pager ok\n");
+}
 /* Every catalogue entry, typed with no arguments, must reach exactly its
  * handler through the engine's translator: a broken or shadowed entry fails. */
 static void every_entry_translates(void){
@@ -77,12 +107,29 @@ static void every_entry_translates(void){
   snprintf(expect,sizeof expect,"%s%s\n",handler,
        !strcmp(bar1+1,"characterchange")?" appearance":!strcmp(bar1+1,"inventory grant")?" grant":
        !strcmp(bar1+1,"give weapons")?" give weapons":
+       (!strcmp(bar1+1,"give") || !strcmp(bar1+1,"additem"))?" give":
+       (!strcmp(bar1+1,"give money") || !strcmp(bar1+1,"give coin") || !strcmp(bar1+1,"give rich"))?" give money":
+       (!strcmp(bar1+1,"noburden") || !strcmp(bar1+1,"unburdened") || !strcmp(bar1+1,"noweight"))?" noburden":
+       (!strcmp(bar1+1,"setlvl") || !strcmp(bar1+1,"setlevel"))?" setlevel":
+       (!strcmp(bar1+1,"maxstats") || !strcmp(bar1+1,"maxstat"))?" max":
+       (!strcmp(bar1+1,"restorestats") || !strcmp(bar1+1,"restore stats") || !strcmp(bar1+1,"stats restore"))?" restore":
+       (!strcmp(bar1+1,"torch") || !strcmp(bar1+1,"give dbgtorch") || !strcmp(bar1+1,"give debugtorch"))?" give debugtorch":
        !strcmp(bar1+1,"door roulette")?" roulette":!strcmp(bar1+1,"doorlocks")?" locks":
        !strcmp(bar1+1,"creatures")?" actors creatures":!strcmp(bar1+1,"mwscript")?" about":
        !strcmp(bar1+1,"mwscript stats")?" stats":!strcmp(bar1+1,"mwscript result")?" result":
        !strcmp(bar1+1,"kill")?" actors killpick":
        !strcmp(bar1+1,"weapon")?" box weapon":!strcmp(bar1+1,"gear")?" box gear":
        (!strcmp(bar1+1,"set race") || !strcmp(bar1+1,"set playerrace"))?" playerrace":"");
+  /* DBG-SUPERSPEED-62: the camera and cast words keep their own word; a bare switch with a state gets the other
+   * value (every setting reads 0 here: "1" for a setting, "on" for a command); fog rule / cut groups flip a bit */
+  {char *sub=strchr(bar1+1,' ');const char *state;
+   if(sub && ((!strcmp(handler,"aw_camera") && !strncmp(bar1+1,"camera ",7)) ||
+              (!strcmp(handler,"aw_magicfx") && !strncmp(bar1+1,"cast ",5))))
+       snprintf(expect,sizeof expect,"%s%s\n",handler,sub);
+   if(AW_DebugPureToggle(bar3+1) && (state=AW_DebugToggleState(bar1+1,handler))!=NULL){
+       expect[strlen(expect)-1]=0;strcat(expect,!strcmp(state,handler)?" 1\n":" on\n");}
+   if(!strcmp(handler,"aw_cull") && (!strcmp(bar1+1,"fog rule") || !strcmp(bar1+1,"cut groups")))
+       snprintf(expect,sizeof expect,"aw_cull %d\n",(int)cull_value|(bar1[1]=='f'?AW_CULL_FOG_RULE:AW_CULL_GROUPS));}
   if(AW_DebugTranslate(argc,argv,output,sizeof(output))!=1 || strcmp(output,expect)){
    printf("catalogue entry does not reach its handler: dbg %s -> %s (got %s)\n",bar1+1,handler,output);assert(0);
   }
@@ -170,7 +217,27 @@ int main(int count,char **values){
     char *music[3]={"dbg","music","off"};
     assert(AW_DebugTranslate(3,music,output,sizeof(output))==1 && !strcmp(output,"aw_music_status off\n"));
     music[2]="1";assert(AW_DebugTranslate(3,music,output,sizeof(output))==1 && !strcmp(output,"aw_music_status 1\n"));
-    assert(AW_DebugTranslate(2,music,output,sizeof(output))==1 && !strcmp(output,"aw_music_status\n"));
+    /* DBG-SUPERSPEED-62: bare, the switch turns the other way: off (aw_music 0) gives on, on gives off; a setting
+     * route (dbg fog) the other value; the camera and cast words are kept; superspeed turns itself */
+    switch_value=0;assert(AW_DebugTranslate(2,music,output,sizeof(output))==1 && !strcmp(output,"aw_music_status on\n"));
+    switch_value=1;assert(AW_DebugTranslate(2,music,output,sizeof(output))==1 && !strcmp(output,"aw_music_status off\n"));
+    {char *fog[2]={"dbg","fog"},*parts[4]={"dbg","camera","parts","off"},*cast[3]={"dbg","cast","now"},
+          *speed[2]={"dbg","superspeed"},*rule[3]={"dbg","fog","rule"};
+     switch_value=2;assert(AW_DebugTranslate(2,fog,output,sizeof(output))==1 && !strcmp(output,"aw_fog 0\n"));
+     switch_value=0;assert(AW_DebugTranslate(2,fog,output,sizeof(output))==1 && !strcmp(output,"aw_fog 1\n"));
+     assert(AW_DebugTranslate(4,parts,output,sizeof(output))==1 && !strcmp(output,"aw_camera parts off\n"));
+     assert(AW_DebugTranslate(3,parts,output,sizeof(output))==1 && !strcmp(output,"aw_camera parts on\n"));
+     switch_value=1;assert(AW_DebugTranslate(3,parts,output,sizeof(output))==1 && !strcmp(output,"aw_camera parts off\n"));
+     assert(AW_DebugTranslate(3,cast,output,sizeof(output))==1 && !strcmp(output,"aw_magicfx now\n"));
+     assert(AW_DebugTranslate(2,speed,output,sizeof(output))==1 && !strcmp(output,"superspeed\n"));
+     cull_value=4;assert(AW_DebugTranslate(3,rule,output,sizeof(output))==1 && !strcmp(output,"aw_cull 12\n"));
+     cull_value=12;assert(AW_DebugTranslate(3,rule,output,sizeof(output))==1 && !strcmp(output,"aw_cull 4\n"));
+     cull_value=4;switch_value=0;}
+    /* the plain switch words only: another choice after them ("/ list", "/auto") is no switch */
+    assert(AW_DebugPureToggle("[on/off, true/false or 1/0; no argument toggles] x") && AW_DebugPureToggle("on/off (after creation)"));
+    assert(AW_DebugPureToggle("1/0 places in id1") && AW_DebugPureToggle("[0/1] once a second"));
+    assert(!AW_DebugPureToggle("[on/off / list / groups]") && !AW_DebugPureToggle("[on/off/auto] all") &&
+           !AW_DebugPureToggle("[0/1/2/3/4] once") && !AW_DebugPureToggle("[1 / 2; no argument shows]") && !AW_DebugPureToggle(""));
   }
   { /* Photo mode (dbg photomode / dbg killhud) and dbg crosshair(s): one handler each, words kept. */
     char *photo[3]={"dbg","photomode","off"},*kill[3]={"dbg","killhud","on"},*cross[3]={"dbg","crosshairs","on"};
@@ -432,6 +499,46 @@ int main(int count,char **values){
    assert(!AW_DebugTranslate(5,kit,output,sizeof(output)));
    kit[3]="all";assert(!AW_DebugTranslate(4,kit,output,sizeof(output)));
   }
+  { /* DBG-GIVE-MONEY-62: dbg give alone (the picker), give ID [N], give money|coin|rich [N], additem the same as give;
+     * the torch and weapon kit words keep their own routes */
+   char *give[]={"dbg","give","iron dagger","3","4"};char *money[]={"dbg","give","coin","5000","6"};
+   assert(AW_DebugTranslate(2,give,output,sizeof(output))==1 && !strcmp(output,"aw_inventory give\n"));
+   assert(AW_DebugTranslate(4,give,output,sizeof(output))==1 && !strcmp(output,"aw_inventory give \"iron dagger\" 3\n"));
+   assert(!AW_DebugTranslate(5,give,output,sizeof(output)));
+   give[2]="iron;quit";assert(!AW_DebugTranslate(3,give,output,sizeof(output)));
+   give[1]="additem";give[2]="gold_001";
+   assert(AW_DebugTranslate(4,give,output,sizeof(output))==1 && !strcmp(output,"aw_inventory give gold_001 3\n"));
+   assert(AW_DebugTranslate(3,money,output,sizeof(output))==1 && !strcmp(output,"aw_inventory give money\n"));
+   assert(AW_DebugTranslate(4,money,output,sizeof(output))==1 && !strcmp(output,"aw_inventory give money 5000\n"));
+   assert(!AW_DebugTranslate(5,money,output,sizeof(output)));
+   money[2]="rich";assert(AW_DebugTranslate(3,money,output,sizeof(output))==1 && !strcmp(output,"aw_inventory give money\n"));
+   money[2]="money";assert(AW_DebugTranslate(4,money,output,sizeof(output))==1 && !strcmp(output,"aw_inventory give money 5000\n"));
+   money[2]="debugtorch";assert(AW_DebugTranslate(3,money,output,sizeof(output))==1 && !strcmp(output,"aw_inventory give debugtorch\n"));
+   money[2]="weapons";assert(AW_DebugTranslate(3,money,output,sizeof(output))==1 && !strcmp(output,"aw_inventory give weapons\n"));
+  }
+  { /* DBG-STATS-COMMANDS-62: dbg setlvl [N] (one number at most), restorestats and maxstats (no words), levelup kept */
+   char *lvl[]={"dbg","setlvl","50","9"},*rs[]={"dbg","stats","restore","x"},*mx[]={"dbg","maxstat","x"},*lu[]={"dbg","levelup","check"};
+   assert(AW_DebugTranslate(2,lvl,output,sizeof(output))==1 && !strcmp(output,"aw_levelup setlevel\n"));
+   assert(AW_DebugTranslate(3,lvl,output,sizeof(output))==1 && !strcmp(output,"aw_levelup setlevel 50\n"));
+   assert(!AW_DebugTranslate(4,lvl,output,sizeof(output)));
+   lvl[1]="setlevel";assert(AW_DebugTranslate(3,lvl,output,sizeof(output))==1 && !strcmp(output,"aw_levelup setlevel 50\n"));
+   assert(AW_DebugTranslate(3,rs,output,sizeof(output))==1 && !strcmp(output,"aw_levelup restore\n"));
+   assert(!AW_DebugTranslate(4,rs,output,sizeof(output)));
+   rs[1]="restore";rs[2]="stats";assert(AW_DebugTranslate(3,rs,output,sizeof(output))==1 && !strcmp(output,"aw_levelup restore\n"));
+   rs[1]="restorestats";assert(AW_DebugTranslate(2,rs,output,sizeof(output))==1 && !strcmp(output,"aw_levelup restore\n"));
+   assert(AW_DebugTranslate(2,mx,output,sizeof(output))==1 && !strcmp(output,"aw_levelup max\n"));
+   assert(!AW_DebugTranslate(3,mx,output,sizeof(output)));
+   assert(AW_DebugTranslate(3,lu,output,sizeof(output))==1 && !strcmp(output,"aw_levelup check\n"));
+  }
+  { /* DBG-NOBURDEN-62: three names, one switch word at most, through the inventory command */
+   char *nb[]={"dbg","noweight","off","more"};
+   assert(AW_DebugTranslate(2,nb,output,sizeof(output))==1 && !strcmp(output,"aw_inventory noburden\n"));
+   assert(AW_DebugTranslate(3,nb,output,sizeof(output))==1 && !strcmp(output,"aw_inventory noburden off\n"));
+   assert(!AW_DebugTranslate(4,nb,output,sizeof(output)));
+   nb[1]="unburdened";nb[2]="on";
+   assert(AW_DebugTranslate(3,nb,output,sizeof(output))==1 && !strcmp(output,"aw_inventory noburden on\n"));
+   nb[1]="noburden";assert(AW_DebugTranslate(2,nb,output,sizeof(output))==1 && !strcmp(output,"aw_inventory noburden\n"));
+  }
   { /* dbg door roulette [SEED]: the teleport command's roulette, no resident command of its own; plain dbg door
      * stays the hinged door */
    char *roulette[]={"dbg","door","roulette","1234"},*door[]={"dbg","door","status"};
@@ -444,13 +551,13 @@ int main(int count,char **values){
  i=catalogue_opens;
  AW_ConsoleInit();assert(colour->value==255);assert(dbg_command==debug_command);
  assert(i==catalogue_opens); /* Registering/opening does not load a catalogue. */
- argc=2;args[0]="dbg";args[1]="help";printed[0]=0;debug_command();
+ argc=2;args[0]="dbg";args[1]="help";printed[0]=0;debug_command();page_all();
  /* Normal builds: the gallery commands are listed plainly. */
  assert(gallery_checks==1 && !strstr(printed,"(not in this build)"));
  assert(strstr(printed," npcgallery [number/name/ID]\n"));
  /* A --no-npc-gallery build marks every gallery route, and only those, in the
   * full list and in dbg help <word>; dispatch never checks the marker. */
- gallery_omitted=1;printed[0]=0;debug_command();
+ gallery_omitted=1;printed[0]=0;debug_command();page_all();
  assert(gallery_checks==2);
  assert(strstr(printed," npcgallery [number/name/ID] (not in this build)\n"));
  assert(strstr(printed," modelgallery [number/name/ID] (not in this build)\n"));
@@ -467,12 +574,13 @@ int main(int count,char **values){
  assert(gallery_checks==4 && strstr(printed," dbg lightgallery [off]") && !strstr(printed,"(not in this build)"));
  argc=2;args[1]="npcgallery";strcpy(queued,"untouched");debug_command();
  assert(gallery_checks==4 && !strcmp(queued,"aw_charplane\n"));
- gallery_omitted=0;argc=2;args[1]="help";printed[0]=0;debug_command();
+ gallery_omitted=0;argc=2;args[1]="help";printed[0]=0;debug_command();page_all();
  assert(strstr(printed,"AUDIO\n--------------------------------------\n"));
  assert(strstr(printed,"VIDEO\n--------------------------------------\n"));
  assert(strstr(printed,"PLAYTESTING\n--------------------------------------\n"));
  assert(strstr(printed,"shroompicker [1..10/list]"));
  assert(!strstr(printed,"NOT PART"));
+ pager_checks();
  {
   char *query[]={"dbg","sample"};char badline[500];
   catalogue_override="AWDC1\nTEST|sample|aw_pos|first\n";

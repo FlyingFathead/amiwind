@@ -348,15 +348,18 @@ def head_detail_supported():
 
 
 def _detail(detail):
-    """Keyword arguments selecting a head detail, when npc_geometry has the switch."""
-    return {'head_detail': detail} if detail and head_detail_supported() else {}
+    """Keyword arguments selecting a head detail, when npc_geometry has the switch. The levels follow their own
+    quotas face for face (level_tiles), so the seam locks stay off here (NPC-BODY-REGRESSION-62)."""
+    out = {'head_detail': detail} if detail and head_detail_supported() else {}
+    return dict(out, seams=False)
 
 
 def quotas_for(shapes, budget, face_limit=666, minimum_faces=None, detail='budget'):
     """npc_geometry.bake_quotas with a head detail (the budget split by default: the levels'
     own split; the original-head rule only where asked)."""
     from npc_geometry import bake_quotas
-    return bake_quotas(shapes, budget, face_limit, minimum_faces, **_detail(detail))
+    return bake_quotas(shapes, budget, face_limit, minimum_faces,
+                       **{k: v for k, v in _detail(detail).items() if k != 'seams'})
 
 
 def bake_far(shapes, materials, textures, palette, label='', detail=None):
@@ -406,7 +409,7 @@ def bake_near(shapes, materials, textures, palette, far_triangles):
                 break
             try:
                 frames, faces, uv, skin = bake(shapes, materials, textures, palette, budget=budget,
-                                               face_limit=NEAR_FACE_LIMIT, minimum_faces=protected)
+                                               face_limit=NEAR_FACE_LIMIT, minimum_faces=protected, seams=False)
             except ValueError as error:
                 if str(error) in ('Alias vertex budget exceeded', 'Too many separate shapes for budget'):
                     continue
@@ -548,7 +551,11 @@ def levels_check(raws):
 BAKE_MODULES = ('npc_geometry', 'npc_faces', 'prepare_scenery', 'nif_common', 'mesh_geometry_env', 'mwad.audit', 'mwad.esm',
                 'mwad.paths', 'mesh_geometry', 'npc_anim',
                 # the boundary-locked head reducer (npc_geometry.simplify_head_locked, NPC-HEAD-DECIMATION-33)
-                'mold_shell', 'static_lod')
+                'mold_shell', 'static_lod',
+                # the seam locks, the seam check and stop, the per-model face entries and head floors (MESH-SEAM-METHOD-62)
+                'npc_seams', 'npc_seam_audit', 'mesh_seam_check', 'model_face_overrides')
+# data files the bake reads: a changed entry changes the baked model (the seam baseline only judges, it is not here)
+BAKE_DATA = ('config/model-face-overrides.json', 'config/model-head-floors.json')
 BAKE_PACKAGES = ('numpy', 'scipy', 'Pillow', 'PyFFI', 'fast-simplification')
 
 
@@ -574,12 +581,22 @@ def code_identity():
     import npc_geometry
     import prepare_scenery
     import static_lod
+    import npc_seams
+    import npc_seam_audit
+    import mesh_seam_check
+    import model_face_overrides
     modules = {'npc_geometry': npc_geometry, 'npc_faces': npc_faces, 'prepare_scenery': prepare_scenery,
                'nif_common': nif_common, 'mesh_geometry_env': mesh_geometry_env, 'mwad.audit': mwad.audit,
                'mwad.esm': mwad.esm, 'mwad.paths': mwad.paths,
                'mesh_geometry': mesh_geometry, 'npc_anim': npc_anim,
-               'mold_shell': mold_shell, 'static_lod': static_lod}
+               'mold_shell': mold_shell, 'static_lod': static_lod, 'npc_seams': npc_seams,
+               'npc_seam_audit': npc_seam_audit, 'mesh_seam_check': mesh_seam_check,
+               'model_face_overrides': model_face_overrides}
     texts = [inspect.getsource(modules[name]) for name in BAKE_MODULES]
+    root = Path(__file__).resolve().parents[1]
+    for name in BAKE_DATA:
+        p = root / name
+        texts.append(name + '\n' + (p.read_text(encoding='utf-8') if p.is_file() else ''))
     texts.append(inspect.getsource(sys.modules[__name__]))
     versions = []
     for name in BAKE_PACKAGES:

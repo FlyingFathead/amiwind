@@ -131,6 +131,18 @@ static void rules(void){
         AW_CStripLayout(320,200,60,8,8,&o);assert(o.top==60);
         AW_CStripLayout(320,200,168,8,8,&o);assert(o.top<168 && o.top==200-(o.keys_y-o.top)-o.line_h-AW_CSTRIP_GAP-AW_CSTRIP_FRAME);
     }
+    /* CONTAINER-TAKE-CONFIRM-62: the take confirmation line (the original and OpenMW 0.51 show no text for a take; the
+     * AmiWind name-label style says it), by example; and the small buttons are 56 x 14 with a 54 x 12 text box inside */
+    {
+        char line[96];int n;
+        n=AW_CStripTakeLine(line,sizeof(line),"Iron Sparksword",1,0,NULL,0);assert(!strcmp(line,"Took Iron Sparksword") && n==(int)strlen(line));
+        AW_CStripTakeLine(line,sizeof(line),"Gold",8,0,NULL,0);assert(!strcmp(line,"Took Gold x 8"));
+        AW_CStripTakeLine(line,sizeof(line),"Scroll of Icarian Flight",3,1,NULL,0);assert(!strcmp(line,"Took Scroll of Icarian Flight x 3 (stolen)"));
+        AW_CStripTakeLine(line,sizeof(line),NULL,0,0,"Tarhiel",5);assert(!strcmp(line,"Took 5 items from Tarhiel"));
+        AW_CStripTakeLine(line,sizeof(line),NULL,0,1,"Tarhiel",1);assert(!strcmp(line,"Took 1 item from Tarhiel (stolen)"));
+        n=AW_CStripTakeLine(line,8,"A very long name",1,0,NULL,0);assert(n==7 && strlen(line)==7);   /* never past the buffer */
+        assert(AW_CSTRIP_BUTTON_W==56 && AW_CSTRIP_TITLE==14);
+    }
 }
 int main(void){
     const char *name,*why;char weight[48],value[48],prompt[48];int owned,steal;

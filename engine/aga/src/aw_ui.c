@@ -559,14 +559,64 @@ void AW_UIBox(int x,int y,int w,int h) {
     initialize();if(w<8 || h<8)return;
     AW_UIFill(x,y,w,h,black);AW_UIFrame(x,y,w,h);
 }
+/* THE HOUSE STYLE of every small button and box (UI-THIN-BUTTON-62, decided by the maintainer 7 November 2026): a black
+ * face inside a 1 pixel line (AW_UI_THIN_LINE) in the frame's muted gold; lit (hovered or selected) the line is the bright
+ * gold. The skin frame (AW_UIBox, 4 pixel edges) leaves a 14 pixel button only 6 pixels for its text; this leaves h - 2.
+ * AW_UIThinInner gives the text box inside the line, AW_UIButton draws the box with its text centred in all of it. */
+void AW_UIThinInner(int x,int y,int w,int h,int *ix,int *iy,int *iw,int *ih) {
+    if(ix)*ix=x+AW_UI_THIN_LINE;
+    if(iy)*iy=y+AW_UI_THIN_LINE;
+    if(iw)*iw=w-2*AW_UI_THIN_LINE;
+    if(ih)*ih=h-2*AW_UI_THIN_LINE;
+}
+void AW_UIThinBox(int x,int y,int w,int h,int lit) {
+    int line;
+    initialize();if(w<2*AW_UI_THIN_LINE+1 || h<2*AW_UI_THIN_LINE+1)return;
+    line=lit?AW_UIColor(223,199,144):AW_UIColor(120,109,87);
+    AW_UIFill(x,y,w,h,black);
+    AW_UIFill(x,y,w,AW_UI_THIN_LINE,line);AW_UIFill(x,y+h-AW_UI_THIN_LINE,w,AW_UI_THIN_LINE,line);
+    AW_UIFill(x,y,AW_UI_THIN_LINE,h,line);AW_UIFill(x+w-AW_UI_THIN_LINE,y,AW_UI_THIN_LINE,h,line);
+}
+void AW_UIButton(int x,int y,int w,int h,const char *text,int lit,int colour) {
+    int ix,iy,iw,ih;
+    AW_UIThinBox(x,y,w,h,lit);AW_UIThinInner(x,y,w,h,&ix,&iy,&iw,&ih);
+    AW_UITextBox(ix,iy,iw,ih,text,colour);
+}
 void AW_UIOuterFrame(void) {
     if(ui_frame.value && key_dest==key_game && cls.state==ca_connected)
         AW_UIFrame(0,0,vid.width,vid.height);
 }
 int AW_UIFrameEnabled(void){return ui_frame.value!=0;}
 void AW_UIFrameToggle(void){Cvar_SetValue(ui_frame.name,!ui_frame.value);scr_copyeverything=1;}
+/* SKILL-RAISE-NOT-SEEN-62: a held notice (the skill-raise line, AW_UIHeldNotice) is not replaced by the next line for
+ * its first seconds: in a fight the hit voice and armour lines came in the same frame and the raise was never seen.
+ * The one line that comes meanwhile waits here and shows when the hold ends (a newer one replaces it). */
+static double subtitle_hold_until;
+static char pending_text[sizeof(subtitle)],pending_speaker[sizeof(speaker)];
+static double pending_duration;
+static int pending_voice,pending_pickup,pending,subtitle_held;
+static void subtitle_set(const char *name,const char *text,double duration);
 void AW_UISubtitle(const char *name,const char *text,double duration) {
-    subtitle_voice=subtitle_pickup=0;subtitle_revision++;
+    if(realtime<subtitle_hold_until){
+        strncpy(pending_speaker,name,sizeof(pending_speaker)-1);pending_speaker[sizeof(pending_speaker)-1]=0;
+        strncpy(pending_text,text,sizeof(pending_text)-1);pending_text[sizeof(pending_text)-1]=0;
+        pending_duration=duration;pending_voice=pending_pickup=0;pending=1;return;
+    }
+    pending=0;subtitle_set(name,text,duration);
+}
+void AW_UIHeldNotice(const char *text,double duration,double hold) {
+    subtitle_hold_until=0;pending=0;
+    subtitle_set("",text,duration);subtitle_held=1;
+    subtitle_hold_until=realtime+(hold<duration?hold:duration);
+}
+/* the line that waited for a held notice, once the hold is over (AW_UIDraw) */
+static void pending_show(void) {
+    if(!pending || realtime<subtitle_hold_until)return;
+    pending=0;subtitle_set(pending_speaker,pending_text,pending_duration);
+    subtitle_voice=pending_voice;subtitle_pickup=pending_pickup;
+}
+static void subtitle_set(const char *name,const char *text,double duration) {
+    subtitle_voice=subtitle_pickup=subtitle_held=0;subtitle_revision++;
     strncpy(speaker,name,sizeof(speaker)-1);speaker[sizeof(speaker)-1]=0;
     strncpy(subtitle,text,sizeof(subtitle)-1);subtitle[sizeof(subtitle)-1]=0;
     if(duration<0)duration=0;
@@ -576,17 +626,19 @@ void AW_UISubtitle(const char *name,const char *text,double duration) {
 /* Photo mode asks whether its own notice (no speaker) is the current message. */
 int AW_UISubtitleIs(const char *text){return !speaker[0] && !strcmp(subtitle,text);}
 void AW_UIPickupNotice(const char *text,double duration) {
-    AW_UISubtitle("",text,duration);subtitle_pickup=1;
+    AW_UISubtitle("",text,duration);
+    if(pending)pending_pickup=1;else subtitle_pickup=1;
 }
 void AW_UIVoiceSubtitle(const char *name,const char *text,double duration) {
-    AW_UISubtitle(name,text,duration);subtitle_voice=1;
+    AW_UISubtitle(name,text,duration);
+    if(pending)pending_voice=1;else subtitle_voice=1;
 }
 void AW_UICenterMessage(const char *text) {
     char name[80];const char *p=strchr(text,'\n');int n;double duration=AW_SpeechRemaining();int voiced=duration>0;
     if(duration<=0)duration=8;
     if(p && (n=(int)(p-text))<80){memcpy(name,text,n);name[n]=0;AW_UISubtitle(name,p+1,duration);}
     else AW_UISubtitle("",text,duration);
-    subtitle_voice=voiced;
+    if(pending)pending_voice=voiced;else subtitle_voice=voiced;
 }
 /* color: 0 red (health), 1 blue (magicka), 2 green (fatigue), 3 yellow (the
  * enemy's health: the atlas's fourth bar, tools/prepare_ui.py). */
@@ -703,22 +755,45 @@ void AW_UIObjectName(const char *name,int style) {
 }
 /* The focus box (FOCUS-BOX-58): the original's framed box under the crosshair, the name on the first line and an
  * item's weight and value below it; the name in red when taking the item would be theft (owned 1). */
+/* INFO-BOX-TEXT-CUT-62: the box is sized from the measured width of its text in the font it is drawn with (the small
+ * font), plus the padding, and a line wider than the screen wraps (AW_UILine) instead of being cut. The caller has the
+ * small font selected. Rows: the name's wrapped rows first (the first one red when owned), then the two detail lines. */
+static int focus_layout(const char *name,const char *line2,const char *line3,int max_width,char rows[][AW_FOCUS_ROW_CHARS],
+                        int *name_rows,int *box_w) {
+    const char *rest,*lines[2];int n=0,i,w=0,lw,pad=5,k;
+    rest=name;
+    while(*rest && n<AW_FOCUS_ROWS-2){rest=AW_UILine(rest,max_width-2*pad,rows[n],AW_FOCUS_ROW_CHARS);n++;}
+    if(name_rows)*name_rows=n;
+    k=0;if(line2 && *line2)lines[k++]=line2;if(line3 && *line3)lines[k++]=line3;
+    for(i=0;i<k && n<AW_FOCUS_ROWS;i++){
+        rest=lines[i];AW_UILine(rest,max_width-2*pad,rows[n],AW_FOCUS_ROW_CHARS);n++;
+    }
+    for(i=0;i<n;i++){lw=AW_UIWidth(rows[i]);if(lw>w)w=lw;}
+    if(box_w)*box_w=w+2*pad;
+    return n;
+}
+int AW_UIFocusLayout(const char *name,const char *line2,const char *line3,int max_width,char rows[][AW_FOCUS_ROW_CHARS],int *box_w) {
+    int n;
+    if(!name || !*name)return 0;
+    initialize();AW_UISmallBegin();
+    n=focus_layout(name,line2,line3,max_width,rows,NULL,box_w);
+    AW_UISmallEnd();
+    return n;
+}
 void AW_UIFocusBox(const char *name,const char *line2,const char *line3,int owned) {
-    static int red=-1;const char *lines[3];int n=0,i,w=0,lw,h,x,y,bottom,pad=5;
+    static int red=-1;char rows[AW_FOCUS_ROWS][AW_FOCUS_ROW_CHARS];int n,nr,i,w,h,x,y,bottom,pad=5;
     if(!name || !*name)return;
     initialize();
     if(red<0)red=AW_UIColor(220,40,40);
-    lines[n++]=name;if(line2 && *line2)lines[n++]=line2;if(line3 && *line3)lines[n++]=line3;
     AW_UISmallBegin();
-    for(i=0;i<n;i++){lw=AW_UIWidth(lines[i]);if(lw>w)w=lw;}
-    w+=2*pad;if(w>(int)vid.width-8)w=vid.width-8;
+    n=focus_layout(name,line2,line3,(int)vid.width-8,rows,&nr,&w);
     h=n*line_height+2*pad;
     bottom=r_refdef.vrect.y+r_refdef.vrect.height;
     x=((int)vid.width-w)/2;y=r_refdef.vrect.y+r_refdef.vrect.height/2+10;
     if(y+h>bottom)y=bottom-h;
     if(y<0)y=0;
     AW_UIBox(x,y,w,h);
-    for(i=0;i<n;i++)AW_UITextBox(x,y+pad+i*line_height,w,line_height,lines[i],!i && owned?red:-1);
+    for(i=0;i<n;i++)AW_UITextBox(x,y+pad+i*line_height,w,line_height,rows[i],i<nr && owned?red:-1);
     AW_UISmallEnd();scr_copyeverything=1;
 }
 /* Cache painted extents for each font selection, including sparse bitmap masks.
@@ -777,21 +852,25 @@ void AW_UITextCentred(int x,int y,int w,int h,const char *text,int color) {
     AW_UIText(x+(w-(r-l))/2-l,y+(h-(b-t))/2-t,text,color);
 }
 /* Shared fixed-panel centering for instructional text and ordinary dialogue. */
-void AW_UICenteredLines(int x,int y,int w,int h,const char *text) {
-    const char *p=text;char lines[3][256];int n=0,i,l,t,r,b,top=32767,bottom=-32767,row;
+void AW_UICenteredLines(int x,int y,int w,int h,const char *text) {AW_UICenteredLinesUpTo(x,y,w,h,text,3);}
+/* The same with up to MOST lines (CRIME-RELEASE-LINE-CUT-62: a message box draws every line it has room for): the
+ * lines are wrapped twice, once to measure the block and once to draw it, so no line store is needed. */
+void AW_UICenteredLinesUpTo(int x,int y,int w,int h,const char *text,int most) {
+    const char *p;char line[256];int n=0,i,l,t,r,b,top=32767,bottom=-32767,row;
     initialize();
-    while(*p && n<3){
-        p=AW_UILine(p,w-16,lines[n],sizeof(lines[n]));
-        text_bounds(lines[n],&l,&t,&r,&b);
+    if(!text)return;
+    for(p=text;*p && n<most;n++){
+        p=AW_UILine(p,w-16,line,sizeof(line));
+        text_bounds(line,&l,&t,&r,&b);
         if(t+n*line_height<top)top=t+n*line_height;
         if(b+n*line_height>bottom)bottom=b+n*line_height;
-        n++;
     }
     if(!n)return;
     row=y+(h-(bottom-top))/2-top;
-    for(i=0;i<n;i++){
-        text_bounds(lines[i],&l,&t,&r,&b);
-        AW_UIText(x+(w-(r-l))/2-l,row+i*line_height,lines[i],-1);
+    for(p=text,i=0;i<n;i++){
+        p=AW_UILine(p,w-16,line,sizeof(line));
+        text_bounds(line,&l,&t,&r,&b);
+        AW_UIText(x+(w-(r-l))/2-l,row+i*line_height,line,-1);
     }
 }
 /* Sentence-aware paging without a regex engine or per-frame allocation.
@@ -854,6 +933,7 @@ void AW_UIDraw(void) {
     int l,t,r,b,top=32767,bottom=-32767,boxwidth=vid.width,boxx=0,wide=0;
     float target,step;double elapsed,duration;
     initialize();
+    pending_show();
     if(key_dest==key_console)return;
     /* Input prompts own the strip; an expired speaker must not linger above it. */
     if(AW_IntroPromptActive()){panel_position=0;return;}
@@ -864,6 +944,9 @@ void AW_UIDraw(void) {
     /* DIALOGUE-MSGBOX-BEHIND-60: over a window the view may be the full screen (the idle camera's full view under the
      * dialogue window): the notice box rises over the bottom of the screen the same way */
     if(aw_ui_over_window && h<72)h=72;
+    /* SKILL-RAISE-NOT-SEEN-62: a full view with no strip under it (the third-person and idle cameras) shows no
+     * line, except a held notice (the skill raise): it rises over the bottom of the view, as in photo mode */
+    if(h<24 && subtitle_held)h=72;
     if(h<24)return;
     legacy=AW_UIDialogueMethod()==1;centered=!legacy && dialogue_layout.value!=1;
     show_name=speaker[0] && (!subtitle_voice || AW_UIVoiceNames());

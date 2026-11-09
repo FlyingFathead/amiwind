@@ -150,11 +150,14 @@ def _bake_standing(task):
         times = npc_anim.idle_compatible_times(groups)
         step = groups[0]['step']
     shapes, materials, textures = assemble(assets, appearance, kit or skeleton, times)
+    from model_face_overrides import extra_faces, body_key
     for budget in (480, 384, 320, 256, 192):
         try:
             frames, faces, uv, skin = bake(shapes, materials, textures, palette, budget=budget,
                                            reference_frames=8 if kit else None,
-                                           full_frame_budget=npc_anim.ACTOR_BYTE_BUDGET if kit else None)
+                                           full_frame_budget=npc_anim.ACTOR_BYTE_BUDGET if kit else None,
+                                           extra_faces=extra_faces(appearance['id']), model=appearance['id'],
+                                           body_key=body_key(appearance))
             break
         except ValueError as error:
             if str(error) not in ('Alias vertex budget exceeded', BYTE_BUDGET_ERROR) or budget == 192:
@@ -185,6 +188,11 @@ def _bake_standing(task):
         nframes = len(frames)
     facts = {'bytes': len(raw), 'frames': nframes, 'triangles': int(len(faces)), 'vertices': int(frames.shape[1]),
              'skin': list(skin.size), 'step': float(step), 'sha256': hashlib.sha256(raw).hexdigest()}
+    # the bake's per-actor receipt (npc_geometry.body_audit, NPC-BODY-REGRESSION-62)
+    from npc_geometry import LAST_PLAN
+    facts['body'] = json.loads(json.dumps({'receipt': LAST_PLAN.get('receipt'),
+                                           'problems': [list(p) for p in LAST_PLAN.get('body_problems') or []]},
+                                          default=str))
     return raw, layout, sounds, facts
 
 
@@ -247,7 +255,18 @@ def build(data, palette, ids, out_id1, jobs=1, kinds=None):
     print('NPC library: %d NPC records, %d appearances, profile %s, %d jobs' % (
         len(apps), len(tasks), profile, jobs), flush=True)
     models = {}
+    seam = {'passing': 0, 'baselined': 0, 'entry': 0, 'new': 0, 'worse': 0}
+    stops = []
     for key, result, seconds, error in ordered_map(_unit, tasks, jobs=max(1, jobs)):
+        if result is None and error and error.startswith('BakeStop'):
+            # the seam stop is never an appearance left out: every one is listed, then the stage fails
+            stops.append('%s (%s): %s' % (key, groups[key][0], error))
+            seam['worse' if '(worse)' in error else 'new'] += 1
+            continue
+        if result is not None:
+            status = (((result[3].get('body') or {}).get('receipt') or {}).get('seam_status'))
+            if status in seam:
+                seam[status] += 1
         if result is None:
             left[key] = error
             print('NPC library: appearance %s (%s) left out: %s' % (key, groups[key][0], error), flush=True)
@@ -274,6 +293,12 @@ def build(data, palette, ids, out_id1, jobs=1, kinds=None):
         models[key] = dict(facts, model=path, seconds=round(seconds, 2))
         print('NPC library: %s -> %s (%d bytes, %d frames, %.1f s)' % (groups[key][0], path, facts['bytes'],
                                                                          facts['frames'], seconds), flush=True)
+    print('NPC library: seam check: %(passing)d passing, %(baselined)d baselined, %(entry)d by an override entry, '
+          '%(new)d new, %(worse)d worse' % seam, flush=True)
+    if stops:
+        from npc_geometry import BakeStop
+        raise BakeStop('NPC library: %d appearances stopped by the seam check (new or worse than '
+                       'config/mesh-seam-baseline.json):\n  %s' % (len(stops), '\n  '.join(stops)))
     npcs = {}
     for key, idents in groups.items():
         if key in models:

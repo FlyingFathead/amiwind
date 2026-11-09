@@ -106,6 +106,34 @@ class FocusTableTests(unittest.TestCase):
         self.assertEqual(rows[16][8], 'Somewhere')              # outside: the exterior cell's name
         self.assertEqual(rows[17][8], 'Ascadian Isles Region')  # an unnamed cell: its region's name
 
+    def test_a_long_door_name_continues_in_the_id_field(self):
+        # INFO-BOX-TEXT-CUT-62: "Suran, Ibarnadad Assimarari: Apothecary" and "Seyda Neen, Census and Excise Office"
+        # filled the 36-byte name field and were cut ("...Apoth", "...Offic"); a door's name goes on in its row's id field
+        import prepare_focus as focus
+        for name in ('Suran, Ibarnadad Assimarari: Apothecary', 'Seyda Neen, Census and Excise Office',
+                     'A' * 66, 'B' * 35, 'Vivec, Hall of Wisdom'):
+            packed = focus.pack_name_and_id('D', name, '')
+            self.assertEqual(len(packed), focus.NAME + focus.IDENT)
+            head = packed[:focus.NAME].split(b'\0', 1)[0]
+            tail = packed[focus.NAME:].split(b'\0', 1)[0]
+            self.assertEqual((head + tail).decode('cp1252'), name)         # the engine's join gives the whole name
+            self.assertLessEqual(len(head), focus.NAME - 1)
+            if len(name) <= focus.NAME - 1:
+                self.assertEqual(tail, b'')                                  # a short name leaves the id field empty
+        # more than the two fields hold is cut at 66 bytes, never past the row
+        self.assertEqual(len(focus.pack_name_and_id('D', 'C' * 90, '')), focus.NAME + focus.IDENT)
+        self.assertEqual((focus.pack_name_and_id('D', 'C' * 90, '')[:focus.NAME].rstrip(b'\0') +
+                          focus.pack_name_and_id('D', 'C' * 90, '')[focus.NAME:].rstrip(b'\0')), b'C' * 66)
+        # items, containers and actors keep the old fields: a long item name is cut at 35, its id stays in the id field
+        packed = focus.pack_name_and_id('I', 'I' * 50, 'misc_cup')
+        self.assertEqual(packed[:focus.NAME].rstrip(b'\0'), b'I' * 35)
+        self.assertEqual(packed[focus.NAME:].rstrip(b'\0'), b'misc_cup')
+        self.assertEqual(focus.pack_name_and_id('A', 'N' * 50, '')[focus.NAME:], b'\0' * focus.IDENT)
+        # the engine joins them, and an old file (no tail) reads as before
+        inventory = (ROOT/'engine/aga/src/aw_inventory.c').read_text(encoding='utf-8')
+        self.assertIn("row[0]=='D' && strlen(r->name)==FOCUS_NAME_FIELD-1 && row[FOCUS_ROW]", inventory)
+        self.assertIn('#define FOCUS_NAME_LONG (FOCUS_NAME_FIELD-1+FOCUS_ID-1)', inventory)
+
     def test_exterior_cells_are_keyed_by_grid(self):
         import prepare_focus as focus
         rooms = focus.placements(self.MASTER, focus.objects_of(self.MASTER), {'test office': 7})
@@ -354,7 +382,9 @@ class EngineTests(unittest.TestCase):
         self.assertIn('AW_PlacedFocus(', draw)                 # placed items and doors
         self.assertIn('AW_UIFocusBox(', draw)
         # FOCUS-BOX-NO-ACTORS-58: no box for a creature or a person (their name shows under the view)
-        self.assertEqual(draw.count('AW_UIFocusBox('), 1)
+        # INFO-BOX-TEXT-CUT-62: in the Morrowind name-label style the box is the only label, for every target: with the
+        # focus row's weight and value lines, or the title alone
+        self.assertEqual(draw.count('AW_UIFocusBox('), 2)
         self.assertIn('if(!driver && !npc_hint() &&', draw)
         self.assertNotIn('person->v.netname', draw)
         placed = body(self.inventory, 'int AW_PlacedFocus(')
@@ -362,6 +392,28 @@ class EngineTests(unittest.TestCase):
         box = body(self.ui, 'void AW_UIFocusBox(')
         self.assertIn('AW_UIBox(', box)                      # the shared framed box
         self.assertIn('owned?red', box.replace(' ', ''))     # theft colour on the name
+
+    def test_name_labels_switch_defaults_to_the_amiwind_style(self):
+        # INFO-BOX-TEXT-CUT-62: aw_name_labels 1 = AmiWind (title and action only below the view, no box over it,
+        # the default), 0 = Morrowind (the framed box too, sized from its measured text and wrapped, never cut)
+        self.assertIn('static cvar_t name_labels={"aw_name_labels","1",true};', self.scene)
+        self.assertIn('Cmd_AddCommand("aw_name_labels_set",name_labels_command)', self.scene)
+        draw = body(self.scene, 'void AW_SceneDraw(void)')
+        self.assertIn('ami=AW_SceneNameLabelsAmiWind()', draw)
+        self.assertIn('if(!ami){', draw)                  # Morrowind: the box only, then return before any title or action
+        self.assertIn('if(ami && (!AW_UISpeakerAtRight()', draw)   # AmiWind only: the aimed name below the view
+        keymaps = (ROOT/'config/keymaps.cfg').read_text(encoding='utf-8')
+        self.assertIn('\naw_name_labels 1\n', keymaps)               # Reset to defaults
+        commands = (ROOT/'config/debug-commands.txt').read_text(encoding='utf-8')
+        self.assertIn('ui namelabels|aw_name_labels_set|', commands)
+        listing = (ROOT/'docs/AMIWIND_CONSOLE_COMMANDS.md').read_text(encoding='utf-8')
+        self.assertIn('ui namelabels', listing)
+        menu = (ROOT/'engine/aga/src/aw_menu.c').read_text(encoding='utf-8')
+        self.assertIn('"Name labels: AmiWind":"Name labels: Morrowind"', menu)
+        # the box measures its rows in the small font and wraps at the screen width (AW_UILine): nothing is cut
+        box = body(self.ui, 'static int focus_layout(')
+        self.assertIn('AW_UILine(', box)
+        self.assertIn('AW_UIWidth(rows[i])', box)
 
     def test_weight_text_drops_trailing_zeros(self):
         self.assertTrue(re.search(r'static void weight_text\(', self.inventory))

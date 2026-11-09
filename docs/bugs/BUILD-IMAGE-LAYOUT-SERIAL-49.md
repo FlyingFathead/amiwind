@@ -30,6 +30,19 @@
 
 _Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 
+<!-- contents start -->
+## Contents
+
+- [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
+- [Status: 30 October 2026](#status-30-october-2026)
+- [Symptom](#symptom)
+- [Where](#where)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
+
 ## Status: 30 October 2026
 
 Open, persisting. The v0.0.57-dev2 full build's perf guard failed on the image step's layout write: two units on two
@@ -128,6 +141,7 @@ Family: Build reuse keys and output attribution (`build-cache-reuse`). A unit is
 - BUILD-STAGE-KEY-TEXT-DEFINES-59 (no report page): The CHIM world and CHIM rooms stages rebuild when tools/text_defines.py changes, although the world does not use the text macros
 - BUILD-STAGE-KEY-WHOLE-CLASS-48 (no report page): A one-method edit in tools/actor_grounding.py rekeyed the CHIM stages: a class was import-time code of its module, so every stage importing the module hashed every method
 - [BUILD-STAGE-READS-UNFINGERPRINTED-48](BUILD-STAGE-READS-UNFINGERPRINTED-48.md): Two stages read repository files their fingerprint leaves out, so their records are refused and they rerun on every reuse
+- BUILD-STAGE-WRITES-OTHERS-OUTPUT-63 (no report page): A failed image step wrote into a file another stage owns, so resuming rebuilt Vivec city (11 min), the actor library (40 min) and the Vivec rooms (28 min)
 - [BUILD-STAIR-KEY-BOOKKEEPING-36](BUILD-STAIR-KEY-BOOKKEEPING-36.md): Stair walk keys count the progress lines (stair_progress.py) and the record bookkeeping (stair_records.py): an edit to either rekeys every walk
 - [BUILD-STAIR-PASS-NOT-KEPT-41](BUILD-STAIR-PASS-NOT-KEPT-41.md): A frame's passed stair walk is not reused when the build it ran in failed, and the walker key changes with converter code
 - [BUILD-SURVEY-KEY-CONFIG-35](BUILD-SURVEY-KEY-CONFIG-35.md): World survey, world terrain, world UI and CHIM stage keys counted every file under config/: a path built from a loop name read as the whole folder

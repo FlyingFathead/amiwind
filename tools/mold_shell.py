@@ -411,7 +411,7 @@ def _plane_quadric(p0, p1, p2):
     return np.outer(plane, plane) * (length / 2)
 
 
-def quadric_simplify(vertices, faces, targets, max_turn=0.3, locked=None, anchored=False):
+def quadric_simplify(vertices, faces, targets, max_turn=0.3, locked=None, anchored=False, boundary_weight=0.0):
     """Garland-Heckbert edge collapse that keeps a closed 2-manifold closed:
     a collapse must pass the link condition (exactly two common neighbours),
     must not turn any surviving face by more than acos(max_turn) or collapse
@@ -427,7 +427,12 @@ def quadric_simplify(vertices, faces, targets, max_turn=0.3, locked=None, anchor
 
     anchored: the face-turn limit is measured against each face's ORIGINAL
     normal instead of its previous one, so many small turns cannot add up to
-    a flipped or edge-on face."""
+    a flipped or edge-on face.
+
+    boundary_weight (NPC-BODY-REGRESSION-62, the body reduction design 3.2): above 0, every rim edge (a, b) adds
+    the plane through it perpendicular to its face to Q[a] and Q[b] (weight x |b - a|^2), and a rim edge whose ends
+    are both unlocked may collapse (one face): a free rim may thin out but cannot pull inward. 0 (the default) is the
+    previous reducer, byte for byte."""
     import heapq
     locked = set(int(x) for x in (locked or ()))
     V = np.array(vertices, float)
@@ -443,6 +448,33 @@ def quadric_simplify(vertices, faces, targets, max_turn=0.3, locked=None, anchor
         k = _plane_quadric(V[f[0]], V[f[1]], V[f[2]])
         for x in f:
             Q[x] += k
+    if boundary_weight:
+        from collections import Counter
+        uses, owner = Counter(), {}
+        for i, f in enumerate(F):
+            for k3 in range(3):
+                e = (min(f[k3], f[(k3 + 1) % 3]), max(f[k3], f[(k3 + 1) % 3]))
+                uses[e] += 1
+                owner[e] = i
+        for e, n in uses.items():
+            if n != 1:
+                continue
+            a0, b0 = e
+            f = F[owner[e]]
+            fn = np.cross(V[f[1]] - V[f[0]], V[f[2]] - V[f[0]])
+            ln = np.linalg.norm(fn)
+            d = V[b0] - V[a0]
+            if ln < 1e-12 or np.linalg.norm(d) < 1e-12:
+                continue
+            nrm = np.cross(d, fn / ln)
+            nl = np.linalg.norm(nrm)
+            if nl < 1e-12:
+                continue
+            nrm /= nl
+            plane = np.append(nrm, -nrm @ V[a0])
+            k = np.outer(plane, plane) * boundary_weight * float(d @ d)
+            Q[a0] += k
+            Q[b0] += k
     version = [0] * len(V)
     dead = [False] * len(V)
     count = len(F)
@@ -509,10 +541,19 @@ def quadric_simplify(vertices, faces, targets, max_turn=0.3, locked=None, anchor
         if c == math.inf:
             continue
         shared = vf[a] & vf[b]
-        if len(shared) != 2 or count - 2 < 4:
-            continue
-        if len((neighbours(a) & neighbours(b)) - {a, b}) != 2:
-            continue
+        if boundary_weight:
+            # a free rim edge (one face) may collapse when neither end is locked
+            if len(shared) not in (1, 2) or count - len(shared) < 4:
+                continue
+            if len(shared) == 1 and (a in locked or b in locked):
+                continue
+            if len((neighbours(a) & neighbours(b)) - {a, b}) != len(shared):
+                continue
+        else:
+            if len(shared) != 2 or count - 2 < 4:
+                continue
+            if len((neighbours(a) & neighbours(b)) - {a, b}) != 2:
+                continue
         pos = np.array(pos)
         ok = True
         for i in (vf[a] | vf[b]) - shared:
@@ -544,7 +585,7 @@ def quadric_simplify(vertices, faces, targets, max_turn=0.3, locked=None, anchor
             locked.add(a)
         Q[a] += Q[b]
         version[a] += 1
-        count -= 2
+        count -= len(shared)
         for n in neighbours(a):
             push(a, n)
         while targets and count <= targets[0]:

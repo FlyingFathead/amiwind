@@ -103,12 +103,14 @@ class CombatSourceContractTests(unittest.TestCase):
         self.assertIn('if(AW_CompanionPickAim())return;', combat)
         self.assertIn('int AW_CompanionPickAim(void)', code('aw_companion.c'))
 
-    def test_blocking_hold_to_block_default_and_original_kept(self):
-        # COMBAT-BLOCKING-36: the right button (+aw_alt) is the block button; aw_combat_block 1 (hold to
-        # block, an AmiWind extension) is the default, 0 keeps the original automatic block; the original
-        # formula decides every blow (rules: AW_CombatCanBlock checks block_off, the player's readiness).
+    def test_blocking_automatic_default_and_hold_to_block_kept(self):
+        # COMBAT-BLOCKING-36 / COMBAT-BLOCK-DEFAULT-62: the right button (+aw_alt) is the block button;
+        # aw_combat_block 0 (the original automatic block) is the default, 1 (hold to block, an AmiWind
+        # extension) is an option; the original formula decides every blow (rules: AW_CombatCanBlock
+        # checks block_off, the player's readiness). The visible dodge on a miss (aw_combat_miss) stays on.
         combat = code('aw_combat.c')
-        self.assertIn('static cvar_t block_cvar={"aw_combat_block","1",true};', combat)
+        self.assertIn('static cvar_t block_cvar={"aw_combat_block","0",true};', combat)
+        self.assertIn('static cvar_t miss_cvar={"aw_combat_miss","1",true};', combat)
         self.assertIn('you.block_off=(unsigned char)(block_cvar.value && !AW_CombatGuarding());', combat)
         self.assertIn('svs.clients[0].cmd.forwardmove<=0', combat)   # fBlockStillBonus: not moving forward
         self.assertIn('aw_combat_buttons=guard_buttons', combat)
@@ -495,6 +497,31 @@ class CombatBuilderTests(unittest.TestCase):
         self.assertEqual(groups['run'][0][0], 10)
         config = json.loads((ROOT / 'config' / 'arena_fighters.json').read_text(encoding='utf-8'))
         self.assertEqual(config['fighters'][0]['id'], 'mevil molor')   # the default opponent
+
+
+class HitOnMeWiring(unittest.TestCase):
+    """MWSCRIPT-INVENTORY-HITONME-62: a landed weapon blow keeps the weapon per victim (OpenMW Creature/Npc::onHit,
+    setLastHitObject), at both landing points beside the strike enchantment, and HitOnMe reads and clears it."""
+
+    def test_both_landing_points_call_the_hook_and_the_host_reads_it(self):
+        combat = code('aw_combat.c')
+        self.assertIn('aw_combat_weapon_hit(p,t);', combat)
+        self.assertIn('aw_combat_weapon_hit(s->e,p);', combat)
+        self.assertLess(combat.index('aw_combat_strike_enchant(p,t);'), combat.index('aw_combat_weapon_hit(p,t);'))
+        host = code('aw_mwhost.c')
+        self.assertIn('aw_combat_weapon_hit=weapon_hit;', host)
+        self.assertIn('if(function==AWF_HITONME)', host)
+        self.assertIn('AW_CombatLastHitTake(ref,id_hash(weapon))', host)
+        imports = host[host.index('static void actors_import('):]
+        self.assertIn('AW_CombatLastHitReset();', imports[:imports.index('\n}\n')])   # New Game and a save load
+
+    def test_hitonme_compiles_to_a_host_read_asked_every_frame(self):
+        from mwscript.functions import FUNCTION_NUMBERS, HOST
+        self.assertIn('hitonme', HOST)
+        header = (SRC / 'aw_mwcode.h').read_text(encoding='utf-8')
+        self.assertIn('#define AWF_HITONME %d' % FUNCTION_NUMBERS['hitonme'], header)
+        codegen = (ROOT / 'tools' / 'mwscript' / 'codegen.py').read_text(encoding='utf-8')
+        self.assertIn("'hassoulgem', 'hitonme') or", codegen)
 
 
 if __name__ == '__main__':

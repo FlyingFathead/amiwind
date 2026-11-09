@@ -77,6 +77,37 @@ typedef struct {
     int region;                /* the last region with a name, -1 none yet */
 } aw_weather_state_t;
 
+/* The scripts' weather (MWSCRIPT-COMPLETE-LANDMARK): rules from OpenMW 0.51 apps/openmw/mwscript/skyextensions.cpp
+ * OpChangeWeather / OpModRegion and apps/openmw/mwworld/weather.cpp WeatherManager::changeWeather / modRegion,
+ * RegionWeather::setWeather / setChances (read, not copied). ChangeWeather sets a region's weather until the region's
+ * next weather change (here: the end of its period); ModRegion replaces the region's first chances for the rest of the
+ * game, and a weather the new chances still allow stays until that change, else the new chances choose. The player in
+ * that region moves to it as to any new weather (a transition, queued behind a running one). One row per changed
+ * region, AW_WEATHER_SCRIPT_ROWS at most (the game's scripts change one region of Vvardenfell, Red Mountain, at the end
+ * of the main quest); saved in the scripts' block (AWWR) and emptied by New Game and every save load. */
+#define AW_WEATHER_SCRIPT_ROWS 8
+typedef struct {
+    int count;
+    struct {short region;signed char weather;unsigned char has_chances;int period;unsigned char chances[AW_WEATHERS];}
+        row[AW_WEATHER_SCRIPT_ROWS];
+} aw_weather_script_t;
+void AW_WeatherScriptReset(aw_weather_script_t *s);
+int AW_WeatherScriptChange(aw_weather_script_t *s,const aw_weather_table_t *t,int region,int weather,int period);
+int AW_WeatherScriptModRegion(aw_weather_script_t *s,const aw_weather_table_t *t,int region,const int *chances,int n,
+                              int period);
+/* the region's weather of the moment with the scripts' changes (AW_WeatherOfRegion without them) */
+int AW_WeatherScripted(const aw_weather_script_t *s,const aw_weather_table_t *t,int region,int days,int milliseconds);
+/* the region's chances in effect (the scripts' when changed), NULL for a region the table has not */
+const unsigned char *AW_WeatherChancesOf(const aw_weather_script_t *s,const aw_weather_table_t *t,int region);
+int AW_WeatherScriptExport(const aw_weather_script_t *s,unsigned char *out,int capacity);
+int AW_WeatherScriptImport(aw_weather_script_t *s,const unsigned char *p,int bytes);
+/* Runtime (aw_weather.c): the calls of ChangeWeather and ModRegion (1 kept), the save block and its reset */
+int AW_WeatherChangeByScript(int region,int weather);
+int AW_WeatherModRegionByScript(int region,const int *chances,int n);
+int AW_WeatherScriptSave(unsigned char *out,int capacity);
+int AW_WeatherScriptLoad(const unsigned char *p,int bytes);
+void AW_WeatherScriptClear(void);
+
 /* Pure rules (aw_weather_rules.c, host-tested). */
 void AW_WeatherForce(aw_weather_state_t *s,int weather);
 void AW_WeatherAddTransition(aw_weather_state_t *s,int weather);

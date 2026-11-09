@@ -1,6 +1,6 @@
 # AmiWind Toolkit
 
-_Last updated with AmiWind v0.0.58 (1 November 2026)._
+_Last updated with AmiWind v0.0.62-dev1 (7 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -24,6 +24,7 @@ _Last updated with AmiWind v0.0.58 (1 November 2026)._
   - [Track your own build](#track-your-own-build)
 - [Monitor](#monitor)
 - [Mesh Compare](#mesh-compare)
+- [Seam Check](#seam-check)
 - [Using it for development](#using-it-for-development)
 - [Other parts](#other-parts)
 
@@ -730,6 +731,16 @@ endpoints refusing anything outside `DIR` and the page on a synthetic cube.
 
 Later (not yet in the page): a deviation heat map between A and B, saved camera presets, an overlay of both meshes in
 one view and a statistics table.
+
+## Seam Check
+
+`amiwind-toolkit/seam-check.html` shows one reduced actor model's seam receipt: whether it passes, its uncovered
+(and, for a character, covered) new openings with their positions, each part's thickness at 25 %, 50 % and 75 % of
+its length with every value under 0.5 in red, and the join map (every seam of the original, which parts meet, the
+seam's length, how much of it stayed open and the widest opening), open seams first. Open a receipt with the
+button: the `--json` file of `tools/mesh_seam_check.py check`, or the receipt the builder writes for a baked
+character. Served by `tools/toolkit_serve.py`, `seam-check.html?receipt=<path>` opens one directly. The method and
+the pass rule: [MODEL_REDUCTION.md](MODEL_REDUCTION.md).
 
 ## Using it for development
 

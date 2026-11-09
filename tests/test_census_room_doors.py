@@ -133,7 +133,9 @@ class CensusOfficeDoors(unittest.TestCase):
         self.assertIn('#define AW_REF_CENSUS_HALL_DOOR %d' % HALL, ACTIVATED.read_text(encoding='ascii'))
         opening = (ROOT / 'engine/aga/src/aw_opening.c').read_text(encoding='utf-8')
         self.assertIn('int AW_OpeningHingedStory(unsigned ref,int event)', opening)
-        self.assertIn('case AW_HINGE_STORY_LOCK:return aw_story.hall?0:1;', opening)
+        # the story holds the lock on the old path only; on the census office's own scripts (the default) the door's
+        # own lock and the guard script's Unlock decide (CENSUS-INTRO-SCRIPTS-62, aga_opening_test.c counts both)
+        self.assertIn('case AW_HINGE_STORY_LOCK:return AW_CensusLegacy()?(aw_story.hall?0:1):-1;', opening)
         hinged = (ROOT / 'engine/aga/src/aw_hinged_door.c').read_text(encoding='utf-8')
         self.assertIn('static int door_row(unsigned reference){return AW_HingedDoorRow(reference);}', hinged)
         debug = (ROOT / 'engine/aga/src/aw_debug.c').read_text(encoding='utf-8')

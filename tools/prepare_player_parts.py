@@ -27,6 +27,7 @@ same inputs takes it byte for byte. A part's triangles are capped by its slot (S
 starting clothes stays near the baked body's cost.
 """
 import hashlib
+import json
 import struct
 import sys
 import time
@@ -235,6 +236,49 @@ def recipe_text(races, items, models, anms, tables, bones):
     return '\n'.join(lines) + '\n'
 
 
+# ---------------------------------------------------------------- coverage of the worn parts (ROBE-PART-NOT-BAKED-62)
+
+KNOWN_MISSING = 'config/player-parts-known-missing.json'
+BEAST_NO_FEET = (15, 16, 17, 18)   # mwad.npc PART_NAMES: right foot, left foot, right ankle, left ankle
+
+
+def part_coverage(items, models, skeletons):
+    """Every clothing and armour record's drawn parts (every ID variant; robes, skirts and every piece that covers
+    several slots included), per skeleton: how many the records name, how many have a model, and each one without.
+    A part '-' (covered) draws nothing and is not counted."""
+    out = {'items': len(items), 'multi_part_items': 0, 'robes': 0, 'skeletons': {}, 'missing': []}
+    for item in items:
+        named = [(slot, body) for slot, pair in item['slots'].items() for body in {b for b in pair if b}]
+        out['multi_part_items'] += len(item['slots']) > 1
+        out['robes'] += item.get('rank') == 24
+        for skeleton in sorted(skeletons):
+            row = out['skeletons'].setdefault(SKELETONS[skeleton], {'parts': 0, 'built': 0, 'missing': 0})
+            for slot, body in named:
+                # beast races wear no shoes or boots (OpenMW 0.51 mwclass/clothing.cpp and armor.cpp canBeEquipped):
+                # their feet and ankles are never drawn from an item
+                if skeleton == 'meshes/base_animkna.nif' and slot in BEAST_NO_FEET:
+                    continue
+                row['parts'] += 1
+                if (skeleton, slot, body) in models:
+                    row['built'] += 1
+                else:
+                    row['missing'] += 1
+                    out['missing'].append({'item': item['id'], 'skeleton': skeleton, 'slot': slot, 'body': body})
+    return out
+
+
+def known_missing():
+    """(skeleton, body) pairs a register entry names as not yet buildable (config/player-parts-known-missing.json)."""
+    path = Path(__file__).resolve().parents[1] / KNOWN_MISSING
+    if not path.is_file():
+        return set()
+    rows = json.loads(path.read_text(encoding='utf-8'))['parts']
+    for row in rows:
+        if not row.get('register') or not row.get('reason'):
+            raise ValueError('%s: every row needs register and reason' % KNOWN_MISSING)
+    return {(row['skeleton'], row['body']) for row in rows}
+
+
 # ---------------------------------------------------------------- one part (a pool unit)
 
 _rigs = {}
@@ -248,6 +292,32 @@ def _skeleton_of(assets):
             _rigs[name] = Skeleton(assets, name)
         return _rigs[name]
     return of
+
+
+def open_edges(faces):
+    """Edges used by one triangle only (an open edge), of one shape's faces (vertex indices)."""
+    from collections import Counter
+    count = Counter()
+    for a, b, c in faces:
+        for e in ((a, b), (b, c), (c, a)):
+            count[(e[0], e[1]) if e[0] < e[1] else (e[1], e[0])] += 1
+    return sum(1 for v in count.values() if v == 1)
+
+
+def open_edges_grew(shapes, cap):
+    """1 when reducing SHAPES at CAP's quotas without whole panels gives any shape more open edges than its source."""
+    import numpy as np
+    from npc_geometry import simplify_shape
+    for shape, quota in zip(shapes, quotas_for(shapes, cap)):
+        p = np.asarray(shape['positions'][0])
+        points, ix = np.unique(np.round(p, 5), axis=0, return_inverse=True)
+        ff = ix[np.asarray(shape['faces'])]
+        if len(ff) <= quota:
+            continue
+        _, reduced = simplify_shape(points, ff.astype(np.int32), int(quota), False)
+        if open_edges(np.asarray(reduced).tolist()) > open_edges(ff.tolist()):
+            return True
+    return False
 
 
 def quotas_for(shapes, cap):
@@ -278,14 +348,49 @@ def bake_part(task):
     if not shapes:
         raise ValueError('Part %s (%s) has no drawn shape' % (part['id'], part['mesh']))
     sources = sa.export_actor(assets, appearance, rig)
-    raw, facts = sa.skeletal_from_shapes(shapes, materials, textures, palette, sources, rig.pose(float(times[0])),
-                                         [.25, .25, .25], table, report['bone_names'], table_path=path,
-                                         budgets=(cap,), quotas=quotas_for(shapes, cap), head_detail='budget',
-                                         body_skin_rows=480, parents=getattr(rig, 'parents', None))
+    from npc_geometry import AliasOverflow
+    # ROBE-PART-NOT-BAKED-62: a part whose mesh splits into more vertices than the alias format holds at its slot's
+    # triangle cap (the Tarhiel robe's chest, c_m_robe_extrav_1t) failed outright and the body drew nothing for it;
+    # it is baked again at a smaller cap (three quarters, then half, then a third), the first that fits kept and
+    # reported, never dropped while some cap fits (down to an eighth)
+    tried = []
+    for use in sorted({cap, max(1, cap * 3 // 4), max(1, cap // 2), max(1, cap // 3), max(1, cap // 4),
+                       max(1, cap // 6), max(1, cap // 8)}, reverse=True):
+        try:
+            raw, facts = sa.skeletal_from_shapes(shapes, materials, textures, palette, sources,
+                                                 rig.pose(float(times[0])), [.25, .25, .25], table,
+                                                 report['bone_names'], table_path=path, budgets=(use,),
+                                                 quotas=quotas_for(shapes, use), head_detail='budget',
+                                                 body_skin_rows=480, parents=getattr(rig, 'parents', None))
+            break
+        except AliasOverflow:
+            tried.append(use)
+    else:
+        # ROBE-PART-NOT-BAKED-62, measured first: a tall robe panel kept whole as a shell (512 faces of the Tarhiel
+        # robe's chest on the beast skeleton) holds the part over the 666-face alias limit at every cap. Last try: the
+        # same cap ladder's smallest cap with no panel kept whole; taken only when no shape gets an open edge it did
+        # not have (open_edges_grew: the closed-edge rule, counted per shape)
+        for use in tried:   # the largest cap that fits without whole panels
+            if open_edges_grew(shapes, use):
+                continue
+            try:
+                raw, facts = sa.skeletal_from_shapes(shapes, materials, textures, palette, sources,
+                                                     rig.pose(float(times[0])), [.25, .25, .25], table,
+                                                     report['bone_names'], table_path=path, budgets=(use,),
+                                                     quotas=quotas_for(shapes, use), head_detail='budget',
+                                                     body_skin_rows=480, parents=getattr(rig, 'parents', None),
+                                                     preserve=[False] * len(shapes))
+                use = -use      # reported as negative: no panel kept whole
+                break
+            except AliasOverflow:
+                continue
+        else:
+            raise ValueError('Part %s (%s) does not fit the alias vertex budget at caps %s, with or without whole '
+                             'panels (without them only where no open edge is added)' % (part['id'], part['mesh'], tried))
     out = part_path(skeleton, part)
     return out, raw, {'id': part['id'], 'slot': part['slot'], 'mesh': part['mesh'], 'skeleton': skeleton,
                       'model': out, 'bytes': len(raw), 'faces': facts['faces'], 'vertices': facts['vertices'],
-                      'sha256': hashlib.sha256(raw).hexdigest()}
+                      'sha256': hashlib.sha256(raw).hexdigest(), 'cap': cap, 'cap_used': use}
 
 
 def player_layout(data, skeleton, female):
@@ -421,6 +526,14 @@ def prepare(data, id1, palette, jobs=None, log=print):
             names = [n.casefold() for n in bone_names]
             bones[s] = (names.index('weapon bone') if 'weapon bone' in names else -1,
                         names.index('shield bone') if 'shield bone' in names else -1)
+    coverage = part_coverage(items, models, {r['skeleton'] for r in races})
+    log('player parts coverage (multi-part items: robes, skirts, cuirasses, greaves, paired pieces): %s' %
+        json.dumps({k: v for k, v in coverage.items() if k != 'missing'}), flush=True)
+    known = known_missing()
+    unexplained = [m for m in coverage['missing'] if (m['skeleton'], m['body']) not in known]
+    if unexplained:
+        raise ValueError('ROBE-PART-NOT-BAKED-62: %d drawn parts have no model (first: %s); fix the part or list it '
+                         'with its register ID in %s' % (len(unexplained), unexplained[:5], KNOWN_MISSING))
     log('=== PHASE 3/3: player parts: the recipe table ===', flush=True)
     text = recipe_text(races, items, models, anms, tables, bones)
     (Path(id1) / RECIPE_PATH).parent.mkdir(parents=True, exist_ok=True)
@@ -430,7 +543,7 @@ def prepare(data, id1, palette, jobs=None, log=print):
     report = {'models': len(results), 'reused': reused, 'made': len(results) - reused, 'failed': failed,
               'bytes': sum(sizes), 'faces_median': sorted(faces)[len(faces) // 2] if faces else 0,
               'recipe_sha256': hashlib.sha256(text.encode('ascii')).hexdigest(), 'items': len(items),
-              'races': len(races), 'seconds': round(time.monotonic() - started, 1)}
+              'races': len(races), 'seconds': round(time.monotonic() - started, 1), 'coverage': coverage}
     log('Player parts: %d models (%d reused, %d made, %d failed), %.1f MB, %d items, %.1f s' % (
         report['models'], reused, report['made'], len(failed), report['bytes'] / 1e6, len(items), report['seconds']),
         flush=True)

@@ -60,6 +60,52 @@ int main(void) {
     assert(!strcmp(m.button[11],"12"));
     AW_MsgBoxOpen(&m,"None",yes_no,0);                                    /* no buttons: not a box here */
     assert(!strcmp(m.text,"Second"));
+    /* CRIME-RELEASE-LINE-CUT-62: the box shows every line while it fits. The 15-day jail of session s9: the release
+     * line and 12 changed skills = 13 lines, one OK row, 10-pixel lines: 8+130+8+24 = 170 of a 200 screen: all 13
+     * (the drawing stopped after 3 before). Too many for the screen: as many as fit, (200-8-16-24)/10 = 15. */
+    assert(AW_MsgBoxLinesShown(13,1,200,10)==13);
+    assert(AW_MsgBoxLinesShown(3,1,200,10)==3);
+    assert(AW_MsgBoxLinesShown(40,1,200,10)==15);
+    assert(AW_MsgBoxLinesShown(40,0,480,8)==AW_MSGBOX_LINES);             /* the drawing's own limit */
+    assert(AW_MsgBoxLinesShown(0,1,200,10)==1 && AW_MsgBoxLinesShown(5,8,200,10)==1);   /* never below one line */
+    /* the text holds a long release whole: 13 lines of up to 60 characters */
+    {
+        char text[13*61+1];int i;
+        for(i=0;i<13;i++){memset(text+i*61,'x',60);text[i*61+60]='\n';}
+        text[13*61]=0;
+        AW_MsgBoxOpen(&m,text,yes_no,1);
+        assert(strlen(m.text)==13*61);
+    }
+    /* MSGBOX-NO-CURSOR-62: the pointer's hit test, per box kind, on the 320 x 200 screen; the centre of every
+     * button picks that button, a point beside the buttons or in the text picks none */
+    {
+        int f[4],r[4],i,k,counts[4]={1,2,3,5};
+        /* a script's box (1, 2, 3 buttons in a row; 5 in two rows) and the failed-load box (OK / Load Game) */
+        for(k=0;k<4;k++){
+            AW_MsgBoxLayout(counts[k],320,200,24,f);
+            assert(f[2]==300 && f[0]==10 && f[1]+f[3]<=200);
+            for(i=0;i<counts[k];i++){
+                AW_MsgBoxButtonRect(counts[k],i,f,r);
+                assert(r[0]>=f[0] && r[0]+r[2]<=f[0]+f[2] && r[1]+r[3]<=f[1]+f[3]+2 && r[3]==22);
+                assert(AW_MsgBoxButtonAt(counts[k],f,r[0]+r[2]/2,r[1]+r[3]/2)==i);
+                assert(AW_MsgBoxButtonAt(counts[k],f,r[0]-1,r[1])!=i);              /* just left of it: not this one */
+            }
+            assert(AW_MsgBoxButtonAt(counts[k],f,f[0]+f[2]/2,f[1]+6)==-1);         /* the text */
+            assert(AW_MsgBoxButtonAt(counts[k],f,0,0)==-1);                          /* outside the box */
+        }
+        /* the failed-load box: OK left, Load Game right */
+        AW_MsgBoxLayout(2,320,200,16,f);AW_MsgBoxButtonRect(2,1,f,r);
+        assert(AW_MsgBoxButtonAt(2,f,r[0]+4,r[1]+4)==1);
+        AW_MsgBoxButtonRect(2,0,f,r);assert(AW_MsgBoxButtonAt(2,f,r[0]+4,r[1]+4)==0);
+        /* the death box: Yes / No, and Yes / No / Retry fight */
+        for(k=2;k<=3;k++)for(i=0;i<k;i++){
+            AW_DeathBoxButtonRect(k,i,320,200,r);
+            assert(r[3]==24 && r[0]>=(320-AW_DEATHBOX_W)/2 && r[0]+r[2]<=(320+AW_DEATHBOX_W)/2);
+            assert(AW_DeathBoxButtonAt(k,320,200,r[0]+r[2]/2,r[1]+12)==i);
+            assert(AW_DeathBoxButtonAt(k,320,200,r[0]+r[2]/2,r[1]-1)==-1);
+        }
+        assert(AW_DeathBoxButtonAt(3,320,200,160,100-AW_DEATHBOX_H/2+8)==-1);       /* the question */
+    }
     printf("msgbox rules ok\n");
     return 0;
 }

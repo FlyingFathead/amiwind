@@ -284,6 +284,18 @@ static void levelling_fields(aw_character_t *c){
     for(i=0;i<8;i++){n=c->raises[i];integer(&n,0,10000);c->raises[i]=(short)n;}
     for(i=0;i<3;i++){n=c->special[i];integer(&n,0,10000);c->special[i]=(short)n;}
 }
+/* AWS4 feature bit 1024 (SKILL-BOOKS-MISSING-62): the skill books read, u32 words (1..AW_BOOKS_READ_MAX/32: up to
+ * the last word with a bit) then the words; written only when any book is read, older readers refuse the bit. */
+static int books_words(const aw_character_t *c){
+    int n=AW_BOOKS_READ_MAX/32;
+    while(n>0 && !c->books_read[n-1])n--;
+    return n;
+}
+static void books_fields(aw_character_t *c){
+    int n=books_words(c),i;
+    integer(&n,1,AW_BOOKS_READ_MAX/32);if(error)return;
+    for(i=0;i<n && !error;i++){uint32_t w=(uint32_t)c->books_read[i];word(&w);c->books_read[i]=w;}
+}
 /* AWS4 feature bit 8: the world-state change list (aw_save.h). Entries strictly ascending by key, each checked
  * field by field; 36 bytes each on disk. The sorted copy and the decoder's scratch live here, off the stack. */
 static aw_changes_t change_scratch;
@@ -358,7 +370,8 @@ int AW_SaveEncodeChanges(unsigned char *out,int capacity,const aw_save_t *state,
     mark_words=copy.state.items.count>32?(copy.state.items.count+31)/32:1;
     {uint32_t features=(copy.state.harvest.slots?1U:0U)|(inventory_used(&copy.state)?2U:0U)|
         (magic_used(&copy.state)?4U:0U)|(listed?8U:0U)|(actors?16U:0U)|(ledgered?32U:0U)|
-        (levelling_used(&copy.character)?64U:0U)|(dated?128U:0U)|(copy.state.items.count>32?512U:0U);word(&features);}
+        (levelling_used(&copy.character)?64U:0U)|(dated?128U:0U)|(copy.state.items.count>32?512U:0U)|
+        (books_words(&copy.character)?1024U:0U);word(&features);}
     if(!error && copy.state.harvest.slots)harvest_fields(&copy.state.harvest);
     if(!copy.state.harvest.slots){
         int i;for(i=0;i<32;i++)if(copy.state.harvest.catalogue[i])error=1;
@@ -370,6 +383,7 @@ int AW_SaveEncodeChanges(unsigned char *out,int capacity,const aw_save_t *state,
     if(!error && inventory_used(&copy.state))inventory_fields(&copy.state);
     if(!error && magic_used(&copy.state))magic_fields(&copy.state);
     if(!error && levelling_used(&copy.character))levelling_fields(&copy.character);
+    if(!error && books_words(&copy.character))books_fields(&copy.character);
     if(!error && listed){
         if(changes->count>AW_SAVE_CHANGES)return 0;
         change_scratch.count=changes->count;
@@ -430,7 +444,7 @@ static int decode(const unsigned char *data,int size,aw_save_t *out,aw_changes_t
     /* Older saves have quest indices but no chronological evidence. Do not
      * fabricate earlier entries or dates when decoding them. */
     if(!error && data[3]!='1')journal_fields(&candidate.state);
-    if(!error && data[3]=='4'){word(&features);if(features>1023)error=1;}
+    if(!error && data[3]=='4'){word(&features);if(features>2047)error=1;}
     /* more than 32 kinds of item: feature 256 (4 mark words, up to 128 kinds; the v0.0.61 line's 128-kind table) or
      * feature 512 (ceil(kinds / 32) words), never both; 32 or fewer: neither (none before AWS4) */
     if((features&256) && (features&512))error=1;
@@ -446,6 +460,7 @@ static int decode(const unsigned char *data,int size,aw_save_t *out,aw_changes_t
     if(!error && data[3]=='4' && (features&2))inventory_fields(&candidate.state);
     if(!error && data[3]=='4' && (features&4))magic_fields(&candidate.state);
     if(!error && data[3]=='4' && (features&64))levelling_fields(&candidate.character);
+    if(!error && data[3]=='4' && (features&1024))books_fields(&candidate.character);
     change_scratch.count=0;
     if(!error && data[3]=='4' && (features&8))changes_fields(&change_scratch);
     actor_scratch_bytes=0;

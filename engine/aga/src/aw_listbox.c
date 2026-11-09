@@ -73,6 +73,14 @@ static void text(int x,int y,const char *s,int right){
     int w=char_w();
     for(;s && *s && x+w<=right;s++,x+=w)AW_ConsoleCharacter(x,y,(unsigned char)*s);
 }
+/* DBG-GIVE-MONEY-62: a row's label up to a tab in the console ink, what follows the tab one space on in the dimmer
+ * ink (the item picker's record id beside the name; the large font's coloured half, the small font's muted colour) */
+static void row_text(int x,int y,const char *s,int right){
+    int w=char_w(),dim=AW_UIColor(150,135,104);
+    for(;s && *s && *s!='\t' && x+w<=right;s++,x+=w)AW_ConsoleCharacter(x,y,(unsigned char)*s);
+    if(!s || *s!='\t')return;
+    for(s++,x+=w;*s && x+w<=right;s++,x+=w)AW_ConsoleCharacterRed(x,y,(unsigned char)*s,dim);
+}
 static void centred(int y,const char *s){
     int w=(int)strlen(s)*char_w(),x=BOX_X+(BOX_W-w)/2;
     if(x<BOX_X+PAD)x=BOX_X+PAD;
@@ -102,7 +110,7 @@ static void draw(void){
     for(i=0;i<rows && box.top+i<box.shown_count;i++){
         y=list_y()+i*row_h();
         if(box.top+i==box.selection)AW_UIFill(BOX_X+PAD,y-1,right-(BOX_X+PAD),row_h(),pick);
-        text(BOX_X+PAD+char_w(),y,spec.label(spec.ctx,box.shown[box.top+i]),right-2);
+        row_text(BOX_X+PAD+char_w(),y,spec.label(spec.ctx,box.shown[box.top+i]),right-2);
     }
     if(!box.shown_count)centred(list_y(),"No match");
     if(bar)AW_UIScrollbar(scroll_x(),list_y()-1,rows*row_h(),box.shown_count,rows,box.top);

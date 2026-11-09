@@ -554,7 +554,8 @@ class PlayerBodyBudgetTests(unittest.TestCase):
              patch('npc_anim.fit', side_effect=lambda *args: real_fit(*args, budget=48 * 1024)), \
              patch.dict('os.environ', {'AMIWIND_NPC_HEAD_REDUCER': 'default', 'AMIWIND_NPC_HAIR_SHARE': 'plain'}):
             with self.assertRaisesRegex(ValueError, 'synthetic body: no body fits') as caught:
-                view._fit_body('synthetic body', [], [], [], b'', self.groups())
+                # the search with the configured rules (_fit_body adds the dev1-rules retry on top: tested below)
+                view._fit_body_rules('synthetic body', [], [], [], b'', self.groups())
         self.assertEqual(bake.call_count, 4 * len(view.BUDGETS))
         for budget in view.BUDGETS:
             self.assertIn('%d/96/plain: Alias byte budget exceeded' % budget, str(caught.exception))
@@ -563,6 +564,29 @@ class PlayerBodyBudgetTests(unittest.TestCase):
         self.assertEqual([c.kwargs['body_leg_contour'] for c in bake.call_args_list],
                          [0] * (2 * len(view.BUDGETS)) + [1] * len(view.BUDGETS) +
                          [2] * len(view.BUDGETS))
+
+    def test_no_fit_retries_once_with_the_dev1_body_rules(self):
+        """The v0.0.62 final build stopped on a player body that fit no budget with the new body rules: _fit_body
+        searches once more with the v0.0.62-dev1 body rules, then gives up with the same error; the environment is
+        restored."""
+        import os
+        import npc_geometry
+        import prepare_player_view as view
+        seen = []
+
+        def search(*args, **kwargs):
+            seen.append({k: os.environ.get(k) for k in npc_geometry.DEV1_BODY_RULES})
+            raise ValueError('synthetic body: no body fits the existing budgets (none)')
+
+        with patch.object(view, '_fit_body_rules', side_effect=search), patch.dict('os.environ', {}, clear=False):
+            for k in npc_geometry.DEV1_BODY_RULES:
+                os.environ.pop(k, None)
+            with self.assertRaisesRegex(ValueError, 'no body fits'):
+                view._fit_body('synthetic body', [], [], [], b'', self.groups())
+            self.assertEqual(len(seen), 2)
+            self.assertEqual(seen[1], npc_geometry.DEV1_BODY_RULES)
+            for k in npc_geometry.DEV1_BODY_RULES:
+                self.assertNotIn(k, os.environ)
 
     def test_locked_head_reducer_falls_back_to_the_previous_reducer(self):
         """NPC-HEAD-DECIMATION-33 (v0.0.44-dev1 image step): when no body fits with the locked head reducer, the

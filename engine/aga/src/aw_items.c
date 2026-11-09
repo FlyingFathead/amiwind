@@ -107,6 +107,20 @@ void AW_ItemsPose(const float *tag6,const float origin[3],float yaw,float out_or
     out_angles[0]=-tag6[3];out_angles[1]=tag6[4]+yaw;out_angles[2]=tag6[5];
 }
 
+unsigned AW_ItemsPathHash(const char *s) {
+    unsigned h=2166136261u;
+    if(!s)return 0;
+    while(*s)h=(h^(unsigned char)*s++)*16777619u;
+    return h;
+}
+/* A held item's model is an item model: its path has an "items/" folder (tools/npc_items.py). */
+int AW_ItemsIsItemPath(const char *s) {
+    const char *p;
+    if(!s)return 0;
+    for(p=s;(p=strstr(p,"items/"))!=NULL;p++)if(p==s || p[-1]=='/')return 1;
+    return 0;
+}
+
 #ifndef AW_ITEMS_HOST_TEST
 /* One tag table per actor model in use, reset per level (like aw_anim.c's layouts);
  * rows live on the hunk, which the level owns. */
@@ -114,11 +128,25 @@ void AW_ItemsPose(const float *tag6,const float origin[3],float yaw,float out_or
 /* rows: a baked model's tag rows; or skel: a skeletal model's item bones and actor scale (rows NULL). */
 static struct {model_t *model;int frames;float *rows;int item[AW_ITEMS_KINDS];
                int skel,bone[AW_ITEMS_KINDS];float scale[3];
-               float emitter[3];int has_emitter,light_item;} table[TABLE];   /* a carried light (guard torch) */
+               float emitter[3];int has_emitter,light_item;   /* a carried light (guard torch) */
+               unsigned item_hash[AW_ITEMS_KINDS];} table[TABLE];   /* the tag's own item paths (HELD-WEAPON-WRONG-MODEL-62) */
 static int used;
 static model_t *level_world;
 static char names[TABLE*AW_ITEMS_KINDS][AW_ITEMS_PATH];   /* precache names live through the level */
 static int named;
+#define CARRIERS AW_ITEMS_CARRIERS
+static struct {edict_t *actor;edict_t *light;int table;} carriers[CARRIERS];
+static int carrier_count;
+static model_t *carrier_world;
+
+/* HELD-WEAPON-WRONG-MODEL-62: the tables hold precache indices of one server. A reload of the same world (the opening
+ * skipped with `dbg aw hors 0` reloads Seyda Neen) keeps sv.worldmodel, so the worldmodel test alone kept the opening's
+ * indices, which then named other models of the new precache (a guard drew an opening NPC as his weapon). Every new
+ * server clears them (SV_SpawnServer, beside AW_AnimSceneReset). */
+void AW_ItemsSceneReset(void) {
+    used=0;named=0;memset(table,0,sizeof(table));level_world=NULL;
+    carrier_count=0;memset(carriers,0,sizeof(carriers));carrier_world=NULL;
+}
 
 static void level_check(void) {
     R_AliasTorchLayer=AW_ItemsTorchLayer;   /* the renderer poses a torch-holding guard's arm (r_alias.c) */
@@ -138,10 +166,6 @@ static int entry_of(model_t *m) {
  * carries its shield-slot item all the time, not only while it fights (the combat slots then draw its weapon only).
  * One entity per carrier, made when first needed and moved with the actor every server frame
  * (AW_ItemsCarriedUpdate); reset per level. */
-#define CARRIERS AW_ITEMS_CARRIERS
-static struct {edict_t *actor;edict_t *light;int table;} carriers[CARRIERS];
-static int carrier_count;
-static model_t *carrier_world;
 static void carriers_check(void) {
     if(carrier_world!=sv.worldmodel){carrier_world=sv.worldmodel;carrier_count=0;memset(carriers,0,sizeof(carriers));}
 }
@@ -183,6 +207,7 @@ static void prep(model_t *m,const char *name,int numframes) {
         for(k=0;k<AW_ITEMS_KINDS;k++){
             table[used].bone[k]=bones[k];
             table[used].item[k]=items[k][0] && bones[k]>=0?precache(items[k]):0;
+            table[used].item_hash[k]=table[used].item[k]?AW_ItemsPathHash(items[k]):0;
             if(table[used].item[k])any=1;
         }
         table[used].light_item=table[used].has_emitter && light[0]?precache(light):0;
@@ -207,7 +232,11 @@ static void prep(model_t *m,const char *name,int numframes) {
         Hunk_FreeToLowMark(mark);return;
     }
     table[used].model=m;table[used].frames=frames;table[used].rows=rows;table[used].skel=0;
-    for(k=0;k<AW_ITEMS_KINDS;k++){table[used].item[k]=items[k][0]?precache(items[k]):0;if(table[used].item[k])any=1;}
+    for(k=0;k<AW_ITEMS_KINDS;k++){
+        table[used].item[k]=items[k][0]?precache(items[k]):0;
+        table[used].item_hash[k]=table[used].item[k]?AW_ItemsPathHash(items[k]):0;
+        if(table[used].item[k])any=1;
+    }
     if(any)used++;else Hunk_FreeToLowMark(mark);
 }
 
@@ -239,6 +268,20 @@ void AW_ItemsPrep(edict_t *actor) {
 /* A table is used only when its rows match the model's frames (a mover's are checked once it is loaded). */
 static int frames_match(model_t *m,int t) {return t>=0 && m && m->numframes==table[t].frames;}
 
+/* HELD-WEAPON-WRONG-MODEL-62: a held item's precache slot must still name the tag's own item model, and an item model
+ * at that; anything else is drawn as nothing and said once per server. */
+static int held_item_ok(edict_t *actor,int t,int k,int i) {
+    static int said_used=-1;
+    const char *name=i>0 && i<MAX_MODELS?sv.model_precache[i]:NULL;
+    if(name && AW_ItemsPathHash(name)==table[t].item_hash[k] && AW_ItemsIsItemPath(name))return 1;
+    if(said_used!=named){
+        said_used=named;
+        Con_Printf("Held item: slot %d of %s names %s, not its item model; not drawn\n",i,
+                   model_of(actor)?model_of(actor)->name:"?",name?name:"nothing");
+    }
+    return 0;
+}
+
 int AW_ItemsShow(edict_t *actor,edict_t *out[AW_ITEMS_KINDS]) {
     int t,k,n=0;edict_t *e;
     level_check();
@@ -248,6 +291,9 @@ int AW_ItemsShow(edict_t *actor,edict_t *out[AW_ITEMS_KINDS]) {
         int i=table[t].item[k];
         /* while torches are carried the torch has the shield hand (AW_ItemsCarriedUpdate) */
         if(!i || !sv.model_precache[i] || (k==1 && carries_light(t) && AW_GuardTorchWanted()))continue;
+        /* HELD-WEAPON-WRONG-MODEL-62: the slot must still name the tag's own item model, and an item model at that;
+         * anything else is drawn as nothing and said once per level */
+        if(!held_item_ok(actor,t,k,i))continue;
         e=ED_Alloc();
         e->v.classname=ED_NewString("aw_item")-pr_strings;
         e->v.model=sv.model_precache[i]-pr_strings;e->v.modelindex=i;

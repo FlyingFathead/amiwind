@@ -1,0 +1,228 @@
+{
+ "schema": 1,
+ "date": "2026-11-07",
+ "reason": "The 65 sampled bodies (60 base bodies of every race and sex, three records each, and the five intro actors dressed), every distinct guard outfit (17, worn widths judged piece by piece, armour merged per slot) and every creature mesh of the actor library, measured on branch v0.0.62-npcbody. Not yet the whole game: the dev2 full build runs once with AMIWIND_MESH_SEAM_STOP=warn and its library records complete this file (MESH-SEAM-METHOD-62).",
+ "about": "Known seam failures (npc_geometry.seam_stop ratchet): a listed model may fail as far as its line, never further; written by tools/mesh_seam_baseline.py from a sweep, never by hand.",
+ "models": {
+  "creature:r/ancestorghost.nif": {
+   "uncovered": 21,
+   "least_width": 1.0
+  },
+  "creature:r/ashghoul.nif": {
+   "uncovered": 45,
+   "least_width": 1.0
+  },
+  "creature:r/ashvampire.nif": {
+   "uncovered": 12,
+   "least_width": 1.0
+  },
+  "creature:r/atronach_fire.nif": {
+   "uncovered": 54,
+   "least_width": 1.0
+  },
+  "creature:r/atronach_frost.nif": {
+   "uncovered": 92,
+   "least_width": 1.0
+  },
+  "creature:r/atronach_storm.nif": {
+   "uncovered": 86,
+   "least_width": 1.0
+  },
+  "creature:r/bonewalker.nif": {
+   "uncovered": 39,
+   "least_width": 1.0
+  },
+  "creature:r/byagram.nif": {
+   "uncovered": 91,
+   "least_width": 1.0
+  },
+  "creature:r/cavemudcrab.nif": {
+   "uncovered": 42,
+   "least_width": 1.0
+  },
+  "creature:r/clannfear.nif": {
+   "uncovered": 57,
+   "least_width": 1.0
+  },
+  "creature:r/clannfear_daddy.nif": {
+   "uncovered": 83,
+   "least_width": 1.0
+  },
+  "creature:r/corprus_stalker.nif": {
+   "uncovered": 30,
+   "least_width": 1.0
+  },
+  "creature:r/daedroth.nif": {
+   "uncovered": 1,
+   "least_width": 1.0
+  },
+  "creature:r/dremora.nif": {
+   "uncovered": 12,
+   "least_width": 1.0
+  },
+  "creature:r/dreugh.nif": {
+   "uncovered": 33,
+   "least_width": 1.0
+  },
+  "creature:r/duskyalit.nif": {
+   "uncovered": 52,
+   "least_width": 1.0
+  },
+  "creature:r/dwarvenspecter.nif": {
+   "uncovered": 6,
+   "least_width": 1.0
+  },
+  "creature:r/g_centurionspider.nif": {
+   "uncovered": 44,
+   "least_width": 1.0
+  },
+  "creature:r/golden saint.nif": {
+   "uncovered": 36,
+   "least_width": 1.0
+  },
+  "creature:r/guar.nif": {
+   "uncovered": 116,
+   "least_width": 1.0
+  },
+  "creature:r/guar_white.nif": {
+   "uncovered": 116,
+   "least_width": 1.0
+  },
+  "creature:r/guar_withpack.nif": {
+   "uncovered": 162,
+   "least_width": 1.0
+  },
+  "creature:r/kwama queen.nif": {
+   "uncovered": 34,
+   "least_width": 1.0
+  },
+  "creature:r/kwama warior.nif": {
+   "uncovered": 48,
+   "least_width": 1.0
+  },
+  "creature:r/lame_corprus.nif": {
+   "uncovered": 70,
+   "least_width": 1.0
+  },
+  "creature:r/leastkagouti.nif": {
+   "uncovered": 38,
+   "least_width": 1.0
+  },
+  "creature:r/minescrib.nif": {
+   "uncovered": 33,
+   "least_width": 1.0
+  },
+  "creature:r/netch_betty.nif": {
+   "uncovered": 64,
+   "least_width": 1.0
+  },
+  "creature:r/netch_bull.nif": {
+   "uncovered": 74,
+   "least_width": 1.0
+  },
+  "creature:r/rust rat.nif": {
+   "uncovered": 52,
+   "least_width": 1.0
+  },
+  "creature:r/sphere_centurions.nif": {
+   "uncovered": 107,
+   "least_width": 1.0
+  },
+  "creature:r/steam_centurions.nif": {
+   "uncovered": 177,
+   "least_width": 1.0
+  },
+  "creature:r/wingedtwilight.nif": {
+   "uncovered": 32,
+   "least_width": 1.0
+  },
+  "npc:agarond": {
+   "uncovered": 24,
+   "least_width": 0.602
+  },
+  "npc:ah-meesei": {
+   "uncovered": 20,
+   "least_width": 0.591
+  },
+  "npc:akish": {
+   "uncovered": 20,
+   "least_width": 0.602
+  },
+  "npc:an-zaw": {
+   "uncovered": 7,
+   "least_width": 0.752
+  },
+  "npc:argonian slave male": {
+   "uncovered": 17,
+   "least_width": 0.6
+  },
+  "npc:chargen boat guard 1": {
+   "uncovered": 7,
+   "least_width": 0.568
+  },
+  "npc:chargen boat guard 2": {
+   "uncovered": 15,
+   "least_width": 0.699
+  },
+  "npc:chargen class": {
+   "uncovered": 14,
+   "least_width": 0.771
+  },
+  "npc:chargen dock guard": {
+   "uncovered": 3,
+   "least_width": 0.392
+  },
+  "npc:chargen door guard": {
+   "uncovered": 9,
+   "least_width": 0.539
+  },
+  "npc:company guard_unique": {
+   "uncovered": 9,
+   "least_width": 0.539
+  },
+  "npc:dreamer guard": {
+   "uncovered": 6,
+   "least_width": 0.602
+  },
+  "npc:duke's guard": {
+   "uncovered": 23,
+   "least_width": 0.392
+  },
+  "npc:duke's guard_tomb2": {
+   "uncovered": 23,
+   "least_width": 0.392
+  },
+  "npc:hlaalu guard": {
+   "uncovered": 10,
+   "least_width": 0.38
+  },
+  "npc:imperial guard": {
+   "uncovered": 22,
+   "least_width": 0.671
+  },
+  "npc:imperial guard_prisoner": {
+   "uncovered": 14,
+   "least_width": 0.528
+  },
+  "npc:nels llendo": {
+   "uncovered": 33,
+   "least_width": 0.286
+  },
+  "npc:redguard dancer girl": {
+   "uncovered": 2,
+   "least_width": 0.621
+  },
+  "npc:redoran guard female": {
+   "uncovered": 6,
+   "least_width": 0.235
+  },
+  "npc:redoran guard male": {
+   "uncovered": 14,
+   "least_width": 0.141
+  },
+  "npc:redoran guard sarethi4": {
+   "uncovered": 10,
+   "least_width": 0.145
+  }
+ }
+}

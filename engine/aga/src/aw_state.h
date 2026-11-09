@@ -97,6 +97,8 @@ int AW_StateTest(const aw_state_t *state,int kind,const char *id,int comparison,
 int AW_JournalAdd(aw_state_t *state,const char *id,int32_t index);
 unsigned AW_JournalNotices(void);   /* sJournalEntry notices owed so far (a rising quest index each) */
 int AW_ItemAdd(aw_state_t *state,const char *id,int32_t count);
+extern void (*aw_item_added)(const char *id,int32_t count);   /* the player's inventory gained ID (aw_mwhost.c) */
+extern void (*aw_item_removed)(const char *id);   /* the last ID left the player's inventory (aw_mwhost.c) */
 /* The item table (INVENTORY-ORIGINAL-LIMITS-61). Count: rows in use; Index: the row of ID (any case), -1 none;
  * Reserve: room for N new kinds made now (rows at 0 count; blocks allocated), so the adds after it cannot fail for
  * room, 0 when memory says no (nothing changed); Append: a raw row at the end (the save decoder; 0 refused);
@@ -127,6 +129,17 @@ void AW_ItemsWeigh(aw_state_t *state);
 enum { AW_ITEM_OK, AW_ITEM_FULL, AW_ITEM_TOO_MANY, AW_ITEM_BAD_ID };
 int AW_ItemRoom(const aw_state_t *state);
 int AW_ItemRefusal(const aw_state_t *state,const char *id,int32_t count);
+/* DBG-GIVE-MONEY-62: the player's gold (the item count of gold_001) never goes past AW_GOLD_MAX. The original and
+ * OpenMW 0.51 keep an item count as a signed 32-bit number (components/esm3/cellref.hpp mCount, int32_t), so
+ * 2,147,483,647 is the hard limit there; here a gain is added in 32-bit arithmetic on the 68040 (aw_mwhost.c
+ * AW_MwscriptPlayerGold: gold + price), so a sale near that limit would wrap below 0 and lose the purse. The cap of
+ * 999,999,999 (nine digits) leaves more than a thousand million of headroom for any single gain (a script's AddItem
+ * adds at most 65,535 at once, a sale one item's price) and is shown as "999m" in the inventory's count column
+ * (AW_InventoryCountText). Every count set on gold_001 (a pick-up, a sale, a script, a save loaded, dbg give money) is
+ * held at the cap: a gain past it is kept up to the cap, never refused. */
+#define AW_GOLD_ID "gold_001"
+#define AW_GOLD_MAX 999999999L
+int32_t AW_GoldCap(const char *folded_id,int32_t value);
 const char *AW_ItemRefusalText(const aw_state_t *state,int reason);
 /* Enchantment recharge for unpaused or waited seconds (aw_inventory.c sets it). */
 extern void (*aw_magic_frame)(float seconds);

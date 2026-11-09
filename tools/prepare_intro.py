@@ -128,6 +128,14 @@ def intro_sounds(data,out,ffmpeg='ffmpeg'):
 _actor_context = None
 
 
+def _receipt():
+    """The last bake's per-actor receipt (npc_geometry.LAST_PLAN), JSON-ready."""
+    import json
+    from npc_geometry import LAST_PLAN
+    return json.loads(json.dumps({'receipt': LAST_PLAN.get('receipt'),
+                                  'problems': [list(p) for p in LAST_PLAN.get('body_problems') or []]}, default=str))
+
+
 def _actor(task):
     global _actor_context
     data, palette, identifier, stem, role, appearance = task
@@ -138,11 +146,15 @@ def _actor(task):
     _,assets,skeletons=_actor_context
     skeleton=skeletons[appearance['female']];times,facesamples,step,walkstep=actor_samples(skeleton)
     shapes,materials,textures=assemble(assets,appearance,skeleton,times,facesamples)
-    frames,faces,uv,skin=bake(shapes,materials,textures,palette)
+    from model_face_overrides import extra_faces,body_key
+    frames,faces,uv,skin=bake(shapes,materials,textures,palette,extra_faces=extra_faces(identifier),model=identifier,
+                              body_key=body_key(appearance))
     raw=animated_mdl(frames,faces,uv,skin);model='progs/np_'+stem+'.mdl'
     report={'model':model,'frames':len(frames),'triangles':len(faces),'vertices':frames.shape[1],
         'sha256':hashlib.sha256(raw).hexdigest(),'talk_displacement':float(abs(frames[11]-frames[8]).max()),
-        'blink_displacement':float(abs(frames[12]-frames[8]).max()),'idle_step':float(step),'walk_step':float(walkstep),'appearance':appearance}
+        'blink_displacement':float(abs(frames[12]-frames[8]).max()),'idle_step':float(step),'walk_step':float(walkstep),'appearance':appearance,
+        # the bake's per-actor receipt (npc_geometry.body_audit, NPC-BODY-REGRESSION-62)
+        'body':_receipt()}
     return identifier,role,raw,report
 
 

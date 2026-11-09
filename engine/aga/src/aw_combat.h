@@ -244,6 +244,8 @@ void AW_CombatEquipmentStore(void);
 int AW_CombatPlayerKnocked(void);
 float AW_CombatPlayerFatigue(float *maximum);
 void AW_CombatPlayerFatigueLoss(float loss);
+/* DBG-SUPERSPEED-62: the player's fatigue to its maximum (the fight sheet and the character sheet) */
+void AW_CombatPlayerFatigueFill(void);
 void AW_CombatEquipmentChanged(void);
 int AW_CombatLoadout(const char *loadout,aw_fighter_t *out,char *chosen);
 extern int (*aw_combat_input_locked)(void);
@@ -299,6 +301,24 @@ extern int (*aw_combat_player_weapon_normal)(void);
  * Strikes enchantment on the weapon is cast on the victim with its charge. Called after the blow is applied (a victim
  * the blow killed: the charge is spent, the effects find a corpse). */
 extern void (*aw_combat_strike_enchant)(struct edict_s *attacker,struct edict_s *victim);
+/* MWSCRIPT-INVENTORY-HITONME-62 (aw_mwhost.c sets it; NULL: none): a weapon blow of ATTACKER landed on VICTIM (it hit or
+ * was blocked: OpenMW Npc::hit calls onHit with success, and Creature/Npc::onHit keeps the weapon's id as the victim's
+ * last hit object, CreatureStats::setLastHitObject), at the same two points as aw_combat_strike_enchant. */
+extern void (*aw_combat_weapon_hit)(struct edict_s *attacker,struct edict_s *victim);
+/* The last weapon that landed on each victim (HitOnMe; OpenMW getLastHitObject / clearLastHitObject): VICTIM is the
+ * actor's reference, WEAPON the FNV-1a hash of the weapon's record id in lower case. AW_COMBAT_LAST_HITS rows of 8 bytes
+ * (64 bytes resident): a victim keeps one row, a new victim takes the oldest row. Take reads 1 when VICTIM's last weapon
+ * is WEAPON and then clears it (OpHitOnMe), else 0; Reset empties the rows (New Game, a save load). */
+#define AW_COMBAT_LAST_HITS 8
+void AW_CombatLastHitSet(unsigned long victim,unsigned long weapon);
+int AW_CombatLastHitTake(unsigned long victim,unsigned long weapon);
+void AW_CombatLastHitReset(void);
+int AW_CombatLastHitCount(void);
+/* CRIME-59 (aw_crime.c; OpenMW actorAttacked, actorKilled): the player's swing at a resident not fighting yet (before
+ * its fight starts: the assault, when it is one), and the player's killing blow (the murder, when it is one). NULL in
+ * fixtures. */
+extern void (*aw_combat_assault)(struct edict_s *victim);
+extern void (*aw_combat_killed)(struct edict_s *victim);
 /* The text the player is shown when an ordinary weapon has no effect (combat/settings.txt "text
  * sMagicTargetResistsWeapons ..."); "" when the image has none. */
 const char *AW_CombatResistText(void);

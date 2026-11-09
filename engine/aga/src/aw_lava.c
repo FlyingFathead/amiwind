@@ -16,6 +16,7 @@ static cvar_t lava_tint_max={"aw_lava_tint_max","230"};
 static cvar_t lava_tint_ramp={"aw_lava_tint_ramp","3"};
 static cvar_t lava_embers={"aw_lava_embers","2"};     /* embers a second per pool (0: none) */
 
+double aw_lava_script_hurt=-1e9;
 static float seconds_in;     /* time the player has stood in lava, 0 when out */
 static int feet_in;          /* the player is in lava this frame */
 
@@ -33,6 +34,7 @@ void AW_LavaPhysics(void) {
         AW_LavaIn((int)p->v.watertype,(int)p->v.waterlevel);
     if(!feet_in){seconds_in=0;return;}
     if(dt>0)seconds_in+=dt;
+    if(realtime-aw_lava_script_hurt<0.25)return;   /* the lava script hurts the player this moment: not twice */
     if(p->v.health>0)AW_CombatHurtPlayer(AW_LavaDamage(lava_dps.value,dt),"lava");
 }
 int AW_LavaContentsShift(int eye_contents, int rgb[3], int *percent) {

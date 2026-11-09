@@ -1,7 +1,16 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 /* CONTAINER-WINDOW-59: the container strip's pure rules (aw_cstrip.h); no engine state, native-tested. */
 #include <stddef.h>
+#include <stdio.h>
 #include "aw_cstrip.h"
+int AW_CStripTakeLine(char *out,int size,const char *name,int count,int stolen,const char *from,int total){
+    int n;
+    if(!out || size<2){return 0;}
+    if(from)n=snprintf(out,(size_t)size,"Took %d item%s from %s%s",total,total==1?"":"s",from?from:"",stolen?" (stolen)":"");
+    else if(count>1)n=snprintf(out,(size_t)size,"Took %s x %d%s",name?name:"",count,stolen?" (stolen)":"");
+    else n=snprintf(out,(size_t)size,"Took %s%s",name?name:"",stolen?" (stolen)":"");
+    return n<0?0:n>=size?size-1:n;
+}
 void AW_CStripClamp(aw_cstrip_list_t *list){
     int s,columns=list->columns>0?list->columns:1;
     for(s=0;s<2;s++){

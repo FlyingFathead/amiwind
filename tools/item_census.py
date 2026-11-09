@@ -152,7 +152,7 @@ def table_text(result):
 def read_image(id1):
     """(folded ids with a built icon, folded ids whose catalogue row names an existing model) of an image's id1."""
     id1 = Path(id1)
-    icons, drawn = set(), set()
+    icons, drawn, inventory = set(), set(), set()
     table = id1 / 'gfx' / 'icons.awl'
     if table.is_file():
         raw = table.read_bytes()
@@ -160,8 +160,13 @@ def read_image(id1):
             raise ValueError('not an AWL2 icon table: %s' % table)
         for i in range(struct.unpack_from('<I', raw, 4)[0]):
             name = raw[8 + 160 * i: 8 + 160 * i + 64].split(b'\0')[0].decode('cp1252').casefold()
-            if name.startswith('inv:'):
+            if name.startswith('big:'):        # ITEM-ICONS-MISSING-62: the strip's picture of every item
                 icons.add(name[4:])
+            elif name.startswith('inv:') and not name.endswith(':equip'):
+                inventory.add(name[4:])
+        # an image from before the big pictures: the inventory pictures are the ones it has
+        if not icons:
+            icons = inventory
     catalogue = id1 / 'inventory' / 'items.awi'
     if catalogue.is_file():
         raw = catalogue.read_bytes()

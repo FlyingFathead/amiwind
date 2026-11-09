@@ -22,6 +22,7 @@
 #define AW_DIAL_QUEST_ROW 12       /* u32 quest id (topic strings), u32 first journal entry, u16 entries, u16 0 */
 #define AW_DIAL_JOURNAL_ROW 8      /* u16 index, u8 flags, u8 0, u32 text */
 #define AW_DIAL_ENTRY_LAST 1       /* no run-time condition: nothing after it can be said */
+#define AW_DIAL_ENTRY_ACTOR 2      /* the INFO names an actor: in a speaker's row, that speaker (OpenMW "specific" topic) */
 #define AW_DIAL_KIND_TOPIC 0
 #define AW_DIAL_KIND_GREETING 2    /* Greeting 0..9: chosen when the conversation opens, never listed */
 #define AW_DIAL_KIND_PERSUASION 3
@@ -325,6 +326,7 @@ int AW_DialWindowOpen(struct edict_s *e,const char *greeting,int talked);
 void AW_DialWindowReadCache(int on);   /* dbg npcs talkcache on|off: the conversation's block cache (default on) */
 /* dbg npcs talk [ID]: Talk with the nearest NPC that can be talked to (or record ID), the player turned to it. */
 void AW_DialWindowTalk(const char *id);
+int AW_DialWindowTalkTo(struct edict_s *e);   /* E's conversation with E (a script's Activate on an NPC); 1 opened */
 /* dbg mwscript result TOPIC NPC [N] (MWSCRIPT-PLAYER-CONTROL-62's test aid): the result script of the answer NPC (a
  * loaded actor's record id) gives on TOPIC now (N 0), or of its N-th answer on it (from 1, conditions not tested), run
  * as the window runs it but without opening the window. 1 when a result ran. */

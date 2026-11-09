@@ -22,6 +22,10 @@ WEAK void AW_LampLink(unsigned row,unsigned reference){(void)row;(void)reference
 WEAK int ChimChunks_GonePid(unsigned pid,int gone){(void)pid;(void)gone;return 0;}
 WEAK int AW_AreaEffectPids(unsigned reference,unsigned *pids,int most){(void)reference;(void)pids;(void)most;return 0;}
 WEAK void AW_AreaEffectsApply(void){}
+/* The crime rules (aw_crime.c, CRIME-59): dbg kill crime (aw_companion.c) asks them; a fixture without them: no crime. */
+struct edict_s;
+WEAK int AW_CrimeCanCommit(struct edict_s *victim){(void)victim;return 0;}
+WEAK int AW_CrimeKilled(struct edict_s *victim,int can_commit){(void)victim;(void)can_commit;return 0;}
 /* The game clock (aw_clock.c): the travel services move it by a ride's hours (aw_scene.c travel_ride). */
 WEAK int AW_ClockAdvance(int milliseconds){(void)milliseconds;return 0;}
 /* The owned-item crosshair cue (view.c defines it; aw_harvest_runtime.c sets it). */
@@ -110,6 +114,7 @@ WEAK int AW_InventoryUnequip(aw_state_t *state,const char *id){(void)state;(void
 WEAK int AW_InventoryDropHere(const aw_inventory_item_t *item,int32_t count){(void)item;(void)count;return 0;}
 WEAK int AW_InventoryUse(void){return 0;}
 WEAK const char *AW_InventoryHint(void){return NULL;}
+WEAK float AW_InventoryAimDistance(void){return -1;}   /* FOCUS-NPC-OVERRIDES-ITEM-62: no item aimed at */
 WEAK int AW_InventoryFocus(const char **name,char *weight_line,char *value_line,int line_size,int *owned){(void)name;(void)weight_line;(void)value_line;(void)line_size;(void)owned;return 0;}
 WEAK float AW_ActivateDistance(void){return 48;}
 WEAK int AW_ConsoleWidth(void){return 38;}   /* aw_console.c: dbg give weapons lines its table up to it */
@@ -151,8 +156,13 @@ WEAK void AW_CombatEquipmentChanged(void){}
 WEAK void AW_UIBox(int x,int y,int w,int h){(void)x;(void)y;(void)w;(void)h;}
 /* Morrowind's mouse pointer (aw_ui.c, CURSOR-MW-58): fixtures without aw_ui.c draw their window's own cursor. */
 WEAK int AW_UICursor(int x,int y){(void)x;(void)y;return 0;}
+WEAK void AW_UIThinBox(int x,int y,int w,int h,int lit){(void)x;(void)y;(void)w;(void)h;(void)lit;}
+WEAK void AW_UIButton(int x,int y,int w,int h,const char *text,int lit,int colour){(void)x;(void)y;(void)w;(void)h;(void)text;(void)lit;(void)colour;}
 WEAK void AW_UISmallBegin(void){}
 WEAK void AW_UISmallEnd(void){}
+/* aw_character.c's class page draws its skill rows with AW_UIText at one fixed line (CLASS-LIST-LAYOUT-62) */
+WEAK void AW_UIText(int x,int y,const char *text,int color){(void)x;(void)y;(void)text;(void)color;}
+WEAK int AW_UIWidth(const char *text){return 6*(int)strlen(text);}
 WEAK int Q_strcasecmp(char *a,char *b){return strcasecmp(a,b);}
 
 /* Lighting/renderer fixtures which omit real hand runtime have no active block.
@@ -194,3 +204,11 @@ WEAK int AW_ControlAllowed(int controls){(void)controls;return 1;}
 WEAK int AW_ControlsDisabled(void){return 0;}
 /* dbg weapon / dbg gear's box (aw_gearbox.c, WEAPONS-57): no box in fixtures. */
 WEAK int AW_GearBoxOpen(int kind){(void)kind;return 0;}
+/* dbg give's item picker and count box (aw_gearbox.c, DBG-GIVE-MONEY-62): no box in fixtures. */
+WEAK int AW_GiveBoxOpen(void){return 0;}
+WEAK int AW_GiveCountBoxOpen(void){return 0;}
+/* dbg noburden's mode (aw_move.c, DBG-NOBURDEN-62): off in fixtures without the movement code. */
+WEAK int AW_MoveNoBurdenOn(void){return 0;}
+WEAK void AW_MoveNoBurdenSet(int on){(void)on;}
+/* superspeed's endless stamina (aw_combat.c, DBG-SUPERSPEED-62): nothing to fill in fixtures without the fight sheet. */
+WEAK void AW_CombatPlayerFatigueFill(void){}

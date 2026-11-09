@@ -40,13 +40,22 @@ EFFECT_NAMES = (
 # spell type they remove) and the effects that hurt health like Damage Health
 CURE_EFFECTS = {69: 3, 70: 2, 72: 0}
 HEALTH_DAMAGE_EFFECTS = (14, 15, 16, 27)
+# v0.0.62 (MWSCRIPT-UNPLACED-ATTACH-62, the shrines' blessings): the effects with no attribute or skill that only stand
+# on the actor for their duration with a magnitude (OpenMW 0.51 keeps them in the actor's active effects and the systems
+# read their magnitude: MagicEffects): an SPFX effect of kind 5, the effect's number as its stat; the engine lands it
+# with AW_EffectsLand. Water Breathing .. Slow Fall, the weaknesses, Invisibility .. Night Eye, the detections, Spell
+# Absorption, Reflect, Fortify Maximum Magicka, the resistances and Fortify Attack. Actions (Lock, Open, Mark, Recall,
+# the interventions, Dispel, the summons, the bound items, Calm, Frenzy, Command) are not among them: a spell with one
+# stays "not yet".
+PASSIVE_EFFECTS = frozenset(list(range(0, 12)) + list(range(28, 37)) + list(range(39, 44)) + [64, 65, 66, 67, 68, 84]
+                            + list(range(90, 100)) + [117])
 # Cast carried out (v0.0.57): the cures on the player (aw_mwhost.c AWF_CAST)
 CURES = ('cure common disease', 'cure blight disease', 'cure poison')
 # The placing family (v0.0.62, MWSCRIPT-PLACE-OBJECTS-62): the calls (their object id is always the first argument),
 # the kinds of a PLAC row, the record types the inventory carries, and the most rows a placed actor's key can name
 # (aw_mwhost.c placed_key: 0xF00000 | row << 12 | serial)
 import re as _re
-PLACE_CALL = _re.compile(r'(?i)\bplace(atpc|atme|itemcell|item)\b[\s,]+("[^"]+"|[^\s,"]+)')
+PLACE_CALL = _re.compile(r'(?i)\b(place(?:atpc|atme|itemcell|item)|drop)\b[\s,]+("[^"]+"|[^\s,"]+)')
 PLACE_FUNCTIONS = ('placeatpc', 'placeatme', 'placeitem', 'placeitemcell')
 PLACE_KINDS = {'actor': 0, 'item': 1, 'other': 2}
 PLACE_ITEM_TAGS = ('WEAP', 'ARMO', 'CLOT', 'ALCH', 'APPA', 'BOOK', 'INGR', 'LIGH', 'LOCK', 'MISC', 'PROB', 'REPA')
@@ -64,7 +73,11 @@ SCRIPT_ACTOR = 256       # reads the actor record (stats, items, spells, deaths)
                          # state generation moves, which a script's change or the engine's (a hit, a death) does
 EFFECT_OPS = {'SETG', 'SETGS', 'SETM', 'SETMS', 'SETJ', 'JOURNAL', 'PLAYSOUND', 'PLAYSOUNDVP', 'PLAYSOUND3D',
               'PLAYSOUND3DVP', 'PLAYLOOP3D', 'PLAYLOOP3DVP', 'STOPSOUND', 'SAY', 'STREAMMUSIC', 'STARTSCRIPT',
-              'STOPSCRIPT', 'ENABLE', 'DISABLE', 'LOCK', 'UNLOCK', 'ACTIVATE', 'COMBAT', 'AIWANDER', 'PLAYERMOVE'}
+              'STOPSCRIPT', 'ENABLE', 'DISABLE', 'LOCK', 'UNLOCK', 'ACTIVATE', 'COMBAT', 'AIWANDER', 'PLAYERMOVE',
+              # MWSCRIPT-INERT-SEEN-62: a message box is seen; reading OnActivate takes the object's use over (the
+              # door that stays shut, the item that cannot be taken: OpenMW 0.51 mwworld/action and the activation
+              # rule of a script that tests OnActivate), so a script holding either is not inert
+              'MESSAGEBOX', 'ONACTIVATE'}
 # ACTOR, ITEM and SPELL are effects only when they change something (their verb): see effect_op()
 
 
@@ -312,6 +325,11 @@ class Program:
                 # a cure (kind 4): the spell type it removes (3 common disease, 2 blight; 0 poison: no state yet)
                 effects.append((4, CURE_EFFECTS[number], 0, 0, 0))
                 continue
+            if number in PASSIVE_EFFECTS:
+                # kind 5: the effect by its number (no attribute or skill), for its duration
+                effects.append((5, number, max(0, min(duration, 0xFFFF)), max(0, min(low, 0xFFFF)),
+                                max(0, min(max(low, high), 0xFFFF))))
+                continue
             if number in HEALTH_DAMAGE_EFFECTS:
                 # Fire, Frost and Shock Damage and Poison hurt health like Damage Health (OpenMW spelleffects.cpp);
                 # resistances do not exist here yet, so the full magnitude lands
@@ -454,8 +472,9 @@ class Program:
             kind = 'other'
         template, home = 0, NONE
         refs = sorted(d.object_refs.get(ident, []))
-        if kind == 'actor' and refs:
-            in_rooms = [(n, (self.rooms or {}).get(d.actor_cells.get(n))) for n in refs if d.actor_cells.get(n)]
+        cells = d.actor_cells if kind == 'actor' else getattr(d, 'object_cells', {})
+        if kind in ('actor', 'other') and refs:
+            in_rooms = [(n, (self.rooms or {}).get(cells.get(n))) for n in refs if cells.get(n)]
             in_rooms = [(n, room) for n, room in in_rooms if room]
             if in_rooms:
                 template, home = in_rooms[0][0] & 0xFFFFFF, self.string(in_rooms[0][1]['map'])
@@ -463,8 +482,12 @@ class Program:
                 template = refs[0] & 0xFFFFFF
         base = d.bases.get(ident)
         script = self.scripts.index.get(base[1], NONE) if base and base[1] else NONE
+        # v0.0.62 (MWSCRIPT-GAP-FUNCTIONS-62): every NPC or creature record can be made (with no placed reference, from
+        # the actor table's base the builder adds for each actor a script places: chim.actors script_placed_actors);
+        # any other object from a placed reference of its record (its entity in a map, the template)
+        carried = kind in ('item', 'actor') or (kind == 'other' and bool(refs))
         row = {'key': ident, 'id': self.string(ident), 'kind': PLACE_KINDS[kind], 'template': template,
-               'home': home, 'script': script, 'carried': kind == 'item' or (kind == 'actor' and bool(refs))}
+               'home': home, 'script': script, 'carried': carried}
         self._place_index[ident] = len(self._place_rows)
         self._place_rows.append(row)
         return self._place_index[ident]
@@ -493,6 +516,27 @@ class Program:
         base = self.data.bases.get(key)
         script = base[1] if base and base[1] else (key if key in self.data.scripts else None)
         return self.script_locals.get(script) if script else None
+
+    def equip_rows(self):
+        """The EQUP rows (v0.0.62, MWSCRIPT-GAP-FUNCTIONS-62; OpenMW 0.51 mwgui/inventorywindow.cpp useItem): every
+        carried item record whose script declares OnPCEquip or PCSkipEquip, sorted by folded id: (key, id string,
+        script row, OnPCEquip's slot, PCSkipEquip's slot; 0xFF when the script has not that local). The engine sets
+        OnPCEquip when the player equips the item and refuses the equipping while PCSkipEquip is 1."""
+        rows = []
+        recs = getattr(self.data, 'records', {})
+        for tag in PLACE_ITEM_TAGS:
+            for ident in recs.get(tag, {}):
+                base = self.data.bases.get(ident)
+                locs = self.script_locals.get(base[1]) if base and base[1] else None
+                if not locs or base[1] not in self.scripts.index:
+                    continue
+                on, skip = locs.get('onpcequip'), locs.get('pcskipequip')
+                if on is None and skip is None:
+                    continue
+                rows.append((ident, self.string(ident), self.scripts.index[base[1]],
+                             on[1] if on is not None and on[1] < 0xFF else 0xFF,
+                             skip[1] if skip is not None and skip[1] < 0xFF else 0xFF))
+        return sorted(rows)
 
 
 class Emitter:
@@ -691,6 +735,8 @@ class ScriptCompiler:
             return self.position_cell(fn, ref, args)
         if fn.name in PLACE_FUNCTIONS:
             return self.place(fn, ref, args)
+        if fn.name == 'drop':
+            return self.drop(fn, ref, args)
         if fn.name in ('aifollowcell', 'aiescortcell'):
             return self.ai_cell(fn, ref, args)
         if fn.name == 'aifollow':
@@ -711,7 +757,7 @@ class ScriptCompiler:
             # moves the state generation when the player's cell changes (aw_mwhost.c)
             self.e.op('GETPCCELL', self.p.pccell(s(0)), pushes=1)
             return 'i'
-        if ref is not None:
+        if ref is not None and n not in ('additem', 'removeitem'):
             self.e.op('REF', self.p.object(ref))
         if n == 'getpos':
             axis = s(0).casefold()[:1]
@@ -856,6 +902,11 @@ class ScriptCompiler:
                 self.flags |= SCRIPT_ACTOR
                 return 'i'
             self.convert(self.expr(args[1] if len(args) > 1 else ('int', 1)), 'i')
+            # the reference after the count (CRIME-FINE-GOLD-NOT-TAKEN-62): a function call in the count ("Player->
+            # RemoveItem Gold_001 GetPCCrimeLevel", the guards' fine) resets the target, so a reference set before it
+            # made the speaker, not the player, give the gold
+            if ref is not None:
+                self.e.op('REF', self.p.object(ref))
             self.e.op('ITEM', 1 if n == 'additem' else 2, item, pops=1)
             return None
         if n in ('addspell', 'removespell', 'getspell'):
@@ -907,7 +958,8 @@ class ScriptCompiler:
                     self.e.op('REF', self.p.object(ref))
                 return self.notyet(fn, None, [('str', spell), ('str', who), ('int', row)], None, carried=True)
         if fn.name in ('gettarget', 'getstandingpc', 'getangle', 'getdetected', 'getlos', 'getlineofsight',
-                       'onknockout', 'getcurrentweather', 'getpcsneaking', 'getweapondrawn', 'hassoulgem') or \
+                       'onknockout', 'getcurrentweather', 'getpcsneaking', 'getweapondrawn', 'getpcinjail',
+                       'hassoulgem', 'hitonme') or \
                 (fn.name.startswith('getresist') and fn.name[3:] in RESISTS):
             # a fight starts without the state generation moving: the script asks every frame; so do the angles, the
             # detection, the line of sight, a knockdown and the weather (v0.0.62), as GetPos does
@@ -933,6 +985,20 @@ class ScriptCompiler:
                 self.warnings.append('AddTopic of an unknown topic %r: nothing' % name)
                 return None
             return self.notyet(fn, None, [('int', row)], None, carried=True)
+        if fn.name in ('changeweather', 'modregion'):
+            # v0.0.62 (MWSCRIPT-COMPLETE-LANDMARK): the region's index in the region catalogue (sorted Morrowind.esm
+            # region ids, as the weather table orders them) as the first number, then the weather or the chances (at
+            # most ten; OpenMW reads them in the weathers' order). A region the image has not (Mournhold, Solstheim):
+            # no code, as OpenMW's weather manager finds no such region and does nothing
+            name = next((a[1] for a in args if a[0] == 'str'), '')
+            regions = sorted(getattr(self.p.data, 'base_regions', ()) or ())
+            if name.casefold() not in regions:
+                self.warnings.append('%s of %r, a region the image has not: nothing' % (fn.name, name))
+                return None
+            nums = [a for a in args if a[0] != 'str'][:1 if fn.name == 'changeweather' else 10]
+            if fn.name == 'changeweather' and not nums:
+                return self.notyet(fn, ref, args, None)
+            return self.notyet(fn, None, [('int', regions.index(name.casefold()))] + nums, None, carried=True)
         if ref is not None:
             self.e.op('REF', self.p.object(ref))
         return self.notyet(fn, None, args, None, carried=True)
@@ -998,7 +1064,7 @@ class ScriptCompiler:
         cell = strs[1]
         x, y, z, rot = (float(fold(a)[1]) for a in nums[:4])
         yaw = round((-rot) % 360.0, 5) % 360.0
-        actor = self.p.place_rows()[row]['kind'] == PLACE_KINDS['actor']
+        actor = self.p.place_rows()[row]['kind'] != PLACE_KINDS['item']    # an actor or an object: the room's units
         key = cell.casefold()
         if key in self.p.data.interior_numbers:
             number = self.p.data.interior_numbers[key]
@@ -1015,6 +1081,24 @@ class ScriptCompiler:
             return None
         return self.notyet(fn, None, [ident, ('str', cell)] + [('float', v) for v in at] +
                            [('float', yaw), ('int', kind), ('int', number), ('int', row)], None, carried=True)
+
+    def drop(self, fn, ref, args):
+        """Drop ITEM COUNT (v0.0.62, MWSCRIPT-GAP-FUNCTIONS-62; OpenMW 0.51 miscextensions.cpp OpDrop: the actor's
+        COUNT of the item leave its inventory and lie on the ground at its feet). An item the engine can make in the
+        world (Program.placed: a carried item's PLAC row) and the inventory knows (its AITM row) goes to the host
+        with the numbers count, AITM row, PLAC row; anything else stays "not yet"."""
+        strs = [a[1] for a in args if a[0] == 'str']
+        nums = [a for a in args if a[0] != 'str']
+        if not strs:
+            return self.notyet(fn, ref, args, None)
+        row = self.p.placed(strs[0])
+        item = self.p.item(strs[0])
+        if row is None or item is None or self.p.place_rows()[row]['kind'] != PLACE_KINDS['item']:
+            return self.notyet(fn, ref, args, None)
+        if ref is not None:
+            self.e.op('REF', self.p.object(ref))
+        count = (nums + [('int', 1)])[0]
+        return self.notyet(fn, None, [('str', strs[0]), count, ('int', item), ('int', row)], None, carried=True)
 
     def follower(self, ref, args):
         """An AIFollow / AIFollowCell whose target is the player: the follower crosses doors with the player (OpenMW

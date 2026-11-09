@@ -1,6 +1,6 @@
 # Building and playing
 
-_Last updated with AmiWind v0.0.58 (31 October 2026)._
+_Last updated with AmiWind v0.0.62 (8 November 2026)._
 
 How to build AmiWind from your own Morrowind copy and run it in an emulator. The short version is in the [README](../README.md#build-it-from-your-own-morrowind).
 
@@ -97,7 +97,7 @@ Plan for a first build to take hours and to use the whole machine.
 | Kind of build | Measured time | What it means |
 | --- | --- | --- |
 | First build from scratch (`--clean`, nothing reused, empty cache) | about 265 minutes (4 h 25 min) for v0.0.57; 323 minutes for v0.0.51 | Every stage runs. Measured with up to 24 cores and 44 GiB of memory on a 12-core / 24-thread desktop CPU with 64 GB of RAM. |
-| Rebuild that reuses a previous run (`--reuse-from`) | from about 8 minutes to two hours; most recent full builds took 20 to 75 minutes | Only the stages whose inputs changed run again. The time depends on what changed: a version label alone is cheap, a change to the CHIM world or the models is not. |
+| Rebuild that reuses a previous run (`--reuse-from`) | from about 8 minutes to two hours; full builds up to v0.0.61 took 20 to 75 minutes; the v0.0.62 full build took hours more, because the new character bake costs more per character and a change of the bake code bakes every character again (room batches about 2 h 40 min, actor library about 40 min, the image step's player bodies over 35 min) | Only the stages whose inputs changed run again. The time depends on what changed: a version label alone is cheap, a change to the CHIM world, the models or the character bake is not. |
 | Smaller test build ([MiniWind](MINIWIND.md)) | minutes: 3 to 25 minutes for recent ones, reusing a previous run | One spot of the world instead of the whole island. |
 
 Why the difference: every stage is keyed by its inputs (your game files, the
@@ -189,3 +189,5 @@ and boots to a test notice; it is not the playable demo.
 The presets of the newest release are
 [`AmiWind-v0.0.48-FS-UAE.fs-uae`](../resources/emulators/AmiWind-v0.0.48-FS-UAE.fs-uae) and
 [`AmiWind-v0.0.48-WinUAE.uae`](../resources/emulators/AmiWind-v0.0.48-WinUAE.uae).
+
+**Model seam check, the first run.** The builder checks every reduced character and creature model against its original and stops on a model that opens a new gap or thins a limb, unless that model is in the known-failures list `config/mesh-seam-baseline.json` and no worse. That list is recorded once by a full build run with `AMIWIND_MESH_SEAM_STOP=warn`, then `tools/mesh_seam_baseline.py write --first` on that build's library records; after that every build runs the check as a ratchet. Details: [How AmiWind reduces a model](MODEL_REDUCTION.md).

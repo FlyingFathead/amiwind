@@ -1,0 +1,198 @@
+{
+ "schema": 1,
+ "about": "Per-model face overrides (tools/model_face_overrides.py, docs/NPC_MODEL_CACHE.md): the only way a baked actor model gets more faces than its class budget. Each entry: model (NPC record id, or the creature mesh path for kind creature), kind, extra_faces, reason, cost {before, added, total} as measured, pi_check (pending or the bench that passed).",
+ "entries": [
+  {
+   "model": "imperial guard",
+   "kind": "npc",
+   "extra_faces": 357,
+   "reason": "The generic Imperial guard of the opening scene does not fit the alias vertex budget at 666 or 777 once its seams are locked, and the free reducer leaves it over too: the v0.0.62-dev2 build stopped in the intro stage twice. Its bake path does not know today's total (the receipt's base_total is 0), so nothing trims it below what the largest alias limit (1,024) allows: it bakes at 963 triangles, 2,889 vertices (measured in the intro stage, 8 November 2026). Before = its v0.0.62-dev1 bake, 606 triangles; the 357 more are over the +2 % triangle rule: decided by the maintainer for v0.0.62-dev2 (keep the seam work, fix the model and the unknown today's total in dev3); pi_check pending (SEAM-STOP-MODE-FLAG-62, NPC-BODY-REGRESSION-62).",
+   "cost": {
+    "before": 606,
+    "added": 357,
+    "total": 963
+   },
+   "pi_check": "pending"
+  },
+  {
+   "model": "nels llendo",
+   "kind": "npc",
+   "extra_faces": 23,
+   "reason": "At today's total his wrists keep 0.29 of their width (stick wrists and hands); the head and hair have nothing left to give on the resident ladder (384), so the wrists need 23 more faces to keep 0.68 (NPC-BODY-REGRESSION-62).",
+   "cost": {
+    "before": 484,
+    "added": 23,
+    "total": 507
+   },
+   "pi_check": "pending"
+  },
+  {
+   "model": "r/duskyalit.nif",
+   "kind": "creature",
+   "extra_faces": 319,
+   "reason": "The Alit's plates meet at seams the free reduction pulls apart: 88 open edges its original does not have (the original, welded, has none), and two torso panels fold away. With every seam point locked on both sides it has no new open edge from 794 faces; decided for the project on 7 November 2026 (CREATURE-MESH-HOLES-62, MESH-REDUCTION-SEAMS-62).",
+   "cost": {
+    "before": 475,
+    "added": 319,
+    "total": 794
+   },
+   "pi_check": "pending"
+  },
+  {
+   "model": "r/ashzombie.nif",
+   "kind": "creature",
+   "extra_faces": 40,
+   "reason": "The creature bake keeps Tri AshZombie 1 whole: the free reduction collapsed its faces and lost its surface (the rule of CREATURE-RACER-MESH-SPIKE-58, shipped since v0.0.58; listed here for NPC-BODY-REGRESSION-62).",
+   "cost": {
+    "before": 471,
+    "added": 40,
+    "total": 511
+   },
+   "pi_check": "shipped since v0.0.58; no separate bench"
+  },
+  {
+   "model": "r/ashslave.nif",
+   "kind": "creature",
+   "extra_faces": 38,
+   "reason": "The creature bake keeps Tri Slave 1 whole: the free reduction collapsed its faces and lost its surface (the rule of CREATURE-RACER-MESH-SPIKE-58, shipped since v0.0.58; listed here for NPC-BODY-REGRESSION-62).",
+   "cost": {
+    "before": 466,
+    "added": 38,
+    "total": 504
+   },
+   "pi_check": "shipped since v0.0.58; no separate bench"
+  },
+  {
+   "model": "r/ascendedsleeper.nif",
+   "kind": "creature",
+   "extra_faces": 95,
+   "reason": "The creature bake keeps Tri body 3 whole: the free reduction collapsed its faces and lost its surface (the rule of CREATURE-RACER-MESH-SPIKE-58, shipped since v0.0.58; listed here for NPC-BODY-REGRESSION-62).",
+   "cost": {
+    "before": 469,
+    "added": 95,
+    "total": 564
+   },
+   "pi_check": "shipped since v0.0.58; no separate bench"
+  },
+  {
+   "model": "r/clannfear.nif",
+   "kind": "creature",
+   "extra_faces": 92,
+   "reason": "The creature bake keeps Tri Clannfear 15 whole: the free reduction collapsed its faces and lost its surface (the rule of CREATURE-RACER-MESH-SPIKE-58, shipped since v0.0.58; listed here for NPC-BODY-REGRESSION-62).",
+   "cost": {
+    "before": 485,
+    "added": 92,
+    "total": 577
+   },
+   "pi_check": "shipped since v0.0.58; no separate bench"
+  },
+  {
+   "model": "r/byagram.nif",
+   "kind": "creature",
+   "extra_faces": 130,
+   "reason": "The creature bake keeps Tri Chair 1, Tri body 4 whole: the free reduction collapsed its faces and lost its surface (the rule of CREATURE-RACER-MESH-SPIKE-58, shipped since v0.0.58; listed here for NPC-BODY-REGRESSION-62).",
+   "cost": {
+    "before": 385,
+    "added": 130,
+    "total": 515
+   },
+   "pi_check": "shipped since v0.0.58; no separate bench"
+  },
+  {
+   "model": "r/greatbonewalker.nif",
+   "kind": "creature",
+   "extra_faces": 29,
+   "reason": "The creature bake keeps Tri Bonewalker00 9, Tri Bonewalker00 10 whole: the free reduction collapsed its faces and lost its surface (the rule of CREATURE-RACER-MESH-SPIKE-58, shipped since v0.0.58; listed here for NPC-BODY-REGRESSION-62).",
+   "cost": {
+    "before": 467,
+    "added": 29,
+    "total": 496
+   },
+   "pi_check": "shipped since v0.0.58; no separate bench"
+  },
+  {
+   "model": "r/kwama queen.nif",
+   "kind": "creature",
+   "extra_faces": 140,
+   "reason": "The creature bake keeps Tri Antena_R, Tri Antena_L whole: the free reduction collapsed its faces and lost its surface (the rule of CREATURE-RACER-MESH-SPIKE-58, shipped since v0.0.58; listed here for NPC-BODY-REGRESSION-62).",
+   "cost": {
+    "before": 370,
+    "added": 140,
+    "total": 510
+   },
+   "pi_check": "shipped since v0.0.58; no separate bench"
+  },
+  {
+   "model": "r/kwama warior.nif",
+   "kind": "creature",
+   "extra_faces": 94,
+   "reason": "The creature bake keeps Tri Antena_L, Tri Antena_R whole: the free reduction collapsed its faces and lost its surface (the rule of CREATURE-RACER-MESH-SPIKE-58, shipped since v0.0.58; listed here for NPC-BODY-REGRESSION-62).",
+   "cost": {
+    "before": 460,
+    "added": 94,
+    "total": 554
+   },
+   "pi_check": "shipped since v0.0.58; no separate bench"
+  },
+  {
+   "model": "r/kwama worker.nif",
+   "kind": "creature",
+   "extra_faces": 94,
+   "reason": "The creature bake keeps Tri Antena_L, Tri Antena_R whole: the free reduction collapsed its faces and lost its surface (the rule of CREATURE-RACER-MESH-SPIKE-58, shipped since v0.0.58; listed here for NPC-BODY-REGRESSION-62).",
+   "cost": {
+    "before": 469,
+    "added": 94,
+    "total": 563
+   },
+   "pi_check": "shipped since v0.0.58; no separate bench"
+  },
+  {
+   "model": "r/shalk.nif",
+   "kind": "creature",
+   "extra_faces": 87,
+   "reason": "The creature bake keeps Tri Antena_L, Tri Antena_R, then Tri body whole: the free reduction collapsed their faces and lost their surface (the rule of CREATURE-RACER-MESH-SPIKE-58, shipped since v0.0.58; listed here for NPC-BODY-REGRESSION-62).",
+   "cost": {
+    "before": 437,
+    "added": 87,
+    "total": 524
+   },
+   "pi_check": "shipped since v0.0.58; no separate bench"
+  },
+  {
+   "model": "r/scamp_fetch.nif",
+   "kind": "creature",
+   "extra_faces": 94,
+   "reason": "The creature bake keeps Tri Scamp_Fetch1 2 whole: the free reduction collapsed its faces and lost its surface (the rule of CREATURE-RACER-MESH-SPIKE-58, shipped since v0.0.58; listed here for NPC-BODY-REGRESSION-62).",
+   "cost": {
+    "before": 464,
+    "added": 94,
+    "total": 558
+   },
+   "pi_check": "shipped since v0.0.58; no separate bench"
+  },
+  {
+   "model": "r/sphere_centurions.nif",
+   "kind": "creature",
+   "extra_faces": 90,
+   "reason": "The creature bake keeps Tri shield 01, Tri ball whole: the free reduction collapsed its faces and lost its surface (the rule of CREATURE-RACER-MESH-SPIKE-58, shipped since v0.0.58; listed here for NPC-BODY-REGRESSION-62).",
+   "cost": {
+    "before": 444,
+    "added": 90,
+    "total": 534
+   },
+   "pi_check": "shipped since v0.0.58; no separate bench"
+  },
+  {
+   "model": "r/wingedtwilight.nif",
+   "kind": "creature",
+   "extra_faces": 97,
+   "reason": "The creature bake keeps Tri body 4, Tri body 6, Tri body 7 whole: the free reduction collapsed its faces and lost its surface (the rule of CREATURE-RACER-MESH-SPIKE-58, shipped since v0.0.58; listed here for NPC-BODY-REGRESSION-62).",
+   "cost": {
+    "before": 458,
+    "added": 97,
+    "total": 555
+   },
+   "pi_check": "shipped since v0.0.58; no separate bench"
+  }
+ ]
+}

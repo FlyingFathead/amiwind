@@ -149,6 +149,39 @@ class IconTableTests(unittest.TestCase):
         self.assertNotEqual(picture(tmp.name, rows['inv:glove'][1])[3], picture(tmp.name, rows['inv:glove:equip'][1])[3])
         self.assertEqual(report['held'], {})
 
+    def test_every_item_with_an_icon_has_its_big_picture_for_the_strip(self):
+        # ITEM-ICONS-MISSING-62: the container strip showed only the names of clothing, armour, books and potions because
+        # its pictures ("item:") were made for the HUD's weapons alone. Every kind of item with an icon now has a 32 x 32
+        # "big:" picture, black behind it (the magic backdrop when enchanted), as well as its "inv:" one.
+        inventory = {}
+        for i in range(40):
+            inventory['weapon%02d' % i] = {'source_icon': 'w\\test_sword.tga', 'enchanted': False, 'equippable': True}
+            inventory['robe%02d' % i] = {'source_icon': 'c\\test_ring.tga', 'enchanted': i % 2 == 0, 'equippable': True}
+        inventory['noicon'] = {'source_icon': '', 'enchanted': False, 'equippable': False}
+        assets = Assets()
+        assets.files[icons.EQUIP_BACKGROUND] = png((64, 64), (0, 255, 0, 255))
+        assets.files[icons.MAGIC_EQUIP_BACKGROUND] = png((64, 64), (255, 0, 255, 255))
+        tmp = tempfile.TemporaryDirectory(); self.addCleanup(tmp.cleanup)
+        report = icons.prepare(assets, tmp.name, {}, PALETTE, COLOURS, inventory, jobs=2)
+        _, rows = table(tmp.name)
+        with_icon = [k for k, v in inventory.items() if v['source_icon']]
+        self.assertEqual(len(with_icon), 80)
+        # 100 % of the items that have an icon: a big and an inv picture each; none for an item without one
+        self.assertEqual(sum('big:' + k in rows for k in with_icon), 80)
+        self.assertEqual(sum('inv:' + k in rows for k in with_icon), 80)
+        self.assertNotIn('big:noicon', rows)
+        self.assertEqual(report['held'], {})
+        black = min(range(255), key=lambda i: sum(PALETTE[i * 3 + c] ** 2 for c in range(3)))
+        blue = min(range(255), key=lambda i: PALETTE[i * 3] ** 2 + PALETTE[i * 3 + 1] ** 2 + (PALETTE[i * 3 + 2] - 255) ** 2)
+        for key in with_icon:
+            _, w, h, pixels = picture(tmp.name, rows['big:' + key][1])
+            self.assertEqual((w, h), (32, 32))
+        self.assertEqual(set(picture(tmp.name, rows['big:robe01'][1])[3]), {black})   # transparent icon, plain: black
+        self.assertEqual(set(picture(tmp.name, rows['big:robe00'][1])[3]), {blue})    # enchanted: the magic backdrop
+        green = set(picture(tmp.name, rows['big:weapon00'][1])[3])
+        self.assertEqual(len(green), 1)                                                 # an opaque icon fills all 32 x 32
+        self.assertNotIn(black, green)
+
     def test_track_is_the_grey_bar_tinted_by_the_ini_colour(self):
         tmp = tempfile.TemporaryDirectory(); self.addCleanup(tmp.cleanup)
         colours = {'color_weapon_fill': [255, 0, 0], 'color_magic_fill': [0, 0, 255]}

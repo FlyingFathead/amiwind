@@ -26,6 +26,7 @@
 #include "aw_clock.h"
 #include "aw_tryalloc.h"
 #include "aw_listbox.h"
+#include "aw_activate.h"
 /* Ordinary hinged doors (aw_hinged_door.c sets these; NULL: none). */
 int (*aw_hinged_use)(void);
 int (*aw_hinged_hint)(const char **name,const char **action);
@@ -250,12 +251,24 @@ static cvar_t intro_docks_variant={"intro_docks_variant","2",true};
 static cvar_t target_names={"aw_target_names","1",true};
 static cvar_t label_style={"aw_interaction_label_style","1",true};
 static cvar_t target_style={"aw_target_name_style","1",true};
+/* Name labels (INFO-BOX-TEXT-CUT-62): 1 = AmiWind (the default): the title and the way to use the target
+ * (doors, actors, items, containers, plants, activators) only below the viewport, on the right, never a
+ * box over the view; 0 = Morrowind: also the original's framed box over the view, sized from its text. */
+static cvar_t name_labels={"aw_name_labels","1",true};
 int AW_SceneUIOption(int option,int change) {
-    cvar_t *c=option==0?&target_names:option==1?&target_style:&label_style;int value;
-    value=option==0?(c->value!=0):(int)c->value;
-    if(option!=0 && (value<1 || value>3))value=1;
-    if(change){value=option==0?!value:(value-1+change+3)%3+1;Cvar_SetValue(c->name,value);}
+    cvar_t *c=option==0?&target_names:option==1?&target_style:option==3?&name_labels:&label_style;int value;
+    value=option==0||option==3?(c->value!=0):(int)c->value;
+    if(option!=0 && option!=3 && (value<1 || value>3))value=1;
+    if(change){value=option==0||option==3?!value:(value-1+change+3)%3+1;Cvar_SetValue(c->name,value);}
     return value;
+}
+int AW_SceneNameLabelsAmiWind(void){return name_labels.value!=0;}
+static void name_labels_command(void) {
+    char *s=Cmd_Argv(1);int value=-1;
+    if(!Q_strcasecmp(s,"amiwind") || !strcmp(s,"1"))value=1;
+    if(!Q_strcasecmp(s,"morrowind") || !Q_strcasecmp(s,"original") || !strcmp(s,"0"))value=0;
+    if(Cmd_Argc()==2 && value>=0)Cvar_SetValue(name_labels.name,(float)value);
+    else Con_Printf("dbg ui namelabels amiwind/morrowind (now %s)\n",name_labels.value?"amiwind":"morrowind");
 }
 static void set_label_style(cvar_t *setting) {
     char *s=Cmd_Argv(1);
@@ -343,10 +356,14 @@ int AW_NPCFloor(edict_t *e) {
 void (*aw_companion_scene)(edict_t *);   /* aw_companion.c: a scene spawned */
 void (*aw_combat_scene)(void);           /* aw_combat.c: a scene spawned (before the arena spawns its fight) */
 edict_t *AW_NPCTarget(edict_t *p,vec3_t angles) {return AW_NPCTargetReach(p,angles,72);}
+/* FOCUS-NPC-OVERRIDES-ITEM-62: where the view ray enters and leaves the box of the actor the last AW_NPCTargetReach
+ * returned (map units from the eye); -1 when it returned none. */
+static float npc_aim_near=-1,npc_aim_far=-1;
 /* The same test with a longer reach (dbg pickcompanion: 384 units). */
 edict_t *AW_NPCTargetReach(edict_t *p,vec3_t angles,float reach) {
-    edict_t *e,*best=NULL;model_t *m;int i,j,index;float limit,lo,hi,a,b,o,d,t;
+    edict_t *e,*best=NULL;model_t *m;int i,j,index;float limit,lo,hi,o;
     vec3_t eye,end,forward,right,up,delta,local,ray,fmins,fmaxs;trace_t tr;
+    npc_aim_near=npc_aim_far=-1;
     AW_FPUCOUNT(AW_FPU_NPCTARGET);
     if(!p || p->v.movetype!=MOVETYPE_WALK)return NULL;
     AW_FPUCOUNT(AW_FPU_NPCSCAN);
@@ -358,7 +375,7 @@ edict_t *AW_NPCTargetReach(edict_t *p,vec3_t angles,float reach) {
     if(!tr.startsolid && !tr.allsolid && tr.fraction<1){
         limit=tr.fraction*reach;
         if(e && !e->free && e->v.modelindex && e->v.netname &&
-           !strcmp(pr_strings+e->v.classname,"aw_npc"))best=e;
+           !strcmp(pr_strings+e->v.classname,"aw_npc")){best=e;npc_aim_near=npc_aim_far=limit;}
     }else{
         tr=SV_Move(eye,vec3_origin,vec3_origin,end,MOVE_NOMONSTERS,p);
         if(tr.startsolid || tr.allsolid)return NULL;
@@ -390,19 +407,23 @@ edict_t *AW_NPCTargetReach(edict_t *p,vec3_t angles,float reach) {
         AngleVectors(e->v.angles,local,right,up);
         ray[0]=DotProduct(forward,local);ray[1]=-DotProduct(forward,right);ray[2]=DotProduct(forward,up);
         end[0]=DotProduct(delta,local);end[1]=-DotProduct(delta,right);end[2]=DotProduct(delta,up);
-        lo=0;hi=limit;
-        for(j=0;j<3;j++){
-            o=end[j];d=ray[j];
-            if(fabs(d)<0.00001f){if(o<fmins[j] || o>fmaxs[j])break;}
-            else{
-                a=(fmins[j]-o)/d;b=(fmaxs[j]-o)/d;
-                if(a>b){t=a;a=b;b=t;}if(a>lo)lo=a;if(b<hi)hi=b;
-                if(lo>hi)break;
-            }
-        }
-        if(j==3 && lo<limit){limit=lo;best=e;}
+        /* the ray against the box (aw_activate_rules.c), its exit kept: an item inside the box is not behind him */
+        if(AW_RayBox(end,ray,fmins,fmaxs,&lo,&hi) && lo<limit){limit=lo;best=e;npc_aim_near=lo;npc_aim_far=hi;}
     }
     return best;
+}
+/* FOCUS-NPC-OVERRIDES-ITEM-62: the actor the use key acts on (talk, search a body), NULL when none or when an item or
+ * plant is aimed at before him or inside his box (aw_activate.h): the nearest thing along the view ray wins, as in
+ * OpenMW 0.51, never the nearest actor. aw_activate_last keeps the numbers for `aw_placed aim`. */
+aw_activate_aim_t aw_activate_last;
+edict_t *AW_ActivateActor(edict_t *p,vec3_t angles) {
+    edict_t *e=AW_NPCTarget(p,angles);
+    aw_activate_last.actor_near=npc_aim_near;aw_activate_last.actor_far=npc_aim_far;
+    aw_activate_last.item=e?AW_InventoryAimDistance():-1;
+    aw_activate_last.plant=e?AW_HarvestAimDistance():-1;
+    aw_activate_last.item_first=e && AW_ActivateItemFirst(AW_ActivateNearest(aw_activate_last.item,aw_activate_last.plant),
+                                                          npc_aim_near,npc_aim_far);
+    return aw_activate_last.item_first?NULL:e;
 }
 /* The scene draw asks for the target several times a frame (name, travel,
  * hints, speaker): compute it once per host frame, stamped the way Quake
@@ -415,7 +436,7 @@ static edict_t *npc_target(void) {
     /* same frame, player, view and edict table (a scene load replaces it) */
     if(stamp==host_framecount && cached_player==p && cached_edicts==sv.edicts && cached_count==sv.num_edicts &&
        VectorCompare(cached_angles,cl.viewangles) && (!cached || !cached->free))return cached;
-    cached=AW_NPCTarget(p,cl.viewangles);
+    cached=AW_ActivateActor(p,cl.viewangles);   /* FOCUS-NPC-OVERRIDES-ITEM-62: an item before him or by him wins */
     stamp=host_framecount;cached_player=p;cached_edicts=sv.edicts;cached_count=sv.num_edicts;
     VectorCopy(cl.viewangles,cached_angles);
     return cached;
@@ -492,6 +513,68 @@ static void read_links_for(const char *map) {
 }
 void (*aw_scene_followers)(edict_t *player,int leave);   /* aw_mwhost.c (v0.0.62): the followers through a door */
 static int no_followers;
+/* A load that fails (HEART-CHAMBER-LOAD-HANG-62): the place the player left, taken when the load starts, so a
+ * failed load (Host_Error, Host_EndGame, a map that does not spawn) brings the player back there, game running,
+ * and a message box says why, with OK (stay) and Load Game. kind: 0 door, 1 debug teleport, 2 script. */
+#define AW_LOAD_DOOR 0
+#define AW_LOAD_TELEPORT 1
+#define AW_LOAD_SCRIPT 2
+static struct {
+    int valid,kind,movetype;char map[16];vec3_t origin,angles;float health;
+} load_from;
+static int tp_cmd;              /* a dbg tp / aw_scene console command is running */
+static int load_recovering;     /* the way back is loading */
+static int load_box_wanted;     /* 1: the box (OK / Load Game), 2: the load menu (no way back); aw_loadfail.c shows it */
+static char load_reason[160];
+static void load_from_capture(edict_t *p,int kind) {
+    if(load_recovering || !p || !sv.active || !map_valid(sv.name)){if(!load_recovering)load_from.valid=0;return;}
+    load_from.valid=1;load_from.kind=kind;copy_name(load_from.map,sizeof(load_from.map),sv.name);
+    VectorCopy(p->v.origin,load_from.origin);VectorCopy(p->v.v_angle,load_from.angles);
+    load_from.movetype=(int)p->v.movetype;load_from.health=p->v.health;
+}
+const char *AW_SceneLoadBoxText(void) {
+    return load_from.kind==AW_LOAD_TELEPORT?"Unable to teleport, see debug console with F10.":
+           load_from.kind==AW_LOAD_SCRIPT?"Unable to move there: the place failed to load. See debug console with F10.":
+           "Unable to go through the door: the place behind it failed to load. See debug console with F10.";
+}
+/* Host_Error / Host_EndGame (host.c, before the longjmp) and Host_Map_f when the map does not spawn. */
+void AW_SceneLoadFailed(const char *why) {
+    char command[32];
+    if(!pending)return;
+    if(why && why[0]){Q_strcpy_bounded(load_reason,why,sizeof(load_reason));}
+    if(load_recovering || !load_from.valid){
+        /* the way back failed too, or there was no place to go back to: no load stays pending; the menus work */
+        Con_Printf("Load failed: %s; %s.\n",load_reason,load_recovering?"the way back failed as well":"no earlier place to return to");
+        pending=region_crossing=map_jump=0;load_recovering=0;load_from.valid=0;AW_StreamTransitionReady();
+        load_box_wanted=2;      /* the load menu: a saved game is the way on (aw_loadfail.c) */
+        return;
+    }
+    Con_Printf("Load failed: %s. Returning to %s at %ld %ld %ld.\n",load_reason,load_from.map,
+        (long)load_from.origin[0],(long)load_from.origin[1],(long)load_from.origin[2]);
+    memset(&next,0,sizeof(next));copy_name(next.target,sizeof(next.target),load_from.map);
+    VectorCopy(load_from.origin,next.arrival);next.yaw=load_from.angles[1];
+    map_jump=3;region_crossing=0;crossing_movetype=load_from.movetype;health=load_from.health;
+    shroompicker_view=0;load_recovering=1;pending=1;started=Sys_FloatTime();
+    sprintf(command,"map %s\n",load_from.map);Cbuf_InsertText(command);
+}
+/* On the way back's arrival (AW_SceneSpawn): the view as it was; the box opens in the next game frame. */
+static void load_recovered(edict_t *p) {
+    if(!load_recovering)return;
+    load_recovering=0;load_from.valid=0;
+    VectorCopy(load_from.angles,p->v.angles);VectorCopy(load_from.angles,p->v.v_angle);p->v.fixangle=1;
+    p->v.movetype=load_from.movetype;noclip_anglehack=p->v.movetype==MOVETYPE_NOCLIP;
+    Con_Printf("Back at %s %ld %ld %ld after the failed load: %s\n",sv.name,(long)p->v.origin[0],(long)p->v.origin[1],
+        (long)p->v.origin[2],load_reason);
+    load_box_wanted=1;
+}
+/* aw_loadfail.c: what to show after a failed load (1 the box, 2 the load menu, 0 nothing), taken once; and the
+ * state dropped (dbg restartgame). */
+int AW_SceneLoadBoxTake(void) {
+    int w=load_box_wanted;
+    if(w==1 && (pending || !sv.active || cls.state!=ca_connected || cls.signon!=SIGNONS))return 0;  /* not arrived yet */
+    load_box_wanted=0;return w;
+}
+void (*aw_loadfail_tick)(void);   /* aw_loadfail.c, each frame from AW_SceneTick */
 static void load_scene(aw_scene_link_t *link,int immediate) {
     edict_t *p=svs.clients[0].edict;char command[32];
     if(pending || !map_valid(link->target))return;
@@ -505,6 +588,7 @@ static void load_scene(aw_scene_link_t *link,int immediate) {
         AW_SetNextLoadingDelay();
     }
     shroompicker_view=0;travel_rows_for=NULL;   /* edicts are reused by the next map: look the provider up again */
+    load_from_capture(p,tp_cmd?AW_LOAD_TELEPORT:no_followers?AW_LOAD_SCRIPT:AW_LOAD_DOOR);
     next=*link;pending=1;started=Sys_FloatTime();AW_StreamTransitionBegin();
     AW_SaveCapture();
     /* the player's followers go along (v0.0.62; OpenMW ActionTeleport teleports them with the player at a door, a
@@ -859,8 +943,12 @@ static const char *npc_hint(void)
 int (*aw_cstrip_open_now)(void);
 /* npc_interaction_layout_template_001: Morrowind name, console action below. */
 void AW_SceneDraw(void) {
-    static int red=-1;int i,y,w,cw,npc=0,steal=0;char line[80],take[48];edict_t *driver;const char *name=NULL,*action=NULL;extern int scr_copyeverything;
-    if(!AW_UISpeakerAtRight() || target_style.value!=2)AW_UIObjectName(AW_SceneTargetName(),(int)target_style.value);
+    static int red=-1;int i,y,w,cw,npc=0,steal=0,ami=AW_SceneNameLabelsAmiWind(),focus_owned=0;
+    char line[80],take[48],focus_weight[48],focus_value[48];edict_t *driver;const char *name=NULL,*action=NULL,*focus_title=NULL;extern int scr_copyeverything;
+    focus_weight[0]=focus_value[0]=0;
+    /* The two name-label styles are exclusive (INFO-BOX-TEXT-CUT-62): AmiWind draws only the title and the action
+     * below the view, Morrowind only the framed box. */
+    if(ami && (!AW_UISpeakerAtRight() || target_style.value!=2))AW_UIObjectName(AW_SceneTargetName(),(int)target_style.value);
     if(key_dest!=key_game || pending || AW_IntroUse() || AW_PlayerDead() || !sv.active || (aw_cstrip_open_now && aw_cstrip_open_now()) ||
        svs.maxclients!=1 || !svs.clients || cls.state!=ca_connected ||
        svs.clients[0].edict->v.movetype!=MOVETYPE_WALK)return;
@@ -868,17 +956,24 @@ void AW_SceneDraw(void) {
     /* FOCUS-BOX-58: an aimed ground item or door within the activation distance gets the original's framed box.
      * FOCUS-BOX-NO-ACTORS-58: a creature or a person gets none: their name already shows under the view; aimed at
      * one, no item box shows either. */
+    /* INFO-BOX-TEXT-CUT-62: the box is the Morrowind name-label style only (aw_name_labels 0), for every kind of
+     * target and then instead of the title and action below the view; the AmiWind style (the default) shows the
+     * aimed item's or container's title below the view with its action line and draws no box. */
     {
-        const char *focus_name;char weight[48],value[48];int owned;
+        const char *focus_name;
         if(!driver && !npc_hint() &&
-           (AW_InventoryFocus(&focus_name,weight,value,sizeof(weight),&owned) ||
-            AW_PlacedFocus(&focus_name,weight,value,sizeof(weight),&owned)))
-            AW_UIFocusBox(focus_name,weight,value,owned);
+           (AW_InventoryFocus(&focus_name,focus_weight,focus_value,sizeof(focus_weight),&focus_owned) ||
+            AW_PlacedFocus(&focus_name,focus_weight,focus_value,sizeof(focus_weight),&focus_owned)))
+            focus_title=focus_name;
     }
     if(!driver && aw_corpse_prompt && aw_corpse_prompt(take,sizeof(take),&name)){action=take;npc=1;}   /* CORPSE-LOOT-60 */
     else if(driver){name=pr_strings+driver->v.netname;action="E: Talk";npc=1;}
     /* STEAL-PROMPT-58: an aimed takeable item (its name is in the focus box): "E: Take", or "E: Steal" in red */
-    else if(!npc_hint() && AW_ItemPrompt(take,sizeof(take),&steal)){name="";action=take;npc=1;}
+    else if(!npc_hint() && AW_ItemPrompt(take,sizeof(take),&steal)){
+        /* the AmiWind style puts the item's or container's title with its action line below the view */
+        if(focus_title && (!ami || !AW_InventoryHint())){name=focus_title;npc=0;}else{name="";npc=1;}
+        action=take;
+    }
     else if(!npc_hint() && (name=AW_HarvestHint())!=NULL){action="E: Pick";npc=1;}
     else if(!AW_OpeningHint(&name,&action)){
         i=aimed_door();
@@ -898,10 +993,20 @@ void AW_SceneDraw(void) {
                 action="E: Talk";
         } }
     }
+    if(!name && focus_title)name=focus_title;   /* a placed thing with no action of its own: its title still shows */
     if(!name)return;
+    if(!ami){
+        /* Morrowind: the box only (the item's or container's weight, value and lock lines when it is the focus row) */
+        const char *shown=*name?name:focus_title;
+        if(shown && *shown){
+            if(focus_title && shown==focus_title)AW_UIFocusBox(shown,focus_weight,focus_value,focus_owned);
+            else AW_UIFocusBox(shown,NULL,NULL,0);
+        }
+        return;
+    }
     y=r_refdef.vrect.y+r_refdef.vrect.height;
     if((int)vid.height-y<20+AW_ConsoleCharHeight())return;
-    if(!npc && (!AW_UISpeakerAtRight() || label_style.value!=2))AW_UIObjectName(name,(int)label_style.value);
+    if(!npc &&(!AW_UISpeakerAtRight() || label_style.value!=2))AW_UIObjectName(name,(int)label_style.value);
     if(!action)return;
     sprintf(line,"(%s)",action);cw=AW_ConsoleCharWidth();w=strlen(line)*cw;
     if(steal && red<0)red=AW_UIColor(220,40,40);   /* the focus box's red name (aw_ui.c AW_UIFocusBox) */
@@ -1160,10 +1265,12 @@ void AW_SceneSpawn(edict_t *p) {
         Con_Printf("Scene ready: %s, %ld ms, %ld hunk bytes, arrival %s\n",sv.name,
             (long)((Sys_FloatTime()-started)*1000),(long)(Hunk_LowMark()+Hunk_HighMark()),placed?"checked":"blocked");
         AW_MusicSceneEvent("scene-enter");pending=0;AW_StreamTransitionReady();
+        load_recovered(p);load_from.valid=0;
         if(aw_scene_followers)aw_scene_followers(p,0);    /* the followers that came along arrive beside the player */
     } else {
         if(aw_scene_followers)aw_scene_followers(p,-1);   /* another map loaded (a load, a restart): none come along */
         pending=shroompicker_view=0;memset(&hand_snapshot,0,sizeof(hand_snapshot));AW_TorchResetAnimation();
+        load_recovering=0;load_from.valid=0;
         if(AW_Interior() || AW_TownFlag(sv.name,AW_TOWN_GROUND_PLACE) || AW_TerrainId(sv.name)>=0)AW_InteriorPlace(p,p->v.origin);
         else AW_PlacePlayer(p,p->v.origin);
     }
@@ -1189,6 +1296,7 @@ void AW_SceneTick(void) {
         if(!e->free){travel_from=e;travel_use();travel_from=NULL;}
     }
     aw_scene_link_t r;edict_t *p;
+    if(aw_loadfail_tick)aw_loadfail_tick();
     AW_NPCFloorRetry();
     if(!pending && aw_hinged_tick)aw_hinged_tick(host_frametime);   /* nothing unless a door turns */
     if(!pending && sv.active && cls.state==ca_connected && cls.signon==SIGNONS &&
@@ -1719,6 +1827,16 @@ static void demo_start(void) {
         } else Cbuf_AddText("map seyda\n");
     }
 }
+static void scene_entry(void) {tp_cmd=1;scene_command();tp_cmd=0;}
+static void teleport_entry(void) {tp_cmd=1;teleport_command();tp_cmd=0;}
+/* dbg restartgame (aw_loadfail.c): the scene's state dropped, the followers left behind, the story and the save state
+ * reset (the game itself is ended there). */
+void AW_SceneLoadReset(void) {
+    AW_SceneCancelTransition();
+    load_recovering=0;load_from.valid=0;load_box_wanted=0;travel_pending=NULL;
+    if(aw_scene_followers && sv.active && svs.clients && svs.clients[0].edict)aw_scene_followers(svs.clients[0].edict,-1);
+    AW_StoryReset(0);AW_SaveReset();
+}
 void AW_SceneInit(void) {
     AW_HarvestInit();
     Cmd_AddCommand("aw_debug_hors",hors_command);
@@ -1726,10 +1844,11 @@ void AW_SceneInit(void) {
     Cvar_RegisterVariable(&target_style);Cmd_AddCommand("aw_target_place",target_style_command);
     Cvar_RegisterVariable(&label_style);Cmd_AddCommand("aw_label_style",label_style_command);
     Cvar_RegisterVariable(&target_names);Cmd_AddCommand("aw_target_names_set",target_names_command);
+    Cvar_RegisterVariable(&name_labels);Cmd_AddCommand("aw_name_labels_set",name_labels_command);
     Cmd_AddCommand("aw_door_status",door_status);
     Cvar_RegisterVariable(&early_game_demo_start_1);
-    Cmd_AddCommand("aw_scene",scene_command);
-    Cmd_AddCommand("aw_teleport",teleport_command);
+    Cmd_AddCommand("aw_scene",scene_entry);
+    Cmd_AddCommand("aw_teleport",teleport_entry);
     Cmd_AddCommand("aw_shroompicker",shroompicker_command);
     Cmd_AddCommand("aw_demo_start",demo_start);
     Cmd_AddCommand("aw_quick_start",quick_start);

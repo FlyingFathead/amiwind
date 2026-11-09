@@ -516,6 +516,9 @@ extern void (*aw_scene_followers)(struct edict_s *player,int leave);
 extern int (*aw_mwscript_packages_export)(unsigned char *out,int capacity);   /* aw_ambient.c: saved travel/follow */
 extern int (*aw_mwscript_packages_import)(const unsigned char *data,int bytes);   /* the ambient tables' AITravel (aw_mwhost.c) */
 extern int (*aw_mwscript_ai_package)(struct edict_s *e,int *done);   /* the ambient tables' AI package (aw_mwhost.c) */
+/* DIALOGUE-AGGRO-62: the Fight actor E has now (a script's or an answer's SetFight / ModFight), -1 when it has no live
+ * record: the ambient aggression reads it instead of the record's (aw_mwhost.c sets it; NULL: the record's) */
+extern int (*aw_ambient_fight_now)(struct edict_s *e);
 int AW_MwscriptSpeedAttribute(struct edict_s *e);
 /* Object state the scripts set (aw_mwhost.c): 1 when Disable hid the placement REFERENCE; its lock level, or
  * ORIGINAL when no script set one (0 unlocked .. 100). */
@@ -524,6 +527,8 @@ int AW_ObjectDisabled(unsigned int reference);
  * disabled (saved with the object state) and hidden, its edict or its CHIM room placements; 0 when nothing of it is
  * on this map to hide (an exterior CHIM static: not yet). */
 int AW_ObjectTake(unsigned int reference,int stolen);
+int AW_PlacedActivate(unsigned reference);   /* aw_inventory.c: a script's Activate on a placed item; 1 used */
+extern int (*aw_inventory_intercept)(unsigned reference);   /* aw_inventory.c; aw_mwhost.c sets it */
 int ChimRoom_Hide(unsigned reference,int hide);   /* chim/chim_room.c: a room's placements of REFERENCE out (1) or back */
 int ChimRoom_Has(unsigned reference);             /* chim/chim_room.c: the loaded room's drawn placements of REFERENCE */
 void AW_MwscriptRoomShift(float shift[3]);
@@ -613,6 +618,27 @@ extern int aw_ui_over_window;   /* screen.c: the messages are drawn over a windo
 int AW_ModalBlackBackground(void);
 int AW_UIMode(void);
 void AW_SceneCancelTransition(void);
+void AW_SceneLoadFailed(const char *why);
+void AW_LoadFailInit(void);             /* aw_loadfail.c */
+void AW_CensusInit(void);               /* aw_census.c: dbg memcensus (a measuring build counts) */
+int AW_SceneLoadBoxTake(void);          /* aw_scene.c, for aw_loadfail.c */
+const char *AW_SceneLoadBoxText(void);
+void AW_SceneLoadReset(void);
+extern void (*aw_loadfail_tick)(void);
+extern void (*aw_game_reset)(int new_game);   /* aw_intro.c; aw_loadfail.c sets it (the reset registry, aw_reset.h) */
+void AW_ResetBootMark(void);                  /* aw_loadfail.c, at the end of the start-up (host.c) */
+void AW_MwscriptNewGameReset(void);           /* aw_mwhost.c: the scripts' whole session reset (NEWGAME-STATE-RESET-62) */
+unsigned long AW_MwscriptDigest(void);
+void AW_MovieRestartLogo(void);
+void AW_MsgBoxClear(void);
+int AW_ConsolePagerKey(int key);
+int AW_ConsolePageRows(void);
+extern int (*aw_console_pager_key)(int key);   /* keys.c; aw_console.c sets it */
+int AW_MsgBoxMouse(int dx,int dy);      /* aw_msgbox.c: 1 = a box with buttons took the move */
+int AW_ViewDeathMouse(int dx,int dy);   /* aw_view.c: 1 = the death box took the move */
+extern int (*aw_msgbox_mouse)(int dx,int dy);   /* in_amiga.c; aw_msgbox.c sets it at the first box */
+extern int (*aw_death_mouse)(int dx,int dy);    /* in_amiga.c; aw_view.c sets it */
+extern cvar_t aw_load_fail_test;
 void AW_ModalFrame(void);
 int AW_UIValidateFont(const byte *,int);
 int AW_UIBackground(void);
@@ -677,6 +703,8 @@ int AW_UIWidth(const char *);
 int AW_UIHeight(void);
 const char *AW_UILine(const char *,int,char *,int);
 void AW_UISubtitle(const char *,const char *,double);
+/* A notice the next lines do not replace for HOLD seconds (they wait and follow it): the skill-raise line. */
+void AW_UIHeldNotice(const char *text,double duration,double hold);
 int AW_UISubtitleIs(const char *text);
 void AW_UIPickupNotice(const char *text,double duration);
 void AW_UICenterMessage(const char *);
@@ -688,8 +716,20 @@ int AW_UIVoiceStyle(void);
 int AW_UIVoiceAimOnly(void);
 void AW_UIVoiceNamesToggle(void);
 void AW_UIDialogueCycle(int step);
+int AW_DialTopicColours(void);          /* aw_dialwin.c: OpenMW's topic colours on (TOPIC-COLOURS-62) */
+void AW_DialTopicColoursToggle(void);
 void AW_UIVoiceSubtitle(const char *name,const char *text,double duration);
-int AW_SceneUIOption(int option,int change);
+#define AW_UI_THIN_LINE 1
+void AW_UIThinInner(int x,int y,int w,int h,int *ix,int *iy,int *iw,int *ih);
+void AW_UIThinBox(int x,int y,int w,int h,int lit);
+void AW_UIButton(int x,int y,int w,int h,const char *text,int lit,int colour);   /* the house button style (UI-THIN-BUTTON-62) */
+int AW_SceneUIOption(int option,int change);   /* 0 aimed NPC names, 1 NPC place, 2 object place, 3 name labels (1 AmiWind, 0 Morrowind) */
+int AW_SceneNameLabelsAmiWind(void);          /* INFO-BOX-TEXT-CUT-62: 1 = no box over the view (the default) */
+#define AW_FOCUS_ROWS 12
+#define AW_FOCUS_ROW_CHARS 96
+/* The Morrowind name box's text rows, wrapped at max_width in the font the box is drawn with; returns the row count
+ * and the box width (the widest row plus the padding) in *box_w. Nothing is cut: a word wider than a row splits. */
+int AW_UIFocusLayout(const char *name,const char *line2,const char *line3,int max_width,char rows[][AW_FOCUS_ROW_CHARS],int *box_w);
 void AW_UITargetName(const char *name);
 void AW_UIObjectName(const char *name,int style);
 void AW_UIFocusBox(const char *name,const char *line2,const char *line3,int owned);
@@ -697,6 +737,9 @@ int AW_IntroPromptActive(void);
 const char *AW_SceneTargetName(void);
 edict_t *AW_NPCTarget(edict_t *player,vec3_t angles);
 edict_t *AW_NPCTargetReach(edict_t *player,vec3_t angles,float reach);
+/* FOCUS-NPC-OVERRIDES-ITEM-62: the actor the use key acts on, NULL when an item or plant is aimed at before him or
+ * inside his box (aw_activate.h, aw_scene.c) */
+edict_t *AW_ActivateActor(edict_t *player,vec3_t angles);
 int AW_NPCFloor(edict_t *actor);
 int AW_NPCFloorRetry(void);
 int AW_AliasBudgetAllows(int vertices,int triangles);
@@ -779,6 +822,7 @@ extern int (*aw_combat_buttons)(int bits);
 int AW_CompanionPickMode(void);
 int AW_CompanionPickAim(void);
 void AW_CompanionKillMode(void);   /* dbg kill: the red-crosshair kill pick on or off (DBG-KILL-60) */
+void AW_CompanionKillCrime(void);  /* dbg kill crime: the same pick, the kill counted as the player's (CRIME-59) */
 /* Hooks set by AW_CompanionInit, defined beside their callers (NULL in
  * fixtures that compile those files alone): view.c, cl_input.c,
  * aw_scene.c, aw_save.c. */
@@ -817,6 +861,7 @@ int AW_CompanionDistance(void);
 int AW_CompanionMimic(void);
 int AW_CompanionToggleWord(char *word);
 int AW_MovieStart(void);
+int AW_MovieScript(const char *file);   /* PlayBink: a catalogue video over the scene (MWSCRIPT-UNPLACED-ATTACH-62) */
 void AW_MovieInit(void);
 void AW_MovieStartup(void);
 int AW_MovieActive(void);
@@ -858,6 +903,10 @@ int AW_OpeningTick(void);
 int AW_OpeningLocked(void);
 void AW_OpeningSpawn(void);
 int AW_OpeningUse(void);
+extern cvar_t aw_census_legacy;   /* CENSUS-INTRO-SCRIPTS-62, aw_opening.c; registered in aw_debug.c */
+int AW_CensusLegacy(void);   /* 1: the old hand-written captain box instead of his dialogue */
+int AW_OpeningScriptMenu(int kind);  /* a script's class (2), birth (3), review (4) window; 1 opened */
+extern int (*aw_intro_census_legacy)(void);   /* aw_intro.c's view of it (set in aw_debug.c; NULL: the new path) */
 int AW_OpeningHint(const char **name,const char **action);
 int AW_BarrierDecode(const byte *raw,int size);
 int AW_BarrierLoad(void);
@@ -881,6 +930,7 @@ int AW_WaitKey(int key);
 int AW_WaitDraw(void);
 
 void AW_UICenteredLines(int x,int y,int w,int h,const char *text);
+void AW_UICenteredLinesUpTo(int x,int y,int w,int h,const char *text,int most);
 const char *AW_UIPage(const char *text,int width,int rows,char *out,int capacity);
 
 const char *AW_SceneWorldModel(const char *name);

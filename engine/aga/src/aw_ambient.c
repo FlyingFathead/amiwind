@@ -235,6 +235,7 @@ int AW_AmbientEscortStep(long place,long room,float target2,float dest2,float hu
 #include "aw_combat.h"
 #include "aw_dial.h"
 #include "aw_spike.h"
+#include "aw_crime.h"
 int AW_AreaPlaceKeys(unsigned long *keys,int max,unsigned long *generation);   /* aw_inventory.c */
 
 #define SLOTS 128
@@ -687,19 +688,32 @@ static int aggro_on=1;          /* "chim actors ambient aggro on|off" (default o
 /* The aggro's facts, read once when the slot is made (the cell's load, with the actor's other data) and never on an
  * engage tick (a disk read in a fight stutters): the record's Fight, and an NPC's own disposition facts. A Fight that
  * cannot reach 100 even at distance 0 and disposition 0 never checks. */
+int (*aw_ambient_fight_now)(edict_t *e);
+/* the Fight kept for the aggro: -1 when even at distance 0 and disposition 0 it cannot reach 100 */
+static short fight_kept(const slot_t *s,int fight) {
+    int npc=!(s->flags&AW_AMBIENT_CREATURE);
+    if(fight+aw_combat_ai.iFightDistanceBase+(npc?50.0f*aw_combat_ai.fFightDispMult:0)<100)return -1;
+    return (short)(fight>0?fight:1);
+}
 static void aggro_facts(slot_t *s) {
-    aw_fighter_t sheet;int npc=!(s->flags&AW_AMBIENT_CREATURE);
-    if(!AW_CombatAiLoaded() || !AW_CombatActorLoad(source_id(s->e),&sheet) ||
-       sheet.fight+aw_combat_ai.iFightDistanceBase+(npc?50.0f*aw_combat_ai.fFightDispMult:0)<100){s->fight=-1;return;}
-    s->fight=(short)(sheet.fight>0?sheet.fight:1);
+    aw_fighter_t sheet;int npc=!(s->flags&AW_AMBIENT_CREATURE),now;
+    if(!AW_CombatAiLoaded() || !AW_CombatActorLoad(source_id(s->e),&sheet)){s->fight=-1;return;}
+    now=aw_ambient_fight_now?aw_ambient_fight_now(s->e):-1;
+    if((s->fight=fight_kept(s,now>=0?now:sheet.fight))<0)return;
     if(npc)AW_DialNpcPrepare(s->e,&s->disp);
 }
 static void aggro(slot_t *s) {
-    aw_fighter_t sheet;int got,disposition=50,npc=!(s->flags&AW_AMBIENT_CREATURE);
-    if(!aggro_on || s->fight<0 || sv.time<s->engage_at)return;
+    aw_fighter_t sheet;int got,disposition=50,npc=!(s->flags&AW_AMBIENT_CREATURE),now=-1;
+    if(!aggro_on || sv.time<s->engage_at || !s->fight)return;   /* 0: not read yet (aggro_facts) */
     s->engage_at=(float)sv.time+0.75f+0.5f*(float)(roll16()&1023)/1023.0f;
     if(!AW_CombatAiLoaded())return;
-    if(!s->fight)return;        /* read with the slot (aggro_facts); never on the engage tick */
+    /* DIALOGUE-AGGRO-62: a script's or an answer's SetFight / ModFight on this actor (not only the speaker's: a
+     * dialogue result may raise a bystander's Fight, "sosia caristiana"->SetFight 100) counts from the next check, as
+     * OpenMW's actors update reads the actor's current Fight; read once a check (about 1 s), from the live record (no
+     * file). One made hostile this way after its slot was made has no disposition facts read (that read is the slot's,
+     * DIALOGUE-FIGHT-DISPOSITION-57): its disposition reads 50 until the slot is made again */
+    if(aw_ambient_fight_now && (now=aw_ambient_fight_now(s->e))>=0)s->fight=fight_kept(s,now);
+    if(s->fight<0)return;
     st.aggro_checks++;
     {
         /* the rating from the kept Fight first (no file read while it stays under 100); distance in original units */
@@ -711,6 +725,7 @@ static void aggro(slot_t *s) {
     }
     if(AW_CombatHostiles()>=FIGHT_SLOTS){st.aggro_full++;return;}
     if(!AW_CombatActorLoad(source_id(s->e),&sheet)){s->fight=-1;return;}
+    if(now>=0)sheet.fight=(unsigned char)(now>100?100:now);   /* the Fight it has now, not the record's */
     got=AW_CombatAggro(s->e,&sheet,NULL,disposition,NULL,NULL);
     if(got>0){st.aggro_engaged++;if(s->state==S_WALK)stop_walk(s);}
     else if(got<0 && !AW_CombatAiLoaded())s->fight=-1;
@@ -1386,6 +1401,21 @@ void AW_AmbientCommand(void) {
     }
     else status();
 }
+/* CRIME-59 (aw_crime.h aw_crime_pursue; OpenMW 0.51 aipursue.cpp): an alarmed guard pursues the player to arrest: the
+ * follow above toward the player at once (not waiting until the player is near), with no duration; ON 0 ends it.
+ * The crime rules' tick talks when it is near (aw_crime.c). OpenMW makes the pursuer run; here it walks at the
+ * follow's pace. */
+static int pursue(edict_t *e,int on) {
+    slot_t *s;edict_t *p=player();
+    if(!e || e->free || !p)return 0;
+    if(!on){
+        if((s=slot_for(e))!=NULL && (s->travel==3 || s->travel==4) && s->follow_num==NUM_FOR_EDICT(p))follow_done(s);
+        return 1;
+    }
+    if(!AW_AmbientFollow(e,p,0,NULL) || !(s=slot_for(e)))return 0;
+    s->travel=4;                                    /* active now: the pursuit does not wait to be in sight */
+    return 1;
+}
 extern void (*aw_ambient_cmd)(void);   /* aw_actors.c: "chim actors ambient" */
 void AW_AmbientInit(void) {
     aw_ambient_cmd=AW_AmbientCommand;
@@ -1400,6 +1430,7 @@ void AW_AmbientInit(void) {
     aw_mwscript_packages_export=AW_AmbientPackagesExport;
     aw_mwscript_packages_import=AW_AmbientPackagesImport;
     aw_ambient_speed_attribute=AW_MwscriptSpeedAttribute;
+    aw_crime_pursue=pursue;                          /* CRIME-59: the guards' pursuit to arrest */
     AW_MoveSettingsDefault(&move_defaults);
 }
 #endif

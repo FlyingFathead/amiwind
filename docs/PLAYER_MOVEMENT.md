@@ -1,6 +1,6 @@
 # Player scale, collision and camera motion
 
-_Last updated with AmiWind v0.0.62-dev1 (2026-11-07)._
+_Last updated with AmiWind v0.0.62-dev2 (2026-11-08)._
 
 <!-- contents start -->
 ## Contents
@@ -48,8 +48,8 @@ the user's Morrowind.esm). Diagonal input is no longer faster than straight inpu
 
 **Read live.** Speed, Athletics, Strength and the load are read from the character sheet every frame,
 never baked at build time or at character creation: a level-up, a skill gain, a scripted change, and
-later a Fortify or Drain effect change the speed at once. `superspeed` with no argument prints the
-current walk, run and swim speed with the stats it used.
+later a Fortify or Drain effect change the speed at once. `superspeed` with no argument turns superspeed the
+other way and prints the current walk, run and swim speed with the stats it used.
 
 | Character | Walk (units/s) | Run (units/s) | Old walk / run |
 | --- | ---: | ---: | ---: |
@@ -62,9 +62,13 @@ costs nothing, and no cost goes below 0 (OpenMW lets only a fight's damage take 
 fatigue comes back as before (fFatigueReturnBase + fFatigueReturnMult x Endurance per second). Godmode
 pays nothing.
 
-**Superspeed** (`dbg superspeed on|off`, also plain `superspeed on|off`; on/off, true/false or 1/0; default
-off, not saved): the earlier movement exactly as it was, `cl_forwardspeed`, Shift x `cl_movespeedkey`,
-`sv_maxspeed`, water x 0.7, with no running fatigue. For debugging and fast travel checks.
+**Superspeed** (`dbg superspeed [on|off]`, also plain `superspeed`; on/off, true/false or 1/0, no word turns it
+the other way; default off, not saved): the earlier movement exactly as it was, `cl_forwardspeed`, Shift x
+`cl_movespeedkey`, `sv_maxspeed`, water x 0.7. Since v0.0.62 the stamina is endless while it is on: whatever spends
+fatigue (a run, a jump, a swing, a block, a blow taken) is filled again at the next move, and the movement rules read
+Speed, Athletics and Acrobatics as 100, the skill and attribute maximum; the character sheet itself is not changed,
+so off gives the real values back at once. For debugging and fast travel checks. The same no-word rule holds for
+every on/off debug command (`tests/test_console_toggles.py` checks the whole catalogue).
 
 Every factor of the OpenMW rules, and where it comes from in AmiWind:
 

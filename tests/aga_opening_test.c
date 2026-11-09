@@ -10,7 +10,8 @@ aw_character_t aw_character;char *pr_strings;
 int pr_edict_size=sizeof(edict_t);client_state_t cl;
 static edict_t object,clerk;static eval_t reference;static int occluded,reads;
 static int obstructed,door_sounds,links,probes,world_hit;static vec3_t hit_pos;
-edict_t *EDICT_NUM(int n){return n==1?&object:&clerk;}
+static edict_t captain;extern cvar_t aw_census_legacy;
+edict_t *EDICT_NUM(int n){return n==1?&object:n==3?&captain:&clerk;}
 trace_t SV_Move(vec3_t a,vec3_t mi,vec3_t ma,vec3_t b,int type,edict_t *p){
  trace_t t;memset(&t,0,sizeof(t));t.fraction=occluded?.5f:1;
  if(world_hit){t.fraction=.5f;t.ent=sv.edicts;VectorCopy(hit_pos,t.endpos);}  /* a CHIM chunk placement */
@@ -19,7 +20,11 @@ trace_t SV_Move(vec3_t a,vec3_t mi,vec3_t ma,vec3_t b,int type,edict_t *p){
 static edict_t guard;static int speech,menu,done,nav_stops,nav_starts,nav_result;
 static vec3_t nav_goal;
 static char line[32];
-edict_t *AW_IntroRole(int role){return role==5?&guard:role==6 && clerk.v.modelindex?&clerk:NULL;}
+static int added;static char added_id[64];   /* the OnPCAdd hook's calls (aw_state.c aw_item_added) */
+static void count_added(const char *id,int32_t count){(void)count;added++;strcpy(added_id,id);}
+static int guard_role8;   /* the captain's edict stands in for the hall door guard */
+edict_t *AW_IntroRole(int role){return role==5?&guard:role==6 && clerk.v.modelindex?&clerk:
+    role==7 && captain.v.modelindex && !guard_role8?&captain:role==8 && guard_role8?&captain:NULL;}
 int AW_NavLoad(const char *s){nav_stops++;return 1;}
 int AW_NavStart(edict_t *e,vec3_t goal){nav_starts++;VectorCopy(goal,nav_goal);return 1;}
 int AW_NavStep(double dt,int wait){return nav_result;}
@@ -44,6 +49,9 @@ int SV_ModelIndex(char *s){return 0;}
 int main(void)
 {
     edict_t player;client_t client;int i;
+    /* the old hand-written path (aw_census_legacy 1) for the checks written for it; the census office's own
+     * scripts (the default, 0) where a block says so (CENSUS-INTRO-SCRIPTS-62) */
+    aw_census_legacy.value=1;
     /* Original camera unlock is after the papers instruction, not race
      * selection, office entry, or merely making the papers visible. */
     AW_StoryReset(1);
@@ -77,6 +85,21 @@ int main(void)
     guard.v.angles[1]=10;nav_result=0;AW_OpeningTick();assert(guard.v.angles[1]==10);
     nav_result=1;AW_OpeningTick();assert(guard.v.angles[1]==225);
     for(i=0;i<5;i++)AW_OpeningTick();assert(nav_starts==2 && guard.v.angles[1]==225);
+    /* INTRO-DOCK-GUARD-BLOCKS-DOOR-62: the post is on the LEFT of the office door as the player comes up from the
+     * pier, clear of the doorway, and he faces the pier there. Door 113893 (doors-seyda.txt box 308.9..332.6,
+     * -173.4..-149.6, centre 320.7 -161.5); the ship's arrival on the deck 695.5 -486.7. */
+    {
+        float door[2]={320.7f,-161.5f},pier[2]={695.5f,-486.7f},walk[2],left[2],rel[2],len,face,want;
+        walk[0]=door[0]-pier[0];walk[1]=door[1]-pier[1];len=(float)sqrt(walk[0]*walk[0]+walk[1]*walk[1]);
+        walk[0]/=len;walk[1]/=len;left[0]=-walk[1];left[1]=walk[0];
+        rel[0]=nav_goal[0]-door[0];rel[1]=nav_goal[1]-door[1];
+        assert(rel[0]*left[0]+rel[1]*left[1]>30);                  /* left of the door, well clear of its frame */
+        assert(sqrt(rel[0]*rel[0]+rel[1]*rel[1])<64);               /* still beside it */
+        face=guard.v.angles[1]+90;                                  /* converted actors face local +Y */
+        want=(float)(atan2(pier[1]-nav_goal[1],pier[0]-nav_goal[0])*180/M_PI);
+        while(face-want>180)face-=360;while(want-face>180)face+=360;
+        assert(fabs(face-want)<15);                                 /* he faces the pier */
+    }
     assert(AW_StoryRestricted()); /* Race completion must not remove the enclosure. */
     for(i=0;i<70;i++)AW_OpeningTick();assert(!strcmp(line,"chargendock3"));
     /* Prompt and E share aim/range/visibility and the same stateful target. */
@@ -155,6 +178,113 @@ int main(void)
         assert(AW_OpeningHint(&name,&action) && !strcmp(action,"Talk: E") && !strcmp(name,"Socucius Ergalla"));
         speech=0;assert(AW_OpeningUse() && aw_story.census==10);
         assert(!AW_OpeningHint(&name,&action));
+        /* CENSUS-INTRO-SCRIPTS-62: Sellus Gravius talks through the dialogue window (his Greeting 1 and "duties"
+         * answers with their result scripts), not the old hand-written box; the box only behind
+         * aw_census_legacy 1. The greeting's take of the papers, seen in his reach, records his state -1. */
+        {
+            int before=reads;
+            aw_census_legacy.value=0;
+            clerk.v.modelindex=0;sv.num_edicts=4;captain.v.modelindex=1;captain.v.netname=1;
+            captain.v.origin[0]=20;captain.v.origin[2]=-14;
+            AW_StoryReset(1);aw_story.stage=AW_STAGE_CAPTAIN;aw_story.census=-1;aw_story.captain_hint=1;
+            assert(AW_ItemAdd(&aw_state,"chargen statssheet",1) && AW_Papers()==1);
+            assert(!AW_CensusLegacy());
+            assert(!AW_OpeningHint(&name,&action));
+            assert(!AW_OpeningUse() && reads==before);
+            aw_census_legacy.value=1;
+            assert(AW_OpeningHint(&name,&action) && !strcmp(action,"Talk: E"));
+            assert(AW_OpeningUse() && reads==before+1);
+            aw_census_legacy.value=0;
+            AW_OpeningTick();assert(aw_story.captain==0);              /* he has not taken them yet */
+            assert(AW_ItemAdd(&aw_state,"chargen statssheet",-1));
+            AW_OpeningTick();assert(aw_story.captain==-1);             /* Greeting 1: removeitem, state -1 */
+            /* papers dropped away from him are not his greeting */
+            AW_StoryReset(1);aw_story.stage=AW_STAGE_CAPTAIN;aw_story.census=-1;aw_story.captain_hint=1;
+            captain.v.origin[0]=400;
+            assert(AW_ItemAdd(&aw_state,"chargen statssheet",1));AW_OpeningTick();
+            assert(AW_ItemAdd(&aw_state,"chargen statssheet",-1));AW_OpeningTick();
+            assert(aw_story.captain==0);
+            captain.v.modelindex=0;sv.num_edicts=3;
+            /* the door guard (role 8) runs CharGenDoorGuardTalker: the opening says nothing for him and no longer
+             * holds the hall door's lock (the door's own lock and his script's Unlock); on the old path it does */
+            assert(AW_OpeningHingedStory(AW_REF_CENSUS_HALL_DOOR,AW_HINGE_STORY_LOCK)==-1);
+            assert(AW_OpeningHingedStory(AW_REF_CENSUS_HALL_DOOR,AW_HINGE_STORY_REFUSED)==-1);
+            AW_StoryReset(1);aw_story.stage=AW_STAGE_COURTYARD;speech=0;line[0]=0;
+            captain.v.modelindex=1;captain.v.origin[0]=20;    /* standing in for him: AW_IntroRole(8) below */
+            guard_role8=1;
+            assert(AW_ItemAdd(&aw_state,"chargen statssheet",1));
+            for(i=0;i<40;i++)AW_OpeningTick();
+            assert(!aw_story.hall && !line[0]);
+            aw_census_legacy.value=1;
+            for(i=0;i<40 && !aw_story.hall;i++)AW_OpeningTick();
+            assert(aw_story.hall && !strcmp(line,"chargen_door2"));
+            assert(AW_OpeningHingedStory(AW_REF_CENSUS_HALL_DOOR,AW_HINGE_STORY_LOCK)==0);
+            guard_role8=0;captain.v.modelindex=0;
+        }
+    }
+    /* CENSUS-INTRO-SCRIPTS-62: the scripts' EnableInventoryMenu / EnableStatsMenu (one saved named fact, one row for
+     * every menu, no row for a repeat; New Game clears it) add to the opening's rule; the clerk's script opens the
+     * class window (the office's CLASS stage), the birth and review windows (no stage of their own) */
+    {
+        int rows;
+        AW_StoryReset(1);aw_story.stage=AW_STAGE_OFFICE;
+        assert(!AW_StoryInventoryAllowed() && !(AW_StoryHudChannels()&AW_HUD_STATS) && !AW_StoryMenus());
+        rows=aw_state.count[AW_GLOBAL];
+        assert(AW_StoryMenuEnable(AW_MENU_INVENTORY|AW_MENU_STATS) && aw_state.count[AW_GLOBAL]==rows+1);
+        assert(AW_StoryMenuEnable(AW_MENU_STATS) && aw_state.count[AW_GLOBAL]==rows+1);
+        assert(AW_StoryMenus()==(AW_MENU_INVENTORY|AW_MENU_STATS));
+        assert(AW_StoryInventoryAllowed() && (AW_StoryHudChannels()&AW_HUD_STATS) && !(AW_StoryHudChannels()&AW_HUD_MAGIC));
+        assert(AW_StoryMenuEnable(AW_MENU_MAGIC) && (AW_StoryHudChannels()&AW_HUD_MAGIC));
+        AW_StoryReset(1);assert(!AW_StoryMenus());
+        menu=0;aw_story.stage=AW_STAGE_OFFICE;
+        assert(AW_OpeningScriptMenu(2) && menu==2 && aw_story.stage==AW_STAGE_CLASS);
+        assert(AW_OpeningScriptMenu(3) && menu==3 && aw_story.stage==AW_STAGE_CLASS);
+        assert(AW_OpeningScriptMenu(4) && menu==4 && !AW_OpeningScriptMenu(1) && !AW_OpeningScriptMenu(5) && menu==4);
+    }
+    /* CENSUS-INTRO-SCRIPTS-62: the clerk runs CharGenClassNPC. The opening says nothing for him, does not lock the
+     * player and does not aim at him; his script's windows move the stages on: class -> birth -> review -> papers,
+     * the review's end restoring the new character's health and allowing the view. On the old path he speaks. */
+    {
+        const char *name,*action;
+        aw_census_legacy.value=0;
+        strcpy(sv.name,"census");sv.active=1;sv.num_edicts=3;object.v.modelindex=0;
+        clerk.v.modelindex=1;clerk.v.origin[0]=15;clerk.v.origin[1]=0;clerk.v.origin[2]=0;
+        player.v.origin[0]=player.v.origin[1]=0;player.v.origin[2]=0;player.v.movetype=MOVETYPE_WALK;
+        AW_StoryReset(1);aw_story.stage=AW_STAGE_OFFICE;speech=0;line[0]=0;menu=0;
+        for(i=0;i<10;i++)AW_OpeningTick();
+        assert(aw_story.census==0 && !line[0] && !menu && !AW_OpeningLocked());
+        assert(!AW_OpeningHint(&name,&action) && !AW_OpeningUse());
+        assert(AW_OpeningScriptMenu(2) && aw_story.stage==AW_STAGE_CLASS);
+        done=3;AW_OpeningTick();assert(aw_story.stage==AW_STAGE_CLASS);     /* not this window's result */
+        done=2;AW_OpeningTick();assert(aw_story.stage==AW_STAGE_BIRTH);
+        done=3;AW_OpeningTick();assert(aw_story.stage==AW_STAGE_REVIEW && !AW_StoryViewAllowed());
+        aw_character.current[0]=55;player.v.health=1;
+        done=4;AW_OpeningTick();
+        assert(aw_story.stage==AW_STAGE_PAPERS && aw_story.census==-1 && player.v.health==55 && AW_StoryViewAllowed());
+        assert(!line[0] && menu==2);   /* only the window his script opened; nothing said for him */
+        /* the papers run CharGenStatsSheet: the opening does not aim at them; carried, they are the courtyard stage;
+         * every gain of the player's inventory reaches the OnPCAdd hook, a copy's does not */
+        clerk.v.modelindex=0;object.v.modelindex=1;reference._float=AW_REF_CENSUS_PAPERS;
+        object.v.absmin[0]=object.v.absmax[0]=30;object.v.absmin[1]=object.v.absmax[1]=0;
+        object.v.absmin[2]=object.v.absmax[2]=13;player.v.view_ofs[2]=13;cl.viewangles[1]=0;
+        assert(!AW_OpeningHint(&name,&action) && !AW_OpeningUse());
+        aw_item_added=count_added;added=0;
+        {aw_state_t copy=aw_state;assert(AW_ItemAdd(&copy,"chargen statssheet",1) && added==0);}
+        assert(AW_ItemAdd(&aw_state,"chargen statssheet",1) && added==1 && !strcmp(added_id,"chargen statssheet"));
+        assert(AW_ItemAdd(&aw_state,"chargen statssheet",-1) && added==1);
+        assert(AW_ItemAdd(&aw_state,"Chargen StatsSheet",1) && added==2 && !strcmp(added_id,"chargen statssheet"));
+        aw_item_added=NULL;
+        AW_OpeningTick();assert(aw_story.stage==AW_STAGE_COURTYARD);
+        aw_census_legacy.value=1;
+        assert(AW_ItemAdd(&aw_state,"chargen statssheet",-1));
+        AW_StoryReset(1);aw_story.stage=AW_STAGE_PAPERS;
+        assert(AW_OpeningHint(&name,&action) && !strcmp(action,"Read: E"));
+        aw_census_legacy.value=0;object.v.modelindex=0;clerk.v.modelindex=1;
+        AW_StoryReset(1);aw_story.stage=AW_STAGE_OFFICE;
+        aw_census_legacy.value=1;
+        AW_StoryReset(1);aw_story.stage=AW_STAGE_OFFICE;speech=0;
+        AW_OpeningTick();assert(aw_story.census==10 && !strcmp(line,"chargen_class1"));
+        clerk.v.modelindex=0;speech=0;
     }
     /* An old full global table cannot silently lose the activation permission.
      * Refuse recording, retain all state, and do not admit an earlier stage. */

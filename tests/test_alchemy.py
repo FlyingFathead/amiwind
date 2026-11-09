@@ -161,13 +161,13 @@ class AlchemySourceContracts(unittest.TestCase):
         ui = code('aw_worldui.c')
         self.assertIn('ok=aw_worldui_use(item);', ui)
         self.assertIn('if(ok==2){close_panel();if(aw_worldui_alchemy_open)aw_worldui_alchemy_open();return;}', ui)
-        self.assertIn('inventory_action(inventory_usable(item)?3:1)', ui)
+        self.assertIn('inventory_action(inventory_usable(item)?3:', ui)   # then Read for books (4), else Equip
         # MADE-ITEM-NO-PICTURE-62: a made item's row shows its base item's picture
         self.assertIn('aw_worldui_icon_id?aw_worldui_icon_id(it->id):it->id', ui)
         self.assertIn('aw_worldui_icon_id=icon_id;', code('aw_alchemy.c'))
         inv = code('aw_inventory.c')
         self.assertIn('if(aw_inventory_command && aw_inventory_command())return;', inv)
-        self.assertIn('(value.flags&~127U)', inv)
+        self.assertIn('(value.flags&~(127U|AW_INV_BEAST_HEAD|AW_INV_BEAST_FEET))', inv)   # flags 128/256 since v0.0.62
 
     def test_glue_follows_the_rules(self):
         glue = code('aw_alchemy.c')

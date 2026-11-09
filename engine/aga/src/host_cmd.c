@@ -323,6 +323,12 @@ void Host_Map_f (void)
 
 	svs.serverflags = 0;			// haven't completed an episode yet
 	COM_FormatPath (name, sizeof(name), "%s", Cmd_Argv(1));	// fits: SV_MapNameFits
+	if (aw_load_fail_test.value >= 1)
+	{
+		/* the test setting: this load fails as a room that cannot load does (HEART-CHAMBER-LOAD-HANG-62) */
+		Cvar_SetValue ("aw_load_fail_test", aw_load_fail_test.value - 1);
+		Host_Error ("map %s: forced load failure (aw_load_fail_test)", name);
+	}
 	AW_SPIKE_BEGIN (spike_t0);
 #ifdef QUAKE2
 	SV_SpawnServer (name, NULL);
@@ -334,6 +340,7 @@ void Host_Map_f (void)
 	{
         S_CancelSceneVoice();
 		SCR_EndLoadingPlaque();
+		AW_SceneLoadFailed ("the map could not be spawned");	/* back where the load started */
 		return;
 	}
 

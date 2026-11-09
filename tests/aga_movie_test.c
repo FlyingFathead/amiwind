@@ -142,6 +142,15 @@ int main(void){
     AW_MoviePaint(paint,1,4000);assert(AW_MovieActive());
     AW_MovieUpdate();assert(!AW_MovieActive() && !paused && key_dest==key_console && ends==4);
 #endif
+    /* PlayBink (MWSCRIPT-UNPLACED-ATTACH-62): a script's "MW_Logo.bik" plays that catalogue video over the scene,
+     * one at a time, and the scene's input comes back after it; a name the catalogue lacks does nothing */
+    if(AW_MovieActive())AW_MovieKey(K_ESCAPE,1);
+    key_dest=key_console;sound_started=0;fixture();soundtime=paintedtime=5000;
+    assert(!AW_MovieScript("mw_end.bik") && !AW_MovieActive());
+    assert(!AW_MovieScript(NULL));
+    assert(AW_MovieScript("MW_Logo.bik") && AW_MovieDebugActive() && key_dest==key_game);
+    assert(!AW_MovieScript("MW_Logo.bik"));
+    AW_MovieUpdate();assert(AW_MovieKey(K_ESCAPE,1) && !AW_MovieActive() && key_dest==key_console);
     /* A partial-area build (aw_miniwind.c): the startup logo's last frame stays up
      * with "Press ENTER to start" in the console font; only Enter starts the game. */
     {

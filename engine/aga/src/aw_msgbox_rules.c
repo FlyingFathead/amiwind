@@ -70,6 +70,15 @@ void AW_MsgBoxOpen(aw_msgbox_t *m,const char *text,const char *const *buttons,in
     for(i=0;i<count;i++)copy(m->button[i],sizeof(m->button[i]),buttons?buttons[i]:"");
     m->count=count;m->selection=0;m->open=1;m->pressed=-1;
 }
+int AW_MsgBoxLinesShown(int lines,int rows,int screen,int line) {
+    int room;
+    if(lines<1)lines=1;
+    if(line<1)line=1;
+    room=(screen-8-16-rows*24)/line;
+    if(room<1)room=1;
+    if(lines>room)lines=room;
+    return lines>AW_MSGBOX_LINES?AW_MSGBOX_LINES:lines;
+}
 int AW_MsgBoxKey(aw_msgbox_t *m,int key) {
     int chosen=-1;
     if(!m->open || m->count<1)return -1;
@@ -81,3 +90,42 @@ int AW_MsgBoxKey(aw_msgbox_t *m,int key) {
     return chosen;
 }
 int AW_MsgBoxTake(aw_msgbox_t *m) {int b=m->pressed;m->pressed=-1;return b;}
+
+/* Where a box and its buttons are on the screen (MSGBOX-NO-CURSOR-62): the pointer's hit test and the drawing use
+ * the same rectangles. A script's box (and the failed-load box): at most 300 wide, centred, TEXT_PX of text, its
+ * buttons in rows of AW_MSGBOX_PER_ROW, 22 high. FRAME and RECT: x, y, w, h. */
+void AW_MsgBoxLayout(int count,int vw,int vh,int text_px,int frame[4]) {
+    int rows=(count+AW_MSGBOX_PER_ROW-1)/AW_MSGBOX_PER_ROW;
+    frame[2]=vw-16<300?vw-16:300;
+    frame[3]=8+text_px+8+rows*24;
+    if(frame[3]>vh-8)frame[3]=vh-8;
+    frame[0]=(vw-frame[2])/2;frame[1]=(vh-frame[3])/2;
+}
+void AW_MsgBoxButtonRect(int count,int i,const int frame[4],int rect[4]) {
+    int rows=(count+AW_MSGBOX_PER_ROW-1)/AW_MSGBOX_PER_ROW,row=i/AW_MSGBOX_PER_ROW,col=i%AW_MSGBOX_PER_ROW;
+    int in_row=row==rows-1?count-row*AW_MSGBOX_PER_ROW:AW_MSGBOX_PER_ROW;
+    rect[2]=(frame[2]-16-(in_row-1)*8)/in_row;rect[3]=22;
+    rect[0]=frame[0]+8+col*(rect[2]+8);rect[1]=frame[1]+frame[3]-rows*24+row*24-2;
+}
+int AW_MsgBoxButtonAt(int count,const int frame[4],int px,int py) {
+    int i,r[4];
+    for(i=0;i<count && i<AW_MSGBOX_BUTTONS;i++){
+        AW_MsgBoxButtonRect(count,i,frame,r);
+        if(px>=r[0] && px<r[0]+r[2] && py>=r[1] && py<r[1]+r[3])return i;
+    }
+    return -1;
+}
+/* The death box (aw_view.c AW_ViewDraw): 280 x 96, centred, COUNT buttons in one row, 24 high, 32 above its foot. */
+void AW_DeathBoxButtonRect(int count,int i,int vw,int vh,int rect[4]) {
+    int x=(vw-AW_DEATHBOX_W)/2,y=(vh-AW_DEATHBOX_H)/2;
+    rect[2]=(AW_DEATHBOX_W-16-(count-1)*8)/count;rect[3]=24;
+    rect[0]=x+8+i*(rect[2]+8);rect[1]=y+AW_DEATHBOX_H-32;
+}
+int AW_DeathBoxButtonAt(int count,int vw,int vh,int px,int py) {
+    int i,r[4];
+    for(i=0;i<count;i++){
+        AW_DeathBoxButtonRect(count,i,vw,vh,r);
+        if(px>=r[0] && px<r[0]+r[2] && py>=r[1] && py<r[1]+r[3])return i;
+    }
+    return -1;
+}

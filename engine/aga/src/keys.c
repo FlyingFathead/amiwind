@@ -387,12 +387,15 @@ static void console_terminal_key(int key)
     }
 }
 
+int (*aw_console_pager_key)(int key);
 void Key_Console (int key)
 {
     char	*cmd;
     if(shift_down && key==K_UPARROW)key=K_PGUP;
     if(shift_down && key==K_DOWNARROW)key=K_PGDN;
     if(Key_ConsoleTerminal()){console_terminal_key(key);return;}
+    /* a paged listing waits: Enter next page, q stops (DBG-HELP-PAGER-62; aw_console.c sets the hook) */
+    if(aw_console_pager_key && aw_console_pager_key(key))return;
 
     if (key == K_ENTER)
     {

@@ -27,6 +27,10 @@ enum {AW_SLOT_HELMET,AW_SLOT_CUIRASS,AW_SLOT_GREAVES,AW_SLOT_LPAULDRON,
 #define AW_INV_DROP 2U
 #define AW_INV_EQUIP_SUPPORTED 4U
 #define AW_INV_SCRIPTED 8U
+/* EQUIP-ACTION-REGRESSION-62 (OpenMW 0.51 mwclass/armor.cpp, clothing.cpp canBeEquipped): a piece with a Head part,
+ * a piece with a foot part: a beast race cannot wear either (tools/prepare_inventory.py FLAG_BEAST_*) */
+#define AW_INV_BEAST_HEAD 128U
+#define AW_INV_BEAST_FEET 256U
 #define AW_INV_CONSTANT_EFFECT 16U
 /* A carried light (catalogue bytes 504..510: burn time, colour; subtype = radius). */
 #define AW_INV_LIGHT 32U
@@ -100,6 +104,8 @@ float AW_LightBurn(const aw_inventory_item_t *,float remaining,float seconds);
 int AW_DebugTorchGrant(aw_state_t *,int enabled);
 /* aw_debug_torch.c: the aw_debug_torch switch, the census-exit grant and the lit torch. */
 void AW_DebugTorchInit(void);
+/* dbg torch / dbg give dbgtorch / dbg give debugtorch (TORCH-HIDES-HELM-62): one more debug torch, with a message */
+void AW_DebugTorchGive(void);
 int AW_MagicSelectedItem(aw_inventory_item_t *out);
 void AW_MagicFrame(float seconds);
 float AW_MagicRechargeRate(void);
@@ -152,10 +158,38 @@ enum {AW_GEARBOX_NONE,AW_GEARBOX_WEAPON,AW_GEARBOX_GEAR};
 int AW_GearBoxKind(const aw_inventory_item_t *it);
 int AW_GearBoxOrder(const aw_inventory_item_t *it);
 int AW_GearBoxLabel(const aw_inventory_item_t *it,char *out,int size);
+/* DBG-GIVE-MONEY-62: COUNT in at most four characters for the inventory's count column (OpenMW getCountString, small
+ * text: 9999, then 10k, 1m, 1b); the length, -1 when OUT holds fewer than 6 bytes */
+int AW_InventoryCountText(long count,char *out,int size);
+/* INVENTORY-DOUBLECLICK-62: the inventory window's double-click on a row and its count box (pure). The original and
+ * OpenMW 0.51 equip or use an item dropped on the character picture (mwgui/inventorywindow.cpp onAvatarClicked,
+ * useItem) and ask the count of a stack in a box with a slider and a number field (countdialog.cpp: 1 to the stack,
+ * OK and Cancel); here a double-click does the same at once: equips or takes off what can be worn (no question), reads
+ * a book, opens the alchemy window for an apparatus, and for a potion or an ingredient asks first in a box with OK and
+ * Cancel, the slider and the number field in it for a stack (from 1; OpenMW starts its count box at the whole stack,
+ * the confirmation starts at one so a stack is never used up by accident). DoubleClick: 1 when ROW was clicked at NOW
+ * within AW_INV_DOUBLE_CLICK_SECONDS of the click on LAST_ROW at LAST_TIME. SliderCount: the count (1..MAX) at X on a
+ * rail from RAIL_X, RAIL_W pixels wide; SliderX: where COUNT sits on it. CountType: the number field after KEY (a
+ * digit, or '\b' Backspace) from COUNT; FRESH: the field is still the opening value, which a digit replaces; 0 =
+ * empty, at most MAX. */
+#define AW_INV_DOUBLE_CLICK_SECONDS 0.5
+int AW_InventoryDoubleClick(int last_row,double last_time,int row,double now);
+int AW_InventorySliderCount(int x,int rail_x,int rail_w,int max);
+int AW_InventorySliderX(int count,int rail_x,int rail_w,int max);
+int AW_InventoryCountType(int count,int fresh,int key,int max);
 /* Every catalogue row in file order through EACH (CTX); the rows read, -1 when the catalogue cannot be read. */
 int AW_InventoryScan(void (*each)(void *ctx,const aw_inventory_item_t *it),void *ctx);
 /* dbg weapon / dbg gear: open the box (KIND AW_GEARBOX_*); 0 when it cannot open now. */
 int AW_GearBoxOpen(int kind);
+/* DBG-GIVE-MONEY-62 (aw_gearbox.c): dbg give alone, the box of every catalogue item (name, id dimmer, kinds as groups),
+ * then the count box for the item chosen; 0 when it cannot open now. AW_InventoryGive (aw_inventory.c): COUNT of
+ * catalogue item ID to the player with a message (gold held at AW_GOLD_MAX); 1 given. dbg give money|coin|rich [N]: N
+ * gold, default AW_GIVE_MONEY_DEFAULT. */
+#define AW_GIVE_MONEY_DEFAULT 1000000L
+#define AW_GIVE_ITEMS_MAX 99999L
+int AW_GiveBoxOpen(void);
+int AW_GiveCountBoxOpen(void);
+int AW_InventoryGive(const char *id,long count);
 int AW_InventoryEquipped(const aw_state_t *,const char *id);
 int AW_InventoryEquipSlot(aw_state_t *,const aw_inventory_item_t *,int slot);
 int AW_InventoryEquip(aw_state_t *,const aw_inventory_item_t *);
@@ -219,6 +253,9 @@ extern int (*aw_inventory_use)(const aw_inventory_item_t *it);
 extern int (*aw_inventory_command)(void);
 /* the same two for the inventory window (aw_worldui.c defines them, so its fixtures link without aw_inventory.c) */
 extern int (*aw_worldui_use)(const aw_inventory_item_t *it);
+/* MWSCRIPT-GAP-FUNCTIONS-62: the item's script around its equipping (aw_mwhost.c; phase 0 before: 1 = its
+ * PCSkipEquip takes the equipping; phase 1 after it was worn: OnPCEquip set) */
+extern int (*aw_worldui_equip_script)(const aw_inventory_item_t *it,int phase);
 extern void (*aw_worldui_alchemy_open)(void);
 /* MADE-ITEM-NO-PICTURE-62: the id whose picture the inventory row shows (a made item's base item; aw_alchemy.c) */
 extern const char *(*aw_worldui_icon_id)(const char *id);
@@ -234,6 +271,9 @@ int AW_InventoryFocus(const char **name,char *weight_line,char *value_line,int l
  * (the short words when the full ones do not fit); one catalogue read per new ID. 0 when the item is unknown. */
 int AW_InventoryPropertiesLine(const char *id,int columns,char *out,int size);
 float AW_ActivateDistance(void);
+/* FOCUS-NPC-OVERRIDES-ITEM-62: how far along the view ray (map units from the eye) the item the use key would take or
+ * open lies: a drop, a placed item or a container within the activation distance; -1 when none */
+float AW_InventoryAimDistance(void);
 /* The same for things placed in the loaded room (id1/focus.awf): items with weight and value, actors and doors with
  * their name only (empty lines). */
 int AW_PlacedFocus(const char **name,char *weight_line,char *value_line,int line_size,int *owned);
@@ -256,6 +296,16 @@ extern unsigned aw_levelled_seed;
 extern unsigned long aw_levelled_rolls,aw_levelled_items;
 /* The book reader's entry (NULL until it exists): opens the readable book placed as REFERENCE; 1 when it opened. */
 extern int (*aw_book_reader)(unsigned reference);
+/* EQUIP-ACTION-REGRESSION-62: NULL when the player's race may wear IT; else the game's message key (sNotifyMessage13
+ * a piece over the head, 14 armour on the feet, 15 clothing on the feet). BEAST: a beast race. Pure. */
+const char *AW_InventoryBeastRefusal(const aw_inventory_item_t *it,int beast);
+/* "is the player a beast race" (set by the engine; NULL in the fixtures: not a beast) */
+extern int (*aw_inventory_player_beast)(void);
+/* the game text key of the last AW_InventoryCanEquip refusal with a message of the original (NULL none) */
+const char *AW_InventoryEquipRefusal(void);
+/* EQUIP-ACTION-REGRESSION-62 (item classes): a carried book or scroll read from the inventory window (aw_reader.c sets
+ * it; aw_worldui.c defines it, NULL in the fixtures: no Read). 1 when the reader opened. */
+extern int (*aw_worldui_read)(const char *id);
 /* BOOK-READER-58: the placed book's record id (FOCUS id, 33 bytes) and ownership; 1 when it is in the focus table. */
 int AW_PlacedBook(unsigned reference,char *id,int *owned);
 /* BOOK-READER-58: take the placed item REFERENCE as E on it would (owned: stolen); 1 when taken or refused. */

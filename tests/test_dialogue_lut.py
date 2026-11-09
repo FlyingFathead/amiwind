@@ -366,11 +366,12 @@ class DialogueTable(unittest.TestCase):
         self.assertEqual(find('My Ring, the ring, a ringing background.'), [2, 3, 0])
         self.assertEqual(find('backgrounds'), [])
         spans = D.span_finder(['Background', None, 'my ring', 'ring'])
-        # OpenMW's rule: a name starts at a word separator (nothing checked at its end: "ringing" links "ring"), the
-        # longest of overlapping names wins; an explicit marker is stripped and linked when it names a topic, kept as
-        # plain text when it does not; the text after a marker is a new segment (a name may start right after it)
+        # OpenMW's rule: a name starts at a word separator, the longest of overlapping names wins; an explicit marker
+        # is stripped and linked when it names a topic, kept as plain text when it does not; the text after a marker
+        # is a new segment (a name may start right after it). Ours adds the word's end (DIALOGUE-LINKS-62):
+        # "ringing" does not link "ring", a plural ("backgrounds") still links
         self.assertEqual(spans('My Ring, the ring, a ringing background.'),
-                         ('My Ring, the ring, a ringing background.', [(0, 7, 2), (13, 4, 3), (21, 4, 3), (29, 10, 0)]))
+                         ('My Ring, the ring, a ringing background.', [(0, 7, 2), (13, 4, 3), (29, 10, 0)]))
         self.assertEqual(spans('Ask about @my ring# or @nothing#, then ring.'),
                          ('Ask about my ring or nothing, then ring.', [(10, 7, 2), (35, 4, 3)]))
         self.assertEqual(spans('@ring#s and backgrounds'), ('rings and backgrounds', [(0, 4, 3), (10, 10, 0)]))
@@ -514,7 +515,7 @@ class ImageStep(unittest.TestCase):
                               ('TOPIC_ROW', struct.calcsize(D.TOPIC_ROW)), ('ENTRY_ROW', struct.calcsize(D.ENTRY_ROW)),
                               ('LIST_ROW', struct.calcsize(D.LIST_ROW)), ('QUEST_ROW', struct.calcsize(D.QUEST_ROW)),
                               ('JOURNAL_ROW', struct.calcsize(D.JOURNAL_ROW)), ('ENTRY_LAST', D.ENTRY_LAST),
-                              ('KIND_TOPIC', D.KIND_TOPIC), ('KIND_PERSUASION', D.KIND_PERSUASION),
+                              ('ENTRY_ACTOR', D.ENTRY_ACTOR), ('KIND_TOPIC', D.KIND_TOPIC), ('KIND_PERSUASION', D.KIND_PERSUASION),
                               ('KIND_GREETING', D.KIND_GREETING),
                               ('BUFFER', D.BUFFER_BUDGET)):
             self.assertRegex(header, r'#define AW_DIAL_%s %d\b' % (define, value))
@@ -761,6 +762,53 @@ class NativeDialogue(unittest.TestCase):
                                  str(Path(self.tmp.name) / G.NAME), str(path)], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn('%d checks' % len(lines), result.stdout)
+
+    def test_choice_branches_follow_every_filter(self):
+        # DIALOGUE-CHOICES-62: a roadside robber's demand in the original's shape (Choice "pay" 1 "refuse" 2; the pay
+        # answer needs the gold, a second pay answer says the player has not got it, the refusal starts the fight).
+        # After a pick the same topic is searched again from its first answer with the Choice value and every other
+        # filter (OpenMW DialogueManager::questionAnswered): by number, the engine's reader and first match (aw_dial.c
+        # AW_DialAnswer with aw_glut.c's evaluator and the live item count) against the reference, with and without
+        # the gold, for each row and with no choice open.
+        gold_at_least, gold_under = ('05IX3gold_001', 50), ('05IX4gold_001', 50)
+        topics = dict(TOPICS, proposition=[
+            result(info('rb1', 'Then we settle it with steel.', kind=0, ONAM='fargoth', scvr=[CHOICE2]),
+                   'SetFight 100\nStartCombat Player\nGoodbye'),
+            result(info('rb2', 'A wise choice, friend.', kind=0, ONAM='fargoth', scvr=[CHOICE, gold_at_least]),
+                   'Player->RemoveItem "Gold_001" 50\nGoodbye'),
+            result(info('rb3', 'You have not got the gold. A pity.', kind=0, ONAM='fargoth', scvr=[CHOICE, gold_under]),
+                   'SetFight 100\nGoodbye'),
+            result(info('rb4', 'Fifty pieces of gold, and you walk on.', kind=0, ONAM='fargoth'),
+                   'Choice "Fine. Take my money." 1 "Never!" 2')])
+        raw, _ = D.build(kinds(), topics, dict(DIALS, proposition=('proposition', 0)))
+        t = D.read(raw)
+        order = list(G.read(self.voices)['npcs'])
+        npc, topic = order.index('fargoth'), [n for n, _ in t['topics']].index('proposition')
+        want = {(-1, 0): 'Fifty pieces of gold, and you walk on.', (-1, 100): 'Fifty pieces of gold, and you walk on.',
+                (1, 0): 'You have not got the gold. A pity.', (1, 100): 'A wise choice, friend.',
+                (2, 0): 'Then we settle it with steel.', (2, 100): 'Then we settle it with steel.'}
+        lines = []
+        for gold in (0, 49, 50, 100):
+            live = {'item': {'gold_001': gold}}
+            lines += ['live', 'set\titem\tgold_001\t%d' % gold,
+                      'row\tfargoth\t%d\t%s' % (npc, ','.join(str(x) for x in sorted(t['rows'][npc])))]
+            for choice in (-1, 1, 2):
+                state = {'choice': choice, 'random': 50, 'disposition': 50, 'live': live}
+                got = ref_answer(t, npc, topic, state)
+                text = t['text'](t['entries'][got][0])
+                self.assertEqual(text, want[(choice, 100 if gold >= 50 else 0)], (choice, gold))
+                script = t['script'](t['entries'][got][2]).replace('\n', '|')
+                links, spans = link_fields(t, got)
+                lines.append('answer\tfargoth\t%d\t50\t%d\t50\t%d\t%s\t%s\t%s\t%s' % (
+                    topic, choice, got, text, script, links, spans))
+        tmp = Path(self.tmp.name)
+        (tmp / 'choices.lut').write_bytes(raw)
+        path = tmp / 'choices.txt'
+        path.write_text('\n'.join(lines) + '\n', encoding='cp1252')
+        result_ = subprocess.run([str(tmp / 'dial'), str(tmp / 'choices.lut'), str(tmp / G.NAME), str(path)],
+                                 capture_output=True, text=True)
+        self.assertEqual(result_.returncode, 0, result_.stdout + result_.stderr)
+        self.assertIn('%d checks' % len(lines), result_.stdout)
 
     def test_services_from_the_npc_or_its_class(self):
         # OpenMW MWClass::Npc::getServices: an autocalculated NPC (FLAG 0x10) offers its class's services (CLDT

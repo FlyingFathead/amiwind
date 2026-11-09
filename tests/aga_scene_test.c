@@ -50,7 +50,28 @@ int AW_GlutNpcOf(struct edict_s *e){(void)e;return -1;}
 void AW_UIObjectName(const char *name,int style){if(name)strcpy(object_name,name);}
 void S_LocalSound(char *name){}
 int AW_IntroUse(void){return 0;}
-int AW_OpeningHint(const char **name,const char **action){return 0;}
+static int opening_hint;   /* INFO-BOX-TEXT-CUT-62: an activator of the opening (the identification papers) */
+int AW_OpeningHint(const char **name,const char **action){
+ if(!opening_hint)return 0;
+ *name="Identification papers";*action="Read: E";return 1;
+}
+/* A placed item or container the crosshair is on (aw_inventory.c) and the box drawn over the view (aw_ui.c) */
+static int focus_kind,box_calls;static char box_name[80];
+void AW_UIFocusBox(const char *name,const char *line2,const char *line3,int owned){box_calls++;strcpy(box_name,name);}
+int AW_PlacedFocus(const char **name,char *weight_line,char *value_line,int line_size,int *owned){
+ if(!focus_kind)return 0;
+ *name=focus_kind==1?"Quill Pen":"Basket";weight_line[0]=value_line[0]=0;*owned=0;return 1;
+}
+int AW_ItemPrompt(char *line,int size,int *steal){
+ if(!focus_kind)return 0;
+ strcpy(line,focus_kind==1?"E: Take":"E: Open");*steal=0;return 1;
+}
+static int hinged_door;
+extern int (*aw_hinged_hint)(const char **name,const char **action);
+static int door_hint(const char **name,const char **action){
+ if(!hinged_door)return 0;
+ *name="Door";*action="Open: E";return 1;
+}
 int AW_ConsoleCharHeight(void){return 8;}
 int AW_ConsoleCharWidth(void){return 8;}
 void AW_ConsoleCharacter(int x,int y,int c){int n=strlen(hint);assert(n<79);hint[n]=c;hint[n+1]=0;}
@@ -123,7 +144,8 @@ extern const char *(*aw_chim_town_map)(const char *town);
 static const char *balmora_frame(const char *town){return strcmp(town,"balmora")?NULL:"maps/balmora-chim.bsp";}
 void AW_UISubtitle(const char *name,const char *text,double duration){strcpy(notice,text);}
 void AW_UIPickupNotice(const char *text,double duration){AW_UISubtitle("",text,duration);}
-void Cvar_RegisterVariable(cvar_t *c){if(!strcmp(c->name,"aw_target_names"))names_option=c;else demo_option=c;c->value=atof(c->string);}
+static cvar_t *labels_option;
+void Cvar_RegisterVariable(cvar_t *c){if(!strcmp(c->name,"aw_target_names"))names_option=c;else if(!strcmp(c->name,"aw_name_labels"))labels_option=c;else demo_option=c;c->value=atof(c->string);}
 /* dbg door roulette: the rooms this fixture's disk holds (bmcaius, census; 2 also mi5b8154939f7aa without a start) */
 static int roulette_fixture;
 /* dbg door roulette [SEED] as the console routes it (aw_console.c): aw_teleport roulette [SEED]; the test sets
@@ -315,6 +337,9 @@ trace_t SV_Move(vec3_t a,vec3_t mins,vec3_t maxs,vec3_t b,int type,edict_t *p){
  trace_t t;memset(&t,0,sizeof(t));t.fraction=1;VectorCopy(b,t.endpos);
  if(all_solid==1 || (all_solid==2 && fabs(a[0])<100 && fabs(a[1])<100)){t.startsolid=t.allsolid=true;t.fraction=0;return t;}
  if(travel_trace){t.fraction=.5;t.ent=occluded?NULL:&target;return t;}
+ /* FOCUS-NPC-OVERRIDES-ITEM-62: the use key's choice also asks the plant aim, whose point test (a zero-length move)
+  * finds no solid here */
+ if(target_trace && VectorCompare(a,b))return t;
  if(target_trace){assert(type==MOVE_NORMAL);assert(fabs((b[0]-a[0])*(b[0]-a[0])+(b[1]-a[1])*(b[1]-a[1])+(b[2]-a[2])*(b[2]-a[2])-72*72)<.1);t.fraction=.5;t.ent=occluded?NULL:&target;return t;}
  if(harvest_fixture && occluded){t.fraction=.1f;return t;}
  if(type==MOVE_NOMONSTERS){door_traces++;VectorCopy(a,door_trace_from);VectorCopy(b,door_trace_to);if(occluded)t.fraction=.3f;
@@ -734,13 +759,45 @@ int main(void){
  hint[0]=object_name[0]=0;AW_SceneDraw();
  assert(!strcmp(hint,"(E: Pick)") && !strcmp(object_name,"Luminous Russula"));
  assert(!strcmp(AW_SceneTargetName(),"Luminous Russula"));
+ /* a plant under the Morrowind style: the box only, nothing below the view (INFO-BOX-TEXT-CUT-62) */
+ labels_option->value=0;box_calls=0;hint[0]=object_name[0]=0;AW_SceneDraw();
+ assert(box_calls==1 && !strcmp(box_name,"Luminous Russula") && !hint[0] && !object_name[0]);labels_option->value=1;
  occluded=1;hint[0]=0;AW_SceneDraw();assert(!hint[0] && !AW_SceneTargetName());occluded=0;
  /* Existing named NPC targeting wins without consuming the plant. */
  target.v.classname=1;target.v.netname=8;target_trace=1;voice.string=8;role._float=0;
  hint[0]=0;AW_SceneDraw();assert(!strcmp(hint,"(E: Talk)"));assert(!AW_SceneUse());
+ /* an actor under the Morrowind style: the box with the name only, no action line below the view */
+ labels_option->value=0;box_calls=0;hint[0]=object_name[0]=0;AW_SceneDraw();
+ assert(box_calls==1 && !strcmp(box_name,"Fargoth") && !hint[0] && !object_name[0]);labels_option->value=1;
  target_trace=0;target.v.classname=sizeof(ORIGINAL_STRINGS);target.v.netname=0;
  assert(AW_SceneUse());assert(!strcmp(notice,"Picked up 2 Original item name."));
  hint[0]=object_name[0]=0;AW_SceneDraw();assert(!hint[0] && !AW_SceneTargetName());
+ /* INFO-BOX-TEXT-CUT-62: the name labels. AmiWind (the default, aw_name_labels 1): every kind of target the crosshair
+  * can pick gives its title and an action line below the view and draws NO box over the view; Morrowind (0) also
+  * draws the framed box. Actors ("(E: Talk)" and the name) and plants ("(E: Pick)") are checked above. */
+ {
+  static const char *want_name[]={"Quill Pen","Basket"},*want_action[]={"(E: Take)","(E: Open)"};int k;
+  assert(labels_option && labels_option->value==1 && AW_SceneNameLabelsAmiWind());
+  aw_hinged_hint=door_hint;
+  for(k=0;k<2;k++){
+   focus_kind=k+1;box_calls=0;hint[0]=object_name[0]=0;AW_SceneDraw();   /* an item, a container */
+   assert(!box_calls && !strcmp(object_name,want_name[k]) && !strcmp(hint,want_action[k]));
+   /* the Morrowind style draws the box and nothing below the view: the two styles never show in one frame */
+   labels_option->value=0;box_calls=0;hint[0]=object_name[0]=0;AW_SceneDraw();
+   assert(box_calls==1 && !strcmp(box_name,want_name[k]) && !hint[0] && !object_name[0] && !AW_SceneNameLabelsAmiWind());
+   labels_option->value=1;
+  }
+  focus_kind=0;
+  hinged_door=1;box_calls=0;hint[0]=object_name[0]=0;AW_SceneDraw();     /* a door */
+  assert(!box_calls && !strcmp(object_name,"Door") && !strcmp(hint,"(Open: E)"));
+  labels_option->value=0;box_calls=0;hint[0]=object_name[0]=0;AW_SceneDraw();
+  assert(box_calls==1 && !strcmp(box_name,"Door") && !hint[0] && !object_name[0]);labels_option->value=1;hinged_door=0;
+  opening_hint=1;box_calls=0;hint[0]=object_name[0]=0;AW_SceneDraw();    /* an activator */
+  assert(!box_calls && !strcmp(object_name,"Identification papers") && !strcmp(hint,"(Read: E)"));
+  labels_option->value=0;box_calls=0;hint[0]=object_name[0]=0;AW_SceneDraw();
+  assert(box_calls==1 && !strcmp(box_name,"Identification papers") && !hint[0] && !object_name[0]);labels_option->value=1;opening_hint=0;
+  aw_hinged_hint=NULL;
+ }
  /* One-command regression location uses checked teleport and does not reset
   * picked facts/inventory. Final signon must not quantize the requested aim. */
  {

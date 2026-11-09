@@ -20,6 +20,9 @@
 #include "aw_clock.h"
 #include "aw_tryalloc.h"
 #include "aw_rest.h"
+#include "aw_inventory.h"
+#include "aw_listbox.h"   /* DBG-STATS-COMMANDS-62: the level prompt */
+#include "aw_combat.h"    /* DBG-STATS-COMMANDS-62: the fight sheet's fatigue */
 
 aw_levelup_rules_t aw_levelup_rules;
 extern int aw_stats_level_total;        /* aw_statswin.c: the level progress bar's total (0 = no bar) */
@@ -75,10 +78,15 @@ static const aw_class_t *player_class(void)
 /* "Your %s skill increased to %d." with the skill and its new value (the game's own line, its two fields filled in
  * order; an AmiWind line when the image has none). */
 int AW_LevelupGameText(const char *key,char *out,int size){return game_text(key,out,size);}
-static void raised_message(int sk,int due)
+static void raised_message(int sk,int due,int book)
 {
     char form[160],line[320],rest[160];int i=0,o=0,fields=0;
     if(!game_text("sNotifyMessage39",form,sizeof(form)))strcpy(form,"Your %s skill increased to %d.");
+    /* a book's raise starts with the game's own book line (OpenMW playerskillhandlers.lua: sBookSkillMessage) */
+    if(book){
+        if(!game_text("sBookSkillMessage",rest,sizeof(rest)))strcpy(rest,"You have learned something new.");
+        o=snprintf(line,sizeof(line),"%s ",rest);
+    }
     while(form[i] && o<(int)sizeof(line)-48){
         if(form[i]=='%' && form[i+1]=='s' && fields==0){o+=snprintf(line+o,sizeof(line)-o,"%s",AW_StatsSkillName(sk));i+=2;fields++;}
         else if(form[i]=='%' && form[i+1]=='d' && fields==1){o+=snprintf(line+o,sizeof(line)-o,"%ld",(long)aw_character.skills[sk]);i+=2;fields++;}
@@ -89,12 +97,13 @@ static void raised_message(int sk,int due)
         if(!game_text("sLevelUpMsg",rest,sizeof(rest)))strcpy(rest,"You should rest and meditate on what you've learned.");
         if(o+2+(int)strlen(rest)<(int)sizeof(line)){strcat(line," ");strcat(line,rest);}
     }
-    AW_UISubtitle("",line,due?6:4);
+    /* held for 3 s: the hit and voice lines of the same blow no longer replace it at once (SKILL-RAISE-NOT-SEEN-62) */
+    AW_UIHeldNotice(line,due?6:4,3);
     if(raise_sound[0])S_LocalSoundBeside(raise_sound);
 }
-static int raised(int sk,int was_due)
+static int raised(int sk,int was_due,int book)
 {
-    raised_message(sk,!was_due && AW_LevelupDue(&aw_levelup_rules,&aw_character));
+    raised_message(sk,!was_due && AW_LevelupDue(&aw_levelup_rules,&aw_character),book);
     return 1;
 }
 int AW_LevelupUse(int sk,int use,float scale)
@@ -103,7 +112,7 @@ int AW_LevelupUse(int sk,int use,float scale)
     if(!aw_character.valid || !AW_LevelupLoad())return 0;
     was_due=AW_LevelupDue(&aw_levelup_rules,&aw_character);
     r=AW_LevelupSkillUsed(&aw_levelup_rules,player_class(),&aw_character,sk,use,scale);
-    return r>0?raised(sk,was_due):0;
+    return r>0?raised(sk,was_due,0):0;
 }
 int AW_LevelupRaise(int sk,int source)
 {
@@ -111,7 +120,34 @@ int AW_LevelupRaise(int sk,int source)
     if(!aw_character.valid || !AW_LevelupLoad())return 0;
     was_due=AW_LevelupDue(&aw_levelup_rules,&aw_character);
     if(!AW_LevelupSkillRaise(&aw_levelup_rules,player_class(),&aw_character,sk,source))return 0;
-    return raised(sk,was_due);
+    return raised(sk,was_due,source==AW_RAISE_BOOK);
+}
+/* SKILL-BOOKS-MISSING-62: the skill books (levelup/books.txt, tools/prepare_levelup.py): "AWLB1", then one line per
+ * book with a skill, "book INDEX SKILL ID" (INDEX its place in the read list, the ID folded, the rest of the line).
+ * Read from disk only when a book opens: nothing resident. 1 with *index and *skill when ID is a skill book. */
+static int skill_book(const char *id,int *index,int *book_skill)
+{
+    FILE *f=NULL;char line[96];int i,s,n,found=0;
+    if(COM_FOpenFile("levelup/books.txt",&f)<0 || !f)return 0;
+    if(!read_line(f,line,sizeof(line)) || strcmp(line,"AWLB1")){fclose(f);return 0;}
+    while(!found && read_line(f,line,sizeof(line))){
+        n=0;
+        if(Q_sscanf(line,"book %d %d %n",&i,&s,&n)!=2 || !n || Q_strcasecmp(line+n,(char *)id))continue;
+        if(i>=0 && i<AW_BOOKS_READ_MAX && s>=0 && s<AW_LEVELUP_SKILLS){*index=i;*book_skill=s;found=1;}
+    }
+    fclose(f);return found;
+}
+/* A book opened for reading (OpenMW 0.51 mwworld/actionread.cpp): the first read of a skill book raises its skill
+ * through the skill-raise rule with the "book" source (the book's line, the sound, the level progress); the book is
+ * remembered as read (saved, AWS4 feature 1024) whether or not the skill could still rise. 1 when it rose. */
+int AW_LevelupBookRead(const char *id)
+{
+    int index,book_skill;unsigned long bit;
+    if(!id || !aw_character.valid || !skill_book(id,&index,&book_skill))return 0;
+    bit=1UL<<(index&31);
+    if(aw_character.books_read[index>>5]&bit)return 0;
+    aw_character.books_read[index>>5]|=bit;
+    return AW_LevelupRaise(book_skill,AW_RAISE_BOOK);
 }
 /* OpenMW character.cpp: the player running on the ground (not sneaking) or swimming reports one Athletics use per
  * whole second (RunOneSecond / SwimOneSecond). */
@@ -295,12 +331,75 @@ static void status(void)
             (long)(AW_LevelupRequirement(&aw_levelup_rules,k,i,c->skills[i])*10)%10,place==2?"major":place==1?"minor":"misc");
     }
 }
+/* ---- dbg setlvl / restorestats / maxstats (DBG-STATS-COMMANDS-62), routed here by aw_console.c ----
+ * The sheet before and after on the console; health lives on the player entity in play and fatigue on the fight sheet,
+ * so both follow the sheet. */
+static void sheet_line(const char *when)
+{
+    const aw_character_t *c=&aw_character;int i;
+    Con_Printf("%s: level %ld, health %ld/%ld, magicka %ld/%ld, fatigue %ld/%ld; attributes",when,(long)c->level,
+        (long)c->current[0],(long)c->maximum[0],(long)c->current[1],(long)c->maximum[1],(long)c->current[2],(long)c->maximum[2]);
+    for(i=0;i<8;i++)Con_Printf(" %.3s %ld",AW_StatsAttributeName(i),(long)(c->attributes[i]+c->modifiers[i]-c->damage[i]));
+    Con_Printf("\n");
+}
+static void sheet_follow(void)
+{
+    edict_t *p=sv.active && svs.clients?svs.clients[0].edict:NULL;
+    if(p)p->v.health=aw_character.current[0];
+    AW_CombatPlayerFatigueFill();      /* the fight sheet takes the fatigue (at most its maximum) */
+    if(aw_character.current[2]<aw_character.maximum[2])aw_character.current[2]=aw_character.maximum[2];
+}
+static void stats_before(void)
+{
+    edict_t *p=sv.active && svs.clients?svs.clients[0].edict:NULL;
+    if(p)aw_character.current[0]=p->v.health;
+    sheet_line("Before");
+}
+static void set_level(int level)
+{
+    edict_t *p=sv.active && svs.clients?svs.clients[0].edict:NULL;
+    stats_before();
+    if(!AW_LevelupSetLevel(&aw_levelup_rules,&aw_character,level)){Con_Printf("dbg setlvl: a level from 1 to %d.\n",AW_LEVEL_MAX);return;}
+    if(p)p->v.health=aw_character.current[0];
+    sheet_line("After");
+}
+static const char *level_label(void *ctx,int row){static char s[16];(void)ctx;Q_snprintf(s,sizeof(s),"%d",row+1);return s;}
+static void level_chosen(void *ctx,int row){(void)ctx;set_level(row+1);}
+static void stats_command(const char *w)
+{
+    if(!Q_strcasecmp((char *)w,"setlevel")){
+        if(Cmd_Argc()==2){
+            aw_listbox_spec_t s;memset(&s,0,sizeof(s));
+            s.title="Set the level: type it, Enter sets it";s.count=AW_LEVEL_MAX;s.label=level_label;s.chosen=level_chosen;
+            if(!AW_ListBoxOpen(&s))Con_Printf("Usage: dbg setlvl N (1 to %d)\n",AW_LEVEL_MAX);
+            return;
+        }
+        {const char *n=Cmd_Argv(2);int v=0;
+         for(;*n;n++){if(*n<'0' || *n>'9' || v>AW_LEVEL_MAX){v=-1;break;}v=v*10+*n-'0';}
+         if(Cmd_Argc()!=3 || v<1 || v>AW_LEVEL_MAX){Con_Printf("Usage: dbg setlvl N (1 to %d, the highest level the game's levelling reaches)\n",AW_LEVEL_MAX);return;}
+         set_level(v);}
+        return;
+    }
+    stats_before();
+    if(!Q_strcasecmp((char *)w,"restore"))AW_LevelupRestore(&aw_character);
+    else{
+        const aw_race_t *r=aw_character.race>=0 && aw_character.race<aw_race_count?&aw_races[aw_character.race]:NULL;
+        const aw_birth_t *b=aw_character.birth>=0 && aw_character.birth<aw_birth_count?&aw_births[aw_character.birth]:NULL;
+        AW_LevelupMax(&aw_levelup_rules,&aw_character,1+((r?r->magicka:0)+(b?b->magicka:0))*.1f);
+    }
+    sheet_follow();
+    sheet_line("After");
+    AW_UISubtitle("",!Q_strcasecmp((char *)w,"restore")?"Health, magicka and fatigue restored.":"Every stat at the game's maximum.",3);
+}
 static void levelup_command(void)
 {
     const char *w=Cmd_Argc()>1?Cmd_Argv(1):"";int sk,count,i,raised_n=0;
     if(!aw_character.valid){Con_Printf("Levelling: no character yet.\n");return;}
     if(!AW_LevelupLoad()){Con_Printf("Levelling: this image has no levelup/settings.txt.\n");return;}
     if(!*w || !Q_strcasecmp((char *)w,"show")){status();return;}
+    /* DBG-STATS-COMMANDS-62: dbg setlvl [N], dbg restorestats, dbg maxstats */
+    if((!Q_strcasecmp((char *)w,"setlevel") && Cmd_Argc()<=3) || ((!Q_strcasecmp((char *)w,"restore") ||
+       !Q_strcasecmp((char *)w,"max")) && Cmd_Argc()==2)){stats_command(w);return;}
     if(!Q_strcasecmp((char *)w,"use") || !Q_strcasecmp((char *)w,"raise")){
         int use=Cmd_Argc()>4?atoi(Cmd_Argv(4)):0;
         sk=Cmd_Argc()>2?skill_of(Cmd_Argv(2)):-1;count=Cmd_Argc()>3?atoi(Cmd_Argv(3)):1;
@@ -308,6 +407,23 @@ static void levelup_command(void)
         for(i=0;i<count;i++)raised_n+=*w=='u' || *w=='U'?AW_LevelupUse(sk,use,1)>0:AW_LevelupRaise(sk,AW_RAISE_USAGE);
         Con_Printf("%s: %ld, progress %ld%%; %ld raise%s; level progress %ld/%ld\n",AW_StatsSkillName(sk),(long)aw_character.skills[sk],
             (long)(aw_character.progress[sk]*100),(long)raised_n,raised_n==1?"":"s",(long)aw_character.level_progress,(long)aw_levelup_rules.total);
+        return;
+    }
+    if(!Q_strcasecmp((char *)w,"book")){
+        /* the first read of a skill book, as opening it in the reader does (no reader shown) */
+        int index,book_skill;
+        if(Cmd_Argc()<3){Con_Printf("Usage: dbg levelup book BOOK_ID\n");return;}
+        if(!skill_book(Cmd_Argv(2),&index,&book_skill)){Con_Printf("%s is not a skill book of this image.\n",Cmd_Argv(2));return;}
+        if(!AW_LevelupBookRead(Cmd_Argv(2)))Con_Printf("%s: read before (read list bit %ld); no raise.\n",Cmd_Argv(2),(long)index);
+        else Con_Printf("%s: %s %ld\n",Cmd_Argv(2),AW_StatsSkillName(book_skill),(long)aw_character.skills[book_skill]);
+        return;
+    }
+    if(!Q_strcasecmp((char *)w,"read")){
+        /* the reader on a placed book of this map by its reference, as E on it opens it (the raise comes from there) */
+        unsigned long ref=Cmd_Argc()>2?(unsigned long)atol(Cmd_Argv(2)):0;
+        if(!ref){Con_Printf("Usage: dbg levelup read REFERENCE\n");return;}
+        if(!aw_book_reader || !aw_book_reader((unsigned)ref))Con_Printf("No readable book %lu on this map.\n",ref);
+        else if(key_dest==key_console)Con_ToggleConsole_f();
         return;
     }
     if(!Q_strcasecmp((char *)w,"check")){
@@ -330,6 +446,7 @@ static void levelup_command(void)
         if(!AW_RestOpen(ref))Con_Printf("The bed %lu did not open the rest window.\n",ref);
         return;
     }
-    Con_Printf("Usage: dbg levelup [show / use SKILL [N [TYPE]] / raise SKILL [N] / check / rest [HOURS] / bed REF]\n");
+    Con_Printf("Usage: dbg levelup [show / use SKILL [N [TYPE]] / raise SKILL [N] / book ID / read REF / check / rest [HOURS] / bed REF]\n");
 }
-void AW_LevelupInit(void){Cmd_AddCommand("aw_levelup",levelup_command);}
+extern int (*aw_worldui_game_text)(const char *key,char *out,int size);   /* aw_worldui.c: the inventory's refusals */
+void AW_LevelupInit(void){Cmd_AddCommand("aw_levelup",levelup_command);aw_worldui_game_text=game_text;}

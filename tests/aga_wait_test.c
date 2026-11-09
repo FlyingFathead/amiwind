@@ -257,7 +257,10 @@ static void daynight_hold(void){
     cycle->value=1;scale->value=30;host_frametime=1;key_dest=key_game;
     strcpy(sv.name,"sn045");strcpy(world.name,"maps/sn045.bsp");cl.worldmodel=&world;
     argc=2;arg="2215";setexact();date(427,8,16,22,15);loaded=aw_state; /* a save made at 22:15 */
-    argc=1;daynight();assert(!AW_DayNightFrozen());date(427,8,16,22,15); /* no argument: report only */
+    /* DBG-SUPERSPEED-62: no argument turns it the other way: held at 12:00, then running again */
+    argc=1;daynight();assert(AW_DayNightFrozen() && clock_ms()==12*3600000);
+    daynight();assert(!AW_DayNightFrozen());
+    argc=2;arg="2215";setexact();date(427,8,16,22,15);
     argc=2;arg="off";daynight();assert(AW_DayNightFrozen() && clock_ms()==12*3600000);date(427,8,16,12,0);
     for(i=0;i<2000;i++)AW_WaitTick();assert(clock_ms()==12*3600000);date(427,8,16,12,0);
     arg="1830";setexact();arg="dusk";setexact();arg="23.5";settime();arg="night";settime();date(427,8,16,12,0);

@@ -2,10 +2,12 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 2 times; something has to be done
+## PERSISTING: reported 4 times; something has to be done
 
 - Reported with v0.0.39-rc1 at 2026-10-13 (time not recorded): Source candidate: two male bodies retain full8/6 gait plus punch within512 KiB;83 affected tests pass. Target/native/visual/all-appearance/RC2-package acceptance pending.
 - Reported with v0.0.39-rc2 at 2026-10-13 (time not recorded): All 20 bodies pass binary checks. Section audits flag possible knee/calf gaps, mostly simplification. Metrics do not prove visible holes; native/original and maintainer acceptance pending.
+- Reported with v0.0.61 at 2026-11-07 (time not recorded): Seen again on the v0.0.61 release image: the legs of Jiub are stick-thin, like pegs, and the same body shape is on other characters (tracker NPC-BODY-REGRESSION-62).
+- Reported with v0.0.62-dev1 at 2026-11-07 12:13 +0200: Seen again on an NPC: Jiub on the prison ship has stick-thin legs. Same cause as NPC-JOINT-GAPS-33: since v0.0.54 each upper leg, knee and shin of his trousers is baked with 4 triangles (from 62 to 75).
 
 <!-- END GENERATED PERSISTING -->
 
@@ -105,6 +107,7 @@ Family: First-person hands and torch (`torch-hands`). First-person hands, punche
 - [DEBUG-GALLERY-TIMING-29](DEBUG-GALLERY-TIMING-29.md): Hands unavailable in the combat and torch test rooms
 - FIRST-PERSON-BLOCK-ITEM-TABLE-59 (no report page): The first-person shield block refuses a shield whose model comes from the shared item model table
 - FIRST-PERSON-WEAPON-SETS-MISSING-54 (no report page): First-person hands have only 4 of the 103 original animation groups: no weapon stance or attack, spellcast, hit, swim or storm
+- [FP-ARMS-CUT-62](FP-ARMS-CUT-62.md): In first person, looking down shows the forearms ending in mid-air, with no upper arms or shoulders behind them
 - FP-FOREARMS-BELOW-VIEW-61 (no report page): In first person only the hands show: the forearms and the sleeves worn on them stay below the view
 - [FP-WEAPON-SWAY-60](FP-WEAPON-SWAY-60.md): The weapon in first-person view moves more while walking than in the original
 - HAND-IDLE-BLINK-29 (no report page): Fists disappear once per idle breathing cycle
@@ -125,6 +128,7 @@ Family: First-person hands and torch (`torch-hands`). First-person hands, punche
 
 Related bugs in other categories:
 
+- MESH-REDUCTION-SEAMS-62 (no report page): Reduced actor models lose seams and thin their limbs, and nothing compared them with the original
 - [NPC-ANIMATION-OFFSET-40](NPC-ANIMATION-OFFSET-40.md): Simplified actor vertices keep a fixed offset while limbs rotate
 
 <!-- END GENERATED CATEGORY -->

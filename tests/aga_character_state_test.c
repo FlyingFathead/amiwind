@@ -22,6 +22,10 @@ void AW_UIFill(int x,int y,int w,int h,int color){
 void AW_UIBox(int x,int y,int w,int h){}
 int AW_UICursor(int x,int y){(void)x;(void)y;return 0;}   /* aw_ui.c (CURSOR-MW-58): AmiWind's own cursor here */
 void AW_UITextBox(int x,int y,int w,int h,const char *s,int color){if(!strcmp(s,"OK")){assert(x==248 && y==166 && w==60 && h==22);ok_drawn++;}}
+void AW_UIButton(int x,int y,int w,int h,const char *s,int lit,int colour){
+    if(lit && !strcmp(s,"OK"))ok_focused++;   /* the focused OK is the lit one (UI-THIN-BUTTON-62) */
+    AW_UITextBox(x,y,w,h,s,colour);
+}
 void AW_UISmallBegin(void){}void AW_UISmallEnd(void){}
 void AW_BirthArt(int index,int x,int y){}
 static void draw_covered(void){
@@ -279,5 +283,13 @@ int main(void)
     assert(decoded.character.raises[0]==4 && decoded.character.raises[5]==9 && decoded.character.special[2]==3 && decoded.character.level==4);
     source.character.progress[5]=1.5f;assert(!AW_SaveEncode(raw,sizeof(raw),&source));
     source.character.progress[5]=.375f;source.character.raises[1]=-1;assert(!AW_SaveEncode(raw,sizeof(raw),&source));
+    source.character.raises[1]=0;
+    /* SKILL-BOOKS-MISSING-62, feature 1024: the skill books read; only up to the last word with a bit is written */
+    assert(!decoded.character.books_read[0]);
+    i=AW_SaveEncode(raw,sizeof(raw),&source);assert(i>0);
+    source.character.books_read[0]=5;source.character.books_read[2]=0x80000000UL;
+    n=AW_SaveEncode(raw,sizeof(raw),&source);assert(n==i+4+3*4 && AW_SaveDecode(raw,n,&decoded));
+    assert(decoded.character.books_read[0]==5 && decoded.character.books_read[1]==0 &&
+           decoded.character.books_read[2]==0x80000000UL && decoded.character.books_read[3]==0);
     return 0;
 }

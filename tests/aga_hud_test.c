@@ -268,7 +268,8 @@ int main(void) {
  arg="false";command();assert(!AW_DebugCoordsEnabled());
  arg="TrUe";command();assert(AW_DebugCoordsEnabled());
  arg="nonsense";command();assert(AW_DebugCoordsEnabled());
- argc=1;command();assert(AW_DebugCoordsEnabled());
+ /* DBG-SUPERSPEED-62: no argument turns it the other way, and back */
+ argc=1;command();assert(!AW_DebugCoordsEnabled());command();assert(AW_DebugCoordsEnabled());
  argc=3;arg="off";command();assert(AW_DebugCoordsEnabled());
  argc=2;command();assert(!AW_DebugCoordsEnabled());
  /* Queries and rejected values preserve an explicit coordinate override. */
@@ -284,7 +285,8 @@ int main(void) {
    argc=2;arg=values[i];scr_copyeverything=0;compass_command();assert(scr_copyeverything);
    n=compass_draws;Sbar_Draw();assert(compass_draws==n+(i%2==0));
   }
-  n=compass_draws;argc=1;compass_command();Sbar_Draw();assert(compass_draws==n);
+  n=compass_draws;argc=1;compass_command();Sbar_Draw();assert(compass_draws==n+1);   /* bare: on (it was off) */
+  n=compass_draws;compass_command();Sbar_Draw();assert(compass_draws==n);              /* bare again: off */
   argc=2;arg="invalid";compass_command();Sbar_Draw();assert(compass_draws==n);
   argc=3;arg="on";compass_command();Sbar_Draw();assert(compass_draws==n);
  }

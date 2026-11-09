@@ -35,6 +35,7 @@
 #include "aw_player_parts.h"
 #include "aw_skel.h"
 #include "aw_animpick.h"
+#include "aw_msgbox.h"     /* the death box's button rectangles (MSGBOX-NO-CURSOR-62) */
 
 extern cvar_t chase_active;
 /* The hooks (defined beside their callers, NULL in fixtures without this file). */
@@ -85,6 +86,7 @@ static struct {
     vec3_t point,offset,origin,angles,view;float yaw,pitch,distance,rate,pending_rate,movetype,flags;
 } orbit;
 static aw_death_t death;
+static int death_mouse_x=-1,death_mouse_y=-1;   /* the death box's pointer (MSGBOX-NO-CURSOR-62) */
 static int ready,pov_down,pov_tapped,input_seen,owned,last_view=-1,warned,death_arena,acted;
 static vec3_t anchor,last_angles,death_angles;
 static char load_text[160]="The most recent Save Game is '%s'. \nWould you like to load it?";
@@ -283,6 +285,10 @@ static int parts_ready(const char *race,int female) {
  * picture waits for them instead of keeping the previous outfit */
 extern int (*aw_inventory_preview_pending)(void);
 static int parts_pending(void){return pend_on && parts_cvar.value && !parts_failed;}
+/* EQUIP-ACTION-REGRESSION-62: the player is a beast race when the race's recipe is on the beast skeleton (the
+ * builder takes the skeleton from the race's Beast flag, tools/prepare_player_parts.py race_rows): the assembled
+ * body's own answer, or the one being assembled */
+static int player_beast(void){return (pend_on && pend.beast) || (body_parts && parts.count && parts.beast);}
 /* ---- the first-person arms from parts (PLAYER-GEAR-VISUAL-59, docs/THIRD_PERSON.md "First-person arms") ----
  * The same recipe reader on view/parts_1st.txt (tools/prepare_player_fp_parts.py): the race's arm skin and the arm
  * parts of what is worn (gloves, gauntlets, bracers, sleeves; a robe's own first-person sleeves), each one shared
@@ -1223,7 +1229,7 @@ static void begin_death(void) {
     /* character.cpp playRandomDeath -> useDeathCamera: third person for the death animation */
     view.orbit_yaw=view.orbit_pitch=0;
     if(death_cvar.value && body_ready())view.mode=AW_VIEW_DEATH;
-    AW_DeathBegin(&death,death_seconds(),retry,saved);acted=0;
+    AW_DeathBegin(&death,death_seconds(),retry,saved);acted=0;death_mouse_x=death_mouse_y=-1;
     /* the death track (music.lua playerDied); combat plays it for a death in a fight */
     if(!AW_CombatDeathMusicPlayed())AW_MusicDeath();
     IN_AWClearButtons();
@@ -1247,13 +1253,35 @@ static void choose(int choice) {
     /* No: the main menu (the menu's own "Return to main menu") */
     key_dest=key_game;Cbuf_AddText("disconnect\naw_main_menu\n");
 }
+/* The death box's pointer (MSGBOX-NO-CURSOR-62): shown over the box, a button under it is the selection, a click
+ * chooses it; the box's geometry as AW_ViewDraw draws it. */
+static int death_button_at(int px,int py) {
+    return death.count<1?-1:AW_DeathBoxButtonAt(death.count,vid.width,vid.height,px,py);
+}
+int AW_ViewDeathMouse(int dx,int dy) {
+    int i;
+    if(death.stage!=AW_DEATH_ASK || key_dest!=key_game)return 0;
+    if(death_mouse_x<0){death_mouse_x=vid.width/2;death_mouse_y=vid.height/2;}
+    death_mouse_x+=dx;death_mouse_y+=dy;
+    if(death_mouse_x<0)death_mouse_x=0;
+    if(death_mouse_x>(int)vid.width-1)death_mouse_x=(int)vid.width-1;
+    if(death_mouse_y<0)death_mouse_y=0;
+    if(death_mouse_y>(int)vid.height-1)death_mouse_y=(int)vid.height-1;
+    if((dx || dy) && (i=death_button_at(death_mouse_x,death_mouse_y))>=0)death.selection=i;
+    return 1;
+}
 int AW_ViewKey(int key) {
     int k=0,c;
     if(orbit_key(key))return 1;
     if(death.stage!=AW_DEATH_ASK || acted || key_dest!=key_game)return 0;
-    if(key==K_LEFTARROW || key=='a' || key=='A')k=1;
+    if(key==K_MOUSE1){
+        int i=death_button_at(death_mouse_x,death_mouse_y);
+        if(i<0)return 1;          /* a click outside the buttons does nothing */
+        death.selection=i;k=3;
+    }
+    else if(key==K_LEFTARROW || key=='a' || key=='A')k=1;
     else if(key==K_RIGHTARROW || key==K_TAB || key=='d' || key=='D')k=2;
-    else if(key==K_ENTER || key==K_MOUSE1 || key==K_SPACE || key=='e' || key=='E')k=3;
+    else if(key==K_ENTER || key==K_SPACE || key=='e' || key=='E')k=3;
     else if(key=='y' || key=='Y')k=4;
     else if(key=='n' || key=='N')k=5;
     if(!k)return 0;
@@ -1266,7 +1294,7 @@ static const char *choice_label(int c) {
     return c==AW_DEATH_LOAD?yes_text:c==AW_DEATH_MENU?no_text:"Retry fight";
 }
 void AW_ViewDraw(void) {
-    char text[240];const char *at;int i,w=280,x=(vid.width-w)/2,y,h=96,bw,gold=AW_UIColor(223,199,144),grey=AW_UIColor(150,130,100);
+    char text[240];const char *at;int i,w=AW_DEATHBOX_W,x=(vid.width-w)/2,y,h=AW_DEATHBOX_H,r[4],gold=AW_UIColor(223,199,144),grey=AW_UIColor(150,130,100);
     extern int scr_copyeverything;
     if(death.stage!=AW_DEATH_ASK || key_dest!=key_game)return;
     scr_copyeverything=1;
@@ -1278,12 +1306,15 @@ void AW_ViewDraw(void) {
     }else strcpy(text,load_text);
     AW_UIBox(x,y,w,h);
     AW_UICenteredLines(x+6,y+4,w-12,h-38,text);
-    bw=(w-16-(death.count-1)*8)/death.count;
     for(i=0;i<death.count;i++){
-        int bx=x+8+i*(bw+8),by=y+h-32;
-        AW_UIBox(bx,by,bw,24);
-        if(i==death.selection)AW_UIFill(bx+3,by+3,bw-6,18,AW_UIColor(70,52,30));
-        AW_UITextBox(bx,by,bw,24,choice_label(death.choice[i]),i==death.selection?gold:grey);
+        AW_DeathBoxButtonRect(death.count,i,vid.width,vid.height,r);   /* the pointer's rectangles too */
+        AW_UIBox(r[0],r[1],r[2],r[3]);
+        if(i==death.selection)AW_UIFill(r[0]+3,r[1]+3,r[2]-6,18,AW_UIColor(70,52,30));
+        AW_UITextBox(r[0],r[1],r[2],r[3],choice_label(death.choice[i]),i==death.selection?gold:grey);
+    }
+    if(death_mouse_x<0){death_mouse_x=vid.width/2;death_mouse_y=vid.height/2;}
+    if(!AW_UICursor(death_mouse_x,death_mouse_y)){
+        AW_UIFill(death_mouse_x,death_mouse_y,2,6,gold);AW_UIFill(death_mouse_x,death_mouse_y,6,2,gold);
     }
 }
 
@@ -1592,12 +1623,14 @@ void AW_ViewInit(void) {
     Cvar_RegisterVariable(&parts_cvar);Cvar_RegisterVariable(&hand_parts_cvar);Cvar_RegisterVariable(&player_cache_cvar);
     Cvar_RegisterVariable(&stances_cvar);
     aw_hand_parts_apply=hand_parts_apply;aw_view_hand_part=hand_part;aw_inventory_preview_pending=parts_pending;
+    aw_inventory_player_beast=player_beast;
     Cvar_RegisterVariable(&fullview_cvar);Cvar_RegisterVariable(&aw_inventory_preview_reserve);Cvar_RegisterVariable(&aw_inventory_preview_live);
     AW_ViewRulesDefault(&rules);AW_ViewReset(&view,&rules);
     Cmd_AddCommand("+aw_pov",pov_press);Cmd_AddCommand("-aw_pov",pov_release);
     Cmd_AddCommand("aw_view_zoom",zoom_command);Cmd_AddCommand("aw_camera",command);
     Cmd_AddCommand("aw_vanitycam",vanity_command);
     aw_death_input_locked=AW_DeathLocked;
+    aw_death_mouse=AW_ViewDeathMouse;   /* the death box's pointer (MSGBOX-NO-CURSOR-62) */
     aw_death_prompt_active=death_prompt_active;
     aw_view_frame=AW_ViewFrame;aw_view_camera=AW_ViewCamera;aw_view_body=AW_ViewBody;aw_view_hide_hands=AW_ViewThirdPerson;
     aw_view_held=view_held;aw_view_torch_emitter=view_torch_emitter;aw_view_torch_light=view_torch_light;

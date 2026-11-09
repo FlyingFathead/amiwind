@@ -119,6 +119,7 @@ void Host_EndGame (char *message, ...)
     else
         CL_Disconnect ();
 
+    AW_SceneLoadFailed (string);	/* a scene load in flight goes back where it started (HEART-CHAMBER-LOAD-HANG-62) */
     longjmp (host_abortserver, 1);
 }
 
@@ -157,6 +158,7 @@ void Host_Error (char *error, ...)
 
     inerror = false;
 
+    AW_SceneLoadFailed (string);	/* a scene load in flight goes back where it started (HEART-CHAMBER-LOAD-HANG-62) */
     longjmp (host_abortserver, 1);
 }
 
@@ -1036,6 +1038,9 @@ void Host_Init (quakeparms_t *parms)
 
     Hunk_AllocName (0, "-HOST_HUNKLEVEL-");
     host_hunklevel = Hunk_LowMark ();
+    /* the boot level dbg restartgame comes back to (DBG-RESTARTGAME-62; its "Restart:" line) */
+    Con_Printf ("Boot: Hunk %ld bytes low, %ld high.\n", (long)Hunk_LowMark (), (long)Hunk_HighMark ());
+    AW_ResetBootMark ();	/* what a New Game's reset must give (aw_reset.h, NEWGAME-STATE-RESET-62) */
 
     host_initialized = true;
 

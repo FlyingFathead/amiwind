@@ -6,7 +6,9 @@
 #ifndef AW_MSGBOX_H
 #define AW_MSGBOX_H
 
-#define AW_MSGBOX_TEXT 512
+/* CRIME-RELEASE-LINE-CUT-62: room for a long jail release (its first line and a line for every skill it changed) */
+#define AW_MSGBOX_TEXT 1024
+#define AW_MSGBOX_LINES 32                         /* at most this many text lines are drawn */
 #define AW_MSGBOX_BUTTONS 12
 #define AW_MSGBOX_LABEL 48
 
@@ -35,6 +37,22 @@ void AW_MsgBoxOpen(aw_msgbox_t *m,const char *text,const char *const *buttons,in
 int AW_MsgBoxKey(aw_msgbox_t *m,int key);
 /* GetButtonPressed: the button chosen, once; -1 until the next choice. */
 int AW_MsgBoxTake(aw_msgbox_t *m);
+/* CRIME-RELEASE-LINE-CUT-62: how many of a text's LINES (wrapped) a box with button ROWS shows on a screen SCREEN pixels
+ * high, with LINE pixels a line: every line while the box fits (8 above and below the text, 24 a button row, 8 from
+ * the screen's edges), else as many as fit (at least 1, at most AW_MSGBOX_LINES). OpenMW's box grows with its text. */
+int AW_MsgBoxLinesShown(int lines,int rows,int screen,int line);
+
+/* Where a box and its buttons are (MSGBOX-NO-CURSOR-62; the pointer's hit test and the drawing share them). FRAME
+ * and RECT: x, y, w, h. A script's box: TEXT_PX of text on a VW x VH screen; the death box: AW_DEATHBOX_W x _H.
+ * ButtonAt: the button under PX, PY, else -1. */
+#define AW_MSGBOX_PER_ROW 3
+#define AW_DEATHBOX_W 280
+#define AW_DEATHBOX_H 96
+void AW_MsgBoxLayout(int count,int vw,int vh,int text_px,int frame[4]);
+void AW_MsgBoxButtonRect(int count,int i,const int frame[4],int rect[4]);
+int AW_MsgBoxButtonAt(int count,const int frame[4],int px,int py);
+void AW_DeathBoxButtonRect(int count,int i,int vw,int vh,int rect[4]);
+int AW_DeathBoxButtonAt(int count,int vw,int vh,int px,int py);
 
 /* The game (aw_msgbox.c): show a box (no buttons: a timed notice), its keys and drawing (1 = the key was used). */
 void AW_MsgBoxShow(const char *text,const char *const *buttons,int count);

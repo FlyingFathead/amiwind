@@ -1,6 +1,6 @@
 # Dialogue: design (topics, conditions, choices, disposition, journal)
 
-_Last updated with AmiWind v0.0.61-dev3 (2026-11-06)._
+_Last updated with AmiWind v0.0.62-dev2 (2026-11-08)._
 
 <!-- contents start -->
 ## Contents
@@ -63,8 +63,9 @@ Read in the amiwind-openmw:0.51.0 image, apps/openmw/mwdialogue/:
   shows as exhausted (greyed), unless its answer leads to a topic the player does not know yet.
 - **A topic chosen** (`executeTopic`): the answer's text (with %PCName style defines filled), its result script, the
   journal's topic page gets the response, the topics named in it become known.
-- **Choices** (`questionAnswered`, `addChoice`): a result script's `Choice "text" n` lists buttons; the player's pick
-  sets the Choice condition and the same topic is searched again.
+- **Choices** (`questionAnswered`, `addChoice`): a result script's `Choice "text" n` lists its options as rows at the
+  end of the conversation text; the player's pick sets the Choice condition and the same topic is searched again from
+  its first answer with every filter; no topic and no Goodbye while a choice is open.
 - **Persuasion** (`persuade`): admire, intimidate, taunt, bribe 10/100/1000; the mechanics manager's formula
   (`getPersuasionDispositionChange`) gives success, a temporary and a permanent change; the answer is the topic
   "<Kind> Success/Fail".
@@ -181,6 +182,32 @@ the first that has no run-time condition; Choice is a run-time condition here (t
 open"). Result scripts are stored as their source for now (step 4 compiles them). Hyperlinks: the Topic names an answer's text
 names, longest first, not inside a word, each once.
 
+**Links in the text (v0.0.62).** OpenMW 0.51's keyword search (keywordsearch.cpp) finds a topic name where it starts
+the text or follows a space, tab, line break, quote, `(` or `[`; it checks nothing at the name's end, and the longest
+of overlapping names wins. OpenMW searches only the topics in the current topic list, so a short name inside a longer
+word rarely shows. The builder searches every topic once for the whole table, so it adds one rule of its own: a name
+must also end the word (no letter or digit right after it), except a plural "s" (a possessive "'s" ends the word
+anyway). A short topic such as "plan" is therefore never lit inside "Plantation", whatever the list holds, while
+"Plantations" still links "Plantation". Measured over every response of the three masters (36,825 texts, 2,098
+topics): without the end rule 79,265 links, with it and no exception 72,524, so 6,741 removed. The largest groups:
+the plural "s" 2,898 (guards, outlanders, needs, plans, scrolls: real links in another form, so "s" is allowed),
+"ed" 990 (reported, enchanted), "l" 625 ("Shal" in "shall"), "ing" 462 (talking), "guard" 148 ("wraith" in
+Wraithguard), "her" 113 ("rat" in "Rather"), "ful" 101 (faithful), then a long tail; "plan" alone sat inside
+"Plantation(s)" 60 times, "planting", "planning", "plant" and "plane" over 160 times. Only "s" is on the allow-list;
+the other endings change the word and stay unlinked. With the allow-list: 75,200 links, 4,065 removed. In the
+window a found name is drawn and answered as a link only while its topic is in the topic list (the topics the
+player knows that this speaker answers), as in OpenMW. A click on a link, or Enter on the link chosen with the arrow
+keys, asks that topic exactly as choosing it in the list does; nothing is asked after Goodbye or while a choice is
+open. A topic an answer names becomes known only when this speaker answers it. `tests/test_dialogue_links.py` checks
+every dialogue text of the three masters (with the tester's own data): each link is a whole-word topic name.
+
+**Topic colours (v0.0.62).** As OpenMW's optional topic colours: a topic whose current answer is written for this
+speaker alone (the answer names the actor) is drawn blue (0.45, 0.5, 0.8), and a topic with nothing new left (its
+answer is already on the journal's topic page and every topic it names that this speaker answers is known) grey
+(0.3); the speaker-specific colour wins. One switch: Options > Prefs > Topic colours, the console word
+`aw_topic_colours` (`dbg ui topiccolours`), the setting `aw_dialogue_topic_colours`. On by default here; OpenMW ships
+it off. Links in the text keep the one link colour.
+
 **2. The engine reader and first match** (`engine/aga/src/aw_dial.c`). A conversation reads the NPC's row and its
 candidates into one buffer; the answer to a topic is the first candidate whose conditions all hold; when none holds
 but one failed only on its disposition test, the answer comes from "Info Refusal". The condition records are tested by
@@ -201,8 +228,22 @@ persuasion were still to come; they are in since v0.0.57 and v0.0.58 (see the pa
 
 **The window's keys and layers (v0.0.61).** Tab moves the keys between the topic list and the conversation; the pane
 that has them is framed. In the list, Up and Down move the highlighted topic or answer and Enter picks it; in the
-conversation, Up and Down scroll it, Left and Right choose a link and Enter asks it. The answer the player picks from
-a choice is shown as the player's line, in the same heading style as a picked topic. The window stands on a plain
+conversation, the arrow keys step through its links (the current one on a band) and Enter asks it; PgUp and PgDn
+scroll it (v0.0.62). The answer the player picks from
+a choice is shown as the player's line, in the same heading style as a picked topic.
+
+**Choices (v0.0.62, DIALOGUE-CHOICES-62).** A result script's `Choice "text" n ...` shows its options as rows in the
+conversation text under the answer, in the link colour, as the original and OpenMW 0.51 show them. A click on a row,
+or the arrow keys (the current row on a band) and Enter, picks it; typed letters never pick a row (the topic list's
+search used to match a typed letter against the options). Until a row is picked, the topic list is dimmed and
+refused, the links ask nothing, and Goodbye and Escape do not end the conversation (OpenMW: no topic, no exit while a
+choice is open). The pick sets the Choice value and the same topic is searched again from its first answer with
+every filter, as OpenMW's `questionAnswered` does: a roadside robber's pay row pays only when the player carries the
+gold (another answer says he has not got it), and the refusal row leads to the fight. `tools/dialogue_choices.py`
+checks every Choice of the masters branch by branch and writes `docs/dialogue-choices.json`: on Morrowind.esm, 2,005
+of 2,043 branches reach an answer whose filters the runner reads; the rest are listed there with the reason.
+
+The window stands on a plain
 black screen with no status bars behind it, and the messages a conversation raises (an item or gold received, a
 journal update, a script's message box) are drawn over it. A result script's disposition change (for example the
 ring's reward) shows on the bar at once, as in OpenMW (Fargoth's ring: 40 to 90, +50 as the original data gives). An

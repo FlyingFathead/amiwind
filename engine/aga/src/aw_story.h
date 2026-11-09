@@ -48,4 +48,12 @@ int AW_ControlsDisabled(void);              /* the mask of switches a script tur
 int AW_ControlAllowed(int controls);        /* 1 when none of CONTROLS is off */
 int AW_ControlSet(int controls,int enable); /* 1 when kept (0: the named facts are full; nothing changed) */
 const char *AW_ControlName(int control);    /* "playercontrols" ... for one bit, "" else */
+/* The menus a script turns on (CENSUS-INTRO-SCRIPTS-62: EnableStatsMenu, -InventoryMenu, -MagicMenu, -MapMenu of the
+ * census office's scripts; OpenMW guiextensions.cpp OpEnableWindow): one bit mask in the saved named facts
+ * ("amiwind:menus", no new save field; New Game clears it with the facts). They add to the opening's own rule above
+ * (a menu is there when either allows it). */
+enum aw_menu { AW_MENU_STATS=1, AW_MENU_INVENTORY=2, AW_MENU_MAGIC=4, AW_MENU_MAP=8, AW_MENU_ALL=15 };
+#define AW_MENU_FACT "amiwind:menus"
+int AW_StoryMenus(void);                    /* the mask of menus a script turned on */
+int AW_StoryMenuEnable(int menus);          /* 1 when kept (0: the named facts are full; nothing changed) */
 #endif

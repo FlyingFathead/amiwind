@@ -1,0 +1,227 @@
+{
+ "schema": 1,
+ "about": "Per-model head trim floors (tools/model_face_overrides.head_floor, docs/MODEL_REDUCTION.md): a body whose locked seams fit inside today's total only when its head gives faces below the default floor of 120. Listed only from a measured bake with 0 uncovered openings and every limb at 0.5 or more; the bake's seam stop judges every bake that reads an entry. No faces are added.",
+ "entries": [
+  {
+   "body": "b_n_dark elf_m_head_01|b_n_dark elf_m_hair_13",
+   "measured_on": "ababael timsar-dadisun",
+   "head_floor": 90,
+   "reason": "With the head held at 120 faces the locked seams do not fit inside today's total; with the head down to 90 faces they do, with no added faces (NPC-BODY-REGRESSION-62).",
+   "cost": {
+    "before": 507,
+    "total": 506
+   },
+   "measured": {
+    "uncovered_openings": 0,
+    "least_width": 0.772,
+    "reducer": "seams",
+    "date": "2026-11-07"
+   },
+   "pi_check": "pending"
+  },
+  {
+   "body": "b_n_dark elf_m_head_06|b_n_dark elf_m_hair_14",
+   "measured_on": "abassel asserbassalit",
+   "head_floor": 90,
+   "reason": "With the head held at 120 faces the locked seams do not fit inside today's total; with the head down to 90 faces they do, with no added faces (NPC-BODY-REGRESSION-62).",
+   "cost": {
+    "before": 514,
+    "total": 512
+   },
+   "measured": {
+    "uncovered_openings": 0,
+    "least_width": 0.782,
+    "reducer": "seams",
+    "date": "2026-11-07"
+   },
+   "pi_check": "pending"
+  },
+  {
+   "body": "b_n_nord_f_head_04|b_n_nord_f_hair_01",
+   "measured_on": "aeta wave-breaker",
+   "head_floor": 90,
+   "reason": "With the head held at 120 faces the locked seams do not fit inside today's total; with the head down to 90 faces they do, with no added faces (NPC-BODY-REGRESSION-62).",
+   "cost": {
+    "before": 476,
+    "total": 476
+   },
+   "measured": {
+    "uncovered_openings": 0,
+    "least_width": 0.662,
+    "reducer": "seams",
+    "date": "2026-11-07"
+   },
+   "pi_check": "pending"
+  },
+  {
+   "body": "b_n_nord_m_head_02|b_n_nord_m_hair02",
+   "measured_on": "agning",
+   "head_floor": 90,
+   "reason": "With the head held at 120 faces the locked seams do not fit inside today's total; with the head down to 90 faces they do, with no added faces (NPC-BODY-REGRESSION-62).",
+   "cost": {
+    "before": 488,
+    "total": 485
+   },
+   "measured": {
+    "uncovered_openings": 0,
+    "least_width": 0.724,
+    "reducer": "seams",
+    "date": "2026-11-07"
+   },
+   "pi_check": "pending"
+  },
+  {
+   "body": "b_n_orc_f_head_03|b_n_orc_f_hair02",
+   "measured_on": "agrob gra-bogharz",
+   "head_floor": 90,
+   "reason": "With the head held at 120 faces the locked seams do not fit inside today's total; with the head down to 90 faces they do, with no added faces (NPC-BODY-REGRESSION-62).",
+   "cost": {
+    "before": 490,
+    "total": 490
+   },
+   "measured": {
+    "uncovered_openings": 0,
+    "least_width": 0.636,
+    "reducer": "seams",
+    "date": "2026-11-07"
+   },
+   "pi_check": "pending"
+  },
+  {
+   "body": "b_n_wood elf_m_head_03|b_n_wood elf_m_hair_05",
+   "measured_on": "agronian guy",
+   "head_floor": 90,
+   "reason": "With the head held at 120 faces the locked seams do not fit inside today's total; with the head down to 90 faces they do, with no added faces (NPC-BODY-REGRESSION-62).",
+   "cost": {
+    "before": 510,
+    "total": 510
+   },
+   "measured": {
+    "uncovered_openings": 0,
+    "least_width": 0.768,
+    "reducer": "seams",
+    "date": "2026-11-07"
+   },
+   "pi_check": "pending"
+  },
+  {
+   "body": "b_n_high elf_m_head_03|b_n_high elf_m_hair_05",
+   "measured_on": "aldaril",
+   "head_floor": 60,
+   "reason": "With the head held at 120 faces the locked seams do not fit inside today's total; with the head down to 60 faces they do, with no added faces (NPC-BODY-REGRESSION-62).",
+   "cost": {
+    "before": 458,
+    "total": 458
+   },
+   "measured": {
+    "uncovered_openings": 0,
+    "least_width": 0.623,
+    "reducer": "seams",
+    "date": "2026-11-07"
+   },
+   "pi_check": "pending"
+  },
+  {
+   "body": "b_n_high elf_m_head_04|b_n_high elf_m_hair_05",
+   "measured_on": "anarenen",
+   "head_floor": 60,
+   "reason": "With the head held at 120 faces the locked seams do not fit inside today's total; with the head down to 60 faces they do, with no added faces (NPC-BODY-REGRESSION-62).",
+   "cost": {
+    "before": 458,
+    "total": 458
+   },
+   "measured": {
+    "uncovered_openings": 0,
+    "least_width": 0.623,
+    "reducer": "seams",
+    "date": "2026-11-07"
+   },
+   "pi_check": "pending"
+  },
+  {
+   "body": "b_n_nord_f_head_01|b_n_nord_f_hair_01",
+   "measured_on": "anja swift-sailer",
+   "head_floor": 90,
+   "reason": "With the head held at 120 faces the locked seams do not fit inside today's total; with the head down to 90 faces they do, with no added faces (NPC-BODY-REGRESSION-62).",
+   "cost": {
+    "before": 476,
+    "total": 476
+   },
+   "measured": {
+    "uncovered_openings": 0,
+    "least_width": 0.662,
+    "reducer": "seams",
+    "date": "2026-11-07"
+   },
+   "pi_check": "pending"
+  },
+  {
+   "body": "b_n_high elf_f_head_04|b_n_high elf_f_hair_04",
+   "measured_on": "ardarume",
+   "head_floor": 60,
+   "reason": "With the head held at 120 faces the locked seams do not fit inside today's total; with the head down to 60 faces they do, with no added faces (NPC-BODY-REGRESSION-62).",
+   "cost": {
+    "before": 477,
+    "total": 476
+   },
+   "measured": {
+    "uncovered_openings": 0,
+    "least_width": 0.623,
+    "reducer": "seams",
+    "date": "2026-11-07"
+   },
+   "pi_check": "pending"
+  },
+  {
+   "body": "b_v_redguard_m_head_01|b_n_redguard_m_hair_05",
+   "measured_on": "aundae vampire 4",
+   "head_floor": 90,
+   "reason": "With the head held at 120 faces the locked seams do not fit inside today's total; with the head down to 90 faces they do, with no added faces (NPC-BODY-REGRESSION-62).",
+   "cost": {
+    "before": 497,
+    "total": 497
+   },
+   "measured": {
+    "uncovered_openings": 0,
+    "least_width": 0.752,
+    "reducer": "seams",
+    "date": "2026-11-07"
+   },
+   "pi_check": "pending"
+  },
+  {
+   "body": "b_n_orc_f_head_02|b_n_orc_f_hair05",
+   "measured_on": "badbog gra-shug",
+   "head_floor": 60,
+   "reason": "With the head held at 120 faces the locked seams do not fit inside today's total; with the head down to 60 faces they do, with no added faces (NPC-BODY-REGRESSION-62).",
+   "cost": {
+    "before": 483,
+    "total": 483
+   },
+   "measured": {
+    "uncovered_openings": 0,
+    "least_width": 0.636,
+    "reducer": "seams",
+    "date": "2026-11-07"
+   },
+   "pi_check": "pending"
+  },
+  {
+   "body": "b_n_orc_f_head_02|b_n_orc_f_hair03",
+   "measured_on": "bashuk gra-bat",
+   "head_floor": 60,
+   "reason": "With the head held at 120 faces the locked seams do not fit inside today's total; with the head down to 60 faces they do, with no added faces (NPC-BODY-REGRESSION-62).",
+   "cost": {
+    "before": 482,
+    "total": 482
+   },
+   "measured": {
+    "uncovered_openings": 0,
+    "least_width": 0.636,
+    "reducer": "seams",
+    "date": "2026-11-07"
+   },
+   "pi_check": "pending"
+  }
+ ]
+}

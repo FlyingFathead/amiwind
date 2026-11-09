@@ -1,6 +1,6 @@
 # Inventory
 
-_Last updated with AmiWind v0.0.61-dev3 (2026-11-06)._
+_Last updated with AmiWind v0.0.62-dev2 (8 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -8,9 +8,11 @@ _Last updated with AmiWind v0.0.61-dev3 (2026-11-06)._
 - [Items and actions](#items-and-actions)
   - [Weapon kit for testing (dbg give weapons)](#weapon-kit-for-testing-dbg-give-weapons)
   - [Every weapon, shield and piece of gear (dbg weapon, dbg gear)](#every-weapon-shield-and-piece-of-gear-dbg-weapon-dbg-gear)
+  - [Any item, and gold (dbg give, dbg give money)](#any-item-and-gold-dbg-give-dbg-give-money)
 - [Carry weight](#carry-weight)
 - [Armour rating](#armour-rating)
 - [World models](#world-models)
+- [Item pictures, slots and the house button style](#item-pictures-slots-and-the-house-button-style)
 - [The container strip](#the-container-strip)
   - [Where container data comes from (AREA-TABLES-59)](#where-container-data-comes-from-area-tables-59)
 - [Debug torch (test only)](#debug-torch-test-only)
@@ -55,11 +57,31 @@ O cycles name/value/weight sorting. Up/down and wheel select, Tab changes catego
 left/right rotates the body preview. Right-click opens only available actions.
 E or Enter equips/unequips the selected supported item; D drops one.
 
+A double-click on a row (two clicks within half a second) does what dropping the item on the character picture does
+in the original and OpenMW 0.51: a weapon, armour, clothing, a ring, an amulet or a light goes on (or comes off when
+worn) at once, with a short box "Equipped <name>" or "Unequipped <name>" for 3 seconds (the refusal's own line when
+it cannot go on); a book is read; an apparatus opens the alchemy window. A potion or an ingredient asks first, in a
+box naming it with OK and Cancel, so nothing is drunk or eaten by a slip: with more than one of it, the box holds a
+slider and a number field for how many (1 to the stack, starting at 1; Left/Right, Page Up/Down, Home/End, digits
+and Backspace, or the mouse on the slider), and OK uses that many one after the other, as OpenMW uses a dragged
+stack one at a time. Enter is OK; Esc or I is Cancel and keeps the window open. OpenMW's own count box starts at the
+whole stack; this one starts at one. One-use scrolls are read like books for now (casting from them is not in this
+window yet). Tests: `tests/aga_inventory_ui_test.c`.
+
 The equipment set is rings and amulets (a Constant Effect ring or amulet acts while worn and ends when taken off, also
 across a save; see [MAGIC_EFFECTS.md](MAGIC_EFFECTS.md) "Magic items"), clothing, armour, and converted melee, ranged
 and thrown weapons and shields, among them those with a Cast When Strikes or Cast When Used enchantment (before
 v0.0.61-dev3, 191 strike weapons, 59 use weapons and 20 use shields, the iron shardaxe among them, were refused).
-Pieces with a script that still acts after registration are not equippable yet. The original starter shirt, pants and
+Every weapon, armour piece, clothing piece, ring, amulet and carried light offers Equip (Unequip when worn) from its
+class; whether it can go on now (one of it, its condition) is decided when E is pressed, with a message.
+From v0.0.59 to v0.0.61 the builder refused Equip and Drop for any wearable item whose record has a script attached
+(EQUIP-ACTION-REGRESSION-62). The original refuses equipping only when the script sets PCSkipEquip, and dropping only
+when the script handles OnPCDrop. Affected were weapons (the Census Office dagger, Sunder, Keening), shields (the
+Darksun shield), armour (Imperial, Indoril, Templar and Dukesguard pieces, the Lord's cuirass, Wraithguard), clothing
+(Therana's skirt, a glove) and scripted amulets. Since v0.0.62 the builder follows the original rule, and the catalogue
+stage checks every item record of the game and stops on a wearable one refused without a named reason. The scripts'
+OnPCEquip reactions (the census dagger's tutorial message, the faction armour's checks) run once that script function
+lands; until then such items are worn without them. The original starter shirt, pants and
 shoes are initialized once from the original player record. Earned items remain earned: opening inventory does not
 grant gold, the healing ring, a sword or a shield. The healing ring is a CastWhenUsed item; wearing it never heals the
 player.
@@ -160,6 +182,27 @@ The rows come from the item catalogue (`inventory/items.awi`), read once when th
 play) and freed when it closes: nothing is kept while it is shut. The console says how many rows it read, the bytes
 the box held and how long the read took. Tests: `tests/aga_weapon_kit_test.c` (which box, the order, the line).
 
+### Any item, and gold (dbg give, dbg give money)
+
+`dbg give` alone (also `dbg additem`) opens the same list box with every item of the game: its in-game name, and its
+record id beside it in a dimmer colour, grouped by kind (weapons, armour, clothing, potions, ingredients, books,
+lights, apparatus, the rest). Typing searches the name and the id. Enter or a click picks an item, then a second box
+asks how many (1 to 1000); choosing the count gives them, a test grant saved and loaded like any other, with the
+notice "N <item> added to your inventory." on screen and a line on the console. `dbg give ID [N]` gives N of one item
+at once (1 to 99999, default 1). The rows are read from the item catalogue when the box opens and freed when it
+closes (about 50 bytes a row while open; the console prints the bytes and the time), nothing while it is shut.
+
+`dbg give money [N]` (also `dbg give coin`, `dbg give rich`) gives N gold, 1,000,000 when no number follows.
+
+The gold limit is 999,999,999. The original and OpenMW 0.51 keep an item count as a signed 32-bit number, so
+2,147,483,647 is the most either can hold; AmiWind adds a gain to the purse in 32-bit arithmetic, so a sale near
+that number would wrap below zero. Nine digits leave over a thousand million of room for any single gain (a script
+adds at most 65,535 at once). Every way gold comes in (a pick-up, a sale, a script, a loaded save, `dbg give`) keeps
+to the limit: what would go past it is not added, and nothing is refused. The item list's count column shows counts
+over 9,999 in four characters as OpenMW does: 10k, 1m, 999m.
+Tests: `tests/aga_inventory_test.c` (the limit on add, set and load; the count column), `tests/aga_console_test.c`
+(the routes).
+
 ## Carry weight
 
 The original's encumbrance, by the OpenMW 0.51 rules (`mwclass/actor.cpp` getEncumbrance, `mwclass/npc.cpp`
@@ -180,6 +223,14 @@ The load is a running total kept by the item table: every count change adds or t
 is summed again exactly when a place loads (from the records the load reads anyway). Nothing is summed per frame.
 Burden and Feather come from the spell effects, which set them with `AW_EncumbranceSetEffects` (aw_move.h). Register:
 [ENCUMBRANCE-INCOMPLETE-61](bugs/ENCUMBRANCE-INCOMPLETE-61.md).
+
+For testing, `dbg noburden` (also `dbg unburdened`, `dbg noweight`) turns on a mode with no burden at all: while it is
+on, the load (with Burden and Feather) counts as 0 in every rule, so nothing slows the walk, run, swim or jump, the
+fatigue costs and the rest are those of an empty pack, and the player is never over-encumbered. The burden bar then
+shows the real load over 999999: the bar's text field holds 28 characters for "load/capacity", and six nines leave
+the load as many. The same command turns it off again (or `on`/`off`); a message says which. It is not saved and a
+New Game turns it off. The original's real capacity is Strength times fEncumbranceStrMult (5): 500 at Strength 100,
+more with Fortify Strength. Tests: `tests/aga_move_rules_test.c`, `tests/aga_move_test.c`.
 
 ## Armour rating
 
@@ -237,11 +288,33 @@ once when the light is equipped; catalogue byte 511 holds the record's flicker a
 colour (the dynamic light is one shade), its burn time counting down, the Bloodmoon and Tribunal lights (the
 catalogue reads Morrowind's records), and the light in the inventory picture.
 
+## Item pictures, slots and the house button style
+
+Every item that has an icon in the game data shows it in the container window, as in the inventory window (before,
+clothing, armour, books, scrolls and potions showed only their names in the container: its pictures were made for
+the HUD's weapons alone). The builder makes a 32 x 32 picture of each item with an icon ("big:" in the icon table, black
+behind it, the magic backdrop when enchanted) beside the 16 x 16 inventory one; a build that has only the inventory
+pictures shows those at twice the size. A slot takes the largest whole-number scale that fits and centres the picture
+with the same margin on both sides, and one function draws it for the inventory, container and barter windows. The
+slots are black. Only an item whose record names no icon at all shows its name as text.
+
+The house style of a small button or box (decided by the maintainer, 7 November 2026, for every later UI fix): a black
+face inside a 1 pixel line in the frame's muted gold, the text centred in the whole inside (a 56 x 14 button gives its
+text 54 x 12), and the line in the bright gold while the button is hovered or selected. It is one helper, `AW_UIButton`
+(`AW_UIThinBox` for a box without text), used for Take All, Close, OK, Cancel and the class window's buttons. The
+skin frame (4 pixel edges) stays for windows.
+
+Taking an item from a container: the original and OpenMW 0.51 show no text, only the item's own sound. In the AmiWind
+name-label style (the default) a short line confirms it, "Took Iron Sparksword", "Took Gold x 8", "Took 5 items from
+Tarhiel" for Take All, with "(stolen)" from an owned container; the Morrowind style shows no line.
+
 ## The container strip
 
 Placed containers (baskets, crates, barrels, chests, urns, sacks, cupboards,
 desks, closets, the corpse and mummy containers and the rest) can be opened. Aim
-at one within the activation distance: the focus box names it and the line under
+at one within the activation distance: its name shows below the view (the framed
+box over the view only in the Morrowind name-label style, see
+[Dialogue and wait](DIALOGUE_AND_WAIT.md#name-labels-amiwind-or-morrowind)) and the line under
 the view reads "E: Open", or "E: Steal" in red when it belongs to someone (opening
 is free, taking from it is theft). A locked container reads "Locked", its box
 shows "Lock Level: N" as the original's tooltip does, and E does not open it; the

@@ -81,6 +81,7 @@ def build(data_files, media, music, out, config=CONFIG):
     # the census of distance-triggered world events for the script tracker
     held = events.check(data)
     program.held = held['rows']
+    program.far = events.far_triggers(data, held['rows'])
     census = events.census(data)
     conf = {'range_units': int(config_data['activation']['range_units']),
             'ops_per_frame': int(config_data['budget']['ops_per_frame']),

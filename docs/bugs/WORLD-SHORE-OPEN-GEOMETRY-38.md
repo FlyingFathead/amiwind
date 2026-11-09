@@ -134,7 +134,12 @@ Family: Object placement and in-game geometry (`placement-geometry`). Placed obj
 - [CHIM-DAGOTH-UR-RUIN-CYLINDER-44](CHIM-DAGOTH-UR-RUIN-CYLINDER-44.md): Graphics translation glitch at Dagoth Ur: the blight cloud whirlwind (nested translucent cylinders) is drawn solid and still
 - [CHIM-TERRAIN-ROCK-EXEMPT-38](CHIM-TERRAIN-ROCK-EXEMPT-38.md): Terrain-named placed rocks bypass experimental buried-surface clipping
 - [CONVERTER-ROOT-ROTATION-30](CONVERTER-ROOT-ROTATION-30.md): Converter applied NIF root-node rotation to placed meshes
+- CREATURE-FLOATING-62 (no report page): A scrib in the wilderness floats above the terrain
 - ROCK-FLORA-SURFACE-29 (no report page): Angular rock-like surfaces newly appearing in Bitter Coast
 - SHACK-VISIBILITY-29 (no report page): Indrele Rathryon shack front walls missing
+
+Related bugs in other categories:
+
+- [INLAND-SHORE-29](INLAND-SHORE-29.md): v0.0.29-dev1: Angular/jagged inland shoreline
 
 <!-- END GENERATED CATEGORY -->

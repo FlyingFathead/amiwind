@@ -229,8 +229,9 @@ class LedgerWiringTests(unittest.TestCase):
         codec = code('aw_save_codec.c')
         self.assertIn('(ledgered?32U:0U)', codec)
         # bit 64: the levelling (LEVEL-UP-58), 128: the dated journal, 256: up to 128 kinds of item (COLLECT-CAPACITY-
-        # REJECTED-60), 512: any number of kinds (INVENTORY-ORIGINAL-LIMITS-61)
-        self.assertIn('if(features>1023)error=1;', codec)
+        # REJECTED-60), 512: any number of kinds (INVENTORY-ORIGINAL-LIMITS-61), 1024: the skill books read
+        # (SKILL-BOOKS-MISSING-62)
+        self.assertIn('if(features>2047)error=1;', codec)
 
     def test_objects_take_and_hide_through_the_list(self):
         host = code('aw_mwhost.c')

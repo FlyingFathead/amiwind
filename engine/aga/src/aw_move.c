@@ -33,7 +33,7 @@ static int settings_state;      /* 0 not read, 1 from the image, 2 the original'
 static struct {char id[64];float male,female;} races[RACES];
 static int race_count;
 static float last_factor;       /* the last move's input 0..1 (fatigue cost scale) */
-static int last_swimming,last_running,last_sneaking,prev_ground;
+static int last_swimming,last_running,last_sneaking,prev_ground,prev_jump;
 static float effect_burden,effect_feather;   /* AW_EncumbranceSetEffects */
 static double over_shown;                     /* when the over-encumbered line was last raised */
 
@@ -90,11 +90,17 @@ static float carried(void) {return AW_ItemsBurden(&aw_state);}
 void AW_EncumbranceSetEffects(float burden,float feather) {
     effect_burden=burden>0?burden:0;effect_feather=feather>0?feather:0;
 }
+/* DBG-NOBURDEN-62 (aw_move.h): the debug mode, not saved; New Game turns it off (aw_loadfail.c registers the reset) */
+static int noburden;
+int AW_MoveNoBurdenOn(void) {return noburden;}
+void AW_MoveNoBurdenSet(int on) {noburden=on!=0;}
 float AW_PlayerEncumbrance(float *capacity) {
     aw_move_inputs_t in;float weight;
     AW_MovePlayerInputs(&in);
     if(capacity)*capacity=AW_MoveCapacity(&settings,&in);
     weight=in.carried-in.feather+(in.godmode?0:in.burden);
+    /* no burden: the bar shows the real load over the largest capacity it shows (the rules see no load) */
+    if(noburden){if(capacity)*capacity=AW_MOVE_NOBURDEN_SHOWN;weight=carried()-effect_feather+(in.godmode?0:effect_burden);}
     return weight>0?weight:0;
 }
 /* The player tried to move or jump while over the limit (OpenMW mwgui/windowmanagerimp.cpp: getEncumbrance >
@@ -132,6 +138,10 @@ void AW_MovePlayerInputs(aw_move_inputs_t *in) {
     in->godmode=p && ((int)p->v.flags&FL_GODMODE);
     in->fatigue=AW_CombatPlayerFatigue(&in->fatigue_max);
     in->burden=effect_burden;in->feather=effect_feather;   /* AW_EncumbranceSetEffects */
+    if(noburden)AW_MoveNoBurden(in);                        /* DBG-NOBURDEN-62: no load in any rule */
+    /* DBG-SUPERSPEED-62: superspeed reads Speed, Athletics and Acrobatics at the game's maximum, 100 (the character
+     * sheet itself untouched, so off gives the real values back at once) */
+    if(AW_MoveSuperspeed())in->speed=in->athletics=in->acrobatics=AW_MOVE_SUPERSPEED_STAT;
     /* paralysis, Levitate, Swift Swim, Jump, Slowfall,
      * Water Walking: no input or magic effect in the engine yet (0 = no effect). */
 }
@@ -210,12 +220,15 @@ static void player_fall(edict_t *p,float seconds,int ground_now) {
     }else{
         if(fall_air && slow>=1 && !water && z<fall_z)fall_height+=(fall_z-z)/AW_MOVE_UNIT_SCALE;
         if(fall_air && fall_height>0 && !water && !((int)p->v.flags&FL_GODMODE)){
-            aw_move_inputs_t in;float loss;
+            aw_move_inputs_t in;float loss;int knockdown=0;
             AW_MovePlayerInputs(&in);
             loss=AW_MoveFallLoss(fall_height,in.acrobatics,
                                  AW_EffectsMagnitude(AW_ACTOR_PLAYER_REF,AW_EFFECT_JUMP,AW_EFFECT_NO_ARG),
-                                 in.fatigue,in.fatigue_max,NULL);
-            if(loss>0){falls_hurt++;fall_last=loss;AW_CombatHurtPlayer(loss,"a fall");}
+                                 in.fatigue,in.fatigue_max,&knockdown);
+            if(loss>0){falls_hurt++;fall_last=loss;AW_CombatHurtPlayer(loss,"a fall");
+                /* LEVEL-UP-INGAME-62: a hurting landing that does not knock the player down is an Acrobatics_Fall
+                 * use (OpenMW 0.51 character.cpp, after the fall damage) */
+                if(!knockdown)AW_LevelupUse(AW_LU_ACROBATICS,AW_USE_FALL,1);}
         }
         fall_height=0;fall_air=0;
     }
@@ -227,10 +240,16 @@ static void player_fall(edict_t *p,float seconds,int ground_now) {
 static void after(float seconds) {
     edict_t *p=sv_player;aw_move_inputs_t in;float loss;int ground_now,jumped;
     if(!p)return;
+    /* DBG-SUPERSPEED-62: endless stamina while superspeed is on: whatever spent fatigue (a run, a jump, a swing, a block,
+     * a blow taken) is filled again every move */
+    if(AW_MoveSuperspeed())AW_CombatPlayerFatigueFill();
     ground_now=((int)p->v.flags&FL_ONGROUND)!=0;
     player_fall(p,seconds,ground_now);
-    jumped=prev_ground && !ground_now && p->v.velocity[2]>0 && p->v.button2;
-    prev_ground=ground_now;
+    /* SKILL-RAISE-NOT-SEEN-62: the jump itself happens after this think (the game code's pre-think), so the frame that
+     * first sees the player off the ground carries the NEXT command: a tapped jump key is already up there. The button
+     * of the frame before counts too, else only a held key was ever a jump (no Acrobatics use, no jump fatigue). */
+    jumped=prev_ground && !ground_now && p->v.velocity[2]>0 && (p->v.button2 || prev_jump);
+    prev_ground=ground_now;prev_jump=p->v.button2!=0;
     if(AW_MoveSuperspeed() || (last_factor<=0 && !jumped)){last_factor=0;return;}
     AW_MovePlayerInputs(&in);in.swimming=last_swimming;in.running=last_running;in.sneaking=last_sneaking;
     loss=AW_MoveMaxSpeed(&settings,&in)>0?AW_MoveFatigueRate(&settings,&in)*last_factor*seconds:0;
@@ -250,14 +269,15 @@ static int toggle_word(char *text) {
     if(!Q_strcasecmp(text,"off") || !Q_strcasecmp(text,"false") || !strcmp(text,"0"))return 0;
     return -1;
 }
-/* superspeed / dbg superspeed [on/off, true/false or 1/0]; no argument = status. */
+/* superspeed / dbg superspeed [on/off, true/false or 1/0]; no argument turns it the other way (DBG-SUPERSPEED-62: a
+ * bare dbg superspeed only printed the state before), then the state and the speeds. */
 static void superspeed_command(void) {
     aw_move_inputs_t in;int on=-1;
     if(Cmd_Argc()>2 || (Cmd_Argc()==2 && (on=toggle_word(Cmd_Argv(1)))<0)){
-        Con_Printf("Usage: superspeed [on/off, true/false or 1/0]; no argument = status (not saved).\n");return;}
-    if(Cmd_Argc()==2)Cvar_SetValue(superspeed.name,on);
+        Con_Printf("Usage: superspeed [on/off, true/false or 1/0]; no argument turns it the other way (not saved).\n");return;}
+    Cvar_SetValue(superspeed.name,Cmd_Argc()==2?on:!AW_MoveSuperspeed());
     if(AW_MoveSuperspeed()){
-        Con_Printf("superspeed ON: the old fixed fast speeds, walk %ld, run %ld units/s; no running fatigue\n",
+        Con_Printf("superspeed ON: the old fixed fast speeds, walk %ld, run %ld units/s; endless stamina; Speed, Athletics and Acrobatics read as 100\n",
                    (long)cl_forwardspeed.value,(long)(cl_forwardspeed.value*cl_movespeedkey.value));return;}
     AW_MovePlayerInputs(&in);
     {float scale=(in.scale>0?in.scale:1)*AW_MOVE_UNIT_SCALE;

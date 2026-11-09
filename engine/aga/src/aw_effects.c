@@ -45,6 +45,9 @@ int AW_EffectHarmful(int effect){
     return effect==7 || (effect>=14 && effect<=38) || (effect>=45 && effect<=48) || effect==58 ||
            (effect>=85 && effect<=89) || effect==101;
 }
+/* the summoning effects (OpenMW 0.51 apps/openmw/mwmechanics/summoning.cpp isSummoningEffect): Summon Scamp 102 to
+ * Summon Storm Atronach 116, Summon Centurion Sphere 134, and the expansions' 137 to 142 */
+int AW_EffectSummon(int effect){return (effect>=102 && effect<=116) || effect==134 || (effect>=137 && effect<=142);}
 int AW_EffectStat(int group,int arg){
     switch(group){
     case 0:return arg>=0 && arg<8?AWA_ATTRIBUTE+arg:-1;
@@ -130,6 +133,16 @@ int AW_EffectsRemoveSource(aw_actor_t *a,int source){
         effect_t *e=&fx[i];
         if(!e->used || e->owner!=a->reference || e->source!=(uint16_t)source)continue;
         if(!(e->flags&FL_PER_SECOND) && (e->flags&FL_STAT))act_entry(a,e,e->magnitude,-1);   /* undone, as at its end */
+        e->used=0;n++;
+    }
+    return n;
+}
+int AW_EffectsEnd(aw_actor_t *a,uint32_t owner,int number){
+    int i,n=0;
+    for(i=0;i<AW_EFFECTS_MAX;i++){
+        effect_t *e=&fx[i];
+        if(!e->used || e->owner!=owner || e->effect!=number)continue;
+        if(a && a->reference==owner && !(e->flags&FL_PER_SECOND) && (e->flags&FL_STAT))act_entry(a,e,e->magnitude,-1);
         e->used=0;n++;
     }
     return n;

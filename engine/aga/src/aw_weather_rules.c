@@ -90,6 +90,108 @@ int AW_WeatherOfRegion(const aw_weather_table_t *table,int region,int days,int m
     return AW_WeatherChoose(table->chances[region],AW_WEATHERS,
         AW_WeatherRoll(region,AW_WeatherPeriod(days,milliseconds,table->hours)));
 }
+/* The scripts' weather (aw_weather.h AW_WeatherScript*; rules from OpenMW 0.51 weather.cpp, read, not copied). */
+static int script_find(const aw_weather_script_t *s,int region)
+{
+    int i;
+    for(i=0;s && i<s->count && i<AW_WEATHER_SCRIPT_ROWS;i++)if(s->row[i].region==region)return i;
+    return -1;
+}
+void AW_WeatherScriptReset(aw_weather_script_t *s)
+{
+    if(s)memset(s,0,sizeof *s);
+}
+const unsigned char *AW_WeatherChancesOf(const aw_weather_script_t *s,const aw_weather_table_t *t,int region)
+{
+    int i=script_find(s,region);
+    if(!t || region<0 || region>=t->regions)return NULL;
+    return i>=0 && s->row[i].has_chances?s->row[i].chances:t->chances[region];
+}
+static int weather_in_period(const aw_weather_script_t *s,const aw_weather_table_t *t,int region,int period)
+{
+    int i=script_find(s,region);const unsigned char *chances=AW_WeatherChancesOf(s,t,region);
+    if(!chances)return AW_WEATHER_CLEAR;
+    if(i>=0 && s->row[i].weather>=0 && s->row[i].period==period)return s->row[i].weather;
+    return AW_WeatherChoose(chances,AW_WEATHERS,AW_WeatherRoll(region,period));
+}
+int AW_WeatherScripted(const aw_weather_script_t *s,const aw_weather_table_t *t,int region,int days,int milliseconds)
+{
+    if(!t || region<0 || region>=t->regions)return AW_WEATHER_CLEAR;
+    return weather_in_period(s,t,region,AW_WeatherPeriod(days,milliseconds,t->hours));
+}
+/* the region's row, made when missing (a new row keeps the table's chances and no weather); -1 when full */
+static int script_row(aw_weather_script_t *s,const aw_weather_table_t *t,int region)
+{
+    int i=script_find(s,region);
+    if(i>=0)return i;
+    if(s->count>=AW_WEATHER_SCRIPT_ROWS)return -1;
+    i=s->count++;
+    memset(&s->row[i],0,sizeof s->row[i]);
+    s->row[i].region=(short)region;s->row[i].weather=-1;
+    memcpy(s->row[i].chances,t->chances[region],AW_WEATHERS);
+    return i;
+}
+int AW_WeatherScriptChange(aw_weather_script_t *s,const aw_weather_table_t *t,int region,int weather,int period)
+{
+    int i;
+    /* OpenMW changeWeather: a weather number past the list or a region it does not have changes nothing */
+    if(!s || !t || region<0 || region>=t->regions || weather<0 || weather>=AW_WEATHERS)return 0;
+    if((i=script_row(s,t,region))<0)return 0;
+    s->row[i].weather=(signed char)weather;s->row[i].period=period;
+    return 1;
+}
+int AW_WeatherScriptModRegion(aw_weather_script_t *s,const aw_weather_table_t *t,int region,const int *chances,int n,
+                              int period)
+{
+    int i,k,before;
+    if(!s || !t || region<0 || region>=t->regions || n<0)return 0;
+    before=weather_in_period(s,t,region,period);
+    if((i=script_row(s,t,region))<0)return 0;
+    /* RegionWeather::setChances: the given chances replace the first ones, the rest keep theirs */
+    for(k=0;k<n && k<AW_WEATHERS;k++)
+        s->row[i].chances[k]=(unsigned char)(chances[k]<0?0:chances[k]>255?255:chances[k]);
+    s->row[i].has_chances=1;
+    /* a weather the new chances still allow stays until the region's next change; else the new chances choose */
+    if(s->row[i].chances[before]){s->row[i].weather=(signed char)before;s->row[i].period=period;}
+    else s->row[i].weather=-1;
+    return 1;
+}
+/* saved: "AWWR" u8 rows, each u8 region, s8 weather (-1 none), u8 has chances, u32 period (big-endian), ten chances */
+#define SCRIPT_ROW_BYTES 17
+int AW_WeatherScriptExport(const aw_weather_script_t *s,unsigned char *out,int capacity)
+{
+    int i,n=s?s->count:0,at=5;
+    if(n>AW_WEATHER_SCRIPT_ROWS)n=AW_WEATHER_SCRIPT_ROWS;
+    if(!out || 5+n*SCRIPT_ROW_BYTES>capacity)return -1;
+    memcpy(out,"AWWR",4);out[4]=(unsigned char)n;
+    for(i=0;i<n;i++){
+        unsigned int p=(unsigned int)s->row[i].period;
+        out[at]=(unsigned char)s->row[i].region;out[at+1]=(unsigned char)s->row[i].weather;
+        out[at+2]=s->row[i].has_chances;
+        out[at+3]=(unsigned char)(p>>24);out[at+4]=(unsigned char)(p>>16);out[at+5]=(unsigned char)(p>>8);
+        out[at+6]=(unsigned char)p;
+        memcpy(out+at+7,s->row[i].chances,AW_WEATHERS);at+=SCRIPT_ROW_BYTES;
+    }
+    return at;
+}
+int AW_WeatherScriptImport(aw_weather_script_t *s,const unsigned char *p,int bytes)
+{
+    int i,n,at=5;
+    if(!s)return -1;
+    AW_WeatherScriptReset(s);
+    if(!p || bytes<5 || memcmp(p,"AWWR",4))return -1;
+    n=p[4];
+    if(n>AW_WEATHER_SCRIPT_ROWS || 5+n*SCRIPT_ROW_BYTES>bytes)return -1;
+    for(i=0;i<n;i++){
+        signed char w=(signed char)p[at+1];
+        if(w<-1 || w>=AW_WEATHERS || p[at+2]>1){AW_WeatherScriptReset(s);return -1;}
+        s->row[i].region=p[at];s->row[i].weather=w;s->row[i].has_chances=p[at+2];
+        s->row[i].period=(int)(((unsigned int)p[at+3]<<24)|((unsigned int)p[at+4]<<16)|((unsigned int)p[at+5]<<8)|p[at+6]);
+        memcpy(s->row[i].chances,p+at+7,AW_WEATHERS);at+=SCRIPT_ROW_BYTES;
+    }
+    s->count=n;
+    return at;
+}
 /* Transitions (aw_weather.h; rules from OpenMW mwworld/weather.cpp forceWeather,
  * addWeatherTransition, updateWeatherTransitions, updateWeatherRegion, playerTeleported). */
 void AW_WeatherForce(aw_weather_state_t *s,int weather)

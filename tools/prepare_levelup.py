@@ -6,6 +6,8 @@ Writes into the image's id1:
   levelup/settings.txt   AWLU1: the levelling game settings, each skill's governing attribute, specialization and
                          four use values (SKIL SKDT), the skill-raise sound, the game's own lines (GMST strings) and,
                          when the install has a Morrowind.ini, each level's own sentence ([Level Up] LevelN)
+  levelup/books.txt      AWLB1: the skill books (BOOK records with a skill), their skill and their place in the read
+                         list a save keeps (SKILL-BOOKS-MISSING-62)
   levelup/<name>.awi     the level-up pictures (textures/levelup/<name>.dds), 128 x 64, the game palette (AWI1)
   levelup/coin.awi       the gold coin the box places on a picked attribute (8 x 8)
   sound/levelup/skillraise.wav   the "skillraise" sound record (11025 Hz, 8-bit mono)
@@ -31,8 +33,13 @@ SETTINGS = ('fMajorSkillBonus', 'fMinorSkillBonus', 'fMiscSkillBonus', 'fSpecial
 # The game's lines the engine shows (aw_levelup.c game_text).
 # sNotifyMessage59: the over-encumbered line (aw_move.c, ENCUMBRANCE-INCOMPLETE-61).
 # sNotifyMessage60-63: an item a dialogue result added or removed (aw_mwhost.c item_notice, DIALOGUE-ITEM-NOTICE-MISSING-61).
+# sBookSkillMessage: the line before a skill book's raise (SKILL-BOOKS-MISSING-62).
+# sNotifyMessage13-15: a beast race refused a helmet over the head, armour boots, shoes (aw_inventory.c, OpenMW 0.51
+# mwclass/armor.cpp and clothing.cpp canBeEquipped; EQUIP-ACTION-REGRESSION-62).
 TEXTS = ('sNotifyMessage39', 'sLevelUpMsg', 'sLevelUpMenu1', 'sLevelUpMenu2', 'sNotifyMessage36', 'sNotifyMessage59',
-         'sNotifyMessage60', 'sNotifyMessage61', 'sNotifyMessage62', 'sNotifyMessage63')
+         'sNotifyMessage60', 'sNotifyMessage61', 'sNotifyMessage62', 'sNotifyMessage63', 'sBookSkillMessage',
+         'sNotifyMessage13', 'sNotifyMessage14', 'sNotifyMessage15')
+BOOKS_MAX = 512           # the engine's read list (aw_character.h AW_BOOKS_READ_MAX)
 # The level-up pictures by name (aw_levelup_rules.c AW_LevelupClassImage; OpenMW getLevelupClassImage).
 PICTURES = ('acrobat', "agent", 'archer', 'assassin', 'barbarian', 'bard', 'battlemage', 'crusader', 'healer',
             'knight', 'mage', 'monk', 'pilgrim', 'rogue', 'scout', 'sorcerer', 'spellsword', 'thief', 'warrior',
@@ -114,6 +121,29 @@ def settings_text(kinds, levels, sound):
     for level in sorted(levels):
         lines.append('level %d %s' % (level, levels[level]))
     return '\n'.join(lines) + '\n'
+
+
+def books_text(raw):
+    """levelup/books.txt (AWLB1): every live BOOK record of the master with a skill (BKDT skill id 0..26), one line
+    "book INDEX SKILL ID" in ascending folded ID; INDEX is the book's bit in the save's read list (aw_levelup.c
+    AW_LevelupBookRead; OpenMW 0.51 mwworld/actionread.cpp: the first read raises the skill)."""
+    from mwad.audit import records, subrecords, string
+    books = {}
+    for tag, flags, payload in records(raw):
+        if tag != 'BOOK' or flags & 0x20:
+            continue
+        fields = dict(subrecords(payload))
+        if 'DELE' in fields or len(fields.get('BKDT', b'')) != 20:
+            continue
+        skill = struct.unpack_from('<i', fields['BKDT'], 12)[0]
+        ident = string(fields['NAME']).casefold()
+        if 0 <= skill < 27 and ident and ident == ident.strip() and all(32 <= ord(c) < 127 for c in ident) \
+                and len(ident) <= 64:
+            books[ident] = skill
+    if len(books) > BOOKS_MAX:
+        raise ValueError('%d skill books, the engine remembers %d' % (len(books), BOOKS_MAX))
+    lines = ['AWLB1'] + ['book %d %d %s' % (i, books[k], k) for i, k in enumerate(sorted(books))]
+    return '\n'.join(lines) + '\n', len(books)
 
 
 # Resting and waiting (REST-WAIT-59, docs/RESTING.md; rules of OpenMW 0.51 mwgui/waitdialog.cpp, mwworld/worldimp.cpp
@@ -251,6 +281,9 @@ def prepare(data_files, id1):
     (id1 / 'levelup/rest.txt').write_bytes(rest.encode('cp1252'))
     report['rest'] = {'lines': rest.count('\n'), 'no_sleep_cells': rest.count('\nnosleep'),
                       'owned_beds': rest.count('\nbed '), 'sleep_regions': rest.count('\nsleepregion ')}
+    books, book_count = books_text(child_ci(data, 'Morrowind.esm').read_bytes())
+    (id1 / 'levelup/books.txt').write_bytes(books.encode('cp1252'))
+    report['skill_books'] = book_count
     levels = ini_levels(data_files)
     text = settings_text(kinds, levels, sound)
     (id1 / 'levelup/settings.txt').write_bytes(text.encode('cp1252'))

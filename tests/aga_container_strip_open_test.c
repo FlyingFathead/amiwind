@@ -93,6 +93,10 @@ void AW_ConsoleCharacterRed(int x,int y,int c,int red){AW_ConsoleCharacter(x,y,c
 int AW_UICursor(int x,int y){(void)x;(void)y;return 1;}
 int AW_IconLoad(aw_icon_t *slot,const char *key){(void)slot;(void)key;return 0;}
 void AW_IconDraw(const aw_icon_t *icon,int x,int y){(void)icon;(void)x;(void)y;}
+int AW_SceneNameLabelsAmiWind(void){return 1;}
+void AW_UIButton(int x,int y,int w,int h,const char *text,int lit,int colour){(void)x;(void)y;(void)w;(void)h;(void)text;(void)lit;(void)colour;}
+int AW_IconLoadItem(aw_icon_t *slot,const char *id){(void)slot;(void)id;return 0;}
+void AW_IconDrawFit(const aw_icon_t *icon,int x,int y,int slot_w,int slot_h,int colour){(void)icon;(void)x;(void)y;(void)slot_w;(void)slot_h;(void)colour;}
 void ED_Free(edict_t *e){(void)e;assert(0);}
 edict_t *ED_Alloc(void){assert(0);return NULL;}
 char *ED_NewString(char *s){(void)s;assert(0);return NULL;}

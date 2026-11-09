@@ -73,8 +73,11 @@ static void view_check(edict_t *p) {
     }
 }
 /* Reproducible local camera placement for visual regression captures. */
+static void walkto_command(void);
 static void view(void) {
-    edict_t *p=player();int i;float v[5];if(!p)return;
+    edict_t *p=player();int i;float v[5];
+    if(Cmd_Argc()>=2 && !Q_strcasecmp(Cmd_Argv(1),"walk")){walkto_command();return;}
+    if(!p)return;
     if(p->v.movetype!=MOVETYPE_NOCLIP || Cmd_Argc()!=6) {
         Con_Printf("Enable noclip, then aw_view x y z yaw pitch\n");return;
     }
@@ -297,16 +300,42 @@ static void AW_SessionShift(const float *d) {
     for(i=0;i<total_channels;i++)for(k=0;k<2;k++)channels[i].origin[k]-=d[k];
     for(k=0;k<2;k++)listener_origin[k]-=d[k];
 }
+/* aw_view walk: a test aid for scripted runs (the opening from the ship to the office, INTRO-DOCK-GUARD-BLOCKS-DOOR-62),
+ * kept under aw_view so the resident command registry does not grow. "aw_view walk X Y" walks the player to the
+ * map-local point as held forward keys would; "aw_view walk role N" keeps walking after intro actor N (1 Jiub .. 8
+ * the hall guard) to 40 units of him; "aw_view walk off" stops. It is ordinary input: every lock after it (the
+ * opening, menus, the scripts' control switches) still holds the player. */
+static int walk_mode,walk_role;static vec3_t walk_goal;
+static void walkto_command(void){
+    if(Cmd_Argc()>=3 && !Q_strcasecmp(Cmd_Argv(2),"off")){walk_mode=0;Con_Printf("Walk to: off.\n");return;}
+    if(Cmd_Argc()>=4 && !Q_strcasecmp(Cmd_Argv(2),"role")){walk_role=Q_atoi(Cmd_Argv(3));
+        if(walk_role<1 || walk_role>8){walk_mode=0;Con_Printf("Walk to: role 1..8.\n");return;}
+        walk_mode=2;Con_Printf("Walk to: following role %d.\n",walk_role);return;}
+    if(Cmd_Argc()<4){Con_Printf("aw_view walk X Y | role N | off\n");return;}
+    walk_goal[0]=Q_atof(Cmd_Argv(2));walk_goal[1]=Q_atof(Cmd_Argv(3));walk_goal[2]=0;walk_mode=1;
+    Con_Printf("Walk to: %ld %ld.\n",(long)walk_goal[0],(long)walk_goal[1]);
+}
+static void walkto_move(usercmd_t *cmd){
+    vec3_t d;float range,stop=12;edict_t *p,*actor;
+    if(!walk_mode || !sv.active || !svs.clients || !(p=svs.clients[0].edict))return;
+    if(walk_mode==2){if(!(actor=AW_IntroRole(walk_role)) || !actor->v.modelindex)return;VectorCopy(actor->v.origin,walk_goal);stop=40;}
+    VectorSubtract(walk_goal,p->v.origin,d);d[2]=0;range=(float)sqrt(d[0]*d[0]+d[1]*d[1]);
+    if(range<stop){if(walk_mode==1){walk_mode=0;Con_Printf("Walk to: reached.\n");}return;}
+    cl.viewangles[1]=Q_atan2(d[1],d[0])*180/M_PI;cl.viewangles[0]=0;
+    cmd->forwardmove=200;cmd->sidemove=0;
+}
 void AW_DebugInit(void) {
     AW_InspectInit();
+    {extern void (*aw_walkto_move)(usercmd_t *);aw_walkto_move=walkto_move;}
     Cvar_RegisterVariable(&aw_logs_live);Cmd_AddCommand("aw_logs_live_set",logs_live_command);Cmd_AddCommand("aw_savelogs",savelogs_command);Cmd_AddCommand("aw_godmode",godmode_command);
     AW_GalleryInit();AW_SweepInit();AW_WorldUIInit();AW_PlacedInit();AW_StatsWindowInit();AW_AlchemyInit();AW_DebugTorchInit();    AW_StreamInit();AW_PhotoInit();AW_SpikeInit();Chim_Init();
     /* CHIM's window (type 1 crossings) names a cell's region map through the world directory. */
     {extern int (*chim_cell_map)(int,int,char *,int);chim_cell_map=AW_CellMap;}
     {extern void (*aw_session_shift)(const float *);aw_session_shift=AW_SessionShift;}
     AW_MiniwindInit();AW_QuickCharInit();AW_TestBoxInit();
+    Cvar_RegisterVariable(&aw_census_legacy);aw_intro_census_legacy=AW_CensusLegacy;   /* CENSUS-INTRO-SCRIPTS-62 */
     AW_NpcPartsInit();     /* aw_npc_tables_areas (NPC-RECIPES-PER-AREA-59) */
-    AW_CamInit();AW_InputDebugInit();AW_BoundsInit();AW_DoorAudioInit();AW_HingedDoorInit();aw_hinged_story=AW_OpeningHingedStory;AW_TalkInit();AW_MwscriptInit();AW_CompanionInit();AW_CombatInit();AW_AmbientInit();AW_MoveInit();AW_ActorsInit();AW_ViewInit();AW_LavaInit();AW_MagicInit();AW_AnimInit();AW_GlutInit();AW_DialWindowInit();AW_AnimKitInit();AW_HalloweenInit();AW_DemoWindInit();AW_WaitInit();AW_LevelupInit();AW_ConsoleInit();AW_SceneInit();AW_UIInit();AW_IconsInit();AW_IntroInit();AW_SaveInit();AW_RecorderInit();
+    AW_CamInit();AW_InputDebugInit();AW_BoundsInit();AW_DoorAudioInit();AW_HingedDoorInit();aw_hinged_story=AW_OpeningHingedStory;AW_TalkInit();AW_MwscriptInit();AW_CompanionInit();AW_CombatInit();AW_AmbientInit();AW_MoveInit();AW_ActorsInit();AW_ViewInit();AW_LavaInit();AW_MagicInit();AW_AnimInit();AW_GlutInit();AW_DialWindowInit();AW_AnimKitInit();AW_HalloweenInit();AW_DemoWindInit();AW_WaitInit();AW_LevelupInit();AW_ConsoleInit();AW_SceneInit();AW_LoadFailInit();AW_CensusInit();AW_UIInit();AW_IconsInit();AW_IntroInit();AW_SaveInit();AW_RecorderInit();
     aw_save_entry_refuse=AW_SceneSaveEntryRefuse;   /* a save in a 32 MB place on less Fast RAM (CHIM-32MB-SAVE-ENTRY-48) */
     /* a bad sprite (r_sprite.c) names the CHIM streamed static it belongs to (SPRITE-BAD-TYPE-THREADED-56) */
     {extern const char *(*aw_sprite_describe)(const entity_t *,char *,int);

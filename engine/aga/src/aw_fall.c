@@ -36,10 +36,13 @@ aw_actor_t *AW_MwscriptActorOf(edict_t *e,int *row);
 #define FALL_MAX 40000.0f        /* original units: no ground met by then (a hole in the streamed world): it lands */
 enum {HELD,WAITING,FALLING,LANDED};
 static const char *state_names[]={"held","waiting for ground","falling","landed"};
-typedef struct {int edict,state;uint32_t ref,support;float vz,height;} fall_t;
+/* the server times of each step (SCRIPTED-EVENTS-FALLING-MAGE-62: the delay between the platform's removal and the
+ * fall is measured from these, aw_mwscript_status): tracked, saw the object gone, started falling, landed (0: not yet) */
+typedef struct {int edict,state;uint32_t ref,support;float vz,height;double t_tracked,t_gone,t_fall,t_land;} fall_t;
+static double last_tracked,last_gone,last_fall,last_land;
 static fall_t falls[FALLS];static int nfalls;
 static void *map_of;static double next_scan;
-static struct {unsigned long scans,tracked,full,fell,landed,water,hurt,killed,no_record,slowed;float height,loss;} st;
+static struct {unsigned long scans,tracked,full,fell,landed,water,hurt,killed,no_record,slowed,no_ground;float height,loss;} st;
 
 static int is_actor(edict_t *e){
     const char *c;
@@ -69,6 +72,7 @@ static void scan(void){
         if(!AW_MwvmHeld(row,NULL,&support,at))continue;
         memset(&falls[nfalls],0,sizeof(fall_t));
         falls[nfalls].edict=i;falls[nfalls].ref=ref;falls[nfalls].support=support;
+        falls[nfalls].t_tracked=last_tracked=sv.time;
         if(AW_CombatSlotState(e,NULL)==2)falls[nfalls].state=LANDED;          /* a body: as it lies */
         else if(!AW_ObjectDisabled(support)){
             /* where the game data puts it: a ground bake of its frame or of the actor table would have moved it */
@@ -87,7 +91,7 @@ static void play(edict_t *e,int key,float gain){
 }
 static void landed(edict_t *e,fall_t *f,int water){
     aw_actor_t *a;float acrobatics=0,fatigue=1,fatigue_max=1,loss,health;int knockdown=0;
-    f->state=LANDED;st.landed++;st.height=f->height;
+    f->state=LANDED;st.landed++;st.height=f->height;f->t_land=last_land=sv.time;
     e->v.flags=(float)((int)e->v.flags|FL_ONGROUND);
     SV_LinkEdict(e,false);
     if(water){st.water++;return;}                     /* OpenMW: no fall damage landing in water */
@@ -167,10 +171,13 @@ void AW_FallTick(float dt){
     for(i=0;i<nfalls;){
         fall_t *f=&falls[i];edict_t *e=f->edict<sv.num_edicts?EDICT_NUM(f->edict):NULL;
         if(!e || e->free || ref_of(e)!=f->ref){falls[i]=falls[--nfalls];continue;}   /* released, freed */
-        if(f->state==HELD && AW_ObjectDisabled(f->support)){f->state=WAITING;st.fell++;}
-        if(f->state==WAITING && ground_below(e)){f->state=FALLING;f->vz=0;f->height=0;
+        /* SCRIPTED-EVENTS-FALLING-MAGE-62: released in the tick its object goes (OpenMW: the physics drops it at once);
+         * only a step with no collidable ground anywhere under it waits (the streamed world not there yet), so it
+         * never falls through a hole in the stream, and the fall goes on from where it hangs once ground arrives */
+        if(f->state==HELD && AW_ObjectDisabled(f->support)){f->state=WAITING;st.fell++;f->t_gone=last_gone=sv.time;}
+        if(f->state==WAITING){f->state=FALLING;f->vz=0;f->height=0;f->t_fall=last_fall=sv.time;
             e->v.flags=(float)((int)e->v.flags&~FL_ONGROUND);}
-        if(f->state==FALLING)step(e,f,dt);
+        if(f->state==FALLING){if(ground_below(e))step(e,f,dt);else st.no_ground++;}
         i++;
     }
 }
@@ -179,8 +186,21 @@ void AW_FallStatus(void){
     Con_Printf("held actors: %d rows in the file, %d tracked here; %lu fell, %lu landed (%lu in water), %lu hurt, %lu "
                "killed, %lu without an actor record, %lu slowed steps; last fall %.0f units, %.1f health\n",
                AW_MwvmHeldCount(),nfalls,st.fell,st.landed,st.water,st.hurt,st.killed,st.no_record,st.slowed,st.height,st.loss);
+    Con_Printf("  last times (server s): tracked %.2f, object gone %.2f, fall started %.2f, landed %.2f; now %.2f; "
+               "%lu ticks waited for ground under a released actor\n",last_tracked,last_gone,last_fall,last_land,sv.time,
+               st.no_ground);
     for(i=0;i<nfalls;i++)
-        Con_Printf("  ref %lu on %lu: %s\n",(unsigned long)falls[i].ref,(unsigned long)falls[i].support,
-                   state_names[falls[i].state]);
+        Con_Printf("  ref %lu on %lu: %s (tracked %.2f, gone %.2f, fall %.2f, landed %.2f)\n",(unsigned long)falls[i].ref,
+                   (unsigned long)falls[i].support,state_names[falls[i].state],falls[i].t_tracked,falls[i].t_gone,
+                   falls[i].t_fall,falls[i].t_land);
 }
-void AW_FallInit(void){aw_fall_held=held;}
+/* SCRIPTED-EVENT-PAST-DRAW-DISTANCE-62: the edict is a live far event's actor (held on its object or falling), drawn
+ * through the fog and past the draw distance (r_main.c, after the fog pass), so the fall is seen and the actor can
+ * be aimed at and saved. A body (landed) is drawn as any other actor. Cost: nothing without HELD rows. */
+static int far_event(int edict){
+    int i;
+    if(!nfalls || !sv.active)return 0;
+    for(i=0;i<nfalls;i++)if(falls[i].edict==edict)return falls[i].state!=LANDED;
+    return 0;
+}
+void AW_FallInit(void){aw_fall_held=held;aw_fall_far_event=far_event;}

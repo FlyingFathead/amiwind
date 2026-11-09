@@ -1,6 +1,6 @@
 # Keyboard and command reference
 
-_Last updated with AmiWind v0.0.61-dev3 (2026-11-06)._
+_Last updated with AmiWind v0.0.62-dev1 (7 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -124,7 +124,7 @@ is tracked in [UI-KEY-HELP-STALE-38](bugs/UI-KEY-HELP-STALE-38.md).
 | E | `+aw_use` | Use / interact; up in noclip. On a book, scroll or letter ("E: Read", red when it belongs to someone) E opens the reader: Left / Right, Up / Down or Page Up / Page Down turn the pages, E takes it ("E: Take", or "E: Steal" in red), Esc closes it; the mouse clicks both buttons. Reading is free. Magic scrolls are taken without reading. The texts come from the game data (build stage `books`, `tools/prepare_books.py`: id1/books.awb, read one book at a time). |
 | Q | `+movedown` | Down in noclip |
 | Mouse 1 | `+attack` | Attack |
-| Right mouse (Amiga sends it as `MOUSE3`) | `+aw_alt` | Block: hold to raise your shield (`aw_combat_block 1`, an AmiWind extension and the default; the original blocks automatically, docs/COMBAT.md "Blocking"). In pick mode (`dbg companion pick`) it picks a companion, like the left button. Older saved key files get it if `MOUSE3` is unbound. |
+| Right mouse (Amiga sends it as `MOUSE3`) | `+aw_alt` | Block: hold to raise your shield (only with `aw_combat_block 1`, an AmiWind extension and an option in Options > Controls; the default is the original automatic block, docs/COMBAT.md "Blocking"). In pick mode (`dbg companion pick`) it picks a companion, like the left button. Older saved key files get it if `MOUSE3` is unbound. |
 | F | `impulse 202` | Draw / lower hands |
 | V | `aw_torch` | Toggle the carried torch while hands are raised |
 | Tab | `+aw_pov` | Tap to change first/third person; hold to orbit the camera |

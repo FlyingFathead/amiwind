@@ -1,6 +1,6 @@
 # Modular NPCs: every body part stored once, assembled per actor
 
-_Last updated with AmiWind v0.0.60-dev3 (4 November 2026)._
+_Last updated with AmiWind v0.0.62-dev1 (7 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -465,6 +465,24 @@ its source vertices, chosen from the rim's own geometry, and lock that subset.
 the island-wide open joint length, the number of appearances with open joints
 or the largest gap exceeds `config/npc-seam-limits.json`. The limits are the
 measured values of today's reduction; each repair lowers them.
+
+**The default for every modular NPC from v0.0.62** (MESH-REDUCTION-SEAMS-62; the guide is
+[MODEL_REDUCTION.md](MODEL_REDUCTION.md), the bake details [NPC_MODEL_CACHE.md](NPC_MODEL_CACHE.md)).
+From v0.0.54 to v0.0.61 a large hairstyle or helmet took most of the 480-face split, and every body part fell to
+4 faces: Jiub on the prison ship had stick-thin legs and the guards a gap under their helmets. The bake now works
+part by part from the slots above:
+
+- every limb slot (neck, hands, wrists, forearms, arms, feet, ankles, knees, legs, tail) is a limb, never a 4-face
+  detail, and each part keeps at least the faces at which it holds 80 % of its own cross-section and loses no
+  surface (`AMIWIND_NPC_BODY_FLOORS parts`; `silhouette` is the earlier rule);
+- the hair or helmet, then the head, give those faces, inside the actor's total; more faces only through an entry
+  in `config/model-face-overrides.json`;
+- each bake measures the reduced body against its source parts (the joints of this section, each limb's width,
+  the neck, open edges the source does not have) and writes the numbers into the actor's receipt; the coordinated
+  rim reduction planned above is the seam lock (`AMIWIND_NPC_BODY_REDUCER seams`): the points two parts share are
+  locked on both sides.
+
+Jiub, measured: before 620 faces, after 607; his least limb width went from 0.12 to 0.60 of the source.
 
 ## Runtime method C: one shared animation table, posed in the alias renderer
 

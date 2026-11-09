@@ -16,6 +16,7 @@ from mwad.audit import normpath
 from prepare_scenery import bsa_read, nif_reader
 from nif_common import ROOT_RULES, root_local, check_root_rule
 import os
+import sys
 
 # NPC root-node rule (DON'T DELETE ANY METHOD): 'morrowind' = the game's rule shared with
 # scenery (root rotation dropped, translation + scale kept); 'legacy' = full root transform.
@@ -263,8 +264,56 @@ def combined(shapes,frame=0):
     vertices=[];faces=[]
     for shape in shapes:
         base=len(vertices);vertices.extend(np.column_stack((shape['positions'][frame],shape['uv'],shape['colours']*255)).tolist())
-        faces.extend([[*(f+base),shape['material']] for f in shape['faces']])
+        fm=shape.get('face_material')
+        faces.extend([[*(f+base),int(fm[k]) if fm is not None else shape['material']]
+                      for k,f in enumerate(shape['faces'])])
     return np.array(vertices),np.array(faces,int)
+
+SKIN_PREFIXES=('b_n_','b_v_','tri b_n_','tri b_v_','tri chest','tri right hand','tri left hand')
+
+def is_skin(shape):
+    """A bare body part (the race's own mesh) rather than worn armour or clothing."""
+    return shape.get('name','').lower().startswith(SKIN_PREFIXES)
+
+def merge_worn_pieces(shapes):
+    """MESH-SEAM-METHOD-62, armoured outfits: the worn pieces of one limb slot (a pauldron's three parts, a greave's
+    parts, a bracer's two) become ONE shape before reducing, so the slot is reduced as one piece with one width floor
+    instead of each part falling to 4 faces (the Hlaalu guard: 69 shapes in 568 faces, bracers kept 0.01 of their
+    width). Positions coincide where the parts meet, so the reducer's weld closes those seams. Each face keeps its own
+    material (face_material). Shapes outside the limb slots, bare body parts, heads and hair are unchanged; a slot with
+    one worn piece is unchanged. Returns (shapes, {merged shape name: [source names]})."""
+    groups={}
+    for i,s in enumerate(shapes):
+        if s['part'] in LIMB_SLOTS and s['part'] not in HEAD_SLOTS and not is_skin(s):
+            groups.setdefault(s['part'],[]).append(i)
+    merged={};out=[];done=set()
+    for i,s in enumerate(shapes):
+        if i in done:continue
+        idx=groups.get(s['part']) if s['part'] in groups and i in groups[s['part']] else None
+        if not idx or len(idx)<2 or len({shapes[j]['positions'].shape[0] for j in idx})!=1:
+            out.append(s);continue
+        parts=[shapes[j] for j in idx];done.update(idx)
+        off=np.cumsum([0]+[p['positions'].shape[1] for p in parts])
+        name=parts[0].get('name','')+' (merged %d)'%len(parts)
+        out.append({'name':name,'part':s['part'],
+                    'positions':np.concatenate([p['positions'] for p in parts],axis=1),
+                    'faces':np.concatenate([np.asarray(p['faces'])[:,:3]+off[k] for k,p in enumerate(parts)]),
+                    'uv':np.concatenate([p['uv'] for p in parts]),
+                    'colours':np.concatenate([p['colours'] for p in parts]),
+                    'material':parts[0]['material'],
+                    'face_material':np.concatenate([np.full(len(p['faces']),
+                        p['material'],int) if p.get('face_material') is None else np.asarray(p['face_material'])
+                        for p in parts])})
+        merged[name]=[p.get('name','') for p in parts]
+    return out,merged
+
+def worn_merge():
+    """AMIWIND_NPC_WORN_MERGE: merge (default from v0.0.62: merge_worn_pieces before the bake) or pieces (each worn
+    piece reduced alone, the step before). Read here only."""
+    import os
+    value=os.environ.get('AMIWIND_NPC_WORN_MERGE','').strip() or 'merge'
+    if value not in ('merge','pieces'):raise ValueError('AMIWIND_NPC_WORN_MERGE must be merge or pieces')
+    return value=='merge'
 
 def simplify_shape(points, faces, quota, preserve_shell=False):
     """Bound reduction without allowing a large torso panel to collapse away.
@@ -460,6 +509,284 @@ def hair_share():
     if value not in HAIR_SHARES:raise ValueError('AMIWIND_NPC_HAIR_SHARE must be whole, head or plain')
     return value
 
+BODY_SHARES=('body','budget')
+
+def body_share():
+    """The body's share of an original-head bake (NPC-BODY-REGRESSION-62): 'body' (the default from v0.0.62: the
+    budget split among the body shapes alone, the head and hair kept whole beside it, no more triangles than the
+    previous plan) or 'budget' (v0.0.54 to v0.0.61, byte for byte: the body took what a split that also weighed the
+    head and hair left it, down to 4 faces a limb). AMIWIND_NPC_BODY_SHARE selects it; read here only."""
+    import os
+    value=os.environ.get('AMIWIND_NPC_BODY_SHARE','').strip() or 'body'
+    if value not in BODY_SHARES:raise ValueError('AMIWIND_NPC_BODY_SHARE must be body or budget')
+    return value
+
+def body_quotas(shapes,budget,classes):
+    """Per shape: the budget split among the body shapes (every class but head and hair) by their triangles, at
+    least 4 each; 0 for the head and hair (kept whole by the original-head plan)."""
+    body=[i for i,c in enumerate(classes) if c not in ('head','hair')]
+    out=np.zeros(len(shapes),int)
+    if not body:return out
+    n=np.array([len(shapes[i]['faces']) for i in body],float)
+    base=np.minimum(4,n).astype(int);rest=max(0,int(budget)-int(base.sum()))
+    out[body]=base+np.floor(n/n.sum()*rest).astype(int)
+    return out
+
+# The body check of a whole-model bake (NPC-BODY-REGRESSION-62, NPC-JOINT-GAPS-33, PLAYER-BODY-LEG-SHAPE-39): every
+# limb slot (LIMB_SLOTS) keeps its width across the source's cross-section (limb_widths: Jiub's v0.0.61 upper legs and
+# wrists 0.12, the repaired bake at least 0.60), and the neck (slot 2) is sampled against the baked model as
+# lost_surface does, at BODY_CHECK_RATIO of the actor's largest extent (the guards' 4-face necks lost 3.5 to 4.6 %, the
+# repaired ones at most 0.7 %).
+BODY_CHECK_RATIO=0.02
+BODY_LIMB_WIDTH=0.5         # under it: the bake retries with more faces for that part, then reports it
+BODY_NECK_LOST=0.03
+BODY_LIMB_FAIL=0.2          # a limb kept under a fifth of its width (Jiub's v0.0.61 legs: 0.12) stops the bake
+BODY_NECK_FAIL=0.2          # a neck that lost a fifth of its surface stops the bake
+
+def limb_widths(shapes,frame,faces,face_parts,face_shapes=None):
+    """{slot: (width ratio, first shape index)} of every limb slot (LIMB_SLOTS): the baked faces of the slot against
+    the slot's source shapes, across the source's two narrow principal axes (the limb's cross-section): the smaller
+    of the two ratios of baked to source extent (5th to 95th percentile of face samples). 1.0 keeps the width."""
+    faces=np.asarray(faces)[:,:3];face_parts=np.asarray(face_parts)
+    out={}
+    def ratio(src,baked):
+        centre=src.mean(0);_,_,axes=np.linalg.svd(src-centre,full_matrices=False)
+        r=[]
+        for axis in axes[1:]:
+            a=np.percentile((src-centre)@axis,[5,95]);b=np.percentile((baked-centre)@axis,[5,95])
+            r.append(float((b[1]-b[0])/max(a[1]-a[0],1e-6)))
+        return min(r)
+    for slot in sorted({s['part'] for s in shapes} & LIMB_SLOTS):
+        idx=[i for i,s in enumerate(shapes) if s['part']==slot]
+        src=np.concatenate([face_samples(shapes[i]['positions'][0],shapes[i]['faces']) for i in idx])
+        mine=faces[face_parts==slot] if len(face_parts)==len(faces) else faces[:0]
+        if len(src)<8:continue
+        if not len(mine):out[slot]=(0.0,idx[0]);continue
+        best=(round(ratio(src,face_samples(frame,mine)),3),idx[0])
+        if face_shapes is not None and len(face_shapes)==len(faces) and worn_widths():
+            # MESH-SEAM-METHOD-62: every worn piece of the slot on its own (a bracer, a pauldron, a greave): the slot
+            # as a whole kept 0.50 on a Hlaalu guard whose bracers kept 0.01 to 0.27 of their width ("pencil arms")
+            fsh=np.asarray(face_shapes)
+            for i in idx:
+                if len(shapes[i]['faces'])<WORN_MIN_FACES:continue
+                own=faces[fsh==i]
+                s_i=face_samples(shapes[i]['positions'][0],shapes[i]['faces'])
+                w=0.0 if not len(own) else ratio(s_i,face_samples(frame,own))
+                if w<best[0]:best=(round(w,3),i)
+        out[slot]=best
+    return out
+
+WORN_MIN_FACES=24               # a limb-slot piece this small is a detail (a buckle, a strap): not judged alone
+
+def worn_widths():
+    """AMIWIND_NPC_WORN_WIDTHS: each (default from v0.0.62: every piece of a limb slot judged on its own width, worn
+    armour and clothing included) or slot (the slot as a whole, the step before). Read here only."""
+    import os
+    value=os.environ.get('AMIWIND_NPC_WORN_WIDTHS','').strip() or 'each'
+    if value not in ('each','slot'):raise ValueError('AMIWIND_NPC_WORN_WIDTHS must be each or slot')
+    return value=='each'
+
+def body_check(shapes,frame,faces,face_parts=None,ratio=BODY_CHECK_RATIO,face_shapes=None):
+    """[(shape index, part, name, measure, kind)] of the thin limbs (limb_widths under BODY_LIMB_WIDTH, with the
+    baked face slots FACE_PARTS) and the neck gaps (a neck that lost more than BODY_NECK_LOST of its surface) of the
+    baked FRAME/FACES; empty: the body is whole."""
+    from scipy.spatial import cKDTree
+    src=np.concatenate([s['positions'][0] for s in shapes])
+    size=float((src.max(0)-src.min(0)).max()) or 1.0
+    tree=None;out=[]
+    for index,s in enumerate(shapes):
+        if s['part']!=2:continue
+        if tree is None:tree=cKDTree(face_samples(frame,np.asarray(faces)[:,:3]))
+        samples=face_samples(s['positions'][0],s['faces'])
+        if not len(samples):continue
+        lost=float((tree.query(samples)[0]>ratio*size).mean())
+        if lost>BODY_NECK_LOST:out.append((index,2,s.get('name',''),round(lost,3),'neck gap'))
+    if face_parts is not None:
+        for slot,(width,index) in limb_widths(shapes,frame,faces,face_parts,face_shapes).items():
+            if width<BODY_LIMB_WIDTH:out.append((index,slot,shapes[index].get('name',''),width,'thin limb'))
+    return out
+
+JOINT_OPEN_SHARE=0.05       # design step 2 (3.5): at most this share of the joint length open
+JOINT_MAX_GAP=0.5           # and no opening past 0.5 units (4 alias steps of a resident)
+SPIKE_DISTANCE=1.0          # a reduced vertex farther than this from the source surface (NPC-GALLERY-SPIKE-33)
+JOINT_FAIL_GAP=1.0          # an opening this wide left after the retries stops the bake (the v0.0.61 guards: 0.83)
+AUDIT_MODES=('gate','check')
+BODY_REDUCERS=('default','seams')
+
+def body_reducer():
+    """AMIWIND_NPC_BODY_REDUCER: seams (the default from v0.0.62, design step 3: the seam points locked on both
+    sides, tools/npc_seams.py; an actor whose seams do not fit its total takes faces from the hair and head first and
+    falls back to the free reducer only after that, recorded in its receipt) or default (each body shape reduced
+    alone, rims free, as up to v0.0.62-dev1). Read here only."""
+    import os
+    value=os.environ.get('AMIWIND_NPC_BODY_REDUCER','').strip() or 'seams'
+    if value not in BODY_REDUCERS:raise ValueError('AMIWIND_NPC_BODY_REDUCER must be default or seams')
+    return value
+
+def body_audit_mode():
+    """AMIWIND_NPC_BODY_AUDIT: gate (default from v0.0.62: body_audit, the joints and spikes beside the widths and
+    the neck, with the per-actor receipt) or check (body_check only, the step before). Read here only."""
+    import os
+    value=os.environ.get('AMIWIND_NPC_BODY_AUDIT','').strip() or 'gate'
+    if value not in AUDIT_MODES:raise ValueError('AMIWIND_NPC_BODY_AUDIT must be gate or check')
+    return value
+
+def body_audit(shapes,frame,faces,face_parts=None,face_shapes=None,source_shapes=None,covered_tris=None):
+    """The per-actor receipt of a whole-model bake (design step 2): faces, vertices, the joints (npc_seam_audit.measure:
+    open share and largest gap), the least limb width, the neck's lost surface, the shapes that lost surface, the
+    farthest reduced vertex from the source; and its failures [(shape index, part, name, measure, kind)]."""
+    import npc_seam_audit as seams
+    faces=np.asarray(faces)[:,:3];frame=np.asarray(frame,float)
+    src=[{'name':s.get('name',''),'points':np.asarray(s['positions'][0],float),'faces':np.asarray(s['faces'])}
+         for s in shapes]
+    reduced=frame[faces]
+    joints=seams.measure(src,reduced)
+    widths=limb_widths(shapes,frame,faces,face_parts,face_shapes) if face_parts is not None else {}
+    lost=lost_shapes(shapes,frame,faces)
+    source_tris=np.concatenate([s['points'][s['faces']] for s in src if len(s['faces'])])
+    spike=float(seams.point_triangle_distance(frame,source_tris,SPIKE_DISTANCE).max()) if len(frame) else 0.0
+    receipt={'faces':int(len(faces)),'vertices':int(len(frame)),'joint_length':joints['joint_length'],
+             'open_share':joints['open_share'],'max_gap':joints['max_gap'],
+             'least_width':round(min((w for w,_ in widths.values()),default=1.0),3),
+             'lost_shapes':{k:list(v) for k,v in lost.items()},'farthest_vertex':round(spike,3)}
+    failures=list(body_check(shapes,frame,faces,face_parts,face_shapes=face_shapes))
+    if joints['open_share']>JOINT_OPEN_SHARE or joints['max_gap']>JOINT_MAX_GAP:
+        names={s.get('name',''):i for i,s in enumerate(shapes)}
+        for pair,row in sorted(joints['pairs'].items(),key=lambda kv:-kv[1]['open_length']):
+            a=pair.split(' / ')[0]
+            if a in names:
+                i=names[a];failures.append((i,shapes[i]['part'],a,row['max_gap'],'open joint'))
+    if spike>SPIKE_DISTANCE:failures.append((-1,-1,'',round(spike,3),'spike'))
+    if face_shapes is not None and len(face_shapes)==len(faces):
+        # open edges the source does not have (mesh_seam_check): covered only on a head patch the bake removed under
+        # the hair or helmet and away from every join; the pass rule is 0 uncovered (MESH-REDUCTION-SEAMS-62)
+        import mesh_seam_check
+        source=source_shapes if source_shapes is not None else shapes
+        covered,uncovered=mesh_seam_check.classify(source,frame,faces,face_shapes,covered_tris)
+        receipt.update(new_openings=len(covered)+len(uncovered),covered_openings=len(covered),
+                       uncovered_openings=len(uncovered),uncovered_at=[[n,list(p)] for _,n,p in uncovered[:20]])
+        # the join map (every seam of the source: which parts meet, its length, what stayed open) and each limb's
+        # thickness at 25 / 50 / 75 % of its length (MESH-SEAM-METHOD-62)
+        groups={str(slot):[i for i,s in enumerate(shapes) if s['part']==slot]
+                for slot in sorted({s['part'] for s in shapes} & LIMB_SLOTS)}
+        thick=mesh_seam_check.limb_thickness(shapes,frame,faces,face_shapes,groups)
+        receipt.update(joins=mesh_seam_check.join_map(source,frame,faces),limb_thickness=thick,
+                       least_thickness=round(mesh_seam_check.least_thickness(thick),3))
+        per={}
+        for i,n,p in uncovered:per.setdefault(i,[]).append(p)
+        for i,ps in per.items():
+            failures.append((i,source[i]['part'],source[i].get('name',''),len(ps),'open edge'))
+    return receipt,failures
+
+def _cleared(items):
+    """ITEMS emptied for the next bake attempt (None stays None)."""
+    if items is not None:
+        items.clear()
+    return items
+
+def _reduced_total(shapes,materials,textures,palette,minimum_faces,quotas,shell_height,protected,shell_set,preserve,
+                   head_reducer=None):
+    """The triangles a plan's reduction keeps, without the texture work: _bake reduces every shape first and refuses
+    a total over its face limit with the overshoot, so a face limit of 0 returns the total."""
+    try:
+        _bake(shapes,materials,textures,palette,0,minimum_faces,quotas,shell_height,protected,False,shell_set,
+              preserve=preserve,head_reducer=head_reducer)
+    except AliasOverflow as overflow:
+        if str(overflow)=='Alias vertex budget exceeded':return int(overflow.over)
+        raise
+    raise ValueError('reduction total not measured')
+
+def body_check_mode():
+    """AMIWIND_NPC_BODY_CHECK: fail (default: a bake whose body check finds a gap or a thin limb stops) or warn."""
+    import os
+    value=os.environ.get('AMIWIND_NPC_BODY_CHECK','').strip() or 'fail'
+    if value not in ('fail','warn'):raise ValueError('AMIWIND_NPC_BODY_CHECK must be fail or warn')
+    return value
+
+SEAM_FREE_MAX=6                 # shapes whose seam locks may be let go one by one before the free reducer takes all
+
+def _seam_shape_to_free(shapes,locks,freed):
+    """The next shape whose seam locks are let go when the locks do not fit (MESH-SEAM-METHOD-62, the dressed
+    actors): clothing and armour first (a shape not named like a skin part, B_N_/B_V_/Tri Chest/hands), the most
+    locked points first; a head or hair never; None after SEAM_FREE_MAX or when nothing is left (the whole free
+    reducer then, as before)."""
+    if len(freed)>=SEAM_FREE_MAX:return None
+    def skin(s):
+        n=s.get('name','').lower()
+        return n.startswith(('b_n_','b_v_','tri b_n_','tri b_v_','tri chest','tri right hand','tri left hand'))
+    cands=[i for i,s in enumerate(shapes) if s['part'] not in HEAD_SLOTS and i not in freed and len(locks[i])]
+    if not cands:return None
+    return max(cands,key=lambda i:(not skin(shapes[i]),len(locks[i])))
+
+def head_rims_locked():
+    """AMIWIND_NPC_HEAD_RIMS: locked (default from v0.0.62: the head's and hair's rim vertices keep their reduced
+    place through keep_head_inside_cover / keep_outside_surface) or pushed (the step before). Read here only."""
+    import os
+    value=os.environ.get('AMIWIND_NPC_HEAD_RIMS','').strip() or 'locked'
+    if value not in ('locked','pushed'):raise ValueError('AMIWIND_NPC_HEAD_RIMS must be locked or pushed')
+    return value=='locked'
+
+class BakeStop(RuntimeError):
+    """The seam stop (MESH-SEAM-METHOD-62): a reduced model with an uncovered new opening or a limb under
+    SEAM_STOP_WIDTH of its width, and no entry in config/model-face-overrides.json. A RuntimeError, so the budget
+    ladders that catch ValueError (a rung that does not fit) never take it for a smaller rung."""
+
+SEAM_STOP_WIDTH=0.5             # a limb kept under half its width stops the bake (engine_chim_design.md MESH REDUCTION)
+
+SEAM_STOP_MODES=('ratchet','fail','warn')
+WIDTH_SLACK=0.005               # a baselined limb this much thinner is the same measurement, not worse
+
+def seam_stop_mode():
+    """AMIWIND_MESH_SEAM_STOP: ratchet (default from v0.0.62: a model that fails stops the bake unless it is in
+    config/mesh-seam-baseline.json and no worse than its baseline line), fail (every failing model stops) or warn
+    (printed only). Read here only."""
+    import os
+    value=os.environ.get('AMIWIND_MESH_SEAM_STOP','').strip() or 'ratchet'
+    if value not in SEAM_STOP_MODES:raise ValueError('AMIWIND_MESH_SEAM_STOP must be ratchet, fail or warn')
+    return value
+
+def seam_stop(model,uncovered,least_width,has_entry,kind='npc',baseline=None):
+    """The bake stop (MESH-SEAM-METHOD-62). Returns the model's status: 'passing' (0 uncovered openings, every limb
+    at SEAM_STOP_WIDTH or more), 'entry' (fails, but has an entry in config/model-face-overrides.json: printed),
+    'baselined' (fails, listed in config/mesh-seam-baseline.json and no worse: printed), 'new' or 'worse' (printed in
+    warn mode; BakeStop in ratchet and fail mode; fail mode stops a baselined model too). A passing model that is
+    still in the baseline is printed as leaving it (tools/mesh_seam_baseline.py write drops it, so it cannot fail
+    again unnoticed). BASELINE: {key: line} (default: model_face_overrides.load_seam_baseline())."""
+    bad=[]
+    if uncovered:bad.append('%d uncovered new opening%s'%(uncovered,'' if uncovered==1 else 's'))
+    if least_width is not None and least_width<SEAM_STOP_WIDTH:bad.append('a limb at %.2f of its width'%least_width)
+    if baseline is None:
+        from model_face_overrides import load_seam_baseline
+        baseline=load_seam_baseline()
+    key='%s:%s'%(kind,str(model or '').strip().lower())
+    line=baseline.get(key)
+    if not bad:
+        if line is not None:
+            print('seam: %s %s passes now and leaves the baseline (tools/mesh_seam_baseline.py write)'%(kind,model),
+                  flush=True)
+        return 'passing'
+    text='%s %s: %s'%(kind,model or '(unnamed)','; '.join(bad))
+    if has_entry:
+        print('seam stop: %s (passed by its entry in config/model-face-overrides.json)'%text,flush=True)
+        return 'entry'
+    mode=seam_stop_mode()
+    status='new'
+    if line is not None:
+        worse=(uncovered or 0)>int(line.get('uncovered',0)) or (
+            least_width is not None and least_width<float(line.get('least_width',1.0))-WIDTH_SLACK)
+        status='worse' if worse else 'baselined'
+        if status=='baselined':
+            text+=' (baseline %s: %d uncovered, least width %.2f)'%(line.get('date',''),int(line.get('uncovered',0)),
+                                                                  float(line.get('least_width',1.0)))
+            if mode!='fail':
+                print('seam: baselined: '+text,flush=True)
+                return status
+    if mode=='warn':
+        print('seam stop (warn, %s): %s'%(status,text),flush=True)
+        return status
+    raise BakeStop('seam stop (%s): %s; the smallest fix first (lock the seam), else an entry in '
+                   'config/model-face-overrides.json'%(status,text))
+
 COVER_TILTS=(0.0,40.0,70.0)     # degrees from a head face's normal: the rays that must all meet the cover
 COVER_AROUND=6
 COVER_SAMPLES=((1/3,1/3,1/3),(.7,.15,.15),(.15,.7,.15),(.15,.15,.7))
@@ -506,6 +833,17 @@ def hidden_head_faces(head_points,head_faces,cover):
         out[i]=bool(np.all(np.isfinite(_ray_hits(o,d,a,e1,e2,normal))))
     return out
 
+JOIN_KEEP=0.5                   # a head face with a corner this close to another part's surface stays (two seam TOLs)
+
+def _faces_at_joins(shape,others):
+    """Mask of SHAPE's faces with a corner within JOIN_KEEP of any of OTHERS' surfaces (frame 0)."""
+    from npc_seam_audit import point_triangle_distance
+    p=np.asarray(shape['positions'][0],float);f=np.asarray(shape['faces'])[:,:3]
+    tris=[np.asarray(o['positions'][0],float)[np.asarray(o['faces'])[:,:3]] for o in others if len(o['faces'])]
+    if not tris or not len(f):return np.zeros(len(f),bool)
+    near=point_triangle_distance(p,np.concatenate(tris),JOIN_KEEP)<=JOIN_KEEP
+    return near[f].any(axis=1)
+
 def cull_hidden_head(shapes,minimum_faces=None):
     """'whole' hair: the head faces the hair or helmet hides are left out before the split (they also free faces
     for the hair). A head shape every face of which is hidden keeps one face (the shape list stays the same)."""
@@ -515,6 +853,10 @@ def cull_hidden_head(shapes,minimum_faces=None):
     for s in shapes:
         if s['part']!=0 or (minimum_faces or {}).get(s.get('name','')):out.append(s);continue
         hide=hidden_head_faces(s['positions'][0],s['faces'],cover)
+        if hide.any() and head_rims_locked():
+            # MESH-SEAM-METHOD-62: the head keeps every face that touches another part (the nape against the neck):
+            # removing it opens an edge at a join, which no hair excuses (mesh_seam_check.classify)
+            hide&=~_faces_at_joins(s,[o for o in shapes if o is not s and o['part']!=1])
         if hide.all():hide[0]=False
         total+=int(hide.sum());out.append({**s,'faces':np.asarray(s['faces'])[~hide]})
     return out,total
@@ -597,7 +939,7 @@ def lost_shapes(shapes,frame,faces,ratio=LOSS_RATIO,least=LOSS_SAMPLES):
     return out
 
 
-def _budget_quotas(shapes,budget,face_limit,minimum_faces,reference_frames,whole_limit=None):
+def _budget_quotas(shapes,budget,face_limit,minimum_faces,reference_frames,whole_limit=None,body=None):
     """The whole-model split of a budget-head bake (--npc-head-detail budget); the hair or helmet takes the head's
     rule unless hair_share() is 'plain' (the previous split). whole_limit: the face limit a whole hair may take the
     model to (a caller whose reader takes extended models: skeletal residents, SKEL-VERTEX-LIMIT-52); default
@@ -624,6 +966,47 @@ def _budget_quotas(shapes,budget,face_limit,minimum_faces,reference_frames,whole
         if remaining<0:raise ValueError('Too many separate shapes for budget')
         quotas+=np.floor(weights*remaining).astype(int)
         return quotas
+    quotas=_hair_split(shapes,budget,face_limit,minimum_faces,whole_limit,share,split)
+    if share=='plain' or (body or body_share())=='budget':return quotas
+    return _keep_body(shapes,quotas,split(shapes,(0,)),minimum_faces)
+
+
+def _keep_body(shapes,quotas,plain,minimum_faces):
+    """NPC-BODY-REGRESSION-62: every body shape (not head or hair) keeps at least its share of the v0.0.53 split
+    (PLAIN: the hair took 4 faces and a plain share). With the head's weight and floor on the hair (v0.0.54) a whole
+    or heavy hair left the body 4 faces a part: Jiub's legs became sticks, a 4-face neck left a gap under the guards'
+    helmets. The total stays the same (the triangle cap): the faces come off the hair first, then the head, never
+    below 4 faces, the head's floor of up to 120, or a protected minimum."""
+    quotas=np.array(quotas,int);plain=np.asarray(plain,int)
+    body=[i for i,s in enumerate(shapes) if s['part'] not in HEAD_SLOTS]
+    need=sum(max(0,int(plain[i])-int(quotas[i])) for i in body)
+    if not need:return quotas
+    minimum_faces=minimum_faces or {}
+    def least(i):
+        s=shapes[i];n=len(s['faces'])
+        return min(n,max(4,minimum_faces.get(s.get('name',''),0),min(120,n) if s['part']==0 else 4))
+    give=0
+    for slot in (1,0):
+        idx=[i for i,s in enumerate(shapes) if s['part']==slot and quotas[i]>least(i)]
+        room=sum(int(quotas[i])-least(i) for i in idx)
+        take=min(need-give,room)
+        if take<=0 or not room:continue
+        taken=0
+        for i in idx:
+            t=(int(quotas[i])-least(i))*take//room;quotas[i]-=t;taken+=t
+        for i in idx:
+            if taken>=take:break
+            if quotas[i]>least(i):quotas[i]-=1;taken+=1
+        give+=taken
+    # what the head and hair gave goes to the body, short shapes first, up to their v0.0.53 share
+    for i in sorted(body,key=lambda i:int(quotas[i])-int(plain[i])):
+        if give<=0:break
+        t=min(give,max(0,int(plain[i])-int(quotas[i])));quotas[i]+=t;give-=t
+    return quotas
+
+
+def _hair_split(shapes,budget,face_limit,minimum_faces,whole_limit,share,split):
+    """The head and hair part of _budget_quotas (hair_share)."""
     # only the full model (the 480 budget, or any budget of a caller's ladder that takes extended models: a skeletal
     # resident whose outfit overflowed at 480 retries at 384 and lower); the lower levels and parts keep the 'head' split
     if share=='whole' and (budget>=480 or whole_limit):
@@ -663,6 +1046,81 @@ def body_classes(shapes,actor_height):
         else:out.append('torso')
     return out
 
+# NPC-BODY-REGRESSION-62, the body reduction design step 1 (docs/MODEL_REDUCTION.md):
+# classes by body part slot. Every skin slot of a limb (neck, hands, wrists, forearms, arms, feet, ankles, knees, legs,
+# tail) is a limb whatever its size; 'detail' (a 4-face floor) only for the small shapes of the torso, groin and
+# clavicle slots (belts, spikes). The size rule above filed every hand, wrist, forearm and neck as a detail.
+LIMB_CLASS_SLOTS=frozenset({2,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,26})
+DETAIL_CLASS_SLOTS=frozenset({3,4,5,23,24,25})
+GIRTH_LADDER=(4,6,8,10,12,14,16,20,24,28,32,40,48,64)
+GIRTH_KEEP=0.8              # a limb part keeps at least this share of its source cross-section (n=6 ring: 0.866)
+FLOOR_METHODS=('parts','silhouette')
+
+def floor_method():
+    """AMIWIND_NPC_BODY_FLOORS: parts (default from v0.0.62: slot classes, girth and loss floors) or silhouette (the
+    size classes and silhouette floors up to v0.0.62-dev1, byte for byte). Read here only."""
+    import os
+    value=os.environ.get('AMIWIND_NPC_BODY_FLOORS','').strip() or 'parts'
+    if value not in FLOOR_METHODS:raise ValueError('AMIWIND_NPC_BODY_FLOORS must be parts or silhouette')
+    return value
+
+def slot_classes(shapes,actor_height):
+    """head / hair / detail / torso / limb for each shape by its body part slot (LIMB_CLASS_SLOTS)."""
+    out=[]
+    for s in shapes:
+        part=s['part']
+        if part==0:out.append('head')
+        elif part==1:out.append('hair')
+        elif part in LIMB_CLASS_SLOTS:out.append('limb')
+        elif part in DETAIL_CLASS_SLOTS and float(np.ptp(s['positions'][0],axis=0).max())<DETAIL_EXTENT*actor_height:
+            out.append('detail')
+        else:out.append('torso')
+    return out
+
+def girth_ratio(source_points,source_faces,points,faces):
+    """The share of a shape's source cross-section its reduction keeps: the smaller ratio of reduced to source
+    extent (5th to 95th percentile of face samples) along the source's two narrow principal axes."""
+    src=face_samples(source_points,source_faces)
+    if len(src)<8 or not len(faces):return 0.0 if len(src)>=8 else 1.0
+    red=face_samples(points,faces)
+    centre=src.mean(0);_,_,axes=np.linalg.svd(src-centre,full_matrices=False)
+    ratios=[]
+    for axis in axes[1:]:
+        a=np.percentile((src-centre)@axis,[5,95]);b=np.percentile((red-centre)@axis,[5,95])
+        ratios.append(float((b[1]-b[0])/max(a[1]-a[0],1e-6)))
+    return min(ratios)
+
+def part_floors(shapes,classes,model_size=None):
+    """Per shape: the fewest faces on GIRTH_LADDER at which today's reduction keeps the shape whole (design 3.3):
+    girth (limbs and torso: GIRTH_KEEP of the cross-section at that rung and the next, the reducer is not monotone)
+    and loss (every body shape: fewer than LOSS_SAMPLES samples farther than LOSS_RATIO of the model's size). The
+    head keeps all its faces, details 4; never more than the source."""
+    if model_size is None:
+        src=np.concatenate([s['positions'][0] for s in shapes])
+        model_size=float((src.max(0)-src.min(0)).max()) or 1.0
+    out=[]
+    for s,c in zip(shapes,classes):
+        n=len(s['faces'])
+        if c=='head':out.append(n);continue
+        if c=='detail' or n<=4:out.append(min(n,4));continue
+        points,ix=np.unique(np.round(s['positions'][0],5),axis=0,return_inverse=True);ff=ix[s['faces']].astype(np.int32)
+        rungs=[r for r in GIRTH_LADDER if r<n]+[n]
+        results={}
+        def reduced(r):
+            if r not in results:
+                results[r]=(points,ff) if r>=n else simplify_shape(points,ff,r,c in ('torso','limb','hair'))
+            return results[r]
+        def whole(r):
+            p,f=reduced(r)
+            if c in ('limb','torso') and girth_ratio(points,ff,p,f)<GIRTH_KEEP:return False
+            count,_=lost_surface(points,ff,p,f,model_size)
+            return count<LOSS_SAMPLES
+        floor=n
+        for k,r in enumerate(rungs):
+            if whole(r) and (k+1>=len(rungs) or whole(rungs[k+1])):floor=r;break
+        out.append(min(n,max(4,floor)))
+    return out
+
 def silhouette_floors(shapes,classes):
     """Per shape: the fewest triangles its shell-preserving reduction keeps
     (area and extent, simplify_shape); 4 for details, all faces for a head. bake
@@ -676,9 +1134,16 @@ def silhouette_floors(shapes,classes):
         out.append(min(n,len(simplify_shape(points,ix[s['faces']].astype(np.int32),4,True)[1])))
     return out
 
+# The head's floor when the trims of the budget-head bake take faces from it (the hair gives first, then the head
+# down to this). 120 is the shipped default; the override-or-floor measurement (NPC-BODY-REGRESSION-62) tries lower.
+HEAD_TRIM_FLOOR=120
+
 def head_plan(shapes,budget=480,face_limit=666,minimum_faces=None,reference_frames=None,head_detail=None,
-              floors=None,classes=None,extra_cut=0,whole_limit=None,raised_limit=False):
-    """The whole-model bake plan: quotas, the shapes kept exactly and the alias face limit.
+              floors=None,classes=None,extra_cut=0,whole_limit=None,raised_limit=False,share=None,ceiling=None,
+              boost=None,grow_to=None,trim=0,head_floor=None):
+    """head_floor: this model's head trim floor from config/model-head-floors.json (None: HEAD_TRIM_FLOOR).
+
+    The whole-model bake plan: quotas, the shapes kept exactly and the alias face limit.
 
     budget mode: the previous split. original mode (default): every shape of body part
     slot 0 (head) keeps its exact original triangles; slot 1 (hair or helmet) too,
@@ -701,6 +1166,36 @@ def head_plan(shapes,budget=480,face_limit=666,minimum_faces=None,reference_fram
     # down the resident ladder to a 384 budget)
     # raised_limit: the bake overflowed at face_limit with a whole hair (bake retries once at the largest limit)
     limit=face_limit if int(quotas.sum())<=face_limit and not raised_limit else ALIAS_FACE_LIMITS[-1]
+    if boost and mode=='budget':
+        # the body check's retry (bake): the named shapes take at least these faces, from the hair, then the head
+        target=quotas.copy()
+        for i,want in boost.items():target[i]=max(int(target[i]),min(int(want),len(shapes[i]['faces'])))
+        quotas=_keep_body(shapes,quotas,target,minimum_faces)
+        if trim:
+            # the reduction kept more faces than its quotas: the overshoot comes off the hair, then the head, then
+            # the body shapes above their targets, so the model stays at today's total (the triangle cap)
+            quotas=quotas.copy();left=int(trim)
+            groups=([i for i,s in enumerate(shapes) if s['part']==1],[i for i,s in enumerate(shapes) if s['part']==0],
+                    [i for i in range(len(shapes)) if shapes[i]['part'] not in HEAD_SLOTS])
+            for k,idx in enumerate(groups+(groups[2],)):
+                # the last pass takes the body below its floors: without an override entry the total wins
+                least=lambda i:min(head_floor or HEAD_TRIM_FLOOR,len(shapes[i]['faces'])) if shapes[i]['part']==0 else \
+                    (int(target[i]) if shapes[i]['part'] not in HEAD_SLOTS and k<3 else 4)
+                room=sum(max(0,int(quotas[i])-least(i)) for i in idx)
+                if left<=0 or not room:continue
+                take=min(left,room);taken=0
+                for i in idx:
+                    t=max(0,int(quotas[i])-least(i))*take//room;quotas[i]-=t;taken+=t
+                for i in idx:
+                    if taken>=take:break
+                    if quotas[i]>least(i):quotas[i]-=1;taken+=1
+                left-=taken
+        if grow_to:
+            # the last retry: what the hair and head could not give comes from the room left under the face limit
+            room=int(grow_to)-int(quotas.sum())
+            for i in sorted(boost,key=lambda i:int(quotas[i])-int(target[i])):
+                if room<=0:break
+                t=min(room,max(0,int(target[i])-int(quotas[i])));quotas[i]+=t;room-=t
     plan={'mode':mode,'quotas':quotas,'protected':frozenset(),'face_limit':limit,
           'head_faces':0,'hair_reduced':False,'lod_only':False,'cuts':{}}
     if mode=='budget' or not any(s['part'] in HEAD_SLOTS for s in shapes):return plan
@@ -715,9 +1210,18 @@ def head_plan(shapes,budget=480,face_limit=666,minimum_faces=None,reference_fram
     want=[n[i] if c in ('head','hair') else max(floor[i],min(int(quotas[i]),n[i])) for i,c in enumerate(classes)]
     if sum(floor)>ALIAS_FACE_LIMITS[-1]:
         plan.update(mode='budget',lod_only=True);return plan
+    if (share or body_share())=='body':
+        # NPC-BODY-REGRESSION-62: the head and hair are kept whole outside the budget, so the body takes the budget
+        # split among the body shapes alone (body_quotas), never the leftovers of a split that also weighed the
+        # whole head and hair (with the v0.0.54 hair share every limb of Jiub fell to 4 faces: stick legs, and a
+        # 4-face neck left a gap under the guards' helmets). ceiling (bake: the triangles the previous split's model
+        # draws) holds the total: the hair gives up faces first (CUT_ORDER), then details, the torso, the limbs.
+        body=body_quotas(shapes,budget,classes)
+        want=[n[i] if c in ('head','hair') else max(floor[i],min(int(body[i]),n[i])) for i,c in enumerate(classes)]
     target=sum(want)
-    limit=next((l for l in ALIAS_FACE_LIMITS if l>=face_limit and l>=target),ALIAS_FACE_LIMITS[-1])
-    over=max(0,target-limit)+int(extra_cut)
+    cap=target if ceiling is None else max(min(target,ceiling),sum(floor))
+    limit=next((l for l in ALIAS_FACE_LIMITS if l>=face_limit and l>=cap),ALIAS_FACE_LIMITS[-1])
+    over=max(0,target-min(limit,cap))+int(extra_cut)
     cuts={}
     for cls in CUT_ORDER:
         idx=[i for i,c in enumerate(classes) if c==cls and want[i]>floor[i]]
@@ -733,7 +1237,7 @@ def head_plan(shapes,budget=480,face_limit=666,minimum_faces=None,reference_fram
     if over>0:
         plan.update(mode='budget',lod_only=True);return plan
     protected=frozenset(i for i,c in enumerate(classes) if c in ('head','hair') and want[i]==n[i])
-    plan.update(quotas=np.array(want,int),protected=protected,face_limit=limit,cuts=cuts,
+    plan.update(quotas=np.array(want,int),protected=protected,face_limit=limit,cuts=cuts,ceiling=ceiling,
                 head_faces=sum(n[i] for i in protected),
                 hair_reduced=any(c=='hair' and want[i]<n[i] for i,c in enumerate(classes)))
     return plan
@@ -745,7 +1249,8 @@ def bake_quotas(shapes,budget=480,face_limit=666,minimum_faces=None,reference_fr
     the same body part gets a different quota in a different outfit. Heads keep
     their original triangles unless head_detail is 'budget' (head_plan).
     """
-    return head_plan(shapes,budget,face_limit,minimum_faces,reference_frames,head_detail)['quotas']
+    # the parts library (tools/npc_parts.py) keeps the previous body share until its own repair (NPC-BODY-REGRESSION-62)
+    return head_plan(shapes,budget,face_limit,minimum_faces,reference_frames,head_detail,share='budget')['quotas']
 
 def _retry_head_reducer(run, reducer):
     """run(reducer); when the boundary-locked head reducer leaves an appearance over the alias vertex budget
@@ -766,10 +1271,63 @@ def _retry_head_reducer(run, reducer):
 HEAD_REDUCER_FALLBACKS = []
 
 
-def bake(shapes,materials,textures,palette,budget=480,face_limit=666,minimum_faces=None,reference_frames=None,
+DEV1_BODY_RULES = {'AMIWIND_NPC_BODY_SHARE': 'budget', 'AMIWIND_NPC_BODY_FLOORS': 'silhouette',
+                   'AMIWIND_NPC_BODY_REDUCER': 'default'}
+_FALLBACK_ACTIVE = []
+
+
+def bake(*args, head_detail=None, **kwargs):
+    """The NPC bake. head_detail is named here because callers read it from the signature (npc_lod); it is passed on
+    only when given (a module-level __wrapped__ link would make every importer reach the bake: test_stage_key_npc).
+    The other parameters are _bake_once's. With AMIWIND_NPC_BAKE_FALLBACK=dev1 (off by default; set for the v0.0.62 release build by the
+    maintainer's decision, 2026-11-08: high triangle counts or an imperfect character ship and are fixed later, the
+    build never stops on one), a model the new seam and floor method cannot bake (AliasOverflow, or no split for its
+    shapes) is baked once more with the v0.0.62-dev1 body rules, logged as BAKE-FALLBACK; only a failure of that too
+    stops the build."""
+    if head_detail is not None:
+        kwargs['head_detail'] = head_detail
+    if os.environ.get('AMIWIND_NPC_BAKE_FALLBACK', '').strip() != 'dev1' or _FALLBACK_ACTIVE:
+        return _bake_once(*args, **kwargs)
+    try:
+        return _bake_once(*args, **kwargs)
+    except (AliasOverflow, ValueError) as error:
+        if not isinstance(error, AliasOverflow) and str(error) != 'Too many separate shapes for budget':
+            raise
+        saved = {k: os.environ.get(k) for k in DEV1_BODY_RULES}
+        os.environ.update(DEV1_BODY_RULES)
+        _FALLBACK_ACTIVE.append(1)
+        try:
+            print('BAKE-FALLBACK: %s: %s; baked with the v0.0.62-dev1 body rules'
+                  % (kwargs.get('model') or '?', error), file=sys.stderr, flush=True)
+            return _bake_once(*args, **kwargs)
+        finally:
+            _FALLBACK_ACTIVE.pop()
+            for k, v in saved.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
+
+
+def _bake_once(shapes,materials,textures,palette,budget=480,face_limit=666,minimum_faces=None,reference_frames=None,
          quotas=None,shell_height=None,head_detail=None,lod_only='budget',preserve=None,body_skin_rows=None,
-         body_leg_contour=False,face_parts=None,full_frame_budget=None,whole_limit=None):
+         body_leg_contour=False,face_parts=None,full_frame_budget=None,whole_limit=None,extra_faces=0,
+         rim_locked=None,seams=None,face_shapes=None,model=None,body_key=None,keep_whole_retry=True):
     """One topology shared by every frame, per-face tiny UV atlas patches.
+
+    model: the NPC record id of a builder bake: turns the seam stop on (seam_stop; MESH-SEAM-METHOD-62). Without it
+    (far levels, the parts library, probes) the receipt is written and nothing stops.
+    body_key: the body appearance ('head part id|hair part id', model_face_overrides.body_key) whose head trim floor
+    config/model-head-floors.json may lower.
+
+    seams: True = the seam locks (tools/npc_seams.py) whatever AMIWIND_NPC_BODY_REDUCER says (a creature's shapes);
+    False = never (a caller whose face counts must follow its own quotas exactly: the far levels of npc_lod);
+    None = AMIWIND_NPC_BODY_REDUCER.
+
+    extra_faces: the faces this model may add over today's total, only from its entry in
+    config/model-face-overrides.json (tools/model_face_overrides.extra_faces; NPC-BODY-REGRESSION-62).
+    rim_locked: shape indices reduced with their rims locked (simplify_head_locked): an open panel that the free
+    reduction folds away (the Alit's torso, CREATURE-MESH-HOLES-62).
 
     whole_limit: the face limit a whole hair may take a budget bake to (hair_share 'whole'; a caller whose reader
     takes extended models, e.g. skeletal residents: SKEL-VERTEX-LIMIT-52); such a model uses the raised-limit skin.
@@ -789,6 +1347,12 @@ def bake(shapes,materials,textures,palette,budget=480,face_limit=666,minimum_fac
     preserve: explicit per-shape shell flags (the flag the whole-appearance bake
     would compute for that shape in its outfit), overriding shell_height.
     """
+    worn_merged={}
+    if model and quotas is None and worn_merge():
+        # MESH-SEAM-METHOD-62: an armoured slot's pieces are reduced as one shape (merge_worn_pieces)
+        shapes,worn_merged=merge_worn_pieces(shapes)
+    _call=dict(locals())           # the arguments as given: the keep-whole retry bakes again with them
+    _call.pop('worn_merged',None)
     from mesh_geometry_env import npc_head_detail, npc_head_reducer
     if full_frame_budget is not None and (type(full_frame_budget) is not int or full_frame_budget <= 0):
         raise ValueError('Invalid full-frame byte budget')
@@ -800,33 +1364,132 @@ def bake(shapes,materials,textures,palette,budget=480,face_limit=666,minimum_fac
         protected=frozenset() if npc_head_detail(head_detail)=='budget' else frozenset(
             i for i,s in enumerate(shapes) if s['part'] in HEAD_SLOTS and quotas[i]>=len(s['faces']))
         if face_parts is not None:face_parts.clear()
+        explicit_locks=None
+        if seams:
+            from npc_seams import joint_locks
+            explicit_locks=joint_locks(shapes)
         return _retry_head_reducer(lambda reducer:_bake(shapes,materials,textures,palette,face_limit,minimum_faces,
-                     quotas,shell_height,protected,False,
+                     quotas,shell_height,protected,face_limit!=ALIAS_FACE_LIMITS[0] and int(quotas.sum())>ALIAS_FACE_LIMITS[0],
                      preserve=preserve,body_skin_rows=body_skin_rows,body_leg_contour=body_leg_contour,
-                     face_parts=face_parts,head_reducer=reducer),
+                     face_parts=face_parts,head_reducer=reducer,seam_locks=explicit_locks,
+                     face_shapes=_cleared(face_shapes)),
                      npc_head_reducer() if npc_head_detail(head_detail)=='budget' else None)
     mode=npc_head_detail(head_detail)
+    if face_parts is None:face_parts=[]     # the body check reads each baked face's body part slot
+    # base_limit: the caller's alias face limit (a plan above it uses the raised-limit skin). A model with an override
+    # entry may go up to the largest limit (1,024; the engine loads it through model-budgets.txt, written for every
+    # model past 2,000 vertices by audit_gallery_budgets.world_allowances); its total stays today's plus the entry.
+    base_limit=face_limit
+    if extra_faces and face_limit<ALIAS_FACE_LIMITS[-1]:face_limit=ALIAS_FACE_LIMITS[-1]
+    # the receipt's open-edge count compares the baked model with the source shapes as given (before any head cull)
+    source_shapes=shapes;culled_tris=[]
+    if face_shapes is None:face_shapes=[]
     if mode=='budget' and (budget>=480 or whole_limit) and hair_share()=='whole':
         # the head faces the hair or helmet hides are never drawn: out before the split (cull_hidden_head), but only
         # when the hair then stays whole; a reduced cap keeps the head under it (no hole through a sunk cap)
         culled,hidden=cull_hidden_head(shapes,minimum_faces)
         if hidden:
             q=_budget_quotas(culled,budget,face_limit,minimum_faces,reference_frames,whole_limit)
-            if all(int(q[i])>=len(s['faces']) for i,s in enumerate(culled) if s['part']==1):shapes=culled
+            if all(int(q[i])>=len(s['faces']) for i,s in enumerate(culled) if s['part']==1):
+                # the removed head triangles: the only openings the receipt may count as covered (mesh_seam_check)
+                for s,c in zip(shapes,culled):
+                    if s['part']==0 and len(c['faces'])<len(s['faces']):
+                        kept={tuple(f) for f in np.asarray(c['faces']).tolist()}
+                        gone=[f for f in np.asarray(s['faces']).tolist() if tuple(f) not in kept]
+                        if gone:culled_tris.append(np.asarray(s['positions'][0],float)[np.asarray(gone)])
+                shapes=culled
     floors=classes=None;shell_set=None
     if mode=='original' and any(s['part'] in HEAD_SLOTS for s in shapes):
         height=float(shell_height) if shell_height else (max(s['positions'][0,:,2].max() for s in shapes)-
                                                           min(s['positions'][0,:,2].min() for s in shapes))
-        classes=body_classes(shapes,height);silhouette=silhouette_floors(shapes,classes)
-        # A body shape's floor: its silhouette count, but never more than the budget
-        # bake gave it (that body is never thinner than the budget model's).
-        share=_budget_quotas(shapes,budget,face_limit,minimum_faces,reference_frames)
-        floors=[f if c in ('head','hair','detail') else min(f,max(4,int(q))) for f,c,q in zip(silhouette,classes,share)]
+        if floor_method()=='parts':
+            # design step 1: slot classes and each part's own girth and loss floor, never capped by a share
+            classes=slot_classes(shapes,height);silhouette=part_floors(shapes,classes)
+            floors=list(silhouette)
+        else:
+            classes=body_classes(shapes,height);silhouette=silhouette_floors(shapes,classes)
+            # A body shape's floor: its silhouette count, but never more than the budget
+            # bake gave it (that body is never thinner than the budget model's).
+            share=_budget_quotas(shapes,budget,face_limit,minimum_faces,reference_frames) if body_share()=='budget' \
+                else body_quotas(shapes,budget,classes)
+            floors=[f if c in ('head','hair','detail') else min(f,max(4,int(q)))
+                    for f,c,q in zip(silhouette,classes,share)]
+    ceiling=None;regrow=0;boost={};best=None;use_best=False;plain_boost={}
+    base_total=0;trim=0;trims=0
+    seam_locks=None;seams_dropped=False;seams_trim=0
+    if seams or (seams is None and body_reducer()=='seams' and floor_method()=='parts' and body_share()=='body' and
+                 any(s['part']==0 for s in shapes)):
+        from npc_seams import joint_locks
+        seam_locks=joint_locks(shapes)
+    if (mode=='budget' and body_share()=='body' and floor_method()=='parts' and
+            any(s['part']==0 for s in shapes)):
+        # design step 1 in the budget-head bake: every body part asks for its girth and loss floor; the hair, then
+        # the head, give the faces (head_plan boost, _keep_body): the model's total stays today's
+        height=float(shell_height) if shell_height else (max(s['positions'][0,:,2].max() for s in shapes)-
+                                                          min(s['positions'][0,:,2].min() for s in shapes))
+        part_classes=slot_classes(shapes,height)
+        boost={i:f for i,(f,c) in enumerate(zip(part_floors(shapes,part_classes),part_classes))
+               if c not in ('head','hair')}
+        plain_boost=dict(boost)
+        if seam_locks is not None:
+            # a shape needs at least as many faces as it has seam vertices to fan the seam (design 3.3)
+            for i in boost:
+                boost[i]=min(len(shapes[i]['faces']),max(boost[i],len(seam_locks[i])))
+        # today's total: the faces the previous split's reduction keeps (reduced without the texture work); the
+        # reducer often keeps fewer than its quotas, so the quotas' sum would let the model grow
+        try:
+            old=_budget_quotas(shapes,budget,base_limit,minimum_faces,reference_frames,whole_limit,body='budget')
+            base_total=min(base_limit,_reduced_total(shapes,materials,textures,palette,minimum_faces,old,shell_height,
+                                                     frozenset(),None,preserve,head_reducer=npc_head_reducer()))
+        except (ValueError,AliasOverflow):
+            # the previous split does not bake at this budget: today's total is at most the caller's face limit
+            base_total=base_limit
+    if classes is not None and body_share()=='body':
+        # NPC-BODY-REGRESSION-62, the triangle cap: the previous split's model is reduced (no texture work) and its
+        # triangle count is this model's ceiling, so the repair moves triangles from the hair to the body, adds none
+        try:
+            old=_budget_quotas(shapes,budget,face_limit,minimum_faces,reference_frames)
+            old_floors=[f if c in ('head','hair','detail') else min(f,max(4,int(q))) for f,c,q in zip(silhouette,classes,old)]
+            old_plan=head_plan(shapes,budget,face_limit,minimum_faces,reference_frames,head_detail,old_floors,classes,
+                               share='budget')
+        except ValueError as error:
+            # v0.0.62-dev2 build (the room batches, twice): an outfit of many pieces has no previous split at this
+            # budget, so there is no previous model to cap it by: no ceiling, as before v0.0.62-dev2
+            if str(error)!='Too many separate shapes for budget':raise
+            old_plan={'lod_only':True}
+        if not old_plan['lod_only']:
+            old_shells=frozenset(i for i,c in enumerate(classes) if c in ('hair','torso','limb')
+                                 and old_plan['quotas'][i]>=silhouette[i])
+            ceiling=min(ALIAS_FACE_LIMITS[-1],_reduced_total(shapes,materials,textures,palette,minimum_faces,
+                        old_plan['quotas'],shell_height,old_plan['protected'],old_shells,preserve))
     extra=0
     raised_limit=False
-    for _ in range(16):
-        plan=head_plan(shapes,budget,face_limit,minimum_faces,reference_frames,head_detail,floors,classes,extra,
-                       whole_limit,raised_limit)
+    # a lower head trim floor only per model, as data (config/model-head-floors.json; NPC-BODY-REGRESSION-62)
+    from model_face_overrides import head_floor as _head_floor
+    model_head_floor=_head_floor(body_key) if body_key else None
+    seams_freed=[]           # shapes whose seam locks were let go one at a time before the whole fallback
+    for _ in range(120):        # the cuts, the body-check retries, the total's trims and the seam fallback
+        try:
+            plan=head_plan(shapes,budget,face_limit,minimum_faces,reference_frames,head_detail,floors,classes,extra,
+                           whole_limit,raised_limit,ceiling=ceiling,boost=boost,
+                           # more faces than today's total only through an entry of config/model-face-overrides.json
+                           grow_to=min(face_limit-HAIR_WHOLE_MARGIN,base_total+int(extra_faces))
+                           if regrow>=3 and extra_faces and base_total else None,trim=trim,head_floor=model_head_floor)
+        except ValueError as error:
+            # v0.0.62-dev2 build (the room batches): the body floors and seam locks (NPC-BODY-REGRESSION-62) reserve
+            # faces for every separate piece, so an outfit of many pieces fits no split at this budget; the last
+            # fallback is the plain shares of v0.0.62-dev1 (no floors, no locks, no trim), logged, and the body check
+            # reports what it costs; the caller's own budget ladder still runs when this too does not fit
+            if str(error)!='Too many separate shapes for budget' or not (boost or seam_locks is not None or trim):
+                raise
+            print('npc bake: too many separate shapes with the body floors and seam locks: the plain shares instead',
+                  flush=True)
+            seam_locks=None;seams_dropped=True;boost={};plain_boost={};trim=0;trims=0
+            continue
+        if plan['mode']=='budget' and face_limit>base_limit:
+            # an override entry's model: the smallest alias limit that holds today's total plus the entry
+            want=max(int(plan['quotas'].sum()),(base_total or 0)+int(extra_faces))
+            plan['face_limit']=next((l for l in ALIAS_FACE_LIMITS if l>=base_limit and l>=want),ALIAS_FACE_LIMITS[-1])
         if classes is not None:
             # Shapes whose quota holds their silhouette keep it in the reduction.
             shell_set=frozenset(i for i,c in enumerate(classes) if c in ('hair','torso','limb')
@@ -838,25 +1501,48 @@ def bake(shapes,materials,textures,palette,budget=480,face_limit=666,minimum_fac
             # head and hair of the budget bake: the boundary-locked reducer by default (npc_head_reducer)
             head_reducer=npc_head_reducer() if plan['mode']=='budget' else None
             result=_bake(shapes,materials,textures,palette,plan['face_limit'],minimum_faces,plan['quotas'],
-                         shell_height,plan['protected'],plan['face_limit']!=face_limit,
+                         shell_height,plan['protected'],plan['face_limit']!=base_limit,
                          None if plan['mode']=='budget' else shell_set,preserve=preserve,
                          body_skin_rows=body_skin_rows,body_leg_contour=body_leg_contour,face_parts=face_parts,
-                         head_reducer=head_reducer)
+                         head_reducer=head_reducer,rim_locked=rim_locked,seam_locks=seam_locks,
+                         face_shapes=_cleared(face_shapes))
         except AliasOverflow as overflow:
             if str(overflow).startswith('Player leg'):raise
-            if plan['mode']=='budget':
+            if seam_locks is not None and boost and trims<6 and str(overflow)=='Alias vertex budget exceeded':
+                # the seam locks keep vertices the quotas did not count: the overshoot comes off the hair, the head,
+                # then the body above its floors (trim), and the bake runs again
+                trim+=int(overflow.over)+2;trims+=1;continue
+            if seam_locks is not None and boost and str(overflow)=='Alias vertex budget exceeded':
+                i=_seam_shape_to_free(shapes,seam_locks,seams_freed)
+                if i is not None:
+                    seams_freed.append(i);seam_locks[i]=set();trim=0;trims=0;continue
+                print('npc bake: seam locks over the face limit after the trims: the free reducer instead',flush=True)
+                seam_locks=None;seams_dropped=True;seams_trim=trim;trim=0;trims=0;boost=dict(plain_boost);continue
+            if regrow and best is not None:
+                # a body-check retry that no longer fits: the best bake so far stands (its problems reported below)
+                result,plan=best[0],best[2];face_parts[:]=best[3];use_best=True
+            elif plan['mode']=='budget':
                 # NPC-BAKE-VERTEX-32: preserve every disconnected visible panel;
                 # successful normal bakes and all animation samples are unchanged.
                 if str(overflow) != 'Alias vertex budget exceeded':raise
                 retry=lambda reducer:_bake(shapes,materials,textures,palette,plan['face_limit'],minimum_faces,
-                             plan['quotas'],shell_height,plan['protected'],plan['face_limit']!=face_limit,None,
+                             plan['quotas'],shell_height,plan['protected'],plan['face_limit']!=base_limit,None,
                              preserve=preserve,
                              body_skin_rows=body_skin_rows,body_leg_contour=body_leg_contour,
                              face_parts=face_parts,shell_components=True,full_frame_budget=full_frame_budget,
-                             head_reducer=reducer)
+                             head_reducer=reducer,rim_locked=rim_locked,seam_locks=seam_locks,
+                             face_shapes=_cleared(face_shapes))
                 try:
                     result=_retry_head_reducer(retry,head_reducer)
                 except AliasOverflow:
+                    # the shell-components retry kept the seam locks: when it still overflows, the locks go and the
+                    # free reducer bakes it, as the first fallback above does (v0.0.62-dev2 build: the imperial guard
+                    # of the intro stopped the intro stage with 'Alias vertex budget exceeded', SEAM-STOP-MODE-FLAG-62)
+                    if seam_locks is not None:
+                        print('npc bake: seam locks over the face limit in the shell-components retry: the free '
+                              'reducer instead',flush=True)
+                        seam_locks=None;seams_dropped=True;seams_trim=trim;trim=0;trims=0
+                        boost=dict(plain_boost) if plain_boost else boost;continue
                     # a whole hair that took the model past face_limit: once more at the largest alias face limit
                     whole=any(int(plan['quotas'][i])>=len(s['faces']) for i,s in enumerate(shapes) if s['part']==1)
                     if not (whole_limit and whole and hair_share()=='whole' and not raised_limit and
@@ -865,10 +1551,104 @@ def bake(shapes,materials,textures,palette,budget=480,face_limit=666,minimum_fac
                     raised_limit=True;continue
             else:
                 extra+=overflow.over+2;continue
+        # NPC-BODY-REGRESSION-62: the reducer can keep a few faces over its quotas; the body share draws no more
+        # than the previous plan (the triangle cap), so the overshoot comes off as another cut
+        if (not use_best and boost and base_total and len(result[1])>base_total+int(extra_faces)):
+            # the budget-head bake with body floors: held to today's total (plus an override entry's faces)
+            if trims<6:
+                trim+=len(result[1])-base_total-int(extra_faces);trims+=1;continue
+            if seam_locks is not None:
+                i=_seam_shape_to_free(shapes,seam_locks,seams_freed)
+                if i is not None:
+                    seams_freed.append(i);seam_locks[i]=set();trim=0;trims=0;continue
+                # the seam locks do not fit the total: this actor is baked with the free reducer (recorded)
+                print('npc bake: seam locks over the total (%d faces, today %d + %d): the free reducer instead'
+                      %(len(result[1]),base_total,int(extra_faces)),flush=True)
+                seam_locks=None;seams_dropped=True;seams_trim=trim;trim=0;trims=0;boost=dict(plain_boost);continue
+        if not use_best and ceiling and len(result[1])>max(ceiling,sum(floors)) and not plan['lod_only']:
+            extra+=len(result[1])-max(ceiling,sum(floors));continue
+        problems=[];receipt=None
+        if body_share()=='body' and ((classes is not None and not plan['lod_only']) or
+                                     (plan['mode']=='budget' and (budget>=480 or floor_method()=='parts') and
+                                      any(s['part']==0 for s in shapes))):
+            if use_best:
+                problems,receipt=best[1],best[4]
+            elif body_audit_mode()=='gate':
+                # design step 2: the joints, spikes and lost surface beside the widths and the neck
+                receipt,problems=body_audit(shapes,result[0][0],result[1],face_parts,face_shapes,source_shapes,
+                                            np.concatenate(culled_tris) if culled_tris else None)
+            else:
+                problems=body_check(shapes,result[0][0],result[1],face_parts)
+            if problems and (best is None or len(problems)<len(best[1])):
+                best=(result,problems,plan,list(face_parts),receipt)
+            # the retries raise thin limbs and necks; an open joint is closed by the seam locks (step 3), not by faces
+            regrow_on=[x for x in problems if x[0]>=0 and x[4] in ('thin limb','neck gap')]
+            if regrow_on and regrow<4 and not use_best:
+                # a thin limb, a neck gap or an open joint: twice its faces (the hair and details, in a budget bake
+                # the hair and the head, give them up; the total stays), twice more, then the whole source shape
+                regrow+=1
+                for i,*_ in regrow_on:
+                    whole=len(shapes[i]['faces'])
+                    if classes is not None:
+                        floors[i]=whole if regrow>=3 else min(whole,max(2*floors[i],2*int(plan['quotas'][i])))
+                    else:
+                        boost[i]=whole if regrow>=3 else min(whole,2*max(int(plan['quotas'][i]),boost.get(i,0)))
+                continue
+            if problems:
+                what={'neck gap':'surface lost','thin limb':'width kept','open joint':'gap','spike':'units off'}
+                text='; '.join('%s part %d %s (%s %.2f)'%(k,p,n,what.get(k,''),l) for _,p,n,l,k in problems)
+                hard=[x for x in problems if (x[4]=='neck gap' and x[3]>BODY_NECK_FAIL) or
+                      (x[4]=='thin limb' and x[3]<BODY_LIMB_FAIL) or
+                      (x[4]=='open joint' and x[3]>JOINT_FAIL_GAP and body_reducer()=='seams') or x[4]=='spike']
+                if hard and body_check_mode()=='fail':raise ValueError('NPC body check: '+text)
+                print('npc bake: body check: '+text,flush=True)
         LAST_PLAN.clear()
         LAST_PLAN.update(mode=plan['mode'],face_limit=plan['face_limit'],head_faces=plan['head_faces'],
                          protected_shapes=len(plan['protected']),hair_reduced=plan['hair_reduced'],
-                         lod_only=plan['lod_only'],cuts=dict(plan['cuts']),extra_cut=extra)
+                         lod_only=plan['lod_only'],cuts=dict(plan['cuts']),extra_cut=extra,body_problems=problems,
+                         receipt=dict(receipt or {},base_total=base_total,extra_faces=int(extra_faces),
+                                      taken_from_hair_and_head=int(trim),
+                                      head_floor=int(model_head_floor or HEAD_TRIM_FLOOR),
+                                      seams_freed=[shapes[i].get('name','') for i in seams_freed],
+                                      worn_merged=worn_merged,
+                                      head_floor_entry=bool(model_head_floor),
+                                      taken_before_the_fallback=int(seams_trim),
+                                      reducer=('seams' if seam_locks is not None else
+                                               'default (seams over the total)' if seams_dropped else 'default'),
+                                      delta=(len(result[1])-base_total) if base_total else None))
+        if model and receipt and receipt.get('uncovered_openings') and keep_whole_retry:
+            # MESH-SEAM-METHOD-62: a head or hair whose reduction still opens an edge is kept whole (its source
+            # triangles), the rest of the model as before; kept only when the model then passes inside today's total
+            # plus its entry, else the first bake stands and the stop judges it
+            names={n for n,_ in receipt.get('uncovered_at',[])}
+            whole={s.get('name',''):len(s['faces']) for s in source_shapes
+                   if s['part'] in HEAD_SLOTS and s.get('name','') in names}
+            if whole:
+                fp2,fs2=[],[];first=dict(LAST_PLAN)
+                try:
+                    again=bake(**dict(_call,minimum_faces=dict(_call.get('minimum_faces') or {},**whole),
+                                      face_parts=fp2,face_shapes=fs2,model=None,keep_whole_retry=False))
+                    r2=LAST_PLAN.get('receipt') or {}
+                    ok=(r2.get('uncovered_openings')==0 and r2.get('least_width',1.0)>=SEAM_STOP_WIDTH and
+                        (not base_total or len(again[1])<=base_total+int(extra_faces)))
+                except (ValueError,AliasOverflow):
+                    ok=False
+                print('npc bake: %s: head/hair kept whole (%s): %s'%(model,', '.join(sorted(whole)),
+                      'passes, kept' if ok else 'no pass inside the total, the first bake stands'),flush=True)
+                if ok:
+                    result=again
+                    if face_parts is not None:face_parts[:]=fp2
+                    if face_shapes is not None:face_shapes[:]=fs2
+                    LAST_PLAN['receipt']['kept_whole']=sorted(whole)
+                else:
+                    LAST_PLAN.clear();LAST_PLAN.update(first)
+                receipt=LAST_PLAN['receipt']
+        if model and receipt and 'uncovered_openings' in receipt:
+            # the seam stop (MESH-SEAM-METHOD-62): any uncovered new opening or a limb under half its width; only the
+            # builder's named actor bakes (npc_library, prepare_area, prepare_intro), never a far level or a probe
+            LAST_PLAN['receipt']['seam_model']=str(model)
+            LAST_PLAN['receipt']['seam_status']=seam_stop(model,receipt['uncovered_openings'],
+                                                          receipt.get('least_width'),bool(extra_faces))
         return result
     raise ValueError('Original head does not fit the alias face limit')
 
@@ -911,8 +1691,9 @@ def transfer_vertex(point, triangles):
 
 def _bake(shapes,materials,textures,palette,face_limit,minimum_faces,quotas,shell_height,protected,raised,
           shell_set=None,preserve=None,body_skin_rows=None,body_leg_contour=False,face_parts=None,shell_components=False,full_frame_budget=None,
-          head_reducer=None):
-    """shell_set None: the previous rule (large torso panels keep their shell); else the
+          head_reducer=None,rim_locked=None,seam_locks=None,face_shapes=None):
+    """face_shapes: a list that receives each baked face's shape index (the open-edge check, tools/mesh_seam_check.py).
+    shell_set None: the previous rule (large torso panels keep their shell); else the
     shape indices whose reduction keeps its silhouette (original-head bake). head_reducer 'locked': head and
     hair shapes (HEAD_SLOTS) are reduced with simplify_head_locked; None/'default': the previous reducer."""
     from scipy.spatial import cKDTree
@@ -937,11 +1718,23 @@ def _bake(shapes,materials,textures,palette,face_limit,minimum_faces,quotas,shel
                 (shape['part']==3 and np.ptp(p[:,2]) >= .2*actor_height) if shell_set is None \
                 else index in shell_set
             source_points=points; source_faces=ff
-            if head_reducer=='locked' and shape['part'] in HEAD_SLOTS:
+            if (head_reducer=='locked' and shape['part'] in HEAD_SLOTS) or (rim_locked and index in rim_locked):
                 points,ff=simplify_head_locked(points,ff,int(quota))
+            elif seam_locks is not None and shape['part'] not in HEAD_SLOTS and not exact:
+                # design step 3 (AMIWIND_NPC_BODY_REDUCER=seams): the joint rims locked on both sides, the free rims
+                # held by the boundary term (tools/npc_seams.py)
+                from npc_seams import simplify_body
+                points,ff=simplify_body(points,ff,int(quota),seam_locks[index])
             else:
                 points,ff=simplify_shape(points,ff.astype(np.int32),int(quota),preserve_shell)
             if shape['part'] in HEAD_SLOTS and hair_share()=='whole':
+                # the rims stay locked through the pushes below, as the reducer locked them (MESH-SEAM-METHOD-62): a
+                # pushed rim slid off its source place and opened the edge the reduction had kept (the head's edge
+                # round the patch the hair hides moved 0.6-1.0 units inward; a hair's edge slid over the scalp)
+                from static_lod import boundary_vertices
+                rim=np.asarray(sorted(boundary_vertices(np.asarray(ff,dtype=np.int64))),dtype=np.int64) \
+                    if head_rims_locked() else np.zeros(0,np.int64)
+                rim_at=np.asarray(points,float)[rim].copy() if len(rim) else None
                 if shape['part']==0:
                     # the reduced head stays under the hair or helmet (no head vertex through the shell)
                     cover=_cover(shapes)
@@ -954,7 +1747,11 @@ def _bake(shapes,materials,textures,palette,face_limit,minimum_faces,quotas,shel
                         centre=np.concatenate([np.asarray(s['positions'][0]) for s in shapes
                                                if s['part']==0]).mean(axis=0)
                         points,_=keep_outside_surface(points,head,centre)
-            if shell_components and preserve_shell:
+                if rim_at is not None:
+                    points=np.array(points,float);points[rim]=rim_at
+            seam_reduced=seam_locks is not None and shape['part'] not in HEAD_SLOTS
+            if shell_components and preserve_shell and not seam_reduced:
+                # (a seam-locked shape keeps its seam reduction: the shell components' free reducer would open it)
                 candidate=simplify_shell_components(source_points,source_faces,int(quota))
                 if candidate is not None and len(candidate[1]) < len(ff):
                     points,ff=candidate
@@ -987,7 +1784,7 @@ def _bake(shapes,materials,textures,palette,face_limit,minimum_faces,quotas,shel
     # barycentric weights of the 16 x 16 texels of a face tile: the same for every face
     yy,xx=np.mgrid[0:16,0:16];tile_weights=np.column_stack((np.maximum(0,1-(xx.ravel()+yy.ravel())/15),xx.ravel()/15,yy.ravel()/15))
     tile_weights/=tile_weights.sum(1)[:,None]
-    for shape,(exact,points,ff) in zip(shapes,reduced):
+    for shape_index,(shape,(exact,points,ff)) in enumerate(zip(shapes,reduced)):
         orig=shape['positions'];faces=shape['faces'];p=orig[0]
         old_tri=p[faces];centres=old_tri.mean(axis=1);tree=cKDTree(centres)
         # Every pseudo-inverse below is of one original triangle's edge matrix:
@@ -995,6 +1792,7 @@ def _bake(shapes,materials,textures,palette,face_limit,minimum_faces,quotas,shel
         # per-matrix calls (tests/test_npc_parts.py), so output bytes are unchanged.
         inverse=np.linalg.pinv(np.stack((old_tri[:,1]-old_tri[:,0],old_tri[:,2]-old_tri[:,0]),axis=2))
         mat=materials[shape['material']];tex=textures.get(mat['texture_index'])
+        fmat=shape.get('face_material')       # a merged worn slot (merge_worn_pieces): each face its own material
         for source_face,face in enumerate(ff):
             triangle=points[face]
             if exact:
@@ -1016,6 +1814,7 @@ def _bake(shapes,materials,textures,palette,face_limit,minimum_faces,quotas,shel
                 # Nearby folds must not lend their texture to the original face.
                 sampleuv=tile_weights@shape['uv'][faces[source_face]]
                 samplecolour=tile_weights@shape['colours'][faces[source_face],:3]
+                sampletri=np.full(len(samples),source_face)
             else:
                 # Sample the closest original surface per texel. Projecting an
                 # entire decimated face onto one tiny source triangle crosses UV
@@ -1023,6 +1822,7 @@ def _bake(shapes,materials,textures,palette,face_limit,minimum_faces,quotas,shel
                 choices=tree.query(samples,k=min(12,len(old_tri)))[1]
                 if choices.ndim==1:choices=choices[:,None]
                 best=np.full(len(samples),np.inf);sampleuv=np.zeros((len(samples),2));samplecolour=np.ones((len(samples),3))
+                sampletri=np.zeros(len(samples),int)
                 for ci in range(choices.shape[1]):
                     triids=choices[:,ci];tri=old_tri[triids]
                     # the pseudo-inverse of each original triangle's edge matrix, made once per shape above
@@ -1033,11 +1833,23 @@ def _bake(shapes,materials,textures,palette,face_limit,minimum_faces,quotas,shel
                     projected=np.einsum('nv,nvc->nc',bw,tri);dist=((projected-samples)**2).sum(1);take=dist<best
                     sampleuv[take]=np.einsum('nv,nvc->nc',bw,shape['uv'][faces[triids]])[take]
                     samplecolour[take]=np.einsum('nv,nvc->nc',bw,shape['colours'][faces[triids],:3])[take];best[take]=dist[take]
-            if tex is None:colours=np.full((len(samples),3),220.)
+                    sampletri[take]=triids[take]
+            if fmat is not None:
+                colours=np.zeros((len(samples),3))
+                fm=np.asarray(fmat)[sampletri]
+                for mi in np.unique(fm):
+                    sel=fm==mi;m2=materials[int(mi)];t2=textures.get(m2['texture_index'])
+                    if t2 is None:c=np.full((int(sel.sum()),3),220.)
+                    else:
+                        px=np.floor(sampleuv[sel,0]*t2.shape[1]).astype(int)%t2.shape[1];py=np.floor(sampleuv[sel,1]*t2.shape[0]).astype(int)%t2.shape[0]
+                        c=t2[py,px,:3].astype(float)
+                    colours[sel]=c*np.array(m2['diffuse'])
+                colours*=samplecolour
+            elif tex is None:colours=np.full((len(samples),3),220.)*samplecolour*np.array(mat['diffuse'])
             else:
                 px=np.floor(sampleuv[:,0]*tex.shape[1]).astype(int)%tex.shape[1];py=np.floor(sampleuv[:,1]*tex.shape[0]).astype(int)%tex.shape[0]
-                colours=tex[py,px,:3].astype(float)
-            colours*=samplecolour*np.array(mat['diffuse']);tile=np.clip(colours,0,255).astype(np.uint8).reshape(16,16,3)
+                colours=tex[py,px,:3].astype(float)*samplecolour*np.array(mat['diffuse'])
+            tile=np.clip(colours,0,255).astype(np.uint8).reshape(16,16,3)
             if fi>=face_limit:raise AliasOverflow('Alias vertex budget exceeded',1)
             ty_required=((fi//32)+1)*16
             if ty_required>skin.height:
@@ -1048,6 +1860,7 @@ def _bake(shapes,materials,textures,palette,face_limit,minimum_faces,quotas,shel
             if raised or body_skin_rows:tiles.append((tile,shape['part']))
             outfaces.append([fi*3,fi*3+2,fi*3+1]);fi+=1
             if face_parts is not None:face_parts.append(shape['part'])
+            if face_shapes is not None:face_shapes.append(shape_index)
     outuv=np.array(outuv)
     if raised:skin,outuv=mixed_tile_skin(tiles)
     elif body_skin_rows:skin,outuv=mixed_tile_skin(tiles,rows=body_skin_rows)

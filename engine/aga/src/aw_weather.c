@@ -10,6 +10,8 @@
 #include "quakedef.h"
 #include "aw_weather.h"
 #include "aw_world.h"
+#include "aw_state.h"
+#include "aw_clock.h"
 
 static cvar_t aw_weather={"aw_weather","1",true};
 /* The Red Mountain sky (REDMOUNTAIN-SKY-55, aw_weather.h AW_WeatherMountainPull): 1 (saved, default) pulls the sky,
@@ -47,12 +49,67 @@ static int player_source(float *source)
     if(cls.state!=ca_connected || !sv.active || svs.maxclients!=1 || !svs.clients || !svs.clients[0].edict)return 0;
     return AW_WorldToSource(sv.name,svs.clients[0].edict->v.origin,source);
 }
+/* The scripts' changes (ChangeWeather, ModRegion: aw_weather.h AW_WeatherScript*), saved with the scripts' block.
+ * mountain_region: the Red Mountain region's catalogue index, read once when a change is first seen (-2 not yet). */
+static aw_weather_script_t script;
+static int mountain_region=-2;
 static int target_weather(int days,int milliseconds,const float *source,int *region)
 {
     /* A cell without a region keeps the last region's weather (OpenMW updateWeatherRegion). */
     *region=AW_WeatherRegionKeep(&state,AW_RegionIndexAt(source));
     if(forced>=0)return forced;
-    return AW_WeatherOfRegion(&table,*region,days,milliseconds);
+    return AW_WeatherScripted(&script,&table,*region,days,milliseconds);
+}
+/* the weather period of the game clock now (the period AW_WeatherFrame uses) */
+static int script_period(void)
+{
+    int days=0,ms=0;
+    if(AW_ClockEnsure()){
+        days=AW_StateGet(&aw_state,AW_GLOBAL,"amiwind:clock:days");
+        ms=AW_StateGet(&aw_state,AW_GLOBAL,"amiwind:clock:ms");
+    }
+    return AW_WeatherPeriod(days,ms,table.hours);
+}
+int AW_WeatherChangeByScript(int region,int weather)
+{
+    load();
+    if(!loaded || !AW_WeatherScriptChange(&script,&table,region,weather,script_period()))return 0;
+    if(mountain_region==-2)mountain_region=-3;   /* read at the next exterior frame */
+    return 1;
+}
+int AW_WeatherModRegionByScript(int region,const int *chances,int n)
+{
+    load();
+    if(!loaded || !AW_WeatherScriptModRegion(&script,&table,region,chances,n,script_period()))return 0;
+    if(mountain_region==-2)mountain_region=-3;
+    return 1;
+}
+int AW_WeatherScriptSave(unsigned char *out,int capacity){return AW_WeatherScriptExport(&script,out,capacity);}
+int AW_WeatherScriptLoad(const unsigned char *p,int bytes)
+{
+    int k=AW_WeatherScriptImport(&script,p,bytes);
+    if(k>0 && script.count && mountain_region==-2)mountain_region=-3;
+    return k;
+}
+/* New Game and every save load (NEWGAME-STATE-RESET-62): no region changed by a script */
+void AW_WeatherScriptClear(void){AW_WeatherScriptReset(&script);}
+/* The Red Mountain pull is our stand-in for the mountain's blight (REDMOUNTAIN-SKY-55): once a script gives the Red
+ * Mountain region chances with no ash and no blight (the end of the main quest: EndGame's ModRegion), it stops, as
+ * the original's sky over the mountain clears then. */
+static int mountain_cleared(void)
+{
+    const unsigned char *c;
+    if(!script.count)return 0;
+    if(mountain_region==-3){
+        float crater[3]={AW_WEATHER_RED_MOUNTAIN_X,AW_WEATHER_RED_MOUNTAIN_Y,0};
+        mountain_region=AW_RegionIndexAt(crater);   /* one catalogue read; the player's cell is read again next */
+        if(mountain_region<0)mountain_region=-1;
+    }
+    if(mountain_region<0)return 0;
+    {int i;for(i=0;i<script.count;i++)if(script.row[i].region==mountain_region && script.row[i].has_chances)break;
+     if(i==script.count)return 0;}
+    c=AW_WeatherChancesOf(&script,&table,mountain_region);
+    return c && !c[AW_WEATHER_ASH] && !c[AW_WEATHER_BLIGHT];
 }
 /* GetCurrentWeather (MWSCRIPT-SMALL-FUNCTIONS-62): the weather in effect */
 int AW_WeatherCurrent(void)
@@ -112,7 +169,7 @@ int AW_WeatherFrame(int days,int milliseconds,aw_weather_blend_t *out)
     }
     /* the Red Mountain pull on top (REDMOUNTAIN-SKY-55): one distance a frame; the key changes with the pull, so
      * the sky tables are rebuilt at most AW_WEATHER_STEPS times on the way to the crater */
-    if(aw_redmountain.value>0 && forced<0)mountain_pull=AW_WeatherMountainPull(source);
+    if(aw_redmountain.value>0 && forced<0 && !mountain_cleared())mountain_pull=AW_WeatherMountainPull(source);
     if(mountain_pull>0)AW_WeatherMountainBlend(&table,mountain_pull,out);
     return key*(AW_WEATHER_STEPS+1)+mountain_pull;
 }
@@ -141,14 +198,15 @@ static void weather_command(void)
     Con_Printf("; Red Mountain pull %d/%d%s",mountain_pull,AW_WEATHER_STEPS,aw_redmountain.value>0?"":" (aw_redmountain 0)");
     Con_Printf(" (table %s",loaded?"loaded":"missing: clear sky");
     if(loaded && player_source(source)){
-        int region=AW_RegionIndexAt(source);
-        if(region>=0 && region<table.regions)
+        int region=AW_RegionIndexAt(source);const unsigned char *c=AW_WeatherChancesOf(&script,&table,region);
+        /* the chances in effect: a script's ModRegion's when it changed them (MWSCRIPT-COMPLETE-LANDMARK) */
+        if(c)
             Con_Printf("; region %ld: clear %ld cloudy %ld foggy %ld overcast %ld rain %ld thunder %ld ash %ld blight %ld snow %ld blizzard %ld",
-                (long)region,(long)table.chances[region][0],(long)table.chances[region][1],(long)table.chances[region][2],
-                (long)table.chances[region][3],(long)table.chances[region][4],(long)table.chances[region][5],
-                (long)table.chances[region][6],(long)table.chances[region][7],(long)table.chances[region][8],
-                (long)table.chances[region][9]);
+                (long)region,(long)c[0],(long)c[1],(long)c[2],(long)c[3],(long)c[4],(long)c[5],(long)c[6],(long)c[7],
+                (long)c[8],(long)c[9]);
     }
+    if(script.count)Con_Printf("; %ld regions changed by scripts%s",(long)script.count,mountain_cleared()?
+                               ", Red Mountain cleared":"");
     Con_Printf(")\n");
 }
 void AW_WeatherInit(void)

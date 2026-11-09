@@ -138,6 +138,41 @@ int AW_LevelupApply(const aw_levelup_rules_t *r,aw_character_t *c,const int *pic
     if(c->current[0]>c->maximum[0])c->current[0]=c->maximum[0];
     return ++c->level;
 }
+/* DBG-STATS-COMMANDS-62 (aw_levelup.h) */
+int AW_LevelupSetLevel(const aw_levelup_rules_t *r,aw_character_t *c,int level)
+{
+    float gain;
+    if(!r || !c || level<1 || level>AW_LEVEL_MAX)return 0;
+    gain=(float)(level-c->level)*c->attributes[5]*r->health_end;
+    c->maximum[0]+=gain;
+    if(c->maximum[0]<1)c->maximum[0]=1;
+    if(gain>0)c->current[0]+=gain;
+    if(c->current[0]>c->maximum[0])c->current[0]=c->maximum[0];
+    if(c->current[0]<1)c->current[0]=1;
+    c->level=level;c->level_progress=0;
+    memset(c->raises,0,sizeof(c->raises));memset(c->special,0,sizeof(c->special));
+    return level;
+}
+void AW_LevelupRestore(aw_character_t *c)
+{
+    int i;
+    if(!c)return;
+    for(i=0;i<3;i++)if(c->current[i]<c->maximum[i])c->current[i]=c->maximum[i];
+}
+void AW_LevelupMax(const aw_levelup_rules_t *r,aw_character_t *c,float magicka_mult)
+{
+    int i;
+    if(!r || !c)return;
+    for(i=0;i<8;i++){c->attributes[i]=100;c->damage[i]=0;}
+    for(i=0;i<AW_LEVELUP_SKILLS;i++){c->skills[i]=100;c->progress[i]=0;}
+    c->level=AW_LEVEL_MAX;c->level_progress=0;
+    memset(c->raises,0,sizeof(c->raises));memset(c->special,0,sizeof(c->special));
+    c->maximum[0]=(c->attributes[0]+c->attributes[5])*.5f+(float)(AW_LEVEL_MAX-1)*c->attributes[5]*r->health_end;
+    c->maximum[1]=(c->attributes[1]+c->modifiers[1])*(magicka_mult>0?magicka_mult:1);
+    c->maximum[2]=0;
+    for(i=0;i<6;i++)if(i!=1 && i!=4)c->maximum[2]+=c->attributes[i]+c->modifiers[i];
+    for(i=0;i<3;i++)c->current[i]=c->maximum[i];
+}
 const char *AW_LevelupClassImage(int combat,int magic,int stealth)
 {
     const char *name="acrobat";

@@ -77,9 +77,12 @@ class EngineLimitsTests(unittest.TestCase):
         # checks for a free edict before each actor and leaves the rest out when the map is full.
         # aw_inventory.c: the drops, of the old fixed table (two) and of the world change list (two, CELL-CHANGES-59);
         # one map shows at most AW_INVENTORY_DROPS of either (map_drop_room), the 32 below
+        # aw_mwhost.c (v0.0.62, MWSCRIPT-GAP-FUNCTIONS-62): an object a script places takes no reserved slot, as the
+        # Halloween scene: it checks for a free edict first and is left out when the map is full
         self.assertEqual(sorted(sites), ['aw_actors.c', 'aw_actors.c', 'aw_arena.c', 'aw_companion.c', 'aw_halloween.c',
                                          'aw_inventory.c', 'aw_inventory.c', 'aw_inventory.c', 'aw_inventory.c',
-                                         'aw_items.c', 'aw_items.c'])
+                                         'aw_items.c', 'aw_items.c', 'aw_mwhost.c'])
+        self.assertIn('!object_edict_free() ||', (SRC / 'aw_mwhost.c').read_text())
         self.assertIn('if(map_drop_count>=AW_INVENTORY_DROPS)return 0;', (SRC / 'aw_inventory.c').read_text())
         self.assertIn('if(!edict_available()){', (SRC / 'aw_halloween.c').read_text())
         # one each for the companion and the arena foe; aw_items.c one per carried item of every hostile, and one

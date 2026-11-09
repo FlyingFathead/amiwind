@@ -262,6 +262,73 @@ int main(int argc,char **argv){
  p="A verylongword and more";i=0;
  while(*p){const char *next=AW_UILine(p,32,line,sizeof(line));assert(next>p && strlen(line)<sizeof(line));p=next;assert(++i<30);}
  p="abc";assert(AW_UILine(p,0,line,sizeof(line))>p);
+ /* INFO-BOX-TEXT-CUT-62: the Morrowind name box measures its rows in the small font it is drawn with and wraps at the
+  * screen width, so no name is ever cut (the maintainer's door: "Seyda Neen, Census and Excise Office"). For names
+  * of every length and word mix, and at screen widths from a handset to a desktop: every character of the name is
+  * in the rows, no row is wider than the screen, the box is as wide as its widest row plus the padding. */
+ {
+  static const char *words[]={"Seyda","Neen,","Census","and","Excise","Office","Vivec,","Foreign","Quarter","Waistworks",
+   "Telvanni","Tower,","Sadrith","Mora,","Wolverine","Hall:","Imperial","Chapels","Ald-ruhn,","Manor","Superlongunbrokencompoundname"};
+  static const int screens[]={160,240,320,640};
+  char rows[AW_FOCUS_ROWS][AW_FOCUS_ROW_CHARS],name[300],kept[300],got[400];int n,box,wide,k,s,length,j,m,pos;
+  for(s=0;s<4;s++)for(length=1;length<=21;length++)for(k=0;k<21;k++){
+   int max=screens[s]-8,widest=0;
+   name[0]=0;for(j=0;j<length;j++){strcat(name,words[(k+j*5)%21]);if(j+1<length)strcat(name," ");}
+   n=AW_UIFocusLayout(name,"Weight: 1.5","Value: 30",max,rows,&box);
+   assert(n>=3 && n<=AW_FOCUS_ROWS);
+   AW_UISmallBegin();
+   for(j=0;j<n;j++){int rw=AW_UIWidth(rows[j]);if(rw>widest)widest=rw;assert(rw<=max-10);}
+   AW_UISmallEnd();
+   assert(box==widest+10 && box<=max);
+   /* the name's rows are all but the last two: the same characters as the name, only the wrapping spaces differ */
+   pos=0;for(m=0;name[m];m++)if(name[m]!=' ')kept[pos++]=name[m];kept[pos]=0;
+   got[0]=0;for(j=0;j<n-2;j++)strcat(got,rows[j]);
+   pos=0;for(m=0;got[m];m++)if(got[m]!=' ')got[pos++]=got[m];got[pos]=0;
+   assert(!strcmp(got,kept));
+   assert(!strcmp(rows[n-2],"Weight: 1.5") && !strcmp(rows[n-1],"Value: 30"));
+  }
+  /* the named cases from the maintainer's pictures: the Census door ("Seyda Neen, Census and Excise Office", shown as
+   * "...Excise Offic") and the Suran apothecary's door ("Suran, Ibarnadad Assimarari: Apothecary", shown as
+   * "...: Apoth"), at the real screen width and at a narrow one where they wrap: the whole name, nothing cut */
+  {
+   static const char *named[]={"Seyda Neen, Census and Excise Office","Suran, Ibarnadad Assimarari: Apothecary"};
+   static const int widths[]={312,200,120};int a,b;
+   for(a=0;a<2;a++)for(b=0;b<3;b++){
+    n=AW_UIFocusLayout(named[a],NULL,NULL,widths[b],rows,&box);
+    pos=0;for(m=0;named[a][m];m++)if(named[a][m]!=' ')kept[pos++]=named[a][m];kept[pos]=0;
+    got[0]=0;for(j=0;j<n;j++)strcat(got,rows[j]);
+    pos=0;for(m=0;got[m];m++)if(got[m]!=' ')got[pos++]=got[m];got[pos]=0;
+    assert(n>=1 && !strcmp(got,kept) && box<=widths[b]);
+    if(b==0 && a==0)assert(n==1 && !strcmp(rows[0],named[a]));   /* one row at the real width, the whole name */
+   }
+  }
+  /* the maintainer's door at the real screen width: one row, the whole name, the box as wide as that row */
+  n=AW_UIFocusLayout("Seyda Neen, Census and Excise Office",NULL,NULL,312,rows,&box);
+  AW_UISmallBegin();
+  assert(n==1 && !strcmp(rows[0],"Seyda Neen, Census and Excise Office") && box==AW_UIWidth(rows[0])+10);
+  AW_UISmallEnd();
+  assert(!AW_UIFocusLayout("",NULL,NULL,312,rows,&box));
+ }
+ /* UI-THIN-BUTTON-62: the house button: a 56 x 14 box has a 1 pixel line (the skin frame's 4 pixel edges left 6 pixels
+  * for the text) and the text box is the whole 54 x 12 inside; lit, the line is the bright colour; the pixels outside the
+  * box are never touched */
+ {
+  int ix,iy,iw,ih,x,y,dim=AW_UIColor(120,109,87),lit=AW_UIColor(223,199,144),black=AW_UIColor(0,0,0),ring=0,inside=0;
+  assert(AW_UI_THIN_LINE==1 && dim!=lit && dim!=black && lit!=black);
+  AW_UIThinInner(100,100,56,14,&ix,&iy,&iw,&ih);assert(ix==101 && iy==101 && iw==54 && ih==12);
+  memset(vid.buffer,7,320*200);
+  AW_UIThinBox(100,100,56,14,0);
+  for(y=98;y<117;y++)for(x=98;x<158;x++){
+   int in_box=x>=100 && x<156 && y>=100 && y<114,edge=in_box && (x==100 || x==155 || y==100 || y==113);
+   byte p=vid.buffer[y*320+x];
+   if(!in_box)assert(p==7);                   /* outside: untouched */
+   else if(edge){assert(p==dim);ring++;}      /* the line: 1 pixel wide, 2*56 + 2*12 pixels */
+   else{assert(p==black);inside++;}           /* inside: black, the 54 x 12 the text gets */
+  }
+  assert(ring==2*56+2*12 && inside==iw*ih);
+  AW_UIThinBox(100,100,56,14,1);assert(vid.buffer[100*320+100]==lit && vid.buffer[113*320+155]==lit && vid.buffer[101*320+101]==black);
+  AW_UIThinBox(100,100,2,2,0);assert(vid.buffer[100*320+100]==lit);   /* too small for a line and a face: left alone */
+ }
  AW_UIText(20,20,"A",0);memcpy(before,vid.buffer+20*320+20,3);
  AW_UIBookBegin();AW_UIText(20,20,"A",0);
  assert(vid.buffer[20*320+20]==170 && vid.buffer[20*320+21]==85 && vid.buffer[20*320+22]==0);

@@ -182,6 +182,11 @@ static void toggle(void)
     }
     v=GetEdictFieldValue(p,"aw_torch");
     if(!v){Con_Printf("Torch requires matching AmiWind game rules.\n");return;}
+    /* TORCH-HIDES-HELM-62: as in the original, only an equipped light is carried (OpenMW: a light in the carried-left
+     * slot); V with no light equipped lights nothing, so the old baked torch body is no longer reached that way */
+    if(v->_float!=1 && aw_torch_item_lit && !aw_torch_item_lit()){
+        Con_Printf("No light equipped: equip a torch or another light in the inventory (dbg torch gives one).\n");return;
+    }
     v->_float=v->_float==1?0:1;
     if(!v->_float)extinguish();
     Con_Printf("Torch %s.\n",v->_float?"on":"off");

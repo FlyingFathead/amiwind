@@ -30,6 +30,12 @@ static float rotation;
 #define OK_Y 166
 #define OK_W 60
 #define OK_H 22
+/* Cancel (CLASS-LIST-LAYOUT-62): beside OK on the questions and the own class windows; the same as Esc there */
+#define CANCEL_X 180
+static int over_cancel(void) {
+    return mouse_x>=CANCEL_X && mouse_x<CANCEL_X+OK_W &&
+        mouse_y>=OK_Y && mouse_y<OK_Y+OK_H;
+}
 static int over_ok(void) {
     return mouse_x>=OK_X && mouse_x<OK_X+OK_W &&
         mouse_y>=OK_Y && mouse_y<OK_Y+OK_H;
@@ -150,6 +156,22 @@ static void custom_start(void)
     custom_row=0;class_way=2;
 }
 /* the class page's two buttons beside the list: "Questions" and "Make your own" */
+/* The class page's skill block (CLASS-LIST-LAYOUT-62): rules at y 58, 71 and 128; five rows of 11 lines from y 72 */
+#define CLASS_RULE_TOP 58
+#define CLASS_RULE_HEAD 71
+#define CLASS_SKILL_Y 74
+#define CLASS_RULE_END 129
+/* The scroll triangles of the class and birthsign lists (CLASS-LIST-LAYOUT-62): 7 lines high like the race page's arrows */
+#define LIST_ARROW_H 7
+#define LIST_ARROW_UP_Y (CLASS_Y-LIST_ARROW_H-2)
+#define LIST_ARROW_DOWN_Y (CLASS_Y+CLASS_ROWS*CLASS_H+2)
+static void list_arrow(int cx,int y,int up,int color) {
+    int j,half;
+    for(j=0;j<LIST_ARROW_H;j++){
+        half=up?j:LIST_ARROW_H-1-j;
+        AW_UIFill(cx-half,y+j,half*2+1,1,color);
+    }
+}
 #define QWAY_Y 132
 #define QWAY_H 18
 /* A button that cannot be used: every other pixel inside its frame black, the usual greyed-out look */
@@ -409,6 +431,7 @@ int AW_CharacterRebuild(aw_character_t *c)
     /* a rebuilt sheet starts its levelling afresh (LEVEL-UP-58) */
     memset(c->progress,0,sizeof(c->progress));c->level_progress=0;
     memset(c->raises,0,sizeof(c->raises));memset(c->special,0,sizeof(c->special));
+    memset(c->books_read,0,sizeof(c->books_read));
     c->level=1;c->valid=1;return 1;
 }
 
@@ -581,6 +604,7 @@ int AW_CharacterKey(int key)
     if(menu==2 && class_way){
         int up=key==K_UPARROW || key=='w' || key=='W',down=key==K_DOWNARROW || key=='s' || key=='S' || key==K_TAB;
         int left=key==K_LEFTARROW || key=='a' || key=='A',right=key==K_RIGHTARROW || key=='d' || key=='D';
+        if(key==K_MOUSE1 && AW_UIMode()==2 && over_cancel())key=K_ESCAPE;   /* the Cancel button is Esc */
         if(key==K_ESCAPE){quiz_free();class_way=0;return 1;}   /* back to the list, nothing changed */
         if(class_way==1){
             if(key==K_MOUSE1){
@@ -751,8 +775,7 @@ void AW_CharacterDraw(void)
             AW_UITextBox(134,y,154,9,value,gold);
             AW_UITextBox(290,y,16,9,">",gold);
         }
-        AW_UITextBox(12,34+13*9,296,11,"Arrows: change  Enter: next  Esc: back",muted);
-        AW_UISmallEnd();
+        AW_UISmallEnd();   /* the one hint row of this window is the footer's (CLASS-LIST-LAYOUT-62) */
     }else if(menu==2 || menu==3){
         const aw_class_t *k=&aw_classes[choice.clas];
         int selected=menu==2?choice.clas:choice.birth,count=list_count();
@@ -764,8 +787,13 @@ void AW_CharacterDraw(void)
             if(class_top+i==selected)AW_UIFill(CLASS_X,y,CLASS_W,CLASS_H-1,AW_UIColor(54,47,32));
             AW_UITextBox(CLASS_X,y,CLASS_W,CLASS_H,menu==2?aw_classes[class_top+i].name:aw_births[class_top+i].name,gold);
         }
-        if(class_top)AW_UITextBox(CLASS_X,CLASS_Y-9,CLASS_W,8,"more above",muted);
-        if(class_top+CLASS_ROWS<count)AW_UITextBox(CLASS_X,CLASS_Y+CLASS_ROWS*CLASS_H,CLASS_W,8,"more below",muted);
+        /* CLASS-LIST-LAYOUT-62: the scroll marks of a list are the race page's triangles turned a quarter turn, up above
+         * the list and down below it, gold when there is more that way and dim when there is not (no text) */
+        {
+            int dim=AW_UIColor(84,76,61);
+            list_arrow(CLASS_X+CLASS_W/2,LIST_ARROW_UP_Y,1,class_top?gold:dim);
+            list_arrow(CLASS_X+CLASS_W/2,LIST_ARROW_DOWN_Y,0,class_top+CLASS_ROWS<count?gold:dim);
+        }
         if(menu==3){
             static const char *kinds[]={"Spell","Ability","Power"};
             sign_spells(choice.birth); /* already loaded when the page opened or changed: no file read here */
@@ -782,17 +810,23 @@ void AW_CharacterDraw(void)
         AW_UITextBox(128,34,180,11,line,gold);
         sprintf(line,"Favored: %s, %s",attributes[k->attributes[0]],attributes[k->attributes[1]]);
         AW_UITextBox(128,46,180,11,line,gold);
+        /* CLASS-LIST-LAYOUT-62: a rule above the skill headers, one under them and one under the lists, as the
+         * original's class window separates them; the rows of both columns sit on the same lines (each row is drawn
+         * from one fixed line, not centred on its own glyphs, so a word with a descender does not shift) */
+        AW_UIFill(128,CLASS_RULE_TOP,180,1,muted);
         AW_UITextBox(128,60,88,11,"Major skills",muted);
         AW_UITextBox(220,60,88,11,"Minor skills",muted);
+        AW_UIFill(128,CLASS_RULE_HEAD,180,1,muted);
         for(i=0;i<5;i++){
-            AW_UITextBox(128,72+i*11,88,11,skills[k->skills[i*2+1]],gold);
-            AW_UITextBox(220,72+i*11,88,11,skills[k->skills[i*2]],gold);
+            const char *major=skills[k->skills[i*2+1]],*minor=skills[k->skills[i*2]];
+            AW_UIText(128+(88-AW_UIWidth(major))/2,CLASS_SKILL_Y+i*11,major,gold);
+            AW_UIText(220+(88-AW_UIWidth(minor))/2,CLASS_SKILL_Y+i*11,minor,gold);
         }
+        AW_UIFill(128,CLASS_RULE_END,180,1,muted);
         if(choice.clas>=aw_class_count)AW_UITextBox(CLASS_X,156,CLASS_W,9,"Custom class",gold);
         /* the other two ways: the questions (when the build has them) and the own class */
-        AW_UIBox(128,QWAY_Y,88,QWAY_H);AW_UIBox(220,QWAY_Y,88,QWAY_H);
-        AW_UITextBox(128,QWAY_Y,88,QWAY_H,"Questions (Q)",quiz_available>0?gold:muted);
-        AW_UITextBox(220,QWAY_Y,88,QWAY_H,"Make own (M)",aw_class_count<32?gold:muted);
+        AW_UIButton(128,QWAY_Y,88,QWAY_H,"Questions (Q)",0,quiz_available>0?gold:muted);
+        AW_UIButton(220,QWAY_Y,88,QWAY_H,"Make own (M)",0,aw_class_count<32?gold:muted);
         /* the muted colour alone recolours only a glyph's brightest shade, so an unusable button read as usable
          * (CHARGEN-BIRTHSIGN-REVIEW-58: an image built without Morrowind.ini has no questions): grey it out */
         if(quiz_available<=0)greyed(128,QWAY_Y,88,QWAY_H);
@@ -834,13 +868,15 @@ void AW_CharacterDraw(void)
         AW_UISmallEnd();
     }
     if(AW_UIMode()==2){
+        int sub=menu==2 && class_way;   /* the questions and the own class: a Cancel button, as Esc */
         AW_UISmallBegin();
-        AW_UITextBox(10,166,230,22,menu==4?"Arrows: pages  Enter: OK":menu==1?"Enter: next/OK  LMB: rotate":"Arrows: choose  Enter: OK",gold);
+        /* ONE hint row, for the window that is open, in the lower left; the keys it names are the ones that work */
+        AW_UITextBox(10,166,sub?CANCEL_X-14:230,22,menu==4?"Arrows: pages  Enter: OK":menu==1?"Enter: next/OK  LMB: rotate":
+            menu==2 && class_way==1?"Arrows/1-3  Enter: answer":menu==2 && class_way==2?"Arrows: change  Enter: next":"Arrows: choose  Enter: OK",gold);
         AW_UISmallEnd();
-        AW_UIBox(OK_X,OK_Y,OK_W,OK_H);
-        if(row==4 || (mouse_visible && over_ok()))
-            AW_UIFill(OK_X+3,OK_Y+3,OK_W-6,OK_H-6,AW_UIColor(54,47,32));
-        AW_UITextBox(OK_X,OK_Y,OK_W,OK_H,"OK",gold);
+        /* the house button style (UI-THIN-BUTTON-62): a 1 pixel line, lit on hover or selection */
+        if(sub)AW_UIButton(CANCEL_X,OK_Y,OK_W,OK_H,"Cancel",mouse_visible && over_cancel(),gold);
+        AW_UIButton(OK_X,OK_Y,OK_W,OK_H,"OK",row==4 || (mouse_visible && over_ok()),gold);
     }else {
     AW_UITextBox(10,166,300,22,menu==4?"Enter: accept  Arrows/WASD: pages":menu==1?"Enter: next / accept   LMB: rotate":"Arrows/WASD: Choose  Enter: accept",gold);
     }

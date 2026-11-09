@@ -28,6 +28,10 @@ int AW_ItemsParseSkel(const char *text,int numframes,char paths[AW_ITEMS_KINDS][
  * actor's yaw; the tag angles plus the actor's yaw (actors only turn about z), with
  * the pitch negated for the alias renderer (R_AliasSetUpTransform negates it back). */
 void AW_ItemsPose(const float *tag6,const float origin[3],float yaw,float out_origin[3],float out_angles[3]);
+/* The held-item check (HELD-WEAPON-WRONG-MODEL-62): the 32-bit FNV-1a hash of a tag's item path, and 1 when a path
+ * is an item model's (an "items/" folder, tools/npc_items.py). */
+unsigned AW_ItemsPathHash(const char *s);
+int AW_ItemsIsItemPath(const char *s);
 
 #ifndef AW_ITEMS_HOST_TEST
 struct edict_s;
@@ -42,6 +46,9 @@ int AW_ItemsShow(struct edict_s *actor,struct edict_s *out[AW_ITEMS_KINDS]);
 /* Follow the actor's current frame. */
 void AW_ItemsUpdate(struct edict_s *actor,struct edict_s *items[AW_ITEMS_KINDS]);
 void AW_ItemsHide(struct edict_s *items[AW_ITEMS_KINDS]);
+/* A new server (SV_SpawnServer): the item tables, their precache indices and the light carriers start empty, also on a
+ * reload of the same world (HELD-WEAPON-WRONG-MODEL-62). */
+void AW_ItemsSceneReset(void);
 /* What an actor carries: bit 0 a weapon, bit 1 a shield, AW_ITEMS_LIGHT a carried light (a guard's torch); the
  * animation stage picks its cast with it (dbg animkit stage, SKEL-ANIM-STAGE-52). */
 #define AW_ITEMS_LIGHT 4

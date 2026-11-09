@@ -92,6 +92,14 @@ OWN_ROUTES = {('aw_cull', 'fog rule'), ('aw_cull', 'cut groups'), ('aw_teleport'
               ('aw_magicfx', 'cast casting'), ('aw_magicfx', 'cast now'), ('aw_magicfx', 'cast ready'),
               ('aw_magicfx', 'cast spell'), ('aw_magicfx', 'cast start'), ('aw_magicfx', 'cast strike'),
               ('aw_camera', 'camera fpview'), ('aw_camera', 'camera hands'), ('aw_camera', 'camera parts')}
+# the inventory command's give words (DBG-GIVE-MONEY-62): commands of their own, with their aliases on their row
+OWN_ROUTES |= {('aw_inventory', 'give'), ('aw_inventory', 'give money')}
+ROUTE_ALIASES = {('aw_inventory', 'additem'): 'give', ('aw_inventory', 'give coin'): 'give money',
+                 ('aw_inventory', 'give rich'): 'give money'}
+# the levelling command's stat words (DBG-STATS-COMMANDS-62): commands of their own, their aliases on their row
+OWN_ROUTES |= {('aw_levelup', 'setlvl'), ('aw_levelup', 'restorestats'), ('aw_levelup', 'maxstats')}
+ROUTE_ALIASES.update({('aw_levelup', 'setlevel'): 'setlvl', ('aw_levelup', 'restore stats'): 'restorestats',
+                      ('aw_levelup', 'stats restore'): 'restorestats', ('aw_levelup', 'maxstat'): 'maxstats'})
 
 
 def render(text, stamp=None):
@@ -100,9 +108,14 @@ def render(text, stamp=None):
     groups = {}
     for group, words, handler, help_text in entries(text):
         cmds = groups.setdefault(group, {})
-        key = (handler, words) if (handler, words) in OWN_ROUTES else handler
+        main = ROUTE_ALIASES.get((handler, words), words)
+        key = (handler, main) if (handler, main) in OWN_ROUTES else handler
         cmd = cmds.setdefault(key, {'words': [], 'help': help_text})
-        cmd['words'].append(words)
+        if main != words or (handler, main) not in OWN_ROUTES:
+            cmd['words'].append(words)
+        else:   # an own route's main words lead its row with its own help, whatever alias came first
+            cmd['words'].insert(0, words)
+            cmd['help'] = help_text
     out = ['# AmiWind console commands', ''] + ([stamp, ''] if stamp else []) + [
            'Open the console with F10 or the backquote key and type',
            'a command, for example `dbg headlamp on`. This page is generated from',
@@ -112,7 +125,10 @@ def render(text, stamp=None):
            'game and CHIM versions, the AmiQuake version and where help is (on a map load the',
            'AmiQuake line ends with `SERVER (<game code CRC>)`):', '',
            '```text', 'AmiWind v<version> / CHIM v<CHIM version>', 'AmiQuake: VERSION 1.09',
-           'Type: "dbg help" for help.', '```', '']
+           'Type: "dbg help" for help.', '```', '',
+           'Long listings (`dbg`, `dbg help`, `dbg help <word>`) are shown one console screen at a time, with the',
+           'line `---------- [ more: ENTER | stop: q ] ----------` between the pages: Enter shows the next page, q',
+           'stops the listing; any other key ends it and works as usual.', '']
     for group, cmds in groups.items():
         out += ['## ' + group.title(), '', '| Command | Also | Arguments and notes |', '| --- | --- | --- |']
         for cmd in cmds.values():

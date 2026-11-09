@@ -120,6 +120,14 @@
 #define AWF_CLEARINFOACTOR 27
 #define AWF_SHOWMAP 448
 #define AWF_SHOWRESTMENU 449
+/* the menus a script turns on (CENSUS-INTRO-SCRIPTS-62; OpenMW guiextensions.cpp OpEnableWindow, OpShowDialogue) */
+#define AWF_ENABLEBIRTHMENU 44
+#define AWF_ENABLECLASSMENU 45
+#define AWF_ENABLEINVENTORYMENU 46
+#define AWF_ENABLEMAGICMENU 49
+#define AWF_ENABLEMAPMENU 50
+#define AWF_ENABLESTATREVIEWMENU 60
+#define AWF_ENABLESTATSMENU 61
 #define AWF_GETPCSLEEP 160
 #define AWF_MODFACTIONREACTION 260
 #define AWF_SETFACTIONREACTION 390
@@ -192,6 +200,9 @@
 #define AWF_FACE 66
 #define AWF_GETANGLE 85
 #define AWF_GETCURRENTWEATHER 106
+/* v0.0.62 (MWSCRIPT-COMPLETE-LANDMARK): a region's weather and its chances (aw_weather.c AW_WeatherScript*) */
+#define AWF_CHANGEWEATHER 21
+#define AWF_MODREGION 285
 #define AWF_GETDETECTED 110
 #define AWF_GETINTERIOR 134
 #define AWF_GETLINEOFSIGHT 140
@@ -207,6 +218,12 @@
 #define AWF_SETATSTART 375
 #define AWF_SETPOS 417
 #define AWF_WAKEUPPC 502
+/* v0.0.62: the crimes (aw_crime.c, CRIME-59) */
+#define AWF_GETPCINJAIL 156
+#define AWF_GOTOJAIL 220
+#define AWF_ONMURDER 319
+#define AWF_PAYFINE 322
+#define AWF_PAYFINETHIEF 323
 /* v0.0.62: the fades, the forced sneak, the resistances (aw_mwhost.c, MWSCRIPT-GAP-FUNCTIONS-62) */
 #define AWF_FADEIN 67
 #define AWF_FADEOUT 68
@@ -246,6 +263,11 @@
 #define AWF_SETRESISTSHOCK 428
 #define AWF_HASSOULGEM 222
 #define AWF_REMOVESOULGEM 354
+#define AWF_HURTSTANDINGACTOR 227
+#define AWF_DROP 41
+#define AWF_RESURRECT 358
+#define AWF_PLAYBINK 337
+#define AWF_HITONME 225
 #define AWM_VERB_GET 0
 #define AWM_VERB_SET 1
 #define AWM_VERB_MOD 2
@@ -293,4 +315,10 @@
 #define AWB_INTERIOR 1
 #define AWB_ACTOR 2
 #define AWB_EDICT 4
+/* MWSCRIPT-INVENTORY-HITONME-62 (tools/mwscript/compiler.py BIND_HELD, held_key): an item a placed container, NPC or
+ * creature holds; its reference is AWB_HELD_BIT, the item's ordinal in bits 24-29 and the holder's reference below */
+#define AWB_HELD 8
+#define AWB_HELD_BIT 0x40000000u
+#define AWB_HELD_KEY(r) (((r)&AWB_HELD_BIT)!=0)
+#define AWB_HELD_HOLDER(r) ((r)&0xFFFFFFu)
 #endif

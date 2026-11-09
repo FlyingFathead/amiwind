@@ -1,6 +1,6 @@
 # Game features
 
-_Last updated with AmiWind v0.0.62-dev1 (7 November 2026)._
+_Last updated with AmiWind v0.0.62 (7 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -34,19 +34,19 @@ A row counts the system, not its size: a done row can be small and a missing one
 
 ## Measured: MWScript
 
-tools/mwscript/functions.py (the compiler's own table, counted in the builder container on 7 November 2026) and the builder's script measurement (docs/MWSCRIPT_BYTECODE.md).
+tools/mwscript/functions.py (the compiler's own table, counted in the builder container on 8 November 2026) and the builder's script measurement (docs/MWSCRIPT_BYTECODE.md).
 
 | | Count |
 | --- | ---: |
 | Functions and instructions in the compiler's table | 504 |
-| Carried out by the interpreter and the host | 319 (63.3 %) |
+| Carried out by the interpreter and the host | 338 (67.1 %) |
 | Distinct functions the game's scripts use (23 October 2026, over the three masters) | 251 |
 | Of those, carried out | used: pending |
 | Scripts in the three masters | 1,207 |
 | Scripts that compile | 1,207 |
 | Scripts that run whole (30 October 2026) | 957 (79.3 %) |
 
-used_and_carried_out is pending: the builder's script report does not record the used functions per build, so the overlap of the 251 used with the 319 carried out needs one run of python3 -m mwscript.measure on the game data in the builder container (MWSCRIPT-MORE-57).
+used_and_carried_out is pending: the builder's script report does not record the used functions per build, so the overlap of the 251 used with the 322 carried out needs one run of python3 -m mwscript.measure on the game data in the builder container (MWSCRIPT-MORE-57).
 
 ## Sub-trackers
 
@@ -55,7 +55,7 @@ Each has its own source file and its own check.
 | Tracker | Headline |
 | --- | --- |
 | [Dialogue features](DIALOGUE_FEATURES.md) | 5 of 29 done, 19 partial, 5 missing |
-| [MWScript features](MWSCRIPT_FEATURES.md) | 479 of 1207 scripts run, 130 use a function the interpreter lacks |
+| [MWScript features](MWSCRIPT_FEATURES.md) | 588 of 1207 scripts run, 71 use a function the interpreter lacks |
 | [Voices and sounds](VOICE_FEATURES.md) | per kind of line, with its proof |
 | [CHIM features](chim/FEATURES.md) | engine features with measured gains |
 | [World, cell by cell](chim/CELL_TRACKER.md) | every cell converted and audited |
@@ -109,7 +109,7 @@ Each has its own source file and its own check.
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Weapons | partial | Melee swings and the hit rules against actors, with the weapon kit; weapons and shields of every type drawn in their stance in both views, the two-handed rules, two first-person sway styles, creatures that resist normal weapons, god mode. | OpenMW 0.51 combat; UESP Morrowind:Combat | tests/aga_combat_test.c, tests/aga_combat_rules_test.c, tests/aga_weapon_kit_test.c; docs/COMBAT.md. | The shot of a bow, a crossbow or a thrown weapon (ranged combat); a Shield effect on the player does not soften the blows that land on it; the resistance to normal weapons is not yet proven with a skilled character in game. | WEAPONS-57, FIRST-PERSON-WEAPONS-56 | - |
 | Death and bodies | done | Actors die, the player's death is handled, and bodies are opened and looted through the container strip. | OpenMW 0.51 death and corpse inventory | tests/aga_player_dead_test.c, tests/aga_levelled_contents_test.c; CORPSE-LOOT-60 gated in v0.0.60-dev3. | - | CORPSE-LOOT-60, CONTAINER-LEVELLED-CONTENTS-60 | - |
-| Crime and the law | partial | Theft, attacks and trespass seen by witnesses raise a bounty; guards arrest, fine or jail. | OpenMW 0.51 crime handling; UESP Morrowind:Crime | tests/aga_crime_rules_test.c, tests/test_crime.py (theft: the witnesses, the bounty, the crime message, the witnesses' attack). | Pickpocketing, trespass, assault and murder as crimes; guards pursuing to arrest, fines and jail; the witnesses' disposition change. | CRIME-59, STEAL-WITNESSED-NO-CRIME-61 | STEAL-WITNESSED-NO-CRIME-60 |
+| Crime and the law | partial | Theft, attacks and trespass seen by witnesses raise a bounty; guards arrest, fine or jail. | OpenMW 0.51 crime handling; UESP Morrowind:Crime | tests/aga_crime_rules_test.c, tests/test_crime.py (theft, assault, murder and an owned bed: the witnesses, the bounty by the game settings, the crime message, every witness's disposition change, pursuit or attack; the fine, jail and the prison markers; OnMurder, PayFine, PayFineThief, GotoJail and the guards' Alarmed); since v0.0.62. | Pickpocketing (no pickpocket window yet) and picking an owned lock (no lockpicks yet) have their rules but no event in the game; the arrest, the fine and jail are to be seen in game. | CRIME-59, STEAL-WITNESSED-NO-CRIME-61 | STEAL-WITNESSED-NO-CRIME-60 |
 | Sneaking and stealing | missing | Sneak, pickpocketing and the Security skill with locks and probes. | OpenMW 0.51 sneak and security; UESP Morrowind:Sneak, Morrowind:Security | - | - | CRIME-59, MWSCRIPT-TRAY-SMOKE-58 | - |
 
 ### Magic
@@ -146,7 +146,7 @@ Each has its own source file and its own check.
 | System | State | What | Reference | Proof | Missing | Work items | Register |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | MWScript compiler | done | All 1,207 scripts of the three masters compile to the compact bytecode, with the original's quirks kept. | OpenMW 0.51 script compiler (behaviour only); UESP Morrowind:Scripting | tests/test_mwscript.py; docs/MWSCRIPT_BYTECODE.md (1,207 of 1,207 compiled, none refused). | - | - | - |
-| MWScript functions | partial | The compiler knows 504 functions and instructions; the interpreter and the host carry out 281 of them (since v0.0.62 the player's control switches too: Disable/EnablePlayerControls and their family, kept in saved games; the small functions: GetAngle, SetAngle, Move, MoveWorld, RotateWorld, SetPos, SetAtStart, Face, GetDetected, GetLOS, GetInterior, GetCurrentWeather, GetPCSneaking, GetWeaponDrawn, OnKnockout, SetDelete, WakeUpPC; and the placing family: PlaceAtPC, PlaceAtMe, PlaceItem, PlaceItemCell), the rest compile to the not-yet call. The game's scripts use 251 distinct functions. | OpenMW 0.51 script extensions (behaviour); UESP Morrowind:Script Functions | tools/mwscript/functions.py (the table and its RUN and HOST sets); tests/test_mwscript.py; tests/aga_controls_test.c; tests/aga_move_rules_test.c; tests/aga_crime_rules_test.c. | 223 table functions are not carried out. How many of the 251 used ones are among them is pending a measurement run. | MWSCRIPT-MORE-57, ACTORS-ON-57, MWSCRIPT-PLAYER-CONTROL-62, MWSCRIPT-SMALL-FUNCTIONS-62, MWSCRIPT-PLACE-OBJECTS-62 | - |
+| MWScript functions | partial | The compiler knows 504 functions and instructions; the interpreter and the host carry out 324 of them (since v0.0.62 the player's control switches too: Disable/EnablePlayerControls and their family, kept in saved games; the small functions: GetAngle, SetAngle, Move, MoveWorld, RotateWorld, SetPos, SetAtStart, Face, GetDetected, GetLOS, GetInterior, GetCurrentWeather, GetPCSneaking, GetWeaponDrawn, OnKnockout, SetDelete, WakeUpPC; the placing family: PlaceAtPC, PlaceAtMe, PlaceItem, PlaceItemCell; the fades, the forced sneak and the resistances; and the crimes: OnMurder, PayFine, PayFineThief, GotoJail, GetPCInJail), the rest compile to the not-yet call. The game's scripts use 251 distinct functions. | OpenMW 0.51 script extensions (behaviour); UESP Morrowind:Script Functions | tools/mwscript/functions.py (the table and its RUN and HOST sets); tests/test_mwscript.py; tests/aga_controls_test.c; tests/aga_move_rules_test.c; tests/aga_crime_rules_test.c. | 180 table functions are not carried out. How many of the 251 used ones are among them is pending a measurement run. | MWSCRIPT-MORE-57, ACTORS-ON-57, MWSCRIPT-PLAYER-CONTROL-62, MWSCRIPT-SMALL-FUNCTIONS-62, MWSCRIPT-PLACE-OBJECTS-62, CRIME-59 | - |
 | Scripts that run whole | partial | 957 of the 1,207 scripts run whole today: every function they call is carried out. | the original scripts run under OpenMW 0.51 | docs/MWSCRIPT_BYTECODE.md (measured 30 October 2026); tests/test_mwscript.py. | 250 scripts call at least one function that is not carried out. The census tray smoke test is not run. | MWSCRIPT-MORE-57, MWSCRIPT-TRAY-SMOKE-58, ACTORS-ON-57 | - |
 
 ### Sound, music and the interface

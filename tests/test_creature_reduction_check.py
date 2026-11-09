@@ -66,8 +66,15 @@ class CreatureReductionCheck(unittest.TestCase):
         self.assertEqual(G.lost_shapes(self.shapes, allv, allf), {})
 
     def test_chain_kept_whole_with_grown_budget(self):
+        from unittest import mock
+        import model_face_overrides
+        # without an entry in config/model-face-overrides.json the grown bake is refused (NPC-BODY-REGRESSION-62)
+        with mock.patch.object(model_face_overrides, 'extra_faces', lambda model, kind='npc', path=None: 0):
+            *_r, check = L.checked_bake(FakeBake(), self.shapes, [], {}, b'', 480, None, model='test.nif')
+        self.assertEqual(check['kept_whole'], [])
         bake = FakeBake()
-        *_r, check = L.checked_bake(bake, self.shapes, [], {}, b'', 480, None)
+        with mock.patch.object(model_face_overrides, 'extra_faces', lambda model, kind='npc', path=None: 1000):
+            *_r, check = L.checked_bake(bake, self.shapes, [], {}, b'', 480, None, model='test.nif')
         self.assertIn('tail', check['kept_whole'])
         self.assertNotIn('tail', check['lost'])
         self.assertEqual(bake.budgets[0], 480)

@@ -1,6 +1,6 @@
 # Persistent NPC model conversion cache
 
-_Last updated with AmiWind v0.0.54-dev1 (27 October 2026)._
+_Last updated with AmiWind v0.0.62-dev1 (7 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -206,6 +206,81 @@ The Suran dancers keep their hair whole (Marelle 300, Caminda 435, Runa 174 tria
 faces), and no direction shows head where the original shows hair, except 3 of 1,466 at Caminda's spikes (927, 217
 and 1,088 directions did in v0.0.53).
 
+**The body keeps its share** (v0.0.62, NPC-BODY-REGRESSION-62; setting `AMIWIND_NPC_BODY_SHARE`: `body`, the
+default, or `budget`, the split of v0.0.54 to v0.0.61, byte for byte). With the head's weight and floor on the hair,
+or a whole hair inside the 480 split, a head with a large hairstyle or helmet left the body 4 faces a part: Jiub on
+the prison ship had stick-thin legs (each upper leg, knee and shin of his trousers 4 of 62 to 75 triangles), and the
+guards' 4-face necks left a gap under their helmets. Now every body part (not the head or hair) keeps at least its
+share of the v0.0.53 split, and the hair, then the head, give those faces back (never below 4 faces, the head's
+floor of up to 120, or a protected minimum). The model's total stays the same or falls (Jiub 620 to 600 triangles,
+the Imperial guard 606 to 553), so it draws no more than before. In an original-head bake the body takes the budget
+split among the body shapes alone, and the model may draw no more triangles than the previous split's model.
+
+**The body check** (v0.0.62): every full-model bake measures each limb's width across its source cross-section
+(the baked faces of that body part against the source part, along the source's two narrow axes) and samples the
+neck against the baked model. A limb under half its width, or a neck that lost more than 3 % of its surface
+(farther than 2 % of the actor's size from the baked model), first gets more faces (twice, twice again, then the
+whole source part; the hair and the head give them up, then the room left under the face limit); what is left is
+printed with the part named. A limb under a fifth of its width or a neck that lost a fifth of its surface stops the
+bake (`AMIWIND_NPC_BODY_CHECK=fail`, the default; `warn` only prints). Measured on every sixth NPC of the master
+(268 that bake on the base skeleton): the v0.0.61 split left 162 with a limb under half its width (Jiub's upper legs
+and wrists 0.12), the repaired split 7 (the narrowest 0.23, no neck past 0.15), and the models draw 2.6 % fewer
+triangles in all.
+
+**Parts by slot, each with its own floor** (v0.0.62; setting `AMIWIND_NPC_BODY_FLOORS`: `parts`, the default, or
+`silhouette`, the size classes and silhouette floors up to v0.0.62-dev1). A body part's class comes from its slot:
+the neck, hands, wrists, forearms, arms, feet, ankles, knees, legs and the tail are limbs whatever their size; only
+the small shapes of the torso, groin and clavicle slots (belts, spikes) are 4-face details. The size rule before
+filed every hand, wrist, forearm and neck as a detail. Each part's floor is the fewest faces, on the ladder 4, 6, 8,
+10, 12, 14, 16, 20, 24, 28, 32, 40, 48, 64, at which its reduction keeps 80 % of its source cross-section and loses
+no surface, at that rung and the next. The hair, then the head (never below its floor of up to 120 faces), give
+those faces; the model never draws more than the previous split's model did (its reduction is measured first, without
+the texture work), and when the head and hair have nothing left the body gives back below its floors, unless the model
+has an override entry (below). Measured, before / added / total: Jiub 620 / -13 / 607 (least limb width 0.12 to
+0.60), the escort guard 590 / -2 / 588, the Imperial guard 606 / -61 / 545; Nels Llendo on the resident ladder 484 /
+0 / 484 keeps wrists at 0.29 of their width, so he has an override entry: 484 / +23 (+4.8 %) / 507, wrists 0.68.
+
+**Reducing a model: measure the original, reduce, prove the seams stayed intact** (v0.0.62, MESH-REDUCTION-SEAMS-62).
+The method for every actor model the builder reduces, NPC bodies and creatures alike (the full guide:
+[MODEL_REDUCTION.md](MODEL_REDUCTION.md); the parts and joints of a modular NPC:
+[MODULAR_NPCS.md](MODULAR_NPCS.md#joint-seams)):
+
+1. Measure the original: its bounding box, each part's box and cross-section, its surface, and its open edges (an
+   edge used by exactly one face, counted after welding positions that coincide, per part and across parts, so a
+   seam between two parts counts as closed).
+2. Reduce it, part by part, inside the model's face total.
+3. Measure the reduced model the same way, and refuse it when it has an open edge the original does not have (a
+   seam pulled apart, a hole) or a limb under half its original width. The verdict is these two numbers, never a
+   picture. `tools/mesh_seam_check.py` is the check; the bake runs the same code and writes the numbers into the
+   actor's receipt.
+
+Measured on the branch (2026-11-07): the Alit as it ships has 88 open edges its original does not have (the
+original, welded, has none); the rim-locked panels leave 52. Jiub has 12 with the v0.0.61 method and 17 with the
+part floors; closing them takes the seam locks below and the weld of coinciding positions, still being finished.
+
+**The per-actor receipt** (v0.0.62; setting `AMIWIND_NPC_BODY_AUDIT`: `gate`, the default, or `check`, the width and
+neck check alone). Every whole-model bake measures the joints (the joint-seam audit, `tools/npc_seam_audit.py`: the
+share of the joint length left open and the largest opening), the least limb width, the neck, the shapes that lost
+surface and the farthest baked vertex from the source, and writes them with the faces, the previous model's count and
+the difference into the actor's record (`body` in the intro report and in the actor library's facts). A thin limb or
+a neck gap gets more faces first; a spike (a vertex more than 1 unit off the source) stops the bake. Open joints are
+recorded but do not stop the bake until the seam locks land: today's reduction leaves 14 % (Jiub) to 59 % (the
+Imperial guard) of the joint length open, largest openings 0.5 to 1.2 units.
+
+**Per-model face overrides** (v0.0.62, `config/model-face-overrides.json`, read by `tools/model_face_overrides.py`):
+the only way a baked actor model gets more faces than its class budget gives it. Each entry names the model (the
+NPC record id, or the creature's mesh path for a creature), the faces it may add, the reason, the measured cost as
+before / added / total, and the state of its check on the Pi (`pending`, or the bench that passed). The bake grows a
+model past its total only by that entry; `tests/test_model_face_overrides.py` keeps the file valid and checks that
+no other route passes extra faces. The file is the shipped default, so the public builder builds the same models.
+
+**Creatures: open panels with locked rims** (v0.0.62, CREATURE-MESH-HOLES-62). The creature bake already keeps a small
+shape (up to 128 faces) whole when the reduction loses its surface (the cliff racer's tail). A larger open panel that
+loses surface is now reduced with its rims locked (the head reducer, `simplify_head_locked`), and a locked panel that
+still loses surface takes a third of its faces, then twice that. The result is taken only when it closes every such
+panel and fits the model's total, or its override entry. The Alit's two torso panels (336 and 204 faces) folded away
+and left a hole in its upper torso; they close at before 475 / added +87 (+18.3 %) / total 562, its entry.
+
 **Allowances:** a model past 2,000 vertices (666 triangles) loads in the engine
 only with a byte-matching `model-budgets.txt` line. The gallery already writes
 one per model; the image step now adds one for every such model outside the
@@ -370,7 +445,7 @@ folder per level. The level table `progs/npc-lod.txt` (`AWNL2`) lists every appe
 its map model, the level-0 use flag and the bytes of each level.
 
 Builder options ([LINUX_BUILD.md](LINUX_BUILD.md#npc-model-levels-of-detail)):
-`--npc-lod on|off` (off: one model per resident, the earlier method),
+`--npc-lod on|off` (off: one model per appearance, the earlier method),
 `--npc-lod-levels 2|3|4` (2: levels 0-1; 3: levels 0-2; 4: levels 0-3),
 `--npc-face-lod all|named|measured|list` and `--npc-lod-disk-mib`. Their defaults are
 `config/build-defaults.json`: off, 3 levels, `all`, 96 MiB. The levels stay off by default until

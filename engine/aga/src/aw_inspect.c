@@ -263,8 +263,9 @@ static int key(int k) {
 }
 static void hud_command(void) {
     char *s=Cmd_Argv(1);int on;
-    if(Cmd_Argc()==1){Con_Printf("dbg hud %s: click pins identity; attack disabled while on.\n",enabled?"on":"off");return;}
-    if(Cmd_Argc()!=2 || (Q_strcasecmp(s,"on") && Q_strcasecmp(s,"off") && Q_strcasecmp(s,"true") &&
+    /* DBG-SUPERSPEED-62: bare turns it the other way (it printed the state only before) */
+    if(Cmd_Argc()==1)s=enabled?"off":"on";
+    else if(Cmd_Argc()!=2 || (Q_strcasecmp(s,"on") && Q_strcasecmp(s,"off") && Q_strcasecmp(s,"true") &&
        Q_strcasecmp(s,"false") && strcmp(s,"1") && strcmp(s,"0"))){Con_Printf("Usage: dbg hud on/off\n");return;}
     on=!Q_strcasecmp(s,"on") || !Q_strcasecmp(s,"true") || !strcmp(s,"1");
     if(!on){off();Con_Printf("Inspect HUD off: normal controls (release any held click).\n");return;}

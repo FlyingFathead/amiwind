@@ -49,6 +49,25 @@ class EngineWiringTests(unittest.TestCase):
         # no C library floating-point formatting in the engine (aw_format.c)
         self.assertNotIn('snprintf(', code('aw_msgbox_rules.c').replace('Q_snprintf(', ''))
 
+    def test_every_box_shows_the_pointer_and_takes_clicks(self):
+        # MSGBOX-NO-CURSOR-62: a script's box (and the failed-load box, aw_loadfail.c, the same box) and the death box
+        # draw the pointer and choose the button under it on a click; the rectangles are the rules' (aga_msgbox_test.c)
+        box = code('aw_msgbox.c')
+        self.assertIn('aw_msgbox_mouse=AW_MsgBoxMouse;', box)
+        self.assertIn('AW_UICursor(mouse_x,mouse_y)', box)
+        self.assertIn('AW_MsgBoxButtonAt(box.count,frame,px,py)', box)
+        self.assertIn('AW_MsgBoxButtonRect(box.count,i,f,r);', box)
+        view = code('aw_view.c')
+        self.assertIn('aw_death_mouse=AW_ViewDeathMouse;', view)
+        self.assertIn('AW_UICursor(death_mouse_x,death_mouse_y)', view)
+        self.assertIn('AW_DeathBoxButtonRect(death.count,i,vid.width,vid.height,r);', view)
+        mouse = code('in_amiga.c')
+        event = mouse[mouse.index('void IN_AWMouseEvent'):]
+        self.assertLess(event.index('aw_msgbox_mouse(dx,dy)'), event.index('if(key_dest!=key_game)'))
+        loadfail = code('aw_loadfail.c')
+        self.assertIn('AW_MsgBoxShow(AW_SceneLoadBoxText(),buttons,2);', loadfail)
+        self.assertIn('{"OK","Load Game"}', loadfail)
+
     def test_built_into_the_engine(self):
         make = (ROOT / 'engine' / 'aga' / 'Makefile').read_text(encoding='utf-8')
         self.assertIn('aw_mwhost.c aw_msgbox_rules.c aw_msgbox.c', make)

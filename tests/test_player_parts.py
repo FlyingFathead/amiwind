@@ -176,9 +176,10 @@ class EngineWiring(unittest.TestCase):
         # a weapon or shield is equipped under the assembled body too (it holds them on its table's bones)
         self.assertIn('if(body_parts)return parts_table && parts.weapon_bone>=0', view)
         # clothing with body parts is worn now that the assembled body shows it (v0.0.61, PLAYER-CASTING-59: with a
-        # Cast When Used or a Constant Effect enchantment too)
+        # Cast When Used or a Constant Effect enchantment too); since v0.0.62 (EQUIP-ACTION-REGRESSION-62) every
+        # clothing record by the same rule, with or without body parts
         inventory = (ROOT / 'tools/prepare_inventory.py').read_text(encoding='utf-8')
-        self.assertIn("elif item['parts'] and inert and (not item['enchantment'] or (enchant and enchant[0] in (2,3))):flags|=4",
+        self.assertIn("if inert and (not item['enchantment'] or (enchant and enchant[0] in (2,3))):flags|=4",
                       inventory)
 
     def test_swimming_wears_the_assembled_body(self):

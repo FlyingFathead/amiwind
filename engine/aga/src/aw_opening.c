@@ -8,6 +8,25 @@
 #include "aw_activated.h"
 #include "aw_hinged_door.h"
 static int route_started,route_failed,route_done;
+/* CENSUS-INTRO-SCRIPTS-62: Sellus Gravius ("chargen captain") talks through the ordinary dialogue window, as in the
+ * original: his Greeting 1 result takes the papers ("player->removeitem chargen statssheet" and his local state -1)
+ * and his "duties" answer gives the package, the directions, 87 gold and journal A1_1_FindSpymaster 1. The project's
+ * early hand-written box (reading/captain_greeting, captain_duties: "Enter: Duties") is kept only behind this switch,
+ * off by default, for an A/B of the old path. */
+cvar_t aw_census_legacy={"aw_census_legacy","0"};   /* registered in aw_debug.c */
+int AW_CensusLegacy(void){return aw_census_legacy.value!=0;}
+/* EnableClassMenu / EnableBirthMenu / EnableStatReviewMenu of the clerk's script (CharGenClassNPC; aw_mwhost.c host
+ * call): KIND 2, 3, 4 as AW_CharacterOpen takes them. The class window opening is the office's CLASS stage, as the
+ * old path's census step 10 made it; the windows' results move the stages on in AW_OpeningTick. 1 opened. */
+int AW_OpeningScriptMenu(int kind)
+{
+    if(kind<2 || kind>4 || !AW_CharacterOpen(kind))return 0;
+    if(kind==2 && aw_story.stage==AW_STAGE_OFFICE)AW_StoryTransition(AW_STAGE_CLASS);
+    return 1;
+}
+/* The captain is an intro role only on the old path; on the new one he is an ordinary speaker (aw_talk.c, world.qc,
+ * aw_scene.c read aw_intro_role) bound to role 7 by his record id for the distance rules below. */
+static int captain_papers=-1;   /* the papers carried at the last tick in his reach: the greeting's take is seen */
 static float near_actor(int role)
 {
     edict_t *actor=AW_IntroRole(role),*player=svs.clients[0].edict;vec3_t delta;
@@ -46,7 +65,7 @@ int AW_OpeningStoryHidden(void)
 void AW_OpeningSpawn(void)
 {
     int i,reference;edict_t *e;eval_t *v;
-    route_started=route_failed=route_done=0;
+    route_started=route_failed=route_done=0;captain_papers=-1;
     if(aw_story.stage==AW_STAGE_DEMO)return;
     if(!strcmp(sv.name,"census") && aw_story.stage>=AW_STAGE_OFFICE)aw_story.ship_disabled=1;
     for(i=1;i<sv.num_edicts;i++){
@@ -142,10 +161,31 @@ int AW_OpeningTick(void)
         }
     }
     if(strcmp(sv.name,"census") || aw_story.stage<AW_STAGE_OFFICE)return 0;
-    if(!aw_story.captain_hint && near_actor(7)<75){
-        aw_story.captain_hint=1;AW_UISubtitle("","E: talk to Sellus Gravius. Ask about your duties.",7);
+    if(!aw_story.captain_hint && near_actor(7)<75){   /* CharGenDialogueMessage: GetDistance Player < 300 */
+        aw_story.captain_hint=1;
+        AW_UISubtitle("","Press E to talk to the Captain. Select topics to ask about them. Don't try persuasion on him. "
+                         "If you're not good at it, he will start to dislike you.",9);
     }
-    if(aw_story.census==0 && near_actor(6)<25 && AW_IntroSpeak(6,"chargen_class1"))aw_story.census=10;
+    if(!AW_CensusLegacy() && aw_story.stage>=AW_STAGE_CAPTAIN && !aw_story.captain){
+        /* his greeting's result took the papers (Greeting 1: removeitem "chargen statssheet", set state to -1) */
+        int papers=AW_Papers();
+        if(near_actor(7)>=75)captain_papers=-1;
+        else{if(captain_papers>0 && papers==0)aw_story.captain=-1;captain_papers=papers;}
+    }
+    if(!AW_CensusLegacy()){
+        /* the clerk runs his own script (CharGenClassNPC: his lines, EnableClassMenu / -BirthMenu / -StatReviewMenu,
+         * the papers shown, the menus and controls turned on). The windows' results move the office's stages on, as
+         * the old path's steps did, and the review's end restores the new character's health and shows the papers */
+        if(done==2 && aw_story.stage==AW_STAGE_CLASS)AW_StoryTransition(AW_STAGE_BIRTH);
+        else if(done==3 && aw_story.stage==AW_STAGE_BIRTH)AW_StoryTransition(AW_STAGE_REVIEW);
+        else if(done==4 && aw_story.stage==AW_STAGE_REVIEW && AW_StoryTransition(AW_STAGE_PAPERS)){
+            show_papers();aw_story.census=-1;
+            svs.clients[0].edict->v.health=aw_character.current[0];
+        }
+        /* the papers taken (through their own script's Activate): the courtyard stage, as the old reader's Take */
+        else if(aw_story.stage==AW_STAGE_PAPERS && AW_Papers())AW_StoryTransition(AW_STAGE_COURTYARD);
+    }
+    else if(aw_story.census==0 && near_actor(6)<25 && AW_IntroSpeak(6,"chargen_class1"))aw_story.census=10;
     else if(aw_story.census==10 && AW_SpeechRemaining()<=0){
         if(AW_CharacterOpen(2)){AW_StoryTransition(AW_STAGE_CLASS);aw_story.census=12;aw_story.census_timer=0;}
     }else if(aw_story.census==12){
@@ -174,7 +214,8 @@ int AW_OpeningTick(void)
         aw_story.census_timer+=dt;
         if(aw_story.census_timer>5 && AW_IntroSpeak(6,"chargen_class4"))aw_story.census_timer=0;
     }
-    if(!aw_story.hall && near_actor(8)<45 && AW_SpeechRemaining()<=0){
+    /* the door guard: his own script (CharGenDoorGuardTalker: his lines, the hall door's Unlock) unless the old path */
+    if(AW_CensusLegacy() && !aw_story.hall && near_actor(8)<45 && AW_SpeechRemaining()<=0){
         if(AW_Papers()){if(AW_IntroSpeak(8,"chargen_door2"))aw_story.hall=1;}
         else{
             aw_story.hall_timer+=dt;
@@ -212,12 +253,18 @@ static edict_t *opening_target(void)
         e=EDICT_NUM(i);if(e->free || !e->v.modelindex)continue;
         v=GetEdictFieldValue(e,"aw_ref");ref=v?(int)v->_float:0;
         role=e==AW_IntroRole(6)?6:e==AW_IntroRole(7)?7:e==AW_IntroRole(8)?8:0;
+        /* the census office's people run their own scripts and talk through the dialogue window (role 7 the captain,
+         * 8 the door guard; CENSUS-INTRO-SCRIPTS-62) unless the old path */
+        if(role && !AW_CensusLegacy())continue;   /* 6 the clerk too */
         if(role){
             if(!AW_StoryRestricted() || strcmp(sv.name,"census") || near_actor(role)>=48 ||
                (role==6 && aw_story.census!=0) || (role==7 && aw_story.stage!=AW_STAGE_CAPTAIN))continue;
             VectorCopy(e->v.origin,point);point[2]+=27;
         }else{
             if(ref!=AW_REF_CENSUS_PAPERS && ref!=AW_REF_COURTYARD_BARREL)continue;
+            /* the papers run their own script (CharGenStatsSheet: the use, the reader with Take, OnPCAdd's messages)
+             * unless the old path; the courtyard barrel's ring stays the opening's (the ring's own script follows) */
+            if(ref==AW_REF_CENSUS_PAPERS && !AW_CensusLegacy())continue;
             VectorAdd(e->v.absmin,e->v.absmax,point);VectorScale(point,.5f,point);
         }
         VectorSubtract(point,eye,delta);distance=Length(delta);
@@ -255,8 +302,12 @@ int AW_OpeningHingedStory(unsigned ref,int event)
 {
     if(ref!=AW_REF_CENSUS_HALL_DOOR)return -1;
     switch(event){
-    case AW_HINGE_STORY_LOCK:return aw_story.hall?0:1;
-    case AW_HINGE_STORY_REFUSED:AW_UISubtitle("","The door is locked. Show your papers to the guard.",4);return 1;
+    /* the door's own lock (its record: level 100, no key) and the guard script's Unlock, unless the old path */
+    case AW_HINGE_STORY_LOCK:return AW_CensusLegacy()?(aw_story.hall?0:1):-1;
+    case AW_HINGE_STORY_REFUSED:
+        if(!AW_CensusLegacy())return -1;
+        AW_UISubtitle("","The door is locked. Show your papers to the guard.",4);
+        return 1;
     case AW_HINGE_STORY_OPEN:aw_story.hall_open=1;return 1;
     case AW_HINGE_STORY_CLOSED:aw_story.hall_open=0;return 1;
     case AW_HINGE_STORY_SPAWN:return aw_story.hall_open?1:0;
@@ -271,7 +322,7 @@ int AW_OpeningUse(void)
         if(AW_IntroSpeak(6,"chargen_class1"))aw_story.census=10;
         return 1;
     }
-    if(target==AW_IntroRole(7)){
+    if(target==AW_IntroRole(7)){   /* only on the old path: opening_target skips him otherwise */
         if(AW_Papers() || aw_story.captain)AW_ReaderOpen("captain_greeting",2);
         else AW_UISubtitle("Sellus Gravius","Bring your identification papers.",4);
         return 1;

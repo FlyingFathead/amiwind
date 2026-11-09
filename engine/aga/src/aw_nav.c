@@ -103,9 +103,14 @@ int AW_NavStep(double dt,int wait_for_player) {
     if(length<.1)length=.1;
     step=22*dt;if(step>length)step=length;
     move[0]=delta[0]*step/length;move[1]=delta[1]*step/length;move[2]=0;
-    /* A following player can overtake or stand in the aisle. This is a wait,
-     * not a broken path-grid route. Keep the same goal and resume when clear. */
-    {
+    /* An escort (wait_for_player) whose following player overtakes or stands
+     * in the aisle waits: not a broken route; same goal, resumed when clear.
+     * A plain travel (the script's AITravel, e.g. CharGenRaceNPC's walk to his
+     * post beside the Census door) never waits for the player: OpenMW's
+     * AiTravel steers round obstacles instead. Waiting there held the dock
+     * guard in the doorway for as long as the player stood before him
+     * (INTRO-DOCK-GUARD-BLOCKS-DOOR-62). */
+    if(wait_for_player){
         trace_t tr;vec3_t ahead;
         VectorAdd(walker->v.origin,move,ahead);
         tr=SV_Move(walker->v.origin,walker->v.mins,walker->v.maxs,ahead,MOVE_NORMAL,walker);
@@ -125,7 +130,10 @@ int AW_NavStep(double dt,int wait_for_player) {
     if(!moved)for(i=0;i<6;i++){
         angle=Q_atan2(delta[1],delta[0])+avoid[i]*M_PI/180;
         side[0]=Q_CosRad(angle)*step;side[1]=Q_SinRad(angle)*step;side[2]=0;
-        if(AW_ActorStep(walker,side,dt)){moved=1;walker->v.angles[1]=angle*180/M_PI-90;break;}
+        /* The side-step keeps the walker facing his travel direction: turning
+         * him to each +-30..90 degree candidate spun him on the spot
+         * (INTRO-DOCK-GUARD-BLOCKS-DOOR-62). */
+        if(AW_ActorStep(walker,side,dt)){moved=1;break;}
     }
     if(moved)blocked=0;else {
         if(blocked==0){trace_t tr;vec3_t end;VectorAdd(walker->v.origin,move,end);

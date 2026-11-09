@@ -321,6 +321,7 @@ static void open_modal(int kind){return_dest=key_dest;modal=kind;key_dest=key_me
  * and in WAIT mode elsewhere; it refuses on water, in the air (a bed lifts that) and with enemies near, with the game's
  * lines. levelup/rest.txt (tools/prepare_levelup.py) is read from disk when the window opens, never in play. Modal 3. */
 void (*aw_rest_bed_refused)(unsigned long reference,const char *owner);
+int (*aw_rest_bed_crime)(unsigned long reference,const char *owner,int faction);
 void (*aw_rest_spawn)(const char *sleep_list);
 int AW_CombatHostiles(void);float AW_CombatPlayerFatigue(float *maximum);   /* aw_combat.c */
 static aw_rest_settings_t rest_settings;
@@ -442,10 +443,14 @@ int AW_RestOpen(unsigned long bed_reference)
             int global=strcmp(rest_read.global,"-")?AW_StateGet(&aw_state,AW_GLOBAL,rest_read.global):0;
             int rank=strcmp(rest_read.faction,"-")?AW_StandingRank(rest_read.faction):-1;
             if(!AW_RestBedAllowed(rest_read.owner,rest_read.faction,rest_read.bed_rank,global>0,rank)){
-                rest_text("sNotifyMessage64","You can't sleep in someone else's bed!",line,sizeof(line));
-                AW_UISubtitle("",line,5);
-                if(aw_rest_bed_refused)aw_rest_bed_refused(bed_reference,strcmp(rest_read.owner,"-")?rest_read.owner:rest_read.faction);
-                return 0;
+                int owner=strcmp(rest_read.owner,"-")!=0;
+                /* v0.0.62 (CRIME-59): the trespass when someone sees it, and only then the refusal (sleepInBed) */
+                if(!aw_rest_bed_crime || aw_rest_bed_crime(bed_reference,owner?rest_read.owner:rest_read.faction,!owner)){
+                    rest_text("sNotifyMessage64","You can't sleep in someone else's bed!",line,sizeof(line));
+                    AW_UISubtitle("",line,5);
+                    if(aw_rest_bed_refused)aw_rest_bed_refused(bed_reference,owner?rest_read.owner:rest_read.faction);
+                    return 0;
+                }
             }
         }
     }
@@ -493,6 +498,24 @@ static void rest_run(int wanted)
     AW_UISubtitle("",line,5);
     /* only a full rest opens a due level-up (OpenMW WaitDialog::onWaitingFinished) */
     if(rest_sleeping && done==wanted)AW_LevelupRested();
+}
+/* CRIME-59: the jail's days as a rest (OpenMW jailscreen.cpp onJailFinished: rest(days x 24, true) and the time) */
+void AW_RestPass(int many,int sleeping)
+{
+    int done;aw_rest_body_t b;
+    if(many<=0 || !sv.active || svs.maxclients!=1 || !svs.clients || !svs.clients[0].edict || !AW_ClockEnsure())return;
+    memset(&rest_read,0,sizeof(rest_read));
+    rest_read.sign=aw_character.birth>=0 && aw_character.birth<aw_birth_count?aw_births[aw_character.birth].id:"";
+    rest_data=rest_load();
+    for(done=0;done<many;done++){
+        if(!AW_ClockAdvance(3600000))break;
+        if(timescale.value>0){
+            if(aw_magic_frame)aw_magic_frame(3600.0f/timescale.value);
+            AW_MwscriptEffectsAdvance(3600.0f/timescale.value);
+        }
+    }
+    clock_fraction=0;
+    if(rest_data){rest_body(&b);AW_RestRestore(&rest_settings,&b,(float)done,sleeping);rest_store(&b);}
 }
 static void wait_open(void) {
     if(modal || gallery_active || key_dest!=key_game)return;
@@ -567,6 +590,7 @@ static void daynight_command(void) {
     if(Cmd_Argc()>2 || (Cmd_Argc()==2 && on<0)){
         Con_Printf("Usage: dbg daynight [on/off] (off holds the clock at 12:00, on resumes)\n");return;
     }
+    if(Cmd_Argc()==1)on=daynight_hold?1:0;   /* DBG-SUPERSPEED-62: bare turns it the other way */
     if(on==0){
         /* Everything shows midday at once: stop the hour stepper and the
          * previews that would otherwise still show another time. */

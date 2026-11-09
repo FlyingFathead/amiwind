@@ -165,6 +165,7 @@ DIAL_TYPES = (KIND_TOPIC, KIND_GREETING, KIND_PERSUASION)
 DIAL_JOURNAL = 4
 QUEST_NAME, QUEST_FINISHED, QUEST_RESTART = 1, 2, 4
 ENTRY_LAST = G.ENTRY_LAST
+ENTRY_ACTOR = 2                  # entry flags: the INFO names an actor (OpenMW's "specific" topic colour)
 NONE16, NONE32 = G.NONE16, G.NONE32
 NO_CELL = G.NO_CELL
 
@@ -318,14 +319,30 @@ def _lower(text):
     return ''.join(chr(ord(c) + 32) if 'A' <= c <= 'Z' else c for c in text)
 
 
+WORD_END_SUFFIXES = ('s',)   # measured over the three masters (docs/DIALOGUE_DESIGN.md): the plural keeps its link
+
+
+def ends_inside(text, end):
+    """True when position END of TEXT is inside a word (a letter or digit there), unless the rest of the word is one
+    of WORD_END_SUFFIXES (a plural: "guards" still links "guard"); a possessive ("'s") ends the word anyway."""
+    if end >= len(text) or not text[end].isalnum():
+        return False
+    for suffix in WORD_END_SUFFIXES:
+        after = end + len(suffix)
+        if text[end:after].lower() == suffix and (after >= len(text) or not text[after].isalnum()):
+            return False
+    return True
+
+
 def span_finder(display):
     """A function text -> (shown text, [(offset, length, topic index)]): the rule of OpenMW's hypertext parsing and
     keyword search (apps/openmw/mwdialogue/keywordsearch.cpp; the reference and the test oracle, our own code):
     - an explicit link '@name#' (the next '#' after an '@') is shown as its name, trailing pseudo-asterisks dropped, and
       links that topic when the name is one;
     - the text between explicit links is searched for every topic name (case-insensitive) that starts at the
-      segment's start or after a word separator (newline, space, tab, quotes, '(' or '['); nothing is checked at the
-      name's end;
+      segment's start or after a word separator (newline, space, tab, quotes, '(' or '['); OpenMW checks nothing at
+      the name's end, ours also needs the name to end the word (no letter or digit right after it: DIALOGUE-LINKS-62,
+      a short topic never lights inside a longer word; docs/DIALOGUE_DESIGN.md);
     - overlapping names: repeatedly the longest of the first run of overlapping matches is kept and those overlapping
       it are dropped.
     Offsets and lengths count the shown text's characters."""
@@ -342,7 +359,7 @@ def span_finder(display):
             if i and segment[i - 1] not in WORD_SEPARATORS:
                 continue
             for n in lengths:
-                if i + n <= len(segment) and low[i:i + n] in names:
+                if i + n <= len(segment) and low[i:i + n] in names and not ends_inside(segment, i + n):
                     matches.append((i, i + n, names[low[i:i + n]]))
         found = []
         while matches:
@@ -579,7 +596,8 @@ def tables(kinds, topics, dials, names, masks, order):
         entries.append(struct.pack(ENTRY_ROW, texts.add(line) if line else NONE32, first,
                                    scripts.add(script) if script.strip() else NONE32,
                                    len(links) if found else NONE32, len(found), len(runtime),
-                                   0 if runtime else ENTRY_LAST))
+                                   (0 if runtime else ENTRY_LAST)
+                                   | (ENTRY_ACTOR if text(fields, 'ONAM').strip() else 0)))
         links += found
     list_rows, list_items, list_of = [], [], {}
     for group in sorted(kept, key=lambda g: (g[0], entry_index[kept[g][0]], g[1])):
@@ -1192,7 +1210,8 @@ LIVE_FUNCTIONS = ('Health_Percent', 'PcHealthPercent', 'PcHealth', 'TalkedToPc',
                   'PcSpear', 'PcAthletics', 'PcEnchant', 'PcDestruction', 'PcAlteration', 'PcIllusion',
                   'PcConjuration', 'PcMysticism', 'PcRestoration', 'PcAlchemy', 'PcUnarmored', 'PcSecurity', 'PcSneak',
                   'PcAcrobatics', 'PcLightArmor', 'PcShortBlade', 'PcMarksman', 'PcMercantile', 'PcSpeechcraft',
-                  'PcHandToHand', 'SameSex', 'SameRace', 'ShouldAttack')
+                  'PcHandToHand', 'SameSex', 'SameRace', 'ShouldAttack',
+                  'Alarmed')   # v0.0.62 (CRIME-59): the speaker's mark from the crime rules (an alarmed guard)
 
 
 def coverage(table):

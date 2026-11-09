@@ -470,6 +470,7 @@ static void command(void){
             Con_Printf("Usage: dbg doorlocks [on/off, true/false or 1/0]\n");return;
         }
         if(*w)door_locks=!Q_strcasecmp(w,"on") || !strcmp(w,"1") || !Q_strcasecmp(w,"true");
+        else door_locks=!door_locks;   /* DBG-SUPERSPEED-62: bare turns it the other way */
         Con_Printf("Door locks %s (%ld locked load doors and keyed doors in the table; god mode or the key opens them).\n",
                    door_locks?"on":"off: every lock ignored",(long)lock_count);
         return;

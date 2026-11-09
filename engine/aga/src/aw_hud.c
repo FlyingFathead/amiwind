@@ -53,8 +53,10 @@ int AW_InspectHudLift(void) {
 int AW_SeaLevelEnabled(void) {return sealevel.value != 0;}
 static int debug_toggle(cvar_t *setting,char *name) {
     char *value;
+    /* DBG-SUPERSPEED-62: typed bare it turns the other way (it printed the state only before), then says which */
     if(Cmd_Argc()==1) {
-        Con_Printf("%s %s\n", name,setting->value?"on":"off");return 0;
+        Cvar_SetValue(setting->name,setting->value==0);vid.recalc_refdef=true;
+        Con_Printf("%s %s\n", name,setting->value?"on":"off");return 1;
     }
     value=Cmd_Argv(1);
     if(Cmd_Argc()!=2 || (Q_strcasecmp(value,"true") && Q_strcasecmp(value,"false") &&
@@ -75,7 +77,7 @@ static void debug_compass(void) {
 }
 /* dbg fps on: always shown; dbg fps off: never, not even with the debug HUD. */
 static void debug_fps(void) {if(debug_toggle(&fps,"amiwind_debug_fps"))Cvar_SetValue(fps_hud.name,fps.value!=0);}
-static void debug_showfps(void) {if(Cmd_Argc()==1)Cvar_SetValue(fps.name,1);else debug_fps();}
+static void debug_showfps(void) {debug_fps();}   /* DBG-SUPERSPEED-62: bare turns it the other way, as dbg fps */
 static void debug_ram(void) {debug_toggle(&scr_showram,"amiwind_debug_showram");}
 static void debug_sea(void) {debug_toggle(&sealevel,"amiwind_debug_sealevel");}
 static void debug_hud_type(void) {

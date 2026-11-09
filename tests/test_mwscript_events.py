@@ -143,6 +143,22 @@ class HeldTests(unittest.TestCase):
             self.assertIn(op, ops)
         self.assertNotIn('NOTYET', ops)
 
+    def test_far_trigger(self):
+        # SCRIPTED-EVENT-PAST-DRAW-DISTANCE-62: the script that removes a held actor's support carries its own trigger
+        # distance in the SCRP row, so the engine can fire it under the player's draw distance; others carry 0
+        rows = events.check(self.data)['rows']
+        self.assertEqual(events.far_triggers(self.data, rows), {'falltest': 2000})
+        self.assertEqual(events.far_triggers(self.data, []), {})
+        self.prog.held = rows
+        self.prog.far = events.far_triggers(self.data, rows)
+        f = awms.read(awms.write(self.prog, self.compiled, bindings(self.prog))[0])
+        far = {}
+        for i in range(f['SCRP_rows']):
+            far[i] = struct.unpack_from('>H', f['SCRP'], 16 * i + 6)[0]
+        self.assertEqual(far[self.prog.scripts.index['falltest']], 2000)
+        self.assertEqual(far[self.prog.scripts.index['ambush']], 0)     # an ambush keeps its own distance
+        self.prog.far = {}
+
     def test_census(self):
         rows = events.census(self.data)
         by = {r['script']: r for r in rows}

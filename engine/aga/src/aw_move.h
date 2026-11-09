@@ -116,6 +116,7 @@ float AW_MoveFallLoss(float height,float acrobatics,float jump,float fatigue,flo
 /* aw_fall.c: the actors held on an object a script removes, and their falls (the HELD rows of the compiled scripts) */
 void AW_FallInit(void);
 void AW_FallTick(float dt);
+extern int (*aw_fall_far_event)(int edict);   /* a live far event's actor: drawn past the draw distance (r_main.c) */
 void AW_FallStatus(void);
 
 /* Original units -> AmiWind units (tools/prepare_quake.py SCALE, the converter's world scale). */
@@ -141,6 +142,10 @@ int AW_MoveScriptLocal(const float forward[3],const float right[3],const float u
  * on; after each move, the fatigue cost of running/swimming and of a jump. */
 void AW_MoveInit(void);
 int AW_MoveSuperspeed(void);
+/* DBG-SUPERSPEED-62: while superspeed is on, the movement rules read Speed, Athletics and Acrobatics as this (the
+ * game's maximum for a skill and an unfortified attribute) and the player's fatigue is filled every move
+ * (aw_combat.c AW_CombatPlayerFatigueFill): endless stamina. The character sheet is never written. */
+#define AW_MOVE_SUPERSPEED_STAT 100.0f
 /* SNEAK-58: 1 while the player sneaks (the sneak key held, on foot, not swimming, not in noclip). */
 int AW_MoveSneaking(void);
 /* MWSCRIPT-GAP-FUNCTIONS-62: 1 while a script's ForceSneak holds the player in the sneak stance (aw_mwhost.c). */
@@ -154,4 +159,15 @@ void AW_MovePlayerInputs(aw_move_inputs_t *in);
 #define AW_ENCUMBRANCE_EFFECTS 1
 void AW_EncumbranceSetEffects(float burden,float feather);
 float AW_PlayerEncumbrance(float *capacity);
+/* DBG-NOBURDEN-62: dbg noburden / unburdened / noweight, a debug mode (not saved, off at New Game): while on, the
+ * encumbrance is 0 in every rule (AW_MoveNoBurden: the load, Burden and Feather taken as 0, so no slower walk, run,
+ * swim or jump, no load in the fatigue costs or the rest, never over-encumbered), and the inventory's burden bar shows
+ * the real load over AW_MOVE_NOBURDEN_SHOWN. That number: the bar's text field holds 28 characters of the 4-pixel font
+ * (114 pixels) for "load/capacity", and OpenMW 0.51 shows the capacity as a whole number (inventorywindow.cpp
+ * updateEncumbranceBar); six nines leave the load as many digits as the capacity. The original's real capacity is
+ * Strength x fEncumbranceStrMult (5), 500 at Strength 100. */
+#define AW_MOVE_NOBURDEN_SHOWN 999999.0f
+void AW_MoveNoBurden(aw_move_inputs_t *in);
+int AW_MoveNoBurdenOn(void);
+void AW_MoveNoBurdenSet(int on);
 #endif

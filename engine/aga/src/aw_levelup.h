@@ -68,6 +68,23 @@ int AW_LevelupMultiplier(const aw_levelup_rules_t *r,const aw_character_t *c,int
  * + 1, health maximum and current + Endurance x fLevelUpHealthEndMult (Endurance after the raise; current at least
  * 1). Returns the new level, 0 when PICKS is not COUNT distinct attributes. */
 int AW_LevelupApply(const aw_levelup_rules_t *r,aw_character_t *c,const int *picks,int count);
+/* DBG-STATS-COMMANDS-62 (dbg setlvl, dbg restorestats, dbg maxstats; pure). The level cap: the original has none of
+ * its own (its SetLevel, and OpenMW 0.51's statsextensions.cpp OpSetLevel, set any level and change nothing else);
+ * the highest level its levelling reaches is 78 by skill use (10 major and minor skills from 30 and 15 to 100: 775
+ * raises at 10 a level) and 83 with the skill books (UESP, Morrowind:Level, "Maximum Level"). AW_LEVEL_MAX is that 83.
+ * SetLevel: the level as SetLevel sets it, plus the health the level-ups between would have given (NpcStats::levelUp:
+ * Endurance x fLevelUpHealthEndMult a level, taken off again going down; maximum at least 1, current within it),
+ * the level progress and the attribute raise counts cleared; no attribute is raised (which three a level-up raises is
+ * the player's choice). 0 for a level outside 1..AW_LEVEL_MAX. Restore: health, magicka and fatigue to their maximum
+ * (a current above it is kept). Max: every attribute (base) and skill to 100, damage and progress cleared, the level to
+ * AW_LEVEL_MAX, the derived maximums worked out again by the character builder's own rules (health (Strength +
+ * Endurance) / 2 plus each level's Endurance x fLevelUpHealthEndMult, magicka Intelligence x MAGICKA_MULT (1 + 0.1 x
+ * the race's and the birthsign's magicka bonus), fatigue Strength + Willpower + Agility + Endurance, the modifiers
+ * counted), then restored. */
+#define AW_LEVEL_MAX 83
+int AW_LevelupSetLevel(const aw_levelup_rules_t *r,aw_character_t *c,int level);
+void AW_LevelupRestore(aw_character_t *c);
+void AW_LevelupMax(const aw_levelup_rules_t *r,aw_character_t *c,float magicka_mult);
 /* A barter's Mercantile_Success scale (OpenMW mwgui/tradewindow.cpp, "apply skill gain on successful barter"): the
  * share haggled, floor(100 x (merchant offer - price) / merchant offer) when buying below the offer, floor(100 x
  * (price - offer) / price) when selling above it, else 0. A trade at the merchant's own price trains nothing. */
@@ -96,6 +113,9 @@ int AW_LevelupLoad(void);
 int AW_LevelupUse(int skill,int use,float scale);
 /* A skill raised by a trainer or a book (the dialogue's training): the skill-raise rule with its message. */
 int AW_LevelupRaise(int skill,int source);
+/* A book opened for reading by its record ID: a skill book read the first time raises its skill (source book) and is
+ * remembered as read. 1 when the skill rose. */
+int AW_LevelupBookRead(const char *id);
 /* Seconds of running or swimming on foot (Athletics; OpenMW character.cpp: one use per whole second). */
 void AW_LevelupMoveSeconds(int running,int swimming,float seconds);
 /* One of the game's own lines from levelup/settings.txt ("text KEY ..."; tools/prepare_levelup.py TEXTS), read from

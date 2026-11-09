@@ -63,7 +63,7 @@ def area_fixture(id1):
         rows.append((ord('I'), 0, 1, 0, pref, 'Placed', pid))
         expect.append('P %d %d %s' % (room, pref, pid))
         rooms[room] = rows
-        icons['item:r%d_a' % room] = (4, 3, 40 + r)
+        icons['big:r%d_a' % room] = (4, 3, 40 + r)
     index, body = [], []
     for room in sorted(rooms):
         index.append(struct.pack('<III', room, len(body), len(rooms[room])))
@@ -87,7 +87,7 @@ def area_fixture(id1):
         row = bytearray(160); row[0:len(key)] = key.encode()
         struct.pack_into('<II', row, 120, len(pack), len(pic))
         table.append(bytes(row)); pack += pic
-        expect.append('K %s %d %d %d' % (key[5:], w, h, first))
+        expect.append('K %s %d %d %d' % (key[4:], w, h, first))   # after "big:" (ITEM-ICONS-MISSING-62)
     (id1 / 'inventory').mkdir(parents=True); (id1 / 'gfx').mkdir()
     (id1 / 'focus.awf').write_bytes(focus)
     (id1 / 'inventory/items.awi').write_bytes(b'AWI2' + struct.pack('<I', len(rows)) + b''.join(rows))
@@ -613,6 +613,25 @@ class NativeSourceTests(unittest.TestCase):
         self.compile_run('aga_dial_rules_test.c', [Path(SOURCE)/'src/aw_dial.c', Path(SOURCE)/'src/aw_glut.c'],
             defines=['AW_GLUT_HOST_TEST'], cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])
 
+    def test_dialogue_link_clicks_after_the_first(self):
+        # DIALOGUE-LINKS-62 (v0.0.62-dev1): A, then B in the new answer, A again, C, in the topic and barter lists and
+        # after scrolling; the old rule (the linkable set rebuilt only with the topic list) loses the second click
+        self.compile_run('aga_dial_links_test.c', [Path(SOURCE)/'src/aw_dial_links.c'],
+            cflags=['-fsanitize=address,undefined','-fno-sanitize-recover=all'])
+        win = (Path(SOURCE)/'src/aw_dialwin.c').read_text(encoding='utf-8')
+        body = win.split('static void refresh(void){')[1].split('\n}')[0]
+        self.assertIn('if(linkable){\n        if(topics_at>=0)AW_DialLinksSet(', body)
+        self.assertIn('AW_DialTopicList(&conv,known,&state,topics,AW_DIAL_MAX_TOPICS)', body)
+        self.assertIn('AW_DialLinkHit(hits,nhits,mouse_x,mouse_y,row_h())', win)
+        # DIALOGUE-SCROLLBARS-62: both panes' bars drawn every frame, a plain click and a held drag scroll them
+        draw = win.split('static void draw(void){')[1].split('\n}')[0]
+        self.assertIn('draw_bar(BAR_TEXT);', draw)
+        self.assertIn('draw_bar(BAR_LIST);', draw)
+        self.assertIn('if(b>=0){bar_click(b,mouse_y);return 1;}', win)
+        self.assertIn('aw_worldui_panel_drag=bar_dragged;', win)
+        ui = (Path(SOURCE)/'src/aw_worldui.c').read_text(encoding='utf-8')
+        self.assertIn('if(modal==4 && drag==K_MOUSE1 && aw_worldui_panel_drag)', ui)
+
     def test_prefetch_byte_identity_cancellation_eviction_and_low_memory_fallback(self):
         self.compile_run('aga_stream_test.c', [Path(SOURCE)/'src/aw_stream.c'],
             cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])
@@ -986,6 +1005,9 @@ class NativeSourceTests(unittest.TestCase):
             # the travel services' table rules (TRAVEL-SERVICES-CHIM-51)
             if not any(p.name == "aw_travel_rules.c" for p in sources):
                 sources.append(tree/"src/aw_travel_rules.c")
+            # the use key's ray and box rules (FOCUS-NPC-OVERRIDES-ITEM-62)
+            if not any(p.name == "aw_activate_rules.c" for p in sources):
+                sources.append(tree/"src/aw_activate_rules.c")
         # The one map path resolver (aw_mappath.c) every map-path builder asks.
         if any(p.name in MAP_PATH_USERS for p in sources) and not any(p.name == "aw_mappath.c" for p in sources):
             sources = [*sources, tree/"src/aw_mappath.c"]

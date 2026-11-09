@@ -1,6 +1,6 @@
 # Next milestone: dock and Census Office character creation
 
-_Last updated with AmiWind v0.0.61-dev3 (2026-11-06)._
+_Last updated with AmiWind v0.0.62-dev2 (2026-11-08)._
 
 <!-- contents start -->
 ## Contents
@@ -403,12 +403,31 @@ rises by one, the game's "Your ... skill increased to ..." line shows and the sk
 | Your blow lands | the weapon's skill, Hand-to-hand for fists | successful hit |
 | You block a blow | Block | successful block |
 | A blow hurts you | the armour skill of the piece it lands on, Unarmored for an empty slot | hit by an opponent |
-| You jump | Acrobatics | jump |
+| You jump (a tapped jump key counts as well as a held one) | Acrobatics | jump |
+| A landing that hurts without knocking you down | Acrobatics | fall |
 | A second of running on the ground (not sneaking) | Athletics | run one second |
 | A second of swimming | Athletics | swim one second |
 | A trainer's lesson | the skill trained (one point, its progress kept) | trainer |
 | A persuasion in conversation (admire, intimidate, taunt, bribe) | Speechcraft | success or failure |
 | A trade accepted in Barter | Mercantile | success, scaled by the share haggled (0 at the merchant's own price) |
+| Making a potion in the alchemy window, eating an ingredient | Alchemy | create potion, use ingredient |
+| The first read of a skill book | the book's skill (one point) | book |
+
+**How long a raise takes.** The rates are the original's, so most skills rise slowly. A major skill at 35 needs
+(35 + 1) x 0.75 = 27 progress, and a second of running gives Athletics 0.02: about 22 minutes of running for one
+point (less for a skill of your specialization). A weapon hit gives its skill 1 (an axe 1.2): about 20 to 30 hits
+for a major weapon skill in the thirties. Low misc skills rise fastest. `dbg levelup` shows each skill's progress.
+
+**Skill books.** Opening a skill book in the reader for the first time raises its skill by one, with the game's book
+line before the usual "Your ... skill increased to ..." line, and the skill-raise sound (rule from OpenMW 0.51
+`apps/openmw/mwworld/actionread.cpp`, the "book" source). The rise counts toward the level like any other. The book
+is remembered as read, also in the save (AWS4 feature 1024), so reading it again does nothing. The list of skill books
+and their skills is read from your master when the image is built (`levelup/books.txt`). Books in the inventory
+cannot be opened yet; a placed book can.
+
+**The line stays.** The skill-raise line is held on screen for its first 3 seconds: a line that comes meanwhile (the
+voice and hit lines of the same blow) waits and follows it. In a view with no strip under it (the third-person and
+idle cameras) the line shows over the bottom of the view.
 
 The other uses of the original wait for their part of the game; until then `dbg levelup use SKILL [N [TYPE]]` raises
 any skill by the same rules. Where each will report:
@@ -417,13 +436,11 @@ any skill by the same rules. Where each will report:
 | --- | --- | --- |
 | Casting a spell | the spell's school | spell casting (today only the test casts) |
 | Using or recharging a magic item, casting on strike, making one | Enchant | casting from items, recharging, the enchanting window of your own |
-| Making a potion, eating an ingredient | Alchemy | the alchemy window, eating from the inventory |
 | Picking a lock, disarming a trap | Security | lockpicks and probes (doors are locked by the debug switch only) |
 | Not being noticed while sneaking, picking a pocket | Sneak | the detection rule and pickpocketing |
 | Haggling a better price | Mercantile | an offer you can change: every accepted trade already reports its use, scaled by the share haggled, and Barter takes the merchant's own price today, so it adds nothing yet (as in the original) |
 | Repairing with a hammer | Armorer | repairing your own items (a merchant's repair trains nothing) |
 | Ranged hits | Marksman | bows, crossbows and thrown weapons in combat |
-| Taking fall damage | Acrobatics | fall damage |
 
 **Level progress.** Every rise of a major or minor skill adds iLevelupMajorMult or iLevelupMinorMult (1) to the
 level progress; misc skills add nothing. Every rise also counts for the skill's governing attribute
@@ -455,9 +472,19 @@ your character's own, so the combat rolls ([COMBAT.md](COMBAT.md)), fatigue and 
 | `dbg levelup` | level, level progress, each attribute's raises and multiplier, every skill's value, progress and requirement |
 | `dbg levelup use SKILL [N [TYPE]]` | N uses of a skill (name, its start, or 0..26) by the rules above; TYPE 0..3 the kind of use |
 | `dbg levelup raise SKILL [N]` | N rises of a skill, as if by use |
+| `dbg levelup book ID` | a skill book's first read by its record ID (its skill +1, once), without opening the reader |
+| `dbg levelup read REF` | opens the reader on a placed book of this map by its reference, as E on it does |
 | `dbg levelup check` | the level-up box, when it is due |
 | `dbg levelup rest [HOURS]` | rest HOURS (default 8), then the level-up box when it is due |
+| `dbg setlvl N` (also `dbg setlevel`) | the level, 1 to 83, as the game's SetLevel sets it, plus the health each level-up between gives (Endurance x fLevelUpHealthEndMult a level; taken off again going down); no attribute is raised, since which three a level-up raises is the player's choice; alone: a list box to type the level in |
+| `dbg restorestats` (also `dbg restore stats`, `dbg stats restore`) | health, magicka and fatigue back to their maximum |
+| `dbg maxstats` (also `dbg maxstat`) | every attribute and skill to 100 and the level to 83, then health, magicka and fatigue worked out again by the character builder's own rules (health (Strength + Endurance) / 2 plus each level's gain, magicka Intelligence x the race's and birthsign's multiplier, fatigue Strength + Willpower + Agility + Endurance) and full |
+
+The level cap of 83: the original and OpenMW 0.51 have no cap of their own (SetLevel takes any level and changes
+nothing else); 78 is the highest level the levelling reaches by skill use (the ten major and minor skills from 30 and
+15 to 100 are 775 raises, ten a level) and 83 counting the skill books. Each of the three prints the sheet before and
+after on the console. Tests: `tests/aga_levelup_rules_test.c`, `tests/aga_console_test.c`.
 
 As in the original, the box has no cancel: Esc does nothing, the box stays until every coin is placed and OK is
 pressed. Only the console key (a debugging aid) closes it; the level-up then stays due and the next rest opens the box
-again. Not yet: jail time and skill books come with those parts of the game.
+again. Not yet: jail time comes with that part of the game.

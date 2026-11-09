@@ -143,6 +143,16 @@ int main(void) {
     in.carried=300.01f;assert(AW_MoveMaxSpeed(&s,&in)==0 && AW_MoveJumpVelocity(&s,&in)==0);
     in.running=1;assert(AW_MoveFatigueRate(&s,&in)==0 && near(AW_MoveJumpFatigue(&s,&in),5));
     in.running=0;
+    /* DBG-NOBURDEN-62: the no-burden mode: 10 times the capacity carried, with Burden, is no load in any rule: the
+     * unloaded walk 150 and run 150 x 2.1, the unloaded jump, the run costs fFatigueRunBase 5 only */
+    {aw_move_inputs_t nb=in;
+     nb.carried=3000;nb.burden=200;nb.feather=10;assert(AW_MoveMaxSpeed(&s,&nb)==0);
+     AW_MoveNoBurden(&nb);
+     assert(AW_MoveEncumbrance(&s,&nb)==0 && near(AW_MoveWalkSpeed(&s,&nb),150) && near(AW_MoveMaxSpeed(&s,&nb),150));
+     nb.running=1;assert(near(AW_MoveRunSpeed(&s,&nb),315) && near(AW_MoveFatigueRate(&s,&nb),5));
+     nb.running=0;assert(fabs(AW_MoveJumpVelocity(&s,&nb)-(129*1.5f*1.25f+627.1216f)/3)<.01f);
+     assert(near(AW_MoveCapacity(&s,&nb),300) && AW_MOVE_NOBURDEN_SHOWN==999999.0f);
+     AW_MoveNoBurden(NULL);}
     /* levitation with half the load: (5 + 0.01 x (50 + 10) x 295) x (1 - 0.3 x 0.5) */
     in.carried=150;in.levitate=10;in.levitation_enabled=1;assert(near(AW_MoveMaxSpeed(&s,&in),182*.85f));
     in.levitate=0;in.levitation_enabled=0;in.carried=0;

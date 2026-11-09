@@ -1,6 +1,6 @@
 # Development overlays
 
-_Last updated with AmiWind v0.0.57-dev3 (30 October 2026)._
+_Last updated with AmiWind v0.0.62-dev1 (7 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -419,6 +419,9 @@ converted source gain; the earlier extra 5 dB reduction is removed.
   parameter `aw_target_names`; unrelated to the master diagnostics overlay.
 - `dbg ui targetplace below/topright/hudleft`: place aimed NPC names.
   `dbg ui labels below/topright/hudleft`: independently place object/action labels.
+- `dbg ui namelabels amiwind/morrowind`: the name-label style. AmiWind (default) shows the title and the action
+  only below the view; Morrowind shows only the framed box over the view. Archived parameter `aw_name_labels`,
+  also Options > Prefs > Name labels.
 - `dbg timeofday`: show time/date; append an hour in [0,24), or `morning`,
   `night`, `midday`, `day`, `evening`, `sunset`, `sunrise`, `dawn`, `dusk`.
   Preserves legacy evening=18:00 / sunset=19:00 aliases.

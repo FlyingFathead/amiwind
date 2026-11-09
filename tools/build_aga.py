@@ -2121,6 +2121,9 @@ def image(args):
     print('Converting combat data (settings, NPC sheets, sounds, Arena fighters)...',flush=True)
     combat_report=prepare_combat(args.data_files,boot/'id1',jobs=jobs)
     (out/'combat-data.json').write_text(json.dumps(combat_report,indent=2)+'\n',encoding='utf-8',newline='\n')
+    # The jail's way out (CRIME-59): every prison marker of the master and its prison's evidence chest, for GotoJail
+    # and PayFine (engine aw_crime.c; tools/world_doors.py prison_markers)
+    write_prison_markers(args,boot/'id1',out)
     view_report=view_job.result()
     (out/'player-view.json').write_text(json.dumps(view_report,indent=2)+'\n',encoding='utf-8',newline='\n')
     if not getattr(args,'no_player_body',False):
@@ -2424,6 +2427,22 @@ def staged_town_interiors(id1):
     from map_files import map_file
     from town_config import town_interiors
     return [room['map'] for room in town_interiors() if map_file(Path(id1) / 'maps', room['map']).is_file()]
+
+
+def write_prison_markers(args, id1, out):
+    """id1/prison-markers.txt (CRIME-59): every prison marker of the owned master (its place in original units, facing,
+    prison and that prison's evidence chest), written whole for every build: the engine teleports by original
+    coordinates and refuses a marker whose map the image does not hold. Returns the markers (also OUT/prison-markers.json)."""
+    import world_doors
+    from mwad.paths import child_ci
+    markers = world_doors.prison_markers(child_ci(args.data_files, 'Morrowind.esm').read_bytes())
+    (Path(id1)/world_doors.PRISON_MARKERS).write_text(world_doors.prison_markers_text(markers), encoding='cp1252',
+                                                      newline='\n')
+    (Path(out)/'prison-markers.json').write_text(json.dumps(markers, indent=1, sort_keys=True)+'\n', encoding='utf-8',
+                                                 newline='\n')
+    print('Prison markers: %d (%d with an evidence chest) (prison-markers.txt)' %
+          (len(markers), sum(1 for m in markers if m['chest'])), flush=True)
+    return markers
 
 
 def write_world_doors(args, id1, out, chim_frames):

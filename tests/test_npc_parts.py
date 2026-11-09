@@ -24,6 +24,28 @@ def grid(name, part, width, height, z0, frames=2):
 
 
 class PartsLibrary(unittest.TestCase):
+    # The parts library takes its quotas from bake_quotas, the previous body share; the whole bake it is compared
+    # with runs on the same share (AMIWIND_NPC_BODY_SHARE budget; the default body share: NPC-BODY-REGRESSION-62)
+    @classmethod
+    def setUpClass(cls):
+        import os
+        cls._share = os.environ.get('AMIWIND_NPC_BODY_SHARE')
+        os.environ['AMIWIND_NPC_BODY_SHARE'] = 'budget'
+        cls._floors = os.environ.get('AMIWIND_NPC_BODY_FLOORS')
+        os.environ['AMIWIND_NPC_BODY_FLOORS'] = 'silhouette'
+
+    @classmethod
+    def tearDownClass(cls):
+        import os
+        if cls._share is None:
+            os.environ.pop('AMIWIND_NPC_BODY_SHARE', None)
+        else:
+            os.environ['AMIWIND_NPC_BODY_SHARE'] = cls._share
+        if cls._floors is None:
+            os.environ.pop('AMIWIND_NPC_BODY_FLOORS', None)
+        else:
+            os.environ['AMIWIND_NPC_BODY_FLOORS'] = cls._floors
+
     def setUp(self):
         try:
             import numpy  # noqa: F401

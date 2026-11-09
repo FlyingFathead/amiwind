@@ -24,6 +24,10 @@ int AW_ActorsMoveTo (unsigned reference, long room, const float origin[3], float
 void AW_ActorsCapture (edict_t *e);
 /* The actor's edict leaves this map (moved elsewhere): its combat slot let go, the edict freed; its row stays. */
 void AW_ActorsRemove (edict_t *e);
+/* Resurrect (v0.0.62): REFERENCE back to its game data (change row, live record, body contents gone). */
+void AW_ActorsReset (unsigned reference);
+/* A placed row's place in this session's units and its angles (v0.0.62: a placed object spawns there); 1 when kept. */
+int AW_ActorsRowPlace (unsigned reference, float origin[3], float angles[3]);
 /* An actor of another place arrives here: TEXT its entity block ("{" .. "}", LENGTH bytes) spawned as a joining frame's
  * actor is (its row's place and position applied); the edict, or NULL (dead, disabled, alive here already, no memory). */
 edict_t *AW_ActorsSpawnVisitor (const char *text, unsigned long length);
@@ -38,12 +42,21 @@ int AW_ActorsArriveHere (unsigned reference, const float origin[3], float yaw);
 int AW_ActorsFrameMap (edict_t *e, char *map, int size);
 /* A room's arrivals: called when a room's actors take their rows (aw_mwhost.c sets it: the VISI rows of ROOM). */
 extern void (*aw_actors_visitors)(long room);
+/* An actor a levelled list gave has spawned (MWSCRIPT-UNPLACED-ATTACH-62; aw_mwhost.c sets it: its record's script,
+ * the LACT row of HASH, the actor table's base hash of the record, attached under the list's reference). */
+extern void (*aw_actors_levelled_spawned)(edict_t *ent, unsigned hash);
 
 /* Actors a script placed (v0.0.62, MWSCRIPT-PLACE-OBJECTS-62; aw_mwhost.c AWF_PLACE*): new references in the block
  * AW_ACTORS_PLACED .. AW_ACTORS_PLACED | 0xFFFFF (content file index 15, which no game file has; aw_mwhost.c: the
  * object's PLAC row << 12 | a serial). */
 #define AW_ACTORS_PLACED 0xF00000U
-/* REFERENCE's row: placed here, at LOCAL (this map's units) facing YAW; the row is made new (1 kept, 0 refused). */
+/* Summoned creatures (v0.0.62, SUMMONED-CREATURES-62; aw_mwhost.c summons): AW_ACTORS_SUMMONED | slot, content file
+ * index 14, which no game file AmiWind reads has. Their rows follow the player (follow set) and are never spawned by
+ * AW_ActorsPlacedTick: the summon itself spawns them while its effect lasts. */
+#define AW_ACTORS_SUMMONED 0xE00000U
+#define AW_ACTORS_SUMMONED_SLOTS 0x100U
+/* REFERENCE's row (a placed or a summoned key): placed here, at LOCAL (this map's units) facing YAW; the row is made
+ * new (1 kept, 0 refused). */
 int AW_ActorsPlaceRow (unsigned reference, const float local[3], float yaw);
 /* REFERENCE's row emptied (a placement that could not spawn): not saved, the key free again. */
 void AW_ActorsPlacedForget (unsigned reference);

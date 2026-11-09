@@ -29,6 +29,10 @@ float AW_LavaDamage(float dps, float seconds);
 /* Engine glue (aw_lava.c). */
 void AW_LavaInit(void);
 void AW_LavaPhysics(void);
+/* MWSCRIPT-GAP-FUNCTIONS-62: realtime when a script's HurtStandingActor last hurt the player (aw_mwhost.c); while it
+ * is recent (0.25 s) the lava volume's own damage holds back, so the original's lava script, where it can see the
+ * player standing on its object, is the one that hurts, and the volume covers only the lava no script sees. */
+extern double aw_lava_script_hurt;
 /* Contents colour shift: eye_contents is the view leaf's contents. Writes the
  * lava tint (rgb, percent 0..255) and returns 1 when the eye is in lava or the
  * player's feet are in lava; otherwise returns 0 and writes nothing. */

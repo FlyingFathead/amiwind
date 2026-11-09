@@ -44,7 +44,10 @@ def pinned_bake_digests(*modes):
             'out = {}\n'
             'for mode in sys.argv[1:]:\n'
             # the previous hair share (NPC-HAIR-BACK-MISSING-53): these digests are of the v0.0.53 split
-            '    with patch.dict(os.environ, {"AMIWIND_NPC_HEAD_REDUCER": mode, "AMIWIND_NPC_HAIR_SHARE": "plain"}):\n'
+            # and the body bake as it was before v0.0.62 (NPC-BODY-REGRESSION-62: share, floors, reducer, audit)
+            '    with patch.dict(os.environ, {"AMIWIND_NPC_HEAD_REDUCER": mode, "AMIWIND_NPC_HAIR_SHARE": "plain",\n'
+            '                                 "AMIWIND_NPC_BODY_SHARE": "budget", "AMIWIND_NPC_BODY_FLOORS": "silhouette",\n'
+            '                                 "AMIWIND_NPC_BODY_REDUCER": "default", "AMIWIND_NPC_BODY_AUDIT": "check"}):\n'
             '        r = bake(case.shapes(), case.materials, {}, case.palette, budget=192, head_detail="budget")\n'
             '    out[mode] = [T.digest(r), len(r[1])]\n'
             'print("DIGESTS " + json.dumps(out))\n')

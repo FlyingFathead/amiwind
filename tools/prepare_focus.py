@@ -20,7 +20,9 @@ owner list; the engine reads all three):
                     level in the data (FLTV 0..100; 0 for everything else and in older files),
                     u32 reference,
                     i32 x, i32 y, i32 z (game units), f32 weight, i32 value, char name[36] (NUL-ended cp1252),
-                    char id[32] (an item's record id, folded, NUL-padded; empty for actors and doors) }
+                    char id[32] (an item's record id, folded, NUL-padded; empty for actors; for a door empty, or the
+                    rest of a name longer than 35 bytes, up to 31 more: INFO-BOX-TEXT-CUT-62, the engine joins the two
+                    when the name field is full) }
   then the owners list (CELL-CHANGES-59 slice 2): "AWO1" u32 n,
   n x { u32 reference, u16 offset of its owner id in the pool, u8 flags (bit 0: a faction owns it), u8 0 }
           ascending reference: every owned item row whose owner id fits (OWNER_ID bytes, printable)
@@ -95,6 +97,23 @@ def clean(name):
     name = ''.join(c for c in name if ord(c) >= 32).strip()
     raw = name.encode('cp1252', 'replace')[:NAME - 1]
     return raw
+
+
+def name_tail(name):
+    """INFO-BOX-TEXT-CUT-62: the part of a door's name that does not fit the row's name field (the first NAME - 1 bytes
+    are in it), up to IDENT - 1 bytes: it goes in the row's id field, which a door does not use (the engine, when the
+    name field is full and the id field is not empty, reads the two as one name). Nothing for a shorter name."""
+    name = ''.join(c for c in name if ord(c) >= 32).strip()
+    return name.encode('cp1252', 'replace')[NAME - 1:NAME - 1 + IDENT - 1]
+
+
+def pack_name_and_id(kind, name, ident):
+    """The last 68 bytes of a row: the name field (NAME bytes) and the id field (IDENT bytes). An item's or container's
+    id as record_id gives it; a door's long name continues there; actors keep an empty field (the area tables mark
+    their rows in it)."""
+    head = clean(name)
+    tail = name_tail(name) if kind == 'D' and len(head) == NAME - 1 else b''
+    return head + b'\0' * (NAME - len(head)) + (tail + b'\0' * (IDENT - len(tail)) if tail else record_id(ident))
 
 
 def record_id(ident):
@@ -482,10 +501,8 @@ def build(data_files):
         for kind, owned, reference, x, y, z, weight, value, name, ident, action, owner, contents, lock in rows:
             if contents is not None:
                 containers[reference] = contents
-            name = clean(name)
             body.append(struct.pack('<BBBBIiiifi', ord(kind), owned, action, lock, reference, int(round(x)), int(round(y)),
-                                    int(round(z)), weight, value) + name + b'\0' * (NAME - len(name)) +
-                        record_id(ident))
+                                    int(round(z)), weight, value) + pack_name_and_id(kind, name, ident))
             if owner:
                 owners[reference] = owner
     identities, references, respawn = reference_table(raw, hashes.get('Morrowind.esm'))

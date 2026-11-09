@@ -137,6 +137,11 @@ extern float (*aw_worldui_encumbrance)(float *capacity);
 static float test_armor_value=17.8f;static int armor_calls;
 static float test_armor(void){armor_calls++;return test_armor_value;}
 extern float (*aw_worldui_armor_rating)(void);
+/* INVENTORY-DOUBLECLICK-62: one click (press and release) at the pointer; the potion's use as aw_alchemy.c does it
+ * (one taken from the stack), counted */
+static void click(void){AW_WorldUIKey(K_MOUSE1,1);AW_WorldUIKey(K_MOUSE1,0);}
+static int uses;
+static int test_use(const aw_inventory_item_t *it){uses++;return AW_ItemAdd(&aw_state,it->id,-1)?1:0;}
 int main(void){
     static client_t client;static edict_t actor;aw_state_t before;int calls;
     assert(!map_journal_regressions());
@@ -364,6 +369,72 @@ int main(void){
         assert(scroll_calls==c && !memcmp(&before,&aw_state,sizeof(before)));
         AW_WorldUIKey('i',1);scroll_mode=layout_capture=0;
         puts("inventory scrollbar: visible rows, bounded layout, mouse release/focus/category/keyboard/close cancellation and real equip identity pass");
+    }
+    /* INVENTORY-DOUBLECLICK-62: a double-click (two clicks on one row within 0.5 s) equips or takes off at once with the
+     * notice box (3 s); a potion asks first: OK and Cancel, Esc and I cancel and keep the window, the count by keys,
+     * digits, Backspace, the slider (click and drag) and the buttons; one use per count; the last one without a slider */
+    {
+        int left;
+        memset(&aw_state,0,sizeof(aw_state));
+        memset(&fixture_item,0,sizeof(fixture_item));strcpy(fixture_item.id,"fixture_ring");strcpy(fixture_item.name,"Fixture Ring");
+        strcpy(fixture_item.model,"progs/inv/fixture.mdl");fixture_item.category=AW_INV_CLOTHING;
+        fixture_item.slots=(1U<<AW_SLOT_LRING)|(1U<<AW_SLOT_RRING);fixture_item.flags=7;
+        assert(AW_ItemAdd(&aw_state,fixture_item.id,1));
+        AW_InventoryOpen();draw();layout_point(160,60);
+        test_clock=200;click();assert(!AW_InventoryEquipped(&aw_state,fixture_item.id));          /* one click selects */
+        test_clock=200.6;click();assert(!AW_InventoryEquipped(&aw_state,fixture_item.id));        /* too slow: a first click */
+        test_clock=200.9;click();assert(AW_InventoryEquipped(&aw_state,fixture_item.id)==1);
+        draw();assert(strstr(drawn,"Equipped Fixture Ring"));
+        test_clock=203.85;draw();assert(strstr(drawn,"Equipped Fixture Ring"));
+        test_clock=203.95;draw();assert(!strstr(drawn,"Equipped Fixture Ring"));                  /* gone after 3 s */
+        test_clock=205;click();test_clock=205.3;click();assert(!AW_InventoryEquipped(&aw_state,fixture_item.id));
+        draw();assert(strstr(drawn,"Unequipped Fixture Ring"));
+        test_clock=205.5;click();assert(!AW_InventoryEquipped(&aw_state,fixture_item.id));       /* a third click starts again */
+        AW_WorldUIKey('i',1);assert(!AW_InventoryActive());
+        memset(&aw_state,0,sizeof(aw_state));
+        memset(&fixture_item,0,sizeof(fixture_item));strcpy(fixture_item.id,"fixture_potion");strcpy(fixture_item.name,"Fixture Potion");
+        fixture_item.category=AW_INV_POTION;fixture_item.flags=AW_INV_ALCHEMY|AW_INV_DROP;fixture_item.alchemy_kind=AW_ALCHEMY_POTION;
+        aw_worldui_use=test_use;uses=0;
+        assert(AW_ItemAdd(&aw_state,fixture_item.id,12));
+        AW_InventoryOpen();layout_point(160,60);
+        test_clock=300;click();test_clock=300.1;click();assert(!uses && AW_StateGet(&aw_state,AW_ITEM,fixture_item.id)==12);
+        draw();assert(strstr(drawn,"Drink Fixture Potion?") && strstr(drawn,"How many? 1 to 12") && strstr(drawn,"1_") &&
+                      strstr(drawn,"of 12") && strstr(drawn,"OK") && strstr(drawn,"Cancel"));
+        AW_WorldUIKey(K_ESCAPE,1);assert(AW_InventoryActive() && !uses);draw();assert(!strstr(drawn,"Drink Fixture"));
+        test_clock=301;click();test_clock=301.1;click();
+        AW_WorldUIKey(K_RIGHTARROW,1);AW_WorldUIKey(K_RIGHTARROW,1);draw();assert(strstr(drawn,"3_"));
+        AW_WorldUIKey(K_END,1);draw();assert(strstr(drawn,"12_"));AW_WorldUIKey(K_PGDN,1);draw();assert(strstr(drawn,"2_"));
+        AW_WorldUIKey('i',1);assert(AW_InventoryActive() && !uses);                                  /* I cancels too */
+        test_clock=302;click();test_clock=302.1;click();
+        AW_WorldUIKey('7',1);draw();assert(strstr(drawn,"7_"));                                       /* a digit replaces */
+        AW_WorldUIKey('0',1);draw();assert(strstr(drawn,"12_"));                                      /* 70: the stack */
+        AW_WorldUIKey(K_BACKSPACE,1);AW_WorldUIKey(K_BACKSPACE,1);AW_WorldUIKey('4',1);
+        AW_WorldUIKey(K_ENTER,1);assert(uses==4 && AW_StateGet(&aw_state,AW_ITEM,fixture_item.id)==8 && AW_InventoryActive());
+        draw();assert(strstr(drawn,"Fixture Potion: 4 drunk."));
+        test_clock=303;click();test_clock=303.1;click();
+        layout_point(140+10+148-1,62+40);AW_WorldUIKey(K_MOUSE1,1);draw();assert(strstr(drawn,"8_"));   /* the rail's end */
+        AW_WorldUIMouse(-200,0);draw();assert(strstr(drawn,"1_"));                                    /* dragged to 1 */
+        AW_WorldUIMouse(79,0);draw();left=AW_InventorySliderCount(97+79,150,148,8);assert(left>1 && left<8);
+        AW_WorldUIKey(K_MOUSE1,0);AW_WorldUIMouse(40,0);draw();
+        {char want[8];sprintf(want,"%d_",left);assert(strstr(drawn,want));}                          /* let go: it stays */
+        layout_point(160+5,62+82-20+5);AW_WorldUIKey(K_MOUSE1,1);AW_WorldUIKey(K_MOUSE1,0);         /* OK */
+        assert(uses==4+left && AW_StateGet(&aw_state,AW_ITEM,fixture_item.id)==8-left);
+        assert(AW_StateSet(&aw_state,AW_ITEM,fixture_item.id,1));draw();
+        layout_point(160,60);test_clock=304;click();test_clock=304.1;click();
+        draw();assert(strstr(drawn,"Drink Fixture Potion?") && strstr(drawn,"The last one.") && !strstr(drawn,"How many"));
+        layout_point(140+168-20-52+5,62+82-20+5);AW_WorldUIKey(K_MOUSE1,1);AW_WorldUIKey(K_MOUSE1,0);  /* Cancel */
+        assert(uses==4+left && AW_StateGet(&aw_state,AW_ITEM,fixture_item.id)==1);
+        layout_point(160,60);test_clock=305;click();test_clock=305.1;click();AW_WorldUIKey(K_ENTER,1);
+        assert(uses==5+left && !AW_StateGet(&aw_state,AW_ITEM,fixture_item.id));
+        AW_WorldUIKey('i',1);assert(!AW_InventoryActive());aw_worldui_use=NULL;
+        /* the rules: the window, the slider ends and the middle, the number field */
+        assert(AW_InventoryDoubleClick(3,10,3,10.5) && !AW_InventoryDoubleClick(3,10,3,10.51) && !AW_InventoryDoubleClick(3,10,4,10.1));
+        assert(!AW_InventoryDoubleClick(-1,10,-1,10.1) && !AW_InventoryDoubleClick(3,10,3,9.9));
+        assert(AW_InventorySliderCount(0,10,101,51)==1 && AW_InventorySliderCount(110,10,101,51)==51 && AW_InventorySliderCount(60,10,101,51)==26);
+        assert(AW_InventorySliderX(26,10,101,51)==60 && AW_InventorySliderX(1,10,101,51)==10 && AW_InventorySliderX(99,10,101,51)==110);
+        assert(AW_InventoryCountType(1,1,'5',9)==5 && AW_InventoryCountType(5,0,'2',99)==52 && AW_InventoryCountType(5,0,'2',30)==30);
+        assert(AW_InventoryCountType(52,0,'\b',99)==5 && AW_InventoryCountType(7,1,'\b',99)==0 && AW_InventoryCountType(7,0,'x',99)==7);
+        puts("inventory double-click: equip/unequip with the notice, the potion's box (OK, Cancel, Esc, I, keys, digits, slider, buttons, the last one) pass");
     }
     return 0;
 }

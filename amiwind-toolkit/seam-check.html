@@ -1,0 +1,94 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AmiWind Toolkit - Seam Check</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#101923;color:#edf3fa;font:14px system-ui,sans-serif}
+#bar{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;padding:8px 14px;border-bottom:1px solid #345;background:#13202d}
+button,label.file{background:#203346;color:#edf3fa;border:1px solid #456;border-radius:5px;padding:6px 8px;font:inherit;cursor:pointer}
+main{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px;padding:12px 14px}
+section{background:#162433;border:1px solid #2c4256;border-radius:8px;padding:10px 12px;min-width:0;overflow:auto}
+h2{font-size:15px;margin:0 0 8px;color:#ffe28a}
+.muted{color:#9fb3c8;font-size:12px}
+.big{font-size:22px;font-weight:700}
+.pass{color:#7dffa6}.fail{color:#ff7070}.warn{color:#ffb454}
+table{border-collapse:collapse;width:100%;font-size:12px}
+td,th{padding:3px 6px;border-bottom:1px solid #243649;text-align:left;vertical-align:top}
+td.num{text-align:right;white-space:nowrap}
+</style>
+<script src="header.js" data-subtitle="Seam Check"></script>
+</head>
+<body>
+<div id="bar">
+  <label class="file">Open a seam receipt (.json)<input id="file" type="file" accept=".json,application/json" hidden></label>
+  <span id="verdict" class="big">-</span>
+  <span id="what" class="muted">A receipt from tools/mesh_seam_check.py check --json, or the receipt of a baked actor.</span>
+</div>
+<main>
+  <section><h2>Openings</h2><div id="openings" class="muted">No receipt loaded.</div></section>
+  <section><h2>Thickness at 25 / 50 / 75 % of the length</h2>
+    <div class="muted">1.0 keeps the source's cross-section; under 0.5 is a thinned limb.</div><div id="thickness"></div></section>
+  <section><h2>Join map</h2>
+    <div class="muted">Every seam of the original: which parts meet, the seam's length, how much of it the reduced model
+    left open, and the widest opening (Quake units, measured just inside the rim).</div><div id="joins"></div></section>
+</main>
+<script>
+(function (root) {
+  'use strict';
+  const STOP = 0.5;
+  function esc(t) { return String(t).replace(/[&<>"]/g, ch => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[ch])); }
+  function num(v, d) { return typeof v === 'number' ? v.toFixed(d === undefined ? 2 : d) : '-'; }
+  // receipt fields: the CLI's (new, new_at, thickness, joins, least_thickness) or the NPC bake's
+  // (uncovered_openings, covered_openings, uncovered_at, limb_thickness, joins, least_thickness, least_width)
+  function view(r) {
+    const uncovered = r.uncovered_openings !== undefined ? r.uncovered_openings : (r.new || 0);
+    const at = r.uncovered_at || r.new_at || [];
+    const thick = r.limb_thickness || r.thickness || {};
+    const least = typeof r.least_thickness === 'number' ? r.least_thickness : 1;
+    const width = typeof r.least_width === 'number' ? r.least_width : least;
+    const pass = uncovered === 0 && width >= STOP && least >= STOP;
+    const stations = r.stations || [25, 50, 75];
+    let open = '<div class="big ' + (uncovered ? 'fail' : 'pass') + '">' + uncovered + ' uncovered</div>';
+    if (r.covered_openings !== undefined) open += '<div class="muted">' + r.covered_openings + ' covered (a head patch under the hair or helmet, away from every join)</div>';
+    if (r.source_open !== undefined) open += '<div class="muted">open edges: original ' + r.source_open + ', reduced ' + r.reduced_open + '</div>';
+    if (at.length) open += '<table><tr><th>part</th><th>where (x, y, z)</th></tr>' + at.map(a =>
+      '<tr><td>' + esc(a[0]) + '</td><td>' + esc(a[1].map(v => num(v)).join(', ')) + '</td></tr>').join('') + '</table>';
+    const rows = Object.keys(thick).map(k => {
+      const p = thick[k];
+      const cells = stations.map(s => { const v = p[String(s)]; return '<td class="num ' + (typeof v === 'number' && v < STOP ? 'fail' : '') + '">' + num(v) + '</td>'; });
+      return '<tr><td>' + esc(k) + '</td>' + cells.join('') + '</tr>';
+    });
+    const th = rows.length ? '<table><tr><th>part</th>' + stations.map(s => '<th>' + s + ' %</th>').join('') + '</tr>' + rows.join('') + '</table>' : '<div class="muted">none measured</div>';
+    const joins = (r.joins || []).slice().sort((a, b) => b.open_length - a.open_length);
+    const jt = joins.length ? '<table><tr><th>part</th><th>meets</th><th>seam</th><th>open</th><th>widest</th></tr>' + joins.map(j =>
+      '<tr><td>' + esc(j.a) + '</td><td>' + esc(j.b) + '</td><td class="num">' + num(j.length) + '</td><td class="num ' +
+      (j.open_length > 0 ? 'warn' : '') + '">' + num(j.open_length) + '</td><td class="num">' + num(j.max_gap) + '</td></tr>').join('') + '</table>' : '<div class="muted">no joins</div>';
+    return {pass, open, th, jt, label: (r.model || r.mesh || '') + (r.faces ? ' (' + r.faces + ' faces)' : '')};
+  }
+  function show(r) {
+    const v = view(r);
+    const doc = root.document;
+    doc.getElementById('verdict').textContent = v.pass ? 'PASS' : 'FAIL';
+    doc.getElementById('verdict').className = 'big ' + (v.pass ? 'pass' : 'fail');
+    doc.getElementById('what').textContent = v.label;
+    doc.getElementById('openings').innerHTML = v.open;
+    doc.getElementById('thickness').innerHTML = v.th;
+    doc.getElementById('joins').innerHTML = v.jt;
+  }
+  if (root.document && root.document.getElementById('file')) {
+    root.document.getElementById('file').onchange = ev => {
+      const f = ev.target.files[0]; if (!f) return;
+      f.text().then(t => show(JSON.parse(t))).catch(e => { root.document.getElementById('openings').textContent = 'Not a seam receipt: ' + e; });
+    };
+    const q = new URLSearchParams(root.location.search).get('receipt');     // served mode: ?receipt=path.json
+    if (q && !/^[a-z]+:/i.test(q)) fetch(q).then(r => r.json()).then(show).catch(() => {});
+  }
+  if (typeof module !== 'undefined' && module.exports) module.exports = {view};
+})(typeof window !== 'undefined' ? window : this);
+</script>
+</body>
+</html>

@@ -163,6 +163,17 @@ static float test_shield(struct edict_s *actor,int effect){(void)actor;shield_as
 int main(void){
     edict_t *p=&edicts[1],*npc=&edicts[2],*resident=&edicts[3];aw_fighter_t f;const aw_fighter_t *sheet;
     float fraction,alpha;int i,before;
+    /* MWSCRIPT-INVENTORY-HITONME-62: the last weapon per victim (OpenMW OpHitOnMe: read 1 and cleared on a match, a
+     * mismatch keeps it; a victim keeps one row; a new victim past the rows takes the oldest) */
+    AW_CombatLastHitReset();assert(AW_CombatLastHitCount()==0 && !AW_CombatLastHitTake(7,0x11));
+    AW_CombatLastHitSet(0,0x11);assert(AW_CombatLastHitCount()==0);          /* no reference: nothing kept */
+    AW_CombatLastHitSet(7,0x11);AW_CombatLastHitSet(7,0x22);assert(AW_CombatLastHitCount()==1);
+    assert(!AW_CombatLastHitTake(7,0x11) && AW_CombatLastHitTake(7,0x22) && !AW_CombatLastHitTake(7,0x22));
+    for(i=1;i<=AW_COMBAT_LAST_HITS+1;i++)AW_CombatLastHitSet((unsigned long)i,0x100+(unsigned long)i);
+    assert(AW_CombatLastHitCount()==AW_COMBAT_LAST_HITS && !AW_CombatLastHitTake(1,0x101));
+    assert(AW_CombatLastHitTake(AW_COMBAT_LAST_HITS+1,0x100+AW_COMBAT_LAST_HITS+1) && AW_CombatLastHitTake(2,0x102));
+    AW_CombatLastHitReset();assert(AW_CombatLastHitCount()==0 && !AW_CombatLastHitTake(3,0x103));
+    assert(aw_combat_weapon_hit==NULL);
     strcpy(dir,"/tmp/awcombatXXXXXX");assert(mkdtemp(dir));
     {char sub[96];sprintf(sub,"%s/combat",dir);mkdir(sub,0700);}
     write_file("combat/settings.txt","AWCS1\nfFatigueBase 1.25\nfFatigueMult 0.5\nfCombatDistance 128\nfHandToHandReach 1\n"
@@ -326,12 +337,18 @@ int main(void){
     aw_character.current[2]=100;tick(50);
     assert(aw_character.current[2]>103 && aw_character.current[2]<104);
 
-    /* Blocking (COMBAT-BLOCKING-36). aw_combat_block 1 (default, AmiWind extension): the player blocks
+    /* Blocking (COMBAT-BLOCKING-36). aw_combat_block 1 (option, AmiWind extension): the player blocks
      * only while the block button (+aw_alt, the right mouse button) is held, and every blow is still
-     * decided by the original formula; no swing while guarding. 0: the original automatic block. */
+     * decided by the original formula; no swing while guarding. 0 (default): the original automatic block. */
     {
         aw_fighter_t shieldp,brute;char used[24];unsigned long held_blocks,free_blocks,auto_blocks;
         assert(aw_combat_buttons && aw_combat_guard_marker==AW_CombatGuarding);
+        {   /* COMBAT-BLOCK-DEFAULT-62: the default is the original automatic block (aw_combat_block 0) */
+            int i,found=0;
+            for(i=0;i<cvar_count;i++)if(!strcmp(cvars[i]->name,"aw_combat_block")){found=1;assert(!strcmp(cvars[i]->string,"0"));}
+            assert(found);
+        }
+        run("aw_combat_cmd block hold");              /* the held block is the option under test here */
         AW_CombatClear();aw_combat_scene();
         run("+aw_alt");assert(!AW_CombatGuarding() && aw_combat_buttons(1)==1);   /* the character: no shield */
         run("-aw_alt");

@@ -102,12 +102,12 @@ static cvar_t best_cvar={"aw_combat_best_attack","0",true};
 static char resist_text[128];        /* sMagicTargetResistsWeapons (combat/settings.txt; RESIST-NORMAL-WEAPONS-61) */
 static short normal_resistance(edict_t *t,int test);
 static unsigned long god_blows;      /* blows god mode turned away (GODMODE-COMBAT-DAMAGE-61), shown by dbg combat */
-/* Blocking (Controls > Blocking; docs/COMBAT.md "Blocking"): aw_combat_block 1 = hold to block
- * (AmiWind extension, the default by owner decision 2026-10-11: the player blocks only while the
- * block button, the right mouse button, is held; each blow is still decided by the original
- * formula and settings), 0 = Original Morrowind (automatic: a shield blocks by skill, no button;
- * UESP Block, OpenMW has no block input). NPCs always block the original way. */
-static cvar_t block_cvar={"aw_combat_block","1",true};
+/* Blocking (Controls > Blocking; docs/COMBAT.md "Blocking"): aw_combat_block 0 = Original Morrowind
+ * (automatic: a shield blocks by skill, no button; UESP Block, OpenMW has no block input), the default
+ * by decision of the maintainer, 7 November 2026 (COMBAT-BLOCK-DEFAULT-62); 1 = hold to block (AmiWind
+ * extension, an option: the player blocks only while the block button, the right mouse button, is held;
+ * each blow is still decided by the original formula and settings). NPCs always block the original way. */
+static cvar_t block_cvar={"aw_combat_block","0",true};
 /* Flee by the Flee rating (OpenMW aicombataction.cpp makeFleeDecision; docs/COMBAT.md "Combat playground"):
  * 0 (default) = a fighter flees only when it cannot reach the player (the earlier rule); 1 = also when its flee
  * rating beats its best action, and a fleeing fighter runs again whenever the player comes within reach. The
@@ -835,6 +835,8 @@ static void npc_strike(slot_t *s,edict_t *p) {
     }
     /* WEAPON-STRIKE-ENCHANT-NOT-CAST-61: the NPC's weapon's Cast When Strikes on the player (a hit or a block) */
     else if(aw_combat_strike_enchant && s->f.weapon && out.outcome!=AW_HIT_MISS)aw_combat_strike_enchant(s->e,p);
+    /* MWSCRIPT-INVENTORY-HITONME-62: the weapon's id as the player's last hit object (OpenMW Npc::onHit) */
+    if(aw_combat_weapon_hit && s->f.weapon && out.outcome!=AW_HIT_MISS)aw_combat_weapon_hit(s->e,p);
 }
 /* Damage from the world, not from a fighter (lava, aw_lava.c, docs/LAVA.md): the
  * player's live health as combat keeps it; a death ends like a death in combat. */
@@ -880,6 +882,11 @@ void AW_CombatPlayerFatigueLoss(float loss) {
         if(aw_character.valid)aw_character.current[2]=you.fatigue;
     }else if(aw_character.valid)aw_character.current[2]=AW_MoveFatigueAfter(aw_character.current[2],loss);
 }
+/* DBG-SUPERSPEED-62 (aw_combat.h) */
+void AW_CombatPlayerFatigueFill(void) {
+    if(you_valid && you.fatigue<you.fatigue_max)you.fatigue=you.fatigue_max;
+    if(aw_character.valid)aw_character.current[2]=you_valid?you.fatigue:aw_character.maximum[2];
+}
 static void player_down_view(edict_t *p) {
     float low,base,t,f=1;
     if(!pv.view_saved){
@@ -911,6 +918,30 @@ int (*aw_combat_player_ranged)(void);
 float (*aw_combat_effect_magnitude)(struct edict_s *actor,int effect);
 int (*aw_combat_player_weapon_normal)(void);
 void (*aw_combat_strike_enchant)(struct edict_s *attacker,struct edict_s *victim);
+void (*aw_combat_weapon_hit)(struct edict_s *attacker,struct edict_s *victim);
+/* MWSCRIPT-INVENTORY-HITONME-62 (aw_combat.h): the last weapon per victim, a victim's own row or the oldest */
+static struct {unsigned long victim,weapon;} last_hit[AW_COMBAT_LAST_HITS];static int last_hit_next;
+void AW_CombatLastHitSet(unsigned long victim,unsigned long weapon){
+    int k;
+    if(!victim)return;
+    for(k=0;k<AW_COMBAT_LAST_HITS && last_hit[k].victim!=victim;k++);
+    if(k==AW_COMBAT_LAST_HITS){k=last_hit_next;last_hit_next=(last_hit_next+1)%AW_COMBAT_LAST_HITS;}
+    last_hit[k].victim=victim;last_hit[k].weapon=weapon;
+}
+int AW_CombatLastHitTake(unsigned long victim,unsigned long weapon){
+    int k;
+    if(!victim)return 0;
+    for(k=0;k<AW_COMBAT_LAST_HITS;k++)
+        if(last_hit[k].victim==victim){
+            if(last_hit[k].weapon!=weapon)return 0;
+            last_hit[k].victim=last_hit[k].weapon=0;return 1;
+        }
+    return 0;
+}
+void AW_CombatLastHitReset(void){memset(last_hit,0,sizeof(last_hit));last_hit_next=0;}
+int AW_CombatLastHitCount(void){int k,n=0;for(k=0;k<AW_COMBAT_LAST_HITS;k++)n+=last_hit[k].victim!=0;return n;}
+void (*aw_combat_assault)(struct edict_s *victim);
+void (*aw_combat_killed)(struct edict_s *victim);
 static float resist_test=-1;
 const char *AW_CombatResistText(void){return resist_text;}
 /* Resist less Weakness to Normal Weapons in percent, clamped to the sheet's short; TEST: the target of the player's
@@ -930,7 +961,7 @@ static void resist_notice(void){
 }
 /* The player's punch reached its hit key: what is in reach takes it. */
 static void player_strike(edict_t *p) {
-    edict_t *t;slot_t *s;aw_swing_t out;float reach=AW_CombatReach(&aw_combat_settings,&you)*SCALE,dz;
+    edict_t *t,*killed=NULL;slot_t *s;aw_swing_t out;float reach=AW_CombatReach(&aw_combat_settings,&you)*SCALE,dz;
     char id[32];aw_fighter_t sheet;int attack,mapped;
     you.health=p->v.health;
     if(aw_combat_player_ranged && aw_combat_player_ranged()){
@@ -945,7 +976,11 @@ static void player_strike(edict_t *p) {
         if(!v || !v->string || !*(pr_strings+v->string)){t=NULL;}
         else{
             strncpy(id,pr_strings+v->string,sizeof(id)-1);id[sizeof(id)-1]=0;
-            if(!AW_CombatActorLoad(id,&sheet)){if(readout.value)Con_Printf("Combat: no combat sheet for %s\n",id);t=NULL;}
+            /* CRIME-59: the assault (OpenMW actorAttacked: canCommitCrimeAgainst, commitCrime OT_Assault) before its
+             * fight starts; a witness or the victim itself may start fighting there (the crime's reactions) */
+            if(aw_combat_assault)aw_combat_assault(t);
+            if((s=slot_of(t))!=NULL)s->f.aware=0;   /* the crime started its fight: the blow is still unaware's */
+            else if(!AW_CombatActorLoad(id,&sheet)){if(readout.value)Con_Printf("Combat: no combat sheet for %s\n",id);t=NULL;}
             else{sheet.aware=0;if(!AW_CombatEngage(t,&sheet,NULL))t=NULL;else if((s=slot_of(t)))s->f.aware=0;}
         }
     }
@@ -1004,6 +1039,7 @@ static void player_strike(edict_t *p) {
         essential_death(s->e);
         if(readout.value)Con_Printf("Combat: %s is dead\n",s->f.name);
         voice(s->e,AW_VOICE_DEATH);
+        killed=s->e;   /* CRIME-59: the murder, when it is one, after this strike (its witnesses may take slots) */
         if(!AW_CombatHostiles())ended(1);
     }else if(s->f.knocked && s->state!=S_KNOCK){set_state(s,S_KNOCK,G_KNOCK);sound(SND_FALL);}
     else if(out.outcome>=AW_HIT_FATIGUE && !out.no_effect && s->state!=S_KNOCK)set_state(s,S_HIT,G_HIT);   /* hit recovery: every damaging hit */
@@ -1012,6 +1048,10 @@ static void player_strike(edict_t *p) {
      * blow too (OpenMW npc.cpp hit: the enchantment is cast before the blow's damage; its charge is spent, its effects
      * find a corpse and do nothing) */
     if(aw_combat_strike_enchant && you.weapon && out.outcome!=AW_HIT_MISS)aw_combat_strike_enchant(p,t);
+    /* MWSCRIPT-INVENTORY-HITONME-62: the weapon's id as the victim's last hit object (OpenMW Creature/Npc::onHit,
+     * successful blows only, the killing one too; HitOnMe reads it) */
+    if(aw_combat_weapon_hit && you.weapon && out.outcome!=AW_HIT_MISS)aw_combat_weapon_hit(p,t);
+    if(killed && aw_combat_killed)aw_combat_killed(killed);   /* CRIME-59: OpenMW actorKilled */
 }
 /* The player's swing now (0 chop, 1 slash, 2 thrust): the same choice player_strike makes, by the movement at the
  * swing's start or the best attack; the third-person body plays its keys (aw_view.c, WEAPONS-57). */
@@ -1367,8 +1407,8 @@ static void report(void) {
 }
 /* +aw_alt (the Amiga right mouse button, keymaps.cfg): one context action. Pick mode
  * (dbg companion pick): pick the companion under the crosshair (the left button picks
- * too). Otherwise the block button (COMBAT-BLOCKING-36): with aw_combat_block 1 the
- * player guards while it is held. */
+ * too). Otherwise the block button (COMBAT-BLOCKING-36): with aw_combat_block 1 (the
+ * option; the default 0 is automatic) the player guards while it is held. */
 static int shield_ready(void) {
     aw_fighter_t f;const aw_fighter_t *o=&f;
     if(you_valid)o=&you;else{if(!settings_ok && !AW_CombatSettingsLoad())return 0;AW_CombatPlayerSheet(&f);}
@@ -1501,7 +1541,9 @@ int AW_CombatSpellHit(edict_t *e,float health,int harmful) {
     if(!s){
         eval_t *v=GetEdictFieldValue(e,"aw_source_id");aw_fighter_t sheet;
         if(!harmful || !v || !v->string || !*(pr_strings+v->string))return 0;
-        if(!AW_CombatActorLoad(pr_strings+v->string,&sheet) || !AW_CombatEngage(e,&sheet,NULL) || !(s=slot_of(e)))return 0;
+        if(aw_combat_assault)aw_combat_assault(e);   /* CRIME-59: the player's harmful spell is an attack too */
+        if(!(s=slot_of(e)) && (!AW_CombatActorLoad(pr_strings+v->string,&sheet) || !AW_CombatEngage(e,&sheet,NULL) ||
+                               !(s=slot_of(e))))return 0;
     }
     if(s->f.dead)return 1;
     if(harmful){enemy=e;enemy_until=(float)sv.time+aw_combat_settings.fNPCHealthBarTime;}
@@ -1514,6 +1556,7 @@ int AW_CombatSpellHit(edict_t *e,float health,int harmful) {
         essential_death(s->e);
         if(readout.value)Con_Printf("Combat: %s is dead\n",s->f.name);
         voice(s->e,AW_VOICE_DEATH);
+        if(harmful && aw_combat_killed)aw_combat_killed(s->e);   /* CRIME-59: the player's spell killed it */
         if(!AW_CombatHostiles())ended(1);
     }
     return 1;

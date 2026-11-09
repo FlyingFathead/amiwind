@@ -53,6 +53,10 @@ int AW_EffectPerSecond(int effect);
 /* 1 when the effect is harmful: an attack when it lands on an actor (OpenMW's hardcoded harmful flag; the game
  * data's MGEF flags do not carry it). */
 int AW_EffectHarmful(int effect);
+/* 1 for a summoning effect (Summon Scamp 102 .. Summon Storm Atronach 116, Summon Centurion Sphere 134, the
+ * expansions' 137 .. 142): while it is active on an actor, the creature its game setting names stands by that actor
+ * (SUMMONED-CREATURES-62; aw_mwhost.c, rule from OpenMW 0.51 apps/openmw/mwmechanics/summoning.cpp). */
+int AW_EffectSummon(int effect);
 /* The AWA_* stat of a GROUP and its ARG (attribute or skill index); -1 when it has none. */
 int AW_EffectStat(int group,int arg);
 
@@ -83,6 +87,9 @@ int AW_EffectsOwners(uint32_t *out,int max);
 int AW_EffectsForget(uint32_t owner);
 /* A's effects of SOURCE go, each undone as at its end (an item taken off); how many. */
 int AW_EffectsRemoveSource(aw_actor_t *a,int source);
+/* OWNER's effects of NUMBER end now, each undone as at its end when A is OWNER's record (A may be NULL: nothing to
+ * undo, as for a summoning effect); how many (a summoned creature died: OpenMW ends its effect). */
+int AW_EffectsEnd(aw_actor_t *a,uint32_t owner,int number);
 /* Moves with every reset and every load of a saved game (the worn items' effects are checked again then). */
 unsigned long AW_EffectsGeneration(void);
 /* The I-th active effect (0..AW_EffectsCount()-1), for the HUD and the status line; 1 when there is one. */

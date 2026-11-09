@@ -166,6 +166,7 @@ def _convert(job):
     return icon_picture(rgba(raw), palette, background, size)
 
 
+BIG = 32            # the container strip's pictures (big:<id>): the original 32 x 32 icon, black behind it
 INV = 16            # inventory icons: the 32x32 originals 2:1 (the inventory row's 16-pixel slot)
 EQUIP_BACKGROUND = 'textures/menu_icon_equip.dds'
 MAGIC_EQUIP_BACKGROUND = 'textures/menu_icon_magic_equip.dds'
@@ -326,6 +327,9 @@ def prepare(assets, id1, items, palette, colours, inventory=None, jobs=1):
             queue('item:' + identifier, item['source_icon'], MAGIC_BACKGROUND if item.get('enchanted') else None, ICON)
     for identifier, item in sorted(inventory.items()):
         if not item.get('source_icon'): continue
+        # ITEM-ICONS-MISSING-62: the strip's picture of EVERY item that has an icon: the original 32 x 32, black behind
+        # it (the magic backdrop of an enchanted item), the engine centres it in its slot (aw_icons.c AW_IconDrawFit)
+        queue('big:' + identifier, item['source_icon'], MAGIC_BACKGROUND if item.get('enchanted') else None, BIG)
         queue('inv:' + identifier, item['source_icon'], MAGIC_BACKGROUND if item.get('enchanted') else None, INV, True)
         if item.get('equippable'):
             queue('inv:' + identifier + ':equip', item['source_icon'],

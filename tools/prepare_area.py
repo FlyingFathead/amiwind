@@ -822,10 +822,13 @@ def _bake_resident(task, profile_name):
         facts={'triangles':lod_facts['far_triangles'],'frames':lod_facts['frames'],'bounds':lod_facts['bounds']}
     else:
         shapes,materials,textures=assemble(assets,appearance,kit or skeleton,times)
+        from model_face_overrides import extra_faces, body_key
         for budget in RESIDENT_LADDER:
             # reference_frames=8: the face quotas of the idle-only model (head topology unchanged).
             try:frames,faces,uv,skin=bake(shapes,materials,textures,palette,budget=budget,reference_frames=8 if kit else None,
-                                               full_frame_budget=npc_anim.ACTOR_BYTE_BUDGET if kit else None);break
+                                               full_frame_budget=npc_anim.ACTOR_BYTE_BUDGET if kit else None,
+                                               extra_faces=extra_faces(appearance['id']),model=appearance['id'],
+                                               body_key=body_key(appearance));break
             except ValueError as error:
                 if str(error) not in ('Alias vertex budget exceeded',BYTE_BUDGET_ERROR) or budget==RESIDENT_LADDER[-1]:
                     # over the byte budget at every rung: build_resident falls back (resident_levels)

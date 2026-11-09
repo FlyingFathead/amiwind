@@ -29,8 +29,13 @@ int AW_StandingFactionReputation(const char *faction);
 void AW_StandingSetFactionReputation(const char *faction,int value);
 /* 1 when the table had no room for a new faction (the call did nothing) since the last reset. */
 int AW_StandingFull(void);
-/* Saved games: the standing as a byte block (AWPS1); Export returns the bytes (-1 too small), Import 1 or 0 for a
- * bad block (then the standing is empty). */
+/* v0.0.62 (CRIME-59): the crimes' numbers (OpenMW Player getNewCrimeId, recordCrimeId, getCrimeId: the last crime and
+ * the last one paid for, -1 none). The stolen goods are the world change list's stolen pairs (aw_ledger.h). */
+int AW_StandingCrimeNew(void);                   /* a new crime's number */
+void AW_StandingCrimePaid(void);                 /* recordCrimeId: every crime so far is paid for */
+int AW_StandingCrimeLast(void);                  /* the last paid crime's number (-1 none) */
+/* Saved games: the standing as a byte block (AWPS2; AWPS1 still loads); Export returns the bytes (-1 too small),
+ * Import 1 or 0 for a bad block (then the standing is empty). */
 int AW_StandingExport(unsigned char *out,int capacity);
 int AW_StandingImport(const unsigned char *data,int bytes);
 #endif

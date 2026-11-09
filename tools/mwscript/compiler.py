@@ -4,6 +4,7 @@ from collections import Counter
 
 from .codegen import (Program, ScriptCompiler, CompileError, SCRIPT_BROKEN, SCRIPT_START, SCRIPT_GLOBAL,
                       SCRIPT_HANDWRITTEN, SCRIPT_INERT, SCRIPT_DIALOGUE, EFFECT_OPS, effect_op)  # noqa: F401 (EFFECT_OPS: callers)
+from .awms import CARRIED
 from .functions import lookup
 from .lexer import LexError
 from .parser import Parser, ParseError
@@ -11,6 +12,20 @@ from .parser import Parser, ParseError
 BIND_INTERIOR = 1        # the reference stands in an interior cell (cell = interior name string)
 BIND_ACTOR = 2           # an NPC or creature: found in game by its aw_ref edict
 BIND_EDICT = 4           # another kind the maps keep as an edict (doors, containers, activators with aw_ref)
+# MWSCRIPT-INVENTORY-HITONME-62: an item held by a placed container, NPC or creature (OpenMW 0.51 mwworld/
+# localscripts.cpp addCell: the scripts of the items in the active cells' containers and actors run, each on its item).
+# Its row's reference is HELD_KEY(holder, n): bit 30 and the item's ordinal among the holder's scripted items in bits
+# 24-29 above the holder's own reference, so the rows sort after every placed reference; the cell and position are
+# the holder's. The engine attaches it while the holder's area is loaded and the holder still has the item.
+BIND_HELD = 8
+HELD_BIT = 0x40000000
+HELD_PER_HOLDER = 64
+
+
+def held_key(holder, n):
+    if not 0 < holder <= 0xFFFFFF or not 0 <= n < HELD_PER_HOLDER:
+        raise ValueError('held item key out of range: %r %r' % (holder, n))
+    return HELD_BIT | (n << 24) | holder
 
 
 class Compiled:
@@ -101,11 +116,31 @@ def compile_program(data, media=None, scripts=None, handwritten=None, rooms=None
                 obj = program.objects.rows[args[0]]
                 if obj['script'] is not None:
                     read_by_others.add(obj['script'])
+    dialogue_read = dialogue_read_slots(data, program)
     for index, c in enumerate(out):
         if c.error is None and index not in read_by_others and \
-                not any(effect_op(name, args) for _, name, args in decode(c.code)):
+                not any(effect_op(name, args) or (name in ('SETL', 'SETLS') and args[0] in dialogue_read.get(c.ident, ()))
+                        for _, name, args in decode(c.code)):
             c.flags |= SCRIPT_INERT
     return program, out
+
+
+def dialogue_read_slots(data, program):
+    """MWSCRIPT-INERT-SEEN-62: {script ident: {slot}} of the locals a dialogue filter reads (an INFO's Local or NotLocal
+    condition, read from the speaker's attached script: engine aw_mwhost.c live_local), for the scripts an NPC or a
+    creature record carries. A script that sets one is seen through what the speaker says (the Temple stewards'
+    completedGraces, Baren Alen's land deed), so it is not inert."""
+    names = getattr(data, 'dialogue_locals', None) or set()
+    if not names:
+        return {}
+    speakers = {script for tag, script in data.bases.values() if tag in ('NPC_', 'CREA') and script}
+    out = {}
+    for ident in speakers:
+        slots = {slot for name, (letter, slot) in program.script_locals.get(ident, {}).items()
+                 if name.casefold() in names}
+        if slots:
+            out[ident] = slots
+    return out
 
 
 def bindings(program, compiled=None):
@@ -131,6 +166,7 @@ def bindings(program, compiled=None):
                      'cell': program.data.interior_numbers.get(ref['cell'].casefold(), 0) if ref['interior']
                      else tuple(ref['cell']),
                      'position': [int(round(v)) for v in ref['position']], 'id': ref['id'], 'type': ref['type']})
+    rows.extend(held_bindings(program, compiled))
     rows.sort(key=lambda r: r['reference'])
     seen = set()
     unique = []
@@ -140,6 +176,37 @@ def bindings(program, compiled=None):
         seen.add(r['reference'])
         unique.append(r)
     return unique
+
+
+def held_bindings(program, compiled=None):
+    """BIND_HELD rows (MWSCRIPT-INVENTORY-HITONME-62): one per placed Morrowind.esm container, NPC or creature and each
+    distinct carryable item of its record (NPCO) whose record names a compiled script that is not inert, in the
+    record's order; the holder's cell and position. A levelled item list in a holder names no item record: none."""
+    data = program.data
+    holdings = getattr(data, 'holdings', None) or {}
+    rows = []
+    for ref in getattr(data, 'holder_refs', None) or ():
+        items, seen = [], set()
+        for item in holdings.get(ref['id'], ()):
+            tag, script = data.bases.get(item, (None, ''))
+            if tag not in CARRIED or not script or script not in program.scripts.index or (item, script) in seen:
+                continue
+            index = program.scripts.index[script]
+            if compiled is not None and compiled[index].flags & SCRIPT_INERT:
+                continue
+            seen.add((item, script))
+            items.append((item, index))
+        if not 0 < ref['reference'] <= 0xFFFFFF:
+            continue
+        for n, (item, index) in enumerate(items[:HELD_PER_HOLDER]):
+            flags = BIND_HELD | (BIND_INTERIOR if ref['interior'] else 0) | \
+                (BIND_ACTOR if ref['type'] in ('NPC_', 'CREA') else BIND_EDICT)
+            rows.append({'reference': held_key(ref['reference'], n), 'script': index, 'flags': flags,
+                         'cell': data.interior_numbers.get(ref['cell'].casefold(), 0) if ref['interior']
+                         else tuple(ref['cell']),
+                         'position': [int(round(v)) for v in ref['position']], 'id': item, 'type': 'HELD',
+                         'holder': ref['reference']})
+    return rows
 
 
 def usage(compiled):

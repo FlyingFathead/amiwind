@@ -514,6 +514,21 @@ static void spell_command(int A){
         if(spell.valid)Con_Printf("Selected %s: cost %d, chance %.0f %%.\n",spell.name,spell.cost,AW_CastChanceNow());
         return;
     }
+    /* for tests: "spell make EFFECT RANGE AREA DURATION MAGNITUDE" adds a one-effect made spell as the Spellmaking
+     * window does (RANGE 0 self, 1 touch, 2 target) and selects it (SCRIPTED-EVENT-PAST-DRAW-DISTANCE-62: the
+     * falling mage's Slowfall save) */
+    if(!Q_strcasecmp(ARG(0),"make") && ARGS>=6){
+        aw_made_spell_t m;int k;
+        memset(&m,0,sizeof(m));Q_strncpy(m.name,"Test spell",sizeof(m.name));m.effects=1;
+        m.effect[0].effect=(int16_t)Q_atoi(ARG(1));m.effect[0].skill=m.effect[0].attribute=-1;
+        m.effect[0].range=(unsigned char)Q_atoi(ARG(2));m.effect[0].area=(unsigned short)Q_atoi(ARG(3));
+        m.effect[0].duration=(unsigned short)Q_atoi(ARG(4));
+        m.effect[0].magnitude_min=m.effect[0].magnitude_max=(unsigned short)Q_atoi(ARG(5));
+        if((k=AW_MadeSpellAdd(&m))<0){Con_Printf("dbg cast spell make: refused\n");return;}
+        AW_CastSelect(1,k);
+        if(spell.valid)Con_Printf("Selected %s (m%d): cost %d, chance %.0f %%.\n",spell.name,k,spell.cost,AW_CastChanceNow());
+        return;
+    }
     if(ARG(0)[0]=='m')AW_CastSelect(1,Q_atoi(ARG(0)+1));
     else AW_CastSelect(0,Q_atoi(ARG(0)));
     if(spell.valid)Con_Printf("Selected %s: cost %d, chance %.0f %%.\n",spell.name,spell.cost,AW_CastChanceNow());
@@ -539,6 +554,7 @@ int AW_CastCommand(void){
     }
     if(!Q_strcasecmp((char *)w,"casting")){
         if(Cmd_Argc()>=3)cast_on=Q_strcasecmp(Cmd_Argv(2),"off") && strcmp(Cmd_Argv(2),"0");
+        else cast_on=!cast_on;   /* DBG-SUPERSPEED-62: bare turns it the other way */
         if(!cast_on){ready=0;held=0;}
         Con_Printf("Casting %s.\n",cast_on?"on":"off");
         return 1;

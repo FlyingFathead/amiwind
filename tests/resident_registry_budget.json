@@ -3,13 +3,13 @@
  "note": "Ratchet: tests/test_resident_registry.py fails above these numbers and asks for them to be lowered when the engine needs less. Raise only with a dated, maintainer-approved reason.",
  "totals": {
   "commands": {
-   "count": 291,
-   "hunk_bytes": 9312
+   "count": 297,
+   "hunk_bytes": 9504
   },
   "cvars": {
-   "count": 361,
-   "static_bytes": 8664,
-   "zone_bytes": 11776
+   "count": 365,
+   "static_bytes": 8760,
+   "zone_bytes": 11904
   },
   "tables": {
    "count": 0,
@@ -91,7 +91,12 @@
   "2026-11-05: +1 console variable aw_player_stances (WEAPONS-57, weapons of every type in third person, the maintainer's request of 2026-10-30): the A/B switch of the drawn weapon's stance on the assembled body vs the fixed layout, by the A/B/C rule of 2026-11-03; 24 structure bytes and 32 zone bytes, no new command (dbg camera stances is a word of the existing aw_camera command).",
   "2026-11-05: +1 console variable aw_fp_sway (FP-WEAPON-SWAY-61, decided by the maintainer the same evening: the first-person weapon sway as a saved choice, 1 AmiWind groove the default, 2 Morrowind stiff; Options > Controls and dbg camera sway); 24 structure bytes and 32 zone bytes, no new command.",
   "2026-11-06: GAME-RECORDER-61, the gameplay recorder the maintainer asked for (dbg recorder, Ctrl+R; slice 1 of its design): one command record, aw_recorder (32 hunk bytes; dbg recorder routes to it through the on-disk catalogue), no cvar; two growing allocations, nothing until a recording or a playback starts and both freed at its stop: the frame stream, at most 2,097,152 bytes (3 to 15 bytes a frame, about 0.5 MB an hour at 10 frames a second), and the checkpoints, at most 3,600 x 48 bytes = 172,800 bytes (one every 5 s of game time, five hours). Raised on the worker branch v0.0.61-recorder; the maintainer approves it at merge.",
-  "2026-11-06: +1 console variable aw_fp_view (FP-FOREARMS-BELOW-VIEW-61, the coordinator's job for the maintainer's report that the worn sleeves never show in first person): the A/B switch of the original's first-person view (the arms, weapon and held light with their own 60-degree field of view, the arms lagging the pitch as OpenMW 0.51's first-person neck does) against the previous method, by the A/B/C rule of 2026-11-03; 24 structure bytes and 32 zone bytes, no new command (dbg camera fpview is a word of the existing aw_camera command). Raised on the worker branch v0.0.61-fparms; the maintainer approves it at merge."
+  "2026-11-06: +1 console variable aw_fp_view (FP-FOREARMS-BELOW-VIEW-61, the coordinator's job for the maintainer's report that the worn sleeves never show in first person): the A/B switch of the original's first-person view (the arms, weapon and held light with their own 60-degree field of view, the arms lagging the pitch as OpenMW 0.51's first-person neck does) against the previous method, by the A/B/C rule of 2026-11-03; 24 structure bytes and 32 zone bytes, no new command (dbg camera fpview is a word of the existing aw_camera command). Raised on the worker branch v0.0.61-fparms; the maintainer approves it at merge.",
+  "2026-11-07: aw_name_labels, the saved Name labels switch (AmiWind or Morrowind) and its console command aw_name_labels_set, decided by the maintainer, INFO-BOX-TEXT-CUT-62",
+  "2026-11-07: +1 console variable aw_census_legacy (CENSUS-INTRO-SCRIPTS-62, the maintainer's report that talking to the census captain opened the project's early hand-written box instead of the game's dialogue): the captain now talks through the dialogue window with his own greetings, topics and result scripts; the old box stays selectable behind this switch, default off, by the A/B/C rule of 2026-11-03; 24 structure bytes and 32 zone bytes, no new command. Raised on the worker branch v0.0.62-census; the maintainer approves it at merge.",
+  "2026-11-07: merge of v0.0.62-census (aw_census_legacy) and integration 583c0feb (aw_name_labels, aw_name_labels_set): both approved raises recorded separately above; the totals are their union (no new setting)",
+  "2026-11-07: maintainer-ordered recovery from a failed load and the clean game reset (HEART-CHAMBER-LOAD-HANG-62, DBG-RESTARTGAME-62, DBG-VERSION-62, critical): four commands (128 hunk bytes): aw_restart_game (dbg restartgame), aw_load_fail (dbg loadfail, the test aid that forces a failed load), aw_version_info (dbg ver / dbg version), aw_memcensus (dbg memcensus, the free Fast RAM in one line); one cvar aw_load_fail_test (24 structure bytes, 32 zone bytes), the count dbg loadfail sets and the map command reads.",
+  "2026-11-08: +1 command aw_topic_colours (32 hunk bytes) and +1 console variable aw_dialogue_topic_colours (24 structure bytes, 32 zone bytes) for the dialogue topic colours switch (DIALOGUE-LINKS-62, the maintainer's dialogue link reports of 2026-11-07); added on the worker branch v0.0.62-dlglinks while its base still had room, recorded at the catch-up with the v0.0.62-dev2 line; the maintainer approves it at merge."
  ],
  "entries": {
   "commands": [
@@ -225,6 +230,7 @@
    "aw_music_previous",
    "aw_music_status",
    "aw_mwscript_status",
+   "aw_name_labels_set",
    "aw_new_game",
    "aw_night_clouds_set",
    "aw_nightgallery",
@@ -425,6 +431,7 @@
    "aw_cell_change_method",
    "aw_cell_prefetch_kib",
    "aw_cell_prefetch_seconds",
+   "aw_census_legacy",
    "aw_cloud_control",
    "aw_cloud_type",
    "aw_clouds",
@@ -507,6 +514,7 @@
    "aw_modal_freeze",
    "aw_music",
    "aw_mwscript",
+   "aw_name_labels",
    "aw_night_clouds",
    "aw_night_light",
    "aw_night_tint",

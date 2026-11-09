@@ -245,6 +245,35 @@ def _sources(data):
 
 
 def _fit_body(identifier, shapes, materials, textures, palette, groups):
+    """_fit_body_rules; when no body fits with the configured body rules even after its own fallbacks (the plain hair
+    share, the previous head reducer), the body is baked once more with the v0.0.62-dev1 body rules
+    (npc_geometry.DEV1_BODY_RULES), which baked every player body of v0.0.62-dev1, and the fallback is logged. The
+    v0.0.62 final build stopped twice on a player body (the Argonian woman, then the Dark Elf man: "no body fits the
+    existing budgets"); the maintainer, 2026-11-08: a character that does not fit falls back, nothing gets stuck."""
+    import os
+    from npc_geometry import DEV1_BODY_RULES
+    try:
+        return _fit_body_rules(identifier, shapes, materials, textures, palette, groups)
+    except ValueError as error:
+        if 'no body fits the existing budgets' not in str(error):
+            raise
+        if all(os.environ.get(k) == v for k, v in DEV1_BODY_RULES.items()):
+            raise
+        print('BAKE-FALLBACK: player body %s: no fit with the new body rules; baked with the v0.0.62-dev1 body rules'
+              % identifier, flush=True)
+        saved = {k: os.environ.get(k) for k in DEV1_BODY_RULES}
+        os.environ.update(DEV1_BODY_RULES)
+        try:
+            return _fit_body_rules(identifier, shapes, materials, textures, palette, groups)
+        finally:
+            for k, v in saved.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
+
+
+def _fit_body_rules(identifier, shapes, materials, textures, palette, groups):
     """_fit_body_search with the configured head reducer; when the boundary-locked head reducer leaves no body
     that fits (it keeps every rim vertex), the search runs again with the previous head reducer and the fallback
     is logged, as the NPC bake does (npc_geometry._retry_head_reducer; v0.0.44-dev1 build: the image step
@@ -264,7 +293,7 @@ def _fit_body(identifier, shapes, materials, textures, palette, groups):
             saved_share = os.environ.get('AMIWIND_NPC_HAIR_SHARE')
             os.environ['AMIWIND_NPC_HAIR_SHARE'] = 'plain'
             try:
-                return _fit_body(identifier, shapes, materials, textures, palette, groups)
+                return _fit_body_rules(identifier, shapes, materials, textures, palette, groups)
             finally:
                 if saved_share is None:
                     os.environ.pop('AMIWIND_NPC_HAIR_SHARE', None)
@@ -326,6 +355,12 @@ def _fit_body_search(identifier, shapes, materials, textures, palette, groups):
                 failures.append('%d/%d/%s: %s' % (budget,rows,mode,error))
                 continue
             except ValueError as error:
+                # a skin that does not fit its rows is a "does not fit" like AliasOverflow: the next, smaller try
+                # (the v0.0.62 final build stopped on the Argonian woman's body after 1 h 13 min of the image step)
+                if str(error) == 'Alias skin rows exceeded':
+                    mode='thigh' if contour==2 else 'knee' if contour else 'plain'
+                    failures.append('%d/%d/%s: %s' % (budget,rows,mode,error))
+                    continue
                 raise ValueError(identifier + ': ' + str(error)) from error
             candidate = (budget, frames, faces, uv, skin, fitted, index)
             if len(index) == full_count:
@@ -494,6 +529,10 @@ def bake_torch_body(task):
                 break
             except AliasOverflow:
                 continue
+            except ValueError as error:
+                if str(error) != 'Alias skin rows exceeded':   # a skin over its rows: the next, smaller try
+                    raise
+                continue
         if fit is not None:
             break
     if fit is None:
@@ -569,6 +608,10 @@ def bake_swim_body(task):
                 break
             except AliasOverflow:
                 continue
+            except ValueError as error:
+                if str(error) != 'Alias skin rows exceeded':   # a skin over its rows: the next, smaller try
+                    raise
+                continue
         if fit is not None:
             break
     if fit is None:
@@ -616,6 +659,22 @@ def bake_unit(unit):
     return _unit_worker(kind)(task)
 
 
+class UnitFailed:
+    """A unit's error, returned by bake_unit_kept instead of raised (picklable: the message only)."""
+
+    def __init__(self, name, error):
+        self.message = '%s: %s: %s' % (name, type(error).__name__, error)
+
+
+def bake_unit_kept(unit):
+    """Pool worker: bake_unit, but a failing unit returns UnitFailed instead of raising, so run_units stores every
+    finished unit before the stage fails (incident INC-20261108-V062BUILD, cause C4)."""
+    try:
+        return bake_unit(unit)
+    except Exception as error:   # every unit's error is collected; run_units raises after storing the rest
+        return UnitFailed(unit_name(unit), error)
+
+
 def unit_name(unit):
     kind, task = unit
     return '%s %s %s' % (kind, task[2], 'female' if task[3] else 'male')
@@ -660,12 +719,21 @@ def unpack_result(row, files):
 def _unit_cache():
     """The player view's share of the image unit cache (tools/pass_cache.py UnitCache, WORKSPACE/cache/image-passes),
     or None: cache off, or no input lock naming the game data by SHA-256 (the inputs are then not known exactly)."""
-    from pass_cache import UnitCache, game_data_digest
-    game = game_data_digest()
+    import pass_cache
+    game = pass_cache.game_data_digest()
     if game is None:
         return None
     import player_inventory_pose
-    return UnitCache.open(UNIT_CACHE, {'game_data': game}, __file__, player_inventory_pose.__file__)
+    import unit_store
+    # keyed on what the bake runs (bake_unit, bake_body and their reach), not the whole files: a change to how units
+    # are scheduled or stored keeps every stored unit; the units stored under the whole-file key of 70115402 are
+    # found under it while the bake code is unchanged (unit_store.LEGACY_SOURCES)
+    return unit_store.bake_keyed_cache(
+        UNIT_CACHE, {'game_data': game},
+        pass_cache.source_digest((__file__, 'bake_unit'), (player_inventory_pose.__file__, 'bake_body')),
+        pass_cache.previous_digests((__file__, 'bake_unit'), (player_inventory_pose.__file__, 'bake_body')),
+        (__file__, player_inventory_pose.__file__),
+        pass_cache.covered_lines((__file__, 'bake_unit'), (player_inventory_pose.__file__, 'bake_body')))
 
 
 def run_units(units, cache, jobs):
@@ -686,19 +754,27 @@ def run_units(units, cache, jobs):
                     pass
         todo.append(index)
     if todo:
-        from build_costs import costed_map
+        import unit_store
         from build_jobs import resolve_jobs
-        items = [units[index] for index in todo]
-        workers = max(1, min(resolve_jobs(jobs), len(items)))
-        # list(): run the map to its end, where costed_map records this run's unit seconds for the next build
-        made = list(costed_map(UNIT_COSTS, bake_unit, items, [unit_name(unit) for unit in items], workers,
-                               fallback=lambda name: UNIT_FALLBACK_SECONDS[name.split(' ', 1)[0]]))
-        for index, result in zip(todo, made):
+        workers = max(1, min(resolve_jobs(jobs), len(todo)))
+
+        def keep(index, result):
+            # in the unit cache the moment the unit is back, before any other unit (UNIT-STORED-AT-MAP-END-62: the
+            # units were stored only when the whole map ended, so a stage stopped mid-map kept nothing)
             if cache is not None:
                 packed = pack_result(result)
                 if packed is not None:
                     cache.store_files(unit_inputs(units[index]), *packed)
             results[index] = result
+        # a unit that fails is collected and named; every other unit is kept (collect-then-fail, incident
+        # INC-20261108-V062BUILD cause C4)
+        failed = unit_store.run_each(UNIT_COSTS, bake_unit, [(index, units[index]) for index in todo],
+                                     [unit_name(units[index]) for index in todo], workers, keep,
+                                     fallback=lambda name: UNIT_FALLBACK_SECONDS[name.split(' ', 1)[0]],
+                                     label='Player view', already=len(units) - len(todo))
+        if failed:
+            raise ValueError('; '.join(failed) + ' (%d of %d units failed; the %d finished ones are kept in the unit '
+                             'cache)' % (len(failed), len(todo), len(todo) - len(failed)))
     return results, len(units) - len(todo)
 
 

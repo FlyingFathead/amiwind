@@ -75,9 +75,15 @@ static float fatigue=200;static int knocked;
 int AW_CombatPlayerKnocked(void){return knocked;}
 float AW_CombatPlayerFatigue(float *maximum){if(maximum)*maximum=200;return fatigue;}
 void AW_CombatPlayerFatigueLoss(float loss){fatigue=AW_MoveFatigueAfter(fatigue,loss);}
+void AW_CombatPlayerFatigueFill(void){fatigue=200;}   /* DBG-SUPERSPEED-62: the maximum of this fixture */
 /* aw_levelup.c (LEVEL-UP-58): the jumps and the seconds of running/swimming the movement reports. */
-static int jumps_reported;static float run_reported,swim_reported;
-int AW_LevelupUse(int skill_index,int use,float scale){assert(skill_index==20 && use==0 && scale==1);jumps_reported++;return 0;}
+static int jumps_reported,falls_reported;static float run_reported,swim_reported;
+/* Acrobatics (20): use 0 a jump, use 1 a landing that hurt without a knockdown (LEVEL-UP-INGAME-62) */
+int AW_LevelupUse(int skill_index,int use,float scale){
+    assert(skill_index==20 && (use==0 || use==1) && scale==1);
+    if(use)falls_reported++;else jumps_reported++;
+    return 0;
+}
 void AW_LevelupMoveSeconds(int running,int swimming,float seconds){
     if(swimming)swim_reported+=seconds;else if(running)run_reported+=seconds;
 }
@@ -186,6 +192,13 @@ int main(void){
     realtime=13;ground(120,0,0);assert(subtitles==2);
     {float capacity;assert(AW_PlayerEncumbrance(&capacity)==330 && capacity==300);}
     assert(aw_worldui_encumbrance==AW_PlayerEncumbrance);
+    /* DBG-NOBURDEN-62: with no burden the same 330 of 300 moves at the unloaded speed, no over-encumbered line; the
+     * bar shows the real load over 999999; off again: stopped as before */
+    {float capacity;int shown=subtitles;
+     assert(!AW_MoveNoBurdenOn());AW_MoveNoBurdenSet(1);assert(AW_MoveNoBurdenOn());
+     realtime=20;assert(near(ground(120,0,0),46.875f) && subtitles==shown);
+     assert(AW_PlayerEncumbrance(&capacity)==330 && capacity==999999.0f);
+     AW_MoveNoBurdenSet(0);realtime=30;assert(ground(120,0,0)==0 && subtitles==shown+1);}
     /* Burden and Feather (the spell effects' call, v061-magic): Feather 40 takes 330 to 290, moving again */
     AW_EncumbranceSetEffects(0,40);assert(near(ground(120,0,0),46.875f*(1-.3f*290/300.0f)));
     AW_EncumbranceSetEffects(100,0);assert(AW_ItemAdd(&aw_state,"cuirass",-10));   /* 30 + 100 Burden */
@@ -247,6 +260,20 @@ int main(void){
     /* a teleport or a new map: no fall from where the player was */
     player.v.origin[2]=5000;player.v.flags=0;aw_move_after(.05f);player.v.origin[2]=0;aw_move_after(.05f);
     player.v.flags=FL_ONGROUND;aw_move_after(.05f);assert(hurts==4);
+    /* LEVEL-UP-INGAME-62: the falls above knock the player down (damage over Acrobatics 15 x 1.25): no Acrobatics use;
+     * 150 units (600 original, 13.7 damage) hurts without a knockdown: one Acrobatics_Fall use */
+    assert(falls_reported==0);
+    fall(1000,850,0,0);assert(hurts==5 && falls_reported==1);
+    fatigue=200;
+    /* SKILL-RAISE-NOT-SEEN-62: a TAPPED jump: the think on the ground carries the key, the next one (already in the
+     * air) does not; it still counts as one jump with its fatigue */
+    {int before=jumps_reported;
+     player.v.flags=FL_ONGROUND;player.v.velocity[2]=0;player.v.button2=0;aw_move_after(0);
+     ground(0,0,0);player.v.button2=1;aw_move_after(0);
+     player.v.flags=0;player.v.velocity[2]=200;player.v.button2=0;aw_move_after(0);
+     assert(jumps_reported==before+1 && near(fatigue,195));
+     aw_move_after(0);assert(jumps_reported==before+1);
+     player.v.flags=FL_ONGROUND;player.v.velocity[2]=0;aw_move_after(0);}
     fatigue=200;
 
     /* Superspeed: exactly the old numbers and no fatigue cost; the words; off restores the rules. */
@@ -262,6 +289,19 @@ int main(void){
     run("superspeed","1");assert(AW_MoveSuperspeed());
     run("superspeed","false");assert(!AW_MoveSuperspeed());
     run("superspeed","maybe");assert(!AW_MoveSuperspeed());          /* refused, unchanged */
-    run("superspeed",NULL);assert(!AW_MoveSuperspeed());             /* status only */
+    /* DBG-SUPERSPEED-62: the bare command turns it the other way and back; endless stamina: 30 s of running and a jump
+     * every second leave the fatigue at its maximum (a loss from elsewhere, a swing, is filled at the next move);
+     * Speed, Athletics, Acrobatics read as 100, the sheet untouched; off: the real values and the costs again */
+    run("superspeed",NULL);assert(AW_MoveSuperspeed());
+    {aw_move_inputs_t in;int s;
+     AW_MovePlayerInputs(&in);assert(in.speed==100 && in.athletics==100 && in.acrobatics==100);
+     assert(aw_character.skills[8]==35);
+     fatigue=200;player.v.flags=FL_ONGROUND;
+     for(s=0;s<30;s++){ground(120,0,1);player.v.button2=1;aw_move_after(1);AW_CombatPlayerFatigueLoss(7);aw_move_after(0);}
+     assert(fatigue==200);
+     player.v.button2=0;
+     run("superspeed",NULL);assert(!AW_MoveSuperspeed());
+     AW_MovePlayerInputs(&in);assert(in.speed!=100 && in.athletics==35);
+     player.v.flags=FL_ONGROUND;aw_move_after(0);ground(120,0,1);aw_move_after(1);assert(fatigue<=195);}
     return 0;
 }

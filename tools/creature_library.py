@@ -134,7 +134,18 @@ def bake(data, palette, meshes, out_id1, jobs=1, method=DEFAULT_METHOD, bipedal=
         app = {'id': ids[0], 'kind': 'CREA', 'name': ids[0], 'mesh': mesh}
         tasks.append(('corpse', data, palette, app, bool((bipedal or {}).get(mesh)), 1.0))
     done, failed = {}, {}
+    seam = {'passing': 0, 'baselined': 0, 'entry': 0, 'new': 0, 'worse': 0}
+    stops = []
     for key, out, seconds, error in ordered_map(_unit, tasks, jobs=max(1, jobs)):
+        if out is None and error and error.startswith('BakeStop'):
+            # the seam stop is never a mesh left out: every one is listed, then the stage fails
+            stops.append('%s: %s' % (key, error))
+            seam['worse' if '(worse)' in error else 'new'] += 1
+            continue
+        if out is not None:
+            status = (out['record'].get('seam_check') or {}).get('status')
+            if status in seam:
+                seam[status] += 1
         if out is None:
             failed[key] = error
             print('Creature library: %s left out (%s)' % (key, error), flush=True)
@@ -151,6 +162,12 @@ def bake(data, palette, meshes, out_id1, jobs=1, method=DEFAULT_METHOD, bipedal=
         if record.get('kept_whole') or record.get('lost_surface'):
             print('Creature library: %s reduction check: kept whole %s, surface still lost %s' % (
                 key, record.get('kept_whole') or 'none', record.get('lost_surface') or 'none'), flush=True)
+    print('Creature library: seam check: %(passing)d passing, %(baselined)d baselined, %(entry)d by an override '
+          'entry, %(new)d new, %(worse)d worse' % seam, flush=True)
+    if stops:
+        from npc_geometry import BakeStop
+        raise BakeStop('Creature library: %d meshes stopped by the seam check (new or worse than '
+                       'config/mesh-seam-baseline.json):\n  %s' % (len(stops), '\n  '.join(stops)))
     return done, failed
 
 
@@ -209,13 +226,14 @@ def bake_skeletal(data, palette, app, bipedal):
 # A shape the reduction lost surface of is baked again with more of its faces kept, at most this many rounds
 # (CREATURE-RACER-MESH-SPIKE-58); only shapes up to KEEP_WHOLE_FACES are raised (a thin chain, a fin, a claw).
 KEEP_ROUNDS = 3
+RIM_ROUNDS = 3                  # CREATURE-MESH-HOLES-62: rim-locked rounds for a larger open panel
 KEEP_WHOLE_FACES = 128
 KEEP_BUDGET_CAP = 600           # below the alias face limit (666) the engine reads
 WHOLE_VERTEX_LIMIT = 1999       # a shared-vertex model takes the renderer's original alias path (no triangle cap)
 
 
 def checked_bake(bake_model, shapes, materials, textures, palette, budget, minimum_faces, whole=False,
-                 whole_model=None):
+                 whole_model=None, model=None, seam_gate=False):
     """npc_geometry.bake with the lost-surface check (npc_geometry.lost_shapes): a small shape whose faces the
     reduction collapsed (the cliff racer's tail: its vertices kept, its lower faces gone, the tip floating free) is
     kept whole in the next round, while the bake still fits; the best fitting result is kept. Returns (frames, faces,
@@ -236,6 +254,10 @@ def checked_bake(bake_model, shapes, materials, textures, palette, budget, minim
     result = bake_model(shapes, materials, textures, palette, budget=budget, minimum_faces=minimum or None)
     lost = lost_shapes(shapes, result[0][0], result[1])
     worst = max((w for _, w in lost.values()), default=0.0)
+    from model_face_overrides import extra_faces
+    # every route that adds faces is held to the model's entry in config/model-face-overrides.json
+    today = len(result[1])
+    allowed = today + extra_faces(model, 'creature')
     for _ in range(KEEP_ROUNDS):
         raise_ = [s for s in shapes if s.get('name') in lost and len(s['faces']) <= KEEP_WHOLE_FACES
                   and minimum.get(s['name'], 0) < len(s['faces'])]
@@ -252,9 +274,104 @@ def checked_bake(bake_model, shapes, materials, textures, palette, budget, minim
         worst2 = max((w for _, w in lost2.values()), default=0.0)
         if worst2 >= worst:
             break               # no better: the first bake stands
+        if len(again[1]) > allowed:
+            print('creature bake: %s: keeping %s whole: before %d, added +%d (%+.1f %%), total %d; an entry in '
+                  'config/model-face-overrides.json is needed' % (
+                      model, ', '.join(s['name'] for s in raise_), today, len(again[1]) - today,
+                      100.0 * (len(again[1]) - today) / today, len(again[1])), flush=True)
+            break
         minimum, result, lost, worst, budget = trial, again, lost2, worst2, grown
         kept += [s['name'] for s in raise_]
-    return result + ({'kept_whole': kept, 'lost': lost, 'budget': budget},)
+    # CREATURE-MESH-HOLES-62: a larger open panel the free reduction folds away (the Alit's torso: 336 and 204 faces,
+    # 128 and 48 rim edges) is reduced with its rims locked instead (npc_geometry.simplify_head_locked), at the same
+    # quotas; the model may draw more than before only by its entry in config/model-face-overrides.json
+    big = frozenset(i for i, s in enumerate(shapes) if s.get('name') in lost and len(s['faces']) > KEEP_WHOLE_FACES)
+    locked = []
+    if big:
+        trial = dict(minimum)
+        for _ in range(RIM_ROUNDS):
+            try:
+                again = bake_model(shapes, materials, textures, palette, budget=budget, minimum_faces=trial or None,
+                                   rim_locked=big)
+            except ValueError as error:
+                print('creature bake: %s: the rim-locked bake was refused (%s)' % (model, error), flush=True)
+                break
+            lost2 = lost_shapes(shapes, again[0][0], again[1])
+            print('creature bake: %s: rims locked on %s: %d faces (today %d), lost %s' % (
+                model, ', '.join(shapes[i]['name'] for i in sorted(big)), len(again[1]), today,
+                sorted(lost2) or 'none'), flush=True)
+            if not any(shapes[i]['name'] in lost2 for i in big):
+                if len(again[1]) <= allowed:
+                    result, lost = again, lost2
+                    locked = [shapes[i]['name'] for i in sorted(big)]
+                else:
+                    print('creature bake: %s: the panels close at %d faces: before %d, added +%d (%+.1f %%), total %d; '
+                          'an entry in config/model-face-overrides.json is needed' % (
+                              model, len(again[1]), today, len(again[1]) - today,
+                              100.0 * (len(again[1]) - today) / today, len(again[1])), flush=True)
+                break
+            # a locked panel that still loses surface takes a third of its faces, then twice that
+            for i in big:
+                s = shapes[i]
+                if s['name'] in lost2:
+                    trial[s['name']] = min(len(s['faces']), max(2 * trial.get(s['name'], 0), len(s['faces']) // 3))
+    # CREATURE-MESH-HOLES-62, the joints: the plates of a creature meet at rims the free reduction pulls apart (the
+    # Alit's back plates against its torso: 37 % of the joint length open, gaps to 2.1 units). The seam locks
+    # (tools/npc_seams.py: the joint rims locked on both sides, the free rims held) are tried when the model has an
+    # override entry, and kept when they close more of the joints within it.
+    joints = None
+    if extra_faces(model, 'creature') and not whole:
+        import numpy as np
+        import npc_seam_audit
+        src = [{'name': s.get('name', ''), 'points': np.asarray(s['positions'][0], float),
+                'faces': np.asarray(s['faces'])} for s in shapes]
+        def open_share(r):
+            return npc_seam_audit.measure(src, np.asarray(r[0][0])[np.asarray(r[1])[:, :3]])
+        joints = open_share(result)
+        # the seam-locked bake at explicit quotas: each shape's fewest faces with its seams locked (seam_quotas),
+        # the rest of the entry's total shared by source faces; kept only with no new open edge
+        try:
+            import mesh_seam_check
+            from npc_seams import seam_quotas
+            quotas = seam_quotas(shapes, allowed)
+            if quotas is not None:
+                face_shapes = []
+                # the smallest alias face limit that holds the entry's total: a 1,024 skin under 666 faces is not a
+                # skin the model writer takes ('Unsupported alias skin': the kwama worker, scamp_fetch,
+                # ascendedsleeper left the library on 2026-11-07)
+                from npc_geometry import ALIAS_FACE_LIMITS
+                limit = next((l for l in ALIAS_FACE_LIMITS if l >= int(sum(quotas))), ALIAS_FACE_LIMITS[-1])
+                again = bake_model(shapes, materials, textures, palette, face_limit=limit, quotas=quotas, seams=True,
+                                   face_shapes=face_shapes)
+                new = mesh_seam_check.new_openings(shapes, again[0][0], again[1], face_shapes)
+                joints2 = open_share(again)
+                print('creature bake: %s: seams locked at %d faces (today %d, entry %d): new openings %d, open joints '
+                      '%.3f (was %.3f)' % (model, len(again[1]), today, allowed, len(new), joints2['open_share'],
+                                           joints['open_share']), flush=True)
+                if not new and len(again[1]) <= allowed:
+                    result, joints = again, joints2
+                    lost = lost_shapes(shapes, result[0][0], result[1])
+                    locked = ['seams']
+        except TypeError:
+            pass                # a bake without the seam locks (a test stand-in)
+        except ValueError as error:
+            print('creature bake: %s: the seam-locked bake was refused (%s)' % (model, error), flush=True)
+    # the seam check's receipt and the bake stop (MESH-SEAM-METHOD-62): any new opening the original does not have
+    # stops the bake unless the model has an entry in config/model-face-overrides.json
+    seam = None
+    try:
+        import mesh_seam_check
+        from npc_geometry import seam_stop
+        seam = mesh_seam_check.audit(shapes, result[0][0], result[1])
+    except (ImportError, TypeError, KeyError, IndexError):
+        seam = None             # a test stand-in without real shapes
+    if seam is not None and seam_gate:
+        # the thickness is recorded, not judged: a creature's shapes are plates, claws and chains, not limbs, and a
+        # per-shape profile read 0.0 on parts that are visibly whole (the Alit at 794: 0.02); only openings stop
+        seam['status'] = seam_stop(model, seam['new'], None, bool(extra_faces(model, 'creature')), kind='creature')
+    return result + ({'kept_whole': kept, 'lost': lost, 'budget': budget, 'rim_locked': locked,
+                      'joints': {k: joints[k] for k in ('open_share', 'max_gap')} if joints else None,
+                      'seam': seam},)
 
 
 def bake_kf(data, palette, app, bipedal, scale=1.0, profile=None, corpse=False):
@@ -332,7 +449,8 @@ def bake_kf(data, palette, app, bipedal, scale=1.0, profile=None, corpse=False):
         try:
             frames, faces, uv, skin, check = checked_bake(bake_model, shapes, materials, textures, palette, budget,
                                                           (profile or {}).get('minimum_faces'),
-                                                          whole=bool((profile or {}).get('whole')))
+                                                          whole=bool((profile or {}).get('whole')),
+                                                          model=normpath(app['mesh']), seam_gate=True)
             mover = animated_mdl(frames, faces, uv, skin)
             break
         except ValueError as error:
@@ -361,6 +479,7 @@ def bake_kf(data, palette, app, bipedal, scale=1.0, profile=None, corpse=False):
               'groups_from_idle': [g['name'] for g in groups if g.get('source') == 'idle'],
               'repeated_node_names': rig.duplicates, 'kept_whole': check['kept_whole'],
               'lost_surface': {k: list(v) for k, v in check['lost'].items()},
+              'seam_check': check.get('seam'),
               'sha256': hashlib.sha256(standing).hexdigest(), 'mover_sha256': hashlib.sha256(mover).hexdigest()}
     return {'files': files, 'record': record}
 

@@ -134,7 +134,7 @@ static void ask(int room){
             for(j=0;j<nconts;j++)if(conts[j].room==room)for(k=0;k<conts[j].n;k++)if(!Q_strcasecmp(conts[j].id[k],icons[i].id))goto here;
             continue;
          here:
-            snprintf(key,sizeof(key),"item:%s",icons[i].id);
+            snprintf(key,sizeof(key),"big:%s",icons[i].id);
             assert(AW_AreaIcon(key,&w,&h,pixels,32,32) && w==icons[i].w && h==icons[i].h && pixels[0]==icons[i].first);
         }
         assert(file_opens==opens);                 /* no search of focus.awf or items.awi */
@@ -203,7 +203,7 @@ int main(int argc,char **argv){
      assert(picture_reads==1);
      AW_AreaCacheTrim(1L<<30);
      AW_AreaStats(s);fb=AW_AreaFallbacks();
-     snprintf(key,sizeof(key),"item:%s",icons[other].id);
+     snprintf(key,sizeof(key),"big:%s",icons[other].id);
      assert(AW_AreaIcon(key,&w,&h,px,32,32)==1 && w==3 && h==2 && px[0]==77);
      AW_AreaStats(t);
      assert(t[3]==s[3] && AW_AreaFallbacks()==fb && picture_reads==1);   /* no narrow load, no search */

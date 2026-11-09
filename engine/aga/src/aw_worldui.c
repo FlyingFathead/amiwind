@@ -16,6 +16,7 @@
 #include "aw_questbook.h"
 #include "aw_jhist.h"
 #include "aw_save.h"
+#include "aw_listnav.h"
 #include <stdint.h>
 /* AWM1: header, areas, pixels. AWM2 adds the LAVA section (docs/WORLD_MAP_AND_JOURNAL.md "Map file formats"). */
 #define LAVA_POOLS_MAX 2048
@@ -88,8 +89,26 @@ typedef struct {
      * made outside the window (the console, a script, a trade, a pick-up) redraws it at the next frame */
     char seen_worn[AW_INVENTORY_SLOTS][64];
     uint32_t seen_kinds,seen_kinds_sum;
+    /* INVENTORY-DOUBLECLICK-62: the last click on a row (for the double-click), the consumable's confirmation box
+     * (its item copied when it opens, the count 1..confirm_max, fresh until the first digit, the slider held), and the
+     * short "Equipped <name>" notice box until notice_until */
+    int click_row;double click_time;
+    int confirm,confirm_count,confirm_max,confirm_fresh,confirm_drag;aw_inventory_item_t confirm_item;
+    char notice[96];double notice_until;
     byte preview[INV_PREVIEW_W*INV_PREVIEW_H];
 } inventory_panel_t;
+#define INV_CONFIRM_X 140
+#define INV_CONFIRM_Y 62
+#define INV_CONFIRM_W 168
+#define INV_CONFIRM_H 82
+#define INV_CONFIRM_RAIL_X (INV_CONFIRM_X+10)
+#define INV_CONFIRM_RAIL_W (INV_CONFIRM_W-20)
+#define INV_CONFIRM_RAIL_Y (INV_CONFIRM_Y+40)
+#define INV_CONFIRM_BUTTON_Y (INV_CONFIRM_Y+INV_CONFIRM_H-20)
+#define INV_CONFIRM_BUTTON_W 52
+#define INV_CONFIRM_OK_X (INV_CONFIRM_X+20)
+#define INV_CONFIRM_CANCEL_X (INV_CONFIRM_X+INV_CONFIRM_W-20-INV_CONFIRM_BUTTON_W)
+#define INV_NOTICE_SECONDS 3.0
 static inventory_panel_t *inventory;
 int AW_InventoryActive(void){return modal==3;}
 static const char *const inventory_categories[]={"All","Weapons","Armour","Clothing","Potions","Ingredients","Books","Misc"};
@@ -163,8 +182,9 @@ static void book_free(void){
     free(book);book=NULL;
 }
 int aw_worldui_panel_holds_escape;   /* set by the panel's opener after AW_WorldUIOpenPanel; cleared on every close */
+void (*aw_worldui_panel_drag)(int mouse_x,int mouse_y);   /* set by the opener; called while the left button is held */
 static void close_panel(void){
-    aw_worldui_panel_holds_escape=0;
+    aw_worldui_panel_holds_escape=0;aw_worldui_panel_drag=NULL;
     if(modal==4 && panel_closed)panel_closed();
     panel_draw=NULL;panel_key=NULL;panel_closed=NULL;
     if(inventory && inventory->preview_frames)
@@ -211,6 +231,7 @@ void AW_InventoryOpen(void){
     inventory=(inventory_panel_t *)AW_TryCalloc(1,sizeof(*inventory));
     if(!inventory){Con_Printf("Inventory: not enough memory.\n");return;}
     for(i=0;i<INV_VISIBLE;i++)inventory->icon_row[i]=-1;
+    inventory->click_row=-1;   /* INVENTORY-DOUBLECLICK-62: no click yet */
     inventory->angle=(float)M_PI;opened(3);
     if(!AW_InventoryBootstrap())strcpy(inventory->message,"Initial item catalogue unavailable.");
     inventory_refresh();
@@ -312,6 +333,7 @@ static void inventory_filter(void){
     inventory->selected=minmax(inventory->selected,0,n?n-1:0);
     inventory->top=minmax(inventory->top,0,n>INV_VISIBLE?n-INV_VISIBLE:0);
     for(i=0;i<INV_VISIBLE;i++)inventory->icon_row[i]=-1;
+    inventory->click_row=-1;   /* INVENTORY-DOUBLECLICK-62: the rows may have moved: a new click starts again */
 }
 /* the record of list row ROW: from the page (the rows in view and a page either side, read again when the view has
  * left it), else read into the one spare */
@@ -338,15 +360,26 @@ static aw_inventory_item_t *inventory_item(int row,int *known){
 static aw_inventory_item_t *inventory_selected(void){
     return inventory && inventory->count?inventory_item(inventory->selected,NULL):NULL;
 }
+/* EQUIP-ACTION-REGRESSION-62: the actions come from the item's class, read from its record (the catalogue's flag 1:
+ * weapons, armour, clothing, rings and amulets, carried lights), as in the original: such an item always offers Equip
+ * (Unequip when worn). Whether it can be put on now (one of it, its condition, the hands free) is decided when the
+ * action is taken, with a message, never by hiding the action (the census dagger showed no action at all). */
 static int inventory_equippable(const aw_inventory_item_t *item){
-    if(item && AW_InventoryEquipped(&aw_state,item->id) && (item->flags&AW_INV_EQUIP_SUPPORTED))return 1;
-    return AW_InventoryCanEquip(item);
+    return item && (item->flags&AW_INV_EQUIP)!=0;
 }
 /* ALCHEMY-61 (aw_inventory.h; aw_alchemy.c sets them, NULL in the fixtures): a potion drunk, an ingredient eaten, an
  * apparatus opening the alchemy window */
 int (*aw_worldui_use)(const aw_inventory_item_t *it);
 void (*aw_worldui_alchemy_open)(void);
+/* MWSCRIPT-GAP-FUNCTIONS-62 (aw_mwhost.c sets it, NULL in the fixtures): the item's script around its equipping:
+ * phase 0 before (1: its PCSkipEquip takes it, nothing is worn), phase 1 after it was worn (OnPCEquip set) */
+int (*aw_worldui_equip_script)(const aw_inventory_item_t *it,int phase);
 static int inventory_usable(const aw_inventory_item_t *item){return item && aw_worldui_use && AW_INV_USABLE_KIND(item);}
+/* EQUIP-ACTION-REGRESSION-62 (item classes): a book or scroll offers Read (OpenMW mwclass/book.cpp: ActionRead) */
+int (*aw_worldui_read)(const char *id);
+/* the game's own lines by key (aw_levelup.c AW_LevelupGameText; NULL in the fixtures) */
+int (*aw_worldui_game_text)(const char *key,char *out,int size);
+static int inventory_readable(const aw_inventory_item_t *item){return item && aw_worldui_read && item->category==AW_INV_BOOK;}
 static int inventory_droppable(const aw_inventory_item_t *item){
     return item && (item->flags&AW_INV_DROP) &&
         (!AW_InventoryEquipped(&aw_state,item->id) || inventory_equippable(item));
@@ -357,9 +390,23 @@ static void inventory_action(int action){
     inventory->preview_state=0;   /* equipment may change: one new still picture */
     inventory->armor_state=0;     /* and the armour rating again */
     if(action==1 && inventory_equippable(item)){
+        int worn=AW_InventoryEquipped(&aw_state,item->id);
+        if(!worn && !AW_InventoryCanEquip(item)){
+            /* the original's own line when it has one (a beast race: sNotifyMessage13/14/15) */
+            const char *key=AW_InventoryEquipRefusal();
+            if(!key || !aw_worldui_game_text || !aw_worldui_game_text(key,inventory->message,sizeof(inventory->message)))
+                strcpy(inventory->message,"This item cannot be equipped now.");
+            inventory->context=0;inventory_refresh();return;
+        }
         AW_CombatEquipmentStore();
-        if(AW_InventoryEquipped(&aw_state,item->id))ok=AW_InventoryUnequip(&aw_state,item->id);
-        else ok=AW_InventoryEquip(&aw_state,item);
+        if(worn)ok=AW_InventoryUnequip(&aw_state,item->id);
+        else if(aw_worldui_equip_script && aw_worldui_equip_script(item,0)){
+            /* its script took the equipping (PCSkipEquip): nothing is worn, the script says what happens */
+            inventory->message[0]=0;inventory->context=0;inventory_refresh();return;
+        }else{
+            ok=AW_InventoryEquip(&aw_state,item);
+            if(ok && aw_worldui_equip_script)aw_worldui_equip_script(item,1);
+        }
         if(ok)AW_CombatEquipmentChanged();
         strcpy(inventory->message,ok?"Equipment updated.":"Cannot equip this item.");
     }else if(action==3 && inventory_usable(item)){
@@ -369,6 +416,11 @@ static void inventory_action(int action){
         if(ok==2){close_panel();if(aw_worldui_alchemy_open)aw_worldui_alchemy_open();return;}
         if(!ok)strcpy(inventory->message,"Cannot use this item now.");
         else inventory->message[0]=0;
+    }else if(action==4 && inventory_readable(item)){
+        char id[sizeof(item->id)];strcpy(id,item->id);
+        close_panel();
+        if(!aw_worldui_read(id))Con_Printf("%s cannot be read.\n",id);
+        return;
     }else if(action==2 && inventory_droppable(item)){
         /* First stage drops one real item; repeated actions preserve stack count.
          * No deletion occurs when the world placement/model/entity is refused. */
@@ -376,6 +428,116 @@ static void inventory_action(int action){
         strcpy(inventory->message,ok?"Dropped one item.":AW_InventoryDropReason());
     }
     inventory->context=0;inventory_refresh();
+}
+/* INVENTORY-DOUBLECLICK-62 (aw_inventory.h): a double-click on a row does what dropping the item on the character
+ * picture does in the original and OpenMW 0.51 (inventorywindow.cpp onAvatarClicked, useItem): what can be worn goes
+ * on or comes off at once, with a short notice box "Equipped <name>" / "Unequipped <name>" (the refusal's own line when
+ * it cannot); a book is read; an apparatus opens the alchemy window; a potion or an ingredient asks first, in a box
+ * with OK and Cancel (Enter / Esc), the count slider and number field in it for a stack. */
+static void inventory_text(int x,int y,int width,int height,const char *value,int color);
+static int inventory_consumable(const aw_inventory_item_t *item){
+    return inventory_usable(item) && item->alchemy_kind!=AW_ALCHEMY_APPARATUS;
+}
+static void inventory_notice(const char *text){
+    Q_strcpy_bounded(inventory->notice,text,sizeof(inventory->notice));
+    inventory->notice_until=Sys_FloatTime()+INV_NOTICE_SECONDS;
+}
+static void inventory_confirm_close(void){inventory->confirm=inventory->confirm_drag=0;}
+static void inventory_confirm_open(const aw_inventory_item_t *item){
+    int have=AW_StateGet(&aw_state,AW_ITEM,item->id);
+    if(have<1)return;
+    inventory->confirm_item=*item;inventory->confirm=1;inventory->confirm_max=have;inventory->confirm_count=1;
+    inventory->confirm_fresh=1;inventory->confirm_drag=0;inventory->context=0;inventory->notice_until=0;
+}
+static const char *inventory_use_verb(const aw_inventory_item_t *it,int past){
+    if(it->alchemy_kind==AW_ALCHEMY_POTION)return past?"drunk":"Drink";
+    if(it->alchemy_kind==AW_ALCHEMY_INGREDIENT)return past?"eaten":"Eat";
+    return past?"used":"Use";
+}
+/* OK: the count, one use after the other (OpenMW drinks a dragged stack one potion per use), stopping at the first
+ * refusal; the list and the picture follow */
+static void inventory_confirm_ok(void){
+    aw_inventory_item_t item=inventory->confirm_item;int n=inventory->confirm_count<1?1:inventory->confirm_count,used=0;
+    inventory_confirm_close();
+    inventory->preview_state=0;inventory->armor_state=0;
+    while(used<n && AW_StateGet(&aw_state,AW_ITEM,item.id)>0 && aw_worldui_use && aw_worldui_use(&item)==1)used++;
+    if(!used)strcpy(inventory->message,"Cannot use this item now.");
+    else Q_snprintf(inventory->message,sizeof(inventory->message),"%s: %d %s.",item.name[0]?item.name:item.id,used,
+                    inventory_use_verb(&item,1));
+    inventory_refresh();
+}
+static void inventory_confirm_key(int key){
+    int max=inventory->confirm_max,count=inventory->confirm_count,stack=max>1;
+    if(key==K_ENTER){inventory_confirm_ok();return;}
+    if(key==K_MOUSE1){
+        if(mouse_y>=INV_CONFIRM_BUTTON_Y && mouse_y<INV_CONFIRM_BUTTON_Y+12){
+            if(mouse_x>=INV_CONFIRM_OK_X && mouse_x<INV_CONFIRM_OK_X+INV_CONFIRM_BUTTON_W){inventory_confirm_ok();return;}
+            if(mouse_x>=INV_CONFIRM_CANCEL_X && mouse_x<INV_CONFIRM_CANCEL_X+INV_CONFIRM_BUTTON_W){inventory_confirm_close();return;}
+        }
+        if(stack && mouse_y>=INV_CONFIRM_RAIL_Y-4 && mouse_y<INV_CONFIRM_RAIL_Y+8 &&
+           mouse_x>=INV_CONFIRM_RAIL_X-2 && mouse_x<INV_CONFIRM_RAIL_X+INV_CONFIRM_RAIL_W+2){
+            inventory->confirm_count=AW_InventorySliderCount(mouse_x,INV_CONFIRM_RAIL_X,INV_CONFIRM_RAIL_W,max);
+            inventory->confirm_fresh=0;inventory->confirm_drag=1;drag=K_MOUSE1;
+        }
+        return;                                   /* the box holds the window until OK or Cancel */
+    }
+    if(!stack)return;
+    if(key==K_RIGHTARROW || key==K_UPARROW || key==K_MWHEELUP)count++;
+    else if(key==K_LEFTARROW || key==K_DOWNARROW || key==K_MWHEELDOWN)count--;
+    else if(key==K_PGUP)count+=10;
+    else if(key==K_PGDN)count-=10;
+    else if(key==K_HOME)count=1;
+    else if(key==K_END)count=max;
+    else if((key>='0' && key<='9') || key==K_BACKSPACE){
+        inventory->confirm_count=AW_InventoryCountType(count,inventory->confirm_fresh,key==K_BACKSPACE?'\b':key,max);
+        inventory->confirm_fresh=0;return;
+    }else return;
+    inventory->confirm_count=minmax(count,1,max);inventory->confirm_fresh=0;
+}
+static void inventory_double(int row){
+    aw_inventory_item_t *item=inventory_item(row,NULL);char id[64],name[96],line[112];int worn;
+    if(!item)return;
+    inventory->selected=row;
+    if(inventory_equippable(item)){
+        Q_strcpy_bounded(id,item->id,sizeof(id));Q_strcpy_bounded(name,item->name[0]?item->name:item->id,sizeof(name));
+        worn=AW_InventoryEquipped(&aw_state,id)>0;
+        inventory_action(1);
+        if((AW_InventoryEquipped(&aw_state,id)>0)!=worn){
+            Q_snprintf(line,sizeof(line),"%s %s",worn?"Unequipped":"Equipped",name);inventory_notice(line);
+        }else inventory_notice(inventory->message);
+        return;
+    }
+    if(inventory_consumable(item)){inventory_confirm_open(item);return;}
+    if(inventory_usable(item)){inventory_action(3);return;}     /* an apparatus: the alchemy window */
+    if(inventory_readable(item)){inventory_action(4);return;}
+}
+static void inventory_confirm_draw(int gold,int muted){
+    char line[128];const aw_inventory_item_t *it=&inventory->confirm_item;int max=inventory->confirm_max,x,y=INV_CONFIRM_Y;
+    AW_UIFill(INV_CONFIRM_X,y,INV_CONFIRM_W,INV_CONFIRM_H,AW_UIColor(10,9,7));AW_UIBox(INV_CONFIRM_X,y,INV_CONFIRM_W,INV_CONFIRM_H);
+    Q_snprintf(line,sizeof(line),"%s %s?",inventory_use_verb(it,0),it->name[0]?it->name:it->id);
+    inventory_text(INV_CONFIRM_X+6,y+6,INV_CONFIRM_W-12,8,line,gold);
+    if(max>1){
+        Q_snprintf(line,sizeof(line),"How many? 1 to %d",max);
+        inventory_text(INV_CONFIRM_X+6,y+16,INV_CONFIRM_W-12,8,line,muted);
+        AW_UIFill(INV_CONFIRM_X+6,y+26,48,10,AW_UIColor(29,23,17));
+        if(inventory->confirm_count>0)Q_snprintf(line,sizeof(line),"%d_",inventory->confirm_count);else strcpy(line,"_");
+        inventory_text(INV_CONFIRM_X+8,y+26,44,10,line,gold);
+        Q_snprintf(line,sizeof(line),"of %d",max);inventory_text(INV_CONFIRM_X+58,y+26,60,10,line,muted);
+        AW_UIFill(INV_CONFIRM_RAIL_X,INV_CONFIRM_RAIL_Y+1,INV_CONFIRM_RAIL_W,2,muted);
+        x=AW_InventorySliderX(inventory->confirm_count<1?1:inventory->confirm_count,INV_CONFIRM_RAIL_X,INV_CONFIRM_RAIL_W,max);
+        AW_UIFill(x-1,INV_CONFIRM_RAIL_Y-2,3,8,gold);
+    }else inventory_text(INV_CONFIRM_X+6,y+20,INV_CONFIRM_W-12,8,"The last one.",muted);
+    AW_UIFill(INV_CONFIRM_OK_X,INV_CONFIRM_BUTTON_Y,INV_CONFIRM_BUTTON_W,12,AW_UIColor(44,36,20));
+    AW_UIFill(INV_CONFIRM_CANCEL_X,INV_CONFIRM_BUTTON_Y,INV_CONFIRM_BUTTON_W,12,AW_UIColor(44,36,20));
+    inventory_text(INV_CONFIRM_OK_X+(INV_CONFIRM_BUTTON_W-8)/2,INV_CONFIRM_BUTTON_Y,12,12,"OK",gold);
+    inventory_text(INV_CONFIRM_CANCEL_X+(INV_CONFIRM_BUTTON_W-24)/2,INV_CONFIRM_BUTTON_Y,28,12,"Cancel",gold);
+}
+static void inventory_notice_draw(int gold){
+    int w;
+    if(inventory->confirm || !inventory->notice[0] || Sys_FloatTime()>=inventory->notice_until)return;
+    w=(int)strlen(inventory->notice)*4+12;if(w>164)w=164;if(w<60)w=60;
+    AW_UIFill(224-w/2,94,w,16,AW_UIColor(10,9,7));AW_UIBox(224-w/2,94,w,16);
+    inventory_text(224-w/2+6,94,w-12,16,inventory->notice,gold);
 }
 /* Use the same bounded scrollbar as the journal. Keep a visible selection so
  * Equip/Drop still act on a displayed row; scrolling never changes ownership. */
@@ -392,18 +554,15 @@ static void inventory_key(int key){
     int i,x,y,row,top;aw_inventory_item_t *item=inventory_selected();
     if(!inventory)return;
     drag=0;
+    if(inventory->confirm){inventory_confirm_key(key);return;}   /* INVENTORY-DOUBLECLICK-62: the box answers first */
     /* The original picture does not turn; turning is the live preview's (aw_inventory_preview_live 1). */
     if(key==K_LEFTARROW){if(AW_ViewInventoryLive())inventory->angle-=.25f;return;}
     if(key==K_RIGHTARROW){if(AW_ViewInventoryLive())inventory->angle+=.25f;return;}
-    if(key==K_UPARROW || key=='w' || key==K_MWHEELUP)inventory->selected--;
-    if(key==K_DOWNARROW || key=='s' || key==K_MWHEELDOWN)inventory->selected++;
-    if(key==K_PGUP)inventory->selected-=INV_VISIBLE;
-    if(key==K_PGDN)inventory->selected+=INV_VISIBLE;
-    if(key==K_HOME)inventory->selected=0;
-    if(key==K_END)inventory->selected=inventory->count-1;
+    /* the one list rule (aw_listnav.h, INVENTORY-ARROWS-SCROLL-62): Up/Down, pages, ends; the list follows */
+    if(AW_ListNavKey(key,&inventory->selected,&inventory->top,inventory->count,INV_VISIBLE)){inventory->context=0;return;}
     if(key==K_TAB){inventory->category=(inventory->category+1)%8;inventory->selected=inventory->top=0;inventory_filter();}
     if(key=='o'){inventory->sort=(inventory->sort+1)%3;inventory_filter();}
-    if(key==K_ENTER || key=='e'){inventory_action(inventory_usable(item)?3:1);return;}
+    if(key==K_ENTER || key=='e'){inventory_action(inventory_usable(item)?3:inventory_readable(item)?4:1);return;}
     if(key=='d'){inventory_action(2);return;}
     if(key==K_MOUSE3 || key==K_MOUSE2){
         if(mouse_x<128 || mouse_x>=inventory_list_right() || mouse_y<INV_LIST_Y || mouse_y>=INV_LIST_Y+INV_VISIBLE*INV_ROW_H)return;
@@ -413,7 +572,7 @@ static void inventory_key(int key){
         /* room for its entries above the footer: two as before, three with Drink/Eat/Use (ALCHEMY-61) */
         item=inventory_item(row,NULL);
         inventory->context_x=minmax(mouse_x,128,206);
-        inventory->context_y=minmax(mouse_y,50,INV_CONTROLS_Y-(inventory_usable(item)?3:2)*16-4);
+        inventory->context_y=minmax(mouse_y,50,INV_CONTROLS_Y-(inventory_usable(item) || inventory_readable(item)?3:2)*16-4);
         return;
     }
     if(key==K_MOUSE1){
@@ -421,6 +580,10 @@ static void inventory_key(int key){
             x=inventory->context_x;y=inventory->context_y;row=0;
             if(inventory_usable(item)){
                 if(mouse_x>=x && mouse_x<x+110 && mouse_y>=y+row*16 && mouse_y<y+(row+1)*16){inventory_action(3);return;}
+                row++;
+            }
+            if(inventory_readable(item)){
+                if(mouse_x>=x && mouse_x<x+110 && mouse_y>=y+row*16 && mouse_y<y+(row+1)*16){inventory_action(4);return;}
                 row++;
             }
             if(inventory_equippable(item)){
@@ -449,7 +612,15 @@ static void inventory_key(int key){
         }
         if(mouse_x>=128 && mouse_x<inventory_list_right() && mouse_y>=INV_LIST_Y && mouse_y<INV_LIST_Y+INV_VISIBLE*INV_ROW_H){
             row=inventory->top+(mouse_y-INV_LIST_Y)/INV_ROW_H;
-            if(row<inventory->count)inventory->selected=row;
+            if(row<inventory->count){
+                /* INVENTORY-DOUBLECLICK-62: the second click on the same row within half a second */
+                double now=Sys_FloatTime();
+                if(AW_InventoryDoubleClick(inventory->click_row,inventory->click_time,row,now)){
+                    inventory->click_row=-1;inventory_double(row);return;
+                }
+                inventory->click_row=row;inventory->click_time=now;
+                inventory->selected=row;
+            }
         }
         /* Close only over its displayed hint; the lower navigation row is
          * no longer an invisible full-width close target. */
@@ -641,7 +812,9 @@ static void inventory_draw(void){
         inventory_icon(i,row,132,INV_LIST_Y+i*INV_ROW_H);
         sprintf(line,"%s%s",AW_InventoryEquipped(&aw_state,item->id)?"* ":"",item->name);
         inventory_text(151,INV_LIST_Y+i*INV_ROW_H,right-24-151,11,line,gold);
-        sprintf(line,"%ld",(long)AW_StateGet(&aw_state,AW_ITEM,item->id));inventory_text(right-22,INV_LIST_Y+i*INV_ROW_H,22,11,line,gold);
+        /* DBG-GIVE-MONEY-62: four characters at most (1000000 gold: "1m"), the column holds five */
+        AW_InventoryCountText((long)AW_StateGet(&aw_state,AW_ITEM,item->id),line,sizeof(line));
+        inventory_text(right-22,INV_LIST_Y+i*INV_ROW_H,22,11,line,gold);
     }
     if(inventory->count>INV_VISIBLE)
         AW_UIScrollbar(INV_SCROLL_X,INV_LIST_Y,INV_SCROLL_H,inventory->count,INV_VISIBLE,inventory->top);
@@ -654,12 +827,14 @@ static void inventory_draw(void){
             inventory_usable(item)?(item->alchemy_kind==AW_ALCHEMY_POTION?"E/Enter drink  D drop  RMB actions":
                                       item->alchemy_kind==AW_ALCHEMY_INGREDIENT?"E/Enter eat  D drop  RMB actions":
                                       "E/Enter use  D drop  RMB actions"):
+            inventory_readable(item)?"E/Enter read  D drop  RMB actions":
             inventory_equippable(item)?"E/Enter equip  D drop  RMB actions":
             inventory_droppable(item)?"D drop  RMB actions":"Actions unavailable for this item",muted);
     }
     if(inventory->context && item){
         x=inventory->context_x;j=inventory->context_y;row=0;
         if(inventory_usable(item))row++;
+        if(inventory_readable(item))row++;
         if(inventory_equippable(item))row++;
         if(inventory_droppable(item))row++;
         if(row){
@@ -668,6 +843,7 @@ static void inventory_draw(void){
                 inventory_text(x+4,j+row*16+2,102,13,item->alchemy_kind==AW_ALCHEMY_POTION?"Drink":
                                item->alchemy_kind==AW_ALCHEMY_INGREDIENT?"Eat":"Use",gold);row++;
             }
+            if(inventory_readable(item)){inventory_text(x+4,j+row*16+2,102,13,"Read",gold);row++;}
             if(inventory_equippable(item)){inventory_text(x+4,j+row*16+2,102,13,AW_InventoryEquipped(&aw_state,item->id)?"Unequip":"Equip",gold);row++;}
             if(inventory_droppable(item))inventory_text(x+4,j+row*16+2,102,13,"Drop one",gold);
         }else inventory->context=0;
@@ -678,6 +854,8 @@ static void inventory_draw(void){
     inventory_text(192,INV_CONTROLS_Y,120,5,"Tab category",gold);
     /* Turning belongs to the old live preview only (UI-INVENTORY-PREVIEW-STILL-42). */
     inventory_text(132,INV_CONTROLS_Y+8,180,5,AW_ViewInventoryLive()?"Up/Down select   Left/Right turn":"Up/Down select",gold);
+    /* INVENTORY-DOUBLECLICK-62: the consumable's box over the list, else the short equip notice */
+    if(inventory->confirm)inventory_confirm_draw(gold,muted);else inventory_notice_draw(gold);
 }
 static void map_fit(void){
     float sx=(float)map_w/310,sy=(float)map_h/150;
@@ -1158,7 +1336,11 @@ void AW_WorldUIMouse(int dx,int dy){
         }else{map_x-=dx*map_step;map_y-=dy*map_step;}
     }
     mouse_x=minmax(mouse_x+dx,0,319);mouse_y=minmax(mouse_y+dy,0,199);
-    if(modal==3 && inventory && drag==K_MOUSE1){
+    if(modal==4 && drag==K_MOUSE1 && aw_worldui_panel_drag)aw_worldui_panel_drag(mouse_x,mouse_y);   /* a scroll bar */
+    if(modal==3 && inventory && inventory->confirm){   /* INVENTORY-DOUBLECLICK-62: the count slider held */
+        if(drag==K_MOUSE1 && inventory->confirm_drag)
+            inventory->confirm_count=AW_InventorySliderCount(mouse_x,INV_CONFIRM_RAIL_X,INV_CONFIRM_RAIL_W,inventory->confirm_max);
+    }else if(modal==3 && inventory && drag==K_MOUSE1){
         top=AW_UIScrollHit(INV_SCROLL_X+2,minmax(mouse_y,INV_LIST_Y+10,INV_LIST_Y+INV_SCROLL_H-11),
             INV_SCROLL_X,INV_LIST_Y,INV_SCROLL_H,inventory->count,INV_VISIBLE,inventory->top);
         if(top>=0)inventory_scroll(top);
@@ -1183,15 +1365,17 @@ int AW_WorldUIKey(int key,int down){
         if(modal==1 && key==K_MOUSE1 && marker_click){
             marker_click=0;if(!teleport_mode && !teleport_button_hit())place_marker();
         }
-        if((modal==1 && key==drag) || (modal==2 && (key==K_MOUSE1 || key==K_MOUSE2)) || (modal==3 && key==K_MOUSE1))drag=0;
+        if((modal==1 && key==drag) || (modal==4 && key==K_MOUSE1) || (modal==2 && (key==K_MOUSE1 || key==K_MOUSE2)) || (modal==3 && key==K_MOUSE1))drag=0;
         return 1;
     }
     if(key==K_F10 || key=='`'){close_panel();return 0;}
     /* a panel that must be finished (the level-up box, LEVEL-UP-58: the original's box has no cancel) takes Esc itself */
     if(key==K_ESCAPE && modal==4 && aw_worldui_panel_holds_escape){if(!panel_key(key,mouse_x,mouse_y))close_panel();return 1;}
+    /* INVENTORY-DOUBLECLICK-62: Esc (or I) in the consumable's box is its Cancel, the window stays */
+    if(modal==3 && inventory && inventory->confirm && (key==K_ESCAPE || key=='i' || key=='I')){inventory_confirm_close();return 1;}
     if(key==K_ESCAPE || (modal==1 && (key=='m' || key=='M')) || (modal==2 && (key=='j' || key=='J')) || (modal==3 && (key=='i' || key=='I'))){close_panel();return 1;}
     if(modal==3){inventory_key(key);return 1;}
-    if(modal==4){if(!panel_key(key,mouse_x,mouse_y))close_panel();return 1;}
+    if(modal==4){if(key==K_MOUSE1)drag=K_MOUSE1;if(!panel_key(key,mouse_x,mouse_y))close_panel();return 1;}
     if(modal==1){
         if(key!=K_MOUSE1 && key!=K_MOUSE2 && key!=K_MOUSE3)marker_click=0;
         if(key==K_MOUSE1 && !teleport_mode && mouse_y>=1 && mouse_y<16){

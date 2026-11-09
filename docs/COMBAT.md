@@ -1,6 +1,6 @@
 # Combat and the Vivec Arena minigame
 
-_Last updated with AmiWind v0.0.61 (7 November 2026)._
+_Last updated with AmiWind v0.0.62-dev1 (7 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -228,10 +228,13 @@ your own master file when the image is built.
 ## Blocking
 
 The original game has no block button: blocking is automatic whenever a shield
-is equipped (the rule above). AmiWind adds a held block, an AmiWind extension
-and the default (project decision, 11 October 2026):
+is equipped (the rule above). The automatic block is the default (project
+decision, 7 November 2026). AmiWind adds a held block as an option, an AmiWind
+extension that is switched on in Options > Controls:
 
-- Blocking: Hold to block (default, `aw_combat_block 1`). Hold the right mouse
+- Blocking: Automatic (default, `aw_combat_block 0`): the original rule, the
+  shield blocks by itself and the button does nothing.
+- Blocking: Hold to block (option, `aw_combat_block 1`). Hold the right mouse
   button (the Block action in Options > Controls) to raise your shield. You
   block only while it is held, and each blow is still decided by the original
   formula and settings above (Block skill, Agility, Luck, swing, fatigue,
@@ -243,8 +246,6 @@ and the default (project decision, 11 October 2026):
   animation: it rises to the block's hit key and stays up while you hold, and
   plays out after a blocked blow). In first person a block gives the shield's
   sound and a kick of the view; a first-person shield model is a later step.
-- Blocking: Automatic (`aw_combat_block 0`): the original rule, the shield
-  blocks by itself and the button does nothing.
 
 NPCs always block the original way (automatic, by their skill), with the
 block animation of the animation kit and their shield's sound; only fighters

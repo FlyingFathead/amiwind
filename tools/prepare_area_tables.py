@@ -185,7 +185,7 @@ def read_icons(table, pack):
     for i in range(u32(table, 4)):
         row = table[8 + i * ICON_ROW: 8 + (i + 1) * ICON_ROW]
         key = row[:64].split(b'\0', 1)[0].decode('cp1252').lower()
-        if key.startswith('item:'):
+        if key.startswith('big:'):     # ITEM-ICONS-MISSING-62: the strip's picture of every item (was item:, the HUD closure)
             off, size = u32(row, 120), u32(row, 124)
             out[key] = pack[off:off + size]
     return out
@@ -280,7 +280,7 @@ def area(rows, owners, containers, refs, extras, items, icons, levelled=None, ex
     body += b''.join(offsets) + b''.join(packed)
     pictures, table, at = [], [], len(body) + 8 * len(order)
     for k in order:
-        pic = icons.get('item:' + k, b'')
+        pic = icons.get('big:' + k, b'')
         table.append(struct.pack('<II', at if pic else 0, len(pic)))
         pictures.append(pic); at += len(pic)
     record = body + b''.join(table) + b''.join(pictures)

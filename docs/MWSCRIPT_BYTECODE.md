@@ -1,6 +1,6 @@
 # MWScript compiled by the builder
 
-_Last updated with AmiWind v0.0.62-dev1 (7 November 2026)._
+_Last updated with AmiWind v0.0.62-dev2 (8 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -177,7 +177,12 @@ all 1,231 SCPT records:
 - A script is **INERT** when nothing it can do today is seen outside its own values (only not-yet calls; no sound,
   global, journal, other object, script start or stop) and no other script reads its values: compiled and counted,
   its placements left out of the file, never run. 119 scripts today (230 before the actor calls of v0.0.54); each
-  one comes back by itself when a function it calls is carried out and the file is compiled again.
+  one comes back by itself when a function it calls is carried out and the file is compiled again. Seen, so never
+  inert (v0.0.62, MWSCRIPT-INERT-SEEN-62): a message box; reading OnActivate (the object's use goes to the script, so
+  a blocked door stays shut and an item the script keeps cannot be taken); and setting a local that a dialogue filter
+  reads (an INFO's Local or NotLocal condition reads the speaker's attached script at run time), for a script an NPC
+  or a creature record carries. 15 scripts of the masters came back by this (blockedDoor, DoorBarricaded, noPickUp,
+  templeStewards and others; 25 more bindings).
 - A script that reads the actor record (a stat, an item count, a spell, OnDeath, a dead count) is not VOLATILE: it
   is marked ACTOR and runs again when the state it can read changes. A script's own change of an actor moves the
   state generation as a global does, and the engine moves it when a fight changes an actor's health or an actor
@@ -265,6 +270,8 @@ on disk.
 | PCEL | | the cells each `GetPCCell` name matches (v0.0.54): per name the rooms by stable number and the outdoor cells by grid, made at build time | 1,692 |
 | PMOV | 20 | the player's PositionCell moves (v0.0.54): kind (outdoors, into a room), the room map's name, x y z, yaw | 420 |
 | VISI | 12 | the actors a PositionCell may bring into a room (v0.0.62), sorted: the room's stable number, the actor's reference, its home room map's name (none: outdoors or a room the build lacks) | 12 a row |
+| PADD | 8 | every carryable item record that names a script (v0.0.62), sorted by the FNV-1a of its folded id: the hash, the script, the slot of its OnPCAdd local (0xFF: none). The item's script runs while the player carries one (OpenMW 0.51's rule): its carried instance starts when the item arrives and at every map change while it is carried, and stops when the last one leaves the inventory. A script with OnPCAdd gets that local set to 1 on arrival: on the placement the player took (its own values go on), else on the carried instance. The game's masters give 186 rows, 3 of them with OnPCAdd (the census papers and the courtyard ring among them) | 1,488 (186 rows) |
+| LACT | 8 | every NPC or creature record a levelled creature list names that has a script (v0.0.62), sorted by the FNV-1a of its folded id (the actor table's base hash): the hash, the script, 0. The actor a levelled list gives runs its record's script under the list's reference from its spawn (OpenMW 0.51's rule); its values are kept as any placed actor's | 656 (82 rows) |
 | PLAC | 12 | every object a Place call names (v0.0.62), sorted by id: the id, a template reference of the same record and its home room map's name, the record's script, the kind (NPC or creature, carried item, other) and whether the engine can make it, [below](#what-runs-today-what-is-not-yet) | 492 (41 rows) |
 | CODE | | the bytecode | 132,376 |
 | BIND | 24 | placed scripted objects, by reference: script, flags, cell (grid or the room's stable number), position | 117,768 (4,907 rows) |
@@ -734,8 +741,39 @@ Not carried in this batch, with the reason: `Cast` of other spells (the spell ef
 `PlaceAtPC`, `PlaceItem`, `PlaceAtMe`, `Drop` (the object spawner, above), `BecomeWerewolf`, `IsWerewolf`,
 `UndoWerewolf` (werewolves), `OnMurder` (the murder crime: the crime rules know thefts only, CRIME-59), `PlayBink` (the
 videos are not in the image), `HurtStandingActor` (the engine's own lava rule hurts the player already; the script form
-would hurt twice), `GotoJail` and `PayFine` (jail), `Resurrect`, `HitOnMe` (the last weapon to hit an actor is not kept
-yet), `HasSoulGem` (souls in soul gems are not kept yet).
+would hurt twice), `GotoJail` and `PayFine` (jail), `Resurrect`, `HitOnMe` (the last weapon to hit an actor was not
+kept then; it is since v0.0.62, below), `HasSoulGem` (souls in soul gems are not kept yet). `OnMurder`, `GotoJail` and `PayFine` followed with the crimes
+(below).
+
+The crimes (v0.0.62, CRIME-59; rules from OpenMW 0.51, our own code, docs/GAME_FORMULAS.md "Crime, sneaking, locks and
+detection"): the functions the guards' arrest and the murder scripts call, through the import route (no new opcode, no
+change of the file's format):
+
+| Function | What it does here | OpenMW 0.51 |
+| --- | --- | --- |
+| `OnMurder` | 1 once after the actor's murder by the player was reported to the crime rules (a killing that was a crime: it was not fair to attack, or it had reacted to one of the player's crimes) | statsextensions.cpp OpOnMurder; mechanicsmanagerimp.cpp actorKilled, reportCrime |
+| `PayFine` | the bounty to 0, the stolen goods the player carries go into the nearest prison's evidence chest, and every NPC that reacted to the crimes paid for calms down (its fight and pursuit end, its Fight and disposition come back) | miscextensions.cpp OpPayFine; worldimp.cpp confiscateStolenItems; actors.cpp |
+| `PayFineThief` | the bounty to 0 and the calm, the goods kept (the thieves' fixers) | OpPayFineThief |
+| `GotoJail` | the bounty to 0, the goods taken, the calm; when the conversation has closed, max(1, bounty / iDaysinPrisonMod) days pass as a rest, a random skill a day falls by one (Security and Sneak rise), and the player is let out at the nearest prison marker with the game's release line | OpGoToJail; worldimp.cpp goToJail; jailscreen.cpp; playerskillhandlers.lua jailTimeServed |
+| `GetPCInJail` | 1 from GotoJail until the release | OpGetPcInJail |
+
+A conversation's answer runs with its speaker's reference but no entity of its own; since v0.0.62 its calls on the
+speaker find the speaker by that reference, so an answer's `StartCombat` starts the fight at once (the guard's "Resist
+Arrest.", GUARD-RESIST-ARREST-NOTHING-61), and an answer's `SetFight` takes effect when the talk closes: the speaker
+whose Fight, with the disposition and distance biases, reaches 100 attacks (OpenMW 0.51 actors.cpp; a robber's refused
+demand "SetFight 100 / Goodbye", DIALOGUE-AGGRO-62). The three masters hold 343 answers whose result starts combat (138
+distinct result texts, all compiled whole).
+
+The dialogue's `Alarmed` condition reads the speaker's mark from the crime rules (an alarmed guard), and the crime gold
+globals (PCHasCrimeGold, PCHasGoldDiscount, CrimeGoldDiscount, CrimeGoldTurnIn, PCHasTurnIn) are set when a
+conversation opens (OpenMW updateDialogueGlobals). Measured 7 November 2026 with the feature tracker: scripts that run
+whole 479 before, 485 after (of 1,207; OnMurder alone held the 5 placed scripts of the Redoran councillors, Athyn
+Sarethi, Bolvyn Venim, Alvis Teri and Ondres Nerano); dialogue results that run whole 7,390 before, 7,404 after (the 14
+answers of the guards and the thieves' fixers that pay the fine or go to jail); 324 of 504 functions carried out (319
+before). Cost
+(the budget sheet): resident, 32 NPC rows of 16 bytes and the jail's state (about 700 bytes, its release line); a call
+is a table lookup, PayFine and GotoJail a pass over the stolen pairs and the 32 rows; GotoJail reads the prison markers
+(a file of six lines) once.
 
 A test aid for result scripts: `dbg mwscript result TOPIC NPC [N]` runs the result script of the answer the loaded NPC
 gives on TOPIC now (or its N-th answer on the topic, from 1, whatever its conditions say) the way the dialogue window
@@ -905,6 +943,61 @@ and Fire, Frost and Shock Damage and Poison, which hurt health like Damage Healt
 the full magnitude lands): 830 before, 834 after. Still waiting: the effects of other kinds (Shield, Water
 Breathing, Swift Swim, Levitate and the like; 13 scripts wait only for a Cast of them), Casts on other actors, effects on other actors, the effect table of every spell and
 enchantment.
+
+**The shrines' own blessings (v0.0.62).** A spell may now also hold effects with no attribute or skill that only
+stand on the actor for their duration with a magnitude: Water Breathing to Slow Fall, the weaknesses, Invisibility to
+Night Eye, the detections, Spell Absorption, Reflect, Fortify Maximum Magicka, the resistances and Fortify Attack
+(SPFX kind 5: the effect by its number). The engine lands them with their magnitude rolled once, as any other effect
+of the active list (OpenMW 0.51 keeps them in the actor's active effects, which its systems read). Spells with an
+action effect (Lock, Open, Mark, Recall, the interventions, Dispel, the summons, the bound items, Calm, Frenzy,
+Command) still wait. Measured 8 November 2026 with the MWScript tracker: scripts that run 541 before, 551 after (the
+10 Vvardenfell shrines that waited only for their blessing: Aldsotha, Delyn, Ghostgate, Kummu, Meris, Olms, the Puzzle
+Canal, Seryn, Stop Moon, Vivec's Fury); scripts that use a function the interpreter lacks 94 before, 82 after.
+
+`PlayBink` (v0.0.62; OpenMW 0.51 miscextensions.cpp OpPlayBink: the video plays over the game, which goes on after
+it): the converted video of the same catalogue name (the file name less ".bik", `intro/videos.awl`) plays over the
+scene as `debug playvid` plays it, and the scene and its input come back when it ends or Esc skips it; a build without
+videos says so once and the script goes on. Scripts that run: 551 before, 553 after (AzuraEnd's ending video and
+MoonAndStar's cavern video).
+
+`HitOnMe WEAPON` (v0.0.62; OpenMW 0.51 miscextensions.cpp OpHitOnMe, Creature/Npc::onHit: the weapon of every
+successful blow becomes the victim's last hit object; HitOnMe reads 1 when it is that weapon and then clears it):
+each weapon blow of the player that lands (a hit or a blocked blow, the killing one too; a miss and fists keep nothing)
+keeps the right-hand weapon's record id for its victim, at the same two points as the strike enchantment
+(`aw_combat.c`, the hook `aw_combat_weapon_hit`); the host compares the call's id and clears it on a match. Eight
+rows of victim reference and id hash, 64 bytes resident; a new victim past them takes the oldest row; New Game and a
+save load empty them. An NPC's or a creature's weapon has no record id in its fight sheet yet, so its blows on the
+player are counted, not kept. The Heart of Lorkhan's script (LorkhanHeart: Sunder, then Keening) needed only this.
+Scripts that run: 553 before, 554 after; scripts that use a function the interpreter lacks 79 before, 77 after
+(ValbrandrDraugr, the other script that calls it, waits for Solstheim).
+
+`ChangeWeather REGION WEATHER` and `ModRegion REGION CHANCES...` (v0.0.62; OpenMW 0.51 skyextensions.cpp
+OpChangeWeather, OpModRegion; weather.cpp WeatherManager::changeWeather, modRegion, RegionWeather::setChances): the
+compiler works the region out (its index among the sorted Morrowind.esm region ids, the order of the weather table
+`world/region-weather.aww`) and hands it first; a region the image has not (Mournhold, Solstheim) is no code, as
+OpenMW finds no such region. ChangeWeather sets the region's weather until its next weather change (here the end of
+its period of "Hours Between Weather Changes"); ModRegion replaces the region's first chances for the rest of the
+game, and a weather the new chances still allow stays until that change, else the new chances choose. The player in
+that region moves to the new weather as to any other (a transition). One row per changed region, 8 at most (148 bytes
+resident), saved in the scripts' block (AWWR) and emptied by New Game and every save load. Once the Red Mountain
+region's chances have neither ash nor blight, the Red Mountain sky pull stops. The end of the main quest (EndGame:
+"Red Mountain Region" 50 clear, 50 cloudy, then clear) needed only these; scripts that run 569 before, 570 after;
+scripts that use a function the interpreter lacks 77 before, 73 after (three Mournhold scripts wait for Mournhold).
+
+**Items held by containers and other actors (v0.0.62).** OpenMW 0.51 runs the script of every item in the
+containers, NPCs and creatures of the active cells, each on its own item (mwworld/localscripts.cpp addCell). The
+builder writes one BIND row per placed container, NPC or creature of Morrowind.esm and each distinct carryable item of
+its record that names a compiled script (`compiler.held_bindings`, flag 8): its reference is the holder's with bit 30
+and the item's number among the holder's scripted items in bits 24-29, so the rows sort after every placed reference,
+and its cell and position are the holder's. The engine reads them with the map's other bindings (no resident table)
+and attaches each while the holder's area is loaded and the holder still has an item of that script (a container by
+its contents now, an actor by its live record), at most 32 a map; when the player gains such an item (taken from the
+container or a body) the held instances of that script are checked again. A held item's values are neither parked nor
+saved: each visit starts them again. Measured 8 November 2026: 491 rows over 14 scripts (OrdinatorUniform 284 and
+LegionUniform 164 on the guards' armour, ashStatueTopic 32, the rest one each: Sunder on Dagoth Vemyn, the Darksun
+shield and Light of Day on Ano Vando, the treasury orders, the Mark amulets, books in chests); BIND 8,568 rows before,
+9,059 after (11,784 bytes more on disk, read at each map change). The tracker counts no state change from them: those
+scripts already ran while the player carries their items.
 
 **Any effect on any actor (v0.0.61).** The active list now holds any of the game's 143 magic effects, by its
 effect number and its attribute or skill, on any actor record by its reference (the player and the NPCs and

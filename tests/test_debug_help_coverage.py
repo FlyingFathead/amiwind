@@ -95,7 +95,9 @@ class DebugHelpCoverage(unittest.TestCase):
         # the in-game help prints every row: AW_DebugTranslate's catalogue walk, no filter but availability notes
         console = (SRC / 'aw_console.c').read_text(encoding='utf-8')
         help_body = console[console.index('static void help(void)'):console.index('static void help_for')]
-        self.assertIn('Con_Printf(" %s %s%s\\n",r.words,r.arguments,availability(omitted,&r));', help_body)
+        # through the console pager since DBG-HELP-PAGER-62 (say() collects, pager_show() pages)
+        self.assertIn('say(" %s %s%s\\n",r.words,r.arguments,availability(omitted,&r));', help_body)
+        self.assertIn('pager_show();', help_body)
 
     def test_aliases_are_catalogue_rows_read_from_disk(self):
         """Project rule: aliases live as rows in the on-disk catalogue, read only when a dbg command is submitted;

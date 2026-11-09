@@ -14,6 +14,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'src'))
 from mwad.esm import records, subrecords, string  # noqa: E402
+from mwad.dialogue import conditions as dialogue_conditions  # noqa: E402
 
 MASTERS = ('Morrowind.esm', 'Tribunal.esm', 'Bloodmoon.esm')
 # The global script the game always runs (OpenMW 0.51 apps/openmw/mwscript/globalscripts.cpp GlobalScripts::addStartup
@@ -83,6 +84,8 @@ SCRIPTED = ('ACTI', 'ALCH', 'APPA', 'ARMO', 'BOOK', 'CLOT', 'CONT', 'CREA', 'DOO
             'NPC_', 'PROB', 'REPA', 'WEAP', 'STAT')
 # The placements events.py reads: the actors and the objects an actor can stand on.
 PLACEMENT_TYPES = ('NPC_', 'CREA', 'ACTI', 'STAT', 'CONT', 'DOOR')
+# The records that hold items (NPCO): their items' scripts run while the holder's area is loaded (bindings, BIND_HELD)
+HOLDERS = ('CONT', 'NPC_', 'CREA')
 # Records kept whole for the actor table (actors.py): the actors, what their stats come from, what they carry.
 RECORD_TAGS = ('NPC_', 'CREA', 'RACE', 'CLAS', 'SKIL', 'WEAP', 'ARMO', 'CLOT', 'LEVI', 'SPEL', 'FACT', 'GMST',
                'ALCH', 'APPA', 'BOOK', 'INGR', 'LIGH', 'LOCK', 'MISC', 'PROB', 'REPA', 'MGEF', 'ENCH')
@@ -121,6 +124,7 @@ class GameData:
         # the cell each placed actor (an NPC_ or CREA reference of Morrowind.esm) stands in: reference number -> the
         # folded interior cell id, or None outdoors (PositionCell's visitors, codegen.Program.visitor)
         self.actor_cells = {}
+        self.object_cells = {}     # any other placed object's interior cell: reference number -> folded cell id
         # Morrowind.esm placed actors and the objects they can stand on (events.py, SCRIPTED-EVENT-FALLING-MAGE-61):
         # reference number -> (base type, folded id, cell, x, y, z in game units)
         self.placements = {}
@@ -139,6 +143,23 @@ class GameData:
         # the records the actor table reads (tools/mwscript/actors.py): {tag: {folded id: [(sub, data)]}}, the last
         # master wins; SKIL by its INDX number; a deleted record removes the earlier one
         self.records = {tag: {} for tag in RECORD_TAGS}
+        self.levelled_lists = {}   # folded LEVC id -> [folded ids it names] (MWSCRIPT-UNPLACED-ATTACH-62)
+        # MWSCRIPT-INVENTORY-HITONME-62: what each container, NPC and creature record holds (NPCO, the last master's
+        # record wins): folded holder id -> [folded item ids] in record order; and the Morrowind.esm placed references
+        # of those three types: [{'reference', 'id' (folded), 'type', 'interior', 'cell', 'position'}]
+        self.holdings = {}
+        self.holder_refs = []
+        # MWSCRIPT-INERT-SEEN-62: the folded local names the dialogue's Local and NotLocal filters read (from the
+        # speaker's script, at run time): a script setting one is not inert (compiler.dialogue_read_slots)
+        self.dialogue_locals = set()
+        # the folded REGN ids of Morrowind.esm: sorted, their places are the region catalogue's indexes the engine's
+        # weather uses (tools/prepare_world_ui.py region_names / region_weather; ChangeWeather, ModRegion)
+        self.base_regions = set()
+
+    @property
+    def levelled_actors(self):
+        """The folded record ids any levelled creature list names (a list inside a list names no actor itself)."""
+        return sorted({n for names in self.levelled_lists.values() for n in names})
 
     def sound_range(self, soun):
         """(min, max) hearing distance of a SOUN record in game units: its bytes times the game settings
@@ -229,6 +250,8 @@ class GameData:
                 ident = _text(fields.get('NAME', b'')).casefold()
                 if ident:
                     self.regions[ident] = _text(fields.get('FNAM', b'')) or ident
+                    if master == MASTERS[0] and 'DELE' not in fields:
+                        self.base_regions.add(ident)
             elif tag == 'DIAL':
                 # the dialogue topics (DATA type 0) AddTopic names and the dialogue window lists (v0.0.57)
                 parts = list(subrecords(payload)); fields = dict(parts)
@@ -244,17 +267,32 @@ class GameData:
                 text = _text(fields.get('BNAM') or b'')    # as the dialogue table keeps it (mwad text)
                 if text.strip() and not _deleted(flags, parts):
                     self.results.setdefault((_text(fields.get('ONAM', b'')).casefold(), text), None)
+                if not _deleted(flags, parts):
+                    for function, variable, _, _ in dialogue_conditions(parts):
+                        if function in ('Local', 'NotLocal') and variable:
+                            self.dialogue_locals.add(variable)
             elif tag == 'SSCR':
                 fields = dict(subrecords(payload))
                 ident = _text(fields.get('NAME', b'')).casefold()
                 if ident and ident not in self.start_scripts:
                     self.start_scripts.append(ident)
+            elif tag == 'LEVC':
+                # MWSCRIPT-UNPLACED-ATTACH-62: the actors each levelled creature list can give (the last master's
+                # record of a list wins; awms.levelled_actor_rows)
+                parts = list(subrecords(payload)); fields = dict(parts)
+                ident = _text(fields.get('NAME', b'')).casefold()
+                if _deleted(flags, parts):
+                    self.levelled_lists.pop(ident, None); continue
+                self.levelled_lists[ident] = sorted({_text(d).casefold() for t, d in parts if t == 'CNAM'})
             elif tag in SCRIPTED:
                 parts = list(subrecords(payload)); fields = dict(parts)
                 ident = _text(fields.get('NAME', b''))
                 if _deleted(flags, parts):
-                    self.bases.pop(ident.casefold(), None); continue
+                    self.bases.pop(ident.casefold(), None); self.holdings.pop(ident.casefold(), None); continue
                 self.bases[ident.casefold()] = (tag, _text(fields.get('SCRI', b'')).casefold())
+                if tag in HOLDERS:
+                    self.holdings[ident.casefold()] = [_text(d[4:36]).casefold() for t, d in parts
+                                                       if t == 'NPCO' and len(d) >= 36]
             elif tag == 'CELL':
                 pending_refs.append(payload)
         for payload in pending_refs:
@@ -293,8 +331,15 @@ class GameData:
             base = self.bases.get(r['id'].casefold())
             if master == 'Morrowind.esm':
                 self.object_refs.setdefault(r['id'].casefold(), []).append(r['number'])
+                if base and base[0] in HOLDERS:
+                    self.holder_refs.append({'reference': r['number'], 'id': r['id'].casefold(), 'type': base[0],
+                                             'interior': interior, 'cell': cell_name if interior else (gx, gy),
+                                             'position': r.get('position', [0.0, 0.0, 0.0])})
                 if base and base[0] in ('NPC_', 'CREA'):
                     self.actor_cells[r['number']] = cell_name.casefold() if interior else None
+                elif base and interior:
+                    # v0.0.62 (MWSCRIPT-GAP-FUNCTIONS-62): any other object's room, for a placing call's template
+                    self.object_cells[r['number']] = cell_name.casefold()
                 if base and base[0] in PLACEMENT_TYPES:
                     x, y, z = r.get('position', [0.0, 0.0, 0.0])
                     self.placements[r['number']] = (base[0], r['id'].casefold(),

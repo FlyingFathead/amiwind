@@ -9,9 +9,11 @@
 | Where | Console Up/Down history on the maintainer's FS-UAE (Ubuntu) |
 | Reproduction | unknown |
 | Duplicate of | no |
-| Persists in | fixed in v0.0.53 |
-| Severity | low: Console history recall seems dead for one owner setup; not reproduced. |
+| Persists in | v0.0.61 (last seen) |
+| Severity | medium: Regressed in v0.0.61 (was low): Console history recall seems dead for one owner setup; not reproduced. |
 | Family | Console, keyboard and mouse input (`console-input`) |
+| Deferred by the maintainer | 2026-11-09: deferred by the maintainer to v0.0.63 (app chat 2026-11-09, on the v0.0.62 release guard's eight persisting bugs: "Defer all 8 to v0.0.63"), with the v0.0.63 work. |
+| Came back (regression) | in v0.0.61 (fixed in v0.0.53 before) |
 | Playtest version | v0.0.32-dev1 |
 | From commit | source and engine 978475d |
 | CHIM engine version | none: legacy engine |
@@ -175,5 +177,9 @@ Family: Console, keyboard and mouse input (`console-input`). The console line ed
 - MAP-VIEW-SWITCH-28 (no report page): Mouse cannot switch DEBUG / IN-GAME map views
 - [UI-MAP-CLICK-DRAGS-SCREEN-36](UI-MAP-CLICK-DRAGS-SCREEN-36.md): A click on the game screen with the Amiga qualifier (held, or latched by a crashed program) drags the game screen down and reveals the AmigaDOS screen behind it
 - VIEW-PITCH-CENTER-29 (no report page): Legacy automatic pitch centering during free-look
+
+Related bugs in other categories:
+
+- [INVENTORY-ARROWS-SCROLL-62](INVENTORY-ARROWS-SCROLL-62.md): The arrow keys do not move through any list window: dialogue topics, bartering, the inventory, containers and spells
 
 <!-- END GENERATED CATEGORY -->

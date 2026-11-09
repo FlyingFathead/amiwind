@@ -2,11 +2,12 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 3 times; something has to be done
+## PERSISTING: reported 4 times; something has to be done
 
 - Reported with v0.0.48-dev2 at 2026-10-22 (time not recorded): the maintainer: outdoors NPCs only in Seyda Neen, Balmora and Vivec
 - Reported with v0.0.54-dev1 at 2026-10-27 15:58 +0200: Still no outdoor creature in the v0.0.54-dev1 MiniWinds. The maintainer asked, 27 October 2026, about the in-game creatures: none is seen anywhere in game (wild guars, cliff racers, slaughterfish and the rest). The image carries all 5,981 exterior creature references and the frames place 317 direct ones; the 4,853 levelled ones are rolled at run time. Taken by the creatures worker, who is diagnosing the run time cause in game.
 - Reported with v0.0.54-dev1 at 2026-10-27 16:30 +0200: Cause found 27 October 2026 by the creatures worker: the actor table setting was dropped silently at game start (CHIM-ACTOR-TABLE-OFF-IN-GAME-47), so only 317 direct creature rows appeared outdoors and the 5,082 levelled references were never rolled. Fix on branch v0.0.54-creatures, in-game check pending.
+- Reported with v0.0.61 at 2026-11-07 (time not recorded): Seen again on the v0.0.61 release image: no worms, wild guars or mudcrabs are seen in the wilderness. Per the register the region frames place 317 direct creature references of 5,981 and the 4,853 levelled ones are rolled at run time; the builder default for placing region actors is on in build_parser.py but off in build_aga.py (tracker WILD-CREATURES-MISSING-62).
 
 <!-- END GENERATED PERSISTING -->
 
@@ -36,7 +37,7 @@ _Last updated with AmiWind v0.0.48-dev2 (22 October 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
+- [PERSISTING: reported 4 times; something has to be done](#persisting-reported-4-times-something-has-to-be-done)
 - [Status: 22 October 2026](#status-22-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)

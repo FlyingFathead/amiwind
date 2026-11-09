@@ -156,7 +156,10 @@ def prepare(data_files, scene, qbsp, vis, light, jobs=None, vis_mode='fast'):
         if not (scene/'id1'/model).is_file():raise ValueError('Run intro actor conversion first: '+model)
         fields={'classname':'aw_npc','model':model,'origin':' '.join(f'{v*.25:.5f}' for v in ref['position']),
                 'angles':f"0 {-math.degrees(ref['rotation_radians'][2]):.5f} 0",'netname':netnames[identifier],
-                'aw_intro_role':role,'aw_ref':ref['number'],'aw_idle_step':'.15','aw_walk_step':'.125'}
+                'aw_intro_role':role,'aw_ref':ref['number'],'aw_idle_step':'.15','aw_walk_step':'.125',
+                # the record id: the dialogue table finds the speaker by it (CENSUS-INTRO-SCRIPTS-62: Sellus Gravius
+                # talks through the dialogue window with his own greetings, topics and result scripts)
+                'aw_source_id':identifier}
         entities.append('{\n'+'\n'.join(quote(k)+' '+quote(v) for k,v in fields.items())+'\n}')
     b=lumps((scene/'census.bsp').read_bytes());b[0]=b[0].rstrip(b'\0')+('\n'+'\n'.join(entities)+'\n\0').encode('cp1252')
     target.write_bytes(pack_lumps(b));shutil.copyfile(target,scene/'census.bsp')

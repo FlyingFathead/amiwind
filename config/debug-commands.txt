@@ -1,8 +1,79 @@
 AWDC1
 # Group|debug words|registered handler|help arguments
+PLAYTESTING|additem|aw_inventory|same as give
+PLAYTESTING|animkit|aw_animkit_cmd|[on/off / list / groups / play <group> / cycle [all] / stage [1..8] / stop / speed <0.1..4> / pick [on/off / cast / sneak / idle]] animation kit (docs/ANIMKIT.md): on/off gaits by speed; list/groups, play, cycle, stage: the target's groups; pick: every group by state
+PLAYTESTING|arena|aw_arenapit|[opponent / list / next / prev / here/pit/floor / seed N / rematch / setup / exit] Vivec Arena combat minigame (also dbgmode arenapit, testarena): title, fight, result, then Enter rematch / S same seed / N, B next, previous / P pick / Esc leave; opponent = Arena fighter, gallery # or NPC record ID; Ctrl+X returns (not saved)
+PLAYTESTING|arenapit|aw_arenapit|[opponent / list / next / prev / here/pit/floor / seed N / rematch / setup / exit] Vivec Arena combat minigame (also dbgmode arenapit, testarena): title, fight, result, then Enter rematch / S same seed / N, B next, previous / P pick / Esc leave; opponent = Arena fighter, gallery # or NPC record ID; Ctrl+X returns (not saved)
+PLAYTESTING|arenatest|aw_arenapit|same as arenapit
+PLAYTESTING|aw charplane|aw_charplane|[number/name/ID; next/previous/body/exit]
+PLAYTESTING|aw hors|aw_debug_hors|0 (new Hors, Nord / Barbarian / Steed, after Census; in play or from the main menu)
+PLAYTESTING|battlearena|aw_arenapit|same as arenapit
+PLAYTESTING|bench|aw_bench|[halloween [skeletons]] the standard benchmark (docs/REAL_HARDWARE.md; also aw halloweenbench, dbg halloween bench): 600 fixed frames of the Halloween scene, FPS small at the bottom left, then the result (drawing and disk measured apart) on the console and in bench/halloween-BUILD-NNN.txt
+PLAYTESTING|cast|aw_magicfx|[NAME [target / touch / self / fail] [npc] [area FEET] [dur S] [shape egg/sphere] [repeat] / list / stop / orb 0-3 / shell egg/sphere; no argument: status and costs] a spell's look and sound (docs/MAGIC_EFFECTS.md; needs dbg magicfx 1/2): cast animation, orb, cast, bolt, hit, area; npc: the actor in front casts at you; no magicka
+PLAYTESTING|cast casting|aw_magicfx|[on/off; no argument toggles] the player's casting switch (default on): off lowers the magic and the attack button is the fight again
+PLAYTESTING|cast now|aw_magicfx|cast the selected spell once, as the attack button does with magic ready (docs/MAGIC_EFFECTS.md)
+PLAYTESTING|cast ready|aw_magicfx|raise or lower the magic (the R key): the hands come up as for a fight and the attack button casts the selected spell; a message says when no spell is selected
+PLAYTESTING|cast spell|aw_magicfx|[list / none / N / mN / grant N] your spells: no argument or list shows the known spells, the selected one, the counts of casts, magic items used and your active effects; N or mN selects a spell or a made spell; none clears it; grant N gives you spell row N and selects it (for tests)
+PLAYTESTING|cast start|aw_magicfx|the starting spells chosen for the character: what the start gave and why (report)
+PLAYTESTING|cast strike|aw_magicfx|for tests: the held enchanted weapon's blow lands on the actor in reach and its enchantment casts; prints the count of strikes cast
+PLAYTESTING|census legacy|aw_census_legacy|[0 / 1; no argument prints it] the census office's registration (default 0, not saved): 0 = the original's own scripts and dialogue (the clerk, the captain, the door guard, the papers, the doors, the courtyard barrel and ring); 1 = the project's earlier hand-written registration, kept for an A/B; set it before the office loads
+PLAYTESTING|characterchange|aw_quickchar|[race class birthsign review / all] reopen the pier race, gender, head and hair menu over the current scene; confirm to apply (after registration)
+PLAYTESTING|choosecompanion|aw_pickcompanion|same as companion pick
+PLAYTESTING|combat|aw_combat_cmd|[on/off / seed N / readout on/off / music on/off / dice on/off / style amiwind/original / block hold/auto / flee on/off / bestattack on/off / loadout NAME/off / resistnormal N/off / calm] melee combat: no argument = status, costs; readout = a line per swing; flee on = also by Flee rating (defaults on, readout on, music on, block auto, flee off)
+PLAYTESTING|combattest|aw_combattest|[opponent] same as arenapit; combattest gallery (or floor): the empty floor test, current hands, then idle/draw/lower/punch/center/help/exit
+PLAYTESTING|companion|aw_companion|[pick/choose/test/off/distance N/mimic speed on/off] NPC follower test (not saved): no argument = status and counters; pick = attack the NPC under the red crosshair; test = spawn one beside you; off = it goes home / is removed; distance 48..512 (default 96); mimic speed (default on)
+PLAYTESTING|companiontest|aw_companiontest|[on/off] same as companion test / companion off; no argument: status
+PLAYTESTING|creatures|chim|[on/off, true/false or 1/0; no argument toggles] the outdoor creatures (default on; not saved): off removes the wild creatures alive (their state kept) and spawns none, to compare frame rate, memory and behaviour; on brings them back as their cells join again
+PLAYTESTING|daycycle gallery|aw_daycycle_gallery|[here/off] (eight-stage camera tour; here keeps this view; Esc returns)
+PLAYTESTING|demowind|aw_demowind|[on / off / next / prev / effect 1-2 / dist 0-7 / status] DemoWind (docs/DEMOWIND.md): the effects test kit, fullscreen, no world; each effect with its ms a frame and bytes on screen; Left/Right effect, Up/Down distance to Red Mountain, Esc off
+PLAYTESTING|gallery|aw_charplane|[number/name/ID; next/previous/body/browse/help/exit]
+PLAYTESTING|gear|aw_inventory|every armour and clothing piece in a list box by piece and weight class (type to search: glass, heavy, boots; Enter gives one and wears it), test only, saved like any grant (docs/INVENTORY.md)
+PLAYTESTING|give|aw_inventory|[ID [N] / money [N]] no argument: every item of the game in a list box by kind, its name with its record id beside it (type to search by name or id; Enter picks one, then a count from 1 to 1000); ID [N]: N of that item (1 to 99999, default 1); saved like any grant, with a message (docs/INVENTORY.md)
+PLAYTESTING|give coin|aw_inventory|same as give money
+PLAYTESTING|give dbgtorch|aw_inventory|same as torch: one more debug torch in the inventory, with a message
+PLAYTESTING|give debugtorch|aw_inventory|same as torch: one more debug torch in the inventory, with a message
+PLAYTESTING|give money|aw_inventory|[N] N gold (default 1000000; at most 999999999, the gold limit, which every gold gain keeps to), saved like any grant, with a message
+PLAYTESTING|give rich|aw_inventory|same as give money
+PLAYTESTING|give weapons|aw_inventory|[stats] a kit of the game's own weapons, one of every type (blades, blunt, staff, spear, axes, bow, crossbow, thrown, arrows, bolts) and a light and a heavy shield, given at once and saved like any grant, with each one's stats from its record; stats: the table only (docs/INVENTORY.md)
+PLAYTESTING|halloween|aw_halloween|[dagoth / skeletons / bench [skeletons] / fps on/off / camera wide/director / stop / status] Halloween scene (docs/HALLOWEEN.md, an image with the cast): skeletons, Desele's dancers, Dagoth Ur dance on the beat; dagoth (default) or skeletons alone; bench: the standard benchmark, one result line
+PLAYTESTING|halloweenbench|aw_bench|same as bench halloween
+PLAYTESTING|halloweentest|aw_halloweentest|[same words as halloween] the Halloween scene with the FPS counter on (bottom left)
+PLAYTESTING|inventory grant|aw_inventory|<quoted source item ID> <1..999> explicit diagnostic grant of actual catalogue items (not saved defaults)
+PLAYTESTING|kill|chim|[REF or crime] test kill: no argument = pick mode, a red crosshair over a living NPC or creature, attack kills it (the body lies down, can be searched), dbg kill, right click or Escape leaves; REF = chim actors kill REF; crime = pick mode whose kills are the player's crime (murder). One console line per kill; essential characters show the game's message
+PLAYTESTING|levelup|aw_levelup|[use SKILL [N [TYPE]] / raise SKILL [N] / book ID / read REF / check / rest [HOURS] / bed REF] levelling: no argument = level, progress, multipliers, each skill's progress; use = N skill uses (TYPE 0..3); raise = N raises; book = a skill book's first read; check = the level-up box when due; rest = HOURS (default 8), then the box when due (saved)
+PLAYTESTING|lightgallery|aw_lightgallery|[off] lighting switches at this spot in a strip below the view: night mode, tint, lamps, glow, headlamp, horizon veil, time preview; arrows change, Esc done
+PLAYTESTING|loadfail|aw_load_fail|[N; no argument: status] a test aid: the next N map loads fail on purpose (0 = off); 1 shows the way back (the player returns to where the load started, with a message box: OK stays, Load Game opens the load menu), 2 a way back that fails as well (the load menu opens)
+PLAYTESTING|maxstat|aw_levelup|same as maxstats
+PLAYTESTING|maxstats|aw_levelup|every attribute and skill to 100 and the level to 83 (the highest the game's levelling reaches), health, magicka and fatigue worked out again by the character's own rules and full; the sheet before and after on the console
+PLAYTESTING|memcensus|aw_memcensus|(the free Fast RAM and its largest block now, the map and the Hunk in use, in one console line)
+PLAYTESTING|modelgallery|aw_charplane|[number/name/ID]
+PLAYTESTING|nightgallery|aw_nightgallery|[here/off] (23:00 wide view, Masser, Secunda, stars; Esc returns)
+PLAYTESTING|npcgallery|aw_charplane|[number/name/ID]
+PLAYTESTING|pickcompanion|aw_pickcompanion|same as companion pick (again or Escape leaves pick mode)
+PLAYTESTING|playground|aw_arenapit|<duel / anim / aggro / group [N] / modes / creatures> [ids, comma separated] combat playground in the Vivec Arena (also dbgmode combat): duel = the minigame; anim = one actor plays every combat group, labelled; aggro = up to 4 actors attack on sight by Fight, flee by Flee; group = up to 4 fighters at once, think cost shown (not saved)
+PLAYTESTING|quickchar|aw_quickchar|[name race class birthsign review / all] the quick character screen over the current scene (default: all pages; the New Game screen of --skip-census builds)
+PLAYTESTING|recorder|aw_recorder|[on/off / start / stop / play FILE / status] gameplay recorder (docs/GAME_RECORDER.md): no argument arms it; Ctrl+R records from a save taken at the start, (RECORDING) on the version line, and names the file at the stop; play 001 replays recordings/001.awr, (PLAYBACK), checkpoints compared, one RECORDER RESULT line
+PLAYTESTING|restartgame|aw_restart_game|(ends the running game cleanly, memory back to the boot level, then the startup logo and the main menu, as at boot; also after a failed load)
+PLAYTESTING|restore stats|aw_levelup|same as restorestats
+PLAYTESTING|restorestats|aw_levelup|health, magicka and fatigue back to their maximum; the sheet before and after on the console
+PLAYTESTING|set playerrace|aw_quickchar_set|[ID / NAME / list] zero-based race list; switch appearance in place; retain gender/class/name/equipment/level/stats; choose valid head and hair
+PLAYTESTING|set race|aw_quickchar_set|[ID / NAME / list] alias for set playerrace; no value lists loaded race IDs and names
+PLAYTESTING|setlevel|aw_levelup|same as setlvl
+PLAYTESTING|setlvl|aw_levelup|[1..83; no argument: a list box to type the level in] the level, as the game's SetLevel sets it, with the health each level-up between gives (Endurance x fLevelUpHealthEndMult a level; off again going down); no attribute is raised; the sheet before and after on the console
+PLAYTESTING|shroompicker|aw_shroompicker|[1..10/list] (default 1; preserves inventory and picked state)
+PLAYTESTING|shroomtracker|aw_shroomtracker|(picked mushrooms in this save; excludes empty plants)
+PLAYTESTING|skill progress|aw_levelup|same as levelup
+PLAYTESTING|stats restore|aw_levelup|same as restorestats
+PLAYTESTING|torch|aw_inventory|one more debug torch in the inventory (a light that never burns out; equip it like any light, carried-left slot), with a message
+PLAYTESTING|torchgallery|aw_torchtest|[npc ID/name] same as torchtest: one NPC in the dark room, V toggles your torch
+PLAYTESTING|torchtest|aw_torchtest|[npc ID/name; empty/center/help/exit] dark room, current hands, V toggles torch
+PLAYTESTING|tpscene|aw_tpscene|[list/headselection] (fresh debug scene; resets unsaved progress)
+PLAYTESTING|ver|aw_version_info|(the AmiWind build version, the build commit and date as the image records them, and the CHIM engine version)
+PLAYTESTING|version|aw_version_info|same as ver
+PLAYTESTING|weapon|aw_inventory|every weapon and shield of the game in a list box by type (type to search, Enter or a click gives one and equips it; carry only: what this engine cannot equip yet), test only, saved like any grant (docs/INVENTORY.md)
 AUDIO|door sounds|aw_door_sounds|on/off (default on)
-AUDIO|footsteps|aw_player_footsteps_cmd|[on/off, true/false or 1/0; no argument = status] your own footsteps (default off, saved; also Options > Audio): by your boots (bare, light, medium, heavy), in water and swimming; NPC and creature footsteps stay on (aw_npc_footsteps)
-AUDIO|music|aw_music_status|[on/off, true/false or 1/0; no argument = status of the switch and the stream] background music (default on; not saved): off closes the stream at once and opens none until on again
+AUDIO|footsteps|aw_player_footsteps_cmd|[on/off, true/false or 1/0; no argument toggles] your own footsteps (default off, saved; also Options > Audio): by your boots (bare, light, medium, heavy), in water and swimming; NPC and creature footsteps stay on (aw_npc_footsteps)
+AUDIO|music|aw_music_status|[on/off, true/false or 1/0; no argument toggles; then the switch and the stream] background music (default on; not saved): off closes the stream at once and opens none until on again
 AUDIO|music custom|aw_music_custom|[play / stop; no argument: status] the custom OST player (an image built with --custom-ost FILE): play your own track alone, the playlist and its auto-advance waiting; stop gives the playlist back; without a custom track: silence, never the OST
 AUDIO|mwscript|aw_mwscript_status|[on/off, true/false or 1/0; no argument: what it does] (default on, saved) the game's compiled scripts (docs/MWSCRIPT_BYTECODE.md): sounds, NPC lines, music cues, journal, globals, object state, AIWander; not-yet functions logged once. Answers with the file (id1/mwscript.awm: format, scripts, bytes kept) and the counts
 AUDIO|mwscript result|aw_mwscript_status|TOPIC NPC [N] a dialogue answer's result script, run without the dialogue window (a test aid): the answer NPC (a loaded actor's record id) gives on TOPIC now, or its N-th answer on the topic (from 1, its conditions not tested); TOPIC or NPC in quotes when they hold spaces; prints the script and whether it ran
@@ -21,22 +92,22 @@ VIDEO|crosshair|aw_crosshair|[on/off or 1/0; no argument toggles / colour NAME /
 VIDEO|crosshairs|aw_crosshair|same as crosshair
 VIDEO|cull|aw_cull|far detail (saved; also Options > Video > Far detail): 1 Full (everything to the fog), 3 Light, 4 Strong (default; saves from before v0.0.42 keep Full), 6 Strong + small faces (distant models drop out sooner: faster); also 0 none, 2 fog-exact (same picture as 1), 5 small faces only, 7 debug view; on = 1, off = 0; +8 fog rule, +16 cut groups (see those)
 VIDEO|cursortype|aw_cursor_type|[1 / 2; no argument shows the value] the mouse cursor in every window (saved; also Options > Prefs > Mouse cursor): 2 Morrowind's own pointer from your game data (default), 1 AmiWind's drawn cursor; an image without the original's pointer always shows AmiWind's
-VIDEO|cut groups|aw_cull|[on/off, 1/0; no argument shows aw_cull] whole-structure cuts (saved as aw_cull + 16; default off until the in-game A/B): the pieces of one long structure (walkways, town walls, bridges, the Ghostfence, hillside rocks; the frame map's .cut file) are drawn, fogged and left out together, tested on the structure's box; 0 each piece on its own
+VIDEO|cut groups|aw_cull|[on/off, 1/0; no argument toggles] whole-structure cuts (saved as aw_cull + 16; default off until the in-game A/B): the pieces of one long structure (walkways, town walls, bridges, the Ghostfence, hillside rocks; the frame map's .cut file) are drawn, fogged and left out together, tested on the structure's box; 0 each piece on its own
 VIDEO|draw distance|aw_fog_distance|[100..4096 local units; default 300]
 VIDEO|drawdistance|aw_fog_distance|[100..4096 local units; default 300]
 VIDEO|fog|aw_fog|on/off or 1/0 (default on: exterior and interior fog; the console value 2 = exterior fog only, interiors without their cell fog as before)
 VIDEO|fog distance|aw_fog_distance|[100..4096 local units; default 300]
 VIDEO|fog location|aw_fog_location|1/0 places in id1/world/fog-locations.txt (the HUD title's place or region, or the map) set their own day/night fog distance (Ald'ruhn 300, Balmora 300 day, 250 night; default 1 on)
-VIDEO|fog rule|aw_cull|[on/off, 1/0; no argument shows aw_cull] no distance cut before the fog is opaque (saved as aw_cull + 8; default off until the in-game A/B): the Light/Strong far detail cut-offs and the small-faces step start at the fog distance, so nothing pops out of clear air; 0 the cut-offs as before (faster)
+VIDEO|fog rule|aw_cull|[on/off, 1/0; no argument toggles] no distance cut before the fog is opaque (saved as aw_cull + 8; default off until the in-game A/B): the Light/Strong far detail cut-offs and the small-faces step start at the fog distance, so nothing pops out of clear air; 0 the cut-offs as before (faster)
 VIDEO|foglocation|aw_fog_location|1/0 places in id1/world/fog-locations.txt (the HUD title's place or region, or the map) set their own day/night fog distance (Ald'ruhn 300, Balmora 300 day, 250 night; default 1 on)
 VIDEO|ghostfence|aw_ghostfence|[on/off, true/false or 1/0] animated scrolling textures (default on; not saved): on = the Ghostfence curtain, waterfalls and other turbulent textures ripple over time; off = drawn straight and still (unlit, as they are built; also stills water in interiors)
 VIDEO|killhud|aw_photomode|[on/off, true/false or 1/0; no argument toggles; hud: Ctrl+Alt+H] clean shots: hides bars, crosshair, hands, prompts, names, subtitles and overlays; full view; fog off and free camera (aw_photomode_nofog, aw_photomode_noclip, aw_photomode_hands); Ctrl+F fog, Ctrl+H dbg hud; off returns to the start point (not saved; Options > Video > Photo mode)
 VIDEO|land fill|aw_land_fill|1/0 (default 1): Land Fill Independence v1, enabled LAND passes with fog on or off; 0 disables for A/B
 VIDEO|land method|aw_terrain_horizon|1/0 legacy resident LAND rasterizer (default 0, experimental); separate from the CHIM far layer
-VIDEO|landfill|aw_land_fill|[on/off, true/false or 1/0; no argument shows the value] distant land layer (CHIM far layer, plus the terrain horizon when enabled; with the day/night sky off, also the fog colour below the horizon) on or off for debugging (default on, saved)
+VIDEO|landfill|aw_land_fill|[on/off, true/false or 1/0; no argument toggles] distant land layer (CHIM far layer, plus the terrain horizon when enabled; with the day/night sky off, also the fog colour below the horizon) on or off for debugging (default on, saved)
 VIDEO|magicfx|aw_magic_fx|[0 / 1 / 2; no argument shows the value] magic effects (docs/MAGIC_EFFECTS.md, experimental): 0 off (default, saved), 1 sprites and particles, 2 also their light
 VIDEO|noclipbob|aw_noclipwobble|same as noclipwobble
-VIDEO|noclipwobble|aw_noclipwobble|[on/off, true/false or 1/0; no argument = status] walking bob and movement roll in noclip (saved; default off); photo mode temporarily disables it
+VIDEO|noclipwobble|aw_noclipwobble|[on/off, true/false or 1/0; no argument toggles] walking bob and movement roll in noclip (saved; default off); photo mode temporarily disables it
 VIDEO|photomode|aw_photomode|[on/off, true/false or 1/0; no argument toggles; hud: Ctrl+Alt+H] clean shots: hides bars, crosshair, hands, prompts, names, subtitles and overlays; full view; fog off and free camera (aw_photomode_nofog, aw_photomode_noclip, aw_photomode_hands); Ctrl+F fog, Ctrl+H dbg hud; off returns to the start point (not saved; Options > Video > Photo mode)
 VIDEO|photomode ui|aw_photomode_ui|[on/off or 1/0] photo mode's own notice box and hints (saved; default on; off hides them; the Halloween scene turns them off while it runs)
 VIDEO|playvid|playvid|<1..17 / 01..17 / catalogue name> (drains queued game audio first)
@@ -48,82 +119,35 @@ VIDEO|vanitycam|aw_vanitycam|same as vanitycamera
 VIDEO|vanitycamera|aw_vanitycam|[auto / off / on (now) / delay N/default / fullview on/off] the vanity camera (idle orbit): no argument = state; auto = the original (orbit after fVanityDelay, 30 s idle, 3 deg/s; default); off = never (saved); on = orbit now until any input; delay N = test delay (not saved); fullview on/off: full screen, no HUD (aw_vanity_fullview)
 VIDEO|videoplay|playvid|<1..17 / 01..17 / catalogue name> (alias of playvid)
 VIDEO|vidplay|playvid|<1..17 / 01..17 / catalogue name> (alias of playvid)
-PLAYTESTING|animkit|aw_animkit_cmd|[on/off / list / groups / play <group> / cycle [all] / stage [1..8] / stop / speed <0.1..4> / pick [on/off / cast / sneak / idle]] animation kit (docs/ANIMKIT.md): on/off gaits by speed; list/groups, play, cycle, stage: the target's groups; pick: every group by state
-PLAYTESTING|arena|aw_arenapit|[opponent / list / next / prev / here/pit/floor / seed N / rematch / setup / exit] Vivec Arena combat minigame (also dbgmode arenapit, testarena): title, fight, result, then Enter rematch / S same seed / N, B next, previous / P pick / Esc leave; opponent = Arena fighter, gallery # or NPC record ID; Ctrl+X returns (not saved)
-PLAYTESTING|arenapit|aw_arenapit|[opponent / list / next / prev / here/pit/floor / seed N / rematch / setup / exit] Vivec Arena combat minigame (also dbgmode arenapit, testarena): title, fight, result, then Enter rematch / S same seed / N, B next, previous / P pick / Esc leave; opponent = Arena fighter, gallery # or NPC record ID; Ctrl+X returns (not saved)
-PLAYTESTING|arenatest|aw_arenapit|same as arenapit
-PLAYTESTING|aw charplane|aw_charplane|[number/name/ID; next/previous/body/exit]
-PLAYTESTING|aw hors|aw_debug_hors|0 (new Hors, Nord / Barbarian / Steed, after Census; in play or from the main menu)
-PLAYTESTING|battlearena|aw_arenapit|same as arenapit
-PLAYTESTING|bench|aw_bench|[halloween [skeletons]] the standard benchmark (docs/REAL_HARDWARE.md; also aw halloweenbench, dbg halloween bench): 600 fixed frames of the Halloween scene, FPS small at the bottom left, then the result (drawing and disk measured apart) on the console and in bench/halloween-BUILD-NNN.txt
-PLAYTESTING|cast|aw_magicfx|[NAME [target / touch / self / fail] [npc] [area FEET] [dur S] [shape egg/sphere] [repeat] / list / stop / orb 0-3 / shell egg/sphere; no argument: status and costs] a spell's look and sound (docs/MAGIC_EFFECTS.md; needs dbg magicfx 1/2): cast animation, orb, cast, bolt, hit, area; npc: the actor in front casts at you; no magicka
-PLAYTESTING|cast casting|aw_magicfx|[on/off; no argument: status] the player's casting switch (default on): off lowers the magic and the attack button is the fight again
-PLAYTESTING|cast now|aw_magicfx|cast the selected spell once, as the attack button does with magic ready (docs/MAGIC_EFFECTS.md)
-PLAYTESTING|cast ready|aw_magicfx|raise or lower the magic (the R key): the hands come up as for a fight and the attack button casts the selected spell; a message says when no spell is selected
-PLAYTESTING|cast spell|aw_magicfx|[list / none / N / mN / grant N] your spells: no argument or list shows the known spells, the selected one, the counts of casts, magic items used and your active effects; N or mN selects a spell or a made spell; none clears it; grant N gives you spell row N and selects it (for tests)
-PLAYTESTING|cast start|aw_magicfx|the starting spells chosen for the character: what the start gave and why (report)
-PLAYTESTING|cast strike|aw_magicfx|for tests: the held enchanted weapon's blow lands on the actor in reach and its enchantment casts; prints the count of strikes cast
-PLAYTESTING|characterchange|aw_quickchar|[race class birthsign review / all] reopen the pier race, gender, head and hair menu over the current scene; confirm to apply (after registration)
-PLAYTESTING|choosecompanion|aw_pickcompanion|same as companion pick
-PLAYTESTING|combat|aw_combat_cmd|[on/off / seed N / readout on/off / music on/off / dice on/off / style amiwind/original / block hold/auto / flee on/off / bestattack on/off / loadout NAME/off / resistnormal N/off / calm] melee combat: no argument = status, costs; readout = a line per swing; flee on = also by Flee rating (defaults on, readout on, music on, block hold, flee off)
-PLAYTESTING|combattest|aw_combattest|[opponent] same as arenapit; combattest gallery (or floor): the empty floor test, current hands, then idle/draw/lower/punch/center/help/exit
-PLAYTESTING|companion|aw_companion|[pick/choose/test/off/distance N/mimic speed on/off] NPC follower test (not saved): no argument = status and counters; pick = attack the NPC under the red crosshair; test = spawn one beside you; off = it goes home / is removed; distance 48..512 (default 96); mimic speed (default on)
-PLAYTESTING|companiontest|aw_companiontest|[on/off] same as companion test / companion off; no argument: status
-PLAYTESTING|creatures|chim|[on/off, true/false or 1/0; no argument: status] the outdoor creatures (default on; not saved): off removes the wild creatures alive (their state kept) and spawns none, to compare frame rate, memory and behaviour; on brings them back as their cells join again
-PLAYTESTING|daycycle gallery|aw_daycycle_gallery|[here/off] (eight-stage camera tour; here keeps this view; Esc returns)
-PLAYTESTING|demowind|aw_demowind|[on / off / next / prev / effect 1-2 / dist 0-7 / status] DemoWind (docs/DEMOWIND.md): the effects test kit, fullscreen, no world; each effect with its ms a frame and bytes on screen; Left/Right effect, Up/Down distance to Red Mountain, Esc off
-PLAYTESTING|gallery|aw_charplane|[number/name/ID; next/previous/body/browse/help/exit]
-PLAYTESTING|gear|aw_inventory|every armour and clothing piece in a list box by piece and weight class (type to search: glass, heavy, boots; Enter gives one and wears it), test only, saved like any grant (docs/INVENTORY.md)
-PLAYTESTING|give weapons|aw_inventory|[stats] a kit of the game's own weapons, one of every type (blades, blunt, staff, spear, axes, bow, crossbow, thrown, arrows, bolts) and a light and a heavy shield, given at once and saved like any grant, with each one's stats from its record; stats: the table only (docs/INVENTORY.md)
-PLAYTESTING|halloween|aw_halloween|[dagoth / skeletons / bench [skeletons] / fps on/off / camera wide/director / stop / status] Halloween scene (docs/HALLOWEEN.md, an image with the cast): skeletons, Desele's dancers, Dagoth Ur dance on the beat; dagoth (default) or skeletons alone; bench: the standard benchmark, one result line
-PLAYTESTING|halloweenbench|aw_bench|same as bench halloween
-PLAYTESTING|halloweentest|aw_halloweentest|[same words as halloween] the Halloween scene with the FPS counter on (bottom left)
-PLAYTESTING|inventory grant|aw_inventory|<quoted source item ID> <1..999> explicit diagnostic grant of actual catalogue items (not saved defaults)
-PLAYTESTING|kill|chim|[REF] test kill: no argument = pick mode, a red crosshair over a living NPC or creature, attack kills it (the body lies down, can be searched), dbg kill, a right click or Escape leaves; REF = the same as chim actors kill REF (that actor, by reference). One console line per kill. Essential characters show the game's essential-death message
-PLAYTESTING|levelup|aw_levelup|[use SKILL [N [TYPE]] / raise SKILL [N] / check / rest [HOURS] / bed REF] levelling: no argument = level, progress, multipliers, each skill's progress; use = N skill uses (TYPE 0..3); raise = N raises; check = the level-up box when due; rest = HOURS (default 8), then the box when due (saved)
-PLAYTESTING|lightgallery|aw_lightgallery|[off] lighting switches at this spot in a strip below the view: night mode, tint, lamps, glow, headlamp, horizon veil, time preview; arrows change, Esc done
-PLAYTESTING|modelgallery|aw_charplane|[number/name/ID]
-PLAYTESTING|nightgallery|aw_nightgallery|[here/off] (23:00 wide view, Masser, Secunda, stars; Esc returns)
-PLAYTESTING|npcgallery|aw_charplane|[number/name/ID]
-PLAYTESTING|pickcompanion|aw_pickcompanion|same as companion pick (again or Escape leaves pick mode)
-PLAYTESTING|playground|aw_arenapit|<duel / anim / aggro / group [N] / modes / creatures> [ids, comma separated] combat playground in the Vivec Arena (also dbgmode combat): duel = the minigame; anim = one actor plays every combat group, labelled; aggro = up to 4 actors attack on sight by Fight, flee by Flee; group = up to 4 fighters at once, think cost shown (not saved)
-PLAYTESTING|quickchar|aw_quickchar|[name race class birthsign review / all] the quick character screen over the current scene (default: all pages; the New Game screen of --skip-census builds)
-PLAYTESTING|recorder|aw_recorder|[on/off / start / stop / play FILE / status] gameplay recorder (docs/GAME_RECORDER.md): no argument arms it; Ctrl+R records from a save taken at the start, (RECORDING) on the version line, and names the file at the stop; play 001 replays recordings/001.awr, (PLAYBACK), checkpoints compared, one RECORDER RESULT line
-PLAYTESTING|set playerrace|aw_quickchar_set|[ID / NAME / list] zero-based race list; switch appearance in place; retain gender/class/name/equipment/level/stats; choose valid head and hair
-PLAYTESTING|set race|aw_quickchar_set|[ID / NAME / list] alias for set playerrace; no value lists loaded race IDs and names
-PLAYTESTING|shroompicker|aw_shroompicker|[1..10/list] (default 1; preserves inventory and picked state)
-PLAYTESTING|shroomtracker|aw_shroomtracker|(picked mushrooms in this save; excludes empty plants)
-PLAYTESTING|skill progress|aw_levelup|same as levelup
-PLAYTESTING|torchgallery|aw_torchtest|[npc ID/name] same as torchtest: one NPC in the dark room, V toggles your torch
-PLAYTESTING|torchtest|aw_torchtest|[npc ID/name; empty/center/help/exit] dark room, current hands, V toggles torch
-PLAYTESTING|tpscene|aw_tpscene|[list/headselection] (fresh debug scene; resets unsaved progress)
-PLAYTESTING|weapon|aw_inventory|every weapon and shield of the game in a list box by type (type to search, Enter or a click gives one and equips it; carry only: what this engine cannot equip yet), test only, saved like any grant (docs/INVENTORY.md)
 WORLD / TRAVEL|door|aw_hinged_door|[status / list; no argument: open or close the hinged door under the crosshair, locks ignored] ordinary hinged doors (docs/DOOR_MAPPING.md): status counts the table and this map's doors, list prints each (reference, edict or CHIM, how far open, lock)
 WORLD / TRAVEL|door roulette|aw_teleport|[SEED] one random interior: loads you straight into a room of this disk at the room's own start and prints which (name, map id, cell number) and the seed; the same SEED loads the same room again (random tests of interior loading)
-WORLD / TRAVEL|doorlocks|aw_hinged_door|[on/off, true/false or 1/0; no argument prints it] door locks (default on; not saved): on = a locked load or hinged door opens only with its key or in god mode (the message box says which; else the locked sound); off = every lock ignored, until lockpicks and the Open spell exist
+WORLD / TRAVEL|doorlocks|aw_hinged_door|[on/off, true/false or 1/0; no argument toggles] door locks (default on; not saved): on = a locked load or hinged door opens only with its key or in god mode (the message box says which; else the locked sound); off = every lock ignored, until lockpicks and the Open spell exist
 WORLD / TRAVEL|god|aw_godmode|[on/off, true/false or 1/0; no argument toggles] Quake god mode (no damage; the HUD shows GOD) (not saved)
 WORLD / TRAVEL|godmode|aw_godmode|same as god
 WORLD / TRAVEL|map format|aw_map_format|2 draws the v2 world map layers (default) / 1 draws a v2 map as the v1 map (terrain and settlements only)
 WORLD / TRAVEL|map lava|aw_map_lava|1/0 molten lava pools on the world map (M), v2 maps only (default 1, saved)
 WORLD / TRAVEL|map tp|aw_teleport_map|select a destination on the world map (alias)
+WORLD / TRAVEL|noburden|aw_inventory|[on/off, true/false or 1/0; no argument toggles] no burden (not saved; off at New Game): the carried weight counts in no rule, no slower walk, run, swim or jump, no extra fatigue, never over-encumbered; the inventory's bar shows the load over 999999; a message says on or off (docs/INVENTORY.md)
 WORLD / TRAVEL|noclip|noclip|
+WORLD / TRAVEL|noweight|aw_inventory|same as noburden
 WORLD / TRAVEL|recover|aw_recover|
 WORLD / TRAVEL|reset location|amiwind_debug_reset_location|0
 WORLD / TRAVEL|scene|aw_scene|ship/town/balmora/<map name>
 WORLD / TRAVEL|scene change|aw_scene_menu|(scene picker)
-WORLD / TRAVEL|superspeed|superspeed|[on/off, true/false or 1/0; no argument = status and current speeds] the old fixed fast walk/run (cl_forwardspeed, Shift x cl_movespeedkey) instead of the original's speed from Speed, Athletics and load; no running fatigue (default off; not saved; also plain superspeed on/off)
+WORLD / TRAVEL|superspeed|superspeed|[on/off, true/false or 1/0; no argument toggles; then the speeds] the old fixed fast walk/run (cl_forwardspeed, Shift x cl_movespeedkey), not the original's speed from Speed, Athletics and load; endless stamina; Speed, Athletics, Acrobatics read as 100 while on (default off; not saved; also plain superspeed)
 WORLD / TRAVEL|tp|aw_teleport|[X Y [Z] original global coordinates (Z: the floor at or below it) / mark or marker (the map marker you set on the map screen) / seydaneen / prisonship / balmora / vivec (the whole city vivec_city, else the Vivec Arena) / tel_uvirith (teluvirith) / heartchamber / suran / suranclub / aldruhn / khuul / arenapit / <map name>; no argument: town list]
 WORLD / TRAVEL|tp map|aw_teleport_map|select a destination on the world map
 WORLD / TRAVEL|tp menu|aw_scene_menu|(teleport picker)
+WORLD / TRAVEL|unburdened|aw_inventory|same as noburden
 WORLD / TRAVEL|unstuck|aw_unstuck|(nearest clear standing spot below or beside you; never into a wall or water; leaves noclip)
 WORLD / TRAVEL|view|aw_view|x y z yaw pitch
-WORLD / TRAVEL|worldbounds|aw_worldbounds|[on/off, true/false or 1/0; no argument shows the state] the sea current along the edge of the open world that turns you back (an AmiWind extension; on in a default build) (not saved)
+WORLD / TRAVEL|worldbounds|aw_worldbounds|[on/off, true/false or 1/0; no argument toggles] the sea current along the edge of the open world that turns you back (an AmiWind extension; on in a default build) (not saved)
 SKY / LIGHTING|24hrcycle|aw_24hrcycle|[seconds per hour 0.25..60, default 1; off] steps through 24 game hours, showing each hour that long (default 24 s in all); Esc stops
 SKY / LIGHTING|cloudcontrol|aw_cloud_control_set|legacy/new or 1/2 (legacy also disables midnight clearing)
 SKY / LIGHTING|clouds|aw_clouds|on/off true/false 1/0 (default on, independent of sun)
 SKY / LIGHTING|cloudtype|aw_cloud_type_set|classic/veil or 1/2 (classic default)
 SKY / LIGHTING|dayclouds|aw_day_clouds_set|0..100% in 10:00..14:00 core; 09:00..10:00/14:00..15:00 fade; dawn/sunset protected
-SKY / LIGHTING|daynight|aw_daynight_set|[on/off] off holds the clock at 12:00 midday (sky, light, lamps, windows; survives map changes, not saved); on resumes from the current time; no argument: state
+SKY / LIGHTING|daynight|aw_daynight_set|[on/off] off holds the clock at 12:00 midday (sky, light, lamps, windows; survives map changes, not saved); on resumes from the current time; no argument toggles
 SKY / LIGHTING|daynightcycle|aw_daynightcycle|on/off true/false 1/0 (automatic time; explicit set/wait still work)
 SKY / LIGHTING|daytimecycle|aw_24hrcycle|same as 24hrcycle
 SKY / LIGHTING|emissive|aw_emissive|[0 or 1] glowing lanterns, flames, lava and mushrooms (default 1); no argument: query
@@ -176,9 +200,11 @@ UI / CONSOLE|ui font|aw_ui_select|16/14/12/fallback
 UI / CONSOLE|ui ink|aw_ui_ink|original/readable
 UI / CONSOLE|ui labels|aw_label_style|below/topright/hudleft
 UI / CONSOLE|ui layout|aw_dialogue_layout|1 legacy / 2 full width / 3 padded content (default)
+UI / CONSOLE|ui namelabels|aw_name_labels_set|amiwind/morrowind (amiwind: name and action only below the view, the default; morrowind: also the framed box over the view)
 UI / CONSOLE|ui preview|aw_ui_preview|
 UI / CONSOLE|ui targetnames|aw_target_names_set|on/off (after creation)
 UI / CONSOLE|ui targetplace|aw_target_place|below/topright/hudleft
+UI / CONSOLE|ui topiccolours|aw_topic_colours|1/0 the topic list's colours: a topic whose answer is for this speaker alone in blue, one with nothing new left in grey (default 1, saved; also Options > Prefs > Topic colours); no argument: the setting
 INPUT|input trace|aw_input_trace|on/off true/false 1/0 (alias; default off)
 INPUT|inputtrace|aw_input_trace|on/off true/false 1/0 (raw keys and mouse events; default off)
 INPUT|sensitivity|aw_sensitivity|[0.1..20, one decimal; no argument prints it] mouse sensitivity, Quake's sensitivity setting (saved; default 3, unchanged; also Options > Controls > Mouse sensitivity, 0.5..10 in steps of 0.5)
@@ -195,7 +221,7 @@ DIAGNOSTICS|fpu|aw_fpu_status|(CPU and FPU support library status: 68040.library
 DIAGNOSTICS|fpucount|aw_fpucount|[0/1] once a second: per-frame counts of brush model rotations (and rebuilds), direction vectors, table sine/cosine lookups and NPC targeting (average/peak)
 DIAGNOSTICS|hands|aw_hands|
 DIAGNOSTICS|heap|aw_heap_audit|(current hunk clearance and load peak)
-DIAGNOSTICS|hud|aw_debug_hud|on/off true/false 1/0; click-to-pin raw target identity (not saved), shown under the stat bars; a CHIM placement is named by mesh, reference and cell. Attack selects while on; right click or off leaves it and restores attacks after releasing the button. Use dbg overlay for overlays without inspection.
+DIAGNOSTICS|hud|aw_debug_hud|on/off true/false 1/0 (no argument toggles); click-to-pin raw target identity (not saved), shown under the stat bars; a CHIM placement is named by mesh, reference and cell. Attack selects while on; right click or off leaves it and restores attacks after releasing the button. Use dbg overlay for overlays without inspection.
 DIAGNOSTICS|hud type|aw_debug_hud_type|1 original / 2 compact (default)
 DIAGNOSTICS|logs live|aw_logs_live_set|[on/off, true/false or 1/0] write the diagnostic logs (DEBUG.TXT, walk-profile.csv, frame-stalls.csv, heap-audit.log, cell-load-profile.tsv, music-events.csv, ...) as they happen, for benchmarks; default off: kept in memory (oldest lines drop) and written at Exit game or with dbg savelogs (saved once set)
 DIAGNOSTICS|npcfloors|aw_npc_floors|(read-only ground-contact report)

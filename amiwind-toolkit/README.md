@@ -1,6 +1,6 @@
 # AmiWind Toolkit
 
-_Last updated with AmiWind v0.0.48-dev2 (22 October 2026)._
+_Last updated with AmiWind v0.0.62-dev1 (7 November 2026)._
 
 The AmiWind Toolkit is a set of web pages for looking at AmiWind's world: where the conversion stands on the
 island map, any converted map in 3D, and its polygon and memory figures. Everything runs in your own browser.
@@ -88,6 +88,7 @@ conversion, native or packaged coverage.
 | **Local** | One area's maps around a cell, ready to open in 3D |
 | **3D Inspector** (`map-inspector.html`) | Fly through a map's real polygons: Quake `.bsp` maps, CHIM maps (`.chim`) and whole CHIM worlds, with polygon counts, textures and the CHIM memory overlay |
 | **Monitor** (`monitor.html`) | A build as it runs, read-only: its live log, stage progress, ETA, cores in use, a live stage timeline and recent builds and gates |
+| **Seam Check** (`seam-check.html`) | A reduced actor model's seam receipt: new openings, thickness at 25 / 50 / 75 % of each limb, the join map ([details](../docs/AMIWIND_TOOLKIT.md#seam-check)) |
 
 ![3D Inspector on a CHIM map (.chim): its entities as markers and the CHIM frame that holds its geometry](../docs/images/amiwind-v0.0.36-toolkit-inspector-chim-map.png)
 

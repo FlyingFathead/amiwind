@@ -1,12 +1,12 @@
 {
   "schema": "amiwind-disk-footprint-1",
-  "version": "0.0.61-dev3",
-  "build": "2026_11_06_v0.0.61-dev3_full-v0.0.61-dev3_ad4f950",
-  "measured": "2026-11-06",
+  "version": "0.0.62-dev1",
+  "build": "2026_11_07_v0.0.62-dev1_full-v0.0.62-dev1_089421b",
+  "measured": "2026-11-07",
   "bytes": {
-    "run": 20443856896,
-    "scratch": 3004211200,
-    "cache": 403886080,
+    "run": 19588620288,
+    "scratch": 5344608256,
+    "cache": 267620352,
     "pool": 0,
     "game_data": 1926864896,
     "builder_image": 2146901118
@@ -14,151 +14,151 @@
   "file_systems": [
     {
       "role": "workspace",
-      "peak_growth": 23168901120,
-      "growth": 20164689920
+      "peak_growth": 20860960768,
+      "growth": 15516352512
     }
   ],
   "stages": {
     "actor-contact": {
-      "workspace": 52420608
+      "workspace": 2727936
     },
     "actor-library": {
-      "workspace": 213282816
+      "workspace": 548864
     },
     "area": {
-      "workspace": 167104512
+      "workspace": 4321280
     },
     "balmora-interiors": {
-      "workspace": 197718016
+      "workspace": 17199104
     },
     "books": {
-      "workspace": 7536640
+      "workspace": 11071488
     },
     "bsp": {
-      "workspace": 27172864
+      "workspace": 688128
     },
     "cell-progress": {
-      "workspace": 142974976
+      "workspace": 120053760
     },
     "census": {
-      "workspace": 12132352
+      "workspace": 1265664
     },
     "character": {
-      "workspace": 10911744
+      "workspace": 10805248
     },
     "chargen": {
-      "workspace": 7598080
+      "workspace": 11247616
     },
     "chim": {
-      "workspace": 9893150720
+      "workspace": 13084217344
     },
     "chim-interiors": {
-      "workspace": 351277056
+      "workspace": 456163328
     },
     "chim-room-batches": {
-      "workspace": 4293877760
+      "workspace": 166006784
     },
     "chim-rooms-vivec_city": {
-      "workspace": 602963968
+      "workspace": 9498624
     },
     "chim-town-balmora": {
-      "workspace": 9244672
+      "workspace": 1585152
     },
     "chim-town-seyda": {
-      "workspace": 402509824
+      "workspace": 1150976
     },
     "chim-town-vivec_city": {
-      "workspace": 364974080
+      "workspace": 1241088
     },
     "dialogue-lookup": {
-      "workspace": 319488
+      "workspace": 1363968
     },
     "door-audio": {
-      "workspace": 1765376
+      "workspace": 18939904
     },
     "engine": {
-      "workspace": 65220608
+      "workspace": 230072320
     },
     "focus": {
-      "workspace": 7458816
+      "workspace": 10833920
     },
     "hand-catalog": {
-      "workspace": 576528384
+      "workspace": 3940352
     },
     "hands": {
-      "workspace": 17707008
+      "workspace": 700416
     },
     "harvest": {
-      "workspace": 16494592
+      "workspace": 14303232
     },
     "image": {
-      "workspace": 8164737024
+      "workspace": 7758688256
     },
     "interior": {
-      "workspace": 31907840
+      "workspace": 1044480
     },
     "intro": {
-      "workspace": 111353856
+      "workspace": 3248128
     },
     "item-models": {
-      "workspace": 52039680
+      "workspace": 183619584
     },
     "items-index": {
-      "workspace": 7565312
+      "workspace": 10936320
     },
     "media": {
-      "workspace": 28418048
+      "workspace": 16306176
     },
     "music": {
-      "workspace": 5025792
+      "workspace": 10969088
     },
     "mwscript": {
-      "workspace": 30003200
+      "workspace": 61075456
     },
     "npcs": {
-      "workspace": 28938240
+      "workspace": 598016
     },
     "opening-references": {
-      "workspace": 39931904
+      "workspace": 1323008
     },
     "reading": {
-      "workspace": 28188672
+      "workspace": 17776640
     },
     "scene": {
-      "workspace": 311296
+      "workspace": 466944
     },
     "scenery": {
-      "workspace": 192512
+      "workspace": 4460544
     },
     "seam-audit": {
-      "workspace": 352256
+      "workspace": 10407936
     },
     "setup": {
-      "workspace": 221184
+      "workspace": 1294336
     },
     "terrain": {
-      "workspace": 217088
+      "workspace": 1257472
     },
     "world-flora": {
-      "workspace": 59641856
+      "workspace": 946176
     },
     "world-flora-assets": {
-      "workspace": 93618176
+      "workspace": 5054464
     },
     "world-scenery": {
-      "workspace": 471040
+      "workspace": 1019904
     },
     "world-scenery-assets": {
-      "workspace": 458752
+      "workspace": 10571776
     },
     "world-survey": {
-      "workspace": 24588288
+      "workspace": 5746688
     },
     "world-terrain": {
-      "workspace": 354410496
+      "workspace": 1433600
     },
     "world-ui": {
-      "workspace": 105226240
+      "workspace": 1433600
     }
   },
   "note": "The last known good build's disk figure (tools/disk_need.py, BUILD-DISK-NEED-UNKNOWN-52): bytes on disk, each file once. Written by tools/disk_need.py ship RUN."

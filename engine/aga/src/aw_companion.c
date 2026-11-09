@@ -25,6 +25,7 @@
 #include "aw_npcpath.h"
 #include "aw_anim.h"
 #include "aw_actors.h"   /* AW_CombatSlotState, AW_CombatTestEngage (dbg kill) */
+#include "aw_crime.h"    /* dbg kill crime (CRIME-59) */
 
 #define DISTANCE_MIN 48         /* dbg companion distance: follow distance clamp */
 #define DISTANCE_MAX 512
@@ -67,7 +68,7 @@ static struct {
     double started, think_seconds, think_max;
 } stats;
 
-static struct {unsigned char on, click, red, drawn, kill; int frame; edict_t *target;} pick;   /* kill: dbg kill's pick (DBG-KILL-60) */
+static struct {unsigned char on, click, red, drawn, kill, crime; int frame; edict_t *target;} pick;   /* kill: dbg kill's pick (DBG-KILL-60); crime: dbg kill crime's (CRIME-59) */
 static cvar_t think_interval={"aw_companion_think","0.1"};
 /* How close the follower keeps (feet to feet, game units). 96: out of the
  * player's way in a doorway, still in view. Not saved. */
@@ -427,10 +428,15 @@ static edict_t *pick_target(void) {
 /* A click in pick mode: dbg companion pick makes the actor follow, dbg kill (DBG-KILL-60) kills it through the same call
  * as "chim actors kill" (AW_CombatTestEngage dead: it lies down, is not solid, its death is on the change list at once). */
 static void pick_act(edict_t *e) {
+    int can=0;
     if(!pick.kill){pick_npc(e);return;}
+    /* dbg kill crime (CRIME-59): canCommitCrimeAgainst before the blow, then actorKilled (the murder when it is one) */
+    if(pick.crime)can=AW_CrimeCanCommit(e);
     if(AW_CombatTestEngage(e,1)){
         eval_t *r=GetEdictFieldValue(e,"aw_ref");
         Con_Printf("dbg kill: %s (ref %.0f) is dead\n",e->v.netname?pr_strings+e->v.netname:"?",r?r->_float:0.0f);
+        if(pick.crime)Con_Printf("dbg kill crime: %s\n",AW_CrimeKilled(e,can)?"a murder (aw_placed crime shows it)":
+                                 "no crime (not an NPC, or it was fair to kill)");
     }else Con_Printf("dbg kill: %s has no combat sheet and cannot be killed\n",e->v.netname?pr_strings+e->v.netname:"?");
 }
 /* view.c: 0 = not picking (normal crosshair rule), 1 = picking, no target
@@ -524,9 +530,15 @@ static void toggle_pick(void) {
  * registry budget); dbg kill REF is "chim actors kill REF". */
 void AW_CompanionKillMode(void) {
     if(!player() || cls.state!=ca_connected){Con_Printf("AmiWind: start the local scene first.\n");return;}
-    if(pick.on && pick.kill){pick.on=0;pick.kill=0;Con_Printf("Pick mode off.\n");return;}
-    pick.on=1;pick.kill=1;pick.frame=-1;pick.target=NULL;
+    if(pick.on && pick.kill){pick.on=0;pick.kill=0;pick.crime=0;Con_Printf("Pick mode off.\n");return;}
+    pick.on=1;pick.kill=1;pick.crime=0;pick.frame=-1;pick.target=NULL;
     Con_Printf("Kill mode: aim at an NPC or creature (red crosshair) and attack to kill it; dbg kill, a right click or Escape leaves.\n");
+}
+/* dbg kill crime (CRIME-59): the kill pick, each kill counted as the player's by the crime rules (a witnessed murder:
+ * the bounty, the message, the reactions; an attacker or a creature: no crime) */
+void AW_CompanionKillCrime(void) {
+    AW_CompanionKillMode();
+    if(pick.on && pick.kill){pick.crime=1;Con_Printf("Kill mode counts as the player's crime (dbg kill crime).\n");}
 }
 static void distance(void) {
     float v;

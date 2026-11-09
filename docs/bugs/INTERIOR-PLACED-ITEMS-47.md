@@ -2,11 +2,12 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 3 times; something has to be done
+## PERSISTING: reported 4 times; something has to be done
 
 - Reported with v0.0.54-dev1 at 2026-10-27 17:17 +0200: PERSISTING (27 October 2026, the NPC docs audit): 6 of 2,031 placed items in interiors are takeable.
 - Reported with v0.0.58-dev4 at 2026-11-01 05:16 +0000: The office's 124 takeable items now share one inline model per equal item (57 models instead of 124), the shared bake taken from the first equal item, so the office stays under the engine's model table. Each item keeps its own func_wall edict and reference, so the aim box, taking with the activate key and the saved taken state work as before.
 - Reported with v0.0.58-dev3 at 2026-11-01 05:33 +0200: PERSISTING (v0.0.58-dev3 test image): the opening's Census and Excise Office is a compiled room map (tools/prepare_census.py) that leaves all 124 small items out (Iron Dagger 119577, Quill Pen 406347, the meal on the back-room table and others): they are not drawn and cannot be taken. Only the registration paper is kept, as the opening's own object.
+- Reported with v0.0.61 at 2026-11-07 (time not recorded): Seen again on the v0.0.61 release image: in the Andrano Ancestral Tomb no container or placed item can be used (ROOM-OBJECTS-MISSING-62).
 
 <!-- END GENERATED PERSISTING -->
 
@@ -35,7 +36,7 @@ _Last updated with AmiWind v0.0.56 (30 October 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
+- [PERSISTING: reported 4 times; something has to be done](#persisting-reported-4-times-something-has-to-be-done)
 - [Status: 21 October 2026](#status-21-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -188,10 +189,12 @@ Family: Content silently missing from a build (`build-content-missing`). Every o
 - [NIGHT-WINDOWS-LOST-CHIM-36](NIGHT-WINDOWS-LOST-CHIM-36.md): Windows no longer glow at night: the night-windows table has been empty since the towns moved to CHIM
 - [PLAYTEST-PAYLOAD-COVERAGE-32](PLAYTEST-PAYLOAD-COVERAGE-32.md): The v0.0.32-dev1 playtest has no first-person hands and no harvest
 - [RELEASE-PRIVATE-NAMES-48](RELEASE-PRIVATE-NAMES-48.md): Two public files named the private working folder, and seven public lines used a banned abbreviation for actor behaviour
+- ROBE-PART-NOT-BAKED-62 (no report page): An equipped robe taken from Tarhiel is drawn in first person but not on the third-person body or in the inventory picture
 - [ROOM-ACTORS-FLOATING-48](ROOM-ACTORS-FLOATING-48.md): Regression: 1,662 residents of batch CHIM rooms stood above the floor, never fitted to it
 - [ROOM-BATCH-HARVEST-48](ROOM-BATCH-HARVEST-48.md): Harvestable plants in batch rooms may stay baked scenery
 - [ROOM-BATCH-NPC-GROUNDING-48](ROOM-BATCH-NPC-GROUNDING-48.md): The residents of rooms no town list holds have no grounding class: --room-batches 5 is refused (62 NPCs in 22 rooms)
 - [ROOM-BATCH-WATER-OUTSIDE-48](ROOM-BATCH-WATER-OUTSIDE-48.md): Room batches refused rooms whose cell water lies under or over everything the room places (water outside the room bounds)
+- [ROOM-OBJECTS-MISSING-62](ROOM-OBJECTS-MISSING-62.md): In the Andrano Ancestral Tomb only the doors can be used: no containers, items or creatures
 - [SEYDA-LANTERNS-MISSING-31](SEYDA-LANTERNS-MISSING-31.md): Seyda Neen lanterns light the night but are not in its maps
 - [SKY-FLAT-PALETTE-DRIFT-41](SKY-FLAT-PALETTE-DRIFT-41.md): Exterior sky flat with no clouds: the sampled palette drifted and the shared cloud sky silently fell back to a one-colour placeholder
 - TREE-SCALE-001 (no report page): Non-unit-scale tree sprites omitted; bounds too conservative

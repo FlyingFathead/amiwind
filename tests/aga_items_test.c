@@ -59,6 +59,14 @@ int main(void) {
         AW_ItemsPose(tag,origin,0,o,a);assert(near(o[0],110) && near(o[1],200) && near(o[2],305) && near(a[0],-1) && near(a[1],2) && near(a[2],3));   /* pitch negated for r_alias.c */
         AW_ItemsPose(tag,origin,90,o,a);assert(near(o[0],100) && near(o[1],210) && near(o[2],305) && near(a[1],92));
     }
+    {   /* HELD-WEAPON-WRONG-MODEL-62: a held item is drawn only from an item model with the tag's own path */
+        assert(AW_ItemsIsItemPath("items/w0123456789ab.mdl") && AW_ItemsIsItemPath("progs/items/s_shield.mdl"));
+        assert(!AW_ItemsIsItemPath("progs/npcs/n_deck_prisoner.mdl") && !AW_ItemsIsItemPath("progs/myitems/x.mdl"));
+        assert(!AW_ItemsIsItemPath("") && !AW_ItemsIsItemPath(NULL) && !AW_ItemsIsItemPath("maps/seyda.chim"));
+        assert(AW_ItemsPathHash("items/w_a.mdl")==AW_ItemsPathHash("items/w_a.mdl"));
+        assert(AW_ItemsPathHash("items/w_a.mdl")!=AW_ItemsPathHash("items/w_b.mdl"));
+        assert(AW_ItemsPathHash("")==2166136261u && AW_ItemsPathHash(NULL)==0);
+    }
     printf("items ok\n");
     return 0;
 }

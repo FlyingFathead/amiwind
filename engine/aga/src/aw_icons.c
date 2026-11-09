@@ -93,6 +93,44 @@ int AW_IconLoad(aw_icon_t *slot,const char *key){
     slot->ok=picture_load(key,&slot->w,&slot->h,slot->pixels,AW_ICON_MAX,AW_ICON_MAX);
     return slot->ok;
 }
+/* An item's picture: "big:<id>" (32 x 32, black behind it), else "inv:<id>" (the inventory window's 16 x 16, which
+ * every item the player can own has); the slot remembers the item, so a missing "big:" is not looked up again each frame. */
+int AW_IconLoadItem(aw_icon_t *slot,const char *id){
+    char want[64],key[64];
+    if(!slot || !id || !*id || strlen(id)>58){if(slot){slot->key[0]=0;slot->ok=0;}return 0;}
+    sprintf(want,"item*%s",id);
+    if(!strcmp(slot->key,want))return slot->ok;
+    sprintf(key,"big:%s",id);slot->key[0]=0;
+    if(!AW_IconLoad(slot,key)){sprintf(key,"inv:%s",id);slot->key[0]=0;AW_IconLoad(slot,key);}
+    strcpy(slot->key,want);
+    return slot->ok;
+}
+/* ITEM-ICONS-MISSING-62: where a W x H picture sits in a slot of SLOT_W x SLOT_H: the largest whole-number scale that
+ * fits (nearest neighbour, so a 16 x 16 inventory picture fills a 34 x 34 cell at 2x and a 32 x 32 one at 1x), centred
+ * with the same margin on both sides (a spare odd pixel goes to the bottom right). Returns the scale (0: it does not
+ * fit at all); *OX and *OY are the picture's top left inside the slot. */
+int AW_IconFit(int w,int h,int slot_w,int slot_h,int *ox,int *oy){
+    int k;
+    if(w<1 || h<1 || slot_w<1 || slot_h<1 || w>slot_w || h>slot_h)return 0;
+    k=slot_w/w<slot_h/h?slot_w/w:slot_h/h;
+    if(ox)*ox=(slot_w-w*k)/2;
+    if(oy)*oy=(slot_h-h*k)/2;
+    return k;
+}
+/* A slot: filled with COLOUR (black, the house background of every item slot), the picture on it at the AW_IconFit
+ * position and scale. The inventory, container and barter windows draw their pictures through this one function. */
+void AW_IconDrawFit(const aw_icon_t *icon,int x,int y,int slot_w,int slot_h,int colour){
+    int ox,oy,k,yy,xx,ky,kx;
+    AW_UIFill(x,y,slot_w,slot_h,colour);
+    if(!icon || !icon->ok || !(k=AW_IconFit(icon->w,icon->h,slot_w,slot_h,&ox,&oy)))return;
+    if(x+ox<0 || y+oy<0 || x+ox+icon->w*k>(int)vid.width || y+oy+icon->h*k>(int)vid.height)return;
+    for(yy=0;yy<icon->h;yy++)for(ky=0;ky<k;ky++){
+        unsigned char *dst=vid.buffer+(y+oy+yy*k+ky)*vid.rowbytes+x+ox;
+        const unsigned char *src=icon->pixels+yy*icon->w;
+        for(xx=0;xx<icon->w;xx++)for(kx=0;kx<k;kx++)*dst++=src[xx];
+    }
+    aw_icon_stats.draws++;
+}
 void AW_IconDraw(const aw_icon_t *icon,int x,int y){
     int yy;
     if(!icon || !icon->ok || x<0 || y<0 || x+icon->w>(int)vid.width || y+icon->h>(int)vid.height)return;
@@ -265,7 +303,7 @@ static int inventory_row_icon(int slot,const char *id,int equipped,int x,int y){
     if(!AW_IconLoad(t,key) && equipped){sprintf(key,"inv:%s",id);if(!AW_IconLoad(t,key))return 0;}
     else if(!t->ok)return 0;
     if(t->w!=16 || t->h!=16)return 0;
-    AW_IconDraw(t,x,y);return 1;
+    AW_IconDrawFit(t,x,y,16,16,AW_UIColor(0,0,0));return 1;   /* the shared slot fit (ITEM-ICONS-MISSING-62) */
 }
 /* AREA-TABLES-59: the pack's own read for the carried items' pictures, taken while an area loads (aw_inventory.c) */
 static int area_picture_read(const char *key,int *w,int *h,byte *pixels,int maxw,int maxh){

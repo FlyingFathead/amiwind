@@ -137,7 +137,18 @@ int main(void){
      for(i=0;i<64000;i++)if(vid.buffer[i]!=137 && i/320<top)top=i/320;
      assert(top>=128 && top<190 && changed(160,199));
      AW_UISubtitle("Speaker","AAAA",4);assert(!AW_UISubtitleIs("AAAA")); /* speech is not a photo notice */
-     photo=0;r_refdef.vrect.height=152;}
+     photo=0;
+     /* SKILL-RAISE-NOT-SEEN-62: a held notice (the skill raise) shows over the bottom of a view with no strip, and
+      * the next line waits 3 s for it, then follows */
+     realtime=400;AW_UIHeldNotice("Raised",4,3);
+     top=200;clean();AW_UIDraw();
+     for(i=0;i<64000;i++)if(vid.buffer[i]!=137 && i/320<top)top=i/320;
+     assert(top>=128 && top<200);
+     AW_UIVoiceSubtitle("Speaker","Ouch",2);assert(AW_UISubtitleIs("Raised"));
+     realtime=402;clean();AW_UIDraw();assert(AW_UISubtitleIs("Raised"));
+     realtime=403.5;clean();AW_UIDraw();assert(!AW_UISubtitleIs("Raised"));   /* the voice line now (it has a speaker) */
+     clean();AW_UIDraw();for(i=0;i<64000;i++)assert(vid.buffer[i]==137);    /* not held: no strip, nothing */
+     r_refdef.vrect.height=152;}
     return 0;
 }
 int AW_PhotoModeActive(void){return photo;}

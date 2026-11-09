@@ -1,11 +1,12 @@
 # Roadmap and implementation options
 
-_Last updated with AmiWind v0.0.62-dev1 (7 November 2026)._
+_Last updated with AmiWind v0.0.62 (8 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
-- [v0.0.61: released 6 November 2026; v0.0.62 next](#v0061-released-6-november-2026-v0062-next)
+- [v0.0.62: released 8 November 2026; v0.0.63 next](#v0062-released-8-november-2026-v0063-next)
+- [v0.0.61: released 6 November 2026](#v0061-released-6-november-2026)
 - [v0.0.60: released 4 November 2026](#v0060-released-4-november-2026)
 - [v0.0.59: released 3 November 2026](#v0059-released-3-november-2026)
 - [v0.0.58: released 1 November 2026](#v0058-released-1-november-2026)
@@ -110,7 +111,35 @@ _Last updated with AmiWind v0.0.62-dev1 (7 November 2026)._
 
 15 October 2026: exact-source validation completed 4,231 tests: 4,225 passed, three Windows-only skips and three tracked Census expected failures. The 71 focused tests and original-data readback across nine frame positions passed, consistently hiding 33 of 158 original references at stronghold state 6 while preserving unknown scripts. All 243 player resources are reusable after exact producer, input and file verification. Complete combined-world conversion, native comparison, packaging and shipment remain pending; coverage counts are unchanged.
 
-## v0.0.61: released 6 November 2026; v0.0.62 next
+## v0.0.62: released 8 November 2026; v0.0.63 next
+
+v0.0.62, "Stick To The Script", shipped as what was to be its third development snapshot, with its final version
+number ([release notes](releases/notes/RELEASE-v0.0.62.md); snapshots [dev1](releases/notes/RELEASE-v0.0.62-dev1.md) and
+[dev2](releases/notes/RELEASE-v0.0.62-dev2.md), which was not delivered and whose work ships in v0.0.62).
+
+**Done in v0.0.62:**
+
+- **Alchemy** as in the original: the alchemy window, potions drunk, ingredients eaten (dev1).
+- **The creatures placed in rooms:** 228 creature records built, 527 of 904 room placements; the creature and flora
+  census; pickable tree fungi (dev1).
+- **The game's scripts:** 588 of 1,207 run (479 in dev1); the new-game scripts, the falling mage, falls, PositionCell,
+  followers and the Place functions; the census office runs its own scripts; items carried or kept in containers and
+  characters from levelled lists run theirs.
+- **The crime system, except pickpocketing and owned locks:** assault, murder and trespass seen by guards, arrest, fine,
+  resisting arrest and jail, with pursuers and marks saved.
+- **Dialogue:** choices as rows to pick, links that stay clickable, scroll bars, persuasion, fights that an answer sets.
+- **A failed room load recovers, and a New Game resets the game state.**
+- **Characters reduced with measured and locked seams;** summoned creatures; a double-click in the inventory; debug
+  commands for gold, the carrying limit, the level and the stats.
+
+**Shipped, with its in-game check still to do:** the pieces listed under "Not yet seen in game" in the release notes.
+
+**Still to do (v0.0.63 and later):** pickpocketing and picking owned locks; enchanting; spellmaking; the rest of the
+game's scripts; per-area data tables for containers, doors, items, activators and creatures; outdoor items that can be
+picked up; dropped lights with their flame; the Constant Effect items of other characters; summoned creatures that fight
+for the player.
+
+## v0.0.61: released 6 November 2026
 
 v0.0.61, "Keep Your Lantern Lit", shipped as its third development snapshot with its final version number
 ([release notes](releases/notes/RELEASE-v0.0.61.md); snapshots [dev1](releases/notes/RELEASE-v0.0.61-dev1.md),
@@ -148,7 +177,7 @@ Seyda Neen takes about a second; the resident bake of the Vivec town costs about
 to; the trip from Seyda Neen to Balmora sometimes stalls on the loading screen in the emulator; some rooms still load in
 after you arrive.
 
-**v0.0.62 is next.** It holds what moved from v0.0.61:
+**What moved from v0.0.61 to v0.0.62** (what v0.0.62 did with each is in the section above):
 
 - The in-game check of the third snapshot and the fixes it brings.
 - The original crime system: theft, pickpocketing, attacks, killing and trespass seen by witnesses raise a bounty, and
@@ -174,6 +203,11 @@ falls, fall damage and Slowfall; PositionCell, AIFollowCell, AIEscort and the Pl
 creature and flora census; the MWScript tracker at 479 of 1,207 scripts running; the in-game check of v0.0.61 and its
 fixes. Still to do from the list above: the crime system, enchanting, spellmaking, the per-area tables, outdoor items,
 dropped lights and the Constant Effect items of other characters.
+
+**In v0.0.62-dev2** ([release notes](releases/notes/RELEASE-v0.0.62-dev2.md), 7 November 2026, not delivered; its work
+ships in v0.0.62): a failed room load recovers and a New Game resets the game state; the census office runs the game's
+own scripts; guards arrest for assault, murder and trespass, with the fine and jail; dialogue links and persuasion;
+summoned creatures.
 
 The longer list that stood for v0.0.61 before this cut, with the status of each item at the time, follows under
 v0.0.60.
@@ -546,9 +580,13 @@ notes claims) and 63 open, 96 in all.
 - [ ] The dialogue conditions read the live state of the game: journal, globals, locals, dead counts, and the
   player's faction and rank (same sex, same race and should attack are live since v0.0.58; journal, globals, locals
   and dead counts follow).
-- [x] The rest of the original dialogue window: clickable links in text, persuasion, services, choices, result
-  scripts, exhausted topics and journal topic pages; shipped in v0.0.58 (the Fargoth greeting is not yet checked in
-  game).
+- [ ] In progress: the rest of the original dialogue window. Clickable links in text, persuasion, services, exhausted
+  topics and journal topic pages shipped in v0.0.58 (the Fargoth greeting is not yet checked in game). Dialogue
+  choices and the outcomes that depend on them are not done yet: choices do not show as rows to pick, and each
+  choice does not yet lead to the answer the original gives, such as paying only when you have the gold. Characters
+  who threaten you in dialogue attacking when the talk ends, and fights that start from dialogue results across the
+  whole game, are being checked. These lead the next landmark: every game script running as in the original,
+  measured by the MWScript feature tracker; other fixes continue alongside.
 - [ ] In progress: joining and rising in factions: ranks are kept, saved and checked by dialogue.
 - [ ] The full trade window: buying and selling with prices from disposition and skill.
 - [ ] Topic names in the journal quest entries become links too.

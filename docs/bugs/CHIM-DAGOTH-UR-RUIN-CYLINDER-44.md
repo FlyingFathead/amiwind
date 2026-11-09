@@ -2,11 +2,12 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 3 times; something has to be done
+## PERSISTING: reported 4 times; something has to be done
 
 - Reported with v0.0.44-dev1 at 2026-10-19 15:17 +0300: third screenshot, global 20178 71745 17371: curved swept sheets around the crater; maintainer suspects animated graphics layers
 - Reported with v0.0.44-dev1 at 2026-10-19 15:18 +0300: the inspect pick cannot select the sheets: no collision, which fits an effect layer rather than a ruin piece
 - Reported with v0.0.44-dev1 at 2026-10-19 15:20 +0300: maintainer, from modding and playing the original through: a graphics layer meant to be something else, like a whirlwind (animated ash swirl)
+- Reported with v0.0.62-dev1 at 2026-11-07 19:20 +0200: Seen again in v0.0.62-dev1: the blight-cloud whirlwind at Dagoth Ur is drawn as a big solid brown shape.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -98,6 +99,7 @@ Family: Object placement and in-game geometry (`placement-geometry`). Placed obj
 - [CHIM-BC-TREE-PYRAMID-BOX-47](CHIM-BC-TREE-PYRAMID-BOX-47.md): Bitter Coast trees (flora_bc_tree family) look like a pyramid trunk with a flat box floating above it
 - [CHIM-TERRAIN-ROCK-EXEMPT-38](CHIM-TERRAIN-ROCK-EXEMPT-38.md): Terrain-named placed rocks bypass experimental buried-surface clipping
 - [CONVERTER-ROOT-ROTATION-30](CONVERTER-ROOT-ROTATION-30.md): Converter applied NIF root-node rotation to placed meshes
+- CREATURE-FLOATING-62 (no report page): A scrib in the wilderness floats above the terrain
 - ROCK-FLORA-SURFACE-29 (no report page): Angular rock-like surfaces newly appearing in Bitter Coast
 - SHACK-VISIBILITY-29 (no report page): Indrele Rathryon shack front walls missing
 - [WORLD-SHORE-OPEN-GEOMETRY-38](WORLD-SHORE-OPEN-GEOMETRY-38.md): Shoreline objects show large open sections and thin disconnected edges

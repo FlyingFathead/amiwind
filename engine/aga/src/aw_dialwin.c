@@ -34,6 +34,7 @@
 #include "aw_talk.h"
 #include "aw_msgbox.h"
 #include "aw_levelup.h"
+#include "aw_dial_links.h"
 
 #define BOX_X 8
 #define BOX_Y 6
@@ -47,11 +48,16 @@
 #define HITS 48                     /* the links on screen this frame (clicks, Tab) */
 #define NAME_CHARS 32
 typedef struct {short start,len;unsigned char heading,spans;aw_dial_span_t span[PARA_SPANS];} para_t;
-typedef struct {short x,y,w;unsigned short topic;short para,span;} hit_t;
+typedef aw_dial_hit_t hit_t;
 
 static const char path[]="dialogue.lut";
 static aw_dial_t table;
 static unsigned char *resident,*known;
+/* DIALOGUE-LINKS-62: the topics a word in the text links to now, one bit per table topic (OpenMW DialogueWindow seeds
+ * its keyword search with the topic list only: the topics the player knows that this speaker answers); a builder
+ * span to any other topic is drawn and clicked as plain text */
+static unsigned char *linkable;
+static int link_on(int topic){return AW_DialLinkOn(linkable,(int)table.topics,topic);}
 static int loaded;                  /* 0 not tried, 1 usable, -1 unavailable (logged once) */
 
 static int active,row,listed,scroll,disposition;
@@ -61,7 +67,11 @@ static aw_dial_facts_t facts;      /* the speaker's disposition facts while the 
 #define CODE_BACK (-2)
 #define CODE_TRAVEL (-3)
 #define CODE_SERVICE(k) (-30-(k))     /* k an index of services_shown[] */
-#define CODE_ACTION(k) (-10-(k))
+/* PERSUASION-BROKEN-62: the persuasion rows had -10..-15, the codes the enchanting page took later
+ * (CODE_EN_ITEM -10 ... CODE_EN_BUY -15), and ask() tests those first: Admire opened the item page, Intimidate the
+ * gem page, Taunt changed a style, the bribes added, removed or bought. Every list code range is now apart
+ * (tests/test_dialwin_codes.py checks it). */
+#define CODE_ACTION(k) (-900-(k))
 static int mode,fight_started,travel_after;
 static unsigned long services;      /* the speaker's service flags (AW_DialServices), read when the conversation opens */
 /* the service entries in OpenMW's order (DialogueWindow::updateTopicsPane), Travel between Spells and Spellmaking */
@@ -81,12 +91,22 @@ static int leave_after;
 #define SERVICE_SPELLS 1
 #define SERVICE_BARTER 0
 #define SERVICE_REPAIR 6
-/* the result scripts' Choice and Goodbye (OpenMW DialogueWindow: choices replace the topics until one is picked; after
- * Goodbye only the Goodbye button is left) */
+/* the result scripts' Choice and Goodbye (OpenMW 0.51 DialogueWindow; after Goodbye only the Goodbye button is left).
+ * DIALOGUE-CHOICES-62: the choices are rows in the conversation text under the last answer, picked by a click or by
+ * Up/Down and Enter (aw_dial_links.c AW_DialChoiceAt / AW_DialChoiceStep), never by typed letters (the topic list's
+ * search picked "Fine." for a typed "n"); while they are open the topic list, the links, Goodbye and Escape are
+ * refused (OpenMW onSelectListItem and exit() while isInChoice). The pick sets the Choice value and the same topic is
+ * searched again from its first answer with every filter (gold carried, items, journal, disposition: aw_dial.c
+ * AW_DialAnswer, OpenMW DialogueManager::questionAnswered). The three masters' longest option is 197 characters
+ * (Morrowind.esm 115), the most options of one call 9 (docs/dialogue-choices.json, tools/dialogue_choices.py); the
+ * rows take 2 KB for the session. */
 #define CHOICES 10
+#define CHOICE_CHARS 200
 #define RESULT_TEXT 3072             /* the longest result text of the three masters is far shorter */
 #define CODE_CHOICE(k) (-800-(k))
-static int choice_count,choice_number[CHOICES],choice_topic=-1,goodbye_only;static char choice_text[CHOICES][64];
+static int choice_count,choice_number[CHOICES],choice_topic=-1,goodbye_only,choice_focus=-1;
+static char choice_text[CHOICES][CHOICE_CHARS];
+extern int aw_worldui_panel_holds_escape;   /* aw_worldui.c: Esc goes to the open panel, which does not close */
 #define SERVICE_SPELLMAKING 3
 /* Spellmaking (OpenMW SpellCreationDialog): page 7 the spell being made, page 8 the effects to add */
 #define CODE_SM_NAME (-5)
@@ -187,6 +207,7 @@ static int load(void) {
     fclose(f);
     file_size=size;
     AW_DialKnownStart(&table,known);
+    if((linkable=(unsigned char *)AW_TryMalloc((size_t)(table.topics/8+1)))!=NULL)memset(linkable,0,(size_t)(table.topics/8+1));
     Con_DPrintf("Dialogue: %ld topics, %ld NPC rows, %ld bytes resident\n",table.topics,table.npcs,resident_size);
     loaded=1;
     return 1;
@@ -287,7 +308,6 @@ static const char *label(void *ctx,int r){
     if(list[r]==CODE_PERSUASION)return T(AW_DIAL_TEXT_PERSUASION,"Persuasion");
     if(list[r]==CODE_BACK)return T(AW_DIAL_TEXT_BACK,"Back");
     if(list[r]==CODE_TRAVEL)return T(AW_DIAL_TEXT_TRAVEL,"Travel");
-    if(list[r]<=CODE_CHOICE(0) && list[r]>CODE_CHOICE(CHOICES))return choice_text[CODE_CHOICE(0)-list[r]];
     if(en_label){
         if(list[r]==CODE_EN_NAME)return en_label[0];
         if(list[r]==CODE_EN_ITEM)return en_label[1];
@@ -324,19 +344,33 @@ static const char *label(void *ctx,int r){
  * on its topic's journal page already, and none of the topics it names is unknown to the player. Drawn dimmer, still
  * chosen as any topic. Worked out once per list (the spans read the answer from disk), not per drawn frame. */
 static unsigned char spent[AW_DIAL_MAX_TOPICS];
+static int answers_topic(int topic);
+/* TOPIC-COLOURS-62: OpenMW's topic colours (DialogueWindow::updateTopicFormat, settings "color topic enable"): a
+ * "specific" topic (the answer this speaker gives now names this actor) and an "exhausted" one, specific first. One
+ * switch, the cvar aw_dialogue_topic_colours (console word aw_topic_colours, Options "Topic colours"), on by default
+ * (OpenMW's default is off). */
+static cvar_t topic_colours={"aw_dialogue_topic_colours","1",true};
+int AW_DialTopicColours(void){return topic_colours.value!=0;}
+void AW_DialTopicColoursToggle(void){Cvar_SetValue(topic_colours.name,AW_DialTopicColours()?0:1);}
+#define TOPIC_SPENT 1
+#define TOPIC_SPECIFIC 2
 static int topic_spent(int topic){
     int refused=0,answer,i,n;aw_dial_span_t spans[PARA_SPANS];
-    if(AW_DialTopicKind(&table,topic)!=AW_DIAL_KIND_TOPIC)return 0;
+    if(!AW_DialTopicColours() || AW_DialTopicKind(&table,topic)!=AW_DIAL_KIND_TOPIC)return 0;
     if((answer=AW_DialPick(&conv,topic,&state,&refused))<0 || refused)return 0;
+    if(conv.answer[answer].flags&AW_DIAL_ENTRY_ACTOR)return TOPIC_SPECIFIC;
     if(!AW_DialHeardHas((int)conv.answer[answer].entry))return 0;
     n=AW_DialSpans(&conv,answer,read_file,NULL,spans,PARA_SPANS);
-    for(i=0;i<n;i++)if(!AW_DialKnows(&table,known,spans[i].topic))return 0;
-    return 1;
+    /* an unknown topic it names counts only when this speaker answers it (OpenMW: mActorKnownTopics) */
+    for(i=0;i<n;i++)if(!AW_DialKnows(&table,known,spans[i].topic) && answers_topic(spans[i].topic))return 0;
+    return TOPIC_SPENT;
 }
 static void refresh(void){
-    int keep=AW_ListBoxSelected(&box),at=keep>=0 && keep<listed?list[keep]:-99,i,j;
+    int keep=AW_ListBoxSelected(&box),at=keep>=0 && keep<listed?list[keep]:-99,i,j,topics_at=-1;
+    /* DIALOGUE-CHOICES-62: an open Choice keeps the topic list where it is (drawn dim, refused); its rows are in the
+     * text (history_lines) */
+    if(active)aw_worldui_panel_holds_escape=choice_count>0;
     if(goodbye_only){listed=0;}
-    else if(choice_count){for(i=0;i<choice_count;i++)list[i]=CODE_CHOICE(i);listed=choice_count;}
     else if(mode==1){
         for(i=0;i<AW_PERSUADE_KINDS;i++)list[i]=CODE_ACTION(i);
         list[AW_PERSUADE_KINDS]=CODE_BACK;listed=AW_PERSUADE_KINDS+1;
@@ -393,8 +427,22 @@ static void refresh(void){
             else if(services&services_mask[i])list[fixed++]=CODE_SERVICE(i);
         }
         listed=fixed+AW_DialTopicList(&conv,known,&state,list+fixed,AW_DIAL_MAX_TOPICS-fixed);
+        topics_at=fixed;
     }
-    for(i=0;i<listed;i++)spent[i]=(unsigned char)(list[i]>=0 && mode==0 && !choice_count && topic_spent(list[i]));
+    /* DIALOGUE-LINKS-62 (v0.0.62-dev1: a link click worked once, then the links of the new answer stayed dead): the
+     * linkable set follows the topic list after EVERY change, in every mode. It was rebuilt only while the window
+     * showed the topic list, so with the barter, spell, training or persuasion list showing, a link asked from the
+     * text added an answer whose newly learned topics were never made linkable (drawn plain, clicks ignored), and the
+     * set kept the topics of an older list. */
+    if(linkable){
+        if(topics_at>=0)AW_DialLinksSet(linkable,(int)table.topics,list+topics_at,listed-topics_at);
+        else{
+            static int topics[AW_DIAL_MAX_TOPICS];   /* static: the 68k stack is small */
+            int n=goodbye_only?0:AW_DialTopicList(&conv,known,&state,topics,AW_DIAL_MAX_TOPICS);
+            AW_DialLinksSet(linkable,(int)table.topics,topics,n);
+        }
+    }
+    for(i=0;i<listed;i++)spent[i]=(unsigned char)(list[i]>=0 && mode==0 && !choice_count?topic_spent(list[i]):0);
     AW_ListBoxReset(&box,listed,label,NULL,shown,list_rows());
     for(i=0;i<box.shown_count;i++)if(list[box.shown[i]]==at){box.selection=i;break;}
 }
@@ -425,6 +473,7 @@ static int affordable(int kind){return !bribe_gold[kind] || AW_MwscriptPlayerGol
 /* a row the player cannot choose now: a bribe of more gold than he has (OpenMW greys those buttons out) */
 static int greyed(int r){
     if(r<0 || r>=listed)return 0;
+    if(choice_count)return 1;        /* DIALOGUE-CHOICES-62: nothing in the list is chosen while a Choice is open */
     if(list[r]<=CODE_TRAIN(0) && list[r]>CODE_TRAIN(3))return AW_MwscriptPlayerGold(0)<train_price[CODE_TRAIN(0)-list[r]];
     if(list[r]<=CODE_SPELL(0) && list[r]>CODE_SPELL(SPELL_ROWS))return AW_MwscriptPlayerGold(0)<sale_price[CODE_SPELL(0)-list[r]];
     if(list[r]<=CODE_WARE(0) && list[r]>CODE_WARE(WARE_ROWS))return (mode==4 || mode==6) && AW_MwscriptPlayerGold(0)<ware_price[CODE_WARE(0)-list[r]];
@@ -473,12 +522,17 @@ static void release(void){
     free(sm);sm=NULL;free(sm_known);sm_known=NULL;free(sm_label);sm_label=NULL;sm_known_count=0;
     free(en);en=NULL;free(en_wares);en_wares=NULL;free(en_label);en_label=NULL;en_items=0;en_item=en_gem=en_edit=-1;
     memset(&conv,0,sizeof(conv));active=0;speaker=NULL;listed=0;history_len=0;nparas=0;nhits=0;focus=-1;
+    choice_count=0;choice_focus=-1;
 }
 static void closed(void){
-    edict_t *e=speaker;int travel=travel_after;
+    edict_t *e=speaker;int travel=travel_after,dispo=disposition,fighting=fight_started;
     if(active)goodbye();
     release();
     if(travel && e)AW_SceneTravelWith(e);      /* the menu opens once the window has gone (aw_scene.c AW_SceneTick) */
+    /* DIALOGUE-AGGRO-62: an answer's SetFight takes effect when the talk ends (OpenMW 0.51 actors.cpp: the actor whose
+     * Fight with the disposition and distance biases reaches 100 engages the player it sees; a robber's "SetFight 100 /
+     * Goodbye" with no StartCombat); StartCombat in an answer starts the fight at once (aw_mwhost.c actor_of) */
+    if(e && !e->free && !fighting && !travel)AW_MwscriptSpeakerAggro(e,dispo);
 }
 
 /* A console character in COLOR: drawn as usual, then the pixels it changed take the colour (any console font). */
@@ -495,7 +549,8 @@ static void char_in(int x,int y,int c,int color){
 /* the link (span index) holding character AT of paragraph P, -1 none */
 static int span_at(const para_t *p,int at){
     int k;
-    for(k=0;k<p->spans;k++)if(at>=p->span[k].offset && at<p->span[k].offset+p->span[k].length)return k;
+    for(k=0;k<p->spans;k++)
+        if(at>=p->span[k].offset && at<p->span[k].offset+p->span[k].length)return link_on(p->span[k].topic)?k:-1;
     return -1;
 }
 /* the lines of the conversation that fit, newest at the bottom (SCROLL lines up): one pass over the wrapped lines,
@@ -540,8 +595,84 @@ static int history_lines(int draw,int first){
             y+=row_h();
         }
     }
+    /* DIALOGUE-CHOICES-62: the open Choice's rows under the last answer, one option a row (wrapped, indented), in
+     * link blue, the keyboard's row on a band; each visible line of a row is a hit (para AW_DIAL_HIT_CHOICE, span =
+     * the row) for the mouse */
+    for(i=0;i<choice_count;i++){
+        const char *rest=choice_text[i];
+        for(;;line++){
+            if(!AW_DialWrapNext(&rest,cols-2,out,sizeof(out)))break;
+            if(!draw || line<first || line>=first+rows)continue;
+            x0=BOX_X+PAD+char_w();
+            if(nhits<HITS){
+                hit_t *h=&hits[nhits++];
+                h->x=(short)x0;h->y=(short)y;h->w=(short)((int)strlen(out)*char_w());h->topic=0;
+                h->para=(short)AW_DIAL_HIT_CHOICE;h->span=(short)i;
+            }
+            if(i==choice_focus)AW_UIFill(BOX_X+PAD,y-1,cols*char_w(),row_h(),AW_UIColor(46,46,92));
+            for(j=0;out[j];j++){
+                int x=x0+j*char_w();
+                if(x+char_w()>list_x()-6)break;
+                char_in(x,y,(unsigned char)out[j],blue);
+            }
+            y+=row_h();
+        }
+    }
     return line;
 }
+/* DIALOGUE-SCROLLBARS-62: the two panes' thin bars (aw_dial_links.c AW_DialBar): the text's beside the column rule,
+ * the list's at the list's right edge; drawn from the scroll state each frame, so the wheel, the keys and a drag stay
+ * in step */
+#define BAR_TEXT 0
+#define BAR_LIST 1
+static int bar_drag=-1;              /* the bar a mouse press started on (held: a drag moves it), -1 none */
+static int bar_x(int which){return which==BAR_TEXT?list_x()-5:list_x()+LIST_W-AW_DIAL_BAR_W;}
+static int sbar_y(int which){return which==BAR_TEXT?body_y()-2:list_y()-1;}
+static int bar_h(int which){return which==BAR_TEXT?BOX_Y+BOX_H-PAD-body_y()+2:list_rows()*row_h();}
+static int rgb(unsigned c){return AW_UIColor((int)(c>>16)&255,(int)(c>>8)&255,(int)c&255);}
+/* the pane's lines: total, visible and the first shown */
+static void bar_lines(int which,int *total,int *visible,int *first){
+    if(which==BAR_TEXT){*total=history_lines(0,0);*visible=text_rows();*first=*total-*visible-scroll;if(*first<0)*first=0;}
+    else{*total=box.shown_count;*visible=list_rows();*first=box.top;}
+}
+static void draw_bar(int which){
+    int total,visible,first,pos,len,x=bar_x(which),y=sbar_y(which),h=bar_h(which);
+    int a=AW_DIAL_BAR_ARROW;
+    bar_lines(which,&total,&visible,&first);
+    if(!AW_DialBar(total,visible,first,h-2*a,&pos,&len)){AW_UIFill(x,y,AW_DIAL_BAR_W,h,rgb(AW_DIAL_BAR_DIM));return;}
+    AW_UIFill(x,y,AW_DIAL_BAR_W,h,rgb(AW_DIAL_BAR_TRACK));
+    /* the arrow ends: a point (one pixel) over a base (the bar's width), up at the top, down at the bottom */
+    AW_UIFill(x+1,y,1,1,rgb(AW_DIAL_BAR_THUMB));AW_UIFill(x,y+1,AW_DIAL_BAR_W,1,rgb(AW_DIAL_BAR_THUMB));
+    AW_UIFill(x,y+h-2,AW_DIAL_BAR_W,1,rgb(AW_DIAL_BAR_THUMB));AW_UIFill(x+1,y+h-1,1,1,rgb(AW_DIAL_BAR_THUMB));
+    AW_UIFill(x,y+a+pos,AW_DIAL_BAR_W,len,rgb(AW_DIAL_BAR_THUMB));
+}
+/* the pane's first line set to FIRST */
+static void bar_set(int which,int total,int visible,int first){
+    if(which==BAR_TEXT){scroll=total-visible-first;if(scroll<0)scroll=0;}
+    else AW_ListBoxScroll(&box,first);
+}
+/* the pane scrolled so the thumb's centre sits at mouse Y (a drag) */
+static void bar_move(int which,int mouse_y){
+    int total,visible,first;
+    bar_lines(which,&total,&visible,&first);
+    bar_set(which,total,visible,
+            AW_DialBarFirst(total,visible,bar_h(which)-2*AW_DIAL_BAR_ARROW,mouse_y-sbar_y(which)-AW_DIAL_BAR_ARROW));
+}
+/* a plain click on the bar: arrow ends a line, the track a page, the thumb grabbed (dragged while held) */
+static void bar_click(int which,int mouse_y){
+    int total,visible,first,grab;
+    bar_lines(which,&total,&visible,&first);
+    bar_set(which,total,visible,AW_DialBarClick(total,visible,first,bar_h(which),mouse_y-sbar_y(which),&grab));
+    bar_drag=grab?which:-1;
+}
+static int bar_at(int mouse_x,int mouse_y){
+    int which;
+    for(which=BAR_TEXT;which<=BAR_LIST;which++)
+        if(mouse_x>=bar_x(which)-1 && mouse_x<bar_x(which)+AW_DIAL_BAR_W+1 && mouse_y>=sbar_y(which) &&
+           mouse_y<sbar_y(which)+bar_h(which))return which;
+    return -1;
+}
+static void bar_dragged(int mouse_x,int mouse_y){(void)mouse_x;if(active && bar_drag>=0)bar_move(bar_drag,mouse_y);}
 static void draw_history(void){
     int rows=text_rows(),total=history_lines(0,0),first;
     if(scroll>total-rows)scroll=total-rows;
@@ -562,7 +693,7 @@ static void draw(void){
         if(fill>0)AW_UIFill(BOX_X+PAD,bar_y()-1,fill,char_h()+2,AW_UIColor(38,56,170));
         text(BOX_X+(BOX_W-(int)strlen(line)*char_w())/2,bar_y(),line,right);
     }
-    AW_UIFill(list_x()-4,body_y()-2,1,BOX_Y+BOX_H-PAD-body_y(),pick);    /* the column rule */
+    (void)pick;draw_bar(BAR_TEXT);   /* the text's thin bar stands where the column rule was (DIALOGUE-SCROLLBARS-62) */
     draw_history();
     AW_UIFill(list_x(),body_y()-2,LIST_W,char_h()+4,dark);
     Q_snprintf(line,sizeof(line),"Find: %s_",box.search);
@@ -577,11 +708,16 @@ static void draw(void){
         /* the highlighted row: bright while the list has the keys, dim while the text has them */
         if(box.top+i==box.selection)AW_UIFill(list_x(),y-1,LIST_W,row_h(),pane==PANE_LIST?pick:AW_UIColor(44,38,28));
         if(greyed(box.shown[box.top+i]) || (box.shown[box.top+i]<listed && spent[box.shown[box.top+i]])){
-            const char *s=label(NULL,box.shown[box.top+i]);int x=list_x()+2,g=AW_UIColor(96,90,80);
+            /* OpenMW's colours: specific 0.45 0.5 0.8, exhausted 0.3 0.3 0.3; a greyed-out row as before */
+            int kind=box.shown[box.top+i]<listed?spent[box.shown[box.top+i]]:0;
+            const char *s=label(NULL,box.shown[box.top+i]);int x=list_x()+2,
+                g=kind==TOPIC_SPECIFIC?AW_UIColor(115,128,204):kind==TOPIC_SPENT?AW_UIColor(77,77,77):AW_UIColor(96,90,80);
+            if(greyed(box.shown[box.top+i]))g=AW_UIColor(96,90,80);
             for(;*s && x+char_w()<=right;s++,x+=char_w())char_in(x,y,(unsigned char)*s,g);
         }else text(list_x()+2,y,label(NULL,box.shown[box.top+i]),right);
     }
     if(!box.shown_count)text(list_x()+2,list_y(),"(no topics)",right);
+    draw_bar(BAR_LIST);
     AW_UIFill(list_x(),button_y()-1,LIST_W,row_h(),dark);
     {const char *g=T(AW_DIAL_TEXT_GOODBYE,"Goodbye");int glyphs=(int)strlen(g);
      if(glyphs>LIST_W/char_w())glyphs=LIST_W/char_w();
@@ -627,6 +763,7 @@ static void result_choice(const char **texts,int ntexts,const aw_mwcell_t *numbe
     if(!texts){goodbye_only=1;choice_count=0;return;}
     for(i=0;i<ntexts && i<count && choice_count<CHOICES;i++){
         Q_snprintf(choice_text[choice_count],sizeof(choice_text[0]),"%s",texts[i]);choice_number[choice_count++]=numbers[i].i;}
+    choice_focus=-1;scroll=0;            /* the rows in view under the answer; no row chosen for Enter yet */
 }
 /* ClearInfoActor (OpenMW clearInfoActor: the last entry this speaker added to the topic's journal page goes) */
 static void result_clear(void){
@@ -644,6 +781,12 @@ static void run_result(int answer,int topic){
     aw_dial_result_choice=NULL;aw_dial_result_clear=NULL;
     dispose();                       /* a result may change the disposition (ModDisposition, SetDisposition) */
 }
+/* this speaker has an answer to TOPIC now (the test of AW_DialTopicList, without the known check) */
+static int answers_topic(int topic){
+    int refused=0;
+    if(AW_DialTopicKind(&table,topic)!=AW_DIAL_KIND_TOPIC || AW_DialFind(&conv,topic)<0)return 0;
+    return AW_DialPick(&conv,topic,&state,&refused)>=0 || refused;
+}
 /* an answer's text into the conversation with its links (the spans kept through the define filling), the topics it
  * names made known */
 static void show_answer(int answer){
@@ -658,7 +801,9 @@ static void show_answer(int answer){
     }
     AW_DialTakeSpans(filled,spans,n,plain,sizeof(plain),kept,&found);
     append_spans(plain,0,kept,found);
-    for(i=0;i<n;i++)know(spans[i].topic);
+    /* DIALOGUE-LINKS-62: a topic the text names is learned only when this speaker answers it (OpenMW
+     * DialogueManager::parseText adds a keyword to the known topics only for the actor's own topics) */
+    for(i=0;i<n;i++)if(answers_topic(spans[i].topic))know(spans[i].topic);
 }
 /* The greeting (OpenMW DialogueManager::startDialogue): the first Greeting topic's answer this speaker passes now,
  * shown, its topics made known and its result script run. 0 when the table has none for this speaker (then the
@@ -1046,18 +1191,24 @@ static int service_refused(void){
     if(topic<0 || (answer=AW_DialPickRefusal(&conv,topic,&state))<0)return 0;
     answer_with(topic,answer,"Service Refusal",0);return 1;
 }
-/* a row of the list: a topic, or the persuasion page's entries */
+/* DIALOGUE-CHOICES-62: the Choice row K picked (a click or Enter, never typed letters): the topic again with its
+ * number (OpenMW DialogueManager::questionAnswered: the first answer of the topic whose filters all pass) */
+static void pick_choice(int k){
+    int topic=choice_topic,answer;
+    if(k<0 || k>=choice_count)return;
+    /* DIALOGUE-CHOICE-LINE-UNMARKED-60: the player's chosen answer is the player's line, in the same heading style
+     * as a picked topic's name (the answer follows under it, with no heading of its own) */
+    append(choice_text[k],1);
+    conv.cond.choice=choice_number[k];choice_count=0;choice_focus=-1;
+    answer=topic>=0 && AW_DialFind(&conv,topic)>=0?AW_DialAnswer(&conv,topic,&state):-1;
+    Con_DPrintf("Dialogue: choice %d (row %d) answered by %d\n",choice_number[k],k+1,answer);
+    if(answer>=0)answer_with(topic,answer,"",1);  /* answer_of(topic,"") with the answer known */
+    else{conv.cond.choice=-1;refresh();}          /* nothing in the topic answers it: the list comes back */
+}
+/* a row of the list: a topic, or the persuasion page's entries (nothing while a Choice is open: OpenMW
+ * DialogueWindow::onSelectListItem while isInChoice) */
 static void ask(int r){
-    if(r<0 || r>=listed)return;
-    if(list[r]<=CODE_CHOICE(0) && list[r]>CODE_CHOICE(CHOICES)){   /* the topic again, with this choice */
-        int k=CODE_CHOICE(0)-list[r],topic=choice_topic;
-        /* DIALOGUE-CHOICE-LINE-UNMARKED-60: the player's chosen answer is the player's line, in the same heading style
-         * as a picked topic's name (the answer follows under it, with no heading of its own) */
-        append(choice_text[k],1);
-        conv.cond.choice=choice_number[k];choice_count=0;
-        if(topic>=0)answer_of(topic,"");else refresh();
-        return;
-    }
+    if(r<0 || r>=listed || choice_count)return;
     if(list[r]==CODE_PERSUASION){mode=1;refresh();return;}
     if(list[r]==CODE_BACK){mode=mode==8?7:mode>=10 && mode<=12?9:0;refresh();return;}
     if(list[r]==CODE_EN_ITEM){mode=10;refresh();return;}
@@ -1105,16 +1256,48 @@ static void ask(int r){
     if(list[r]<=CODE_ACTION(0) && list[r]>CODE_ACTION(AW_PERSUADE_KINDS)){persuade(CODE_ACTION(0)-list[r]);refresh();return;}
     ask_topic(list[r]);
 }
+/* DIALOGUE-LINKS-62: a link asked (a click or Enter on the focused one) as the same topic chosen from the list; none
+ * after Goodbye or while a Choice is open (OpenMW DialogueWindow::onTopicActivated is refused then) */
+static void ask_link(int h){
+    if(h<0 || h>=nhits || hits[h].para<0 || goodbye_only || choice_count || !link_on(hits[h].topic))return;
+    ask_topic(hits[h].topic);
+}
+/* the next (DIR 1) or previous (-1) link on screen, wrapping */
+static void step_link(int dir){
+    if(!nhits){focus=-1;return;}
+    focus=dir>0?(focus+1)%nhits:(focus<=0?nhits-1:focus-1);
+}
+/* DIALOGUE-CHOICES-62: the keys while a Choice is open: Up/Down (and Left/Right) choose a row, Enter picks it, a click
+ * on a row picks it; typed letters, the list, the links, Goodbye, Escape and a click outside do nothing (the original
+ * and OpenMW 0.51 keep the conversation until a row is picked). -1: the key goes on (the scrolling keys and the bars). */
+static int choice_key(int k,int mouse_x,int mouse_y){
+    switch(k){
+    case K_UPARROW:case K_LEFTARROW:choice_focus=AW_DialChoiceStep(choice_count,choice_focus,-1);scroll=0;return 1;
+    case K_DOWNARROW:case K_RIGHTARROW:choice_focus=AW_DialChoiceStep(choice_count,choice_focus,1);scroll=0;return 1;
+    case K_ENTER:if(choice_focus>=0)pick_choice(choice_focus);return 1;
+    case K_MOUSE1:{
+        int b=bar_at(mouse_x,mouse_y),c;
+        bar_drag=-1;
+        if(b>=0){bar_click(b,mouse_y);return 1;}
+        if((c=AW_DialChoiceAt(hits,nhits,mouse_x,mouse_y,row_h()))>=0)pick_choice(c);
+        return 1;}
+    case K_PGUP:case K_PGDN:case K_MWHEELUP:case K_MWHEELDOWN:return -1;
+    default:return 1;
+    }
+}
 static int key(int k,int mouse_x,int mouse_y){
     int r=AW_LB_NONE;
+    if(choice_count){int c=choice_key(k,mouse_x,mouse_y);if(c>=0)return c?!fight_started && !travel_after && !leave_after:0;}
+    if(k==K_ESCAPE)return 0;         /* aw_worldui.c gives the window Esc while a Choice is open; after it, Esc closes */
     switch(k){
-    /* DIALOGUE-ARROWS-MOVE-POINTER-60: Up/Down work in the focused pane (OpenMW 0.51 DialogueWindow's keyboard and
-     * controller focus: the topics and answers in turn, Enter activates); Tab switches the pane */
+    /* DIALOGUE-ARROWS-MOVE-POINTER-60, DIALOGUE-LINKS-62: the arrows work in the focused pane (OpenMW 0.51
+     * DialogueWindow's keyboard and controller focus): in the topic list they move the highlighted topic, in the
+     * conversation text they step through its links (the current one on a band) and Enter asks it; Tab switches */
     case K_UPARROW:
-        if(pane==PANE_TEXT){scroll++;focus=-1;break;}         /* the conversation: one line older */
+        if(pane==PANE_TEXT){step_link(-1);return 1;}
         r=AW_ListBoxKey(&box,AW_LBKEY_UP);break;
     case K_DOWNARROW:
-        if(pane==PANE_TEXT){scroll--;focus=-1;break;}
+        if(pane==PANE_TEXT){step_link(1);return 1;}
         r=AW_ListBoxKey(&box,AW_LBKEY_DOWN);break;
     case K_TAB:pane=pane==PANE_TEXT?PANE_LIST:PANE_TEXT;focus=-1;return 1;
     case K_PGUP:scroll+=text_rows()-1;break;                  /* the conversation text */
@@ -1126,10 +1309,7 @@ static int key(int k,int mouse_x,int mouse_y){
         if(mode==9 && en){size_t n=strlen(en->name);if(n){en->name[n-1]=0;en_labels();}return 1;}
         r=AW_ListBoxKey(&box,AW_LBKEY_BACKSPACE);break;
     case K_LEFTARROW:case K_RIGHTARROW:
-        if(pane==PANE_TEXT){       /* the previous / next link on screen; Enter asks it */
-            if(nhits)focus=k==K_RIGHTARROW?(focus+1)%nhits:(focus<=0?nhits-1:focus-1);
-            return 1;
-        }
+        if(pane==PANE_TEXT){step_link(k==K_RIGHTARROW?1:-1);return 1;}   /* the previous / next link; Enter asks it */
         if(mode==7){int s=AW_ListBoxSelected(&box);
             if(s>=0 && s<listed && list[s]<=CODE_SM_FIELD(0) && list[s]>CODE_SM_FIELD(5))
                 sm_change(CODE_SM_FIELD(0)-list[s],k==K_LEFTARROW?-1:1);}
@@ -1138,7 +1318,7 @@ static int key(int k,int mouse_x,int mouse_y){
                 en_change(CODE_EN_FIELD(0)-list[s],k==K_LEFTARROW?-1:1);}
         return 1;
     case K_ENTER:
-        if(focus>=0 && focus<nhits){ask_topic(hits[focus].topic);return 1;}
+        if(pane==PANE_TEXT && focus>=0 && focus<nhits){ask_link(focus);return 1;}
         if(pane==PANE_TEXT)return 1;                          /* no link chosen: nothing to ask */
         r=AW_ListBoxKey(&box,AW_LBKEY_CHOOSE);break;
     case K_MWHEELUP:if(mouse_x<list_x())scroll+=3;else r=AW_ListBoxKey(&box,AW_LBKEY_UP);break;
@@ -1146,9 +1326,10 @@ static int key(int k,int mouse_x,int mouse_y){
     case K_MOUSE1:
         if(mouse_x>=list_x() && mouse_x<list_x()+LIST_W && mouse_y>=button_y()-1 && mouse_y<button_y()-1+row_h())
             return 0;                                          /* Goodbye */
-        {int h;for(h=0;h<nhits;h++)           /* a link in the conversation: ask its topic */
-            if(mouse_x>=hits[h].x && mouse_x<hits[h].x+hits[h].w && mouse_y>=hits[h].y-1 && mouse_y<hits[h].y-1+row_h()){
-                ask_topic(hits[h].topic);return 1;}}
+        {int b=bar_at(mouse_x,mouse_y);bar_drag=-1;           /* DIALOGUE-SCROLLBARS-62: a pane's bar */
+            if(b>=0){bar_click(b,mouse_y);return 1;}}
+        {int h=AW_DialLinkHit(hits,nhits,mouse_x,mouse_y,row_h());   /* a link in the conversation: ask its topic */
+            if(h>=0){ask_link(h);return 1;}}
         if(mouse_x>=list_x() && mouse_x<list_x()+LIST_W && mouse_y>=list_y()-1 && mouse_y<list_y()-1+list_rows()*row_h()){
             pane=PANE_LIST;focus=-1;r=AW_ListBoxClick(&box,(mouse_y-(list_y()-1))/row_h());}
         else if(mouse_x<BOX_X || mouse_x>=BOX_X+BOX_W || mouse_y<BOX_Y || mouse_y>=BOX_Y+BOX_H)return 0;
@@ -1237,7 +1418,10 @@ int AW_DialWindowOpen(edict_t *e,const char *greeting,int again){
     PHASE();
     if(key_dest==key_console)key_dest=key_game;
     active=1;
+    bar_drag=-1;
     if(!AW_WorldUIOpenPanel(draw,key,closed)){key_dest=was;release();return 0;}
+    aw_worldui_panel_drag=bar_dragged;
+    aw_worldui_panel_holds_escape=choice_count>0;   /* DIALOGUE-CHOICES-62: a greeting's Choice must be answered */
     PHASE();
 #undef PHASE
     {   char line[400];int n=0,i;
@@ -1328,8 +1512,8 @@ int AW_DialNpcDisposition(edict_t *e,const aw_dial_npc_cache_t *c){
 /* dbg npcs talk [record id] (aw_debug.c): Talk with the nearest NPC that can be talked to (or the named record), as E does on
  * the one under the crosshair, the player turned to face it; for checks and pictures (the window is the same). */
 void AW_DialWindowTalk(const char *want){
-    edict_t *p,*e,*best=NULL;int i;float best_d=1e9f,d;vec3_t delta;char text[1024];
-    eval_t *v,*count;
+    edict_t *p,*e,*best=NULL;int i;float best_d=1e9f,d;vec3_t delta;
+    eval_t *v;
     if(!sv.active || svs.maxclients<1 || !(p=svs.clients[0].edict)){Con_Printf("Not in a game.\n");return;}
     for(i=1;i<sv.num_edicts;i++){
         e=EDICT_NUM(i);
@@ -1341,14 +1525,22 @@ void AW_DialWindowTalk(const char *want){
     if(!best){Con_Printf("No NPC to talk to%s%s.\n",want?" named ":"",want?want:"");return;}
     VectorSubtract(best->v.origin,p->v.origin,delta);delta[2]=0;
     p->v.angles[0]=0;p->v.angles[1]=(float)(atan2(delta[1],delta[0])*180/M_PI);p->v.angles[2]=0;p->v.fixangle=1;
+    Con_Printf("Talk: %s (%.0f units)\n",pr_strings+best->v.netname,best_d);
+    if(!AW_DialWindowTalkTo(best))Con_Printf("Talk: no dialogue window for this NPC.\n");
+}
+/* The conversation with E, as the player's use opens it (its first-meeting or again greeting, the voice table's
+ * line without one): dbg npcs talk above, and a script's Activate on an NPC (aw_mwhost.c object_activate: the census
+ * clerk's CharGenClassNPC takes his use with OnActivate and passes it on; CENSUS-INTRO-SCRIPTS-62). 1 opened. */
+int AW_DialWindowTalkTo(edict_t *best){
+    eval_t *v,*count;char text[1024];
+    if(!best || best->free || active)return 0;
     count=GetEdictFieldValue(best,"aw_manual_count");
     v=GetEdictFieldValue(best,count && count->_float>0?"aw_greeting_again":"aw_greeting");
     if((!v || !v->string || !pr_strings[v->string]) && count && count->_float>0)v=GetEdictFieldValue(best,"aw_greeting");
     if(v && v->string && pr_strings[v->string])AW_ExpandDialogue(text,sizeof(text),pr_strings+v->string);
     else if(!AW_GlutConverse(best,count && count->_float>0,text,sizeof(text)))text[0]=0;
     if(count)count->_float+=1;
-    Con_Printf("Talk: %s (%.0f units)\n",pr_strings+best->v.netname,best_d);
-    if(!AW_DialWindowOpen(best,text,count && count->_float>1))Con_Printf("Talk: no dialogue window for this NPC.\n");
+    return AW_DialWindowOpen(best,text,count && count->_float>1);
 }
 /* dbg mwscript result TOPIC NPC [N] (MWSCRIPT-PLAYER-CONTROL-62's test aid, aw_dial.h): the conversation is read as
  * AW_DialWindowOpen reads it (the speaker's row, its disposition, every candidate of its topics into the buffer) but
@@ -1448,11 +1640,18 @@ static void journal_updated(void){
     words[AW_DIAL_UI_TEXT-1]=0;
     if(words[0])AW_MsgBoxShow(words,NULL,0);
 }
+/* aw_topic_colours [0|1]: the topic colours off or on, no argument shows the setting (TOPIC-COLOURS-62) */
+static void topic_colours_command(void){
+    if(Cmd_Argc()>1)Cvar_SetValue(topic_colours.name,atoi(Cmd_Argv(1))?1:0);
+    Con_Printf("Topic colours (specific, exhausted): %s\n",AW_DialTopicColours()?"on":"off");
+    if(active)refresh();
+}
 void AW_DialWindowInit(void){   /* the journal book's topic pages read through these (aw_worldui.c) */
     aw_journal_heard_count=AW_DialHeardCount;aw_journal_heard_at=AW_DialHeardAt;
     aw_journal_topic_name=AW_DialWindowTopicName;aw_journal_entry_text=journal_entry_filled;
     aw_journal_entry_marked=journal_entry_marked;aw_journal_updated=journal_updated;
     aw_ui_dialogue_backdrop=AW_DialWindowActive;   /* DIALOGUE-BACKDROP-HUD-60: plain black, no HUD behind the window */
+    Cvar_RegisterVariable(&topic_colours);Cmd_AddCommand("aw_topic_colours",topic_colours_command);
 }
 /* PLAYER-CASTING-59 (aw_cast.c): the game's fEffectCostMult from this table (0 when the build has none), and a
  * made spell's magicka cost by the Spellmaking rule it was bought with (-1 without the table) */

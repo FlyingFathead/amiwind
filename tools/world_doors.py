@@ -260,6 +260,57 @@ def apply(id1, rows, door_bounds):
     return {'added': added, 'filled': filled, 'banks_changed': changed}
 
 
+PRISON_MARKERS = 'prison-markers.txt'      # id1/: the jail's way out (engine aw_crime.c markers_read)
+PRISON_FORMAT = 'AWPM1'
+EVIDENCE_CHEST = 'stolen_goods'            # OpenMW confiscateStolenItems: the prison's evidence chest
+
+
+def prison_markers(raw):
+    """The prison markers of a master (CRIME-59): every PrisonMarker reference with a destination, where an arrest lets
+    the player out (OpenMW 0.51 World::teleportToClosestMarker: the marker's own place, original units and facing), the
+    prison it names and that prison's evidence chest (World::confiscateStolenItems: the first stolen_goods reference of
+    the marker's destination cell; 0 when it has none). Sorted by reference:
+    [{'reference', 'position', 'yaw', 'prison', 'chest'}]."""
+    import math
+    from mwad.audit import cell_data
+    from mwad.esm import is_deleted, records, subrecords
+    from mwad.interior import original_doors
+    chests = {}
+    for tag, flags, payload in records(raw):
+        if tag != 'CELL':
+            continue
+        subs = list(subrecords(payload))
+        if is_deleted(flags, subs, header_only=True):
+            continue
+        cell = cell_data(subs)
+        if not cell['flags'] & 1:
+            continue
+        for ref in cell['refs']:
+            if ref.get('id', '').casefold() == EVIDENCE_CHEST and not ref.get('deleted'):
+                chests.setdefault(cell['name'].casefold(), ref['number'])
+    out = []
+    for door in original_doors(raw):
+        if door['id'].casefold() not in MARKER_IDS:
+            continue
+        yaw = math.degrees(door.get('rotation_radians', [0, 0, 0])[2]) % 360.0
+        out.append({'reference': door['number'], 'position': [round(v, 3) for v in door['position']],
+                    'yaw': round(yaw, 3), 'prison': door['destination_cell'],
+                    'chest': chests.get(door['destination_cell'].casefold(), 0)})
+    return sorted(out, key=lambda m: m['reference'])
+
+
+def prison_markers_text(markers):
+    """id1/prison-markers.txt: "AWPM1", then per marker "REF X Y Z YAW CHEST|PRISON" (cp1252, at most 199 bytes a line:
+    the engine reads lines of 200)."""
+    lines = [PRISON_FORMAT]
+    for m in markers:
+        line = '%d %.3f %.3f %.3f %.3f %d|%s' % (m['reference'], *m['position'], m['yaw'], m['chest'], m['prison'])
+        if len(line.encode('cp1252')) > 199:
+            raise ValueError('prison marker %d: its line is too long for the engine' % m['reference'])
+        lines.append(line)
+    return '\n'.join(lines) + '\n'
+
+
 TELEPORT_NAMES = 'teleport-names.txt'      # config/ and the game data: dbg tp NAME (engine aw_scene.c named_place)
 GLOBAL_PLACE = 'global'                    # the map of an outdoor place: x y z are original global coordinates
 

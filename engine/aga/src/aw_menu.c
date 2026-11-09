@@ -95,10 +95,11 @@ static int tab,focus;
 #define BACK_H 20
 /* Prefs and Video rows (Prefs: the HUD and gameplay; Video: view, loading, memory). */
 enum {ROW_CROSSHAIR,ROW_COLOUR,ROW_SHAPE,ROW_FRAME,ROW_FONT,ROW_VOICE,ROW_DIALOGUE,ROW_AIMED,ROW_NPC,ROW_OBJECTS,
-    ROW_AUTOSAVE,ROW_FOG,ROW_RESET,ROW_FAR,ROW_PHOTO,ROW_AREA,ROW_METHOD,ROW_BUFFER,ROW_MEMORY,ROW_GRAPHICS,ROW_CURSOR};
+    ROW_AUTOSAVE,ROW_FOG,ROW_RESET,ROW_FAR,ROW_PHOTO,ROW_AREA,ROW_METHOD,ROW_BUFFER,ROW_MEMORY,ROW_GRAPHICS,ROW_CURSOR,
+    ROW_TOPICS,ROW_LABELS};
 /* Mouse cursor (CURSOR-MW-58): Morrowind's own pointer or AmiWind's, beside the crosshair's choices. */
 static const unsigned char prefs_rows[]={ROW_CROSSHAIR,ROW_COLOUR,ROW_SHAPE,ROW_CURSOR,ROW_FRAME,ROW_FONT,ROW_VOICE,
-    ROW_DIALOGUE,ROW_AIMED,ROW_NPC,ROW_OBJECTS,ROW_AUTOSAVE};
+    ROW_DIALOGUE,ROW_TOPICS,ROW_AIMED,ROW_NPC,ROW_OBJECTS,ROW_LABELS,ROW_AUTOSAVE};
 static const unsigned char video_rows[]={ROW_FOG,ROW_RESET,ROW_FAR,ROW_PHOTO,ROW_AREA,ROW_METHOD,ROW_BUFFER,ROW_MEMORY
 #if defined(AMIWIND_DEBUG_LUMA) && AMIWIND_DEBUG_LUMA
     ,ROW_GRAPHICS
@@ -195,8 +196,8 @@ static const control_t controls[]={
  * Combat style: AmiWind (aw_combat_miss 1, AmiWind extension: a failed roll shows
  * the defender's dodge or block) / Original Morrowind (0: the swish);
  * Dice rolls: On (aw_combat_dice 1, the original rolls) / Off (no dice, extension);
- * Blocking: Hold to block (aw_combat_block 1, AmiWind extension: the block button raises the
- * shield, the original formula decides each blow) / Automatic (0: the original). */
+ * Blocking: Automatic (aw_combat_block 0, the default: the original) / Hold to block (1, AmiWind
+ * extension: the block button raises the shield, the original formula decides each blow). */
 #define CONTROL_SENS 0
 #define CONTROL_INVERT 1
 #define CONTROL_FIRST 2
@@ -355,9 +356,11 @@ static void prefs_video_change(int id,int direction,int enter){
     case ROW_FONT:font_step(direction);break;
     case ROW_VOICE:AW_UIVoiceNamesToggle();break;
     case ROW_DIALOGUE:AW_UIDialogueCycle(direction);break;
+    case ROW_TOPICS:AW_DialTopicColoursToggle();break;
     case ROW_AIMED:AW_SceneUIOption(0,direction);break;
     case ROW_NPC:AW_SceneUIOption(1,direction);break;
     case ROW_OBJECTS:AW_SceneUIOption(2,direction);break;
+    case ROW_LABELS:AW_SceneUIOption(3,1);break;   /* two settings: any key switches (INFO-BOX-TEXT-CUT-62) */
     case ROW_AUTOSAVE:if(enter)AW_SetAutosaveCount((AW_AutosaveCount()+1)%17);else AW_SetAutosaveCount(AW_AutosaveCount()+direction);break;
     case ROW_FOG:
         if(enter){fog_slider=1;fog_drag=fog_typing=0;fog_typed[0]=0;fog_before=fog_value();}
@@ -637,9 +640,11 @@ static void prefs_video_line(int id,char *line){
     case ROW_FONT:value=AW_UIFontSize();if(value)sprintf(line,"UI font: %ld px",(long)value);else strcpy(line,"UI font: fallback");break;
     case ROW_VOICE:strcpy(line,AW_UIVoiceStyle()==2?"Voice identity: Aim only":AW_UIVoiceNames()?"Voice speaker names: On":"Voice speaker names: Off");break;
     case ROW_DIALOGUE:sprintf(line,"Dialogue style: %ld",(long)AW_UIDialogueMethod());break;
+    case ROW_TOPICS:strcpy(line,AW_DialTopicColours()?"Topic colours: On":"Topic colours: Off");break;
     case ROW_AIMED:strcpy(line,AW_SceneUIOption(0,0)?"Aimed NPC names: On":"Aimed NPC names: Off");break;
     case ROW_NPC:sprintf(line,"NPC: %s",places[AW_SceneUIOption(1,0)-1]);break;
     case ROW_OBJECTS:sprintf(line,"Objects: %s",places[AW_SceneUIOption(2,0)-1]);break;
+    case ROW_LABELS:strcpy(line,AW_SceneUIOption(3,0)?"Name labels: AmiWind":"Name labels: Morrowind");break;
     case ROW_AUTOSAVE:sprintf(line,"Autosave history: %ld",(long)AW_AutosaveCount());break;
     case ROW_FOG:sprintf(line,"Fog distance: %ld",(long)AW_DrawDistance());break;
     case ROW_RESET:strcpy(line,"Reset distance: 300");break;

@@ -1,6 +1,15 @@
 # Dialogue, character confirmation and waiting — v0.0.23-dev4
 
-_Last updated with AmiWind v0.0.36 (11 October 2026)._
+_Last updated with AmiWind v0.0.62-dev1 (7 November 2026)._
+
+<!-- contents start -->
+## Contents
+
+- [Dialogue display](#dialogue-display)
+- [Wait and game time](#wait-and-game-time)
+- [Ship ambience](#ship-ambience)
+
+<!-- contents end -->
 
 ## Dialogue display
 
@@ -72,6 +81,23 @@ name takes priority over a target/object name in the same upper-right position.
 Lower-strip labels are covered while the dialogue panel occupies that strip.
 Method 3 never displays a speaker identity. The target-name toggle controls
 ordinary identification; voice style 2 overrides it while a sampled subtitle is active.
+
+### Name labels: AmiWind or Morrowind
+
+Options > Prefs > **Name labels** (saved setting `aw_name_labels`, console `dbg ui namelabels amiwind|morrowind`)
+chooses how the thing under the crosshair is named. It covers doors, people and creatures, items, containers, plants
+and the other things the activate key uses.
+
+- **AmiWind** (default, `aw_name_labels 1`): the title and the way to use the target ("(E: Talk)", "(Open: E)",
+  "(E: Take)", "(E: Pick)", "(Enter: E)") show only below the viewport, on the right. No box is drawn over the view.
+- **Morrowind** (`aw_name_labels 0`): only the original's framed box over the view, for every kind of target, with an
+  item's or container's weight, value and lock level; nothing is drawn below the view. The box is sized from the
+  measured width of its text in the font it is drawn with, plus padding, and a line wider than the screen wraps onto
+  the next row, so a name is never cut.
+
+The two styles never show in the same frame.
+
+Reset to defaults (Options > Controls) sets the AmiWind style again.
 
 Targeting uses a 96-unit solid-world/entity ray,
 not the broad greeting cone. Walls and other solid entities block it. Menus,

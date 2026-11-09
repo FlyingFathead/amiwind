@@ -43,6 +43,10 @@ typedef struct {
 void AW_CStripLayout(int width,int height,int view_bottom,int char_w,int char_h,aw_cstrip_layout_t *layout);
 /* The entry under (X,Y) for cells of W x H from (LEFT,TOP), COLUMNS of them: its index on the side shown, -1 none. */
 int AW_CStripCell(const aw_cstrip_list_t *list,int x,int y,int left,int top,int w,int h);
+/* The confirmation line of a take (CONTAINER-TAKE-CONFIRM-62): "Took Iron Sparksword", "Took Gold x 8", with " (stolen)"
+ * of an owned container; FROM non-NULL: a Take All, "Took 5 items from Tarhiel". Shown only in the AmiWind name-label
+ * style; the original and OpenMW 0.51 show no text for a take from a container (the item's own sound is all). */
+int AW_CStripTakeLine(char *out,int size,const char *name,int count,int stolen,const char *from,int total);
 /* aw_cstrip.c: the strip in the game (keys before the bindings, drawn over the view, the mouse while open), reached
  * through the hooks AW_CStripInit sets (quakedef.h). */
 int AW_CStripActive(void);

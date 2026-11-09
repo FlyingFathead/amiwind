@@ -1,10 +1,12 @@
 # Changelog
 
-_Last updated with AmiWind v0.0.62-dev1 (7 November 2026)._
+_Last updated with AmiWind v0.0.62 (8 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.62: Stick To The Script, 8 November 2026](#v0062-stick-to-the-script-8-november-2026)
+- [v0.0.62-dev2: second snapshot of v0.0.62, 7 November 2026 (not delivered; its work ships in v0.0.62)](#v0062-dev2-second-snapshot-of-v0062-7-november-2026-not-delivered-its-work-ships-in-v0062)
 - [v0.0.62-dev1: first snapshot of v0.0.62, 7 November 2026](#v0062-dev1-first-snapshot-of-v0062-7-november-2026)
 - [v0.0.61: Keep Your Lantern Lit, 6 November 2026](#v0061-keep-your-lantern-lit-6-november-2026)
 - [v0.0.60: Work With What You've Got, 4 November 2026](#v0060-work-with-what-youve-got-4-november-2026)
@@ -171,6 +173,56 @@ _Last updated with AmiWind v0.0.62-dev1 (7 November 2026)._
 
 <!-- contents end -->
 
+## v0.0.62: Stick To The Script, 8 November 2026
+
+v0.0.62 is what was to be the third development snapshot with its final version number and the release documents; its
+[release notes](releases/notes/RELEASE-v0.0.62.md) cover the whole version by area. The second snapshot (dev2) was not
+delivered and its work ships here. It needs 32 MB of Fast RAM.
+
+- Alchemy as in the original, the creatures placed in rooms, the new-game scripts and the falling mage (from dev1).
+- 588 of 1,207 game scripts run (479 in dev1; [MWScript tracker](MWSCRIPT_FEATURES.md)): items that are
+  carried, bought, given or kept in containers and characters from levelled lists run their scripts; HitOnMe, PlayBink,
+  ChangeWeather, ModRegion, OnPCEquip and the shrines' blessings work.
+- Dialogue choices show as rows to pick, each leading to the answer the original gives.
+- Crime: a guard in pursuit and the marks a crime leaves on people are saved; fights that dialogue sets work world-wide;
+  a message box shows all its lines and the release from jail lists every skill changed.
+- Character bodies are baked with the new seam and floor method; the Imperial guard has a face entry again (963
+  triangles against 606 in dev1); the Tarhiel robe's chest part bakes on the human skeleton; held items use their own model.
+- Double-clicking an item in the inventory equips or uses it, with a count slider for stacks.
+- Debug commands: `dbg give` (picker, items and gold), `dbg noburden`, `dbg superspeed` with endless stamina, `dbg setlvl`,
+  `dbg restorestats` and `dbg maxstats`; every on/off command turns the other way when typed bare.
+- Builder: every finished unit goes into the checksummed unit cache the moment it is done, keyed on the code its bake
+  runs, so a stopped or failed build resumes from the units still missing; the player view prints `[done/total]` per unit.
+- Everything from v0.0.62-dev2 below. The new fixes were checked by tests, not yet in play.
+
+## v0.0.62-dev2: second snapshot of v0.0.62, 7 November 2026 (not delivered; its work ships in v0.0.62)
+
+The second development snapshot of v0.0.62 ([release notes](releases/notes/RELEASE-v0.0.62-dev2.md)). It was not
+delivered: its builds failed, and its work ships in [v0.0.62](releases/notes/RELEASE-v0.0.62.md). It needs 32 MB
+of Fast RAM.
+
+- A room that fails to load no longer locks the game: the player is brought back to where the move started, with the
+  game's message box. New: `dbg restartgame`, `dbg ver`, `dbg memcensus`, a pager for long console listings, the mouse
+  pointer in message boxes, and a New Game that resets the game state completely
+  ([GAME_STATE_RESET](GAME_STATE_RESET.md)).
+- The census office runs the game's own scripts (clerk, captain, door guard, papers, ring, barrel and doors); the captain
+  talks through the dialogue window; `dbg census legacy` switches back to the old path for a comparison. 499 of 1,207
+  scripts run ([MWScript tracker](MWSCRIPT_FEATURES.md)).
+- Dialogue links stay clickable and only topics the speaker answers are lit; thin scroll bars; persuasion works again; an
+  answer that sets a fight starts it when the talk closes.
+- Crime: guards who see a crime come to arrest; assault, murder and trespass at a bed are crimes; the fine takes the
+  gold; resisting arrest makes the guard attack; jail passes the days and releases the player at the prison marker.
+- Character bodies: a new reduction method (seams measured and locked, limbs kept a minimum thickness, armour merged
+  per slot) is in the code, but this snapshot's characters are still reduced as in v0.0.62-dev1, because the method did
+  not yet bake the whole cast within the model budget ([MODEL_REDUCTION](MODEL_REDUCTION.md)).
+- Summoning effects call up all 16 summoned creatures; the falling mage is released in the tick his platform goes.
+- The V key lights only an equipped light; the use key takes the nearest thing along the view; item pictures, black slots
+  and a Took line in the container window; beast races are refused helmets and footwear; books and scrolls offer Read;
+  one list rule for every list window; scroll triangles in the class lists; long door names continue in the focus row;
+  the original's automatic block is the default again.
+- Register entries from the dev1 playtest, among them lava in god mode, breath under water, floating creatures, animations
+  of creatures without walk or attack animations, dialogue choices and combat style presets.
+
 ## v0.0.62-dev1: first snapshot of v0.0.62, 7 November 2026
 
 The first development snapshot of v0.0.62 ([release notes](releases/notes/RELEASE-v0.0.62-dev1.md)). It needs 32 MB of
@@ -192,6 +244,26 @@ Fast RAM.
 - Ctrl+R works in every window, and recordings of fights replay exactly; the inventory window refreshes when items
   change outside it; the benchmark writes its result file; the test tools start a small test image in its own map; long debug listings no
   longer stall a frame for seconds (remote console prints are written twice a second).
+- Blocking: the original game's automatic block is the default again. Holding the right mouse button to raise the
+  shield stays available as an option (Options > Controls > Blocking). A setting you saved earlier is kept as it is.
+  The visible dodge or block on a missed blow is unchanged. See [Combat](COMBAT.md#blocking).
+- Name labels: a new Options > Prefs setting (and `dbg ui namelabels`) with two styles. AmiWind, the default, shows the
+  title of whatever the crosshair is on (doors, people, items, containers, plants, activators) and how to use it only
+  below the view on the right, with no box over the view. Morrowind draws only the original's framed box over the
+  view, for every kind of target, sized from its measured text and wrapped at the screen width so a name is never
+  cut; the two styles never show in one frame. See
+  [Dialogue and wait](DIALOGUE_AND_WAIT.md#name-labels-amiwind-or-morrowind).
+- The container window shows the picture of every item that has one (clothing, armour, books, scrolls and potions showed
+  only their names), centred and filling its slot, on a black background; the item slots are black in the inventory,
+  container and barter windows. Take All, Close, OK, Cancel and the class window's buttons use one thin 1 pixel button
+  style, and taking an item from a container says "Took ..." in the AmiWind name-label style.
+- A door's name over 35 characters is no longer cut in the name box (the Census Office and the Suran apothecary doors):
+  the focus table keeps up to 66 characters of a door's name, and an older table reads as it did.
+- The Choose your class window separates the skill lists with lines above and below them, and the major and minor
+  skill rows sit on the same lines. Each class window shows one hint row, in the lower left, for the window that is
+  open; the questions and the own-class windows have a Cancel button (the same as Esc); and the class and birthsign lists
+  show the race page's triangles, turned up and down, instead of "more" text: bright when there is more that way, dim
+  when there is not.
 
 ## v0.0.61: Keep Your Lantern Lit, 6 November 2026
 

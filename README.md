@@ -4,7 +4,7 @@
 
 # AmiWind
 
-_Last updated with AmiWind v0.0.62-dev1 (7 November 2026)._
+_Last updated with AmiWind v0.0.62 (8 November 2026)._
 
 An unofficial, experimental RPG engine and enthusiast project bringing Morrowind
 to the Commodore Amiga, featuring CHIM: an AmiQuake-based engine and an asset
@@ -25,15 +25,22 @@ Like community projects such as
 
 More in the [gallery](docs/GALLERY.md).
 
-## Where AmiWind stands (6 November 2026)
+## Where AmiWind stands (8 November 2026)
 
-The newest release is **v0.0.61: Keep Your Lantern Lit**, the combat, magic and light release: casting with a
-spell-effect system, weapons and shields of every type in their stances, enchanted items that cast, one set of stats for
-every person and creature, an inventory limited only by carry weight, carriable lights that take their flame with them
-and held candles and lanterns that light as themselves, theft that witnesses report, a fuller dialogue and loot window,
-the first slice of an in-game recorder for testing, and a faster game (the standard benchmark runs 37 % more frames a
-second in the emulator than in the first snapshot of the version), running on CHIM Engine v0.2.2 and needing 32 MB of
-Fast RAM ([release notes](docs/releases/notes/RELEASE-v0.0.61.md)). The one before it, **v0.0.60: Work With What
+The newest release is **v0.0.62: Stick To The Script**, the scripts, crime and alchemy release: alchemy as in
+the original, the creatures placed in rooms, 588 of the game's 1,207 scripts running (the
+[tracker of the game's scripts](docs/MWSCRIPT_FEATURES.md)), the census office running its own scripts, dialogue choices
+as rows to pick, guards who arrest for crimes with the fine and the jail of the original, persuasion and dialogue links
+that work, a room that fails to load recovered instead of locking the game, a New Game that resets the game state, a
+double-click in the inventory, character models reduced with measured seams, and debug commands for gold, load and
+level, running on CHIM Engine v0.2.2 and needing 32 MB of Fast RAM
+([release notes](docs/releases/notes/RELEASE-v0.0.62.md)). It was cut from what was to be the third snapshot; the
+second snapshot, dev2, was not delivered and its work ships in it. The one before it, **v0.0.61: Keep Your Lantern
+Lit**, was the combat, magic and light release: casting with a spell-effect system, weapons and shields of every type in
+their stances, enchanted items that cast, one set of stats for every person and creature, an inventory limited only by
+carry weight, carriable lights that take their flame with them, theft that witnesses report, a fuller dialogue and loot
+window, the first slice of an in-game recorder, and a faster game
+([release notes](docs/releases/notes/RELEASE-v0.0.61.md)). Before it, **v0.0.60: Work With What
 You've Got**, made beds and the two rank raises work again, levelled container contents show their items, the bodies of
 the dead can be searched, and the residents read small per-area tables
 ([release notes](docs/releases/notes/RELEASE-v0.0.60.md)). Before that, **v0.0.59: Assembling The Bits And
@@ -48,19 +55,31 @@ and 19 open-sea cells), with no classic region maps left outdoors. What these nu
 prison and the census office) is built as a CHIM room, with the people the game places in them. Solstheim is not
 converted.
 
-The development line is at **v0.0.62-dev1** (7 November 2026): the first snapshot of v0.0.62, in development. It adds
-alchemy as in the original, the creatures placed in tombs, caves and other rooms, the scripts of a new game (the
-Dreamers held back, the falling mage near Seyda Neen), falls with fall damage and Slowfall, characters and objects
-that scripts move, follow and place, pickable tree fungi, and a generated [tracker of the game's scripts](docs/MWSCRIPT_FEATURES.md)
-(479 of 1,207 running) ([dev1 notes](docs/releases/notes/RELEASE-v0.0.62-dev1.md)). It needs 32 MB of Fast RAM.
-v0.0.61 shipped as its third snapshot with the final version number
+v0.0.62 shipped as what was to be its third snapshot with the final version number; its first snapshot
+([dev1 notes](docs/releases/notes/RELEASE-v0.0.62-dev1.md)) added alchemy, the creatures placed in rooms, the scripts of
+a new game and the falling mage, and its second ([dev2 notes](docs/releases/notes/RELEASE-v0.0.62-dev2.md)) was not
+delivered. v0.0.61 shipped as its third snapshot with the final version number
 ([release notes](docs/releases/notes/RELEASE-v0.0.61.md)).
 
-What comes next is in the [roadmap](docs/ROADMAP.md): v0.0.62 holds the in-game check of the v0.0.61 pieces not yet
-seen in play, the full crime system (guards who arrest, pickpocketing, trespass, assault, murder), alchemy, enchanting
-and spellmaking, per-area data tables for containers, doors, items, activators and creatures, a build check on the size
-of every lookup table, outdoor items that can be picked up, dropped lights with their flame, and the Constant Effect
-items of non-player characters. Items that are in no version's list yet stay in the backlog until they are scheduled.
+What comes next is in the [roadmap](docs/ROADMAP.md). Still to come after v0.0.62: the rest of the crime system
+(pickpocketing, picking owned locks), enchanting and spellmaking, more of the game's scripts, per-area data tables for
+containers, doors, items, activators and creatures, outdoor items that can be picked up, dropped lights with their
+flame, the Constant Effect items of non-player characters, summoned creatures that fight for the player, and the in-game
+check of the pieces not yet seen in play. Items that are in no version's list yet stay in the backlog until they are
+scheduled.
+
+### What v0.0.62 changed
+
+Alchemy as in the original (the window, potions, ingredients); the creatures placed in tombs, caves and other rooms;
+588 of 1,207 game scripts running, among them the census office's own scripts, items that are carried or kept in
+containers, HitOnMe, PlayBink and weather changes; dialogue choices as rows to pick, links that stay clickable, thin
+scroll bars and persuasion that works; guards who arrest for theft, assault, murder and trespass, with the fine, resisting
+arrest and jail, and pursuers saved in games; a failed room load that brings the player back and a New Game that resets
+every state; the player's torch, the use key and the container and class windows reworked; a double-click in the
+inventory; character bodies reduced with measured seams; summoned creatures; and debug commands for gold, the carrying
+limit, the level and the stats. Known limits: the Heart Chamber may not load at 32 MB Fast RAM, pickpocketing and owned
+locks are not done, 619 scripts do not run yet, and the new fixes were checked by tests, not yet in play. Full list:
+[v0.0.62 release notes](docs/releases/notes/RELEASE-v0.0.62.md).
 
 ### What v0.0.61 changed
 
@@ -230,11 +249,13 @@ front page used to carry are kept in [earlier README sections](docs/README_ARCHI
   block, knockdown, knockout, fatigue, death) and weapons and shields of every type in first and third person;
   casting spells, with the original's chance, cost and effects, and enchanted items that cast; talking to people
   (topics, choices, disposition, persuasion and the services); containers and the bodies of the dead opened in a strip;
-  taking things in view of a witness is reported as a crime; a torch, a candle, a candlestick or a lantern in the hand
+  crimes seen by a witness bring the guards, with the arrest, the fine and jail; alchemy (making and drinking
+  potions); a torch, a candle, a candlestick or a lantern in the hand
   to explore Vvardenfell at night and underground; mushrooms to pick indoors and out; the original movement speeds;
   weather by region, and music streamed from disk; travel by silt strider, boat, gondola and guild guide.
-- **Not yet:** most quests and other game logic that depends on scripts the game does not run yet (957 of the 1,207
-  scripts run whole), guards who arrest and jail, pickpocketing, trespass, alchemy, making your own enchantments, the
+- **Not yet:** most quests and other game logic that depends on scripts the game does not run yet (588 of the 1,207
+  scripts run; [the MWScript tracker](docs/MWSCRIPT_FEATURES.md)), pickpocketing and picking owned locks, trespass,
+  making your own enchantments, the
   shot of a bow or a thrown weapon, schedules by the time of day and most of the scripted AI packages, and Dagoth Ur's
   fight and voice. The jail markers are in the door table for the jail system to come. The Unmarked Shipwreck's upper
   trapdoor still keeps the use key out of reach ([v0.0.55 release notes](docs/releases/notes/RELEASE-v0.0.55.md#known-in-this-build)).
@@ -280,8 +301,8 @@ test image of one spot see [MiniWind: the test ground](docs/MINIWIND.md), the
 Everything else about building, the build speed options, the FPU support library and running the image in FS-UAE or
 WinUAE: [Building and playing](docs/BUILDING_AND_PLAYING.md), the [Linux build guide](docs/LINUX_BUILD.md) and the
 [FS-UAE launcher](docs/FS-UAE-LAUNCHER.md). The newest emulator presets are
-[`AmiWind-v0.0.61-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.61-FS-UAE.fs-uae) and
-[`AmiWind-v0.0.61-WinUAE.uae`](resources/emulators/AmiWind-v0.0.61-WinUAE.uae); both start with 32 MB of
+[`AmiWind-v0.0.62-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.62-FS-UAE.fs-uae) and
+[`AmiWind-v0.0.62-WinUAE.uae`](resources/emulators/AmiWind-v0.0.62-WinUAE.uae); both start with 32 MB of
 Fast RAM.
 
 ## Where to read more

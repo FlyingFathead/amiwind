@@ -52,7 +52,7 @@ OPENING_MAPS = frozenset({'prison', 'census', 'intro_docks', 'sncourt'})   # doo
 # the scene code and what the scene fixture links with it (tests/test_aga_native_source.py compile_run)
 ENGINE_FILES = ('aw_scene.c', 'aw_region.c', 'aw_story.c', 'aw_state.c', 'mathlib.c', 'cl_main.c', 'view.c',
                 'aw_section.c', 'aw_world.c', 'aw_mappath.c', 'aw_miniwind.c', 'aw_harvest.c', 'aw_harvest_runtime.c',
-                'aw_excluded.c', 'aw_format.c', 'aw_harvest_proxy.c', 'aw_travel_rules.c')
+                'aw_excluded.c', 'aw_format.c', 'aw_harvest_proxy.c', 'aw_travel_rules.c', 'aw_activate_rules.c')
 
 
 def _inside(core, point, margin=0.0):

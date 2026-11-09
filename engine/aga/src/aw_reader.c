@@ -5,6 +5,7 @@
 #include "aw_inventory.h"
 #include "aw_tryalloc.h"
 #include "aw_textdef.h"
+#include "aw_levelup.h"
 static char text[8192],title[96];
 static unsigned short pages[512];
 static int page_count,page,active,action,result;
@@ -160,7 +161,20 @@ static int book_open(unsigned reference)
     if(!book_load(id))return 0;
     if(!book_defines() || !paginate(book)){book_free();return 0;}
     book_reference=reference;book_owned=owned;
-    page=0;active=1;action=BOOK_ACTION;result=0;IN_AWClearButtons();return 1;
+    page=0;active=1;action=BOOK_ACTION;result=0;IN_AWClearButtons();
+    AW_LevelupBookRead(id);     /* SKILL-BOOKS-MISSING-62: a skill book's first read raises its skill */
+    return 1;
+}
+/* EQUIP-ACTION-REGRESSION-62 (the item classes): a carried book or scroll read from the inventory window (OpenMW
+ * mwclass/book.cpp use: ActionRead); the generic reader with Close only. 1 when the reader opened. */
+static int carried_open(const char *id)
+{
+    if(active || !id || strlen(id)>BOOK_ID)return 0;
+    book_free();
+    if(!book_load(id))return 0;
+    if(!book_defines() || !paginate(book)){book_free();return 0;}
+    book_reference=0;book_owned=0;
+    page=0;active=1;action=0;result=0;IN_AWClearButtons();return 1;
 }
 static void close_reader(int take)
 {
@@ -209,7 +223,7 @@ int AW_ReaderKey(int key)
     if((key==K_RIGHTARROW || key==K_SPACE) && page+1<page_count)page++;
     if(key==K_ENTER || key=='t' || key==K_ESCAPE){
         if(key!=K_ESCAPE)result=action;
-        active=0;IN_AWClearButtons();
+        active=0;book_free();IN_AWClearButtons();
     }
     return 1;
 }
@@ -218,6 +232,7 @@ void AW_ReaderDraw(void)
     int i,ink;const char *p;char line[128];
     /* switch "E: Read" on: the inventory's hook to this reader (aw_inventory.c AW_ItemPrompt, placed_use) */
     if(!aw_book_reader)aw_book_reader=book_open;
+    if(!aw_worldui_read)aw_worldui_read=carried_open;
     if(!active || key_dest!=key_game)return;
     AW_UIBox(2,2,316,196);
     /* Texture noise and curled edges obscure small text at 320x200. Keep the

@@ -1,6 +1,6 @@
 # Magic effects
 
-_Last updated with AmiWind v0.0.61-dev3 (2026-11-06)._
+_Last updated with AmiWind v0.0.62-dev1 (2026-11-07)._
 
 <!-- contents start -->
 ## Contents
@@ -188,6 +188,34 @@ shields, the iron shardaxe among them, were refused); Constant Effect items are 
 
 `dbg cast spell list` also shows the selected item's charge and how many items were used, refused for lack of
 charge, how many strikes cast, and how many worn effects are active.
+
+### Summoning (v0.0.62)
+
+A summoning effect (Summon Scamp to Summon Storm Atronach, Summon Centurion Sphere) calls up the creature the
+effect's game setting names (sMagicScampID and the others), by OpenMW 0.51's rules (its summoning and actors code),
+written independently. It works from a spell, a scroll or an enchanted item alike, since it is an effect like any
+other.
+
+- The creature appears 120 game units in front of the caster, facing as the caster faces (where that spot is
+  blocked, beside or behind), with a short flash, and stays while the effect lasts on the game clock.
+- It follows the player, comes back beside the player after a door or a loaded game while the effect lasts, and
+  goes with the same flash when the effect ends.
+- When it dies the effect ends at once and its body goes a few seconds later.
+- The creatures are the game's own records (the summoned scamp, clannfear, daedroth, dremora, golden saint, hunger,
+  winged twilight, the flame, frost and storm atronachs, the ancestor ghost, the skeletal minion, the bonewalker and
+  the greater bonewalker, the bonelord and the centurion sphere), drawn with the creature library's models of the
+  same kind: the builder gives each a base in the actor table and writes the effects' creatures into
+  `maps/chim-summons.txt`.
+
+What it costs: one creature model while it stands (445 to 589 triangles; its model file 183 to 316 KB, the walking
+model 358 to 472 KB when the same kind of creature is not already loaded nearby), about 2 KB of the engine's own
+memory, and a look over the 64 active effect entries each frame while any effect is active.
+
+Not yet: the creature does not fight for the player (`COMBAT-SUMMON-ALLY-62`), its record's script is not attached
+(the bonewalkers' disease script), the original's summon start and end effect meshes are not converted (a Quake
+teleport flash stands in), and a summoning effect cast by an NPC calls up nothing (NPCs do not cast yet).
+`aw_mwscript_status` counts the summons; `aw_mwscript_status summon EFFECT SECONDS` lands a summoning effect on the
+player for SECONDS (a test route, as a cast's Self effect lands).
 
 ### Starting spells (v0.0.61)
 

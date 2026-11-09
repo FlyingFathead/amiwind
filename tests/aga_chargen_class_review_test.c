@@ -13,10 +13,22 @@ static byte frame[340*207];
 int AW_UIMode(void){return 2;}
 int AW_ModalBlackBackground(void){return 1;}
 void AW_HeadDraw(int x,int y,int w,int h,float angle){}
-int AW_UIColor(int r,int g,int b){return 1;}
+int AW_UIColor(int r,int g,int b){return r*65536+g*256+b;}   /* distinct colours: gold 223,199,144, dim 84,76,61 */
+#define GOLD_COLOUR (223*65536+199*256+144)
+#define DIM_COLOUR (84*65536+76*256+61)
+/* the scroll triangles (CLASS-LIST-LAYOUT-62): 1-high fills of the list's width in the zones above and below it */
+static int up_lines,down_lines,up_colour,down_colour,up_widths[8],down_widths[8];
 static int grey_dots;   /* single black dots over the Questions button (128,132 88x18): the greyed-out look */
+static int rules[8],rule_count,skill_x[16],skill_y[16],skill_n;   /* CLASS-LIST-LAYOUT-62 */
+void AW_UIText(int x,int y,const char *s,int color);
+int AW_UIWidth(const char *s){return (int)strlen(s)*6;}
 void AW_UIFill(int x,int y,int w,int h,int color){
     assert(x>=0 && y>=0 && x+w<=320 && y+h<=200);
+    if(x==128 && w==180 && h==1 && rule_count<8)rules[rule_count++]=y;
+    if(h==1 && x>=10 && x+w<=122 && w%2==1 && w<=13){   /* a triangle line: above the list (y 25-31) or below it (146-152) */
+        if(y>=25 && y<32 && up_lines<8){up_widths[up_lines++]=w;up_colour=color;}
+        if(y>=146 && y<156 && down_lines<8){down_widths[down_lines++]=w;down_colour=color;}
+    }
     if(w==1 && h==1 && x>=128 && x<216 && y>=132 && y<150)grey_dots++;
 }
 void AW_UIBox(int x,int y,int w,int h){assert(x>=0 && y>=0 && x+w<=320 && y+h<=200);}
@@ -26,8 +38,23 @@ void AW_UITextBox(int x,int y,int w,int h,const char *s,int color){
     assert(x>=0 && y>=0 && x+w<=320 && y+h<=200 && strlen(s)<96);
     if(seen_count<64)strcpy(seen[seen_count++],s);
 }
+void AW_UIText(int x,int y,const char *s,int color){
+    assert(strlen(s)<96);
+    if(seen_count<64)strcpy(seen[seen_count++],s);
+    if(skill_n<16){skill_x[skill_n]=x;skill_y[skill_n]=y;skill_n++;}
+}
+/* the house button (aw_ui.c AW_UIButton): the fixture records its text box like any other text */
+void AW_UIButton(int x,int y,int w,int h,const char *s,int lit,int colour){(void)lit;AW_UITextBox(x,y,w,h,s,colour);}
 static int shown(const char *s){int i;for(i=0;i<seen_count;i++)if(!strcmp(seen[i],s))return 1;return 0;}
-static void draw(void){seen_count=0;AW_CharacterDraw();}
+/* the hint rows drawn: texts that name keys ("Enter:") */
+static int hint_rows(void){int i,n=0;for(i=0;i<seen_count;i++)if(strstr(seen[i],"Enter:"))n++;return n;}
+static void draw(void){seen_count=rule_count=skill_n=up_lines=down_lines=0;AW_CharacterDraw();}
+/* both triangles drawn as a quarter-turned race arrow (7 lines, widths 1,3,..13 up; 13,11,..1 down); colours given */
+static void check_arrows(int up_colour_want,int down_colour_want){
+    int j;
+    assert(up_lines==7 && down_lines==7 && up_colour==up_colour_want && down_colour==down_colour_want);
+    for(j=0;j<7;j++){assert(up_widths[j]==2*j+1 && down_widths[j]==13-2*j);}
+}
 void AW_UISmallBegin(void){}void AW_UISmallEnd(void){}
 void AW_BirthArt(int index,int x,int y){}
 void AW_HeadClear(void){}
@@ -76,14 +103,28 @@ int main(void)
     assert(AW_CharacterPreset("nord","class0","charioteer",0,"Hors"));
     /* class page: list rows, details of the chosen class */
     assert(AW_CharacterOpen(2));draw();
-    assert(shown("Class 0") && shown("Class 6") && !shown("Class 7") && shown("more below"));
+    assert(shown("Class 0") && shown("Class 6") && !shown("Class 7"));
+    /* CLASS-LIST-LAYOUT-62: no "more" text; the race page's triangles turned up and down: at the top the one above is
+     * dim and the one below is bright (more below) */
+    assert(!shown("(more...)") && !shown("more below") && !shown("more above"));check_arrows(DIM_COLOUR,GOLD_COLOUR);
     assert(shown("Specialization: Combat") && shown("Favored: Strength, Endurance"));
     assert(shown("Major skills") && shown("Minor skills") && shown("Armorer") && shown("Block"));
+    /* CLASS-LIST-LAYOUT-62: a rule above the skill headers (header text at y 60), one under them and one under the
+     * lists; the five rows of the major and minor columns on the same fixed lines, between the rules */
+    assert(rule_count==3 && rules[0]==58 && rules[1]==71 && rules[2]>rules[1]);
+    assert(skill_n==10);
+    for(i=0;i<5;i++){
+        assert(skill_y[i*2]==skill_y[i*2+1]);                 /* the two columns share each row's line */
+        assert(skill_x[i*2]<216 && skill_x[i*2+1]>=220);      /* the major column left, the minor right */
+        assert(skill_y[i*2]>rules[1] && skill_y[i*2]+11<=rules[2]+1);
+        if(i)assert(skill_y[i*2]-skill_y[i*2-2]==11);
+    }
     /* a click on the fourth row picks Class 3 (mouse starts at 100,176) */
     AW_CharacterMouse(-50,-176+34+3*16+4);AW_CharacterKey(K_MOUSE1);draw();
     assert(shown("Specialization: Combat") && shown("Favored: Strength, Endurance"));
     for(i=0;i<8;i++)AW_CharacterKey(K_DOWNARROW);
-    draw();assert(shown("Class 11") && !shown("Class 0") && shown("more above") && shown("Specialization: Stealth"));
+    draw();assert(shown("Class 11") && !shown("Class 0") && !shown("(more...)") && !shown("more above") && shown("Specialization: Stealth"));
+    check_arrows(GOLD_COLOUR,DIM_COLOUR);   /* at the end: more above, nothing below */
     AW_CharacterKey(K_ENTER);AW_CharacterKey(K_ENTER);
     assert(!AW_CharacterActive() && AW_CharacterDone()==2 && aw_character.clas==11);
     /* review sheet: level, names, derived stats, then grouped skills */
@@ -108,12 +149,12 @@ int main(void)
     aw_births[0].power_count=1;strcpy(aw_births[0].powers[0],"steed_power");
     aw_births[2].power_count=2;strcpy(aw_births[2].powers[0],"lady_power");strcpy(aw_births[2].powers[1],"unnamed");
     opens=0;assert(AW_CharacterOpen(3) && opens==1);draw();draw();assert(opens==1);
-    assert(shown("The Steed") && shown("Sign 6") && !shown("Sign 7") && shown("more below"));
+    assert(shown("The Steed") && shown("Sign 6") && !shown("Sign 7") && !shown("(more...)"));check_arrows(DIM_COLOUR,GOLD_COLOUR);   /* the birthsign list too */
     assert(shown("Ability") && shown("Speed of the Steed"));
     AW_CharacterMouse(-50,-176+34+2*16+4);AW_CharacterKey(K_MOUSE1);draw();
     assert(opens==2 && shown("Power") && shown("Lady's Grace") && shown("unnamed") && !shown("Speed of the Steed"));
     for(i=0;i<7;i++)AW_CharacterKey(K_DOWNARROW);
-    draw();assert(shown("Sign 9") && shown("more above") && shown("none"));
+    draw();assert(shown("Sign 9") && !shown("(more...)") && shown("none"));check_arrows(GOLD_COLOUR,DIM_COLOUR);
     AW_CharacterKey(K_ENTER);AW_CharacterKey(K_ENTER);
     assert(!AW_CharacterActive() && AW_CharacterDone()==3 && aw_character.birth==9);
     /* review's B goes to the signs and back to review */
@@ -156,6 +197,12 @@ int main(void)
     have_questions=1;
     AW_CharacterOpen(2);AW_CharacterKey('q');draw();
     assert(shown("Class questions (1/10)") && shown("A1-1") && shown("A1-3"));
+    /* CLASS-LIST-LAYOUT-62: ONE hint row, for this window (not the list's "Arrows: choose  Enter: OK" under it), and a
+     * Cancel button that is Esc */
+    assert(hint_rows()==1 && shown("Arrows/1-3  Enter: answer") && shown("Cancel"));
+    AW_CharacterMouse(-400,-400);AW_CharacterMouse(190,176);AW_CharacterKey(K_MOUSE1);   /* a click on Cancel */
+    draw();assert(shown("Choose your class") && !shown("Class questions (1/10)") && !shown("Cancel") && hint_rows()==1);
+    AW_CharacterKey('q');draw();assert(shown("Class questions (1/10)"));
     {int found=0;for(i=0;i<seen_count;i++)if(!strncmp(seen[i],"Q1 is a",7))found=1;assert(found);}
     for(i=0;i<9;i++)AW_CharacterKey(K_ENTER);
     draw();assert(shown("Class questions (10/10)"));
@@ -170,6 +217,13 @@ int main(void)
     {
     aw_save_t source,decoded;static byte raw[AW_SAVE_BYTES];int n,slot;
     assert(AW_CharacterOpen(2));AW_CharacterKey('m');draw();assert(shown("Make your own class") && shown("Specialization"));
+    /* one hint row (the footer's, lower left; the in-page one is gone), the Cancel button, and Cancel is Esc */
+    assert(hint_rows()==1 && shown("Arrows: change  Enter: next") && shown("Cancel") && !shown("Arrows: choose  Enter: OK"));
+    AW_CharacterMouse(-400,-400);AW_CharacterMouse(190,176);AW_CharacterKey(K_MOUSE1);
+    draw();assert(shown("Choose your class") && !shown("Make your own class") && !shown("Cancel"));
+    AW_CharacterKey('m');draw();assert(shown("Make your own class"));
+    AW_CharacterKey(K_ESCAPE);draw();assert(shown("Choose your class") && !shown("Make your own class"));
+    AW_CharacterKey('m');draw();assert(shown("Make your own class"));
     AW_CharacterKey(K_RIGHTARROW);                                  /* from Class 4's Magic to Stealth */
     AW_CharacterKey(K_DOWNARROW);AW_CharacterKey(K_RIGHTARROW);     /* first favored: next attribute */
     for(i=0;i<12;i++)AW_CharacterKey(K_ENTER);                      /* to OK */

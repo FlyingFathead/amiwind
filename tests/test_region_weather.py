@@ -65,7 +65,23 @@ class WeatherWiringTests(unittest.TestCase):
         self.assertIn('region_index=(int)index;', world)
         weather = code('aw_weather.c')
         self.assertIn('AW_RegionIndexAt(source)', weather)
-        self.assertIn('AW_WeatherOfRegion(&table,*region,days,milliseconds)', weather)
+        # the region's weather with the scripts' ChangeWeather and ModRegion (MWSCRIPT-COMPLETE-LANDMARK)
+        self.assertIn('AW_WeatherScripted(&script,&table,*region,days,milliseconds)', weather)
+
+    def test_the_scripts_weather_is_saved_reset_and_clears_the_mountain(self):
+        # MWSCRIPT-COMPLETE-LANDMARK: ChangeWeather and ModRegion reach aw_weather.c through the host; the changes are
+        # in the scripts' save block (AWWR), emptied by every save load and New Game (actors_import), and once the Red
+        # Mountain region's chances have no ash and no blight the mountain pull stops
+        host = code('aw_mwhost.c')
+        self.assertIn('AW_WeatherChangeByScript(numbers[0].i,numbers[1].i)', host)
+        self.assertIn('AW_WeatherModRegionByScript(numbers[0].i,chances,n<0?0:n)', host)
+        self.assertIn('k=AW_WeatherScriptSave(out+n+s+t,capacity-n-s-t-8);', host)
+        self.assertIn('!memcmp(p+rest,"AWWR",4)', host)
+        imp = host[host.index('static void actors_import('):]
+        self.assertIn('AW_WeatherScriptClear();', imp[:imp.index('\n}\n')])
+        weather = code('aw_weather.c')
+        self.assertIn('!mountain_cleared())mountain_pull=AW_WeatherMountainPull(source);', weather)
+        self.assertIn('return c && !c[AW_WEATHER_ASH] && !c[AW_WEATHER_BLIGHT];', weather)
 
     def test_crossings_are_no_arrivals_and_transitions_queue(self):
         # SKY-REDMOUNTAIN-BLUE-44 reported again with v0.0.46: a walked crossing into another frame map (a map

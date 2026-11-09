@@ -2,7 +2,7 @@
 
 # CHIM Cell Tracker
 
-_Generated from `cell-progress.json` with AmiWind v0.0.57-dev4._
+_Generated from `cell-progress.json` with AmiWind v0.0.62._
 
 Live status of the open world on CHIM, Vvardenfell (island 1). Generated page: do not edit by hand. Per-cell detail is in the Toolkit and its CSV export. What each number counts: [what we count](#what-we-count).
 
@@ -10,19 +10,19 @@ Live status of the open world on CHIM, Vvardenfell (island 1). Generated page: d
 
 These audit totals count the cells with a LAND record (land and seabed), not cells included in a playable build; see Included in builds below.
 
-**Every cell of the tracker, in three groups** (the Toolkit legend shows the same; newest ingested build: v0_0_57_dev4_full_v0_0_57_dev4_snapshot_):
+**Every cell of the tracker, in three groups** (the Toolkit legend shows the same; newest ingested build: v0_0_62_full_v0_0_62_1d5eda8):
 
 - **In the game: 1,409** (Cell complete, awaiting lighting 13, Terrain complete, awaiting lighting 804, Passed (something still deferred) 376, Sea, in the game 216)
 - **Not in the game yet: 153** (Solstheim (Bloodmoon) 153)
-- **Beyond the world's edge: settled: 755** (Settled 755)
+- **Beyond the world's edge: settled: 749** (Settled 749)
 
-Accounted for: 2,164 of 2,317 cells (in the game + settled). Settled squares count toward "accounted for", never toward the cells in the game. Settled: No cell exists here in the original game data. AmiWind's edge current turns the player back before this point, so there is nothing to build.
+Accounted for: 2,158 of 2,311 cells (in the game + settled). Settled squares count toward "accounted for", never toward the cells in the game. Settled: No cell exists here in the original game data. AmiWind's edge current turns the player back before this point, so there is nothing to build.
 
-**On CHIM in the newest ingested build (v0.0.57-dev4 (c53994d6)): 1,292 of 1,292 Vvardenfell land cells (100.0 %), plus 117 sea cells.**
+**On CHIM in the newest ingested build (v0.0.62 release): 1,292 of 1,292 Vvardenfell land cells (100.0 %), plus 116 sea cells.**
 
 A cell is on CHIM in a build when a frame of the CHIM world of that build owns it. The tracker records per cell the newest build that carries it. Land cells have terrain heights; the sea cells are seabed and open ocean ([what we count](#what-we-count)).
 
-Map cells 2,157: cells with a LAND record 1,390 (done 1,390, 100.0 %) and open-sea cells 767 (no LAND record, not counted as done; the groups above say which are in the game and which are settled).
+Map cells 2,156: cells with a LAND record 1,390 (done 1,390, 100.0 %) and open-sea cells 766 (no LAND record, not counted as done; the groups above say which are in the game and which are settled).
 
 - Cell complete: 0
 - Terrain complete: 0
@@ -30,7 +30,7 @@ Map cells 2,157: cells with a LAND record 1,390 (done 1,390, 100.0 %) and open-s
 - Terrain complete, awaiting lighting: 804
 - Passed (something still deferred): 376
 - Empty sea: 197
-- Open sea, no LAND record (not counted as done): 767
+- Open sea, no LAND record (not counted as done): 766
 
 **Conversion-eligible: 1,390 of 1,390** (every audit-done cell, lighting done or not; this is not a release assignment).
 
@@ -38,41 +38,41 @@ Lighting: lit 0, partial 137, unlit 1,056, not measured 99 (cells; lit is requir
 
 Original light sources placed in these cells (numbers of lights, not of cells): lamp / lantern 545 (0 without a mesh), candle 6 (0 without a mesh), torch 69 (0 without a mesh), fire 74 (4 without a mesh), glowing plant 332 (332 without a mesh), darkener (negative light) 12 (12 without a mesh), plain light 1,936 (1,936 without a mesh). In converted cells: 0 lights baked, 694 night lamps only, 2,280 not represented.
 
-Generated 2026-10-30 20:00 +0200. Tracker data generated 2026-10-30T17:59:32+00:00.
+Generated 2026-11-09 01:16 +0200. Tracker data generated 2026-11-08T23:15:07+00:00.
 
 ## What we count
 
 Every cell count on this page, and the counts other pages quote, from the same tracker data. Vvardenfell only (base game, Morrowind.esm) unless a row says otherwise. Light sources are not cells: the light line above counts light placements.
 
-In short: Vvardenfell has 1,390 cells with a LAND record (1,292 land cells with terrain heights and 98 flat seabed cells). The newest ingested build has 1,390 of them on CHIM, plus 19 open-ocean cells: 1,409 cells on CHIM in all.
+In short: Vvardenfell has 1,390 cells with a LAND record (1,292 land cells with terrain heights and 98 flat seabed cells). The newest ingested build has 1,390 of them on CHIM, plus 18 open-ocean cells: 1,408 cells on CHIM in all.
 
 | Number | What it counts | From |
 | :-- | :-- | :-- |
-| 2,157 | Map cells: every cell of Vvardenfell's rectangle on the tracker map, land and sea. | tracker map |
+| 2,156 | Map cells: every cell of Vvardenfell's rectangle on the tracker map, land and sea. | tracker map |
 | 1,390 | Cells with a LAND record (terrain data) in the game data: land cells and seabed cells. The audit total ("Conversion/audit progress"). | LAND records of the masters (asset census) |
 | 1,292 | Land cells: a LAND record with terrain heights. "Vvardenfell land cells" means these. | LAND records with heights |
 | 1,193 | Land cells with something placed (statics, flora, actors...). | tracker status |
 | 99 | Land cells with nothing placed (terrain under the water): status empty sea. | tracker status |
 | 98 | Seabed cells: a LAND record without heights (flat sea floor), nothing placed: status empty sea. | LAND records without heights |
 | 197 | Empty sea (status): empty land cells and seabed cells. The builder calls these "seabed". | tracker status |
-| 767 | Open-ocean cells: no LAND record; water over the default sea floor (one shared ocean chunk). | ocean conversion |
+| 766 | Open-ocean cells: no LAND record; water over the default sea floor (one shared ocean chunk). | ocean conversion |
 | 1,436 | Land cells of every island: Vvardenfell 1,292 and Solstheim 144. Not a Vvardenfell figure; Solstheim (Bloodmoon) is not converted yet. | LAND records with heights, all masters |
-| 1,409 | Cells on CHIM in the newest ingested build (v0.0.57-dev4 (c53994d6)): every cell a frame of that build's world owns: 1,292 land, 98 seabed and 19 open ocean. | the build's CHIM world |
+| 1,408 | Cells on CHIM in the newest ingested build (v0.0.62 release): every cell a frame of that build's world owns: 1,292 land, 98 seabed and 18 open ocean. | the build's CHIM world |
 | 1,351 | Frames in that build's CHIM world: 1,348 region frames (one cell each) and 3 town frames. | the build's CHIM world |
 | 61 | Cells owned by the town frames: balmora 9, seyda 16, vivec_city 36. | the build's CHIM world |
-| 1,132 | The builder's "land" in its log line "N cells on CHIM (S seabed, L land, O ocean)": land cells with something placed, in region frames only (town frames not included). That line's seabed is 197 and its ocean 19. | builder log |
+| 1,132 | The builder's "land" in its log line "N cells on CHIM (S seabed, L land, O ocean)": land cells with something placed, in region frames only (town frames not included). That line's seabed is 197 and its ocean 18. | builder log |
 
 How they add up:
 
 - land cells + seabed cells = cells with a LAND record: 1,292 + 98 = 1,390
 - land cells with something placed + land cells with nothing placed = land cells: 1,193 + 99 = 1,292
 - empty land cells + seabed cells = empty sea: 99 + 98 = 197
-- cells with a LAND record + open-ocean cells = map cells: 1,390 + 767 = 2,157
+- cells with a LAND record + open-ocean cells = map cells: 1,390 + 766 = 2,156
 - Vvardenfell land cells + Solstheim land cells = land cells of every island: 1,292 + 144 = 1,436
-- land + seabed + open ocean on CHIM = cells on CHIM: 1,292 + 98 + 19 = 1,409
+- land + seabed + open ocean on CHIM = cells on CHIM: 1,292 + 98 + 18 = 1,408
 - region frames + town frames = frames: 1,348 + 3 = 1,351
-- cells in region frames + cells in town frames = cells on CHIM: 1,348 + 61 = 1,409
-- builder land + builder seabed + builder ocean = cells in region frames (one cell per region frame): 1,132 + 197 + 19 = 1,348
+- cells in region frames + cells in town frames = cells on CHIM: 1,347 + 61 = 1,408
+- builder land + builder seabed + builder ocean = cells in region frames (one cell per region frame): 1,132 + 197 + 18 = 1,348 (DOES NOT ADD UP)
 
 Older notes use other totals. 1,436 (the tracker headline before v0.0.44) is the land cells of both islands. "46 more inside the town frames" (v0.0.43 notes) is the listed cells the builder dropped; the town frames own more cells than that (see above). 1,395 (v0.0.42 notes) is the cells with a LAND record plus the 5 open-sea cells then selected; 14 more open-sea cells joined in v0.0.43. 1,404 (world survey) is the exterior CELL records of Morrowind.esm: the 1,390 cells with a LAND record and those 14 open-sea cells. The figures in this table are the ones to use.
 
@@ -86,7 +86,7 @@ Older notes use other totals. 1,436 (the tracker headline before v0.0.44) is the
 | Terrain complete, awaiting lighting | 804 | 57.8 % |
 | Passed (something still deferred) | 376 | 27.1 % |
 | Empty sea | 197 | 14.2 % |
-| Open sea | 767 | 55.2 % |
+| Open sea | 766 | 55.1 % |
 | Hull policy pending | 0 | 0.0 % |
 | Failed | 0 | 0.0 % |
 | Not converted | 0 | 0.0 % |
@@ -100,6 +100,11 @@ Included means verified in a packaged image. Packaged does not mean published or
 
 | Version | Evidence state | Included |
 | :-- | --: | --: |
+| v0.0.61 | released | 1,390 (100.0 %) |
+| v0.0.60 | released | 1,390 (100.0 %) |
+| v0.0.59 | released | 1,390 (100.0 %) |
+| v0.0.58 | released | 1,390 (100.0 %) |
+| v0.0.57 | released | 1,390 (100.0 %) |
 | v0.0.56 | released | 1,390 (100.0 %) |
 | v0.0.55 | released | 1,390 (100.0 %) |
 | v0.0.54 | released | 1,390 (100.0 %) |
@@ -138,7 +143,7 @@ Which cells are approved for which release (set by the maintainer with `cell_pro
 
 | Ring | Cells | Cell complete | Terrain complete | Cell complete, awaiting lighting | Terrain complete, awaiting lighting | Passed (something still deferred) | Empty sea | Open sea | Hull policy pending | Failed | Not converted | Not started |
 | :-- | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: |
-| 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 |
+| 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 |
 | 1 | 171 | 0 | 0 | 3 | 0 | 70 | 98 | 0 | 0 | 0 | 0 | 0 |
 | 2 | 160 | 0 | 0 | 1 | 1 | 157 | 1 | 0 | 0 | 0 | 0 | 0 |
 | 3 | 149 | 0 | 0 | 3 | 79 | 67 | 0 | 0 | 0 | 0 | 0 | 0 |

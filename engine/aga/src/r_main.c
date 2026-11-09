@@ -550,6 +550,8 @@ void R_MarkLeaves (void)
 R_DrawEntitiesOnList
 =============
 */
+int (*aw_fall_far_event)(int edict);   /* aw_fall.c sets it (none in the native tests) */
+static int r_far_event_pass, r_far_event_pending;
 void R_DrawEntitiesOnList (void)
 {
 	int			i, j;
@@ -563,14 +565,25 @@ void R_DrawEntitiesOnList (void)
 	if (!r_drawentities.value)
 		return;
 
-	AW_RC_ADD (RC_ENTITIES, cl_numvisedicts);
-	AW_NpcLodFrame ();
-	AW_RC_ADD (RC_LOD_SLOTS, AW_NpcLodResident (NULL));
+	if (!r_far_event_pass)
+	{
+		AW_RC_ADD (RC_ENTITIES, cl_numvisedicts);
+		AW_NpcLodFrame ();
+		AW_RC_ADD (RC_LOD_SLOTS, AW_NpcLodResident (NULL));
+	}
 	for (i=0 ; i<cl_numvisedicts ; i++)
 	{
 		currententity = AW_GuardTorchEntity(cl_visedicts[i]);
         if(!currententity)continue;
-        if(!AW_ModelVisible(currententity->origin,currententity->model->radius * R_SpriteEntityScale(currententity)))continue;
+        /* SCRIPTED-EVENT-PAST-DRAW-DISTANCE-62: a live far event's actor is drawn only in the pass after the fog,
+         * with no far-plane test; every other entity only in the first pass */
+        if(aw_fall_far_event && currententity->model->type==mod_alias && currententity>=cl_entities && currententity<cl_entities+MAX_EDICTS &&
+           aw_fall_far_event((int)(currententity-cl_entities))){
+            if(!r_far_event_pass){r_far_event_pending=1;continue;}
+        }else{
+            if(r_far_event_pass)continue;
+            if(!AW_ModelVisible(currententity->origin,currententity->model->radius * R_SpriteEntityScale(currententity)))continue;
+        }
 
 		if (currententity == &cl_entities[cl.viewentity])
 			continue;	// don't draw the player
@@ -1247,6 +1260,11 @@ SetVisibilityByPassages ();
 		dp_time2 = Sys_FloatTime ();
 
 	{ double fog_t0; AW_RT_BEGIN(fog_t0); AW_FogDraw(); AW_RT_END(RT_FOG, fog_t0); }
+	/* SCRIPTED-EVENT-PAST-DRAW-DISTANCE-62: a live far event's actor over the fog, against the z-buffer as drawn */
+	if (r_far_event_pending)
+	{
+		r_far_event_pass = 1; R_DrawEntitiesOnList (); r_far_event_pass = 0; r_far_event_pending = 0;
+	}
     AW_GuardTorchDraw(); /* Same world camera/depth, before hands and water warp. */
     AW_StaticFlamesDraw();
     AW_LavaEmbersDraw();

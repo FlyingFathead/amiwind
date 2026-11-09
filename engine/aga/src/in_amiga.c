@@ -67,10 +67,14 @@ void IN_AWMouseReset(void) {
 }
 /* CONTAINER-WINDOW-59: the container strip's mouse while it is open (aw_cstrip.c sets it; 1 when it took the move) */
 int (*aw_cstrip_mouse)(int dx,int dy);
+int (*aw_msgbox_mouse)(int dx,int dy);
+int (*aw_death_mouse)(int dx,int dy);
 void IN_AWMouseEvent(int dx, int dy) {
   dx=IN_AWMouseBound(dx);dy=IN_AWMouseBound(dy);
   /* UI movement must precede the next button in the SAME Intuition batch.
    * Apply each delta separately so clamping and drag order are preserved. */
+  /* a message box or the death box over play or a world window: its pointer (MSGBOX-NO-CURSOR-62) */
+  if((aw_msgbox_mouse && aw_msgbox_mouse(dx,dy)) || (aw_death_mouse && aw_death_mouse(dx,dy))){IN_AWMouseReset();return;}
   if(key_dest!=key_game){
     IN_AWMouseReset();
     if(AW_WorldUIActive())AW_WorldUIMouse(dx,dy);

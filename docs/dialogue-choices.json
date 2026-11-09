@@ -1,0 +1,476 @@
+{
+ "masters": {
+  "Bloodmoon.esm": {
+   "branches": 281,
+   "calls": 125,
+   "in_table": false,
+   "infos_with_choice": 125,
+   "max_options": 9,
+   "max_text": 197,
+   "status": {
+    "none": 0,
+    "plain": 11,
+    "reachable": 269,
+    "shadowed": 0,
+    "start_value": 1,
+    "unread": 0
+   }
+  },
+  "Morrowind.esm": {
+   "branches": 2043,
+   "calls": 1048,
+   "in_table": true,
+   "infos_with_choice": 1048,
+   "max_options": 7,
+   "max_text": 115,
+   "status": {
+    "none": 0,
+    "plain": 5,
+    "reachable": 2005,
+    "shadowed": 5,
+    "start_value": 28,
+    "unread": 0
+   }
+  },
+  "Tribunal.esm": {
+   "branches": 637,
+   "calls": 267,
+   "in_table": false,
+   "infos_with_choice": 267,
+   "max_options": 9,
+   "max_text": 96,
+   "status": {
+    "none": 1,
+    "plain": 27,
+    "reachable": 608,
+    "shadowed": 0,
+    "start_value": 1,
+    "unread": 0
+   }
+  }
+ },
+ "not_reachable": [
+  {
+   "answer": "9108954969393860",
+   "choice": 1,
+   "info": "2539043763107130609",
+   "master": "Morrowind.esm",
+   "speaker": "dhaunayne aundae",
+   "status": "start_value",
+   "topic": "about my family",
+   "why": [
+    "PcVampire"
+   ]
+  },
+  {
+   "answer": "1673412749170796935",
+   "choice": 2,
+   "info": "2539043763107130609",
+   "master": "Morrowind.esm",
+   "speaker": "dhaunayne aundae",
+   "status": "start_value",
+   "topic": "about my family",
+   "why": [
+    "PcVampire"
+   ]
+  },
+  {
+   "answer": "223631120519718084",
+   "choice": 1,
+   "info": "27030114162309511904",
+   "master": "Morrowind.esm",
+   "speaker": "raxle berne",
+   "status": "start_value",
+   "topic": "an errand for you",
+   "why": [
+    "PcVampire"
+   ]
+  },
+  {
+   "answer": "194443234669845543",
+   "choice": 2,
+   "info": "27030114162309511904",
+   "master": "Morrowind.esm",
+   "speaker": "raxle berne",
+   "status": "start_value",
+   "topic": "an errand for you",
+   "why": [
+    "PcVampire"
+   ]
+  },
+  {
+   "answer": "287729144134582816",
+   "choice": 1,
+   "info": "1456843831407910377",
+   "master": "Morrowind.esm",
+   "speaker": "fathasa llethri",
+   "status": "start_value",
+   "topic": "because of my son",
+   "why": [
+    "PcVampire"
+   ]
+  },
+  {
+   "answer": "69438808559732229",
+   "choice": 2,
+   "info": "1456843831407910377",
+   "master": "Morrowind.esm",
+   "speaker": "fathasa llethri",
+   "status": "start_value",
+   "topic": "because of my son",
+   "why": [
+    "PcVampire"
+   ]
+  },
+  {
+   "answer": "20346204972850912813",
+   "choice": 1,
+   "info": "19808204903220023708",
+   "master": "Morrowind.esm",
+   "speaker": "ulyne henim",
+   "status": "shadowed",
+   "topic": "fight together",
+   "why": []
+  },
+  {
+   "answer": "20346204972850912813",
+   "choice": 2,
+   "info": "19808204903220023708",
+   "master": "Morrowind.esm",
+   "speaker": "ulyne henim",
+   "status": "shadowed",
+   "topic": "fight together",
+   "why": []
+  },
+  {
+   "answer": "20346204972850912813",
+   "choice": 1,
+   "info": "16742267121877231535",
+   "master": "Morrowind.esm",
+   "speaker": "ulyne henim",
+   "status": "shadowed",
+   "topic": "fight together",
+   "why": []
+  },
+  {
+   "answer": "20346204972850912813",
+   "choice": 2,
+   "info": "16742267121877231535",
+   "master": "Morrowind.esm",
+   "speaker": "ulyne henim",
+   "status": "shadowed",
+   "topic": "fight together",
+   "why": []
+  },
+  {
+   "answer": "30120308861557115251",
+   "choice": 2,
+   "info": "1733819314779529785",
+   "master": "Morrowind.esm",
+   "speaker": "dangor",
+   "status": "shadowed",
+   "topic": "flin",
+   "why": []
+  },
+  {
+   "answer": "24293259802848115115",
+   "choice": 1,
+   "info": "1605629794349424573",
+   "master": "Morrowind.esm",
+   "speaker": "raxle berne",
+   "status": "start_value",
+   "topic": "serve me",
+   "why": [
+    "PcVampire"
+   ]
+  },
+  {
+   "answer": "611731859272224166",
+   "choice": 2,
+   "info": "1605629794349424573",
+   "master": "Morrowind.esm",
+   "speaker": "raxle berne",
+   "status": "start_value",
+   "topic": "serve me",
+   "why": [
+    "PcVampire"
+   ]
+  },
+  {
+   "answer": "20024771124631493",
+   "choice": 9,
+   "info": "847686501806225829",
+   "master": "Morrowind.esm",
+   "speaker": "sanvyn llethri",
+   "status": "start_value",
+   "topic": "submit myself",
+   "why": [
+    "PcVampire"
+   ]
+  },
+  {
+   "answer": "114258073139804507",
+   "choice": 10,
+   "info": "847686501806225829",
+   "master": "Morrowind.esm",
+   "speaker": "sanvyn llethri",
+   "status": "start_value",
+   "topic": "submit myself",
+   "why": [
+    "PcVampire"
+   ]
+  },
+  {
+   "answer": "20024771124631493",
+   "choice": 9,
+   "info": "8243439107833085",
+   "master": "Morrowind.esm",
+   "speaker": "sanvyn llethri",
+   "status": "start_value",
+   "topic": "submit myself",
+   "why": [
+    "PcVampire"
+   ]
+  },
+  {
+   "answer": "114258073139804507",
+   "choice": 10,
+   "info": "8243439107833085",
+   "master": "Morrowind.esm",
+   "speaker": "sanvyn llethri",
+   "status": "start_value",
+   "topic": "submit myself",
+   "why": [
+    "PcVampire"
+   ]
+  },
+  {
+   "answer": "8243439107833085",
+   "choice": 7,
+   "info": "2400831361214927528",
+   "master": "Morrowind.esm",
+   "speaker": "sanvyn llethri",
+   "status": "start_value",
+   "topic": "submit myself",
+   "why": [
+    "PcVampire"
+   ]
+  },
+  {
+   "answer": "847686501806225829",
+   "choice": 8,
+   "info": "2400831361214927528",
+   "master": "Morrowind.esm",
+   "speaker": "sanvyn llethri",
+   "status": "start_value",
+   "topic": "submit myself",
+   "why": [
+    "PcVampire"
+   ]
+  },
+  {
+   "answer": "8243439107833085",
+   "choice": 7,
+   "info": "12981339121322322",
+   "master": "Morrowind.esm",
+   "speaker": "sanvyn llethri",
+   "status": "start_value",
+   "topic": "submit myself",
+   "why": [
+    "PcVampire"
+   ]
+  },
+  {
+   "answer": "847686501806225829",
+   "choice": 8,
+   "info": "12981339121322322",
+   "master": "Morrowind.esm",
+   "speaker": "sanvyn llethri",
+   "status": "start_value",
+   "topic": "submit myself",
+   "why": [
+    "PcVampire"
+   ]
+  },
+  {
+   "answer": "12981339121322322",
+   "choice": 5,
+   "info": "30742075127519401",
+   "master": "Morrowind.esm",
+   "speaker": "sanvyn llethri",
+   "status": "start_value",
+   "topic": "submit myself",
+   "why": [
+    "PcVampire"
+   ]
+  },
+  {
+   "answer": "2400831361214927528",
+   "choice": 6,
+   "info": "30742075127519401",
+   "master": "Morrowind.esm",
+   "speaker": "sanvyn llethri",
+   "status": "start_value",
+   "topic": "submit myself",
+   "why": [
+    "PcVampire"
+   ]
+  },
+  {
+   "answer": "12981339121322322",
+   "choice": 5,
+   "info": "1672014651682310489",
+   "master": "Morrowind.esm",
+   "speaker": "sanvyn llethri",
+   "status": "start_value",
+   "topic": "submit myself",
+   "why": [
+    "PcVampire"
+   ]
+  },
+  {
+   "answer": "2400831361214927528",
+   "choice": 6,
+   "info": "1672014651682310489",
+   "master": "Morrowind.esm",
+   "speaker": "sanvyn llethri",
+   "status": "start_value",
+   "topic": "submit myself",
+   "why": [
+    "PcVampire"
+   ]
+  },
+  {
+   "answer": "1672014651682310489",
+   "choice": 3,
+   "info": "89033079519326591",
+   "master": "Morrowind.esm",
+   "speaker": "sanvyn llethri",
+   "status": "start_value",
+   "topic": "submit myself",
+   "why": [
+    "PcVampire"
+   ]
+  },
+  {
+   "answer": "30742075127519401",
+   "choice": 4,
+   "info": "89033079519326591",
+   "master": "Morrowind.esm",
+   "speaker": "sanvyn llethri",
+   "status": "start_value",
+   "topic": "submit myself",
+   "why": [
+    "PcVampire"
+   ]
+  },
+  {
+   "answer": "1672014651682310489",
+   "choice": 3,
+   "info": "10190134643227725723",
+   "master": "Morrowind.esm",
+   "speaker": "sanvyn llethri",
+   "status": "start_value",
+   "topic": "submit myself",
+   "why": [
+    "PcVampire"
+   ]
+  },
+  {
+   "answer": "30742075127519401",
+   "choice": 4,
+   "info": "10190134643227725723",
+   "master": "Morrowind.esm",
+   "speaker": "sanvyn llethri",
+   "status": "start_value",
+   "topic": "submit myself",
+   "why": [
+    "PcVampire"
+   ]
+  },
+  {
+   "answer": "10190134643227725723",
+   "choice": 1,
+   "info": "27705168951333023459",
+   "master": "Morrowind.esm",
+   "speaker": "sanvyn llethri",
+   "status": "start_value",
+   "topic": "submit myself",
+   "why": [
+    "PcVampire"
+   ]
+  },
+  {
+   "answer": "89033079519326591",
+   "choice": 2,
+   "info": "27705168951333023459",
+   "master": "Morrowind.esm",
+   "speaker": "sanvyn llethri",
+   "status": "start_value",
+   "topic": "submit myself",
+   "why": [
+    "PcVampire"
+   ]
+  },
+  {
+   "answer": "1895954131164512304",
+   "choice": 1,
+   "info": "14317185292636531007",
+   "master": "Morrowind.esm",
+   "speaker": "dhaunayne aundae",
+   "status": "start_value",
+   "topic": "vampire hunter",
+   "why": [
+    "PcVampire"
+   ]
+  },
+  {
+   "answer": "228095534128791179",
+   "choice": 2,
+   "info": "14317185292636531007",
+   "master": "Morrowind.esm",
+   "speaker": "dhaunayne aundae",
+   "status": "start_value",
+   "topic": "vampire hunter",
+   "why": [
+    "PcVampire"
+   ]
+  },
+  {
+   "answer": "",
+   "choice": 1,
+   "info": "147793207175513376",
+   "master": "Tribunal.esm",
+   "speaker": "varus vatinius",
+   "status": "none",
+   "topic": "chrysamere",
+   "why": []
+  },
+  {
+   "answer": "1895954131164512304",
+   "choice": 1,
+   "info": "14317185292636531007",
+   "master": "Tribunal.esm",
+   "speaker": "dhaunayne aundae",
+   "status": "start_value",
+   "topic": "vampire hunter",
+   "why": [
+    "PcVampire"
+   ]
+  },
+  {
+   "answer": "1895954131164512304",
+   "choice": 1,
+   "info": "14317185292636531007",
+   "master": "Bloodmoon.esm",
+   "speaker": "dhaunayne aundae",
+   "status": "start_value",
+   "topic": "vampire hunter",
+   "why": [
+    "PcVampire"
+   ]
+  }
+ ],
+ "schema": "dialogue-choices 1",
+ "table_master": "Morrowind.esm"
+}

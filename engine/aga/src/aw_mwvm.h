@@ -120,6 +120,7 @@ int AW_MwvmLoaded(void);
 int AW_MwvmScriptCount(void);
 int AW_MwvmScriptFlags(int script);
 int AW_MwvmScriptName(int script);                       /* string index */
+int AW_MwvmScriptFarTrigger(int script);                 /* game units of a far event's distance check, 0 none */
 /* 1 mapped; NEAR/FAR: hearing distances in game units */
 int AW_MwvmSound(int sound,unsigned char hash[8],int *centis,int *volume,int *near_units,int *far_units);
 int AW_MwvmSoundAmbience(int sound);                     /* 1: a mapped dungeon ambience (flags 1|2) */
@@ -141,6 +142,24 @@ int AW_MwvmSection(const char tag[4],uint32_t *offset,uint32_t *rows,uint32_t *b
 /* Map changes: every attached object is parked (its values kept), then the host attaches the new map's objects. */
 void AW_MwvmBeginMap(void);
 int AW_MwvmAttach(uint32_t reference,int script,int bind_flags,int entity,const float origin[3]);
+/* A script the host holds is neither attached nor started (CENSUS-INTRO-SCRIPTS-62: the census office's scripts while
+ * aw_census_legacy chooses the old hand-written path); at most AW_MWVM_HELD_SCRIPTS. */
+#define AW_MWVM_HELD_SCRIPTS 16
+int AW_MwvmScriptHold(int script,int hold);
+/* OnPCAdd (CENSUS-INTRO-SCRIPTS-62): the PADD row of a carried item (the FNV-1a of its folded id), and the item's
+ * arrival in the player's inventory (the taken placement REFERENCE's instance, else the carried instance). */
+int AW_MwvmPcAddRow(uint32_t hash,int *script,int *slot);
+int AW_MwvmPcAdd(uint32_t reference,int script,int slot);
+/* MWSCRIPT-UNPLACED-ATTACH-62 (OpenMW 0.51: the scripts of the items in the player's inventory run; the actor a
+ * levelled list gives runs its record's script). Every carried item that names a script has a PADD row; its slot is
+ * AW_MWVM_NO_SLOT when the script has no OnPCAdd local (PcAdd then only starts the carried instance). CarriedStop: the
+ * last one left the inventory (1 stopped). ScriptAttached: 1 when an object of the loaded map runs SCRIPT. Levelled-
+ * Script: the LACT row of an actor record (the FNV-1a of its folded id), 1 found. */
+#define AW_MWVM_NO_SLOT 0xFF
+int AW_MwvmCarriedStop(int script);
+int AW_MwvmScriptAttached(int script);
+int AW_MwvmLevelledScript(uint32_t hash,int *script);
+int AW_MwvmScriptHeld(int script);
 void AW_MwvmSetOrigin(int instance,const float origin[3]);
 /* An attached object left the loaded map (PositionCell elsewhere): its values parked, it runs no more here (1 found). */
 int AW_MwvmDetach(uint32_t reference);

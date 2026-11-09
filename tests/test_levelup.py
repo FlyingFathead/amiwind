@@ -92,6 +92,28 @@ class LevelupBuilderTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             p.settings_text(kinds, {}, None)
 
+    def test_skill_books_list(self):
+        """SKILL-BOOKS-MISSING-62: every live book with a skill, in folded ID order, its index its read-list bit."""
+        import prepare_levelup as p
+
+        def record(tag, subs, flags=0):
+            body = b''.join(k.encode() + struct.pack('<I', len(v)) + v for k, v in subs)
+            return tag.encode() + struct.pack('<III', len(body), 0, flags) + body
+
+        def book(ident, skill, flags=0, extra=()):
+            return record('BOOK', [('NAME', ident.encode() + b'\0'),
+                                   ('BKDT', struct.pack('<fiiii', 1.0, 10, 0, skill, 0))] + list(extra), flags)
+        raw = (book('BookSkill_Axe2', 6) + book('bookskill_alchemy1', 16) + book('BK_plain', -1) +
+               book('bk_gone', 3, flags=0x20) + book('bk_dele', 3, extra=[('DELE', b'\0\0\0\0')]) +
+               book('bk two words', 25) + record('MISC', [('NAME', b'thing\0')]))
+        text, count = p.books_text(raw)
+        self.assertEqual(count, 3)
+        self.assertEqual(text.splitlines(), ['AWLB1', 'book 0 25 bk two words', 'book 1 16 bookskill_alchemy1',
+                                             'book 2 6 bookskill_axe2'])
+        self.assertIn('sBookSkillMessage', p.TEXTS)
+        self.assertEqual(p.BOOKS_MAX, int(re.search(r'#define AW_BOOKS_READ_MAX (\d+)',
+                                                    (SRC / 'aw_character.h').read_text(encoding='utf-8')).group(1)))
+
     def test_level_texts_from_the_install_ini(self):
         import prepare_levelup as p
         with tempfile.TemporaryDirectory() as folder:
@@ -111,6 +133,7 @@ class LevelupSourceContractTests(unittest.TestCase):
         self.assertIn('AW_LevelupUse(c==1?AW_SK_LIGHT:c==2?AW_SK_MEDIUM:c==3?AW_SK_HEAVY:AW_SK_UNARMORED,0,1);', combat)
         move = code('aw_move.c')
         self.assertIn('if(jumped)AW_LevelupUse(AW_LU_ACROBATICS,AW_USE_JUMP,1);', move)
+        self.assertIn('(p->v.button2 || prev_jump)', move)     # a tapped jump counts (SKILL-RAISE-NOT-SEEN-62)
         self.assertIn('AW_LevelupMoveSeconds(', move)
         self.assertIn('AW_LevelupRaise(which,AW_RAISE_TRAINER)', code('aw_dialwin.c'))
         self.assertIn('AW_LevelupUse(25,r.success?0:1,1);', code('aw_dialwin.c'))
@@ -135,7 +158,22 @@ class LevelupSourceContractTests(unittest.TestCase):
         self.assertIn("if(!error && data[3]=='4' && (features&64))levelling_fields(&candidate.character);", codec)
         # bit 128: the dated journal history (JOURNAL-ORIGINAL-VIEW-59), 256: up to 128 kinds of item, 512: any number
         # of kinds (INVENTORY-ORIGINAL-LIMITS-61)
-        self.assertIn('if(features>1023)error=1;', codec)
+        # bit 1024: the skill books read (SKILL-BOOKS-MISSING-62)
+        self.assertIn('if(features>2047)error=1;', codec)
+        self.assertIn('(books_words(&copy.character)?1024U:0U)', codec)
+        self.assertIn("if(!error && data[3]=='4' && (features&1024))books_fields(&candidate.character);", codec)
+
+    def test_skill_book_read_and_held_raise_line(self):
+        # SKILL-BOOKS-MISSING-62: the placed book's reader reports the read; the rule marks it read once
+        self.assertIn('AW_LevelupBookRead(id);', code('aw_reader.c'))
+        lu = code('aw_levelup.c')
+        self.assertIn('return AW_LevelupRaise(book_skill,AW_RAISE_BOOK);', lu)
+        self.assertIn('if(aw_character.books_read[index>>5]&bit)return 0;', lu)
+        # SKILL-RAISE-NOT-SEEN-62: the raise line is held against the same blow's voice and hit lines
+        self.assertIn('AW_UIHeldNotice(line,due?6:4,3);', lu)
+        self.assertNotIn('AW_UISubtitle("",line,due?6:4)', lu)
+        # LEVEL-UP-INGAME-62: Acrobatics from a landing that hurt without a knockdown
+        self.assertIn('if(!knockdown)AW_LevelupUse(AW_LU_ACROBATICS,AW_USE_FALL,1);', code('aw_move.c'))
 
     def test_engine_wiring_build_route_and_budget(self):
         make = (ROOT / 'engine/aga/Makefile').read_text(encoding='utf-8')

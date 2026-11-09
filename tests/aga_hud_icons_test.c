@@ -147,6 +147,36 @@ int main(void){
     assert(count(132,54,16,16,21)==256);
     assert(aw_inventory_row_icon(0,"steel longsword",1,132,54) && count(132,54,16,16,22)==256);
     assert(!aw_inventory_row_icon(1,"no such item",0,132,70) && count(132,70,16,16,0)==256);
+    /* ITEM-ICONS-MISSING-62: the shared slot fit, by number. A picture takes the largest whole scale that fits and sits
+     * centred with the same margin on both sides; a slot too small for it gets none. Slots: the container cell (34),
+     * the inventory row (16), the HUD box interior (18); pictures: 32 and 16 (the table's), 18, 12, 1 and odd sizes. */
+    {
+        static const int cases[][7]={   /* picture w, h, slot w, h, scale, ox, oy */
+            {32,32,34,34,1,1,1},{16,16,34,34,2,1,1},{18,18,34,34,1,8,8},{12,12,34,34,2,5,5},{17,17,34,34,2,0,0},
+            {11,11,34,34,3,0,0},{1,1,34,34,34,0,0},{16,16,16,16,1,0,0},{12,12,16,16,1,2,2},{32,32,36,36,1,2,2},
+            {32,16,34,34,1,1,9},{16,32,34,34,1,9,1},{8,16,34,34,2,9,1},{16,16,18,18,1,1,1},{16,16,15,15,0,0,0},
+            {0,16,34,34,0,0,0},{16,16,0,34,0,0,0}};
+        int n,ox,oy,k;
+        for(n=0;n<(int)(sizeof(cases)/sizeof(cases[0]));n++){
+            ox=oy=-1;k=AW_IconFit(cases[n][0],cases[n][1],cases[n][2],cases[n][3],&ox,&oy);
+            assert(k==cases[n][4]);
+            if(k){assert(ox==cases[n][5] && oy==cases[n][6]);
+                  assert(ox==cases[n][2]-cases[n][0]*k-ox || ox==cases[n][2]-cases[n][0]*k-ox-1);   /* even margin */
+                  assert(oy==cases[n][3]-cases[n][1]*k-oy || oy==cases[n][3]-cases[n][1]*k-oy-1);}
+        }
+        /* drawn: an item with only an inventory picture (the table has "inv:steel longsword", 16 x 16, colour 21) fills a
+         * 34 x 34 cell at 2x, the 32 x 32 block centred (1 pixel each side), black around it; a second draw reads nothing */
+        {
+            aw_icon_t slot;memset(&slot,0,sizeof(slot));memset(screen,9,sizeof(screen));
+            assert(AW_IconLoadItem(&slot,"steel longsword") && slot.w==16 && slot.h==16);
+            reads=opens;AW_IconDrawFit(&slot,40,40,34,34,0);
+            assert(count(41,41,32,32,21)==32*32 && count(40,40,34,34,0)==34*34-32*32 && screen[39][40]==9 && screen[40][74]==9);
+            assert(AW_IconLoadItem(&slot,"steel longsword") && opens==reads);       /* remembered, not looked up again */
+            assert(!AW_IconLoadItem(&slot,"no such item") && !AW_IconLoadItem(&slot,"no such item"));   /* none: false, no text claim */
+            memset(screen,9,sizeof(screen));AW_IconDrawFit(&slot,40,40,34,34,0);
+            assert(count(40,40,34,34,0)==34*34);                                     /* a missing picture: the black slot only */
+        }
+    }
     /* The pack layout (AWL2 + gfx/icons.awp) reads the same pictures. */
     pack_mode=1;{aw_icon_t slot;memset(&slot,0,sizeof(slot));
      assert(AW_IconLoad(&slot,"skill:26") && slot.w==18 && slot.h==18 && slot.pixels[0]==17 && slot.pixels[18*18-1]==17);

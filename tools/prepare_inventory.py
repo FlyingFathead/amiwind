@@ -36,7 +36,9 @@ DEBUG_TORCH_NAME='Debug torch (test only)'
 DEBUG_TORCH_SOURCE='torch'
 LIGHT_INFINITE=-1
 FLAG_LIGHT=32
-FLAG_ALCHEMY=64   # ALCHEMY-61: bytes 440..495 hold the alchemy block (tools/prepare_alchemy.py)
+FLAG_BEAST_HEAD=128   # EQUIP-ACTION-REGRESSION-62: a Head part: a beast race cannot wear it (sNotifyMessage13)
+FLAG_BEAST_FEET=256   # a foot part: a beast race cannot wear it (sNotifyMessage14 armour, 15 clothing)
+FLAG_ALCHEMY=64  # ALCHEMY-61: bytes 440..495 hold the alchemy block (tools/prepare_alchemy.py)
 SLOT_LEFT=17
 
 def safe_text(value,size):
@@ -53,6 +55,36 @@ def script_inert_after_registration(source):
     source=re.sub(r'^\s*begin\s+[^\n]+','',source)
     source=re.sub(r'^\s*(?:(?:short|long|float)\s+\w+\s*)*','',source)
     return bool(re.match(r'\s*if\s*\(?\s*chargenstate\s*==\s*-1\s*\)?\s*return\s*endif',source))
+
+# EQUIP-ACTION-REGRESSION-62: in the original any carried item with a script can be worn, wielded and dropped; the
+# script matters to equipping only when it reads OnPCEquip or sets PCSkipEquip, and to dropping only when it reads
+# OnPCDrop (OpenMW 0.51 mwgui/inventorywindow.cpp useItem, mwworld/actionequip.cpp; mwscript/miscextensions.cpp).
+# The engine does not run those yet, so only such scripts keep their item from being equipped or dropped. Before
+# this, every script that was not the narrow "registration done" form refused both: the census office's dagger
+# (chargen dagger, an OnActivate-only script) showed no action at all.
+# Only PCSkipEquip refuses: such a script replaces the equipping itself (Sunder and Keening without Wraithguard, the
+# Wraithguard of a wrong race). A script that only reads OnPCEquip (the census dagger's tutorial message, the faction
+# armour's checks) reacts after the item is worn; the item is worn and that reaction is listed in the stage report
+# (equip_reaction_not_run) until carried items' scripts run (MWSCRIPT tracker).
+EQUIP_SCRIPT_WORDS=re.compile(r'\bpcskipequip\b')
+EQUIP_REACTION_WORDS=re.compile(r'\bonpcequip\b')
+DROP_SCRIPT_WORDS=re.compile(r'\bonpcdrop\b')
+def equip_refusal(item,source,model,enchantments,may_equip):
+    """Why a wearable or wieldable record gets no Equip action, or None when no rule refuses it (then it is a bug)."""
+    if not may_equip:return 'its script sets PCSkipEquip, which the engine does not run yet'
+    if item['enchantment']:
+        enchant=enchantments.get(item['enchantment'])
+        if not enchant:return 'its enchantment is not in the masters'
+        held=item['kind']=='WEAP' or (item['kind']=='ARMO' and item['subtype']==8)
+        if enchant[0] not in ((1,2,3) if held else (2,3)):return 'its enchantment kind %d is not applied when worn'%enchant[0]
+    if item['kind']=='ARMO' and item['subtype']!=8 and struct.unpack_from('<i',item['raw'],12)[0]<=0:return 'its armour health is 0'
+    if (item['kind']=='WEAP' or (item['kind']=='ARMO' and item['subtype']==8)) and not model:return 'no world model to hold'
+    return None
+
+def script_allows(source,words):
+    if not source:return True
+    if script_inert_after_registration(source):return True
+    return not words.search(re.sub(r';[^\n]*','',source).lower())
 
 def effect_cost(effect,mgef,cost_mult):
     # OpenMW 0.51 mwmechanics/spellutil.cpp calcEffectCost, EffectCostMethod::GameEnchantment
@@ -160,6 +192,7 @@ def source_items(data):
             subtype=subtype,weight=weight,value=value,source_model=text(fields,'MODL'),
             source_icon=text(fields,'TEXT' if kind=='ALCH' else 'ITEX'),script=text(fields,'SCRI').casefold(),
             raw=raw,enchantment=text(fields,'ENAM').casefold() if kind in ('CLOT','ARMO','WEAP','BOOK') else '',parts=any(k=='INDX' for k,_ in fields),
+            part_ids={v[0] for k,v in fields if k=='INDX' and len(v)==1},
             capacity=enchant_capacity(kind,raw),alchemy=block_for(kind,fields))
     for identifier,enchant in enchantments.items():
         if not 0<=enchant[0]<=3:continue
@@ -210,7 +243,7 @@ def prepare(data_files,id1,selected=(),palette=None,models=True,jobs=None,model_
     # HELD-LIGHT-OWN-MODEL-61: beside each carried light's item model (not the torch's mesh: the torch keeps its own
     # hand, flame and light) its placing on the shield bone and its flames, one small file per model
     torch_mesh=mesh_key(items[DEBUG_TORCH_SOURCE]['source_model']) if DEBUG_TORCH_SOURCE in items else ''
-    report['held_lights']={'files':0,'flames':0,'without_flame':0,'torch_mesh_skipped':0,'failed':{}}
+    report['held_lights']={'files':0,'flames':0,'without_flame':0,'torch_mesh':0,'failed':{}}
     held_written=set()
     def held_inert(item):
         # EQUIP-SHARDAXE-REFUSED-61: a weapon or shield whose enchantment does nothing while it is merely held is
@@ -224,7 +257,9 @@ def prepare(data_files,id1,selected=(),palette=None,models=True,jobs=None,model_
         return bool(enchant) and enchant[0] in (1,2,3)
     for identifier,item in sorted(items.items()):
         model=icon='';slots=flags=0
-        inert=not item['script'] or script_inert_after_registration(scripts.get(item['script'],''))
+        source=scripts.get(item['script'],'') if item['script'] else ''
+        inert=script_allows(source,EQUIP_SCRIPT_WORDS)          # may be equipped (EQUIP-ACTION-REGRESSION-62)
+        droppable=script_allows(source,DROP_SCRIPT_WORDS)
         if item['kind']=='CLOT' and item['subtype'] in CLOTHING_SLOTS:
             slot=CLOTHING_SLOTS[item['subtype']]
             slots=(1<<12)|(1<<13) if item['subtype']==8 else 1<<slot
@@ -234,11 +269,11 @@ def prepare(data_files,id1,selected=(),palette=None,models=True,jobs=None,model_
             # never applied merely by wearing the item.
             # v0.0.61 (PLAYER-CASTING-59): a Constant Effect enchantment too, active while worn (aw_cast.c).
             enchant=enchantments.get(item['enchantment']) if item['enchantment'] else None
-            if item['subtype'] in (8,9) and not item['parts'] and inert and (not item['enchantment'] or (enchant and enchant[0] in (2,3))):flags|=4
             # Clothing with body parts (shirts, pants, shoes, robes, skirts, gloves): the player's assembled body
             # shows them (PLAYER-GEAR-VISUAL-59, tools/prepare_player_parts.py), so they are worn by the same rule
-            # (nothing else happens when worn).
-            elif item['parts'] and inert and (not item['enchantment'] or (enchant and enchant[0] in (2,3))):flags|=4
+            # (nothing else happens when worn). EQUIP-ACTION-REGRESSION-62: a piece without body parts is worn as
+            # well (the original wears it; nothing shows), so every clothing record follows one rule.
+            if inert and (not item['enchantment'] or (enchant and enchant[0] in (2,3))):flags|=4
         combat=[0,26,*([0]*6),0.,0.,0.,0.,0,0]
         if item['kind']=='WEAP' and item['subtype'] in HELD_WEAPONS:
             from prepare_combat import WEAPON_SKILL
@@ -265,6 +300,11 @@ def prepare(data_files,id1,selected=(),palette=None,models=True,jobs=None,model_
         if item.get('light'):
             # Equipped like a torch: the left hand (its own slot rules; never a weapon or shield).
             slots=1<<SLOT_LEFT;flags|=1|4|FLAG_LIGHT
+        # EQUIP-ACTION-REGRESSION-62: what a beast race cannot wear (OpenMW 0.51 mwclass/armor.cpp and clothing.cpp
+        # canBeEquipped): a piece with a Head part (128) or a foot part, left or right (256)
+        if item['kind'] in ('ARMO','CLOT') and slots:
+            if 0 in item.get('part_ids',()):flags|=FLAG_BEAST_HEAD
+            if item.get('part_ids',set())&{15,16}:flags|=FLAG_BEAST_FEET
         if item['script']:flags|=8
         if item['enchantment'] and enchantments.get(item['enchantment'],[None])[0]==3:flags|=16
         if model_table is not None and item['source_model']:
@@ -272,12 +312,15 @@ def prepare(data_files,id1,selected=(),palette=None,models=True,jobs=None,model_
             # keyed by the mesh path): on disk only, loaded when the item lies on the ground (aw_inventory.c inv_model).
             model=model_table.get(mesh_key(item['source_model']),'')
             if model:
-                if inert:flags|=2
+                if droppable:flags|=2
                 if inert and held_inert(item) and (item['kind']=='WEAP' and item['subtype'] in HELD_WEAPONS or item['kind']=='ARMO' and item['subtype']==8):flags|=4
             else:report['held'].setdefault(identifier,{})['model']='not in the item model table'
             if model and item.get('light') and assets is not None and model not in held_written:
-                if mesh_key(item['source_model'])==torch_mesh:report['held_lights']['torch_mesh_skipped']+=1
-                else:
+                # TORCH-HIDES-HELM-62: the torch's mesh gets its held file too, so a held torch (the debug torch
+                # included) is a held light on the assembled body like every other light, on the carried-left slot;
+                # before, it was skipped and the torch drew the old baked torch body without anything worn
+                if mesh_key(item['source_model'])==torch_mesh:report['held_lights']['torch_mesh']+=1
+                if True:
                     try:
                         from mwad.audit import normpath
                         key=normpath('meshes/'+item['source_model'])
@@ -297,7 +340,7 @@ def prepare(data_files,id1,selected=(),palette=None,models=True,jobs=None,model_
                     raw=item_model(assets,{'slot':25,'id':identifier,'mesh':item['source_model'],'attach':'','filter':''},palette,nif)
                     model='progs/inv/i'+stem+'.mdl';out=id1/model;out.parent.mkdir(parents=True,exist_ok=True);out.write_bytes(raw)
                     report['models'][identifier]={'path':model,'sha256':hashlib.sha256(raw).hexdigest(),'bytes':len(raw)}
-                    if inert:flags|=2
+                    if droppable:flags|=2
                     if inert and held_inert(item) and (item['kind']=='WEAP' and item['subtype'] in HELD_WEAPONS or item['kind']=='ARMO' and item['subtype']==8):flags|=4
                 except (ValueError,KeyError,OSError) as error:report['held'].setdefault(identifier,{})['model']=str(error)
             if item['source_icon']:
@@ -323,6 +366,17 @@ def prepare(data_files,id1,selected=(),palette=None,models=True,jobs=None,model_
             'enchanted':bool(item['enchantment']),'equippable':bool(flags&1)}
         if item.get('alchemy'):flags|=FLAG_ALCHEMY
         row_flags[identifier]=flags
+        # EQUIP-ACTION-REGRESSION-62: every wearable or wieldable record of the game is checked here: one that cannot
+        # be equipped is listed with its named reason, and one refused without a known reason stops the stage.
+        if flags&1 and not flags&4:
+            reason=equip_refusal(item,source,model,enchantments,inert)
+            report.setdefault('equip_refused',{})[identifier]=reason
+            if reason is None:raise ValueError('EQUIP-ACTION-REGRESSION-62: %s (%s) refused Equip without a named reason'%(identifier,item['kind']))
+        if flags&1 and flags&4:
+            report['equip_allowed']=report.get('equip_allowed',0)+1
+            if source and not script_inert_after_registration(source) and \
+               not script_allows(source,EQUIP_REACTION_WORDS):
+                report.setdefault('equip_reaction_not_run',[]).append(identifier)
         row=safe_text(identifier,64)+safe_text(item['name'],96)+struct.pack('<iiifII',item['category'],item['subtype'],item['value'],item['weight'],slots,flags)
         row+=safe_text(model,64)+safe_text(icon,64)+safe_text(item['enchantment'],64)+safe_text(item['script'],64)
         # Bytes 496..511 (zero in older catalogues): the enchantment's kind (0 none, else ENDT

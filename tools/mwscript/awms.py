@@ -16,11 +16,15 @@
   MUSI  4 bytes a track:    u8 track number (255 none) u8 flags (1 mapped) u16 path
   OBJS  12 bytes an object: u32 reference (0: not placed once) u16 id u16 script (0xFFFF none) u16 placed u16 flags
                             (1: the id names a script, its global instance)
-  SCRP  16 bytes a script:  u16 name u8 locals u8 stack u16 flags u16 0 u32 code offset u32 code bytes
+  SCRP  16 bytes a script:  u16 name u8 locals u8 stack u16 flags u16 far trigger u32 code offset u32 code bytes
+                            (far trigger: game units of a scripted sky/far event's GetDistance Player check,
+                            events.far_triggers, 0 none; SCRIPTED-EVENT-PAST-DRAW-DISTANCE-62)
   CODE  the bytecode of every script, one after another
   BIND  24 bytes a placed scripted reference, ascending: u32 reference u16 script u16 flags
                             i16 cell x (or u16 the interior's stable number, the room map's _aw_cell_int)
-                            i16 cell y i32 x y z (game units)
+                            i16 cell y i32 x y z (game units); flags 8 (compiler.BIND_HELD, v0.0.62): an item a
+                            placed container or actor holds, its reference compiler.held_key (bit 30, the item's
+                            number in bits 24-29, the holder's reference), cell and position the holder's
   STRT  2 bytes a start script: u16 script
   NEWG  2 bytes a script a new game starts once (Main's CharGenState block: Startup, VampireCheck; v0.0.62,
         NPC-STORY-DISABLED-AT-START-42): u16 script; resident, optional (an older file: none)
@@ -34,6 +38,9 @@
   PMOV  20 bytes a move of the player (PositionCell; resident; written in write() below)
   VISI  12 bytes an actor a PositionCell may bring into a room (resident; written in write() below)
   PLAC  12 bytes an object a Place call names (PlaceAtPC, PlaceAtMe, PlaceItem, PlaceItemCell; resident; write() below)
+  PADD  8 bytes a carryable item record that names a script (its OnPCAdd slot, or 0xFF none; resident; write() below)
+  LACT  8 bytes a scripted NPC or creature record a levelled list names (resident; write() below)
+  EQUP  8 bytes a carried item whose script has OnPCEquip or PCSkipEquip (resident; write() below)
   TOPC  2 bytes a dialogue topic (DIAL type 0), sorted by folded id: u16 name (on disk; AddTopic hands the row)
   DRSC  12 bytes a dialogue result script, sorted: u32 FNV-1a of its text, u16 length, u16 speaker script, u16 its
         compiled script (_dlg_N), u16 flags (1 did not compile); on disk
@@ -47,7 +54,7 @@ from .opcodes import NAME, LAYOUT
 MAGIC = b'AWMS'
 VERSION = 1
 TYPES = {'s': 0, 'l': 1, 'f': 2}
-ORDER = ('CONF', 'GLOB', 'JRNL', 'SNDS', 'VOIC', 'MUSI', 'OBJS', 'SCRP', 'STRT', 'NEWG', 'HELD', 'OACT', 'PCEL', 'PMOV', 'SPFX', 'VISI', 'PLAC', 'CODE', 'BIND', 'STRS',
+ORDER = ('CONF', 'GLOB', 'JRNL', 'SNDS', 'VOIC', 'MUSI', 'OBJS', 'SCRP', 'STRT', 'NEWG', 'HELD', 'OACT', 'PCEL', 'PMOV', 'SPFX', 'VISI', 'PLAC', 'PADD', 'LACT', 'EQUP', 'CODE', 'BIND', 'STRS',
          'ACTB', 'AINV', 'AITM', 'ASPT', 'ASPL', 'TOPC', 'ASPC', 'ASPE', 'AEFF', 'AMGE', 'DRSC', 'AENC', 'APCS')
 # The actor sections (actors.py, docs/ACTOR_STATE.md): OACT is resident (a script's target -> its actor row); the
 # others stay on disk and are read a row at a time by the engine's actor state (aw_actorstate.c).
@@ -106,6 +113,53 @@ def pccell_section(table):
     return bytes(head + body), len(rows)
 
 
+# Records the player can carry (the original's item records; their script runs while carried)
+CARRIED = ('ALCH', 'APPA', 'ARMO', 'BOOK', 'CLOT', 'INGR', 'LIGH', 'LOCK', 'MISC', 'PROB', 'REPA', 'WEAP')
+
+
+def fnv1a(text):
+    """The engine's AW_MwvmTextHash of a folded record id (cp1252)."""
+    h = 0x811C9DC5
+    for b in text.casefold().encode('cp1252', 'replace'):
+        h = ((h ^ b) * 0x01000193) & 0xFFFFFFFF
+    return h
+
+
+NO_SLOT = 0xFF   # a PADD row whose script has no OnPCAdd local: the script runs while carried, nothing is set
+
+
+def pcadd_rows(program):
+    """PADD (v0.0.62, CENSUS-INTRO-SCRIPTS-62; every scripted item since MWSCRIPT-UNPLACED-ATTACH-62): one row per
+    carryable item record that names a script, sorted by the FNV-1a of the folded record id: (hash, script index, the
+    OnPCAdd slot or NO_SLOT). OpenMW 0.51 runs the script of an item in the player's inventory (its local OnPCAdd reads 1
+    once the item arrives); the engine starts the item's carried instance when it arrives and at every map change while
+    it is carried, and stops it when the last one leaves (aw_mwhost.c carried_sync)."""
+    rows = []
+    bases = getattr(program.data, 'bases', {}) or {}
+    for ident, (tag, script) in bases.items():
+        if tag not in CARRIED or not script or script not in program.scripts.index:
+            continue
+        slot = (program.script_locals.get(script) or {}).get('onpcadd')
+        rows.append((fnv1a(ident), program.scripts.index[script], NO_SLOT if slot is None else slot[1]))
+    return sorted(set(rows))
+
+
+def levelled_actor_rows(program):
+    """LACT (v0.0.62, MWSCRIPT-UNPLACED-ATTACH-62): one row per NPC or creature record a levelled creature list names
+    whose record names a script, sorted by the FNV-1a of the folded record id (the actor table's base hash): (hash,
+    script index). The engine attaches that script to the actor a levelled list gives when it spawns, under the
+    list's reference (OpenMW 0.51 mwclass/creaturelevlist.cpp: the list's pick is a new actor of that record, whose
+    script runs as any placed actor's)."""
+    rows = []
+    bases = getattr(program.data, 'bases', {}) or {}
+    for ident in getattr(program.data, 'levelled_actors', ()) or ():
+        tag, script = bases.get(ident, (None, ''))
+        if tag not in ('CREA', 'NPC_') or not script or script not in program.scripts.index:
+            continue
+        rows.append((fnv1a(ident), program.scripts.index[script]))
+    return sorted(set(rows))
+
+
 def write(program, compiled, binds, conf=None):
     """The file's bytes, and a size table {section: bytes}. CONF: config/mwscript.json's activation and budget."""
     p = program
@@ -118,8 +172,10 @@ def write(program, compiled, binds, conf=None):
     # scripts and code first: they intern their names
     code = bytearray()
     scrp = bytearray()
+    far = getattr(p, 'far', None) or {}
     for row, c in zip(p.scripts.rows, compiled):
-        scrp += struct.pack('>HBBHHII', p.string(row['name']), c.nlocals, min(255, c.max_depth), c.flags, 0,
+        scrp += struct.pack('>HBBHHII', p.string(row['name']), c.nlocals, min(255, c.max_depth), c.flags,
+                            far.get(row['name'].casefold(), 0),
                             len(code), len(c.code))
         code += c.code
     glob = bytearray()
@@ -169,7 +225,9 @@ def write(program, compiled, binds, conf=None):
     pmov = (b''.join(struct.pack('>BBHffff', r['kind'], 0, r['map'], *r['at'], r['yaw']) for r in moves.rows)
             if moves is not None else b'', len(moves) if moves is not None else 0)
     # SPFX (v0.0.57, SPELL-EFFECTS-57): 4 bytes a spell a Cast names (u16 first effect, u8 effects, u8 0), then 8
-    # bytes an effect (u8 kind 0 drain 1 damage 2 restore 3 fortify, u8 stat, u16 seconds, u16 low, u16 high); resident
+    # bytes an effect (u8 kind 0 drain 1 damage 2 restore 3 fortify 4 cure 5 an effect by its number with no attribute
+    # or skill (v0.0.62, codegen.PASSIVE_EFFECTS), u8 stat (kind 5: the effect number), u16 seconds, u16 low, u16 high);
+    # resident
     spfx_rows = getattr(p, 'spfx', None)
     head, body, first = bytearray(), bytearray(), 0
     for r in (spfx_rows.rows if spfx_rows is not None else []):
@@ -191,6 +249,11 @@ def write(program, compiled, binds, conf=None):
     places = p.place_rows() if hasattr(p, 'place_rows') else []
     plac = (b''.join(struct.pack('>HHIHBB', r['id'], r['home'], r['template'], r['script'], r['kind'],
                                  1 if r['carried'] else 0) for r in places), len(places))
+    # EQUP (v0.0.62, MWSCRIPT-GAP-FUNCTIONS-62): 8 bytes a carried item whose script declares OnPCEquip or
+    # PCSkipEquip, sorted by folded id: u16 id, u16 its script, u8 OnPCEquip's slot, u8 PCSkipEquip's slot (0xFF none),
+    # u16 0; resident
+    equips = p.equip_rows() if hasattr(p, 'equip_rows') else []
+    equp = (b''.join(struct.pack('>HHBBH', r[1], r[2], r[3], r[4], 0) for r in equips), len(equips))
     # TOPC, 2 bytes a dialogue topic (v0.0.57): u16 name, sorted by folded id (AddTopic hands the row number); on disk
     rows = getattr(p, 'topic_rows', None)
     topics = sorted(rows(), key=rows().get) if rows else []
@@ -218,7 +281,16 @@ def write(program, compiled, binds, conf=None):
                 'OBJS': (objs, len(p.objects)), 'SCRP': (bytes(scrp), len(compiled)),
                 'CODE': (bytes(code), len(compiled)), 'BIND': (bytes(bind), len(binds)),
                 'STRT': (strt, len(strt) // 2), 'NEWG': (newg, len(newg) // 2), 'HELD': (held, len(held_rows)), 'PCEL': pcel, 'PMOV': pmov, 'TOPC': topc, 'SPFX': spfx,
-                'VISI': visi, 'PLAC': plac, 'DRSC': drsc}
+                'VISI': visi, 'PLAC': plac, 'EQUP': equp, 'DRSC': drsc}
+    # PADD (v0.0.62, CENSUS-INTRO-SCRIPTS-62, MWSCRIPT-UNPLACED-ATTACH-62): 8 bytes a carryable item record that names
+    # a script, sorted by the FNV-1a of its folded id: u32 hash, u16 script, u8 the OnPCAdd local's slot (0xFF: none),
+    # u8 0; resident
+    padd_rows = pcadd_rows(p)
+    sections['PADD'] = (b''.join(struct.pack('>IHBB', h, s, slot, 0) for h, s, slot in padd_rows), len(padd_rows))
+    # LACT (v0.0.62, MWSCRIPT-UNPLACED-ATTACH-62): 8 bytes a scripted NPC or creature record a levelled list names,
+    # sorted by the FNV-1a of its folded id: u32 hash, u16 script, u16 0; resident
+    lact_rows = levelled_actor_rows(p)
+    sections['LACT'] = (b''.join(struct.pack('>IHH', h, s, 0) for h, s in lact_rows), len(lact_rows))
     actors = getattr(p, 'actors', None)
     if actors is not None:
         sections.update(actors.sections(p.objects.rows))

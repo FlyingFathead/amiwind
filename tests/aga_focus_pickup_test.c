@@ -119,6 +119,27 @@ int main(void){
     /* the room draws the quill: the box, then E takes it once into the inventory */
     level(1);
     assert(AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned) && !strcmp(name,"Quill Pen") && owned==1);
+    /* INFO-BOX-TEXT-CUT-62: a door's name longer than the 35-byte name field goes on in the row's id field: the maintainer's
+     * two doors, whole ("...Excise Offic" and "...: Apoth" were the cut ones); an older file (empty id field) reads as written */
+    {
+     static const struct {const char *head,*tail,*whole;} doors[]={
+      {"Seyda Neen, Census and Excise Offic","e","Seyda Neen, Census and Excise Office"},
+      {"Suran, Ibarnadad Assimarari: Apothe","cary","Suran, Ibarnadad Assimarari: Apothecary"},
+      {"Short Door","","Short Door"}};
+     int d;
+     for(d=0;d<3;d++){
+      byte *row=focus_file+8+12;
+      tables();memset(row+28,0,36+32);row[0]='D';row[1]=0;memcpy(row+28,doors[d].head,strlen(doors[d].head));
+      memcpy(row+64,doors[d].tail,strlen(doors[d].tail));
+      level(1);
+      if(!AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned))fprintf(stderr,"door %d: no focus row\n",d),assert(0);
+      if(strcmp(name,doors[d].whole))fprintf(stderr,"door %d: name '%s'\n",d,name),assert(0);
+      /* the same row in a file without the continuation: the name as written */
+      memset(row+64,0,32);level(1);
+      assert(AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned) && !strcmp(name,doors[d].head));
+     }
+     tables();level(1);
+    }
     /* STEAL-PROMPT-58: the owned quill reads "E: Steal" (drawn red); unowned it reads the GMST's "E: Take" */
     {char prompt[48];int steal=-1;
      assert(AW_ItemPrompt(prompt,sizeof(prompt),&steal) && steal==1 && !strcmp(prompt,"E: Steal"));

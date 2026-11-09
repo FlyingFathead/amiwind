@@ -15,6 +15,7 @@ typedef struct {
     int power_count;char powers[16][64];
 } aw_birth_t;
 typedef struct {char id[64];unsigned char race,female,kind;} aw_part_t;
+#define AW_BOOKS_READ_MAX 512    /* skill books a save remembers as read (tools/prepare_levelup.py BOOKS_MAX) */
 typedef struct {
     int valid,race,female,head,hair,clas,birth,level;
     short attributes[8],modifiers[8],damage[8],skills[27];
@@ -24,6 +25,8 @@ typedef struct {
      * the last level. Saved (AWS4 feature 64); a new character starts at 0. */
     float progress[27];
     short level_progress,raises[8],special[3];
+    /* SKILL-BOOKS-MISSING-62: the skill books read (one bit per row of levelup/books.txt); saved (AWS4 feature 1024) */
+    unsigned long books_read[AW_BOOKS_READ_MAX/32];
 } aw_character_t;
 extern aw_character_t aw_character;
 extern aw_race_t aw_races[16];

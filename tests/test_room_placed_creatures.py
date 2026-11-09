@@ -165,6 +165,37 @@ class RoomPlacedCreatureTests(unittest.TestCase):
         _, _, _, _, _, corpses = actor_library.plan(TOMB)
         self.assertNotIn('r/rust rat.nif', corpses)
 
+    def test_actors_a_script_places(self):
+        # v0.0.62 (MWSCRIPT-GAP-FUNCTIONS-62): a creature a script places with no reference of its own gets a library
+        # model and a table base with its text, after the bases the rest made (their indices as before); an id no
+        # actor record has is left out; a commented-out call does not count
+        import struct
+        import actor_library
+        from chim import actors as A
+
+        def sub(tag, data):
+            return tag.encode() + struct.pack('<I', len(data)) + data
+
+        def rec(tag, *subs):
+            body = b''.join(subs)
+            return tag.encode() + struct.pack('<III', len(body), 0, 0) + body
+        text = b'Begin Summoner\nPlaceAtPC "scamp_one", 1, 128, 1\n;PlaceAtPC crab 1 1 1\nPlaceItem no_such 1 2 3 0\nEnd'
+        master = TOMB + crea('scamp_one', 'r\\scamp.nif', 'Scamp') + rec('SCPT', sub('SCHD', b'Summoner'.ljust(52, b'\0')),
+                                                                         sub('SCTX', text))
+        self.assertEqual(A.script_placed_actors(master), {'NPC_': [], 'CREA': ['scamp_one']})
+        meshes = actor_library.plan(master)[0]
+        self.assertIn('scamp_one', meshes['r/scamp.nif'])
+        refs, lists, creatures = A.exterior_actors(master), A.levelled_lists(master), A.creature_ids(master)
+        library = dict(LIBRARY, scamp_one='"classname" "aw_creature"\n"model" "progs/c_scamp.mdl"\n')
+        before, _ = A.build_table(refs, {}, lists, creatures, library)
+        data, rep = A.build_table(refs, {}, lists, creatures, library, script_placed=[('scamp_one', 'CREA')])
+        _, _, _, bases0, _ = A.read_table(before)
+        _, _, _, bases, _ = A.read_table(data)
+        self.assertEqual(rep['script_placed_bases'], 1)
+        self.assertEqual(bases[:len(bases0)], bases0)
+        self.assertIn('c_scamp.mdl', bases[-1]['text'])
+        self.assertEqual(A.master_tables(self.master)[6], [])           # the tomb's master has no placing script
+
     def test_build_options(self):
         build = (ROOT / 'tools/build.py').read_text()
         self.assertIn("os.environ['AMIWIND_ROOM_PLACED']", build)
