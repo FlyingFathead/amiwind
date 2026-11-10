@@ -71,6 +71,16 @@ int AW_ObjectLock(unsigned reference,int lock,int level);
  * USE 0: 1 when locked now; USE 1: the player's use, 1 = refused (LockedDoor played), 0 = through (unlocked,
  * the key, god mode with AW_DOOR_GOD_TEXT in the message box, dbg doorlocks off). */
 int AW_HingedDoorLoadLock(unsigned reference,int use);
+/* TRAPS-WHEN-OPENED-63: the trapped doors and containers (the T rows). Spell: the armed trap's spell id, NULL none
+ * (no trap, used up or disarmed). Spring: the player's use of a trapped object: its spell cast on the player through
+ * aw_trap_cast (aw_mwhost.c), the trap used up; 1 when it sprang (the use is spent: the object does not open). Disarm:
+ * the trap gone without a cast (the object's key). Counts: rows, sprung, disarmed, sprung without a cast. */
+const char *AW_TrapSpell(unsigned reference);
+int AW_TrapSpring(unsigned reference);
+void AW_TrapDisarm(unsigned reference);
+void AW_TrapCounts(unsigned long out[4]);
+extern int (*aw_trap_cast)(const char *spell);
+extern int (*aw_trap_spring)(unsigned reference);   /* aw_inventory.c; set by AW_HingedDoorInit */
 /* The maintainer's words (TG, 25 October 2026). */
 #define AW_DOOR_GOD_TEXT "God mode used to enter a locked door"
 /* Activation: a script that reads OnActivate takes the use (aw_mwhost.c sets it); its Activate opens the door. */
@@ -92,6 +102,8 @@ void AW_HingedDoorRecentre(const float *d);
 int AW_MoverPlacement(unsigned pid,unsigned reference);
 int AW_MoverShift(unsigned reference,const float *d);
 int AW_MoverAtStart(unsigned reference);
+/* where the mover stands now (its loaded placement, map units): 1 found (WORLD-BUTTONS-62 round two, console GetPos) */
+int AW_MoverOrigin(unsigned reference,float *out);
 /* Rotate / RotateWorld: turn by D (Quake angles: pitch, yaw, roll); SetAngle: Quake angle K to VALUE (its placement
  * loaded). 1 when it is a mover (and, for SetAngle, done). SetAtStart and AW_MoverReset undo turns too. */
 int AW_MoverTurn(unsigned reference,const float *d);

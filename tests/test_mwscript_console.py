@@ -102,6 +102,77 @@ class Census(unittest.TestCase):
         self.assertIn('AW_MwvmScratch((uint32_t)r->_float,NUM_FOR_EDICT(e))', begin)
         self.assertIn('*who=AW_MWVM_SELF;', begin)
 
+    def test_a_placement_without_an_edict_is_a_target(self):
+        # WORLD-BUTTONS-62 / MARKS-SUMMON-CARRIERS-NOT-LIVE-63 (v0.0.63 release check round two): the Ghostgate switches
+        # and portcullises and the Marks carriers are CHIM placements without an edict; the console finds them by the
+        # scripts' object table (an attached instance of that id or its own script, or a scripted mover)
+        host = (SRC / 'aw_mwhost.c').read_text(encoding='utf-8')
+        begin = host[host.index('static int console_placement('):host.index('static int console_stat(')]
+        self.assertIn('AW_MwvmObjectId(k)', begin)
+        self.assertIn('(in->flags&AWI_GLOBAL) || !in->reference', begin)      # attached objects only, never a scratch
+        self.assertIn('AW_MoverOrigin(r,origin)', begin)                      # a portcullis: where it stands now
+        self.assertIn('(*instance=AW_MwvmScratch(ref,-1))<0', begin)
+        self.assertIn('AW_MwvmSetOrigin(*instance,at);', begin)
+        # the console's Activate is the player's use: the object's own OnActivate script takes it (as E)
+        special = host[host.index('static int console_special('):host.index('static int console_table(')]
+        self.assertIn('if(in && object_intercept(in->reference)){', special)
+        vm = (SRC / 'aw_mwvm.c').read_text(encoding='utf-8')
+        self.assertIn('int AW_MwvmObjectId(int k){return ON && k>=0 && k<vm.nobjs?(int)U16(vm.objs+12*k+4):-1;}', vm)
+        self.assertIn('int AW_MwvmObjectScript(int k){return ON && k>=0 && k<vm.nobjs?(int)U16(vm.objs+12*k+6):AWM_NONE;}',
+                      vm)
+        # the OBJS row the builder writes: reference, id string, own script (tools/mwscript/awms.py)
+        self.assertIn("struct.pack('>IHHHH', r['reference'], r['id_string'],",
+                      (ROOT / 'tools/mwscript/awms.py').read_text(encoding='utf-8'))
+
+    def test_a_placement_no_script_names_is_found_by_its_id(self):
+        # WORLD-BUTTONS-62 / MARKS-SUMMON-CARRIERS-NOT-LIVE-63 round three (v0.0.64-dev1 check): the Ghostgate switches
+        # and the cursed coins are named by no script, so OBJS has no row for them; BNAM lists every placed scripted
+        # reference by its id's hash and the console looks there after OBJS
+        from mwscript import awms
+        binds = [{'reference': 0x48445, 'id': 'ex_gg_gateswitch_01', 'type': 'ACTI', 'flags': 4},
+                 {'reference': 0x48447, 'id': 'EX_GG_GateSwitch_01', 'type': 'ACTI', 'flags': 4},
+                 {'reference': 0x40000123, 'id': 'misc_dwrv_cursed_coin00', 'type': 'HELD', 'flags': 8},
+                 {'reference': 0x1234, 'id': 'misc_dwrv_cursed_coin00', 'type': 'MISC', 'flags': 2}]
+        rows = awms.bound_name_rows(binds)
+        self.assertEqual(rows, sorted(rows))
+        self.assertIn((awms.fnv1a('ex_gg_gateswitch_01'), 0x48445), rows)
+        self.assertIn((awms.fnv1a('ex_gg_gateswitch_01'), 0x48447), rows)   # the id folded: both placements
+        self.assertIn((awms.fnv1a('misc_dwrv_cursed_coin00'), 0x1234), rows)
+        self.assertEqual(len(rows), 3)                                        # a held item has no place: left out
+        self.assertIn('BNAM', awms.ORDER)
+        self.assertGreater(awms.ORDER.index('BNAM'), awms.ORDER.index('BIND'))   # on disk, not resident
+        host = (SRC / 'aw_mwhost.c').read_text(encoding='utf-8')
+        self.assertIn('return console_bound(target,ref,origin);', host)
+        bound = host[host.index('static int console_bound('):host.index('static int console_placement(')]
+        self.assertIn('AW_MwvmSection("BNAM",&off,&rows,&bytes)', bound)
+        self.assertIn('in->reference!=r', bound)
+        self.assertIn('AW_MoverOrigin(r,origin)', bound)
+
+    def test_the_actor_table_reads_the_whole_directory(self):
+        # UNDERWATER-BREATH-62 round three: the engine read at most 32 directory rows of mwscript.awm while the file
+        # has more since v0.0.63, so AEFF (every spell's effects), AMGE, AENC and APCS were never found and no game
+        # spell could be cast. The engine's limit covers every section the builder writes, with room to grow.
+        from mwscript import awms
+        host = (SRC / 'aw_mwhost.c').read_text(encoding='utf-8')
+        limit = int(re.search(r'#define AW_MWSCRIPT_SECTIONS (\d+)', host).group(1))
+        self.assertGreaterEqual(limit, len(awms.ORDER) + 8)
+        self.assertNotIn('if(n>32)n=32;', host)
+        self.assertIn('static unsigned char head[16+16*AW_MWSCRIPT_SECTIONS];', host)
+        self.assertGreater(awms.ORDER.index('AEFF'), 31)   # the section the old cut lost
+
+    def test_the_actor_reader_answers_zero_when_it_read(self):
+        # UNDERWATER-BREATH-62 round three: actor_read answers 0 on a good read; the console's id index search tested
+        # it the other way round, so player->getspell "argonian breathing" answered 0 for a player holding the spell
+        # (and a trap's spell and additem of a known item missed too). Every call site keeps the convention.
+        host = (SRC / 'aw_mwhost.c').read_text(encoding='utf-8')
+        self.assertIn('return fread(out,1,bytes,actor_file)!=bytes;', host)
+        calls = re.findall(r'(.{0,4})actor_read\(NULL,', host)
+        self.assertTrue(calls)
+        for before in calls:
+            self.assertFalse(before.endswith('&& ') or before.endswith('&&'), before)   # "&& actor_read" = success taken as failure
+        self.assertNotIn('if(!actor_read(', host)
+        self.assertIn('if(actor_read(NULL,off+2u*mid,b,2))return -1;', host)
+
     def test_the_finder_and_the_help(self):
         host = (SRC / 'aw_mwhost.c').read_text(encoding='utf-8')
         self.assertIn('Cmd_AddCommand("aw_mw_target",mw_target);', host)

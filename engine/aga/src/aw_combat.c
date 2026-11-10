@@ -63,7 +63,7 @@ typedef struct {
 
 aw_combat_settings_t aw_combat_settings;
 aw_combat_ai_t aw_combat_ai;
-static int settings_ok,ai_ok;
+static int settings_ok,ai_ok,settings_tried;   /* settings_tried: read this load already (COMBAT-SETTINGS-REREAD-63) */
 static char sound_path[AW_SND_COUNT][32];
 static const char *const sound_key[AW_SND_COUNT]={"health","miss","punch","light","medium","heavy","swish","critical","fall","punch2"};
 enum {SND_HEALTH=AW_SND_HEALTH,SND_MISS=AW_SND_MISS,SND_PUNCH=AW_SND_PUNCH,SND_LIGHT=AW_SND_LIGHT,SND_MEDIUM=AW_SND_MEDIUM,
@@ -157,6 +157,10 @@ static int read_line(FILE *f,char *line,int size) {
 int AW_CombatSettingsLoad(void) {
     FILE *f=NULL;char line[128],name[64],path[64];float value;int i,n=0,ai=0;
     if(settings_ok)return 1;
+    /* COMBAT-SETTINGS-REREAD-63: an incomplete file was re-read (and its warning printed) on every actor spawn, 16 file
+     * opens in one frame after an arrival; it is read once per load (AW_CombatSceneSpawn clears the mark) */
+    if(settings_tried)return 0;
+    settings_tried=1;
     memset(&aw_combat_settings,0,sizeof(aw_combat_settings));memset(sound_path,0,sizeof(sound_path));
     memset(&aw_combat_ai,0,sizeof(aw_combat_ai));ai_ok=0;
     if(COM_FOpenFile("combat/settings.txt",&f)<0 || !f)return 0;
@@ -1546,7 +1550,7 @@ void AW_CombatCost(float *per_second,float *ms_mean,float *ms_max,int *fighters)
 /* aw_scene.c: a new map; the old edicts are gone. */
 void AW_CombatSceneSpawn(void) {
     int i;for(i=0;i<SLOTS;i++)memset(&slots[i],0,sizeof(slots[i]));
-    memset(&pv,0,sizeof(pv));block_shown_until=0;
+    memset(&pv,0,sizeof(pv));block_shown_until=0;settings_tried=0;
     enemy=NULL;you_valid=0;memset(&retry,0,sizeof(retry));
     if(battle){battle=0;AW_MusicCombat(0);}
 }

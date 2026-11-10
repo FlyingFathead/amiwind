@@ -60,6 +60,38 @@ class RepoList(unittest.TestCase):
         header = town_table.HEADER.read_text(encoding='ascii')
         self.assertIn('#define AW_ROOM_BATCH_COUNT %d' % len(R.engine_rows()), header)
 
+    def test_the_expansion_room_tables(self):
+        # BUILD-EXPANSIONS-31: each expansion's room list has its own 4096-id range (aw_layer_table.h); the repo's
+        # lists start empty, a two-room list gives a two-row table, an id past 4095 is refused naming the list
+        import town_table
+        for macro, title, config in town_table.LAYERS:
+            with self.subTest(list=config):
+                doc = json.loads((ROOT / 'config' / config).read_text(encoding='utf-8'))
+                self.assertEqual(R.check(doc), [])
+                self.assertEqual((doc['batches'], doc['next_id']), ([], 0))
+                self.assertEqual(doc['island'], {'TRIBUNAL': 'Mournhold', 'BLOODMOON': 'Solstheim'}[macro])
+                self.assertEqual(town_table.layer_room_rows(macro, title, config, doc=doc), [])
+                self.assertEqual(town_table.layer_docs()[macro], doc)        # layer_docs reads the same files
+        header = town_table.LAYER_HEADER.read_text(encoding='ascii')
+        self.assertEqual(header, town_table.render_layer_header())
+        self.assertIn('#define AW_TRIBUNAL_ROOM_COUNT 0\n#define AW_TRIBUNAL_ROOM_NAMES {""}', header)
+        self.assertIn('#define AW_BLOODMOON_ROOM_COUNT 0', header)
+        two = doc_of({1: ['Mournhold, Royal Palace', 'Mournhold, Temple']})
+        text = town_table.render_layer_header(docs={'TRIBUNAL': two})
+        self.assertIn('#define AW_TRIBUNAL_ROOM_COUNT 2\n#define AW_TRIBUNAL_ROOM_NAMES {"%s","%s"}'
+                      % (R.room_map('Mournhold, Royal Palace'), R.room_map('Mournhold, Temple')), text)
+        self.assertIn('#define AW_TRIBUNAL_ROOM_TITLES {\\\n    "Mournhold, Royal Palace",\\\n    "Mournhold, Temple"\\\n}',
+                      text)
+        self.assertIn('#define AW_BLOODMOON_ROOM_COUNT 0', text)
+        for macro, title, config in town_table.LAYERS:
+            past = doc_of({1: ['A', 'B']})
+            past['batches'][0]['rooms'][1]['id'] = 4096
+            past['next_id'] = 4097
+            with self.subTest(list=config), self.assertRaisesRegex(ValueError, config + r'.*not a free number below 4096'):
+                town_table.render_layer_header(docs={macro: past})
+        # the base town table is not touched by the expansions' lists (the base world keys read it whole)
+        self.assertNotIn('TRIBUNAL', town_table.render_header())
+
     def test_ids_never_move(self):
         old = doc_of({1: ['A', 'B'], 2: ['C']})
         ids, nxt = R.assign_ids(['C', 'D', 'A'], old)

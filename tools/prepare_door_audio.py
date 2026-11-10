@@ -26,6 +26,9 @@ hinged-doors.txt (AWHD1, AW-20260928-12): every placed DOOR reference of Morrowi
   M <reference>                                 scripted movers, references ascending (WORLD-BUTTONS-62): placed
                                                 activators, statics, doors and containers a script moves along the
                                                 world (MoveWorld, SetAtStart...), the Ghostgate portcullises first
+  T <reference> <spell ID>                      trapped references, ascending (TRAPS-WHEN-OPENED-63): every placed
+                                                door (load door or hinged) and container whose reference names a
+                                                trap spell (TNAM); the engine casts it on the one who opens it
 flags: 1 locked (a lock level above 0 or a key: OpenMW components/esm3/cellref.cpp for content files), 2 key
 (KNAM), 4 trap (TNAM), 8 the DOOR record has a script. The census hall door keeps its story rule in the engine.
 """
@@ -250,6 +253,38 @@ def mover_catalogue(raw,exclude=()):
     return out,{k:sorted(v) for k,v in sorted(moved.items())}
 
 
+HINGED_TRAPS,HINGED_TRAP_SPELLS,HINGED_TRAP_POOL=768,128,3072   # aw_hinged_door.c HD_TRAPS, HD_TRAP_SPELLS, HD_TRAP_POOL
+
+
+def trap_catalogue(raw):
+    """TRAPS-WHEN-OPENED-63: [(reference, trap spell ID)] ascending of every placed DOOR and CONT reference that names
+    a trap spell (TNAM; OpenMW 0.53 CellRef getTrap), deleted references and records left out. The masters' own
+    count (Morrowind.esm): 457 references, 85 distinct spells."""
+    bases=set();refs=[]
+    for tag,flags,payload in records(raw):
+        if tag in ('DOOR','CONT'):
+            s=dict(subrecords(payload))
+            if 'DELE' not in s and 'NAME' in s:bases.add(string(s['NAME']).casefold())
+        elif tag=='CELL':
+            ref=None
+            for t,data in subrecords(payload):
+                if t=='FRMR':
+                    ref={'number':struct.unpack('<I',data)[0]};refs.append(ref)
+                elif ref is None:continue
+                elif t=='NAME':ref['id']=string(data)
+                elif t=='TNAM':ref['trap']=string(data)
+                elif t=='DELE':ref['deleted']=True
+    out={}
+    for ref in refs:
+        if ref.get('deleted') or not ref.get('trap') or ref.get('id','').casefold() not in bases:continue
+        out[ref['number']]=key_id(ref['trap'])
+    rows=sorted(out.items())
+    spells={s.casefold() for _,s in rows}
+    if len(rows)>HINGED_TRAPS or len(spells)>HINGED_TRAP_SPELLS or sum(len(s)+1 for s in spells)>HINGED_TRAP_POOL:
+        raise ValueError('Trap table exceeds the runtime bounds (%d rows, %d spells)' % (len(rows),len(spells)))
+    return rows
+
+
 def key_id(text):
     """A key's record ID as the engine compares it (aw_state item IDs, at most 63 characters, printable ASCII)."""
     if len(text)>63 or any(not 32<=ord(c)<127 for c in text):raise ValueError('Unusable key ID: %r' % text)
@@ -266,9 +301,9 @@ def safe_name(text):
     return out[:HINGED_NAME]
 
 
-def hinged_text(bases,rows,sounds,sample,locks=(),key_used='',movers=()):
+def hinged_text(bases,rows,sounds,sample,locks=(),key_used='',movers=(),traps=()):
     """The AWHD1 table. sample(source) -> (path, seconds) converts (or reuses) one SOUN file; LOCKS and KEY_USED from
-    door_locks() (K and U rows); MOVERS from mover_catalogue() (M rows)."""
+    door_locks() (K and U rows); MOVERS from mover_catalogue() (M rows); TRAPS from trap_catalogue() (T rows)."""
     samples=[];index={}
     def w(identifier):
         if not identifier:return -1
@@ -295,6 +330,7 @@ def hinged_text(bases,rows,sounds,sample,locks=(),key_used='',movers=()):
     lines+=[('K %d %d %d %s' % (k['reference'],k['lock'],k['flags'],k['key'])).rstrip() for k in locks]
     if key_used:lines.append('U '+key_used)
     lines+=['M %d' % r for r in sorted(movers)]
+    lines+=['T %d %s' % (r,s) for r,s in sorted(traps)]
     return '\n'.join(lines)+'\n'
 
 
@@ -327,7 +363,8 @@ def prepare(data,scene,ffmpeg='ffmpeg'):
     bases,hinged,sounds=hinged_catalogue(raw)
     locks,key_used=door_locks(raw,hinged)
     movers,moved=mover_catalogue(raw,{r['reference'] for r in hinged})
-    (scene/'id1/hinged-doors.txt').write_text(hinged_text(bases,hinged,sounds,sample,locks,key_used,movers),
+    traps=trap_catalogue(raw)
+    (scene/'id1/hinged-doors.txt').write_text(hinged_text(bases,hinged,sounds,sample,locks,key_used,movers,traps),
                                                encoding='ascii',newline='\n')
     pairs=sum(1 for line in lines if line.startswith('p '))
     report={'doors':rows,'files':list(converted.values()),'format':'AWSFX2','pairs':pairs,
@@ -341,7 +378,8 @@ def prepare(data,scene,ffmpeg='ffmpeg'):
               'locks':{'rows':len(locks),'load_doors_locked':sum(1 for k in locks if k['reference'] not in
                                                                    {r['reference'] for r in hinged}),
                        'with_key':sum(1 for k in locks if k['key'])},
-            'movers':{'references':len(movers),'records':moved}}
+            'movers':{'references':len(movers),'records':moved},
+            'traps':{'references':len(traps),'spells':len({s.casefold() for _,s in traps})}}
     (scene/'door-audio.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8',newline='\n');return report
 
 

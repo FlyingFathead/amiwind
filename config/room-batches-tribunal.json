@@ -1,0 +1,10 @@
+{
+  "format": "aw-room-batches-1",
+  "generator": "tools/door_graph.py room-batches",
+  "about": "The Tribunal expansion's interior rooms by batch (Mournhold), in the same form as config/room-batches.json. Each room's save id counts from the expansion's own base (engine aw_maps.h AW_TRIBUNAL_ROOM_BASE, 4096 ids), so its rooms never move a base id. Empty until the expansion's rooms are converted.",
+  "island": "Mournhold",
+  "order": null,
+  "next_id": 0,
+  "batches": [
+  ]
+}

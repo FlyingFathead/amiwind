@@ -6,6 +6,7 @@
 #include <string.h>
 #include <stdio.h>
 #include "aw_town_table.h"
+#include "aw_layer_table.h"
 #define AW_MAP_COUNT 60
 #define AW_INTERIOR_MAP_BASE (AW_MAP_COUNT+8192)
 #define AW_INTERIOR_MAP_COUNT 2
@@ -20,9 +21,18 @@
  * town interiors' range; an id a town or scene list holds is "" (that room keeps its own name and ID). */
 #define AW_ROOM_BATCH_BASE (AW_TOWN_INTERIOR_BASE+4096)
 #define AW_SCENE_COUNT (AW_ROOM_BATCH_BASE+AW_ROOM_BATCH_COUNT)
+/* The expansions' rooms (aw_layer_table.h, config/room-batches-tribunal.json and -bloodmoon.json) take fixed IDs by
+ * their id from their own base, 4096 each, after the base batch rooms' range: an expansion never moves a base ID.
+ * The engine always carries all three lists (one engine for every combination of expansions); an ID in an
+ * expansion's range that this engine's table does not name is titled "needs <expansion>" (AW_MapLayer). */
+#define AW_TRIBUNAL_ROOM_BASE (AW_ROOM_BATCH_BASE+4096)
+#define AW_BLOODMOON_ROOM_BASE (AW_TRIBUNAL_ROOM_BASE+4096)
+#define AW_LAYER_ROOM_END (AW_BLOODMOON_ROOM_BASE+4096)
 typedef char aw_town_extra_range_check[AW_TOWN_EXTRA_COUNT<4096?1:-1];
 typedef char aw_town_interior_range_check[AW_TOWN_INTERIOR_COUNT<4096?1:-1];
 typedef char aw_room_batch_range_check[AW_ROOM_BATCH_COUNT<4096?1:-1];
+typedef char aw_tribunal_room_range_check[AW_TRIBUNAL_ROOM_COUNT<=4096?1:-1];
+typedef char aw_bloodmoon_room_range_check[AW_BLOODMOON_ROOM_COUNT<=4096?1:-1];
 static __inline__ const char *AW_InteriorMapName(int n)
 {
     static const char *const names[AW_INTERIOR_MAP_COUNT]={"mi5b8154939f7aa","mi5b8154939f7ab"};
@@ -68,6 +78,34 @@ static __inline__ const char *AW_RoomBatchTitle(int n)
     return n>=0 && n<AW_ROOM_BATCH_COUNT && titles[n][0]?titles[n]:"Cancel";
 }
 
+static __inline__ const char *AW_TribunalRoomName(int n)
+{
+    static const char *const names[AW_TRIBUNAL_ROOM_COUNT>0?AW_TRIBUNAL_ROOM_COUNT:1]=AW_TRIBUNAL_ROOM_NAMES;
+    return n>=0 && n<AW_TRIBUNAL_ROOM_COUNT?names[n]:"";
+}
+static __inline__ const char *AW_TribunalRoomTitle(int n)
+{
+    static const char *const titles[AW_TRIBUNAL_ROOM_COUNT>0?AW_TRIBUNAL_ROOM_COUNT:1]=AW_TRIBUNAL_ROOM_TITLES;
+    return n>=0 && n<AW_TRIBUNAL_ROOM_COUNT?titles[n]:"";
+}
+static __inline__ const char *AW_BloodmoonRoomName(int n)
+{
+    static const char *const names[AW_BLOODMOON_ROOM_COUNT>0?AW_BLOODMOON_ROOM_COUNT:1]=AW_BLOODMOON_ROOM_NAMES;
+    return n>=0 && n<AW_BLOODMOON_ROOM_COUNT?names[n]:"";
+}
+static __inline__ const char *AW_BloodmoonRoomTitle(int n)
+{
+    static const char *const titles[AW_BLOODMOON_ROOM_COUNT>0?AW_BLOODMOON_ROOM_COUNT:1]=AW_BLOODMOON_ROOM_TITLES;
+    return n>=0 && n<AW_BLOODMOON_ROOM_COUNT?titles[n]:"";
+}
+/* The expansion an ID's range belongs to ("Tribunal", "Bloodmoon"), or NULL for a base ID. */
+static __inline__ const char *AW_MapLayer(int id)
+{
+    if(id>=AW_TRIBUNAL_ROOM_BASE && id<AW_BLOODMOON_ROOM_BASE)return "Tribunal";
+    if(id>=AW_BLOODMOON_ROOM_BASE && id<AW_LAYER_ROOM_END)return "Bloodmoon";
+    return NULL;
+}
+
 static __inline__ int AW_TerrainId(const char *name)
 {
     int i,n=0;if(strlen(name)!=6 || name[0]!='v' || name[1]!='f')return -1;
@@ -85,7 +123,11 @@ static __inline__ int AW_MapId(const char *name)
     for(i=0;i<AW_TOWN_INTERIOR_COUNT;i++)if(!strcmp(name,AW_TownInteriorName(i)))return AW_TOWN_INTERIOR_BASE+i;
     /* batch rooms: "ri" and 10 hex digits (room_batches.room_map); only such a name is looked up */
     if(name[0]=='r' && name[1]=='i' && strlen(name)==12)
+    {
         for(i=0;i<AW_ROOM_BATCH_COUNT;i++)if(!strcmp(name,AW_RoomBatchName(i)))return AW_ROOM_BATCH_BASE+i;
+        for(i=0;i<AW_TRIBUNAL_ROOM_COUNT;i++)if(AW_TribunalRoomName(i)[0] && !strcmp(name,AW_TribunalRoomName(i)))return AW_TRIBUNAL_ROOM_BASE+i;
+        for(i=0;i<AW_BLOODMOON_ROOM_COUNT;i++)if(AW_BloodmoonRoomName(i)[0] && !strcmp(name,AW_BloodmoonRoomName(i)))return AW_BLOODMOON_ROOM_BASE+i;
+    }
     return -1;
 }
 static __inline__ const char *AW_MapName(int id)
@@ -97,6 +139,8 @@ static __inline__ const char *AW_MapName(int id)
     if(id>=AW_TOWN_MAP_BASE && id<AW_TOWN_INTERIOR_BASE)return AW_TownExtraName(id-AW_TOWN_MAP_BASE);
     if(id>=AW_TOWN_INTERIOR_BASE && id<AW_TOWN_INTERIOR_BASE+AW_TOWN_INTERIOR_COUNT)return AW_TownInteriorName(id-AW_TOWN_INTERIOR_BASE);
     if(id>=AW_ROOM_BATCH_BASE && id<AW_SCENE_COUNT)return AW_RoomBatchName(id-AW_ROOM_BATCH_BASE);
+    if(id>=AW_TRIBUNAL_ROOM_BASE && id<AW_BLOODMOON_ROOM_BASE)return AW_TribunalRoomName(id-AW_TRIBUNAL_ROOM_BASE);
+    if(id>=AW_BLOODMOON_ROOM_BASE && id<AW_LAYER_ROOM_END)return AW_BloodmoonRoomName(id-AW_BLOODMOON_ROOM_BASE);
     return id>=0 && id<AW_MAP_COUNT ? names[id] : "";
 }
 static __inline__ const char *AW_MapTitle(int id)
@@ -107,6 +151,11 @@ static __inline__ const char *AW_MapTitle(int id)
     if(id>=AW_TOWN_MAP_BASE && id<AW_TOWN_INTERIOR_BASE)return AW_TownExtraTitle(id-AW_TOWN_MAP_BASE);
     if(id>=AW_TOWN_INTERIOR_BASE && id<AW_TOWN_INTERIOR_BASE+AW_TOWN_INTERIOR_COUNT)return AW_TownInteriorTitle(id-AW_TOWN_INTERIOR_BASE);
     if(id>=AW_ROOM_BATCH_BASE && id<AW_SCENE_COUNT)return AW_RoomBatchTitle(id-AW_ROOM_BATCH_BASE);
+    if(AW_MapLayer(id)){
+        const char *title=id<AW_BLOODMOON_ROOM_BASE?AW_TribunalRoomTitle(id-AW_TRIBUNAL_ROOM_BASE)
+                                                   :AW_BloodmoonRoomTitle(id-AW_BLOODMOON_ROOM_BASE);
+        return title[0]?title:id<AW_BLOODMOON_ROOM_BASE?"needs Tribunal":"needs Bloodmoon";
+    }
     return id>=0 && id<AW_MAP_COUNT ? titles[id] : "Cancel";
 }
 /* Actor facts use the original cell; save.scene still names the physical section. */

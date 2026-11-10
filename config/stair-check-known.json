@@ -13,6 +13,16 @@
     "meshes/x/ex_de_shack_04.nif": "Dunmer shack: 1 flight",
     "meshes/x/ex_common_house_tall_02.nif": "common tall house: 1 flight",
     "meshes/x/ex_hlaalu_bal_02.nif": "Hlaalu balcony: 1 flight",
-    "meshes/x/ex_hlaalu_dsteps_01.nif": "Hlaalu double steps: 1 flight (its own RootCollisionNode has 46-48 degree faces, not standable in OpenMW either)"
+    "meshes/x/ex_hlaalu_dsteps_01.nif": "Hlaalu double steps: 1 flight (its own RootCollisionNode has 46-48 degree faces, not standable in OpenMW either)",
+    "meshes/f/act_bm_garden_plot_01.nif": "Bloodmoon garden plot (Solstheim): 1 flight, a rise between neighbouring standing points over a step; method 0 kept",
+    "meshes/x/ex_colony_house02.nif": "Bloodmoon colony house (Solstheim): 1 flight, no place on the tread for the standing box; method 0 kept",
+    "meshes/x/ex_colony_wall_02.nif": "Bloodmoon colony wall (Solstheim): 1 flight, no place on the tread for the standing box; method 0 kept"
+  },
+  "layers": {
+    "bloodmoon": [
+      "meshes/f/act_bm_garden_plot_01.nif",
+      "meshes/x/ex_colony_house02.nif",
+      "meshes/x/ex_colony_wall_02.nif"
+    ]
   }
 }

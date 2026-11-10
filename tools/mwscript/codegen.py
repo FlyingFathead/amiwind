@@ -978,7 +978,7 @@ class ScriptCompiler:
             strs = [a[1].casefold() for a in args if a[0] == 'str']
             spell, who = (strs + ['', ''])[:2]
             if who != 'player':
-                return self.notyet(fn, ref, args, None)
+                return self.cast_on(fn, ref, args, spell, who)
             if not any(c in spell for c in CURES):
                 row = self.p.spell_effects(spell)
                 if row is None:
@@ -1065,6 +1065,26 @@ class ScriptCompiler:
         if ref is not None:
             self.e.op('REF', self.p.object(ref))
         return self.notyet(fn, None, args, None, carried=True)
+
+    def cast_on(self, fn, ref, args, spell, who):
+        """Cast SPELL TARGET on anything but the player (v0.0.64, MWSCRIPT-GAPS-63; rule from OpenMW 0.53
+        apps/openmw/mwscript/miscextensions.cpp OpCast, mwmechanics/spellcasting.cpp CastSpell::cast): a spell the
+        game has not does nothing (OpenMW reports it); the player as the caster only selects the spell there (kept "not
+        yet"); any other caster casts it on the target and it always succeeds: its Self effects on the caster when it
+        is an actor, its Touch and Target effects on the target. The host gets the spell's ASPT row and the target's
+        object row (aw_mwhost.c AWF_CAST, aw_cast.c AW_CastOn)."""
+        if ref is not None and ref.casefold() == 'player':
+            return self.notyet(fn, ref, args, None)
+        if not spell or not who:
+            return self.notyet(fn, ref, args, None)
+        if spell not in getattr(self.p.actors, 'records', {}).get('SPEL', {}):
+            self.warnings.append('Cast of %r, a spell the game has not: nothing (OpenMW)' % spell)
+            return None
+        row = self.p.spell(spell)
+        if ref is not None:
+            self.e.op('REF', self.p.object(ref))
+        return self.notyet(fn, None, [('str', spell), ('str', who), ('int', row), ('int', self.p.object(who))], None,
+                           carried=True)
 
     def position_cell(self, fn, ref, args):
         """PositionCell (OpenMW transformationextensions.cpp OpPositionCell). The player: a PMOV row (PLAYERMOVE), or

@@ -1,6 +1,6 @@
 # AmiWind Toolkit
 
-_Last updated with AmiWind v0.0.62-dev1 (7 November 2026)._
+_Last updated with AmiWind v0.0.64-dev3 (10 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -305,6 +305,13 @@ every audit that was measured passed**. Audits that were not measured are
 counted apart ("unmeasured audits on N converted cells") and are never counted as passed. Under the headline are the
 breakdown (maintainer-approved, playtested, audits passed, converted with failing audits, converted with nothing measured,
 not started) and a history line (passed cells per day). Click a number to highlight those cells on the map.
+
+Above the World map a view switch offers one pane per map: Vvardenfell (the base game), Solstheim (the Bloodmoon expansion, the same grid framed on the island, with its rooms under the map) and Mournhold (the Tribunal expansion, a screen of its own with its districts and rooms). Each pane shows its own done, partial and missing counts, and a line under the switch gives the completion rate of each. A data set without an expansion hides its pane. Details: [the expansion views](chim/PROGRESS_TRACKER.md#the-expansion-views-solstheim-and-mournhold).
+
+**Expansion views.** Solstheim is on the main map view beside Vvardenfell. Mournhold has no exterior, so it has a map
+screen of its own (its districts and rooms) behind a view switch above the map. Each view shows its done, partial and
+missing counts, and the completion of Bloodmoon and Tribunal is shown beside the base game's. A build without an
+expansion shows no view and no figure for it. Details: [the expansion views](chim/PROGRESS_TRACKER.md#the-expansion-views-solstheim-and-mournhold).
 
 ### Making the data
 

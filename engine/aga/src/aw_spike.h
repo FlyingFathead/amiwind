@@ -130,28 +130,49 @@ extern void (*aw_chim_spike_counts)(unsigned long *out, int count);
  * no CHIM world stage (tools/engine_facts.py TIMING_HEADERS, BUILD-ENGINE-SOURCE-KEY-BROAD-36). */
 #if defined(AW_DISKWAIT_WRAPPED) && !defined(AW_DISKWAIT_BODIES)
 #define AW_DISKWAIT_BODIES
+/* LOAD-HANG-WATCHDOG-62: the load trace (aw_loadtrace.c, off by default: one test of aw_loadtrace_on per call) */
+extern int aw_loadtrace_on;
+unsigned long AW_LoadTraceBegin(int op,const void *file,const char *name,long bytes);
+void AW_LoadTraceEnd(unsigned long seq,long result,const void *file);
+enum {AW_LT_OP_OPEN = 1, AW_LT_OP_READ, AW_LT_OP_SEEK, AW_LT_OP_CLOSE};
 static inline FILE *AW_DiskFopen(const char *path,const char *mode)
 {
-    double t0; FILE *f;
+    double t0; FILE *f; unsigned long lt=0;
+    if(aw_loadtrace_on)lt=AW_LoadTraceBegin(AW_LT_OP_OPEN,0,path,0);
     AW_DISK_BEGIN(t0); f=(fopen)(path,mode); AW_DISK_END(t0);
+    if(lt)AW_LoadTraceEnd(lt,f?0:-1,f);
     return f;
 }
 static inline size_t AW_DiskFread(void *p,size_t size,size_t n,FILE *f)
 {
-    double t0; size_t got;
+    double t0; size_t got; unsigned long lt=0;
+    if(aw_loadtrace_on)lt=AW_LoadTraceBegin(AW_LT_OP_READ,f,0,(long)(size*n));
     AW_DISK_BEGIN(t0); got=(fread)(p,size,n,f); AW_DISK_END(t0);
+    if(lt)AW_LoadTraceEnd(lt,(long)(got*size),f);
     return got;
 }
 static inline int AW_DiskFseek(FILE *f,long offset,int whence)
 {
-    double t0; int r;
+    double t0; int r; unsigned long lt=0;
+    if(aw_loadtrace_on)lt=AW_LoadTraceBegin(AW_LT_OP_SEEK,f,0,offset);
     AW_DISK_BEGIN(t0); r=(fseek)(f,offset,whence); AW_DISK_END(t0);
+    if(lt)AW_LoadTraceEnd(lt,r,f);
+    return r;
+}
+static inline int AW_DiskFclose(FILE *f)
+{
+    int r; unsigned long lt=0;
+    if(aw_loadtrace_on)lt=AW_LoadTraceBegin(AW_LT_OP_CLOSE,f,0,0);
+    r=(fclose)(f);
+    if(lt)AW_LoadTraceEnd(lt,r,f);
     return r;
 }
 #undef fopen
 #undef fread
 #undef fseek
+#undef fclose
 #define fopen(p,m) AW_DiskFopen((p),(m))
 #define fread(p,s,n,f) AW_DiskFread((p),(s),(n),(f))
 #define fseek(f,o,w) AW_DiskFseek((f),(o),(w))
+#define fclose(f) AW_DiskFclose((f))
 #endif

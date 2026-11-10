@@ -99,6 +99,24 @@ def add_accept_entity_loss_group(p):
     p.add_argument("--game-data-policy", choices=("warn", "fail", "require-known"), default="warn",
                    help="Known-inputs policy for Morrowind/Tribunal/Bloodmoon .esm/.bsa: warn (default; unknown versions "
                         "used with a warning), fail (any invalid file stops), require-known. See docs/KNOWN_INPUTS.md")
+    p.add_argument("--dlc", choices=("tribunal", "bloodmoon", "both", "none"), default=None,
+                   help="Which expansions the build uses (DLC-BUILD-LATER): tribunal, bloodmoon, both or none. Default: "
+                        "every expansion found in Data Files. The base world's stage keys never depend on this choice "
+                        "or on which expansion files are present (BUILD-GAME-INPUT-KEY-BROAD-64)")
+    # dest dlc_off, not no_dlc: a player's choice, not a DEBUGGING ONLY opt-out of shipped content
+    p.add_argument("--no-dlc", "--no-dlcs", dest="dlc_off", action="store_true",
+                   help="Leave both expansions out, the same as --dlc none")
+    p.add_argument("--chim-sol-test", dest="chim_sol_test", metavar="CELLS", default=None,
+                   help="TEST BUILDS ONLY (DLC-BUILD-LATER): also build these Solstheim cells (\"x,y:l ...\", the "
+                        "--chim-regions-cells form) as CHIM frames from Bloodmoon.esm into their own folder, run/chim-sol, "
+                        "on a layered test data folder (tools/chim_layer_data.py); the stages chim-sol-data and chim-sol "
+                        "are keyed by Bloodmoon's files, the base stages keep their keys, and the image does not take "
+                        "them. Off by default")
+    p.add_argument("--chim-sol-tree-copies", dest="chim_sol_tree_copies", choices=("off", "star"), default=None,
+                   help="TEST BUILDS ONLY, with --chim-sol-test (TREES-DEPTH-56): off (unset, the default) the Solstheim trees as "
+                        "their original models; star: the chim-sol stage draws them as closed star prisms "
+                        "(tools/chim_tree_star.py, config/tree-copies.json) and the stage chim-sol-trees bakes the "
+                        "billboard and four 45-degree views per tree model (tools/chim_tree_copies.py)")
     p.add_argument("--check-hashes", choices=("core", "full", "auto", "off"), default="core",
                    help="Input hashing with the workspace lock amiwind-inputs.lock: core (default; the masters, archives, "
                         "Amiga libraries and ROM are hashed every build, other inputs only when size or times changed), "

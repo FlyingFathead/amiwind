@@ -340,6 +340,12 @@ EnableNameMenu
 EnableRaceMenu
 EnableRest
 End''',
+    # v0.0.64 (MWSCRIPT-GAPS-63, the add-ons' functions): Cast on an actor, a spell the game has not
+    'GapUser64': '''Begin GapUser64
+Cast "shrine test sp" "chime_obj"
+Cast "no such spell" "chime_obj"
+"chime_obj"->Cast "shrine test sp" "chime_obj"
+End''',
     # v0.0.63 (MWSCRIPT-GAPS-63, batch 3): the werewolf set, the travel read and the scale
     'GapUser63c': '''Begin GapUser63c
 short r
@@ -1166,6 +1172,28 @@ End''')
             self.assertIn(case, host)
         self.assertIn('int AW_CastExplode(', (ROOT / 'engine/aga/src/aw_cast.c').read_text(encoding='utf-8'))
         self.assertIn('aw_combat_attacked(t)', (ROOT / 'engine/aga/src/aw_combat.c').read_text(encoding='utf-8'))
+
+    def test_cast_on_an_actor_goes_through_the_host_call(self):
+        # v0.0.64 (MWSCRIPT-GAPS-63; OpenMW 0.53 miscextensions.cpp OpCast): Cast on anything but the player hands the
+        # spell's ASPT row and the target's object row (the caster: the script's object, or its REF); a spell the game
+        # has not is no code
+        from mwscript.functions import FUNCTION_NUMBERS
+        prog, compiled, _, _ = program()
+        user = {c.name: c for c in compiled}['GapUser64']
+        self.assertEqual(user.notyet, [])
+        self.assertFalse(user.flags & (SCRIPT_NOTYET | SCRIPT_INERT))
+        ops = [(n, a) for _, n, a in awms.decode(user.code)]
+        calls = [(k, a) for k, (n, a) in enumerate(ops) if n == 'NOTYET']
+        self.assertEqual([a[0] for _, a in calls], [FUNCTION_NUMBERS['cast']] * 2)
+        for k, a in calls:
+            self.assertEqual(a[2] & 0x1F, 2)                        # two numbers: the spell row and the target
+            self.assertEqual([prog.strings.rows[s] for s in a[4:]], ['shrine test sp', 'chime_obj'])
+        pushed = [a[0] for n, a in ops[:calls[0][0]] if n.startswith('PUSH')]
+        self.assertEqual(pushed[-2:], [prog.spell('shrine test sp'), prog.object('chime_obj')])
+        self.assertIn(('REF', [prog.object('chime_obj')]), ops[calls[0][0] + 1:calls[1][0]])   # "chime_obj"->Cast
+        host = (ROOT / 'engine/aga/src/aw_mwhost.c').read_text(encoding='utf-8')
+        self.assertIn('AW_CastOn(caster,', host)
+        self.assertIn('int AW_CastOn(', (ROOT / 'engine/aga/src/aw_cast.c').read_text(encoding='utf-8'))
 
     def test_name_race_menus_and_rest_go_through_the_host_call(self):
         # v0.0.63 (MWSCRIPT-GAPS-63, batch 6): EnableNameMenu, EnableRaceMenu, EnableRest carried out by the host

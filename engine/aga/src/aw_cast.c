@@ -207,6 +207,27 @@ int AW_CastExplode(const float at[3],int row){
     landed+=(unsigned long)hits;
     return hits;
 }
+/* Cast SPELL TARGET of a script (aw_cast.h; OpenMW 0.53 CastSpell::cast): the Self effects on the caster when it is
+ * an actor, the Touch and Target effects on the target, landed at once (no bolt flies). */
+int AW_CastOn(edict_t *caster,edict_t *target,int row){
+    aw_spell_effect_t e[AW_MADE_EFFECTS];aw_mgef_t m[AW_MADE_EFFECTS];int i,n,hits=0,range;
+    n=row>=0?AW_ActorSpellEffects(row,e,AW_MADE_EFFECTS):0;
+    if(n<=0)return -1;
+    for(i=0;i<n;i++)if(!AW_ActorMagicEffect(e[i].effect,&m[i]))memset(&m[i],0,sizeof(m[i]));
+    for(range=AW_RANGE_SELF;range<=AW_RANGE_TARGET;range++){
+        aw_spell_effect_t pick[AW_MADE_EFFECTS];aw_mgef_t pm[AW_MADE_EFFECTS];int k=0;edict_t *on;
+        for(i=0;i<n;i++)if(e[i].range==range){pick[k]=e[i];pm[k]=m[i];k++;}
+        if(!k)continue;
+        if(range==AW_RANGE_SELF){
+            if(!caster || caster->free)continue;
+            if(caster!=sv_player && !AW_MwscriptActorOf(caster,NULL))continue;   /* an object: nothing to change */
+            on=caster==sv_player?NULL:caster;
+        }else on=target;
+        if(AW_MwscriptLand(on,pick,pm,k,range,row)>0)hits++;
+    }
+    landed+=(unsigned long)hits;
+    return hits;
+}
 static void bolts_frame(float dt){
     int i;
     for(i=0;i<BOLTS;i++){

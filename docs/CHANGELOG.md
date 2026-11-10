@@ -1,10 +1,13 @@
 # Changelog
 
-_Last updated with AmiWind v0.0.63 (9 November 2026)._
+_Last updated with AmiWind v0.0.64-dev3 (10 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.64-dev3: third snapshot of v0.0.64, 10 November 2026](#v0064-dev3-third-snapshot-of-v0064-10-november-2026)
+- [v0.0.64-dev2: second snapshot of v0.0.64, 10 November 2026](#v0064-dev2-second-snapshot-of-v0064-10-november-2026)
+- [v0.0.64-dev1: first snapshot of v0.0.64, 10 November 2026](#v0064-dev1-first-snapshot-of-v0064-10-november-2026)
 - [v0.0.63: Every Script Of Vvardenfell, 9 November 2026](#v0063-every-script-of-vvardenfell-9-november-2026)
 - [v0.0.63-dev5: fifth snapshot of v0.0.63, 9 November 2026](#v0063-dev5-fifth-snapshot-of-v0063-9-november-2026)
 - [v0.0.63-dev4: fourth snapshot of v0.0.63, 9 November 2026](#v0063-dev4-fourth-snapshot-of-v0063-9-november-2026)
@@ -178,6 +181,80 @@ _Last updated with AmiWind v0.0.63 (9 November 2026)._
 - [CHIM source candidate - 14 October 2026, v0.0.40-dev1](#chim-source-candidate---14-october-2026-v0040-dev1)
 
 <!-- contents end -->
+
+## v0.0.64-dev3: third snapshot of v0.0.64, 10 November 2026
+
+The third development snapshot of v0.0.64, "Gone Beyond The Gate" ([release notes](releases/notes/RELEASE-v0.0.64-dev3.md)).
+It needs 32 MB of Fast RAM. It carries v0.0.64-dev1 and v0.0.64-dev2 as well: neither was published on its own, so this
+is the first snapshot of v0.0.64 on GitHub, and their changes are listed in the two entries below. Argonian Breathing
+cast and held under water, the Ghostgate's switches raising the portcullises, the door list's arrival lines and lava were
+checked in play on a test build; everything else is checked by tests, not yet in play.
+
+- Spells, powers and enchantments of the game take effect again: the actor table read 32 of the 39 sections of the compiled
+  scripts file, so no spell effect was found since v0.0.63 (SPELL-EFFECTS-TABLE-CUT-64). The console's id search no longer
+  misses `getspell`, a trap's spell or `additem`; Argonian Breathing (Water Breathing for 120 seconds) is the race's
+  castable spell and works when cast. A gate test reads every section.
+- The console activates buttons and objects that no script names (the Ghostgate's switches, which raise the portcullises;
+  the cursed coin) through a new on-disk name section.
+- The door list (`dbg tp`) shows each door's arrival point; lava is stood in and kills instead of being refused as water;
+  `dbg tp X Y Z` takes the nearest floor beside the point; god mode stays on across map changes.
+- The journal sorts a quest's state by its entries: a success or failure ending finishes it and a restart entry reopens
+  it, so the active and finished lists are right. The expulsion from a faction shows the game's own message, and the
+  factions row of the game features page lists what is carried and what is missing.
+- The renderer has a see-through face pass for cobwebs, hanging growths and decals, off by default until a measured
+  comparison on a full build decides (`dbg fence`, ROOM-DECAL-ALPHA-62); the converter marks see-through textures. The
+  Heart of Lorkhan's fire shield and hidden glows no longer cover it.
+- The builder has star-shaped tree copies for Solstheim's spruces (test builds only, unset by default): 30 faces per tree
+  instead of 472 to 724, and the median faces per view of the test area go from 45,964 to 6,096. The unit cache keeps
+  entries across the expansion rows of the collision table, the resident budget tool keeps its caps block, and the boot
+  smoke has options for the load stall.
+- The Toolkit's CHIM Progress Tracker has three panes (Vvardenfell, Solstheim, Mournhold) with their own counts.
+- Register: a race ability's resistance not applied to spell and trap damage, the actor-library stage's use of the cores
+  seen again, the resident budget fix, the expulsion message and the stats page's factions.
+
+## v0.0.64-dev2: second snapshot of v0.0.64, 10 November 2026
+
+The second development snapshot of v0.0.64, "Gone Beyond The Gate" ([release notes](releases/notes/RELEASE-v0.0.64-dev2.md)).
+It needs 32 MB of Fast RAM. Its changes are checked by tests, not yet in play. It carries v0.0.64-dev1 as well: the
+first snapshot was not published on its own, and its changes are listed in the entry below.
+
+- Opening a trapped door, load door or container casts its trap spell on the player instead of opening it, as in the
+  original; the trap is used up (and that is saved), and the key of the lock disarms it. Morrowind.esm places 457 trapped
+  references with 85 spells. [World mechanisms](WORLD_MECHANISMS.md) counts them and the 54 activators that move or open
+  other objects.
+- `dbg loadtrace on|off|dump` keeps every file call of a load in memory (off by default) and writes it out when the scene
+  is ready, and every load prints one memory line; the boot smoke has a `--load-trace` switch. Both are for the stall on the
+  trip from Seyda Neen to Balmora.
+- The Toolkit's CHIM Progress Tracker has a view switch (Vvardenfell and Solstheim, Mournhold), a screen for Mournhold and
+  a completion line for each expansion.
+- The builder can build the first Solstheim frame as a test build (`--chim-sol-test`), measured in
+  [docs/performance](performance/SOLSTHEIM-FIRST-FRAME-v0.0.64.md): the memory fits at 32 MB Fast RAM, the trees are most of
+  the drawn faces and need the cheaper method before Solstheim ships. The 25 Bloodmoon meshes the collision surface check
+  did not know and three meshes of the stair check are covered, so the test frame builds with the shipped defaults, and
+  the base world's key leaves out these expansion rows (CHIM-SOLSTHEIM-HULL-SURFACE-64, CHIM-SOLSTHEIM-STAIR-CHECK-64
+  fixed).
+- Register: the build's start-up plan counting stages whose reuse is at risk as reused, and the image step's use of the
+  cores, were measured on the previous snapshot's build.
+
+## v0.0.64-dev1: first snapshot of v0.0.64, 10 November 2026
+
+The first development snapshot of v0.0.64, "Gone Beyond The Gate" ([release notes](releases/notes/RELEASE-v0.0.64-dev1.md)).
+It needs 32 MB of Fast RAM. Its changes are checked by tests, not yet in play.
+
+- The console finds and uses world objects that are not characters, such as the Ghostgate's switches and portcullises and
+  the items whose taking summons a guardian: Activate acts as the player's use.
+- `dbg tp X Y Z` and the Position function of scripts take Z as the floor under the feet, as in the original.
+- Scripts can cast spells on characters other than the player (605 of 1,207 scripts run; 27 wait for a function).
+- The Argonian's water breathing is checked against the original's cast spell "argonian breathing" (120 seconds), not a
+  lasting ability.
+- The builder: `--dlc tribunal|bloodmoon|both|none` and `--no-dlc` choose the expansion layers; the base world's keys
+  no longer depend on which expansion files are present; the cell and room readers take a master list; the expansions get
+  their own room id ranges and store layout units. No expansion area is built yet. The census of Tribunal and Bloodmoon is
+  in [docs/performance](performance/EXPANSIONS-CENSUS-v0.0.64.md).
+- The test sessions examine every stop before a retry, an incomplete combat settings file is read once per load, and the
+  release kit takes the gate's test suite result.
+- The bug register follows the v0.0.63 release check: seven fixes seen in play, the Ghostgate buttons opened again, new
+  findings entered.
 
 ## v0.0.63: Every Script Of Vvardenfell, 9 November 2026
 

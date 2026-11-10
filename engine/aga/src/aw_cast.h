@@ -91,4 +91,9 @@ void AW_CastSelect(int kind,int index);
  * actor, so its Self and Touch effects land only through their area: on every actor within each effect's area (feet)
  * of AT (map units), the player included. How many actors it reached; -1 when the spell has no effects here. */
 int AW_CastExplode(const float at[3],int spell);
+/* Cast SPELL TARGET of a script whose caster is not the player (v0.0.64, MWSCRIPT-GAPS-63; OpenMW 0.53
+ * miscextensions.cpp OpCast, spellcasting.cpp CastSpell::cast, always succeeding): the ASPT spell's Self effects on
+ * CASTER when it is an actor (the player's edict included), its Touch and Target effects on TARGET (NULL: the player),
+ * at once. How many ranges landed; -1 when the spell has no effects here. */
+int AW_CastOn(struct edict_s *caster,struct edict_s *target,int spell);
 #endif

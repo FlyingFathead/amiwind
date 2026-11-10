@@ -1,6 +1,6 @@
 # MWScript features
 
-_Last updated with AmiWind v0.0.63 (9 November 2026)._
+_Last updated with AmiWind v0.0.64-dev3 (10 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -33,16 +33,16 @@ _Last updated with AmiWind v0.0.63 (9 November 2026)._
 
 One row per script record of the game: what names it, where it stands, which functions it calls and what its conditions test, and what state AmiWind has it in. The data is measured from the game's masters with the builder's own compiler; the page lists record ids, counts and states only. When the work list runs dry, the scripting work is taken from here row by row, toward the next landmark: every game script running as in the original. On Vvardenfell the scripts left are the character creation ones; the rest belong to Mournhold and Solstheim.
 
-Of the 1,074 scripts the original game uses, **605 run** as scripts and **9 are carried by AmiWind's own code**; of the rest, 28 use a function the interpreter lacks, 0 are attached but not run, 0 are compiled but not attached, 432 belong to an add-on world not in the image yet, 0 are not converted. The 133 scripts that nothing in the original game ever names (test and example scripts, replaced versions, cut content) are listed apart under Not used in the original game.
+Of the 1,074 scripts the original game uses, **605 run** as scripts and **9 are carried by AmiWind's own code**; of the rest, 27 use a function the interpreter lacks, 0 are attached but not run, 0 are compiled but not attached, 433 belong to an add-on world not in the image yet, 0 are not converted. The 133 scripts that nothing in the original game ever names (test and example scripts, replaced versions, cut content) are listed apart under Not used in the original game.
 
 | State | Scripts | What it means |
 | --- | ---: | --- |
 | runs | 605 | compiles whole, and the build attaches it to its objects or starts it (a record that is never placed: while the player carries its item, on the actor a levelled list gives, or on the object a script places; a script with no function, whose own locals the dialogue keeps on the speaker without it, counts as running) |
 | carried by AmiWind's own code | 9 | not run as a script because AmiWind's own code does what it does (the section Carried by AmiWind's own code names the code and compares it step by step) |
-| uses a function the interpreter lacks | 28 | compiles, but calls at least one function the interpreter does not carry out yet (those calls do nothing and read 0) |
+| uses a function the interpreter lacks | 27 | compiles, but calls at least one function the interpreter does not carry out yet (those calls do nothing and read 0) |
 | attached, not run | 0 | the game attaches it, but the build does not run it: a hand-written rule carries it, or nothing it does is seen yet |
 | compiled, not attached | 0 | compiles whole, but nothing in the build attaches or starts it: its records are never placed, and nothing makes them at run time yet |
-| only in an add-on world | 432 | compiles whole, but its records are placed (or made by scripts) only in Mournhold or Solstheim, which are not in the image yet |
+| only in an add-on world | 433 | compiles whole, but its records are placed (or made by scripts) only in Mournhold or Solstheim, which are not in the image yet |
 | not converted | 0 | does not compile |
 | **Used in the original game** | **1,074** | |
 | Not used in the original game (listed apart) | 133 | compiles whole, but no record, start, StartScript or dialogue result names it, or the records that name it are never placed and nothing makes them: it never runs in the original either |
@@ -51,7 +51,7 @@ Of the 1,074 scripts the original game uses, **605 run** as scripts and **9 are 
 | Game file | All | Used in the original | Runs | AmiWind code | Function missing | Attached, not run | Not attached | Add-on world | Not converted | Not used |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | Morrowind.esm | 616 | 528 | 518 | 9 | 0 | 0 | 0 | 1 | 0 | 88 |
-| Tribunal.esm | 255 | 236 | 42 | 0 | 8 | 0 | 0 | 186 | 0 | 19 |
+| Tribunal.esm | 255 | 236 | 42 | 0 | 7 | 0 | 0 | 187 | 0 | 19 |
 | Bloodmoon.esm | 336 | 310 | 45 | 0 | 20 | 0 | 0 | 245 | 0 | 26 |
 
 Dialogue result scripts (the lines a topic answer runs) are compiled as scripts of their own: 7,411 results, 7,411 run whole, 0 use a function the interpreter lacks, 0 are not converted.
@@ -66,7 +66,7 @@ Dialogue answers that start or change a fight (StartCombat, SetFight, ModFight):
 | the speaker attacks (StartCombat): found by the answer's reference | 124 |
 | a fight between two actors: both are set against each other (since v0.0.63) | 5 |
 
-Measured on 9 November 2026 from the three masters (Morrowind, Tribunal, Bloodmoon) with the builder's own compiler (tools/mwscript), 11,171 placed scripted references, 9,095 bindings in the compiled file, 4 start scripts. The states are worked out again from the interpreter's function table (tools/mwscript/functions.py) whenever the page is rendered, so a function carried out later moves its scripts without a new measurement.
+Measured on 10 November 2026 from the three masters (Morrowind, Tribunal, Bloodmoon) with the builder's own compiler (tools/mwscript), 11,171 placed scripted references, 9,095 bindings in the compiled file, 4 start scripts. The states are worked out again from the interpreter's function table (tools/mwscript/functions.py) whenever the page is rendered, so a function carried out later moves its scripts without a new measurement.
 
 ## Why the others do not run
 
@@ -74,9 +74,9 @@ Each script that does not run, by its reason, and where its area is: Vvardenfell
 
 | State | Reason | Vvardenfell | Add-on world | All |
 | --- | --- | ---: | ---: | ---: |
-| only in an add-on world | placed only in an add-on world, not in the image yet | 1 | 428 | 429 |
+| only in an add-on world | placed only in an add-on world, not in the image yet | 1 | 429 | 430 |
 | named by nothing | nothing names it: it never runs in the original either | 122 | 0 | 122 |
-| uses a function the interpreter lacks | calls a function the interpreter does not carry out yet | 9 | 19 | 28 |
+| uses a function the interpreter lacks | calls a function the interpreter does not carry out yet | 9 | 18 | 27 |
 | named by nothing | its records are never placed and nothing makes them: it never runs in the original either | 11 | 0 | 11 |
 | only in an add-on world | made only by a script of an add-on world, not in the image yet | 3 | 0 | 3 |
 
@@ -212,7 +212,7 @@ The area of a script is where most of its placed references stand: the region fo
 
 | Area | Scripts | Runs | AmiWind code | Function missing | Attached, not run | Not attached | Add-on world | Named by nothing | Not converted |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| mournhold (tribunal) | 194 | 3 | 0 | 5 | 0 | 0 | 186 | 0 | 0 |
+| mournhold (tribunal) | 194 | 3 | 0 | 4 | 0 | 0 | 187 | 0 | 0 |
 | named by nothing | 123 | 0 | 1 | 0 | 0 | 0 | 0 | 122 | 0 |
 | ascadian isles region | 115 | 115 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | hirstaang forest region | 103 | 0 | 0 | 4 | 0 | 0 | 99 | 0 | 0 |
@@ -234,7 +234,7 @@ The area of a script is where most of its placed references stand: the region fo
 | sheogorad | 13 | 13 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | brodir grove region | 7 | 0 | 0 | 0 | 0 | 0 | 7 | 0 | 0 |
 | interior with no way out | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| **All** | **1207** | **605** | **9** | **28** | **0** | **0** | **432** | **133** | **0** |
+| **All** | **1207** | **605** | **9** | **27** | **0** | **0** | **433** | **133** | **0** |
 
 ## By function
 
@@ -245,7 +245,7 @@ Every function the game's scripts call. Scripts: the script records that call it
 | placeitem | position | host, in part | 24 | 37 | 0 | 19 | 19 | 0 | 0 |
 | positioncell | position | host, in part | 57 | 96 | 0 | 7 | 7 | 14 | 0 |
 | setwaterlevel | world | no | 3 | 3 | 0 | 3 | 2 | 0 | 0 |
-| cast | spells | host, in part | 53 | 126 | 0 | 2 | 2 | 5 | 0 |
+| cast | spells | host, in part | 53 | 126 | 0 | 1 | 1 | 5 | 0 |
 | modwaterlevel | world | no | 1 | 1 | 0 | 1 | 0 | 0 | 0 |
 | getjournalindex | journal | yes | 547 | 1371 | 535 | 0 | 0 | 0 | 0 |
 | disable | world | yes | 390 | 832 | 0 | 0 | 0 | 52 | 0 |
@@ -1126,7 +1126,7 @@ Referenced by: the records that carry the script and their placed references per
 | fab_cent_fight_watch | mournhold (tribunal) | uses a function the interpreter lacks | 1 activator; placed 1 (Tribunal 1) | fab_cent_fight_watcher | cellchanged, getdistance, journal, menumode, placeitem | 7: cellchanged, getdistance, local, menumode | - | 1 not carried out: placeitem |
 | floatAboveStartHeight | mournhold (tribunal) | only in an add-on world | 1 container; placed 9 (Tribunal 9) | crate_01_float1 | getangle, getpos, getsecondspassed, getwaterlevel, menumode, random, setangle, setpos | 8: local, menumode | - | placed only in an add-on world, not in the image yet |
 | Gaenor_bScript | mournhold (tribunal) | only in an add-on world | 1 NPC; placed 1 (Tribunal 1); speaker of 1 dialogue results | gaenor_b | disable, enable, forcegreeting, getdisabled, getdistance, getjournalindex, journal, menumode, ondeath | 9: getdisabled, getdistance, getjournalindex, local, menumode, ondeath | - | placed only in an add-on world, not in the image yet |
-| GaenorScript | mournhold (tribunal) | uses a function the interpreter lacks | 1 NPC; placed 1 (Tribunal 1); speaker of 20 dialogue results | gaenor | cast, disable, forcegreeting, getchameleon, getjournalindex, journal, menumode, ondeath, stopscript | 8: getchameleon, getjournalindex, local, menumode, ondeath | - | 1 not carried out: cast |
+| GaenorScript | mournhold (tribunal) | only in an add-on world | 1 NPC; placed 1 (Tribunal 1); speaker of 20 dialogue results | gaenor | cast, disable, forcegreeting, getchameleon, getjournalindex, journal, menumode, ondeath, stopscript | 8: getchameleon, getjournalindex, local, menumode, ondeath | - | placed only in an add-on world, not in the image yet |
 | galmsScript | mournhold (tribunal) | only in an add-on world | 1 NPC; placed 1 (Tribunal 1); speaker of 11 dialogue results | galms seles | random | - | - | placed only in an add-on world, not in the image yet |
 | GavisScript | mournhold (tribunal) | only in an add-on world | 1 NPC; placed 1 (Tribunal 1); speaker of 2 dialogue results | gavis velas | disable, enable, forcegreeting, getdeadcount, getdisabled, getdistance, getjournalindex, getsecondspassed, journal, lock, ondeath, playsound, unlock | 15: getdeadcount, getdisabled, getdistance, getjournalindex, local, ondeath | - | placed only in an add-on world, not in the image yet |
 | goblinchiefScript1 | mournhold (tribunal) | only in an add-on world | 1 creature; placed 1 (Tribunal 1) | goblin_warchief1 | getdeadcount, journal, ondeath | 3: getdeadcount, global, ondeath | - | placed only in an add-on world, not in the image yet |

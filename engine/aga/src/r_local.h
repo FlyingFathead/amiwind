@@ -134,6 +134,11 @@ void R_DrawSprite (void);
 void R_RenderFace (msurface_t *fa, int clipflags);
 void R_RenderPoly (msurface_t *fa, int clipflags);
 void R_RenderBmodelFace (bedge_t *pedges, msurface_t *psurf);
+/* see-through faces (d_fence.c): listed off the edge list, drawn after R_ScanEdges */
+int R_FenceAdd (msurface_t *surf, entity_t *ent);
+void D_FenceInit (void);
+void D_FenceBeginFrame (void);
+void D_DrawFences (void);
 void R_TransformPlane (mplane_t *p, float *normal, float *dist);
 void R_TransformFrustum (void);
 void R_SetSkyFrame (void);

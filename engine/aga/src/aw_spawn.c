@@ -76,6 +76,10 @@ static qboolean map_water_surface(edict_t *p,vec3_t top,vec3_t point)
     VectorCopy(point,probe);probe[2]+=p->v.mins[2];
     contents=SV_PointContents(probe);
     if(contents==CONTENTS_EMPTY)return true;
+    /* GODMODE-LAVA-DEATH-62 round three: lava is a damaging surface, not water to float on: the player stands on its
+     * bed with the feet in the liquid (tools/chim/terrain.py: 8 units of lava over the slab), as walking in from the
+     * rim does. It was refused as "water surface not standable" and the teleport fell back to the map origin. */
+    if(contents==CONTENTS_LAVA)return true;
     if(contents!=CONTENTS_WATER)return false;
     low=probe[2];high=top[2]+p->v.mins[2];probe[2]=high;
     if(high<=low || SV_PointContents(probe)!=CONTENTS_EMPTY)return false;
@@ -147,10 +151,35 @@ qboolean AW_MapPlace(edict_t *p,const float *xy)
 {
     return map_place(p,xy,AW_COORD_BOUND);
 }
-/* dbg tp X Y Z: the first walkable surface at or below Z (the player's centre
- * there; a solid start steps down up to 128 units), so a bridge, a roof or an
- * upper floor is kept instead of the highest surface. Checked as AW_MapPlace. */
+/* dbg tp X Y Z: the first walkable surface at or below Z (a solid start steps
+ * down up to 128 units), so a bridge, a roof or an upper floor is kept instead
+ * of the highest surface. Checked as AW_MapPlace.
+ * LAVA-NO-DAMAGE-63 (v0.0.63 release check round two): Z names the floor (the
+ * feet, as the original's positions and Position do), so the search starts with
+ * the standing box's bottom 1 unit above Z. It started with the player's centre
+ * at Z: a Z on a lava surface put the box into the lava bed (the 16-unit slab
+ * under the 8-unit liquid, tools/chim/terrain.py), the start stepped down out of
+ * the slab's underside and the player stood on the basin floor 636 game units
+ * under the lava, out of the liquid, with no damage and the bed seen from below. */
+/* GODMODE-LAVA-DEATH-62 round three (the v0.0.64-dev1 check: a Z on the Red Mountain lava pool's rim answered "no
+ * walkable floor below" and the player went to the map origin): the asked XY first, then the nearest floor beside it
+ * at the same height, rings of 32 units out to 128 (at most 32 more searches, once at the arrival), so a point on a
+ * steep rim or a gap lands next to it instead of at the scene spawn. */
 qboolean AW_MapPlaceBelow(edict_t *p,const float *point)
 {
-    return point && isfinite(point[2]) && fabs(point[2])<AW_COORD_BOUND && map_place(p,point,point[2]);
+    static const int dirs[8][2]={{1,0},{-1,0},{0,1},{0,-1},{1,1},{-1,1},{1,-1},{-1,-1}};
+    const char *first;float xy[3];int ring,i;
+    if(!point || !p || !isfinite(point[2]) || fabs(point[2])>=AW_COORD_BOUND)return false;
+    if(map_place(p,point,point[2]-p->v.mins[2]+1.0f))return true;
+    first=aw_map_place_failure;
+    for(ring=1;ring<=4;ring++)for(i=0;i<8;i++){
+        xy[0]=point[0]+dirs[i][0]*32*ring;xy[1]=point[1]+dirs[i][1]*32*ring;xy[2]=point[2];
+        if(map_place(p,xy,point[2]-p->v.mins[2]+1.0f)){
+            Con_Printf("Debug teleport: %s at the asked point; the nearest floor beside it, %ld %ld.\n",first,
+                       (long)(xy[0]-point[0]),(long)(xy[1]-point[1]));
+            return true;
+        }
+    }
+    aw_map_place_failure=first;
+    return false;
 }

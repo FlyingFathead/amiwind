@@ -4,7 +4,7 @@
 
 # AmiWind
 
-_Last updated with AmiWind v0.0.63 (9 November 2026)._
+_Last updated with AmiWind v0.0.64-dev3 (10 November 2026)._
 
 An unofficial, experimental RPG engine and enthusiast project bringing Morrowind
 to the Commodore Amiga, featuring CHIM: an AmiQuake-based engine and an asset
@@ -25,7 +25,27 @@ Like community projects such as
 
 More in the [gallery](docs/GALLERY.md).
 
-## Where AmiWind stands (9 November 2026)
+## Where AmiWind stands (10 November 2026)
+
+The development line is **v0.0.64: Gone Beyond The Gate**. Its third snapshot,
+[v0.0.64-dev3](docs/releases/notes/RELEASE-v0.0.64-dev3.md), carries the first two (neither was published on its own, so
+it is the first snapshot of v0.0.64 on GitHub). It makes the spells, powers and enchantments of the game take effect again
+(a fault since v0.0.63 left every game spell without its effects), lets the console activate the Ghostgate's switches and
+other objects no script names, stands in lava and kills, keeps god mode across map changes, sorts a quest's state in the
+journal by its endings, shows the game's expulsion message, adds a see-through face pass for cobwebs and hanging growths
+(off by default until measured), a test-only star-shaped copy of Solstheim's spruces (a forest view goes from 45,964 faces
+at the median to 6,096), and three map panes for the Toolkit's CHIM Progress Tracker. Argonian Breathing, the Ghostgate's
+switches, the door list's arrival lines and lava were checked in play on a test build; the rest is checked by tests, not
+yet in play. Its second snapshot,
+[v0.0.64-dev2](docs/releases/notes/RELEASE-v0.0.64-dev2.md), made trapped doors and containers spring their trap on the
+player as in the original, added a switchable load trace and a memory line per load for the stall on the trip from Seyda
+Neen to Balmora, gave the Toolkit's CHIM Progress Tracker a view for each expansion, and measured the first Solstheim
+frame as a test build. Its first snapshot is
+[v0.0.64-dev1](docs/releases/notes/RELEASE-v0.0.64-dev1.md): the builder can choose which expansions it includes
+(`--dlc tribunal|bloodmoon|both|none`, `--no-dlc`) with the base world's keys independent of them, the Tribunal and
+Bloodmoon files are counted (no expansion area is built yet), the console finds and uses world objects that are not
+characters, scripts cast spells on other characters, and `dbg tp` takes the floor under the feet as its height.
+605 of the 1,207 scripts run, as in v0.0.63.
 
 The newest release is **v0.0.63: Every Script Of Vvardenfell**, the release of the base game's scripting
 ([release notes](docs/releases/notes/RELEASE-v0.0.63.md)). It follows five development snapshots
@@ -100,7 +120,10 @@ a new game and the falling mage, and its second ([dev2 notes](docs/releases/note
 delivered. v0.0.61 shipped as its third snapshot with the final version number
 ([release notes](docs/releases/notes/RELEASE-v0.0.61.md)).
 
-What comes next is in the [roadmap](docs/ROADMAP.md). The next release is **v0.0.64: Gone Beyond The Gate**:
+What comes next is in the [roadmap](docs/ROADMAP.md). The next release is **v0.0.64: Gone Beyond The Gate**
+(its snapshots, [dev1](docs/releases/notes/RELEASE-v0.0.64-dev1.md),
+[dev2](docs/releases/notes/RELEASE-v0.0.64-dev2.md) and [dev3](docs/releases/notes/RELEASE-v0.0.64-dev3.md), have the expansion switch, the keys, the traps and a test-only
+Solstheim frame but no expansion area in the game yet):
 Tribunal (Mournhold) and Bloodmoon (Solstheim) built in by default where you own them (a warning when the files are
 not found, and a builder switch for the base game only), their scripting, and scripted world events such as the
 Ghostgate's doors and the traps that poison when opened; then the remaining partial systems, among them the rest of the
@@ -324,8 +347,8 @@ front page used to carry are kept in [earlier README sections](docs/README_ARCHI
 - **The game's scripts:** the three game files hold 1,207 script records, 1,074 of them used by the original game.
   Every one of Vvardenfell that the original runs also runs here: 605 run as scripts and 9 more, the opening's and the
   game's main script, are carried by the game's own code (in every Vvardenfell region all of them, for example the
-  Ascadian Isles 115 of 115 and the Ashlands 66 of 66). The other 460 of the 1,074 wait: 432 belong to Mournhold or
-  Solstheim and wait for those worlds to be built (one of them is a Morrowind.esm script that Tribunal places), and 28
+  Ascadian Isles 115 of 115 and the Ashlands 66 of 66). The other 460 of the 1,074 wait: 433 belong to Mournhold or
+  Solstheim and wait for those worlds to be built (one of them is a Morrowind.esm script that Tribunal places), and 27
   also call a function not carried out yet, such as placing their own records there. The remaining 133 are not named or
   started by anything in the original game and never ran there either; they stay in the game and are listed apart.
   460 of the original's 504 script functions are carried out
@@ -371,10 +394,14 @@ test image of one spot see [MiniWind: the test ground](docs/MINIWIND.md), the
 Everything else about building, the build speed options, the FPU support library and running the image in FS-UAE or
 WinUAE: [Building and playing](docs/BUILDING_AND_PLAYING.md), the [Linux build guide](docs/LINUX_BUILD.md) and the
 [FS-UAE launcher](docs/FS-UAE-LAUNCHER.md). The newest emulator presets are
+[`AmiWind-v0.0.64-dev3-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.64-dev3-FS-UAE.fs-uae) and
+[`AmiWind-v0.0.64-dev3-WinUAE.uae`](resources/emulators/AmiWind-v0.0.64-dev3-WinUAE.uae) (for the previous snapshot:
+[`AmiWind-v0.0.64-dev2-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.64-dev2-FS-UAE.fs-uae) and
+[`AmiWind-v0.0.64-dev2-WinUAE.uae`](resources/emulators/AmiWind-v0.0.64-dev2-WinUAE.uae); for the first:
+[`AmiWind-v0.0.64-dev1-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.64-dev1-FS-UAE.fs-uae) and
+[`AmiWind-v0.0.64-dev1-WinUAE.uae`](resources/emulators/AmiWind-v0.0.64-dev1-WinUAE.uae); for the v0.0.63 release:
 [`AmiWind-v0.0.63-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.63-FS-UAE.fs-uae) and
-[`AmiWind-v0.0.63-WinUAE.uae`](resources/emulators/AmiWind-v0.0.63-WinUAE.uae) (for the v0.0.62 release:
-[`AmiWind-v0.0.62-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.62-FS-UAE.fs-uae) and
-[`AmiWind-v0.0.62-WinUAE.uae`](resources/emulators/AmiWind-v0.0.62-WinUAE.uae)); all start with 32 MB of
+[`AmiWind-v0.0.63-WinUAE.uae`](resources/emulators/AmiWind-v0.0.63-WinUAE.uae)); all start with 32 MB of
 Fast RAM, which is the requirement.
 
 ## Where to read more

@@ -51,6 +51,8 @@ KNOWN_UNCACHED_BAKES = {
     ('tools/creature_library.py', 'bake_kf'): 'NPC-LIBRARY-UNITS-63',
     ('tools/creature_library.py', 'bake_skeletal'): 'NPC-LIBRARY-UNITS-63',
     ('tools/prepare_combat.py', 'bake_fighter'): 'NPC-LIBRARY-UNITS-63',
+    # the Solstheim tree copies (test stage chim-sol-trees only, 56 views in about a minute; reused as a whole stage)
+    ('tools/chim_tree_copies.py', 'bake_view'): 'TREES-DEPTH-56',
     # found by the first scan (2026-11-09), to be judged under BUILD-UNIT-PREFLIGHT-63: the room actors' ground
     # heights, and a study tool no build stage runs (tools/actor_grounding.py bake_ground has its per-placement unit
     # cache since BUILD-TABLE-UNITS-REBAKE-63)

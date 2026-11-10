@@ -1159,6 +1159,42 @@
       "to": [],
       "source": "tools/reuse_all.py parse_allowed (BUILD-UNIT-PREFLIGHT-63)",
       "note": "STAGE:REASON, repeatable: a stage the --reuse-all-available stop names runs anyway, the reason recorded in build-state.json"
+    },
+    {
+      "version": "0.0.63",
+      "option": "dlc",
+      "flag": "--dlc",
+      "change": "added",
+      "to": null,
+      "source": "tools/build.py expansion_selection, tools/expansions_report.py (DLC-BUILD-LATER)",
+      "note": "Which expansions the build uses: tribunal, bloodmoon, both or none; unset = every expansion found. Recorded as expansion_layers; never a key of a base stage (BUILD-GAME-INPUT-KEY-BROAD-64)"
+    },
+    {
+      "version": "0.0.63",
+      "option": "dlc_off",
+      "flag": "--no-dlc",
+      "change": "added",
+      "to": false,
+      "source": "tools/build.py expansion_selection (DLC-BUILD-LATER)",
+      "note": "Leave both expansions out (also --no-dlcs), the same as --dlc none"
+    },
+    {
+      "version": "0.0.64-dev1",
+      "option": "chim_sol_test",
+      "flag": "--chim-sol-test",
+      "change": "added",
+      "to": null,
+      "source": "tools/build.py chim_sol_test_commands, tools/chim_layer_data.py (DLC-BUILD-LATER)",
+      "note": "Test builds only: the Bloodmoon layer's CHIM frames of the given Solstheim cells, built into run/chim-sol from a layered test data folder; keyed by Bloodmoon's files, never by a base stage; the image does not take them"
+    },
+    {
+      "version": "0.0.64-dev2",
+      "option": "chim_sol_tree_copies",
+      "flag": "--chim-sol-tree-copies",
+      "change": "added",
+      "to": null,
+      "source": "tools/build.py chim_sol_test_commands, tools/chim_tree_star.py, tools/chim_tree_copies.py (TREES-DEPTH-56)",
+      "note": "Test builds only, with --chim-sol-test: star draws the Solstheim trees in the chim-sol stage as closed star prisms and adds the stage chim-sol-trees (billboard and four 45-degree views per tree model); unset, nothing changes and no base stage reads these files"
     }
   ],
   "current": {
@@ -1226,6 +1262,8 @@
       "chim_region_rows": null,
       "chim_regions": [],
       "chim_regions_status": null,
+      "chim_sol_test": null,
+      "chim_sol_tree_copies": null,
       "chim_stream_statics": true,
       "chim_terrain_hull": "compiled",
       "chim_terrain_pack": "generate",
@@ -1241,6 +1279,8 @@
       "death_retry": null,
       "direct_to_game_map": null,
       "disk_layout": null,
+      "dlc": null,
+      "dlc_off": false,
       "engine_asm": null,
       "engine_cpu": "68040",
       "engine_experiment": null,

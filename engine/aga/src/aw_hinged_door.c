@@ -64,12 +64,33 @@ typedef struct {unsigned ref,pid;vec3_t shift,turn;float since;} hd_mover_t;
 #define MOVED(m) ((m)->shift[0] || (m)->shift[1] || (m)->shift[2] || (m)->turn[0] || (m)->turn[1] || (m)->turn[2])
 static hd_mover_t movers[HD_MOVERS];static int mover_count,mover_pending;
 static void movers_pending(void);
+/* TRAPS-WHEN-OPENED-63: the T rows, references ascending (every placed door and container that names a trap spell),
+ * each with its spell's place in the pool of distinct spell ids. 768 x 6 + 128 x 2 + 3,072 = 7,936 bytes; the
+ * original's Morrowind.esm has 457 rows and 85 spells (tools/world_mechanisms.py). */
+#define HD_TRAPS 768
+#define HD_TRAP_SPELLS 128
+#define HD_TRAP_POOL 3072
+typedef struct {unsigned ref;unsigned short spell;} hd_trap_t;   /* spell: index into trap_spell */
+static hd_trap_t traps[HD_TRAPS];static int trap_count,trap_spell_count,trap_pool_used;
+static unsigned short trap_spell[HD_TRAP_SPELLS];static char trap_pool[HD_TRAP_POOL];
+static unsigned long traps_sprung,traps_disarmed,traps_missed;
 /* dbg doorlocks on|off (the coordinator, 2026-10-27: on by default, a debug switch until lockpicks and the Open
  * spell exist; no cvar: the resident registry is full). Not saved. */
 static int door_locks=1;
 int (*aw_hinged_story)(unsigned ref,int event);
 static int story(unsigned ref,int event){return aw_hinged_story?aw_hinged_story(ref,event):-1;}
 
+/* the first N bytes of A and B the same with A-Z folded (the game's ids are case-blind) */
+static int same_folded(const char *a,const char *b,int n){
+    int i,x,y;
+    for(i=0;i<n;i++){
+        x=(unsigned char)a[i];y=(unsigned char)b[i];
+        if(x>='A' && x<='Z')x+=32;
+        if(y>='A' && y<='Z')y+=32;
+        if(x!=y)return 0;
+    }
+    return 1;
+}
 static int valid_path(const char *s){
     int i;
     if(strncmp(s,"doors/d",7) || strlen(s)!=27 || strcmp(s+23,".wav"))return 0;
@@ -134,9 +155,29 @@ static void load(void){
             if(mover_count>=HD_MOVERS || Q_sscanf(line+2,"%u %c",&ref,&extra)!=1 ||
                (mover_count && ref<=movers[mover_count-1].ref))continue;
             memset(&movers[mover_count],0,sizeof(movers[0]));movers[mover_count++].ref=ref;
+        }else if(line[0]=='T' && line[1]==' '){
+            /* a trapped reference (TRAPS-WHEN-OPENED-63): left out when out of order, its spell id unusable or no room */
+            char *id;int len,k;
+            n=0;
+            if(trap_count>=HD_TRAPS || Q_sscanf(line+2,"%u%n",&ref,&n)!=1 ||
+               (trap_count && ref<=traps[trap_count-1].ref))continue;
+            id=line+2+n;while(*id==' ')id++;
+            len=(int)strcspn(id,"\r\n");
+            if(len<=0 || len>63)continue;
+            for(k=0;k<trap_spell_count;k++){
+                const char *s=trap_pool+trap_spell[k];
+                if((int)strlen(s)==len && same_folded(s,id,len))break;
+            }
+            if(k==trap_spell_count){
+                if(k>=HD_TRAP_SPELLS || trap_pool_used+len+1>HD_TRAP_POOL)continue;
+                memcpy(trap_pool+trap_pool_used,id,len);trap_pool[trap_pool_used+len]=0;
+                trap_spell[trap_spell_count++]=(unsigned short)trap_pool_used;trap_pool_used+=len+1;
+            }
+            traps[trap_count].ref=ref;traps[trap_count++].spell=(unsigned short)k;
         }else{bad=1;break;}
     }
-    if(bad){row_count=base_count=sound_count=lock_count=key_pool_used=mover_count=0;locked_sound=-1;key_used[0]=0;}
+    if(bad){row_count=base_count=sound_count=lock_count=key_pool_used=mover_count=0;locked_sound=-1;key_used[0]=0;
+            trap_count=trap_spell_count=trap_pool_used=0;}
     fclose(f);
 }
 int AW_HingedDoorRow(unsigned reference){
@@ -194,6 +235,45 @@ int AW_HingedDoorOriginalLock(unsigned reference){
     k=lock_row(reference);
     return k && (k->flags&AW_HINGE_LOCKED)?(k->lock?k->lock:1):-1;
 }
+/* ---- Traps (TRAPS-WHEN-OPENED-63; rules read in OpenMW 0.53, not copied: mwclass/door.cpp and container.cpp
+ * activate, mwworld/actiontrap.cpp). A door or container whose reference names a trap spell (the T rows) casts it on
+ * the one who opens it: the use does not open it then, the spell lands on the player (the trap object is no actor:
+ * its Touch and Target effects on the player) and the trap is used up. The key that opens the lock disarms it. A
+ * used-up or disarmed trap is the named fact "amiwind:trap:<reference>" = 1 (aw_state.h: saved with the world change
+ * list, cleared by New Game). Cost: a binary search of at most 768 rows per use; nothing per frame. */
+int (*aw_trap_cast)(const char *spell);   /* aw_mwhost.c: the spell's ASPT row cast on the player; 1 landed */
+static const hd_trap_t *trap_row(unsigned reference){
+    int low=0,high,mid;
+    load();high=trap_count-1;
+    while(low<=high){
+        mid=(low+high)/2;
+        if(traps[mid].ref==reference)return &traps[mid];
+        if(traps[mid].ref<reference)low=mid+1;else high=mid-1;
+    }
+    return NULL;
+}
+static void trap_fact(unsigned reference,char *id,int size){snprintf(id,size,"amiwind:trap:%u",reference);}
+const char *AW_TrapSpell(unsigned reference){
+    const hd_trap_t *t=trap_row(reference);char id[32];
+    if(!t)return NULL;
+    trap_fact(reference,id,sizeof(id));
+    return AW_StateGet(&aw_state,AW_GLOBAL,id)?NULL:trap_pool+trap_spell[t->spell];
+}
+void AW_TrapDisarm(unsigned reference){
+    char id[32];
+    if(!AW_TrapSpell(reference))return;
+    trap_fact(reference,id,sizeof(id));AW_StateSet(&aw_state,AW_GLOBAL,id,1);traps_disarmed++;
+}
+int AW_TrapSpring(unsigned reference){
+    const char *spell=AW_TrapSpell(reference);char id[32];
+    if(!spell)return 0;
+    trap_fact(reference,id,sizeof(id));AW_StateSet(&aw_state,AW_GLOBAL,id,1);
+    if(aw_trap_cast && aw_trap_cast(spell))traps_sprung++;else traps_missed++;
+    return 1;
+}
+void AW_TrapCounts(unsigned long out[4]){
+    load();out[0]=(unsigned long)trap_count;out[1]=traps_sprung;out[2]=traps_disarmed;out[3]=traps_missed;
+}
 /* The locked door's way through (OpenMW apps/openmw/mwclass/door.cpp Door::activate, rule read, not copied): the
  * player who carries the door's key opens it ("<key> used to open lock", GMST sKeyUsed); else, in god mode (dbg god),
  * the player goes through and the message box says so (the maintainer, 25 October 2026: "it should throw a
@@ -208,6 +288,7 @@ static int lock_pass(unsigned reference){
         AW_UISubtitle("",text,3);
         /* the key unlocks it for good (OpenMW 0.51 door.cpp: the reference is unlocked, its level kept for a Lock) */
         if(aw_object_lock)aw_object_lock(reference,0,0);
+        AW_TrapDisarm(reference);   /* and disarms its trap (OpenMW 0.53 door.cpp: "using a key disarms the trap") */
         return 1;
     }
     p=sv.active && svs.clients?svs.clients[0].edict:NULL;
@@ -221,11 +302,12 @@ int AW_HingedDoorLoadLock(unsigned reference,int use){
     int level=AW_HingedDoorOriginalLock(reference);
     if(level<0)level=0;
     if(aw_object_lock_level)level=aw_object_lock_level(reference,level);
-    if(level<=0 || !door_locks)return 0;
-    if(!use)return 1;
-    if(lock_pass(reference))return 0;
-    AW_HingedDoorLockedSound();
-    return 1;
+    if(level>0 && door_locks){
+        if(!use)return 1;
+        if(!lock_pass(reference)){AW_HingedDoorLockedSound();return 1;}
+    }else if(!use)return 0;
+    /* a trapped load door springs its trap instead of taking the player through (TRAPS-WHEN-OPENED-63) */
+    return AW_TrapSpring(reference);
 }
 static int sound_entity(const hd_door_t *d){return d->edict?d->edict:MAX_EDICTS+(int)(d-placed);}
 static void play(hd_door_t *d,int sample){
@@ -350,6 +432,8 @@ static int use_door(hd_door_t *d,int force){
     if(!force && locked(d) && (story(d->ref,AW_HINGE_STORY_LOCK)>=0 || !lock_pass(d->ref))){
         play(d,locked_sound);story(d->ref,AW_HINGE_STORY_REFUSED);return 1;
     }
+    /* a trapped door springs its trap instead of opening (TRAPS-WHEN-OPENED-63; a script's own Activate as well) */
+    if(!force && !d->dir && d->amount<=0 && AW_TrapSpring(d->ref))return 1;
     if(!d->dir){d->dir=d->amount>0?-1:1;moving++;}
     else d->dir=(signed char)-d->dir;
     d->held=0;
@@ -458,6 +542,13 @@ int AW_MoverShift(unsigned reference,const float *d){
     relink=m->since>=AW_MOVER_RELINK;if(relink)m->since=0;
     mover_place(m,d,relink);
     return 1;
+}
+/* WORLD-BUTTONS-62 round two: where mover REFERENCE stands now (its loaded placement, map units); 1 found */
+int AW_MoverOrigin(unsigned reference,float *out){
+    int i;
+    if((i=mover_find(reference))<0)return 0;
+    if(movers[i].since<0)movers_pending();
+    return movers[i].pid && aw_chim_place_origin?aw_chim_place_origin(movers[i].pid,out):0;
 }
 int AW_MoverAtStart(unsigned reference){
     int i;hd_mover_t *m;vec3_t back,unturn;
@@ -699,4 +790,5 @@ void AW_HingedDoorInit(void){
     aw_hinged_tick=AW_HingedDoorTick;aw_hinged_map_begin=AW_HingedDoorMapBegin;aw_hinged_protect=AW_HingedDoorProtect;
     aw_hinged_locked_sound=AW_HingedDoorLockedSound;
     aw_load_door_lock=AW_HingedDoorLoadLock;
+    aw_trap_spring=AW_TrapSpring;   /* the containers' traps (aw_inventory.c container_open) */
 }

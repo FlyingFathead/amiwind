@@ -2,10 +2,12 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 2 times; something has to be done
+## PERSISTING: reported 4 times; something has to be done
 
 - Reported with v0.0.63-dev3 at 2026-11-09 16:11 +0200: In game on v0.0.63-dev3: the breath meter falls (13.8, 5.7, 0.0 of 20 s) and drowning takes the health to 0, but an Argonian player shows Water Breathing 0 and loses breath under water; the race ability is not applied.
 - Reported with v0.0.63-dev5 at 2026-11-09 20:25 +0200: With the fix in the build: the player set to Argonian (the race change reported the race as already Argonian) under the sea south of Seyda Neen: dbg breath showed 9.7 of 20 s left, head under water, Water Breathing 0; the player then drowned. The race's Water Breathing is still not applied.
+- Reported with v0.0.63 at 2026-11-10 02:34 +0200: Seen again on the v0.0.63 release image: an Argonian character has Water Breathing 0 at the start, after a save and load and after a teleport, and drowns in the Seyda Neen bay; the v0.0.63 fix does not take effect there.
+- Reported with v0.0.64-dev1 at 2026-11-10 06:01 +0200: Seen again in the v0.0.64-dev1 in-game check: for an Argonian quick character player->getspell "argonian breathing" answers 0, although dbg cast spell lists 68 Water Breathing; under water in the Seyda Neen bay the breath runs out and the character drowns.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -34,7 +36,7 @@ _Last updated with AmiWind v0.0.63 (9 November 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [PERSISTING: reported 4 times; something has to be done](#persisting-reported-4-times-something-has-to-be-done)
 - [Status: 9 November 2026](#status-9-november-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -180,6 +182,8 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [ENGINE-QC-ARGS-SYSERROR-35](ENGINE-QC-ARGS-SYSERROR-35.md): Bad QuakeC sound arguments stopped the program; lightstyle had no range check
 - [EQUIP-ACTION-REGRESSION-62](EQUIP-ACTION-REGRESSION-62.md): Some weapons, armour and clothing show no Equip action in the inventory (the census office dagger reads "Actions unavailable for this item")
 - EQUIP-SHARDAXE-REFUSED-61 (no report page): Equipping the iron shardaxe is refused while the iron longsword can be equipped
+- FACTION-EXPEL-MESSAGE-64 (no report page): An expulsion from a faction shows no message to the player
+- FACTION-STATS-PAGE-64 (no report page): The stats page shows no factions, ranks, reputation or bounty
 - [FALL-LANDING-KNOCKDOWN-62](FALL-LANDING-KNOCKDOWN-62.md): A hard landing does not knock the player or an actor down, and an NPC's landing plays no landing sound
 - [GODMODE-COMBAT-DAMAGE-61](GODMODE-COMBAT-DAMAGE-61.md): With god mode on, a fight's blows still take the player's health and kill the player
 - GODMODE-LAVA-DEATH-62 (no report page): The player can die in a lava pool with god mode on
@@ -190,7 +194,9 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - INVENTORY-ITEM-MODEL-PATH-59 (no report page): The inventory catalogue refuses every item whose world model comes from the item model table (progs/items/)
 - [INVENTORY-OPEN-COST-MANY-KINDS-61](INVENTORY-OPEN-COST-MANY-KINDS-61.md): With hundreds of kinds of item the inventory takes seconds to open, and every Tab reads the item file again
 - JOURNAL-BOOK-32-QUESTS-59 (no report page): The journal book lists only the quests of the old 32-slot table, although every quest's stage is now kept
+- LAVA-NO-DAMAGE-63 (no report page): Lava does no damage and is not drawn in the Red Mountain lava pool
 - [LOADED-ITEMS-NOT-WEIGHED-61](LOADED-ITEMS-NOT-WEIGHED-61.md): After loading a save of another character the carried weight reads 0 until the next place load
+- MARKS-SUMMON-CARRIERS-NOT-LIVE-63 (no report page): The guarded items whose taking summons a guardian are not live references, so the summon never comes
 - MWSCRIPT-CELLCHANGED-VOLATILE-54 (no report page): CellChanged made the sound-marker scripts volatile: 85 percent of Vivec's per-frame script work
 - MWSCRIPT-CONSOLE-LOCAL-NAMES-63 (no report page): Show and ShowVars cannot name a script's local variables: Show reads globals only, ShowVars lists the locals by slot number, and ToggleScripts flips the saved scripts switch
 - MWSCRIPT-DATA-UNKNOWN-NAMES-48 (no report page): Four Bloodmoon scripts read names declared nowhere in the game data and do not compile
@@ -231,6 +237,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [PLAYER-START-SPELLS-NOT-KNOWN-61](PLAYER-START-SPELLS-NOT-KNOWN-61.md): Character creation never puts the race, birthsign and class spells and abilities on the player record, so they cannot be cast or apply
 - PLAYER-WALK-SPEED-SLOW-51 (no report page): The starting walk speed feels very slow; check it against the original and OpenMW
 - [QC-AW-FLAME-SPAWN-32](QC-AW-FLAME-SPAWN-32.md): Every aw_flame entity prints load errors: the game logic has no aw_flame spawn function or aw_flame_size/aw_flame_shape fields
+- RACE-RESIST-NOT-ON-SPELL-DAMAGE-64 (no report page): A race ability that resists an element does not reduce spell damage of that element
 - RENDER-METADATA-29 (no report page): Native renderer metadata warns as an unknown QuakeC field
 - RESIST-NORMAL-WEAPONS-61 (no report page): Ghosts and other creatures that resist normal weapons take full damage from ordinary weapons, with no "no effect" message
 - REST-CENSUS-NO-CELL-ID-61 (no report page): The rest window offers Rest in the Census and Excise Office, a cell the game marks as no sleeping
@@ -250,6 +257,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - SERVICE-REFUSAL-UNCLOTHED-60 (no report page): Arrille refuses to barter at disposition 80 (player without clothes)
 - SKILL-BOOKS-MISSING-62 (no report page): Reading a skill book does not raise its skill: the original raises it by one on the first read
 - SKILL-RAISE-NOT-SEEN-62 (no report page): In a playtest of v0.0.61 no skill was ever seen to rise: no skill-increased line and no sound in normal play
+- SPELL-EFFECTS-TABLE-CUT-64 (no report page): Game spells cast nothing: the actor table read only the first 32 sections of the compiled scripts file
 - STEAL-WITNESSED-NO-CRIME-60 (no report page): Taking an owned item in full view of its owner or other people has no consequence
 - SWEEP-ARENA-PIT-TWO-FAIL-54 (no report page): dbg sweep reports two failing entities in the Vivec Arena Pit (map vai000) in every session of the Arena Pit images
 - TAKEN-LIGHT-FLAME-STAYS-60 (no report page): Picking up a lit candle leaves its flame floating where it stood

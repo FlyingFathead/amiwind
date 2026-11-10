@@ -291,7 +291,9 @@ int COM_FOpenFile(char *name,FILE **f){
 #endif
  *f=tmpfile();assert(*f);fputs(s,*f);rewind(*f);return strlen(s);
 }
-void Con_Printf(char *fmt,...){if(!strcmp(fmt,"%ld: %s [%s]\n"))picker_list_rows++;}
+static int door_arrival_lines;   /* DBG-TP-DOORLIST-NO-ARRIVAL-LINE-63: "ROOM: at its door's arrival X Y Z." */
+void Con_Printf(char *fmt,...){if(!strcmp(fmt,"%ld: %s [%s]\n"))picker_list_rows++;
+ if(!strcmp(fmt,"%s: at its door's arrival %ld %ld %ld.\n"))door_arrival_lines++;}
 void Sys_Error(char *fmt,...){abort();}
 void Cbuf_AddText(char *s){strcpy(queued,s);}
 void Cbuf_InsertText(char *s){strcpy(queued,s);}
@@ -491,9 +493,14 @@ int main(void){
  command_args[1]="missing";teleport();assert(!queued[0]);
  command_argc=3;command_args[1]="seydaneen";command_args[2]="extra";teleport();assert(!queued[0]);
  command_argc=2;command_args[1]="census";strcpy(sv.name,"balmora");
+ door_arrival_lines=0;
  scene();assert(!strcmp(queued,"map census\n")); /* Destination catalogue, not Balmora's empty links. */
+ assert(door_arrival_lines==1);   /* a room through a door list says its arrival, as a room start does */
+ /* GODMODE-LAVA-DEATH-62 round three: god mode is put back on the fresh player edict of a map change */
+ p.v.flags=0;aw_godmode_kept=1;
  strcpy(sv.name,"census");AW_SceneSpawn(&p);assert(p.v.origin[0]==12 && p.v.origin[1]==34);
- command_args[1]="bmcaius";scene();assert(!strcmp(queued,"map bmcaius\n"));
+ assert((int)p.v.flags&FL_GODMODE);aw_godmode_kept=0;p.v.flags=0;
+ command_args[1]="bmcaius";scene();assert(!strcmp(queued,"map bmcaius\n"));assert(door_arrival_lines==2);
  strcpy(sv.name,"bmcaius");AW_SceneSpawn(&p);assert(p.v.origin[0]==22 && p.v.origin[1]==44);
 #ifdef BALMORA_AVAILABLE
  command_args[1]="BaLmOrA";teleport();assert(!strcmp(queued,"map balmora\n"));

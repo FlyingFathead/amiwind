@@ -1,6 +1,6 @@
 # Known inputs: which files did the builder get?
 
-_Last updated with AmiWind v0.0.63-dev5 (2026-11-09)._
+_Last updated with AmiWind v0.0.63 (2026-11-10)._
 
 <!-- contents start -->
 ## Contents
@@ -101,8 +101,18 @@ Expansions:
 - `FOUND`: the master and its archive are there and usable.
 - `PARTLY FOUND` (a warning line): the master is there, its archive is not.
 - `NOT FOUND` (a warning line): no usable master; the expansion is left out.
-- `LEFT OUT by --no-dlc`: kept for the planned option that builds without the
-  expansions (DLC-BUILD-LATER); the option itself does not exist yet.
+- `LEFT OUT by --no-dlc`: the build was asked for no expansion (`--no-dlc`,
+  `--no-dlcs` or `--dlc none`).
+- `LEFT OUT by --dlc`: the build was asked for the other expansion only
+  (`--dlc tribunal` or `--dlc bloodmoon`).
+
+Which expansions a build uses: `--dlc tribunal|bloodmoon|both|none`, or `--no-dlc`
+(the same as `--dlc none`). The default is every expansion found. The chosen set is
+printed as `Expansion layers: ...` and kept as `expansion_layers` in
+`build-state.json` and the master builder's result (DLC-BUILD-LATER). The base world's
+stage keys depend on neither the choice nor which expansion files are present: each
+stage is keyed only by the game files it reads, `Morrowind.esm`, `Morrowind.bsa` and
+the loose files for every stage today (BUILD-GAME-INPUT-KEY-BROAD-64).
 
 The counts come only from what the build already has at hand, so the block costs
 milliseconds: the record count in the master's header and the archive's file count

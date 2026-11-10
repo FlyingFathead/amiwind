@@ -22,6 +22,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "quakedef.h"
 #include "r_local.h"
 #include "aw_rcount.h"
+#include "d_fence.h"
 
 //
 // current entity info
@@ -434,6 +435,33 @@ static int R_FarFaceSkipped (model_t *pmodel, msurface_t *psurf)
 
 /*
 ================
+R_FenceDivert
+
+A see-through face (texture name prefix '{', d_fence.c) goes to the fence list
+instead of the edge list: 1 = listed. The texture test runs once per face
+(SURF_FENCEKNOWN); with aw_fence 0 or a full list R_FenceAdd refuses and the
+face is drawn solid as before.
+================
+*/
+/* d_fence.c sets it (D_FenceInit) to R_FenceAdd; host tests of this file link without it */
+int (*r_fence_add) (msurface_t *surf, entity_t *ent);
+
+static int R_FenceDivert (msurface_t *psurf)
+{
+	if (!(psurf->flags & SURF_FENCEKNOWN))
+	{
+		psurf->flags |= SURF_FENCEKNOWN;
+		if (psurf->texinfo && psurf->texinfo->texture &&
+			psurf->texinfo->texture->name[0] == AW_FENCE_TEXTURE_PREFIX &&
+			!(psurf->flags & (SURF_DRAWSKY|SURF_DRAWTURB)))
+			psurf->flags |= SURF_DRAWFENCE;
+	}
+	return (psurf->flags & SURF_DRAWFENCE) && r_fence_add && r_fence_add (psurf, currententity);
+}
+
+
+/*
+================
 R_DrawSolidClippedSubmodelPolygons
 ================
 */
@@ -468,6 +496,8 @@ void R_DrawSolidClippedSubmodelPolygo (model_t *pmodel)
 		{
 			AW_RC(RC_BF_FRONT);
 			if (aw_far_faces && R_FarFaceSkipped (pmodel, psurf))
+				continue;
+			if (R_FenceDivert (psurf))
 				continue;
 			AW_RC(RC_CLIP_FACES);
 		// FIXME: use bounding-box-based frustum clipping info?
@@ -559,6 +589,8 @@ void R_DrawSubmodelPolygons (model_t *pmodel, int clipflags)
 		{
 			AW_RC(RC_BF_FRONT);
 			if (aw_far_faces && R_FarFaceSkipped (pmodel, psurf))
+				continue;
+			if (R_FenceDivert (psurf))
 				continue;
 			AW_RC(RC_LEAF_FACES);
 			r_currentkey = ((mleaf_t *)currententity->topnode)->key;
@@ -726,7 +758,7 @@ void R_RecursiveWorldNode (mnode_t *node, int clipflags)
 								R_RenderPoly (surf, clipflags);
 							}
 						}
-						else
+						else if (!R_FenceDivert (surf))
 						{
 							AW_RC(RC_WORLD_FACES);
 							R_RenderFace (surf, clipflags);
@@ -760,7 +792,7 @@ void R_RecursiveWorldNode (mnode_t *node, int clipflags)
 								R_RenderPoly (surf, clipflags);
 							}
 						}
-						else
+						else if (!R_FenceDivert (surf))
 						{
 							AW_RC(RC_WORLD_FACES);
 							R_RenderFace (surf, clipflags);

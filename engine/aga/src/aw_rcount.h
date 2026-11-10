@@ -41,6 +41,9 @@ enum {
     RC_FAR_FOG_FACES,   /* front faces it left out */
     RC_FAR_SIZE,        /* passes the size-scaled cut-off left out (aw_cull 3, 4, 6) */
     RC_FAR_DETAIL,      /* front faces the far detail step left out (aw_cull 5, 6) */
+    RC_FENCE_FACES,     /* see-through faces drawn by the fence pass (d_fence.c, aw_fence 1) */
+    RC_FENCE_VISITED,   /* ... texels visited */
+    RC_FENCE_WRITTEN,   /* ... texels written (not transparent, nearer than the z buffer) */
     RC_COUNTERS
 };
 /* RT_SKY: the background sky spans (D_DrawBackground, inside RT_DRAW); RT_FOG: the fog
@@ -49,7 +52,8 @@ enum {
  * (SKEL-RUNTIME-COST-52); the line's "kp" field, with the poses made and drawn from the pose cache. */
 /* RT_HANDS: the first-person view model (R_DrawViewModel: the hands, a torch, a shield or a weapon), inside RT_VIEW;
  * the line's "hd" field (PLAYER-GEAR-VISUAL-59: the hand cost measured before and after any first-person change). */
-enum { RT_WORLD, RT_BMODELS, RT_SCAN, RT_DRAW, RT_ALIAS, RT_VIEW, RT_SKY, RT_FOG, RT_SKELPOSE, RT_SKELVERTS, RT_HANDS, RT_TIMERS };
+enum { RT_WORLD, RT_BMODELS, RT_SCAN, RT_DRAW, RT_ALIAS, RT_VIEW, RT_SKY, RT_FOG, RT_SKELPOSE, RT_SKELVERTS, RT_HANDS, RT_FENCE, RT_TIMERS };
+/* RT_FENCE: the see-through face pass (D_DrawFences), the line's "fn" field with its three counters. */
 
 #ifdef AMIGA
 extern long aw_rcount[RC_COUNTERS];

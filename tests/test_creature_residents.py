@@ -118,6 +118,22 @@ class IdleRange(unittest.TestCase):
             cr.idle_range(self.skeleton({'walkforward: start': 0.}), None)
 
 
+class EffectShapes(unittest.TestCase):
+    """HEART-OF-LORKHAN-LOOK-62: shapes an opaque skin cannot draw are left out of the resident model."""
+
+    def test_material_alpha_zero_is_left_out(self):
+        self.assertIn('alpha 0', cr.effect_shape({'alpha': 0.0, 'source_shape': 'Tri large rays'}))
+
+    def test_translucent_scrolling_shell_is_left_out(self):
+        self.assertIn('scrolling', cr.effect_shape({'alpha': 0.6, 'uv_scroll': {'u': [[0, 0], [1, 1]]}}))
+
+    def test_translucent_body_without_scroll_is_kept(self):
+        # the ancestor ghosts (0.45), the dwarven specters (0.9) and the netches stay drawn
+        self.assertIsNone(cr.effect_shape({'alpha': 0.45}))
+        self.assertIsNone(cr.effect_shape({'alpha': 1.0, 'uv_scroll': {'u': [[0, 0], [1, 1]]}}))
+        self.assertIsNone(cr.effect_shape({}))
+
+
 class Wiring(unittest.TestCase):
     def test_resident_stage_lists_left_out_references_and_places_creatures(self):
         text = (ROOT / 'tools/prepare_area.py').read_text()

@@ -1228,8 +1228,14 @@ static int stream_cross(edict_t *p,aw_scene_link_t *r){
         moved?", recentred":"",(long)cx,(long)cy,(long)((Sys_FloatTime()-t0)*1e6));
     return 1;
 }
+/* GODMODE-LAVA-DEATH-62 round three (the v0.0.64-dev1 check: tgm, then dbg tp into the Red Mountain lava pool, and
+ * the player died): a map change spawns a fresh player edict whose flags the game code sets, so god mode was lost on
+ * every teleport, door and load. The switch is kept here (Host_God_f sets it) and put back on each spawn; New Game
+ * clears it (aw_debug.c registers the reset). Not saved, as before. */
+int aw_godmode_kept;
 void AW_SceneSpawn(edict_t *p) {
     int placed=0;float eye;
+    if(aw_godmode_kept)p->v.flags=(float)((int)p->v.flags|FL_GODMODE);
     area_last_ok=0;frame_last_ok=0;frame_refused[0]=frame_mark_map[0]=0;
     logical_map[0]=0;VectorCopy(vec3_origin,logical_offset);logical_used=0;
     /* Quake's stuck recovery returns to oldorigin, which a fresh client edict
@@ -1285,6 +1291,10 @@ void AW_SceneSpawn(edict_t *p) {
         memset(&hand_snapshot,0,sizeof(hand_snapshot));
         Con_Printf("Scene ready: %s, %ld ms, %ld hunk bytes, arrival %s\n",sv.name,
             (long)((Sys_FloatTime()-started)*1000),(long)(Hunk_LowMark()+Hunk_HighMark()),placed?"checked":"blocked");
+#ifdef AMIGA
+        /* CHIM-SEYDA-BALMORA-LOAD-HANG-43: the memory line at Scene ready (E6) and the load trace's dump (when on) */
+        {extern void AW_LoadTraceSceneReady(const char *);AW_HeapAuditPhase(sv.name,"scene-ready");AW_LoadTraceSceneReady("scene ready");}
+#endif
         AW_MusicSceneEvent("scene-enter");pending=0;AW_StreamTransitionReady();
         load_recovered(p);load_from.valid=0;
         if(aw_scene_followers)aw_scene_followers(p,0);    /* the followers that came along arrive beside the player */
@@ -1414,6 +1424,13 @@ static int named_place(const char *name,aw_scene_link_t *r) {
     fclose(f);return found;
 }
 static int roulette_room(const char *name,aw_scene_link_t *r,char *title,int size,long *cell);
+/* DBG-TP-DOORLIST-NO-ARRIVAL-LINE-63: a room reached through a town's door list says where the player arrives, as
+ * the room-start path below does (its title from the map's header, else the map name) */
+static void door_list_arrival(const char *s,const aw_scene_link_t *l) {
+    aw_scene_link_t t;char title[96];long cell;
+    if(!roulette_room(s,&t,title,sizeof(title),&cell))copy_name(title,sizeof(title),s);
+    Con_Printf("%s: at its door's arrival %ld %ld %ld.\n",title,(long)l->arrival[0],(long)l->arrival[1],(long)l->arrival[2]);
+}
 static void scene_command(void) {
     aw_scene_link_t r;const char *s=Cmd_Argv(1);char path[40];int i,size;
     if(!Q_strcasecmp((char *)s,"seydaneen") || !Q_strcasecmp((char *)s,"seyda") ||
@@ -1482,9 +1499,9 @@ static void scene_command(void) {
          * Debug arrival uses the inspected registration entrance from the pier. */
         if(!strcmp(s,"census"))for(i=0;i<count;i++)
             if(links[i].reference==113893 && !strcmp(links[i].target,s)){
-                load_scene(&links[i],1);return;
+                door_list_arrival(s,&links[i]);load_scene(&links[i],1);return;
             }
-        for(i=0;i<count;i++)if(!strcmp(links[i].target,s)){load_scene(&links[i],1);return;}
+        for(i=0;i<count;i++)if(!strcmp(links[i].target,s)){door_list_arrival(s,&links[i]);load_scene(&links[i],1);return;}
         /* No door of that bank leads in (a room entered from a region frame, another town or a cell with no frame,
          * CONSOLE-TP-ROOM-NAME-63, DEBUG-TP-ROOM-ENTRANCE-50): the room's own start, which the builder puts at the
          * first original door's arrival (tools/chim_room_batches.py, prepare_area.spawn_entrance), the place a

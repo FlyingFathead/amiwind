@@ -877,7 +877,8 @@ class NativeSourceTests(unittest.TestCase):
         # AW-20260928-12: ordinary hinged doors on the engine's own collision (world.c), 90 degrees in one second.
         self.compile_run("aga_hinged_door_test.c", [ROOT/"engine/aga/src/aw_hinged_door.c", Path(SOURCE)/"src/world.c",
                                                     Path(SOURCE)/"src/mathlib.c"],
-                         argument_sets=[["table"], ["badtable"], ["door"], ["chim"], ["census"], ["locks"], ["kept"], ["movers"], ["turns"]],
+                         argument_sets=[["table"], ["badtable"], ["door"], ["chim"], ["census"], ["locks"], ["kept"], ["movers"], ["turns"],
+                                        ["traps"]],
                          cflags=["-fsanitize=undefined", "-fno-sanitize-recover=all"])
 
     def test_talk_rule_combat_dead_knocked_calm_and_one_read_a_frame(self):
@@ -977,6 +978,13 @@ class NativeSourceTests(unittest.TestCase):
         self.compile_run('aga_town_table_test.c', [Path(SOURCE)/'src/aw_region.c'],
             cflags=['-Wall', '-Wno-unused-function', '-Werror', '-fsanitize=undefined', '-fno-sanitize-recover=all'],
             argument_sets=[(), ('prefix',), ('distance',)])
+
+    def test_expansion_room_ids_have_their_own_bases(self):
+        # BUILD-EXPANSIONS-31: Tribunal and Bloodmoon rooms take save IDs from their own 4096-ID bases; the shipped
+        # empty lists and a two-room list both resolve, and an unnamed ID in a layer's range says what it needs
+        flags = ['-Wall', '-Wno-unused-function', '-Werror', '-fsanitize=undefined', '-fno-sanitize-recover=all']
+        self.compile_run('aga_layer_rooms_test.c', [], cflags=flags)
+        self.compile_run('aga_layer_rooms_test.c', [], ['AW_LAYER_TEST_TWO'], cflags=flags)
 
     def test_strider_available_destination_and_return(self):
         self.compile_run('aga_scene_test.c', [Path(SOURCE)/'src'/n for n in

@@ -1,6 +1,6 @@
 # FS-UAE development access
 
-_Last updated with AmiWind v0.0.36 (11 October 2026)._
+_Last updated with AmiWind v0.0.64-dev1 (10 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -68,6 +68,19 @@ Any other line is a comment. The run passes if the game survives the whole scrip
 Every engine gate runs it on the engine it has just built. It would have stopped the v0.0.36-dev3 playtest, whose
 engine corrupted memory on every music read and made the emulator exit a few seconds after a map load
 ([CHIM-DEV3-MAPLOAD-CRASH-36](bugs/CHIM-DEV3-MAPLOAD-CRASH-36.md)).
+
+Two options separate the causes of the intermittent load stop
+([CHIM-SEYDA-BALMORA-LOAD-HANG-43](bugs/CHIM-SEYDA-BALMORA-LOAD-HANG-43.md)). `--remote off` runs the smoke without
+the remote-console folder, as in a player's game: the play copy's autoexec turns the debug HUD on and drives the
+route itself (`map seyda`, then `dbg tp` into Balmora and back, a fixed number of frames apart), and the run is judged
+by a screenshot every 10 s. The HUD clock and frame counter change every few seconds in play, so the same picture for
+150 s is a stop; it is examined with the emulator's monitor like any other stop. `--emu-option KEY=VALUE` (for example
+`deterministic=1`, which runs the emulated file systems in step with the emulated machine) adds a line to the
+emulator's configuration; the run fails if the emulator's start-up log does not show that it took the option. Keys the
+smoke sets itself (memory, disks, Kickstart, processor, JIT) are refused. `--alternate remote` or `--alternate emu`
+with `--runs N` runs N rounds of the two variants in turn (remote console on, then off; or without, then with the
+extra lines) and writes the counts of passes, stops and other failures to `counts.tsv`. All runs use 32 MB of Fast
+RAM and the IDE port, as the plain smoke does.
 
 ## Which interface does what?
 

@@ -105,6 +105,9 @@ void AW_StreamTransitionReady(void) {if(transition_pending)transition_ready=1;}
 void AW_StreamPresented(void) {
     if(heap_first_present && cls.state==ca_connected && cls.signon==SIGNONS && cl.worldmodel){
         AW_HeapAuditPhase(cl.worldmodel->name,"first-presented");heap_first_present=0;
+#ifdef AMIGA
+        {extern void AW_LoadTraceSceneReady(const char *);AW_LoadTraceSceneReady("first presented");}   /* a load without Scene ready (map) */
+#endif
     }
     if(!transition_pending || !transition_ready || cls.state!=ca_connected || cls.signon!=SIGNONS || !cl.worldmodel)return;
     {AW_LogPrintf(AW_LOG_CELL_VISIBLE,"%s\t%d\t%.6f\t%lu\t%.2f\n",cl.worldmodel->name,AW_CellChangeMethod(),

@@ -114,11 +114,30 @@ def tracked(values, path):
     return TrackedSet(values, name(path))
 
 
-def _views(table):
-    """(format text, {mesh: decision}) of a table as it is on disk now (cached by its bytes' SHA-256)."""
+def _base_text(table, text):
+    """TEXT of a layer-row table (build_cache.LAYER_ROW_TABLES) without the rows of every expansion layer it names:
+    the table as it was before those rows (NPC-LIBRARY-NO-UNIT-CACHE-63); TEXT itself for any other table."""
+    from build_cache import LAYER_ROW_TABLES, layer_table_view
+    spec = LAYER_ROW_TABLES.get(name(_path(table)))
+    if spec is None:
+        return text
+    try:
+        layers = json.loads(text).get('layers')
+    except ValueError:
+        return text
+    if not isinstance(layers, dict) or not layers:
+        return text
+    return layer_table_view(text, set(layers), *spec)
+
+
+def _views(table, base=False):
+    """(format text, {mesh: decision}) of a table as it is on disk now (cached by its bytes' SHA-256); BASE: without
+    its expansion layers' rows (_base_text)."""
     raw = _path(table).read_bytes()
+    if base:
+        raw = _base_text(table, raw.decode('utf-8')).encode('utf-8')
     digest = hashlib.sha256(raw).hexdigest()
-    known = _VIEWS.get(table)
+    known = _VIEWS.get((table, base))
     if known is not None and known[0] == digest:
         return known[1]
     data = json.loads(raw.decode('utf-8'))
@@ -136,12 +155,12 @@ def _views(table):
     for mesh in (data.get('known_over_step') or {}):
         add(mesh, 'known', True)
     result = (head, {mesh: json.dumps(view, sort_keys=True) for mesh, view in views.items()})
-    _VIEWS[table] = (digest, result)
+    _VIEWS[(table, base)] = (digest, result)
     return result
 
 
-def _decision(table, mesh):
-    head, views = _views(table)
+def _decision(table, mesh, base=False):
+    head, views = _views(table, base)
     if mesh == WHOLE:
         value = [head, sorted(views.items())]
     else:
@@ -169,13 +188,19 @@ def whole_rows(tables=TABLES):
 
 
 def matches(record):
-    """True when every decision RECORD (rows()) names is the same in the tables now."""
+    """True when every decision RECORD (rows()) names is the same in the tables now. A whole-table row ('*') also
+    matches the table without its expansion layers' rows (build_cache.LAYER_ROW_TABLES): an entry recorded before a
+    layer's rows were added read only the base rows, and those are unchanged (NPC-LIBRARY-NO-UNIT-CACHE-63: the
+    Bloodmoon rows of the hull-surface table missed all 418 NPC appearances and the creature models, whose bakes
+    never read them). A base row changed still misses; a mesh row is compared as it is."""
     if not record:
         return True
     try:
         for table, meshes in record.items():
             for mesh, digest in meshes.items():
-                if digest is None or _decision(table, mesh) != digest:
+                if digest is None:
+                    return False
+                if _decision(table, mesh) != digest and (mesh != WHOLE or _decision(table, mesh, True) != digest):
                     return False
     except (OSError, ValueError, AttributeError, TypeError):
         return False

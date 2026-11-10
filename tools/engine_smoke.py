@@ -66,9 +66,6 @@ kickstart_file = /roms/$KICK
 hard_drive_0 = /w/play-boot.hdf
 hard_drive_0_type = hdf
 hard_drive_0_controller = ide0
-hard_drive_2 = $R/awctl
-hard_drive_2_label = AWCTL
-hard_drive_2_priority = -128
 joystick_port_1 = none
 floppy_drive_volume = 0
 fullscreen = 0
@@ -81,6 +78,9 @@ modifier_key = key_lalt
 screenshots_output_dir = $R/shots
 base_dir = $R/home
 CFG
+# REMOTE=0 (--remote off, experiment E2 of CHIM-SEYDA-BALMORA-LOAD-HANG-43): no remote-console folder (AWCTL) at all,
+# as in a player's game; the route then runs from the play copy's autoexec and is judged by screenshots
+[ "${REMOTE:-1}" = 0 ] || printf 'hard_drive_2 = %s\nhard_drive_2_label = AWCTL\nhard_drive_2_priority = -128\n' "$R/awctl" >> $R/smoke.fs-uae
 if [ -n "${WORLD:-}" ]; then
   printf 'hard_drive_1 = /img/%s\nhard_drive_1_type = hdf\nhard_drive_1_read_only = 1\nhard_drive_1_controller = ide1\n' "$WORLD" >> $R/smoke.fs-uae
 fi
@@ -89,6 +89,8 @@ if [ "$PROF" = interp ]; then printf 'jit_compiler = 0\nuae_cpu_speed = max\n' >
 else printf 'jit_compiler = 1\nuae_cpu_speed = max\n' >> $R/smoke.fs-uae; fi
 # ILLEGAL=1: FS-UAE logs the 68k PC of every access to unmapped memory (use with PROF interp; JOB_PREAMBLE 53)
 [ "${ILLEGAL:-0}" = 1 ] && printf 'uae_log_illegal_mem = 1\n' >> $R/smoke.fs-uae
+# --emu-option KEY=VALUE (experiment E3: e.g. deterministic=1): extra emulator lines, checked in the start-up log
+[ -s $R/emu-options.txt ] && cat $R/emu-options.txt >> $R/smoke.fs-uae
 export HOME=$R/home DISPLAY=:$N LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe SDL_AUDIODRIVER=dummy
 Xvfb :$N -screen 0 1024x768x24 -nolisten tcp > $R/logs/xvfb.log 2>&1 &
 XP=$!; sleep 2
@@ -146,7 +148,17 @@ reads(){ grep -o 'reads=[0-9]*' $R/awctl/console.log 2>/dev/null | tail -1 | cut
 zonefull(){ grep -c "CHIM: .*zone full" $R/awctl/console.log 2>/dev/null; }
 # finish RESULT: the first result stands; a finish reached inside $( ) (rc in status/advance) ends only that subshell,
 # so the outer script's own finish afterwards must not write a second result over it
-finish(){ [ -e $R/finished ] && exit 0; : > $R/finished; case "$1" in PASS*) b=$(st efrags_bad); [ -n "$b" ] && [ "$b" != 0 ] && set -- "FAIL efrag safety net used $b times (console: Efrag safety net)"
+# SMOKE-INPLAY-UNSAMPLED-63: every stop is examined (stall.py) before the run ends and before any retry, whichever
+# check stopped it; a stop that went through stall() already was examined there ($R/examined).
+# SMOKE-IDE-TRACE-LOG-63: the emulator package logs every IDE transfer (compiled in, about a million lines a run);
+# the kept logs drop those lines unless IDETRACE=1 (--ide-trace), and say how many went.
+idetrim(){ [ "${IDETRACE:-0}" = 1 ] && return 0; for f in "$@"; do [ -f "$f" ] || continue
+    n=$(grep -c -E '^IDE[0-9]* ' "$f" 2>/dev/null); grep -v -E '^IDE[0-9]* ' "$f" > "$f.trim" 2>/dev/null; mv "$f.trim" "$f"
+    log "ide trace: ${n:-0} lines left out of $(basename $f) (--ide-trace keeps them)"; done; }
+finish(){ [ -e $R/finished ] && exit 0; : > $R/finished
+  case "$1" in FAIL*) [ -e $R/examined ] || ! alive || { : > $R/examined
+      log "examined at the stop: $( (python3 $R/stall.py 5 || echo 'STALL unknown: stall check could not run') 2>/dev/null | tail -n 1)"; };; esac
+  [ "${REMOTE:-1}" = 0 ] || case "$1" in PASS*) b=$(st efrags_bad); [ -n "$b" ] && [ "$b" != 0 ] && set -- "FAIL efrag safety net used $b times (console: Efrag safety net)"
     z=$(zonefull); [ "${z:-0}" -gt 0 ] && [ "$FASTMB" -ge 32 ] && [ "${ZONEFULL:-fail}" != allow ] && case "$1" in PASS*)
       if grep -q 'CHIM cache off (skipped for this start)' $R/awctl/console.log 2>/dev/null; then
         set -- "FAIL CHIM zone full $z times at $FASTMB MB of Fast RAM, with the CHIM cache skipped for this start by a key the smoke sent onto the startup logo (SMOKE-M-KEY-SKIPS-CHIM-CACHE-57)"
@@ -155,7 +167,13 @@ finish(){ [ -e $R/finished ] && exit 0; : > $R/finished; case "$1" in PASS*) b=$
   recstop; cp $R/home/Cache/Logs/fs-uae.log.txt $R/logs/fs-uae.log.txt 2>/dev/null
   grep -E "Caught illegal|Fault address|Suspicious" $R/logs/fs-uae.log.txt 2>/dev/null | tail -12 > $R/logs/emulator-faults.txt
   cp $R/awctl/console.log $R/logs/console.log 2>/dev/null; alive && shot final
-  kill $FP 2>/dev/null; sleep 2; kill $XP 2>/dev/null; log "smoke RESULT $1"; exit 0; }
+  kill $FP 2>/dev/null; sleep 2; kill $XP 2>/dev/null; idetrim $R/logs/fs-uae.log.txt $R/logs/fsuae.log
+  rm -f $R/home/Cache/Logs/fs-uae.log.txt; log "smoke RESULT $1"; exit 0; }
+# emucheck: every --emu-option line must show in the emulator's start-up log (judge.py emucheck), else the run fails:
+# a count with an option the emulator never took would prove nothing
+emucheck(){ [ -s $R/emu-options.txt ] || return 0
+  v=$(python3 $R/judge.py emucheck $R/emu-options.txt $R/home/Cache/Logs/fs-uae.log.txt $R/logs/fsuae.log 2>&1 | tail -n 1); log "$v"
+  case "$v" in "EMUOPT ok"*) ;; *) finish "FAIL the emulator did not take its extra options: ${v#EMUOPT }";; esac; }
 # play S: S seconds of game time; the emulator must stay up and the game clock must move. A window open (screen not
 # "game": inventory, journal, rest, dialogue, ...) whose realtime stood still while the engine's ticks moved is long
 # work inside one frame, not a stall (LOAD-STALL-SESSIONS-59); with neither moving it is a stall as before.
@@ -188,11 +206,12 @@ play(){ r1=$(st realtime); t1=$(st ticks); s=0
 inplay(){ s=0; while [ $s -lt $((30*K)) ]; do alive || finish "FAIL emulator exited before $1 was in play"
     [ "$(st screen)" = game ] && [ "$(st signon)" = 4 ] && [ "$(st world_leafs)" -gt 0 ] 2>/dev/null && { log "in play: $1 (map $(st map), $(st world_leafs) leaves, local $(st local))"; return 0; }
     sleep 1; s=$((s+1)); done
-  finish "FAIL $1 is not in play: screen $(st screen), signon $(st signon), world leaves $(st world_leafs) (map $(st map))"; }
+  # SMOKE-INPLAY-UNSAMPLED-63: examined like a load that never finished (gate 9950's stop was not sampled)
+  stall "$1 is not in play: screen $(st screen), signon $(st signon), world leaves $(st world_leafs) (map $(st map))"; }
 # stall: a load that does not finish is examined with the FS-UAE monitor (stall.py): an emulator disk stall (the
 # processor idle, the game's file request taken by a handler and never answered, CHIM-SEYDA-BALMORA-LOAD-HANG-43)
 # is named as such; the launcher retries such a run once on a fresh play copy.
-stall(){ S=$( (python3 $R/stall.py 5 || echo 'STALL unknown: stall check could not run') 2>/dev/null | tail -n 1); log "$S"
+stall(){ : > $R/examined; S=$( (python3 $R/stall.py 5 || echo 'STALL unknown: stall check could not run') 2>/dev/null | tail -n 1); log "$S"
   case "$S" in "STALL emulator-disk"*) finish "FAIL emulator disk stall (CHIM-SEYDA-BALMORA-LOAD-HANG-43) $1: ${S#STALL emulator-disk: }";;
     "STALL busy"*) finish "FAIL long frame (busy) $1: ${S#STALL busy: }";; esac
   finish "FAIL $1 ($S)"; }
@@ -201,6 +220,27 @@ loaded(){ s=0; while [ $s -lt $((150*K)) ]; do alive || finish "FAIL emulator ex
   [ "$(st server)" = "$1" ] && return 0; sleep 1; s=$((s+1)); done; stall "$1 did not load (server $(st server))"; }
 t0=$(date +%s)
 sleep $((9*K))
+# ROUTE-OFF-BEGIN
+# REMOTE=0 (experiment E2, CHIM-SEYDA-BALMORA-LOAD-HANG-43): no remote console, nothing typed. The play copy's
+# autoexec turns the debug HUD on and runs the route itself (map MAP1, then dbg tp TP and map MAP1 in turn, a fixed
+# number of frames apart). A screenshot every SHOTEVERY s for ROUTESECS s; each is kept with its SHA-256 in
+# frames.txt. The HUD clock and frame counter change every few seconds in play, so the same picture for FROZEN s
+# (150, the smoke's own load limit) is a frozen clock: a stop, examined like any other (stall.py) and failed.
+if [ "${REMOTE:-1}" = 0 ]; then
+  log "remote console off: the route runs from the play copy's autoexec; a screenshot every ${SHOTEVERY:-10} s for ${ROUTESECS:-600} s, a stop = the same picture for ${FROZEN:-150} s"
+  : > $R/frames.txt; i=0; until_t=$(( $(date +%s) + ${ROUTESECS:-600}*K ))
+  while [ $(date +%s) -lt $until_t ]; do alive || finish "FAIL emulator exited on the route, remote console off ($(( $(date +%s) - t0 )) s)"
+    i=$((i+1)); f=$(printf 'route-%03d' $i); shot $f
+    [ -s $R/shots/$f.png ] && echo "$(( $(date +%s) - t0 )) $(sha256sum $R/shots/$f.png | cut -c1-64) $f" >> $R/frames.txt
+    [ $i = 1 ] && emucheck
+    v=$(python3 $R/judge.py live $R/frames.txt ${FROZEN:-150} 2>&1 | tail -n 1)
+    case "$v" in STOP*) stall "frozen clock on the route, remote console off: ${v#STOP }";; esac
+    sleep $((${SHOTEVERY:-10}*K)); done
+  v=$(python3 $R/judge.py final $R/frames.txt ${FROZEN:-150} 2>&1 | tail -n 1)
+  case "$v" in PASS*) finish "PASS remote console off, route ${v#PASS }";; STOP*) stall "frozen clock on the route, remote console off: ${v#STOP }";;
+    *) finish "FAIL remote console off, route ${v#* }";; esac
+fi
+# ROUTE-OFF-END
 # BOOT-WAIT-BEGIN
 n=0; while [ ! -s $R/awctl/state.txt ] && [ $n -lt $((${BOOT_WAIT:-300}*K)) ]; do
   # Escape first: the start-up logo takes every key, and its memory notice reads M as "not now" (the CHIM cache off
@@ -227,7 +267,7 @@ n=0; while [ ! -s $R/awctl/state.txt ] && [ $n -lt $((${BOOT_WAIT:-300}*K)) ]; d
 remote_up(){ i=0; while [ $i -lt 10 ]; do [ -s $R/awctl/state.txt ] && return 0; sleep 0.5; i=$((i+1)); done; return 1; }
 remote_up && for i in 1 2 3; do key Escape; sleep $((2*K)); done
 remote_up || finish "FAIL no remote control after boot ($(( $(date +%s) - t0 )) s; the play copy's autoexec turns it on, nothing is typed before it answers)"
-log "boot: remote up after $(( $(date +%s) - t0 )) s"; shot menu
+log "boot: remote up after $(( $(date +%s) - t0 )) s"; shot menu; emucheck
 if [ "${START:-map}" = enter ] || [ "${START:-map}" = auto ]; then  # a MiniWind image starts its own scene; Enter through its quick character pages
   [ "${START:-map}" = auto ] || key Return
   # MAP1 any: the map the image starts on, whichever it is (a MiniWind holds one; TEST-HARNESS-MINIWIND-62: a session
@@ -293,7 +333,7 @@ view\ *)  # a one-area image: noclip and aw_view to a LOCAL point X Y Z of MAP1;
 map:*)  # a one-town image: the second load is another map it holds
   rc "map ${TP#map:}"; s=0; while [ $s -lt $((150*K)) ]; do alive || finish "FAIL emulator exited after map ${TP#map:}";
   [ "$(st server)" != "$MAP1" ] && [ -n "$(st server)" ] && [ "$(st server)" != none ] && break; sleep 1; s=$((s+1)); done
-[ $s -lt $((150*K)) ] || finish "FAIL map ${TP#map:} did not load a map (server $(st server))";;
+[ $s -lt $((150*K)) ] || stall "map ${TP#map:} did not load a map (server $(st server))";;
 *)
 # REPEAT: the map change runs REPEAT times (back to MAP1 with "map MAP1" in between), so an intermittent hang
 # fails the smoke instead of passing on a lucky run (CHIM-SEYDA-BALMORA-LOAD-HANG-43).
@@ -393,23 +433,104 @@ def be32(b, o):
     return int.from_bytes(b[o:o + 4], 'big') if len(b) >= o + 4 else 0
 
 
-def classify(pcs, tasks, stack):
-    """pcs: sampled program counters; tasks: [(name, node, sigwait, is_process)]; stack: the game's stack words.
-    Returns (class, details)."""
+ACTIONS = {8: 'LOCATE_OBJECT', 15: 'FREE_LOCK', 16: 'DELETE_OBJECT', 23: 'EXAMINE_OBJECT', 24: 'EXAMINE_NEXT',
+           29: 'PARENT', 82: 'READ', 87: 'WRITE', 1004: 'FINDUPDATE', 1005: 'FINDINPUT', 1006: 'FINDOUTPUT',
+           1007: 'END', 1008: 'SEEK', 1022: 'SET_FILE_SIZE', 1027: 'IS_FILESYSTEM'}
+
+
+def pending(game, queues):
+    """SMOKE-INPLAY-UNSAMPLED-63 / SMOKE-STALL-LABEL-INFERRED-60: the game's file request read from the ports, not
+    inferred from its stack. game: the game task tuple (node at [1]); queues: {port owner name: [(packet, dp_Port,
+    dp_Type, dp_Arg1)]}, the game's own reply port under 'Initial CLI'. Returns (handler or None, text)."""
+    if not game:
+        return None, 'game task not found'
+    reply = game[1] + 0x5C
+    back = [q for q in queues.get('Initial CLI', [])]
+    if back:
+        p = back[0]
+        return 'Initial CLI', 'the reply to %s (arg1 $%08X) is on the game\'s port but the game still waits: ' \
+            'the completion signal was lost' % (ACTIONS.get(p[2], 'type %d' % p[2]), p[3])
+    for name, msgs in sorted(queues.items()):
+        for p in msgs:
+            if name != 'Initial CLI' and p[1] == reply:
+                return name, 'request %s (arg1 $%08X, packet $%08X) queued on %s\'s port, not taken' % (
+                    ACTIONS.get(p[2], 'type %d' % p[2]), p[3], p[0], name)
+    return None, 'no request of the game queued on any handler port (taken by a handler, or the call is not a file call)'
+
+
+def classify(pcs, tasks, stack, queues=None):
+    """pcs: sampled program counters; tasks: [(name, node, sigwait, is_process)]; stack: the game's stack words;
+    queues: the message ports read (see pending), None when they could not be read. Returns (class, details)."""
     idle = [p for p in pcs if IDLE[0] <= p < IDLE[1]]
     game = next((t for t in tasks if t[0] == 'Initial CLI'), None)
     lists = {t[1] + 0x5C + 0x14: t[0] for t in tasks if t[3] and t[0] != 'Initial CLI'}
     holder = next((lists[w] for w in stack if w in lists), None)
-    details = 'pc %d of %d samples in exec idle; game %s; request held by %s' % (
-        len(idle), len(pcs), 'waits on SIGF_DOS' if game and game[2] & 0x100 else 'not in a file call',
+    named, text = pending(game, queues) if queues is not None else (None, 'ports not read')
+    details = 'pc %d of %d samples in exec idle; game %s; pending: %s; stack scan (inferred): request held by %s' % (
+        len(idle), len(pcs), 'waits on SIGF_DOS' if game and game[2] & 0x100 else 'not in a file call', text,
         holder or 'none found')
-    if pcs and len(idle) == len(pcs) and game and game[2] & 0x100 and holder:
+    if pcs and len(idle) == len(pcs) and game and game[2] & 0x100 and (holder or named):
         return 'emulator-disk', details
     # ARRIVAL-LONG-FRAME-DEV6-59: three samples or more and none in exec idle: the processor is working (a long run of
     # file and game work inside one frame), not a request nobody answers
     if len(pcs) >= 3 and not idle:
         return 'busy', details
     return 'unknown', details
+
+
+LT_OPS = {1: 'open', 2: 'read', 3: 'seek', 4: 'close'}
+LT_HEADER, LT_ENTRY = 24, 64
+
+
+def ring_lines(raw):
+    """LOAD-HANG-WATCHDOG-62: the engine's load trace ring (aw_loadtrace.c layout) read from memory -> (lines oldest
+    first, the unfinished calls). Header: AWLTRACE, count, entries, entry size, started; entry: t0, t1 (0xFFFFFFFF
+    not finished), bytes, result, op, stage[11], name[36]."""
+    if len(raw) < LT_HEADER or raw[:8] != b'AWLTRACE':
+        return [], []
+    count, entries, size = be32(raw, 8), be32(raw, 12), be32(raw, 16)
+    if size != LT_ENTRY or not 0 < entries <= 1024:
+        return [], []
+    lines, open_ = [], []
+    for seq in range(max(1, count - entries + 1), count + 1):
+        o = LT_HEADER + ((seq - 1) % entries) * LT_ENTRY
+        e = raw[o:o + LT_ENTRY]
+        if len(e) < LT_ENTRY:
+            break
+        t0, t1, nbytes, result = be32(e, 0), be32(e, 4), be32(e, 8), be32(e, 12)
+        nbytes -= (nbytes >> 31) << 32
+        result -= (result >> 31) << 32
+        stage = e[17:28].split(b'\x00')[0].decode('latin-1', 'replace')
+        name = e[28:64].split(b'\x00')[0].decode('latin-1', 'replace')
+        head = 'LT %d %s %s %s %d bytes' % (seq, stage, LT_OPS.get(e[16], '?'), name, nbytes)
+        if t1 == 0xFFFFFFFF:
+            lines.append('%s, at %d ms, NOT FINISHED' % (head, t0))
+            open_.append(lines[-1])
+        else:
+            lines.append('%s -> %d, at %d ms, %d ms' % (head, result, t0, (t1 - t0) & 0xFFFFFFFF))
+    return lines, open_
+
+
+def load_trace():
+    """The ring named by the console's last "Load trace on: ring at $ADDR" line, read with the monitor (the game is
+    stopped); its lines go to logs/loadtrace-at-stop.txt. Returns the summary for the STALL line ('' when off)."""
+    if os.environ.get('LOADTRACE') != '1':
+        return ''
+    try:
+        text = open(R + '/awctl/console.log', encoding='latin-1').read()
+    except OSError:
+        text = ''
+    found = re.findall(r'Load trace on: ring at \$([0-9A-Fa-f]{8})', text)
+    if not found:
+        return '; load trace: no ring address on the console'
+    raw = mread(int(found[-1], 16), LT_HEADER + 128 * LT_ENTRY)
+    lines, open_ = ring_lines(raw)
+    with open(R + '/logs/loadtrace-at-stop.txt', 'w') as f:
+        f.write('\n'.join(lines) + '\n')
+    if not lines:
+        return '; load trace: ring at $%s not readable' % found[-1]
+    return '; load trace: %d calls kept, last %s; not finished: %s' % (
+        len(lines), lines[-1], ' | '.join(open_[-3:]) or 'none')
 
 
 def main():
@@ -438,14 +559,246 @@ def main():
                     s = mread(be32(t, 54) & ~1, 3072)
                     stack = [be32(s, i) for i in range(0, len(s) - 3, 2)]
                 node, k = be32(t, 0), k + 1
+        # every process's message port (pr_MsgPort at +0x5C, its list at +0x14): the packets queued there
+        queues = {}
+        for name, node, _sig, proc in tasks:
+            if not proc:
+                continue
+            lst = node + 0x5C + 0x14
+            msg, k, got = be32(mread(lst, 4), 0), 0, []
+            while msg and msg != lst + 4 and k < 8:
+                m = mread(msg, 14)
+                pk = be32(m, 10)          # mn_Node.ln_Name = the DosPacket of a StandardPacket
+                if pk:
+                    d = mread(pk, 24)
+                    got.append((pk, be32(d, 4), be32(d, 8), be32(d, 20)))
+                msg, k = be32(m, 0), k + 1
+            if got:
+                queues[name] = got
+        trace = load_trace()      # LOAD-HANG-WATCHDOG-62: the last file calls, read while the game is stopped
         resume()
-    kind, details = classify(pcs, tasks, stack)
-    print('STALL %s: %s; pc %s' % (kind, details, ' '.join('%08X' % p for p in pcs[:5])))
+    else:
+        queues, trace = None, ''
+    kind, details = classify(pcs, tasks, stack, queues)
+    print('STALL %s: %s; pc %s%s' % (kind, details, ' '.join('%08X' % p for p in pcs[:5]), trace))
 
 
 if __name__ == '__main__':
     main()
 '''
+
+
+# The emulator side's judge (OUT/judge.py, run with python3 in the FS-UAE container), experiments E2 and E3 of
+# CHIM-SEYDA-BALMORA-LOAD-HANG-43. Standard library only; the same functions are loaded here for the unit tests.
+#   judge.py live|final FRAMES FROZEN: FRAMES = lines "SECONDS SHA256 NAME" (one per screenshot). A stop = the same
+#     picture (debug HUD clock and frame counter included) over FROZEN seconds or more. live: only the newest run of
+#     equal pictures counts; final: any run, and a route that never moved fails. One line: "STOP ...", "PASS ...",
+#     "RUN ..." (live, nothing yet) or "FAIL ...".
+#   judge.py emucheck OPTIONS LOG...: every "key = value" line of OPTIONS must show in one of the logs. One line:
+#     "EMUOPT ok ..." or "EMUOPT missing ...".
+JUDGE_PY = r'''#!/usr/bin/env python3
+import re, sys
+
+# what the emulator writes when it took an option (FS-UAE 3.1.66 source: od-fs/libamiga.cpp
+# amiga_set_deterministic_mode); any other key must appear as "key = value" in a log
+EMU_PROOF = {'deterministic': ('1', 'libamiga enabling net play mode')}
+
+
+def judge_frames(frames, frozen, final=False, min_distinct=3):
+    """frames: [(seconds, digest)] in time order. Returns (verdict, details)."""
+    if not frames:
+        return ('FAIL' if final else 'RUN'), 'no screenshot taken'
+    runs, start = [], 0
+    for i in range(1, len(frames) + 1):
+        if i == len(frames) or frames[i][1] != frames[start][1]:
+            runs.append((frames[start][0], frames[i - 1][0], i - start))
+            start = i
+    longest = max(runs, key=lambda r: r[1] - r[0])
+    look = runs if final else runs[-1:]
+    for t0, t1, n in look:
+        if t1 - t0 >= frozen:
+            return 'STOP', 'the same picture from %d s to %d s (%d shots, %d s; limit %d s)' % (t0, t1, n, t1 - t0, frozen)
+    distinct = len(set(d for _t, d in frames))
+    summary = '%d shots over %d s, %d different pictures, longest still %d s' % (
+        len(frames), frames[-1][0] - frames[0][0], distinct, longest[1] - longest[0])
+    if not final:
+        return 'RUN', summary
+    if distinct < min_distinct:
+        return 'FAIL', 'the picture hardly moved: ' + summary
+    return 'PASS', summary
+
+
+def read_frames(path):
+    out = []
+    for line in open(path, encoding='utf-8', errors='replace'):
+        p = line.split()
+        if len(p) >= 2 and p[0].isdigit():
+            out.append((int(p[0]), p[1]))
+    return out
+
+
+def emu_check(options, logs):
+    """options: [(key, value)]; logs: the emulator's log texts. Returns the keys not shown as taken."""
+    text = '\n'.join(logs)
+    missing = []
+    for key, value in options:
+        proof = EMU_PROOF.get(key)
+        if proof and proof[0] == value:
+            ok = proof[1] in text
+        else:
+            ok = re.search(r'(?m)\b%s\s*=\s*%s\s*$' % (re.escape(key), re.escape(value)), text) is not None
+        if not ok:
+            missing.append('%s=%s' % (key, value))
+    return missing
+
+
+def main(argv):
+    if argv[0] in ('live', 'final'):
+        verdict, details = judge_frames(read_frames(argv[1]), int(argv[2]), final=argv[0] == 'final')
+        print('%s %s' % (verdict, details))
+        return 0
+    if argv[0] == 'emucheck':
+        opts = []
+        for line in open(argv[1], encoding='utf-8'):
+            if '=' in line:
+                k, v = line.split('=', 1)
+                opts.append((k.strip(), v.strip()))
+        logs = []
+        for p in argv[2:]:
+            try:
+                logs.append(open(p, encoding='utf-8', errors='replace').read())
+            except OSError:
+                pass
+        missing = emu_check(opts, logs)
+        print('EMUOPT missing %s (not in the emulator log)' % ', '.join(missing) if missing
+              else 'EMUOPT ok %s taken (emulator log)' % ', '.join('%s=%s' % o for o in opts))
+        return 0
+    return 2
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv[1:]))
+'''
+_JUDGE = {'__name__': 'judge'}
+exec(compile(JUDGE_PY, 'judge.py', 'exec'), _JUDGE)
+judge_frames = _JUDGE['judge_frames']
+emu_check = _JUDGE['emu_check']
+
+# Keys the smoke sets itself: an --emu-option may not change the machine under test (memory, disks, ROM, CPU,
+# the JIT profile, the monitor the stall check needs, the screenshot paths)
+EMU_MANAGED = re.compile(r'^(amiga_model|cpu|fpu|uae_cpu_24bit_addressing|chip_memory|slow_memory|fast_memory|'
+                         r'zorro_iii_memory|kickstart_file|hard_drive_.*|floppy_.*|joystick_port_.*|fullscreen|'
+                         r'window_.*|console_debugger|screenshots_output_dir|base_dir|jit_compiler|uae_cpu_speed)$')
+
+
+def parse_emu_options(items):
+    """--emu-option KEY=VALUE values -> [(key, value)]; raises ValueError on a bad or a managed key. ['none'] = []."""
+    if list(items) == ['none']:
+        return []
+    out = []
+    for item in items:
+        key, sep, value = item.partition('=')
+        key, value = key.strip(), value.strip()
+        if not sep or not re.fullmatch(r'[a-z][a-z0-9_]*', key) or not re.fullmatch(r'[A-Za-z0-9_.:/+-]+', value):
+            raise ValueError('emulator option %r: KEY=VALUE, a lower-case key and a plain value' % item)
+        if EMU_MANAGED.match(key):
+            raise ValueError('emulator option %r: the smoke sets %s itself' % (item, key))
+        out.append((key, value))
+    return out
+
+
+def emu_config_lines(options):
+    """The lines appended to the emulator config (OUT/emu-options.txt)."""
+    return ''.join('%s = %s\n' % kv for kv in options)
+
+
+ROUTE_WAIT_CHUNK = 50
+
+
+def route_autoexec(map1, tp, frames, load_trace=False):
+    """The play copy's id1/autoexec.cfg for --remote off (experiment E2): debug HUD on (its clock is what the
+    screenshots are judged by), then map MAP1 and dbg tp TP in turn, FRAMES frames apart, until the run ends."""
+    if not re.fullmatch(r'[a-z0-9_]+', map1):
+        raise ValueError('route map %r: a plain map name' % map1)
+    if not re.fullmatch(r'-?\d+ -?\d+', tp):
+        raise ValueError('route teleport %r: "X Y" (dbg tp)' % tp)
+    if frames < 1:
+        raise ValueError('route frames must be 1 or more')
+    chunks = -(-frames // ROUTE_WAIT_CHUNK)
+    lines = ['dbg all on', 'dbg coords on'] + (['aw_loadtrace 1'] if load_trace else []) + [
+        'alias aw_e2w "%s"' % ';'.join(['wait'] * ROUTE_WAIT_CHUNK),
+        'alias aw_e2p "%s"' % ';'.join(['aw_e2w'] * chunks),
+        'alias aw_e2b "dbg tp %s;aw_e2p;aw_e2s"' % tp,
+        'alias aw_e2s "map %s;aw_e2p;aw_e2b"' % map1,
+        'aw_e2s']
+    return '\n'.join(lines) + '\n'
+
+
+def count_class(result):
+    """A run's result line -> pass / stop / fail, for the alternating counts."""
+    if result.startswith('PASS'):
+        return 'pass'
+    if re.search(r'emulator disk stall|frozen clock|stopped taking commands|is not in play|did not load|'
+                 r'game stalled|no answer to aw_music_status', result):
+        return 'stop'
+    return 'fail'
+
+
+def strip_options(argv, names):
+    """argv without the options in NAMES (each with its value)."""
+    out, skip = [], False
+    for a in argv:
+        if skip:
+            skip = False
+            continue
+        if a in names:
+            skip = True
+            continue
+        if any(a.startswith(n + '=') for n in names):
+            continue
+        out.append(a)
+    return out
+
+
+def alternate(args, argv):
+    """--alternate remote|emu --runs N: N rounds of the two variants in turn, each its own smoke (no retry), and
+    the counts. remote: remote console on, then off. emu: remote on without, then with the --emu-option lines."""
+    out = args.out.resolve()
+    out.mkdir(parents=True, exist_ok=True)
+    base = strip_options(argv, ('--alternate', '--runs', '--out', '--remote', '--name')) + ['--no-stall-retry']
+    if args.alternate == 'remote':
+        emu = []      # any --emu-option stays in base: both variants get it
+        variants = [('remote-on', ['--remote', 'on']), ('remote-off', ['--remote', 'off'])]
+    else:
+        base = strip_options(base, ('--emu-option',))
+        emu = []
+        variants = [('plain', ['--remote', 'on', '--emu-option', 'none']),
+                    ('emu', ['--remote', 'on'] + [x for o in args.emu_option for x in ('--emu-option', o)])]
+    counts = {name: {'pass': 0, 'stop': 0, 'fail': 0} for name, _ in variants}
+    table = out / 'counts.tsv'
+    with open(table, 'a', encoding='utf-8', newline='\n') as f:
+        f.write('# round\tvariant\tclass\tresult (%s)\n' % ' '.join(argv))
+    for i in range(1, args.runs + 1):
+        for name, extra in variants:
+            sub = out / ('%02d-%s' % (i, name))
+            print('=== ROUND %d/%d: %s ===' % (i, args.runs, name), flush=True)
+            code = main(base + emu + extra + ['--out', str(sub), '--name', '%s-%s' % (args.name, name)])
+            steps = sub / 'logs' / 'steps.log'
+            lines = steps.read_text(encoding='utf-8', errors='replace').splitlines() if steps.is_file() else []
+            result = next((l.split('smoke RESULT ', 1)[1] for l in reversed(lines) if 'smoke RESULT ' in l),
+                          'FAIL no result line (exit %d)' % code)
+            kind = count_class(result)
+            counts[name][kind] += 1
+            with open(table, 'a', encoding='utf-8', newline='\n') as f:
+                f.write('%d\t%s\t%s\t%s\n' % (i, name, kind, result))
+            print('round %d %s: %s: %s' % (i, name, kind, result), flush=True)
+    line = 'COUNTS ' + '; '.join('%s: %d pass, %d stop, %d other fail of %d' % (
+        n, c['pass'], c['stop'], c['fail'], args.runs) for n, c in counts.items())
+    with open(table, 'a', encoding='utf-8', newline='\n') as f:
+        f.write('# %s\n' % line)
+    print(line)
+    print('smoke-exit=0')
+    return 0
 
 
 def sha256(path):
@@ -493,6 +846,13 @@ def main(argv=None):
                     'e.g. key:Return for a MiniWind image, which holds its startup screen until Enter')
     ap.add_argument('--log-illegal', action='store_true',
                     help='FS-UAE logs the 68k PC of every unmapped memory access (uae_log_illegal_mem; with --prof interp)')
+    ap.add_argument('--ide-trace', action='store_true',
+                    help='keep the emulator\'s IDE transfer trace in the saved logs (about a million lines a run; '
+                         'left out by default: SMOKE-IDE-TRACE-LOG-63); for a disk investigation')
+    ap.add_argument('--load-trace', action='store_true', default=os.environ.get('AW_SMOKE_LOAD_TRACE') == '1',
+                    help='turn the engine\'s load trace on in the play copy (aw_loadtrace 1; off by default, also '
+                         'AW_SMOKE_LOAD_TRACE=1): every file call kept in memory, dumped to the console at each Scene '
+                         'ready, and read from memory by the examination of a stop (logs/loadtrace-at-stop.txt)')
     ap.add_argument('--start', choices=('map', 'enter', 'auto'), default='map',
                     help='map: load --map from the console (default); enter: press Enter on a MiniWind startup screen, which starts '
                          'its own scene (--map names the map it must load)')
@@ -502,6 +862,24 @@ def main(argv=None):
     ap.add_argument('--sweep', choices=('report', 'fail', 'off'), default='report',
                     help='dbg sweep on the first map (ENTITY-SWEEP-AB): report (default) logs its SWEEP RESULT line, fail '
                          'fails the smoke on a FAIL result, off skips it')
+    # CHIM-SEYDA-BALMORA-LOAD-HANG-43, experiments E2 and E3 (remote console off; extra emulator lines)
+    ap.add_argument('--remote', default=os.environ.get('AW_SMOKE_REMOTE', 'on'),
+                    help='on (default): the remote-console folder drives and reads the game; off (also AW_SMOKE_REMOTE=off): '
+                         'no such folder, as in a player\'s game; the route (--map, then --tp and --map in turn) runs from the '
+                         'play copy\'s autoexec and is judged by screenshots of the debug HUD clock (experiment E2)')
+    ap.add_argument('--route-seconds', type=int, default=600, help='--remote off: how long the route runs (600 s)')
+    ap.add_argument('--route-frames', type=int, default=400, help='--remote off: frames between two moves of the route (400)')
+    ap.add_argument('--shot-every', type=int, default=10, help='--remote off: seconds between screenshots (10)')
+    ap.add_argument('--frozen', type=int, default=150,
+                    help='--remote off: the same picture this many seconds = a stop (150, the smoke\'s load limit)')
+    ap.add_argument('--emu-option', action='append', default=None, metavar='KEY=VALUE',
+                    help='an extra emulator config line, e.g. deterministic=1 (experiment E3); repeatable; also '
+                         'AW_SMOKE_EMU_OPTION="k=v;k2=v2"; "none" = no extra lines; checked in the emulator\'s start-up '
+                         'log (a run whose option the emulator did not take fails)')
+    ap.add_argument('--alternate', choices=('remote', 'emu'),
+                    help='run --runs rounds of two variants in turn and count stops: remote = remote console on, then '
+                         'off; emu = without, then with the --emu-option lines (remote on); OUT/counts.tsv')
+    ap.add_argument('--runs', type=int, default=20, help='--alternate: rounds (20)')
     ap.add_argument('--builder-image', default='amiwind-builder:v0.0.35-clean')
     ap.add_argument('--fsuae-image', default='amiwind-fsuae:3.1.66-ubuntu24.04-eval1')
     ap.add_argument('--cpus', default='2')
@@ -517,6 +895,29 @@ def main(argv=None):
         print('engine smoke: engine or Kickstart missing')
         print('smoke-exit=2')
         return 2
+    try:
+        if args.remote not in ('on', 'off'):
+            raise ValueError('--remote (or AW_SMOKE_REMOTE) must be on or off, not %r' % args.remote)
+        raw = args.emu_option if args.emu_option is not None else \
+            [x for x in os.environ.get('AW_SMOKE_EMU_OPTION', '').split(';') if x.strip()]
+        emu_options = parse_emu_options(raw)
+        autoexec = None
+        if args.remote == 'off':
+            if args.script or args.start != 'map':
+                raise ValueError('--remote off runs the plain route only (no --script, --start map)')
+            if min(args.route_seconds, args.shot_every, args.frozen) < 1:
+                raise ValueError('--route-seconds, --shot-every and --frozen must be 1 or more')
+            autoexec = route_autoexec(args.map, args.tp, args.route_frames, args.load_trace)
+        if args.alternate == 'emu' and not emu_options:
+            raise ValueError('--alternate emu needs at least one --emu-option')
+        if args.alternate and args.runs < 1:
+            raise ValueError('--runs must be 1 or more')
+    except ValueError as e:
+        print('engine smoke: %s' % e)
+        print('smoke-exit=2')
+        return 2
+    if args.alternate:
+        return alternate(args, list(sys.argv[1:] if argv is None else argv))
     want = sha256(args.engine)
     out = args.out.resolve()
     if out.exists():
@@ -525,14 +926,27 @@ def main(argv=None):
     shutil.copyfile(args.engine, out / 'engine.AmiWind')
     (out / 'probe.sh').write_text(PROBE, encoding='utf-8', newline='\n')
     (out / 'stall.py').write_text(STALL_PY, encoding='utf-8', newline='\n')
+    (out / 'judge.py').write_text(JUDGE_PY, encoding='utf-8', newline='\n')
+    if emu_options:
+        (out / 'emu-options.txt').write_text(emu_config_lines(emu_options), encoding='utf-8', newline='\n')
+    if autoexec is not None:
+        (out / 'autoexec.cfg').write_text(autoexec, encoding='utf-8', newline='\n')
     if args.script:
         shutil.copyfile(args.script, out / 'script.txt')
-    (out / 'engine.txt').write_text('engine sha256 %s\nimage %s\nprofile %s\nfast ram %d MiB\n'
-                                    % (want, args.image_dir, args.prof, args.fast_mb),
+    (out / 'engine.txt').write_text('engine sha256 %s\nimage %s\nprofile %s\nfast ram %d MiB\nremote console %s\n'
+                                    'emulator options %s\n'
+                                    % (want, args.image_dir, args.prof, args.fast_mb, args.remote,
+                                       ' '.join('%s=%s' % o for o in emu_options) or 'none'),
                                     encoding='utf-8', newline='\n')
     shares = ['--cpu-shares', args.cpu_shares] if args.cpu_shares else []
     base = ['run', '--pull', 'never', '--rm', '--network', 'none', *shares]
     scratch = args.scratch.strip('/')
+    # LOAD-HANG-WATCHDOG-62: --load-trace turns the engine's load trace on from the play copy's autoexec (off in a
+    # shipped game); a stop's examination then reads its ring (logs/loadtrace-at-stop.txt)
+    trace_line = 'aw_loadtrace 1\\n' if args.load_trace else ''
+    # --remote off: the route autoexec written above (OUT/autoexec.cfg), no aw_remote line
+    put_autoexec = ("printf 'aw_remote 1\\n{trace_line}' > /tmp/autoexec.cfg".format(trace_line=trace_line)
+                    if autoexec is None else 'cp /t/autoexec.cfg /tmp/autoexec.cfg')
     # The 4 GiB play copy past the page cache (direct I/O, holes kept): a cached copy filled the 2 GiB prep container
     # and the kernel killed it, on and off (ENGINE-SMOKE-PREP-KILLED-52)
     prep = f'''set -e
@@ -544,7 +958,7 @@ dd if="$B" of=/vol/{scratch}/play-boot.hdf bs=4M iflag=direct oflag=direct conv=
 W=$(ls /vol/{args.image_dir}/*world-01.hdf 2>/dev/null | head -1 || true); echo "world=$(basename "$W" 2>/dev/null)"
 X={XDF}; D=/vol/{scratch}/play-boot.hdf
 $X $D open part=DH0 + delete AmiWind + write /t/engine.AmiWind AmiWind
-printf 'aw_remote 1\\n' > /tmp/autoexec.cfg
+{put_autoexec}
 $X $D open part=DH0 + delete id1/autoexec.cfg + write /tmp/autoexec.cfg id1/autoexec.cfg
 $X $D open part=DH0 + read AmiWind /tmp/back
 echo "readback=$(sha256sum /tmp/back | cut -d' ' -f1)"'''
@@ -574,7 +988,7 @@ echo "readback=$(sha256sum /tmp/back | cut -d' ' -f1)"'''
             return 2
         docker(*base, '--cpus', args.cpus, '--memory', '3g', '--name', args.name + '-run', '--entrypoint', 'sh',
                '-e', f'PROF={args.prof}', '-e', f'WORLD={world.group(1) if world else ""}', '-e', f'MAP1={args.map}',
-               '-e', f'TP={args.tp}', '-e', f'PLAY={args.play}', '-e', f'REPEAT={max(1, args.repeat)}', '-e', f'START={args.start}', '-e', f'AFTER={args.after_load}', '-e', f'ILLEGAL={int(args.log_illegal)}', '-e', f'KICK={args.kickstart}', '-e', f'FASTMB={args.fast_mb}', '-e', f'SWEEP={args.sweep}', '-e', 'ZONEFULL=%s' % ('allow' if args.allow_zone_full else 'fail'),
+               '-e', f'TP={args.tp}', '-e', f'PLAY={args.play}', '-e', f'REPEAT={max(1, args.repeat)}', '-e', f'START={args.start}', '-e', f'AFTER={args.after_load}', '-e', f'ILLEGAL={int(args.log_illegal)}', '-e', f'IDETRACE={int(args.ide_trace)}', '-e', f'LOADTRACE={int(args.load_trace)}', '-e', 'REMOTE=%d' % (args.remote == 'on'), '-e', f'ROUTESECS={args.route_seconds}', '-e', f'SHOTEVERY={args.shot_every}', '-e', f'FROZEN={args.frozen}','-e', f'KICK={args.kickstart}', '-e', f'FASTMB={args.fast_mb}', '-e', f'SWEEP={args.sweep}', '-e', 'ZONEFULL=%s' % ('allow' if args.allow_zone_full else 'fail'),
                '--mount', f'type=volume,src={args.volume},dst=/w,volume-subpath={scratch}',
                '--mount', f'type=volume,src={args.volume},dst=/img,volume-subpath={args.image_dir},readonly',
                '-v', f'{args.roms.resolve()}:/roms:ro', '-v', f'{out}:/out', args.fsuae_image, '/out/probe.sh',

@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "r_local.h"
 #include "aw_torch.h"
 #include "aw_sky.h"
+#include "d_fence.h"
 
 drawsurf_t	r_drawsurf;
 
@@ -43,6 +44,9 @@ void R_DrawSurfaceBlock8_mip0 (void);
 void R_DrawSurfaceBlock8_mip1 (void);
 void R_DrawSurfaceBlock8_mip2 (void);
 void R_DrawSurfaceBlock8_mip3 (void);
+void R_DrawSurfaceBlock8_fence (void);
+/* d_fence.c sets it with aw_fence: SURF_DRAWFENCE tiles keep index 255 (transparent) unshaded */
+int				r_fence_cache_on;
 
 static void	(*surfmiptable[4])(void) = {
 	R_DrawSurfaceBlock8_mip0,
@@ -450,6 +454,9 @@ void R_DrawSurface (void)
 	if (r_pixbytes != 1)
 		Sys_Error ("R_DrawSurface: only 8-bit surfaces are supported");
 	pblockdrawer = surfmiptable[r_drawsurf.surfmip];
+	/* a see-through face drawn by d_fence.c keeps its transparent texels (255) unshaded */
+	if (r_fence_cache_on && (r_drawsurf.surf->flags & SURF_DRAWFENCE))
+		pblockdrawer = R_DrawSurfaceBlock8_fence;
 	r_block_colormap = R_SurfaceTable (r_drawsurf.surf);
 // TODO: only needs to be set when there is a display settings change
 	horzblockstep = blocksize;
@@ -712,6 +719,61 @@ void R_DrawSurfaceBlock8_mip3 (void)
 				light += lightstep;
 			}
 
+			psource += psourcestep;
+			lightright += lightrightstep;
+			lightleft += lightleftstep;
+			prowdest += prowdeststep;
+		}
+
+		if (psource >= r_sourcemax)
+			psource -= r_stepback;
+	}
+}
+
+
+/*
+================
+R_DrawSurfaceBlock8_fence
+
+Any mip (blocksize 16 >> mip): the block drawer of a see-through face
+(SURF_DRAWFENCE, d_fence.c). Index 255 is the transparent texel and stays 255;
+every other texel is lit as in the mip drawers above.
+================
+*/
+void R_DrawSurfaceBlock8_fence (void)
+{
+	int	v, size = blocksize, shift = blockdivshift;
+	int	psourcestep, prowdeststep;
+	unsigned char	*psource, *prowdest, *colormap;
+
+	colormap = r_block_colormap;
+	psourcestep = sourcetstep;
+	prowdeststep = surfrowbytes;
+	psource = pbasesource;
+	prowdest = prowdestbase;
+
+	for (v=0 ; v<r_numvblocks ; v++)
+	{
+		int i, lightleft, lightright, lightleftstep, lightrightstep;
+
+		lightleft = r_lightptr[0];
+		lightright = r_lightptr[1];
+		r_lightptr += r_lightwidth;
+		lightleftstep = R_LightStep((int)r_lightptr[0], lightleft, shift);
+		lightrightstep = R_LightStep((int)r_lightptr[1], lightright, shift);
+
+		for (i=0 ; i<size ; i++)
+		{
+			int b, lightstep, light, pix;
+
+			lightstep = R_LightStep(lightleft, lightright, shift);
+			light = lightright;
+			for (b=size-1; b>=0; b--)
+			{
+				pix = psource[b];
+				prowdest[b] = pix == 255 ? 255 : colormap[(light & 0xFF00) + pix];
+				light += lightstep;
+			}
 			psource += psourcestep;
 			lightright += lightrightstep;
 			lightleft += lightleftstep;

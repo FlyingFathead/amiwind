@@ -9,13 +9,13 @@
  },
  "totals": {
   "commands": {
-   "count": 300,
-   "hunk_bytes": 9600
+   "count": 302,
+   "hunk_bytes": 9664
   },
   "cvars": {
-   "count": 366,
-   "static_bytes": 8784,
-   "zone_bytes": 11936
+   "count": 368,
+   "static_bytes": 8832,
+   "zone_bytes": 12000
   },
   "tables": {
    "count": 0,
@@ -107,7 +107,9 @@
   "2026-11-09: +2 commands aw_mw_help (dbg help mw / dbg mw help, the original game's console commands paged from a file on disk, one offset and a 256-byte line buffer kept) and aw_mw_target (dbg mw target, the finder for a console line's target: 256 rows of 82 bytes only while its list is open), 64 hunk bytes, no cvar: the original console commands the maintainer asked for (MW-CONSOLE-COMMANDS-62, TG 2026-11-07, and the finder menu like dbg tp's, the same day). The entry list also gains five commands whose raises were approved and recorded above but whose names were never added: aw_restart_game, aw_load_fail, aw_version_info, aw_memcensus (2026-11-07) and aw_topic_colours (2026-11-08).",
   "2026-11-09: the command cap raised to 512 commands (512 x 32 = 16,384 hunk bytes; 300 in use, 9,600 bytes) by the maintainer's decision the same day (app chat, while dev2 was gated), so new console commands asked for do not each need a raise; the ratchet still refuses growth past 512 and the cvar, table and growing budgets are unchanged.",
   "2026-11-09: the command cap raised from 512 to 1,000 commands (1,000 x 32 = 32,000 hunk bytes; 300 in use, 9,600 bytes) by the maintainer's decision the same day (app chat), so the original game's console commands and AmiWind's own can grow without a raise each; the ratchet still refuses growth past 1,000 and the cvar, table and growing budgets are unchanged.",
-  "2026-11-09: +1 console variable aw_text_box_type, the saved text box type (1 rising strip / 2 box only, the default) the maintainer asked for, with its Options entry and dbg ui textbox; the command aw_text_box sits under the commands cap (SUBTITLE-BOX-HIDES-STATS-63)"
+  "2026-11-09: +1 console variable aw_text_box_type, the saved text box type (1 rising strip / 2 box only, the default) the maintainer asked for, with its Options entry and dbg ui textbox; the command aw_text_box sits under the commands cap (SUBTITLE-BOX-HIDES-STATS-63)",
+  "2026-11-10: +1 console variable aw_loadtrace (24 structure bytes, 32 zone bytes) and the command aw_loadtrace_cmd (dbg loadtrace, under the commands cap): the load trace the maintainer asked for on 2026-11-09 (a load tracker for the smoke tests, enabled separately), off by default, for CHIM-SEYDA-BALMORA-LOAD-HANG-43; a feature he asked for, so the raise carries his request as its reason.",
+  "2026-11-10: ROOM-DECAL-ALPHA-62, the maintainer-reported solid cobwebs and hanging growths (see-through faces drawn solid): aw_fence, one console variable (24 structure bytes, 32 zone bytes; default 0 until a measured A/B decides, 1 = the new fence pass of d_fence.c), the A/B switch the project rules ask for beside every new method; no command, no static name table."
  ],
  "entries": {
   "commands": [
@@ -230,6 +232,7 @@
    "aw_light_probe",
    "aw_lightgallery",
    "aw_load_fail",
+   "aw_loadtrace_cmd",
    "aw_logs_live_set",
    "aw_luma_status",
    "aw_magic",
@@ -293,6 +296,7 @@
    "aw_test_shot",
    "aw_test_status",
    "aw_test_write",
+   "aw_text_box",
    "aw_timeofday",
    "aw_topic_colours",
    "aw_torch",
@@ -485,11 +489,13 @@
    "aw_depthslop",
    "aw_dialogue_box_display_method",
    "aw_dialogue_box_layout",
+   "aw_dialogue_topic_colours",
    "aw_door_sounds",
    "aw_drawdistance",
    "aw_emissive",
    "aw_ent_count_exceed_soft_fail",
    "aw_exteriorluma",
+   "aw_fence",
    "aw_fog",
    "aw_fog_location",
    "aw_fp_sway",
@@ -521,7 +527,9 @@
    "aw_lava_tint_min",
    "aw_lava_tint_ramp",
    "aw_light_hue",
+   "aw_load_fail_test",
    "aw_loading_style",
+   "aw_loadtrace",
    "aw_logs_live",
    "aw_magic_fx",
    "aw_magic_orb",
@@ -596,6 +604,7 @@
    "aw_terrain_horizon",
    "aw_test_poll",
    "aw_test_start",
+   "aw_text_box_type",
    "aw_timescale",
    "aw_torch_depth_bob",
    "aw_torch_flame_style",

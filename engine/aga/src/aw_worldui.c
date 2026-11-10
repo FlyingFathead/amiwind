@@ -1224,9 +1224,10 @@ static void load_topic(int k){
  * quests are kept (a stage on the list, or a dated entry), with their names. A quest finished at its kept stage is
  * read from the journal index's flags (AWJ2). Freed with the book. */
 static int dated_quest(const char *id){return AW_JHistHasQuest(&aw_jhist,AW_LedgerNameHash(id));}
-static int quest_finished(const char *id,int32_t stage,void *ctx){
+/* the entry's quest status marks (AWJ2 1 finished, 2 restart: aw_questbook.h AW_QB_FINISHED / AW_QB_RESTART) */
+static int quest_status(const char *id,int32_t stage,void *ctx){
     uint32_t offset,length,flags=0;(void)ctx;
-    return journal_row(id,stage,&offset,&length,&flags) && (flags&1);
+    return journal_row(id,stage,&offset,&length,&flags)?(int)(flags&(AW_QB_FINISHED|AW_QB_RESTART)):0;
 }
 static int book_quests(void){
     FILE *f=NULL;byte header[8],row[160];int i,j,count=0,size,kept=0,ok;aw_qb_dated_t *dated=NULL;
@@ -1265,7 +1266,7 @@ static int book_quests(void){
     }
     free(hash);}
     book->nquests=kept;
-    ok=AW_QuestBookBuild(&book->qb,book->quests,kept,&aw_ledger,dated,aw_jhist.count,quest_finished,NULL);
+    ok=AW_QuestBookBuild(&book->qb,book->quests,kept,&aw_ledger,dated,aw_jhist.count,quest_status,NULL);
     free(dated);
     return ok;
 }

@@ -1,6 +1,6 @@
 # Roadmap and implementation options
 
-_Last updated with AmiWind v0.0.63 (9 November 2026)._
+_Last updated with AmiWind v0.0.64-dev3 (10 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -116,6 +116,30 @@ _Last updated with AmiWind v0.0.63 (9 November 2026)._
 ## v0.0.64: Gone Beyond The Gate, next
 
 The next release brings the two expansion worlds and the scripts that wait for them.
+
+**First snapshot, 10 November 2026:** [v0.0.64-dev1](releases/notes/RELEASE-v0.0.64-dev1.md) has the builder's
+expansion switch (`--dlc`, `--no-dlc`), per-stage game-input keys so the base world does not depend on which expansion
+files are present, master-list cell and room readers, the expansions' own room id ranges and store units, and the
+[census of Tribunal and Bloodmoon](performance/EXPANSIONS-CENSUS-v0.0.64.md). No expansion area is built yet; the console
+also reaches world objects that are not characters, and scripts cast spells on other characters.
+
+**Second snapshot, 10 November 2026:** [v0.0.64-dev2](releases/notes/RELEASE-v0.0.64-dev2.md) makes trapped doors and
+containers spring their trap on the player (the scripted world events item below, first part), adds the switchable load
+trace and the memory line per load for the Seyda Neen to Balmora load stall, gives the Toolkit's CHIM Progress Tracker a
+view for each expansion, and measures the first Solstheim frame as a test build: the memory fits at 32 MB Fast RAM, and
+the trees, which are most of the drawn faces, need the cheaper method before Solstheim ships (the meshes the frame first
+stopped on are fixed). Traps on a failed lock pick, trap sounds and the expansions' traps are still to do.
+
+**Third snapshot, 10 November 2026:** [v0.0.64-dev3](releases/notes/RELEASE-v0.0.64-dev3.md) carries dev1 and dev2 (neither
+was published on its own, so it is the first v0.0.64 snapshot on GitHub). It makes the game's spells, powers and
+enchantments take effect again (the actor table read 32 of 39 sections of the compiled scripts file), lets the console
+activate the Ghostgate's switches and other objects no script names, stands in lava and kills, keeps god mode across map
+changes, sorts a quest's state in the journal by its endings, and shows the expulsion message of a faction. The renderer
+has a see-through face pass for cobwebs, hanging growths and decals, off by default until a measured comparison decides.
+For Solstheim, a test-only star-shaped copy of the spruces brings a forest view from 45,964 faces at the median to 6,096;
+the method still needs a measurement on a full build before it is the default. The Toolkit's tracker has a pane for each
+map. A race ability's resistance against spell and trap damage, the factions on the stats page and the Heart Chamber's
+animated end are still to do.
 
 - **Tribunal (Mournhold) and Bloodmoon (Solstheim) built in by default** where the player owns them. The builder warns
   when their files are not found and has a switch to build the base game only. The builder already reports what it

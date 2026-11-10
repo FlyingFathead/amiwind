@@ -772,6 +772,42 @@ def resolve_coord_range(args):
             'selected_by': '--coord-range' if name != coord_range.DEFAULT else 'shipped default'}
 
 
+CHIM_SOL_TEST_STAGES = ('chim-sol-data', 'chim-sol')
+
+
+def chim_sol_test_commands(args, steps, tool, run, tools, jobs):
+    """TEST BUILDS ONLY (--chim-sol-test CELLS, DLC-BUILD-LATER): the Bloodmoon layer's CHIM frames of CELLS, built
+    after the base CHIM world into their own folder run/chim-sol (the store chimsol of the layer plan) from a layered
+    test data folder (tools/chim_layer_data.py: Morrowind.esm + Bloodmoon.esm, Morrowind.bsa + Bloodmoon.bsa). Both
+    stages are keyed by Bloodmoon's files (build_cache.STAGE_GAME_INPUTS); no base stage reads them and the image
+    does not take them, so a build with or without this option has the same base keys. Off: STEPS unchanged."""
+    cells = getattr(args, 'chim_sol_test', None)
+    if not cells:
+        return steps
+    from chim.regions import decode_cells
+    decode_cells(cells)                                  # a bad cell list stops here, before any stage
+    index = next(i for i, (name, _) in enumerate(steps) if name == 'chim') + 1
+    palette = run / 'intro-scene/id1/gfx/palette.lmp'
+    star = getattr(args, 'chim_sol_tree_copies', 'off') == 'star'
+    # --chim-sol-tree-copies star (TREES-DEPTH-56): the same chim_build arguments through tools/chim_tree_star.py
+    entry = ('chim_tree_star.py', '--tree-star', Path(__file__).resolve().parents[1] / 'config/tree-copies.json') \
+        if star else ('chim_build.py',)
+    trees = [('chim-sol-trees', tool('chim_tree_copies.py', '--data-files', run / 'chim-sol-data', '--palette', palette,
+                                     '--out', run / 'chim-sol-trees', '--jobs', jobs))] if star else []
+    steps[index:index] = [
+        ('chim-sol-data', tool('chim_layer_data.py', '--data-files', args.data_files, '--layer', 'Bloodmoon',
+                               '--out', run / 'chim-sol-data')),
+        *trees,
+        ('chim-sol', tool(*entry, '--data-files', run / 'chim-sol-data', '--palette', palette,
+                          '--out', run / 'chim-sol', '--qbsp', tools['qbsp'],
+                          *chim_stage_options(args), '--chim-regions-cells=' + cells,
+                          '--lighting-type', 'hybrid', '--unit-cache', args.workspace / 'cache/chim-sol-units',
+                          '--jobs', jobs, '--validate', '--stats', '--sdk', args.sdk))]
+    # the image takes the layer's frames as the store chimsol (tools/chim/sol_test.py), only with this option
+    return [(name, list(command) + ['--chim-sol-world', str(run / 'chim-sol')] if name == 'image' else command)
+            for name, command in steps]
+
+
 def chim_town_commands(args, builder, steps, tool, run, tools, jobs):
     """Replace each CHIM-native town's legacy chain stage by its chim-town stage (tools/chim_town.py,
     after the CHIM world): residents, frame entities, region table and door bank from the game data.
@@ -1424,6 +1460,7 @@ def commands(args, tools, run):
             steps = [(name, command + ['--chim-world', str(run / 'chim-world'), '--chim-lighting-type',
                                        builder.get('chim_lighting_type') or 'hybrid'] if name == 'image' else command)
                      for name, command in steps]
+            steps = chim_sol_test_commands(args, steps, tool, run, tools, jobs)
             steps = chim_town_commands(args, builder, steps, tool, run, tools, jobs)
             if getattr(args, 'interior_format', 'chim') == 'chim':
                 steps = chim_interior_commands(args, steps, tool, run, tools, jobs)
@@ -2167,16 +2204,40 @@ def check_known_game_data(args, data):
               'they are used (--game-data-policy warn). See docs/KNOWN_INPUTS.md', flush=True)
     args.known_game_data = report
     # Tribunal and Bloodmoon, plainly: found or not, used now, waiting (tools/expansions_report.py; report only).
-    # The coming --no-dlc flag (DLC-BUILD-LATER) sets args.no_dlc.
+    # --dlc / --no-dlc (DLC-BUILD-LATER) choose the layers; the default is every expansion found.
+    selected = expansion_selection(args)   # a contradictory choice stops the build here, before any stage
+    args.expansion_layers = {'requested': 'none' if selected == [] else (getattr(args, 'dlc', None) or 'default'),
+                             'layers': []}
     try:
         import expansions_report
-        args.expansions_record = expansions_report.report(report, no_dlc=getattr(args, 'no_dlc', False))
+        args.expansions_record = expansions_report.report(report, no_dlc=selected == [], selected=selected)
+        args.expansion_layers['layers'] = args.expansions_record.get('layers', [])
+        print('Expansion layers: %s (requested: %s)' % (', '.join(args.expansion_layers['layers']) or 'none',
+                                                        args.expansion_layers['requested']), flush=True)
         for text in expansions_report.lines(args.expansions_record):
             print(text, flush=True)
     except Exception as exc:  # the report never stops a build
         print('[warning] expansions report not made: %s' % exc, flush=True)
         args.expansions_record = None
     return report
+
+
+DLC_CHOICES = {'tribunal': ['Tribunal'], 'bloodmoon': ['Bloodmoon'], 'both': ['Tribunal', 'Bloodmoon'], 'none': []}
+
+
+def expansion_selection(args):
+    """The expansions --dlc / --no-dlc / --no-dlcs ask for: a list of names, [] for none, or None (the default:
+    every expansion found). --no-dlc with --dlc naming an expansion is refused (ValueError)."""
+    dlc = getattr(args, 'dlc', None)
+    if getattr(args, 'dlc_off', False) or getattr(args, 'no_dlc', False):
+        if dlc not in (None, 'none'):
+            raise ValueError('--no-dlc and --dlc %s contradict each other: give one of them' % dlc)
+        return []
+    if dlc is None:
+        return None
+    if dlc not in DLC_CHOICES:
+        raise ValueError('--dlc must be one of %s' % ', '.join(DLC_CHOICES))
+    return list(DLC_CHOICES[dlc])
 
 
 def input_hashes(args):
@@ -3278,6 +3339,8 @@ def _main(argv=None):
         # The expansions block (tools/expansions_report.py): build-state.json and the summary, never a stage key.
         metadata['expansions'] = getattr(args, 'expansions_record', None)
         summary.expansions = metadata['expansions']
+        # The layer set --dlc / --no-dlc chose (DLC-BUILD-LATER): recorded, never a key of a base stage.
+        metadata['expansion_layers'] = getattr(args, 'expansion_layers', None)
         lock = getattr(args, '_input_lock', None)
         lock_path = lock.save() if lock is not None else None
         if lock_path:

@@ -1,0 +1,24 @@
+{
+  "schema": "aw-tree-copies-1",
+  "note": "Tree type 2 (TREES-DEPTH-56): per tree model of a layer, a billboard sprite and an eight-sided star of four oriented sprites at the angles below, both baked from the original model. Read only by the layer's test stage chim-sol-trees (tools/chim_tree_copies.py); no base stage reads this file.",
+  "star_angles_degrees": [0, 45, 90, 135],
+  "outline_points": 16,
+  "star_prism": {
+    "note": "Route D, the maintainer's drawing (10 November 2026): a closed opaque star-footprint crown of stacked tiers on a trunk; sizes from each model's vertices (tools/chim_tree_star.py).",
+    "tiers": 3,
+    "point_depth": 0.45,
+    "crown_bottom_share": 0.15,
+    "tier_overlap": 0.3,
+    "trunk_half_width_share": 0.06,
+    "inner_shade": 0.3,
+    "undersides": false,
+    "trunk_sides": 6,
+    "needle_texture": "baked",
+    "texture_units": 128
+  },
+  "layers": {
+    "bloodmoon": {
+      "model_stem_contains": ["tree_bm"]
+    }
+  }
+}

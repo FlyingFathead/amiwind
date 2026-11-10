@@ -61,6 +61,17 @@ class CombatSourceContractTests(unittest.TestCase):
                 self.assertIsNone(re.search(r'\b(malloc|calloc|realloc|Hunk_\w+|Z_Malloc|Cache_Alloc)\s*\(', text))
                 self.assertIsNone(re.search(r'\b(rand|srand|random)\s*\(', text))
 
+    def test_incomplete_settings_are_read_once_per_load(self):
+        """COMBAT-SETTINGS-REREAD-63: an incomplete combat/settings.txt was opened again on every actor spawn (16 opens in
+        one frame after an arrival); it is read once per load, the scene spawn clears the mark for the next map."""
+        text = code('aw_combat.c')
+        load = text[text.index('int AW_CombatSettingsLoad(void) {'):]
+        load = load[:load.index('\n}\n')]
+        self.assertLess(load.index('if(settings_tried)return 0;'), load.index('COM_FOpenFile("combat/settings.txt"'))
+        self.assertIn('settings_tried=1;', load)
+        spawn = text[text.index('void AW_CombatSceneSpawn(void) {'):]
+        self.assertIn('settings_tried=0;', spawn[:spawn.index('\n}\n')])
+
     def test_combat_sounds_on_and_flee_off_by_default(self):
         # COMBAT-SOUNDS-RULE-OFF-58: the swing sounds as OpenMW plays them are a shipped feature, default on;
         # the flee rule stays an A/B switch, default off. Order follows the enum in aw_combat.h.

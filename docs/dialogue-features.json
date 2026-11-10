@@ -1,6 +1,6 @@
 {
   "schema": "dialogue-features 1",
-  "updated": "2026-11-09",
+  "updated": "2026-11-10",
   "requirement": "v0.0.58 ships the dialogue feature-complete against the original and OpenMW 0.51 (decided for the project, 31 October 2026); a row that is not done blocks the release unless it carries the maintainer's written deferral. Status on 8 November 2026: dialogue choices show as rows in the conversation text, picked by a click or the arrow keys and Enter, and each pick is answered by the first answer of the topic whose filters pass, such as paying only when you have the gold; this still needs its check in the game (DIALOGUE-CHOICES-62). Characters who threaten you in dialogue attacking when the talk ends, and fights that start from dialogue results across the whole game, are being checked (DIALOGUE-AGGRO-62). They lead the next landmark, every game script running as in the original, measured by the MWScript feature tracker; other fixes continue alongside.",
   "measured": {
     "source": "tools/dialogue_lut.py on Morrowind.esm (the report's coverage block), measured again on 7 November 2026 with the v0.0.62 table and the Alarmed condition live (CRIME-59); first measured 31 October 2026, the 114 RankRequirement conditions moved to live on 1 November 2026 (FACTION-RANK-58)",
@@ -213,8 +213,8 @@
       "area": "journal",
       "state": "partial",
       "what": "The 632 quests and their 2,489 entries with their names and the finished and restart marks.",
-      "proof": "tests/test_dialogue_lut.py (the journal table).",
-      "missing": "The journal book does not read them from the table yet.",
+      "proof": "tests/test_dialogue_lut.py (the journal table); tests/aga_questbook_test.c (the journal book reads the marks: a quest with a success and a failure ending, a restart entry, an index without an entry).",
+      "missing": "The journal book reads the marks since v0.0.64 (a quest is finished by its ending's entry, reopened by a restart entry, as OpenMW); no in-game still yet.",
       "bugs": []
     },
     {

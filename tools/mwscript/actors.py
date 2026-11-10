@@ -198,6 +198,7 @@ class ActorTables:
                     struct.unpack_from('<i', spdt, 8)[0] & SPELL_PC_START:
                 self.pc_start.append(self.spell(_text(_first(fields, 'NAME')) or key))
         self.report['pc_start_spells'] = len(self.pc_start)
+        self.trap_spells = getattr(data, 'trap_spells', {})
 
     # --- enchantments (AENC, v0.0.61) ---
     def _enchantments(self):
@@ -446,6 +447,11 @@ class ActorTables:
     def sections(self, objects):
         """{tag: (bytes, rows)} of the actor sections; OBJECTS: the program's object table rows (OACT)."""
         s = self.string
+        # TRAPS-WHEN-OPENED-63: every trap spell a placed door or container names gets its ASPT row, after every other
+        # row (the actors' and the scripts' rows keep their numbers); the engine finds it by id (ASPX) when a trap
+        # springs and casts it with the spell code (aw_cast.c AW_CastOn)
+        self.report['trap_spells'] = sum(1 for key, ident in self.trap_spells.items()
+                                         if key in self.records['SPEL'] and self.spell(ident) >= 0)
         actb = bytearray()
         for row in self.rows:
             actb += struct.pack('>HBBH8H27B4BBBbHHHHHHIHHHHBB6HH', row['id'], row['kind'], row['flags'],

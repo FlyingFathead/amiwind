@@ -729,7 +729,7 @@ def build_frames(out, frames, settings=None, terrain_light=12, jobs=1, cache=Non
     are laid out in Hilbert order of their cells; placement ids run on across
     frames; model and texture ids follow the pack walk over every frame."""
     from contextlib import nullcontext
-    from chim.models import engine_texture_name
+    from chim.fence import engine_name as engine_texture_name     # '{' for see-through textures, else as before
     section = timer.section if timer else (lambda name: nullcontext())
     if not frames:
         raise ValueError('A world needs at least one frame')

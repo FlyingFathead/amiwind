@@ -1099,6 +1099,9 @@ void R_DrawBEntitiesOnList (void)
 R_EdgeDrawing
 ================
 */
+/* d_fence.c sets both (D_FenceInit); host tests of this file link without it */
+void (*r_fence_begin) (void), (*r_fence_draw) (void);
+
 void R_EdgeDrawing (void)
 {
 	edge_t	ledges[NUMSTACKEDGES +
@@ -1129,6 +1132,8 @@ void R_EdgeDrawing (void)
 	}
 
 	R_BeginEdgeFrame ();
+	if (r_fence_begin)
+		r_fence_begin ();	/* see-through faces: an empty list, the cache state of aw_fence */
 
 	if (r_dspeeds.value)
 	{
@@ -1235,6 +1240,10 @@ SetVisibilityByPassages ();
 		se_time2 = Sys_FloatTime ();
 		de_time1 = se_time2;
 	}
+
+	/* see-through faces after the opaque world wrote its z, before models and sprites test it (d_fence.c) */
+	if (r_fence_draw)
+		r_fence_draw ();
 
 	AW_RT_BEGIN(t0);
 	AW_Mark(1); R_DrawEntitiesOnList (); AW_EndMark(1);

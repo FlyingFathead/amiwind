@@ -38,11 +38,11 @@ const sandbox = Object.assign(win, {document: doc, window: win, console, setTime
 const context = vm.createContext(sandbox);
 vm.runInContext(fs.readFileSync(kit + '/chim-legend.js', 'utf8'), context);
 // The interior tracker block (panel-fold.js, interior-tracker.js), as the page loads them.
-for (const f of ['panel-fold.js', 'interior-tracker.js']) if (fs.existsSync(kit + '/' + f)) vm.runInContext(fs.readFileSync(kit + '/' + f, 'utf8'), context);
+for (const f of ['panel-fold.js', 'interior-tracker.js', 'expansion-views.js']) if (fs.existsSync(kit + '/' + f)) vm.runInContext(fs.readFileSync(kit + '/' + f, 'utf8'), context);
 const html = fs.readFileSync(kit + '/world-map.html', 'utf8');
 const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]);
 let code = scripts[scripts.length - 1];
-code += '\n;globalThis.__t = {draw, get view() { return view; }, geometry, setChim, get layout() { return layout; }, zoomAt, viewFit, get itIr() { return itIr; }, get itEntr() { return itEntr; }, chimOverview, LAYERS, chimLegend, legendHtml, chimCls};';
+code += '\n;globalThis.__t = {draw, get view() { return view; }, geometry, setChim, get layout() { return layout; }, zoomAt, viewFit, get itIr() { return itIr; }, get itEntr() { return itEntr; }, chimOverview, LAYERS, chimLegend, legendHtml, chimCls, get evView() { return evView; }, get evList() { return evList; }, viewSelect, mhRender};';
 try { vm.runInContext(code, context); } catch (e) { console.log('LOAD ERROR', e.stack.split('\n').slice(0, 4).join('\n')); process.exit(1); }
 const T = context.__t;
 try {
@@ -78,4 +78,8 @@ if (dd.headline.groups && dd.headline.states) {
   for (const c of Object.values(dd.cells)) assert.strictEqual(T.chimCls(c), c.chim.state);
   console.log('grouped legend rows ok');
 }
+// expansion views: the Mournhold screen is offered only when the data holds Tribunal rooms, and it draws without errors
+const hasMh = (dd.interior_rooms && dd.interior_rooms.rooms || []).some(r => r.master === 'Tribunal.esm' || r.island === 'Mournhold');
+assert.strictEqual(T.evList.some(v => v.id === 'mournhold'), hasMh, 'the Mournhold view follows the data');
+if (hasMh) { T.viewSelect('mournhold'); T.mhRender(); assert.strictEqual(T.evView, 'mournhold'); for (const v of T.evList) { T.viewSelect(v.id); T.draw(); } console.log('mournhold screen ok'); }
 console.log('page run ok');

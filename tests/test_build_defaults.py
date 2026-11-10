@@ -278,6 +278,10 @@ OPTIONS = {
     'recover_image_from': 'mode',
     'autorun_fs_uae': 'mode', 'kickstart_file': 'input', 'amiga_libs_policy': 'check',
     'game_data_policy': 'check', 'check_hashes': 'check', 'allow_data_differences': 'check',
+    # which expansion layers a build uses (DLC-BUILD-LATER); the default is every expansion found
+    'dlc': 'mode', 'dlc_off': 'mode',
+    # the Bloodmoon layer's CHIM test frames (TEST BUILDS ONLY; the image does not take them)
+    'chim_sol_test': 'opt-in, not shipped', 'chim_sol_tree_copies': 'opt-in, not shipped',
     'name': 'tooling', 'sdk': 'tooling', 'vasm': 'tooling', 'upstream_archive': 'check',
     'quake_tools': 'tooling', 'qcc': 'tooling', 'ffmpeg': 'tooling', 'xdftool': 'tooling',
     'rdbtool': 'tooling', 'gallery_cache': 'tooling', 'gallery_seed_run': 'tooling',

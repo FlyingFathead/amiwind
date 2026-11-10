@@ -33,6 +33,7 @@
 #include "aw_move.h"
 #include "aw_magic.h"
 #include "aw_levelup.h"
+#include "aw_reset.h"
 void AW_CamInit(void);
 extern trace_t SV_ClipMoveToEntity(edict_t *,vec3_t,vec3_t,vec3_t,vec3_t);
 static edict_t *player(void) {
@@ -268,6 +269,10 @@ static void savelogs_command(void)
 /* dbg god / dbg godmode: Quake's god cheat (Host_God_f, FL_GODMODE, the HUD GOD
  * indicator) with the usual on/off, true/false or 1/0 words. Not saved. The
  * state lives only in the player's edict; this asks Quake's own "god" to flip it. */
+/* GODMODE-LAVA-DEATH-62 round three: the switch kept across map changes (aw_scene.c aw_godmode_kept) starts off with
+ * New Game and dbg restartgame (aw_reset.h) */
+static void godmode_reset(int new_game){(void)new_game;aw_godmode_kept=0;}
+static unsigned long godmode_digest(void){return AW_ResetHash(AW_RESET_SEED,&aw_godmode_kept,sizeof(aw_godmode_kept));}
 static void godmode_command(void)
 {
     char *text=Cmd_Argv(1);int on,now;
@@ -344,6 +349,7 @@ void AW_DebugInit(void) {
     AW_InspectInit();
     {extern void (*aw_walkto_move)(usercmd_t *);aw_walkto_move=walkto_move;}
     Cvar_RegisterVariable(&aw_logs_live);Cmd_AddCommand("aw_logs_live_set",logs_live_command);Cmd_AddCommand("aw_savelogs",savelogs_command);Cmd_AddCommand("aw_godmode",godmode_command);
+    AW_ResetRegister("god mode across maps",godmode_reset,godmode_digest);
     AW_GalleryInit();AW_SweepInit();AW_WorldUIInit();AW_PlacedInit();AW_StatsWindowInit();AW_AlchemyInit();AW_DebugTorchInit();    AW_StreamInit();AW_PhotoInit();AW_SpikeInit();Chim_Init();
     /* CHIM's window (type 1 crossings) names a cell's region map through the world directory. */
     {extern int (*chim_cell_map)(int,int,char *,int);chim_cell_map=AW_CellMap;}
@@ -352,6 +358,7 @@ void AW_DebugInit(void) {
      aw_chim_window_slot=Chim_WindowSlot;aw_chim_map_frame=Chim_MapFrame;aw_frame_map_entities=frame_map_entities;}
     {extern void (*aw_session_shift)(const float *);aw_session_shift=AW_SessionShift;}
     AW_MiniwindInit();AW_QuickCharInit();AW_TestBoxInit();
+    {extern void AW_LoadTraceInit(void);AW_LoadTraceInit();}   /* dbg loadtrace, aw_loadtrace (LOAD-HANG-WATCHDOG-62) */
     Cvar_RegisterVariable(&aw_census_legacy);aw_intro_census_legacy=AW_CensusLegacy;   /* CENSUS-INTRO-SCRIPTS-62 */
     AW_NpcPartsInit();     /* aw_npc_tables_areas (NPC-RECIPES-PER-AREA-59) */
     AW_CamInit();AW_InputDebugInit();AW_BoundsInit();AW_DoorAudioInit();AW_HingedDoorInit();aw_hinged_story=AW_OpeningHingedStory;AW_TalkInit();AW_MwscriptInit();AW_CompanionInit();AW_CombatInit();AW_AmbientInit();AW_MoveInit();AW_ActorsInit();AW_ViewInit();AW_LavaInit();AW_BreathInit();AW_MagicInit();AW_AnimInit();AW_GlutInit();AW_DialWindowInit();AW_AnimKitInit();AW_HalloweenInit();AW_DemoWindInit();AW_WaitInit();AW_LevelupInit();AW_ConsoleInit();AW_SceneInit();AW_LoadFailInit();AW_CensusInit();AW_UIInit();AW_IconsInit();AW_IntroInit();AW_SaveInit();AW_RecorderInit();

@@ -195,6 +195,90 @@ class EngineSmokeTests(unittest.TestCase):
         self.assertEqual(classify([0x00F811BC, 0x00FA838C], tasks, stack)[0], 'unknown')
         self.assertIn('FAIL long frame (busy)', engine_smoke.PROBE)
 
+    def test_every_stop_is_examined_and_names_the_pending_request(self):
+        """SMOKE-INPLAY-UNSAMPLED-63: the not-in-play stop goes through the examination too, any other FAIL is
+        examined before the run ends, and the examination names the queued request and its handler."""
+        text = engine_smoke.PROBE
+        start = text.index('inplay(){')
+        body = text[start:text.index('# stall:', start)]
+        self.assertIn('stall "$1 is not in play', body)
+        self.assertNotIn('finish "FAIL $1 is not in play', body)
+        self.assertIn('stall "map ${TP#map:} did not load a map', text)
+        self.assertIn('stall(){ : > $R/examined;', text)
+        self.assertIn('log "examined at the stop:', text)
+        classify = self.stall_classify()
+        game = ('Initial CLI', 0x4000F8A8, 0x100, True)
+        tasks = [game, ('DH0', 0x40010618, 0x40000100, True), ('AWCTL', 0x40020000, 0x40000100, True)]
+        idle = [0xF81476, 0xF81478, 0xF81478]
+        reply = game[1] + 0x5C
+        kind, details = classify(idle, tasks, [], {'AWCTL': [(0x40030000, reply, 87, 0x40031000)]})
+        self.assertEqual(kind, 'emulator-disk')
+        self.assertIn("request WRITE (arg1 $40031000, packet $40030000) queued on AWCTL's port, not taken", details)
+        kind, details = classify(idle, tasks, [], {'Initial CLI': [(0x40030000, reply, 82, 0x1234)]})
+        self.assertEqual(kind, 'emulator-disk')
+        self.assertIn('completion signal was lost', details)
+        # another process's packet on a handler port is not the game's; nothing named, no stack holder: unknown
+        kind, details = classify(idle, tasks, [], {'DH0': [(0x40030000, 0x40099999, 82, 0)]})
+        self.assertEqual(kind, 'unknown')
+        self.assertIn('no request of the game queued', details)
+        self.assertIn('ports not read', classify(idle, tasks, [])[1])
+
+    def test_ide_trace_is_left_out_unless_asked(self):
+        """SMOKE-IDE-TRACE-LOG-63: the IDE transfer lines (compiled into the emulator package) leave the kept logs by
+        default; --ide-trace keeps them."""
+        self.assertIn('idetrim $R/logs/fs-uae.log.txt $R/logs/fsuae.log', engine_smoke.PROBE)
+        self.assertIn("f'IDETRACE={int(args.ide_trace)}'", (ROOT / 'tools/engine_smoke.py').read_text())
+        text = engine_smoke.PROBE
+        start = text.index('idetrim(){')
+        body = text[start:text.index('done; }', start) + len('done; }')]
+        if not shutil.which('sh'):
+            self.skipTest('a POSIX shell is required')
+        with tempfile.TemporaryDirectory() as tmp:
+            log = Path(tmp, 'fs-uae.log.txt')
+            for trace, kept, said in (('0', 2, '2 lines left out'), ('1', 4, '')):
+                log.write_text('IDE0 read finished\nkeep one\nIDE INT 80 -> 08\nkeep two\n', encoding='utf-8')
+                script = Path(tmp, 't.sh')
+                script.write_text('log(){ echo "$*"; }\nIDETRACE=%s\n%s\nidetrim %s\n' % (trace, body, log.as_posix()),
+                                  encoding='utf-8', newline='\n')
+                done = subprocess.run(['sh', str(script)], capture_output=True, text=True, timeout=60)
+                self.assertEqual(done.returncode, 0, done.stderr)
+                self.assertEqual(len(log.read_text(encoding='utf-8').splitlines()), kept)
+                self.assertIn(said, done.stdout)
+
+    def test_load_trace_is_a_separate_switch_and_its_ring_is_read_at_a_stop(self):
+        """LOAD-HANG-WATCHDOG-62: --load-trace (off by default) puts aw_loadtrace 1 into the play copy's autoexec and
+        LOADTRACE=1 into the run; the examination decodes the engine's ring (aw_loadtrace.c layout) and names the
+        calls that never finished."""
+        source = (ROOT / 'tools/engine_smoke.py').read_text()
+        self.assertIn("trace_line = 'aw_loadtrace 1\\\\n' if args.load_trace else ''", source)
+        self.assertIn("printf 'aw_remote 1\\\\n{trace_line}' > /tmp/autoexec.cfg", source)
+        self.assertIn("f'LOADTRACE={int(args.load_trace)}'", source)
+        self.assertIn("default=os.environ.get('AW_SMOKE_LOAD_TRACE') == '1'", source)
+        self.assertIn('trace = load_trace()', engine_smoke.STALL_PY)
+        space = {'__name__': 'stall'}
+        exec(compile(engine_smoke.STALL_PY, 'stall.py', 'exec'), space)
+        ring_lines = space['ring_lines']
+
+        def entry(t0, t1, nbytes, result, op, stage, name):
+            return (t0.to_bytes(4, 'big') + t1.to_bytes(4, 'big') + (nbytes & 0xFFFFFFFF).to_bytes(4, 'big')
+                    + (result & 0xFFFFFFFF).to_bytes(4, 'big') + bytes([op]) + stage.encode().ljust(11, b'\0')
+                    + name.encode().ljust(36, b'\0'))
+        entries = [entry(0, 0, 0, 0, 0, '', '')] * 4
+        # 6 calls through a 4-entry ring: calls 3..6 kept, call N in entry (N - 1) mod 4
+        entries[2] = entry(100, 110, 0, -1, 1, 'after-bsp', 'id1/combat/settings.txt')     # call 3
+        entries[3] = entry(120, 130, 4096, 4096, 2, 'after-bsp', 'maps/balmora.chim')        # call 4
+        entries[0] = entry(140, 141, 0, 0, 4, 'after-bsp', 'maps/balmora.chim')              # call 5
+        entries[1] = entry(150, 0xFFFFFFFF, 512, 0, 2, 'after-actor', 'progs/a.mdl')         # call 6
+        raw = b'AWLTRACE' + (6).to_bytes(4, 'big') + (4).to_bytes(4, 'big') + (64).to_bytes(4, 'big') + bytes(4)
+        lines, unfinished = ring_lines(raw + b''.join(entries))
+        self.assertEqual(lines, ['LT 3 after-bsp open id1/combat/settings.txt 0 bytes -> -1, at 100 ms, 10 ms',
+                                 'LT 4 after-bsp read maps/balmora.chim 4096 bytes -> 4096, at 120 ms, 10 ms',
+                                 'LT 5 after-bsp close maps/balmora.chim 0 bytes -> 0, at 140 ms, 1 ms',
+                                 'LT 6 after-actor read progs/a.mdl 512 bytes, at 150 ms, NOT FINISHED'])
+        self.assertEqual(unfinished, lines[-1:])
+        self.assertEqual(ring_lines(b'NOTARING' + raw[8:]), ([], []))
+        self.assertEqual(ring_lines(raw[:20]), ([], []))
+
     def test_emulator_disk_stall_is_retried_once(self):
         with tempfile.TemporaryDirectory() as tmp:
             engine = Path(tmp, 'AmiWind')
@@ -469,3 +553,205 @@ class ScriptedSessionTests(unittest.TestCase):
             result = subprocess.run(['sh', '-c', stubs + block], capture_output=True, text=True, timeout=30)
         self.assertIn('FAIL scripted run ended outside play', result.stdout)
         self.assertNotIn('PASS', result.stdout)
+
+
+class LoadHangExperimentTests(unittest.TestCase):
+    """CHIM-SEYDA-BALMORA-LOAD-HANG-43, experiments E2 (remote console off against on) and E3 (extra emulator lines,
+    e.g. deterministic = 1): what can be checked without the emulator."""
+
+    def run_main(self, *argv):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            code = engine_smoke.main(list(argv))
+        return code, out.getvalue()
+
+    def setup_dirs(self, tmp):
+        engine = Path(tmp, 'AmiWind')
+        engine.write_bytes(b'x')
+        roms = Path(tmp, 'roms')
+        roms.mkdir()
+        Path(roms, 'kickstart-3.1-a1200.rom').write_bytes(b'k')
+        return engine, roms
+
+    def test_route_autoexec(self):
+        text = engine_smoke.route_autoexec('seyda', '-21800 -12300', 120, load_trace=True)
+        lines = text.splitlines()
+        self.assertEqual(lines[:3], ['dbg all on', 'dbg coords on', 'aw_loadtrace 1'])
+        self.assertNotIn('aw_remote', text)
+        self.assertEqual(lines[3], 'alias aw_e2w "%s"' % ';'.join(['wait'] * 50))
+        self.assertEqual(lines[4], 'alias aw_e2p "aw_e2w;aw_e2w;aw_e2w"')        # 120 frames -> 3 x 50
+        self.assertEqual(lines[5], 'alias aw_e2b "dbg tp -21800 -12300;aw_e2p;aw_e2s"')
+        self.assertEqual(lines[6], 'alias aw_e2s "map seyda;aw_e2p;aw_e2b"')
+        self.assertEqual(lines[7], 'aw_e2s')
+        self.assertTrue(all(len(l) < 1000 for l in lines))
+        self.assertNotIn('aw_loadtrace', engine_smoke.route_autoexec('seyda', '1 2', 1))
+        for bad in (('seyda;quit', '1 2', 10), ('seyda', '1 2;quit', 10), ('seyda', '1 2', 0)):
+            with self.assertRaises(ValueError):
+                engine_smoke.route_autoexec(*bad)
+
+    def test_emulator_options_parse_and_lines(self):
+        opts = engine_smoke.parse_emu_options(['deterministic=1', 'cpu_idle = 0'])
+        self.assertEqual(opts, [('deterministic', '1'), ('cpu_idle', '0')])
+        self.assertEqual(engine_smoke.emu_config_lines(opts), 'deterministic = 1\ncpu_idle = 0\n')
+        self.assertEqual(engine_smoke.parse_emu_options(['none']), [])
+        for bad in ('deterministic', 'Bad=1', 'x=1\nhard_drive_9=y', 'zorro_iii_memory=1', 'hard_drive_2=/x',
+                    'jit_compiler=0', 'x=a b'):
+            with self.assertRaises(ValueError, msg=bad):
+                engine_smoke.parse_emu_options([bad])
+
+    def test_emulator_option_is_checked_in_the_log(self):
+        log = 'something\nlibamiga enabling net play mode\n'
+        self.assertEqual(engine_smoke.emu_check([('deterministic', '1')], [log]), [])
+        self.assertEqual(engine_smoke.emu_check([('deterministic', '1')], ['nothing']), ['deterministic=1'])
+        self.assertEqual(engine_smoke.emu_check([('cpu_idle', '0')], ['cpu_idle = 0']), [])
+        self.assertEqual(engine_smoke.emu_check([('cpu_idle', '0')], ['cpu_idle = 1']), ['cpu_idle=0'])
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, 'judge.py').write_text(engine_smoke.JUDGE_PY, encoding='utf-8')
+            Path(tmp, 'o.txt').write_text('deterministic = 1\n', encoding='utf-8')
+            Path(tmp, 'a.log').write_text(log, encoding='utf-8')
+            run = subprocess.run([sys.executable, str(Path(tmp, 'judge.py')), 'emucheck', str(Path(tmp, 'o.txt')),
+                                  str(Path(tmp, 'missing.log')), str(Path(tmp, 'a.log'))], capture_output=True, text=True)
+        self.assertEqual(run.stdout.strip(), 'EMUOPT ok deterministic=1 taken (emulator log)')
+        probe = engine_smoke.PROBE
+        self.assertIn('[ -s $R/emu-options.txt ] && cat $R/emu-options.txt >> $R/smoke.fs-uae', probe)
+        self.assertIn('shot menu; emucheck', probe)              # remote on: checked once the game answers
+        self.assertIn('[ $i = 1 ] && emucheck', probe)           # remote off: at the first screenshot
+
+    def test_frozen_clock_from_a_list_of_frames(self):
+        judge = engine_smoke.judge_frames
+        moving = [(t, 'd%d' % t) for t in range(0, 300, 10)]
+        self.assertEqual(judge(moving, 150, final=True)[0], 'PASS')
+        self.assertEqual(judge(moving, 150)[0], 'RUN')
+        # a 60 s loading picture, then play again: no stop
+        load = [(t, 'L' if 100 <= t <= 160 else 'd%d' % t) for t in range(0, 300, 10)]
+        self.assertEqual(judge(load, 150, final=True)[0], 'PASS')
+        # frozen from 100 s to the end (270 s): a stop, live and final
+        frozen = [(t, 'F' if t >= 100 else 'd%d' % t) for t in range(0, 280, 10)]
+        verdict, details = judge(frozen, 150)
+        self.assertEqual(verdict, 'STOP')
+        self.assertIn('from 100 s to 270 s', details)
+        self.assertEqual(judge(frozen, 150, final=True)[0], 'STOP')
+        # live judges only the newest run; final any run
+        past = [(t, 'F' if 50 <= t <= 210 else 'd%d' % t) for t in range(0, 300, 10)]
+        self.assertEqual(judge(past, 150)[0], 'RUN')
+        self.assertEqual(judge(past, 150, final=True)[0], 'STOP')
+        # a picture that never moved under the limit still fails the route
+        self.assertEqual(judge([(0, 'a'), (10, 'a'), (20, 'b')], 150, final=True)[0], 'FAIL')
+        self.assertEqual(judge([], 150, final=True)[0], 'FAIL')
+
+    def test_remote_off_drops_the_folder_and_runs_the_route(self):
+        probe = engine_smoke.PROBE
+        cfg = probe[probe.index('cat > $R/smoke.fs-uae <<CFG'):probe.index('\nCFG\n')]
+        self.assertNotIn('hard_drive_2', cfg)                  # only added with the remote on
+        self.assertIn('[ "${REMOTE:-1}" = 0 ] || printf \'hard_drive_2 = %s', probe)
+        block = probe[probe.index('# ROUTE-OFF-BEGIN'):probe.index('# ROUTE-OFF-END')]
+        self.assertNotIn('rc ', block)
+        self.assertNotIn('key ', block)
+        self.assertIn('stall "frozen clock', block)            # a stop is examined like any other
+        self.assertLess(probe.index('# ROUTE-OFF-END'), probe.index('# BOOT-WAIT-BEGIN'))
+        with tempfile.TemporaryDirectory() as tmp:
+            engine, roms = self.setup_dirs(tmp)
+            sha = engine_smoke.sha256(engine)
+            calls = []
+
+            def fake(*args, **kw):
+                calls.append(args)
+                if '/out/probe.sh' in args:
+                    out = Path(next(a for a in args if str(a).endswith(':/out'))[:-5])
+                    (out / 'logs').mkdir(parents=True, exist_ok=True)
+                    (out / 'logs' / 'steps.log').write_text('00:00 smoke RESULT PASS remote console off, route x\n',
+                                                            encoding='utf-8')
+                return subprocess.CompletedProcess(args, 0, 'world=\nreadback=%s\n' % sha, '')
+            o = Path(tmp, 'o')
+            with unittest.mock.patch.object(engine_smoke, 'docker', side_effect=fake):
+                code, text = self.run_main('--engine', str(engine), '--volume', 'v', '--image-dir', 'build/image',
+                                           '--scratch', 'workspaces/s', '--roms', str(roms), '--out', str(o),
+                                           '--remote', 'off', '--emu-option', 'deterministic=1')
+            self.assertEqual(code, 0, text)
+            self.assertIn('alias aw_e2s "map seyda;aw_e2p;aw_e2b"', (o / 'autoexec.cfg').read_text())
+            self.assertEqual((o / 'emu-options.txt').read_text(), 'deterministic = 1\n')
+            self.assertTrue((o / 'judge.py').is_file())
+            self.assertIn('remote console off', (o / 'engine.txt').read_text())
+            prep = next(a for a in calls if '-prep' in ' '.join(map(str, a)))
+            self.assertIn('cp /t/autoexec.cfg /tmp/autoexec.cfg', prep[-1])
+            self.assertNotIn('aw_remote', prep[-1])
+            run = next(a for a in calls if '/out/probe.sh' in a)
+            self.assertIn('REMOTE=0', run)
+            # remote on (default): the old autoexec, REMOTE=1
+            calls.clear()
+            with unittest.mock.patch.object(engine_smoke, 'docker', side_effect=fake):
+                self.run_main('--engine', str(engine), '--volume', 'v', '--image-dir', 'build/image',
+                              '--scratch', 'workspaces/s', '--roms', str(roms), '--out', str(o))
+            prep = next(a for a in calls if '-prep' in ' '.join(map(str, a)))
+            self.assertIn("printf 'aw_remote 1\\n' > /tmp/autoexec.cfg", prep[-1])
+            self.assertIn('REMOTE=1', next(a for a in calls if '/out/probe.sh' in a))
+            self.assertFalse((o / 'emu-options.txt').exists())
+
+    def test_bad_options_exit_2_before_any_container(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            engine, roms = self.setup_dirs(tmp)
+            common = ['--engine', str(engine), '--volume', 'v', '--image-dir', 'i', '--scratch', 's', '--roms',
+                      str(roms), '--out', str(Path(tmp, 'o'))]
+            for extra in (['--remote', 'maybe'], ['--emu-option', 'hard_drive_0=/x'],
+                          ['--remote', 'off', '--tp', 'same 1 2'], ['--remote', 'off', '--start', 'enter'],
+                          ['--alternate', 'emu']):
+                with unittest.mock.patch.object(engine_smoke, 'docker') as docker:
+                    code, _text = self.run_main(*common, *extra)
+                self.assertEqual(code, 2, extra)
+                docker.assert_not_called()
+            with unittest.mock.patch.dict('os.environ', {'AW_SMOKE_EMU_OPTION': 'kickstart_file=/x'}), \
+                    unittest.mock.patch.object(engine_smoke, 'docker'):
+                self.assertEqual(self.run_main(*common)[0], 2)
+
+    def test_alternating_counts(self):
+        self.assertEqual(engine_smoke.count_class('PASS boot'), 'pass')
+        self.assertEqual(engine_smoke.count_class('FAIL emulator disk stall (X) y'), 'stop')
+        self.assertEqual(engine_smoke.count_class('FAIL frozen clock on the route, remote console off: z'), 'stop')
+        self.assertEqual(engine_smoke.count_class('FAIL dbg music off not confirmed'), 'fail')
+        self.assertEqual(engine_smoke.strip_options(['--a', '1', '--b=2', '--c', '3'], ('--a', '--b')), ['--c', '3'])
+        with tempfile.TemporaryDirectory() as tmp:
+            engine, roms = self.setup_dirs(tmp)
+            seen = []
+
+            def fake_main(argv):
+                o = Path(argv[argv.index('--out') + 1])
+                seen.append(argv)
+                (o / 'logs').mkdir(parents=True)
+                off = argv[argv.index('--remote') + 1] == 'off'
+                (o / 'logs' / 'steps.log').write_text('smoke RESULT %s\n' % (
+                    'FAIL frozen clock x' if off and len(seen) == 2 else 'PASS y'), encoding='utf-8')
+                return 0
+            argv = ['--engine', str(engine), '--volume', 'v', '--image-dir', 'i', '--scratch', 's', '--roms', str(roms),
+                    '--out', str(Path(tmp, 'o')), '--alternate', 'remote', '--runs', '2', '--emu-option', 'deterministic=1']
+            real = engine_smoke.main
+
+            def route(a=None):
+                return real(a) if '--alternate' in a else fake_main(a)
+            with unittest.mock.patch.object(engine_smoke, 'main', side_effect=route):
+                out = io.StringIO()
+                with contextlib.redirect_stdout(out):
+                    code = engine_smoke.main(argv)
+            self.assertEqual(code, 0)
+            self.assertEqual([a[a.index('--remote') + 1] for a in seen], ['on', 'off', 'on', 'off'])   # alternating
+            self.assertTrue(all('--no-stall-retry' in a and a.count('--emu-option') == 1 for a in seen))
+            self.assertNotIn('--alternate', seen[0])
+            self.assertIn('COUNTS remote-on: 2 pass, 0 stop, 0 other fail of 2; '
+                          'remote-off: 1 pass, 1 stop, 0 other fail of 2', out.getvalue())
+            self.assertIn('1\tremote-off\tstop\tFAIL frozen clock x', Path(tmp, 'o', 'counts.tsv').read_text())
+            # emu: plain (no option) then with it, the remote on in both
+            seen.clear()
+            argv[argv.index('remote')] = 'emu'
+            with unittest.mock.patch.object(engine_smoke, 'main', side_effect=route):
+                with contextlib.redirect_stdout(io.StringIO()):
+                    engine_smoke.main(argv)
+            self.assertEqual([a[a.index('--emu-option') + 1] for a in seen], ['none', 'deterministic=1'] * 2)
+            self.assertTrue(all(a[a.index('--remote') + 1] == 'on' for a in seen))
+
+    def test_judge_script_runs_alone(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, 'judge.py').write_text(engine_smoke.JUDGE_PY, encoding='utf-8')
+            Path(tmp, 'frames.txt').write_text(''.join('%d %s route-%03d\n' % (t, 'F' if t >= 50 else 'x%d' % t, t)
+                                                       for t in range(0, 300, 10)), encoding='utf-8')
+            run = subprocess.run([sys.executable, str(Path(tmp, 'judge.py')), 'live', str(Path(tmp, 'frames.txt')),
+                                  '150'], capture_output=True, text=True)
+        self.assertTrue(run.stdout.startswith('STOP the same picture from 50 s to 290 s'), run.stdout)

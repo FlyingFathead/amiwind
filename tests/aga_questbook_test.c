@@ -7,7 +7,50 @@
 #include <string.h>
 #include "aw_questbook.h"
 
-static int finished_at_100(const char *id,int32_t stage,void *ctx){(void)ctx;(void)id;return stage>=100;}
+static int finished_at_100(const char *id,int32_t stage,void *ctx){(void)ctx;(void)id;return stage>=100?AW_QB_FINISHED:0;}
+
+/* JOURNAL-QUEST-ENDINGS-64: a quest with two endings, as the journal index marks them: 10 the start, 50 the success
+ * ending (finished), 60 the failure ending (finished), 70 a restart entry, 80 an entry without a mark. */
+static int two_endings(const char *id,int32_t stage,void *ctx){
+    (void)ctx;(void)id;
+    return stage==50 || stage==60?AW_QB_FINISHED:stage==70?AW_QB_RESTART:0;
+}
+static int book_of(const aw_qb_quest_t *q,aw_ledger_t *l,int32_t kept,const aw_qb_dated_t *d,int nd){
+    aw_questbook_t b;int fin,shown[2];
+    memset(&b,0,sizeof(b));AW_LedgerClear(l);
+    assert(AW_LedgerValueSet(l,AW_LEDGER_QUESTS,AW_LedgerNameHash(q[0].id),kept));
+    assert(AW_QuestBookBuild(&b,q,1,l,d,nd,two_endings,NULL));
+    assert(b.started==1 && b.groups==1 && (b.finished==0 || b.finished==1));
+    fin=b.group[0].finished;
+    assert(fin==b.finished);
+    /* the active list holds it only while it is active, "show all" always */
+    assert(AW_QuestBookShown(&b,0,shown,2)==!fin && AW_QuestBookShown(&b,1,shown,2)==1);
+    /* the text read is the entry of the index reached: the newest entry is the kept stage's */
+    assert(b.entry[b.entries-1].stage==kept || nd);
+    AW_QuestBookFree(&b);
+    return fin;
+}
+static void two_endings_test(void){
+    static aw_qb_quest_t q[1];aw_ledger_t l;aw_qb_dated_t d[4];int i;
+    memset(&l,0,sizeof(l));
+    strcpy(q[0].id,"a1_two_endings");strcpy(q[0].title,"Two Endings");
+    for(i=0;i<4;i++){d[i].id="a1_two_endings";d[i].days=i;d[i].milliseconds=0;}
+    /* started: active */
+    d[0].stage=10;assert(book_of(q,&l,10,d,1)==0);
+    /* the success ending: finished */
+    d[1].stage=50;assert(book_of(q,&l,50,d,2)==1);
+    /* the failure ending instead: finished too, a different entry */
+    d[1].stage=60;assert(book_of(q,&l,60,d,2)==1);
+    /* a later entry without a mark, or an index without an entry, keeps it finished */
+    d[2].stage=80;assert(book_of(q,&l,80,d,3)==1);
+    assert(book_of(q,&l,90,d,2)==1);
+    /* the restart entry reopens it; a finished entry after it finishes it again */
+    d[2].stage=70;assert(book_of(q,&l,70,d,3)==0);
+    d[3].stage=50;assert(book_of(q,&l,70,d,4)==1);
+    /* an older save: only the kept stage, no dated entries */
+    assert(book_of(q,&l,60,NULL,0)==1 && book_of(q,&l,10,NULL,0)==0 && book_of(q,&l,70,NULL,0)==0);
+    AW_LedgerClear(&l);
+}
 
 /* JOURNAL-ORIGINAL-VIEW-59: the dated journal. A wrap of 10 characters a line (the game's is aw_ui.c AW_UILine). */
 static const char *wrap10(const char *p,int width,char *out,int capacity){
@@ -129,6 +172,7 @@ int main(void){
     assert(!AW_QuestBookBuild(&b,NULL,3,&l,NULL,0,NULL,NULL));
     AW_QuestBookFree(&b);AW_LedgerClear(&l);
     dated_journal_test();
+    two_endings_test();
     puts("aga_questbook_test ok");
     return 0;
 }

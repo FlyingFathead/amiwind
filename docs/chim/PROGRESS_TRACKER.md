@@ -1,6 +1,6 @@
 # CHIM Progress Tracker
 
-_Last updated with AmiWind v0.0.48 (24 October 2026)._
+_Last updated with AmiWind v0.0.64-dev3 (10 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -18,6 +18,7 @@ _Last updated with AmiWind v0.0.48 (24 October 2026)._
 - [The release plan: gold for the next release](#the-release-plan-gold-for-the-next-release)
 - [Legend checkboxes and presets](#legend-checkboxes-and-presets)
 - [The map view](#the-map-view)
+- [The expansion views: Solstheim and Mournhold](#the-expansion-views-solstheim-and-mournhold)
 - [Interiors: every room on the tracker](#interiors-every-room-on-the-tracker)
 - [Included in build: what each packaged build holds](#included-in-build-what-each-packaged-build-holds)
 - [Track your own build and compare with the project](#track-your-own-build-and-compare-with-the-project)
@@ -221,6 +222,35 @@ overview below the map has a chart that answers what storing every mesh once sav
 panel (a) shows meshes converted as cells are converted (store-once against every cell converting its own, log scale) and
 panel (b) compares the spiral order with the risk order. Every Toolkit page carries the same header; see the
 [Toolkit guide](../AMIWIND_TOOLKIT.md#chim-progress-tracker).
+
+## The expansion views: Solstheim and Mournhold
+
+The two expansions are on the tracker beside the base game. Everything below is read from the tracker data that is
+loaded (the cells with their island, and the `interior_rooms` section), so a build or data folder without an
+expansion shows no view and no figures for it.
+
+- **Three panes, one per map**, in the view switch above the map: **Vvardenfell** (the base game), **Solstheim**
+  (the Bloodmoon expansion) and **Mournhold** (the Tribunal expansion). A pane is offered only when the loaded data
+  holds its cells or rooms.
+- **Vvardenfell** is the exterior map with the Vvardenfell cells only; Solstheim's cells are left off it, and its counts
+  are Vvardenfell's alone.
+- **Solstheim** lies on the same exterior grid, north-west of Vvardenfell, so its pane is the same map framed on the
+  island, with its cells coloured by the tracker states. Under the map, its rooms (those of Bloodmoon.esm) are drawn as
+  small squares in the state colours of the interior tracker.
+- **Mournhold** has no exterior of its own (its city is interior cells), so its pane is a screen of its own. It draws
+  the five districts that act like an exterior (interior cells with the exterior flag) as large tiles and every other
+  Tribunal room as a small square; hovering a tile names the room, its state, batch and reasons, and the room list of the
+  interior tracker sits below.
+- **Three counts per pane:** done (in the game and passed), partial (converted, but not done or not in the game yet)
+  and missing (the rest). The map panes count the exterior cells (land, empty sea and sea in the game; the open ocean
+  and the settled squares beyond the world's edge are not counted); the Mournhold pane counts its rooms, and rooms set
+  aside are counted as missing and named. A Solstheim cell counts as partial only when the data records a CHIM
+  conversion for it; otherwise it is missing.
+- **Completion rate per pane:** a line under the switch gives done over total, in percent, for Vvardenfell (its cells
+  and base-game rooms), Solstheim (its cells and the rooms of Bloodmoon.esm) and Mournhold (the rooms of Tribunal.esm),
+  so the expansions are never mixed into the base game's figure.
+The code is `amiwind-toolkit/expansion-views.js` (pure functions, checked by `tests/test_expansion_views.js`); the
+page wiring is in `world-map.html`.
 
 ## Interiors: every room on the tracker
 

@@ -1,6 +1,6 @@
 # AmiWind console commands
 
-_Generated from `config/debug-commands.txt` with AmiWind v0.0.63._
+_Generated from `config/debug-commands.txt` with AmiWind v0.0.64-dev3._
 
 Open the console with F10 or the backquote key and type
 a command, for example `dbg headlamp on`. This page is generated from
@@ -58,6 +58,7 @@ original: [the table of them](CONSOLE_COMMANDS_MORROWIND.md).
 | `dbg levelup` | `dbg skill progress` | [use SKILL [N [TYPE]] / raise SKILL [N] / book ID / read REF / check / rest [HOURS] / bed REF] levelling: no argument = level, progress, multipliers, each skill's progress; use = N skill uses (TYPE 0..3); raise = N raises; book = a skill book's first read; check = the level-up box when due; rest = HOURS (default 8), then the box when due (saved) |
 | `dbg lightgallery` | - | [off] lighting switches at this spot in a strip below the view: night mode, tint, lamps, glow, headlamp, horizon veil, time preview; arrows change, Esc done |
 | `dbg loadfail` | - | [N; no argument: status] a test aid: the next N map loads fail on purpose (0 = off); 1 shows the way back (the player returns to where the load started, with a message box: OK stays, Load Game opens the load menu), 2 a way back that fails as well (the load menu opens) |
+| `dbg loadtrace` | - | [on / off / dump] the load trace (off by default; console aw_loadtrace 0/1): every file open, read, seek and close kept in memory with its time and load stage, printed and written to RAM:amiwind-loadtrace.txt when a scene is ready; dump: now |
 | `dbg maxstats` | `dbg maxstat` | every attribute and skill to 100 and the level to 83 (the highest the game's levelling reaches), health, magicka and fatigue worked out again by the character's own rules and full; the sheet before and after on the console |
 | `dbg memcensus` | - | (the free Fast RAM and its largest block now, the map and the Hunk in use, in one console line) |
 | `dbg nightgallery` | - | [here/off] (23:00 wide view, Masser, Secunda, stars; Esc returns) |
@@ -100,6 +101,7 @@ original: [the table of them](CONSOLE_COMMANDS_MORROWIND.md).
 | `dbg cursortype` | - | [1 / 2; no argument shows the value] the mouse cursor in every window (saved; also Options > Prefs > Mouse cursor): 2 Morrowind's own pointer from your game data (default), 1 AmiWind's drawn cursor; an image without the original's pointer always shows AmiWind's |
 | `dbg cut groups` | - | [on/off, 1/0; no argument toggles] whole-structure cuts (saved as aw_cull + 16; default off until the in-game A/B): the pieces of one long structure (walkways, town walls, bridges, the Ghostfence, hillside rocks; the frame map's .cut file) are drawn, fogged and left out together, tested on the structure's box; 0 each piece on its own |
 | `dbg draw distance` | `dbg drawdistance`, `dbg fog distance` | [100..4096 local units; default 300] |
+| `dbg fence` | - | [on/off, true/false or 1/0] see-through faces (default off until measured; not saved): on = cobwebs, hanging vines and other faces whose texture has see-through texels are drawn see-through after the walls (the fence pass, rcount field fn); off = drawn solid as before |
 | `dbg fog` | - | on/off or 1/0 (default on: exterior and interior fog; the console value 2 = exterior fog only, interiors without their cell fog as before) |
 | `dbg fog location` | `dbg foglocation` | 1/0 places in id1/world/fog-locations.txt (the HUD title's place or region, or the map) set their own day/night fog distance (Ald'ruhn 300, Balmora 300 day, 250 night; default 1 on) |
 | `dbg fog rule` | - | [on/off, 1/0; no argument toggles] no distance cut before the fog is opaque (saved as aw_cull + 8; default off until the in-game A/B): the Light/Strong far detail cut-offs and the small-faces step start at the fog distance, so nothing pops out of clear air; 0 the cut-offs as before (faster) |

@@ -243,6 +243,10 @@ int AW_MwvmVoice(int k,unsigned char hash[8],int *centis){
 }
 int AW_MwvmMusic(int k){return ON && k>=0 && k<vm.nmusi && (vm.musi[4*k+1]&1)?vm.musi[4*k]:-1;}
 uint32_t AW_MwvmObjectReference(int k){return ON && k>=0 && k<vm.nobjs?u32(vm.objs+12*k):0;}
+/* WORLD-BUTTONS-62 round two: the OBJS row's id (a string index) and the object's own script (AWM_NONE none) */
+int AW_MwvmObjectCount(void){return ON?vm.nobjs:0;}
+int AW_MwvmObjectId(int k){return ON && k>=0 && k<vm.nobjs?(int)U16(vm.objs+12*k+4):-1;}
+int AW_MwvmObjectScript(int k){return ON && k>=0 && k<vm.nobjs?(int)U16(vm.objs+12*k+6):AWM_NONE;}
 int AW_MwvmTopicName(int k){return ON && k>=0 && k<vm.njrnl?(int)U16(vm.jrnl+2*k):-1;}
 int AW_MwvmTopicCount(void){return ON?vm.njrnl:0;}
 int AW_MwvmObjectActor(int k){return ON && vm.oact && k>=0 && k<vm.noact?(int)U16(vm.oact+2*k):AWM_NONE;}

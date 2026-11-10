@@ -1,6 +1,6 @@
 # Build cache: resuming and reusing work safely
 
-_Last updated with AmiWind v0.0.63-dev4 (9 November 2026)._
+_Last updated with AmiWind v0.0.64-dev3 (10 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -11,6 +11,7 @@ _Last updated with AmiWind v0.0.63-dev4 (9 November 2026)._
 - [Early cutoff](#early-cutoff)
 - [Code keys and early cutoff in the unit caches](#code-keys-and-early-cutoff-in-the-unit-caches)
   - [The table units and the actor ground fit (v0.0.63-dev4)](#the-table-units-and-the-actor-ground-fit-v0063-dev4)
+  - [Expansion rows in the measured tables (v0.0.64-dev3)](#expansion-rows-in-the-measured-tables-v0064-dev3)
   - [Collision defaults of v0.0.48-dev2: what rebuilds once](#collision-defaults-of-v0048-dev2-what-rebuilds-once)
 - [Narrowed reuse: what a stage really used](#narrowed-reuse-what-a-stage-really-used)
 - [Reuse preflight](#reuse-preflight)
@@ -278,6 +279,17 @@ in small modules of their own (`mwscript/hearing.py`, `mwscript/lexer.py`), unch
 v0.0.62 and v0.0.63 dev builds are found again (`unit_store.LEGACY_SOURCES`). The map bake's actor ground fit
 (`bake_ground`, about 41 s) had no cache; it keeps one unit per placement (`actor-ground`). Tests:
 `tests/test_table_unit_keys.py`.
+
+### Expansion rows in the measured tables (v0.0.64-dev3)
+
+A unit cache entry records the measured-table decisions it read (`tools/mesh_tables.py`); some, among them every NPC
+appearance and creature model, record `config/collision-hull-surface.json` read whole. In v0.0.64-dev2 the Bloodmoon
+rows were added to that table under its `layers` block, which changed the whole-table decision: the build baked all 418
+NPC appearances and every creature model again, though none of those bakes reads a Bloodmoon row. A whole-table record
+now also matches the table without its expansion layers' rows (`build_cache.LAYER_ROW_TABLES`, the same view the stage
+keys use): an entry recorded before a layer's rows were added is still taken; a base row added or changed, a layer row
+changed after the entry was recorded with that layer, or a single mesh row still re-keys it. Tests:
+`tests/test_mesh_table_layer_rows.py`.
 
 ### Collision defaults of v0.0.48-dev2: what rebuilds once
 

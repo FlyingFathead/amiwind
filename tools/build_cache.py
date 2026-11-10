@@ -2432,6 +2432,88 @@ def stage_environment(script, index):
     return environment
 
 
+# The game inputs a stage reads (BUILD-GAME-INPUT-KEY-BROAD-64): the masters and archives in the data folder's top
+# level that its key covers, plus every loose file in the installed asset folders. The key used to digest EVERY game
+# input, so an expansion's files merely being present re-keyed the whole base world. Every stage today reads the base
+# game; a stage that reads an expansion layer names its containers here (lower case). The expansions report and the
+# known-inputs check keep seeing the full set (metadata input_sha256 is unchanged).
+BASE_GAME_INPUTS = ('morrowind.esm', 'morrowind.bsa')
+LAYER_GAME_INPUTS = {'bloodmoon': ('bloodmoon.esm', 'bloodmoon.bsa'), 'tribunal': ('tribunal.esm', 'tribunal.bsa')}
+STAGE_GAME_INPUTS = {
+    # the Bloodmoon layer's test stages (tools/build.py --chim-sol-test, TEST BUILDS ONLY): the layered data folder
+    # and the Solstheim CHIM frames built from it read the base master and archive plus Bloodmoon's
+    'chim-sol-data': BASE_GAME_INPUTS + LAYER_GAME_INPUTS['bloodmoon'],
+    'chim-sol': BASE_GAME_INPUTS + LAYER_GAME_INPUTS['bloodmoon'],
+    'chim-sol-trees': BASE_GAME_INPUTS + LAYER_GAME_INPUTS['bloodmoon'],   # --chim-sol-tree-copies star
+}
+# {(run, stage): digest of every game input}: the key form before the narrowing, for reuse sources fingerprinted with
+# it (comparable); kept out of the fingerprint itself. Set by stage_components.
+PREVIOUS_GAME_INPUTS = {}
+
+
+def declared_game_inputs(name, inputs):
+    """{relative path: sha256} of the game inputs stage NAME reads (STAGE_GAME_INPUTS, default BASE_GAME_INPUTS)."""
+    allowed = STAGE_GAME_INPUTS.get(name, BASE_GAME_INPUTS)
+    return {path: value for path, value in sorted((inputs or {}).items())
+            if len(Path(str(path).replace('\\', '/')).parts) > 1 or str(path).casefold() in allowed}
+
+
+# Per-mesh tables that hold rows of an expansion layer (CHIM-SOLSTHEIM-HULL-SURFACE-64): {repository path: (JSON
+# indent the file is written with, its rows field)}. A layer's rows sit in the rows field like any other (the readers
+# are unchanged) and are also named under "layers": {layer: [mesh, ...]}. A stage that does not read the layer's game
+# inputs keys the table WITHOUT those rows and that block, as the file bytes were before them, so adding a layer's
+# rows re-keys no base stage; a stage that reads the layer keys the whole file.
+LAYER_ROW_TABLES = {'config/collision-hull-surface.json': (1, 'meshes'),
+                    'config/stair-check-known.json': (2, 'meshes')}
+
+
+def layer_table_view(text, layers, indent, field):
+    """The text of a layer-row table without the rows of LAYERS (and with the "layers" block gone when every layer it
+    names is left out), written as the table is (json.dumps with INDENT, a final new line); TEXT itself when it names
+    no layer rows."""
+    doc = json.loads(text)
+    named = doc.get('layers')
+    if not isinstance(named, dict):
+        return text
+    drop = {str(m).casefold() for layer in layers for m in named.get(layer, ())}
+    rows = doc.get(field)
+    if isinstance(rows, list):
+        doc[field] = [m for m in rows if str(m).casefold() not in drop]
+    elif isinstance(rows, dict):
+        doc[field] = {m: v for m, v in rows.items() if str(m).casefold() not in drop}
+    kept = {layer: ms for layer, ms in named.items() if layer not in layers}
+    if kept:
+        doc['layers'] = kept
+    else:
+        del doc['layers']
+    return json.dumps(doc, indent=indent) + '\n'
+
+
+def stage_layers_left_out(name):
+    """The expansion layers whose game inputs stage NAME does not read (STAGE_GAME_INPUTS)."""
+    reads = set(STAGE_GAME_INPUTS.get(name, BASE_GAME_INPUTS))
+    return {layer for layer, inputs in LAYER_GAME_INPUTS.items() if not reads.intersection(inputs)}
+
+
+def layer_table_values(selected, name, root):
+    """SELECTED ({repository path: value}) with each layer-row table keyed as stage NAME reads it: the SHA-256 of
+    layer_table_view for the layers it leaves out (unchanged when the file names none of them)."""
+    out = selected
+    left_out = stage_layers_left_out(name)
+    for path, (indent, field) in LAYER_ROW_TABLES.items():
+        if path not in selected or not left_out:
+            continue
+        try:
+            text = (Path(root) / path).read_text(encoding='utf-8')
+            view = layer_table_view(text, left_out, indent, field)
+        except (OSError, ValueError):
+            continue
+        if view != text:
+            out = dict(out) if out is selected else out
+            out[path] = hashlib.sha256(view.encode('utf-8')).hexdigest()
+    return out
+
+
 def stage_components(name, command, run, metadata, index, dependencies, fingerprints):
     command = [str(part) for part in command]
     components = {'stage': name, 'schema': CACHE_SCHEMA, 'command': normalize_command(command, run, metadata, index)}
@@ -2439,6 +2521,7 @@ def stage_components(name, command, run, metadata, index, dependencies, fingerpr
     script = stage_script(command)
     if script is not None and script.is_file():
         selected, uncertain = index.selection(script)
+        selected = layer_table_values(selected, name, index.root)
         scope = 'all files (dynamic code)' if uncertain else {'units': 'reachable functions', 'symbols': 'reachable code',
                                                               'modules': 'import closure'}[index.scope]
         components['sources'] = {'digest': digest_json(selected), 'files': len(selected), 'scope': scope}
@@ -2448,7 +2531,9 @@ def stage_components(name, command, run, metadata, index, dependencies, fingerpr
             if index.top_format != 1:
                 # The same stage in each older form, for reuse sources fingerprinted with one (comparable); kept out
                 # of the fingerprint itself.
-                PREVIOUS_SOURCES[(str(run), name)] = index.previous_selections(script)
+                PREVIOUS_SOURCES[(str(run), name)] = {
+                    form: layer_table_values(value, name, index.root) if isinstance(value, dict) else value
+                    for form, value in index.previous_selections(script).items()}
                 if index.companion() is not index:
                     # the AMIWIND_* names the older reach read (form 3 may reach fewer or more)
                     PREVIOUS_SOURCES[(str(run), name)]['environment'] = stage_environment(script, index.companion())
@@ -2460,7 +2545,11 @@ def stage_components(name, command, run, metadata, index, dependencies, fingerpr
     components['tools'] = {tool: tool_hashes.get(tool) for tool, path in sorted(tools.items())
                            if str(path) in joined or str(Path(path).parent) in command}
     if '--data-files' in command:
-        components['game_inputs'] = digest_json(metadata.get('input_sha256') or {})
+        inputs = metadata.get('input_sha256') or {}
+        declared = declared_game_inputs(name, inputs)
+        components['game_inputs'] = {'form': 2, 'masters': sorted(STAGE_GAME_INPUTS.get(name, BASE_GAME_INPUTS)),
+                                     'digest': digest_json(declared)}
+        PREVIOUS_GAME_INPUTS[(str(run), name)] = digest_json(inputs)
     external, external_problems = external_inputs(name, command, run, metadata, skip_hashing=name in NON_REUSABLE,
                                                   index=index)
     problems += external_problems
@@ -2529,10 +2618,23 @@ def source_format(components):
     return None
 
 
+def _comparable_game_inputs(old_components, new_components, run, name):
+    old = (old_components or {}).get('game_inputs')
+    new = (new_components or {}).get('game_inputs')
+    previous = PREVIOUS_GAME_INPUTS.get((str(run), name))
+    if isinstance(old, str) and isinstance(new, dict) and previous is not None:
+        return dict(new_components, game_inputs=previous)
+    return new_components
+
+
 def comparable(old_components, new_components, run, name):
     """NEW_COMPONENTS as OLD_COMPONENTS' import-time form (TOP_FORMATS) sees them: a reuse source fingerprinted
     with format 1 is compared with this checkout's format-1 digests, so a change of form alone rebuilds nothing
-    while a real edit still shows (BUILD-KEY-FUNCTION-DEFAULTS-TOP-36). Unchanged when the forms agree."""
+    while a real edit still shows (BUILD-KEY-FUNCTION-DEFAULTS-TOP-36). Unchanged when the forms agree.
+    A reuse source whose game-input key is the older blanket digest of every game input (a plain string) is compared
+    with this run's blanket digest, so the narrowing alone rebuilds nothing on the same data
+    (BUILD-GAME-INPUT-KEY-BROAD-64)."""
+    new_components = _comparable_game_inputs(old_components, new_components, run, name)
     old_form, new_form = source_format(old_components), source_format(new_components)
     if old_form is None or new_form is None or old_form >= new_form:
         return new_components

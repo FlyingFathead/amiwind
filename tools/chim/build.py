@@ -336,6 +336,7 @@ def frame_input(*, frame, centre, models, references, prepared, profiles, mesh_f
     terrain_on=False (a CHIM room, chim.interior): no ground at all; the models, textures and placements only.
     Returns the receipt."""
     from chim.models import texture_unit, variant_ref, variant_unit, yaw_degrees, depth_compile_candidate
+    from chim import fence
     timer = timer or Timer()
     cache = cache or UnitCache()
     references = snap_scales(references, prepared)
@@ -529,17 +530,30 @@ def frame_input(*, frame, centre, models, references, prepared, profiles, mesh_f
                 ti = None if flat else (index_of_sha[tkey[1]] if isinstance(tkey[1], str) else tkey[1])
                 flat_rgb = prepared[mi][4].get('_flat_rgb') if flat else None
                 source_archive = model.get('_archive', archive)
+                # a see-through texture (its alpha channel, chim.fence) becomes a fence texture: its own unit kind,
+                # so every other texture keeps its unit key and its bytes (ROOM-DECAL-ALPHA-62)
+                # the material's own record, which pairs with the model's own archive: ti is found by hash and can be
+                # another archive's record of the same texture (CHIM-FENCE-WRONG-ARCHIVE-64)
+                if kind == 'surface' and not glow and ti is not None and source_archive and \
+                        fence.is_fence(str(source_archive), fence.material_record(texture_records, model, material)):
+                    kind = 'fence'
                 task = {'archive': str(source_archive) if source_archive else None, 'textures': texture_records,
                         'model': model,
                         'material': material, 'size': tkey[3] if flat else tkey[2], 'palette': palette,
                         'flat_rgb': flat_rgb, 'kind': kind, 'glow': glow}
                 # by content: the texture's hash, not its position in this stage's texture list
-                fp = fingerprint('texture', [tkey[0], None if ti is not None else tkey[1], *tkey[2:]],
+                fp = fingerprint('texture-fence' if kind == 'fence' else 'texture',
+                                 [tkey[0], None if ti is not None else tkey[1], *tkey[2:]],
                                  texture_records[ti].get('sha256') if ti is not None else None,
                                  flat_rgb, palette)
                 tasks[tkey] = (fp, task)
-        keys = list(tasks)
+        keys = [k for k in tasks if tasks[k][1]['kind'] != 'fence']
+        fence_keys = [k for k in tasks if tasks[k][1]['kind'] == 'fence']
         built = run_units('texture', [tasks[k] for k in keys], texture_unit, jobs, cache)
+        if fence_keys:
+            built += run_units('texture-fence', [tasks[k] for k in fence_keys], fence.fence_texture_unit, jobs, cache)
+            keys += fence_keys
+            _log('see-through textures: %d of %d (chim.fence)' % (len(fence_keys), len(keys)))
     def stage_key(k):
         # the key as the stage indexes it (the identity written into the world, as before content keys)
         return ((k[0], index_of_sha[k[1]], *k[2:]) if k[0] == 'model' and isinstance(k[1], str) and k[1] != 'flatten'

@@ -49,6 +49,10 @@
         console's lookup of an item or spell id, a binary search); on disk, optional (an older file: a scan)
   DRSC  12 bytes a dialogue result script, sorted: u32 FNV-1a of its text, u16 length, u16 speaker script, u16 its
         compiled script (_dlg_N), u16 flags (1 did not compile); on disk
+  BNAM  8 bytes a placed scripted reference by its object id (v0.0.64, WORLD-BUTTONS-62 round three): u32 FNV-1a of
+        the folded id, u32 the reference (a BIND row's), sorted; on disk, optional. The console's "ID"->Activate finds
+        a placement the scripts never name (the Ghostgate switches, the Marks coins: not in OBJS) by a binary search
+        here, then its attached instance by the reference.
 
 A pool name is the 8 bytes of a converted file's name in the media catalogue: sound/pool/a<16 hex>.wav.
 """
@@ -61,7 +65,7 @@ VERSION = 1
 TYPES = {'s': 0, 'l': 1, 'f': 2}
 ORDER = ('CONF', 'GLOB', 'JRNL', 'SNDS', 'VOIC', 'MUSI', 'OBJS', 'SCRP', 'STRT', 'NEWG', 'NGWE', 'HELD', 'OACT', 'PCEL', 'PMOV', 'SPFX', 'VISI', 'PLAC', 'PADD', 'LACT', 'EQUP', 'CODE', 'BIND', 'STRS',
          'ACTB', 'AINV', 'AITM', 'ASPT', 'ASPL', 'TOPC', 'ASPC', 'ASPE', 'AEFF', 'AMGE', 'DRSC', 'AENC', 'APCS',
-         'AIDX', 'ASPX')
+         'AIDX', 'ASPX') + ('BNAM',)
 # The actor sections (actors.py, docs/ACTOR_STATE.md): OACT is resident (a script's target -> its actor row); the
 # others stay on disk and are read a row at a time by the engine's actor state (aw_actorstate.c).
 ACTOR_SECTIONS = ('OACT', 'ACTB', 'AINV', 'AITM', 'ASPT', 'ASPL', 'ASPC', 'ASPE', 'AEFF', 'AMGE', 'AENC', 'APCS',
@@ -187,6 +191,13 @@ def levelled_actor_rows(program):
             continue
         rows.append((fnv1a(ident), program.scripts.index[script]))
     return sorted(set(rows))
+
+
+def bound_name_rows(binds):
+    """BNAM (v0.0.64, WORLD-BUTTONS-62 round three): [(FNV-1a of the folded object id, reference)] of every placed
+    scripted reference of BIND (an item a holder carries has no place of its own: left out), sorted."""
+    return sorted({(fnv1a(b['id']), b['reference']) for b in binds
+                   if b.get('id') and b.get('type') != 'HELD' and not b['flags'] & 8})
 
 
 def write(program, compiled, binds, conf=None):
@@ -322,6 +333,8 @@ def write(program, compiled, binds, conf=None):
     # sorted by the FNV-1a of its folded id: u32 hash, u16 script, u16 0; resident
     lact_rows = levelled_actor_rows(p)
     sections['LACT'] = (b''.join(struct.pack('>IHH', h, s, 0) for h, s in lact_rows), len(lact_rows))
+    bnam_rows = bound_name_rows(binds)
+    sections['BNAM'] = (b''.join(struct.pack('>II', h, r) for h, r in bnam_rows), len(bnam_rows))
     actors = getattr(p, 'actors', None)
     if actors is not None:
         sections.update(actors.sections(p.objects.rows))

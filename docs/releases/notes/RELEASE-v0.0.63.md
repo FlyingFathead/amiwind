@@ -62,9 +62,8 @@ example scripts, earlier versions replaced by others, and cut content). They sta
   stat family; `dbg help mw` lists them. Five toggles are mapped to the game's own switches (ToggleDebugText,
   ToggleStats, ToggleCombatStats, ToggleLights, RepairedOnMe), the console takes up to 1,000 commands, and every
   function or toggle still left names its reason on the [console commands](../../CONSOLE_COMMANDS_MORROWIND.md) page.
-- **Scripts move and turn the world objects they name.** The Ghostgate switch scripts raise their portcullis and set it
-  back, as in the original; scripts that move placed activators, statics, doors and containers (MoveWorld, Move, SetPos,
-  SetAtStart) find them, and moved or turned objects are kept in saved games (`WORLD-BUTTONS-62`).
+- **Scripts move and turn the world objects they name.** Scripts that move placed activators, statics, doors and
+  containers (MoveWorld, Move, SetPos, SetAtStart) find them, and moved or turned objects are kept in saved games.
 - **Scripts that react to taking or using an object** (for example the Dwemer ruin guardians that appear when a
   valuable object is picked up) run; none of them has been seen in play yet.
 - A placed object is bound to its record's final script; the scripts carried by AmiWind's own code are listed in the
@@ -252,8 +251,8 @@ The fixes below are checked by the test suite and the gate of this release, not 
 
 - **The race's Water Breathing is not confirmed:** `UNDERWATER-BREATH-62` was reported twice and persists; this release's
   fix (the race's abilities given again after a load or a New Game) is checked by tests only.
-- Sunder equipped without Wraithguard hurts after about nine seconds in the release check, not at once
-  (`MWSCRIPT-UNPLACED-RECORD-SCRIPTS-61`).
+- The Ghostgate's switches and portcullises are not live objects in the gate's world frame, so they cannot be used yet
+  (found after the release; `WORLD-BUTTONS-62`, reopened, v0.0.64).
 - A player who becomes a werewolf is not drawn as the werewolf (`WEREWOLF-BODY-NOT-DRAWN-63`). Show and ShowVars name no
   script locals (`MWSCRIPT-CONSOLE-LOCAL-NAMES-63`).
 - The Pi bench's worst frame from the disk is 72.8 ms (48.1 in the v0.0.61 test image;
@@ -270,8 +269,7 @@ The fixes below are checked by the test suite and the gate of this release, not 
   [BUILD-CHIM-STAGE-SERIAL-TAIL-36](../../bugs/BUILD-CHIM-STAGE-SERIAL-TAIL-36.md)). The new world key is checked by tests;
   a build that proves it is still to come (`BUILD-CHIM-HEAP-KEY-LOADER-63`).
 - Text box type 1 still hides the stat bars while a line shows; type 2 is the default.
-- The longest room names of the `dbg tp` menu run past the box (`TP-MENU-LABEL-CUT-63`). The CI timeout of the native
-  engine checks is raised and split but not yet seen green (`TEST-CHIM-BIG-FRAME-TIMEOUT-33`).
+- The longest room names of the `dbg tp` menu run past the box (`TP-MENU-LABEL-CUT-63`).
 - The trip from Seyda Neen to Balmora sometimes stalls on the loading screen in the emulator; it was seen again in a gate
   smoke of this release line, and the cause is not found
   ([CHIM-SEYDA-BALMORA-LOAD-HANG-43](../../bugs/CHIM-SEYDA-BALMORA-LOAD-HANG-43.md)).
@@ -286,11 +284,20 @@ The fixes below are checked by the test suite and the gate of this release, not 
   [bug register](../../BUGS.md).
 - Fixed in v0.0.62 and still open in the register until seen in play: `EQUIP-ACTION-REGRESSION-62`,
   `DIALOGUE-LINKS-62`, `HELD-WEAPON-WRONG-MODEL-62`, `NEWGAME-STATE-RESET-62`, `FOCUS-NPC-OVERRIDES-ITEM-62`,
-  `PERSUASION-BROKEN-62`, `STEAL-WITNESSED-NO-CRIME-60`, `TOMB-NO-CREATURES-60`, `BALMORA-GROUND-DENTS-51`. The dialogue
+  `PERSUASION-BROKEN-62`, `TOMB-NO-CREATURES-60`. The dialogue
   result that held a frame for seconds reads one block of rows in this release and is still to be timed in play
   (`MWSCRIPT-RESULT-LONG-FRAME-62`).
 - From [v0.0.62](RELEASE-v0.0.62.md): pickpocketing and owned locks are not done, and the Heart Chamber may not load at
   32 MB Fast RAM.
+
+## Seen in play after the release
+
+The in-game check of the released image, after publication, saw these working: Sunder kills about one or two seconds
+after it is equipped with the console closed, as the original's script does (`MWSCRIPT-UNPLACED-RECORD-SCRIPTS-61`); a
+witnessed theft gives a bounty and the guards pursue (`STEAL-WITNESSED-NO-CRIME-60`); the ground beside the Balmora canal
+wall is even (`BALMORA-GROUND-DENTS-51`); the hosted test run passed every part with the smaller native engine checks
+(`TEST-CHIM-BIG-FRAME-TIMEOUT-33`). It also found that the race's Water Breathing still reads 0, lava does no damage in
+the Red Mountain pool and the Ghostgate's switches cannot be used; these go on in v0.0.64.
 
 ## Moved to v0.0.64
 

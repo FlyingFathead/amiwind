@@ -69,8 +69,11 @@ def creature_counts(census):
     return out
 
 
-def report(game_data, no_dlc=False, tracker=TRACKER, census=None):
-    """The expansions record from the game-file check's report (known_inputs.check_game_data)."""
+def report(game_data, no_dlc=False, tracker=TRACKER, census=None, selected=None):
+    """The expansions record from the game-file check's report (known_inputs.check_game_data). SELECTED (--dlc): the
+    expansion names the build asks for, None = every one found; 'layers' lists the found ones the build uses."""
+    if selected == []:
+        no_dlc = True
     files = (game_data or {}).get('files', [])
     scripts, scripts_source = (None, 'not counted') if no_dlc else script_counts(game_data, tracker)
     creatures = creature_counts(census)
@@ -80,6 +83,8 @@ def report(game_data, no_dlc=False, tracker=TRACKER, census=None):
         usable = lambda r: r is not None and r.get('verdict') != 'invalid'
         if no_dlc:
             status = 'left out by --no-dlc'
+        elif selected is not None and name not in selected:
+            status = 'left out by --dlc'
         elif usable(master) and usable(archive):
             status = 'found'
         elif usable(master):
@@ -93,10 +98,12 @@ def report(game_data, no_dlc=False, tracker=TRACKER, census=None):
                'master': identity(master), 'archive': identity(archive),
                'records': (master or {}).get('identity', {}).get('records') if usable(master) else None,
                'archive_files': (archive or {}).get('identity', {}).get('files') if usable(archive) else None,
-               'scripts': (scripts or {}).get(master_name) if usable(master) and not no_dlc else None,
-               'creatures': (creatures or {}).get(master_name) if usable(master) and not no_dlc else None}
+               'scripts': (scripts or {}).get(master_name) if status in ('found', 'partly found') else None,
+               'creatures': (creatures or {}).get(master_name) if status in ('found', 'partly found') else None}
         rows.append(row)
-    return {'schema': SCHEMA, 'no_dlc': bool(no_dlc), 'scripts_source': scripts_source,
+    return {'schema': SCHEMA, 'no_dlc': bool(no_dlc), 'selected': None if selected is None else list(selected),
+            'layers': [row['name'] for row in rows if row['status'] == 'found'],
+            'scripts_source': scripts_source,
             'creatures_source': 'image/creature-census.json' if creatures else 'not counted yet (the image step)',
             'expansions': rows}
 
@@ -135,6 +142,10 @@ def lines(record, at_end=False):
         if row['status'] == 'left out by --no-dlc':
             out.append('  %s: LEFT OUT by --no-dlc: none of its records, scripts, creatures or archive files are '
                        'built; its world %s waits (%s).' % (row['name'], row['world'], row['register']))
+            continue
+        if row['status'] == 'left out by --dlc':
+            out.append('  %s: LEFT OUT by --dlc: not chosen for this build; none of it is built, its world %s neither '
+                       '(%s).' % (row['name'], row['world'], row['register']))
             continue
         if row['status'] == 'not found':
             why = ('%s is not a usable master (%s)' % (master['name'], master.get('verdict'))) if master else \

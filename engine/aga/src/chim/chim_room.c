@@ -208,6 +208,38 @@ int ChimMovers_Shift (unsigned pid, const float *d, int relink)
 	return n;
 }
 
+/* WORLD-BUTTONS-62 round two: where the first loaded copy of mover pid stands
+ * now (map units; the console's GetPos on a placement without an edict).
+ * Returns 1 found. */
+int ChimMovers_Origin (unsigned pid, float *out)
+{
+	int i, j;
+	if (ChimRoom_Active ())
+	{
+		for (i=0 ; i<room.count ; i++)
+			if (room.places[i].pid == pid && (room.places[i].flags & CHIM_PLACE_HINGED))
+			{
+				VectorCopy (room.places[i].ent.origin, out);
+				return 1;
+			}
+		return 0;
+	}
+	for (i=0 ; i<chim_frame.count ; i++)
+	{
+		chim_entry_t *e = &chim_frame.entries[i];
+		chim_chunk_t *c = e->chunk.data;
+		if (e->state == CHIM_STATE_ABSENT || !c)
+			continue;
+		for (j=0 ; j<c->records ; j++)
+			if (c->places[j].pid == pid && (c->places[j].flags & CHIM_PLACE_HINGED))
+			{
+				VectorCopy (c->places[j].ent.origin, out);
+				return 1;
+			}
+	}
+	return 0;
+}
+
 /* The trace against door placement pid alone (through ChimChunks_DoorClip):
  * the same placed collision path as every room placement. 0: not a door. */
 int ChimRoom_DoorClip (unsigned pid, vec3_t start, vec3_t mins, vec3_t maxs, vec3_t end, trace_t *trace)

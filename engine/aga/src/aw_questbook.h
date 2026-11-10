@@ -6,8 +6,8 @@
  * copied): the book lists quest NAMES, each name once (several quest ids can share one), sorted by name; a quest
  * without a name is not listed (its entries still read under "All entries"); a name is finished when any of its
  * quests is finished, and the default list shows the active ones only ("Show all" adds the finished). A quest is
- * finished when the entry of its kept stage finishes it (QSTF; mwdialogue/quest.cpp addEntry), as only the stage is
- * kept. Entries: the dated ones in the order recorded, then, for every started quest whose kept stage has no dated
+ * finished when the last of its entries with a status mark, in the order earned, is a finished one (QSTF), and active
+ * again after a restart entry (QSTR; mwdialogue/quest.cpp addEntry, see aw_qb_status_fn). Entries: the dated ones in the order recorded, then, for every started quest whose kept stage has no dated
  * entry (a quest past the old 32 slots, or a save's stages without their dates), that stage's entry, undated, in
  * the catalogue's order. Pure C: no engine headers, so the native test compiles it as it is. */
 #ifndef AW_QUESTBOOK_H
@@ -38,14 +38,21 @@ typedef struct {
     aw_qb_group_t *group;int groups;      /* by name (case-blind), sorted */
     aw_qb_entry_t *entry;int entries;     /* in reading order */
     int started;                          /* quests with a stage */
+    int finished;                         /* of those, the finished ones */
 } aw_questbook_t;
-/* 1 when quest ID's entry at STAGE finishes it (the journal index's flags); CTX the caller's. NULL: none finishes. */
-typedef int (*aw_qb_finished_fn)(const char *id,int32_t stage,void *ctx);
+/* The quest status marks of quest ID's entry at STAGE (the journal index's AWJ2 flags, world/journal.awj):
+ * AW_QB_FINISHED (QSTF) and AW_QB_RESTART (QSTR); 0 for an entry without a mark or no entry at all. CTX the
+ * caller's. NULL: no quest is ever finished. JOURNAL-QUEST-ENDINGS-64: the marks are replayed over the quest's
+ * entries in the order earned (OpenMW 0.53 mwdialogue/quest.cpp addEntry), so a success and a failure ending both
+ * finish it, a restart entry reopens it, and an index without an entry changes nothing. */
+#define AW_QB_FINISHED 1
+#define AW_QB_RESTART 2
+typedef int (*aw_qb_status_fn)(const char *id,int32_t stage,void *ctx);
 
 /* Builds B (emptied first) from the catalogue (QUESTS, N rows, any order), the kept stages L (NULL: none) and the dated
  * entries (DATED, ND). 1 built; 0 out of memory (B left empty). */
 int AW_QuestBookBuild(aw_questbook_t *b,const aw_qb_quest_t *quests,int n,const aw_ledger_t *l,
-                      const aw_qb_dated_t *dated,int nd,aw_qb_finished_fn finished,void *ctx);
+                      const aw_qb_dated_t *dated,int nd,aw_qb_status_fn status,void *ctx);
 void AW_QuestBookFree(aw_questbook_t *b);
 /* The rows of the list shown: ALL 0 = the active names only, 1 = every name. Into OUT (up to MAX) the group rows in
  * order; returns their count. */

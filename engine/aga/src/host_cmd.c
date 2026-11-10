@@ -127,6 +127,8 @@ void Host_God_f (void)
 		return;
 
 	sv_player->v.flags = (int)sv_player->v.flags ^ FL_GODMODE;
+	/* GODMODE-LAVA-DEATH-62 round three: kept across a map change (aw_scene.c AW_SceneSpawn) */
+	aw_godmode_kept = ((int)sv_player->v.flags & FL_GODMODE) != 0;
 	if (!((int)sv_player->v.flags & FL_GODMODE) )
 		SV_ClientPrintf ("godmode OFF\n");
 	else

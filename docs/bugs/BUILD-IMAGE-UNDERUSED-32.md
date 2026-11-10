@@ -2,7 +2,7 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 11 times; something has to be done
+## PERSISTING: reported 12 times; something has to be done
 
 - Reported with v0.0.32-dev at 2026-10-08 (time not recorded): BUILD-IMAGE-UNDERUSED-32: parts of the image step still serial
 - Reported with v0.0.36-dev3 at 2026-10-11 00:43 +0300: audio payload and CHIM maps serial, stats on one core
@@ -15,6 +15,7 @@
 - Reported with v0.0.62-dev1 at 2026-11-07 (time not recorded): Seen again in the v0.0.62-dev1 build: the image stage ran on 6.3 of 24 cores for 81 s with 4 units queued and none running, so the scheduler left work waiting (tracker BUILD-IMAGE-QUEUE-STALL-62).
 - Reported with v0.0.63-dev2 at 2026-11-09 13:44 +0200: v0.0.63-dev2 full build: image step 1,638 s. CHIM room actor bake 2,342 placements on 24 workers in 9 min 36 s (20.7 of 24 cores; the last 40 placements took the final 4 minutes). Guard torches: 6 models on 6 workers for 5 min 36 s (4.7 cores), all 6 ended as skips. CHIM frame maps 31 s on 2.9 cores (town frame maps one worker per map). Partitions 1 min 13 s on 1.5 cores. Underused lines: 4 queued / 0 running for 60 s; 2 queued / 0 running in the partitions. Fix on v0.0.63-imagequeue: the shared pools (completed_map, spread_map) start queued units between two results handed back (BUILD-IMAGE-QUEUE-STALL-62).
 - Reported with v0.0.63-dev3 at 2026-11-09 15:10 +0200: Seen in the v0.0.63-dev3 build (run 2026_11_09_v0.0.63-dev3_full-v0.0.63-dev3-try2_6e68096): the CHIM room actor bake took all 2,342 placements from its unit cache room-actor (0 fitted), yet the step took 1m22s on 1.3 of 24 cores: the cached units are read one after another. The image stage itself went from 1,638 s (dev2, which filled the cache) to 544 s.
+- Reported with v0.0.63 at 2026-11-10 02:34 +0200: Seen again in the v0.0.63 release build: the image step links its 7,181 media files one by one at about 2 of 24 cores.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -40,7 +41,7 @@ _Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 11 times; something has to be done](#persisting-reported-11-times-something-has-to-be-done)
+- [PERSISTING: reported 12 times; something has to be done](#persisting-reported-12-times-something-has-to-be-done)
 - [Seen again: 7 November 2026 (v0.0.62-dev1)](#seen-again-7-november-2026-v0062-dev1)
 - [Status: 23 October 2026 (v0.0.48)](#status-23-october-2026-v0048)
 - [Status: 8 October 2026](#status-8-october-2026)
@@ -238,7 +239,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-IMAGE-NOT-INCREMENTAL-33](BUILD-IMAGE-NOT-INCREMENTAL-33.md): The image step redoes every per-map pass and the whole pack on every build
 - [BUILD-IMAGE-NPC-CHECKS-LATE-44](BUILD-IMAGE-NPC-CHECKS-LATE-44.md): The image step's player body and guard torch bakes fail only at the end of a full build instead of before the expensive stages
 - [BUILD-IMAGE-REGION-MAPS-SERIAL-43](BUILD-IMAGE-REGION-MAPS-SERIAL-43.md): The image step's CHIM frame-map phases run on one core: the world read six times, ground traces on whole frames
-- BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52 (no report page): The image step scans maps on about one core and runs the actor ground check under half the pool
+- [BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52](BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52.md): The image step scans maps on about one core and runs the actor ground check under half the pool
 - [BUILD-IMAGE-SERIAL-32](BUILD-IMAGE-SERIAL-32.md): The image step runs on one core for about 23 minutes per pass
 - [BUILD-IMAGE-SOURCE-MANIFEST-REPARSED-47](BUILD-IMAGE-SOURCE-MANIFEST-REPARSED-47.md): The image step parses the 694 MB CHIM source manifest three times, on one core each (16.0 s, 18.5 s, 17.1 s)
 - [BUILD-IMAGE-STAIR-WALK-CORES-43](BUILD-IMAGE-STAIR-WALK-CORES-43.md): The image step's stair walk used 45 % of its cores in the v0.0.43-dev3 build (95 % before): the perf guard failed its walk_unit section
@@ -263,6 +264,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-PASS-KEY-TOP-BROAD-43](BUILD-PASS-KEY-TOP-BROAD-43.md): A pass key counts a reached module's whole import-time code: a new constant in chim/models.py rekeyed all 1,295 region frame maps
 - BUILD-PERF-GUARD-BUSY-HOST-CORES-61 (no report page): The perf guard fails a build on a lower core share even when it has marked the run as a busy host
 - [BUILD-PIPELINE-UNDERUTILIZATION-36](BUILD-PIPELINE-UNDERUTILIZATION-36.md): Umbrella: several builder phases run on one core while the rest of the machine idles, and some do work the build no longer needs
+- BUILD-PLAN-AT-RISK-CASCADE-64 (no report page): The start-up resource plan counts a stage whose reuse is at risk as reused, so a rebuilt stage that writes different files makes the build run much longer than planned
 - BUILD-PLAN-BESIDE-STALE-48 (no report page): The resource plan held a reuse build at 1 of 24 room batch workers against memory that stages it no longer runs held in the measured run
 - BUILD-PLAN-HISTORY-ROW-CORRUPT-54 (no report page): The resource plan refuses every 16 GiB build: the mwscript stage is priced at 32,412 MiB from one corrupt history row, while its largest process measured 277 MiB
 - [BUILD-PLAN-PESSIMISTIC-48](BUILD-PLAN-PESSIMISTIC-48.md): The start-up resource plan predicts hours for stages that run in minutes: it sums every stage that could run beside one at full speed
@@ -323,6 +325,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - IMAGE-BIGGER-THAN-ORIGINAL-62 (no report page): The game image (3,022 MB in v0.0.62) is bigger than the original game data it is made from (1.93 GB)
 - [MINIWIND-NO-INTERIOR-SCOPE-42](MINIWIND-NO-INTERIOR-SCOPE-42.md): A MiniWind of one room built the whole town: no scope converted only the start room
 - [MINIWIND-NOT-MINUTES-33](MINIWIND-NOT-MINUTES-33.md): A reused MiniWind build took about two hours instead of minutes
+- MINIWIND-NPCS-ONE-WORKER-64 (no report page): The npcs stage of a MiniWind sandbox build runs alone on 1 of its 8 workers
 - [MINIWIND-SCENE-CHAIN-WEIGHT-42](MINIWIND-SCENE-CHAIN-WEIGHT-42.md): Every MiniWind bakes all playable races and the opening rooms, and walks its whole frame stairs
 - NPC-BAKE-STAGES-OVERRUN-62 (no report page): The new seam and floor character bake made every stage that bakes characters run far past its history: room batches about 2 h 40 min, actor library about 40 min, player bodies 35+ min
 - [NPC-BAKED-WHOLE-DUPLICATION-33](NPC-BAKED-WHOLE-DUPLICATION-33.md): Every NPC appearance is baked whole: shared body parts are converted again for each actor, and equipment cannot change

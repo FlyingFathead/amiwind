@@ -127,6 +127,9 @@ int AW_MwvmSoundAmbience(int sound);                     /* 1: a mapped dungeon 
 int AW_MwvmVoice(int voice,unsigned char hash[8],int *centis);                               /* 1 mapped */
 int AW_MwvmMusic(int music);                             /* track number, -1 none */
 uint32_t AW_MwvmObjectReference(int object);             /* 0: not placed once */
+int AW_MwvmObjectCount(void);
+int AW_MwvmObjectId(int object);                         /* string index of its id, -1 none */
+int AW_MwvmObjectScript(int object);                     /* its own script, AWM_NONE (0xFFFF) none */
 int AW_MwvmTopicName(int topic);                         /* string index */
 int AW_MwvmTopicCount(void);
 /* The actor table row (ACTB) an object names (the resident OACT section), 0xFFFF none. */

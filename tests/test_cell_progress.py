@@ -1048,7 +1048,7 @@ class CompleteAndPageTests(unittest.TestCase):
         self.assertIn("['terrain_complete', 'terrain complete'", head)
         # the white outline is drawn around complete cells only; the legacy full-town border is dashed amber
         self.assertIn("function chimIsComplete(c) { return chimCls(c) === 'complete' || chimCls(c) === 'complete_unlit'; }", page)
-        self.assertIn('groupOutline(g, chimCellList.filter(c => chimIsComplete(c) && chimVisible(c)));', page)
+        self.assertIn('groupOutline(g, list.filter(c => chimIsComplete(c) && chimVisible(c)));', page)
         self.assertIn("data.cells.filter(c => c.map === 'full'), 'dashed')", page)
         self.assertIn("legacy full town/area map (dashed amber border", page)
         self.assertNotIn('full town/area map (white border', page)
@@ -1176,6 +1176,23 @@ class ReleaseUiTests(unittest.TestCase):
                            capture_output=True, text=True, timeout=60)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertIn('interior tracker ok', r.stdout)
+
+    def test_expansion_views_in_node(self):
+        import shutil
+        import subprocess
+        node = shutil.which('node')
+        if not node:
+            self.skipTest('Node.js unavailable; the expansion view checks need an existing interpreter')
+        r = subprocess.run([node, str(ROOT / 'tests' / 'test_expansion_views.js'), str(self.KIT)],
+                           capture_output=True, text=True, timeout=60)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn('expansion views ok', r.stdout)
+
+    def test_map_page_has_the_view_switch_and_the_mournhold_screen(self):
+        page = (self.KIT / 'world-map.html').read_text(encoding='utf-8')
+        for needle in ('<script src="expansion-views.js">', 'id="viewswitch"', 'id="viewrates"', 'id="mournholdview"', 'id="mhmap"',
+                       'id="mainview"'):
+            self.assertIn(needle, page)
 
     def test_toolkit_header_is_unchanged_from_the_lighting_branch(self):
         # Project rule (2026-10-09): the Toolkit's logo header (logo, "Toolkit", "Last updated with AmiWind ...", the World / Local /
@@ -1506,6 +1523,15 @@ class PlanTests(ReleaseUiTests):
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertIn('interiors 2 rooms · in the game 0 · not in the game yet 1 · set aside 1 · entrance cells 1 · '
                       'list rows 2', r.stdout)
+        # with a Tribunal room: the Mournhold view is offered and its screen draws
+        graph['rooms'].append({'name': 'Mournhold, Temple Courtyard', 'hard': ['behaves_exterior'], 'island': 'Mournhold',
+                               'master': 'Tribunal.esm', 'access': 'script'})
+        data['interior_rooms'] = RM.section(RM.rooms(graph))
+        path.write_text(json.dumps(data), encoding='utf-8')
+        r = subprocess.run([node, str(ROOT / 'tests' / 'test_cell_progress_page_run.js'), str(self.KIT), str(path)],
+                           capture_output=True, text=True, timeout=120)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn('mournhold screen ok', r.stdout)
 
     def test_open_ocean_is_silver_and_not_done(self):
         js = (self.KIT / 'chim-legend.js').read_text(encoding='utf-8')
@@ -1666,7 +1692,8 @@ class PageTests(unittest.TestCase):
                      'tests/test_cell_progress_legend.js', 'tests/test_cell_progress_page_run.js', 'amiwind-toolkit/header.js',
                      'amiwind-toolkit/chim-head.js', 'amiwind-toolkit/zebra.js', 'config/cell-progress-areas.json',
                      'amiwind-toolkit/interior-tracker.js', 'amiwind-toolkit/panel-fold.js',
-                     'tests/test_interior_tracker.js', 'tools/cell_progress_rooms.py', 'tests/test_cell_progress.py'):
+                     'tests/test_interior_tracker.js', 'tools/cell_progress_rooms.py', 'tests/test_cell_progress.py',
+                     'amiwind-toolkit/expansion-views.js', 'tests/test_expansion_views.js'):
             self.assertIn(name, shipped)
             self.assertTrue((ROOT / name).is_file(), name)
 

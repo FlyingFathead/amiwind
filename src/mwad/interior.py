@@ -58,21 +58,42 @@ def original_doors(raw):
     return out
 
 
-def read_interior(path, name, *, include_interior_entrances=False):
-    return read_interiors(path, [name], include_interior_entrances=include_interior_entrances)[0]
+def read_interior(path, name, *, include_interior_entrances=False, layers=()):
+    return read_interiors(path, [name], include_interior_entrances=include_interior_entrances, layers=layers)[0]
 
 
-def read_interiors(path, names, *, include_interior_entrances=False):
+def read_interiors(path, names, *, include_interior_entrances=False, layers=()):
     """read_interior for several cells in one pass over the master, in `names` order.
 
     Each result equals read_interior(path, name) (tests compare them); the
     master is parsed once instead of once per cell (BUILD-DOOR-REFERENCE-SERIAL-33:
-    the door step read the 80 MB master again for each of its destination cells)."""
+    the door step read the 80 MB master again for each of its destination cells).
+    LAYERS (DLC-BUILD-LATER): the masters of the expansion layers the build uses, read after PATH in load order. A
+    cell is found in the base master or in a listed layer; a layer's cell of the same name replaces the base one
+    whole (reference-level merging is not done yet) and its base records override the earlier ones. Without layers
+    the result is exactly the single-master one."""
     import copy
-    raw=Path(path).read_bytes();objects={}
+    raws=[Path(p).read_bytes() for p in (path,*layers)];raw=raws[0];objects={}
     wanted={}
     for name in names:wanted.setdefault(name.casefold(),{'cells':[],'entrances':[]})
     kinds={'STAT','DOOR','CONT','LIGH','ACTI','NPC_','MISC','BOOK','INGR','WEAP','ARMO','CLOT','ALCH','APPA','REPA','LOCK','PROB','LEVC','LEVI','CREA'}
+    for position,source in enumerate(raws):
+        if position:
+            # a layer: the cells it holds replace the earlier masters' ones of the same name
+            found_here={key:{'cells':[],'entrances':[]} for key in wanted}
+            _interior_records(source,kinds,found_here,objects)
+            for key,cells in found_here.items():
+                if cells['cells']:wanted[key]['cells']=cells['cells']
+                wanted[key]['entrances'].extend(cells['entrances'])
+            continue
+        _interior_records(source,kinds,wanted,objects)
+    doors=original_doors(raw) if include_interior_entrances else None
+    digest=hashlib.sha256(raw).hexdigest() if not layers else hashlib.sha256(
+        '\n'.join(hashlib.sha256(r).hexdigest() for r in raws).encode()).hexdigest()
+    return _interior_results(names,wanted,objects,doors,digest,include_interior_entrances)
+
+
+def _interior_records(raw,kinds,wanted,objects):
     for tag,flags,payload in records(raw):
         if tag not in kinds and tag!='CELL':continue
         subs=list(subrecords(payload));s=dict(subs)
@@ -114,8 +135,10 @@ def read_interiors(path, names, *, include_interior_entrances=False):
                 weight,value,duration,radius=struct.unpack_from('<fiiI',s['LHDT'])
                 obj['light']={'radius':radius,'color':list(s['LHDT'][16:19]),'flags':struct.unpack_from('<I',s['LHDT'],20)[0]}
             objects[string(s['NAME']).casefold()]=obj
-    doors=original_doors(raw) if include_interior_entrances else None
-    digest=hashlib.sha256(raw).hexdigest()
+
+
+def _interior_results(names,wanted,objects,doors,digest,include_interior_entrances):
+    import copy
     result=[];used=set()
     for name in names:
         found=wanted[name.casefold()]

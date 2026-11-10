@@ -2699,6 +2699,9 @@ static focus_row_t *container_row(void){
  * lock level stands). */
 int (*aw_container_open)(unsigned reference,const char *name,int owned);
 int (*aw_container_lock)(unsigned reference,int original);
+/* TRAPS-WHEN-OPENED-63 (aw_hinged_door.c AW_TrapSpring sets it; NULL in the tools' tests: no traps): a trapped
+ * container's use springs its trap instead of opening it; 1 when it sprang */
+int (*aw_trap_spring)(unsigned reference);
 /* the lock level now: a script's Lock / Unlock on the world change list (slice 2), else the data's */
 static int container_lock(const focus_row_t *row){
     return aw_container_lock?aw_container_lock(row->reference,row->lock):row->lock;
@@ -2711,6 +2714,7 @@ static int container_open(const focus_row_t *row){
         if(!line[0] && !hud_setting("sLocked",line,sizeof(line)))strcpy(line,"Locked");
         AW_UISubtitle(row->name,line,3);return 1;
     }
+    if(aw_trap_spring && aw_trap_spring(row->reference))return 1;   /* the trap instead of the strip */
     return aw_container_open && aw_container_open(row->reference,row->name,row->owned!=0);
 }
 /* aw_placed container [open | aim [N] | take ID [N] | put ID [N] | all] (CELL-CHANGES-59 slice 3,

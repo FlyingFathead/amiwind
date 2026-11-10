@@ -169,6 +169,22 @@ table.mt small{opacity:.8}
 .itchip{display:inline-block;border:1px solid;border-radius:9px;padding:0 7px 0 4px;font-size:12px;white-space:nowrap}
 .itchip i,.itn i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;vertical-align:middle}
 .itn{margin-left:8px;font-size:12px;color:var(--muted,#9fb3c8)}
+/* Expansion views (expansion-views.js): the view switch above the map, the completion rates, the Mournhold screen. */
+#viewbar{margin:8px 0;padding:8px 10px;background:var(--panel);border:1px solid var(--line);border-radius:6px;font-size:14px}
+#viewbar[hidden]{display:none}
+#viewswitch{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
+#viewswitch button{background:#203346;color:var(--ink);border:1px solid #456;border-radius:5px;padding:5px 10px;cursor:pointer}
+#viewswitch button[aria-pressed="true"]{border-color:#ffe28a;background:#2c4660}
+#viewswitch small{display:block;opacity:.8}
+#viewcounts{margin-bottom:4px}
+.evrate{display:inline-block;margin-right:16px}
+#mournholdview{margin:8px 0}
+#mournholdview[hidden]{display:none}
+#mhmap{display:block;background:#10202e;border:1px solid var(--line);border-radius:6px;max-width:100%}
+#mhtip{min-height:1.4em;margin:4px 0}
+#mhlegend span{display:inline-block;margin-right:12px;font-size:13px}
+#mhlegend i{display:inline-block;width:10px;height:10px;margin-right:4px;vertical-align:middle}
+#mhlist{max-height:60vh;overflow:auto;margin-top:8px}
 </style>
 </head>
 <body>
@@ -227,9 +243,14 @@ table.mt small{opacity:.8}
   <span id="chimcount">No CHIM progress loaded: serve it with toolkit_serve.py --progress, or import cell-progress.json.</span>
 </div>
 </div>
+<div id="viewbar" hidden aria-label="Map views and completion rates">
+  <div id="viewswitch" role="group" aria-label="Map view"></div>
+  <div id="viewcounts"></div>
+  <div id="viewrates" class="muted" aria-label="Completion rate per game"></div>
+</div>
 <div id="selected">Selected area: click a cell on the map</div>
 <div id="multi" class="muted" style="color:#ffd24a"></div>
-<main>
+<main id="mainview">
   <div id="stage"><canvas id="map" width="820" height="820"></canvas><div id="cell-highlight" hidden aria-hidden="true"><div id="cell-highlight-box"></div></div><div id="tip"></div>
     <div id="hbar" class="sbar" title="Scroll west / east"><div></div></div><div id="vbar" class="sbar" title="Scroll north / south"><div></div></div>
     <div id="gridtoggle" role="group" aria-label="Map grid and names">Grid:<button id="gridon" aria-pressed="false">on</button><button id="gridoff" aria-pressed="true">off</button><span style="margin-left:8px">Names:</span><button id="nameson" aria-label="Names on" aria-pressed="true">on</button><button id="namesoff" aria-label="Names off" aria-pressed="false">off</button><span style="margin-left:8px">Paint:</span><button id="painton" aria-label="Paint cells on" aria-pressed="false" title="Paint: click or drag over cells to mark them (a drag that starts on a marked cell erases); shift-drag selects a rectangle in any mode">on</button><button id="paintoff" aria-label="Paint cells off" aria-pressed="true">off</button><button id="undocells" title="Undo the last paint stroke, rectangle or clear (Ctrl+Z)" aria-label="Undo painting" disabled><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button><button id="copycells" title="Copy the painted cells (aw-chim-cells-1 JSON with place names)" aria-label="Copy painted cells" disabled><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg></button><span id="copycellsdone" role="status" aria-live="polite" style="margin-left:4px;color:#ffe28a"></span></div>
@@ -271,6 +292,12 @@ table.mt small{opacity:.8}
     <div id="interiorswrap"><table class="mt" id="interiorstable"></table></div>
   </section>
 </main>
+<section id="mournholdview" hidden aria-label="Rooms of the selected expansion">
+  <canvas id="mhmap" width="600" height="300" role="img" aria-label="Rooms of the selected expansion (Mournhold: its districts and rooms), coloured by state"></canvas>
+  <div id="mhtip" class="muted">Hover a tile to see the room.</div>
+  <div id="mhlegend" class="muted"></div>
+  <div id="mhlist"></div>
+</section>
 <section id="localview" hidden>
   <div id="localpanel">
     <div id="localtitle">Local: click a cell in World first.</div>
@@ -296,6 +323,7 @@ table.mt small{opacity:.8}
 <script src="chim-legend.js"></script>
 <script src="chim-inclusion.js"></script>
 <script src="interior-tracker.js"></script>
+<script src="expansion-views.js"></script>
 <!--AW-LIVE-DATA-->
 <script>
 const $ = id => document.getElementById(id), canvas = $('map'), ctx = canvas.getContext('2d');
@@ -303,6 +331,9 @@ let data = null, maxOriginal = 1;
 // The interior tracker (interior-tracker.js; drawn by interiorTrackerUi below): its section, the entrance cells, its fold.
 const IT = window.AmiWindInteriors || null;
 let itIr = null, itEntr = null, itFold = null;
+// The expansion views (expansion-views.js; wired below at viewsUi): the selected pane, one per map.
+const EV = window.AmiWindViews || null, EV_KEY = 'amiwind-map-view-select-2';
+let evView = null, evList = [], evLayout = null, evPicked = null, evFramed = null;
 // Local images by style: {img, bounds}. Each is drawn at its own cell bounds.
 const images = {topo: {}, world: {}};
 // Local level: per-cell terrain and original placements (local cells JSON).
@@ -1173,7 +1204,7 @@ $('metricsfile').onchange = e => {
   load(f, text => { if (setMetrics(JSON.parse(text))) metricsFileName = f.name; });
 };
 // Copy state: toolkit version, loaded data, layers and selection, as JSON to paste.
-const TOOLKIT = {name: 'AmiWind Toolkit · World Map', version: '0.1.24'};
+const TOOLKIT = {name: 'AmiWind Toolkit · World Map', version: '0.1.25'};
 let statusFileName = null;
 function stateJson() {
   const sel = picked && data ? data.cells.find(c => c.x === picked.x && c.y === picked.y) : null;
@@ -1553,7 +1584,7 @@ let chim = null, chimCells = new Map(), chimCellList = [], chimClicked = null, c
 function chimFaces(c) { const f = c.stats && c.stats.faces; return f ? (f.chim_placed || f.after || 0) : 0; }
 const cset = {colour: 'status', order: 'spiral', filter: '', nums: true, next: true};
 function chimOn() { return !!chim && on('chim'); }
-function chimCell(x, y) { return chimOn() ? chimCells.get(x + ',' + y) || null : null; }
+function chimCell(x, y) { const c = chimOn() ? chimCells.get(x + ',' + y) || null : null; return c && evShows(c) ? c : null; }
 function chimOpenBugs(c) {
   return (c.bugs || []).filter(id => { const b = chim.bugs && chim.bugs[id]; return !b || (b.state !== 'fixed' && b.state !== 'closed'); });
 }
@@ -1651,7 +1682,8 @@ function chimZebraCss(base, stripe) { return 'repeating-linear-gradient(135deg,'
 function chimPx(g) { return cellPx(g); }
 function drawChim(g) {
   const px = chimPx(g), dim = chimBucket || cset.filter || legendActive();
-  for (const c of chimCellList) {
+  const list = chimCellList.filter(evShows);      // the cells of the selected map pane (all of them with no pane)
+  for (const c of list) {
     const col = chimColour(c); if (!col) continue;
     const hit = chimVisible(c) && (!cset.filter || chimMatch(c)) && (!chimBucket || chimDrawn(c) && chimCls(c) === chimBucket);
     const zebra = chimZebra(c);
@@ -1659,10 +1691,10 @@ function drawChim(g) {
     ctx.fillRect(g.px(c.x) + .5, g.py(c.y) + .5, g.s - 1, g.s - 1);
   }
   ctx.globalAlpha = 1;
-  groupOutline(g, chimCellList.filter(c => chimIsComplete(c) && chimVisible(c)));
+  groupOutline(g, list.filter(c => chimIsComplete(c) && chimVisible(c)));
   // Planned for the next release: a gold outline on every other colouring (the plan colouring fills them gold instead).
-  if (cset.colour !== 'plan' && chim.plan_next) for (const c of chimCellList) if (window.ChimLegend.planTier(c) === 'next' && chimVisible(c)) outline(g, c, window.ChimLegend.PLAN_GOLD, 2);
-  if (chimBucket) for (const c of chimCellList) if (chimDrawn(c) && chimCls(c) === chimBucket) outline(g, c, '#ffe28a', 2.5);
+  if (cset.colour !== 'plan' && chim.plan_next) for (const c of list) if (window.ChimLegend.planTier(c) === 'next' && chimVisible(c)) outline(g, c, window.ChimLegend.PLAN_GOLD, 2);
+  if (chimBucket) for (const c of list) if (chimDrawn(c) && chimCls(c) === chimBucket) outline(g, c, '#ffe28a', 2.5);
   const showOrder = cset.next ? chimNext[cset.order] : new Map(), other = cset.next ? chimNext[cset.order === 'spiral' ? 'risk' : 'spiral'] : new Map();
   if (cset.next) {
     for (const [k] of showOrder) { const c = chimCells.get(k); if (c) outline(g, c, '#ffffff', 3); }
@@ -1676,7 +1708,7 @@ function drawChim(g) {
   if (cset.nums && window.ChimLegend.ringLabelsVisible(px)) {     // ring numbers hide below a zoom level instead of overlapping
     ctx.font = '600 ' + Math.min(g.s * .5, 14 / Math.sqrt(view.z)).toFixed(2) + 'px system-ui, sans-serif';
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    for (const c of chimCellList) {
+    for (const c of list) {
       let t = null;
       if (cset.order === 'spiral' && c.ring != null) t = String(c.ring);
       else if (cset.order === 'risk' && c.risk_rank && c.risk_rank <= 150 && !c.chim.converted) t = String(c.risk_rank);
@@ -1825,6 +1857,82 @@ function itRender() {
   if (itFold && itFold.blocks[0] && itFold.blocks[0].folded) return;   // drawn when opened
   $('itlist').innerHTML = IT.listHtml(itIr, $('itsearch').value);
 }
+// Expansion views (expansion-views.js): the view switch above the map (Vvardenfell + Solstheim; Mournhold, which has no
+// exterior, on a screen of its own), done / partial / missing per view and the completion rate of each game. A view whose
+// content the loaded data does not hold is not offered.
+function evMapPane() { return evView === 'vvardenfell' || evView === 'solstheim'; }
+function evShows(c) { return !EV || !evMapPane() || EV.inPane(c, evView); }
+function evRooms() { return !EV || !chim ? [] : evView === EV.MOURNHOLD ? EV.mournholdRooms(chim) : evView === 'solstheim' ? EV.bloodmoonRooms(chim) : []; }
+function viewsUi() {
+  evList = EV && chim ? EV.views(chim) : [];
+  const rates = EV && chim ? EV.completion(chim).filter(r => r.present) : [];
+  $('viewbar').hidden = !evList.length && !rates.length;
+  if (!EV || !chim) return;
+  let want = evView;
+  try { want = want || window.localStorage.getItem(EV_KEY); } catch (_) { /* no storage */ }
+  evView = EV.pick(evList, want);
+  $('viewswitch').innerHTML = evList.length > 0 ? evList.map(v => '<button type="button" data-view="' + escapeHtml(v.id) + '" aria-pressed="' + (v.id === evView) + '">' + escapeHtml(v.label) + (v.sub ? ' (' + escapeHtml(v.sub) + ')' : '') +
+    '<small>' + escapeHtml(v.text) + '</small></button>').join('') : '';
+  const cur = evList.find(v => v.id === evView);
+  $('viewcounts').textContent = cur ? (evList.length > 1 ? '' : cur.label + ': ') + cur.text : '';
+  $('viewcounts').hidden = !cur || evList.length > 1;
+  $('viewrates').innerHTML = rates.length ? 'Completion: ' + rates.map(r => '<span class="evrate">' + escapeHtml(EV.rateText(r)) + '</span>').join('') : '';
+  viewShow();
+}
+function viewShow() {
+  const mh = evView === EV.MOURNHOLD, rooms = evRooms();
+  $('mainview').hidden = mh; $('mournholdview').hidden = !rooms.length;     // Solstheim: its rooms under the map; Mournhold: the screen alone
+  if (evMapPane()) {      // frame the grid on the pane's island; the view is reset only when the pane changes
+    const b = EV.paneBounds(chim, evView);
+    if (b) chim.bounds = b;
+    if (evFramed !== evView) { view.z = 1; view.x = view.y = 0; evFramed = evView; }
+  }
+  if (rooms.length) mhRender();
+  if (!mh) draw();
+}
+function viewSelect(id) {
+  evView = id;
+  try { window.localStorage.setItem(EV_KEY, id); } catch (_) { /* no storage */ }
+  viewsUi();
+}
+$('viewswitch').addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('button[data-view]');
+  if (b) viewSelect(b.dataset.view);
+});
+// The Mournhold screen: districts as large tiles, every other room a small square, in the state colours of the interior tracker.
+function mhRender() {
+  if (!EV || !IT || !chim) return;
+  const rooms = evRooms(), host = $('mournholdview');
+  evLayout = EV.mournholdLayout(rooms, Math.min(host.clientWidth || 900, 1100));
+  const dpr = window.devicePixelRatio || 1, cv = $('mhmap'), c2 = cv.getContext('2d');
+  cv.width = Math.round(evLayout.width * dpr); cv.height = Math.round(evLayout.height * dpr);
+  cv.style.width = evLayout.width + 'px'; cv.style.height = evLayout.height + 'px';
+  c2.setTransform(dpr, 0, 0, dpr, 0, 0); c2.clearRect(0, 0, evLayout.width, evLayout.height);
+  c2.font = '600 13px system-ui, sans-serif'; c2.textBaseline = 'middle'; c2.fillStyle = '#9fb3c8';
+  for (const h of Object.values(evLayout.heads)) c2.fillText(h.text, 8, h.y + 8);
+  for (const t of evLayout.tiles) {
+    c2.fillStyle = IT.COLOURS[t.room.state] || '#888'; c2.fillRect(t.x, t.y, t.w - 1, t.h - 1);
+    if (evPicked && evPicked.id === t.room.id) { c2.strokeStyle = '#ffe28a'; c2.lineWidth = 2; c2.strokeRect(t.x + 1, t.y + 1, t.w - 3, t.h - 3); }
+    if (t.district) {
+      c2.fillStyle = '#081420'; c2.font = '12px system-ui, sans-serif';
+      c2.fillText(t.room.name.replace(/^Mournhold,\s*/, ''), t.x + 6, t.y + 16, t.w - 12);
+      c2.fillText(IT.LABELS[t.room.state] || t.room.state, t.x + 6, t.y + t.h - 14, t.w - 12);
+    }
+  }
+  const cnt = EV.roomCounts(rooms), seen = new Set(rooms.map(r => r.state));
+  $('mhlegend').innerHTML = EV.countText(cnt) + ' of ' + cnt.total.toLocaleString() + ' rooms. ' + IT.STATES.filter(s => seen.has(s)).map(s => '<span><i style="background:' + IT.COLOURS[s] + '"></i>' +
+    escapeHtml(IT.LABELS[s]) + ' ' + rooms.filter(r => r.state === s).length + '</span>').join('');
+  $('mhlist').innerHTML = itIr ? IT.listHtml(Object.assign({}, itIr, {rooms}), '') : '';
+}
+function mhText(r) { return r.name + ' · ' + (IT.LABELS[r.state] || r.state) + ' · batch ' + IT.batchText(r.batch) + (r.reasons && r.reasons.length ? ' · ' + r.reasons.join(', ').replace(/_/g, ' ') : ''); }
+$('mhmap').addEventListener('mousemove', e => {
+  const t = evLayout && EV.hit(evLayout, e.offsetX, e.offsetY);
+  $('mhtip').textContent = t ? mhText(t.room) : (evPicked ? mhText(evPicked) : 'Hover a tile to see the room.');
+});
+$('mhmap').addEventListener('click', e => {
+  const t = evLayout && EV.hit(evLayout, e.offsetX, e.offsetY);
+  evPicked = t ? t.room : null; mhRender();
+});
 $('itsearch').addEventListener('input', () => itRender());
 $('itlist').addEventListener('click', e => {
   const tr = e.target.closest && e.target.closest('tr[data-cell]');
@@ -2144,7 +2252,7 @@ function setChim(doc, source, keepView) {
   if (first || !keepView) { view.z = 1; view.x = view.y = 0; }
   if (first) viewRestore();
   chimBuildIndex(); interiorTrackerUi();
-  chimUi(); chimHeadSend(); draw(); loadChimCurve();
+  chimUi(); chimHeadSend(); draw(); loadChimCurve(); viewsUi();
   if (!SERVED) openLinkedCell();
   return true;
 }

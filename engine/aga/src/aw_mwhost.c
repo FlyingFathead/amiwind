@@ -961,9 +961,14 @@ static void stats_hooks(void){
     aw_area_actor_make=area_actor_make;aw_area_stat_decode_at=AW_StatDecodeAt;aw_area_stat_decode=AW_StatDecode;
     aw_combat_sheet_stats=combat_sheet_stats;
 }
+#define AW_MWSCRIPT_SECTIONS 64   /* the AWMS directory rows read (tools/mwscript/awms.py ORDER: 40 today) */
 int AW_MwscriptActors(void){
     static const aw_actorstate_io_t io={actor_read,NULL};
-    unsigned char head[16+16*32];int length,n;
+    /* UNDERWATER-BREATH-62 round three: the directory read whole. It was cut at 32 sections while the file has 39
+     * since v0.0.63 (AEFF is the 33rd), so the actor table never found AEFF, AMGE, AENC, APCS: every game spell had
+     * "no effects in this build" (Argonian Breathing cast nothing) and no enchantment or starting spell list was
+     * read. Static: the 68k stack is small. */
+    static unsigned char head[16+16*AW_MWSCRIPT_SECTIONS];int length,n;
     if(AW_ActorStateReady())return 1;
     if(actors_failed)return 0;
     actors_failed=1;
@@ -976,7 +981,8 @@ int AW_MwscriptActors(void){
     if(!actor_file || length<16)return 0;
     actor_base=ftell(actor_file);
     if(fread(head,1,16,actor_file)!=16 || memcmp(head,"AWMS",4))return 0;
-    n=(head[6]<<8)|head[7];if(n>32)n=32;
+    n=(head[6]<<8)|head[7];
+    if(n>AW_MWSCRIPT_SECTIONS){Con_Printf("Actor table: %d sections in %s, at most %d read: refused.\n",n,FILE_NAME,AW_MWSCRIPT_SECTIONS);return 0;}
     if(fread(head+16,1,16*n,actor_file)!=(size_t)(16*n) || !AW_ActorStateOpen(head,16+16*n,&io))return 0;
     actors_failed=0;
     aw_actor_stats_source=area_stats_source;     /* ACTOR-STATS-ALL-61: a placed actor's record from its area */
@@ -3379,6 +3385,7 @@ static int gap_call(int instance,int target,int function,const aw_mwcell_t *numb
  * or a passive effect by its number) lands on the player, each magnitude rolled once; 0 when the row is not there.
  * Cast and ExplodeSpell share it (v0.0.63). */
 static unsigned long explodes,explodes_missed;   /* v0.0.63, MWSCRIPT-GAPS-63 */
+static unsigned long casts_on,casts_missed;      /* v0.0.64: Cast on anything but the player */
 /* OPENING-WEATHER-NOT-CLOUDY-63: the NGWE rows (awms.py: u16 region catalogue index, u8 weather, u8 0), the weather
  * a carried new-game script sets (CharGen: Bitter Coast Region cloudy), set as its ChangeWeather would (aw_weather.c) */
 static void new_game_weather(void){
@@ -3763,6 +3770,18 @@ static int host_call(int instance,int target,int function,const aw_mwcell_t *num
          * nothing (said so in docs/MWSCRIPT_BYTECODE.md). */
         const char *spell=call_string(strings,nstrings,0),*who=call_string(strings,nstrings,1);char s[64];int k,type;
         vec3_t at;edict_t *caster;int n;
+        if(count>=2){
+            /* v0.0.64 (MWSCRIPT-GAPS-63; OpenMW 0.53 OpCast, CastSpell::cast): a caster other than the player casts
+             * the spell (its ASPT row) on the target (its object row), always succeeding: Self on the caster when it
+             * is an actor, Touch and Target on the target (aw_cast.c AW_CastOn) */
+            vec3_t tat;int tn=locate(instance,numbers[1].i,tat);edict_t *t=tn>0?edict_of(tn):NULL;
+            if(!t || t->free)t=named_actor(who);   /* an id placed more than once, or made by a script: by its id */
+            n=locate(instance,target,at);caster=n>0?edict_of(n):NULL;
+            if(!t || t->free){casts_missed++;return 1;}
+            if(AW_CastOn(caster,t==sv_player?NULL:t,numbers[0].i)<0){casts_missed++;return 1;}
+            if(caster && caster!=sv_player)AW_AnimPickCast(caster,AW_PR_TOUCH);
+            casts_on++;return 1;
+        }
         if(count>=1){
             /* SPELL-EFFECTS-57, the first slice: the compiler handed the spell's SPFX row (every effect a Fortify,
              * Drain, Damage or Restore of a stat); each lands on the player with its magnitude rolled once */
@@ -5213,6 +5232,7 @@ static int ambient_fight_now(edict_t *e){
     a=r && r->_float>0?AW_ActorGet((uint32_t)r->_float,AW_ACTOR_NONE,0):NULL;
     return a && !(a->flags&AWL_DEAD)?(int)AW_ActorStat(a,AWA_FIGHT):-1;
 }
+static int trap_cast(const char *spell);
 void AW_MwscriptInit(void){
     Cvar_RegisterVariable(&mwscript);
     stats_hooks();
@@ -5231,6 +5251,7 @@ void AW_MwscriptInit(void){
     aw_object_lock_level=AW_ObjectLockLevel;   /* the doors read a script's Lock and Unlock */
     aw_object_lock=AW_ObjectLock;aw_door_open=door_open;   /* CELL-CHANGES-59 slice 2: the key's unlock, door poses */
     aw_scene_intercept=aw_hinged_intercept=object_intercept;
+    aw_trap_cast=trap_cast;   /* a sprung trap's spell on the player (TRAPS-WHEN-OPENED-63) */
     aw_item_added=item_added;   /* OnPCAdd (CENSUS-INTRO-SCRIPTS-62) */
     aw_item_removed=item_removed;   /* a carried item's script stops with the last one (MWSCRIPT-UNPLACED-ATTACH-62) */
     aw_actors_levelled_spawned=levelled_spawned;   /* a levelled pick runs its record's script (the same item) */
@@ -5673,11 +5694,85 @@ static edict_t *console_resolve(const char *target){
     }
     return found;
 }
+/* WORLD-BUTTONS-62 / MARKS-SUMMON-CARRIERS-NOT-LIVE-63 round two: a reference the CHIM world keeps without an edict
+ * (an activator, a placed item, a portcullis: drawn as placements, their scripts attached as instances with their
+ * spots, aw_mwhost.c attach_map) was out of the console's reach, which searched edicts only, so
+ * "ex_gg_gateswitch_01"->Activate and "misc_dwrv_cursed_coin00"->Activate answered "no such reference here". Here the
+ * scripts' own object table (OBJS: id, reference when placed once, own script) names it: a row of that id whose
+ * reference is attached on this map or is a scripted mover, or whose own script runs on an attached instance here
+ * (an id placed more than once: the instance nearest the player). Only rows with such a match have their id read
+ * from disk: a few string reads per console line, never a frame of play. REF and ORIGIN (map units) out; 1 found. */
+static unsigned long console_placements;
+/* WORLD-BUTTONS-62 / MARKS-SUMMON-CARRIERS-NOT-LIVE-63 round three (the v0.0.64-dev1 check: the switches and the coin
+ * still "no such reference here"): OBJS holds only the objects a script NAMES; the Ghostgate switches (their own
+ * scripts GG_OpenGate1/2, each placed on both sides) and the cursed coins are named by no script, so the lookup above
+ * never had a row for them. BNAM (tools/mwscript/awms.py bound_name_rows, on disk) lists every placed scripted
+ * reference by the FNV-1a of its folded id: a binary search there (about 13 reads of 8 bytes), then each reference of
+ * that id is matched to an attached instance on this map (the nearest), or to a scripted mover. 1 found. */
+static unsigned long console_bound_reads;
+static int console_bound(const char *target,uint32_t *ref,float origin[3]){
+    uint32_t off,rows,bytes,lo=0,hi,h,at,r;unsigned char b[8];int i,ni=AW_MwvmInstanceCount(),found=0;float best=0;
+    char folded[64];
+    for(i=0;target[i] && i<(int)sizeof(folded)-1;i++)folded[i]=(char)tolower((unsigned char)target[i]);
+    folded[i]=0;
+    if(!sv_player || !AW_MwvmSection("BNAM",&off,&rows,&bytes) || !rows)return 0;
+    h=AW_MwvmTextHash(folded,i);hi=rows;
+    while(lo<hi){   /* the first row of hash H */
+        uint32_t mid=(lo+hi)/2,v;
+        console_bound_reads++;
+        if(actor_read(NULL,off+8u*mid,b,4))return 0;
+        v=((uint32_t)b[0]<<24)|((uint32_t)b[1]<<16)|((uint32_t)b[2]<<8)|b[3];
+        if(v<h)lo=mid+1;else hi=mid;
+    }
+    for(at=lo;at<rows;at++){
+        console_bound_reads++;
+        if(actor_read(NULL,off+8u*at,b,8))break;
+        if((((uint32_t)b[0]<<24)|((uint32_t)b[1]<<16)|((uint32_t)b[2]<<8)|b[3])!=h)break;
+        r=((uint32_t)b[4]<<24)|((uint32_t)b[5]<<16)|((uint32_t)b[6]<<8)|b[7];
+        for(i=0;i<ni;i++){
+            aw_mwvm_instance_t *in=AW_MwvmInstance(i);vec3_t d;float dd;
+            if(!in || !(in->flags&AWI_USED) || (in->flags&AWI_GLOBAL) || in->reference!=r)continue;
+            VectorSubtract(in->origin,sv_player->v.origin,d);dd=DotProduct(d,d);
+            if(!found || dd<best){found=1;best=dd;*ref=r;VectorCopy(in->origin,origin);}
+        }
+        if(!found && AW_MoverOrigin(r,origin)){*ref=r;found=1;}
+    }
+    if(found)console_placements++;
+    return found;
+}
+static int console_placement(const char *target,uint32_t *ref,float origin[3]){
+    int k,i,n=AW_MwvmObjectCount(),ni=AW_MwvmInstanceCount(),found=0;float best=0;char id[64];
+    if(!sv_player)return 0;
+    for(k=0;k<n;k++){
+        uint32_t r=AW_MwvmObjectReference(k);int script=AW_MwvmObjectScript(k),named=0;
+        for(i=0;i<ni;i++){
+            aw_mwvm_instance_t *in=AW_MwvmInstance(i);vec3_t d;float dd;
+            if(!in || !(in->flags&AWI_USED) || (in->flags&AWI_GLOBAL) || !in->reference)continue;
+            if(r?in->reference!=r:(script==AWM_NONE || (int)in->script!=script))continue;
+            if(!named){named=read_string(AW_MwvmObjectId(k),id,sizeof(id)) && !Q_strcasecmp(id,(char *)target)?1:-1;}
+            if(named<0)break;
+            VectorSubtract(in->origin,sv_player->v.origin,d);dd=DotProduct(d,d);
+            if(!found || dd<best){found=1;best=dd;*ref=in->reference;VectorCopy(in->origin,origin);}
+        }
+        if(!found && r && !named && AW_MoverOrigin(r,origin) && read_string(AW_MwvmObjectId(k),id,sizeof(id)) &&
+           !Q_strcasecmp(id,(char *)target)){*ref=r;found=1;}
+        if(found){console_placements++;return 1;}
+    }
+    return console_bound(target,ref,origin);
+}
 /* the line's target as the VM's own: the player, or a scratch instance on the reference (AW_MWVM_SELF, as a script's
  * own reference is found); 0 none */
 static int console_begin(const char *target,int *instance,int *who,edict_t **edict){
     edict_t *e=console_resolve(target);eval_t *r;
     *instance=-1;*who=AW_MWVM_PLAYER;*edict=e;
+    if(!e && target[0]){   /* a placement without an edict: its reference (round two of the v0.0.63 release check) */
+        uint32_t ref=0;float at[3];
+        if(!console_placement(target,&ref,at) || (*instance=AW_MwvmScratch(ref,-1))<0)return 0;
+        (void)AW_MoverOrigin(ref,at);   /* a mover: where it stands now */
+        AW_MwvmSetOrigin(*instance,at);
+        *who=AW_MWVM_SELF;
+        return 1;
+    }
     if(!e)return 0;
     if(e==sv_player)return 1;
     if(!(r=GetEdictFieldValue(e,"aw_ref")) || r->_float<=0)return 0;
@@ -5702,7 +5797,8 @@ static int console_row_id(int spell,int row,char *s,int capacity){   /* the id s
     uint32_t off,rows,bytes;unsigned char b[4];aw_item_t it;
     console_id_probes++;
     if(!spell)return AW_ActorItem(row,&it) && read_string(it.id,s,capacity);
-    return AW_MwvmSection("ASPT",&off,&rows,&bytes) && actor_read(NULL,off+4u*(uint32_t)row,b,4) &&
+    /* actor_read answers 0 when it read (the actor table's reader convention, non-zero a failure) */
+    return AW_MwvmSection("ASPT",&off,&rows,&bytes) && !actor_read(NULL,off+4u*(uint32_t)row,b,4) &&
            read_string((b[0]<<8)|b[1],s,capacity);
 }
 static int id_compare(const char *a,const char *b){   /* folded, unsigned bytes: the builder's sort (cp1252) */
@@ -5719,7 +5815,10 @@ static int console_row(int spell,const char *id){
         hi=rows;
         while(lo<hi){
             uint32_t mid=(lo+hi)/2;
-            if(!actor_read(NULL,off+2u*mid,b,2))return -1;
+            /* UNDERWATER-BREATH-62 round three: actor_read answers non-zero on a FAILED read; this test was inverted,
+             * so every indexed id lookup (getspell, a trap's spell, additem of a known item) gave up at its first
+             * successful probe: player->getspell "argonian breathing" answered 0 for a player holding the spell */
+            if(actor_read(NULL,off+2u*mid,b,2))return -1;
             row=(b[0]<<8)|b[1];
             if(!console_row_id(spell,row,s,sizeof(s)))return -1;
             if(!(c=id_compare(s,id)))return row;
@@ -5733,6 +5832,14 @@ static int console_row(int spell,const char *id){
 }
 static int console_item_row(const char *id){return console_row(0,id);}
 static int console_spell_row(const char *id){return console_row(1,id);}
+/* TRAPS-WHEN-OPENED-63 (aw_hinged_door.c AW_TrapSpring): the trap spell's ASPT row (the builder gives every trap
+ * spell one, tools/mwscript/actors.py) cast by the trapped object on the player (OpenMW 0.53 actiontrap.cpp: the
+ * trap source casts on the actor who opened it); the object is no actor, so its Touch and Target effects land on the
+ * player. One id lookup on disk (about 13 probes) per sprung trap, never per frame. 1 when it landed. */
+static int trap_cast(const char *spell){
+    int row=console_spell_row(spell);
+    return row>=0 && AW_CastOn(NULL,NULL,row)>0;
+}
 static float console_number(const char *s){return (float)Q_atof((char *)s);}
 static int console_command(const char *target,int command,const aw_mwcon_line_t *l,char *answer,int capacity){
     int k,who,row,n,i;edict_t *e;aw_mwcell_t numbers[6],result;unsigned char strings[4];int32_t values[13];
@@ -5824,7 +5931,16 @@ static int console_special(const char *name,int k,int who,edict_t *e,const aw_mw
     int32_t v;int row;
     if(!strcmp(name,"lock")){host_object(k,who,AWM_LOCK,l->args?(int32_t)console_number(l->arg[0]):-1);return 1;}
     if(!strcmp(name,"unlock")){host_object(k,who,AWM_UNLOCK,0);return 1;}
-    if(!strcmp(name,"activate")){host_object(k,who,AWM_ACTIVATE,0);return 1;}
+    if(!strcmp(name,"activate")){
+        /* from the console the line is the player's use (as E): an object whose own script reads OnActivate passes it
+         * to the script (the Ghostgate switches, the Marks carriers); else its default use (OpenMW OpActivate) */
+        aw_mwvm_instance_t *in=who==AW_MWVM_SELF?AW_MwvmInstance(k):NULL;
+        if(in && object_intercept(in->reference)){
+            Q_snprintf(answer,capacity,"activate: used; its script's OnActivate takes it (reference %lu).\n",(unsigned long)in->reference);
+            return 1;
+        }
+        host_object(k,who,AWM_ACTIVATE,0);return 1;
+    }
     if(!strcmp(name,"getlocked")){Q_snprintf(answer,capacity,"getlocked -> %ld\n",(long)host_object(k,who,AWM_GETLOCKED,0));return 1;}
     if(!strcmp(name,"startcombat") || !strcmp(name,"stopcombat")){
         if(name[1]=='t' && name[2]=='a' && (!l->args || Q_strcasecmp((char *)l->arg[0],"player"))){

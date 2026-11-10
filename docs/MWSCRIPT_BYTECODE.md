@@ -1,6 +1,6 @@
 # MWScript compiled by the builder
 
-_Last updated with AmiWind v0.0.62-dev2 (8 November 2026)._
+_Last updated with AmiWind v0.0.63 (10 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -824,6 +824,13 @@ blight; Cure Poison changes nothing, because no poison state exists yet. The cas
 shrines' cure blessings (16 shrine scripts, 48 casts); the same scripts also cast their own shrine blessing, which
 waits for the spell effects (SPELL-EFFECTS-57: an effect table on disk, active effects per actor, saved), so they
 do not run whole yet and the count of scripts that run whole stays 799. Every other Cast compiles as "not yet".
+
+`Cast` on anything but the player (v0.0.64; OpenMW 0.53 miscextensions.cpp OpCast, spellcasting.cpp CastSpell::cast):
+the call hands the spell's ASPT row and the target's object row. A caster other than the player casts the spell on the
+target and it always succeeds: its Self effects land on the caster when the caster is an actor, its Touch and Target
+effects on the target, at once (no bolt flies). A target placed more than once, or made by a script, is found by its
+id among the loaded actors. A spell the game has not compiles to nothing, with a warning (OpenMW reports it and does
+nothing). The player as the caster (OpenMW only selects the spell then) stays "not yet".
 
 `ForceGreeting` (v0.0.57; OpenMW dialogueextensions.cpp OpForceGreeting: the actor opens the dialogue with its
 greeting): the actor plays the greeting the engine plays when the player talks to it (the voice table and its hello

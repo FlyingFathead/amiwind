@@ -169,6 +169,27 @@ class HingedDoorTable(unittest.TestCase):
         source = (ROOT / 'engine/aga/src/aw_hinged_door.c').read_text(encoding='utf-8')
         self.assertEqual(int(dict(re.findall(r'#define (HD_\w+) (\d+)', source))['HD_MOVERS']), HINGED_MOVERS)
 
+    def test_trapped_doors_and_containers_are_the_t_rows(self):
+        # TRAPS-WHEN-OPENED-63: every placed door (hinged or load) and container naming a trap spell; a deleted one,
+        # a static and a trapless one are not rows; the engine's bounds are the tool's
+        from prepare_door_audio import HINGED_TRAPS, HINGED_TRAP_POOL, HINGED_TRAP_SPELLS, trap_catalogue
+        raw = master() + record('CONT', sub('NAME', z('chest')) + sub('MODL', z('c\\x.nif')))
+        raw += cell('Tomb',
+                    ref(90, 'chest', ('TNAM', z('trap_fire00'))),
+                    ref(91, 'chest'),
+                    ref(92, 'chest', ('TNAM', z('trap_fire00')), ('DELE', struct.pack('<i', 0))),
+                    ref(55, 'load_door', ('DODT', struct.pack('<6f', 0, 0, 0, 0, 0, 0)), ('TNAM', z('dread curse: health'))),
+                    ref(93, 'some_static', ('TNAM', z('trap_fire00'))))
+        traps = trap_catalogue(raw)
+        self.assertEqual(traps, [(40, 'poison'), (55, 'dread curse: health'), (90, 'trap_fire00')])
+        bases, rows, sounds = hinged_catalogue(raw)
+        lines = hinged_text(bases, rows, sounds, lambda s: (sample_name(s), 1), traps=reversed(traps)).splitlines()
+        self.assertEqual(lines[-3:], ['T 40 poison', 'T 55 dread curse: health', 'T 90 trap_fire00'])
+        source = (ROOT / 'engine/aga/src/aw_hinged_door.c').read_text(encoding='utf-8')
+        defines = dict(re.findall(r'#define (HD_\w+) (\d+)', source))
+        self.assertEqual((int(defines['HD_TRAPS']), int(defines['HD_TRAP_SPELLS']), int(defines['HD_TRAP_POOL'])),
+                         (HINGED_TRAPS, HINGED_TRAP_SPELLS, HINGED_TRAP_POOL))
+
     def test_a_missing_authored_sound_stops_the_build(self):
         raw = door('d', 'Door', 'Nowhere') + cell('Room', ref(1, 'd'))
         with self.assertRaises(ValueError):

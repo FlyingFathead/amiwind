@@ -50,7 +50,9 @@ class PureChimDiskTests(unittest.TestCase):
         self.assertIn('placed=(map_jump==2 && AW_MapPlaceBelow(p,next.arrival)) || arrival_place(p,next.arrival,1);', scene)
         self.assertIn('Unknown destination: %s.', scene)
         self.assertIn('AW_TeleportDestinations(names,sizeof(names))', scene)
-        self.assertIn('map_place(p,point,point[2])', (src / 'aw_spawn.c').read_text())
+        # LAVA-NO-DAMAGE-63: Z is the floor (the feet), so the standing box starts just above it, never inside a
+        # lava bed or a thin floor under Z (the round-two check stood 636 game units under the Red Mountain lava)
+        self.assertIn('map_place(p,point,point[2]-p->v.mins[2]+1.0f)', (src / 'aw_spawn.c').read_text())
 
 
 if __name__ == '__main__':

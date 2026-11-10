@@ -180,6 +180,9 @@ class GameData:
         # the folded REGN ids of Morrowind.esm: sorted, their places are the region catalogue's indexes the engine's
         # weather uses (tools/prepare_world_ui.py region_names / region_weather; ChangeWeather, ModRegion)
         self.base_regions = set()
+        # TRAPS-WHEN-OPENED-63: the trap spells placed references name (TNAM), folded id -> id, first-seen order: the
+        # actor table gives each an ASPT row, so the engine casts a trap with the spell code (actors.py)
+        self.trap_spells = {}
 
     @property
     def levelled_actors(self):
@@ -373,6 +376,11 @@ class GameData:
                 ref['position'] = list(struct.unpack('<6f', data)[:3])
             elif tag == 'DELE':
                 ref['deleted'] = True
+            elif tag == 'TNAM':
+                ref['trap'] = _text(data)
+        for r in refs:
+            if r.get('trap') and not r.get('deleted'):
+                self.trap_spells.setdefault(r['trap'].casefold(), r['trap'])
         cell_flags, gx, gy = struct.unpack('<Iii', head['DATA']) if len(head.get('DATA', b'')) == 12 else (0, 0, 0)
         interior = bool(cell_flags & 1)
         cell_name = _text(head.get('NAME', b''))

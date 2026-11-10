@@ -310,6 +310,13 @@ def write_table(path, report, previous):
            'meshes': table,
            'recipe_meshes': report['table'].get('recipe_meshes', {}),
            'known_over_step': known}
+    # an expansion layer's rows (the survey measures the base master only): kept in the rows and their layers block
+    # (build_cache.LAYER_ROW_TABLES; CHIM-SOLSTHEIM-HULL-SURFACE-64)
+    layers = previous.get('layers') or {}
+    if layers:
+        rows = set(table)
+        doc['meshes'] = sorted(rows | {m for ms in layers.values() for m in ms})
+        doc['layers'] = layers
     Path(path).write_text(json.dumps(doc, indent=1) + '\n', encoding='utf-8', newline='\n')
     return doc
 

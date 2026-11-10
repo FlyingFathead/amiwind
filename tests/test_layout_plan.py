@@ -266,6 +266,28 @@ class PlannerTests(unittest.TestCase):
                      'id1/default-game.cfg', 'AmiWind', 'id1/chimi', 'id1/maps/sub/x.bsp'):
             self.assertIsNone(L.movable_unit(path), path)
 
+    def test_expansion_stores_move_as_one_unit(self):
+        # BUILD-EXPANSIONS-31: an expansion's CHIM store folder is a movable unit like id1/chimi/, moved whole
+        for store in ('id1/chimsol/', 'id1/chimiti/', 'id1/chimibm/'):
+            with self.subTest(store=store):
+                self.assertIn(store, L.STORE_UNITS)
+                self.assertEqual(L.movable_unit(store + 'world.cwi'), store)
+                self.assertEqual(L.movable_unit(store + 'rooms/r.crm'), store)
+                self.assertIsNone(L.movable_unit(store.rstrip('/')))
+                self.assertEqual(L.unit_kind(store), 'store')
+                rows = boot_payload(1800 * MIB)
+                rows.update({store + 'world.cwi': 40 * MIB, store + 'p00.ccs': 160 * MIB, store + 'rooms/r.crm': 1000,
+                             store + 'rooms/s.crm': 2000})
+                plan = L.plan_compact(rows, frame_maps(20), chim_payload(300 * MIB))
+                L.require_minimal(plan)
+                boot, chim = plan['partitions']
+                self.assertIn(store, chim['moved'])
+                on_chim = {p for p, _ in L.assign_units(plan, sorted(rows))['DW0']}
+                self.assertEqual({p for p in rows if p.startswith(store)} - on_chim, set())   # every file of it
+                self.assertLess(boot['bytes'], 2 * GIB)
+        # a base payload (no expansion store) plans exactly as before
+        self.assertEqual(L.movable_unit('id1/chimsolx/world.cwi'), None)
+
     def split_payload(self):
         """A boot payload over 2 GiB: 1,700 MiB that stays, a 250 MiB interior store, 40 actors of 8 MiB, 6 maps."""
         rows = boot_payload(1700 * MIB)

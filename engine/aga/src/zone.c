@@ -356,6 +356,16 @@ void AW_HeapAuditPhase(const char *scene,const char *phase) {
         (long)aw_heap_load_peak,(long)hunk_size,(long)clearance,(long)peak_clearance,
         (long)aw_cache_bytes,(long)aw_cache_peak,(long)zone_largest);
     if(peak_clearance<2097152)Con_Printf("WARNING: hunk-gap safety below 2 MiB. Region requires memory review.\n");
+    /* CHIM-SEYDA-BALMORA-LOAD-HANG-43 (E6): the memory line after every load and at Scene ready, Fast and Chip RAM
+     * outside the hunk included, so growth from load to load names itself (four AvailMem calls a load, none a frame) */
+    if(!strcmp(aw_heap_phase,"after-actors") || !strcmp(aw_heap_phase,"scene-ready") || !strcmp(aw_heap_phase,"after-restore"))
+        Con_Printf("Mem %s %s: hunk low %ld high %ld; zone largest %d free %d; cache %ld peak %ld; fast %lu largest %lu; chip %lu largest %lu\n",
+            aw_heap_scene,aw_heap_phase,(long)hunk_low_used,(long)hunk_high_used,zone_largest,zone_free,
+            (long)aw_cache_bytes,(long)aw_cache_peak,fast_free,fast_largest,chip_free,chip_largest);
+#ifdef AMIGA
+    {extern void AW_LoadTraceStage(const char *,int);extern int AW_LoadTraceCvar(void);
+     AW_LoadTraceStage(aw_heap_phase,AW_LoadTraceCvar());}   /* the load trace's stage (aw_loadtrace.c) */
+#endif
     /* heap-audit.log: in memory unless aw_logs_live (aw_log.c); a fatal exit writes it
      * after the crash report (BOOT-VOLUME-NOT-VALIDATED-33). */
     {

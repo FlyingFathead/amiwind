@@ -6,7 +6,7 @@ server_t sv;
 #include <stdarg.h>
 extern qboolean AW_FindSafeSpawn(edict_t *,vec3_t,vec3_t);
 extern qboolean AW_PlacePlayer(edict_t *,vec3_t);
-static int unavailable;static float water_height,ceiling,mountain;static int steep;
+static int unavailable;static float water_height,ceiling,mountain,lava_height,steep_x;static int steep;
 void Con_Printf(char *fmt,...) {}
 void SV_LinkEdict(edict_t *p,qboolean touch) {}
 /* Synthetic standing-hull space: floor at z=24 and an expanded block around
@@ -26,7 +26,7 @@ trace_t SV_Move(vec3_t a,vec3_t mins,vec3_t maxs,vec3_t b,int kind,edict_t *skip
    t.endpos[0]=a[0]+previous*(b[0]-a[0]);
    t.endpos[1]=a[1]+previous*(b[1]-a[1]);
    t.endpos[2]=a[2]+previous*(b[2]-a[2]);
-   t.plane.normal[2]=steep?.5f:1;break;
+   t.plane.normal[2]=steep || (steep_x && fabs(a[0]-steep_x)<20)?.5f:1;break;
   }
   previous=u;
  }
@@ -35,6 +35,7 @@ trace_t SV_Move(vec3_t a,vec3_t mins,vec3_t maxs,vec3_t b,int kind,edict_t *skip
 }
 int SV_PointContents(vec3_t point) {
  if(point[2]<0)return CONTENTS_SOLID;
+ if(point[2]<lava_height)return CONTENTS_LAVA;
  return point[2]<water_height?CONTENTS_WATER:CONTENTS_EMPTY;
 }
 int main(void) {
@@ -67,6 +68,19 @@ int main(void) {
  VectorCopy(p.v.origin,saved);water_height=220;
  assert(!AW_MapPlace(&p,preferred) && !memcmp(saved,p.v.origin,sizeof saved));
  water_height=0;
+ /* GODMODE-LAVA-DEATH-62 round three: lava is stood in (feet in the liquid on its bed), never refused as water;
+  * dbg tp X Y Z onto it lands there, and a steep rim point lands on the nearest floor beside it */
+ lava_height=40;
+ assert(AW_MapPlace(&p,preferred));
+ assert(p.v.origin[0]==50 && p.v.origin[2]>=24 && p.v.origin[2]<25);
+ assert(SV_PointContents((vec3_t){p.v.origin[0],p.v.origin[1],p.v.origin[2]+p.v.mins[2]+1})==CONTENTS_LAVA);
+ {vec3_t at={50,0,40};
+  assert(AW_MapPlaceBelow(&p,at));assert(p.v.origin[0]==50 && p.v.origin[2]>=24 && p.v.origin[2]<25);
+  steep_x=50;
+  assert(AW_MapPlaceBelow(&p,at));
+  assert(fabs(p.v.origin[0]-50)==32 && p.v.origin[2]>=24 && p.v.origin[2]<25);
+  steep_x=0;}
+ lava_height=0;
  unavailable=0;preferred[0]=NAN;assert(!AW_MapPlace(&p,preferred));preferred[0]=AW_COORD_BOUND;assert(!AW_MapPlace(&p,preferred));
 #ifndef AW_COORD_NARROW
  /* Red Mountain (CHIM-RED-MOUNTAIN-SOLID-SKY-43): ground at 4,730 frame-local under a 9,216 frame top. The

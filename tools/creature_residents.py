@@ -137,6 +137,24 @@ def idle_range(skeleton, profile):
     raise ValueError('no %s animation range in the model\'s text keys' % group)
 
 
+def effect_shape(material):
+    """The reason a shape is left out of a creature resident's opaque model, or None (HEART-OF-LORKHAN-LOOK-62).
+    An MDL skin has no translucency, so two kinds of shape would cover the creature instead of glowing around it:
+    - material alpha 0: invisible at rest; the original fades it in with an alpha controller (OpenMW
+      components/nifosg/controller.hpp AlphaController on the material alpha): the Heart's rays and glow quads,
+      seen only in its death;
+    - a translucent shell whose texture scrolls (alpha under 1 with a UV controller, controller.hpp UVController):
+      the Heart's fire shield around it.
+    Measured over every creature mesh of the three masters (2026-11-10): only the Heart of Lorkhan's shapes are
+    either; the translucent bodies that do not scroll (ancestor ghosts, the dwarven specters, the netches) are kept."""
+    alpha = float(material.get('alpha', 1.0))
+    if alpha <= 0.0:
+        return 'invisible at rest (material alpha 0)'
+    if alpha < 1.0 and material.get('uv_scroll'):
+        return 'translucent scrolling effect shell'
+    return None
+
+
 _assets = {}
 
 
@@ -170,10 +188,14 @@ def bake_task(task):
     for v, f, _ in per_frame[1:]:
         if v.shape != v0.shape or not np.array_equal(f, f0):
             raise ValueError('posed frames do not share one topology')
-    shapes, textures = [], {}
+    shapes, textures, effects = [], {}, []
     for i, material in enumerate(materials):
         selected = f0[f0[:, 3] == i, :3]
         if not len(selected):
+            continue
+        why = effect_shape(material)
+        if why:
+            effects.append({'shape': material.get('source_shape'), 'triangles': int(len(selected)), 'reason': why})
             continue
         source = material.pop('texture_source'); material['texture_index'] = source
         if source and source not in textures:
@@ -212,6 +234,8 @@ def bake_task(task):
               # the lowest point of the posed body above the reference point (Quake units): Vivec's float
               'lift': float(low[2]),
               'sha256': hashlib.sha256(raw).hexdigest(), 'voice_seconds': 0.}
+    if effects:
+        record['effects_left_out'] = effects
     return app['id'], raw, record
 
 

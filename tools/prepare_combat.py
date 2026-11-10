@@ -187,7 +187,7 @@ def gmst_text(kinds, name):
 # and the crime rules (STEAL-WITNESSED-NO-CRIME-61: the bounty rose; CRIME-59: the release from jail after one day or
 # more, a skill that fell there)
 TEXT_SETTINGS = ('sMagicTargetResistsWeapons', 'sCrimeMessage', 'sNotifyMessage42', 'sNotifyMessage43',
-                 'sNotifyMessage44')
+                 'sNotifyMessage44', 'sExpelledMessage')   # FACTION-EXPEL-MESSAGE-64: the expulsion's message box
 
 
 def movement_lines(kinds, settings):

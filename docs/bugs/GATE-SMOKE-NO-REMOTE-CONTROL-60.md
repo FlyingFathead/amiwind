@@ -19,9 +19,10 @@
 | Where | gate boot smoke: the emulator session gives no remote control after boot |
 | Reproduction | sometimes |
 | Duplicate of | no |
-| Persists in | fixed in v0.0.61-dev1 |
-| Severity | medium: Seen in gates 6858 and 6866 on the corpseaim branch; the reruns passed, so each hit costs a gate rerun |
+| Persists in | v0.0.64-dev3 (last seen) |
+| Severity | high: Regressed in v0.0.64-dev3 (was medium): Seen in gates 6858 and 6866 on the corpseaim branch; the reruns passed, so each hit costs a gate rerun |
 | Family | Gates, CI and tests (`tests-ci`) |
+| Came back (regression) | in v0.0.64-dev3 (fixed in v0.0.61-dev1 before) |
 | Playtest version | unknown |
 | From commit | source unknown, engine unknown, CHIM world unknown |
 | CHIM engine version | CHIM 0.2.2, engine unknown, world format unknown |
@@ -187,7 +188,9 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - [TEST-PARALLEL-ORDER-FLAKY-36](TEST-PARALLEL-ORDER-FLAKY-36.md): test_processes_keep_order_and_limit_nested_threads is timing-sensitive and fails now and then
 - [TEST-PARALLEL-ORDER-LOAD-33](TEST-PARALLEL-ORDER-LOAD-33.md): The process-pool order test fails on a fully loaded machine (one worker process takes every item)
 - [TEST-PARALLEL-SHARE-TIMING-36](TEST-PARALLEL-SHARE-TIMING-36.md): The fair-share scheduler test watched the freed budget for a fixed 4 s and failed on a loaded machine
+- TEST-POOL-QUEUE-REFILL-TIMING-64 (no report page): The pool queue refill test (test_longest_first) failed once in a gate on a busy machine and passed on the rerun of the same commit
 - TEST-POOL-RESUME-SHELL-CONTAINER-58 (no report page): A stage-key test fails when run on its own in the shell container: a pool-mode resume reuses the scene-chain stage it should rerun
+- TEST-POOL-SCENE-RESUME-ENV-64 (no report page): A stage-key test fails when run directly in the shell container but passes in the gate
 - TEST-PORT-01 (no report page): Focused tests depended on repo root and Windows UTF-8 mode
 - TEST-PORTABILITY-01 (no report page): Pre-release test fixtures assumed host features and links
 - [TEST-PROFILE-OVERHEAD-SAMPLES-36](TEST-PROFILE-OVERHEAD-SAMPLES-36.md): The profiler overhead test sampled for a fixed 2 s and got too few samples on a loaded machine

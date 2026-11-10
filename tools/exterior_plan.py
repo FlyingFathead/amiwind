@@ -14,8 +14,23 @@ from world_payload import bounds, subtract
 FORMAT = 'AmiWind exterior build checklist 1'
 
 
-def source_cells(master):
-    """Read exterior CELL plus height-bearing LAND identities, as the world survey does."""
+def source_cells(master, layers=()):
+    """Read exterior CELL plus height-bearing LAND identities, as the world survey does.
+
+    MASTER is Morrowind.esm; LAYERS (DLC-BUILD-LATER) the masters of the expansion layers the build uses, in load
+    order. Their cells are added; a cell a layer edits counts once. With no layers the result and its digest are
+    exactly the single-master ones (the base world's plan is unchanged); with layers the digest covers every master."""
+    if not layers:
+        return _master_cells(master)
+    cells, digests = set(), []
+    for position, path in enumerate((master, *layers)):
+        found, digest = _master_cells(path, require=position == 0)
+        cells.update(found)
+        digests.append(digest)
+    return sorted(cells), hashlib.sha256('\n'.join(digests).encode()).hexdigest()
+
+
+def _master_cells(master, require=True):
     from mwad.esm import records, subrecords, is_deleted
     raw = Path(master).read_bytes()
     cells, lands = set(), set()
@@ -47,7 +62,7 @@ def source_cells(master):
             raise ValueError('Duplicate LAND identity in exterior checklist')
         lands.add(cell)
     cells |= lands
-    if not cells:
+    if not cells and require:
         raise ValueError('Exterior checklist has no terrain cells')
     return sorted(cells), hashlib.sha256(raw).hexdigest()
 

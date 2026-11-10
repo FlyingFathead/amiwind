@@ -249,7 +249,14 @@ def update_budget(found, budget, reason=None):
     reasons = list(budget.get('reasons', []))
     if reason:
         reasons.append(reason)
-    return budget_document(found, reasons)
+    fresh = budget_document(found, reasons)
+    # keep every decision the budget file holds besides the numbers (its "caps" block, its note, any later key) in
+    # its place: only totals, reasons and entries are rewritten (BUILD-RESIDENT-BUDGET-CAPS-DROPPED-64)
+    document = dict(budget)
+    for key in ('format', 'totals', 'reasons', 'entries'):
+        document[key] = fresh[key]
+    document.setdefault('note', fresh['note'])
+    return document
 
 
 def main(argv=None):

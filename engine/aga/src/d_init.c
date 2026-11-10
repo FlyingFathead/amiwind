@@ -41,6 +41,7 @@ void D_DrawSpans8_C (espan_t *pspan);
 #endif
 
 void (*d_drawspans) (espan_t *pspan);
+void D_FenceInit (void);
 
 
 /*
@@ -56,6 +57,7 @@ void D_Init (void)
 	Cvar_RegisterVariable (&d_subdiv16);
 	Cvar_RegisterVariable (&d_mipcap);
 	Cvar_RegisterVariable (&d_mipscale);
+	D_FenceInit ();		/* see-through faces (d_fence.c): aw_fence and its hooks */
 
 	r_drawpolys = false;
 	r_worldpolysbacktofront = false;

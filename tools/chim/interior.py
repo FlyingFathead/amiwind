@@ -751,7 +751,7 @@ class Store:
             self.current, self.current_bytes = [], 0
 
     def texture_id(self, src):
-        from chim.models import engine_texture_name
+        from chim.fence import engine_name as engine_texture_name     # '{' for see-through textures, else as before
         mip = src['miptex']
         engine = mip[:16].split(b'\0')[0].decode('ascii') if src['engine'] is None else \
             engine_texture_name(src['engine'][0], src['engine'][1], len(self.texture_records))

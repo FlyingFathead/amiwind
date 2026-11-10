@@ -18,7 +18,7 @@
 | Where | CHIM frame maps and batch room maps: no aw_flame entities (tools/chim/frame_map.py) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.47 (last seen) |
+| Persists in | fixed in v0.0.63 |
 | Severity | medium: Every fire outdoors on CHIM is unlit: 719 fire emitters on 719 placements in 299 of 1,351 frames of the v0.0.47 world, and the hearths of batch rooms |
 | Family | Lighting, lamps and night (`lighting-night`) |
 | CHIM | Rendering and visibility ([CHIM Engine tracker](CHIM_TRACKER.md)) |

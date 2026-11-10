@@ -1,6 +1,6 @@
 # Game features
 
-_Last updated with AmiWind v0.0.63 (9 November 2026)._
+_Last updated with AmiWind v0.0.64-dev3 (10 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -55,7 +55,7 @@ Each has its own source file and its own check.
 | Tracker | Headline |
 | --- | --- |
 | [Dialogue features](DIALOGUE_FEATURES.md) | 5 of 29 done, 19 partial, 5 missing |
-| [MWScript features](MWSCRIPT_FEATURES.md) | 605 of 1207 scripts run, 28 use a function the interpreter lacks |
+| [MWScript features](MWSCRIPT_FEATURES.md) | 605 of 1207 scripts run, 27 use a function the interpreter lacks |
 | [Voices and sounds](VOICE_FEATURES.md) | per kind of line, with its proof |
 | [CHIM features](chim/FEATURES.md) | engine features with measured gains |
 | [World, cell by cell](chim/CELL_TRACKER.md) | every cell converted and audited |
@@ -138,8 +138,8 @@ Each has its own source file and its own check.
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Dialogue | partial | The conversation window, topics, conditions, disposition, persuasion and services; all 7,411 dialogue result scripts run; the headline of its own tracker is shown below. | OpenMW 0.51 dialogue; UESP Morrowind:Dialogue | docs/DIALOGUE_FEATURES.md and tests/test_dialogue_features.py. | The rows of docs/DIALOGUE_FEATURES.md that are not done. | DIALOGUE-COMPLETE-58, DIALOGUE-LIVE-STATE-58 | - |
 | Voices | partial | Character voice lines and creature sounds mapped into the world and heard in game. | the original's voice files; OpenMW 0.51 sound handling | docs/VOICE_FEATURES.md and tests/test_voice_features.py. | Rows of the voice tracker not yet heard in game. | VOICE-COVERAGE-58 | - |
-| Journal and quests | partial | The journal with dated entries and the quest book; journal indexes kept by the dialogue and the scripts. Dates read as in the original (18 Last Seed, Day 3) in the journal, the rest window and the saved game list. | OpenMW 0.51 journal; UESP Morrowind:Journal | tests/aga_journal_state_test.c, tests/aga_questbook_test.c, tests/aga_jhist_test.c. | Topic names in quest entries are not links yet; quests run only as far as the scripts do. | JOURNAL-QUEST-LINKS-58, MWSCRIPT-MORE-57 | - |
-| Factions and ranks | partial | Faction membership, rank and reputation read by the dialogue conditions and the scripts. | OpenMW 0.51 factions; UESP Morrowind:Factions | docs/DIALOGUE_FEATURES.md (rank requirement conditions live); tests/test_dialogue_lut.py. | Joining, advancing and expelling through play, not only through script calls. | MWSCRIPT-MORE-57 | - |
+| Journal and quests | partial | The journal with dated entries and the quest book; journal indexes kept by the dialogue and the scripts. Dates read as in the original (18 Last Seed, Day 3) in the journal, the rest window and the saved game list. Each quest's outcome: the entry of the ending reached, and the quest under the finished ones once an ending's entry finishes it (success and failure endings alike); a restart entry reopens it. | OpenMW 0.53 journal (mwdialogue/quest.cpp); UESP Morrowind:Journal | tests/aga_journal_state_test.c, tests/aga_questbook_test.c, tests/aga_jhist_test.c. | Topic names in quest entries are not links yet; quests run only as far as the scripts do. | JOURNAL-QUEST-LINKS-58, MWSCRIPT-MORE-57 | - |
+| Factions and ranks | partial | Faction membership, rank and reputation read by the dialogue conditions and the scripts; the guild masters' advancement check (the next rank's attribute, skill and reputation needs); faction reactions in disposition; expulsion for a reported crime against a member or a faction's item, with the original message, and reinstatement by the dialogue's results. | OpenMW 0.51 factions; UESP Morrowind:Factions | docs/DIALOGUE_FEATURES.md (rank requirement conditions live); tests/test_dialogue_lut.py; tests/test_crime.py; tests/test_combat_settings_text.py. | The stats page does not list factions, ranks, the next rank's needs, reputation or the bounty; not yet walked through in game. | FACTIONS-IN-PLAY-64, MWSCRIPT-MORE-57 | FACTION-STATS-PAGE-64, FACTION-EXPEL-MESSAGE-64 |
 
 ### MWScript
 

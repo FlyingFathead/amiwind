@@ -32,16 +32,17 @@ static int by_title(const void *a,const void *b){
     return c?c:x->quest-y->quest;
 }
 int AW_QuestBookBuild(aw_questbook_t *b,const aw_qb_quest_t *quests,int n,const aw_ledger_t *l,
-                      const aw_qb_dated_t *dated,int nd,aw_qb_finished_fn finished,void *ctx){
-    int32_t *stage=NULL;int i,j,g,*row_of=NULL,ok=0;
+                      const aw_qb_dated_t *dated,int nd,aw_qb_status_fn status,void *ctx){
+    int32_t *stage=NULL;int i,j,g,*row_of=NULL,ok=0;uint8_t *fin=NULL;
     if(!b)return 0;
     AW_QuestBookFree(b);
     if(n<0 || n>AW_QB_QUESTS || nd<0 || (n && !quests) || (nd && !dated))return 0;
+    fin=(uint8_t *)AW_TryCalloc((unsigned long)(n?n:1),1);
     stage=(int32_t *)AW_TryCalloc((unsigned long)(n?n:1),sizeof(int32_t));
     row_of=(int *)AW_TryMalloc((unsigned long)(nd?nd:1)*sizeof(int));
     b->group=(aw_qb_group_t *)AW_TryMalloc((unsigned long)(n?n:1)*sizeof(aw_qb_group_t));
     b->entry=(aw_qb_entry_t *)AW_TryMalloc((unsigned long)(nd+n?nd+n:1)*sizeof(aw_qb_entry_t));
-    if(!stage || !row_of || !b->group || !b->entry)goto done;
+    if(!fin || !stage || !row_of || !b->group || !b->entry)goto done;
     /* the stage of every quest: the kept one, else the highest dated (an older save's 32-slot journal) */
     for(i=0;i<n;i++)stage[i]=AW_QuestBookStage(l,quests[i].id);
     for(j=0;j<nd;j++){
@@ -49,14 +50,37 @@ int AW_QuestBookBuild(aw_questbook_t *b,const aw_qb_quest_t *quests,int n,const 
         if(row_of[j]>=0 && !AW_QuestBookStage(l,quests[row_of[j]].id) && dated[j].stage>stage[row_of[j]])
             stage[row_of[j]]=dated[j].stage;
     }
+    /* finished or active (JOURNAL-QUEST-ENDINGS-64; OpenMW 0.53 mwdialogue/quest.cpp addEntry, read, not copied):
+     * the quest's entries replayed in the order earned, an entry with the finished mark finishes it, one with the
+     * restart mark reopens it, any other entry and a bare index change leave it as it was; the kept stage counts as
+     * the last entry when no dated entry holds it (an older save's stages without dates) */
+    if(status){
+        for(j=0;j<nd;j++){
+            int s;
+            if(row_of[j]<0 || dated[j].stage<=0)continue;
+            s=status(quests[row_of[j]].id,dated[j].stage,ctx);
+            if(s&AW_QB_FINISHED)fin[row_of[j]]=1;
+            else if(s&AW_QB_RESTART)fin[row_of[j]]=0;
+        }
+        for(i=0;i<n;i++){
+            int s;
+            if(stage[i]<=0)continue;
+            for(j=0;j<nd && !(row_of[j]==i && dated[j].stage==stage[i]);j++);
+            if(j<nd)continue;
+            s=status(quests[i].id,stage[i],ctx);
+            if(s&AW_QB_FINISHED)fin[i]=1;
+            else if(s&AW_QB_RESTART)fin[i]=0;
+        }
+    }
     /* the names: each once, a name finished when any of its quests is */
     for(i=0;i<n;i++){
         if(stage[i]<=0)continue;
         b->started++;
+        if(fin[i])b->finished++;
         if(!quests[i].title[0])continue;
         for(g=0;g<b->groups && casecmp(quests[b->group[g].quest].title,quests[i].title);g++);
         if(g==b->groups){b->group[g].quest=i;b->group[g].finished=0;b->groups++;}
-        if(finished && finished(quests[i].id,stage[i],ctx))b->group[g].finished=1;
+        if(fin[i])b->group[g].finished=1;
     }
     sort_quests=quests;
     if(b->groups>1)qsort(b->group,(size_t)b->groups,sizeof(aw_qb_group_t),by_title);
@@ -82,7 +106,7 @@ int AW_QuestBookBuild(aw_questbook_t *b,const aw_qb_quest_t *quests,int n,const 
     }
     ok=1;
  done:
-    free(stage);free(row_of);
+    free(fin);free(stage);free(row_of);
     if(!ok)AW_QuestBookFree(b);
     return ok;
 }

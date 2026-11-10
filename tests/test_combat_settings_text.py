@@ -25,6 +25,16 @@ class CombatSettingsText(unittest.TestCase):
         self.assertIn('sMagicTargetResistsWeapons', pc.TEXT_SETTINGS)
         self.assertEqual(struct.calcsize('<i'), 4)
 
+    def test_expelled_message(self):
+        """FACTION-EXPEL-MESSAGE-64: the expulsion shows sExpelledMessage + the faction (OpenMW NpcStats::expell);
+        the image carries the setting and the engine reads its line and shows it beside the console line."""
+        self.assertIn('sExpelledMessage', pc.TEXT_SETTINGS)
+        self.assertLessEqual(len('text sExpelledMessage ') + 90, 127)
+        c = (ROOT / 'engine/aga/src/aw_crime.c').read_text(encoding='utf-8')
+        self.assertIn('"text sExpelledMessage ",22', c)
+        expel = c.index('AW_StandingSetExpelled(f,1)')
+        self.assertIn('AW_MsgBoxShow(text,NULL,0)', c[expel:expel + 800])
+
     def test_no_function_shadows_the_text_helper(self):
         tree = ast.parse((ROOT / 'tools/prepare_combat.py').read_text(encoding='utf-8'))
         for fn in (n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)):

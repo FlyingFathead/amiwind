@@ -76,7 +76,15 @@ Family: Morrowind editions, archives and inputs (`game-data-editions`). The buil
 
 Related bugs in other categories:
 
+- BUILD-GAME-INPUT-KEY-BROAD-64 (no report page): Every stage that reads the game data was keyed by every game input, so an expansion file being present re-keyed the base world
+- CHIM-SEA-BETWEEN-ISLANDS-64 (no report page): The CHIM cell list holds no sea between Vvardenfell and Solstheim
+- CHIM-SOLSTHEIM-HULL-SURFACE-64 (no report page): The CHIM collision surface check refuses 25 Bloodmoon meshes that are not in its measured table
+- CHIM-SOLSTHEIM-STAIR-CHECK-64 (no report page): The geometric stair check fails on three Bloodmoon meshes
+- CHIM-SOLSTHEIM-TREE-FACES-64 (no report page): A dense Solstheim forest frame draws about six times the faces of a median Vvardenfell view
+- CHIM-STORE-ONE-AT-A-TIME-64 (no report page): The engine streams one CHIM store at a time, so frames of a second store cannot sit beside the first in the open world
 - [CREATURE-EXPANSION-62](CREATURE-EXPANSION-62.md): The creatures of Tribunal and Bloodmoon are not in the game: 136 creature records, their 491 placements and 1,126 levelled creature points
 - [HARVEST-EXPANSION-FLORA-62](HARVEST-EXPANSION-FLORA-62.md): The plants placed by the Tribunal and Bloodmoon masters are not harvestable
+- WORLD-REGION-NAMES-VF-ONLY-64 (no report page): The open-world region directory accepts only Vvardenfell region names
+- WORLDMAP-ONE-ISLAND-64 (no report page): The in-game world map covers Vvardenfell only
 
 <!-- END GENERATED CATEGORY -->

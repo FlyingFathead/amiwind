@@ -153,7 +153,10 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(parsed['vertices'], [(480., -256., 42.), (480., -320., 42.), (488., -288., 42.),
                                               (480., -160., 38.), (488., -416., 42.)])
         self.assertEqual(parsed['check'], {'box': ((480., -480.), (512., -160.)), 'grid': 8., 'tolerance': 4.})
-        ids = {b['id'] for b in json.loads((ROOT / 'docs/bugs/bugs.json').read_text(encoding='utf-8'))}
+        # the whole register, archives included: a fixed bug rotates out of bugs.json (BALMORA-GROUND-DENTS-51 was seen
+        # fixed in the v0.0.63 release check), and the fixup must still name a real entry
+        import bug_register
+        ids = {b['id'] for b in bug_register.load()}
         self.assertIn(parsed['bug'], ids)
 
 

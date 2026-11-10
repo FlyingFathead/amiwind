@@ -28,6 +28,7 @@ void (*aw_hinged_spawn)(void);
 void (*aw_hinged_tick)(double seconds);
 int (*aw_hinged_locked_sound)(void);
 int (*aw_load_door_lock)(unsigned reference,int use);
+int (*aw_trap_spring)(unsigned reference);   /* aw_inventory.c in the engine */
 /* The player's items: the engine's aw_state.c (linked); the key's catalogue name. */
 static void carry_key(int on){AW_StateSet(&aw_state,AW_ITEM,"key_Private Quarters",on);
     assert(AW_StateGet(&aw_state,AW_ITEM,"key_Private Quarters")==on);}
@@ -41,6 +42,7 @@ int (*aw_chim_door_yaw)(unsigned pid,float yaw);
 int (*aw_chim_door_clip)(unsigned pid,vec3_t start,vec3_t mins,vec3_t maxs,vec3_t end,trace_t *trace);
 int (*aw_chim_place_shift)(unsigned pid,const float *d,int relink);
 int (*aw_chim_place_turn)(unsigned pid,const float *d,float *now);
+int (*aw_chim_place_origin)(unsigned pid,float *out);
 
 static const char *table;
 static int opens,started,stopped,last_entity,last_channel;static float last_volume,last_attenuation;
@@ -531,6 +533,9 @@ static unsigned shifted_pid;static float shifted[3];static int shifts,relinks;
 static int chim_shift(unsigned pid,const float *d,int relink){
     int k;shifted_pid=pid;for(k=0;k<3;k++)shifted[k]+=d[k];shifts++;relinks+=relink;return 1;
 }
+/* the placement's origin now: its start (0 0 0) plus what it was shifted by */
+static unsigned origin_pid;
+static int chim_origin(unsigned pid,float *out){int k;origin_pid=pid;for(k=0;k<3;k++)out[k]=shifted[k];return 1;}
 static void movers_mode(void){
     float d[3]={0,0,0},yaw=0;int i;
     table="AWHD1\nW doors/d0123456789abcdef.wav 0.5 1.2\nB 0 0 Door\nD 100 0 0 0\n"
@@ -553,6 +558,13 @@ static void movers_mode(void){
     assert(shifted_pid==77 && fabs(shifted[2]-52.5f)<.01f && shifts==30 && relinks==1);
     /* not a mover: the call is not taken */
     assert(!AW_MoverShift(4001,d) && !AW_MoverAtStart(4001));
+    /* WORLD-BUTTONS-62 round two: the console's GetPos reads where the loaded placement stands now; none without
+     * the frames' hook, none for a reference that is no mover */
+    {float at[3]={0,0,0};
+     assert(!AW_MoverOrigin(5000,at));
+     aw_chim_place_origin=chim_origin;
+     assert(AW_MoverOrigin(5000,at) && origin_pid==77 && fabs(at[2]-shifted[2])<.01f && !AW_MoverOrigin(4001,at));
+     aw_chim_place_origin=NULL;}
     /* SetAtStart: back by everything it moved (1.5 before and 52.5 now), relinked */
     assert(AW_MoverAtStart(5000) && fabs(shifted[2]+1.5f)<.01f && relinks==2 && AW_MoverMoved()==0);
     /* New Game: every mover back at its start */
@@ -611,8 +623,64 @@ static void turns_mode(void){
     printf("turns ok\n");
 }
 
+/* TRAPS-WHEN-OPENED-63: the T rows (hinged door 100 and the locked hinged door 200, load door 5000, container 7000;
+ * out of order and an id past 63 bytes left out). A trapped door's use casts the trap on the player (aw_mwhost.c
+ * trap_cast in the engine; a stand-in here) and does not open it; the next use opens it; the key that opens the
+ * lock disarms the trap (no cast); a used-up trap is a named fact; the container hook is set. */
+static const char *trap_table=
+    "AWHD1\n"
+    "W doors/d0123456789abcdef.wav 0.5 1.2\n"
+    "W doors/dfedcba9876543210.wav 0.25 0.9\n"
+    "W doors/d00000000000000aa.wav 1 0.4\n"
+    "B 0 1 Door\n"
+    "B -1 -1 Gate of the Tribunal\n"
+    "D 100 0 0 4\n"
+    "D 200 1 50 7\n"
+    "D 172860 0 100 1\n"
+    "L 2\n"
+    "K 200 50 3 key_Private Quarters\n"
+    "K 5000 30 1\n"
+    "T 100 trap_fire00\n"
+    "T 200 Trap_Fire00\n"
+    "T 150 trap_frost00\n"
+    "T 5000 dread curse: health\n"
+    "T 7000 trap_poison00\n"
+    "T 7001 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n";
+static int casts;static char cast_spell[64];
+static int stand_in_cast(const char *spell){casts++;strncpy(cast_spell,spell,sizeof(cast_spell)-1);return 1;}
+static void traps_mode(void){
+    unsigned long n[4];int i;
+    table=trap_table;setup();AW_HingedDoorInit();aw_trap_cast=stand_in_cast;assert(aw_trap_spring==AW_TrapSpring);
+    AW_HingedDoorMapBegin();AW_HingedDoorSpawn();
+    AW_TrapCounts(n);assert(n[0]==4);
+    assert(AW_TrapSpell(150)==NULL && AW_TrapSpell(7001)==NULL && AW_TrapSpell(9)==NULL);
+    assert(!strcmp(AW_TrapSpell(7000),"trap_poison00") && !strcmp(AW_TrapSpell(200),"trap_fire00"));
+    /* the trapped hinged door: the use springs the trap on the player, the door stays shut; the next use opens it */
+    place_player(40,16,180);
+    i=casts;assert(AW_HingedDoorUse() && casts==i+1 && !strcmp(cast_spell,"trap_fire00"));
+    tick(.1,10);assert(edicts[1].v.angles[1]==0 && AW_TrapSpell(100)==NULL);
+    assert(AW_StateGet(&aw_state,AW_GLOBAL,"amiwind:trap:100")==1);
+    assert(AW_HingedDoorUse() && casts==i+1);tick(.1,10);assert(edicts[1].v.angles[1]==-90);
+    /* the locked, trapped door 200: refused without the key (no cast); its key opens it and disarms the trap */
+    place_player(340,16,180);
+    i=casts;assert(AW_HingedDoorUse() && casts==i);tick(.1,10);assert(edicts[3].v.angles[1]==0 && AW_TrapSpell(200));
+    carry_key(1);
+    assert(AW_HingedDoorUse() && casts==i && AW_TrapSpell(200)==NULL);tick(.1,10);assert(edicts[3].v.angles[1]==-90);
+    carry_key(0);
+    /* the locked, trapped load door 5000: god mode passes the lock and the trap springs (no way through) */
+    edicts[2].v.flags=FL_GODMODE;
+    assert(AW_HingedDoorLoadLock(5000,1) && casts==i+1 && !strcmp(cast_spell,"dread curse: health"));
+    assert(!AW_HingedDoorLoadLock(5000,1) && casts==i+1);
+    edicts[2].v.flags=0;
+    /* the container: sprung once through the hook, then it opens */
+    assert(aw_trap_spring(7000)==1 && casts==i+2 && aw_trap_spring(7000)==0);
+    AW_TrapCounts(n);assert(n[1]==3 && n[2]==1 && n[3]==0);
+    aw_trap_cast=NULL;
+    printf("traps ok\n");
+}
 int main(int argc,char **argv){
     assert(argc==2);
+    if(!strcmp(argv[1],"traps")){traps_mode();return 0;}
     if(!strcmp(argv[1],"movers")){movers_mode();return 0;}
     if(!strcmp(argv[1],"turns")){turns_mode();return 0;}
     if(!strcmp(argv[1],"locks")){locks_mode();return 0;}

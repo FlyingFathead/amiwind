@@ -503,7 +503,10 @@ class KnownMeshTests(unittest.TestCase):
         import json
         data = json.loads((ROOT / 'config/stair-check-known.json').read_text(encoding='utf-8'))
         # 11 measured on 22 October; the 2 the dev2 verify run found pass since (CHIM-STAIR-METHOD1-UNFIXED-48)
-        self.assertEqual(len(data['meshes']), 11)
+        # plus the Bloodmoon layer's 3 (CHIM-SOLSTHEIM-STAIR-CHECK-64), named under layers
+        bloodmoon = data['layers']['bloodmoon']
+        self.assertEqual(len(bloodmoon), 3)
+        self.assertEqual(len(set(data['meshes']) - set(bloodmoon)), 11)
         self.assertNotIn('meshes/f/flora_tree_gl_06.nif', data['meshes'])
         self.assertNotIn('meshes/x/ex_t_slavemarket.nif', data['meshes'])
         self.assertTrue((ROOT / 'docs/bugs' / (data['class'] + '.md')).is_file())

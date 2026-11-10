@@ -44,6 +44,9 @@ int ChimMovers_Shift (unsigned pid, const float *d, int relink);
  * gets the angles after it, may be NULL): the cranks, bar doors, Dwemer doors */
 extern int (*aw_chim_place_turn)(unsigned pid, const float *d, float *now);
 int ChimMovers_Turn (unsigned pid, const float *d, float *now);
+/* ... and where its first loaded copy stands now (map units; 1 found) */
+extern int (*aw_chim_place_origin)(unsigned pid, float *out);
+int ChimMovers_Origin (unsigned pid, float *out);
 #define CHIM_PLACE_TURNED	0x40000		/* run-time: a turned mover's box holds every pose */
 /* The window's slot i (1 used: its frame and frame-local -> session offset;
  * 0 for every slot without a window) and a frame map's own frame: for the

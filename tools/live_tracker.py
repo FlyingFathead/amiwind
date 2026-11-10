@@ -30,7 +30,7 @@ INTERVAL = 10
 STATUS_FILE = 'live-status.json'
 DATA_FILE = 'cell-progress-data.js'
 LIVE_FOLDER = 'live'
-PAGE_FILES = ('world-map.html', 'header.js', 'chim-legend.js', 'chim-inclusion.js', 'chim-inclusion.json', 'zebra.js', 'chim-head.js', 'panel-fold.js', 'interior-tracker.js')
+PAGE_FILES = ('world-map.html', 'header.js', 'chim-legend.js', 'chim-inclusion.js', 'chim-inclusion.json', 'zebra.js', 'chim-head.js', 'panel-fold.js', 'interior-tracker.js', 'expansion-views.js')
 # Page files a run keeps its own copy of (BUILD/toolkit): the inclusion ledger with the run's entry on top, written at the
 # end of the build (tools/chim_inclusion.py build_step); until then the repository's copy is shown.
 RUN_FILES = ('chim-inclusion.js', 'chim-inclusion.json')

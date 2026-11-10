@@ -151,7 +151,8 @@ else:
     out.update(found=True, status=state.get("status"), stages=len(steps), reused=len(cache.get("reused") or {}),
                rebuilt=len(cache.get("not_reused") or {}), failed_stage=failed[0] if failed else None,
                not_started=len(state.get("not_started") or []), elapsed_seconds=state.get("elapsed_seconds"),
-               reuse_from=cache.get("reuse_from"), storage_pool=state.get("storage_pool"))
+               reuse_from=cache.get("reuse_from"), storage_pool=state.get("storage_pool"),
+               expansion_layers=state.get("expansion_layers"))
     # every CHIM frame over its memory budget, worst first, with how much (maintainer 2026-10-16: "whenever something is
     # over budget, I'd know how much over budget")
     over = []

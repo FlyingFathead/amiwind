@@ -117,6 +117,7 @@ Family: Harvestable plants (`harvest`). Harvest catalogues are built by the buil
 
 Related bugs in other categories:
 
+- CHIM-MODEL-FENCE-FACES-64 (no report page): CHIM model faces cannot be alpha-tested, so crossed tree panels cannot be drawn as model variants
 - TREE-PILLAR-28 (no report page): Sprite-tree roots extend into unintended striped pillars
 - TREE-SCALE-001 (no report page): Non-unit-scale tree sprites omitted; bounds too conservative
 

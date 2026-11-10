@@ -1,6 +1,6 @@
 # World tree sprites and the Balmora comparison zone
 
-_Last updated with AmiWind v0.0.61-dev3 (2026-11-06)._
+_Last updated with AmiWind v0.0.64-dev3 (10 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -114,6 +114,37 @@ panels can use side views baked at their angles). Candidates to measure, like fo
 
 The checks under "Acceptance" apply unchanged: collision, roots on slopes (TREE-PILLAR-28), leaf membership of the
 wider footprint, measured frame times and heap. Not started; a study item, nothing enabled.
+
+### Tree type 2 for Solstheim: the star prism and the baked copies (10 November 2026)
+
+Crossed panels need see-through texels, and CHIM model faces have none: the surface renderer has no masked face kind
+(see-through index 255 exists only for sprites and 2D pictures; CHIM-MODEL-FENCE-FACES-64, the same cause as
+ROOM-DECAL-ALPHA-62). The near copy is therefore a closed opaque volume, decided for the project on 10 November 2026:
+seen from above a four-pointed star (four long points with inner corners between them), a crown of stacked tiers each
+smaller than the one below, starting where the model's needles start so the bare trunk shows, on a hexagonal bark
+trunk (six faces, no caps: the crown covers its top and the ground its foot). Every face is an ordinary face, so the
+CHIM model path draws it as it is. The needle faces take an opaque texture baked from the model's side view, its
+see-through texels filled from their neighbours.
+
+| Copy | Tool | Form | Cost per tree |
+| --- | --- | --- | --- |
+| Near: star prism | `tools/chim_tree_star.py` | 3 tiers of 8 sides (the top one closes on a point), hexagonal trunk | 30 faces (472-724 for the model) |
+| Far: billboard | `tools/chim_tree_copies.py` | one camera-facing sprite (the shared tree sprite bake) | 1 sprite |
+| Baked side views | `tools/chim_tree_copies.py` | four oriented sprites at 0, 45, 90 and 135 degrees, each with its outline polygon | texture source, route C |
+
+Settings live in `config/tree-copies.json`: the tiers (2-4), the star's point depth, the tier overlap, the shade of
+the inner corners, the texture scale, undersides (off), the trunk's sides (6), the needle texture (baked), the star
+angles and the outline's point count. Sizes come from each model's vertices: the crown starts at the lowest vertex of
+a see-through (needle) material, a tier reaches as far as the crown reaches in its height band, and the trunk's width
+is the bark's (the opaque material nearest the axis) at the foot and just under the crown. Collision stays the
+model's own.
+
+Only the Solstheim test stages use this: `tools/build.py --chim-sol-test CELLS --chim-sol-tree-copies star` runs the
+chim-sol stage through `chim_tree_star.py` and adds the stage chim-sol-trees for the baked copies; unset, nothing
+changes. The base CHIM stage reads none of these files and keeps its key (tests/test_tree_copies.py). Measured on the
+densest Solstheim forest frame: the median view falls from 45,964 to 6,096 faces
+([SOLSTHEIM-FIRST-FRAME-v0.0.64.md](performance/SOLSTHEIM-FIRST-FRAME-v0.0.64.md)). Still to do: the distance level
+in the engine (star prisms in a near ring, billboards beyond) and the frame time on the emulator and the Pi.
 
 ### Bloodmoon: Solstheim's forests (29 October 2026)
 

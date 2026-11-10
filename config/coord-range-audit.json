@@ -153,6 +153,42 @@
    "note": "a count check of a save ID range, not a position"
   },
   {
+   "file": "engine/aga/src/aw_maps.h",
+   "contains": "their id from their own base, 4096 each",
+   "class": "unrelated",
+   "note": "the size of the expansions' save ID ranges (a comment), not a position"
+  },
+  {
+   "file": "engine/aga/src/aw_maps.h",
+   "contains": "AW_TRIBUNAL_ROOM_BASE (AW_ROOM_BATCH_BASE+4096)",
+   "class": "unrelated",
+   "note": "a save ID range (the Tribunal rooms after the batch rooms), not a position"
+  },
+  {
+   "file": "engine/aga/src/aw_maps.h",
+   "contains": "AW_BLOODMOON_ROOM_BASE (AW_TRIBUNAL_ROOM_BASE+4096)",
+   "class": "unrelated",
+   "note": "a save ID range (the Bloodmoon rooms after the Tribunal rooms), not a position"
+  },
+  {
+   "file": "engine/aga/src/aw_maps.h",
+   "contains": "AW_LAYER_ROOM_END (AW_BLOODMOON_ROOM_BASE+4096)",
+   "class": "unrelated",
+   "note": "the end of the expansions' save ID ranges, not a position"
+  },
+  {
+   "file": "engine/aga/src/aw_maps.h",
+   "contains": "heck[AW_TRIBUNAL_ROOM_COUNT<=4096?1:-1];",
+   "class": "unrelated",
+   "note": "a count check of a save ID range, not a position"
+  },
+  {
+   "file": "engine/aga/src/aw_maps.h",
+   "contains": "heck[AW_BLOODMOON_ROOM_COUNT<=4096?1:-1];",
+   "class": "unrelated",
+   "note": "a count check of a save ID range, not a position"
+  },
+  {
    "file": "engine/aga/src/aw_movie.c",
    "contains": "_PIXELS];signed char pcm[4096];} movie",
    "class": "unrelated",

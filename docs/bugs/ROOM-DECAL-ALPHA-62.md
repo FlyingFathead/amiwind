@@ -74,4 +74,9 @@ Family: Town and interior import (`town-import`). The town importer converts eve
 - [TOWN-INTERIOR-SAVEID-ORDER-33](TOWN-INTERIOR-SAVEID-ORDER-33.md): Town interior save IDs are numbered across towns: listing a room for an earlier town renumbers every later town's rooms
 - [VIVEC-ROOMS-UNREACHABLE-32](VIVEC-ROOMS-UNREACHABLE-32.md): Excluded Vivec hub rooms leave converted rooms unreachable
 
+Related bugs in other categories:
+
+- CHIM-FENCE-WRONG-ARCHIVE-64 (no report page): The see-through texture check read a texture from the wrong archive and stopped the CHIM stage
+- CHIM-MODEL-FENCE-FACES-64 (no report page): CHIM model faces cannot be alpha-tested, so crossed tree panels cannot be drawn as model variants
+
 <!-- END GENERATED CATEGORY -->

@@ -125,6 +125,7 @@ int (*aw_chim_door_yaw)(unsigned pid, float yaw);
 int (*aw_chim_door_clip)(unsigned pid, vec3_t start, vec3_t mins, vec3_t maxs, vec3_t end, trace_t *trace);
 int (*aw_chim_place_shift)(unsigned pid, const float *d, int relink);
 int (*aw_chim_place_turn)(unsigned pid, const float *d, float *now);
+int (*aw_chim_place_origin)(unsigned pid, float *out);
 
 static int		available;			/* chim/world.cwi exists */
 static int		active;				/* the current map is a CHIM frame */
@@ -2168,6 +2169,7 @@ void Chim_Init (void)
 	aw_chim_door_clip = ChimChunks_DoorClip;
 	aw_chim_place_shift = ChimMovers_Shift;		/* chim_room.c, WORLD-BUTTONS-62 */
 	aw_chim_place_turn = ChimMovers_Turn;	aw_chim_view_reach = ViewReach;
+	aw_chim_place_origin = ChimMovers_Origin;	/* WORLD-BUTTONS-62 round two: the console's GetPos */
 #ifdef AMIGA
 	aw_chim_spike_counts = SpikeCounts;
 #endif

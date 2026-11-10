@@ -76,7 +76,10 @@ class Survey(unittest.TestCase):
             path = Path(d) / 'table.json'
             doc = write_table(path, report, previous)
             self.assertEqual(set(doc), set(previous))
-            self.assertEqual(hull_surface_table(path), {'meshes/x/deck.nif'})
+            # the expansion layers' rows of the table it replaces stay (CHIM-SOLSTHEIM-HULL-SURFACE-64)
+            layer = {m for ms in (previous.get('layers') or {}).values() for m in ms}
+            self.assertEqual(doc.get('layers'), previous.get('layers'))
+            self.assertEqual(hull_surface_table(path), {'meshes/x/deck.nif'} | layer)
             self.assertEqual(hull_surface_known(path), {'meshes/x/still.nif'})
             self.assertEqual(hull_surface_recipe_table(path), {'telvanni-v1': {'meshes/x/ship.nif'}})
             self.assertEqual(doc['counts']['meshes'], 1)
@@ -89,7 +92,10 @@ class ShippedTable(unittest.TestCase):
     def test_format(self):
         d = self.doc
         self.assertEqual(d['schema'], 'aw-collision-hull-surface-1')
-        self.assertEqual(d['counts']['meshes'], len(d['meshes']))
+        # counts are the base master's survey; an expansion layer's rows are named under layers
+        layer = {m for ms in d.get('layers', {}).values() for m in ms}
+        self.assertLessEqual(layer, set(d['meshes']))
+        self.assertEqual(d['counts']['meshes'], len(set(d['meshes']) - layer))
         self.assertEqual(d['meshes'], sorted(d['meshes']))
         self.assertTrue(all(m == m.casefold() and m.startswith('meshes/') and '\\' not in m for m in d['meshes']))
         self.assertFalse(set(d['meshes']) & set(d['known_over_step']))

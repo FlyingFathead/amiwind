@@ -9,10 +9,9 @@
 | Where | Console Up/Down history on the maintainer's FS-UAE (Ubuntu) |
 | Reproduction | unknown |
 | Duplicate of | no |
-| Persists in | v0.0.61 (last seen) |
+| Persists in | fixed in v0.0.63 |
 | Severity | medium: Regressed in v0.0.61 (was low): Console history recall seems dead for one owner setup; not reproduced. |
 | Family | Console, keyboard and mouse input (`console-input`) |
-| Deferred by the maintainer | 2026-11-09: deferred by the maintainer to v0.0.64 (the v0.0.63 release triage: "Defer all six") |
 | Came back (regression) | in v0.0.61 (fixed in v0.0.53 before) |
 | Playtest version | v0.0.32-dev1 |
 | From commit | source and engine 978475d |

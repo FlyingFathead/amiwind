@@ -68,13 +68,16 @@ MAP_BASE = 'id1/maps/'
 # maps and their sidecars (aw_mappath.c, model.c, chim_cuts.c, chim_far.c: COM_FOpenFile) and the actor models
 # (model.c, aw_anim.c .anm, aw_items.c .tag: COM_FOpenFile / COM_Load*File). Music (aw_music.c opens
 # <gamedir>/music directly), saves, configs and everything else stay on DH0.
-STORE_UNITS = ('id1/chimi/',)
+# The expansions' CHIM stores of the v0.0.64 layer plan (BUILD-EXPANSIONS-31: chimsol for Solstheim, chimiti for
+# Tribunal, chimibm for Bloodmoon's rooms) move the same way, each a whole folder. A base build has none of them, so
+# its plan is unchanged.
+STORE_UNITS = ('id1/chimi/', 'id1/chimsol/', 'id1/chimiti/', 'id1/chimibm/')
 ACTOR_PREFIX = 'id1/progs/a_'
 
 
 def movable_unit(path):
     """The unit a boot-relative PATH moves with to a world volume, or None when it stays on DH0: a whole store
-    folder (id1/chimi/), a map with its sidecars (id1/maps/<stem>), an actor model with its mover, layout and tag
+    folder (id1/chimi/, an expansion's id1/chimsol/, id1/chimiti/, id1/chimibm/), a map with its sidecars (id1/maps/<stem>), an actor model with its mover, layout and tag
     files (id1/progs/a_<id>, the mover a_<id>_m)."""
     path = str(path).replace('\\', '/')
     for store in STORE_UNITS:

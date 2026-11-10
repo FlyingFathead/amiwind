@@ -680,6 +680,7 @@ void AW_UIRoomRefused(const char *first,const char *second);
 int AW_SceneRoomFastMb(const char *target);
 int AW_SceneFrameFastMb(const char *target);
 int AW_SceneRoomRefused(void);
+extern int aw_godmode_kept;   /* GODMODE-LAVA-DEATH-62: dbg god / tgm kept across map changes (aw_scene.c) */
 int AW_SceneRoomRefuse(const char *target);
 int AW_SceneFrameRefuse(edict_t *p,const char *target);   /* aw_scene.c: a marked CHIM frame refused on less RAM */
 int AW_SceneEntryRefuse(const char *target,const float *point,int to_menu);   /* CHIM-32MB-SAVE-ENTRY-48 */

@@ -49,6 +49,7 @@ int (*aw_crime_guard)(edict_t *e);                 /* aw_mwhost.c: of class Guar
 static aw_crime_settings_t settings;
 static int loaded;                  /* 0 not tried, 2 every setting, 1 the theft's only (an older image), -1 none */
 static char crime_text[128];        /* sCrimeMessage */
+static char expel_text[128];        /* sExpelledMessage (FACTION-EXPEL-MESSAGE-64), the faction's name follows it */
 #define SCALE AW_MOVE_UNIT_SCALE    /* Quake units per original unit */
 #define WITNESSES 16                /* the NPCs of one crime kept for `aw_placed crime` */
 static struct {
@@ -76,6 +77,7 @@ static int load(void){
         line[strcspn(line,"\r\n")]=0;
         if(Q_sscanf(line,"crime %63s %f",name,&value)==2){if(AW_CrimeSettingSet(&settings,name,value))n++;continue;}
         if(!strncmp(line,"text sCrimeMessage ",19)){Q_strcpy_bounded(crime_text,line+19,sizeof(crime_text));continue;}
+        if(!strncmp(line,"text sExpelledMessage ",22)){Q_strcpy_bounded(expel_text,line+22,sizeof(expel_text));continue;}
     }
     fclose(f);
     /* the theft's settings first: an image built before v0.0.62 has those alone (then thefts alone are crimes) */
@@ -213,6 +215,13 @@ static void report(int kind,edict_t *victim,const char *owner,int faction,int ar
         else if(!victim && faction && owner && owner[0])f=owner;
         if(f && AW_StandingRank(f)>=0 && !AW_StandingExpelled(f)){
             AW_StandingSetExpelled(f,1);Con_Printf("Crime: expelled from %s.\n",f);
+            /* OpenMW 0.52 NpcStats::expell: the message box sExpelledMessage + the faction's name (the id here; the
+             * original's guilds use their name as the id). The image strips the setting's last space: put it back */
+            if(expel_text[0]){
+                char text[192];int n=(int)strlen(expel_text);
+                Q_snprintf(text,sizeof(text),"%s%s%s",expel_text,expel_text[n-1]==' '?"":" ",f);
+                AW_MsgBoxShow(text,NULL,0);
+            }
         }
     }
     last.after=AW_StandingCrime();

@@ -1,0 +1,19 @@
+{
+  "schema": "build-recipe-1",
+  "name": "miniwind-solstheim",
+  "description": "TEST ONLY. A MiniWind spot: the Balmora exterior plus one Solstheim CHIM frame (Bloodmoon cell -23,20, the densest forest) in the image as the store chimsol (--chim-sol-test); the game starts in Balmora and the boot command stands the player in the Solstheim frame (dbg tp solm23p20) to measure its frame time and faces per view.",
+  "options": {
+    "miniwind": true,
+    "miniwind_scope": "exterior",
+    "miniwind_description": "Solstheim test frame: Bloodmoon cell -23,20 (dbg tp solm23p20)",
+    "direct_to_game_map": "cell:-3,-2",
+    "exclude_unreferenced": "voice,npcs",
+    "chim_frame_ext": "chim",
+    "chim_sol_test": "-23,20:l",
+    "miniwind_boot": "dbg tp solm23p20"
+  },
+  "inputs": [],
+  "written_with": null,
+  "checked_with": null,
+  "status": "unverified"
+}

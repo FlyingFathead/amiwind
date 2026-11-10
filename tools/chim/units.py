@@ -55,6 +55,8 @@ TOOLS = {
 }
 # EXPERIMENTAL edge bevels (chim.bevels, build setting model_bevels tol:N): the default kinds plus that module
 TOOLS['variant-bevels'] = TOOLS['variant'] + ['tools/chim/bevels.py']
+# see-through textures (chim.fence, ROOM-DECAL-ALPHA-62): an own kind, so the 'texture' key never reaches that module
+TOOLS['texture-fence'] = TOOLS['texture'] + ['tools/chim/fence.py']
 TOOLS['tiles-bevels'] = TOOLS['tiles'] + ['tools/chim/bevels.py']
 # EXPERIMENTAL world format 0.8 (chim.placed, build setting placement_format 0.8): the default kinds plus that module
 TOOLS['variant-placed'] = TOOLS['variant'] + ['tools/chim/placed.py']
@@ -85,6 +87,8 @@ CODE_ENTRIES = {
     'hull-surface': [('tools/chim/build.py', 'hull_surface_unit')],
     'variant': [('tools/chim/models.py', 'variant_unit')],
     'texture': [('tools/chim/models.py', 'texture_unit')],
+    # see-through textures (chim.fence): their own kind, the 'texture' key stays as it was
+    'texture-fence': [('tools/chim/fence.py', 'fence_texture_unit')],
     'terrain': [('tools/chim/terrain.py', 'terrain_unit')],
     'tiles': [('tools/chim/cut.py', 'tile_unit')],
     # EXPERIMENTAL edge bevels (build setting model_bevels tol:N, chim.bevels): own kinds, so the default kinds' keys

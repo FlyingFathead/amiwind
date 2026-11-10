@@ -99,6 +99,22 @@ class Scan(unittest.TestCase):
             lowered = registry.update_budget(registry.scan(base), raised)
             self.assertEqual(lowered['totals']['commands'], {'count': 0, 'hunk_bytes': 0})
 
+    def test_a_raise_keeps_the_caps_block_and_the_note(self):
+        # BUILD-RESIDENT-BUDGET-CAPS-DROPPED-64: --raise-budget rewrote the file without the maintainer's "caps"
+        # block and its note, twice on 2026-11-10
+        with tempfile.TemporaryDirectory() as temp:
+            base = engine(Path(temp), {'a.c': 'void A(void){Cvar_RegisterVariable(&x);}\ncvar_t x={"aw_x","0"};\n'})
+            budget = registry.budget_document(registry.scan(base), ['2026-10-10: first'])
+            budget = {'format': budget['format'], 'note': 'the note, with the caps rule', 'caps': {
+                'commands': {'count': 1000, 'hunk_bytes': 32000}}, **{k: budget[k] for k in ('totals', 'reasons', 'entries')}}
+            (base / 'src' / 'a.c').write_text('void A(void){Cvar_RegisterVariable(&x);Cvar_RegisterVariable(&y);}\n'
+                                              'cvar_t x={"aw_x","0"};\ncvar_t y={"aw_y","0"};\n')
+            raised = registry.update_budget(registry.scan(base), budget, '2026-11-10: maintainer OK for aw_y')
+            self.assertEqual(raised['caps'], {'commands': {'count': 1000, 'hunk_bytes': 32000}})
+            self.assertEqual(raised['note'], 'the note, with the caps rule')
+            self.assertEqual(list(raised), ['format', 'note', 'caps', 'totals', 'reasons', 'entries'])
+            self.assertEqual(raised['reasons'][-1], '2026-11-10: maintainer OK for aw_y')
+
 
 class Budget(unittest.TestCase):
     def test_the_engine_fits_its_resident_registry_budget(self):

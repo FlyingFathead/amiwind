@@ -3201,6 +3201,12 @@ def finalize_image(args):
                   'bytes out, %d frame-map bytes in)' % (len(chim_frames['region_maps']),
                   sum(r['bytes'] for r in region_replaced if r['file'].startswith('maps/')),
                   sum(r['bytes'] for r in chim_frames['region_maps'])), flush=True)
+        if getattr(args, 'chim_sol_world', None):
+            # TEST BUILDS ONLY (--chim-sol-test): the Bloodmoon layer's frames as the store chimsol (chim.sol_test)
+            from chim.sol_test import install as install_chim_sol
+            sol = install_chim_sol(args.chim_sol_world, boot/'id1', hand_metadata['worldspawn_fields'])
+            (out/'chim-sol-image.json').write_text(json.dumps(sol, indent=1, sort_keys=True)+'\n', encoding='utf-8',
+                                                   newline='\n')
         (out/'chim-removed-legacy.json').write_text(json.dumps(removed_legacy, indent=2)+'\n', encoding='utf-8',
                                                    newline='\n')
         # Each frame map's whole-map heap (CHIM-SEYDA-MEMORY-33): the zone the engine can take beside
@@ -3666,6 +3672,10 @@ def main():
                    help='With --chim-actor-table on or --chim-region-actors on: the actor library stage '
                         '(tools/actor_library.py): its models are installed and named by the actor table and the '
                         'region frame maps')
+    i.add_argument('--chim-sol-world', type=Path, default=None,
+                   help='TEST BUILDS ONLY (tools/build.py --chim-sol-test): the Bloodmoon layer\'s CHIM world '
+                        '(run/chim-sol) into the image as the store chimsol, one frame map sol<cell> per '
+                        'frame (tools/chim/sol_test.py); off by default')
     i.add_argument('--chim-region-actors', choices=('off', 'on'), default='off',
                    help='EXPERIMENTAL: the CHIM region frame maps place every exterior NPC and creature reference of '
                         'their cells at its authored spot, grounded as the towns\' residents '
