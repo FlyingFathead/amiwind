@@ -63,6 +63,8 @@ void AW_StandingSetExpelled(const char *id,int expelled){
 int AW_StandingFactionReputation(const char *id){faction_t *f=find(id,0);return f?f->reputation:0;}
 void AW_StandingSetFactionReputation(const char *id,int value){faction_t *f=find(id,1);if(f)f->reputation=value;}
 int AW_StandingFull(void){return full;}
+int AW_StandingCount(void){return nfactions;}
+const char *AW_StandingAt(int i){return i>=0 && i<nfactions?factions[i].id:NULL;}
 
 int AW_StandingCrimeNew(void){return ++crime_current;}
 void AW_StandingCrimePaid(void){crime_paid=crime_current;}

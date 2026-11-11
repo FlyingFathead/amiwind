@@ -97,6 +97,59 @@ def fence_image(archive, index, model, material, size, palette_image):
     return Image.fromarray(pixels.astype(np.uint8), 'P')
 
 
+TWOSIDED_MODES = ('off', 'mirror')
+
+
+def twosided_mode(settings):
+    """The build setting fence_twosided_faces: 'off' (default: one face per see-through plane, the method before) or
+    'mirror' (the converter route: a mirrored copy of every see-through face, so its back side draws through the
+    ordinary back-face test; the engine route is the console setting aw_fence_twosided)."""
+    mode = str((settings or {}).get('fence_twosided_faces', 'off'))
+    if mode not in TWOSIDED_MODES:
+        raise ValueError('fence_twosided_faces: %s (one of %s)' % (mode, ', '.join(TWOSIDED_MODES)))
+    return mode
+
+
+FACE = struct.Struct('<HhihH4Bi')       # BSP29 face: plane, side, first surfedge, edges, texinfo, styles, light offset
+MODEL = struct.Struct('<9f7i')          # BSP29 model: box, origin, 4 heads, visleafs, first face, faces
+
+
+def mirror_faces(lumps, fence_textures):
+    """A model image's lumps with a mirrored copy of every face whose local texture index is in FENCE_TEXTURES (the
+    two-sided see-through planes: the converter's fence textures; only those faces, never another).
+
+    The copy keeps the plane, texinfo (so the same texels, seen from the other side), styles and light samples; its
+    side is flipped and its edge loop reversed. Copies are appended after the model's faces, which must end the face
+    lump (one model per image). Returns (lumps, faces added); the lumps unchanged and 0 when nothing is to mirror."""
+    lumps = [bytearray(x) for x in lumps]
+    if not fence_textures or len(lumps[14]) != MODEL.size:
+        return lumps, 0
+    model = list(MODEL.unpack(bytes(lumps[14])))
+    first, count = model[14], model[15]
+    total = len(lumps[7]) // FACE.size
+    if first + count != total:
+        return lumps, 0
+    miptex = [struct.unpack_from('<i', lumps[6], o + 32)[0] for o in range(0, len(lumps[6]), 40)]
+    added = bytearray()
+    surfedges = bytearray(lumps[13])
+    for i in range(first, total):
+        plane, side, firstedge, numedges, texinfo, s0, s1, s2, s3, light = FACE.unpack_from(lumps[7], i * FACE.size)
+        if texinfo >= len(miptex) or miptex[texinfo] not in fence_textures:
+            continue
+        loop = struct.unpack_from('<%di' % numedges, lumps[13], firstedge * 4)
+        new_first = len(surfedges) // 4
+        surfedges += struct.pack('<%di' % numedges, *(-e for e in reversed(loop)))
+        added += FACE.pack(plane, 1 - side, new_first, numedges, texinfo, s0, s1, s2, s3, light)
+    n = len(added) // FACE.size
+    if not n:
+        return lumps, 0
+    lumps[7] += added
+    lumps[13] = surfedges
+    model[15] = count + n
+    lumps[14] = bytearray(MODEL.pack(*model))
+    return lumps, n
+
+
 def fence_texture_unit(task):
     """One fence texture as a miptex with a placeholder name (a pool worker; chim.models.texture_unit's task)."""
     from PIL import Image

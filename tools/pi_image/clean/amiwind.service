@@ -1,0 +1,25 @@
+[Unit]
+Description=AmiWind on Amiberry (straight to the Amiga at boot)
+After=systemd-user-sessions.service sound.target opt-amiwind-data.mount amiwind-firstboot.service
+Conflicts=getty@tty1.service
+StartLimitIntervalSec=120
+StartLimitBurst=3
+
+[Service]
+User=amiwind
+Group=amiwind
+SupplementaryGroups=video render input audio
+PAMName=login
+TTYPath=/dev/tty1
+StandardInput=tty
+StandardOutput=journal
+Environment=SDL_VIDEODRIVER=kmsdrm
+WorkingDirectory=/home/amiwind
+TimeoutStartSec=infinity
+ExecStartPre=+/usr/local/bin/amiwind-start
+ExecStart=/usr/bin/amiberry -G -f /home/amiwind/.config/amiberry/conf/default.uae
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

@@ -77,7 +77,7 @@ Balmora's ring has only 2,528 bytes of headroom: any byte added to its models ti
 
 Family: Map heap and memory budget (`heap-memory`). The heap model must match what the loader actually allocates; strict heap gate, hard ceiling always fatal. See [families](README.md#families).
 
-- AKULAKHAN-CHAMBER-32MB-STALL-53 (no report page): Akulakhan's Chamber loads three times at 32 MB Fast RAM
+- [AKULAKHAN-CHAMBER-32MB-STALL-53](AKULAKHAN-CHAMBER-32MB-STALL-53.md): Akulakhan's Chamber loads three times at 32 MB Fast RAM
 - AW-20260929-06 (no report page): Expanded scene exhausts 9 MiB heap
 - BUILD-EDGE-PIN-SHARED-SHAPES-63 (no report page): The shared actor shapes changed the model loader without re-pinning its packed-edge heap policy
 - [CHIM-ARENA-HUNK-GAP-36](CHIM-ARENA-HUNK-GAP-36.md): The Vivec Arena frame leaves less than 2 MiB of hunk gap (memory review before Vivec stage B)
@@ -107,14 +107,18 @@ Family: Map heap and memory budget (`heap-memory`). The heap model must match wh
 - [MAP-UNUSED-HULL2-32](MAP-UNUSED-HULL2-32.md): Shipped maps carry about 1.1 MB of collision data for a hull the engine never uses
 - MEM-GEOMETRY-01 (no report page): Light-range sharing could copy a too-short byte span
 - MEM-TOWN-02 (no report page): Bounded Balmora maps exceeded the modeled map heap limit
+- MEMCENSUS-OWNERS-START-STALL-64 (no report page): An engine with the first per-asker block count stalled at the start: every free searched the whole count table once its removal markers filled it
 - [NPC-ANIM-MEMORY-33](NPC-ANIM-MEMORY-33.md): Full animation kit models are 2.2 times the idle models; four Balmora residents exceed the 512 KiB alias staging buffer
 - [RAM-REQUIREMENT-32MB-48](RAM-REQUIREMENT-32MB-48.md): 16 MB of Fast RAM no longer holds the whole game: 32 MB is the safe minimum, 16 MB starts with a warning
 - ROOM-AKULAKHAN-HEAP-52 (no report page): Akulakhan s Chamber needs 18.8 MB for its models and textures with its activators kept: more than the 14.3 MB the 32 MB minimum gives a room, so the image step stops
+- ROOM-LOAD-FAIL-LEAKS-FAST-RAM-64 (no report page): A room load that fails and returns to the town leaves about 1.4 MB less Fast RAM free than before
+- [ROOM-LOAD-KEEPS-EXTERIOR-CACHE-64](ROOM-LOAD-KEEPS-EXTERIOR-CACHE-64.md): Entering a large room from a town keeps the town's CHIM model cache, so the room can run out of Fast RAM at 32 MB although it fits on its own
 - SDK-MALLOC-TRAPS-52 (no report page): The toolchain's malloc never returns NULL: a failed allocation stops the game with Software Failure #80000027 (TRAP #7); 45 engine malloc sites test for a NULL that cannot come
 - SKEL-HEAP-ACCOUNTING-52 (no report page): Audit: every heap and size estimate of actor models must count a skeletal model s block (16 bytes a vertex) and its shared table
 - SKEL-TABLE-SHARED-FEMALE-52 (no report page): The female animation table repeats the common table whole for its three own groups: 561 KB of Fast RAM, kept all session
 - SKEL-TABLE-SIZE-52 (no report page): The shared humanoid animation table is 4.3 MB held in RAM: all 61 skeleton nodes at 15 frames a second, too much beside the game on 16 MB
 - SMOKE-16MB-MAPLOAD-54 (no report page): Below the 32 MB requirement: at 16 MB Fast RAM the boot smoke loads no map (dbg tp to Seyda Neen)
+- STORE-MODELS-VIS-PLANES-BLOAT-64 (no report page): Placed CHIM store models carry visibility data the engine may not read, and over-budget models stored as tiles repeat planes and visibility per tile
 - [VIVEC-HEAP-31](VIVEC-HEAP-31.md): Dense Vivec maps exceed the loader heap budget once mappings and extents no longer stop them
 - WORLD-FLORA-HEAP-010 (no report page): Seyda sprite payload exceeds the final map heap headroom
 - ZONE-FREE-SHRINK-63 (no report page): The largest free block of the small memory zone shrinks about 140 bytes with every load

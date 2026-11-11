@@ -19,6 +19,7 @@ extern int AW_SceneryCount(void);
 #include "aw_tryalloc.h"
 #include "aw_actorstate.h"
 #include "aw_move.h"
+#include "aw_fastrelease.h"
 /* the inventory window's records of every carried kind (AW_InventoryCarried, set by AW_InventoryInit; NULL in the
  * rules-only fixtures: the window reads one record per kind) */
 int (*aw_inventory_carried)(void (*row)(void *ctx,int state_row,const aw_inventory_item_t *it,int file_row),void *ctx);
@@ -1206,7 +1207,9 @@ static int inv_weight(const char *id,float *weight){
     if(!AW_InventoryRead(id,&item))return 0;
     *weight=item.weight;return 1;
 }
+static unsigned long area_cache_release(void);    /* the cached area tables' releaser (below, with the area cache) */
 void AW_InventoryInit(void){
+    AW_FastReleaseRegister("cached area tables",area_cache_release);
     aw_combat_equipment=inv_combat;aw_combat_equipment_store=inv_store;aw_hand_block_item=inv_block_item;aw_hand_weapon_item=inv_weapon_item;
     aw_combat_player_ranged=inv_ranged;aw_combat_player_weapon_normal=inv_weapon_normal;
     aw_inventory_hand_item=AW_InventoryEquippedItem;
@@ -1968,6 +1971,15 @@ long AW_AreaCacheTrim(long wanted){
         freed+=areas[slot].bytes;area_free(&areas[slot]);
     }
     return freed;
+}
+/* AREA-CHANGE-MEMORY-64 (the area memory rule: what is kept across an area change is a purgeable cache): the cached
+ * tables of areas left are given back whole before a large block is sized from the free Fast RAM (aw_fastrelease.c,
+ * a room's growth); they are read again from disk when an area needs them. The place's own areas and the world change
+ * list are never touched. */
+static unsigned long area_cache_release(void){
+    long freed=AW_AreaCacheTrim(LONG_MAX);
+    if(freed>0)Con_Printf("Cached area tables given back: %ld KiB\n",freed/1024);
+    return freed>0?(unsigned long)freed:0UL;
 }
 /* an area the player left: into the cache (KEEP WHAT YOU CAN AFFORD), else freed */
 static void area_keep(area_t *a){

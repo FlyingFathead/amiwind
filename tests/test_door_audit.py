@@ -49,9 +49,11 @@ def row(source, target, ref, mins, maxs, arrival=(0, 0, 0), yaw=90.0, label='A T
 
 class EngineNames(unittest.TestCase):
     def test_every_list_and_the_terrain_rule(self):
-        for name in ('seyda', 'mi000000000001', 'vivec_city', 'bmhouse', 'ri0123456789', 'vf0042', 'vf8191'):
+        for name in ('seyda', 'mi000000000001', 'vivec_city', 'bmhouse', 'ri0123456789', 'vf0042', 'vf4095',
+                     'sl0000', 'sl4095'):
             self.assertTrue(door_audit.map_valid(name, NAMES), name)
-        for name in ('', 'vf8192', 'vf42', 'ri0000000000', 'nowhere', 'riaaaaaaaaa'):
+        self.assertEqual((door_audit.terrain_id('vf0042'), door_audit.terrain_id('sl0007')), (42, 4103))
+        for name in ('', 'vf4096', 'vf8191', 'sl4096', 'vf42', 'ri0000000000', 'nowhere', 'riaaaaaaaaa'):
             self.assertFalse(door_audit.map_valid(name, NAMES), name)
 
 

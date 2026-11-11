@@ -198,7 +198,8 @@ class PageTextTests(unittest.TestCase):
     def test_no_release_version_written_in_the_tracker_code(self):
         src = (ROOT / 'tools' / 'cell_progress.py').read_text(encoding='utf-8')
         self.assertNotIn("ELIGIBLE_RELEASE = 'v", src)
-        self.assertIn("eligible_release(PL.next_release(plan_doc), working_release())", src)
+        self.assertIn("eligible_release(None, working_release())", src)      # computed from VERSION, never from the plan
+        self.assertNotIn("eligible_release(PL.next_release", src)
         self.assertTrue(cp.working_version())
 
 

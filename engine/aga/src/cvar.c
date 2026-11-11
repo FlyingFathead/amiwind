@@ -214,8 +214,34 @@ qboolean	Cvar_Command (void)
 
 // check variables
     v = Cvar_FindVar (Cmd_Argv(0));
+    /* quiet aliases of aw_seethrough_material (earlier names of the same setting) */
+    if (!v && (!Q_strcasecmp(Cmd_Argv(0),"aw_seethrough") || !Q_strcasecmp(Cmd_Argv(0),"aw_fence")))
+        v = Cvar_FindVar ("aw_seethrough_material");
     if (!v)
         return false;
+
+    /* aw_seethrough_material (d_fence.c, ROOM-DECAL-ALPHA-62): cobwebs, hanging moss and leaves are drawn with
+     * their see-through parts instead of solid rectangles. 0 off, 1 on (the default), 2 on and also from behind;
+     * on/off = 1/0. No value prints the current value and the list. aw_fence_twosided 1 stays the old name of 2. */
+    if(!strcmp(v->name,"aw_seethrough_material")) {
+        static const char *fence_methods[3]={"off (see-through textures drawn as solid rectangles)",
+                                              "on: cobwebs, hanging moss and leaves drawn with their see-through parts (the default)",
+                                              "on, and also seen from behind"};
+        int value=-1;
+        if(Cmd_Argc()==2){
+            char *s=Cmd_Argv(1);value=AW_ParseBoolean(s);
+            if(value<0 && s[0]>='0' && s[0]<='2' && !s[1])value=s[0]-'0';
+        }
+        if(Cmd_Argc()!=2 || value<0){
+            int cur=(int)v->value;if(cur<0||cur>2)cur=1;
+            Con_Printf("aw_seethrough_material is %d: %s\n",cur,fence_methods[cur]);
+            Con_Printf("  0 = %s\n  1 = %s\n  2 = %s\n",fence_methods[0],fence_methods[1],fence_methods[2]);
+            Con_Printf("  (seen from behind can also be built in: build option --chim-fence-twosided-faces mirror)\n");
+            return true;
+        }
+        Cvar_SetValue(v->name,value);
+        return true;
+    }
 
 // perform a variable print or set
     if (Cmd_Argc() == 1)

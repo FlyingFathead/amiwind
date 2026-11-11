@@ -242,6 +242,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - INVENTORY-ITEM-MODEL-PATH-59 (no report page): The inventory catalogue refuses every item whose world model comes from the item model table (progs/items/)
 - [INVENTORY-OPEN-COST-MANY-KINDS-61](INVENTORY-OPEN-COST-MANY-KINDS-61.md): With hundreds of kinds of item the inventory takes seconds to open, and every Tab reads the item file again
 - JOURNAL-BOOK-32-QUESTS-59 (no report page): The journal book lists only the quests of the old 32-slot table, although every quest's stage is now kept
+- JOURNAL-LOWER-INDEX-ENTRY-64 (no report page): A Journal command at or below the quest index adds no entry, no finished or restart mark and no notice
 - LAVA-NO-DAMAGE-63 (no report page): Lava does no damage and is not drawn in the Red Mountain lava pool
 - [LOADED-ITEMS-NOT-WEIGHED-61](LOADED-ITEMS-NOT-WEIGHED-61.md): After loading a save of another character the carried weight reads 0 until the next place load
 - MARKS-SUMMON-CARRIERS-NOT-LIVE-63 (no report page): The guarded items whose taking summons a guardian are not live references, so the summon never comes

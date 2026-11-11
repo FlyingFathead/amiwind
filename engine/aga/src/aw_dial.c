@@ -245,6 +245,18 @@ long AW_DialRankAt(const aw_dial_t *d,const char *faction,int rank) {
     if(i<0 || rank<0 || rank>=AW_DIAL_RANKS)return -1;
     return d->at_ranks+(long)AW_DIAL_FACTION_ID*((long)i*AW_DIAL_RANKS+rank);
 }
+long AW_DialRankReqAt(const aw_dial_t *d,const char *faction) {
+    int i=faction_index(d,faction);
+    return i<0?-1:d->at_rank_reqs+(long)AW_DIAL_RANK_REQ*i;
+}
+int AW_DialRankNeeds(const unsigned char *row,int rank,unsigned char *attribute,short *need) {
+    const unsigned char *q;int k;
+    if(!row || rank<1 || rank>=AW_DIAL_RANKS)return 0;
+    q=row+12+10*rank;
+    for(k=0;k<2;k++)attribute[k]=row[k]<8?row[k]:0;
+    for(k=0;k<5;k++)need[k]=(short)rd16(q+2*k);
+    return 1;
+}
 /* the section's row: u8 attribute x2, u8 skill x7 (255 none), 3 zeros, then per rank s16 attribute 1, attribute 2,
  * first skill, second skill, faction reputation */
 int AW_DialRankRequirement(const aw_dial_t *d,const char *faction,int rank,const short *attributes,const short *skills,

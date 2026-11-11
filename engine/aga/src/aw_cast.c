@@ -537,6 +537,7 @@ static void spell_command(int A){
              Con_Printf("Weapon: %s, charge %.1f of %.0f\n",it.name,AW_MagicCharge(&aw_state,&it),it.charge_max);}
         Con_Printf("Magic items: %lu used, %lu refused, %lu of your strikes cast, %lu NPC strikes cast; worn: %lu effects on, %lu refused\n",
                    item_uses,item_refused,item_strikes,npc_strikes,worn_landed,worn_refused);
+        AW_MwscriptResistReport();   /* RACE-RESIST-NOT-ON-SPELL-DAMAGE-64 */
         {   /* the player's active effects now: effect number, its attribute or skill, magnitude, seconds left (worn:
              * the slot of the item it comes with) */
             aw_effect_info_t e;int k;aw_actor_t *r=AW_MwscriptPlayerRecord();

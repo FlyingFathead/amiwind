@@ -3,11 +3,14 @@
 
 The layer's CHIM world (run/chim-sol, tools/chim_build.py on the layered data folder) goes into the image as its own
 store, id1/chimsol/ (world.cwi and its sector files, the same paths inside the store as the base world's id1/chim/),
-and each of its frames gets a frame map sol<cell> (map_files.frame_map_path) whose worldspawn names that store ("_chim_world"
-"chimsol": the engine selects the store from the map, chim_world.c Chim_StoreSelect) and closes its edges
-("_chim_edge" "closed": the frame touches no Vvardenfell frame). The map is made the way a CHIM region frame map is
-made from the game data (chim.frame_map._region_map_game_data: the open-world worldspawn, the player start on the
-frame's own ground), so `dbg tp sol<cell>` (a map name) stands the player in it. Nothing of the base world changes:
+and each of its frames gets a frame map slNNNN (map_files.frame_map_path; the open-world map form of the engine,
+aw_maps.h AW_TerrainId) whose worldspawn names that store ("_chim_world" "chimsol": the engine selects the store from
+the map, chim_world.c Chim_StoreSelect) and closes its edges ("_chim_edge" "closed"). The map is made the way a CHIM
+region frame map is made from the game data (chim.frame_map._region_map_game_data: the open-world worldspawn, the
+player start on the frame's own ground). Each frame also gets its row in the open-world region table
+(world/regions-sl.awr, after Vvardenfell's rows in the engine's one table: dbg tp X Y and camera marks find a
+Solstheim point by its coordinates), and the cells their region names (world/region-names.awn with Bloodmoon's
+regions added after the base ones: the HUD reads "Solstheim / <region>"). Nothing of the base world changes:
 the base store, its frame maps, the region directory and every base key stay as they are; the option is off by
 default and an image without it is byte for byte the image before it."""
 import json
@@ -19,9 +22,72 @@ EDGE_KEY = '_chim_edge'
 STORE_KEY = '_chim_world'
 
 
-def map_name(cell):
-    """The frame map's name of a Solstheim frame at CELL: sol, then m/p and the number of each coordinate."""
-    return 'sol' + ''.join(('m' if v < 0 else 'p') + str(abs(int(v))) for v in cell)
+import struct
+
+DIRECTORY = 'world/regions-sl.awr'      # the Solstheim rows of the open-world region table (engine aw_world.c)
+REGION_NAMES = 'world/region-names.awn'  # per-cell region and place names (tools/prepare_world_ui.py region_names)
+COVER = 896                              # a row's cover reaches this far past its core (aw_world.c read_row)
+
+
+def map_name(index):
+    """The frame map's name of the INDEX-th Solstheim frame (the ownership table's order): sl and four digits, the
+    open-world map form the engine knows (aw_maps.h AW_TerrainId: terrain IDs from AW_SOLSTHEIM_TERRAIN_BASE)."""
+    if not 0 <= index < 4096:
+        raise ValueError('--chim-sol-test: Solstheim frame index %r out of range' % index)
+    return 'sl%04d' % index
+
+
+def directory_rows(frames):
+    """world/regions-sl.awr: 'AWS1', u32 rows, then per frame (in order) the 52-byte row the engine reads: its name
+    (slNNNN, NUL padded to 8), origin (3 f32, map units), core (4 f32: x0 y0 x1 y1, frame-local) and cover (the core
+    COVER units wider), little-endian."""
+    out = [b'AWS1' + struct.pack('<I', len(frames))]
+    for i, frame in enumerate(frames):
+        (x0, y0), (x1, y1) = frame['core']
+        core = (x0, y0, x1, y1)
+        cover = (x0 - COVER, y0 - COVER, x1 + COVER, y1 + COVER)
+        out.append(map_name(i).encode('ascii').ljust(8, b'\0') +
+                   struct.pack('<3f4f4f', *[float(v) for v in frame['origin']], *core, *cover))
+    return b''.join(out)
+
+
+def read_region_names(raw):
+    """(names, places, {(x, y): (name index, place index)}) of an ARN2 file (prepare_world_ui.region_names)."""
+    if raw[:4] != b'ARN2':
+        raise ValueError('--chim-sol-test: %s is not ARN2' % REGION_NAMES)
+    n, p, c = struct.unpack_from('<III', raw, 4)
+    at = 16
+    names = [raw[at + 64 * i:at + 64 * (i + 1)].rstrip(b'\0') for i in range(n)]
+    at += 64 * n
+    places = [raw[at + 64 * i:at + 64 * (i + 1)].rstrip(b'\0') for i in range(p)]
+    at += 64 * p
+    cells = {}
+    for i in range(c):
+        x, y, r, q = struct.unpack_from('<iiII', raw, at + 16 * i)
+        cells[x, y] = (r, q)
+    return names, places, cells
+
+
+def merged_region_names(base_raw, layer_raw):
+    """The base region-names file with the layer's regions, places and cells added: every base name keeps its index
+    (the weather table, region-weather.aww, is indexed by it), new names follow; a cell the base names keeps its
+    row. LAYER_RAW: the same file made from the layered master (Morrowind.esm + Bloodmoon.esm)."""
+    names, places, cells = read_region_names(base_raw)
+    lnames, lplaces, lcells = read_region_names(layer_raw)
+    from prepare_world_ui import NO_NAME
+
+    def index_of(table, value):
+        if value not in table:
+            table.append(value)
+        return table.index(value)
+    for xy, (r, q) in sorted(lcells.items()):
+        if xy in cells:
+            continue
+        cells[xy] = (index_of(names, lnames[r]) if r != NO_NAME else NO_NAME,
+                     index_of(places, lplaces[q]) if q != NO_NAME else NO_NAME)
+    return (b'ARN2' + struct.pack('<III', len(names), len(places), len(cells))
+            + b''.join(n.ljust(64, b'\0') for n in names) + b''.join(p.ljust(64, b'\0') for p in places)
+            + b''.join(struct.pack('<iiII', x, y, *cells[x, y]) for x, y in sorted(cells)))
 
 
 def install(world_dir, id1, hand_fields):
@@ -50,9 +116,9 @@ def install(world_dir, id1, hand_fields):
             size += path.stat().st_size
     world = FM.load(world_dir)
     maps = []
-    for frame in table['frames']:
+    for index, frame in enumerate(table['frames']):
         cell = tuple(frame['cell'])
-        name = map_name(cell)
+        name = map_name(index)
         _, record, chunks = (FM.frames_at(world['frames'], cell) or [(0, next(
             f for f in world['frames'] if tuple(f[1]['cell']) == cell))])[0][1]
         g, (lx, ly) = record['grain'], record['low']
@@ -80,6 +146,15 @@ def install(world_dir, id1, hand_fields):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(data)
         maps.append(dict(report, cell=list(cell), store=STORE, tp='dbg tp ' + name))
+    # the Solstheim rows of the region table, and the region names of its cells (Bloodmoon.esm's REGN and CELL rows,
+    # read from the layered master the chim-sol-data stage wrote next to WORLD_DIR)
+    (id1 / DIRECTORY).parent.mkdir(parents=True, exist_ok=True)
+    (id1 / DIRECTORY).write_bytes(directory_rows(table['frames']))
+    layered = world_dir.parent / 'chim-sol-data' / 'Morrowind.esm'
+    names_path = id1 / REGION_NAMES
+    if layered.is_file() and names_path.is_file():
+        from prepare_world_ui import region_names
+        names_path.write_bytes(merged_region_names(names_path.read_bytes(), region_names(layered.read_bytes())))
     print('[chim-sol] TEST: store %s (%d files, %d bytes) and %d Solstheim frame maps: %s' % (
         STORE, files, size, len(maps), ', '.join('%s (frame %s)' % (m['map'], m['id']) for m in maps)), flush=True)
     return {'store': STORE, 'files': files, 'bytes': size, 'maps': maps}

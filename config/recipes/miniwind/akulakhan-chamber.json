@@ -1,0 +1,19 @@
+{
+  "schema": "build-recipe-1",
+  "name": "akulakhan-chamber",
+  "description": "MiniWind preset --miniwind-akulakhan-chamber: Akulakhan's Chamber: the Heart of Lorkhan and Dagoth Ur",
+  "options": {
+    "miniwind": true,
+    "miniwind_scope": "full",
+    "miniwind_description": "Akulakhan's Chamber: the Heart of Lorkhan and Dagoth Ur",
+    "exclude": [
+      "npc-gallery"
+    ],
+    "exclude_unreferenced": "voice,npcs",
+    "room_batches": "19"
+  },
+  "inputs": [],
+  "written_with": null,
+  "checked_with": null,
+  "status": "unverified"
+}

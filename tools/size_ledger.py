@@ -460,6 +460,12 @@ def step(run, version, baselines=(), mode='auto', margin_gib=DEFAULT_MARGIN_GIB,
             pass
         log(guard_line(ledger['guard']))
         return 'failed' if effective == 'fail' else 'warned'
+    # the collision census (tools/collision_census.py): the 20 worst models by collision / visual ratio, and a
+    # WARNING line per model above the threshold; never fails the build
+    import collision_census
+    collision = collision_census.ledger_entry(run, log=log)
+    if collision is not None:
+        ledger['collision'] = collision
     path = write(run, ledger)
     log('Size ledger: written %s (took %.1f s)' % (path, time.monotonic() - started))
     if ledger['guard'].get('final_needs_reason'):

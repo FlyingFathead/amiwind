@@ -1195,6 +1195,15 @@
       "to": null,
       "source": "tools/build.py chim_sol_test_commands, tools/chim_tree_star.py, tools/chim_tree_copies.py (TREES-DEPTH-56)",
       "note": "Test builds only, with --chim-sol-test: star draws the Solstheim trees in the chim-sol stage as closed star prisms and adds the stage chim-sol-trees (billboard and four 45-degree views per tree model); unset, nothing changes and no base stage reads these files"
+    },
+    {
+      "version": "0.0.64-dev3",
+      "option": "chim_fence_twosided_faces",
+      "flag": "--chim-fence-twosided-faces",
+      "change": "added",
+      "to": null,
+      "source": "tools/build.py, tools/chim/fence.py (ROOM-DECAL-ALPHA-62)",
+      "note": "null = off: one face per see-through plane (the method before); mirror = experimental, a mirrored copy of each see-through face (cobwebs, hanging moss and vines) so its back side draws too; the engine route is the console setting aw_seethrough_material 2"
     }
   ],
   "current": {
@@ -1247,6 +1256,7 @@
       "chim_cut_models_over": null,
       "chim_detail_budget": null,
       "chim_draw_distance": null,
+      "chim_fence_twosided_faces": null,
       "chim_fire_light": "on",
       "chim_frame_ext": "chim",
       "chim_lighting_type": null,

@@ -334,6 +334,11 @@ def add_legacy_area_group(p):
                    help='CHIM builder: add the pieces a compiled model hull lost under a walkable surface (on, '
                         'default), or keep the compiled hull as it is and record the check (off: the previous '
                         'method; CHIM-COMPILED-HULL-SHORT-36)')
+    p.add_argument('--chim-fence-twosided-faces', choices=('off', 'mirror'), default=None,
+                   help='CHIM builder: two-sided see-through planes (cobwebs, hanging moss and vines; EXPERIMENTAL, '
+                        'ROOM-DECAL-ALPHA-62): mirror = a mirrored copy of each see-through face (the converter '
+                        'route); not given or off = one face each (the engine route is the console setting '
+                        'aw_seethrough_material 2)')
     p.add_argument('--chim-model-bevels', default=None,
                    help='CHIM builder: edge bevels of the model standing hulls (EXPERIMENTAL; '
                         'CHIM-COMPILED-HULL-OVERFILL-46): exact, or tol:N; not given or profile = only the meshes whose '

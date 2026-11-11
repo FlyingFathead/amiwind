@@ -1,0 +1,25 @@
+#!/bin/sh
+# AmiWind clean Pi image, first start only: installs Amiberry and its libraries from the packages saved in the image
+# (no network needed), makes the amiwind user (no password, no sudo), mounts the AMIWIND drive for it, switches the
+# Amiga start on and restarts once. tools/pi_image/build_clean_image.py puts it there; it removes itself when done.
+set -eu
+D=/var/cache/amiwind/debs
+LOG=/var/log/amiwind-firstboot.log
+say() { printf '\033[2J\033[H\n  %s\n' "$1" > /dev/tty1 2>/dev/null || true; }
+say "AmiWind, first start: installing Amiberry from the image (about two minutes, no network needed)..."
+DEBIAN_FRONTEND=noninteractive dpkg -i "$D"/*.deb > "$LOG" 2>&1 || {
+  say "AmiWind, first start: the Amiberry install failed; details in $LOG (console: Ctrl+Alt+F2)"; exit 1; }
+id amiwind > /dev/null 2>&1 || useradd -m -s /bin/bash -G video,render,input,audio,plugdev amiwind
+passwd -l amiwind > /dev/null
+install -d -o amiwind -g amiwind /home/amiwind/.config /home/amiwind/.config/amiberry /home/amiwind/.config/amiberry/conf
+install -m 644 -o amiwind -g amiwind /usr/local/share/amiwind/amiwind.uae /home/amiwind/.config/amiberry/conf/default.uae
+U=$(id -u amiwind); G=$(id -g amiwind)
+grep -q 'LABEL=AMIWIND' /etc/fstab || \
+  echo "LABEL=AMIWIND /opt/amiwind/data vfat defaults,nofail,uid=$U,gid=$G,umask=022 0 0" >> /etc/fstab
+systemctl enable amiwind.service getty@tty2.service >> "$LOG" 2>&1
+systemctl disable getty@tty1.service >> "$LOG" 2>&1 || true
+rm -rf "$D"
+systemctl disable amiwind-firstboot.service >> "$LOG" 2>&1
+say "AmiWind, first start: done, restarting..."
+sync
+systemctl reboot

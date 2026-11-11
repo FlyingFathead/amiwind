@@ -1,11 +1,12 @@
 # AmiWind releases
 
-_Generated from `docs/releases/` with AmiWind v0.0.64-dev3._
+_Generated from `docs/releases/` with AmiWind v0.0.64-dev4._
 
 Every release line, newest first: its release notes (docs/releases/notes/) and the whitespace baseline of the published release it was built on (docs/releases/patches/). Until v0.0.54 these files sat at the docs/ root; the table at the end maps every old path to the new one. Links into an old release tag (https://github.com/FlyingFathead/amiwind/blob/v0.0.37/docs/releases/notes/RELEASE-v0.0.37.md) keep working, because every tag keeps its own tree.
 
 | Version | Kind | Title | Notes | Whitespace baseline | GitHub |
 | --- | --- | --- | --- | --- | --- |
+| v0.0.64-dev4 | dev | AmiWind v0.0.64-dev4 (in development) | [RELEASE-v0.0.64-dev4.md](notes/RELEASE-v0.0.64-dev4.md) | none | - |
 | v0.0.64-dev3 | dev | AmiWind v0.0.64-dev3 (in development) | [RELEASE-v0.0.64-dev3.md](notes/RELEASE-v0.0.64-dev3.md) | none | - |
 | v0.0.64-dev2 | dev | AmiWind v0.0.64-dev2 (in development) | [RELEASE-v0.0.64-dev2.md](notes/RELEASE-v0.0.64-dev2.md) | none | - |
 | v0.0.64-dev1 | dev | AmiWind v0.0.64-dev1 (in development) | [RELEASE-v0.0.64-dev1.md](notes/RELEASE-v0.0.64-dev1.md) | none | - |

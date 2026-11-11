@@ -55,6 +55,17 @@ typedef struct {
  * creature plays every humanoid group from the one shared table and only its own from its small file. */
 #define AW_SKEL_VERSION_APPENDED	3
 #define AW_SKEL_TABLE_NAME	32		/* a table's game path, NUL padded (the model's block and an appended table) */
+/* A SCALED table (version 4, HEART-OF-LORKHAN-LOOK-62, CREATURE-SCALE-KEYS-54): the version 2 layout with, after the
+ * 24-byte header, an 8-byte extension { u16 scaled bones n (1..AW_SKEL_MAX_SCALED), u16 0, u32 the scale section's
+ * bytes }, then the scale section: n x { u16 bone, u16 0 }, then per scaled bone one u16 per frame (its uniform scale
+ * x AW_SKEL_SCALE_ONE, 0..65535: up to 4x), padded to 4 bytes; then the version 2 rest. A bone's scale multiplies its
+ * local rotation (its children inherit it, as the original's node scale: OpenMW components/nifosg/controller.cpp
+ * KeyframeController::operator() applies the scale key to the node's matrix). Only a table that has scale keys is
+ * version 4 (the Heart of Lorkhan's Death1 shrink); every other table stays version 2 or 3. */
+#define AW_SKEL_VERSION_SCALED	4
+#define AW_SKEL_SCALED_EXT	8
+#define AW_SKEL_MAX_SCALED	8
+#define AW_SKEL_SCALE_ONE	16384.0f
 typedef struct aw_skel_table_s {
 	int			bones, frames, groups, keys_count;
 	float		rate, scale;
@@ -70,6 +81,11 @@ typedef struct aw_skel_table_s {
 	int			own_frames, own_groups;	/* this file's own (frames and groups count both, the base's included) */
 	char		base_name[AW_SKEL_TABLE_NAME];	/* version 3: the base table's path; "" otherwise */
 	const struct aw_skel_table_s	*more;	/* version 3, linked by the loader: the base; NULL otherwise */
+	/* version 4: the scaled bones' tracks (own_frames x u16 each, in the table's memory, the index included) and each
+	 * bone's track number (-1 none); scaled 0 for every other table */
+	int			scaled;
+	signed char	scale_slot[AW_SKEL_MAX_BONES];
+	const unsigned char	*scale_data;
 	/* frames paged from the file (aw_skel_load.c, WALK-CYCLES-57): keys NULL and row_of gives frame f's row (never
 	 * NULL: a row that cannot be read gives frame 0's, kept from the load); NULL for a table held whole */
 	const unsigned char	*(*row_of) (const struct aw_skel_table_s *t, int frame);

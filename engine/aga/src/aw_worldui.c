@@ -1325,7 +1325,14 @@ static void open_journal(void){
 static void inventory_command(void){
     if(Cmd_Argc()==1)AW_InventoryOpen();else AW_InventoryGrantCommand();
 }
-void AW_WorldUIInit(void){AW_InventoryInit();Cvar_RegisterVariable(&aw_map_mode);Cvar_RegisterVariable(&aw_map_debug_available);
+/* aw_dial.h aw_journal_entry_exists: the journal table has (ID, INDEX) (JOURNAL-LOWER-INDEX-ENTRY-64) */
+static int journal_entry_exists(const char *id,int32_t index){
+    uint32_t offset,length,flags;char low[AW_QB_ID];int i;
+    for(i=0;i<AW_QB_ID-1 && id[i];i++)low[i]=(char)(id[i]>='A' && id[i]<='Z'?id[i]-'A'+'a':id[i]);
+    low[i]=0;
+    return journal_row(low,(int)index,&offset,&length,&flags);
+}
+void AW_WorldUIInit(void){aw_journal_entry_exists=journal_entry_exists;AW_InventoryInit();Cvar_RegisterVariable(&aw_map_mode);Cvar_RegisterVariable(&aw_map_debug_available);
     Cvar_RegisterVariable(&aw_map_lava);Cvar_RegisterVariable(&aw_map_format);Cmd_AddCommand("aw_teleport_map",open_teleport_map);Cmd_AddCommand("aw_worldmap",open_normal_map);Cmd_AddCommand("aw_journal",open_journal);Cmd_AddCommand("aw_inventory",inventory_command);}
 void AW_WorldUIMouse(int dx,int dy){
     int top;

@@ -459,6 +459,21 @@ static int R_FenceDivert (msurface_t *psurf)
 	return (psurf->flags & SURF_DRAWFENCE) && r_fence_add && r_fence_add (psurf, currententity);
 }
 
+/* aw_fence_twosided 1 (d_fence.c sets it each frame): a see-through face that the back-face test
+ * dropped (seen from behind) still goes to the fence list. d_fence.c draws it with its own clip,
+ * projection and depth test, so its side does not matter there: the same texels, seen mirrored.
+ * Only SURF_DRAWFENCE faces; every other face stays culled. */
+int r_fence_twosided;
+
+static int R_FenceBack (msurface_t *psurf)
+{
+	if (!r_fence_twosided)
+		return 0;
+	if ((psurf->flags & SURF_FENCEKNOWN) && !(psurf->flags & SURF_DRAWFENCE))
+		return 0;
+	return R_FenceDivert (psurf);
+}
+
 
 /*
 ================
@@ -489,6 +504,11 @@ void R_DrawSolidClippedSubmodelPolygo (model_t *pmodel)
 
 		dot = DotProduct (modelorg, pplane->normal) - pplane->dist;
 		AW_RC(RC_BF_TESTED);
+
+	// a see-through face seen from behind (aw_fence_twosided)
+		if (r_fence_twosided && !(((psurf->flags & SURF_PLANEBACK) && (dot < -BACKFACE_EPSILON)) ||
+			(!(psurf->flags & SURF_PLANEBACK) && (dot > BACKFACE_EPSILON))) && R_FenceBack (psurf))
+			continue;
 
 	// draw the polygon
 		if (((psurf->flags & SURF_PLANEBACK) && (dot < -BACKFACE_EPSILON)) ||
@@ -582,6 +602,11 @@ void R_DrawSubmodelPolygons (model_t *pmodel, int clipflags)
 
 		dot = DotProduct (modelorg, pplane->normal) - pplane->dist;
 		AW_RC(RC_BF_TESTED);
+
+	// a see-through face seen from behind (aw_fence_twosided)
+		if (r_fence_twosided && !(((psurf->flags & SURF_PLANEBACK) && (dot < -BACKFACE_EPSILON)) ||
+			(!(psurf->flags & SURF_PLANEBACK) && (dot > BACKFACE_EPSILON))) && R_FenceBack (psurf))
+			continue;
 
 	// draw the polygon
 		if (((psurf->flags & SURF_PLANEBACK) && (dot < -BACKFACE_EPSILON)) ||
@@ -764,6 +789,8 @@ void R_RecursiveWorldNode (mnode_t *node, int clipflags)
 							R_RenderFace (surf, clipflags);
 						}
 					}
+					else if (surf->visframe == r_framecount)
+						(void) R_FenceBack (surf);	/* a see-through face seen from behind (aw_fence_twosided) */
 
 					surf++;
 				} while (--c);
@@ -798,6 +825,8 @@ void R_RecursiveWorldNode (mnode_t *node, int clipflags)
 							R_RenderFace (surf, clipflags);
 						}
 					}
+					else if (surf->visframe == r_framecount)
+						(void) R_FenceBack (surf);	/* a see-through face seen from behind (aw_fence_twosided) */
 
 					surf++;
 				} while (--c);

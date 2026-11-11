@@ -320,6 +320,7 @@ table.mt small{opacity:.8}
 <script src="panel-fold.js"></script>
 <script src="zebra.js"></script>
 <script src="header.js"></script>
+<script src="auto-refresh.js"></script>
 <script src="chim-legend.js"></script>
 <script src="chim-inclusion.js"></script>
 <script src="interior-tracker.js"></script>
@@ -1204,7 +1205,7 @@ $('metricsfile').onchange = e => {
   load(f, text => { if (setMetrics(JSON.parse(text))) metricsFileName = f.name; });
 };
 // Copy state: toolkit version, loaded data, layers and selection, as JSON to paste.
-const TOOLKIT = {name: 'AmiWind Toolkit · World Map', version: '0.1.25'};
+const TOOLKIT = {name: 'AmiWind Toolkit · World Map', version: '0.1.26'};
 let statusFileName = null;
 function stateJson() {
   const sel = picked && data ? data.cells.find(c => c.x === picked.x && c.y === picked.y) : null;
@@ -1503,8 +1504,8 @@ function chimDrawn(c) { return !!c.chim.state || c.land || CHIM_SEA.has(chimCls(
 function chimEligible(c) { return CHIM_ELIGIBLE.has(chimCls(c)) || (chimCls(c) === 'not_in_build' && CHIM_ELIGIBLE.has(c.chim.bucket)); }
 const CHIM_SETTLED_ALPHA = .45;
 const CHIM_BUCKETS = {
-  complete: ['#7dffa6', 'Cell complete: terrain and every placed object converted, all audits passed (solid white border around a group)'],
-  terrain_complete: ['#7dffa6', 'Terrain complete: all audits passed, everything but actors converted'],
+  complete: ['#7dffa6', 'Fully approved cells: not a single polygon off, terrain and every placed object converted, all audits passed, approved by the project maintainer (solid white border around a group)'],
+  terrain_complete: ['#7dffa6', 'Fully approved terrain: the same for everything but the actors, all audits passed, approved'],
   complete_unlit: ['#7dffa6', 'Cell complete, awaiting lighting: everything but the lighting audit (zebra, white border)', CHIM_ZEBRA],
   terrain_complete_unlit: ['#7dffa6', 'Terrain complete, awaiting lighting: everything but actors and the lighting audit (zebra)', CHIM_ZEBRA],
   approved: ['#ffd23f', 'maintainer-approved'], playtested: ['#2ec4b6', 'playtested'], audits_passed: ['#46c37b', 'passed (something still deferred)'],

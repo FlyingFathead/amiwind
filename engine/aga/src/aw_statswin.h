@@ -4,7 +4,17 @@
 /* The Stats window (P, aw_stats) and the Magic window placeholder (O, aw_magicmenu):
  * full-screen windows on the inventory's modal (aw_worldui.c AW_WorldUIOpenPanel).
  * docs/INVENTORY.md "Stats and Magic windows", docs/KEYMAPS.md. */
-#define AW_STATS_ROWS 32
+#define AW_STATS_FACTIONS 8
+#define AW_STATS_FACTION_LINES 6   /* name and rank; next rank; its two attributes; the skills; the reputation */
+#define AW_STATS_ROWS (32+1+AW_STATS_FACTIONS*AW_STATS_FACTION_LINES+2)
+/* FACTION-STATS-PAGE-64: one faction the player belongs to, as the stats page lists it (OpenMW statswindow.cpp:
+ * the rank's name or Expelled, and the next rank's needs). need[]: the next rank's attribute 1, attribute 2, one
+ * favoured skill, a second favoured skill, the faction reputation; attribute[]: the faction's two attributes (0..7). */
+typedef struct {
+    char name[32],rank[32],next[32];
+    short need[5],reputation;
+    unsigned char attribute[2],expelled,has_next;
+} aw_stats_faction_t;
 typedef struct {
     char name[48],race[48],clas[48],birth[48];
     int level,classed;                  /* classed: major/minor from the class */
@@ -13,7 +23,13 @@ typedef struct {
     short attributes[8],base[8];        /* current (base + modifiers - damage) and base */
     short skills[27];
     unsigned char major[5],minor[5];
+    /* FACTION-STATS-PAGE-64: filled by aw_stats_standing when the window opens (standing 0: no rows) */
+    int standing,reputation,bounty,factions;
+    aw_stats_faction_t faction[AW_STATS_FACTIONS];
 } aw_stats_sheet_t;
+/* Set by the dialogue window (aw_dialwin.c, which has the factions' rank table): fills the standing fields of S
+ * from the player's standing, reading the rank names and needs from disk; called once per opening, never per frame. */
+extern int (*aw_stats_standing)(aw_stats_sheet_t *s);
 /* The live character sheet; 0 when no character exists (the sheet is then empty). */
 int AW_StatsSheet(aw_stats_sheet_t *out);
 /* The skill list rows: header (-1 major, -2 minor, -3 misc) or a skill index. */

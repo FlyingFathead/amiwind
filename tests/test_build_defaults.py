@@ -221,6 +221,8 @@ OPTIONS = {
     'chim_model_hull_patch': 'shipped default',
     # edge bevels on every CHIM model's standing hull (CHIM-COMPILED-HULL-OVERFILL-46): EXPERIMENTAL, profile by default
     'chim_model_bevels': 'opt-in, not shipped',
+    # the converter route for two-sided see-through planes (ROOM-DECAL-ALPHA-62): off until the A/B decides
+    'chim_fence_twosided_faces': 'opt-in, not shipped',
     # world format 0.8: one model per mesh + scale, the full rotation in the record (CHIM-TILT-VARIANTS-SPLIT-33):
     # EXPERIMENTAL, 0.7 by default
     'chim_placement_format': 'opt-in, not shipped',

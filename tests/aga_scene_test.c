@@ -193,6 +193,7 @@ static int room_map(const char *name,FILE **f){
  *f=tmpfile();assert(*f);fwrite(h,1,sizeof(h),*f);fputs(text,*f);rewind(*f);return (int)(124+n);
 }
 int COM_FOpenFile(char *name,FILE **f){
+ if(!strcmp(name,"world/regions-sl.awr")){*f=NULL;return -1;}   /* no Solstheim rows on this disk */
 #ifdef AW_DOOR_ENGINE_CHECK
  /* tools/door_engine_check.c: the files of a built image instead of this fixture's (DOOR-ENTRANCE-AUDIT-51) */
  return door_check_open(name,f);

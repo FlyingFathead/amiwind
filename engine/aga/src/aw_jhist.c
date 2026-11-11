@@ -8,6 +8,7 @@
 
 AW_RESIDENT_GROWS("dated journal history (JOURNAL-ORIGINAL-VIEW-59)",AW_JHIST_MAX,AW_JHIST_ENTRY_BYTES);
 aw_jhist_t aw_jhist;
+int (*aw_journal_entry_exists)(const char *id,int32_t index);
 
 static int valid(uint32_t quest,int32_t stage,int32_t days,int32_t ms){
     return quest && stage>0 && days>=0 && days<=365000 && ms>=0 && ms<86400000;
@@ -28,6 +29,16 @@ int AW_JHistAdd(aw_jhist_t *h,uint32_t quest,int32_t stage,int32_t days,int32_t 
     h->entry[h->count].days=days;h->entry[h->count].milliseconds=milliseconds;
     h->count++;
     return 2;
+}
+int AW_JHistJournal(aw_jhist_t *h,uint32_t quest,int32_t current,int32_t index,int exists,int32_t days,int32_t milliseconds){
+    int dated;
+    if(index>current){
+        dated=AW_JHistAdd(h,quest,index,days,milliseconds);(void)dated;
+        return AW_JH_RAISE|AW_JH_NOTICE;
+    }
+    if(!exists || index<=0)return 0;
+    dated=AW_JHistAdd(h,quest,index,days,milliseconds);
+    return dated==2?AW_JH_NOTICE:0;
 }
 int AW_JHistHasQuest(const aw_jhist_t *h,uint32_t quest){
     int i;

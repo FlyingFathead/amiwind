@@ -5,8 +5,9 @@
  * its stats window layout; no art or code copied): the player's name as the title; left the
  * health, magicka and fatigue bars, level, race and class, then the eight attributes; right a
  * scrolled list of Major, Minor and Misc skills as the class defines them. The birthsign sits
- * under the attributes here (the original lists it under the skills). Factions, reputation and
- * bounty are not shown: the engine has no faction state yet. Everything is read live from
+ * under the attributes here (the original lists it under the skills). Under the skills the
+ * factions the player belongs to (rank or Expelled, the next rank's needs), the reputation and the
+ * bounty (FACTION-STATS-PAGE-64; read once when the window opens). Everything else is read live from
  * aw_character (attributes, modifiers, damage, skills, current/maximum) every frame; nothing
  * is kept while the window is closed except the scroll position.
  *
@@ -46,6 +47,13 @@ static int skill_top;
 /* aw_levelup.c sets it when the levelling data loads: iLevelupTotal, the level progress bar's end (0 = no bar). */
 int aw_stats_level_total;
 static aw_magic_list_t *magic;   /* only while the Magic window is open */
+/* FACTION-STATS-PAGE-64: the standing read once when the window opens (the window is modal: nothing changes it) */
+int (*aw_stats_standing)(aw_stats_sheet_t *s);
+static aw_stats_sheet_t standing_cache;
+#define ROW_FACTION_HEADER (-4)
+#define ROW_REPUTATION (-5)
+#define ROW_BOUNTY (-6)
+#define ROW_FACTION(k,line) (100+(k)*8+(line))
 
 /* the name cut to the field (no strncpy: -O2 warns on the cut, -Wstringop-truncation) */
 static void copy(char *out,int size,const char *in){int n=0;if(in)while(n<size-1 && in[n]){out[n]=in[n];n++;}out[n]=0;}
@@ -73,6 +81,10 @@ int AW_StatsSheet(aw_stats_sheet_t *s){
     for(i=0;i<3;i++){s->current[i]=c->current[i];s->maximum[i]=c->maximum[i];}
     /* Health lives on the player entity while a game runs (aw_combat.c keeps the sheet in step). */
     if(sv.active && svs.clients && svs.clients[0].edict)s->current[0]=svs.clients[0].edict->v.health;
+    if(standing_cache.standing){
+        s->standing=1;s->reputation=standing_cache.reputation;s->bounty=standing_cache.bounty;
+        s->factions=standing_cache.factions;memcpy(s->faction,standing_cache.faction,sizeof(s->faction));
+    }
     return 1;
 }
 int AW_StatsRows(const aw_stats_sheet_t *s,int *rows){
@@ -86,6 +98,17 @@ int AW_StatsRows(const aw_stats_sheet_t *s,int *rows){
     /* The misc skills: the rest in skill record order (OpenMW statswindow.cpp configureSkills walks the
      * skill store; major and minor keep the class's order). */
     for(j=0;j<27;j++)if(!used[j])rows[n++]=j;
+    /* FACTION-STATS-PAGE-64: then the factions, the reputation and the bounty (OpenMW statswindow.cpp order; the
+     * original shows the next rank's needs in a tooltip, here as rows under the faction) */
+    if(s->standing){
+        if(s->factions>0)rows[n++]=ROW_FACTION_HEADER;
+        for(i=0;i<s->factions && i<AW_STATS_FACTIONS;i++){
+            rows[n++]=ROW_FACTION(i,0);
+            if(!s->faction[i].expelled && s->faction[i].has_next)
+                for(j=1;j<AW_STATS_FACTION_LINES;j++)rows[n++]=ROW_FACTION(i,j);
+        }
+        rows[n++]=ROW_REPUTATION;rows[n++]=ROW_BOUNTY;
+    }
     return n;
 }
 static void small(int x,int y,int width,const char *value,int color){
@@ -156,7 +179,24 @@ void AW_StatsDrawSheet(const aw_stats_sheet_t *s,int top){
     if(top<0)top=0;
     for(i=0;i<LIST_VISIBLE && top+i<n;i++){
         int r=rows[top+i],x_right=n>LIST_VISIBLE?SCROLL_X-4:312;y=LIST_Y+i*LIST_ROW;
-        if(r<0)small(LIST_X,y,x_right-LIST_X,r==-1?"Major Skills":r==-2?"Minor Skills":"Misc Skills",muted);
+        if(r>=100){
+            const aw_stats_faction_t *f=&s->faction[(r-100)/8];int line_no=(r-100)%8;char need[48];
+            switch(line_no){
+            case 0:pair(LIST_X+4,y,x_right,f->name,f->expelled?"Expelled":f->rank[0]?f->rank:"-",gold,gold);break;
+            case 1:pair(LIST_X+8,y,x_right,"Next rank",f->next,muted,gold);break;
+            case 2:case 3:
+                sprintf(need,"%d",f->need[line_no-2]);
+                pair(LIST_X+8,y,x_right,attribute_names[f->attribute[line_no-2]&7],need,muted,gold);break;
+            case 4:sprintf(need,"%d, %d",f->need[2],f->need[3]);pair(LIST_X+8,y,x_right,"Favoured skills",need,muted,gold);break;
+            default:sprintf(need,"%d/%d",f->reputation,f->need[4]);pair(LIST_X+8,y,x_right,"Reputation",need,muted,gold);break;
+            }
+        }
+        else if(r==ROW_FACTION_HEADER)small(LIST_X,y,x_right-LIST_X,"Faction",muted);
+        else if(r==ROW_REPUTATION || r==ROW_BOUNTY){
+            sprintf(line,"%ld",(long)(r==ROW_REPUTATION?s->reputation:s->bounty));
+            pair(LIST_X,y,x_right,r==ROW_REPUTATION?"Reputation":"Bounty",line,muted,gold);
+        }
+        else if(r<0)small(LIST_X,y,x_right-LIST_X,r==-1?"Major Skills":r==-2?"Minor Skills":"Misc Skills",muted);
         else{sprintf(line,"%ld",(long)s->skills[r]);pair(LIST_X+4,y,x_right,skill_names[r],line,gold,gold);}
     }
     if(n>LIST_VISIBLE)AW_UIScrollbar(SCROLL_X,LIST_Y,SCROLL_H,n,LIST_VISIBLE,top);
@@ -187,6 +227,8 @@ static int stats_key(int key,int mouse_x,int mouse_y){
 }
 void AW_StatsOpen(void){
     if(!aw_character.valid){Con_Printf("Stats: no character yet.\n");return;}
+    memset(&standing_cache,0,sizeof(standing_cache));
+    if(aw_stats_standing && aw_stats_standing(&standing_cache))standing_cache.standing=1;
     AW_WorldUIOpenPanel(stats_draw,stats_key,NULL);
 }
 

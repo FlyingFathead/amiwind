@@ -554,6 +554,21 @@ def frame_input(*, frame, centre, models, references, prepared, profiles, mesh_f
             built += run_units('texture-fence', [tasks[k] for k in fence_keys], fence.fence_texture_unit, jobs, cache)
             keys += fence_keys
             _log('see-through textures: %d of %d (chim.fence)' % (len(fence_keys), len(keys)))
+        # the converter route for two-sided see-through planes (build setting fence_twosided_faces mirror; off by
+        # default): a mirrored copy of each see-through face, only those (ROOM-DECAL-ALPHA-62)
+        if fence.twosided_mode(settings) == 'mirror' and fence_keys:
+            fenced, mirrored, models_touched = set(fence_keys), 0, 0
+            for k, v in variants.items():
+                local = {i for i, t in enumerate(v.get('texture_keys') or []) if t in fenced}
+                if not local:
+                    continue
+                lumps, n = fence.mirror_faces(v['lumps'], local)
+                if n:
+                    variants[k] = dict(v, lumps=[bytes(x) for x in lumps])
+                    mirrored += n
+                    models_touched += 1
+            _log('two-sided see-through faces: %d mirrored copies added in %d models (chim.fence)' % (
+                mirrored, models_touched))
     def stage_key(k):
         # the key as the stage indexes it (the identity written into the world, as before content keys)
         return ((k[0], index_of_sha[k[1]], *k[2:]) if k[0] == 'model' and isinstance(k[1], str) and k[1] != 'flatten'

@@ -26,6 +26,21 @@ void *AW_TryMalloc (unsigned long size);
 void *AW_TryCalloc (unsigned long count, unsigned long size);
 /* NULL leaves the old block as it was (realloc's own rule): the caller keeps and frees it */
 void *AW_TryRealloc (void *old, unsigned long size);
+/* ROOM-LOAD-KEEPS-EXTERIOR-CACHE-64: the count by asking address. Every block of AW_TRYALLOC_OWNED bytes or more that these
+ * allocate is noted with the address it was asked from; free() in a file that includes this header goes through
+ * AW_TryFree, which forgets it (the C library's own blocks are never in the table, so they are freed as before).
+ * aw_memcensus owners prints the live bytes by asking address (tools map it to a function by the link map). */
+#define AW_TRYALLOC_OWNED	(4UL * 1024UL)	/* 4 KiB, a size in bytes (no coordinate) */
+/* The count is off by default: nothing is noted and free() only tests a flag. ON 1 starts it (aw_memcensus owners
+ * on, a measuring session), 0 stops it and forgets the table. */
+void AW_TryOwnersEnable (int on);
+int AW_TryOwnersOn (void);
+void AW_TryFree (void *block);
+/* The live owned blocks summed by asking address, largest first: up to MAX (pc, bytes, blocks); returns the count,
+ * *total the live owned bytes, *dropped the blocks the full table could not note (counted, never lost). */
+int AW_TryOwners (unsigned long *pc, unsigned long *bytes, unsigned long *blocks, int max, unsigned long *total,
+	unsigned long *dropped);
+#define free(block)	AW_TryFree (block)
 #else
 #define AW_TryMalloc(size)	malloc (size)
 #define AW_TryCalloc(count, size)	calloc (count, size)

@@ -10,8 +10,8 @@
 (function (root) {
   const esc = t => String(t).replace(/[&<>"]/g, ch => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[ch]));
   const PARTS = [
-    ['complete', 'cell complete', '#7dffa6'],
-    ['terrain_complete', 'terrain complete', '#7dffa6'],
+    ['complete', 'Fully approved cells', '#7dffa6'],
+    ['terrain_complete', 'Fully approved terrain', '#7dffa6'],
     ['complete_unlit', 'cell complete, awaiting lighting', 'repeating-linear-gradient(135deg,#7dffa6 0 4px,#00e5ff 4px 7px)'],
     ['terrain_complete_unlit', 'terrain complete, awaiting lighting', 'repeating-linear-gradient(135deg,#7dffa6 0 4px,#00e5ff 4px 7px)'],
     ['approved', 'maintainer-approved', '#ffd23f'],
@@ -31,8 +31,8 @@
   const SETTLED_GREY = '#5a626b';
   const SETTLED_TEXT = "No cell exists here in the original game data. AmiWind's edge current turns the player back before this point, so there is nothing to build.";
   const STATE_PARTS = {
-    complete: ['cell complete', '#7dffa6', 'Everything converted, every audit passed, lit like the original'],
-    terrain_complete: ['terrain complete', '#7dffa6', 'Everything but actors converted, every audit passed, lit'],
+    complete: ['Fully approved cells', '#7dffa6', 'Not a single polygon off, every audit passed, lit like the original, approved by the project maintainer'],
+    terrain_complete: ['Fully approved terrain', '#7dffa6', 'The same for everything but the actors: not a single polygon off, every audit passed, lit, approved'],
     complete_unlit: ['cell complete, awaiting lighting', STRIPES('#7dffa6', '#00e5ff'), 'Cell complete except the lighting audit'],
     terrain_complete_unlit: ['terrain complete, awaiting lighting', STRIPES('#7dffa6', '#00e5ff'), 'Terrain complete except the lighting audit'],
     approved: ['maintainer-approved', '#ffd23f', 'In the game and approved by the maintainer'],
@@ -106,6 +106,33 @@
       ' · partial ' + (s.partial || 0).toLocaleString() + ' · unlit ' + (s.unlit || 0).toLocaleString() + ' · lights baked ' + (r.baked || 0).toLocaleString() +
       ', night lamps only ' + (r.lamp_table || 0).toLocaleString() + ', not represented ' + (r.none || 0).toLocaleString() + '</span>';
   }
+  // The headline's rows, one per land and one for the build: [{html, title}]. Every number is the data's own; the release in
+  // "eligible for" is the data's eligible_release (computed from VERSION when the data is written).
+  const LEGEND = 'Done = converted and eligible for the release (fully approved, awaiting lighting, passed with something deferred, or empty sea). ' +
+    'Fully approved cells = not a single polygon off and approved by the project maintainer; fully approved terrain = the same for everything but the actors.';
+  const LANDS = [[1, 'Vvardenfell (main game)'], [2, 'Solstheim (Bloodmoon DLC)'], [3, 'Mournhold (Tribunal DLC)']];
+  function landRow(label, isl, release) {
+    if (!isl) return {html: esc(label) + ': <b>not started</b> · not in the tracker’s cell data yet', title: LEGEND};
+    const n = v => (v || 0).toLocaleString();
+    if (!isl.done) return {html: esc(label) + ': <b>not started</b> · ' + n(isl.cells) + ' cells', title: LEGEND};
+    const pct = (+isl.percent).toFixed(1) + ' %';
+    return {html: esc(label) + ' <b>Done: ' + n(isl.done) + ' of ' + n(isl.cells) + ' (' + pct + ')</b> · ' + FULL_CELLS + ' ' + n(isl.complete) +
+      ' · ' + FULL_TERRAIN + ' ' + n(isl.terrain_complete) + ' · awaiting lighting ' + n((isl.complete_unlit || 0) + (isl.terrain_complete_unlit || 0)) +
+      (isl.eligible != null ? ' · <b>eligible for ' + esc(release || 'the next release') + ': ' + n(isl.eligible) + '</b>' : ''), title: LEGEND};
+  }
+  function buildRow(h) {
+    if (!(h.groups && h.states)) return null;
+    const label = h.in_game_label || h.in_game_build || 'none';
+    return {html: '<b>In the game: ' + fmt(h.groups.in_game) + ' cells</b> · newest ingested build ' + esc(label) + ' · accounted for ' + fmt(h.groups.accounted_for) + ' of ' + fmt(h.groups.cells),
+      title: 'Build run: ' + (h.in_game_build || 'none')};
+  }
+  function headRows(h) {
+    const isl = h.islands || [];
+    const rows = LANDS.map(([id, label]) => landRow(label, isl.find(i => i.island === id), h.eligible_release));
+    const b = buildRow(h);
+    return b ? rows.concat([b]) : rows;
+  }
+  const FULL_CELLS = 'Fully approved cells:', FULL_TERRAIN = 'Fully approved terrain:';
   function render(el, h, history, onPick, picked) {
     if (!el) return;
     const doc = el.ownerDocument;
@@ -115,17 +142,9 @@
     if (!h) { el.innerHTML = ''; el.hidden = true; return; }
     el.hidden = false;
     const grouped = !!(h.groups && h.states);
-    const isl = (h.islands || []).find(i => i.island === 1) || {done: h.passed, cells: h.land_cells, percent: h.percent, complete: 0, terrain_complete: 0};
-    const pct = (+isl.percent).toFixed(1) + ' %';
-    const others = (h.islands || []).filter(i => i.island !== 1).map(i => esc(i.name) + ': ' + (i.done ? i.done.toLocaleString() + ' of ' + i.cells.toLocaleString() + ' done' : 'not started') + ', ' + i.cells.toLocaleString() + ' cells').join(' · ');
     const hist = (history || []).slice(-5).map(x => esc(x.date.slice(5, 10)) + ' ' + x.passed).join(' · ');
-    el.innerHTML = '<span class="chimtitle">' + esc(isl.name || 'CHIM cells') + ' <b>Done: ' + isl.done.toLocaleString() + ' of ' + isl.cells.toLocaleString() +
-      ' (' + pct + ')</b> · cell complete ' + (isl.complete || 0).toLocaleString() + ' · terrain complete ' + (isl.terrain_complete || 0).toLocaleString() +
-      ' · awaiting lighting ' + ((isl.complete_unlit || 0) + (isl.terrain_complete_unlit || 0)).toLocaleString() +
-      (isl.eligible != null ? ' · <b>eligible for ' + esc(h.eligible_release || 'next release') + ': ' + isl.eligible.toLocaleString() + '</b>' : '') +
-      (others ? ' · ' + others : '') +
-      (grouped ? ' · <b>in the game: ' + fmt(h.groups.in_game) + '</b>' + (h.in_game_build ? ' (' + esc(h.in_game_build) + ')' : '') + ' · accounted for ' + fmt(h.groups.accounted_for) + ' of ' + fmt(h.groups.cells) : '') +
-      '</span>' + (grouped ? groupsHtml(h, picked) : '<span class="chimparts">' +
+    el.innerHTML = '<span class="chimrows">' + headRows(h).map(r => '<span class="chimtitle chimrow"' + (r.title ? ' title="' + esc(r.title) + '"' : '') + '>' + r.html + '</span>').join('') + '</span>' +
+      (grouped ? groupsHtml(h, picked) : '<span class="chimparts">' +
       PARTS.filter(([k]) => k !== 'sea_in_game' || h.sea_in_game != null).map(([k, t, c]) => '<button type="button" data-bucket="' + k + '" aria-pressed="' + (picked === k ? 'true' : 'false') +
         '" title="Highlight these cells on the map"><i style="background:' + c + '"></i>' + esc(t) + ' <b>' + (h[k] || 0).toLocaleString() +
         '</b></button>').join('') +

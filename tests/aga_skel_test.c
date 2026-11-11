@@ -218,8 +218,14 @@ int main (int argc, char **argv)
 	bad = malloc (size);
 	memcpy (bad, data, size); bad[0] = 'X';
 	assert (!AW_SkelParse (bad, size, &t));
-	memcpy (bad, data, size); bad[AW_SKEL_HEADER] = 0; bad[AW_SKEL_HEADER+1] = 1;	/* bone 0's parent 1 */
-	assert (!AW_SkelParse (bad, size, &t));
+	{
+		/* the parents follow the header (a version 4 table: after its scale extension and section) */
+		long at = AW_SKEL_HEADER;
+		if (data[4] == 0 && data[5] == AW_SKEL_VERSION_SCALED)
+			at += AW_SKEL_SCALED_EXT + ((long)data[28] << 24 | (long)data[29] << 16 | (long)data[30] << 8 | data[31]);
+		memcpy (bad, data, size); bad[at] = 0; bad[at+1] = 1;	/* bone 0's parent 1 */
+		assert (!AW_SkelParse (bad, size, &t));
+	}
 	assert (AW_SkelParse (data, size, &t));
 	printf ("table bones %d frames %d groups %d\n", t.bones, t.frames, t.groups);
 	assert (AW_SkelGroup (&t, "WALKFORWARD") >= 0 && AW_SkelGroup (&t, "nosuchgroup") == -1);

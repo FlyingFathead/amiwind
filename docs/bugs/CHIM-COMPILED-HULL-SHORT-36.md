@@ -251,6 +251,8 @@ Family: CHIM world streamer (`chim-streamer`). The CHIM streamer keeps Quake's v
 - CHIM-SEA-BETWEEN-ISLANDS-64 (no report page): The CHIM cell list holds no sea between Vvardenfell and Solstheim
 - [CHIM-SEYDA-ACTOR-CONTACT-33](CHIM-SEYDA-ACTOR-CONTACT-33.md): rc1 image step refuses Seyda Neen's CHIM frame map: six actors stand 0.8-3.3 units off the CHIM ground
 - [CHIM-SEYDA-BALMORA-LOAD-HANG-43](CHIM-SEYDA-BALMORA-LOAD-HANG-43.md): Travelling from Seyda Neen to Balmora sometimes hangs on the Loading screen (boot smoke, 2 of about 5 runs)
+- CHIM-SOLSTHEIM-CROWNS-NOT-DRAWN-64 (no report page): The Solstheim test frame draws the tree trunks but not their crowns
+- CHIM-SOLSTHEIM-STAR-HITCHES-64 (no report page): Single frames of about 100 to 134 ms in the Solstheim forest frame with the star trees
 - [CHIM-STAIR-PLATE-BEVELS-PER-PIECE-43](CHIM-STAIR-PLATE-BEVELS-PER-PIECE-43.md): CHIM model variants take only the mesh-wide exact-bevel flag: stair plates marked for exact standing bevels get the approximate axial hull
 - [CHIM-STAIR-STEPS-SOLID-43](CHIM-STAIR-STEPS-SOLID-43.md): Three stair meshes fail the CHIM stair walk: Redoran steps start in solid (Ald-ruhn, Maar Gan), Hlaalu steps blocked (Suran), a rope bridge starts in solid (0,8)
 - [CHIM-STATIC-PLACE-HOST-ERROR-35](CHIM-STATIC-PLACE-HOST-ERROR-35.md): Bad flora data at CHIM chunk activation ended the session with zone locks held; the next map then stopped the program

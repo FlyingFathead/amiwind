@@ -611,12 +611,30 @@ def working_release(path=None):
 
 
 def eligible_release(plan_next, version):
-    """The release the eligible figure is for: the upcoming plan release when it is not older than the version in
-    development, else that version's release name ('0.0.48-dev2' -> 'v0.0.48'). None when neither is known."""
-    base = ('v' + str(version).lstrip('v').split('-')[0]) if version else None
-    if plan_next and (not base or PL.version_key(plan_next) >= PL.version_key(base)):
-        return plan_next
-    return base or plan_next
+    """The release the eligible figure is for: always the release of the version in development, computed from the
+    VERSION file ('0.0.48-dev2' -> 'v0.0.48'). A hand-set plan value never decides it (TOOLKIT-ELIGIBLE-RELEASE-STALE-64:
+    the label read v0.0.57 for six versions); `plan_next` stays in the signature only for the callers that pass it.
+    None when the version is not known."""
+    return ('v' + str(version).lstrip('v').split('-')[0]) if version else None
+
+
+def version_stamp(path=None):
+    """The version fields every tracker data file carries, computed from the VERSION file at the moment the data is
+    written (tools/tracker_version_check.py refuses data whose stamp or version-derived fields differ from VERSION)."""
+    # The release only ('v0.0.64'), never the dev or rc label: the tracker data stage keys the VERSION file as its release
+    # line (build_cache.VERSION_RELEASE_UNITS), so a dev number change re-keys and rewrites nothing (BUILD-CHIM-KEY-VERSION-48).
+    return {'release': working_release(path), 'source': 'the version file'}
+
+
+def stamp_document(doc, path=None):
+    """Write the version-derived fields of a tracker document from VERSION: the stamp, the eligible release and the
+    version. Returns doc."""
+    stamp = version_stamp(path)
+    doc['version_stamp'] = stamp
+    doc.setdefault('headline', {})['eligible_release'] = stamp['release']
+    # `plan_next` is plan data (the lowest plan release not shipped, set through `plan` / `ship`), a record of what
+    # was planned, never a claim about the version line; no label of the page is read from it.
+    return doc
 
 
 def on_map(c):
@@ -1399,8 +1417,8 @@ def ingest(out, progress=None, metrics=None, cells_detail=None, census=None, chi
     plan_doc = PL.load(out)        # set by `plan` / `ship` only, never by ingest; separate from conversion status
     PL.attach(cells, plan_doc)
     plans = PL.summary(cells, plan_doc)
-    # The release the "eligible" figure is for: the upcoming plan release (data), the old constant only while there is no plan.
-    head['eligible_release'] = eligible_release(PL.next_release(plan_doc), working_release())
+    # The release the "eligible" figure is for: computed from VERSION (stamp_document below), never from the plan.
+    head['eligible_release'] = eligible_release(None, working_release())
     interiors, entrances = build_interiors(census, metrics, cells, (cells_detail or {}).get('pois'), bugs, our_maps(config_dir))
     # Interiors, additive (tools/cell_progress_rooms.py): a state per room and counts per island from the door graph.
     interior_rooms = None
@@ -1438,6 +1456,7 @@ def ingest(out, progress=None, metrics=None, cells_detail=None, census=None, chi
     }
     if interior_rooms is not None:
         doc['interior_rooms'] = interior_rooms
+    stamp_document(doc)      # every version-derived field, from VERSION, at the moment the data is written
     write_json(out / OUT_FILES['progress'], doc)
     nxt = next_lists(cells, now)
     write_json(out / OUT_FILES['next'], nxt, pretty=True)
@@ -1675,8 +1694,22 @@ def main(argv=None):
     ck.add_argument('--md', type=Path)
     st = sub.add_parser('status', help='print the headline counts')
     st.add_argument('--out', type=Path, required=True)
+    rs = sub.add_parser('restamp', help='rewrite the version-derived fields of the tracker data from VERSION (no re-ingest)')
+    rs.add_argument('--out', type=Path, required=True)
     a = ap.parse_args(argv)
     out = getattr(a, 'out', None)
+    if a.cmd == 'restamp':
+        doc = read_json(out / OUT_FILES['progress'])
+        if not doc:
+            print('no tracker data in %s yet; run ingest' % out)
+            return 1
+        stamp_document(doc)
+        target = out / OUT_FILES['progress']
+        tmp = target.with_name(target.name + '.restamp.tmp')
+        write_json(tmp, doc)
+        tmp.replace(target)          # the Toolkit server never reads a half-written file
+        print('restamped %s: eligible for %s' % (target, doc['headline']['eligible_release']))
+        return 0
     if a.cmd == 'status':
         doc = read_json(out / OUT_FILES['progress'])
         if not doc:

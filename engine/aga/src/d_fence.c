@@ -14,9 +14,13 @@
  * compare, z write and colour write. Models and sprites drawn after it z-test
  * against it. No sorting: nothing blends, and a transparent texel writes no z.
  *
- * aw_fence 0 (the default until a measured A/B decides) keeps every face on the
- * edge list as before: the old path stays selectable. Counters on the rcount
- * line ("fn"): faces drawn this way, texels visited, texels written.
+ * The setting is aw_seethrough_material (cvar.c handles its values and the quiet
+ * aliases aw_seethrough and aw_fence): cobwebs, hanging moss and leaves are drawn
+ * with their see-through parts instead of solid rectangles. 1 is the default
+ * since v0.0.64-dev4 (the fix ships on; its cost is measured on the dev4 bench
+ * and the Pi), 2 = also seen from behind, 0 keeps every face on the edge list
+ * as before: the old path stays selectable. Counters on the rcount line ("fn"):
+ * faces drawn this way, texels visited, texels written.
  */
 #include "quakedef.h"
 #include "r_local.h"
@@ -24,7 +28,14 @@
 #include "aw_rcount.h"
 #include "d_fence.h"
 
-cvar_t	aw_fence = {"aw_fence", "0"};
+cvar_t	aw_seethrough_material = {"aw_seethrough_material", "1"};
+/* the engine route for two-sided see-through planes (cobwebs, hanging moss and vines): 1 = a fence face seen from
+ * behind is drawn too (r_bsp.c R_FenceBack), mirrored; 0 = the back side stays culled (the method before; the
+ * converter route, the build option --chim-fence-twosided-faces mirror, adds a mirrored face instead). Default 0
+ * until the A/B on a full image decides (ROOM-DECAL-ALPHA-62). Only SURF_DRAWFENCE faces, never ordinary ones.
+ * Since v0.0.64-dev4 aw_seethrough_material 2 selects the same route; this name is kept as a quiet alias. */
+cvar_t	aw_fence_twosided = {"aw_fence_twosided", "0"};
+extern int	r_fence_twosided;	/* r_bsp.c */
 
 extern int	r_fence_cache_on;	/* r_surf.c: the fence block drawer for SURF_DRAWFENCE tiles */
 extern vec3_t	transformed_modelorg;	/* d_edge.c */
@@ -59,7 +70,8 @@ extern void (*r_fence_begin) (void), (*r_fence_draw) (void);	/* r_main.c */
  * pointers, so their host tests link without this file) */
 void D_FenceInit (void)
 {
-	Cvar_RegisterVariable (&aw_fence);
+	Cvar_RegisterVariable (&aw_seethrough_material);
+	Cvar_RegisterVariable (&aw_fence_twosided);
 	r_fence_add = R_FenceAdd;
 	r_fence_begin = D_FenceBeginFrame;
 	r_fence_draw = D_DrawFences;
@@ -69,7 +81,7 @@ void D_FenceInit (void)
  * the switch changes, so aw_fence 0 shows exactly the old solid tiles. */
 static void FenceCacheState (void)
 {
-	int	on = aw_fence.value != 0;
+	int	on = aw_seethrough_material.value != 0;
 
 	if (on != fence_cache_state)
 	{
@@ -84,6 +96,8 @@ void D_FenceBeginFrame (void)
 {
 	fence_count = 0;
 	FenceCacheState ();
+	/* aw_seethrough_material 2 = also seen from behind (the engine two-sided route); aw_fence_twosided 1 is its old name */
+	r_fence_twosided = r_fence_cache_on && (aw_seethrough_material.value >= 2 || aw_fence_twosided.value != 0);
 }
 
 /* r_bsp.c: 1 = the face is listed (keep it off the edge list), 0 = draw it solid. */

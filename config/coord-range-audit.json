@@ -3,6 +3,24 @@
  "about": "Every 4000 / 4096 / 4095 in the engine and the builder's frame checks, classified against the coordinate range (CHIM-FRAME-COORD-RANGE-33, engine/aga/src/aw_coord.h): bound = follows the coordinate bound (AW_COORD_BOUND; tools/coord_range.py in the builder: wide by default since v0.0.36, narrow with --coord-range narrow); kept = about positions or distances but deliberately unchanged (why in note); unrelated = not a position. tests/test_coord_range_audit.py fails on any new occurrence that is not listed.",
  "entries": [
   {
+   "file": "engine/aga/src/aw_maps.h",
+   "contains": "#define AW_SOLSTHEIM_TERRAIN_BASE 4096",
+   "class": "unrelated",
+   "note": "the first terrain (save) ID of Solstheim's frame maps slNNNN (WORLD-REGION-NAMES-VF-ONLY-64), an ID range, not a position"
+  },
+  {
+   "file": "engine/aga/src/aw_maps.h",
+   "contains": "4096..8191, so a save ID of either island never moves",
+   "class": "unrelated",
+   "note": "the comment of AW_SOLSTHEIM_TERRAIN_BASE: the ID range of Solstheim's frame maps, not a position"
+  },
+  {
+   "file": "tools/chim/sol_test.py",
+   "contains": "if not 0 <= index < 4096:",
+   "class": "unrelated",
+   "note": "the number of Solstheim frame map names slNNNN the engine takes (AW_SOLSTHEIM_TERRAIN_BASE), not a position"
+  },
+  {
    "file": "engine/aga/src/aw_mwhost.c",
    "contains": "(long)numbers[0].i*8192L+4096L,(long)numbers[1].i*8192L+4096L",
    "class": "unrelated",

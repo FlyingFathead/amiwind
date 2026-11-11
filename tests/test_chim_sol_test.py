@@ -38,9 +38,24 @@ class SolTestCommands(unittest.TestCase):
         self.assertEqual(image[-2:], ['--chim-sol-world', str(Path('/run') / 'chim-sol')])
         self.assertNotIn('--chim-sol-world', dict(steps)['chim'])
 
+    def test_layer_data_finds_the_mwad_package_when_run_as_a_script(self):
+        # BUILD-LAYER-DATA-MWAD-SHADOWED-64: run as a script, tools/ (with tools/mwad.py) is first on the path
+        import subprocess
+        # the stage's path: the script folder first, src and tools later (from PYTHONPATH)
+        code = ("import runpy, sys; sys.path.insert(0, %r); sys.path += [%r, %r]; runpy.run_path(%r, run_name='probe'); "
+                "import mwad; print(hasattr(mwad, '__path__'))"
+                % (str(ROOT / 'tools'), str(ROOT / 'src'), str(ROOT / 'tools'), str(ROOT / 'tools/chim_layer_data.py')))
+        out = subprocess.run([sys.executable, '-B', '-c', code], capture_output=True, text=True, cwd=str(ROOT / 'tools'),
+                             env={'PATH': '/usr/bin:/bin'})
+        self.assertEqual(out.returncode, 0, out.stderr)
+        self.assertEqual(out.stdout.strip(), 'True')
+
     def test_map_names(self):
-        self.assertEqual(map_name((-23, 20)), 'solm23p20')
-        self.assertEqual(map_name((-20, 23)), 'solm20p23')
+        # the open-world map form (aw_maps.h AW_TerrainId "slNNNN"), by the frame's index in the ownership table
+        self.assertEqual(map_name(0), 'sl0000')
+        self.assertEqual(map_name(12), 'sl0012')
+        with self.assertRaises(ValueError):
+            map_name(4096)
 
 
 if __name__ == '__main__':

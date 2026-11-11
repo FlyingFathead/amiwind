@@ -2,11 +2,12 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 3 times; something has to be done
+## PERSISTING: reported 4 times; something has to be done
 
 - Reported with v0.0.60-dev3 at 2026-11-04 12:02 +0200: Gate 6870 smoke (v0.0.60-dev3 opener): no remote control after boot (15 s), on the gate smoke image; rerun passed.
 - Reported with v0.0.60-dev3 at 2026-11-04 13:16 +0200: v0.0.60-dev3 delivery, 16 MB Fast smoke: no remote control after boot (309 s). Below the 32 MB requirement: recorded, not blocking; the 32 MB smoke of the same image passed.
 - Reported with v0.0.60-dev3 at 2026-11-04 15:07 +0200: Gate 6898 smoke (v0.0.60-tables a7f9a9f6): no remote control after boot (15 s); the rerun, gate 6899, passed.
+- Reported with v0.0.64-dev3 at 2026-11-10 17:05 +0200: Seen again in the v0.0.64-dev3 delivery smoke of build 2026_11_10_v0.0.64-dev3_full-v0.0.64-dev3_bf2743f (commit bf2743fa). At 16 MB Fast RAM the smoke stopped with no remote control after boot, after 320 s. The same image at 32 MB Fast RAM passed: boot, Seyda Neen and Balmora loaded, music reads, and the six area hops passed. The game requires 32 MB Fast RAM, so this is a below-requirement run.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -36,7 +37,7 @@ _Last updated with AmiWind v0.0.60-dev3 (4 November 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
+- [PERSISTING: reported 4 times; something has to be done](#persisting-reported-4-times-something-has-to-be-done)
 - [Status: 4 November 2026](#status-4-november-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -171,6 +172,7 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - SMOKE-M-KEY-SKIPS-CHIM-CACHE-57 (no report page): The gate's boot smoke sometimes fails with the CHIM zone full: an M typed while the startup memory notice shows turns the CHIM cache off for that start
 - [SMOKE-MUSIC-REREAD-FLAKY-57](SMOKE-MUSIC-REREAD-FLAKY-57.md): The boot smoke's music check fails now and then: music is not read again after dbg music on (reads 35 -> 35), a rerun passes
 - [SMOKE-PASSES-WITHOUT-MAP-36](SMOKE-PASSES-WITHOUT-MAP-36.md): The engine boot smoke passed while its first map ran under the title menu: a loaded server was taken for a played map
+- SMOKE-PROBE-ARRIVAL-LOAD-NOT-STARTED-64 (no report page): The session probe reports a MiniWind as never started while the preset's own arrival step is loading a room, and runs none of the session script
 - SMOKE-SEYDA-AGAIN-NOT-IN-PLAY-58 (no report page): The boot smoke failed once with 'seyda again (before load 3 of 3) is not in play'; the rerun on the same commit passed
 - [SMOKE-STALL-LABEL-INFERRED-60](SMOKE-STALL-LABEL-INFERRED-60.md): The boot smoke names a stop an emulator disk stall without checking the pending disk request
 - [SMOKE-TALK-BOX-BLOCKS-REMOTE-57](SMOKE-TALK-BOX-BLOCKS-REMOTE-57.md): The boot smoke failed with a talk box (Yes?) open in Seyda Neen right after the load: the remote commands went unanswered and the music check read nothing
@@ -199,6 +201,7 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - [TEST-PROFILE-TIMELINE-BOUND-33](TEST-PROFILE-TIMELINE-BOUND-33.md): A profiler test bounds the sampled CPU too tightly and fails on a loaded machine
 - [TEST-PROFILE-TIMELINE-SUM-33](TEST-PROFILE-TIMELINE-SUM-33.md): The build profile test's sampled-timeline check fails on a loaded machine (timeline CPU above the stage's own CPU)
 - [TEST-RC1-INTEGRATION-CONTRACTS-39](TEST-RC1-INTEGRATION-CONTRACTS-39.md): RC1 regression tests assume the old fingerprint location and a separate class cache unit
+- TEST-SAVED-EQUIPMENT-NATIVE-FLAKY-64 (no report page): The saved equipment native test errors once in a full suite run while the machine is busy and passes when run alone
 - TEST-SKEL-NATIVE-FLAKY-UNDER-LOAD-60 (no report page): Native test test_skel_native (left_arm_takes_the_layer_frame) fails once under host load
 - [TEST-SPAWN-SCAN-DOCSTRING-KEY-48](TEST-SPAWN-SCAN-DOCSTRING-KEY-48.md): The spawn contract scan read a docstring example in hand_metadata.py as a map key named key
 - [TEST-TOWN-BOUNDS-40](TEST-TOWN-BOUNDS-40.md): Town expansion left recovery fixtures and coordinate audit stale

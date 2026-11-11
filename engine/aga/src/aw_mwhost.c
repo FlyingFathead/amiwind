@@ -334,8 +334,7 @@ static int32_t host_query(int instance,int query,int operand){
     return 0;   /* the other queries are not available yet (the compiler marks such scripts VOLATILE) */
 }
 /* the journal-updated notice (aw_dialwin.c sets it at start: the game's sJournalEntry; none in the native tests) */
-void (*aw_journal_updated)(void);
-static int32_t host_journal_get(int topic){
+void (*aw_journal_updated)(void);static int32_t host_journal_get(int topic){
     int32_t story;
     if(topic<0 || topic>=AW_MwvmTopicCount() || !topic_values)return 0;
     story=AW_StateGet(&aw_state,AW_JOURNAL,topic_names+topic_offsets[topic]);
@@ -346,16 +345,15 @@ static void host_journal_set(int topic,int32_t index,int advance){
     if(topic<0 || topic>=AW_MwvmTopicCount() || !topic_values)return;
     name=topic_names+topic_offsets[topic];
     if(advance){
-        if(index<=host_journal_get(topic))return;
-        {
-            unsigned owed=AW_JournalNotices();int dated;
-            int32_t days=AW_StateGet(&aw_state,AW_GLOBAL,"amiwind:clock:days"),ms=AW_StateGet(&aw_state,AW_GLOBAL,"amiwind:clock:ms");
-            if(!AW_StateGet(&aw_state,AW_GLOBAL,"amiwind:clock:ready"))ms=32400000;
-            topic_values[topic]=index;AW_JournalAdd(&aw_state,name,index);   /* the 32-slot copy, for older readers */
-            /* the dated history on the world change list (aw_jhist.h): every quest, no 32-slot limit */
-            dated=AW_JHistAdd(&aw_jhist,AW_LedgerNameHash(name),index,days,ms);
-            if((AW_JournalNotices()!=owed || dated==2) && aw_journal_updated)aw_journal_updated();   /* "Your journal has been updated." */
-        }
+        /* JOURNAL-LOWER-INDEX-ENTRY-64 (aw_jhist.h AW_JHistJournal): an entry at or below the kept index is still
+         * dated once when the table has it, so its finished or restart mark counts; the kept index only rises */
+        int32_t current=host_journal_get(topic);int r;
+        int32_t days=AW_StateGet(&aw_state,AW_GLOBAL,"amiwind:clock:days"),ms=AW_StateGet(&aw_state,AW_GLOBAL,"amiwind:clock:ms");
+        if(!AW_StateGet(&aw_state,AW_GLOBAL,"amiwind:clock:ready"))ms=32400000;
+        r=AW_JHistJournal(&aw_jhist,AW_LedgerNameHash(name),current,index,
+                          index<=current && aw_journal_entry_exists?aw_journal_entry_exists(name,index):index<=current?0:1,days,ms);
+        if(r&AW_JH_RAISE){topic_values[topic]=index;AW_JournalAdd(&aw_state,name,index);}   /* the 32-slot copy, for older readers */
+        if((r&AW_JH_NOTICE) && aw_journal_updated)aw_journal_updated();   /* "Your journal has been updated." */
     }else{
         topic_values[topic]=index;AW_StateSet(&aw_state,AW_JOURNAL,name,index);
     }
@@ -1154,6 +1152,12 @@ aw_actor_t *AW_MwscriptActorOf(edict_t *e,int *row){
  * sv_player, else the actor whose edict it is (OpenMW spellcasting.cpp inflict): each magnitude rolled once, the
  * cures carried out at once as the scripts' Cast does; a harmful effect on an actor is an attack (AW_CombatSpellHit).
  * How many effects landed; -1 when TARGET has no actor record. */
+static unsigned long resists_seen,resists_full,resists_part;static float last_resist;static int last_resist_effect=-1;
+/* dbg cast resist (aw_cast.c): the resistance the last landed effect met and the counts */
+void AW_MwscriptResistReport(void){
+    Con_Printf("Resistance: %lu resistible effects landed on, %lu resisted in full, %lu reduced; last effect %d at %.0f %%\n",
+               resists_seen,resists_full,resists_part,last_resist_effect,(double)last_resist);
+}
 int AW_MwscriptLand(edict_t *target,const aw_spell_effect_t *e,const aw_mgef_t *m,int n,int range,int source){
     aw_actor_t *a;int i,k=0,harmful=0,on_player=!target || target==sv_player;float health;
     a=on_player?player_record():record_of_edict(target);
@@ -1172,6 +1176,26 @@ int AW_MwscriptLand(edict_t *target,const aw_spell_effect_t *e,const aw_mgef_t *
             continue;
         }
         mag=m[i].flags&AW_MGEF_NO_MAGNITUDE?1:AW_CastMagnitude(e[i].magnitude_min,e[i].magnitude_max,(float)(rand()&32767)/32768.0f);
+        {   /* RACE-RESIST-NOT-ON-SPELL-DAMAGE-64 (OpenMW 0.53 spellresistance.cpp getEffectMultiplier): the target's
+             * resist, shield and weakness (active effects and the always-on abilities of its race, birthsign and
+             * list) and its Willpower / Luck roll take their share; the caster's chance counts as 100 (a trap, or a
+             * caster this landing does not know). A full resistance: the effect does not land. */
+            int rs,wk,sh;
+            if(AW_CastResistEffects(e[i].effect,&rs,&wk,&sh)){
+                uint32_t who=on_player?AW_ACTOR_PLAYER_REF:a->reference;float attr,fat,resist;
+                attr=AW_EffectsMagnitude(who,rs,AW_EFFECT_NO_ARG)+AW_ActorPassiveMagnitude(a,rs);
+                if(sh>=0)attr+=AW_EffectsMagnitude(who,sh,AW_EFFECT_NO_ARG)+AW_ActorPassiveMagnitude(a,sh);
+                if(wk>=0)attr-=AW_EffectsMagnitude(who,wk,AW_EFFECT_NO_ARG)+AW_ActorPassiveMagnitude(a,wk);
+                fat=AW_CastFatigueTerm(1.25f,0.5f,a->dyn_cur[2],a->dyn_base[2]);
+                resist=AW_CastResistance(attr,AW_ActorStat(a,AWA_ATTRIBUTE+2),AW_ActorStat(a,AWA_ATTRIBUTE+7),fat,100.0f,
+                                         (float)(rand()%10001)/100.0f,(m[i].flags&AW_MGEF_NO_MAGNITUDE)!=0);
+                resists_seen++;
+                if(resist>=100.0f){resists_full++;
+                    Con_DPrintf("Spell: effect %d resisted in full (resistance %.0f %%)\n",e[i].effect,(double)resist);continue;}
+                if(resist!=0.0f){mag*=1.0f-resist/100.0f;resists_part++;}
+                last_resist=resist;last_resist_effect=e[i].effect;
+            }
+        }
         arg=e[i].attribute>=0?e[i].attribute:e[i].skill>=0?e[i].skill:AW_EFFECT_NO_ARG;
         if(AW_EffectsLand(a,e[i].effect,arg,mag,AW_CastDuration(&e[i],&m[i]),source))k++;
     }

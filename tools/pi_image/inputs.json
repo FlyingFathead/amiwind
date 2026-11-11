@@ -1,0 +1,566 @@
+{
+ "note": "Inputs of the clean Pi image, each checked by SHA-256 (tools/pi_image/build_clean_image.py).",
+ "os": {
+  "path": "2026-10-06-raspios-trixie-arm64-lite.img.xz",
+  "sha256": "483db18a48da399b5b7022ffae9a07bc6d99daab30e593aedac09b69ff422843",
+  "source": "https://downloads.raspberrypi.com/raspios_lite_arm64/images/"
+ },
+ "packages": [
+  {
+   "path": "amiberry/amiberry_8.5.0+trixie_arm64.deb",
+   "sha256": "c3924fbb8c69a83dfe51fa1222fb881ab0b66b3c24a8587f5363274edd479e10"
+  },
+  {
+   "path": "debs/flac_1.5.0+ds-2_arm64.deb",
+   "sha256": "a3c28053cfa2fd494a2c7a4b109dcc363245874cd1bfd4fd2b0a9343d7b5bbdb"
+  },
+  {
+   "path": "debs/fontconfig-config_2.15.0-2.3_arm64.deb",
+   "sha256": "10f643f467b51cf25fc18d1945bc61246dd8d8d1fe6bc712a2b1712c74ebc4d6"
+  },
+  {
+   "path": "debs/fontconfig_2.15.0-2.3_arm64.deb",
+   "sha256": "f899e800435bc3bd3ecc6139bfcb2b45b3dbd2ffa59c4b9b3cc246e9661052af"
+  },
+  {
+   "path": "debs/fonts-dejavu-core_2.37-8_all.deb",
+   "sha256": "86635b3d25b3655fc11cb3ecc3af59f0bf19643b02b94f2de48bd10253cdba12"
+  },
+  {
+   "path": "debs/fonts-dejavu-mono_2.37-8_all.deb",
+   "sha256": "3003e98a5debfdeadc7040a7f715fe9fe6fb67f68deacf6049b54e30f07fc014"
+  },
+  {
+   "path": "debs/libaom3_3.12.1-1+deb13u1_arm64.deb",
+   "sha256": "552e2bd21772a39713a0c63e814039f558b355d048f0d0bfc4009658253cc1e9"
+  },
+  {
+   "path": "debs/libasyncns0_0.8-6+b5_arm64.deb",
+   "sha256": "818bbcaa7ada536a1bdd5b1c26b77608606403f5c15557691e83d0b4433b89ef"
+  },
+  {
+   "path": "debs/libavcodec61_7.1.5-0+deb13u1+rpt2_arm64.deb",
+   "sha256": "5136b722de2d49b3c7a05e9ad54fb30f22891b2ae41ff9f6548590ca5cd2c42b"
+  },
+  {
+   "path": "debs/libavformat61_7.1.5-0+deb13u1+rpt2_arm64.deb",
+   "sha256": "45a68cb60a35c9d8edbe3468bd87d39976ec89e6e75671b344d98b932ff2069f"
+  },
+  {
+   "path": "debs/libavutil59_7.1.5-0+deb13u1+rpt2_arm64.deb",
+   "sha256": "6ea0066f5d55cd5cbe9b69c6dc60665f20ffff332020b8b6c5cb14b1ffd21a2e"
+  },
+  {
+   "path": "debs/libbluray2_1.3.4-1+b2_arm64.deb",
+   "sha256": "14da09203931bdbff17b129d447850daecc8c72b87b296e3f7d0e0beb56e9f50"
+  },
+  {
+   "path": "debs/libcairo-gobject2_1.18.4-1+rpt1_arm64.deb",
+   "sha256": "602016d81e69e8410cb0bbb18f98e73132c9544d4c94ffa5eb7bfcee168193bc"
+  },
+  {
+   "path": "debs/libcairo2_1.18.4-1+rpt1_arm64.deb",
+   "sha256": "f55eb759103f3cb6c1011733da0e71af9821843dfa308a29931a3b7de3694d82"
+  },
+  {
+   "path": "debs/libchromaprint1_1.5.1-7_arm64.deb",
+   "sha256": "4ad44ffa6d4c2af857e3bc4fba69d55373126ab23ba1e841dc69fe937246929c"
+  },
+  {
+   "path": "debs/libcjson1_1.7.18-3.1+deb13u1_arm64.deb",
+   "sha256": "f8a6ce78b0d4b1db40b16e0330fb1dfcd54a15c4a1f6798afd631e99f30fe707"
+  },
+  {
+   "path": "debs/libcodec2-1.2_1.2.0-3_arm64.deb",
+   "sha256": "33e971eb87601c32b330dc1915b92f3fd88ea74380a30a2d10b657065d36e920"
+  },
+  {
+   "path": "debs/libdatrie1_0.2.13-3+b1_arm64.deb",
+   "sha256": "d513d0602836c4df782c15dc9472c17ab5a815343aabc9ebe7dc9604c0acfaa0"
+  },
+  {
+   "path": "debs/libdav1d7_1.5.1-1_arm64.deb",
+   "sha256": "bcb430fa4c5f05bc3fa4dd9f18b7b0498ec9701c23e83bf57a29996216c3a245"
+  },
+  {
+   "path": "debs/libdecor-0-0_0.2.2-2_arm64.deb",
+   "sha256": "34c0db59390767ef7b1cb5594f78f142b0673a5e7788e068cdd323f9c16f9207"
+  },
+  {
+   "path": "debs/libdrm-amdgpu1_2.4.134-3~bpo13+1+rpt1_arm64.deb",
+   "sha256": "fc1193658b5457568f0310b73ef9490460219eac5e917e25a373ea486bea4c9c"
+  },
+  {
+   "path": "debs/libdvdnav4_6.1.1-3+b1_arm64.deb",
+   "sha256": "42c7fbfbb8c048f64c5099d3a9174ebb510ef591022c0bbb0c6a03c5acd7c51c"
+  },
+  {
+   "path": "debs/libebur128-1_1.2.6-1+b2_arm64.deb",
+   "sha256": "3b7ac8f30620590a710e6c8877bb28aad295e253a87a173f05f852a953be3326"
+  },
+  {
+   "path": "debs/libenet7_1.3.18+ds-1+b1_arm64.deb",
+   "sha256": "701964b06341c25661ffd4ec15fed1da35fe0a855a95ed8ec4ae6bbb918fde3e"
+  },
+  {
+   "path": "debs/libfontconfig1_2.15.0-2.3_arm64.deb",
+   "sha256": "872781cf62926b68c34a4302a3caae334ff8d4d83a2b2477f8fb454460aadc99"
+  },
+  {
+   "path": "debs/libfreetype6_2.13.3+dfsg-1+deb13u1_arm64.deb",
+   "sha256": "0c426e83f1af816b9a4df9056fd2238463d1cd07969ee640965da9fb6ecaf107"
+  },
+  {
+   "path": "debs/libfribidi0_1.0.16-1_arm64.deb",
+   "sha256": "5f5bfdf6ef126b0a38f8ebb8751cbbb845fe2cd4e1dd5258d241be243e09897f"
+  },
+  {
+   "path": "debs/libgbm1_26.2.2-1~bpo13+0~rpt1_arm64.deb",
+   "sha256": "c8cd3a21f350bfe4b3ac7a1754c01a4a993537d2af9fcb6df414cfa6959d63f2"
+  },
+  {
+   "path": "debs/libgdk-pixbuf-2.0-0_2.42.12+dfsg-4+deb13u1_arm64.deb",
+   "sha256": "2090d2ee768d27c3bfad89d34b6915453d3034fa778d4bf15f5144a3fb4a0c78"
+  },
+  {
+   "path": "debs/libgdk-pixbuf2.0-common_2.42.12+dfsg-4+deb13u1_all.deb",
+   "sha256": "9f0c64e33cf5bb3226a5a6ddf630dd76530596e476e6b47a8b27da444ff43a03"
+  },
+  {
+   "path": "debs/libgl1-mesa-dri_26.2.2-1~bpo13+0~rpt1_arm64.deb",
+   "sha256": "6d88cce6edb8b2266f366140f73a5fee8c31b014b47135d8504eb6709356feb1"
+  },
+  {
+   "path": "debs/libgl1_1.7.0-1+b2_arm64.deb",
+   "sha256": "7943f99962aa3316515760bf44e66f0c15a3c813ad750b784b43e319fa2e6003"
+  },
+  {
+   "path": "debs/libglvnd0_1.7.0-1+b2_arm64.deb",
+   "sha256": "29ec7b8cf1c9a47055de643eb0a1921854e762b4789a7f3bc3b0dea498fd4da9"
+  },
+  {
+   "path": "debs/libglx-mesa0_26.2.2-1~bpo13+0~rpt1_arm64.deb",
+   "sha256": "4a658281fb3c8126fbde7947b3311bd6cf1c44834f2ef170af7194757ceba44a"
+  },
+  {
+   "path": "debs/libglx0_1.7.0-1+b2_arm64.deb",
+   "sha256": "0245aafaac5e68ca9511f23c5bebf010327e63c65790c03dbb80bf14d485956d"
+  },
+  {
+   "path": "debs/libgme0_0.6.3-7+b2_arm64.deb",
+   "sha256": "800d180f08f676cfad4db078c10e0b304dc54d62c05a7f32d79896879a0a3eaf"
+  },
+  {
+   "path": "debs/libgraphite2-3_1.3.14-2+deb13u1_arm64.deb",
+   "sha256": "b0c3414b113de62be1dc28fa2c899ac0856256e2f094d92c36c3275a5053311a"
+  },
+  {
+   "path": "debs/libgsm1_1.0.22-1+b2_arm64.deb",
+   "sha256": "dc9a761c9cca7d886db0474fe28b9697e72d376fa2112590cf5f7ed737944f6c"
+  },
+  {
+   "path": "debs/libharfbuzz0b_10.2.0-1+deb13u1_arm64.deb",
+   "sha256": "3ff928f981b54b491ee12e4cf68558cc5d61c652bdab276cd4c4c3fbbcee16ca"
+  },
+  {
+   "path": "debs/libhwy1t64_1.2.0-2+b2_arm64.deb",
+   "sha256": "05d6a112f091902db1155b8ebf355e78f92889d97394eef242736ec326199da3"
+  },
+  {
+   "path": "debs/libjxl0.11_0.11.2-0.1~deb13u3_arm64.deb",
+   "sha256": "b2a7a44db46cc9519b8ec60ee4c274e2bf1d2029a0d591e57e2885dced4e4080"
+  },
+  {
+   "path": "debs/liblcms2-2_2.16-2+deb13u2_arm64.deb",
+   "sha256": "6636997fc488327a8d0951a038df6e5178a52b3f5e5cc2386d42655621f5672d"
+  },
+  {
+   "path": "debs/liblilv-0-0_0.24.26-1_arm64.deb",
+   "sha256": "eb14f680a7c639a9dce34928a2a560468baa25f03a79cb76b6acc9b35226b54e"
+  },
+  {
+   "path": "debs/libllvm19_19.1.7-3+b1_arm64.deb",
+   "sha256": "8a48e1a49f7fcc3be74e697767d72902f4b03041401d1529bcfad1849df39148"
+  },
+  {
+   "path": "debs/libmbedcrypto16_3.6.6-0.1~deb13u1_arm64.deb",
+   "sha256": "5b30446d96fac946849bfc74c67c85b0d30c1f760eea0bd08a2ee14956f304c7"
+  },
+  {
+   "path": "debs/libmp3lame0_3.100-6+b3_arm64.deb",
+   "sha256": "ed3563722129ffa4def03b7af0b589fa20eef972bdcc4599202ddb1ac654c58e"
+  },
+  {
+   "path": "debs/libmpeg2-4_0.5.1-9+b3_arm64.deb",
+   "sha256": "977960192c6eb6b6a5e58de612bfb4a22bf3d714cd77cabce40c62caaedc942f"
+  },
+  {
+   "path": "debs/libmpg123-0t64_1.32.10-1+deb13u1_arm64.deb",
+   "sha256": "d284df39ff3b64f1cdf274352613c52534c55eed82c3a2ff0fc7ba154acd7bf0"
+  },
+  {
+   "path": "debs/libmysofa1_1.3.3+dfsg-1_arm64.deb",
+   "sha256": "691ae51a7b5643fb9f7c81c917d12c1dc71c74eb1cf2073f0d3f71141fbffa8a"
+  },
+  {
+   "path": "debs/libnorm1t64_1.5.9+dfsg-3.1+b2_arm64.deb",
+   "sha256": "5e814795f4cb6ba23c5bb091ecabe1ef1e3336f128e2bacf0f64ad593f918168"
+  },
+  {
+   "path": "debs/libopenjp2-7_2.5.3-2.1~deb13u2_arm64.deb",
+   "sha256": "e27f4d03d4b5836473be3210b16567aa9435a337f8c4537868773a123f9c9e57"
+  },
+  {
+   "path": "debs/libopenmpt0t64_0.7.13-1+b1_arm64.deb",
+   "sha256": "29e78a3abedd46155a241d64eba0baae5a7a4ba836faac412da94954cc56be7e"
+  },
+  {
+   "path": "debs/libopus0_1.5.2-2_arm64.deb",
+   "sha256": "1d980e8a4717074805a98dbe07671cb3bee068c25709315f3de836980c629836"
+  },
+  {
+   "path": "debs/libpango-1.0-0_1.56.3-1_arm64.deb",
+   "sha256": "5c5c6061afdff84a76418c9c2cf8bd4f3b6174aa7bf39ddf58bfa7702a59d3f2"
+  },
+  {
+   "path": "debs/libpangocairo-1.0-0_1.56.3-1_arm64.deb",
+   "sha256": "1bb68c8dfa0f829cf9834a2dec4af49f82a8dd211e3a9c1fa0446b3f32fa6991"
+  },
+  {
+   "path": "debs/libpangoft2-1.0-0_1.56.3-1_arm64.deb",
+   "sha256": "f0e32d579c7b40dee0ed43355dd832857cf5d477cfb50b0bda56097eca8a81c0"
+  },
+  {
+   "path": "debs/libpgm-5.3-0t64_5.3.128~dfsg-2.1+b1_arm64.deb",
+   "sha256": "6db0a545d79fd0c5009fa4c31bd90beae50fb02b413ec71bb0fc482219b83a9f"
+  },
+  {
+   "path": "debs/libpipewire-0.3-0t64_1.4.2-1+rpt4_arm64.deb",
+   "sha256": "78312f40f7d260173203f462251a8a73dccc5900ddef7cbbbe07ea4c8905b96f"
+  },
+  {
+   "path": "debs/libpixman-1-0_0.46.4-1+rpt1_arm64.deb",
+   "sha256": "94742a65e7ada9fbc6f52a1f859d1d83ef6e5d9dccb9cf6b34fb40c5fc7677e5"
+  },
+  {
+   "path": "debs/libportmidi0_217-6.1+b4_arm64.deb",
+   "sha256": "4d6f82e2146a8e6fe6e2de53be95c4e2abac02eaebe60e1ab53d2d4625d1350f"
+  },
+  {
+   "path": "debs/libpulse0_17.0+dfsg1-2+rpt1_arm64.deb",
+   "sha256": "15c4231e1484b2a1c7bb791415fd6cddc554a23348f20aa4c46aa9b2dd011a36"
+  },
+  {
+   "path": "debs/librabbitmq4_0.15.0-1+deb13u2_arm64.deb",
+   "sha256": "5407e9b4347ac405211c5719898aedcaf2d701c45977ec49704f3dc2ad281e2f"
+  },
+  {
+   "path": "debs/librav1e0.7_0.7.1-9+b2_arm64.deb",
+   "sha256": "1b81b3c3494033bb32573442ce49f253dc76e262de8b28d4bfa3f433cd9783d4"
+  },
+  {
+   "path": "debs/librist4_0.2.11+dfsg-1_arm64.deb",
+   "sha256": "c0614f5e8696430801e201d958bc00d442008e9bd58915313a314cac475b295c"
+  },
+  {
+   "path": "debs/librsvg2-2_2.60.0+dfsg-1+deb13u1_arm64.deb",
+   "sha256": "f0ce936ee724964f62d7c31a4f826a5f13e13b7d44cd44ccae2f241c1b08ad2b"
+  },
+  {
+   "path": "debs/libsdl3-0_3.2.10+ds-1_arm64.deb",
+   "sha256": "f861e182cab490e2a6ff20de414458a834394e4131c48080d903304f785c0b71"
+  },
+  {
+   "path": "debs/libsdl3-image0_3.2.4+ds-1+deb13u1_arm64.deb",
+   "sha256": "76f5318e60e3fd9077678cf36cbed149fa55e6915d16c3a8dcf0abc83f1973ec"
+  },
+  {
+   "path": "debs/libsensors-config_3.6.2-2_all.deb",
+   "sha256": "3056da80c7d963af795dab480ab6f6f4b154ad4ac39f522dc52d17c834fea253"
+  },
+  {
+   "path": "debs/libsensors5_3.6.2-2_arm64.deb",
+   "sha256": "7469f1ccce8afdba33d3b11847d0ecdf2221805a0694dee21ee4d622e8f72145"
+  },
+  {
+   "path": "debs/libserd-0-0_0.32.4-1_arm64.deb",
+   "sha256": "01205ff5c346ae395ec3066034e151e8100e46f596afc65d9bba7a80cce129ae"
+  },
+  {
+   "path": "debs/libserialport0_0.1.2-1_arm64.deb",
+   "sha256": "f4939ae96f7f3c8f59068162e9fde5ca63a6d1179b697ea5ece5533765800033"
+  },
+  {
+   "path": "debs/libshine3_3.1.1-2+b2_arm64.deb",
+   "sha256": "d54a5f7154c0e826338bb18c34c69de9a036f3264adf59cef39bc30f07baa6d0"
+  },
+  {
+   "path": "debs/libsnappy1v5_1.2.2-1_arm64.deb",
+   "sha256": "b307da3076ad257cd8adec2faa5ad051fa9bd54edc1f473ecaf69b1456fdebd2"
+  },
+  {
+   "path": "debs/libsndfile1_1.2.2-2+deb13u1_arm64.deb",
+   "sha256": "6c94f17e1f02778f98b96bb9ae19ff30085662e96685898a018c26bfd4bfc3f2"
+  },
+  {
+   "path": "debs/libsndio7.0_1.10.0-0.1_arm64.deb",
+   "sha256": "a3cff916145efe7473c67c44b0bbde94989551b47cacfda203d878d0e2c3d2a5"
+  },
+  {
+   "path": "debs/libsodium23_1.0.18-1+deb13u1_arm64.deb",
+   "sha256": "d94fc46204b65a965e356ebc19f9f88aeb20a9c777cb9a6569e75f75d0ae5523"
+  },
+  {
+   "path": "debs/libsord-0-0_0.16.18-1_arm64.deb",
+   "sha256": "d2a648495869e680c7ecd107dad0c716590fec427817db703f3bebf719b37f59"
+  },
+  {
+   "path": "debs/libsoxr0_0.1.3-4+b2_arm64.deb",
+   "sha256": "1dc754a7d84c5a79d9cdd04c85760e735e2fe7cec7535f9991251a5a8ab851a1"
+  },
+  {
+   "path": "debs/libspa-0.2-modules_1.4.2-1+rpt4_arm64.deb",
+   "sha256": "46a3c38f3d496c06f4c9e3068394649090da89fc54b95218d39993040b98ded0"
+  },
+  {
+   "path": "debs/libspeex1_1.2.1-3_arm64.deb",
+   "sha256": "20e12b5754792b5d2c4386c4f405d652c4d6f91ec4e6f68b0c70a48bf3095a28"
+  },
+  {
+   "path": "debs/libsratom-0-0_0.6.18-1_arm64.deb",
+   "sha256": "5ebc866e3632741477cc225a3a927ddacae432238494e73c50b07c00420d2406"
+  },
+  {
+   "path": "debs/libsrt1.5-gnutls_1.5.4-1+deb13u1_arm64.deb",
+   "sha256": "9241d9103847ec59e96699533daceb4ac95d18d7d652df6e56218f2d77f1e8c9"
+  },
+  {
+   "path": "debs/libssh-4_0.11.5-0+deb13u1_arm64.deb",
+   "sha256": "bc70c157a3850050e256d293be0e5a851b1f98ae6dd4e31b2c7d237b670eb1c9"
+  },
+  {
+   "path": "debs/libsvtav1enc2_2.3.0+dfsg-1_arm64.deb",
+   "sha256": "9b7de4fcdaba3fdc0fe8eed956cd5ce270158c858493db901bfcb9bd4a432fb6"
+  },
+  {
+   "path": "debs/libswresample5_7.1.5-0+deb13u1+rpt2_arm64.deb",
+   "sha256": "d969ce1ec48ca42b1fdd4d4e7c9d7c4d652be30158bcefe5b9b0914b568ac630"
+  },
+  {
+   "path": "debs/libswscale8_7.1.5-0+deb13u1+rpt2_arm64.deb",
+   "sha256": "22dd42112e0c163be7a75621e540ba6f33b81045c2f5bcbc9b420ea3cf751afb"
+  },
+  {
+   "path": "debs/libthai-data_0.1.29-2_all.deb",
+   "sha256": "fd38d40602834d510a29140bd27fd48485105e834f03dccab1c02e2edaa794dd"
+  },
+  {
+   "path": "debs/libthai0_0.1.29-2+b1_arm64.deb",
+   "sha256": "4ea5b9d09449023a30e4d5237b8a69e19d6b3e576e36570818c87a093e2b5eec"
+  },
+  {
+   "path": "debs/libtheoradec1_1.2.0~alpha1+dfsg-6_arm64.deb",
+   "sha256": "e233aa1a1d345e6db838040f0ced479c5cda3fcc04d6637468275c398f585924"
+  },
+  {
+   "path": "debs/libtheoraenc1_1.2.0~alpha1+dfsg-6_arm64.deb",
+   "sha256": "b09a5ad17f11b0f90b7d0f0262dc363b6ec59625a9b55d1cdc2a6feb7c7f349e"
+  },
+  {
+   "path": "debs/libtwolame0_0.4.0-2+b2_arm64.deb",
+   "sha256": "e83981a1c10e43b09c1b8b6624a2d814b7d0c965f0d9ddf771606feb7cd29b72"
+  },
+  {
+   "path": "debs/libudfread0_1.1.2-1+b2_arm64.deb",
+   "sha256": "badab108ac953987ced64c4b25a38c75ac391e6f4815cca4880619f313b4da22"
+  },
+  {
+   "path": "debs/libva-drm2_2.22.0-3_arm64.deb",
+   "sha256": "18e556968a0f4bffd321d67b01fa5e445177c0849bef96a741aa7ed3a11dcc8b"
+  },
+  {
+   "path": "debs/libva-x11-2_2.22.0-3_arm64.deb",
+   "sha256": "a2c63e408e4adaa0ee8da79e2c439cc2b0b644460dba84637e8cef466ed6c884"
+  },
+  {
+   "path": "debs/libva2_2.22.0-3_arm64.deb",
+   "sha256": "7a5e7cbaaddf1f39973c10f9daae6769b704e0d6d72fe752d64003929272cbcf"
+  },
+  {
+   "path": "debs/libvdpau1_1.5-3+b1_arm64.deb",
+   "sha256": "2ec2bf9930e402330e6b165645cdcb1e5b8528ac9782651d0217e4f827bf1451"
+  },
+  {
+   "path": "debs/libvorbisenc2_1.3.7-3_arm64.deb",
+   "sha256": "4a477b3ae19ba50a288f036c8176d61cd9f3836ba65472f88b95e3f6b3bf2dd3"
+  },
+  {
+   "path": "debs/libvorbisfile3_1.3.7-3_arm64.deb",
+   "sha256": "6eea69ab6f851955736abe56002551e304eb36cffdc9e9a1a21fb578ca3632ff"
+  },
+  {
+   "path": "debs/libvpx9_1.15.0-2.1+deb13u1_arm64.deb",
+   "sha256": "96b7d384a6f090cf11f4634a9ad443a767ce7fa930b9b3136c27886a17e21d41"
+  },
+  {
+   "path": "debs/libvulkan1_1.4.309.0-1_arm64.deb",
+   "sha256": "f5f576d8b9e5703702a9f3254c8c5d130bef17da9db4aecd46ba86cec7a08930"
+  },
+  {
+   "path": "debs/libwayland-client0_1.24.0-2~bpo13+1~rpt1_arm64.deb",
+   "sha256": "6ba34ab53ddf12d8d959512a7bbf467cd8f5a2eb6d2ff02f665769c18a2dcc68"
+  },
+  {
+   "path": "debs/libwayland-cursor0_1.24.0-2~bpo13+1~rpt1_arm64.deb",
+   "sha256": "67b14a3e2eaca4214ffa02a57f644ecd1169fb493c5b8edd65f54b8d8bda49d9"
+  },
+  {
+   "path": "debs/libwayland-egl1_1.24.0-2~bpo13+1~rpt1_arm64.deb",
+   "sha256": "ab55b3d447d751a60e137947c23b62b5395b2a0cf90ed3da43b7c78cc457c1eb"
+  },
+  {
+   "path": "debs/libwayland-server0_1.24.0-2~bpo13+1~rpt1_arm64.deb",
+   "sha256": "05858aaf843a23ce4de7f2f5884a0689967ab2af23ed1ae9086a08977155845f"
+  },
+  {
+   "path": "debs/libwebpdemux2_1.5.0-0.1_arm64.deb",
+   "sha256": "3ce742d0420c9b4c7f875a150eebed63e2e2fb1c7191edb0bdd482c28cc52f51"
+  },
+  {
+   "path": "debs/libwebpmux3_1.5.0-0.1_arm64.deb",
+   "sha256": "84a98af076003c5a502afb95b2a1412e14dbe029e10272ddcdf2ac6f75d8c0d1"
+  },
+  {
+   "path": "debs/libwebrtc-audio-processing-1-3_1.3-3+b1_arm64.deb",
+   "sha256": "b3222b13cac750380a6f6800aace801fbc0587ab1fa23a4aa2ce307ed0391ae2"
+  },
+  {
+   "path": "debs/libx11-xcb1_1.8.12-1_arm64.deb",
+   "sha256": "1eafaa4295e129d6a81e742ab8da43194daa6b916199923c8cef8ad358985894"
+  },
+  {
+   "path": "debs/libx264-164_0.164.3108+git31e19f9-2+b1_arm64.deb",
+   "sha256": "e062e2ed96d60fdc3ebba5714957e4bfc76e1c87ff6cfa7c022cea3052573f94"
+  },
+  {
+   "path": "debs/libx265-215_4.1-2_arm64.deb",
+   "sha256": "c786ffe37393781b39fa99100aaa93891436dc0d8e0a4a5209cc1102679ebe22"
+  },
+  {
+   "path": "debs/libxcb-dri3-0_1.17.0-2+b1_arm64.deb",
+   "sha256": "247bf758dd78d6c285fdd47942ddacf4a3189fd50de4f0891c9bd9aea12da3a1"
+  },
+  {
+   "path": "debs/libxcb-glx0_1.17.0-2+b1_arm64.deb",
+   "sha256": "a0d96ab5faea8fa1f3e095d6236597622a6b763f061f8f9fa23b77733608fdbc"
+  },
+  {
+   "path": "debs/libxcb-present0_1.17.0-2+b1_arm64.deb",
+   "sha256": "73521d715554a2230901d1d480465d6358b3083a5ce8801639595ffde6f31441"
+  },
+  {
+   "path": "debs/libxcb-randr0_1.17.0-2+b1_arm64.deb",
+   "sha256": "dbeb78d1d032959fe65548758ab12bfc6bb5919ec2984c3d871496b52aef929a"
+  },
+  {
+   "path": "debs/libxcb-render0_1.17.0-2+b1_arm64.deb",
+   "sha256": "7d6faf0afad0b27a047bbf320bf80999e94b7e6a0f73e42069e8b08958910466"
+  },
+  {
+   "path": "debs/libxcb-shm0_1.17.0-2+b1_arm64.deb",
+   "sha256": "e9e871dc5d2f9265eb5d3028f0d0545cb6f8b748a68997b4c43f5a9416c7ead7"
+  },
+  {
+   "path": "debs/libxcb-sync1_1.17.0-2+b1_arm64.deb",
+   "sha256": "eb428ac77daac9e5eea8a4e9ba48d1d78cc8ca400e415c8e4628cc729c6f4749"
+  },
+  {
+   "path": "debs/libxcb-xfixes0_1.17.0-2+b1_arm64.deb",
+   "sha256": "19cdb8502827bc010993e69eaba09c670024976f7edd35b2b504bd646b141b0a"
+  },
+  {
+   "path": "debs/libxcursor1_1.2.3-1_arm64.deb",
+   "sha256": "76d13a27c444f88c44cf50e209e8f9dc5088da330680bd35f6eba0430662a4b5"
+  },
+  {
+   "path": "debs/libxfixes3_6.0.0-2+b4_arm64.deb",
+   "sha256": "d29134cbb9230a50ba1d097743d4d4fcf7826c6b48a2d8a303a0e3fc20b837e6"
+  },
+  {
+   "path": "debs/libxi6_1.8.2-1_arm64.deb",
+   "sha256": "b7148d371c908fa81bf45153fdcb3e7d178fe11e15f9907e29ce6e9ed9aaad24"
+  },
+  {
+   "path": "debs/libxkbcommon0_1.13.1-1~bpo13+1+rpt1_arm64.deb",
+   "sha256": "b9839efc034dfca74ec9457fec194f1b97e2a4e422c9fb892eb36781b572410e"
+  },
+  {
+   "path": "debs/libxrandr2_1.5.4-1+b3_arm64.deb",
+   "sha256": "607a23d6d2cb920e000b24870531a86821cf4e141a4eb0bf38212b47b892d597"
+  },
+  {
+   "path": "debs/libxrender1_0.9.12-1_arm64.deb",
+   "sha256": "28396c96e460288d5851913121b053609f7ff34f996d78d7a38c1d2b6ab9f006"
+  },
+  {
+   "path": "debs/libxshmfence1_1.3.3-1_arm64.deb",
+   "sha256": "34b494c83cebcf138d1f87c2cbdd5ee8efe9da2befbd69c2a025b0e214c64d2d"
+  },
+  {
+   "path": "debs/libxss1_1.2.3-1+b3_arm64.deb",
+   "sha256": "ffbdfe7ee0644984dfe7577a22edee74f1e3b2dd76721417c8e45aed9388a220"
+  },
+  {
+   "path": "debs/libxvidcore4_1.3.7-1+b2_arm64.deb",
+   "sha256": "82ec04ee5561e5f01e0c93c4a7feb68252cd14a2cddf6622c006a01ea6bb0471"
+  },
+  {
+   "path": "debs/libxxf86vm1_1.1.4-1+b4_arm64.deb",
+   "sha256": "9ed4bb25e311486207eeaa609decc3905aa9071c4c7f2a605829e3a79ec88b83"
+  },
+  {
+   "path": "debs/libz3-4_4.13.3-1_arm64.deb",
+   "sha256": "29a7b924a5a38c9ac4e2a64aa11586a9c54f26b579b18e4f75adf8f7c1106e45"
+  },
+  {
+   "path": "debs/libzix-0-0_0.6.2-1_arm64.deb",
+   "sha256": "6848ea4b2911b670c8b7bf106c932eabd715c56819af4998f77a09a6be69a479"
+  },
+  {
+   "path": "debs/libzmq5_4.3.5-1+b3_arm64.deb",
+   "sha256": "6a83a68a091963c59b00ea68b5ed78180206fb2d93fe32432c5be5dc9d624d1f"
+  },
+  {
+   "path": "debs/libzvbi-common_0.2.44-1_all.deb",
+   "sha256": "98ab88223df2380c79d048c6bd276449c64603eef4e43aa99d52406877ebee59"
+  },
+  {
+   "path": "debs/libzvbi0t64_0.2.44-1_arm64.deb",
+   "sha256": "ce0fa37ceeffcf844bbee9b00eba8e8dcffc1bf1a772007c8710ac6491598941"
+  },
+  {
+   "path": "debs/mesa-libgallium_26.2.2-1~bpo13+0~rpt1_arm64.deb",
+   "sha256": "a493e062b2b3834a2843d5d4ff83c11330e47bff95ea8b980dc953a2ca363089"
+  },
+  {
+   "path": "debs/ocl-icd-libopencl1_2.3.3-1_arm64.deb",
+   "sha256": "eadc1b9341c36dbac2ad2f1ae159f55533512cec888425d53e42abacd814742b"
+  },
+  {
+   "path": "debs/x11-common_7.7+24+deb13u1_all.deb",
+   "sha256": "57a981938506b26dc552f19cafeaa8c04e9b59dc7508509151f8507a9d4e5f24"
+  },
+  {
+   "path": "debs-egl/libegl-mesa0_26.2.2-1~bpo13+0~rpt1_arm64.deb",
+   "sha256": "d53b4297db3a794034d387293b7d234be728640042d18e8be4ce736f6470ab21"
+  },
+  {
+   "path": "debs-egl/libegl1_1.7.0-1+b2_arm64.deb",
+   "sha256": "b663ad1777df7ed8e320f897bbf678c2baef67f5458fe4a43195ac9b444c7afb"
+  },
+  {
+   "path": "debs-egl/libgles2_1.7.0-1+b2_arm64.deb",
+   "sha256": "c727fa1746ed3e343d1a2917932363d71e961eacca0443a1e2296587e03c47fb"
+  }
+ ]
+}

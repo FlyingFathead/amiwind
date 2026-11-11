@@ -75,6 +75,11 @@ typedef struct {
 #define AW_DIAL_RANKS 10           /* a faction's rank names on disk, AW_DIAL_FACTION_ID bytes each */
 /* The file offset of faction FACTION's rank RANK name (0..9), -1 when the table has no such faction. */
 long AW_DialRankAt(const aw_dial_t *d,const char *faction,int rank);
+/* FACTION-STATS-PAGE-64: the needs of FACTION's rank RANK (1..9) from its requirement row ROW (AW_DIAL_RANK_REQ
+ * bytes, as read at AW_DialRankReqAt): ATTRIBUTE[2] the faction's two attributes (0..7), NEED[5] attribute 1,
+ * attribute 2, one favoured skill, two favoured skills, faction reputation; 0 when RANK is out of range */
+long AW_DialRankReqAt(const aw_dial_t *d,const char *faction);
+int AW_DialRankNeeds(const unsigned char *row,int rank,unsigned char *attribute,short *need);
 /* RankRequirement (FACTION-RANK-58; the rule of OpenMW's filter.cpp and hasFactionRankSkillRequirements /
  * hasFactionRankReputationRequirements, our own code): for the player at RANK (-1 not a member) of the speaker's
  * FACTION, the next rank's requirements read from disk (AW_DIAL_RANK_REQ bytes, nothing kept): +1 when the two

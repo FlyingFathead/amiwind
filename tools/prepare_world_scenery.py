@@ -150,8 +150,13 @@ def convert_region_cached(task):
 
 def unit_cache(scenery, palette):
     """(the region unit cache or None, the inputs every region shares, by content)."""
-    from pass_cache import UnitCache
-    cache = UnitCache.open('world-scenery-region', {}, __file__)
+    # keyed on what makes a region (convert_region and its reach), not the whole file (UNIT-KEY-WHOLE-FILE-63). The
+    # digest calls stay written here, so this stage's own key covers what the cache key reads.
+    from unit_store import bake_keyed_cache
+    from pass_cache import covered_lines, previous_digests, source_digest
+    cache = bake_keyed_cache('world-scenery-region', {}, source_digest((__file__, 'convert_region')),
+                             previous_digests((__file__, 'convert_region')), (__file__,),
+                             covered_lines((__file__, 'convert_region')))
     if cache is None:
         return None, None
     from build_parallel import sha256_file

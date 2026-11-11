@@ -1,6 +1,6 @@
 # MiniWind: the test ground
 
-_Last updated with AmiWind v0.0.57-dev1 (30 October 2026)._
+_Last updated with AmiWind v0.0.64-dev1 (10 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -111,6 +111,7 @@ preset, [Build recipes](BUILD_RECIPES.md)); the builder makes one
 | `vivec-city-chim` | `--miniwind-vivec-city-chim` | All of Vivec on CHIM, one frame: cantons, Temple, frame edge |
 | `vivec-city-exterior` | `--miniwind-vivec-city-exterior` | Vivec city on CHIM, exterior: mushrooms, HUD, inspect |
 | `vivec-palace` | `--miniwind-vivec-palace` | Palace of Vivec: Vivec meditating, interior creatures |
+| `akulakhan-chamber` | `--miniwind-akulakhan-chamber` | Akulakhan's Chamber: the Heart of Lorkhan and Dagoth Ur (Balmora with room batch 19; type `dbg tp heartchamber`) |
 | `opening-ship` | `--miniwind-opening-ship` | Opening ship: lantern and ship lighting check |
 | `animkit` | `--miniwind-animkit` | Animation kit: walk and run with a companion and hostiles |
 | `anim-stage` | `--miniwind-anim-stage` | Animation stage: skeletal NPCs play every shared-table group |

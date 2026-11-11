@@ -110,8 +110,8 @@ A cell has exactly one status. Strongest first:
 
 | Status | Map | Meaning |
 | --- | --- | --- |
-| Cell complete | bright green, solid white border around a run of such cells | Terrain and every placed object converted, actors included, every measured audit passed, and the cell is lit like the original |
-| Terrain complete | bright green | The same, except that actors (NPCs, creatures) may still be deferred |
+| Cell complete (shown as "Fully approved cells") | bright green, solid white border around a run of such cells | Not a single polygon off, and approved by the project maintainer: terrain and every placed object converted, actors included, every measured audit passed, and the cell is lit like the original |
+| Terrain complete (shown as "Fully approved terrain") | bright green | The same, except that actors (NPCs, creatures) may still be deferred |
 | Cell complete, awaiting lighting | bright green with cyan stripes, white border | Everything cell complete needs except the lighting audit; counts as done |
 | Terrain complete, awaiting lighting | bright green with cyan stripes | Everything terrain complete needs except the lighting audit; counts as done |
 | Maintainer-approved, Playtested | gold, teal | Set by the maintainer for a converted cell that passes |

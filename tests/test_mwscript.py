@@ -2413,6 +2413,60 @@ class ItemAndStartSpellRuleTests(unittest.TestCase):
                                'all 3 10 11 14', 'max2 2 11 14', 'int6 2 10 12', 'weak 3 11 12 14'])
 
 
+RESIST_RULES_HARNESS = r'''
+#include <stdio.h>
+#include "aw_cast.h"
+int main(void){
+    int r,w,s,k;static const int fx[]={16,14,15,27,23,17,45,37,7,0,75,133};
+    for(k=0;k<(int)(sizeof(fx)/sizeof(fx[0]));k++){
+        int ok=AW_CastResistEffects(fx[k],&r,&w,&s);printf("%d:%d %d %d %d\n",fx[k],ok,r,w,s);
+    }
+    /* a Nord's Immune to Frost 100: in full whatever the roll; a Dunmer's Resist Fire 75 with the roll beyond X */
+    printf("immune %.1f %.1f\n",AW_CastResistance(100,30,40,1.25f,100,0,0),AW_CastResistance(100,30,40,1.25f,100,99,0));
+    printf("dunmer %.1f\n",AW_CastResistance(75,30,40,1.25f,100,99,0));
+    /* Willpower 30, Luck 40, fatigue 1.25: X = 42.5 x 0.5 = 21.25; a roll of 10 resists 10/21.25 = 0.47 more */
+    printf("roll %.2f\n",AW_CastResistance(0,30,40,1.25f,100,10,0));
+    /* a High Elf's Weakness to Fire 50: -50 (more than the full damage); a NoMagnitude effect is all or nothing */
+    printf("weak %.1f nomag %.1f %.1f\n",AW_CastResistance(-50,30,40,1.25f,100,99,0),AW_CastResistance(0,30,40,1.25f,100,5,1),
+           AW_CastResistance(0,30,40,1.25f,100,50,1));
+    return 0;
+}
+'''
+
+
+@unittest.skipIf(os.name == 'nt', 'native fixtures run in the Linux Docker gate')
+@unittest.skipUnless(shutil.which('cc'), 'a Linux C compiler is required')
+class ResistRuleTests(unittest.TestCase):
+    """RACE-RESIST-NOT-ON-SPELL-DAMAGE-64: which effects resist which (the research table OpenMW 0.53 loadmgef.cpp
+    follows) and the resistance of a landing (spellresistance.cpp getEffectResistance), natively."""
+
+    def test_resist_table_and_sum(self):
+        tmp = Path(tempfile.mkdtemp(prefix='aw-resist-'))
+        try:
+            (tmp / 'h.c').write_text(RESIST_RULES_HARNESS, encoding='utf-8')
+            src = ROOT / 'engine/aga/src'
+            built = subprocess.run(['cc', '-std=gnu89', '-Wall', '-Werror', '-Wshadow', '-fsanitize=undefined,address',
+                                    '-fno-sanitize-recover=all', '-I' + str(src), str(tmp / 'h.c'),
+                                    str(src / 'aw_cast_rules.c'), str(src / 'aw_effects.c'), '-lm', '-o', str(tmp / 'h')],
+                                   capture_output=True, text=True)
+            self.assertEqual(built.returncode, 0, built.stdout + built.stderr)
+            out = subprocess.run([str(tmp / 'h')], capture_output=True, text=True, check=True).stdout.splitlines()
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+        self.assertEqual(out[:12], ['16:1 91 29 6', '14:1 90 28 4', '15:1 92 30 5', '27:1 97 35 -1', '23:1 93 31 -1',
+                                    '17:1 93 31 -1', '45:1 99 -1 -1', '37:1 42 -1 -1', '7:1 93 31 -1', '0:0 -1 -1 -1',
+                                    '75:0 -1 -1 -1', '133:1 94 32 -1'])
+        self.assertEqual(out[12], 'immune 100.0 100.0')
+        self.assertEqual(out[13], 'dunmer 75.0')
+        self.assertEqual(out[14], 'roll 0.47')
+        self.assertEqual(out[15], 'weak -50.0 nomag 100.0 0.0')
+        host = (ROOT / 'engine/aga/src/aw_mwhost.c').read_text(encoding='utf-8')
+        land = host[host.index('int AW_MwscriptLand('):host.index('#ifdef AW_COMBAT_EFFECT_MAGNITUDE')]
+        self.assertIn('AW_CastResistEffects(e[i].effect,&rs,&wk,&sh)', land)
+        self.assertIn('AW_ActorPassiveMagnitude(a,rs)', land)   # the race's and birthsign's abilities count
+        self.assertIn('if(resist>=100.0f){', land)
+
+
 @unittest.skipIf(os.name == 'nt', 'native fixtures run in the Linux Docker gate')
 @unittest.skipUnless(shutil.which('cc'), 'a Linux C compiler is required')
 class CastRuleTests(unittest.TestCase):

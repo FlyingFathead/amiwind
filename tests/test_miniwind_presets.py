@@ -98,7 +98,7 @@ class Table(unittest.TestCase):
     def test_every_preset_parses(self):
         rows = mp.presets()
         self.assertEqual(sorted(row['name'] for row in rows),
-                         ['anim-stage', 'animkit', 'balmora', 'balmora-exterior', 'combat-playground', 'demowind',
+                         ['akulakhan-chamber', 'anim-stage', 'animkit', 'balmora', 'balmora-exterior', 'combat-playground', 'demowind',
                           'halloween', 'lava-pools', 'magic', 'opening-ship',
                           'redmountain',
                           'seyda-chim', 'urshilaku-camp', 'vivec-arena-chim', 'vivec-arena-pit', 'vivec-city-chim',
@@ -113,6 +113,11 @@ class Table(unittest.TestCase):
         self.assertEqual(playground['boot_commands'], ['dbg playground modes', 'dbg playground duel'])
         palace = mp.find('vivec-palace')         # v0.0.42: Vivec in his palace (INTERIOR-CREATURES-MISSING-41)
         self.assertEqual(palace['start'], 'interior:Vivec, Palace of Vivec')
+        # v0.0.64: the Heart Chamber (HEART-OF-LORKHAN-LOOK-62): a batch room, batch 19, reached by dbg tp heartchamber
+        # (typed by the session: an arrival teleport raced the session's start check)
+        chamber = mp.find('akulakhan-chamber')
+        self.assertEqual((chamber['room_batches'], chamber['boot_commands']), ('19', []))
+        self.assertEqual(mp.row_of(mp.recipe_of(chamber)), chamber)
         seyda = mp.find('seyda-chim')            # v0.0.36-dev5: Seyda Neen CHIM-native, starts at its arrival
         self.assertEqual(seyda['start'], 'seyda_neen')
         ship = mp.find('opening-ship')

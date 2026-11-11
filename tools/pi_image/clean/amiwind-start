@@ -1,0 +1,23 @@
+#!/bin/bash
+# Before Amiberry takes the screen: wait for kick.rom and an AmiWind-v*.hdf on the AMIWIND drive, link the newest
+# image, and show "Starting AmiWind v<version> on Amiberry <version> on the Raspberry Pi <model>" on tty1.
+T=/dev/tty1; D=/opt/amiwind/data
+cols=$(stty size < "$T" 2>/dev/null | cut -d' ' -f2); line=$(printf '%*s' "${cols:-80}" '' | tr ' ' '-')
+say() { printf '\033[2J\033[H\n%s\n  %s\n%s\n' "$line" "$1" "$line" > "$T"; }
+while :; do
+  hdf=$(ls "$D"/AmiWind-v*.hdf 2>/dev/null | sort -V | tail -n 1)
+  if [ -z "$hdf" ]; then
+    say "No AmiWind-v*.hdf on the AMIWIND drive: copy your AmiWind image onto it (checking again every 10 s)."
+  elif [ ! -f "$D/kick.rom" ]; then
+    say "Copy your Kickstart 3.1 ROM (A1200, 524288 bytes) onto the AMIWIND drive as kick.rom, then put the drive back (checking again every 10 s)."
+  else
+    break
+  fi
+  sleep 10
+done
+ln -sfn "$hdf" /opt/amiwind/current.hdf
+aw=$(basename "$hdf" .hdf); aw=${aw#AmiWind-v}
+ab=$(dpkg-query -W -f='${Version}' amiberry 2>/dev/null | cut -d+ -f1)
+pi=$(tr -d '\0' < /proc/device-tree/model 2>/dev/null | sed 's/^Raspberry Pi //')
+say "Starting AmiWind v$aw on Amiberry $ab on the Raspberry Pi $pi"
+sleep 2

@@ -212,8 +212,6 @@ WHOLE_FILE_KEYS = frozenset({
     ('import_town.py', "'town-region'"),
     ('prepare_player_fp_parts.py', 'UNIT_CACHE'),
     ('prepare_player_parts.py', 'UNIT_CACHE'),
-    ('prepare_world_flora.py', "'world-flora-region'"),
-    ('prepare_world_scenery.py', "'world-scenery-region'"),
     ('skeletal_actor.py', 'TABLE_UNIT'),
     ('tp_places_lut.py', "'tp-places-table'"),
 })

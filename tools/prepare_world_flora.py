@@ -686,9 +686,15 @@ def prepare(terrain, base, flora, palette, out, jobs=None, only=None, aggregate_
         pending.append(entry)
     (out/'resume-validation.json').write_text(json.dumps(adoption,indent=2)+'\n',encoding='utf-8')
     print('FLORA RESUME',len(results),'validated regions;',len(pending),'to convert',flush=True)
-    from pass_cache import UnitCache
-    cache=UnitCache.open('world-flora-region',{'aggregate_sprite_collision':aggregate_sprite_collision,
-                                               'collision_packing':collision_packing},__file__)
+    # keyed on what makes a region (convert_region and its reach), not the whole file (UNIT-KEY-WHOLE-FILE-63: an
+    # edit to this stage's main flow, or to code only the stage reaches, re-keyed all 1931 regions). The digest calls
+    # stay written here, so this stage's own key covers what the cache key reads.
+    from unit_store import bake_keyed_cache
+    from pass_cache import covered_lines, previous_digests, source_digest
+    cache=bake_keyed_cache('world-flora-region',{'aggregate_sprite_collision':aggregate_sprite_collision,
+                                                 'collision_packing':collision_packing},
+                           source_digest((__file__,'convert_region')),previous_digests((__file__,'convert_region')),
+                           (__file__,),covered_lines((__file__,'convert_region')))
     # A region's inputs: its record, its base region's bytes and every owned flora input (the contract
     # without the two whole-directory receipts, which each region's base hash replaces).
     owned={k:v for k,v in contract['hashes'].items() if k not in ('terrain_directory','base_receipt')}

@@ -1,0 +1,19 @@
+{
+  "schema": "build-recipe-1",
+  "name": "miniwind-solstheim-star",
+  "description": "TEST ONLY. As miniwind-solstheim, with the Solstheim trees drawn as closed star prisms (--chim-sol-tree-copies star), for the A/D measurement of the forest frame -23,20 (load it with map solm23p20).",
+  "options": {
+    "miniwind": true,
+    "miniwind_scope": "exterior",
+    "miniwind_description": "Solstheim star trees: Bloodmoon cell -23,20 (map solm23p20)",
+    "direct_to_game_map": "balmora",
+    "exclude_unreferenced": "voice,npcs",
+    "chim_frame_ext": "chim",
+    "chim_sol_test": "-23,20:l",
+    "chim_sol_tree_copies": "star"
+  },
+  "inputs": [],
+  "written_with": null,
+  "checked_with": null,
+  "status": "unverified"
+}

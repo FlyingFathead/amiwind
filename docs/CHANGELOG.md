@@ -1,10 +1,11 @@
 # Changelog
 
-_Last updated with AmiWind v0.0.64-dev3 (10 November 2026)._
+_Last updated with AmiWind v0.0.64-dev4 (10 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.64-dev4: fourth snapshot of v0.0.64, 10 November 2026](#v0064-dev4-fourth-snapshot-of-v0064-10-november-2026)
 - [v0.0.64-dev3: third snapshot of v0.0.64, 10 November 2026](#v0064-dev3-third-snapshot-of-v0064-10-november-2026)
 - [v0.0.64-dev2: second snapshot of v0.0.64, 10 November 2026](#v0064-dev2-second-snapshot-of-v0064-10-november-2026)
 - [v0.0.64-dev1: first snapshot of v0.0.64, 10 November 2026](#v0064-dev1-first-snapshot-of-v0064-10-november-2026)
@@ -181,6 +182,32 @@ _Last updated with AmiWind v0.0.64-dev3 (10 November 2026)._
 - [CHIM source candidate - 14 October 2026, v0.0.40-dev1](#chim-source-candidate---14-october-2026-v0040-dev1)
 
 <!-- contents end -->
+
+## v0.0.64-dev4: fourth snapshot of v0.0.64, 10 November 2026
+
+The fourth development snapshot of v0.0.64, "Gone Beyond The Gate" ([release notes](releases/notes/RELEASE-v0.0.64-dev4.md)).
+It needs 32 MB of Fast RAM. It carries v0.0.64-dev1, dev2 and dev3 as well: for anyone who did not take dev3, their
+changes are listed in the three entries below and arrive together with these. Race resistances on spell and trap damage
+were seen in play on a test build; everything else is checked by tests, not yet in play.
+
+- Cobwebs, hanging moss and leaves are drawn with their see-through parts instead of solid rectangles, now on by default.
+  The console setting is `aw_seethrough_material` (`dbg seethrough`): 0 solid rectangles as before, 1 the default, 2 also
+  from behind; without a value it prints the list (ROOM-DECAL-ALPHA-62).
+- Spell and trap damage meets the target's resistances and weaknesses, from its effects and its race, birthsign and
+  spell abilities, with the Willpower and Luck roll; a Nord's frost immunity stops a frost trap.
+- The journal adds an ending entry at or below the quest's current index once, so that ending finishes the quest; the
+  stats page lists the player's factions with rank, the next rank's needs, reputation and bounty.
+- Groundwork for Solstheim's map rows and HUD region names ("Solstheim / Brodir Grove Region"); Solstheim is not playable
+  in this build yet.
+- A room load gives back the cached tables of the area left before it grows; a memory census by owner (off by default).
+- The builder keys the world flora and scenery units on the region converter only, ranks models by collision bytes
+  against drawn faces with a warning for the worst, and reads scale keys in animation tables. The builder can make a
+  ready-to-write Raspberry Pi 4B drive image (no ROMs, no personal settings) for test deliveries.
+- The Toolkit's tracker headline has one row per land and follows the build's version, its pages reload themselves, and
+  the 3D Map Inspector opens CHIM rooms with collision views.
+- Register: the reuse report's count for a stage that makes no units, the Toolkit's world reader, the star trees'
+  pop-in and hitches (test-only tree methods), the store models' planes, and sightings of the day. Not in it yet: the
+  Heart Chamber still does not load at 32 MB (work in progress), and the tree methods are not settled.
 
 ## v0.0.64-dev3: third snapshot of v0.0.64, 10 November 2026
 

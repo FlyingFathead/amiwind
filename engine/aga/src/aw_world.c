@@ -98,38 +98,68 @@ static void table_towns(void){
         if(AW_SceneMapSize(t->name,path,sizeof(path))>=124)town_ready[i]=1;
     }
 }
+/* One 52-byte directory row: its name (PREFIX and the index I), origin, core and cover, checked. */
+static int read_row(FILE *f,const char *prefix,int i,terrain_region_t *r){
+    byte row[52];char expected[16];int k;
+    if(fread(row,1,52,f)!=52)return 0;
+    sprintf(expected,"%s%04ld",prefix,(long)i);if(memcmp(row,expected,7) || row[7])return 0;
+    for(k=0;k<3;k++)r->origin[k]=number(row+8+k*4);
+    for(k=0;k<4;k++){r->core[k]=number(row+20+k*4);r->cover[k]=number(row+36+k*4);}
+    for(k=0;k<3;k++)if(!isfinite(r->origin[k]) || fabs(r->origin[k])>1000000)return 0;
+    for(k=0;k<2;k++)if(!(r->core[k]<r->core[k+2] && r->cover[k]<=r->core[k]-896 &&
+        r->cover[k+2]>=r->core[k+2]+896 && r->cover[k]>-AW_COORD_BOUND && r->cover[k+2]<AW_COORD_BOUND))return 0;
+    return 1;
+}
+/* Rows 0..count_vf-1 are Vvardenfell's region maps (world/regions.awr, vfNNNN), the rows after them Solstheim's
+ * frame maps (world/regions-sl.awr, slNNNN, terrain IDs from AW_SOLSTHEIM_TERRAIN_BASE): one table, so a Solstheim
+ * cell is found by its coordinates exactly as a Vvardenfell one (WORLD-REGION-NAMES-VF-ONLY-64). */
+static int count_vf;
+static int row_terrain(int i){return i<count_vf?i:AW_SOLSTHEIM_TERRAIN_BASE+i-count_vf;}
+static int terrain_row(int t){
+    if(t<0)return -1;
+    if(t<AW_SOLSTHEIM_TERRAIN_BASE)return t<count_vf?t:-1;
+    t=count_vf+t-AW_SOLSTHEIM_TERRAIN_BASE;return t<count?t:-1;
+}
+static void row_name(int i,char *out){AW_TerrainName(row_terrain(i),out);}
 static int load_directory(void){
-    FILE *f=NULL;byte header[8],row[52];int size,n,i,k,t;char expected[16];terrain_region_t *r,slots[2];
+    FILE *f=NULL,*g=NULL;byte header[8],row[52];int size,gsize,n=0,m=0,i,k,t;terrain_region_t slots[2];
     if(attempted)return count>0;
     attempted=1;size=COM_FOpenFile("world/regions.awr",&f);
-    if(!f)return 0;
-    if(size<64 || fread(header,1,8,f)!=8 || memcmp(header,"AWR2",4))goto bad;
-    n=(int)word(header+4);if(n<1 || n>8192 || size!=64+n*52)goto bad;
-    for(i=0;i<2;i++){
-        if(fread(row,1,28,f)!=28)goto bad;
-        for(k=0;k<3;k++)slots[i].origin[k]=number(row+k*4);
-        for(k=0;k<4;k++)slots[i].core[k]=number(row+12+k*4);
-        if(!valid_town(&slots[i]))goto bad;
+    gsize=COM_FOpenFile("world/regions-sl.awr",&g);
+    if(!f && !g)return 0;
+    if(f){
+        if(size<64 || fread(header,1,8,f)!=8 || memcmp(header,"AWR2",4))goto bad;
+        n=(int)word(header+4);if(n<1 || n>AW_SOLSTHEIM_TERRAIN_BASE || size!=64+n*52)goto bad;
+        for(i=0;i<2;i++){
+            if(fread(row,1,28,f)!=28)goto bad;
+            for(k=0;k<3;k++)slots[i].origin[k]=number(row+k*4);
+            for(k=0;k<4;k++)slots[i].core[k]=number(row+12+k*4);
+            if(!valid_town(&slots[i]))goto bad;
+        }
     }
-    for(t=0;t<AW_TOWN_COUNT;t++){
-        i=AW_Town(t)->world_slot;if(i<0 || i>1)continue;
-        towns[t]=slots[i];town_ready[t]=1;
+    if(g){
+        if(gsize<8 || fread(header,1,8,g)!=8 || memcmp(header,"AWS1",4))goto bad;
+        m=(int)word(header+4);if(m<1 || m>AW_SOLSTHEIM_TERRAIN_BASE || gsize!=8+m*52)goto bad;
     }
-    regions=(terrain_region_t *)AW_TryMalloc(n*sizeof(*regions));if(!regions)goto bad;
-    for(i=0;i<n;i++){
-        if(fread(row,1,52,f)!=52)goto bad;
-        sprintf(expected,"vf%04ld",(long)i);if(memcmp(row,expected,7) || row[7])goto bad;
-        r=&regions[i];
-        for(k=0;k<3;k++)r->origin[k]=number(row+8+k*4);
-        for(k=0;k<4;k++){r->core[k]=number(row+20+k*4);r->cover[k]=number(row+36+k*4);}
-        for(k=0;k<3;k++)if(!isfinite(r->origin[k]) || fabs(r->origin[k])>1000000)goto bad;
-        for(k=0;k<2;k++)if(!(r->core[k]<r->core[k+2] && r->cover[k]<=r->core[k]-896 &&
-            r->cover[k+2]>=r->core[k+2]+896 && r->cover[k]>-AW_COORD_BOUND && r->cover[k+2]<AW_COORD_BOUND))goto bad;
+    regions=(terrain_region_t *)AW_TryMalloc((n+m)*sizeof(*regions));if(!regions)goto bad;
+    for(i=0;i<n;i++)if(!read_row(f,"vf",i,&regions[i]))goto bad;
+    for(i=0;i<m;i++)if(!read_row(g,"sl",i,&regions[n+i]))goto bad;
+    if(f){
+        for(t=0;t<AW_TOWN_COUNT;t++){
+            i=AW_Town(t)->world_slot;if(i<0 || i>1)continue;
+            towns[t]=slots[i];town_ready[t]=1;
+        }
+        fclose(f);
     }
-    fclose(f);count=n;table_towns();
-    Con_Printf("Vvardenfell: %ld terrain regions; %ld directory bytes.\n",(long)n,(long)(n*sizeof(*regions)));return 1;
+    if(g)fclose(g);
+    count_vf=n;count=n+m;table_towns();
+    if(n)Con_Printf("Vvardenfell: %ld terrain regions; ",(long)n);
+    if(m)Con_Printf("Solstheim: %ld frame maps; ",(long)m);
+    Con_Printf("%ld directory bytes.\n",(long)((n+m)*sizeof(*regions)));return 1;
 bad:
-    fclose(f);free(regions);regions=NULL;count=0;memset(town_ready,0,sizeof(town_ready));
+    if(f)fclose(f);
+    if(g)fclose(g);
+    free(regions);regions=NULL;count=count_vf=0;memset(town_ready,0,sizeof(town_ready));
     Con_Printf("Invalid or unavailable Vvardenfell region directory.\n");return 0;
 }
 /* Town with a world handoff (directory slot or table frame), or -1. */
@@ -141,7 +171,7 @@ static terrain_region_t *source(const char *name){
     int i=AW_TerrainId(name),t=world_town(name);
     if(i<0 && t<0)return NULL;
     if(!load_directory())return NULL;
-    if(i>=0)return i<count?&regions[i]:NULL;
+    if(i>=0)return (i=terrain_row(i))>=0?&regions[i]:NULL;
     return town_ready[t]?&towns[t]:NULL;
 }
 /* A destination exists when its scene map does: a region map, or for a town
@@ -225,7 +255,7 @@ int AW_WorldDestination(const char *name,const float *local,char *target,float *
     if(!to && id>=0 && inside(local,from->core,64))return 0;
     if(!to)for(i=0;i<count;i++){
         for(k=0;k<3;k++)point[k]=global[k]-regions[i].origin[k];
-        if(inside(point,regions[i].core,0)){to=&regions[i];sprintf(target,"vf%04ld",(long)i);break;}
+        if(inside(point,regions[i].core,0)){to=&regions[i];row_name(i,target);break;}
     }
     if(!to || !strcmp(name,target))return 0;
     for(k=0;k<3;k++){arrival[k]=global[k]-to->origin[k];if(!(fabs(arrival[k])<AW_COORD_BOUND))return 0;}
@@ -256,7 +286,7 @@ int AW_WorldMapTarget(const float *world,char *target,float *arrival){
     }
     if(!to)for(i=0;i<count;i++){
         for(k=0;k<2;k++)point[k]=world[k]*.25f-regions[i].origin[k];
-        if(inside(point,regions[i].core,0)){to=&regions[i];sprintf(target,"vf%04ld",(long)i);break;}
+        if(inside(point,regions[i].core,0)){to=&regions[i];row_name(i,target);break;}
     }
     if(!to)return 0;
     for(k=0;k<2;k++){arrival[k]=world[k]*.25f-to->origin[k];if(fabs(arrival[k])>=AW_COORD_BOUND)return 0;}

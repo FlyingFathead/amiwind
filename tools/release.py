@@ -18,7 +18,10 @@ from mwad.paths import ensure_external
 from project_version import public_version, check_native_versions
 
 PROJECT = "amiwind"
-EXECUTABLES = {"build.sh", "tools/AmiWind-FS-UAE-launcher.py", "tools/run_fs_uae.py"}
+EXECUTABLES = {"build.sh", "tools/AmiWind-FS-UAE-launcher.py", "tools/run_fs_uae.py",
+               # the Raspberry Pi 4B image tools; the two clean/ scripts are installed on the Pi and must stay executable
+               "tools/pi_image/build_clean_image.py", "tools/pi_image/scrub_check.py",
+               "tools/pi_image/clean/amiwind-firstboot", "tools/pi_image/clean/amiwind-start"}
 PROJECT_MEDIA = {"resources/media/AmiWind_logo.png", "resources/media/AmiWind_wordmark.png",
                  "resources/media/AmiWind_logo_name_only.png",
                  # the Workbench icon's pictures (tools/workbench_launcher.py, docs/WORKBENCH_ICON.md)
@@ -146,7 +149,10 @@ NATIVE_SOURCE_INCLUDES = {"engine/aga/src/model_alias_stream.inc", "engine/aga/s
 # version and SHA-256 per file): meshoptimizer's simplifier (MIT), compiled on the build host by tools/meshopt.py.
 VENDORED_SOURCES = {"third_party/meshoptimizer/simplifier.cpp", "third_party/meshoptimizer/allocator.cpp"}
 # The Pi boot image tool (docs/PI_BOOT_IMAGE.md): the Linux assembly script and its Amiberry preset; exact names.
-PI_IMAGE_TOOL = {"tools/pi_image/make_pi_image.sh", "tools/pi_image/amiwind.uae"}
+PI_IMAGE_TOOL = {"tools/pi_image/make_pi_image.sh", "tools/pi_image/amiwind.uae"} | {
+    "tools/pi_image/clean/" + n for n in ("10-watchdog.conf", "README-FIRST.txt", "amiwind-firstboot",
+                                          "amiwind-firstboot.service", "amiwind-start", "amiwind.service",
+                                          "autologin.conf")}   # the clean Pi image's system files
 
 
 def allowed_files(root):
@@ -160,7 +166,7 @@ def allowed_files(root):
         if p.is_absolute() or ".." in p.parts or str(p) != name or "\\" in name:
             raise ValueError("Unsafe source file list entry")
         preset = (p.suffix in (".uae", ".fs-uae") and p.parent == PurePosixPath("resources/emulators")) or name in ("config/keymaps.cfg", "config/game.cfg") or name in DOCUMENTATION_IMAGES or name in DOCUMENTATION_CLIPS or name in PROJECT_MEDIA or name in DOCUMENTATION_SOURCE_GRAPHICS or name in DEBUG_CATALOGUES or name in WORLD_TABLES or (p.suffix == ".chimfx" and p.parent == CHIM_EFFECTS_DIR) or (p.suffix == ".txt" and p.parent == TEST_SESSIONS_DIR)
-        native_aux = name in ("tools/polycount_inspector.html", "amiwind-toolkit/map-inspector.html", "amiwind-toolkit/world-map.html", "amiwind-toolkit/index.html", "amiwind-toolkit/chim-head.js", "amiwind-toolkit/zebra.js", "amiwind-toolkit/chim-legend.js", "amiwind-toolkit/chim-inclusion.js", "amiwind-toolkit/panel-fold.js", "amiwind-toolkit/interior-tracker.js", "amiwind-toolkit/expansion-views.js", "amiwind-toolkit/header.js", "amiwind-toolkit/chim-reader.js", "amiwind-toolkit/monitor.html", "amiwind-toolkit/mesh-compare.html", "amiwind-toolkit/seam-check.html", "amiwind-toolkit/view-camera.js", "tests/test_mesh_compare.js", "tests/test_cell_progress_legend.js", "tests/test_cell_progress_page_run.js", "tests/test_interior_tracker.js", "tests/test_expansion_views.js", "tests/test_toolkit_chim.js", "tests/test_toolkit_monitor.js", "tests/test_toolkit_fold.js", "tests/test_legend_groups.js", "tests/test_polycount_markup.js", "tests/test_world_metrics_layer.js", "engine/aga/Makefile", "engine/aga/qc/progs.src", "engine/aga/src/progdefs.q1", "engine/aga/src/progdefs.q2", "docs/aga/COPYING.NEWLIB", ".github/workflows/source-check.yml")
+        native_aux = name in ("tools/polycount_inspector.html", "amiwind-toolkit/map-inspector.html", "amiwind-toolkit/world-map.html", "amiwind-toolkit/index.html", "amiwind-toolkit/chim-head.js", "amiwind-toolkit/zebra.js", "amiwind-toolkit/chim-legend.js", "amiwind-toolkit/chim-inclusion.js", "amiwind-toolkit/panel-fold.js", "amiwind-toolkit/interior-tracker.js", "amiwind-toolkit/expansion-views.js", "amiwind-toolkit/header.js", "amiwind-toolkit/auto-refresh.js", "amiwind-toolkit/chim-reader.js", "amiwind-toolkit/monitor.html", "amiwind-toolkit/mesh-compare.html", "amiwind-toolkit/seam-check.html", "amiwind-toolkit/view-camera.js", "tests/test_mesh_compare.js", "tests/test_cell_progress_legend.js", "tests/test_cell_progress_page_run.js", "tests/test_interior_tracker.js", "tests/test_expansion_views.js", "tests/test_toolkit_chim.js", "tests/test_toolkit_monitor.js", "tests/test_toolkit_fold.js", "tests/test_legend_groups.js", "tests/test_polycount_markup.js", "tests/test_world_metrics_layer.js", "engine/aga/Makefile", "engine/aga/qc/progs.src", "engine/aga/src/progdefs.q1", "engine/aga/src/progdefs.q2", "docs/aga/COPYING.NEWLIB", ".github/workflows/source-check.yml")
         if not preset and not native_aux and name not in NATIVE_SOURCE_INCLUDES and name not in VENDORED_SOURCES and name not in PI_IMAGE_TOOL and p.suffix not in (".py", ".md", ".json", ".toml", ".c", ".h", ".asm", ".qc", ".patch") and name not in (".gitignore", ".gitattributes", "LICENSE", "VERSION", "CHIM_VERSION", "engine/aga/COPYING", "build.sh", "build.cmd", "build.ps1", "setup-windows.cmd", "setup-windows.ps1"):
             raise ValueError(f"Unexpected distributable file type: {name}")
     return sorted(paths)

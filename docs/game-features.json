@@ -256,8 +256,8 @@
     {"id": "factions", "name": "Factions and ranks", "area": "story", "state": "partial",
      "what": "Faction membership, rank and reputation read by the dialogue conditions and the scripts; the guild masters' advancement check (the next rank's attribute, skill and reputation needs); faction reactions in disposition; expulsion for a reported crime against a member or a faction's item, with the original message, and reinstatement by the dialogue's results.",
      "reference": "OpenMW 0.51 factions; UESP Morrowind:Factions",
-     "proof": "docs/DIALOGUE_FEATURES.md (rank requirement conditions live); tests/test_dialogue_lut.py; tests/test_crime.py; tests/test_combat_settings_text.py.",
-     "missing": "The stats page does not list factions, ranks, the next rank's needs, reputation or the bounty; not yet walked through in game.",
+     "proof": "docs/DIALOGUE_FEATURES.md (rank requirement conditions live); tests/test_dialogue_lut.py; tests/test_crime.py; tests/test_combat_settings_text.py; tests/aga_statswin_test.c.",
+     "missing": "Not yet walked through in game (the stats page's factions, ranks, next rank's needs, reputation and bounty are new in v0.0.64-dev3).",
      "bugs": ["FACTION-STATS-PAGE-64", "FACTION-EXPEL-MESSAGE-64"], "todo": ["FACTIONS-IN-PLAY-64", "MWSCRIPT-MORE-57"]},
 
     {"id": "mwscript-compiler", "name": "MWScript compiler", "area": "scripts", "state": "done",

@@ -29,9 +29,12 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-for p in (ROOT / 'src', ROOT / 'tools'):
-    if str(p) not in sys.path:
-        sys.path.insert(0, str(p))
+# src/ before tools/: the src/mwad package, not tools/mwad.py (run as a script, its own folder tools/ comes first
+# otherwise; BUILD-LAYER-DATA-MWAD-SHADOWED-64), as tools/chim_build.py does
+for p in (ROOT / 'tools', ROOT / 'src'):
+    while str(p) in sys.path:
+        sys.path.remove(str(p))
+    sys.path.insert(0, str(p))
 
 FORMAT = 'aw-chim-layer-data-1'
 MASTERS = ('Morrowind.esm', 'Tribunal.esm', 'Bloodmoon.esm')     # tools/mwscript/gamedata.py MASTERS

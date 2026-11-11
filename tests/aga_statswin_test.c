@@ -127,6 +127,17 @@ static int fake_status(char *out,int size){
     if(chosen_index<0)return 0;
     snprintf(out,(size_t)size,"%s: cost 6, chance 16 %%",chosen_kind?"My Spell":"Fire Bite");return 1;
 }
+static int standing_calls;
+static int fake_standing(aw_stats_sheet_t *s){
+    aw_stats_faction_t *f=&s->faction[0];
+    standing_calls++;s->reputation=12;s->bounty=40;s->factions=2;
+    strcpy(f->name,"Fighters Guild");strcpy(f->rank,"Apprentice");strcpy(f->next,"Journeyman");
+    f->attribute[0]=0;f->attribute[1]=5;f->need[0]=30;f->need[1]=25;f->need[2]=20;f->need[3]=5;f->need[4]=10;
+    f->reputation=3;f->has_next=1;
+    f=&s->faction[1];strcpy(f->name,"Mages Guild");strcpy(f->rank,"Associate");strcpy(f->next,"Apprentice");
+    f->expelled=1;f->has_next=1;
+    return 1;
+}
 int main(void){
     static const char *const attributes[8]={"Strength","Intelligence","Willpower","Agility","Speed","Endurance","Personality","Luck"};
     char line[32],*path=getenv("AW_STATS_PPM");int i,j,seen[27],major_rows;
@@ -237,8 +248,26 @@ int main(void){
     draw();assert(find("* My Spell") && find("Fire Bite") && find("My Spell: cost 6, chance 16 %"));
     assert(!panel_key('o',0,0));panel_closed();
     aw_magic_castables=NULL;aw_magic_select=NULL;aw_magic_status=NULL;
+    /* FACTION-STATS-PAGE-64: the standing, read once per opening (a fake of aw_dialwin.c's filler): the member
+     * factions with the rank or Expelled, the next rank's needs, then the reputation and the bounty. */
+    {aw_stats_sheet_t s;int rows[AW_STATS_ROWS],n;
+     aw_stats_standing=fake_standing;standing_calls=0;
+     stats_command();assert(opens==5 && standing_calls==1);
+     draw();draw();assert(standing_calls==1);                       /* never per frame */
+     AW_StatsSheet(&s);n=AW_StatsRows(&s,rows);
+     assert(n==30+1+6+1+2);                                          /* header, 6 for the guild, 1 expelled, rep, bounty */
+     assert(rows[30]==-4 && rows[n-2]==-5 && rows[n-1]==-6);
+     assert(panel_key(K_END,0,0));draw();
+     row("Fighters Guild","Apprentice",300);row("Next rank","Journeyman",300);
+     {int k,hits=0;for(k=0;k<text_count;k++)   /* the needs' attribute rows, under the faction (the left column has them too) */
+         if(texts[k].x==148 && (!strcmp(texts[k].value,"Strength") || !strcmp(texts[k].value,"Endurance")))hits++;
+      assert(hits==2 && find("25"));}
+     row("Favoured skills","20, 5",300);
+     row("Reputation","3/10",300);row("Mages Guild","Expelled",300);row("Bounty","40",300);
+     assert(find("Faction"));
+     panel_key(K_HOME,0,0);aw_stats_standing=NULL;}
     /* No character: neither window opens. */
-    c->valid=0;stats_command();magic_command();assert(opens==4);
+    c->valid=0;stats_command();magic_command();assert(opens==5);
     puts("Stats and Magic windows: content rows, grouping, scroll, keys, live update ok");
     return 0;
 }

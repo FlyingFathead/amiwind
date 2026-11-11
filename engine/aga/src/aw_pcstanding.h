@@ -27,6 +27,10 @@ int AW_StandingExpelled(const char *faction);
 void AW_StandingSetExpelled(const char *faction,int expelled);
 int AW_StandingFactionReputation(const char *faction);
 void AW_StandingSetFactionReputation(const char *faction,int value);
+/* FACTION-STATS-PAGE-64: the factions known, in the order first met (the stats page lists the members' ones);
+ * the id of entry I (0..count-1), NULL past the end */
+int AW_StandingCount(void);
+const char *AW_StandingAt(int i);
 /* 1 when the table had no room for a new faction (the call did nothing) since the last reset. */
 int AW_StandingFull(void);
 /* v0.0.62 (CRIME-59): the crimes' numbers (OpenMW Player getNewCrimeId, recordCrimeId, getCrimeId: the last crime and

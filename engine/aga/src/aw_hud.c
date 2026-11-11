@@ -3,6 +3,7 @@
 #include "aw_links.h"
 #include "amiwind_version.h"
 #include "aw_world.h"
+#include "aw_maps.h"
 #include "aw_clock.h"
 #include "aw_npc_lod.h"
 #include "aw_inspect.h"
@@ -334,7 +335,13 @@ void Sbar_Draw(void) {
     if((!AW_PhotoModeActive() || AW_DebugOverlaysEnabled()) && AW_LightGalleryDraw())return;
     if(!AW_DebugOverlaysEnabled())return;
     if(current_region(&region))
-        snprintf(title,sizeof(title),"AmiWind v" AMIWIND_VERSION "%s Vvardenfell / %s",AW_RecorderSuffix(),region?region:"Region unavailable");
+    {
+        /* the land the map lies on (aw_maps.h AW_IslandOf), then the region in it without the land's name again
+         * (AW_RegionInLand: "Solstheim / Brodir Grove Region") */
+        const char *land=AW_IslandOf(sv.name);region=AW_RegionInLand(land,region);
+        snprintf(title,sizeof(title),"AmiWind v" AMIWIND_VERSION "%s %s / %s",AW_RecorderSuffix(),land,
+                 region?region:"Region unavailable");
+    }
     else
         snprintf(title,sizeof(title),"AmiWind v" AMIWIND_VERSION "%s / %s",AW_RecorderSuffix(),cl.levelname[0]?cl.levelname:"Location unavailable");
     limit=(vid.width-16)/width;if(limit<0)limit=0;if(limit>127)limit=127;

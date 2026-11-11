@@ -74,15 +74,18 @@
 
   // ------------------------------------------------------------ CHIM world files (big-endian structures)
 
-  function readHeader(data, kind) {
-    const b = u8(data), d = dv(b);
+  // A model store's index and a room record (the CHIM rooms, tools/chim/interior.py) keep the index layout of 0.5
+  // in every later format: their reader takes formats 0.5 to 0.13.
+  const STORE_VERSIONS = [5, 6, 7, 8, 9, 10, 11, 12, 13].map(m => [0, m]);
+  function readHeader(data, kind, versions) {
+    const b = u8(data), d = dv(b), allowed = versions || READ_VERSIONS;
     if (b.length < HEADER) throw Error('CHIM file shorter than its header');
     const magic = tag(b, 0), k = tag(b, 4);
-    if (magic !== 'CHIM' || !KINDS.includes(k)) throw Error('Not a CHIM file');
+    if (magic !== 'CHIM' || !(KINDS.includes(k) || (kind === 'ROOM' && k === 'ROOM'))) throw Error('Not a CHIM file');
     if (kind && k !== kind) throw Error('Expected a CHIM ' + kind + ' file, found ' + k);
     const version = [d.getUint16(8), d.getUint16(10)];
-    if (!READ_VERSIONS.some(v => v[0] === version[0] && v[1] === version[1]))
-      throw Error('CHIM world format ' + version.join('.') + ', expected ' + READ_VERSIONS.map(v => v.join('.')).join(' or '));
+    if (!allowed.some(v => v[0] === version[0] && v[1] === version[1]))
+      throw Error('CHIM world format ' + version.join('.') + ', expected ' + allowed.map(v => v.join('.')).join(' or '));
     const size = d.getUint32(12), count = d.getUint32(16), directory = d.getUint32(20), dataAt = d.getUint32(24),
       total = d.getUint32(28);
     if (size !== HEADER || total !== b.length || !(size <= directory && directory <= dataAt && dataAt <= total))
@@ -90,8 +93,8 @@
     return {kind: k, count, directory, data: dataAt, bytes: total, version};
   }
 
-  function readIndex(data) {
-    const b = u8(data), d = dv(b), h = readHeader(b, 'INDX');
+  function readIndex(data, versions) {
+    const b = u8(data), d = dv(b), h = readHeader(b, 'INDX', versions);
     let at = HEADER;
     const settings = {draw_distance: d.getFloat32(at), hysteresis: d.getFloat32(at + 4),
       collision_margin: d.getFloat32(at + 8), prefetch_margin: d.getFloat32(at + 12), grain: d.getUint16(at + 16),
@@ -653,7 +656,115 @@
     }, read: async p => { const r = await fetch(root + p); return r.ok ? new Uint8Array(await r.arrayBuffer()) : null; }};
   }
 
-  const api = {READ_VERSIONS, LUMPS, DEFAULT_SIZES, DEFAULT_MEMORY, FLAG_OVER_16_LEAVES, FLAG_STORY_HIDDEN, crc32, nameHash,
+  // ---------------------------------------------------------------- collision figures and CHIM rooms
+  // The drawing and collision parts of one brush image, as tools/collision_census.py model_stats counts them:
+  // collision = clipnodes (lump 9) + the placed collision piece table (lump 4, "PCS1") + the planes only clipnodes
+  // use; drawing = the rest of the image.
+  function collisionStats(data) {
+    const b = u8(data), L = readBrushImage(b), D = L.map(dv);
+    const refs = little => {
+      const np = L[1].length / 20, f = new Set(), n = new Set(), c = new Set();
+      for (let o = 0; o + 20 <= L[7].length; o += 20) f.add(D[7].getUint16(o, little));
+      for (let o = 0; o + 24 <= L[5].length; o += 24) n.add(D[5].getInt32(o, little));
+      for (let o = 0; o + 8 <= L[9].length; o += 8) c.add(D[9].getInt32(o, little));
+      for (const s of [f, n, c]) for (const p of s) if (p < 0 || p >= np) return null;
+      return {f, n, c};
+    };
+    let little = true, r = refs(true);
+    if (!r) { little = false; r = refs(false); }
+    if (!r) throw Error('plane numbers out of range in both byte orders');
+    let triangles = 0;
+    for (let o = 0; o + 20 <= L[7].length; o += 20) triangles += Math.max(0, D[7].getInt16(o + 8, little) - 2);
+    let clipOnly = 0;
+    for (const p of r.c) if (!r.f.has(p) && !r.n.has(p)) clipOnly++;
+    const nclip = L[9].length / 8;
+    const hull = head => {
+      if (head < 0 || head >= nclip) return [0, 0];
+      const seen = new Set(), stack = [[head, 1]];
+      let deepest = 0;
+      while (stack.length) {
+        const [i, depth] = stack.pop();
+        if (seen.has(i)) continue;
+        seen.add(i); deepest = Math.max(deepest, depth);
+        for (const k of [4, 6]) { const ch = D[9].getInt16(8 * i + k, little); if (ch >= 0 && ch < nclip) stack.push([ch, depth + 1]); }
+      }
+      return [seen.size, deepest];
+    };
+    const heads = L[14].length >= 64 ? [0, 1, 2, 3].map(k => D[14].getInt32(36 + 4 * k, little)) : [0, -1, -1, -1];
+    const h1 = hull(heads[1]), h2 = hull(heads[2]);
+    const pieces = L[4].length >= 16 && tag(L[4], 0).slice(0, 3) === 'PCS' ? D[4].getUint32(4, false) : 0;
+    const faces = L[7].length / 20, coll = L[9].length + L[4].length + clipOnly * 20, draw = Math.max(b.length - coll, 0);
+    const round3 = x => Math.round(x * 1000) / 1000;
+    return {faces, triangles, planes: L[1].length / 20, face_planes: r.f.size, node_planes: r.n.size,
+      clip_only_planes: clipOnly, nodes: L[5].length / 24, clipnodes: nclip, hull1_clipnodes: h1[0],
+      hull2_clipnodes: h2[0], deepest_chain: Math.max(h1[1], h2[1]), pieces, piece_bytes: L[4].length,
+      clipnode_bytes: L[9].length, bytes: b.length, draw_bytes: draw, collision_bytes: coll,
+      ratio_bytes: draw ? round3(coll / draw) : null, ratio_counts: faces ? round3((nclip + pieces) / faces) : null};
+  }
+  // chimi/rooms/<room>.crm (tools/chim/interior.py room_record): header ROOM, room block (bounds, model count),
+  // the model list, then the placed records.
+  function readRoomRecord(data) {
+    const b = u8(data), d = dv(b), h = readHeader(b, 'ROOM', STORE_VERSIONS);
+    const n = d.getUint32(HEADER + 24);
+    if (h.directory !== HEADER + 32 || h.data !== h.directory + 4 * n) throw Error('Room record offsets do not match its model list');
+    // placed records of format 0.8 on are 56 bytes (tools/chim/placed.py: the 48-byte record + pitch and roll)
+    const size = h.count ? (b.length - h.data) / h.count : 56;
+    if (![48, 56].includes(size)) throw Error('Room record size does not match its placements');
+    const models = [];
+    for (let i = 0; i < n; i++) models.push(d.getUint32(h.directory + 4 * i));
+    const placements = [];
+    for (let i = 0; i < h.count; i++) placements.push(readPlacement(b, h.data + i * size));
+    return {bounds: [[0, 1, 2].map(k => d.getFloat32(HEADER + 4 * k)), [3, 4, 5].map(k => d.getFloat32(HEADER + 4 * k))],
+      models, placements, version: h.version};
+  }
+  // A CHIM room store in SOURCE: the first chimi/world.cwi (an image's id1, the build's chim-interiors folder or
+  // the run folder); its room names from the listing (when the source can list) and its index.
+  async function openRoomStore(source) {
+    const paths = source.list ? await source.list() : [];
+    let base = null;
+    for (const p of paths) if (/(^|\/)chimi\/world\.cwi$/.test(p)) { const s = p.slice(0, -'world.cwi'.length); if (base === null || s.length < base.length) base = s; }
+    if (base === null) base = 'chimi/';
+    const raw = await source.read(base + 'world.cwi');
+    if (!raw) throw Error('No chimi/world.cwi in the chosen files: choose the image\'s id1 folder or the build\'s chim-interiors folder');
+    const index = readIndex(raw, STORE_VERSIONS);
+    const rooms = paths.filter(p => p.startsWith(base + 'rooms/') && p.endsWith('.crm')).map(p => p.slice(base.length + 6, -4)).sort();
+    return {source, base, index, rooms, packs: new Map()};
+  }
+  // One room: its record, and per store model the image bytes and its collision figures (only the packs that hold
+  // its models are read).
+  async function loadRoom(store, room) {
+    const raw = await store.source.read(store.base + 'rooms/' + room + '.crm');
+    if (!raw) throw Error('No room ' + room + ' in this store (' + store.base + 'rooms/' + room + '.crm)');
+    const rec = readRoomRecord(raw), idx = store.index, models = new Map(), problems = [];
+    const ids = [...new Set(rec.models.concat(rec.placements.map(p => p.model)))].sort((a, b) => a - b);
+    for (const i of ids) {
+      const m = idx.models[i];
+      if (!m) { problems.push('model ' + i + ' is not in the store'); continue; }
+      const path = idx.files[m.file].path;
+      if (!store.packs.has(path)) store.packs.set(path, await store.source.read(store.base + path));
+      const pack = store.packs.get(path);
+      if (!pack || m.offset + m.bytes > pack.length) { problems.push('model ' + i + ' runs past its pack ' + path); continue; }
+      const image = pack.subarray(m.offset, m.offset + m.bytes);
+      let stats = null;
+      try { stats = collisionStats(image); } catch (e) { problems.push(m.name + ': ' + (e.message || e)); }
+      models.set(i, {id: i, name: m.name, bytes: m.bytes, render: m.render, image, file: path, collision: stats});
+    }
+    return {room, record: rec, models, problems};
+  }
+  // Per room totals of a loaded room: placed (each placement counts its model) and stored (each model once).
+  function roomCollisionTotals(rd) {
+    const sum = list => {
+      const t = {faces: 0, triangles: 0, clipnodes: 0, pieces: 0, draw_bytes: 0, collision_bytes: 0};
+      for (const s of list) if (s) for (const k of Object.keys(t)) t[k] += s[k];
+      t.ratio_bytes = t.draw_bytes ? Math.round(1000 * t.collision_bytes / t.draw_bytes) / 1000 : null;
+      t.ratio_counts = t.faces ? Math.round(1000 * (t.clipnodes + t.pieces) / t.faces) / 1000 : null;
+      return t;
+    };
+    return {stored: sum([...rd.models.values()].map(m => m.collision)),
+      placed: sum(rd.record.placements.map(p => (rd.models.get(p.model) || {}).collision))};
+  }
+
+  const api = {READ_VERSIONS, STORE_VERSIONS, collisionStats, readRoomRecord, openRoomStore, loadRoom, roomCollisionTotals, LUMPS, DEFAULT_SIZES, DEFAULT_MEMORY, FLAG_OVER_16_LEAVES, FLAG_STORY_HIDDEN, crc32, nameHash,
     readHeader, readIndex, readFrame, readSector, readChunk, readPlacement, readBrushImage, readTextureRefs,
     brushGeometry, readMiptex, spatialOrder, sizesFrom, imageBytes, textureBytes, lumpLengths, ringTables, ringAt,
     ringScan, openWorld, loadFrame, frameSummary, parseHeapReport, readChimMap, isChimFrameMap, parseEntities,

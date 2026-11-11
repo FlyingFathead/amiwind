@@ -315,6 +315,20 @@ def table(rig, path='own'):
     if report['missing']:
         raise ValueError('%s: groups without start or stop keys: %s' % (rig.model, report['missing']))
     scaled = dict(base.scaled, **(over.scaled if over is not None else {}))
+    if scaled and over is None:
+        # the scale keys as a version 4 table (CREATURE-SCALE-KEYS-54, HEART-OF-LORKHAN-LOOK-62): each scaled bone's
+        # uniform scale at every table frame, read from the unscaled source (the Heart's Death1 shrink)
+        import numpy as np
+        import skeletal_actor
+        from halloween_cast import RigSkeleton
+        whole = skeletal_actor.KeptSkeleton(RigSkeleton(rig, 0), keep)
+        names = list(report['bone_names'])
+        tracks = {names.index(b): [float(np.linalg.norm(np.array(whole.local(b, float(t)), float)[:3, :3], axis=1).mean())
+                                   for t in report['times']]
+                  for b in scaled if b in names}
+        # the builder's readers (kit, the model bake) take the version 2 table; the file is the scaled one
+        report = dict(report, own_table=data, scale_tracks={names[k]: len(v) for k, v in tracks.items()})
+        data = to_scaled(data, tracks)
     return data, dict(report, sources=[s['name'] for s in rig.sources], layered=over is not None,
                       bones_left_out=dropped, bones_before=bones_before,
                       max_drift=max([d for _, _, d in dropped], default=0.0),
@@ -343,6 +357,59 @@ def from_appended(data):
         raise ValueError('Not an appended animation table')
     base = data[24:24 + BASE_NAME].rstrip(b'\0').decode('ascii')
     return data[:4] + struct.pack('>H', 2) + data[6:24] + data[24 + BASE_NAME:], base
+
+
+SCALED_VERSION = 4                      # engine/aga/src/aw_skel.h AW_SKEL_VERSION_SCALED
+SCALED_EXT = 8                          # AW_SKEL_SCALED_EXT
+MAX_SCALED = 8                          # AW_SKEL_MAX_SCALED
+SCALE_ONE = 16384.0                     # AW_SKEL_SCALE_ONE
+
+
+def to_scaled(data, tracks):
+    """A version 2 table (skeletal_actor.write_table) as a SCALED table (aw_skel.h version 4, CREATURE-SCALE-KEYS-54):
+    TRACKS {bone index: [uniform scale per frame]} in a scale section after the header. The engine multiplies each
+    such bone's local rotation by its scale (its children inherit it), as the original's node scale keys (OpenMW
+    components/nifosg/controller.cpp KeyframeController applies the scale key to the node's matrix). No tracks: the
+    table unchanged (version 2 stays the format of every table without scale keys)."""
+    import struct
+    if not tracks:
+        return data
+    if data[:4] != b'AWSK' or struct.unpack_from('>H', data, 4)[0] != 2:
+        raise ValueError('Not a version 2 table')
+    bones, frames = struct.unpack_from('>HI', data, 6)
+    if len(tracks) > MAX_SCALED:
+        raise ValueError('%d scaled bones, the engine takes %d' % (len(tracks), MAX_SCALED))
+    order = sorted(tracks)
+    section = bytearray()
+    for b in order:
+        if not 0 <= b < bones:
+            raise ValueError('No bone %d' % b)
+        section += struct.pack('>HH', b, 0)
+    for b in order:
+        values = [int(round(float(s) * SCALE_ONE)) for s in tracks[b]]
+        if len(values) != frames or min(values) < 0 or max(values) > 0xFFFF:
+            raise ValueError('Bone %d: one scale per frame, 0 to 4' % b)
+        section += struct.pack('>%dH' % frames, *values)
+    section += bytes((-len(section)) % 4)
+    return (data[:4] + struct.pack('>H', SCALED_VERSION) + data[6:24] + struct.pack('>HHI', len(order), 0, len(section))
+            + bytes(section) + data[24:])
+
+
+def from_scaled(data):
+    """(version 2 table bytes, {bone: [scale per frame]}) of a scaled table (to_scaled's inverse)."""
+    import struct
+    if data[:4] != b'AWSK' or struct.unpack_from('>H', data, 4)[0] != SCALED_VERSION:
+        raise ValueError('Not a scaled animation table')
+    frames = struct.unpack_from('>I', data, 8)[0]
+    n, _, size = struct.unpack_from('>HHI', data, 24)
+    at = 24 + SCALED_EXT
+    order = [struct.unpack_from('>H', data, at + 4 * i)[0] for i in range(n)]
+    at += 4 * n
+    tracks = {}
+    for b in order:
+        tracks[b] = [v / SCALE_ONE for v in struct.unpack_from('>%dH' % frames, data, at)]
+        at += 2 * frames
+    return data[:4] + struct.pack('>H', 2) + data[6:24] + data[24 + SCALED_EXT + size:], tracks
 
 
 HUMANOID_TABLE = 'progs/humanoid.awsk'  # skeletal_actor.GAME_TABLES: the common humanoid table every NPC shares

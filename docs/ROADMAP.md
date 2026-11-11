@@ -1,6 +1,6 @@
 # Roadmap and implementation options
 
-_Last updated with AmiWind v0.0.64-dev3 (10 November 2026)._
+_Last updated with AmiWind v0.0.64-dev4 (10 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -135,11 +135,19 @@ was published on its own, so it is the first v0.0.64 snapshot on GitHub). It mak
 enchantments take effect again (the actor table read 32 of 39 sections of the compiled scripts file), lets the console
 activate the Ghostgate's switches and other objects no script names, stands in lava and kills, keeps god mode across map
 changes, sorts a quest's state in the journal by its endings, and shows the expulsion message of a faction. The renderer
-has a see-through face pass for cobwebs, hanging growths and decals, off by default until a measured comparison decides.
+gained a see-through face pass for cobwebs and hanging growths, off by default in that snapshot.
 For Solstheim, a test-only star-shaped copy of the spruces brings a forest view from 45,964 faces at the median to 6,096;
-the method still needs a measurement on a full build before it is the default. The Toolkit's tracker has a pane for each
-map. A race ability's resistance against spell and trap damage, the factions on the stats page and the Heart Chamber's
-animated end are still to do.
+that tree method still needs a measurement on a full build before it is the default. The Toolkit's tracker has a pane
+for each map.
+
+**Fourth snapshot, 10 November 2026:** [v0.0.64-dev4](releases/notes/RELEASE-v0.0.64-dev4.md) carries dev1 to dev3. It
+draws cobwebs, hanging moss and leaves with their see-through parts instead of solid rectangles, now on by default
+(`aw_seethrough_material` 0/1/2), weighs spell and trap damage against the target's resistances and weaknesses, lists the
+player's factions on the stats page, no longer skips a quest's ending entry, and gives back the area cache before a room
+load grows. It lays the groundwork for Solstheim's map rows and HUD region names; Solstheim is not playable yet. The
+builder keys the flora units narrower and ranks models by collision bytes; the Toolkit's pages follow the build's version
+and reload themselves, and its 3D Map Inspector opens CHIM rooms with collision views. The Heart Chamber's load at 32 MB
+and its animated end, and the tree methods (test-only), are still to do.
 
 - **Tribunal (Mournhold) and Bloodmoon (Solstheim) built in by default** where the player owns them. The builder warns
   when their files are not found and has a switch to build the base game only. The builder already reports what it

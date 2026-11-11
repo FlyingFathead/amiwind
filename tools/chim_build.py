@@ -74,6 +74,10 @@ def _cli(argv=None):
                     help='Compiled model hulls whose compiler lost pieces under a walkable surface get those pieces '
                          'added exactly (on, default), or stay as compiled with the check recorded (off: the '
                          'previous method); CHIM-COMPILED-HULL-SHORT-36')
+    ap.add_argument('--fence-twosided-faces', choices=('off', 'mirror'), default='off',
+                    help='Two-sided see-through planes (cobwebs, hanging moss and vines; ROOM-DECAL-ALPHA-62): off '
+                         '(default: one face each, the method before; the engine route is aw_seethrough_material 2) or mirror '
+                         '(the converter route: a mirrored copy of each see-through face, only those)')
     ap.add_argument('--model-bevels', default='profile',
                     help='Edge bevels of the model standing hulls (EXPERIMENTAL; CHIM-COMPILED-HULL-OVERFILL-46): profile '
                          '(default: only meshes whose profile asks for them, the method before), exact (every model) or '
@@ -334,6 +338,7 @@ def _main(ap, a):
                      **({'terrain_refs': a.terrain_refs} if a.terrain_refs != 'off' else {}),
                      **({'model_hull_patch': a.model_hull_patch} if a.model_hull_patch != 'on' else {}),
                      **({'model_bevels': a.model_bevels} if a.model_bevels != 'profile' else {}),
+                     **({'fence_twosided_faces': a.fence_twosided_faces} if a.fence_twosided_faces != 'off' else {}),
                      **({'placement_format': a.placement_format} if a.placement_format != '0.7' else {}),
                      **({'reach_index': a.reach_index} if a.reach_index != 'copies' else {}),
                      **({'terrain_pack': a.terrain_pack} if a.terrain_pack != 'bsp29' else {}),

@@ -77,6 +77,7 @@ Family: Morrowind editions, archives and inputs (`game-data-editions`). The buil
 Related bugs in other categories:
 
 - BUILD-GAME-INPUT-KEY-BROAD-64 (no report page): Every stage that reads the game data was keyed by every game input, so an expansion file being present re-keyed the base world
+- BUILD-LAYER-DATA-MWAD-SHADOWED-64 (no report page): The Bloodmoon layer data stage stops with mwad is not a package in a MiniWind build
 - CHIM-SEA-BETWEEN-ISLANDS-64 (no report page): The CHIM cell list holds no sea between Vvardenfell and Solstheim
 - CHIM-SOLSTHEIM-HULL-SURFACE-64 (no report page): The CHIM collision surface check refuses 25 Bloodmoon meshes that are not in its measured table
 - CHIM-SOLSTHEIM-STAIR-CHECK-64 (no report page): The geometric stair check fails on three Bloodmoon meshes

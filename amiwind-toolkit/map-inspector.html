@@ -14,10 +14,18 @@ button[aria-pressed="true"]{background:#386685;border-color:#8bd5ff;color:#fff;b
 .footercopy{display:inline-flex;align-items:center;gap:6px}.footercopy.copy-success{background:#175b38;border-color:#6bdf96;color:#fff}
 </style>
 <script src="header.js" data-subtitle="3D Map Inspector" data-hide="header h1"></script>
+<script src="auto-refresh.js"></script>
 <script src="chim-reader.js"></script>
 <script src="view-camera.js"></script>
 <header><button id="sidebartoggle" aria-expanded="true" aria-controls="inspector-sidebar" style="flex-shrink:0;white-space:nowrap;display:inline-flex;align-items:center;gap:7px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/></svg><span id="sidebarlabel">Hide sidebar</span></button><div id="viewcontrols" role="group" aria-label="View" style="display:flex;gap:6px;flex-shrink:0;white-space:nowrap"><button id="above" aria-pressed="false">From above</button><button id="returnfly" aria-pressed="true">Fly view</button><button id="vieworbit" aria-pressed="false">Orbit</button></div><h1>AmiWind · Polycount inspector<br><small style="font-size:11px;color:#abc">Last updated with AmiWind v0.0.38 · first made in v0.0.28</small></h1><label style="margin:0">Open BSP / CHIM / JSON <input id="file" type="file" accept=".bsp,.chim,.json"></label><button id="demo">Synthetic cube</button><button id="painttoggle" aria-pressed="false" title="Click a face to mark it; drag is one undo step" style="white-space:nowrap;flex-shrink:0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 3l7 7-9 9-7-7zM5 12l-3 9 9-3"/></svg> Paint mode OFF</button><button id="exportall" title="Camera, display settings and planning annotations; source assets are referenced, not embedded">Export all</button><button id="copysession" title="Copy inspection session JSON" aria-label="Copy inspection session JSON"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg><span id="copysessionlabel" hidden></span></button><label class="sessionload">Load session<input id="sessionimport" type="file" accept=".json" hidden></label></header><div id="copyconfirmation" role="status" aria-live="polite" hidden></div><div id="facebar" role="group" aria-label="Polygon budget"><output id="facecount">Faces: no scene</output><label>Face budget <input id="facebudget" type="number" min="1" step="1" placeholder="Set budget" aria-label="Face budget"></label><span id="facebudgetstatus">Budget unset</span></div>
 <main><aside id="inspector-sidebar"><b>Inspect compiled geometry</b><p class="small">Offline, read-only. No uploads, collision simulation or game execution. User-supplied scenes remain local.</p>
+<details open id="chimroompanel"><summary><b>CHIM room</b></summary>
+<p class="small">A CHIM room is <code>chimi/rooms/&lt;room&gt;.crm</code> with its models in the interior store <code>chimi/world.cwi</code>: open an image's <code>id1</code> folder or the build's <code>chim-interiors</code> folder. Each placed model shows its faces and its drawing and collision bytes; the heat switch below colours by collision.</p>
+<label>Open id1 or chim-interiors folder <input id="chimroomfolder" type="file" webkitdirectory multiple style="width:100%"></label>
+<label>Room <input id="chimroomname" list="chimroomlist" style="width:100%"><datalist id="chimroomlist"></datalist></label>
+<p><button id="chimroomload">Show room</button></p>
+<div id="chimroominfo" class="small" style="white-space:pre-wrap">No CHIM room loaded.</div>
+</details>
 <details open id="chimpanel"><summary><b>CHIM world</b></summary>
 <p class="small">A CHIM world is the build's <code>chim-world</code> folder: <code>chim/world.cwi</code>, the frames and their sector files, and the reports (<code>chim-heap.json</code>). It is read here, in this browser; nothing is uploaded. A <code>.chim</code> map holds only its frame's entities: the frame's ground and objects are in the world.</p>
 <label>Open CHIM world folder <input id="chimfolder" type="file" webkitdirectory multiple style="width:100%"></label>
@@ -33,6 +41,7 @@ button[aria-pressed="true"]{background:#386685;border-color:#8bd5ff;color:#fff;b
 </details>
 <button id="fly">Enter mouse look</button> <button id="reset">Overview</button><label><input type="checkbox" id="showcompass" checked> Viewport compass</label><label><input id="showgizmo" type="checkbox" checked> Orientation gizmo</label>
 <label>Display <select id="mode"><option value="white">White wireframe</option><option value="density">Vertex density</option></select></label>
+<label>Heat <select id="heatsource"><option value="visual">Visual: vertex density</option><option value="collision">Collision: collision bytes per model</option><option value="ratio">Ratio: collision / visual bytes</option></select></label>
 <label><input type="checkbox" id="textures"> Load textures</label>
 <div id="texturecolorchoice" style="display:none"><p>Texture color</p><div role="group" aria-label="Texture color"><button id="texturebw" aria-pressed="true">B/W</button> <button id="texturecolor" aria-pressed="false">COLOR</button></div><p>Palette</p><div role="group" aria-label="Preview palette"><button id="palettebuiltin" aria-pressed="true">Built-in preview</button> <button id="palettelocal" aria-pressed="false">Local palette</button></div><p class="small">Built-in preview palette: 256 RGB entries (216-color cube + 40 grays), generated by this tool. It does not reproduce original game colors or emulate display hardware.</p></div>
 <label><input type="checkbox" id="heattextures" checked> Show heatmap over textures</label><label><input type="checkbox" id="overlay" checked> Wireframe overlay on solids</label>
@@ -633,8 +642,20 @@ function gizmoPointerUp(event){
 function initializeGizmo(){const canvas=$('gizmo');canvas.addEventListener('pointerdown',gizmoPointerDown);canvas.addEventListener('pointermove',gizmoPointerMove);canvas.addEventListener('pointerup',gizmoPointerUp);canvas.addEventListener('pointercancel',e=>{e.stopPropagation();gizmoGesture=null;});canvas.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();});$('showgizmo').onchange=()=>{updateOrientationGizmo();dirty=true;};$('vieworbit').onclick=enterOrbit;}
 
 function load(s,filename){validate(s);$('emptyload').hidden=true;resetNavigation();closeSessionCopy();orbitMode=false;orbitOrtho=false;orbitPivot=null;clearZones(false);faceMarks=[];markupUndo=[];markupRedo=[];paintStroke=null;$('markmode').value='inspect';markupStatus();if(!demoSwitching){demoReturn=null;demoActive=false;$('demo').textContent='Synthetic cube';}pendingInspectionImport=null;loadedPaletteFilename=null;requiredPaletteFilename=null;selectedPaletteKind=s.palette?'local':'builtin';loadedFilename=filename||s.loaded_filename||s.source_filename||s.source;areaPoints=[];areaClosed=false;drawArea=false;if(!gl)throw Error('WebGL unavailable');disposeSolids();for(let o of objects){gl.deleteBuffer(o.buffer);}scene=s;baseFaceTotals=previewFaceTotals(s,null);terrainPreview=null;objects=s.objects.map(o=>({...o,bounds:bounds(o.vertices)}));if(VC()&&objects.length){const lo=[0,1,2].map(k=>Math.min(...objects.map(o=>o.bounds[0][k]))),hi=[0,1,2].map(k=>Math.max(...objects.map(o=>o.bounds[1][k])));moveBase=VC().baseSpeed(lo,hi);}for(let o of objects)componentStats(o);cachePlacementFaceTotals();cacheSceneBatchStats();selected=-1;$('copyobject').disabled=true;$('objectcopytext').hidden=true;$('objectcopystatus').textContent='';updateSelectedFooter();density();list();textureList();overview();if($('terraincull').checked)updateTerrainPreview();cutsSceneChanged();$('hint').textContent='Actual compiled edges. Wireframe is see-through. Load textures adds depth-tested unlit surfaces. Click a surface to inspect.';}
+// The heat of a placed model under the collision views: its collision bytes, or its collision / visual byte ratio
+// (x1000, so the log scale keeps the spread); 0 for an object with no collision figures.
+function collisionHeat(o,source){const s=o.chim&&o.chim.collision;if(!s)return 0;return source==='ratio'?Math.round(1000*(s.ratio_bytes||0)):s.collision_bytes;}
 function density(){
   if(!scene)return;
+  const source=$('heatsource')?$('heatsource').value:'visual';
+  if(source!=='visual'){
+    densityMax=1;for(const o of objects)densityMax=Math.max(densityMax,collisionHeat(o,source));
+    densityBins=new Map();densityKey=p=>p.join(',');
+    for(const o of objects){const v=collisionHeat(o,source);o.vertexDensity=o.vertices.map(()=>v);if(o.previewVertices)o.previewVertexDensity=o.previewVertices.map(()=>v);}
+    rebuildLineBuffers();
+    $('densitylabel').textContent=(source==='ratio'?'Heat = collision / visual bytes of each placed model (x1000). Maximum ratio '+(densityMax/1000).toFixed(2):'Heat = collision bytes of each placed model (clipnodes, collision pieces, collision-only planes). Maximum '+chimFmt(densityMax)+' B')+'. Objects without collision figures (not a CHIM model) show 0.';
+    resetDensityRange();disposeSolids();dirty=true;return;
+  }
   let size=Math.max(1,Math.min(8192,Number($('bin').value)||64)),bins=new Map(),key=p=>p.map(x=>Math.floor(x/size)).join(',');
   for(let o of objects)for(let p of o.vertices){let k=key(p);bins.set(k,(bins.get(k)||0)+1);}
   densityMax=1;for(let count of bins.values())densityMax=Math.max(densityMax,count);
@@ -793,7 +814,7 @@ $('palette').onchange=async()=>{let file=$('palette').files[0];if(!file||!scene)
 // A bare name (?map=bmhlaalucouncil) loads <name>.bsp from the local map server (?maps=<base url>, default 127.0.0.1:8061);
 // a map server that resolves names as the engine does answers with the frame's .chim, recognised by its "_chim_frame" key.
 // ?world=<url of a chim-world folder>[&frame=frames/x-03/y-02] opens a CHIM world served over HTTP (Open CHIM world).
-if(typeof addEventListener==='function')addEventListener('load',async()=>{let q=new URLSearchParams(location.search),w=q.get('world'),u=q.get('map'),z=q.get('worldzip');if(z){try{const url=new URL(z,location.href);if(!['http:','https:'].includes(url.protocol)||url.username||url.password)throw Error('Use an HTTP(S) archive URL without credentials');const r=await fetch(url,{credentials:'omit'});if(!r.ok)throw Error('HTTP '+r.status);const b=await r.blob();if(b.size>128*1024*1024)throw Error('Archive exceeds 128 MiB inspection limit');const f=new File([b],decodeURIComponent(url.pathname.split('/').pop()));await chimOpenWorld(await chimReader().zipSource(f),f.name,q.get('frame'));}catch(e){reportError(e);}return;}if(w){try{await chimOpenWorld(AmiWindChim.urlSource(w),w,q.get('frame'));}catch(e){$('hint').textContent='Cannot autoload the CHIM world: '+e.message;$('hint').className='error';}return;}if(!u)return;if(!/[\/:]/.test(u))u=(q.get('maps')||'http://127.0.0.1:8061').replace(/\/$/,'')+'/'+(/\.(bsp|chim|json)$/i.test(u)?u:u+'.bsp');try{let r=await fetch(u);if(!r.ok)throw Error('HTTP '+r.status+' for '+u);let b=await r.blob();await openFile(new File([b],decodeURIComponent(u.split('/').pop().split('?')[0])));}catch(e){$('hint').textContent='Cannot autoload: '+e.message;$('hint').className='error';}});
+if(typeof addEventListener==='function')addEventListener('load',async()=>{let q=new URLSearchParams(location.search),w=q.get('world'),u=q.get('map'),z=q.get('worldzip'),rs=q.get('rooms');if(rs){try{if(q.get('heat'))$('heatsource').value=q.get('heat');await chimOpenRooms(AmiWindChim.urlSource(rs),rs,q.get('room'));if($('heatsource').value!=='visual'){$('mode').value='density';density();}}catch(e){$('hint').textContent='Cannot autoload the CHIM room: '+e.message;$('hint').className='error';}return;}if(z){try{const url=new URL(z,location.href);if(!['http:','https:'].includes(url.protocol)||url.username||url.password)throw Error('Use an HTTP(S) archive URL without credentials');const r=await fetch(url,{credentials:'omit'});if(!r.ok)throw Error('HTTP '+r.status);const b=await r.blob();if(b.size>128*1024*1024)throw Error('Archive exceeds 128 MiB inspection limit');const f=new File([b],decodeURIComponent(url.pathname.split('/').pop()));await chimOpenWorld(await chimReader().zipSource(f),f.name,q.get('frame'));}catch(e){reportError(e);}return;}if(w){try{await chimOpenWorld(AmiWindChim.urlSource(w),w,q.get('frame'));}catch(e){$('hint').textContent='Cannot autoload the CHIM world: '+e.message;$('hint').className='error';}return;}if(!u)return;if(!/[\/:]/.test(u))u=(q.get('maps')||'http://127.0.0.1:8061').replace(/\/$/,'')+'/'+(/\.(bsp|chim|json)$/i.test(u)?u:u+'.bsp');try{let r=await fetch(u);if(!r.ok)throw Error('HTTP '+r.status+' for '+u);let b=await r.blob();await openFile(new File([b],decodeURIComponent(u.split('/').pop().split('?')[0])));}catch(e){$('hint').textContent='Cannot autoload: '+e.message;$('hint').className='error';}});
 // Two readers: .bsp is a Quake BSP29 map (bsp() above); .chim is a CHIM map, CHIM's own format, read by the CHIM
 // reader (chim-reader.js). A file named .bsp whose worldspawn names a CHIM frame ("_chim_frame", the builder's own
 // test) is a CHIM frame map of a build before v0.0.36 and goes to the CHIM reader too.
@@ -950,8 +971,56 @@ function chimInfoUpdate(){
   if(fd&&fd.problems.length)L.push('Problems: '+fd.problems.slice(0,8).join('; ')+(fd.problems.length>8?' ...':''));
   chimInfo(L.join('\n'));
 }
+// ---- CHIM rooms (chimi/rooms/<room>.crm + the interior store): every placement with its model's collision figures
+const chimRoom={store:null,label:'',data:null};
+function chimCollisionText(s){
+  if(!s)return 'Collision figures: not read';
+  return 'Faces '+chimFmt(s.faces)+' · triangles '+chimFmt(s.triangles)+'\nBytes: drawing '+chimFmt(s.draw_bytes)+' B, collision '+chimFmt(s.collision_bytes)+' B (clipnodes '+chimFmt(s.clipnode_bytes)+' B, piece table '+chimFmt(s.piece_bytes)+' B, collision-only planes '+chimFmt(20*s.clip_only_planes)+' B)'
+    +'\nPlanes '+chimFmt(s.planes)+': '+chimFmt(s.face_planes)+' used by faces, '+chimFmt(s.node_planes)+' by nodes, '+chimFmt(s.clip_only_planes)+' by clipnodes only'
+    +'\nClipnodes '+chimFmt(s.clipnodes)+' (hull 1 reaches '+chimFmt(s.hull1_clipnodes)+', hull 2 '+chimFmt(s.hull2_clipnodes)+', deepest chain '+chimFmt(s.deepest_chain)+') · hull 0 nodes '+chimFmt(s.nodes)+' · collision pieces '+chimFmt(s.pieces)
+    +'\nCollision / visual: '+(s.ratio_bytes===null?'-':s.ratio_bytes.toFixed(2))+' by bytes, '+(s.ratio_counts===null?'-':s.ratio_counts.toFixed(2))+' by counts (clipnodes + pieces per face)';
+}
+function chimRoomScene(rd,name){
+  const R=chimReader(),objects=[],modelKey=new Map();let key=0;
+  for(const r of rd.record.placements){
+    const m=rd.models.get(r.model);if(!m)continue;if(objects.length>=9900)break;
+    const g0=R.brushGeometry(m.image,{origin:r.origin,yaw:r.yaw});
+    let g;
+    if(!g0.vertices.length)g=chimBox(r.box[0],r.box[1]);
+    else{const triangles=[],edges=new Set();for(const p of g0.polygons){for(let k=1;k+1<p.vertices.length;k++)triangles.push([p.vertices[0],p.vertices[k],p.vertices[k+1]]);for(let k=0;k<p.vertices.length;k++){const a=p.vertices[k],b=p.vertices[(k+1)%p.vertices.length];edges.add(a<b?a+','+b:b+','+a);}}
+      g={vertices:g0.vertices,polygons:g0.polygons.map(p=>({vertices:p.vertices,texinfo:p.texinfo,lightmapped:p.lightmapped})),triangles,edges:Array.from(edges,x=>x.split(',').map(Number)),faceCount:g0.polygons.length,materialCount:new Set(g0.polygons.map(p=>p.texinfo)).size};}
+    if(!modelKey.has(r.model)){modelKey.set(r.model,key);key+=g.faceCount;}
+    const s=m.collision;
+    objects.push(Object.assign(g,{name:'CHIM room placement '+r.pid+' · '+m.name+(s&&s.ratio_bytes!==null?' · collision / visual '+s.ratio_bytes.toFixed(2):''),model:r.model+1,reference:String(r.ref),entityIndex:r.pid+1,storedFaceRange:[modelKey.get(r.model),g.faceCount],origin:r.origin,angles:'0 '+r.yaw+' 0',chim:{kind:'room-placement',record:r,model:m,collision:s}}));
+  }
+  return {format:'amiwind-mesh-inspector-1',source:name,metric:'CHIM room placements; heat by the Heat switch (visual, collision, ratio)',objects,textures:[],chim_room:rd.room};
+}
+function chimRoomInfo(){
+  const rd=chimRoom.data;if(!rd){$('chimroominfo').textContent='No CHIM room loaded.';return;}
+  const R=chimReader(),t=R.roomCollisionTotals(rd),row=x=>chimFmt(x.faces)+' faces, '+chimFmt(x.clipnodes)+' clipnodes, '+chimFmt(x.pieces)+' collision pieces; drawing '+chimFmt(x.draw_bytes)+' B, collision '+chimFmt(x.collision_bytes)+' B; collision / visual '+(x.ratio_bytes===null?'-':x.ratio_bytes.toFixed(2))+' by bytes, '+(x.ratio_counts===null?'-':x.ratio_counts.toFixed(2))+' by counts';
+  const worst=[...rd.models.values()].filter(m=>m.collision).sort((a,b)=>(b.collision.ratio_bytes||0)-(a.collision.ratio_bytes||0)).slice(0,8);
+  $('chimroominfo').textContent='Room '+rd.room+' ('+chimRoom.label+'): '+rd.record.placements.length+' placements of '+rd.models.size+' store models\nStored (each model once): '+row(t.stored)+'\nPlaced (every placement): '+row(t.placed)
+    +'\nWorst models by collision / visual bytes:\n'+worst.map(m=>'  '+m.collision.ratio_bytes.toFixed(2)+'  '+m.name+'  ('+chimFmt(m.collision.collision_bytes)+' / '+chimFmt(m.collision.draw_bytes)+' B)').join('\n')
+    +(rd.problems.length?'\nProblems: '+rd.problems.slice(0,6).join('; '):'');
+}
+async function chimOpenRooms(source,label,room){
+  const R=chimReader();if(!R)throw Error('The CHIM reader (chim-reader.js) did not load');
+  $('chimroominfo').textContent='Reading the interior store index ...';
+  chimRoom.store=await R.openRoomStore(source);chimRoom.label=label;chimRoom.data=null;
+  const dl=$('chimroomlist');dl.replaceChildren();for(const r of chimRoom.store.rooms){const o=document.createElement('option');o.value=r;dl.append(o);}
+  $('chimroominfo').textContent='Store '+chimRoom.store.base+': '+chimFmt(chimRoom.store.index.models.length)+' models, '+chimRoom.store.rooms.length+' rooms listed. Name a room and press Show room.';
+  if(room){$('chimroomname').value=room;await chimShowRoom();}
+}
+async function chimShowRoom(){
+  if(!chimRoom.store)throw Error('Open an id1 or chim-interiors folder first');
+  const name=($('chimroomname').value||'').trim().replace(/\.crm$/,'');if(!name)return;
+  $('chimroominfo').textContent='Reading room '+name+' ...';
+  chimRoom.data=await chimReader().loadRoom(chimRoom.store,name);
+  const s=chimRoomScene(chimRoom.data,(chimRoom.label||'CHIM rooms')+' · '+name);load(s,s.source);chimRoomInfo();
+}
 function chimDescribe(o){
   const c=o.chim,t=chim.tables,fd=chim.frameData;
+  if(c.kind==='room-placement'){const r=c.record,m=c.model;return 'CHIM room placement '+r.pid+' · reference '+r.ref+'\nModel '+m.id+' '+m.name+': '+chimFmt(m.bytes)+' B in '+m.file+' (render part '+chimFmt(m.render)+' B)\n'+chimCollisionText(c.collision)+'\nOrigin '+r.origin.map(v=>v.toFixed(1)).join(', ')+' · yaw '+r.yaw.toFixed(1)+'°';}
   if(c.kind==='chunk'){const k=c.chunk,i=fd?fd.chunks.indexOf(k):-1;return 'CHIM chunk '+k.index+', chunk ('+k.cx+', '+k.cy+') of the frame, sector s'+String(k.sector).padStart(2,'0')+' ('+k.file+')\nRecord '+chimFmt(k.record_bytes)+' B on disk (render '+chimFmt(k.render)+' B, collision '+chimFmt(k.collision)+' B)\n'+(k.terrain?'Ground: a terrain reference to TERR '+k.terrain.id+' in '+k.terrain.file+' ('+chimFmt(k.terrain.bytes)+' B), placed at '+k.terrain.shift.join(', '):'Ground: stored in the chunk record')+'\nZone block with its placement catalogue: '+(t&&i>=0?chimFmt(t.own[i]):'?')+' B\n'+k.owned.length+' owned + '+k.reach.length+' reach placement records · drawn z '+k.zmin+' to '+k.zmax;}
   if(c.kind==='placement'){const r=c.record,m=c.model;return 'CHIM placement '+r.pid+' · reference '+r.ref+' · owner chunk '+r.owner+'\nModel '+m.id+' '+m.name+': record '+chimFmt(m.bytes)+' B on disk (render '+chimFmt(m.render)+' B) in '+m.file+'\nZone block: '+chimFmt(m.heap_bytes)+' B, once per ring for every placement of the model\nOrigin '+r.origin.map(v=>v.toFixed(1)).join(', ')+' · yaw '+r.yaw.toFixed(1)+'° · '+r.leaves+' leaves'+(r.flags&1?' · more than 16 leaves':'')+(r.flags&2?' · hidden by the opening story':'');}
   const e=c.entity||{};return 'CHIM map '+(c.kind==='map-bounds'?'frame bounds':c.kind==='map-clip'?'clip model (collision only)':'entity')+'\n'+Object.entries(c.kind==='map-bounds'?c.map.worldspawn:e).filter(([k])=>/^(classname|model|origin|aw_ref|aw_source_id|_chim_[a-z_]+)$/.test(k)).map(([k,v])=>k+' '+v).join('\n');
@@ -975,6 +1044,9 @@ function drawChimOverlay(c){
 $('chimfolder').onchange=()=>{const fl=$('chimfolder').files;if(fl&&fl.length)chimRun(()=>chimOpenWorld(chimReader().filesSource(fl),'folder '+(((fl[0].webkitRelativePath||'').split('/')[0])||'chosen')));};
 $('chimzip').onchange=()=>{const f=$('chimzip').files&&$('chimzip').files[0];if(f)chimRun(async()=>chimOpenWorld(await chimReader().zipSource(f),f.name));};
 $('chimload').onclick=()=>chimRun(chimShowFrame);
+$('chimroomfolder').onchange=()=>{const fl=$('chimroomfolder').files;if(fl&&fl.length)chimRun(()=>chimOpenRooms(chimReader().filesSource(fl),'folder '+(((fl[0].webkitRelativePath||'').split('/')[0])||'chosen')));};
+$('chimroomload').onclick=()=>chimRun(chimShowRoom);
+$('heatsource').onchange=()=>{if($('heatsource').value!=='visual')$('mode').value='density';density();};
 $('chimheapfile').onchange=()=>{const f=$('chimheapfile').files&&$('chimheapfile').files[0];if(f)chimRun(async()=>{chim.heap=chimReader().parseHeapReport(JSON.parse(await f.text()));chim.heapLabel=f.name;if(chim.world)chimFillFrames();chimHeapUpdate();});};
 $('chimsizes').onchange=()=>{const f=$('chimsizes').files&&$('chimsizes').files[0];if(f)chimRun(async()=>{chim.sizes=chimReader().sizesFrom(JSON.parse(await f.text()));chim.sizesLabel=f.name;chimHeapUpdate();});};
 $('chimheat').onchange=()=>{dirty=true;};$('chimworst').onchange=()=>{dirty=true;};

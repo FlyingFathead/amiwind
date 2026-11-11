@@ -35,6 +35,7 @@
 #include "aw_msgbox.h"
 #include "aw_levelup.h"
 #include "aw_dial_links.h"
+#include "aw_pcstanding.h"
 
 #define BOX_X 8
 #define BOX_Y 6
@@ -1459,6 +1460,46 @@ int AW_DialWindowRankRequirement(const char *faction,int rank,const short *attri
     if(!load())return 0;
     return AW_DialRankRequirement(&table,faction,rank,attributes,skills,reputation,read_rank_req,NULL);
 }
+/* FACTION-STATS-PAGE-64: BYTES at OFFSET of the table (the open conversation's file, else opened for the read) */
+static int read_table(long offset,void *out,long bytes){
+    FILE *f=file;long start=file_start;int ok;
+    if(offset<0)return 0;
+    if(!f){if(COM_FOpenFile((char *)path,&f)<=0 || !f){if(f)fclose(f);return 0;}start=ftell(f);}
+    ok=!fseek(f,start+offset,SEEK_SET) && fread(out,1,bytes,f)==(size_t)bytes;
+    if(f!=file)fclose(f);
+    return ok;
+}
+static void rank_name(const char *faction,int rank,char *out,int size){
+    char name[AW_DIAL_FACTION_ID];long at=AW_DialRankAt(&table,faction,rank);int i;
+    out[0]=0;
+    if(at<0 || !read_table(at,name,AW_DIAL_FACTION_ID))return;
+    for(i=0;i<size-1 && i<AW_DIAL_FACTION_ID && name[i];i++)out[i]=name[i];
+    out[i]=0;
+}
+/* the stats page's standing (aw_statswin.h aw_stats_standing): the members' factions with the rank's name and the
+ * next rank's needs (the requirement row: u8 attribute x2, u8 skill x7, 3 zeros, then per rank s16 attribute 1,
+ * attribute 2, one skill, two skills, faction reputation; aw_dial.c AW_DialRankRequirement), the reputation and
+ * the bounty; at most 2 rank-name reads and one row read per faction, once per opening */
+static int stats_standing(aw_stats_sheet_t *s){
+    int i,n=AW_StandingCount(),k;
+    s->reputation=AW_StandingReputation();s->bounty=AW_StandingCrime();s->factions=0;
+    for(i=0;i<n && s->factions<AW_STATS_FACTIONS;i++){
+        const char *id=AW_StandingAt(i);int rank=AW_StandingRank(id);aw_stats_faction_t *f;unsigned char r[AW_DIAL_RANK_REQ];
+        if(!id || rank<0)continue;                        /* known by a reputation alone: not a member */
+        f=&s->faction[s->factions++];memset(f,0,sizeof(*f));
+        for(k=0;k<(int)sizeof(f->name)-1 && id[k];k++)f->name[k]=id[k];
+        f->expelled=(unsigned char)(AW_StandingExpelled(id)!=0);f->reputation=(short)AW_StandingFactionReputation(id);
+        if(!load())continue;
+        rank_name(id,rank,f->rank,sizeof(f->rank));
+        if(rank+1<AW_DIAL_RANKS)rank_name(id,rank+1,f->next,sizeof(f->next));
+        if(f->next[0]){
+            long at=AW_DialRankReqAt(&table,id);
+            if(at>=0 && read_rank_req(NULL,at,r,AW_DIAL_RANK_REQ) && AW_DialRankNeeds(r,rank+1,f->attribute,f->need))
+                f->has_next=1;
+        }
+    }
+    return 1;
+}
 /* The journal's topic pages (aw_worldui.c): a topic's name and a heard entry's text from the table, the file opened
  * for the read when no conversation holds it. 1 read. */
 static int read_journal(long at,char *out,int capacity){
@@ -1655,6 +1696,7 @@ void AW_DialWindowInit(void){   /* the journal book's topic pages read through t
     aw_journal_topic_name=AW_DialWindowTopicName;aw_journal_entry_text=journal_entry_filled;
     aw_journal_entry_marked=journal_entry_marked;aw_journal_updated=journal_updated;
     aw_ui_dialogue_backdrop=AW_DialWindowActive;   /* DIALOGUE-BACKDROP-HUD-60: plain black, no HUD behind the window */
+    aw_stats_standing=stats_standing;              /* FACTION-STATS-PAGE-64 */
     Cvar_RegisterVariable(&topic_colours);Cmd_AddCommand("aw_topic_colours",topic_colours_command);
 }
 /* PLAYER-CASTING-59 (aw_cast.c): the game's fEffectCostMult from this table (0 when the build has none), and a

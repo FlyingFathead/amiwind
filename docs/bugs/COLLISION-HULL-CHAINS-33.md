@@ -1,5 +1,14 @@
 # COLLISION-HULL-CHAINS-33: 183 brush models across the island collide through long standing-hull chains
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 2 times; something has to be done
+
+- Reported with v0.0.42-dev2 at 2026-10-17 12:03 +0300: CHIMport run 17 Oct: 14 cells stay hull policy pending (one model over the chain limit each, depth 285-1,624), all else passing
+- Reported with v0.0.64-dev3 at 2026-11-10 20:29 +0200: Collision census of the v0.0.64-dev3 build: in_mudcave_21, in_moldcave_21, in_pycave_21 and in_lavacave_21 have 27,950 clipnodes for 1,077 faces and a deepest chain of 27,950 (the whole hull is one chain: a trace can walk every clipnode), collision / drawing bytes 2.98; the Heart Chamber cave tiles (in_akulacave00) show the same, about 26 clipnodes per face, ratio 2.93 to 2.96. Costs frame time as well as memory (tools/collision_census.py).
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -20,6 +29,7 @@ _Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
 <!-- contents start -->
 ## Contents
 
+- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
 - [Status: 9 October 2026](#status-9-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)

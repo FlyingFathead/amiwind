@@ -1,0 +1,14 @@
+[Unit]
+Description=AmiWind first start: install Amiberry from the image, then restart
+ConditionPathExists=/var/cache/amiwind/debs
+After=local-fs.target
+Before=amiwind.service getty@tty1.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/amiwind-firstboot
+StandardOutput=journal
+TimeoutStartSec=20min
+
+[Install]
+WantedBy=multi-user.target

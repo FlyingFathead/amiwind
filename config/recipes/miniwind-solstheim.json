@@ -6,7 +6,7 @@
     "miniwind": true,
     "miniwind_scope": "exterior",
     "miniwind_description": "Solstheim test frame: Bloodmoon cell -23,20 (dbg tp solm23p20)",
-    "direct_to_game_map": "cell:-3,-2",
+    "direct_to_game_map": "balmora",
     "exclude_unreferenced": "voice,npcs",
     "chim_frame_ext": "chim",
     "chim_sol_test": "-23,20:l",

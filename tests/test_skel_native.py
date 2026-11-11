@@ -85,6 +85,78 @@ class SkelNativeTests(unittest.TestCase):
 
 @unittest.skipIf(os.name == 'nt', 'native fixtures run in the Linux Docker gate')
 @unittest.skipUnless(shutil.which('cc'), 'a Linux C compiler is required')
+class SkelScaledNativeTests(unittest.TestCase):
+    def test_the_engine_scales_a_bone_and_its_children_from_a_version_4_table(self):
+        """HEART-OF-LORKHAN-LOOK-62 (CREATURE-SCALE-KEYS-54): a scale track on the middle bone of the chain shrinks it
+        and the bone below it, between frames too, as the builder's local matrices times the scale; the index of the
+        scaled table sizes and pages as a version 2 table's (the scale section is in the index)."""
+        import creature_tables as CT
+        chain = Chain()
+        bones = S.bone_order(Chain.parents, ['fore'])
+        parents = [-1 if Chain.parents[b] is None else bones.index(Chain.parents[b]) for b in bones]
+        times = S.table_frames(0.0, 2.0, rate=10.0)
+        rot, pos = S.sample_table(chain, bones, times)
+        q, p, scale = S.quantise_table(rot, pos)
+        keys = [('start', 0, 0), ('stop', 0, 10), ('soundgen: left', S.NO_GROUP, 14), ('start', 1, 11),
+                ('stop', 1, 20)]
+        plain = S.write_table(parents, {'idle': (0, 10), 'walkforward': (11, 20)}, q, p, scale, keys=keys)
+        shrink = np.linspace(1.0, 0.0682, len(times))
+        table = CT.to_scaled(plain, {1: shrink})
+        self.assertEqual(table[4:6], b'\x00\x04')
+        back, tracks = CT.from_scaled(table)
+        self.assertEqual(back, plain)
+        np.testing.assert_allclose(tracks[1], shrink, atol=1 / CT.SCALE_ONE)
+        self.assertEqual(CT.to_scaled(plain, {}), plain)
+        stored = np.round(shrink * CT.SCALE_ONE) / CT.SCALE_ONE
+        rot_q, pos_q = S.dequantise_table(q, p, scale)
+        rng = np.random.default_rng(11)
+        rows, expect = [], []
+        for frame in (0.0, 4.0, 4.5, 12.25, 20.0, 30.0):
+            f0 = min(int(frame), len(times) - 1)
+            f1 = min(f0 + 1, len(times) - 1)
+            u = min(frame, len(times) - 1) - f0
+            locals_ = []
+            for b in range(len(bones)):
+                qq = S.nlerp(rot_q[f0, b], rot_q[f1, b], u)
+                m = np.array(S.local_matrix(qq, pos_q[f0, b] * (1 - u) + pos_q[f1, b] * u), float)
+                if b == 1:
+                    m[:3, :3] *= stored[f0] * (1 - u) + stored[f1] * u
+                locals_.append(m)
+            world = S.pose_matrices(parents, locals_)
+            for b in range(len(bones)):
+                point = rng.uniform(-5, 5, 3)
+                rows.append('%.9g %d %.9g %.9g %.9g' % (frame, b, *point))
+                expect.append((np.append(point, 1.0) @ world[b])[:3])
+        with tempfile.TemporaryDirectory() as scratch:
+            scratch = Path(scratch)
+            (scratch / 'table.bin').write_bytes(table)
+            (scratch / 'points.txt').write_text('\n'.join(rows) + '\n')
+            exe = scratch / 'skel-check'
+            compiled = subprocess.run(['cc', '-std=gnu89', '-O1', '-fsanitize=undefined', '-fno-sanitize-recover=all',
+                                       '-I' + str(SOURCE), str(ROOT / 'tests/aga_skel_test.c'),
+                                       str(SOURCE / 'aw_skel.c'), '-lm', '-o', str(exe)],
+                                      capture_output=True, text=True)
+            self.assertEqual(compiled.returncode, 0, compiled.stdout + compiled.stderr)
+            result = subprocess.run([str(exe), str(scratch / 'table.bin'), str(scratch / 'points.txt')],
+                                    capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            # a damaged scale section is refused: a bone past the table, a section size that does not fit
+            for at, value in ((24 + CT.SCALED_EXT + 1, 9), (24 + 7, 0)):
+                bad = bytearray(table)
+                bad[at] = value
+                (scratch / 'bad.bin').write_bytes(bytes(bad))
+                refused = subprocess.run([str(exe), str(scratch / 'bad.bin'), str(scratch / 'points.txt')],
+                                         capture_output=True, text=True)
+                self.assertNotEqual(refused.returncode, 0)
+        lines = result.stdout.splitlines()
+        self.assertEqual(lines[0], 'table bones 3 frames 21 groups 2')
+        self.assertEqual(lines[-1], 'skel ok')
+        got = np.array([[float(v) for v in line.split()] for line in lines[3:-1]])
+        np.testing.assert_allclose(got, np.array(expect), atol=1e-3)
+
+
+@unittest.skipIf(os.name == 'nt', 'native fixtures run in the Linux Docker gate')
+@unittest.skipUnless(shutil.which('cc'), 'a Linux C compiler is required')
 class SkelVertsNativeTests(unittest.TestCase):
     def test_the_engine_poses_a_skinned_shape_into_alias_bytes(self):
         """A shape with one-bone and joint vertices: the engine's byte frame (AW_SkelPoseVerts) equals the builder's
@@ -268,7 +340,8 @@ class SkelSourceTests(unittest.TestCase):
         # (the arrival autosave): the save buffers go through AW_TryMalloc, which asks exec's largest block first
         header = (SOURCE / 'aw_tryalloc.h').read_text()
         body = (SOURCE / 'aw_tryalloc.c').read_text()      # the rule: tests/test_engine_allocations.py
-        self.assertIn('return fits (size) ? malloc (size) : NULL;', body)
+        # (ROOM-LOAD-KEEPS-EXTERIOR-CACHE-64: the block is noted with its asking address before it is returned)
+        self.assertIn('void *p = fits (size) ? malloc (size) : NULL;', body)
         self.assertIn('#define AW_TryMalloc(size)\tmalloc (size)', header)
         save = (SOURCE / 'aw_save.c').read_text()
         self.assertIn('#include "aw_tryalloc.h"', save)

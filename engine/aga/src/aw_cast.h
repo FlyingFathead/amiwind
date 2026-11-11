@@ -37,6 +37,10 @@ float AW_CastChance(float base,int type,int power_ready,int always,float silence
 float AW_CastFatigueTerm(float base,float mult,float current,float maximum);
 /* A rolled magnitude between LO and HI for a draw R in [0, 1): LO + floor(R x (HI - LO + 1)), at most HI. */
 float AW_CastMagnitude(int lo,int hi,float r);
+/* RACE-RESIST-NOT-ON-SPELL-DAMAGE-64: the effects that resist EFFECT (aw_cast_rules.c) and the resistance in percent */
+int AW_CastResistEffects(int effect,int *resist,int *weakness,int *shield);
+float AW_CastResistance(float attr,float willpower,float luck,float fatigue_term,float cast_chance,float roll,int no_magnitude);
+void AW_MwscriptResistReport(void);   /* aw_mwhost.c: the landings' resistance counts (dbg cast spell prints them) */
 /* The seconds an effect lasts once landed: its duration, 1 for an effect without one (OpenMW inflict). */
 float AW_CastDuration(const aw_spell_effect_t *e,const aw_mgef_t *m);
 /* The ranges among the N effects, a bit per AW_RANGE_*. */

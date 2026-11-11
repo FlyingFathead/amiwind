@@ -1725,6 +1725,8 @@ def chim_stage_options(args):
         out += ['--model-hull-patch', args.chim_model_hull_patch]
     if getattr(args, 'chim_model_bevels', None) not in (None, 'profile'):
         out += ['--model-bevels', args.chim_model_bevels]
+    if getattr(args, 'chim_fence_twosided_faces', None) not in (None, 'off'):
+        out += ['--fence-twosided-faces', args.chim_fence_twosided_faces]
     if getattr(args, 'chim_placement_format', None) not in (None, '0.7'):
         out += ['--placement-format', args.chim_placement_format]
     if getattr(args, 'chim_reach_index', None) not in (None, 'copies'):

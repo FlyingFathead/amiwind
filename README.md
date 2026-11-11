@@ -4,7 +4,7 @@
 
 # AmiWind
 
-_Last updated with AmiWind v0.0.64-dev3 (10 November 2026)._
+_Last updated with AmiWind v0.0.64-dev4 (10 November 2026)._
 
 An unofficial, experimental RPG engine and enthusiast project bringing Morrowind
 to the Commodore Amiga, featuring CHIM: an AmiQuake-based engine and an asset
@@ -27,13 +27,20 @@ More in the [gallery](docs/GALLERY.md).
 
 ## Where AmiWind stands (10 November 2026)
 
-The development line is **v0.0.64: Gone Beyond The Gate**. Its third snapshot,
+The development line is **v0.0.64: Gone Beyond The Gate**. Its fourth snapshot,
+[v0.0.64-dev4](docs/releases/notes/RELEASE-v0.0.64-dev4.md), carries the first three. Cobwebs, hanging moss and leaves
+are drawn with their see-through parts instead of solid rectangles, now on by default (`aw_seethrough_material` 0/1/2);
+spell and trap damage meets the target's resistances and weaknesses; the stats page lists the player's factions; the
+journal no longer skips an ending entry; a room load gives back the area cache first; and the groundwork for Solstheim's
+map rows and HUD region names is in, though Solstheim is not playable yet. Race resistances were seen in play on a test
+build; the rest is checked by tests, not yet in play. Not in it yet: the Heart Chamber still does not load at 32 MB, and
+the tree methods are test-only. Its third snapshot,
 [v0.0.64-dev3](docs/releases/notes/RELEASE-v0.0.64-dev3.md), carries the first two (neither was published on its own, so
 it is the first snapshot of v0.0.64 on GitHub). It makes the spells, powers and enchantments of the game take effect again
 (a fault since v0.0.63 left every game spell without its effects), lets the console activate the Ghostgate's switches and
 other objects no script names, stands in lava and kills, keeps god mode across map changes, sorts a quest's state in the
 journal by its endings, shows the game's expulsion message, adds a see-through face pass for cobwebs and hanging growths
-(off by default until measured), a test-only star-shaped copy of Solstheim's spruces (a forest view goes from 45,964 faces
+(off by default in dev3, on from dev4), a test-only star-shaped copy of Solstheim's spruces (a forest view goes from 45,964 faces
 at the median to 6,096), and three map panes for the Toolkit's CHIM Progress Tracker. Argonian Breathing, the Ghostgate's
 switches, the door list's arrival lines and lava were checked in play on a test build; the rest is checked by tests, not
 yet in play. Its second snapshot,
@@ -122,7 +129,7 @@ delivered. v0.0.61 shipped as its third snapshot with the final version number
 
 What comes next is in the [roadmap](docs/ROADMAP.md). The next release is **v0.0.64: Gone Beyond The Gate**
 (its snapshots, [dev1](docs/releases/notes/RELEASE-v0.0.64-dev1.md),
-[dev2](docs/releases/notes/RELEASE-v0.0.64-dev2.md) and [dev3](docs/releases/notes/RELEASE-v0.0.64-dev3.md), have the expansion switch, the keys, the traps and a test-only
+[dev2](docs/releases/notes/RELEASE-v0.0.64-dev2.md), [dev3](docs/releases/notes/RELEASE-v0.0.64-dev3.md) and [dev4](docs/releases/notes/RELEASE-v0.0.64-dev4.md), have the expansion switch, the keys, the traps and a test-only
 Solstheim frame but no expansion area in the game yet):
 Tribunal (Mournhold) and Bloodmoon (Solstheim) built in by default where you own them (a warning when the files are
 not found, and a builder switch for the base game only), their scripting, and scripted world events such as the
@@ -394,8 +401,10 @@ test image of one spot see [MiniWind: the test ground](docs/MINIWIND.md), the
 Everything else about building, the build speed options, the FPU support library and running the image in FS-UAE or
 WinUAE: [Building and playing](docs/BUILDING_AND_PLAYING.md), the [Linux build guide](docs/LINUX_BUILD.md) and the
 [FS-UAE launcher](docs/FS-UAE-LAUNCHER.md). The newest emulator presets are
+[`AmiWind-v0.0.64-dev4-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.64-dev4-FS-UAE.fs-uae) and
+[`AmiWind-v0.0.64-dev4-WinUAE.uae`](resources/emulators/AmiWind-v0.0.64-dev4-WinUAE.uae) (for the previous snapshot:
 [`AmiWind-v0.0.64-dev3-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.64-dev3-FS-UAE.fs-uae) and
-[`AmiWind-v0.0.64-dev3-WinUAE.uae`](resources/emulators/AmiWind-v0.0.64-dev3-WinUAE.uae) (for the previous snapshot:
+[`AmiWind-v0.0.64-dev3-WinUAE.uae`](resources/emulators/AmiWind-v0.0.64-dev3-WinUAE.uae); then
 [`AmiWind-v0.0.64-dev2-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.64-dev2-FS-UAE.fs-uae) and
 [`AmiWind-v0.0.64-dev2-WinUAE.uae`](resources/emulators/AmiWind-v0.0.64-dev2-WinUAE.uae); for the first:
 [`AmiWind-v0.0.64-dev1-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.64-dev1-FS-UAE.fs-uae) and

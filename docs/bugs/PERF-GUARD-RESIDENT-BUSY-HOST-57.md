@@ -2,7 +2,7 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 7 times; something has to be done
+## PERSISTING: reported 8 times; something has to be done
 
 - Reported with v0.0.57 at 2026-10-31 03:46 +0200: v0.0.57 release image run 2026_10_31_v0.0.57_full-v0.0.57-release_7ff625e: every stage passed, the perf guard failed the same two: chim-town-balmora build_resident 86 s, was 52 s (+65 %); chim-town-vivec_city 98 s, was 62 s (+57 %), same units. Worker gates shared the host. Perf only, delivered; the monitor lists the run as failed for this.
 - Reported with v0.0.58-dev1 at 2026-10-31 16:50 +0200: v0.0.58-dev1 build 2026_10_31_v0.0.58-dev1_full-v0.0.58-dev1_3d610fa: every stage passed, the perf guard failed the same two: chim-town-balmora build_resident 101 s, was 52 s (+93 %); chim-town-vivec_city 118 s, was 62 s (+89 %), same units; worker gates (5046, 5088 and more) shared the host. Third sighting: delivered (perf only).
@@ -11,6 +11,7 @@
 - Reported with v0.0.59-dev5 at 2026-11-02 (time not recorded): PERSISTING on a quiet machine: v0.0.59-dev5 (f08583e0) chim-town-vivec_city build_resident 26.3 s CPU per unit against the baseline 7.1 s (+268 %, the same 39 units); dev4 26.6 s, so dev4 to dev5 unchanged. Failing in every full build since v0.0.58-dev1.
 - Reported with v0.0.59-dev5 at 2026-11-02 (time not recorded): Cause found (quiet machine): since skeletal actors became the default, every worker process builds the shared animation table again, about 18 s of CPU per table (the beast table too); a Vivec resident bake itself is 3 to 6 s. Fix on branch v0.0.59-vivecbake: the table goes through the unit cache and the stage builds each table once before the bakes. Same cause as BUILD-RESIDENT-BAKE-SLOWER-52.
 - Reported with v0.0.61-dev2 at 2026-11-06 (time not recorded): Seen again in the v0.0.61-dev2 full build: chim-town-vivec_city, parallel map build_resident, 11.9 s of CPU per unit against 7.1 s (+66 %) with the same 39 units, at 7.34 cores against the baseline 5.90; the only perf guard failure of the build, the stage output passed.
+- Reported with v0.0.64-dev3 at 2026-11-10 16:37 +0200: Seen again on the v0.0.64-dev3 full build 2026_11_10_v0.0.64-dev3_full-v0.0.64-dev3_bf2743f (commit bf2743fa): every stage passed, the perf guard failed the same two build_resident sections. chim-town-balmora: CPU per unit 107.8 s against 18.1 s with the same 15 units (+495 %). chim-town-vivec_city: CPU per unit 143.1 s against 7.1 s with the same 39 units (+1903 %). Perf only, the build went on.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -37,7 +38,7 @@
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 7 times; something has to be done](#persisting-reported-7-times-something-has-to-be-done)
+- [PERSISTING: reported 8 times; something has to be done](#persisting-reported-8-times-something-has-to-be-done)
 - [Symptom](#symptom)
 - [Where](#where)
 - [How it happened](#how-it-happened)
@@ -204,8 +205,10 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-PROFILER-NO-WASTE-ALARM-36](BUILD-PROFILER-NO-WASTE-ALARM-36.md): No profiler, perf ledger or gate flagged idle cores, work done for maps that are removed, or growth of the image
 - [BUILD-PROGRESS-ETA-BASIS-36](BUILD-PROGRESS-ETA-BASIS-36.md): The live build progress took a stage's expected time from earlier runs of any size: dev3's chim stage was expected at 154 s and ran 1 h 48 min
 - BUILD-PY-TEXT-LIMIT-52 (no report page): tools/build.py is a few bytes under the release text size limit: the next change to it fails the gate unless it is split
+- BUILD-REGION-KEY-NO-LEGACY-64 (no report page): The world flora and scenery region caches lost every stored region when their key changed form
 - BUILD-RESIDENT-BAKE-SLOWER-52 (no report page): The skeletal resident bake of the town stages is 74 to 149 % slower than its baseline with the same residents
 - [BUILD-RESIDENT-HAIR-SLOWER-54](BUILD-RESIDENT-HAIR-SLOWER-54.md): build_resident ran 87 to 159 percent slower with the same units in the v0.0.54-dev2 town stages
+- BUILD-RESIDENT-KEY-TOOLKIT-PAGE-64 (no report page): An edit to a Toolkit page changed the key of every baked resident
 - [BUILD-RESIDENT-MAP-SLOWER-46](BUILD-RESIDENT-MAP-SLOWER-46.md): The resident-map step of the area and balmora-interiors stages ran 55 to 60 percent slower than its baseline with the same units
 - [BUILD-RESOURCE-PLAN-CHIM-ESTIMATE-44](BUILD-RESOURCE-PLAN-CHIM-ESTIMATE-44.md): The resource plan estimated the CHIM stage at 2 workers and 6 h 13 min; it ran on 24 workers in about 75 min
 - [BUILD-RESOURCE-PLAN-MINIWIND-FULL-PARENT-52](BUILD-RESOURCE-PLAN-MINIWIND-FULL-PARENT-52.md): A MiniWind build is refused by the resource plan: its one-area CHIM stage is estimated from the full build's island-wide chim parent (19,868 MiB) and labelled a stair walk although the walk is off

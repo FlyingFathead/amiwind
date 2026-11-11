@@ -12,6 +12,7 @@ _Last updated with AmiWind v0.0.64-dev3 (10 November 2026)._
 - [Code keys and early cutoff in the unit caches](#code-keys-and-early-cutoff-in-the-unit-caches)
   - [The table units and the actor ground fit (v0.0.63-dev4)](#the-table-units-and-the-actor-ground-fit-v0063-dev4)
   - [Expansion rows in the measured tables (v0.0.64-dev3)](#expansion-rows-in-the-measured-tables-v0064-dev3)
+  - [World flora and world scenery regions (v0.0.64-dev4)](#world-flora-and-world-scenery-regions-v0064-dev4)
   - [Collision defaults of v0.0.48-dev2: what rebuilds once](#collision-defaults-of-v0048-dev2-what-rebuilds-once)
 - [Narrowed reuse: what a stage really used](#narrowed-reuse-what-a-stage-really-used)
 - [Reuse preflight](#reuse-preflight)
@@ -290,6 +291,16 @@ now also matches the table without its expansion layers' rows (`build_cache.LAYE
 keys use): an entry recorded before a layer's rows were added is still taken; a base row added or changed, a layer row
 changed after the entry was recorded with that layer, or a single mesh row still re-keys it. Tests:
 `tests/test_mesh_table_layer_rows.py`.
+
+### World flora and world scenery regions (v0.0.64-dev4)
+
+The two region caches (`world-flora-region`, `world-scenery-region`) keyed every region on the whole of their tool
+files and everything those reach, so an edit to a stage's main flow or to the cache code left no stored region usable;
+in v0.0.64-dev3 the measured-table change counted all 1931 flora regions as baking again. Both now key on
+`convert_region` and its reach (`unit_store.bake_keyed_cache`, as the resident and room caches): an edit to code no
+region runs keeps every region key, an edit to code a region runs changes it. The reach still counts the engine files
+that `tools/map_engine_limits.py` reads whole. Every region is a CHIM cell today, so neither stage makes a region and the
+one rebuild for the new key form takes seconds. Tests: `tests/test_flora_unit_key.py`.
 
 ### Collision defaults of v0.0.48-dev2: what rebuilds once
 

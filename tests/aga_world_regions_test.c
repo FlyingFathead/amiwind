@@ -8,6 +8,7 @@ void Con_Printf(char *fmt,...){}
 static void word(FILE *f,unsigned n){int i;for(i=0;i<4;i++)fputc((n>>(8*i))&255,f);}
 static void number(FILE *f,float value){unsigned n;memcpy(&n,&value,4);word(f,n);}
 int COM_FOpenFile(char *name,FILE **out){
+    if(!strcmp(name,"world/regions-sl.awr")){*out=NULL;return -1;}   /* no Solstheim rows on this disk */
     FILE *f=tmpfile();int i,k;float towns[2][7]={{0,0,0,-200,-200,200,200},{4096,0,0,-200,-200,200,200}};
     float rows[2][11]={{1024,0,512,-1024,-1024,1024,1024,-1920,-1920,1920,1920},
                        {3072,0,768,-1024,-1024,1024,1024,-1920,-1920,1920,1920}};
@@ -126,9 +127,12 @@ int main(int argc,char **argv){
     aw_world_chim_source=NULL;aw_world_chim_local=NULL;aw_world_chim_contains=NULL;frame_name="seyda_chim";
     assert(AW_MapId("vf0000")==AW_MAP_COUNT);
     /* Outdoor save IDs stay fixed when interior sections are appended. */
-    assert(AW_MapId("vf8191")==8251 && AW_INTERIOR_MAP_BASE==8252);
-    assert(!strcmp(AW_MapName(8251),"vf8191"));
-    assert(AW_MapId("vf8192")==-1 && AW_MapId("vf12")==-1 && AW_MapId("vf001x")==-1);
+    /* Vvardenfell's region maps take the terrain IDs 0..4095, Solstheim's frame maps slNNNN 4096..8191
+     * (WORLD-REGION-NAMES-VF-ONLY-64): the last outdoor ID and the interior base stay where they were. */
+    assert(AW_MapId("vf4095")==4155 && AW_MapId("sl4095")==8251 && AW_INTERIOR_MAP_BASE==8252);
+    assert(!strcmp(AW_MapName(4155),"vf4095") && !strcmp(AW_MapName(8251),"sl4095"));
+    assert(AW_MapId("vf4096")==-1 && AW_MapId("sl4096")==-1 && AW_MapId("vf8191")==-1);
+    assert(AW_MapId("vf12")==-1 && AW_MapId("vf001x")==-1);
     assert(!strcmp(AW_MapName(AW_MAP_COUNT+1),"vf0001"));
     assert(AW_WorldDestination("seyda",a,target,b));
     assert(!strcmp(target,"vf0000") && b[0]==-784 && b[2]==-472);

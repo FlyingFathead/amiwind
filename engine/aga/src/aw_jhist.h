@@ -25,6 +25,19 @@ typedef struct aw_jhist_s {
 extern aw_jhist_t aw_jhist;
 /* Adds (QUEST, STAGE) dated DAYS, MS: 2 added, 1 already there (never twice), 0 refused (a bad value, memory). */
 int AW_JHistAdd(aw_jhist_t *h,uint32_t quest,int32_t stage,int32_t days,int32_t milliseconds);
+/* JOURNAL-LOWER-INDEX-ENTRY-64: a Journal command for QUEST at INDEX, its kept index CURRENT (OpenMW 0.53
+ * mwdialogue/journalimp.cpp Journal::addEntry and quest.cpp Quest::addEntry, read, not copied). INDEX above CURRENT:
+ * the entry is dated (once) and the kept index rises, with the notice. INDEX at or below CURRENT: the kept index stays;
+ * an entry not heard before (EXISTS: the journal table has a row for it) is dated, so the book applies its finished or
+ * restart mark, with the notice; an entry already heard, or one without a row, does nothing. Returns AW_JH_RAISE
+ * (the caller raises the kept index) and AW_JH_NOTICE ("Your journal has been updated."). SetJournalIndex does not
+ * come here: it sets the index without an entry or a notice. */
+#define AW_JH_RAISE 1
+#define AW_JH_NOTICE 2
+/* 1 when the journal table has quest ID's entry at INDEX (aw_worldui.c sets it at start; NULL: none known, so a
+ * Journal at or below the kept index adds nothing) */
+extern int (*aw_journal_entry_exists)(const char *id,int32_t index);
+int AW_JHistJournal(aw_jhist_t *h,uint32_t quest,int32_t current,int32_t index,int exists,int32_t days,int32_t milliseconds);
 /* 1 when QUEST has an entry (any stage). */
 int AW_JHistHasQuest(const aw_jhist_t *h,uint32_t quest);
 void AW_JHistClear(aw_jhist_t *h);

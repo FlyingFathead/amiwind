@@ -2,6 +2,22 @@
 
 _Last updated with AmiWind v0.0.64-dev3 (10 November 2026)._
 
+<!-- contents start -->
+## Contents
+
+- [What was built and how](#what-was-built-and-how)
+- [The frame against the limits](#the-frame-against-the-limits)
+- [Where the faces go: the trees](#where-the-faces-go-the-trees)
+- [The trees as star prisms (built, 10 November 2026)](#the-trees-as-star-prisms-built-10-november-2026)
+- [The trees as crossed panels (computed, the first study)](#the-trees-as-crossed-panels-computed-the-first-study)
+- [What stopped the first runs](#what-stopped-the-first-runs)
+- [What the numbers point to](#what-the-numbers-point-to)
+- [In the emulator (FS-UAE, 32 MB Fast)](#in-the-emulator-fs-uae-32-mb-fast)
+- [In the forest: original trees (A) against star trees (D)](#in-the-forest-original-trees-a-against-star-trees-d)
+- [Not measured yet](#not-measured-yet)
+
+<!-- contents end -->
+
 Solstheim (Bloodmoon) is planned as an optional layer of the world, with its own CHIM store. The census
 ([EXPANSIONS-CENSUS-v0.0.64.md](EXPANSIONS-CENSUS-v0.0.64.md)) counted its placements; this page builds its densest
 forest cell as a real CHIM frame and measures it against the engine's limits at 32 MB Fast RAM. Every number below is
@@ -141,9 +157,59 @@ read Bloodmoon's files keys these tables without the layer's rows, byte for byte
 - The layered path builds Solstheim with the base converters unchanged; what it still needs is table rows for the
   Bloodmoon meshes and three stair fixes, then the store (chimsol) in the image.
 
+## In the emulator (FS-UAE, 32 MB Fast)
+
+A MiniWind test image (recipe config/recipes/miniwind-solstheim.json, `--chim-sol-test`, build
+`2026_11_10_v0.0.64-dev2_miniwind-solstheim-solstheim-frame5_5c1b646`, source commit 5c1b6466) carries the frame as the
+test store chimsol. The console's `map solm23p20` loads it after the Balmora frame (the engine changes store between the
+two maps). FS-UAE, 68040 JIT preset, 32 MB Fast, `dbg rcount 1`, a turn in six steps at the frame centre:
+
+| | The Solstheim frame -23,20 | Balmora, same session and preset |
+| --- | --- | --- |
+| Frames per second (fps10 / 10) | 65.5 to 70.7 | 39.4 to 60.7 |
+| R_RenderView per frame | 7.9 to 12.0 ms (looking at the trees), 4.5 to 5.8 ms (open ground) | 13.8 to 22.3 ms |
+| Slowest frame of a second (pk) | 94 ms (the first second after the load), then 28 to 56 ms | 34 to 126 ms |
+| Brush model faces tested / front | 2,033 to 3,849 / 1,003 to 1,919 | 4,748 to 5,263 / 2,245 to 2,505 |
+| Placements in view (chim pl) | 33 resident, 14 to 17 drawn | |
+| CHIM ring after the load | models 33 (1,775 KiB), textures 18, chunks 29; zone 2,881 KiB used of 13,007; 0 failed loads | |
+| Load | 120 models, 98 textures, 61 chunks: 1,598 KiB in 815 reads, 77 opens | |
+| Fast RAM after the load | 2,507 KiB free, largest block 2,424 KiB | |
+
+The emulator's host frame stays near 14 ms either way, so the JIT preset caps the frame rate; the renderer time is the
+comparable figure. This first measurement leaves out the tree crowns: the pictures show the trunks of the trees near the
+start and no crowns at all, so the needles (the frame's largest share of faces) were not in view and these renderer
+times are not the cost of the forest (CHIM-SOLSTHEIM-CROWNS-NOT-DRAWN-64; the reason and the forest numbers are in
+[the next section](#in-the-forest-original-trees-a-against-star-trees-d)). The frame time on the Pi 4B is not
+measured yet. The HUD names the place "Vvardenfell / Region unavailable": the region table has no
+Solstheim rows (WORLD-REGION-NAMES-VF-ONLY-64).
+
+## In the forest: original trees (A) against star trees (D)
+
+Why the first pictures showed no crowns: the frame centre, where the map starts the player, has no tree within the
+far test's reach (299 units in these runs; the nearest trees of the 327 stand 360 to 450 units away), so the views
+held two rocks and open ground. Flying into the forest (noclip, the same script for both images: a turn, then
+forward in 2-second steps, 8 stills, counters every second) shows the crowns in both images.
+
+Both images are MiniWind test builds of commit e7bfa707 (A, `--chim-sol-test`) and 74b4da6e (D, the same plus
+`--chim-sol-tree-copies star`), v0.0.64-dev3 engine; FS-UAE 68040 JIT preset, 32 MB Fast. The two flights do not
+end on exactly the same headings (the turn is timed), so the views are close, not identical.
+
+| In the forest of frame -23,20 | A: original tree models | D: star trees |
+| --- | --- | --- |
+| Renderer time per frame (R_RenderView) | 6.7 to 27.2 ms, most 10 to 17 ms | 2.1 to 5.5 ms |
+| Brush model time per frame | 2.0 to 15.0 ms | 0.26 to 0.61 ms |
+| Brush faces tested / front | 2,033 to 10,276 / 1,002 to 5,142 | 240 to 500 / 99 to 232 |
+| Frames per second (capped near 71 by the preset) | 32.0 to 69.6 | 62.6 to 71.8 |
+| Slowest frame of a second | 40 to 108 ms | 28 to 134 ms (four one-off hitches of 98 to 134 ms) |
+| CHIM ring at the end | 44 models, 2,542 KiB; zone 3,875 KiB used | 37 models, 760 KiB; zone 2,095 KiB used |
+| Fast RAM free at the end | 2,478 KiB | 2,446 KiB |
+
+The star trees cut the renderer time in the forest to about a third and the drawn faces to about a twentieth, with
+1.8 MB less in the CHIM zone. D's one-off hitches of about 120 ms are not explained yet (load of the next chunk
+models while moving is the first suspect).
+
 ## Not measured yet
 
-- The frame time in the emulator (FS-UAE, 32 MB Fast) and on the Pi: the image does not take a Solstheim frame yet
-  (the chimsol store, its region rows and the travel holders come first).
+- The frame time on the Pi.
 - The densest cell overall (-20,23, 579 placements, 13 trees).
 - Fill cost of crossed panels.

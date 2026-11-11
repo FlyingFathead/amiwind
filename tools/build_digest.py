@@ -159,6 +159,11 @@ def digest(run, receipt=None, watch=None, now_seconds=None, previous=None):
         if size_guard.get('verdict') in ('warned', 'failed'):
             need('size-growth:%s' % row.get('group'), 'payload folder %s grew without a named reason (size-ledger.json)'
                  % row.get('group'))
+    collision = (sizes or {}).get('collision') or {}
+    if collision.get('warned'):
+        need('collision-heavy', '%d model(s) carry more than %s times their drawing bytes as collision data, worst %s '
+             '(collision-census.md)' % (len(collision['warned']), (collision.get('threshold') or {}).get('ratio_bytes'),
+                                        collision['warned'][0]))
     for flag in state.get('retired_flags_used') or []:
         label = flag.get('flag') if isinstance(flag, dict) else str(flag)
         need('retired-flag:%s' % label, 'retired flag used: %s' % label)
@@ -183,7 +188,8 @@ def digest(run, receipt=None, watch=None, now_seconds=None, previous=None):
     return {'schema': SCHEMA, 'run': run.name, 'kind': kind(run.name), 'status': state.get('status'),
             'updated_at': time.strftime('%Y-%m-%dT%H:%M:%S%z'), 'worker_budget': state.get('worker_budget'),
             'needs_attention': attention, 'stages': stages,
-            'compared_with': Path(previous).name if previous is not None else None, 'stage_changes': comparison}
+            'compared_with': Path(previous).name if previous is not None else None, 'stage_changes': comparison,
+            'collision_top': collision.get('top') or [], 'collision_total': collision.get('total')}
 
 
 def _round(value):
@@ -225,6 +231,16 @@ def markdown(record):
         lines.extend('- %s %s -> %s (%+.0f %%)' % (row['stage'], _duration(row['previous_seconds']),
                                                     _duration(row['seconds']), row['change'] * 100)
                      for row in record['stage_changes'][:10])
+    top = record.get('collision_top') or []
+    if top:
+        total = record.get('collision_total') or {}
+        lines.extend(['', '## Collision-heavy models (collision / visual ratio)', '',
+                      'All models: drawing %s bytes, collision %s bytes (ratio %s); collision-census.md has the rest.'
+                      % (total.get('draw_bytes'), total.get('collision_bytes'), total.get('ratio_bytes')), '',
+                      '| Model | Faces | Clipnodes | Pieces | Collision / drawing bytes | Ratio |', '| --- | --- | --- | --- | --- | --- |'])
+        lines.extend('| %s | %s | %s | %s | %s / %s | %s |' % (r['name'], r['faces'], r['clipnodes'], r['pieces'],
+                                                              r['collision_bytes'], r['draw_bytes'], r['ratio_bytes'])
+                     for r in top[:20])
     return '\n'.join(lines) + '\n'
 
 

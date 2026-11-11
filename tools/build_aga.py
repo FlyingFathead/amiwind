@@ -3201,12 +3201,6 @@ def finalize_image(args):
                   'bytes out, %d frame-map bytes in)' % (len(chim_frames['region_maps']),
                   sum(r['bytes'] for r in region_replaced if r['file'].startswith('maps/')),
                   sum(r['bytes'] for r in chim_frames['region_maps'])), flush=True)
-        if getattr(args, 'chim_sol_world', None):
-            # TEST BUILDS ONLY (--chim-sol-test): the Bloodmoon layer's frames as the store chimsol (chim.sol_test)
-            from chim.sol_test import install as install_chim_sol
-            sol = install_chim_sol(args.chim_sol_world, boot/'id1', hand_metadata['worldspawn_fields'])
-            (out/'chim-sol-image.json').write_text(json.dumps(sol, indent=1, sort_keys=True)+'\n', encoding='utf-8',
-                                                   newline='\n')
         (out/'chim-removed-legacy.json').write_text(json.dumps(removed_legacy, indent=2)+'\n', encoding='utf-8',
                                                    newline='\n')
         # Each frame map's whole-map heap (CHIM-SEYDA-MEMORY-33): the zone the engine can take beside
@@ -3223,6 +3217,14 @@ def finalize_image(args):
             print(f"[chim] frame-map heap {name}: zone {m['zone_bytes']} B (after the map {m['after_zone_bytes']} B), "
                   f"active ring {m['peak_bytes']} / load ring {m['load_ring']['peak_bytes']} of {m['budget_bytes']} B, "
                   f"streamed models {m['streamed_bytes']} B, largest block {m['largest_block_bytes']} B", flush=True)
+        if getattr(args, 'chim_sol_world', None):
+            # TEST BUILDS ONLY (--chim-sol-test): the Bloodmoon layer's frames as the store chimsol (chim.sol_test),
+            # after the base frame-map heap check (it reads every frame map against the base world); the layer's
+            # frame heap is its own stage's (run/chim-sol/chim-heap.json)
+            from chim.sol_test import install as install_chim_sol
+            sol = install_chim_sol(args.chim_sol_world, boot/'id1', hand_metadata['worldspawn_fields'])
+            (out/'chim-sol-image.json').write_text(json.dumps(sol, indent=1, sort_keys=True)+'\n', encoding='utf-8',
+                                                   newline='\n')
         # frame maps the gate marked 32 MB itself (over the 16 MB budget by this exact check, not by the CHIM stage's
         # estimate; BUILD-CHIM-HEAP-GATE-LATE-36): their records follow the marked file
         late = set(frame_heap.get('marked_32mb_late') or [])

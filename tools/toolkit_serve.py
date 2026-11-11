@@ -426,6 +426,8 @@ class Handler(SimpleHTTPRequestHandler):
     mesh_exporter = None   # Mesh Compare: a MeshExporter when --mesh-data-files is given, or None
     chim_worlds = {}   # --chim-world NAME=DIR: CHIM world folders served read-only at /chim-world/NAME/
     builds_dir = None   # --builds DIR (a local folder of runs): their CHIM inclusion entries join the served ledger
+    follow_record = None   # --follow RECORD: the published working-version record whose head is served, or None
+    stamp_cache = (0.0, None)
 
     def log_message(self, fmt, *args):  # quiet: one line per request is noise here
         pass
@@ -447,6 +449,29 @@ class Handler(SimpleHTTPRequestHandler):
         if not path.is_file():
             return self.send_error(404)
         self.send_bytes(path.read_bytes(), mimetypes.guess_type(path.name)[0] or 'application/octet-stream')
+
+    def current_stamp(self):
+        """The version stamp (tools/toolkit_stamp.py), recomputed at most every two seconds."""
+        import toolkit_stamp
+        now = time.monotonic()
+        at, doc = Handler.stamp_cache
+        if doc is None or now - at > 2.0:
+            doc = toolkit_stamp.make_stamp(ROOT, Handler.follow_record, Handler.progress_dir)
+            Handler.stamp_cache = (now, doc)
+        return doc
+
+    def send_toolkit_file(self, rel):
+        """A Toolkit page or script: from the checkout, or in follow mode from the commit the published record names
+        (git show, read only), so the page that is served is always the newest published line."""
+        if Handler.follow_record:
+            import toolkit_stamp
+            commit = self.current_stamp().get('followed_commit')
+            if commit:
+                raw = toolkit_stamp.file_at(ROOT, commit, rel)
+                if raw is None:
+                    return self.send_error(404)
+                return self.send_bytes(raw, mimetypes.guess_type(rel)[0] or 'application/octet-stream')
+        return self.send_file(ROOT / rel)
 
     def send_inclusion(self, name):
         """The CHIM inclusion ledger the page reads: the build's own copy (--build, this build on top) or the repository's,
@@ -577,8 +602,10 @@ class Handler(SimpleHTTPRequestHandler):
             return self.mesh(parts[1:], split.query)
         if len(parts) == 2 and parts[0] == 'amiwind-toolkit' and parts[1] in INCLUSION_FILES:
             return self.send_inclusion(parts[1])
+        if parts == ['amiwind-toolkit', 'version.json']:
+            return self.send_json(self.current_stamp())
         if len(parts) == 2 and parts[0] == 'amiwind-toolkit' and parts[1].endswith(('.html', '.js')):
-            return self.send_file(ROOT / 'amiwind-toolkit' / parts[1])
+            return self.send_toolkit_file('amiwind-toolkit/' + parts[1])
         if parts == ['docs', 'chim', 'CHIM_PROGRESS_MAP.md']:      # the legend's "what do these colours mean?" guide, shown as text
             p = ROOT / 'docs' / 'chim' / 'CHIM_PROGRESS_MAP.md'
             return self.send_bytes(p.read_bytes(), 'text/plain; charset=utf-8') if p.is_file() else self.send_error(404)
@@ -667,6 +694,11 @@ def main(argv=None):
                    help="a build's chim-world folder, served read-only at /chim-world/NAME/ (repeatable); the Polycount "
                         'inspector opens it with map-inspector.html?world=/chim-world/NAME/ (memory heatmap from its '
                         'chim-heap.json)')
+    p.add_argument('--follow', type=Path, metavar='RECORD',
+                   help='follow the newest published line: a JSON record with "head" (a commit of this repository) and '
+                        '"working_version"; the Toolkit pages are served from that commit and the pages reload by '
+                        'themselves when it moves. Without it the checkout itself is served and the version stamp '
+                        'follows its own HEAD (the pages reload when the repository moves)')
     p.add_argument('--port', type=int, default=8031)
     p.add_argument('--open', action='store_true', help='open the toolkit in your browser')
     a = p.parse_args(argv)
@@ -713,6 +745,7 @@ def main(argv=None):
     elif a.builds_command:
         Handler.builds = Cached(CommandBuilds(shlex.split(a.builds_command, posix=True)))
     Handler.builds_dir = a.builds.resolve() if a.builds else None
+    Handler.follow_record = a.follow.resolve() if a.follow else None
     Handler.results_dir = a.results.resolve() if a.results else None
     Handler.console_dir = a.console_logs.resolve() if a.console_logs else None
     Handler.reference = (a.reference or REFERENCE_DEFAULT).resolve() if (a.reference or REFERENCE_DEFAULT.is_file()) else None

@@ -74,6 +74,13 @@ is a build's `id1/maps` folder. Add `--metrics FILE` for the
 [CHIM Progress Tracker](#chim-progress-tracker). Without `--open`, browse to the address it
 prints (default `http://127.0.0.1:8031/`). Python standard library only.
 
+**Always the newest version.** A served page asks `/amiwind-toolkit/version.json` every 30 seconds: the commit served,
+the version line and when the tracker data was last written. When any of them changes the page reloads itself, keeps your
+view (zoom, pan, selected tab) and shows a short note that a newer version was loaded. Opened from a file, the pages do
+not ask. By default the server follows its own checkout's HEAD, so pulling new commits into it is enough. With
+`--follow RECORD` (a JSON file with `head`, a commit of this repository, and `working_version`) it serves the Toolkit
+straight from that commit instead, and follows the record when it moves.
+
 **Straight from disk.** Open `amiwind-toolkit/index.html` in a desktop browser
 and pick the files with the **Status**, **Island (local)** and **Maps folder
 (local)** buttons. Browsers do not let a page opened from disk read other files
@@ -178,6 +185,41 @@ slower.
 The inspector also works on its own:
 [`amiwind-toolkit/map-inspector.html`](../amiwind-toolkit/map-inspector.html),
 [details](POLYCOUNT_INSPECTOR.md).
+
+#### CHIM rooms and collision data
+
+A CHIM room keeps its meshes in the interior store: `chimi/rooms/<room>.crm`
+lists the placements, `chimi/world.cwi` and its packs hold the models. The
+**CHIM room** panel opens an image's `id1` folder (or the build's
+`chim-interiors` folder) and shows one room; a served store opens with
+`map-inspector.html?rooms=/chim-world/NAME/&room=<room>&heat=collision`.
+
+Every placed model is split into two parts:
+
+- **drawing**: faces, edges, vertexes, texture data, lighting, the hull 0 nodes
+  and leaves, and the planes the faces and nodes use;
+- **collision**: the clipnodes (the standing hulls 1 and 2), the collision piece
+  table that placed traces test, and the planes only the clipnodes use.
+
+The selection shows faces, triangles, both byte counts, the planes by use, the
+clipnodes each hull reaches and the deepest chain a trace can walk, the collision
+pieces, and the collision / visual ratio by bytes and by counts (clipnodes and
+pieces per face). The panel totals the room twice: each stored model once, and
+every placement.
+
+The **Heat** switch colours the scene by **Visual** (vertex density, as before),
+**Collision** (collision bytes per placed model) or **Ratio** (collision /
+visual bytes).
+
+The same split for a whole build: `python3 tools/collision_census.py RUN`
+(in the build container) reads every model of the open world and of the rooms
+and writes `collision-census.json` and `collision-census.md`, sorted by the
+byte ratio. Every image build runs it with the size ledger: the 20 worst models
+are in `size-ledger.json` and the build summary, and a model warns (never
+fails) when its collision bytes are more than 2.0 times its drawing bytes and
+at least 64 KiB. The threshold comes from the v0.0.64-dev3 census of 37,706
+models: the byte ratio's median is 0.044, and over the 632 models with at least
+64 KiB of collision its 90th percentile is 2.03 and its maximum 2.98.
 
 #### Sub-cell cuts and the divider
 
@@ -298,9 +340,16 @@ exterior cell, the interiors reached from it, what is converted, what each audit
 mapped there before, and the order to convert the rest in. It is built on the data the Toolkit already has (the
 World progress table for the legacy mapping quality, the Map metrics layer for risk and cost) and adds the CHIM side.
 
-A headline sits at the top of the Toolkit page, on every tab: **Done: N of 1,390 (percent)** for Vvardenfell (its
-1,390 cells with a LAND record: 1,292 land cells and 98 sea-floor cells; open ocean is apart, see
-[what we count](chim/CELL_TRACKER.md#what-we-count)) with the completion levels beside it, and Solstheim reported separately. A cell counts as passed only when it is converted **and
+A headline sits at the top of the Toolkit page, on every tab, one row per land. **Vvardenfell (main game) Done: N of 1,390
+(percent)** (its 1,390 cells with a LAND record: 1,292 land cells and 98 sea-floor cells; open ocean is apart, see
+[what we count](chim/CELL_TRACKER.md#what-we-count)) with the completion levels beside it (**Fully approved cells**,
+**Fully approved terrain**, awaiting lighting) and the release the eligible figure is for. A second row reports **Solstheim
+(Bloodmoon DLC)**, a third **Mournhold (Tribunal DLC)** (not started, and not yet in the tracker's cell data), and a fourth
+the build: how many cells are in the game and the newest ingested build. Done means converted and eligible for the release; "Fully approved" means not a single
+polygon off and approved by the project maintainer, so it can be lower than Done. The release in the eligible figure is
+computed from the VERSION file whenever the data is written (`tools/cell_progress.py`, `restamp` refreshes it without a
+new ingest), and `tools/tracker_version_check.py` (run by the pregate and the gate) fails when the data or the pages show
+a version that does not match VERSION. A cell counts as passed only when it is converted **and
 every audit that was measured passed**. Audits that were not measured are
 counted apart ("unmeasured audits on N converted cells") and are never counted as passed. Under the headline are the
 breakdown (maintainer-approved, playtested, audits passed, converted with failing audits, converted with nothing measured,
@@ -360,8 +409,9 @@ totals, a table per ring, failures by mechanism class, objects by type and an im
 constants. Re-run it after every ingest; the page is never edited by hand. `check-md` (and the test suite) fails when the
 committed page lacks its generated header, mentions a private path, or has an import policy that no longer matches the code.
 
-Completion levels (map fill, headline and totals): **Terrain complete** = all audits pass and every placed object except
-actors is converted (bright green); **Cell complete** = terrain complete and every actor converted too (the same bright
+Completion levels (map fill, headline and totals): **Terrain complete** (shown as "Fully approved terrain") = all audits
+pass and every placed object except actors is converted (bright green); **Cell complete** (shown as "Fully approved
+cells") = terrain complete and every actor converted too (the same bright
 green plus a solid white border around a run of such cells; the legacy full town/area map border is dashed amber).
 
 **Lighting** (`tools/cell_lighting.py`): a cell is only complete when it is lit like the original, so both completion

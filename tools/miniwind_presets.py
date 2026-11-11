@@ -16,6 +16,8 @@ win, and --exclude adds to the recipe's exclusions. A preset recipe sets:
   quick_character          a --quick-character RACE,CLASS[,NAME]; left out: the Hors preset
   skip_census              true / false: --skip-census / --no-skip-census; left out: the builder's default
   miniwind_boot            dbg console commands run once on arrival, separated by ";"
+  room_batches             --room-batches numbers (tools/room_batches.py), a comma list: a spot in a batch room,
+                           reached with a miniwind_boot teleport (the batch rooms are no --direct-to-game-map start)
 
 The row view of a recipe (row_of: name, description, scope, start, exclude, unreferenced, character,
 skip_census, boot_commands) is what build-state.json records as miniwind_preset, exactly as the earlier preset
@@ -36,9 +38,11 @@ KEYS = ('name', 'description', 'scope', 'start', 'exclude', 'unreferenced', 'cha
         'boot_commands')
 # The recipe options a preset may set (row field -> recipe option). halloween: the Halloween scene's cast
 # (tools/halloween_cast.py, --halloween; docs/HALLOWEEN.md), an optional row field: only its preset has it (true).
+# room_batches: the batch rooms a spot needs (akulakhan-chamber: batch 19), an optional row field too (v0.0.64).
 FIELDS = {'scope': 'miniwind_scope', 'description': 'miniwind_description', 'start': 'direct_to_game_map',
           'exclude': 'exclude', 'unreferenced': 'exclude_unreferenced', 'character': 'quick_character',
-          'skip_census': 'skip_census', 'boot_commands': 'miniwind_boot', 'halloween': 'halloween'}
+          'skip_census': 'skip_census', 'boot_commands': 'miniwind_boot', 'halloween': 'halloween',
+          'room_batches': 'room_batches'}
 
 
 def recipe_files(root=ROOT):
@@ -56,6 +60,7 @@ def row_of(document):
     exclude = [group for entry in options.get('exclude') or [] for group in str(entry).split(',') if group]
     boot = options.get('miniwind_boot')
     return {**({'halloween': True} if options.get('halloween') else {}),
+            **({'room_batches': str(options['room_batches'])} if options.get('room_batches') else {}),
             'name': document['name'], 'description': options.get('miniwind_description'),
             'scope': options.get('miniwind_scope'), 'start': options.get('direct_to_game_map'),
             'exclude': exclude, 'unreferenced': options.get('exclude_unreferenced'),
@@ -77,6 +82,8 @@ def recipe_of(row):
         options['miniwind_boot'] = ';'.join(row['boot_commands'])
     if row.get('halloween'):
         options['halloween'] = True
+    if row.get('room_batches'):
+        options['room_batches'] = row['room_batches']
     return {'schema': 'build-recipe-1', 'name': row['name'],
             'description': 'MiniWind preset --miniwind-%s: %s' % (row['name'], row['description']),
             'options': options, 'inputs': [], 'written_with': None, 'checked_with': None, 'status': 'unverified'}
@@ -99,7 +106,7 @@ def check_row(row, root=ROOT):
     import miniwind
     from build_exclusions import parse as parse_exclusions
     from content_closure import parse_groups
-    if sorted(k for k in row if k != 'halloween') != sorted(KEYS):
+    if sorted(k for k in row if k not in ('halloween', 'room_batches')) != sorted(KEYS):
         raise ValueError('%s: preset %r needs exactly the keys %s' % (TABLE, row.get('name'), ', '.join(KEYS)))
     if not re.fullmatch(r'[a-z0-9]+(?:-[a-z0-9]+)*', row['name'] or '') or len(row['name']) > 32:
         raise ValueError('%s: preset name %r: lower case letters, digits and single hyphens' % (TABLE, row['name']))
@@ -122,6 +129,8 @@ def check_row(row, root=ROOT):
         raise ValueError('%s: preset %s: skip_census is true, false or null' % (TABLE, row['name']))
     if row.get('halloween', True) is not True:
         raise ValueError('%s: preset %s: halloween is true or left out' % (TABLE, row['name']))
+    if 'room_batches' in row and not re.fullmatch(r'\d+(?:,\d+)*', row['room_batches']):
+        raise ValueError('%s: preset %s: room_batches is a comma list of batch numbers' % (TABLE, row['name']))
     return row
 
 
@@ -213,5 +222,7 @@ def apply_row(args, row):
         args.miniwind_boot = ';'.join(row['boot_commands'])
     if row.get('halloween'):
         args.halloween = True
+    if getattr(args, 'room_batches', None) is None and row.get('room_batches'):
+        args.room_batches = row['room_batches']
     args.miniwind_preset_record = dict(row)
     return row

@@ -75,6 +75,35 @@ static AW_SKEL_APART int keys_ok (const aw_skel_table_t *t)
 	return 1;
 }
 
+/* A version 4 table's scale section (aw_skel.h): n scaled bones, each a known bone once, the section exactly its
+ * tracks' bytes (padded to 4); *head moves past it. */
+static AW_SKEL_APART int scaled_ok (const unsigned char *data, long size, int *head, aw_skel_table_t *out)
+{
+	int i, n, bones = (int)U16 (data+6);
+	unsigned long frames = U32 (data+8), bytes, need;
+	if (size < AW_SKEL_HEADER + AW_SKEL_SCALED_EXT)
+		return 0;
+	n = (int)U16 (data + AW_SKEL_HEADER);
+	bytes = U32 (data + AW_SKEL_HEADER + 4);
+	if (n < 1 || n > AW_SKEL_MAX_SCALED || U16 (data + AW_SKEL_HEADER + 2) || frames < 1 || frames > 1000000)
+		return 0;
+	need = ((unsigned long)n * 4 + (unsigned long)n * frames * 2 + 3) & ~3UL;
+	if (bytes != need || (long)(AW_SKEL_HEADER + AW_SKEL_SCALED_EXT + bytes) > size)
+		return 0;
+	for (i=0 ; i<n ; i++)
+	{
+		const unsigned char *s = data + AW_SKEL_HEADER + AW_SKEL_SCALED_EXT + 4*i;
+		int bone = (int)U16 (s);
+		if (bone >= bones || bone >= AW_SKEL_MAX_BONES || U16 (s+2) || out->scale_slot[bone] >= 0)
+			return 0;
+		out->scale_slot[bone] = (signed char)i;
+	}
+	out->scaled = n;
+	out->scale_data = data + AW_SKEL_HEADER + AW_SKEL_SCALED_EXT + 4*n;
+	*head += AW_SKEL_SCALED_EXT + (int)bytes;
+	return 1;
+}
+
 long AW_SkelIndexBytes (const unsigned char *data, long have)
 {
 	long bones, groups, keys, head = AW_SKEL_HEADER;
@@ -82,6 +111,13 @@ long AW_SkelIndexBytes (const unsigned char *data, long have)
 		return -1;
 	if (U16 (data+4) == AW_SKEL_VERSION_APPENDED)
 		head += AW_SKEL_TABLE_NAME;
+	else if (U16 (data+4) == AW_SKEL_VERSION_SCALED)
+	{
+		/* the extension names the scale section's bytes, so the index is sized from the first bytes alone */
+		if (have < AW_SKEL_HEADER + AW_SKEL_SCALED_EXT)
+			return -1;
+		head += AW_SKEL_SCALED_EXT + (long)U32 (data + AW_SKEL_HEADER + 4);
+	}
 	else if (U16 (data+4) != AW_SKEL_VERSION)
 		return -1;
 	bones = (long)U16 (data+6);
@@ -114,9 +150,12 @@ static int parse (const unsigned char *data, long size, long file_size, aw_skel_
 	if (!data || size < AW_SKEL_HEADER || memcmp (data, AW_SKEL_MAGIC, 4))
 		return 0;
 	version = (int)U16 (data+4);
-	if (version != AW_SKEL_VERSION && version != AW_SKEL_VERSION_APPENDED)
+	if (version != AW_SKEL_VERSION && version != AW_SKEL_VERSION_APPENDED && version != AW_SKEL_VERSION_SCALED)
 		return 0;
 	memset (out, 0, sizeof(*out));
+	memset (out->scale_slot, -1, sizeof(out->scale_slot));
+	if (version == AW_SKEL_VERSION_SCALED && !scaled_ok (data, size, &head, out))
+		return 0;
 	if (version == AW_SKEL_VERSION_APPENDED)
 	{
 		/* the base table's path after the header (aw_skel.h): NUL padded, not empty, no view of a table */
@@ -508,6 +547,27 @@ static void rows_at (const aw_skel_table_t *t, float frame, const unsigned char 
 	*b = t->keys + (long)f1 * t->row;
 }
 
+/* A scaled bone's local rotation times its scale at a frame position (track SLOT, the two frames blended as the
+ * rotations are; clamped to the table): a version 4 table only (aw_skel.h). */
+static void scale_local (const aw_skel_table_t *t, int slot, float frame, float m[3][4])
+{
+	const unsigned char *track = t->scale_data + (long)slot * t->own_frames * 2;
+	int f0, f1, r;
+	float u, s;
+	if (!(frame > 0))
+		frame = 0;
+	if (frame > (float)(t->own_frames - 1))
+		frame = (float)(t->own_frames - 1);
+	f0 = (int)frame;
+	f1 = f0 + 1 < t->own_frames ? f0 + 1 : f0;
+	u = frame - (float)f0;
+	s = ((float)U16 (track + 2*f0) * (1-u) + (float)U16 (track + 2*f1) * u) * (1.0f / AW_SKEL_SCALE_ONE);
+	for (r=0 ; r<3 ; r++)
+	{
+		m[r][0] *= s; m[r][1] *= s; m[r][2] *= s;
+	}
+}
+
 int AW_SkelLeftArmRoot (const aw_skel_table_t *t, int shield, int weapon)
 {
 	int i, l = shield, r = weapon;
@@ -614,6 +674,8 @@ void AW_SkelPoseLayers (const aw_skel_table_t *t, float frame, int n, const floa
 			local_at (t, ra + t->offset[i], rb + t->offset[i], base + 6, base + 6, ru, local);
 		else
 			local_at (t, ra + t->offset[i], rb + t->offset[i], ra + t->offset[i] + 6, rb + t->offset[i] + 6, ru, local);
+		if (t->scaled && t->scale_slot[i] >= 0)
+			scale_local (t, t->scale_slot[i], layered[i] ? layer_frames[layered[i]-1] : frame, local);
 		/* the builder's world = local @ world(parent) in row form: parent * local in column form */
 		if (t->parent[i] < 0)
 			memcpy (world[i], local, sizeof(local));

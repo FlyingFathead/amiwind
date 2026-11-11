@@ -52,6 +52,22 @@ LEGACY_SOURCES = {
          '004a9ca21f8a211f5e514ed00c236ab97f722d3c35d49d32a8a9addc3fdf07cc',
          '2caa0d24bbe95f1c55921cabef06dd6a8f834c1e3a189790994138acc7a4cfc4',
          '5a291620b94d3f6ffeb02d87d2e689f3600a64ee7c1afd2d38900d221ac061cc'),
+    # The world region caches (tools/prepare_world_flora.py, tools/prepare_world_scenery.py) keyed every region on the
+    # whole file up to bf2743fa (v0.0.64-dev3); 3c6f31aa keyed them on convert_region without adding their old keys
+    # here, so the v0.0.64-dev4 preflight counted all 1931 flora and 2064 scenery regions as baking again
+    # (BUILD-REGION-KEY-NO-LEGACY-64). Between bf2743fa and the new key the only edits in their reach were the cache
+    # opening lines themselves (prepare / unit_cache), never region code; the old keys are the bf2743fa whole-file
+    # digests (key form 2).
+    ('world-flora-region', '98a996e7dabfcf7a0fd7bb13c95a86ce3be84e255b4ecd47c835df560da4c1ac'):
+        ('c136479e96095474c88c3d543f865973c03e44360bef129d0fe9318916381726',),
+    ('world-scenery-region', '625ada31d5038e7277ae2c59babaabbb212bbe850924c5a2b8f0cd3111e4cb5b'):
+        ('7aab23025ab2f7644101d1eeecec459efbf5f1a60c39a2049fdb6d8d4b46f302',),
+    # resident-bake: its reach names the Toolkit's seam check page as a data file (the seam check's
+    # text names it), so the Toolkit edit 62c4ae6b re-keyed all 2147 residents although no resident reads the page
+    # (BUILD-RESIDENT-KEY-TOOLKIT-PAGE-64). Apart from that page the reach is the same as at bf2743fa (v0.0.64-dev3),
+    # whose residents are stored under the key below.
+    ('resident-bake', '965a70be8255f95d2ebb3b44676934cce9faa6163c6592ac17a697a07d4f6c8b'):
+        ('4318d4be491911a8a2867bb8873f23a052a1616df08f4151d7344705a13ec576',),
 }
 
 # AMIWIND_* settings that say where a stage does its work, never what a unit is made of: left out of a unit key

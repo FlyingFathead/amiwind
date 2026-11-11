@@ -51,6 +51,39 @@ float AW_CastMagnitude(int lo,int hi,float r){
     m=(float)lo+(float)floor(r*(float)(hi-lo+1));
     return m>(float)hi?(float)hi:m;
 }
+/* RACE-RESIST-NOT-ON-SPELL-DAMAGE-64 (rules from OpenMW 0.53 components/esm3/loadmgef.cpp getResistanceEffect /
+ * getWeaknessEffect and mwmechanics/spellresistance.cpp, written independently). EFFECT's resisting effect, its
+ * weakness effect and the elemental shield that also resists it (ESM indices; -1 none); 1 when it can be resisted. */
+int AW_CastResistEffects(int effect,int *resist,int *weakness,int *shield){
+    int r=-1,w=-1,s=-1;
+    if((effect>=17 && effect<=26) || (effect>=85 && effect<=89) || (effect>=28 && effect<=36) ||
+       effect==7 || effect==44 || (effect>=46 && effect<=56) || effect==101){r=93;w=31;}   /* Resist / Weakness to Magicka */
+    else if(effect==37 || effect==38)r=42;               /* Disintegrate Weapon / Armor: Sanctuary */
+    else if(effect==14){r=90;w=28;s=4;}                  /* Fire Damage: Resist Fire, Weakness to Fire, Fire Shield */
+    else if(effect==16){r=91;w=29;s=6;}                  /* Frost Damage: Resist Frost, ..., Frost Shield */
+    else if(effect==15){r=92;w=30;s=5;}                  /* Shock Damage: Resist Shock, ..., Lightning Shield */
+    else if(effect==27){r=97;w=35;}                      /* Poison */
+    else if(effect==45)r=99;                             /* Paralyze: Resist Paralysis */
+    else if(effect==132){r=96;w=34;}                     /* Corprus */
+    else if(effect==133){r=94;w=32;}                     /* Vampirism: Resist / Weakness to Common Disease */
+    if(resist)*resist=r;
+    if(weakness)*weakness=w;
+    if(shield)*shield=s;
+    return r>=0;
+}
+/* The resistance in percent (OpenMW getEffectResistance): ATTR the target's resist (+ shield) less its weakness
+ * magnitudes; X = (Willpower + Luck/10) x the fatigue term, scaled by 50 / CAST_CHANCE (100: a caster that is no
+ * actor, a trap); ROLL 0..100; a NoMagnitude effect's roll counts the resistance first and it is all or nothing.
+ * min(X' + ATTR, 100): may be below 0 (a weakness: more than the full magnitude). */
+float AW_CastResistance(float attr,float willpower,float luck,float fatigue_term,float cast_chance,float roll,int no_magnitude){
+    float x=(willpower+0.1f*luck)*fatigue_term;
+    if(cast_chance>0)x*=50.0f/cast_chance;
+    if(no_magnitude)roll-=attr;
+    if(x<=roll)x=0;
+    else x=no_magnitude?100.0f:roll/(x<100.0f?x:100.0f);
+    x+=attr;
+    return x<100.0f?x:100.0f;
+}
 float AW_CastDuration(const aw_spell_effect_t *e,const aw_mgef_t *m){
     return m->flags&AW_MGEF_NO_DURATION?1.0f:(float)e->duration;
 }

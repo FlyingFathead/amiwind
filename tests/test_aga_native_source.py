@@ -611,7 +611,7 @@ class NativeSourceTests(unittest.TestCase):
         # JOURNAL-ORIGINAL-VIEW-59: the dated history past 32 quests and 256 entries, its save feature 128 both ways,
         # an older save's 32-slot history taken over
         self.compile_run('aga_jhist_test.c', [Path(SOURCE)/'src'/n for n in
-            ('aw_jhist.c','aw_ledger.c','aw_save_codec.c','aw_state.c','mathlib.c')],
+            ('aw_jhist.c','aw_ledger.c','aw_questbook.c','aw_save_codec.c','aw_state.c','mathlib.c')],
             cflags=['-fsanitize=address,undefined','-fno-sanitize-recover=all'])
 
     def test_dialogue_speaker_functions_and_disposition_terms(self):

@@ -1042,10 +1042,12 @@ class CompleteAndPageTests(unittest.TestCase):
     def test_legend_and_outline_in_the_toolkit(self):
         page = (self.KIT / 'world-map.html').read_text(encoding='utf-8')
         head = (self.KIT / 'chim-head.js').read_text(encoding='utf-8')
-        for needle in ("complete: ['#7dffa6', 'Cell complete", "terrain_complete: ['#7dffa6', 'Terrain complete"):
+        for needle in ("complete: ['#7dffa6', 'Fully approved cells", "terrain_complete: ['#7dffa6', 'Fully approved terrain"):
             self.assertIn(needle, page)
-        self.assertIn("['complete', 'cell complete'", head)
-        self.assertIn("['terrain_complete', 'terrain complete'", head)
+        self.assertIn("['complete', 'Fully approved cells'", head)
+        self.assertIn("['terrain_complete', 'Fully approved terrain'", head)
+        self.assertIn("FULL_CELLS = 'Fully approved cells:'", head)         # the headline rows say it too (display text only)
+        self.assertIn("FULL_TERRAIN = 'Fully approved terrain:'", head)
         # the white outline is drawn around complete cells only; the legacy full-town border is dashed amber
         self.assertIn("function chimIsComplete(c) { return chimCls(c) === 'complete' || chimCls(c) === 'complete_unlit'; }", page)
         self.assertIn('groupOutline(g, list.filter(c => chimIsComplete(c) && chimVisible(c)));', page)
@@ -1219,14 +1221,18 @@ class ReleaseUiTests(unittest.TestCase):
         # (TOOLKIT-RELOAD-WORLD-55); the header markup and its CSS are unchanged, the CSS fingerprint moves because it
         # spans the script up to the first closing brace, inside mark().
         self.assertEqual(sha(header), '8671d753f463c2fccbdace4b0a568d2f3ea99c39f1b2dce0cff6d4b58b305e31')
-        self.assertEqual(sha(css), '06a6803390c79aa63a37794983461b10f5972d07ca0eb2c46ef9a459f4548626')
+        # 2026-11-10 (maintainer, TOOLKIT-DLC-VIEWS-64): auto-refresh.js loaded by every page; the CSS fingerprint moves with the
+        # script tag, the header markup and its rules are unchanged.
+        self.assertEqual(sha(css), '04b7b52e6eeb25fc425cdc086cc2759e188b3dddc2276daeada0916896ce5cda')
         head = (self.KIT / 'chim-head.js').read_bytes()
         # K-OCEAN (v0.0.36) added the open-sea row on purpose; TRACKER-OCEAN-COUNTED-DONE-36 (maintainer, 2026-10-11) made it silver and renamed it.
         # 2026-10-17: the approved row's label reads "maintainer-approved" (public wording); nothing else changed.
         # 2026-10-22 (maintainer): the sea-in-game row (sea colour with stripes) and its chip, shown only when the data has the count.
         # 2026-10-22 (maintainer, TOOLKIT-LEGEND-STATES-UNCLEAR-48): the chips grouped under three headers (In the game, Not in the
         # game yet, Beyond the world's edge: settled), zero-count chips in a "More states" fold-out; old data keeps the flat row.
-        self.assertEqual(hashlib.sha256(head).hexdigest(), 'c7579a020332354af26c6a92d1933ebb70afe18fdda1d8f63b88e7d3023ff010')
+        # 2026-11-10 (maintainer, TOOLKIT-DLC-VIEWS-64): one row per land (Vvardenfell, Solstheim, Mournhold) and one for the
+        # build, the two approved statuses relabelled "Fully approved cells/terrain" (display text only), a short legend.
+        self.assertEqual(hashlib.sha256(head).hexdigest(), '0b1beafd4e28eb470b23dfe4039be906c648996939a05e517f90667436f28704')
 
     def test_one_header_for_every_toolkit_page(self):
         # The shared header (header.js) is the logo block of index.html: same logo file, same version line. Pages opened on their
@@ -1460,20 +1466,17 @@ class PlanTests(ReleaseUiTests):
         self.assertEqual(self.ship('v0.0.36'), 0)
         self.assertEqual(self.plan('--release', 'v9.0.36', '--cells', '0,0'), 0)
         d = self.read()
-        self.assertEqual(d['headline']['eligible_release'], 'v9.0.36')
+        self.assertEqual(d['headline']['eligible_release'], working)                    # a plan, even a later one, never decides it
         self.assertIn('**Conversion-eligible:', md.render(d, 'now'))
         self.assertNotIn('Eligible for v0.0.34', md.render(d, 'now'))
-        self.assertEqual(self.plan('--release', 'v9.0.37', '--cells', '1,0'), 0)
-        self.assertEqual(self.read()['headline']['eligible_release'], 'v9.0.36')        # the lowest unshipped
         self.assertEqual(self.ship('v9.0.36'), 0)
         d = self.read()
-        self.assertEqual(d['headline']['eligible_release'], 'v9.0.37')                  # no code change after a release
-        # the rule itself: plan release when not older than the version in development, else that version
+        self.assertEqual(d['headline']['eligible_release'], working)                    # nor does a shipped one
+        # the rule itself: computed from the version in development, whatever the plan says
         self.assertEqual(cp.eligible_release('v0.0.41', '0.0.48-dev2'), 'v0.0.48')
-        self.assertEqual(cp.eligible_release('v0.0.48', '0.0.48-dev2'), 'v0.0.48')
-        self.assertEqual(cp.eligible_release('v0.0.49', '0.0.48-dev2'), 'v0.0.49')
+        self.assertEqual(cp.eligible_release('v0.0.49', '0.0.48-dev2'), 'v0.0.48')
         self.assertEqual(cp.eligible_release(None, '0.0.48-dev2'), 'v0.0.48')
-        self.assertEqual(cp.eligible_release('v0.0.41', None), 'v0.0.41')
+        self.assertIsNone(cp.eligible_release('v0.0.41', None))
         self.assertIsNone(cp.eligible_release(None, None))
         self.assertFalse(hasattr(cp, 'ELIGIBLE_RELEASE'))                              # no version written in the code
         self.assertIn('**Conversion-eligible:', md.render(d, 'now'))
