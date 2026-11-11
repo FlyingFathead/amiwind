@@ -280,6 +280,26 @@ def hull_pieces(parts):
             for points, hull, ids, err in parts]
 
 
+WALKABLE_EXACT = 'walkable'    # a model's 'exact': exact standing bevels on its walkable pieces only (walkable_pieces)
+WALKABLE_PIECE_Z = 0.7         # a piece is walkable when its first face's normal is at least this far up
+
+
+def walkable_pieces(parts):
+    """frozenset of the positions of parts whose plate faces up enough to stand on (|normal z| >= WALKABLE_PIECE_Z of
+    the plane through its first three corners): the hollow plates a room type with hollow_bevels 1 keeps exact (the
+    standing box on a floor, a stair tread or a ledge; a flat ceiling plate counts too, its corners do not say which
+    side is up), the walls get the approximate bevels."""
+    out = []
+    for i, part in enumerate(parts):
+        p = np.asarray(part[0], float)[:, :3]
+        if len(p) < 3:
+            continue
+        n = np.cross(p[1] - p[0], p[2] - p[0])
+        if abs(n[2]) >= WALKABLE_PIECE_Z * max(float(np.linalg.norm(n)), 1e-9):
+            out.append(i)
+    return frozenset(out)
+
+
 def model_image_lumps(surfaces, parts, lo, hi, texture_of, exact=False, compiled=None, entities=b'',
                       hull=None, report=None, weld=None):
     """Lumps of one shared model (faces, collision chain, dmodel) and its texture list.
@@ -294,6 +314,8 @@ def model_image_lumps(surfaces, parts, lo, hi, texture_of, exact=False, compiled
     (the variant's base frame, base_frame)."""
     w = BrushLumps()
     first, num = w.faces(surfaces, texture_of, weld=weld)
+    if exact == WALKABLE_EXACT:
+        exact = walkable_pieces(parts)
     pieces = hull_pieces(parts)
     from routed_hull import CHIM_ROUTE_PIECES, wants_route
     if hull is None:
@@ -431,12 +453,15 @@ def variant_unit(task):
     mode = task.get('model_hull', model_hull_mode())
     big = len(parts) > CHIM_ROUTE_PIECES and mode == 'compiled'
     deep_fern = False
+    if task['exact'] == WALKABLE_EXACT:
+        # a room type's hollow_bevels 1: the walkable plates exact, the chain (not the qbsp union exact models get)
+        task = dict(task, exact=walkable_pieces(parts))
     if parts and task.get('qbsp') and depth_compile_candidate(model['source'], mode, task.get('keep_chain')):
         from routed_hull import chain_depth_limit
         probe = BrushLumps()
         probe.collider(hull_pieces(parts), task['exact'], None, point_hull=False)
         deep_fern = len(probe.lumps[9]) // 8 > chain_depth_limit()
-    if (task['exact'] or big or deep_fern) and task.get('qbsp') and parts:
+    if ((task['exact'] and not isinstance(task['exact'], frozenset)) or big or deep_fern) and task.get('qbsp') and parts:
         from collision_bsp import compile_standing_checked
         try:
             # the compiled union is checked against its pieces (CHIM-COMPILED-HULL-SHORT-36); pieces the compiler

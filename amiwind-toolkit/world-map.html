@@ -66,7 +66,8 @@ aside{flex:0 1 300px;background:var(--panel);border:1px solid var(--line);border
 #selected b{color:#ffe28a}
 #zoom{position:absolute;top:8px;right:8px;display:flex;gap:4px;z-index:2}
 #zoom button{width:38px;height:34px;font-size:18px;font-weight:700;padding:0;background:#203346ee;border:1px solid #6a85a3;border-radius:6px;cursor:pointer}
-#zoom button#zoomreset,#zoom button#zoomfit{width:auto;padding:0 10px;font-size:13px;font-weight:600}
+#zoom button#zoomreset,#zoom button#zoomfit,#zoom button#wheelzoom{width:auto;padding:0 10px;font-size:13px;font-weight:600}
+#zoom button#wheelzoom[aria-pressed="true"]{background:#2e4a66;border-color:#ffe28a;color:#ffe28a}
 #gridtoggle{position:absolute;top:8px;left:8px;display:flex;align-items:center;gap:4px;z-index:2;background:#101923cc;border:1px solid #456;border-radius:6px;padding:3px 4px 3px 9px;font-size:13px;font-weight:600}
 #gridtoggle button{height:28px;padding:0 10px;font-size:13px;font-weight:600;background:#203346ee;border:1px solid #6a85a3;border-radius:5px;cursor:pointer;color:inherit}
 #gridtoggle button[aria-pressed="true"]{background:#2e4a66;border-color:#ffe28a;color:#ffe28a}
@@ -131,6 +132,7 @@ body.embedded #localpanel{max-width:none;flex:1 1 100%}
 .filesblock{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center}
 #chimhead{display:flex;flex-wrap:wrap;align-items:center;gap:4px 18px;padding:6px 16px;background:#13202d}
 :is(#chimhead,#legendblock) .chimtitle{font-size:17px;white-space:nowrap}
+#chimhead .chimrule{display:none}/* this page draws its own full-width rule (#summaryrule) right under the rows */
 :is(#chimhead,#legendblock) .chimtitle b{color:#46c37b}
 :is(#chimhead,#legendblock) .chimparts{display:flex;flex-wrap:wrap;gap:4px 8px}
 :is(#chimhead,#legendblock) button{font-size:12px;padding:3px 8px;cursor:pointer}
@@ -153,13 +155,13 @@ table.mt td.worst{outline:2px solid #ffe28a;outline-offset:-2px;font-weight:700}
 table.mt small{opacity:.8}
 #interiorsfilters{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;margin-bottom:8px}
 #interiorsfilters select,#interiorsfilters input{background:#203346;color:var(--ink);border:1px solid #456;border-radius:5px;padding:5px}
-#interiorswrap{max-height:70vh;overflow:auto}
+#interiorswrap{overflow-x:auto}/* no vertical scroll box inside the page (TOOLKIT-WORLD-MAP-NESTED-SCROLL-64) */
 /* Interior tracker (interior-tracker.js): a foldable block under the map; title and counts stay visible when folded. */
 #interiortracker{margin-top:8px;padding:8px 10px;background:var(--panel);border:1px solid var(--line);border-radius:6px;font-size:14px}
 #interiortracker[hidden]{display:none}
 #itcounts{margin-left:8px;color:var(--ink)}
 #itsearch{margin:8px 0;width:min(420px,100%);background:#203346;color:var(--ink);border:1px solid #456;border-radius:5px;padding:5px}
-#itlist{max-height:60vh;overflow:auto}
+#itlist{overflow-x:auto}
 #itlist details{margin:2px 0 2px 4px}
 #itlist details.itentrance{margin-left:18px}
 #itlist summary{cursor:pointer;padding:2px 0}
@@ -184,7 +186,7 @@ table.mt small{opacity:.8}
 #mhtip{min-height:1.4em;margin:4px 0}
 #mhlegend span{display:inline-block;margin-right:12px;font-size:13px}
 #mhlegend i{display:inline-block;width:10px;height:10px;margin-right:4px;vertical-align:middle}
-#mhlist{max-height:60vh;overflow:auto;margin-top:8px}
+#mhlist{overflow-x:auto;margin-top:8px}
 </style>
 </head>
 <body>
@@ -254,7 +256,7 @@ table.mt small{opacity:.8}
   <div id="stage"><canvas id="map" width="820" height="820"></canvas><div id="cell-highlight" hidden aria-hidden="true"><div id="cell-highlight-box"></div></div><div id="tip"></div>
     <div id="hbar" class="sbar" title="Scroll west / east"><div></div></div><div id="vbar" class="sbar" title="Scroll north / south"><div></div></div>
     <div id="gridtoggle" role="group" aria-label="Map grid and names">Grid:<button id="gridon" aria-pressed="false">on</button><button id="gridoff" aria-pressed="true">off</button><span style="margin-left:8px">Names:</span><button id="nameson" aria-label="Names on" aria-pressed="true">on</button><button id="namesoff" aria-label="Names off" aria-pressed="false">off</button><span style="margin-left:8px">Paint:</span><button id="painton" aria-label="Paint cells on" aria-pressed="false" title="Paint: click or drag over cells to mark them (a drag that starts on a marked cell erases); shift-drag selects a rectangle in any mode">on</button><button id="paintoff" aria-label="Paint cells off" aria-pressed="true">off</button><button id="undocells" title="Undo the last paint stroke, rectangle or clear (Ctrl+Z)" aria-label="Undo painting" disabled><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button><button id="copycells" title="Copy the painted cells (aw-chim-cells-1 JSON with place names)" aria-label="Copy painted cells" disabled><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg></button><span id="copycellsdone" role="status" aria-live="polite" style="margin-left:4px;color:#ffe28a"></span></div>
-    <div id="zoom"><button id="zoomout" title="Zoom out">&minus;</button><button id="zoomfit" title="Fit the whole map to the window">fit</button><button id="zoomreset" title="Back to the fitted view">reset</button><button id="zoomin" title="Zoom in">+</button></div>
+    <div id="zoom"><button id="zoomout" title="Zoom out">&minus;</button><button id="zoomfit" title="Fit the whole map to the window">fit</button><button id="zoomreset" title="Back to the fitted view">reset</button><button id="zoomin" title="Zoom in">+</button><button id="wheelzoom" aria-pressed="false" title="The mouse wheel scrolls the page. Press this to let the wheel zoom the map while the pointer is on it (holding Ctrl or Alt does the same for one turn).">wheel zoom</button></div>
     <div id="picked" class="muted">Click a cell to show it here.</div>
     <section id="interiortracker" hidden aria-label="Interior tracker"><span id="itcounts" class="foldkeep"></span>
       <div><input id="itsearch" type="search" placeholder="Find a room: name, cell ID, town, state, batch or reason" aria-label="Find a room" autocomplete="off"></div>
@@ -319,6 +321,7 @@ table.mt small{opacity:.8}
 <script src="chim-head.js"></script>
 <script src="panel-fold.js"></script>
 <script src="zebra.js"></script>
+<script src="aw-version.js"></script>
 <script src="header.js"></script>
 <script src="auto-refresh.js"></script>
 <script src="chim-legend.js"></script>
@@ -832,8 +835,13 @@ $('zoomin').onclick = () => { const [vw, vh] = vsize(geometry()); zoomAt(1.6, vw
 $('zoomout').onclick = () => { const [vw, vh] = vsize(geometry()); zoomAt(1 / 1.6, vw / 2, vh / 2); };
 $('zoomreset').onclick = viewFit;
 $('zoomfit').onclick = viewFit;
+// TOOLKIT-WORLD-MAP-NESTED-SCROLL-64: the wheel scrolls the page, also over the map; it zooms the map only with the wheel-zoom
+// switch on, or while Ctrl or Alt is held (WHEEL_ZOOMS), so the page never scrolls as two boxes.
+const WHEEL_ZOOMS = (on, e) => !!(on || e.ctrlKey || e.altKey);
+$('wheelzoom').onclick = () => { const on = $('wheelzoom').getAttribute('aria-pressed') !== 'true'; $('wheelzoom').setAttribute('aria-pressed', on ? 'true' : 'false'); };
 canvas.addEventListener('wheel', e => {
   if (!data && !metrics && !chim) return;
+  if (!WHEEL_ZOOMS($('wheelzoom').getAttribute('aria-pressed') === 'true', e)) return;      // not a zoom turn: the page scrolls
   e.preventDefault();
   const r = canvas.getBoundingClientRect(), k = vsize(geometry())[0] / r.width;
   zoomAt(e.deltaY < 0 ? 1.25 : 1 / 1.25, (e.clientX - r.left) * k, (e.clientY - r.top) * k);
@@ -1205,7 +1213,7 @@ $('metricsfile').onchange = e => {
   load(f, text => { if (setMetrics(JSON.parse(text))) metricsFileName = f.name; });
 };
 // Copy state: toolkit version, loaded data, layers and selection, as JSON to paste.
-const TOOLKIT = {name: 'AmiWind Toolkit · World Map', version: '0.1.26'};
+const TOOLKIT = {name: 'AmiWind Toolkit · World Map', version: '0.1.27'};
 let statusFileName = null;
 function stateJson() {
   const sel = picked && data ? data.cells.find(c => c.x === picked.x && c.y === picked.y) : null;
@@ -1216,7 +1224,7 @@ function stateJson() {
     counts[k].original++; if (placed === 1) counts[k].placed++;
   }
   return {
-    tool: TOOLKIT.name, toolkit_version: TOOLKIT.version, page: location.pathname.split('/').pop(),
+    tool: TOOLKIT.name, version: window.AMIWIND_VERSION || null, toolkit_build: TOOLKIT.version, page: location.pathname.split('/').pop(),
     copied_utc: new Date().toISOString(),
     data: {
       status: data ? {file: statusFileName, format: data.format, master_sha256: data.master_sha256, summary: data.summary} : null,
@@ -1305,6 +1313,12 @@ $('mapselect').onchange = showMap;
 let inspectorReady = false, inspectorQueue = null;
 const EMBEDDED = window.parent !== window;
 if (EMBEDDED) document.body.classList.add('embedded');
+// TOOLKIT-WORLD-MAP-NESTED-SCROLL-64: inside the Toolkit this page does not scroll by itself: it reports its content height and
+// the Toolkit page makes the frame that tall, so the whole Toolkit is ONE page scroll (headline, controls and map together).
+// "Collapse all" also folds or unfolds the tracker summary the Toolkit page draws above this frame.
+if (EMBEDDED) {
+  $('foldall').addEventListener('click', () => window.parent.postMessage({type: 'amiwind-summary-fold', folded: $('foldall').textContent === 'Expand all'}, '*'));
+}
 function openInInspector(file) {
   // Inside the Toolkit the inspector is its own tab: hand the map over.
   if (EMBEDDED) { window.parent.postMessage({type: 'amiwind-open-inspector', file}, '*'); return; }
@@ -2206,7 +2220,7 @@ function chimHeadSend() {
   const msg = {type: 'amiwind-chim-head', headline: chim.headline, history: chim.history};
   if (window.parent !== window) window.parent.postMessage(msg, '*');
   else {
-    window.ChimHead.render($('chimhead'), chim.headline, chim.history, bucket => { chimPickBucket(bucket === chimBucket ? null : bucket); chimHeadSend(); }, chimBucket);
+    window.ChimHead.render($('chimhead'), chim.headline, chim.history, bucket => { chimPickBucket(bucket === chimBucket ? null : bucket); chimHeadSend(); }, chimBucket, {noFold: true});
     // The summary line stays at the top; the colour chips, lighting and history lines move into the foldable legend block.
     const head = $('chimhead'), box = $('legendblock');
     for (const n of Array.from(box.children)) if (!n.classList.contains('foldbtn') && !n.classList.contains('foldtitle')) n.remove();
@@ -2258,16 +2272,27 @@ function setChim(doc, source, keepView) {
   return true;
 }
 // Served by toolkit_serve.py --progress: read again on reload, on window focus and on the Reload button.
+// TOOLKIT-PROGRESS-FILE-REFETCHED-64: the tracker file is over 100 MB, so it is only fetched when the server's small stamp
+// (/data/progress-stamp.json: the file's version) differs from the one already loaded, never two fetches at once, and the server
+// answers 304 or gzip for it. A server without the stamp answers 404: the file is then fetched as before.
+let chimStamp = null, chimLoading = false;
 async function loadChim(force) {
   if (chimImported && !force) return false;
+  if (chimLoading) return !!chim;                      // a fetch is already running: never two at once
+  chimLoading = true;
   try {
-    const r = await fetch('../data/cell-progress.json?t=' + Date.now(), {cache: 'no-store'});
+    let stamp = null;
+    try { const s = await fetch('../data/progress-stamp.json', {cache: 'no-store'}); if (s.ok) stamp = (await s.json()).etag || null; } catch (_) { /* no stamp: fetch the file */ }
+    if (stamp && stamp === chimStamp && chim && !chimImported) return true;           // unchanged: nothing fetched, nothing parsed
+    const r = await fetch('../data/cell-progress.json', {cache: 'no-cache'});
     if (!r.ok) return false;
     const doc = await r.json();
     if (chim && !chimImported && doc.generated === chim.generated && !force) return false;
     chimImported = false;
-    return setChim(doc, 'server ' + location.origin + ' (cell-progress.json)', !!chim);
-  } catch (_) { return false; }
+    const ok = setChim(doc, 'server ' + location.origin + ' (cell-progress.json)', !!chim);
+    if (ok) chimStamp = stamp || r.headers.get('ETag');
+    return ok;
+  } catch (_) { return false; } finally { chimLoading = false; }
 }
 $('chimfile').onchange = e => {
   const f = e.target.files[0]; if (!f) return;
@@ -2338,10 +2363,20 @@ function liveText(st) {
 }
 // The status strip above the map (freshness dot, source, last update with a ticking age, the auto-update switch).
 let stripUpdated = null, stripUpdatedText = '', stripError = false;
+// The newest delivered build (the server's /data/newest-build.json from the master builder results), asked every 30 s when served.
+let newestBuild = null;
+async function newestBuildPoll() {
+  if (!SERVED) return;
+  try { const r = await fetch('../data/newest-build.json', {cache: 'no-store'}); const d = r.ok ? await r.json() : null; newestBuild = d && d.ok ? d.version : null; } catch (_) { newestBuild = null; }
+  stripRender();
+}
+newestBuildPoll(); if (typeof setInterval === 'function') setInterval(newestBuildPoll, 30000);
 function stripRender() {
   const L = window.ChimLegend, now = Date.now(), auto = $('chimlive').checked;
   const fin = !!(liveStatus && ['finished', 'passed', 'failed', 'cancelled'].includes(liveStatus.state));
-  const s = L.stripState({now, updated: stripUpdated, interval: LIVE_MS, auto, finished: fin, error: stripError});
+  const ing = chim && chim.headline && /v?(\d+\.\d+\.\d+(?:-(?:dev|rc)\d+)?)/.exec(String(chim.headline.in_game_label || chim.headline.in_game_build || ''));
+  const s = L.stripState({now, updated: stripUpdated, interval: LIVE_MS, auto, finished: fin, error: stripError,
+    newest: newestBuild, ingested: ing ? ing[1] : null, live: !!(liveStatus && !fin)});
   $('stdot').dataset.state = s.dot; $('stdot').title = s.label; $('stlabel').textContent = s.label;
   $('stsrc').textContent = chim ? (chimSource || 'loaded data') : 'nothing loaded';
   $('stupd').textContent = stripUpdated ? (stripUpdatedText || new Date(stripUpdated).toLocaleString()) : 'not yet';

@@ -55,8 +55,14 @@ def open_cache(name, entries, sources, previous, covered):
     game = pass_cache.game_data_digest()
     if root is None or game is None:
         return None
-    return pass_cache.UnitCache(name, {'game_data': game, 'environment': reach_environment(*entries)}, sources, root,
-                                previous=tuple(previous), covered=covered)
+    import unit_store
+    # the settings the reach names, less those it only holds as a constant no reached code names (the model hull
+    # setting of mesh_geometry_env for every NPC and creature bake, BUILD-UNIT-KEYS-REACH-64); stored units are
+    # looked up under the full set too
+    keyed, older = unit_store.keyed_environment(reach_environment(*entries), list(entries))
+    return pass_cache.UnitCache(name, {'game_data': game, 'environment': keyed}, sources, root,
+                                previous=tuple(previous), covered=covered,
+                                previous_options=[{'game_data': game, 'environment': value} for value in older])
 
 
 def palette_digest(palette):

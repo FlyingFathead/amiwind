@@ -1,6 +1,41 @@
 # Active-effect HUD, icons and magic indicators
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.64-dev5 (11 November 2026)._
+
+## How many small effect icons there are (11 November 2026)
+
+The small coloured icons the HUD shows while something is on the player (a disease, a shrine blessing, a race or
+birthsign ability, a constant-effect ring, a potion or a spell) are the small icons of the magic effects, one per
+effect type however many sources feed it. Counted in the game data:
+
+| Source | Magic effect records | Distinct small icons |
+| --- | --- | --- |
+| Morrowind.esm | 137 | 135 |
+| Tribunal.esm | +1 | +1 |
+| Bloodmoon.esm | +4 | +4 |
+
+The game files do not store which effects are instant; OpenMW keeps that in its own fixed table of 143 effect types
+(components/esm3/loadmgef.cpp). By that table 13 effect types have no duration and never stay on as an icon (Open, Lock,
+Dispel, Mark, Recall, the two Interventions and the Cures, among them), so **130 effect types can be active**; 111 of them
+can be cast on oneself, the rest arrive from others, from diseases or from traps. The icons are the effect records'
+small icon paths (for example `s\tx_s_ab_attrib.tga` under `icons\` in the game's archive; OpenMW loads the `.dds` file
+the archive carries for it).
+
+**How many show at once.** Neither OpenMW nor the game data caps it. OpenMW's effect box sits at the bottom right and
+grows leftwards by one 16-pixel icon per active effect type, with no wrapping and no hidden count; at very large counts it
+would run across the screen. In normal play a character carries a handful, at most a few dozen (abilities, constant
+effects, a disease or two, a blessing, potions and spells running). Whether the original executable hides icons beyond
+some number is not documented in the sources we hold; it is to be measured (an OpenMW and an original-engine session
+with a stack of effects, screenshots, before the AmiWind grid is final).
+
+**AmiWind's plan.** A row of small icons under the view, above the health, magicka and fatigue bars; when the row fills
+it wraps into a second and a third row, and no further: beyond three rows the last place shows "+N" for the hidden ones
+(they stay in the full, paused effects list), so the HUD never grows past three rows and no active effect is ever dropped
+silently. The character's stats page shows the same icons and a key (for example V, "view active effects") that opens a
+box you scroll up and down: every active effect with its icon, name, description, magnitude, its sources (spell, potion,
+disease, blessing, ability, item) and the time left for timed ones. So a few always show on the HUD, and the whole list
+is one key away in the stats view. How many icons fit in a row follows from the HUD width at the screen mode in use. The icons are converted from the player's own game data by the build (about 256 bytes each at 16 × 16
+in 8 bits, about 36 KB for all of them); the repository holds the converter, never the pixels.
 
 14 October 2026. Source findings and planned follow-up for v0.0.40. This document does not implement the effect grid, original icon conversion, selected-magic gameplay or the display diagnostic. The current HUD's interim artwork does not establish original visual parity. See the [HUD roadmap](ROADMAP_HISTORY.md#world-map-inventory-and-journal-todo-maintainer-request-1-october-2026) and [HUD-STATS-29](bugs/HUD-STATS-29.md).
 

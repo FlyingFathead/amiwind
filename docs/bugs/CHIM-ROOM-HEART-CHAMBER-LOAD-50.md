@@ -121,7 +121,7 @@ The release smokes enter the game's largest rooms, not only the two towns.
 
 Family: Map heap and memory budget (`heap-memory`). The heap model must match what the loader actually allocates; strict heap gate, hard ceiling always fatal. See [families](README.md#families).
 
-- [AKULAKHAN-CHAMBER-32MB-STALL-53](AKULAKHAN-CHAMBER-32MB-STALL-53.md): Akulakhan's Chamber loads three times at 32 MB Fast RAM
+- [AKULAKHAN-CHAMBER-32MB-STALL-53](AKULAKHAN-CHAMBER-32MB-STALL-53.md): Akulakhan's Chamber does not fit in 32 MB of Fast RAM: its room models need more memory than is free
 - AW-20260929-06 (no report page): Expanded scene exhausts 9 MiB heap
 - [BUILD-CHIM-HULL-RING-33](BUILD-CHIM-HULL-RING-33.md): Routed and compiled CHIM model hulls grew Balmora's ring past the zone
 - BUILD-EDGE-PIN-SHARED-SHAPES-63 (no report page): The shared actor shapes changed the model loader without re-pinning its packed-edge heap policy
@@ -146,6 +146,7 @@ Family: Map heap and memory budget (`heap-memory`). The heap model must match wh
 - [ESTIMATE-HEAP-STALE-32](ESTIMATE-HEAP-STALE-32.md): World estimate heap coefficients were fitted to the old loader model
 - [HEAP-12MB-FAST-ROOM-33](HEAP-12MB-FAST-ROOM-33.md): A 12 MiB game heap leaves 342 KB of Fast RAM in one block: the guard torch's 1 MiB probe can never pass
 - [HEAP-MODEL-SUM-32](HEAP-MODEL-SUM-32.md): Summing per-object costs overestimates a map's heap (11 % median, 39 % worst)
+- HOLLOW-COLLISION-PLATE-PER-TRIANGLE-64 (no report page): A hollow model gets one exact-bevel collision plate per authored collision triangle, and a visual recipe ratio reduces only the drawn mesh
 - HUNK-RESERVE-SN012-29 (no report page): Dev4 first-presented sn012 reserve below 2 MiB target
 - [LOADER-STAGING-PEAK-32](LOADER-STAGING-PEAK-32.md): Map loading stages most lumps in temporary memory before decoding, raising the heap peak
 - [MAP-UNUSED-HULL2-32](MAP-UNUSED-HULL2-32.md): Shipped maps carry about 1.1 MB of collision data for a hull the engine never uses

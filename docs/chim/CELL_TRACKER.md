@@ -2,7 +2,7 @@
 
 # CHIM Cell Tracker
 
-_Generated from `cell-progress.json` with AmiWind v0.0.64-dev4._
+_Generated from `cell-progress.json` with AmiWind v0.0.64._
 
 Live status of the open world on CHIM, Vvardenfell (island 1). Generated page: do not edit by hand. Per-cell detail is in the Toolkit and its CSV export. What each number counts: [what we count](#what-we-count).
 
@@ -10,7 +10,7 @@ Live status of the open world on CHIM, Vvardenfell (island 1). Generated page: d
 
 These audit totals count the cells with a LAND record (land and seabed), not cells included in a playable build; see Included in builds below.
 
-**Every cell of the tracker, in three groups** (the Toolkit legend shows the same; newest ingested build: v0_0_64_dev4_full_v0_0_64_dev4_try2_dbe3):
+**Every cell of the tracker, in three groups** (the Toolkit legend shows the same; newest ingested build: v0_0_64_full_v0_0_64_release_try3_b3dc0a):
 
 - **In the game: 1,409** (Cell complete, awaiting lighting 13, Terrain complete, awaiting lighting 804, Passed (something still deferred) 376, Sea, in the game 216)
 - **Not in the game yet: 153** (Solstheim (Bloodmoon) 153)
@@ -18,7 +18,7 @@ These audit totals count the cells with a LAND record (land and seabed), not cel
 
 Accounted for: 2,158 of 2,311 cells (in the game + settled). Settled squares count toward "accounted for", never toward the cells in the game. Settled: No cell exists here in the original game data. AmiWind's edge current turns the player back before this point, so there is nothing to build.
 
-**On CHIM in the newest ingested build (v0.0.64-dev4 (dbe3869b)): 1,292 of 1,292 Vvardenfell land cells (100.0 %), plus 116 sea cells.**
+**On CHIM in the newest ingested build (v0.0.64 (b3dc0a2b)): 1,292 of 1,292 Vvardenfell land cells (100.0 %), plus 116 sea cells.**
 
 A cell is on CHIM in a build when a frame of the CHIM world of that build owns it. The tracker records per cell the newest build that carries it. Land cells have terrain heights; the sea cells are seabed and open ocean ([what we count](#what-we-count)).
 
@@ -38,7 +38,7 @@ Lighting: lit 0, partial 137, unlit 1,056, not measured 99 (cells; lit is requir
 
 Original light sources placed in these cells (numbers of lights, not of cells): lamp / lantern 545 (0 without a mesh), candle 6 (0 without a mesh), torch 69 (0 without a mesh), fire 74 (4 without a mesh), glowing plant 332 (332 without a mesh), darkener (negative light) 12 (12 without a mesh), plain light 1,936 (1,936 without a mesh). In converted cells: 0 lights baked, 694 night lamps only, 2,280 not represented.
 
-Generated 2026-11-11 01:20 +0200. Tracker data generated 2026-11-10T23:19:04+00:00.
+Generated 2026-11-11 16:22 +0200. Tracker data generated 2026-11-11T14:21:29+00:00.
 
 ## What we count
 
@@ -57,7 +57,7 @@ In short: Vvardenfell has 1,390 cells with a LAND record (1,292 land cells with 
 | 197 | Empty sea (status): empty land cells and seabed cells. The builder calls these "seabed". | tracker status |
 | 766 | Open-ocean cells: no LAND record; water over the default sea floor (one shared ocean chunk). | ocean conversion |
 | 1,436 | Land cells of every island: Vvardenfell 1,292 and Solstheim 144. Not a Vvardenfell figure; Solstheim (Bloodmoon) is not converted yet. | LAND records with heights, all masters |
-| 1,408 | Cells on CHIM in the newest ingested build (v0.0.64-dev4 (dbe3869b)): every cell a frame of that build's world owns: 1,292 land, 98 seabed and 18 open ocean. | the build's CHIM world |
+| 1,408 | Cells on CHIM in the newest ingested build (v0.0.64 (b3dc0a2b)): every cell a frame of that build's world owns: 1,292 land, 98 seabed and 18 open ocean. | the build's CHIM world |
 | 1,351 | Frames in that build's CHIM world: 1,348 region frames (one cell each) and 3 town frames. | the build's CHIM world |
 | 61 | Cells owned by the town frames: balmora 9, seyda 16, vivec_city 36. | the build's CHIM world |
 | 1,132 | The builder's "land" in its log line "N cells on CHIM (S seabed, L land, O ocean)": land cells with something placed, in region frames only (town frames not included). That line's seabed is 197 and its ocean 18. | builder log |
@@ -191,13 +191,13 @@ Counts are every placed reference in converted cells, from the conversion job. D
 
 Every interior cell of the game has a room on the tracker, keyed by its cell ID: none is left out. A room is in the game, not in the game yet, or set aside with its reason (a set-aside room keeps its state and is converted in a later batch). Rooms are counted by the island their entrance is on; rooms with no entrance area are counted on their own.
 
-**1,328 rooms: in the game 988; not in the game yet 324; set aside, with a reason 16.**
+**1,328 rooms: in the game 1,134; not in the game yet 178; set aside, with a reason 16.**
 
 | Group | State | Vvardenfell | Solstheim | Mournhold | No entrance area | All |
 | :-- | :-- | --: | --: | --: | --: | --: |
-| In the game | In the game on CHIM rooms | 975 | 3 | 0 | 8 | 986 |
+| In the game | In the game on CHIM rooms | 1,121 | 3 | 0 | 8 | 1,132 |
 | In the game | In the game as a room map | 2 | 0 | 0 | 0 | 2 |
-| Not in the game yet | Converted, not in the game yet | 146 | 0 | 0 | 0 | 146 |
+| Not in the game yet | Converted, not in the game yet | 0 | 0 | 0 | 0 | 0 |
 | Not in the game yet | Not started | 0 | 92 | 86 | 0 | 178 |
 | Set aside, with a reason | Set aside: hard case | 0 | 0 | 5 | 0 | 5 |
 | Set aside, with a reason | Set aside: test cell | 0 | 0 | 0 | 2 | 2 |

@@ -13,9 +13,9 @@
    "hunk_bytes": 9664
   },
   "cvars": {
-   "count": 369,
-   "static_bytes": 8856,
-   "zone_bytes": 12032
+   "count": 372,
+   "static_bytes": 8928,
+   "zone_bytes": 12128
   },
   "tables": {
    "count": 0,
@@ -110,7 +110,10 @@
   "2026-11-09: +1 console variable aw_text_box_type, the saved text box type (1 rising strip / 2 box only, the default) the maintainer asked for, with its Options entry and dbg ui textbox; the command aw_text_box sits under the commands cap (SUBTITLE-BOX-HIDES-STATS-63)",
   "2026-11-10: +1 console variable aw_loadtrace (24 structure bytes, 32 zone bytes) and the command aw_loadtrace_cmd (dbg loadtrace, under the commands cap): the load trace the maintainer asked for on 2026-11-09 (a load tracker for the smoke tests, enabled separately), off by default, for CHIM-SEYDA-BALMORA-LOAD-HANG-43; a feature he asked for, so the raise carries his request as its reason.",
   "2026-11-10: ROOM-DECAL-ALPHA-62, the maintainer-reported solid cobwebs and hanging growths (see-through faces drawn solid): aw_seethrough_material (first named aw_fence, kept as a quiet alias in cvar.c), one console variable (24 structure bytes, 32 zone bytes; default 1 since v0.0.64-dev4, the fix ships on; 0 = drawn solid as before, 2 = also seen from behind), the A/B switch the project rules ask for beside every new method; no command, no static name table.",
-  "2026-11-10: ROOM-DECAL-ALPHA-62, two-sided see-through planes (cobwebs, hanging moss and vines visible from both sides, asked for by the maintainer): aw_fence_twosided, one console variable (24 structure bytes, 32 zone bytes; default 0 until the A/B on a full image decides; 1 = the fence pass draws a see-through face seen from behind). The converter route is a build option and adds no setting."
+  "2026-11-10: ROOM-DECAL-ALPHA-62, two-sided see-through planes (cobwebs, hanging moss and vines visible from both sides, asked for by the maintainer): aw_fence_twosided, one console variable (24 structure bytes, 32 zone bytes; default 0 until the A/B on a full image decides; 1 = the fence pass draws a see-through face seen from behind). The converter route is a build option and adds no setting.",
+  "2026-11-10: LARGE-ROOM-FOG-SETTING-64, the maintainer's request for its own setting for the large-room fog: aw_fog_large_rooms, one saved console variable (0 off, 1 on, the default) with an Options > Video row; no command, no static name table.",
+  "2026-11-10: LARGE-ROOM-FOG-SETTING-64, the maintainer's request for an indoor fog distance of its own: aw_fog_distance_interior, one saved console variable (100..4096 local units, default 300 as the shared value before) with an Options > Video row; the outdoor aw_drawdistance unchanged; no command, no static name table.",
+  "2026-11-10: aw_tree_crowns, the Tree crowns player setting the maintainer asked for (saved with the other settings, Options > Video > Tree crowns; TREES-DEPTH-56): one console variable"
  ],
  "entries": {
   "commands": [
@@ -498,6 +501,8 @@
    "aw_exteriorluma",
    "aw_fence_twosided",
    "aw_fog",
+   "aw_fog_distance_interior",
+   "aw_fog_large_rooms",
    "aw_fog_location",
    "aw_fp_sway",
    "aw_fp_view",
@@ -613,6 +618,7 @@
    "aw_torch_radius",
    "aw_torch_strength",
    "aw_transition_console",
+   "aw_tree_crowns",
    "aw_ui_font",
    "aw_ui_frame",
    "aw_ui_hud",

@@ -8,6 +8,9 @@
 <style>
 :root{--bg:#101923;--panel:#162433;--ink:#edf3fa;--muted:#9fb3c8;--line:#345;--accent:#ffe28a}
 *{box-sizing:border-box}
+/* ONE page scroll (TOOLKIT-WORLD-MAP-NESTED-SCROLL-64): the headline, the controls and the map scroll together; the frames have no scroll
+   box of their own. The World Map frame is as tall as its content (the page sizes it from the height the map page reports); the
+   other tabs are full-height tools and fill the window below the header. */
 html,body{height:100%}
 body{margin:0;background:var(--bg);color:var(--ink);font:14px system-ui,sans-serif;display:flex;flex-direction:column}
 header{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;padding:8px 16px;border-bottom:1px solid var(--line);background:var(--panel)}
@@ -17,7 +20,9 @@ header h1 small{display:block;font-size:11px;font-weight:400;color:var(--muted);
 nav{display:flex;gap:6px}
 nav button{background:#203346;color:var(--ink);border:1px solid #456;border-radius:6px;padding:8px 14px;font-size:14px;cursor:pointer}
 nav button[aria-selected="true"]{background:#2e4a66;border-color:var(--accent);color:var(--accent)}
-.note{margin-left:auto;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border:1px solid #6f8193;border-radius:50%;color:#8a9bad;font-size:12px;font-weight:700;cursor:help;user-select:none;flex:0 0 auto}
+.note{margin-left:auto;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border:1px solid #6f8193;border-radius:50%;color:#8a9bad;font-size:12px;font-weight:700;cursor:pointer;user-select:none;flex:0 0 auto}
+button.note{background:none;padding:0;font-family:inherit}
+h1 button.note{margin:0 0 0 10px;vertical-align:middle;position:relative;top:-2px;line-height:1}
 .note:hover,.note:focus{color:var(--text,#edf3fa);border-color:#9fb3c8}
 #chimhead{display:flex;flex-wrap:wrap;align-items:center;gap:4px 18px;padding:6px 16px;border-bottom:1px solid var(--line);background:#13202d}
 #chimhead[hidden]{display:none}
@@ -37,7 +42,7 @@ iframe.active{display:block}
 <body>
 <header>
   <img src="../resources/media/AmiWind_logo_name_only.png" alt="AmiWind">
-  <h1>Toolkit<small id="toolkit-version" title="Set by hand when the Toolkit is next updated">Last updated with AmiWind v0.0.64</small></h1>
+  <h1>Toolkit<button type="button" class="note" id="helpbtn" title="Help for this page. Everything here runs in your browser. Views of the world are made from your own Morrowind files and build output on your machine; nothing is uploaded." aria-label="Help for this page" aria-haspopup="dialog" aria-expanded="false">?</button><small id="toolkit-version" title="Set by hand when the Toolkit is next updated">Last updated with AmiWind v0.0.64</small></h1>
   <nav role="tablist">
     <button role="tab" id="tab-world" aria-selected="true">World</button>
     <button role="tab" id="tab-local" aria-selected="false">Local</button>
@@ -45,7 +50,6 @@ iframe.active{display:block}
     <button role="tab" id="tab-monitor" aria-selected="false">Monitor</button>
     <button role="tab" id="tab-meshes" aria-selected="false">Mesh Compare</button>
   </nav>
-  <span class="note" title="Everything here runs in your browser. Views of the world are made from your own Morrowind files and build output on your machine; nothing is uploaded." aria-label="Everything here runs in your browser. Views of the world are made from your own Morrowind files and build output on your machine; nothing is uploaded." tabindex="0">?</span>
 </header>
 <div id="chimhead" hidden aria-label="CHIM Progress Tracker headline"></div>
 <main>
@@ -54,6 +58,7 @@ iframe.active{display:block}
   <iframe id="monitor" title="Monitor: follow a build"></iframe>
   <iframe id="meshes" title="Mesh Compare: two meshes side by side"></iframe>
 </main>
+<script src="header.js"></script>
 <script src="chim-head.js"></script>
 <script src="auto-refresh.js"></script>
 <script>
@@ -108,7 +113,13 @@ function chimHead(m) {
   };
   window.ChimHead.render(document.getElementById('chimhead'), m.headline, m.history, pick, chimPicked);
 }
+// The round "?" opens the help panel of the tab that is open (header.js: click, Enter or Space; Esc or a click outside closes it).
+document.getElementById('helpbtn').onclick = () => {
+  const tab = ['world', 'local', 'inspector', 'monitor', 'meshes'].find(t => document.getElementById('tab-' + t).getAttribute('aria-selected') === 'true');
+  window.AmiWindToolkitHeader.help(tab || 'world', document.getElementById('helpbtn'));
+};
 window.addEventListener('message', e => {
+  if (e.source === frame.contentWindow && e.data && e.data.type === 'amiwind-summary-fold') { window.ChimHead.setSummary(document.getElementById('chimhead'), !!e.data.folded); return; }
   if (e.source !== frame.contentWindow || !e.data) return;
   if (e.data.type === 'amiwind-chim-head') { lastChim = e.data; chimHead(e.data); return; }
   if (e.data.type === 'amiwind-mode' && !inspector.classList.contains('active') && !monitorFrame.classList.contains('active') &&

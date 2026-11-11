@@ -1,6 +1,6 @@
 # Inventory
 
-_Last updated with AmiWind v0.0.62-dev2 (8 November 2026)._
+_Last updated with AmiWind v0.0.64-dev5 (11 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -65,8 +65,9 @@ box naming it with OK and Cancel, so nothing is drunk or eaten by a slip: with m
 slider and a number field for how many (1 to the stack, starting at 1; Left/Right, Page Up/Down, Home/End, digits
 and Backspace, or the mouse on the slider), and OK uses that many one after the other, as OpenMW uses a dragged
 stack one at a time. Enter is OK; Esc or I is Cancel and keeps the window open. OpenMW's own count box starts at the
-whole stack; this one starts at one. One-use scrolls are read like books for now (casting from them is not in this
-window yet). Tests: `tests/aga_inventory_ui_test.c`.
+whole stack; this one starts at one. A scroll used here is read, as a book is (OpenMW 0.51 reads a scroll on use);
+an enchanted one-use scroll is cast from the Magic window's Magic Items (below, since v0.0.64). Tests:
+`tests/aga_inventory_ui_test.c`.
 
 The equipment set is rings and amulets (a Constant Effect ring or amulet acts while worn and ends when taken off, also
 across a save; see [MAGIC_EFFECTS.md](MAGIC_EFFECTS.md) "Magic items"), clothing, armour, and converted melee, ranged
@@ -700,7 +701,11 @@ because the engine has no faction state yet.
 The Magic window shows the original's headings, Powers, Spells and Magic Items. With casting in the build
 (v0.0.61, [Magic effects: Casting](MAGIC_EFFECTS.md#casting-v0061)) it lists the spells and powers the player
 knows and the spells he made: Up and Down (or W and S) move the cursor, Enter or a click selects the spell to cast,
-the selected one is marked with a star, and the bottom line names it with its magicka cost and chance. Without
+the selected one is marked with a star, and the bottom line names it with its magicka cost and chance. Since v0.0.64
+Magic Items lists every carried Cast Once scroll and Cast When Used item, as in the original: selecting one makes it
+the thing the cast button uses, in place of a spell. A scroll is then cast once: its enchantment's effects land
+without a success roll and the scroll is used up; a Cast When Used item pays its charge instead (the bottom line
+shows how many scrolls are carried, or the item's charge). Without
 casting it lists the character's race and birthsign spells by their names from the game data
 (`character/spells.aws`, written by the image builder; powers under Powers, spells under Spells, abilities left
 out) and says "(Not yet implemented)" at the bottom. An empty heading shows "None". Its title is "Magic"; the

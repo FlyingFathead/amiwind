@@ -1201,7 +1201,7 @@ static int LoadCatalogue (int index, long *budget)
 			goto bad;
 		p->pid = r.pid;
 		p->flags = r.flags;
-		p->model = r.model;
+		p->model = Chim_AltModel (r.model);		/* aw_tree_crowns: the store's alternative model, if any */
 		p->owner = r.owner + base;
 		VectorCopy (r.origin, p->ent.origin);
 		p->ent.origin[0] += dx;

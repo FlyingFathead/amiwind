@@ -112,11 +112,13 @@ def add_accept_entity_loss_group(p):
                         "on a layered test data folder (tools/chim_layer_data.py); the stages chim-sol-data and chim-sol "
                         "are keyed by Bloodmoon's files, the base stages keep their keys, and the image does not take "
                         "them. Off by default")
-    p.add_argument("--chim-sol-tree-copies", dest="chim_sol_tree_copies", choices=("off", "star"), default=None,
+    p.add_argument("--chim-sol-tree-copies", dest="chim_sol_tree_copies", choices=("off", "star", "switch"), default=None,
                    help="TEST BUILDS ONLY, with --chim-sol-test (TREES-DEPTH-56): off (unset, the default) the Solstheim trees as "
                         "their original models; star: the chim-sol stage draws them as closed star prisms "
                         "(tools/chim_tree_star.py, config/tree-copies.json) and the stage chim-sol-trees bakes the "
-                        "billboard and four 45-degree views per tree model (tools/chim_tree_copies.py)")
+                        "billboard and four 45-degree views per tree model (tools/chim_tree_copies.py); switch: both, the "
+                        "original trees in the store and the star crowns as its alternative models (stage chim-sol-star, "
+                        "tools/chim/alt_models.py), picked in game by aw_tree_crowns (0 original, 1 star)")
     p.add_argument("--check-hashes", choices=("core", "full", "auto", "off"), default="core",
                    help="Input hashing with the workspace lock amiwind-inputs.lock: core (default; the masters, archives, "
                         "Amiga libraries and ROM are hashed every build, other inputs only when size or times changed), "
@@ -334,6 +336,11 @@ def add_legacy_area_group(p):
                    help='CHIM builder: add the pieces a compiled model hull lost under a walkable surface (on, '
                         'default), or keep the compiled hull as it is and record the check (off: the previous '
                         'method; CHIM-COMPILED-HULL-SHORT-36)')
+    p.add_argument('--chim-hollow-bevels', type=int, choices=(0, 1, 2), default=None,
+                   help='CHIM builder: the standing bevels of every hollow model\'s collision plates where its room '
+                        'does not choose them (default: config/chim-rooms.json hollow_bevels, 2 = approximate, as '
+                        'every solid model; 1 = exact on near-horizontal plates; 0 = exact on every plate, the method '
+                        'up to v0.0.64-dev4; COLLISION-WORLDWIDE-REDUCTION-64)')
     p.add_argument('--chim-fence-twosided-faces', choices=('off', 'mirror'), default=None,
                    help='CHIM builder: two-sided see-through planes (cobwebs, hanging moss and vines; EXPERIMENTAL, '
                         'ROOM-DECAL-ALPHA-62): mirror = a mirrored copy of each see-through face (the converter '

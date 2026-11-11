@@ -281,8 +281,10 @@ void AW_MagicDrawList(const aw_magic_list_t *list){
         /* Rows past the box bottom are not drawn (at most a handful of starting spells). */
         if(y<=170)small(10,y,200,headings[section],muted);
         y+=8;any=0;
-        for(i=0;section<2 && i<list->count;i++){
-            if(list->power[i]!=(section==0))continue;
+        for(i=0;i<list->count;i++){
+            /* power: 1 a power, 0 a spell, 2 a magic item (SCROLL-CAST-64: a Cast Once scroll or a Cast When Used
+             * item the player carries, as the original's Magic Items list; OpenMW 0.51 spellmodel.cpp) */
+            if(list->power[i]!=(section==0?1:section==1?0:2))continue;
             if(y<=170){
                 /* casting: the cursor's row bright, the selected spell marked */
                 int colour=list->castable && i==list->cursor?bright:gold;

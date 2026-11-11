@@ -1,6 +1,6 @@
 # AmiWind documentation
 
-_Generated from `docs/README.topics.json` with AmiWind v0.0.64-dev4._
+_Generated from `docs/README.topics.json` with AmiWind v0.0.64._
 
 Every document of the project, by topic, with the version and date of its last update. A document marked "needs a refresh" predates the current state of its subject and is due for a review; its facts may be out of date. Release notes and whitespace baselines are listed in [releases](releases/README.md); one-off records and replaced documents in [history](history/README.md).
 
@@ -70,16 +70,16 @@ Every document of the project, by topic, with the version and date of its last u
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Architecture | v0.0.64-dev1 (10 November 2026) |
 | [AGA_RUNTIME.md](AGA_RUNTIME.md) | AmiWind AGA runtime source | v0.0.30 (7 October 2026), needs a refresh |
 | [ENGINE_PROFILES.md](ENGINE_PROFILES.md) | Engine profiles | v0.0.46 (20 October 2026) |
-| [EXPERIMENTAL_FLAGS.md](EXPERIMENTAL_FLAGS.md) | Experimental flags | v0.0.64 (10 November 2026) |
+| [EXPERIMENTAL_FLAGS.md](EXPERIMENTAL_FLAGS.md) | Experimental flags | v0.0.64 (11 November 2026) |
 | [CRASH_REPORTING.md](CRASH_REPORTING.md) | Fatal error reports | v0.0.28 (4 October 2026), needs a refresh |
 | [DEBUG_OVERLAYS.md](DEBUG_OVERLAYS.md) | Development overlays | v0.0.63-dev5 (9 November 2026) |
 | [GAME_RECORDER.md](GAME_RECORDER.md) | Gameplay recorder | v0.0.62-dev1 (2026-11-07) |
-| [AMIWIND_CONSOLE_COMMANDS.md](AMIWIND_CONSOLE_COMMANDS.md) | AmiWind console commands | generated (v0.0.64-dev4) |
-| [CONSOLE_COMMANDS_MORROWIND.md](CONSOLE_COMMANDS_MORROWIND.md) | The original game's console commands in AmiWind | v0.0.63-dev3 (9 November 2026) |
+| [AMIWIND_CONSOLE_COMMANDS.md](AMIWIND_CONSOLE_COMMANDS.md) | AmiWind console commands | generated (v0.0.64) |
+| [CONSOLE_COMMANDS_MORROWIND.md](CONSOLE_COMMANDS_MORROWIND.md) | The original game's console commands in AmiWind | v0.0.64-dev4 (11 November 2026) |
 | [GAME_STATE_RESET.md](GAME_STATE_RESET.md) | Game state reset and failed loads | v0.0.62-dev2 (8 November 2026) |
 | [MEMORY_ALLOCATION.md](MEMORY_ALLOCATION.md) | Memory allocation and heap clearance | v0.0.42-dev1 (17 October 2026), needs a refresh |
 | [HEAP_WATCHER.md](HEAP_WATCHER.md) | Heap watcher: build estimates and complete scene lifecycles | v0.0.42-dev1 (17 October 2026), needs a refresh |
-| [COLLISION_MESHES.md](COLLISION_MESHES.md) | Morrowind collision meshes: where they are and how AmiWind uses them | v0.0.54 (27 October 2026) |
+| [COLLISION_MESHES.md](COLLISION_MESHES.md) | Morrowind collision meshes: where they are and how AmiWind uses them | v0.0.64-dev5 (11 November 2026) |
 | [PHYSICS.md](PHYSICS.md) | Physics: how AmiWind uses Quake's physics | v0.0.36 (11 October 2026), needs a refresh |
 | [STEP_MOVEMENT.md](STEP_MOVEMENT.md) | Step movement: Morrowind's stair and slope rules in AmiWind | v0.0.48-dev2 (22 October 2026) |
 | [STAIR_RULES.md](STAIR_RULES.md) | Stairs: Morrowind's own rules, and a gate that proves them | v0.0.42-dev1 (17 October 2026), needs a refresh |
@@ -120,9 +120,9 @@ Every document of the project, by topic, with the version and date of its last u
 
 | Document | Title | Last updated |
 | --- | --- | --- |
-| [GAME_FEATURES.md](GAME_FEATURES.md) | Game features | v0.0.64-dev4 (10 November 2026) |
+| [GAME_FEATURES.md](GAME_FEATURES.md) | Game features | v0.0.64 (10 November 2026) |
 | [game-features.json](game-features.json) | game-features.json | data file |
-| [MWSCRIPT_FEATURES.md](MWSCRIPT_FEATURES.md) | MWScript features | v0.0.64-dev4 (10 November 2026) |
+| [MWSCRIPT_FEATURES.md](MWSCRIPT_FEATURES.md) | MWScript features | v0.0.64 (11 November 2026) |
 | [WORLD_MECHANISMS.md](WORLD_MECHANISMS.md) | World mechanisms | v0.0.64-dev1 (10 November 2026) |
 | [mwscript-features.json](mwscript-features.json) | mwscript-features.json | data file |
 | [ACTOR_PLACEMENT.md](ACTOR_PLACEMENT.md) | Actor placement: how actors stand, fly, swim and float | v0.0.52-dev (26 October 2026) |
@@ -132,7 +132,7 @@ Every document of the project, by topic, with the version and date of its last u
 | [WORLD_ESTIMATE.md](WORLD_ESTIMATE.md) | World estimate | v0.0.42-dev1 (17 October 2026), needs a refresh |
 | [WORLD_SURVEY.md](WORLD_SURVEY.md) | Vvardenfell terrain and cell-density survey | v0.0.25-dev1 (1 October 2026), needs a refresh |
 | [WORLD_TERRAIN.md](WORLD_TERRAIN.md) | Playable Vvardenfell terrain | v0.0.42-dev1 (17 October 2026), needs a refresh |
-| [WORLD_MAP_AND_JOURNAL.md](WORLD_MAP_AND_JOURNAL.md) | World map and progression journal | v0.0.59-dev5 (2 November 2026), needs a refresh |
+| [WORLD_MAP_AND_JOURNAL.md](WORLD_MAP_AND_JOURNAL.md) | World map and progression journal | v0.0.64-dev5 (11 November 2026), needs a refresh |
 | [WORLD_TREE_SPRITES.md](WORLD_TREE_SPRITES.md) | World tree sprites and the Balmora comparison zone | v0.0.64-dev3 (10 November 2026), needs a refresh |
 | [BOUNDED_WORLD_CANDIDATES.md](BOUNDED_WORLD_CANDIDATES.md) | Bounded world candidates | v0.0.28 (4 October 2026), needs a refresh |
 | [POI_CHECKLIST.md](POI_CHECKLIST.md) | Points-of-interest checklist | v0.0.30 (7 October 2026), needs a refresh |
@@ -180,9 +180,9 @@ Every document of the project, by topic, with the version and date of its last u
 | [MOVEMENT_SPEED_STUDY.md](MOVEMENT_SPEED_STUDY.md) | Movement speed study | v0.0.48-dev2 (23 October 2026) |
 | [COMBAT.md](COMBAT.md) | Combat and the Vivec Arena minigame | v0.0.62 (8 November 2026) |
 | [RESTING.md](RESTING.md) | Resting and waiting | v0.0.61-dev3 (2026-11-06) |
-| [MAGIC_EFFECTS.md](MAGIC_EFFECTS.md) | Magic effects | v0.0.62-dev1 (2026-11-07) |
+| [MAGIC_EFFECTS.md](MAGIC_EFFECTS.md) | Magic effects | v0.0.64-dev5 (11 November 2026) |
 | [ALCHEMY.md](ALCHEMY.md) | Alchemy | v0.0.62-dev1 (2026-11-07) |
-| [INVENTORY.md](INVENTORY.md) | Inventory | v0.0.62-dev2 (8 November 2026) |
+| [INVENTORY.md](INVENTORY.md) | Inventory | v0.0.64-dev5 (11 November 2026) |
 | [HUNTER_STUDY.md](HUNTER_STUDY.md) | Hunter as an optimization study | v0.0.42-dev1 (17 October 2026), needs a refresh |
 | [FACE_VALIDATION.md](FACE_VALIDATION.md) | Face validation | v0.0.32-dev1 (8 October 2026), needs a refresh |
 | [MESH_TIPS_AND_TRICKS.md](MESH_TIPS_AND_TRICKS.md) | Mesh tips and tricks: expensive scenery | v0.0.42-dev1 (17 October 2026), needs a refresh |
@@ -199,7 +199,7 @@ Every document of the project, by topic, with the version and date of its last u
 | [VOICED_DIALOGUE.md](VOICED_DIALOGUE.md) | Voiced dialogue: event lookup and runtime plan | v0.0.48-dev2 (23 October 2026) |
 | [DIALOGUE_AND_WAIT.md](DIALOGUE_AND_WAIT.md) | Dialogue, character confirmation and waiting — v0.0.23-dev4 | v0.0.63-dev5 (9 November 2026), needs a refresh |
 | [DIALOGUE_DESIGN.md](DIALOGUE_DESIGN.md) | Dialogue: design (topics, conditions, choices, disposition, journal) | v0.0.62-dev2 (2026-11-08) |
-| [DIALOGUE_FEATURES.md](DIALOGUE_FEATURES.md) | Dialogue features | v0.0.64-dev4 (10 November 2026) |
+| [DIALOGUE_FEATURES.md](DIALOGUE_FEATURES.md) | Dialogue features | v0.0.64 (10 November 2026) |
 | [dialogue-features.json](dialogue-features.json) | dialogue-features.json | data file |
 | [dialogue-choices.json](dialogue-choices.json) | dialogue-choices.json | data file |
 | [VOICE_FEATURES.md](VOICE_FEATURES.md) | Voices and sounds | v0.0.59-dev4 (2 November 2026) |
@@ -212,7 +212,7 @@ Every document of the project, by topic, with the version and date of its last u
 | Document | Title | Last updated |
 | --- | --- | --- |
 | [HUD.md](HUD.md) | HUD: weapon and magic boxes | v0.0.42-dev1 (17 October 2026), needs a refresh |
-| [HUD_ACTIVE_EFFECTS.md](HUD_ACTIVE_EFFECTS.md) | Active-effect HUD, icons and magic indicators | v0.0.42-dev1 (17 October 2026), needs a refresh |
+| [HUD_ACTIVE_EFFECTS.md](HUD_ACTIVE_EFFECTS.md) | Active-effect HUD, icons and magic indicators | v0.0.64-dev5 (11 November 2026), needs a refresh |
 | [KEYMAPS.md](KEYMAPS.md) | Keyboard and command reference | v0.0.62-dev1 (7 November 2026) |
 | [IN_GAME_BUTTONS.md](IN_GAME_BUTTONS.md) | In-game action buttons | v0.0.29-dev4 (6 October 2026), needs a refresh |
 | [INTERACTION_LAYOUTS.md](INTERACTION_LAYOUTS.md) | Interaction layouts | v0.0.42-dev1 (17 October 2026), needs a refresh |
@@ -224,9 +224,9 @@ Every document of the project, by topic, with the version and date of its last u
 
 | Document | Title | Last updated |
 | --- | --- | --- |
-| [AMIWIND_TOOLKIT.md](AMIWIND_TOOLKIT.md) | AmiWind Toolkit | v0.0.64-dev3 (10 November 2026) |
+| [AMIWIND_TOOLKIT.md](AMIWIND_TOOLKIT.md) | AmiWind Toolkit | v0.0.64-dev5 (11 November 2026) |
 | [AMIWIND_MAP_OPTIMIZATION_TOOLKIT.md](AMIWIND_MAP_OPTIMIZATION_TOOLKIT.md) | AmiWind Map Optimization Toolkit | v0.0.41-dev4 (16 October 2026), needs a refresh |
-| [POLYCOUNT_INSPECTOR.md](POLYCOUNT_INSPECTOR.md) | AmiWind 3D Map Inspector | v0.0.42-dev1 (17 October 2026), needs a refresh |
+| [POLYCOUNT_INSPECTOR.md](POLYCOUNT_INSPECTOR.md) | AmiWind 3D Map Inspector | v0.0.64-dev4 (10 November 2026), needs a refresh |
 | [POLYGON_HEATMAP.md](POLYGON_HEATMAP.md) | Polygon density, cells and town subcells | v0.0.32-dev1 (8 October 2026), needs a refresh |
 | [MINIWIND.md](MINIWIND.md) | MiniWind: the test ground | v0.0.64-dev1 (10 November 2026) |
 | [MINIWIND_PLAYTESTER.md](MINIWIND_PLAYTESTER.md) | AmiWind "MiniWind" Playtester Build | v0.0.42-dev1 (17 October 2026), needs a refresh |
@@ -251,16 +251,16 @@ Every document of the project, by topic, with the version and date of its last u
 
 | Document | Title | Last updated |
 | --- | --- | --- |
-| [BUGS.md](BUGS.md) | Bug register | generated (v0.0.64-dev4) |
+| [BUGS.md](BUGS.md) | Bug register | generated (v0.0.64) |
 | [BUG_JOURNAL.md](BUG_JOURNAL.md) | Bug journal | v0.0.62-dev1 (7 November 2026) |
 
 ## Releases
 
 | Document | Title | Last updated |
 | --- | --- | --- |
-| [CHANGELOG.md](CHANGELOG.md) | Changelog | v0.0.64-dev4 (10 November 2026) |
-| [ROADMAP.md](ROADMAP.md) | Roadmap and implementation options | v0.0.64-dev4 (10 November 2026) |
-| [RELEASE_WORKFLOW.md](RELEASE_WORKFLOW.md) | AmiWind release workflow | v0.0.61-dev1 (5 November 2026) |
+| [CHANGELOG.md](CHANGELOG.md) | Changelog | v0.0.64 (11 November 2026) |
+| [ROADMAP.md](ROADMAP.md) | Roadmap and implementation options | v0.0.64 (11 November 2026) |
+| [RELEASE_WORKFLOW.md](RELEASE_WORKFLOW.md) | AmiWind release workflow | v0.0.64-dev4 (10 November 2026) |
 | [CI.md](CI.md) | Build audit and the local pipeline | v0.0.54 (27 October 2026) |
 | [CI_DRY_RUN.md](CI_DRY_RUN.md) | Asset-free compilation and boot image | v0.0.54 (27 October 2026) |
 | [WHITESPACE-BASELINE.json](WHITESPACE-BASELINE.json) | WHITESPACE-BASELINE.json | data file |

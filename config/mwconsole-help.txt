@@ -85,6 +85,7 @@ without one: the dbg mw target, else the player). The table: docs/CONSOLE_COMMAN
  getintelligence: runs
  getinterior: runs
  getitemcount: runs
+ getjournalindex: aw_mwscript_status call getjournalindex "<quest>"
  getlevel: runs
  getlightarmor: runs
  getlineofsight: runs
@@ -99,6 +100,7 @@ without one: the dbg mw target, else the player). The table: docs/CONSOLE_COMMAN
  getmercantile: runs
  getmysticism: runs
  getpccrimelevel: runs
+ getpcexpelled: aw_mwscript_status call pcexpelled "<faction>"
  getpcfacrep: runs
  getpcinjail: runs
  getpcjumping: runs
@@ -138,6 +140,7 @@ without one: the dbg mw target, else the player). The table: docs/CONSOLE_COMMAN
  hurtcollidingactor: runs
  hurtstandingactor: runs
  iswerewolf: runs
+ journal: aw_mwscript_status call journal "<quest>" <index>
  lock: runs
  loopgroup: runs
  lowerrank: runs
@@ -252,6 +255,7 @@ without one: the dbg mw target, else the player). The table: docs/CONSOLE_COMMAN
  sethello: runs
  setillusion: runs
  setintelligence: runs
+ setjournalindex: aw_mwscript_status call setjournalindex "<quest>" <index>
  setlevel: dbg setlvl <n>
  setlightarmor: runs
  setlongblade: runs

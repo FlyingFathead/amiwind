@@ -65,8 +65,19 @@ def room_settings(room=None):
     per type with that type's own settings (room_types)."""
     data = _rooms_config()
     if room is None or room not in (data.get('rooms') or ()):
-        return {'cut_models_over': 0.0, 'detail_budget': {}, 'merge_faces': frozenset()}
-    return _resolved(data)
+        return {'cut_models_over': 0.0, 'detail_budget': {}, 'merge_faces': frozenset(), 'hollow_bevels': None}
+    # the listed rooms' shared settings; the file's top-level hollow_bevels is the universal default, not theirs
+    return _resolved({k: v for k, v in data.items() if k != 'hollow_bevels'})
+
+
+def room_hollow_bevels(settings):
+    """The standing bevels of a room's hollow collision plates: its own hollow_bevels (room_settings / a room type),
+    else the universal default (mesh_geometry_env.hollow_bevels_default: the builder option, else the config's 2;
+    COLLISION-WORLDWIDE-REDUCTION-64)."""
+    if settings.get('hollow_bevels') is not None:
+        return int(settings['hollow_bevels'])
+    from hollow_bevels_env import hollow_bevels_default
+    return hollow_bevels_default()
 
 
 def room_recipe(room):
@@ -92,7 +103,14 @@ def _resolved(data, where='config/chim-rooms.json'):
     # merge_faces: room meshes whose faces go through the lossless planar merge (tools/planar_merge.py, the CHIM mesh
     # method 'merge': coplanar triangles with one texture mapping as one convex face, never more faces, the same picture)
     merge = frozenset(str(m).replace(chr(92), '/').lower() for m in (data.get('merge_faces') or ()))
-    return {'cut_models_over': cut, 'detail_budget': detail_budget(data.get('detail_budget')), 'merge_faces': merge}
+    # hollow_bevels: the standing bevels of hollow collision plates (AKULAKHAN-CHAMBER-32MB-STALL-53): 0 = the profile's
+    # (today), 1 = exact on the walkable plates only, 2 = approximate everywhere (as every non-hollow model)
+    # absent: the universal default (mesh_geometry_env.hollow_bevels_default, COLLISION-WORLDWIDE-REDUCTION-64)
+    bevels = data.get('hollow_bevels')
+    if bevels is not None and bevels not in (0, 1, 2):
+        raise ValueError(where + ': hollow_bevels must be 0, 1 or 2')
+    return {'cut_models_over': cut, 'detail_budget': detail_budget(data.get('detail_budget')), 'merge_faces': merge,
+            'hollow_bevels': bevels}
 
 
 TYPE_SUFFIX = 't'      # rooms/<room>t<N>.crm: the record of type N of a room with types (engine chim_world.c RoomType)
@@ -339,7 +357,8 @@ def room_input(work, pal_bytes, qbsp, jobs, cache, timer, collision_cache, harve
                        palette=pal_bytes, heights=None, materials=None, step=grain, floor=0.0, ceiling=0.0,
                        ground_textures={}, qbsp=qbsp, collision_cache=collision_cache, jobs=jobs,
                        cache=cache, timer=timer,
-                       settings={'placement_format': '0.8', 'grain': grain, 'cut_models_over': rooms['cut_models_over']},
+                       settings={'placement_format': '0.8', 'grain': grain, 'cut_models_over': rooms['cut_models_over'],
+                                 'hollow_bevels': room_hollow_bevels(rooms)},
                        mesh_occluders=False,
                        terrain_on=False)
     lighting = index.get('lighting') or {}
@@ -903,6 +922,16 @@ def build(room_works, palette, out, qbsp=None, jobs=1, unit_cache=None, harvest=
                            'rule': 'harvestable interior plants are left out of the room records; the image places '
                                    'each as its harvest entity (CHIM-ROOM-HARVEST-DOUBLE-48)'}
         _log('harvest: %d harvestable interior plants are left out of the room records' % len(numbers))
+    # every large room fades into fog at the draw distance and draws nothing past it (config/large-rooms.txt): a
+    # converted room at least LARGE_ROOM_SIDE across that the table does not list stops here, before any room work
+    # (INTERIOR-FAR-BLANK-MANOR-56: unlisted, Akulakhan's Chamber overflowed the edge list and showed blank areas)
+    from large_rooms import LARGE_ROOM_SIDE, missing_large_rooms
+    missing = missing_large_rooms(room_works)
+    if missing:
+        raise ValueError('CHIM rooms: %d large room(s) not in config/large-rooms.txt (at least %d local units across; '
+                         'tools/large_rooms.py AREA_WORK --write): %s' % (
+                             len(missing), LARGE_ROOM_SIDE,
+                             ', '.join('%s (%s, %d)' % row for row in missing[:12])))
     store = Store()
     types_of = room_types()
     rows, kept_bsp, tasks, liquids = [], [], [], {}

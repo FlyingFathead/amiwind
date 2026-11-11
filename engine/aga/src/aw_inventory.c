@@ -193,7 +193,11 @@ int AW_InventoryDrop(aw_state_t *s,const aw_inventory_item_t *item,int32_t count
     s->inventory.dropped[i]=drop;s->inventory.next_serial=drop.serial;return i;
 }
 int AW_MagicSelectable(const aw_inventory_item_t *item){
-    return item && (item->enchant_kind==AW_ENCH_ONCE || item->enchant_kind==AW_ENCH_USED) && item->charge_max>0;
+    /* SCROLL-CAST-64: a Cast Once scroll needs no charge (OpenMW 0.51 spellcasting.cpp cast(item): the charge is
+     * paid for When Used and When Strikes only; spellmodel.cpp shows a Cast Once item as 100/100), so a scroll whose
+     * enchantment has charge 0 in the masters can be selected and cast too */
+    return item && ((item->enchant_kind==AW_ENCH_ONCE && item->enchantment[0]) ||
+                    (item->enchant_kind==AW_ENCH_USED && item->charge_max>0));
 }
 int AW_MagicSelect(aw_state_t *s,const aw_inventory_item_t *item){
     if(!s || !AW_MagicSelectable(item) || !inv_id(item->id,64) || AW_StateGet(s,AW_ITEM,item->id)<1)return 0;

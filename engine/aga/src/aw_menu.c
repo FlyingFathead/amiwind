@@ -23,6 +23,7 @@ static int audio_drag,sens_drag;
 /* Options > Video > Fog distance slider (Morrowind style): drag, arrows, or type. */
 #define FOG_MIN 100
 #define FOG_MAX 1500
+#define FOG_INDOORS_MAX (4*1024)	/* the large-room cap (aw_fog.c LARGE_ROOM_MAX) */
 #define FOG_X 60
 #define FOG_W 200
 #define FOG_Y 104
@@ -96,13 +97,19 @@ static int tab,focus;
 /* Prefs and Video rows (Prefs: the HUD and gameplay; Video: view, loading, memory). */
 enum {ROW_CROSSHAIR,ROW_COLOUR,ROW_SHAPE,ROW_FRAME,ROW_FONT,ROW_VOICE,ROW_DIALOGUE,ROW_AIMED,ROW_NPC,ROW_OBJECTS,
     ROW_AUTOSAVE,ROW_FOG,ROW_RESET,ROW_FAR,ROW_PHOTO,ROW_AREA,ROW_METHOD,ROW_BUFFER,ROW_MEMORY,ROW_GRAPHICS,ROW_CURSOR,
-    ROW_TOPICS,ROW_LABELS,ROW_BEST,ROW_TEXTBOX};
+    ROW_TOPICS,ROW_LABELS,ROW_BEST,ROW_TEXTBOX,ROW_ROOMFOG,ROW_FOG_INDOORS,ROW_TREES};
 /* Mouse cursor (CURSOR-MW-58): Morrowind's own pointer or AmiWind's, beside the crosshair's choices.
  * Always use best attack (BEST-ATTACK-OPTION-62): the original's Preferences setting, the same saved value as the
  * console's aw_combat_best_attack and dbg combat bestattack (aw_combat.c); on by default (an AmiWind default). */
 static const unsigned char prefs_rows[]={ROW_CROSSHAIR,ROW_COLOUR,ROW_SHAPE,ROW_CURSOR,ROW_FRAME,ROW_FONT,ROW_VOICE,
     ROW_DIALOGUE,ROW_TEXTBOX,ROW_TOPICS,ROW_AIMED,ROW_NPC,ROW_OBJECTS,ROW_LABELS,ROW_BEST,ROW_AUTOSAVE};
-static const unsigned char video_rows[]={ROW_FOG,ROW_RESET,ROW_FAR,ROW_PHOTO,ROW_AREA,ROW_METHOD,ROW_BUFFER,ROW_MEMORY
+/* Fog in large rooms and the indoor fog distance (LARGE-ROOM-FOG-SETTING-64): aw_fog_large_rooms (on by default) and
+ * aw_fog_distance_interior (arrows 10 units, Shift 1; Enter steps 150, 300, 540, 1000), both saved (aw_fog.c); the
+ * Fog distance row above is the outdoor one (aw_drawdistance).
+ * Tree crowns (TREES-DEPTH-56): the same saved value as the console's aw_tree_crowns (chim_world.c): original,
+ * fast (star crowns) or sprite crowns, taken at the next map load where the image carries the alternative models. */
+static const unsigned char video_rows[]={ROW_FOG,ROW_RESET,ROW_FOG_INDOORS,ROW_ROOMFOG,ROW_FAR,ROW_PHOTO,ROW_AREA,ROW_METHOD,
+    ROW_BUFFER,ROW_MEMORY,ROW_TREES
 #if defined(AMIWIND_DEBUG_LUMA) && AMIWIND_DEBUG_LUMA
     ,ROW_GRAPHICS
 #endif
@@ -371,7 +378,15 @@ static void prefs_video_change(int id,int direction,int enter){
         else AW_SetDrawDistance(AW_DrawDistance()+direction*(keydown[K_SHIFT]?1:10));
         break;
     case ROW_RESET:if(enter)AW_SetDrawDistance(300);break;
+    case ROW_ROOMFOG:Cvar_SetValue("aw_fog_large_rooms",Cvar_VariableValue("aw_fog_large_rooms")?0:1);break;
+    case ROW_FOG_INDOORS:{
+        int d=(int)Cvar_VariableValue("aw_fog_distance_interior");
+        if(enter)d=d<150?150:d<300?300:d<540?540:d<1000?1000:150;
+        else d+=direction*(keydown[K_SHIFT]?1:10);
+        Cvar_SetValue("aw_fog_distance_interior",(float)(d<FOG_MIN?FOG_MIN:d>FOG_INDOORS_MAX?FOG_INDOORS_MAX:d));
+        break;}
     case ROW_FAR:far_step(direction);break;
+    case ROW_TREES:Cvar_SetValue("aw_tree_crowns",(float)(((int)Cvar_VariableValue("aw_tree_crowns")+(direction<0?2:1))%3));break;
     /* Photo mode needs the running game; the menu closes first so the
      * notice and then the clean frames follow at once. */
     case ROW_PHOTO:if(enter && photo_ready()){photo=!AW_PhotoModeActive();options_close();close_menu();AW_PhotoModeSet(photo);}break;
@@ -657,9 +672,17 @@ static void prefs_video_line(int id,char *line){
         if(AW_UIWidth(line)>LIST_W-4){strcpy(line,on?"Best attack: On":"Best attack: Off");}
         break;
     }
-    case ROW_FOG:sprintf(line,"Fog distance: %ld",(long)AW_DrawDistance());break;
+    case ROW_FOG:sprintf(line,"Fog distance outdoors: %ld",(long)AW_DrawDistance());break;
+    case ROW_FOG_INDOORS:sprintf(line,"Fog distance indoors: %ld",(long)Cvar_VariableValue("aw_fog_distance_interior"));break;
     case ROW_RESET:strcpy(line,"Reset distance: 300");break;
+    case ROW_ROOMFOG:strcpy(line,Cvar_VariableValue("aw_fog_large_rooms")?"Fog in large rooms: On":"Fog in large rooms: Off");break;
     case ROW_FAR:if(far_index()<0)strcpy(line,"Far detail: Custom");else sprintf(line,"Far detail: %s",far_names[far_index()]);break;
+    case ROW_TREES:{
+        static const char *const crowns[3]={"original","fast","sprite"};
+        int v=(int)Cvar_VariableValue("aw_tree_crowns");
+        sprintf(line,"Tree crowns: %s",crowns[v>=0 && v<3?v:0]);
+        break;
+    }
     case ROW_PHOTO:strcpy(line,AW_PhotoModeActive()?"Leave photo mode":"Photo mode");break;
     case ROW_AREA:strcpy(line,AW_RegionLoadingFrozen()?"Area loading: Freeze frame":"Area loading: Black screen");break;
     case ROW_METHOD:strcpy(line,AW_CellChangeMethod()==1?"Load method: Current":"Load method: Read-ahead (test)");break;

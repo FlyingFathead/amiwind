@@ -22,6 +22,21 @@
 
 _Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
 
+<!-- contents start -->
+## Contents
+
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
+
 ## Symptom
 The v0.0.41-dev5 build stopped at the end of its CHIM stage, after 1 h 35 min. The stair gate found two
 flight steps it cannot walk. Both are the same step, the top step of a walkway stair in Vos, walked in the
@@ -111,6 +126,7 @@ Family: Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collisi
 - [CHIM-STAIR-METHOD1-UNFIXED-48](CHIM-STAIR-METHOD1-UNFIXED-48.md): Stair collision method 1 cannot yet make 11 meshes' flights pass the geometric stair check (ships, shipwreck, silt strider, tent, Daedric ruins and four buildings)
 - [CHIM-VIVEC-DOCK-WALKWAY-43](CHIM-VIVEC-DOCK-WALKWAY-43.md): The player cannot climb the walkway at the Vivec Hlaalu canton dock and gets stuck
 - [COLLISION-CONVEX-LOSS-32](COLLISION-CONVEX-LOSS-32.md): Convex collision proxies lose and invent authored surfaces
+- [COLLISION-DISPARITY-WORLDWIDE-64](COLLISION-DISPARITY-WORLDWIDE-64.md): Collision data is far larger and deeper than the drawn meshes across the game
 - [COLLISION-HULL-CHAINS-33](COLLISION-HULL-CHAINS-33.md): 183 brush models across the island collide through standing-hull chains 512 to 31,659 clipnodes deep
 - [COLLISION-NC-FLAGS-32](COLLISION-NC-FLAGS-32.md): Morrowind no-collision and editor-marker flags (NC, NCC, MRK, AvoidNode) are ignored by the mesh converters
 - [COLLISION-RCN-SCOPE-32](COLLISION-RCN-SCOPE-32.md): Authored collision meshes (RootCollisionNode) are used by some converters only

@@ -91,8 +91,11 @@ class FogRuleTests(unittest.TestCase):
         self.assertNotIn('aw_cut_groups', fog)
         head = (SRC / 'quakedef.h').read_text()
         for line in ('#define AW_CULL_TEST 7', '#define AW_CULL_FOG_RULE 8', '#define AW_CULL_GROUPS 16',
-                     '#define AW_CULL_MAX 31'):
+                     '#define AW_CULL_ROOM_FOG_OFF 32', '#define AW_CULL_MAX 63'):
             self.assertIn(line, head)
+        # the large-room face cut is ON in the default (its bit turns it off; INTERIOR-FAR-BLANK-HEART-64)
+        self.assertIn('room_fog=large && mode && !((int)aw_cull.value&AW_CULL_ROOM_FOG_OFF);', fog)
+        self.assertIn('if(room_fog)top=down=-1;', fog)
         self.assertIn('fog_rule=!AW_Interior() && ((int)aw_cull.value&AW_CULL_FOG_RULE);', fog)
         self.assertIn('((int)aw_cull.value&AW_CULL_GROUPS)', fog)
         table = (ROOT / 'config/debug-commands.txt').read_text()

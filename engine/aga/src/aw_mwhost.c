@@ -4669,7 +4669,11 @@ static void status(void){
         static struct {char *name;int fn;} calls[]={{"getpccrimelevel",AWF_GETPCCRIMELEVEL},
             {"setpccrimelevel",AWF_SETPCCRIMELEVEL},{"modpccrimelevel",AWF_MODPCCRIMELEVEL},
             {"modreputation",AWF_MODREPUTATION},{"getpcrank",AWF_GETPCRANK},{"pcraiserank",AWF_PCRAISERANK},
-            {"pcjoinfaction",AWF_PCJOINFACTION},{"pcexpell",AWF_PCEXPELL},{"addtopic",AWF_ADDTOPIC}};
+            {"pcjoinfaction",AWF_PCJOINFACTION},{"pcexpell",AWF_PCEXPELL},{"addtopic",AWF_ADDTOPIC},
+            /* CONSOLE-QUEST-READS-64: the expulsion and faction reputation reads and their clears */
+            {"pcexpelled",AWF_PCEXPELLED},{"getpcexpelled",AWF_PCEXPELLED},{"pcclearexpelled",AWF_PCCLEAREXPELLED},
+            {"getpcfacrep",AWF_GETPCFACREP},{"setpcfacrep",AWF_SETPCFACREP},{"modpcfacrep",AWF_MODPCFACREP},
+            {"pclowerrank",AWF_PCLOWERRANK}};
         aw_mwcell_t num[1],r;unsigned char str[2];int i,n=0,ns=0,fn=-1,done;char *f=Cmd_Argc()>2?Cmd_Argv(2):"";
         if(!Q_strcasecmp(f,"aifollow")){   /* the actor under the crosshair follows the player, as a script's AIFollow */
             edict_t *e=sv_player?AW_NPCTarget(sv_player,sv_player->v.v_angle):NULL;
@@ -4687,10 +4691,13 @@ static void status(void){
                        e?pr_strings+e->v.netname:"no actor under the crosshair");
             return;
         }
-        if(!Q_strcasecmp(f,"journal") || !Q_strcasecmp(f,"setjournalindex")){
+        if(!Q_strcasecmp(f,"journal") || !Q_strcasecmp(f,"setjournalindex") || !Q_strcasecmp(f,"getjournalindex")){
             /* "call journal QUEST INDEX": a script's Journal (the dated entry, the notice; a lower index is ignored);
-             * "call setjournalindex QUEST INDEX": SetJournalIndex (the index alone, no entry) */
+             * "call setjournalindex QUEST INDEX": SetJournalIndex (the index alone, no entry);
+             * "call getjournalindex QUEST" (CONSOLE-QUEST-READS-64): GetJournalIndex, the index alone printed */
             int advance=!Q_strcasecmp(f,"journal");
+            if(!Q_strcasecmp(f,"getjournalindex") && Cmd_Argc()>4){
+                Con_Printf("dbg mwscript call getjournalindex QUEST: one argument\n");return;}
             int t,quests=load()?AW_MwvmTopicCount():0,found=-1;
             for(t=0;Cmd_Argc()>3 && t<quests && found<0;t++)if(topic_names && same_id(topic_names+topic_offsets[t],Cmd_Argv(3)))found=t;
             if(found<0){Con_Printf("dbg mwscript call journal QUEST [INDEX]: no such quest (the file must be loaded)\n");return;}
@@ -4846,7 +4853,10 @@ static void status(void){
         for(i=0;i<(int)(sizeof(calls)/sizeof(calls[0]));i++)if(!Q_strcasecmp(f,calls[i].name))fn=calls[i].fn;
         if(fn<0 || !load()){Con_Printf("dbg mwscript call: getpccrimelevel, setpccrimelevel N, modpccrimelevel N, "
                                        "modreputation N, getpcrank FACTION, pcraiserank FACTION, pcjoinfaction FACTION, "
-                                       "pcexpell FACTION, addtopic ROW, journal QUEST INDEX (the file must be loaded)\n");return;}
+                                       "pcexpell FACTION, pcexpelled FACTION, pcclearexpelled FACTION, getpcfacrep FACTION, "
+                                       "setpcfacrep N FACTION, modpcfacrep N FACTION, pclowerrank FACTION, addtopic ROW, "
+                                       "journal QUEST INDEX, setjournalindex QUEST INDEX, getjournalindex QUEST "
+                                       "(the file must be loaded)\n");return;}
         for(i=3;i<Cmd_Argc();i++){
             char *s=Cmd_Argv(i);
             if((s[0]>='0' && s[0]<='9') || s[0]=='-'){

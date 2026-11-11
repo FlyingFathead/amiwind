@@ -31,7 +31,11 @@
     {"original": ["ToggleStats", "tst"], "amiwind": "dbg fps", "verdict": "partial", "note": "the frame rate counter; the original also lists render counts"},
     {"original": ["ToggleCombatStats", "tcs"], "amiwind": "aw_combat_readout toggled", "verdict": "same", "note": "the combat rolls printed on the console"},
     {"original": ["ToggleLights", "tl"], "amiwind": "r_fullbright toggled", "verdict": "partial", "note": "the lighting off and on as the engine draws it"},
-    {"original": ["RepairedOnMe"], "amiwind": "echo 0", "verdict": "same", "note": "OpenMW 0.51 reads it as always 0"}
+    {"original": ["RepairedOnMe"], "amiwind": "echo 0", "verdict": "same", "note": "OpenMW 0.51 reads it as always 0"},
+    {"original": ["Journal"], "amiwind": "aw_mwscript_status call journal", "verdict": "same", "note": "the host route a script's Journal takes: the dated entry, a lower index ignored"},
+    {"original": ["SetJournalIndex"], "amiwind": "aw_mwscript_status call setjournalindex", "verdict": "same", "note": "the index alone, as a script's SetJournalIndex"},
+    {"original": ["GetJournalIndex"], "amiwind": "aw_mwscript_status call getjournalindex", "verdict": "same", "note": "the index the scripts read, printed"},
+    {"original": ["GetPCExpelled"], "amiwind": "aw_mwscript_status call pcexpelled", "verdict": "same", "note": "PCExpelled through the host route, printed"}
   ],
   "entries": [
     {"script": "CharGen", "what": "the new game's start: the player's controls off, the player placed on the prison ship, the Bitter Coast weather set to cloudy, CharGenState 10",

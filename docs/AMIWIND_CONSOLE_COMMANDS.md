@@ -1,6 +1,6 @@
 # AmiWind console commands
 
-_Generated from `config/debug-commands.txt` with AmiWind v0.0.64-dev4._
+_Generated from `config/debug-commands.txt` with AmiWind v0.0.64._
 
 Open the console with F10 or the backquote key and type
 a command, for example `dbg headlamp on`. This page is generated from
@@ -102,6 +102,8 @@ original: [the table of them](CONSOLE_COMMANDS_MORROWIND.md).
 | `dbg cut groups` | - | [on/off, 1/0; no argument toggles] whole-structure cuts (saved as aw_cull + 16; default off until the in-game A/B): the pieces of one long structure (walkways, town walls, bridges, the Ghostfence, hillside rocks; the frame map's .cut file) are drawn, fogged and left out together, tested on the structure's box; 0 each piece on its own |
 | `dbg draw distance` | `dbg drawdistance`, `dbg fog distance` | [100..4096 local units; default 300] |
 | `dbg fog` | - | on/off or 1/0 (default on: exterior and interior fog; the console value 2 = exterior fog only, interiors without their cell fog as before) |
+| `dbg fog indoors` | - | [100..4096 local units] the indoor fog distance, its own value (saved; default 300; also Options > Video > Fog distance indoors): where a large room's fog is full and its drawing stops; aw_fog_distance stays the outdoor one |
+| `dbg fog large rooms` | - | [on/off or 1/0] fog in large rooms (saved; default on; also Options > Video > Fog in large rooms): rooms at least 1,024 units across fade into their fog at the indoor fog distance and draw nothing past it; off = they draw as small rooms |
 | `dbg fog location` | `dbg foglocation` | 1/0 places in id1/world/fog-locations.txt (the HUD title's place or region, or the map) set their own day/night fog distance (Ald'ruhn 300, Balmora 300 day, 250 night; default 1 on) |
 | `dbg fog rule` | - | [on/off, 1/0; no argument toggles] no distance cut before the fog is opaque (saved as aw_cull + 8; default off until the in-game A/B): the Light/Strong far detail cut-offs and the small-faces step start at the fog distance, so nothing pops out of clear air; 0 the cut-offs as before (faster) |
 | `dbg ghostfence` | - | [on/off, true/false or 1/0] animated scrolling textures (default on; not saved): on = the Ghostfence curtain, waterfalls and other turbulent textures ripple over time; off = drawn straight and still (unlit, as they are built; also stills water in interiors) |
@@ -114,6 +116,7 @@ original: [the table of them](CONSOLE_COMMANDS_MORROWIND.md).
 | `dbg playvid` | `dbg playvideo`, `dbg videoplay`, `dbg vidplay` | <1..17 / 01..17 / catalogue name> (drains queued game audio first) |
 | `dbg render order` | - | 1 legacy / 2 mesh intersections (default) |
 | `dbg seethrough` | - | [0/1/2 or on/off; no value lists them] see-through textures (default 1; not saved): 1 = cobwebs, hanging moss and leaves drawn with their see-through parts instead of solid rectangles; 2 = also seen from behind; 0 = solid rectangles as before; build option --chim-fence-twosided-faces mirror builds the back sides in |
+| `dbg treecrowns` | - | [0 / 1 / 2; no argument shows the value] how trees with an alternative in the image are drawn, from the next map load (saved; default 0; Options > Video > Tree crowns): 0 the original models, 1 fast (star crowns), 2 sprite crowns; an image without alternatives draws the originals |
 | `dbg vanitycam` | `dbg vanitycamera` | same as vanitycamera |
 
 ## World / Travel

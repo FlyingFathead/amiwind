@@ -1,6 +1,6 @@
 # AmiWind 3D Map Inspector
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.64-dev4 (10 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -23,6 +23,10 @@ _Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 - [CHIM maps and CHIM worlds](#chim-maps-and-chim-worlds)
 
 <!-- contents end -->
+
+The JSON copies (session, zones, sub-cell plan) name the AmiWind version the Toolkit ships with in program.version.
+
+On a Toolkit server started with `--served-build DIR` ([Toolkit](AMIWIND_TOOLKIT.md)), the inspector opened with no `map`, `world` or `rooms` in its address opens that build by itself: it lists the build's maps and rooms and opens its CHIM world, and `map-inspector.html?room=NAME` opens a room by name, with no file picker.
 
 **Geometry analysis and optimization planning**
 

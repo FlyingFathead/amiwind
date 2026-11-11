@@ -98,6 +98,8 @@ VIDEO|draw distance|aw_fog_distance|[100..4096 local units; default 300]
 VIDEO|drawdistance|aw_fog_distance|[100..4096 local units; default 300]
 VIDEO|fog|aw_fog|on/off or 1/0 (default on: exterior and interior fog; the console value 2 = exterior fog only, interiors without their cell fog as before)
 VIDEO|fog distance|aw_fog_distance|[100..4096 local units; default 300]
+VIDEO|fog indoors|aw_fog_distance_interior|[100..4096 local units] the indoor fog distance, its own value (saved; default 300; also Options > Video > Fog distance indoors): where a large room's fog is full and its drawing stops; aw_fog_distance stays the outdoor one
+VIDEO|fog large rooms|aw_fog_large_rooms|[on/off or 1/0] fog in large rooms (saved; default on; also Options > Video > Fog in large rooms): rooms at least 1,024 units across fade into their fog at the indoor fog distance and draw nothing past it; off = they draw as small rooms
 VIDEO|fog location|aw_fog_location|1/0 places in id1/world/fog-locations.txt (the HUD title's place or region, or the map) set their own day/night fog distance (Ald'ruhn 300, Balmora 300 day, 250 night; default 1 on)
 VIDEO|fog rule|aw_cull|[on/off, 1/0; no argument toggles] no distance cut before the fog is opaque (saved as aw_cull + 8; default off until the in-game A/B): the Light/Strong far detail cut-offs and the small-faces step start at the fog distance, so nothing pops out of clear air; 0 the cut-offs as before (faster)
 VIDEO|foglocation|aw_fog_location|1/0 places in id1/world/fog-locations.txt (the HUD title's place or region, or the map) set their own day/night fog distance (Ald'ruhn 300, Balmora 300 day, 250 night; default 1 on)
@@ -117,6 +119,7 @@ VIDEO|pov|aw_camera|same as camera
 VIDEO|render order|aw_surface_order|1 legacy / 2 mesh intersections (default)
 VIDEO|seethrough|aw_seethrough_material|[0/1/2 or on/off; no value lists them] see-through textures (default 1; not saved): 1 = cobwebs, hanging moss and leaves drawn with their see-through parts instead of solid rectangles; 2 = also seen from behind; 0 = solid rectangles as before; build option --chim-fence-twosided-faces mirror builds the back sides in
 VIDEO|thirdperson|aw_camera|same as camera
+VIDEO|treecrowns|aw_tree_crowns|[0 / 1 / 2; no argument shows the value] how trees with an alternative in the image are drawn, from the next map load (saved; default 0; Options > Video > Tree crowns): 0 the original models, 1 fast (star crowns), 2 sprite crowns; an image without alternatives draws the originals
 VIDEO|vanitycam|aw_vanitycam|same as vanitycamera
 VIDEO|vanitycamera|aw_vanitycam|[auto / off / on (now) / delay N/default / fullview on/off] the vanity camera (idle orbit): no argument = state; auto = the original (orbit after fVanityDelay, 30 s idle, 3 deg/s; default); off = never (saved); on = orbit now until any input; delay N = test delay (not saved); fullview on/off: full screen, no HUD (aw_vanity_fullview)
 VIDEO|videoplay|playvid|<1..17 / 01..17 / catalogue name> (alias of playvid)

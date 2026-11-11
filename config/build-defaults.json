@@ -10,7 +10,7 @@
   "chim_lighting_type": "hybrid",
   "follow_original_stair_rules": true,
   "chim_stream_statics": true,
-  "model_hull": "chain",
+  "model_hull": "auto",
   "lava": "quake",
   "world_map": "v2",
   "npc_lod": "off",

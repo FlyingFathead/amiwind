@@ -15,6 +15,14 @@ extern cvar_t aw_drawdistance;
 extern vec3_t modelorg;
 extern float xcenter,ycenter,xscale,yscale;
 static cvar_t aw_fog={"aw_fog","1",true};
+/* Fog in large rooms (LARGE-ROOM-FOG-SETTING-64; INTERIOR-FAR-BLANK-MANOR-56): 1 (default, saved) the rooms of
+ * world/large-rooms.txt fade into their fog at the draw distance and draw nothing past it; 0 they draw as small rooms
+ * (no fog, the indoor cut of AW_CullBegin). Options > Video > Fog in large rooms; aw_fog 0 turns every fog off as before. */
+static cvar_t aw_fog_large_rooms={"aw_fog_large_rooms","1",true};
+/* The indoor fog distance (LARGE-ROOM-FOG-SETTING-64), local units 100..4096, saved: where a large room's fog is full
+ * and its drawing stops; aw_drawdistance stays the outdoor one. Default 300, the shared value before, until measured.
+ * Options > Video > Fog distance indoors. */
+static cvar_t aw_fog_distance_interior={"aw_fog_distance_interior","300",true};
 /* Land Fill Independence v1: disabling colour fog must not disable an
  * enabled geometric LAND pass. 0 disables LAND fill for a measured A/B. */
 static cvar_t aw_land_fill={"aw_land_fill","1",true};
@@ -139,7 +147,7 @@ static void cycle_distance(void) {
     AW_SetDrawDistance(value);
     Con_Printf("View distance: %ld (effective %ld).\n",(long)value,(long)AW_DrawDistance());
 }
-void AW_FogInit(void) { Cvar_RegisterVariable(&aw_land_fill);Cvar_RegisterVariable(&aw_terrain_horizon);Cvar_RegisterVariable(&aw_skyline_fill);Cvar_RegisterVariable(&aw_sky_haze);Cvar_RegisterVariable(&aw_horizon_defaults);Cmd_AddCommand("aw_horizon_migrate",horizon_migrate);Cmd_AddCommand("aw_horizon_stats",AW_HorizonReport);Cvar_RegisterVariable(&aw_fog);Cvar_RegisterVariable(&aw_cull);Cmd_AddCommand("aw_fog_distance",distance_command);Cmd_AddCommand("aw_viewdistance_cycle",cycle_distance);colours=COM_LoadHunkFile("gfx/fog.lmp"); }
+void AW_FogInit(void) { Cvar_RegisterVariable(&aw_land_fill);Cvar_RegisterVariable(&aw_terrain_horizon);Cvar_RegisterVariable(&aw_skyline_fill);Cvar_RegisterVariable(&aw_sky_haze);Cvar_RegisterVariable(&aw_horizon_defaults);Cmd_AddCommand("aw_horizon_migrate",horizon_migrate);Cmd_AddCommand("aw_horizon_stats",AW_HorizonReport);Cvar_RegisterVariable(&aw_fog);Cvar_RegisterVariable(&aw_fog_large_rooms);Cvar_RegisterVariable(&aw_fog_distance_interior);Cvar_RegisterVariable(&aw_cull);Cmd_AddCommand("aw_fog_distance",distance_command);Cmd_AddCommand("aw_viewdistance_cycle",cycle_distance);colours=COM_LoadHunkFile("gfx/fog.lmp"); }
 /* Fill inverse-depth bands with 15 integer divisions, not 32767 floating-point
  * divisions on each live adjustment. Same 40%-to-100% linear fog profile. */
 void AW_FogDepths(byte *table,int distance) {
@@ -221,10 +229,11 @@ static void large_room_load(void) {
 /* The large room's fog and draw distance here, 0 when this is not one (or fog is off). */
 int AW_LargeRoomDistance(void) {
     int d;
-    if(!sv.active || !AW_Interior() || !aw_fog.value || aw_fog.value>=2)return 0;
+    if(!sv.active || !AW_Interior() || !aw_fog.value || aw_fog.value>=2 || !aw_fog_large_rooms.value)return 0;
     large_room_load();
     if(!large_room_cap)return 0;
-    d=aw_drawdistance.value>=100?(int)aw_drawdistance.value:100;
+    d=aw_fog_distance_interior.value>=100?(int)aw_fog_distance_interior.value:100;   /* indoors: its own distance */
+    if(d>LARGE_ROOM_MAX)d=LARGE_ROOM_MAX;
     return d<large_room_cap?d:large_room_cap;
 }
 /* Fog levels 1..15 linear from start to end (local units); nearer than start: none. */
@@ -373,6 +382,12 @@ static cvar_t aw_cull={"aw_cull","4",true};
  * (chim_cuts.c, the frame map's .cut sidecar): drawn, fogged and left out as
  * one piece. 0: each placement on its own sphere (the method up to v0.0.45),
  * the default until the maintainer's in-game A/B. */
+/* Large rooms (INTERIOR-FAR-BLANK-HEART-64): a placed model's faces wholly past the room's fog end draw only the full
+ * fog colour, so they are left out like an exterior's fog-exact faces (no sky horizon indoors: the background is the
+ * fog colour too), and a tile past it is left out whole. Without it Akulakhan's Chamber overflowed the edge list
+ * (tens of thousands of edges short a frame) and the dropped surfaces showed the clear colour. On by default;
+ * aw_cull + AW_CULL_ROOM_FOG_OFF (32) turns it off, the method before. */
+static int room_fog;
 #define CULL_MODE ((int)aw_cull.value&AW_CULL_TEST)
 static float far_normal[3],far_distance;
 static int fog_rule;                /* the fog rule this frame (exteriors) */
@@ -461,6 +476,12 @@ void AW_CullBegin(void) {
     VectorCopy(vpn,far_normal);
     far_distance=DotProduct(r_origin,far_normal)+distance+16;
     fog_exact=mode>=2 && !AW_Interior() && fog_exact_begin((int)distance);
+    room_fog=large && mode && !((int)aw_cull.value&AW_CULL_ROOM_FOG_OFF);
+    if(room_fog){
+        int i;
+        fog_exact=1;fog_exact_depth=(float)large+16;
+        for(i=0;i<3;i++)fog_down_k[i]=fog_down[i]=0;
+    }
     /* Indoors too (30 October 2026, docs/chim/MESH_METHODS.md): a large hall's props
      * past the share of its distance (the indoor distance above, or a large room's fog) are
      * left out the same way; a small room is nearer than every share. */
@@ -571,6 +592,7 @@ int AW_BrushPassFar(vec3_t origin,float radius,const float *minmaxs) {
         }
         nearest-=eye;farthest-=eye;
         top-=DotProduct(r_origin,fog_down);down-=DotProduct(r_origin,fog_down);
+        if(room_fog)top=down=-1;        /* indoors no sky above the fog: only the depth decides */
         if(nearest>=fog_exact_depth && top<0)return AW_FAR_SKIP;
         if(farthest>=fog_exact_depth && down<0)faces|=1;
     }
@@ -590,7 +612,7 @@ void AW_FarPassBegin(int result) {
     }
     aw_far_view[3]=DotProduct(modelorg,vpn);
     aw_far_depth[3]=aw_far_view[3]+fog_exact_depth;
-    aw_far_down[3]=DotProduct(modelorg,d);
+    aw_far_down[3]=room_fog?1e30f:DotProduct(modelorg,d);   /* a large room: every vertex counts as below */
 }
 /* r_bsp.c, aw_cull 5/6: a front face of a far model (AW_BrushPassFar) whose
  * largest model-space extent covers fewer than this many pixels at its

@@ -197,7 +197,9 @@ static int hud_original_boxes(int y,int boxes) {
         x=107;if(!hud_frame(x,y))return 0;
         if(AW_MagicSelectedItem(&item)){
             sprintf(key,"item:%s",item.id);hud_icon(SLOT_MAGIC,key,x+1,y+1);
-            hud_track(SLOT_TRACK_MAGIC,"hud:track:magic",x+1,y+HUD_BOX+1,AW_MagicCharge(&aw_state,&item)/item.charge_max);
+            /* a Cast Once scroll: the bar full (OpenMW shows it as 100/100; its charge may be 0, SCROLL-CAST-64) */
+            hud_track(SLOT_TRACK_MAGIC,"hud:track:magic",x+1,y+HUD_BOX+1,
+                      item.enchant_kind==AW_ENCH_ONCE || !(item.charge_max>0)?1.0f:AW_MagicCharge(&aw_state,&item)/item.charge_max);
         }
     }
     /* SNEAK-58: the original's sneak indicator (hud:sneak) beside the boxes while the player sneaks; it loads on the
@@ -224,7 +226,8 @@ void AW_IconStats(void) {
 }
 /* aw_magic: show the selection; aw_magic select ID | none; DIAGNOSTIC aw_magic charge ID POINTS;
  * aw_magic stats: the HUD icon counters and per-frame cost (aw_icons.c).
- * The original selects magic items in the magic menu, which AmiWind does not have yet. */
+ * The original selects magic items in the magic menu; since v0.0.64 (SCROLL-CAST-64) the Magic window's Magic Items
+ * do the same (aw_cast.c window_item). */
 void AW_MagicCommand(void){
     aw_inventory_item_t item;
     if(cmd_source!=src_command || !sv.active || svs.maxclients!=1){Con_Printf("aw_magic: single-player game only.\n");return;}

@@ -1,11 +1,12 @@
 # Roadmap and implementation options
 
-_Last updated with AmiWind v0.0.64-dev4 (10 November 2026)._
+_Last updated with AmiWind v0.0.64 (11 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
-- [v0.0.64: Gone Beyond The Gate, next](#v0064-gone-beyond-the-gate-next)
+- [Next version: the two expansion worlds](#next-version-the-two-expansion-worlds)
+- [v0.0.64: Gone Beyond The Gate, released 11 November 2026](#v0064-gone-beyond-the-gate-released-11-november-2026)
 - [v0.0.63: Every Script Of Vvardenfell, released 9 November 2026](#v0063-every-script-of-vvardenfell-released-9-november-2026)
 - [v0.0.62: released 8 November 2026](#v0062-released-8-november-2026)
 - [v0.0.61: released 6 November 2026](#v0061-released-6-november-2026)
@@ -113,9 +114,46 @@ _Last updated with AmiWind v0.0.64-dev4 (10 November 2026)._
 
 15 October 2026: exact-source validation completed 4,231 tests: 4,225 passed, three Windows-only skips and three tracked Census expected failures. The 71 focused tests and original-data readback across nine frame positions passed, consistently hiding 33 of 158 original references at stronghold state 6 while preserving unknown scripts. All 243 player resources are reusable after exact producer, input and file verification. Complete combined-world conversion, native comparison, packaging and shipment remain pending; coverage counts are unchanged.
 
-## v0.0.64: Gone Beyond The Gate, next
+## Next version: the two expansion worlds
 
-The next release brings the two expansion worlds and the scripts that wait for them.
+The version after v0.0.64 takes up what v0.0.64 moved on; no dates are promised.
+
+- **Tribunal (Mournhold) and Bloodmoon (Solstheim) built in by default** where the player owns them. The builder warns
+  when their files are not found and has a switch to build the base game only. The builder already reports what it
+  finds of each, chooses the expansion layers (`--dlc`, `--no-dlc`) and counts both from the game files
+  ([census](performance/EXPANSIONS-CENSUS-v0.0.64.md)).
+- **The tree method Solstheim's forests need:** a dense forest view draws about six times the faces of a median
+  Vvardenfell view; the star-shaped spruces and tree crowns of v0.0.64 are test-build methods that are measured but not
+  settled (their crowns pop in and out and a flight over them has single-frame hitches).
+- **Their scripting:** the 433 scripts of Mournhold and Solstheim that wait for those worlds (27 of them also lack a
+  function), so that the scripts of all three game files run, and the scripted world events of the two worlds.
+- **The Heart Chamber on the full image,** and the end of the main quest: the heart placed in the room and the chamber's
+  collapse animated.
+- **The remaining partial systems** of the [game systems table](GAME_FEATURES.md) (7 of 49 done, 39 partial, 3 missing),
+  among them pickpocketing and owned locks, locks on doors, enchanting at an altar and spellmaking in play, per-area data
+  tables, outdoor items that can be picked up, dropped lights with their flame, the werewolf's body, and the in-game
+  check of the pieces listed under "Known in this build" in the [v0.0.64 release notes](releases/notes/RELEASE-v0.0.64.md).
+- **The shorelines:** the saw-tooth steps at shores and pond edges need a world rebuild.
+- **The builder and the image:** a build that measures the lighter room collision on an image, every stage on all cores,
+  and a smaller image.
+
+## v0.0.64: Gone Beyond The Gate, released 11 November 2026
+
+v0.0.64, "Gone Beyond The Gate", shipped with its final version number after five development snapshots
+([release notes](releases/notes/RELEASE-v0.0.64.md)); it prepares the road to the two expansion worlds and mends what the
+checks of v0.0.63 found. **Done in v0.0.64:** game spells, powers and enchantments take effect again; spell and trap
+damage meets resistances and weaknesses; scrolls cast from the Magic window; trapped doors and containers spring their
+trap; the console activates the Ghostgate's switches by id; lava kills; god mode survives map changes; the journal
+follows a quest's endings, the stats page lists the factions and the console takes the original journal and faction
+commands; lighter approximate collision in every room, fog in large rooms and see-through cobwebs, moss and leaves by
+default; the builder's expansion switch with the base world's keys independent of the expansion files, the CHIM stage
+keyed by what reaches the world, a Raspberry Pi 4B drive image, and a load trace for the stall on the trip from Seyda
+Neen to Balmora; the Toolkit's three map panes and the [CHIM progress tracker](chim/PROGRESS_TRACKER.md) written newest
+first. **Not in v0.0.64:** the Mournhold and Solstheim worlds (Solstheim exists as test builds), the Heart Chamber's check
+on the full image and its animated end, locks on doors; these moved to "Next version" above. The release's changes were
+checked by tests; a few were seen on test builds, none yet on its image.
+
+**The snapshots of v0.0.64:**
 
 **First snapshot, 10 November 2026:** [v0.0.64-dev1](releases/notes/RELEASE-v0.0.64-dev1.md) has the builder's
 expansion switch (`--dlc`, `--no-dlc`), per-stage game-input keys so the base world does not depend on which expansion
@@ -124,7 +162,7 @@ files are present, master-list cell and room readers, the expansions' own room i
 also reaches world objects that are not characters, and scripts cast spells on other characters.
 
 **Second snapshot, 10 November 2026:** [v0.0.64-dev2](releases/notes/RELEASE-v0.0.64-dev2.md) makes trapped doors and
-containers spring their trap on the player (the scripted world events item below, first part), adds the switchable load
+containers spring their trap on the player (the first part of the scripted world events, which moved to the next version), adds the switchable load
 trace and the memory line per load for the Seyda Neen to Balmora load stall, gives the Toolkit's CHIM Progress Tracker a
 view for each expansion, and measures the first Solstheim frame as a test build: the memory fits at 32 MB Fast RAM, and
 the trees, which are most of the drawn faces, need the cheaper method before Solstheim ships (the meshes the frame first
@@ -149,19 +187,14 @@ builder keys the flora units narrower and ranks models by collision bytes; the T
 and reload themselves, and its 3D Map Inspector opens CHIM rooms with collision views. The Heart Chamber's load at 32 MB
 and its animated end, and the tree methods (test-only), are still to do.
 
-- **Tribunal (Mournhold) and Bloodmoon (Solstheim) built in by default** where the player owns them. The builder warns
-  when their files are not found and has a switch to build the base game only. The builder already reports what it
-  finds of each.
-- **Their scripting:** the 431 scripts of Mournhold and Solstheim that wait for those worlds, and the 28 that also lack
-  a function (placing their own records, moving into their cells, the water level), so that the scripts of all three
-  game files run.
-- **Scripted world events,** such as the Ghostgate's doors and the traps that poison when opened.
-- **The remaining partial systems** of the [game systems table](GAME_FEATURES.md) (7 of 49 done, 39 partial, 3 missing at
-  v0.0.63), among them pickpocketing and owned locks, enchanting at an altar and spellmaking in play, per-area data
-  tables, outdoor items that can be picked up, dropped lights with their flame, the werewolf's body, the shorelines,
-  and the in-game check of the pieces listed under "Not yet seen in game" in the
-  [v0.0.63 release notes](releases/notes/RELEASE-v0.0.63.md).
-- **The builder and the image:** a build that proves the new world key, every stage on all cores, and a smaller image.
+**Fifth snapshot, 11 November 2026:** [v0.0.64-dev5](releases/notes/RELEASE-v0.0.64-dev5.md) (not pushed on its own; its work
+went into the v0.0.64 release) carried the work of the night after dev4. Hollow models in every room use approximate standing bevels by default and large
+models' standing hulls are routed, which takes the rooms' collision to about 46 % of before by the builder's estimate
+([collision meshes](COLLISION_MESHES.md)); large rooms such as the Heart Chamber fade into fog, with their own fog
+settings in Options > Video and on the console; the console takes the original journal and faction commands and scrolls
+are cast from the Magic window; the builder keys the world by what reaches it and makes a Raspberry Pi 4B drive image;
+the Toolkit and the [CHIM progress tracker](chim/PROGRESS_TRACKER.md) follow the newest build. The Heart Chamber on the
+full image, the measured collision on an image, and the tree methods are still to check.
 
 ## v0.0.63: Every Script Of Vvardenfell, released 9 November 2026
 
@@ -242,7 +275,7 @@ it came to the main line with dev4), [dev4](releases/notes/RELEASE-v0.0.63-dev4.
 - **Combat:** the best-attack option in Options, the original's hit chance with the active effects, and its hit cone.
 - **Drops on uneven room floors;** the blight cloud at Dagoth Ur no longer drawn as a solid shape.
 
-**Moved to v0.0.64:** see "v0.0.64: Gone Beyond The Gate, next" above.
+**Moved to v0.0.64:** see "v0.0.64: Gone Beyond The Gate, released 11 November 2026" and "Next version" above.
 
 ## v0.0.62: released 8 November 2026
 
@@ -1652,7 +1685,7 @@ History, as written during v0.0.43 (all of it is done; v0.0.43 shipped the whole
 are the ones held by the stair walk (Ald-ruhn, Maar Gan, Suran and one rope bridge cell, with the town cells
 around them), eight Balmora border cells and fourteen open-sea cells; the last two are fixed, the stair fix is
 in the shared converter. v0.0.43-dev3 is meant to be the first build with the whole outdoors on CHIM
-([progress tracker](chim/PROGRESS_TRACKER.md#current-state-24-october-2026)).
+([progress tracker](chim/PROGRESS_TRACKER.md#history-current-state-as-written-24-october-2026)).
 
 **Milestone, 18 October 2026: every exterior cell converted to CHIM.** The v0.0.43-dev3 build converted the
 whole outdoors of Vvardenfell to CHIM in one run (1,351 frames: 1,348 region frames and 3 town frames; the stair gate passed every flight it walks, but it

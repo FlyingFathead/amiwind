@@ -55,7 +55,15 @@
   const MORE_KEY = 'amiwind-chim-more-1', OPEN = '\u25be', CLOSED = '\u25b8';
   function moreOpen() { try { return root.localStorage.getItem(MORE_KEY) === 'open'; } catch (_) { return false; } }
   function setMoreOpen(v) { try { root.localStorage.setItem(MORE_KEY, v ? 'open' : 'closed'); } catch (_) { /* no storage: lasts until reload */ } }
-  const CSS = '.chimgroups{display:flex;flex-direction:column;gap:4px;width:100%}.chimgroup{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px}' +
+  // The group is one full-width block; the rule under its rows is positioned against the headline box itself, so it runs from
+  // window edge to window edge whatever padding the headline has (the page header's 1px line colour, var(--line)); the
+  // headline keeps the page header's 16px left and right padding, so the rows never start at the window edge.
+  const CSS = '#chimhead{position:relative;padding-left:16px;padding-right:16px}.chimrows{display:block;flex:0 0 100%;width:100%;padding-bottom:6px}' +
+    '.chimrows .chimrow{display:block;margin:1px 0;white-space:normal;overflow-wrap:anywhere}.chimrows .chimdetail{display:block;margin-left:1.6em;font-size:13px;font-weight:400;color:var(--muted,#9fb3c8)}' +
+    '.chimrows .chimdetail b{color:inherit;font-weight:600}.chimsumbar{flex:0 0 100%}.chimsumbar .chimsumbtn{background:none;border:0;color:var(--muted,#9fb3c8);font-size:13px;padding:2px 5px;cursor:pointer}' +
+    '.chimsummary{display:flex;flex-wrap:wrap;align-items:center;gap:4px 18px;flex:0 0 100%;width:100%}.chimsummary[hidden]{display:none!important}' +
+    '.chimrows .chimrule{position:absolute;left:0;right:0;height:0;border-top:1px solid var(--line,#345)}' +
+    '.chimgroups{display:flex;flex-direction:column;gap:4px;width:100%}.chimgroup{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px}' +
     '.chimgh{font-size:12px;font-weight:600;color:#9fb3c8;min-width:13em}.chimgh b{color:#edf3fa}.chimmore .chimmorebtn{background:none;border:0;color:#9fb3c8;padding:2px 5px}' +
     '.chimmore .chimparts[hidden]{display:none!important}.chimgroup[data-group="settled"] button i{opacity:.55}';
   const fmt = n => (n || 0).toLocaleString();
@@ -116,9 +124,11 @@
     const n = v => (v || 0).toLocaleString();
     if (!isl.done) return {html: esc(label) + ': <b>not started</b> · ' + n(isl.cells) + ' cells', title: LEGEND};
     const pct = (+isl.percent).toFixed(1) + ' %';
-    return {html: esc(label) + ' <b>Done: ' + n(isl.done) + ' of ' + n(isl.cells) + ' (' + pct + ')</b> · ' + FULL_CELLS + ' ' + n(isl.complete) +
-      ' · ' + FULL_TERRAIN + ' ' + n(isl.terrain_complete) + ' · awaiting lighting ' + n((isl.complete_unlit || 0) + (isl.terrain_complete_unlit || 0)) +
-      (isl.eligible != null ? ' · <b>eligible for ' + esc(release || 'the next release') + ': ' + n(isl.eligible) + '</b>' : ''), title: LEGEND};
+    // the land and its main figure on the row; the details (all the other numbers) on a smaller line under it
+    return {html: esc(label) + ': <b>Done: ' + n(isl.done) + ' of ' + n(isl.cells) + ' (' + pct + ')</b>' +
+      '<span class="chimdetail">' + FULL_CELLS + ' ' + n(isl.complete) + ' · ' + FULL_TERRAIN + ' ' + n(isl.terrain_complete) + '</span>' +
+      '<span class="chimdetail">awaiting lighting: ' + n((isl.complete_unlit || 0) + (isl.terrain_complete_unlit || 0)) + '</span>' +
+      (isl.eligible != null ? '<span class="chimdetail"><b>eligible for ' + esc(release || 'the next release') + ': ' + n(isl.eligible) + '</b></span>' : ''), title: LEGEND};
   }
   function buildRow(h) {
     if (!(h.groups && h.states)) return null;
@@ -132,8 +142,29 @@
     const b = buildRow(h);
     return b ? rows.concat([b]) : rows;
   }
+  // TOOLKIT-HEADLINE-ROWS-INLINE-64: the rows were inline spans, so Firefox (and any browser without the page's own CSS) ran them
+  // into one line ("1 390Solstheim"). Real block elements, one <div class="chimrow"> per land and one for the build, inside one
+  // full-width <div class="chimrows chimtitle"> (chimtitle keeps the group at the top of the World Map's page header); the layout
+  // CSS is injected with the script, so every page that draws the headline gets it.
+  function rowsHtml(h) {
+    return '<div class="chimrows chimtitle">' + headRows(h).map(r => '<div class="chimrow"' + (r.title ? ' title="' + esc(r.title) + '"' : '') + '>' + r.html + '</div>').join('') + '<div class="chimrule"></div></div>';
+  }
   const FULL_CELLS = 'Fully approved cells:', FULL_TERRAIN = 'Fully approved terrain:';
-  function render(el, h, history, onPick, picked) {
+  // The fold state of the summary block, kept per browser in localStorage (every access guarded; without storage it lasts until reload).
+  const SUM_KEY = 'amiwind-chim-summary-1';
+  let memFolded = null;
+  function summaryFolded() {
+    if (memFolded !== null) return memFolded;
+    try { return root.localStorage.getItem(SUM_KEY) === 'closed'; } catch (_) { return false; }
+  }
+  function setSummary(el, folded) {
+    memFolded = !!folded;
+    try { root.localStorage.setItem(SUM_KEY, folded ? 'closed' : 'open'); } catch (_) { /* no storage: lasts until the page closes */ }
+    const btn = el && el.querySelector('.chimsumbtn'), body = el && el.querySelector('.chimsummary');
+    if (body) body.hidden = !!folded;
+    if (btn) { btn.setAttribute('aria-expanded', folded ? 'false' : 'true'); btn.textContent = (folded ? CLOSED : OPEN) + ' Tracker summary'; }
+  }
+  function render(el, h, history, onPick, picked, opts) {
     if (!el) return;
     const doc = el.ownerDocument;
     if (doc && doc.head && !doc.getElementById('chim-head-css')) {
@@ -143,14 +174,20 @@
     el.hidden = false;
     const grouped = !!(h.groups && h.states);
     const hist = (history || []).slice(-5).map(x => esc(x.date.slice(5, 10)) + ' ' + x.passed).join(' · ');
-    el.innerHTML = '<span class="chimrows">' + headRows(h).map(r => '<span class="chimtitle chimrow"' + (r.title ? ' title="' + esc(r.title) + '"' : '') + '>' + r.html + '</span>').join('') + '</span>' +
-      (grouped ? groupsHtml(h, picked) : '<span class="chimparts">' +
+    const rest = (grouped ? groupsHtml(h, picked) : '<span class="chimparts">' +
       PARTS.filter(([k]) => k !== 'sea_in_game' || h.sea_in_game != null).map(([k, t, c]) => '<button type="button" data-bucket="' + k + '" aria-pressed="' + (picked === k ? 'true' : 'false') +
         '" title="Highlight these cells on the map"><i style="background:' + c + '"></i>' + esc(t) + ' <b>' + (h[k] || 0).toLocaleString() +
         '</b></button>').join('') +
       '</span>') + lightLine(h.lighting) + '<span class="chimnote">unmeasured audits on ' + (h.with_unmeasured_audits || 0) + ' converted cell' +
       (h.with_unmeasured_audits === 1 ? '' : 's') + ' (never counted as passed)</span>' +
       (hist ? '<span class="chimhist" title="Passed cells per day, last five days">' + spark(history) + ' ' + hist + '</span>' : '');
+    // The summary under the rows (chips, accounted for, lighting, unmeasured, history) folds as one block; the choice is kept per
+    // browser. A page with its own fold for it (the World Map's legend block) passes opts.noFold and gets the plain pieces.
+    const fold = !(opts && opts.noFold), folded = summaryFolded();
+    el.innerHTML = rowsHtml(h) + (fold ? '<div class="chimsumbar"><button type="button" class="chimsumbtn" aria-expanded="' + !folded + '" title="Fold or unfold the tracker summary">' +
+      (folded ? CLOSED : OPEN) + ' Tracker summary</button></div><div class="chimsummary"' + (folded ? ' hidden' : '') + '>' + rest + '</div>' : rest);
+    const sumBtn = el.querySelector('.chimsumbtn');
+    if (sumBtn) sumBtn.onclick = () => setSummary(el, sumBtn.getAttribute('aria-expanded') === 'true');
     for (const b of el.querySelectorAll('button[data-bucket]')) b.onclick = () => onPick && onPick(b.dataset.bucket);
     const more = el.querySelector('.chimmorebtn');
     if (more) more.onclick = () => {
@@ -161,7 +198,7 @@
       more.nextElementSibling.hidden = !open;
     };
   }
-  const api = {render, PARTS, STATE_PARTS, GROUPS, SETTLED_TEXT, SETTLED_GREY, layout, groupsHtml, MORE_KEY};
+  const api = {render, setSummary, summaryFolded, SUM_KEY, rowsHtml, headRows, CSS, PARTS, STATE_PARTS, GROUPS, SETTLED_TEXT, SETTLED_GREY, layout, groupsHtml, MORE_KEY};
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.ChimHead = api;
 })(typeof window !== 'undefined' ? window : this);

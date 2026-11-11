@@ -51,6 +51,9 @@ static cvar_t	chim_rest_measured = {"chim_rest_measured", "1"};
  * budget (the default since the maintainer's decision of 2026-10-28). A room map with "_chim_room_types" "0 1 2" holds its default type as rooms/<room>.crm and each other type as
  * rooms/<room>t<N>.crm on the same store; only the chosen record's models load. Read when the room map loads. */
 static cvar_t	aw_vivec_arena_pit_type = {"aw_vivec_arena_pit_type", "-1", true};
+/* The same setting picks the type of every room with types: Akulakhan's Chamber (rifa4ef181ed) too, 0 = exact
+ * standing bevels on every collision plate, 1 = exact on the near-horizontal plates only, 2 = approximate everywhere
+ * (AKULAKHAN-CHAMBER-32MB-STALL-53; one setting, the resident registry budget). */
 static cvar_t	chim_read_kib = {"chim_read_kib", "32"};
 static cvar_t	chim_buffer_kib = {"chim_buffer_kib", "32"};
 /* 0: towns use their region maps: LEGACY TOWN REGIONS, the A/B of a historical regression only (an image that ships
@@ -561,6 +564,85 @@ static void IndexFields (chim_world_t *to, const chim_world_t *from)
 	to->minor = from->minor;
 }
 
+/* Alternative models (TREES-DEPTH-56, tools/chim/alt_models.py): the store's
+ * alt-models.bin pairs (base model id, alternative id) per method; the setting
+ * aw_tree_crowns (0 = the original models, 1 = star crowns, 2 = sprite crowns)
+ * picks the method at the index read, and the chunk loader takes the
+ * alternative id (Chim_AltModel). A store without the file, or the setting 0,
+ * leaves every id as it is. Format (big-endian): 'AWA1', u32 methods; per
+ * method u8 value, 3 pad bytes, u32 pairs, pairs x (u32 base, u32 alt) sorted. */
+#define CHIM_ALT_MAX	1024
+static cvar_t	aw_tree_crowns = {"aw_tree_crowns", "0", true};
+static unsigned	alt_base[CHIM_ALT_MAX], alt_id[CHIM_ALT_MAX];
+static int		alt_count, alt_method = -1;
+
+static unsigned AltWord (const byte *p)
+{
+	return ((unsigned)p[0]<<24) | ((unsigned)p[1]<<16) | ((unsigned)p[2]<<8) | p[3];
+}
+
+static void ReadAltModels (void)
+{
+	chim_pack_t pack;
+	byte b[8];
+	unsigned methods, m, n, i;
+	long at = 8;
+	int want = (int)aw_tree_crowns.value;
+	alt_count = 0;
+	alt_method = want;
+	if (want <= 0 || !Chim_PackOpen (&pack, "alt-models.bin"))
+		return;
+	if (!Chim_PackRead (&pack, 0, b, 8) || memcmp (b, "AWA1", 4))
+		goto done;
+	methods = AltWord (b+4);
+	for (m=0 ; m<methods && m<16 ; m++)
+	{
+		if (!Chim_PackRead (&pack, at, b, 8))
+			goto done;
+		n = AltWord (b+4);
+		at += 8;
+		if (b[0] != want)
+		{
+			at += (long)n*8;
+			continue;
+		}
+		for (i=0 ; i<n && i<CHIM_ALT_MAX ; i++, at+=8)
+		{
+			if (!Chim_PackRead (&pack, at, b, 8))
+				goto done;
+			alt_base[i] = AltWord (b);
+			alt_id[i] = AltWord (b+4);
+			if (alt_id[i] >= chim_world.models || alt_base[i] >= chim_world.models || (i && alt_base[i] <= alt_base[i-1]))
+			{
+				alt_count = 0;
+				goto done;
+			}
+		}
+		alt_count = (int)i;
+		break;
+	}
+done:
+	Chim_PackClose (&pack);
+}
+
+/* The model id a placement draws with under the setting: the alternative of BASE
+ * when the store pairs one for the method in use, else BASE. */
+unsigned Chim_AltModel (unsigned base)
+{
+	int lo = 0, hi = alt_count;
+	while (lo < hi)
+	{
+		int mid = (lo + hi) >> 1;
+		if (alt_base[mid] == base)
+			return alt_id[mid];
+		if (alt_base[mid] < base)
+			lo = mid + 1;
+		else
+			hi = mid;
+	}
+	return base;
+}
+
 /* world.cwi: header, settings, table of contents, then the file table and
  * the model and texture directories, kept in the zone while the map runs.
  * Names are not read: the engine finds models and textures by id. */
@@ -652,6 +734,10 @@ done:
 	if (!ok && index_resident)
 		IndexDrop ();
 	Chim_PackClose (&pack);
+	if (ok)
+		ReadAltModels ();
+	else
+		alt_count = 0;
 	return ok;
 }
 
@@ -2096,6 +2182,7 @@ void Chim_Init (void)
 	FILE *f = NULL;
 
 	Cvar_RegisterVariable (&chim_zone_kib);
+	Cvar_RegisterVariable (&aw_tree_crowns);
 	Cvar_RegisterVariable (&chim_reserve_kib);
 	Cvar_RegisterVariable (&chim_rest_measured);
 	Cvar_RegisterVariable (&aw_vivec_arena_pit_type);

@@ -1220,10 +1220,12 @@ class ReleaseUiTests(unittest.TestCase):
         # 2026-10-28 (maintainer: "reload throws you back into the World"): mark() keeps the open tab in the address
         # (TOOLKIT-RELOAD-WORLD-55); the header markup and its CSS are unchanged, the CSS fingerprint moves because it
         # spans the script up to the first closing brace, inside mark().
-        self.assertEqual(sha(header), '8671d753f463c2fccbdace4b0a568d2f3ea99c39f1b2dce0cff6d4b58b305e31')
+        # 2026-11-11 (maintainer, TOOLKIT-HELP-BUTTON-INERT-64): the round "?" is a real help button, placed next to the word Toolkit.
+        self.assertEqual(sha(header), 'd61ce52a61393c4e5f19f5402d2f7e6a87df5744d44e47ee355b6a4e4ce5887d')
         # 2026-11-10 (maintainer, TOOLKIT-DLC-VIEWS-64): auto-refresh.js loaded by every page; the CSS fingerprint moves with the
         # script tag, the header markup and its rules are unchanged.
-        self.assertEqual(sha(css), '04b7b52e6eeb25fc425cdc086cc2759e188b3dddc2276daeada0916896ce5cda')
+        # 2026-11-11 (maintainer): the help button's rule and the frame comment; the header rules themselves are unchanged.
+        self.assertEqual(sha(css), '0b9b5d5e44bc1719e10dce08758a805482569dab54e5b96d33616f39c1151b2e')
         head = (self.KIT / 'chim-head.js').read_bytes()
         # K-OCEAN (v0.0.36) added the open-sea row on purpose; TRACKER-OCEAN-COUNTED-DONE-36 (maintainer, 2026-10-11) made it silver and renamed it.
         # 2026-10-17: the approved row's label reads "maintainer-approved" (public wording); nothing else changed.
@@ -1232,7 +1234,8 @@ class ReleaseUiTests(unittest.TestCase):
         # game yet, Beyond the world's edge: settled), zero-count chips in a "More states" fold-out; old data keeps the flat row.
         # 2026-11-10 (maintainer, TOOLKIT-DLC-VIEWS-64): one row per land (Vvardenfell, Solstheim, Mournhold) and one for the
         # build, the two approved statuses relabelled "Fully approved cells/terrain" (display text only), a short legend.
-        self.assertEqual(hashlib.sha256(head).hexdigest(), '0b1beafd4e28eb470b23dfe4039be906c648996939a05e517f90667436f28704')
+        # 2026-11-10 (TOOLKIT-HEADLINE-ROWS-INLINE-64): the rows are block elements (div) with their layout CSS shipped in the script.
+        self.assertEqual(hashlib.sha256(head).hexdigest(), 'e19e156effdd3da23565ae21588b2ec98dc13a28f998878cbfe989dd2a3359ca')
 
     def test_one_header_for_every_toolkit_page(self):
         # The shared header (header.js) is the logo block of index.html: same logo file, same version line. Pages opened on their

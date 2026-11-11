@@ -21,13 +21,18 @@ ROOT = Path(__file__).resolve().parents[1]
 KIT = 'amiwind-toolkit'
 # Files whose version-like text is data or another program's own version, not a claim about the AmiWind line:
 #   chim-inclusion.js    the generated inclusion ledger (build names, release names of cells)
-#   map-inspector.html   the inspector's own program/format version (data-inspector-version, program.version)
-# The "Last updated with AmiWind" line and the Toolkit's own version are kept by tools/toolkit_version.py.
-SKIP_FILES = {'chim-inclusion.js', 'map-inspector.html'}
+#   map-inspector.html   names past releases in its on-screen hints (builds before v0.0.36); it is still checked for a
+#                        version typed into any version field (FIELD_LITERAL below), as every page is
+#   aw-version.js        the one stamp the exports read; checked against VERSION by stamp_problems
+# The "Last updated with AmiWind" line and the Toolkit's own counter are kept by tools/toolkit_version.py.
+# TOOLKIT-INSPECTOR-EXPORT-VERSION-64: the inspector's JSON copy said program.version 0.0.38 on v0.0.64 because the value
+# was typed into the page; every export now reads the stamp, and a typed version in any program/version field fails.
+SKIP_FILES = {'chim-inclusion.js', 'map-inspector.html', 'aw-version.js'}
 ALLOWED = (re.compile(r'Last updated with AmiWind v[0-9.]+'),
-           re.compile(r'data-inspector-version="[0-9.]+"'),
-           re.compile(r"program:\{name:'[^']*',version:'[0-9.]+'\}"),
            re.compile(r"const TOOLKIT = \{name: '[^']*', version: '[0-9.]+'\}"))
+FIELD_LITERAL = re.compile(r"""(?:\bversion|\btoolkit_version|\bprogram_version|\binspector-version|\binspector_version)"?\s*[:=]\s*['"]v?\d+\.\d+""")
+STAMP_FILE = KIT + '/aw-version.js'
+STAMP_RE = re.compile(r"root\.AMIWIND_VERSION = '([^']*)'")
 VERSION_LIKE = re.compile(r'(?<![0-9.])v?0\.0\.\d{2,3}(?:-(?:dev|rc)\d+)?(?![0-9.])')
 COMMENT = re.compile(r'^\s*(//|\*|/\*|<!--)')
 RELEASE_IN_NAME = re.compile(r'v(\d+)[._](\d+)[._](\d+)')
@@ -59,11 +64,49 @@ def static_problems(root=ROOT):
             for found in VERSION_LIKE.findall(text):
                 out.append('%s/%s:%d types the version %s; show the data\'s own value (version.json / the tracker headline)'
                            % (KIT, path.name, number, found))
+    out.extend(field_problems(root))
+    out.extend(stamp_problems(root))
     source = (root / 'tools' / 'cell_progress.py').read_text(encoding='utf-8')
     if re.search(r"ELIGIBLE_RELEASE\s*=\s*['\"]v", source):
         out.append('tools/cell_progress.py types an eligible release: compute it from VERSION (working_release)')
     if 'eligible_release(None, working_release())' not in source or 'stamp_document(doc)' not in source:
         out.append('tools/cell_progress.py no longer computes eligible_release from VERSION / stamps its data (stamp_document)')
+    return out
+
+
+def field_problems(root=ROOT):
+    """A version typed into a version field of any Toolkit page or script (the inspector's program.version, a data-*-version
+    attribute, an export's version): exports read AMIWIND_VERSION (aw-version.js) instead. The Toolkit's own counter
+    (const TOOLKIT) is the one allowed literal; the generated ledger chim-inclusion.js is data."""
+    out = []
+    for path in sorted((Path(root) / KIT).glob('*')):
+        if path.suffix not in ('.html', '.js') or path.name in ('chim-inclusion.js', 'aw-version.js'):
+            continue
+        for number, line in enumerate(path.read_text(encoding='utf-8', errors='replace').splitlines(), 1):
+            text = line
+            for pattern in ALLOWED:
+                text = pattern.sub('', text)
+            for found in FIELD_LITERAL.findall(text):
+                out.append('%s/%s:%d types a version into a version field (%s); read window.AMIWIND_VERSION (aw-version.js)'
+                           % (KIT, path.name, number, found.strip()))
+    return out
+
+
+def stamp_problems(root=ROOT):
+    """aw-version.js must carry exactly VERSION (the -devN or -rcN included), or an export reports a version the build is not,
+    and every export page that reports a version must load that stamp."""
+    root = Path(root)
+    out = []
+    found = STAMP_RE.search((root / STAMP_FILE).read_text(encoding='utf-8'))
+    want = current_version(root)
+    if not found:
+        out.append('%s has no AMIWIND_VERSION line' % STAMP_FILE)
+    elif found.group(1) != want:
+        out.append('%s carries %s, VERSION is %s: run tools/toolkit_version.py stamp' % (STAMP_FILE, found.group(1), want))
+    for name in sorted(p.name for p in (root / KIT).glob('*.html')):
+        text = (root / KIT / name).read_text(encoding='utf-8', errors='replace')
+        if 'AMIWIND_VERSION' in text and 'src="aw-version.js"' not in text:
+            out.append('%s/%s reads AMIWIND_VERSION but does not load aw-version.js' % (KIT, name))
     return out
 
 

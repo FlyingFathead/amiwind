@@ -50,6 +50,12 @@ PLANE = 20
 # percentile (45 times the world median): 67 models warn, 50 of them tiles of the Heart Chamber cave.
 WARN_RATIO = 2.0
 WARN_MIN_BYTES = 64 * 1024
+# Shape warnings (COLLISION-WORLDWIDE-REDUCTION-64): a deepest clipnode chain above WARN_CHAIN (a balanced tree over
+# 32,768 clipnodes is 15 deep; dev3 had 8,202 models above 64) or more than WARN_COUNTS clipnodes and pieces per drawn
+# face (dev3: 2,106 models). Printed as one summary line plus the worst SHAPE_LINES models.
+WARN_CHAIN = 64
+WARN_COUNTS = 4.0
+SHAPE_LINES = 20
 STORES = (('open world', ('chim-world/chim', 'chim', 'id1/chim')),
           ('rooms', ('chim-interiors/chimi', 'image/boot/id1/chimi', 'chimi', 'id1/chimi')))
 
@@ -78,8 +84,10 @@ def _hull(L, order, head):
             continue
         seen.add(i)
         deepest = max(deepest, depth)
-        for c in struct.unpack_from(order + 'hh', L[9], 8 * i + 4):
-            if 0 <= c < n:
+        # children are unsigned 16-bit (the writers store them & 65535; the top values 0xFFF0 up are contents): read
+        # signed, every chain past 32,767 clipnodes stopped there and its depth read as 32,768
+        for c in struct.unpack_from(order + 'HH', L[9], 8 * i + 4):
+            if c < 0xFFF0 and c < n:
                 stack.append((c, depth + 1))
     return len(seen), deepest
 
@@ -165,6 +173,75 @@ def warnings(rows, ratio=WARN_RATIO, min_bytes=WARN_MIN_BYTES):
             and r['collision_bytes'] >= min_bytes]
 
 
+def shape_warnings(rows, chain=WARN_CHAIN, counts=WARN_COUNTS):
+    """Models whose collision is costly by its SHAPE, which the byte ratio misses (COLLISION-WORLDWIDE-REDUCTION-64:
+    the Heart Chamber bridge, 1.30 by bytes, 13.9 by counts, deepest chain 811): deepest clipnode chain above CHAIN or
+    (clipnodes + pieces) per drawn face above COUNTS; worst first (deepest chain, then the count ratio)."""
+    out = [r for r in rows if r.get('deepest_chain', 0) > chain
+           or (r.get('ratio_counts') is not None and r['ratio_counts'] > counts)]
+    return sorted(out, key=lambda r: (-r.get('deepest_chain', 0), -(r.get('ratio_counts') or 0)))
+
+
+def shape_summary(warned, shown=SHAPE_LINES, chain=WARN_CHAIN, counts=WARN_COUNTS):
+    """One summary line and the worst SHOWN models (a census of the whole world has thousands)."""
+    lines = ['WARNING: %d model(s) with collision deeper than %d clipnodes or more than %.1f clipnodes and pieces per '
+             'drawn face (the worst %d below)' % (len(warned), chain, counts, min(shown, len(warned)))]
+    for r in warned[:shown]:
+        lines.append('WARNING: collision shape %s (%s): deepest chain %s, %s clipnodes and %s pieces for %s faces '
+                     '(ratio %s by counts)' % (r['name'], r['store'], f"{r['deepest_chain']:,}", f"{r['clipnodes']:,}",
+                                               f"{r['pieces']:,}", f"{r['faces']:,}", r['ratio_counts']))
+    return lines if warned else []
+
+
+INDEX_GLOBS = ('scenery/scenery-index.json', '*/source/scenery-index.json', '*/*/area-work/*/source/scenery-index.json',
+               'chim-world/work/*/scenery/scenery-index.json', '*/scene/area-work/*/source/scenery-index.json')
+
+
+def mesh_key(name):
+    """A census row's mesh stem: 'i/in_mudcave_21@s1@tile0,1#2' -> 'in_mudcave_21'."""
+    return name.split('/')[-1].split('@')[0].split('#')[0].lower()
+
+
+def collision_sources(run):
+    """{mesh stem: (collision source 'rcn' | 'visual', drawn mesh reduced)} from the scenery exports of a build run
+    (COLLISION-WORLDWIDE-REDUCTION-64: where collision from the reduced drawn mesh could pay). reduced: the export's
+    visual profile asks for a ratio (an export without a profile counts as not reduced; terrain rocks get their ratio
+    from static_lod.rock_profile)."""
+    out = {}
+    for pattern in INDEX_GLOBS:
+        for path in sorted(Path(run).glob(pattern)):
+            try:
+                index = json.loads(path.read_text(encoding='utf-8'))
+            except (OSError, ValueError):
+                continue
+            profiles = {n: p for g in index.get('groups', {}).values() for n, p in g.get('visual_profiles', {}).items()}
+            for m in index.get('models', ()):
+                stem = mesh_key(m['source'].replace(chr(92), '/').rsplit('.', 1)[0])
+                rcn = (m.get('collision') or {}).get('source') == 'NIF RootCollisionNode'
+                p = profiles.get(m['source']) or {}
+                reduced = bool(p.get('ratio')) or stem.startswith('terrain_rock_')
+                old = out.get(stem)
+                out[stem] = ('rcn' if rcn or (old and old[0] == 'rcn') else 'visual', reduced or bool(old and old[1]))
+    return out
+
+
+def source_summary(rows, sources):
+    """Rows get 'collision_source' and 'drawn_reduced' where the exports name their mesh; totals per kind."""
+    total = {}
+    for r in rows:
+        s = sources.get(mesh_key(r['name']))
+        if s is None:
+            kind = 'unknown'
+        else:
+            r['collision_source'], r['drawn_reduced'] = s
+            kind = s[0] + ('/reduced' if s[1] else '/full')
+        t = total.setdefault(kind, {'models': 0, 'collision_bytes': 0, 'draw_bytes': 0})
+        t['models'] += 1
+        t['collision_bytes'] += r['collision_bytes']
+        t['draw_bytes'] += r['draw_bytes']
+    return total
+
+
 def warning_line(r, ratio=WARN_RATIO):
     return ('WARNING: collision-heavy model %s (%s): collision %s bytes against drawing %s bytes, ratio %.1f (warns '
             'above %.1f); %s faces, %s clipnodes, %s collision pieces' % (
@@ -193,11 +270,15 @@ def census(folder, log=print):
               'weighty_models': len(weighty), 'weighty_median': percentile(weighty, 0.5),
               'weighty_p90': percentile(weighty, 0.9), 'weighty_p99': percentile(weighty, 0.99)}
     warn = warnings(good)
+    shape = shape_warnings(good)
+    by_source = source_summary(good, collision_sources(folder))
     return {'schema': SCHEMA, 'folder': Path(folder).name, 'stores': [str(r) for _, r in stores],
-            'threshold': {'ratio_bytes': WARN_RATIO, 'min_collision_bytes': WARN_MIN_BYTES},
+            'threshold': {'ratio_bytes': WARN_RATIO, 'min_collision_bytes': WARN_MIN_BYTES,
+                          'deepest_chain': WARN_CHAIN, 'ratio_counts': WARN_COUNTS},
             'total': dict(total, ratio_bytes=round(total['collision_bytes'] / total['draw_bytes'], 3)
                           if total['draw_bytes'] else None),
-            'spread': spread, 'warned': [r['name'] for r in warn], 'errors': [r for r in rows if 'error' in r],
+            'spread': spread, 'warned': [r['name'] for r in warn],
+            'shape_warned': [r['name'] for r in shape], 'by_collision_source': by_source, 'errors': [r for r in rows if 'error' in r],
             'models': good}
 
 
@@ -251,8 +332,11 @@ def ledger_entry(run, log=print, n=20):
         write(record, Path(run))
         for r in warnings(record['models']):
             log(warning_line(r))
+        for line in shape_summary(shape_warnings(record['models'])):
+            log(line)
         return {'census': JSON_NAME, 'threshold': record['threshold'], 'total': record['total'],
-                'spread': record['spread'], 'warned': record['warned'], 'top': top_rows(record, n)}
+                'spread': record['spread'], 'warned': record['warned'],
+                'shape_warned': len(record['shape_warned']), 'top': top_rows(record, n)}
     except Exception as exc:  # noqa: BLE001 - a census problem is a note, never a failed build
         log('Collision census: not written (%s: %s); the build is unaffected' % (type(exc).__name__, exc))
         return {'error': '%s: %s' % (type(exc).__name__, exc)}
@@ -269,6 +353,8 @@ def main(argv=None):
     j, m = write(record, a.out or a.run, a.top)
     for r in warnings(record['models']):
         print(warning_line(r), flush=True)
+    for line in shape_summary(shape_warnings(record['models'])):
+        print(line, flush=True)
     print(markdown(record, a.top), end='')
     print('Written %s and %s (took %.1f s)' % (j, m, time.monotonic() - started), flush=True)
     return 0

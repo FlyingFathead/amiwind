@@ -166,6 +166,7 @@ Family: Console, keyboard and mouse input (`console-input`). The console line ed
 - AW25-05 (no report page): Console typed only uppercase letters and shifted digits
 - CONSOLE-CAPS-29 (no report page): FS-UAE F10 Caps Lock appears stuck
 - [CONSOLE-HISTORY-EMPTY-32](CONSOLE-HISTORY-EMPTY-32.md): Console Up past the oldest command shows an empty line and stays there
+- CONSOLE-QUEST-READS-MISSING-64 (no report page): The console does not take the original journal and faction commands, so quest endings and expulsion cannot be read back
 - CONSOLE-WHEEL-29 (no report page): FS-UAE console wheel starts working then reports unbound
 - [ENGINE-CBUF-OVERFLOW-35](ENGINE-CBUF-OVERFLOW-35.md): Command text larger than the command buffer or a line over 1023 characters overflowed
 - [ENGINE-COM-TOKEN-UNBOUNDED-35](ENGINE-COM-TOKEN-UNBOUNDED-35.md): COM_Parse wrote tokens of any length into the 1 KiB com_token

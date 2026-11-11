@@ -381,6 +381,32 @@ class TrackerRoomsTests(unittest.TestCase):
         {'name': 'G', 'hard': [], 'island': 'Vvardenfell', 'master': 'Morrowind.esm', 'access': 'door',
          'entrance_exterior': '3,-4', 'settlement': 'Town'}]}
 
+    def test_ingested_build_counts_every_room_its_image_holds(self):
+        """TRACKER-INTERIORS-IN-GAME-COUNT-64: a build with N rooms in its image counts N rooms in the game, read from
+        the run's image/chim-interiors.json beside the rooms receipt it was ingested with (map names only there)."""
+        import tempfile
+        from pathlib import Path
+        import cell_progress as CP
+        names = ['A', 'C', 'D', 'G']
+        with tempfile.TemporaryDirectory() as tmp:
+            run = Path(tmp) / 'run'
+            (run / 'chim-interiors').mkdir(parents=True)
+            (run / 'image').mkdir()
+            receipt = run / 'chim-interiors' / 'chim-rooms-receipt.json'
+            receipt.write_text(json.dumps({'format': 'aw-chim-rooms-1', 'rooms': [
+                {'cell': n, 'room': 'map_%s' % n.lower()} for n in names]}), encoding='utf-8')
+            (run / 'image' / 'chim-interiors.json').write_text(json.dumps({'store': 'chimi', 'not_in_image': [],
+                'rooms': [{'room': 'map_%s' % n.lower()} for n in names]}), encoding='utf-8')
+            docs = CP.room_receipts([str(receipt)])
+            self.assertEqual(len(docs), 2)
+            rows = RM.rooms(self.GRAPH, in_game={}, receipts=docs)
+            in_game = sorted(r['name'] for r in rows.values() if r['group'] == 'in_game')
+            self.assertEqual(in_game, sorted(names))
+            # without the image file the receipt alone only says "converted"
+            (run / 'image' / 'chim-interiors.json').unlink()
+            rows = RM.rooms(self.GRAPH, in_game={}, receipts=CP.room_receipts([str(receipt)]))
+            self.assertEqual([r for r in rows.values() if r['group'] == 'in_game'], [])
+
     def test_states_first_match_wins(self):
         rows = RM.rooms(self.GRAPH, in_game={'a': 'mapa', 'e': 'mape'},
                         receipts=[{'format': 'aw-chim-rooms-1', 'rooms': [{'cell': 'A'}, {'cell': 'C'}]},

@@ -1,6 +1,6 @@
 # AmiWind Toolkit
 
-_Last updated with AmiWind v0.0.64-dev3 (10 November 2026)._
+_Last updated with AmiWind v0.0.64-dev5 (11 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -150,8 +150,11 @@ Vvardenfell's exterior cells, one square per cell, north up.
   "Highlighted: <name>".
 - **Click** a cell: the Selected-area bar names it ("Selected area: Balmora
   (West Gash Region) · cell -3, -2 ...") and **Local view** opens it.
-- **Copy state (JSON)**: the Toolkit version, the loaded data, the layers and
-  the selection, ready to paste into a bug report or a message.
+- **Copy state (JSON)**: the AmiWind version the Toolkit ships with ("version",
+  for example 0.0.64-dev5), the Toolkit's own counter ("toolkit_build"), the
+  loaded data, the layers and the selection, ready to paste into a bug report
+  or a message. The Polycount inspector's JSON copies carry the same AmiWind
+  version as program.version.
 
 ### Local
 
@@ -447,9 +450,34 @@ choice is remembered in the browser). To look at a build's CHIM world in the 3D 
 `--chim-world NAME=DIR` (the build's `chim-world` folder) and open
 `amiwind-toolkit/map-inspector.html?world=/chim-world/NAME/` ([Polycount inspector](POLYCOUNT_INSPECTOR.md)).
 
+**Serving a delivered build.** `--served-build DIR` serves a build's outputs so that the World Map and the Polycount
+inspector open them by default, with no file picker. `DIR` holds one copy, or several copies in sub-folders (the newest is
+served, and a copy added while the server runs is picked up without a restart). A copy is laid out as the build wrote it:
+`maps/` (the compiled maps, `.bsp` and `.chim`), `chim/` (the CHIM world: `world.cwi` and `frames/`), `chimi/` (the rooms
+store: `world.cwi`, its packs and `rooms/*.crm`) and a `SERVED-BUILD.json` naming the build (label, version, run, commit),
+written last so a copy still being written is never served. The server answers `/build/config.json` with the build's
+label, maps and rooms; the World Map's Local view opens any of the maps by name; the inspector, opened with no `map`,
+`world` or `rooms` in its address, lists the maps and the rooms, opens the CHIM world, and
+`map-inspector.html?room=NAME` opens a room by name. `--maps` and `--chim-world` keep working beside it.
+
+**The "?" next to the word Toolkit** (on every Toolkit page) is a button: a click, Enter or Space opens a short help panel for
+the page that is open (what it shows, its controls, a link to its docs page); Escape or a click outside closes it.
+
+**The headline** shows one block per land: the land and its main figure as the heading (for example *Done: 1,390 of 1,390*),
+the other figures (fully approved cells and terrain, awaiting lighting, eligible for the release) as indented lines under it,
+then one line for the build in the game. Long rows wrap inside the window. Under them a rule runs across the window, and the
+**Tracker summary** (the state chips, the accounted-for line, lighting and history) folds with its own toggle; the choice is
+kept in the browser, and **Collapse all** on the World Map folds it too. The **status strip** judges the data against the newest
+delivered build, not the clock: *current (v0.0.64-dev3)* when the tracker data covers that build, *stale: newer build vX not
+ingested* only when a newer delivered build exists. The mouse wheel scrolls the page, also over the map; the map zooms with the
+wheel only while **wheel zoom** is on (or Ctrl or Alt is held).
+
 `--progress` takes the folder the ingester writes (or its `cell-progress.json`). The file is read again on every
 request: run `cell_progress.py` after a build and reload the page (or press **Reload progress**, or return to the window);
-the server does not need a restart. Without `--progress`, or when you open the pages from disk, use **Import progress**
+the server does not need a restart. The file can be over 100 MB, so the server gives it an ETag (an unchanged file answers
+304 and is not sent again), compresses it with gzip when the browser accepts it (about 15 MB, made once per file version),
+and serves a small stamp (`/data/progress-stamp.json`) that the page's auto-update checks first: the file is fetched only
+when the stamp changes, never twice at once. Without `--progress`, or when you open the pages from disk, use **Import progress**
 and pick `cell-progress.json`.
 
 The **CHIM Progress Tracker** layer has its own bar and is exclusive with Map metrics (both colour cells); every older

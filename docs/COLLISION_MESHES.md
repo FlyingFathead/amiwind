@@ -1,10 +1,21 @@
 # Morrowind collision meshes: where they are and how AmiWind uses them
 
-_Last updated with AmiWind v0.0.54 (27 October 2026)._
+_Last updated with AmiWind v0.0.64-dev5 (11 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [Collision against the drawing across the game (11 November 2026)](#collision-against-the-drawing-across-the-game-11-november-2026)
+  - [Measured on sample models: the real cause (11 November 2026)](#measured-on-sample-models-the-real-cause-11-november-2026)
+  - [What collision is in AmiWind](#what-collision-is-in-amiwind)
+  - [The census of v0.0.64-dev3](#the-census-of-v0064-dev3)
+  - [The split by kind of model](#the-split-by-kind-of-model)
+  - [Example: the Heart Chamber bridge](#example-the-heart-chamber-bridge)
+  - [Why the byte warning missed it](#why-the-byte-warning-missed-it)
+  - [The Toolkit's collision views](#the-toolkits-collision-views)
+  - [Why it grew](#why-it-grew)
+  - [The methods and their switches](#the-methods-and-their-switches)
+  - [The plan and the checks](#the-plan-and-the-checks)
 - [Short answer](#short-answer)
 - [The rules (OpenMW 0.51 as reference)](#the-rules-openmw-051-as-reference)
 - [What the data contains](#what-the-data-contains)
@@ -29,6 +40,191 @@ Related: [COLLISION-RCN-SCOPE-32](bugs/COLLISION-RCN-SCOPE-32.md),
 [COLLISION-CONVEX-LOSS-32](bugs/COLLISION-CONVEX-LOSS-32.md),
 [INTERIOR-HULLS-HEAVY-32](bugs/INTERIOR-HULLS-HEAVY-32.md),
 [Mesh tips and tricks](MESH_TIPS_AND_TRICKS.md).
+
+## Collision against the drawing across the game (11 November 2026)
+
+Newest part of this page. The sections after it are the October 2026 findings on where the original's collision is
+and how the converter first used it; they are kept as written.
+
+### Measured on sample models: the real cause (11 November 2026)
+
+Ten models from the census top list were built the way the builder builds them (v0.0.63 release scenery exports,
+one copy at scale 1) with the three tree forms of `--model-hull`, and each was measured. Each cell gives chain /
+auto / routed.
+
+| Model | Collision from | Clipnodes | Deepest chain | Collision bytes |
+| --- | --- | --- | --- | --- |
+| `in_dagoth_bridge00` | drawn triangles | 35,072 / 35,339 / 43,998 | over 32,768 / 5,509 / 3,231 | 971,476 / 976,412 / 1,045,984 |
+| `in_mudcave_21` | `RootCollisionNode` | 27,950 / 28,315 / 56,738 | 27,950 / 5,603 / 1,603 | 782,080 / 788,520 / 1,018,444 |
+| `in_ar_shellbottom_01` | `RootCollisionNode` | 48,780 / 49,525 / 61,937 | over 32,768 / 7,076 / 4,096 | 1,360,880 / 1,374,640 / 1,475,796 |
+| `in_v_arena_01` | `RootCollisionNode` | 36,545 / 37,130 / 46,559 | over 32,768 / 6,682 / 4,136 | 874,320 / 883,940 / 961,452 |
+| `ex_holamayan_01` | drawn triangles | 3,214 / 3,295 / 6,617 | 3,214 / 1,345 / 1,289 | 78,572 / 79,800 / 107,016 |
+| `ex_dae_ruin_03` | `RootCollisionNode` | 2,608 / 2,698 / 5,374 | 2,608 / 1,229 / 740 | 67,004 / 68,644 / 90,532 |
+| `ex_ar_01` | `RootCollisionNode` | 2,643 / 2,784 / 5,546 | 2,643 / 654 / 537 | 65,464 / 68,072 / 90,508 |
+| three large terrain rocks | drawn triangles | 22 to 24, one piece each, the same in every form | the same | about 650 bytes |
+
+The bridge here is built with exact bevels everywhere. The v0.0.64-dev3 store holds it with its room type setting
+(22,865 clipnodes, 811 deep), so it is shown here as the exact-bevel case. For the cave and the arena shell the
+figures match the store exactly.
+
+**Standing-box sweep.** For every model and every form, the standing hull was tested at points on both sides of
+every collision plate (17 to 48 units out) and on a grid over every walkable plate. Each was compared with the chain:
+0 points pushed through and 0 blocked early. The routed trees hold exactly the same solid space.
+
+**The corrected cause.**
+
+- The extra cost is not extra triangles. Collision pieces are already fewer than drawn triangles (the bridge: 1,412
+  pieces for 1,863 triangles), and coplanar plates are already merged into one.
+- 6 of the 10 samples use the original's authored `RootCollisionNode`, so their collision does not come from the drawn
+  mesh at all. The 4 that collide with their drawn triangles draw them unreduced.
+- What costs is the standing bevels: about 20 to 25 clipnodes per piece once the player's box is added. Then the chain
+  makes a trace walk all of them.
+- The census counter stopped at 32,768: it read the tree's child links as signed numbers. Every "32,768" in the census
+  above is a lower bound; the real chains are longer. The counter now reads them unsigned.
+
+**What was decided.**
+
+- `auto` becomes the default tree form (`--model-hull`) in the planned rebuild. The worst trace becomes 5 to 6 times
+  shorter for 0.3 to 1.1 % more collision bytes. `routed` gives 8 to 17 times shorter traces but 7 to 30 % more bytes.
+  Neither is a fully balanced tree yet: in the large rooms the worst trace is still 1,600 to 7,000 clipnodes.
+- A better router, aiming at a depth near that of a balanced tree with its byte cost stated, is its own task.
+- Type 2 (approximate) standing bevels are the lever for bytes and memory.
+- Collision from the reduced drawn mesh stays a switch, off by default (`AMIWIND_COLLISION_MESH`: `original`,
+  `reduced`, `reduced-all`). It is aimed at models whose drawing really is reduced. The census now records each
+  model's collision source and whether its drawing is reduced, so it can be counted where it could pay. It is dropped
+  if it pays nowhere.
+- The census also warns on shape: a deepest chain over 64 or more than 4 clipnodes and pieces per drawn face.
+
+### What collision is in AmiWind
+
+A model has two shapes: the drawn mesh the player sees and the collision the game moves and traces through. The
+engine is Quake's and does not collide with triangles. It collides with hulls: solid space cut by planes into a tree
+of clipnodes, tested with a box of the player's size.
+
+- **Clipnode**: one plane of the tree. A movement or line-of-sight trace visits clipnodes down the tree and every
+  visit costs time on a 68040. The longest path from the top is the tree's depth, or chain length.
+- **Collision piece (plate)**: one convex solid of the model's collision; each source triangle becomes one.
+- **Standing box and bevels**: growing a piece by the player's box needs extra bevel planes on slanted edges. Exact
+  bevels keep every slope as authored and need many planes; approximate standing bevels use fewer planes and a
+  slightly different edge.
+- **Chain and balanced tree**: pieces tested one after another form a chain as long as the number of pieces. The same
+  pieces cut by a splitting plane at each step form a balanced ("routed") tree, which a trace walks in a few steps.
+
+Collision differs from the drawing on purpose: the drawing may lose triangles to reduction ([mesh
+methods](chim/MESH_METHODS.md)) while the collision has to keep every step, wall and floor the player touches.
+
+**Where a model's collision comes from** (tools/collision_source.py, the rule from OpenMW, described below in
+[the rules](#the-rules-openmw-051-as-reference)): when the original model has a `RootCollisionNode`, that authored,
+simplified collision is used (source `rcn`); otherwise the model's drawn triangles at full detail are used (source
+`visual`). The image draws the reduced mesh of the same model. So for `visual` models the collision holds more
+triangles than what is drawn, each triangle becomes a plate with its own bevel planes, and the tree over the plates
+is built as a chain.
+
+### The census of v0.0.64-dev3
+
+The collision census (tools/collision_census.py) reads every model of the CHIM stores of one build and counts faces,
+clipnodes, collision pieces, the deepest chain and the bytes of drawing and collision. All numbers below are counted
+from the v0.0.64-dev3 build (source bf2743f), 37,706 models:
+
+- Drawing 853.0 MB, collision 201.2 MB (0.236 by bytes; median model 0.044, 99th percentile 1.379, largest 2.982).
+- The deepest chain is over 64 clipnodes in 8,202 models, over 200 in 2,009 and over 500 in 517.
+- Collision is larger than the drawing by count (clipnodes against drawn faces, ratio over 4) in 2,106 models.
+- 2,983 flagged models hold 123.8 MB of collision beside 145.8 MB of drawing. A model is flagged when its tree is
+  deeper than 200 or it has more than 8 collision pieces per drawn face.
+- The worst chains reach the counter's cap of 32,768 (the Vivec Arena shell parts and the arena, Akulakhan's tiles,
+  the Ghostfence citadel) or are one straight chain as long as the whole tree: `in_mudcave_21`, `in_moldcave_21`,
+  `in_pycave_21` and `in_lavacave_21` have 27,950 clipnodes for 1,077 faces, deepest chain 27,950.
+
+How many of the 2,983 flagged models are `visual` and how many `rcn` is not counted yet: the census records no source
+per model. For orientation, the base game's own files (counted below, Morrowind.bsa): 259 of 1,583 interior NIFs and
+159 of 865 exterior-architecture NIFs have no `RootCollisionNode`, and where authored collision exists it holds about a
+fifth of the visible triangles. The census will record the source of each model so the split can be counted.
+
+### The split by kind of model
+
+Same census (v0.0.64-dev3, source bf2743f). "Deeper than 500" counts trees.
+
+| Kind | Models | Collision | Drawing | Flagged models | Collision / drawing in the flagged | Trees deeper than 500 |
+| --- | --- | --- | --- | --- | --- | --- |
+| Interior architecture | 2,404 | 111.0 MB | 131.6 MB | 595 | 77.5 / 57.8 MB | 137 |
+| Exterior architecture | 9,854 | 41.6 MB | 220.8 MB | 783 | 26.3 / 54.4 MB | 199 |
+| Rocks, flora and landscape | 19,646 | 37.7 MB | 359.0 MB | 1,590 | 19.9 / 32.3 MB | 179 |
+| Objects | 5,038 | 1.0 MB | not counted | none | none | none |
+
+Interior architecture is where collision outweighs the drawing as a whole (111.0 against 131.6 MB, and 77.5 against
+57.8 MB in its flagged models). In the exterior and natural kinds the flagged models are a small share of the models
+and still hold tens of megabytes. Objects are not a concern.
+
+### Example: the Heart Chamber bridge
+
+The bridge in Akulakhan's Chamber (v0.0.64-dev3): 1,745 drawn faces, 22,865 clipnodes, 1,412 collision pieces,
+deepest chain 811, collision 712,976 bytes beside 548,900 bytes of drawing. A trace inside the Chamber can walk
+hundreds of nodes for one step, and the collision takes memory beside the drawing in a room that has to fit 32 MB of
+Fast RAM.
+
+### Why the byte warning missed it
+
+The census warned only on bytes (collision above 2.0 times the drawing, at least 65,536 bytes of collision), and no
+model reached that in this census. The bridge is 1.30 by bytes but 13.91 by counts, with a chain 811 deep: many small
+convex pieces are cheap in bytes and expensive to walk. The warning has to look at chain depth and the count ratio.
+
+### The Toolkit's collision views
+
+The Toolkit shows the disparity per model and per placement: the Polycount inspector's collision heat view colours
+placements by the cost of their collision and lists per-placement collision-to-visual ratios. The census is the
+whole-game view, the Toolkit the view of one place.
+
+### Why it grew
+
+- **Collision is built from the authored or drawn triangles at full detail.** The drawn meshes received reduction
+  recipes; the collision did not, so a reduced drawing sits on a full-size collision.
+- **Collision used to be proven by walking.** Whether it could be walked was checked by stair walks of the whole
+  island (about 1.5 million steps a release cycle), so a heavy collision cost build time but its size never failed
+  anything. The walks have been off since v0.0.46; the cheap proof that replaced them, the geometric check of [stair
+  collision method 1](#stair-collision-method-1-the-default), says nothing about size.
+- **Balanced trees exist but are not the default.** Routed hulls have been selectable since v0.0.33, but the shipped
+  default of `--model-hull` stayed `chain`; the first version cost flora memory and had a node-order fault, both since
+  fixed ([CHIMport](chim/CHIMPORT.md)).
+
+### The methods and their switches
+
+| Method | What it does | Switch | State |
+| --- | --- | --- | --- |
+| Standing bevels, type 0 | The room whole, exact bevels: the original shape | room type 0 ([interior store](chim/INTERIOR_STORE.md)) | Heart Chamber (build ref `ifa4ef181ed`): needs 18,130 KiB at 32 MB Fast RAM, does not load |
+| Standing bevels, type 1 | Tiles, exact bevels | room type 1 | needs 15,242 KiB, does not load |
+| Standing bevels, type 2 | Approximate standing bevels | room type 2; `--chim-hollow-bevels 0/1/2`; `hollow_bevels` in `config/chim-rooms.json` | default for hollow models in every room from v0.0.64-dev5; needs 13,796 KiB for the Heart Chamber, loads |
+| Room type 3 | A room built to the drawn mesh's budget (type 2 plus a reduced detail budget) | room type 3 | the Vivec Arena Pit; the Heart Chamber's default from v0.0.64-dev5 |
+| Stair collision method 1 | One stairway collision mesh per flight, proven by a geometric check | stair collision method | default since v0.0.48-dev2; 11 meshes keep method 0 ([CHIM-STAIR-METHOD1-UNFIXED-48](bugs/CHIM-STAIR-METHOD1-UNFIXED-48.md)) |
+| Routed hulls | Balanced tree of the same solid set instead of a chain | `--model-hull` (`auto`, `chain`, `routed`, `balanced`) | default `auto` from v0.0.64-dev5 (was `chain`) |
+| Collision from the reduced drawn mesh | Collision of `visual` models from the reduced drawing, the original walkable faces kept | `AMIWIND_COLLISION_MESH` (`original`, `reduced`, `reduced-all`) | off; measured to save nothing on the samples, aimed at models with a reduced drawing |
+
+Each method sits beside the older one behind a switch so it is measured before it becomes the default.
+
+### The plan and the checks
+
+Tracked as the worldwide collision reduction, with the register entry
+[COLLISION-DISPARITY-WORLDWIDE-64](bugs/COLLISION-DISPARITY-WORLDWIDE-64.md). Planned for v0.0.64-dev5:
+
+1. For `visual` models, collision from the reduced drawn mesh (it keeps every closed edge, so it has no holes),
+   coplanar neighbours merged into one plate, type 2 bevels and routed trees. Models with a `RootCollisionNode` keep
+   their authored collision.
+2. Type 2 as the build default for hollow models; balanced trees as the default `--model-hull`.
+3. Walkable surfaces proven by the standing-box sweep over every hollow model and by the stair check.
+4. Census warnings on chain depth and count ratio, not only bytes, and the source of each model recorded.
+5. One planned rebuild, reported per model with the numbers before and after, and the frame time measured on the
+   Raspberry Pi 4B, the yardstick for speed.
+
+The sample measurements above changed points 1 and 2: the reduced-mesh switch stays off, and `auto` (not a fully
+balanced tree) is the default from the rebuild.
+
+**State in v0.0.64-dev5 (11 November 2026).** Points 2 and 3 are in for rooms: type 2 is the default for hollow models in
+every room (the exterior frames keep exact bevels for their authored walkways and underpasses until their own sweep), and
+`--model-hull` defaults to `auto`. The world sweep (`tools/hollow_bevel_sweep.py`) covered 934 rooms: no sample was
+pushed through a wall; early stops were 1.87 % of the samples (limit 2 %), the worst about 4 % (Ald Daedroth Antechamber,
+Ald Sotha Lower Level and the dome huts). The collision of the rooms goes from 667,788,436 to 307,535,200 bytes (46.1 %)
+by the builder's estimate; Akulakhan's Chamber from 9,078,636 to 3,945,312 bytes. These are estimates: the dev5 build
+measures the image's real numbers, and the frame time on the Raspberry Pi 4B follows. Wiring the sweep into the build as a
+check is still to do. This section is updated with the build's results.
 
 ## Short answer
 

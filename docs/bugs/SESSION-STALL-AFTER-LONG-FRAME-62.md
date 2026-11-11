@@ -9,9 +9,11 @@
 | Where | scripted FS-UAE sessions, Seyda Neen MiniWind, after a long console frame |
 | Reproduction | sometimes |
 | Duplicate of | no |
-| Persists in | fixed in v0.0.62-dev1 |
-| Severity | medium: a frozen game in play, or a session that cannot finish its check |
+| Persists in | v0.0.64-dev3 (last seen) |
+| Severity | high: Regressed in v0.0.64-dev3 (was medium): a frozen game in play, or a session that cannot finish its check |
 | Family | Loading and disk reads (`disk-loading`) |
+| Deferred by the maintainer | 2026-11-11: deferred by the maintainer to v0.0.65 (the v0.0.64 release ships early); its "came back" mark is checked against its evidence first |
+| Came back (regression) | in v0.0.64-dev3 (fixed in v0.0.62-dev1 before) |
 | Playtest version | MiniWind v0.0.62-dev1 seyda-enabledraw2 7bb679e |
 | From commit | source 7bb679e, engine 7bb679e, CHIM world 7bb679e |
 | CHIM engine version | CHIM 0.2.2, engine 7bb679e, world format 0.11 |
@@ -91,5 +93,6 @@ Related bugs in other categories:
 
 - [CHIM-SEYDA-BALMORA-LOAD-HANG-43](CHIM-SEYDA-BALMORA-LOAD-HANG-43.md): Travelling from Seyda Neen to Balmora sometimes hangs on the Loading screen (boot smoke, 2 of about 5 runs)
 - [REMOTE-CONSOLE-LOG-COST-32](REMOTE-CONSOLE-LOG-COST-32.md): With the remote console on, every console line costs about 7-18 ms in FS-UAE
+- SMOKE-END-CONSOLE-TOGGLE-OUTSIDE-PLAY-64 (no report page): A scripted session whose last step closes the console is judged as ended outside play while the game is in play
 
 <!-- END GENERATED CATEGORY -->

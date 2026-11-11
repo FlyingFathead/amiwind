@@ -66,6 +66,61 @@ class RoomSettings(unittest.TestCase):
         self.assertIn('"aw_vivec_arena_pit_type"', source)
         self.assertIn('"_chim_room_types"', source)
 
+    def test_the_heart_chamber_is_built_in_its_three_bevel_types(self):
+        # AKULAKHAN-CHAMBER-32MB-STALL-53: 0 = exact plates (today), 1 = walkable exact, 2 = approximate everywhere
+        types = I.room_types()['rifa4ef181ed']
+        self.assertEqual(sorted(types['types']), [0, 1, 2, 3])
+        self.assertEqual([types['types'][n]['hollow_bevels'] for n in (0, 1, 2, 3)], [0, 1, 2, 2])
+        self.assertTrue(all(types['types'][n]['cut_models_over'] == 0 for n in (0, 1, 2, 3)))
+        # type 3: type 2 and the Arena Pit's method, a detail budget for the drawn meshes (INTERIOR-FAR-BLANK-HEART-64)
+        budget = types['types'][3]['detail_budget']
+        self.assertEqual(budget.get('meshes/i/in_akulakhan00.nif'), 6000)
+        self.assertTrue(budget.get('meshes/i/in_akulacave00.nif') and budget.get('meshes/i/in_dagoth_bridge00.nif'))
+        self.assertEqual(types['types'][2]['detail_budget'], {})
+        self.assertEqual(types['default'], 3)      # the maintainer's decision, 2026-11-10
+        # a room without its own value takes the universal default (COLLISION-WORLDWIDE-REDUCTION-64)
+        self.assertIsNone(I.room_settings('vai000')['hollow_bevels'])
+        self.assertIsNone(I.room_settings('not-listed')['hollow_bevels'])
+        self.assertIsNone(I.room_types()['vai000']['types'][2]['hollow_bevels'])
+        source = (ROOT / 'engine/aga/src/chim/chim_world.c').read_text(encoding='utf-8')
+        self.assertIn('"aw_vivec_arena_pit_type"', source)    # one setting picks the type of every room with types
+
+    def test_hollow_bevels_universal_default(self):
+        # the maintainer's decision, 2026-11-10: approximate bevels (2) for every hollow model; the builder option
+        # overrides (AMIWIND_HOLLOW_BEVELS), a bad value is refused; the variable keys the CHIM units
+        import os
+        from unittest import mock
+        import hollow_bevels_env as E
+        from chim.units import SWITCHES
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop(E.HOLLOW_BEVELS_VARIABLE, None)
+            self.assertEqual(E.hollow_bevels_default(), 2)
+            self.assertEqual(E.export_hollow_bevels(0), 0)
+            self.assertEqual(E.hollow_bevels_default(), 0)
+            os.environ[E.HOLLOW_BEVELS_VARIABLE] = '7'
+            with self.assertRaises(ValueError):
+                E.hollow_bevels_default()
+            self.assertEqual(E.export_hollow_bevels(None), 2)
+        self.assertIn('AMIWIND_HOLLOW_BEVELS', SWITCHES)
+        data = json.loads((ROOT / 'config/chim-rooms.json').read_text(encoding='utf-8'))
+        self.assertEqual(data['hollow_bevels'], 2)
+        # a room takes its own value, else the default; the chamber's type 0 opts back in
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop(E.HOLLOW_BEVELS_VARIABLE, None)
+            self.assertEqual(I.room_hollow_bevels(I.room_settings('not-listed')), 2)
+            self.assertEqual(I.room_hollow_bevels(I.room_types()['rifa4ef181ed']['types'][0]), 0)
+            self.assertEqual(I.room_hollow_bevels(I.room_types()['vai000']['types'][2]), 2)
+        source = (ROOT / 'tools/chim/interior.py').read_text(encoding='utf-8')
+        self.assertIn("'hollow_bevels': room_hollow_bevels(rooms)", source)
+
+    def test_walkable_pieces_are_the_plates_that_face_up(self):
+        from chim.models import walkable_pieces
+        floor = ([[0, 0, 0], [64, 0, 0], [0, 64, 0], [0, 0, -2]], None, [], 0.)
+        ceiling = ([[0, 0, 96], [0, 64, 96], [64, 0, 96], [0, 0, 98]], None, [], 0.)
+        wall = ([[0, 0, 0], [0, 64, 0], [0, 0, 64], [-2, 0, 0]], None, [], 0.)
+        slope = ([[0, 0, 0], [64, 0, 110], [0, 64, 0], [0, 0, -2]], None, [], 0.)  # about 60 degrees: a wall
+        self.assertEqual(walkable_pieces([floor, wall, ceiling, slope]), frozenset({0, 2}))
+
     def config(self, data):
         folder = tempfile.TemporaryDirectory()
         self.addCleanup(folder.cleanup)

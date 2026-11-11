@@ -67,6 +67,7 @@ Family: Console, keyboard and mouse input (`console-input`). The console line ed
 - CONSOLE-CAPS-29 (no report page): FS-UAE F10 Caps Lock appears stuck
 - [CONSOLE-HISTORY-ARROWS-32](CONSOLE-HISTORY-ARROWS-32.md): Console Up/Down arrows recall nothing on the maintainer's FS-UAE (Ubuntu)
 - [CONSOLE-HISTORY-EMPTY-32](CONSOLE-HISTORY-EMPTY-32.md): Console Up past the oldest command shows an empty line and stays there
+- CONSOLE-QUEST-READS-MISSING-64 (no report page): The console does not take the original journal and faction commands, so quest endings and expulsion cannot be read back
 - CONSOLE-WHEEL-29 (no report page): FS-UAE console wheel starts working then reports unbound
 - [ENGINE-COM-TOKEN-UNBOUNDED-35](ENGINE-COM-TOKEN-UNBOUNDED-35.md): COM_Parse wrote tokens of any length into the 1 KiB com_token
 - [ENGINE-LOADGAME-SYSERROR-35](ENGINE-LOADGAME-SYSERROR-35.md): A damaged Quake save stopped the program (Sys_Error) and its strings were read without a width

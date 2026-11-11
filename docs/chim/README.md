@@ -208,6 +208,7 @@ Leary). The CHIM builder is GPLv3. Details and the reviewed upstream revision:
 | [Border audit](STITCH_AUDIT.md) | Where a CHIM area meets the legacy world: heights, arrival, far layer and objects at its edges |
 | [Disk space](DISK_SPACE.md) | Amiga disk limits, what CHIM saves, and the size budget of the whole game |
 | [Mesh methods](MESH_METHODS.md) | How meshes become faces: planar merge for every mesh, meshoptimizer with locked borders for the large reduced shells, the method table and its rule |
+| [Collision](../COLLISION_MESHES.md#collision-against-the-drawing-across-the-game-11-november-2026) | How collision differs from the drawn mesh, the collision census of v0.0.64-dev3, the methods and the reduction plan |
 | [Terrain clipping and residency](../AMIWIND_MAP_OPTIMIZATION_TOOLKIT.md#placement-aware-terrain-clipping-and-residency) | Placement-aware buried-surface cuts, shared models, and separate disk versus active/load-ring measurements |
 | [Reference models](REFERENCE_MODELS.md) | The models held up as the good version (the base silt strider): each a recipe from your own data, checked by SHA-256 at every step |
 | [CHIM statistics](STATS.md) | `chim-stats.json`: polycounts, disk, memory and streaming figures of every build |

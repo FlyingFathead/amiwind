@@ -166,6 +166,28 @@ def read_json(path):
     return json.loads(path.read_bytes().decode('utf-8')) if path.is_file() else None
 
 
+def room_receipts(paths):
+    """The CHIM rooms documents for the interiors tracker, from the --chim-rooms paths. A build's rooms receipt
+    (<run>/chim-interiors/chim-rooms-receipt.json) only says which rooms were MADE; the rooms its image installed are
+    in <run>/image/chim-interiors.json beside it. That file is read too whenever it exists, so an ingested build counts
+    every room its image holds as in the game (TRACKER-INTERIORS-IN-GAME-COUNT-64: before, only the rooms also named in
+    a config scene list counted, 59 of 1,132)."""
+    out, seen = [], set()
+    for p in paths or ():
+        p = Path(p)
+        cands = [p]
+        if p.name == 'chim-rooms-receipt.json' and p.parent.name == 'chim-interiors':
+            cands.append(p.parent.parent / 'image' / 'chim-interiors.json')
+        for c in cands:
+            if str(c) in seen:
+                continue
+            seen.add(str(c))
+            doc = read_json(c)
+            if doc is not None:
+                out.append(doc)
+    return out
+
+
 def write_json(path, value, pretty=False):
     text = json.dumps(value, sort_keys=True, indent=1 if pretty else None, separators=None if pretty else (',', ':'))
     path = Path(path)
@@ -1855,7 +1877,7 @@ def main(argv=None):
                  remembered.get('config_dir') or str(Path(__file__).resolve().parents[1] / 'config'),
                  read_json(remembered['door_graph']) if remembered.get('door_graph') else None,
                  read_json(remembered['batch_plan']) if remembered.get('batch_plan') else None,
-                 [read_json(p) for p in remembered.get('chim_rooms', [])])
+                 room_receipts(remembered.get('chim_rooms', [])))
     h = doc['headline']
     print(on_chim_line(h))
     # The audit figure: cells whose audits passed, over the LAND cells of every island (Solstheim included); empty-sea

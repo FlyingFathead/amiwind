@@ -63,6 +63,21 @@ class FormatTests(unittest.TestCase):
     def test_large_rooms_table_follows_the_engine(self):
         raw, rooms = NL.large_rooms_table((ROOT / 'config/large-rooms.txt').read_bytes())
         self.assertIn(b'rie242a8d69e\n', raw)
+        self.assertIn(b'rifa4ef181ed\n', raw)          # Akulakhan's Chamber (INTERIOR-FAR-BLANK-MANOR-56)
+        self.assertGreaterEqual(rooms, 300)             # every room at least 1,024 local units across
+
+    def test_the_room_build_stops_on_an_unlisted_large_room(self):
+        import tempfile
+        from large_rooms import missing_large_rooms
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            for name, side in (('rifa4ef181ed', 3000), ('ribig0000000', 2048), ('rismall00000', 512)):
+                (root / name).mkdir()
+                (root / name / 'conversion.json').write_text(json.dumps(
+                    {'map': name, 'cell': name, 'bounds': [[0, 0, 0], [side, 100, 100]]}))
+            table = root / 'large.txt'
+            table.write_text('# t\nrifa4ef181ed\n')
+            self.assertEqual(missing_large_rooms(sorted(root.iterdir()), table), [('ribig0000000', 'ribig0000000', 2048)])
         self.assertEqual(NL.large_rooms_table(b'# c\nrie242a8d69e\nvhi017 450\n')[1], 2)
         for bad in (b'', b'rie242a8d69e', b'rie242a8d69e\r\n', b'a\na\n', b'rie242a8d69e 99\n', b'r 4097\n',
                     b'Rie242a8d69e\n', b'a234567890123456\n', b'r  300\n'):
@@ -111,7 +126,8 @@ class StageTests(unittest.TestCase):
             self.assertEqual(sorted(p.name for p in world.iterdir()),
                              ['fog-locations.txt', 'lamps.awl', 'large-rooms.txt', 'night-windows.txt'])
             self.assertEqual((world / 'large-rooms.txt').read_bytes(), (ROOT / 'config/large-rooms.txt').read_bytes())
-            self.assertEqual(receipt['tables']['world/large-rooms.txt']['rooms'], 1)
+            self.assertEqual(receipt['tables']['world/large-rooms.txt']['rooms'],
+                             NL.large_rooms_table((ROOT / 'config/large-rooms.txt').read_bytes())[1])
             lamps = (world / 'lamps.awl').read_bytes()
             self.assertEqual(lamps[:8], b'AWL1' + struct.pack('<I', 3))
             self.assertEqual(len(lamps), 8 + 3 * 20)

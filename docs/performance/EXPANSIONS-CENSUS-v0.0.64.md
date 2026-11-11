@@ -1,6 +1,6 @@
 # Expansions census: Tribunal and Bloodmoon, measured
 
-_Last updated with AmiWind v0.0.64 (10 November 2026)._
+_Last updated with AmiWind v0.0.64-dev4 (11 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -136,6 +136,27 @@ are the spruces.
 Total: 3,675 tree placements in 74 exterior cells (per cell: maximum 96, median 57.5). The seven plain and the
 seven snow-covered tree models carry 1,724 and 1,867 of them. The most placed models of Solstheim overall are the
 ice layer (948), a rock (529) and then the snow tree (403).
+
+### The sea around and between the islands
+
+Counted on the same data (11 November 2026), cell by cell:
+
+| | Cells |
+| --- | --- |
+| Bloodmoon.esm exterior cells | 173: 18 that Morrowind.esm also has, 155 new |
+| New cells with land (heights) | 144 (the tracker's land count) |
+| New cells with a land record without heights (seabed) | 6 |
+| New cells without a land record (open water) | 5 |
+| Solstheim's extent | cells x -29 to -16, y 14 to 28 |
+| Cells next to Solstheim's land that are land in neither file | 59: 4 water cells of Bloodmoon.esm, 55 without a cell record |
+| Between the islands (the rectangle x -29 to -8, y 6 to 28, 506 cells) | 137 cells of Morrowind.esm, 160 of Bloodmoon.esm, 214 in neither file |
+
+A cell no file defines is still open sea in the original game: OpenMW creates such a cell when it is first needed,
+as an empty exterior cell with water and no land (apps/openmw/mwworld/worldmodel.cpp, `createExteriorCell`). So
+the sea around Solstheim and between the two islands has no edge where the data ends. Vvardenfell on CHIM is its
+1,404 recorded cells plus 5 open-sea cells; following that model, Solstheim's recorded sea is its 6 seabed and 5
+water cells, and the open sea the player can swim or sail across (up to the 214 recordless cells of the strait and
+the 55 around the island) has to be generated (CHIM-SEA-BETWEEN-ISLANDS-64).
 
 ## What the census says about the plan
 

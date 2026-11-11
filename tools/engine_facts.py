@@ -51,9 +51,20 @@ import re
 #   and its own #include lines leave the key. map_engine_limits reads one define (SLOTS) of aw_combat.c: the facts
 #   kept every declaration whose name is an English word in a string of the reached code (slots, you, retry, cost,
 #   music, rules, ...), so combat edits re-keyed the CHIM world, the three towns and the flora (about 2,700 s).
+# 5 (CHIM-KEYS-TOO-BROAD-62, v0.0.64-dev4): a name found only as a word in a one-line string of the reached Python
+#   code (a message, an option's help or choices) keeps only a header item that can carry a value the builder reads
+#   as text (_word_value: an object-like #define, a struct, union, enum, typedef or a defined variable), never a
+#   prototype, a function body, a function-like macro or an extern declaration: the words "free" and "mirror" kept
+#   aw_tryalloc.h's free() wrapper and glquake.h's `extern qboolean mirror`, so an engine memory census edit and an
+#   option's help text re-keyed the CHIM world (about 3.8 h). Names from compiled C (an engine file counted whole,
+#   the ABI probe's C source) keep every item, as before, except a target-only item (_target_only: in an
+#   `#if defined(AMIGA) && defined(__m68k__)` branch) that cannot carry a size: the host compiles (the zone walk
+#   gate's chim_zone.c) never see it and the builder's one target compile, the ABI probe, reads only sizes; the
+#   memory census added `#define free(block) AW_TryFree(block)` there. From this reading on, stage keys also leave the
+#   default-off switches' code out (build_cache.DEFAULT_OFF_SWITCHES).
 # A record made by an earlier version is compared through its own source tree (translate).
-VERSION = 4
-PREFIXES = {1: 'cfacts1:', 2: 'cfacts2:', 3: 'cfacts3:', 4: 'cfacts4:'}
+VERSION = 5
+PREFIXES = {1: 'cfacts1:', 2: 'cfacts2:', 3: 'cfacts3:', 4: 'cfacts4:', 5: 'cfacts5:'}
 # Version 4: the patterns of the define readers (engine_limits.define on the comment-free text, world_estimate._define,
 # engine_limits._mib_define and cvar_default on the raw text); a define-only file counts as the first match of each
 # for every name read (tests/test_stage_key_engine_defines.py checks each reader against them).
@@ -303,7 +314,27 @@ def _timing_only(item):
     return not _shapes(item) or text.startswith('extern') or text.startswith('enum {')
 
 
-def kept_items(headers, roots, version=1, definitions_only=()):
+TARGET_TEST = 'defined ( __m68k__ )'
+
+
+def _target_only(item):
+    """True when ITEM sits in an #if branch that needs __m68k__ (version 5): only the target compiler sees it, and the
+    builder's only target compile is the ABI probe, which reads sizes (an `#if ... && defined(__m68k__)` first branch,
+    no `||`, not negated)."""
+    for level in item['stack']:
+        test = level[0] if len(level) == 1 else ''
+        if TARGET_TEST in test and '! ' + TARGET_TEST not in test and '||' not in test:
+            return True
+    return False
+
+
+def _word_value(item):
+    """True when ITEM can carry a value a builder reads as text (version 5): not a function, a prototype, a
+    function-like macro or an extern declaration."""
+    return _shapes(item) and not item['text'].startswith('extern')
+
+
+def kept_items(headers, roots, version=1, definitions_only=(), word_roots=()):
     """({path: [kept item, ...]}, uncertain) of HEADERS {path: text} for the names ROOTS can reach (module doc).
     DEFINITIONS_ONLY: files nothing compiles, read only for single definitions (a .c file named only in define()
     or cvar_default calls): their function bodies are never kept (version 2).
@@ -334,16 +365,25 @@ def kept_items(headers, roots, version=1, definitions_only=()):
             if (name, shaped) not in reached:
                 reached.add((name, shaped))
                 pending.append((name, shaped))
+    # version 5: a target-only item that cannot carry a size (_target_only, _shapes) is never kept by a name: the host
+    # compiles never see it and the ABI probe reads only sizes
+    sizeless = {(path, index) for path, items in parsed.items() for index, item in enumerate(items)
+                if version >= 5 and not item['always'] and _target_only(item) and not _shapes(item)}
     for path, items in parsed.items():
         for index, item in enumerate(items):
-            if (path, index) in timing and not item['always']:
+            if ((path, index) in timing or (path, index) in sizeless) and not item['always']:
                 continue
             if item['always'] or item['call'] in macros:
                 keep((path, index))
+    # version 5: WORD_ROOTS (words of one-line strings) keep only the items that can carry a value (_word_value)
+    for name in sorted(set(word_roots) - set(roots)):
+        for ref in by_name.get(name, ()):
+            if ref not in kept and ref not in timing and ref not in sizeless and _word_value(parsed[ref[0]][ref[1]]):
+                keep(ref)
     while pending:
         name, shaped = pending.pop()
         for ref in by_name.get(name, ()):
-            if ref not in kept and (shaped or ref not in timing):
+            if ref not in kept and (shaped or ref not in timing) and ref not in sizeless:
                 keep(ref)
     out = {path: [item for index, item in enumerate(items) if (path, index) in kept] for path, items in parsed.items()}
     uncertain = any(item['paste'] for items in out.values() for item in items)
@@ -369,10 +409,11 @@ def define_rows(text, reads):
     return rows
 
 
-def define_value(text, names):
-    """The key value of a define-only file (version 4): its prefix, DEFINES_TAG and the SHA-256 of define_rows."""
+def define_value(text, names, version=4):
+    """The key value of a define-only file (version 4 and later): the reading's prefix, DEFINES_TAG and the SHA-256
+    of define_rows."""
     rows = define_rows(text, names)
-    return PREFIXES[4] + DEFINES_TAG + hashlib.sha256(json.dumps(rows, separators=(',', ':')).encode('utf-8')).hexdigest()
+    return PREFIXES[max(4, version)] + DEFINES_TAG + hashlib.sha256(json.dumps(rows, separators=(',', ':')).encode('utf-8')).hexdigest()
 
 
 def _define_read(node, parents):
@@ -500,7 +541,7 @@ def narrow(index, script, selected, folders, readers):
     by_base = {}
     for path in engine:
         by_base.setdefault(path.rsplit('/', 1)[-1], set()).add(path)
-    contexts, probes, roots, writers, define_names = {}, set(), set(), False, {}
+    contexts, probes, roots, writers, define_names, words = {}, set(), set(), False, {}, set()
     for relative, unit_names in reached.items():
         symbols = index._module_symbols(relative)
         for unit in unit_names:
@@ -519,7 +560,10 @@ def narrow(index, script, selected, folders, readers):
             if not (isinstance(node, ast.Constant) and isinstance(node.value, str)) \
                     or not set(units.get(node, ())) & set(unit_names):
                 continue
-            if version >= 2 and not isinstance(parents.get(node), ast.Expr):
+            if version >= 5 and not isinstance(parents.get(node), ast.Expr) \
+                    and not ('\n' in node.value and relative in readers):
+                words.update(IDENTIFIER.findall(node.value))    # a word of a message or option text (version 5)
+            elif version >= 2 and not isinstance(parents.get(node), ast.Expr):
                 roots.update(IDENTIFIER.findall(node.value))    # what the code uses; a docstring reads nothing
             if '\n' in node.value:
                 if relative in readers:      # a C source the reader compiles (the ABI probe): its #include lines
@@ -566,7 +610,7 @@ def narrow(index, script, selected, folders, readers):
         if path not in out:
             out[path] = index.files[path]
         if path in defines_only:
-            out[path] = define_value(read_text(index, path), define_names[path])
+            out[path] = define_value(read_text(index, path), define_names[path], version)
         elif kind == 'policy' and path not in closure:
             import engine_loader_policy
             out[path] = engine_loader_policy.key_value(index.root)
@@ -588,7 +632,7 @@ def narrow(index, script, selected, folders, readers):
     definitions_only = {path for path in facts if version >= 2 and kinds.get(path) in ('define', 'doc')
                         and not path.endswith(HEADER) and path not in included}
     kept, uncertain = kept_items(headers, {word for word in roots if IDENTIFIER.fullmatch(word)}, version,
-                                 definitions_only)
+                                 definitions_only, words)
     if uncertain:
         return selected
     for path in facts:
@@ -652,10 +696,14 @@ def translate(old_components, new_components, old_run, name, current=None):
             _OLD_INDEXES[key] = B.SourceIndex(root, scope=scope, top_format=B.STAGE_TOP_FORMAT, engine_facts=facts)
         index = _OLD_INDEXES[key]
         try:
-            selections.append(index.selection(script)[0] if wanted in (None, index.top_format)
-                              else index.previous_selections(script).get(wanted))
+            chosen = (index.selection(script)[0] if wanted in (None, index.top_format)
+                      else index.previous_selections(script).get(wanted))
         except (OSError, ValueError, SyntaxError):
             return new_components
+        # as the stage key itself reads them (build_cache.stage_components): the layer-row tables by the layers the
+        # stage reads. Without it a stage that reads such a table (chim: config/collision-hull-surface.json) never
+        # matched its record here, and every reading change re-keyed it (CHIM-KEYS-TOO-BROAD-62)
+        selections.append(B.layer_table_values(chosen, name, root) if isinstance(chosen, dict) else chosen)
     recorded_again, today = selections
     if recorded_again != old or today is None:
         return new_components      # the tree is not the one the record was made from

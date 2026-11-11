@@ -6,7 +6,19 @@
   "recipe_rooms": {"rie242a8d69e": "everywhere-v1"},
   "cut_models_over": 512,
   "detail_budget": "rooms",
+  "hollow_bevels_about": "The standing bevels of every hollow model's collision plates where a room or room type does not set its own hollow_bevels (COLLISION-WORLDWIDE-REDUCTION-64; the maintainer's decision, 2026-11-10): 2 = approximate everywhere, as every solid model (the default); 1 = exact on the near-horizontal plates only; 0 = exact on every plate (the method up to v0.0.64-dev4). A room opts back in with its own hollow_bevels 0. Rooms only: exterior frames keep their hollow profiles' bevels (authored underpasses and walkways) until their own sweep. Builder option --chim-hollow-bevels overrides this default.",
+  "hollow_bevels": 2,
   "room_types": {
+    "rifa4ef181ed": {
+      "about": "Akulakhan's Chamber (the Heart Chamber), the setting aw_vivec_arena_pit_type (it picks the type of every room with types): the standing bevels of its hollow collision plates (AKULAKHAN-CHAMBER-32MB-STALL-53). 0 = exact on every plate (the method up to v0.0.64-dev3; the room's models need about 18,130 KiB and do not load at 32 MB Fast), 1 = exact on the near-horizontal plates (floors, stair treads, ledges; a plate's own corners do not say which side is up, so flat ceilings count too), approximate on the walls, 2 = approximate everywhere (as every non-hollow model). Store models measured 18,579,456 (0), 15,621,904 (1), 14,142,096 bytes (2); at 32 MB Fast only type 2 loads (2,519 KiB Fast RAM free inside). Standing-box sweep along every wall: no point where type 2 lets the box further in than type 0; it stops the box earlier at 2.3 % of the sampled wall points in the cave and 5.5 % in Akulakhan (mostly 1 to 4 units; at 2 to 3 per 1,000 of the far samples by 48 units or more). Type 3 = type 2 and a detail budget for its drawn meshes (heart-chamber: Akulakhan 15,217 -> 6,000 triangles, cave 6,532 -> 4,000, bridge 1,864 -> 1,200; collision unchanged), the Vivec Arena Pit's method. Default 3 (the maintainer's decision, 2026-11-10; type 2 was the first type that loads).",
+      "default": 3,
+      "types": {
+        "0": {"cut_models_over": 0, "detail_budget": null, "hollow_bevels": 0},
+        "1": {"cut_models_over": 0, "detail_budget": null, "hollow_bevels": 1},
+        "2": {"cut_models_over": 0, "detail_budget": null, "hollow_bevels": 2},
+        "3": {"cut_models_over": 0, "detail_budget": "heart-chamber", "hollow_bevels": 2}
+      }
+    },
     "vai000": {
       "about": "Vivec, Arena Pit: 0 = the bowl whole (the original, the method up to v0.0.54-dev1), 1 = tiles, 2 = tiles + the room detail budget (the bowl at 6,000 visual triangles). Default 2, decided by the maintainer on 2026-10-28 (about 07:2x +0200) after the one-image A/B of that night (frame ms floor/ring: type 0 17.4/27.5, type 1 14.5/23.2, type 2 13.9/18.0): 'Type 2 is more than good enough ... keep in our builder the original as type 0, type 1, type 2, and 2 would be our default from now on'. Type 4 (tiles + the lossless planar merge, the room setting merge_faces) was measured equal to type 1 (-43 faces) and is not built (image space); the setting stays available.",
       "default": 2,

@@ -1,0 +1,1680 @@
+{
+ "builds": [
+  {
+   "built_at": "2026-11-10T13:49:37+00:00",
+   "cells": 1409,
+   "commit": "dbe3869b",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.64-dev4 (dbe3869b)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-11-10T13:49:37+00:00",
+   "cells": 1409,
+   "commit": "bf2743fa",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.64-dev3 (bf2743fa)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-11-09T05:44:20+00:00",
+   "cells": 1409,
+   "commit": "874440d3",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.64-dev2 (874440d3)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-11-09T05:44:20+00:00",
+   "cells": 1409,
+   "commit": "4bd67418",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.64-dev1 (4bd67418)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-11-09T05:44:20+00:00",
+   "cells": 1409,
+   "commit": "84bc6f57",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.63 (84bc6f57)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-11-09T05:44:20+00:00",
+   "cells": 1409,
+   "commit": "5a4c4720",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.63-dev5 (5a4c4720)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-11-09T05:44:20+00:00",
+   "cells": 1409,
+   "commit": "1ba2e352",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.63-dev4 (1ba2e352)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-11-09T05:44:20+00:00",
+   "cells": 1409,
+   "commit": "6e680965",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.63-dev3 (6e680965)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-11-09T05:44:20+00:00",
+   "cells": 1409,
+   "commit": "d2c64081",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.63-dev2 (d2c64081)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-11-09T05:44:20+00:00",
+   "cells": 1409,
+   "commit": "dc356e39",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.63-dev1 (dc356e39)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-11-07T04:45:41+00:00",
+   "cells": 1409,
+   "commit": "1d5eda8b",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.62 (1d5eda8b)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-11-07T04:45:41+00:00",
+   "cells": 1409,
+   "commit": "089421bf",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.62-dev1 (089421bf)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-11-06T02:49:44+00:00",
+   "cells": 1409,
+   "commit": "1a0640a3",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.61 (1a0640a3)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-11-06T02:49:44+00:00",
+   "cells": 1409,
+   "commit": "ad4f9501",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.61-dev3 (ad4f9501)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-11-06T02:49:44+00:00",
+   "cells": 1409,
+   "commit": "cf155318",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.61-dev2 (cf155318)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-11-06T02:49:44+00:00",
+   "cells": 1409,
+   "commit": "afa644d4",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.61-dev2 (afa644d4)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-10-30T22:03:39+00:00",
+   "cells": 1409,
+   "commit": "ef794b33",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.61-dev1 (ef794b33)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-10-30T22:03:39+00:00",
+   "cells": 1409,
+   "commit": "be26b03b",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.61-dev1 (be26b03b)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-10-30T22:03:39+00:00",
+   "cells": 1409,
+   "commit": "66d0ed70",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.61-dev1 (66d0ed70)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-10-30T22:03:39+00:00",
+   "cells": 1409,
+   "commit": "374d59b1",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.61-dev1 (374d59b1)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-10-30T22:03:39+00:00",
+   "cells": 1409,
+   "commit": "1fed45df",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.60 (1fed45df)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-10-30T22:03:39+00:00",
+   "cells": 1409,
+   "commit": "bbf3ba8f",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.60-dev4 (bbf3ba8f)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-10-30T22:03:39+00:00",
+   "cells": 1409,
+   "commit": "bcf788db",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.60-dev3 (bcf788db)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-10-30T22:03:39+00:00",
+   "cells": 1409,
+   "commit": "d2388458",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.60-dev2 (d2388458)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-10-30T22:03:39+00:00",
+   "cells": 1409,
+   "commit": "e61a8b94",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.60-dev1 (e61a8b94)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-10-30T22:03:39+00:00",
+   "cells": 1409,
+   "commit": "e4f5aa97",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.60-dev1 (e4f5aa97)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-10-30T22:03:39+00:00",
+   "cells": 1409,
+   "commit": "feaee79e",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.59 (feaee79e)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-10-30T22:03:39+00:00",
+   "cells": 1409,
+   "commit": "dd81a5b3",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.59-dev6 (dd81a5b3)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-10-30T22:03:39+00:00",
+   "cells": 1409,
+   "commit": "52aaeae1",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.59-dev6 (52aaeae1)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-10-30T22:03:39+00:00",
+   "cells": 1409,
+   "commit": "f08583e0",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.59-dev5 (f08583e0)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-10-30T22:03:39+00:00",
+   "cells": 1409,
+   "commit": "ca347985",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.59-dev4 (ca347985)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-10-30T22:03:39+00:00",
+   "cells": 1409,
+   "commit": "0ce27527",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.59-dev3 (0ce27527)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-10-30T22:03:39+00:00",
+   "cells": 1409,
+   "commit": "41bea321",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.59-dev1 (41bea321)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-10-30T22:03:39+00:00",
+   "cells": 1409,
+   "commit": "b370794e",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.58 (b370794e)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-10-30T22:03:39+00:00",
+   "cells": 1409,
+   "commit": "7a2c5935",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.58-dev6 (7a2c5935)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-10-30T22:03:39+00:00",
+   "cells": 1409,
+   "commit": "2fb3bf49",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.58-dev5 (2fb3bf49)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-10-30T22:03:39+00:00",
+   "cells": 1409,
+   "commit": "9155d6d6",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.58-dev4 (9155d6d6)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-10-30T22:03:39+00:00",
+   "cells": 1409,
+   "commit": "738edf26",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.58-dev3 (738edf26)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-10-30T22:03:39+00:00",
+   "cells": 1409,
+   "commit": "25a8ddbc",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.58-dev2 (25a8ddbc)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-10-30T22:03:39+00:00",
+   "cells": 1409,
+   "commit": "3d610fa9",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.58-dev1 (3d610fa9)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-10-30T22:03:39+00:00",
+   "cells": 1409,
+   "commit": "7ff625e5",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.57 (7ff625e5)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-10-30T22:03:39+00:00",
+   "cells": 1409,
+   "commit": "095612e9",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.57-dev5 (095612e9)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-10-30T17:05:07+00:00",
+   "cells": 1409,
+   "commit": "c53994d6",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.57-dev4 (c53994d6)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-10-30T09:09:03+00:00",
+   "cells": 1409,
+   "commit": "8297a0b4",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.57-dev3 (8297a0b4)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-10-30T09:09:03+00:00",
+   "cells": 1409,
+   "commit": "d725e23a",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.57-dev2 (d725e23a)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-10-30T03:24:31+00:00",
+   "cells": 1409,
+   "commit": "efc9db36",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.57-dev1 (efc9db36)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-10-30T03:24:31+00:00",
+   "cells": 1409,
+   "commit": "4f112b16",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.57-dev1 (4f112b16)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-10-28T05:13:47+00:00",
+   "cells": 1409,
+   "commit": "b213657",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.56 release, Some Velvet Morning (b213657)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-10-21T19:48:49+00:00",
+   "cells": 1409,
+   "commit": null,
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.47 release, clean public build (791771f7)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-10-19T13:51:03+00:00",
+   "cells": 1409,
+   "commit": null,
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.44 release, every exterior cell on CHIM (c84f850)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-10-19T09:09:47+00:00",
+   "cells": 1409,
+   "commit": null,
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.44-dev1 every exterior cell on CHIM (793d7c1)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-10-18T11:03:24+00:00",
+   "cells": 1356,
+   "commit": null,
+   "islands": [
+    {
+     "land": 1253,
+     "name": "Vvardenfell",
+     "sea": 102
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.43-dev2 full build (b55a5ce)",
+   "land": 1253,
+   "sea": 103
+  },
+  {
+   "built_at": "2026-10-17T21:33:46+00:00",
+   "cells": 1318,
+   "commit": null,
+   "islands": [
+    {
+     "land": 1215,
+     "name": "Vvardenfell",
+     "sea": 102
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.43-dev1 full build (7ac15b1)",
+   "land": 1215,
+   "sea": 103
+  },
+  {
+   "built_at": "2026-10-17T16:36:04+00:00",
+   "cells": 1176,
+   "commit": null,
+   "islands": [
+    {
+     "land": 1171,
+     "name": "Vvardenfell",
+     "sea": 4
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.42 final (a241ba1)",
+   "land": 1171,
+   "sea": 5
+  },
+  {
+   "built_at": "2026-10-17T04:02:48+00:00",
+   "cells": 784,
+   "commit": null,
+   "islands": [
+    {
+     "land": 779,
+     "name": "Vvardenfell",
+     "sea": 4
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.42-dev1 full proof build (5e043ad)",
+   "land": 779,
+   "sea": 5
+  },
+  {
+   "built_at": "2026-10-17T04:02:48+00:00",
+   "cells": 849,
+   "commit": null,
+   "islands": [
+    {
+     "land": 849,
+     "name": "Vvardenfell",
+     "sea": 0
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 0
+    }
+   ],
+   "label": "v0.0.42-dev1 regional (5e043ad)",
+   "land": 849,
+   "sea": 0
+  },
+  {
+   "built_at": "2026-10-16T13:41:27+00:00",
+   "cells": 784,
+   "commit": null,
+   "islands": [
+    {
+     "land": 779,
+     "name": "Vvardenfell",
+     "sea": 4
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.41 final release: rings 0-4 + Bitter Coast + Azura's Coast (ce7ace6)",
+   "land": 779,
+   "sea": 5
+  },
+  {
+   "built_at": "2026-10-16T11:38:54+00:00",
+   "cells": 784,
+   "commit": null,
+   "islands": [
+    {
+     "land": 779,
+     "name": "Vvardenfell",
+     "sea": 4
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.41-dev5 regional build: rings 0-4 + Bitter Coast + Azura's Coast (74ae87b)",
+   "land": 779,
+   "sea": 5
+  },
+  {
+   "built_at": "2026-10-16T06:15:28+00:00",
+   "cells": 662,
+   "commit": null,
+   "islands": [
+    {
+     "land": 657,
+     "name": "Vvardenfell",
+     "sea": 4
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.41-dev4 rings 0-4 (87f6534)",
+   "land": 657,
+   "sea": 5
+  },
+  {
+   "built_at": "2026-10-16T04:13:27+00:00",
+   "cells": 552,
+   "commit": null,
+   "islands": [
+    {
+     "land": 547,
+     "name": "Vvardenfell",
+     "sea": 4
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.41-dev3 rings 0-3 (513 cells, b00e9c4)",
+   "land": 547,
+   "sea": 5
+  },
+  {
+   "built_at": "2026-10-16T01:52:38+00:00",
+   "cells": 426,
+   "commit": null,
+   "islands": [
+    {
+     "land": 421,
+     "name": "Vvardenfell",
+     "sea": 4
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.41-dev2 rings 0-2 (371 cells, 91a8b23)",
+   "land": 421,
+   "sea": 5
+  },
+  {
+   "built_at": "2026-10-15T00:28:30+00:00",
+   "cells": 16,
+   "commit": "a4a475b233f90cf41432b00ad4b08f79c21b4987",
+   "islands": [
+    {
+     "land": 16,
+     "name": "Vvardenfell",
+     "sea": 0
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 0
+    }
+   ],
+   "label": "v0.0.40-dev2 original-cell Seyda conversion; native and package checks pending",
+   "land": 16,
+   "sea": 0
+  },
+  {
+   "built_at": "2026-10-14T22:56:19+00:00",
+   "cells": 36,
+   "commit": "01bdf9f2286050d0eb0f8f7d84e7e67730d18f70",
+   "islands": [
+    {
+     "land": 36,
+     "name": "Vvardenfell",
+     "sea": 0
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 0
+    }
+   ],
+   "label": "v0.0.40-dev2 original-cell Vivec conversion; native and package checks pending",
+   "land": 36,
+   "sea": 0
+  },
+  {
+   "built_at": "2026-10-13T04:19:09.744425+00:00",
+   "cells": 396,
+   "commit": "4772bff70ae334ef565e615f37799b7f2c4b3804",
+   "islands": [
+    {
+     "land": 396,
+     "name": "Vvardenfell",
+     "sea": 0
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 0
+    }
+   ],
+   "label": "v0.0.38 completed full conversion; inclusion and native coverage are separate",
+   "land": 396,
+   "sea": 0
+  },
+  {
+   "built_at": "2026-10-12T23:15:16+00:00",
+   "cells": 6,
+   "commit": "026caf4",
+   "islands": [
+    {
+     "land": 6,
+     "name": "Vvardenfell",
+     "sea": 0
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 0
+    }
+   ],
+   "label": "v0.0.38 cells (1,-3) and (10,-1): isolated CHIM gates passed; final package and native verification pending",
+   "land": 6,
+   "sea": 0
+  },
+  {
+   "built_at": "2026-10-12T22:23:47+00:00",
+   "cells": 3,
+   "commit": "68c2863",
+   "islands": [
+    {
+     "land": 3,
+     "name": "Vvardenfell",
+     "sea": 0
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 0
+    }
+   ],
+   "label": "v0.0.38 cell (3,-3) isolated CHIM trial; full image and native verification pending",
+   "land": 3,
+   "sea": 0
+  },
+  {
+   "built_at": "2026-10-11T15:05:05+00:00",
+   "cells": 335,
+   "commit": null,
+   "islands": [
+    {
+     "land": 335,
+     "name": "Vvardenfell",
+     "sea": 0
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 0
+    }
+   ],
+   "label": "v0.0.38-dev2 full current playable build (c2eaa5a)",
+   "land": 335,
+   "sea": 0
+  },
+  {
+   "built_at": "2026-10-11T05:32:08+00:00",
+   "cells": 236,
+   "commit": "6c29a23",
+   "islands": [
+    {
+     "land": 236,
+     "name": "Vvardenfell",
+     "sea": 0
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 0
+    }
+   ],
+   "label": "v0.0.36-dev5 full coast + Arena + Seyda + Balmora (6c29a23)",
+   "land": 236,
+   "sea": 0
+  },
+  {
+   "built_at": "2026-10-09T02:11:56+00:00",
+   "cells": 1,
+   "commit": null,
+   "islands": [
+    {
+     "land": 1,
+     "name": "Vvardenfell",
+     "sea": 0
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 0
+    }
+   ],
+   "label": "MiniWind #2 mw2-033b3 (Balmora, dev1 line)",
+   "land": 1,
+   "sea": 0
+  },
+  {
+   "built_at": "2026-10-09T00:23:48+00:00",
+   "cells": 1,
+   "commit": null,
+   "islands": [
+    {
+     "land": 1,
+     "name": "Vvardenfell",
+     "sea": 0
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 0
+    }
+   ],
+   "label": "CHIM M2 arena-004 (Vivec Arena)",
+   "land": 1,
+   "sea": 0
+  },
+  {
+   "built_at": "2026-10-08T22:20:35+00:00",
+   "cells": 2,
+   "commit": null,
+   "islands": [
+    {
+     "land": 2,
+     "name": "Vvardenfell",
+     "sea": 0
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 0
+    }
+   ],
+   "label": "CHIM M2 seyda-009 (Seyda Neen)",
+   "land": 2,
+   "sea": 0
+  }
+ ],
+ "eligible_release": "v0.0.64",
+ "format": "aw-progress-state-1",
+ "generated": "2026-11-11T03:07:29+00:00",
+ "groups": {
+  "accounted_for": 2158,
+  "cells": 2311,
+  "in_game": 1409,
+  "not_in_game": 153,
+  "settled": 749
+ },
+ "in_game_label": "v0.0.64-dev4 (dbe3869b)",
+ "interiors": {
+  "classic_rooms": [
+   {
+    "id": "Imperial Prison Ship",
+    "island": "Vvardenfell",
+    "label": "In the game as a room map"
+   },
+   {
+    "id": "Seyda Neen, Census and Excise Office",
+    "island": "Vvardenfell",
+    "label": "In the game as a room map"
+   }
+  ],
+  "groups": [
+   {
+    "id": "in_game",
+    "label": "In the game",
+    "states": [
+     "on_chim_rooms",
+     "room_map"
+    ]
+   },
+   {
+    "id": "not_in_game",
+    "label": "Not in the game yet",
+    "states": [
+     "converted",
+     "not_started"
+    ]
+   },
+   {
+    "id": "set_aside",
+    "label": "Set aside, with a reason",
+    "states": [
+     "hard_case",
+     "test_cell",
+     "teleport_only",
+     "no_entrance"
+    ]
+   }
+  ],
+  "headline": {
+   "Mournhold": {
+    "converted": 0,
+    "groups": {
+     "in_game": 0,
+     "not_in_game": 86,
+     "set_aside": 7
+    },
+    "hard_case": 5,
+    "hard_reasons": {
+     "behaves_exterior": 5,
+     "teleport_only": 2
+    },
+    "no_entrance": 0,
+    "not_started": 86,
+    "on_chim_rooms": 0,
+    "room_map": 0,
+    "teleport_only": 2,
+    "test_cell": 0,
+    "total": 93
+   },
+   "Solstheim": {
+    "converted": 0,
+    "groups": {
+     "in_game": 3,
+     "not_in_game": 92,
+     "set_aside": 1
+    },
+    "hard_case": 0,
+    "hard_reasons": {
+     "teleport_only": 1
+    },
+    "no_entrance": 0,
+    "not_started": 92,
+    "on_chim_rooms": 3,
+    "room_map": 0,
+    "teleport_only": 1,
+    "test_cell": 0,
+    "total": 96
+   },
+   "Vvardenfell": {
+    "converted": 0,
+    "groups": {
+     "in_game": 1123,
+     "not_in_game": 0,
+     "set_aside": 0
+    },
+    "hard_case": 0,
+    "hard_reasons": {},
+    "no_entrance": 0,
+    "not_started": 0,
+    "on_chim_rooms": 1121,
+    "room_map": 2,
+    "teleport_only": 0,
+    "test_cell": 0,
+    "total": 1123
+   },
+   "none": {
+    "converted": 0,
+    "groups": {
+     "in_game": 8,
+     "not_in_game": 0,
+     "set_aside": 8
+    },
+    "hard_case": 0,
+    "hard_reasons": {
+     "unreachable": 8
+    },
+    "no_entrance": 6,
+    "not_started": 0,
+    "on_chim_rooms": 8,
+    "room_map": 0,
+    "teleport_only": 0,
+    "test_cell": 2,
+    "total": 16
+   }
+  },
+  "islands": {
+   "Mournhold": "Mournhold",
+   "Solstheim": "Solstheim",
+   "Vvardenfell": "Vvardenfell",
+   "none": "No entrance area"
+  },
+  "labels": {
+   "converted": "Converted, not in the game yet",
+   "hard_case": "Set aside: hard case",
+   "no_entrance": "Set aside: no entrance, no script",
+   "not_started": "Not started",
+   "on_chim_rooms": "In the game on CHIM rooms",
+   "room_map": "In the game as a room map",
+   "teleport_only": "Set aside: teleport only",
+   "test_cell": "Set aside: test cell"
+  },
+  "later": [
+   {
+    "batch": "later: Mournhold",
+    "island": "Mournhold",
+    "master": "Tribunal.esm",
+    "waits_for": "Mournhold is reached only by script (Tribunal's teleport): its rooms wait for the scripts step (roadmap step 6)"
+   },
+   {
+    "batch": "later: Solstheim",
+    "island": "Solstheim",
+    "master": "Bloodmoon.esm",
+    "waits_for": "Solstheim's exterior (Bloodmoon) is not on CHIM yet: its rooms come in with the island (roadmap step 7)"
+   }
+  ],
+  "totals": {
+   "converted": 0,
+   "groups": {
+    "in_game": 1134,
+    "not_in_game": 178,
+    "set_aside": 16
+   },
+   "hard_case": 5,
+   "no_entrance": 6,
+   "not_started": 178,
+   "on_chim_rooms": 1132,
+   "room_map": 2,
+   "teleport_only": 3,
+   "test_cell": 2,
+   "total": 1328
+  }
+ },
+ "islands": [
+  {
+   "approved": 0,
+   "audits_passed": 376,
+   "cells": 1390,
+   "complete": 0,
+   "complete_unlit": 13,
+   "converted": 1193,
+   "done": 1390,
+   "eligible": 1390,
+   "empty_sea": 197,
+   "island": 1,
+   "lighting": {
+    "lit": 0,
+    "not_measured": 99,
+    "partial": 137,
+    "unlit": 1056
+   },
+   "map_cells": 2156,
+   "name": "Vvardenfell",
+   "not_started": 0,
+   "ocean": 766,
+   "passed": 1193,
+   "percent": 100.0,
+   "playtested": 0,
+   "terrain_complete": 0,
+   "terrain_complete_unlit": 804
+  },
+  {
+   "approved": 0,
+   "audits_passed": 0,
+   "cells": 144,
+   "complete": 0,
+   "complete_unlit": 0,
+   "converted": 0,
+   "done": 0,
+   "eligible": 0,
+   "empty_sea": 0,
+   "island": 2,
+   "lighting": {
+    "lit": 0,
+    "not_measured": 144,
+    "partial": 0,
+    "unlit": 0
+   },
+   "map_cells": 147,
+   "name": "Solstheim",
+   "not_started": 144,
+   "ocean": 3,
+   "passed": 0,
+   "percent": 0.0,
+   "playtested": 0,
+   "terrain_complete": 0,
+   "terrain_complete_unlit": 0
+  }
+ ],
+ "states": {
+  "approved": 0,
+  "audits_passed": 376,
+  "complete": 0,
+  "complete_unlit": 13,
+  "converted_failing": 0,
+  "converted_unmeasured": 0,
+  "empty_sea": 0,
+  "hull_policy_pending": 0,
+  "not_converted": 0,
+  "not_in_build": 0,
+  "not_started": 0,
+  "ocean": 0,
+  "playtested": 0,
+  "sea_in_game": 216,
+  "settled": 749,
+  "solstheim": 153,
+  "terrain_complete": 0,
+  "terrain_complete_unlit": 804
+ },
+ "version_stamp": {
+  "release": "v0.0.64",
+  "source": "the version file"
+ }
+}

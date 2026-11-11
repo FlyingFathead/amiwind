@@ -1,8 +1,9 @@
 AmiWind for the Raspberry Pi 4B: ready-to-write drive image
 ============================================================
 
-1. Write the .img file in this ZIP to a USB stick or SD card of 16 GB or more (Raspberry Pi Imager: "Use custom";
-   or dd on Linux). Do not apply any of the Imager's settings (user, wifi, SSH): the image needs none.
+1. Unzip, then write the AmiWind-v<version>-Pi4B.img file to a USB stick or SD card of 16 GB or more with Raspberry
+   Pi Imager ("Use custom") or balenaEtcher (or dd on Linux). Do not apply any of the Imager's settings (user, wifi,
+   SSH): the image needs none.
 2. Copy your own Kickstart 3.1 ROM (A1200, 524288 bytes) onto the drive called AMIWIND as kick.rom. Any PC opens
    that drive. The image holds no Kickstart; you supply it, as with the playtest launcher.
 3. Boot the Pi 4B from it. The FIRST start installs Amiberry from the image (about two minutes, no network needed)

@@ -333,6 +333,17 @@ def _script(node, path, imports, root):
     return None
 
 
+def _module_constant(root, node):
+    """The string a `module.NAME` node names: NAME's literal value at the top of tools/<module>.py, or None."""
+    if not isinstance(node.value, ast.Name):
+        return None
+    try:
+        tree = ast.parse((Path(root) / 'tools' / (node.value.id + '.py')).read_text(encoding='utf-8'))
+    except (OSError, UnicodeDecodeError, SyntaxError):
+        return None
+    return _constants(tree).get(node.attr)
+
+
 def unit_cache_openers(root=ROOT):
     """[{'module', 'function', 'name', 'scripts'}] of every unit cache the tools open with a literal key: the cache
     name and the code its key hashes (UnitCache.open(name, options, *scripts), unit_store.bake_keyed_cache(name,
@@ -343,7 +354,7 @@ def unit_cache_openers(root=ROOT):
             text = path.read_text(encoding='utf-8')
         except (OSError, UnicodeDecodeError):
             continue
-        if 'UnitCache.open(' not in text and 'bake_keyed_cache(' not in text:
+        if 'UnitCache.open(' not in text and 'bake_keyed_cache(' not in text and 'open_cache(' not in text:
             continue
         try:
             tree = ast.parse(text)
@@ -359,12 +370,19 @@ def unit_cache_openers(root=ROOT):
                 kind = ('open' if isinstance(callee, ast.Attribute) and callee.attr == 'open'
                         and isinstance(callee.value, ast.Name) and callee.value.id == 'UnitCache'
                         else 'keyed' if (isinstance(callee, ast.Name) and callee.id == 'bake_keyed_cache')
-                        or (isinstance(callee, ast.Attribute) and callee.attr == 'bake_keyed_cache') else None)
+                        or (isinstance(callee, ast.Attribute) and callee.attr == 'bake_keyed_cache')
+                        # actor_units.open_cache(NAME, entries, source_digest(...), ...): the actor bakes' caches
+                        # (room-actor, npc-appearance, ...); left out, the preflight never counted the room-actor
+                        # cache, and v0.0.64-dev4 fitted its 2,342 placements again with no stop
+                        # (BUILD-ROOM-ACTOR-KEY-SWITCH-64)
+                        else 'keyed' if (getattr(callee, 'id', None) == 'open_cache'
+                                         or getattr(callee, 'attr', None) == 'open_cache') else None)
                 if kind is None:
                     continue
                 first = call.args[0]
                 name = (first.value if isinstance(first, ast.Constant) and isinstance(first.value, str)
-                        else constants.get(first.id) if isinstance(first, ast.Name) else None)
+                        else constants.get(first.id) if isinstance(first, ast.Name)
+                        else _module_constant(root, first) if isinstance(first, ast.Attribute) else None)
                 if kind == 'open':
                     arguments = call.args[2:]
                 else:
@@ -542,14 +560,48 @@ def unit_report(steps, closures, units, cache_root, workspace, rebuilt, root=ROO
     return report
 
 
-def strict_problems(steps, rebuilt, unit_rows, closures, uncached, allowed, limit=REBAKE_LIMIT, units=None):
+# A whole stage with no unit cache that would redo stored work (its key changed, an earlier run holds it) stops the
+# build when its stored run took this long or more (CHIM-KEYS-TOO-BROAD-62: v0.0.64-dev4 converted the whole CHIM
+# world again for a key change, with no stop, because the stop looked only at unit caches).
+WHOLE_STAGE_LIMIT_SECONDS = 600.0
+
+
+def stored_seconds(run, stage, depth=12):
+    """Wall seconds stage STAGE took where it last ran in full: RUN's build-profile.json, followed back through each
+    'reused.from' (at most DEPTH runs); None when no profile says."""
+    for _ in range(depth):
+        try:
+            profile = json.loads((Path(run) / 'build-profile.json').read_text())
+        except (OSError, ValueError, TypeError):
+            return None
+        row = next((s for s in profile.get('stages') or () if s.get('name') == stage), None)
+        if row is None:
+            return None
+        source = (row.get('reused') or {}).get('from')
+        if not source:
+            return float(row['wall']) if row.get('wall') is not None else None
+        run = source
+    return None
+
+
+def strict_problems(steps, rebuilt, unit_rows, closures, uncached, allowed, limit=REBAKE_LIMIT, units=None,
+                    costs=None, reasons=None, stage_limit=WHOLE_STAGE_LIMIT_SECONDS):
     """[(stage, why)] that stop a --reuse-all-available build before any stage runs (less those ALLOWED). UNITS:
     {stage: {module: reached functions}}; an uncached bake counts for a stage that reaches it (or, without the
-    stage's unit reach, has its module in the closure)."""
+    stage's unit reach, has its module in the closure). COSTS {stage: stored wall seconds} and REASONS {stage: why it
+    rebuilds}: a stage without a unit cache whose key changed ('changed: ...') and whose stored run took STAGE_LIMIT
+    seconds or more stops too, with its estimated minutes."""
     problems = []
     for name, _ in steps:
         if name not in rebuilt or name in allowed:
             continue
+        seconds = (costs or {}).get(name)
+        why = str((reasons or {}).get(name) or '')
+        if seconds is not None and seconds >= stage_limit and why.startswith('changed: '):
+            cached = '; '.join(f'{cache}: {usable} of {held} units from the cache' for cache, usable, held
+                               in unit_rows.get(name, ()) if held) or 'no unit cache'
+            problems.append((name, f'would run the whole stage again, about {seconds / 60.0:.0f} min where it last ran '
+                                   f'in full ({cached}), because its key {why[:200]}'))
         for cache, usable, held in unit_rows.get(name, ()):
             if not held:
                 continue

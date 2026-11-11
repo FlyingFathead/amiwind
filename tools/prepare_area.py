@@ -485,7 +485,8 @@ def open_residents():
     cache = bake_keyed_cache(
         RESIDENT_UNIT, {}, source_digest((__file__, 'build_resident'), (__file__, 'publish_resident')),
         previous_digests((__file__, 'build_resident'), (__file__, 'publish_resident')), (__file__,),
-        covered_lines((__file__, 'build_resident'), (__file__, 'publish_resident')), neutral=WORK_PLACE_SETTINGS)
+        covered_lines((__file__, 'build_resident'), (__file__, 'publish_resident')), neutral=WORK_PLACE_SETTINGS,
+        entries=((__file__, 'build_resident'), (__file__, 'publish_resident')))
     identity = game_data_digest() if cache is not None else None
     if identity is None:
         return None, None

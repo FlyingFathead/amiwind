@@ -90,7 +90,7 @@ def merged_region_names(base_raw, layer_raw):
             + b''.join(struct.pack('<iiII', x, y, *cells[x, y]) for x, y in sorted(cells)))
 
 
-def install(world_dir, id1, hand_fields):
+def install(world_dir, id1, hand_fields, alternatives=()):
     """Copy the layer's store into ID1/chimsol and write one frame map per frame of WORLD_DIR's ownership table.
     Returns the record: {'store', 'files', 'bytes', 'maps': [{'map', 'frame', 'cell', 'bytes', 'sha256', ...}]}."""
     from chim import frame_map as FM
@@ -107,11 +107,23 @@ def install(world_dir, id1, hand_fields):
         raise ValueError('--chim-sol-test: %s already exists' % target)
     files = 0
     size = 0
-    for path in sorted(source.rglob('*')):
+    alt_records = []
+    if alternatives:
+        # ALTERNATIVES: [(method value, the other build's world folder)]: one store, the original trees plus their
+        # alternative models for aw_tree_crowns (tools/chim/alt_models.py); only one method per store for now
+        if len(alternatives) != 1:
+            raise ValueError('--chim-sol-test: one alternative tree method per store')
+        from chim.alt_models import merge
+        method, alt_dir = alternatives[0]
+        alt_records.append(merge(source, Path(alt_dir) / 'chim', target, int(method)))
+    else:
+        for path in sorted(source.rglob('*')):
+            if path.is_file():
+                out = target / path.relative_to(source)
+                out.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(path, out)
+    for path in sorted(target.rglob('*')):
         if path.is_file():
-            out = target / path.relative_to(source)
-            out.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(path, out)
             files += 1
             size += path.stat().st_size
     world = FM.load(world_dir)
@@ -157,4 +169,4 @@ def install(world_dir, id1, hand_fields):
         names_path.write_bytes(merged_region_names(names_path.read_bytes(), region_names(layered.read_bytes())))
     print('[chim-sol] TEST: store %s (%d files, %d bytes) and %d Solstheim frame maps: %s' % (
         STORE, files, size, len(maps), ', '.join('%s (frame %s)' % (m['map'], m['id']) for m in maps)), flush=True)
-    return {'store': STORE, 'files': files, 'bytes': size, 'maps': maps}
+    return {'store': STORE, 'files': files, 'bytes': size, 'maps': maps, 'alternatives': alt_records}

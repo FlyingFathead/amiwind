@@ -38,6 +38,21 @@ class SolTestCommands(unittest.TestCase):
         self.assertEqual(image[-2:], ['--chim-sol-world', str(Path('/run') / 'chim-sol')])
         self.assertNotIn('--chim-sol-world', dict(steps)['chim'])
 
+    def test_switch_builds_both_tree_methods_and_hands_the_image_the_alternative(self):
+        args = SimpleNamespace(chim_sol_test='-23,20:l', data_files='/data', workspace=Path('/ws'), sdk='/sdk',
+                               chim_terrain_hull='compiled', chim_sol_tree_copies='switch')
+        try:
+            steps = build.chim_sol_test_commands(args, self.steps(), tool, Path('/run'), {'qbsp': '/q'}, 4)
+        except AttributeError as missing:
+            self.skipTest('build settings: %s' % missing)
+        commands = dict(steps)
+        self.assertEqual([n for n, _ in steps], ['chim', 'chim-sol-data', 'chim-sol-trees', 'chim-sol', 'chim-sol-star',
+                                                 'image'])
+        self.assertIn('chim_build.py', ' '.join(commands['chim-sol']))
+        self.assertIn('chim_tree_star.py', ' '.join(commands['chim-sol-star']))
+        self.assertEqual(commands['image'][-4:], ['--chim-sol-world', str(Path('/run') / 'chim-sol'),
+                                                  '--chim-sol-alt', '1=' + str(Path('/run') / 'chim-sol-star')])
+
     def test_layer_data_finds_the_mwad_package_when_run_as_a_script(self):
         # BUILD-LAYER-DATA-MWAD-SHADOWED-64: run as a script, tools/ (with tools/mwad.py) is first on the path
         import subprocess

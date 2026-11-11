@@ -44,7 +44,7 @@ def test_fat32_roundtrip():
     tmp.cleanup()
 
 
-def _run(new_extra=None, boot_new=None, data=None, contents=None, shadow=SHADOW, removed=()):
+def _run(new_extra=None, boot_new=None, data=None, contents=None, shadow=SHADOW, removed=(), variant='full'):
     base = {'/etc': ('dir', '', 0o40755, 0, 0), '/etc/shadow': ('file', 's0', 0o100640, 0, 10),
             '/etc/ssh/sshd_config.d/rename_user.conf': ('file', 'r', 0o100644, 0, 4)}
     new = {k: v for k, v in base.items() if k not in ('/etc/ssh/sshd_config.d/rename_user.conf',) + tuple(removed)}
@@ -57,7 +57,16 @@ def _run(new_extra=None, boot_new=None, data=None, contents=None, shadow=SHADOW,
     def read(part, path):
         return files.get(path, b'')
     return scrub_check.evaluate(base, new, boot_base, boot_new or {'/cmdline.txt': 'c1', '/config.txt': 'k0'}, data, read,
-                                ALLOW, SHA_HDF, set(), scrub_check.BUILTIN_WORDS + ['secretname'], '0.0.1')
+                                ALLOW, SHA_HDF, set(), scrub_check.BUILTIN_WORDS + ['secretname'], '0.0.1', variant)
+
+
+def test_slim_variant():
+    fails, _ = _run(data={'/README-FIRST.txt': (5, 'r1')}, variant='slim')
+    assert fails == [], fails
+    fails, _ = _run(variant='slim')          # a game disk on a slim image
+    assert fails
+    fails, _ = _run(data={'/README-FIRST.txt': (5, 'r1')})   # none on a full image
+    assert fails
 
 
 def test_clean_passes():
@@ -88,7 +97,25 @@ def test_refuses_keys_passwords_tokens_and_strays():
         assert fails, 'case %d passed: %s' % (i, kw)
 
 
+def test_package_is_one_img_xz():
+    src = (ROOT / 'tools/pi_image/build_clean_image.py').read_text(encoding='utf-8')
+    assert "'AmiWind-v%s-pi4b-image%s.zip'" in src and "'AmiWind-v%s-pi4b-image%s.img.xz'" in src
+    assert "choices=('zip', 'xz'), default='zip'" in src and "'-T%d' % a.jobs" in src
+    assert "choices=('full', 'slim'), default='full'" in src
+    import build_clean_image
+    assert b'0.0.9' in build_clean_image.SLIM_README.replace(b'%(v)s', b'0.0.9')
+    assert "'-T%d' % a.jobs" in src
+    readme = (ROOT / 'tools/pi_image/clean/README-FIRST.txt').read_text(encoding='utf-8')
+    assert 'balenaEtcher' in readme and 'Raspberry' in readme and 'Pi4B.img' in readme
+
+
 class PiCleanImage(unittest.TestCase):
+    def test_package(self):
+        test_package_is_one_img_xz()
+
+    def test_slim(self):
+        test_slim_variant()
+
     def test_inputs(self):
         test_inputs_manifest_complete()
 

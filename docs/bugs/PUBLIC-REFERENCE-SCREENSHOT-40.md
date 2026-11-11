@@ -120,6 +120,7 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - [DOCS-CHANGELOG-STALE-39](DOCS-CHANGELOG-STALE-39.md): Maintained changelog stops at v0.0.35 while current development reaches v0.0.39-rc1
 - [DOCS-CHIM-PROGRESS-STALE-38](DOCS-CHIM-PROGRESS-STALE-38.md): Main README CHIM progress map still shows the v0.0.36 snapshot
 - [DOCS-DEAD-ANCHORS-32](DOCS-DEAD-ANCHORS-32.md): Seven documentation links point at headings that no longer exist
+- DOCS-PROGRESS-TRACKER-STALE-64 (no report page): The CHIM Progress Tracker page carried the newest version in its last-updated line while its current state stopped at v0.0.48 and listed its builds oldest first
 - [DOCS-RC1-PREFLIGHT-39](DOCS-RC1-PREFLIGHT-39.md): RC1 documentation changes omit export and generated-document requirements
 - [DOCS-RELEASE-EVIDENCE-SCOPE-39](DOCS-RELEASE-EVIDENCE-SCOPE-39.md): Release notes conflate earlier image evidence and open bug identities
 - [DOCS-ROADMAP-IMPLEMENTATION-39](DOCS-ROADMAP-IMPLEMENTATION-39.md): Roadmap retains obsolete implementation and coverage claims
@@ -153,18 +154,26 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - TOOLKIT-COPY-ONE-CELL-57 (no report page): The world map's copy-cells button is disabled when only one cell is clicked
 - [TOOLKIT-CULL-DIAGNOSTICS-38](TOOLKIT-CULL-DIAGNOSTICS-38.md): Collision-only diagnostics disable terrain culling preview
 - TOOLKIT-ELIGIBLE-RELEASE-STALE-64 (no report page): The CHIM Progress Tracker headline says eligible for a release six versions old
+- TOOLKIT-HEADLINE-ROWS-INLINE-64 (no report page): The CHIM Progress Tracker headline shows its rows for each land and the build as one run-on line in Firefox
+- TOOLKIT-HEADLINE-ROWS-OVERFLOW-64 (no report page): The CHIM Progress Tracker headline rows run off the right edge and its summary cannot be folded
+- TOOLKIT-HELP-BUTTON-INERT-64 (no report page): The round question mark in the Toolkit header does nothing when clicked
+- TOOLKIT-INSPECTOR-EXPORT-VERSION-64 (no report page): The Polycount inspector JSON copy names program version 0.0.38 on every later release
 - [TOOLKIT-LEGEND-STATES-UNCLEAR-48](TOOLKIT-LEGEND-STATES-UNCLEAR-48.md): The CHIM Progress Tracker legend is confusing: 15 status buttons, half of them always 0, and open ocean labelled not in the game for cells that are
 - [TOOLKIT-MAP-SCALING-36](TOOLKIT-MAP-SCALING-36.md): The CHIM Progress Tracker map scales badly: a small box in the middle with inner scrollbars, controls far away, the island cropped
 - [TOOLKIT-MONITOR-BLIND-PHASES-36](TOOLKIT-MONITOR-BLIND-PHASES-36.md): The Toolkit Monitor shows nothing during silent build phases: no activity, no phases, no time since the last log line
 - TOOLKIT-MONITOR-FOLLOW-NOT-DEFAULT-49 (no report page): The Toolkit Monitor did not follow the newest running build on a load or a reload: follow latest started off and the page link pinned the old run
 - TOOLKIT-MONITOR-NO-MEMORY-55 (no report page): Requested: the Toolkit build monitor shows the build's memory: RAM used and available, a memory curve beside the cores, the peak
 - TOOLKIT-PAINT-SEA-CELLS-48 (no report page): Paint and the rectangle select on the World map skip sea cells, so their properties cannot be copied
+- TOOLKIT-PROGRESS-FILE-REFETCHED-64 (no report page): The World Map fetches and parses the whole 109 MB tracker file every 10 seconds
 - TOOLKIT-RELOAD-WORLD-55 (no report page): A reload of the Toolkit always opened the World tab instead of the tab that was open
 - TOOLKIT-RESULTS-NO-OPEN-55 (no report page): Requested: a build in the monitor's Recent builds and gates list opens that run with one click
 - TOOLKIT-SERVE-SOCKET-BUFFER-57 (no report page): The Toolkit server stops for good on one transient socket error while heavy builds run
 - [TOOLKIT-STALE-DOT-FOR-INGESTED-DATA-48](TOOLKIT-STALE-DOT-FOR-INGESTED-DATA-48.md): The World map status dot says stale for finished ingested data
+- TOOLKIT-STATUS-STALE-BY-CLOCK-64 (no report page): The World Map status strip says stale for data that covers the newest delivered build
 - TOOLKIT-TIMELINE-CORES-TOP-48 (no report page): Toolkit Monitor stage timeline: the top of the cores line ran into its label, so the peaks could not be seen
 - TOOLKIT-VERSION-CHECK-NO-GIT-64 (no report page): The Toolkit version check passes in a source tree without git history, so the gate lets a stale Toolkit version line through and the dev delivery stops after the build
+- TOOLKIT-WORLD-MAP-FRAME-LOOP-64 (no report page): The World Map vanished in Firefox after the frame was sized to its own content
+- TOOLKIT-WORLD-MAP-NESTED-SCROLL-64 (no report page): The World Map scrolls as separate boxes: the headline stays while the map frame scrolls, and the wheel over the map never scrolls the page
 - [TRACKER-AREA-CELLS-RUN-WIDE-42](TRACKER-AREA-CELLS-RUN-WIDE-42.md): The CHIM tracker gives every area of a build all of the build's cells: Balmora holds 811 cells, so an area or shipped-towns plan selector takes most of the island
 - [TRACKER-CHIM-COUNT-STALE-44](TRACKER-CHIM-COUNT-STALE-44.md): The CHIM progress tracker still reports 1,193 of 1,436 cells after a build with every exterior cell: it counts audits over both islands, not what the build put on CHIM
 - [TRACKER-CHIM-LINK-MERGE-33](TRACKER-CHIM-LINK-MERGE-33.md): A merge dropped the CHIM Engine tracker link from the register; the integration head fails a tracker test
@@ -173,6 +182,7 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - [TRACKER-FIXED-LEFT-OPEN-36](TRACKER-FIXED-LEFT-OPEN-36.md): Fixed work whose bug entry stayed open (LAVA-NOT-IMPLEMENTED-33)
 - [TRACKER-IN-GAME-SEA-LABELLED-OCEAN-48](TRACKER-IN-GAME-SEA-LABELLED-OCEAN-48.md): The cell tracker calls cells that are in the game ocean: cell -15,-8 stands alone in the sea on the World map
 - [TRACKER-INCLUSION-NOT-RUN-SINCE-44-48](TRACKER-INCLUSION-NOT-RUN-SINCE-44-48.md): The inclusion ledger was not refreshed after v0.0.44-dev1 and the Toolkit headline still names v0.0.41
+- TRACKER-INTERIORS-IN-GAME-COUNT-64 (no report page): The tracker data counts 59 of 1,123 Vvardenfell interior rooms as in the game on CHIM rooms, while the builds since v0.0.48 convert almost all of them
 - [TRACKER-INTERIORS-NOT-SHOWN-48](TRACKER-INTERIORS-NOT-SHOWN-48.md): The CHIM Progress Tracker does not show the interiors: no room list, no counts per island and state, and 16 rooms with no entrance area left out of every batch
 - [TRACKER-MAP-BLANK-31](TRACKER-MAP-BLANK-31.md): World progress map vanished when the mouse moved over it
 - [TRACKER-OCEAN-COUNTED-DONE-36](TRACKER-OCEAN-COUNTED-DONE-36.md): The tracker counts the 867 open-ocean cells as done, although the engine does not place the ocean chunk yet

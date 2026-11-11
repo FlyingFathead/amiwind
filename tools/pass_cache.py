@@ -197,10 +197,13 @@ _LOADED_ROWS = {}
 class PassCache:
     """One pass's view of the cache; picklable, so pool workers get it in their task."""
 
-    def __init__(self, name, options, sources, root=None, tally=None, previous=(), covered=()):
+    def __init__(self, name, options, sources, root=None, tally=None, previous=(), covered=(), previous_options=()):
         self.name = name
         self.options = options
         self.sources = sources
+        # Options of older key forms (unit_store.keyed_environment: the settings before unread ones left the key):
+        # looked up on a miss with every sources digest, never written.
+        self.previous_options = tuple(previous_options)
         # the trace lines of the code its key covers, written into the stage's trace on a hit (covered_lines)
         self.covered = tuple(covered)
         # Source digests of older key forms (previous_digests): looked up on a miss, never written.
@@ -250,13 +253,14 @@ class PassCache:
             shutil.rmtree(folder, ignore_errors=True)
         return {'sources_sha256': self.sources, 'hits': hits, 'misses': misses}
 
-    def key(self, input_sha256, sources=None):
+    def key(self, input_sha256, sources=None, options=None):
         sources = self.sources if sources is None else sources
-        return hashlib.sha256(json.dumps([FORMAT, self.name, self.options, sources, input_sha256],
+        options = self.options if options is None else options
+        return hashlib.sha256(json.dumps([FORMAT, self.name, options, sources, input_sha256],
                                          sort_keys=True).encode()).hexdigest()
 
-    def _paths(self, input_sha256, root=None, sources=None):
-        key = self.key(input_sha256, sources)
+    def _paths(self, input_sha256, root=None, sources=None, options=None):
+        key = self.key(input_sha256, sources, options)
         base = Path(root or self.root) / self.name / key[:2]
         return base / (key + '.json'), base / (key + '.bin')
 
@@ -272,6 +276,16 @@ class PassCache:
             found = self._load(input_sha256, sources=sources)
             if found is not None:
                 self.store(input_sha256, found[0], found[1], mesh_rows=mesh_tables.whole_rows())
+                break
+        for options in getattr(self, 'previous_options', ()) if found is None else ():
+            # the same unit stored while a setting its code never reads was still in the key
+            # (BUILD-UNIT-KEYS-REACH-64); verified like any entry, then recorded under the current key
+            for sources in (self.sources,) + tuple(self.previous):
+                found = self._load(input_sha256, sources=sources, options=options)
+                if found is not None:
+                    self.store(input_sha256, found[0], found[1], mesh_rows=_LOADED_ROWS.get(self._slot(input_sha256)))
+                    break
+            if found is not None:
                 break
         if found is None:
             from file_cache import fallback_root
@@ -293,8 +307,8 @@ class PassCache:
         cache_provenance.reused(self.root, self.name, self.key(input_sha256), found is not None)
         return found
 
-    def _load(self, input_sha256, root=None, sources=None):
-        meta_path, blob_path = self._paths(input_sha256, root, sources)
+    def _load(self, input_sha256, root=None, sources=None, options=None):
+        meta_path, blob_path = self._paths(input_sha256, root, sources, options)
         try:
             meta = json.loads(meta_path.read_text(encoding='utf-8'))
             if meta.get('format') != FORMAT or meta.get('input_sha256') != input_sha256:
@@ -390,8 +404,11 @@ class UnitCache(PassCache):
         root = folder()
         if root is None:
             return None
-        return cls(name, dict(options, environment=environment(*scripts)), source_digest(*scripts), root,
-                   previous=previous_digests(*scripts), covered=covered_lines(*scripts))
+        import unit_store
+        keyed, older = unit_store.keyed_environment(environment(*scripts), [(script, None) for script in scripts])
+        return cls(name, dict(options, environment=keyed), source_digest(*scripts), root,
+                   previous=previous_digests(*scripts), covered=covered_lines(*scripts),
+                   previous_options=[dict(options, environment=value) for value in older])
 
     def _blob(self, sha256):
         return Path(self.root) / self.name / 'files' / sha256[:2] / (sha256 + '.bin')

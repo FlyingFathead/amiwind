@@ -250,6 +250,12 @@ def mesh_fingerprint(model, profile, texture_records, kind='mesh'):
     """A mesh unit by content: its record without layout (mesh and collision hashes, materials with their
     textures' hashes), and its profile. KIND 'mesh-stair': the stair collision method 1 worker's code key
     (chim.units.CODE_ENTRIES), so method 1's code never enters a default mesh unit's key."""
+    # the collision mesh setting (collision_source_env.collision_mesh_mode, COLLISION-WORLDWIDE-REDUCTION-64) changes
+    # the prepared collision pieces: keyed only when not the default, so default units keep their keys
+    from collision_mesh_env import collision_mesh_mode, DEFAULT_COLLISION_MESH
+    mode = collision_mesh_mode()
+    if mode != DEFAULT_COLLISION_MESH:
+        return fingerprint(kind, canonical_model(model, texture_records), profile, ('collision_mesh', mode))
     return fingerprint(kind, canonical_model(model, texture_records), profile)
 
 
@@ -404,6 +410,16 @@ def frame_input(*, frame, centre, models, references, prepared, profiles, mesh_f
                 from chim.bevels import model_bevels_mode
                 bevels = model_bevels_mode(settings)
                 exact = exact or bevels == 'exact'
+            # the bevels of hollow collision plates in a room (chim.interior passes hollow_bevels: the room's own from
+            # config/chim-rooms.json, a room or room type opts back in with 0, else the universal default
+            # mesh_geometry_env.hollow_bevels_default, 2; COLLISION-WORLDWIDE-REDUCTION-64): 1 = exact on the
+            # walkable plates only, 2 = approximate everywhere, 0 = the profile's (exact, the method before).
+            # Exterior frames pass none: their hollow profiles keep their bevels (authored underpasses and walkways,
+            # CHIM-VOS-TEMPLE-WALKWAY-41) until their own sweep.
+            wall = int((settings or {}).get('hollow_bevels') or 0) if profile.get('hollow_collision') else 0
+            if wall:
+                from chim.models import WALKABLE_EXACT
+                exact = WALKABLE_EXACT if wall == 1 else False
             task = {'ref': ref, 'data': prepared[mi], 'texsize': size, 'centre': list(centre), 'model': model,
                     'texture_shas': texture_shas,
                     'exact': exact, 'hollow': bool(profile.get('hollow_collision')),

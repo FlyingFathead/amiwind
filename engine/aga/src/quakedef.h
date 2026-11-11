@@ -394,7 +394,8 @@ float AW_SizeCutShare(int preset,float radius);
 #define AW_CULL_TEST 7
 #define AW_CULL_FOG_RULE 8
 #define AW_CULL_GROUPS 16
-#define AW_CULL_MAX 31
+#define AW_CULL_ROOM_FOG_OFF 32	/* large rooms: no face cut past the fog (INTERIOR-FAR-BLANK-HEART-64) */
+#define AW_CULL_MAX 63
 float AW_SizeCutDepthShare(float radius);
 void AW_FarGroup(const float *box);
 int AW_PassVisible(vec3_t origin,float radius);

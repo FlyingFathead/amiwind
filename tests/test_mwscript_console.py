@@ -270,6 +270,28 @@ class NativeLines(unittest.TestCase):
                          ['exec dbg god|', 'exec dbg god|', 'exec noclip|', 'exec dbg tp "Seyda Neen"|',
                           'exec dbg tp -12288 -69632|', 'exec dbg unstuck|'])
 
+    def test_the_journal_and_expulsion_lines(self):
+        # CONSOLE-QUEST-READS-64: the original's journal lines and the expulsion read, as typed, go to the host route a
+        # script takes (dbg mwscript call); the quest id keeps its quotes, a read has no index
+        out = self.run_lines('Journal A1_1_FindSpymaster 10', 'SetJournalIndex, "A1_1_FindSpymaster", 5',
+                             'GetJournalIndex A1_1_FindSpymaster', 'GetPCExpelled "Mages Guild"', 'getpcexpelled')
+        self.assertEqual([l for l in out if l.startswith('exec')],
+                         ['exec aw_mwscript_status call journal "A1_1_FindSpymaster" 10|',
+                          'exec aw_mwscript_status call setjournalindex "A1_1_FindSpymaster" 5|',
+                          'exec aw_mwscript_status call getjournalindex "A1_1_FindSpymaster"|',
+                          'exec aw_mwscript_status call pcexpelled "Mages Guild"|',
+                          'exec aw_mwscript_status call pcexpelled|'])
+
+    def test_the_call_route_takes_the_reads(self):
+        host = (SRC / 'aw_mwhost.c').read_text(encoding='utf-8')
+        call = host[host.index('if(!Q_strcasecmp(a,"call")){'):host.index('if(on<0 && Q_strcasecmp(a,"about"))')]
+        for row in ('{"pcexpelled",AWF_PCEXPELLED}', '{"getpcexpelled",AWF_PCEXPELLED}',
+                    '{"pcclearexpelled",AWF_PCCLEAREXPELLED}', '{"getpcfacrep",AWF_GETPCFACREP}',
+                    '{"getpcrank",AWF_GETPCRANK}', '{"pcexpell",AWF_PCEXPELL}'):
+            self.assertIn(row, call)
+        self.assertIn('!Q_strcasecmp(f,"getjournalindex")', call)
+        self.assertIn('host_journal_get(found)', call)
+
     def test_the_target_rule(self):
         out = self.run_lines('player->AddItem "iron dagger", 5', 'Fargoth -> removeitem gold_001 100',
                              'additem', 'nobody->GetItemCount x', 'fargoth->setlevel 5')

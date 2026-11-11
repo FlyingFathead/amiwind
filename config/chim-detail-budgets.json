@@ -5,6 +5,11 @@
     "rooms": {
       "meshes/i/in_v_arena_01.nif": 6000
     },
+    "heart-chamber": {
+      "meshes/i/in_akulakhan00.nif": 6000,
+      "meshes/i/in_akulacave00.nif": 4000,
+      "meshes/i/in_dagoth_bridge00.nif": 1200
+    },
     "vivec": {
       "meshes/x/ex_vivec_prisonmoon_01.nif": 3000,
       "meshes/x/ex_v_vivecstatue_02.nif": 1200,

@@ -1,6 +1,6 @@
 # Magic effects
 
-_Last updated with AmiWind v0.0.62-dev1 (2026-11-07)._
+_Last updated with AmiWind v0.0.64-dev5 (11 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -174,7 +174,8 @@ engine reads an item's enchantment by its id when the item is used, strikes or i
 path has not yet been seen in game, although 408 actors hold such a weapon). Weapons and shields with a Cast When
 Strikes or Cast When Used enchantment can be equipped (before dev3, 191 strike weapons, 59 use weapons and 20 use
 shields, the iron shardaxe among them, were refused); Constant Effect items are worn as before.
-- **Cast When Used** and **Cast Once** (scrolls): select the item (`aw_magic select ID` in the console), ready magic and press the
+- **Cast When Used** and **Cast Once** (scrolls): select the item (in the Magic window's Magic Items since v0.0.64,
+  or `aw_magic select ID` in the console; a scroll needs no charge to be selected), ready magic and press the
   attack button (or `dbg cast now`): it is cast without a success roll, paying its charge as above (a Cast Once item
   is used up instead); Self effects on the player, Touch on the actor in reach, Target as a bolt. A selected item and
   a selected spell exclude each other, as in the original.

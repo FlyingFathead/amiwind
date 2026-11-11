@@ -23,6 +23,8 @@ static float combat_miss=1,combat_dice=1,combat_block=0;   /* the shipped defaul
 static float fp_sway=1;
 /* Video > Far detail (aw_cull, aw_fog.c; the engine default 4 = Strong). */
 static float far_detail=4;static int far_sets;
+/* Video > Tree crowns (aw_tree_crowns, chim_world.c; default 0 = original). */
+static float tree_crowns;
 /* Video > Extra RAM (aw_autoram, chim_world.c; default 1 = automatic). */
 static float autoram=1;
 /* Controls > Invert Y axis: the sign of Quake's m_pitch (default 0.022). */
@@ -31,7 +33,11 @@ static float pitch_value=.022f;
 static float player_steps;
 /* Prefs > Always use best attack (aw_combat_best_attack, BEST-ATTACK-OPTION-62: on by default, an AmiWind default). */
 static float best_attack=1;
+/* Video > Fog distance indoors and Fog in large rooms (aw_fog.c, LARGE-ROOM-FOG-SETTING-64: 300 and on by default). */
+static float fog_indoors=300,fog_large_rooms=1;
 float Cvar_VariableValue(char *name){
+    if(!strcmp(name,"aw_fog_distance_interior"))return fog_indoors;
+    if(!strcmp(name,"aw_fog_large_rooms"))return fog_large_rooms;
     if(!strcmp(name,"aw_combat_best_attack"))return best_attack;
     if(!strcmp(name,"aw_cull"))return far_detail;
     if(!strcmp(name,"aw_autoram"))return autoram;
@@ -41,14 +47,18 @@ float Cvar_VariableValue(char *name){
     if(!strcmp(name,"aw_fp_sway"))return fp_sway;
     if(!strcmp(name,"m_pitch"))return pitch_value;
     if(!strcmp(name,"aw_player_footsteps"))return player_steps;
+    if(!strcmp(name,"aw_tree_crowns"))return tree_crowns;
     assert(0);return 0;
 }
 void Cvar_SetValue(char *name,float value){cvar_t *rows[]={&volume,&bgmvolume,&effectsvolume,&dialoguevolume};int i;
     if(!strcmp(name,"aw_cull")){assert(value==1 || value==3 || value==4 || value==6);far_detail=value;far_sets++;return;}
+    if(!strcmp(name,"aw_tree_crowns")){assert(value==0 || value==1 || value==2);tree_crowns=value;return;}
     if(!strcmp(name,"m_pitch")){pitch_value=value;return;}
     if(!strcmp(name,"aw_player_footsteps")){assert(value==0 || value==1);player_steps=value;return;}
     if(!strcmp(name,"aw_fp_sway")){assert(value==1 || value==2);fp_sway=value;return;}
+    if(!strcmp(name,"aw_fog_distance_interior")){assert(value>=100 && value<=4*1024);fog_indoors=value;return;}
     assert(value>=0 && value<=1);
+    if(!strcmp(name,"aw_fog_large_rooms")){fog_large_rooms=value;return;}
     if(!strcmp(name,"aw_combat_miss")){combat_miss=value;return;}
     if(!strcmp(name,"aw_autoram")){autoram=value;return;}
     if(!strcmp(name,"aw_combat_dice")){combat_dice=value;return;}
@@ -76,7 +86,7 @@ void AW_UIScrollbar(int x,int y,int h,int total,int visible,int top){assert(x>=0
 int AW_UIScrollHit(int mx,int my,int x,int y,int h,int total,int visible,int top){return -1;}
 /* What the Options page drew: labels by their start, every tab and box. */
 static char crosshair_label[64],photo_label[64],far_label[64],colour_label[64],shape_label[64],invert_label[64],cursor_label[64],
-            best_label[64];
+            best_label[64],room_fog_label[64],indoor_label[64];
 /* The mouse cursor (aw_ui.c, CURSOR-MW-58): aw_cursor_type 2 = Morrowind's pointer (drawn when the image has it), 1 = AmiWind's. */
 static int cursor_kind=2,cursor_calls,cursor_art=1;
 int AW_UICursorType(void){return cursor_kind;}
@@ -95,6 +105,7 @@ void AW_UITextBox(int x,int y,int w,int h,const char *s,int c){assert(y>=0 && y+
  if(x==252)strcpy(sens_value,s); /* the value beside the sensitivity rail */
  if(x==10 && y==176)strcpy(help,s);
  if(!strncmp(s,"Far detail",10)){strcpy(far_label,s);assert(AW_UIWidth(s)<=w-4);}
+ if(!strncmp(s,"Fog ",4)){if(s[4]=='i')strcpy(room_fog_label,s);else if(!strncmp(s,"Fog distance indoors",20))strcpy(indoor_label,s);}
  if(!strcmp(s,"Photo mode") || !strcmp(s,"Leave photo mode")){strcpy(photo_label,s);photo_colour=c;}}
 /* Photo mode and the crosshair preference (aw_photo.c). */
 static int crosshair_on=1,photo_on,photo_available=1,photo_sets,crosshair_style[2];
@@ -249,9 +260,17 @@ static void check_video(void){
  open_options();page(3);
  down(1);M_Keydown('a');assert(distance==530);keydown[K_SHIFT]=true;M_Keydown('D');assert(distance==531);keydown[K_SHIFT]=false;
  M_Keydown('s');M_Keydown(K_ENTER);assert(distance==300);   /* reset = the universal default 300 */
+ /* Fog distance indoors (aw_fog_distance_interior, its own value; 300 by default): arrows 10, Enter steps */
+ down(1);M_Draw();assert(!strcmp(indoor_label,"Fog distance indoors: 300") && highlight_y==36+2*19);
+ M_Keydown(K_RIGHTARROW);assert(fog_indoors==310 && distance==300);M_Keydown(K_ENTER);assert(fog_indoors==540);
+ M_Keydown(K_ENTER);M_Keydown(K_ENTER);assert(fog_indoors==150);M_Keydown(K_ENTER);assert(fog_indoors==300);
+ /* Fog in large rooms (aw_fog_large_rooms): on by default, Enter or an arrow switches */
+ down(1);M_Draw();assert(!strcmp(room_fog_label,"Fog in large rooms: On"));
+ M_Keydown(K_ENTER);M_Draw();assert(fog_large_rooms==0 && !strcmp(room_fog_label,"Fog in large rooms: Off"));
+ M_Keydown(K_RIGHTARROW);assert(fog_large_rooms==1);
  /* Far detail: plain names, Enter and the arrows step Full, Light, Strong,
   * Strong + small faces (aw_cull 1, 3, 4, 6); a console-only value reads Custom. */
- down(1);assert(!strcmp(far_label,"Far detail: Strong") && highlight_y==36+2*19);
+ down(1);assert(!strcmp(far_label,"Far detail: Strong") && highlight_y==36+4*19);
  M_Keydown(K_ENTER);M_Draw();assert(far_detail==6 && !strcmp(far_label,"Far detail: Strong + small faces"));
  M_Keydown(K_ENTER);M_Draw();assert(far_detail==1 && !strcmp(far_label,"Far detail: Full"));
  M_Keydown(K_RIGHTARROW);M_Draw();assert(far_detail==3 && !strcmp(far_label,"Far detail: Light"));
@@ -260,18 +279,22 @@ static void check_video(void){
  M_Keydown(K_RIGHTARROW);assert(far_detail==1);M_Keydown(K_RIGHTARROW);M_Keydown(K_RIGHTARROW);assert(far_detail==4 && far_sets==8);
  down(1);photo_available=0;M_Draw();assert(!strcmp(photo_label,"Photo mode") && photo_colour==114);
  M_Keydown(K_ENTER);assert(key_dest==key_menu && !photo_sets);
- photo_available=1;M_Draw();assert(photo_colour==210 && highlight_y==36+3*19);
+ photo_available=1;M_Draw();assert(photo_colour==210 && highlight_y==36+5*19);
  M_Keydown(K_ENTER);assert(key_dest==key_game && photo_on && photo_sets==1 && !aw_menu_fullscreen());
- open_options();down(4);assert(!strcmp(photo_label,"Leave photo mode")); /* the page is kept */
+ open_options();down(6);assert(!strcmp(photo_label,"Leave photo mode")); /* the page is kept */
  M_Keydown(K_ENTER);assert(key_dest==key_game && !photo_on && photo_sets==2);
- open_options();down(5);M_Keydown(K_ENTER);assert(!frozen_loading); /* Area loading */
+ open_options();down(7);M_Keydown(K_ENTER);assert(!frozen_loading); /* Area loading */
  M_Keydown(K_LEFTARROW);assert(frozen_loading);M_Keydown(K_RIGHTARROW);assert(!frozen_loading);
- click(100,36+4*19+18);assert(frozen_loading); /* final pixel of the loading row */
+ click(100,36+6*19+18);assert(frozen_loading); /* final pixel of the loading row */
  down(1);M_Keydown(K_ENTER);M_Draw();assert(AW_CellChangeMethod()==2);
  down(1);M_Keydown(K_ENTER);assert(AW_StreamOption(1,0)==256);
  M_Keydown(K_RIGHTARROW);assert(AW_StreamOption(1,0)==512);
- down(1);M_Keydown(K_ENTER);M_Draw();assert(autoram==0 && scroll_total==8 && scroll_top==1); /* Extra RAM: Off */
+ down(1);M_Keydown(K_ENTER);M_Draw();assert(autoram==0 && scroll_total==11 && scroll_top==3); /* Extra RAM: Off (11 rows: the indoor fog rows and Tree crowns) */
  M_Keydown(K_RIGHTARROW);assert(autoram==1);M_Keydown(K_LEFTARROW);assert(autoram==0);M_Keydown(K_ENTER);assert(autoram==1);
+ /* Tree crowns, the last row (TREES-DEPTH-56): original (0, the default), fast (1), sprite (2), round again */
+ down(1);assert(tree_crowns==0);M_Keydown(K_ENTER);assert(tree_crowns==1);M_Keydown(K_RIGHTARROW);assert(tree_crowns==2);
+ M_Keydown(K_RIGHTARROW);assert(tree_crowns==0);M_Keydown(K_LEFTARROW);assert(tree_crowns==2);M_Keydown(K_ENTER);
+ assert(tree_crowns==0);
  M_Keydown(K_ESCAPE);M_Keydown(K_ESCAPE);
 }
 /* The title screen: the same panel; Photo mode greyed and inert. */

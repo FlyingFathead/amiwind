@@ -1204,6 +1204,25 @@
       "to": null,
       "source": "tools/build.py, tools/chim/fence.py (ROOM-DECAL-ALPHA-62)",
       "note": "null = off: one face per see-through plane (the method before); mirror = experimental, a mirrored copy of each see-through face (cobwebs, hanging moss and vines) so its back side draws too; the engine route is the console setting aw_seethrough_material 2"
+    },
+    {
+      "version": "0.0.64-dev5",
+      "option": "model_hull",
+      "flag": "--model-hull",
+      "change": "default",
+      "from": "chain",
+      "to": "auto",
+      "source": "config/build-defaults.json (COLLISION-HULL-CHAINS-33, COLLISION-WORLDWIDE-REDUCTION-64)",
+      "note": "routed standing hulls for large models: measured on 10 sample models the worst trace is 5 to 6 times shorter for 0.3 to 1.1 % more collision bytes, the same solid set (standing-box sweep: nothing pushed through, nothing blocked); the chain fallback where a routing does not fit stays"
+    },
+    {
+      "version": "0.0.64-dev5",
+      "option": "chim_hollow_bevels",
+      "flag": "--chim-hollow-bevels",
+      "change": "added",
+      "to": null,
+      "source": "tools/build.py, tools/mesh_geometry_env.py, tools/chim/interior.py (COLLISION-WORLDWIDE-REDUCTION-64)",
+      "note": "null = config/chim-rooms.json hollow_bevels (2: approximate standing bevels on every room's hollow collision plates, as every solid model; the method up to v0.0.64-dev4 was 0, exact on every plate); 0, 1 (exact on near-horizontal plates only) or 2 override it; a room or room type opts back in with its own hollow_bevels; checked by tools/hollow_bevel_sweep.py"
     }
   ],
   "current": {
@@ -1224,7 +1243,7 @@
       "follow_original_stair_rules": true,
       "lava": "quake",
       "min_free_gib": 35,
-      "model_hull": "chain",
+      "model_hull": "auto",
       "npc_face_lod": "all",
       "npc_head_detail": "auto",
       "npc_head_reducer": "locked",
@@ -1259,6 +1278,7 @@
       "chim_fence_twosided_faces": null,
       "chim_fire_light": "on",
       "chim_frame_ext": "chim",
+      "chim_hollow_bevels": null,
       "chim_lighting_type": null,
       "chim_mesh_method": null,
       "chim_model_bevels": null,

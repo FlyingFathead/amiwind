@@ -115,10 +115,20 @@ static void fog_exact_tests(void){
   * at most its cap; an unlisted room, fog off or an exterior keep the 4096 indoor reach. */
  {qboolean was_active=sv.active;char was_name[sizeof sv.name];float was_distance=aw_drawdistance.value;
   memcpy(was_name,sv.name,sizeof was_name);sv.active=1;inside=1;Cvar_SetValue("aw_cull",1);
-  strcpy(sv.name,"rie242a8d69e");aw_drawdistance.value=300;AW_CullBegin();
+  /* indoors the large room follows its own distance (aw_fog_distance_interior, LARGE-ROOM-FOG-SETTING-64), never the
+   * outdoor aw_drawdistance */
+  strcpy(sv.name,"rie242a8d69e");aw_drawdistance.value=1000;Cvar_SetValue("aw_fog_distance_interior",300);AW_CullBegin();
   {vec3_t at={400,0,0},near_at={250,0,0},far_at={3000,0,0};
   assert(AW_LargeRoomDistance()==300 && !AW_ModelVisible(at,10) && AW_ModelVisible(near_at,10));
-  aw_drawdistance.value=700;AW_CullBegin();
+  /* the face cut past the room's fog end (INTERIOR-FAR-BLANK-HEART-64): a box past it is left out whole, above eye
+   * height too (no sky indoors), a nearer one drawn; aw_cull + 32 turns the cut off */
+  assert(point_far(500,0,-50)==AW_FAR_SKIP && point_far(500,0,50)==AW_FAR_SKIP && point_far(200,0,50)==AW_FAR_DRAW);
+  Cvar_SetValue("aw_cull",1+AW_CULL_ROOM_FOG_OFF);AW_CullBegin();
+  assert(point_far(500,0,-50)==AW_FAR_DRAW && AW_LargeRoomDistance()==300);
+  Cvar_SetValue("aw_cull",1);Cvar_SetValue("aw_fog_large_rooms",0);AW_CullBegin();
+  assert(!AW_LargeRoomDistance() && AW_ModelVisible(far_at,10) && point_far(500,0,50)==AW_FAR_DRAW);
+  Cvar_SetValue("aw_fog_large_rooms",1);
+  Cvar_SetValue("aw_fog_distance_interior",700);AW_CullBegin();
   at[0]=500;near_at[0]=400;
   assert(AW_LargeRoomDistance()==450 && !AW_ModelVisible(at,10) && AW_ModelVisible(near_at,10));
   strcpy(sv.name,"rimanor");AW_CullBegin();assert(AW_LargeRoomDistance()==700);
@@ -127,6 +137,7 @@ static void fog_exact_tests(void){
   assert(!AW_LargeRoomDistance() && AW_ModelVisible(far_at,10));Cvar_SetValue("aw_fog",1);}
   inside=0;assert(!AW_LargeRoomDistance());
   sv.active=was_active;memcpy(sv.name,was_name,sizeof was_name);aw_drawdistance.value=was_distance;
+  Cvar_SetValue("aw_fog_distance_interior",300);
   Cvar_SetValue("aw_cull",2);AW_CullBegin();}
  /* A flame farther than full fog moves the test behind it. */
  aw_flame_depth_limit=flame_limit;flame_limit_value=40;AW_CullBegin();

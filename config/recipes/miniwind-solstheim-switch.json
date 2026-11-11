@@ -1,0 +1,19 @@
+{
+  "schema": "build-recipe-1",
+  "name": "miniwind-solstheim-switch",
+  "description": "TEST ONLY. As miniwind-solstheim, with both tree methods in one store (--chim-sol-tree-copies switch): the original trees, and the star crowns as their alternative models, picked in game by aw_tree_crowns (0 original, 1 star); load the frame with map sl0000.",
+  "options": {
+    "miniwind": true,
+    "miniwind_scope": "exterior",
+    "miniwind_description": "Solstheim trees, both methods: Bloodmoon cell -23,20 (map sl0000)",
+    "direct_to_game_map": "balmora",
+    "exclude_unreferenced": "voice,npcs",
+    "chim_frame_ext": "chim",
+    "chim_sol_test": "-23,20:l",
+    "chim_sol_tree_copies": "switch"
+  },
+  "inputs": [],
+  "written_with": null,
+  "checked_with": null,
+  "status": "unverified"
+}

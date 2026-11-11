@@ -970,9 +970,8 @@
     "OpenMW 0.51"
    ],
    "group": "Dialogue",
-   "state": "planned",
-   "amiwind": "",
-   "why": "an interpreter opcode with compiled arguments (a sound, topic, script or message row)"
+   "state": "alias",
+   "amiwind": "aw_mwscript_status call getjournalindex \"<quest>\" (prints the index kept now)"
   },
   {
    "name": "getlevel",
@@ -1109,6 +1108,15 @@
    "group": "Stats",
    "state": "vm",
    "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getpcexpelled",
+   "sources": [
+    "AmiWind"
+   ],
+   "group": "Stats",
+   "state": "alias",
+   "amiwind": "aw_mwscript_status call pcexpelled \"<faction>\" (the read form of PCExpelled: 1 when the player is expelled)"
   },
   {
    "name": "getpcfacrep",
@@ -1536,9 +1544,8 @@
     "OpenMW 0.51"
    ],
    "group": "Dialogue",
-   "state": "planned",
-   "amiwind": "",
-   "why": "an interpreter opcode with compiled arguments (a sound, topic, script or message row)"
+   "state": "alias",
+   "amiwind": "aw_mwscript_status call journal \"<quest>\" <index> (a script's Journal: the dated entry; a lower index is ignored)"
   },
   {
    "name": "lock",
@@ -2820,9 +2827,8 @@
     "OpenMW 0.51"
    ],
    "group": "Dialogue",
-   "state": "planned",
-   "amiwind": "",
-   "why": "an interpreter opcode with compiled arguments (a sound, topic, script or message row)"
+   "state": "alias",
+   "amiwind": "aw_mwscript_status call setjournalindex \"<quest>\" <index> (the index alone, no entry)"
   },
   {
    "name": "setlevel",

@@ -1,6 +1,6 @@
 # AmiWind release workflow
 
-_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
+_Last updated with AmiWind v0.0.64-dev4 (10 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -74,6 +74,14 @@ One commit carries everything that must agree before the build:
   RAM.
 - **The records**, see [the change records](#mandatory-change-records): register, README, changelog, release notes,
   roadmap, the generated indexes.
+- **The progress pages.** Every version commit renders the current state of the scripting tracker and of the
+  [CHIM progress tracker](chim/PROGRESS_TRACKER.md) for its own version, the newest build first: after the tracker
+  ingest, `python3 tools/cell_progress_state.py snapshot --from <tracker data>/cell-progress.json`, then
+  `python3 tools/cell_progress_state.py render` and `python3 tools/doc_toc.py write`; beside it
+  `python3 tools/mwscript_features.py measure --data-files <game data> --version <VERSION>` for the
+  [MWScript features](MWSCRIPT_FEATURES.md). The preflight refuses a version whose progress page block differs from a
+  fresh render, and a page that the release notes or the changelog link to when only its last-updated line changed and
+  its generated block lags (`python3 tools/release_linked_pages.py list` prints those pages for the docs review).
 - **The release notes** `docs/releases/notes/RELEASE-v<version>.md`, with the title word for word as the maintainer
   gave it, a "Known in this build" section whose entries link register pages, and the whitespace baseline
   `docs/releases/patches/PATCH-v<version>.json`.

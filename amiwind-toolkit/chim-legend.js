@@ -181,6 +181,14 @@
   function stripState(o) {
     if (o.error) return {dot: 'red', label: 'load error'};
     if (o.finished) return {dot: 'grey', label: 'final'};
+    // TOOLKIT-STATUS-STALE-BY-CLOCK-64: data from a delivered build is judged against the newest delivered build, not against the
+    // clock: current when the tracker data covers it, stale only when a newer delivered build is not in it. (A build that is
+    // running now, o.live, keeps the live rule below.)
+    if (o.newest && o.ingested && !o.live) {
+      const v = x => String(x).replace(/^v/, '');
+      return v(o.newest) === v(o.ingested) ? {dot: 'green', label: 'current (v' + v(o.ingested) + ')'}
+        : {dot: 'amber', label: 'stale: newer build v' + v(o.newest) + ' not ingested'};
+    }
     if (!o.auto) return {dot: 'grey', label: 'auto-update off'};
     if (o.updated == null) return {dot: 'amber', label: 'waiting for data'};
     return o.now - o.updated <= 2 * o.interval ? {dot: 'green', label: 'live'} : {dot: 'amber', label: 'stale'};

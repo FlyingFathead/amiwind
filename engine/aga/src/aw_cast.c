@@ -448,6 +448,15 @@ static void cast_now(void){
     if(ranges&(1<<AW_RANGE_TARGET)){launch();AW_MagicCastLook(first_mgef(AW_RANGE_TARGET),AW_RANGE_TARGET,0,0);}
 }
 
+/* one carried item of AW_InventoryCarried: a Magic Items row when it can be cast (AW_MagicSelectable) */
+static void window_item(void *ctx,int state_row,const aw_inventory_item_t *it,int file_row){
+    aw_magic_list_t *out=(aw_magic_list_t *)ctx;(void)file_row;
+    if(!it || out->count>=32 || !AW_MagicSelectable(it) || AW_ITEM_ROW(&aw_state,state_row)->value<=0)return;
+    Q_strncpy(out->name[out->count],(char *)(it->name[0]?it->name:it->id),47);out->name[out->count][47]=0;
+    out->power[out->count]=2;out->kind[out->count]=2;out->index[out->count]=state_row;
+    if(sel_index<0 && aw_state.magic.selected[0] && !strcmp(aw_state.magic.selected,it->id))out->selected=out->count;
+    out->count++;
+}
 /* the Magic window (aw_statswin.c): the spells and powers the player knows, the made spells, the selection */
 static int window_castables(aw_magic_list_t *out){
     aw_actor_t *p=AW_ActorPlayer();int known[64],n=p?AW_ActorSpells(p,known,64):0,i,type,cost;char name[32];
@@ -466,11 +475,30 @@ static int window_castables(aw_magic_list_t *out){
         if(sel_kind==1 && sel_index==i)out->selected=out->count;
         out->count++;
     }
+    /* SCROLL-CAST-64: the Magic Items (OpenMW 0.51 spellmodel.cpp: every carried item whose enchantment is Cast Once
+     * or Cast When Used), from one pass over the item file as the inventory window opens it */
+    if(out->count<32)AW_InventoryCarried(window_item,out);
     if(out->selected>=0)out->cursor=out->selected;
     return out->count;
 }
-static void window_select(int kind,int index){AW_CastSelect(kind,index);}
+static void window_select(int kind,int index){
+    if(kind==2){   /* a magic item: its row in the player's item table */
+        aw_inventory_item_t it;
+        if(index<0 || index>=AW_ItemCount(&aw_state) || !AW_InventoryRead(AW_ITEM_ID(&aw_state,index),&it) ||
+           !AW_MagicSelect(&aw_state,&it)){say("Cannot select that item.");return;}
+        sel_kind=-1;sel_index=-1;memset(&spell,0,sizeof(spell));   /* an item or a spell, never both */
+        Q_strncpy(item_seen,aw_state.magic.selected,sizeof(item_seen)-1);item_seen[sizeof(item_seen)-1]=0;
+        return;
+    }
+    AW_CastSelect(kind,index);
+}
 static int window_status(char *out,int size){
+    aw_inventory_item_t it;
+    if(!spell.valid && AW_MagicSelectedItem(&it)){
+        if(it.enchant_kind==AW_ENCH_ONCE)Q_snprintf(out,size,"%s: cast once, %d carried",it.name,(int)AW_StateGet(&aw_state,AW_ITEM,it.id));
+        else Q_snprintf(out,size,"%s: charge %.0f of %.0f",it.name,AW_MagicCharge(&aw_state,&it),it.charge_max);
+        return 1;
+    }
     if(!spell.valid)return 0;
     Q_snprintf(out,size,"%s: cost %d, chance %.0f %%",spell.name,spell.cost,AW_CastChanceNow());
     return 1;

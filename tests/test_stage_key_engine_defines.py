@@ -61,7 +61,7 @@ class EngineDefineKeyTests(unittest.TestCase):
     def test_combat_counts_as_its_slots_value(self):
         for script, key in self.keys.items():
             with self.subTest(script=script):
-                self.assertTrue(str(key[COMBAT]).startswith(engine_facts.PREFIXES[4] + engine_facts.DEFINES_TAG))
+                self.assertTrue(str(key[COMBAT]).startswith(engine_facts.PREFIX + engine_facts.DEFINES_TAG))
                 self.assertNotIn('engine/aga/src/aw_combat.h', key if script != 'chim_build.py' else ())
         rows = engine_facts.define_rows((ROOT / COMBAT).read_text(encoding='utf-8'), {('SLOTS', 'define')})
         self.assertEqual(int(rows[0][2]), engine_limits.define('aw_combat.c', 'SLOTS'))

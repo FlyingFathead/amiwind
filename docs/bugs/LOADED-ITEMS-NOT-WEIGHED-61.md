@@ -137,7 +137,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - DROP-STACK-ONE-ROW-PER-UNIT-59 (no report page): Dropping a stack drops one piece per key press, each its own ground item, so the map's ground item limit (32) fills with single coins
 - [DROPPED-LIGHT-NO-EFFECTS-61](DROPPED-LIGHT-NO-EFFECTS-61.md): A carriable light that is dropped shows no flame and gives no light where it lies
 - [ENCUMBRANCE-INCOMPLETE-61](ENCUMBRANCE-INCOMPLETE-61.md): Carry weight is only half there: no burden shown, no message over the limit, Burden and Feather do nothing, and the kinds of item are capped
-- ENDGAME-CHAMBER-COLLAPSE-63 (no report page): The ending in the Heart Chamber cannot play: the heart is not placed and the collapse is not animated
+- ENDGAME-CHAMBER-COLLAPSE-63 (no report page): The ending in the Heart Chamber cannot play: the heart cannot play its death animation and the chamber's collapse is not animated
 - ENEMY-HEALTH-BAR-62 (no report page): In a fight with a cliff racer the HUD shows no enemy health bar
 - [ENGINE-ANGLEMOD-RANGE-35](ENGINE-ANGLEMOD-RANGE-35.md): anglemod returned 360 for -360 and passed NaN and out-of-range values on
 - [ENGINE-QC-ARGS-SYSERROR-35](ENGINE-QC-ARGS-SYSERROR-35.md): Bad QuakeC sound arguments stopped the program; lightstyle had no range check
@@ -214,6 +214,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - SCRIPT-LOOP-SOUND-DISABLED-OBJECT-61 (no report page): A looping script sound keeps playing after a script disables its object
 - [SCRIPTED-EVENT-FALLING-MAGE-61](SCRIPTED-EVENT-FALLING-MAGE-61.md): The falling mage north of Seyda Neen does not fall: he is in the world from the start and his scripted fall does not run
 - [SCRIPTED-EVENT-PAST-DRAW-DISTANCE-62](SCRIPTED-EVENT-PAST-DRAW-DISTANCE-62.md): The falling mage near Seyda Neen plays out past the default draw distance: on his platform and for most of his fall he is too far up to be drawn from anywhere the player can stand when his event starts
+- SCROLL-CAST-MISSING-64 (no report page): Scrolls cannot be cast: a scroll opens like a book and its spell never takes effect
 - [SERVER-FRAME-ARRIVAL-33](SERVER-FRAME-ARRIVAL-33.md): The server frame costs about 226 ms per frame at the Balmora arrival camera on a slow 68040
 - SERVICE-REFUSAL-UNCLOTHED-60 (no report page): Arrille refuses to barter at disposition 80 (player without clothes)
 - SKILL-BOOKS-MISSING-62 (no report page): Reading a skill book does not raise its skill: the original raises it by one on the first read

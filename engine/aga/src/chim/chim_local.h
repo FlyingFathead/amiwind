@@ -226,6 +226,8 @@ int Chim_PackOpen (chim_pack_t *pack, const char *relative);
  * or while a CHIM map runs; a different store drops the resident index, every
  * kept model and texture and the read-ahead blocks (ids are per store). */
 const char *Chim_Store (void);
+/* the model id a placement draws with under aw_tree_crowns (the store's alt-models.bin; BASE when none) */
+unsigned Chim_AltModel (unsigned base);
 int Chim_StoreSelect (const char *name);
 void Chim_PackClose (chim_pack_t *pack);
 int Chim_PackRead (chim_pack_t *pack, long offset, void *out, long bytes);

@@ -17,6 +17,7 @@ its units were stored with before, but only while the code that makes the unit i
 bake-reach digest in the table), so a stored unit is never taken for code that changed. A hit is stored under the
 current key (pass_cache.PassCache.load does that for every previous key).
 """
+import re
 import time
 
 # (unit cache name, bake-reach sources digest) -> whole-file sources digests its units were stored under.
@@ -78,16 +79,174 @@ WORK_PLACE_SETTINGS = ('AMIWIND_RESIDENT_WORK',)
 # in this module would count as files its users' code reads, and so as part of their keys.)
 
 
+# Settings a unit's code can only hold, never read (BUILD-UNIT-KEYS-REACH-64). The AMIWIND_* names in a unit key were
+# every name its reach holds as text, and a module's top-level constants (MODEL_HULL_VARIABLE, the model hull
+# setting's name) are import-time code of every function of that module: every NPC, creature and player-body bake that
+# imports mesh_geometry_env keyed the model hull setting, which only the collision code reads, so the v0.0.64-dev5 change of
+# its default (chain -> auto) would have baked them all again. A name now counts only when the reached code names it:
+# the setting text itself outside such a constant, or the constant's name. Units stored under the older form are
+# looked up under it (the full set, with an unread setting at each value in SETTING_VALUES or unset).
+# (The names are put together when this module runs: a setting name written in this module, even as two joined
+# literals, would count as a setting every user of the unit caches reads, and a bare prefix as every setting.)
+SETTING_PREFIX = ''.join(('AMIWIND', chr(95)))
+SETTING_VALUES = {SETTING_PREFIX + 'MODEL' + chr(95) + 'HULL': ('auto', 'chain', 'routed', 'balanced', 'compiled')}
+SETTING_TEXT = re.compile(re.escape(SETTING_PREFIX) + r'[A-Z0-9_]+')
+
+
+
+# Decorators that only wrap a function (they run nothing of its body on import and register it nowhere): such a
+# function is import-time code in a unit reach (build_cache '<top>'), but its body runs only when something calls it.
+WRAPPING_DECORATORS = frozenset({'contextmanager', 'contextlib.contextmanager', 'staticmethod', 'property',
+                                 'lru_cache', 'functools.lru_cache', 'cache', 'functools.cache'})
+
+
+def _code_only(source, tree):
+    """SOURCE with its comments and docstrings blanked (same positions; a docstring becomes 0): text that names a
+    setting or a constant there reads nothing."""
+    import ast
+    import io
+    import tokenize
+    lines = source.splitlines(keepends=True)
+
+    def blank(start, end, keep=''):
+        (row, col), (end_row, end_col) = start, end
+        for number in range(row, end_row + 1):
+            line = lines[number - 1]
+            first = col if number == row else 0
+            last = end_col if number == end_row else len(line.rstrip('\r\n'))
+            filler = (keep + ' ' * (last - first))[:last - first] if number == row else ' ' * (last - first)
+            lines[number - 1] = line[:first] + filler + line[last:]
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and node.body:
+            first = node.body[0]
+            if (isinstance(first, ast.Expr) and isinstance(first.value, ast.Constant)
+                    and isinstance(first.value.value, str)):
+                blank((first.lineno, first.col_offset), (first.end_lineno, first.end_col_offset), '0')
+    try:
+        for token in tokenize.generate_tokens(io.StringIO(source).readline):
+            if token.type == tokenize.COMMENT:
+                blank(token.start, token.end)
+    except (tokenize.TokenError, SyntaxError):
+        pass
+    return lines
+
+
+def unread_settings(names, entries, root=None):
+    """The settings of NAMES the code of ENTRIES [(path, function or None for the whole script)] never reads: not
+    among the names its reach holds at all, or held only as a top-level `CONSTANT = <setting name>` whose CONSTANT no
+    reached code names (a reached function or table, a wrapped function once named, every other top-level statement;
+    comments and docstrings left out), with the setting written nowhere else in that code. A module the reach reads
+    whole (all its units) counts every line. Empty when the reach is uncertain (every name counts)."""
+    import ast
+    from pathlib import Path
+    from build_cache import ENV_ANY, SourceIndex, STAGE_TOP_FORMAT
+    root = Path(root) if root else Path(__file__).resolve().parents[1]
+    index = SourceIndex(root, top_format=STAGE_TOP_FORMAT)
+    try:
+        keyed = [(Path(path).resolve().relative_to(root.resolve()).as_posix(), function) for path, function in entries]
+    except ValueError:
+        return set()
+    python, _, uncertain, held_names, units = index.keyed_coverage(keyed)
+    if uncertain or ENV_ANY in held_names:
+        return set()
+    pieces, holders, lazy = [], {}, []
+    for path in sorted(python):
+        try:
+            source = (root / path).read_text(encoding='utf-8')
+            tree = ast.parse(source)
+        except (OSError, UnicodeDecodeError, SyntaxError):
+            return set()
+        lines = _code_only(source, tree)
+        reached = set(units.get(path) or ())
+        whole = not reached or set(index._module_symbols(path)['units']) <= reached
+        for statement in tree.body:
+            first = min([statement.lineno] + [d.lineno for d in getattr(statement, 'decorator_list', ())])
+            text = ''.join(lines[first - 1:statement.end_lineno])
+            if (isinstance(statement, ast.Assign) and len(statement.targets) == 1
+                    and isinstance(statement.targets[0], ast.Name) and isinstance(statement.value, ast.Constant)
+                    and isinstance(statement.value.value, str) and SETTING_TEXT.fullmatch(statement.value.value)):
+                holders.setdefault(statement.value.value, []).append(statement.targets[0].id)
+                continue
+            if whole:
+                pieces.append(text)
+            elif isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                decorators = [ast.unparse(d.func if isinstance(d, ast.Call) else d) for d in statement.decorator_list]
+                if not decorators:
+                    if statement.name in reached:
+                        pieces.append(text)
+                elif all(name in WRAPPING_DECORATORS for name in decorators):
+                    lazy.append((statement.name, text))
+                else:
+                    pieces.append(text)          # a decorator that runs code on import: counts
+            elif (isinstance(statement, ast.Assign) and len(statement.targets) == 1
+                  and isinstance(statement.targets[0], ast.Name)
+                  and isinstance(statement.value, (ast.Dict, ast.List, ast.Tuple, ast.Set))):
+                if statement.targets[0].id in reached or not _literal(statement.value):
+                    pieces.append(text)          # a literal table counts when reached (build_cache lazy_tables)
+            else:
+                pieces.append(text)              # imports, classes, statements: import-time code
+    everything = '\n'.join(pieces)
+    # a function whose decorator only wraps it runs when called: its body counts once reached code names it
+    waiting = list(lazy)
+    while waiting:
+        named = [row for row in waiting if re.search(r'\b%s\b' % re.escape(row[0]), everything)]
+        if not named:
+            break
+        everything += '\n' + '\n'.join(text for _, text in named)
+        waiting = [row for row in waiting if row not in named]
+    unread = {setting for setting in names if setting not in held_names}
+    for setting in set(names) & set(held_names):
+        constants = holders.get(setting)
+        if not constants or setting in everything:
+            continue
+        if any(re.search(r'\b%s\b' % re.escape(constant), everything) for constant in constants):
+            continue
+        unread.add(setting)
+    return unread
+
+
+def _literal(node):
+    import ast
+    try:
+        ast.literal_eval(node)
+    except (ValueError, TypeError, SyntaxError, MemoryError, RecursionError):
+        return False
+    return True
+
+
+
+def keyed_environment(environment, entries, root=None):
+    """(the settings of ENVIRONMENT a unit key counts, [older environments to look stored units up under]) for the code
+    of ENTRIES (unread_settings). No unread setting: (ENVIRONMENT, [])."""
+    unread = unread_settings(set(environment), entries, root) if entries else set()
+    if not unread:
+        return environment, []
+    keyed = {name: value for name, value in environment.items() if name not in unread}
+    # the full set as the older form keyed it; then each unread setting at another value, or not yet named (a setting
+    # new in the code: absent from the older keys); then every unread setting that is unset left out at once
+    # (each also with every unread unset setting left out: one setting changed while others are new)
+    unset = {key: value for key, value in environment.items() if not (key in unread and value is None)}
+    older = []
+    for base in (dict(environment), unset):
+        variants = [base]
+        for name in sorted(unread):
+            variants += [dict(base, **{name: value}) for value in SETTING_VALUES.get(name, ()) + (None,)]
+            variants.append({key: value for key, value in base.items() if key != name})
+        older += [variant for variant in variants if variant not in older]
+    return keyed, older
+
+
 def legacy_sources(name, sources):
     """The older whole-file keys under which units of cache NAME with the bake-reach digest SOURCES were stored."""
     return tuple(LEGACY_SOURCES.get((name, sources), ()))
 
 
-def bake_keyed_cache(name, options, sources, previous, files, covered=(), neutral=()):
+def bake_keyed_cache(name, options, sources, previous, files, covered=(), neutral=(), entries=None):
     """The unit cache NAME keyed on SOURCES (the digest of what its workers run), or None when the cache is off.
     OPTIONS as UnitCache.open makes them: the caller's options with the AMIWIND_* settings that FILES read, less the
-    NEUTRAL ones (WORK_PLACE_SETTINGS); PREVIOUS: older key forms (pass_cache.previous_digests) with the
-    LEGACY_SOURCES keys added."""
+    NEUTRAL ones (WORK_PLACE_SETTINGS) and, given ENTRIES (the (path, function) SOURCES digests), less the settings
+    that code never reads (keyed_environment; stored units are looked up under the full set too); PREVIOUS: older key
+    forms (pass_cache.previous_digests) with the LEGACY_SOURCES keys added."""
     import pass_cache
     root = pass_cache.folder()
     if root is None:
@@ -95,8 +254,10 @@ def bake_keyed_cache(name, options, sources, previous, files, covered=(), neutra
     environment = pass_cache.environment(*files)
     for setting in neutral:
         environment.pop(setting, None)
-    return pass_cache.UnitCache(name, dict(options, environment=environment), sources, root,
-                                previous=tuple(previous) + legacy_sources(name, sources), covered=covered)
+    keyed, older = keyed_environment(environment, entries) if entries else (environment, [])
+    return pass_cache.UnitCache(name, dict(options, environment=keyed), sources, root,
+                                previous=tuple(previous) + legacy_sources(name, sources), covered=covered,
+                                previous_options=[dict(options, environment=value) for value in older])
 
 
 class Failed:

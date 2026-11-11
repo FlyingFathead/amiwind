@@ -147,7 +147,7 @@ def base_manifests(osxz, cache, jobs):
     return m
 
 
-def evaluate(base, new, boot_base, boot_new, data_files, read, allow, hdf_sha, input_shas, words, version):
+def evaluate(base, new, boot_base, boot_new, data_files, read, allow, hdf_sha, input_shas, words, version, variant='full'):
     """The checks themselves, on manifests; `read(part, path)` returns a file's bytes. Returns (failures, changes)."""
     fails, changes = [], []
 
@@ -234,13 +234,16 @@ def evaluate(base, new, boot_base, boot_new, data_files, read, allow, hdf_sha, i
             fails.append('data: %s is not the AmiWind image of this build' % path)
         if size in (262144, 524288):
             fails.append('data: Kickstart-sized file %s' % path)
-    if not any(p.lower().endswith('.hdf') for p in data_files):
-        fails.append('data: no AmiWind image on AMIWIND')
+    has_hdf = any(p.lower().endswith('.hdf') for p in data_files)
+    if variant == 'full' and not has_hdf:
+        fails.append('data: no AmiWind image on AMIWIND (full image)')
+    if variant == 'slim' and has_hdf:
+        fails.append('data: an AmiWind image on AMIWIND (slim image carries none)')
     return fails, changes
 
 
 def check_image(img, base_meta=None, spec=None, downloads=None, hdf_sha='', version='', extra_words=None, work=None,
-                jobs=8, cache=None):
+                jobs=8, cache=None, variant='full'):
     img = Path(img)
     work = Path(work or img.parent / 'scrub')
     spec = spec or json.loads((HERE / 'inputs.json').read_text())
@@ -286,7 +289,8 @@ def check_image(img, base_meta=None, spec=None, downloads=None, hdf_sha='', vers
 
     input_shas = {e['sha256'] for e in spec['packages']}
     fails, changes = evaluate({k: tuple(v) for k, v in base['root'].items()}, {k: tuple(v) for k, v in new.items()},
-                              base['boot'], boot_new, data_files, read, allow, hdf_sha, input_shas, words, version)
+                              base['boot'], boot_new, data_files, read, allow, hdf_sha, input_shas, words, version,
+                              variant)
     if dvol.label() != 'AMIWIND':
         fails.append('data: the drive label is %r, not AMIWIND' % dvol.label())
     shutil.rmtree(tree)
@@ -301,11 +305,12 @@ def main(argv=None):
     p.add_argument('--hdf-sha256', required=True)
     p.add_argument('--version', required=True)
     p.add_argument('--extra-words')
+    p.add_argument('--pi-image', choices=('full', 'slim'), default='full')
     p.add_argument('--work')
     p.add_argument('--jobs', type=int, default=8)
     a = p.parse_args(argv)
     r = check_image(a.image, downloads=a.downloads, hdf_sha=a.hdf_sha256, version=a.version, extra_words=a.extra_words,
-                    work=a.work, jobs=a.jobs)
+                    work=a.work, jobs=a.jobs, variant=a.pi_image)
     print(json.dumps({k: v for k, v in r.items() if k != 'changes'}, indent=1))
     print('%s: %d changes' % (r['result'], len(r['changes'])))
     return 0 if r['result'] == 'PASS' else 1

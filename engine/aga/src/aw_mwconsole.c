@@ -57,6 +57,12 @@ static const alias_t aliases[]={
     {"tcs","togglecombatstats","toggle aw_combat_readout",0},  /* the combat rolls on the console */
     {"tl","togglelights","toggle r_fullbright",0},       /* the lighting off and on (Quake's full-bright drawing) */
     {"repairedonme",NULL,"echo 0",0},                    /* OpenMW 0.51 OpRepairedOnMe: always 0 */
+    /* v0.0.64 (CONSOLE-QUEST-READS-64): the journal as typed, through the same host route a script's Journal and
+     * SetJournalIndex take (aw_mwhost.c status "call journal"); the reads print the index kept now */
+    {"journal",NULL,"aw_mwscript_status call journal \"%1\" %2",0},
+    {"setjournalindex",NULL,"aw_mwscript_status call setjournalindex \"%1\" %2",0},
+    {"getjournalindex",NULL,"aw_mwscript_status call getjournalindex \"%1\"",0},
+    {"getpcexpelled",NULL,"aw_mwscript_status call pcexpelled \"%1\"",0},   /* the read form of PCExpelled */
 };
 #define NALIAS ((int)(sizeof(aliases)/sizeof(aliases[0])))
 const char *AW_MwConsoleAlias(int n,const char **amiwind){

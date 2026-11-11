@@ -1,12 +1,12 @@
 # The original game's console commands in AmiWind
 
-_Last updated with AmiWind v0.0.63-dev3 (9 November 2026)._
+_Last updated with AmiWind v0.0.64-dev4 (11 November 2026)._
 
 Debug steps written for the original game work in AmiWind's console as typed: an original console command that does not clash with one of AmiWind's runs AmiWind's own command for the same job, or runs through the game's script interpreter as a script line would. The names are matched without regard to case, the short and long forms alike (tgm and ToggleGodMode). A line may name its target first (player->SetStrength 50); arguments are separated by spaces or commas, and an id with spaces goes in quotes. These names are not listed in dbg help; dbg help mw (or dbg mw help) lists them page by page. A line without a target runs on the console target, chosen with dbg mw target from a list of the references on the map (typed to filter by name, id or kind, nearest first; the input line shows it), or on the player when none is chosen. Item and spell ids are found in the actor table (what an actor carries or a script names), so such a line may take a moment.
 
 With thanks to the UESP for its Morrowind:Console page (https://en.uesp.net/wiki/Morrowind:Console), which lists the original's commands; the list here is also checked against OpenMW 0.51.
 
-391 commands: 18 alias, 282 vm, 3 collision, 75 planned, 13 not applicable.
+392 commands: 22 alias, 282 vm, 3 collision, 72 planned, 13 not applicable.
 
 Very high values of Speed or Acrobatics (SetSpeed, SetAcrobatics) make the player hard to control, as in the original.
 
@@ -128,7 +128,7 @@ These names are AmiWind's own commands; AmiWind's meaning is kept.
 | getintelligence |  | Stats | works (run as a script line) | the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target |
 | getinterior |  | Cell | works (run as a script line) | the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target |
 | getitemcount |  | Container | works (run as a script line) | the MWScript host (aw_mwhost.c host_item), on any reference by id-> or the console target |
-| getjournalindex |  | Dialogue | planned | an interpreter opcode with compiled arguments (a sound, topic, script or message row) |
+| getjournalindex |  | Dialogue | works (AmiWind's own command) | aw_mwscript_status call getjournalindex "<quest>" (prints the index kept now) |
 | getlevel |  | Stats | works (run as a script line) | the MWScript host by the compiler's function table (host_actor), on any reference by id-> or the console target |
 | getlightarmor |  | Stats | works (run as a script line) | the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target |
 | getlineofsight |  | Ai | works (run as a script line) | the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target |
@@ -144,6 +144,7 @@ These names are AmiWind's own commands; AmiWind's meaning is kept.
 | getmysticism |  | Stats | works (run as a script line) | the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target |
 | getpccell |  | Cell | planned | an interpreter opcode with compiled arguments (a sound, topic, script or message row) |
 | getpccrimelevel |  | Stats | works (run as a script line) | the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target |
+| getpcexpelled |  | Stats | works (AmiWind's own command) | aw_mwscript_status call pcexpelled "<faction>" (the read form of PCExpelled: 1 when the player is expelled) |
 | getpcfacrep |  | Stats | works (run as a script line) | the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target |
 | getpcinjail |  | Misc | works (run as a script line) | the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target |
 | getpcjumping |  | Misc | works (run as a script line) | the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target |
@@ -190,7 +191,7 @@ These names are AmiWind's own commands; AmiWind's meaning is kept.
 | hurtcollidingactor |  | Misc | works (run as a script line) | the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target |
 | hurtstandingactor |  | Misc | works (run as a script line) | the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target |
 | iswerewolf |  | Stats | works (run as a script line) | the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target |
-| journal |  | Dialogue | planned | an interpreter opcode with compiled arguments (a sound, topic, script or message row) |
+| journal |  | Dialogue | works (AmiWind's own command) | aw_mwscript_status call journal "<quest>" <index> (a script's Journal: the dated entry; a lower index is ignored) |
 | lock |  | Misc | works (run as a script line) | the MWScript host by the compiler's function table (host_object), on any reference by id-> or the console target |
 | loopgroup |  | Animation | works (run as a script line) | the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target |
 | lowerrank |  | Stats | works (run as a script line) | the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target |
@@ -330,7 +331,7 @@ These names are AmiWind's own commands; AmiWind's meaning is kept.
 | sethello |  | Ai | works (run as a script line) | the MWScript host by the compiler's function table (host_actor), on any reference by id-> or the console target |
 | setillusion |  | Stats | works (run as a script line) | the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target |
 | setintelligence |  | Stats | works (run as a script line) | the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target |
-| setjournalindex |  | Dialogue | planned | an interpreter opcode with compiled arguments (a sound, topic, script or message row) |
+| setjournalindex |  | Dialogue | works (AmiWind's own command) | aw_mwscript_status call setjournalindex "<quest>" <index> (the index alone, no entry) |
 | setlevel |  | Stats | works (AmiWind's own command) | dbg setlvl <n> (the player) |
 | setlightarmor |  | Stats | works (run as a script line) | the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target |
 | setlongblade |  | Stats | works (run as a script line) | the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target |

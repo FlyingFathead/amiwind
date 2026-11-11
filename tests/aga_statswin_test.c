@@ -120,11 +120,14 @@ static int fake_castables(aw_magic_list_t *out){
     strcpy(out->name[0],"Ancestor Guardian");out->power[0]=1;out->kind[0]=0;out->index[0]=2;
     strcpy(out->name[1],"Fire Bite");out->power[1]=0;out->kind[1]=0;out->index[1]=324;
     strcpy(out->name[2],"My Spell");out->power[2]=0;out->kind[2]=1;out->index[2]=0;
-    out->count=3;out->selected=-1;return 3;
+    /* SCROLL-CAST-64: a carried Cast Once scroll, under Magic Items (kind 2, its item table row) */
+    strcpy(out->name[3],"Almsivi Intervention");out->power[3]=2;out->kind[3]=2;out->index[3]=7;
+    out->count=4;out->selected=-1;return 4;
 }
 static void fake_select(int kind,int index){chosen_kind=kind;chosen_index=index;}
 static int fake_status(char *out,int size){
     if(chosen_index<0)return 0;
+    if(chosen_kind==2){snprintf(out,(size_t)size,"Almsivi Intervention: cast once, 1 carried");return 1;}
     snprintf(out,(size_t)size,"%s: cost 6, chance 16 %%",chosen_kind?"My Spell":"Fire Bite");return 1;
 }
 static int standing_calls;
@@ -246,6 +249,13 @@ int main(void){
     {int y=find("My Spell")->y;assert(panel_key(K_MOUSE1,20,y+1));}
     assert(chosen_kind==1 && chosen_index==0);
     draw();assert(find("* My Spell") && find("Fire Bite") && find("My Spell: cost 6, chance 16 %"));
+    /* SCROLL-CAST-64: the scroll is listed under Magic Items (no None there) and a click selects it */
+    assert(find("Almsivi Intervention") && find("Almsivi Intervention")->y>find("Magic Items")->y);
+    for(i=j=0;i<text_count;i++)if(!strcmp(texts[i].value,"None"))j++;
+    assert(j==0);
+    {int y=find("Almsivi Intervention")->y;assert(panel_key(K_MOUSE1,20,y+1));}
+    assert(chosen_kind==2 && chosen_index==7);
+    draw();assert(find("* Almsivi Intervention") && find("Almsivi Intervention: cast once, 1 carried"));
     assert(!panel_key('o',0,0));panel_closed();
     aw_magic_castables=NULL;aw_magic_select=NULL;aw_magic_status=NULL;
     /* FACTION-STATS-PAGE-64: the standing, read once per opening (a fake of aw_dialwin.c's filler): the member

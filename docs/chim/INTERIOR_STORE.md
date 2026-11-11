@@ -1,6 +1,6 @@
 # Interiors on CHIM: CHIM rooms on a shared store
 
-_Last updated with AmiWind v0.0.54-dev1 (27 October 2026)._
+_Last updated with AmiWind v0.0.64-dev3 (10 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -102,7 +102,10 @@ MiniWind A/B (below) is next.
   decided by the maintainer on 28 October 2026 after the in-game A/B: frame time on the Pit's floor and upper ring
   17.4 / 27.5 ms for type 0, 14.5 / 23.2 for type 1, 13.9 / 18.0 for type 2; a lossless planar merge of the bowl
   measured equal to type 1 and is not built)
-  picks the record the door loads, so only that type's models take memory.
+  picks the record the door loads, so only that type's models take memory. Akulakhan's Chamber (the Heart Chamber,
+  room `rifa4ef181ed`) is built in three types picked by the same setting, for the standing bevels of its hollow collision
+  plates (the room setting `hollow_bevels`): 0 exact on every plate (the earlier method, too large for 32 MB Fast),
+  1 exact on the near-horizontal plates and approximate on the walls, 2 approximate everywhere, as every solid model.
 - Switching between the exterior store and the interior store drops the kept models. A per-store cache for machines
   with 64 to 128 MB is a follow-up.
 

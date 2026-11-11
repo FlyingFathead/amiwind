@@ -135,5 +135,6 @@ Family: Rendering cost and visibility (`render-performance`). Read the visibilit
 Related bugs in other categories:
 
 - [CHIM-TERRAIN-HULL-BEVELS-33](CHIM-TERRAIN-HULL-BEVELS-33.md): A standing box rests above the ground at convex CHIM terrain edges
+- [COLLISION-DISPARITY-WORLDWIDE-64](COLLISION-DISPARITY-WORLDWIDE-64.md): Collision data is far larger and deeper than the drawn meshes across the game
 
 <!-- END GENERATED CATEGORY -->

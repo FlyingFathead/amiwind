@@ -3222,7 +3222,8 @@ def finalize_image(args):
             # after the base frame-map heap check (it reads every frame map against the base world); the layer's
             # frame heap is its own stage's (run/chim-sol/chim-heap.json)
             from chim.sol_test import install as install_chim_sol
-            sol = install_chim_sol(args.chim_sol_world, boot/'id1', hand_metadata['worldspawn_fields'])
+            alternatives = [tuple(a.split('=', 1)) for a in (getattr(args, 'chim_sol_alt', None) or [])]
+            sol = install_chim_sol(args.chim_sol_world, boot/'id1', hand_metadata['worldspawn_fields'], alternatives)
             (out/'chim-sol-image.json').write_text(json.dumps(sol, indent=1, sort_keys=True)+'\n', encoding='utf-8',
                                                    newline='\n')
         # frame maps the gate marked 32 MB itself (over the 16 MB budget by this exact check, not by the CHIM stage's
@@ -3678,6 +3679,9 @@ def main():
                    help='TEST BUILDS ONLY (tools/build.py --chim-sol-test): the Bloodmoon layer\'s CHIM world '
                         '(run/chim-sol) into the image as the store chimsol, one frame map sol<cell> per '
                         'frame (tools/chim/sol_test.py); off by default')
+    i.add_argument('--chim-sol-alt', action='append', default=None, metavar='METHOD=WORLD',
+                   help='TEST BUILDS ONLY, with --chim-sol-world: another build of the same Solstheim frames whose models '
+                        'go into the store as the alternative models of aw_tree_crowns METHOD (tools/chim/alt_models.py)')
     i.add_argument('--chim-region-actors', choices=('off', 'on'), default='off',
                    help='EXPERIMENTAL: the CHIM region frame maps place every exterior NPC and creature reference of '
                         'their cells at its authored spot, grounded as the towns\' residents '

@@ -162,6 +162,7 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - SESSION-PASS-DEAD-ENGINE-57 (no report page): The scripted test session reported PASS while the engine had crashed
 - SESSION-STALL-CENSUS-QUICKSTART-58 (no report page): On the v0.0.58-dev6 image a session that quick-starts into the Census and Excise Office at 135 172 64 stalls before its first still: the runner reports game stalled with the game clock frozen at 23.23 s
 - [SMOKE-DELIVERY-OLD-COPY-58](SMOKE-DELIVERY-OLD-COPY-58.md): The playtest delivery ran an old copy of the boot smoke: the v0.0.58 release smoke failed four times on a working image
+- SMOKE-END-CONSOLE-TOGGLE-OUTSIDE-PLAY-64 (no report page): A scripted session whose last step closes the console is judged as ended outside play while the game is in play
 - SMOKE-IDE-TRACE-LOG-63 (no report page): The gate smoke runs the emulator with its IDE trace log on, about 41 MB per two-minute run
 - SMOKE-INPLAY-UNSAMPLED-63 (no report page): The boot smoke never examines a stop where the game does not get into play after a load
 - SMOKE-KEY-DURING-LOGO-52 (no report page): The engine smoke can type its console command while the logo is still up: the m of map is the logo s not-now key for the extra Fast RAM, so the start runs without the CHIM cache and the 32 MB zone check fails falsely
@@ -186,6 +187,7 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - [TEST-PARALLEL-ORDER-FLAKY-36](TEST-PARALLEL-ORDER-FLAKY-36.md): test_processes_keep_order_and_limit_nested_threads is timing-sensitive and fails now and then
 - [TEST-PARALLEL-ORDER-LOAD-33](TEST-PARALLEL-ORDER-LOAD-33.md): The process-pool order test fails on a fully loaded machine (one worker process takes every item)
 - [TEST-PARALLEL-SHARE-TIMING-36](TEST-PARALLEL-SHARE-TIMING-36.md): The fair-share scheduler test watched the freed budget for a fixed 4 s and failed on a loaded machine
+- TEST-POOL-LIVE-GROWTH-FLAKY-64 (no report page): The pool live growth test fails once in a full suite run while the machine is busy and passes when run alone
 - TEST-POOL-QUEUE-REFILL-TIMING-64 (no report page): The pool queue refill test (test_longest_first) failed once in a gate on a busy machine and passed on the rerun of the same commit
 - TEST-POOL-RESUME-SHELL-CONTAINER-58 (no report page): A stage-key test fails when run on its own in the shell container: a pool-mode resume reuses the scene-chain stage it should rerun
 - TEST-POOL-SCENE-RESUME-ENV-64 (no report page): A stage-key test fails when run directly in the shell container but passes in the gate

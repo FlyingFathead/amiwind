@@ -121,6 +121,45 @@ def standing_planes(points, equations, exact=False):
     return result
 
 
+def reduced_collision_mesh(v, f, visual_v, visual_f, mode=None):
+    """The collision mesh of a model without authored collision whose drawing is a geometric reduction
+    (collision_source_env.collision_mesh_mode, COLLISION-WORLDWIDE-REDUCTION-64): (vertices, faces, record).
+    original: the source triangles (v, f); reduced: the reduced drawn triangles that are not walkable plus the ORIGINAL
+    walkable triangles (floors, treads and walkways stay exact); reduced-all: the reduced drawn triangles alone. The
+    record (None for original) gives the triangle counts; a result with more triangles than the source keeps the source."""
+    from collision_mesh_env import collision_mesh_mode
+    from player_hull import WALKABLE_Z
+    mode = mode or collision_mesh_mode()
+    if mode == 'original':
+        return v, f, None
+    v, f = np.asarray(v), np.asarray(f)
+    visual_v, visual_f = np.asarray(visual_v), np.asarray(visual_f)
+
+    def walkable(vv, ff):
+        t = vv[ff[:, :3], :3]
+        n = np.cross(t[:, 1] - t[:, 0], t[:, 2] - t[:, 0])
+        a = np.linalg.norm(n, axis=1)
+        nz = np.zeros(len(ff))
+        ok = a > 1e-9
+        nz[ok] = n[ok, 2] / a[ok]
+        return nz >= WALKABLE_Z
+    if mode == 'reduced-all':
+        cv, cf = visual_v, visual_f
+        walk = 0
+    else:
+        keep = visual_f[~walkable(visual_v, visual_f)]
+        walk_f = f[walkable(v, f)]
+        cv = np.vstack((visual_v, v))
+        cf = np.vstack((keep, np.column_stack((walk_f[:, :3] + len(visual_v), walk_f[:, 3:])))) if len(walk_f) else keep
+        walk = len(walk_f)
+    record = {'mode': mode, 'source_triangles': int(len(f)), 'drawn_triangles': int(len(visual_f)),
+              'collision_triangles': int(len(cf)), 'original_walkable_triangles': int(walk)}
+    if len(cf) >= len(f) or not len(cf):
+        record['kept'] = 'source triangles (the reduced collision mesh is not smaller)'
+        return v, f, record
+    return cv, cf, record
+
+
 def _prepare_model(task):
     mi, m, profile, archive_path, *extras = task
     name = m['source']
@@ -173,6 +212,12 @@ def _prepare_model(task):
           raise ValueError('Visual primitive material outside source palette: '+name)
          lod['visual_primitive']=profile['visual_primitive']['kind']
         collision_v,collision_f=v,f
+        reduced=bool(profile.get('ratio') or lod.get('scenery_reduce'))
+        if (not m.get('collision') and reduced and len(visual_f)
+                and not (profile.get('flatten') or profile.get('visual_panel') or profile.get('visual_primitive')
+                         or m.get('exterior_visibility'))):
+         collision_v,collision_f,record=reduced_collision_mesh(v,f,visual_v,visual_f)
+         if record is not None:lod['collision_mesh']=record
         if m.get('collision'):
          cv,cf,_=unpack_geometry(read_asset(archive,m['collision']))
          collision_v,collision_f=np.array(cv),np.array(cf)

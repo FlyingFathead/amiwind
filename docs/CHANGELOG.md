@@ -1,10 +1,12 @@
 # Changelog
 
-_Last updated with AmiWind v0.0.64-dev4 (10 November 2026)._
+_Last updated with AmiWind v0.0.64 (11 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.64: Gone Beyond The Gate, 11 November 2026](#v0064-gone-beyond-the-gate-11-november-2026)
+- [v0.0.64-dev5: fifth snapshot of v0.0.64, 11 November 2026](#v0064-dev5-fifth-snapshot-of-v0064-11-november-2026)
 - [v0.0.64-dev4: fourth snapshot of v0.0.64, 10 November 2026](#v0064-dev4-fourth-snapshot-of-v0064-10-november-2026)
 - [v0.0.64-dev3: third snapshot of v0.0.64, 10 November 2026](#v0064-dev3-third-snapshot-of-v0064-10-november-2026)
 - [v0.0.64-dev2: second snapshot of v0.0.64, 10 November 2026](#v0064-dev2-second-snapshot-of-v0064-10-november-2026)
@@ -182,6 +184,80 @@ _Last updated with AmiWind v0.0.64-dev4 (10 November 2026)._
 - [CHIM source candidate - 14 October 2026, v0.0.40-dev1](#chim-source-candidate---14-october-2026-v0040-dev1)
 
 <!-- contents end -->
+
+## v0.0.64: Gone Beyond The Gate, 11 November 2026
+
+v0.0.64 is the release that prepares the road to the two expansion worlds and mends what the v0.0.63 checks found
+([release notes](releases/notes/RELEASE-v0.0.64.md)); it covers everything since v0.0.63: the five development snapshots
+(dev1 to dev5) and the register work made after dev5. It needs 32 MB of Fast RAM. Mournhold and Solstheim are not in the
+game image; they move to the next version. Almost everything is checked by tests; the few changes seen in play were seen
+on test builds, none on this release's image. Grouped by what a player notices:
+
+- **Spells and magic:** game spells, powers and enchantments take effect again (the actor table read 32 of the 39 sections
+  of the compiled scripts file, so no spell effect was found since v0.0.63); spell and trap damage meets the target's
+  resistances and weaknesses (a Nord's frost immunity stops a frost trap); scrolls are cast from the Magic window's Magic
+  Items and used up; Argonian Breathing is the race's castable spell, and the console's id search finds it; scripts can cast
+  on characters other than the player.
+- **Traps, switches and lava:** opening a trapped door, load door or container springs its trap on the player (457
+  trapped references with 85 spells in Morrowind.esm; the key disarms it); the console activates the Ghostgate's switches
+  and other objects no script names, by id; lava is stood in and kills; `dbg tp X Y Z` reads Z as the floor under the feet;
+  god mode stays on across map changes; the door list shows each door's arrival point.
+- **The journal and the factions:** a quest's state follows its entries, so an ending finishes it and a restart entry
+  reopens it; the expulsion from a faction shows the game's own message; the stats page lists the player's factions with
+  rank, the next rank's needs, reputation and bounty; the console takes `Journal`, `SetJournalIndex`, `GetJournalIndex`
+  and `GetPCExpelled`.
+- **Rooms and fog:** hollow models in every room use approximate standing bevels by default (about 46 % of the rooms'
+  collision bytes by the builder's estimate; nothing pushed through in a sweep over 934 rooms); large rooms such as the Heart
+  Chamber fade into fog with their own settings in Options > Video (default distance 300); the Heart of Lorkhan's fire
+  shield no longer covers it; a room load gives back the area cache first.
+- **The renderer:** cobwebs, hanging moss and leaves are drawn with their see-through parts, on by default
+  (`aw_seethrough_material` 0/1/2).
+- **Solstheim, in test builds only:** the first frame was built and measured (a dense forest view draws 45,964 faces at the
+  median against 7,562 on Vvardenfell), star-shaped spruces bring it to 6,096, tree crowns are a setting (`aw_tree_crowns`,
+  off by default), and the map rows and HUD region names are in; Solstheim is not playable.
+- **The builder:** `--dlc tribunal|bloodmoon|both|none` and `--no-dlc` choose the expansion layers; the base world's keys no
+  longer depend on the expansion files; the expansions have their own id ranges and store units; the CHIM stage is keyed by
+  what reaches the world (69,508 of 69,510 world files identical in a comparison by SHA-256); the reuse preflight stops on a
+  whole stage that would rebuild; a Raspberry Pi 4B drive image for test deliveries. The census of Tribunal and Bloodmoon is
+  in [docs/performance](performance/EXPANSIONS-CENSUS-v0.0.64.md).
+- **The load stall tools:** `dbg loadtrace on|off|dump` and a memory line per load, for the stall on the trip from Seyda Neen
+  to Balmora (not caught yet).
+- **The Toolkit and the progress pages:** the tracker has a pane for Vvardenfell, one for Solstheim and one for Mournhold;
+  the 3D Map Inspector opens CHIM rooms with collision views; the [CHIM progress tracker](chim/PROGRESS_TRACKER.md) is
+  written newest first with its current state generated from the tracker data.
+- **The game's scripts and systems:** 605 of 1,207 scripts run and 9 more are carried by AmiWind's own code (27 wait for a
+  function, 433 belong to the add-on worlds, 133 are named by nothing); the game systems table stands at 7 of 49 done, 39
+  partial, 3 missing.
+- Everything from the snapshots below.
+
+## v0.0.64-dev5: fifth snapshot of v0.0.64, 11 November 2026
+
+The fifth development snapshot of v0.0.64, "Gone Beyond The Gate" ([release notes](releases/notes/RELEASE-v0.0.64-dev5.md)).
+It needs 32 MB of Fast RAM. It was not pushed on its own; its changes went into the v0.0.64 release. The dev4 changes are
+listed in the entry below and in [the dev4 notes](releases/notes/RELEASE-v0.0.64-dev4.md). Everything is checked by tests;
+some changes were also seen on test builds of one room, none yet on this snapshot's image.
+
+- Hollow models in every room use approximate standing bevels by default (`--chim-hollow-bevels 0/1/2`, a room can opt
+  back in); a sweep over 934 rooms found nothing pushed through, and the collision of the rooms is about 46 % of before
+  by the builder's estimate (667,788,436 to 307,535,200 bytes). Large models' standing hulls are routed
+  (`--model-hull auto`) ([collision meshes](COLLISION_MESHES.md)).
+- Large rooms fade into fog: `Fog in large rooms` and `Fog distance indoors` in Options > Video and on the console
+  (`aw_fog_large_rooms`, `aw_fog_distance_interior`, default 300), the face cut past the fog end, and a room type 3 for
+  the Heart Chamber. On a test build of the chamber alone, a full turn showed no blank patches at 42.9 frames per second at
+  32 MB Fast RAM in the emulator.
+- The console takes the original `Journal`, `SetJournalIndex`, `GetJournalIndex` and `GetPCExpelled`; scrolls are cast
+  from the Magic window's Magic Items, as in the original game.
+- `aw_tree_crowns` 0/1 (off by default) with the crown alternatives in compact files; on the Solstheim test frame
+  they cost 2.6 % more world data (an earlier form cost 74 %).
+- The builder keys the CHIM stage by what reaches the world, so a change that does not reach it no longer converts it
+  again, and its reuse preflight stops on a whole stage that would rebuild; it makes a Raspberry Pi 4B drive image for
+  each test delivery.
+- The Toolkit's exports carry the shipping version, its status follows the newest delivered build, it serves that build,
+  has a help button on every page and sends the tracker data only when it changed. The
+  [CHIM progress tracker](chim/PROGRESS_TRACKER.md) is written newest first with its current state generated from the
+  tracker data, and there is a plan page for the [active-effect HUD](HUD_ACTIVE_EFFECTS.md).
+- Not in it yet: the Heart Chamber is not checked on the full image, lock picking and drinking potions do not work, and
+  the tree methods are test-only.
 
 ## v0.0.64-dev4: fourth snapshot of v0.0.64, 10 November 2026
 

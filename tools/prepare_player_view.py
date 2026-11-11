@@ -733,7 +733,8 @@ def _unit_cache():
         pass_cache.source_digest((__file__, 'bake_unit'), (player_inventory_pose.__file__, 'bake_body')),
         pass_cache.previous_digests((__file__, 'bake_unit'), (player_inventory_pose.__file__, 'bake_body')),
         (__file__, player_inventory_pose.__file__),
-        pass_cache.covered_lines((__file__, 'bake_unit'), (player_inventory_pose.__file__, 'bake_body')))
+        pass_cache.covered_lines((__file__, 'bake_unit'), (player_inventory_pose.__file__, 'bake_body')),
+        entries=((__file__, 'bake_unit'), (player_inventory_pose.__file__, 'bake_body')))
 
 
 def run_units(units, cache, jobs):

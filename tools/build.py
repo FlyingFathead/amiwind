@@ -788,24 +788,34 @@ def chim_sol_test_commands(args, steps, tool, run, tools, jobs):
     decode_cells(cells)                                  # a bad cell list stops here, before any stage
     index = next(i for i, (name, _) in enumerate(steps) if name == 'chim') + 1
     palette = run / 'intro-scene/id1/gfx/palette.lmp'
-    star = getattr(args, 'chim_sol_tree_copies', 'off') == 'star'
-    # --chim-sol-tree-copies star (TREES-DEPTH-56): the same chim_build arguments through tools/chim_tree_star.py
-    entry = ('chim_tree_star.py', '--tree-star', Path(__file__).resolve().parents[1] / 'config/tree-copies.json') \
-        if star else ('chim_build.py',)
+    copies = getattr(args, 'chim_sol_tree_copies', 'off') or 'off'
+    star = copies == 'star'
+    # --chim-sol-tree-copies star (TREES-DEPTH-56): the same chim_build arguments through tools/chim_tree_star.py;
+    # switch: the original trees in run/chim-sol AND the star trees in run/chim-sol-star, which the image adds to the
+    # same store as alternative models for aw_tree_crowns 1 (tools/chim/alt_models.py)
+    star_entry = ('chim_tree_star.py', '--tree-star', Path(__file__).resolve().parents[1] / 'config/tree-copies.json')
+    entry = star_entry if star else ('chim_build.py',)
     trees = [('chim-sol-trees', tool('chim_tree_copies.py', '--data-files', run / 'chim-sol-data', '--palette', palette,
-                                     '--out', run / 'chim-sol-trees', '--jobs', jobs))] if star else []
+                                     '--out', run / 'chim-sol-trees', '--jobs', jobs))] if copies != 'off' else []
+
+    def frames(name, how, out, units):
+        return (name, tool(*how, '--data-files', run / 'chim-sol-data', '--palette', palette,
+                           '--out', out, '--qbsp', tools['qbsp'],
+                           *chim_stage_options(args), '--chim-regions-cells=' + cells,
+                           '--lighting-type', 'hybrid', '--unit-cache', args.workspace / units,
+                           '--jobs', jobs, '--validate', '--stats', '--sdk', args.sdk))
     steps[index:index] = [
         ('chim-sol-data', tool('chim_layer_data.py', '--data-files', args.data_files, '--layer', 'Bloodmoon',
                                '--out', run / 'chim-sol-data')),
         *trees,
-        ('chim-sol', tool(*entry, '--data-files', run / 'chim-sol-data', '--palette', palette,
-                          '--out', run / 'chim-sol', '--qbsp', tools['qbsp'],
-                          *chim_stage_options(args), '--chim-regions-cells=' + cells,
-                          '--lighting-type', 'hybrid', '--unit-cache', args.workspace / 'cache/chim-sol-units',
-                          '--jobs', jobs, '--validate', '--stats', '--sdk', args.sdk))]
+        frames('chim-sol', entry, run / 'chim-sol', 'cache/chim-sol-units'),
+        *([frames('chim-sol-star', star_entry, run / 'chim-sol-star', 'cache/chim-sol-units')]
+          if copies == 'switch' else [])]
     # the image takes the layer's frames as the store chimsol (tools/chim/sol_test.py), only with this option
-    return [(name, list(command) + ['--chim-sol-world', str(run / 'chim-sol')] if name == 'image' else command)
-            for name, command in steps]
+    extra = ['--chim-sol-world', str(run / 'chim-sol')]
+    if copies == 'switch':
+        extra += ['--chim-sol-alt', '1=' + str(run / 'chim-sol-star')]
+    return [(name, list(command) + extra if name == 'image' else command) for name, command in steps]
 
 
 def chim_town_commands(args, builder, steps, tool, run, tools, jobs):
@@ -2755,6 +2765,9 @@ def export_converter_environment(args):
                                    export_npc_head_reducer, export_stair_rules)
     export_stair_rules(args.font_options["follow_original_stair_rules"])
     export_model_hull(args.font_options["model_hull"])
+    # the standing bevels of hollow collision plates (COLLISION-WORLDWIDE-REDUCTION-64): the option, else the config
+    from hollow_bevels_env import export_hollow_bevels
+    export_hollow_bevels(getattr(args, "chim_hollow_bevels", None))
     from lava import export_lava
     export_lava(args.font_options["lava"])
     from build_font_options import export_world_map

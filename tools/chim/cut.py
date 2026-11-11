@@ -283,6 +283,9 @@ def cut_unit(task):
         surfs, prts, po = pieces[c]
         exact = True if task['exact'] else {k for k, p in enumerate(prts) if p[4]}
         prts = [p[:4] for p in prts]
+        if task['exact'] == 'walkable':        # chim.models.WALKABLE_EXACT (a room type's hollow_bevels 1)
+            from chim.models import walkable_pieces
+            exact = walkable_pieces(prts)
         pts = [np.asarray(s[0]) for s in surfs] + [p for p, *_ in prts]
         allp = np.vstack(pts)
         lo, hi = allp.min(axis=0) - 1, allp.max(axis=0) + 1

@@ -54,6 +54,50 @@ class Stats(unittest.TestCase):
         self.assertEqual([r['name'] for r in C.warnings([heavy, small, low])], ['a'])
         self.assertTrue(C.warning_line(heavy).startswith('WARNING: collision-heavy model a'))
 
+    def test_shape_warning_on_chain_or_counts(self):
+        base = {'store': 'rooms', 'faces': 10, 'clipnodes': 20, 'pieces': 1, 'deepest_chain': C.WARN_CHAIN,
+                'ratio_counts': C.WARN_COUNTS}
+        deep = dict(base, name='deep', deepest_chain=C.WARN_CHAIN + 1)
+        dense = dict(base, name='dense', ratio_counts=C.WARN_COUNTS + 0.5)
+        fine = dict(base, name='fine')
+        bare = dict(base, name='bare', ratio_counts=None)
+        warned = C.shape_warnings([fine, dense, deep, bare])
+        self.assertEqual([r['name'] for r in warned], ['deep', 'dense'])
+        lines = C.shape_summary(warned, shown=1)
+        self.assertEqual(len(lines), 2)
+        self.assertTrue(lines[0].startswith('WARNING: 2 model(s)'))
+        self.assertIn('collision shape deep', lines[1])
+        self.assertEqual(C.shape_summary([]), [])
+        # a chain image over the limit warns by its deepest chain
+        s = dict(C.model_stats(image(clipnodes=C.WARN_CHAIN + 1)), name='m', store='rooms')
+        self.assertEqual([r['name'] for r in C.shape_warnings([s])], ['m'])
+
+    def test_unsigned_children_long_chain(self):
+        n = 33000
+        lumps = [b''] * 15
+        lumps[1] = struct.pack('<4fi', 0, 0, 1, 0, 0)
+        lumps[9] = b''.join(struct.pack('<iHH', 0, i + 1 if i + 1 < n else 0xFFFF, 0xFFFE) for i in range(n))
+        lumps[14] = struct.pack('<9f4i3i', *([0.0] * 9), 0, 0, -1, -1, 0, 0, 0)
+        s = C.model_stats(F.brush_image(lumps)[0])
+        self.assertEqual(s['deepest_chain'], n)
+
+    def test_collision_sources(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / 'scenery'
+            p.mkdir()
+            (p / 'scenery-index.json').write_text(json.dumps({
+                'groups': {'g': {'visual_profiles': {'meshes/x/ex_a.nif': {'ratio': 0.5}}}},
+                'models': [{'source': 'meshes/x/ex_a.nif'},
+                           {'source': 'meshes/i/in_b.nif', 'collision': {'source': 'NIF RootCollisionNode'}}]}))
+            src = C.collision_sources(Path(d))
+        self.assertEqual(src, {'ex_a': ('visual', True), 'in_b': ('rcn', False)})
+        rows = [{'name': 'x/ex_a@s1', 'collision_bytes': 5, 'draw_bytes': 9},
+                {'name': 'i/in_b@s1@tile0,1#2', 'collision_bytes': 3, 'draw_bytes': 4},
+                {'name': 'o/other@s1', 'collision_bytes': 1, 'draw_bytes': 1}]
+        total = C.source_summary(rows, src)
+        self.assertEqual(sorted(total), ['rcn/full', 'unknown', 'visual/reduced'])
+        self.assertTrue(rows[0]['drawn_reduced'])
+
     def test_no_store_no_entry(self):
         with tempfile.TemporaryDirectory() as d:
             self.assertIsNone(C.ledger_entry(Path(d)))

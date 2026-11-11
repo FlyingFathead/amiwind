@@ -255,5 +255,48 @@ class ConverterScopeTests(unittest.TestCase):
         self.assertIn("'collision_source': collision_source_receipt()", text)
 
 
+@unittest.skipUnless(READY, 'numpy and pyffi needed')
+class ReducedCollisionMesh(unittest.TestCase):
+    """prepare_mesh_bsp.reduced_collision_mesh (COLLISION-WORLDWIDE-REDUCTION-64): the reduced drawn mesh collides,
+    with the original walkable faces; original keeps the source; never more collision triangles than the source."""
+
+    def meshes(self):
+        import numpy as np
+        # source: a floor of 4 triangles and a wall of 4; reduced: the floor and the wall as 2 triangles each
+        v = np.array([(0, 0, 0), (8, 0, 0), (8, 8, 0), (0, 8, 0), (4, 4, 0),
+                      (0, 0, 0), (8, 0, 0), (8, 0, 8), (0, 0, 8), (4, 0, 4)], float)
+        f = np.array([(0, 1, 4, 0), (1, 2, 4, 0), (2, 3, 4, 0), (3, 0, 4, 0),
+                      (5, 6, 9, 0), (6, 7, 9, 0), (7, 8, 9, 0), (8, 5, 9, 0)])
+        rv = np.array([(0, 0, 0), (8, 0, 0), (8, 8, 0), (0, 8, 0), (8, 0, 8), (0, 0, 8)], float)
+        rf = np.array([(0, 1, 2, 0), (0, 2, 3, 0), (0, 1, 4, 0), (0, 4, 5, 0)])
+        return v, f, rv, rf
+
+    def test_modes(self):
+        from prepare_mesh_bsp import reduced_collision_mesh
+        v, f, rv, rf = self.meshes()
+        cv, cf, rec = reduced_collision_mesh(v, f, rv, rf, mode='original')
+        self.assertIs(cf, f)
+        self.assertIsNone(rec)
+        cv, cf, rec = reduced_collision_mesh(v, f, rv, rf, mode='reduced')
+        # the 2 reduced wall triangles and the 4 original floor triangles
+        self.assertEqual((len(cf), rec['original_walkable_triangles'], rec['collision_triangles']), (6, 4, 6))
+        self.assertEqual(sorted(set(cv[cf[2:, :3]].reshape(-1, 3)[:, 2])), [0.0])     # floors: the original 4
+        cv, cf, rec = reduced_collision_mesh(v, f, rv, rf, mode='reduced-all')
+        self.assertEqual(len(cf), 4)
+
+    def test_never_more_than_the_source(self):
+        from prepare_mesh_bsp import reduced_collision_mesh
+        v, f, rv, rf = self.meshes()
+        cv, cf, rec = reduced_collision_mesh(v, f[:4], rv, rf, mode='reduced')
+        self.assertEqual(len(cf), 4)
+        self.assertIn('kept', rec)
+
+    def test_mode_setting(self):
+        from collision_mesh_env import collision_mesh_mode
+        with patch.dict(os.environ, {'AMIWIND_COLLISION_MESH': 'bogus'}):
+            with self.assertRaises(ValueError):
+                collision_mesh_mode()
+
+
 if __name__ == '__main__':
     unittest.main()

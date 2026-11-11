@@ -143,7 +143,7 @@ class ModelHullOptionTests(unittest.TestCase):
         from build_font_options import resolve_font_options
         from types import SimpleNamespace
         r = resolve_font_options(SimpleNamespace(build_config=None, model_hull=None))
-        self.assertEqual((r['model_hull'], r['model_hull_selected_by']), ('chain', 'shipped default'))
+        self.assertEqual((r['model_hull'], r['model_hull_selected_by']), ('auto', 'shipped default'))
         with tempfile.TemporaryDirectory() as tmp:
             cfg = Path(tmp) / 'b.json'
             cfg.write_text('{"model_hull": "chain"}')

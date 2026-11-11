@@ -2,7 +2,7 @@
 """The Toolkit's "Last updated with AmiWind vX" line, kept honest by the release check.
 
 Two version marks, both kept by this check. The Toolkit's own version (TOOLKIT.version in world-map.html, carried in
-its exports as "toolkit_version") goes up by at least 0.0.1 in every release in which a Toolkit file changed. The line
+its exports as "toolkit_build") goes up by at least 0.0.1 in every release in which a Toolkit file changed. The line
 names the AmiWind version the Toolkit (amiwind-toolkit/) last changed in. It is never
 bumped just because VERSION moved: only when a Toolkit file differs from the previous release
 (the published commit in tools/previous-release.json) must it name the version being released
@@ -12,6 +12,12 @@ bumped just because VERSION moved: only when a Toolkit file differs from the pre
     python3 tools/toolkit_version.py check    exit 1 when the Toolkit changed and the line is stale
     python3 tools/toolkit_version.py bump     write the expected line into header.js and index.html and raise the
                                               Toolkit's own version by 0.0.1 over the previous release's
+
+The exports of the pages (the inspector's JSON copies, the World Map state) carry the shipping AmiWind version as
+"version", from amiwind-toolkit/aw-version.js, the one place a version number is typed into the pages:
+
+    python3 tools/toolkit_version.py stamp    write VERSION (with its -devN or -rcN) into aw-version.js
+                                              (every VERSION change; tools/tracker_version_check.py static refuses a lag)
 
 `tools/release.py --check` runs the check. A source tree without git history, or a one-commit
 (shallow) checkout as in hosted CI, cannot compare and is skipped, as in tools/previous_release.py.
@@ -136,12 +142,35 @@ def bump(root=ROOT, run=None):
     return 'Toolkit ' + '; '.join(done)
 
 
+STAMP_FILE = TOOLKIT + '/aw-version.js'
+STAMP_RE = re.compile(r"(root\.AMIWIND_VERSION = ')([^']*)(')")
+
+
+def stamped_version(root=ROOT):
+    """The AmiWind version aw-version.js carries (what every export reports), or None."""
+    found = STAMP_RE.search((Path(root) / STAMP_FILE).read_text(encoding='utf-8'))
+    return found.group(2) if found else None
+
+
+def stamp(root=ROOT):
+    """Write VERSION, as it is, into aw-version.js; return what was done."""
+    path = Path(root) / STAMP_FILE
+    text = path.read_text(encoding='utf-8')
+    if not STAMP_RE.search(text):
+        raise ValueError('no AMIWIND_VERSION line in ' + STAMP_FILE)
+    version = (Path(root) / 'VERSION').read_text(encoding='utf-8').strip()
+    path.write_text(STAMP_RE.sub(lambda m: m.group(1) + version + m.group(3), text, count=1), encoding='utf-8', newline='\n')
+    return '%s carries %s' % (STAMP_FILE, version)
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('command', choices=('status', 'check', 'bump'))
+    ap.add_argument('command', choices=('status', 'check', 'bump', 'stamp'))
     args = ap.parse_args(argv)
     try:
-        if args.command == 'status':
+        if args.command == 'stamp':
+            print(stamp())
+        elif args.command == 'status':
             state, changed = changed_files()
             print('previous release: v%s (%s), comparison: %s' % (load_pin()['version'], load_pin()['published'][:7], state))
             print('header names: v%s / v%s, this release: v%s' % (*named_versions(), expected_version()))
@@ -151,6 +180,8 @@ def main(argv=None):
                 print('  changed: ' + name)
         else:
             print(check() if args.command == 'check' else bump())
+            if args.command == 'bump':
+                print(stamp())
     except ValueError as exc:
         ap.exit(1, 'Error: %s\n' % exc)
     return 0

@@ -69,12 +69,44 @@ class VersionFollowTests(unittest.TestCase):
         (root / 'amiwind-toolkit').mkdir()
         (root / 'tools').mkdir()
         (root / 'tools' / 'cell_progress.py').write_text('eligible_release(None, working_release())\nstamp_document(doc)\n')
+        (root / 'VERSION').write_text('0.0.64-dev4\n')
+        (root / 'amiwind-toolkit' / 'aw-version.js').write_text("root.AMIWIND_VERSION = '0.0.64-dev4';\n")
         (root / 'amiwind-toolkit' / 'x.js').write_text("// eligible for v0.0.57 in a comment is fine\n"
                                                       "const a = 'Last updated with AmiWind v0.0.64';\n"
                                                       "const label = 'eligible for v0.0.57';\n")
         problems = tvc.static_problems(root)
         self.assertEqual(len(problems), 1)
         self.assertIn('x.js:3', problems[0])
+
+    def test_a_typed_export_version_or_a_lagging_stamp_is_found(self):
+        # TOOLKIT-INSPECTOR-EXPORT-VERSION-64: the inspector's program.version was typed (0.0.38) on v0.0.64.
+        root = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        (root / 'amiwind-toolkit').mkdir()
+        (root / 'tools').mkdir()
+        (root / 'tools' / 'cell_progress.py').write_text('eligible_release(None, working_release())\nstamp_document(doc)\n')
+        (root / 'VERSION').write_text('0.0.64-dev5\n')
+        (root / 'amiwind-toolkit' / 'aw-version.js').write_text("root.AMIWIND_VERSION = '0.0.64-dev4';\n")
+        (root / 'amiwind-toolkit' / 'page.html').write_text(
+            "<html data-inspector-version=\"0.0.36\">\n"
+            "<script>function id(){return {program:{name:'x',version:'0.0.38'}};}</script>\n"
+            "<script>const TOOLKIT = {name: 'T', version: '0.1.26'}; const v = window.AMIWIND_VERSION;</script>\n")
+        problems = tvc.static_problems(root)
+        text = '\n'.join(problems)
+        self.assertIn('page.html:1', text)
+        self.assertIn('page.html:2', text)
+        self.assertNotIn('page.html:3 types', text)                    # the Toolkit's own counter is the allowed literal
+        self.assertIn('carries 0.0.64-dev4, VERSION is 0.0.64-dev5', text)
+        self.assertIn('does not load aw-version.js', text)
+
+    def test_the_stamp_follows_version_and_stamping_fixes_it(self):
+        import toolkit_version as tv
+        self.assertEqual(tv.stamped_version(ROOT), (ROOT / 'VERSION').read_text(encoding='utf-8').strip())
+        root = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        (root / 'amiwind-toolkit').mkdir()
+        (root / 'VERSION').write_text('0.0.64-dev5\n')
+        (root / 'amiwind-toolkit' / 'aw-version.js').write_text("root.AMIWIND_VERSION = '0.0.64-dev4';\n")
+        tv.stamp(root)
+        self.assertEqual(tv.stamped_version(root), '0.0.64-dev5')
 
     def test_restamp_rewrites_only_the_version_fields(self):
         out = Path(self.enterContext(tempfile.TemporaryDirectory()))

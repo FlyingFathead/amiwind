@@ -1,6 +1,6 @@
 # World map and progression journal
 
-_Last updated with AmiWind v0.0.59-dev5 (2 November 2026)._
+_Last updated with AmiWind v0.0.64-dev5 (11 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -191,7 +191,9 @@ kept on the world change list with no quest or entry limit (JOURNAL-ORIGINAL-VIE
 saved only when it has an entry (save feature 128, `AWH1`, 16 bytes an entry). An older save's history (at most
 256 entries of 32 quests) is taken over when it loads. The 32-slot copy is still written for older readers.
 `dbg mwscript call journal QUEST N` records a stage as a script's `Journal` does; `dbg mwscript call setjournalindex
-QUEST N` sets it without an entry.
+QUEST N` sets it without an entry; `dbg mwscript call getjournalindex QUEST` prints the index kept now. Since
+v0.0.64 the console also takes the original's lines as typed: `Journal QUEST N`, `SetJournalIndex QUEST N` and
+`GetJournalIndex QUEST` run the same three calls.
 
 ### Quests (since v0.0.59)
 

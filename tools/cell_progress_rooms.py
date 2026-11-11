@@ -56,6 +56,12 @@ def chim_room_cells(receipts, maps=None):
             by_map.setdefault(row['map'].casefold(), row['room'].casefold())
     except (OSError, ValueError, ImportError):
         pass
+    # a rooms receipt (aw-chim-rooms-1) names each room by its cell AND its map name: the image's chim-interiors.json
+    # names rooms by map name only, so map them back through the receipts first (TRACKER-INTERIORS-IN-GAME-COUNT-64)
+    for doc in receipts or ():
+        for row in (doc or {}).get('rooms', []):
+            if row.get('cell') and row.get('room'):
+                by_map.setdefault(row['room'].casefold(), row['cell'].casefold())
     made, installed = set(), set()
     for doc in receipts or ():
         doc = doc or {}

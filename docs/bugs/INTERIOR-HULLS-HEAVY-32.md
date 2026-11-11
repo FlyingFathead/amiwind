@@ -73,6 +73,7 @@ Family: World storage and duplication (`world-storage`). Every asset stored once
 
 Related bugs in other categories:
 
+- [COLLISION-DISPARITY-WORLDWIDE-64](COLLISION-DISPARITY-WORLDWIDE-64.md): Collision data is far larger and deeper than the drawn meshes across the game
 - [INTERIOR-HULL-CHAIN-33](INTERIOR-HULL-CHAIN-33.md): The Arena Pit's main structure collides through one chain of 36,545 clipnodes; every trace in the room walks it
 
 <!-- END GENERATED CATEGORY -->

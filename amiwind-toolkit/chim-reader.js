@@ -686,7 +686,7 @@
         const [i, depth] = stack.pop();
         if (seen.has(i)) continue;
         seen.add(i); deepest = Math.max(deepest, depth);
-        for (const k of [4, 6]) { const ch = D[9].getInt16(8 * i + k, little); if (ch >= 0 && ch < nclip) stack.push([ch, depth + 1]); }
+        for (const k of [4, 6]) { const ch = D[9].getUint16(8 * i + k, little); if (ch < 0xFFF0 && ch < nclip) stack.push([ch, depth + 1]); }
       }
       return [seen.size, deepest];
     };

@@ -407,6 +407,123 @@ def strip_provenance(text):
     return stripped
 
 
+# Converter options that are off by default and leave every output as it was while off (CHIM-KEYS-TOO-BROAD-62): a
+# stage key (form 3 and later, engine_facts reading 5) reads the code without each switch's own code, so adding such a
+# method re-keys nothing while it is off. v0.0.64-dev4: the two-sided see-through planes (05e60666, both methods off)
+# put tools/chim/fence.py, tools/chim/build.py and tools/chim_build.py into the chim stage key, and the word "mirror"
+# of its option text kept a glquake.h declaration: about 3.8 h of CHIM world converted again, the same bytes.
+# Left out of the text (strip_switches; whole lines only, never a block emptied, the module must still parse):
+# - DEFINITIONS: the switch's own top-level functions and constants;
+# - an `if` without else whose test calls GUARD (the method's only entry);
+# - a call statement whose first argument is one of FLAGS (the add_argument line);
+# - a dict entry or call argument `**({SETTING: ...} if ... else {})` (the setting passed on only when it is not the
+#   default), on lines of its own.
+# While a stage command carries a FLAG with a value other than DEFAULT, the stage key counts MODULES whole as its
+# 'switches' component (stage_components), so the method's code still keys every build that runs it.
+# Explicit list, reviewed: add a switch only when its off state runs none of its code. Tested in
+# tests/test_stage_key_switches.py.
+DEFAULT_OFF_SWITCHES = (
+    {'id': 'ROOM-DECAL-ALPHA-62', 'flags': ('--fence-twosided-faces', '--chim-fence-twosided-faces'),
+     'default': 'off', 'setting': 'fence_twosided_faces', 'guard': 'twosided_mode',
+     'definitions': {'tools/chim/fence.py': ('TWOSIDED_MODES', 'twosided_mode', 'FACE', 'MODEL', 'mirror_faces')},
+     'modules': ('tools/chim/fence.py', 'tools/chim/build.py', 'tools/chim_build.py')},
+)
+SWITCH_READING = 5      # the engine_facts reading from which stage keys leave switch code out
+
+
+def _calls_name(node, name):
+    return any(isinstance(n, ast.Call) and (getattr(n.func, 'id', None) == name or getattr(n.func, 'attr', None) == name)
+               for n in ast.walk(node))
+
+
+def strip_switches(relative, text, switches=DEFAULT_OFF_SWITCHES):
+    """TEXT without the code of the default-off SWITCHES (DEFAULT_OFF_SWITCHES, whole lines), or TEXT itself when it
+    has none (or any doubt)."""
+    mine = [s for s in switches if s['guard'] in text or s['setting'] in text or relative in s['definitions']
+            or any(flag in text for flag in s['flags'])]
+    if not mine:
+        return text
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return text
+    lines = text.splitlines(keepends=True)
+    drop = set()
+
+    def whole_lines(node):
+        first, last = lines[node.lineno - 1], lines[node.end_lineno - 1]
+        return not first[:node.col_offset].strip() and not last[node.end_col_offset:].split('#')[0].strip()
+
+    def drop_with_comments(node):
+        number = node.lineno - 1
+        while number >= 1 and lines[number - 1].strip().startswith('#'):
+            drop.add(number)
+            number -= 1
+        drop.update(range(node.lineno, node.end_lineno + 1))
+
+    for switch in mine:
+        names = set(switch['definitions'].get(relative, ()))
+        for statement in tree.body:
+            if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and statement.name in names \
+                    and not statement.decorator_list:
+                drop_with_comments(statement)
+            elif isinstance(statement, ast.Assign) and statement.targets and all(
+                    isinstance(t, ast.Name) and t.id in names for t in statement.targets):
+                drop_with_comments(statement)
+        for node in ast.walk(tree):
+            for field in ('body', 'orelse', 'finalbody'):
+                block = getattr(node, field, None)
+                if not isinstance(block, list):
+                    continue
+                statements = [item for item in block if isinstance(item, ast.stmt)]
+                found = [item for item in statements
+                         if (isinstance(item, ast.If) and not item.orelse and _calls_name(item.test, switch['guard']))
+                         or (isinstance(item, ast.Expr) and isinstance(item.value, ast.Call) and item.value.args
+                             and isinstance(item.value.args[0], ast.Constant)
+                             and item.value.args[0].value in switch['flags'])]
+                if not found or len(found) == len(statements):
+                    continue   # never empty a block
+                for item in found:
+                    if whole_lines(item):
+                        drop_with_comments(item)
+            entries = (list(zip(node.keys, node.values)) if isinstance(node, ast.Dict) else
+                       [(k.arg, k.value) for k in node.keywords] if isinstance(node, ast.Call) else [])
+            if entries:
+                for key, value in entries:
+                    if key is not None or not isinstance(value, ast.IfExp) or not isinstance(value.body, ast.Dict) \
+                            or not (isinstance(value.orelse, ast.Dict) and not value.orelse.keys) \
+                            or not any(isinstance(k, ast.Constant) and k.value == switch['setting']
+                                       for k in value.body.keys):
+                        continue
+                    first, last = lines[value.lineno - 1], lines[value.end_lineno - 1]
+                    if re.fullmatch(r'\s*\*\*\(?', first[:value.col_offset]) and \
+                            re.fullmatch(r'\)?,?\s*(#.*)?', last[value.end_col_offset:].rstrip('\r\n')):
+                        drop.update(range(value.lineno, value.end_lineno + 1))
+    if not drop:
+        return text
+    stripped = ''.join(line for number, line in enumerate(lines, 1) if number not in drop)
+    try:
+        ast.parse(stripped)
+    except SyntaxError:
+        return text
+    return stripped
+
+
+def switches_on(command, switches=DEFAULT_OFF_SWITCHES):
+    """The DEFAULT_OFF_SWITCHES a stage COMMAND turns on (a FLAG with a value other than the default)."""
+    command = [str(part) for part in command]
+    found = []
+    for switch in switches:
+        for at, part in enumerate(command):
+            flag, _, inline = part.partition('=')
+            if flag in switch['flags']:
+                value = inline if inline else (command[at + 1] if at + 1 < len(command) else '')
+                if value != switch['default']:
+                    found.append(switch)
+                    break
+    return found
+
+
 def sha256_file(path):
     digest = hashlib.sha256()
     with open(path, 'rb') as source:
@@ -587,6 +704,21 @@ class SourceIndex:
         # ... and each engine C file by its use: C facts, or left out (tools/engine_facts.py); False: whole files
         self.engine_facts = self.narrow_headers if engine_facts is None else engine_facts
         self._includes = {}
+
+    def switch_neutral(self):
+        """True when this index leaves the default-off switches' code out (DEFAULT_OFF_SWITCHES): stage keys (form 3
+        and later) read by engine_facts reading SWITCH_READING or later. An index of an earlier reading (a record's
+        own method, engine_facts.translate) keeps the code, as that record was keyed. The unit cache keys (forms 1
+        and 2, pass_cache) leave it out too: their import-time text of tools/chim/fence.py held the switch's constants,
+        so the room-actor cache missed all 2,342 placements in v0.0.64-dev4 (BUILD-ROOM-ACTOR-KEY-SWITCH-64)."""
+        if not self.stage_form:
+            return True
+        if self.engine_facts is False:
+            return False
+        if self.engine_facts is True:
+            import engine_facts
+            return engine_facts.VERSION >= SWITCH_READING
+        return int(self.engine_facts) >= SWITCH_READING
 
     def chim_line_digest(self):
         """SHA-256 of the CHIM_VERSION file with its label replaced by its compatibility line (chim_compat.key_bytes):
@@ -907,10 +1039,13 @@ class SourceIndex:
     def _module_symbols(self, relative):
         if relative not in self._symbols:
             raw = (self.root / relative).read_text(encoding='utf-8', errors='replace')
-            key = (raw, self.scope == 'units', self.split)
+            switches = self.switch_neutral()
+            key = (raw, self.scope == 'units', self.split) + ((relative, 'switches') if switches else ())
             known = _SYMBOL_MEMO.get(key)
             if known is None:
                 text = strip_provenance(raw)
+                if switches:
+                    text = strip_switches(relative, text)
                 try:
                     tree = ast.parse(text)
                 except SyntaxError:
@@ -2444,6 +2579,7 @@ STAGE_GAME_INPUTS = {
     # and the Solstheim CHIM frames built from it read the base master and archive plus Bloodmoon's
     'chim-sol-data': BASE_GAME_INPUTS + LAYER_GAME_INPUTS['bloodmoon'],
     'chim-sol': BASE_GAME_INPUTS + LAYER_GAME_INPUTS['bloodmoon'],
+    'chim-sol-star': BASE_GAME_INPUTS + LAYER_GAME_INPUTS['bloodmoon'],
     'chim-sol-trees': BASE_GAME_INPUTS + LAYER_GAME_INPUTS['bloodmoon'],   # --chim-sol-tree-copies star
 }
 # {(run, stage): digest of every game input}: the key form before the narrowing, for reuse sources fingerprinted with
@@ -2539,6 +2675,13 @@ def stage_components(name, command, run, metadata, index, dependencies, fingerpr
                     PREVIOUS_SOURCES[(str(run), name)]['environment'] = stage_environment(script, index.companion())
     else:
         components['sources'] = {'digest': digest_json(dict(index.files)), 'files': len(index.files), 'scope': 'all files (not a repository tool)'}
+    if index.switch_neutral():
+        # a default-off method this stage runs (DEFAULT_OFF_SWITCHES): its modules count whole; only then, so a
+        # build with every switch off keeps its fingerprint
+        on = switches_on(command)
+        if on:
+            components['switches'] = {s['id']: {path: index.files[path] if path in index.files else None
+                                                   for path in s['modules']} for s in on}
     tools = metadata.get('tools') or {}
     tool_hashes = metadata.get('tool_sha256') or {}
     joined = '\0'.join(command)
@@ -4379,8 +4522,17 @@ def minute_one(steps, run, metadata, cache, reasons, index, reuse_all):
     for line in RA.minute_one_lines(steps, plans, reasons, unit_rows):
         print(line, flush=True)
     allowed = reuse_all.get('allowed') or {}
+    # what each rebuilt stage cost where it last ran in full: the reuse sources' profiles (the most used first)
+    sources = sorted({plan['from'] for plan in plans.values() if plan.get('from')},
+                     key=lambda s: -sum(p.get('from') == s for p in plans.values()))
+    costs = {}
+    for name in sorted(rebuilt):
+        for source in sources:
+            costs[name] = RA.stored_seconds(source, name)
+            if costs[name] is not None:
+                break
     problems = RA.strict_problems(steps, rebuilt, unit_rows, closures, RA.uncached_bakes(index.root), allowed,
-                                  units=units)
+                                  units=units, costs=costs, reasons=reasons)
     cache['minute_one'] = {'units': {name: [list(row) for row in found] for name, found in unit_rows.items()},
                            'allowed': allowed, 'stops': [list(row) for row in problems]}
     for stage, reason in sorted(allowed.items()):

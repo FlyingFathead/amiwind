@@ -25,6 +25,12 @@ opens any map without picking a folder. Python standard library only.
                --progress and, when the folder holds them, its world-progress.json / island files become --data,
                so `toolkit_serve.py --build BUILD` shows your own build's cell progress with nothing else to pass
                (and its toolkit/chim-inclusion.json: the World Map's "Included in build" list with this build on top)
+  --served-build DIR  a delivered build's outputs, opened by default by the World Map and the Polycount inspector with no
+               file picker. DIR holds one copy (or several copies in sub-folders; the newest is served, and a new one is
+               picked up without restarting) laid out as the build wrote it: maps/ (the compiled maps, .bsp and .chim),
+               chim/ (the CHIM world: world.cwi and frames/), chimi/ (the rooms store: world.cwi, packs, rooms/*.crm) and
+               a SERVED-BUILD.json naming the build. The inspector lists its maps and rooms; map-inspector.html?room=NAME
+               opens a room by name. --maps and --chim-world still work and are served next to it
   --reference F  the project's reference progress file (default: docs/chim/cell-progress-reference.json of this
                repository, if present); the World Map's Compare layer shows your cells next to it
 
@@ -80,6 +86,49 @@ REFERENCE_FILE = 'cell-progress-reference.json'
 # The CHIM inclusion ledger: served from the build when there is one (tools/chim_inclusion.py served_ledger).
 INCLUSION_FILES = ('chim-inclusion.js', 'chim-inclusion.json')
 REFERENCE_DEFAULT = ROOT / 'docs' / 'chim' / REFERENCE_FILE
+
+
+SERVED_MARK = 'SERVED-BUILD.json'
+SERVED_NAME = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._+-]{0,120}$')
+
+
+def served_build_root(path):
+    """The copy --served-build serves: PATH itself when it holds SERVED-BUILD.json, else the newest folder inside it that
+    does (newest by the marker's write time, which a copy gets last), else None."""
+    path = Path(path)
+    if (path / SERVED_MARK).is_file():
+        return path
+    best = None
+    try:
+        for child in path.iterdir():
+            mark = child / SERVED_MARK
+            if child.is_dir() and not child.is_symlink() and mark.is_file():
+                stamp = mark.stat().st_mtime
+                if best is None or stamp > best[0]:
+                    best = (stamp, child)
+    except OSError:
+        return None
+    return best[1] if best else None
+
+
+def served_build_info(root):
+    """What a served build holds, for the pages (/build/config.json): its label (from SERVED-BUILD.json, else the folder
+    name), the map names, the room names, and whether it has a CHIM world and a rooms store."""
+    from map_files import map_files
+    root = Path(root)
+    try:
+        mark = json.loads((root / SERVED_MARK).read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        mark = {}
+    mark = mark if isinstance(mark, dict) else {}
+    maps = sorted({p.stem.lower() for p in map_files(root / 'maps')}) if (root / 'maps').is_dir() else []
+    try:
+        rooms = sorted(p.stem for p in (root / 'chimi' / 'rooms').iterdir() if p.suffix == '.crm' and p.is_file())
+    except OSError:
+        rooms = []
+    return {'ok': True, 'label': str(mark.get('label') or root.name), 'version': mark.get('version'), 'run': mark.get('run'),
+            'commit': mark.get('commit'), 'maps': maps, 'rooms': rooms, 'base': '/chim-world/build/',
+            'world': (root / 'chim' / 'world.cwi').is_file(), 'interiors': (root / 'chimi' / 'world.cwi').is_file()}
 
 
 def build_folders(build):
@@ -301,6 +350,35 @@ def recent_results(folder, limit=30):
     return out
 
 
+DELIVERED_OUTCOMES = ('passed', PERF_ONLY)       # a build whose stages all passed (the perf guard alone failing still delivers)
+
+
+def newest_delivered(folder):
+    """The newest delivered full build in the master builder results (aw-result-1): {'ok', 'version', 'run', 'finished'}.
+    A delivered build is a finished, non-dry-run build of a full image whose outcome is passed (or passed with only the perf
+    guard failing). The World Map's status strip judges its tracker data against this version instead of against the clock
+    (TOOLKIT-STATUS-STALE-BY-CLOCK-64)."""
+    best = None
+    for row in recent_results(folder, limit=200) if folder else []:
+        if row.get('kind') != 'build' or row.get('dry_run') or row.get('outcome') not in DELIVERED_OUTCOMES:
+            continue
+        if '_full' not in str(row.get('run_name') or '') or not row.get('version'):
+            continue
+        key = str(row.get('finished') or '')
+        if best is None or key > best[0]:
+            best = (key, row)
+    if best is None:
+        return {'ok': False}
+    row = best[1]
+    return {'ok': True, 'version': str(row['version']), 'run': row.get('run_name'), 'finished': row.get('finished')}
+
+
+def file_etag(path):
+    """A validator for a file's current version: its size and write time (a weak-enough stamp; the tracker writes a file whole)."""
+    st = Path(path).stat()
+    return '"%x-%x"' % (st.st_size, st.st_mtime_ns)
+
+
 def check_bind(address):
     """The listen address: this machine only (127.0.0.1, the default) or one address of this machine chosen on purpose
     (for example its LAN address, to reach the Toolkit from a phone). Every-interface addresses are refused: listening
@@ -428,6 +506,35 @@ class Handler(SimpleHTTPRequestHandler):
     builds_dir = None   # --builds DIR (a local folder of runs): their CHIM inclusion entries join the served ledger
     follow_record = None   # --follow RECORD: the published working-version record whose head is served, or None
     stamp_cache = (0.0, None)
+    served_build = None   # --served-build DIR: a delivered build's outputs (a copy, or a folder of copies), or None
+    served_cache = (0.0, None)
+
+    def build_root(self):
+        """The served build's current folder (--served-build), looked up again at most every two seconds, so a copy
+        dropped in while the server runs is served without a restart; None when there is none."""
+        if not Handler.served_build:
+            return None
+        now = time.monotonic()
+        at, root = Handler.served_cache
+        if now - at > 2.0:
+            root = served_build_root(Handler.served_build)
+            Handler.served_cache = (now, root)
+        return root
+
+    def maps_folder(self):
+        """The folder maps are served from: --maps, else the served build's maps/."""
+        if self.maps_dir:
+            return self.maps_dir
+        root = self.build_root()
+        return root / 'maps' if root and (root / 'maps').is_dir() else None
+
+    def worlds(self):
+        """The served CHIM world folders: --chim-world NAME=DIR, plus the served build as NAME build."""
+        worlds = dict(self.chim_worlds)
+        root = self.build_root()
+        if root:
+            worlds['build'] = root.resolve()
+        return worlds
 
     def log_message(self, fmt, *args):  # quiet: one line per request is noise here
         pass
@@ -437,6 +544,43 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header('Content-Type', ctype)
         self.send_header('Content-Length', str(len(body)))
         self.send_header('Cache-Control', 'no-store')
+        self.end_headers()
+        self.wfile.write(body)
+
+    gz_cache = {}          # path -> (etag, gzip bytes): the compressed file of its current version, made once
+    gz_lock = threading.Lock()
+
+    def send_validated(self, path, ctype):
+        """A tracker data file that can be big (cell-progress.json is over 100 MB): an ETag from its size and write time, a 304
+        for a browser that already has this version, and gzip when the browser accepts it, compressed once per file version and
+        kept (TOOLKIT-PROGRESS-FILE-REFETCHED-64: the page used to fetch and parse it again every 10 s)."""
+        etag = file_etag(path)
+        sent = [t.strip() for t in (self.headers.get('If-None-Match') or '').split(',')]
+        if etag in sent or '*' in sent:
+            self.send_response(304)
+            self.send_header('ETag', etag)
+            self.send_header('Cache-Control', 'no-cache')
+            self.end_headers()
+            return
+        gzip_ok = 'gzip' in (self.headers.get('Accept-Encoding') or '')
+        if gzip_ok:
+            import gzip
+            with Handler.gz_lock:
+                have = Handler.gz_cache.get(str(path))
+                if not have or have[0] != etag:
+                    have = (etag, gzip.compress(path.read_bytes(), compresslevel=5))
+                    Handler.gz_cache[str(path)] = have
+            body = have[1]
+        else:
+            body = path.read_bytes()
+        self.send_response(200)
+        self.send_header('Content-Type', ctype)
+        self.send_header('Content-Length', str(len(body)))
+        self.send_header('ETag', etag)
+        self.send_header('Cache-Control', 'no-cache')
+        self.send_header('Vary', 'Accept-Encoding')
+        if gzip_ok:
+            self.send_header('Content-Encoding', 'gzip')
         self.end_headers()
         self.wfile.write(body)
 
@@ -615,7 +759,10 @@ class Handler(SimpleHTTPRequestHandler):
             return self.send_bytes(self.metrics, 'application/json') if self.metrics else self.send_error(404)
         if len(parts) == 2 and parts[0] == 'data' and parts[1] in PROGRESS_FILES:
             f = self.progress_dir / PROGRESS_SOURCES[parts[1]] if self.progress_dir else None
-            return self.send_bytes(f.read_bytes(), PROGRESS_FILES[parts[1]]) if f and f.is_file() else self.send_error(404)
+            return self.send_validated(f, PROGRESS_FILES[parts[1]]) if f and f.is_file() else self.send_error(404)
+        if parts == ['data', 'progress-stamp.json']:
+            f = self.progress_dir / PROGRESS_SOURCES['cell-progress.json'] if self.progress_dir else None
+            return self.send_json({'ok': True, 'etag': file_etag(f)} if f and f.is_file() else {'ok': False}, 200 if f and f.is_file() else 404)
         # Optional files answer 204 (nothing) when absent, so the browser console shows no 404 for them.
         if parts == ['data', REFERENCE_FILE]:
             return self.send_file(self.reference) if self.reference else self.send_nothing()
@@ -624,23 +771,30 @@ class Handler(SimpleHTTPRequestHandler):
             return self.send_bytes(f.read_bytes(), 'application/json') if f and f.is_file() else self.send_nothing()
         if len(parts) == 2 and parts[0] == 'data' and parts[1] in DATA_FILES and self.data_dir:
             return self.send_file(self.data_dir / parts[1])
+        if parts == ['data', 'newest-build.json']:
+            return self.send_json(newest_delivered(self.results_dir))
+        if parts == ['build', 'config.json']:
+            root = self.build_root()
+            return self.send_json(served_build_info(root)) if root else self.send_json({'ok': False, 'error': 'no served build'}, 404)
+        maps_dir = self.maps_folder()
         if parts == ['maps', 'index.json']:
             # x.bsp and the CHIM frame maps x.chim (tools/map_files.py): one name each
             from map_files import map_files
-            names = sorted({p.stem.lower() for p in map_files(self.maps_dir)}) if self.maps_dir else []
+            names = sorted({p.stem.lower() for p in map_files(maps_dir)}) if maps_dir else []
             return self.send_bytes(json.dumps(names).encode(), 'application/json')
+        worlds = self.worlds()
         if parts == ['chim-world', 'index.json']:
-            return self.send_json(sorted(self.chim_worlds))
-        if len(parts) >= 3 and parts[0] == 'chim-world' and parts[1] in self.chim_worlds:
+            return self.send_json(sorted(worlds))
+        if len(parts) >= 3 and parts[0] == 'chim-world' and parts[1] in worlds:
             # a file of a served CHIM world (the Polycount inspector's ?world=/chim-world/NAME/), never outside it
-            root = self.chim_worlds[parts[1]]
+            root = worlds[parts[1]]
             f = root.joinpath(*parts[2:]).resolve()
             return self.send_file(f) if f.is_relative_to(root) else self.send_error(400)
         from map_files import is_map_name
-        if len(parts) == 2 and parts[0] == 'maps' and is_map_name(parts[1]) and self.maps_dir:
+        if len(parts) == 2 and parts[0] == 'maps' and is_map_name(parts[1]) and maps_dir:
             # a map by name, resolved as the engine does (a frame map's .chim when there is one)
             from map_files import map_file, map_stem
-            return self.send_file(map_file(self.maps_dir, map_stem(parts[1])))
+            return self.send_file(map_file(maps_dir, map_stem(parts[1])))
         self.send_error(404)
 
 
@@ -694,6 +848,10 @@ def main(argv=None):
                    help="a build's chim-world folder, served read-only at /chim-world/NAME/ (repeatable); the Polycount "
                         'inspector opens it with map-inspector.html?world=/chim-world/NAME/ (memory heatmap from its '
                         'chim-heap.json)')
+    p.add_argument('--served-build', type=Path, metavar='DIR',
+                   help="a delivered build's outputs (maps/, chim/, chimi/, SERVED-BUILD.json), or a folder of such copies "
+                        '(the newest is served, and a new one is picked up without a restart): the World Map and the '
+                        'Polycount inspector open it by default')
     p.add_argument('--follow', type=Path, metavar='RECORD',
                    help='follow the newest published line: a JSON record with "head" (a commit of this repository) and '
                         '"working_version"; the Toolkit pages are served from that commit and the pages reload by '
@@ -717,8 +875,11 @@ def main(argv=None):
             p.error('--chim-world wants NAME=DIR with an existing folder: %s' % item)
         worlds[name] = Path(folder).resolve()
     Handler.chim_worlds = worlds
-    if not data and not a.build and not monitor and not a.mesh_cache and not worlds:
-        p.error('give --data DIR or --build DIR (or the Monitor options --builds / --builds-command, or --mesh-cache DIR)')
+    if a.served_build and not a.served_build.is_dir():
+        p.error('--served-build wants an existing folder: %s' % a.served_build)
+    Handler.served_build = a.served_build.resolve() if a.served_build else None
+    if not data and not a.build and not monitor and not a.mesh_cache and not worlds and not a.served_build:
+        p.error('give --data DIR or --build DIR (or --served-build DIR, the Monitor options --builds / --builds-command, or --mesh-cache DIR)')
     if (a.mesh_data_files or a.mesh_docker) and not a.mesh_cache:
         p.error('--mesh-data-files and --mesh-docker need --mesh-cache DIR (where the exports go)')
     if a.mesh_docker and not a.mesh_data_files:
@@ -775,6 +936,10 @@ def main(argv=None):
         print('  Mesh Compare: %samiwind-toolkit/mesh-compare.html  exports: %s%s' %
               (url, Handler.mesh_cache, ' (export on request%s)' % (' in a container' if a.mesh_docker else '')
                if Handler.mesh_exporter else ''), flush=True)
+    if Handler.served_build:
+        root = Handler.build_root(Handler)
+        print('  Served build: %s (%s); the World Map and %samiwind-toolkit/map-inspector.html open it by default' %
+              (served_build_info(root)['label'] if root else 'none yet', Handler.served_build, url), flush=True)
     for name in sorted(worlds):
         print('  CHIM world %s: %samiwind-toolkit/map-inspector.html?world=/chim-world/%s/' % (name, url, name), flush=True)
     if a.open:

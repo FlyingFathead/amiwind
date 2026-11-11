@@ -69,7 +69,8 @@ TOOLS['tiles-budget-placed'] = TOOLS['tiles-placed'] + ['tools/chim/budget_tiles
 # The standing-hull form (--model-hull, mesh_geometry_env.model_hull_mode) changes every big model's hull:
 # a cached unit of one form must never be reused for another (BUILD-CHIM-UNIT-HULL-KEY-33).
 SWITCHES = ('AMIWIND_NO_EMISSIVE', 'AMIWIND_NO_FLAMES', 'AMIWIND_SCENERY_REDUCE', 'AMIWIND_SCENERY_REDUCE_TEXELS',
-            'AMIWIND_TEXINFO_SNAP', 'AMIWIND_STAIR_MITIGATION', 'AMIWIND_MODEL_HULL', 'AMIWIND_LAVA')
+            'AMIWIND_TEXINFO_SNAP', 'AMIWIND_STAIR_MITIGATION', 'AMIWIND_MODEL_HULL', 'AMIWIND_LAVA',
+            'AMIWIND_HOLLOW_BEVELS')   # --chim-hollow-bevels (mesh_geometry_env.hollow_bevels_default)
 _TOOL_HASH = {}
 # Code keys (tools/code_key.py; BUILD-CACHE-CLOSURE-WIDE-33, BUILD-CHIM-CONVERTER-CHANGE-FULL-REBUILD-46): the code
 # part of a unit's key is what its worker can reach, not the whole files of TOOLS: a collision-hull fix in

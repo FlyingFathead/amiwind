@@ -4,7 +4,7 @@
 
 # AmiWind
 
-_Last updated with AmiWind v0.0.64-dev4 (10 November 2026)._
+_Last updated with AmiWind v0.0.64 (11 November 2026)._
 
 An unofficial, experimental RPG engine and enthusiast project bringing Morrowind
 to the Commodore Amiga, featuring CHIM: an AmiQuake-based engine and an asset
@@ -25,42 +25,52 @@ Like community projects such as
 
 More in the [gallery](docs/GALLERY.md).
 
-## Where AmiWind stands (10 November 2026)
+## Where AmiWind stands (11 November 2026)
 
-The development line is **v0.0.64: Gone Beyond The Gate**. Its fourth snapshot,
-[v0.0.64-dev4](docs/releases/notes/RELEASE-v0.0.64-dev4.md), carries the first three. Cobwebs, hanging moss and leaves
-are drawn with their see-through parts instead of solid rectangles, now on by default (`aw_seethrough_material` 0/1/2);
-spell and trap damage meets the target's resistances and weaknesses; the stats page lists the player's factions; the
-journal no longer skips an ending entry; a room load gives back the area cache first; and the groundwork for Solstheim's
-map rows and HUD region names is in, though Solstheim is not playable yet. Race resistances were seen in play on a test
-build; the rest is checked by tests, not yet in play. Not in it yet: the Heart Chamber still does not load at 32 MB, and
-the tree methods are test-only. Its third snapshot,
-[v0.0.64-dev3](docs/releases/notes/RELEASE-v0.0.64-dev3.md), carries the first two (neither was published on its own, so
-it is the first snapshot of v0.0.64 on GitHub). It makes the spells, powers and enchantments of the game take effect again
-(a fault since v0.0.63 left every game spell without its effects), lets the console activate the Ghostgate's switches and
-other objects no script names, stands in lava and kills, keeps god mode across map changes, sorts a quest's state in the
-journal by its endings, shows the game's expulsion message, adds a see-through face pass for cobwebs and hanging growths
-(off by default in dev3, on from dev4), a test-only star-shaped copy of Solstheim's spruces (a forest view goes from 45,964 faces
-at the median to 6,096), and three map panes for the Toolkit's CHIM Progress Tracker. Argonian Breathing, the Ghostgate's
-switches, the door list's arrival lines and lava were checked in play on a test build; the rest is checked by tests, not
-yet in play. Its second snapshot,
-[v0.0.64-dev2](docs/releases/notes/RELEASE-v0.0.64-dev2.md), made trapped doors and containers spring their trap on the
-player as in the original, added a switchable load trace and a memory line per load for the stall on the trip from Seyda
-Neen to Balmora, gave the Toolkit's CHIM Progress Tracker a view for each expansion, and measured the first Solstheim
-frame as a test build. Its first snapshot is
-[v0.0.64-dev1](docs/releases/notes/RELEASE-v0.0.64-dev1.md): the builder can choose which expansions it includes
-(`--dlc tribunal|bloodmoon|both|none`, `--no-dlc`) with the base world's keys independent of them, the Tribunal and
-Bloodmoon files are counted (no expansion area is built yet), the console finds and uses world objects that are not
-characters, scripts cast spells on other characters, and `dbg tp` takes the floor under the feet as its height.
-605 of the 1,207 scripts run, as in v0.0.63.
+The newest release is **v0.0.64: Gone Beyond The Gate**, the release that prepares the road to the two expansion worlds
+and mends what the v0.0.63 checks found ([release notes](docs/releases/notes/RELEASE-v0.0.64.md)). It follows five
+development snapshots ([dev1](docs/releases/notes/RELEASE-v0.0.64-dev1.md),
+[dev2](docs/releases/notes/RELEASE-v0.0.64-dev2.md), [dev3](docs/releases/notes/RELEASE-v0.0.64-dev3.md),
+[dev4](docs/releases/notes/RELEASE-v0.0.64-dev4.md) and [dev5](docs/releases/notes/RELEASE-v0.0.64-dev5.md)), whose work it
+carries. It runs on CHIM Engine v0.2.2 and needs 32 MB of Fast RAM. Its changes were checked by tests, and a few were seen
+in play on test builds (Argonian Breathing, the Ghostgate's switches by id from the console, lava, race resistances, the
+Heart Chamber loaded alone); none is yet seen on the release's own image. **Mournhold and Solstheim are not in the game
+yet:** their worlds, with their scripts, move to the next version.
 
-The newest release is **v0.0.63: Every Script Of Vvardenfell**, the release of the base game's scripting
-([release notes](docs/releases/notes/RELEASE-v0.0.63.md)). It follows five development snapshots
+### Highlights of v0.0.64
+
+- **Spells work again.** A fault since v0.0.63 left every game spell, power and enchantment without its effects (the
+  engine read 32 of the 39 sections of the compiled scripts file); they take effect again, spell and trap damage meets the
+  target's resistances and weaknesses, scrolls are cast from the Magic window, and Argonian Breathing is the race's
+  castable spell.
+- **Traps, switches and lava.** Opening a trapped door, load door or container springs its trap on the player (457 trapped
+  references with 85 spells in the base game); the console activates the Ghostgate's switches by id; lava is stood in and
+  kills; god mode stays on across map changes.
+- **Lighter rooms and fog in large ones.** Hollow models in every room use approximate standing bevels by default (about
+  46 % of the rooms' collision bytes by the builder's estimate, nothing pushed through in a sweep over 934 rooms); large
+  rooms such as the Heart Chamber fade into fog instead of showing blank patches, with their own settings in Options >
+  Video; cobwebs, hanging moss and leaves are drawn see-through, on by default.
+- **The journal and the factions.** A quest's state follows its entries, so an ending finishes it; the stats page lists
+  the player's factions; the expulsion message of a faction shows; the console takes the original journal and faction
+  commands.
+- **The road to Tribunal and Bloodmoon.** The builder chooses its expansion layers (`--dlc tribunal|bloodmoon|both|none`,
+  `--no-dlc`) with the base world's keys independent of them, the two expansions are counted from the game files, and the
+  first Solstheim frame, star-shaped spruces (a forest view goes from 45,964 faces at the median to 6,096) and the
+  island's map rows and region names exist as test builds and groundwork; no expansion area is in the game image.
+- **A builder that converts the world only for a change that reaches it,** makes a Raspberry Pi 4B drive image for test
+  deliveries, and has a load trace and a memory line per load for the stall on the trip from Seyda Neen to Balmora.
+- **The Toolkit and the progress pages** follow the newest build: the
+  [CHIM progress tracker](docs/chim/PROGRESS_TRACKER.md) is written newest first with one pane for Vvardenfell, Solstheim
+  and Mournhold, and the 3D Map Inspector opens CHIM rooms with collision views.
+- **The game's scripts:** 605 of the 1,207 scripts run and 9 more are carried by AmiWind's own code, as in v0.0.63 (27
+  wait for a function, 433 belong to Mournhold and Solstheim, 133 are named by nothing); 7 of the 49 systems of the base
+  game are done, 39 partial, 3 missing ([game features](docs/GAME_FEATURES.md)).
+
+The release before it was **v0.0.63: Every Script Of Vvardenfell**, the release of the base game's scripting
+([release notes](docs/releases/notes/RELEASE-v0.0.63.md)); it followed five development snapshots
 ([dev1](docs/releases/notes/RELEASE-v0.0.63-dev1.md), [dev2](docs/releases/notes/RELEASE-v0.0.63-dev2.md),
 [dev3](docs/releases/notes/RELEASE-v0.0.63-dev3.md), [dev4](docs/releases/notes/RELEASE-v0.0.63-dev4.md) and
-[dev5](docs/releases/notes/RELEASE-v0.0.63-dev5.md)), whose work it carries, with the fixes made after dev5. It runs on
-CHIM Engine v0.2.2 and needs 32 MB of Fast RAM. Its fixes were checked by tests, and a release check on the last
-snapshot was played in the emulator and on a Raspberry Pi 4B; the rest is not yet seen in play.
+[dev5](docs/releases/notes/RELEASE-v0.0.63-dev5.md)). It runs on CHIM Engine v0.2.2 and needs 32 MB of Fast RAM.
 
 ### Highlights of v0.0.63
 
@@ -73,8 +83,8 @@ snapshot was played in the emulator and on a Raspberry Pi 4B; the rest is not ye
   are used: 518 run, 9 are carried and 1 belongs to an add-on, so every script of the base game that the original uses
   runs, except one that Tribunal places (88 are not used). Of Tribunal.esm's 255, 236 are used: 42 run in Vvardenfell, 8
   wait for a function, 186 belong to Mournhold (19 are not used). Of Bloodmoon.esm's 336, 310 are used: 45 run, 20 wait
-  for a function, 245 belong to Solstheim (26 are not used). Mournhold and Solstheim come with the expansions, the goal
-  of the next release. 460 of the original's 504 script functions are carried out, and the original game's console
+  for a function, 245 belong to Solstheim (26 are not used). Mournhold and Solstheim come with the expansions, which
+  are still to come. 460 of the original's 504 script functions are carried out, and the original game's console
   commands work on any reference (`dbg help mw`). Every script with its state:
   [the MWScript tracker](docs/MWSCRIPT_FEATURES.md).
 - **The game's systems, in one table.** 49 systems of the base game with their state and proof: 7 done, 39 partial, 3
@@ -127,18 +137,30 @@ a new game and the falling mage, and its second ([dev2 notes](docs/releases/note
 delivered. v0.0.61 shipped as its third snapshot with the final version number
 ([release notes](docs/releases/notes/RELEASE-v0.0.61.md)).
 
-What comes next is in the [roadmap](docs/ROADMAP.md). The next release is **v0.0.64: Gone Beyond The Gate**
-(its snapshots, [dev1](docs/releases/notes/RELEASE-v0.0.64-dev1.md),
-[dev2](docs/releases/notes/RELEASE-v0.0.64-dev2.md), [dev3](docs/releases/notes/RELEASE-v0.0.64-dev3.md) and [dev4](docs/releases/notes/RELEASE-v0.0.64-dev4.md), have the expansion switch, the keys, the traps and a test-only
-Solstheim frame but no expansion area in the game yet):
+What comes next is in the [roadmap](docs/ROADMAP.md). The next release carries what v0.0.64 did not:
 Tribunal (Mournhold) and Bloodmoon (Solstheim) built in by default where you own them (a warning when the files are
 not found, and a builder switch for the base game only), their scripting, and scripted world events such as the
-Ghostgate's doors and the traps that poison when opened; then the remaining partial systems, among them the rest of the
-crime system (pickpocketing, picking owned locks), enchanting and spellmaking in play, per-area data tables for
-containers, doors, items, activators and creatures, outdoor items that can be picked up, dropped lights with their
-flame, the Constant Effect items of non-player characters, summoned creatures that fight for the player, and the in-game
-check of the pieces not yet seen in play. Items that are in no version's list yet stay in the backlog until they are
-scheduled.
+Ghostgate's doors and the traps of their worlds, with the tree method Solstheim's forests need; then the remaining
+partial systems, among them the rest of the crime system (pickpocketing, picking owned locks), locks on doors, enchanting
+and spellmaking in play, per-area data tables for containers, doors, items, activators and creatures, outdoor items that
+can be picked up, dropped lights with their flame, the Constant Effect items of non-player characters, summoned
+creatures that fight for the player, the shores' saw-tooth steps, and the in-game check of the pieces not yet seen in
+play. No dates are promised. Items that are in no version's list yet stay in the backlog until they are scheduled.
+
+### What v0.0.64 changed
+
+Game spells, powers and enchantments take effect again (a fault since v0.0.63 left them without effects), spell and trap
+damage meets resistances and weaknesses, scrolls are cast from the Magic window; trapped doors and containers spring
+their trap, the console activates the Ghostgate's switches by id, lava kills, god mode survives map changes; a quest's
+state in the journal follows its endings, the stats page lists the player's factions, the console takes the original
+journal and faction commands; hollow models in every room use lighter approximate collision by default, large rooms
+fade into fog with their own Options > Video rows, cobwebs and moss are drawn see-through by default; the builder chooses
+its expansion layers, converts the world only for a change that reaches it and makes a Raspberry Pi 4B drive image;
+Solstheim exists as test builds (a first frame, star-shaped spruces, map rows and region names), not in the game. Known
+limits: Mournhold and Solstheim are not in the game, the Heart Chamber is checked only on a test build of the chamber
+alone and the end of the main quest cannot play, locks on doors and lock picking are not done, the shores run in saw-tooth
+steps, the stall on the trip from Seyda Neen to Balmora is not caught, and the release's changes were checked by tests, not
+yet on its image. Full list: [v0.0.64 release notes](docs/releases/notes/RELEASE-v0.0.64.md).
 
 ### What v0.0.63 changed
 
@@ -280,7 +302,7 @@ The base game's main pieces are finally coming together:
 The good news: the whole thing still takes a reasonable amount of disk space. The sad part: some of it would need
 far too much squeezing to fit a 16 MB expansion. Everything runs so smoothly with 32 MB that 32 MB is the default
 from here on. On today's accelerator cards that is rarely a problem: many of them carry well over 32 MB of Fast
-RAM, and AmiWind puts the extra to use. Most of the island can still be explored with 16 MB: of the base game's 1,134 interiors, the 16
+RAM, and AmiWind puts the extra to use. Most of the island can still be explored with 16 MB: of the 1,134 interiors in the image, the 16
 biggest ask for 32 MB at the door (and 5 region frames at their border), and the rest open as before.
 
 For now the game requires **32 MB of Fast RAM, the safe minimum**, which should be enough for the entire game. More
@@ -326,7 +348,7 @@ front page used to carry are kept in [earlier README sections](docs/README_ARCHI
 
 - **The whole main island is in.** All of Vvardenfell's outdoors, 1,409 exterior cells, is converted and streamed
   as you walk; visit the towns and cities of the main island, such as Seyda Neen, Balmora, Vivec and many others.
-- **Every interior of the base game is in.** 1,132 of the 1,134 are CHIM rooms; the two where the opening sequence
+- **Every interior of Vvardenfell is in.** 1,121 of its 1,123 are CHIM rooms; the two where the opening sequence
   runs (the prison ship and the census office) stay classic room maps on purpose until rooms have object state. The
   people and creatures the game places in a room stand in it with their full set of animations and their own voices.
 - **Every door leads in and back out.** All 3,133 load doors and markers of the base game resolve through one door
@@ -338,15 +360,14 @@ front page used to carry are kept in [earlier README sections](docs/README_ARCHI
   loading, with what you change in the world staying changed; melee combat with the original's rules (damage, armour,
   block, knockdown, knockout, fatigue, death), creatures that walk, run and attack with their own animations, and
   weapons and shields of every type in first and third person;
-  casting spells, with the original's chance, cost and effects, and enchanted items that cast; talking to people
+  casting spells, with the original's chance, cost and effects, scrolls cast from the Magic window, and enchanted items that cast; traps that spring when a trapped door or container is opened; talking to people
   (topics, choices, disposition, persuasion and the services; spoken lines show in a box that leaves the stats visible); containers and the bodies of the dead opened in a strip;
-  crimes seen by a witness bring the guards, with the arrest, the fine and jail; alchemy (making and drinking
-  potions); breath and drowning under water; a torch, a candle, a candlestick or a lantern in the hand
+  crimes seen by a witness bring the guards, with the arrest, the fine and jail; alchemy (making and drinking potions); breath and drowning under water; a torch, a candle, a candlestick or a lantern in the hand
   to explore Vvardenfell at night and underground; mushrooms to pick indoors and out; the original movement speeds;
   weather by region, and music streamed from disk; travel by silt strider, boat, gondola and guild guide.
-- **Not yet:** Mournhold (Tribunal) and Solstheim (Bloodmoon), and with them their scripts (the goal of v0.0.64); the quests played through
-  from start to end in a test; pickpocketing and picking owned locks, trespass,
-  making your own enchantments, the
+- **Not yet:** Mournhold (Tribunal) and Solstheim (Bloodmoon), and with them their scripts (the goal of the next release); the quests played through
+  from start to end in a test; the end of the main quest in the Heart Chamber; pickpocketing and picking owned locks, trespass,
+  making your own enchantments, locks on doors, the
   shot of a bow or a thrown weapon, schedules by the time of day and most of the scripted AI packages, and Dagoth Ur's
   fight and voice. The jail markers are in the door table for the jail system to come. The Unmarked Shipwreck's upper
   trapdoor still keeps the use key out of reach ([v0.0.55 release notes](docs/releases/notes/RELEASE-v0.0.55.md#known-in-this-build)).
@@ -401,8 +422,12 @@ test image of one spot see [MiniWind: the test ground](docs/MINIWIND.md), the
 Everything else about building, the build speed options, the FPU support library and running the image in FS-UAE or
 WinUAE: [Building and playing](docs/BUILDING_AND_PLAYING.md), the [Linux build guide](docs/LINUX_BUILD.md) and the
 [FS-UAE launcher](docs/FS-UAE-LAUNCHER.md). The newest emulator presets are
+[`AmiWind-v0.0.64-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.64-FS-UAE.fs-uae) and
+[`AmiWind-v0.0.64-WinUAE.uae`](resources/emulators/AmiWind-v0.0.64-WinUAE.uae) (for the last snapshot:
+[`AmiWind-v0.0.64-dev5-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.64-dev5-FS-UAE.fs-uae) and
+[`AmiWind-v0.0.64-dev5-WinUAE.uae`](resources/emulators/AmiWind-v0.0.64-dev5-WinUAE.uae); then
 [`AmiWind-v0.0.64-dev4-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.64-dev4-FS-UAE.fs-uae) and
-[`AmiWind-v0.0.64-dev4-WinUAE.uae`](resources/emulators/AmiWind-v0.0.64-dev4-WinUAE.uae) (for the previous snapshot:
+[`AmiWind-v0.0.64-dev4-WinUAE.uae`](resources/emulators/AmiWind-v0.0.64-dev4-WinUAE.uae); then
 [`AmiWind-v0.0.64-dev3-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.64-dev3-FS-UAE.fs-uae) and
 [`AmiWind-v0.0.64-dev3-WinUAE.uae`](resources/emulators/AmiWind-v0.0.64-dev3-WinUAE.uae); then
 [`AmiWind-v0.0.64-dev2-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.64-dev2-FS-UAE.fs-uae) and

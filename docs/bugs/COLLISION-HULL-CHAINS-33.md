@@ -2,10 +2,11 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 2 times; something has to be done
+## PERSISTING: reported 3 times; something has to be done
 
 - Reported with v0.0.42-dev2 at 2026-10-17 12:03 +0300: CHIMport run 17 Oct: 14 cells stay hull policy pending (one model over the chain limit each, depth 285-1,624), all else passing
 - Reported with v0.0.64-dev3 at 2026-11-10 20:29 +0200: Collision census of the v0.0.64-dev3 build: in_mudcave_21, in_moldcave_21, in_pycave_21 and in_lavacave_21 have 27,950 clipnodes for 1,077 faces and a deepest chain of 27,950 (the whole hull is one chain: a trace can walk every clipnode), collision / drawing bytes 2.98; the Heart Chamber cave tiles (in_akulacave00) show the same, about 26 clipnodes per face, ratio 2.93 to 2.96. Costs frame time as well as memory (tools/collision_census.py).
+- Reported with v0.0.64-dev4 at 2026-11-11 00:49 +0200: Measured on 10 sample models (v0.0.63 release scenery exports): as chains, the cave, arena and Vivec shell pieces have trees 27,950 to more than 32,768 clipnodes deep. The auto tree form makes the worst trace 5 to 6 times shorter for 0.3 to 1.1 % more collision bytes; routed makes it 8 to 17 times shorter for 7 to 30 % more. A standing-box sweep finds the same solid space in every form (nothing pushed through, nothing blocked). auto becomes the default tree form in the planned rebuild. The large rooms still need 1,600 to 7,000 clipnodes in the worst trace, so a better router is a separate task. The census read child links as signed numbers and capped chains at 32,768; it reads them unsigned now.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -29,7 +30,7 @@ _Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
 - [Status: 9 October 2026](#status-9-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -238,6 +239,7 @@ Family: Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collisi
 - [CHIM-VIVEC-DOCK-WALKWAY-43](CHIM-VIVEC-DOCK-WALKWAY-43.md): The player cannot climb the walkway at the Vivec Hlaalu canton dock and gets stuck
 - [CHIM-VOS-TEMPLE-WALKWAY-41](CHIM-VOS-TEMPLE-WALKWAY-41.md): Vos walkway stair starts inside the Velothi temple's collision and fails the stair gate
 - [COLLISION-CONVEX-LOSS-32](COLLISION-CONVEX-LOSS-32.md): Convex collision proxies lose and invent authored surfaces
+- [COLLISION-DISPARITY-WORLDWIDE-64](COLLISION-DISPARITY-WORLDWIDE-64.md): Collision data is far larger and deeper than the drawn meshes across the game
 - [COLLISION-NC-FLAGS-32](COLLISION-NC-FLAGS-32.md): Morrowind no-collision and editor-marker flags (NC, NCC, MRK, AvoidNode) are ignored by the mesh converters
 - [COLLISION-RCN-SCOPE-32](COLLISION-RCN-SCOPE-32.md): Authored collision meshes (RootCollisionNode) are used by some converters only
 - [COLLISION-ROUTE-NO-SPLIT-36](COLLISION-ROUTE-NO-SPLIT-36.md): Routed standing hulls of dense flora (kelp, kreshweed) stay one chain 277-305 clipnodes deep: the router finds no cut, so the cell stays hull-pending

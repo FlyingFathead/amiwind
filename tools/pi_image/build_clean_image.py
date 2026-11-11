@@ -13,10 +13,12 @@ Amiberry with its libraries is installed on the Pi itself at the first start, fr
 The image: Raspberry Pi OS Lite (64-bit) as published, its root file system grown for the libraries, plus a FAT32
 drive labelled AMIWIND with the AmiWind image and README-FIRST.txt. No Kickstart, no keys, no password, no SSH, no
 wifi, no user account until the first start makes `amiwind` (locked, no sudo). The finished image is checked by
-tools/pi_image/scrub_check.py before it is zipped; a failed check leaves no ZIP.
+tools/pi_image/scrub_check.py before it is packed; a failed check leaves no package. The package is a ZIP of
+README-FIRST.txt and the one complete .img (AmiWind-v<V>-pi4b-image.zip); --pack xz writes AmiWind-v<V>-pi4b-image.img.xz
+with multi-threaded xz instead.
 
 The system half (boot drive + root file system) is cached under --cache by the SHA-256 of inputs.json and of this
-folder's files, so a new AmiWind build only writes the AMIWIND drive and the ZIP.
+folder's files, so a new AmiWind build only writes the AMIWIND drive and the package.
 """
 import argparse
 import concurrent.futures
@@ -44,6 +46,8 @@ DATA_SLACK_MIB = 512          # room on AMIWIND for kick.rom and a second image 
 IDE_CYLINDER = 516096
 CMDLINE_ADD = ['quiet', 'loglevel=3', 'logo.nologo', 'vt.global_cursor_default=0', 'video=HDMI-A-1:720x576@50']
 CONFIG_ADD = '\n[all]\n# AmiWind clean image: no splash, the hardware watchdog on (stock clock; README-FIRST.txt)\ndisable_splash=1\ndtparam=watchdog=on\n'
+SLIM_README = (b'\nTHIS IS THE SLIM IMAGE: it has no AmiWind game disk. Before the first start, copy AmiWind-v%(v)s.hdf\n'
+               b'out of the AmiWind playtest ZIP onto the AMIWIND drive (beside kick.rom).\n')
 INSTALL = [  # (file in clean/, path in the image, mode)
     ('amiwind-firstboot', '/usr/local/sbin/amiwind-firstboot', 0o100755),
     ('amiwind-start', '/usr/local/bin/amiwind-start', 0o100755),
@@ -264,42 +268,62 @@ def build(a):
     name = 'AmiWind-v%s-Pi4B.img' % a.version
     img = work / name
     readme = (HERE / 'clean' / 'README-FIRST.txt').read_bytes()
+    if a.pi_image == 'slim':
+        readme += SLIM_README.replace(b'%(v)s', a.version.encode())
     p2end = meta['p2']['start'] + meta['p2']['sectors']
     p3start = (p2end + 2047) // 2048 * 2048
+    # the same AMIWIND size for both variants: on slim there is room for the game disk the player copies on
     p3mib = (hdf.stat().st_size + len(readme)) // MIB + DATA_SLACK_MIB
     p3sectors = p3mib * MIB // SECTOR
+    payload = [('README-FIRST.txt', len(readme), readme)]
+    if a.pi_image == 'full':
+        payload.insert(0, ('AmiWind-v%s.hdf' % a.version, hdf.stat().st_size, str(hdf)))
     with open(img, 'wb') as f:
         copy_range(base, f, 0, base.stat().st_size, Ticker('system half'))
         f.write(b'\x00' * ((p3start - p2end) * SECTOR))
-        info = fatfs.write_fat32(f, p3start * SECTOR, p3sectors, 'AMIWIND',
-                                 [('AmiWind-v%s.hdf' % a.version, hdf.stat().st_size, str(hdf)),
-                                  ('README-FIRST.txt', len(readme), readme)],
+        info = fatfs.write_fat32(f, p3start * SECTOR, p3sectors, 'AMIWIND', payload,
                                  hidden=p3start, progress=Ticker('AMIWIND drive'))
         set_mbr_part(f, 3, 0x0C, p3start, p3sectors)
     say('  image %s: %d MiB (AMIWIND %d MiB, %d clusters)' % (name, img.stat().st_size // MIB, p3mib, info['clusters']))
     say('=== PHASE 4/5: scrub check')
     receipt = scrub_check.check_image(img, base_meta=meta, spec=spec, downloads=downloads, hdf_sha=hdf_sha,
-                                      version=a.version, extra_words=a.extra_words, work=work / 'scrub', jobs=a.jobs)
-    receipt.update({'version': a.version, 'image': name, 'image_bytes': img.stat().st_size, 'hdf_sha256': hdf_sha,
+                                      version=a.version, extra_words=a.extra_words, work=work / 'scrub', jobs=a.jobs,
+                                      variant=a.pi_image)
+    receipt.update({'version': a.version, 'variant': a.pi_image, 'image': name, 'image_bytes': img.stat().st_size, 'hdf_sha256': hdf_sha,
                     'system_key': meta['key'], 'os_sha256': meta['os_sha256'], 'cmdline': meta['cmdline'],
                     'boot_check': 'pending'})
-    rpath = out / 'PI-IMAGE-RECEIPT.json'
+    tail = '' if a.pi_image == 'full' else '-slim'
+    rpath = out / ('PI-IMAGE-RECEIPT%s.json' % tail)
     if receipt['result'] != 'PASS':
         rpath.write_text(json.dumps(receipt, indent=1), encoding='utf-8', newline='\n')
         img.unlink()
-        raise SystemExit('scrub check FAILED: %s (receipt %s; no ZIP written)' % ('; '.join(receipt['failures'][:10]), rpath))
+        raise SystemExit('scrub check FAILED: %s (receipt %s; no package written)' % ('; '.join(receipt['failures'][:10]), rpath))
     say('  scrub PASS: %d changes against the plain OS, all on the allowlist' % len(receipt['changes']))
-    say('=== PHASE 5/5: ZIP')
-    zpath = out / ('AmiWind-v%s-pi4b-image.zip' % a.version)
-    tmpz = zpath.with_suffix('.zip.part')
     receipt['image_sha256'] = sha256(img)
-    with zipfile.ZipFile(tmpz, 'w', zipfile.ZIP_DEFLATED, compresslevel=6, allowZip64=True) as z:
-        z.writestr('README-FIRST.txt', readme)
-        z.write(img, name)
+    tx = time.time()
+    if a.pack == 'zip':
+        # the default package: README-FIRST.txt + the one complete .img in a ZIP (one core)
+        say('=== PHASE 5/5: ZIP')
+        zpath = out / ('AmiWind-v%s-pi4b-image%s.zip' % (a.version, tail))
+        tmpz = out / (zpath.name + '.part')
+        with zipfile.ZipFile(tmpz, 'w', zipfile.ZIP_DEFLATED, compresslevel=6, allowZip64=True) as z:
+            z.writestr('README-FIRST.txt', readme)
+            z.write(img, name)
+    else:
+        # a builder option only: the image as .img.xz (multi-threaded xz)
+        say('=== PHASE 5/5: xz (%d threads)' % a.jobs)
+        zpath = out / ('AmiWind-v%s-pi4b-image%s.img.xz' % (a.version, tail))
+        tmpz = out / (zpath.name + '.part')
+        with open(tmpz, 'wb') as z:
+            r = subprocess.run(['xz', '-z', '-c', '-6', '-T%d' % a.jobs, '--block-size=64MiB', str(img)], stdout=z)
+        if r.returncode:
+            tmpz.unlink()
+            raise SystemExit('xz failed (exit %d)' % r.returncode)
     os.replace(tmpz, zpath)
+    receipt['pack_seconds'] = round(time.time() - tx)
     zsha = sha256(zpath)
     (out / (zpath.name + '.sha256')).write_text('%s  %s\n' % (zsha, zpath.name), encoding='utf-8', newline='\n')
-    receipt.update({'zip': zpath.name, 'zip_bytes': zpath.stat().st_size, 'zip_sha256': zsha,
+    receipt.update({'package': zpath.name, 'package_bytes': zpath.stat().st_size, 'package_sha256': zsha,
                     'seconds': round(time.time() - t0)})
     rpath.write_text(json.dumps(receipt, indent=1), encoding='utf-8', newline='\n')
     img.unlink()
@@ -330,6 +354,11 @@ def main(argv=None):
     b.add_argument('--work')
     b.add_argument('--cache')
     b.add_argument('--jobs', type=int, default=8)
+    b.add_argument('--pi-image', choices=('full', 'slim'), default='full',
+                   help='full (default): the complete image with the game disk on AMIWIND; slim: the same image without '
+                        'it (the player copies AmiWind-v<V>.hdf from the playtest ZIP onto AMIWIND)')
+    b.add_argument('--pack', choices=('zip', 'xz'), default='zip',
+                   help='zip (default): README + .img in a ZIP; xz: the .img as .img.xz')
     b.add_argument('--extra-words', help='file of private words the image must not contain (one per line)')
     i = sub.add_parser('inputs')
     i.add_argument('--downloads', required=True)
